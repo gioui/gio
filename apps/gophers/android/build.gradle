@@ -1,0 +1,32 @@
+buildscript {
+    repositories {
+		google()
+		jcenter()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:3.3.1'
+    }
+}
+
+apply plugin: 'com.android.application'
+
+android {
+    buildToolsVersion "28.0.3"
+    compileSdkVersion 27
+
+	defaultConfig {
+		targetSdkVersion 27
+		minSdkVersion 16
+		versionCode 1
+		versionName "0.1"
+	}
+}
+
+dependencies {
+	implementation fileTree(dir: '.', include: ['*.aar'])
+}
+
+repositories {
+	google()
+	jcenter()
+}

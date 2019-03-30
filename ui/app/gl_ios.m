@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: Unlicense OR MIT
+
+//+build darwin,ios
+
+@import UIKit;
+@import OpenGLES;
+
+#include "gl_ios.h"
+
+int gio_renderbufferStorage(CFTypeRef ctxRef, CFTypeRef layerRef, GLenum buffer) {
+	EAGLContext *ctx = (__bridge EAGLContext *)ctxRef;
+	CAEAGLLayer *layer = (__bridge CAEAGLLayer *)layerRef;
+	return (int)[ctx renderbufferStorage:buffer fromDrawable:layer];
+}
+
+int gio_presentRenderbuffer(CFTypeRef ctxRef, GLenum buffer) {
+	EAGLContext *ctx = (__bridge EAGLContext *)ctxRef;
+	return (int)[ctx presentRenderbuffer:buffer];
+}
+
+int gio_makeCurrent(CFTypeRef ctxRef) {
+	EAGLContext *ctx = (__bridge EAGLContext *)ctxRef;
+	return (int)[EAGLContext setCurrentContext:ctx];
+}
+
+CFTypeRef gio_createContext(void) {
+	EAGLContext *ctx = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES3];
+	if (ctx == nil) {
+		return nil;
+	}
+	return CFBridgingRetain(ctx);
+}
+
+CFTypeRef gio_createGLLayer() {
+	CAEAGLLayer *layer = [[CAEAGLLayer layer] init];
+	if (layer == nil) {
+		return nil;
+	}
+	layer.drawableProperties = @{kEAGLDrawablePropertyColorFormat: kEAGLColorFormatSRGBA8};
+	//layer.presentsWithTransaction = YES;
+	layer.opaque = YES;
+	layer.anchorPoint = CGPointMake(0, 0);
+	return CFBridgingRetain(layer);
+}
