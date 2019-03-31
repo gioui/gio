@@ -2,6 +2,8 @@
 
 package main
 
+// A simple Gio program. See https://gioui.org for more information.
+
 import (
 	"image"
 	"image/color"

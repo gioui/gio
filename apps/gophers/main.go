@@ -2,6 +2,8 @@
 
 package main
 
+// A Gio program that displays Go contributors from GitHub. See https://gioui.org for more information.
+
 import (
 	"context"
 	"flag"
