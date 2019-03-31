@@ -60,6 +60,8 @@ outputs Gophers.framework with the demo program built for iOS. For tvOS, use `-t
 
 	$ go run gioui.org/cmd/gio -target tvos gioui.org/apps/gophers
 
+tvOS requires Go 1.13.
+
 To run the demo on an iOS device, use the sample Xcode project:
 
 	$ git clone https://git.sr.ht/~eliasnaur/gio
@@ -68,7 +70,7 @@ To run the demo on an iOS device, use the sample Xcode project:
 	$ open gophers/ios/gophers.xcodeproj/
 
 You need to provide a valid bundle identifier and set up code signing in Xcode to run the demo
-on a device.
+on a device. If you're using Go 1.12 or older, you also need to disable bitcode.
 
 ## License
 
