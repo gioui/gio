@@ -16,7 +16,7 @@ development packages.
 Xcode is required for macOS, iOS, tvOS.
 
 For Windows you need the ANGLE drivers for emulating OpenGL ES. You can build ANGLE yourself or use
-[mine](https://drive.google.com/file/d/1k2950mHNtR2iwhweHS1rJ7reChTa3rki/view?usp=sharing).
+[a prebuilt version](https://drive.google.com/file/d/1k2950mHNtR2iwhweHS1rJ7reChTa3rki/view?usp=sharing).
 
 With Go 1.12 or newer,
 
@@ -29,11 +29,11 @@ The command
 
 	$ go run gioui.org/apps/gophers
 
-should display a simple (nonsense) demo that displays Go contributors fetched from GitHub.
+runs a simple (nonsense) demo that displays Go contributors fetched from GitHub.
 
 If you run into quota issues, supply a
 [Github token](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line)
-with the `-token`flag:
+with the `-token` flag:
 
 	$ go run gioui.org/apps/gophers -token <github token>
 
@@ -44,9 +44,10 @@ directory.
 
 To build a Gio program as an .aar package, use the gio tool. For example,
 
+	$ export ANDROID_HOME=...
 	$ go run gioui.org/cmd/gio -target android gioui.org/apps/gophers
 
-to produce gophers.aar, ready to use in an Android project. To run
+produces gophers.aar, ready to use in an Android project. To run
 the demo on an Android device:
 
 	$ git clone https://git.sr.ht/~eliasnaur/gio
@@ -70,7 +71,7 @@ outputs Gophers.framework with the demo program built for iOS. For tvOS, use `-t
 
 	$ go run gioui.org/cmd/gio -target tvos gioui.org/apps/gophers
 
-tvOS requires Go 1.13.
+Building for tvOS requires Go 1.13.
 
 To run the demo on an iOS device, use the sample Xcode project:
 
@@ -93,7 +94,7 @@ Discussion and patches: [~eliasnaur/gio-dev@lists.sr.ht](mailto:~eliasnaur/gio-d
 
 Contributors must agree to the [developer certificate og origin](https://developercertificate.org/),
 to ensure their work is compatible with the MIT and the UNLICENSE. Sign your commits with Signed-off-by
-statements to show your agreement. For convenience, the `git commit --sign` signs a commit with the
-name and email from your `user.name` and `user.email` settings.
+statements to show your agreement. The `git commit --sign` signs a commit with the name and email from
+your `user.name` and `user.email` settings.
 
-Bugs and TODOs go in the [issue tracker](https://todo.sr.ht/~eliasnaur/gio).
+File bugs and TODOs in the [issue tracker](https://todo.sr.ht/~eliasnaur/gio).
