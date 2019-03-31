@@ -34,7 +34,7 @@ func vanityHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.URL.Path {
 	case "/":
-		http.Redirect(w, r, "https://git.sr.ht/~eliasnaur/gio-ui", http.StatusFound)
+		http.Redirect(w, r, "https://git.sr.ht/~eliasnaur/gio", http.StatusFound)
 	default:
 		http.NotFound(w, r)
 	}
