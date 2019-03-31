@@ -122,7 +122,7 @@ func main() {
 	err := app.CreateWindow(app.WindowOptions{
 		Width:  ui.Dp(400),
 		Height: ui.Dp(800),
-		Title:  "Gopher Chat",
+		Title:  "Gophers",
 	})
 	if err != nil {
 		log.Fatal(err)
