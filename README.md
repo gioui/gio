@@ -11,7 +11,7 @@ window management, input and GPU drawing.
 For Linux you need Wayland and the `wayland-client`, `wayland-egl`, `wayland-cursor`, and `xkbcommon`
 development packages.
 
-Xcode is required for macOS and iOS.
+Xcode is required for macOS, iOS, tvOS.
 
 For Windows you need the ANGLE drivers for emulating OpenGL ES. You can build ANGLE yourself or use
 [mine](https://drive.google.com/file/d/1k2950mHNtR2iwhweHS1rJ7reChTa3rki/view?usp=sharing).
@@ -42,6 +42,28 @@ the demo on an Android device:
 The gio tool passes command line arguments to os.Args at runtime:
 
 	$ go run gioui.org/cmd/gio -target android .. -token <github token>
+
+## iOS/tvOS
+
+To build a Gio program for iOS or tvOS you need a macOS machine with Xcode installed.
+
+The gio tool can produce a framework ready to include in an Xcode project. For example,
+
+	$ go run gioui.org/cmd/gio -target ios gioui.org/apps/gophers
+
+outputs Gophers.framework with the demo program built for iOS. For tvOS, use `-target tvos`:
+
+	$ go run gioui.org/cmd/gio -target tvos gioui.org/apps/gophers
+
+To run the demo on an iOS device, use the sample Xcode project:
+
+	$ git clone https://git.sr.ht/~eliasnaur/gio
+	$ cd gio/apps
+	$ go run gioui.org/cmd/gio -target ios -o gophers/ios/gophers/Gophers.framework ./gophers
+	$ open gophers/ios/gophers.xcodeproj/
+
+You need to provide a valid bundle identifier and set up code signing in Xcode to run the demo
+on a device.
 
 ## License
 
