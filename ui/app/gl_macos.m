@@ -57,6 +57,7 @@ CVDisplayLinkRef displayLink;
 	CVDisplayLinkSetCurrentCGDisplay(displayLink, dispID);
 }
 - (void)prepareOpenGL {
+	[super prepareOpenGL];
 	// Bind a default VBA to emulate OpenGL ES 2.
 	GLuint defVBA;
 	glGenVertexArrays(1, &defVBA);
