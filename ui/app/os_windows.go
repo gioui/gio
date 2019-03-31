@@ -13,10 +13,10 @@ import (
 
 	syscall "golang.org/x/sys/windows"
 
+	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
-	"gioui.org/ui"
 )
 
 var winMap = make(map[syscall.Handle]*window)
@@ -157,34 +157,37 @@ func Main() {
 	<-mainDone
 }
 
-func createWindow(opts WindowOptions) error {
+func createWindow(opts WindowOptions) (*Window, error) {
 	onceMu.Lock()
 	defer onceMu.Unlock()
 	if len(winMap) > 0 {
 		panic("multiple windows are not supported")
 	}
-	cerr := make(chan error, 1)
+	type windowError struct {
+		window *Window
+		err    error
+	}
+	cerr := make(chan windowError)
 	go func() {
 		// Call win32 API from a single OS thread.
 		runtime.LockOSThread()
 		w, err := createNativeWindow(opts)
 		if err != nil {
-			cerr <- err
+			cerr <- windowError{err: err}
 			return
 		}
 		defer w.destroy()
-		cerr <- nil
-		windows <- w.w
+		cerr <- windowError{w.w, nil}
 		showWindow(w.hwnd, _SW_SHOWDEFAULT)
 		setForegroundWindow(w.hwnd)
 		setFocus(w.hwnd)
 		if err := w.loop(); err != nil {
 			panic(err)
 		}
-		close(windows)
 		close(mainDone)
 	}()
-	return <-cerr
+	werr := <-cerr
+	return werr.window, werr.err
 }
 
 func createNativeWindow(opts WindowOptions) (*window, error) {

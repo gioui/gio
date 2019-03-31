@@ -22,10 +22,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
-	"gioui.org/ui"
 )
 
 type window struct {
@@ -41,6 +41,8 @@ type window struct {
 var layerFactory func() uintptr
 
 var views = make(map[C.CFTypeRef]*window)
+
+var windows = make(chan *Window)
 
 func init() {
 	// Darwin requires UI operations happen on the main thread only.
@@ -233,8 +235,8 @@ func (w *window) setTextInput(s key.TextInputState) {
 	}
 }
 
-func createWindow(opts WindowOptions) error {
-	panic("unsupported")
+func createWindow(opts WindowOptions) (*Window, error) {
+	return <-windows, nil
 }
 
 func Main() {

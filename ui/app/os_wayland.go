@@ -141,30 +141,28 @@ func Main() {
 	<-mainDone
 }
 
-func createWindow(opts WindowOptions) error {
+func createWindow(opts WindowOptions) (*Window, error) {
 	connMu.Lock()
 	defer connMu.Unlock()
 	if len(winMap) > 0 {
 		panic("multiple windows are not supported")
 	}
 	if err := waylandConnect(); err != nil {
-		return err
+		return nil, err
 	}
 	w, err := createNativeWindow(opts)
 	if err != nil {
 		conn.destroy()
-		return err
+		return nil, err
 	}
 	go func() {
-		windows <- w.w
 		w.setStage(StageVisible)
 		w.loop()
 		w.destroy()
 		conn.destroy()
-		close(windows)
 		close(mainDone)
 	}()
-	return nil
+	return w.w, nil
 }
 
 func createNativeWindow(opts WindowOptions) (*window, error) {

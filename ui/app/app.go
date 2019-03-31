@@ -59,17 +59,16 @@ const (
 // Set it with the go tool linker flag -X.
 var extraArgs string
 
-var windows = make(chan *Window)
-
-func CreateWindow(opts WindowOptions) error {
+// NewWindow creates a new window for a set of window
+// options. The options are hints; the platform is free to
+// ignore or adjust them.
+// If the current program is running on iOS and Android,
+// NewWindow the window previously created by the platform.
+func NewWindow(opts WindowOptions) (*Window, error) {
 	if opts.Width.V <= 0 || opts.Height.V <= 0 {
 		panic("window width and height must be larger than 0")
 	}
 	return createWindow(opts)
-}
-
-func Windows() <-chan *Window {
-	return windows
 }
 
 func (l Stage) String() string {
