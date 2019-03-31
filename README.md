@@ -3,6 +3,10 @@
 Gio implements portable immediate mode GUI programs in Go. Gio programs run on all the major platforms:
 iOS/tvOS, Android, Linux (Wayland), macOS and Windows.
 
+Gio includes an efficient vector renderer based on the Pathfinder project (https://github.com/pcwalton/pathfinder).
+Text and other shapes are rendered using only their outlines without baking them into texture images,
+to support efficient animations, transformed drawing and pixel resolution independence.
+
 [![GoDoc](https://godoc.org/gioui.org/ui?status.svg)](https://godoc.org/gioui.org/ui)
 
 ## Quickstart
@@ -71,7 +75,7 @@ outputs Gophers.framework with the demo program built for iOS. For tvOS, use `-t
 
 	$ go run gioui.org/cmd/gio -target tvos gioui.org/apps/gophers
 
-Building for tvOS requires Go 1.13.
+Building for tvOS requires (the not yet released) Go 1.13.
 
 To run the demo on an iOS device, use the sample Xcode project:
 
