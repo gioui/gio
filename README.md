@@ -3,7 +3,7 @@
 Gio implements portable immediate mode GUI programs in Go. Gio programs run on all the major platforms:
 iOS/tvOS, Android, Linux (Wayland), macOS and Windows.
 
-[![GoDoc](https://godoc.org/gioui.org/ui/app?status.svg)](https://godoc.org/gioui.org/ui/app)
+[![GoDoc](https://godoc.org/gioui.org/ui?status.svg)](https://godoc.org/gioui.org/ui)
 
 ## Quickstart
 
