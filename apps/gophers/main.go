@@ -423,7 +423,8 @@ func (up *userPage) fetchCommits() {
 			Author: up.user.login,
 		})
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("failed to fetch commits: %v", err)
+			return
 		}
 		var commits []*github.Commit
 		for _, commit := range repoCommits {
