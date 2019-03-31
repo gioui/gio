@@ -18,9 +18,13 @@ import (
 )
 
 func main() {
+	// Never called on mobile, blocks forever on
+	// desktop.
 	app.Main()
 }
 
+// On iOS and Android main will never be called, so
+// setting up the window must run in an init function.
 func init() {
 	regular, err := sfnt.Parse(goregular.TTF)
 	if err != nil {
@@ -29,6 +33,8 @@ func init() {
 	var faces measure.Faces
 	black := &image.Uniform{color.Black}
 	face := faces.For(regular, ui.Dp(50))
+	// On iOS and Android app.NewWindow blocks, waiting
+	// for the platform to create a window.
 	go func() {
 		w, err := app.NewWindow(nil)
 		if err != nil {
