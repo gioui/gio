@@ -56,12 +56,14 @@ func main() {
 		os.Exit(2)
 	}
 	// Expand relative package paths.
-	out, err := exec.Command("go", "list", pkg).CombinedOutput()
-	out = bytes.TrimSpace(out)
+	out, err := exec.Command("go", "list", pkg).Output()
 	if err != nil {
-		errorf("gio: %s", out)
+		if err, ok := err.(*exec.ExitError); ok {
+			errorf("gio: %s", bytes.TrimSpace(err.Stderr))
+		}
+		errorf("gio: failed to run the go tool: %v", err)
 	}
-	pkg = string(out)
+	pkg = string(bytes.TrimSpace(out))
 	appArgs := flag.Args()[1:]
 	if err := run(pkg, appArgs); err != nil {
 		errorf("gio: %v", err)
