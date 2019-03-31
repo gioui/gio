@@ -21,10 +21,18 @@ For Windows you need the ANGLE drivers for emulating OpenGL ES. You can build AN
 With Go 1.12 or newer,
 
 	$ export GO111MODULE=on
+	$ go run gioui.org/apps/hello
+
+should display a simple message in a window.
+
+The command
+
 	$ go run gioui.org/apps/gophers
 
-should display a simple (nonsense) demo that displays Go contributors fetched from GitHub. If you run
-into quota issues, supply a [Github token](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line)
+should display a simple (nonsense) demo that displays Go contributors fetched from GitHub.
+
+If you run into quota issues, supply a
+[Github token](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line)
 with the `-token`flag:
 
 	$ go run gioui.org/apps/gophers -token <github token>
