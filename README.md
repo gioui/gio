@@ -94,7 +94,7 @@ Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
 ## Contributing
 
 Discussion and patches: [~eliasnaur/gio-dev@lists.sr.ht](mailto:~eliasnaur/gio-dev@lists.sr.ht).
-[Instructions](https://man.sr.ht/git.sr.ht/send-email.md). for using git-send-email for sending patches.
+[Instructions](https://man.sr.ht/git.sr.ht/send-email.md) for using git-send-email for sending patches.
 
 Contributors must agree to the [developer certificate og origin](https://developercertificate.org/),
 to ensure their work is compatible with the MIT and the UNLICENSE. Sign your commits with Signed-off-by
