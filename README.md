@@ -18,6 +18,7 @@ For Windows you need the ANGLE drivers for emulating OpenGL ES. You can build AN
 
 With Go 1.12 or newer,
 
+	$ export GO111MODULE=on
 	$ go run gioui.org/apps/gophers
 
 should display a simple (nonsense) demo.
