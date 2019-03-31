@@ -235,7 +235,7 @@ func (w *window) setTextInput(s key.TextInputState) {
 	}
 }
 
-func createWindow(opts WindowOptions) (*Window, error) {
+func createWindow(opts *WindowOptions) (*Window, error) {
 	return <-windows, nil
 }
 

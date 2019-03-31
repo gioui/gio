@@ -381,6 +381,6 @@ func Main() {
 	panic("unreachable")
 }
 
-func createWindow(opts WindowOptions) (*Window, error) {
-	return <- windows, nil
+func createWindow(opts *WindowOptions) (*Window, error) {
+	return <-windows, nil
 }

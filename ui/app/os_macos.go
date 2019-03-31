@@ -40,7 +40,7 @@ type windowError struct {
 	err    error
 }
 
-var windowOpts = make(chan WindowOptions)
+var windowOpts = make(chan *WindowOptions)
 
 var windows = make(chan windowError)
 
@@ -188,7 +188,7 @@ func gio_onCreate(view C.CFTypeRef) {
 	windows <- windowError{window: ow}
 }
 
-func createWindow(opts WindowOptions) (*Window, error) {
+func createWindow(opts *WindowOptions) (*Window, error) {
 	windowOpts <- opts
 	werr := <-windows
 	return werr.window, werr.err

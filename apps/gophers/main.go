@@ -139,7 +139,7 @@ func init() {
 	fonts.italic = mustLoadFont(goitalic.TTF)
 	fonts.mono = mustLoadFont(gomono.TTF)
 	go func() {
-		w, err := app.NewWindow(app.WindowOptions{
+		w, err := app.NewWindow(&app.WindowOptions{
 			Width:  ui.Dp(400),
 			Height: ui.Dp(800),
 			Title:  "Gophers",

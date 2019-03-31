@@ -30,11 +30,7 @@ func init() {
 	black := &image.Uniform{color.Black}
 	face := faces.For(regular, ui.Dp(50))
 	go func() {
-		w, err := app.NewWindow(app.WindowOptions{
-			Width:  ui.Dp(400),
-			Height: ui.Dp(800),
-			Title:  "Hello World",
-		})
+		w, err := app.NewWindow(nil)
 		if err != nil {
 			log.Fatal(err)
 		}

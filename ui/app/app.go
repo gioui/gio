@@ -64,7 +64,14 @@ var extraArgs string
 // ignore or adjust them.
 // If the current program is running on iOS and Android,
 // NewWindow the window previously created by the platform.
-func NewWindow(opts WindowOptions) (*Window, error) {
+func NewWindow(opts *WindowOptions) (*Window, error) {
+	if opts == nil {
+		opts = &WindowOptions{
+			Width:  ui.Dp(800),
+			Height: ui.Dp(600),
+			Title:  "Gio program",
+		}
+	}
 	if opts.Width.V <= 0 || opts.Height.V <= 0 {
 		panic("window width and height must be larger than 0")
 	}

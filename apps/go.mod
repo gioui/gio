@@ -2,8 +2,6 @@ module gioui.org/apps
 
 go 1.12
 
-replace gioui.org/ui => ../ui
-
 require (
 	gioui.org/ui v0.0.0-20190331090026-ca5204fcb8b3
 	github.com/google/go-github/v24 v24.0.1
