@@ -9,16 +9,12 @@
 /* Begin PBXBuildFile section */
 		644702662225DDD70022507C /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 644702652225DDD70022507C /* main.m */; };
 		6447028A2225E97B0022507C /* Gophers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 644702892225E97B0022507C /* Gophers.framework */; };
-		64CCFF572121A32B00B48E05 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 64CCFF562121A32B00B48E05 /* Assets.xcassets */; };
-		64CCFF5A2121A32B00B48E05 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 64CCFF582121A32B00B48E05 /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		644702652225DDD70022507C /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		644702892225E97B0022507C /* Gophers.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Gophers.framework; path = gophers/Gophers.framework; sourceTree = "<group>"; };
 		64CCFF432121A32800B48E05 /* gophers.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = gophers.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		64CCFF562121A32B00B48E05 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		64CCFF592121A32B00B48E05 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		64CCFF5B2121A32B00B48E05 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -54,8 +50,6 @@
 		64CCFF452121A32800B48E05 /* gophers */ = {
 			isa = PBXGroup;
 			children = (
-				64CCFF562121A32B00B48E05 /* Assets.xcassets */,
-				64CCFF582121A32B00B48E05 /* LaunchScreen.storyboard */,
 				64CCFF5B2121A32B00B48E05 /* Info.plist */,
 				644702652225DDD70022507C /* main.m */,
 			);
@@ -119,8 +113,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				64CCFF572121A32B00B48E05 /* Assets.xcassets in Resources */,
-				64CCFF5A2121A32B00B48E05 /* LaunchScreen.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -136,17 +128,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXVariantGroup section */
-		64CCFF582121A32B00B48E05 /* LaunchScreen.storyboard */ = {
-			isa = PBXVariantGroup;
-			children = (
-				64CCFF592121A32B00B48E05 /* Base */,
-			);
-			name = LaunchScreen.storyboard;
-			sourceTree = "<group>";
-		};
-/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		64CCFF5E2121A32B00B48E05 /* Debug */ = {
@@ -264,7 +245,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 9NFTYP4MQ3;
+				DEVELOPMENT_TEAM = "";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/gophers",
@@ -275,7 +256,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.eliasnaur.gophers;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -286,7 +266,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 9NFTYP4MQ3;
+				DEVELOPMENT_TEAM = "";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/gophers",
@@ -297,7 +277,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.eliasnaur.gophers;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
