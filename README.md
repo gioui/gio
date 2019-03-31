@@ -21,7 +21,11 @@ With Go 1.12 or newer,
 	$ export GO111MODULE=on
 	$ go run gioui.org/apps/gophers
 
-should display a simple (nonsense) demo.
+should display a simple (nonsense) demo that displays Go contributors fetched from GitHub. If you run
+into quota issues, supply a [Github token](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line)
+with the `-token`flag:
+
+	$ go run gioui.org/apps/gophers -token <github token>
 
 ## Android
 
