@@ -9,3 +9,5 @@ require (
 	golang.org/x/image v0.0.0-20190321063152-3fc05d484e9f
 	golang.org/x/oauth2 v0.0.0-20190319182350-c85d3e98c914
 )
+
+replace gioui.org/ui => ../ui
