@@ -25,7 +25,7 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 static CVReturn displayLinkCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext) {
 	CFTypeRef view = (CFTypeRef *)displayLinkContext;
 	gio_onFrameCallback(view);
-	return COREVIDEO_TRUE;
+	return kCVReturnSuccess;
 }
 
 @interface GioView : NSOpenGLView 
