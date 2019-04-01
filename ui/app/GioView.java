@@ -3,6 +3,7 @@
 package org.gioui;
 
 import android.content.Context;
+import android.os.Build;
 import android.os.Handler;
 import android.util.AttributeSet;
 import android.text.Editable;
@@ -56,6 +57,12 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 	}
 
 	@Override public boolean onTouchEvent(MotionEvent event) {
+		// Ask for unbuffered events. Flutter and Chrome does it
+		// so I assume its good for us as well.
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+			requestUnbufferedDispatch(event);
+		}
+
 		for (int j = 0; j < event.getHistorySize(); j++) {
 			long time = event.getHistoricalEventTime(j);
 			for (int i = 0; i < event.getPointerCount(); i++) {
