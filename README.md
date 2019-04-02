@@ -113,8 +113,8 @@ With `git send-email` configured, you can clone the project and set it up for su
 
 Contributors must agree to the [developer certificate of origin](https://developercertificate.org/),
 to ensure their work is compatible with the MIT and the UNLICENSE. Sign your commits with Signed-off-by
-statements to show your agreement. The `git commit --sign` signs a commit with the name and email from
-your `user.name` and `user.email` settings.
+statements to show your agreement. The `git commit --sign` command signs a commit with the name and email
+from your `user.name` and `user.email` settings.
 
 Whenever you want to submit your work for review, use `git send-email` with the base revision of your
 changes. For example, to submit the most recent commit use
