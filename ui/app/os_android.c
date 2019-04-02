@@ -72,6 +72,11 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserver) {
 			.name = "onFrameCallback",
 			.signature = "(JJ)V",
 			.fnPtr = onFrameCallback
+		},
+		{
+			.name = "onBack",
+			.signature = "(J)Z",
+			.fnPtr = onBack
 		}
 	};
 	if ((*env)->RegisterNatives(env, viewClass, methods, sizeof(methods)/sizeof(methods[0])) != 0) {

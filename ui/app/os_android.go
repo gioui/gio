@@ -180,6 +180,17 @@ func onFrameCallback(env *C.JNIEnv, class C.jclass, view C.jlong, nanos C.jlong)
 	}
 }
 
+//export onBack
+func onBack(env *C.JNIEnv, class C.jclass, view C.jlong) C.jboolean {
+	w := views[view]
+	ev := &Command{Type: CommandBack}
+	w.event(ev)
+	if ev.Cancel {
+		return C.JNI_TRUE
+	}
+	return C.JNI_FALSE
+}
+
 func (w *window) setVisible() {
 	win := w.aNativeWindow()
 	width, height := C.ANativeWindow_getWidth(win), C.ANativeWindow_getHeight(win)

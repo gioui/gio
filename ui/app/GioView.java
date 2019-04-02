@@ -163,6 +163,10 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 		onLowMemory();
 	}
 
+	boolean backPressed() {
+		return onBack(nhandle);
+	}
+
 	static private native long onCreateView(GioView view);
 	static private native void onDestroyView(long handle);
 	static private native void onStartView(long handle);
@@ -174,6 +178,7 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 	static private native void onTouchEvent(long handle, int action, int pointerID, int tool, float x, float y, long time);
 	static private native void onKeyEvent(long handle, int code, int character, long time);
 	static private native void onFrameCallback(long handle, long nanos);
+	static private native boolean onBack(long handle);
 
 	private static class InputConnection extends BaseInputConnection {
 		private final Editable editable;

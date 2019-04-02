@@ -10,6 +10,10 @@ import (
 	"gioui.org/ui"
 )
 
+type Event interface {
+	ImplementsEvent()
+}
+
 type Draw struct {
 	Config *ui.Config
 	Size   image.Point
@@ -23,11 +27,15 @@ type ChangeStage struct {
 	Stage Stage
 }
 
-type Stage uint8
-
-type Event interface {
-	ImplementsEvent()
+// Command is a system event.
+type Command struct {
+	Type CommandType
+	// Suppress the default action of the command.
+	Cancel bool
 }
+
+type Stage uint8
+type CommandType uint8
 
 type Input interface {
 	ImplementsInput()
@@ -37,6 +45,12 @@ const (
 	StageDead Stage = iota
 	StageInvisible
 	StageVisible
+)
+
+const (
+	// CommandBack is the command for a back action
+	// such as the Android back button.
+	CommandBack CommandType = iota
 )
 
 const (
@@ -98,6 +112,7 @@ func (l Stage) String() string {
 
 func (_ Draw) ImplementsEvent()        {}
 func (_ ChangeStage) ImplementsEvent() {}
+func (_ *Command) ImplementsEvent()    {}
 
 func init() {
 	args := strings.Split(extraArgs, "|")

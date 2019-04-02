@@ -50,4 +50,9 @@ public class GioActivity extends Activity {
 		super.onLowMemory();
 		view.lowMemory();
 	}
+
+	@Override public void onBackPressed() {
+		if (!view.backPressed())
+			super.onBackPressed();
+	}
 }

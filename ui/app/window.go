@@ -206,6 +206,9 @@ func (w *Window) event(e Event) {
 		needRedraw = true
 	case key.Event:
 		needRedraw = true
+	case *Command:
+		needAck = true
+		needRedraw = true
 	case ChangeStage:
 		w.stage = e.Stage
 		if w.stage > StageDead {
