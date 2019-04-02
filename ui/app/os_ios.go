@@ -42,8 +42,6 @@ var layerFactory func() uintptr
 
 var views = make(map[C.CFTypeRef]*window)
 
-var windows = make(chan *Window)
-
 func init() {
 	// Darwin requires UI operations happen on the main thread only.
 	runtime.LockOSThread()
@@ -235,8 +233,8 @@ func (w *window) setTextInput(s key.TextInputState) {
 	}
 }
 
-func createWindow(opts *WindowOptions) (*Window, error) {
-	return <-windows, nil
+func createWindow(opts *WindowOptions) error {
+	panic("unsupported")
 }
 
 func Main() {

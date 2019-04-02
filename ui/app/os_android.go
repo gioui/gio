@@ -55,8 +55,6 @@ type window struct {
 
 var theJVM *C.JavaVM
 
-var windows = make(chan *Window)
-
 var views = make(map[C.jlong]*window)
 
 func jniGetMethodID(env *C.JNIEnv, class C.jclass, method, sig string) C.jmethodID {
@@ -381,6 +379,6 @@ func Main() {
 	panic("unreachable")
 }
 
-func createWindow(opts *WindowOptions) (*Window, error) {
-	return <-windows, nil
+func createWindow(opts *WindowOptions) error {
+	return errors.New("createWindow not supported")
 }

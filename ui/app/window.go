@@ -36,7 +36,6 @@ type Window struct {
 	mu           sync.Mutex
 	stage        Stage
 	size         image.Point
-	skipAcks     int
 	syncGPU      bool
 	animating    bool
 	hasNextFrame bool
@@ -208,9 +207,11 @@ func (w *Window) event(e Event) {
 	case key.Event:
 		needRedraw = true
 	case ChangeStage:
-		needAck = true
 		w.stage = e.Stage
-		w.syncGPU = true
+		if w.stage > StageDead {
+			needAck = true
+			w.syncGPU = true
+		}
 	case Draw:
 		if e.Size == (image.Point{}) {
 			panic(errors.New("internal error: zero-sized Draw"))
@@ -222,9 +223,6 @@ func (w *Window) event(e Event) {
 		needAck = true
 		w.syncGPU = e.sync
 		w.size = e.Size
-	}
-	if !needAck {
-		w.skipAcks++
 	}
 	stage := w.stage
 	w.mu.Unlock()

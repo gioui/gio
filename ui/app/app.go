@@ -59,12 +59,13 @@ const (
 // Set it with the go tool linker flag -X.
 var extraArgs string
 
-// NewWindow creates a new window for a set of window
+var windows = make(chan *Window)
+
+// CreateWindow creates a new window for a set of window
 // options. The options are hints; the platform is free to
 // ignore or adjust them.
-// If the current program is running on iOS and Android,
-// NewWindow the window previously created by the platform.
-func NewWindow(opts *WindowOptions) (*Window, error) {
+// CreateWindow is not supported on iOS and Android.
+func CreateWindow(opts *WindowOptions) error {
 	if opts == nil {
 		opts = &WindowOptions{
 			Width:  ui.Dp(800),
@@ -76,6 +77,10 @@ func NewWindow(opts *WindowOptions) (*Window, error) {
 		panic("window width and height must be larger than 0")
 	}
 	return createWindow(opts)
+}
+
+func Windows() <-chan *Window {
+	return windows
 }
 
 func (l Stage) String() string {

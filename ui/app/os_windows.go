@@ -157,37 +157,34 @@ func Main() {
 	<-mainDone
 }
 
-func createWindow(opts *WindowOptions) (*Window, error) {
+func createWindow(opts *WindowOptions) error {
 	onceMu.Lock()
 	defer onceMu.Unlock()
 	if len(winMap) > 0 {
 		panic("multiple windows are not supported")
 	}
-	type windowError struct {
-		window *Window
-		err    error
-	}
-	cerr := make(chan windowError)
+	cerr := make(chan error)
 	go func() {
 		// Call win32 API from a single OS thread.
 		runtime.LockOSThread()
 		w, err := createNativeWindow(opts)
 		if err != nil {
-			cerr <- windowError{err: err}
+			cerr <- err
 			return
 		}
 		defer w.destroy()
-		cerr <- windowError{w.w, nil}
+		cerr <- nil
+		windows <- w.w
 		showWindow(w.hwnd, _SW_SHOWDEFAULT)
 		setForegroundWindow(w.hwnd)
 		setFocus(w.hwnd)
 		if err := w.loop(); err != nil {
 			panic(err)
 		}
+		close(windows)
 		close(mainDone)
 	}()
-	werr := <-cerr
-	return werr.window, werr.err
+	return <-cerr
 }
 
 func createNativeWindow(opts *WindowOptions) (*window, error) {
