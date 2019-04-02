@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
+	"gioui.org/ui"
 	"gioui.org/ui/app/internal/gpu"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
-	"gioui.org/ui"
 )
 
 type WindowOptions struct {

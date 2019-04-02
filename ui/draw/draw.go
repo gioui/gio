@@ -6,9 +6,9 @@ import (
 	"image"
 	"math"
 
+	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/internal/path"
-	"gioui.org/ui"
 )
 
 type OpImage struct {

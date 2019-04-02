@@ -24,10 +24,10 @@ import (
 	"time"
 	"unsafe"
 
+	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
-	"gioui.org/ui"
 )
 
 type window struct {

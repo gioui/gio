@@ -8,9 +8,9 @@ import (
 	"runtime"
 	"time"
 
+	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/pointer"
-	"gioui.org/ui"
 )
 
 type ClickEvent struct {

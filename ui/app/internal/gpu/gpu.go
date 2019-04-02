@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
+	"gioui.org/ui"
 	"gioui.org/ui/app/internal/gl"
 	gdraw "gioui.org/ui/draw"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/internal/path"
-	"gioui.org/ui"
 	"golang.org/x/image/draw"
 )
 

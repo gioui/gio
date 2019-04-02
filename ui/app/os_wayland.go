@@ -19,10 +19,10 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
+	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
-	"gioui.org/ui"
 	syscall "golang.org/x/sys/unix"
 )
 

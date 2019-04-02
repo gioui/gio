@@ -7,10 +7,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"gioui.org/ui"
 	"gioui.org/ui/draw"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/text"
-	"gioui.org/ui"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"

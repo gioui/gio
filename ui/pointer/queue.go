@@ -3,8 +3,8 @@
 package pointer
 
 import (
-	"gioui.org/ui/f32"
 	"gioui.org/ui"
+	"gioui.org/ui/f32"
 )
 
 type Queue struct {

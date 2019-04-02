@@ -5,8 +5,8 @@ package layout
 import (
 	"image"
 
-	"gioui.org/ui/f32"
 	"gioui.org/ui"
+	"gioui.org/ui/f32"
 )
 
 type Flex struct {

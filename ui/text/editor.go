@@ -8,13 +8,13 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"gioui.org/ui"
 	"gioui.org/ui/draw"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/gesture"
 	"gioui.org/ui/key"
 	"gioui.org/ui/layout"
 	"gioui.org/ui/pointer"
-	"gioui.org/ui"
 
 	"golang.org/x/image/math/fixed"
 )
