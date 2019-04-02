@@ -200,7 +200,6 @@ func (a *App) run() error {
 				a.pqueue.Frame(root)
 				a.faces.Frame()
 			}
-			a.w.Ack()
 		}
 	}
 	return a.w.Err()

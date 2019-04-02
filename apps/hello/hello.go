@@ -52,7 +52,6 @@ func init() {
 				w.Draw(root)
 				faces.Frame()
 			}
-			w.Ack()
 		}
 		if w.Err() != nil {
 			log.Fatal(err)

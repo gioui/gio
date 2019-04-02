@@ -32,7 +32,6 @@ type Window struct {
 	err        error
 
 	events chan Event
-	acks   chan struct{}
 
 	mu           sync.Mutex
 	stage        Stage
@@ -55,11 +54,12 @@ var _ interface {
 	setTextInput(s key.TextInputState)
 } = (*window)(nil)
 
+var ackEvent Event
+
 func newWindow(nw *window) *Window {
 	w := &Window{
 		driver: nw,
 		events: make(chan Event),
-		acks:   make(chan struct{}),
 		stage:  StageInvisible,
 	}
 	return w
@@ -67,30 +67,6 @@ func newWindow(nw *window) *Window {
 
 func (w *Window) Events() <-chan Event {
 	return w.events
-}
-
-func (w *Window) Ack() {
-	w.mu.Lock()
-	st := w.stage
-	needAck := w.skipAcks == 0
-	if !needAck {
-		w.skipAcks--
-	}
-	sync := w.syncGPU
-	w.syncGPU = false
-	w.mu.Unlock()
-	if w.gpu != nil {
-		switch {
-		case st < StageVisible:
-			w.gpu.Release()
-			w.gpu = nil
-		case sync:
-			w.gpu.Refresh()
-		}
-	}
-	if needAck {
-		w.acks <- struct{}{}
-	}
 }
 
 func (w *Window) Timings() string {
@@ -258,7 +234,22 @@ func (w *Window) event(e Event) {
 	w.updateAnimation()
 	w.events <- e
 	if needAck {
-		<-w.acks
+		// Send a dummy event; when it gets through we
+		// know the application has processed the actual event.
+		w.events <- ackEvent
+	}
+	if w.gpu != nil {
+		w.mu.Lock()
+		sync := w.syncGPU
+		w.syncGPU = false
+		w.mu.Unlock()
+		switch {
+		case stage < StageVisible:
+			w.gpu.Release()
+			w.gpu = nil
+		case sync:
+			w.gpu.Refresh()
+		}
 	}
 	if stage == StageDead {
 		close(w.events)
