@@ -185,6 +185,14 @@ func (a *App) run() error {
 					}
 				}
 			case app.ChangeStage:
+			case *app.Command:
+				switch e.Type {
+				case app.CommandBack:
+					if a.selectedUser != nil {
+						a.selectedUser = nil
+						e.Cancel = true
+					}
+				}
 			case app.Draw:
 				a.cfg = e.Config
 				a.faces.Cfg = a.cfg
