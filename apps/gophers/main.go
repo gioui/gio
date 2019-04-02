@@ -365,14 +365,13 @@ func (a *App) Layout(cs layout.Constraints) (ui.Op, layout.Dimens) {
 	if a.selectedUser == nil {
 		return a.layoutUsers(cs)
 	} else {
-		a.selectedUser.Update(a.pqueue)
+		a.selectedUser.Update(a.cfg, a.pqueue)
 		return a.selectedUser.Layout(cs)
 	}
 }
 
-func newUserPage(cfg *ui.Config, user *user, redraw redrawer, faces measure.Faces) *userPage {
+func newUserPage(user *user, redraw redrawer, faces measure.Faces) *userPage {
 	up := &userPage{
-		cfg:           cfg,
 		faces:         faces,
 		redraw:        redraw,
 		user:          user,
@@ -383,7 +382,8 @@ func newUserPage(cfg *ui.Config, user *user, redraw redrawer, faces measure.Face
 	return up
 }
 
-func (up *userPage) Update(pqueue pointer.Events) {
+func (up *userPage) Update(cfg *ui.Config, pqueue pointer.Events) {
+	up.cfg = cfg
 	up.commitsList.Scroll(up.cfg, pqueue)
 }
 
@@ -528,7 +528,7 @@ func (a *App) user(c *ui.Config, index int) layout.Widget {
 	sz := ui.Dp(48)
 	for _, r := range click.Update(a.pqueue) {
 		if r.Type == gesture.TypeClick {
-			a.selectedUser = newUserPage(a.cfg, u, a.w.Redraw, a.faces)
+			a.selectedUser = newUserPage(u, a.w.Redraw, a.faces)
 		}
 	}
 	avatar := clipCircle(layout.Sized(a.cfg, sz, sz, widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}))
