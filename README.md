@@ -14,14 +14,14 @@ to support efficient animations, transformed drawing and pixel resolution indepe
 Gio is designed to work with very few dependencies. It depends only on the platform libraries for
 window management, input and GPU drawing.
 
-For Linux you need Wayland and the wayland, xkbcommon, GLES development packages. On Fedora 28 and newer,
+For Linux you need Wayland and the wayland, xkbcommon, GLES, EGL development packages. On Fedora 28 and newer,
 install the dependencies with the command
 
-	$ sudo dnf install wayland-devel libxkbcommon-devel mesa-libGLES-devel
+	$ sudo dnf install wayland-devel libxkbcommon-devel mesa-libGLES-devel mesa-libEGL-devel
 
 On Ubuntu 18.04 and newer, use
 
-	$ sudo apt install libwayland-dev libxkbcommon-dev libgles2-mesa-dev
+	$ sudo apt install libwayland-dev libxkbcommon-dev libgles2-mesa-dev libegl1-mesa-dev
 
 Xcode is required for macOS, iOS, tvOS.
 
