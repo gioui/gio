@@ -100,11 +100,28 @@ Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
 ## Contributing
 
 Discussion and patches: [~eliasnaur/gio-dev@lists.sr.ht](mailto:~eliasnaur/gio-dev@lists.sr.ht).
-[Instructions](https://man.sr.ht/git.sr.ht/send-email.md) for using git-send-email for sending patches.
 
-Contributors must agree to the [developer certificate og origin](https://developercertificate.org/),
+The `git send-email` command is a convenient way to send patches to the mailing list; see
+[instructions](https://man.sr.ht/git.sr.ht/send-email.md) for setting up git to use your email service.
+
+With `git send-email` configured, you can clone the project and set it up for submitting your changes:
+
+	$ git clone https://git.sr.ht/~eliasnaur/gio
+	$ cd gio
+	$ git config sendemail.to '~eliasnaur/gio-dev@lists.sr.ht'
+	$ git config sendemail.annotate yes
+
+Contributors must agree to the [developer certificate of origin](https://developercertificate.org/),
 to ensure their work is compatible with the MIT and the UNLICENSE. Sign your commits with Signed-off-by
 statements to show your agreement. The `git commit --sign` signs a commit with the name and email from
 your `user.name` and `user.email` settings.
 
-File bugs and TODOs in the [issue tracker](https://todo.sr.ht/~eliasnaur/gio).
+Whenever you want to submit your work for review, use `git send-email` with the base revision of your
+changes. For example, to submit the most recent commit use
+
+	$ git send-email HEAD^
+
+## Issues
+
+File bugs and TODOs in the [issue tracker](https://todo.sr.ht/~eliasnaur/gio) or send them to
+[the mailing list](mailto:~eliasnaur/gio-dev@lists.sr.ht).
