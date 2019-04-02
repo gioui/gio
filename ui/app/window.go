@@ -58,8 +58,7 @@ var _ interface {
 func newWindow(nw *window) *Window {
 	w := &Window{
 		driver: nw,
-		// Make room for a backlog of input events.
-		events: make(chan Event, 30),
+		events: make(chan Event),
 		acks:   make(chan struct{}),
 		stage:  StageInvisible,
 	}
