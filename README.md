@@ -93,6 +93,11 @@ To run the demo on an iOS device, use the sample Xcode project:
 You need to provide a valid bundle identifier and set up code signing in Xcode to run the demo
 on a device. If you're using Go 1.12 or older, you also need to disable bitcode.
 
+## Issues
+
+File bugs and TODOs in the [issue tracker](https://todo.sr.ht/~eliasnaur/gio) or send them to
+[the mailing list](mailto:~eliasnaur/gio-dev@lists.sr.ht).
+
 ## License
 
 Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
@@ -100,6 +105,13 @@ Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
 ## Contributing
 
 Discussion and patches: [~eliasnaur/gio-dev@lists.sr.ht](mailto:~eliasnaur/gio-dev@lists.sr.ht).
+
+Commit messages follow [the Go project style](https://golang.org/doc/contribute.html#commit_messages):
+the first line is prefixed with the package and a short summary. The rest of the message provides context
+for the change and what it does. See
+[an example](https://git.sr.ht/~eliasnaur/gio/commit/abb9d291e954f3b80384046d7d4487e1ead6bd6a).
+Add `Fixes ~eliasnaur/gio#nnn` or `Updates ~eliasnaur/gio#nnn` if the change fixes or updates an existing
+issue.
 
 The `git send-email` command is a convenient way to send patches to the mailing list; see
 [instructions](https://man.sr.ht/git.sr.ht/send-email.md) for setting up git to use your email service.
@@ -120,8 +132,3 @@ Whenever you want to submit your work for review, use `git send-email` with the 
 changes. For example, to submit the most recent commit use
 
 	$ git send-email HEAD^
-
-## Issues
-
-File bugs and TODOs in the [issue tracker](https://todo.sr.ht/~eliasnaur/gio) or send them to
-[the mailing list](mailto:~eliasnaur/gio-dev@lists.sr.ht).
