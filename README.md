@@ -104,9 +104,9 @@ Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
 
 ## Contributing
 
-Post discussion and patches to the mailing list,
-[~eliasnaur/gio-dev@lists.sr.ht](mailto:~eliasnaur/gio-dev@lists.sr.ht). A Sourcehut account is only
-required if you want to [subscribe](https://lists.sr.ht/~eliasnaur/gio-dev) to new posts.
+Post discussion and patches to the [mailing list](https://lists.sr.ht/~eliasnaur/gio-dev). Send your
+message to [~eliasnaur/gio-dev@lists.sr.ht](mailto:~eliasnaur/gio-dev@lists.sr.ht); no Sourcehut account
+is required and you can post without being subscribed.
 
 Commit messages follow [the Go project style](https://golang.org/doc/contribute.html#commit_messages):
 the first line is prefixed with the package and a short summary. The rest of the message provides context
