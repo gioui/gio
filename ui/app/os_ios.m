@@ -129,9 +129,6 @@ NSArray<UIKeyCommand *> *_keyCommands;
 	if (self) {
 		__weak id weakSelf = self;
 		displayLink = [CADisplayLink displayLinkWithTarget:weakSelf selector:@selector(onFrameCallback:)];
-		displayLink.paused = YES;
-		NSRunLoop *runLoop = [NSRunLoop currentRunLoop];
-		[displayLink addToRunLoop:runLoop forMode:[runLoop currentMode]];
 	}
 	return self;
 }
@@ -141,7 +138,12 @@ NSArray<UIKeyCommand *> *_keyCommands;
 }
 
 - (void)setAnimating:(BOOL)anim {
-	displayLink.paused = !anim;
+	NSRunLoop *runLoop = [NSRunLoop currentRunLoop];
+	if (anim) {
+		[displayLink addToRunLoop:runLoop forMode:[runLoop currentMode]];
+	} else {
+		[displayLink removeFromRunLoop:runLoop forMode:[runLoop currentMode]];
+	}
 }
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
