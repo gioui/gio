@@ -23,6 +23,8 @@ On Ubuntu 18.04 and newer, use
 
 	$ sudo apt install libwayland-dev libxkbcommon-dev libgles2-mesa-dev libegl1-mesa-dev
 
+Note that Gio does not run with the NVIDIA proprietary driver.
+
 Xcode is required for macOS, iOS, tvOS.
 
 For Windows you need the ANGLE drivers for emulating OpenGL ES. You can build ANGLE yourself or use
