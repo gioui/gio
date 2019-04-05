@@ -115,8 +115,8 @@ for the change and what it does. See
 Add `Fixes ~eliasnaur/gio#nnn` or `Updates ~eliasnaur/gio#nnn` if the change fixes or updates an existing
 issue.
 
-The `git send-email` command is a convenient way to send patches to the mailing list; see
-[instructions](https://man.sr.ht/git.sr.ht/send-email.md) for setting up git to use your email service.
+The `git send-email` command is a convenient way to send patches to the mailing list. See
+[git-send-email.io](https://git-send-email.io) for a thorough setup guide.
 
 With `git send-email` configured, you can clone the project and set it up for submitting your changes:
 
