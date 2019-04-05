@@ -125,10 +125,15 @@ With `git send-email` configured, you can clone the project and set it up for su
 	$ git config sendemail.to '~eliasnaur/gio-dev@lists.sr.ht'
 	$ git config sendemail.annotate yes
 
+Configure your name and email address if you have not done so already:
+
+	$ git config --global user.email "you@gmail.com"
+	$ git config --global user.name "Your Name"
+
 Contributors must agree to the [developer certificate of origin](https://developercertificate.org/),
 to ensure their work is compatible with the MIT and the UNLICENSE. Sign your commits with Signed-off-by
-statements to show your agreement. The `git commit --signoff` command signs a commit with the name and email
-from your `user.name` and `user.email` settings.
+statements to show your agreement. The `git commit --signoff` (or `-s`) command signs a commit with
+your name and email address.
 
 Whenever you want to submit your work for review, use `git send-email` with the base revision of your
 changes. For example, to submit the most recent commit use
