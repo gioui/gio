@@ -20,8 +20,8 @@ import (
 )
 
 func main() {
-	err := app.CreateWindow(nil)
-	if err != nil {
+	wopt := app.WindowOptions{Width: ui.Px(612), Height: ui.Px(792), Title: "Hello"}
+	if err := app.CreateWindow(&wopt); err != nil {
 		log.Fatal(err)
 	}
 	app.Main()
@@ -43,15 +43,16 @@ func loop(w *app.Window) {
 		panic("failed to load font")
 	}
 	var faces measure.Faces
-	black := &image.Uniform{color.Black}
-	face := faces.For(regular, ui.Dp(50))
+	maroon := &image.Uniform{color.RGBA{127, 0, 0, 255}}
+	face := faces.For(regular, ui.Sp(72))
+	message := "Hello, Gio"
 	for w.IsAlive() {
 		e := <-w.Events()
 		switch e := e.(type) {
 		case app.Draw:
 			faces.Cfg = e.Config
 			cs := layout.ExactConstraints(w.Size())
-			root, _ := (text.Label{Src: black, Face: face, Text: "Hello, World!"}).Layout(cs)
+			root, _ := (text.Label{Src: maroon, Face: face, Alignment: text.Center, Text: message}).Layout(cs)
 			w.Draw(root)
 			faces.Frame()
 		}
