@@ -83,10 +83,10 @@ func run(pkg string, appArgs []string) error {
 	}
 	var archs []string
 	switch *target {
-	case "tvos":
+	case "ios", "tvos":
 		// Only 64-bit support.
 		archs = []string{"arm64", "amd64"}
-	default:
+	case "android":
 		archs = []string{"arm", "arm64", "386", "amd64"}
 	}
 	if *archNames != "" {
