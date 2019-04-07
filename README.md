@@ -30,7 +30,7 @@ Xcode is required for macOS, iOS, tvOS.
 For Windows you need the ANGLE drivers for emulating OpenGL ES. You can build ANGLE yourself or use
 [a prebuilt version](https://drive.google.com/file/d/1k2950mHNtR2iwhweHS1rJ7reChTa3rki/view?usp=sharing).
 
-With Go 1.12 or newer,
+With [Go 1.12](https://golang.org/dl/) or newer,
 
 	$ export GO111MODULE=on
 	$ go run gioui.org/apps/hello
