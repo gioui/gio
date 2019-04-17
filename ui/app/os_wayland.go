@@ -474,14 +474,6 @@ func gio_onTouchCancel(data unsafe.Pointer, touch *C.struct_wl_touch) {
 	})
 }
 
-//export gio_onTouchShape
-func gio_onTouchShape(data unsafe.Pointer, touch *C.struct_wl_touch, id C.int32_t, major, minor C.wl_fixed_t) {
-}
-
-//export gio_onTouchOrientation
-func gio_onTouchOrientation(data unsafe.Pointer, touch *C.struct_wl_touch, id C.int32_t, orientation C.wl_fixed_t) {
-}
-
 //export gio_onPointerEnter
 func gio_onPointerEnter(data unsafe.Pointer, pointer *C.struct_wl_pointer, serial C.uint32_t, surf *C.struct_wl_surface, x, y C.wl_fixed_t) {
 	// Get images[0].

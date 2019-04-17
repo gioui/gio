@@ -104,8 +104,6 @@ static const struct wl_touch_listener wl_touch_listener = {
 	.motion = gio_onTouchMotion,
 	.frame = gio_onTouchFrame,
 	.cancel = gio_onTouchCancel,
-	.shape = gio_onTouchShape,
-	.orientation = gio_onTouchOrientation
 };
 
 void gio_wl_touch_add_listener(struct wl_touch *touch) {
