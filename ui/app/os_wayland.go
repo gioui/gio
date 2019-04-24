@@ -954,6 +954,9 @@ func (w *window) draw(sync bool) {
 	w.mu.Lock()
 	animating := w.animating
 	w.mu.Unlock()
+	if !animating && !sync {
+		return
+	}
 	width, height, cfg := w.config()
 	if cfg == (ui.Config{}) {
 		return
