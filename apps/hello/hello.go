@@ -46,14 +46,16 @@ func loop(w *app.Window) {
 	maroon := &image.Uniform{color.RGBA{127, 0, 0, 255}}
 	face := faces.For(regular, ui.Sp(72))
 	message := "Hello, Gio"
+	ops := new(ui.Ops)
 	for w.IsAlive() {
 		e := <-w.Events()
 		switch e := e.(type) {
 		case app.Draw:
 			faces.Cfg = e.Config
 			cs := layout.ExactConstraints(w.Size())
-			root, _ := (text.Label{Src: maroon, Face: face, Alignment: text.Center, Text: message}).Layout(cs)
-			w.Draw(root)
+			ops.Reset()
+			(text.Label{Src: maroon, Face: face, Alignment: text.Center, Text: message}).Layout(ops, cs)
+			w.Draw(ops)
 			faces.Frame()
 		}
 	}

@@ -83,8 +83,9 @@ const (
 	thresholdVelocity = 1
 )
 
-func (c *Click) Op(a pointer.Area) pointer.OpHandler {
-	return pointer.OpHandler{Area: a, Key: c}
+func (c *Click) Op(ops *ui.Ops, a pointer.Area) {
+	op := pointer.OpHandler{Area: a, Key: c}
+	op.Add(ops)
 }
 
 func (c *Click) Update(q pointer.Events) []ClickEvent {
@@ -115,12 +116,12 @@ func (c *Click) Update(q pointer.Events) []ClickEvent {
 	return events
 }
 
-func (s *Scroll) Op(a pointer.Area) ui.Op {
+func (s *Scroll) Op(ops *ui.Ops, a pointer.Area) {
 	oph := pointer.OpHandler{Area: a, Key: s, Grab: s.grab}
-	if !s.flinger.Active() {
-		return oph
+	oph.Add(ops)
+	if s.flinger.Active() {
+		ui.OpRedraw{}.Add(ops)
 	}
-	return ui.Ops{oph, ui.OpRedraw{}}
 }
 
 func (s *Scroll) Stop() {

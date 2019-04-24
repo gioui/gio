@@ -4,12 +4,14 @@ package key
 
 import (
 	"gioui.org/ui"
+	"gioui.org/ui/internal/ops"
 )
 
 type Queue struct {
 	focus    Key
 	events   []Event
 	handlers map[Key]bool
+	reader   ops.Reader
 }
 
 type listenerPriority uint8
@@ -21,9 +23,10 @@ const (
 	priNewFocus
 )
 
-func (q *Queue) Frame(op ui.Op) TextInputState {
+func (q *Queue) Frame(root *ui.Ops) TextInputState {
 	q.events = q.events[:0]
-	f, pri, hide := resolveFocus(op, q.focus)
+	q.reader.Reset(root.Data(), root.Refs())
+	f, pri, hide := resolveFocus(&q.reader, q.focus)
 	changed := f != nil && f != q.focus
 	for k, active := range q.handlers {
 		if !active || changed {
@@ -71,39 +74,43 @@ func (q *Queue) For(k Key) []Event {
 	return q.events
 }
 
-func resolveFocus(op ui.Op, focus Key) (Key, listenerPriority, bool) {
-	type childOp interface {
-		ChildOp() ui.Op
-	}
+func resolveFocus(r *ops.Reader, focus Key) (Key, listenerPriority, bool) {
 	var k Key
 	var pri listenerPriority
 	var hide bool
-	switch op := op.(type) {
-	case ui.Ops:
-		for i := len(op) - 1; i >= 0; i-- {
-			newK, newPri, h := resolveFocus(op[i], focus)
+loop:
+	for {
+		data, ok := r.Decode()
+		if !ok {
+			break
+		}
+		switch ops.OpType(data[0]) {
+		case ops.TypeKeyHandler:
+			var op OpHandler
+			op.Decode(data, r.Refs)
+			var newPri listenerPriority
+			switch {
+			case op.Focus:
+				newPri = priNewFocus
+			case op.Key == focus:
+				newPri = priCurrentFocus
+			default:
+				newPri = priDefault
+			}
+			if newPri >= pri {
+				k, pri = op.Key, newPri
+			}
+		case ops.TypeHideInput:
+			hide = true
+		case ops.TypePush:
+			newK, newPri, h := resolveFocus(r, focus)
 			hide = hide || h
-			if newPri > pri {
+			if newPri >= pri {
 				k, pri = newK, newPri
 			}
+		case ops.TypePop:
+			break loop
 		}
-	case OpHandler:
-		var newPri listenerPriority
-		switch {
-		case op.Focus:
-			newPri = priNewFocus
-		case op.Key == focus:
-			newPri = priCurrentFocus
-		default:
-			newPri = priDefault
-		}
-		if newPri > pri {
-			k, pri = op.Key, newPri
-		}
-	case OpHideInput:
-		hide = true
-	case childOp:
-		return resolveFocus(op.ChildOp(), focus)
 	}
 	return k, pri, hide
 }

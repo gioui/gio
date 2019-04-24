@@ -80,7 +80,7 @@ func (l *lineIterator) Next() (String, f32.Point, bool) {
 	return String{}, f32.Point{}, false
 }
 
-func (l Label) Layout(cs layout.Constraints) (ui.Op, layout.Dimens) {
+func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	textLayout := l.Face.Layout(l.Text, false, cs.Width.Max)
 	lines := textLayout.Lines
 	dims := linesDimens(lines)
@@ -90,7 +90,6 @@ func (l Label) Layout(cs layout.Constraints) (ui.Op, layout.Dimens) {
 		Min: image.Point{X: -ui.Inf, Y: -padTop},
 		Max: image.Point{X: ui.Inf, Y: dims.Size.Y + padBottom},
 	}
-	var ops ui.Ops = make([]ui.Op, len(lines))[:0]
 	l.it = lineIterator{
 		Lines:     lines,
 		Clip:      clip,
@@ -104,13 +103,13 @@ func (l Label) Layout(cs layout.Constraints) (ui.Op, layout.Dimens) {
 		}
 		path := l.Face.Path(str)
 		lclip := toRectF(clip).Sub(off)
-		op := ui.OpTransform{
-			Transform: ui.Offset(off),
-			Op:        draw.OpClip{Path: path, Op: draw.OpImage{Rect: lclip, Src: l.Src, SrcRect: l.Src.Bounds()}},
-		}
-		ops = append(ops, op)
+		ops.Begin()
+		ui.OpTransform{Transform: ui.Offset(off)}.Add(ops)
+		draw.OpClip{Path: path}.Add(ops)
+		draw.OpImage{Rect: lclip, Src: l.Src, SrcRect: l.Src.Bounds()}.Add(ops)
+		ops.End().Add(ops)
 	}
-	return ops, dims
+	return dims
 }
 
 func itof(i int) float32 {

@@ -48,8 +48,6 @@ type Editor struct {
 	scrollOff image.Point
 
 	clicker gesture.Click
-
-	ops ui.Ops
 }
 
 type linePath struct {
@@ -126,7 +124,7 @@ func (e *Editor) caretWidth() fixed.Int26_6 {
 	return fixed.Int26_6(oneDp * 64)
 }
 
-func (e *Editor) Layout(cs layout.Constraints) (ui.Op, layout.Dimens) {
+func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	twoDp := int(e.cfg.Pixels(ui.Dp(2)) + 0.5)
 	e.padLeft, e.padRight = twoDp, twoDp
 	maxWidth := cs.Width.Max
@@ -155,8 +153,7 @@ func (e *Editor) Layout(cs layout.Constraints) (ui.Op, layout.Dimens) {
 		Min: image.Point{X: 0, Y: 0},
 		Max: image.Point{X: e.viewSize.X, Y: e.viewSize.Y},
 	}
-	e.ops = e.ops[:0]
-	e.ops = append(e.ops, key.OpHandler{Key: e, Focus: e.requestFocus})
+	key.OpHandler{Key: e, Focus: e.requestFocus}.Add(ops)
 	e.requestFocus = false
 	e.it = lineIterator{
 		Lines:     lines,
@@ -171,10 +168,11 @@ func (e *Editor) Layout(cs layout.Constraints) (ui.Op, layout.Dimens) {
 			break
 		}
 		path := e.Face.Path(str)
-		e.ops = append(e.ops, ui.OpTransform{
-			Transform: ui.Offset(lineOff),
-			Op:        draw.OpClip{Path: path, Op: draw.OpImage{Rect: toRectF(clip).Sub(lineOff), Src: e.Src, SrcRect: e.Src.Bounds()}},
-		})
+		ops.Begin()
+		ui.OpTransform{Transform: ui.Offset(lineOff)}.Add(ops)
+		draw.OpClip{Path: path}.Add(ops)
+		draw.OpImage{Rect: toRectF(clip).Sub(lineOff), Src: e.Src, SrcRect: e.Src.Bounds()}.Add(ops)
+		ops.End().Add(ops)
 	}
 	if e.focused {
 		now := e.cfg.Now
@@ -197,18 +195,21 @@ func (e *Editor) Layout(cs layout.Constraints) (ui.Op, layout.Dimens) {
 			})
 			carRect = clip.Intersect(carRect)
 			if !carRect.Empty() {
-				e.ops = append(e.ops, draw.OpImage{Src: e.Src, Rect: toRectF(carRect), SrcRect: e.Src.Bounds()})
+				img := draw.OpImage{Src: e.Src, Rect: toRectF(carRect), SrcRect: e.Src.Bounds()}
+				img.Add(ops)
 			}
 		}
 		if blinking {
-			e.ops = append(e.ops, ui.OpRedraw{At: nextBlink})
+			redraw := ui.OpRedraw{At: nextBlink}
+			redraw.Add(ops)
 		}
 	}
 
 	baseline := e.padTop + e.dims.Baseline
 	area := &gesture.Rect{e.viewSize}
-	e.ops = append(e.ops, e.scroller.Op(area), e.clicker.Op(area))
-	return e.ops, layout.Dimens{Size: e.viewSize, Baseline: baseline}
+	e.scroller.Op(ops, area)
+	e.clicker.Op(ops, area)
+	return layout.Dimens{Size: e.viewSize, Baseline: baseline}
 }
 
 func (e *Editor) layout() {

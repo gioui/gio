@@ -14,6 +14,7 @@ import (
 	"gioui.org/ui/app/internal/gl"
 	gdraw "gioui.org/ui/draw"
 	"gioui.org/ui/f32"
+	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/internal/path"
 	"golang.org/x/image/draw"
 )
@@ -31,13 +32,13 @@ type GPU struct {
 	refreshErr chan error
 	stop       chan struct{}
 	stopped    chan struct{}
-	ops        ops
+	ops        drawOps
 }
 
 type frame struct {
 	collectStats bool
 	viewport     image.Point
-	ops          ops
+	ops          drawOps
 }
 
 type frameResult struct {
@@ -54,7 +55,8 @@ type renderer struct {
 	intersections packer
 }
 
-type ops struct {
+type drawOps struct {
+	reader     ops.Reader
 	cache      *resourceCache
 	viewport   image.Point
 	clearColor [3]float32
@@ -64,6 +66,14 @@ type ops struct {
 	// and no blending.
 	zimageOps []imageOp
 	pathOps   []*pathOp
+}
+
+type drawState struct {
+	clip  f32.Rectangle
+	t     ui.Transform
+	cpath *pathOp
+	rect  bool
+	z     int
 }
 
 type pathOp struct {
@@ -298,12 +308,13 @@ func (g *GPU) Refresh() {
 	g.setErr(<-g.refreshErr)
 }
 
-func (g *GPU) Draw(profile bool, viewport image.Point, op ui.Op) {
+func (g *GPU) Draw(profile bool, viewport image.Point, root *ui.Ops) {
 	if g.err != nil {
 		return
 	}
 	g.Flush()
-	g.ops.collect(g.cache, op, viewport)
+	g.ops.reset(g.cache, viewport)
+	g.ops.collect(g.cache, root, viewport)
 	g.frames <- frame{profile, viewport, g.ops}
 	g.drawing = true
 }
@@ -629,84 +640,99 @@ func floor(v float32) int {
 	}
 }
 
-func (ops *ops) collect(cache *resourceCache, op ui.Op, viewport image.Point) {
-	ops.clearColor = [3]float32{1.0, 1.0, 1.0}
-	ops.cache = cache
-	ops.viewport = viewport
-	ops.imageOps = ops.imageOps[:0]
-	ops.zimageOps = ops.zimageOps[:0]
-	ops.pathOps = ops.pathOps[:0]
+func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
+	d.clearColor = [3]float32{1.0, 1.0, 1.0}
+	d.cache = cache
+	d.viewport = viewport
+	d.imageOps = d.imageOps[:0]
+	d.zimageOps = d.zimageOps[:0]
+	d.pathOps = d.pathOps[:0]
+}
+
+func (d *drawOps) collect(cache *resourceCache, root *ui.Ops, viewport image.Point) {
+	d.reset(cache, viewport)
 	clip := f32.Rectangle{
 		Max: f32.Point{X: float32(viewport.X), Y: float32(viewport.Y)},
 	}
-	ops.collectOp(op, clip, ui.Transform{}, nil, true, 0)
+	d.reader.Reset(root.Data(), root.Refs())
+	d.collectOps(&d.reader, clip, ui.Transform{}, nil, true, 0)
 }
 
-func (ops *ops) collectOp(op ui.Op, clip f32.Rectangle, t ui.Transform, cpath *pathOp, rect bool, z int) int {
-	type childOp interface {
-		ChildOp() ui.Op
-	}
-	switch op := op.(type) {
-	case ui.OpTransform:
-		t := t.Mul(op.Transform)
-		z = ops.collectOp(op.ChildOp(), clip, t, cpath, rect, z)
-	case gdraw.OpClip:
-		data := op.Path.Data().(*path.Path)
-		off := t.Transform(f32.Point{})
-		clip := clip.Intersect(data.Bounds.Add(off))
-		if clip.Empty() {
+func (d *drawOps) collectOps(r *ops.Reader, clip f32.Rectangle, t ui.Transform, cpath *pathOp, rect bool, z int) int {
+loop:
+	for {
+		data, ok := r.Decode()
+		if !ok {
 			break
 		}
-		cpath := &pathOp{
-			parent: cpath,
-			off:    off,
+		switch ops.OpType(data[0]) {
+		case ops.TypeTransform:
+			var op ui.OpTransform
+			op.Decode(data)
+			t = t.Mul(op.Transform)
+		case ops.TypeClip:
+			var op gdraw.OpClip
+			op.Decode(data, r.Refs)
+			if op.Path == nil {
+				clip = f32.Rectangle{}
+				continue
+			}
+			data := op.Path.Data().(*path.Path)
+			off := t.Transform(f32.Point{})
+			clip = clip.Intersect(data.Bounds.Add(off))
+			if clip.Empty() {
+				continue
+			}
+			cpath = &pathOp{
+				parent: cpath,
+				off:    off,
+			}
+			if len(data.Vertices) > 0 {
+				rect = false
+				cpath.path = data
+				d.pathOps = append(d.pathOps, cpath)
+			}
+		case ops.TypeImage:
+			var op gdraw.OpImage
+			op.Decode(data, r.Refs)
+			off := t.Transform(f32.Point{})
+			clip := clip.Intersect(op.Rect.Add(off))
+			if clip.Empty() {
+				continue
+			}
+			bounds := boundRectF(clip)
+			mat := materialFor(d.cache, op, off, bounds)
+			if bounds.Min == (image.Point{}) && bounds.Max == d.viewport && mat.opaque && mat.material == materialColor {
+				// The image is a uniform opaque color and takes up the whole screen.
+				// Scrap images up to and including this image and set clear color.
+				d.zimageOps = d.zimageOps[:0]
+				d.imageOps = d.imageOps[:0]
+				z = 0
+				copy(d.clearColor[:], mat.color[:3])
+				continue
+			}
+			z++
+			// Assume 16-bit depth buffer.
+			const zdepth = 1 << 16
+			// Convert z to window-space, assuming depth range [0;1].
+			zf := float32(z)*2/zdepth - 1.0
+			img := imageOp{
+				z:        zf,
+				path:     cpath,
+				off:      off,
+				clip:     bounds,
+				material: mat,
+			}
+			if rect && img.material.opaque {
+				d.zimageOps = append(d.zimageOps, img)
+			} else {
+				d.imageOps = append(d.imageOps, img)
+			}
+		case ops.TypePush:
+			z = d.collectOps(r, clip, t, cpath, rect, z)
+		case ops.TypePop:
+			break loop
 		}
-		if len(data.Vertices) > 0 {
-			rect = false
-			cpath.path = data
-			ops.pathOps = append(ops.pathOps, cpath)
-		}
-		z = ops.collectOp(op.ChildOp(), clip, t, cpath, rect, z)
-	case gdraw.OpImage:
-		off := t.Transform(f32.Point{})
-		clip := clip.Intersect(op.Rect.Add(off))
-		if clip.Empty() {
-			break
-		}
-		bounds := boundRectF(clip)
-		mat := materialFor(ops.cache, op, off, bounds)
-		if bounds.Min == (image.Point{}) && bounds.Max == ops.viewport && mat.opaque && mat.material == materialColor {
-			// The image is a uniform opaque color and takes up the whole screen.
-			// Scrap images up to and including this image and set clear color.
-			ops.zimageOps = ops.zimageOps[:0]
-			ops.imageOps = ops.imageOps[:0]
-			z = 0
-			copy(ops.clearColor[:], mat.color[:3])
-			break
-		}
-		z++
-		// Assume 16-bit depth buffer.
-		const zdepth = 1 << 16
-		// Convert z to window-space, assuming depth range [0;1].
-		zf := float32(z)*2/zdepth - 1.0
-		img := imageOp{
-			z:        zf,
-			path:     cpath,
-			off:      off,
-			clip:     bounds,
-			material: mat,
-		}
-		if rect && img.material.opaque {
-			ops.zimageOps = append(ops.zimageOps, img)
-		} else {
-			ops.imageOps = append(ops.imageOps, img)
-		}
-	case ui.Ops:
-		for _, op := range op {
-			z = ops.collectOp(op, clip, t, cpath, rect, z)
-		}
-	case childOp:
-		z = ops.collectOp(op.ChildOp(), clip, t, cpath, rect, z)
 	}
 	return z
 }

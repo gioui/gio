@@ -2,6 +2,13 @@
 
 package key
 
+import (
+	"encoding/binary"
+
+	"gioui.org/ui"
+	"gioui.org/ui/internal/ops"
+)
+
 type OpHandler struct {
 	Key   Key
 	Focus bool
@@ -62,6 +69,35 @@ const (
 	NamePageUp         = '⇞'
 	NamePageDown       = '⇟'
 )
+
+func (h OpHandler) Add(o *ui.Ops) {
+	data := make([]byte, ops.TypeKeyHandlerLen)
+	data[0] = byte(ops.TypeKeyHandler)
+	bo := binary.LittleEndian
+	if h.Focus {
+		data[1] = 1
+	}
+	bo.PutUint32(data[2:], uint32(o.Ref(h.Key)))
+	o.Write(data)
+}
+
+func (h *OpHandler) Decode(d []byte, refs []interface{}) {
+	bo := binary.LittleEndian
+	if ops.OpType(d[0]) != ops.TypeKeyHandler {
+		panic("invalid op")
+	}
+	key := int(bo.Uint32(d[2:]))
+	*h = OpHandler{
+		Focus: d[1] != 0,
+		Key:   refs[key].(Key),
+	}
+}
+
+func (h OpHideInput) Add(o *ui.Ops) {
+	data := make([]byte, ops.TypeHideInputLen)
+	data[0] = byte(ops.TypeHideInput)
+	o.Write(data)
+}
 
 func (OpHandler) ImplementsOp()   {}
 func (OpHideInput) ImplementsOp() {}

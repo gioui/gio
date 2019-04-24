@@ -3,9 +3,12 @@
 package pointer
 
 import (
+	"encoding/binary"
 	"time"
 
+	"gioui.org/ui"
 	"gioui.org/ui/f32"
+	"gioui.org/ui/internal/ops"
 )
 
 type Event struct {
@@ -65,6 +68,32 @@ const (
 	Foremost
 	Grabbed
 )
+
+func (h OpHandler) Add(o *ui.Ops) {
+	data := make([]byte, ops.TypePointerHandlerLen)
+	data[0] = byte(ops.TypePointerHandler)
+	bo := binary.LittleEndian
+	if h.Grab {
+		data[1] = 1
+	}
+	bo.PutUint32(data[2:], uint32(o.Ref(h.Key)))
+	bo.PutUint32(data[6:], uint32(o.Ref(h.Area)))
+	o.Write(data)
+}
+
+func (h *OpHandler) Decode(d []byte, refs []interface{}) {
+	bo := binary.LittleEndian
+	if ops.OpType(d[0]) != ops.TypePointerHandler {
+		panic("invalid op")
+	}
+	key := int(bo.Uint32(d[2:]))
+	area := int(bo.Uint32(d[6:]))
+	*h = OpHandler{
+		Grab: d[1] != 0,
+		Key:  refs[key].(Key),
+		Area: refs[area].(Area),
+	}
+}
 
 func (t Type) String() string {
 	switch t {

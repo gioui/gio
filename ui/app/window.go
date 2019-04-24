@@ -11,6 +11,7 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/app/internal/gpu"
+	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
 )
@@ -41,6 +42,8 @@ type Window struct {
 	hasNextFrame bool
 	nextFrame    time.Time
 	delayedDraw  *time.Timer
+
+	reader ops.Reader
 }
 
 // driver is the interface for the platform implementation
@@ -89,7 +92,7 @@ func (w *Window) Err() error {
 	return w.err
 }
 
-func (w *Window) Draw(root ui.Op) {
+func (w *Window) Draw(root *ui.Ops) {
 	if !w.IsAlive() {
 		return
 	}
@@ -132,11 +135,33 @@ func (w *Window) Draw(root ui.Op) {
 		w.timings = fmt.Sprintf("t:%7s %s", frameDur, w.gpu.Timings())
 		w.setNextFrame(time.Time{})
 	}
-	if t, ok := collectRedraws(root); ok {
+	w.reader.Reset(root.Data(), root.Refs())
+	if t, ok := collectRedraws(&w.reader); ok {
 		w.setNextFrame(t)
 	}
 	w.updateAnimation()
 	w.gpu.Draw(w.Profiling, size, root)
+}
+
+func collectRedraws(r *ops.Reader) (time.Time, bool) {
+	var t time.Time
+	redraw := false
+	for {
+		data, ok := r.Decode()
+		if !ok {
+			break
+		}
+		switch ops.OpType(data[0]) {
+		case ops.TypeRedraw:
+			var op ui.OpRedraw
+			op.Decode(data)
+			if !redraw || op.At.Before(t) {
+				redraw = true
+				t = op.At
+			}
+		}
+	}
+	return t, redraw
 }
 
 func (w *Window) Redraw() {
@@ -254,31 +279,5 @@ func (w *Window) event(e Event) {
 	}
 	if stage == StageDead {
 		close(w.events)
-	}
-}
-
-func collectRedraws(op ui.Op) (time.Time, bool) {
-	type childOp interface {
-		ChildOp() ui.Op
-	}
-	switch op := op.(type) {
-	case ui.Ops:
-		var earliest time.Time
-		var valid bool
-		for _, op := range op {
-			if t, ok := collectRedraws(op); ok {
-				if !valid || t.Before(earliest) {
-					valid = true
-					earliest = t
-				}
-			}
-		}
-		return earliest, valid
-	case ui.OpRedraw:
-		return op.At, true
-	case childOp:
-		return collectRedraws(op.ChildOp())
-	default:
-		return time.Time{}, false
 	}
 }

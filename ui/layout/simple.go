@@ -10,7 +10,7 @@ import (
 )
 
 type Widget interface {
-	Layout(cs Constraints) (ui.Op, Dimens)
+	Layout(ops *ui.Ops, cs Constraints) Dimens
 }
 
 type Constraints struct {
@@ -29,7 +29,7 @@ type Dimens struct {
 
 type Axis uint8
 
-type F func(cs Constraints) (ui.Op, Dimens)
+type F func(ops *ui.Ops, cs Constraints) Dimens
 
 const (
 	Horizontal Axis = iota
@@ -73,8 +73,8 @@ func ExactConstraints(size image.Point) Constraints {
 	}
 }
 
-func (f F) Layout(cs Constraints) (ui.Op, Dimens) {
-	return f(cs)
+func (f F) Layout(ops *ui.Ops, cs Constraints) Dimens {
+	return f(ops, cs)
 }
 
 type Margins struct {
@@ -82,7 +82,7 @@ type Margins struct {
 }
 
 func Margin(c *ui.Config, m Margins, w Widget) Widget {
-	return F(func(cs Constraints) (ui.Op, Dimens) {
+	return F(func(ops *ui.Ops, cs Constraints) Dimens {
 		mcs := cs
 		t, r, b, l := int(c.Pixels(m.Top)+0.5), int(c.Pixels(m.Right)+0.5), int(c.Pixels(m.Bottom)+0.5), int(c.Pixels(m.Left)+0.5)
 		if mcs.Width.Max != ui.Inf {
@@ -105,10 +105,11 @@ func Margin(c *ui.Config, m Margins, w Widget) Widget {
 				mcs.Height.Max = mcs.Height.Min
 			}
 		}
-
-		op, dims := w.Layout(mcs)
-		op = ui.OpTransform{Transform: ui.Offset(toPointF(image.Point{X: l, Y: t})), Op: op}
-		return op, Dimens{
+		ops.Begin()
+		ui.OpTransform{Transform: ui.Offset(toPointF(image.Point{X: l, Y: t}))}.Add(ops)
+		dims := w.Layout(ops, mcs)
+		ops.End().Add(ops)
+		return Dimens{
 			Size:     cs.Constrain(dims.Size.Add(image.Point{X: r + l, Y: t + b})),
 			Baseline: dims.Baseline + t,
 		}
@@ -124,7 +125,7 @@ func isInf(v ui.Value) bool {
 }
 
 func Capped(c *ui.Config, maxWidth, maxHeight ui.Value, wt Widget) Widget {
-	return F(func(cs Constraints) (ui.Op, Dimens) {
+	return F(func(ops *ui.Ops, cs Constraints) Dimens {
 		if !isInf(maxWidth) {
 			mw := int(c.Pixels(maxWidth) + .5)
 			if mw < cs.Width.Min {
@@ -143,12 +144,12 @@ func Capped(c *ui.Config, maxWidth, maxHeight ui.Value, wt Widget) Widget {
 				cs.Height.Max = mh
 			}
 		}
-		return wt.Layout(cs)
+		return wt.Layout(ops, cs)
 	})
 }
 
 func Sized(c *ui.Config, width, height ui.Value, wt Widget) Widget {
-	return F(func(cs Constraints) (ui.Op, Dimens) {
+	return F(func(ops *ui.Ops, cs Constraints) Dimens {
 		if h := int(c.Pixels(height) + 0.5); h != 0 {
 			if cs.Height.Min < h {
 				cs.Height.Min = h
@@ -165,25 +166,27 @@ func Sized(c *ui.Config, width, height ui.Value, wt Widget) Widget {
 				cs.Width.Max = w
 			}
 		}
-		return wt.Layout(cs)
+		return wt.Layout(ops, cs)
 	})
 }
 
 func Expand(w Widget) Widget {
-	return F(func(cs Constraints) (ui.Op, Dimens) {
+	return F(func(ops *ui.Ops, cs Constraints) Dimens {
 		if cs.Height.Max != ui.Inf {
 			cs.Height.Min = cs.Height.Max
 		}
 		if cs.Width.Max != ui.Inf {
 			cs.Width.Min = cs.Width.Max
 		}
-		return w.Layout(cs)
+		return w.Layout(ops, cs)
 	})
 }
 
 func Align(alignment Direction, w Widget) Widget {
-	return F(func(cs Constraints) (ui.Op, Dimens) {
-		op, dims := w.Layout(cs.Loose())
+	return F(func(ops *ui.Ops, cs Constraints) Dimens {
+		ops.Begin()
+		dims := w.Layout(ops, cs.Loose())
+		block := ops.End()
 		sz := dims.Size
 		if cs.Width.Max != ui.Inf {
 			sz.X = cs.Width.Max
@@ -204,8 +207,11 @@ func Align(alignment Direction, w Widget) Widget {
 		case SW, S, SE:
 			p.Y = sz.Y - dims.Size.Y
 		}
-		op = ui.OpTransform{Transform: ui.Offset(toPointF(p)), Op: op}
-		return op, Dimens{
+		ops.Begin()
+		ui.OpTransform{Transform: ui.Offset(toPointF(p))}.Add(ops)
+		block.Add(ops)
+		ops.End().Add(ops)
+		return Dimens{
 			Size:     sz,
 			Baseline: dims.Baseline,
 		}

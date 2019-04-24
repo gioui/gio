@@ -16,7 +16,7 @@ type Image struct {
 	Rect image.Rectangle
 }
 
-func (im Image) Layout(cs layout.Constraints) (ui.Op, layout.Dimens) {
+func (im Image) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	d := image.Point{X: cs.Width.Max, Y: cs.Height.Max}
 	if d.X == ui.Inf {
 		d.X = cs.Width.Min
@@ -27,6 +27,6 @@ func (im Image) Layout(cs layout.Constraints) (ui.Op, layout.Dimens) {
 	dr := f32.Rectangle{
 		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
 	}
-	op := draw.OpImage{Rect: dr, Src: im.Src, SrcRect: im.Rect}
-	return op, layout.Dimens{Size: d, Baseline: d.Y}
+	draw.OpImage{Rect: dr, Src: im.Src, SrcRect: im.Rect}.Add(ops)
+	return layout.Dimens{Size: d, Baseline: d.Y}
 }

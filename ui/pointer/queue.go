@@ -5,12 +5,14 @@ package pointer
 import (
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
+	"gioui.org/ui/internal/ops"
 )
 
 type Queue struct {
 	hitTree  []hitNode
 	handlers map[Key]*handler
 	pointers []pointerInfo
+	reader   ops.Reader
 	scratch  []Key
 }
 
@@ -35,49 +37,37 @@ type handler struct {
 	wantsGrab bool
 }
 
-type childOp interface {
-	ChildOp() ui.Op
-}
-
-func (q *Queue) collectHandlers(op ui.Op, t ui.Transform, layer int) ui.Op {
-	switch op := op.(type) {
-	case ui.Ops:
-		var all ui.Ops
-		for _, op := range op {
-			if op := q.collectHandlers(op, t, layer); op != nil {
-				if ops, ok := op.(ui.Ops); ok {
-					all = append(all, ops...)
-				} else {
-					all = append(all, op)
-				}
-			}
-		}
-		return all
-	case ui.OpLayer:
-		layer++
-		q.hitTree = append(q.hitTree, hitNode{level: layer})
-		child := q.collectHandlers(op.ChildOp(), t, layer)
-		if child == nil {
-			return nil
-		}
-		return ui.OpLayer{Op: child}
-	case ui.OpTransform:
-		return q.collectHandlers(op.ChildOp(), t.Mul(op.Transform), layer)
-	case OpHandler:
-		q.hitTree = append(q.hitTree, hitNode{level: layer, key: op.Key})
-		h, ok := q.handlers[op.Key]
+func (q *Queue) collectHandlers(r *ops.Reader, t ui.Transform, layer int) {
+	for {
+		data, ok := r.Decode()
 		if !ok {
-			h = new(handler)
-			q.handlers[op.Key] = h
+			return
 		}
-		h.area = op.Area
-		h.transform = t
-		h.wantsGrab = h.wantsGrab || op.Grab
-		return op
-	case childOp:
-		return q.collectHandlers(op.ChildOp(), t, layer)
-	default:
-		return nil
+		switch ops.OpType(data[0]) {
+		case ops.TypePush:
+			q.collectHandlers(r, t, layer)
+		case ops.TypePop:
+			return
+		case ops.TypeLayer:
+			layer++
+			q.hitTree = append(q.hitTree, hitNode{level: layer})
+		case ops.TypeTransform:
+			var op ui.OpTransform
+			op.Decode(data)
+			t = t.Mul(op.Transform)
+		case ops.TypePointerHandler:
+			var op OpHandler
+			op.Decode(data, r.Refs)
+			q.hitTree = append(q.hitTree, hitNode{level: layer, key: op.Key})
+			h, ok := q.handlers[op.Key]
+			if !ok {
+				h = new(handler)
+				q.handlers[op.Key] = h
+			}
+			h.area = op.Area
+			h.transform = t
+			h.wantsGrab = h.wantsGrab || op.Grab
+		}
 	}
 }
 
@@ -115,7 +105,7 @@ func (q *Queue) init() {
 	}
 }
 
-func (q *Queue) Frame(op ui.Op) {
+func (q *Queue) Frame(root *ui.Ops) {
 	q.init()
 	for k, h := range q.handlers {
 		if !h.active {
@@ -126,7 +116,8 @@ func (q *Queue) Frame(op ui.Op) {
 		}
 	}
 	q.hitTree = q.hitTree[:0]
-	q.collectHandlers(op, ui.Transform{}, 0)
+	q.reader.Reset(root.Data(), root.Refs())
+	q.collectHandlers(&q.reader, ui.Transform{}, 0)
 }
 
 func (q *Queue) For(k Key) []Event {

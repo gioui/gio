@@ -12,8 +12,8 @@ import (
 )
 
 type scrollChild struct {
-	op   ui.Op
-	size image.Point
+	size  image.Point
+	block ui.OpBlock
 }
 
 type List struct {
@@ -24,12 +24,14 @@ type List struct {
 	// The distance scrolled since last call to Init.
 	Distance int
 
+	area      gesture.Rect
 	scroll    gesture.Scroll
 	scrollDir int
 
 	offset int
 	first  int
 
+	ops *ui.Ops
 	cs  Constraints
 	len int
 
@@ -38,7 +40,6 @@ type List struct {
 	elem     func(w Widget)
 
 	size image.Point
-	ops  ui.Ops
 }
 
 type Interface interface {
@@ -46,19 +47,20 @@ type Interface interface {
 	At(i int) Widget
 }
 
-func (l *List) Init(cs Constraints, len int) (int, bool) {
+func (l *List) Init(ops *ui.Ops, cs Constraints, len int) (int, bool) {
 	l.maxSize = 0
 	l.children = l.children[:0]
+	l.ops = ops
 	l.cs = cs
 	l.len = len
 	l.elem = nil
 	if l.first > len {
 		l.first = len
 	}
-	l.ops = l.ops[:0]
 	if len == 0 {
 		return 0, false
 	}
+	l.scroll.Op(ops, &l.area)
 	return l.Index()
 }
 
@@ -82,9 +84,9 @@ func (l *List) Index() (int, bool) {
 	return i, ok
 }
 
-func (l *List) Layout() (ui.Op, Dimens) {
-	ops := append(ui.Ops{l.scroll.Op(&gesture.Rect{l.size})}, l.ops...)
-	return ops, Dimens{Size: l.size}
+func (l *List) Layout() Dimens {
+	l.area.Size = l.size
+	return Dimens{Size: l.size}
 }
 
 func (l *List) next() (int, bool) {
@@ -116,21 +118,28 @@ func (l *List) Elem(w Widget) {
 }
 
 func (l *List) backward(w Widget) {
-	subcs := axisConstraints(l.Axis, Constraint{Max: ui.Inf}, l.crossConstraintChild(l.cs))
 	l.first--
-	op, dims := w.Layout(subcs)
-	mainSize := axisMain(l.Axis, dims.Size)
+	child := l.add(w)
+	mainSize := axisMain(l.Axis, child.size)
 	l.offset += mainSize
 	l.maxSize += mainSize
-	l.children = append([]scrollChild{{op, dims.Size}}, l.children...)
+	l.children = append([]scrollChild{child}, l.children...)
 }
 
 func (l *List) forward(w Widget) {
-	subcs := axisConstraints(l.Axis, Constraint{Max: ui.Inf}, l.crossConstraintChild(l.cs))
-	op, dims := w.Layout(subcs)
-	mainSize := axisMain(l.Axis, dims.Size)
+	child := l.add(w)
+	mainSize := axisMain(l.Axis, child.size)
 	l.maxSize += mainSize
-	l.children = append(l.children, scrollChild{op, dims.Size})
+	l.children = append(l.children, child)
+}
+
+func (l *List) add(w Widget) scrollChild {
+	subcs := axisConstraints(l.Axis, Constraint{Max: ui.Inf}, l.crossConstraintChild(l.cs))
+	l.ops.Begin()
+	ui.OpLayer{}.Add(l.ops)
+	dims := w.Layout(l.ops, subcs)
+	block := l.ops.End()
+	return scrollChild{dims.Size, block}
 }
 
 func (l *List) draw() {
@@ -176,14 +185,17 @@ func (l *List) draw() {
 		if min < 0 {
 			min = 0
 		}
-		op := draw.ClipRect(
-			image.Rectangle{
-				Min: axisPoint(l.Axis, min, -ui.Inf),
-				Max: axisPoint(l.Axis, max, ui.Inf),
-			},
-			ui.OpTransform{Transform: ui.Offset(toPointF(axisPoint(l.Axis, pos, cross))), Op: child.op},
-		)
-		l.ops = append(l.ops, ui.OpLayer{Op: op})
+		r := image.Rectangle{
+			Min: axisPoint(l.Axis, min, -ui.Inf),
+			Max: axisPoint(l.Axis, max, ui.Inf),
+		}
+		l.ops.Begin()
+		draw.OpClip{Path: draw.RectPath(r)}.Add(l.ops)
+		ui.OpTransform{
+			Transform: ui.Offset(toPointF(axisPoint(l.Axis, pos, cross))),
+		}.Add(l.ops)
+		child.block.Add(l.ops)
+		l.ops.End().Add(l.ops)
 		pos += axisMain(l.Axis, sz)
 	}
 	atStart := l.first == 0 && l.offset <= 0

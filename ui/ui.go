@@ -3,9 +3,12 @@
 package ui
 
 import (
+	"encoding/binary"
+	"math"
 	"time"
 
 	"gioui.org/ui/f32"
+	"gioui.org/ui/internal/ops"
 )
 
 // Config contain the context for updating and
@@ -33,7 +36,7 @@ func (c *Config) Pixels(v Value) float32 {
 	}
 }
 
-// Op is implemented by all known drawing and control
+// Op is implemented by all drawing and control
 // operations.
 type Op interface {
 	ImplementsOp()
@@ -41,7 +44,6 @@ type Op interface {
 
 // OpLayer represents a semantic layer of UI.
 type OpLayer struct {
-	Op Op
 }
 
 // OpRedraw requests a redraw at the given time. Use
@@ -50,18 +52,38 @@ type OpRedraw struct {
 	At time.Time
 }
 
-// Ops is the operation for a list of ops.
-type Ops []Op
-
 // OpTransform transforms an op.
 type OpTransform struct {
 	Transform Transform
-	Op        Op
 }
 
 type Transform struct {
 	// TODO: general transforms.
 	offset f32.Point
+}
+
+func (r OpRedraw) Add(o *Ops) {
+	data := make([]byte, ops.TypeRedrawLen)
+	data[0] = byte(ops.TypeRedraw)
+	bo := binary.LittleEndian
+	// UnixNano cannot represent the zero time.
+	if t := r.At; !t.IsZero() {
+		nanos := t.UnixNano()
+		if nanos > 0 {
+			bo.PutUint64(data[1:], uint64(nanos))
+		}
+	}
+	o.Write(data)
+}
+
+func (r *OpRedraw) Decode(d []byte) {
+	bo := binary.LittleEndian
+	if ops.OpType(d[0]) != ops.TypeRedraw {
+		panic("invalid op")
+	}
+	if nanos := bo.Uint64(d[1:]); nanos > 0 {
+		r.At = time.Unix(0, int64(nanos))
+	}
 }
 
 func (t Transform) InvTransform(p f32.Point) f32.Point {
@@ -78,12 +100,39 @@ func (t Transform) Mul(t2 Transform) Transform {
 	}
 }
 
-func (t OpTransform) ChildOp() Op {
-	return t.Op
+func (t OpTransform) Add(o *Ops) {
+	data := make([]byte, ops.TypeTransformLen)
+	data[0] = byte(ops.TypeTransform)
+	bo := binary.LittleEndian
+	bo.PutUint32(data[1:], math.Float32bits(t.Transform.offset.X))
+	bo.PutUint32(data[5:], math.Float32bits(t.Transform.offset.Y))
+	o.Write(data)
 }
 
-func (o OpLayer) ChildOp() Op {
-	return o.Op
+func (t *OpTransform) Decode(d []byte) {
+	bo := binary.LittleEndian
+	if ops.OpType(d[0]) != ops.TypeTransform {
+		panic("invalid op")
+	}
+	*t = OpTransform{
+		Transform: Offset(f32.Point{
+			X: math.Float32frombits(bo.Uint32(d[1:])),
+			Y: math.Float32frombits(bo.Uint32(d[5:])),
+		}),
+	}
+}
+
+func (l OpLayer) Add(o *Ops) {
+	data := make([]byte, ops.TypeLayerLen)
+	data[0] = byte(ops.TypeLayer)
+	o.Write(data)
+}
+
+func (l *OpLayer) Decode(d []byte) {
+	if ops.OpType(d[0]) != ops.TypeLayer {
+		panic("invalid op")
+	}
+	*l = OpLayer{}
 }
 
 func Offset(o f32.Point) Transform {
@@ -93,7 +142,6 @@ func Offset(o f32.Point) Transform {
 // Inf is the int value that represents an unbounded maximum constraint.
 const Inf = int(^uint(0) >> 1)
 
-func (Ops) ImplementsOp()         {}
 func (OpLayer) ImplementsOp()     {}
 func (OpTransform) ImplementsOp() {}
 func (OpRedraw) ImplementsOp()    {}
