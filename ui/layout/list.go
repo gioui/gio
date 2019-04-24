@@ -83,7 +83,7 @@ func (l *List) Index() (int, bool) {
 }
 
 func (l *List) Layout() (ui.Op, Dimens) {
-	ops := append(ui.Ops{l.scroll.Op(gesture.Rect(l.size))}, l.ops...)
+	ops := append(ui.Ops{l.scroll.Op(&gesture.Rect{l.size})}, l.ops...)
 	return ops, Dimens{Size: l.size}
 }
 

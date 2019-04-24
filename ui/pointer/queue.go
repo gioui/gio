@@ -101,7 +101,7 @@ func (q *Queue) opHit(handlers *[]Key, op ui.Op, pos f32.Point) (HitResult, bool
 			return HitNone, false
 		}
 		tpos := h.transform.InvTransform(pos)
-		res := h.area(tpos)
+		res := h.area.Hit(tpos)
 		if res != HitNone {
 			*handlers = append(*handlers, op.Key)
 		}
@@ -229,7 +229,7 @@ func (q *Queue) Push(e Event) {
 			e.Priority = Foremost
 		}
 		e.Position = h.transform.InvTransform(e.Position)
-		e.Hit = h.area(e.Position) != HitNone
+		e.Hit = h.area.Hit(e.Position) != HitNone
 		h.events = append(h.events, e)
 		if e.Type == Release {
 			// Release grab when the number of grabs reaches zero.

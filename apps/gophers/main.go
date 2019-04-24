@@ -498,7 +498,7 @@ func (a *ActionButton) Layout(cs layout.Constraints) (ui.Op, layout.Dimens) {
 		layout.Margins{Top: ui.Dp(4)},
 		layout.F(func(cs layout.Constraints) (ui.Op, layout.Dimens) {
 			op, dims := fab(c, a.sendIco.image(c), fabCol, ui.Dp(56)).Layout(cs)
-			ops := ui.Ops{op, a.btnClicker.Op(gesture.Ellipse(dims.Size))}
+			ops := ui.Ops{op, a.btnClicker.Op(&gesture.Ellipse{dims.Size})}
 			return ops, dims
 		}),
 	))
@@ -556,7 +556,7 @@ func (a *App) user(c *ui.Config, index int) layout.Widget {
 						Layout()
 				}),
 			).Layout(cs)
-			ops := ui.Ops{op, click.Op(gesture.Rect(dims.Size))}
+			ops := ui.Ops{op, click.Op(&gesture.Rect{dims.Size})}
 			return ops, dims
 		}))
 		return elem.Layout()

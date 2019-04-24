@@ -37,6 +37,14 @@ type Scroll struct {
 	scroll float32
 }
 
+type Rect struct {
+	Size image.Point
+}
+
+type Ellipse struct {
+	Size image.Point
+}
+
 type flinger struct {
 	// Current offset in pixels.
 	x float32
@@ -254,30 +262,26 @@ func (f *flinger) Tick(now time.Time) int {
 	return idist
 }
 
-func Rect(sz image.Point) pointer.Area {
-	return func(pos f32.Point) pointer.HitResult {
-		if 0 <= pos.X && pos.X < float32(sz.X) &&
-			0 <= pos.Y && pos.Y < float32(sz.Y) {
-			return pointer.HitOpaque
-		} else {
-			return pointer.HitNone
-		}
+func (r *Rect) Hit(pos f32.Point) pointer.HitResult {
+	if 0 <= pos.X && pos.X < float32(r.Size.X) &&
+		0 <= pos.Y && pos.Y < float32(r.Size.Y) {
+		return pointer.HitOpaque
+	} else {
+		return pointer.HitNone
 	}
 }
 
-func Ellipse(sz image.Point) pointer.Area {
-	return func(pos f32.Point) pointer.HitResult {
-		rx := float32(sz.X) / 2
-		ry := float32(sz.Y) / 2
-		rx2 := rx * rx
-		ry2 := ry * ry
-		xh := pos.X - rx
-		yk := pos.Y - ry
-		if xh*xh*ry2+yk*yk*rx2 <= rx2*ry2 {
-			return pointer.HitOpaque
-		} else {
-			return pointer.HitNone
-		}
+func (e *Ellipse) Hit(pos f32.Point) pointer.HitResult {
+	rx := float32(e.Size.X) / 2
+	ry := float32(e.Size.Y) / 2
+	rx2 := rx * rx
+	ry2 := ry * ry
+	xh := pos.X - rx
+	yk := pos.Y - ry
+	if xh*xh*ry2+yk*yk*rx2 <= rx2*ry2 {
+		return pointer.HitOpaque
+	} else {
+		return pointer.HitNone
 	}
 }
 

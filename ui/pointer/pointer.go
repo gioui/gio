@@ -25,7 +25,9 @@ type OpHandler struct {
 	Grab bool
 }
 
-type Area func(pos f32.Point) HitResult
+type Area interface {
+	Hit(pos f32.Point) HitResult
+}
 
 type Key interface{}
 
