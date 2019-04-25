@@ -273,9 +273,6 @@ func (g *GPU) Release() {
 }
 
 func (g *GPU) Flush() error {
-	if g.err != nil {
-		return g.err
-	}
 	if g.drawing {
 		st := <-g.results
 		g.setErr(st.err)
@@ -305,6 +302,7 @@ func (g *GPU) Draw(profile bool, viewport image.Point, op ui.Op) {
 	if g.err != nil {
 		return
 	}
+	g.Flush()
 	g.ops.collect(g.cache, op, viewport)
 	g.frames <- frame{profile, viewport, g.ops}
 	g.drawing = true
