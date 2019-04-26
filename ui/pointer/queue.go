@@ -8,11 +8,17 @@ import (
 )
 
 type Queue struct {
-	// The root of the tree of ops relevant to pointer handling.
-	root     ui.Op
+	hitTree  []hitNode
 	handlers map[Key]*handler
 	pointers []pointerInfo
 	scratch  []Key
+}
+
+type hitNode struct {
+	// The layer depth.
+	level int
+	// The handler, or nil for a layer.
+	key Key
 }
 
 type pointerInfo struct {
@@ -33,12 +39,12 @@ type childOp interface {
 	ChildOp() ui.Op
 }
 
-func (q *Queue) collectHandlers(op ui.Op, t ui.Transform) ui.Op {
+func (q *Queue) collectHandlers(op ui.Op, t ui.Transform, layer int) ui.Op {
 	switch op := op.(type) {
 	case ui.Ops:
 		var all ui.Ops
 		for _, op := range op {
-			if op := q.collectHandlers(op, t); op != nil {
+			if op := q.collectHandlers(op, t, layer); op != nil {
 				if ops, ok := op.(ui.Ops); ok {
 					all = append(all, ops...)
 				} else {
@@ -48,14 +54,17 @@ func (q *Queue) collectHandlers(op ui.Op, t ui.Transform) ui.Op {
 		}
 		return all
 	case ui.OpLayer:
-		child := q.collectHandlers(op.ChildOp(), t)
+		layer++
+		q.hitTree = append(q.hitTree, hitNode{level: layer})
+		child := q.collectHandlers(op.ChildOp(), t, layer)
 		if child == nil {
 			return nil
 		}
 		return ui.OpLayer{Op: child}
 	case ui.OpTransform:
-		return q.collectHandlers(op.ChildOp(), t.Mul(op.Transform))
+		return q.collectHandlers(op.ChildOp(), t.Mul(op.Transform), layer)
 	case OpHandler:
+		q.hitTree = append(q.hitTree, hitNode{level: layer, key: op.Key})
 		h, ok := q.handlers[op.Key]
 		if !ok {
 			h = new(handler)
@@ -66,48 +75,37 @@ func (q *Queue) collectHandlers(op ui.Op, t ui.Transform) ui.Op {
 		h.wantsGrab = h.wantsGrab || op.Grab
 		return op
 	case childOp:
-		return q.collectHandlers(op.ChildOp(), t)
+		return q.collectHandlers(op.ChildOp(), t, layer)
 	default:
 		return nil
 	}
 }
 
-func (q *Queue) opHit(handlers *[]Key, op ui.Op, pos f32.Point) (HitResult, bool) {
-	if op == nil {
-		return HitNone, false
-	}
-	switch op := op.(type) {
-	case ui.Ops:
-		hitRes := HitNone
-		var layer bool
-		for i := len(op) - 1; i >= 0; i-- {
-			op := op[i]
-			if _, ok := op.(ui.OpLayer); layer && ok {
+func (q *Queue) opHit(handlers *[]Key, pos f32.Point) {
+	level := 1 << 30
+	opaque := false
+	for i := len(q.hitTree) - 1; i >= 0; i-- {
+		n := q.hitTree[i]
+		if n.key == nil {
+			// Layer
+			if opaque {
+				opaque = false
+				// Skip sibling handlers.
+				level = n.level - 1
+			}
+		} else if n.level <= level {
+			// Handler
+			h, ok := q.handlers[n.key]
+			if !ok {
 				continue
 			}
-			res, l := q.opHit(handlers, op, pos)
-			if res > hitRes {
-				hitRes = res
+			tpos := h.transform.InvTransform(pos)
+			res := h.area.Hit(tpos)
+			opaque = opaque || res == HitOpaque
+			if res != HitNone {
+				*handlers = append(*handlers, n.key)
 			}
-			layer = layer || l
 		}
-		return hitRes, layer
-	case ui.OpLayer:
-		res, layer := q.opHit(handlers, op.Op, pos)
-		return res, layer || res == HitOpaque
-	case OpHandler:
-		h, ok := q.handlers[op.Key]
-		if !ok {
-			return HitNone, false
-		}
-		tpos := h.transform.InvTransform(pos)
-		res := h.area.Hit(tpos)
-		if res != HitNone {
-			*handlers = append(*handlers, op.Key)
-		}
-		return res, false
-	default:
-		panic("unexpected op")
 	}
 }
 
@@ -127,7 +125,8 @@ func (q *Queue) Frame(op ui.Op) {
 			h.events = h.events[:0]
 		}
 	}
-	q.root = q.collectHandlers(op, ui.Transform{})
+	q.hitTree = q.hitTree[:0]
+	q.collectHandlers(op, ui.Transform{}, 0)
 }
 
 func (q *Queue) For(k Key) []Event {
@@ -185,7 +184,7 @@ func (q *Queue) Push(e Event) {
 	p := &q.pointers[pidx]
 	if !p.pressed && (e.Type == Move || e.Type == Press) {
 		p.handlers, q.scratch = q.scratch[:0], p.handlers
-		q.opHit(&p.handlers, q.root, e.Position)
+		q.opHit(&p.handlers, e.Position)
 		// Drop handlers no longer hit.
 	loop:
 		for _, h := range q.scratch {
