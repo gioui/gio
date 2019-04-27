@@ -69,8 +69,6 @@ func (i *OpImage) Decode(d []byte, refs []interface{}) {
 	}
 }
 
-func (OpImage) ImplementsOp() {}
-
 // RectPath constructs a path corresponding to
 // a pixel aligned rectangular area.
 func RectPath(r image.Rectangle) *Path {

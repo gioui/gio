@@ -36,12 +36,6 @@ func (c *Config) Pixels(v Value) float32 {
 	}
 }
 
-// Op is implemented by all drawing and control
-// operations.
-type Op interface {
-	ImplementsOp()
-}
-
 // OpLayer represents a semantic layer of UI.
 type OpLayer struct {
 }
@@ -141,7 +135,3 @@ func Offset(o f32.Point) Transform {
 
 // Inf is the int value that represents an unbounded maximum constraint.
 const Inf = int(^uint(0) >> 1)
-
-func (OpLayer) ImplementsOp()     {}
-func (OpTransform) ImplementsOp() {}
-func (OpRedraw) ImplementsOp()    {}

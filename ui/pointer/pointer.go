@@ -134,5 +134,4 @@ func (s Source) String() string {
 	}
 }
 
-func (OpHandler) ImplementsOp() {}
-func (Event) ImplementsEvent()  {}
+func (Event) ImplementsEvent() {}

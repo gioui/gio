@@ -99,9 +99,6 @@ func (h OpHideInput) Add(o *ui.Ops) {
 	o.Write(data)
 }
 
-func (OpHandler) ImplementsOp()   {}
-func (OpHideInput) ImplementsOp() {}
-
 func (Edit) ImplementsEvent()  {}
 func (Chord) ImplementsEvent() {}
 func (Focus) ImplementsEvent() {}

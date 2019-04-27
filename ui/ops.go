@@ -75,5 +75,3 @@ func (b OpBlock) Add(o *Ops) {
 	bo.PutUint32(data[1:], uint32(b.idx))
 	o.Write(data)
 }
-
-func (OpBlock) ImplementsOp() {}

@@ -280,5 +280,3 @@ func (p *PathBuilder) Path() *Path {
 	}
 	return data
 }
-
-func (p OpClip) ImplementsOp() {}
