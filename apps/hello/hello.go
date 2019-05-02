@@ -59,7 +59,7 @@ func loop(w *app.Window) {
 			faces.Frame()
 		}
 	}
-	if w.Err() != nil {
+	if err := w.Err(); err != nil {
 		log.Fatal(err)
 	}
 }
