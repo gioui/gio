@@ -41,13 +41,6 @@ var (
 	_eglQueryString         = libEGL.NewProc("eglQueryString")
 )
 
-const (
-	nilEGLSurface          _EGLSurface          = 0
-	nilEGLContext          _EGLContext          = 0
-	nilEGLConfig           _EGLConfig           = 0
-	nilEGLNativeWindowType _EGLNativeWindowType = 0
-)
-
 func init() {
 	mustLoadDLL(libEGL, "libEGL.dll")
 	mustLoadDLL(gl.LibGLESv2, "libGLESv2.dll")

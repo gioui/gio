@@ -117,7 +117,7 @@ func newCoverer(ctx *gl.Functions) *coverer {
 }
 
 func newStenciler(ctx *gl.Functions) *stenciler {
-	defFBO := gl.Framebuffer(ctx.GetInteger(gl.FRAMEBUFFER_BINDING))
+	defFBO := gl.Framebuffer(ctx.GetBinding(gl.FRAMEBUFFER_BINDING))
 	prog, err := gl.CreateProgram(ctx, stencilVSrc, stencilFSrc, pathAttribs)
 	if err != nil {
 		panic(err)
@@ -248,7 +248,7 @@ func (p *pather) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.
 
 func (s *stenciler) beginIntersect(sizes []image.Point) {
 	s.ctx.ActiveTexture(gl.TEXTURE1)
-	s.ctx.BindTexture(gl.TEXTURE_2D, 0)
+	s.ctx.BindTexture(gl.TEXTURE_2D, gl.Texture{})
 	s.ctx.ActiveTexture(gl.TEXTURE0)
 	s.ctx.BlendFunc(gl.DST_COLOR, gl.ZERO)
 	// 8 bit coverage is enough, but OpenGL ES only supports single channel
@@ -275,7 +275,7 @@ func (s *stenciler) cover(idx int) stencilFBO {
 
 func (s *stenciler) begin(sizes []image.Point) {
 	s.ctx.ActiveTexture(gl.TEXTURE1)
-	s.ctx.BindTexture(gl.TEXTURE_2D, 0)
+	s.ctx.BindTexture(gl.TEXTURE_2D, gl.Texture{})
 	s.ctx.ActiveTexture(gl.TEXTURE0)
 	s.ctx.BlendFunc(gl.ONE, gl.ONE)
 	s.fbos.resize(s.ctx, sizes, gl.R16F, gl.RED, gl.HALF_FLOAT)

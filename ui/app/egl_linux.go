@@ -20,13 +20,6 @@ type (
 	_EGLSurface = C.EGLSurface
 )
 
-var (
-	nilEGLSurface          _EGLSurface
-	nilEGLContext          _EGLContext
-	nilEGLConfig           _EGLConfig
-	nilEGLNativeWindowType _EGLNativeWindowType
-)
-
 func eglChooseConfig(disp _EGLDisplay, attribs []_EGLint) (_EGLConfig, bool) {
 	var cfg C.EGLConfig
 	var ncfg C.EGLint

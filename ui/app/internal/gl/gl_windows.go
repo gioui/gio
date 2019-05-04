@@ -91,26 +91,26 @@ func (c *Functions) ActiveTexture(t Enum) {
 	syscall.Syscall(_glActiveTexture.Addr(), 1, uintptr(t), 0, 0)
 }
 func (c *Functions) AttachShader(p Program, s Shader) {
-	syscall.Syscall(_glAttachShader.Addr(), 2, uintptr(p), uintptr(s), 0)
+	syscall.Syscall(_glAttachShader.Addr(), 2, uintptr(p.V), uintptr(s.V), 0)
 }
 func (f *Functions) BeginQuery(target Enum, query Query) {
-	syscall.Syscall(_glBeginQuery.Addr(), 2, uintptr(target), uintptr(query), 0)
+	syscall.Syscall(_glBeginQuery.Addr(), 2, uintptr(target), uintptr(query.V), 0)
 }
 func (c *Functions) BindAttribLocation(p Program, a Attrib, name string) {
 	cname := cString(name)
-	syscall.Syscall(_glBindAttribLocation.Addr(), 3, uintptr(p), uintptr(a), uintptr(unsafe.Pointer(&cname[0])))
+	syscall.Syscall(_glBindAttribLocation.Addr(), 3, uintptr(p.V), uintptr(a), uintptr(unsafe.Pointer(&cname[0])))
 }
 func (c *Functions) BindBuffer(target Enum, b Buffer) {
-	syscall.Syscall(_glBindBuffer.Addr(), 2, uintptr(target), uintptr(b), 0)
+	syscall.Syscall(_glBindBuffer.Addr(), 2, uintptr(target), uintptr(b.V), 0)
 }
 func (c *Functions) BindFramebuffer(target Enum, fb Framebuffer) {
-	syscall.Syscall(_glBindFramebuffer.Addr(), 2, uintptr(target), uintptr(fb), 0)
+	syscall.Syscall(_glBindFramebuffer.Addr(), 2, uintptr(target), uintptr(fb.V), 0)
 }
 func (c *Functions) BindRenderbuffer(target Enum, rb Renderbuffer) {
-	syscall.Syscall(_glBindRenderbuffer.Addr(), 2, uintptr(target), uintptr(rb), 0)
+	syscall.Syscall(_glBindRenderbuffer.Addr(), 2, uintptr(target), uintptr(rb.V), 0)
 }
 func (c *Functions) BindTexture(target Enum, t Texture) {
-	syscall.Syscall(_glBindTexture.Addr(), 2, uintptr(target), uintptr(t), 0)
+	syscall.Syscall(_glBindTexture.Addr(), 2, uintptr(target), uintptr(t.V), 0)
 }
 func (c *Functions) BlendEquation(mode Enum) {
 	syscall.Syscall(_glBlendEquation.Addr(), 1, uintptr(mode), 0, 0)
@@ -139,61 +139,61 @@ func (c *Functions) ClearDepthf(d float32) {
 	syscall.Syscall(_glClearDepthf.Addr(), 1, uintptr(math.Float32bits(d)), 0, 0)
 }
 func (c *Functions) CompileShader(s Shader) {
-	syscall.Syscall(_glCompileShader.Addr(), 1, uintptr(s), 0, 0)
+	syscall.Syscall(_glCompileShader.Addr(), 1, uintptr(s.V), 0, 0)
 }
 func (c *Functions) CreateBuffer() Buffer {
 	var buf uintptr
 	syscall.Syscall(_glGenBuffers.Addr(), 2, 1, uintptr(unsafe.Pointer(&buf)), 0)
-	return Buffer(buf)
+	return Buffer{uint(buf)}
 }
 func (c *Functions) CreateFramebuffer() Framebuffer {
 	var fb uintptr
 	syscall.Syscall(_glGenFramebuffers.Addr(), 2, 1, uintptr(unsafe.Pointer(&fb)), 0)
-	return Framebuffer(fb)
+	return Framebuffer{uint(fb)}
 }
 func (c *Functions) CreateProgram() Program {
 	p, _, _ := syscall.Syscall(_glCreateProgram.Addr(), 0, 0, 0, 0)
-	return Program(p)
+	return Program{uint(p)}
 }
 func (f *Functions) CreateQuery() Query {
 	var q uintptr
 	syscall.Syscall(_glGenQueries.Addr(), 2, 1, uintptr(unsafe.Pointer(&q)), 0)
-	return Query(q)
+	return Query{uint(q)}
 }
 func (c *Functions) CreateRenderbuffer() Renderbuffer {
 	var rb uintptr
 	syscall.Syscall(_glGenRenderbuffers.Addr(), 2, 1, uintptr(unsafe.Pointer(&rb)), 0)
-	return Renderbuffer(rb)
+	return Renderbuffer{uint(rb)}
 }
 func (c *Functions) CreateShader(ty Enum) Shader {
 	s, _, _ := syscall.Syscall(_glCreateShader.Addr(), 1, uintptr(ty), 0, 0)
-	return Shader(s)
+	return Shader{uint(s)}
 }
 func (c *Functions) CreateTexture() Texture {
 	var t uintptr
 	syscall.Syscall(_glGenTextures.Addr(), 2, 1, uintptr(unsafe.Pointer(&t)), 0)
-	return Texture(t)
+	return Texture{uint(t)}
 }
 func (c *Functions) DeleteBuffer(v Buffer) {
 	syscall.Syscall(_glDeleteBuffers.Addr(), 2, 1, uintptr(unsafe.Pointer(&v)), 0)
 }
 func (c *Functions) DeleteFramebuffer(v Framebuffer) {
-	syscall.Syscall(_glDeleteFramebuffers.Addr(), 2, 1, uintptr(unsafe.Pointer(&v)), 0)
+	syscall.Syscall(_glDeleteFramebuffers.Addr(), 2, 1, uintptr(unsafe.Pointer(&v.V)), 0)
 }
 func (c *Functions) DeleteProgram(p Program) {
-	syscall.Syscall(_glDeleteProgram.Addr(), 1, uintptr(p), 0, 0)
+	syscall.Syscall(_glDeleteProgram.Addr(), 1, uintptr(p.V), 0, 0)
 }
 func (f *Functions) DeleteQuery(query Query) {
-	syscall.Syscall(_glDeleteQueries.Addr(), 2, 1, uintptr(unsafe.Pointer(&query)), 0)
+	syscall.Syscall(_glDeleteQueries.Addr(), 2, 1, uintptr(unsafe.Pointer(&query.V)), 0)
 }
 func (c *Functions) DeleteShader(s Shader) {
-	syscall.Syscall(_glDeleteShader.Addr(), 1, uintptr(s), 0, 0)
+	syscall.Syscall(_glDeleteShader.Addr(), 1, uintptr(s.V), 0, 0)
 }
 func (c *Functions) DeleteRenderbuffer(v Renderbuffer) {
-	syscall.Syscall(_glDeleteRenderbuffers.Addr(), 2, 1, uintptr(unsafe.Pointer(&v)), 0)
+	syscall.Syscall(_glDeleteRenderbuffers.Addr(), 2, 1, uintptr(unsafe.Pointer(&v.V)), 0)
 }
 func (c *Functions) DeleteTexture(v Texture) {
-	syscall.Syscall(_glDeleteTextures.Addr(), 2, 1, uintptr(unsafe.Pointer(&v)), 0)
+	syscall.Syscall(_glDeleteTextures.Addr(), 2, 1, uintptr(unsafe.Pointer(&v.V)), 0)
 }
 func (c *Functions) DepthFunc(f Enum) {
 	syscall.Syscall(_glDepthFunc.Addr(), 1, uintptr(f), 0, 0)
@@ -230,10 +230,13 @@ func (c *Functions) Finish() {
 	syscall.Syscall(_glFinish.Addr(), 0, 0, 0, 0)
 }
 func (c *Functions) FramebufferRenderbuffer(target, attachment, renderbuffertarget Enum, renderbuffer Renderbuffer) {
-	syscall.Syscall6(_glFramebufferRenderbuffer.Addr(), 4, uintptr(target), uintptr(attachment), uintptr(renderbuffertarget), uintptr(renderbuffer), 0, 0)
+	syscall.Syscall6(_glFramebufferRenderbuffer.Addr(), 4, uintptr(target), uintptr(attachment), uintptr(renderbuffertarget), uintptr(renderbuffer.V), 0, 0)
 }
 func (c *Functions) FramebufferTexture2D(target, attachment, texTarget Enum, t Texture, level int) {
-	syscall.Syscall6(_glFramebufferTexture2D.Addr(), 5, uintptr(target), uintptr(attachment), uintptr(texTarget), uintptr(t), uintptr(level), 0)
+	syscall.Syscall6(_glFramebufferTexture2D.Addr(), 5, uintptr(target), uintptr(attachment), uintptr(texTarget), uintptr(t.V), uintptr(level), 0)
+}
+func (c *Functions) GetBinding(pname Enum) Object {
+	return Object{uint(c.GetInteger(pname))}
 }
 func (c *Functions) GetError() Enum {
 	e, _, _ := syscall.Syscall(_glGetError.Addr(), 0, 0, 0, 0)
@@ -256,41 +259,41 @@ func (c *Functions) GetInteger(pname Enum) int {
 func (c *Functions) GetProgrami(p Program, pname Enum) int {
 	// Hopefully enough space.
 	var params [100]int32
-	syscall.Syscall(_glGetProgramiv.Addr(), 3, uintptr(p), uintptr(pname), uintptr(unsafe.Pointer(&params[0])))
+	syscall.Syscall(_glGetProgramiv.Addr(), 3, uintptr(p.V), uintptr(pname), uintptr(unsafe.Pointer(&params[0])))
 	return int(params[0])
 }
 func (c *Functions) GetProgramInfoLog(p Program) string {
 	var n uintptr
-	syscall.Syscall6(_glGetProgramInfoLog.Addr(), 4, uintptr(p), 0, uintptr(unsafe.Pointer(&n)), 0, 0, 0)
+	syscall.Syscall6(_glGetProgramInfoLog.Addr(), 4, uintptr(p.V), 0, uintptr(unsafe.Pointer(&n)), 0, 0, 0)
 	if n == 0 {
 		return ""
 	}
 	// Make space for the null terminator.
 	buf := make([]byte, n+1)
-	syscall.Syscall6(_glGetProgramInfoLog.Addr(), 4, uintptr(p), uintptr(len(buf)), uintptr(unsafe.Pointer(&n)), uintptr(unsafe.Pointer(&buf[0])), 0, 0)
+	syscall.Syscall6(_glGetProgramInfoLog.Addr(), 4, uintptr(p.V), uintptr(len(buf)), uintptr(unsafe.Pointer(&n)), uintptr(unsafe.Pointer(&buf[0])), 0, 0)
 	return string(buf[:len(buf)-1])
 }
 func (f *Functions) GetQueryObjectuiv(query Query, pname Enum) uint {
 	// Hope this is enough room.
 	var buf [100]int32
-	syscall.Syscall(_glGetQueryObjectuiv.Addr(), 3, uintptr(query), uintptr(pname), uintptr(unsafe.Pointer(&buf[0])))
+	syscall.Syscall(_glGetQueryObjectuiv.Addr(), 3, uintptr(query.V), uintptr(pname), uintptr(unsafe.Pointer(&buf[0])))
 	return uint(buf[0])
 }
 func (c *Functions) GetShaderi(s Shader, pname Enum) int {
 	// Hopefully enough room.
 	var params [100]int32
-	syscall.Syscall(_glGetShaderiv.Addr(), 3, uintptr(s), uintptr(pname), uintptr(unsafe.Pointer(&params[0])))
+	syscall.Syscall(_glGetShaderiv.Addr(), 3, uintptr(s.V), uintptr(pname), uintptr(unsafe.Pointer(&params[0])))
 	return int(params[0])
 }
 func (c *Functions) GetShaderInfoLog(s Shader) string {
 	var n uintptr
-	syscall.Syscall6(_glGetShaderInfoLog.Addr(), 4, uintptr(s), 0, uintptr(unsafe.Pointer(&n)), 0, 0, 0)
+	syscall.Syscall6(_glGetShaderInfoLog.Addr(), 4, uintptr(s.V), 0, uintptr(unsafe.Pointer(&n)), 0, 0, 0)
 	if n == 0 {
 		return ""
 	}
 	// Make space for the null terminator.
 	buf := make([]byte, n+1)
-	syscall.Syscall6(_glGetShaderInfoLog.Addr(), 4, uintptr(s), uintptr(len(buf)), uintptr(unsafe.Pointer(&n)), uintptr(unsafe.Pointer(&buf[0])), 0, 0)
+	syscall.Syscall6(_glGetShaderInfoLog.Addr(), 4, uintptr(s.V), uintptr(len(buf)), uintptr(unsafe.Pointer(&n)), uintptr(unsafe.Pointer(&buf[0])), 0, 0)
 	return string(buf[:len(buf)-1])
 }
 func (c *Functions) GetString(pname Enum) string {
@@ -299,8 +302,8 @@ func (c *Functions) GetString(pname Enum) string {
 }
 func (c *Functions) GetUniformLocation(p Program, name string) Uniform {
 	cname := cString(name)
-	u, _, _ := syscall.Syscall(_glGetUniformLocation.Addr(), 2, uintptr(p), uintptr(unsafe.Pointer(&cname[0])), 0)
-	return Uniform(u)
+	u, _, _ := syscall.Syscall(_glGetUniformLocation.Addr(), 2, uintptr(p.V), uintptr(unsafe.Pointer(&cname[0])), 0)
+	return Uniform{int(u)}
 }
 func (c *Functions) InvalidateFramebuffer(target, attachment Enum) {
 	addr := _glInvalidateFramebuffer.Addr()
@@ -311,7 +314,7 @@ func (c *Functions) InvalidateFramebuffer(target, attachment Enum) {
 	syscall.Syscall(addr, 3, uintptr(target), 1, uintptr(unsafe.Pointer(&attachment)))
 }
 func (c *Functions) LinkProgram(p Program) {
-	syscall.Syscall(_glLinkProgram.Addr(), 1, uintptr(p), 0, 0)
+	syscall.Syscall(_glLinkProgram.Addr(), 1, uintptr(p.V), 0, 0)
 }
 func (c *Functions) PixelStorei(pname Enum, param int32) {
 	syscall.Syscall(_glPixelStorei.Addr(), 2, uintptr(pname), uintptr(param), 0)
@@ -324,7 +327,7 @@ func (c *Functions) Scissor(x, y, width, height int32) {
 }
 func (c *Functions) ShaderSource(s Shader, src string) {
 	var n uintptr = uintptr(len(src))
-	syscall.Syscall6(_glShaderSource.Addr(), 4, uintptr(s), 1, uintptr(unsafe.Pointer(&src)), uintptr(unsafe.Pointer(&n)), 0, 0)
+	syscall.Syscall6(_glShaderSource.Addr(), 4, uintptr(s.V), 1, uintptr(unsafe.Pointer(&src)), uintptr(unsafe.Pointer(&n)), 0, 0)
 }
 func (c *Functions) TexImage2D(target Enum, level int, internalFormat int, width, height int, format, ty Enum, data []byte) {
 	if len(data) == 0 {
@@ -340,22 +343,22 @@ func (c *Functions) TexParameteri(target, pname Enum, param int) {
 	syscall.Syscall(_glTexParameteri.Addr(), 3, uintptr(target), uintptr(pname), uintptr(param))
 }
 func (c *Functions) Uniform1f(dst Uniform, v float32) {
-	syscall.Syscall(_glUniform1f.Addr(), 2, uintptr(dst), uintptr(math.Float32bits(v)), 0)
+	syscall.Syscall(_glUniform1f.Addr(), 2, uintptr(dst.V), uintptr(math.Float32bits(v)), 0)
 }
 func (c *Functions) Uniform1i(dst Uniform, v int) {
-	syscall.Syscall(_glUniform1i.Addr(), 2, uintptr(dst), uintptr(v), 0)
+	syscall.Syscall(_glUniform1i.Addr(), 2, uintptr(dst.V), uintptr(v), 0)
 }
 func (c *Functions) Uniform2f(dst Uniform, v0, v1 float32) {
-	syscall.Syscall(_glUniform2f.Addr(), 3, uintptr(dst), uintptr(math.Float32bits(v0)), uintptr(math.Float32bits(v1)))
+	syscall.Syscall(_glUniform2f.Addr(), 3, uintptr(dst.V), uintptr(math.Float32bits(v0)), uintptr(math.Float32bits(v1)))
 }
 func (c *Functions) Uniform3f(dst Uniform, v0, v1, v2 float32) {
-	syscall.Syscall6(_glUniform3f.Addr(), 4, uintptr(dst), uintptr(math.Float32bits(v0)), uintptr(math.Float32bits(v1)), uintptr(math.Float32bits(v2)), 0, 0)
+	syscall.Syscall6(_glUniform3f.Addr(), 4, uintptr(dst.V), uintptr(math.Float32bits(v0)), uintptr(math.Float32bits(v1)), uintptr(math.Float32bits(v2)), 0, 0)
 }
 func (c *Functions) Uniform4f(dst Uniform, v0, v1, v2, v3 float32) {
-	syscall.Syscall6(_glUniform4f.Addr(), 5, uintptr(dst), uintptr(math.Float32bits(v0)), uintptr(math.Float32bits(v1)), uintptr(math.Float32bits(v2)), uintptr(math.Float32bits(v3)), 0)
+	syscall.Syscall6(_glUniform4f.Addr(), 5, uintptr(dst.V), uintptr(math.Float32bits(v0)), uintptr(math.Float32bits(v1)), uintptr(math.Float32bits(v2)), uintptr(math.Float32bits(v3)), 0)
 }
 func (c *Functions) UseProgram(p Program) {
-	syscall.Syscall(_glUseProgram.Addr(), 1, uintptr(p), 0, 0)
+	syscall.Syscall(_glUseProgram.Addr(), 1, uintptr(p.V), 0, 0)
 }
 func (c *Functions) VertexAttribPointer(dst Attrib, size int, ty Enum, normalized bool, stride, offset int) {
 	var norm uintptr

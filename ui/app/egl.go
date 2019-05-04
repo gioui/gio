@@ -33,6 +33,13 @@ type eglContext struct {
 	srgb     bool
 }
 
+var (
+	nilEGLSurface          _EGLSurface
+	nilEGLContext          _EGLContext
+	nilEGLConfig           _EGLConfig
+	nilEGLNativeWindowType _EGLNativeWindowType
+)
+
 const (
 	_EGL_ALPHA_SIZE             = 0x3021
 	_EGL_BLUE_SIZE              = 0x3022

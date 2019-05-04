@@ -326,7 +326,7 @@ func (g *GPU) setErr(err error) {
 }
 
 func (r *renderer) texHandle(t *texture) gl.Texture {
-	if t.id != 0 {
+	if t.id != (gl.Texture{}) {
 		return t.id
 	}
 	t.id = createTexture(r.ctx)
@@ -336,7 +336,7 @@ func (r *renderer) texHandle(t *texture) gl.Texture {
 }
 
 func (t *texture) release(ctx *gl.Functions) {
-	if t.id != 0 {
+	if t.id != (gl.Texture{}) {
 		ctx.DeleteTexture(t.id)
 	}
 }

@@ -69,7 +69,7 @@ func NewSRGBFBO(f *Functions) (*SRGBFBO, error) {
 }
 
 func (s *SRGBFBO) Blit() {
-	s.c.BindFramebuffer(FRAMEBUFFER, 0)
+	s.c.BindFramebuffer(FRAMEBUFFER, Framebuffer{})
 	s.c.ClearColor(1, 0, 1, 1)
 	s.c.Clear(COLOR_BUFFER_BIT)
 	s.c.UseProgram(s.prog)
@@ -80,7 +80,7 @@ func (s *SRGBFBO) Blit() {
 	s.c.EnableVertexAttribArray(0)
 	s.c.EnableVertexAttribArray(1)
 	s.c.DrawArrays(TRIANGLE_STRIP, 0, 4)
-	s.c.BindTexture(TEXTURE_2D, 0)
+	s.c.BindTexture(TEXTURE_2D, Texture{})
 	s.c.DisableVertexAttribArray(0)
 	s.c.DisableVertexAttribArray(1)
 	s.c.BindFramebuffer(FRAMEBUFFER, s.frameBuffer)
@@ -106,7 +106,7 @@ func (s *SRGBFBO) Refresh(w, h int) error {
 	} else /* EXT_sRGB */ {
 		s.c.TexImage2D(TEXTURE_2D, 0, SRGB_ALPHA_EXT, w, h, SRGB_ALPHA_EXT, UNSIGNED_BYTE, nil)
 	}
-	currentRB := Renderbuffer(s.c.GetInteger(RENDERBUFFER_BINDING))
+	currentRB := Renderbuffer(s.c.GetBinding(RENDERBUFFER_BINDING))
 	s.c.BindRenderbuffer(RENDERBUFFER, s.depthBuffer)
 	s.c.RenderbufferStorage(RENDERBUFFER, DEPTH_COMPONENT16, w, h)
 	s.c.BindRenderbuffer(RENDERBUFFER, currentRB)

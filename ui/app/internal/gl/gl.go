@@ -3,16 +3,8 @@
 package gl
 
 type (
-	Attrib       uint
-	Buffer       uint
-	Enum         uint
-	Framebuffer  uint
-	Program      uint
-	Renderbuffer uint
-	Shader       uint
-	Texture      uint
-	Uniform      int
-	Query        uint
+	Attrib uint
+	Enum   uint
 )
 
 type Context interface {
@@ -135,6 +127,7 @@ var _ interface {
 	Finish()
 	FramebufferRenderbuffer(target, attachment, renderbuffertarget Enum, renderbuffer Renderbuffer)
 	FramebufferTexture2D(target, attachment, texTarget Enum, t Texture, level int)
+	GetBinding(pname Enum) Object
 	GetError() Enum
 	GetRenderbufferParameteri(target, pname Enum) int
 	GetFramebufferAttachmentParameteri(target, attachment, pname Enum) int
