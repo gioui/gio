@@ -18,6 +18,8 @@ type caps struct {
 	// floatTriple holds the settings for floating point
 	// textures.
 	floatTriple textureTriple
+	// Single channel alpha textures.
+	alphaTriple textureTriple
 }
 
 // textureTriple holds the type settings for
@@ -57,8 +59,18 @@ func newContext(glctx gl.Context) (*context, error) {
 		EXT_disjoint_timer_query: strings.Contains(exts, "GL_EXT_disjoint_timer_query"),
 		srgbMode:                 srgbMode,
 		floatTriple:              floatTriple,
+		alphaTriple:              alphaTripleFor(ver),
 	}
 	return ctx, nil
+}
+
+func alphaTripleFor(ver [2]int) textureTriple {
+	intf, f := gl.R8, gl.Enum(gl.RED)
+	if ver[0] < 3 {
+		// R8, RED not supported on OpenGL ES 2.0.
+		intf, f = gl.LUMINANCE, gl.Enum(gl.LUMINANCE)
+	}
+	return textureTriple{intf, f, gl.UNSIGNED_BYTE}
 }
 
 func floatTripleFor(ver [2]int, exts string) (textureTriple, error) {

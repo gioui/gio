@@ -376,13 +376,8 @@ func loadLUT(ctx *context, lut *image.Gray) (gl.Texture, error) {
 	if lut.Stride != lut.Bounds().Dx() {
 		panic("unsupported LUT stride")
 	}
-	ver, _ := gl.ParseGLVersion(ctx.GetString(gl.VERSION))
-	intf, f := gl.R8, gl.RED
-	if ver[0] < 3 {
-		// R8, RED not supported on OpenGL ES 2.0.
-		intf, f = gl.LUMINANCE, gl.LUMINANCE
-	}
-	ctx.TexImage2D(gl.TEXTURE_2D, 0, intf, lut.Bounds().Dx(), lut.Bounds().Dy(), gl.Enum(f), gl.UNSIGNED_BYTE, lut.Pix)
+	tt := ctx.caps.alphaTriple
+	ctx.TexImage2D(gl.TEXTURE_2D, 0, tt.internalFormat, lut.Bounds().Dx(), lut.Bounds().Dy(), tt.format, tt.typ, lut.Pix)
 	ctx.PixelStorei(gl.UNPACK_ALIGNMENT, 4)
 	return tex, nil
 }
