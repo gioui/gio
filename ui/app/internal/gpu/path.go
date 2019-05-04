@@ -151,7 +151,7 @@ func newStenciler(ctx *context) *stenciler {
 	}
 }
 
-func (s *fboSet) resize(ctx *context, sizes []image.Point, internalFormat int, format, ty gl.Enum) {
+func (s *fboSet) resize(ctx *context, sizes []image.Point) {
 	// Add fbos.
 	for i := len(s.fbos); i < len(sizes); i++ {
 		tex := ctx.CreateTexture()
@@ -177,7 +177,8 @@ func (s *fboSet) resize(ctx *context, sizes []image.Point, internalFormat int, f
 		if resize {
 			f.size = sz
 			ctx.BindTexture(gl.TEXTURE_2D, f.tex)
-			ctx.TexImage2D(gl.TEXTURE_2D, 0, internalFormat, sz.X, sz.Y, format, ty, nil)
+			tt := ctx.caps.floatTriple
+			ctx.TexImage2D(gl.TEXTURE_2D, 0, tt.internalFormat, sz.X, sz.Y, tt.format, tt.typ, nil)
 			ctx.BindFramebuffer(gl.FRAMEBUFFER, f.fbo)
 			ctx.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, f.tex, 0)
 		}
@@ -254,7 +255,7 @@ func (s *stenciler) beginIntersect(sizes []image.Point) {
 	// 8 bit coverage is enough, but OpenGL ES only supports single channel
 	// floating point formats. Replace with GL_RGB+GL_UNSIGNED_BYTE if
 	// no floating point support is available.
-	s.intersections.resize(s.ctx, sizes, gl.R16F, gl.RED, gl.HALF_FLOAT)
+	s.intersections.resize(s.ctx, sizes)
 	s.ctx.ClearColor(1.0, 0.0, 0.0, 0.0)
 	s.ctx.UseProgram(s.iprog)
 }
@@ -278,7 +279,7 @@ func (s *stenciler) begin(sizes []image.Point) {
 	s.ctx.BindTexture(gl.TEXTURE_2D, gl.Texture{})
 	s.ctx.ActiveTexture(gl.TEXTURE0)
 	s.ctx.BlendFunc(gl.ONE, gl.ONE)
-	s.fbos.resize(s.ctx, sizes, gl.R16F, gl.RED, gl.HALF_FLOAT)
+	s.fbos.resize(s.ctx, sizes)
 	s.ctx.ClearColor(0.0, 0.0, 0.0, 0.0)
 	s.ctx.BindTexture(gl.TEXTURE_2D, s.areaLUT)
 	s.ctx.UseProgram(s.prog)

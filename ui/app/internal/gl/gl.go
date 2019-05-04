@@ -35,6 +35,7 @@ const (
 	FRAMEBUFFER_BINDING                   = 0x8ca6
 	FRAMEBUFFER_COMPLETE                  = 0x8cd5
 	HALF_FLOAT                            = 0x140b
+	HALF_FLOAT_OES                        = 0x8d61
 	GREATER                               = 0x204
 	LINEAR                                = 0x2601
 	LINK_STATUS                           = 0x8b82
