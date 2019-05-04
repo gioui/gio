@@ -859,15 +859,8 @@ func (r *renderer) uploadTexture(img image.Image) {
 	default:
 		pixels = copyImage(img, b).Pix
 	}
-	var internal int
-	var format gl.Enum
-	switch r.ctx.caps.srgbMode {
-	case srgbES3:
-		internal, format = gl.SRGB8_ALPHA8, gl.RGBA
-	case srgbEXT:
-		internal, format = gl.SRGB_ALPHA_EXT, gl.SRGB_ALPHA_EXT
-	}
-	r.ctx.TexImage2D(gl.TEXTURE_2D, 0, internal, w, h, format, gl.UNSIGNED_BYTE, pixels)
+	tt := r.ctx.caps.srgbaTriple
+	r.ctx.TexImage2D(gl.TEXTURE_2D, 0, tt.internalFormat, w, h, tt.format, tt.typ, pixels)
 
 }
 

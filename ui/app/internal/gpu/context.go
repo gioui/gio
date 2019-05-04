@@ -14,12 +14,12 @@ type context struct {
 
 type caps struct {
 	EXT_disjoint_timer_query bool
-	srgbMode                 srgbMode
 	// floatTriple holds the settings for floating point
 	// textures.
 	floatTriple textureTriple
 	// Single channel alpha textures.
 	alphaTriple textureTriple
+	srgbaTriple textureTriple
 }
 
 // textureTriple holds the type settings for
@@ -29,13 +29,6 @@ type textureTriple struct {
 	format         gl.Enum
 	typ            gl.Enum
 }
-
-type srgbMode uint8
-
-const (
-	srgbES3 srgbMode = iota
-	srgbEXT
-)
 
 func newContext(glctx gl.Context) (*context, error) {
 	ctx := &context{
@@ -47,21 +40,32 @@ func newContext(glctx gl.Context) (*context, error) {
 	if err != nil {
 		return nil, err
 	}
-	srgbMode, err := srgbModeFor(ver, exts)
+	floatTriple, err := floatTripleFor(ver, exts)
 	if err != nil {
 		return nil, err
 	}
-	floatTriple, err := floatTripleFor(ver, exts)
+	srgbaTriple, err := srgbaTripleFor(ver, exts)
 	if err != nil {
 		return nil, err
 	}
 	ctx.caps = caps{
 		EXT_disjoint_timer_query: strings.Contains(exts, "GL_EXT_disjoint_timer_query"),
-		srgbMode:                 srgbMode,
 		floatTriple:              floatTriple,
 		alphaTriple:              alphaTripleFor(ver),
+		srgbaTriple:              srgbaTriple,
 	}
 	return ctx, nil
+}
+
+func srgbaTripleFor(ver [2]int, exts string) (textureTriple, error) {
+	switch {
+	case ver[0] >= 3:
+		return textureTriple{gl.SRGB8_ALPHA8, gl.Enum(gl.RGBA), gl.Enum(gl.UNSIGNED_BYTE)}, nil
+	case strings.Contains(exts, "GL_EXT_sRGB"):
+		return textureTriple{gl.SRGB_ALPHA_EXT, gl.Enum(gl.SRGB_ALPHA_EXT), gl.Enum(gl.UNSIGNED_BYTE)}, nil
+	default:
+		return textureTriple{}, errors.New("no sRGB texture formats found")
+	}
 }
 
 func alphaTripleFor(ver [2]int) textureTriple {
@@ -83,16 +87,5 @@ func floatTripleFor(ver [2]int, exts string) (textureTriple, error) {
 		return textureTriple{gl.RGBA, gl.Enum(gl.RGBA), gl.Enum(gl.FLOAT)}, nil
 	default:
 		return textureTriple{}, errors.New("floating point texture not supported")
-	}
-}
-
-func srgbModeFor(ver [2]int, exts string) (srgbMode, error) {
-	switch {
-	case ver[0] >= 3:
-		return srgbES3, nil
-	case strings.Contains(exts, "EXT_sRGB"):
-		return srgbEXT, nil
-	default:
-		return 0, errors.New("neither OpenGL ES 3 nor EXT_sRGB is supported")
 	}
 }
