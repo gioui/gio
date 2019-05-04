@@ -26,7 +26,7 @@ func NewSRGBFBO(f *Functions) (*SRGBFBO, error) {
 	glVer := f.GetString(VERSION)
 	ver, err := ParseGLVersion(glVer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse OpenGL ES version (%s): %v", glVer, err)
+		return nil, err
 	}
 	if ver[0] >= 3 {
 		es3 = true

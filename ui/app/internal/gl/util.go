@@ -76,10 +76,14 @@ func BytesView(s interface{}) []byte {
 
 func ParseGLVersion(glVer string) ([2]int, error) {
 	var ver [2]int
-	if _, err := fmt.Sscanf(glVer, "OpenGL ES %d.%d", &ver[0], &ver[1]); err != nil {
-		if _, err := fmt.Sscanf(glVer, "%d.%d", &ver[0], &ver[1]); err != nil {
-			return [2]int{}, fmt.Errorf("failed to parse OpenGL ES version (%s): %v", glVer, err)
-		}
+	if _, err := fmt.Sscanf(glVer, "OpenGL ES %d.%d", &ver[0], &ver[1]); err == nil {
+		return ver, nil
+	} else if _, err := fmt.Sscanf(glVer, "WebGL %d.%d", &ver[0], &ver[1]); err == nil {
+		// WebGL major version v corresponds to OpenGL ES version v + 1
+		ver[0]++
+		return ver, nil
+	} else if _, err := fmt.Sscanf(glVer, "%d.%d", &ver[0], &ver[1]); err == nil {
+		return ver, nil
 	}
-	return ver, nil
+	return ver, fmt.Errorf("failed to parse OpenGL ES version (%s)", glVer)
 }
