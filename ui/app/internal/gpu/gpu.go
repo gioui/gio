@@ -47,8 +47,7 @@ type frameResult struct {
 }
 
 type renderer struct {
-	ctx           *gl.Functions
-	srgbMode      srgbMode
+	ctx           *context
 	blitter       *blitter
 	pather        *pather
 	packer        packer
@@ -115,7 +114,7 @@ type resourceCache struct {
 }
 
 type resource interface {
-	release(ctx *gl.Functions)
+	release(ctx *context)
 }
 
 type texture struct {
@@ -125,7 +124,7 @@ type texture struct {
 }
 
 type blitter struct {
-	ctx      *gl.Functions
+	ctx      *context
 	viewport image.Point
 	prog     [2]gl.Program
 	vars     [2]struct {
@@ -138,12 +137,6 @@ type blitter struct {
 }
 
 type materialType uint8
-type srgbMode uint8
-
-const (
-	srgbES3 srgbMode = iota
-	srgbEXT
-)
 
 const (
 	clipTypeNone clipType = iota
@@ -172,14 +165,13 @@ func NewGPU(ctx gl.Context) (*GPU, error) {
 		stopped:    make(chan struct{}),
 		cache:      newResourceCache(),
 	}
-	// Pretend the last error was nil.
 	if err := g.renderLoop(ctx); err != nil {
 		return nil, err
 	}
 	return g, nil
 }
 
-func (g *GPU) renderLoop(ctx gl.Context) error {
+func (g *GPU) renderLoop(glctx gl.Context) error {
 	// GL Operations must happen on a single OS thread, so
 	// pass initialization result through a channel.
 	initErr := make(chan error)
@@ -187,35 +179,31 @@ func (g *GPU) renderLoop(ctx gl.Context) error {
 		runtime.LockOSThread()
 		// Don't UnlockOSThread to avoid reuse by the Go runtime.
 		defer close(g.stopped)
-		defer ctx.Release()
+		defer glctx.Release()
 
-		if err := ctx.MakeCurrent(); err != nil {
+		if err := glctx.MakeCurrent(); err != nil {
 			initErr <- err
 			return
 		}
-		funcs := ctx.Functions()
-		defer g.cache.release(funcs)
-		exts := funcs.GetString(gl.EXTENSIONS)
-		glVer := funcs.GetString(gl.VERSION)
-		ver, err := gl.ParseGLVersion(glVer)
+		ctx, err := newContext(glctx)
 		if err != nil {
 			initErr <- err
 			return
 		}
-		r := newRenderer(funcs, srgbModeFor(ver, exts))
+		defer g.cache.release(ctx)
+		r := newRenderer(ctx)
 		defer r.release()
 		var timers *timers
 		var zopsTimer, stencilTimer, coverTimer, cleanupTimer *timer
-		hasTimers := strings.Contains(exts, "GL_EXT_disjoint_timer_query")
 		initErr <- nil
 	loop:
 		for {
 			select {
 			case <-g.refresh:
-				g.refreshErr <- ctx.MakeCurrent()
+				g.refreshErr <- glctx.MakeCurrent()
 			case frame := <-g.frames:
-				if frame.collectStats && timers == nil && hasTimers {
-					timers = newTimers(funcs, exts)
+				if frame.collectStats && timers == nil && ctx.caps.EXT_disjoint_timer_query {
+					timers = newTimers(ctx)
 					zopsTimer = timers.newTimer()
 					stencilTimer = timers.newTimer()
 					coverTimer = timers.newTimer()
@@ -231,29 +219,29 @@ func (g *GPU) renderLoop(ctx gl.Context) error {
 				if frame.collectStats {
 					zopsTimer.begin()
 				}
-				funcs.DepthFunc(gl.GREATER)
-				funcs.ClearColor(ops.clearColor[0], ops.clearColor[1], ops.clearColor[2], 1.0)
-				funcs.ClearDepthf(0.0)
-				funcs.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-				funcs.Viewport(0, 0, frame.viewport.X, frame.viewport.Y)
+				ctx.DepthFunc(gl.GREATER)
+				ctx.ClearColor(ops.clearColor[0], ops.clearColor[1], ops.clearColor[2], 1.0)
+				ctx.ClearDepthf(0.0)
+				ctx.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+				ctx.Viewport(0, 0, frame.viewport.X, frame.viewport.Y)
 				r.drawZOps(ops.zimageOps)
 				zopsTimer.end()
 				stencilTimer.begin()
-				funcs.Enable(gl.BLEND)
+				ctx.Enable(gl.BLEND)
 				r.packStencils(&ops.pathOps)
 				r.stencilClips(g.cache, ops.pathOps)
 				r.packIntersections(ops.imageOps)
 				r.intersect(ops.imageOps)
 				stencilTimer.end()
 				coverTimer.begin()
-				funcs.Viewport(0, 0, frame.viewport.X, frame.viewport.Y)
+				ctx.Viewport(0, 0, frame.viewport.X, frame.viewport.Y)
 				r.drawOps(ops.imageOps)
-				funcs.Disable(gl.BLEND)
+				ctx.Disable(gl.BLEND)
 				r.pather.stenciler.invalidateFBO()
 				coverTimer.end()
-				err := ctx.Present()
+				err := glctx.Present()
 				cleanupTimer.begin()
-				g.cache.frame(funcs)
+				g.cache.frame(ctx)
 				cleanupTimer.end()
 				var res frameResult
 				if frame.collectStats && timers.ready() {
@@ -335,18 +323,17 @@ func (r *renderer) texHandle(t *texture) gl.Texture {
 	return t.id
 }
 
-func (t *texture) release(ctx *gl.Functions) {
+func (t *texture) release(ctx *context) {
 	if t.id != (gl.Texture{}) {
 		ctx.DeleteTexture(t.id)
 	}
 }
 
-func newRenderer(ctx *gl.Functions, mode srgbMode) *renderer {
+func newRenderer(ctx *context) *renderer {
 	r := &renderer{
-		ctx:      ctx,
-		srgbMode: mode,
-		blitter:  newBlitter(ctx),
-		pather:   newPather(ctx),
+		ctx:     ctx,
+		blitter: newBlitter(ctx),
+		pather:  newPather(ctx),
 	}
 	r.packer.maxDim = ctx.GetInteger(gl.MAX_TEXTURE_SIZE)
 	r.intersections.maxDim = r.packer.maxDim
@@ -381,7 +368,7 @@ func (r *resourceCache) put(key interface{}, val resource) {
 	r.newRes[key] = val
 }
 
-func (r *resourceCache) frame(ctx *gl.Functions) {
+func (r *resourceCache) frame(ctx *context) {
 	for k, v := range r.res {
 		if _, exists := r.newRes[k]; !exists {
 			delete(r.res, k)
@@ -394,7 +381,7 @@ func (r *resourceCache) frame(ctx *gl.Functions) {
 	}
 }
 
-func (r *resourceCache) release(ctx *gl.Functions) {
+func (r *resourceCache) release(ctx *context) {
 	for _, v := range r.newRes {
 		v.release(ctx)
 	}
@@ -402,7 +389,7 @@ func (r *resourceCache) release(ctx *gl.Functions) {
 	r.res = nil
 }
 
-func newBlitter(ctx *gl.Functions) *blitter {
+func newBlitter(ctx *context) *blitter {
 	prog, err := createColorPrograms(ctx, blitVSrc, blitFSrc)
 	if err != nil {
 		panic(err)
@@ -426,16 +413,16 @@ func newBlitter(ctx *gl.Functions) *blitter {
 		ctx.UseProgram(prog)
 		switch materialType(i) {
 		case materialTexture:
-			uTex := gl.GetUniformLocation(ctx, prog, "tex")
+			uTex := gl.GetUniformLocation(ctx.Functions, prog, "tex")
 			ctx.Uniform1i(uTex, 0)
-			b.vars[i].uUVScale = gl.GetUniformLocation(ctx, prog, "uvScale")
-			b.vars[i].uUVOffset = gl.GetUniformLocation(ctx, prog, "uvOffset")
+			b.vars[i].uUVScale = gl.GetUniformLocation(ctx.Functions, prog, "uvScale")
+			b.vars[i].uUVOffset = gl.GetUniformLocation(ctx.Functions, prog, "uvOffset")
 		case materialColor:
-			b.vars[i].uColor = gl.GetUniformLocation(ctx, prog, "color")
+			b.vars[i].uColor = gl.GetUniformLocation(ctx.Functions, prog, "color")
 		}
-		b.vars[i].z = gl.GetUniformLocation(ctx, prog, "z")
-		b.vars[i].uScale = gl.GetUniformLocation(ctx, prog, "scale")
-		b.vars[i].uOffset = gl.GetUniformLocation(ctx, prog, "offset")
+		b.vars[i].z = gl.GetUniformLocation(ctx.Functions, prog, "z")
+		b.vars[i].uScale = gl.GetUniformLocation(ctx.Functions, prog, "scale")
+		b.vars[i].uOffset = gl.GetUniformLocation(ctx.Functions, prog, "offset")
 	}
 	return b
 }
@@ -447,7 +434,7 @@ func (b *blitter) release() {
 	}
 }
 
-func createColorPrograms(ctx *gl.Functions, vsSrc, fsSrc string) ([2]gl.Program, error) {
+func createColorPrograms(ctx *context, vsSrc, fsSrc string) ([2]gl.Program, error) {
 	var prog [2]gl.Program
 	frep := strings.NewReplacer(
 		"HEADER", `
@@ -457,7 +444,7 @@ uniform sampler2D tex;
 	)
 	fsSrcTex := frep.Replace(fsSrc)
 	var err error
-	prog[materialTexture], err = gl.CreateProgram(ctx, vsSrc, fsSrcTex, blitAttribs)
+	prog[materialTexture], err = gl.CreateProgram(ctx.Functions, vsSrc, fsSrcTex, blitAttribs)
 	if err != nil {
 		return prog, err
 	}
@@ -468,7 +455,7 @@ uniform vec4 color;
 		"GET_COLOR", `color`,
 	)
 	fsSrcCol := frep.Replace(fsSrc)
-	prog[materialColor], err = gl.CreateProgram(ctx, vsSrc, fsSrcCol, blitAttribs)
+	prog[materialColor], err = gl.CreateProgram(ctx.Functions, vsSrc, fsSrcCol, blitAttribs)
 	if err != nil {
 		ctx.DeleteProgram(prog[materialTexture])
 		return prog, err
@@ -886,7 +873,7 @@ func (r *renderer) uploadTexture(img image.Image, opaque bool) {
 		r.ctx.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
 		var internal int
 		var format gl.Enum
-		switch r.srgbMode {
+		switch r.ctx.caps.srgbMode {
 		case srgbES3:
 			internal, format = gl.SRGB8, gl.RGB
 		case srgbEXT:
@@ -897,7 +884,7 @@ func (r *renderer) uploadTexture(img image.Image, opaque bool) {
 	} else {
 		var internal int
 		var format gl.Enum
-		switch r.srgbMode {
+		switch r.ctx.caps.srgbMode {
 		case srgbES3:
 			internal, format = gl.SRGB8_ALPHA8, gl.RGBA
 		case srgbEXT:
@@ -970,14 +957,14 @@ func clipSpaceTransform(r image.Rectangle, viewport image.Point) (f32.Point, f32
 	return scale, offset
 }
 
-func bindFramebuffer(ctx *gl.Functions, fbo gl.Framebuffer) {
+func bindFramebuffer(ctx *context, fbo gl.Framebuffer) {
 	ctx.BindFramebuffer(gl.FRAMEBUFFER, fbo)
 	if st := ctx.CheckFramebufferStatus(gl.FRAMEBUFFER); st != gl.FRAMEBUFFER_COMPLETE {
 		panic(fmt.Errorf("AA FBO not complete; status = 0x%x, err = %d", st, ctx.GetError()))
 	}
 }
 
-func createTexture(ctx *gl.Functions) gl.Texture {
+func createTexture(ctx *context) gl.Texture {
 	tex := ctx.CreateTexture()
 	ctx.BindTexture(gl.TEXTURE_2D, tex)
 	ctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
@@ -991,17 +978,6 @@ func copyImage(img image.Image, r image.Rectangle) *image.RGBA {
 	tmp := image.NewRGBA(r)
 	draw.Draw(tmp, r, img, r.Min, draw.Src)
 	return tmp
-}
-
-func srgbModeFor(ver [2]int, exts string) srgbMode {
-	switch {
-	case ver[0] >= 3:
-		return srgbES3
-	case strings.Contains(exts, "EXT_sRGB"):
-		return srgbEXT
-	default:
-		panic("neither OpenGL ES 3 nor EXT_sRGB is supported")
-	}
 }
 
 const blitVSrc = `

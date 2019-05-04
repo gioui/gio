@@ -15,7 +15,7 @@ import (
 )
 
 type pather struct {
-	ctx *gl.Functions
+	ctx *context
 
 	viewport image.Point
 
@@ -24,7 +24,7 @@ type pather struct {
 }
 
 type coverer struct {
-	ctx  *gl.Functions
+	ctx  *context
 	prog [2]gl.Program
 	vars [2]struct {
 		z                             gl.Uniform
@@ -36,7 +36,7 @@ type coverer struct {
 }
 
 type stenciler struct {
-	ctx                *gl.Functions
+	ctx                *context
 	defFBO             gl.Framebuffer
 	indexBufQuads      int
 	prog               gl.Program
@@ -77,7 +77,7 @@ var (
 	intersectAttribs = []string{"pos", "uv"}
 )
 
-func newPather(ctx *gl.Functions) *pather {
+func newPather(ctx *context) *pather {
 	return &pather{
 		ctx:       ctx,
 		stenciler: newStenciler(ctx),
@@ -85,7 +85,7 @@ func newPather(ctx *gl.Functions) *pather {
 	}
 }
 
-func newCoverer(ctx *gl.Functions) *coverer {
+func newCoverer(ctx *context) *coverer {
 	prog, err := createColorPrograms(ctx, coverVSrc, coverFSrc)
 	if err != nil {
 		panic(err)
@@ -98,42 +98,42 @@ func newCoverer(ctx *gl.Functions) *coverer {
 		ctx.UseProgram(prog)
 		switch materialType(i) {
 		case materialTexture:
-			uTex := gl.GetUniformLocation(ctx, prog, "tex")
+			uTex := gl.GetUniformLocation(ctx.Functions, prog, "tex")
 			ctx.Uniform1i(uTex, 0)
-			c.vars[i].uUVScale = gl.GetUniformLocation(ctx, prog, "uvScale")
-			c.vars[i].uUVOffset = gl.GetUniformLocation(ctx, prog, "uvOffset")
+			c.vars[i].uUVScale = gl.GetUniformLocation(ctx.Functions, prog, "uvScale")
+			c.vars[i].uUVOffset = gl.GetUniformLocation(ctx.Functions, prog, "uvOffset")
 		case materialColor:
-			c.vars[i].uColor = gl.GetUniformLocation(ctx, prog, "color")
+			c.vars[i].uColor = gl.GetUniformLocation(ctx.Functions, prog, "color")
 		}
-		uCover := gl.GetUniformLocation(ctx, prog, "cover")
+		uCover := gl.GetUniformLocation(ctx.Functions, prog, "cover")
 		ctx.Uniform1i(uCover, 1)
-		c.vars[i].z = gl.GetUniformLocation(ctx, prog, "z")
-		c.vars[i].uScale = gl.GetUniformLocation(ctx, prog, "scale")
-		c.vars[i].uOffset = gl.GetUniformLocation(ctx, prog, "offset")
-		c.vars[i].uCoverUVScale = gl.GetUniformLocation(ctx, prog, "uvCoverScale")
-		c.vars[i].uCoverUVOffset = gl.GetUniformLocation(ctx, prog, "uvCoverOffset")
+		c.vars[i].z = gl.GetUniformLocation(ctx.Functions, prog, "z")
+		c.vars[i].uScale = gl.GetUniformLocation(ctx.Functions, prog, "scale")
+		c.vars[i].uOffset = gl.GetUniformLocation(ctx.Functions, prog, "offset")
+		c.vars[i].uCoverUVScale = gl.GetUniformLocation(ctx.Functions, prog, "uvCoverScale")
+		c.vars[i].uCoverUVOffset = gl.GetUniformLocation(ctx.Functions, prog, "uvCoverOffset")
 	}
 	return c
 }
 
-func newStenciler(ctx *gl.Functions) *stenciler {
+func newStenciler(ctx *context) *stenciler {
 	defFBO := gl.Framebuffer(ctx.GetBinding(gl.FRAMEBUFFER_BINDING))
-	prog, err := gl.CreateProgram(ctx, stencilVSrc, stencilFSrc, pathAttribs)
+	prog, err := gl.CreateProgram(ctx.Functions, stencilVSrc, stencilFSrc, pathAttribs)
 	if err != nil {
 		panic(err)
 	}
-	uAreaLUT := gl.GetUniformLocation(ctx, prog, "areaLUT")
+	uAreaLUT := gl.GetUniformLocation(ctx.Functions, prog, "areaLUT")
 	ctx.UseProgram(prog)
 	ctx.Uniform1i(uAreaLUT, 0)
 	areaLUT, err := loadLUT(ctx, genAreaLUT(256, 256))
 	if err != nil {
 		panic(err)
 	}
-	iprog, err := gl.CreateProgram(ctx, intersectVSrc, intersectFSrc, intersectAttribs)
+	iprog, err := gl.CreateProgram(ctx.Functions, intersectVSrc, intersectFSrc, intersectAttribs)
 	if err != nil {
 		panic(err)
 	}
-	coverLoc := gl.GetUniformLocation(ctx, iprog, "cover")
+	coverLoc := gl.GetUniformLocation(ctx.Functions, iprog, "cover")
 	ctx.UseProgram(iprog)
 	ctx.Uniform1i(coverLoc, 0)
 	return &stenciler{
@@ -142,16 +142,16 @@ func newStenciler(ctx *gl.Functions) *stenciler {
 		prog:               prog,
 		iprog:              iprog,
 		areaLUT:            areaLUT,
-		uScale:             gl.GetUniformLocation(ctx, prog, "scale"),
-		uOffset:            gl.GetUniformLocation(ctx, prog, "offset"),
-		uPathOffset:        gl.GetUniformLocation(ctx, prog, "pathOffset"),
-		uIntersectUVScale:  gl.GetUniformLocation(ctx, iprog, "uvScale"),
-		uIntersectUVOffset: gl.GetUniformLocation(ctx, iprog, "uvOffset"),
+		uScale:             gl.GetUniformLocation(ctx.Functions, prog, "scale"),
+		uOffset:            gl.GetUniformLocation(ctx.Functions, prog, "offset"),
+		uPathOffset:        gl.GetUniformLocation(ctx.Functions, prog, "pathOffset"),
+		uIntersectUVScale:  gl.GetUniformLocation(ctx.Functions, iprog, "uvScale"),
+		uIntersectUVOffset: gl.GetUniformLocation(ctx.Functions, iprog, "uvOffset"),
 		indexBuf:           ctx.CreateBuffer(),
 	}
 }
 
-func (s *fboSet) resize(ctx *gl.Functions, sizes []image.Point, internalFormat int, format, ty gl.Enum) {
+func (s *fboSet) resize(ctx *context, sizes []image.Point, internalFormat int, format, ty gl.Enum) {
 	// Add fbos.
 	for i := len(s.fbos); i < len(sizes); i++ {
 		tex := ctx.CreateTexture()
@@ -186,14 +186,14 @@ func (s *fboSet) resize(ctx *gl.Functions, sizes []image.Point, internalFormat i
 	s.delete(ctx, len(sizes))
 }
 
-func (s *fboSet) invalidate(ctx *gl.Functions) {
+func (s *fboSet) invalidate(ctx *context) {
 	for _, f := range s.fbos {
 		ctx.BindFramebuffer(gl.FRAMEBUFFER, f.fbo)
 		ctx.InvalidateFramebuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0)
 	}
 }
 
-func (s *fboSet) delete(ctx *gl.Functions, idx int) {
+func (s *fboSet) delete(ctx *context, idx int) {
 	for i := idx; i < len(s.fbos); i++ {
 		f := s.fbos[i]
 		ctx.DeleteFramebuffer(f.fbo)
@@ -220,7 +220,7 @@ func (c *coverer) release() {
 	}
 }
 
-func buildPath(ctx *gl.Functions, p *path.Path) *pathData {
+func buildPath(ctx *context, p *path.Path) *pathData {
 	buf := ctx.CreateBuffer()
 	ctx.BindBuffer(gl.ARRAY_BUFFER, buf)
 	ctx.BufferData(gl.ARRAY_BUFFER, gl.BytesView(p.Vertices), gl.STATIC_DRAW)
@@ -230,7 +230,7 @@ func buildPath(ctx *gl.Functions, p *path.Path) *pathData {
 	}
 }
 
-func (p *pathData) release(ctx *gl.Functions) {
+func (p *pathData) release(ctx *context) {
 	ctx.DeleteBuffer(p.data)
 }
 
@@ -364,7 +364,7 @@ func (c *coverer) cover(z float32, mat materialType, col [4]float32, scale, off,
 	c.ctx.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 }
 
-func loadLUT(ctx *gl.Functions, lut *image.Gray) (gl.Texture, error) {
+func loadLUT(ctx *context, lut *image.Gray) (gl.Texture, error) {
 	tex := ctx.CreateTexture()
 	ctx.BindTexture(gl.TEXTURE_2D, tex)
 	ctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)

@@ -9,13 +9,13 @@ import (
 )
 
 type timers struct {
-	ctx    *gl.Functions
+	ctx    *context
 	timers []*timer
 }
 
 type timer struct {
 	Elapsed time.Duration
-	ctx     *gl.Functions
+	ctx     *context
 	obj     gl.Query
 	state   timerState
 }
@@ -28,7 +28,7 @@ const (
 	timerWaiting
 )
 
-func newTimers(ctx *gl.Functions, exts string) *timers {
+func newTimers(ctx *context) *timers {
 	return &timers{
 		ctx: ctx,
 	}
