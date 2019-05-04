@@ -118,9 +118,8 @@ type resource interface {
 }
 
 type texture struct {
-	src    image.Image
-	opaque bool
-	id     gl.Texture
+	src image.Image
+	id  gl.Texture
 }
 
 type blitter struct {
@@ -319,7 +318,7 @@ func (r *renderer) texHandle(t *texture) gl.Texture {
 	}
 	t.id = createTexture(r.ctx)
 	r.ctx.BindTexture(gl.TEXTURE_2D, t.id)
-	r.uploadTexture(t.src, t.opaque)
+	r.uploadTexture(t.src)
 	return t.id
 }
 
@@ -764,9 +763,6 @@ func materialFor(cache *resourceCache, op gdraw.OpImage, off f32.Point, clip ima
 			t := &texture{
 				src: op.Src,
 			}
-			if img, ok := op.Src.(interface{ Opaque() bool }); ok {
-				t.opaque = img.Opaque()
-			}
 			cache.put(op.Src, t)
 			tex = t
 		}
@@ -847,7 +843,7 @@ func (r *renderer) drawOps(ops []imageOp) {
 	r.ctx.Disable(gl.DEPTH_TEST)
 }
 
-func (r *renderer) uploadTexture(img image.Image, opaque bool) {
+func (r *renderer) uploadTexture(img image.Image) {
 	var pixels []byte
 	b := img.Bounds()
 	w, h := b.Dx(), b.Dy()
@@ -863,35 +859,15 @@ func (r *renderer) uploadTexture(img image.Image, opaque bool) {
 	default:
 		pixels = copyImage(img, b).Pix
 	}
-	if opaque {
-		rgb := make([]uint8, w*h*3)
-		for i := 0; i < w*h; i++ {
-			rgb[i*3+0] = pixels[i*4+0]
-			rgb[i*3+1] = pixels[i*4+1]
-			rgb[i*3+2] = pixels[i*4+2]
-		}
-		r.ctx.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
-		var internal int
-		var format gl.Enum
-		switch r.ctx.caps.srgbMode {
-		case srgbES3:
-			internal, format = gl.SRGB8, gl.RGB
-		case srgbEXT:
-			internal, format = gl.SRGB, gl.SRGB
-		}
-		r.ctx.TexImage2D(gl.TEXTURE_2D, 0, internal, w, h, format, gl.UNSIGNED_BYTE, rgb)
-		r.ctx.PixelStorei(gl.UNPACK_ALIGNMENT, 4)
-	} else {
-		var internal int
-		var format gl.Enum
-		switch r.ctx.caps.srgbMode {
-		case srgbES3:
-			internal, format = gl.SRGB8_ALPHA8, gl.RGBA
-		case srgbEXT:
-			internal, format = gl.SRGB_ALPHA_EXT, gl.SRGB_ALPHA_EXT
-		}
-		r.ctx.TexImage2D(gl.TEXTURE_2D, 0, internal, w, h, format, gl.UNSIGNED_BYTE, pixels)
+	var internal int
+	var format gl.Enum
+	switch r.ctx.caps.srgbMode {
+	case srgbES3:
+		internal, format = gl.SRGB8_ALPHA8, gl.RGBA
+	case srgbEXT:
+		internal, format = gl.SRGB_ALPHA_EXT, gl.SRGB_ALPHA_EXT
 	}
+	r.ctx.TexImage2D(gl.TEXTURE_2D, 0, internal, w, h, format, gl.UNSIGNED_BYTE, pixels)
 
 }
 
