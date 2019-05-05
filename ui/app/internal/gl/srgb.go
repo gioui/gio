@@ -83,10 +83,12 @@ func (s *SRGBFBO) Blit() {
 	s.c.BindTexture(TEXTURE_2D, 0)
 	s.c.DisableVertexAttribArray(0)
 	s.c.DisableVertexAttribArray(1)
+	s.c.BindFramebuffer(FRAMEBUFFER, s.frameBuffer)
 	s.c.InvalidateFramebuffer(FRAMEBUFFER, COLOR_ATTACHMENT0)
 	s.c.InvalidateFramebuffer(FRAMEBUFFER, DEPTH_ATTACHMENT)
 	// The Android emulator requires framebuffer 0 bound at eglSwapBuffer time.
-	// Bind the default sRGB framebuffer in afterPresent.
+	// Bind the sRGB framebuffer again in afterPresent.
+	s.c.BindFramebuffer(FRAMEBUFFER, Framebuffer{})
 }
 
 func (s *SRGBFBO) AfterPresent() {
