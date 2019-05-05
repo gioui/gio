@@ -29,7 +29,10 @@ func vanityHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Query().Get("go-get") == "1" {
-		fmt.Fprintf(w, `<html><head><meta name="go-import" content="gioui.org git https://git.sr.ht/~eliasnaur/gio"></head></html>`)
+		fmt.Fprintf(w, `<html><head>
+<meta name="go-import" content="gioui.org git https://git.sr.ht/~eliasnaur/gio">
+<meta name="go-source" content="gioui.org https://git.sr.ht/~eliasnaur/gio https://git.sr.ht/~eliasnaur/gio/tree/master{/dir} https://git.sr.ht/~eliasnaur/gio/tree/master{/dir}/{file}#L{line}">
+</head></html>`)
 		return
 	}
 	switch r.URL.Path {
