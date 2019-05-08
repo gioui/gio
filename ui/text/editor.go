@@ -61,6 +61,9 @@ const (
 )
 
 func (e *Editor) Update(c *ui.Config, pq pointer.Events, kq key.Events) {
+	if e.cfg == nil || c.PxPerDp != e.cfg.PxPerDp || c.PxPerSp != e.cfg.PxPerSp {
+		e.invalidate()
+	}
 	e.cfg = c
 	sbounds := e.scrollBounds()
 	var smin, smax int
@@ -136,7 +139,7 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	}
 	if maxWidth != e.maxWidth {
 		e.maxWidth = maxWidth
-		e.valid = false
+		e.invalidate()
 	}
 
 	e.layout()
