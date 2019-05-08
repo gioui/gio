@@ -496,35 +496,28 @@ type arch struct {
 	iosArch string
 	jniArch string
 	clang   string
-	// TODO: Remove when https://github.com/android-ndk/ndk/issues/920
-	// is solved and released.
-	r19bWindowsClangArgs string
 }
 
 var allArchs = map[string]arch{
 	"arm": arch{
-		iosArch:              "armv7",
-		jniArch:              "armeabi-v7a",
-		clang:                "armv7a-linux-androideabi16-clang",
-		r19bWindowsClangArgs: "--target=armv7a-linux-androideabi16 -fno-addrsig",
+		iosArch: "armv7",
+		jniArch: "armeabi-v7a",
+		clang:   "armv7a-linux-androideabi16-clang",
 	},
 	"arm64": arch{
-		iosArch:              "arm64",
-		jniArch:              "arm64-v8a",
-		clang:                "aarch64-linux-android21-clang",
-		r19bWindowsClangArgs: "--target=aarch64-linux-androideabi21 -fno-addrsig",
+		iosArch: "arm64",
+		jniArch: "arm64-v8a",
+		clang:   "aarch64-linux-android21-clang",
 	},
 	"386": arch{
-		iosArch:              "i386",
-		jniArch:              "x86",
-		clang:                "i686-linux-android16-clang",
-		r19bWindowsClangArgs: "--target=i686-linux-androideabi16 -fno-addrsig",
+		iosArch: "i386",
+		jniArch: "x86",
+		clang:   "i686-linux-android16-clang",
 	},
 	"amd64": arch{
-		iosArch:              "x86_64",
-		jniArch:              "x86_64",
-		clang:                "x86_64-linux-android21-clang",
-		r19bWindowsClangArgs: "--target=x86_64-linux-androideabi21 -fno-addrsig",
+		iosArch: "x86_64",
+		jniArch: "x86_64",
+		clang:   "x86_64-linux-android21-clang",
 	},
 }
 
