@@ -4,6 +4,7 @@ package gl
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 )
 
@@ -116,6 +117,23 @@ func (s *SRGBFBO) Refresh(w, h int) error {
 	if st := s.c.CheckFramebufferStatus(FRAMEBUFFER); st != FRAMEBUFFER_COMPLETE {
 		return fmt.Errorf("sRGB framebuffer incomplete (%dx%d), status: %#x error: %x", s.width, s.height, st, s.c.GetError())
 	}
+
+	if runtime.GOOS == "js" {
+		// With macOS Safari, rendering to and then reading from a SRGB8_ALPHA8
+		// texture result in twice gamma corrected colors. Using a plain RGBA
+		// texture seems to work.
+		s.c.ClearColor(.5, .5, .5, 1.0)
+		s.c.Clear(COLOR_BUFFER_BIT)
+		var pixel [4]byte
+		s.c.ReadPixels(0, 0, 1, 1, RGBA, UNSIGNED_BYTE, pixel[:])
+		if pixel[0] == 128 { // Correct sRGB color value is ~188
+			s.c.TexImage2D(TEXTURE_2D, 0, RGBA, w, h, RGBA, UNSIGNED_BYTE, nil)
+			if st := s.c.CheckFramebufferStatus(FRAMEBUFFER); st != FRAMEBUFFER_COMPLETE {
+				return fmt.Errorf("fallback RGBA framebuffer incomplete (%dx%d), status: %#x error: %x", s.width, s.height, st, s.c.GetError())
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -149,13 +167,17 @@ precision mediump float;
 uniform sampler2D tex;
 varying vec2 vUV;
 
-void main() {
-    vec4 col = texture2D(tex, vUV);
-	vec3 rgb = col.rgb;
+vec3 gamma(vec3 rgb) {
 	vec3 exp = vec3(1.055)*pow(rgb, vec3(0.41666)) - vec3(0.055);
 	vec3 lin = rgb * vec3(12.92);
 	bvec3 cut = lessThan(rgb, vec3(0.0031308));
-	rgb = vec3(cut.r ? lin.r : exp.r, cut.g ? lin.g : exp.g, cut.b ? lin.b : exp.b);
+	return vec3(cut.r ? lin.r : exp.r, cut.g ? lin.g : exp.g, cut.b ? lin.b : exp.b);
+}
+
+void main() {
+    vec4 col = texture2D(tex, vUV);
+	vec3 rgb = col.rgb;
+	rgb = gamma(rgb);
 	gl_FragColor = vec4(rgb, col.a);
 }
 `

@@ -69,6 +69,7 @@ var (
 	_glInvalidateFramebuffer              = LibGLESv2.NewProc("glInvalidateFramebuffer")
 	_glLinkProgram                        = LibGLESv2.NewProc("glLinkProgram")
 	_glPixelStorei                        = LibGLESv2.NewProc("glPixelStorei")
+	_glReadPixels                         = LibGLESv2.NewProc("glReadPixels")
 	_glRenderbufferStorage                = LibGLESv2.NewProc("glRenderbufferStorage")
 	_glScissor                            = LibGLESv2.NewProc("glScissor")
 	_glShaderSource                       = LibGLESv2.NewProc("glShaderSource")
@@ -318,6 +319,9 @@ func (c *Functions) LinkProgram(p Program) {
 }
 func (c *Functions) PixelStorei(pname Enum, param int32) {
 	syscall.Syscall(_glPixelStorei.Addr(), 2, uintptr(pname), uintptr(param), 0)
+}
+func (f *Functions) ReadPixels(x, y, width, height int, format, ty Enum, data []byte) {
+	syscall.Syscall6(_glReadPixels.Addr(), uintptr(x), uintptr(y), uintptr(width), uintptr(height), uintptr(format), uintptr(ty), uintptr(unsafe.Pointer(&data[0])))
 }
 func (c *Functions) RenderbufferStorage(target, internalformat Enum, width, height int) {
 	syscall.Syscall6(_glRenderbufferStorage.Addr(), 4, uintptr(target), uintptr(internalformat), uintptr(width), uintptr(height), 0, 0)

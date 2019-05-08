@@ -409,6 +409,14 @@ func (f *Functions) Scissor(x, y, width, height int32) {
 	C.glScissor(C.GLint(x), C.GLint(y), C.GLsizei(width), C.GLsizei(height))
 }
 
+func (f *Functions) ReadPixels(x, y, width, height int, format, ty Enum, data []byte) {
+	var p unsafe.Pointer
+	if len(data) > 0 {
+		p = unsafe.Pointer(&data[0])
+	}
+	C.glReadPixels(C.GLint(x), C.GLint(y), C.GLsizei(width), C.GLsizei(height), C.GLenum(format), C.GLenum(ty), p)
+}
+
 func (f *Functions) RenderbufferStorage(target, internalformat Enum, width, height int) {
 	C.glRenderbufferStorage(C.GLenum(target), C.GLenum(internalformat), C.GLsizei(width), C.GLsizei(height))
 }
