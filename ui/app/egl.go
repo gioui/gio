@@ -176,6 +176,15 @@ func (c *context) MakeCurrent() error {
 	return nil
 }
 
+func hasExtension(exts []string, ext string) bool {
+	for _, e := range exts {
+		if ext == e {
+			return true
+		}
+	}
+	return false
+}
+
 func createContext(disp _EGLNativeDisplayType) (*eglContext, error) {
 	eglDisp := eglGetDisplay(disp)
 	if eglDisp == 0 {
@@ -186,8 +195,8 @@ func createContext(disp _EGLNativeDisplayType) (*eglContext, error) {
 		return nil, fmt.Errorf("eglInitialize failed: 0x%x", eglGetError())
 	}
 	// sRGB framebuffer support on EGL 1.5 or if EGL_KHR_gl_colorspace is supported.
-	exts := eglQueryString(eglDisp, _EGL_EXTENSIONS)
-	srgb := minor >= 5 || strings.Contains(exts, "EGL_KHR_gl_colorspace")
+	exts := strings.Split(eglQueryString(eglDisp, _EGL_EXTENSIONS), " ")
+	srgb := minor >= 5 || hasExtension(exts, "EGL_KHR_gl_colorspace")
 	attribs := []_EGLint{
 		_EGL_RENDERABLE_TYPE, _EGL_OPENGL_ES2_BIT,
 		_EGL_SURFACE_TYPE, _EGL_WINDOW_BIT,
