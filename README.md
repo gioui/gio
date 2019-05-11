@@ -1,7 +1,7 @@
 # Gio
 
 Gio implements portable immediate mode GUI programs in Go. Gio programs run on all the major platforms:
-iOS/tvOS, Android, Linux (Wayland), macOS and Windows.
+iOS/tvOS, Android, Linux (Wayland), macOS, Windows and browsers (Wwebassembly/WebGL).
 
 Gio includes an efficient vector renderer based on the Pathfinder project (https://github.com/pcwalton/pathfinder).
 Text and other shapes are rendered using only their outlines without baking them into texture images,
@@ -94,6 +94,19 @@ To run the demo on an iOS device, use the sample Xcode project:
 
 You need to provide a valid bundle identifier and set up code signing in Xcode to run the demo
 on a device. If you're using Go 1.12 or older, you also need to disable bitcode.
+
+## Webassembly/WebGL
+
+To run a Gio program in a browser with WebAssembly and WebGL support, use the Go webassembly
+driver and add a <div id="giowindow"> element to a HTML page. To run the Gio demo:
+
+	$ go get github.com/shurcooL/goexec
+	$ git clone https://git.sr.ht/~eliasnaur/gio
+	$ cd gio/apps/
+	$ GOOS=js GOARCH=wasm go build -o gophers/web/main.wasm ./gophers/
+	$ goexec 'http.ListenAndServe(":8080", http.FileServer(http.Dir("gophers/web")))'
+
+and then open http://localhost:8080 in a browser.
 
 ## Issues
 
