@@ -99,7 +99,7 @@ func (c *context) MakeCurrent() error {
 		c.c.Finish()
 		return nil
 	}
-	currentRB := gl.Renderbuffer(c.c.GetInteger(gl.RENDERBUFFER_BINDING))
+	currentRB := gl.Renderbuffer{uint(c.c.GetInteger(gl.RENDERBUFFER_BINDING))}
 	c.c.BindRenderbuffer(gl.RENDERBUFFER, c.colorBuffer)
 	if C.gio_renderbufferStorage(c.ctx, c.layer, C.GLenum(gl.RENDERBUFFER)) == 0 {
 		return errors.New("renderbufferStorage failed")
