@@ -59,7 +59,7 @@ func onCreate(view C.CFTypeRef) {
 	C.gio_addLayerToView(view, w.layer)
 	views[view] = w
 	windows <- ow
-	w.w.event(ChangeStage{StageInvisible})
+	w.w.event(changeStage{stageInvisible})
 }
 
 //export onDraw
@@ -72,7 +72,7 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int) {
 	w.visible.Store(true)
 	C.gio_updateView(view, w.layer)
 	if !wasVisible {
-		w.w.event(ChangeStage{StageVisible})
+		w.w.event(changeStage{stageVisible})
 	}
 	isSync := false
 	if sync != 0 {
@@ -96,14 +96,14 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int) {
 func onStop(view C.CFTypeRef) {
 	w := views[view]
 	w.visible.Store(false)
-	w.w.event(ChangeStage{StageInvisible})
+	w.w.event(changeStage{stageInvisible})
 }
 
 //export onDestroy
 func onDestroy(view C.CFTypeRef) {
 	w := views[view]
 	delete(views, view)
-	w.w.event(ChangeStage{StageDead})
+	w.w.event(changeStage{stageDead})
 	C.gio_removeLayer(w.layer)
 	C.CFRelease(w.layer)
 	w.layer = 0

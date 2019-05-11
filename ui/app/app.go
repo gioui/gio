@@ -23,8 +23,8 @@ type Draw struct {
 	sync bool
 }
 
-type ChangeStage struct {
-	Stage Stage
+type changeStage struct {
+	stage stage
 }
 
 // Command is a system event.
@@ -34,7 +34,7 @@ type Command struct {
 	Cancel bool
 }
 
-type Stage uint8
+type stage uint8
 type CommandType uint8
 
 type Input interface {
@@ -42,9 +42,9 @@ type Input interface {
 }
 
 const (
-	StageDead Stage = iota
-	StageInvisible
-	StageVisible
+	stageDead stage = iota
+	stageInvisible
+	stageVisible
 )
 
 const (
@@ -97,21 +97,21 @@ func Windows() <-chan *Window {
 	return windows
 }
 
-func (l Stage) String() string {
+func (l stage) String() string {
 	switch l {
-	case StageDead:
-		return "StageDead"
-	case StageInvisible:
-		return "StageInvisible"
-	case StageVisible:
-		return "StageVisible"
+	case stageDead:
+		return "stageDead"
+	case stageInvisible:
+		return "stageInvisible"
+	case stageVisible:
+		return "stageVisible"
 	default:
-		panic("unexpected Stage value")
+		panic("unexpected stage value")
 	}
 }
 
 func (_ Draw) ImplementsEvent()        {}
-func (_ ChangeStage) ImplementsEvent() {}
+func (_ changeStage) ImplementsEvent() {}
 func (_ *Command) ImplementsEvent()    {}
 
 func init() {

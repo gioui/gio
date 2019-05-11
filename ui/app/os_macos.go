@@ -33,7 +33,7 @@ func init() {
 type window struct {
 	view  C.CFTypeRef
 	w     *Window
-	stage Stage
+	stage stage
 }
 
 // Only support one main window for now.
@@ -61,12 +61,12 @@ func (w *window) setAnimating(anim bool) {
 	C.gio_setAnimating(w.view, animb)
 }
 
-func (w *window) setStage(stage Stage) {
+func (w *window) setStage(stage stage) {
 	if stage == w.stage {
 		return
 	}
 	w.stage = stage
-	w.w.event(ChangeStage{stage})
+	w.w.event(changeStage{stage})
 }
 
 //export gio_onFrameCallback
@@ -134,7 +134,7 @@ func (w *window) draw(sync bool) {
 	}
 	cfg := getConfig()
 	cfg.Now = time.Now()
-	w.setStage(StageVisible)
+	w.setStage(stageVisible)
 	w.w.event(Draw{
 		Size: image.Point{
 			X: width,
@@ -161,20 +161,20 @@ func getConfig() ui.Config {
 func gio_onTerminate(view C.CFTypeRef) {
 	w := views[view]
 	delete(views, view)
-	w.setStage(StageDead)
+	w.setStage(stageDead)
 	close(windows)
 }
 
 //export gio_onHide
 func gio_onHide(view C.CFTypeRef) {
 	w := views[view]
-	w.setStage(StageInvisible)
+	w.setStage(stageInvisible)
 }
 
 //export gio_onShow
 func gio_onShow(view C.CFTypeRef) {
 	w := views[view]
-	w.setStage(StageVisible)
+	w.setStage(stageVisible)
 }
 
 //export gio_onCreate

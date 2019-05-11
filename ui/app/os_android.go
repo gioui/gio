@@ -38,7 +38,7 @@ type window struct {
 	dpi       int
 	fontScale float32
 
-	stage   Stage
+	stage   stage
 	started bool
 
 	mu        sync.Mutex
@@ -96,7 +96,7 @@ func onCreateView(env *C.JNIEnv, class C.jclass, view C.jobject) C.jlong {
 	views[handle] = w
 	w.loadConfig(env, class)
 	windows <- ow
-	w.setStage(StageInvisible)
+	w.setStage(stageInvisible)
 	return handle
 }
 
@@ -104,7 +104,7 @@ func onCreateView(env *C.JNIEnv, class C.jclass, view C.jobject) C.jlong {
 func onDestroyView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := views[handle]
 	delete(views, handle)
-	w.setStage(StageDead)
+	w.setStage(stageDead)
 	C.gio_jni_DeleteGlobalRef(env, w.view)
 	w.view = 0
 }
@@ -113,7 +113,7 @@ func onDestroyView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 func onStopView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := views[handle]
 	w.started = false
-	w.setStage(StageInvisible)
+	w.setStage(stageInvisible)
 }
 
 //export onStartView
@@ -131,7 +131,7 @@ func onSurfaceDestroyed(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w.mu.Lock()
 	w.win = nil
 	w.mu.Unlock()
-	w.setStage(StageInvisible)
+	w.setStage(stageInvisible)
 }
 
 //export onSurfaceChanged
@@ -155,7 +155,7 @@ func onLowMemory() {
 func onConfigurationChanged(env *C.JNIEnv, class C.jclass, view C.jlong) {
 	w := views[view]
 	w.loadConfig(env, class)
-	if w.stage >= StageVisible {
+	if w.stage >= stageVisible {
 		w.draw(true)
 	}
 }
@@ -166,7 +166,7 @@ func onFrameCallback(env *C.JNIEnv, class C.jclass, view C.jlong, nanos C.jlong)
 	if !exist {
 		return
 	}
-	if w.stage < StageVisible {
+	if w.stage < stageVisible {
 		return
 	}
 	w.mu.Lock()
@@ -197,16 +197,16 @@ func (w *window) setVisible() {
 	if width == 0 || height == 0 {
 		return
 	}
-	w.setStage(StageVisible)
+	w.setStage(stageVisible)
 	w.draw(true)
 }
 
-func (w *window) setStage(stage Stage) {
+func (w *window) setStage(stage stage) {
 	if stage == w.stage {
 		return
 	}
 	w.stage = stage
-	w.event(ChangeStage{stage})
+	w.event(changeStage{stage})
 }
 
 func (w *window) display() unsafe.Pointer {
