@@ -189,7 +189,7 @@ func (a *App) run() error {
 					}
 				}
 			case app.ChangeStage:
-				if e.Stage <= app.StagePaused {
+				if e.Stage >= app.StageRunning {
 					if a.ctxCancel == nil {
 						a.ctx, a.ctxCancel = context.WithCancel(context.Background())
 					}
