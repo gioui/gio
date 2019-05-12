@@ -27,6 +27,7 @@ type Window struct {
 
 	driver     *window
 	lastFrame  time.Time
+	drawStart  time.Time
 	gpu        *gpu.GPU
 	timings    string
 	inputState key.TextInputState
@@ -97,6 +98,11 @@ func (w *Window) Draw(root *ui.Ops) {
 		return
 	}
 	w.mu.Lock()
+	var drawDur time.Duration
+	if !w.drawStart.IsZero() {
+		drawDur = time.Since(w.drawStart)
+		w.drawStart = time.Time{}
+	}
 	stage := w.stage
 	sync := w.syncGPU
 	size := w.size
@@ -132,7 +138,7 @@ func (w *Window) Draw(root *ui.Ops) {
 	frameDur = frameDur.Truncate(100 * time.Microsecond)
 	w.lastFrame = now
 	if w.Profiling {
-		w.timings = fmt.Sprintf("t:%7s %s", frameDur, w.gpu.Timings())
+		w.timings = fmt.Sprintf("tot:%7s cpu:%7s %s", frameDur, drawDur, w.gpu.Timings())
 		w.setNextFrame(time.Time{})
 	}
 	w.reader.Reset(root.Data(), root.Refs())
@@ -248,6 +254,7 @@ func (w *Window) event(e Event) {
 			// No drawing if not visible.
 			break
 		}
+		w.drawStart = time.Now()
 		needAck = true
 		w.syncGPU = e.sync
 		w.size = e.Size
