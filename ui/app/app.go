@@ -43,8 +43,8 @@ type Input interface {
 
 const (
 	StageDead Stage = iota
-	StageInvisible
-	StageVisible
+	StagePaused
+	StageRunning
 )
 
 const (
@@ -101,10 +101,10 @@ func (l Stage) String() string {
 	switch l {
 	case StageDead:
 		return "StageDead"
-	case StageInvisible:
-		return "StageInvisible"
-	case StageVisible:
-		return "StageVisible"
+	case StagePaused:
+		return "StagePaused"
+	case StageRunning:
+		return "StageRunning"
 	default:
 		panic("unexpected Stage value")
 	}

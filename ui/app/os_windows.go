@@ -239,7 +239,7 @@ func createNativeWindow(opts *WindowOptions) (*window, error) {
 	}
 	w := &window{
 		hwnd:  hwnd,
-		stage: StageInvisible,
+		stage: StagePaused,
 	}
 	winMap[hwnd] = w
 	w.hdc, err = getDC(hwnd)
@@ -324,9 +324,9 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case _WM_SIZE:
 		switch wParam {
 		case _SIZE_MINIMIZED:
-			w.setStage(StageInvisible)
+			w.setStage(StagePaused)
 		case _SIZE_MAXIMIZED, _SIZE_RESTORED:
-			w.setStage(StageVisible)
+			w.setStage(StageRunning)
 			w.draw(true)
 		}
 	}

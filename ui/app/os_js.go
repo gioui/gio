@@ -56,7 +56,7 @@ func createWindow(opts *WindowOptions) error {
 	w.w = newWindow(w)
 	go func() {
 		windows <- w.w
-		w.w.event(ChangeStage{StageVisible})
+		w.w.event(ChangeStage{StageRunning})
 		w.draw(true)
 		select {}
 		w.cleanup()

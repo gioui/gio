@@ -134,7 +134,7 @@ func (w *window) draw(sync bool) {
 	}
 	cfg := getConfig()
 	cfg.Now = time.Now()
-	w.setStage(StageVisible)
+	w.setStage(StageRunning)
 	w.w.event(Draw{
 		Size: image.Point{
 			X: width,
@@ -168,13 +168,13 @@ func gio_onTerminate(view C.CFTypeRef) {
 //export gio_onHide
 func gio_onHide(view C.CFTypeRef) {
 	w := views[view]
-	w.setStage(StageInvisible)
+	w.setStage(StagePaused)
 }
 
 //export gio_onShow
 func gio_onShow(view C.CFTypeRef) {
 	w := views[view]
-	w.setStage(StageVisible)
+	w.setStage(StageRunning)
 }
 
 //export gio_onCreate

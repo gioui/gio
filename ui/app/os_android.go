@@ -96,7 +96,7 @@ func onCreateView(env *C.JNIEnv, class C.jclass, view C.jobject) C.jlong {
 	views[handle] = w
 	w.loadConfig(env, class)
 	windows <- ow
-	w.setStage(StageInvisible)
+	w.setStage(StagePaused)
 	return handle
 }
 
@@ -113,7 +113,7 @@ func onDestroyView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 func onStopView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := views[handle]
 	w.started = false
-	w.setStage(StageInvisible)
+	w.setStage(StagePaused)
 }
 
 //export onStartView
@@ -131,7 +131,7 @@ func onSurfaceDestroyed(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w.mu.Lock()
 	w.win = nil
 	w.mu.Unlock()
-	w.setStage(StageInvisible)
+	w.setStage(StagePaused)
 }
 
 //export onSurfaceChanged
@@ -155,7 +155,7 @@ func onLowMemory() {
 func onConfigurationChanged(env *C.JNIEnv, class C.jclass, view C.jlong) {
 	w := views[view]
 	w.loadConfig(env, class)
-	if w.stage >= StageVisible {
+	if w.stage >= StageRunning {
 		w.draw(true)
 	}
 }
@@ -166,7 +166,7 @@ func onFrameCallback(env *C.JNIEnv, class C.jclass, view C.jlong, nanos C.jlong)
 	if !exist {
 		return
 	}
-	if w.stage < StageVisible {
+	if w.stage < StageRunning {
 		return
 	}
 	w.mu.Lock()
@@ -197,7 +197,7 @@ func (w *window) setVisible() {
 	if width == 0 || height == 0 {
 		return
 	}
-	w.setStage(StageVisible)
+	w.setStage(StageRunning)
 	w.draw(true)
 }
 

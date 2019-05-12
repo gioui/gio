@@ -62,7 +62,7 @@ func newWindow(nw *window) *Window {
 	w := &Window{
 		driver: nw,
 		events: make(chan Event),
-		stage:  StageInvisible,
+		stage:  StagePaused,
 	}
 	return w
 }
@@ -103,7 +103,7 @@ func (w *Window) Draw(root *ui.Ops) {
 	w.hasNextFrame = false
 	w.syncGPU = false
 	w.mu.Unlock()
-	if stage < StageVisible {
+	if stage < StageRunning {
 		return
 	}
 	if w.gpu != nil {
@@ -176,7 +176,7 @@ func (w *Window) updateAnimation() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	animate := false
-	if w.stage >= StageVisible && w.hasNextFrame {
+	if w.stage >= StageRunning && w.hasNextFrame {
 		if dt := time.Until(w.nextFrame); dt <= 0 {
 			animate = true
 		} else {
@@ -244,7 +244,7 @@ func (w *Window) event(e Event) {
 		if e.Size == (image.Point{}) {
 			panic(errors.New("internal error: zero-sized Draw"))
 		}
-		if w.stage < StageVisible {
+		if w.stage < StageRunning {
 			// No drawing if not visible.
 			break
 		}
@@ -270,7 +270,7 @@ func (w *Window) event(e Event) {
 		w.syncGPU = false
 		w.mu.Unlock()
 		switch {
-		case stage < StageVisible:
+		case stage < StageRunning:
 			w.gpu.Release()
 			w.gpu = nil
 		case sync:

@@ -157,7 +157,7 @@ func createWindow(opts *WindowOptions) error {
 	}
 	go func() {
 		windows <- w.w
-		w.setStage(StageVisible)
+		w.setStage(StageRunning)
 		w.loop()
 		w.destroy()
 		conn.destroy()
@@ -935,9 +935,9 @@ func (w *window) updateOutputs() {
 	}
 	w.mu.Unlock()
 	if !found {
-		w.setStage(StageInvisible)
+		w.setStage(StagePaused)
 	} else {
-		w.setStage(StageVisible)
+		w.setStage(StageRunning)
 		w.draw(true)
 	}
 }
