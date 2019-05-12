@@ -348,7 +348,7 @@ func (w *window) config() (int, int, float32, ui.Config) {
 		w.cnv.Set("width", iw)
 		w.cnv.Set("height", ih)
 	}
-	const ppdp = 96 * inchPrDp
+	const ppdp = 96 * inchPrDp * monitorScale
 	return iw, ih, float32(scale), ui.Config{
 		PxPerDp: ppdp * float32(scale),
 		PxPerSp: ppdp * float32(scale),
