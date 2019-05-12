@@ -16,6 +16,7 @@ import (
 type ClickEvent struct {
 	Type     ClickType
 	Position f32.Point
+	Source   pointer.Source
 }
 
 type ClickState uint8
@@ -94,7 +95,7 @@ func (c *Click) Update(q pointer.Events) []ClickEvent {
 		switch e.Type {
 		case pointer.Release:
 			if c.State == StatePressed {
-				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position})
+				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source})
 			}
 			c.State = StateNormal
 		case pointer.Cancel:
@@ -104,7 +105,7 @@ func (c *Click) Update(q pointer.Events) []ClickEvent {
 				break
 			}
 			c.State = StatePressed
-			events = append(events, ClickEvent{Type: TypePress, Position: e.Position})
+			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source})
 		case pointer.Move:
 			if c.State == StatePressed && !e.Hit {
 				c.State = StateNormal

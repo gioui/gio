@@ -86,8 +86,9 @@ func (e *Editor) Update(c *ui.Config, pq pointer.Events, kq key.Events) {
 	}
 	scrollTo := false
 	for _, evt := range e.clicker.Update(pq) {
-		switch evt.Type {
-		case gesture.TypePress:
+		switch {
+		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
+			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
 			scrollTo = true
 			e.blinkStart = c.Now
 			e.moveCoord(image.Point{
