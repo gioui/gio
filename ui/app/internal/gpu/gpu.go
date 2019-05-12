@@ -249,7 +249,7 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 					q := 100 * time.Microsecond
 					zt, st, covt, cleant = zt.Round(q), st.Round(q), covt.Round(q), cleant.Round(q)
 					ft = ft.Round(q)
-					res.summary = fmt.Sprintf("f:%7s zt:%7s st:%7s cov:%7s cl:%7s", ft, zt, st, covt, cleant)
+					res.summary = fmt.Sprintf("f:%7s zt:%7s st:%7s cov:%7s", ft, zt, st, covt)
 				}
 				res.err = err
 				g.results <- res
