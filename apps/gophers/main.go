@@ -63,6 +63,9 @@ type App struct {
 	selectedUser *userPage
 
 	updateUsers chan []*user
+
+	ctx       context.Context
+	ctxCancel context.CancelFunc
 }
 
 type userPage struct {
@@ -186,6 +189,19 @@ func (a *App) run() error {
 					}
 				}
 			case app.ChangeStage:
+				if e.Stage <= app.StagePaused {
+					if a.ctxCancel == nil {
+						a.ctx, a.ctxCancel = context.WithCancel(context.Background())
+					}
+					if a.users == nil {
+						go a.fetchContributors()
+					}
+				} else {
+					if a.ctxCancel != nil {
+						a.ctxCancel()
+						a.ctxCancel = nil
+					}
+				}
 			case *app.Command:
 				switch e.Type {
 				case app.CommandBack:
@@ -248,7 +264,6 @@ func newApp(w *app.Window) *App {
 		//SingleLine: true,
 	}
 	a.edit.SetText(longTextSample)
-	go a.fetchContributors()
 	return a
 }
 
@@ -264,9 +279,8 @@ func githubClient(ctx context.Context) *github.Client {
 }
 
 func (a *App) fetchContributors() {
-	ctx := context.Background()
-	client := githubClient(ctx)
-	cons, _, err := client.Repositories.ListContributors(ctx, "golang", "go", nil)
+	client := githubClient(a.ctx)
+	cons, _, err := client.Repositories.ListContributors(a.ctx, "golang", "go", nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "github: failed to fetch contributors: %v\n", err)
 		return
@@ -285,7 +299,7 @@ func (a *App) fetchContributors() {
 		}
 		users = append(users, u)
 		go func() {
-			guser, _, err := client.Users.Get(ctx, u.login)
+			guser, _, err := client.Users.Get(a.ctx, u.login)
 			if err != nil {
 				avatarErrs <- err
 				return
@@ -371,7 +385,7 @@ func (a *App) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	}
 }
 
-func newUserPage(user *user, redraw redrawer, faces measure.Faces) *userPage {
+func newUserPage(ctx context.Context, user *user, redraw redrawer, faces measure.Faces) *userPage {
 	up := &userPage{
 		faces:         faces,
 		redraw:        redraw,
@@ -379,7 +393,7 @@ func newUserPage(user *user, redraw redrawer, faces measure.Faces) *userPage {
 		commitsList:   &layout.List{Axis: layout.Vertical},
 		commitsResult: make(chan []*github.Commit, 1),
 	}
-	up.fetchCommits()
+	up.fetchCommits(ctx)
 	return up
 }
 
@@ -424,9 +438,8 @@ func (up *userPage) commit(index int) layout.Widget {
 	)
 }
 
-func (up *userPage) fetchCommits() {
+func (up *userPage) fetchCommits(ctx context.Context) {
 	go func() {
-		ctx := context.Background()
 		gh := githubClient(ctx)
 		repoCommits, _, err := gh.Repositories.ListCommits(ctx, "golang", "go", &github.CommitsListOptions{
 			Author: up.user.login,
@@ -527,7 +540,7 @@ func (a *App) user(c *ui.Config, index int) layout.Widget {
 	sz := ui.Dp(48)
 	for _, r := range click.Update(a.pqueue) {
 		if r.Type == gesture.TypeClick {
-			a.selectedUser = newUserPage(u, a.w.Redraw, a.faces)
+			a.selectedUser = newUserPage(a.ctx, u, a.w.Redraw, a.faces)
 		}
 	}
 	avatar := clipCircle(layout.Sized(a.cfg, sz, sz, widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}))
