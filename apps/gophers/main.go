@@ -185,6 +185,7 @@ func (a *App) run() error {
 						}
 					}
 				}
+			case app.ChangeStage:
 			case *app.Command:
 				switch e.Type {
 				case app.CommandBack:

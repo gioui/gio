@@ -60,7 +60,7 @@ type window struct {
 	w      *Window
 	width  int
 	height int
-	stage  stage
+	stage  Stage
 
 	mu        sync.Mutex
 	animating bool
@@ -239,7 +239,7 @@ func createNativeWindow(opts *WindowOptions) (*window, error) {
 	}
 	w := &window{
 		hwnd:  hwnd,
-		stage: stageInvisible,
+		stage: StageInvisible,
 	}
 	winMap[hwnd] = w
 	w.hdc, err = getDC(hwnd)
@@ -310,7 +310,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.scrollEvent(wParam, lParam)
 	case _WM_DESTROY:
 		delete(winMap, hwnd)
-		w.setStage(stageDead)
+		w.setStage(StageDead)
 	case _WM_REDRAW:
 		w.mu.Lock()
 		anim := w.animating
@@ -324,9 +324,9 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case _WM_SIZE:
 		switch wParam {
 		case _SIZE_MINIMIZED:
-			w.setStage(stageInvisible)
+			w.setStage(StageInvisible)
 		case _SIZE_MAXIMIZED, _SIZE_RESTORED:
-			w.setStage(stageVisible)
+			w.setStage(StageVisible)
 			w.draw(true)
 		}
 	}
@@ -359,7 +359,7 @@ func (w *window) scrollEvent(wParam, lParam uintptr) {
 // Adapted from https://blogs.msdn.microsoft.com/oldnewthing/20060126-00/?p=32513/
 func (w *window) loop() error {
 loop:
-	for w.stage > stageDead {
+	for w.stage > StageDead {
 		var msg msg
 		// Since posted messages are always returned before system messages,
 		// but we want our WM_REDRAW to always come last, just like WM_PAINT.
@@ -398,9 +398,9 @@ func (w *window) postRedraw() {
 	}
 }
 
-func (w *window) setStage(s stage) {
+func (w *window) setStage(s Stage) {
 	w.stage = s
-	w.w.event(changeStage{s})
+	w.w.event(ChangeStage{s})
 }
 
 func (w *window) draw(sync bool) {

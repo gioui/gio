@@ -35,7 +35,7 @@ type Window struct {
 	events chan Event
 
 	mu           sync.Mutex
-	stage        stage
+	stage        Stage
 	size         image.Point
 	syncGPU      bool
 	animating    bool
@@ -62,7 +62,7 @@ func newWindow(nw *window) *Window {
 	w := &Window{
 		driver: nw,
 		events: make(chan Event),
-		stage:  stageInvisible,
+		stage:  StageInvisible,
 	}
 	return w
 }
@@ -103,7 +103,7 @@ func (w *Window) Draw(root *ui.Ops) {
 	w.hasNextFrame = false
 	w.syncGPU = false
 	w.mu.Unlock()
-	if stage < stageVisible {
+	if stage < StageVisible {
 		return
 	}
 	if w.gpu != nil {
@@ -176,7 +176,7 @@ func (w *Window) updateAnimation() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	animate := false
-	if w.stage >= stageVisible && w.hasNextFrame {
+	if w.stage >= StageVisible && w.hasNextFrame {
 		if dt := time.Until(w.nextFrame); dt <= 0 {
 			animate = true
 		} else {
@@ -208,10 +208,14 @@ func (w *Window) Size() image.Point {
 	return w.size
 }
 
-func (w *Window) IsAlive() bool {
+func (w *Window) Stage() Stage {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.stage != stageDead && w.err == nil
+	return w.stage
+}
+
+func (w *Window) IsAlive() bool {
+	return w.Stage() != StageDead && w.err == nil
 }
 
 func (w *Window) contextDriver() interface{} {
@@ -230,9 +234,9 @@ func (w *Window) event(e Event) {
 	case *Command:
 		needAck = true
 		needRedraw = true
-	case changeStage:
-		w.stage = e.stage
-		if w.stage > stageDead {
+	case ChangeStage:
+		w.stage = e.Stage
+		if w.stage > StageDead {
 			needAck = true
 			w.syncGPU = true
 		}
@@ -240,7 +244,7 @@ func (w *Window) event(e Event) {
 		if e.Size == (image.Point{}) {
 			panic(errors.New("internal error: zero-sized Draw"))
 		}
-		if w.stage < stageVisible {
+		if w.stage < StageVisible {
 			// No drawing if not visible.
 			break
 		}
@@ -266,14 +270,14 @@ func (w *Window) event(e Event) {
 		w.syncGPU = false
 		w.mu.Unlock()
 		switch {
-		case stage < stageVisible:
+		case stage < StageVisible:
 			w.gpu.Release()
 			w.gpu = nil
 		case sync:
 			w.gpu.Refresh()
 		}
 	}
-	if stage == stageDead {
+	if stage == StageDead {
 		close(w.events)
 	}
 }
