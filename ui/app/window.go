@@ -138,7 +138,8 @@ func (w *Window) Draw(root *ui.Ops) {
 	frameDur = frameDur.Truncate(100 * time.Microsecond)
 	w.lastFrame = now
 	if w.Profiling {
-		w.timings = fmt.Sprintf("tot:%7s cpu:%7s %s", frameDur, drawDur, w.gpu.Timings())
+		q := 100 * time.Microsecond
+		w.timings = fmt.Sprintf("tot:%7s cpu:%7s %s", frameDur.Round(q), drawDur.Round(q), w.gpu.Timings())
 		w.setNextFrame(time.Time{})
 	}
 	w.reader.Reset(root.Data(), root.Refs())
