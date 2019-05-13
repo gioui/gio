@@ -48,8 +48,9 @@ func newContext(glctx gl.Context) (*context, error) {
 	if err != nil {
 		return nil, err
 	}
+	hasTimers := hasExtension(exts, "GL_EXT_disjoint_timer_query_webgl2") || hasExtension(exts, "GL_EXT_disjoint_timer_query")
 	ctx.caps = caps{
-		EXT_disjoint_timer_query: hasExtension(exts, "GL_EXT_disjoint_timer_query"),
+		EXT_disjoint_timer_query: hasTimers,
 		floatTriple:              floatTriple,
 		alphaTriple:              alphaTripleFor(ver),
 		srgbaTriple:              srgbaTriple,
