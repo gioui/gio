@@ -50,6 +50,7 @@ const (
 	R8                                    = 0x8229
 	READ_FRAMEBUFFER                      = 0x8ca8
 	RED                                   = 0x1903
+	RENDERER                              = 0x1F01
 	RENDERBUFFER                          = 0x8d41
 	RENDERBUFFER_BINDING                  = 0x8ca7
 	RENDERBUFFER_HEIGHT                   = 0x8d43
