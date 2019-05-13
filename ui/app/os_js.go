@@ -109,7 +109,6 @@ func (w *window) addEventListeners() {
 		return nil
 	})
 	w.addEventListener(w.cnv, "mousedown", func(this js.Value, args []js.Value) interface{} {
-		w.focus()
 		w.pointerEvent(pointer.Press, 0, 0, args[0])
 		return nil
 	})
@@ -133,7 +132,6 @@ func (w *window) addEventListeners() {
 		return nil
 	})
 	w.addEventListener(w.cnv, "touchstart", func(this js.Value, args []js.Value) interface{} {
-		w.focus()
 		w.touchEvent(pointer.Press, args[0])
 		return nil
 	})
