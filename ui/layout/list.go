@@ -42,11 +42,6 @@ type List struct {
 	size image.Point
 }
 
-type Interface interface {
-	Len() int
-	At(i int) Widget
-}
-
 func (l *List) Init(ops *ui.Ops, cs Constraints, len int) (int, bool) {
 	l.maxSize = 0
 	l.children = l.children[:0]
