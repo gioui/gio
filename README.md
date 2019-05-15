@@ -110,8 +110,9 @@ and then open http://localhost:8080 in a browser.
 
 ## Issues
 
-File bugs and TODOs in the [issue tracker](https://todo.sr.ht/~eliasnaur/gio) or send them to
-[the mailing list](mailto:~eliasnaur/gio-dev@lists.sr.ht).
+File bugs and TODOs through the the [issue tracker](https://todo.sr.ht/~eliasnaur/gio) or send an email
+to [~eliasnaur/gio@todo.sr.ht](mailto:~eliasnaur/gio-dev@lists.sr.ht). For general discussion, use the
+mailing list: [~eliasnaur/gio-dev@lists.sr.ht](mailto:~eliasnaur/gio-dev@lists.sr.ht).
 
 ## License
 
