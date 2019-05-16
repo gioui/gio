@@ -220,7 +220,7 @@ func (a *App) run() error {
 					layout.Align{
 						Alignment: layout.NE,
 						C: layout.Insets{
-							Top: a.cfg.Pixels(ui.Dp(16)),
+							Top: a.cfg.Dp(16),
 							C:   text.Label{Src: textColor, Face: a.face(fonts.mono, 8), Text: a.w.Timings()}.W,
 						}.W,
 					}.W(ops, cs)
@@ -427,15 +427,15 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	msg := up.commits[index].GetMessage()
 	label := text.Label{Src: textColor, Face: up.faces.For(fonts.regular, ui.Sp(12)), Text: msg}
 	return layout.Insets{
-		Top: c.Pixels(ui.Dp(16)), Right: c.Pixels(ui.Dp(8)), Left: c.Pixels(ui.Dp(8)),
+		Top: c.Dp(16), Right: c.Dp(8), Left: c.Dp(8),
 		C: func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			f := layout.Flex{Constraints: cs, Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
 			return f.Layout(ops,
 				f.Rigid(ops, func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-					sz := c.Pixels(ui.Dp(48))
+					sz := c.Dp(48)
 					return clipCircle(ops, cs, layout.Sized{Width: sz, Height: sz, C: widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.W}.W)
 				}),
-				f.Flexible(ops, 1, layout.Fit, layout.Insets{Left: c.Pixels(ui.Dp(8)), C: label.W}.W),
+				f.Flexible(ops, 1, layout.Fit, layout.Insets{Left: c.Dp(8), C: label.W}.W),
 			)
 		},
 	}.W(ops, cs)
@@ -469,7 +469,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	c2 := st.Rigid(ops, layout.Align{
 		Alignment: layout.SE,
 		C: layout.EqualInsets(
-			c.Pixels(ui.Dp(16)),
+			c.Dp(16),
 			a.fab.W,
 		).W,
 	}.W)
@@ -480,17 +480,17 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			f := layout.Flex{Constraints: cs, Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Stretch}
 			return f.Layout(ops,
 				f.Rigid(ops, layout.EqualInsets(
-					c.Pixels(ui.Dp(16)),
-					layout.Sized{Width: 0, Height: c.Pixels(ui.Dp(200)), C: a.edit.W}.W,
+					c.Dp(16),
+					layout.Sized{Width: 0, Height: c.Dp(200), C: a.edit.W}.W,
 				).W),
 				f.Rigid(ops, layout.Insets{
-					Bottom: c.Pixels(ui.Dp(16)), Left: c.Pixels(ui.Dp(16)), Right: c.Pixels(ui.Dp(16)),
+					Bottom: c.Dp(16), Left: c.Dp(16), Right: c.Dp(16),
 					C: a.edit2.W,
 				}.W),
 				f.Rigid(ops, func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 					s := layout.Stack{Constraints: cs, Alignment: layout.Center}
 					c := s.Rigid(ops, layout.Insets{
-						Top: c.Pixels(ui.Dp(16)), Right: c.Pixels(ui.Dp(8)), Bottom: c.Pixels(ui.Dp(8)), Left: c.Pixels(ui.Dp(8)),
+						Top: c.Dp(16), Right: c.Dp(8), Bottom: c.Dp(8), Left: c.Dp(8),
 						C: text.Label{Src: rgb(0x888888), Face: a.face(fonts.regular, 9), Text: "GOPHERS"}.W,
 					}.W)
 					return s.Layout(ops,
@@ -517,9 +517,9 @@ func (a *ActionButton) W(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	fabCol := brandColor
 	return f.Layout(ops,
 		f.Rigid(ops, layout.Insets{
-			Top: c.Pixels(ui.Dp(4)),
+			Top: c.Dp(4),
 			C: func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-				dims := fab(ops, cs, a.sendIco.image(c), fabCol, c.Pixels(ui.Dp(56)))
+				dims := fab(ops, cs, a.sendIco.image(c), fabCol, c.Dp(56))
 				a.btnClicker.Op(ops, &gesture.Ellipse{dims.Size})
 				return dims
 			},
@@ -555,12 +555,12 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 	return elem.Layout(ops,
 		elem.Rigid(ops, func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			dims := layout.EqualInsets(
-				c.Pixels(ui.Dp(8)),
+				c.Dp(8),
 				func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 					f := centerRowOpts(cs)
 					return f.Layout(ops,
-						f.Rigid(ops, layout.Insets{Right: c.Pixels(ui.Dp(8)), C: func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-							sz := c.Pixels(ui.Dp(48))
+						f.Rigid(ops, layout.Insets{Right: c.Dp(8), C: func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+							sz := c.Dp(48)
 							return clipCircle(ops, cs, layout.Sized{Width: sz, Height: sz, C: widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.W}.W)
 						}}.W),
 						f.Rigid(ops, func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
@@ -574,7 +574,7 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 											layout.Align{
 												Alignment: layout.E,
 												C: layout.Insets{
-													Left: c.Pixels(ui.Dp(2)),
+													Left: c.Dp(2),
 													C:    text.Label{Src: textColor, Face: a.face(fonts.regular, 8), Text: "3 hours ago"}.W,
 												}.W,
 											}.W,
@@ -582,7 +582,7 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 									)
 								}),
 								f.Rigid(ops, layout.Insets{
-									Top: c.Pixels(ui.Dp(4)),
+									Top: c.Dp(4),
 									C:   text.Label{Src: tertTextColor, Face: a.face(fonts.regular, 10), Text: u.company}.W,
 								}.W),
 							)
@@ -651,7 +651,7 @@ func toRectF(r image.Rectangle) f32.Rectangle {
 }
 
 func (ic *icon) image(cfg *ui.Config) image.Image {
-	sz := cfg.Pixels(ic.size)
+	sz := cfg.Val(ic.size)
 	if sz == ic.imgSize {
 		return ic.img
 	}
