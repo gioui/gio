@@ -16,7 +16,7 @@ type Image struct {
 	Rect image.Rectangle
 }
 
-func (im Image) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+func (im Image) W(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	d := image.Point{X: cs.Width.Max, Y: cs.Height.Max}
 	if d.X == ui.Inf {
 		d.X = cs.Width.Min

@@ -128,7 +128,7 @@ func (e *Editor) caretWidth() fixed.Int26_6 {
 	return fixed.Int26_6(oneDp * 64)
 }
 
-func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+func (e *Editor) W(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	twoDp := int(e.cfg.Pixels(ui.Dp(2)) + 0.5)
 	e.padLeft, e.padRight = twoDp, twoDp
 	maxWidth := cs.Width.Max

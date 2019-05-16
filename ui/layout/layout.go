@@ -70,12 +70,12 @@ func ExactConstraints(size image.Point) Constraints {
 }
 
 type Insets struct {
-	W Widget
+	C Widget
 
 	Top, Right, Bottom, Left float32
 }
 
-func (in Insets) Layout(ops *ui.Ops, cs Constraints) Dimens {
+func (in Insets) W(ops *ui.Ops, cs Constraints) Dimens {
 	mcs := cs
 	t, r, b, l := int(math.Round(float64(in.Top))), int(math.Round(float64(in.Right))), int(math.Round(float64(in.Bottom))), int(math.Round(float64(in.Left)))
 	if mcs.Width.Max != ui.Inf {
@@ -100,7 +100,7 @@ func (in Insets) Layout(ops *ui.Ops, cs Constraints) Dimens {
 	}
 	ops.Begin()
 	ui.OpTransform{Transform: ui.Offset(toPointF(image.Point{X: l, Y: t}))}.Add(ops)
-	dims := in.W(ops, mcs)
+	dims := in.C(ops, mcs)
 	ops.End().Add(ops)
 	return Dimens{
 		Size:     cs.Constrain(dims.Size.Add(image.Point{X: r + l, Y: t + b})),
@@ -109,7 +109,7 @@ func (in Insets) Layout(ops *ui.Ops, cs Constraints) Dimens {
 }
 
 func EqualInsets(v float32, w Widget) Insets {
-	return Insets{W: w, Top: v, Right: v, Bottom: v, Left: v}
+	return Insets{C: w, Top: v, Right: v, Bottom: v, Left: v}
 }
 
 func isInf(v ui.Value) bool {
@@ -117,11 +117,11 @@ func isInf(v ui.Value) bool {
 }
 
 type Sized struct {
-	W             Widget
+	C             Widget
 	Width, Height float32
 }
 
-func (s Sized) Layout(ops *ui.Ops, cs Constraints) Dimens {
+func (s Sized) W(ops *ui.Ops, cs Constraints) Dimens {
 	if h := int(s.Height + 0.5); h != 0 {
 		if cs.Height.Min < h {
 			cs.Height.Min = h
@@ -138,17 +138,17 @@ func (s Sized) Layout(ops *ui.Ops, cs Constraints) Dimens {
 			cs.Width.Max = w
 		}
 	}
-	return s.W(ops, cs)
+	return s.C(ops, cs)
 }
 
 type Align struct {
-	W         Widget
+	C         Widget
 	Alignment Direction
 }
 
-func (a Align) Layout(ops *ui.Ops, cs Constraints) Dimens {
+func (a Align) W(ops *ui.Ops, cs Constraints) Dimens {
 	ops.Begin()
-	dims := a.W(ops, cs.Loose())
+	dims := a.C(ops, cs.Loose())
 	block := ops.End()
 	sz := dims.Size
 	if cs.Width.Max != ui.Inf {
