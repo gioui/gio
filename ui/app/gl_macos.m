@@ -96,6 +96,10 @@ CVDisplayLinkRef displayLink;
 	const char *utf8 = [string UTF8String];
 	gio_onText((__bridge CFTypeRef)self, (char *)utf8);
 }
+- (void)doCommandBySelector:(SEL)sel {
+	// Don't pass commands up the responder chain.
+	// They will end up in a beep.
+}
 @end
 
 CFTypeRef gio_createGLView() {
