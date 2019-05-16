@@ -9,18 +9,14 @@ import (
 )
 
 type Stack struct {
-	Alignment Direction
+	Alignment   Direction
+	Constraints Constraints
 
-	ops      *ui.Ops
-	cs       Constraints
-	children []stackChild
 	maxSZ    image.Point
 	baseline int
-
-	ccache [10]stackChild
 }
 
-type stackChild struct {
+type StackChild struct {
 	block ui.OpBlock
 	dims  Dimens
 }
@@ -38,23 +34,11 @@ const (
 	W
 )
 
-func (s *Stack) Init(ops *ui.Ops, cs Constraints) *Stack {
-	if s.children == nil {
-		s.children = s.ccache[:0]
-	}
-	s.children = s.children[:0]
-	s.maxSZ = image.Point{}
-	s.baseline = 0
-	s.ops = ops
-	s.cs = cs
-	return s
-}
-
-func (s *Stack) Rigid(w Widget) *Stack {
-	s.ops.Begin()
-	ui.OpLayer{}.Add(s.ops)
-	dims := w.Layout(s.ops, s.cs)
-	b := s.ops.End()
+func (s *Stack) Rigid(ops *ui.Ops, w Widget) StackChild {
+	ops.Begin()
+	ui.OpLayer{}.Add(ops)
+	dims := w(ops, s.Constraints)
+	b := ops.End()
 	if w := dims.Size.X; w > s.maxSZ.X {
 		s.maxSZ.X = w
 	}
@@ -62,27 +46,20 @@ func (s *Stack) Rigid(w Widget) *Stack {
 		s.maxSZ.Y = h
 	}
 	s.addjustBaseline(dims)
-	s.children = append(s.children, stackChild{b, dims})
-	return s
+	return StackChild{b, dims}
 }
 
-func (s *Stack) Expand(idx int, w Widget) *Stack {
+func (s *Stack) Expand(ops *ui.Ops, w Widget) StackChild {
 	cs := Constraints{
 		Width:  Constraint{Min: s.maxSZ.X, Max: s.maxSZ.X},
 		Height: Constraint{Min: s.maxSZ.Y, Max: s.maxSZ.Y},
 	}
-	s.ops.Begin()
-	ui.OpLayer{}.Add(s.ops)
-	dims := w.Layout(s.ops, cs)
-	b := s.ops.End()
+	ops.Begin()
+	ui.OpLayer{}.Add(ops)
+	dims := w(ops, cs)
+	b := ops.End()
 	s.addjustBaseline(dims)
-	if idx < 0 {
-		idx += len(s.children) + 1
-	}
-	s.children = append(s.children, stackChild{})
-	copy(s.children[idx+1:], s.children[idx:])
-	s.children[idx] = stackChild{b, dims}
-	return s
+	return StackChild{b, dims}
 }
 
 func (s *Stack) addjustBaseline(dims Dimens) {
@@ -93,8 +70,8 @@ func (s *Stack) addjustBaseline(dims Dimens) {
 	}
 }
 
-func (s *Stack) Layout() Dimens {
-	for _, ch := range s.children {
+func (s *Stack) Layout(ops *ui.Ops, children ...StackChild) Dimens {
+	for _, ch := range children {
 		sz := ch.dims.Size
 		var p image.Point
 		switch s.Alignment {
@@ -109,10 +86,10 @@ func (s *Stack) Layout() Dimens {
 		case SW, S, SE:
 			p.Y = s.maxSZ.Y - sz.Y
 		}
-		s.ops.Begin()
-		ui.OpTransform{Transform: ui.Offset(toPointF(p))}.Add(s.ops)
-		ch.block.Add(s.ops)
-		s.ops.End().Add(s.ops)
+		ops.Begin()
+		ui.OpTransform{Transform: ui.Offset(toPointF(p))}.Add(ops)
+		ch.block.Add(ops)
+		ops.End().Add(ops)
 	}
 	b := s.baseline
 	if b == 0 {

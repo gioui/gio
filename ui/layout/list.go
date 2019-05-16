@@ -35,9 +35,9 @@ type List struct {
 	cs  Constraints
 	len int
 
-	maxSize  int
-	children []scrollChild
-	elem     func(w Widget)
+	maxSize     int
+	children    []scrollChild
+	elemForward bool
 
 	size image.Point
 }
@@ -48,7 +48,6 @@ func (l *List) Init(ops *ui.Ops, cs Constraints, len int) (int, bool) {
 	l.ops = ops
 	l.cs = cs
 	l.len = len
-	l.elem = nil
 	if l.first > len {
 		l.first = len
 	}
@@ -88,7 +87,7 @@ func (l *List) next() (int, bool) {
 	mainc := axisMainConstraint(l.Axis, l.cs)
 	if l.offset <= 0 {
 		if l.first > 0 {
-			l.elem = l.backward
+			l.elemForward = false
 			return l.first - 1, true
 		}
 		l.offset = 0
@@ -96,7 +95,7 @@ func (l *List) next() (int, bool) {
 	if l.maxSize-l.offset < mainc.Max {
 		i := l.first + len(l.children)
 		if i < l.len {
-			l.elem = l.forward
+			l.elemForward = true
 			return i, true
 		}
 		missing := mainc.Max - (l.maxSize - l.offset)
@@ -109,30 +108,25 @@ func (l *List) next() (int, bool) {
 }
 
 func (l *List) Elem(w Widget) {
-	l.elem(w)
-}
-
-func (l *List) backward(w Widget) {
-	l.first--
 	child := l.add(w)
-	mainSize := axisMain(l.Axis, child.size)
-	l.offset += mainSize
-	l.maxSize += mainSize
-	l.children = append([]scrollChild{child}, l.children...)
-}
-
-func (l *List) forward(w Widget) {
-	child := l.add(w)
-	mainSize := axisMain(l.Axis, child.size)
-	l.maxSize += mainSize
-	l.children = append(l.children, child)
+	if l.elemForward {
+		mainSize := axisMain(l.Axis, child.size)
+		l.maxSize += mainSize
+		l.children = append(l.children, child)
+	} else {
+		l.first--
+		mainSize := axisMain(l.Axis, child.size)
+		l.offset += mainSize
+		l.maxSize += mainSize
+		l.children = append([]scrollChild{child}, l.children...)
+	}
 }
 
 func (l *List) add(w Widget) scrollChild {
 	subcs := axisConstraints(l.Axis, Constraint{Max: ui.Inf}, l.crossConstraintChild(l.cs))
 	l.ops.Begin()
 	ui.OpLayer{}.Add(l.ops)
-	dims := w.Layout(l.ops, subcs)
+	dims := w(l.ops, subcs)
 	block := l.ops.End()
 	return scrollChild{dims.Size, block}
 }
