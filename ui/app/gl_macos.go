@@ -34,6 +34,7 @@ func newContext(w *window) (*context, error) {
 	ctx := C.gio_contextForView(w.contextView())
 	c := &context{
 		ctx: ctx,
+		c:   new(gl.Functions),
 	}
 	return c, nil
 }

@@ -86,7 +86,10 @@ var (
 	_glViewport                           = LibGLESv2.NewProc("glViewport")
 )
 
-type Functions struct{}
+type Functions struct {
+	// Query caches.
+	int32s [100]int32
+}
 
 func (c *Functions) ActiveTexture(t Enum) {
 	syscall.Syscall(_glActiveTexture.Addr(), 1, uintptr(t), 0, 0)
@@ -252,16 +255,12 @@ func (c *Functions) GetFramebufferAttachmentParameteri(target, attachment, pname
 	return int(p)
 }
 func (c *Functions) GetInteger(pname Enum) int {
-	// Hopefully enough room.
-	var params [100]int32
-	syscall.Syscall(_glGetIntegerv.Addr(), 2, uintptr(pname), uintptr(unsafe.Pointer(&params[0])), 0)
-	return int(params[0])
+	syscall.Syscall(_glGetIntegerv.Addr(), 2, uintptr(pname), uintptr(unsafe.Pointer(&c.int32s[0])), 0)
+	return int(c.int32s[0])
 }
 func (c *Functions) GetProgrami(p Program, pname Enum) int {
-	// Hopefully enough space.
-	var params [100]int32
-	syscall.Syscall(_glGetProgramiv.Addr(), 3, uintptr(p.V), uintptr(pname), uintptr(unsafe.Pointer(&params[0])))
-	return int(params[0])
+	syscall.Syscall(_glGetProgramiv.Addr(), 3, uintptr(p.V), uintptr(pname), uintptr(unsafe.Pointer(&c.int32s[0])))
+	return int(c.int32s[0])
 }
 func (c *Functions) GetProgramInfoLog(p Program) string {
 	var n uintptr
@@ -274,17 +273,13 @@ func (c *Functions) GetProgramInfoLog(p Program) string {
 	syscall.Syscall6(_glGetProgramInfoLog.Addr(), 4, uintptr(p.V), uintptr(len(buf)), uintptr(unsafe.Pointer(&n)), uintptr(unsafe.Pointer(&buf[0])), 0, 0)
 	return string(buf[:len(buf)-1])
 }
-func (f *Functions) GetQueryObjectuiv(query Query, pname Enum) uint {
-	// Hope this is enough room.
-	var buf [100]int32
-	syscall.Syscall(_glGetQueryObjectuiv.Addr(), 3, uintptr(query.V), uintptr(pname), uintptr(unsafe.Pointer(&buf[0])))
-	return uint(buf[0])
+func (c *Functions) GetQueryObjectuiv(query Query, pname Enum) uint {
+	syscall.Syscall(_glGetQueryObjectuiv.Addr(), 3, uintptr(query.V), uintptr(pname), uintptr(unsafe.Pointer(&c.int32s[0])))
+	return uint(c.int32s[0])
 }
 func (c *Functions) GetShaderi(s Shader, pname Enum) int {
-	// Hopefully enough room.
-	var params [100]int32
-	syscall.Syscall(_glGetShaderiv.Addr(), 3, uintptr(s.V), uintptr(pname), uintptr(unsafe.Pointer(&params[0])))
-	return int(params[0])
+	syscall.Syscall(_glGetShaderiv.Addr(), 3, uintptr(s.V), uintptr(pname), uintptr(unsafe.Pointer(&c.int32s[0])))
+	return int(c.int32s[0])
 }
 func (c *Functions) GetShaderInfoLog(s Shader) string {
 	var n uintptr

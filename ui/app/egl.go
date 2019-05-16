@@ -105,6 +105,7 @@ func newContext(w *window) (*context, error) {
 	c := &context{
 		driver: w,
 		eglCtx: eglCtx,
+		c:      new(gl.Functions),
 	}
 	return c, nil
 }

@@ -46,6 +46,7 @@ func newContext(w *window) (*context, error) {
 		ctx:   ctx,
 		owner: w,
 		layer: C.CFTypeRef(w.contextLayer()),
+		c:     new(gl.Functions),
 	}
 	return c, nil
 }

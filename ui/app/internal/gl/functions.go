@@ -113,7 +113,11 @@ __attribute__((constructor)) static void gio_loadGLFunctions() {
 */
 import "C"
 
-type Functions struct{}
+type Functions struct {
+	// Query caches.
+	uints [100]C.GLuint
+	ints  [100]C.GLint
+}
 
 func (f *Functions) ActiveTexture(texture Enum) {
 	C.glActiveTexture(C.GLenum(texture))
@@ -317,31 +321,23 @@ func (f *Functions) GetError() Enum {
 }
 
 func (f *Functions) GetRenderbufferParameteri(target, pname Enum) int {
-	// Hope this is enough room.
-	var buf [100]C.GLint
-	C.glGetRenderbufferParameteriv(C.GLenum(target), C.GLenum(pname), &buf[0])
-	return int(buf[0])
+	C.glGetRenderbufferParameteriv(C.GLenum(target), C.GLenum(pname), &f.ints[0])
+	return int(f.ints[0])
 }
 
 func (f *Functions) GetFramebufferAttachmentParameteri(target, attachment, pname Enum) int {
-	// Hope this is enough room.
-	var buf [100]C.GLint
-	C.glGetFramebufferAttachmentParameteriv(C.GLenum(target), C.GLenum(attachment), C.GLenum(pname), &buf[0])
-	return int(buf[0])
+	C.glGetFramebufferAttachmentParameteriv(C.GLenum(target), C.GLenum(attachment), C.GLenum(pname), &f.ints[0])
+	return int(f.ints[0])
 }
 
 func (f *Functions) GetInteger(pname Enum) int {
-	// Hope this is enough room.
-	var buf [100]C.GLint
-	C.glGetIntegerv(C.GLenum(pname), &buf[0])
-	return int(buf[0])
+	C.glGetIntegerv(C.GLenum(pname), &f.ints[0])
+	return int(f.ints[0])
 }
 
 func (f *Functions) GetProgrami(p Program, pname Enum) int {
-	// Hope this is enough room.
-	var buf [100]C.GLint
-	C.glGetProgramiv(C.GLuint(p.V), C.GLenum(pname), &buf[0])
-	return int(buf[0])
+	C.glGetProgramiv(C.GLuint(p.V), C.GLenum(pname), &f.ints[0])
+	return int(f.ints[0])
 }
 
 func (f *Functions) GetProgramInfoLog(p Program) string {
@@ -357,17 +353,13 @@ func (f *Functions) GetProgramInfoLog(p Program) string {
 }
 
 func (f *Functions) GetQueryObjectuiv(query Query, pname Enum) uint {
-	// Hope this is enough room.
-	var buf [100]C.GLuint
-	C.gio_glGetQueryObjectuiv(C.GLuint(query.V), C.GLenum(pname), &buf[0])
-	return uint(buf[0])
+	C.gio_glGetQueryObjectuiv(C.GLuint(query.V), C.GLenum(pname), &f.uints[0])
+	return uint(f.uints[0])
 }
 
 func (f *Functions) GetShaderi(s Shader, pname Enum) int {
-	// Hope this is enough room.
-	var buf [100]C.GLint
-	C.glGetShaderiv(C.GLuint(s.V), C.GLenum(pname), &buf[0])
-	return int(buf[0])
+	C.glGetShaderiv(C.GLuint(s.V), C.GLenum(pname), &f.ints[0])
+	return int(f.ints[0])
 }
 
 func (f *Functions) GetShaderInfoLog(s Shader) string {
