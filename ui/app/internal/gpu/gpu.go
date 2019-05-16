@@ -63,8 +63,9 @@ type drawOps struct {
 	// zimageOps are the rectangle clipped opaque images
 	// that can use fast front-to-back rendering with z-test
 	// and no blending.
-	zimageOps []imageOp
-	pathOps   []*pathOp
+	zimageOps   []imageOp
+	pathOps     []*pathOp
+	pathOpCache []pathOp
 }
 
 type drawState struct {
@@ -633,6 +634,7 @@ func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
 	d.imageOps = d.imageOps[:0]
 	d.zimageOps = d.zimageOps[:0]
 	d.pathOps = d.pathOps[:0]
+	d.pathOpCache = d.pathOpCache[:0]
 }
 
 func (d *drawOps) collect(cache *resourceCache, root *ui.Ops, viewport image.Point) {
@@ -642,6 +644,11 @@ func (d *drawOps) collect(cache *resourceCache, root *ui.Ops, viewport image.Poi
 	}
 	d.reader.Reset(root.Data(), root.Refs())
 	d.collectOps(&d.reader, clip, ui.Transform{}, nil, true, 0)
+}
+
+func (d *drawOps) newPathOp() *pathOp {
+	d.pathOpCache = append(d.pathOpCache, pathOp{})
+	return &d.pathOpCache[len(d.pathOpCache)-1]
 }
 
 func (d *drawOps) collectOps(r *ops.Reader, clip f32.Rectangle, t ui.Transform, cpath *pathOp, rect bool, z int) int {
@@ -669,10 +676,12 @@ loop:
 			if clip.Empty() {
 				continue
 			}
-			cpath = &pathOp{
+			npath := d.newPathOp()
+			*npath = pathOp{
 				parent: cpath,
 				off:    off,
 			}
+			cpath = npath
 			if len(data.Vertices) > 0 {
 				rect = false
 				cpath.path = data
