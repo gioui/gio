@@ -22,8 +22,18 @@ type Config struct {
 	Now time.Time
 }
 
-// Pixels converts a value to unitless device pixels.
-func (c *Config) Pixels(v Value) float32 {
+// Dp converts a value in dp units to pixels.
+func (c *Config) Dp(dp float32) float32 {
+	return c.PxPerDp * dp
+}
+
+// Sp converts a value in sp units to pixels.
+func (c *Config) Sp(sp float32) float32 {
+	return c.PxPerSp * sp
+}
+
+// Val converts a value to pixels.
+func (c *Config) Val(v Value) float32 {
 	switch v.U {
 	case UnitPx:
 		return v.V

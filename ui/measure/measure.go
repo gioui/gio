@@ -103,7 +103,7 @@ func (f *Faces) init() {
 }
 
 func (f *textFace) Layout(str string, singleLine bool, maxWidth int) *text.Layout {
-	ppem := fixed.Int26_6(f.faces.Cfg.Pixels(f.size)*64 + .5)
+	ppem := fixed.Int26_6(f.faces.Cfg.Val(f.size)*64 + .5)
 	lk := layoutKey{
 		f:          f.font.Font,
 		ppem:       ppem,
@@ -122,7 +122,7 @@ func (f *textFace) Layout(str string, singleLine bool, maxWidth int) *text.Layou
 }
 
 func (f *textFace) Path(str text.String) *draw.Path {
-	ppem := fixed.Int26_6(f.faces.Cfg.Pixels(f.size)*64 + .5)
+	ppem := fixed.Int26_6(f.faces.Cfg.Val(f.size)*64 + .5)
 	pk := pathKey{
 		f:    f.font.Font,
 		ppem: ppem,

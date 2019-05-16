@@ -207,8 +207,8 @@ func Main() {
 	}
 	cfg := getConfig()
 	opts := singleWindow.opts
-	w := cfg.Pixels(opts.Width)
-	h := cfg.Pixels(opts.Height)
+	w := cfg.Val(opts.Width)
+	h := cfg.Val(opts.Height)
 	title := C.CString(opts.Title)
 	defer C.free(unsafe.Pointer(title))
 	C.gio_main(view, title, C.CGFloat(w), C.CGFloat(h))

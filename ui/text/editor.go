@@ -124,12 +124,12 @@ func (e *Editor) Update(c *ui.Config, pq pointer.Events, kq key.Events) {
 }
 
 func (e *Editor) caretWidth() fixed.Int26_6 {
-	oneDp := int(e.cfg.Pixels(ui.Dp(1)) + .5)
+	oneDp := int(e.cfg.Val(ui.Dp(1)) + .5)
 	return fixed.Int26_6(oneDp * 64)
 }
 
 func (e *Editor) W(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	twoDp := int(e.cfg.Pixels(ui.Dp(2)) + 0.5)
+	twoDp := int(e.cfg.Val(ui.Dp(2)) + 0.5)
 	e.padLeft, e.padRight = twoDp, twoDp
 	maxWidth := cs.Width.Max
 	if e.SingleLine {
