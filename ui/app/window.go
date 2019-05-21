@@ -35,6 +35,8 @@ type Window struct {
 
 	events chan Event
 
+	eventLock sync.Mutex
+
 	mu           sync.Mutex
 	stage        Stage
 	size         image.Point
@@ -230,6 +232,8 @@ func (w *Window) contextDriver() interface{} {
 }
 
 func (w *Window) event(e Event) {
+	w.eventLock.Lock()
+	defer w.eventLock.Unlock()
 	w.mu.Lock()
 	needAck := false
 	needRedraw := false
