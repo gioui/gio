@@ -11,11 +11,12 @@ type Functions struct {
 	Ctx                             js.Value
 	EXT_disjoint_timer_query        js.Value
 	EXT_disjoint_timer_query_webgl2 js.Value
+
+	int32Buf js.Value
 }
 
 var (
 	uint8Array = js.Global().Get("Uint8Array")
-	int32Array = js.Global().Get("Int32Array")
 )
 
 func (f *Functions) Init() {
@@ -228,7 +229,11 @@ func (f *Functions) GetUniformLocation(p Program, name string) Uniform {
 func (f *Functions) InvalidateFramebuffer(target, attachment Enum) {
 	fn := f.Ctx.Get("invalidateFramebuffer")
 	if fn != js.Undefined() {
-		f.Ctx.Call("invalidateFramebuffer", int(target), int32ArrayOf([]int32{int32(attachment)}))
+		if f.int32Buf == (js.Value{}) {
+			f.int32Buf = js.Global().Get("Int32Array").New(1)
+		}
+		f.int32Buf.SetIndex(0, int32(attachment))
+		f.Ctx.Call("invalidateFramebuffer", int(target), f.int32Buf)
 	}
 }
 func (f *Functions) LinkProgram(p Program) {
@@ -305,17 +310,6 @@ func paramVal(v js.Value) int {
 // decides to grow memory.
 // TODO: The workaround is not enough: https://github.com/golang/go/issues/31980.
 
-func int32ArrayOf(data []int32) js.Value {
-	if len(data) == 0 {
-		return js.Null()
-	}
-	var a js.Value
-	a = int32Array.New(len(data))
-	s := js.TypedArrayOf(data)
-	a.Call("set", s)
-	s.Release()
-	return a
-}
 func byteArrayOf(data []byte) js.Value {
 	if len(data) == 0 {
 		return js.Null()
