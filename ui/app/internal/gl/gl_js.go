@@ -245,9 +245,7 @@ func (f *Functions) RenderbufferStorage(target, internalformat Enum, width, heig
 func (f *Functions) ReadPixels(x, y, width, height int, format, ty Enum, data []byte) {
 	f.resizeByteBuffer(len(data))
 	f.Ctx.Call("readPixels", x, y, width, height, int(format), int(ty), f.byteBuf)
-	sub := f.byteBuf.Call("subarray", 0, len(data))
-	d := js.TypedArrayOf(data)
-	d.Call("set", sub)
+	js.CopyBytesToGo(data, f.byteBuf)
 }
 func (f *Functions) Scissor(x, y, width, height int32) {
 	f.Ctx.Call("scissor", x, y, width, height)
@@ -294,9 +292,7 @@ func (f *Functions) byteArrayOf(data []byte) js.Value {
 		return js.Null()
 	}
 	f.resizeByteBuffer(len(data))
-	s := js.TypedArrayOf(data)
-	f.byteBuf.Call("set", s)
-	s.Release()
+	js.CopyBytesToJS(f.byteBuf, data)
 	return f.byteBuf
 }
 

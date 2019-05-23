@@ -387,6 +387,34 @@
 						mem().setUint8(sp + 24, loadValue(sp + 8) instanceof loadValue(sp + 16));
 					},
 
+					// func copyBytesToGo(dst []byte, src ref) (int, bool)
+					"syscall/js.copyBytesToGo": (sp) => {
+						const dst = loadSlice(sp + 8);
+						const src = loadValue(sp + 32);
+						if (!(src instanceof Uint8Array)) {
+							mem().setUint8(sp + 48, 0);
+							return;
+						}
+						const toCopy = src.subarray(0, dst.length);
+						dst.set(toCopy);
+						setInt64(sp + 40, toCopy.length);
+						mem().setUint8(sp + 48, 1);
+					},
+
+					// func copyBytesToJS(dst ref, src []byte) (int, bool)
+					"syscall/js.copyBytesToJS": (sp) => {
+						const dst = loadValue(sp + 8);
+						const src = loadSlice(sp + 16);
+						if (!(dst instanceof Uint8Array)) {
+							mem().setUint8(sp + 48, 0);
+							return;
+						}
+						const toCopy = src.subarray(0, dst.length);
+						dst.set(toCopy);
+						setInt64(sp + 40, toCopy.length);
+						mem().setUint8(sp + 48, 1);
+					},
+
 					"debug": (value) => {
 						console.log(value);
 					},
@@ -403,7 +431,6 @@
 				true,
 				false,
 				global,
-				this._inst.exports.mem,
 				this,
 			];
 			this._refs = new Map();
@@ -415,9 +442,13 @@
 			let offset = 4096;
 
 			const strPtr = (str) => {
-				let ptr = offset;
-				new Uint8Array(mem.buffer, offset, str.length + 1).set(encoder.encode(str + "\0"));
-				offset += str.length + (8 - (str.length % 8));
+				const ptr = offset;
+				const bytes = encoder.encode(str + "\0");
+				new Uint8Array(mem.buffer, offset, bytes.length).set(bytes);
+				offset += bytes.length;
+				if (offset % 8 !== 0) {
+					offset += 8 - (offset % 8);
+				}
 				return ptr;
 			};
 
