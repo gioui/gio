@@ -12,12 +12,10 @@ type Functions struct {
 	EXT_disjoint_timer_query        js.Value
 	EXT_disjoint_timer_query_webgl2 js.Value
 
+	// Cached JS arrays.
+	byteBuf  js.Value
 	int32Buf js.Value
 }
-
-var (
-	uint8Array = js.Global().Get("Uint8Array")
-)
 
 func (f *Functions) Init() {
 	f.EXT_disjoint_timer_query_webgl2 = f.getExtension("EXT_disjoint_timer_query_webgl2")
@@ -72,8 +70,7 @@ func (f *Functions) BlendFunc(sfactor, dfactor Enum) {
 	f.Ctx.Call("blendFunc", int(sfactor), int(dfactor))
 }
 func (f *Functions) BufferData(target Enum, src []byte, usage Enum) {
-	a := byteArrayOf(src)
-	f.Ctx.Call("bufferData", int(target), a, int(usage))
+	f.Ctx.Call("bufferData", int(target), f.byteArrayOf(src), int(usage))
 }
 func (f *Functions) CheckFramebufferStatus(target Enum) Enum {
 	return Enum(f.Ctx.Call("checkFramebufferStatus", int(target)).Int())
@@ -246,10 +243,11 @@ func (f *Functions) RenderbufferStorage(target, internalformat Enum, width, heig
 	f.Ctx.Call("renderbufferStorage", int(target), int(internalformat), width, height)
 }
 func (f *Functions) ReadPixels(x, y, width, height int, format, ty Enum, data []byte) {
-	a := byteArrayOf(data)
-	f.Ctx.Call("readPixels", x, y, width, height, int(format), int(ty), a)
+	f.resizeByteBuffer(len(data))
+	f.Ctx.Call("readPixels", x, y, width, height, int(format), int(ty), f.byteBuf)
+	sub := f.byteBuf.Call("subarray", 0, len(data))
 	d := js.TypedArrayOf(data)
-	d.Call("set", a)
+	d.Call("set", sub)
 }
 func (f *Functions) Scissor(x, y, width, height int32) {
 	f.Ctx.Call("scissor", x, y, width, height)
@@ -258,10 +256,10 @@ func (f *Functions) ShaderSource(s Shader, src string) {
 	f.Ctx.Call("shaderSource", js.Value(s), src)
 }
 func (f *Functions) TexImage2D(target Enum, level int, internalFormat int, width, height int, format, ty Enum, data []byte) {
-	f.Ctx.Call("texImage2D", int(target), int(level), int(internalFormat), int(width), int(height), 0, int(format), int(ty), byteArrayOf(data))
+	f.Ctx.Call("texImage2D", int(target), int(level), int(internalFormat), int(width), int(height), 0, int(format), int(ty), f.byteArrayOf(data))
 }
 func (f *Functions) TexSubImage2D(target Enum, level int, x, y, width, height int, format, ty Enum, data []byte) {
-	f.Ctx.Call("texSubImage2D", int(target), level, x, y, width, height, int(format), int(ty), byteArrayOf(data))
+	f.Ctx.Call("texSubImage2D", int(target), level, x, y, width, height, int(format), int(ty), f.byteArrayOf(data))
 }
 func (f *Functions) TexParameteri(target, pname Enum, param int) {
 	f.Ctx.Call("texParameteri", int(target), int(pname), int(param))
@@ -290,6 +288,28 @@ func (f *Functions) VertexAttribPointer(dst Attrib, size int, ty Enum, normalize
 func (f *Functions) Viewport(x, y, width, height int) {
 	f.Ctx.Call("viewport", x, y, width, height)
 }
+
+func (f *Functions) byteArrayOf(data []byte) js.Value {
+	if len(data) == 0 {
+		return js.Null()
+	}
+	f.resizeByteBuffer(len(data))
+	s := js.TypedArrayOf(data)
+	f.byteBuf.Call("set", s)
+	s.Release()
+	return f.byteBuf
+}
+
+func (f *Functions) resizeByteBuffer(n int) {
+	if n == 0 {
+		return
+	}
+	if f.byteBuf != (js.Value{}) && f.byteBuf.Length() >= n {
+		return
+	}
+	f.byteBuf = js.Global().Get("Uint8Array").New(n)
+}
+
 func paramVal(v js.Value) int {
 	switch v.Type() {
 	case js.TypeBoolean:
@@ -303,21 +323,4 @@ func paramVal(v js.Value) int {
 	default:
 		panic("unknown parameter type")
 	}
-}
-
-// *arrayOf copy Go slices into JS backed typed arrays to avoid
-// using typed array views of Go memory in case the Go runtime
-// decides to grow memory.
-// TODO: The workaround is not enough: https://github.com/golang/go/issues/31980.
-
-func byteArrayOf(data []byte) js.Value {
-	if len(data) == 0 {
-		return js.Null()
-	}
-	var a js.Value
-	a = uint8Array.New(len(data))
-	s := js.TypedArrayOf(data)
-	a.Call("set", s)
-	s.Release()
-	return a
 }
