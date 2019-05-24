@@ -202,6 +202,7 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 			case <-g.refresh:
 				g.refreshErr <- glctx.MakeCurrent()
 			case frame := <-g.frames:
+				glctx.Lock()
 				if frame.collectStats && timers == nil && ctx.caps.EXT_disjoint_timer_query {
 					timers = newTimers(ctx)
 					zopsTimer = timers.newTimer()
@@ -253,6 +254,7 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 					res.summary = fmt.Sprintf("f:%7s zt:%7s st:%7s cov:%7s", ft, zt, st, covt)
 				}
 				res.err = err
+				glctx.Unlock()
 				g.results <- res
 			case <-g.stop:
 				break loop

@@ -62,6 +62,10 @@ func (c *context) Present() error {
 	return nil
 }
 
+func (c *context) Lock() {}
+
+func (c *context) Unlock() {}
+
 func (c *context) MakeCurrent() error {
 	if c.srgbFBO == nil {
 		var err error

@@ -5,3 +5,5 @@ __attribute__ ((visibility ("hidden"))) CFTypeRef gio_contextForView(CFTypeRef v
 __attribute__ ((visibility ("hidden"))) void gio_makeCurrentContext(CFTypeRef ctx);
 __attribute__ ((visibility ("hidden"))) void gio_flushContextBuffer(CFTypeRef ctx);
 __attribute__ ((visibility ("hidden"))) void gio_clearCurrentContext();
+__attribute__ ((visibility ("hidden"))) void gio_lockContext(CFTypeRef ctxRef);
+__attribute__ ((visibility ("hidden"))) void gio_unlockContext(CFTypeRef ctxRef);

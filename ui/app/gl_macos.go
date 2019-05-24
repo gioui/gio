@@ -44,17 +44,30 @@ func (c *context) Functions() *gl.Functions {
 }
 
 func (c *context) Release() {
+	c.Lock()
+	defer c.Unlock()
 	C.gio_clearCurrentContext()
 	C.CFRelease(c.ctx)
 	c.ctx = 0
 }
 
 func (c *context) Present() error {
+	// Assume the caller already locked the context.
 	C.glFlush()
 	return nil
 }
 
+func (c *context) Lock() {
+	C.gio_lockContext(c.ctx)
+}
+
+func (c *context) Unlock() {
+	C.gio_unlockContext(c.ctx)
+}
+
 func (c *context) MakeCurrent() error {
+	c.Lock()
+	defer c.Unlock()
 	C.gio_makeCurrentContext(c.ctx)
 	return nil
 }

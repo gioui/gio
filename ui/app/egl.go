@@ -114,6 +114,10 @@ func (c *context) Functions() *gl.Functions {
 	return c.c
 }
 
+func (c *context) Lock() {}
+
+func (c *context) Unlock() {}
+
 func (c *context) MakeCurrent() error {
 	w, width, height := c.driver.nativeWindow(int(c.eglCtx.visualID))
 	win := _EGLNativeWindowType(w)

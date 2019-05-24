@@ -12,6 +12,8 @@ type Context interface {
 	Present() error
 	MakeCurrent() error
 	Release()
+	Lock()
+	Unlock()
 }
 
 const (
