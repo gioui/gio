@@ -25,8 +25,8 @@ type context struct {
 }
 
 func init() {
-	viewFactory = func() uintptr {
-		return uintptr(C.gio_createGLView())
+	viewFactory = func() C.CFTypeRef {
+		return C.gio_createGLView()
 	}
 }
 

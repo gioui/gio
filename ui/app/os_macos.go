@@ -43,7 +43,7 @@ var singleWindow struct {
 	opts    *WindowOptions
 }
 
-var viewFactory func() uintptr
+var viewFactory func() C.CFTypeRef
 
 var views = make(map[C.CFTypeRef]*window)
 
@@ -200,7 +200,7 @@ func createWindow(opts *WindowOptions) error {
 }
 
 func Main() {
-	view := C.CFTypeRef(viewFactory())
+	view := viewFactory()
 	if view == 0 {
 		// TODO: return this error from CreateWindow.
 		panic(errors.New("CreateWindow: failed to create view"))
