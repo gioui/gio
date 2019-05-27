@@ -53,16 +53,9 @@ func mustLoadDLL(dll *syscall.LazyDLL, name string) {
 	if loadErr == nil {
 		return
 	}
-	user32 := syscall.NewLazySystemDLL("user32.dll")
-	messageBox := user32.NewProc("MessageBoxW")
-	if err := messageBox.Find(); err != nil {
-		panic(loadErr)
-	}
 	pmsg := syscall.StringToUTF16Ptr("Failed to load " + name)
 	ptitle := syscall.StringToUTF16Ptr("Error")
-	const MB_ICONERROR = 0x00000010
-	const MB_SYSTEMMODAL = 0x00001000
-	messageBox.Call(0 /* HWND */, uintptr(unsafe.Pointer(pmsg)), uintptr(unsafe.Pointer(ptitle)), MB_ICONERROR|MB_SYSTEMMODAL)
+	syscall.MessageBox(0 /* HWND */, pmsg, ptitle, syscall.MB_ICONERROR|syscall.MB_SYSTEMMODAL)
 	os.Exit(1)
 }
 
