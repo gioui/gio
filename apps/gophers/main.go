@@ -399,7 +399,7 @@ func newUserPage(ctx context.Context, user *user, redraw redrawer, faces measure
 
 func (up *userPage) Update(cfg *ui.Config, pqueue pointer.Events) {
 	up.cfg = cfg
-	up.commitsList.Scroll(up.cfg, pqueue)
+	up.commitsList.Update(up.cfg, pqueue)
 }
 
 func (up *userPage) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
@@ -552,7 +552,7 @@ func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens 
 func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	c := a.cfg
 	l := a.usersList
-	l.Scroll(c, a.pqueue)
+	l.Update(c, a.pqueue)
 	if l.Dragging() {
 		key.OpHideInput{}.Add(ops)
 	}
