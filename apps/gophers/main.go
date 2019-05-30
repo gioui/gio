@@ -215,15 +215,15 @@ func (a *App) run() error {
 				a.cfg = e.Config
 				a.faces.Cfg = a.cfg
 				cs := layout.ExactConstraints(a.w.Size())
-				a.W(ops, cs)
+				a.Layout(ops, cs)
 				if a.w.Profiling {
-					layout.Align{
-						Alignment: layout.NE,
-						C: layout.Insets{
-							Top: a.cfg.Dp(16),
-							C:   text.Label{Src: textColor, Face: a.face(fonts.mono, 8), Text: a.w.Timings()}.W,
-						}.W,
-					}.W(ops, cs)
+					al := layout.Align{Alignment: layout.NE}
+					cs := al.Begin(ops, cs)
+					in := layout.Insets{Top: a.cfg.Dp(16)}
+					cs = in.Begin(ops, cs)
+					dims := text.Label{Src: textColor, Face: a.face(fonts.mono, 8), Text: a.w.Timings()}.Layout(ops, cs)
+					dims = in.End(ops, dims)
+					al.End(ops, dims)
 				}
 				a.w.Draw(ops)
 				a.w.SetTextInput(a.kqueue.Frame(ops))
@@ -376,12 +376,12 @@ func (a *App) face(f *sfnt.Font, size float32) text.Face {
 	return a.faces.For(f, ui.Sp(size))
 }
 
-func (a *App) W(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+func (a *App) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	if a.selectedUser == nil {
 		return a.layoutUsers(ops, cs)
 	} else {
 		a.selectedUser.Update(a.cfg, a.pqueue)
-		return a.selectedUser.W(ops, cs)
+		return a.selectedUser.Layout(ops, cs)
 	}
 }
 
@@ -402,7 +402,7 @@ func (up *userPage) Update(cfg *ui.Config, pqueue pointer.Events) {
 	up.commitsList.Scroll(up.cfg, pqueue)
 }
 
-func (up *userPage) W(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+func (up *userPage) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	l := up.commitsList
 	if l.Dragging() {
 		key.OpHideInput{}.Add(ops)
@@ -412,13 +412,15 @@ func (up *userPage) W(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		up.commits = commits
 	default:
 	}
-	for i, ok := l.Init(ops, cs, len(up.commits)); ok; i, ok = l.Index() {
-		l.Elem(func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-			return up.commit(ops, cs, i)
-		})
+	l.Init(cs, len(up.commits))
+	for {
+		i, cs, ok := l.Next(ops)
+		if !ok {
+			break
+		}
+		l.End(ops, up.commit(ops, cs, i))
 	}
-	dims := l.Layout()
-	return dims
+	return l.Layout(ops)
 }
 
 func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout.Dimens {
@@ -426,19 +428,25 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	c := up.cfg
 	msg := up.commits[index].GetMessage()
 	label := text.Label{Src: textColor, Face: up.faces.For(fonts.regular, ui.Sp(12)), Text: msg}
-	return layout.Insets{
-		Top: c.Dp(16), Right: c.Dp(8), Left: c.Dp(8),
-		C: func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-			f := layout.Flex{Constraints: cs, Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
-			return f.Layout(ops,
-				f.Rigid(ops, func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-					sz := c.Dp(48)
-					return clipCircle(ops, cs, layout.Sized{Width: sz, Height: sz, C: widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.W}.W)
-				}),
-				f.Flexible(ops, 1, layout.Fit, layout.Insets{Left: c.Dp(8), C: label.W}.W),
-			)
-		},
-	}.W(ops, cs)
+	in := layout.Insets{Top: c.Dp(16), Right: c.Dp(8), Left: c.Dp(8)}
+	cs = in.Begin(ops, cs)
+	f := layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
+	f.Init(cs)
+	cs = f.Rigid(ops)
+	sz := c.Dp(48)
+	cc := clipCircle{}
+	cs = cc.Begin(ops, cs)
+	dims := widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(ops, layout.Sized{Width: sz, Height: sz}.Constrain(cs))
+	dims = cc.End(ops, dims)
+	c1 := f.End(ops, dims)
+	cs = f.Flexible(ops, 1, layout.Fit)
+	in = layout.Insets{Left: c.Dp(8)}
+	cs = in.Begin(ops, cs)
+	dims = label.Layout(ops, cs)
+	dims = in.End(ops, dims)
+	c2 := f.End(ops, dims)
+	dims = f.Layout(ops, c1, c2)
+	return in.End(ops, dims)
 }
 
 func (up *userPage) fetchCommits(ctx context.Context) {
@@ -465,44 +473,60 @@ func (up *userPage) fetchCommits(ctx context.Context) {
 func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	c := a.cfg
 	a.fab.Update(c, a.pqueue)
-	st := layout.Stack{Constraints: cs, Alignment: layout.Center}
-	c2 := st.Rigid(ops, layout.Align{
-		Alignment: layout.SE,
-		C: layout.EqualInsets(
-			c.Dp(16),
-			a.fab.W,
-		).W,
-	}.W)
 	a.edit.Update(c, a.pqueue, a.kqueue)
 	a.edit2.Update(c, a.pqueue, a.kqueue)
-	return st.Layout(ops,
-		st.Expand(ops, func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-			f := layout.Flex{Constraints: cs, Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Stretch}
-			return f.Layout(ops,
-				f.Rigid(ops, layout.EqualInsets(
-					c.Dp(16),
-					layout.Sized{Width: 0, Height: c.Dp(200), C: a.edit.W}.W,
-				).W),
-				f.Rigid(ops, layout.Insets{
-					Bottom: c.Dp(16), Left: c.Dp(16), Right: c.Dp(16),
-					C: a.edit2.W,
-				}.W),
-				f.Rigid(ops, func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-					s := layout.Stack{Constraints: cs, Alignment: layout.Center}
-					c := s.Rigid(ops, layout.Insets{
-						Top: c.Dp(16), Right: c.Dp(8), Bottom: c.Dp(8), Left: c.Dp(8),
-						C: text.Label{Src: rgb(0x888888), Face: a.face(fonts.regular, 9), Text: "GOPHERS"}.W,
-					}.W)
-					return s.Layout(ops,
-						s.Expand(ops, fill(rgb(0xf2f2f2)).W),
-						c,
-					)
-				}),
-				f.Flexible(ops, 1, layout.Fit, a.layoutContributors),
-			)
-		}),
-		c2,
-	)
+	st := layout.Stack{Alignment: layout.Center}
+	st.Init(cs)
+	cs = st.Rigid(ops)
+	al := layout.Align{Alignment: layout.SE}
+	in := layout.EqualInsets(c.Dp(16))
+	cs = in.Begin(ops, al.Begin(ops, cs))
+	dims := a.fab.Layout(ops, cs)
+	dims = al.End(ops, in.End(ops, dims))
+	c2 := st.End(ops, dims)
+
+	cs = st.Expand(ops)
+	{
+		f := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Stretch}
+		f.Init(cs)
+
+		cs = f.Rigid(ops)
+		{
+			in := layout.EqualInsets(c.Dp(16))
+			cs = layout.Sized{Height: c.Dp(200)}.Constrain(cs)
+			dims = a.edit.Layout(ops, in.Begin(ops, cs))
+			dims = in.End(ops, dims)
+		}
+		c1 := f.End(ops, dims)
+
+		cs = f.Rigid(ops)
+		{
+			in := layout.Insets{Bottom: c.Dp(16), Left: c.Dp(16), Right: c.Dp(16)}
+			dims = a.edit2.Layout(ops, in.Begin(ops, cs))
+			dims = in.End(ops, dims)
+		}
+		c2 := f.End(ops, dims)
+
+		cs = f.Rigid(ops)
+		{
+			s := layout.Stack{Alignment: layout.Center}
+			s.Init(cs)
+			cs = s.Rigid(ops)
+			in := layout.Insets{Top: c.Dp(16), Right: c.Dp(8), Bottom: c.Dp(8), Left: c.Dp(8)}
+			lbl := text.Label{Src: rgb(0x888888), Face: a.face(fonts.regular, 9), Text: "GOPHERS"}
+			dims = in.End(ops, lbl.Layout(ops, in.Begin(ops, cs)))
+			c2 := s.End(ops, dims)
+			c1 := s.End(ops, fill(rgb(0xf2f2f2)).Layout(ops, s.Expand(ops)))
+			dims = s.Layout(ops, c1, c2)
+		}
+		c3 := f.End(ops, dims)
+
+		dims = a.layoutContributors(ops, f.Flexible(ops, 1, layout.Fit))
+		c4 := f.End(ops, dims)
+		dims = f.Layout(ops, c1, c2, c3, c4)
+	}
+	c1 := st.End(ops, dims)
+	return st.Layout(ops, c1, c2)
 }
 
 func (a *ActionButton) Update(c *ui.Config, q pointer.Events) {
@@ -511,20 +535,18 @@ func (a *ActionButton) Update(c *ui.Config, q pointer.Events) {
 	a.btnClicker.Update(q)
 }
 
-func (a *ActionButton) W(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	c := a.cfg
-	f := layout.Flex{Constraints: cs, Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.End, MainAxisSize: layout.Min}
 	fabCol := brandColor
-	return f.Layout(ops,
-		f.Rigid(ops, layout.Insets{
-			Top: c.Dp(4),
-			C: func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-				dims := fab(ops, cs, a.sendIco.image(c), fabCol, c.Dp(56))
-				a.btnClicker.Op(ops, &gesture.Ellipse{dims.Size})
-				return dims
-			},
-		}.W),
-	)
+	f := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.End, MainAxisSize: layout.Min}
+	f.Init(cs)
+	cs = f.Rigid(ops)
+	in := layout.Insets{Top: c.Dp(4)}
+	cs = in.Begin(ops, cs)
+	dims := fab(ops, cs, a.sendIco.image(c), fabCol, c.Dp(56))
+	a.btnClicker.Op(ops, &gesture.Ellipse{dims.Size})
+	dims = in.End(ops, dims)
+	return f.Layout(ops, f.End(ops, dims))
 }
 
 func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
@@ -534,12 +556,15 @@ func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dime
 	if l.Dragging() {
 		key.OpHideInput{}.Add(ops)
 	}
-	for i, ok := l.Init(ops, cs, len(a.users)); ok; i, ok = l.Index() {
-		l.Elem(func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-			return a.user(ops, cs, c, i)
-		})
+	l.Init(cs, len(a.users))
+	for {
+		i, cs, ok := l.Next(ops)
+		if !ok {
+			break
+		}
+		l.End(ops, a.user(ops, cs, c, i))
 	}
-	dims := l.Layout()
+	dims := l.Layout(ops)
 	return dims
 }
 
@@ -551,69 +576,86 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 			a.selectedUser = newUserPage(a.ctx, u, a.w.Redraw, a.faces)
 		}
 	}
-	elem := layout.Flex{Constraints: cs, Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
-	return elem.Layout(ops,
-		elem.Rigid(ops, func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-			dims := layout.EqualInsets(
-				c.Dp(8),
-				func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-					f := centerRowOpts(cs)
-					return f.Layout(ops,
-						f.Rigid(ops, layout.Insets{Right: c.Dp(8), C: func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-							sz := c.Dp(48)
-							return clipCircle(ops, cs, layout.Sized{Width: sz, Height: sz, C: widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.W}.W)
-						}}.W),
-						f.Rigid(ops, func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-							f := column(cs)
-							return f.Layout(ops,
-								f.Rigid(ops, func(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-									f := baseline(cs)
-									return f.Layout(ops,
-										f.Rigid(ops, text.Label{Src: textColor, Face: a.face(fonts.regular, 11), Text: u.name}.W),
-										f.Rigid(ops,
-											layout.Align{
-												Alignment: layout.E,
-												C: layout.Insets{
-													Left: c.Dp(2),
-													C:    text.Label{Src: textColor, Face: a.face(fonts.regular, 8), Text: "3 hours ago"}.W,
-												}.W,
-											}.W,
-										),
-									)
-								}),
-								f.Rigid(ops, layout.Insets{
-									Top: c.Dp(4),
-									C:   text.Label{Src: tertTextColor, Face: a.face(fonts.regular, 10), Text: u.company}.W,
-								}.W),
-							)
-						}),
-					)
-				},
-			).W(ops, cs)
-			click.Op(ops, &gesture.Rect{dims.Size})
-			return dims
-		}))
+	elem := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
+	elem.Init(cs)
+	cs = elem.Rigid(ops)
+	var dims layout.Dimens
+	{
+		in := layout.EqualInsets(c.Dp(8))
+		cs = in.Begin(ops, cs)
+		f := centerRowOpts()
+		f.Init(cs)
+		cs = f.Rigid(ops)
+		{
+			in := layout.Insets{Right: c.Dp(8)}
+			cc := clipCircle{}
+			cs = cc.Begin(ops, in.Begin(ops, cs))
+			dims = widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(ops, layout.Sized{Width: c.Dp(48), Height: c.Dp(48)}.Constrain(cs))
+			dims = in.End(ops, cc.End(ops, dims))
+		}
+		c1 := f.End(ops, dims)
+		cs = f.Rigid(ops)
+		{
+			f := column()
+			f.Init(cs)
+			cs = f.Rigid(ops)
+			{
+				f := baseline()
+				f.Init(cs)
+				cs = f.Rigid(ops)
+				dims = text.Label{Src: textColor, Face: a.face(fonts.regular, 11), Text: u.name}.Layout(ops, cs)
+				c1 := f.End(ops, dims)
+				cs = f.Rigid(ops)
+				al := layout.Align{Alignment: layout.E}
+				in := layout.Insets{Left: c.Dp(2)}
+				cs = in.Begin(ops, al.Begin(ops, cs))
+				dims = text.Label{Src: textColor, Face: a.face(fonts.regular, 8), Text: "3 hours ago"}.Layout(ops, cs)
+				dims = al.End(ops, in.End(ops, dims))
+				c2 := f.End(ops, dims)
+				dims = f.Layout(ops, c1, c2)
+			}
+			c1 := f.End(ops, dims)
+			cs = f.Rigid(ops)
+			in := layout.Insets{Top: c.Dp(4)}
+			cs = in.Begin(ops, cs)
+			dims = text.Label{Src: tertTextColor, Face: a.face(fonts.regular, 10), Text: u.company}.Layout(ops, cs)
+			dims = in.End(ops, dims)
+			c2 := f.End(ops, dims)
+			dims = f.Layout(ops, c1, c2)
+		}
+		c2 := f.End(ops, dims)
+		dims = f.Layout(ops, c1, c2)
+		dims = in.End(ops, dims)
+		click.Op(ops, &gesture.Rect{dims.Size})
+	}
+	c1 := elem.End(ops, dims)
+	return elem.Layout(ops, c1)
 }
 
 func fill(img image.Image) widget.Image {
 	return widget.Image{Src: img, Rect: image.Rectangle{Max: image.Point{X: 1, Y: 1}}}
 }
 
-func column(cs layout.Constraints) layout.Flex {
-	return layout.Flex{Constraints: cs, Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
+func column() layout.Flex {
+	return layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
 }
 
-func centerRowOpts(cs layout.Constraints) layout.Flex {
-	return layout.Flex{Constraints: cs, Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Center, MainAxisSize: layout.Min}
+func centerRowOpts() layout.Flex {
+	return layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Center, MainAxisSize: layout.Min}
 }
 
-func baseline(cs layout.Constraints) layout.Flex {
-	return layout.Flex{Constraints: cs, Axis: layout.Horizontal, CrossAxisAlignment: layout.Baseline, MainAxisSize: layout.Min}
+func baseline() layout.Flex {
+	return layout.Flex{Axis: layout.Horizontal, CrossAxisAlignment: layout.Baseline, MainAxisSize: layout.Min}
 }
 
-func clipCircle(ops *ui.Ops, cs layout.Constraints, w layout.Widget) layout.Dimens {
+type clipCircle struct{}
+
+func (c *clipCircle) Begin(ops *ui.Ops, cs layout.Constraints) layout.Constraints {
 	ops.Begin()
-	dims := w(ops, cs)
+	return cs
+}
+
+func (c *clipCircle) End(ops *ui.Ops, dims layout.Dimens) layout.Dimens {
 	block := ops.End()
 	max := dims.Size.X
 	if dy := dims.Size.Y; dy > max {
