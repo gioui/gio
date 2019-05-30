@@ -62,9 +62,9 @@ func (l *List) Dragging() bool {
 	return l.scroll.Dragging()
 }
 
-func (l *List) Scroll(c *ui.Config, q pointer.Events) {
+func (l *List) Update(c *ui.Config, q pointer.Events) {
 	l.Distance = 0
-	d := l.scroll.Scroll(c, q, gesture.Axis(l.Axis))
+	d := l.scroll.Update(c, q, gesture.Axis(l.Axis))
 	l.scrollDir = d
 	l.Distance += d
 	l.offset += d

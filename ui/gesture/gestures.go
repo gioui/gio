@@ -133,7 +133,7 @@ func (s *Scroll) Dragging() bool {
 	return s.dragging
 }
 
-func (s *Scroll) Scroll(cfg *ui.Config, q pointer.Events, axis Axis) int {
+func (s *Scroll) Update(cfg *ui.Config, q pointer.Events, axis Axis) int {
 	if s.axis != axis {
 		s.axis = axis
 		return 0

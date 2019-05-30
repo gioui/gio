@@ -75,7 +75,7 @@ func (e *Editor) Update(c *ui.Config, pq pointer.Events, kq key.Events) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Scroll(c, pq, axis)
+	sdist := e.scroller.Update(c, pq, axis)
 	var soff int
 	if e.SingleLine {
 		e.scrollOff.X += sdist
