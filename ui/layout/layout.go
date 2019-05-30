@@ -9,8 +9,6 @@ import (
 	"gioui.org/ui"
 )
 
-type Widget func(ops *ui.Ops, cs Constraints) Dimens
-
 type Constraints struct {
 	Width  Constraint
 	Height Constraint
@@ -70,12 +68,13 @@ func ExactConstraints(size image.Point) Constraints {
 }
 
 type Insets struct {
-	C Widget
-
 	Top, Right, Bottom, Left float32
+
+	cs Constraints
 }
 
-func (in Insets) W(ops *ui.Ops, cs Constraints) Dimens {
+func (in *Insets) Begin(ops *ui.Ops, cs Constraints) Constraints {
+	in.cs = cs
 	mcs := cs
 	t, r, b, l := int(math.Round(float64(in.Top))), int(math.Round(float64(in.Right))), int(math.Round(float64(in.Bottom))), int(math.Round(float64(in.Left)))
 	if mcs.Width.Max != ui.Inf {
@@ -100,16 +99,20 @@ func (in Insets) W(ops *ui.Ops, cs Constraints) Dimens {
 	}
 	ops.Begin()
 	ui.OpTransform{Transform: ui.Offset(toPointF(image.Point{X: l, Y: t}))}.Add(ops)
-	dims := in.C(ops, mcs)
+	return mcs
+}
+
+func (in *Insets) End(ops *ui.Ops, dims Dimens) Dimens {
 	ops.End().Add(ops)
+	t, r, b, l := int(math.Round(float64(in.Top))), int(math.Round(float64(in.Right))), int(math.Round(float64(in.Bottom))), int(math.Round(float64(in.Left)))
 	return Dimens{
-		Size:     cs.Constrain(dims.Size.Add(image.Point{X: r + l, Y: t + b})),
+		Size:     in.cs.Constrain(dims.Size.Add(image.Point{X: r + l, Y: t + b})),
 		Baseline: dims.Baseline + t,
 	}
 }
 
-func EqualInsets(v float32, w Widget) Insets {
-	return Insets{C: w, Top: v, Right: v, Bottom: v, Left: v}
+func EqualInsets(v float32) Insets {
+	return Insets{Top: v, Right: v, Bottom: v, Left: v}
 }
 
 func isInf(v ui.Value) bool {
@@ -117,11 +120,10 @@ func isInf(v ui.Value) bool {
 }
 
 type Sized struct {
-	C             Widget
 	Width, Height float32
 }
 
-func (s Sized) W(ops *ui.Ops, cs Constraints) Dimens {
+func (s Sized) Constrain(cs Constraints) Constraints {
 	if h := int(s.Height + 0.5); h != 0 {
 		if cs.Height.Min < h {
 			cs.Height.Min = h
@@ -138,24 +140,28 @@ func (s Sized) W(ops *ui.Ops, cs Constraints) Dimens {
 			cs.Width.Max = w
 		}
 	}
-	return s.C(ops, cs)
+	return cs
 }
 
 type Align struct {
-	C         Widget
 	Alignment Direction
+	cs        Constraints
 }
 
-func (a Align) W(ops *ui.Ops, cs Constraints) Dimens {
+func (a *Align) Begin(ops *ui.Ops, cs Constraints) Constraints {
+	a.cs = cs
 	ops.Begin()
-	dims := a.C(ops, cs.Loose())
+	return cs.Loose()
+}
+
+func (a *Align) End(ops *ui.Ops, dims Dimens) Dimens {
 	block := ops.End()
 	sz := dims.Size
-	if cs.Width.Max != ui.Inf {
-		sz.X = cs.Width.Max
+	if a.cs.Width.Max != ui.Inf {
+		sz.X = a.cs.Width.Max
 	}
-	if cs.Height.Max != ui.Inf {
-		sz.Y = cs.Height.Max
+	if a.cs.Height.Max != ui.Inf {
+		sz.Y = a.cs.Height.Max
 	}
 	var p image.Point
 	switch a.Alignment {

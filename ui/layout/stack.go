@@ -9,11 +9,13 @@ import (
 )
 
 type Stack struct {
-	Alignment   Direction
-	Constraints Constraints
+	Alignment Direction
 
-	maxSZ    image.Point
-	baseline int
+	constrained bool
+	cs          Constraints
+	begun       bool
+	maxSZ       image.Point
+	baseline    int
 }
 
 type StackChild struct {
@@ -34,10 +36,42 @@ const (
 	W
 )
 
-func (s *Stack) Rigid(ops *ui.Ops, w Widget) StackChild {
+func (s *Stack) Init(cs Constraints) {
+	s.cs = cs
+	s.constrained = true
+	s.maxSZ = image.Point{}
+	s.baseline = 0
+}
+
+func (s *Stack) begin(ops *ui.Ops) {
+	if !s.constrained {
+		panic("must Constrain before adding a child")
+	}
+	if s.begun {
+		panic("must End before adding a child")
+	}
+	s.begun = true
 	ops.Begin()
 	ui.OpLayer{}.Add(ops)
-	dims := w(ops, s.Constraints)
+}
+
+func (s *Stack) Rigid(ops *ui.Ops) Constraints {
+	ops.Begin()
+	ui.OpLayer{}.Add(ops)
+	return s.cs
+}
+
+func (s *Stack) Expand(ops *ui.Ops) Constraints {
+	cs := Constraints{
+		Width:  Constraint{Min: s.maxSZ.X, Max: s.maxSZ.X},
+		Height: Constraint{Min: s.maxSZ.Y, Max: s.maxSZ.Y},
+	}
+	ops.Begin()
+	ui.OpLayer{}.Add(ops)
+	return cs
+}
+
+func (s *Stack) End(ops *ui.Ops, dims Dimens) StackChild {
 	b := ops.End()
 	if w := dims.Size.X; w > s.maxSZ.X {
 		s.maxSZ.X = w
@@ -45,29 +79,12 @@ func (s *Stack) Rigid(ops *ui.Ops, w Widget) StackChild {
 	if h := dims.Size.Y; h > s.maxSZ.Y {
 		s.maxSZ.Y = h
 	}
-	s.addjustBaseline(dims)
-	return StackChild{b, dims}
-}
-
-func (s *Stack) Expand(ops *ui.Ops, w Widget) StackChild {
-	cs := Constraints{
-		Width:  Constraint{Min: s.maxSZ.X, Max: s.maxSZ.X},
-		Height: Constraint{Min: s.maxSZ.Y, Max: s.maxSZ.Y},
-	}
-	ops.Begin()
-	ui.OpLayer{}.Add(ops)
-	dims := w(ops, cs)
-	b := ops.End()
-	s.addjustBaseline(dims)
-	return StackChild{b, dims}
-}
-
-func (s *Stack) addjustBaseline(dims Dimens) {
 	if s.baseline == 0 {
 		if b := dims.Baseline; b != dims.Size.Y {
 			s.baseline = b
 		}
 	}
+	return StackChild{b, dims}
 }
 
 func (s *Stack) Layout(ops *ui.Ops, children ...StackChild) Dimens {

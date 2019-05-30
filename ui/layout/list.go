@@ -31,31 +31,31 @@ type List struct {
 	offset int
 	first  int
 
-	ops *ui.Ops
 	cs  Constraints
 	len int
 
-	maxSize     int
-	children    []scrollChild
-	elemForward bool
-
-	size image.Point
+	maxSize  int
+	children []scrollChild
+	dir      iterationDir
 }
 
-func (l *List) Init(ops *ui.Ops, cs Constraints, len int) (int, bool) {
+type iterationDir uint8
+
+const (
+	iterateNone iterationDir = iota
+	iterateForward
+	iterateBackward
+)
+
+func (l *List) Init(cs Constraints, len int) {
+	l.dir = iterateNone
 	l.maxSize = 0
 	l.children = l.children[:0]
-	l.ops = ops
 	l.cs = cs
 	l.len = len
 	if l.first > len {
 		l.first = len
 	}
-	if len == 0 {
-		return 0, false
-	}
-	l.scroll.Op(ops, &l.area)
-	return l.Index()
 }
 
 func (l *List) Dragging() bool {
@@ -70,24 +70,28 @@ func (l *List) Scroll(c *ui.Config, q pointer.Events) {
 	l.offset += d
 }
 
-func (l *List) Index() (int, bool) {
-	i, ok := l.next()
-	if !ok {
-		l.draw()
+func (l *List) Next(ops *ui.Ops) (int, Constraints, bool) {
+	if l.dir != iterateNone {
+		panic("a previous Next was not finished with Elem")
 	}
-	return i, ok
-}
-
-func (l *List) Layout() Dimens {
-	l.area.Size = l.size
-	return Dimens{Size: l.size}
+	i, ok := l.next()
+	var cs Constraints
+	if ok {
+		if len(l.children) == 0 {
+			l.scroll.Op(ops, &l.area)
+		}
+		cs = axisConstraints(l.Axis, Constraint{Max: ui.Inf}, l.crossConstraintChild(l.cs))
+		ops.Begin()
+		ui.OpLayer{}.Add(ops)
+	}
+	return i, cs, ok
 }
 
 func (l *List) next() (int, bool) {
 	mainc := axisMainConstraint(l.Axis, l.cs)
 	if l.offset <= 0 {
 		if l.first > 0 {
-			l.elemForward = false
+			l.dir = iterateBackward
 			return l.first - 1, true
 		}
 		l.offset = 0
@@ -95,7 +99,7 @@ func (l *List) next() (int, bool) {
 	if l.maxSize-l.offset < mainc.Max {
 		i := l.first + len(l.children)
 		if i < l.len {
-			l.elemForward = true
+			l.dir = iterateForward
 			return i, true
 		}
 		missing := mainc.Max - (l.maxSize - l.offset)
@@ -107,31 +111,27 @@ func (l *List) next() (int, bool) {
 	return 0, false
 }
 
-func (l *List) Elem(w Widget) {
-	child := l.add(w)
-	if l.elemForward {
+func (l *List) End(ops *ui.Ops, dims Dimens) {
+	block := ops.End()
+	child := scrollChild{dims.Size, block}
+	switch l.dir {
+	case iterateForward:
 		mainSize := axisMain(l.Axis, child.size)
 		l.maxSize += mainSize
 		l.children = append(l.children, child)
-	} else {
+	case iterateBackward:
 		l.first--
 		mainSize := axisMain(l.Axis, child.size)
 		l.offset += mainSize
 		l.maxSize += mainSize
 		l.children = append([]scrollChild{child}, l.children...)
+	default:
+		panic("call Next before End")
 	}
+	l.dir = iterateNone
 }
 
-func (l *List) add(w Widget) scrollChild {
-	subcs := axisConstraints(l.Axis, Constraint{Max: ui.Inf}, l.crossConstraintChild(l.cs))
-	l.ops.Begin()
-	ui.OpLayer{}.Add(l.ops)
-	dims := w(l.ops, subcs)
-	block := l.ops.End()
-	return scrollChild{dims.Size, block}
-}
-
-func (l *List) draw() {
+func (l *List) Layout(ops *ui.Ops) Dimens {
 	mainc := axisMainConstraint(l.Axis, l.cs)
 	for len(l.children) > 0 {
 		sz := l.children[0].size
@@ -178,13 +178,13 @@ func (l *List) draw() {
 			Min: axisPoint(l.Axis, min, -ui.Inf),
 			Max: axisPoint(l.Axis, max, ui.Inf),
 		}
-		l.ops.Begin()
-		draw.OpClip{Path: draw.RectPath(r)}.Add(l.ops)
+		ops.Begin()
+		draw.OpClip{Path: draw.RectPath(r)}.Add(ops)
 		ui.OpTransform{
 			Transform: ui.Offset(toPointF(axisPoint(l.Axis, pos, cross))),
-		}.Add(l.ops)
-		child.block.Add(l.ops)
-		l.ops.End().Add(l.ops)
+		}.Add(ops)
+		child.block.Add(ops)
+		ops.End().Add(ops)
 		pos += axisMain(l.Axis, sz)
 	}
 	atStart := l.first == 0 && l.offset <= 0
@@ -192,7 +192,9 @@ func (l *List) draw() {
 	if atStart && l.scrollDir < 0 || atEnd && l.scrollDir > 0 {
 		l.scroll.Stop()
 	}
-	l.size = axisPoint(l.Axis, mainc.Constrain(pos), maxCross)
+	dims := axisPoint(l.Axis, mainc.Constrain(pos), maxCross)
+	l.area.Size = dims
+	return Dimens{Size: dims}
 }
 
 func (l *List) crossConstraintChild(cs Constraints) Constraint {

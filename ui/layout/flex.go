@@ -10,13 +10,14 @@ import (
 )
 
 type Flex struct {
-	Constraints Constraints
-
 	Axis               Axis
 	MainAxisAlignment  MainAxisAlignment
 	CrossAxisAlignment CrossAxisAlignment
 	MainAxisSize       MainAxisSize
 
+	constrained bool
+	cs          Constraints
+	begun       bool
 	taken       int
 	maxCross    int
 	maxBaseline int
@@ -56,29 +57,42 @@ const (
 	Stretch
 )
 
-func (f *Flex) Rigid(ops *ui.Ops, w Widget) FlexChild {
-	mainc := axisMainConstraint(f.Axis, f.Constraints)
+func (f *Flex) Init(cs Constraints) {
+	if f.constrained {
+		panic("Constrain must be called exactly once")
+	}
+	f.constrained = true
+	f.cs = cs
+	f.taken = 0
+	f.maxCross = 0
+	f.maxBaseline = 0
+}
+
+func (f *Flex) begin(ops *ui.Ops) {
+	if !f.constrained {
+		panic("must Constrain before adding a child")
+	}
+	if f.begun {
+		panic("must End before adding a child")
+	}
+	f.begun = true
+	ops.Begin()
+	ui.OpLayer{}.Add(ops)
+}
+
+func (f *Flex) Rigid(ops *ui.Ops) Constraints {
+	f.begin(ops)
+	mainc := axisMainConstraint(f.Axis, f.cs)
 	mainMax := mainc.Max
 	if mainc.Max != ui.Inf {
 		mainMax -= f.taken
 	}
-	cs := axisConstraints(f.Axis, Constraint{Max: mainMax}, f.crossConstraintChild(f.Constraints))
-	ops.Begin()
-	ui.OpLayer{}.Add(ops)
-	dims := w(ops, cs)
-	block := ops.End()
-	f.taken += axisMain(f.Axis, dims.Size)
-	if c := axisCross(f.Axis, dims.Size); c > f.maxCross {
-		f.maxCross = c
-	}
-	if b := dims.Baseline; b > f.maxBaseline {
-		f.maxBaseline = b
-	}
-	return FlexChild{block, dims}
+	return axisConstraints(f.Axis, Constraint{Max: mainMax}, f.crossConstraintChild(f.cs))
 }
 
-func (f *Flex) Flexible(ops *ui.Ops, flex float32, mode FlexMode, w Widget) FlexChild {
-	mainc := axisMainConstraint(f.Axis, f.Constraints)
+func (f *Flex) Flexible(ops *ui.Ops, flex float32, mode FlexMode) Constraints {
+	f.begin(ops)
+	mainc := axisMainConstraint(f.Axis, f.cs)
 	var flexSize int
 	if mainc.Max != ui.Inf && mainc.Max > f.taken {
 		flexSize = mainc.Max - f.taken
@@ -87,10 +101,14 @@ func (f *Flex) Flexible(ops *ui.Ops, flex float32, mode FlexMode, w Widget) Flex
 	if mode == Fit {
 		submainc.Min = submainc.Max
 	}
-	cs := axisConstraints(f.Axis, submainc, f.crossConstraintChild(f.Constraints))
-	ops.Begin()
-	ui.OpLayer{}.Add(ops)
-	dims := w(ops, cs)
+	return axisConstraints(f.Axis, submainc, f.crossConstraintChild(f.cs))
+}
+
+func (f *Flex) End(ops *ui.Ops, dims Dimens) FlexChild {
+	if !f.begun {
+		panic("End called without an active child")
+	}
+	f.begun = false
 	block := ops.End()
 	f.taken += axisMain(f.Axis, dims.Size)
 	if c := axisCross(f.Axis, dims.Size); c > f.maxCross {
@@ -103,8 +121,8 @@ func (f *Flex) Flexible(ops *ui.Ops, flex float32, mode FlexMode, w Widget) Flex
 }
 
 func (f *Flex) Layout(ops *ui.Ops, children ...FlexChild) Dimens {
-	mainc := axisMainConstraint(f.Axis, f.Constraints)
-	crossSize := axisCrossConstraint(f.Axis, f.Constraints).Constrain(f.maxCross)
+	mainc := axisMainConstraint(f.Axis, f.cs)
+	crossSize := axisCrossConstraint(f.Axis, f.cs).Constrain(f.maxCross)
 	var space int
 	if mainc.Max != ui.Inf && f.MainAxisSize == Max {
 		if mainc.Max > f.taken {

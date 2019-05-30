@@ -80,7 +80,7 @@ func (l *lineIterator) Next() (String, f32.Point, bool) {
 	return String{}, f32.Point{}, false
 }
 
-func (l Label) W(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	textLayout := l.Face.Layout(l.Text, false, cs.Width.Max)
 	lines := textLayout.Lines
 	dims := linesDimens(lines)
