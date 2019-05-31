@@ -13,6 +13,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime"
 
 	"golang.org/x/image/draw"
 	"golang.org/x/oauth2"
@@ -166,6 +167,7 @@ func init() {
 func (a *App) run() error {
 	a.w.Profiling = *stats
 	ops := new(ui.Ops)
+	var lastMallocs uint64
 	for a.w.IsAlive() {
 		select {
 		case users := <-a.updateUsers:
@@ -217,11 +219,16 @@ func (a *App) run() error {
 				cs := layout.ExactConstraints(a.w.Size())
 				a.Layout(ops, cs)
 				if a.w.Profiling {
+					var mstats runtime.MemStats
+					runtime.ReadMemStats(&mstats)
+					mallocs := mstats.Mallocs - lastMallocs
+					lastMallocs = mstats.Mallocs
 					al := layout.Align{Alignment: layout.NE}
 					cs := al.Begin(ops, cs)
 					in := layout.Insets{Top: a.cfg.Dp(16)}
 					cs = in.Begin(ops, cs)
-					dims := text.Label{Src: textColor, Face: a.face(fonts.mono, 8), Text: a.w.Timings()}.Layout(ops, cs)
+					txt := fmt.Sprintf("m: %d %s", mallocs, a.w.Timings())
+					dims := text.Label{Src: textColor, Face: a.face(fonts.mono, 8), Text: txt}.Layout(ops, cs)
 					dims = in.End(ops, dims)
 					al.End(ops, dims)
 				}
