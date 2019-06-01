@@ -46,7 +46,7 @@ type Window struct {
 	nextFrame    time.Time
 	delayedDraw  *time.Timer
 
-	reader ops.Reader
+	reader ui.OpsReader
 }
 
 // driver is the interface for the platform implementation
@@ -144,7 +144,7 @@ func (w *Window) Draw(root *ui.Ops) {
 		w.timings = fmt.Sprintf("tot:%7s cpu:%7s %s", frameDur.Round(q), drawDur.Round(q), w.gpu.Timings())
 		w.setNextFrame(time.Time{})
 	}
-	w.reader.Reset(root.Data(), root.Refs())
+	w.reader.Reset(root)
 	if t, ok := collectRedraws(&w.reader); ok {
 		w.setNextFrame(t)
 	}
@@ -152,7 +152,7 @@ func (w *Window) Draw(root *ui.Ops) {
 	w.gpu.Draw(w.Profiling, size, root)
 }
 
-func collectRedraws(r *ops.Reader) (time.Time, bool) {
+func collectRedraws(r *ui.OpsReader) (time.Time, bool) {
 	var t time.Time
 	redraw := false
 	for {

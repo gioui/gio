@@ -11,7 +11,7 @@ type Queue struct {
 	focus    Key
 	events   []Event
 	handlers map[Key]bool
-	reader   ops.Reader
+	reader   ui.OpsReader
 }
 
 type listenerPriority uint8
@@ -25,7 +25,7 @@ const (
 
 func (q *Queue) Frame(root *ui.Ops) TextInputState {
 	q.events = q.events[:0]
-	q.reader.Reset(root.Data(), root.Refs())
+	q.reader.Reset(root)
 	f, pri, hide := resolveFocus(&q.reader, q.focus)
 	changed := f != nil && f != q.focus
 	for k, active := range q.handlers {
@@ -74,7 +74,7 @@ func (q *Queue) For(k Key) []Event {
 	return q.events
 }
 
-func resolveFocus(r *ops.Reader, focus Key) (Key, listenerPriority, bool) {
+func resolveFocus(r *ui.OpsReader, focus Key) (Key, listenerPriority, bool) {
 	var k Key
 	var pri listenerPriority
 	var hide bool

@@ -56,7 +56,7 @@ type renderer struct {
 }
 
 type drawOps struct {
-	reader     ops.Reader
+	reader     ui.OpsReader
 	cache      *resourceCache
 	viewport   image.Point
 	clearColor [3]float32
@@ -651,7 +651,7 @@ func (d *drawOps) collect(cache *resourceCache, root *ui.Ops, viewport image.Poi
 	clip := f32.Rectangle{
 		Max: f32.Point{X: float32(viewport.X), Y: float32(viewport.Y)},
 	}
-	d.reader.Reset(root.Data(), root.Refs())
+	d.reader.Reset(root)
 	state := drawState{
 		clip: clip,
 		rect: true,
@@ -664,7 +664,7 @@ func (d *drawOps) newPathOp() *pathOp {
 	return &d.pathOpCache[len(d.pathOpCache)-1]
 }
 
-func (d *drawOps) collectOps(r *ops.Reader, state drawState) int {
+func (d *drawOps) collectOps(r *ui.OpsReader, state drawState) int {
 loop:
 	for {
 		data, ok := r.Decode()

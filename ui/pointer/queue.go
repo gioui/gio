@@ -12,7 +12,7 @@ type Queue struct {
 	hitTree  []hitNode
 	handlers map[Key]*handler
 	pointers []pointerInfo
-	reader   ops.Reader
+	reader   ui.OpsReader
 	scratch  []Key
 }
 
@@ -37,7 +37,7 @@ type handler struct {
 	wantsGrab bool
 }
 
-func (q *Queue) collectHandlers(r *ops.Reader, t ui.Transform, layer int) {
+func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int) {
 	for {
 		data, ok := r.Decode()
 		if !ok {
@@ -116,7 +116,7 @@ func (q *Queue) Frame(root *ui.Ops) {
 		}
 	}
 	q.hitTree = q.hitTree[:0]
-	q.reader.Reset(root.Data(), root.Refs())
+	q.reader.Reset(root)
 	q.collectHandlers(&q.reader, ui.Transform{}, 0)
 }
 
