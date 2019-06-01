@@ -67,12 +67,6 @@ type drawOps struct {
 	zimageOps   []imageOp
 	pathOps     []*pathOp
 	pathOpCache []pathOp
-
-	// Current OpImage image and rect, if any.
-	img     image.Image
-	imgRect image.Rectangle
-	// Current OpColor, if any.
-	color color.NRGBA
 }
 
 type drawState struct {
@@ -81,6 +75,12 @@ type drawState struct {
 	cpath *pathOp
 	rect  bool
 	z     int
+
+	// Current OpImage image and rect, if any.
+	img     image.Image
+	imgRect image.Rectangle
+	// Current OpColor, if any.
+	color color.NRGBA
 }
 
 type pathOp struct {
@@ -652,7 +652,11 @@ func (d *drawOps) collect(cache *resourceCache, root *ui.Ops, viewport image.Poi
 		Max: f32.Point{X: float32(viewport.X), Y: float32(viewport.Y)},
 	}
 	d.reader.Reset(root.Data(), root.Refs())
-	d.collectOps(&d.reader, clip, ui.Transform{}, nil, true, 0)
+	state := drawState{
+		clip: clip,
+		rect: true,
+	}
+	d.collectOps(&d.reader, state)
 }
 
 func (d *drawOps) newPathOp() *pathOp {
@@ -660,7 +664,7 @@ func (d *drawOps) newPathOp() *pathOp {
 	return &d.pathOpCache[len(d.pathOpCache)-1]
 }
 
-func (d *drawOps) collectOps(r *ops.Reader, clip f32.Rectangle, t ui.Transform, cpath *pathOp, rect bool, z int) int {
+func (d *drawOps) collectOps(r *ops.Reader, state drawState) int {
 loop:
 	for {
 		data, ok := r.Decode()
@@ -671,84 +675,84 @@ loop:
 		case ops.TypeTransform:
 			var op ui.OpTransform
 			op.Decode(data)
-			t = t.Mul(op.Transform)
+			state.t = state.t.Mul(op.Transform)
 		case ops.TypeClip:
 			var op gdraw.OpClip
 			op.Decode(data, r.Refs)
 			if op.Path == nil {
-				clip = f32.Rectangle{}
+				state.clip = f32.Rectangle{}
 				continue
 			}
 			data := op.Path.Data().(*path.Path)
-			off := t.Transform(f32.Point{})
-			clip = clip.Intersect(data.Bounds.Add(off))
-			if clip.Empty() {
+			off := state.t.Transform(f32.Point{})
+			state.clip = state.clip.Intersect(data.Bounds.Add(off))
+			if state.clip.Empty() {
 				continue
 			}
 			npath := d.newPathOp()
 			*npath = pathOp{
-				parent: cpath,
+				parent: state.cpath,
 				off:    off,
 			}
-			cpath = npath
+			state.cpath = npath
 			if len(data.Vertices) > 0 {
-				rect = false
-				cpath.path = data
-				d.pathOps = append(d.pathOps, cpath)
+				state.rect = false
+				state.cpath.path = data
+				d.pathOps = append(d.pathOps, state.cpath)
 			}
 		case ops.TypeColor:
 			var op gdraw.OpColor
 			op.Decode(data, r.Refs)
-			d.img = nil
-			d.color = op.Col
+			state.img = nil
+			state.color = op.Col
 		case ops.TypeImage:
 			var op gdraw.OpImage
 			op.Decode(data, r.Refs)
-			d.img = op.Img
-			d.imgRect = op.Rect
+			state.img = op.Img
+			state.imgRect = op.Rect
 		case ops.TypeDraw:
 			var op gdraw.OpDraw
 			op.Decode(data, r.Refs)
-			off := t.Transform(f32.Point{})
-			clip := clip.Intersect(op.Rect.Add(off))
+			off := state.t.Transform(f32.Point{})
+			clip := state.clip.Intersect(op.Rect.Add(off))
 			if clip.Empty() {
 				continue
 			}
 			bounds := boundRectF(clip)
-			mat := d.materialFor(d.cache, op.Rect, off, bounds)
+			mat := state.materialFor(d.cache, op.Rect, off, bounds)
 			if bounds.Min == (image.Point{}) && bounds.Max == d.viewport && mat.opaque && mat.material == materialColor {
 				// The image is a uniform opaque color and takes up the whole screen.
 				// Scrap images up to and including this image and set clear color.
 				d.zimageOps = d.zimageOps[:0]
 				d.imageOps = d.imageOps[:0]
-				z = 0
+				state.z = 0
 				copy(d.clearColor[:], mat.color[:3])
 				continue
 			}
-			z++
+			state.z++
 			// Assume 16-bit depth buffer.
 			const zdepth = 1 << 16
 			// Convert z to window-space, assuming depth range [0;1].
-			zf := float32(z)*2/zdepth - 1.0
+			zf := float32(state.z)*2/zdepth - 1.0
 			img := imageOp{
 				z:        zf,
-				path:     cpath,
+				path:     state.cpath,
 				off:      off,
 				clip:     bounds,
 				material: mat,
 			}
-			if rect && img.material.opaque {
+			if state.rect && img.material.opaque {
 				d.zimageOps = append(d.zimageOps, img)
 			} else {
 				d.imageOps = append(d.imageOps, img)
 			}
 		case ops.TypePush:
-			z = d.collectOps(r, clip, t, cpath, rect, z)
+			state.z = d.collectOps(r, state)
 		case ops.TypePop:
 			break loop
 		}
 	}
-	return z
+	return state.z
 }
 
 func expandPathOp(p *pathOp, clip image.Rectangle) {
@@ -762,7 +766,7 @@ func expandPathOp(p *pathOp, clip image.Rectangle) {
 	}
 }
 
-func (d *drawOps) materialFor(cache *resourceCache, rect f32.Rectangle, off f32.Point, clip image.Rectangle) material {
+func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f32.Point, clip image.Rectangle) material {
 	var m material
 	if d.img == nil {
 		m.material = materialColor
