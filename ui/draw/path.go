@@ -3,7 +3,6 @@
 package draw
 
 import (
-	"encoding/binary"
 	"math"
 
 	"gioui.org/ui"
@@ -37,20 +36,15 @@ func (p *Path) Data() interface{} {
 func (c OpClip) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypeClipLen)
 	data[0] = byte(ops.TypeClip)
-	bo := binary.LittleEndian
-	ref := o.Ref(c.Path)
-	bo.PutUint32(data[1:], uint32(ref))
-	o.Write(data)
+	o.Write(data, []interface{}{c.Path})
 }
 
 func (c *OpClip) Decode(d []byte, refs []interface{}) {
-	bo := binary.LittleEndian
 	if ops.OpType(d[0]) != ops.TypeClip {
 		panic("invalid op")
 	}
-	ref := int(bo.Uint32(d[1:]))
 	*c = OpClip{
-		Path: refs[ref].(*Path),
+		Path: refs[0].(*Path),
 	}
 }
 

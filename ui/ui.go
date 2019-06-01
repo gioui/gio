@@ -77,7 +77,7 @@ func (r OpRedraw) Add(o *Ops) {
 			bo.PutUint64(data[1:], uint64(nanos))
 		}
 	}
-	o.Write(data)
+	o.Write(data, nil)
 }
 
 func (r *OpRedraw) Decode(d []byte) {
@@ -110,7 +110,7 @@ func (t OpTransform) Add(o *Ops) {
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], math.Float32bits(t.Transform.offset.X))
 	bo.PutUint32(data[5:], math.Float32bits(t.Transform.offset.Y))
-	o.Write(data)
+	o.Write(data, nil)
 }
 
 func (t *OpTransform) Decode(d []byte) {
@@ -129,7 +129,7 @@ func (t *OpTransform) Decode(d []byte) {
 func (l OpLayer) Add(o *Ops) {
 	data := make([]byte, ops.TypeLayerLen)
 	data[0] = byte(ops.TypeLayer)
-	o.Write(data)
+	o.Write(data, nil)
 }
 
 func (l *OpLayer) Decode(d []byte) {

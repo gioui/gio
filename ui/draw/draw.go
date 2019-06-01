@@ -31,13 +31,11 @@ func (i OpImage) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypeImageLen)
 	data[0] = byte(ops.TypeImage)
 	bo := binary.LittleEndian
-	ref := o.Ref(i.Img)
-	bo.PutUint32(data[1:], uint32(ref))
-	bo.PutUint32(data[5:], uint32(i.Rect.Min.X))
-	bo.PutUint32(data[9:], uint32(i.Rect.Min.Y))
-	bo.PutUint32(data[13:], uint32(i.Rect.Max.X))
-	bo.PutUint32(data[17:], uint32(i.Rect.Max.Y))
-	o.Write(data)
+	bo.PutUint32(data[1:], uint32(i.Rect.Min.X))
+	bo.PutUint32(data[5:], uint32(i.Rect.Min.Y))
+	bo.PutUint32(data[9:], uint32(i.Rect.Max.X))
+	bo.PutUint32(data[13:], uint32(i.Rect.Max.Y))
+	o.Write(data, []interface{}{i.Img})
 }
 
 func (i *OpImage) Decode(data []byte, refs []interface{}) {
@@ -45,19 +43,18 @@ func (i *OpImage) Decode(data []byte, refs []interface{}) {
 	if ops.OpType(data[0]) != ops.TypeImage {
 		panic("invalid op")
 	}
-	ref := int(bo.Uint32(data[1:]))
 	sr := image.Rectangle{
 		Min: image.Point{
-			X: int(bo.Uint32(data[5:])),
-			Y: int(bo.Uint32(data[9:])),
+			X: int(bo.Uint32(data[1:])),
+			Y: int(bo.Uint32(data[5:])),
 		},
 		Max: image.Point{
-			X: int(bo.Uint32(data[13:])),
-			Y: int(bo.Uint32(data[17:])),
+			X: int(bo.Uint32(data[9:])),
+			Y: int(bo.Uint32(data[13:])),
 		},
 	}
 	*i = OpImage{
-		Img:  refs[ref].(image.Image),
+		Img:  refs[0].(image.Image),
 		Rect: sr,
 	}
 }
@@ -69,7 +66,7 @@ func (c OpColor) Add(o *ui.Ops) {
 	data[2] = c.Col.G
 	data[3] = c.Col.B
 	data[4] = c.Col.A
-	o.Write(data)
+	o.Write(data, nil)
 }
 
 func (c *OpColor) Decode(data []byte, refs []interface{}) {
@@ -94,7 +91,7 @@ func (d OpDraw) Add(o *ui.Ops) {
 	bo.PutUint32(data[5:], math.Float32bits(d.Rect.Min.Y))
 	bo.PutUint32(data[9:], math.Float32bits(d.Rect.Max.X))
 	bo.PutUint32(data[13:], math.Float32bits(d.Rect.Max.Y))
-	o.Write(data)
+	o.Write(data, nil)
 }
 
 func (d *OpDraw) Decode(data []byte, refs []interface{}) {

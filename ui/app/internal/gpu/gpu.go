@@ -667,7 +667,7 @@ func (d *drawOps) newPathOp() *pathOp {
 func (d *drawOps) collectOps(r *ui.OpsReader, state drawState) int {
 loop:
 	for {
-		data, ok := r.Decode()
+		data, refs, ok := r.Decode()
 		if !ok {
 			break
 		}
@@ -678,7 +678,7 @@ loop:
 			state.t = state.t.Mul(op.Transform)
 		case ops.TypeClip:
 			var op gdraw.OpClip
-			op.Decode(data, r.Refs)
+			op.Decode(data, refs)
 			if op.Path == nil {
 				state.clip = f32.Rectangle{}
 				continue
@@ -702,17 +702,17 @@ loop:
 			}
 		case ops.TypeColor:
 			var op gdraw.OpColor
-			op.Decode(data, r.Refs)
+			op.Decode(data, refs)
 			state.img = nil
 			state.color = op.Col
 		case ops.TypeImage:
 			var op gdraw.OpImage
-			op.Decode(data, r.Refs)
+			op.Decode(data, refs)
 			state.img = op.Img
 			state.imgRect = op.Rect
 		case ops.TypeDraw:
 			var op gdraw.OpDraw
-			op.Decode(data, r.Refs)
+			op.Decode(data, refs)
 			off := state.t.Transform(f32.Point{})
 			clip := state.clip.Intersect(op.Rect.Add(off))
 			if clip.Empty() {

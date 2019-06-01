@@ -156,7 +156,7 @@ func collectRedraws(r *ui.OpsReader) (time.Time, bool) {
 	var t time.Time
 	redraw := false
 	for {
-		data, ok := r.Decode()
+		data, _, ok := r.Decode()
 		if !ok {
 			break
 		}

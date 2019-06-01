@@ -39,7 +39,7 @@ type handler struct {
 
 func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int) {
 	for {
-		data, ok := r.Decode()
+		data, refs, ok := r.Decode()
 		if !ok {
 			return
 		}
@@ -57,7 +57,7 @@ func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int) {
 			t = t.Mul(op.Transform)
 		case ops.TypePointerHandler:
 			var op OpHandler
-			op.Decode(data, r.Refs)
+			op.Decode(data, refs)
 			q.hitTree = append(q.hitTree, hitNode{level: layer, key: op.Key})
 			h, ok := q.handlers[op.Key]
 			if !ok {
