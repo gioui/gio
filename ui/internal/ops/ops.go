@@ -39,7 +39,7 @@ const (
 	TypePopLen            = 1
 
 	TypeBlockDefRefs       = 0
-	TypeBlockRefs          = 0
+	TypeBlockRefs          = 1
 	TypeTransformRefs      = 0
 	TypeLayerRefs          = 0
 	TypeRedrawRefs         = 0
