@@ -92,7 +92,7 @@ func (p *PathBuilder) Quad(ctrl, to f32.Point) {
 }
 
 func (p *PathBuilder) quadTo(ctrl, to f32.Point) {
-	// Zero width curve don't contribute to stenciling.
+	// Zero width curves don't contribute to stenciling.
 	if p.pen.X == to.X && p.pen.X == ctrl.X {
 		p.pen = to
 		return
