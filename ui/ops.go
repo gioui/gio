@@ -10,6 +10,10 @@ import (
 type Ops struct {
 	// Stack of block start indices.
 	stack []pc
+	ops   opsData
+}
+
+type opsData struct {
 	// Serialized ops.
 	data []byte
 	// Op references.
@@ -19,8 +23,7 @@ type Ops struct {
 type OpsReader struct {
 	pc    pc
 	stack []block
-	refs  []interface{}
-	data  []byte
+	ops   opsData
 
 	pseudoOp [1]byte
 }
@@ -79,9 +82,9 @@ type opBlockDef struct {
 
 // Begin a block of ops.
 func (o *Ops) Begin() {
-	o.stack = append(o.stack, o.pc())
+	o.stack = append(o.stack, o.ops.pc())
 	// Make room for a block definition. Filled out in End.
-	o.data = append(o.data, make([]byte, ops.TypeBlockDefLen)...)
+	o.Write(make([]byte, ops.TypeBlockDefLen), nil)
 }
 
 func (op *opBlockDef) decode(data []byte) {
@@ -104,9 +107,9 @@ func (op *opBlockDef) decode(data []byte) {
 func (o *Ops) End() OpBlock {
 	start := o.stack[len(o.stack)-1]
 	o.stack = o.stack[:len(o.stack)-1]
-	pc := o.pc()
+	pc := o.ops.pc()
 	// Write the block header reserved in Begin.
-	data := o.data[start.data : start.data+ops.TypeBlockDefLen]
+	data := o.ops.data[start.data : start.data+ops.TypeBlockDefLen]
 	data[0] = byte(ops.TypeBlockDef)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(pc.data))
@@ -116,18 +119,26 @@ func (o *Ops) End() OpBlock {
 
 // Reset clears the Ops.
 func (o *Ops) Reset() {
-	o.refs = o.refs[:0]
 	o.stack = o.stack[:0]
-	o.data = o.data[:0]
+	o.ops.reset()
+}
+
+func (d *opsData) reset() {
+	d.data = d.data[:0]
+	d.refs = d.refs[:0]
+}
+
+func (d *opsData) write(op []byte, refs []interface{}) {
+	d.data = append(d.data, op...)
+	d.refs = append(d.refs, refs...)
 }
 
 func (o *Ops) Write(op []byte, refs []interface{}) {
-	o.data = append(o.data, op...)
-	o.refs = append(o.refs, refs...)
+	o.ops.write(op, refs)
 }
 
-func (o *Ops) pc() pc {
-	return pc{data: len(o.data), refs: len(o.refs)}
+func (d *opsData) pc() pc {
+	return pc{data: len(d.data), refs: len(d.refs)}
 }
 
 func (b *OpBlock) decode(data []byte) {
@@ -156,15 +167,14 @@ func (b OpBlock) Add(o *Ops) {
 
 // Reset start reading from the op list.
 func (r *OpsReader) Reset(ops *Ops) {
-	r.refs = ops.refs
-	r.data = ops.data
+	r.ops = ops.ops
 	r.stack = r.stack[:0]
 	r.pc = pc{}
 }
 
 func (r *OpsReader) Decode() ([]byte, []interface{}, bool) {
 	for {
-		if r.pc.data == len(r.data) {
+		if r.pc.data == len(r.ops.data) {
 			return nil, nil, false
 		}
 		if len(r.stack) > 0 {
@@ -176,20 +186,20 @@ func (r *OpsReader) Decode() ([]byte, []interface{}, bool) {
 				return r.pseudoOp[:], nil, true
 			}
 		}
-		t := ops.OpType(r.data[r.pc.data])
+		t := ops.OpType(r.ops.data[r.pc.data])
 		n := typeLengths[t-ops.FirstOpIndex]
 		nrefs := refLengths[t-ops.FirstOpIndex]
-		data := r.data[r.pc.data : r.pc.data+n]
-		refs := r.refs[r.pc.refs : r.pc.refs+nrefs]
+		data := r.ops.data[r.pc.data : r.pc.data+n]
+		refs := r.ops.refs[r.pc.refs : r.pc.refs+nrefs]
 		switch t {
 		case ops.TypeBlock:
 			var op OpBlock
 			op.decode(data)
-			if ops.OpType(r.data[op.pc.data]) != ops.TypeBlockDef {
+			if ops.OpType(r.ops.data[op.pc.data]) != ops.TypeBlockDef {
 				panic("invalid block reference")
 			}
 			var opDef opBlockDef
-			opDef.decode(r.data[op.pc.data : op.pc.data+ops.TypeBlockDefLen])
+			opDef.decode(r.ops.data[op.pc.data : op.pc.data+ops.TypeBlockDefLen])
 			retPC := r.pc
 			retPC.data += n
 			retPC.refs += nrefs
