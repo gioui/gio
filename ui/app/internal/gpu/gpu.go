@@ -5,6 +5,7 @@ package gpu
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"math"
 	"runtime"
 	"strings"
@@ -70,6 +71,8 @@ type drawOps struct {
 	// Current OpImage image and rect, if any.
 	img     image.Image
 	imgRect image.Rectangle
+	// Current OpColor, if any.
+	color color.NRGBA
 }
 
 type drawState struct {
@@ -693,6 +696,11 @@ loop:
 				cpath.path = data
 				d.pathOps = append(d.pathOps, cpath)
 			}
+		case ops.TypeColor:
+			var op gdraw.OpColor
+			op.Decode(data, r.Refs)
+			d.img = nil
+			d.color = op.Col
 		case ops.TypeImage:
 			var op gdraw.OpImage
 			op.Decode(data, r.Refs)
@@ -756,7 +764,11 @@ func expandPathOp(p *pathOp, clip image.Rectangle) {
 
 func (d *drawOps) materialFor(cache *resourceCache, rect f32.Rectangle, off f32.Point, clip image.Rectangle) material {
 	var m material
-	if uniform, ok := d.img.(*image.Uniform); ok {
+	if d.img == nil {
+		m.material = materialColor
+		m.color = gamma(d.color.RGBA())
+		m.opaque = m.color[3] == 1.0
+	} else if uniform, ok := d.img.(*image.Uniform); ok {
 		m.material = materialColor
 		m.color = gamma(uniform.RGBA())
 		m.opaque = m.color[3] == 1.0

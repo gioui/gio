@@ -29,6 +29,7 @@ const (
 	TypeClip
 	TypeImage
 	TypeDraw
+	TypeColor
 	TypePointerHandler
 	TypeKeyHandler
 	TypeHideInput
@@ -45,6 +46,7 @@ const (
 	TypeClipLen           = 1 + 4
 	TypeImageLen          = 1 + 4 + 4*4
 	TypeDrawLen           = 1 + 4*4
+	TypeColorLen          = 1 + 4
 	TypePointerHandlerLen = 1 + 4 + 4 + 1
 	TypeKeyHandlerLen     = 1 + 4 + 1
 	TypeHideInputLen      = 1
@@ -61,6 +63,7 @@ var typeLengths = [...]int{
 	TypeClipLen,
 	TypeImageLen,
 	TypeDrawLen,
+	TypeColorLen,
 	TypePointerHandlerLen,
 	TypeKeyHandlerLen,
 	TypeHideInputLen,

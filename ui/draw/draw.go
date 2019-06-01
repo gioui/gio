@@ -5,6 +5,7 @@ package draw
 import (
 	"encoding/binary"
 	"image"
+	"image/color"
 	"math"
 
 	"gioui.org/ui"
@@ -16,6 +17,10 @@ import (
 type OpImage struct {
 	Img  image.Image
 	Rect image.Rectangle
+}
+
+type OpColor struct {
+	Col color.NRGBA
 }
 
 type OpDraw struct {
@@ -54,6 +59,30 @@ func (i *OpImage) Decode(data []byte, refs []interface{}) {
 	*i = OpImage{
 		Img:  refs[ref].(image.Image),
 		Rect: sr,
+	}
+}
+
+func (c OpColor) Add(o *ui.Ops) {
+	data := make([]byte, ops.TypeColorLen)
+	data[0] = byte(ops.TypeColor)
+	data[1] = c.Col.R
+	data[2] = c.Col.G
+	data[3] = c.Col.B
+	data[4] = c.Col.A
+	o.Write(data)
+}
+
+func (c *OpColor) Decode(data []byte, refs []interface{}) {
+	if ops.OpType(data[0]) != ops.TypeColor {
+		panic("invalid op")
+	}
+	*c = OpColor{
+		Col: color.NRGBA{
+			R: data[1],
+			G: data[2],
+			B: data[3],
+			A: data[4],
+		},
 	}
 }
 
