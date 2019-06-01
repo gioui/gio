@@ -17,7 +17,6 @@ import (
 
 type Label struct {
 	Face      Face
-	Src       image.Image
 	Alignment Alignment
 	Text      string
 
@@ -106,7 +105,7 @@ func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		ops.Begin()
 		ui.OpTransform{Transform: ui.Offset(off)}.Add(ops)
 		draw.OpClip{Path: path}.Add(ops)
-		draw.OpImage{Rect: lclip, Src: l.Src, SrcRect: l.Src.Bounds()}.Add(ops)
+		draw.OpDraw{Rect: lclip}.Add(ops)
 		ops.End().Add(ops)
 	}
 	return dims

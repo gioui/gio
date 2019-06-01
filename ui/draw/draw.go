@@ -14,58 +14,77 @@ import (
 )
 
 type OpImage struct {
-	Rect    f32.Rectangle
-	Src     image.Image
-	SrcRect image.Rectangle
+	Img  image.Image
+	Rect image.Rectangle
+}
+
+type OpDraw struct {
+	Rect f32.Rectangle
 }
 
 func (i OpImage) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypeImageLen)
 	data[0] = byte(ops.TypeImage)
 	bo := binary.LittleEndian
-	ref := o.Ref(i.Src)
+	ref := o.Ref(i.Img)
 	bo.PutUint32(data[1:], uint32(ref))
-	bo.PutUint32(data[5:], math.Float32bits(i.Rect.Min.X))
-	bo.PutUint32(data[9:], math.Float32bits(i.Rect.Min.Y))
-	bo.PutUint32(data[13:], math.Float32bits(i.Rect.Max.X))
-	bo.PutUint32(data[17:], math.Float32bits(i.Rect.Max.Y))
-	bo.PutUint32(data[21:], uint32(i.SrcRect.Min.X))
-	bo.PutUint32(data[25:], uint32(i.SrcRect.Min.Y))
-	bo.PutUint32(data[29:], uint32(i.SrcRect.Max.X))
-	bo.PutUint32(data[33:], uint32(i.SrcRect.Max.Y))
+	bo.PutUint32(data[5:], uint32(i.Rect.Min.X))
+	bo.PutUint32(data[9:], uint32(i.Rect.Min.Y))
+	bo.PutUint32(data[13:], uint32(i.Rect.Max.X))
+	bo.PutUint32(data[17:], uint32(i.Rect.Max.Y))
 	o.Write(data)
 }
 
-func (i *OpImage) Decode(d []byte, refs []interface{}) {
+func (i *OpImage) Decode(data []byte, refs []interface{}) {
 	bo := binary.LittleEndian
-	if ops.OpType(d[0]) != ops.TypeImage {
+	if ops.OpType(data[0]) != ops.TypeImage {
 		panic("invalid op")
 	}
-	ref := int(bo.Uint32(d[1:]))
-	r := f32.Rectangle{
-		Min: f32.Point{
-			X: math.Float32frombits(bo.Uint32(d[5:])),
-			Y: math.Float32frombits(bo.Uint32(d[9:])),
-		},
-		Max: f32.Point{
-			X: math.Float32frombits(bo.Uint32(d[13:])),
-			Y: math.Float32frombits(bo.Uint32(d[17:])),
-		},
-	}
+	ref := int(bo.Uint32(data[1:]))
 	sr := image.Rectangle{
 		Min: image.Point{
-			X: int(bo.Uint32(d[21:])),
-			Y: int(bo.Uint32(d[25:])),
+			X: int(bo.Uint32(data[5:])),
+			Y: int(bo.Uint32(data[9:])),
 		},
 		Max: image.Point{
-			X: int(bo.Uint32(d[29:])),
-			Y: int(bo.Uint32(d[33:])),
+			X: int(bo.Uint32(data[13:])),
+			Y: int(bo.Uint32(data[17:])),
 		},
 	}
 	*i = OpImage{
-		Rect:    r,
-		Src:     refs[ref].(image.Image),
-		SrcRect: sr,
+		Img:  refs[ref].(image.Image),
+		Rect: sr,
+	}
+}
+
+func (d OpDraw) Add(o *ui.Ops) {
+	data := make([]byte, ops.TypeDrawLen)
+	data[0] = byte(ops.TypeDraw)
+	bo := binary.LittleEndian
+	bo.PutUint32(data[1:], math.Float32bits(d.Rect.Min.X))
+	bo.PutUint32(data[5:], math.Float32bits(d.Rect.Min.Y))
+	bo.PutUint32(data[9:], math.Float32bits(d.Rect.Max.X))
+	bo.PutUint32(data[13:], math.Float32bits(d.Rect.Max.Y))
+	o.Write(data)
+}
+
+func (d *OpDraw) Decode(data []byte, refs []interface{}) {
+	bo := binary.LittleEndian
+	if ops.OpType(data[0]) != ops.TypeDraw {
+		panic("invalid op")
+	}
+	r := f32.Rectangle{
+		Min: f32.Point{
+			X: math.Float32frombits(bo.Uint32(data[1:])),
+			Y: math.Float32frombits(bo.Uint32(data[5:])),
+		},
+		Max: f32.Point{
+			X: math.Float32frombits(bo.Uint32(data[9:])),
+			Y: math.Float32frombits(bo.Uint32(data[13:])),
+		},
+	}
+	*d = OpDraw{
+		Rect: r,
 	}
 }
 

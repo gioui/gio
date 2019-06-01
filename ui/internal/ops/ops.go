@@ -28,6 +28,7 @@ const (
 	TypeRedraw
 	TypeClip
 	TypeImage
+	TypeDraw
 	TypePointerHandler
 	TypeKeyHandler
 	TypeHideInput
@@ -42,7 +43,8 @@ const (
 	TypeLayerLen          = 1
 	TypeRedrawLen         = 1 + 8
 	TypeClipLen           = 1 + 4
-	TypeImageLen          = 1 + 4 + 4*4 + 4*4
+	TypeImageLen          = 1 + 4 + 4*4
+	TypeDrawLen           = 1 + 4*4
 	TypePointerHandlerLen = 1 + 4 + 4 + 1
 	TypeKeyHandlerLen     = 1 + 4 + 1
 	TypeHideInputLen      = 1
@@ -58,6 +60,7 @@ var typeLengths = [...]int{
 	TypeRedrawLen,
 	TypeClipLen,
 	TypeImageLen,
+	TypeDrawLen,
 	TypePointerHandlerLen,
 	TypeKeyHandlerLen,
 	TypeHideInputLen,

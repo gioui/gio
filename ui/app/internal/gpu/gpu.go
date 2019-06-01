@@ -66,6 +66,10 @@ type drawOps struct {
 	zimageOps   []imageOp
 	pathOps     []*pathOp
 	pathOpCache []pathOp
+
+	// Current OpImage image and rect, if any.
+	img     image.Image
+	imgRect image.Rectangle
 }
 
 type drawState struct {
@@ -692,13 +696,18 @@ loop:
 		case ops.TypeImage:
 			var op gdraw.OpImage
 			op.Decode(data, r.Refs)
+			d.img = op.Img
+			d.imgRect = op.Rect
+		case ops.TypeDraw:
+			var op gdraw.OpDraw
+			op.Decode(data, r.Refs)
 			off := t.Transform(f32.Point{})
 			clip := clip.Intersect(op.Rect.Add(off))
 			if clip.Empty() {
 				continue
 			}
 			bounds := boundRectF(clip)
-			mat := materialFor(d.cache, op, off, bounds)
+			mat := d.materialFor(d.cache, op.Rect, off, bounds)
 			if bounds.Min == (image.Point{}) && bounds.Max == d.viewport && mat.opaque && mat.material == materialColor {
 				// The image is a uniform opaque color and takes up the whole screen.
 				// Scrap images up to and including this image and set clear color.
@@ -745,16 +754,16 @@ func expandPathOp(p *pathOp, clip image.Rectangle) {
 	}
 }
 
-func materialFor(cache *resourceCache, op gdraw.OpImage, off f32.Point, clip image.Rectangle) material {
+func (d *drawOps) materialFor(cache *resourceCache, rect f32.Rectangle, off f32.Point, clip image.Rectangle) material {
 	var m material
-	if uniform, ok := op.Src.(*image.Uniform); ok {
+	if uniform, ok := d.img.(*image.Uniform); ok {
 		m.material = materialColor
 		m.color = gamma(uniform.RGBA())
 		m.opaque = m.color[3] == 1.0
 	} else {
 		m.material = materialTexture
-		dr := boundRectF(op.Rect.Add(off))
-		sr := op.SrcRect
+		dr := boundRectF(rect.Add(off))
+		sr := d.imgRect
 		if dx := dr.Dx(); dx != 0 {
 			// Don't clip 1 px width sources.
 			if sdx := sr.Dx(); sdx > 1 {
@@ -769,16 +778,16 @@ func materialFor(cache *resourceCache, op gdraw.OpImage, off f32.Point, clip ima
 				sr.Max.Y -= ((dr.Max.Y-clip.Max.Y)*sdy + dy/2) / dy
 			}
 		}
-		tex, exists := cache.get(op.Src)
+		tex, exists := cache.get(d.img)
 		if !exists {
 			t := &texture{
-				src: op.Src,
+				src: d.img,
 			}
-			cache.put(op.Src, t)
+			cache.put(d.img, t)
 			tex = t
 		}
 		m.texture = tex.(*texture)
-		m.uvScale, m.uvOffset = texSpaceTransform(sr, op.Src.Bounds().Size())
+		m.uvScale, m.uvOffset = texSpaceTransform(sr, d.img.Bounds().Size())
 	}
 	return m
 }

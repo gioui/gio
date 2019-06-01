@@ -20,7 +20,6 @@ import (
 )
 
 type Editor struct {
-	Src        image.Image
 	Face       Face
 	Alignment  Alignment
 	SingleLine bool
@@ -175,7 +174,7 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		ops.Begin()
 		ui.OpTransform{Transform: ui.Offset(lineOff)}.Add(ops)
 		draw.OpClip{Path: path}.Add(ops)
-		draw.OpImage{Rect: toRectF(clip).Sub(lineOff), Src: e.Src, SrcRect: e.Src.Bounds()}.Add(ops)
+		draw.OpDraw{Rect: toRectF(clip).Sub(lineOff)}.Add(ops)
 		ops.End().Add(ops)
 	}
 	if e.focused {
@@ -199,8 +198,7 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			})
 			carRect = clip.Intersect(carRect)
 			if !carRect.Empty() {
-				img := draw.OpImage{Src: e.Src, Rect: toRectF(carRect), SrcRect: e.Src.Bounds()}
-				img.Add(ops)
+				draw.OpDraw{Rect: toRectF(carRect)}.Add(ops)
 			}
 		}
 		if blinking {
