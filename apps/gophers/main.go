@@ -228,7 +228,8 @@ func (a *App) run() error {
 					in := layout.Insets{Top: a.cfg.Dp(16)}
 					cs = in.Begin(ops, cs)
 					txt := fmt.Sprintf("m: %d %s", mallocs, a.w.Timings())
-					dims := text.Label{Src: textColor, Face: a.face(fonts.mono, 8), Text: txt}.Layout(ops, cs)
+					gdraw.OpColor{Col: textColor}.Add(ops)
+					dims := text.Label{Face: a.face(fonts.mono, 8), Text: txt}.Layout(ops, cs)
 					dims = in.End(ops, dims)
 					al.End(ops, dims)
 				}
@@ -258,14 +259,12 @@ func newApp(w *app.Window) *App {
 		btnsClicker: new(gesture.Click),
 	}
 	a.edit2 = &text.Editor{
-		Src:  textColor,
 		Face: a.face(fonts.italic, 14),
 		//Alignment: text.End,
 		SingleLine: true,
 	}
 	a.edit2.SetText("Single line editor. Edit me!")
 	a.edit = &text.Editor{
-		Src:  textColor,
 		Face: a.face(fonts.regular, 14),
 		//Alignment: text.End,
 		//SingleLine: true,
@@ -370,13 +369,12 @@ var (
 	accentColor     = rgb(0x00c28c)
 )
 
-func rgb(c uint32) *image.Uniform {
+func rgb(c uint32) color.NRGBA {
 	return argb((0xff << 24) | c)
 }
 
-func argb(c uint32) *image.Uniform {
-	col := color.NRGBA{A: uint8(c >> 24), R: uint8(c >> 16), G: uint8(c >> 8), B: uint8(c)}
-	return &image.Uniform{col}
+func argb(c uint32) color.NRGBA {
+	return color.NRGBA{A: uint8(c >> 24), R: uint8(c >> 16), G: uint8(c >> 8), B: uint8(c)}
 }
 
 func (a *App) face(f *sfnt.Font, size float32) text.Face {
@@ -434,7 +432,8 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	u := up.user
 	c := up.cfg
 	msg := up.commits[index].GetMessage()
-	label := text.Label{Src: textColor, Face: up.faces.For(fonts.regular, ui.Sp(12)), Text: msg}
+	gdraw.OpColor{Col: textColor}.Add(ops)
+	label := text.Label{Face: up.faces.For(fonts.regular, ui.Sp(12)), Text: msg}
 	in := layout.Insets{Top: c.Dp(16), Right: c.Dp(8), Left: c.Dp(8)}
 	cs = in.Begin(ops, cs)
 	f := layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
@@ -501,6 +500,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		{
 			in := layout.EqualInsets(c.Dp(16))
 			cs = layout.Sized{Height: c.Dp(200)}.Constrain(cs)
+			gdraw.OpColor{Col: textColor}.Add(ops)
 			dims = a.edit.Layout(ops, in.Begin(ops, cs))
 			dims = in.End(ops, dims)
 		}
@@ -509,6 +509,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		cs = f.Rigid(ops)
 		{
 			in := layout.Insets{Bottom: c.Dp(16), Left: c.Dp(16), Right: c.Dp(16)}
+			gdraw.OpColor{Col: textColor}.Add(ops)
 			dims = a.edit2.Layout(ops, in.Begin(ops, cs))
 			dims = in.End(ops, dims)
 		}
@@ -520,10 +521,11 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			s.Init(cs)
 			cs = s.Rigid(ops)
 			in := layout.Insets{Top: c.Dp(16), Right: c.Dp(8), Bottom: c.Dp(8), Left: c.Dp(8)}
-			lbl := text.Label{Src: rgb(0x888888), Face: a.face(fonts.regular, 9), Text: "GOPHERS"}
+			gdraw.OpColor{Col: rgb(0x888888)}.Add(ops)
+			lbl := text.Label{Face: a.face(fonts.regular, 9), Text: "GOPHERS"}
 			dims = in.End(ops, lbl.Layout(ops, in.Begin(ops, cs)))
 			c2 := s.End(ops, dims)
-			c1 := s.End(ops, fill(rgb(0xf2f2f2)).Layout(ops, s.Expand(ops)))
+			c1 := s.End(ops, fill{color: rgb(0xf2f2f2)}.Layout(ops, s.Expand(ops)))
 			dims = s.Layout(ops, c1, c2)
 		}
 		c3 := f.End(ops, dims)
@@ -610,13 +612,15 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 				f := baseline()
 				f.Init(cs)
 				cs = f.Rigid(ops)
-				dims = text.Label{Src: textColor, Face: a.face(fonts.regular, 11), Text: u.name}.Layout(ops, cs)
+				gdraw.OpColor{Col: textColor}.Add(ops)
+				dims = text.Label{Face: a.face(fonts.regular, 11), Text: u.name}.Layout(ops, cs)
 				c1 := f.End(ops, dims)
 				cs = f.Rigid(ops)
 				al := layout.Align{Alignment: layout.E}
 				in := layout.Insets{Left: c.Dp(2)}
 				cs = in.Begin(ops, al.Begin(ops, cs))
-				dims = text.Label{Src: textColor, Face: a.face(fonts.regular, 8), Text: "3 hours ago"}.Layout(ops, cs)
+				gdraw.OpColor{Col: textColor}.Add(ops)
+				dims = text.Label{Face: a.face(fonts.regular, 8), Text: "3 hours ago"}.Layout(ops, cs)
 				dims = al.End(ops, in.End(ops, dims))
 				c2 := f.End(ops, dims)
 				dims = f.Layout(ops, c1, c2)
@@ -625,7 +629,8 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 			cs = f.Rigid(ops)
 			in := layout.Insets{Top: c.Dp(4)}
 			cs = in.Begin(ops, cs)
-			dims = text.Label{Src: tertTextColor, Face: a.face(fonts.regular, 10), Text: u.company}.Layout(ops, cs)
+			gdraw.OpColor{Col: tertTextColor}.Add(ops)
+			dims = text.Label{Face: a.face(fonts.regular, 10), Text: u.company}.Layout(ops, cs)
 			dims = in.End(ops, dims)
 			c2 := f.End(ops, dims)
 			dims = f.Layout(ops, c1, c2)
@@ -639,8 +644,24 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 	return elem.Layout(ops, c1)
 }
 
-func fill(img image.Image) widget.Image {
-	return widget.Image{Src: img, Rect: image.Rectangle{Max: image.Point{X: 1, Y: 1}}}
+type fill struct {
+	color color.NRGBA
+}
+
+func (f fill) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+	d := image.Point{X: cs.Width.Max, Y: cs.Height.Max}
+	if d.X == ui.Inf {
+		d.X = cs.Width.Min
+	}
+	if d.Y == ui.Inf {
+		d.Y = cs.Height.Min
+	}
+	dr := f32.Rectangle{
+		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
+	}
+	gdraw.OpColor{Col: f.color}.Add(ops)
+	gdraw.OpDraw{Rect: dr}.Add(ops)
+	return layout.Dimens{Size: d, Baseline: d.Y}
 }
 
 func column() layout.Flex {
@@ -677,17 +698,17 @@ func (c *clipCircle) End(ops *ui.Ops, dims layout.Dimens) layout.Dimens {
 	return dims
 }
 
-func fab(ops *ui.Ops, cs layout.Constraints, ico, col image.Image, size float32) layout.Dimens {
+func fab(ops *ui.Ops, cs layout.Constraints, ico image.Image, col color.NRGBA, size float32) layout.Dimens {
 	sz := int(size + .5)
 	rr := size * .5
 	dp := image.Point{X: (sz - ico.Bounds().Dx()) / 2, Y: (sz - ico.Bounds().Dy()) / 2}
 	dims := image.Point{X: sz, Y: sz}
 	gdraw.OpClip{Path: rrect(size, size, rr, rr, rr, rr)}.Add(ops)
-	gdraw.OpImage{Rect: f32.Rectangle{Max: f32.Point{X: float32(sz), Y: float32(sz)}}, Src: col, SrcRect: col.Bounds()}.Add(ops)
-	gdraw.OpImage{
-		Rect:    toRectF(ico.Bounds().Add(dp)),
-		Src:     ico,
-		SrcRect: ico.Bounds(),
+	gdraw.OpColor{Col: col}.Add(ops)
+	gdraw.OpDraw{Rect: f32.Rectangle{Max: f32.Point{X: float32(sz), Y: float32(sz)}}}.Add(ops)
+	gdraw.OpImage{Img: ico, Rect: ico.Bounds()}.Add(ops)
+	gdraw.OpDraw{
+		Rect: toRectF(ico.Bounds().Add(dp)),
 	}.Add(ops)
 	return layout.Dimens{Size: dims}
 }
