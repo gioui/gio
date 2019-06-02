@@ -171,11 +171,11 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			break
 		}
 		path := e.Face.Path(str)
-		ops.Begin()
+		ui.OpPush{}.Add(ops)
 		ui.OpTransform{Transform: ui.Offset(lineOff)}.Add(ops)
 		draw.OpClip{Path: path}.Add(ops)
 		draw.OpDraw{Rect: toRectF(clip).Sub(lineOff)}.Add(ops)
-		ops.End().Add(ops)
+		ui.OpPop{}.Add(ops)
 	}
 	if e.focused {
 		now := e.cfg.Now

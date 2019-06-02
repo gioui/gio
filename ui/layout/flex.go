@@ -157,12 +157,12 @@ func (f *Flex) Layout(ops *ui.Ops, children ...FlexChild) Dimens {
 				cross = f.maxBaseline - b
 			}
 		}
-		ops.Begin()
+		ui.OpPush{}.Add(ops)
 		ui.OpTransform{
 			Transform: ui.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))),
 		}.Add(ops)
 		child.block.Add(ops)
-		ops.End().Add(ops)
+		ui.OpPop{}.Add(ops)
 		mainSize += axisMain(f.Axis, dims.Size)
 		switch f.MainAxisAlignment {
 		case SpaceEvenly:

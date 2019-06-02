@@ -24,8 +24,6 @@ type OpsReader struct {
 	pc    pc
 	stack []block
 	ops   opsData
-
-	pseudoOp [1]byte
 }
 
 type block struct {
@@ -73,6 +71,10 @@ var refLengths = [...]int{
 	ops.TypePopRefs,
 }
 
+type OpPush struct{}
+
+type OpPop struct{}
+
 type OpBlock struct {
 	ops *Ops
 	pc  pc
@@ -80,6 +82,14 @@ type OpBlock struct {
 
 type opBlockDef struct {
 	endpc pc
+}
+
+func (p OpPush) Add(o *Ops) {
+	o.Write([]byte{byte(ops.TypePush)}, nil)
+}
+
+func (p OpPop) Add(o *Ops) {
+	o.Write([]byte{byte(ops.TypePop)}, nil)
 }
 
 // Begin a block of ops.
@@ -183,8 +193,7 @@ func (r *OpsReader) Decode() ([]byte, []interface{}, bool) {
 				r.ops = b.ops
 				r.pc = b.retPC
 				r.stack = r.stack[:len(r.stack)-1]
-				r.pseudoOp[0] = byte(ops.TypePop)
-				return r.pseudoOp[:], nil, true
+				continue
 			}
 		}
 		if r.pc.data == len(r.ops.data) {
@@ -217,8 +226,7 @@ func (r *OpsReader) Decode() ([]byte, []interface{}, bool) {
 			r.pc = op.pc
 			r.pc.data += ops.TypeBlockDefLen
 			r.pc.refs += ops.TypeBlockDefRefs
-			r.pseudoOp[0] = byte(ops.TypePush)
-			return r.pseudoOp[:], nil, true
+			continue
 		case ops.TypeBlockDef:
 			var op opBlockDef
 			op.decode(data)

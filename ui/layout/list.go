@@ -178,13 +178,13 @@ func (l *List) Layout(ops *ui.Ops) Dimens {
 			Min: axisPoint(l.Axis, min, -ui.Inf),
 			Max: axisPoint(l.Axis, max, ui.Inf),
 		}
-		ops.Begin()
+		ui.OpPush{}.Add(ops)
 		draw.OpClip{Path: draw.RectPath(r)}.Add(ops)
 		ui.OpTransform{
 			Transform: ui.Offset(toPointF(axisPoint(l.Axis, pos, cross))),
 		}.Add(ops)
 		child.block.Add(ops)
-		ops.End().Add(ops)
+		ui.OpPop{}.Add(ops)
 		pos += axisMain(l.Axis, sz)
 	}
 	atStart := l.first == 0 && l.offset <= 0
