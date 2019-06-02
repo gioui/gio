@@ -692,7 +692,7 @@ func (c *clipCircle) End(ops *ui.Ops, dims layout.Dimens) layout.Dimens {
 	szf := float32(max)
 	rr := szf * .5
 	ui.OpPush{}.Add(ops)
-	gdraw.OpClip{Path: rrect(szf, szf, rr, rr, rr, rr)}.Add(ops)
+	rrect(ops, szf, szf, rr, rr, rr, rr)
 	block.Add(ops)
 	ui.OpPop{}.Add(ops)
 	return dims
@@ -703,7 +703,7 @@ func fab(ops *ui.Ops, cs layout.Constraints, ico image.Image, col color.NRGBA, s
 	rr := size * .5
 	dp := image.Point{X: (sz - ico.Bounds().Dx()) / 2, Y: (sz - ico.Bounds().Dy()) / 2}
 	dims := image.Point{X: sz, Y: sz}
-	gdraw.OpClip{Path: rrect(size, size, rr, rr, rr, rr)}.Add(ops)
+	rrect(ops, size, size, rr, rr, rr, rr)
 	gdraw.OpColor{Col: col}.Add(ops)
 	gdraw.OpDraw{Rect: f32.Rectangle{Max: f32.Point{X: float32(sz), Y: float32(sz)}}}.Add(ops)
 	gdraw.OpImage{Img: ico, Rect: ico.Bounds()}.Add(ops)
@@ -741,19 +741,19 @@ func (ic *icon) image(cfg *ui.Config) image.Image {
 }
 
 // https://pomax.github.io/bezierinfo/#circles_cubic.
-func rrect(width, height, se, sw, nw, ne float32) *gdraw.Path {
+func rrect(ops *ui.Ops, width, height, se, sw, nw, ne float32) {
 	w, h := float32(width), float32(height)
 	const c = 0.55228475 // 4*(sqrt(2)-1)/3
 	var b gdraw.PathBuilder
-	b.Move(f32.Point{X: w, Y: h - se})
-	b.Cube(f32.Point{X: 0, Y: se * c}, f32.Point{X: -se + se*c, Y: se}, f32.Point{X: -se, Y: se}) // SE
-	b.Line(f32.Point{X: sw - w + se, Y: 0})
-	b.Cube(f32.Point{X: -sw * c, Y: 0}, f32.Point{X: -sw, Y: -sw + sw*c}, f32.Point{X: -sw, Y: -sw}) // SW
-	b.Line(f32.Point{X: 0, Y: nw - h + sw})
-	b.Cube(f32.Point{X: 0, Y: -nw * c}, f32.Point{X: nw - nw*c, Y: -nw}, f32.Point{X: nw, Y: -nw}) // NW
-	b.Line(f32.Point{X: w - ne - nw, Y: 0})
-	b.Cube(f32.Point{X: ne * c, Y: 0}, f32.Point{X: ne, Y: ne - ne*c}, f32.Point{X: ne, Y: ne}) // NE
-	return b.Path()
+	b.Move(ops, f32.Point{X: w, Y: h - se})
+	b.Cube(ops, f32.Point{X: 0, Y: se * c}, f32.Point{X: -se + se*c, Y: se}, f32.Point{X: -se, Y: se}) // SE
+	b.Line(ops, f32.Point{X: sw - w + se, Y: 0})
+	b.Cube(ops, f32.Point{X: -sw * c, Y: 0}, f32.Point{X: -sw, Y: -sw + sw*c}, f32.Point{X: -sw, Y: -sw}) // SW
+	b.Line(ops, f32.Point{X: 0, Y: nw - h + sw})
+	b.Cube(ops, f32.Point{X: 0, Y: -nw * c}, f32.Point{X: nw - nw*c, Y: -nw}, f32.Point{X: nw, Y: -nw}) // NW
+	b.Line(ops, f32.Point{X: w - ne - nw, Y: 0})
+	b.Cube(ops, f32.Point{X: ne * c, Y: 0}, f32.Point{X: ne, Y: ne - ne*c}, f32.Point{X: ne, Y: ne}) // NE
+	b.End(ops)
 }
 
 const longTextSample = `1. I learned from my grandfather, Verus, to use good manners, and to
