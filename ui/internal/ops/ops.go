@@ -24,7 +24,7 @@ const (
 
 const (
 	TypeBlockDefLen       = 1 + 4 + 4
-	TypeBlockLen          = 1 + 4 + 4
+	TypeBlockLen          = 1 + 4 + 4 + 4
 	TypeTransformLen      = 1 + 4*2
 	TypeLayerLen          = 1
 	TypeRedrawLen         = 1 + 8

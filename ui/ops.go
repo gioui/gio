@@ -14,6 +14,7 @@ type Ops struct {
 }
 
 type opsData struct {
+	version int
 	// Serialized ops.
 	data []byte
 	// Op references.
@@ -76,8 +77,9 @@ type OpPush struct{}
 type OpPop struct{}
 
 type OpBlock struct {
-	ops *Ops
-	pc  pc
+	ops     *Ops
+	version int
+	pc      pc
 }
 
 type opBlockDef struct {
@@ -126,7 +128,7 @@ func (o *Ops) End() OpBlock {
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(pc.data))
 	bo.PutUint32(data[5:], uint32(pc.refs))
-	return OpBlock{ops: o, pc: start}
+	return OpBlock{ops: o, pc: start, version: o.ops.version}
 }
 
 // Reset clears the Ops.
@@ -138,6 +140,7 @@ func (o *Ops) Reset() {
 func (d *opsData) reset() {
 	d.data = d.data[:0]
 	d.refs = d.refs[:0]
+	d.version++
 }
 
 func (d *opsData) write(op []byte, refs []interface{}) {
@@ -160,12 +163,14 @@ func (b *OpBlock) decode(data []byte, refs []interface{}) {
 	bo := binary.LittleEndian
 	dataIdx := int(bo.Uint32(data[1:]))
 	refsIdx := int(bo.Uint32(data[5:]))
+	version := int(bo.Uint32(data[9:]))
 	*b = OpBlock{
 		ops: refs[0].(*Ops),
 		pc: pc{
 			data: dataIdx,
 			refs: refsIdx,
 		},
+		version: version,
 	}
 }
 
@@ -175,6 +180,7 @@ func (b OpBlock) Add(o *Ops) {
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(b.pc.data))
 	bo.PutUint32(data[5:], uint32(b.pc.refs))
+	bo.PutUint32(data[9:], uint32(b.version))
 	o.Write(data, []interface{}{b.ops})
 }
 
@@ -211,6 +217,9 @@ func (r *OpsReader) Decode() ([]byte, []interface{}, bool) {
 			blockOps := op.ops.ops
 			if ops.OpType(blockOps.data[op.pc.data]) != ops.TypeBlockDef {
 				panic("invalid block reference")
+			}
+			if op.version != r.ops.version {
+				panic("invalid OpBlock reference to reset Ops")
 			}
 			var opDef opBlockDef
 			opDef.decode(blockOps.data[op.pc.data : op.pc.data+ops.TypeBlockDefLen])
