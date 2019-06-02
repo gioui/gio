@@ -56,23 +56,21 @@ func (s *Stack) begin(ops *ui.Ops) {
 }
 
 func (s *Stack) Rigid(ops *ui.Ops) Constraints {
-	ops.Begin()
-	ui.OpLayer{}.Add(ops)
+	s.begin(ops)
 	return s.cs
 }
 
 func (s *Stack) Expand(ops *ui.Ops) Constraints {
-	cs := Constraints{
+	s.begin(ops)
+	return Constraints{
 		Width:  Constraint{Min: s.maxSZ.X, Max: s.maxSZ.X},
 		Height: Constraint{Min: s.maxSZ.Y, Max: s.maxSZ.Y},
 	}
-	ops.Begin()
-	ui.OpLayer{}.Add(ops)
-	return cs
 }
 
 func (s *Stack) End(ops *ui.Ops, dims Dimens) StackChild {
 	b := ops.End()
+	s.begun = false
 	if w := dims.Size.X; w > s.maxSZ.X {
 		s.maxSZ.X = w
 	}
