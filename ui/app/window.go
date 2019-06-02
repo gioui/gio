@@ -156,14 +156,14 @@ func collectRedraws(r *ui.OpsReader) (time.Time, bool) {
 	var t time.Time
 	redraw := false
 	for {
-		data, _, ok := r.Decode()
+		encOp, ok := r.Decode()
 		if !ok {
 			break
 		}
-		switch ops.OpType(data[0]) {
+		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeRedraw:
 			var op ui.OpRedraw
-			op.Decode(data)
+			op.Decode(encOp.Data)
 			if !redraw || op.At.Before(t) {
 				redraw = true
 				t = op.At

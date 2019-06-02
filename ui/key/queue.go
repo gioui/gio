@@ -80,14 +80,14 @@ func resolveFocus(r *ui.OpsReader, focus Key) (Key, listenerPriority, bool) {
 	var hide bool
 loop:
 	for {
-		data, refs, ok := r.Decode()
+		encOp, ok := r.Decode()
 		if !ok {
 			break
 		}
-		switch ops.OpType(data[0]) {
+		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeKeyHandler:
 			var op OpHandler
-			op.Decode(data, refs)
+			op.Decode(encOp.Data, encOp.Refs)
 			var newPri listenerPriority
 			switch {
 			case op.Focus:

@@ -221,12 +221,12 @@ func (c *coverer) release() {
 	}
 }
 
-func buildPath(ctx *context, p *path.Path) *pathData {
+func buildPath(ctx *context, p []byte) *pathData {
 	buf := ctx.CreateBuffer()
 	ctx.BindBuffer(gl.ARRAY_BUFFER, buf)
-	ctx.BufferData(gl.ARRAY_BUFFER, gl.BytesView(p.Vertices), gl.STATIC_DRAW)
+	ctx.BufferData(gl.ARRAY_BUFFER, p, gl.STATIC_DRAW)
 	return &pathData{
-		ncurves: len(p.Vertices),
+		ncurves: len(p) / path.VertStride,
 		data:    buf,
 	}
 }

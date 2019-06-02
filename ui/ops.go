@@ -11,6 +11,10 @@ type Ops struct {
 	// Stack of block start indices.
 	stack []pc
 	ops   opsData
+
+	inAux  bool
+	auxOff int
+	auxLen int
 }
 
 type opsData struct {
@@ -21,14 +25,30 @@ type opsData struct {
 	refs []interface{}
 }
 
+// OpsReader parses an ops list. Internal use only.
 type OpsReader struct {
 	pc    pc
 	stack []block
-	ops   opsData
+	ops   *opsData
+}
+
+// EncodedOp represents an encoded op returned by
+// OpsReader. Internal use only.
+type EncodedOp struct {
+	Key  OpKey
+	Data []byte
+	Refs []interface{}
+}
+
+// OpKey is a unique key for a given op. Internal use only.
+type OpKey struct {
+	ops     *opsData
+	pc      int
+	version int
 }
 
 type block struct {
-	ops   opsData
+	ops   *opsData
 	retPC pc
 	endPC pc
 }
@@ -44,7 +64,6 @@ var typeLengths = [...]int{
 	ops.TypeTransformLen,
 	ops.TypeLayerLen,
 	ops.TypeRedrawLen,
-	ops.TypeClipLen,
 	ops.TypeImageLen,
 	ops.TypeDrawLen,
 	ops.TypeColorLen,
@@ -53,6 +72,8 @@ var typeLengths = [...]int{
 	ops.TypeHideInputLen,
 	ops.TypePushLen,
 	ops.TypePopLen,
+	ops.TypeAuxLen,
+	ops.TypeClipLen,
 }
 
 var refLengths = [...]int{
@@ -61,7 +82,6 @@ var refLengths = [...]int{
 	ops.TypeTransformRefs,
 	ops.TypeLayerRefs,
 	ops.TypeRedrawRefs,
-	ops.TypeClipRefs,
 	ops.TypeImageRefs,
 	ops.TypeDrawRefs,
 	ops.TypeColorRefs,
@@ -70,6 +90,8 @@ var refLengths = [...]int{
 	ops.TypeHideInputRefs,
 	ops.TypePushRefs,
 	ops.TypePopRefs,
+	ops.TypeAuxRefs,
+	ops.TypeClipRefs,
 }
 
 type OpPush struct{}
@@ -77,13 +99,17 @@ type OpPush struct{}
 type OpPop struct{}
 
 type OpBlock struct {
-	ops     *Ops
+	ops     *opsData
 	version int
 	pc      pc
 }
 
 type opBlockDef struct {
 	endpc pc
+}
+
+type opAux struct {
+	len int
 }
 
 func (p OpPush) Add(o *Ops) {
@@ -99,6 +125,16 @@ func (o *Ops) Begin() {
 	o.stack = append(o.stack, o.ops.pc())
 	// Make room for a block definition. Filled out in End.
 	o.Write(make([]byte, ops.TypeBlockDefLen), nil)
+}
+
+func (op *opAux) decode(data []byte) {
+	if ops.OpType(data[0]) != ops.TypeAux {
+		panic("invalid op")
+	}
+	bo := binary.LittleEndian
+	*op = opAux{
+		len: int(bo.Uint32(data[1:])),
+	}
 }
 
 func (op *opBlockDef) decode(data []byte) {
@@ -128,13 +164,22 @@ func (o *Ops) End() OpBlock {
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(pc.data))
 	bo.PutUint32(data[5:], uint32(pc.refs))
-	return OpBlock{ops: o, pc: start, version: o.ops.version}
+	return OpBlock{ops: &o.ops, pc: start, version: o.ops.version}
 }
 
 // Reset clears the Ops.
 func (o *Ops) Reset() {
+	o.inAux = false
 	o.stack = o.stack[:0]
 	o.ops.reset()
+}
+
+// Internal use only.
+func (o *Ops) Aux() []byte {
+	if !o.inAux {
+		return nil
+	}
+	return o.ops.data[o.auxOff+ops.TypeAuxLen : o.auxOff+ops.TypeAuxLen+o.auxLen]
 }
 
 func (d *opsData) reset() {
@@ -149,6 +194,26 @@ func (d *opsData) write(op []byte, refs []interface{}) {
 }
 
 func (o *Ops) Write(op []byte, refs []interface{}) {
+	switch ops.OpType(op[0]) {
+	case ops.TypeAux:
+		// Write only the data.
+		op = op[1:]
+		if !o.inAux {
+			o.inAux = true
+			o.auxOff = o.ops.pc().data
+			o.auxLen = 0
+			header := make([]byte, ops.TypeAuxLen)
+			header[0] = byte(ops.TypeAux)
+			o.ops.write(header, nil)
+		}
+		o.auxLen += len(op)
+	default:
+		if o.inAux {
+			o.inAux = false
+			bo := binary.LittleEndian
+			bo.PutUint32(o.ops.data[o.auxOff+1:], uint32(o.auxLen))
+		}
+	}
 	o.ops.write(op, refs)
 }
 
@@ -165,7 +230,7 @@ func (b *OpBlock) decode(data []byte, refs []interface{}) {
 	refsIdx := int(bo.Uint32(data[5:]))
 	version := int(bo.Uint32(data[9:]))
 	*b = OpBlock{
-		ops: refs[0].(*Ops),
+		ops: refs[0].(*opsData),
 		pc: pc{
 			data: dataIdx,
 			refs: refsIdx,
@@ -186,12 +251,12 @@ func (b OpBlock) Add(o *Ops) {
 
 // Reset start reading from the op list.
 func (r *OpsReader) Reset(ops *Ops) {
-	r.ops = ops.ops
+	r.ops = &ops.ops
 	r.stack = r.stack[:0]
 	r.pc = pc{}
 }
 
-func (r *OpsReader) Decode() ([]byte, []interface{}, bool) {
+func (r *OpsReader) Decode() (EncodedOp, bool) {
 	for {
 		if len(r.stack) > 0 {
 			b := r.stack[len(r.stack)-1]
@@ -203,22 +268,28 @@ func (r *OpsReader) Decode() ([]byte, []interface{}, bool) {
 			}
 		}
 		if r.pc.data == len(r.ops.data) {
-			return nil, nil, false
+			return EncodedOp{}, false
 		}
+		key := OpKey{ops: r.ops, pc: r.pc.data, version: r.ops.version}
 		t := ops.OpType(r.ops.data[r.pc.data])
 		n := typeLengths[t-ops.FirstOpIndex]
 		nrefs := refLengths[t-ops.FirstOpIndex]
 		data := r.ops.data[r.pc.data : r.pc.data+n]
 		refs := r.ops.refs[r.pc.refs : r.pc.refs+nrefs]
 		switch t {
+		case ops.TypeAux:
+			var op opAux
+			op.decode(data)
+			n += op.len
+			data = r.ops.data[r.pc.data : r.pc.data+n]
 		case ops.TypeBlock:
 			var op OpBlock
 			op.decode(data, refs)
-			blockOps := op.ops.ops
+			blockOps := op.ops
 			if ops.OpType(blockOps.data[op.pc.data]) != ops.TypeBlockDef {
 				panic("invalid block reference")
 			}
-			if op.version != r.ops.version {
+			if op.version != op.ops.version {
 				panic("invalid OpBlock reference to reset Ops")
 			}
 			var opDef opBlockDef
@@ -244,6 +315,6 @@ func (r *OpsReader) Decode() ([]byte, []interface{}, bool) {
 		}
 		r.pc.data += n
 		r.pc.refs += nrefs
-		return data, refs, true
+		return EncodedOp{Key: key, Data: data, Refs: refs}, true
 	}
 }

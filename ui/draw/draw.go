@@ -11,7 +11,6 @@ import (
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/internal/ops"
-	"gioui.org/ui/internal/path"
 )
 
 type OpImage struct {
@@ -114,14 +113,10 @@ func (d *OpDraw) Decode(data []byte, refs []interface{}) {
 	}
 }
 
-// RectPath constructs a path corresponding to
+// RectClip append a clip op corresponding to
 // a pixel aligned rectangular area.
-func RectPath(r image.Rectangle) *Path {
-	return &Path{
-		data: &path.Path{
-			Bounds: toRectF(r),
-		},
-	}
+func RectClip(ops *ui.Ops, r image.Rectangle) {
+	opClip{bounds: toRectF(r)}.Add(ops)
 }
 
 func itof(i int) float32 {

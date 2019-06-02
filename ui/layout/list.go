@@ -179,7 +179,7 @@ func (l *List) Layout(ops *ui.Ops) Dimens {
 			Max: axisPoint(l.Axis, max, ui.Inf),
 		}
 		ui.OpPush{}.Add(ops)
-		draw.OpClip{Path: draw.RectPath(r)}.Add(ops)
+		draw.RectClip(ops, r)
 		ui.OpTransform{
 			Transform: ui.Offset(toPointF(axisPoint(l.Axis, pos, cross))),
 		}.Add(ops)

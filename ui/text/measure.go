@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"image"
 
-	"gioui.org/ui/draw"
+	"gioui.org/ui"
 	"gioui.org/ui/layout"
 	"golang.org/x/image/math/fixed"
 )
@@ -35,7 +35,7 @@ type Layout struct {
 
 type Face interface {
 	Layout(str string, singleLine bool, maxWidth int) *Layout
-	Path(str String) *draw.Path
+	Path(str String) ui.OpBlock
 }
 
 type Alignment uint8

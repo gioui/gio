@@ -3,6 +3,7 @@
 package gpu
 
 import (
+	"encoding/binary"
 	"fmt"
 	"image"
 	"image/color"
@@ -16,7 +17,6 @@ import (
 	gdraw "gioui.org/ui/draw"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/internal/ops"
-	"gioui.org/ui/internal/path"
 	"golang.org/x/image/draw"
 )
 
@@ -87,10 +87,11 @@ type pathOp struct {
 	off f32.Point
 	// clip is the union of all
 	// later clip rectangles.
-	clip   image.Rectangle
-	path   *path.Path
-	parent *pathOp
-	place  placement
+	clip      image.Rectangle
+	pathKey   ui.OpKey
+	pathVerts []byte
+	parent    *pathOp
+	place     placement
 }
 
 type imageOp struct {
@@ -112,6 +113,31 @@ type material struct {
 	texture  *texture
 	uvScale  f32.Point
 	uvOffset f32.Point
+}
+
+// opClip structure must match opClip in package ui/draw.
+type opClip struct {
+	bounds f32.Rectangle
+}
+
+func (op *opClip) decode(data []byte) {
+	if ops.OpType(data[0]) != ops.TypeClip {
+		panic("invalid op")
+	}
+	bo := binary.LittleEndian
+	r := f32.Rectangle{
+		Min: f32.Point{
+			X: math.Float32frombits(bo.Uint32(data[1:])),
+			Y: math.Float32frombits(bo.Uint32(data[5:])),
+		},
+		Max: f32.Point{
+			X: math.Float32frombits(bo.Uint32(data[9:])),
+			Y: math.Float32frombits(bo.Uint32(data[13:])),
+		},
+	}
+	*op = opClip{
+		bounds: r,
+	}
 }
 
 type clipType uint8
@@ -485,10 +511,10 @@ func (r *renderer) stencilClips(cache *resourceCache, ops []*pathOp) {
 			bindFramebuffer(r.ctx, f.fbo)
 			r.ctx.Clear(gl.COLOR_BUFFER_BIT)
 		}
-		data, exists := cache.get(p.path)
+		data, exists := cache.get(p.pathKey)
 		if !exists {
-			data = buildPath(r.ctx, p.path)
-			cache.put(p.path, data)
+			data = buildPath(r.ctx, p.pathVerts)
+			cache.put(p.pathKey, data)
 		}
 		r.pather.stencilPath(p.clip, p.off, p.place.Pos, data.(*pathData))
 	}
@@ -528,7 +554,7 @@ func (r *renderer) intersectPath(p *pathOp, clip image.Rectangle) {
 	if p.parent != nil {
 		r.intersectPath(p.parent, clip)
 	}
-	if p.path == nil {
+	if len(p.pathVerts) == 0 {
 		return
 	}
 	o := p.place.Pos.Add(clip.Min).Sub(p.clip.Min)
@@ -550,7 +576,7 @@ func (r *renderer) packIntersections(ops []imageOp) {
 		var npaths int
 		var onePath *pathOp
 		for p := img.path; p != nil; p = p.parent {
-			if p.path != nil {
+			if len(p.pathVerts) > 0 {
 				onePath = p
 				npaths++
 			}
@@ -665,27 +691,27 @@ func (d *drawOps) newPathOp() *pathOp {
 }
 
 func (d *drawOps) collectOps(r *ui.OpsReader, state drawState) int {
+	var aux []byte
+	var auxKey ui.OpKey
 loop:
 	for {
-		data, refs, ok := r.Decode()
+		encOp, ok := r.Decode()
 		if !ok {
 			break
 		}
-		switch ops.OpType(data[0]) {
+		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeTransform:
 			var op ui.OpTransform
-			op.Decode(data)
+			op.Decode(encOp.Data)
 			state.t = state.t.Mul(op.Transform)
+		case ops.TypeAux:
+			aux = encOp.Data[ops.TypeAuxLen:]
+			auxKey = encOp.Key
 		case ops.TypeClip:
-			var op gdraw.OpClip
-			op.Decode(data, refs)
-			if op.Path == nil {
-				state.clip = f32.Rectangle{}
-				continue
-			}
-			data := op.Path.Data().(*path.Path)
+			var op opClip
+			op.decode(encOp.Data)
 			off := state.t.Transform(f32.Point{})
-			state.clip = state.clip.Intersect(data.Bounds.Add(off))
+			state.clip = state.clip.Intersect(op.bounds.Add(off))
 			if state.clip.Empty() {
 				continue
 			}
@@ -695,24 +721,27 @@ loop:
 				off:    off,
 			}
 			state.cpath = npath
-			if len(data.Vertices) > 0 {
+			if len(aux) > 0 {
 				state.rect = false
-				state.cpath.path = data
+				state.cpath.pathKey = auxKey
+				state.cpath.pathVerts = aux
 				d.pathOps = append(d.pathOps, state.cpath)
 			}
+			aux = nil
+			auxKey = ui.OpKey{}
 		case ops.TypeColor:
 			var op gdraw.OpColor
-			op.Decode(data, refs)
+			op.Decode(encOp.Data, encOp.Refs)
 			state.img = nil
 			state.color = op.Col
 		case ops.TypeImage:
 			var op gdraw.OpImage
-			op.Decode(data, refs)
+			op.Decode(encOp.Data, encOp.Refs)
 			state.img = op.Img
 			state.imgRect = op.Rect
 		case ops.TypeDraw:
 			var op gdraw.OpDraw
-			op.Decode(data, refs)
+			op.Decode(encOp.Data, encOp.Refs)
 			off := state.t.Transform(f32.Point{})
 			clip := state.clip.Intersect(op.Rect.Add(off))
 			if clip.Empty() {

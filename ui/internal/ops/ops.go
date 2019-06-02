@@ -11,7 +11,6 @@ const (
 	TypeTransform
 	TypeLayer
 	TypeRedraw
-	TypeClip
 	TypeImage
 	TypeDraw
 	TypeColor
@@ -20,6 +19,8 @@ const (
 	TypeHideInput
 	TypePush
 	TypePop
+	TypeAux
+	TypeClip
 )
 
 const (
@@ -28,7 +29,6 @@ const (
 	TypeTransformLen      = 1 + 4*2
 	TypeLayerLen          = 1
 	TypeRedrawLen         = 1 + 8
-	TypeClipLen           = 1
 	TypeImageLen          = 1 + 4*4
 	TypeDrawLen           = 1 + 4*4
 	TypeColorLen          = 1 + 4
@@ -37,13 +37,14 @@ const (
 	TypeHideInputLen      = 1
 	TypePushLen           = 1
 	TypePopLen            = 1
+	TypeAuxLen            = 1 + 4
+	TypeClipLen           = 1 + 4*4
 
 	TypeBlockDefRefs       = 0
 	TypeBlockRefs          = 1
 	TypeTransformRefs      = 0
 	TypeLayerRefs          = 0
 	TypeRedrawRefs         = 0
-	TypeClipRefs           = 1
 	TypeImageRefs          = 1
 	TypeDrawRefs           = 0
 	TypeColorRefs          = 0
@@ -52,4 +53,6 @@ const (
 	TypeHideInputRefs      = 0
 	TypePushRefs           = 0
 	TypePopRefs            = 0
+	TypeAuxRefs            = 0
+	TypeClipRefs           = 0
 )

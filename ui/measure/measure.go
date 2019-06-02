@@ -30,7 +30,7 @@ type cachedLayout struct {
 
 type cachedPath struct {
 	active bool
-	path   *draw.Path
+	path   ui.OpBlock
 }
 
 type layoutKey struct {
@@ -121,7 +121,7 @@ func (f *textFace) Layout(str string, singleLine bool, maxWidth int) *text.Layou
 	return l
 }
 
-func (f *textFace) Path(str text.String) *draw.Path {
+func (f *textFace) Path(str text.String) ui.OpBlock {
 	ppem := fixed.Int26_6(f.faces.Cfg.Val(f.size)*64 + .5)
 	pk := pathKey{
 		f:    f.font.Font,
@@ -229,11 +229,13 @@ func layoutText(ppem fixed.Int26_6, str string, f *opentype, singleLine bool, ma
 	return &text.Layout{Lines: lines}
 }
 
-func textPath(ppem fixed.Int26_6, f *opentype, str text.String) *draw.Path {
+func textPath(ppem fixed.Int26_6, f *opentype, str text.String) ui.OpBlock {
 	var lastPos f32.Point
 	var builder draw.PathBuilder
+	ops := new(ui.Ops)
 	var x fixed.Int26_6
 	var advIdx int
+	ops.Begin()
 	for _, r := range str.String {
 		if !unicode.IsSpace(r) {
 			segs, ok := f.LoadGlyph(ppem, r)
@@ -244,7 +246,7 @@ func textPath(ppem fixed.Int26_6, f *opentype, str text.String) *draw.Path {
 			pos := f32.Point{
 				X: float32(x) / 64,
 			}
-			builder.Move(pos.Sub(lastPos))
+			builder.Move(ops, pos.Sub(lastPos))
 			lastPos = pos
 			var lastArg f32.Point
 			// Convert sfnt.Segments to relative segments.
@@ -269,13 +271,13 @@ func textPath(ppem fixed.Int26_6, f *opentype, str text.String) *draw.Path {
 				}
 				switch fseg.Op {
 				case sfnt.SegmentOpMoveTo:
-					builder.Move(args[0])
+					builder.Move(ops, args[0])
 				case sfnt.SegmentOpLineTo:
-					builder.Line(args[0])
+					builder.Line(ops, args[0])
 				case sfnt.SegmentOpQuadTo:
-					builder.Quad(args[0], args[1])
+					builder.Quad(ops, args[0], args[1])
 				case sfnt.SegmentOpCubeTo:
-					builder.Cube(args[0], args[1], args[2])
+					builder.Cube(ops, args[0], args[1], args[2])
 				default:
 					panic("unsupported segment op")
 				}
@@ -285,5 +287,6 @@ func textPath(ppem fixed.Int26_6, f *opentype, str text.String) *draw.Path {
 		x += str.Advances[advIdx]
 		advIdx++
 	}
-	return builder.Path()
+	builder.End(ops)
+	return ops.End()
 }

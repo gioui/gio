@@ -39,11 +39,11 @@ type handler struct {
 
 func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int) {
 	for {
-		data, refs, ok := r.Decode()
+		encOp, ok := r.Decode()
 		if !ok {
 			return
 		}
-		switch ops.OpType(data[0]) {
+		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypePush:
 			q.collectHandlers(r, t, layer)
 		case ops.TypePop:
@@ -53,11 +53,11 @@ func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int) {
 			q.hitTree = append(q.hitTree, hitNode{level: layer})
 		case ops.TypeTransform:
 			var op ui.OpTransform
-			op.Decode(data)
+			op.Decode(encOp.Data)
 			t = t.Mul(op.Transform)
 		case ops.TypePointerHandler:
 			var op OpHandler
-			op.Decode(data, refs)
+			op.Decode(encOp.Data, encOp.Refs)
 			q.hitTree = append(q.hitTree, hitNode{level: layer, key: op.Key})
 			h, ok := q.handlers[op.Key]
 			if !ok {

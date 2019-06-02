@@ -4,14 +4,7 @@ package path
 
 import (
 	"unsafe"
-
-	"gioui.org/ui/f32"
 )
-
-type Path struct {
-	Vertices []Vertex
-	Bounds   f32.Rectangle
-}
 
 // The vertex data suitable for passing to vertex programs.
 type Vertex struct {

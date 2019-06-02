@@ -10,7 +10,6 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/draw"
-	"gioui.org/ui/f32"
 	"gioui.org/ui/gesture"
 	"gioui.org/ui/key"
 	"gioui.org/ui/layout"
@@ -47,11 +46,6 @@ type Editor struct {
 	scrollOff image.Point
 
 	clicker gesture.Click
-}
-
-type linePath struct {
-	path *draw.Path
-	off  f32.Point
 }
 
 const (
@@ -170,10 +164,9 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		if !ok {
 			break
 		}
-		path := e.Face.Path(str)
 		ui.OpPush{}.Add(ops)
 		ui.OpTransform{Transform: ui.Offset(lineOff)}.Add(ops)
-		draw.OpClip{Path: path}.Add(ops)
+		e.Face.Path(str).Add(ops)
 		draw.OpDraw{Rect: toRectF(clip).Sub(lineOff)}.Add(ops)
 		ui.OpPop{}.Add(ops)
 	}

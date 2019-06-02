@@ -100,11 +100,10 @@ func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		if !ok {
 			break
 		}
-		path := l.Face.Path(str)
 		lclip := toRectF(clip).Sub(off)
 		ui.OpPush{}.Add(ops)
 		ui.OpTransform{Transform: ui.Offset(off)}.Add(ops)
-		draw.OpClip{Path: path}.Add(ops)
+		l.Face.Path(str).Add(ops)
 		draw.OpDraw{Rect: lclip}.Add(ops)
 		ui.OpPop{}.Add(ops)
 	}

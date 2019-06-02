@@ -3,7 +3,9 @@
 package draw
 
 import (
+	"encoding/binary"
 	"math"
+	"unsafe"
 
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
@@ -11,81 +13,71 @@ import (
 	"gioui.org/ui/internal/path"
 )
 
-type OpClip struct {
-	Path *Path
-}
-
-type Path struct {
-	data *path.Path
-}
-
 type PathBuilder struct {
-	verts     []path.Vertex
 	firstVert int
+	nverts    int
 	maxy      float32
 	pen       f32.Point
 	bounds    f32.Rectangle
 	hasBounds bool
 }
 
-// Data is for internal use only.
-func (p *Path) Data() interface{} {
-	return p.data
+// opClip structure must match opClip in package ui/internal/gpu.
+type opClip struct {
+	bounds f32.Rectangle
 }
 
-func (c OpClip) Add(o *ui.Ops) {
+func (p opClip) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypeClipLen)
 	data[0] = byte(ops.TypeClip)
-	o.Write(data, []interface{}{c.Path})
-}
-
-func (c *OpClip) Decode(d []byte, refs []interface{}) {
-	if ops.OpType(d[0]) != ops.TypeClip {
-		panic("invalid op")
-	}
-	*c = OpClip{
-		Path: refs[0].(*Path),
-	}
+	bo := binary.LittleEndian
+	bo.PutUint32(data[1:], math.Float32bits(p.bounds.Min.X))
+	bo.PutUint32(data[5:], math.Float32bits(p.bounds.Min.Y))
+	bo.PutUint32(data[9:], math.Float32bits(p.bounds.Max.X))
+	bo.PutUint32(data[13:], math.Float32bits(p.bounds.Max.Y))
+	o.Write(data, nil)
 }
 
 // MoveTo moves the pen to the given position.
-func (p *PathBuilder) Move(to f32.Point) {
-	p.end()
+func (p *PathBuilder) Move(ops *ui.Ops, to f32.Point) {
+	p.end(ops)
 	to = to.Add(p.pen)
 	p.maxy = to.Y
 	p.pen = to
 }
 
 // end completes the current contour.
-func (p *PathBuilder) end() {
-	// Fill in maximal Y coordinates of the NW and NE corners
-	// and offset their curve coordinates.
-	for i := p.firstVert; i < len(p.verts); i++ {
-		p.verts[i].MaxY = p.maxy
+func (p *PathBuilder) end(ops *ui.Ops) {
+	aux := ops.Aux()
+	bo := binary.LittleEndian
+	// Fill in maximal Y coordinates of the NW and NE corners.
+	for i := p.firstVert; i < p.nverts; i++ {
+		off := path.VertStride*i + int(unsafe.Offsetof(((*path.Vertex)(nil)).MaxY))
+		bo.PutUint32(aux[off:], math.Float32bits(p.maxy))
 	}
-	p.firstVert = len(p.verts)
+	p.firstVert = p.nverts
 }
 
 // Line records a line from the pen to end.
-func (p *PathBuilder) Line(to f32.Point) {
+func (p *PathBuilder) Line(ops *ui.Ops, to f32.Point) {
 	to = to.Add(p.pen)
-	p.lineTo(to)
+	p.lineTo(ops, to)
 }
 
-func (p *PathBuilder) lineTo(to f32.Point) {
+func (p *PathBuilder) lineTo(ops *ui.Ops, to f32.Point) {
 	// Model lines as degenerate quadratic beziers.
-	p.quadTo(to.Add(p.pen).Mul(.5), to)
+	p.quadTo(ops, to.Add(p.pen).Mul(.5), to)
 }
 
 // Quad records a quadratic bezier from the pen to end
 // with the control point ctrl.
-func (p *PathBuilder) Quad(ctrl, to f32.Point) {
+func (p *PathBuilder) Quad(ops *ui.Ops, ctrl, to f32.Point) {
 	ctrl = ctrl.Add(p.pen)
 	to = to.Add(p.pen)
-	p.quadTo(ctrl, to)
+	p.quadTo(ops, ctrl, to)
 }
 
-func (p *PathBuilder) quadTo(ctrl, to f32.Point) {
+func (p *PathBuilder) quadTo(ops *ui.Ops, ctrl, to f32.Point) {
 	// Zero width curves don't contribute to stenciling.
 	if p.pen.X == to.X && p.pen.X == ctrl.X {
 		p.pen = to
@@ -112,8 +104,8 @@ func (p *PathBuilder) quadTo(ctrl, to f32.Point) {
 		ctrl0 := p.pen.Mul(1 - t).Add(ctrl.Mul(t))
 		ctrl1 := ctrl.Mul(1 - t).Add(to.Mul(t))
 		mid := ctrl0.Mul(1 - t).Add(ctrl1.Mul(t))
-		p.simpleQuadTo(ctrl0, mid)
-		p.simpleQuadTo(ctrl1, to)
+		p.simpleQuadTo(ops, ctrl0, mid)
+		p.simpleQuadTo(ops, ctrl1, to)
 		if mid.X > bounds.Max.X {
 			bounds.Max.X = mid.X
 		}
@@ -121,7 +113,7 @@ func (p *PathBuilder) quadTo(ctrl, to f32.Point) {
 			bounds.Min.X = mid.X
 		}
 	} else {
-		p.simpleQuadTo(ctrl, to)
+		p.simpleQuadTo(ops, ctrl, to)
 	}
 	// Find the y extremum, if any.
 	d = v0.Y - v1.Y
@@ -140,7 +132,7 @@ func (p *PathBuilder) quadTo(ctrl, to f32.Point) {
 
 // Cube records a cubic bezier from the pen through
 // two control points ending in to.
-func (p *PathBuilder) Cube(ctrl0, ctrl1, to f32.Point) {
+func (p *PathBuilder) Cube(ops *ui.Ops, ctrl0, ctrl1, to f32.Point) {
 	ctrl0 = ctrl0.Add(p.pen)
 	ctrl1 = ctrl1.Add(p.pen)
 	to = to.Add(p.pen)
@@ -154,12 +146,12 @@ func (p *PathBuilder) Cube(ctrl0, ctrl1, to f32.Point) {
 	if h := hull.Dy(); h > l {
 		l = h
 	}
-	p.approxCubeTo(0, l*0.001, ctrl0, ctrl1, to)
+	p.approxCubeTo(ops, 0, l*0.001, ctrl0, ctrl1, to)
 }
 
 // approxCube approximates a cubic beziér by a series of quadratic
 // curves.
-func (p *PathBuilder) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to f32.Point) int {
+func (p *PathBuilder) approxCubeTo(ops *ui.Ops, splits int, maxDist float32, ctrl0, ctrl1, to f32.Point) int {
 	// The idea is from
 	// https://caffeineowl.com/graphics/2d/vectorial/cubic2quad01.html
 	// where a quadratic approximates a cubic by eliminating its t³ term
@@ -171,7 +163,7 @@ func (p *PathBuilder) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to
 	//
 	// C1 = (3ctrl0 - pen)/2
 	//
-	// The reverse cubic that is anchored at the end point has the polynomial
+	// The reverse cubic anchored at the end point has the polynomial
 	//
 	// P'(t) = to + 3t(ctrl1 - to) + 3t²(ctrl0 - 2ctrl1 + to) + t³(pen - 3ctrl0 + 3ctrl1 - to)
 	//
@@ -187,7 +179,7 @@ func (p *PathBuilder) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to
 	c := ctrl0.Mul(3).Sub(p.pen).Add(ctrl1.Mul(3)).Sub(to).Mul(1.0 / 4.0)
 	const maxSplits = 32
 	if splits >= maxSplits {
-		p.quadTo(c, to)
+		p.quadTo(ops, c, to)
 		return splits
 	}
 	// The maximum distance between the cubic P and its approximation Q given t
@@ -199,7 +191,7 @@ func (p *PathBuilder) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to
 	v := to.Sub(ctrl1.Mul(3)).Add(ctrl0.Mul(3)).Sub(p.pen)
 	d2 := (v.X*v.X + v.Y*v.Y) * 3 / (36 * 36)
 	if d2 <= maxDist*maxDist {
-		p.quadTo(c, to)
+		p.quadTo(ops, c, to)
 		return splits
 	}
 	// De Casteljau split the curve and approximate the halves.
@@ -211,8 +203,8 @@ func (p *PathBuilder) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to
 	c12 := c1.Add(c2.Sub(c1).Mul(t))
 	c0112 := c01.Add(c12.Sub(c01).Mul(t))
 	splits++
-	splits = p.approxCubeTo(splits, maxDist, c0, c01, c0112)
-	splits = p.approxCubeTo(splits, maxDist, c12, c2, to)
+	splits = p.approxCubeTo(ops, splits, maxDist, c0, c01, c0112)
+	splits = p.approxCubeTo(ops, splits, maxDist, c12, c2, to)
 	return splits
 }
 
@@ -228,8 +220,9 @@ func (p *PathBuilder) expand(b f32.Rectangle) {
 	p.bounds = p.bounds.Union(b)
 }
 
-func (p *PathBuilder) vertex(cornerx, cornery int16, ctrl, to f32.Point) {
-	p.verts = append(p.verts, path.Vertex{
+func (p *PathBuilder) vertex(o *ui.Ops, cornerx, cornery int16, ctrl, to f32.Point) {
+	p.nverts++
+	v := path.Vertex{
 		CornerX: cornerx,
 		CornerY: cornery,
 		FromX:   p.pen.X,
@@ -238,10 +231,25 @@ func (p *PathBuilder) vertex(cornerx, cornery int16, ctrl, to f32.Point) {
 		CtrlY:   ctrl.Y,
 		ToX:     to.X,
 		ToY:     to.Y,
-	})
+	}
+	data := make([]byte, path.VertStride+1)
+	data[0] = byte(ops.TypeAux)
+	bo := binary.LittleEndian
+	data[1] = byte(uint16(v.CornerX))
+	data[2] = byte(uint16(v.CornerX) >> 8)
+	data[3] = byte(uint16(v.CornerY))
+	data[4] = byte(uint16(v.CornerY) >> 8)
+	bo.PutUint32(data[5:], math.Float32bits(v.MaxY))
+	bo.PutUint32(data[9:], math.Float32bits(v.FromX))
+	bo.PutUint32(data[13:], math.Float32bits(v.FromY))
+	bo.PutUint32(data[17:], math.Float32bits(v.CtrlX))
+	bo.PutUint32(data[21:], math.Float32bits(v.CtrlY))
+	bo.PutUint32(data[25:], math.Float32bits(v.ToX))
+	bo.PutUint32(data[29:], math.Float32bits(v.ToY))
+	o.Write(data, nil)
 }
 
-func (p *PathBuilder) simpleQuadTo(ctrl, to f32.Point) {
+func (p *PathBuilder) simpleQuadTo(ops *ui.Ops, ctrl, to f32.Point) {
 	if p.pen.Y > p.maxy {
 		p.maxy = p.pen.Y
 	}
@@ -252,25 +260,19 @@ func (p *PathBuilder) simpleQuadTo(ctrl, to f32.Point) {
 		p.maxy = to.Y
 	}
 	// NW.
-	p.vertex(-1, 1, ctrl, to)
+	p.vertex(ops, -1, 1, ctrl, to)
 	// NE.
-	p.vertex(1, 1, ctrl, to)
+	p.vertex(ops, 1, 1, ctrl, to)
 	// SW.
-	p.vertex(-1, -1, ctrl, to)
+	p.vertex(ops, -1, -1, ctrl, to)
 	// SE.
-	p.vertex(1, -1, ctrl, to)
+	p.vertex(ops, 1, -1, ctrl, to)
 	p.pen = to
 }
 
-func (p *PathBuilder) Path() *Path {
-	p.end()
-	data := &Path{
-		data: &path.Path{
-			Bounds: p.bounds,
-		},
-	}
-	if !p.bounds.Empty() {
-		data.data.Vertices = p.verts
-	}
-	return data
+func (p *PathBuilder) End(ops *ui.Ops) {
+	p.end(ops)
+	opClip{
+		bounds: p.bounds,
+	}.Add(ops)
 }
