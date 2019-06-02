@@ -691,10 +691,10 @@ func (c *clipCircle) End(ops *ui.Ops, dims layout.Dimens) layout.Dimens {
 	}
 	szf := float32(max)
 	rr := szf * .5
-	ops.Begin()
+	ui.OpPush{}.Add(ops)
 	gdraw.OpClip{Path: rrect(szf, szf, rr, rr, rr, rr)}.Add(ops)
 	block.Add(ops)
-	ops.End().Add(ops)
+	ui.OpPop{}.Add(ops)
 	return dims
 }
 
