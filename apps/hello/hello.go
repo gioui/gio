@@ -5,12 +5,12 @@ package main
 // A simple Gio program. See https://gioui.org for more information.
 
 import (
-	"image"
 	"image/color"
 	"log"
 
 	"gioui.org/ui"
 	"gioui.org/ui/app"
+	"gioui.org/ui/draw"
 	"gioui.org/ui/layout"
 	"gioui.org/ui/measure"
 	"gioui.org/ui/text"
@@ -43,7 +43,7 @@ func loop(w *app.Window) {
 		panic("failed to load font")
 	}
 	var faces measure.Faces
-	maroon := &image.Uniform{color.RGBA{127, 0, 0, 255}}
+	maroon := color.NRGBA{127, 0, 0, 255}
 	face := faces.For(regular, ui.Sp(72))
 	message := "Hello, Gio"
 	ops := new(ui.Ops)
@@ -54,7 +54,8 @@ func loop(w *app.Window) {
 			faces.Cfg = e.Config
 			cs := layout.ExactConstraints(w.Size())
 			ops.Reset()
-			(text.Label{Src: maroon, Face: face, Alignment: text.Center, Text: message}).W(ops, cs)
+			draw.OpColor{Col: maroon}.Add(ops)
+			text.Label{Face: face, Alignment: text.Center, Text: message}.Layout(ops, cs)
 			w.Draw(ops)
 			faces.Frame()
 		}
