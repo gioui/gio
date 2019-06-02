@@ -190,15 +190,13 @@ func (f *Functions) CompileShader(s Shader) {
 }
 
 func (f *Functions) CreateBuffer() Buffer {
-	var handle C.GLuint
-	C.glGenBuffers(1, &handle)
-	return Buffer{uint(handle)}
+	C.glGenBuffers(1, &f.uints[0])
+	return Buffer{uint(f.uints[0])}
 }
 
 func (f *Functions) CreateFramebuffer() Framebuffer {
-	var handle C.GLuint
-	C.glGenFramebuffers(1, &handle)
-	return Framebuffer{uint(handle)}
+	C.glGenFramebuffers(1, &f.uints[0])
+	return Framebuffer{uint(f.uints[0])}
 }
 
 func (f *Functions) CreateProgram() Program {
@@ -206,15 +204,13 @@ func (f *Functions) CreateProgram() Program {
 }
 
 func (f *Functions) CreateQuery() Query {
-	var handle C.GLuint
-	C.gio_glGenQueries(1, &handle)
-	return Query{uint(handle)}
+	C.gio_glGenQueries(1, &f.uints[0])
+	return Query{uint(f.uints[0])}
 }
 
 func (f *Functions) CreateRenderbuffer() Renderbuffer {
-	var handle C.GLuint
-	C.glGenRenderbuffers(1, &handle)
-	return Renderbuffer{uint(handle)}
+	C.glGenRenderbuffers(1, &f.uints[0])
+	return Renderbuffer{uint(f.uints[0])}
 }
 
 func (f *Functions) CreateShader(ty Enum) Shader {
@@ -222,19 +218,18 @@ func (f *Functions) CreateShader(ty Enum) Shader {
 }
 
 func (f *Functions) CreateTexture() Texture {
-	var handle C.GLuint
-	C.glGenTextures(1, &handle)
-	return Texture{uint(handle)}
+	C.glGenTextures(1, &f.uints[0])
+	return Texture{uint(f.uints[0])}
 }
 
 func (f *Functions) DeleteBuffer(v Buffer) {
-	handle := C.GLuint(v.V)
-	C.glDeleteBuffers(1, &handle)
+	f.uints[0] = C.GLuint(v.V)
+	C.glDeleteBuffers(1, &f.uints[0])
 }
 
 func (f *Functions) DeleteFramebuffer(v Framebuffer) {
-	handle := C.GLuint(v.V)
-	C.glDeleteFramebuffers(1, &handle)
+	f.uints[0] = C.GLuint(v.V)
+	C.glDeleteFramebuffers(1, &f.uints[0])
 }
 
 func (f *Functions) DeleteProgram(p Program) {
@@ -242,13 +237,13 @@ func (f *Functions) DeleteProgram(p Program) {
 }
 
 func (f *Functions) DeleteQuery(query Query) {
-	handle := C.GLuint(query.V)
-	C.gio_glDeleteQueries(1, &handle)
+	f.uints[0] = C.GLuint(query.V)
+	C.gio_glDeleteQueries(1, &f.uints[0])
 }
 
 func (f *Functions) DeleteRenderbuffer(v Renderbuffer) {
-	handle := C.GLuint(v.V)
-	C.glDeleteRenderbuffers(1, &handle)
+	f.uints[0] = C.GLuint(v.V)
+	C.glDeleteRenderbuffers(1, &f.uints[0])
 }
 
 func (f *Functions) DeleteShader(s Shader) {
@@ -256,8 +251,8 @@ func (f *Functions) DeleteShader(s Shader) {
 }
 
 func (f *Functions) DeleteTexture(v Texture) {
-	handle := C.GLuint(v.V)
-	C.glDeleteTextures(1, &handle)
+	f.uints[0] = C.GLuint(v.V)
+	C.glDeleteTextures(1, &f.uints[0])
 }
 
 func (f *Functions) DepthFunc(v Enum) {
