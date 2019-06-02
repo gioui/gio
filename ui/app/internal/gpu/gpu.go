@@ -25,7 +25,8 @@ type GPU struct {
 	summary string
 	err     error
 
-	cache *resourceCache
+	pathCache *opCache
+	cache     *resourceCache
 
 	frames     chan frame
 	results    chan frameResult
@@ -142,11 +143,6 @@ func (op *opClip) decode(data []byte) {
 
 type clipType uint8
 
-type resourceCache struct {
-	res    map[interface{}]resource
-	newRes map[interface{}]resource
-}
-
 type resource interface {
 	release(ctx *context)
 }
@@ -196,6 +192,7 @@ func NewGPU(ctx gl.Context) (*GPU, error) {
 		refreshErr: make(chan error),
 		stop:       make(chan struct{}),
 		stopped:    make(chan struct{}),
+		pathCache:  newOpCache(),
 		cache:      newResourceCache(),
 	}
 	if err := g.renderLoop(ctx); err != nil {
@@ -224,6 +221,7 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 			return
 		}
 		defer g.cache.release(ctx)
+		defer g.pathCache.release(ctx)
 		r := newRenderer(ctx)
 		defer r.release()
 		var timers *timers
@@ -263,7 +261,7 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 				stencilTimer.begin()
 				ctx.Enable(gl.BLEND)
 				r.packStencils(&ops.pathOps)
-				r.stencilClips(g.cache, ops.pathOps)
+				r.stencilClips(g.pathCache, ops.pathOps)
 				r.packIntersections(ops.imageOps)
 				r.intersect(ops.imageOps)
 				stencilTimer.end()
@@ -276,6 +274,7 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 				err := glctx.Present()
 				cleanupTimer.begin()
 				g.cache.frame(ctx)
+				g.pathCache.frame(ctx)
 				cleanupTimer.end()
 				var res frameResult
 				if frame.collectStats && timers.ready() {
@@ -380,50 +379,6 @@ func (r *renderer) release() {
 	r.blitter.release()
 }
 
-func newResourceCache() *resourceCache {
-	return &resourceCache{
-		res:    make(map[interface{}]resource),
-		newRes: make(map[interface{}]resource),
-	}
-}
-
-func (r *resourceCache) get(key interface{}) (resource, bool) {
-	v, exists := r.res[key]
-	if exists {
-		r.newRes[key] = v
-	}
-	return v, exists
-}
-
-func (r *resourceCache) put(key interface{}, val resource) {
-	if _, exists := r.newRes[key]; exists {
-		panic(fmt.Errorf("key exists, %p", key))
-	}
-	r.res[key] = val
-	r.newRes[key] = val
-}
-
-func (r *resourceCache) frame(ctx *context) {
-	for k, v := range r.res {
-		if _, exists := r.newRes[k]; !exists {
-			delete(r.res, k)
-			v.release(ctx)
-		}
-	}
-	for k, v := range r.newRes {
-		delete(r.newRes, k)
-		r.res[k] = v
-	}
-}
-
-func (r *resourceCache) release(ctx *context) {
-	for _, v := range r.newRes {
-		v.release(ctx)
-	}
-	r.newRes = nil
-	r.res = nil
-}
-
 func newBlitter(ctx *context) *blitter {
 	prog, err := createColorPrograms(ctx, blitVSrc, blitFSrc)
 	if err != nil {
@@ -498,7 +453,7 @@ uniform vec4 color;
 	return prog, nil
 }
 
-func (r *renderer) stencilClips(cache *resourceCache, ops []*pathOp) {
+func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
 	if len(r.packer.sizes) == 0 {
 		return
 	}
@@ -511,10 +466,10 @@ func (r *renderer) stencilClips(cache *resourceCache, ops []*pathOp) {
 			bindFramebuffer(r.ctx, f.fbo)
 			r.ctx.Clear(gl.COLOR_BUFFER_BIT)
 		}
-		data, exists := cache.get(p.pathKey)
+		data, exists := pathCache.get(p.pathKey)
 		if !exists {
 			data = buildPath(r.ctx, p.pathVerts)
-			cache.put(p.pathKey, data)
+			pathCache.put(p.pathKey, data)
 		}
 		r.pather.stencilPath(p.clip, p.off, p.place.Pos, data.(*pathData))
 	}
