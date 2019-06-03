@@ -230,8 +230,8 @@ func (a *App) run() error {
 					txt := fmt.Sprintf("m: %d %s", mallocs, a.w.Timings())
 					gdraw.OpColor{Col: textColor}.Add(ops)
 					dims := text.Label{Face: a.face(fonts.mono, 8), Text: txt}.Layout(ops, cs)
-					dims = in.End(ops, dims)
-					al.End(ops, dims)
+					dims = in.End(dims)
+					al.End(dims)
 				}
 				a.w.Draw(ops)
 				a.w.SetTextInput(a.kqueue.Frame(ops))
@@ -417,15 +417,15 @@ func (up *userPage) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		up.commits = commits
 	default:
 	}
-	l.Init(cs, len(up.commits))
+	l.Init(ops, cs, len(up.commits))
 	for {
-		i, cs, ok := l.Next(ops)
+		i, cs, ok := l.Next()
 		if !ok {
 			break
 		}
-		l.End(ops, up.commit(ops, cs, i))
+		l.End(up.commit(ops, cs, i))
 	}
-	return l.Layout(ops)
+	return l.Layout()
 }
 
 func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout.Dimens {
@@ -437,22 +437,22 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	in := layout.Insets{Top: c.Dp(16), Right: c.Dp(8), Left: c.Dp(8)}
 	cs = in.Begin(ops, cs)
 	f := layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
-	f.Init(cs)
-	cs = f.Rigid(ops)
+	f.Init(ops, cs)
+	cs = f.Rigid()
 	sz := c.Dp(48)
 	cc := clipCircle{}
 	cs = cc.Begin(ops, cs)
 	dims := widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(ops, layout.Sized{Width: sz, Height: sz}.Constrain(cs))
-	dims = cc.End(ops, dims)
-	c1 := f.End(ops, dims)
-	cs = f.Flexible(ops, 1, layout.Fit)
+	dims = cc.End(dims)
+	c1 := f.End(dims)
+	cs = f.Flexible(1, layout.Fit)
 	in = layout.Insets{Left: c.Dp(8)}
 	cs = in.Begin(ops, cs)
 	dims = label.Layout(ops, cs)
-	dims = in.End(ops, dims)
-	c2 := f.End(ops, dims)
-	dims = f.Layout(ops, c1, c2)
-	return in.End(ops, dims)
+	dims = in.End(dims)
+	c2 := f.End(dims)
+	dims = f.Layout(c1, c2)
+	return in.End(dims)
 }
 
 func (up *userPage) fetchCommits(ctx context.Context) {
@@ -482,60 +482,60 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	a.edit.Update(c, a.pqueue, a.kqueue)
 	a.edit2.Update(c, a.pqueue, a.kqueue)
 	st := layout.Stack{Alignment: layout.Center}
-	st.Init(cs)
-	cs = st.Rigid(ops)
+	st.Init(ops, cs)
+	cs = st.Rigid()
 	al := layout.Align{Alignment: layout.SE}
 	in := layout.EqualInsets(c.Dp(16))
 	cs = in.Begin(ops, al.Begin(ops, cs))
 	dims := a.fab.Layout(ops, cs)
-	dims = al.End(ops, in.End(ops, dims))
-	c2 := st.End(ops, dims)
+	dims = al.End(in.End(dims))
+	c2 := st.End(dims)
 
-	cs = st.Expand(ops)
+	cs = st.Expand()
 	{
 		f := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Stretch}
-		f.Init(cs)
+		f.Init(ops, cs)
 
-		cs = f.Rigid(ops)
+		cs = f.Rigid()
 		{
 			in := layout.EqualInsets(c.Dp(16))
 			cs = layout.Sized{Height: c.Dp(200)}.Constrain(cs)
 			gdraw.OpColor{Col: textColor}.Add(ops)
 			dims = a.edit.Layout(ops, in.Begin(ops, cs))
-			dims = in.End(ops, dims)
+			dims = in.End(dims)
 		}
-		c1 := f.End(ops, dims)
+		c1 := f.End(dims)
 
-		cs = f.Rigid(ops)
+		cs = f.Rigid()
 		{
 			in := layout.Insets{Bottom: c.Dp(16), Left: c.Dp(16), Right: c.Dp(16)}
 			gdraw.OpColor{Col: textColor}.Add(ops)
 			dims = a.edit2.Layout(ops, in.Begin(ops, cs))
-			dims = in.End(ops, dims)
+			dims = in.End(dims)
 		}
-		c2 := f.End(ops, dims)
+		c2 := f.End(dims)
 
-		cs = f.Rigid(ops)
+		cs = f.Rigid()
 		{
 			s := layout.Stack{Alignment: layout.Center}
-			s.Init(cs)
-			cs = s.Rigid(ops)
+			s.Init(ops, cs)
+			cs = s.Rigid()
 			in := layout.Insets{Top: c.Dp(16), Right: c.Dp(8), Bottom: c.Dp(8), Left: c.Dp(8)}
 			gdraw.OpColor{Col: rgb(0x888888)}.Add(ops)
 			lbl := text.Label{Face: a.face(fonts.regular, 9), Text: "GOPHERS"}
-			dims = in.End(ops, lbl.Layout(ops, in.Begin(ops, cs)))
-			c2 := s.End(ops, dims)
-			c1 := s.End(ops, fill{color: rgb(0xf2f2f2)}.Layout(ops, s.Expand(ops)))
-			dims = s.Layout(ops, c1, c2)
+			dims = in.End(lbl.Layout(ops, in.Begin(ops, cs)))
+			c2 := s.End(dims)
+			c1 := s.End(fill{color: rgb(0xf2f2f2)}.Layout(ops, s.Expand()))
+			dims = s.Layout(c1, c2)
 		}
-		c3 := f.End(ops, dims)
+		c3 := f.End(dims)
 
-		dims = a.layoutContributors(ops, f.Flexible(ops, 1, layout.Fit))
-		c4 := f.End(ops, dims)
-		dims = f.Layout(ops, c1, c2, c3, c4)
+		dims = a.layoutContributors(ops, f.Flexible(1, layout.Fit))
+		c4 := f.End(dims)
+		dims = f.Layout(c1, c2, c3, c4)
 	}
-	c1 := st.End(ops, dims)
-	return st.Layout(ops, c1, c2)
+	c1 := st.End(dims)
+	return st.Layout(c1, c2)
 }
 
 func (a *ActionButton) Update(c *ui.Config, q pointer.Events) {
@@ -548,15 +548,15 @@ func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens 
 	c := a.cfg
 	fabCol := brandColor
 	f := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.End, MainAxisSize: layout.Min}
-	f.Init(cs)
-	cs = f.Rigid(ops)
+	f.Init(ops, cs)
+	cs = f.Rigid()
 	in := layout.Insets{Top: c.Dp(4)}
 	cs = in.Begin(ops, cs)
 	dims := fab(ops, cs, a.sendIco.image(c), fabCol, c.Dp(56))
 	pointer.AreaEllipse(dims.Size).Add(ops)
 	a.btnClicker.Add(ops)
-	dims = in.End(ops, dims)
-	return f.Layout(ops, f.End(ops, dims))
+	dims = in.End(dims)
+	return f.Layout(f.End(dims))
 }
 
 func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
@@ -566,15 +566,15 @@ func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dime
 	if l.Dragging() {
 		key.OpHideInput{}.Add(ops)
 	}
-	l.Init(cs, len(a.users))
+	l.Init(ops, cs, len(a.users))
 	for {
-		i, cs, ok := l.Next(ops)
+		i, cs, ok := l.Next()
 		if !ok {
 			break
 		}
-		l.End(ops, a.user(ops, cs, c, i))
+		l.End(a.user(ops, cs, c, i))
 	}
-	dims := l.Layout(ops)
+	dims := l.Layout()
 	return dims
 }
 
@@ -587,63 +587,63 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 		}
 	}
 	elem := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
-	elem.Init(cs)
-	cs = elem.Rigid(ops)
+	elem.Init(ops, cs)
+	cs = elem.Rigid()
 	var dims layout.Dimens
 	{
 		in := layout.EqualInsets(c.Dp(8))
 		cs = in.Begin(ops, cs)
 		f := centerRowOpts()
-		f.Init(cs)
-		cs = f.Rigid(ops)
+		f.Init(ops, cs)
+		cs = f.Rigid()
 		{
 			in := layout.Insets{Right: c.Dp(8)}
 			cc := clipCircle{}
 			cs = cc.Begin(ops, in.Begin(ops, cs))
 			dims = widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(ops, layout.Sized{Width: c.Dp(48), Height: c.Dp(48)}.Constrain(cs))
-			dims = in.End(ops, cc.End(ops, dims))
+			dims = in.End(cc.End(dims))
 		}
-		c1 := f.End(ops, dims)
-		cs = f.Rigid(ops)
+		c1 := f.End(dims)
+		cs = f.Rigid()
 		{
 			f := column()
-			f.Init(cs)
-			cs = f.Rigid(ops)
+			f.Init(ops, cs)
+			cs = f.Rigid()
 			{
 				f := baseline()
-				f.Init(cs)
-				cs = f.Rigid(ops)
+				f.Init(ops, cs)
+				cs = f.Rigid()
 				gdraw.OpColor{Col: textColor}.Add(ops)
 				dims = text.Label{Face: a.face(fonts.regular, 11), Text: u.name}.Layout(ops, cs)
-				c1 := f.End(ops, dims)
-				cs = f.Rigid(ops)
+				c1 := f.End(dims)
+				cs = f.Rigid()
 				al := layout.Align{Alignment: layout.E}
 				in := layout.Insets{Left: c.Dp(2)}
 				cs = in.Begin(ops, al.Begin(ops, cs))
 				gdraw.OpColor{Col: textColor}.Add(ops)
 				dims = text.Label{Face: a.face(fonts.regular, 8), Text: "3 hours ago"}.Layout(ops, cs)
-				dims = al.End(ops, in.End(ops, dims))
-				c2 := f.End(ops, dims)
-				dims = f.Layout(ops, c1, c2)
+				dims = al.End(in.End(dims))
+				c2 := f.End(dims)
+				dims = f.Layout(c1, c2)
 			}
-			c1 := f.End(ops, dims)
-			cs = f.Rigid(ops)
+			c1 := f.End(dims)
+			cs = f.Rigid()
 			in := layout.Insets{Top: c.Dp(4)}
 			cs = in.Begin(ops, cs)
 			gdraw.OpColor{Col: tertTextColor}.Add(ops)
 			dims = text.Label{Face: a.face(fonts.regular, 10), Text: u.company}.Layout(ops, cs)
-			dims = in.End(ops, dims)
-			c2 := f.End(ops, dims)
-			dims = f.Layout(ops, c1, c2)
+			dims = in.End(dims)
+			c2 := f.End(dims)
+			dims = f.Layout(c1, c2)
 		}
-		c2 := f.End(ops, dims)
-		dims = f.Layout(ops, c1, c2)
-		dims = in.End(ops, dims)
+		c2 := f.End(dims)
+		dims = f.Layout(c1, c2)
+		dims = in.End(dims)
 		pointer.AreaRect(dims.Size).Add(ops)
 		click.Add(ops)
 	}
-	c1 := elem.End(ops, dims)
-	return elem.Layout(ops, c1)
+	c1 := elem.End(dims)
+	return elem.Layout(c1)
 }
 
 type fill struct {
@@ -678,14 +678,18 @@ func baseline() layout.Flex {
 	return layout.Flex{Axis: layout.Horizontal, CrossAxisAlignment: layout.Baseline, MainAxisSize: layout.Min}
 }
 
-type clipCircle struct{}
+type clipCircle struct {
+	ops *ui.Ops
+}
 
 func (c *clipCircle) Begin(ops *ui.Ops, cs layout.Constraints) layout.Constraints {
+	c.ops = ops
 	ops.Begin()
 	return cs
 }
 
-func (c *clipCircle) End(ops *ui.Ops, dims layout.Dimens) layout.Dimens {
+func (c *clipCircle) End(dims layout.Dimens) layout.Dimens {
+	ops := c.ops
 	block := ops.End()
 	max := dims.Size.X
 	if dy := dims.Size.Y; dy > max {
@@ -747,15 +751,16 @@ func rrect(ops *ui.Ops, width, height, se, sw, nw, ne float32) {
 	w, h := float32(width), float32(height)
 	const c = 0.55228475 // 4*(sqrt(2)-1)/3
 	var b gdraw.PathBuilder
-	b.Move(ops, f32.Point{X: w, Y: h - se})
-	b.Cube(ops, f32.Point{X: 0, Y: se * c}, f32.Point{X: -se + se*c, Y: se}, f32.Point{X: -se, Y: se}) // SE
-	b.Line(ops, f32.Point{X: sw - w + se, Y: 0})
-	b.Cube(ops, f32.Point{X: -sw * c, Y: 0}, f32.Point{X: -sw, Y: -sw + sw*c}, f32.Point{X: -sw, Y: -sw}) // SW
-	b.Line(ops, f32.Point{X: 0, Y: nw - h + sw})
-	b.Cube(ops, f32.Point{X: 0, Y: -nw * c}, f32.Point{X: nw - nw*c, Y: -nw}, f32.Point{X: nw, Y: -nw}) // NW
-	b.Line(ops, f32.Point{X: w - ne - nw, Y: 0})
-	b.Cube(ops, f32.Point{X: ne * c, Y: 0}, f32.Point{X: ne, Y: ne - ne*c}, f32.Point{X: ne, Y: ne}) // NE
-	b.End(ops)
+	b.Init(ops)
+	b.Move(f32.Point{X: w, Y: h - se})
+	b.Cube(f32.Point{X: 0, Y: se * c}, f32.Point{X: -se + se*c, Y: se}, f32.Point{X: -se, Y: se}) // SE
+	b.Line(f32.Point{X: sw - w + se, Y: 0})
+	b.Cube(f32.Point{X: -sw * c, Y: 0}, f32.Point{X: -sw, Y: -sw + sw*c}, f32.Point{X: -sw, Y: -sw}) // SW
+	b.Line(f32.Point{X: 0, Y: nw - h + sw})
+	b.Cube(f32.Point{X: 0, Y: -nw * c}, f32.Point{X: nw - nw*c, Y: -nw}, f32.Point{X: nw, Y: -nw}) // NW
+	b.Line(f32.Point{X: w - ne - nw, Y: 0})
+	b.Cube(f32.Point{X: ne * c, Y: 0}, f32.Point{X: ne, Y: ne - ne*c}, f32.Point{X: ne, Y: ne}) // NE
+	b.End()
 }
 
 const longTextSample = `1. I learned from my grandfather, Verus, to use good manners, and to
