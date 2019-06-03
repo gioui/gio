@@ -15,6 +15,7 @@ type Flex struct {
 	CrossAxisAlignment CrossAxisAlignment
 	MainAxisSize       MainAxisSize
 
+	ops         *ui.Ops
 	constrained bool
 	cs          Constraints
 	begun       bool
@@ -57,10 +58,11 @@ const (
 	Stretch
 )
 
-func (f *Flex) Init(cs Constraints) {
+func (f *Flex) Init(ops *ui.Ops, cs Constraints) {
 	if f.constrained {
 		panic("Constrain must be called exactly once")
 	}
+	f.ops = ops
 	f.constrained = true
 	f.cs = cs
 	f.taken = 0
@@ -68,7 +70,7 @@ func (f *Flex) Init(cs Constraints) {
 	f.maxBaseline = 0
 }
 
-func (f *Flex) begin(ops *ui.Ops) {
+func (f *Flex) begin() {
 	if !f.constrained {
 		panic("must Constrain before adding a child")
 	}
@@ -76,12 +78,12 @@ func (f *Flex) begin(ops *ui.Ops) {
 		panic("must End before adding a child")
 	}
 	f.begun = true
-	ops.Begin()
-	ui.OpLayer{}.Add(ops)
+	f.ops.Begin()
+	ui.OpLayer{}.Add(f.ops)
 }
 
-func (f *Flex) Rigid(ops *ui.Ops) Constraints {
-	f.begin(ops)
+func (f *Flex) Rigid() Constraints {
+	f.begin()
 	mainc := axisMainConstraint(f.Axis, f.cs)
 	mainMax := mainc.Max
 	if mainc.Max != ui.Inf {
@@ -90,8 +92,8 @@ func (f *Flex) Rigid(ops *ui.Ops) Constraints {
 	return axisConstraints(f.Axis, Constraint{Max: mainMax}, f.crossConstraintChild(f.cs))
 }
 
-func (f *Flex) Flexible(ops *ui.Ops, flex float32, mode FlexMode) Constraints {
-	f.begin(ops)
+func (f *Flex) Flexible(flex float32, mode FlexMode) Constraints {
+	f.begin()
 	mainc := axisMainConstraint(f.Axis, f.cs)
 	var flexSize int
 	if mainc.Max != ui.Inf && mainc.Max > f.taken {
@@ -104,12 +106,12 @@ func (f *Flex) Flexible(ops *ui.Ops, flex float32, mode FlexMode) Constraints {
 	return axisConstraints(f.Axis, submainc, f.crossConstraintChild(f.cs))
 }
 
-func (f *Flex) End(ops *ui.Ops, dims Dimens) FlexChild {
+func (f *Flex) End(dims Dimens) FlexChild {
 	if !f.begun {
 		panic("End called without an active child")
 	}
 	f.begun = false
-	block := ops.End()
+	block := f.ops.End()
 	f.taken += axisMain(f.Axis, dims.Size)
 	if c := axisCross(f.Axis, dims.Size); c > f.maxCross {
 		f.maxCross = c
@@ -120,7 +122,7 @@ func (f *Flex) End(ops *ui.Ops, dims Dimens) FlexChild {
 	return FlexChild{block, dims}
 }
 
-func (f *Flex) Layout(ops *ui.Ops, children ...FlexChild) Dimens {
+func (f *Flex) Layout(children ...FlexChild) Dimens {
 	mainc := axisMainConstraint(f.Axis, f.cs)
 	crossSize := axisCrossConstraint(f.Axis, f.cs).Constrain(f.maxCross)
 	var space int
@@ -157,12 +159,12 @@ func (f *Flex) Layout(ops *ui.Ops, children ...FlexChild) Dimens {
 				cross = f.maxBaseline - b
 			}
 		}
-		ui.OpPush{}.Add(ops)
+		ui.OpPush{}.Add(f.ops)
 		ui.OpTransform{
 			Transform: ui.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))),
-		}.Add(ops)
-		child.block.Add(ops)
-		ui.OpPop{}.Add(ops)
+		}.Add(f.ops)
+		child.block.Add(f.ops)
+		ui.OpPop{}.Add(f.ops)
 		mainSize += axisMain(f.Axis, dims.Size)
 		switch f.MainAxisAlignment {
 		case SpaceEvenly:

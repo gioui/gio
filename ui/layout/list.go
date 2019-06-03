@@ -24,6 +24,7 @@ type List struct {
 	// The distance scrolled since last call to Init.
 	Distance int
 
+	ops       *ui.Ops
 	scroll    gesture.Scroll
 	scrollDir int
 
@@ -46,7 +47,8 @@ const (
 	iterateBackward
 )
 
-func (l *List) Init(cs Constraints, len int) {
+func (l *List) Init(ops *ui.Ops, cs Constraints, len int) {
+	l.ops = ops
 	l.dir = iterateNone
 	l.maxSize = 0
 	l.children = l.children[:0]
@@ -55,6 +57,7 @@ func (l *List) Init(cs Constraints, len int) {
 	if l.first > len {
 		l.first = len
 	}
+	ops.Begin()
 }
 
 func (l *List) Dragging() bool {
@@ -69,19 +72,16 @@ func (l *List) Update(c *ui.Config, q pointer.Events) {
 	l.offset += d
 }
 
-func (l *List) Next(ops *ui.Ops) (int, Constraints, bool) {
+func (l *List) Next() (int, Constraints, bool) {
 	if l.dir != iterateNone {
 		panic("a previous Next was not finished with Elem")
 	}
 	i, ok := l.next()
 	var cs Constraints
 	if ok {
-		if len(l.children) == 0 {
-			ops.Begin()
-		}
 		cs = axisConstraints(l.Axis, Constraint{Max: ui.Inf}, l.crossConstraintChild(l.cs))
-		ops.Begin()
-		ui.OpLayer{}.Add(ops)
+		l.ops.Begin()
+		ui.OpLayer{}.Add(l.ops)
 	}
 	return i, cs, ok
 }
@@ -110,8 +110,8 @@ func (l *List) next() (int, bool) {
 	return 0, false
 }
 
-func (l *List) End(ops *ui.Ops, dims Dimens) {
-	block := ops.End()
+func (l *List) End(dims Dimens) {
+	block := l.ops.End()
 	child := scrollChild{dims.Size, block}
 	switch l.dir {
 	case iterateForward:
@@ -130,7 +130,7 @@ func (l *List) End(ops *ui.Ops, dims Dimens) {
 	l.dir = iterateNone
 }
 
-func (l *List) Layout(ops *ui.Ops) Dimens {
+func (l *List) Layout() Dimens {
 	mainc := axisMainConstraint(l.Axis, l.cs)
 	for len(l.children) > 0 {
 		sz := l.children[0].size
@@ -155,6 +155,7 @@ func (l *List) Layout(ops *ui.Ops) Dimens {
 			break
 		}
 	}
+	ops := l.ops
 	pos := -l.offset
 	for _, child := range l.children {
 		sz := child.size
@@ -192,12 +193,10 @@ func (l *List) Layout(ops *ui.Ops) Dimens {
 		l.scroll.Stop()
 	}
 	dims := axisPoint(l.Axis, mainc.Constrain(pos), maxCross)
-	if len(l.children) > 0 {
-		block := ops.End()
-		pointer.AreaRect(dims).Add(ops)
-		l.scroll.Add(ops)
-		block.Add(ops)
-	}
+	block := ops.End()
+	pointer.AreaRect(dims).Add(ops)
+	l.scroll.Add(ops)
+	block.Add(ops)
 	return Dimens{Size: dims}
 }
 

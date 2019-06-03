@@ -11,6 +11,7 @@ import (
 type Stack struct {
 	Alignment Direction
 
+	ops         *ui.Ops
 	constrained bool
 	cs          Constraints
 	begun       bool
@@ -36,14 +37,15 @@ const (
 	W
 )
 
-func (s *Stack) Init(cs Constraints) {
+func (s *Stack) Init(ops *ui.Ops, cs Constraints) {
+	s.ops = ops
 	s.cs = cs
 	s.constrained = true
 	s.maxSZ = image.Point{}
 	s.baseline = 0
 }
 
-func (s *Stack) begin(ops *ui.Ops) {
+func (s *Stack) begin() {
 	if !s.constrained {
 		panic("must Constrain before adding a child")
 	}
@@ -51,25 +53,25 @@ func (s *Stack) begin(ops *ui.Ops) {
 		panic("must End before adding a child")
 	}
 	s.begun = true
-	ops.Begin()
-	ui.OpLayer{}.Add(ops)
+	s.ops.Begin()
+	ui.OpLayer{}.Add(s.ops)
 }
 
-func (s *Stack) Rigid(ops *ui.Ops) Constraints {
-	s.begin(ops)
+func (s *Stack) Rigid() Constraints {
+	s.begin()
 	return s.cs
 }
 
-func (s *Stack) Expand(ops *ui.Ops) Constraints {
-	s.begin(ops)
+func (s *Stack) Expand() Constraints {
+	s.begin()
 	return Constraints{
 		Width:  Constraint{Min: s.maxSZ.X, Max: s.maxSZ.X},
 		Height: Constraint{Min: s.maxSZ.Y, Max: s.maxSZ.Y},
 	}
 }
 
-func (s *Stack) End(ops *ui.Ops, dims Dimens) StackChild {
-	b := ops.End()
+func (s *Stack) End(dims Dimens) StackChild {
+	b := s.ops.End()
 	s.begun = false
 	if w := dims.Size.X; w > s.maxSZ.X {
 		s.maxSZ.X = w
@@ -85,7 +87,7 @@ func (s *Stack) End(ops *ui.Ops, dims Dimens) StackChild {
 	return StackChild{b, dims}
 }
 
-func (s *Stack) Layout(ops *ui.Ops, children ...StackChild) Dimens {
+func (s *Stack) Layout(children ...StackChild) Dimens {
 	for _, ch := range children {
 		sz := ch.dims.Size
 		var p image.Point
@@ -101,10 +103,10 @@ func (s *Stack) Layout(ops *ui.Ops, children ...StackChild) Dimens {
 		case SW, S, SE:
 			p.Y = s.maxSZ.Y - sz.Y
 		}
-		ui.OpPush{}.Add(ops)
-		ui.OpTransform{Transform: ui.Offset(toPointF(p))}.Add(ops)
-		ch.block.Add(ops)
-		ui.OpPop{}.Add(ops)
+		ui.OpPush{}.Add(s.ops)
+		ui.OpTransform{Transform: ui.Offset(toPointF(p))}.Add(s.ops)
+		ch.block.Add(s.ops)
+		ui.OpPop{}.Add(s.ops)
 	}
 	b := s.baseline
 	if b == 0 {

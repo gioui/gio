@@ -233,6 +233,7 @@ func textPath(ppem fixed.Int26_6, f *opentype, str text.String) ui.OpBlock {
 	var lastPos f32.Point
 	var builder draw.PathBuilder
 	ops := new(ui.Ops)
+	builder.Init(ops)
 	var x fixed.Int26_6
 	var advIdx int
 	ops.Begin()
@@ -246,7 +247,7 @@ func textPath(ppem fixed.Int26_6, f *opentype, str text.String) ui.OpBlock {
 			pos := f32.Point{
 				X: float32(x) / 64,
 			}
-			builder.Move(ops, pos.Sub(lastPos))
+			builder.Move(pos.Sub(lastPos))
 			lastPos = pos
 			var lastArg f32.Point
 			// Convert sfnt.Segments to relative segments.
@@ -271,13 +272,13 @@ func textPath(ppem fixed.Int26_6, f *opentype, str text.String) ui.OpBlock {
 				}
 				switch fseg.Op {
 				case sfnt.SegmentOpMoveTo:
-					builder.Move(ops, args[0])
+					builder.Move(args[0])
 				case sfnt.SegmentOpLineTo:
-					builder.Line(ops, args[0])
+					builder.Line(args[0])
 				case sfnt.SegmentOpQuadTo:
-					builder.Quad(ops, args[0], args[1])
+					builder.Quad(args[0], args[1])
 				case sfnt.SegmentOpCubeTo:
-					builder.Cube(ops, args[0], args[1], args[2])
+					builder.Cube(args[0], args[1], args[2])
 				default:
 					panic("unsupported segment op")
 				}
@@ -287,6 +288,6 @@ func textPath(ppem fixed.Int26_6, f *opentype, str text.String) ui.OpBlock {
 		x += str.Advances[advIdx]
 		advIdx++
 	}
-	builder.End(ops)
+	builder.End()
 	return ops.End()
 }

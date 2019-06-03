@@ -70,10 +70,12 @@ func ExactConstraints(size image.Point) Constraints {
 type Insets struct {
 	Top, Right, Bottom, Left float32
 
-	cs Constraints
+	ops *ui.Ops
+	cs  Constraints
 }
 
 func (in *Insets) Begin(ops *ui.Ops, cs Constraints) Constraints {
+	in.ops = ops
 	in.cs = cs
 	mcs := cs
 	t, r, b, l := int(math.Round(float64(in.Top))), int(math.Round(float64(in.Right))), int(math.Round(float64(in.Bottom))), int(math.Round(float64(in.Left)))
@@ -102,7 +104,8 @@ func (in *Insets) Begin(ops *ui.Ops, cs Constraints) Constraints {
 	return mcs
 }
 
-func (in *Insets) End(ops *ui.Ops, dims Dimens) Dimens {
+func (in *Insets) End(dims Dimens) Dimens {
+	ops := in.ops
 	ui.OpPop{}.Add(ops)
 	t, r, b, l := int(math.Round(float64(in.Top))), int(math.Round(float64(in.Right))), int(math.Round(float64(in.Bottom))), int(math.Round(float64(in.Left)))
 	return Dimens{
@@ -144,17 +147,20 @@ func (s Sized) Constrain(cs Constraints) Constraints {
 }
 
 type Align struct {
+	ops       *ui.Ops
 	Alignment Direction
 	cs        Constraints
 }
 
 func (a *Align) Begin(ops *ui.Ops, cs Constraints) Constraints {
+	a.ops = ops
 	a.cs = cs
 	ops.Begin()
 	return cs.Loose()
 }
 
-func (a *Align) End(ops *ui.Ops, dims Dimens) Dimens {
+func (a *Align) End(dims Dimens) Dimens {
+	ops := a.ops
 	block := ops.End()
 	sz := dims.Size
 	if a.cs.Width.Max != ui.Inf {
