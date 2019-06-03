@@ -74,7 +74,7 @@ func (h OpHandler) Add(o *ui.Ops) {
 	if h.Focus {
 		data[1] = 1
 	}
-	o.Write(data, []interface{}{h.Key})
+	o.Write(data, h.Key)
 }
 
 func (h *OpHandler) Decode(d []byte, refs []interface{}) {
@@ -90,7 +90,7 @@ func (h *OpHandler) Decode(d []byte, refs []interface{}) {
 func (h OpHideInput) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypeHideInputLen)
 	data[0] = byte(ops.TypeHideInput)
-	o.Write(data, nil)
+	o.Write(data)
 }
 
 func (Edit) ImplementsEvent()  {}

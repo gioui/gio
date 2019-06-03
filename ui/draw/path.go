@@ -35,7 +35,7 @@ func (p opClip) Add(o *ui.Ops) {
 	bo.PutUint32(data[5:], math.Float32bits(p.bounds.Min.Y))
 	bo.PutUint32(data[9:], math.Float32bits(p.bounds.Max.X))
 	bo.PutUint32(data[13:], math.Float32bits(p.bounds.Max.Y))
-	o.Write(data, nil)
+	o.Write(data)
 }
 
 // MoveTo moves the pen to the given position.
@@ -246,7 +246,7 @@ func (p *PathBuilder) vertex(o *ui.Ops, cornerx, cornery int16, ctrl, to f32.Poi
 	bo.PutUint32(data[21:], math.Float32bits(v.CtrlY))
 	bo.PutUint32(data[25:], math.Float32bits(v.ToX))
 	bo.PutUint32(data[29:], math.Float32bits(v.ToY))
-	o.Write(data, nil)
+	o.Write(data)
 }
 
 func (p *PathBuilder) simpleQuadTo(ops *ui.Ops, ctrl, to f32.Point) {

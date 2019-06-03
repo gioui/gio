@@ -77,18 +77,18 @@ type opAux struct {
 }
 
 func (p OpPush) Add(o *Ops) {
-	o.Write([]byte{byte(ops.TypePush)}, nil)
+	o.Write([]byte{byte(ops.TypePush)})
 }
 
 func (p OpPop) Add(o *Ops) {
-	o.Write([]byte{byte(ops.TypePop)}, nil)
+	o.Write([]byte{byte(ops.TypePop)})
 }
 
 // Begin a block of ops.
 func (o *Ops) Begin() {
 	o.stack = append(o.stack, o.ops.pc())
 	// Make room for a block definition. Filled out in End.
-	o.Write(make([]byte, ops.TypeBlockDefLen), nil)
+	o.Write(make([]byte, ops.TypeBlockDefLen))
 }
 
 func (op *opAux) decode(data []byte) {
@@ -152,13 +152,17 @@ func (d *opsData) reset() {
 	d.version++
 }
 
-func (d *opsData) write(op []byte, refs []interface{}) {
+func (d *opsData) write(op []byte, refs ...interface{}) {
 	d.data = append(d.data, op...)
 	d.refs = append(d.refs, refs...)
 }
 
-func (o *Ops) Write(op []byte, refs []interface{}) {
-	switch ops.OpType(op[0]) {
+func (o *Ops) Write(op []byte, refs ...interface{}) {
+	t := ops.OpType(op[0])
+	if len(refs) != t.NumRefs() {
+		panic("invalid ref count")
+	}
+	switch t {
 	case ops.TypeAux:
 		// Write only the data.
 		op = op[1:]
@@ -168,7 +172,7 @@ func (o *Ops) Write(op []byte, refs []interface{}) {
 			o.auxLen = 0
 			header := make([]byte, ops.TypeAuxLen)
 			header[0] = byte(ops.TypeAux)
-			o.ops.write(header, nil)
+			o.ops.write(header)
 		}
 		o.auxLen += len(op)
 	default:
@@ -178,7 +182,7 @@ func (o *Ops) Write(op []byte, refs []interface{}) {
 			bo.PutUint32(o.ops.data[o.auxOff+1:], uint32(o.auxLen))
 		}
 	}
-	o.ops.write(op, refs)
+	o.ops.write(op, refs...)
 }
 
 func (d *opsData) pc() pc {
@@ -210,7 +214,7 @@ func (b OpBlock) Add(o *Ops) {
 	bo.PutUint32(data[1:], uint32(b.pc.data))
 	bo.PutUint32(data[5:], uint32(b.pc.refs))
 	bo.PutUint32(data[9:], uint32(b.version))
-	o.Write(data, []interface{}{b.ops})
+	o.Write(data, b.ops)
 }
 
 // Reset start reading from the op list.

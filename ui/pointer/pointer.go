@@ -98,7 +98,7 @@ func (op OpArea) Add(o *ui.Ops) {
 	bo := binary.LittleEndian
 	bo.PutUint32(data[2:], uint32(op.size.X))
 	bo.PutUint32(data[6:], uint32(op.size.Y))
-	o.Write(data, nil)
+	o.Write(data)
 }
 
 func (op *OpArea) decode(d []byte) {
@@ -148,7 +148,7 @@ func (h OpHandler) Add(o *ui.Ops) {
 	if h.Grab {
 		data[1] = 1
 	}
-	o.Write(data, []interface{}{h.Key})
+	o.Write(data, h.Key)
 }
 
 func (h *OpHandler) Decode(d []byte, refs []interface{}) {

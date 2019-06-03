@@ -34,7 +34,7 @@ func (i OpImage) Add(o *ui.Ops) {
 	bo.PutUint32(data[5:], uint32(i.Rect.Min.Y))
 	bo.PutUint32(data[9:], uint32(i.Rect.Max.X))
 	bo.PutUint32(data[13:], uint32(i.Rect.Max.Y))
-	o.Write(data, []interface{}{i.Img})
+	o.Write(data, i.Img)
 }
 
 func (i *OpImage) Decode(data []byte, refs []interface{}) {
@@ -65,7 +65,7 @@ func (c OpColor) Add(o *ui.Ops) {
 	data[2] = c.Col.G
 	data[3] = c.Col.B
 	data[4] = c.Col.A
-	o.Write(data, nil)
+	o.Write(data)
 }
 
 func (c *OpColor) Decode(data []byte, refs []interface{}) {
@@ -90,7 +90,7 @@ func (d OpDraw) Add(o *ui.Ops) {
 	bo.PutUint32(data[5:], math.Float32bits(d.Rect.Min.Y))
 	bo.PutUint32(data[9:], math.Float32bits(d.Rect.Max.X))
 	bo.PutUint32(data[13:], math.Float32bits(d.Rect.Max.Y))
-	o.Write(data, nil)
+	o.Write(data)
 }
 
 func (d *OpDraw) Decode(data []byte, refs []interface{}) {
