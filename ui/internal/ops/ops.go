@@ -3,10 +3,10 @@ package ops
 type OpType byte
 
 // Start at a high number for easier debugging.
-const FirstOpIndex = 200
+const firstOpIndex = 200
 
 const (
-	TypeBlockDef OpType = iota + FirstOpIndex
+	TypeBlockDef OpType = iota + firstOpIndex
 	TypeBlock
 	TypeTransform
 	TypeLayer
@@ -39,20 +39,35 @@ const (
 	TypePopLen            = 1
 	TypeAuxLen            = 1 + 4
 	TypeClipLen           = 1 + 4*4
-
-	TypeBlockDefRefs       = 0
-	TypeBlockRefs          = 1
-	TypeTransformRefs      = 0
-	TypeLayerRefs          = 0
-	TypeRedrawRefs         = 0
-	TypeImageRefs          = 1
-	TypeDrawRefs           = 0
-	TypeColorRefs          = 0
-	TypePointerHandlerRefs = 2
-	TypeKeyHandlerRefs     = 1
-	TypeHideInputRefs      = 0
-	TypePushRefs           = 0
-	TypePopRefs            = 0
-	TypeAuxRefs            = 0
-	TypeClipRefs           = 0
 )
+
+func (t OpType) Size() int {
+	return [...]int{
+		TypeBlockDefLen,
+		TypeBlockLen,
+		TypeTransformLen,
+		TypeLayerLen,
+		TypeRedrawLen,
+		TypeImageLen,
+		TypeDrawLen,
+		TypeColorLen,
+		TypePointerHandlerLen,
+		TypeKeyHandlerLen,
+		TypeHideInputLen,
+		TypePushLen,
+		TypePopLen,
+		TypeAuxLen,
+		TypeClipLen,
+	}[t-firstOpIndex]
+}
+
+func (t OpType) NumRefs() int {
+	switch t {
+	case TypeBlock, TypeImage, TypeKeyHandler:
+		return 1
+	case TypePointerHandler:
+		return 2
+	default:
+		return 0
+	}
+}

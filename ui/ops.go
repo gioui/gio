@@ -58,42 +58,6 @@ type pc struct {
 	refs int
 }
 
-var typeLengths = [...]int{
-	ops.TypeBlockDefLen,
-	ops.TypeBlockLen,
-	ops.TypeTransformLen,
-	ops.TypeLayerLen,
-	ops.TypeRedrawLen,
-	ops.TypeImageLen,
-	ops.TypeDrawLen,
-	ops.TypeColorLen,
-	ops.TypePointerHandlerLen,
-	ops.TypeKeyHandlerLen,
-	ops.TypeHideInputLen,
-	ops.TypePushLen,
-	ops.TypePopLen,
-	ops.TypeAuxLen,
-	ops.TypeClipLen,
-}
-
-var refLengths = [...]int{
-	ops.TypeBlockDefRefs,
-	ops.TypeBlockRefs,
-	ops.TypeTransformRefs,
-	ops.TypeLayerRefs,
-	ops.TypeRedrawRefs,
-	ops.TypeImageRefs,
-	ops.TypeDrawRefs,
-	ops.TypeColorRefs,
-	ops.TypePointerHandlerRefs,
-	ops.TypeKeyHandlerRefs,
-	ops.TypeHideInputRefs,
-	ops.TypePushRefs,
-	ops.TypePopRefs,
-	ops.TypeAuxRefs,
-	ops.TypeClipRefs,
-}
-
 type OpPush struct{}
 
 type OpPop struct{}
@@ -272,8 +236,8 @@ func (r *OpsReader) Decode() (EncodedOp, bool) {
 		}
 		key := OpKey{ops: r.ops, pc: r.pc.data, version: r.ops.version}
 		t := ops.OpType(r.ops.data[r.pc.data])
-		n := typeLengths[t-ops.FirstOpIndex]
-		nrefs := refLengths[t-ops.FirstOpIndex]
+		n := t.Size()
+		nrefs := t.NumRefs()
 		data := r.ops.data[r.pc.data : r.pc.data+n]
 		refs := r.ops.refs[r.pc.refs : r.pc.refs+nrefs]
 		switch t {
@@ -293,7 +257,7 @@ func (r *OpsReader) Decode() (EncodedOp, bool) {
 				panic("invalid OpBlock reference to reset Ops")
 			}
 			var opDef opBlockDef
-			opDef.decode(blockOps.data[op.pc.data : op.pc.data+ops.TypeBlockDefLen])
+			opDef.decode(blockOps.data[op.pc.data : op.pc.data+ops.TypeBlockDef.Size()])
 			retPC := r.pc
 			retPC.data += n
 			retPC.refs += nrefs
@@ -304,8 +268,8 @@ func (r *OpsReader) Decode() (EncodedOp, bool) {
 			})
 			r.ops = blockOps
 			r.pc = op.pc
-			r.pc.data += ops.TypeBlockDefLen
-			r.pc.refs += ops.TypeBlockDefRefs
+			r.pc.data += ops.TypeBlockDef.Size()
+			r.pc.refs += ops.TypeBlockDef.NumRefs()
 			continue
 		case ops.TypeBlockDef:
 			var op opBlockDef
