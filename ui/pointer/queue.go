@@ -30,14 +30,14 @@ type pointerInfo struct {
 }
 
 type handler struct {
-	area      Area
+	area      OpArea
 	active    bool
 	transform ui.Transform
 	events    []Event
 	wantsGrab bool
 }
 
-func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int) {
+func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int, area OpArea) {
 	for {
 		encOp, ok := r.Decode()
 		if !ok {
@@ -45,12 +45,16 @@ func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int) {
 		}
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypePush:
-			q.collectHandlers(r, t, layer)
+			q.collectHandlers(r, t, layer, area)
 		case ops.TypePop:
 			return
 		case ops.TypeLayer:
 			layer++
 			q.hitTree = append(q.hitTree, hitNode{level: layer})
+		case ops.TypeArea:
+			var op OpArea
+			op.decode(encOp.Data)
+			area = op
 		case ops.TypeTransform:
 			var op ui.OpTransform
 			op.Decode(encOp.Data)
@@ -64,7 +68,7 @@ func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int) {
 				h = new(handler)
 				q.handlers[op.Key] = h
 			}
-			h.area = op.Area
+			h.area = area
 			h.transform = t
 			h.wantsGrab = h.wantsGrab || op.Grab
 		}
@@ -117,7 +121,7 @@ func (q *Queue) Frame(root *ui.Ops) {
 	}
 	q.hitTree = q.hitTree[:0]
 	q.reader.Reset(root)
-	q.collectHandlers(&q.reader, ui.Transform{}, 0)
+	q.collectHandlers(&q.reader, ui.Transform{}, 0, OpArea{})
 }
 
 func (q *Queue) For(k Key) []Event {

@@ -24,7 +24,6 @@ type List struct {
 	// The distance scrolled since last call to Init.
 	Distance int
 
-	area      gesture.Rect
 	scroll    gesture.Scroll
 	scrollDir int
 
@@ -78,7 +77,7 @@ func (l *List) Next(ops *ui.Ops) (int, Constraints, bool) {
 	var cs Constraints
 	if ok {
 		if len(l.children) == 0 {
-			l.scroll.Op(ops, &l.area)
+			ops.Begin()
 		}
 		cs = axisConstraints(l.Axis, Constraint{Max: ui.Inf}, l.crossConstraintChild(l.cs))
 		ops.Begin()
@@ -193,7 +192,12 @@ func (l *List) Layout(ops *ui.Ops) Dimens {
 		l.scroll.Stop()
 	}
 	dims := axisPoint(l.Axis, mainc.Constrain(pos), maxCross)
-	l.area.Size = dims
+	if len(l.children) > 0 {
+		block := ops.End()
+		pointer.AreaRect(dims).Add(ops)
+		l.scroll.Add(ops)
+		block.Add(ops)
+	}
 	return Dimens{Size: dims}
 }
 

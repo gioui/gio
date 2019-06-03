@@ -14,6 +14,7 @@ const (
 	TypeImage
 	TypeDraw
 	TypeColor
+	TypeArea
 	TypePointerHandler
 	TypeKeyHandler
 	TypeHideInput
@@ -32,6 +33,7 @@ const (
 	TypeImageLen          = 1 + 4*4
 	TypeDrawLen           = 1 + 4*4
 	TypeColorLen          = 1 + 4
+	TypeAreaLen           = 1 + 1 + 2*4
 	TypePointerHandlerLen = 1 + 1
 	TypeKeyHandlerLen     = 1 + 1
 	TypeHideInputLen      = 1
@@ -51,6 +53,7 @@ func (t OpType) Size() int {
 		TypeImageLen,
 		TypeDrawLen,
 		TypeColorLen,
+		TypeAreaLen,
 		TypePointerHandlerLen,
 		TypeKeyHandlerLen,
 		TypeHideInputLen,
@@ -63,10 +66,8 @@ func (t OpType) Size() int {
 
 func (t OpType) NumRefs() int {
 	switch t {
-	case TypeBlock, TypeImage, TypeKeyHandler:
+	case TypeBlock, TypeImage, TypeKeyHandler, TypePointerHandler:
 		return 1
-	case TypePointerHandler:
-		return 2
 	default:
 		return 0
 	}

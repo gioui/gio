@@ -3,6 +3,8 @@
 package pointer
 
 import (
+	"encoding/binary"
+	"image"
 	"time"
 
 	"gioui.org/ui"
@@ -21,14 +23,14 @@ type Event struct {
 	Scroll    f32.Point
 }
 
-type OpHandler struct {
-	Key  Key
-	Area Area
-	Grab bool
+type OpArea struct {
+	kind areaKind
+	size image.Point
 }
 
-type Area interface {
-	Hit(pos f32.Point) HitResult
+type OpHandler struct {
+	Key  Key
+	Grab bool
 }
 
 type Key interface{}
@@ -50,6 +52,8 @@ type Type uint8
 type Priority uint8
 type Source uint8
 
+type areaKind uint8
+
 const (
 	Cancel Type = iota
 	Press
@@ -68,13 +72,83 @@ const (
 	Grabbed
 )
 
+const (
+	areaRect areaKind = iota
+	areaEllipse
+)
+
+func AreaRect(size image.Point) OpArea {
+	return OpArea{
+		kind: areaRect,
+		size: size,
+	}
+}
+
+func AreaEllipse(size image.Point) OpArea {
+	return OpArea{
+		kind: areaEllipse,
+		size: size,
+	}
+}
+
+func (op OpArea) Add(o *ui.Ops) {
+	data := make([]byte, ops.TypeAreaLen)
+	data[0] = byte(ops.TypeArea)
+	data[1] = byte(op.kind)
+	bo := binary.LittleEndian
+	bo.PutUint32(data[2:], uint32(op.size.X))
+	bo.PutUint32(data[6:], uint32(op.size.Y))
+	o.Write(data, nil)
+}
+
+func (op *OpArea) decode(d []byte) {
+	if ops.OpType(d[0]) != ops.TypeArea {
+		panic("invalid op")
+	}
+	bo := binary.LittleEndian
+	size := image.Point{
+		X: int(bo.Uint32(d[2:])),
+		Y: int(bo.Uint32(d[6:])),
+	}
+	*op = OpArea{
+		kind: areaKind(d[1]),
+		size: size,
+	}
+}
+
+func (op *OpArea) Hit(pos f32.Point) HitResult {
+	switch op.kind {
+	case areaRect:
+		if 0 <= pos.X && pos.X < float32(op.size.X) &&
+			0 <= pos.Y && pos.Y < float32(op.size.Y) {
+			return HitOpaque
+		} else {
+			return HitNone
+		}
+	case areaEllipse:
+		rx := float32(op.size.X) / 2
+		ry := float32(op.size.Y) / 2
+		rx2 := rx * rx
+		ry2 := ry * ry
+		xh := pos.X - rx
+		yk := pos.Y - ry
+		if xh*xh*ry2+yk*yk*rx2 <= rx2*ry2 {
+			return HitOpaque
+		} else {
+			return HitNone
+		}
+	default:
+		panic("invalid area kind")
+	}
+}
+
 func (h OpHandler) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypePointerHandlerLen)
 	data[0] = byte(ops.TypePointerHandler)
 	if h.Grab {
 		data[1] = 1
 	}
-	o.Write(data, []interface{}{h.Key, h.Area})
+	o.Write(data, []interface{}{h.Key})
 }
 
 func (h *OpHandler) Decode(d []byte, refs []interface{}) {
@@ -84,7 +158,6 @@ func (h *OpHandler) Decode(d []byte, refs []interface{}) {
 	*h = OpHandler{
 		Grab: d[1] != 0,
 		Key:  refs[0].(Key),
-		Area: refs[1].(Area),
 	}
 }
 
