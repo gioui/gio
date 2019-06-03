@@ -14,6 +14,7 @@ type Queue struct {
 	pointers []pointerInfo
 	reader   ui.OpsReader
 	scratch  []Key
+	areas    areaStack
 }
 
 type hitNode struct {
@@ -30,14 +31,27 @@ type pointerInfo struct {
 }
 
 type handler struct {
-	area      OpArea
+	area      areaIntersection
 	active    bool
 	transform ui.Transform
 	events    []Event
 	wantsGrab bool
 }
 
-func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int, area OpArea) {
+type area struct {
+	trans ui.Transform
+	area  OpArea
+}
+
+type areaIntersection []area
+
+type areaStack struct {
+	stack   []int
+	areas   []area
+	backing []area
+}
+
+func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int) {
 	for {
 		encOp, ok := r.Decode()
 		if !ok {
@@ -45,8 +59,10 @@ func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int, area
 		}
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypePush:
-			q.collectHandlers(r, t, layer, area)
+			q.areas.push()
+			q.collectHandlers(r, t, layer)
 		case ops.TypePop:
+			q.areas.pop()
 			return
 		case ops.TypeLayer:
 			layer++
@@ -54,7 +70,7 @@ func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int, area
 		case ops.TypeArea:
 			var op OpArea
 			op.decode(encOp.Data)
-			area = op
+			q.areas.add(t, op)
 		case ops.TypeTransform:
 			var op ui.OpTransform
 			op.Decode(encOp.Data)
@@ -68,7 +84,7 @@ func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int, area
 				h = new(handler)
 				q.handlers[op.Key] = h
 			}
-			h.area = area
+			h.area = q.areas.intersection()
 			h.transform = t
 			h.wantsGrab = h.wantsGrab || op.Grab
 		}
@@ -93,8 +109,7 @@ func (q *Queue) opHit(handlers *[]Key, pos f32.Point) {
 			if !ok {
 				continue
 			}
-			tpos := h.transform.InvTransform(pos)
-			res := h.area.Hit(tpos)
+			res := h.area.Hit(pos)
 			opaque = opaque || res == HitOpaque
 			if res != HitNone {
 				*handlers = append(*handlers, n.key)
@@ -120,8 +135,9 @@ func (q *Queue) Frame(root *ui.Ops) {
 		}
 	}
 	q.hitTree = q.hitTree[:0]
+	q.areas.reset()
 	q.reader.Reset(root)
-	q.collectHandlers(&q.reader, ui.Transform{}, 0, OpArea{})
+	q.collectHandlers(&q.reader, ui.Transform{}, 0)
 }
 
 func (q *Queue) For(k Key) []Event {
@@ -222,8 +238,8 @@ func (q *Queue) Push(e Event) {
 		case i == 0:
 			e.Priority = Foremost
 		}
-		e.Position = h.transform.InvTransform(e.Position)
 		e.Hit = h.area.Hit(e.Position) != HitNone
+		e.Position = h.transform.InvTransform(e.Position)
 		h.events = append(h.events, e)
 		if e.Type == Release {
 			// Release grab when the number of grabs reaches zero.
@@ -238,4 +254,42 @@ func (q *Queue) Push(e Event) {
 			}
 		}
 	}
+}
+
+func (a areaIntersection) Hit(p f32.Point) HitResult {
+	res := HitNone
+	for _, area := range a {
+		tp := area.trans.InvTransform(p)
+		res = area.area.Hit(tp)
+		if res == HitNone {
+			break
+		}
+	}
+	return res
+}
+
+func (s *areaStack) add(t ui.Transform, a OpArea) {
+	s.areas = append(s.areas, area{t, a})
+}
+
+func (s *areaStack) push() {
+	s.stack = append(s.stack, len(s.areas))
+}
+
+func (s *areaStack) pop() {
+	off := s.stack[len(s.stack)-1]
+	s.stack = s.stack[:len(s.stack)-1]
+	s.areas = s.areas[:off]
+}
+
+func (s *areaStack) intersection() areaIntersection {
+	off := len(s.backing)
+	s.backing = append(s.backing, s.areas...)
+	return areaIntersection(s.backing[off:len(s.backing):len(s.backing)])
+}
+
+func (a *areaStack) reset() {
+	a.areas = a.areas[:0]
+	a.stack = a.stack[:0]
+	a.backing = a.backing[:0]
 }
