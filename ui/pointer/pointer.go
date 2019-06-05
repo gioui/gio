@@ -116,7 +116,7 @@ func (op *OpArea) decode(d []byte) {
 	}
 }
 
-func (op *OpArea) Hit(pos f32.Point) HitResult {
+func (op *OpArea) hit(pos f32.Point) HitResult {
 	switch op.kind {
 	case areaRect:
 		if 0 <= pos.X && pos.X < float32(op.size.X) &&
