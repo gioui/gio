@@ -110,8 +110,8 @@ func (q *Queue) opHit(handlers *[]Key, pos f32.Point) {
 				continue
 			}
 			res := h.area.hit(pos)
-			opaque = opaque || res == HitOpaque
-			if res != HitNone {
+			opaque = opaque || res == hitOpaque
+			if res != hitNone {
 				*handlers = append(*handlers, n.key)
 			}
 		}
@@ -238,7 +238,7 @@ func (q *Queue) Push(e Event) {
 		case i == 0:
 			e.Priority = Foremost
 		}
-		e.Hit = h.area.hit(e.Position) != HitNone
+		e.Hit = h.area.hit(e.Position) != hitNone
 		e.Position = h.transform.InvTransform(e.Position)
 		h.events = append(h.events, e)
 		if e.Type == Release {
@@ -256,12 +256,12 @@ func (q *Queue) Push(e Event) {
 	}
 }
 
-func (a areaIntersection) hit(p f32.Point) HitResult {
-	res := HitNone
+func (a areaIntersection) hit(p f32.Point) hitResult {
+	res := hitNone
 	for _, area := range a {
 		tp := area.trans.InvTransform(p)
 		res = area.area.hit(tp)
-		if res == HitNone {
+		if res == hitNone {
 			break
 		}
 	}
