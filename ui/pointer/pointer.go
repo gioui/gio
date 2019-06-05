@@ -24,6 +24,8 @@ type Event struct {
 }
 
 type OpArea struct {
+	Transparent bool
+
 	kind areaKind
 	size image.Point
 }
@@ -117,11 +119,15 @@ func (op *OpArea) decode(d []byte) {
 }
 
 func (op *OpArea) hit(pos f32.Point) HitResult {
+	res := HitOpaque
+	if op.Transparent {
+		res = HitTransparent
+	}
 	switch op.kind {
 	case areaRect:
 		if 0 <= pos.X && pos.X < float32(op.size.X) &&
 			0 <= pos.Y && pos.Y < float32(op.size.Y) {
-			return HitOpaque
+			return res
 		} else {
 			return HitNone
 		}
@@ -133,7 +139,7 @@ func (op *OpArea) hit(pos f32.Point) HitResult {
 		xh := pos.X - rx
 		yk := pos.Y - ry
 		if xh*xh*ry2+yk*yk*rx2 <= rx2*ry2 {
-			return HitOpaque
+			return res
 		} else {
 			return HitNone
 		}
