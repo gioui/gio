@@ -9,9 +9,13 @@ import (
 
 type Queue struct {
 	focus    Key
-	events   []Event
-	handlers map[Key]bool
+	handlers map[Key]*handler
 	reader   ui.OpsReader
+}
+
+type handler struct {
+	active bool
+	events []Event
 }
 
 type listenerPriority uint8
@@ -24,18 +28,37 @@ const (
 )
 
 func (q *Queue) Frame(root *ui.Ops) TextInputState {
-	q.events = q.events[:0]
+	if q.handlers == nil {
+		q.handlers = make(map[Key]*handler)
+	}
+	for _, h := range q.handlers {
+		h.active = false
+		h.events = h.events[:0]
+	}
 	q.reader.Reset(root)
-	f, pri, hide := resolveFocus(&q.reader, q.focus)
-	changed := f != nil && f != q.focus
-	for k, active := range q.handlers {
-		if !active || changed {
+	focus, pri, hide := q.resolveFocus()
+	for k, h := range q.handlers {
+		if !h.active {
 			delete(q.handlers, k)
-		} else {
-			q.handlers[k] = false
+			if q.focus == k {
+				q.focus = nil
+			}
 		}
 	}
-	q.focus = f
+	changed := focus != nil && focus != q.focus
+	if focus != q.focus {
+		if q.focus != nil {
+			if h, ok := q.handlers[q.focus]; ok {
+				h.events = append(h.events, Focus{Focus: false})
+			}
+		}
+		q.focus = focus
+		if q.focus != nil {
+			// A new focus always exists in the handler map.
+			h := q.handlers[q.focus]
+			h.events = append(h.events, Focus{Focus: true})
+		}
+	}
 	switch {
 	case pri == priNewFocus:
 		return TextInputOpen
@@ -49,38 +72,28 @@ func (q *Queue) Frame(root *ui.Ops) TextInputState {
 }
 
 func (q *Queue) Push(e Event) {
-	q.events = append(q.events, e)
+	if q.focus == nil {
+		return
+	}
+	h := q.handlers[q.focus]
+	h.events = append(h.events, e)
 }
 
 func (q *Queue) For(k Key) []Event {
-	if q.handlers == nil {
-		q.handlers = make(map[Key]bool)
-	}
-	_, exists := q.handlers[k]
-	q.handlers[k] = true
-	if !exists {
-		if k == q.focus {
-			// Prepend focus event.
-			q.events = append(q.events, nil)
-			copy(q.events[1:], q.events)
-			q.events[0] = Focus{Focus: true}
-		} else {
-			return []Event{Focus{Focus: false}}
-		}
-	}
-	if k != q.focus {
+	h := q.handlers[k]
+	if h == nil {
 		return nil
 	}
-	return q.events
+	return h.events
 }
 
-func resolveFocus(r *ui.OpsReader, focus Key) (Key, listenerPriority, bool) {
+func (q *Queue) resolveFocus() (Key, listenerPriority, bool) {
 	var k Key
 	var pri listenerPriority
 	var hide bool
 loop:
 	for {
-		encOp, ok := r.Decode()
+		encOp, ok := q.reader.Decode()
 		if !ok {
 			break
 		}
@@ -92,7 +105,7 @@ loop:
 			switch {
 			case op.Focus:
 				newPri = priNewFocus
-			case op.Key == focus:
+			case op.Key == q.focus:
 				newPri = priCurrentFocus
 			default:
 				newPri = priDefault
@@ -100,10 +113,19 @@ loop:
 			if newPri >= pri {
 				k, pri = op.Key, newPri
 			}
+			h, ok := q.handlers[op.Key]
+			if !ok {
+				h = &handler{
+					// Reset the handler on (each) first appearance.
+					events: []Event{Focus{Focus: false}},
+				}
+				q.handlers[op.Key] = h
+			}
+			h.active = true
 		case ops.TypeHideInput:
 			hide = true
 		case ops.TypePush:
-			newK, newPri, h := resolveFocus(r, focus)
+			newK, newPri, h := q.resolveFocus()
 			hide = hide || h
 			if newPri >= pri {
 				k, pri = newK, newPri
