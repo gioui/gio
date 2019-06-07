@@ -11,9 +11,9 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/app/internal/gpu"
+	"gioui.org/ui/input"
 	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/key"
-	"gioui.org/ui/pointer"
 )
 
 type WindowOptions struct {
@@ -238,9 +238,7 @@ func (w *Window) event(e Event) {
 	needAck := false
 	needRedraw := false
 	switch e := e.(type) {
-	case pointer.Event:
-		needRedraw = true
-	case key.Event:
+	case input.Event:
 		needRedraw = true
 	case *Command:
 		needAck = true

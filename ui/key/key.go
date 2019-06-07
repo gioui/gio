@@ -16,14 +16,6 @@ type OpHideInput struct{}
 
 type Key interface{}
 
-type Events interface {
-	For(k Key) []Event
-}
-
-type Event interface {
-	isKeyEvent()
-}
-
 type Focus struct {
 	Focus bool
 }
@@ -93,9 +85,9 @@ func (h OpHideInput) Add(o *ui.Ops) {
 	o.Write(data)
 }
 
-func (Edit) ImplementsEvent()  {}
-func (Chord) ImplementsEvent() {}
-func (Focus) ImplementsEvent() {}
-func (Edit) isKeyEvent()       {}
-func (Chord) isKeyEvent()      {}
-func (Focus) isKeyEvent()      {}
+func (Edit) ImplementsEvent()       {}
+func (Chord) ImplementsEvent()      {}
+func (Focus) ImplementsEvent()      {}
+func (Edit) ImplementsInputEvent()  {}
+func (Chord) ImplementsInputEvent() {}
+func (Focus) ImplementsInputEvent() {}

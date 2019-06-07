@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package key
+package input
 
 import (
 	"gioui.org/ui"
 	"gioui.org/ui/internal/ops"
+	"gioui.org/ui/key"
 )
 
-type Queue struct {
+type keyQueue struct {
 	focus    Key
-	handlers map[Key]*handler
+	handlers map[Key]*keyHandler
 	reader   ui.OpsReader
-	state    TextInputState
+	state    key.TextInputState
 }
 
-type handler struct {
+type keyHandler struct {
 	active bool
-	events []Event
 }
 
 type listenerPriority uint8
@@ -30,20 +30,19 @@ const (
 
 // InputState returns the last text input state as
 // determined in Frame.
-func (q *Queue) InputState() TextInputState {
+func (q *keyQueue) InputState() key.TextInputState {
 	return q.state
 }
 
-func (q *Queue) Frame(root *ui.Ops) {
+func (q *keyQueue) Frame(root *ui.Ops, events handlerEvents) {
 	if q.handlers == nil {
-		q.handlers = make(map[Key]*handler)
+		q.handlers = make(map[Key]*keyHandler)
 	}
 	for _, h := range q.handlers {
 		h.active = false
-		h.events = h.events[:0]
 	}
 	q.reader.Reset(root)
-	focus, pri, hide := q.resolveFocus()
+	focus, pri, hide := q.resolveFocus(events)
 	for k, h := range q.handlers {
 		if !h.active {
 			delete(q.handlers, k)
@@ -55,46 +54,33 @@ func (q *Queue) Frame(root *ui.Ops) {
 	changed := focus != nil && focus != q.focus
 	if focus != q.focus {
 		if q.focus != nil {
-			if h, ok := q.handlers[q.focus]; ok {
-				h.events = append(h.events, Focus{Focus: false})
-			}
+			events[q.focus] = append(events[q.focus], key.Focus{Focus: false})
 		}
 		q.focus = focus
 		if q.focus != nil {
-			// A new focus always exists in the handler map.
-			h := q.handlers[q.focus]
-			h.events = append(h.events, Focus{Focus: true})
+			events[q.focus] = append(events[q.focus], key.Focus{Focus: true})
 		}
 	}
 	switch {
 	case pri == priNewFocus:
-		q.state = TextInputOpen
+		q.state = key.TextInputOpen
 	case hide:
-		q.state = TextInputClosed
+		q.state = key.TextInputClosed
 	case changed:
-		q.state = TextInputFocus
+		q.state = key.TextInputFocus
 	default:
-		q.state = TextInputKeep
+		q.state = key.TextInputKeep
 	}
 }
 
-func (q *Queue) Push(e Event) {
+func (q *keyQueue) Push(e Event, events handlerEvents) {
 	if q.focus == nil {
 		return
 	}
-	h := q.handlers[q.focus]
-	h.events = append(h.events, e)
+	events[q.focus] = append(events[q.focus], e)
 }
 
-func (q *Queue) For(k Key) []Event {
-	h := q.handlers[k]
-	if h == nil {
-		return nil
-	}
-	return h.events
-}
-
-func (q *Queue) resolveFocus() (Key, listenerPriority, bool) {
+func (q *keyQueue) resolveFocus(events handlerEvents) (Key, listenerPriority, bool) {
 	var k Key
 	var pri listenerPriority
 	var hide bool
@@ -106,7 +92,7 @@ loop:
 		}
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeKeyHandler:
-			var op OpHandler
+			var op key.OpHandler
 			op.Decode(encOp.Data, encOp.Refs)
 			var newPri listenerPriority
 			switch {
@@ -122,17 +108,16 @@ loop:
 			}
 			h, ok := q.handlers[op.Key]
 			if !ok {
-				h = &handler{
-					// Reset the handler on (each) first appearance.
-					events: []Event{Focus{Focus: false}},
-				}
+				h = new(keyHandler)
 				q.handlers[op.Key] = h
+				// Reset the handler on (each) first appearance.
+				events[op.Key] = []Event{key.Focus{Focus: false}}
 			}
 			h.active = true
 		case ops.TypeHideInput:
 			hide = true
 		case ops.TypePush:
-			newK, newPri, h := q.resolveFocus()
+			newK, newPri, h := q.resolveFocus(events)
 			hide = hide || h
 			if newPri >= pri {
 				k, pri = newK, newPri

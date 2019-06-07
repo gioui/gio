@@ -37,16 +37,12 @@ type OpHandler struct {
 
 type Key interface{}
 
-type Events interface {
-	For(k Key) []Event
-}
-
-type hitResult uint8
+type HitResult uint8
 
 const (
-	hitNone hitResult = iota
-	hitTransparent
-	hitOpaque
+	HitNone HitResult = iota
+	HitTransparent
+	HitOpaque
 )
 
 type ID uint16
@@ -103,7 +99,7 @@ func (op OpArea) Add(o *ui.Ops) {
 	o.Write(data)
 }
 
-func (op *OpArea) decode(d []byte) {
+func (op *OpArea) Decode(d []byte) {
 	if ops.OpType(d[0]) != ops.TypeArea {
 		panic("invalid op")
 	}
@@ -118,10 +114,10 @@ func (op *OpArea) decode(d []byte) {
 	}
 }
 
-func (op *OpArea) hit(pos f32.Point) hitResult {
-	res := hitOpaque
+func (op *OpArea) Hit(pos f32.Point) HitResult {
+	res := HitOpaque
 	if op.Transparent {
-		res = hitTransparent
+		res = HitTransparent
 	}
 	switch op.kind {
 	case areaRect:
@@ -129,7 +125,7 @@ func (op *OpArea) hit(pos f32.Point) hitResult {
 			0 <= pos.Y && pos.Y < float32(op.size.Y) {
 			return res
 		} else {
-			return hitNone
+			return HitNone
 		}
 	case areaEllipse:
 		rx := float32(op.size.X) / 2
@@ -141,7 +137,7 @@ func (op *OpArea) hit(pos f32.Point) hitResult {
 		if xh*xh*ry2+yk*yk*rx2 <= rx2*ry2 {
 			return res
 		} else {
-			return hitNone
+			return HitNone
 		}
 	default:
 		panic("invalid area kind")
@@ -206,4 +202,5 @@ func (s Source) String() string {
 	}
 }
 
-func (Event) ImplementsEvent() {}
+func (Event) ImplementsEvent()      {}
+func (Event) ImplementsInputEvent() {}

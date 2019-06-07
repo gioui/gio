@@ -9,6 +9,7 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
+	"gioui.org/ui/input"
 	"gioui.org/ui/pointer"
 )
 
@@ -80,9 +81,13 @@ func (c *Click) Add(ops *ui.Ops) {
 	op.Add(ops)
 }
 
-func (c *Click) Update(q pointer.Events) []ClickEvent {
+func (c *Click) Update(q input.Events) []ClickEvent {
 	var events []ClickEvent
 	for _, e := range q.For(c) {
+		e, ok := e.(pointer.Event)
+		if !ok {
+			continue
+		}
 		switch e.Type {
 		case pointer.Release:
 			if c.State == StatePressed {
@@ -124,13 +129,17 @@ func (s *Scroll) Dragging() bool {
 	return s.dragging
 }
 
-func (s *Scroll) Update(cfg *ui.Config, q pointer.Events, axis Axis) int {
+func (s *Scroll) Update(cfg *ui.Config, q input.Events, axis Axis) int {
 	if s.axis != axis {
 		s.axis = axis
 		return 0
 	}
 	total := 0
 	for _, e := range q.For(s) {
+		e, ok := e.(pointer.Event)
+		if !ok {
+			continue
+		}
 		switch e.Type {
 		case pointer.Press:
 			if s.dragging || e.Source != pointer.Touch {

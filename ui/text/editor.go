@@ -11,6 +11,7 @@ import (
 	"gioui.org/ui"
 	"gioui.org/ui/draw"
 	"gioui.org/ui/gesture"
+	"gioui.org/ui/input"
 	"gioui.org/ui/key"
 	"gioui.org/ui/layout"
 	"gioui.org/ui/pointer"
@@ -53,7 +54,7 @@ const (
 	maxBlinkDuration = 10 * time.Second
 )
 
-func (e *Editor) Update(c *ui.Config, pq pointer.Events, kq key.Events) {
+func (e *Editor) Update(c *ui.Config, q input.Events) {
 	if e.cfg == nil || c.PxPerDp != e.cfg.PxPerDp || c.PxPerSp != e.cfg.PxPerSp {
 		e.invalidate()
 	}
@@ -68,7 +69,7 @@ func (e *Editor) Update(c *ui.Config, pq pointer.Events, kq key.Events) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Update(c, pq, axis)
+	sdist := e.scroller.Update(c, q, axis)
 	var soff int
 	if e.SingleLine {
 		e.scrollOff.X += sdist
@@ -78,7 +79,7 @@ func (e *Editor) Update(c *ui.Config, pq pointer.Events, kq key.Events) {
 		soff = e.scrollOff.Y
 	}
 	scrollTo := false
-	for _, evt := range e.clicker.Update(pq) {
+	for _, evt := range e.clicker.Update(q) {
 		switch {
 		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
 			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
@@ -92,7 +93,7 @@ func (e *Editor) Update(c *ui.Config, pq pointer.Events, kq key.Events) {
 		}
 	}
 	stop := (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin)
-	for _, ke := range kq.For(e) {
+	for _, ke := range q.For(e) {
 		e.blinkStart = c.Now
 		switch ke := ke.(type) {
 		case key.Focus:

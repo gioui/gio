@@ -8,6 +8,7 @@ import (
 	"gioui.org/ui"
 	"gioui.org/ui/draw"
 	"gioui.org/ui/gesture"
+	"gioui.org/ui/input"
 	"gioui.org/ui/pointer"
 )
 
@@ -64,7 +65,7 @@ func (l *List) Dragging() bool {
 	return l.scroll.Dragging()
 }
 
-func (l *List) Update(c *ui.Config, q pointer.Events) {
+func (l *List) Update(c *ui.Config, q input.Events) {
 	l.Distance = 0
 	d := l.scroll.Update(c, q, gesture.Axis(l.Axis))
 	l.scrollDir = d

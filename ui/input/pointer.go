@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package pointer
+package input
 
 import (
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/internal/ops"
+	"gioui.org/ui/pointer"
 )
 
-type Queue struct {
+type pointerQueue struct {
 	hitTree  []hitNode
-	handlers map[Key]*handler
+	handlers map[Key]*pointerHandler
 	pointers []pointerInfo
 	reader   ui.OpsReader
 	scratch  []Key
@@ -25,22 +26,21 @@ type hitNode struct {
 }
 
 type pointerInfo struct {
-	id       ID
+	id       pointer.ID
 	pressed  bool
 	handlers []Key
 }
 
-type handler struct {
+type pointerHandler struct {
 	area      areaIntersection
 	active    bool
 	transform ui.Transform
-	events    []Event
 	wantsGrab bool
 }
 
 type area struct {
 	trans ui.Transform
-	area  OpArea
+	area  pointer.OpArea
 }
 
 type areaIntersection []area
@@ -51,7 +51,7 @@ type areaStack struct {
 	backing []area
 }
 
-func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int) {
+func (q *pointerQueue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int, events handlerEvents) {
 	for {
 		encOp, ok := r.Decode()
 		if !ok {
@@ -60,7 +60,7 @@ func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int) {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypePush:
 			q.areas.push()
-			q.collectHandlers(r, t, layer)
+			q.collectHandlers(r, t, layer, events)
 		case ops.TypePop:
 			q.areas.pop()
 			return
@@ -68,24 +68,22 @@ func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int) {
 			layer++
 			q.hitTree = append(q.hitTree, hitNode{level: layer})
 		case ops.TypeArea:
-			var op OpArea
-			op.decode(encOp.Data)
+			var op pointer.OpArea
+			op.Decode(encOp.Data)
 			q.areas.add(t, op)
 		case ops.TypeTransform:
 			var op ui.OpTransform
 			op.Decode(encOp.Data)
 			t = t.Mul(op.Transform)
 		case ops.TypePointerHandler:
-			var op OpHandler
+			var op pointer.OpHandler
 			op.Decode(encOp.Data, encOp.Refs)
 			q.hitTree = append(q.hitTree, hitNode{level: layer, key: op.Key})
 			h, ok := q.handlers[op.Key]
 			if !ok {
-				h = &handler{
-					// Reset the handler on (each) first appearance.
-					events: []Event{Event{Type: Cancel}},
-				}
+				h = new(pointerHandler)
 				q.handlers[op.Key] = h
+				events[op.Key] = []Event{pointer.Event{Type: pointer.Cancel}}
 			}
 			h.active = true
 			h.area = q.areas.intersection()
@@ -95,7 +93,7 @@ func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int) {
 	}
 }
 
-func (q *Queue) opHit(handlers *[]Key, pos f32.Point) {
+func (q *pointerQueue) opHit(handlers *[]Key, pos f32.Point) {
 	level := 1 << 30
 	opaque := false
 	for i := len(q.hitTree) - 1; i >= 0; i-- {
@@ -114,31 +112,30 @@ func (q *Queue) opHit(handlers *[]Key, pos f32.Point) {
 				continue
 			}
 			res := h.area.hit(pos)
-			opaque = opaque || res == hitOpaque
-			if res != hitNone {
+			opaque = opaque || res == pointer.HitOpaque
+			if res != pointer.HitNone {
 				*handlers = append(*handlers, n.key)
 			}
 		}
 	}
 }
 
-func (q *Queue) init() {
+func (q *pointerQueue) init() {
 	if q.handlers == nil {
-		q.handlers = make(map[Key]*handler)
+		q.handlers = make(map[Key]*pointerHandler)
 	}
 }
 
-func (q *Queue) Frame(root *ui.Ops) {
+func (q *pointerQueue) Frame(root *ui.Ops, events handlerEvents) {
 	q.init()
 	for _, h := range q.handlers {
 		// Reset handler.
 		h.active = false
-		h.events = h.events[:0]
 	}
 	q.hitTree = q.hitTree[:0]
 	q.areas.reset()
 	q.reader.Reset(root)
-	q.collectHandlers(&q.reader, ui.Transform{}, 0)
+	q.collectHandlers(&q.reader, ui.Transform{}, 0, events)
 	for k, h := range q.handlers {
 		if !h.active {
 			q.dropHandler(k)
@@ -146,18 +143,7 @@ func (q *Queue) Frame(root *ui.Ops) {
 	}
 }
 
-func (q *Queue) For(k Key) []Event {
-	if k == nil {
-		panic("nil handler")
-	}
-	h := q.handlers[k]
-	if h == nil {
-		return nil
-	}
-	return h.events
-}
-
-func (q *Queue) dropHandler(k Key) {
+func (q *pointerQueue) dropHandler(k Key) {
 	delete(q.handlers, k)
 	for i := range q.pointers {
 		p := &q.pointers[i]
@@ -169,9 +155,9 @@ func (q *Queue) dropHandler(k Key) {
 	}
 }
 
-func (q *Queue) Push(e Event) {
+func (q *pointerQueue) Push(e pointer.Event, events handlerEvents) {
 	q.init()
-	if e.Type == Cancel {
+	if e.Type == pointer.Cancel {
 		q.pointers = q.pointers[:0]
 		for k := range q.handlers {
 			q.dropHandler(k)
@@ -190,7 +176,7 @@ func (q *Queue) Push(e Event) {
 		pidx = len(q.pointers) - 1
 	}
 	p := &q.pointers[pidx]
-	if !p.pressed && (e.Type == Move || e.Type == Press) {
+	if !p.pressed && (e.Type == pointer.Move || e.Type == pointer.Press) {
 		p.handlers, q.scratch = q.scratch[:0], p.handlers
 		q.opHit(&p.handlers, e.Position)
 		// Drop handlers no longer hit.
@@ -203,7 +189,7 @@ func (q *Queue) Push(e Event) {
 			}
 			q.dropHandler(h)
 		}
-		if e.Type == Press {
+		if e.Type == pointer.Press {
 			p.pressed = true
 		}
 	}
@@ -223,7 +209,7 @@ func (q *Queue) Push(e Event) {
 			q.dropHandler(k)
 		}
 	}
-	if e.Type == Release {
+	if e.Type == pointer.Release {
 		q.pointers = append(q.pointers[:pidx], q.pointers[pidx+1:]...)
 	}
 	for i, k := range p.handlers {
@@ -231,14 +217,14 @@ func (q *Queue) Push(e Event) {
 		e := e
 		switch {
 		case p.pressed && len(p.handlers) == 1:
-			e.Priority = Grabbed
+			e.Priority = pointer.Grabbed
 		case i == 0:
-			e.Priority = Foremost
+			e.Priority = pointer.Foremost
 		}
-		e.Hit = h.area.hit(e.Position) != hitNone
+		e.Hit = h.area.hit(e.Position) != pointer.HitNone
 		e.Position = h.transform.InvTransform(e.Position)
-		h.events = append(h.events, e)
-		if e.Type == Release {
+		events[k] = append(events[k], e)
+		if e.Type == pointer.Release {
 			// Release grab when the number of grabs reaches zero.
 			grabs := 0
 			for _, p := range q.pointers {
@@ -253,19 +239,19 @@ func (q *Queue) Push(e Event) {
 	}
 }
 
-func (a areaIntersection) hit(p f32.Point) hitResult {
-	res := hitNone
+func (a areaIntersection) hit(p f32.Point) pointer.HitResult {
+	res := pointer.HitNone
 	for _, area := range a {
 		tp := area.trans.InvTransform(p)
-		res = area.area.hit(tp)
-		if res == hitNone {
+		res = area.area.Hit(tp)
+		if res == pointer.HitNone {
 			break
 		}
 	}
 	return res
 }
 
-func (s *areaStack) add(t ui.Transform, a OpArea) {
+func (s *areaStack) add(t ui.Transform, a pointer.OpArea) {
 	s.areas = append(s.areas, area{t, a})
 }
 
