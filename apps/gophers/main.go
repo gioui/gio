@@ -28,6 +28,7 @@ import (
 	gdraw "gioui.org/ui/draw"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/gesture"
+	"gioui.org/ui/input"
 	"gioui.org/ui/key"
 	"gioui.org/ui/layout"
 	"gioui.org/ui/measure"
@@ -51,8 +52,7 @@ type App struct {
 	cfg   *ui.Config
 	faces measure.Faces
 
-	pqueue *pointer.Queue
-	kqueue *key.Queue
+	queue *input.Queue
 
 	fab *ActionButton
 
@@ -176,10 +176,8 @@ func (a *App) run() error {
 			a.w.Redraw()
 		case e := <-a.w.Events():
 			switch e := e.(type) {
-			case pointer.Event:
-				a.pqueue.Push(e)
-			case key.Event:
-				a.kqueue.Push(e)
+			case input.Event:
+				a.queue.Add(e)
 				if e, ok := e.(key.Chord); ok {
 					switch e.Name {
 					case key.NameEscape:
@@ -234,8 +232,8 @@ func (a *App) run() error {
 					al.End(dims)
 				}
 				a.w.Draw(ops)
-				a.w.SetTextInput(a.kqueue.Frame(ops))
-				a.pqueue.Frame(ops)
+				a.queue.Frame(ops)
+				a.w.SetTextInput(a.queue.InputState())
 				a.faces.Frame()
 			}
 		}
@@ -247,8 +245,7 @@ func newApp(w *app.Window) *App {
 	a := &App{
 		w:           w,
 		updateUsers: make(chan []*user),
-		pqueue:      new(pointer.Queue),
-		kqueue:      new(key.Queue),
+		queue:       new(input.Queue),
 	}
 	a.usersList = &layout.List{Axis: layout.Vertical}
 	a.fab = &ActionButton{
@@ -385,7 +382,7 @@ func (a *App) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	if a.selectedUser == nil {
 		return a.layoutUsers(ops, cs)
 	} else {
-		a.selectedUser.Update(a.cfg, a.pqueue)
+		a.selectedUser.Update(a.cfg, a.queue)
 		return a.selectedUser.Layout(ops, cs)
 	}
 }
@@ -402,9 +399,9 @@ func newUserPage(ctx context.Context, user *user, redraw redrawer, faces measure
 	return up
 }
 
-func (up *userPage) Update(cfg *ui.Config, pqueue pointer.Events) {
+func (up *userPage) Update(cfg *ui.Config, queue input.Events) {
 	up.cfg = cfg
-	up.commitsList.Update(up.cfg, pqueue)
+	up.commitsList.Update(up.cfg, queue)
 }
 
 func (up *userPage) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
@@ -478,9 +475,9 @@ func (up *userPage) fetchCommits(ctx context.Context) {
 
 func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	c := a.cfg
-	a.fab.Update(c, a.pqueue)
-	a.edit.Update(c, a.pqueue, a.kqueue)
-	a.edit2.Update(c, a.pqueue, a.kqueue)
+	a.fab.Update(c, a.queue)
+	a.edit.Update(c, a.queue)
+	a.edit2.Update(c, a.queue)
 	st := layout.Stack{Alignment: layout.Center}
 	st.Init(ops, cs)
 	cs = st.Rigid()
@@ -538,7 +535,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	return st.Layout(c1, c2)
 }
 
-func (a *ActionButton) Update(c *ui.Config, q pointer.Events) {
+func (a *ActionButton) Update(c *ui.Config, q input.Events) {
 	a.cfg = c
 	a.btnsClicker.Update(q)
 	a.btnClicker.Update(q)
@@ -562,7 +559,7 @@ func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens 
 func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	c := a.cfg
 	l := a.usersList
-	l.Update(c, a.pqueue)
+	l.Update(c, a.queue)
 	if l.Dragging() {
 		key.OpHideInput{}.Add(ops)
 	}
@@ -581,7 +578,7 @@ func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dime
 func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) layout.Dimens {
 	u := a.users[index]
 	click := &a.userClicks[index]
-	for _, r := range click.Update(a.pqueue) {
+	for _, r := range click.Update(a.queue) {
 		if r.Type == gesture.TypeClick {
 			a.selectedUser = newUserPage(a.ctx, u, a.w.Redraw, a.faces)
 		}
