@@ -11,6 +11,7 @@ type Queue struct {
 	focus    Key
 	handlers map[Key]*handler
 	reader   ui.OpsReader
+	state    TextInputState
 }
 
 type handler struct {
@@ -27,7 +28,13 @@ const (
 	priNewFocus
 )
 
-func (q *Queue) Frame(root *ui.Ops) TextInputState {
+// InputState returns the last text input state as
+// determined in Frame.
+func (q *Queue) InputState() TextInputState {
+	return q.state
+}
+
+func (q *Queue) Frame(root *ui.Ops) {
 	if q.handlers == nil {
 		q.handlers = make(map[Key]*handler)
 	}
@@ -61,13 +68,13 @@ func (q *Queue) Frame(root *ui.Ops) TextInputState {
 	}
 	switch {
 	case pri == priNewFocus:
-		return TextInputOpen
+		q.state = TextInputOpen
 	case hide:
-		return TextInputClosed
+		q.state = TextInputClosed
 	case changed:
-		return TextInputFocus
+		q.state = TextInputFocus
 	default:
-		return TextInputKeep
+		q.state = TextInputKeep
 	}
 }
 
