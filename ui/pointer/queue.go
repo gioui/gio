@@ -81,9 +81,13 @@ func (q *Queue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer int) {
 			q.hitTree = append(q.hitTree, hitNode{level: layer, key: op.Key})
 			h, ok := q.handlers[op.Key]
 			if !ok {
-				h = new(handler)
+				h = &handler{
+					// Reset the handler on (each) first appearance.
+					events: []Event{Event{Type: Cancel}},
+				}
 				q.handlers[op.Key] = h
 			}
+			h.active = true
 			h.area = q.areas.intersection()
 			h.transform = t
 			h.wantsGrab = h.wantsGrab || op.Grab
@@ -126,36 +130,29 @@ func (q *Queue) init() {
 
 func (q *Queue) Frame(root *ui.Ops) {
 	q.init()
-	for k, h := range q.handlers {
-		if !h.active {
-			q.dropHandler(k)
-		} else {
-			// Reset handler.
-			h.events = h.events[:0]
-		}
+	for _, h := range q.handlers {
+		// Reset handler.
+		h.active = false
+		h.events = h.events[:0]
 	}
 	q.hitTree = q.hitTree[:0]
 	q.areas.reset()
 	q.reader.Reset(root)
 	q.collectHandlers(&q.reader, ui.Transform{}, 0)
+	for k, h := range q.handlers {
+		if !h.active {
+			q.dropHandler(k)
+		}
+	}
 }
 
 func (q *Queue) For(k Key) []Event {
 	if k == nil {
 		panic("nil handler")
 	}
-	q.init()
-	h, ok := q.handlers[k]
-	if !ok {
-		h = new(handler)
-		q.handlers[k] = h
-	}
-	if !h.active {
-		h.active = true
-		// Prepend a Cancel.
-		h.events = append(h.events, Event{})
-		copy(h.events[1:], h.events)
-		h.events[0] = Event{Type: Cancel}
+	h := q.handlers[k]
+	if h == nil {
+		return nil
 	}
 	return h.events
 }
