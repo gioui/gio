@@ -33,15 +33,16 @@ type errWriter struct {
 }
 
 var (
-	target    = flag.String("target", "", "specify target (ios or android)")
+	target    = flag.String("target", "", "specify target (ios, tvos, android)")
 	archNames = flag.String("arch", "", "specify architecture(s) to include")
-	destPath  = flag.String("o", "", "output file (for Android .aar) or directory (for iOS .framework)")
+	destPath  = flag.String("o", "", "output file (for Android .aar) or directory (for iOS/tvOS .framework)")
 	verbose   = flag.Bool("v", false, "verbose output")
 )
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [flags] <pkg>\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Gio is a tool for building and running gio programs.\n\n")
+		fmt.Fprintf(os.Stderr, "Usage:\n\n\tgio [flags] <pkg>\n\n")
 		flag.PrintDefaults()
 		os.Exit(2)
 	}
