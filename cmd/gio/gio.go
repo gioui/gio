@@ -3,9 +3,7 @@
 package main
 
 import (
-	"archive/zip"
 	"bytes"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -13,31 +11,24 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
-	"strconv"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
 )
 
-// zip.Writer with a sticky error.
-type zipWriter struct {
-	err error
-	w   *zip.Writer
-}
-
-// Writer that saves any errors.
-type errWriter struct {
-	w   io.Writer
-	err *error
-}
-
 var (
 	target    = flag.String("target", "", "specify target (ios, tvos, android)")
 	archNames = flag.String("arch", "", "specify architecture(s) to include")
-	destPath  = flag.String("o", "", "output file (for Android .aar) or directory (for iOS/tvOS .framework)")
+	buildMode = flag.String("buildmode", "archive", "specify buildmode: archive or exe")
+	destPath  = flag.String("o", "", "output file (Android .aar or .apk file) or directory (iOS/tvOS .framework)")
 	verbose   = flag.Bool("v", false, "verbose output")
 )
+
+type buildInfo struct {
+	pkg     string
+	ldflags string
+	archs   []string
+}
 
 func main() {
 	flag.Usage = func() {
@@ -56,6 +47,16 @@ func main() {
 		flag.PrintDefaults()
 		os.Exit(2)
 	}
+	switch *target {
+	case "ios", "tvos", "android":
+	default:
+		errorf("invalid -target %s\n", *target)
+	}
+	switch *buildMode {
+	case "archive", "exe":
+	default:
+		errorf("invalid -buildmode %s\n", *buildMode)
+	}
 	// Expand relative package paths.
 	out, err := exec.Command("go", "list", pkg).Output()
 	if err != nil {
@@ -64,49 +65,48 @@ func main() {
 		}
 		errorf("gio: failed to run the go tool: %v", err)
 	}
-	pkg = string(bytes.TrimSpace(out))
-	appArgs := flag.Args()[1:]
-	if err := run(pkg, appArgs); err != nil {
+	bi := &buildInfo{
+		pkg: string(bytes.TrimSpace(out)),
+	}
+	switch *target {
+	case "ios", "tvos":
+		// Only 64-bit support.
+		bi.archs = []string{"arm64", "amd64"}
+	case "android":
+		bi.archs = []string{"arm", "arm64", "386", "amd64"}
+	}
+	if *archNames != "" {
+		bi.archs = strings.Split(*archNames, ",")
+	}
+	if appArgs := flag.Args()[1:]; len(appArgs) > 0 {
+		// Pass along arguments to the app.
+		bi.ldflags = fmt.Sprintf("-X gioui.org/ui/app.extraArgs=%s", strings.Join(appArgs, "|"))
+	}
+	if err := build(bi); err != nil {
 		errorf("gio: %v", err)
 	}
 }
 
-func run(pkg string, appArgs []string) error {
+func build(bi *buildInfo) error {
 	tmpDir, err := ioutil.TempDir("", "gio-")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(tmpDir)
-	var ldflags string
-	if len(appArgs) > 0 {
-		// Pass along arguments to the app.
-		ldflags = fmt.Sprintf("-X gioui.org/ui/app.extraArgs=%s", strings.Join(appArgs, "|"))
-	}
-	var archs []string
 	switch *target {
 	case "ios", "tvos":
-		// Only 64-bit support.
-		archs = []string{"arm64", "amd64"}
+		return archiveIOS(tmpDir, *target, bi)
 	case "android":
-		archs = []string{"arm", "arm64", "386", "amd64"}
-	}
-	if *archNames != "" {
-		archs = strings.Split(*archNames, ",")
-	}
-	switch *target {
-	case "ios", "tvos":
-		return runIOS(tmpDir, *target, pkg, archs, ldflags)
-	case "android":
-		return runAndroid(tmpDir, pkg, archs, ldflags)
+		return buildAndroid(tmpDir, bi)
 	default:
-		return fmt.Errorf("invalid -target %s\n", *target)
+		panic("unreachable")
 	}
 }
 
-func runIOS(tmpDir, target, pkg string, archs []string, ldflags string) error {
+func archiveIOS(tmpDir, target string, bi *buildInfo) error {
 	frameworkRoot := *destPath
 	if frameworkRoot == "" {
-		appName := filepath.Base(pkg)
+		appName := filepath.Base(bi.pkg)
 		frameworkRoot = fmt.Sprintf("%s.framework", strings.Title(appName))
 	}
 	framework := filepath.Base(frameworkRoot)
@@ -139,7 +139,7 @@ func runIOS(tmpDir, target, pkg string, archs []string, ldflags string) error {
 	exe := filepath.Join(frameworkDir, framework)
 	lipo := exec.Command("xcrun", "lipo", "-o", exe, "-create")
 	var builds errgroup.Group
-	for _, a := range archs {
+	for _, a := range bi.archs {
 		arch := allArchs[a]
 		var platformSDK string
 		var platformOS string
@@ -175,11 +175,11 @@ func runIOS(tmpDir, target, pkg string, archs []string, ldflags string) error {
 		cmd := exec.Command(
 			"go",
 			"build",
-			"-ldflags=-s -w "+ldflags,
+			"-ldflags=-s -w "+bi.ldflags,
 			"-buildmode=c-archive",
 			"-o", lib,
 			"-tags", "ios",
-			pkg,
+			bi.pkg,
 		)
 		lipo.Args = append(lipo.Args, lib)
 		cmd.Env = append(
@@ -218,192 +218,6 @@ func runIOS(tmpDir, target, pkg string, archs []string, ldflags string) error {
 }`, framework)
 	moduleFile := filepath.Join(frameworkDir, "Modules", "module.modulemap")
 	return ioutil.WriteFile(moduleFile, []byte(module), 0644)
-}
-
-func runAndroid(tmpDir, pkg string, archs []string, ldflags string) (err error) {
-	androidHome := os.Getenv("ANDROID_HOME")
-	if androidHome == "" {
-		return errors.New("ANDROID_HOME is not set. Please point it to the root of the Android SDK.")
-	}
-	ndkRoot := filepath.Join(androidHome, "ndk-bundle")
-	if _, err := os.Stat(ndkRoot); err != nil {
-		return fmt.Errorf("No NDK found in $ANDROID_HOME/ndk-bundle (%s). Use `sdkmanager ndk-bundle` to install it.", ndkRoot)
-	}
-	tcRoot := filepath.Join(ndkRoot, "toolchains", "llvm", "prebuilt", archNDK())
-	sdk := os.Getenv("ANDROID_HOME")
-	if sdk == "" {
-		return errors.New("Please set ANDROID_HOME to the Android SDK path")
-	}
-	if _, err := os.Stat(sdk); err != nil {
-		return err
-	}
-	platform, err := latestPlatform(sdk)
-	if err != nil {
-		return err
-	}
-	var builds errgroup.Group
-	for _, a := range archs {
-		arch := allArchs[a]
-		clang := filepath.Join(tcRoot, "bin", arch.clang)
-		if _, err := os.Stat(clang); err != nil {
-			return fmt.Errorf("No NDK compiler found. Please make sure you have NDK >= r19c installed. Use the command `sdkmanager ndk-bundle` to install it. Path %s", clang)
-		}
-		if runtime.GOOS == "windows" {
-			// Because of https://github.com/android-ndk/ndk/issues/920,
-			// we need NDK r19c, not just r19b. Check for the presence of
-			// clang++.cmd which is only available in r19c.
-			clangpp := filepath.Join(tcRoot, "bin", arch.clang+"++.cmd")
-			if _, err := os.Stat(clangpp); err != nil {
-				return fmt.Errorf("NDK version r19b detected, but >= r19c is required. Use the command `sdkmanager ndk-bundle` to install it.")
-			}
-		}
-		archDir := filepath.Join(tmpDir, "jni", arch.jniArch)
-		if err := os.MkdirAll(archDir, 0755); err != nil {
-			return fmt.Errorf("failed to create %q: %v", archDir, err)
-		}
-		libFile := filepath.Join(archDir, "libgio.so")
-		cmd := exec.Command(
-			"go",
-			"build",
-			"-ldflags=-w -s "+ldflags,
-			"-buildmode=c-shared",
-			"-o", libFile,
-			pkg,
-		)
-		cmd.Env = append(
-			os.Environ(),
-			"GOOS=android",
-			"GOARCH="+a,
-			"CGO_ENABLED=1",
-			"CC="+clang,
-			"CGO_CFLAGS=-Werror",
-		)
-		builds.Go(func() error {
-			_, err := runCmd(cmd)
-			return err
-		})
-	}
-	if err := builds.Wait(); err != nil {
-		return err
-	}
-	aarFile := *destPath
-	if aarFile == "" {
-		aarFile = fmt.Sprintf("%s.aar", filepath.Base(pkg))
-	}
-	if filepath.Ext(aarFile) != ".aar" {
-		return fmt.Errorf("the specified output %q does not end in '.aar'", aarFile)
-	}
-	aar, err := os.Create(aarFile)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if cerr := aar.Close(); err == nil {
-			err = cerr
-		}
-	}()
-	aarw := newZipWriter(aar)
-	defer aarw.Close()
-	aarw.Create("R.txt")
-	aarw.Create("res/")
-	manifest := aarw.Create("AndroidManifest.xml")
-	manifest.Write([]byte(`<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.gioui.app">
-	<uses-sdk android:minSdkVersion="16"/>
-	<uses-feature android:glEsVersion="0x00030000" android:required="true" />
-</manifest>`))
-	proguard := aarw.Create("proguard.txt")
-	proguard.Write([]byte(`-keep class org.gioui.** { *; }`))
-
-	for _, a := range archs {
-		arch := allArchs[a]
-		libFile := filepath.Join("jni", arch.jniArch, "libgio.so")
-		aarw.Add(filepath.ToSlash(libFile), filepath.Join(tmpDir, libFile))
-	}
-	appDir, err := appDir()
-	if err != nil {
-		return err
-	}
-	javaFiles, err := filepath.Glob(filepath.Join(appDir, "*.java"))
-	if err != nil {
-		return err
-	}
-	if len(javaFiles) > 0 {
-		clsPath := filepath.Join(platform, "android.jar")
-		classes := filepath.Join(tmpDir, "classes")
-		if err := os.MkdirAll(classes, 0755); err != nil {
-			return err
-		}
-		javac := exec.Command(
-			"javac",
-			"-target", "1.8",
-			"-source", "1.8",
-			"-sourcepath", appDir,
-			"-bootclasspath", clsPath,
-			"-d", classes,
-		)
-		javac.Args = append(javac.Args, javaFiles...)
-		if _, err := runCmd(javac); err != nil {
-			return err
-		}
-		jarFile := filepath.Join(tmpDir, "classes.jar")
-		if err := writeJar(jarFile, classes); err != nil {
-			return err
-		}
-		aarw.Add("classes.jar", jarFile)
-	}
-	return aarw.Close()
-}
-
-func newZipWriter(w io.Writer) *zipWriter {
-	return &zipWriter{
-		w: zip.NewWriter(w),
-	}
-}
-
-func (z *zipWriter) Close() error {
-	err := z.w.Close()
-	if z.err == nil {
-		z.err = err
-	}
-	return z.err
-}
-
-func (z *zipWriter) Create(name string) io.Writer {
-	if z.err != nil {
-		return ioutil.Discard
-	}
-	w, err := z.w.Create(name)
-	if err != nil {
-		z.err = err
-		return ioutil.Discard
-	}
-	return &errWriter{w: w, err: &z.err}
-}
-
-func (z *zipWriter) Add(name, file string) {
-	if z.err != nil {
-		return
-	}
-	w := z.Create(name)
-	f, err := os.Open(file)
-	if err != nil {
-		z.err = err
-		return
-	}
-	defer f.Close()
-	if _, err := io.Copy(w, f); err != nil {
-		z.err = err
-		return
-	}
-}
-
-func (w *errWriter) Write(p []byte) (n int, err error) {
-	if err := *w.err; err != nil {
-		return 0, err
-	}
-	n, err = w.w.Write(p)
-	*w.err = err
-	return
 }
 
 func errorf(format string, args ...interface{}) {
@@ -446,51 +260,12 @@ func copyFile(dst, src string) (err error) {
 
 func appDir() (string, error) {
 	cmd := exec.Command("go", "list", "-f", "{{.Dir}}", "gioui.org/ui/app")
-	cmd.Env = append(
-		os.Environ(),
-		"GOOS=android",
-	)
 	out, err := runCmd(cmd)
 	if err != nil {
 		return "", err
 	}
 	appDir := string(bytes.TrimSpace(out))
 	return appDir, nil
-}
-
-func writeJar(jarFile, dir string) (err error) {
-	jar, err := os.Create(jarFile)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if cerr := jar.Close(); err == nil {
-			err = cerr
-		}
-	}()
-	jarw := newZipWriter(jar)
-	const manifestHeader = `Manifest-Version: 1.0
-Created-By: 1.0 (Go)
-
-`
-	jarw.Create("META-INF/MANIFEST.MF").Write([]byte(manifestHeader))
-	err = filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if f.IsDir() {
-			return nil
-		}
-		if filepath.Ext(path) == ".class" {
-			rel := filepath.ToSlash(path[len(dir)+1:])
-			jarw.Add(rel, path)
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	return jarw.Close()
 }
 
 type arch struct {
@@ -520,48 +295,4 @@ var allArchs = map[string]arch{
 		jniArch: "x86_64",
 		clang:   "x86_64-linux-android21-clang",
 	},
-}
-
-func archNDK() string {
-	if runtime.GOOS == "windows" && runtime.GOARCH == "386" {
-		return "windows"
-	} else {
-		var arch string
-		switch runtime.GOARCH {
-		case "386":
-			arch = "x86"
-		case "amd64":
-			arch = "x86_64"
-		default:
-			panic("unsupported GOARCH: " + runtime.GOARCH)
-		}
-		return runtime.GOOS + "-" + arch
-	}
-}
-
-func latestPlatform(sdk string) (string, error) {
-	allPlats, err := filepath.Glob(filepath.Join(sdk, "platforms", "android-*"))
-	if err != nil {
-		return "", err
-	}
-	var bestVer int
-	var bestPlat string
-	for _, platform := range allPlats {
-		_, name := filepath.Split(platform)
-		// The glob above guarantees the "android-" prefix.
-		verStr := name[len("android-"):]
-		ver, err := strconv.Atoi(verStr)
-		if err != nil {
-			continue
-		}
-		if ver < bestVer {
-			continue
-		}
-		bestVer = ver
-		bestPlat = platform
-	}
-	if bestPlat == "" {
-		return "", fmt.Errorf("no platforms found in %q", sdk)
-	}
-	return bestPlat, nil
 }
