@@ -131,7 +131,7 @@ func (o *Ops) End() OpBlock {
 	return OpBlock{ops: &o.ops, pc: start, version: o.ops.version}
 }
 
-// Reset clears the Ops.
+// Reset the Ops, preparing it for re-use.
 func (o *Ops) Reset() {
 	o.inAux = false
 	o.stack = o.stack[:0]
