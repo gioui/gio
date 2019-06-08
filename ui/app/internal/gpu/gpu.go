@@ -32,6 +32,7 @@ type GPU struct {
 	results    chan frameResult
 	refresh    chan struct{}
 	refreshErr chan error
+	ack        chan struct{}
 	stop       chan struct{}
 	stopped    chan struct{}
 	ops        drawOps
@@ -90,6 +91,7 @@ type pathOp struct {
 	// later clip rectangles.
 	clip      image.Rectangle
 	pathKey   ui.OpKey
+	path      bool
 	pathVerts []byte
 	parent    *pathOp
 	place     placement
@@ -190,6 +192,7 @@ func NewGPU(ctx gl.Context) (*GPU, error) {
 		results:    make(chan frameResult),
 		refresh:    make(chan struct{}),
 		refreshErr: make(chan error),
+		ack:        make(chan struct{}),
 		stop:       make(chan struct{}),
 		stopped:    make(chan struct{}),
 		pathCache:  newOpCache(),
@@ -243,6 +246,16 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 					defer timers.release()
 				}
 				ops := frame.ops
+				// Upload path data to GPU before ack'ing the frame data for re-use.
+				for _, p := range ops.pathOps {
+					data, exists := g.pathCache.get(p.pathKey)
+					if !exists {
+						data = buildPath(r.ctx, p.pathVerts)
+						g.pathCache.put(p.pathKey, data)
+					}
+					p.pathVerts = nil
+				}
+				g.ack <- struct{}{}
 				r.blitter.viewport = frame.viewport
 				r.pather.viewport = frame.viewport
 				for _, img := range ops.imageOps {
@@ -338,6 +351,7 @@ func (g *GPU) Draw(profile bool, viewport image.Point, root *ui.Ops) {
 	g.ops.reset(g.cache, viewport)
 	g.ops.collect(g.cache, root, viewport)
 	g.frames <- frame{profile, viewport, g.ops}
+	<-g.ack
 	g.drawing = true
 }
 
@@ -466,11 +480,7 @@ func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
 			bindFramebuffer(r.ctx, f.fbo)
 			r.ctx.Clear(gl.COLOR_BUFFER_BIT)
 		}
-		data, exists := pathCache.get(p.pathKey)
-		if !exists {
-			data = buildPath(r.ctx, p.pathVerts)
-			pathCache.put(p.pathKey, data)
-		}
+		data, _ := pathCache.get(p.pathKey)
 		r.pather.stencilPath(p.clip, p.off, p.place.Pos, data.(*pathData))
 	}
 	r.pather.end()
@@ -509,7 +519,7 @@ func (r *renderer) intersectPath(p *pathOp, clip image.Rectangle) {
 	if p.parent != nil {
 		r.intersectPath(p.parent, clip)
 	}
-	if len(p.pathVerts) == 0 {
+	if !p.path {
 		return
 	}
 	o := p.place.Pos.Add(clip.Min).Sub(p.clip.Min)
@@ -531,7 +541,7 @@ func (r *renderer) packIntersections(ops []imageOp) {
 		var npaths int
 		var onePath *pathOp
 		for p := img.path; p != nil; p = p.parent {
-			if len(p.pathVerts) > 0 {
+			if p.path {
 				onePath = p
 				npaths++
 			}
@@ -679,6 +689,7 @@ loop:
 			if len(aux) > 0 {
 				state.rect = false
 				state.cpath.pathKey = auxKey
+				state.cpath.path = true
 				state.cpath.pathVerts = aux
 				d.pathOps = append(d.pathOps, state.cpath)
 			}
