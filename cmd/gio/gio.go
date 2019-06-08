@@ -10,10 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
-
-	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -21,6 +18,7 @@ var (
 	archNames = flag.String("arch", "", "specify architecture(s) to include")
 	buildMode = flag.String("buildmode", "archive", "specify buildmode: archive or exe")
 	destPath  = flag.String("o", "", "output file (Android .aar or .apk file) or directory (iOS/tvOS .framework)")
+	appID     = flag.String("appid", "org.gioui.app", "app identifier (for -buildmode=exe)")
 	verbose   = flag.Bool("v", false, "verbose output")
 )
 
@@ -92,7 +90,7 @@ func build(bi *buildInfo) error {
 	defer os.RemoveAll(tmpDir)
 	switch *target {
 	case "ios", "tvos":
-		return archiveIOS(tmpDir, *target, bi)
+		return buildIOS(tmpDir, *target, bi)
 	case "android":
 		return buildAndroid(tmpDir, bi)
 	default:
@@ -100,140 +98,28 @@ func build(bi *buildInfo) error {
 	}
 }
 
-func archiveIOS(tmpDir, target string, bi *buildInfo) error {
-	frameworkRoot := *destPath
-	if frameworkRoot == "" {
-		appName := filepath.Base(bi.pkg)
-		frameworkRoot = fmt.Sprintf("%s.framework", strings.Title(appName))
-	}
-	framework := filepath.Base(frameworkRoot)
-	suf := ".framework"
-	if !strings.HasSuffix(framework, suf) {
-		return fmt.Errorf("the specified output %q does not end in '.framework'", frameworkRoot)
-	}
-	framework = framework[:len(framework)-len(suf)]
-	if err := os.RemoveAll(frameworkRoot); err != nil {
-		return err
-	}
-	frameworkDir := filepath.Join(frameworkRoot, "Versions", "A")
-	for _, dir := range []string{"Headers", "Modules"} {
-		p := filepath.Join(frameworkDir, dir)
-		if err := os.MkdirAll(p, 0755); err != nil {
-			return err
-		}
-	}
-	symlinks := [][2]string{
-		{"Versions/Current/Headers", "Headers"},
-		{"Versions/Current/Modules", "Modules"},
-		{"Versions/Current/" + framework, framework},
-		{"A", filepath.Join("Versions", "Current")},
-	}
-	for _, l := range symlinks {
-		if err := os.Symlink(l[0], filepath.Join(frameworkRoot, l[1])); err != nil && !os.IsExist(err) {
-			return err
-		}
-	}
-	exe := filepath.Join(frameworkDir, framework)
-	lipo := exec.Command("xcrun", "lipo", "-o", exe, "-create")
-	var builds errgroup.Group
-	for _, a := range bi.archs {
-		arch := allArchs[a]
-		var platformSDK string
-		var platformOS string
-		switch target {
-		case "ios":
-			platformOS = "ios"
-			platformSDK = "iphone"
-		case "tvos":
-			platformOS = "tvos"
-			platformSDK = "appletv"
-		}
-		switch a {
-		case "arm", "arm64":
-			platformSDK += "os"
-		case "386", "amd64":
-			platformOS += "-simulator"
-			platformSDK += "simulator"
-		default:
-			return fmt.Errorf("unsupported -arch: %s", a)
-		}
-		sdkPathOut, err := runCmd(exec.Command("xcrun", "--sdk", platformSDK, "--show-sdk-path"))
-		if err != nil {
-			return err
-		}
-		sdkPath := string(bytes.TrimSpace(sdkPathOut))
-		clangOut, err := runCmd(exec.Command("xcrun", "--sdk", platformSDK, "--find", "clang"))
-		if err != nil {
-			return err
-		}
-		clang := string(bytes.TrimSpace(clangOut))
-		cflags := fmt.Sprintf("-fmodules -fobjc-arc -fembed-bitcode -Werror -arch %s -isysroot %s -m%s-version-min=9.0", arch.iosArch, sdkPath, platformOS)
-		lib := filepath.Join(tmpDir, "gio-"+a)
-		cmd := exec.Command(
-			"go",
-			"build",
-			"-ldflags=-s -w "+bi.ldflags,
-			"-buildmode=c-archive",
-			"-o", lib,
-			"-tags", "ios",
-			bi.pkg,
-		)
-		lipo.Args = append(lipo.Args, lib)
-		cmd.Env = append(
-			os.Environ(),
-			"GOOS=darwin",
-			"GOARCH="+a,
-			"CGO_ENABLED=1",
-			"CC="+clang,
-			"CGO_CFLAGS="+cflags,
-			"CGO_LDFLAGS="+cflags,
-		)
-		builds.Go(func() error {
-			_, err := runCmd(cmd)
-			return err
-		})
-	}
-	if err := builds.Wait(); err != nil {
-		return err
-	}
-	if _, err := runCmd(lipo); err != nil {
-		return err
-	}
-	appDir, err := appDir()
-	if err != nil {
-		return err
-	}
-	headerDst := filepath.Join(frameworkDir, "Headers", framework+".h")
-	headerSrc := filepath.Join(appDir, "framework_ios.h")
-	if err := copyFile(headerDst, headerSrc); err != nil {
-		return err
-	}
-	module := fmt.Sprintf(`framework module "%s" {
-    header "%[1]s.h"
-
-    export *
-}`, framework)
-	moduleFile := filepath.Join(frameworkDir, "Modules", "module.modulemap")
-	return ioutil.WriteFile(moduleFile, []byte(module), 0644)
-}
-
 func errorf(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, format+"\n", args...)
 	os.Exit(2)
 }
 
-func runCmd(cmd *exec.Cmd) (string, error) {
+func runCmdRaw(cmd *exec.Cmd) ([]byte, error) {
 	if *verbose {
 		fmt.Printf("%s\n", strings.Join(cmd.Args, " "))
 	}
 	out, err := cmd.Output()
 	if err == nil {
-		return string(bytes.TrimSpace(out)), nil
+		return out, nil
 	}
 	if err, ok := err.(*exec.ExitError); ok {
-		return "", fmt.Errorf("%s failed: %s%s", strings.Join(cmd.Args, " "), out, err.Stderr)
+		return nil, fmt.Errorf("%s failed: %s%s", strings.Join(cmd.Args, " "), out, err.Stderr)
 	}
-	return "", err
+	return nil, err
+}
+
+func runCmd(cmd *exec.Cmd) (string, error) {
+	out, err := runCmdRaw(cmd)
+	return string(bytes.TrimSpace(out)), err
 }
 
 func copyFile(dst, src string) (err error) {
