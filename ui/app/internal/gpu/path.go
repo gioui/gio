@@ -503,7 +503,10 @@ void main() {
 	// around dy = 0. Scale slope with extent width.
 	float areav = abs(dy*width)/16.0;
 	// Look up coverage from y and slope and scale to extent.
-	gl_FragColor.r = texture2D(areaLUT, vec2(areau, areav)).r*width;
+	float cover = texture2D(areaLUT, vec2(areau, areav)).r*width;
+	if (width == 0.0)
+		cover = 0.0; // Needed on the iOS simulator.
+	gl_FragColor.r = cover;
 }
 `
 
