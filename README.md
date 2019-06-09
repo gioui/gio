@@ -60,7 +60,7 @@ To build a Gio program as an .aar package, use the gio tool. For example,
 	$ go run gioui.org/cmd/gio -target android gioui.org/apps/gophers
 
 produces gophers.aar, ready to use in an Android project. To run
-the demo on an Android device, use -buildmode=exe:
+a Gio program on an Android device or emulator, use -buildmode=exe:
 
 	$ go run gioui.org/cmd/gio -buildmode exe -target android gioui.org/apps/gophers
 
@@ -86,15 +86,25 @@ outputs Gophers.framework with the demo program built for iOS. For tvOS, use `-t
 
 Building for tvOS requires (the not yet released) Go 1.13.
 
-To run the demo on an iOS device, use -buildmode=exe:
+To run a Gio program on an iOS device, use -buildmode=exe:
 
 	$ go run gioui.org/cmd/gio -buildmode exe -target ios -appid <bundle-id> gioui.org/apps/gophers
 
 where <bundle-id> is a valid bundle identifier previously provisioned in Xcode for your device.
-Use the Window=>Devices and Simulators to install the ipa file to the device or use
-[ideviceinstaller](https://github.com/libimobiledevice/ideviceinstaller):
+
+Use the Window=>Devices and Simulators option on Xcode to install the ipa file to the device.
+If you have [ideviceinstaller](https://github.com/libimobiledevice/ideviceinstaller) installed,
+you can install the app directly to your device:
 
 	$ ideviceinstaller -i gophers.ipa
+
+To run a program on a running simulator, use the -o flag with a .app directory:
+
+	$ go run gioui.org/cmd/gio/ -o gophers.app -buildmode=exe -target ios gioui.org/apps/gophers
+
+Install the app with simctl:
+
+	$ xcrun simctl install booted gophers.app
 
 ## Webassembly/WebGL
 
