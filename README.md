@@ -153,7 +153,7 @@ With `git send-email` configured, you can clone the project and set it up for su
 
 Configure your name and email address if you have not done so already:
 
-	$ git config --global user.email "you@gmail.com"
+	$ git config --global user.email "you@example.com"
 	$ git config --global user.name "Your Name"
 
 Contributors must agree to the [developer certificate of origin](https://developercertificate.org/),
