@@ -58,15 +58,12 @@ func main() {
 		errorf("invalid -buildmode %s\n", *buildMode)
 	}
 	// Expand relative package paths.
-	out, err := exec.Command("go", "list", pkg).Output()
+	pkg, err := runCmd(exec.Command("go", "list", pkg))
 	if err != nil {
-		if err, ok := err.(*exec.ExitError); ok {
-			errorf("gio: %s", bytes.TrimSpace(err.Stderr))
-		}
-		errorf("gio: failed to run the go tool: %v", err)
+		errorf("gio: %v", err)
 	}
 	bi := &buildInfo{
-		pkg: string(bytes.TrimSpace(out)),
+		pkg: pkg,
 	}
 	switch *target {
 	case "ios", "tvos":
@@ -225,18 +222,18 @@ func errorf(format string, args ...interface{}) {
 	os.Exit(2)
 }
 
-func runCmd(cmd *exec.Cmd) ([]byte, error) {
+func runCmd(cmd *exec.Cmd) (string, error) {
 	if *verbose {
 		fmt.Printf("%s\n", strings.Join(cmd.Args, " "))
 	}
 	out, err := cmd.Output()
 	if err == nil {
-		return out, nil
+		return string(bytes.TrimSpace(out)), nil
 	}
 	if err, ok := err.(*exec.ExitError); ok {
-		return nil, fmt.Errorf("%s failed: %s%s", strings.Join(cmd.Args, " "), out, err.Stderr)
+		return "", fmt.Errorf("%s failed: %s%s", strings.Join(cmd.Args, " "), out, err.Stderr)
 	}
-	return nil, err
+	return "", err
 }
 
 func copyFile(dst, src string) (err error) {
@@ -260,12 +257,7 @@ func copyFile(dst, src string) (err error) {
 
 func appDir() (string, error) {
 	cmd := exec.Command("go", "list", "-f", "{{.Dir}}", "gioui.org/ui/app")
-	out, err := runCmd(cmd)
-	if err != nil {
-		return "", err
-	}
-	appDir := string(bytes.TrimSpace(out))
-	return appDir, nil
+	return runCmd(cmd)
 }
 
 type arch struct {
