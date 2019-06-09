@@ -325,17 +325,15 @@ func signAPK(tmpDir string, tools *androidTools, bi *buildInfo) error {
 		return err
 	}
 	keystore := filepath.Join(home, ".android", "debug.keystore")
-	if _, err := os.Stat(keystore); err == nil {
-		_, err = runCmd(exec.Command(
-			filepath.Join(tools.buildtools, "apksigner"),
-			"sign",
-			"--ks-pass", "pass:android",
-			"--ks", keystore,
-			apkFile,
-		))
-		if err != nil {
-			return err
-		}
+	_, err = runCmd(exec.Command(
+		filepath.Join(tools.buildtools, "apksigner"),
+		"sign",
+		"--ks-pass", "pass:android",
+		"--ks", keystore,
+		apkFile,
+	))
+	if err != nil {
+		return err
 	}
 	return nil
 }
