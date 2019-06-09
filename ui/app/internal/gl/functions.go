@@ -336,15 +336,10 @@ func (f *Functions) GetProgrami(p Program, pname Enum) int {
 }
 
 func (f *Functions) GetProgramInfoLog(p Program) string {
-	var plen C.GLsizei
-	C.glGetProgramInfoLog(C.GLuint(p.V), 0, &plen, nil)
-	if plen == 0 {
-		return ""
-	}
-	// Make room for the string and the null terminator.
-	buf := make([]byte, plen+1)
-	C.glGetProgramInfoLog(C.GLuint(p.V), C.GLsizei(len(buf)), &plen, (*C.GLchar)(unsafe.Pointer(&buf[0])))
-	return string(buf[:len(buf)-1])
+	n := f.GetProgrami(p, INFO_LOG_LENGTH)
+	buf := make([]byte, n)
+	C.glGetProgramInfoLog(C.GLuint(p.V), C.GLsizei(len(buf)), nil, (*C.GLchar)(unsafe.Pointer(&buf[0])))
+	return string(buf)
 }
 
 func (f *Functions) GetQueryObjectuiv(query Query, pname Enum) uint {
@@ -358,15 +353,10 @@ func (f *Functions) GetShaderi(s Shader, pname Enum) int {
 }
 
 func (f *Functions) GetShaderInfoLog(s Shader) string {
-	var plen C.GLsizei
-	C.glGetShaderInfoLog(C.GLuint(s.V), 0, &plen, nil)
-	if plen == 0 {
-		return ""
-	}
-	// Make room for the string and the null terminator.
-	buf := make([]byte, plen+1)
-	C.glGetShaderInfoLog(C.GLuint(s.V), C.GLsizei(len(buf)), &plen, (*C.GLchar)(unsafe.Pointer(&buf[0])))
-	return string(buf[:len(buf)-1])
+	n := f.GetShaderi(s, INFO_LOG_LENGTH)
+	buf := make([]byte, n)
+	C.glGetShaderInfoLog(C.GLuint(s.V), C.GLsizei(len(buf)), nil, (*C.GLchar)(unsafe.Pointer(&buf[0])))
+	return string(buf)
 }
 
 func (f *Functions) GetString(pname Enum) string {

@@ -263,15 +263,10 @@ func (c *Functions) GetProgrami(p Program, pname Enum) int {
 	return int(c.int32s[0])
 }
 func (c *Functions) GetProgramInfoLog(p Program) string {
-	var n uintptr
-	syscall.Syscall6(_glGetProgramInfoLog.Addr(), 4, uintptr(p.V), 0, uintptr(unsafe.Pointer(&n)), 0, 0, 0)
-	if n == 0 {
-		return ""
-	}
-	// Make space for the null terminator.
-	buf := make([]byte, n+1)
-	syscall.Syscall6(_glGetProgramInfoLog.Addr(), 4, uintptr(p.V), uintptr(len(buf)), uintptr(unsafe.Pointer(&n)), uintptr(unsafe.Pointer(&buf[0])), 0, 0)
-	return string(buf[:len(buf)-1])
+	n := c.GetProgrami(p, INFO_LOG_LENGTH)
+	buf := make([]byte, n)
+	syscall.Syscall6(_glGetProgramInfoLog.Addr(), 4, uintptr(p.V), uintptr(len(buf)), 0, uintptr(unsafe.Pointer(&buf[0])), 0, 0)
+	return string(buf)
 }
 func (c *Functions) GetQueryObjectuiv(query Query, pname Enum) uint {
 	syscall.Syscall(_glGetQueryObjectuiv.Addr(), 3, uintptr(query.V), uintptr(pname), uintptr(unsafe.Pointer(&c.int32s[0])))
@@ -282,15 +277,10 @@ func (c *Functions) GetShaderi(s Shader, pname Enum) int {
 	return int(c.int32s[0])
 }
 func (c *Functions) GetShaderInfoLog(s Shader) string {
-	var n uintptr
-	syscall.Syscall6(_glGetShaderInfoLog.Addr(), 4, uintptr(s.V), 0, uintptr(unsafe.Pointer(&n)), 0, 0, 0)
-	if n == 0 {
-		return ""
-	}
-	// Make space for the null terminator.
-	buf := make([]byte, n+1)
-	syscall.Syscall6(_glGetShaderInfoLog.Addr(), 4, uintptr(s.V), uintptr(len(buf)), uintptr(unsafe.Pointer(&n)), uintptr(unsafe.Pointer(&buf[0])), 0, 0)
-	return string(buf[:len(buf)-1])
+	n := c.GetShaderi(s, INFO_LOG_LENGTH)
+	buf := make([]byte, n)
+	syscall.Syscall6(_glGetShaderInfoLog.Addr(), 4, uintptr(s.V), uintptr(len(buf)), 0, uintptr(unsafe.Pointer(&buf[0])), 0, 0)
+	return string(buf)
 }
 func (c *Functions) GetString(pname Enum) string {
 	s, _, _ := syscall.Syscall(_glGetString.Addr(), 1, uintptr(pname), 0, 0)
