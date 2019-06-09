@@ -14,10 +14,10 @@ import (
 )
 
 var (
-	target    = flag.String("target", "", "specify target (ios, tvos, android)")
+	target    = flag.String("target", "", "specify target (ios, tvos, android, js)")
 	archNames = flag.String("arch", "", "specify architecture(s) to include")
 	buildMode = flag.String("buildmode", "archive", "specify buildmode: archive or exe")
-	destPath  = flag.String("o", "", "output file (Android .aar or .apk file) or directory (iOS/tvOS .framework)")
+	destPath  = flag.String("o", "", "output file (Android .aar or .apk file) or directory (iOS/tvOS .framework or webassembly files)")
 	appID     = flag.String("appid", "org.gioui.app", "app identifier (for -buildmode=exe)")
 	verbose   = flag.Bool("v", false, "verbose output")
 )
@@ -46,7 +46,7 @@ func main() {
 		os.Exit(2)
 	}
 	switch *target {
-	case "ios", "tvos", "android":
+	case "ios", "tvos", "android", "js":
 	default:
 		errorf("invalid -target %s\n", *target)
 	}
@@ -64,6 +64,8 @@ func main() {
 		pkg: pkg,
 	}
 	switch *target {
+	case "js":
+		bi.archs = []string{"wasm"}
 	case "ios", "tvos":
 		// Only 64-bit support.
 		bi.archs = []string{"arm64", "amd64"}
@@ -89,6 +91,8 @@ func build(bi *buildInfo) error {
 	}
 	defer os.RemoveAll(tmpDir)
 	switch *target {
+	case "js":
+		return buildJS(bi)
 	case "ios", "tvos":
 		return buildIOS(tmpDir, *target, bi)
 	case "android":
