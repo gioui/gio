@@ -48,7 +48,6 @@ type stenciler struct {
 	uIntersectUVOffset gl.Uniform
 	uIntersectUVScale  gl.Uniform
 	indexBuf           gl.Buffer
-	areaLUT            gl.Texture
 }
 
 type fboSet struct {
@@ -122,13 +121,7 @@ func newStenciler(ctx *context) *stenciler {
 	if err != nil {
 		panic(err)
 	}
-	uAreaLUT := gl.GetUniformLocation(ctx.Functions, prog, "areaLUT")
 	ctx.UseProgram(prog)
-	ctx.Uniform1i(uAreaLUT, 0)
-	areaLUT, err := loadLUT(ctx, genAreaLUT(256, 256))
-	if err != nil {
-		panic(err)
-	}
 	iprog, err := gl.CreateProgram(ctx.Functions, intersectVSrc, intersectFSrc, intersectAttribs)
 	if err != nil {
 		panic(err)
@@ -141,7 +134,6 @@ func newStenciler(ctx *context) *stenciler {
 		defFBO:             defFBO,
 		prog:               prog,
 		iprog:              iprog,
-		areaLUT:            areaLUT,
 		uScale:             gl.GetUniformLocation(ctx.Functions, prog, "scale"),
 		uOffset:            gl.GetUniformLocation(ctx.Functions, prog, "offset"),
 		uPathOffset:        gl.GetUniformLocation(ctx.Functions, prog, "pathOffset"),
@@ -205,7 +197,6 @@ func (s *fboSet) delete(ctx *context, idx int) {
 
 func (s *stenciler) release() {
 	s.fbos.delete(s.ctx, 0)
-	s.ctx.DeleteTexture(s.areaLUT)
 	s.ctx.DeleteProgram(s.prog)
 	s.ctx.DeleteBuffer(s.indexBuf)
 }
@@ -281,7 +272,6 @@ func (s *stenciler) begin(sizes []image.Point) {
 	s.ctx.BlendFunc(gl.ONE, gl.ONE)
 	s.fbos.resize(s.ctx, sizes)
 	s.ctx.ClearColor(0.0, 0.0, 0.0, 0.0)
-	s.ctx.BindTexture(gl.TEXTURE_2D, s.areaLUT)
 	s.ctx.UseProgram(s.prog)
 	s.ctx.EnableVertexAttribArray(attribPathCorner)
 	s.ctx.EnableVertexAttribArray(attribPathMaxY)
@@ -363,23 +353,6 @@ func (c *coverer) cover(z float32, mat materialType, col [4]float32, scale, off,
 	c.ctx.Uniform2f(c.vars[mat].uCoverUVScale, coverScale.X, coverScale.Y)
 	c.ctx.Uniform2f(c.vars[mat].uCoverUVOffset, coverOff.X, coverOff.Y)
 	c.ctx.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
-}
-
-func loadLUT(ctx *context, lut *image.Gray) (gl.Texture, error) {
-	tex := ctx.CreateTexture()
-	ctx.BindTexture(gl.TEXTURE_2D, tex)
-	ctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-	ctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-	ctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-	ctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-	ctx.PixelStorei(gl.UNPACK_ALIGNMENT, 1)
-	if lut.Stride != lut.Bounds().Dx() {
-		panic("unsupported LUT stride")
-	}
-	tt := ctx.caps.alphaTriple
-	ctx.TexImage2D(gl.TEXTURE_2D, 0, tt.internalFormat, lut.Bounds().Dx(), lut.Bounds().Dy(), tt.format, tt.typ, lut.Pix)
-	ctx.PixelStorei(gl.UNPACK_ALIGNMENT, 4)
-	return tex, nil
 }
 
 const stencilVSrc = `
@@ -494,19 +467,20 @@ void main() {
 	// And the slope.
 	vec2 d_half = mix(p1, v, t);
 	float dy = d_half.y/d_half.x;
-	// Together, y and dy form a line approximation. The areaLUT table
-	// maps the line to a pixel coverage.
+	// Together, y and dy form a line approximation.
+
+	// Compute the fragment area above the line.
+	// The area is symmetric around dy = 0. Scale slope with extent width.
 	float width = extent.y - extent.x;
-	// The first axis maps y in [-8;+8] to [0;1].
-	float areau = y/16.0 + 0.5;
-	// The second axis maps slopes in [0;16] to [0;1]. The area is symmetric
-	// around dy = 0. Scale slope with extent width.
-	float areav = abs(dy*width)/16.0;
-	// Look up coverage from y and slope and scale to extent.
-	float cover = texture2D(areaLUT, vec2(areau, areav)).r*width;
-	if (width == 0.0)
-		cover = 0.0; // Needed on the iOS simulator.
-	gl_FragColor.r = cover;
+	dy = abs(dy*width);
+
+	vec4 sides = vec4(dy*+0.5 + y, dy*-0.5 + y, (+0.5-y)/dy, (-0.5-y)/dy);
+	sides = clamp(sides+0.5, 0.0, 1.0);
+
+	float area = 0.5*(sides.z - sides.z*sides.y + 1.0 - sides.x+sides.x*sides.w);
+	area *= width;
+
+	gl_FragColor.r = area;
 }
 `
 
