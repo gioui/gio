@@ -60,16 +60,17 @@ To build a Gio program as an .aar package, use the gio tool. For example,
 	$ go run gioui.org/cmd/gio -target android gioui.org/apps/gophers
 
 produces gophers.aar, ready to use in an Android project. To run
-the demo on an Android device:
+the demo on an Android device, use -buildmode=exe:
 
-	$ git clone https://git.sr.ht/~eliasnaur/gio
-	$ cd gio/apps/gophers/android
-	$ go run gioui.org/cmd/gio -target android ..
-	$ ./gradlew installDebug          # gradlew.bat on Windows
+	$ go run gioui.org/cmd/gio -buildmode exe -target android gioui.org/apps/gophers
+
+Install the apk to a running emulator or attached device with adb:
+
+	$ adb install gophers.apk
 
 The gio tool passes command line arguments to os.Args at runtime:
 
-	$ go run gioui.org/cmd/gio -target android .. -token <github token>
+	$ go run gioui.org/cmd/gio -buildmode exe -target android gioui.org/apps/gophers -token <github token>
 
 ## iOS/tvOS
 
@@ -85,28 +86,27 @@ outputs Gophers.framework with the demo program built for iOS. For tvOS, use `-t
 
 Building for tvOS requires (the not yet released) Go 1.13.
 
-To run the demo on an iOS device, use the sample Xcode project:
+To run the demo on an iOS device, use -buildmode=exe:
 
-	$ git clone https://git.sr.ht/~eliasnaur/gio
-	$ cd gio/apps
-	$ go run gioui.org/cmd/gio -target ios -o gophers/ios/gophers/Gophers.framework ./gophers
-	$ open gophers/ios/gophers.xcodeproj/
+	$ go run gioui.org/cmd/gio -buildmode exe -target ios -appid <bundle-id> gioui.org/apps/gophers
 
-You need to provide a valid bundle identifier and set up code signing in Xcode to run the demo
-on a device. If you're using Go 1.12 or older, you also need to disable bitcode.
+where <bundle-id> is a valid bundle identifier previously provisioned in Xcode for your device.
+Use the Window=>Devices and Simulators to install the ipa file to the device or use
+[ideviceinstaller](https://github.com/libimobiledevice/ideviceinstaller):
+
+	$ ideviceinstaller -i gophers.ipa
 
 ## Webassembly/WebGL
 
 To run a Gio program in a browser with WebAssembly and WebGL support, use the Go webassembly
-driver and add a <div id="giowindow"> element to a HTML page. To run the Gio demo:
+driver and add a <div id="giowindow"> element to a HTML page. The gio tool can also output
+a directory ready to view in a browser:
 
 	$ go get github.com/shurcooL/goexec
-	$ git clone https://git.sr.ht/~eliasnaur/gio
-	$ cd gio/apps/
-	$ GOOS=js GOARCH=wasm go build -o gophers/web/main.wasm ./gophers/
-	$ goexec 'http.ListenAndServe(":8080", http.FileServer(http.Dir("gophers/web")))'
+	$ go run gioui.org/cmd/gio -target js gioui.org/apps/gophers
+	$ goexec 'http.ListenAndServe(":8080", http.FileServer(http.Dir("gophers")))'
 
-and then open http://localhost:8080 in a browser.
+Open http://localhost:8080 in a browser to run the app.
 
 ## Issues
 
