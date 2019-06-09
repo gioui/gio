@@ -67,7 +67,7 @@ func createWindow(opts *WindowOptions) error {
 }
 
 func createTextArea(doc js.Value) js.Value {
-	tarea := doc.Call("createElement", "textarea")
+	tarea := doc.Call("createElement", "input")
 	style := tarea.Get("style")
 	style.Set("width", "1px")
 	style.Set("height", "1px")
