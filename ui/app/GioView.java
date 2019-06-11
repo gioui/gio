@@ -184,7 +184,9 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 		private final Editable editable;
 
 		InputConnection(View view) {
-			super(view, true);
+			// Passing false enables "dummy mode", where the BaseInputConnection
+			// attempts to convert IME operations to key events.
+			super(view, false);
 			editable = Editable.Factory.getInstance().newEditable("");
 		}
 
