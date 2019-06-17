@@ -443,10 +443,10 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	dims = cc.End(dims)
 	c1 := f.End(dims)
 	cs = f.Flexible(1, layout.Fit)
-	in = layout.Insets{Left: c.Dp(8)}
-	cs = in.Begin(ops, cs)
+	in2 := layout.Insets{Left: c.Dp(8)}
+	cs = in2.Begin(ops, cs)
 	dims = label.Layout(ops, cs)
-	dims = in.End(dims)
+	dims = in2.End(dims)
 	c2 := f.End(dims)
 	dims = f.Layout(c1, c2)
 	return in.End(dims)
