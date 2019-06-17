@@ -23,12 +23,13 @@ type PathBuilder struct {
 	hasBounds bool
 }
 
-// opClip structure must match opClip in package ui/internal/gpu.
-type opClip struct {
+// OpClip structure must match opClip in package ui/internal/gpu.
+
+type OpClip struct {
 	bounds f32.Rectangle
 }
 
-func (p opClip) Add(o *ui.Ops) {
+func (p OpClip) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypeClipLen)
 	data[0] = byte(ops.TypeClip)
 	bo := binary.LittleEndian
@@ -277,7 +278,7 @@ func (p *PathBuilder) simpleQuadTo(ctrl, to f32.Point) {
 
 func (p *PathBuilder) End() {
 	p.end()
-	opClip{
+	OpClip{
 		bounds: p.bounds,
 	}.Add(p.ops)
 }

@@ -113,10 +113,10 @@ func (d *OpDraw) Decode(data []byte, refs []interface{}) {
 	}
 }
 
-// RectClip append a clip op corresponding to
+// RectClip returns an OpClip op corresponding to
 // a pixel aligned rectangular area.
-func RectClip(ops *ui.Ops, r image.Rectangle) {
-	opClip{bounds: toRectF(r)}.Add(ops)
+func RectClip(r image.Rectangle) OpClip {
+	return OpClip{bounds: toRectF(r)}
 }
 
 func itof(i int) float32 {
