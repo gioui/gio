@@ -70,11 +70,16 @@ func ExactConstraints(size image.Point) Constraints {
 type Insets struct {
 	Top, Right, Bottom, Left float32
 
-	ops *ui.Ops
-	cs  Constraints
+	ops   *ui.Ops
+	begun bool
+	cs    Constraints
 }
 
 func (in *Insets) Begin(ops *ui.Ops, cs Constraints) Constraints {
+	if in.begun {
+		panic("must End before Begin")
+	}
+	in.begun = true
 	in.ops = ops
 	in.cs = cs
 	mcs := cs
@@ -105,6 +110,10 @@ func (in *Insets) Begin(ops *ui.Ops, cs Constraints) Constraints {
 }
 
 func (in *Insets) End(dims Dimens) Dimens {
+	if !in.begun {
+		panic("must Begin before End")
+	}
+	in.begun = false
 	ops := in.ops
 	ui.OpPop{}.Add(ops)
 	t, r, b, l := int(math.Round(float64(in.Top))), int(math.Round(float64(in.Right))), int(math.Round(float64(in.Bottom))), int(math.Round(float64(in.Left)))
@@ -147,12 +156,18 @@ func (s Sized) Constrain(cs Constraints) Constraints {
 }
 
 type Align struct {
-	ops       *ui.Ops
 	Alignment Direction
-	cs        Constraints
+
+	ops   *ui.Ops
+	begun bool
+	cs    Constraints
 }
 
 func (a *Align) Begin(ops *ui.Ops, cs Constraints) Constraints {
+	if a.begun {
+		panic("must End before Begin")
+	}
+	a.begun = true
 	a.ops = ops
 	a.cs = cs
 	ops.Begin()
@@ -160,6 +175,10 @@ func (a *Align) Begin(ops *ui.Ops, cs Constraints) Constraints {
 }
 
 func (a *Align) End(dims Dimens) Dimens {
+	if !a.begun {
+		panic("must Begin before End")
+	}
+	a.begun = false
 	ops := a.ops
 	block := ops.End()
 	sz := dims.Size
