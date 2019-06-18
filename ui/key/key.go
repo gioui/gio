@@ -61,6 +61,10 @@ const (
 	NamePageDown       = '⇟'
 )
 
+func (m Modifiers) Contain(m2 Modifiers) bool {
+	return m&m2 == m2
+}
+
 func (h OpHandler) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypeKeyHandlerLen)
 	data[0] = byte(ops.TypeKeyHandler)
