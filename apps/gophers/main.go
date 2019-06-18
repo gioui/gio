@@ -183,7 +183,7 @@ func (a *App) run() error {
 					case key.NameEscape:
 						os.Exit(0)
 					case 'P':
-						if e.Modifiers&key.ModCommand != 0 {
+						if e.Modifiers.Contain(key.ModCommand) {
 							a.w.Profiling = !a.w.Profiling
 						}
 					}
