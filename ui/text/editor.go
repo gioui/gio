@@ -99,7 +99,7 @@ func (e *Editor) Update(c *ui.Config, q input.Events) {
 		case key.Focus:
 			e.focused = ke.Focus
 		case key.Chord:
-			if e.Command(ke) {
+			if e.command(ke) {
 				stop = true
 				scrollTo = true
 			}
@@ -495,7 +495,7 @@ func (e *Editor) scrollToCaret() {
 	}
 }
 
-func (e *Editor) Command(k key.Chord) bool {
+func (e *Editor) command(k key.Chord) bool {
 	if !e.focused {
 		return false
 	}
