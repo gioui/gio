@@ -121,8 +121,8 @@ Open http://localhost:8080 in a browser to run the app.
 ## Issues
 
 File bugs and TODOs through the the [issue tracker](https://todo.sr.ht/~eliasnaur/gio) or send an email
-to [~eliasnaur/gio@todo.sr.ht](mailto:~eliasnaur/gio-dev@lists.sr.ht). For general discussion, use the
-mailing list: [~eliasnaur/gio-dev@lists.sr.ht](mailto:~eliasnaur/gio-dev@lists.sr.ht).
+to [~eliasnaur/gio@todo.sr.ht](mailto:~eliasnaur/gio@todo.sr.ht). For general discussion, use the
+mailing list: [~eliasnaur/gio@lists.sr.ht](mailto:~eliasnaur/gio@lists.sr.ht).
 
 ## License
 
@@ -130,8 +130,8 @@ Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
 
 ## Contributing
 
-Post discussion and patches to the [mailing list](https://lists.sr.ht/~eliasnaur/gio-dev). Send your
-message to [~eliasnaur/gio-dev@lists.sr.ht](mailto:~eliasnaur/gio-dev@lists.sr.ht); no Sourcehut account
+Post discussion and patches to the [mailing list](https://lists.sr.ht/~eliasnaur/gio). Send your
+message to [~eliasnaur/gio@lists.sr.ht](mailto:~eliasnaur/gio@lists.sr.ht); no Sourcehut account
 is required and you can post without being subscribed.
 
 Commit messages follow [the Go project style](https://golang.org/doc/contribute.html#commit_messages):
@@ -148,7 +148,7 @@ With `git send-email` configured, you can clone the project and set it up for su
 
 	$ git clone https://git.sr.ht/~eliasnaur/gio
 	$ cd gio
-	$ git config sendemail.to '~eliasnaur/gio-dev@lists.sr.ht'
+	$ git config sendemail.to '~eliasnaur/gio@lists.sr.ht'
 	$ git config sendemail.annotate yes
 
 Configure your name and email address if you have not done so already:
