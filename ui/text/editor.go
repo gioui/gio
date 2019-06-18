@@ -23,6 +23,7 @@ type Editor struct {
 	Face       Face
 	Alignment  Alignment
 	SingleLine bool
+	Submit     bool
 
 	cfg               *ui.Config
 	blinkStart        time.Time
@@ -49,12 +50,22 @@ type Editor struct {
 	clicker gesture.Click
 }
 
+type EditorEvent interface {
+	isEditorEvent()
+}
+
+type Submission struct {
+	Text string
+}
+
 const (
 	blinksPerSecond  = 1
 	maxBlinkDuration = 10 * time.Second
 )
 
-func (e *Editor) Update(c *ui.Config, q input.Events) {
+func (s Submission) isEditorEvent() {}
+
+func (e *Editor) Update(c *ui.Config, q input.Events) []EditorEvent {
 	if e.cfg == nil || c.PxPerDp != e.cfg.PxPerDp || c.PxPerSp != e.cfg.PxPerSp {
 		e.invalidate()
 	}
@@ -93,12 +104,23 @@ func (e *Editor) Update(c *ui.Config, q input.Events) {
 		}
 	}
 	stop := (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin)
+	var events []EditorEvent
 	for _, ke := range q.For(e) {
 		e.blinkStart = c.Now
 		switch ke := ke.(type) {
 		case key.Focus:
 			e.focused = ke.Focus
 		case key.Chord:
+			if !e.focused {
+				break
+			}
+			if e.Submit && (ke.Name == key.NameReturn || ke.Name == key.NameEnter) {
+				if !ke.Modifiers.Contain(key.ModShift) {
+					events = append(events, Submission{e.Text()})
+					e.SetText("")
+					break
+				}
+			}
 			if e.command(ke) {
 				stop = true
 				scrollTo = true
@@ -115,6 +137,7 @@ func (e *Editor) Update(c *ui.Config, q input.Events) {
 	if stop {
 		e.scroller.Stop()
 	}
+	return events
 }
 
 func (e *Editor) caretWidth() fixed.Int26_6 {
@@ -341,8 +364,13 @@ func (e *Editor) deleteRuneForward() {
 	e.invalidate()
 }
 
+func (e *Editor) Text() string {
+	return e.rr.String()
+}
+
 func (e *Editor) SetText(s string) {
 	e.rr = editBuffer{}
+	e.carXOff = 0
 	e.prepend(s)
 }
 
@@ -496,9 +524,6 @@ func (e *Editor) scrollToCaret() {
 }
 
 func (e *Editor) command(k key.Chord) bool {
-	if !e.focused {
-		return false
-	}
 	switch k.Name {
 	case key.NameReturn, key.NameEnter:
 		if !e.SingleLine {
