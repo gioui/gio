@@ -198,6 +198,9 @@ func (w *window) keyEvent(e js.Value) {
 		if e.Call("getModifierState", "Control").Bool() {
 			cmd.Modifiers |= key.ModCommand
 		}
+		if e.Call("getModifierState", "Shift").Bool() {
+			cmd.Modifiers |= key.ModShift
+		}
 		w.w.event(cmd)
 	}
 }

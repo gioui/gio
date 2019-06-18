@@ -80,9 +80,6 @@ type wlConn struct {
 	repeatRate   int
 	repeatDelay  time.Duration
 	repeatStop   chan struct{}
-
-	// Cached strings
-	_XKB_MOD_NAME_CTRL *C.char
 }
 
 type window struct {
@@ -135,6 +132,11 @@ var (
 	winMap       = make(map[interface{}]*window)
 	outputMap    = make(map[C.uint32_t]*C.struct_wl_output)
 	outputConfig = make(map[*C.struct_wl_output]*wlOutput)
+)
+
+var (
+	_XKB_MOD_NAME_CTRL  = []byte("Control\x00")
+	_XKB_MOD_NAME_SHIFT = []byte("Shift\x00")
 )
 
 func Main() {
@@ -779,8 +781,11 @@ func (w *window) dispatchKey(keyCode C.uint32_t) {
 	sym := C.xkb_state_key_get_one_sym(conn.xkbState, C.xkb_keycode_t(keyCode))
 	if n, ok := convertKeysym(sym); ok {
 		cmd := key.Chord{Name: n}
-		if C.xkb_state_mod_name_is_active(conn.xkbState, conn._XKB_MOD_NAME_CTRL, C.XKB_STATE_MODS_EFFECTIVE) == 1 {
+		if C.xkb_state_mod_name_is_active(conn.xkbState, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_CTRL[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
 			cmd.Modifiers |= key.ModCommand
+		}
+		if C.xkb_state_mod_name_is_active(conn.xkbState, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_SHIFT[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
+			cmd.Modifiers |= key.ModShift
 		}
 		w.w.event(cmd)
 	}
@@ -1072,7 +1077,6 @@ func waylandConnect() error {
 		c.destroy()
 		return errors.New("wayland: wl_compositor_create_surface failed")
 	}
-	c._XKB_MOD_NAME_CTRL = C.CString(C.XKB_MOD_NAME_CTRL)
 	return nil
 }
 
@@ -1087,10 +1091,6 @@ func (c *wlConn) stopRepeat() {
 
 func (c *wlConn) destroy() {
 	c.stopRepeat()
-	if c._XKB_MOD_NAME_CTRL != nil {
-		C.free(unsafe.Pointer(c._XKB_MOD_NAME_CTRL))
-		c._XKB_MOD_NAME_CTRL = nil
-	}
 	if c.xkbCompState != nil {
 		C.xkb_compose_state_unref(c.xkbCompState)
 		c.xkbCompState = nil

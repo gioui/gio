@@ -35,6 +35,7 @@ type TextInputState uint8
 
 const (
 	ModCommand Modifiers = 1 << iota
+	ModShift
 )
 
 const (

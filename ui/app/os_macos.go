@@ -82,6 +82,9 @@ func gio_onKeys(view C.CFTypeRef, cstr *C.char, ti C.double, mods C.NSUInteger) 
 	if mods&C.NSEventModifierFlagCommand != 0 {
 		kmods |= key.ModCommand
 	}
+	if mods&C.NSEventModifierFlagShift != 0 {
+		kmods |= key.ModShift
+	}
 	w := views[view]
 	for _, k := range str {
 		if n, ok := convertKey(k); ok {

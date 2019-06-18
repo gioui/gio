@@ -88,6 +88,7 @@ const (
 	_USER_TIMER_MINIMUM = 0x0000000A
 
 	_VK_CONTROL = 0x11
+	_VK_SHIFT   = 0x10
 
 	_VK_BACK   = 0x08
 	_VK_DELETE = 0x2e
@@ -270,6 +271,9 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			cmd := key.Chord{Name: n}
 			if getKeyState(_VK_CONTROL)&0x1000 != 0 {
 				cmd.Modifiers |= key.ModCommand
+			}
+			if getKeyState(_VK_SHIFT)&0x1000 != 0 {
+				cmd.Modifiers |= key.ModShift
 			}
 			w.w.event(cmd)
 		}
