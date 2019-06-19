@@ -77,9 +77,22 @@ type wlConn struct {
 	xkbCompTable *C.struct_xkb_compose_table
 	xkbCompState *C.struct_xkb_compose_state
 	utf8Buf      []byte
-	repeatRate   int
-	repeatDelay  time.Duration
-	repeatStop   chan struct{}
+
+	repeat repeatState
+}
+
+type repeatState struct {
+	rate  int
+	delay time.Duration
+
+	key   C.uint32_t
+	win   *window
+	stopC chan struct{}
+
+	start time.Duration
+	last  time.Duration
+	mu    sync.Mutex
+	now   time.Duration
 }
 
 type window struct {
@@ -569,7 +582,7 @@ func gio_onPointerAxisDiscrete(data unsafe.Pointer, pointer *C.struct_wl_pointer
 
 //export gio_onKeyboardKeymap
 func gio_onKeyboardKeymap(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, format C.uint32_t, fd C.int32_t, size C.uint32_t) {
-	conn.stopRepeat()
+	conn.repeat.Stop(0)
 	defer syscall.Close(int(fd))
 	if conn.xkbCompState != nil {
 		C.xkb_compose_state_unref(conn.xkbCompState)
@@ -628,19 +641,20 @@ func gio_onKeyboardKeymap(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, f
 
 //export gio_onKeyboardEnter
 func gio_onKeyboardEnter(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial C.uint32_t, surf *C.struct_wl_surface, keys *C.struct_wl_array) {
-	conn.stopRepeat()
+	conn.repeat.Stop(0)
 	w := winMap[surf]
 	winMap[keyboard] = w
 }
 
 //export gio_onKeyboardLeave
 func gio_onKeyboardLeave(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial C.uint32_t, surf *C.struct_wl_surface) {
-	conn.stopRepeat()
+	conn.repeat.Stop(0)
 }
 
 //export gio_onKeyboardKey
 func gio_onKeyboardKey(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial, timestamp, keyCode, state C.uint32_t) {
-	conn.stopRepeat()
+	t := time.Duration(timestamp) * time.Millisecond
+	conn.repeat.Stop(t)
 	w := winMap[keyboard]
 	if state != C.WL_KEYBOARD_KEY_STATE_PRESSED || conn.xkbMap == nil || conn.xkbState == nil || conn.xkbCompState == nil {
 		return
@@ -648,24 +662,78 @@ func gio_onKeyboardKey(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, seri
 	// According to the xkb_v1 spec: "to determine the xkb keycode, clients must add 8 to the key event keycode."
 	keyCode += 8
 	w.dispatchKey(keyCode)
-	if conn.repeatRate > 0 && C.xkb_keymap_key_repeats(conn.xkbMap, C.xkb_keycode_t(keyCode)) == 1 {
-		stop := make(chan struct{})
-		conn.repeatStop = stop
-		rate, delay := conn.repeatRate, conn.repeatDelay
-		go func() {
-			timer := time.NewTimer(delay)
-			for {
-				select {
-				case <-timer.C:
-				case <-stop:
-					close(stop)
-					return
-				}
-				w.dispatchKey(keyCode)
-				delay = time.Second / time.Duration(rate)
-				timer.Reset(delay)
+	if C.xkb_keymap_key_repeats(conn.xkbMap, C.xkb_keycode_t(keyCode)) == 1 {
+		conn.repeat.Start(w, keyCode, t)
+	}
+}
+
+func (r *repeatState) Start(w *window, keyCode C.uint32_t, t time.Duration) {
+	if r.rate <= 0 {
+		return
+	}
+	stopC := make(chan struct{})
+	r.start = t
+	r.last = 0
+	r.now = 0
+	r.stopC = stopC
+	r.key = keyCode
+	r.win = w
+	rate, delay := r.rate, r.delay
+	go func() {
+		timer := time.NewTimer(delay)
+		for {
+			select {
+			case <-timer.C:
+			case <-stopC:
+				close(stopC)
+				return
 			}
-		}()
+			r.Advance(delay)
+			w.notify()
+			delay = time.Second / time.Duration(rate)
+			timer.Reset(delay)
+		}
+	}()
+}
+
+func (r *repeatState) Stop(t time.Duration) {
+	if r.stopC == nil {
+		return
+	}
+	r.stopC <- struct{}{}
+	<-r.stopC
+	r.stopC = nil
+	t -= r.start
+	if r.now > t {
+		r.now = t
+	}
+}
+
+func (r *repeatState) Advance(dt time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.now += dt
+}
+
+func (r *repeatState) Repeat() {
+	if r.rate <= 0 {
+		return
+	}
+	r.mu.Lock()
+	now := r.now
+	r.mu.Unlock()
+	for {
+		var delay time.Duration
+		if r.last < r.delay {
+			delay = r.delay
+		} else {
+			delay = time.Second / time.Duration(r.rate)
+		}
+		if r.last+delay > now {
+			break
+		}
+		r.win.dispatchKey(r.key)
+		r.last += delay
 	}
 }
 
@@ -725,6 +793,7 @@ loop:
 		case *dispEvents&(syscall.POLLERR|syscall.POLLHUP) != 0:
 			break loop
 		}
+		conn.repeat.Repeat()
 		if redraw {
 			w.draw(false)
 		}
@@ -827,7 +896,7 @@ func (w *window) dispatchKey(keyCode C.uint32_t) {
 
 //export gio_onKeyboardModifiers
 func gio_onKeyboardModifiers(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial, depressed, latched, locked, group C.uint32_t) {
-	conn.stopRepeat()
+	conn.repeat.Stop(0)
 	if conn.xkbState == nil {
 		return
 	}
@@ -837,8 +906,9 @@ func gio_onKeyboardModifiers(data unsafe.Pointer, keyboard *C.struct_wl_keyboard
 
 //export gio_onKeyboardRepeatInfo
 func gio_onKeyboardRepeatInfo(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, rate, delay C.int32_t) {
-	conn.repeatRate = int(rate)
-	conn.repeatDelay = time.Duration(delay) * time.Millisecond
+	conn.repeat.Stop(0)
+	conn.repeat.rate = int(rate)
+	conn.repeat.delay = time.Duration(delay) * time.Millisecond
 }
 
 //export gio_onTextInputEnter
@@ -1080,17 +1150,8 @@ func waylandConnect() error {
 	return nil
 }
 
-func (c *wlConn) stopRepeat() {
-	if c.repeatStop == nil {
-		return
-	}
-	c.repeatStop <- struct{}{}
-	<-c.repeatStop
-	c.repeatStop = nil
-}
-
 func (c *wlConn) destroy() {
-	c.stopRepeat()
+	c.repeat.Stop(0)
 	if c.xkbCompState != nil {
 		C.xkb_compose_state_unref(c.xkbCompState)
 		c.xkbCompState = nil
