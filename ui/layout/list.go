@@ -18,8 +18,8 @@ type scrollChild struct {
 }
 
 type List struct {
-	Axis Axis
-
+	Axis               Axis
+	Invert             bool
 	CrossAxisAlignment CrossAxisAlignment
 
 	// The distance scrolled since last call to Init.
@@ -68,6 +68,9 @@ func (l *List) Dragging() bool {
 func (l *List) Update(c *ui.Config, q input.Events) {
 	l.Distance = 0
 	d := l.scroll.Update(c, q, gesture.Axis(l.Axis))
+	if l.Invert {
+		d = -d
+	}
 	l.scrollDir = d
 	l.Distance += d
 	l.offset += d
@@ -78,6 +81,9 @@ func (l *List) Next() (int, Constraints, bool) {
 		panic("a previous Next was not finished with Elem")
 	}
 	i, ok := l.next()
+	if l.Invert {
+		i = l.len - 1 - i
+	}
 	var cs Constraints
 	if ok {
 		cs = axisConstraints(l.Axis, Constraint{Max: ui.Inf}, l.crossConstraintChild(l.cs))
@@ -167,13 +173,19 @@ func (l *List) Layout() Dimens {
 		case Center:
 			cross = (maxCross - axisCross(l.Axis, sz)) / 2
 		}
-		max := axisMain(l.Axis, sz) + pos
+		childSize := axisMain(l.Axis, sz)
+		max := childSize + pos
 		if max > mainc.Max {
 			max = mainc.Max
 		}
 		min := pos
 		if min < 0 {
 			min = 0
+		}
+		transPos := pos
+		if l.Invert {
+			transPos = mainc.Max - transPos - childSize
+			min, max = mainc.Max-max, mainc.Max-min
 		}
 		r := image.Rectangle{
 			Min: axisPoint(l.Axis, min, -ui.Inf),
@@ -182,11 +194,11 @@ func (l *List) Layout() Dimens {
 		ui.OpPush{}.Add(ops)
 		draw.RectClip(r).Add(ops)
 		ui.OpTransform{
-			Transform: ui.Offset(toPointF(axisPoint(l.Axis, pos, cross))),
+			Transform: ui.Offset(toPointF(axisPoint(l.Axis, transPos, cross))),
 		}.Add(ops)
 		child.block.Add(ops)
 		ui.OpPop{}.Add(ops)
-		pos += axisMain(l.Axis, sz)
+		pos += childSize
 	}
 	atStart := l.first == 0 && l.offset <= 0
 	atEnd := l.first+len(l.children) == l.len && mainc.Max >= pos
