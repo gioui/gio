@@ -155,6 +155,14 @@ func (w *window) addEventListeners() {
 		})
 		return nil
 	})
+	w.addEventListener(w.tarea, "focus", func(this js.Value, args []js.Value) interface{} {
+		w.w.event(key.Focus{Focus: true})
+		return nil
+	})
+	w.addEventListener(w.tarea, "blur", func(this js.Value, args []js.Value) interface{} {
+		w.w.event(key.Focus{Focus: false})
+		return nil
+	})
 	w.addEventListener(w.tarea, "keydown", func(this js.Value, args []js.Value) interface{} {
 		w.keyEvent(args[0])
 		return nil
