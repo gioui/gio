@@ -77,6 +77,11 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserver) {
 			.name = "onBack",
 			.signature = "(J)Z",
 			.fnPtr = onBack
+		},
+		{
+			.name = "onFocusChange",
+			.signature = "(JZ)V",
+			.fnPtr = onFocusChange
 		}
 	};
 	if ((*env)->RegisterNatives(env, viewClass, methods, sizeof(methods)/sizeof(methods[0])) != 0) {

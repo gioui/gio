@@ -191,6 +191,12 @@ func onBack(env *C.JNIEnv, class C.jclass, view C.jlong) C.jboolean {
 	return C.JNI_FALSE
 }
 
+//export onFocusChange
+func onFocusChange(env *C.JNIEnv, class C.jclass, view C.jlong, focus C.jboolean) {
+	w := views[view]
+	w.event(key.Focus{Focus: focus == C.JNI_TRUE})
+}
+
 func (w *window) setVisible() {
 	win := w.aNativeWindow()
 	width, height := C.ANativeWindow_getWidth(win), C.ANativeWindow_getHeight(win)

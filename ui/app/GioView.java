@@ -32,10 +32,16 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 
 	public GioView(Context context, AttributeSet attrs) {
 		super(context, attrs);
+		nhandle = onCreateView(this);
 		handler = new Handler();
 		imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
 		setFocusable(true);
 		setFocusableInTouchMode(true);
+		setOnFocusChangeListener(new View.OnFocusChangeListener() {
+			@Override public void onFocusChange(View v, boolean focus) {
+				GioView.this.onFocusChange(nhandle, focus);
+			}
+		});
 		callbacks = new SurfaceHolder.Callback() {
 			@Override public void surfaceCreated(SurfaceHolder holder) {
 				// Ignore; surfaceChanged is guaranteed to be called immediately after this.
@@ -48,7 +54,6 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 			}
 		};
 		getHolder().addCallback(callbacks);
-		nhandle = onCreateView(this);
 	}
 
 	@Override public boolean onKeyDown(int keyCode, KeyEvent event) {
@@ -179,6 +184,7 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 	static private native void onKeyEvent(long handle, int code, int character, long time);
 	static private native void onFrameCallback(long handle, long nanos);
 	static private native boolean onBack(long handle);
+	static private native void onFocusChange(long handle, boolean focus);
 
 	private static class InputConnection extends BaseInputConnection {
 		private final Editable editable;
