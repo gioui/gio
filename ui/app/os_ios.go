@@ -110,6 +110,12 @@ func onDestroy(view C.CFTypeRef) {
 	w.view = 0
 }
 
+//export onFocus
+func onFocus(view C.CFTypeRef, focus int) {
+	w := views[view]
+	w.w.event(key.Focus{Focus: focus != 0})
+}
+
 //export onLowMemory
 func onLowMemory() {
 	runtime.GC()

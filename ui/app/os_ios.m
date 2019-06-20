@@ -36,6 +36,16 @@ static void redraw(CFTypeRef viewRef, BOOL sync) {
 	GioViewController *controller = [[GioViewController alloc] initWithNibName:nil bundle:nil];
 	controller.screen = self.window.screen;
     self.window.rootViewController = controller;
+	[[NSNotificationCenter defaultCenter] addObserverForName:UIWindowDidBecomeKeyNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notification) {
+		UIView *view = self.window.rootViewController.view;
+		if (view != nil)
+			onFocus((__bridge CFTypeRef)view, YES);
+	}];
+	[[NSNotificationCenter defaultCenter] addObserverForName:UIWindowDidResignKeyNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notification) {
+		UIView *view = self.window.rootViewController.view;
+		if (view != nil)
+			onFocus((__bridge CFTypeRef)view, NO);
+	}];
     [self.window makeKeyAndVisible];
 	return YES;
 }
