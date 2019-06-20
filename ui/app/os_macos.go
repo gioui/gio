@@ -130,6 +130,12 @@ func gio_onDraw(view C.CFTypeRef) {
 	w.draw(true)
 }
 
+//export gio_onFocus
+func gio_onFocus(view C.CFTypeRef, focus C.BOOL) {
+	w := views[view]
+	w.w.event(key.Focus{Focus: focus == C.YES})
+}
+
 func (w *window) draw(sync bool) {
 	width, height := int(C.gio_viewWidth(w.view)+.5), int(C.gio_viewHeight(w.view)+.5)
 	if width == 0 || height == 0 {

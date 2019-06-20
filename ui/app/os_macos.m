@@ -33,6 +33,12 @@
 	CGDirectDisplayID dispID = [[[self.window screen] deviceDescription][@"NSScreenNumber"] unsignedIntValue];
 	gio_updateDisplayLink((__bridge CFTypeRef)self.window.contentView, dispID);
 }
+- (void)windowDidBecomeKey:(NSNotification *)notification {
+	gio_onFocus((__bridge CFTypeRef)self.window.contentView, YES);
+}
+- (void)windowDidResignKey:(NSNotification *)notification {
+	gio_onFocus((__bridge CFTypeRef)self.window.contentView, NO);
+}
 - (void)windowWillClose:(NSNotification *)notification {
 	gio_onTerminate((__bridge CFTypeRef)self.window.contentView);
 	self.window.delegate = nil;
@@ -106,14 +112,14 @@ void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat heigh
 		[window cascadeTopLeftFromPoint:NSMakePoint(20,20)];
 		[window setAcceptsMouseMovedEvents:YES];
 
-		[window setContentView:view];
-		[window makeFirstResponder:view];
-
+		gio_onCreate((__bridge CFTypeRef)view);
 		GioDelegate *del = [[GioDelegate alloc] init];
 		del.window = window;
 		[window setDelegate:del];
 		[NSApp setDelegate:del];
-		gio_onCreate((__bridge CFTypeRef)view);
+		[window setContentView:view];
+		[window makeFirstResponder:view];
+
 
 		[NSApp run];
 	}
