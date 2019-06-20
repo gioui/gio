@@ -644,11 +644,14 @@ func gio_onKeyboardEnter(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, se
 	conn.repeat.Stop(0)
 	w := winMap[surf]
 	winMap[keyboard] = w
+	w.w.event(key.Focus{Focus: true})
 }
 
 //export gio_onKeyboardLeave
 func gio_onKeyboardLeave(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial C.uint32_t, surf *C.struct_wl_surface) {
 	conn.repeat.Stop(0)
+	w := winMap[keyboard]
+	w.w.event(key.Focus{Focus: false})
 }
 
 //export gio_onKeyboardKey
