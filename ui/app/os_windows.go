@@ -117,6 +117,8 @@ const (
 	_WM_MOUSEWHEEL  = 0x020A
 	_WM_PAINT       = 0x000F
 	_WM_QUIT        = 0x0012
+	_WM_SETFOCUS    = 0x0007
+	_WM_KILLFOCUS   = 0x0008
 	_WM_SHOWWINDOW  = 0x0018
 	_WM_SIZE        = 0x0005
 	_WM_SYSKEYDOWN  = 0x0104
@@ -291,6 +293,10 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.w.event(pointer.Event{
 			Type: pointer.Cancel,
 		})
+	case _WM_SETFOCUS:
+		w.w.event(key.Focus{Focus: true})
+	case _WM_KILLFOCUS:
+		w.w.event(key.Focus{Focus: false})
 	case _WM_LBUTTONUP:
 		releaseCapture()
 		x, y := coordsFromlParam(lParam)
