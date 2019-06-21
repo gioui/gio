@@ -18,6 +18,8 @@ type scrollChild struct {
 }
 
 type List struct {
+	Config             *ui.Config
+	Inputs             input.Events
 	Axis               Axis
 	Invert             bool
 	CrossAxisAlignment CrossAxisAlignment
@@ -49,6 +51,7 @@ const (
 )
 
 func (l *List) Init(ops *ui.Ops, cs Constraints, len int) {
+	l.update()
 	l.ops = ops
 	l.dir = iterateNone
 	l.maxSize = 0
@@ -65,9 +68,9 @@ func (l *List) Dragging() bool {
 	return l.scroll.Dragging()
 }
 
-func (l *List) Update(c *ui.Config, q input.Events) {
+func (l *List) update() {
 	l.Distance = 0
-	d := l.scroll.Update(c, q, gesture.Axis(l.Axis))
+	d := l.scroll.Update(l.Config, l.Inputs, gesture.Axis(l.Axis))
 	if l.Invert {
 		d = -d
 	}
