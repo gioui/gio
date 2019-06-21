@@ -42,7 +42,8 @@ func loop(w *app.Window) {
 	if err != nil {
 		panic("failed to load font")
 	}
-	var faces measure.Faces
+	var cfg ui.Config
+	faces := &measure.Faces{Config: &cfg}
 	maroon := color.NRGBA{127, 0, 0, 255}
 	face := faces.For(regular, ui.Sp(72))
 	message := "Hello, Gio"
@@ -51,7 +52,7 @@ func loop(w *app.Window) {
 		e := <-w.Events()
 		switch e := e.(type) {
 		case app.Draw:
-			faces.Cfg = e.Config
+			cfg = e.Config
 			cs := layout.ExactConstraints(w.Size())
 			ops.Reset()
 			draw.OpColor{Col: maroon}.Add(ops)

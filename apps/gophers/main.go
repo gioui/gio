@@ -49,10 +49,10 @@ import (
 
 type App struct {
 	w     *app.Window
-	cfg   *ui.Config
-	faces measure.Faces
+	cfg   ui.Config
+	faces *measure.Faces
 
-	queue *input.Queue
+	inputs *input.Queue
 
 	fab *ActionButton
 
@@ -70,8 +70,8 @@ type App struct {
 }
 
 type userPage struct {
-	cfg           *ui.Config
-	faces         measure.Faces
+	config        *ui.Config
+	faces         *measure.Faces
 	redraw        redrawer
 	user          *user
 	commitsList   *layout.List
@@ -98,8 +98,9 @@ type icon struct {
 type redrawer func()
 
 type ActionButton struct {
+	config      *ui.Config
+	inputs      input.Events
 	face        text.Face
-	cfg         *ui.Config
 	Open        bool
 	icons       []*icon
 	sendIco     *icon
@@ -177,7 +178,7 @@ func (a *App) run() error {
 		case e := <-a.w.Events():
 			switch e := e.(type) {
 			case input.Event:
-				a.queue.Add(e)
+				a.inputs.Add(e)
 				if e, ok := e.(key.Chord); ok {
 					switch e.Name {
 					case key.NameEscape:
@@ -213,7 +214,6 @@ func (a *App) run() error {
 			case app.Draw:
 				ops.Reset()
 				a.cfg = e.Config
-				a.faces.Cfg = a.cfg
 				cs := layout.ExactConstraints(a.w.Size())
 				a.Layout(ops, cs)
 				if a.w.Profiling {
@@ -232,8 +232,8 @@ func (a *App) run() error {
 					al.End(dims)
 				}
 				a.w.Draw(ops)
-				a.queue.Frame(ops)
-				a.w.SetTextInput(a.queue.InputState())
+				a.inputs.Frame(ops)
+				a.w.SetTextInput(a.inputs.InputState())
 				a.faces.Frame()
 			}
 		}
@@ -245,10 +245,17 @@ func newApp(w *app.Window) *App {
 	a := &App{
 		w:           w,
 		updateUsers: make(chan []*user),
-		queue:       new(input.Queue),
+		inputs:      new(input.Queue),
 	}
-	a.usersList = &layout.List{Axis: layout.Vertical}
+	a.faces = &measure.Faces{Config: &a.cfg}
+	a.usersList = &layout.List{
+		Config: &a.cfg,
+		Inputs: a.inputs,
+		Axis:   layout.Vertical,
+	}
 	a.fab = &ActionButton{
+		config:      &a.cfg,
+		inputs:      a.inputs,
 		face:        a.face(fonts.regular, 9),
 		sendIco:     &icon{src: icons.ContentSend, size: ui.Dp(24)},
 		icons:       []*icon{},
@@ -256,13 +263,17 @@ func newApp(w *app.Window) *App {
 		btnsClicker: new(gesture.Click),
 	}
 	a.edit2 = &text.Editor{
-		Face: a.face(fonts.italic, 14),
+		Config: &a.cfg,
+		Inputs: a.inputs,
+		Face:   a.face(fonts.italic, 14),
 		//Alignment: text.End,
 		SingleLine: true,
 	}
 	a.edit2.SetText("Single line editor. Edit me!")
 	a.edit = &text.Editor{
-		Face: a.face(fonts.regular, 14),
+		Config: &a.cfg,
+		Inputs: a.inputs,
+		Face:   a.face(fonts.regular, 14),
 		//Alignment: text.End,
 		//SingleLine: true,
 	}
@@ -382,26 +393,21 @@ func (a *App) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	if a.selectedUser == nil {
 		return a.layoutUsers(ops, cs)
 	} else {
-		a.selectedUser.Update(a.cfg, a.queue)
 		return a.selectedUser.Layout(ops, cs)
 	}
 }
 
-func newUserPage(ctx context.Context, user *user, redraw redrawer, faces measure.Faces) *userPage {
+func (a *App) newUserPage(user *user) *userPage {
 	up := &userPage{
-		faces:         faces,
-		redraw:        redraw,
+		config:        &a.cfg,
+		faces:         a.faces,
+		redraw:        a.w.Redraw,
 		user:          user,
-		commitsList:   &layout.List{Axis: layout.Vertical},
+		commitsList:   &layout.List{Config: &a.cfg, Inputs: a.inputs, Axis: layout.Vertical},
 		commitsResult: make(chan []*github.Commit, 1),
 	}
-	up.fetchCommits(ctx)
+	up.fetchCommits(a.ctx)
 	return up
-}
-
-func (up *userPage) Update(cfg *ui.Config, queue input.Events) {
-	up.cfg = cfg
-	up.commitsList.Update(up.cfg, queue)
 }
 
 func (up *userPage) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
@@ -427,7 +433,7 @@ func (up *userPage) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 
 func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout.Dimens {
 	u := up.user
-	c := up.cfg
+	c := up.config
 	msg := up.commits[index].GetMessage()
 	gdraw.OpColor{Col: textColor}.Add(ops)
 	label := text.Label{Face: up.faces.For(fonts.regular, ui.Sp(12)), Text: msg}
@@ -474,10 +480,7 @@ func (up *userPage) fetchCommits(ctx context.Context) {
 }
 
 func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	c := a.cfg
-	a.fab.Update(c, a.queue)
-	a.edit.Update(c, a.queue)
-	a.edit2.Update(c, a.queue)
+	c := &a.cfg
 	st := layout.Stack{Alignment: layout.Center}
 	st.Init(ops, cs)
 	cs = st.Rigid()
@@ -535,14 +538,10 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	return st.Layout(c1, c2)
 }
 
-func (a *ActionButton) Update(c *ui.Config, q input.Events) {
-	a.cfg = c
-	a.btnsClicker.Update(q)
-	a.btnClicker.Update(q)
-}
-
 func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	c := a.cfg
+	a.btnsClicker.Update(a.inputs)
+	a.btnClicker.Update(a.inputs)
+	c := a.config
 	fabCol := brandColor
 	f := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.End, MainAxisSize: layout.Min}
 	f.Init(ops, cs)
@@ -557,9 +556,8 @@ func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens 
 }
 
 func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	c := a.cfg
+	c := &a.cfg
 	l := a.usersList
-	l.Update(c, a.queue)
 	if l.Dragging() {
 		key.OpHideInput{}.Add(ops)
 	}
@@ -578,9 +576,9 @@ func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dime
 func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) layout.Dimens {
 	u := a.users[index]
 	click := &a.userClicks[index]
-	for _, r := range click.Update(a.queue) {
+	for _, r := range click.Update(a.inputs) {
 		if r.Type == gesture.TypeClick {
-			a.selectedUser = newUserPage(a.ctx, u, a.w.Redraw, a.faces)
+			a.selectedUser = a.newUserPage(u)
 		}
 	}
 	elem := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
