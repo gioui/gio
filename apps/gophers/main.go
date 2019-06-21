@@ -226,7 +226,7 @@ func (a *App) run() error {
 					in := layout.Insets{Top: a.cfg.Dp(16)}
 					cs = in.Begin(ops, cs)
 					txt := fmt.Sprintf("m: %d %s", mallocs, a.w.Timings())
-					gdraw.OpColor{Col: textColor}.Add(ops)
+					gdraw.ColorOp{Col: textColor}.Add(ops)
 					dims := text.Label{Face: a.face(fonts.mono, 8), Text: txt}.Layout(ops, cs)
 					dims = in.End(dims)
 					al.End(dims)
@@ -413,7 +413,7 @@ func (a *App) newUserPage(user *user) *userPage {
 func (up *userPage) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	l := up.commitsList
 	if l.Dragging() {
-		key.OpHideInput{}.Add(ops)
+		key.HideInputOp{}.Add(ops)
 	}
 	select {
 	case commits := <-up.commitsResult:
@@ -435,7 +435,7 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	u := up.user
 	c := up.config
 	msg := up.commits[index].GetMessage()
-	gdraw.OpColor{Col: textColor}.Add(ops)
+	gdraw.ColorOp{Col: textColor}.Add(ops)
 	label := text.Label{Face: up.faces.For(fonts.regular, ui.Sp(12)), Text: msg}
 	in := layout.Insets{Top: c.Dp(16), Right: c.Dp(8), Left: c.Dp(8)}
 	cs = in.Begin(ops, cs)
@@ -500,7 +500,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		{
 			in := layout.EqualInsets(c.Dp(16))
 			cs = layout.Sized{Height: c.Dp(200)}.Constrain(cs)
-			gdraw.OpColor{Col: textColor}.Add(ops)
+			gdraw.ColorOp{Col: textColor}.Add(ops)
 			dims = a.edit.Layout(ops, in.Begin(ops, cs))
 			dims = in.End(dims)
 		}
@@ -509,7 +509,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		cs = f.Rigid()
 		{
 			in := layout.Insets{Bottom: c.Dp(16), Left: c.Dp(16), Right: c.Dp(16)}
-			gdraw.OpColor{Col: textColor}.Add(ops)
+			gdraw.ColorOp{Col: textColor}.Add(ops)
 			dims = a.edit2.Layout(ops, in.Begin(ops, cs))
 			dims = in.End(dims)
 		}
@@ -521,7 +521,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			s.Init(ops, cs)
 			cs = s.Rigid()
 			in := layout.Insets{Top: c.Dp(16), Right: c.Dp(8), Bottom: c.Dp(8), Left: c.Dp(8)}
-			gdraw.OpColor{Col: rgb(0x888888)}.Add(ops)
+			gdraw.ColorOp{Col: rgb(0x888888)}.Add(ops)
 			lbl := text.Label{Face: a.face(fonts.regular, 9), Text: "GOPHERS"}
 			dims = in.End(lbl.Layout(ops, in.Begin(ops, cs)))
 			c2 := s.End(dims)
@@ -559,7 +559,7 @@ func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dime
 	c := &a.cfg
 	l := a.usersList
 	if l.Dragging() {
-		key.OpHideInput{}.Add(ops)
+		key.HideInputOp{}.Add(ops)
 	}
 	l.Init(ops, cs, len(a.users))
 	for {
@@ -608,14 +608,14 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 				f := baseline()
 				f.Init(ops, cs)
 				cs = f.Rigid()
-				gdraw.OpColor{Col: textColor}.Add(ops)
+				gdraw.ColorOp{Col: textColor}.Add(ops)
 				dims = text.Label{Face: a.face(fonts.regular, 11), Text: u.name}.Layout(ops, cs)
 				c1 := f.End(dims)
 				cs = f.Rigid()
 				al := layout.Align{Alignment: layout.E}
 				in := layout.Insets{Left: c.Dp(2)}
 				cs = in.Begin(ops, al.Begin(ops, cs))
-				gdraw.OpColor{Col: textColor}.Add(ops)
+				gdraw.ColorOp{Col: textColor}.Add(ops)
 				dims = text.Label{Face: a.face(fonts.regular, 8), Text: "3 hours ago"}.Layout(ops, cs)
 				dims = al.End(in.End(dims))
 				c2 := f.End(dims)
@@ -625,7 +625,7 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 			cs = f.Rigid()
 			in := layout.Insets{Top: c.Dp(4)}
 			cs = in.Begin(ops, cs)
-			gdraw.OpColor{Col: tertTextColor}.Add(ops)
+			gdraw.ColorOp{Col: tertTextColor}.Add(ops)
 			dims = text.Label{Face: a.face(fonts.regular, 10), Text: u.company}.Layout(ops, cs)
 			dims = in.End(dims)
 			c2 := f.End(dims)
@@ -656,8 +656,8 @@ func (f fill) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	dr := f32.Rectangle{
 		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
 	}
-	gdraw.OpColor{Col: f.color}.Add(ops)
-	gdraw.OpDraw{Rect: dr}.Add(ops)
+	gdraw.ColorOp{Col: f.color}.Add(ops)
+	gdraw.DrawOp{Rect: dr}.Add(ops)
 	return layout.Dimens{Size: d, Baseline: d.Y}
 }
 
@@ -692,10 +692,10 @@ func (c *clipCircle) End(dims layout.Dimens) layout.Dimens {
 	}
 	szf := float32(max)
 	rr := szf * .5
-	ui.OpPush{}.Add(ops)
+	ui.PushOp{}.Add(ops)
 	rrect(ops, szf, szf, rr, rr, rr, rr)
 	block.Add(ops)
-	ui.OpPop{}.Add(ops)
+	ui.PopOp{}.Add(ops)
 	return dims
 }
 
@@ -705,10 +705,10 @@ func fab(ops *ui.Ops, cs layout.Constraints, ico image.Image, col color.NRGBA, s
 	dp := image.Point{X: (sz - ico.Bounds().Dx()) / 2, Y: (sz - ico.Bounds().Dy()) / 2}
 	dims := image.Point{X: sz, Y: sz}
 	rrect(ops, size, size, rr, rr, rr, rr)
-	gdraw.OpColor{Col: col}.Add(ops)
-	gdraw.OpDraw{Rect: f32.Rectangle{Max: f32.Point{X: float32(sz), Y: float32(sz)}}}.Add(ops)
-	gdraw.OpImage{Img: ico, Rect: ico.Bounds()}.Add(ops)
-	gdraw.OpDraw{
+	gdraw.ColorOp{Col: col}.Add(ops)
+	gdraw.DrawOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(sz), Y: float32(sz)}}}.Add(ops)
+	gdraw.ImageOp{Img: ico, Rect: ico.Bounds()}.Add(ops)
+	gdraw.DrawOp{
 		Rect: toRectF(ico.Bounds().Add(dp)),
 	}.Add(ops)
 	return layout.Dimens{Size: dims}

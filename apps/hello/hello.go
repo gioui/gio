@@ -55,7 +55,7 @@ func loop(w *app.Window) {
 			cfg = e.Config
 			cs := layout.ExactConstraints(w.Size())
 			ops.Reset()
-			draw.OpColor{Col: maroon}.Add(ops)
+			draw.ColorOp{Col: maroon}.Add(ops)
 			text.Label{Face: face, Alignment: text.Center, Text: message}.Layout(ops, cs)
 			w.Draw(ops)
 			faces.Frame()
