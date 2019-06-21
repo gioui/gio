@@ -83,8 +83,12 @@ func (c *Click) Add(ops *ui.Ops) {
 
 func (c *Click) Update(q input.Events) []ClickEvent {
 	var events []ClickEvent
-	for _, e := range q.For(c) {
-		e, ok := e.(pointer.Event)
+	for {
+		evt, ok := q.Next(c)
+		if !ok {
+			break
+		}
+		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue
 		}
@@ -135,8 +139,12 @@ func (s *Scroll) Update(cfg *ui.Config, q input.Events, axis Axis) int {
 		return 0
 	}
 	total := 0
-	for _, e := range q.For(s) {
-		e, ok := e.(pointer.Event)
+	for {
+		evt, ok := q.Next(s)
+		if !ok {
+			break
+		}
+		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue
 		}

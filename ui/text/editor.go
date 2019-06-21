@@ -25,6 +25,7 @@ type Editor struct {
 	Face       Face
 	Alignment  Alignment
 	SingleLine bool
+	Submit     bool
 
 	oldCfg            ui.Config
 	blinkStart        time.Time
@@ -103,7 +104,11 @@ func (e *Editor) Next() (EditorEvent, bool) {
 		}
 	}
 	stop := (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin)
-	for _, ke := range e.Inputs.For(e) {
+	for {
+		ke, ok := e.Inputs.Next(e)
+		if !ok {
+			break
+		}
 		e.blinkStart = e.Config.Now
 		switch ke := ke.(type) {
 		case key.Focus:
@@ -112,7 +117,7 @@ func (e *Editor) Next() (EditorEvent, bool) {
 			if !e.focused {
 				break
 			}
-			if ke.Name == key.NameReturn || ke.Name == key.NameEnter {
+			if e.Submit && (ke.Name == key.NameReturn || ke.Name == key.NameEnter) {
 				if !ke.Modifiers.Contain(key.ModShift) {
 					return Submit{}, true
 				}
