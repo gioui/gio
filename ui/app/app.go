@@ -18,7 +18,7 @@ type Draw struct {
 	Config *ui.Config
 	Size   image.Point
 	// Whether this draw is system generated
-	// and needs to a complete frame before
+	// and needs a complete frame before
 	// proceeding.
 	sync bool
 }

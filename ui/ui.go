@@ -11,8 +11,8 @@ import (
 	"gioui.org/ui/internal/ops"
 )
 
-// Config contain the context for updating and
-// drawing a user interface.
+// Config contains the essential configuration for
+// updating and drawing a user interface.
 type Config struct {
 	// Device pixels per dp.
 	PxPerDp float32
