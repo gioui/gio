@@ -20,12 +20,13 @@ import (
 )
 
 type Editor struct {
+	Config     *ui.Config
 	Face       Face
 	Alignment  Alignment
 	SingleLine bool
 	Submit     bool
 
-	cfg               *ui.Config
+	oldCfg            ui.Config
 	blinkStart        time.Time
 	focused           bool
 	rr                editBuffer
@@ -65,11 +66,11 @@ const (
 
 func (s Submission) isEditorEvent() {}
 
-func (e *Editor) Update(c *ui.Config, q input.Events) []EditorEvent {
-	if e.cfg == nil || c.PxPerDp != e.cfg.PxPerDp || c.PxPerSp != e.cfg.PxPerSp {
+func (e *Editor) Update(q input.Events) []EditorEvent {
+	if cfg := *e.Config; cfg != e.oldCfg {
 		e.invalidate()
+		e.oldCfg = cfg
 	}
-	e.cfg = c
 	sbounds := e.scrollBounds()
 	var smin, smax int
 	var axis gesture.Axis
@@ -80,7 +81,7 @@ func (e *Editor) Update(c *ui.Config, q input.Events) []EditorEvent {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Update(c, q, axis)
+	sdist := e.scroller.Update(e.Config, q, axis)
 	var soff int
 	if e.SingleLine {
 		e.scrollOff.X += sdist
@@ -95,7 +96,7 @@ func (e *Editor) Update(c *ui.Config, q input.Events) []EditorEvent {
 		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
 			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
 			scrollTo = true
-			e.blinkStart = c.Now
+			e.blinkStart = e.Config.Now
 			e.moveCoord(image.Point{
 				X: int(math.Round(float64(evt.Position.X))),
 				Y: int(math.Round(float64(evt.Position.Y))),
@@ -106,7 +107,7 @@ func (e *Editor) Update(c *ui.Config, q input.Events) []EditorEvent {
 	stop := (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin)
 	var events []EditorEvent
 	for _, ke := range q.For(e) {
-		e.blinkStart = c.Now
+		e.blinkStart = e.Config.Now
 		switch ke := ke.(type) {
 		case key.Focus:
 			e.focused = ke.Focus
@@ -141,12 +142,12 @@ func (e *Editor) Update(c *ui.Config, q input.Events) []EditorEvent {
 }
 
 func (e *Editor) caretWidth() fixed.Int26_6 {
-	oneDp := int(e.cfg.Val(ui.Dp(1)) + .5)
+	oneDp := int(e.Config.Val(ui.Dp(1)) + .5)
 	return fixed.Int26_6(oneDp * 64)
 }
 
 func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	twoDp := int(e.cfg.Val(ui.Dp(2)) + 0.5)
+	twoDp := int(e.Config.Val(ui.Dp(2)) + 0.5)
 	e.padLeft, e.padRight = twoDp, twoDp
 	maxWidth := cs.Width.Max
 	if e.SingleLine {
@@ -195,7 +196,7 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		ui.OpPop{}.Add(ops)
 	}
 	if e.focused {
-		now := e.cfg.Now
+		now := e.Config.Now
 		dt := now.Sub(e.blinkStart)
 		blinking := dt < maxBlinkDuration
 		const timePerBlink = time.Second / blinksPerSecond
