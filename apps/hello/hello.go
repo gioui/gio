@@ -51,7 +51,7 @@ func loop(w *app.Window) {
 	for w.IsAlive() {
 		e := <-w.Events()
 		switch e := e.(type) {
-		case app.Draw:
+		case app.DrawEvent:
 			cfg = e.Config
 			cs := layout.ExactConstraints(w.Size())
 			ops.Reset()

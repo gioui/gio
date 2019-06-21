@@ -179,7 +179,7 @@ func (a *App) run() error {
 			switch e := e.(type) {
 			case input.Event:
 				a.inputs.Add(e)
-				if e, ok := e.(key.Chord); ok {
+				if e, ok := e.(key.ChordEvent); ok {
 					switch e.Name {
 					case key.NameEscape:
 						os.Exit(0)
@@ -189,7 +189,7 @@ func (a *App) run() error {
 						}
 					}
 				}
-			case app.ChangeStage:
+			case app.StageEvent:
 				if e.Stage >= app.StageRunning {
 					if a.ctxCancel == nil {
 						a.ctx, a.ctxCancel = context.WithCancel(context.Background())
@@ -203,7 +203,7 @@ func (a *App) run() error {
 						a.ctxCancel = nil
 					}
 				}
-			case *app.Command:
+			case *app.CommandEvent:
 				switch e.Type {
 				case app.CommandBack:
 					if a.selectedUser != nil {
@@ -211,7 +211,7 @@ func (a *App) run() error {
 						e.Cancel = true
 					}
 				}
-			case app.Draw:
+			case app.DrawEvent:
 				ops.Reset()
 				a.cfg = e.Config
 				cs := layout.ExactConstraints(a.w.Size())
