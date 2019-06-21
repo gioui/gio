@@ -20,7 +20,7 @@ type Stack struct {
 }
 
 type StackChild struct {
-	block ui.OpBlock
+	block ui.BlockOp
 	dims  Dimens
 }
 
@@ -54,7 +54,7 @@ func (s *Stack) begin() {
 	}
 	s.begun = true
 	s.ops.Begin()
-	ui.OpLayer{}.Add(s.ops)
+	ui.LayerOp{}.Add(s.ops)
 }
 
 func (s *Stack) Rigid() Constraints {
@@ -103,10 +103,10 @@ func (s *Stack) Layout(children ...StackChild) Dimens {
 		case SW, S, SE:
 			p.Y = s.maxSZ.Y - sz.Y
 		}
-		ui.OpPush{}.Add(s.ops)
-		ui.OpTransform{Transform: ui.Offset(toPointF(p))}.Add(s.ops)
+		ui.PushOp{}.Add(s.ops)
+		ui.TransformOp{Transform: ui.Offset(toPointF(p))}.Add(s.ops)
 		ch.block.Add(s.ops)
-		ui.OpPop{}.Add(s.ops)
+		ui.PopOp{}.Add(s.ops)
 	}
 	b := s.baseline
 	if b == 0 {

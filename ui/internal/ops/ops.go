@@ -10,7 +10,7 @@ const (
 	TypeBlock
 	TypeTransform
 	TypeLayer
-	TypeRedraw
+	TypeInvalidate
 	TypeImage
 	TypeDraw
 	TypeColor

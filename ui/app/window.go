@@ -161,8 +161,8 @@ func collectRedraws(r *ui.OpsReader) (time.Time, bool) {
 			break
 		}
 		switch ops.OpType(encOp.Data[0]) {
-		case ops.TypeRedraw:
-			var op ui.OpRedraw
+		case ops.TypeInvalidate:
+			var op ui.InvalidateOp
 			op.Decode(encOp.Data)
 			if !redraw || op.At.Before(t) {
 				redraw = true

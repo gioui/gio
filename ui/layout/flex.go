@@ -25,7 +25,7 @@ type Flex struct {
 }
 
 type FlexChild struct {
-	block ui.OpBlock
+	block ui.BlockOp
 	dims  Dimens
 }
 
@@ -79,7 +79,7 @@ func (f *Flex) begin() {
 	}
 	f.begun = true
 	f.ops.Begin()
-	ui.OpLayer{}.Add(f.ops)
+	ui.LayerOp{}.Add(f.ops)
 }
 
 func (f *Flex) Rigid() Constraints {
@@ -159,12 +159,12 @@ func (f *Flex) Layout(children ...FlexChild) Dimens {
 				cross = f.maxBaseline - b
 			}
 		}
-		ui.OpPush{}.Add(f.ops)
-		ui.OpTransform{
+		ui.PushOp{}.Add(f.ops)
+		ui.TransformOp{
 			Transform: ui.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))),
 		}.Add(f.ops)
 		child.block.Add(f.ops)
-		ui.OpPop{}.Add(f.ops)
+		ui.PopOp{}.Add(f.ops)
 		mainSize += axisMain(f.Axis, dims.Size)
 		switch f.MainAxisAlignment {
 		case SpaceEvenly:

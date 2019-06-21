@@ -14,7 +14,7 @@ import (
 
 type scrollChild struct {
 	size  image.Point
-	block ui.OpBlock
+	block ui.BlockOp
 }
 
 type List struct {
@@ -91,7 +91,7 @@ func (l *List) Next() (int, Constraints, bool) {
 	if ok {
 		cs = axisConstraints(l.Axis, Constraint{Max: ui.Inf}, l.crossConstraintChild(l.cs))
 		l.ops.Begin()
-		ui.OpLayer{}.Add(l.ops)
+		ui.LayerOp{}.Add(l.ops)
 	}
 	return i, cs, ok
 }
@@ -194,13 +194,13 @@ func (l *List) Layout() Dimens {
 			Min: axisPoint(l.Axis, min, -ui.Inf),
 			Max: axisPoint(l.Axis, max, ui.Inf),
 		}
-		ui.OpPush{}.Add(ops)
+		ui.PushOp{}.Add(ops)
 		draw.RectClip(r).Add(ops)
-		ui.OpTransform{
+		ui.TransformOp{
 			Transform: ui.Offset(toPointF(axisPoint(l.Axis, transPos, cross))),
 		}.Add(ops)
 		child.block.Add(ops)
-		ui.OpPop{}.Add(ops)
+		ui.PopOp{}.Add(ops)
 		pos += childSize
 	}
 	atStart := l.first == 0 && l.offset <= 0

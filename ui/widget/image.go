@@ -27,7 +27,7 @@ func (im Image) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	dr := f32.Rectangle{
 		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
 	}
-	draw.OpImage{Img: im.Src, Rect: im.Rect}.Add(ops)
-	draw.OpDraw{Rect: dr}.Add(ops)
+	draw.ImageOp{Img: im.Src, Rect: im.Rect}.Add(ops)
+	draw.DrawOp{Rect: dr}.Add(ops)
 	return layout.Dimens{Size: d, Baseline: d.Y}
 }

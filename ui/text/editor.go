@@ -180,7 +180,7 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		Min: image.Point{X: 0, Y: 0},
 		Max: image.Point{X: e.viewSize.X, Y: e.viewSize.Y},
 	}
-	key.OpHandler{Key: e, Focus: e.requestFocus}.Add(ops)
+	key.HandlerOp{Key: e, Focus: e.requestFocus}.Add(ops)
 	e.requestFocus = false
 	e.it = lineIterator{
 		Lines:     lines,
@@ -194,11 +194,11 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		if !ok {
 			break
 		}
-		ui.OpPush{}.Add(ops)
-		ui.OpTransform{Transform: ui.Offset(lineOff)}.Add(ops)
+		ui.PushOp{}.Add(ops)
+		ui.TransformOp{Transform: ui.Offset(lineOff)}.Add(ops)
 		e.Face.Path(str).Add(ops)
-		draw.OpDraw{Rect: toRectF(clip).Sub(lineOff)}.Add(ops)
-		ui.OpPop{}.Add(ops)
+		draw.DrawOp{Rect: toRectF(clip).Sub(lineOff)}.Add(ops)
+		ui.PopOp{}.Add(ops)
 	}
 	if e.focused {
 		now := e.Config.Now
@@ -221,11 +221,11 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			})
 			carRect = clip.Intersect(carRect)
 			if !carRect.Empty() {
-				draw.OpDraw{Rect: toRectF(carRect)}.Add(ops)
+				draw.DrawOp{Rect: toRectF(carRect)}.Add(ops)
 			}
 		}
 		if blinking {
-			redraw := ui.OpRedraw{At: nextBlink}
+			redraw := ui.InvalidateOp{At: nextBlink}
 			redraw.Add(ops)
 		}
 	}

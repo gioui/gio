@@ -23,14 +23,14 @@ type Event struct {
 	Scroll    f32.Point
 }
 
-type OpArea struct {
+type AreaOp struct {
 	Transparent bool
 
 	kind areaKind
 	size image.Point
 }
 
-type OpHandler struct {
+type HandlerOp struct {
 	Key  Key
 	Grab bool
 }
@@ -75,21 +75,21 @@ const (
 	areaEllipse
 )
 
-func AreaRect(size image.Point) OpArea {
-	return OpArea{
+func AreaRect(size image.Point) AreaOp {
+	return AreaOp{
 		kind: areaRect,
 		size: size,
 	}
 }
 
-func AreaEllipse(size image.Point) OpArea {
-	return OpArea{
+func AreaEllipse(size image.Point) AreaOp {
+	return AreaOp{
 		kind: areaEllipse,
 		size: size,
 	}
 }
 
-func (op OpArea) Add(o *ui.Ops) {
+func (op AreaOp) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypeAreaLen)
 	data[0] = byte(ops.TypeArea)
 	data[1] = byte(op.kind)
@@ -99,7 +99,7 @@ func (op OpArea) Add(o *ui.Ops) {
 	o.Write(data)
 }
 
-func (op *OpArea) Decode(d []byte) {
+func (op *AreaOp) Decode(d []byte) {
 	if ops.OpType(d[0]) != ops.TypeArea {
 		panic("invalid op")
 	}
@@ -108,13 +108,13 @@ func (op *OpArea) Decode(d []byte) {
 		X: int(bo.Uint32(d[2:])),
 		Y: int(bo.Uint32(d[6:])),
 	}
-	*op = OpArea{
+	*op = AreaOp{
 		kind: areaKind(d[1]),
 		size: size,
 	}
 }
 
-func (op *OpArea) Hit(pos f32.Point) HitResult {
+func (op *AreaOp) Hit(pos f32.Point) HitResult {
 	res := HitOpaque
 	if op.Transparent {
 		res = HitTransparent
@@ -144,7 +144,7 @@ func (op *OpArea) Hit(pos f32.Point) HitResult {
 	}
 }
 
-func (h OpHandler) Add(o *ui.Ops) {
+func (h HandlerOp) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypePointerHandlerLen)
 	data[0] = byte(ops.TypePointerHandler)
 	if h.Grab {
@@ -153,11 +153,11 @@ func (h OpHandler) Add(o *ui.Ops) {
 	o.Write(data, h.Key)
 }
 
-func (h *OpHandler) Decode(d []byte, refs []interface{}) {
+func (h *HandlerOp) Decode(d []byte, refs []interface{}) {
 	if ops.OpType(d[0]) != ops.TypePointerHandler {
 		panic("invalid op")
 	}
-	*h = OpHandler{
+	*h = HandlerOp{
 		Grab: d[1] != 0,
 		Key:  refs[0].(Key),
 	}

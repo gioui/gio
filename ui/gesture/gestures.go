@@ -77,7 +77,7 @@ const (
 )
 
 func (c *Click) Add(ops *ui.Ops) {
-	op := pointer.OpHandler{Key: c}
+	op := pointer.HandlerOp{Key: c}
 	op.Add(ops)
 }
 
@@ -118,10 +118,10 @@ func (c *Click) Update(q input.Events) []ClickEvent {
 }
 
 func (s *Scroll) Add(ops *ui.Ops) {
-	oph := pointer.OpHandler{Key: s, Grab: s.grab}
+	oph := pointer.HandlerOp{Key: s, Grab: s.grab}
 	oph.Add(ops)
 	if s.flinger.Active() {
-		ui.OpRedraw{}.Add(ops)
+		ui.InvalidateOp{}.Add(ops)
 	}
 }
 

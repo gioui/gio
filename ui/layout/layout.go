@@ -104,8 +104,8 @@ func (in *Insets) Begin(ops *ui.Ops, cs Constraints) Constraints {
 			mcs.Height.Max = mcs.Height.Min
 		}
 	}
-	ui.OpPush{}.Add(ops)
-	ui.OpTransform{Transform: ui.Offset(toPointF(image.Point{X: l, Y: t}))}.Add(ops)
+	ui.PushOp{}.Add(ops)
+	ui.TransformOp{Transform: ui.Offset(toPointF(image.Point{X: l, Y: t}))}.Add(ops)
 	return mcs
 }
 
@@ -115,7 +115,7 @@ func (in *Insets) End(dims Dimens) Dimens {
 	}
 	in.begun = false
 	ops := in.ops
-	ui.OpPop{}.Add(ops)
+	ui.PopOp{}.Add(ops)
 	t, r, b, l := int(math.Round(float64(in.Top))), int(math.Round(float64(in.Right))), int(math.Round(float64(in.Bottom))), int(math.Round(float64(in.Left)))
 	return Dimens{
 		Size:     in.cs.Constrain(dims.Size.Add(image.Point{X: r + l, Y: t + b})),
@@ -201,10 +201,10 @@ func (a *Align) End(dims Dimens) Dimens {
 	case SW, S, SE:
 		p.Y = sz.Y - dims.Size.Y
 	}
-	ui.OpPush{}.Add(ops)
-	ui.OpTransform{Transform: ui.Offset(toPointF(p))}.Add(ops)
+	ui.PushOp{}.Add(ops)
+	ui.TransformOp{Transform: ui.Offset(toPointF(p))}.Add(ops)
 	block.Add(ops)
-	ui.OpPop{}.Add(ops)
+	ui.PopOp{}.Add(ops)
 	return Dimens{
 		Size:     sz,
 		Baseline: dims.Baseline,

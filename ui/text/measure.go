@@ -35,7 +35,7 @@ type Layout struct {
 
 type Face interface {
 	Layout(str string, singleLine bool, maxWidth int) *Layout
-	Path(str String) ui.OpBlock
+	Path(str String) ui.BlockOp
 }
 
 type Alignment uint8

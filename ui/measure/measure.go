@@ -30,7 +30,7 @@ type cachedLayout struct {
 
 type cachedPath struct {
 	active bool
-	path   ui.OpBlock
+	path   ui.BlockOp
 }
 
 type layoutKey struct {
@@ -121,7 +121,7 @@ func (f *textFace) Layout(str string, singleLine bool, maxWidth int) *text.Layou
 	return l
 }
 
-func (f *textFace) Path(str text.String) ui.OpBlock {
+func (f *textFace) Path(str text.String) ui.BlockOp {
 	ppem := fixed.Int26_6(f.faces.Config.Val(f.size)*64 + .5)
 	pk := pathKey{
 		f:    f.font.Font,
@@ -229,7 +229,7 @@ func layoutText(ppem fixed.Int26_6, str string, f *opentype, singleLine bool, ma
 	return &text.Layout{Lines: lines}
 }
 
-func textPath(ppem fixed.Int26_6, f *opentype, str text.String) ui.OpBlock {
+func textPath(ppem fixed.Int26_6, f *opentype, str text.String) ui.BlockOp {
 	var lastPos f32.Point
 	var builder draw.PathBuilder
 	ops := new(ui.Ops)

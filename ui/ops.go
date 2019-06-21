@@ -58,11 +58,11 @@ type pc struct {
 	refs int
 }
 
-type OpPush struct{}
+type PushOp struct{}
 
-type OpPop struct{}
+type PopOp struct{}
 
-type OpBlock struct {
+type BlockOp struct {
 	ops     *opsData
 	version int
 	pc      pc
@@ -76,11 +76,11 @@ type opAux struct {
 	len int
 }
 
-func (p OpPush) Add(o *Ops) {
+func (p PushOp) Add(o *Ops) {
 	o.Write([]byte{byte(ops.TypePush)})
 }
 
-func (p OpPop) Add(o *Ops) {
+func (p PopOp) Add(o *Ops) {
 	o.Write([]byte{byte(ops.TypePop)})
 }
 
@@ -118,7 +118,7 @@ func (op *opBlockDef) decode(data []byte) {
 
 // End the most recent block and return
 // an op for invoking the completed block.
-func (o *Ops) End() OpBlock {
+func (o *Ops) End() BlockOp {
 	start := o.stack[len(o.stack)-1]
 	o.stack = o.stack[:len(o.stack)-1]
 	pc := o.ops.pc()
@@ -128,7 +128,7 @@ func (o *Ops) End() OpBlock {
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(pc.data))
 	bo.PutUint32(data[5:], uint32(pc.refs))
-	return OpBlock{ops: &o.ops, pc: start, version: o.ops.version}
+	return BlockOp{ops: &o.ops, pc: start, version: o.ops.version}
 }
 
 // Reset the Ops, preparing it for re-use.
@@ -189,7 +189,7 @@ func (d *opsData) pc() pc {
 	return pc{data: len(d.data), refs: len(d.refs)}
 }
 
-func (b *OpBlock) decode(data []byte, refs []interface{}) {
+func (b *BlockOp) decode(data []byte, refs []interface{}) {
 	if ops.OpType(data[0]) != ops.TypeBlock {
 		panic("invalid op")
 	}
@@ -197,7 +197,7 @@ func (b *OpBlock) decode(data []byte, refs []interface{}) {
 	dataIdx := int(bo.Uint32(data[1:]))
 	refsIdx := int(bo.Uint32(data[5:]))
 	version := int(bo.Uint32(data[9:]))
-	*b = OpBlock{
+	*b = BlockOp{
 		ops: refs[0].(*opsData),
 		pc: pc{
 			data: dataIdx,
@@ -207,7 +207,7 @@ func (b *OpBlock) decode(data []byte, refs []interface{}) {
 	}
 }
 
-func (b OpBlock) Add(o *Ops) {
+func (b BlockOp) Add(o *Ops) {
 	data := make([]byte, ops.TypeBlockLen)
 	data[0] = byte(ops.TypeBlock)
 	bo := binary.LittleEndian
@@ -251,14 +251,14 @@ func (r *OpsReader) Decode() (EncodedOp, bool) {
 			n += op.len
 			data = r.ops.data[r.pc.data : r.pc.data+n]
 		case ops.TypeBlock:
-			var op OpBlock
+			var op BlockOp
 			op.decode(data, refs)
 			blockOps := op.ops
 			if ops.OpType(blockOps.data[op.pc.data]) != ops.TypeBlockDef {
 				panic("invalid block reference")
 			}
 			if op.version != op.ops.version {
-				panic("invalid OpBlock reference to reset Ops")
+				panic("invalid BlockOp reference to reset Ops")
 			}
 			var opDef opBlockDef
 			opDef.decode(blockOps.data[op.pc.data : op.pc.data+ops.TypeBlockDef.Size()])

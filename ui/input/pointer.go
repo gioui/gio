@@ -40,7 +40,7 @@ type pointerHandler struct {
 
 type area struct {
 	trans ui.Transform
-	area  pointer.OpArea
+	area  pointer.AreaOp
 }
 
 type areaIntersection []area
@@ -68,15 +68,15 @@ func (q *pointerQueue) collectHandlers(r *ui.OpsReader, t ui.Transform, layer in
 			layer++
 			q.hitTree = append(q.hitTree, hitNode{level: layer})
 		case ops.TypeArea:
-			var op pointer.OpArea
+			var op pointer.AreaOp
 			op.Decode(encOp.Data)
 			q.areas.add(t, op)
 		case ops.TypeTransform:
-			var op ui.OpTransform
+			var op ui.TransformOp
 			op.Decode(encOp.Data)
 			t = t.Mul(op.Transform)
 		case ops.TypePointerHandler:
-			var op pointer.OpHandler
+			var op pointer.HandlerOp
 			op.Decode(encOp.Data, encOp.Refs)
 			q.hitTree = append(q.hitTree, hitNode{level: layer, key: op.Key})
 			h, ok := q.handlers[op.Key]
@@ -251,7 +251,7 @@ func (a areaIntersection) hit(p f32.Point) pointer.HitResult {
 	return res
 }
 
-func (s *areaStack) add(t ui.Transform, a pointer.OpArea) {
+func (s *areaStack) add(t ui.Transform, a pointer.AreaOp) {
 	s.areas = append(s.areas, area{t, a})
 }
 

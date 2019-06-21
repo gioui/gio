@@ -13,20 +13,20 @@ import (
 	"gioui.org/ui/internal/ops"
 )
 
-type OpImage struct {
+type ImageOp struct {
 	Img  image.Image
 	Rect image.Rectangle
 }
 
-type OpColor struct {
+type ColorOp struct {
 	Col color.NRGBA
 }
 
-type OpDraw struct {
+type DrawOp struct {
 	Rect f32.Rectangle
 }
 
-func (i OpImage) Add(o *ui.Ops) {
+func (i ImageOp) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypeImageLen)
 	data[0] = byte(ops.TypeImage)
 	bo := binary.LittleEndian
@@ -37,7 +37,7 @@ func (i OpImage) Add(o *ui.Ops) {
 	o.Write(data, i.Img)
 }
 
-func (i *OpImage) Decode(data []byte, refs []interface{}) {
+func (i *ImageOp) Decode(data []byte, refs []interface{}) {
 	bo := binary.LittleEndian
 	if ops.OpType(data[0]) != ops.TypeImage {
 		panic("invalid op")
@@ -52,13 +52,13 @@ func (i *OpImage) Decode(data []byte, refs []interface{}) {
 			Y: int(bo.Uint32(data[13:])),
 		},
 	}
-	*i = OpImage{
+	*i = ImageOp{
 		Img:  refs[0].(image.Image),
 		Rect: sr,
 	}
 }
 
-func (c OpColor) Add(o *ui.Ops) {
+func (c ColorOp) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypeColorLen)
 	data[0] = byte(ops.TypeColor)
 	data[1] = c.Col.R
@@ -68,11 +68,11 @@ func (c OpColor) Add(o *ui.Ops) {
 	o.Write(data)
 }
 
-func (c *OpColor) Decode(data []byte, refs []interface{}) {
+func (c *ColorOp) Decode(data []byte, refs []interface{}) {
 	if ops.OpType(data[0]) != ops.TypeColor {
 		panic("invalid op")
 	}
-	*c = OpColor{
+	*c = ColorOp{
 		Col: color.NRGBA{
 			R: data[1],
 			G: data[2],
@@ -82,7 +82,7 @@ func (c *OpColor) Decode(data []byte, refs []interface{}) {
 	}
 }
 
-func (d OpDraw) Add(o *ui.Ops) {
+func (d DrawOp) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypeDrawLen)
 	data[0] = byte(ops.TypeDraw)
 	bo := binary.LittleEndian
@@ -93,7 +93,7 @@ func (d OpDraw) Add(o *ui.Ops) {
 	o.Write(data)
 }
 
-func (d *OpDraw) Decode(data []byte, refs []interface{}) {
+func (d *DrawOp) Decode(data []byte, refs []interface{}) {
 	bo := binary.LittleEndian
 	if ops.OpType(data[0]) != ops.TypeDraw {
 		panic("invalid op")
@@ -108,15 +108,15 @@ func (d *OpDraw) Decode(data []byte, refs []interface{}) {
 			Y: math.Float32frombits(bo.Uint32(data[13:])),
 		},
 	}
-	*d = OpDraw{
+	*d = DrawOp{
 		Rect: r,
 	}
 }
 
-// RectClip returns an OpClip op corresponding to
+// RectClip returns a ClipOp op corresponding to
 // a pixel aligned rectangular area.
-func RectClip(r image.Rectangle) OpClip {
-	return OpClip{bounds: toRectF(r)}
+func RectClip(r image.Rectangle) ClipOp {
+	return ClipOp{bounds: toRectF(r)}
 }
 
 func itof(i int) float32 {

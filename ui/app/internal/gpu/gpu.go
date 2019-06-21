@@ -78,10 +78,10 @@ type drawState struct {
 	rect  bool
 	z     int
 
-	// Current OpImage image and rect, if any.
+	// Current ImageOp image and rect, if any.
 	img     image.Image
 	imgRect image.Rectangle
-	// Current OpColor, if any.
+	// Current ColorOp, if any.
 	color color.NRGBA
 }
 
@@ -666,7 +666,7 @@ loop:
 		}
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeTransform:
-			var op ui.OpTransform
+			var op ui.TransformOp
 			op.Decode(encOp.Data)
 			state.t = state.t.Mul(op.Transform)
 		case ops.TypeAux:
@@ -696,17 +696,17 @@ loop:
 			aux = nil
 			auxKey = ui.OpKey{}
 		case ops.TypeColor:
-			var op gdraw.OpColor
+			var op gdraw.ColorOp
 			op.Decode(encOp.Data, encOp.Refs)
 			state.img = nil
 			state.color = op.Col
 		case ops.TypeImage:
-			var op gdraw.OpImage
+			var op gdraw.ImageOp
 			op.Decode(encOp.Data, encOp.Refs)
 			state.img = op.Img
 			state.imgRect = op.Rect
 		case ops.TypeDraw:
-			var op gdraw.OpDraw
+			var op gdraw.DrawOp
 			op.Decode(encOp.Data, encOp.Refs)
 			off := state.t.Transform(f32.Point{})
 			clip := state.clip.Intersect(op.Rect.Add(off))

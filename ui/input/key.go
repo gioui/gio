@@ -92,7 +92,7 @@ loop:
 		}
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeKeyHandler:
-			var op key.OpHandler
+			var op key.HandlerOp
 			op.Decode(encOp.Data, encOp.Refs)
 			var newPri listenerPriority
 			switch {

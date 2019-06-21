@@ -7,12 +7,12 @@ import (
 	"gioui.org/ui/internal/ops"
 )
 
-type OpHandler struct {
+type HandlerOp struct {
 	Key   Key
 	Focus bool
 }
 
-type OpHideInput struct{}
+type HideInputOp struct{}
 
 type Key interface{}
 
@@ -65,7 +65,7 @@ func (m Modifiers) Contain(m2 Modifiers) bool {
 	return m&m2 == m2
 }
 
-func (h OpHandler) Add(o *ui.Ops) {
+func (h HandlerOp) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypeKeyHandlerLen)
 	data[0] = byte(ops.TypeKeyHandler)
 	if h.Focus {
@@ -74,17 +74,17 @@ func (h OpHandler) Add(o *ui.Ops) {
 	o.Write(data, h.Key)
 }
 
-func (h *OpHandler) Decode(d []byte, refs []interface{}) {
+func (h *HandlerOp) Decode(d []byte, refs []interface{}) {
 	if ops.OpType(d[0]) != ops.TypeKeyHandler {
 		panic("invalid op")
 	}
-	*h = OpHandler{
+	*h = HandlerOp{
 		Focus: d[1] != 0,
 		Key:   refs[0].(Key),
 	}
 }
 
-func (h OpHideInput) Add(o *ui.Ops) {
+func (h HideInputOp) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypeHideInputLen)
 	data[0] = byte(ops.TypeHideInput)
 	o.Write(data)

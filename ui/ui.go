@@ -46,18 +46,18 @@ func (c *Config) Val(v Value) float32 {
 	}
 }
 
-// OpLayer represents a semantic layer of UI.
-type OpLayer struct {
+// LayerOp represents a semantic layer of UI.
+type LayerOp struct {
 }
 
-// OpRedraw requests a redraw at the given time. Use
+// InvalidateOp requests a redraw at the given time. Use
 // the zero value to request an immediate redraw.
-type OpRedraw struct {
+type InvalidateOp struct {
 	At time.Time
 }
 
-// OpTransform transforms an op.
-type OpTransform struct {
+// TransformOp transforms an op.
+type TransformOp struct {
 	Transform Transform
 }
 
@@ -66,9 +66,9 @@ type Transform struct {
 	offset f32.Point
 }
 
-func (r OpRedraw) Add(o *Ops) {
+func (r InvalidateOp) Add(o *Ops) {
 	data := make([]byte, ops.TypeRedrawLen)
-	data[0] = byte(ops.TypeRedraw)
+	data[0] = byte(ops.TypeInvalidate)
 	bo := binary.LittleEndian
 	// UnixNano cannot represent the zero time.
 	if t := r.At; !t.IsZero() {
@@ -80,9 +80,9 @@ func (r OpRedraw) Add(o *Ops) {
 	o.Write(data)
 }
 
-func (r *OpRedraw) Decode(d []byte) {
+func (r *InvalidateOp) Decode(d []byte) {
 	bo := binary.LittleEndian
-	if ops.OpType(d[0]) != ops.TypeRedraw {
+	if ops.OpType(d[0]) != ops.TypeInvalidate {
 		panic("invalid op")
 	}
 	if nanos := bo.Uint64(d[1:]); nanos > 0 {
@@ -104,7 +104,7 @@ func (t Transform) Mul(t2 Transform) Transform {
 	}
 }
 
-func (t OpTransform) Add(o *Ops) {
+func (t TransformOp) Add(o *Ops) {
 	data := make([]byte, ops.TypeTransformLen)
 	data[0] = byte(ops.TypeTransform)
 	bo := binary.LittleEndian
@@ -113,12 +113,12 @@ func (t OpTransform) Add(o *Ops) {
 	o.Write(data)
 }
 
-func (t *OpTransform) Decode(d []byte) {
+func (t *TransformOp) Decode(d []byte) {
 	bo := binary.LittleEndian
 	if ops.OpType(d[0]) != ops.TypeTransform {
 		panic("invalid op")
 	}
-	*t = OpTransform{
+	*t = TransformOp{
 		Transform: Offset(f32.Point{
 			X: math.Float32frombits(bo.Uint32(d[1:])),
 			Y: math.Float32frombits(bo.Uint32(d[5:])),
@@ -126,17 +126,17 @@ func (t *OpTransform) Decode(d []byte) {
 	}
 }
 
-func (l OpLayer) Add(o *Ops) {
+func (l LayerOp) Add(o *Ops) {
 	data := make([]byte, ops.TypeLayerLen)
 	data[0] = byte(ops.TypeLayer)
 	o.Write(data)
 }
 
-func (l *OpLayer) Decode(d []byte) {
+func (l *LayerOp) Decode(d []byte) {
 	if ops.OpType(d[0]) != ops.TypeLayer {
 		panic("invalid op")
 	}
-	*l = OpLayer{}
+	*l = LayerOp{}
 }
 
 func Offset(o f32.Point) Transform {
