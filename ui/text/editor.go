@@ -25,7 +25,6 @@ type Editor struct {
 	Face       Face
 	Alignment  Alignment
 	SingleLine bool
-	Submit     bool
 
 	oldCfg            ui.Config
 	blinkStart        time.Time
@@ -56,18 +55,16 @@ type EditorEvent interface {
 	isEditorEvent()
 }
 
-type Submission struct {
-	Text string
-}
+type Submit struct{}
 
 const (
 	blinksPerSecond  = 1
 	maxBlinkDuration = 10 * time.Second
 )
 
-func (s Submission) isEditorEvent() {}
+func (s Submit) isEditorEvent() {}
 
-func (e *Editor) Update() []EditorEvent {
+func (e *Editor) Next() (EditorEvent, bool) {
 	if cfg := *e.Config; cfg != e.oldCfg {
 		e.invalidate()
 		e.oldCfg = cfg
@@ -106,7 +103,6 @@ func (e *Editor) Update() []EditorEvent {
 		}
 	}
 	stop := (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin)
-	var events []EditorEvent
 	for _, ke := range e.Inputs.For(e) {
 		e.blinkStart = e.Config.Now
 		switch ke := ke.(type) {
@@ -116,11 +112,9 @@ func (e *Editor) Update() []EditorEvent {
 			if !e.focused {
 				break
 			}
-			if e.Submit && (ke.Name == key.NameReturn || ke.Name == key.NameEnter) {
+			if ke.Name == key.NameReturn || ke.Name == key.NameEnter {
 				if !ke.Modifiers.Contain(key.ModShift) {
-					events = append(events, Submission{e.Text()})
-					e.SetText("")
-					break
+					return Submit{}, true
 				}
 			}
 			if e.command(ke) {
@@ -139,7 +133,7 @@ func (e *Editor) Update() []EditorEvent {
 	if stop {
 		e.scroller.Stop()
 	}
-	return events
+	return nil, false
 }
 
 func (e *Editor) caretWidth() fixed.Int26_6 {
@@ -148,6 +142,11 @@ func (e *Editor) caretWidth() fixed.Int26_6 {
 }
 
 func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+	for {
+		if _, ok := e.Next(); !ok {
+			break
+		}
+	}
 	twoDp := int(e.Config.Val(ui.Dp(2)) + 0.5)
 	e.padLeft, e.padRight = twoDp, twoDp
 	maxWidth := cs.Width.Max
