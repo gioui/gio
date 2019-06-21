@@ -21,6 +21,7 @@ import (
 
 type Editor struct {
 	Config     *ui.Config
+	Inputs     input.Events
 	Face       Face
 	Alignment  Alignment
 	SingleLine bool
@@ -66,7 +67,7 @@ const (
 
 func (s Submission) isEditorEvent() {}
 
-func (e *Editor) Update(q input.Events) []EditorEvent {
+func (e *Editor) Update() []EditorEvent {
 	if cfg := *e.Config; cfg != e.oldCfg {
 		e.invalidate()
 		e.oldCfg = cfg
@@ -81,7 +82,7 @@ func (e *Editor) Update(q input.Events) []EditorEvent {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Update(e.Config, q, axis)
+	sdist := e.scroller.Update(e.Config, e.Inputs, axis)
 	var soff int
 	if e.SingleLine {
 		e.scrollOff.X += sdist
@@ -91,7 +92,7 @@ func (e *Editor) Update(q input.Events) []EditorEvent {
 		soff = e.scrollOff.Y
 	}
 	scrollTo := false
-	for _, evt := range e.clicker.Update(q) {
+	for _, evt := range e.clicker.Update(e.Inputs) {
 		switch {
 		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
 			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
@@ -106,7 +107,7 @@ func (e *Editor) Update(q input.Events) []EditorEvent {
 	}
 	stop := (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin)
 	var events []EditorEvent
-	for _, ke := range q.For(e) {
+	for _, ke := range e.Inputs.For(e) {
 		e.blinkStart = e.Config.Now
 		switch ke := ke.(type) {
 		case key.Focus:
