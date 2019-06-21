@@ -59,7 +59,7 @@ func onCreate(view C.CFTypeRef) {
 	C.gio_addLayerToView(view, w.layer)
 	views[view] = w
 	windows <- ow
-	w.w.event(ChangeStage{StagePaused})
+	w.w.event(StageEvent{StagePaused})
 }
 
 //export onDraw
@@ -72,13 +72,13 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int) {
 	w.visible.Store(true)
 	C.gio_updateView(view, w.layer)
 	if !wasVisible {
-		w.w.event(ChangeStage{StageRunning})
+		w.w.event(StageEvent{StageRunning})
 	}
 	isSync := false
 	if sync != 0 {
 		isSync = true
 	}
-	w.w.event(Draw{
+	w.w.event(DrawEvent{
 		Size: image.Point{
 			X: int(width + .5),
 			Y: int(height + .5),
@@ -96,14 +96,14 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int) {
 func onStop(view C.CFTypeRef) {
 	w := views[view]
 	w.visible.Store(false)
-	w.w.event(ChangeStage{StagePaused})
+	w.w.event(StageEvent{StagePaused})
 }
 
 //export onDestroy
 func onDestroy(view C.CFTypeRef) {
 	w := views[view]
 	delete(views, view)
-	w.w.event(ChangeStage{StageDead})
+	w.w.event(StageEvent{StageDead})
 	C.gio_removeLayer(w.layer)
 	C.CFRelease(w.layer)
 	w.layer = 0
@@ -113,7 +113,7 @@ func onDestroy(view C.CFTypeRef) {
 //export onFocus
 func onFocus(view C.CFTypeRef, focus int) {
 	w := views[view]
-	w.w.event(key.Focus{Focus: focus != 0})
+	w.w.event(key.FocusEvent{Focus: focus != 0})
 }
 
 //export onLowMemory
@@ -150,7 +150,7 @@ func onDeleteBackward(view C.CFTypeRef) {
 //export onText
 func onText(view C.CFTypeRef, str *C.char) {
 	w := views[view]
-	w.w.event(key.Edit{
+	w.w.event(key.EditEvent{
 		Text: C.GoString(str),
 	})
 }
@@ -194,7 +194,7 @@ func (w *window) setAnimating(anim bool) {
 }
 
 func (w *window) onKeyCommand(name rune) {
-	w.w.event(key.Chord{
+	w.w.event(key.ChordEvent{
 		Name: name,
 	})
 }

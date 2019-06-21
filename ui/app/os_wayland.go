@@ -644,14 +644,14 @@ func gio_onKeyboardEnter(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, se
 	conn.repeat.Stop(0)
 	w := winMap[surf]
 	winMap[keyboard] = w
-	w.w.event(key.Focus{Focus: true})
+	w.w.event(key.FocusEvent{Focus: true})
 }
 
 //export gio_onKeyboardLeave
 func gio_onKeyboardLeave(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial C.uint32_t, surf *C.struct_wl_surface) {
 	conn.repeat.Stop(0)
 	w := winMap[keyboard]
-	w.w.event(key.Focus{Focus: false})
+	w.w.event(key.FocusEvent{Focus: false})
 }
 
 //export gio_onKeyboardKey
@@ -852,7 +852,7 @@ func (w *window) dispatchKey(keyCode C.uint32_t) {
 	}
 	sym := C.xkb_state_key_get_one_sym(conn.xkbState, C.xkb_keycode_t(keyCode))
 	if n, ok := convertKeysym(sym); ok {
-		cmd := key.Chord{Name: n}
+		cmd := key.ChordEvent{Name: n}
 		if C.xkb_state_mod_name_is_active(conn.xkbState, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_CTRL[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
 			cmd.Modifiers |= key.ModCommand
 		}
@@ -893,7 +893,7 @@ func (w *window) dispatchKey(keyCode C.uint32_t) {
 		}
 	}
 	if len(str) > 0 {
-		w.w.event(key.Edit{Text: string(str)})
+		w.w.event(key.EditEvent{Text: string(str)})
 	}
 }
 
@@ -1045,7 +1045,7 @@ func (w *window) draw(sync bool) {
 		C.gio_wl_callback_add_listener(w.lastFrameCallback, unsafe.Pointer(w.surf))
 	}
 	cfg.Now = time.Now()
-	w.w.event(Draw{
+	w.w.event(DrawEvent{
 		Size: image.Point{
 			X: width,
 			Y: height,
@@ -1060,7 +1060,7 @@ func (w *window) setStage(s Stage) {
 		return
 	}
 	w.stage = s
-	w.w.event(ChangeStage{s})
+	w.w.event(StageEvent{s})
 }
 
 func (w *window) display() unsafe.Pointer {

@@ -240,16 +240,16 @@ func (w *Window) event(e Event) {
 	switch e := e.(type) {
 	case input.Event:
 		needRedraw = true
-	case *Command:
+	case *CommandEvent:
 		needAck = true
 		needRedraw = true
-	case ChangeStage:
+	case StageEvent:
 		w.stage = e.Stage
 		if w.stage > StageDead {
 			needAck = true
 			w.syncGPU = true
 		}
-	case Draw:
+	case DrawEvent:
 		if e.Size == (image.Point{}) {
 			panic(errors.New("internal error: zero-sized Draw"))
 		}

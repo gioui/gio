@@ -66,7 +66,7 @@ func (w *window) setStage(stage Stage) {
 		return
 	}
 	w.stage = stage
-	w.w.event(ChangeStage{stage})
+	w.w.event(StageEvent{stage})
 }
 
 //export gio_onFrameCallback
@@ -88,7 +88,7 @@ func gio_onKeys(view C.CFTypeRef, cstr *C.char, ti C.double, mods C.NSUInteger) 
 	w := views[view]
 	for _, k := range str {
 		if n, ok := convertKey(k); ok {
-			w.w.event(key.Chord{Name: n, Modifiers: kmods})
+			w.w.event(key.ChordEvent{Name: n, Modifiers: kmods})
 		}
 	}
 }
@@ -97,7 +97,7 @@ func gio_onKeys(view C.CFTypeRef, cstr *C.char, ti C.double, mods C.NSUInteger) 
 func gio_onText(view C.CFTypeRef, cstr *C.char) {
 	str := C.GoString(cstr)
 	w := views[view]
-	w.w.event(key.Edit{Text: str})
+	w.w.event(key.EditEvent{Text: str})
 }
 
 //export gio_onMouse
@@ -133,7 +133,7 @@ func gio_onDraw(view C.CFTypeRef) {
 //export gio_onFocus
 func gio_onFocus(view C.CFTypeRef, focus C.BOOL) {
 	w := views[view]
-	w.w.event(key.Focus{Focus: focus == C.YES})
+	w.w.event(key.FocusEvent{Focus: focus == C.YES})
 }
 
 func (w *window) draw(sync bool) {
@@ -144,7 +144,7 @@ func (w *window) draw(sync bool) {
 	cfg := getConfig()
 	cfg.Now = time.Now()
 	w.setStage(StageRunning)
-	w.w.event(Draw{
+	w.w.event(DrawEvent{
 		Size: image.Point{
 			X: width,
 			Y: height,

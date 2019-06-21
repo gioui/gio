@@ -16,16 +16,16 @@ type HideInputOp struct{}
 
 type Key interface{}
 
-type Focus struct {
+type FocusEvent struct {
 	Focus bool
 }
 
-type Chord struct {
+type ChordEvent struct {
 	Name      rune
 	Modifiers Modifiers
 }
 
-type Edit struct {
+type EditEvent struct {
 	Text string
 }
 
@@ -90,9 +90,9 @@ func (h HideInputOp) Add(o *ui.Ops) {
 	o.Write(data)
 }
 
-func (Edit) ImplementsEvent()       {}
-func (Chord) ImplementsEvent()      {}
-func (Focus) ImplementsEvent()      {}
-func (Edit) ImplementsInputEvent()  {}
-func (Chord) ImplementsInputEvent() {}
-func (Focus) ImplementsInputEvent() {}
+func (EditEvent) ImplementsEvent()       {}
+func (ChordEvent) ImplementsEvent()      {}
+func (FocusEvent) ImplementsEvent()      {}
+func (EditEvent) ImplementsInputEvent()  {}
+func (ChordEvent) ImplementsInputEvent() {}
+func (FocusEvent) ImplementsInputEvent() {}

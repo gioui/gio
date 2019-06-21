@@ -14,7 +14,7 @@ type Event interface {
 	ImplementsEvent()
 }
 
-type Draw struct {
+type DrawEvent struct {
 	Config ui.Config
 	Size   image.Point
 	// Whether this draw is system generated
@@ -23,12 +23,12 @@ type Draw struct {
 	sync bool
 }
 
-type ChangeStage struct {
+type StageEvent struct {
 	Stage Stage
 }
 
-// Command is a system event.
-type Command struct {
+// CommandEvent is a system event.
+type CommandEvent struct {
 	Type CommandType
 	// Suppress the default action of the command.
 	Cancel bool
@@ -110,9 +110,9 @@ func (l Stage) String() string {
 	}
 }
 
-func (_ Draw) ImplementsEvent()        {}
-func (_ ChangeStage) ImplementsEvent() {}
-func (_ *Command) ImplementsEvent()    {}
+func (_ DrawEvent) ImplementsEvent()     {}
+func (_ StageEvent) ImplementsEvent()    {}
+func (_ *CommandEvent) ImplementsEvent() {}
 
 func init() {
 	args := strings.Split(extraArgs, "|")

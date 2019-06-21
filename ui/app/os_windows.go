@@ -264,13 +264,13 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		fallthrough
 	case _WM_CHAR:
 		if r := rune(wParam); unicode.IsPrint(r) {
-			w.w.event(key.Edit{Text: string(r)})
+			w.w.event(key.EditEvent{Text: string(r)})
 		}
 		// The message is processed.
 		return 1
 	case _WM_KEYDOWN, _WM_SYSKEYDOWN:
 		if n, ok := convertKeyCode(wParam); ok {
-			cmd := key.Chord{Name: n}
+			cmd := key.ChordEvent{Name: n}
 			if getKeyState(_VK_CONTROL)&0x1000 != 0 {
 				cmd.Modifiers |= key.ModCommand
 			}
@@ -294,9 +294,9 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			Type: pointer.Cancel,
 		})
 	case _WM_SETFOCUS:
-		w.w.event(key.Focus{Focus: true})
+		w.w.event(key.FocusEvent{Focus: true})
 	case _WM_KILLFOCUS:
-		w.w.event(key.Focus{Focus: false})
+		w.w.event(key.FocusEvent{Focus: false})
 	case _WM_LBUTTONUP:
 		releaseCapture()
 		x, y := coordsFromlParam(lParam)
@@ -410,7 +410,7 @@ func (w *window) postRedraw() {
 
 func (w *window) setStage(s Stage) {
 	w.stage = s
-	w.w.event(ChangeStage{s})
+	w.w.event(StageEvent{s})
 }
 
 func (w *window) draw(sync bool) {
@@ -420,7 +420,7 @@ func (w *window) draw(sync bool) {
 	w.height = int(r.bottom - r.top)
 	cfg := configForDC(w.hdc)
 	cfg.Now = time.Now()
-	w.w.event(Draw{
+	w.w.event(DrawEvent{
 		Size: image.Point{
 			X: w.width,
 			Y: w.height,

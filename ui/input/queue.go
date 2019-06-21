@@ -43,7 +43,7 @@ func (q *Queue) Add(e Event) {
 	switch e := e.(type) {
 	case pointer.Event:
 		q.pqueue.Push(e, q.handlers)
-	case key.Edit, key.Chord, key.Focus:
+	case key.EditEvent, key.ChordEvent, key.FocusEvent:
 		q.kqueue.Push(e, q.handlers)
 	}
 }

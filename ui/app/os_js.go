@@ -57,7 +57,7 @@ func createWindow(opts *WindowOptions) error {
 	go func() {
 		windows <- w.w
 		w.focus()
-		w.w.event(ChangeStage{StageRunning})
+		w.w.event(StageEvent{StageRunning})
 		w.draw(true)
 		select {}
 		w.cleanup()
@@ -156,11 +156,11 @@ func (w *window) addEventListeners() {
 		return nil
 	})
 	w.addEventListener(w.tarea, "focus", func(this js.Value, args []js.Value) interface{} {
-		w.w.event(key.Focus{Focus: true})
+		w.w.event(key.FocusEvent{Focus: true})
 		return nil
 	})
 	w.addEventListener(w.tarea, "blur", func(this js.Value, args []js.Value) interface{} {
-		w.w.event(key.Focus{Focus: false})
+		w.w.event(key.FocusEvent{Focus: false})
 		return nil
 	})
 	w.addEventListener(w.tarea, "keydown", func(this js.Value, args []js.Value) interface{} {
@@ -188,7 +188,7 @@ func (w *window) addEventListeners() {
 func (w *window) flushInput() {
 	val := w.tarea.Get("value").String()
 	w.tarea.Set("value", "")
-	w.w.event(key.Edit{Text: string(val)})
+	w.w.event(key.EditEvent{Text: string(val)})
 }
 
 func (w *window) blur() {
@@ -202,7 +202,7 @@ func (w *window) focus() {
 func (w *window) keyEvent(e js.Value) {
 	k := e.Get("key").String()
 	if n, ok := translateKey(k); ok {
-		cmd := key.Chord{Name: n}
+		cmd := key.ChordEvent{Name: n}
 		if e.Call("getModifierState", "Control").Bool() {
 			cmd.Modifiers |= key.ModCommand
 		}
@@ -336,7 +336,7 @@ func (w *window) draw(sync bool) {
 	w.scale = float32(scale)
 	w.mu.Unlock()
 	cfg.Now = time.Now()
-	w.w.event(Draw{
+	w.w.event(DrawEvent{
 		Size: image.Point{
 			X: width,
 			Y: height,

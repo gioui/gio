@@ -111,9 +111,9 @@ func (e *Editor) Next() (EditorEvent, bool) {
 		}
 		e.blinkStart = e.Config.Now
 		switch ke := ke.(type) {
-		case key.Focus:
+		case key.FocusEvent:
 			e.focused = ke.Focus
-		case key.Chord:
+		case key.ChordEvent:
 			if !e.focused {
 				break
 			}
@@ -126,7 +126,7 @@ func (e *Editor) Next() (EditorEvent, bool) {
 				stop = true
 				scrollTo = true
 			}
-		case key.Edit:
+		case key.EditEvent:
 			stop = true
 			scrollTo = true
 			e.append(ke.Text)
@@ -529,7 +529,7 @@ func (e *Editor) scrollToCaret() {
 	}
 }
 
-func (e *Editor) command(k key.Chord) bool {
+func (e *Editor) command(k key.ChordEvent) bool {
 	switch k.Name {
 	case key.NameReturn, key.NameEnter:
 		if !e.SingleLine {

@@ -183,7 +183,7 @@ func onFrameCallback(env *C.JNIEnv, class C.jclass, view C.jlong, nanos C.jlong)
 //export onBack
 func onBack(env *C.JNIEnv, class C.jclass, view C.jlong) C.jboolean {
 	w := views[view]
-	ev := &Command{Type: CommandBack}
+	ev := &CommandEvent{Type: CommandBack}
 	w.event(ev)
 	if ev.Cancel {
 		return C.JNI_TRUE
@@ -194,7 +194,7 @@ func onBack(env *C.JNIEnv, class C.jclass, view C.jlong) C.jboolean {
 //export onFocusChange
 func onFocusChange(env *C.JNIEnv, class C.jclass, view C.jlong, focus C.jboolean) {
 	w := views[view]
-	w.event(key.Focus{Focus: focus == C.JNI_TRUE})
+	w.event(key.FocusEvent{Focus: focus == C.JNI_TRUE})
 }
 
 func (w *window) setVisible() {
@@ -212,7 +212,7 @@ func (w *window) setStage(stage Stage) {
 		return
 	}
 	w.stage = stage
-	w.event(ChangeStage{stage})
+	w.event(StageEvent{stage})
 }
 
 func (w *window) display() unsafe.Pointer {
@@ -270,7 +270,7 @@ func (w *window) draw(sync bool) {
 		return
 	}
 	ppdp := float32(w.dpi) * inchPrDp
-	w.event(Draw{
+	w.event(DrawEvent{
 		Size: image.Point{
 			X: int(width),
 			Y: int(height),
@@ -334,10 +334,10 @@ func convertKeyCode(code C.jint) (rune, bool) {
 func onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, keyCode, r C.jint, t C.jlong) {
 	w := views[handle]
 	if n, ok := convertKeyCode(keyCode); ok {
-		w.event(key.Chord{Name: n})
+		w.event(key.ChordEvent{Name: n})
 	}
 	if r != 0 {
-		w.event(key.Edit{Text: string(rune(r))})
+		w.event(key.EditEvent{Text: string(rune(r))})
 	}
 }
 

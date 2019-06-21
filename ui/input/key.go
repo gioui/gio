@@ -54,11 +54,11 @@ func (q *keyQueue) Frame(root *ui.Ops, events handlerEvents) {
 	changed := focus != nil && focus != q.focus
 	if focus != q.focus {
 		if q.focus != nil {
-			events[q.focus] = append(events[q.focus], key.Focus{Focus: false})
+			events[q.focus] = append(events[q.focus], key.FocusEvent{Focus: false})
 		}
 		q.focus = focus
 		if q.focus != nil {
-			events[q.focus] = append(events[q.focus], key.Focus{Focus: true})
+			events[q.focus] = append(events[q.focus], key.FocusEvent{Focus: true})
 		}
 	}
 	switch {
@@ -111,7 +111,7 @@ loop:
 				h = new(keyHandler)
 				q.handlers[op.Key] = h
 				// Reset the handler on (each) first appearance.
-				events[op.Key] = []Event{key.Focus{Focus: false}}
+				events[op.Key] = []Event{key.FocusEvent{Focus: false}}
 			}
 			h.active = true
 		case ops.TypeHideInput:
