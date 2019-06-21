@@ -487,14 +487,14 @@ func convertKeyCode(code uintptr) (rune, bool) {
 	return r, true
 }
 
-func configForDC(hdc syscall.Handle) *ui.Config {
+func configForDC(hdc syscall.Handle) ui.Config {
 	dpi := getDeviceCaps(hdc, _LOGPIXELSX)
 	ppdp := float32(dpi) * inchPrDp * monitorScale
 	// Force a minimum density to keep text legible and to handle bogus output geometry.
 	if ppdp < minDensity {
 		ppdp = minDensity
 	}
-	return &ui.Config{
+	return ui.Config{
 		PxPerDp: ppdp,
 		PxPerSp: ppdp,
 	}

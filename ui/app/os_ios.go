@@ -83,7 +83,7 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int) {
 			X: int(width + .5),
 			Y: int(height + .5),
 		},
-		Config: &ui.Config{
+		Config: ui.Config{
 			PxPerDp: float32(dpi) * inchPrDp,
 			PxPerSp: float32(sdpi) * inchPrDp,
 			Now:     time.Now(),

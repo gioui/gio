@@ -275,7 +275,7 @@ func (w *window) draw(sync bool) {
 			X: int(width),
 			Y: int(height),
 		},
-		Config: &ui.Config{
+		Config: ui.Config{
 			PxPerDp: ppdp,
 			PxPerSp: w.fontScale * ppdp,
 			Now:     time.Now(),

@@ -1050,7 +1050,7 @@ func (w *window) draw(sync bool) {
 			X: width,
 			Y: height,
 		},
-		Config: &cfg,
+		Config: cfg,
 		sync:   sync,
 	})
 }
