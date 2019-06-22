@@ -70,7 +70,7 @@ func (l *List) Dragging() bool {
 
 func (l *List) update() {
 	l.Distance = 0
-	d := l.scroll.Update(l.Config, l.Inputs, gesture.Axis(l.Axis))
+	d := l.scroll.Scroll(l.Config, l.Inputs, gesture.Axis(l.Axis))
 	if l.Invert {
 		d = -d
 	}

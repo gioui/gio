@@ -80,7 +80,7 @@ func (e *Editor) Next() (EditorEvent, bool) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Update(e.Config, e.Inputs, axis)
+	sdist := e.scroller.Scroll(e.Config, e.Inputs, axis)
 	var soff int
 	if e.SingleLine {
 		e.scrollOff.X += sdist
