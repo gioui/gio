@@ -81,8 +81,7 @@ func (c *Click) Add(ops *ui.Ops) {
 	op.Add(ops)
 }
 
-func (c *Click) Update(q input.Events) []ClickEvent {
-	var events []ClickEvent
+func (c *Click) Next(q input.Events) (ClickEvent, bool) {
 	for {
 		evt, ok := q.Next(c)
 		if !ok {
@@ -94,10 +93,11 @@ func (c *Click) Update(q input.Events) []ClickEvent {
 		}
 		switch e.Type {
 		case pointer.Release:
-			if c.State == StatePressed {
-				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source})
-			}
+			wasPressed := c.State == StatePressed
 			c.State = StateNormal
+			if wasPressed {
+				return ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source}, true
+			}
 		case pointer.Cancel:
 			c.State = StateNormal
 		case pointer.Press:
@@ -105,7 +105,7 @@ func (c *Click) Update(q input.Events) []ClickEvent {
 				break
 			}
 			c.State = StatePressed
-			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source})
+			return ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source}, true
 		case pointer.Move:
 			if c.State == StatePressed && !e.Hit {
 				c.State = StateNormal
@@ -114,7 +114,7 @@ func (c *Click) Update(q input.Events) []ClickEvent {
 			}
 		}
 	}
-	return events
+	return ClickEvent{}, false
 }
 
 func (s *Scroll) Add(ops *ui.Ops) {
