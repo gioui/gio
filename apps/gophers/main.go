@@ -98,14 +98,12 @@ type icon struct {
 type redrawer func()
 
 type ActionButton struct {
-	config      *ui.Config
-	inputs      input.Events
-	face        text.Face
-	Open        bool
-	icons       []*icon
-	sendIco     *icon
-	btnClicker  *gesture.Click
-	btnsClicker *gesture.Click
+	config  *ui.Config
+	inputs  input.Events
+	face    text.Face
+	Open    bool
+	icons   []*icon
+	sendIco *icon
 }
 
 var (
@@ -254,13 +252,11 @@ func newApp(w *app.Window) *App {
 		Axis:   layout.Vertical,
 	}
 	a.fab = &ActionButton{
-		config:      &a.cfg,
-		inputs:      a.inputs,
-		face:        a.face(fonts.regular, 9),
-		sendIco:     &icon{src: icons.ContentSend, size: ui.Dp(24)},
-		icons:       []*icon{},
-		btnClicker:  new(gesture.Click),
-		btnsClicker: new(gesture.Click),
+		config:  &a.cfg,
+		inputs:  a.inputs,
+		face:    a.face(fonts.regular, 9),
+		sendIco: &icon{src: icons.ContentSend, size: ui.Dp(24)},
+		icons:   []*icon{},
 	}
 	a.edit2 = &text.Editor{
 		Config: &a.cfg,
@@ -539,8 +535,6 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 }
 
 func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	a.btnsClicker.Update(a.inputs)
-	a.btnClicker.Update(a.inputs)
 	c := a.config
 	fabCol := brandColor
 	f := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.End, MainAxisSize: layout.Min}
@@ -550,7 +544,6 @@ func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens 
 	cs = in.Begin(ops, cs)
 	dims := fab(ops, cs, a.sendIco.image(c), fabCol, c.Dp(56))
 	pointer.AreaEllipse(dims.Size).Add(ops)
-	a.btnClicker.Add(ops)
 	dims = in.End(dims)
 	return f.Layout(f.End(dims))
 }
@@ -576,8 +569,12 @@ func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dime
 func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) layout.Dimens {
 	u := a.users[index]
 	click := &a.userClicks[index]
-	for _, r := range click.Update(a.inputs) {
-		if r.Type == gesture.TypeClick {
+	for {
+		e, ok := click.Next(a.inputs)
+		if !ok {
+			break
+		}
+		if e.Type == gesture.TypeClick {
 			a.selectedUser = a.newUserPage(u)
 		}
 	}
