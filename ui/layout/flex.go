@@ -58,21 +58,19 @@ const (
 	Stretch
 )
 
-func (f *Flex) Init(ops *ui.Ops, cs Constraints) {
-	if f.constrained {
-		panic("Constrain must be called exactly once")
-	}
+func (f *Flex) Init(ops *ui.Ops, cs Constraints) *Flex {
 	f.ops = ops
-	f.constrained = true
 	f.cs = cs
+	f.constrained = true
 	f.taken = 0
 	f.maxCross = 0
 	f.maxBaseline = 0
+	return f
 }
 
 func (f *Flex) begin() {
 	if !f.constrained {
-		panic("must Constrain before adding a child")
+		panic("must Init before adding a child")
 	}
 	if f.begun {
 		panic("must End before adding a child")

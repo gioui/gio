@@ -37,17 +37,18 @@ const (
 	W
 )
 
-func (s *Stack) Init(ops *ui.Ops, cs Constraints) {
+func (s *Stack) Init(ops *ui.Ops, cs Constraints) *Stack {
 	s.ops = ops
 	s.cs = cs
 	s.constrained = true
 	s.maxSZ = image.Point{}
 	s.baseline = 0
+	return s
 }
 
 func (s *Stack) begin() {
 	if !s.constrained {
-		panic("must Constrain before adding a child")
+		panic("must Init before adding a child")
 	}
 	if s.begun {
 		panic("must End before adding a child")
