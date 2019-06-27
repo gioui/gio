@@ -435,8 +435,7 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	label := text.Label{Face: up.faces.For(fonts.regular, ui.Sp(12)), Text: msg}
 	in := layout.Insets{Top: c.Dp(16), Right: c.Dp(8), Left: c.Dp(8)}
 	cs = in.Begin(ops, cs)
-	f := layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
-	f.Init(ops, cs)
+	f := (&layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}).Init(ops, cs)
 	cs = f.Rigid()
 	sz := c.Dp(48)
 	cc := clipCircle{}
@@ -477,8 +476,7 @@ func (up *userPage) fetchCommits(ctx context.Context) {
 
 func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	c := &a.cfg
-	st := layout.Stack{Alignment: layout.Center}
-	st.Init(ops, cs)
+	st := (&layout.Stack{Alignment: layout.Center}).Init(ops, cs)
 	cs = st.Rigid()
 	al := layout.Align{Alignment: layout.SE}
 	in := layout.EqualInsets(c.Dp(16))
@@ -489,8 +487,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 
 	cs = st.Expand()
 	{
-		f := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Stretch}
-		f.Init(ops, cs)
+		f := (&layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Stretch}).Init(ops, cs)
 
 		cs = f.Rigid()
 		{
