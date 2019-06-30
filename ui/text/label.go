@@ -19,6 +19,7 @@ type Label struct {
 	Face      Face
 	Alignment Alignment
 	Text      string
+	MaxLines  int
 
 	it lineIterator
 }
@@ -82,6 +83,9 @@ func (l *lineIterator) Next() (String, f32.Point, bool) {
 func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	textLayout := l.Face.Layout(l.Text, false, cs.Width.Max)
 	lines := textLayout.Lines
+	if max := l.MaxLines; max > 0 && len(lines) > max {
+		lines = lines[:max]
+	}
 	dims := linesDimens(lines)
 	dims.Size = cs.Constrain(dims.Size)
 	padTop, padBottom := textPadding(lines)
