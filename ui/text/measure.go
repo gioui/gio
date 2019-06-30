@@ -33,8 +33,13 @@ type Layout struct {
 	Lines []Line
 }
 
+type LayoutOptions struct {
+	MaxWidth   int
+	SingleLine bool
+}
+
 type Face interface {
-	Layout(str string, singleLine bool, maxWidth int) *Layout
+	Layout(str string, opts LayoutOptions) *Layout
 	Path(str String) ui.BlockOp
 }
 

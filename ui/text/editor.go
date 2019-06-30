@@ -302,7 +302,7 @@ func (e *Editor) moveCoord(pos image.Point) {
 }
 
 func (e *Editor) layoutText() {
-	textLayout := e.Face.Layout(e.rr.String(), e.SingleLine, e.maxWidth)
+	textLayout := e.Face.Layout(e.rr.String(), LayoutOptions{SingleLine: e.SingleLine, MaxWidth: e.maxWidth})
 	lines := textLayout.Lines
 	dims := linesDimens(lines)
 	for i := 0; i < len(lines)-1; i++ {

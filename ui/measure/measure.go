@@ -34,11 +34,10 @@ type cachedPath struct {
 }
 
 type layoutKey struct {
-	f          *sfnt.Font
-	ppem       fixed.Int26_6
-	str        string
-	singleLine bool
-	maxWidth   int
+	f    *sfnt.Font
+	ppem fixed.Int26_6
+	str  string
+	opts text.LayoutOptions
 }
 
 type pathKey struct {
@@ -102,21 +101,20 @@ func (f *Faces) init() {
 	f.layoutCache = make(map[layoutKey]cachedLayout)
 }
 
-func (f *textFace) Layout(str string, singleLine bool, maxWidth int) *text.Layout {
+func (f *textFace) Layout(str string, opts text.LayoutOptions) *text.Layout {
 	ppem := fixed.Int26_6(f.faces.Config.Val(f.size)*64 + .5)
 	lk := layoutKey{
-		f:          f.font.Font,
-		ppem:       ppem,
-		str:        str,
-		singleLine: singleLine,
-		maxWidth:   maxWidth,
+		f:    f.font.Font,
+		ppem: ppem,
+		str:  str,
+		opts: opts,
 	}
 	if l, ok := f.faces.layoutCache[lk]; ok {
 		l.active = true
 		f.faces.layoutCache[lk] = l
 		return l.layout
 	}
-	l := layoutText(ppem, str, f.font, singleLine, maxWidth)
+	l := layoutText(ppem, str, f.font, opts)
 	f.faces.layoutCache[lk] = cachedLayout{active: true, layout: l}
 	return l
 }
@@ -138,7 +136,7 @@ func (f *textFace) Path(str text.String) ui.BlockOp {
 	return p
 }
 
-func layoutText(ppem fixed.Int26_6, str string, f *opentype, singleLine bool, maxWidth int) *text.Layout {
+func layoutText(ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOptions) *text.Layout {
 	m := f.Metrics(ppem)
 	lineTmpl := text.Line{
 		Ascent: m.Ascent,
@@ -149,8 +147,8 @@ func layoutText(ppem fixed.Int26_6, str string, f *opentype, singleLine bool, ma
 	}
 	var lines []text.Line
 	maxDotX := fixed.Int26_6(math.MaxInt32)
-	if maxWidth != ui.Inf {
-		maxDotX = fixed.I(maxWidth)
+	if opts.MaxWidth != ui.Inf {
+		maxDotX = fixed.I(opts.MaxWidth)
 	}
 	type state struct {
 		r     rune
@@ -175,7 +173,7 @@ func layoutText(ppem fixed.Int26_6, str string, f *opentype, singleLine bool, ma
 	for prev.idx < len(str) {
 		c, s := utf8.DecodeRuneInString(str[prev.idx:])
 		nl := text.IsNewline(c)
-		if singleLine && nl {
+		if opts.SingleLine && nl {
 			nl = false
 			c = ' '
 			s = 1
