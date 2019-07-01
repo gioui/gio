@@ -264,6 +264,8 @@ func newApp(w *app.Window) *App {
 		Face:   a.face(fonts.italic, 14),
 		//Alignment: text.End,
 		SingleLine: true,
+		Hint:       "Hint",
+		HintImage:  &image.Uniform{tertTextColor},
 	}
 	a.edit2.SetText("Single line editor. Edit me!")
 	a.edit = &text.Editor{
