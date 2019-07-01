@@ -27,6 +27,9 @@ type Editor struct {
 	SingleLine bool
 	Submit     bool
 
+	Hint      string
+	HintImage image.Image
+
 	oldCfg            ui.Config
 	blinkStart        time.Time
 	focused           bool
@@ -193,6 +196,10 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		Width:     e.viewWidth(),
 		Offset:    off,
 	}
+	ui.PushOp{}.Add(ops)
+	if e.HintImage != nil && e.rr.len() == 0 {
+		draw.ImageOp{Img: e.HintImage, Rect: e.HintImage.Bounds()}.Add(ops)
+	}
 	for {
 		str, lineOff, ok := e.it.Next()
 		if !ok {
@@ -204,6 +211,7 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		draw.DrawOp{Rect: toRectF(clip).Sub(lineOff)}.Add(ops)
 		ui.PopOp{}.Add(ops)
 	}
+	ui.PopOp{}.Add(ops)
 	if e.focused {
 		now := e.Config.Now
 		dt := now.Sub(e.blinkStart)
@@ -302,7 +310,11 @@ func (e *Editor) moveCoord(pos image.Point) {
 }
 
 func (e *Editor) layoutText() {
-	textLayout := e.Face.Layout(e.rr.String(), LayoutOptions{SingleLine: e.SingleLine, MaxWidth: e.maxWidth})
+	s := e.rr.String()
+	if s == "" {
+		s = e.Hint
+	}
+	textLayout := e.Face.Layout(s, LayoutOptions{SingleLine: e.SingleLine, MaxWidth: e.maxWidth})
 	lines := textLayout.Lines
 	dims := linesDimens(lines)
 	for i := 0; i < len(lines)-1; i++ {
