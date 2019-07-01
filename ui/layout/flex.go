@@ -143,7 +143,7 @@ func (f *Flex) Layout(children ...FlexChild) Dimens {
 	case SpaceAround:
 		mainSize += space / (len(children) * 2)
 	}
-	for _, child := range children {
+	for i, child := range children {
 		dims := child.dims
 		b := dims.Baseline
 		var cross int
@@ -164,19 +164,23 @@ func (f *Flex) Layout(children ...FlexChild) Dimens {
 		child.block.Add(f.ops)
 		ui.PopOp{}.Add(f.ops)
 		mainSize += axisMain(f.Axis, dims.Size)
-		switch f.MainAxisAlignment {
-		case SpaceEvenly:
-			mainSize += space / (1 + len(children))
-		case SpaceAround:
-			mainSize += space / len(children)
-		case SpaceBetween:
-			mainSize += space / (len(children) - 1)
+		if i < len(children)-1 {
+			switch f.MainAxisAlignment {
+			case SpaceEvenly:
+				mainSize += space / (1 + len(children))
+			case SpaceAround:
+				mainSize += space / len(children)
+			case SpaceBetween:
+				mainSize += space / (len(children) - 1)
+			}
 		}
 		if b != dims.Size.Y {
 			baseline = b
 		}
 	}
 	switch f.MainAxisAlignment {
+	case Center:
+		mainSize += space / 2
 	case Start:
 		mainSize += space
 	case SpaceEvenly:
