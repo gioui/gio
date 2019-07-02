@@ -44,7 +44,7 @@ func loop(w *app.Window) {
 	}
 	var cfg ui.Config
 	faces := &measure.Faces{Config: &cfg}
-	maroon := color.NRGBA{127, 0, 0, 255}
+	maroon := color.RGBA{127, 0, 0, 255}
 	face := faces.For(regular, ui.Sp(72))
 	message := "Hello, Gio"
 	ops := new(ui.Ops)
