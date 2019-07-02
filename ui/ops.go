@@ -2,6 +2,8 @@ package ui
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
 
 	"gioui.org/ui/internal/ops"
 )
@@ -119,6 +121,9 @@ func (op *opBlockDef) decode(data []byte) {
 // End the most recent block and return
 // an op for invoking the completed block.
 func (o *Ops) End() BlockOp {
+	if len(o.stack) == 0 {
+		panic(errors.New("End with no matching Begin"))
+	}
 	start := o.stack[len(o.stack)-1]
 	o.stack = o.stack[:len(o.stack)-1]
 	pc := o.ops.pc()
@@ -219,6 +224,9 @@ func (b BlockOp) Add(o *Ops) {
 
 // Reset start reading from the op list.
 func (r *OpsReader) Reset(ops *Ops) {
+	if n := len(ops.stack); n > 0 {
+		panic(fmt.Errorf("%d Begin(s) not matched with End", n))
+	}
 	r.ops = &ops.ops
 	r.stack = r.stack[:0]
 	r.pc = pc{}
