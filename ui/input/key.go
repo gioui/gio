@@ -103,7 +103,8 @@ loop:
 			default:
 				newPri = priDefault
 			}
-			if newPri >= pri {
+			// Switch focus if higher priority or if focus requested.
+			if newPri.replaces(pri) {
 				k, pri = op.Key, newPri
 			}
 			h, ok := q.handlers[op.Key]
@@ -119,7 +120,7 @@ loop:
 		case ops.TypePush:
 			newK, newPri, h := q.resolveFocus(events)
 			hide = hide || h
-			if newPri >= pri {
+			if newPri.replaces(pri) {
 				k, pri = newK, newPri
 			}
 		case ops.TypePop:
@@ -127,4 +128,9 @@ loop:
 		}
 	}
 	return k, pri, hide
+}
+
+func (p listenerPriority) replaces(p2 listenerPriority) bool {
+	// Favor earliest default focus or latest requested focus.
+	return p > p2 || p == p2 && p == priNewFocus
 }
