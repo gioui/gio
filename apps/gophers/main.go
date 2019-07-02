@@ -375,12 +375,12 @@ var (
 	accentColor     = rgb(0x00c28c)
 )
 
-func rgb(c uint32) color.NRGBA {
+func rgb(c uint32) color.RGBA {
 	return argb((0xff << 24) | c)
 }
 
-func argb(c uint32) color.NRGBA {
-	return color.NRGBA{A: uint8(c >> 24), R: uint8(c >> 16), G: uint8(c >> 8), B: uint8(c)}
+func argb(c uint32) color.RGBA {
+	return color.RGBA{A: uint8(c >> 24), R: uint8(c >> 16), G: uint8(c >> 8), B: uint8(c)}
 }
 
 func (a *App) face(f *sfnt.Font, size float32) text.Face {
@@ -638,7 +638,7 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 }
 
 type fill struct {
-	color color.NRGBA
+	color color.RGBA
 }
 
 func (f fill) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
@@ -695,7 +695,7 @@ func (c *clipCircle) End(dims layout.Dimens) layout.Dimens {
 	return dims
 }
 
-func fab(ops *ui.Ops, cs layout.Constraints, ico image.Image, col color.NRGBA, size float32) layout.Dimens {
+func fab(ops *ui.Ops, cs layout.Constraints, ico image.Image, col color.RGBA, size float32) layout.Dimens {
 	sz := int(size + .5)
 	rr := size * .5
 	dp := image.Point{X: (sz - ico.Bounds().Dx()) / 2, Y: (sz - ico.Bounds().Dy()) / 2}
@@ -724,7 +724,7 @@ func (ic *icon) image(cfg *ui.Config) image.Image {
 	}
 	m, _ := iconvg.DecodeMetadata(ic.src)
 	dx, dy := m.ViewBox.AspectRatio()
-	img := image.NewNRGBA(image.Rectangle{Max: image.Point{X: int(sz), Y: int(sz * dy / dx)}})
+	img := image.NewRGBA(image.Rectangle{Max: image.Point{X: int(sz), Y: int(sz * dy / dx)}})
 	var ico iconvg.Rasterizer
 	ico.SetDstImage(img, img.Bounds(), draw.Src)
 	// Use white for icons.
