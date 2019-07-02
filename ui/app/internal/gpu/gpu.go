@@ -82,7 +82,7 @@ type drawState struct {
 	img     image.Image
 	imgRect image.Rectangle
 	// Current ColorOp, if any.
-	color color.NRGBA
+	color color.RGBA
 }
 
 type pathOp struct {

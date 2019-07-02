@@ -19,7 +19,7 @@ type ImageOp struct {
 }
 
 type ColorOp struct {
-	Col color.NRGBA
+	Col color.RGBA
 }
 
 type DrawOp struct {
@@ -73,7 +73,7 @@ func (c *ColorOp) Decode(data []byte, refs []interface{}) {
 		panic("invalid op")
 	}
 	*c = ColorOp{
-		Col: color.NRGBA{
+		Col: color.RGBA{
 			R: data[1],
 			G: data[2],
 			B: data[3],
