@@ -3,11 +3,11 @@ module gioui.org/apps
 go 1.12
 
 require (
-	gioui.org/ui v0.0.0-20190702125648-33fc35f58db8
+	gioui.org/ui v0.0.0-20190702181206-475bccb722ca
 	github.com/google/go-github/v24 v24.0.1
-	golang.org/x/exp v0.0.0-20190321205749-f0864edee7f3
-	golang.org/x/image v0.0.0-20190321063152-3fc05d484e9f
-	golang.org/x/oauth2 v0.0.0-20190319182350-c85d3e98c914
+	golang.org/x/exp v0.0.0-20190627132806-fd42eb6b336f
+	golang.org/x/image v0.0.0-20190703141733-d6a02ce849c9
+	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 )
 
 replace gioui.org/ui => ../ui
