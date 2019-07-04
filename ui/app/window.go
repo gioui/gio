@@ -96,9 +96,6 @@ func (w *Window) Err() error {
 }
 
 func (w *Window) Draw(root *ui.Ops) {
-	if !w.IsAlive() {
-		return
-	}
 	w.mu.Lock()
 	var drawDur time.Duration
 	if !w.drawStart.IsZero() {
@@ -107,11 +104,10 @@ func (w *Window) Draw(root *ui.Ops) {
 	}
 	stage := w.stage
 	sync := w.syncGPU
-	size := w.size
-	w.hasNextFrame = false
 	w.syncGPU = false
+	alive := w.isAlive()
 	w.mu.Unlock()
-	if stage < StageRunning {
+	if !alive || stage < StageRunning {
 		return
 	}
 	if w.gpu != nil {
@@ -135,7 +131,11 @@ func (w *Window) Draw(root *ui.Ops) {
 			return
 		}
 	}
+	w.reader.Reset(root)
+	redrawTime, redraw := collectRedraws(&w.reader)
 	now := time.Now()
+	w.mu.Lock()
+	size := w.size
 	frameDur := now.Sub(w.lastFrame)
 	frameDur = frameDur.Truncate(100 * time.Microsecond)
 	w.lastFrame = now
@@ -144,11 +144,11 @@ func (w *Window) Draw(root *ui.Ops) {
 		w.timings = fmt.Sprintf("tot:%7s cpu:%7s %s", frameDur.Round(q), drawDur.Round(q), w.gpu.Timings())
 		w.setNextFrame(time.Time{})
 	}
-	w.reader.Reset(root)
-	if t, ok := collectRedraws(&w.reader); ok {
-		w.setNextFrame(t)
+	if redraw {
+		w.setNextFrame(redrawTime)
 	}
 	w.updateAnimation()
+	w.mu.Unlock()
 	w.gpu.Draw(w.Profiling, size, root)
 }
 
@@ -174,7 +174,9 @@ func collectRedraws(r *ui.OpsReader) (time.Time, bool) {
 }
 
 func (w *Window) Redraw() {
-	if !w.IsAlive() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.isAlive() {
 		return
 	}
 	w.setNextFrame(time.Time{})
@@ -182,9 +184,11 @@ func (w *Window) Redraw() {
 }
 
 func (w *Window) updateAnimation() {
-	w.mu.Lock()
-	defer w.mu.Unlock()
 	animate := false
+	if w.delayedDraw != nil {
+		w.delayedDraw.Stop()
+		w.delayedDraw = nil
+	}
 	if w.stage >= StageRunning && w.hasNextFrame {
 		if dt := time.Until(w.nextFrame); dt <= 0 {
 			animate = true
@@ -199,13 +203,7 @@ func (w *Window) updateAnimation() {
 }
 
 func (w *Window) setNextFrame(at time.Time) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
 	if !w.hasNextFrame || at.Before(w.nextFrame) {
-		if w.delayedDraw != nil {
-			w.delayedDraw.Stop()
-			w.delayedDraw = nil
-		}
 		w.hasNextFrame = true
 		w.nextFrame = at
 	}
@@ -224,7 +222,13 @@ func (w *Window) Stage() Stage {
 }
 
 func (w *Window) IsAlive() bool {
-	return w.Stage() != StageDead && w.err == nil
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.isAlive()
+}
+
+func (w *Window) isAlive() bool {
+	return w.stage > StageDead && w.err == nil
 }
 
 func (w *Window) contextDriver() interface{} {
@@ -236,13 +240,12 @@ func (w *Window) event(e Event) {
 	defer w.eventLock.Unlock()
 	w.mu.Lock()
 	needAck := false
-	needRedraw := false
 	switch e := e.(type) {
 	case input.Event:
-		needRedraw = true
+		w.setNextFrame(time.Time{})
 	case *CommandEvent:
 		needAck = true
-		needRedraw = true
+		w.setNextFrame(time.Time{})
 	case StageEvent:
 		w.stage = e.Stage
 		if w.stage > StageDead {
@@ -259,15 +262,13 @@ func (w *Window) event(e Event) {
 		}
 		w.drawStart = time.Now()
 		needAck = true
+		w.hasNextFrame = false
 		w.syncGPU = e.sync
 		w.size = e.Size
 	}
 	stage := w.stage
-	w.mu.Unlock()
-	if needRedraw {
-		w.setNextFrame(time.Time{})
-	}
 	w.updateAnimation()
+	w.mu.Unlock()
 	w.events <- e
 	if needAck {
 		// Send a dummy event; when it gets through we
