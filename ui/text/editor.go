@@ -59,14 +59,16 @@ type EditorEvent interface {
 	isEditorEvent()
 }
 
-type Submit struct{}
+type ChangeEvent struct{}
+type SubmitEvent struct{}
 
 const (
 	blinksPerSecond  = 1
 	maxBlinkDuration = 10 * time.Second
 )
 
-func (s Submit) isEditorEvent() {}
+func (s ChangeEvent) isEditorEvent() {}
+func (s SubmitEvent) isEditorEvent() {}
 
 func (e *Editor) Next() (EditorEvent, bool) {
 	if cfg := *e.Config; cfg != e.oldCfg {
@@ -126,7 +128,7 @@ func (e *Editor) Next() (EditorEvent, bool) {
 			}
 			if e.Submit && (ke.Name == key.NameReturn || ke.Name == key.NameEnter) {
 				if !ke.Modifiers.Contain(key.ModShift) {
-					return Submit{}, true
+					return SubmitEvent{}, true
 				}
 			}
 			if e.command(ke) {
@@ -137,6 +139,9 @@ func (e *Editor) Next() (EditorEvent, bool) {
 			stop = true
 			scrollTo = true
 			e.append(ke.Text)
+		}
+		if e.rr.Changed() {
+			return ChangeEvent{}, true
 		}
 	}
 	if sdist == 0 && scrollTo {

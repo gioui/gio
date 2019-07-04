@@ -21,14 +21,25 @@ type editBuffer struct {
 	// The gap start and end in bytes.
 	gapstart, gapend int
 	text             []byte
+
+	// changed tracks whether the buffer content
+	// has changed since the last call to Changed.
+	changed bool
 }
 
 const minSpace = 5
+
+func (e *editBuffer) Changed() bool {
+	c := e.changed
+	e.changed = false
+	return c
+}
 
 func (e *editBuffer) deleteRuneForward() {
 	e.moveGap(0)
 	_, s := utf8.DecodeRune(e.text[e.gapend:])
 	e.gapend += s
+	e.changed = e.changed || s > 0
 	e.dump()
 }
 
@@ -37,6 +48,7 @@ func (e *editBuffer) deleteRune() {
 	_, s := utf8.DecodeLastRune(e.text[:e.gapstart])
 	e.gapstart -= s
 	e.caret -= s
+	e.changed = e.changed || s > 0
 	e.dump()
 }
 
@@ -119,6 +131,7 @@ func (e *editBuffer) prepend(s string) {
 	e.moveGap(len(s))
 	copy(e.text[e.caret:], s)
 	e.gapstart += len(s)
+	e.changed = e.changed || len(s) > 0
 	e.dump()
 }
 
