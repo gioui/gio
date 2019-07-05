@@ -206,10 +206,10 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	ui.PushOp{}.Add(ops)
 	// Apply material. Set a default color in case the material is empty.
 	if e.rr.len() > 0 {
-		draw.ColorOp{Col: color.RGBA{A: 0xff}}.Add(ops)
+		draw.ColorOp{Color: color.RGBA{A: 0xff}}.Add(ops)
 		e.Material.Add(ops)
 	} else {
-		draw.ColorOp{Col: color.RGBA{A: 0xaa}}.Add(ops)
+		draw.ColorOp{Color: color.RGBA{A: 0xaa}}.Add(ops)
 		e.HintMaterial.Add(ops)
 	}
 	for {

@@ -699,7 +699,7 @@ loop:
 			var op gdraw.ColorOp
 			op.Decode(encOp.Data, encOp.Refs)
 			state.img = nil
-			state.color = op.Col
+			state.color = op.Color
 		case ops.TypeImage:
 			var op gdraw.ImageOp
 			op.Decode(encOp.Data, encOp.Refs)

@@ -19,7 +19,7 @@ type ImageOp struct {
 }
 
 type ColorOp struct {
-	Col color.RGBA
+	Color color.RGBA
 }
 
 type DrawOp struct {
@@ -61,10 +61,10 @@ func (i *ImageOp) Decode(data []byte, refs []interface{}) {
 func (c ColorOp) Add(o *ui.Ops) {
 	data := make([]byte, ops.TypeColorLen)
 	data[0] = byte(ops.TypeColor)
-	data[1] = c.Col.R
-	data[2] = c.Col.G
-	data[3] = c.Col.B
-	data[4] = c.Col.A
+	data[1] = c.Color.R
+	data[2] = c.Color.G
+	data[3] = c.Color.B
+	data[4] = c.Color.A
 	o.Write(data)
 }
 
@@ -73,7 +73,7 @@ func (c *ColorOp) Decode(data []byte, refs []interface{}) {
 		panic("invalid op")
 	}
 	*c = ColorOp{
-		Col: color.RGBA{
+		Color: color.RGBA{
 			R: data[1],
 			G: data[2],
 			B: data[3],
