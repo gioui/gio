@@ -119,6 +119,13 @@ var fonts struct {
 	mono    *sfnt.Font
 }
 
+var theme struct {
+	text     ui.BlockOp
+	tertText ui.BlockOp
+	brand    ui.BlockOp
+	white    ui.BlockOp
+}
+
 func main() {
 	if *token == "" {
 		fmt.Println("The quota for anonymous GitHub API access is very low. Specify a token with -token to avoid quota errors.")
@@ -151,6 +158,11 @@ func init() {
 	fonts.bold = mustLoadFont(gobold.TTF)
 	fonts.italic = mustLoadFont(goitalic.TTF)
 	fonts.mono = mustLoadFont(gomono.TTF)
+	var ops ui.Ops
+	theme.text = colorMaterial(&ops, rgb(0x333333))
+	theme.tertText = colorMaterial(&ops, rgb(0xbbbbbb))
+	theme.brand = colorMaterial(&ops, rgb(0x62798c))
+	theme.white = colorMaterial(&ops, rgb(0xffffff))
 	go func() {
 		for w := range app.Windows() {
 			w := w
@@ -161,6 +173,12 @@ func init() {
 			}()
 		}
 	}()
+}
+
+func colorMaterial(ops *ui.Ops, color color.RGBA) ui.BlockOp {
+	ops.Begin()
+	gdraw.ColorOp{Col: color}.Add(ops)
+	return ops.End()
 }
 
 func (a *App) run() error {
@@ -224,8 +242,7 @@ func (a *App) run() error {
 					in := layout.Insets{Top: a.cfg.Dp(16)}
 					cs = in.Begin(ops, cs)
 					txt := fmt.Sprintf("m: %d %s", mallocs, a.w.Timings())
-					gdraw.ColorOp{Col: textColor}.Add(ops)
-					dims := text.Label{Face: a.face(fonts.mono, 8), Text: txt}.Layout(ops, cs)
+					dims := text.Label{Material: theme.text, Face: a.face(fonts.mono, 8), Text: txt}.Layout(ops, cs)
 					dims = in.End(dims)
 					al.End(dims)
 				}
@@ -263,15 +280,17 @@ func newApp(w *app.Window) *App {
 		Inputs: a.inputs,
 		Face:   a.face(fonts.italic, 14),
 		//Alignment: text.End,
-		SingleLine: true,
-		Hint:       "Hint",
-		HintImage:  &image.Uniform{tertTextColor},
+		SingleLine:   true,
+		Hint:         "Hint",
+		HintMaterial: theme.tertText,
+		Material:     theme.text,
 	}
 	a.edit2.SetText("Single line editor. Edit me!")
 	a.edit = &text.Editor{
-		Config: &a.cfg,
-		Inputs: a.inputs,
-		Face:   a.face(fonts.regular, 14),
+		Config:   &a.cfg,
+		Inputs:   a.inputs,
+		Face:     a.face(fonts.regular, 14),
+		Material: theme.text,
 		//Alignment: text.End,
 		//SingleLine: true,
 	}
@@ -364,17 +383,6 @@ func mustLoadFont(fontData []byte) *sfnt.Font {
 	return fnt
 }
 
-var (
-	backgroundColor = rgb(0xfbfbfb)
-	brandColor      = rgb(0x62798c)
-	divColor        = rgb(0xecedef)
-	textColor       = rgb(0x333333)
-	secTextColor    = rgb(0xe0e4e8)
-	tertTextColor   = rgb(0xbbbbbb)
-	whiteColor      = rgb(0xffffff)
-	accentColor     = rgb(0x00c28c)
-)
-
 func rgb(c uint32) color.RGBA {
 	return argb((0xff << 24) | c)
 }
@@ -433,8 +441,7 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	u := up.user
 	c := up.config
 	msg := up.commits[index].GetMessage()
-	gdraw.ColorOp{Col: textColor}.Add(ops)
-	label := text.Label{Face: up.faces.For(fonts.regular, ui.Sp(12)), Text: msg}
+	label := text.Label{Material: theme.text, Face: up.faces.For(fonts.regular, ui.Sp(12)), Text: msg}
 	in := layout.Insets{Top: c.Dp(16), Right: c.Dp(8), Left: c.Dp(8)}
 	cs = in.Begin(ops, cs)
 	f := (&layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}).Init(ops, cs)
@@ -495,7 +502,6 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		{
 			in := layout.EqualInsets(c.Dp(16))
 			cs = layout.Sized{Height: c.Dp(200)}.Constrain(cs)
-			gdraw.ColorOp{Col: textColor}.Add(ops)
 			dims = a.edit.Layout(ops, in.Begin(ops, cs))
 			dims = in.End(dims)
 		}
@@ -504,7 +510,6 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		cs = f.Rigid()
 		{
 			in := layout.Insets{Bottom: c.Dp(16), Left: c.Dp(16), Right: c.Dp(16)}
-			gdraw.ColorOp{Col: textColor}.Add(ops)
 			dims = a.edit2.Layout(ops, in.Begin(ops, cs))
 			dims = in.End(dims)
 		}
@@ -516,11 +521,11 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			s.Init(ops, cs)
 			cs = s.Rigid()
 			in := layout.Insets{Top: c.Dp(16), Right: c.Dp(8), Bottom: c.Dp(8), Left: c.Dp(8)}
-			gdraw.ColorOp{Col: rgb(0x888888)}.Add(ops)
-			lbl := text.Label{Face: a.face(fonts.regular, 9), Text: "GOPHERS"}
+			grey := colorMaterial(ops, rgb(0x888888))
+			lbl := text.Label{Material: grey, Face: a.face(fonts.regular, 9), Text: "GOPHERS"}
 			dims = in.End(lbl.Layout(ops, in.Begin(ops, cs)))
 			c2 := s.End(dims)
-			c1 := s.End(fill{color: rgb(0xf2f2f2)}.Layout(ops, s.Expand()))
+			c1 := s.End(fill{colorMaterial(ops, rgb(0xf2f2f2))}.Layout(ops, s.Expand()))
 			dims = s.Layout(c1, c2)
 		}
 		c3 := f.End(dims)
@@ -535,13 +540,12 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 
 func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	c := a.config
-	fabCol := brandColor
 	f := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.End, MainAxisSize: layout.Min}
 	f.Init(ops, cs)
 	cs = f.Rigid()
 	in := layout.Insets{Top: c.Dp(4)}
 	cs = in.Begin(ops, cs)
-	dims := fab(ops, cs, a.sendIco.image(c), fabCol, c.Dp(56))
+	dims := fab(ops, cs, a.sendIco.image(c), theme.brand, c.Dp(56))
 	pointer.AreaEllipse(dims.Size).Add(ops)
 	dims = in.End(dims)
 	return f.Layout(f.End(dims))
@@ -604,15 +608,13 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 				f := baseline()
 				f.Init(ops, cs)
 				cs = f.Rigid()
-				gdraw.ColorOp{Col: textColor}.Add(ops)
-				dims = text.Label{Face: a.face(fonts.regular, 11), Text: u.name}.Layout(ops, cs)
+				dims = text.Label{Material: theme.text, Face: a.face(fonts.regular, 11), Text: u.name}.Layout(ops, cs)
 				c1 := f.End(dims)
 				cs = f.Rigid()
 				al := layout.Align{Alignment: layout.E}
 				in := layout.Insets{Left: c.Dp(2)}
 				cs = in.Begin(ops, al.Begin(ops, cs))
-				gdraw.ColorOp{Col: textColor}.Add(ops)
-				dims = text.Label{Face: a.face(fonts.regular, 8), Text: "3 hours ago"}.Layout(ops, cs)
+				dims = text.Label{Material: theme.text, Face: a.face(fonts.regular, 8), Text: "3 hours ago"}.Layout(ops, cs)
 				dims = al.End(in.End(dims))
 				c2 := f.End(dims)
 				dims = f.Layout(c1, c2)
@@ -621,8 +623,7 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 			cs = f.Rigid()
 			in := layout.Insets{Top: c.Dp(4)}
 			cs = in.Begin(ops, cs)
-			gdraw.ColorOp{Col: tertTextColor}.Add(ops)
-			dims = text.Label{Face: a.face(fonts.regular, 10), Text: u.company}.Layout(ops, cs)
+			dims = text.Label{Material: theme.tertText, Face: a.face(fonts.regular, 10), Text: u.company}.Layout(ops, cs)
 			dims = in.End(dims)
 			c2 := f.End(dims)
 			dims = f.Layout(c1, c2)
@@ -638,7 +639,7 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 }
 
 type fill struct {
-	color color.RGBA
+	material ui.BlockOp
 }
 
 func (f fill) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
@@ -652,7 +653,7 @@ func (f fill) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	dr := f32.Rectangle{
 		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
 	}
-	gdraw.ColorOp{Col: f.color}.Add(ops)
+	f.material.Add(ops)
 	gdraw.DrawOp{Rect: dr}.Add(ops)
 	return layout.Dimens{Size: d, Baseline: d.Y}
 }
@@ -695,13 +696,13 @@ func (c *clipCircle) End(dims layout.Dimens) layout.Dimens {
 	return dims
 }
 
-func fab(ops *ui.Ops, cs layout.Constraints, ico image.Image, col color.RGBA, size float32) layout.Dimens {
+func fab(ops *ui.Ops, cs layout.Constraints, ico image.Image, mat ui.BlockOp, size float32) layout.Dimens {
 	sz := int(size + .5)
 	rr := size * .5
 	dp := image.Point{X: (sz - ico.Bounds().Dx()) / 2, Y: (sz - ico.Bounds().Dy()) / 2}
 	dims := image.Point{X: sz, Y: sz}
 	rrect(ops, size, size, rr, rr, rr, rr)
-	gdraw.ColorOp{Col: col}.Add(ops)
+	mat.Add(ops)
 	gdraw.DrawOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(sz), Y: float32(sz)}}}.Add(ops)
 	gdraw.ImageOp{Img: ico, Rect: ico.Bounds()}.Add(ops)
 	gdraw.DrawOp{
