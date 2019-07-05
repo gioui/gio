@@ -27,8 +27,9 @@ type Editor struct {
 	SingleLine bool
 	Submit     bool
 
-	Hint      string
-	HintImage image.Image
+	Material     ui.BlockOp
+	Hint         string
+	HintMaterial ui.BlockOp
 
 	oldCfg            ui.Config
 	blinkStart        time.Time
@@ -202,8 +203,10 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		Offset:    off,
 	}
 	ui.PushOp{}.Add(ops)
-	if e.HintImage != nil && e.rr.len() == 0 {
-		draw.ImageOp{Img: e.HintImage, Rect: e.HintImage.Bounds()}.Add(ops)
+	if e.rr.len() > 0 {
+		e.Material.Add(ops)
+	} else {
+		e.HintMaterial.Add(ops)
 	}
 	for {
 		str, lineOff, ok := e.it.Next()
@@ -216,7 +219,6 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		draw.DrawOp{Rect: toRectF(clip).Sub(lineOff)}.Add(ops)
 		ui.PopOp{}.Add(ops)
 	}
-	ui.PopOp{}.Add(ops)
 	if e.focused {
 		now := e.Config.Now
 		dt := now.Sub(e.blinkStart)
@@ -246,6 +248,7 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			redraw.Add(ops)
 		}
 	}
+	ui.PopOp{}.Add(ops)
 
 	baseline := e.padTop + e.dims.Baseline
 	pointer.AreaRect(e.viewSize).Add(ops)

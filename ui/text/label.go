@@ -17,6 +17,7 @@ import (
 
 type Label struct {
 	Face      Face
+	Material  ui.BlockOp
 	Alignment Alignment
 	Text      string
 	MaxLines  int
@@ -108,6 +109,7 @@ func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		ui.PushOp{}.Add(ops)
 		ui.TransformOp{Transform: ui.Offset(off)}.Add(ops)
 		l.Face.Path(str).Add(ops)
+		l.Material.Add(ops)
 		draw.DrawOp{Rect: lclip}.Add(ops)
 		ui.PopOp{}.Add(ops)
 	}

@@ -213,6 +213,9 @@ func (b *BlockOp) decode(data []byte, refs []interface{}) {
 }
 
 func (b BlockOp) Add(o *Ops) {
+	if b.ops == nil {
+		return
+	}
 	data := make([]byte, ops.TypeBlockLen)
 	data[0] = byte(ops.TypeBlock)
 	bo := binary.LittleEndian
