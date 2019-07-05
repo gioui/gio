@@ -177,7 +177,7 @@ func init() {
 
 func colorMaterial(ops *ui.Ops, color color.RGBA) ui.BlockOp {
 	ops.Begin()
-	gdraw.ColorOp{Col: color}.Add(ops)
+	gdraw.ColorOp{Color: color}.Add(ops)
 	return ops.End()
 }
 
