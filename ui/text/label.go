@@ -4,6 +4,7 @@ package text
 
 import (
 	"image"
+	"image/color"
 	"math"
 	"unicode/utf8"
 
@@ -109,6 +110,8 @@ func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		ui.PushOp{}.Add(ops)
 		ui.TransformOp{Transform: ui.Offset(off)}.Add(ops)
 		l.Face.Path(str).Add(ops)
+		// Set a default color in case the material is empty.
+		draw.ColorOp{Col: color.RGBA{A: 0xff}}.Add(ops)
 		l.Material.Add(ops)
 		draw.DrawOp{Rect: lclip}.Add(ops)
 		ui.PopOp{}.Add(ops)
