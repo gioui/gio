@@ -118,3 +118,12 @@ func init() {
 	args := strings.Split(extraArgs, "|")
 	os.Args = append(os.Args, args...)
 }
+
+// DataDir returns a path to use for application-specific
+// configuration data.
+// On desktop systems, DataDir use os.UserConfigDir.
+// On iOS NSDocumentDirectory is queried.
+// For Android Context.getFilesDir is used.
+func DataDir() (string, error) {
+	return dataDir()
+}

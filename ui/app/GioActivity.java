@@ -12,16 +12,14 @@ import android.view.WindowManager;
 public class GioActivity extends Activity {
 	private GioView view;
 
-	static {
-		System.loadLibrary("gio");
-	}
-
 	@Override public void onCreate(Bundle state) {
 		super.onCreate(state);
+
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
 			Window w = getWindow();
 			w.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
 		}
+
 		this.view = new GioView(this);
 		setContentView(view);
 	}

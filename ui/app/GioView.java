@@ -20,11 +20,36 @@ import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 import android.view.inputmethod.EditorInfo;
 
+import java.io.UnsupportedEncodingException;
+
 public class GioView extends SurfaceView implements Choreographer.FrameCallback {
+	private final static Object initLock = new Object();
+	private static boolean jniLoaded;
+	private static String dataDir;
+
 	private final SurfaceHolder.Callback callbacks;
 	private final InputMethodManager imm;
 	private final Handler handler;
 	private long nhandle;
+
+	private static synchronized void initialize(Context appCtx) {
+		synchronized (initLock) {
+			if (jniLoaded) {
+				return;
+			}
+			dataDir = appCtx.getFilesDir().getAbsolutePath();
+			System.loadLibrary("gio");
+			jniLoaded = true;
+		}
+	}
+
+	static byte[] dataDir() {
+		try {
+			return dataDir.getBytes("UTF-8");
+		} catch (UnsupportedEncodingException e) {
+			throw new RuntimeException(e);
+		}
+	}
 
 	public GioView(Context context) {
 		this(context, null);
@@ -32,6 +57,9 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 
 	public GioView(Context context, AttributeSet attrs) {
 		super(context, attrs);
+		// Late initialization of the Go runtime to wait for a valid context.
+		initialize(context.getApplicationContext());
+
 		nhandle = onCreateView(this);
 		handler = new Handler();
 		imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);

@@ -4,7 +4,7 @@
 #include "os_android.h"
 #include "_cgo_export.h"
 
-JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserver) {
+JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
 	JNIEnv *env;
 	if ((*vm)->GetEnv(vm, (void**)&env, JNI_VERSION_1_6) != JNI_OK) {
 		return -1;
@@ -87,6 +87,23 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserver) {
 	if ((*env)->RegisterNatives(env, viewClass, methods, sizeof(methods)/sizeof(methods[0])) != 0) {
 		return -1;
 	}
+
+	// Initialize data dir.
+	jmethodID dataDirMethod = (*env)->GetStaticMethodID(env, viewClass, "dataDir", "()[B");
+	if (dataDirMethod == NULL) {
+		return -1;
+	}
+	jbyteArray dirArr = (*env)->CallStaticObjectMethod(env, viewClass, dataDirMethod);
+	if (dirArr == NULL) {
+		return -1;
+	}
+	jbyte *dir = (*env)->GetByteArrayElements(env, dirArr, NULL);
+	if (dir == NULL) {
+		return -1;
+	}
+	setDataDir((char *)dir);
+	(*env)->ReleaseByteArrayElements(env, dirArr, dir, JNI_ABORT);
+
 	return JNI_VERSION_1_6;
 }
 
