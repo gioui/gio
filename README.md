@@ -112,8 +112,8 @@ To run a Gio program in a browser with WebAssembly and WebGL support, use the Go
 driver and add a <div id="giowindow"> element to a HTML page. The gio tool can also output
 a directory ready to view in a browser:
 
-	$ go get github.com/shurcooL/goexec
 	$ go run gioui.org/cmd/gio -target js gioui.org/apps/gophers
+	$ go get github.com/shurcooL/goexec
 	$ goexec 'http.ListenAndServe(":8080", http.FileServer(http.Dir("gophers")))'
 
 Open http://localhost:8080 in a browser to run the app.
