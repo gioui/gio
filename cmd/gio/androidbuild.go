@@ -233,6 +233,7 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 			return err
 		}
 	}
+	appName := strings.Title(filepath.Base(bi.pkg))
 	manifestSrc := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
 	package="%s"
@@ -243,7 +244,7 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 	<uses-feature android:glEsVersion="0x00030000"/>
 	<application android:label="Gio">
 		<activity android:name="org.gioui.GioActivity"
-			android:label="Gio"
+			android:label="%s"
 			android:theme="@android:style/Theme.NoTitleBar"
 			android:configChanges="orientation|keyboardHidden">
 			<intent-filter>
@@ -252,7 +253,7 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 			</intent-filter>
 		</activity>
 	</application>
-</manifest>`, *appID)
+</manifest>`, *appID, appName)
 	manifest := filepath.Join(tmpDir, "AndroidManifest.xml")
 	if err := ioutil.WriteFile(manifest, []byte(manifestSrc), 0600); err != nil {
 		return err

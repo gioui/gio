@@ -174,6 +174,7 @@ int main(int argc, char * argv[]) {
 	if _, err := runCmd(lipo); err != nil {
 		return err
 	}
+	appName := strings.Title(filepath.Base(bi.pkg))
 	infoPlistSrc := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -187,7 +188,7 @@ int main(int argc, char * argv[]) {
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Gio</string>
+	<string>%s</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -197,7 +198,7 @@ int main(int argc, char * argv[]) {
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 </dict>
-</plist>`, *appID)
+</plist>`, *appID, appName)
 	infoPlist := filepath.Join(app, "Info.plist")
 	if err := ioutil.WriteFile(infoPlist, []byte(infoPlistSrc), 0600); err != nil {
 		return err
