@@ -244,6 +244,8 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			})
 			carRect = clip.Intersect(carRect)
 			if !carRect.Empty() {
+				draw.ColorOp{Color: color.RGBA{A: 0xff}}.Add(ops)
+				e.Material.Add(ops)
 				draw.DrawOp{Rect: toRectF(carRect)}.Add(ops)
 			}
 		}
