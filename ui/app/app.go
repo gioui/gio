@@ -70,7 +70,7 @@ const (
 // os.Args. The arguments are separated with |.
 // Useful for running programs on mobiles where the
 // command line is not available.
-// Set it with the go tool linker flag -X.
+// Set with the go linker flag -X.
 var extraArgs string
 
 var windows = make(chan *Window)
