@@ -16,7 +16,7 @@ import (
 var (
 	target    = flag.String("target", "", "specify target (ios, tvos, android, js)")
 	archNames = flag.String("arch", "", "specify architecture(s) to include")
-	buildMode = flag.String("buildmode", "archive", "specify buildmode: archive or exe")
+	buildMode = flag.String("buildmode", "exe", "specify buildmode: archive or exe")
 	destPath  = flag.String("o", "", "output file (Android .aar or .apk file) or directory (iOS/tvOS .framework or webassembly files)")
 	appID     = flag.String("appid", "org.gioui.app", "app identifier (for -buildmode=exe)")
 	verbose   = flag.Bool("v", false, "verbose output")
