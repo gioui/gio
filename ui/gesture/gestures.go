@@ -222,6 +222,10 @@ func (s *Scroll) val(p f32.Point) float32 {
 	}
 }
 
+func (s *Scroll) Active() bool {
+	return s.flinger.Active()
+}
+
 func (f *flinger) Init(now time.Time, v0 float32) {
 	f.t0 = now
 	f.v0 = v0

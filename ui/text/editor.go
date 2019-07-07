@@ -96,7 +96,6 @@ func (e *Editor) Next() (EditorEvent, bool) {
 		e.scrollOff.Y += sdist
 		soff = e.scrollOff.Y
 	}
-	scrollTo := false
 	for {
 		evt, ok := e.clicker.Next(e.Inputs)
 		if !ok {
@@ -105,16 +104,20 @@ func (e *Editor) Next() (EditorEvent, bool) {
 		switch {
 		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
 			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
-			scrollTo = true
 			e.blinkStart = e.Config.Now
 			e.moveCoord(image.Point{
 				X: int(math.Round(float64(evt.Position.X))),
 				Y: int(math.Round(float64(evt.Position.Y))),
 			})
 			e.requestFocus = true
+			if !e.scroller.Active() {
+				e.scrollToCaret()
+			}
 		}
 	}
-	stop := (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin)
+	if (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin) {
+		e.scroller.Stop()
+	}
 	for {
 		ke, ok := e.Inputs.Next(e)
 		if !ok {
@@ -134,23 +137,17 @@ func (e *Editor) Next() (EditorEvent, bool) {
 				}
 			}
 			if e.command(ke) {
-				stop = true
-				scrollTo = true
+				e.scrollToCaret()
+				e.scroller.Stop()
 			}
 		case key.EditEvent:
-			stop = true
-			scrollTo = true
+			e.scrollToCaret()
+			e.scroller.Stop()
 			e.append(ke.Text)
 		}
 		if e.rr.Changed() {
 			return ChangeEvent{}, true
 		}
-	}
-	if sdist == 0 && scrollTo {
-		e.scrollToCaret()
-	}
-	if stop {
-		e.scroller.Stop()
 	}
 	return nil, false
 }
