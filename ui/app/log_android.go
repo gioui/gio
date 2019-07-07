@@ -22,11 +22,11 @@ import (
 func init() {
 	// Android's logcat already includes timestamps.
 	log.SetFlags(log.Flags() &^ log.LstdFlags)
-	logFd(C.ANDROID_LOG_INFO, os.Stdout.Fd())
-	logFd(C.ANDROID_LOG_ERROR, os.Stderr.Fd())
+	logFd(os.Stdout.Fd())
+	logFd(os.Stderr.Fd())
 }
 
-func logFd(prio C.int, fd uintptr) {
+func logFd(fd uintptr) {
 	r, w, err := os.Pipe()
 	if err != nil {
 		panic(err)
@@ -49,7 +49,7 @@ func logFd(prio C.int, fd uintptr) {
 			}
 			copy(buf, line)
 			buf[len(line)] = 0
-			C.__android_log_write(prio, tag, cbuf)
+			C.__android_log_write(C.ANDROID_LOG_INFO, tag, cbuf)
 		}
 		// The garbage collector doesn't know that w's fd was dup'ed.
 		// Avoid finalizing w, and thereby avoid its finalizer closing its fd.
