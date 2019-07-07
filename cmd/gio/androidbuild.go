@@ -246,7 +246,8 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 		<activity android:name="org.gioui.GioActivity"
 			android:label="%s"
 			android:theme="@android:style/Theme.NoTitleBar"
-			android:configChanges="orientation|keyboardHidden">
+			android:configChanges="orientation|keyboardHidden"
+			android:windowSoftInputMode="adjustResize">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />
