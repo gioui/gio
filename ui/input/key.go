@@ -48,6 +48,7 @@ func (q *keyQueue) Frame(root *ui.Ops, events handlerEvents) {
 			delete(q.handlers, k)
 			if q.focus == k {
 				q.focus = nil
+				hide = true
 			}
 		}
 	}
@@ -59,6 +60,8 @@ func (q *keyQueue) Frame(root *ui.Ops, events handlerEvents) {
 		q.focus = focus
 		if q.focus != nil {
 			events[q.focus] = append(events[q.focus], key.FocusEvent{Focus: true})
+		} else {
+			hide = true
 		}
 	}
 	switch {
