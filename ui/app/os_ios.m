@@ -27,7 +27,9 @@ static void redraw(CFTypeRef viewRef, BOOL sync) {
 		UIFontMetrics *metrics = [UIFontMetrics defaultMetrics];
 		sdpi = [metrics scaledValueForValue:sdpi];
 	}
-	onDraw(viewRef, dpi, sdpi, v.bounds.size.width*scale, v.bounds.size.height*scale, sync);
+	UIEdgeInsets insets = v.layoutMargins;
+	onDraw(viewRef, dpi, sdpi, v.bounds.size.width*scale, v.bounds.size.height*scale, sync,
+			insets.top*scale, insets.right*scale, insets.bottom*scale, insets.left*scale);
 }
 
 @implementation GioAppDelegate
@@ -92,7 +94,6 @@ static void redraw(CFTypeRef viewRef, BOOL sync) {
 - (void)viewWillAppear:(BOOL)animated {
 	[super viewWillAppear:animated];
 	CFTypeRef viewRef = (__bridge CFTypeRef)self.view;
-	redraw(viewRef, YES);
 }
 
 - (void)viewDidDisappear:(BOOL)animated {

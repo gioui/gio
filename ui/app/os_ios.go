@@ -63,7 +63,7 @@ func onCreate(view C.CFTypeRef) {
 }
 
 //export onDraw
-func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int) {
+func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int, top, right, bottom, left C.CGFloat) {
 	if width == 0 || height == 0 {
 		return
 	}
@@ -82,6 +82,10 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int) {
 		Size: image.Point{
 			X: int(width + .5),
 			Y: int(height + .5),
+		},
+		Insets: image.Rectangle{
+			Min: image.Point{X: int(left + .5), Y: int(top + .5)},
+			Max: image.Point{X: int(right + .5), Y: int(bottom + .5)},
 		},
 		Config: ui.Config{
 			PxPerDp: float32(dpi) * inchPrDp,
