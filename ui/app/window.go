@@ -82,7 +82,7 @@ func (w *Window) SetTextInput(s key.TextInputState) {
 	if !w.IsAlive() {
 		return
 	}
-	if s != w.inputState && (s == key.TextInputClosed || s == key.TextInputOpen) {
+	if s != w.inputState && (s == key.TextInputClose || s == key.TextInputOpen) {
 		w.driver.setTextInput(s)
 	}
 	if s == key.TextInputFocus {

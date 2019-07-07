@@ -41,7 +41,7 @@ const (
 const (
 	TextInputKeep TextInputState = iota
 	TextInputFocus
-	TextInputClosed
+	TextInputClose
 	TextInputOpen
 )
 

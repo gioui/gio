@@ -65,7 +65,7 @@ func (q *keyQueue) Frame(root *ui.Ops, events handlerEvents) {
 	case pri == priNewFocus:
 		q.state = key.TextInputOpen
 	case hide:
-		q.state = key.TextInputClosed
+		q.state = key.TextInputClose
 	case changed:
 		q.state = key.TextInputFocus
 	default:

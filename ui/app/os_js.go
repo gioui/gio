@@ -322,7 +322,7 @@ func (w *window) setTextInput(s key.TextInputState) {
 	switch s {
 	case key.TextInputOpen:
 		w.focus()
-	case key.TextInputClosed:
+	case key.TextInputClose:
 		w.blur()
 	}
 }

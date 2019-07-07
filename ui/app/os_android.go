@@ -384,7 +384,7 @@ func (w *window) setTextInput(s key.TextInputState) {
 		runInJVM(func(env *C.JNIEnv) {
 			C.gio_jni_CallVoidMethod(env, w.view, w.mshowTextInput)
 		})
-	case key.TextInputClosed:
+	case key.TextInputClose:
 		runInJVM(func(env *C.JNIEnv) {
 			C.gio_jni_CallVoidMethod(env, w.view, w.mhideTextInput)
 		})

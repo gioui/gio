@@ -234,7 +234,7 @@ func (w *window) setTextInput(s key.TextInputState) {
 	switch s {
 	case key.TextInputOpen:
 		C.gio_showTextInput(w.view)
-	case key.TextInputClosed:
+	case key.TextInputClose:
 		C.gio_hideTextInput(w.view)
 	}
 }
