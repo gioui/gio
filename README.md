@@ -52,17 +52,9 @@ with the `-token` flag:
 ## Android
 
 For Android you need the Android SDK with the NDK installed. Point the ANDROID_HOME to the SDK root
-directory.
+directory. Use the gio tool to build a Gio program for Android:
 
-To build a Gio program as an .aar package, use the gio tool. For example,
-
-	$ export ANDROID_HOME=...
 	$ go run gioui.org/cmd/gio -target android gioui.org/apps/gophers
-
-produces gophers.aar, ready to use in an Android project. To run
-a Gio program on an Android device or emulator, use -buildmode=exe:
-
-	$ go run gioui.org/cmd/gio -buildmode exe -target android gioui.org/apps/gophers
 
 Install the apk to a running emulator or attached device with adb:
 
@@ -70,25 +62,21 @@ Install the apk to a running emulator or attached device with adb:
 
 The gio tool passes command line arguments to os.Args at runtime:
 
-	$ go run gioui.org/cmd/gio -buildmode exe -target android gioui.org/apps/gophers -token <github token>
+	$ go run gioui.org/cmd/gio -target android gioui.org/apps/gophers -token <github token>
+
+To build a Gio program as an .aar package, use -buildmode=archive. For example,
+
+	$ export ANDROID_HOME=...
+	$ go run gioui.org/cmd/gio -target android -buildmode archive gioui.org/apps/gophers
+
+produces gophers.aar, ready to use in an Android project.
 
 ## iOS/tvOS
 
-To build a Gio program for iOS or tvOS you need a macOS machine with Xcode installed.
+To build a Gio program for iOS or tvOS you need a macOS machine with Xcode installed. The gio
+tool can produce .ipa files for devices and .app directories for simulators. For a device:
 
-The gio tool can produce a framework ready to include in an Xcode project. For example,
-
-	$ go run gioui.org/cmd/gio -target ios gioui.org/apps/gophers
-
-outputs Gophers.framework with the demo program built for iOS. For tvOS, use `-target tvos`:
-
-	$ go run gioui.org/cmd/gio -target tvos gioui.org/apps/gophers
-
-Building for tvOS requires (the not yet released) Go 1.13.
-
-To run a Gio program on an iOS device, use -buildmode=exe:
-
-	$ go run gioui.org/cmd/gio -buildmode exe -target ios -appid <bundle-id> gioui.org/apps/gophers
+	$ go run gioui.org/cmd/gio -target ios -appid <bundle-id> gioui.org/apps/gophers
 
 where <bundle-id> is a valid bundle identifier previously provisioned in Xcode for your device.
 
@@ -100,11 +88,22 @@ you can install the app directly to your device:
 
 To run a program on a running simulator, use the -o flag with a .app directory:
 
-	$ go run gioui.org/cmd/gio/ -o gophers.app -buildmode=exe -target ios gioui.org/apps/gophers
+	$ go run gioui.org/cmd/gio/ -o gophers.app -target ios gioui.org/apps/gophers
 
 Install the app with simctl:
 
 	$ xcrun simctl install booted gophers.app
+
+Pass the -buildmode=archive flag to the gio tool to produce a framework ready to include in an
+Xcode project. For example,
+
+	$ go run gioui.org/cmd/gio -target ios -buildmode archive gioui.org/apps/gophers
+
+outputs Gophers.framework with the demo program built for iOS. For tvOS, use `-target tvos`:
+
+	$ go run gioui.org/cmd/gio -target tvos -buildmode archive gioui.org/apps/gophers
+
+Building for tvOS requires (the not yet released) Go 1.13.
 
 ## Webassembly/WebGL
 
