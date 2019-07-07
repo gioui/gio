@@ -31,7 +31,7 @@ func logFd(prio C.int, fd uintptr) {
 	if err != nil {
 		panic(err)
 	}
-	if err := syscall.Dup3(int(w.Fd()), int(fd), 0); err != nil {
+	if err := syscall.Dup3(int(w.Fd()), int(fd), syscall.O_CLOEXEC); err != nil {
 		panic(err)
 	}
 	go func() {
