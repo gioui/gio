@@ -6,6 +6,7 @@ import android.app.Activity;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 
@@ -15,12 +16,13 @@ public class GioActivity extends Activity {
 	@Override public void onCreate(Bundle state) {
 		super.onCreate(state);
 
+		Window w = getWindow();
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-			Window w = getWindow();
-			w.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+			w.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
 		}
 
 		this.view = new GioView(this);
+		this.view.setLayoutParams(new WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT));
 		setContentView(view);
 	}
 

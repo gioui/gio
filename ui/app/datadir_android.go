@@ -15,4 +15,3 @@ func setDataDir(cdir *C.char) {
 		return dir, nil
 	}
 }
-

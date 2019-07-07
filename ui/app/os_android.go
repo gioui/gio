@@ -37,6 +37,7 @@ type window struct {
 
 	dpi       int
 	fontScale float32
+	insets    image.Rectangle
 
 	stage   Stage
 	started bool
@@ -197,6 +198,18 @@ func onFocusChange(env *C.JNIEnv, class C.jclass, view C.jlong, focus C.jboolean
 	w.event(key.FocusEvent{Focus: focus == C.JNI_TRUE})
 }
 
+//export onWindowInsets
+func onWindowInsets(env *C.JNIEnv, class C.jclass, view C.jlong, top, right, bottom, left C.jint) {
+	w := views[view]
+	w.insets = image.Rectangle{
+		Min: image.Point{X: int(left), Y: int(top)},
+		Max: image.Point{X: int(right), Y: int(bottom)},
+	}
+	if w.stage >= StageRunning {
+		w.draw(true)
+	}
+}
+
 func (w *window) setVisible() {
 	win := w.aNativeWindow()
 	width, height := C.ANativeWindow_getWidth(win), C.ANativeWindow_getHeight(win)
@@ -275,6 +288,7 @@ func (w *window) draw(sync bool) {
 			X: int(width),
 			Y: int(height),
 		},
+		Insets: w.insets,
 		Config: ui.Config{
 			PxPerDp: ppdp,
 			PxPerSp: w.fontScale * ppdp,

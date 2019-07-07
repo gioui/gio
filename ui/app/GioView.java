@@ -3,6 +3,7 @@
 package org.gioui;
 
 import android.content.Context;
+import android.graphics.Rect;
 import android.os.Build;
 import android.os.Handler;
 import android.util.AttributeSet;
@@ -12,6 +13,7 @@ import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.WindowInsets;
 import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.SurfaceHolder;
@@ -157,6 +159,11 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 		});
 	}
 
+	@Override protected boolean fitSystemWindows(Rect insets) {
+		onWindowInsets(nhandle, insets.top, insets.right, insets.bottom, insets.left);
+		return true;
+	}
+
 	void postFrameCallback() {
 		Choreographer.getInstance().removeFrameCallback(this);
 		Choreographer.getInstance().postFrameCallback(this);
@@ -207,6 +214,7 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 	static private native void onSurfaceDestroyed(long handle);
 	static private native void onSurfaceChanged(long handle, Surface surface);
 	static private native void onConfigurationChanged(long handle);
+	static private native void onWindowInsets(long handle, int top, int right, int bottom, int left);
 	static private native void onLowMemory();
 	static private native void onTouchEvent(long handle, int action, int pointerID, int tool, float x, float y, long time);
 	static private native void onKeyEvent(long handle, int code, int character, long time);

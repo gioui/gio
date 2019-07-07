@@ -54,6 +54,11 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
 			.fnPtr = onConfigurationChanged
 		},
 		{
+			.name = "onWindowInsets",
+			.signature = "(JIIII)V",
+			.fnPtr = onWindowInsets
+		},
+		{
 			.name = "onLowMemory",
 			.signature = "()V",
 			.fnPtr = onLowMemory
