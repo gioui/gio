@@ -160,6 +160,10 @@ func (e *Editor) caretWidth() fixed.Int26_6 {
 	return fixed.Int26_6(oneDp * 64)
 }
 
+func (e *Editor) Focus() {
+	e.requestFocus = true
+}
+
 func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	for {
 		if _, ok := e.Next(); !ok {
