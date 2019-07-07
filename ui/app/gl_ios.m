@@ -31,7 +31,7 @@ CFTypeRef gio_createContext(void) {
 	return CFBridgingRetain(ctx);
 }
 
-CFTypeRef gio_createGLLayer() {
+CFTypeRef gio_createGLLayer(void) {
 	CAEAGLLayer *layer = [[CAEAGLLayer layer] init];
 	if (layer == nil) {
 		return nil;

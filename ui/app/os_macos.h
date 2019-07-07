@@ -12,6 +12,6 @@ __attribute__ ((visibility ("hidden"))) CGFloat gio_viewWidth(CFTypeRef viewRef)
 __attribute__ ((visibility ("hidden"))) CGFloat gio_viewHeight(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) void gio_setAnimating(CFTypeRef viewRef, BOOL anim);
 __attribute__ ((visibility ("hidden"))) void gio_updateDisplayLink(CFTypeRef viewRef, CGDirectDisplayID dispID);
-__attribute__ ((visibility ("hidden"))) CGFloat gio_getPixelsPerDP();
+__attribute__ ((visibility ("hidden"))) CGFloat gio_getPixelsPerDP(void);
 
 #endif

@@ -20,7 +20,7 @@ import (
 )
 
 func init() {
-	// Android's logcat already include timstamps.
+	// Android's logcat already includes timestamps.
 	log.SetFlags(log.Flags() &^ log.LstdFlags)
 	logFd(C.ANDROID_LOG_INFO, os.Stdout.Fd())
 	logFd(C.ANDROID_LOG_ERROR, os.Stderr.Fd())

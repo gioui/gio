@@ -102,7 +102,7 @@ CVDisplayLinkRef displayLink;
 }
 @end
 
-CFTypeRef gio_createGLView() {
+CFTypeRef gio_createGLView(void) {
 	@autoreleasepool {
 		NSOpenGLPixelFormatAttribute attr[] = {
 			NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core,

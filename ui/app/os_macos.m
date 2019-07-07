@@ -67,7 +67,7 @@ static CGFloat getPointsPerDP(NSScreen *screen) {
 }
 
 // Pixels pr dp.
-CGFloat gio_getPixelsPerDP() {
+CGFloat gio_getPixelsPerDP(void) {
     NSScreen *screen = [NSScreen mainScreen];
     return [screen backingScaleFactor] * getPointsPerDP(screen);
 }

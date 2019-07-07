@@ -4,4 +4,4 @@ __attribute__ ((visibility ("hidden"))) int gio_renderbufferStorage(CFTypeRef ct
 __attribute__ ((visibility ("hidden"))) int gio_presentRenderbuffer(CFTypeRef ctx, GLenum buffer);
 __attribute__ ((visibility ("hidden"))) int gio_makeCurrent(CFTypeRef ctx);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createContext(void);
-__attribute__ ((visibility ("hidden"))) CFTypeRef gio_createGLLayer();
+__attribute__ ((visibility ("hidden"))) CFTypeRef gio_createGLLayer(void);
