@@ -412,6 +412,9 @@ func (e *Editor) SetText(s string) {
 }
 
 func (e *Editor) append(s string) {
+	if e.SingleLine && s == "\n" {
+		return
+	}
 	e.prepend(s)
 	e.rr.caret += len(s)
 }
@@ -563,9 +566,7 @@ func (e *Editor) scrollToCaret() {
 func (e *Editor) command(k key.ChordEvent) bool {
 	switch k.Name {
 	case key.NameReturn, key.NameEnter:
-		if !e.SingleLine {
-			e.append("\n")
-		}
+		e.append("\n")
 	case key.NameDeleteBackward:
 		e.deleteRune()
 	case key.NameDeleteForward:
