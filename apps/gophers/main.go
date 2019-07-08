@@ -185,7 +185,7 @@ func (a *App) run() error {
 	a.w.Profiling = *stats
 	ops := new(ui.Ops)
 	var lastMallocs uint64
-	for a.w.IsAlive() {
+	for {
 		select {
 		case users := <-a.updateUsers:
 			a.users = users
@@ -218,6 +218,9 @@ func (a *App) run() error {
 						a.ctxCancel()
 						a.ctxCancel = nil
 					}
+				}
+				if e.Stage == app.StageDead {
+					return a.w.Err()
 				}
 			case *app.CommandEvent:
 				switch e.Type {
@@ -253,7 +256,6 @@ func (a *App) run() error {
 			}
 		}
 	}
-	return a.w.Err()
 }
 
 func newApp(w *app.Window) *App {

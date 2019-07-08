@@ -32,12 +32,16 @@ func main() {
 func init() {
 	go func() {
 		for w := range app.Windows() {
-			go loop(w)
+			go func() {
+				if err := loop(w); err != nil {
+					log.Fatal(err)
+				}
+			}()
 		}
 	}()
 }
 
-func loop(w *app.Window) {
+func loop(w *app.Window) error {
 	regular, err := sfnt.Parse(goregular.TTF)
 	if err != nil {
 		panic("failed to load font")
@@ -48,9 +52,13 @@ func loop(w *app.Window) {
 	face := faces.For(regular, ui.Sp(72))
 	message := "Hello, Gio"
 	ops := new(ui.Ops)
-	for w.IsAlive() {
+	for {
 		e := <-w.Events()
 		switch e := e.(type) {
+		case app.StageEvent:
+			if e.Stage == app.StageDead {
+				return w.Err()
+			}
 		case app.DrawEvent:
 			cfg = e.Config
 			cs := layout.ExactConstraints(w.Size())
@@ -62,8 +70,5 @@ func loop(w *app.Window) {
 			w.Draw(ops)
 			faces.Frame()
 		}
-	}
-	if err := w.Err(); err != nil {
-		log.Fatal(err)
 	}
 }
