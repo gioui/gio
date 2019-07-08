@@ -9,8 +9,8 @@ import "C"
 var dataDir func() (string, error)
 
 //export setDataDir
-func setDataDir(cdir *C.char) {
-	dir := C.GoString(cdir)
+func setDataDir(cdir *C.char, len C.int) {
+	dir := C.GoStringN(cdir, len)
 	dataDir = func() (string, error) {
 		return dir, nil
 	}

@@ -106,7 +106,8 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
 	if (dir == NULL) {
 		return -1;
 	}
-	setDataDir((char *)dir);
+	jint n = (*env)->GetArrayLength(env, dirArr);
+	setDataDir((char *)dir, n);
 	(*env)->ReleaseByteArrayElements(env, dirArr, dir, JNI_ABORT);
 
 	return JNI_VERSION_1_6;
