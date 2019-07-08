@@ -152,16 +152,11 @@ func onDeleteBackward(view C.CFTypeRef) {
 }
 
 //export onText
-func onText(view C.CFTypeRef, cstr *C.char) {
+func onText(view C.CFTypeRef, str *C.char) {
 	w := views[view]
-	str := C.GoString(cstr)
-	if str != "\n" {
-		w.w.event(key.EditEvent{
-			Text: str,
-		})
-	} else {
-		w.onKeyCommand(key.NameReturn)
-	}
+	w.w.event(key.EditEvent{
+		Text: C.GoString(str),
+	})
 }
 
 //export onTouch
