@@ -79,14 +79,17 @@ func (w *Window) Timings() string {
 }
 
 func (w *Window) SetTextInput(s key.TextInputState) {
-	if !w.IsAlive() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.isAlive() {
 		return
 	}
 	if s != w.inputState && (s == key.TextInputClose || s == key.TextInputOpen) {
 		w.driver.setTextInput(s)
 	}
 	if s == key.TextInputFocus {
-		w.Redraw()
+		w.setNextFrame(time.Time{})
+		w.updateAnimation()
 	}
 	w.inputState = s
 }
@@ -219,12 +222,6 @@ func (w *Window) Stage() Stage {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.stage
-}
-
-func (w *Window) IsAlive() bool {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.isAlive()
 }
 
 func (w *Window) isAlive() bool {
