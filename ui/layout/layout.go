@@ -68,25 +68,29 @@ func ExactConstraints(size image.Point) Constraints {
 }
 
 type Insets struct {
-	Top, Right, Bottom, Left float32
+	Top, Right, Bottom, Left ui.Value
 
-	ops   *ui.Ops
-	begun bool
-	cs    Constraints
+	top, right, bottom, left int
+	ops                      *ui.Ops
+	begun                    bool
+	cs                       Constraints
 }
 
-func (in *Insets) Begin(ops *ui.Ops, cs Constraints) Constraints {
+func (in *Insets) Begin(c *ui.Config, ops *ui.Ops, cs Constraints) Constraints {
 	if in.begun {
 		panic("must End before Begin")
 	}
+	in.top = int(math.Round(float64(c.Val(in.Top))))
+	in.right= int(math.Round(float64(c.Val(in.Right))))
+	in.bottom = int(math.Round(float64(c.Val(in.Bottom))))
+	in.left = int(math.Round(float64(c.Val(in.Left))))
 	in.begun = true
 	in.ops = ops
 	in.cs = cs
 	mcs := cs
-	t, r, b, l := int(math.Round(float64(in.Top))), int(math.Round(float64(in.Right))), int(math.Round(float64(in.Bottom))), int(math.Round(float64(in.Left)))
 	if mcs.Width.Max != ui.Inf {
-		mcs.Width.Min -= l + r
-		mcs.Width.Max -= l + r
+		mcs.Width.Min -= in.left + in.right
+		mcs.Width.Max -= in.left + in.right
 		if mcs.Width.Min < 0 {
 			mcs.Width.Min = 0
 		}
@@ -95,8 +99,8 @@ func (in *Insets) Begin(ops *ui.Ops, cs Constraints) Constraints {
 		}
 	}
 	if mcs.Height.Max != ui.Inf {
-		mcs.Height.Min -= t + b
-		mcs.Height.Max -= t + b
+		mcs.Height.Min -= in.top + in.bottom
+		mcs.Height.Max -= in.top + in.bottom
 		if mcs.Height.Min < 0 {
 			mcs.Height.Min = 0
 		}
@@ -105,7 +109,7 @@ func (in *Insets) Begin(ops *ui.Ops, cs Constraints) Constraints {
 		}
 	}
 	ui.PushOp{}.Add(ops)
-	ui.TransformOp{Transform: ui.Offset(toPointF(image.Point{X: l, Y: t}))}.Add(ops)
+	ui.TransformOp{Transform: ui.Offset(toPointF(image.Point{X: in.left, Y: in.top}))}.Add(ops)
 	return mcs
 }
 
@@ -116,14 +120,13 @@ func (in *Insets) End(dims Dimens) Dimens {
 	in.begun = false
 	ops := in.ops
 	ui.PopOp{}.Add(ops)
-	t, r, b, l := int(math.Round(float64(in.Top))), int(math.Round(float64(in.Right))), int(math.Round(float64(in.Bottom))), int(math.Round(float64(in.Left)))
 	return Dimens{
-		Size:     in.cs.Constrain(dims.Size.Add(image.Point{X: r + l, Y: t + b})),
-		Baseline: dims.Baseline + t,
+		Size:     in.cs.Constrain(dims.Size.Add(image.Point{X: in.right + in.left, Y: in.top + in.bottom})),
+		Baseline: dims.Baseline + in.top,
 	}
 }
 
-func EqualInsets(v float32) Insets {
+func EqualInsets(v ui.Value) Insets {
 	return Insets{Top: v, Right: v, Bottom: v, Left: v}
 }
 
@@ -132,11 +135,11 @@ func isInf(v ui.Value) bool {
 }
 
 type Sized struct {
-	Width, Height float32
+	Width, Height ui.Value
 }
 
-func (s Sized) Constrain(cs Constraints) Constraints {
-	if h := int(s.Height + 0.5); h != 0 {
+func (s Sized) Constrain(c *ui.Config, cs Constraints) Constraints {
+	if h := int(c.Val(s.Height) + 0.5); h != 0 {
 		if cs.Height.Min < h {
 			cs.Height.Min = h
 		}
@@ -144,7 +147,7 @@ func (s Sized) Constrain(cs Constraints) Constraints {
 			cs.Height.Max = h
 		}
 	}
-	if w := int(s.Width + .5); w != 0 {
+	if w := int(c.Val(s.Width) + .5); w != 0 {
 		if cs.Width.Min < w {
 			cs.Width.Min = w
 		}
