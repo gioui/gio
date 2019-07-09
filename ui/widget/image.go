@@ -12,23 +12,26 @@ import (
 )
 
 type Image struct {
-	Src  image.Image
+	// Src is the image to display.
+	Src image.Image
+	// Rect is the source rectangle.
 	Rect image.Rectangle
+	// Scale is the ratio of image pixels to
+	// device pixels. If zero, a scale that
+	// makes the image appear at approximately
+	// 72 DPI is used.
+	Scale float32
 }
 
-func (im Image) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+func (im Image) Layout(c *ui.Config, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	size := im.Src.Bounds()
-	w, h := size.Dx(), size.Dy()
-	if w == 0 || h == 0 {
-		return layout.Dimens{}
+	scale := im.Scale
+	if scale == 0 {
+		const dpPrPx = 160 / 72
+		scale = c.Val(ui.Dp(dpPrPx))
 	}
-	d := image.Point{X: cs.Width.Max, Y: cs.Height.Max}
-	if d.X == ui.Inf {
-		d.X = cs.Width.Min
-	}
-	if d.Y == ui.Inf {
-		d.Y = cs.Height.Min
-	}
+	w, h := int(float32(size.Dx())*scale+.5), int(float32(size.Dy())*scale+.5)
+	d := image.Point{X: cs.Width.Constrain(w), Y: cs.Height.Constrain(h)}
 	aspect := float32(w) / float32(h)
 	dw, dh := float32(d.X), float32(d.Y)
 	dAspect := dw / dh
