@@ -81,7 +81,7 @@ func (in *Insets) Begin(c *ui.Config, ops *ui.Ops, cs Constraints) Constraints {
 		panic("must End before Begin")
 	}
 	in.top = int(math.Round(float64(c.Val(in.Top))))
-	in.right= int(math.Round(float64(c.Val(in.Right))))
+	in.right = int(math.Round(float64(c.Val(in.Right))))
 	in.bottom = int(math.Round(float64(c.Val(in.Bottom))))
 	in.left = int(math.Round(float64(c.Val(in.Left))))
 	in.begun = true
@@ -128,10 +128,6 @@ func (in *Insets) End(dims Dimens) Dimens {
 
 func EqualInsets(v ui.Value) Insets {
 	return Insets{Top: v, Right: v, Bottom: v, Left: v}
-}
-
-func isInf(v ui.Value) bool {
-	return math.IsInf(float64(v.V), 1)
 }
 
 type Sized struct {
