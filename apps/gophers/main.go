@@ -451,7 +451,8 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	sz := ui.Dp(48)
 	cc := clipCircle{}
 	cs = cc.Begin(ops, cs)
-	dims := widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(ops, layout.Sized{Width: sz, Height: sz}.Constrain(c, cs))
+	cs = layout.Sized{Width: sz, Height: sz}.Constrain(c, cs)
+	dims := widget.Image{Src: u.avatar, Rect: u.avatar.Bounds(), Scale: 1}.Layout(c, ops, cs)
 	dims = cc.End(dims)
 	c1 := f.End(dims)
 	cs = f.Flexible(1, layout.Fit)
@@ -597,7 +598,8 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 			in := layout.Insets{Right: ui.Dp(8)}
 			cc := clipCircle{}
 			cs = cc.Begin(ops, in.Begin(c, ops, cs))
-			dims = widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(ops, layout.Sized{Width: ui.Dp(48), Height: ui.Dp(48)}.Constrain(c, cs))
+			cs = layout.Sized{Width: ui.Dp(48), Height: ui.Dp(48)}.Constrain(c, cs)
+			dims = widget.Image{Src: u.avatar, Rect: u.avatar.Bounds(), Scale: 1}.Layout(c, ops, cs)
 			dims = in.End(cc.End(dims))
 		}
 		c1 := f.End(dims)
