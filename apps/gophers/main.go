@@ -242,8 +242,8 @@ func (a *App) run() error {
 					lastMallocs = mstats.Mallocs
 					al := layout.Align{Alignment: layout.NE}
 					cs := al.Begin(ops, cs)
-					in := layout.Insets{Top: a.cfg.Dp(16)}
-					cs = in.Begin(ops, cs)
+					in := layout.Insets{Top: ui.Dp(16)}
+					cs = in.Begin(&a.cfg, ops, cs)
 					txt := fmt.Sprintf("m: %d %s", mallocs, a.w.Timings())
 					dims := text.Label{Material: theme.text, Face: a.face(fonts.mono, 8), Text: txt}.Layout(ops, cs)
 					dims = in.End(dims)
@@ -444,19 +444,19 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	c := up.config
 	msg := up.commits[index].GetMessage()
 	label := text.Label{Material: theme.text, Face: up.faces.For(fonts.regular, ui.Sp(12)), Text: msg}
-	in := layout.Insets{Top: c.Dp(16), Right: c.Dp(8), Left: c.Dp(8)}
-	cs = in.Begin(ops, cs)
+	in := layout.Insets{Top: ui.Dp(16), Right: ui.Dp(8), Left: ui.Dp(8)}
+	cs = in.Begin(c, ops, cs)
 	f := (&layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}).Init(ops, cs)
 	cs = f.Rigid()
-	sz := c.Dp(48)
+	sz := ui.Dp(48)
 	cc := clipCircle{}
 	cs = cc.Begin(ops, cs)
-	dims := widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(ops, layout.Sized{Width: sz, Height: sz}.Constrain(cs))
+	dims := widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(ops, layout.Sized{Width: sz, Height: sz}.Constrain(c, cs))
 	dims = cc.End(dims)
 	c1 := f.End(dims)
 	cs = f.Flexible(1, layout.Fit)
-	in2 := layout.Insets{Left: c.Dp(8)}
-	cs = in2.Begin(ops, cs)
+	in2 := layout.Insets{Left: ui.Dp(8)}
+	cs = in2.Begin(c, ops, cs)
 	dims = label.Layout(ops, cs)
 	dims = in2.End(dims)
 	c2 := f.End(dims)
@@ -490,8 +490,8 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	st := (&layout.Stack{Alignment: layout.Center}).Init(ops, cs)
 	cs = st.Rigid()
 	al := layout.Align{Alignment: layout.SE}
-	in := layout.EqualInsets(c.Dp(16))
-	cs = in.Begin(ops, al.Begin(ops, cs))
+	in := layout.EqualInsets(ui.Dp(16))
+	cs = in.Begin(c, ops, al.Begin(ops, cs))
 	dims := a.fab.Layout(ops, cs)
 	dims = al.End(in.End(dims))
 	c2 := st.End(dims)
@@ -502,17 +502,17 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 
 		cs = f.Rigid()
 		{
-			in := layout.EqualInsets(c.Dp(16))
-			cs = layout.Sized{Height: c.Dp(200)}.Constrain(cs)
-			dims = a.edit.Layout(ops, in.Begin(ops, cs))
+			in := layout.EqualInsets(ui.Dp(16))
+			cs = layout.Sized{Height: ui.Dp(200)}.Constrain(c, cs)
+			dims = a.edit.Layout(ops, in.Begin(c, ops, cs))
 			dims = in.End(dims)
 		}
 		c1 := f.End(dims)
 
 		cs = f.Rigid()
 		{
-			in := layout.Insets{Bottom: c.Dp(16), Left: c.Dp(16), Right: c.Dp(16)}
-			dims = a.edit2.Layout(ops, in.Begin(ops, cs))
+			in := layout.Insets{Bottom: ui.Dp(16), Left: ui.Dp(16), Right: ui.Dp(16)}
+			dims = a.edit2.Layout(ops, in.Begin(c, ops, cs))
 			dims = in.End(dims)
 		}
 		c2 := f.End(dims)
@@ -522,10 +522,10 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			s := layout.Stack{Alignment: layout.Center}
 			s.Init(ops, cs)
 			cs = s.Rigid()
-			in := layout.Insets{Top: c.Dp(16), Right: c.Dp(8), Bottom: c.Dp(8), Left: c.Dp(8)}
+			in := layout.Insets{Top: ui.Dp(16), Right: ui.Dp(8), Bottom: ui.Dp(8), Left: ui.Dp(8)}
 			grey := colorMaterial(ops, rgb(0x888888))
 			lbl := text.Label{Material: grey, Face: a.face(fonts.regular, 9), Text: "GOPHERS"}
-			dims = in.End(lbl.Layout(ops, in.Begin(ops, cs)))
+			dims = in.End(lbl.Layout(ops, in.Begin(c, ops, cs)))
 			c2 := s.End(dims)
 			c1 := s.End(fill{colorMaterial(ops, rgb(0xf2f2f2))}.Layout(ops, s.Expand()))
 			dims = s.Layout(c1, c2)
@@ -545,8 +545,8 @@ func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens 
 	f := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.End, MainAxisSize: layout.Min}
 	f.Init(ops, cs)
 	cs = f.Rigid()
-	in := layout.Insets{Top: c.Dp(4)}
-	cs = in.Begin(ops, cs)
+	in := layout.Insets{Top: ui.Dp(4)}
+	cs = in.Begin(c, ops, cs)
 	dims := fab(ops, cs, a.sendIco.image(c), theme.brand, c.Dp(56))
 	pointer.AreaEllipse(dims.Size).Add(ops)
 	dims = in.End(dims)
@@ -588,16 +588,16 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 	cs = elem.Rigid()
 	var dims layout.Dimens
 	{
-		in := layout.EqualInsets(c.Dp(8))
-		cs = in.Begin(ops, cs)
+		in := layout.EqualInsets(ui.Dp(8))
+		cs = in.Begin(c, ops, cs)
 		f := centerRowOpts()
 		f.Init(ops, cs)
 		cs = f.Rigid()
 		{
-			in := layout.Insets{Right: c.Dp(8)}
+			in := layout.Insets{Right: ui.Dp(8)}
 			cc := clipCircle{}
-			cs = cc.Begin(ops, in.Begin(ops, cs))
-			dims = widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(ops, layout.Sized{Width: c.Dp(48), Height: c.Dp(48)}.Constrain(cs))
+			cs = cc.Begin(ops, in.Begin(c, ops, cs))
+			dims = widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(ops, layout.Sized{Width: ui.Dp(48), Height: ui.Dp(48)}.Constrain(c, cs))
 			dims = in.End(cc.End(dims))
 		}
 		c1 := f.End(dims)
@@ -614,8 +614,8 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 				c1 := f.End(dims)
 				cs = f.Rigid()
 				al := layout.Align{Alignment: layout.E}
-				in := layout.Insets{Left: c.Dp(2)}
-				cs = in.Begin(ops, al.Begin(ops, cs))
+				in := layout.Insets{Left: ui.Dp(2)}
+				cs = in.Begin(c, ops, al.Begin(ops, cs))
 				dims = text.Label{Material: theme.text, Face: a.face(fonts.regular, 8), Text: "3 hours ago"}.Layout(ops, cs)
 				dims = al.End(in.End(dims))
 				c2 := f.End(dims)
@@ -623,8 +623,8 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 			}
 			c1 := f.End(dims)
 			cs = f.Rigid()
-			in := layout.Insets{Top: c.Dp(4)}
-			cs = in.Begin(ops, cs)
+			in := layout.Insets{Top: ui.Dp(4)}
+			cs = in.Begin(c, ops, cs)
 			dims = text.Label{Material: theme.tertText, Face: a.face(fonts.regular, 10), Text: u.company}.Layout(ops, cs)
 			dims = in.End(dims)
 			c2 := f.End(dims)
