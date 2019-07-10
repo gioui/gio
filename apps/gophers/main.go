@@ -723,7 +723,7 @@ func toRectF(r image.Rectangle) f32.Rectangle {
 }
 
 func (ic *icon) image(cfg *ui.Config) image.Image {
-	sz := cfg.Val(ic.size)
+	sz := cfg.Pixels(ic.size)
 	if sz == ic.imgSize {
 		return ic.img
 	}
