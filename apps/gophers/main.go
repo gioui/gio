@@ -49,7 +49,7 @@ import (
 
 type App struct {
 	w     *app.Window
-	cfg   ui.Config
+	cfg   app.Config
 	faces *measure.Faces
 
 	inputs *input.Queue
@@ -70,7 +70,7 @@ type App struct {
 }
 
 type userPage struct {
-	config        *ui.Config
+	config        ui.Config
 	faces         *measure.Faces
 	redraw        redrawer
 	user          *user
@@ -98,7 +98,7 @@ type icon struct {
 type redrawer func()
 
 type ActionButton struct {
-	config  *ui.Config
+	config  ui.Config
 	inputs  input.Events
 	face    text.Face
 	Open    bool
@@ -448,7 +448,7 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	cs = in.Begin(c, ops, cs)
 	f := (&layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}).Init(ops, cs)
 	cs = f.Rigid()
-	sz := c.Dp(48)
+	sz := c.Px(ui.Dp(48))
 	cc := clipCircle{}
 	cs = cc.Begin(ops, cs)
 	cs = cs.Exact(sz, sz)
@@ -504,7 +504,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		cs = f.Rigid()
 		{
 			in := layout.EqualInsets(ui.Dp(16))
-			sz := c.Dp(200)
+			sz := c.Px(ui.Dp(200))
 			cs = cs.Exact(sz, sz)
 			dims = a.edit.Layout(ops, in.Begin(c, ops, cs))
 			dims = in.End(dims)
@@ -549,7 +549,7 @@ func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens 
 	cs = f.Rigid()
 	in := layout.Insets{Top: ui.Dp(4)}
 	cs = in.Begin(c, ops, cs)
-	dims := fab(ops, cs, a.sendIco.image(c), theme.brand, c.Dp(56))
+	dims := fab(ops, cs, a.sendIco.image(c), theme.brand, c.Px(ui.Dp(56)))
 	pointer.AreaEllipse(dims.Size).Add(ops)
 	dims = in.End(dims)
 	return f.Layout(f.End(dims))
@@ -573,7 +573,7 @@ func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dime
 	return dims
 }
 
-func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) layout.Dimens {
+func (a *App) user(ops *ui.Ops, cs layout.Constraints, c ui.Config, index int) layout.Dimens {
 	u := a.users[index]
 	click := &a.userClicks[index]
 	for {
@@ -599,7 +599,7 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 			in := layout.Insets{Right: ui.Dp(8)}
 			cc := clipCircle{}
 			cs = cc.Begin(ops, in.Begin(c, ops, cs))
-			cs = cs.Exact(c.Dp(48), c.Dp(48))
+			cs = cs.Exact(c.Px(ui.Dp(48)), c.Px(ui.Dp(48)))
 			dims = widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(c, ops, cs)
 			dims = in.End(cc.End(dims))
 		}
@@ -722,8 +722,8 @@ func toRectF(r image.Rectangle) f32.Rectangle {
 	}
 }
 
-func (ic *icon) image(cfg *ui.Config) image.Image {
-	sz := cfg.Pixels(ic.size)
+func (ic *icon) image(cfg ui.Config) image.Image {
+	sz := cfg.Px(ic.size)
 	if sz == ic.imgSize {
 		return ic.img
 	}
