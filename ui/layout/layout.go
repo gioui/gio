@@ -4,7 +4,6 @@ package layout
 
 import (
 	"image"
-	"math"
 
 	"gioui.org/ui"
 )
@@ -101,10 +100,10 @@ func (in *Insets) Begin(c *ui.Config, ops *ui.Ops, cs Constraints) Constraints {
 	if in.begun {
 		panic("must End before Begin")
 	}
-	in.top = int(math.Round(float64(c.Val(in.Top))))
-	in.right = int(math.Round(float64(c.Val(in.Right))))
-	in.bottom = int(math.Round(float64(c.Val(in.Bottom))))
-	in.left = int(math.Round(float64(c.Val(in.Left))))
+	in.top = c.Pixels(in.Top)
+	in.right = c.Pixels(in.Right)
+	in.bottom = c.Pixels(in.Bottom)
+	in.left = c.Pixels(in.Left)
 	in.begun = true
 	in.ops = ops
 	in.cs = cs

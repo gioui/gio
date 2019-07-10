@@ -24,16 +24,16 @@ type Config struct {
 
 // Dp converts a value in dp units to pixels.
 func (c *Config) Dp(dp float32) int {
-	return c.Val(Dp(dp))
+	return c.Pixels(Dp(dp))
 }
 
 // Sp converts a value in sp units to pixels.
 func (c *Config) Sp(sp float32) int {
-	return c.Val(Sp(sp))
+	return c.Pixels(Sp(sp))
 }
 
-// Val converts a value to pixels.
-func (c *Config) Val(v Value) int {
+// Pixels converts a value to pixels.
+func (c *Config) Pixels(v Value) int {
 	var r float32
 	switch v.U {
 	case UnitPx:

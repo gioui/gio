@@ -220,8 +220,8 @@ func createNativeWindow(opts *WindowOptions) (*window, error) {
 	}
 	defer unregisterClass(cls, hInst)
 	wr := rect{
-		right:  int32(cfg.Val(opts.Width) + .5),
-		bottom: int32(cfg.Val(opts.Height) + .5),
+		right:  int32(cfg.Pixels(opts.Width)),
+		bottom: int32(cfg.Pixels(opts.Height)),
 	}
 	dwStyle := uint32(_WS_OVERLAPPEDWINDOW)
 	dwExStyle := uint32(_WS_EX_APPWINDOW | _WS_EX_WINDOWEDGE)

@@ -237,8 +237,8 @@ func createNativeWindow(opts *WindowOptions) (*window, error) {
 	C.free(unsafe.Pointer(title))
 
 	_, _, cfg := w.config()
-	w.width = cfg.Val(opts.Width)
-	w.height = cfg.Val(opts.Height)
+	w.width = cfg.Pixels(opts.Width)
+	w.height = cfg.Pixels(opts.Height)
 	if conn.decor != nil {
 		// Request server side decorations.
 		w.decor = C.zxdg_decoration_manager_v1_get_toplevel_decoration(conn.decor, w.topLvl)

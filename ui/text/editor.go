@@ -153,7 +153,7 @@ func (e *Editor) Next() (EditorEvent, bool) {
 }
 
 func (e *Editor) caretWidth() fixed.Int26_6 {
-	oneDp := e.Config.Val(ui.Dp(1))
+	oneDp := e.Config.Dp(1)
 	return fixed.Int26_6(oneDp * 64)
 }
 
@@ -167,7 +167,7 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			break
 		}
 	}
-	twoDp := e.Config.Val(ui.Dp(2))
+	twoDp := e.Config.Dp(2)
 	e.padLeft, e.padRight = twoDp, twoDp
 	maxWidth := cs.Width.Max
 	if e.SingleLine {
