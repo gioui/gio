@@ -23,27 +23,29 @@ type Config struct {
 }
 
 // Dp converts a value in dp units to pixels.
-func (c *Config) Dp(dp float32) float32 {
-	return c.PxPerDp * dp
+func (c *Config) Dp(dp float32) int {
+	return c.Val(Dp(dp))
 }
 
 // Sp converts a value in sp units to pixels.
-func (c *Config) Sp(sp float32) float32 {
-	return c.PxPerSp * sp
+func (c *Config) Sp(sp float32) int {
+	return c.Val(Sp(sp))
 }
 
 // Val converts a value to pixels.
-func (c *Config) Val(v Value) float32 {
+func (c *Config) Val(v Value) int {
+	var r float32
 	switch v.U {
 	case UnitPx:
-		return v.V
+		r = v.V
 	case UnitDp:
-		return c.PxPerDp * v.V
+		r = c.PxPerDp * v.V
 	case UnitSp:
-		return c.PxPerSp * v.V
+		r = c.PxPerSp * v.V
 	default:
 		panic("unknown unit")
 	}
+	return int(math.Round(float64(r)))
 }
 
 // LayerOp represents a semantic layer of UI.

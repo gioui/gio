@@ -165,9 +165,9 @@ func (s *Scroll) Scroll(cfg *ui.Config, q input.Events, axis Axis) int {
 				break
 			}
 			fling := s.estimator.Estimate()
-			if slop, d := cfg.Val(touchSlop), fling.Distance; d >= slop || -slop >= d {
-				if min, v := cfg.Val(minFlingVelocity), fling.Velocity; v >= min || -min >= v {
-					max := cfg.Val(maxFlingVelocity)
+			if slop, d := float32(cfg.Val(touchSlop)), fling.Distance; d >= slop || -slop >= d {
+				if min, v := float32(cfg.Val(minFlingVelocity)), fling.Velocity; v >= min || -min >= v {
+					max := float32(cfg.Val(maxFlingVelocity))
 					if v > max {
 						v = max
 					} else if v < -max {
@@ -201,7 +201,7 @@ func (s *Scroll) Scroll(cfg *ui.Config, q input.Events, axis Axis) int {
 			dist := s.last - v
 			if e.Priority < pointer.Grabbed {
 				slop := cfg.Val(touchSlop)
-				if dist := float32(dist); dist >= slop || -slop >= dist {
+				if dist := dist; dist >= slop || -slop >= dist {
 					s.grab = true
 				}
 			} else {

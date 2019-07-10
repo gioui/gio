@@ -25,12 +25,14 @@ type Image struct {
 
 func (im Image) Layout(c *ui.Config, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	size := im.Src.Bounds()
-	scale := im.Scale
-	if scale == 0 {
+	wf, hf := float32(size.Dx()), float32(size.Dy())
+	var w, h int
+	if im.Scale == 0 {
 		const dpPrPx = 160 / 72
-		scale = c.Val(ui.Dp(dpPrPx))
+		w, h = c.Dp(wf*dpPrPx), c.Dp(hf*dpPrPx)
+	} else {
+		w, h = int(wf*im.Scale+.5), int(hf*im.Scale+.5)
 	}
-	w, h := int(float32(size.Dx())*scale+.5), int(float32(size.Dy())*scale+.5)
 	d := image.Point{X: cs.Width.Constrain(w), Y: cs.Height.Constrain(h)}
 	aspect := float32(w) / float32(h)
 	dw, dh := float32(d.X), float32(d.Y)
