@@ -13,7 +13,6 @@ import (
 
 	syscall "golang.org/x/sys/windows"
 
-	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
@@ -220,8 +219,8 @@ func createNativeWindow(opts *WindowOptions) (*window, error) {
 	}
 	defer unregisterClass(cls, hInst)
 	wr := rect{
-		right:  int32(cfg.Pixels(opts.Width)),
-		bottom: int32(cfg.Pixels(opts.Height)),
+		right:  int32(cfg.Px(opts.Width)),
+		bottom: int32(cfg.Px(opts.Height)),
 	}
 	dwStyle := uint32(_WS_OVERLAPPEDWINDOW)
 	dwExStyle := uint32(_WS_EX_APPWINDOW | _WS_EX_WINDOWEDGE)
@@ -419,7 +418,7 @@ func (w *window) draw(sync bool) {
 	w.width = int(r.right - r.left)
 	w.height = int(r.bottom - r.top)
 	cfg := configForDC(w.hdc)
-	cfg.Now = time.Now()
+	cfg.now = time.Now()
 	w.w.event(DrawEvent{
 		Size: image.Point{
 			X: w.width,
@@ -487,16 +486,16 @@ func convertKeyCode(code uintptr) (rune, bool) {
 	return r, true
 }
 
-func configForDC(hdc syscall.Handle) ui.Config {
+func configForDC(hdc syscall.Handle) Config {
 	dpi := getDeviceCaps(hdc, _LOGPIXELSX)
 	ppdp := float32(dpi) * inchPrDp * monitorScale
 	// Force a minimum density to keep text legible and to handle bogus output geometry.
 	if ppdp < minDensity {
 		ppdp = minDensity
 	}
-	return ui.Config{
-		PxPerDp: ppdp,
-		PxPerSp: ppdp,
+	return Config{
+		pxPerDp: ppdp,
+		pxPerSp: ppdp,
 	}
 }
 

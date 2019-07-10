@@ -4,8 +4,10 @@ package app
 
 import (
 	"image"
+	"math"
 	"os"
 	"strings"
+	"time"
 
 	"gioui.org/ui"
 )
@@ -15,7 +17,7 @@ type Event interface {
 }
 
 type DrawEvent struct {
-	Config ui.Config
+	Config Config
 	Size   image.Point
 	// Insets is the window space taken up by
 	// system decoration such as translucent
@@ -130,4 +132,35 @@ func init() {
 // For Android Context.getFilesDir is used.
 func DataDir() (string, error) {
 	return dataDir()
+}
+
+// Config implements the ui.Config interface.
+type Config struct {
+	// Device pixels per dp.
+	pxPerDp float32
+	// Device pixels per sp.
+	pxPerSp float32
+	now     time.Time
+}
+
+func (c *Config) Now() time.Time {
+	return c.now
+}
+
+func (c *Config) Px(v ui.Value) int {
+	var r float32
+	switch v.U {
+	case ui.UnitPx:
+		r = v.V
+	case ui.UnitDp:
+		r = c.pxPerDp * v.V
+	case ui.UnitSp:
+		r = c.pxPerSp * v.V
+	default:
+		panic("unknown unit")
+	}
+	if math.IsInf(float64(r), +1) {
+		return ui.Inf
+	}
+	return int(math.Round(float64(r)))
 }

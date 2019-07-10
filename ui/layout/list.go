@@ -18,7 +18,7 @@ type scrollChild struct {
 }
 
 type List struct {
-	Config             *ui.Config
+	Config             ui.Config
 	Inputs             input.Events
 	Axis               Axis
 	Invert             bool

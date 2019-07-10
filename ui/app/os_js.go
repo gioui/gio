@@ -7,7 +7,6 @@ import (
 	"syscall/js"
 	"time"
 
-	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
@@ -329,13 +328,13 @@ func (w *window) setTextInput(s key.TextInputState) {
 
 func (w *window) draw(sync bool) {
 	width, height, scale, cfg := w.config()
-	if cfg == (ui.Config{}) {
+	if cfg == (Config{}) {
 		return
 	}
 	w.mu.Lock()
 	w.scale = float32(scale)
 	w.mu.Unlock()
-	cfg.Now = time.Now()
+	cfg.now = time.Now()
 	w.w.event(DrawEvent{
 		Size: image.Point{
 			X: width,
@@ -346,7 +345,7 @@ func (w *window) draw(sync bool) {
 	})
 }
 
-func (w *window) config() (int, int, float32, ui.Config) {
+func (w *window) config() (int, int, float32, Config) {
 	rect := w.cnv.Call("getBoundingClientRect")
 	width, height := rect.Get("width").Float(), rect.Get("height").Float()
 	scale := w.window.Get("devicePixelRatio").Float()
@@ -359,9 +358,9 @@ func (w *window) config() (int, int, float32, ui.Config) {
 		w.cnv.Set("height", ih)
 	}
 	const ppdp = 96 * inchPrDp * monitorScale
-	return iw, ih, float32(scale), ui.Config{
-		PxPerDp: ppdp * float32(scale),
-		PxPerSp: ppdp * float32(scale),
+	return iw, ih, float32(scale), Config{
+		pxPerDp: ppdp * float32(scale),
+		pxPerSp: ppdp * float32(scale),
 	}
 }
 

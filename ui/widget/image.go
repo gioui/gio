@@ -23,13 +23,13 @@ type Image struct {
 	Scale float32
 }
 
-func (im Image) Layout(c *ui.Config, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+func (im Image) Layout(c ui.Config, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	size := im.Src.Bounds()
 	wf, hf := float32(size.Dx()), float32(size.Dy())
 	var w, h int
 	if im.Scale == 0 {
 		const dpPrPx = 160 / 72
-		w, h = c.Dp(wf*dpPrPx), c.Dp(hf*dpPrPx)
+		w, h = c.Px(ui.Dp(wf*dpPrPx)), c.Px(ui.Dp(hf*dpPrPx))
 	} else {
 		w, h = int(wf*im.Scale+.5), int(hf*im.Scale+.5)
 	}

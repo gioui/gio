@@ -133,7 +133,7 @@ func (s *Scroll) Dragging() bool {
 	return s.dragging
 }
 
-func (s *Scroll) Scroll(cfg *ui.Config, q input.Events, axis Axis) int {
+func (s *Scroll) Scroll(cfg ui.Config, q input.Events, axis Axis) int {
 	if s.axis != axis {
 		s.axis = axis
 		return 0
@@ -165,15 +165,15 @@ func (s *Scroll) Scroll(cfg *ui.Config, q input.Events, axis Axis) int {
 				break
 			}
 			fling := s.estimator.Estimate()
-			if slop, d := float32(cfg.Pixels(touchSlop)), fling.Distance; d >= slop || -slop >= d {
-				if min, v := float32(cfg.Pixels(minFlingVelocity)), fling.Velocity; v >= min || -min >= v {
-					max := float32(cfg.Pixels(maxFlingVelocity))
+			if slop, d := float32(cfg.Px(touchSlop)), fling.Distance; d >= slop || -slop >= d {
+				if min, v := float32(cfg.Px(minFlingVelocity)), fling.Velocity; v >= min || -min >= v {
+					max := float32(cfg.Px(maxFlingVelocity))
 					if v > max {
 						v = max
 					} else if v < -max {
 						v = -max
 					}
-					s.flinger.Init(cfg.Now, v)
+					s.flinger.Init(cfg.Now(), v)
 				}
 			}
 			fallthrough
@@ -200,7 +200,7 @@ func (s *Scroll) Scroll(cfg *ui.Config, q input.Events, axis Axis) int {
 			v := int(math.Round(float64(val)))
 			dist := s.last - v
 			if e.Priority < pointer.Grabbed {
-				slop := cfg.Pixels(touchSlop)
+				slop := cfg.Px(touchSlop)
 				if dist := dist; dist >= slop || -slop >= dist {
 					s.grab = true
 				}
@@ -210,7 +210,7 @@ func (s *Scroll) Scroll(cfg *ui.Config, q input.Events, axis Axis) int {
 			}
 		}
 	}
-	total += s.flinger.Tick(cfg.Now)
+	total += s.flinger.Tick(cfg.Now())
 	return total
 }
 

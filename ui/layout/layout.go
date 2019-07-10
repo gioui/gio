@@ -96,14 +96,14 @@ type Insets struct {
 	cs                       Constraints
 }
 
-func (in *Insets) Begin(c *ui.Config, ops *ui.Ops, cs Constraints) Constraints {
+func (in *Insets) Begin(c ui.Config, ops *ui.Ops, cs Constraints) Constraints {
 	if in.begun {
 		panic("must End before Begin")
 	}
-	in.top = c.Pixels(in.Top)
-	in.right = c.Pixels(in.Right)
-	in.bottom = c.Pixels(in.Bottom)
-	in.left = c.Pixels(in.Left)
+	in.top = c.Px(in.Top)
+	in.right = c.Px(in.Right)
+	in.bottom = c.Px(in.Bottom)
+	in.left = c.Px(in.Left)
 	in.begun = true
 	in.ops = ops
 	in.cs = cs

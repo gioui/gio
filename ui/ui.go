@@ -11,41 +11,13 @@ import (
 	"gioui.org/ui/internal/ops"
 )
 
-// Config contains the essential configuration for
+// Config represents the essential configuration for
 // updating and drawing a user interface.
-type Config struct {
-	// Device pixels per dp.
-	PxPerDp float32
-	// Device pixels per sp.
-	PxPerSp float32
-	// The current time for animation.
-	Now time.Time
-}
-
-// Dp converts a value in dp units to pixels.
-func (c *Config) Dp(dp float32) int {
-	return c.Pixels(Dp(dp))
-}
-
-// Sp converts a value in sp units to pixels.
-func (c *Config) Sp(sp float32) int {
-	return c.Pixels(Sp(sp))
-}
-
-// Pixels converts a value to pixels.
-func (c *Config) Pixels(v Value) int {
-	var r float32
-	switch v.U {
-	case UnitPx:
-		r = v.V
-	case UnitDp:
-		r = c.PxPerDp * v.V
-	case UnitSp:
-		r = c.PxPerSp * v.V
-	default:
-		panic("unknown unit")
-	}
-	return int(math.Round(float64(r)))
+type Config interface {
+	// Now returns the current animation time.
+	Now() time.Time
+	// Px converts a Value to pixels.
+	Px(v Value) int
 }
 
 // LayerOp represents a semantic layer of UI.

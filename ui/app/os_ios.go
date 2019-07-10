@@ -22,7 +22,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
@@ -87,10 +86,10 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int, to
 			Min: image.Point{X: int(left + .5), Y: int(top + .5)},
 			Max: image.Point{X: int(right + .5), Y: int(bottom + .5)},
 		},
-		Config: ui.Config{
-			PxPerDp: float32(dpi) * inchPrDp,
-			PxPerSp: float32(sdpi) * inchPrDp,
-			Now:     time.Now(),
+		Config: Config{
+			pxPerDp: float32(dpi) * inchPrDp,
+			pxPerSp: float32(sdpi) * inchPrDp,
+			now:     time.Now(),
 		},
 		sync: isSync,
 	})

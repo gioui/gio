@@ -19,7 +19,6 @@ import (
 	"time"
 	"unsafe"
 
-	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
@@ -142,7 +141,7 @@ func (w *window) draw(sync bool) {
 		return
 	}
 	cfg := getConfig()
-	cfg.Now = time.Now()
+	cfg.now = time.Now()
 	w.setStage(StageRunning)
 	w.w.event(DrawEvent{
 		Size: image.Point{
@@ -154,15 +153,15 @@ func (w *window) draw(sync bool) {
 	})
 }
 
-func getConfig() ui.Config {
+func getConfig() Config {
 	ppdp := float32(C.gio_getPixelsPerDP())
 	ppdp *= monitorScale
 	if ppdp < minDensity {
 		ppdp = minDensity
 	}
-	return ui.Config{
-		PxPerDp: ppdp,
-		PxPerSp: ppdp,
+	return Config{
+		pxPerDp: ppdp,
+		pxPerSp: ppdp,
 	}
 }
 
@@ -216,8 +215,8 @@ func Main() {
 	}
 	cfg := getConfig()
 	opts := singleWindow.opts
-	w := cfg.Pixels(opts.Width)
-	h := cfg.Pixels(opts.Height)
+	w := cfg.Px(opts.Width)
+	h := cfg.Px(opts.Height)
 	title := C.CString(opts.Title)
 	defer C.free(unsafe.Pointer(title))
 	C.gio_main(view, title, C.CGFloat(w), C.CGFloat(h))

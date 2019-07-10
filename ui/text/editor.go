@@ -21,7 +21,7 @@ import (
 )
 
 type Editor struct {
-	Config     *ui.Config
+	Config     ui.Config
 	Inputs     input.Events
 	Face       Face
 	Alignment  Alignment
@@ -32,7 +32,7 @@ type Editor struct {
 	Hint         string
 	HintMaterial ui.BlockOp
 
-	oldCfg            ui.Config
+	oldScale          int
 	blinkStart        time.Time
 	focused           bool
 	rr                editBuffer
@@ -73,9 +73,10 @@ func (s ChangeEvent) isEditorEvent() {}
 func (s SubmitEvent) isEditorEvent() {}
 
 func (e *Editor) Next() (EditorEvent, bool) {
-	if cfg := *e.Config; cfg != e.oldCfg {
+	// Crude configuration change detection.
+	if scale := e.Config.Px(ui.Sp(100)); scale != e.oldScale {
 		e.invalidate()
-		e.oldCfg = cfg
+		e.oldScale = scale
 	}
 	sbounds := e.scrollBounds()
 	var smin, smax int
@@ -104,7 +105,7 @@ func (e *Editor) Next() (EditorEvent, bool) {
 		switch {
 		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
 			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
-			e.blinkStart = e.Config.Now
+			e.blinkStart = e.Config.Now()
 			e.moveCoord(image.Point{
 				X: int(math.Round(float64(evt.Position.X))),
 				Y: int(math.Round(float64(evt.Position.Y))),
@@ -123,7 +124,7 @@ func (e *Editor) Next() (EditorEvent, bool) {
 		if !ok {
 			break
 		}
-		e.blinkStart = e.Config.Now
+		e.blinkStart = e.Config.Now()
 		switch ke := ke.(type) {
 		case key.FocusEvent:
 			e.focused = ke.Focus
@@ -153,7 +154,7 @@ func (e *Editor) Next() (EditorEvent, bool) {
 }
 
 func (e *Editor) caretWidth() fixed.Int26_6 {
-	oneDp := e.Config.Dp(1)
+	oneDp := e.Config.Px(ui.Dp(1))
 	return fixed.Int26_6(oneDp * 64)
 }
 
@@ -167,7 +168,7 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			break
 		}
 	}
-	twoDp := e.Config.Dp(2)
+	twoDp := e.Config.Px(ui.Dp(2))
 	e.padLeft, e.padRight = twoDp, twoDp
 	maxWidth := cs.Width.Max
 	if e.SingleLine {
@@ -225,7 +226,7 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		ui.PopOp{}.Add(ops)
 	}
 	if e.focused {
-		now := e.Config.Now
+		now := e.Config.Now()
 		dt := now.Sub(e.blinkStart)
 		blinking := dt < maxBlinkDuration
 		const timePerBlink = time.Second / blinksPerSecond

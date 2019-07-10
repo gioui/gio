@@ -19,7 +19,6 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
@@ -237,8 +236,8 @@ func createNativeWindow(opts *WindowOptions) (*window, error) {
 	C.free(unsafe.Pointer(title))
 
 	_, _, cfg := w.config()
-	w.width = cfg.Pixels(opts.Width)
-	w.height = cfg.Pixels(opts.Height)
+	w.width = cfg.Px(opts.Width)
+	w.height = cfg.Px(opts.Height)
 	if conn.decor != nil {
 		// Request server side decorations.
 		w.decor = C.zxdg_decoration_manager_v1_get_toplevel_decoration(conn.decor, w.topLvl)
@@ -1020,11 +1019,11 @@ func (w *window) updateOutputs() {
 	}
 }
 
-func (w *window) config() (int, int, ui.Config) {
+func (w *window) config() (int, int, Config) {
 	width, height := w.width*w.scale, w.height*w.scale
-	return width, height, ui.Config{
-		PxPerDp: w.ppdp * float32(w.scale),
-		PxPerSp: w.ppsp * float32(w.scale),
+	return width, height, Config{
+		pxPerDp: w.ppdp * float32(w.scale),
+		pxPerSp: w.ppsp * float32(w.scale),
 	}
 }
 
@@ -1036,7 +1035,7 @@ func (w *window) draw(sync bool) {
 		return
 	}
 	width, height, cfg := w.config()
-	if cfg == (ui.Config{}) {
+	if cfg == (Config{}) {
 		return
 	}
 	if animating && w.lastFrameCallback == nil {
@@ -1044,7 +1043,7 @@ func (w *window) draw(sync bool) {
 		// Use the surface as listener data for gio_onFrameDone.
 		C.gio_wl_callback_add_listener(w.lastFrameCallback, unsafe.Pointer(w.surf))
 	}
-	cfg.Now = time.Now()
+	cfg.now = time.Now()
 	w.w.event(DrawEvent{
 		Size: image.Point{
 			X: width,

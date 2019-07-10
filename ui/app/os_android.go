@@ -24,7 +24,6 @@ import (
 	"time"
 	"unsafe"
 
-	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
@@ -289,10 +288,10 @@ func (w *window) draw(sync bool) {
 			Y: int(height),
 		},
 		Insets: w.insets,
-		Config: ui.Config{
-			PxPerDp: ppdp,
-			PxPerSp: w.fontScale * ppdp,
-			Now:     time.Now(),
+		Config: Config{
+			pxPerDp: ppdp,
+			pxPerSp: w.fontScale * ppdp,
+			now:     time.Now(),
 		},
 		sync: sync,
 	})
