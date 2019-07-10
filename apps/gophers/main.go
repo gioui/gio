@@ -452,7 +452,7 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	cc := clipCircle{}
 	cs = cc.Begin(ops, cs)
 	cs = cs.Exact(sz, sz)
-	dims := widget.Image{Src: u.avatar, Rect: u.avatar.Bounds(), Scale: 1}.Layout(c, ops, cs)
+	dims := widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(c, ops, cs)
 	dims = cc.End(dims)
 	c1 := f.End(dims)
 	cs = f.Flexible(1, layout.Fit)
@@ -600,7 +600,7 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 			cc := clipCircle{}
 			cs = cc.Begin(ops, in.Begin(c, ops, cs))
 			cs = cs.Exact(c.Dp(48), c.Dp(48))
-			dims = widget.Image{Src: u.avatar, Rect: u.avatar.Bounds(), Scale: 1}.Layout(c, ops, cs)
+			dims = widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(c, ops, cs)
 			dims = in.End(cc.End(dims))
 		}
 		c1 := f.End(dims)
