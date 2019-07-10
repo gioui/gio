@@ -2,6 +2,8 @@
 
 package ui
 
+import "fmt"
+
 // Value is a value with a unit.
 type Value struct {
 	V float32
@@ -33,4 +35,21 @@ func Dp(v float32) Value {
 
 func Sp(v float32) Value {
 	return Value{V: v, U: UnitSp}
+}
+
+func (v Value) String() string {
+	return fmt.Sprintf("%g%s", v.V, v.U)
+}
+
+func (u Unit) String() string {
+	switch u {
+	case UnitPx:
+		return "px"
+	case UnitDp:
+		return "dp"
+	case UnitSp:
+		return "sp"
+	default:
+		panic("unknown unit")
+	}
 }

@@ -50,15 +50,36 @@ func (c Constraints) Expand() Constraints {
 func (c Constraint) Expand() Constraint {
 	return Constraint{Min: c.Max, Max: c.Max}
 }
+
 func (c Constraints) Loose() Constraints {
 	return Constraints{Width: c.Width.Loose(), Height: c.Height.Loose()}
+}
+
+func (c Constraints) Exact(width, height int) Constraints {
+	if height != 0 {
+		if c.Height.Min < height {
+			c.Height.Min = height
+		}
+		if height < c.Height.Max {
+			c.Height.Max = height
+		}
+	}
+	if width != 0 {
+		if c.Width.Min < width {
+			c.Width.Min = width
+		}
+		if width < c.Width.Max {
+			c.Width.Max = width
+		}
+	}
+	return c
 }
 
 func (c Constraint) Loose() Constraint {
 	return Constraint{Max: c.Max}
 }
 
-// ExactConstraints returns the constraints that exactly represents the
+// ExactConstraints returns the rigid constraints that represents the
 // given dimensions.
 func ExactConstraints(size image.Point) Constraints {
 	return Constraints{
@@ -128,30 +149,6 @@ func (in *Insets) End(dims Dimens) Dimens {
 
 func EqualInsets(v ui.Value) Insets {
 	return Insets{Top: v, Right: v, Bottom: v, Left: v}
-}
-
-type Sized struct {
-	Width, Height ui.Value
-}
-
-func (s Sized) Constrain(c *ui.Config, cs Constraints) Constraints {
-	if h := int(c.Val(s.Height) + 0.5); h != 0 {
-		if cs.Height.Min < h {
-			cs.Height.Min = h
-		}
-		if h < cs.Height.Max {
-			cs.Height.Max = h
-		}
-	}
-	if w := int(c.Val(s.Width) + .5); w != 0 {
-		if cs.Width.Min < w {
-			cs.Width.Min = w
-		}
-		if w < cs.Width.Max {
-			cs.Width.Max = w
-		}
-	}
-	return cs
 }
 
 type Align struct {
