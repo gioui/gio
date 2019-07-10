@@ -92,7 +92,7 @@ type icon struct {
 
 	// Cached values.
 	img     image.Image
-	imgSize float32
+	imgSize int
 }
 
 type redrawer func()
@@ -448,7 +448,7 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	cs = in.Begin(c, ops, cs)
 	f := (&layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}).Init(ops, cs)
 	cs = f.Rigid()
-	sz := int(c.Dp(48)+.5)
+	sz := c.Dp(48)
 	cc := clipCircle{}
 	cs = cc.Begin(ops, cs)
 	cs = cs.Exact(sz, sz)
@@ -504,7 +504,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		cs = f.Rigid()
 		{
 			in := layout.EqualInsets(ui.Dp(16))
-			sz := int(c.Dp(200)+.5)
+			sz := c.Dp(200)
 			cs = cs.Exact(sz, sz)
 			dims = a.edit.Layout(ops, in.Begin(c, ops, cs))
 			dims = in.End(dims)
@@ -599,7 +599,7 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c *ui.Config, index int) 
 			in := layout.Insets{Right: ui.Dp(8)}
 			cc := clipCircle{}
 			cs = cc.Begin(ops, in.Begin(c, ops, cs))
-			cs = cs.Exact(int(c.Dp(48)+.5), int(c.Dp(48)+.5))
+			cs = cs.Exact(c.Dp(48), c.Dp(48))
 			dims = widget.Image{Src: u.avatar, Rect: u.avatar.Bounds(), Scale: 1}.Layout(c, ops, cs)
 			dims = in.End(cc.End(dims))
 		}
@@ -701,14 +701,13 @@ func (c *clipCircle) End(dims layout.Dimens) layout.Dimens {
 	return dims
 }
 
-func fab(ops *ui.Ops, cs layout.Constraints, ico image.Image, mat ui.BlockOp, size float32) layout.Dimens {
-	sz := int(size + .5)
-	rr := size * .5
-	dp := image.Point{X: (sz - ico.Bounds().Dx()) / 2, Y: (sz - ico.Bounds().Dy()) / 2}
-	dims := image.Point{X: sz, Y: sz}
-	rrect(ops, size, size, rr, rr, rr, rr)
+func fab(ops *ui.Ops, cs layout.Constraints, ico image.Image, mat ui.BlockOp, size int) layout.Dimens {
+	dp := image.Point{X: (size - ico.Bounds().Dx()) / 2, Y: (size - ico.Bounds().Dy()) / 2}
+	dims := image.Point{X: size, Y: size}
+	rr := float32(size) * .5
+	rrect(ops, float32(size), float32(size), rr, rr, rr, rr)
 	mat.Add(ops)
-	gdraw.DrawOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(sz), Y: float32(sz)}}}.Add(ops)
+	gdraw.DrawOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(size), Y: float32(size)}}}.Add(ops)
 	gdraw.ImageOp{Img: ico, Rect: ico.Bounds()}.Add(ops)
 	gdraw.DrawOp{
 		Rect: toRectF(ico.Bounds().Add(dp)),
@@ -730,7 +729,7 @@ func (ic *icon) image(cfg *ui.Config) image.Image {
 	}
 	m, _ := iconvg.DecodeMetadata(ic.src)
 	dx, dy := m.ViewBox.AspectRatio()
-	img := image.NewRGBA(image.Rectangle{Max: image.Point{X: int(sz), Y: int(sz * dy / dx)}})
+	img := image.NewRGBA(image.Rectangle{Max: image.Point{X: sz, Y: int(float32(sz) * dy / dx)}})
 	var ico iconvg.Rasterizer
 	ico.SetDstImage(img, img.Bounds(), draw.Src)
 	// Use white for icons.
