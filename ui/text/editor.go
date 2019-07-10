@@ -259,7 +259,7 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	ui.PopOp{}.Add(ops)
 
 	baseline := e.padTop + e.dims.Baseline
-	pointer.AreaRect(e.viewSize).Add(ops)
+	pointer.RectAreaOp{Size: e.viewSize}.Add(ops)
 	e.scroller.Add(ops)
 	e.clicker.Add(ops)
 	return layout.Dimens{Size: e.viewSize, Baseline: baseline}

@@ -3,6 +3,9 @@
 package input
 
 import (
+	"encoding/binary"
+	"image"
+
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/internal/ops"
@@ -41,11 +44,23 @@ type pointerHandler struct {
 	wantsGrab bool
 }
 
+type areaOp struct {
+	kind areaKind
+	size image.Point
+}
+
 type areaNode struct {
 	trans ui.Transform
 	next  int
-	area  pointer.AreaOp
+	area  areaOp
 }
+
+type areaKind uint8
+
+const (
+	areaRect areaKind = iota
+	areaEllipse
+)
 
 func (q *pointerQueue) collectHandlers(r *ui.OpsReader, events handlerEvents, t ui.Transform, area, node int, pass bool) {
 	for {
@@ -63,7 +78,7 @@ func (q *pointerQueue) collectHandlers(r *ui.OpsReader, events handlerEvents, t 
 			op.Decode(encOp.Data)
 			pass = op.Pass
 		case ops.TypeArea:
-			var op pointer.AreaOp
+			var op areaOp
 			op.Decode(encOp.Data)
 			q.areas = append(q.areas, areaNode{trans: t, next: area, area: op})
 			area = len(q.areas) - 1
@@ -255,5 +270,46 @@ func (q *pointerQueue) Push(e pointer.Event, events handlerEvents) {
 				h.wantsGrab = false
 			}
 		}
+	}
+}
+
+func (op *areaOp) Decode(d []byte) {
+	if ops.OpType(d[0]) != ops.TypeArea {
+		panic("invalid op")
+	}
+	bo := binary.LittleEndian
+	size := image.Point{
+		X: int(bo.Uint32(d[2:])),
+		Y: int(bo.Uint32(d[6:])),
+	}
+	*op = areaOp{
+		kind: areaKind(d[1]),
+		size: size,
+	}
+}
+
+func (op *areaOp) Hit(pos f32.Point) bool {
+	switch op.kind {
+	case areaRect:
+		if 0 <= pos.X && pos.X < float32(op.size.X) &&
+			0 <= pos.Y && pos.Y < float32(op.size.Y) {
+			return true
+		} else {
+			return false
+		}
+	case areaEllipse:
+		rx := float32(op.size.X) / 2
+		ry := float32(op.size.Y) / 2
+		rx2 := rx * rx
+		ry2 := ry * ry
+		xh := pos.X - rx
+		yk := pos.Y - ry
+		if xh*xh*ry2+yk*yk*rx2 <= rx2*ry2 {
+			return true
+		} else {
+			return false
+		}
+	default:
+		panic("invalid area kind")
 	}
 }

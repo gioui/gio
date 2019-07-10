@@ -23,7 +23,16 @@ type Event struct {
 	Scroll    f32.Point
 }
 
-type AreaOp struct {
+type RectAreaOp struct {
+	Size image.Point
+}
+
+type EllipseAreaOp struct {
+	Size image.Point
+}
+
+// Must match the structure in input.areaOp
+type areaOp struct {
 	kind areaKind
 	size image.Point
 }
@@ -46,6 +55,7 @@ type Type uint8
 type Priority uint8
 type Source uint8
 
+// Must match input.areaKind
 type areaKind uint8
 
 const (
@@ -71,21 +81,21 @@ const (
 	areaEllipse
 )
 
-func AreaRect(size image.Point) AreaOp {
-	return AreaOp{
+func (op RectAreaOp) Add(ops *ui.Ops) {
+	areaOp{
 		kind: areaRect,
-		size: size,
-	}
+		size: op.Size,
+	}.add(ops)
 }
 
-func AreaEllipse(size image.Point) AreaOp {
-	return AreaOp{
+func (op EllipseAreaOp) Add(ops *ui.Ops) {
+	areaOp{
 		kind: areaEllipse,
-		size: size,
-	}
+		size: op.Size,
+	}.add(ops)
 }
 
-func (op AreaOp) Add(o *ui.Ops) {
+func (op areaOp) add(o *ui.Ops) {
 	data := make([]byte, ops.TypeAreaLen)
 	data[0] = byte(ops.TypeArea)
 	data[1] = byte(op.kind)
@@ -93,47 +103,6 @@ func (op AreaOp) Add(o *ui.Ops) {
 	bo.PutUint32(data[2:], uint32(op.size.X))
 	bo.PutUint32(data[6:], uint32(op.size.Y))
 	o.Write(data)
-}
-
-func (op *AreaOp) Decode(d []byte) {
-	if ops.OpType(d[0]) != ops.TypeArea {
-		panic("invalid op")
-	}
-	bo := binary.LittleEndian
-	size := image.Point{
-		X: int(bo.Uint32(d[2:])),
-		Y: int(bo.Uint32(d[6:])),
-	}
-	*op = AreaOp{
-		kind: areaKind(d[1]),
-		size: size,
-	}
-}
-
-func (op *AreaOp) Hit(pos f32.Point) bool {
-	switch op.kind {
-	case areaRect:
-		if 0 <= pos.X && pos.X < float32(op.size.X) &&
-			0 <= pos.Y && pos.Y < float32(op.size.Y) {
-			return true
-		} else {
-			return false
-		}
-	case areaEllipse:
-		rx := float32(op.size.X) / 2
-		ry := float32(op.size.Y) / 2
-		rx2 := rx * rx
-		ry2 := ry * ry
-		xh := pos.X - rx
-		yk := pos.Y - ry
-		if xh*xh*ry2+yk*yk*rx2 <= rx2*ry2 {
-			return true
-		} else {
-			return false
-		}
-	default:
-		panic("invalid area kind")
-	}
 }
 
 func (h HandlerOp) Add(o *ui.Ops) {

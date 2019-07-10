@@ -209,7 +209,7 @@ func (l *List) Layout() Dimens {
 	}
 	dims := axisPoint(l.Axis, mainc.Constrain(pos), maxCross)
 	block := ops.End()
-	pointer.AreaRect(dims).Add(ops)
+	pointer.RectAreaOp{Size: dims}.Add(ops)
 	l.scroll.Add(ops)
 	block.Add(ops)
 	return Dimens{Size: dims}
