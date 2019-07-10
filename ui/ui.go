@@ -30,7 +30,7 @@ type InvalidateOp struct {
 	At time.Time
 }
 
-// TransformOp transforms an op.
+// TransformOp applies a transform to later ops.
 type TransformOp struct {
 	Transform Transform
 }
