@@ -16,6 +16,7 @@ const (
 	TypeColor
 	TypeArea
 	TypePointerHandler
+	TypePass
 	TypeKeyHandler
 	TypeHideInput
 	TypePush
@@ -35,6 +36,7 @@ const (
 	TypeColorLen          = 1 + 4
 	TypeAreaLen           = 1 + 1 + 2*4
 	TypePointerHandlerLen = 1 + 1
+	TypePassLen           = 1 + 1
 	TypeKeyHandlerLen     = 1 + 1
 	TypeHideInputLen      = 1
 	TypePushLen           = 1
@@ -55,6 +57,7 @@ func (t OpType) Size() int {
 		TypeColorLen,
 		TypeAreaLen,
 		TypePointerHandlerLen,
+		TypePassLen,
 		TypeKeyHandlerLen,
 		TypeHideInputLen,
 		TypePushLen,

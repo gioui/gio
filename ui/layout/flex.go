@@ -77,7 +77,6 @@ func (f *Flex) begin() {
 	}
 	f.begun = true
 	f.ops.Begin()
-	ui.LayerOp{}.Add(f.ops)
 }
 
 func (f *Flex) Rigid() Constraints {

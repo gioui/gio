@@ -20,10 +20,6 @@ type Config interface {
 	Px(v Value) int
 }
 
-// LayerOp represents a semantic layer of UI.
-type LayerOp struct {
-}
-
 // InvalidateOp requests a redraw at the given time. Use
 // the zero value to request an immediate redraw.
 type InvalidateOp struct {
@@ -39,6 +35,9 @@ type Transform struct {
 	// TODO: general transforms.
 	offset f32.Point
 }
+
+// Inf is the int value that represents an unbounded maximum constraint.
+const Inf = int(^uint(0) >> 1)
 
 func (r InvalidateOp) Add(o *Ops) {
 	data := make([]byte, ops.TypeRedrawLen)
@@ -100,22 +99,6 @@ func (t *TransformOp) Decode(d []byte) {
 	}
 }
 
-func (l LayerOp) Add(o *Ops) {
-	data := make([]byte, ops.TypeLayerLen)
-	data[0] = byte(ops.TypeLayer)
-	o.Write(data)
-}
-
-func (l *LayerOp) Decode(d []byte) {
-	if ops.OpType(d[0]) != ops.TypeLayer {
-		panic("invalid op")
-	}
-	*l = LayerOp{}
-}
-
 func Offset(o f32.Point) Transform {
 	return Transform{o}
 }
-
-// Inf is the int value that represents an unbounded maximum constraint.
-const Inf = int(^uint(0) >> 1)

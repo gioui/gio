@@ -91,7 +91,6 @@ func (l *List) Next() (int, Constraints, bool) {
 	if ok {
 		cs = axisConstraints(l.Axis, Constraint{Max: ui.Inf}, l.crossConstraintChild(l.cs))
 		l.ops.Begin()
-		ui.LayerOp{}.Add(l.ops)
 	}
 	return i, cs, ok
 }

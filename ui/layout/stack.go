@@ -55,7 +55,6 @@ func (s *Stack) begin() {
 	}
 	s.begun = true
 	s.ops.Begin()
-	ui.LayerOp{}.Add(s.ops)
 }
 
 func (s *Stack) Rigid() Constraints {

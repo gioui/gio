@@ -24,8 +24,6 @@ type Event struct {
 }
 
 type AreaOp struct {
-	Transparent bool
-
 	kind areaKind
 	size image.Point
 }
@@ -35,15 +33,13 @@ type HandlerOp struct {
 	Grab bool
 }
 
+// PassOp change the current event pass-through
+// setting.
+type PassOp struct {
+	Pass bool
+}
+
 type Key interface{}
-
-type HitResult uint8
-
-const (
-	HitNone HitResult = iota
-	HitTransparent
-	HitOpaque
-)
 
 type ID uint16
 type Type uint8
@@ -114,18 +110,14 @@ func (op *AreaOp) Decode(d []byte) {
 	}
 }
 
-func (op *AreaOp) Hit(pos f32.Point) HitResult {
-	res := HitOpaque
-	if op.Transparent {
-		res = HitTransparent
-	}
+func (op *AreaOp) Hit(pos f32.Point) bool {
 	switch op.kind {
 	case areaRect:
 		if 0 <= pos.X && pos.X < float32(op.size.X) &&
 			0 <= pos.Y && pos.Y < float32(op.size.Y) {
-			return res
+			return true
 		} else {
-			return HitNone
+			return false
 		}
 	case areaEllipse:
 		rx := float32(op.size.X) / 2
@@ -135,9 +127,9 @@ func (op *AreaOp) Hit(pos f32.Point) HitResult {
 		xh := pos.X - rx
 		yk := pos.Y - ry
 		if xh*xh*ry2+yk*yk*rx2 <= rx2*ry2 {
-			return res
+			return true
 		} else {
-			return HitNone
+			return false
 		}
 	default:
 		panic("invalid area kind")
@@ -160,6 +152,24 @@ func (h *HandlerOp) Decode(d []byte, refs []interface{}) {
 	*h = HandlerOp{
 		Grab: d[1] != 0,
 		Key:  refs[0].(Key),
+	}
+}
+
+func (op PassOp) Add(o *ui.Ops) {
+	data := make([]byte, ops.TypePassLen)
+	data[0] = byte(ops.TypePass)
+	if op.Pass {
+		data[1] = 1
+	}
+	o.Write(data)
+}
+
+func (op *PassOp) Decode(d []byte) {
+	if ops.OpType(d[0]) != ops.TypePass {
+		panic("invalid op")
+	}
+	*op = PassOp{
+		Pass: d[1] != 0,
 	}
 }
 
