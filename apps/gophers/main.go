@@ -273,7 +273,7 @@ func newApp(w *app.Window) *App {
 	a.fab = &ActionButton{
 		config:  &a.cfg,
 		inputs:  a.inputs,
-		face:    a.face(fonts.regular, 9),
+		face:    a.face(fonts.regular, 11),
 		sendIco: &icon{src: icons.ContentSend, size: ui.Dp(24)},
 		icons:   []*icon{},
 	}
@@ -291,7 +291,7 @@ func newApp(w *app.Window) *App {
 	a.edit = &text.Editor{
 		Config:   &a.cfg,
 		Inputs:   a.inputs,
-		Face:     a.face(fonts.regular, 14),
+		Face:     a.face(fonts.regular, 16),
 		Material: theme.text,
 		//Alignment: text.End,
 		//SingleLine: true,
@@ -526,7 +526,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			cs = s.Rigid()
 			in := layout.Insets{Top: ui.Dp(16), Right: ui.Dp(8), Bottom: ui.Dp(8), Left: ui.Dp(8)}
 			grey := colorMaterial(ops, rgb(0x888888))
-			lbl := text.Label{Material: grey, Face: a.face(fonts.regular, 9), Text: "GOPHERS"}
+			lbl := text.Label{Material: grey, Face: a.face(fonts.regular, 11), Text: "GOPHERS"}
 			dims = in.End(lbl.Layout(ops, in.Begin(c, ops, cs)))
 			c2 := s.End(dims)
 			c1 := s.End(fill{colorMaterial(ops, rgb(0xf2f2f2))}.Layout(ops, s.Expand()))
@@ -613,13 +613,13 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c ui.Config, index int) l
 				f := baseline()
 				f.Init(ops, cs)
 				cs = f.Rigid()
-				dims = text.Label{Material: theme.text, Face: a.face(fonts.regular, 11), Text: u.name}.Layout(ops, cs)
+				dims = text.Label{Material: theme.text, Face: a.face(fonts.regular, 13), Text: u.name}.Layout(ops, cs)
 				c1 := f.End(dims)
-				cs = f.Rigid()
+				cs = f.Flexible(1, layout.Fit)
 				al := layout.Align{Alignment: layout.E}
 				in := layout.Insets{Left: ui.Dp(2)}
 				cs = in.Begin(c, ops, al.Begin(ops, cs))
-				dims = text.Label{Material: theme.text, Face: a.face(fonts.regular, 8), Text: "3 hours ago"}.Layout(ops, cs)
+				dims = text.Label{Material: theme.text, Face: a.face(fonts.regular, 10), Text: "3 hours ago"}.Layout(ops, cs)
 				dims = al.End(in.End(dims))
 				c2 := f.End(dims)
 				dims = f.Layout(c1, c2)
@@ -628,7 +628,7 @@ func (a *App) user(ops *ui.Ops, cs layout.Constraints, c ui.Config, index int) l
 			cs = f.Rigid()
 			in := layout.Insets{Top: ui.Dp(4)}
 			cs = in.Begin(c, ops, cs)
-			dims = text.Label{Material: theme.tertText, Face: a.face(fonts.regular, 10), Text: u.company}.Layout(ops, cs)
+			dims = text.Label{Material: theme.tertText, Face: a.face(fonts.regular, 12), Text: u.company}.Layout(ops, cs)
 			dims = in.End(dims)
 			c2 := f.End(dims)
 			dims = f.Layout(c1, c2)
