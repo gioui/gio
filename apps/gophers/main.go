@@ -484,7 +484,7 @@ func (up *userPage) fetchCommits(ctx context.Context) {
 
 func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	c := &a.cfg
-	st := (&layout.Stack{Alignment: layout.Center}).Init(ops, cs)
+	st := (&layout.Stack{Alignment: layout.Start}).Init(ops, cs)
 	cs = st.Rigid()
 	al := layout.Align{Alignment: layout.SE}
 	in := layout.EqualInsets(ui.Dp(16))
@@ -495,10 +495,11 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 
 	cs = st.Expand()
 	{
-		f := (&layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Stretch}).Init(ops, cs)
+		f := (&layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start}).Init(ops, cs)
 
 		cs = f.Rigid()
 		{
+			cs.Width.Min = cs.Width.Max
 			in := layout.EqualInsets(ui.Dp(16))
 			sz := c.Px(ui.Dp(200))
 			cs = cs.Exact(sz, sz)
@@ -509,6 +510,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 
 		cs = f.Rigid()
 		{
+			cs.Width.Min = cs.Width.Max
 			in := layout.Insets{Bottom: ui.Dp(16), Left: ui.Dp(16), Right: ui.Dp(16)}
 			dims = a.edit2.Layout(ops, in.Begin(c, ops, cs))
 			dims = in.End(dims)
@@ -517,6 +519,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 
 		cs = f.Rigid()
 		{
+			cs.Width.Min = cs.Width.Max
 			s := layout.Stack{Alignment: layout.Center}
 			s.Init(ops, cs)
 			cs = s.Rigid()
