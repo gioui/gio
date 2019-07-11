@@ -13,7 +13,6 @@ type Flex struct {
 	Axis               Axis
 	MainAxisAlignment  MainAxisAlignment
 	CrossAxisAlignment CrossAxisAlignment
-	MainAxisSize       MainAxisSize
 
 	ops         *ui.Ops
 	cs          Constraints
@@ -29,17 +28,10 @@ type FlexChild struct {
 	dims  Dimens
 }
 
-type MainAxisSize uint8
-
 type MainAxisAlignment uint8
 type CrossAxisAlignment uint8
 
 type flexMode uint8
-
-const (
-	Max MainAxisSize = iota
-	Min
-)
 
 const (
 	Start = 100 + iota
@@ -136,11 +128,7 @@ func (f *Flex) Layout(children ...FlexChild) Dimens {
 	mainc := axisMainConstraint(f.Axis, f.cs)
 	crossSize := axisCrossConstraint(f.Axis, f.cs).Constrain(f.maxCross)
 	var space int
-	if mainc.Max != ui.Inf && f.MainAxisSize == Max {
-		if mainc.Max > f.size {
-			space = mainc.Max - f.size
-		}
-	} else if mainc.Min > f.size {
+	if mainc.Min > f.size {
 		space = mainc.Min - f.size
 	}
 	var mainSize int
