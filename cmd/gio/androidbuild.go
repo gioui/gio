@@ -338,7 +338,11 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 	}
 	for _, f := range apkFiles {
 		name := filepath.Base(f)
-		apkw.Add(name, f)
+		if name == "resources.arsc" {
+			apkw.Store(name, f)
+		} else {
+			apkw.Add(name, f)
+		}
 	}
 	for _, a := range bi.archs {
 		arch := allArchs[a]
@@ -555,17 +559,35 @@ func (z *zipWriter) Create(name string) io.Writer {
 	return &errWriter{w: w, err: &z.err}
 }
 
+func (z *zipWriter) Store(name, file string) {
+	z.add(name, file, false)
+}
+
 func (z *zipWriter) Add(name, file string) {
+	z.add(name, file, true)
+}
+
+func (z *zipWriter) add(name, file string, compressed bool) {
 	if z.err != nil {
 		return
 	}
-	w := z.Create(name)
 	f, err := os.Open(file)
 	if err != nil {
 		z.err = err
 		return
 	}
 	defer f.Close()
+	fh := &zip.FileHeader{
+		Name: name,
+	}
+	if compressed {
+		fh.Method = zip.Deflate
+	}
+	w, err := z.w.CreateHeader(fh)
+	if err != nil {
+		z.err = err
+		return
+	}
 	if _, err := io.Copy(w, f); err != nil {
 		z.err = err
 		return
