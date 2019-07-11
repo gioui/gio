@@ -81,7 +81,8 @@ func (c *Click) Add(ops *ui.Ops) {
 	op.Add(ops)
 }
 
-func (c *Click) Next(q input.Events) (ClickEvent, bool) {
+func (c *Click) Events(q input.Events) []ClickEvent {
+	var events []ClickEvent
 	for _, evt := range q.Events(c) {
 		e, ok := evt.(pointer.Event)
 		if !ok {
@@ -92,7 +93,7 @@ func (c *Click) Next(q input.Events) (ClickEvent, bool) {
 			wasPressed := c.State == StatePressed
 			c.State = StateNormal
 			if wasPressed {
-				return ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source}, true
+				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source})
 			}
 		case pointer.Cancel:
 			c.State = StateNormal
@@ -101,7 +102,7 @@ func (c *Click) Next(q input.Events) (ClickEvent, bool) {
 				break
 			}
 			c.State = StatePressed
-			return ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source}, true
+			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source})
 		case pointer.Move:
 			if c.State == StatePressed && !e.Hit {
 				c.State = StateNormal
@@ -110,7 +111,7 @@ func (c *Click) Next(q input.Events) (ClickEvent, bool) {
 			}
 		}
 	}
-	return ClickEvent{}, false
+	return events
 }
 
 func (s *Scroll) Add(ops *ui.Ops) {

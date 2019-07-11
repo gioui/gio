@@ -97,11 +97,7 @@ func (e *Editor) Next() (EditorEvent, bool) {
 		e.scrollOff.Y += sdist
 		soff = e.scrollOff.Y
 	}
-	for {
-		evt, ok := e.clicker.Next(e.Inputs)
-		if !ok {
-			break
-		}
+	for _, evt := range e.clicker.Events(e.Inputs) {
 		switch {
 		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
 			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
