@@ -450,7 +450,8 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	dims := widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(c, ops, cs)
 	dims = cc.End(dims)
 	c1 := f.End(dims)
-	cs = f.Flexible(1, layout.Fit)
+	cs = f.Flexible(1)
+	cs.Width.Min = cs.Width.Max
 	in2 := layout.Insets{Left: ui.Dp(8)}
 	cs = in2.Begin(c, ops, cs)
 	dims = label.Layout(ops, cs)
@@ -529,7 +530,9 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		}
 		c3 := f.End(dims)
 
-		dims = a.layoutContributors(ops, f.Flexible(1, layout.Fit))
+		cs = f.Flexible(1)
+		cs.Width.Min = cs.Width.Max
+		dims = a.layoutContributors(ops, cs)
 		c4 := f.End(dims)
 		dims = f.Layout(c1, c2, c3, c4)
 	}
@@ -604,7 +607,8 @@ func (a *App) user(c ui.Config, ops *ui.Ops, cs layout.Constraints, index int) l
 				cs = f.Rigid()
 				dims = text.Label{Material: theme.text, Face: a.face(fonts.regular, 13), Text: u.name}.Layout(ops, cs)
 				c1 := f.End(dims)
-				cs = f.Flexible(1, layout.Fit)
+				cs = f.Flexible(1)
+				cs.Width.Min = cs.Width.Max
 				al := layout.Align{Alignment: layout.E}
 				in := layout.Insets{Left: ui.Dp(2)}
 				cs = in.Begin(c, ops, al.Begin(ops, cs))
