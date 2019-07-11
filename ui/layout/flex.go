@@ -16,10 +16,10 @@ type Flex struct {
 	MainAxisSize       MainAxisSize
 
 	ops         *ui.Ops
-	constrained bool
 	cs          Constraints
-	begun       bool
-	taken       int
+	mode        flexMode
+	size        int
+	rigidSize   int
 	maxCross    int
 	maxBaseline int
 }
@@ -33,6 +33,8 @@ type MainAxisSize uint8
 
 type MainAxisAlignment uint8
 type CrossAxisAlignment uint8
+
+type flexMode uint8
 
 const (
 	Max MainAxisSize = iota
@@ -52,55 +54,75 @@ const (
 	Stretch
 )
 
+const (
+	modeNone flexMode = iota
+	modeBegun
+	modeRigid
+	modeFlex
+)
+
 func (f *Flex) Init(ops *ui.Ops, cs Constraints) *Flex {
+	if f.mode > modeBegun {
+		panic("must End the current child before calling Init again")
+	}
+	f.mode = modeBegun
 	f.ops = ops
 	f.cs = cs
-	f.constrained = true
-	f.taken = 0
+	f.size = 0
+	f.rigidSize = 0
 	f.maxCross = 0
 	f.maxBaseline = 0
 	return f
 }
 
-func (f *Flex) begin() {
-	if !f.constrained {
+func (f *Flex) begin(mode flexMode) {
+	switch {
+	case f.mode == modeNone:
 		panic("must Init before adding a child")
-	}
-	if f.begun {
+	case f.mode > modeBegun:
 		panic("must End before adding a child")
 	}
-	f.begun = true
+	f.mode = mode
 	f.ops.Begin()
 }
 
 func (f *Flex) Rigid() Constraints {
-	f.begin()
+	f.begin(modeRigid)
 	mainc := axisMainConstraint(f.Axis, f.cs)
 	mainMax := mainc.Max
 	if mainc.Max != ui.Inf {
-		mainMax -= f.taken
+		mainMax -= f.size
 	}
 	return axisConstraints(f.Axis, Constraint{Max: mainMax}, f.crossConstraintChild(f.cs))
 }
 
 func (f *Flex) Flexible(weight float32) Constraints {
-	f.begin()
+	f.begin(modeFlex)
 	mainc := axisMainConstraint(f.Axis, f.cs)
 	var flexSize int
-	if mainc.Max != ui.Inf && mainc.Max > f.taken {
-		flexSize = mainc.Max - f.taken
+	if mainc.Max != ui.Inf && mainc.Max > f.size {
+		maxSize := mainc.Max - f.size
+		flexSize = mainc.Max - f.rigidSize
+		flexSize = int(float32(flexSize) * weight)
+		if flexSize > maxSize {
+			flexSize = maxSize
+		}
 	}
-	submainc := Constraint{Max: int(float32(flexSize) * weight)}
+	submainc := Constraint{Max: flexSize}
 	return axisConstraints(f.Axis, submainc, f.crossConstraintChild(f.cs))
 }
 
 func (f *Flex) End(dims Dimens) FlexChild {
-	if !f.begun {
+	if f.mode <= modeBegun {
 		panic("End called without an active child")
 	}
-	f.begun = false
 	block := f.ops.End()
-	f.taken += axisMain(f.Axis, dims.Size)
+	sz := axisMain(f.Axis, dims.Size)
+	f.size += sz
+	if f.mode == modeRigid {
+		f.rigidSize += sz
+	}
+	f.mode = modeBegun
 	if c := axisCross(f.Axis, dims.Size); c > f.maxCross {
 		f.maxCross = c
 	}
@@ -115,11 +137,11 @@ func (f *Flex) Layout(children ...FlexChild) Dimens {
 	crossSize := axisCrossConstraint(f.Axis, f.cs).Constrain(f.maxCross)
 	var space int
 	if mainc.Max != ui.Inf && f.MainAxisSize == Max {
-		if mainc.Max > f.taken {
-			space = mainc.Max - f.taken
+		if mainc.Max > f.size {
+			space = mainc.Max - f.size
 		}
-	} else if mainc.Min > f.taken {
-		space = mainc.Min - f.taken
+	} else if mainc.Min > f.size {
+		space = mainc.Min - f.size
 	}
 	var mainSize int
 	var baseline int
