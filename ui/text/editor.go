@@ -119,11 +119,7 @@ func (e *Editor) Next() (EditorEvent, bool) {
 	if (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin) {
 		e.scroller.Stop()
 	}
-	for {
-		ke, ok := e.Inputs.Next(e)
-		if !ok {
-			break
-		}
+	for _, ke := range e.Inputs.Events(e) {
 		e.blinkStart = e.Config.Now()
 		switch ke := ke.(type) {
 		case key.FocusEvent:

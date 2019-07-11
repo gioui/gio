@@ -19,14 +19,10 @@ type Queue struct {
 
 type handlerEvents map[Key][]Event
 
-func (q *Queue) Next(k Key) (Event, bool) {
+func (q *Queue) Events(k Key) []Event {
 	events := q.handlers[k]
-	if len(events) == 0 {
-		return nil, false
-	}
-	e := events[0]
-	q.handlers[k] = events[1:]
-	return e, true
+	delete(q.handlers, k)
+	return events
 }
 
 func (q *Queue) Frame(ops *ui.Ops) {

@@ -7,7 +7,7 @@ package input
 // Events maps an event handler key to the events
 // available to the handler.
 type Events interface {
-	Next(k Key) (Event, bool)
+	Events(k Key) []Event
 }
 
 // Key is the stable identifier for an event handler. For a handler h, the
