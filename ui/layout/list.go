@@ -40,6 +40,10 @@ type List struct {
 	maxSize  int
 	children []scrollChild
 	dir      iterationDir
+
+	// Iterator state.
+	index int
+	more  bool
 }
 
 type iterationDir uint8
@@ -50,7 +54,11 @@ const (
 	iterateBackward
 )
 
+// Init prepares the list for iterating through its elements with Next.
 func (l *List) Init(ops *ui.Ops, cs Constraints, len int) {
+	if l.more {
+		panic("unfinished element")
+	}
 	l.update()
 	l.ops = ops
 	l.dir = iterateNone
@@ -58,10 +66,12 @@ func (l *List) Init(ops *ui.Ops, cs Constraints, len int) {
 	l.children = l.children[:0]
 	l.cs = cs
 	l.len = len
+	l.more = true
 	if l.first > len {
 		l.first = len
 	}
 	ops.Begin()
+	l.Next()
 }
 
 func (l *List) Dragging() bool {
@@ -79,20 +89,35 @@ func (l *List) update() {
 	l.offset += d
 }
 
-func (l *List) Next() (int, Constraints, bool) {
-	if l.dir != iterateNone {
-		panic("a previous Next was not finished with Elem")
+// Next advances the list to the next element.
+func (l *List) Next() {
+	if !l.more {
+		panic("end of list reached")
 	}
-	i, ok := l.next()
+	i, more := l.next()
+	l.more = more
+	if !more {
+		return
+	}
 	if l.Invert {
 		i = l.len - 1 - i
 	}
-	var cs Constraints
-	if ok {
-		cs = axisConstraints(l.Axis, Constraint{Max: ui.Inf}, l.crossConstraintChild(l.cs))
-		l.ops.Begin()
-	}
-	return i, cs, ok
+	l.index = i
+	l.ops.Begin()
+}
+
+// Index is the current element index.
+func (l *List) Index() int {
+	return l.index
+}
+
+// Constraints is the constraints for the current element.
+func (l *List) Constraints() Constraints {
+	return axisConstraints(l.Axis, Constraint{Max: ui.Inf}, l.crossConstraintChild(l.cs))
+}
+
+func (l *List) More() bool {
+	return l.more
 }
 
 func (l *List) next() (int, bool) {
@@ -119,7 +144,8 @@ func (l *List) next() (int, bool) {
 	return 0, false
 }
 
-func (l *List) End(dims Dimens) {
+// Elem completes an element.
+func (l *List) Elem(dims Dimens) {
 	block := l.ops.End()
 	child := scrollChild{dims.Size, block}
 	switch l.dir {
@@ -134,12 +160,15 @@ func (l *List) End(dims Dimens) {
 		l.maxSize += mainSize
 		l.children = append([]scrollChild{child}, l.children...)
 	default:
-		panic("call Next before End")
+		panic("call Next before Elem")
 	}
 	l.dir = iterateNone
 }
 
 func (l *List) Layout() Dimens {
+	if l.more {
+		panic("unfinished element")
+	}
 	mainc := axisMainConstraint(l.Axis, l.cs)
 	for len(l.children) > 0 {
 		sz := l.children[0].size
