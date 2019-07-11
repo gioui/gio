@@ -428,13 +428,8 @@ func (up *userPage) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		up.commits = commits
 	default:
 	}
-	l.Init(ops, cs, len(up.commits))
-	for {
-		i, cs, ok := l.Next()
-		if !ok {
-			break
-		}
-		l.End(up.commit(ops, cs, i))
+	for l.Init(ops, cs, len(up.commits)); l.More(); l.Next() {
+		l.Elem(up.commit(ops, l.Constraints(), l.Index()))
 	}
 	return l.Layout()
 }
@@ -561,19 +556,13 @@ func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dime
 	if l.Dragging() {
 		key.HideInputOp{}.Add(ops)
 	}
-	l.Init(ops, cs, len(a.users))
-	for {
-		i, cs, ok := l.Next()
-		if !ok {
-			break
-		}
-		l.End(a.user(ops, cs, c, i))
+	for l.Init(ops, cs, len(a.users)); l.More(); l.Next() {
+		l.Elem(a.user(c, ops, l.Constraints(), l.Index()))
 	}
-	dims := l.Layout()
-	return dims
+	return l.Layout()
 }
 
-func (a *App) user(ops *ui.Ops, cs layout.Constraints, c ui.Config, index int) layout.Dimens {
+func (a *App) user(c ui.Config, ops *ui.Ops, cs layout.Constraints, index int) layout.Dimens {
 	u := a.users[index]
 	click := &a.userClicks[index]
 	for {
