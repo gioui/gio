@@ -43,15 +43,19 @@ func (c Constraints) Constrain(p image.Point) image.Point {
 }
 
 func (c Constraints) Expand() Constraints {
-	return Constraints{Width: c.Width.Expand(), Height: c.Height.Expand()}
-}
-
-func (c Constraint) Expand() Constraint {
-	return Constraint{Min: c.Max, Max: c.Max}
+	return Constraints{Width: c.Width.expand(), Height: c.Height.expand()}
 }
 
 func (c Constraints) Loose() Constraints {
-	return Constraints{Width: c.Width.Loose(), Height: c.Height.Loose()}
+	return Constraints{Width: c.Width.loose(), Height: c.Height.loose()}
+}
+
+func (c Constraint) expand() Constraint {
+	return Constraint{Min: c.Max, Max: c.Max}
+}
+
+func (c Constraint) loose() Constraint {
+	return Constraint{Max: c.Max}
 }
 
 func (c Constraints) Exact(width, height int) Constraints {
@@ -72,10 +76,6 @@ func (c Constraints) Exact(width, height int) Constraints {
 		}
 	}
 	return c
-}
-
-func (c Constraint) Loose() Constraint {
-	return Constraint{Max: c.Max}
 }
 
 // ExactConstraints returns the rigid constraints that represents the
@@ -177,11 +177,11 @@ func (a *Align) End(dims Dimens) Dimens {
 	ops := a.ops
 	block := ops.End()
 	sz := dims.Size
-	if a.cs.Width.Max != ui.Inf {
-		sz.X = a.cs.Width.Max
+	if sz.X < a.cs.Width.Min {
+		sz.X = a.cs.Width.Min
 	}
-	if a.cs.Height.Max != ui.Inf {
-		sz.Y = a.cs.Height.Max
+	if sz.Y < a.cs.Height.Min {
+		sz.Y = a.cs.Height.Min
 	}
 	var p image.Point
 	switch a.Alignment {

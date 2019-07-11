@@ -217,11 +217,8 @@ func (l *List) Layout() Dimens {
 
 func (l *List) crossConstraintChild(cs Constraints) Constraint {
 	c := axisCrossConstraint(l.Axis, cs)
-	switch l.CrossAxisAlignment {
-	case Stretch:
+	if l.CrossAxisAlignment == Stretch {
 		c.Min = c.Max
-	default:
-		c.Min = 0
 	}
 	return c
 }
