@@ -31,14 +31,8 @@ type FlexChild struct {
 
 type MainAxisSize uint8
 
-type FlexMode uint8
 type MainAxisAlignment uint8
 type CrossAxisAlignment uint8
-
-const (
-	Loose FlexMode = iota
-	Fit
-)
 
 const (
 	Max MainAxisSize = iota
@@ -89,17 +83,14 @@ func (f *Flex) Rigid() Constraints {
 	return axisConstraints(f.Axis, Constraint{Max: mainMax}, f.crossConstraintChild(f.cs))
 }
 
-func (f *Flex) Flexible(flex float32, mode FlexMode) Constraints {
+func (f *Flex) Flexible(weight float32) Constraints {
 	f.begin()
 	mainc := axisMainConstraint(f.Axis, f.cs)
 	var flexSize int
 	if mainc.Max != ui.Inf && mainc.Max > f.taken {
 		flexSize = mainc.Max - f.taken
 	}
-	submainc := Constraint{Max: int(float32(flexSize) * flex)}
-	if mode == Fit {
-		submainc.Min = submainc.Max
-	}
+	submainc := Constraint{Max: int(float32(flexSize) * weight)}
 	return axisConstraints(f.Axis, submainc, f.crossConstraintChild(f.cs))
 }
 
