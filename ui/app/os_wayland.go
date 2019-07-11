@@ -198,9 +198,14 @@ func createNativeWindow(opts *WindowOptions) (*window, error) {
 			scale = s
 		}
 	}
-	ppdp := ppmm * mmPrDp * monitorScale
+	ppdp := ppmm * mmPrDp
+	ppsp := ppdp * fontScale
+	ppdp *= monitorScale
 	if ppdp < minDensity {
 		ppdp = minDensity
+	}
+	if ppsp < minDensity {
+		ppsp = minDensity
 	}
 
 	w := &window{
@@ -208,7 +213,7 @@ func createNativeWindow(opts *WindowOptions) (*window, error) {
 		scale:    scale,
 		newScale: scale != 1,
 		ppdp:     ppdp,
-		ppsp:     ppdp * fontScale,
+		ppsp:     ppsp,
 		notRead:  pipe[0],
 		notWrite: pipe[1],
 	}

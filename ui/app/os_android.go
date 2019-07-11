@@ -202,10 +202,10 @@ func onFocusChange(env *C.JNIEnv, class C.jclass, view C.jlong, focus C.jboolean
 func onWindowInsets(env *C.JNIEnv, class C.jclass, view C.jlong, top, right, bottom, left C.jint) {
 	w := views[view]
 	w.insets = Insets{
-		Top: ui.Px(float32(top)),
-		Right: ui.Px(float32(right)),
+		Top:    ui.Px(float32(top)),
+		Right:  ui.Px(float32(right)),
 		Bottom: ui.Px(float32(bottom)),
-		Left: ui.Px(float32(left)),
+		Left:   ui.Px(float32(left)),
 	}
 	if w.stage >= StageRunning {
 		w.draw(true)
