@@ -52,7 +52,7 @@ type App struct {
 	cfg   app.Config
 	faces *measure.Faces
 
-	inputs *input.Queue
+	inputs *input.Router
 
 	fab *ActionButton
 
@@ -99,7 +99,7 @@ type redrawer func()
 
 type ActionButton struct {
 	config  ui.Config
-	inputs  input.Events
+	inputs  input.Queue
 	face    text.Face
 	Open    bool
 	icons   []*icon
@@ -262,7 +262,7 @@ func newApp(w *app.Window) *App {
 	a := &App{
 		w:           w,
 		updateUsers: make(chan []*user),
-		inputs:      new(input.Queue),
+		inputs:      new(input.Router),
 	}
 	a.faces = &measure.Faces{Config: &a.cfg}
 	a.usersList = &layout.List{
@@ -400,7 +400,7 @@ func (a *App) face(f *sfnt.Font, size float32) text.Face {
 func (a *App) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	for i := range a.userClicks {
 		click := &a.userClicks[i]
-		for e, ok := click.Next(a.inputs); ok; e, ok = click.Next(a.inputs) {
+		for _, e := range click.Events(a.inputs) {
 			if e.Type == gesture.TypeClick {
 				a.selectedUser = a.newUserPage(a.users[i])
 			}
