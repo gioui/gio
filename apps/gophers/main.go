@@ -542,7 +542,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 
 func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	c := a.config
-	f := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.End, MainAxisSize: layout.Min}
+	f := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.End}
 	f.Init(ops, cs)
 	cs = f.Rigid()
 	in := layout.Insets{Top: ui.Dp(4)}
@@ -661,11 +661,11 @@ func column() layout.Flex {
 }
 
 func centerRowOpts() layout.Flex {
-	return layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Center, MainAxisSize: layout.Min}
+	return layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Center}
 }
 
 func baseline() layout.Flex {
-	return layout.Flex{Axis: layout.Horizontal, CrossAxisAlignment: layout.Baseline, MainAxisSize: layout.Min}
+	return layout.Flex{Axis: layout.Horizontal, CrossAxisAlignment: layout.Baseline}
 }
 
 type clipCircle struct {
