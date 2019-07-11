@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
@@ -82,9 +83,11 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int, to
 			X: int(width + .5),
 			Y: int(height + .5),
 		},
-		Insets: image.Rectangle{
-			Min: image.Point{X: int(left + .5), Y: int(top + .5)},
-			Max: image.Point{X: int(right + .5), Y: int(bottom + .5)},
+		Insets: Insets{
+			Top:    ui.Px(float32(top)),
+			Right:  ui.Px(float32(right)),
+			Bottom: ui.Px(float32(bottom)),
+			Left:   ui.Px(float32(left)),
 		},
 		Config: Config{
 			pxPerDp: float32(dpi) * inchPrDp,

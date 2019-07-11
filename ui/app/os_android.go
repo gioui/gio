@@ -24,6 +24,7 @@ import (
 	"time"
 	"unsafe"
 
+	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
@@ -36,7 +37,7 @@ type window struct {
 
 	dpi       int
 	fontScale float32
-	insets    image.Rectangle
+	insets    Insets
 
 	stage   Stage
 	started bool
@@ -200,9 +201,11 @@ func onFocusChange(env *C.JNIEnv, class C.jclass, view C.jlong, focus C.jboolean
 //export onWindowInsets
 func onWindowInsets(env *C.JNIEnv, class C.jclass, view C.jlong, top, right, bottom, left C.jint) {
 	w := views[view]
-	w.insets = image.Rectangle{
-		Min: image.Point{X: int(left), Y: int(top)},
-		Max: image.Point{X: int(right), Y: int(bottom)},
+	w.insets = Insets{
+		Top: ui.Px(float32(top)),
+		Right: ui.Px(float32(right)),
+		Bottom: ui.Px(float32(bottom)),
+		Left: ui.Px(float32(left)),
 	}
 	if w.stage >= StageRunning {
 		w.draw(true)

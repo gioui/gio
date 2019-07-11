@@ -19,14 +19,18 @@ type Event interface {
 type DrawEvent struct {
 	Config Config
 	Size   image.Point
-	// Insets is the window space taken up by
-	// system decoration such as translucent
-	// system bars and software keyboards.
-	Insets image.Rectangle
+	Insets Insets
 	// Whether this draw is system generated
 	// and needs a complete frame before
 	// proceeding.
 	sync bool
+}
+
+// Insets is the space taken up by
+// system decoration such as translucent
+// system bars and software keyboards.
+type Insets struct {
+	Top, Bottom, Left, Right ui.Value
 }
 
 type StageEvent struct {
