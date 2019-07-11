@@ -32,6 +32,7 @@ func main() {
 func init() {
 	go func() {
 		for w := range app.Windows() {
+			w := w
 			go func() {
 				if err := loop(w); err != nil {
 					log.Fatal(err)
