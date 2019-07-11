@@ -19,7 +19,7 @@ type scrollChild struct {
 
 type List struct {
 	Config             ui.Config
-	Inputs             input.Events
+	Inputs             input.Queue
 	Axis               Axis
 	Invert             bool
 	CrossAxisAlignment CrossAxisAlignment

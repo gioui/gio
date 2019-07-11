@@ -22,7 +22,7 @@ import (
 
 type Editor struct {
 	Config     ui.Config
-	Inputs     input.Events
+	Inputs     input.Queue
 	Face       Face
 	Alignment  Alignment
 	SingleLine bool

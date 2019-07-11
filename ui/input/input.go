@@ -4,9 +4,9 @@
 // such as pointer and key provide the interfaces for specific input types.
 package input
 
-// Events maps an event handler key to the events
+// Queue maps an event handler key to the events
 // available to the handler.
-type Events interface {
+type Queue interface {
 	Events(k Key) []Event
 }
 

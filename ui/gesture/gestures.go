@@ -81,7 +81,7 @@ func (c *Click) Add(ops *ui.Ops) {
 	op.Add(ops)
 }
 
-func (c *Click) Events(q input.Events) []ClickEvent {
+func (c *Click) Events(q input.Queue) []ClickEvent {
 	var events []ClickEvent
 	for _, evt := range q.Events(c) {
 		e, ok := evt.(pointer.Event)
@@ -130,7 +130,7 @@ func (s *Scroll) Dragging() bool {
 	return s.dragging
 }
 
-func (s *Scroll) Scroll(cfg ui.Config, q input.Events, axis Axis) int {
+func (s *Scroll) Scroll(cfg ui.Config, q input.Queue, axis Axis) int {
 	if s.axis != axis {
 		s.axis = axis
 		return 0

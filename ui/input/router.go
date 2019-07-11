@@ -8,9 +8,9 @@ import (
 	"gioui.org/ui/pointer"
 )
 
-// Queue is an Events implementation that merges events from
-// all available input sources.
-type Queue struct {
+// Router is a Queue implementation that routes events from
+// all available input sources to registered handlers.
+type Router struct {
 	pqueue pointerQueue
 	kqueue keyQueue
 
@@ -19,13 +19,13 @@ type Queue struct {
 
 type handlerEvents map[Key][]Event
 
-func (q *Queue) Events(k Key) []Event {
+func (q *Router) Events(k Key) []Event {
 	events := q.handlers[k]
 	delete(q.handlers, k)
 	return events
 }
 
-func (q *Queue) Frame(ops *ui.Ops) {
+func (q *Router) Frame(ops *ui.Ops) {
 	q.init()
 	for k := range q.handlers {
 		delete(q.handlers, k)
@@ -34,7 +34,7 @@ func (q *Queue) Frame(ops *ui.Ops) {
 	q.kqueue.Frame(ops, q.handlers)
 }
 
-func (q *Queue) Add(e Event) {
+func (q *Router) Add(e Event) {
 	q.init()
 	switch e := e.(type) {
 	case pointer.Event:
@@ -44,11 +44,11 @@ func (q *Queue) Add(e Event) {
 	}
 }
 
-func (q *Queue) InputState() key.TextInputState {
+func (q *Router) InputState() key.TextInputState {
 	return q.kqueue.InputState()
 }
 
-func (q *Queue) init() {
+func (q *Router) init() {
 	if q.handlers == nil {
 		q.handlers = make(handlerEvents)
 	}
