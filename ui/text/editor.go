@@ -155,10 +155,7 @@ func (e *Editor) Focus() {
 }
 
 func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	for {
-		if _, ok := e.Next(); !ok {
-			break
-		}
+	for _, ok := e.Next(); ok; _, ok = e.Next() {
 	}
 	twoDp := e.Config.Px(ui.Dp(2))
 	e.padLeft, e.padRight = twoDp, twoDp
