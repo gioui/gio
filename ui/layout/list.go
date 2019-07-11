@@ -113,7 +113,7 @@ func (l *List) Index() int {
 
 // Constraints is the constraints for the current element.
 func (l *List) Constraints() Constraints {
-	return axisConstraints(l.Axis, Constraint{Max: ui.Inf}, l.crossConstraintChild(l.cs))
+	return axisConstraints(l.Axis, Constraint{Max: ui.Inf}, axisCrossConstraint(l.Axis, l.cs))
 }
 
 func (l *List) More() bool {
@@ -242,12 +242,4 @@ func (l *List) Layout() Dimens {
 	l.scroll.Add(ops)
 	block.Add(ops)
 	return Dimens{Size: dims}
-}
-
-func (l *List) crossConstraintChild(cs Constraints) Constraint {
-	c := axisCrossConstraint(l.Axis, cs)
-	if l.CrossAxisAlignment == Stretch {
-		c.Min = c.Max
-	}
-	return c
 }

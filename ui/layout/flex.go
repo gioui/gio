@@ -43,7 +43,6 @@ const (
 	SpaceEvenly
 
 	Baseline CrossAxisAlignment = iota
-	Stretch
 )
 
 const (
@@ -85,7 +84,7 @@ func (f *Flex) Rigid() Constraints {
 	if mainc.Max != ui.Inf {
 		mainMax -= f.size
 	}
-	return axisConstraints(f.Axis, Constraint{Max: mainMax}, f.crossConstraintChild(f.cs))
+	return axisConstraints(f.Axis, Constraint{Max: mainMax}, axisCrossConstraint(f.Axis, f.cs))
 }
 
 func (f *Flex) Flexible(weight float32) Constraints {
@@ -101,7 +100,7 @@ func (f *Flex) Flexible(weight float32) Constraints {
 		}
 	}
 	submainc := Constraint{Max: flexSize}
-	return axisConstraints(f.Axis, submainc, f.crossConstraintChild(f.cs))
+	return axisConstraints(f.Axis, submainc, axisCrossConstraint(f.Axis, f.cs))
 }
 
 func (f *Flex) End(dims Dimens) FlexChild {
@@ -233,17 +232,6 @@ func axisCrossConstraint(a Axis, cs Constraints) Constraint {
 	} else {
 		return cs.Width
 	}
-}
-
-func (f *Flex) crossConstraintChild(cs Constraints) Constraint {
-	c := axisCrossConstraint(f.Axis, cs)
-	switch f.CrossAxisAlignment {
-	case Stretch:
-		c.Min = c.Max
-	default:
-		c.Min = 0
-	}
-	return c
 }
 
 func axisConstraints(a Axis, mainc, crossc Constraint) Constraints {
