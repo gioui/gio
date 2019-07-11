@@ -233,6 +233,49 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 			return err
 		}
 	}
+
+	// Compile resources.
+	resDir := filepath.Join(tmpDir, "res")
+	valDir := filepath.Join(resDir, "values")
+	v21Dir := filepath.Join(resDir, "values-v21")
+	for _, dir := range []string{valDir, v21Dir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+	themes := `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<style name="Theme.GioApp" parent="android:style/Theme.NoTitleBar">
+	</style>
+</resources>`
+	err = ioutil.WriteFile(filepath.Join(valDir, "themes.xml"), []byte(themes), 0660)
+	if err != nil {
+		return err
+	}
+	themesV21 := `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<style name="Theme.GioApp" parent="android:style/Theme.NoTitleBar">
+		<item name="android:windowDrawsSystemBarBackgrounds">true</item>
+		<item name="android:navigationBarColor">#40000000</item>
+		<item name="android:statusBarColor">#40000000</item>
+	</style>
+</resources>`
+	err = ioutil.WriteFile(filepath.Join(v21Dir, "themes.xml"), []byte(themesV21), 0660)
+	if err != nil {
+		return err
+	}
+	resZip := filepath.Join(tmpDir, "resources.zip")
+	aapt2 := filepath.Join(tools.buildtools, "aapt2")
+	_, err = runCmd(exec.Command(
+		aapt2,
+		"compile",
+		"-o", resZip,
+		"--dir", resDir))
+	if err != nil {
+		return err
+	}
+
+	// Link APK.
 	appName := strings.Title(filepath.Base(bi.pkg))
 	manifestSrc := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -245,7 +288,7 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 	<application android:label="Gio">
 		<activity android:name="org.gioui.GioActivity"
 			android:label="%s"
-			android:theme="@android:style/Theme.NoTitleBar"
+			android:theme="@style/Theme.GioApp"
 			android:configChanges="orientation|keyboardHidden"
 			android:windowSoftInputMode="adjustResize">
 			<intent-filter>
@@ -256,18 +299,19 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 	</application>
 </manifest>`, *appID, appName)
 	manifest := filepath.Join(tmpDir, "AndroidManifest.xml")
-	if err := ioutil.WriteFile(manifest, []byte(manifestSrc), 0600); err != nil {
+	if err := ioutil.WriteFile(manifest, []byte(manifestSrc), 0660); err != nil {
 		return err
 	}
 	tmpapk := filepath.Join(tmpDir, "link.apk")
-	_, err = runCmd(exec.Command(
-		filepath.Join(tools.buildtools, "aapt2"),
+	link := exec.Command(
+		aapt2,
 		"link",
 		"--manifest", manifest,
 		"-I", tools.androidjar,
 		"-o", tmpapk,
-	))
-	if err != nil {
+		resZip,
+	)
+	if _, err := runCmd(link); err != nil {
 		return err
 	}
 	// The Go standard library archive/zip doesn't support appending to zip

@@ -17,11 +17,11 @@ public class GioActivity extends Activity {
 		super.onCreate(state);
 
 		Window w = getWindow();
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-			w.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-		}
 
 		this.view = new GioView(this);
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+			this.view.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+		}
 		this.view.setLayoutParams(new WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT));
 		setContentView(view);
 	}

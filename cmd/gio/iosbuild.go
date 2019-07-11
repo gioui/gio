@@ -115,7 +115,7 @@ func signIOS(tmpDir, app, ipa string) error {
 			return err
 		}
 		entFile := filepath.Join(tmpDir, "entitlements.plist")
-		if err := ioutil.WriteFile(entFile, []byte(entitlements), 0600); err != nil {
+		if err := ioutil.WriteFile(entFile, []byte(entitlements), 0660); err != nil {
 			return err
 		}
 		signIdentity := cert.Subject.CommonName
@@ -144,7 +144,7 @@ int main(int argc, char * argv[]) {
         return UIApplicationMain(argc, argv, nil, NSStringFromClass([GioAppDelegate class]));
     }
 }`
-	if err := ioutil.WriteFile(mainm, []byte(mainmSrc), 0600); err != nil {
+	if err := ioutil.WriteFile(mainm, []byte(mainmSrc), 0660); err != nil {
 		return err
 	}
 	exe := filepath.Join(app, "app")
@@ -200,7 +200,7 @@ int main(int argc, char * argv[]) {
 </dict>
 </plist>`, *appID, appName)
 	infoPlist := filepath.Join(app, "Info.plist")
-	if err := ioutil.WriteFile(infoPlist, []byte(infoPlistSrc), 0600); err != nil {
+	if err := ioutil.WriteFile(infoPlist, []byte(infoPlistSrc), 0660); err != nil {
 		return err
 	}
 	if _, err := runCmd(exec.Command("plutil", "-convert", "binary1", infoPlist)); err != nil {
