@@ -46,7 +46,7 @@ func loop(w *app.Window) error {
 	if err != nil {
 		panic("failed to load font")
 	}
-	var cfg ui.Config
+	var cfg app.Config
 	faces := &measure.Faces{Config: &cfg}
 	maroon := color.RGBA{127, 0, 0, 255}
 	face := faces.For(regular, ui.Sp(72))
