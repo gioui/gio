@@ -398,6 +398,14 @@ func (a *App) face(f *sfnt.Font, size float32) text.Face {
 }
 
 func (a *App) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+	for i := range a.userClicks {
+		click := &a.userClicks[i]
+		for e, ok := click.Next(a.inputs); ok; e, ok = click.Next(a.inputs) {
+			if e.Type == gesture.TypeClick {
+				a.selectedUser = a.newUserPage(a.users[i])
+			}
+		}
+	}
 	if a.selectedUser == nil {
 		return a.layoutUsers(ops, cs)
 	} else {
@@ -570,16 +578,6 @@ func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dime
 
 func (a *App) user(c ui.Config, ops *ui.Ops, cs layout.Constraints, index int) layout.Dimens {
 	u := a.users[index]
-	click := &a.userClicks[index]
-	for {
-		e, ok := click.Next(a.inputs)
-		if !ok {
-			break
-		}
-		if e.Type == gesture.TypeClick {
-			a.selectedUser = a.newUserPage(u)
-		}
-	}
 	elem := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
 	elem.Init(ops, cs)
 	cs = elem.Rigid()
@@ -633,6 +631,7 @@ func (a *App) user(c ui.Config, ops *ui.Ops, cs layout.Constraints, index int) l
 		dims = f.Layout(c1, c2)
 		dims = in.End(dims)
 		pointer.RectAreaOp{Size: dims.Size}.Add(ops)
+		click := &a.userClicks[index]
 		click.Add(ops)
 	}
 	c1 := elem.End(dims)
