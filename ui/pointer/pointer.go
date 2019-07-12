@@ -9,6 +9,7 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
+	"gioui.org/ui/input"
 	"gioui.org/ui/internal/ops"
 )
 
@@ -38,7 +39,7 @@ type areaOp struct {
 }
 
 type HandlerOp struct {
-	Key  Key
+	Key  input.Key
 	Grab bool
 }
 
@@ -47,8 +48,6 @@ type HandlerOp struct {
 type PassOp struct {
 	Pass bool
 }
-
-type Key interface{}
 
 type ID uint16
 type Type uint8
@@ -120,7 +119,7 @@ func (h *HandlerOp) Decode(d []byte, refs []interface{}) {
 	}
 	*h = HandlerOp{
 		Grab: d[1] != 0,
-		Key:  refs[0].(Key),
+		Key:  refs[0].(input.Key),
 	}
 }
 

@@ -4,17 +4,16 @@ package key
 
 import (
 	"gioui.org/ui"
+	"gioui.org/ui/input"
 	"gioui.org/ui/internal/ops"
 )
 
 type HandlerOp struct {
-	Key   Key
+	Key   input.Key
 	Focus bool
 }
 
 type HideInputOp struct{}
-
-type Key interface{}
 
 type FocusEvent struct {
 	Focus bool
@@ -80,7 +79,7 @@ func (h *HandlerOp) Decode(d []byte, refs []interface{}) {
 	}
 	*h = HandlerOp{
 		Focus: d[1] != 0,
-		Key:   refs[0].(Key),
+		Key:   refs[0].(input.Key),
 	}
 }
 
