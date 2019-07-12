@@ -13,6 +13,7 @@ import (
 	"gioui.org/ui/app/internal/gpu"
 	iinput "gioui.org/ui/app/internal/input"
 	"gioui.org/ui/input"
+	"gioui.org/ui/input/system"
 	"gioui.org/ui/key"
 )
 
@@ -23,13 +24,10 @@ type WindowOptions struct {
 }
 
 type Window struct {
-	Profiling bool
-
 	driver     *window
 	lastFrame  time.Time
 	drawStart  time.Time
 	gpu        *gpu.GPU
-	timings    string
 	inputState key.TextInputState
 	err        error
 
@@ -72,10 +70,6 @@ func newWindow(nw *window) *Window {
 
 func (w *Window) Events() <-chan Event {
 	return w.events
-}
-
-func (w *Window) Timings() string {
-	return w.timings
 }
 
 func (w *Window) setTextInput(s key.TextInputState) {
@@ -134,7 +128,7 @@ func (w *Window) Draw(root *ui.Ops) {
 			return
 		}
 	}
-	w.gpu.Draw(w.Profiling, size, root)
+	w.gpu.Draw(w.router.Profiling(), size, root)
 	w.router.Frame(root)
 	now := time.Now()
 	w.mu.Lock()
@@ -142,9 +136,10 @@ func (w *Window) Draw(root *ui.Ops) {
 	frameDur := now.Sub(w.lastFrame)
 	frameDur = frameDur.Truncate(100 * time.Microsecond)
 	w.lastFrame = now
-	if w.Profiling {
+	if w.router.Profiling() {
 		q := 100 * time.Microsecond
-		w.timings = fmt.Sprintf("tot:%7s cpu:%7s %s", frameDur.Round(q), drawDur.Round(q), w.gpu.Timings())
+		timings := fmt.Sprintf("tot:%7s cpu:%7s %s", frameDur.Round(q), drawDur.Round(q), w.gpu.Timings())
+		w.router.AddProfile(system.ProfileEvent{Timings: timings})
 		w.setNextFrame(time.Time{})
 	}
 	if t, ok := w.router.RedrawTime(); ok {

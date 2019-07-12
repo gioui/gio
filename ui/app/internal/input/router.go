@@ -7,6 +7,7 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/input"
+	"gioui.org/ui/input/system"
 	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
@@ -21,9 +22,13 @@ type Router struct {
 	handlers handlerEvents
 
 	reader ui.OpsReader
+
 	// InvalidateOp summary.
 	redraw     bool
 	redrawTime time.Time
+
+	// ProfileOp summary.
+	profHandlers []input.Key
 }
 
 type handlerEvents struct {
@@ -38,6 +43,7 @@ func (q *Router) Events(k input.Key) []input.Event {
 func (q *Router) Frame(ops *ui.Ops) {
 	q.handlers.Clear()
 	q.redraw = false
+	q.profHandlers = q.profHandlers[:0]
 	q.reader.Reset(ops)
 	q.collect()
 
@@ -69,8 +75,22 @@ func (q *Router) collect() {
 				q.redraw = true
 				q.redrawTime = op.At
 			}
+		case ops.TypeProfile:
+			var op system.ProfileOp
+			op.Decode(encOp.Data, encOp.Refs)
+			q.profHandlers = append(q.profHandlers, op.Key)
 		}
 	}
+}
+
+func (q *Router) AddProfile(e system.ProfileEvent) {
+	for _, h := range q.profHandlers {
+		q.handlers.Add(h, e)
+	}
+}
+
+func (q *Router) Profiling() bool {
+	return len(q.profHandlers) > 0
 }
 
 func (q *Router) RedrawTime() (time.Time, bool) {
