@@ -11,8 +11,8 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/app/internal/gpu"
-	"gioui.org/ui/input"
 	iinput "gioui.org/ui/app/internal/input"
+	"gioui.org/ui/input"
 	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/key"
 )
@@ -80,12 +80,7 @@ func (w *Window) Timings() string {
 	return w.timings
 }
 
-func (w *Window) SetTextInput(s key.TextInputState) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	if !w.isAlive() {
-		return
-	}
+func (w *Window) setTextInput(s key.TextInputState) {
 	if s != w.inputState && (s == key.TextInputClose || s == key.TextInputOpen) {
 		w.driver.setTextInput(s)
 	}
@@ -143,11 +138,11 @@ func (w *Window) Draw(root *ui.Ops) {
 	}
 	w.gpu.Draw(w.Profiling, size, root)
 	w.router.Frame(root)
-	w.SetTextInput(w.router.InputState())
 	w.reader.Reset(root)
 	redrawTime, redraw := collectRedraws(&w.reader)
 	now := time.Now()
 	w.mu.Lock()
+	w.setTextInput(w.router.InputState())
 	frameDur := now.Sub(w.lastFrame)
 	frameDur = frameDur.Truncate(100 * time.Microsecond)
 	w.lastFrame = now
