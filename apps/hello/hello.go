@@ -20,24 +20,20 @@ import (
 )
 
 func main() {
-	wopt := app.WindowOptions{Width: ui.Px(612), Height: ui.Px(792), Title: "Hello"}
-	if err := app.CreateWindow(&wopt); err != nil {
-		log.Fatal(err)
-	}
 	app.Main()
 }
 
 // On iOS and Android main will never be called, so
 // setting up the window must run in an init function.
 func init() {
+	wopt := app.WindowOptions{Width: ui.Dp(800), Height: ui.Dp(600), Title: "Hello"}
+	w, err := app.NewWindow(&wopt)
+	if err != nil {
+		log.Fatal(err)
+	}
 	go func() {
-		for w := range app.Windows() {
-			w := w
-			go func() {
-				if err := loop(w); err != nil {
-					log.Fatal(err)
-				}
-			}()
+		if err := loop(w); err != nil {
+			log.Fatal(err)
 		}
 	}()
 }

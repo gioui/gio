@@ -137,14 +137,6 @@ func main() {
 		fmt.Println("The quota for anonymous GitHub API access is very low. Specify a token with -token to avoid quota errors.")
 		fmt.Println("See https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line.")
 	}
-	err := app.CreateWindow(&app.WindowOptions{
-		Width:  ui.Dp(400),
-		Height: ui.Dp(800),
-		Title:  "Gophers",
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
 	app.Main()
 }
 
@@ -169,14 +161,17 @@ func init() {
 	theme.tertText = colorMaterial(&ops, rgb(0xbbbbbb))
 	theme.brand = colorMaterial(&ops, rgb(0x62798c))
 	theme.white = colorMaterial(&ops, rgb(0xffffff))
+	w, err := app.NewWindow(&app.WindowOptions{
+		Width:  ui.Dp(400),
+		Height: ui.Dp(800),
+		Title:  "Gophers",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 	go func() {
-		for w := range app.Windows() {
-			w := w
-			go func() {
-				if err := newApp(w).run(); err != nil {
-					log.Fatal(err)
-				}
-			}()
+		if err := newApp(w).run(); err != nil {
+			log.Fatal(err)
 		}
 	}()
 }
