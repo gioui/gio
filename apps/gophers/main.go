@@ -198,16 +198,14 @@ func (a *App) run() error {
 			a.w.Redraw()
 		case e := <-a.w.Events():
 			switch e := e.(type) {
-			case input.Event:
-				if e, ok := e.(key.ChordEvent); ok {
-					switch e.Name {
-					case key.NameEscape:
-						os.Exit(0)
-					case 'P':
-						if e.Modifiers.Contain(key.ModCommand) {
-							a.profiling = !a.profiling
-							a.w.Redraw()
-						}
+			case key.ChordEvent:
+				switch e.Name {
+				case key.NameEscape:
+					os.Exit(0)
+				case 'P':
+					if e.Modifiers.Contain(key.ModCommand) {
+						a.profiling = !a.profiling
+						a.w.Redraw()
 					}
 				}
 			case app.StageEvent:
