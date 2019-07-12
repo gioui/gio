@@ -47,10 +47,6 @@ type CommandEvent struct {
 type Stage uint8
 type CommandType uint8
 
-type Input interface {
-	ImplementsInput()
-}
-
 const (
 	StageDead Stage = iota
 	StagePaused
