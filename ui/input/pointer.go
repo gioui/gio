@@ -63,11 +63,7 @@ const (
 )
 
 func (q *pointerQueue) collectHandlers(r *ui.OpsReader, events handlerEvents, t ui.Transform, area, node int, pass bool) {
-	for {
-		encOp, ok := r.Decode()
-		if !ok {
-			return
-		}
+	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypePush:
 			q.collectHandlers(r, events, t, area, node, pass)

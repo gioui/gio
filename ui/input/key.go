@@ -88,11 +88,7 @@ func (q *keyQueue) resolveFocus(events handlerEvents) (Key, listenerPriority, bo
 	var pri listenerPriority
 	var hide bool
 loop:
-	for {
-		encOp, ok := q.reader.Decode()
-		if !ok {
-			break
-		}
+	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeKeyHandler:
 			var op key.HandlerOp

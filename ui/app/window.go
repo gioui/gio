@@ -158,11 +158,7 @@ func (w *Window) Draw(root *ui.Ops) {
 func collectRedraws(r *ui.OpsReader) (time.Time, bool) {
 	var t time.Time
 	redraw := false
-	for {
-		encOp, ok := r.Decode()
-		if !ok {
-			break
-		}
+	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeInvalidate:
 			var op ui.InvalidateOp

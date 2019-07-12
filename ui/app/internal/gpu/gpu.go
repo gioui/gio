@@ -659,11 +659,7 @@ func (d *drawOps) collectOps(r *ui.OpsReader, state drawState) int {
 	var aux []byte
 	var auxKey ui.OpKey
 loop:
-	for {
-		encOp, ok := r.Decode()
-		if !ok {
-			break
-		}
+	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeTransform:
 			var op ui.TransformOp
