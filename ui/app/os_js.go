@@ -31,7 +31,7 @@ type window struct {
 
 var mainDone = make(chan struct{})
 
-func createWindow(opts *WindowOptions) error {
+func createWindow(win *Window, opts *WindowOptions) error {
 	doc := js.Global().Get("document")
 	parent := doc.Call("getElementById", "giowindow")
 	if parent == js.Null() {
@@ -52,9 +52,9 @@ func createWindow(opts *WindowOptions) error {
 		return nil
 	})
 	w.addEventListeners()
-	w.w = newWindow(w)
+	w.w = win
 	go func() {
-		windows <- w.w
+		w.w.setDriver(w)
 		w.focus()
 		w.w.event(StageEvent{StageRunning})
 		w.draw(true)

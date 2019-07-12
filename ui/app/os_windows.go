@@ -3,6 +3,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"runtime"
@@ -159,11 +160,11 @@ func Main() {
 	<-mainDone
 }
 
-func createWindow(opts *WindowOptions) error {
+func createWindow(window *Window, opts *WindowOptions) error {
 	onceMu.Lock()
 	defer onceMu.Unlock()
 	if len(winMap) > 0 {
-		panic("multiple windows are not supported")
+		return errors.New("multiple windows are not supported")
 	}
 	cerr := make(chan error)
 	go func() {
@@ -176,14 +177,14 @@ func createWindow(opts *WindowOptions) error {
 		}
 		defer w.destroy()
 		cerr <- nil
-		windows <- w.w
+		w.w = window
+		w.w.setDriver(w)
 		showWindow(w.hwnd, _SW_SHOWDEFAULT)
 		setForegroundWindow(w.hwnd)
 		setFocus(w.hwnd)
 		if err := w.loop(); err != nil {
 			panic(err)
 		}
-		close(windows)
 		close(mainDone)
 	}()
 	return <-cerr
@@ -248,7 +249,6 @@ func createNativeWindow(opts *WindowOptions) (*window, error) {
 	if err != nil {
 		return nil, err
 	}
-	w.w = newWindow(w)
 	return w, nil
 }
 

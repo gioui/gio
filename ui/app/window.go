@@ -13,8 +13,8 @@ import (
 	"gioui.org/ui/app/internal/gpu"
 	iinput "gioui.org/ui/app/internal/input"
 	"gioui.org/ui/input"
-	"gioui.org/ui/system"
 	"gioui.org/ui/key"
+	"gioui.org/ui/system"
 )
 
 type WindowOptions struct {
@@ -47,6 +47,12 @@ type Window struct {
 	router iinput.Router
 }
 
+// driverEvent is sent when a new native driver
+// is available for the Window.
+type driverEvent struct {
+	driver *window
+}
+
 // driver is the interface for the platform implementation
 // of a Window.
 var _ interface {
@@ -59,13 +65,31 @@ var _ interface {
 
 var ackEvent Event
 
-func newWindow(nw *window) *Window {
+// NewWindow creates a new window for a set of window
+// options. The options are hints; the platform is free to
+// ignore or adjust them.
+// If the current program is running on iOS and Android,
+// NewWindow returns the window previously by the platform.
+func NewWindow(opts *WindowOptions) (*Window, error) {
+	if opts == nil {
+		opts = &WindowOptions{
+			Width:  ui.Dp(800),
+			Height: ui.Dp(600),
+			Title:  "Gio program",
+		}
+	}
+	if opts.Width.V <= 0 || opts.Height.V <= 0 {
+		panic("window width and height must be larger than 0")
+	}
+
 	w := &Window{
-		driver: nw,
 		events: make(chan Event),
 		stage:  StagePaused,
 	}
-	return w
+	if err := createWindow(w, opts); err != nil {
+		return nil, err
+	}
+	return w, nil
 }
 
 func (w *Window) Events() <-chan Event {
@@ -103,8 +127,9 @@ func (w *Window) Draw(root *ui.Ops) {
 	w.syncGPU = false
 	alive := w.isAlive()
 	size := w.size
+	driver := w.driver
 	w.mu.Unlock()
-	if !alive || stage < StageRunning {
+	if !alive || stage < StageRunning || driver == nil {
 		return
 	}
 	if w.gpu != nil {
@@ -117,7 +142,7 @@ func (w *Window) Draw(root *ui.Ops) {
 		}
 	}
 	if w.gpu == nil {
-		ctx, err := newContext(w.driver)
+		ctx, err := newContext(driver)
 		if err != nil {
 			w.err = err
 			return
@@ -203,6 +228,12 @@ func (w *Window) isAlive() bool {
 
 func (w *Window) contextDriver() interface{} {
 	return w.driver
+}
+
+func (w *Window) setDriver(d *window) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.driver = d
 }
 
 func (w *Window) event(e Event) {

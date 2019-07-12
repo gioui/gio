@@ -155,11 +155,11 @@ func Main() {
 	<-mainDone
 }
 
-func createWindow(opts *WindowOptions) error {
+func createWindow(window *Window, opts *WindowOptions) error {
 	connMu.Lock()
 	defer connMu.Unlock()
 	if len(winMap) > 0 {
-		panic("multiple windows are not supported")
+		return errors.New("multiple windows are not supported")
 	}
 	if err := waylandConnect(); err != nil {
 		return err
@@ -169,13 +169,13 @@ func createWindow(opts *WindowOptions) error {
 		conn.destroy()
 		return err
 	}
+	w.w = window
 	go func() {
-		windows <- w.w
+		w.w.setDriver(w)
 		w.setStage(StageRunning)
 		w.loop()
 		w.destroy()
 		conn.destroy()
-		close(windows)
 		close(mainDone)
 	}()
 	return nil
@@ -250,8 +250,6 @@ func createNativeWindow(opts *WindowOptions) (*window, error) {
 	}
 	w.updateOpaqueRegion()
 	C.wl_surface_commit(w.surf)
-	ow := newWindow(w)
-	w.w = ow
 	winMap[w.topLvl] = w
 	winMap[w.surf] = w
 	winMap[w.wmSurf] = w

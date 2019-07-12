@@ -58,6 +58,8 @@ var theJVM *C.JavaVM
 
 var views = make(map[C.jlong]*window)
 
+var mainWindow = newWindowRendezvous()
+
 func jniGetMethodID(env *C.JNIEnv, class C.jclass, method, sig string) C.jmethodID {
 	m := C.CString(method)
 	defer C.free(unsafe.Pointer(m))
@@ -91,12 +93,12 @@ func onCreateView(env *C.JNIEnv, class C.jclass, view C.jobject) C.jlong {
 		mpostFrameCallback:             jniGetMethodID(env, class, "postFrameCallback", "()V"),
 		mpostFrameCallbackOnMainThread: jniGetMethodID(env, class, "postFrameCallbackOnMainThread", "()V"),
 	}
-	ow := newWindow(w)
-	w.Window = ow
+	wopts := <-mainWindow.out
+	w.Window = wopts.window
+	w.Window.setDriver(w)
 	handle := C.jlong(view)
 	views[handle] = w
 	w.loadConfig(env, class)
-	windows <- ow
 	w.setStage(StagePaused)
 	return handle
 }
@@ -104,8 +106,8 @@ func onCreateView(env *C.JNIEnv, class C.jclass, view C.jobject) C.jlong {
 //export onDestroyView
 func onDestroyView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := views[handle]
+	w.setDriver(nil)
 	delete(views, handle)
-	w.setStage(StageDead)
 	C.gio_jni_DeleteGlobalRef(env, w.view)
 	w.view = 0
 }
@@ -408,10 +410,11 @@ func (w *window) setTextInput(s key.TextInputState) {
 }
 
 func Main() {
-	// Android runs in c-shared mode where is never reached.
-	panic("unreachable")
+	// Android runs in c-shared mode where main is never reached.
+	panic("call to Main from outside main")
 }
 
-func createWindow(opts *WindowOptions) error {
-	return errors.New("createWindow not supported")
+func createWindow(window *Window, opts *WindowOptions) error {
+	mainWindow.in <- windowAndOptions{window, opts}
+	return <-mainWindow.errs
 }

@@ -38,6 +38,8 @@ type window struct {
 	pointerMap []C.CFTypeRef
 }
 
+var mainWindow = newWindowRendezvous()
+
 var layerFactory func() uintptr
 
 var views = make(map[C.CFTypeRef]*window)
@@ -52,13 +54,13 @@ func onCreate(view C.CFTypeRef) {
 	w := &window{
 		view: view,
 	}
-	ow := newWindow(w)
-	w.w = ow
+	wopts := <-mainWindow.out
+	w.w = wopts.window
+	w.w.setDriver(w)
 	w.visible.Store(false)
 	w.layer = C.CFTypeRef(layerFactory())
 	C.gio_addLayerToView(view, w.layer)
 	views[view] = w
-	windows <- ow
 	w.w.event(StageEvent{StagePaused})
 }
 
@@ -245,11 +247,12 @@ func (w *window) setTextInput(s key.TextInputState) {
 	}
 }
 
-func createWindow(opts *WindowOptions) error {
-	panic("unsupported")
+func createWindow(win *Window, opts *WindowOptions) error {
+	mainWindow.in <- windowAndOptions{win, opts}
+	return <-mainWindow.errs
 }
 
 func Main() {
 	// iOS runs in c-archive mode, so this is never reached.
-	panic("unreachable")
+	panic("call to Main from outside main")
 }

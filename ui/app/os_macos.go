@@ -15,7 +15,6 @@ import (
 	"errors"
 	"image"
 	"runtime"
-	"sync"
 	"time"
 	"unsafe"
 
@@ -35,12 +34,7 @@ type window struct {
 	stage Stage
 }
 
-// Only support one main window for now.
-var singleWindow struct {
-	mu      sync.Mutex
-	hasOpts bool
-	opts    *WindowOptions
-}
+var mainWindow = newWindowRendezvous()
 
 var viewFactory func() C.CFTypeRef
 
@@ -170,7 +164,6 @@ func gio_onTerminate(view C.CFTypeRef) {
 	w := views[view]
 	delete(views, view)
 	w.setStage(StageDead)
-	close(windows)
 }
 
 //export gio_onHide
@@ -190,31 +183,26 @@ func gio_onCreate(view C.CFTypeRef) {
 	w := &window{
 		view: view,
 	}
-	ow := newWindow(w)
-	w.w = ow
+	wopts := <-mainWindow.out
+	w.w = wopts.window
+	w.w.setDriver(w)
 	views[view] = w
-	windows <- ow
 }
 
-func createWindow(opts *WindowOptions) error {
-	singleWindow.mu.Lock()
-	defer singleWindow.mu.Unlock()
-	if singleWindow.hasOpts {
-		panic("only one window supported")
-	}
-	singleWindow.opts = opts
-	singleWindow.hasOpts = true
-	return nil
+func createWindow(win *Window, opts *WindowOptions) error {
+	mainWindow.in <- windowAndOptions{win, opts}
+	return <-mainWindow.errs
 }
 
 func Main() {
+	wopts := <-mainWindow.out
 	view := viewFactory()
 	if view == 0 {
 		// TODO: return this error from CreateWindow.
 		panic(errors.New("CreateWindow: failed to create view"))
 	}
 	cfg := getConfig()
-	opts := singleWindow.opts
+	opts := wopts.opts
 	w := cfg.Px(opts.Width)
 	h := cfg.Px(opts.Height)
 	title := C.CString(opts.Title)

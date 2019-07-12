@@ -3,6 +3,7 @@
 package app
 
 import (
+	"errors"
 	"image"
 	"math"
 	"os"
@@ -47,6 +48,17 @@ type CommandEvent struct {
 type Stage uint8
 type CommandType uint8
 
+type windowRendezvous struct {
+	in   chan windowAndOptions
+	out  chan windowAndOptions
+	errs chan error
+}
+
+type windowAndOptions struct {
+	window *Window
+	opts   *WindowOptions
+}
+
 const (
 	StageDead Stage = iota
 	StagePaused
@@ -78,30 +90,6 @@ const (
 // command line is not available.
 // Set with the go linker flag -X.
 var extraArgs string
-
-var windows = make(chan *Window)
-
-// CreateWindow creates a new window for a set of window
-// options. The options are hints; the platform is free to
-// ignore or adjust them.
-// CreateWindow is not supported on iOS and Android.
-func CreateWindow(opts *WindowOptions) error {
-	if opts == nil {
-		opts = &WindowOptions{
-			Width:  ui.Dp(800),
-			Height: ui.Dp(600),
-			Title:  "Gio program",
-		}
-	}
-	if opts.Width.V <= 0 || opts.Height.V <= 0 {
-		panic("window width and height must be larger than 0")
-	}
-	return createWindow(opts)
-}
-
-func Windows() <-chan *Window {
-	return windows
-}
 
 func (l Stage) String() string {
 	switch l {
@@ -163,4 +151,30 @@ func (c *Config) Px(v ui.Value) int {
 		return ui.Inf
 	}
 	return int(math.Round(float64(r)))
+}
+
+func newWindowRendezvous() *windowRendezvous {
+	wr := &windowRendezvous{
+		in:   make(chan windowAndOptions),
+		out:  make(chan windowAndOptions),
+		errs: make(chan error),
+	}
+	go func() {
+		var main windowAndOptions
+		var out chan windowAndOptions
+		for {
+			select {
+			case w := <-wr.in:
+				var err error
+				if main.window != nil {
+					err = errors.New("multiple windows are not supported")
+				}
+				wr.errs <- err
+				main = w
+				out = wr.out
+			case out <- main:
+			}
+		}
+	}()
+	return wr
 }
