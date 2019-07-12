@@ -7,10 +7,10 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/input"
-	"gioui.org/ui/system"
 	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
+	"gioui.org/ui/system"
 )
 
 // Router is a Queue implementation that routes events from
