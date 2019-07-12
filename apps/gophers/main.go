@@ -29,6 +29,7 @@ import (
 	"gioui.org/ui/f32"
 	"gioui.org/ui/gesture"
 	"gioui.org/ui/input"
+	"gioui.org/ui/input/system"
 	"gioui.org/ui/key"
 	"gioui.org/ui/layout"
 	"gioui.org/ui/measure"
@@ -67,6 +68,11 @@ type App struct {
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
+
+	// Profiling.
+	profiling   bool
+	profile     system.ProfileEvent
+	lastMallocs uint64
 }
 
 type userPage struct {
@@ -182,9 +188,8 @@ func colorMaterial(ops *ui.Ops, color color.RGBA) ui.BlockOp {
 }
 
 func (a *App) run() error {
-	a.w.Profiling = *stats
+	a.profiling = *stats
 	ops := new(ui.Ops)
-	var lastMallocs uint64
 	for {
 		select {
 		case users := <-a.updateUsers:
@@ -200,7 +205,7 @@ func (a *App) run() error {
 						os.Exit(0)
 					case 'P':
 						if e.Modifiers.Contain(key.ModCommand) {
-							a.w.Profiling = !a.w.Profiling
+							a.profiling = !a.profiling
 							a.w.Redraw()
 						}
 					}
@@ -236,19 +241,8 @@ func (a *App) run() error {
 				a.cfg = e.Config
 				cs := layout.ExactConstraints(a.w.Size())
 				a.Layout(ops, cs)
-				if a.w.Profiling {
-					var mstats runtime.MemStats
-					runtime.ReadMemStats(&mstats)
-					mallocs := mstats.Mallocs - lastMallocs
-					lastMallocs = mstats.Mallocs
-					al := layout.Align{Alignment: layout.NE}
-					cs := al.Begin(ops, cs)
-					in := layout.Insets{Top: ui.Dp(16)}
-					cs = in.Begin(&a.cfg, ops, cs)
-					txt := fmt.Sprintf("m: %d %s", mallocs, a.w.Timings())
-					dims := text.Label{Material: theme.text, Face: a.face(fonts.mono, 10), Text: txt}.Layout(ops, cs)
-					dims = in.End(dims)
-					al.End(dims)
+				if a.profiling {
+					a.layoutTimings(ops, cs)
 				}
 				a.w.Draw(ops)
 				a.faces.Frame()
@@ -394,6 +388,27 @@ func argb(c uint32) color.RGBA {
 
 func (a *App) face(f *sfnt.Font, size float32) text.Face {
 	return a.faces.For(f, ui.Sp(size))
+}
+
+func (a *App) layoutTimings(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+	for _, e := range a.inputs.Events(a) {
+		if e, ok := e.(system.ProfileEvent); ok {
+			a.profile = e
+		}
+	}
+	system.ProfileOp{Key: a}.Add(ops)
+	var mstats runtime.MemStats
+	runtime.ReadMemStats(&mstats)
+	mallocs := mstats.Mallocs - a.lastMallocs
+	a.lastMallocs = mstats.Mallocs
+	al := layout.Align{Alignment: layout.NE}
+	cs = al.Begin(ops, cs)
+	in := layout.Insets{Top: ui.Dp(16)}
+	cs = in.Begin(&a.cfg, ops, cs)
+	txt := fmt.Sprintf("m: %d %s", mallocs, a.profile.Timings)
+	dims := text.Label{Material: theme.text, Face: a.face(fonts.mono, 10), Text: txt}.Layout(ops, cs)
+	dims = in.End(dims)
+	return al.End(dims)
 }
 
 func (a *App) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
