@@ -53,7 +53,7 @@ type Window struct {
 // of a Window.
 var _ interface {
 	// setAnimating sets the animation flag. When the window is animating,
-	// Draw events are delivered as fast as the display can handle them.
+	// DrawEvents are delivered as fast as the display can handle them.
 	setAnimating(anim bool)
 	// setTextInput updates the virtual keyboard state.
 	setTextInput(s key.TextInputState)
