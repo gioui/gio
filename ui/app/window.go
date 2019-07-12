@@ -13,7 +13,6 @@ import (
 	"gioui.org/ui/app/internal/gpu"
 	iinput "gioui.org/ui/app/internal/input"
 	"gioui.org/ui/input"
-	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/key"
 )
 
@@ -48,7 +47,6 @@ type Window struct {
 	delayedDraw  *time.Timer
 
 	router iinput.Router
-	reader ui.OpsReader
 }
 
 // driver is the interface for the platform implementation
@@ -138,8 +136,6 @@ func (w *Window) Draw(root *ui.Ops) {
 	}
 	w.gpu.Draw(w.Profiling, size, root)
 	w.router.Frame(root)
-	w.reader.Reset(root)
-	redrawTime, redraw := collectRedraws(&w.reader)
 	now := time.Now()
 	w.mu.Lock()
 	w.setTextInput(w.router.InputState())
@@ -151,28 +147,11 @@ func (w *Window) Draw(root *ui.Ops) {
 		w.timings = fmt.Sprintf("tot:%7s cpu:%7s %s", frameDur.Round(q), drawDur.Round(q), w.gpu.Timings())
 		w.setNextFrame(time.Time{})
 	}
-	if redraw {
-		w.setNextFrame(redrawTime)
+	if t, ok := w.router.RedrawTime(); ok {
+		w.setNextFrame(t)
 	}
 	w.updateAnimation()
 	w.mu.Unlock()
-}
-
-func collectRedraws(r *ui.OpsReader) (time.Time, bool) {
-	var t time.Time
-	redraw := false
-	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
-		switch ops.OpType(encOp.Data[0]) {
-		case ops.TypeInvalidate:
-			var op ui.InvalidateOp
-			op.Decode(encOp.Data)
-			if !redraw || op.At.Before(t) {
-				redraw = true
-				t = op.At
-			}
-		}
-	}
-	return t, redraw
 }
 
 func (w *Window) Redraw() {

@@ -3,8 +3,11 @@
 package input
 
 import (
+	"time"
+
 	"gioui.org/ui"
 	"gioui.org/ui/input"
+	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
 )
@@ -16,6 +19,11 @@ type Router struct {
 	kqueue keyQueue
 
 	handlers handlerEvents
+
+	reader ui.OpsReader
+	// InvalidateOp summary.
+	redraw     bool
+	redrawTime time.Time
 }
 
 type handlerEvents struct {
@@ -29,6 +37,10 @@ func (q *Router) Events(k input.Key) []input.Event {
 
 func (q *Router) Frame(ops *ui.Ops) {
 	q.handlers.Clear()
+	q.redraw = false
+	q.reader.Reset(ops)
+	q.collect()
+
 	q.pqueue.Frame(ops, &q.handlers)
 	q.kqueue.Frame(ops, &q.handlers)
 }
@@ -45,6 +57,24 @@ func (q *Router) Add(e input.Event) bool {
 
 func (q *Router) InputState() key.TextInputState {
 	return q.kqueue.InputState()
+}
+
+func (q *Router) collect() {
+	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
+		switch ops.OpType(encOp.Data[0]) {
+		case ops.TypeInvalidate:
+			var op ui.InvalidateOp
+			op.Decode(encOp.Data)
+			if !q.redraw || op.At.Before(q.redrawTime) {
+				q.redraw = true
+				q.redrawTime = op.At
+			}
+		}
+	}
+}
+
+func (q *Router) RedrawTime() (time.Time, bool) {
+	return q.redrawTime, q.redraw
 }
 
 func (h *handlerEvents) init() {
