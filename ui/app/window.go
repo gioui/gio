@@ -13,7 +13,7 @@ import (
 	"gioui.org/ui/app/internal/gpu"
 	iinput "gioui.org/ui/app/internal/input"
 	"gioui.org/ui/input"
-	"gioui.org/ui/input/system"
+	"gioui.org/ui/system"
 	"gioui.org/ui/key"
 )
 

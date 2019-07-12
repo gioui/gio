@@ -7,7 +7,7 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/input"
-	"gioui.org/ui/input/system"
+	"gioui.org/ui/system"
 	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
