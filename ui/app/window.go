@@ -46,6 +46,7 @@ type Window struct {
 	nextFrame    time.Time
 	delayedDraw  *time.Timer
 
+	router input.Router
 	reader ui.OpsReader
 }
 
@@ -98,6 +99,10 @@ func (w *Window) Err() error {
 	return w.err
 }
 
+func (w *Window) Queue() input.Queue {
+	return &w.router
+}
+
 func (w *Window) Draw(root *ui.Ops) {
 	w.mu.Lock()
 	var drawDur time.Duration
@@ -109,6 +114,7 @@ func (w *Window) Draw(root *ui.Ops) {
 	sync := w.syncGPU
 	w.syncGPU = false
 	alive := w.isAlive()
+	size := w.size
 	w.mu.Unlock()
 	if !alive || stage < StageRunning {
 		return
@@ -134,11 +140,13 @@ func (w *Window) Draw(root *ui.Ops) {
 			return
 		}
 	}
+	w.gpu.Draw(w.Profiling, size, root)
+	w.router.Frame(root)
+	w.SetTextInput(w.router.InputState())
 	w.reader.Reset(root)
 	redrawTime, redraw := collectRedraws(&w.reader)
 	now := time.Now()
 	w.mu.Lock()
-	size := w.size
 	frameDur := now.Sub(w.lastFrame)
 	frameDur = frameDur.Truncate(100 * time.Microsecond)
 	w.lastFrame = now
@@ -152,7 +160,6 @@ func (w *Window) Draw(root *ui.Ops) {
 	}
 	w.updateAnimation()
 	w.mu.Unlock()
-	w.gpu.Draw(w.Profiling, size, root)
 }
 
 func collectRedraws(r *ui.OpsReader) (time.Time, bool) {
@@ -235,6 +242,7 @@ func (w *Window) event(e Event) {
 	needAck := false
 	switch e := e.(type) {
 	case input.Event:
+		w.router.Add(e)
 		w.setNextFrame(time.Time{})
 	case *CommandEvent:
 		needAck = true
