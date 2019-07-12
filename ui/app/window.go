@@ -12,6 +12,7 @@ import (
 	"gioui.org/ui"
 	"gioui.org/ui/app/internal/gpu"
 	"gioui.org/ui/input"
+	iinput "gioui.org/ui/app/internal/input"
 	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/key"
 )
@@ -46,7 +47,7 @@ type Window struct {
 	nextFrame    time.Time
 	delayedDraw  *time.Timer
 
-	router input.Router
+	router iinput.Router
 	reader ui.OpsReader
 }
 

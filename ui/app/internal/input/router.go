@@ -4,6 +4,7 @@ package input
 
 import (
 	"gioui.org/ui"
+	"gioui.org/ui/input"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
 )
@@ -17,9 +18,9 @@ type Router struct {
 	handlers handlerEvents
 }
 
-type handlerEvents map[Key][]Event
+type handlerEvents map[input.Key][]input.Event
 
-func (q *Router) Events(k Key) []Event {
+func (q *Router) Events(k input.Key) []input.Event {
 	events := q.handlers[k]
 	delete(q.handlers, k)
 	return events
@@ -34,7 +35,7 @@ func (q *Router) Frame(ops *ui.Ops) {
 	q.kqueue.Frame(ops, q.handlers)
 }
 
-func (q *Router) Add(e Event) {
+func (q *Router) Add(e input.Event) {
 	q.init()
 	switch e := e.(type) {
 	case pointer.Event:

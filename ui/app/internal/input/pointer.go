@@ -8,6 +8,7 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
+	"gioui.org/ui/input"
 	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/pointer"
 )
@@ -15,10 +16,10 @@ import (
 type pointerQueue struct {
 	hitTree  []hitNode
 	areas    []areaNode
-	handlers map[Key]*pointerHandler
+	handlers map[input.Key]*pointerHandler
 	pointers []pointerInfo
 	reader   ui.OpsReader
-	scratch  []Key
+	scratch  []input.Key
 }
 
 type hitNode struct {
@@ -28,13 +29,13 @@ type hitNode struct {
 	pass bool
 
 	// For handler nodes.
-	key Key
+	key input.Key
 }
 
 type pointerInfo struct {
 	id       pointer.ID
 	pressed  bool
-	handlers []Key
+	handlers []input.Key
 }
 
 type pointerHandler struct {
@@ -102,7 +103,7 @@ func (q *pointerQueue) collectHandlers(r *ui.OpsReader, events handlerEvents, t 
 			if !ok {
 				h = new(pointerHandler)
 				q.handlers[op.Key] = h
-				events[op.Key] = []Event{pointer.Event{Type: pointer.Cancel}}
+				events[op.Key] = []input.Event{pointer.Event{Type: pointer.Cancel}}
 			}
 			h.active = true
 			h.area = area
@@ -112,7 +113,7 @@ func (q *pointerQueue) collectHandlers(r *ui.OpsReader, events handlerEvents, t 
 	}
 }
 
-func (q *pointerQueue) opHit(handlers *[]Key, pos f32.Point) {
+func (q *pointerQueue) opHit(handlers *[]input.Key, pos f32.Point) {
 	// Track whether we're passing through hits.
 	pass := true
 	idx := len(q.hitTree) - 1
@@ -155,7 +156,7 @@ func (a *areaNode) hit(p f32.Point) bool {
 
 func (q *pointerQueue) init() {
 	if q.handlers == nil {
-		q.handlers = make(map[Key]*pointerHandler)
+		q.handlers = make(map[input.Key]*pointerHandler)
 	}
 }
 
@@ -176,7 +177,7 @@ func (q *pointerQueue) Frame(root *ui.Ops, events handlerEvents) {
 	}
 }
 
-func (q *pointerQueue) dropHandler(k Key) {
+func (q *pointerQueue) dropHandler(k input.Key) {
 	delete(q.handlers, k)
 	for i := range q.pointers {
 		p := &q.pointers[i]
