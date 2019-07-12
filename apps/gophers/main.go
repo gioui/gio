@@ -201,6 +201,7 @@ func (a *App) run() error {
 					case 'P':
 						if e.Modifiers.Contain(key.ModCommand) {
 							a.w.Profiling = !a.w.Profiling
+							a.w.Redraw()
 						}
 					}
 				}
@@ -227,6 +228,7 @@ func (a *App) run() error {
 					if a.selectedUser != nil {
 						a.selectedUser = nil
 						e.Cancel = true
+						a.w.Redraw()
 					}
 				}
 			case app.DrawEvent:
