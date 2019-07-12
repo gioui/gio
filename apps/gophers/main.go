@@ -52,7 +52,7 @@ type App struct {
 	cfg   app.Config
 	faces *measure.Faces
 
-	inputs *input.Router
+	inputs input.Queue
 
 	fab *ActionButton
 
@@ -194,7 +194,6 @@ func (a *App) run() error {
 		case e := <-a.w.Events():
 			switch e := e.(type) {
 			case input.Event:
-				a.inputs.Add(e)
 				if e, ok := e.(key.ChordEvent); ok {
 					switch e.Name {
 					case key.NameEscape:
@@ -245,13 +244,11 @@ func (a *App) run() error {
 					in := layout.Insets{Top: ui.Dp(16)}
 					cs = in.Begin(&a.cfg, ops, cs)
 					txt := fmt.Sprintf("m: %d %s", mallocs, a.w.Timings())
-					dims := text.Label{Material: theme.text, Face: a.face(fonts.mono, 8), Text: txt}.Layout(ops, cs)
+					dims := text.Label{Material: theme.text, Face: a.face(fonts.mono, 10), Text: txt}.Layout(ops, cs)
 					dims = in.End(dims)
 					al.End(dims)
 				}
 				a.w.Draw(ops)
-				a.inputs.Frame(ops)
-				a.w.SetTextInput(a.inputs.InputState())
 				a.faces.Frame()
 			}
 		}
@@ -262,7 +259,7 @@ func newApp(w *app.Window) *App {
 	a := &App{
 		w:           w,
 		updateUsers: make(chan []*user),
-		inputs:      new(input.Router),
+		inputs:      w.Queue(),
 	}
 	a.faces = &measure.Faces{Config: &a.cfg}
 	a.usersList = &layout.List{
