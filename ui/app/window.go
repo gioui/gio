@@ -238,8 +238,9 @@ func (w *Window) event(e Event) {
 	needAck := false
 	switch e := e.(type) {
 	case input.Event:
-		w.router.Add(e)
-		w.setNextFrame(time.Time{})
+		if w.router.Add(e) {
+			w.setNextFrame(time.Time{})
+		}
 	case *CommandEvent:
 		needAck = true
 	case StageEvent:
