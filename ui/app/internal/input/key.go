@@ -35,7 +35,7 @@ func (q *keyQueue) InputState() key.TextInputState {
 	return q.state
 }
 
-func (q *keyQueue) Frame(root *ui.Ops, events handlerEvents) {
+func (q *keyQueue) Frame(root *ui.Ops, events *handlerEvents) {
 	if q.handlers == nil {
 		q.handlers = make(map[input.Key]*keyHandler)
 	}
@@ -56,11 +56,11 @@ func (q *keyQueue) Frame(root *ui.Ops, events handlerEvents) {
 	changed := focus != nil && focus != q.focus
 	if focus != q.focus {
 		if q.focus != nil {
-			events[q.focus] = append(events[q.focus], key.FocusEvent{Focus: false})
+			events.Add(q.focus, key.FocusEvent{Focus: false})
 		}
 		q.focus = focus
 		if q.focus != nil {
-			events[q.focus] = append(events[q.focus], key.FocusEvent{Focus: true})
+			events.Add(q.focus, key.FocusEvent{Focus: true})
 		} else {
 			hide = true
 		}
@@ -77,14 +77,13 @@ func (q *keyQueue) Frame(root *ui.Ops, events handlerEvents) {
 	}
 }
 
-func (q *keyQueue) Push(e input.Event, events handlerEvents) {
-	if q.focus == nil {
-		return
+func (q *keyQueue) Push(e input.Event, events *handlerEvents) {
+	if q.focus != nil {
+		events.Add(q.focus, e)
 	}
-	events[q.focus] = append(events[q.focus], e)
 }
 
-func (q *keyQueue) resolveFocus(events handlerEvents) (input.Key, listenerPriority, bool) {
+func (q *keyQueue) resolveFocus(events *handlerEvents) (input.Key, listenerPriority, bool) {
 	var k input.Key
 	var pri listenerPriority
 	var hide bool
@@ -112,7 +111,7 @@ loop:
 				h = new(keyHandler)
 				q.handlers[op.Key] = h
 				// Reset the handler on (each) first appearance.
-				events[op.Key] = []input.Event{key.FocusEvent{Focus: false}}
+				events.Set(op.Key, []input.Event{key.FocusEvent{Focus: false}})
 			}
 			h.active = true
 		case ops.TypeHideInput:

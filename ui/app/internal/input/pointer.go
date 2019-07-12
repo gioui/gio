@@ -63,7 +63,7 @@ const (
 	areaEllipse
 )
 
-func (q *pointerQueue) collectHandlers(r *ui.OpsReader, events handlerEvents, t ui.Transform, area, node int, pass bool) {
+func (q *pointerQueue) collectHandlers(r *ui.OpsReader, events *handlerEvents, t ui.Transform, area, node int, pass bool) {
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypePush:
@@ -103,7 +103,7 @@ func (q *pointerQueue) collectHandlers(r *ui.OpsReader, events handlerEvents, t 
 			if !ok {
 				h = new(pointerHandler)
 				q.handlers[op.Key] = h
-				events[op.Key] = []input.Event{pointer.Event{Type: pointer.Cancel}}
+				events.Set(op.Key, []input.Event{pointer.Event{Type: pointer.Cancel}})
 			}
 			h.active = true
 			h.area = area
@@ -160,7 +160,7 @@ func (q *pointerQueue) init() {
 	}
 }
 
-func (q *pointerQueue) Frame(root *ui.Ops, events handlerEvents) {
+func (q *pointerQueue) Frame(root *ui.Ops, events *handlerEvents) {
 	q.init()
 	for _, h := range q.handlers {
 		// Reset handler.
@@ -189,7 +189,7 @@ func (q *pointerQueue) dropHandler(k input.Key) {
 	}
 }
 
-func (q *pointerQueue) Push(e pointer.Event, events handlerEvents) {
+func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	q.init()
 	if e.Type == pointer.Cancel {
 		q.pointers = q.pointers[:0]
@@ -257,7 +257,7 @@ func (q *pointerQueue) Push(e pointer.Event, events handlerEvents) {
 		}
 		e.Hit = q.hit(h.area, e.Position)
 		e.Position = h.transform.InvTransform(e.Position)
-		events[k] = append(events[k], e)
+		events.Add(k, e)
 		if e.Type == pointer.Release {
 			// Release grab when the number of grabs reaches zero.
 			grabs := 0

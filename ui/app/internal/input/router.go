@@ -18,39 +18,67 @@ type Router struct {
 	handlers handlerEvents
 }
 
-type handlerEvents map[input.Key][]input.Event
+type handlerEvents struct {
+	handlers map[input.Key][]input.Event
+	updated  bool
+}
 
 func (q *Router) Events(k input.Key) []input.Event {
-	events := q.handlers[k]
-	delete(q.handlers, k)
-	return events
+	return q.handlers.For(k)
 }
 
 func (q *Router) Frame(ops *ui.Ops) {
-	q.init()
-	for k := range q.handlers {
-		delete(q.handlers, k)
-	}
-	q.pqueue.Frame(ops, q.handlers)
-	q.kqueue.Frame(ops, q.handlers)
+	q.handlers.Clear()
+	q.pqueue.Frame(ops, &q.handlers)
+	q.kqueue.Frame(ops, &q.handlers)
 }
 
-func (q *Router) Add(e input.Event) {
-	q.init()
+func (q *Router) Add(e input.Event) bool {
 	switch e := e.(type) {
 	case pointer.Event:
-		q.pqueue.Push(e, q.handlers)
+		q.pqueue.Push(e, &q.handlers)
 	case key.EditEvent, key.ChordEvent, key.FocusEvent:
-		q.kqueue.Push(e, q.handlers)
+		q.kqueue.Push(e, &q.handlers)
 	}
+	return q.handlers.Updated()
 }
 
 func (q *Router) InputState() key.TextInputState {
 	return q.kqueue.InputState()
 }
 
-func (q *Router) init() {
-	if q.handlers == nil {
-		q.handlers = make(handlerEvents)
+func (h *handlerEvents) init() {
+	if h.handlers == nil {
+		h.handlers = make(map[input.Key][]input.Event)
+	}
+}
+
+func (h *handlerEvents) Set(k input.Key, evts []input.Event) {
+	h.init()
+	h.handlers[k] = evts
+	h.updated = true
+}
+
+func (h *handlerEvents) Add(k input.Key, e input.Event) {
+	h.init()
+	h.handlers[k] = append(h.handlers[k], e)
+	h.updated = true
+}
+
+func (h *handlerEvents) Updated() bool {
+	u := h.updated
+	h.updated = false
+	return u
+}
+
+func (h *handlerEvents) For(k input.Key) []input.Event {
+	events := h.handlers[k]
+	delete(h.handlers, k)
+	return events
+}
+
+func (h *handlerEvents) Clear() {
+	for k := range h.handlers {
+		delete(h.handlers, k)
 	}
 }
