@@ -242,7 +242,6 @@ func (w *Window) event(e Event) {
 		w.setNextFrame(time.Time{})
 	case *CommandEvent:
 		needAck = true
-		w.setNextFrame(time.Time{})
 	case StageEvent:
 		w.stage = e.Stage
 		if w.stage > StageDead {
