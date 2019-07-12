@@ -129,7 +129,10 @@ func (q *pointerQueue) opHit(handlers *[]Key, pos f32.Point) {
 			idx = n.next
 		}
 		if n.key != nil {
-			*handlers = append(*handlers, n.key)
+			if _, exists := q.handlers[n.key]; exists {
+				*handlers = append(*handlers, n.key)
+			}
+
 		}
 	}
 }
