@@ -243,7 +243,6 @@ func createNativeWindow(opts *WindowOptions) (*window, error) {
 	}
 	w := &window{
 		hwnd:  hwnd,
-		stage: StagePaused,
 	}
 	winMap[hwnd] = w
 	w.hdc, err = getDC(hwnd)

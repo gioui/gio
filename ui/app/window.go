@@ -83,7 +83,6 @@ func NewWindow(opts *WindowOptions) *Window {
 
 	w := &Window{
 		events: make(chan Event),
-		stage:  StagePaused,
 	}
 	if err := createWindow(w, opts); err != nil {
 		// For simplicity, NewWindow always succeeds. Send
