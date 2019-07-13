@@ -13,7 +13,7 @@ import (
 func buildJS(bi *buildInfo) error {
 	out := *destPath
 	if out == "" {
-		out = filepath.Base(bi.pkg)
+		out = bi.name
 	}
 	if err := os.MkdirAll(out, 0700); err != nil {
 		return err

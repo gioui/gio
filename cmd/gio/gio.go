@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -24,6 +25,7 @@ var (
 )
 
 type buildInfo struct {
+	name    string
 	pkg     string
 	ldflags string
 	archs   []string
@@ -56,13 +58,15 @@ func main() {
 	default:
 		errorf("invalid -buildmode %s\n", *buildMode)
 	}
-	// Expand relative package paths.
-	pkg, err := runCmd(exec.Command("go", "list", pkg))
+	// Find package name.
+	name, err := runCmd(exec.Command("go", "list", "-f", "{{.ImportPath}}", pkg))
 	if err != nil {
 		errorf("gio: %v", err)
 	}
+	name = filepath.Base(name)
 	bi := &buildInfo{
-		pkg: pkg,
+		name: name,
+		pkg:  pkg,
 	}
 	switch *target {
 	case "js":

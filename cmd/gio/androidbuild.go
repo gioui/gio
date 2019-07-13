@@ -158,7 +158,7 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 func archiveAndroid(tmpDir string, bi *buildInfo) (err error) {
 	aarFile := *destPath
 	if aarFile == "" {
-		aarFile = fmt.Sprintf("%s.aar", filepath.Base(bi.pkg))
+		aarFile = fmt.Sprintf("%s.aar", bi.name)
 	}
 	if filepath.Ext(aarFile) != ".aar" {
 		return fmt.Errorf("the specified output %q does not end in '.aar'", aarFile)
@@ -276,7 +276,7 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 	}
 
 	// Link APK.
-	appName := strings.Title(filepath.Base(bi.pkg))
+	appName := strings.Title(bi.name)
 	manifestSrc := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
 	package="%s"
@@ -355,7 +355,7 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 func signAPK(tmpDir string, tools *androidTools, bi *buildInfo) error {
 	apkFile := *destPath
 	if apkFile == "" {
-		apkFile = fmt.Sprintf("%s.apk", filepath.Base(bi.pkg))
+		apkFile = fmt.Sprintf("%s.apk", bi.name)
 	}
 	if filepath.Ext(apkFile) != ".apk" {
 		return fmt.Errorf("the specified output %q does not end in '.apk'", apkFile)

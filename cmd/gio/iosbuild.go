@@ -19,7 +19,7 @@ import (
 )
 
 func buildIOS(tmpDir, target string, bi *buildInfo) error {
-	appName := filepath.Base(bi.pkg)
+	appName := bi.name
 	switch *buildMode {
 	case "archive":
 		framework := *destPath
@@ -174,7 +174,7 @@ int main(int argc, char * argv[]) {
 	if _, err := runCmd(lipo); err != nil {
 		return err
 	}
-	appName := strings.Title(filepath.Base(bi.pkg))
+	appName := strings.Title(bi.name)
 	infoPlistSrc := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
