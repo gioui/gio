@@ -163,7 +163,7 @@ func getConfig() Config {
 func gio_onTerminate(view C.CFTypeRef) {
 	w := views[view]
 	delete(views, view)
-	w.setStage(StageDead)
+	w.w.event(DestroyEvent{})
 }
 
 //export gio_onHide

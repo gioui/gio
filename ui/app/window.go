@@ -29,7 +29,6 @@ type Window struct {
 	drawStart  time.Time
 	gpu        *gpu.GPU
 	inputState key.TextInputState
-	err        error
 
 	events chan Event
 
@@ -70,7 +69,7 @@ var ackEvent Event
 // ignore or adjust them.
 // If the current program is running on iOS and Android,
 // NewWindow returns the window previously by the platform.
-func NewWindow(opts *WindowOptions) (*Window, error) {
+func NewWindow(opts *WindowOptions) *Window {
 	if opts == nil {
 		opts = &WindowOptions{
 			Width:  ui.Dp(800),
@@ -87,9 +86,11 @@ func NewWindow(opts *WindowOptions) (*Window, error) {
 		stage:  StagePaused,
 	}
 	if err := createWindow(w, opts); err != nil {
-		return nil, err
+		// For simplicity, NewWindow always succeeds. Send
+		// an immediate DestroyEvent instead of returning the error.
+		w.destroy(err)
 	}
-	return w, nil
+	return w
 }
 
 func (w *Window) Events() <-chan Event {
@@ -105,10 +106,6 @@ func (w *Window) setTextInput(s key.TextInputState) {
 		w.updateAnimation()
 	}
 	w.inputState = s
-}
-
-func (w *Window) Err() error {
-	return w.err
 }
 
 func (w *Window) Queue() input.Queue {
@@ -144,12 +141,12 @@ func (w *Window) Draw(root *ui.Ops) {
 	if w.gpu == nil {
 		ctx, err := newContext(driver)
 		if err != nil {
-			w.err = err
+			w.destroy(err)
 			return
 		}
 		w.gpu, err = gpu.NewGPU(ctx)
 		if err != nil {
-			w.err = err
+			w.destroy(err)
 			return
 		}
 	}
@@ -190,6 +187,9 @@ func (w *Window) updateAnimation() {
 		w.delayedDraw.Stop()
 		w.delayedDraw = nil
 	}
+	if !w.isAlive() {
+		return
+	}
 	if w.stage >= StageRunning && w.hasNextFrame {
 		if dt := time.Until(w.nextFrame); dt <= 0 {
 			animate = true
@@ -223,7 +223,7 @@ func (w *Window) Stage() Stage {
 }
 
 func (w *Window) isAlive() bool {
-	return w.stage > StageDead && w.err == nil
+	return w.driver != nil
 }
 
 func (w *Window) contextDriver() interface{} {
@@ -236,10 +236,18 @@ func (w *Window) setDriver(d *window) {
 	w.driver = d
 }
 
+func (w *Window) destroy(err error) {
+	w.setDriver(nil)
+	go func() {
+		w.event(DestroyEvent{err})
+	}()
+}
+
 func (w *Window) event(e Event) {
 	w.eventLock.Lock()
 	defer w.eventLock.Unlock()
 	w.mu.Lock()
+	died := false
 	needAck := false
 	switch e := e.(type) {
 	case input.Event:
@@ -248,12 +256,13 @@ func (w *Window) event(e Event) {
 		}
 	case *CommandEvent:
 		needAck = true
+	case DestroyEvent:
+		w.driver = nil
+		died = true
 	case StageEvent:
 		w.stage = e.Stage
-		if w.stage > StageDead {
-			needAck = true
-			w.syncGPU = true
-		}
+		needAck = true
+		w.syncGPU = true
 	case DrawEvent:
 		if e.Size == (image.Point{}) {
 			panic(errors.New("internal error: zero-sized Draw"))
@@ -290,7 +299,7 @@ func (w *Window) event(e Event) {
 			w.gpu.Refresh()
 		}
 	}
-	if stage == StageDead {
+	if died {
 		close(w.events)
 	}
 }

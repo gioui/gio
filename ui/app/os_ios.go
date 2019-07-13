@@ -111,7 +111,7 @@ func onStop(view C.CFTypeRef) {
 func onDestroy(view C.CFTypeRef) {
 	w := views[view]
 	delete(views, view)
-	w.w.event(StageEvent{StageDead})
+	w.w.event(DestroyEvent{})
 	C.gio_removeLayer(w.layer)
 	C.CFRelease(w.layer)
 	w.layer = 0

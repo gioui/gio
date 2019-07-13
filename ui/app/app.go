@@ -17,6 +17,8 @@ type Event interface {
 	ImplementsEvent()
 }
 
+// DrawEvent is sent when a Window's Draw
+// method must be called.
 type DrawEvent struct {
 	Config Config
 	Size   image.Point
@@ -25,6 +27,14 @@ type DrawEvent struct {
 	// and needs a complete frame before
 	// proceeding.
 	sync bool
+}
+
+// DestroyEvent is the last event sent through
+// a window event channel.
+type DestroyEvent struct {
+	// Err is nil for normal window closures. If a
+	// window is prematurely closed, Err is the cause.
+	Err error
 }
 
 // Insets is the space taken up by
@@ -60,8 +70,7 @@ type windowAndOptions struct {
 }
 
 const (
-	StageDead Stage = iota
-	StagePaused
+	StagePaused Stage = iota
 	StageRunning
 )
 
@@ -93,8 +102,6 @@ var extraArgs string
 
 func (l Stage) String() string {
 	switch l {
-	case StageDead:
-		return "StageDead"
 	case StagePaused:
 		return "StagePaused"
 	case StageRunning:
@@ -103,10 +110,6 @@ func (l Stage) String() string {
 		panic("unexpected Stage value")
 	}
 }
-
-func (_ DrawEvent) ImplementsEvent()     {}
-func (_ StageEvent) ImplementsEvent()    {}
-func (_ *CommandEvent) ImplementsEvent() {}
 
 func init() {
 	args := strings.Split(extraArgs, "|")
@@ -178,3 +181,8 @@ func newWindowRendezvous() *windowRendezvous {
 	}()
 	return wr
 }
+
+func (_ DrawEvent) ImplementsEvent()     {}
+func (_ StageEvent) ImplementsEvent()    {}
+func (_ *CommandEvent) ImplementsEvent() {}
+func (_ DestroyEvent) ImplementsEvent()  {}

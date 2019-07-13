@@ -113,6 +113,7 @@ type window struct {
 	lastTouch f32.Point
 
 	stage             Stage
+	dead              bool
 	lastFrameCallback *C.struct_wl_callback
 
 	mu        sync.Mutex
@@ -308,7 +309,8 @@ func gio_onXdgSurfaceConfigure(data unsafe.Pointer, wmSurf *C.struct_xdg_surface
 //export gio_onToplevelClose
 func gio_onToplevelClose(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel) {
 	w := winMap[topLvl]
-	w.setStage(StageDead)
+	w.dead = true
+	w.w.event(DestroyEvent{})
 }
 
 //export gio_onToplevelConfigure
@@ -769,7 +771,7 @@ loop:
 		if ret := C.wl_display_flush(conn.disp); ret < 0 {
 			break
 		}
-		if w.stage == StageDead {
+		if w.dead {
 			break
 		}
 		// Clear poll events.

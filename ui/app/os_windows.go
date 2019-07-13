@@ -61,6 +61,7 @@ type window struct {
 	width  int
 	height int
 	stage  Stage
+	dead   bool
 
 	mu        sync.Mutex
 	animating bool
@@ -319,7 +320,8 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.scrollEvent(wParam, lParam)
 	case _WM_DESTROY:
 		delete(winMap, hwnd)
-		w.setStage(StageDead)
+		w.dead = true
+		w.w.event(DestroyEvent{})
 	case _WM_REDRAW:
 		w.mu.Lock()
 		anim := w.animating
@@ -368,7 +370,7 @@ func (w *window) scrollEvent(wParam, lParam uintptr) {
 // Adapted from https://blogs.msdn.microsoft.com/oldnewthing/20060126-00/?p=32513/
 func (w *window) loop() error {
 loop:
-	for w.stage > StageDead {
+	for !w.dead {
 		var msg msg
 		// Since posted messages are always returned before system messages,
 		// but we want our WM_REDRAW to always come last, just like WM_PAINT.
