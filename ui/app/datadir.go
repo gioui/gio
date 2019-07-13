@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build !android
+// +build !android,go1.13
 
 package app
 
