@@ -26,12 +26,8 @@ func main() {
 // On iOS and Android main will never be called, so
 // setting up the window must run in an init function.
 func init() {
-	wopt := app.WindowOptions{Width: ui.Dp(800), Height: ui.Dp(600), Title: "Hello"}
-	w, err := app.NewWindow(&wopt)
-	if err != nil {
-		log.Fatal(err)
-	}
 	go func() {
+		w := app.NewWindow(nil)
 		if err := loop(w); err != nil {
 			log.Fatal(err)
 		}
@@ -52,10 +48,8 @@ func loop(w *app.Window) error {
 	for {
 		e := <-w.Events()
 		switch e := e.(type) {
-		case app.StageEvent:
-			if e.Stage == app.StageDead {
-				return w.Err()
-			}
+		case app.DestroyEvent:
+			return e.Err
 		case app.DrawEvent:
 			cfg = e.Config
 			cs := layout.ExactConstraints(w.Size())

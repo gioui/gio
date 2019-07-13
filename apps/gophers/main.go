@@ -152,24 +152,21 @@ func initProfiling() {
 func init() {
 	flag.Parse()
 	initProfiling()
-	fonts.regular = mustLoadFont(goregular.TTF)
-	fonts.bold = mustLoadFont(gobold.TTF)
-	fonts.italic = mustLoadFont(goitalic.TTF)
-	fonts.mono = mustLoadFont(gomono.TTF)
-	var ops ui.Ops
-	theme.text = colorMaterial(&ops, rgb(0x333333))
-	theme.tertText = colorMaterial(&ops, rgb(0xbbbbbb))
-	theme.brand = colorMaterial(&ops, rgb(0x62798c))
-	theme.white = colorMaterial(&ops, rgb(0xffffff))
-	w, err := app.NewWindow(&app.WindowOptions{
-		Width:  ui.Dp(400),
-		Height: ui.Dp(800),
-		Title:  "Gophers",
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
 	go func() {
+		fonts.regular = mustLoadFont(goregular.TTF)
+		fonts.bold = mustLoadFont(gobold.TTF)
+		fonts.italic = mustLoadFont(goitalic.TTF)
+		fonts.mono = mustLoadFont(gomono.TTF)
+		var ops ui.Ops
+		theme.text = colorMaterial(&ops, rgb(0x333333))
+		theme.tertText = colorMaterial(&ops, rgb(0xbbbbbb))
+		theme.brand = colorMaterial(&ops, rgb(0x62798c))
+		theme.white = colorMaterial(&ops, rgb(0xffffff))
+		w := app.NewWindow(&app.WindowOptions{
+			Width:  ui.Dp(400),
+			Height: ui.Dp(800),
+			Title:  "Gophers",
+		})
 		if err := newApp(w).run(); err != nil {
 			log.Fatal(err)
 		}
@@ -203,6 +200,8 @@ func (a *App) run() error {
 						a.w.Redraw()
 					}
 				}
+			case app.DestroyEvent:
+				return e.Err
 			case app.StageEvent:
 				if e.Stage >= app.StageRunning {
 					if a.ctxCancel == nil {
@@ -216,9 +215,6 @@ func (a *App) run() error {
 						a.ctxCancel()
 						a.ctxCancel = nil
 					}
-				}
-				if e.Stage == app.StageDead {
-					return a.w.Err()
 				}
 			case *app.CommandEvent:
 				switch e.Type {
