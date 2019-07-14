@@ -36,6 +36,7 @@ type Window struct {
 
 	mu           sync.Mutex
 	stage        Stage
+	dead         bool
 	size         image.Point
 	syncGPU      bool
 	animating    bool
@@ -121,11 +122,11 @@ func (w *Window) Draw(root *ui.Ops) {
 	stage := w.stage
 	sync := w.syncGPU
 	w.syncGPU = false
-	alive := w.isAlive()
+	dead := w.dead
 	size := w.size
 	driver := w.driver
 	w.mu.Unlock()
-	if !alive || stage < StageRunning || driver == nil {
+	if dead || stage < StageRunning || driver == nil {
 		return
 	}
 	if w.gpu != nil {
@@ -173,7 +174,7 @@ func (w *Window) Draw(root *ui.Ops) {
 func (w *Window) Redraw() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if !w.isAlive() {
+	if w.dead {
 		return
 	}
 	w.setNextFrame(time.Time{})
@@ -186,7 +187,7 @@ func (w *Window) updateAnimation() {
 		w.delayedDraw.Stop()
 		w.delayedDraw = nil
 	}
-	if !w.isAlive() {
+	if w.dead {
 		return
 	}
 	if w.stage >= StageRunning && w.hasNextFrame {
@@ -215,10 +216,6 @@ func (w *Window) Stage() Stage {
 	return w.stage
 }
 
-func (w *Window) isAlive() bool {
-	return w.driver != nil
-}
-
 func (w *Window) contextDriver() interface{} {
 	return w.driver
 }
@@ -240,8 +237,9 @@ func (w *Window) event(e Event) {
 	w.eventLock.Lock()
 	defer w.eventLock.Unlock()
 	w.mu.Lock()
-	died := false
 	needAck := false
+	dead := w.dead
+	died := false
 	switch e := e.(type) {
 	case input.Event:
 		if w.router.Add(e) {
@@ -251,6 +249,7 @@ func (w *Window) event(e Event) {
 		needAck = true
 	case DestroyEvent:
 		w.driver = nil
+		w.dead = true
 		died = true
 	case StageEvent:
 		w.stage = e.Stage
@@ -273,6 +272,9 @@ func (w *Window) event(e Event) {
 	stage := w.stage
 	w.updateAnimation()
 	w.mu.Unlock()
+	if dead {
+		return
+	}
 	w.events <- e
 	if needAck {
 		// Send a dummy event; when it gets through we
