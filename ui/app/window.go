@@ -209,12 +209,6 @@ func (w *Window) setNextFrame(at time.Time) {
 	}
 }
 
-func (w *Window) Size() image.Point {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.size
-}
-
 func (w *Window) Stage() Stage {
 	w.mu.Lock()
 	defer w.mu.Unlock()
