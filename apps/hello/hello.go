@@ -52,7 +52,7 @@ func loop(w *app.Window) error {
 			return e.Err
 		case app.DrawEvent:
 			cfg = e.Config
-			cs := layout.ExactConstraints(w.Size())
+			cs := layout.ExactConstraints(e.Size)
 			ops.Reset()
 			ops.Begin()
 			draw.ColorOp{Color: maroon}.Add(ops)

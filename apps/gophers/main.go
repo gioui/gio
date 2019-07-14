@@ -228,7 +228,7 @@ func (a *App) run() error {
 			case app.DrawEvent:
 				ops.Reset()
 				a.cfg = e.Config
-				cs := layout.ExactConstraints(a.w.Size())
+				cs := layout.ExactConstraints(e.Size)
 				a.Layout(ops, cs)
 				if a.profiling {
 					a.layoutTimings(ops, cs)
