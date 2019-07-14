@@ -60,7 +60,7 @@ var _ interface {
 	setTextInput(s key.TextInputState)
 } = (*window)(nil)
 
-// Pre-allocate zero-sized ack event to avoid garbage.
+// Pre-allocate the ack event to avoid garbage.
 var ackEvent Event
 
 // NewWindow creates a new window for a set of window
@@ -156,7 +156,7 @@ func (w *Window) updateAnimation() {
 		if dt := time.Until(w.nextFrame); dt <= 0 {
 			animate = true
 		} else {
-			w.delayedDraw = time.AfterFunc(dt, w.Redraw)
+			w.delayedDraw = time.NewTimer(dt)
 		}
 	}
 	if animate != w.animating {
@@ -209,7 +209,14 @@ func (w *Window) run(opts *WindowOptions) {
 		return
 	}
 	for {
+		var timer <-chan time.Time
+		if w.delayedDraw != nil {
+			timer = w.delayedDraw.C
+		}
 		select {
+		case <-timer:
+			w.setNextFrame(time.Time{})
+			w.updateAnimation()
 		case <-w.redraws:
 			w.setNextFrame(time.Time{})
 			w.updateAnimation()
