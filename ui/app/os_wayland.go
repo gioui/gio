@@ -1035,8 +1035,9 @@ func (w *window) config() (int, int, Config) {
 func (w *window) draw(sync bool) {
 	w.mu.Lock()
 	animating := w.animating
+	dead := w.dead
 	w.mu.Unlock()
-	if !animating && !sync {
+	if dead || (!animating && !sync) {
 		return
 	}
 	width, height, cfg := w.config()

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"sync"
 	"time"
 
 	"gioui.org/ui"
@@ -30,15 +29,13 @@ type Window struct {
 	gpu        *gpu.GPU
 	inputState key.TextInputState
 
-	events chan Event
+	out     chan Event
+	in      chan Event
+	ack     chan struct{}
+	redraws chan struct{}
+	frames  chan *ui.Ops
 
-	eventLock sync.Mutex
-
-	mu           sync.Mutex
 	stage        Stage
-	dead         bool
-	size         image.Point
-	syncGPU      bool
 	animating    bool
 	hasNextFrame bool
 	nextFrame    time.Time
@@ -63,6 +60,7 @@ var _ interface {
 	setTextInput(s key.TextInputState)
 } = (*window)(nil)
 
+// Pre-allocate zero-sized ack event to avoid garbage.
 var ackEvent Event
 
 // NewWindow creates a new window for a set of window
@@ -83,18 +81,18 @@ func NewWindow(opts *WindowOptions) *Window {
 	}
 
 	w := &Window{
-		events: make(chan Event),
+		in:      make(chan Event),
+		out:     make(chan Event),
+		ack:     make(chan struct{}),
+		redraws: make(chan struct{}, 1),
+		frames:  make(chan *ui.Ops),
 	}
-	if err := createWindow(w, opts); err != nil {
-		// For simplicity, NewWindow always succeeds. Send
-		// an immediate DestroyEvent instead of returning the error.
-		w.destroy(err)
-	}
+	go w.run(opts)
 	return w
 }
 
 func (w *Window) Events() <-chan Event {
-	return w.events
+	return w.out
 }
 
 func (w *Window) setTextInput(s key.TextInputState) {
@@ -112,48 +110,19 @@ func (w *Window) Queue() input.Queue {
 	return &w.router
 }
 
-func (w *Window) Draw(root *ui.Ops) {
-	w.mu.Lock()
+func (w *Window) Draw(frame *ui.Ops) {
+	w.frames <- frame
+}
+
+func (w *Window) draw(size image.Point, frame *ui.Ops) {
 	var drawDur time.Duration
 	if !w.drawStart.IsZero() {
 		drawDur = time.Since(w.drawStart)
 		w.drawStart = time.Time{}
 	}
-	stage := w.stage
-	sync := w.syncGPU
-	w.syncGPU = false
-	dead := w.dead
-	size := w.size
-	driver := w.driver
-	w.mu.Unlock()
-	if dead || stage < StageRunning || driver == nil {
-		return
-	}
-	if w.gpu != nil {
-		if sync {
-			w.gpu.Refresh()
-		}
-		if err := w.gpu.Flush(); err != nil {
-			w.gpu.Release()
-			w.gpu = nil
-		}
-	}
-	if w.gpu == nil {
-		ctx, err := newContext(driver)
-		if err != nil {
-			w.destroy(err)
-			return
-		}
-		w.gpu, err = gpu.NewGPU(ctx)
-		if err != nil {
-			w.destroy(err)
-			return
-		}
-	}
-	w.gpu.Draw(w.router.Profiling(), size, root)
-	w.router.Frame(root)
+	w.gpu.Draw(w.router.Profiling(), size, frame)
+	w.router.Frame(frame)
 	now := time.Now()
-	w.mu.Lock()
 	w.setTextInput(w.router.InputState())
 	frameDur := now.Sub(w.lastFrame)
 	frameDur = frameDur.Truncate(100 * time.Microsecond)
@@ -168,17 +137,13 @@ func (w *Window) Draw(root *ui.Ops) {
 		w.setNextFrame(t)
 	}
 	w.updateAnimation()
-	w.mu.Unlock()
 }
 
 func (w *Window) Redraw() {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	if w.dead {
-		return
+	select {
+	case w.redraws <- struct{}{}:
+	default:
 	}
-	w.setNextFrame(time.Time{})
-	w.updateAnimation()
 }
 
 func (w *Window) updateAnimation() {
@@ -186,9 +151,6 @@ func (w *Window) updateAnimation() {
 	if w.delayedDraw != nil {
 		w.delayedDraw.Stop()
 		w.delayedDraw = nil
-	}
-	if w.dead {
-		return
 	}
 	if w.stage >= StageRunning && w.hasNextFrame {
 		if dt := time.Until(w.nextFrame); dt <= 0 {
@@ -210,91 +172,124 @@ func (w *Window) setNextFrame(at time.Time) {
 	}
 }
 
-func (w *Window) Stage() Stage {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.stage
-}
-
-func (w *Window) contextDriver() interface{} {
-	return w.driver
-}
-
 func (w *Window) setDriver(d *window) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	w.driver = d
-}
-
-func (w *Window) destroy(err error) {
-	w.setDriver(nil)
-	go func() {
-		w.event(DestroyEvent{err})
-	}()
+	w.event(driverEvent{d})
 }
 
 func (w *Window) event(e Event) {
-	w.eventLock.Lock()
-	defer w.eventLock.Unlock()
-	w.mu.Lock()
-	needAck := false
-	dead := w.dead
-	died := false
-	switch e := e.(type) {
-	case input.Event:
-		if w.router.Add(e) {
-			w.setNextFrame(time.Time{})
+	w.in <- e
+	<-w.ack
+}
+
+func (w *Window) waitAck() {
+	// Send a dummy event; when it gets through we
+	// know the application has processed the previous event.
+	w.out <- ackEvent
+}
+
+// Prematurely destroy the window and wait for the native window
+// destroy event.
+func (w *Window) destroy(err error) {
+	// Ack the current event.
+	w.ack <- struct{}{}
+	w.out <- DestroyEvent{err}
+	for e := range w.in {
+		w.ack <- struct{}{}
+		if _, ok := e.(DestroyEvent); ok {
+			return
 		}
-	case *CommandEvent:
-		needAck = true
-	case DestroyEvent:
-		w.driver = nil
-		w.dead = true
-		died = true
-	case StageEvent:
-		w.stage = e.Stage
-		needAck = true
-		w.syncGPU = true
-	case DrawEvent:
-		if e.Size == (image.Point{}) {
-			panic(errors.New("internal error: zero-sized Draw"))
-		}
-		if w.stage < StageRunning {
-			// No drawing if not visible.
-			break
-		}
-		w.drawStart = time.Now()
-		needAck = true
-		w.hasNextFrame = false
-		w.syncGPU = e.sync
-		w.size = e.Size
-	}
-	stage := w.stage
-	w.updateAnimation()
-	w.mu.Unlock()
-	if dead {
-		return
-	}
-	w.events <- e
-	if needAck {
-		// Send a dummy event; when it gets through we
-		// know the application has processed the actual event.
-		w.events <- ackEvent
-	}
-	if w.gpu != nil {
-		w.mu.Lock()
-		sync := w.syncGPU
-		w.syncGPU = false
-		w.mu.Unlock()
-		switch {
-		case stage < StageRunning:
-			w.gpu.Release()
-			w.gpu = nil
-		case sync:
-			w.gpu.Refresh()
-		}
-	}
-	if died {
-		close(w.events)
 	}
 }
+
+func (w *Window) run(opts *WindowOptions) {
+	defer close(w.in)
+	defer close(w.out)
+	if err := createWindow(w, opts); err != nil {
+		w.destroy(err)
+		return
+	}
+	for {
+		select {
+		case <-w.redraws:
+			w.setNextFrame(time.Time{})
+			w.updateAnimation()
+		case e := <-w.in:
+			switch e2 := e.(type) {
+			case StageEvent:
+				if w.gpu != nil {
+					if e2.Stage < StageRunning {
+						w.gpu.Release()
+						w.gpu = nil
+					} else {
+						w.gpu.Refresh()
+					}
+				}
+				w.stage = e2.Stage
+				w.updateAnimation()
+				w.out <- e
+				w.waitAck()
+			case DrawEvent:
+				if e2.Size == (image.Point{}) {
+					panic(errors.New("internal error: zero-sized Draw"))
+				}
+				if w.stage < StageRunning {
+					// No drawing if not visible.
+					break
+				}
+				w.drawStart = time.Now()
+				w.hasNextFrame = false
+				w.out <- e
+				frame := <-w.frames
+				if w.gpu != nil {
+					if e2.sync {
+						w.gpu.Refresh()
+					}
+					if err := w.gpu.Flush(); err != nil {
+						w.gpu.Release()
+						w.gpu = nil
+						w.destroy(err)
+						return
+					}
+				} else {
+					ctx, err := newContext(w.driver)
+					if err != nil {
+						w.destroy(err)
+						return
+					}
+					w.gpu, err = gpu.NewGPU(ctx)
+					if err != nil {
+						w.destroy(err)
+						return
+					}
+				}
+				w.draw(e2.Size, frame)
+				if e2.sync {
+					if err := w.gpu.Flush(); err != nil {
+						w.gpu.Release()
+						w.gpu = nil
+						w.destroy(err)
+						return
+					}
+				}
+			case *CommandEvent:
+				w.out <- e
+				w.waitAck()
+			case input.Event:
+				if w.router.Add(e2) {
+					w.setNextFrame(time.Time{})
+					w.updateAnimation()
+				}
+				w.out <- e
+			case driverEvent:
+				w.driver = e2.driver
+			case DestroyEvent:
+				w.out <- e2
+				w.ack <- struct{}{}
+				return
+			}
+			w.ack <- struct{}{}
+		}
+	}
+}
+
+func (_ driverEvent) ImplementsEvent() {}
