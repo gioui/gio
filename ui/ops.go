@@ -152,6 +152,10 @@ func (o *Ops) Aux() []byte {
 }
 
 func (d *opsData) reset() {
+	// Leave references to the GC.
+	for i := range d.refs {
+		d.refs[i] = nil
+	}
 	d.data = d.data[:0]
 	d.refs = d.refs[:0]
 	d.version++
