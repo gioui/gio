@@ -58,29 +58,9 @@ func (c Constraint) loose() Constraint {
 	return Constraint{Max: c.Max}
 }
 
-func (c Constraints) Exact(width, height int) Constraints {
-	if height != 0 {
-		if c.Height.Min < height {
-			c.Height.Min = height
-		}
-		if height < c.Height.Max {
-			c.Height.Max = height
-		}
-	}
-	if width != 0 {
-		if c.Width.Min < width {
-			c.Width.Min = width
-		}
-		if width < c.Width.Max {
-			c.Width.Max = width
-		}
-	}
-	return c
-}
-
-// ExactConstraints returns the rigid constraints that represents the
-// given dimensions.
-func ExactConstraints(size image.Point) Constraints {
+// RigidConstraints returns the constraints that can only be
+// satisfied by the given dimensions.
+func RigidConstraints(size image.Point) Constraints {
 	return Constraints{
 		Width:  Constraint{Min: size.X, Max: size.X},
 		Height: Constraint{Min: size.Y, Max: size.Y},
