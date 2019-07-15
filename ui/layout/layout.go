@@ -42,22 +42,6 @@ func (c Constraints) Constrain(p image.Point) image.Point {
 	return image.Point{X: c.Width.Constrain(p.X), Y: c.Height.Constrain(p.Y)}
 }
 
-func (c Constraints) Expand() Constraints {
-	return Constraints{Width: c.Width.expand(), Height: c.Height.expand()}
-}
-
-func (c Constraints) Loose() Constraints {
-	return Constraints{Width: c.Width.loose(), Height: c.Height.loose()}
-}
-
-func (c Constraint) expand() Constraint {
-	return Constraint{Min: c.Max, Max: c.Max}
-}
-
-func (c Constraint) loose() Constraint {
-	return Constraint{Max: c.Max}
-}
-
 // RigidConstraints returns the constraints that can only be
 // satisfied by the given dimensions.
 func RigidConstraints(size image.Point) Constraints {
@@ -146,7 +130,9 @@ func (a *Align) Begin(ops *ui.Ops, cs Constraints) Constraints {
 	a.ops = ops
 	a.cs = cs
 	ops.Begin()
-	return cs.Loose()
+	cs.Width.Min = 0
+	cs.Height.Min = 0
+	return cs
 }
 
 func (a *Align) End(dims Dimens) Dimens {
