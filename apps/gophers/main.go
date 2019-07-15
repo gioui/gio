@@ -392,7 +392,7 @@ func (a *App) layoutTimings(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	a.lastMallocs = mstats.Mallocs
 	al := layout.Align{Alignment: layout.NE}
 	cs = al.Begin(ops, cs)
-	in := layout.Insets{Top: ui.Dp(16)}
+	in := layout.Inset{Top: ui.Dp(16)}
 	cs = in.Begin(&a.cfg, ops, cs)
 	txt := fmt.Sprintf("m: %d %s", mallocs, a.profile.Timings)
 	dims := text.Label{Material: theme.text, Face: a.face(fonts.mono, 10), Text: txt}.Layout(ops, cs)
@@ -450,7 +450,7 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	c := up.config
 	msg := up.commits[index].GetMessage()
 	label := text.Label{Material: theme.text, Face: up.faces.For(fonts.regular, ui.Sp(12)), Text: msg}
-	in := layout.Insets{Top: ui.Dp(16), Right: ui.Dp(8), Left: ui.Dp(8)}
+	in := layout.Inset{Top: ui.Dp(16), Right: ui.Dp(8), Left: ui.Dp(8)}
 	cs = in.Begin(c, ops, cs)
 	f := (&layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}).Init(ops, cs)
 	cs = f.Rigid()
@@ -463,7 +463,7 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	c1 := f.End(dims)
 	cs = f.Flexible(1)
 	cs.Width.Min = cs.Width.Max
-	in2 := layout.Insets{Left: ui.Dp(8)}
+	in2 := layout.Inset{Left: ui.Dp(8)}
 	cs = in2.Begin(c, ops, cs)
 	dims = label.Layout(ops, cs)
 	dims = in2.End(dims)
@@ -498,7 +498,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	st := (&layout.Stack{Alignment: layout.Start}).Init(ops, cs)
 	cs = st.Rigid()
 	al := layout.Align{Alignment: layout.SE}
-	in := layout.EqualInsets(ui.Dp(16))
+	in := layout.UniformInset(ui.Dp(16))
 	cs = in.Begin(c, ops, al.Begin(ops, cs))
 	dims := a.fab.Layout(ops, cs)
 	dims = al.End(in.End(dims))
@@ -511,7 +511,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		cs = f.Rigid()
 		{
 			cs.Width.Min = cs.Width.Max
-			in := layout.EqualInsets(ui.Dp(16))
+			in := layout.UniformInset(ui.Dp(16))
 			sz := c.Px(ui.Dp(200))
 			cs = layout.RigidConstraints(cs.Constrain(image.Point{X: sz, Y: sz}))
 			dims = a.edit.Layout(ops, in.Begin(c, ops, cs))
@@ -522,7 +522,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		cs = f.Rigid()
 		{
 			cs.Width.Min = cs.Width.Max
-			in := layout.Insets{Bottom: ui.Dp(16), Left: ui.Dp(16), Right: ui.Dp(16)}
+			in := layout.Inset{Bottom: ui.Dp(16), Left: ui.Dp(16), Right: ui.Dp(16)}
 			dims = a.edit2.Layout(ops, in.Begin(c, ops, cs))
 			dims = in.End(dims)
 		}
@@ -534,7 +534,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			s := layout.Stack{Alignment: layout.Center}
 			s.Init(ops, cs)
 			cs = s.Rigid()
-			in := layout.Insets{Top: ui.Dp(16), Right: ui.Dp(8), Bottom: ui.Dp(8), Left: ui.Dp(8)}
+			in := layout.Inset{Top: ui.Dp(16), Right: ui.Dp(8), Bottom: ui.Dp(8), Left: ui.Dp(8)}
 			grey := colorMaterial(ops, rgb(0x888888))
 			lbl := text.Label{Material: grey, Face: a.face(fonts.regular, 11), Text: "GOPHERS"}
 			dims = in.End(lbl.Layout(ops, in.Begin(c, ops, cs)))
@@ -559,7 +559,7 @@ func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens 
 	f := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.End}
 	f.Init(ops, cs)
 	cs = f.Rigid()
-	in := layout.Insets{Top: ui.Dp(4)}
+	in := layout.Inset{Top: ui.Dp(4)}
 	cs = in.Begin(c, ops, cs)
 	dims := fab(ops, cs, a.sendIco.image(c), theme.brand, c.Px(ui.Dp(56)))
 	pointer.EllipseAreaOp{Size: dims.Size}.Add(ops)
@@ -586,13 +586,13 @@ func (a *App) user(c ui.Config, ops *ui.Ops, cs layout.Constraints, index int) l
 	cs = elem.Rigid()
 	var dims layout.Dimens
 	{
-		in := layout.EqualInsets(ui.Dp(8))
+		in := layout.UniformInset(ui.Dp(8))
 		cs = in.Begin(c, ops, cs)
 		f := centerRowOpts()
 		f.Init(ops, cs)
 		cs = f.Rigid()
 		{
-			in := layout.Insets{Right: ui.Dp(8)}
+			in := layout.Inset{Right: ui.Dp(8)}
 			cc := clipCircle{}
 			cs = cc.Begin(ops, in.Begin(c, ops, cs))
 			sz := image.Point{X: c.Px(ui.Dp(48)), Y: c.Px(ui.Dp(48))}
@@ -615,7 +615,7 @@ func (a *App) user(c ui.Config, ops *ui.Ops, cs layout.Constraints, index int) l
 				cs = f.Flexible(1)
 				cs.Width.Min = cs.Width.Max
 				al := layout.Align{Alignment: layout.E}
-				in := layout.Insets{Left: ui.Dp(2)}
+				in := layout.Inset{Left: ui.Dp(2)}
 				cs = in.Begin(c, ops, al.Begin(ops, cs))
 				dims = text.Label{Material: theme.text, Face: a.face(fonts.regular, 10), Text: "3 hours ago"}.Layout(ops, cs)
 				dims = al.End(in.End(dims))
@@ -624,7 +624,7 @@ func (a *App) user(c ui.Config, ops *ui.Ops, cs layout.Constraints, index int) l
 			}
 			c1 := f.End(dims)
 			cs = f.Rigid()
-			in := layout.Insets{Top: ui.Dp(4)}
+			in := layout.Inset{Top: ui.Dp(4)}
 			cs = in.Begin(c, ops, cs)
 			dims = text.Label{Material: theme.tertText, Face: a.face(fonts.regular, 12), Text: u.company}.Layout(ops, cs)
 			dims = in.End(dims)
