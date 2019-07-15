@@ -228,7 +228,7 @@ func (a *App) run() error {
 			case app.DrawEvent:
 				ops.Reset()
 				a.cfg = e.Config
-				cs := layout.ExactConstraints(e.Size)
+				cs := layout.RigidConstraints(e.Size)
 				a.Layout(ops, cs)
 				if a.profiling {
 					a.layoutTimings(ops, cs)
@@ -457,7 +457,7 @@ func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout
 	sz := c.Px(ui.Dp(48))
 	cc := clipCircle{}
 	cs = cc.Begin(ops, cs)
-	cs = cs.Exact(sz, sz)
+	cs = layout.RigidConstraints(cs.Constrain(image.Point{X: sz, Y: sz}))
 	dims := widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(c, ops, cs)
 	dims = cc.End(dims)
 	c1 := f.End(dims)
@@ -513,7 +513,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			cs.Width.Min = cs.Width.Max
 			in := layout.EqualInsets(ui.Dp(16))
 			sz := c.Px(ui.Dp(200))
-			cs = cs.Exact(sz, sz)
+			cs = layout.RigidConstraints(cs.Constrain(image.Point{X: sz, Y: sz}))
 			dims = a.edit.Layout(ops, in.Begin(c, ops, cs))
 			dims = in.End(dims)
 		}
@@ -595,7 +595,8 @@ func (a *App) user(c ui.Config, ops *ui.Ops, cs layout.Constraints, index int) l
 			in := layout.Insets{Right: ui.Dp(8)}
 			cc := clipCircle{}
 			cs = cc.Begin(ops, in.Begin(c, ops, cs))
-			cs = cs.Exact(c.Px(ui.Dp(48)), c.Px(ui.Dp(48)))
+			sz := image.Point{X: c.Px(ui.Dp(48)), Y: c.Px(ui.Dp(48))}
+			cs = layout.RigidConstraints(cs.Constrain(sz))
 			dims = widget.Image{Src: u.avatar, Rect: u.avatar.Bounds()}.Layout(c, ops, cs)
 			dims = in.End(cc.End(dims))
 		}
