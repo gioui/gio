@@ -51,7 +51,7 @@ func RigidConstraints(size image.Point) Constraints {
 	}
 }
 
-type Insets struct {
+type Inset struct {
 	Top, Right, Bottom, Left ui.Value
 
 	top, right, bottom, left int
@@ -60,7 +60,7 @@ type Insets struct {
 	cs                       Constraints
 }
 
-func (in *Insets) Begin(c ui.Config, ops *ui.Ops, cs Constraints) Constraints {
+func (in *Inset) Begin(c ui.Config, ops *ui.Ops, cs Constraints) Constraints {
 	if in.begun {
 		panic("must End before Begin")
 	}
@@ -97,7 +97,7 @@ func (in *Insets) Begin(c ui.Config, ops *ui.Ops, cs Constraints) Constraints {
 	return mcs
 }
 
-func (in *Insets) End(dims Dimens) Dimens {
+func (in *Inset) End(dims Dimens) Dimens {
 	if !in.begun {
 		panic("must Begin before End")
 	}
@@ -110,8 +110,10 @@ func (in *Insets) End(dims Dimens) Dimens {
 	}
 }
 
-func EqualInsets(v ui.Value) Insets {
-	return Insets{Top: v, Right: v, Bottom: v, Left: v}
+// UniformInset returns an Inset with a single inset applied to all
+// edges.
+func UniformInset(v ui.Value) Inset {
+	return Inset{Top: v, Right: v, Bottom: v, Left: v}
 }
 
 type Align struct {
