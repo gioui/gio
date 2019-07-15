@@ -94,7 +94,7 @@ func (f *Flex) Flexible(weight float32) Constraints {
 	if mainc.Max != ui.Inf && mainc.Max > f.size {
 		maxSize := mainc.Max - f.size
 		flexSize = mainc.Max - f.rigidSize
-		flexSize = int(float32(flexSize) * weight)
+		flexSize = int(float32(flexSize)*weight + .5)
 		if flexSize > maxSize {
 			flexSize = maxSize
 		}
