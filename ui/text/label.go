@@ -18,7 +18,7 @@ import (
 
 type Label struct {
 	Face      Face
-	Material  ui.BlockOp
+	Material  ui.MacroOp
 	Alignment Alignment
 	Text      string
 	MaxLines  int

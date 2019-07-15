@@ -20,7 +20,7 @@ type Stack struct {
 }
 
 type StackChild struct {
-	block ui.BlockOp
+	macro ui.MacroOp
 	dims  Dimens
 }
 
@@ -54,7 +54,7 @@ func (s *Stack) begin() {
 		panic("must End before adding a child")
 	}
 	s.begun = true
-	s.ops.Begin()
+	s.ops.Record()
 }
 
 func (s *Stack) Rigid() Constraints {
@@ -71,7 +71,7 @@ func (s *Stack) Expand() Constraints {
 }
 
 func (s *Stack) End(dims Dimens) StackChild {
-	b := s.ops.End()
+	b := s.ops.Stop()
 	s.begun = false
 	if w := dims.Size.X; w > s.maxSZ.X {
 		s.maxSZ.X = w
@@ -105,7 +105,7 @@ func (s *Stack) Layout(children ...StackChild) Dimens {
 		}
 		ui.PushOp{}.Add(s.ops)
 		ui.TransformOp{Transform: ui.Offset(toPointF(p))}.Add(s.ops)
-		ch.block.Add(s.ops)
+		ch.macro.Add(s.ops)
 		ui.PopOp{}.Add(s.ops)
 	}
 	b := s.baseline

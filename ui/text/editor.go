@@ -28,9 +28,9 @@ type Editor struct {
 	SingleLine bool
 	Submit     bool
 
-	Material     ui.BlockOp
+	Material     ui.MacroOp
 	Hint         string
-	HintMaterial ui.BlockOp
+	HintMaterial ui.MacroOp
 
 	oldScale          int
 	blinkStart        time.Time

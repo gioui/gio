@@ -14,7 +14,7 @@ import (
 
 type scrollChild struct {
 	size  image.Point
-	block ui.BlockOp
+	macro ui.MacroOp
 }
 
 type List struct {
@@ -70,7 +70,7 @@ func (l *List) Init(ops *ui.Ops, cs Constraints, len int) {
 	if l.first > len {
 		l.first = len
 	}
-	ops.Begin()
+	ops.Record()
 	l.Next()
 }
 
@@ -103,7 +103,7 @@ func (l *List) Next() {
 		i = l.len - 1 - i
 	}
 	l.index = i
-	l.ops.Begin()
+	l.ops.Record()
 }
 
 // Index is the current element index.
@@ -146,8 +146,8 @@ func (l *List) next() (int, bool) {
 
 // Elem completes an element.
 func (l *List) Elem(dims Dimens) {
-	block := l.ops.End()
-	child := scrollChild{dims.Size, block}
+	macro := l.ops.Stop()
+	child := scrollChild{dims.Size, macro}
 	switch l.dir {
 	case iterateForward:
 		mainSize := axisMain(l.Axis, child.size)
@@ -227,7 +227,7 @@ func (l *List) Layout() Dimens {
 		ui.TransformOp{
 			Transform: ui.Offset(toPointF(axisPoint(l.Axis, transPos, cross))),
 		}.Add(ops)
-		child.block.Add(ops)
+		child.macro.Add(ops)
 		ui.PopOp{}.Add(ops)
 		pos += childSize
 	}
@@ -237,9 +237,9 @@ func (l *List) Layout() Dimens {
 		l.scroll.Stop()
 	}
 	dims := axisPoint(l.Axis, mainc.Constrain(pos), maxCross)
-	block := ops.End()
+	macro := ops.Stop()
 	pointer.RectAreaOp{Size: dims}.Add(ops)
 	l.scroll.Add(ops)
-	block.Add(ops)
+	macro.Add(ops)
 	return Dimens{Size: dims}
 }

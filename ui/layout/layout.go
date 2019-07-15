@@ -129,7 +129,7 @@ func (a *Align) Begin(ops *ui.Ops, cs Constraints) Constraints {
 	a.begun = true
 	a.ops = ops
 	a.cs = cs
-	ops.Begin()
+	ops.Record()
 	cs.Width.Min = 0
 	cs.Height.Min = 0
 	return cs
@@ -141,7 +141,7 @@ func (a *Align) End(dims Dimens) Dimens {
 	}
 	a.begun = false
 	ops := a.ops
-	block := ops.End()
+	macro := ops.Stop()
 	sz := dims.Size
 	if sz.X < a.cs.Width.Min {
 		sz.X = a.cs.Width.Min
@@ -164,7 +164,7 @@ func (a *Align) End(dims Dimens) Dimens {
 	}
 	ui.PushOp{}.Add(ops)
 	ui.TransformOp{Transform: ui.Offset(toPointF(p))}.Add(ops)
-	block.Add(ops)
+	macro.Add(ops)
 	ui.PopOp{}.Add(ops)
 	return Dimens{
 		Size:     sz,

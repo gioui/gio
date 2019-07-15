@@ -24,7 +24,7 @@ type Flex struct {
 }
 
 type FlexChild struct {
-	block ui.BlockOp
+	macro ui.MacroOp
 	dims  Dimens
 }
 
@@ -74,7 +74,7 @@ func (f *Flex) begin(mode flexMode) {
 		panic("must End before adding a child")
 	}
 	f.mode = mode
-	f.ops.Begin()
+	f.ops.Record()
 }
 
 func (f *Flex) Rigid() Constraints {
@@ -107,7 +107,7 @@ func (f *Flex) End(dims Dimens) FlexChild {
 	if f.mode <= modeBegun {
 		panic("End called without an active child")
 	}
-	block := f.ops.End()
+	macro := f.ops.Stop()
 	sz := axisMain(f.Axis, dims.Size)
 	f.size += sz
 	if f.mode == modeRigid {
@@ -120,7 +120,7 @@ func (f *Flex) End(dims Dimens) FlexChild {
 	if b := dims.Baseline; b > f.maxBaseline {
 		f.maxBaseline = b
 	}
-	return FlexChild{block, dims}
+	return FlexChild{macro, dims}
 }
 
 func (f *Flex) Layout(children ...FlexChild) Dimens {
@@ -160,7 +160,7 @@ func (f *Flex) Layout(children ...FlexChild) Dimens {
 		ui.TransformOp{
 			Transform: ui.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))),
 		}.Add(f.ops)
-		child.block.Add(f.ops)
+		child.macro.Add(f.ops)
 		ui.PopOp{}.Add(f.ops)
 		mainSize += axisMain(f.Axis, dims.Size)
 		if i < len(children)-1 {

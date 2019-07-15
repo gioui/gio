@@ -10,7 +10,7 @@ import (
 
 // Ops holds a list of serialized Ops.
 type Ops struct {
-	// Stack of block start indices.
+	// Stack of macro start indices.
 	stack []pc
 	ops   opsData
 
@@ -30,7 +30,7 @@ type opsData struct {
 // OpsReader parses an ops list. Internal use only.
 type OpsReader struct {
 	pc    pc
-	stack []block
+	stack []macro
 	ops   *opsData
 }
 
@@ -49,7 +49,7 @@ type OpKey struct {
 	version int
 }
 
-type block struct {
+type macro struct {
 	ops   *opsData
 	retPC pc
 	endPC pc
@@ -64,13 +64,13 @@ type PushOp struct{}
 
 type PopOp struct{}
 
-type BlockOp struct {
+type MacroOp struct {
 	ops     *opsData
 	version int
 	pc      pc
 }
 
-type opBlockDef struct {
+type opMacroDef struct {
 	endpc pc
 }
 
@@ -86,11 +86,12 @@ func (p PopOp) Add(o *Ops) {
 	o.Write([]byte{byte(ops.TypePop)})
 }
 
-// Begin a block of ops.
-func (o *Ops) Begin() {
+// Record starts recording a macro. Multiple simultaneous
+// recordings are supported. Stop ends the most recent.
+func (o *Ops) Record() {
 	o.stack = append(o.stack, o.ops.pc())
-	// Make room for a block definition. Filled out in End.
-	o.Write(make([]byte, ops.TypeBlockDefLen))
+	// Make room for a macro definition. Filled out in Stop.
+	o.Write(make([]byte, ops.TypeMacroDefLen))
 }
 
 func (op *opAux) decode(data []byte) {
@@ -103,14 +104,14 @@ func (op *opAux) decode(data []byte) {
 	}
 }
 
-func (op *opBlockDef) decode(data []byte) {
-	if ops.OpType(data[0]) != ops.TypeBlockDef {
+func (op *opMacroDef) decode(data []byte) {
+	if ops.OpType(data[0]) != ops.TypeMacroDef {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
 	dataIdx := int(bo.Uint32(data[1:]))
 	refsIdx := int(bo.Uint32(data[5:]))
-	*op = opBlockDef{
+	*op = opMacroDef{
 		endpc: pc{
 			data: dataIdx,
 			refs: refsIdx,
@@ -118,22 +119,22 @@ func (op *opBlockDef) decode(data []byte) {
 	}
 }
 
-// End the most recent block and return
-// an op for invoking the completed block.
-func (o *Ops) End() BlockOp {
+// Stop the most recent recording and return the macro for later
+// use.
+func (o *Ops) Stop() MacroOp {
 	if len(o.stack) == 0 {
-		panic(errors.New("End with no matching Begin"))
+		panic(errors.New("not recording a macro"))
 	}
 	start := o.stack[len(o.stack)-1]
 	o.stack = o.stack[:len(o.stack)-1]
 	pc := o.ops.pc()
-	// Write the block header reserved in Begin.
-	data := o.ops.data[start.data : start.data+ops.TypeBlockDefLen]
-	data[0] = byte(ops.TypeBlockDef)
+	// Write the macro header reserved in Begin.
+	data := o.ops.data[start.data : start.data+ops.TypeMacroDefLen]
+	data[0] = byte(ops.TypeMacroDef)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(pc.data))
 	bo.PutUint32(data[5:], uint32(pc.refs))
-	return BlockOp{ops: &o.ops, pc: start, version: o.ops.version}
+	return MacroOp{ops: &o.ops, pc: start, version: o.ops.version}
 }
 
 // Reset the Ops, preparing it for re-use.
@@ -198,15 +199,15 @@ func (d *opsData) pc() pc {
 	return pc{data: len(d.data), refs: len(d.refs)}
 }
 
-func (b *BlockOp) decode(data []byte, refs []interface{}) {
-	if ops.OpType(data[0]) != ops.TypeBlock {
+func (b *MacroOp) decode(data []byte, refs []interface{}) {
+	if ops.OpType(data[0]) != ops.TypeMacro {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
 	dataIdx := int(bo.Uint32(data[1:]))
 	refsIdx := int(bo.Uint32(data[5:]))
 	version := int(bo.Uint32(data[9:]))
-	*b = BlockOp{
+	*b = MacroOp{
 		ops: refs[0].(*opsData),
 		pc: pc{
 			data: dataIdx,
@@ -216,12 +217,12 @@ func (b *BlockOp) decode(data []byte, refs []interface{}) {
 	}
 }
 
-func (b BlockOp) Add(o *Ops) {
+func (b MacroOp) Add(o *Ops) {
 	if b.ops == nil {
 		return
 	}
-	data := make([]byte, ops.TypeBlockLen)
-	data[0] = byte(ops.TypeBlock)
+	data := make([]byte, ops.TypeMacroLen)
+	data[0] = byte(ops.TypeMacro)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(b.pc.data))
 	bo.PutUint32(data[5:], uint32(b.pc.refs))
@@ -272,33 +273,33 @@ func (r *OpsReader) Decode() (EncodedOp, bool) {
 			op.decode(data)
 			n += op.len
 			data = r.ops.data[r.pc.data : r.pc.data+n]
-		case ops.TypeBlock:
-			var op BlockOp
+		case ops.TypeMacro:
+			var op MacroOp
 			op.decode(data, refs)
-			blockOps := op.ops
-			if ops.OpType(blockOps.data[op.pc.data]) != ops.TypeBlockDef {
-				panic("invalid block reference")
+			macroOps := op.ops
+			if ops.OpType(macroOps.data[op.pc.data]) != ops.TypeMacroDef {
+				panic("invalid macro reference")
 			}
 			if op.version != op.ops.version {
-				panic("invalid BlockOp reference to reset Ops")
+				panic("invalid MacroOp reference to reset Ops")
 			}
-			var opDef opBlockDef
-			opDef.decode(blockOps.data[op.pc.data : op.pc.data+ops.TypeBlockDef.Size()])
+			var opDef opMacroDef
+			opDef.decode(macroOps.data[op.pc.data : op.pc.data+ops.TypeMacroDef.Size()])
 			retPC := r.pc
 			retPC.data += n
 			retPC.refs += nrefs
-			r.stack = append(r.stack, block{
+			r.stack = append(r.stack, macro{
 				ops:   r.ops,
 				retPC: retPC,
 				endPC: opDef.endpc,
 			})
-			r.ops = blockOps
+			r.ops = macroOps
 			r.pc = op.pc
-			r.pc.data += ops.TypeBlockDef.Size()
-			r.pc.refs += ops.TypeBlockDef.NumRefs()
+			r.pc.data += ops.TypeMacroDef.Size()
+			r.pc.refs += ops.TypeMacroDef.NumRefs()
 			continue
-		case ops.TypeBlockDef:
-			var op opBlockDef
+		case ops.TypeMacroDef:
+			var op opMacroDef
 			op.decode(data)
 			r.pc = op.endpc
 			continue

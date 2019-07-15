@@ -40,7 +40,7 @@ type LayoutOptions struct {
 
 type Face interface {
 	Layout(str string, opts LayoutOptions) *Layout
-	Path(str String) ui.BlockOp
+	Path(str String) ui.MacroOp
 }
 
 type Alignment uint8
