@@ -231,15 +231,22 @@ func (b BlockOp) Add(o *Ops) {
 
 // Reset start reading from the op list.
 func (r *OpsReader) Reset(ops *Ops) {
+	r.stack = r.stack[:0]
+	r.pc = pc{}
+	r.ops = nil
+	if ops == nil {
+		return
+	}
 	if n := len(ops.stack); n > 0 {
 		panic(fmt.Errorf("%d Begin(s) not matched with End", n))
 	}
 	r.ops = &ops.ops
-	r.stack = r.stack[:0]
-	r.pc = pc{}
 }
 
 func (r *OpsReader) Decode() (EncodedOp, bool) {
+	if r.ops == nil {
+		return EncodedOp{}, false
+	}
 	for {
 		if len(r.stack) > 0 {
 			b := r.stack[len(r.stack)-1]
