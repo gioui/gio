@@ -126,10 +126,10 @@ var fonts struct {
 }
 
 var theme struct {
-	text     ui.BlockOp
-	tertText ui.BlockOp
-	brand    ui.BlockOp
-	white    ui.BlockOp
+	text     ui.MacroOp
+	tertText ui.MacroOp
+	brand    ui.MacroOp
+	white    ui.MacroOp
 }
 
 func main() {
@@ -173,10 +173,10 @@ func init() {
 	}()
 }
 
-func colorMaterial(ops *ui.Ops, color color.RGBA) ui.BlockOp {
-	ops.Begin()
+func colorMaterial(ops *ui.Ops, color color.RGBA) ui.MacroOp {
+	ops.Record()
 	gdraw.ColorOp{Color: color}.Add(ops)
-	return ops.End()
+	return ops.Stop()
 }
 
 func (a *App) run() error {
@@ -643,7 +643,7 @@ func (a *App) user(c ui.Config, ops *ui.Ops, cs layout.Constraints, index int) l
 }
 
 type fill struct {
-	material ui.BlockOp
+	material ui.MacroOp
 }
 
 func (f fill) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
@@ -680,13 +680,13 @@ type clipCircle struct {
 
 func (c *clipCircle) Begin(ops *ui.Ops, cs layout.Constraints) layout.Constraints {
 	c.ops = ops
-	ops.Begin()
+	ops.Record()
 	return cs
 }
 
 func (c *clipCircle) End(dims layout.Dimens) layout.Dimens {
 	ops := c.ops
-	block := ops.End()
+	macro := ops.Stop()
 	max := dims.Size.X
 	if dy := dims.Size.Y; dy > max {
 		max = dy
@@ -695,12 +695,12 @@ func (c *clipCircle) End(dims layout.Dimens) layout.Dimens {
 	rr := szf * .5
 	ui.PushOp{}.Add(ops)
 	rrect(ops, szf, szf, rr, rr, rr, rr)
-	block.Add(ops)
+	macro.Add(ops)
 	ui.PopOp{}.Add(ops)
 	return dims
 }
 
-func fab(ops *ui.Ops, cs layout.Constraints, ico image.Image, mat ui.BlockOp, size int) layout.Dimens {
+func fab(ops *ui.Ops, cs layout.Constraints, ico image.Image, mat ui.MacroOp, size int) layout.Dimens {
 	dp := image.Point{X: (size - ico.Bounds().Dx()) / 2, Y: (size - ico.Bounds().Dy()) / 2}
 	dims := image.Point{X: size, Y: size}
 	rr := float32(size) * .5

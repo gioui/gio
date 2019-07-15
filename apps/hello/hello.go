@@ -54,9 +54,9 @@ func loop(w *app.Window) error {
 			cfg = e.Config
 			cs := layout.RigidConstraints(e.Size)
 			ops.Reset()
-			ops.Begin()
+			ops.Record()
 			draw.ColorOp{Color: maroon}.Add(ops)
-			material := ops.End()
+			material := ops.Stop()
 			text.Label{Material: material, Face: face, Alignment: text.Center, Text: message}.Layout(ops, cs)
 			w.Draw(ops)
 			faces.Frame()
