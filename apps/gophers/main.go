@@ -696,10 +696,11 @@ func (c *clipCircle) End(dims layout.Dimens) layout.Dimens {
 	}
 	szf := float32(max)
 	rr := szf * .5
-	ui.PushOp{}.Add(ops)
+	var stack ui.StackOp
+	stack.Push(ops)
 	rrect(ops, szf, szf, rr, rr, rr, rr)
 	c.m.Add(ops)
-	ui.PopOp{}.Add(ops)
+	stack.Pop()
 	return dims
 }
 
