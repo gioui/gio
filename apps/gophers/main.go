@@ -174,9 +174,11 @@ func init() {
 }
 
 func colorMaterial(ops *ui.Ops, color color.RGBA) ui.MacroOp {
-	ops.Record()
+	var mat ui.MacroOp
+	mat.Record(ops)
 	gdraw.ColorOp{Color: color}.Add(ops)
-	return ops.Stop()
+	mat.Stop()
+	return mat
 }
 
 func (a *App) run() error {
@@ -675,18 +677,19 @@ func baseline() layout.Flex {
 }
 
 type clipCircle struct {
+	m   ui.MacroOp
 	ops *ui.Ops
 }
 
 func (c *clipCircle) Begin(ops *ui.Ops, cs layout.Constraints) layout.Constraints {
 	c.ops = ops
-	ops.Record()
+	c.m.Record(ops)
 	return cs
 }
 
 func (c *clipCircle) End(dims layout.Dimens) layout.Dimens {
+	c.m.Stop()
 	ops := c.ops
-	macro := ops.Stop()
 	max := dims.Size.X
 	if dy := dims.Size.Y; dy > max {
 		max = dy
@@ -695,7 +698,7 @@ func (c *clipCircle) End(dims layout.Dimens) layout.Dimens {
 	rr := szf * .5
 	ui.PushOp{}.Add(ops)
 	rrect(ops, szf, szf, rr, rr, rr, rr)
-	macro.Add(ops)
+	c.m.Add(ops)
 	ui.PopOp{}.Add(ops)
 	return dims
 }
