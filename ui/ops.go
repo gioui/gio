@@ -94,6 +94,7 @@ func (s *StackOp) Pop() {
 	if d != s.depth {
 		panic("unbalanced pop")
 	}
+	s.active = false
 	s.ops.stackDepth--
 	s.ops.Write([]byte{byte(ops.TypePop)})
 }
