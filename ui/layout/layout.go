@@ -8,11 +8,15 @@ import (
 	"gioui.org/ui"
 )
 
+// Constraints represent a set of acceptable ranges for
+// a widget's width and height.
 type Constraints struct {
 	Width  Constraint
 	Height Constraint
 }
 
+// Constraint is a range of acceptable sizes in a single
+// dimension.
 type Constraint struct {
 	Min, Max int
 }

@@ -10,8 +10,8 @@ type Queue interface {
 	Events(k Key) []Event
 }
 
-// Key is the stable identifier for an event handler. For a handler h, the
-// key is typically &h.
+// Key is the stable identifier for an event handler.
+// For a handler h, the key is typically &h.
 type Key interface{}
 
 // Event is the marker interface for input events.
