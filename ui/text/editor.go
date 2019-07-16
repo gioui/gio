@@ -194,7 +194,8 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		Width:     e.viewWidth(),
 		Offset:    off,
 	}
-	ui.PushOp{}.Add(ops)
+	var stack ui.StackOp
+	stack.Push(ops)
 	// Apply material. Set a default color in case the material is empty.
 	if e.rr.len() > 0 {
 		draw.ColorOp{Color: color.RGBA{A: 0xff}}.Add(ops)
@@ -208,11 +209,12 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		if !ok {
 			break
 		}
-		ui.PushOp{}.Add(ops)
+		var stack ui.StackOp
+		stack.Push(ops)
 		ui.TransformOp{Transform: ui.Offset(lineOff)}.Add(ops)
 		e.Face.Path(str).Add(ops)
 		draw.DrawOp{Rect: toRectF(clip).Sub(lineOff)}.Add(ops)
-		ui.PopOp{}.Add(ops)
+		stack.Pop()
 	}
 	if e.focused {
 		now := e.Config.Now()
@@ -245,7 +247,7 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			redraw.Add(ops)
 		}
 	}
-	ui.PopOp{}.Add(ops)
+	stack.Pop()
 
 	baseline := e.padTop + e.dims.Baseline
 	pointer.RectAreaOp{Size: e.viewSize}.Add(ops)

@@ -107,14 +107,15 @@ func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			break
 		}
 		lclip := toRectF(clip).Sub(off)
-		ui.PushOp{}.Add(ops)
+		var stack ui.StackOp
+		stack.Push(ops)
 		ui.TransformOp{Transform: ui.Offset(off)}.Add(ops)
 		l.Face.Path(str).Add(ops)
 		// Set a default color in case the material is empty.
 		draw.ColorOp{Color: color.RGBA{A: 0xff}}.Add(ops)
 		l.Material.Add(ops)
 		draw.DrawOp{Rect: lclip}.Add(ops)
-		ui.PopOp{}.Add(ops)
+		stack.Pop()
 	}
 	return dims
 }

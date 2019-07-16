@@ -104,10 +104,11 @@ func (s *Stack) Layout(children ...StackChild) Dimens {
 		case SW, S, SE:
 			p.Y = s.maxSZ.Y - sz.Y
 		}
-		ui.PushOp{}.Add(s.ops)
+		var stack ui.StackOp
+		stack.Push(s.ops)
 		ui.TransformOp{Transform: ui.Offset(toPointF(p))}.Add(s.ops)
 		ch.macro.Add(s.ops)
-		ui.PopOp{}.Add(s.ops)
+		stack.Pop()
 	}
 	b := s.baseline
 	if b == 0 {

@@ -54,8 +54,8 @@ func RigidConstraints(size image.Point) Constraints {
 type Inset struct {
 	Top, Right, Bottom, Left ui.Value
 
+	stack                    ui.StackOp
 	top, right, bottom, left int
-	ops                      *ui.Ops
 	begun                    bool
 	cs                       Constraints
 }
@@ -69,7 +69,6 @@ func (in *Inset) Begin(c ui.Config, ops *ui.Ops, cs Constraints) Constraints {
 	in.bottom = c.Px(in.Bottom)
 	in.left = c.Px(in.Left)
 	in.begun = true
-	in.ops = ops
 	in.cs = cs
 	mcs := cs
 	if mcs.Width.Max != ui.Inf {
@@ -92,7 +91,7 @@ func (in *Inset) Begin(c ui.Config, ops *ui.Ops, cs Constraints) Constraints {
 			mcs.Height.Max = mcs.Height.Min
 		}
 	}
-	ui.PushOp{}.Add(ops)
+	in.stack.Push(ops)
 	ui.TransformOp{Transform: ui.Offset(toPointF(image.Point{X: in.left, Y: in.top}))}.Add(ops)
 	return mcs
 }
@@ -102,8 +101,7 @@ func (in *Inset) End(dims Dimens) Dimens {
 		panic("must Begin before End")
 	}
 	in.begun = false
-	ops := in.ops
-	ui.PopOp{}.Add(ops)
+	in.stack.Pop()
 	return Dimens{
 		Size:     in.cs.Constrain(dims.Size.Add(image.Point{X: in.right + in.left, Y: in.top + in.bottom})),
 		Baseline: dims.Baseline + in.top,
@@ -165,10 +163,11 @@ func (a *Align) End(dims Dimens) Dimens {
 	case SW, S, SE:
 		p.Y = sz.Y - dims.Size.Y
 	}
-	ui.PushOp{}.Add(ops)
+	var stack ui.StackOp
+	stack.Push(ops)
 	ui.TransformOp{Transform: ui.Offset(toPointF(p))}.Add(ops)
 	a.macro.Add(ops)
-	ui.PopOp{}.Add(ops)
+	stack.Pop()
 	return Dimens{
 		Size:     sz,
 		Baseline: dims.Baseline,

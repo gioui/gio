@@ -157,12 +157,13 @@ func (f *Flex) Layout(children ...FlexChild) Dimens {
 				cross = f.maxBaseline - b
 			}
 		}
-		ui.PushOp{}.Add(f.ops)
+		var stack ui.StackOp
+		stack.Push(f.ops)
 		ui.TransformOp{
 			Transform: ui.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))),
 		}.Add(f.ops)
 		child.macro.Add(f.ops)
-		ui.PopOp{}.Add(f.ops)
+		stack.Pop()
 		mainSize += axisMain(f.Axis, dims.Size)
 		if i < len(children)-1 {
 			switch f.MainAxisAlignment {

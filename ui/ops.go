@@ -14,6 +14,8 @@ type Ops struct {
 	// Op references.
 	refs []interface{}
 
+	stackDepth int
+
 	inAux  bool
 	auxOff int
 	auxLen int
@@ -52,9 +54,11 @@ type pc struct {
 	refs int
 }
 
-type PushOp struct{}
-
-type PopOp struct{}
+type StackOp struct {
+	depth  int
+	active bool
+	ops    *Ops
+}
 
 type MacroOp struct {
 	recording bool
@@ -71,12 +75,27 @@ type opAux struct {
 	len int
 }
 
-func (p PushOp) Add(o *Ops) {
+func (s *StackOp) Push(o *Ops) {
+	if s.active {
+		panic("unbalanced push")
+	}
+	s.active = true
+	s.ops = o
+	o.stackDepth++
+	s.depth = o.stackDepth
 	o.Write([]byte{byte(ops.TypePush)})
 }
 
-func (p PopOp) Add(o *Ops) {
-	o.Write([]byte{byte(ops.TypePop)})
+func (s *StackOp) Pop() {
+	if !s.active {
+		panic("unbalanced pop")
+	}
+	d := s.ops.stackDepth
+	if d != s.depth {
+		panic("unbalanced pop")
+	}
+	s.ops.stackDepth--
+	s.ops.Write([]byte{byte(ops.TypePop)})
 }
 
 func (op *opAux) decode(data []byte) {
@@ -107,6 +126,7 @@ func (op *opMacroDef) decode(data []byte) {
 // Reset the Ops, preparing it for re-use.
 func (o *Ops) Reset() {
 	o.inAux = false
+	o.stackDepth = 0
 	// Leave references to the GC.
 	for i := range o.refs {
 		o.refs[i] = nil

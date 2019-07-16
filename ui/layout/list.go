@@ -224,13 +224,14 @@ func (l *List) Layout() Dimens {
 			Min: axisPoint(l.Axis, min, -ui.Inf),
 			Max: axisPoint(l.Axis, max, ui.Inf),
 		}
-		ui.PushOp{}.Add(ops)
+		var stack ui.StackOp
+		stack.Push(ops)
 		draw.RectClip(r).Add(ops)
 		ui.TransformOp{
 			Transform: ui.Offset(toPointF(axisPoint(l.Axis, transPos, cross))),
 		}.Add(ops)
 		child.macro.Add(ops)
-		ui.PopOp{}.Add(ops)
+		stack.Pop()
 		pos += childSize
 	}
 	atStart := l.first == 0 && l.offset <= 0
