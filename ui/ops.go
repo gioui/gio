@@ -11,27 +11,23 @@ import (
 // Ops holds a list of serialized Ops.
 type Ops struct {
 	// Stack of macro start indices.
-	stack []pc
-	ops   opsData
+	stack   []pc
+	version int
+	// Serialized ops.
+	data []byte
+	// Op references.
+	refs []interface{}
 
 	inAux  bool
 	auxOff int
 	auxLen int
 }
 
-type opsData struct {
-	version int
-	// Serialized ops.
-	data []byte
-	// Op references.
-	refs []interface{}
-}
-
 // OpsReader parses an ops list. Internal use only.
 type OpsReader struct {
 	pc    pc
 	stack []macro
-	ops   *opsData
+	ops   *Ops
 }
 
 // EncodedOp represents an encoded op returned by
@@ -44,13 +40,13 @@ type EncodedOp struct {
 
 // OpKey is a unique key for a given op. Internal use only.
 type OpKey struct {
-	ops     *opsData
+	ops     *Ops
 	pc      int
 	version int
 }
 
 type macro struct {
-	ops   *opsData
+	ops   *Ops
 	retPC pc
 	endPC pc
 }
@@ -65,7 +61,7 @@ type PushOp struct{}
 type PopOp struct{}
 
 type MacroOp struct {
-	ops     *opsData
+	ops     *Ops
 	version int
 	pc      pc
 }
@@ -89,7 +85,7 @@ func (p PopOp) Add(o *Ops) {
 // Record starts recording a macro. Multiple simultaneous
 // recordings are supported. Stop ends the most recent.
 func (o *Ops) Record() {
-	o.stack = append(o.stack, o.ops.pc())
+	o.stack = append(o.stack, o.pc())
 	// Make room for a macro definition. Filled out in Stop.
 	o.Write(make([]byte, ops.TypeMacroDefLen))
 }
@@ -127,21 +123,27 @@ func (o *Ops) Stop() MacroOp {
 	}
 	start := o.stack[len(o.stack)-1]
 	o.stack = o.stack[:len(o.stack)-1]
-	pc := o.ops.pc()
+	pc := o.pc()
 	// Write the macro header reserved in Begin.
-	data := o.ops.data[start.data : start.data+ops.TypeMacroDefLen]
+	data := o.data[start.data : start.data+ops.TypeMacroDefLen]
 	data[0] = byte(ops.TypeMacroDef)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(pc.data))
 	bo.PutUint32(data[5:], uint32(pc.refs))
-	return MacroOp{ops: &o.ops, pc: start, version: o.ops.version}
+	return MacroOp{ops: o, pc: start, version: o.version}
 }
 
 // Reset the Ops, preparing it for re-use.
 func (o *Ops) Reset() {
 	o.inAux = false
 	o.stack = o.stack[:0]
-	o.ops.reset()
+	// Leave references to the GC.
+	for i := range o.refs {
+		o.refs[i] = nil
+	}
+	o.data = o.data[:0]
+	o.refs = o.refs[:0]
+	o.version++
 }
 
 // Internal use only.
@@ -149,20 +151,10 @@ func (o *Ops) Aux() []byte {
 	if !o.inAux {
 		return nil
 	}
-	return o.ops.data[o.auxOff+ops.TypeAuxLen : o.auxOff+ops.TypeAuxLen+o.auxLen]
+	return o.data[o.auxOff+ops.TypeAuxLen : o.auxOff+ops.TypeAuxLen+o.auxLen]
 }
 
-func (d *opsData) reset() {
-	// Leave references to the GC.
-	for i := range d.refs {
-		d.refs[i] = nil
-	}
-	d.data = d.data[:0]
-	d.refs = d.refs[:0]
-	d.version++
-}
-
-func (d *opsData) write(op []byte, refs ...interface{}) {
+func (d *Ops) write(op []byte, refs ...interface{}) {
 	d.data = append(d.data, op...)
 	d.refs = append(d.refs, refs...)
 }
@@ -178,24 +170,24 @@ func (o *Ops) Write(op []byte, refs ...interface{}) {
 		op = op[1:]
 		if !o.inAux {
 			o.inAux = true
-			o.auxOff = o.ops.pc().data
+			o.auxOff = o.pc().data
 			o.auxLen = 0
 			header := make([]byte, ops.TypeAuxLen)
 			header[0] = byte(ops.TypeAux)
-			o.ops.write(header)
+			o.write(header)
 		}
 		o.auxLen += len(op)
 	default:
 		if o.inAux {
 			o.inAux = false
 			bo := binary.LittleEndian
-			bo.PutUint32(o.ops.data[o.auxOff+1:], uint32(o.auxLen))
+			bo.PutUint32(o.data[o.auxOff+1:], uint32(o.auxLen))
 		}
 	}
-	o.ops.write(op, refs...)
+	o.write(op, refs...)
 }
 
-func (d *opsData) pc() pc {
+func (d *Ops) pc() pc {
 	return pc{data: len(d.data), refs: len(d.refs)}
 }
 
@@ -208,7 +200,7 @@ func (b *MacroOp) decode(data []byte, refs []interface{}) {
 	refsIdx := int(bo.Uint32(data[5:]))
 	version := int(bo.Uint32(data[9:]))
 	*b = MacroOp{
-		ops: refs[0].(*opsData),
+		ops: refs[0].(*Ops),
 		pc: pc{
 			data: dataIdx,
 			refs: refsIdx,
@@ -241,7 +233,7 @@ func (r *OpsReader) Reset(ops *Ops) {
 	if n := len(ops.stack); n > 0 {
 		panic(fmt.Errorf("%d Begin(s) not matched with End", n))
 	}
-	r.ops = &ops.ops
+	r.ops = ops
 }
 
 func (r *OpsReader) Decode() (EncodedOp, bool) {
