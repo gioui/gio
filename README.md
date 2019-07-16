@@ -117,6 +117,10 @@ a directory ready to view in a browser:
 
 Open http://localhost:8080 in a browser to run the app.
 
+## Programs using Gio
+
+[Scatter](https://scatter.im), an implementation of the Signal protocol over email.
+
 ## Issues
 
 File bugs and TODOs through the the [issue tracker](https://todo.sr.ht/~eliasnaur/gio) or send an email
