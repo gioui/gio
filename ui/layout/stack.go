@@ -11,6 +11,7 @@ import (
 type Stack struct {
 	Alignment Direction
 
+	macro       ui.MacroOp
 	ops         *ui.Ops
 	constrained bool
 	cs          Constraints
@@ -54,7 +55,7 @@ func (s *Stack) begin() {
 		panic("must End before adding a child")
 	}
 	s.begun = true
-	s.ops.Record()
+	s.macro.Record(s.ops)
 }
 
 func (s *Stack) Rigid() Constraints {
@@ -71,7 +72,7 @@ func (s *Stack) Expand() Constraints {
 }
 
 func (s *Stack) End(dims Dimens) StackChild {
-	b := s.ops.Stop()
+	s.macro.Stop()
 	s.begun = false
 	if w := dims.Size.X; w > s.maxSZ.X {
 		s.maxSZ.X = w
@@ -84,7 +85,7 @@ func (s *Stack) End(dims Dimens) StackChild {
 			s.baseline = b
 		}
 	}
-	return StackChild{b, dims}
+	return StackChild{s.macro, dims}
 }
 
 func (s *Stack) Layout(children ...StackChild) Dimens {

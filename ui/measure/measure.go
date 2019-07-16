@@ -234,7 +234,8 @@ func textPath(ppem fixed.Int26_6, f *opentype, str text.String) ui.MacroOp {
 	builder.Init(ops)
 	var x fixed.Int26_6
 	var advIdx int
-	ops.Record()
+	var m ui.MacroOp
+	m.Record(ops)
 	for _, r := range str.String {
 		if !unicode.IsSpace(r) {
 			segs, ok := f.LoadGlyph(ppem, r)
@@ -287,5 +288,6 @@ func textPath(ppem fixed.Int26_6, f *opentype, str text.String) ui.MacroOp {
 		advIdx++
 	}
 	builder.End()
-	return ops.Stop()
+	m.Stop()
+	return m
 }

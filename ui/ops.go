@@ -2,16 +2,12 @@ package ui
 
 import (
 	"encoding/binary"
-	"errors"
-	"fmt"
 
 	"gioui.org/ui/internal/ops"
 )
 
 // Ops holds a list of serialized Ops.
 type Ops struct {
-	// Stack of macro start indices.
-	stack   []pc
 	version int
 	// Serialized ops.
 	data []byte
@@ -61,9 +57,10 @@ type PushOp struct{}
 type PopOp struct{}
 
 type MacroOp struct {
-	ops     *Ops
-	version int
-	pc      pc
+	recording bool
+	ops       *Ops
+	version   int
+	pc        pc
 }
 
 type opMacroDef struct {
@@ -80,14 +77,6 @@ func (p PushOp) Add(o *Ops) {
 
 func (p PopOp) Add(o *Ops) {
 	o.Write([]byte{byte(ops.TypePop)})
-}
-
-// Record starts recording a macro. Multiple simultaneous
-// recordings are supported. Stop ends the most recent.
-func (o *Ops) Record() {
-	o.stack = append(o.stack, o.pc())
-	// Make room for a macro definition. Filled out in Stop.
-	o.Write(make([]byte, ops.TypeMacroDefLen))
 }
 
 func (op *opAux) decode(data []byte) {
@@ -115,28 +104,9 @@ func (op *opMacroDef) decode(data []byte) {
 	}
 }
 
-// Stop the most recent recording and return the macro for later
-// use.
-func (o *Ops) Stop() MacroOp {
-	if len(o.stack) == 0 {
-		panic(errors.New("not recording a macro"))
-	}
-	start := o.stack[len(o.stack)-1]
-	o.stack = o.stack[:len(o.stack)-1]
-	pc := o.pc()
-	// Write the macro header reserved in Begin.
-	data := o.data[start.data : start.data+ops.TypeMacroDefLen]
-	data[0] = byte(ops.TypeMacroDef)
-	bo := binary.LittleEndian
-	bo.PutUint32(data[1:], uint32(pc.data))
-	bo.PutUint32(data[5:], uint32(pc.refs))
-	return MacroOp{ops: o, pc: start, version: o.version}
-}
-
 // Reset the Ops, preparing it for re-use.
 func (o *Ops) Reset() {
 	o.inAux = false
-	o.stack = o.stack[:0]
 	// Leave references to the GC.
 	for i := range o.refs {
 		o.refs[i] = nil
@@ -191,7 +161,35 @@ func (d *Ops) pc() pc {
 	return pc{data: len(d.data), refs: len(d.refs)}
 }
 
-func (b *MacroOp) decode(data []byte, refs []interface{}) {
+// Record a macro of operations.
+func (m *MacroOp) Record(o *Ops) {
+	if m.recording {
+		panic("already recording")
+	}
+	m.recording = true
+	m.ops = o
+	m.pc = o.pc()
+	// Make room for a macro definition. Filled out in Stop.
+	m.ops.Write(make([]byte, ops.TypeMacroDefLen))
+}
+
+// Stop recording the macro.
+func (m *MacroOp) Stop() {
+	if !m.recording {
+		panic("not recording")
+	}
+	m.recording = false
+	pc := m.ops.pc()
+	// Fill out the macro definition reserved in Record.
+	data := m.ops.data[m.pc.data : m.pc.data+ops.TypeMacroDefLen]
+	data[0] = byte(ops.TypeMacroDef)
+	bo := binary.LittleEndian
+	bo.PutUint32(data[1:], uint32(pc.data))
+	bo.PutUint32(data[5:], uint32(pc.refs))
+	m.version = m.ops.version
+}
+
+func (m *MacroOp) decode(data []byte, refs []interface{}) {
 	if ops.OpType(data[0]) != ops.TypeMacro {
 		panic("invalid op")
 	}
@@ -199,7 +197,7 @@ func (b *MacroOp) decode(data []byte, refs []interface{}) {
 	dataIdx := int(bo.Uint32(data[1:]))
 	refsIdx := int(bo.Uint32(data[5:]))
 	version := int(bo.Uint32(data[9:]))
-	*b = MacroOp{
+	*m = MacroOp{
 		ops: refs[0].(*Ops),
 		pc: pc{
 			data: dataIdx,
@@ -209,17 +207,20 @@ func (b *MacroOp) decode(data []byte, refs []interface{}) {
 	}
 }
 
-func (b MacroOp) Add(o *Ops) {
-	if b.ops == nil {
+func (m MacroOp) Add(o *Ops) {
+	if m.recording {
+		panic("a recording is in progress")
+	}
+	if m.ops == nil {
 		return
 	}
 	data := make([]byte, ops.TypeMacroLen)
 	data[0] = byte(ops.TypeMacro)
 	bo := binary.LittleEndian
-	bo.PutUint32(data[1:], uint32(b.pc.data))
-	bo.PutUint32(data[5:], uint32(b.pc.refs))
-	bo.PutUint32(data[9:], uint32(b.version))
-	o.Write(data, b.ops)
+	bo.PutUint32(data[1:], uint32(m.pc.data))
+	bo.PutUint32(data[5:], uint32(m.pc.refs))
+	bo.PutUint32(data[9:], uint32(m.version))
+	o.Write(data, m.ops)
 }
 
 // Reset start reading from the op list.
@@ -229,9 +230,6 @@ func (r *OpsReader) Reset(ops *Ops) {
 	r.ops = nil
 	if ops == nil {
 		return
-	}
-	if n := len(ops.stack); n > 0 {
-		panic(fmt.Errorf("%d Begin(s) not matched with End", n))
 	}
 	r.ops = ops
 }

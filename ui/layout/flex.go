@@ -14,6 +14,7 @@ type Flex struct {
 	MainAxisAlignment  MainAxisAlignment
 	CrossAxisAlignment CrossAxisAlignment
 
+	macro       ui.MacroOp
 	ops         *ui.Ops
 	cs          Constraints
 	mode        flexMode
@@ -74,7 +75,7 @@ func (f *Flex) begin(mode flexMode) {
 		panic("must End before adding a child")
 	}
 	f.mode = mode
-	f.ops.Record()
+	f.macro.Record(f.ops)
 }
 
 func (f *Flex) Rigid() Constraints {
@@ -107,7 +108,7 @@ func (f *Flex) End(dims Dimens) FlexChild {
 	if f.mode <= modeBegun {
 		panic("End called without an active child")
 	}
-	macro := f.ops.Stop()
+	f.macro.Stop()
 	sz := axisMain(f.Axis, dims.Size)
 	f.size += sz
 	if f.mode == modeRigid {
@@ -120,7 +121,7 @@ func (f *Flex) End(dims Dimens) FlexChild {
 	if b := dims.Baseline; b > f.maxBaseline {
 		f.maxBaseline = b
 	}
-	return FlexChild{macro, dims}
+	return FlexChild{f.macro, dims}
 }
 
 func (f *Flex) Layout(children ...FlexChild) Dimens {

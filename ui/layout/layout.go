@@ -119,6 +119,7 @@ func UniformInset(v ui.Value) Inset {
 type Align struct {
 	Alignment Direction
 
+	macro ui.MacroOp
 	ops   *ui.Ops
 	begun bool
 	cs    Constraints
@@ -131,7 +132,7 @@ func (a *Align) Begin(ops *ui.Ops, cs Constraints) Constraints {
 	a.begun = true
 	a.ops = ops
 	a.cs = cs
-	ops.Record()
+	a.macro.Record(ops)
 	cs.Width.Min = 0
 	cs.Height.Min = 0
 	return cs
@@ -143,7 +144,7 @@ func (a *Align) End(dims Dimens) Dimens {
 	}
 	a.begun = false
 	ops := a.ops
-	macro := ops.Stop()
+	a.macro.Stop()
 	sz := dims.Size
 	if sz.X < a.cs.Width.Min {
 		sz.X = a.cs.Width.Min
@@ -166,7 +167,7 @@ func (a *Align) End(dims Dimens) Dimens {
 	}
 	ui.PushOp{}.Add(ops)
 	ui.TransformOp{Transform: ui.Offset(toPointF(p))}.Add(ops)
-	macro.Add(ops)
+	a.macro.Add(ops)
 	ui.PopOp{}.Add(ops)
 	return Dimens{
 		Size:     sz,

@@ -27,6 +27,8 @@ type List struct {
 	// The distance scrolled since last call to Init.
 	Distance int
 
+	macro     ui.MacroOp
+	child     ui.MacroOp
 	ops       *ui.Ops
 	scroll    gesture.Scroll
 	scrollDir int
@@ -70,7 +72,7 @@ func (l *List) Init(ops *ui.Ops, cs Constraints, len int) {
 	if l.first > len {
 		l.first = len
 	}
-	ops.Record()
+	l.macro.Record(ops)
 	l.Next()
 }
 
@@ -103,7 +105,7 @@ func (l *List) Next() {
 		i = l.len - 1 - i
 	}
 	l.index = i
-	l.ops.Record()
+	l.child.Record(l.ops)
 }
 
 // Index is the current element index.
@@ -146,8 +148,8 @@ func (l *List) next() (int, bool) {
 
 // Elem completes an element.
 func (l *List) Elem(dims Dimens) {
-	macro := l.ops.Stop()
-	child := scrollChild{dims.Size, macro}
+	l.child.Stop()
+	child := scrollChild{dims.Size, l.child}
 	switch l.dir {
 	case iterateForward:
 		mainSize := axisMain(l.Axis, child.size)
@@ -237,9 +239,9 @@ func (l *List) Layout() Dimens {
 		l.scroll.Stop()
 	}
 	dims := axisPoint(l.Axis, mainc.Constrain(pos), maxCross)
-	macro := ops.Stop()
+	l.macro.Stop()
 	pointer.RectAreaOp{Size: dims}.Add(ops)
 	l.scroll.Add(ops)
-	macro.Add(ops)
+	l.macro.Add(ops)
 	return Dimens{Size: dims}
 }
