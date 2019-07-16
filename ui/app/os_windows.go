@@ -242,7 +242,7 @@ func createNativeWindow(opts *WindowOptions) (*window, error) {
 		return nil, err
 	}
 	w := &window{
-		hwnd:  hwnd,
+		hwnd: hwnd,
 	}
 	winMap[hwnd] = w
 	w.hdc, err = getDC(hwnd)
