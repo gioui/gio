@@ -29,11 +29,11 @@ type Window struct {
 	gpu        *gpu.GPU
 	inputState key.TextInputState
 
-	out     chan Event
-	in      chan Event
-	ack     chan struct{}
-	redraws chan struct{}
-	frames  chan *ui.Ops
+	out         chan Event
+	in          chan Event
+	ack         chan struct{}
+	invalidates chan struct{}
+	frames      chan *ui.Ops
 
 	stage        Stage
 	animating    bool
@@ -81,11 +81,11 @@ func NewWindow(opts *WindowOptions) *Window {
 	}
 
 	w := &Window{
-		in:      make(chan Event),
-		out:     make(chan Event),
-		ack:     make(chan struct{}),
-		redraws: make(chan struct{}, 1),
-		frames:  make(chan *ui.Ops),
+		in:          make(chan Event),
+		out:         make(chan Event),
+		ack:         make(chan struct{}),
+		invalidates: make(chan struct{}, 1),
+		frames:      make(chan *ui.Ops),
 	}
 	go w.run(opts)
 	return w
@@ -133,15 +133,18 @@ func (w *Window) draw(size image.Point, frame *ui.Ops) {
 		w.router.AddProfile(system.ProfileEvent{Timings: timings})
 		w.setNextFrame(time.Time{})
 	}
-	if t, ok := w.router.RedrawTime(); ok {
+	if t, ok := w.router.WakeupTime(); ok {
 		w.setNextFrame(t)
 	}
 	w.updateAnimation()
 }
 
-func (w *Window) Redraw() {
+// Invalidate the current window such that a DrawEvent will be generated
+// immediately. If the window is not active, the redraw will trigger
+// when the window becomes active.
+func (w *Window) Invalidate() {
 	select {
-	case w.redraws <- struct{}{}:
+	case w.invalidates <- struct{}{}:
 	default:
 	}
 }
@@ -217,7 +220,7 @@ func (w *Window) run(opts *WindowOptions) {
 		case <-timer:
 			w.setNextFrame(time.Time{})
 			w.updateAnimation()
-		case <-w.redraws:
+		case <-w.invalidates:
 			w.setNextFrame(time.Time{})
 			w.updateAnimation()
 		case e := <-w.in:

@@ -24,8 +24,8 @@ type Router struct {
 	reader ui.OpsReader
 
 	// InvalidateOp summary.
-	redraw     bool
-	redrawTime time.Time
+	wakeup     bool
+	wakeupTime time.Time
 
 	// ProfileOp summary.
 	profHandlers []input.Key
@@ -42,7 +42,7 @@ func (q *Router) Events(k input.Key) []input.Event {
 
 func (q *Router) Frame(ops *ui.Ops) {
 	q.handlers.Clear()
-	q.redraw = false
+	q.wakeup = false
 	q.profHandlers = q.profHandlers[:0]
 	q.reader.Reset(ops)
 	q.collect()
@@ -71,9 +71,9 @@ func (q *Router) collect() {
 		case ops.TypeInvalidate:
 			var op ui.InvalidateOp
 			op.Decode(encOp.Data)
-			if !q.redraw || op.At.Before(q.redrawTime) {
-				q.redraw = true
-				q.redrawTime = op.At
+			if !q.wakeup || op.At.Before(q.wakeupTime) {
+				q.wakeup = true
+				q.wakeupTime = op.At
 			}
 		case ops.TypeProfile:
 			var op system.ProfileOp
@@ -93,8 +93,8 @@ func (q *Router) Profiling() bool {
 	return len(q.profHandlers) > 0
 }
 
-func (q *Router) RedrawTime() (time.Time, bool) {
-	return q.redrawTime, q.redraw
+func (q *Router) WakeupTime() (time.Time, bool) {
+	return q.wakeupTime, q.wakeup
 }
 
 func (h *handlerEvents) init() {
