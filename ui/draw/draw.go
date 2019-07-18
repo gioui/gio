@@ -14,7 +14,7 @@ import (
 )
 
 type ImageOp struct {
-	Img  image.Image
+	Src  image.Image
 	Rect image.Rectangle
 }
 
@@ -34,7 +34,7 @@ func (i ImageOp) Add(o *ui.Ops) {
 	bo.PutUint32(data[5:], uint32(i.Rect.Min.Y))
 	bo.PutUint32(data[9:], uint32(i.Rect.Max.X))
 	bo.PutUint32(data[13:], uint32(i.Rect.Max.Y))
-	o.Write(data, i.Img)
+	o.Write(data, i.Src)
 }
 
 func (i *ImageOp) Decode(data []byte, refs []interface{}) {
@@ -53,7 +53,7 @@ func (i *ImageOp) Decode(data []byte, refs []interface{}) {
 		},
 	}
 	*i = ImageOp{
-		Img:  refs[0].(image.Image),
+		Src:  refs[0].(image.Image),
 		Rect: sr,
 	}
 }

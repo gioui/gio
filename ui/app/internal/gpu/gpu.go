@@ -699,7 +699,7 @@ loop:
 		case ops.TypeImage:
 			var op gdraw.ImageOp
 			op.Decode(encOp.Data, encOp.Refs)
-			state.img = op.Img
+			state.img = op.Src
 			state.imgRect = op.Rect
 		case ops.TypeDraw:
 			var op gdraw.DrawOp
