@@ -15,6 +15,7 @@ import (
 	"errors"
 	"image"
 	"runtime"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -34,11 +35,43 @@ type window struct {
 	stage Stage
 }
 
+type viewCmd struct {
+	view C.CFTypeRef
+	f    viewFunc
+}
+
+type viewFunc func(views viewMap, view C.CFTypeRef)
+
+type viewMap map[C.CFTypeRef]*window
+
+var (
+	viewOnce sync.Once
+	viewCmds = make(chan viewCmd)
+	viewAcks = make(chan struct{})
+)
+
 var mainWindow = newWindowRendezvous()
 
 var viewFactory func() C.CFTypeRef
 
-var views = make(map[C.CFTypeRef]*window)
+func viewDo(view C.CFTypeRef, f viewFunc) {
+	viewOnce.Do(func() {
+		go runViewCmdLoop()
+	})
+	viewCmds <- viewCmd{view, f}
+	<-viewAcks
+}
+
+func runViewCmdLoop() {
+	views := make(viewMap)
+	for {
+		select {
+		case cmd := <-viewCmds:
+			cmd.f(views, cmd.view)
+			viewAcks <- struct{}{}
+		}
+	}
+}
 
 func (w *window) contextView() C.CFTypeRef {
 	return w.view
@@ -62,10 +95,16 @@ func (w *window) setStage(stage Stage) {
 	w.w.event(StageEvent{stage})
 }
 
-//export gio_onFrameCallback
-func gio_onFrameCallback(view C.CFTypeRef) {
+// Use a top level func for onFrameCallback to avoid
+// garbage from viewDo.
+func onFrameCmd(views viewMap, view C.CFTypeRef) {
 	w := views[view]
 	w.draw(false)
+}
+
+//export gio_onFrameCallback
+func gio_onFrameCallback(view C.CFTypeRef) {
+	viewDo(view, onFrameCmd)
 }
 
 //export gio_onKeys
@@ -78,19 +117,23 @@ func gio_onKeys(view C.CFTypeRef, cstr *C.char, ti C.double, mods C.NSUInteger) 
 	if mods&C.NSEventModifierFlagShift != 0 {
 		kmods |= key.ModShift
 	}
-	w := views[view]
-	for _, k := range str {
-		if n, ok := convertKey(k); ok {
-			w.w.event(key.ChordEvent{Name: n, Modifiers: kmods})
+	viewDo(view, func(views viewMap, view C.CFTypeRef) {
+		w := views[view]
+		for _, k := range str {
+			if n, ok := convertKey(k); ok {
+				w.w.event(key.ChordEvent{Name: n, Modifiers: kmods})
+			}
 		}
-	}
+	})
 }
 
 //export gio_onText
 func gio_onText(view C.CFTypeRef, cstr *C.char) {
 	str := C.GoString(cstr)
-	w := views[view]
-	w.w.event(key.EditEvent{Text: str})
+	viewDo(view, func(views viewMap, view C.CFTypeRef) {
+		w := views[view]
+		w.w.event(key.EditEvent{Text: str})
+	})
 }
 
 //export gio_onMouse
@@ -107,26 +150,32 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, x, y, dx, dy C.CGFloat, ti C.doub
 		panic("invalid direction")
 	}
 	t := time.Duration(float64(ti)*float64(time.Second) + .5)
-	w := views[view]
-	w.w.event(pointer.Event{
-		Type:     typ,
-		Source:   pointer.Mouse,
-		Time:     t,
-		Position: f32.Point{X: float32(x), Y: float32(y)},
-		Scroll:   f32.Point{X: float32(dx), Y: float32(dy)},
+	viewDo(view, func(views viewMap, view C.CFTypeRef) {
+		w := views[view]
+		w.w.event(pointer.Event{
+			Type:     typ,
+			Source:   pointer.Mouse,
+			Time:     t,
+			Position: f32.Point{X: float32(x), Y: float32(y)},
+			Scroll:   f32.Point{X: float32(dx), Y: float32(dy)},
+		})
 	})
 }
 
 //export gio_onDraw
 func gio_onDraw(view C.CFTypeRef) {
-	w := views[view]
-	w.draw(true)
+	viewDo(view, func(views viewMap, view C.CFTypeRef) {
+		w := views[view]
+		w.draw(true)
+	})
 }
 
 //export gio_onFocus
 func gio_onFocus(view C.CFTypeRef, focus C.BOOL) {
-	w := views[view]
-	w.w.event(key.FocusEvent{Focus: focus == C.YES})
+	viewDo(view, func(views viewMap, view C.CFTypeRef) {
+		w := views[view]
+		w.w.event(key.FocusEvent{Focus: focus == C.YES})
+	})
 }
 
 func (w *window) draw(sync bool) {
@@ -161,32 +210,40 @@ func getConfig() Config {
 
 //export gio_onTerminate
 func gio_onTerminate(view C.CFTypeRef) {
-	w := views[view]
-	delete(views, view)
-	w.w.event(DestroyEvent{})
+	viewDo(view, func(views viewMap, view C.CFTypeRef) {
+		w := views[view]
+		delete(views, view)
+		w.w.event(DestroyEvent{})
+	})
 }
 
 //export gio_onHide
 func gio_onHide(view C.CFTypeRef) {
-	w := views[view]
-	w.setStage(StagePaused)
+	viewDo(view, func(views viewMap, view C.CFTypeRef) {
+		w := views[view]
+		w.setStage(StagePaused)
+	})
 }
 
 //export gio_onShow
 func gio_onShow(view C.CFTypeRef) {
-	w := views[view]
-	w.setStage(StageRunning)
+	viewDo(view, func(views viewMap, view C.CFTypeRef) {
+		w := views[view]
+		w.setStage(StageRunning)
+	})
 }
 
 //export gio_onCreate
 func gio_onCreate(view C.CFTypeRef) {
-	w := &window{
-		view: view,
-	}
-	wopts := <-mainWindow.out
-	w.w = wopts.window
-	w.w.setDriver(w)
-	views[view] = w
+	viewDo(view, func(views viewMap, view C.CFTypeRef) {
+		w := &window{
+			view: view,
+		}
+		wopts := <-mainWindow.out
+		w.w = wopts.window
+		w.w.setDriver(w)
+		views[view] = w
+	})
 }
 
 func createWindow(win *Window, opts *WindowOptions) error {
