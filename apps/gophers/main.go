@@ -711,7 +711,7 @@ func fab(ops *ui.Ops, cs layout.Constraints, ico image.Image, mat ui.MacroOp, si
 	rrect(ops, float32(size), float32(size), rr, rr, rr, rr)
 	mat.Add(ops)
 	gdraw.DrawOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(size), Y: float32(size)}}}.Add(ops)
-	gdraw.ImageOp{Img: ico, Rect: ico.Bounds()}.Add(ops)
+	gdraw.ImageOp{Src: ico, Rect: ico.Bounds()}.Add(ops)
 	gdraw.DrawOp{
 		Rect: toRectF(ico.Bounds().Add(dp)),
 	}.Add(ops)
