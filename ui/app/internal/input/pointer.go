@@ -173,12 +173,12 @@ func (q *pointerQueue) Frame(root *ui.Ops, events *handlerEvents) {
 	for k, h := range q.handlers {
 		if !h.active {
 			q.dropHandler(k)
+			delete(q.handlers, k)
 		}
 	}
 }
 
 func (q *pointerQueue) dropHandler(k input.Key) {
-	delete(q.handlers, k)
 	for i := range q.pointers {
 		p := &q.pointers[i]
 		for i := len(p.handlers) - 1; i >= 0; i-- {
@@ -213,16 +213,6 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	if !p.pressed && (e.Type == pointer.Move || e.Type == pointer.Press) {
 		p.handlers, q.scratch = q.scratch[:0], p.handlers
 		q.opHit(&p.handlers, e.Position)
-		// Drop handlers no longer hit.
-	loop:
-		for _, h := range q.scratch {
-			for _, h2 := range p.handlers {
-				if h == h2 {
-					continue loop
-				}
-			}
-			q.dropHandler(h)
-		}
 		if e.Type == pointer.Press {
 			p.pressed = true
 		}
