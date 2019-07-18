@@ -78,7 +78,7 @@ type App struct {
 type userPage struct {
 	config        ui.Config
 	faces         *measure.Faces
-	redraw        redrawer
+	invalidate    func()
 	user          *user
 	commitsList   *layout.List
 	commits       []*github.Commit
@@ -100,8 +100,6 @@ type icon struct {
 	img     image.Image
 	imgSize int
 }
-
-type redrawer func()
 
 type ActionButton struct {
 	config  ui.Config
@@ -189,7 +187,7 @@ func (a *App) run() error {
 		case users := <-a.updateUsers:
 			a.users = users
 			a.userClicks = make([]gesture.Click, len(users))
-			a.w.Redraw()
+			a.w.Invalidate()
 		case e := <-a.w.Events():
 			switch e := e.(type) {
 			case key.ChordEvent:
@@ -199,7 +197,7 @@ func (a *App) run() error {
 				case 'P':
 					if e.Modifiers.Contain(key.ModCommand) {
 						a.profiling = !a.profiling
-						a.w.Redraw()
+						a.w.Invalidate()
 					}
 				}
 			case app.DestroyEvent:
@@ -224,7 +222,7 @@ func (a *App) run() error {
 					if a.selectedUser != nil {
 						a.selectedUser = nil
 						e.Cancel = true
-						a.w.Redraw()
+						a.w.Invalidate()
 					}
 				}
 			case app.DrawEvent:
@@ -422,7 +420,7 @@ func (a *App) newUserPage(user *user) *userPage {
 	up := &userPage{
 		config:        &a.cfg,
 		faces:         a.faces,
-		redraw:        a.w.Redraw,
+		invalidate:    a.w.Invalidate,
 		user:          user,
 		commitsList:   &layout.List{Config: &a.cfg, Inputs: a.inputs, Axis: layout.Vertical},
 		commitsResult: make(chan []*github.Commit, 1),
@@ -491,7 +489,7 @@ func (up *userPage) fetchCommits(ctx context.Context) {
 			}
 		}
 		up.commitsResult <- commits
-		up.redraw()
+		up.invalidate()
 	}()
 }
 
