@@ -98,8 +98,12 @@ func (w *window) setStage(stage Stage) {
 // Use a top level func for onFrameCallback to avoid
 // garbage from viewDo.
 func onFrameCmd(views viewMap, view C.CFTypeRef) {
-	w := views[view]
-	w.draw(false)
+	// CVDisplayLink does not run on the main thread,
+	// so we have to ignore requests to windows being
+	// deleted.
+	if w, exists := views[view]; exists {
+		w.draw(false)
+	}
 }
 
 //export gio_onFrameCallback
