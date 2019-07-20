@@ -20,8 +20,9 @@ import (
 import "C"
 
 type context struct {
-	c   *gl.Functions
-	ctx C.CFTypeRef
+	c    *gl.Functions
+	ctx  C.CFTypeRef
+	view C.CFTypeRef
 }
 
 func init() {
@@ -31,10 +32,12 @@ func init() {
 }
 
 func newContext(w *window) (*context, error) {
-	ctx := C.gio_contextForView(w.contextView())
+	view := w.contextView()
+	ctx := C.gio_contextForView(view)
 	c := &context{
-		ctx: ctx,
-		c:   new(gl.Functions),
+		ctx:  ctx,
+		c:    new(gl.Functions),
+		view: view,
 	}
 	return c, nil
 }
@@ -47,7 +50,7 @@ func (c *context) Release() {
 	c.Lock()
 	defer c.Unlock()
 	C.gio_clearCurrentContext()
-	C.CFRelease(c.ctx)
+	C.gio_clearGLContext(c.view)
 	c.ctx = 0
 }
 
