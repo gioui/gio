@@ -143,11 +143,6 @@ CFTypeRef gio_contextForView(CFTypeRef viewRef) {
 	return (__bridge CFTypeRef)view.openGLContext;
 }
 
-void gio_clearGLContext(CFTypeRef viewRef) {
-	NSOpenGLView *view = (__bridge NSOpenGLView *)viewRef;
-	[view clearGLContext];
-}
-
 void gio_clearCurrentContext(void) {
 	[NSOpenGLContext clearCurrentContext];
 }

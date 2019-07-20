@@ -50,8 +50,6 @@ func (c *context) Release() {
 	c.Lock()
 	defer c.Unlock()
 	C.gio_clearCurrentContext()
-	C.gio_clearGLContext(c.view)
-	c.ctx = 0
 }
 
 func (c *context) Present() error {
