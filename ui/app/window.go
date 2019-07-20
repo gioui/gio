@@ -41,7 +41,14 @@ type Window struct {
 	nextFrame    time.Time
 	delayedDraw  *time.Timer
 
-	router iinput.Router
+	queue Queue
+}
+
+// Queue is an input.Queue implementation that distributes
+// system input events to the input handlers declared through
+// Draw.
+type Queue struct {
+	q iinput.Router
 }
 
 // driverEvent is sent when a new native driver
@@ -106,8 +113,8 @@ func (w *Window) setTextInput(s key.TextInputState) {
 	w.inputState = s
 }
 
-func (w *Window) Queue() input.Queue {
-	return &w.router
+func (w *Window) Queue() *Queue {
+	return &w.queue
 }
 
 func (w *Window) Draw(frame *ui.Ops) {
@@ -120,20 +127,20 @@ func (w *Window) draw(size image.Point, frame *ui.Ops) {
 		drawDur = time.Since(w.drawStart)
 		w.drawStart = time.Time{}
 	}
-	w.gpu.Draw(w.router.Profiling(), size, frame)
-	w.router.Frame(frame)
+	w.gpu.Draw(w.queue.q.Profiling(), size, frame)
+	w.queue.q.Frame(frame)
 	now := time.Now()
-	w.setTextInput(w.router.InputState())
+	w.setTextInput(w.queue.q.InputState())
 	frameDur := now.Sub(w.lastFrame)
 	frameDur = frameDur.Truncate(100 * time.Microsecond)
 	w.lastFrame = now
-	if w.router.Profiling() {
+	if w.queue.q.Profiling() {
 		q := 100 * time.Microsecond
 		timings := fmt.Sprintf("tot:%7s cpu:%7s %s", frameDur.Round(q), drawDur.Round(q), w.gpu.Timings())
-		w.router.AddProfile(system.ProfileEvent{Timings: timings})
+		w.queue.q.AddProfile(system.ProfileEvent{Timings: timings})
 		w.setNextFrame(time.Time{})
 	}
-	if t, ok := w.router.WakeupTime(); ok {
+	if t, ok := w.queue.q.WakeupTime(); ok {
 		w.setNextFrame(t)
 	}
 	w.updateAnimation()
@@ -285,7 +292,7 @@ func (w *Window) run(opts *WindowOptions) {
 				w.out <- e
 				w.waitAck()
 			case input.Event:
-				if w.router.Add(e2) {
+				if w.queue.q.Add(e2) {
 					w.setNextFrame(time.Time{})
 					w.updateAnimation()
 				}
@@ -300,6 +307,10 @@ func (w *Window) run(opts *WindowOptions) {
 			w.ack <- struct{}{}
 		}
 	}
+}
+
+func (q *Queue) Events(k input.Key) []input.Event {
+	return q.q.Events(k)
 }
 
 func (_ driverEvent) ImplementsEvent() {}
