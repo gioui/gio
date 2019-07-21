@@ -18,8 +18,6 @@ type scrollChild struct {
 }
 
 type List struct {
-	Config             ui.Config
-	Inputs             input.Queue
 	Axis               Axis
 	Invert             bool
 	CrossAxisAlignment CrossAxisAlignment
@@ -27,9 +25,11 @@ type List struct {
 	// The distance scrolled since last call to Init.
 	Distance int
 
+	config    ui.Config
+	ops       *ui.Ops
+	queue     input.Queue
 	macro     ui.MacroOp
 	child     ui.MacroOp
-	ops       *ui.Ops
 	scroll    gesture.Scroll
 	scrollDir int
 
@@ -57,10 +57,12 @@ const (
 )
 
 // Init prepares the list for iterating through its elements with Next.
-func (l *List) Init(ops *ui.Ops, cs Constraints, len int) {
+func (l *List) Init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, len int) {
 	if l.more {
 		panic("unfinished element")
 	}
+	l.config = cfg
+	l.queue = q
 	l.update()
 	l.ops = ops
 	l.dir = iterateNone
@@ -82,7 +84,7 @@ func (l *List) Dragging() bool {
 
 func (l *List) update() {
 	l.Distance = 0
-	d := l.scroll.Scroll(l.Config, l.Inputs, gesture.Axis(l.Axis))
+	d := l.scroll.Scroll(l.config, l.queue, gesture.Axis(l.Axis))
 	if l.Invert {
 		d = -d
 	}

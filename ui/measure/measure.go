@@ -17,7 +17,7 @@ import (
 )
 
 type Faces struct {
-	Config      ui.Config
+	config      ui.Config
 	faceCache   map[faceKey]*textFace
 	layoutCache map[layoutKey]cachedLayout
 	pathCache   map[pathKey]cachedPath
@@ -57,7 +57,8 @@ type textFace struct {
 	font  *opentype
 }
 
-func (f *Faces) Frame() {
+func (f *Faces) Reset(c ui.Config) {
+	f.config = c
 	f.init()
 	for pk, p := range f.pathCache {
 		if !p.active {
@@ -102,7 +103,7 @@ func (f *Faces) init() {
 }
 
 func (f *textFace) Layout(str string, opts text.LayoutOptions) *text.Layout {
-	ppem := fixed.Int26_6(f.faces.Config.Px(f.size) * 64)
+	ppem := fixed.Int26_6(f.faces.config.Px(f.size) * 64)
 	lk := layoutKey{
 		f:    f.font.Font,
 		ppem: ppem,
@@ -120,7 +121,7 @@ func (f *textFace) Layout(str string, opts text.LayoutOptions) *text.Layout {
 }
 
 func (f *textFace) Path(str text.String) ui.MacroOp {
-	ppem := fixed.Int26_6(f.faces.Config.Px(f.size) * 64)
+	ppem := fixed.Int26_6(f.faces.config.Px(f.size) * 64)
 	pk := pathKey{
 		f:    f.font.Font,
 		ppem: ppem,

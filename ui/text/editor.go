@@ -21,8 +21,6 @@ import (
 )
 
 type Editor struct {
-	Config     ui.Config
-	Inputs     input.Queue
 	Face       Face
 	Alignment  Alignment
 	SingleLine bool
@@ -72,9 +70,9 @@ const (
 func (s ChangeEvent) isEditorEvent() {}
 func (s SubmitEvent) isEditorEvent() {}
 
-func (e *Editor) Next() (EditorEvent, bool) {
+func (e *Editor) Next(cfg ui.Config, queue input.Queue) (EditorEvent, bool) {
 	// Crude configuration change detection.
-	if scale := e.Config.Px(ui.Sp(100)); scale != e.oldScale {
+	if scale := cfg.Px(ui.Sp(100)); scale != e.oldScale {
 		e.invalidate()
 		e.oldScale = scale
 	}
@@ -88,7 +86,7 @@ func (e *Editor) Next() (EditorEvent, bool) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Scroll(e.Config, e.Inputs, axis)
+	sdist := e.scroller.Scroll(cfg, queue, axis)
 	var soff int
 	if e.SingleLine {
 		e.scrollOff.X += sdist
@@ -97,26 +95,26 @@ func (e *Editor) Next() (EditorEvent, bool) {
 		e.scrollOff.Y += sdist
 		soff = e.scrollOff.Y
 	}
-	for _, evt := range e.clicker.Events(e.Inputs) {
+	for _, evt := range e.clicker.Events(queue) {
 		switch {
 		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
 			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
-			e.blinkStart = e.Config.Now()
+			e.blinkStart = cfg.Now()
 			e.moveCoord(image.Point{
 				X: int(math.Round(float64(evt.Position.X))),
 				Y: int(math.Round(float64(evt.Position.Y))),
 			})
 			e.requestFocus = true
 			if !e.scroller.Active() {
-				e.scrollToCaret()
+				e.scrollToCaret(cfg)
 			}
 		}
 	}
 	if (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin) {
 		e.scroller.Stop()
 	}
-	for _, ke := range e.Inputs.Events(e) {
-		e.blinkStart = e.Config.Now()
+	for _, ke := range queue.Events(e) {
+		e.blinkStart = cfg.Now()
 		switch ke := ke.(type) {
 		case key.FocusEvent:
 			e.focused = ke.Focus
@@ -130,11 +128,11 @@ func (e *Editor) Next() (EditorEvent, bool) {
 				}
 			}
 			if e.command(ke) {
-				e.scrollToCaret()
+				e.scrollToCaret(cfg)
 				e.scroller.Stop()
 			}
 		case key.EditEvent:
-			e.scrollToCaret()
+			e.scrollToCaret(cfg)
 			e.scroller.Stop()
 			e.append(ke.Text)
 		}
@@ -145,8 +143,8 @@ func (e *Editor) Next() (EditorEvent, bool) {
 	return nil, false
 }
 
-func (e *Editor) caretWidth() fixed.Int26_6 {
-	oneDp := e.Config.Px(ui.Dp(1))
+func (e *Editor) caretWidth(c ui.Config) fixed.Int26_6 {
+	oneDp := c.Px(ui.Dp(1))
 	return fixed.Int26_6(oneDp * 64)
 }
 
@@ -154,10 +152,10 @@ func (e *Editor) Focus() {
 	e.requestFocus = true
 }
 
-func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	for _, ok := e.Next(); ok; _, ok = e.Next() {
+func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+	for _, ok := e.Next(cfg, queue); ok; _, ok = e.Next(cfg, queue) {
 	}
-	twoDp := e.Config.Px(ui.Dp(2))
+	twoDp := cfg.Px(ui.Dp(2))
 	e.padLeft, e.padRight = twoDp, twoDp
 	maxWidth := cs.Width.Max
 	if e.SingleLine {
@@ -217,14 +215,14 @@ func (e *Editor) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		stack.Pop()
 	}
 	if e.focused {
-		now := e.Config.Now()
+		now := cfg.Now()
 		dt := now.Sub(e.blinkStart)
 		blinking := dt < maxBlinkDuration
 		const timePerBlink = time.Second / blinksPerSecond
 		nextBlink := now.Add(timePerBlink/2 - dt%(timePerBlink/2))
 		on := !blinking || dt%timePerBlink < timePerBlink/2
 		if on {
-			carWidth := e.caretWidth()
+			carWidth := e.caretWidth(cfg)
 			carX -= carWidth / 2
 			carAsc, carDesc := -lines[carLine].Bounds.Min.Y, lines[carLine].Bounds.Max.Y
 			carRect := image.Rectangle{
@@ -530,8 +528,8 @@ func (e *Editor) moveEnd() {
 	e.carXOff = l.Width + a - x
 }
 
-func (e *Editor) scrollToCaret() {
-	carWidth := e.caretWidth()
+func (e *Editor) scrollToCaret(cfg ui.Config) {
+	carWidth := e.caretWidth(cfg)
 	carLine, _, x, y := e.layoutCaret()
 	l := e.lines[carLine]
 	if e.SingleLine {
