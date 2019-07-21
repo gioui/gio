@@ -34,6 +34,7 @@ type window struct {
 	w     *Window
 	stage Stage
 	ppdp  float32
+	scale float32
 }
 
 type viewCmd struct {
@@ -157,12 +158,14 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, x, y, dx, dy C.CGFloat, ti C.doub
 	t := time.Duration(float64(ti)*float64(time.Second) + .5)
 	viewDo(view, func(views viewMap, view C.CFTypeRef) {
 		w := views[view]
+		x, y := float32(x)*w.scale, float32(y)*w.scale
+		dx, dy := float32(dx)*w.scale, float32(dy)*w.scale
 		w.w.event(pointer.Event{
 			Type:     typ,
 			Source:   pointer.Mouse,
 			Time:     t,
-			Position: f32.Point{X: float32(x), Y: float32(y)},
-			Scroll:   f32.Point{X: float32(dx), Y: float32(dy)},
+			Position: f32.Point{X: x, Y: y},
+			Scroll:   f32.Point{X: dx, Y: dy},
 		})
 	})
 }
@@ -185,14 +188,14 @@ func gio_onFocus(view C.CFTypeRef, focus C.BOOL) {
 }
 
 func (w *window) draw(sync bool) {
+	w.scale = float32(C.gio_getViewBackingScale(w.view))
 	wf, hf := float32(C.gio_viewWidth(w.view)), float32(C.gio_viewHeight(w.view))
 	if wf == 0 || hf == 0 {
 		return
 	}
-	scale := float32(C.gio_getViewBackingScale(w.view))
-	width := int(wf*scale + .5)
-	height := int(hf*scale + .5)
-	cfg := configFor(w.ppdp, scale)
+	width := int(wf*w.scale + .5)
+	height := int(hf*w.scale + .5)
+	cfg := configFor(w.ppdp, w.scale)
 	cfg.now = time.Now()
 	w.setStage(StageRunning)
 	w.w.event(DrawEvent{
@@ -252,8 +255,9 @@ func gio_onCreate(view C.CFTypeRef) {
 	viewDo(view, func(views viewMap, view C.CFTypeRef) {
 		scale := float32(C.gio_getBackingScale())
 		w := &window{
-			view: view,
-			ppdp: getPixelsPerDp(scale),
+			view:  view,
+			ppdp:  getPixelsPerDp(scale),
+			scale: scale,
 		}
 		wopts := <-mainWindow.out
 		w.w = wopts.window
