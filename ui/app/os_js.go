@@ -317,11 +317,10 @@ func (w *window) setAnimating(anim bool) {
 	w.animating = anim
 }
 
-func (w *window) setTextInput(s key.TextInputState) {
-	switch s {
-	case key.TextInputOpen:
+func (w *window) showTextInput(show bool) {
+	if show {
 		w.focus()
-	case key.TextInputClose:
+	} else {
 		w.blur()
 	}
 }

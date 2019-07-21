@@ -441,7 +441,7 @@ func (w *window) destroy() {
 	}
 }
 
-func (w *window) setTextInput(s key.TextInputState) {}
+func (w *window) showTextInput(show bool) {}
 
 func (w *window) display() uintptr {
 	return uintptr(w.hdc)

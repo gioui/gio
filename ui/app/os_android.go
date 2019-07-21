@@ -393,20 +393,17 @@ func onTouchEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, action, pointer
 	})
 }
 
-func (w *window) setTextInput(s key.TextInputState) {
+func (w *window) showTextInput(show bool) {
 	if w.view == 0 {
 		return
 	}
-	switch s {
-	case key.TextInputOpen:
-		runInJVM(func(env *C.JNIEnv) {
+	runInJVM(func(env *C.JNIEnv) {
+		if show {
 			C.gio_jni_CallVoidMethod(env, w.view, w.mshowTextInput)
-		})
-	case key.TextInputClose:
-		runInJVM(func(env *C.JNIEnv) {
+		} else {
 			C.gio_jni_CallVoidMethod(env, w.view, w.mhideTextInput)
-		})
-	}
+		}
+	})
 }
 
 func Main() {

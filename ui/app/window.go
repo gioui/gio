@@ -12,7 +12,6 @@ import (
 	"gioui.org/ui/app/internal/gpu"
 	iinput "gioui.org/ui/app/internal/input"
 	"gioui.org/ui/input"
-	"gioui.org/ui/key"
 	"gioui.org/ui/system"
 )
 
@@ -23,11 +22,10 @@ type WindowOptions struct {
 }
 
 type Window struct {
-	driver     *window
-	lastFrame  time.Time
-	drawStart  time.Time
-	gpu        *gpu.GPU
-	inputState key.TextInputState
+	driver    *window
+	lastFrame time.Time
+	drawStart time.Time
+	gpu       *gpu.GPU
 
 	out         chan Event
 	in          chan Event
@@ -63,8 +61,8 @@ var _ interface {
 	// setAnimating sets the animation flag. When the window is animating,
 	// DrawEvents are delivered as fast as the display can handle them.
 	setAnimating(anim bool)
-	// setTextInput updates the virtual keyboard state.
-	setTextInput(s key.TextInputState)
+	// showTextInput updates the virtual keyboard state.
+	showTextInput(show bool)
 } = (*window)(nil)
 
 // Pre-allocate the ack event to avoid garbage.
@@ -103,13 +101,6 @@ func (w *Window) Events() <-chan Event {
 	return w.out
 }
 
-func (w *Window) setTextInput(s key.TextInputState) {
-	if s != w.inputState && (s == key.TextInputClose || s == key.TextInputOpen) {
-		w.driver.setTextInput(s)
-	}
-	w.inputState = s
-}
-
 func (w *Window) Queue() *Queue {
 	return &w.queue
 }
@@ -127,7 +118,12 @@ func (w *Window) draw(size image.Point, frame *ui.Ops) {
 	w.gpu.Draw(w.queue.q.Profiling(), size, frame)
 	w.queue.q.Frame(frame)
 	now := time.Now()
-	w.setTextInput(w.queue.q.InputState())
+	switch w.queue.q.TextInputState() {
+	case iinput.TextInputOpen:
+		w.driver.showTextInput(true)
+	case iinput.TextInputClose:
+		w.driver.showTextInput(false)
+	}
 	frameDur := now.Sub(w.lastFrame)
 	frameDur = frameDur.Truncate(100 * time.Microsecond)
 	w.lastFrame = now

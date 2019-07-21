@@ -77,7 +77,7 @@ func (w *window) contextView() C.CFTypeRef {
 	return w.view
 }
 
-func (w *window) setTextInput(s key.TextInputState) {}
+func (w *window) showTextInput(show bool) {}
 
 func (w *window) setAnimating(anim bool) {
 	var animb C.BOOL

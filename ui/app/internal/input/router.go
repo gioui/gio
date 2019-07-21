@@ -65,7 +65,7 @@ func (q *Router) Add(e input.Event) bool {
 	return q.handlers.Updated()
 }
 
-func (q *Router) InputState() key.TextInputState {
+func (q *Router) TextInputState() TextInputState {
 	return q.kqueue.InputState()
 }
 

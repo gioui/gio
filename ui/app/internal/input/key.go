@@ -9,11 +9,13 @@ import (
 	"gioui.org/ui/key"
 )
 
+type TextInputState uint8
+
 type keyQueue struct {
 	focus    input.Key
 	handlers map[input.Key]*keyHandler
 	reader   ui.OpsReader
-	state    key.TextInputState
+	state    TextInputState
 }
 
 type keyHandler struct {
@@ -29,9 +31,15 @@ const (
 	priNewFocus
 )
 
+const (
+	TextInputKeep TextInputState = iota
+	TextInputClose
+	TextInputOpen
+)
+
 // InputState returns the last text input state as
 // determined in Frame.
-func (q *keyQueue) InputState() key.TextInputState {
+func (q *keyQueue) InputState() TextInputState {
 	return q.state
 }
 
@@ -53,7 +61,6 @@ func (q *keyQueue) Frame(root *ui.Ops, events *handlerEvents) {
 			}
 		}
 	}
-	changed := focus != nil && focus != q.focus
 	if focus != q.focus {
 		if q.focus != nil {
 			events.Add(q.focus, key.FocusEvent{Focus: false})
@@ -67,13 +74,11 @@ func (q *keyQueue) Frame(root *ui.Ops, events *handlerEvents) {
 	}
 	switch {
 	case pri == priNewFocus:
-		q.state = key.TextInputOpen
+		q.state = TextInputOpen
 	case hide:
-		q.state = key.TextInputClose
-	case changed:
-		q.state = key.TextInputFocus
+		q.state = TextInputClose
 	default:
-		q.state = key.TextInputKeep
+		q.state = TextInputKeep
 	}
 }
 

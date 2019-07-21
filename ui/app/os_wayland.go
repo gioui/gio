@@ -1087,7 +1087,7 @@ func (w *window) nativeWindow(visID int) (unsafe.Pointer, int, int) {
 	return unsafe.Pointer(w.surf), width * scale, height * scale
 }
 
-func (w *window) setTextInput(s key.TextInputState) {}
+func (w *window) showTextInput(show bool) {}
 
 // detectFontScale reports current font scale, or 1.0
 // if it fails.

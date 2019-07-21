@@ -235,14 +235,13 @@ func (w *window) isVisible() bool {
 	return w.visible.Load().(bool)
 }
 
-func (w *window) setTextInput(s key.TextInputState) {
+func (w *window) showTextInput(show bool) {
 	if w.view == 0 {
 		return
 	}
-	switch s {
-	case key.TextInputOpen:
+	if show {
 		C.gio_showTextInput(w.view)
-	case key.TextInputClose:
+	} else {
 		C.gio_hideTextInput(w.view)
 	}
 }

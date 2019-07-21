@@ -30,18 +30,9 @@ type EditEvent struct {
 
 type Modifiers uint32
 
-type TextInputState uint8
-
 const (
 	ModCommand Modifiers = 1 << iota
 	ModShift
-)
-
-const (
-	TextInputKeep TextInputState = iota
-	TextInputFocus
-	TextInputClose
-	TextInputOpen
 )
 
 const (
