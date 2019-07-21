@@ -50,10 +50,7 @@ import (
 
 type App struct {
 	w     *app.Window
-	cfg   app.Config
-	faces *measure.Faces
-
-	inputs input.Queue
+	faces measure.Faces
 
 	fab *ActionButton
 
@@ -77,7 +74,7 @@ type App struct {
 
 type userPage struct {
 	config        ui.Config
-	faces         *measure.Faces
+	faces         measure.Faces
 	invalidate    func()
 	user          *user
 	commitsList   *layout.List
@@ -102,8 +99,6 @@ type icon struct {
 }
 
 type ActionButton struct {
-	config  ui.Config
-	inputs  input.Queue
 	face    text.Face
 	Open    bool
 	icons   []*icon
@@ -182,6 +177,7 @@ func colorMaterial(ops *ui.Ops, color color.RGBA) ui.MacroOp {
 func (a *App) run() error {
 	a.profiling = *stats
 	ops := new(ui.Ops)
+	var cfg app.Config
 	for {
 		select {
 		case users := <-a.updateUsers:
@@ -227,14 +223,14 @@ func (a *App) run() error {
 				}
 			case app.DrawEvent:
 				ops.Reset()
-				a.cfg = e.Config
+				a.faces.Reset(&cfg)
+				cfg = e.Config
 				cs := layout.RigidConstraints(e.Size)
-				a.Layout(ops, cs)
+				a.Layout(&cfg, a.w.Queue(), ops, cs)
 				if a.profiling {
-					a.layoutTimings(ops, cs)
+					a.layoutTimings(&cfg, a.w.Queue(), ops, cs)
 				}
 				a.w.Draw(ops)
-				a.faces.Frame()
 			}
 		}
 	}
@@ -244,25 +240,17 @@ func newApp(w *app.Window) *App {
 	a := &App{
 		w:           w,
 		updateUsers: make(chan []*user),
-		inputs:      w.Queue(),
 	}
-	a.faces = &measure.Faces{Config: &a.cfg}
 	a.usersList = &layout.List{
-		Config: &a.cfg,
-		Inputs: a.inputs,
-		Axis:   layout.Vertical,
+		Axis: layout.Vertical,
 	}
 	a.fab = &ActionButton{
-		config:  &a.cfg,
-		inputs:  a.inputs,
 		face:    a.face(fonts.regular, 11),
 		sendIco: &icon{src: icons.ContentSend, size: ui.Dp(24)},
 		icons:   []*icon{},
 	}
 	a.edit2 = &text.Editor{
-		Config: &a.cfg,
-		Inputs: a.inputs,
-		Face:   a.face(fonts.italic, 14),
+		Face: a.face(fonts.italic, 14),
 		//Alignment: text.End,
 		SingleLine:   true,
 		Hint:         "Hint",
@@ -271,8 +259,6 @@ func newApp(w *app.Window) *App {
 	}
 	a.edit2.SetText("Single line editor. Edit me!")
 	a.edit = &text.Editor{
-		Config:   &a.cfg,
-		Inputs:   a.inputs,
 		Face:     a.face(fonts.regular, 16),
 		Material: theme.text,
 		//Alignment: text.End,
@@ -379,8 +365,8 @@ func (a *App) face(f *sfnt.Font, size float32) text.Face {
 	return a.faces.For(f, ui.Sp(size))
 }
 
-func (a *App) layoutTimings(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	for _, e := range a.inputs.Events(a) {
+func (a *App) layoutTimings(c ui.Config, q input.Queue, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+	for _, e := range q.Events(a) {
 		if e, ok := e.(system.ProfileEvent); ok {
 			a.profile = e
 		}
@@ -393,43 +379,42 @@ func (a *App) layoutTimings(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	al := layout.Align{Alignment: layout.NE}
 	cs = al.Begin(ops, cs)
 	in := layout.Inset{Top: ui.Dp(16)}
-	cs = in.Begin(&a.cfg, ops, cs)
+	cs = in.Begin(c, ops, cs)
 	txt := fmt.Sprintf("m: %d %s", mallocs, a.profile.Timings)
 	dims := text.Label{Material: theme.text, Face: a.face(fonts.mono, 10), Text: txt}.Layout(ops, cs)
 	dims = in.End(dims)
 	return al.End(dims)
 }
 
-func (a *App) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+func (a *App) Layout(c ui.Config, q input.Queue, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	for i := range a.userClicks {
 		click := &a.userClicks[i]
-		for _, e := range click.Events(a.inputs) {
+		for _, e := range click.Events(q) {
 			if e.Type == gesture.TypeClick {
 				a.selectedUser = a.newUserPage(a.users[i])
 			}
 		}
 	}
 	if a.selectedUser == nil {
-		return a.layoutUsers(ops, cs)
+		return a.layoutUsers(c, q, ops, cs)
 	} else {
-		return a.selectedUser.Layout(ops, cs)
+		return a.selectedUser.Layout(c, q, ops, cs)
 	}
 }
 
 func (a *App) newUserPage(user *user) *userPage {
 	up := &userPage{
-		config:        &a.cfg,
 		faces:         a.faces,
 		invalidate:    a.w.Invalidate,
 		user:          user,
-		commitsList:   &layout.List{Config: &a.cfg, Inputs: a.inputs, Axis: layout.Vertical},
+		commitsList:   &layout.List{Axis: layout.Vertical},
 		commitsResult: make(chan []*github.Commit, 1),
 	}
 	up.fetchCommits(a.ctx)
 	return up
 }
 
-func (up *userPage) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+func (up *userPage) Layout(c ui.Config, q input.Queue, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	l := up.commitsList
 	if l.Dragging() {
 		key.HideInputOp{}.Add(ops)
@@ -439,15 +424,14 @@ func (up *userPage) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		up.commits = commits
 	default:
 	}
-	for l.Init(ops, cs, len(up.commits)); l.More(); l.Next() {
-		l.Elem(up.commit(ops, l.Constraints(), l.Index()))
+	for l.Init(c, q, ops, cs, len(up.commits)); l.More(); l.Next() {
+		l.Elem(up.commit(c, ops, l.Constraints(), l.Index()))
 	}
 	return l.Layout()
 }
 
-func (up *userPage) commit(ops *ui.Ops, cs layout.Constraints, index int) layout.Dimens {
+func (up *userPage) commit(c ui.Config, ops *ui.Ops, cs layout.Constraints, index int) layout.Dimens {
 	u := up.user
-	c := up.config
 	msg := up.commits[index].GetMessage()
 	label := text.Label{Material: theme.text, Face: up.faces.For(fonts.regular, ui.Sp(12)), Text: msg}
 	in := layout.Inset{Top: ui.Dp(16), Right: ui.Dp(8), Left: ui.Dp(8)}
@@ -493,14 +477,13 @@ func (up *userPage) fetchCommits(ctx context.Context) {
 	}()
 }
 
-func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	c := &a.cfg
+func (a *App) layoutUsers(c ui.Config, q input.Queue, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	st := (&layout.Stack{Alignment: layout.Start}).Init(ops, cs)
 	cs = st.Rigid()
 	al := layout.Align{Alignment: layout.SE}
 	in := layout.UniformInset(ui.Dp(16))
 	cs = in.Begin(c, ops, al.Begin(ops, cs))
-	dims := a.fab.Layout(ops, cs)
+	dims := a.fab.Layout(c, q, ops, cs)
 	dims = al.End(in.End(dims))
 	c2 := st.End(dims)
 
@@ -514,7 +497,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 			in := layout.UniformInset(ui.Dp(16))
 			sz := c.Px(ui.Dp(200))
 			cs = layout.RigidConstraints(cs.Constrain(image.Point{X: sz, Y: sz}))
-			dims = a.edit.Layout(ops, in.Begin(c, ops, cs))
+			dims = a.edit.Layout(c, q, ops, in.Begin(c, ops, cs))
 			dims = in.End(dims)
 		}
 		c1 := f.End(dims)
@@ -523,7 +506,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		{
 			cs.Width.Min = cs.Width.Max
 			in := layout.Inset{Bottom: ui.Dp(16), Left: ui.Dp(16), Right: ui.Dp(16)}
-			dims = a.edit2.Layout(ops, in.Begin(c, ops, cs))
+			dims = a.edit2.Layout(c, q, ops, in.Begin(c, ops, cs))
 			dims = in.End(dims)
 		}
 		c2 := f.End(dims)
@@ -546,7 +529,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 
 		cs = f.Flexible(1)
 		cs.Width.Min = cs.Width.Max
-		dims = a.layoutContributors(ops, cs)
+		dims = a.layoutContributors(c, q, ops, cs)
 		c4 := f.End(dims)
 		dims = f.Layout(c1, c2, c3, c4)
 	}
@@ -554,8 +537,7 @@ func (a *App) layoutUsers(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	return st.Layout(c1, c2)
 }
 
-func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	c := a.config
+func (a *ActionButton) Layout(c ui.Config, q input.Queue, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	f := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.End}
 	f.Init(ops, cs)
 	cs = f.Rigid()
@@ -567,13 +549,12 @@ func (a *ActionButton) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens 
 	return f.Layout(f.End(dims))
 }
 
-func (a *App) layoutContributors(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	c := &a.cfg
+func (a *App) layoutContributors(c ui.Config, q input.Queue, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	l := a.usersList
 	if l.Dragging() {
 		key.HideInputOp{}.Add(ops)
 	}
-	for l.Init(ops, cs, len(a.users)); l.More(); l.Next() {
+	for l.Init(c, q, ops, cs, len(a.users)); l.More(); l.Next() {
 		l.Elem(a.user(c, ops, l.Constraints(), l.Index()))
 	}
 	return l.Layout()

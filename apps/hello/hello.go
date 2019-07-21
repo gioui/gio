@@ -40,7 +40,7 @@ func loop(w *app.Window) error {
 		panic("failed to load font")
 	}
 	var cfg app.Config
-	faces := &measure.Faces{Config: &cfg}
+	var faces measure.Faces
 	maroon := color.RGBA{127, 0, 0, 255}
 	face := faces.For(regular, ui.Sp(72))
 	message := "Hello, Gio"
@@ -52,6 +52,7 @@ func loop(w *app.Window) error {
 			return e.Err
 		case app.DrawEvent:
 			cfg = e.Config
+			faces.Reset(&cfg)
 			cs := layout.RigidConstraints(e.Size)
 			ops.Reset()
 			var material ui.MacroOp
@@ -60,7 +61,6 @@ func loop(w *app.Window) error {
 			material.Stop()
 			text.Label{Material: material, Face: face, Alignment: text.Center, Text: message}.Layout(ops, cs)
 			w.Draw(ops)
-			faces.Frame()
 		}
 	}
 }
