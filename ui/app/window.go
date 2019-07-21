@@ -107,10 +107,6 @@ func (w *Window) setTextInput(s key.TextInputState) {
 	if s != w.inputState && (s == key.TextInputClose || s == key.TextInputOpen) {
 		w.driver.setTextInput(s)
 	}
-	if s == key.TextInputFocus {
-		w.setNextFrame(time.Time{})
-		w.updateAnimation()
-	}
 	w.inputState = s
 }
 
