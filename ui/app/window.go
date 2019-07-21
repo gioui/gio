@@ -78,7 +78,7 @@ func NewWindow(opts *WindowOptions) *Window {
 		opts = &WindowOptions{
 			Width:  ui.Dp(800),
 			Height: ui.Dp(600),
-			Title:  "Gio program",
+			Title:  "Gio",
 		}
 	}
 	if opts.Width.V <= 0 || opts.Height.V <= 0 {
