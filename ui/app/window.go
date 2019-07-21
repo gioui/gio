@@ -88,8 +88,9 @@ func NewWindow(opts *WindowOptions) *Window {
 	}
 
 	w := &Window{
-		in:          make(chan Event),
-		out:         make(chan Event),
+		in: make(chan Event),
+		// Make room for buffered input events.
+		out:         make(chan Event, 100),
 		ack:         make(chan struct{}),
 		invalidates: make(chan struct{}, 1),
 		frames:      make(chan *ui.Ops),
