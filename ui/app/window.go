@@ -248,7 +248,13 @@ func (w *Window) run(opts *WindowOptions) {
 				w.drawStart = time.Now()
 				w.hasNextFrame = false
 				w.out <- e
-				frame := <-w.frames
+				var frame *ui.Ops
+				// Wait for either a frame or the ack event,
+				// which meant that the client didn't draw.
+				select {
+				case frame = <-w.frames:
+				case w.out <- ackEvent:
+				}
 				if w.gpu != nil {
 					if e2.sync {
 						w.gpu.Refresh()
