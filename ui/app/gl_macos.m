@@ -67,6 +67,10 @@ CVDisplayLinkRef displayLink;
 - (BOOL)isFlipped {
 	return YES;
 }
+- (void)update {
+	[super update];
+	gio_onDraw((__bridge CFTypeRef)self);
+}
 - (void)drawRect:(NSRect)r {
 	gio_onDraw((__bridge CFTypeRef)self);
 }

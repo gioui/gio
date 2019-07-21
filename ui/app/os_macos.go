@@ -170,8 +170,9 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, x, y, dx, dy C.CGFloat, ti C.doub
 //export gio_onDraw
 func gio_onDraw(view C.CFTypeRef) {
 	viewDo(view, func(views viewMap, view C.CFTypeRef) {
-		w := views[view]
-		w.draw(true)
+		if w, exists := views[view]; exists {
+			w.draw(true)
+		}
 	})
 }
 
