@@ -13,8 +13,8 @@
 
 @implementation GioDelegate
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
-    [[NSRunningApplication currentApplication] activateWithOptions:(NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps)];
-    [self.window makeKeyAndOrderFront:self];
+	[[NSRunningApplication currentApplication] activateWithOptions:(NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps)];
+	[self.window makeKeyAndOrderFront:self];
 	gio_onShow((__bridge CFTypeRef)self.window.contentView);
 }
 - (void)applicationDidHide:(NSNotification *)aNotification {
@@ -31,7 +31,8 @@
 }
 - (void)windowDidChangeScreen:(NSNotification *)notification {
 	CGDirectDisplayID dispID = [[[self.window screen] deviceDescription][@"NSScreenNumber"] unsignedIntValue];
-	gio_updateDisplayLink((__bridge CFTypeRef)self.window.contentView, dispID);
+	CFTypeRef view = (__bridge CFTypeRef)self.window.contentView;
+	gio_updateDisplayLink(view, dispID);
 }
 - (void)windowDidBecomeKey:(NSNotification *)notification {
 	gio_onFocus((__bridge CFTypeRef)self.window.contentView, YES);
@@ -48,14 +49,12 @@
 
 CGFloat gio_viewHeight(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
-    NSRect bounds = [view convertRectToBacking:[view bounds]];
-	return bounds.size.height;
+	return [view bounds].size.height;
 }
 
 CGFloat gio_viewWidth(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
-    NSRect bounds = [view convertRectToBacking:[view bounds]];
-	return bounds.size.width;
+	return [view bounds].size.width;
 }
 
 // Points pr. dp.
@@ -68,8 +67,18 @@ static CGFloat getPointsPerDP(NSScreen *screen) {
 
 // Pixels pr dp.
 CGFloat gio_getPixelsPerDP(void) {
-    NSScreen *screen = [NSScreen mainScreen];
-    return [screen backingScaleFactor] * getPointsPerDP(screen);
+	NSScreen *screen = [NSScreen mainScreen];
+	return getPointsPerDP(screen);
+}
+
+CGFloat gio_getBackingScale() {
+	NSScreen *screen = [NSScreen mainScreen];
+	return [screen backingScaleFactor];
+}
+
+CGFloat gio_getViewBackingScale(CFTypeRef viewRef) {
+	NSView *view = (__bridge NSView *)viewRef;
+	return [view.window backingScaleFactor];
 }
 
 void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height) {
@@ -93,11 +102,6 @@ void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat heigh
 		NSMenu *menuBar = [NSMenu new];
 		[menuBar addItem:mainMenu];
 		[NSApp setMainMenu:menuBar];
-
-		// Width and height are in pixels; convert to points
-		CGFloat scale = [[NSScreen mainScreen] backingScaleFactor];
-		width /= scale;
-		height /= scale;
 
 		NSRect rect = NSMakeRect(0, 0, width, height);
 		NSWindowStyleMask styleMask = NSWindowStyleMaskTitled |

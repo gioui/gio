@@ -13,7 +13,7 @@
 
 static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFloat dy) {
 	NSPoint p = [view convertPoint:[event locationInWindow] fromView:nil];
-	CGFloat scale = view.layer.contentsScale;
+	CGFloat scale = view.window.backingScaleFactor;
 	if (!event.hasPreciseScrollingDeltas) {
 		// dx and dy are in rows and columns.
 		dx *= 10;

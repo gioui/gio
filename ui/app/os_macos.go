@@ -33,6 +33,7 @@ type window struct {
 	view  C.CFTypeRef
 	w     *Window
 	stage Stage
+	ppdp  float32
 }
 
 type viewCmd struct {
@@ -183,11 +184,14 @@ func gio_onFocus(view C.CFTypeRef, focus C.BOOL) {
 }
 
 func (w *window) draw(sync bool) {
-	width, height := int(C.gio_viewWidth(w.view)+.5), int(C.gio_viewHeight(w.view)+.5)
-	if width == 0 || height == 0 {
+	wf, hf := float32(C.gio_viewWidth(w.view)), float32(C.gio_viewHeight(w.view))
+	if wf == 0 || hf == 0 {
 		return
 	}
-	cfg := getConfig()
+	scale := float32(C.gio_getViewBackingScale(w.view))
+	width := int(wf*scale + .5)
+	height := int(hf*scale + .5)
+	cfg := configFor(w.ppdp, scale)
 	cfg.now = time.Now()
 	w.setStage(StageRunning)
 	w.w.event(DrawEvent{
@@ -200,12 +204,17 @@ func (w *window) draw(sync bool) {
 	})
 }
 
-func getConfig() Config {
+func getPixelsPerDp(scale float32) float32 {
 	ppdp := float32(C.gio_getPixelsPerDP())
-	ppdp *= monitorScale
+	ppdp = ppdp * scale * monitorScale
 	if ppdp < minDensity {
 		ppdp = minDensity
 	}
+	return ppdp / scale
+}
+
+func configFor(ppdp, scale float32) Config {
+	ppdp = ppdp * scale
 	return Config{
 		pxPerDp: ppdp,
 		pxPerSp: ppdp,
@@ -240,8 +249,10 @@ func gio_onShow(view C.CFTypeRef) {
 //export gio_onCreate
 func gio_onCreate(view C.CFTypeRef) {
 	viewDo(view, func(views viewMap, view C.CFTypeRef) {
+		scale := float32(C.gio_getBackingScale())
 		w := &window{
 			view: view,
+			ppdp: getPixelsPerDp(scale),
 		}
 		wopts := <-mainWindow.out
 		w.w = wopts.window
@@ -262,10 +273,15 @@ func Main() {
 		// TODO: return this error from CreateWindow.
 		panic(errors.New("CreateWindow: failed to create view"))
 	}
-	cfg := getConfig()
+	scale := float32(C.gio_getBackingScale())
+	ppdp := getPixelsPerDp(scale)
+	cfg := configFor(ppdp, scale)
 	opts := wopts.opts
 	w := cfg.Px(opts.Width)
 	h := cfg.Px(opts.Height)
+	// Window sizes is on screen coordinates, not device pixels.
+	w = int(float32(w) / scale)
+	h = int(float32(h) / scale)
 	title := C.CString(opts.Title)
 	defer C.free(unsafe.Pointer(title))
 	C.gio_main(view, title, C.CGFloat(w), C.CGFloat(h))
