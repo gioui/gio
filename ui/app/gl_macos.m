@@ -68,7 +68,7 @@ CVDisplayLinkRef displayLink;
 }
 - (void)update {
 	[super update];
-	gio_onDraw((__bridge CFTypeRef)self);
+	[self setNeedsDisplay:YES];
 }
 - (void)drawRect:(NSRect)r {
 	gio_onDraw((__bridge CFTypeRef)self);
