@@ -49,6 +49,10 @@ func (q *Router) Frame(ops *ui.Ops) {
 
 	q.pqueue.Frame(ops, &q.handlers)
 	q.kqueue.Frame(ops, &q.handlers)
+	if q.handlers.Updated() {
+		q.wakeup = true
+		q.wakeupTime = time.Time{}
+	}
 }
 
 func (q *Router) Add(e input.Event) bool {
