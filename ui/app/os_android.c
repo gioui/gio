@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 #include <jni.h>
+#include <dlfcn.h>
+#include <android/log.h>
 #include "os_android.h"
 #include "_cgo_export.h"
 
@@ -18,6 +20,11 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
 	}
 
 	static const JNINativeMethod methods[] = {
+		{
+			.name = "runGoMain",
+			.signature = "([B)V",
+			.fnPtr = runGoMain
+		},
 		{
 			.name = "onCreateView",
 			.signature = "(Lorg/gioui/GioView;)J",
@@ -93,23 +100,6 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
 		return -1;
 	}
 
-	// Initialize data dir.
-	jmethodID dataDirMethod = (*env)->GetStaticMethodID(env, viewClass, "dataDir", "()[B");
-	if (dataDirMethod == NULL) {
-		return -1;
-	}
-	jbyteArray dirArr = (*env)->CallStaticObjectMethod(env, viewClass, dataDirMethod);
-	if (dirArr == NULL) {
-		return -1;
-	}
-	jbyte *dir = (*env)->GetByteArrayElements(env, dirArr, NULL);
-	if (dir == NULL) {
-		return -1;
-	}
-	jint n = (*env)->GetArrayLength(env, dirArr);
-	setDataDir((char *)dir, n);
-	(*env)->ReleaseByteArrayElements(env, dirArr, dir, JNI_ABORT);
-
 	return JNI_VERSION_1_6;
 }
 
@@ -163,4 +153,16 @@ void gio_jni_CallVoidMethod(JNIEnv *env, jobject obj, jmethodID methodID) {
 
 void gio_jni_CallVoidMethod_J(JNIEnv *env, jobject obj, jmethodID methodID, jlong a1) {
 	(*env)->CallVoidMethod(env, obj, methodID, a1);
+}
+
+jbyte *gio_jni_GetByteArrayElements(JNIEnv *env, jbyteArray arr) {
+	return (*env)->GetByteArrayElements(env, arr, NULL);
+}
+
+void gio_jni_ReleaseByteArrayElements(JNIEnv *env, jbyteArray arr, jbyte *bytes) {
+	(*env)->ReleaseByteArrayElements(env, arr, bytes, JNI_ABORT);
+}
+
+jsize gio_jni_GetArrayLength(JNIEnv *env, jbyteArray arr) {
+	return (*env)->GetArrayLength(env, arr);
 }

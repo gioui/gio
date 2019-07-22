@@ -76,6 +76,19 @@ func jniGetStaticMethodID(env *C.JNIEnv, class C.jclass, method, sig string) C.j
 	return C.gio_jni_GetStaticMethodID(env, class, m, s)
 }
 
+//export runGoMain
+func runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyteArray) {
+	dirBytes := C.gio_jni_GetByteArrayElements(env, jdataDir)
+	if dirBytes == nil {
+		panic("runGoMain: GetByteArrayElements failed")
+	}
+	n := C.gio_jni_GetArrayLength(env, jdataDir)
+	dataDir := C.GoStringN((*C.char)(unsafe.Pointer(dirBytes)), n)
+	setDataDir(dataDir)
+	C.gio_jni_ReleaseByteArrayElements(env, jdataDir, dirBytes)
+	runMain()
+}
+
 //export setJVM
 func setJVM(vm *C.JavaVM) {
 	theJVM = vm
@@ -407,8 +420,6 @@ func (w *window) showTextInput(show bool) {
 }
 
 func Main() {
-	// Android runs in c-shared mode where main is never reached.
-	panic("call to Main from outside main")
 }
 
 func createWindow(window *Window, opts *WindowOptions) error {

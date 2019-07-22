@@ -252,6 +252,4 @@ func createWindow(win *Window, opts *WindowOptions) error {
 }
 
 func Main() {
-	// iOS runs in c-archive mode, so this is never reached.
-	panic("call to Main from outside main")
 }

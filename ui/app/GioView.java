@@ -27,7 +27,6 @@ import java.io.UnsupportedEncodingException;
 public class GioView extends SurfaceView implements Choreographer.FrameCallback {
 	private final static Object initLock = new Object();
 	private static boolean jniLoaded;
-	private static String dataDir;
 
 	private final SurfaceHolder.Callback callbacks;
 	private final InputMethodManager imm;
@@ -39,17 +38,16 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 			if (jniLoaded) {
 				return;
 			}
-			dataDir = appCtx.getFilesDir().getAbsolutePath();
+			String dataDir = appCtx.getFilesDir().getAbsolutePath();
+			byte[] dataDirUTF8;
+			try {
+				dataDirUTF8 = dataDir.getBytes("UTF-8");
+			} catch (UnsupportedEncodingException e) {
+				throw new RuntimeException(e);
+			}
 			System.loadLibrary("gio");
+			runGoMain(dataDirUTF8);
 			jniLoaded = true;
-		}
-	}
-
-	static byte[] dataDir() {
-		try {
-			return dataDir.getBytes("UTF-8");
-		} catch (UnsupportedEncodingException e) {
-			throw new RuntimeException(e);
 		}
 	}
 
@@ -221,6 +219,7 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 	static private native void onFrameCallback(long handle, long nanos);
 	static private native boolean onBack(long handle);
 	static private native void onFocusChange(long handle, boolean focus);
+	static private native void runGoMain(byte[] dataDir);
 
 	private static class InputConnection extends BaseInputConnection {
 		private final Editable editable;

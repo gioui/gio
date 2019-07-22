@@ -20,8 +20,6 @@ func dataDir() (string, error) {
 	return dataPath, nil
 }
 
-//export setDataDir
-func setDataDir(cdir *C.char, len C.int) {
-	dir := C.GoStringN(cdir, len)
+func setDataDir(dir string) {
 	dataDirChan <- dir
 }

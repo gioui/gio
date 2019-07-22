@@ -14,3 +14,6 @@ __attribute__ ((visibility ("hidden"))) jfloat gio_jni_CallFloatMethod(JNIEnv *e
 __attribute__ ((visibility ("hidden"))) jint gio_jni_CallIntMethod(JNIEnv *env, jobject obj, jmethodID methodID);
 __attribute__ ((visibility ("hidden"))) void gio_jni_CallVoidMethod(JNIEnv *env, jobject obj, jmethodID methodID);
 __attribute__ ((visibility ("hidden"))) void gio_jni_CallVoidMethod_J(JNIEnv *env, jobject obj, jmethodID methodID, jlong a1);
+__attribute__ ((visibility ("hidden"))) jbyte *gio_jni_GetByteArrayElements(JNIEnv *env, jbyteArray arr);
+__attribute__ ((visibility ("hidden"))) void gio_jni_ReleaseByteArrayElements(JNIEnv *env, jbyteArray arr, jbyte *bytes);
+__attribute__ ((visibility ("hidden"))) jsize gio_jni_GetArrayLength(JNIEnv *env, jbyteArray arr);

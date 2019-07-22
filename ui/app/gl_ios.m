@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-//+build darwin,ios
+// +build darwin,ios
 
 @import UIKit;
 @import OpenGLES;
