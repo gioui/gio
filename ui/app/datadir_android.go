@@ -5,13 +5,23 @@
 package app
 
 import "C"
+import "sync"
 
-var dataDir func() (string, error)
+var (
+	dataDirOnce sync.Once
+	dataDirChan = make(chan string, 1)
+	dataPath    string
+)
+
+func dataDir() (string, error) {
+	dataDirOnce.Do(func() {
+		dataPath = <-dataDirChan
+	})
+	return dataPath, nil
+}
 
 //export setDataDir
 func setDataDir(cdir *C.char, len C.int) {
 	dir := C.GoStringN(cdir, len)
-	dataDir = func() (string, error) {
-		return dir, nil
-	}
+	dataDirChan <- dir
 }

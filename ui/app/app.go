@@ -121,6 +121,9 @@ func init() {
 // On desktop systems, DataDir use os.UserConfigDir.
 // On iOS NSDocumentDirectory is queried.
 // For Android Context.getFilesDir is used.
+//
+// BUG: DataDir blocks on Android until init functions
+// have completed.
 func DataDir() (string, error) {
 	return dataDir()
 }
