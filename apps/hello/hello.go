@@ -20,18 +20,13 @@ import (
 )
 
 func main() {
-	app.Main()
-}
-
-// On iOS and Android main will never be called, so
-// setting up the window must run in an init function.
-func init() {
 	go func() {
 		w := app.NewWindow(nil)
 		if err := loop(w); err != nil {
 			log.Fatal(err)
 		}
 	}()
+	app.Main()
 }
 
 func loop(w *app.Window) error {

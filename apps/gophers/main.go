@@ -126,25 +126,12 @@ var theme struct {
 }
 
 func main() {
+	flag.Parse()
+	initProfiling()
 	if *token == "" {
 		fmt.Println("The quota for anonymous GitHub API access is very low. Specify a token with -token to avoid quota errors.")
 		fmt.Println("See https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line.")
 	}
-	app.Main()
-}
-
-func initProfiling() {
-	if !*profile {
-		return
-	}
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
-}
-
-func init() {
-	flag.Parse()
-	initProfiling()
 	go func() {
 		fonts.regular = mustLoadFont(goregular.TTF)
 		fonts.bold = mustLoadFont(gobold.TTF)
@@ -163,6 +150,16 @@ func init() {
 		if err := newApp(w).run(); err != nil {
 			log.Fatal(err)
 		}
+	}()
+	app.Main()
+}
+
+func initProfiling() {
+	if !*profile {
+		return
+	}
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 }
 
