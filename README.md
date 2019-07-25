@@ -9,6 +9,11 @@ to support efficient animations, transformed drawing and pixel resolution indepe
 
 [![GoDoc](https://godoc.org/gioui.org/ui?status.svg)](https://godoc.org/gioui.org/ui)
 
+## Gophercon 2019 talk
+
+There is a [Gophercon 2019 talk](https://go-talks.appspot.com/github.com/eliasnaur/gophercon-2019-talk/gophercon-2019.slide)
+about Gio and [Scatter](https://scatter.im).
+
 ## Quickstart
 
 Gio is designed to work with very few dependencies. It depends only on the platform libraries for
