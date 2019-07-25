@@ -711,7 +711,7 @@ loop:
 			}
 			bounds := boundRectF(clip)
 			mat := state.materialFor(d.cache, op.Rect, off, bounds)
-			if bounds.Min == (image.Point{}) && bounds.Max == d.viewport && mat.opaque && mat.material == materialColor {
+			if bounds.Min == (image.Point{}) && bounds.Max == d.viewport && state.rect && mat.opaque && mat.material == materialColor {
 				// The image is a uniform opaque color and takes up the whole screen.
 				// Scrap images up to and including this image and set clear color.
 				d.zimageOps = d.zimageOps[:0]
