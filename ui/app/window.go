@@ -207,7 +207,7 @@ func (w *Window) run(opts *WindowOptions) {
 	defer close(w.in)
 	defer close(w.out)
 	if err := createWindow(w, opts); err != nil {
-		w.destroy(err)
+		w.out <- DestroyEvent{err}
 		return
 	}
 	for {
