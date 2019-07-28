@@ -480,6 +480,10 @@ void main() {
 	float area = 0.5*(sides.z - sides.z*sides.y + 1.0 - sides.x+sides.x*sides.w);
 	area *= width;
 
+	// Work around issue #13.
+	if (width == 0.0)
+		area = 0.0;
+
 	gl_FragColor.r = area;
 }
 `
