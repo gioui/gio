@@ -41,7 +41,7 @@ type pointerInfo struct {
 type pointerHandler struct {
 	area      int
 	active    bool
-	transform ui.Transform
+	transform ui.TransformOp
 	wantsGrab bool
 }
 
@@ -51,7 +51,7 @@ type areaOp struct {
 }
 
 type areaNode struct {
-	trans ui.Transform
+	trans ui.TransformOp
 	next  int
 	area  areaOp
 }
@@ -63,7 +63,7 @@ const (
 	areaEllipse
 )
 
-func (q *pointerQueue) collectHandlers(r *ui.OpsReader, events *handlerEvents, t ui.Transform, area, node int, pass bool) {
+func (q *pointerQueue) collectHandlers(r *ui.OpsReader, events *handlerEvents, t ui.TransformOp, area, node int, pass bool) {
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypePush:
@@ -88,7 +88,7 @@ func (q *pointerQueue) collectHandlers(r *ui.OpsReader, events *handlerEvents, t
 		case ops.TypeTransform:
 			var op ui.TransformOp
 			op.Decode(encOp.Data)
-			t = t.Mul(op.Transform)
+			t = t.Mul(op)
 		case ops.TypePointerHandler:
 			var op pointer.HandlerOp
 			op.Decode(encOp.Data, encOp.Refs)
@@ -169,7 +169,7 @@ func (q *pointerQueue) Frame(root *ui.Ops, events *handlerEvents) {
 	q.hitTree = q.hitTree[:0]
 	q.areas = q.areas[:0]
 	q.reader.Reset(root)
-	q.collectHandlers(&q.reader, events, ui.Transform{}, -1, -1, false)
+	q.collectHandlers(&q.reader, events, ui.TransformOp{}, -1, -1, false)
 	for k, h := range q.handlers {
 		if !h.active {
 			q.dropHandler(k)

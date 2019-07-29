@@ -209,7 +209,7 @@ func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, cs layout
 		}
 		var stack ui.StackOp
 		stack.Push(ops)
-		ui.TransformOp{Transform: ui.Offset(lineOff)}.Add(ops)
+		ui.TransformOp{}.Offset(lineOff).Add(ops)
 		e.Face.Path(str).Add(ops)
 		draw.DrawOp{Rect: toRectF(clip).Sub(lineOff)}.Add(ops)
 		stack.Pop()

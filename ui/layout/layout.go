@@ -96,7 +96,7 @@ func (in *Inset) Begin(c ui.Config, ops *ui.Ops, cs Constraints) Constraints {
 		}
 	}
 	in.stack.Push(ops)
-	ui.TransformOp{Transform: ui.Offset(toPointF(image.Point{X: in.left, Y: in.top}))}.Add(ops)
+	ui.TransformOp{}.Offset(toPointF(image.Point{X: in.left, Y: in.top})).Add(ops)
 	return mcs
 }
 
@@ -169,7 +169,7 @@ func (a *Align) End(dims Dimens) Dimens {
 	}
 	var stack ui.StackOp
 	stack.Push(ops)
-	ui.TransformOp{Transform: ui.Offset(toPointF(p))}.Add(ops)
+	ui.TransformOp{}.Offset(toPointF(p)).Add(ops)
 	a.macro.Add(ops)
 	stack.Pop()
 	return Dimens{

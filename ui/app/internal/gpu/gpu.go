@@ -73,7 +73,7 @@ type drawOps struct {
 
 type drawState struct {
 	clip  f32.Rectangle
-	t     ui.Transform
+	t     ui.TransformOp
 	cpath *pathOp
 	rect  bool
 	z     int
@@ -664,7 +664,7 @@ loop:
 		case ops.TypeTransform:
 			var op ui.TransformOp
 			op.Decode(encOp.Data)
-			state.t = state.t.Mul(op.Transform)
+			state.t = state.t.Mul(op)
 		case ops.TypeAux:
 			aux = encOp.Data[ops.TypeAuxLen:]
 			auxKey = encOp.Key

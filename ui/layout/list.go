@@ -229,9 +229,7 @@ func (l *List) Layout() Dimens {
 		var stack ui.StackOp
 		stack.Push(ops)
 		draw.RectClip(r).Add(ops)
-		ui.TransformOp{
-			Transform: ui.Offset(toPointF(axisPoint(l.Axis, transPos, cross))),
-		}.Add(ops)
+		ui.TransformOp{}.Offset(toPointF(axisPoint(l.Axis, transPos, cross))).Add(ops)
 		child.macro.Add(ops)
 		stack.Pop()
 		pos += childSize

@@ -159,9 +159,7 @@ func (f *Flex) Layout(children ...FlexChild) Dimens {
 		}
 		var stack ui.StackOp
 		stack.Push(f.ops)
-		ui.TransformOp{
-			Transform: ui.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))),
-		}.Add(f.ops)
+		ui.TransformOp{}.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))).Add(f.ops)
 		child.macro.Add(f.ops)
 		stack.Pop()
 		mainSize += axisMain(f.Axis, dims.Size)

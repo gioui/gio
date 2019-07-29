@@ -106,7 +106,7 @@ func (s *Stack) Layout(children ...StackChild) Dimens {
 		}
 		var stack ui.StackOp
 		stack.Push(s.ops)
-		ui.TransformOp{Transform: ui.Offset(toPointF(p))}.Add(s.ops)
+		ui.TransformOp{}.Offset(toPointF(p)).Add(s.ops)
 		ch.macro.Add(s.ops)
 		stack.Pop()
 	}

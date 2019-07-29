@@ -28,11 +28,7 @@ type InvalidateOp struct {
 
 // TransformOp applies a transform to later ops.
 type TransformOp struct {
-	Transform Transform
-}
-
-type Transform struct {
-	// TODO: general transforms.
+	// TODO: general transformations.
 	offset f32.Point
 }
 
@@ -63,16 +59,20 @@ func (r *InvalidateOp) Decode(d []byte) {
 	}
 }
 
-func (t Transform) InvTransform(p f32.Point) f32.Point {
+func (t TransformOp) Offset(o f32.Point) TransformOp {
+	return TransformOp{o}
+}
+
+func (t TransformOp) InvTransform(p f32.Point) f32.Point {
 	return p.Sub(t.offset)
 }
 
-func (t Transform) Transform(p f32.Point) f32.Point {
+func (t TransformOp) Transform(p f32.Point) f32.Point {
 	return p.Add(t.offset)
 }
 
-func (t Transform) Mul(t2 Transform) Transform {
-	return Transform{
+func (t TransformOp) Mul(t2 TransformOp) TransformOp {
+	return TransformOp{
 		offset: t.offset.Add(t2.offset),
 	}
 }
@@ -81,8 +81,8 @@ func (t TransformOp) Add(o *Ops) {
 	data := make([]byte, ops.TypeTransformLen)
 	data[0] = byte(ops.TypeTransform)
 	bo := binary.LittleEndian
-	bo.PutUint32(data[1:], math.Float32bits(t.Transform.offset.X))
-	bo.PutUint32(data[5:], math.Float32bits(t.Transform.offset.Y))
+	bo.PutUint32(data[1:], math.Float32bits(t.offset.X))
+	bo.PutUint32(data[5:], math.Float32bits(t.offset.Y))
 	o.Write(data)
 }
 
@@ -91,14 +91,8 @@ func (t *TransformOp) Decode(d []byte) {
 	if ops.OpType(d[0]) != ops.TypeTransform {
 		panic("invalid op")
 	}
-	*t = TransformOp{
-		Transform: Offset(f32.Point{
-			X: math.Float32frombits(bo.Uint32(d[1:])),
-			Y: math.Float32frombits(bo.Uint32(d[5:])),
-		}),
-	}
-}
-
-func Offset(o f32.Point) Transform {
-	return Transform{o}
+	*t = TransformOp{f32.Point{
+		X: math.Float32frombits(bo.Uint32(d[1:])),
+		Y: math.Float32frombits(bo.Uint32(d[5:])),
+	}}
 }
