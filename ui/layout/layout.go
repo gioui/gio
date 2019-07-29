@@ -75,25 +75,21 @@ func (in *Inset) Begin(c ui.Config, ops *ui.Ops, cs Constraints) Constraints {
 	in.begun = true
 	in.cs = cs
 	mcs := cs
-	if mcs.Width.Max != ui.Inf {
-		mcs.Width.Min -= in.left + in.right
-		mcs.Width.Max -= in.left + in.right
-		if mcs.Width.Min < 0 {
-			mcs.Width.Min = 0
-		}
-		if mcs.Width.Max < mcs.Width.Min {
-			mcs.Width.Max = mcs.Width.Min
-		}
+	mcs.Width.Min -= in.left + in.right
+	mcs.Width.Max -= in.left + in.right
+	if mcs.Width.Min < 0 {
+		mcs.Width.Min = 0
 	}
-	if mcs.Height.Max != ui.Inf {
-		mcs.Height.Min -= in.top + in.bottom
-		mcs.Height.Max -= in.top + in.bottom
-		if mcs.Height.Min < 0 {
-			mcs.Height.Min = 0
-		}
-		if mcs.Height.Max < mcs.Height.Min {
-			mcs.Height.Max = mcs.Height.Min
-		}
+	if mcs.Width.Max < mcs.Width.Min {
+		mcs.Width.Max = mcs.Width.Min
+	}
+	mcs.Height.Min -= in.top + in.bottom
+	mcs.Height.Max -= in.top + in.bottom
+	if mcs.Height.Min < 0 {
+		mcs.Height.Min = 0
+	}
+	if mcs.Height.Max < mcs.Height.Min {
+		mcs.Height.Max = mcs.Height.Min
 	}
 	in.stack.Push(ops)
 	ui.TransformOp{}.Offset(toPointF(image.Point{X: in.left, Y: in.top})).Add(ops)

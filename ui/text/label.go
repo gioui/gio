@@ -5,7 +5,6 @@ package text
 import (
 	"image"
 	"image/color"
-	"math"
 	"unicode/utf8"
 
 	"gioui.org/ui"
@@ -35,6 +34,8 @@ type lineIterator struct {
 
 	y, prevDesc fixed.Int26_6
 }
+
+const inf = 1e6
 
 func (l *lineIterator) Next() (String, f32.Point, bool) {
 	for len(l.Lines) > 0 {
@@ -92,8 +93,8 @@ func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	dims.Size = cs.Constrain(dims.Size)
 	padTop, padBottom := textPadding(lines)
 	clip := image.Rectangle{
-		Min: image.Point{X: -ui.Inf, Y: -padTop},
-		Max: image.Point{X: ui.Inf, Y: dims.Size.Y + padBottom},
+		Min: image.Point{X: -inf, Y: -padTop},
+		Max: image.Point{X: inf, Y: dims.Size.Y + padBottom},
 	}
 	l.it = lineIterator{
 		Lines:     lines,
@@ -120,21 +121,10 @@ func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	return dims
 }
 
-func itof(i int) float32 {
-	switch i {
-	case ui.Inf:
-		return float32(math.Inf(+1))
-	case -ui.Inf:
-		return float32(math.Inf(-1))
-	default:
-		return float32(i)
-	}
-}
-
 func toRectF(r image.Rectangle) f32.Rectangle {
 	return f32.Rectangle{
-		Min: f32.Point{X: itof(r.Min.X), Y: itof(r.Min.Y)},
-		Max: f32.Point{X: itof(r.Max.X), Y: itof(r.Max.Y)},
+		Min: f32.Point{X: float32(r.Min.X), Y: float32(r.Min.Y)},
+		Max: f32.Point{X: float32(r.Max.X), Y: float32(r.Max.Y)},
 	}
 }
 

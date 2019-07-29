@@ -606,25 +606,11 @@ func boundRectF(r f32.Rectangle) image.Rectangle {
 }
 
 func ceil(v float32) int {
-	switch {
-	case math.IsInf(float64(v), +1):
-		return ui.Inf
-	case math.IsInf(float64(v), -1):
-		return -ui.Inf
-	default:
-		return int(math.Ceil(float64(v)))
-	}
+	return int(math.Ceil(float64(v)))
 }
 
 func floor(v float32) int {
-	switch {
-	case math.IsInf(float64(v), +1):
-		return ui.Inf
-	case math.IsInf(float64(v), -1):
-		return -ui.Inf
-	default:
-		return int(math.Floor(float64(v)))
-	}
+	return int(math.Floor(float64(v)))
 }
 
 func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {

@@ -56,6 +56,8 @@ const (
 	iterateBackward
 )
 
+const inf = 1e6
+
 // Init prepares the list for iterating through its elements with Next.
 func (l *List) Init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, len int) {
 	if l.more {
@@ -117,7 +119,7 @@ func (l *List) Index() int {
 
 // Constraints is the constraints for the current element.
 func (l *List) Constraints() Constraints {
-	return axisConstraints(l.Axis, Constraint{Max: ui.Inf}, axisCrossConstraint(l.Axis, l.cs))
+	return axisConstraints(l.Axis, Constraint{Max: inf}, axisCrossConstraint(l.Axis, l.cs))
 }
 
 func (l *List) More() bool {
@@ -223,8 +225,8 @@ func (l *List) Layout() Dimens {
 			min, max = mainc.Max-max, mainc.Max-min
 		}
 		r := image.Rectangle{
-			Min: axisPoint(l.Axis, min, -ui.Inf),
-			Max: axisPoint(l.Axis, max, ui.Inf),
+			Min: axisPoint(l.Axis, min, -inf),
+			Max: axisPoint(l.Axis, max, inf),
 		}
 		var stack ui.StackOp
 		stack.Push(ops)

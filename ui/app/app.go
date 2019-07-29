@@ -153,9 +153,6 @@ func (c *Config) Px(v ui.Value) int {
 	default:
 		panic("unknown unit")
 	}
-	if math.IsInf(float64(r), +1) {
-		return ui.Inf
-	}
 	return int(math.Round(float64(r)))
 }
 

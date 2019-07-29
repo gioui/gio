@@ -119,20 +119,9 @@ func RectClip(r image.Rectangle) ClipOp {
 	return ClipOp{bounds: toRectF(r)}
 }
 
-func itof(i int) float32 {
-	switch i {
-	case ui.Inf:
-		return float32(math.Inf(+1))
-	case -ui.Inf:
-		return float32(math.Inf(-1))
-	default:
-		return float32(i)
-	}
-}
-
 func toRectF(r image.Rectangle) f32.Rectangle {
 	return f32.Rectangle{
-		Min: f32.Point{X: itof(r.Min.X), Y: itof(r.Min.Y)},
-		Max: f32.Point{X: itof(r.Max.X), Y: itof(r.Max.Y)},
+		Min: f32.Point{X: float32(r.Min.X), Y: float32(r.Min.Y)},
+		Max: f32.Point{X: float32(r.Max.X), Y: float32(r.Max.Y)},
 	}
 }

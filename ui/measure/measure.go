@@ -148,9 +148,7 @@ func layoutText(ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOpt
 	}
 	var lines []text.Line
 	maxDotX := fixed.Int26_6(math.MaxInt32)
-	if opts.MaxWidth != ui.Inf {
-		maxDotX = fixed.I(opts.MaxWidth)
-	}
+	maxDotX = fixed.I(opts.MaxWidth)
 	type state struct {
 		r     rune
 		advs  []fixed.Int26_6

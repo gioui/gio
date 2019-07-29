@@ -82,9 +82,6 @@ func (f *Flex) Rigid() Constraints {
 	f.begin(modeRigid)
 	mainc := axisMainConstraint(f.Axis, f.cs)
 	mainMax := mainc.Max
-	if mainc.Max != ui.Inf {
-		mainMax -= f.size
-	}
 	return axisConstraints(f.Axis, Constraint{Max: mainMax}, axisCrossConstraint(f.Axis, f.cs))
 }
 
@@ -92,7 +89,7 @@ func (f *Flex) Flexible(weight float32) Constraints {
 	f.begin(modeFlex)
 	mainc := axisMainConstraint(f.Axis, f.cs)
 	var flexSize int
-	if mainc.Max != ui.Inf && mainc.Max > f.size {
+	if mainc.Max > f.size {
 		maxSize := mainc.Max - f.size
 		flexSize = mainc.Max - f.rigidSize
 		flexSize = int(float32(flexSize)*weight + .5)

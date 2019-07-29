@@ -32,9 +32,6 @@ type TransformOp struct {
 	offset f32.Point
 }
 
-// Inf is the int value that represents an unbounded maximum constraint.
-const Inf = int(^uint(0) >> 1)
-
 func (r InvalidateOp) Add(o *Ops) {
 	data := make([]byte, ops.TypeRedrawLen)
 	data[0] = byte(ops.TypeInvalidate)

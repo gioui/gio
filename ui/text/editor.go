@@ -159,9 +159,9 @@ func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, cs layout
 	e.padLeft, e.padRight = twoDp, twoDp
 	maxWidth := cs.Width.Max
 	if e.SingleLine {
-		maxWidth = ui.Inf
+		maxWidth = inf
 	}
-	if maxWidth != ui.Inf {
+	if maxWidth != inf {
 		maxWidth -= e.padLeft + e.padRight
 	}
 	if maxWidth != e.maxWidth {
