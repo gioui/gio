@@ -626,12 +626,6 @@ type fill struct {
 
 func (f fill) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 	d := image.Point{X: cs.Width.Max, Y: cs.Height.Max}
-	if d.X == ui.Inf {
-		d.X = cs.Width.Min
-	}
-	if d.Y == ui.Inf {
-		d.Y = cs.Height.Min
-	}
 	dr := f32.Rectangle{
 		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
 	}
