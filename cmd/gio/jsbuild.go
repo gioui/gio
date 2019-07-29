@@ -21,6 +21,7 @@ func buildJS(bi *buildInfo) error {
 	cmd := exec.Command(
 		"go",
 		"build",
+		"-ldflags=-w -s "+bi.ldflags,
 		"-o", filepath.Join(out, "main.wasm"),
 		bi.pkg,
 	)
