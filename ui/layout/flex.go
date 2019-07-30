@@ -81,7 +81,10 @@ func (f *Flex) begin(mode flexMode) {
 func (f *Flex) Rigid() Constraints {
 	f.begin(modeRigid)
 	mainc := axisMainConstraint(f.Axis, f.cs)
-	mainMax := mainc.Max
+	mainMax := mainc.Max - f.size
+	if mainMax < 0 {
+		mainMax = 0
+	}
 	return axisConstraints(f.Axis, Constraint{Max: mainMax}, axisCrossConstraint(f.Axis, f.cs))
 }
 
