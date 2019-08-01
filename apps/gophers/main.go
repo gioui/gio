@@ -363,7 +363,7 @@ func (a *App) face(f *sfnt.Font, size float32) text.Face {
 }
 
 func (a *App) layoutTimings(c ui.Config, q input.Queue, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	for _, e := range q.Events(a) {
+	for e, ok := q.Next(a); ok; e, ok = q.Next(a) {
 		if e, ok := e.(system.ProfileEvent); ok {
 			a.profile = e
 		}
