@@ -182,5 +182,4 @@ func (s Source) String() string {
 	}
 }
 
-func (Event) ImplementsEvent()      {}
-func (Event) ImplementsInputEvent() {}
+func (Event) ImplementsEvent() {}

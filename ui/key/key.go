@@ -80,9 +80,6 @@ func (h HideInputOp) Add(o *ui.Ops) {
 	o.Write(data)
 }
 
-func (EditEvent) ImplementsEvent()       {}
-func (ChordEvent) ImplementsEvent()      {}
-func (FocusEvent) ImplementsEvent()      {}
-func (EditEvent) ImplementsInputEvent()  {}
-func (ChordEvent) ImplementsInputEvent() {}
-func (FocusEvent) ImplementsInputEvent() {}
+func (EditEvent) ImplementsEvent()  {}
+func (ChordEvent) ImplementsEvent() {}
+func (FocusEvent) ImplementsEvent() {}

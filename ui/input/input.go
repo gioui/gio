@@ -14,7 +14,7 @@ type Queue interface {
 // For a handler h, the key is typically &h.
 type Key interface{}
 
-// Event is the marker interface for input events.
+// Event is the marker interface for events.
 type Event interface {
-	ImplementsInputEvent()
+	ImplementsEvent()
 }

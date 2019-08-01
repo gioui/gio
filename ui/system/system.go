@@ -38,4 +38,4 @@ func (p *ProfileOp) Decode(d []byte, refs []interface{}) {
 	}
 }
 
-func (p ProfileEvent) ImplementsInputEvent() {}
+func (p ProfileEvent) ImplementsEvent() {}

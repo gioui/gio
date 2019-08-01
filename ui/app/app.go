@@ -13,10 +13,6 @@ import (
 	"gioui.org/ui"
 )
 
-type Event interface {
-	ImplementsEvent()
-}
-
 // DrawEvent is sent when a Window's Draw
 // method must be called.
 type DrawEvent struct {

@@ -27,8 +27,8 @@ type Window struct {
 	drawStart time.Time
 	gpu       *gpu.GPU
 
-	out         chan Event
-	in          chan Event
+	out         chan input.Event
+	in          chan input.Event
 	ack         chan struct{}
 	invalidates chan struct{}
 	frames      chan *ui.Ops
@@ -66,7 +66,7 @@ var _ interface {
 } = (*window)(nil)
 
 // Pre-allocate the ack event to avoid garbage.
-var ackEvent Event
+var ackEvent input.Event
 
 // NewWindow creates a new window for a set of window
 // options. The options are hints; the platform is free to
@@ -86,8 +86,8 @@ func NewWindow(opts *WindowOptions) *Window {
 	}
 
 	w := &Window{
-		in:          make(chan Event),
-		out:         make(chan Event),
+		in:          make(chan input.Event),
+		out:         make(chan input.Event),
 		ack:         make(chan struct{}),
 		invalidates: make(chan struct{}, 1),
 		frames:      make(chan *ui.Ops),
@@ -96,7 +96,7 @@ func NewWindow(opts *WindowOptions) *Window {
 	return w
 }
 
-func (w *Window) Events() <-chan Event {
+func (w *Window) Events() <-chan input.Event {
 	return w.out
 }
 
@@ -178,7 +178,7 @@ func (w *Window) setDriver(d *window) {
 	w.event(driverEvent{d})
 }
 
-func (w *Window) event(e Event) {
+func (w *Window) event(e input.Event) {
 	w.in <- e
 	<-w.ack
 }
@@ -289,18 +289,18 @@ func (w *Window) run(opts *WindowOptions) {
 			case *CommandEvent:
 				w.out <- e
 				w.waitAck()
-			case input.Event:
-				if w.queue.q.Add(e2) {
-					w.setNextFrame(time.Time{})
-					w.updateAnimation()
-				}
-				w.out <- e
 			case driverEvent:
 				w.driver = e2.driver
 			case DestroyEvent:
 				w.out <- e2
 				w.ack <- struct{}{}
 				return
+			case input.Event:
+				if w.queue.q.Add(e2) {
+					w.setNextFrame(time.Time{})
+					w.updateAnimation()
+				}
+				w.out <- e
 			}
 			w.ack <- struct{}{}
 		}
