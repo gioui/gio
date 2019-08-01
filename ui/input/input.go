@@ -7,7 +7,7 @@ package input
 // Queue maps an event handler key to the events
 // available to the handler.
 type Queue interface {
-	Events(k Key) []Event
+	Next(k Key) (Event, bool)
 }
 
 // Key is the stable identifier for an event handler.

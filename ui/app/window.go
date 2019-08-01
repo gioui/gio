@@ -307,8 +307,8 @@ func (w *Window) run(opts *WindowOptions) {
 	}
 }
 
-func (q *Queue) Events(k input.Key) []input.Event {
-	return q.q.Events(k)
+func (q *Queue) Next(k input.Key) (input.Event, bool) {
+	return q.q.Next(k)
 }
 
 func (_ driverEvent) ImplementsEvent() {}

@@ -83,7 +83,7 @@ func (c *Click) Add(ops *ui.Ops) {
 
 func (c *Click) Events(q input.Queue) []ClickEvent {
 	var events []ClickEvent
-	for _, evt := range q.Events(c) {
+	for evt, ok := q.Next(c); ok; evt, ok = q.Next(c) {
 		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue
@@ -136,7 +136,7 @@ func (s *Scroll) Scroll(cfg ui.Config, q input.Queue, axis Axis) int {
 		return 0
 	}
 	total := 0
-	for _, evt := range q.Events(s) {
+	for evt, ok := q.Next(s); ok; evt, ok = q.Next(s) {
 		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue

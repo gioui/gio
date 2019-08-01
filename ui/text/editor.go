@@ -113,7 +113,7 @@ func (e *Editor) Next(cfg ui.Config, queue input.Queue) (EditorEvent, bool) {
 	if (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin) {
 		e.scroller.Stop()
 	}
-	for _, ke := range queue.Events(e) {
+	for ke, ok := queue.Next(e); ok; ke, ok = queue.Next(e) {
 		e.blinkStart = cfg.Now()
 		switch ke := ke.(type) {
 		case key.FocusEvent:

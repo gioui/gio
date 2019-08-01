@@ -36,8 +36,8 @@ type handlerEvents struct {
 	updated  bool
 }
 
-func (q *Router) Events(k input.Key) []input.Event {
-	return q.handlers.For(k)
+func (q *Router) Next(k input.Key) (input.Event, bool) {
+	return q.handlers.Next(k)
 }
 
 func (q *Router) Frame(ops *ui.Ops) {
@@ -125,10 +125,14 @@ func (h *handlerEvents) Updated() bool {
 	return u
 }
 
-func (h *handlerEvents) For(k input.Key) []input.Event {
+func (h *handlerEvents) Next(k input.Key) (input.Event, bool) {
 	events := h.handlers[k]
-	delete(h.handlers, k)
-	return events
+	if len(events) == 0 {
+		return nil, false
+	}
+	e := events[0]
+	h.handlers[k] = events[1:]
+	return e, true
 }
 
 func (h *handlerEvents) Clear() {
