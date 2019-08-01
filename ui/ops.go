@@ -105,7 +105,7 @@ func (op *opAux) decode(data []byte) {
 	}
 	bo := binary.LittleEndian
 	*op = opAux{
-		len: int(bo.Uint32(data[1:])),
+		len: int(int32(bo.Uint32(data[1:]))),
 	}
 }
 
@@ -114,8 +114,8 @@ func (op *opMacroDef) decode(data []byte) {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
-	dataIdx := int(bo.Uint32(data[1:]))
-	refsIdx := int(bo.Uint32(data[5:]))
+	dataIdx := int(int32(bo.Uint32(data[1:])))
+	refsIdx := int(int32(bo.Uint32(data[5:])))
 	*op = opMacroDef{
 		endpc: pc{
 			data: dataIdx,
@@ -215,9 +215,9 @@ func (m *MacroOp) decode(data []byte, refs []interface{}) {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
-	dataIdx := int(bo.Uint32(data[1:]))
-	refsIdx := int(bo.Uint32(data[5:]))
-	version := int(bo.Uint32(data[9:]))
+	dataIdx := int(int32(bo.Uint32(data[1:])))
+	refsIdx := int(int32(bo.Uint32(data[5:])))
+	version := int(int32(bo.Uint32(data[9:])))
 	*m = MacroOp{
 		ops: refs[0].(*Ops),
 		pc: pc{

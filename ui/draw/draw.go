@@ -44,12 +44,12 @@ func (i *ImageOp) Decode(data []byte, refs []interface{}) {
 	}
 	sr := image.Rectangle{
 		Min: image.Point{
-			X: int(bo.Uint32(data[1:])),
-			Y: int(bo.Uint32(data[5:])),
+			X: int(int32(bo.Uint32(data[1:]))),
+			Y: int(int32(bo.Uint32(data[5:]))),
 		},
 		Max: image.Point{
-			X: int(bo.Uint32(data[9:])),
-			Y: int(bo.Uint32(data[13:])),
+			X: int(int32(bo.Uint32(data[9:]))),
+			Y: int(int32(bo.Uint32(data[13:]))),
 		},
 	}
 	*i = ImageOp{
