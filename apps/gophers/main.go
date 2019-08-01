@@ -541,7 +541,7 @@ func (a *ActionButton) Layout(c ui.Config, q input.Queue, ops *ui.Ops, cs layout
 	in := layout.Inset{Top: ui.Dp(4)}
 	cs = in.Begin(c, ops, cs)
 	dims := fab(ops, cs, a.sendIco.image(c), theme.brand, c.Px(ui.Dp(56)))
-	pointer.EllipseAreaOp{Size: dims.Size}.Add(ops)
+	pointer.EllipseAreaOp{Rect: image.Rectangle{Max: dims.Size}}.Add(ops)
 	dims = in.End(dims)
 	return f.Layout(f.End(dims))
 }
@@ -612,7 +612,7 @@ func (a *App) user(c ui.Config, ops *ui.Ops, cs layout.Constraints, index int) l
 		c2 := f.End(dims)
 		dims = f.Layout(c1, c2)
 		dims = in.End(dims)
-		pointer.RectAreaOp{Size: dims.Size}.Add(ops)
+		pointer.RectAreaOp{Rect: image.Rectangle{Max: dims.Size}}.Add(ops)
 		click := &a.userClicks[index]
 		click.Add(ops)
 	}
