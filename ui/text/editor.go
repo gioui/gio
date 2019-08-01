@@ -248,7 +248,13 @@ func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, cs layout
 	stack.Pop()
 
 	baseline := e.padTop + e.dims.Baseline
-	pointer.RectAreaOp{Size: e.viewSize}.Add(ops)
+	pointerPadding := cfg.Px(ui.Dp(4))
+	r := image.Rectangle{Max: e.viewSize}
+	r.Min.X -= pointerPadding
+	r.Min.Y -= pointerPadding
+	r.Max.X += pointerPadding
+	r.Max.X += pointerPadding
+	pointer.RectAreaOp{Rect: r}.Add(ops)
 	e.scroller.Add(ops)
 	e.clicker.Add(ops)
 	return layout.Dimens{Size: e.viewSize, Baseline: baseline}

@@ -35,7 +35,7 @@ const (
 	TypeImageLen          = 1 + 4*4
 	TypeDrawLen           = 1 + 4*4
 	TypeColorLen          = 1 + 4
-	TypeAreaLen           = 1 + 1 + 2*4
+	TypeAreaLen           = 1 + 1 + 4*4
 	TypePointerHandlerLen = 1 + 1
 	TypePassLen           = 1 + 1
 	TypeKeyHandlerLen     = 1 + 1

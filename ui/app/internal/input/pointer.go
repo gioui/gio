@@ -47,7 +47,7 @@ type pointerHandler struct {
 
 type areaOp struct {
 	kind areaKind
-	size image.Point
+	rect image.Rectangle
 }
 
 type areaNode struct {
@@ -268,28 +268,40 @@ func (op *areaOp) Decode(d []byte) {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
-	size := image.Point{
-		X: int(bo.Uint32(d[2:])),
-		Y: int(bo.Uint32(d[6:])),
+	rect := image.Rectangle{
+		Min: image.Point{
+			X: int(int32(bo.Uint32(d[2:]))),
+			Y: int(int32(bo.Uint32(d[6:]))),
+		},
+		Max: image.Point{
+			X: int(int32(bo.Uint32(d[10:]))),
+			Y: int(int32(bo.Uint32(d[14:]))),
+		},
 	}
 	*op = areaOp{
 		kind: areaKind(d[1]),
-		size: size,
+		rect: rect,
 	}
 }
 
 func (op *areaOp) Hit(pos f32.Point) bool {
+	min := f32.Point{
+		X: float32(op.rect.Min.X),
+		Y: float32(op.rect.Min.Y),
+	}
+	pos = pos.Sub(min)
+	size := op.rect.Size()
 	switch op.kind {
 	case areaRect:
-		if 0 <= pos.X && pos.X < float32(op.size.X) &&
-			0 <= pos.Y && pos.Y < float32(op.size.Y) {
+		if 0 <= pos.X && pos.X < float32(size.X) &&
+			0 <= pos.Y && pos.Y < float32(size.Y) {
 			return true
 		} else {
 			return false
 		}
 	case areaEllipse:
-		rx := float32(op.size.X) / 2
-		ry := float32(op.size.Y) / 2
+		rx := float32(size.X) / 2
+		ry := float32(size.Y) / 2
 		rx2 := rx * rx
 		ry2 := ry * ry
 		xh := pos.X - rx

@@ -25,17 +25,17 @@ type Event struct {
 }
 
 type RectAreaOp struct {
-	Size image.Point
+	Rect image.Rectangle
 }
 
 type EllipseAreaOp struct {
-	Size image.Point
+	Rect image.Rectangle
 }
 
 // Must match the structure in input.areaOp
 type areaOp struct {
 	kind areaKind
-	size image.Point
+	rect image.Rectangle
 }
 
 type HandlerOp struct {
@@ -83,14 +83,14 @@ const (
 func (op RectAreaOp) Add(ops *ui.Ops) {
 	areaOp{
 		kind: areaRect,
-		size: op.Size,
+		rect: op.Rect,
 	}.add(ops)
 }
 
 func (op EllipseAreaOp) Add(ops *ui.Ops) {
 	areaOp{
 		kind: areaEllipse,
-		size: op.Size,
+		rect: op.Rect,
 	}.add(ops)
 }
 
@@ -99,8 +99,10 @@ func (op areaOp) add(o *ui.Ops) {
 	data[0] = byte(ops.TypeArea)
 	data[1] = byte(op.kind)
 	bo := binary.LittleEndian
-	bo.PutUint32(data[2:], uint32(op.size.X))
-	bo.PutUint32(data[6:], uint32(op.size.Y))
+	bo.PutUint32(data[2:], uint32(op.rect.Min.X))
+	bo.PutUint32(data[6:], uint32(op.rect.Min.Y))
+	bo.PutUint32(data[10:], uint32(op.rect.Max.X))
+	bo.PutUint32(data[14:], uint32(op.rect.Max.Y))
 	o.Write(data)
 }
 
