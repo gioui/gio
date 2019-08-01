@@ -35,7 +35,7 @@ func createWindow(win *Window, opts *WindowOptions) error {
 	doc := js.Global().Get("document")
 	parent := doc.Call("getElementById", "giowindow")
 	if parent == js.Null() {
-		return errors.New("app: #giowindow not found found")
+		return errors.New("app: #giowindow not found")
 	}
 	cnv := createCanvas(doc)
 	parent.Call("appendChild", cnv)
