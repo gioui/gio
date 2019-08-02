@@ -318,11 +318,15 @@ func (w *window) setAnimating(anim bool) {
 }
 
 func (w *window) showTextInput(show bool) {
-	if show {
-		w.focus()
-	} else {
-		w.blur()
-	}
+	// Run in a goroutine to avoid a deadlock if the
+	// focus change result in an event.
+	go func() {
+		if show {
+			w.focus()
+		} else {
+			w.blur()
+		}
+	}()
 }
 
 func (w *window) draw(sync bool) {
