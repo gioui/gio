@@ -1,7 +1,6 @@
 package app
 
 import (
-	"errors"
 	"image"
 	"sync"
 	"syscall/js"
@@ -32,14 +31,11 @@ var mainDone = make(chan struct{})
 
 func createWindow(win *Window, opts *WindowOptions) error {
 	doc := js.Global().Get("document")
-	parent := doc.Call("getElementById", "giowindow")
-	if parent == js.Null() {
-		return errors.New("app: #giowindow not found")
-	}
+	cont := getContainer(doc)
 	cnv := createCanvas(doc)
-	parent.Call("appendChild", cnv)
+	cont.Call("appendChild", cnv)
 	tarea := createTextArea(doc)
-	parent.Call("appendChild", tarea)
+	cont.Call("appendChild", tarea)
 	w := &window{
 		cnv:    cnv,
 		tarea:  tarea,
@@ -62,6 +58,16 @@ func createWindow(win *Window, opts *WindowOptions) error {
 		close(mainDone)
 	}()
 	return nil
+}
+
+func getContainer(doc js.Value) js.Value {
+	cont := doc.Call("getElementById", "giowindow")
+	if cont != js.Null() {
+		return cont
+	}
+	cont = doc.Call("createElement", "DIV")
+	doc.Get("body").Call("appendChild", cont)
+	return cont
 }
 
 func createTextArea(doc js.Value) js.Value {
