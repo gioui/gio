@@ -14,7 +14,6 @@ import (
 
 type window struct {
 	window                js.Value
-	parent                js.Value
 	cnv                   js.Value
 	tarea                 js.Value
 	w                     *Window
