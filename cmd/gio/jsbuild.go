@@ -59,7 +59,6 @@ func buildJS(bi *buildInfo) error {
 		</style>
 	</head>
 	<body>
-			<div id="giowindow"></div>
 	</body>
 </html>`
 	if err := ioutil.WriteFile(filepath.Join(out, "index.html"), []byte(indexhtml), 0600); err != nil {
