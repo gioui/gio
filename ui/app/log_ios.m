@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build ios
+// +build darwin,ios
 
 @import Foundation;
 

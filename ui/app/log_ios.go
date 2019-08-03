@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build ios
+// +build darwin,ios
 
 package app
 
