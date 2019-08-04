@@ -113,7 +113,7 @@ Building for tvOS requires (the not yet released) Go 1.13.
 ## Webassembly/WebGL
 
 To run a Gio program in a browser with WebAssembly and WebGL support, use the Go webassembly
-driver and add a <div id="giowindow"> element to a HTML page. The gio tool can also output
+driver and add a `<div id="giowindow">` element to a HTML page. The gio tool can also output
 a directory ready to view in a browser:
 
 	$ go run gioui.org/cmd/gio -target js gioui.org/apps/gophers
