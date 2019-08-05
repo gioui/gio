@@ -34,6 +34,8 @@ static void redraw(CFTypeRef viewRef, BOOL sync) {
 
 @implementation GioAppDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+	gio_runMain();
+
 	self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
 	GioViewController *controller = [[GioViewController alloc] initWithNibName:nil bundle:nil];
 	controller.screen = self.window.screen;

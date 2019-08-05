@@ -139,11 +139,8 @@ func exeIOS(tmpDir, target, app string, bi *buildInfo) error {
 	const mainmSrc = `@import UIKit;
 @import Gio;
 
-void gio_runMain(void);
-
 int main(int argc, char * argv[]) {
 	@autoreleasepool {
-		gio_runMain();
 		return UIApplicationMain(argc, argv, nil, NSStringFromClass([GioAppDelegate class]));
 	}
 }`

@@ -7,16 +7,21 @@ package app
 // library mode. To make Gio programs simpler and uniform, we'll
 // link to the main function here and call it from Java.
 
-import _ "unsafe" // for go:linkname
+import (
+	"sync"
+	_ "unsafe" // for go:linkname
+)
 
 //go:linkname mainMain main.main
 func mainMain()
 
+var runMainOnce sync.Once
+
 func runMain() {
-	go func() {
+	runMainOnce.Do(func() {
 		// Indirect call, since the linker does not know the address of main when
 		// laying down this package.
 		fn := mainMain
-		fn()
-	}()
+		go fn()
+	})
 }
