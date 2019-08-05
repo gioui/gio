@@ -66,9 +66,9 @@ previously provisioned in Xcode. For example,
 
 	$ go run gioui.org/cmd/gio -target ios -appid <bundle-id> gioui.org/apps/gophers
 
-Use the Window=>Devices and Simulators option on Xcode to install the ipa file to the device.
+Use the `Window->Devices and Simulators` option in Xcode to install the ipa file to the device.
 If you have [ideviceinstaller](https://github.com/libimobiledevice/ideviceinstaller) installed,
-you can install the app directly to your device:
+you can install the app from the command line:
 
 	$ ideviceinstaller -i gophers.ipa
 
@@ -118,14 +118,14 @@ to [~eliasnaur/gio@todo.sr.ht](mailto:~eliasnaur/gio@todo.sr.ht). For general di
 mailing list: [~eliasnaur/gio@lists.sr.ht](mailto:~eliasnaur/gio@lists.sr.ht).
 
 
-## License
-
-Dual-licensed under [UNLICENSE](http://unlicense.org) or the MIT.
-
-
 ## Contributing
 
 Post discussion and patches to the [mailing list](https://lists.sr.ht/~eliasnaur/gio). No Sourcehut
 account is required and you can post without being subscribed.
 
 See the [contribution guide](https://man.sr.ht/~eliasnaur/gio/contribute.md) for more details.
+
+
+## License
+
+Dual-licensed under [UNLICENSE](http://unlicense.org) or the MIT.
