@@ -9,31 +9,20 @@ to support efficient animations, transformed drawing and pixel resolution indepe
 
 [![GoDoc](https://godoc.org/gioui.org/ui?status.svg)](https://godoc.org/gioui.org/ui)
 
-## Gophercon 2019 talk
 
-There is a [Gophercon 2019 talk](https://go-talks.appspot.com/github.com/eliasnaur/gophercon-2019-talk/gophercon-2019.slide)
-about Gio and [Scatter](https://scatter.im).
-
-## Quickstart
+## Installation
 
 Gio is designed to work with very few dependencies. It depends only on the platform libraries for
 window management, input and GPU drawing.
 
-For Linux you need Wayland and the wayland, xkbcommon, GLES, EGL development packages. On Fedora 28 and newer,
-install the dependencies with the command
+- [Linux](https://man.sr.ht/~eliasnaur/gio/install.md#linux)
+- [macOS, iOS, tvOS](https://man.sr.ht/~eliasnaur/gio/install.md#macos-ios-tvos)
+- [Windows](https://man.sr.ht/~eliasnaur/gio/install.md#windows)
+- [Android](https://man.sr.ht/~eliasnaur/gio/install.md#android)
+- [WebAssembly](https://man.sr.ht/~eliasnaur/gio/install.md#webassemblywebgl)
 
-	$ sudo dnf install wayland-devel libxkbcommon-devel mesa-libGLES-devel mesa-libEGL-devel
 
-On Ubuntu 18.04 and newer, use
-
-	$ sudo apt install libwayland-dev libxkbcommon-dev libgles2-mesa-dev libegl1-mesa-dev
-
-Note that Gio does not run with the NVIDIA proprietary driver.
-
-Xcode is required for macOS, iOS, tvOS.
-
-For Windows you need the ANGLE drivers for emulating OpenGL ES. You can build ANGLE yourself or use
-[a prebuilt version](https://drive.google.com/file/d/1k2950mHNtR2iwhweHS1rJ7reChTa3rki/view?usp=sharing).
+## Running Gio programs
 
 With [Go 1.12](https://golang.org/dl/) or newer,
 
@@ -54,14 +43,16 @@ with the `-token` flag:
 
 	$ go run gioui.org/apps/gophers -token <github token>
 
-## Android
 
-For Android you need the Android SDK with the NDK installed. Point the ANDROID_HOME to the SDK root
-directory. Use the gio tool to build a Gio program for Android:
+## Running on mobiles
+
+For Android, iOS, tvOS the `gio` tool can build and package a Gio program for you.
+
+To build an Android .apk file from the `gophers` example:
 
 	$ go run gioui.org/cmd/gio -target android gioui.org/apps/gophers
 
-Install the apk to a running emulator or attached device with adb:
+The apk can be installed to a running emulator or attached device with adb:
 
 	$ adb install gophers.apk
 
@@ -69,21 +60,11 @@ The gio tool passes command line arguments to os.Args at runtime:
 
 	$ go run gioui.org/cmd/gio -target android gioui.org/apps/gophers -token <github token>
 
-To build a Gio program as an .aar package, use -buildmode=archive. For example,
-
-	$ export ANDROID_HOME=...
-	$ go run gioui.org/cmd/gio -target android -buildmode archive gioui.org/apps/gophers
-
-produces gophers.aar, ready to use in an Android project.
-
-## iOS/tvOS
-
-To build a Gio program for iOS or tvOS you need a macOS machine with Xcode installed. The gio
-tool can produce .ipa files for devices and .app directories for simulators. For a device:
+The `-appid` flag specifies the iOS bundle id or Android package id. The flag is required
+for creating signed .ipa files for iOS and tvOS devices, because the bundle id must match an id
+previously provisioned in Xcode. For example,
 
 	$ go run gioui.org/cmd/gio -target ios -appid <bundle-id> gioui.org/apps/gophers
-
-where <bundle-id> is a valid bundle identifier previously provisioned in Xcode for your device.
 
 Use the Window=>Devices and Simulators option on Xcode to install the ipa file to the device.
 If you have [ideviceinstaller](https://github.com/libimobiledevice/ideviceinstaller) installed,
@@ -91,40 +72,44 @@ you can install the app directly to your device:
 
 	$ ideviceinstaller -i gophers.ipa
 
-To run a program on a running simulator, use the -o flag with a .app directory:
+If you just want to run a program on the iOS simulator, use the `-o` flag to specify a .app
+directory:
 
 	$ go run gioui.org/cmd/gio/ -o gophers.app -target ios gioui.org/apps/gophers
 
-Install the app with simctl:
+Install the app to a running simulator with simctl:
 
 	$ xcrun simctl install booted gophers.app
 
-Pass the -buildmode=archive flag to the gio tool to produce a framework ready to include in an
-Xcode project. For example,
-
-	$ go run gioui.org/cmd/gio -target ios -buildmode archive gioui.org/apps/gophers
-
-outputs Gophers.framework with the demo program built for iOS. For tvOS, use `-target tvos`:
-
-	$ go run gioui.org/cmd/gio -target tvos -buildmode archive gioui.org/apps/gophers
-
-Building for tvOS requires (the not yet released) Go 1.13.
 
 ## Webassembly/WebGL
 
-To run a Gio program in a browser with WebAssembly and WebGL support, use the Go webassembly
-driver and add a `<div id="giowindow">` element to a HTML page. The gio tool can also output
-a directory ready to view in a browser:
+To run a Gio program in a compatible browser, the `gio` tool can output a directory ready to
+serve. With the `goxec` tool you don't even need a web server:
 
 	$ go run gioui.org/cmd/gio -target js gioui.org/apps/gophers
 	$ go get github.com/shurcooL/goexec
 	$ goexec 'http.ListenAndServe(":8080", http.FileServer(http.Dir("gophers")))'
 
-Open http://localhost:8080 in a browser to run the app.
+Open http://localhost:8080 in a browser to run the program.
+
+
+## Integration with existing projects
+
+See the [integration guide](https://man.sr.ht/~eliasnaur/integrate.md) for details on using
+Gio with existing projects.
+
 
 ## Programs using Gio
 
-[Scatter](https://scatter.im), an implementation of the Signal protocol over email.
+- [Scatter](https://scatter.im), an implementation of the Signal protocol over email.
+
+
+## Resources
+
+- [Gophercon 2019 talk](https://go-talks.appspot.com/github.com/eliasnaur/gophercon-2019-talk/gophercon-2019.slide)
+about Gio and [Scatter](https://scatter.im).
+
 
 ## Issues
 
@@ -132,44 +117,15 @@ File bugs and TODOs through the the [issue tracker](https://todo.sr.ht/~eliasnau
 to [~eliasnaur/gio@todo.sr.ht](mailto:~eliasnaur/gio@todo.sr.ht). For general discussion, use the
 mailing list: [~eliasnaur/gio@lists.sr.ht](mailto:~eliasnaur/gio@lists.sr.ht).
 
+
 ## License
 
-Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
+Dual-licensed under [UNLICENSE](http://unlicense.org) or the MIT.
+
 
 ## Contributing
 
-Post discussion and patches to the [mailing list](https://lists.sr.ht/~eliasnaur/gio). Send your
-message to [~eliasnaur/gio@lists.sr.ht](mailto:~eliasnaur/gio@lists.sr.ht); no Sourcehut account
-is required and you can post without being subscribed.
+Post discussion and patches to the [mailing list](https://lists.sr.ht/~eliasnaur/gio). No Sourcehut
+account is required and you can post without being subscribed.
 
-Commit messages follow [the Go project style](https://golang.org/doc/contribute.html#commit_messages):
-the first line is prefixed with the package and a short summary. The rest of the message provides context
-for the change and what it does. See
-[an example](https://git.sr.ht/~eliasnaur/gio/commit/abb9d291e954f3b80384046d7d4487e1ead6bd6a).
-Add `Fixes ~eliasnaur/gio#nnn` or `Updates ~eliasnaur/gio#nnn` if the change fixes or updates an existing
-issue.
-
-The `git send-email` command is a convenient way to send patches to the mailing list. See
-[git-send-email.io](https://git-send-email.io) for a thorough setup guide.
-
-With `git send-email` configured, you can clone the project and set it up for submitting your changes:
-
-	$ git clone https://git.sr.ht/~eliasnaur/gio
-	$ cd gio
-	$ git config sendemail.to '~eliasnaur/gio@lists.sr.ht'
-	$ git config sendemail.annotate yes
-
-Configure your name and email address if you have not done so already:
-
-	$ git config --global user.email "you@example.com"
-	$ git config --global user.name "Your Name"
-
-Contributors must agree to the [developer certificate of origin](https://developercertificate.org/),
-to ensure their work is compatible with the MIT and the UNLICENSE. Sign your commits with Signed-off-by
-statements to show your agreement. The `git commit --signoff` (or `-s`) command signs a commit with
-your name and email address.
-
-Whenever you want to submit your work for review, use `git send-email` with the base revision of your
-changes. For example, to submit the most recent commit use
-
-	$ git send-email HEAD^
+See the [contribution guide](https://man.sr.ht/~eliasnaur/gio/contribute.md) for more details.
