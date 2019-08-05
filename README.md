@@ -107,6 +107,7 @@ Gio with existing projects.
 
 ## Resources
 
+- [FAQ](https://man.sr.ht/~eliasnaur/gio/faq.md).
 - [Gophercon 2019 talk](https://go-talks.appspot.com/github.com/eliasnaur/gophercon-2019-talk/gophercon-2019.slide)
 about Gio and [Scatter](https://scatter.im).
 
