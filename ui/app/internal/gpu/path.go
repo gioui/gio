@@ -431,7 +431,7 @@ void main() {
 	vec2 extent = clamp(vec2(vFrom.x, vTo.x), -0.5, 0.5);
 	// Find the t where the curve crosses the middle of the
 	// extent, x₀.
-	// Given the bezier curve with x coordinates P₀, P₁, P₂
+	// Given the Bézier curve with x coordinates P₀, P₁, P₂
 	// where P₀ is at the origin, its x coordinate in t
 	// is given by:
 	//

@@ -71,11 +71,11 @@ func (p *PathBuilder) Line(to f32.Point) {
 }
 
 func (p *PathBuilder) lineTo(to f32.Point) {
-	// Model lines as degenerate quadratic beziers.
+	// Model lines as degenerate quadratic Béziers.
 	p.quadTo(to.Add(p.pen).Mul(.5), to)
 }
 
-// Quad records a quadratic bezier from the pen to end
+// Quad records a quadratic Bézier from the pen to end
 // with the control point ctrl.
 func (p *PathBuilder) Quad(ctrl, to f32.Point) {
 	ctrl = ctrl.Add(p.pen)
@@ -136,7 +136,7 @@ func (p *PathBuilder) quadTo(ctrl, to f32.Point) {
 	p.expand(bounds)
 }
 
-// Cube records a cubic bezier from the pen through
+// Cube records a cubic Bézier from the pen through
 // two control points ending in to.
 func (p *PathBuilder) Cube(ctrl0, ctrl1, to f32.Point) {
 	ctrl0 = ctrl0.Add(p.pen)
@@ -155,7 +155,7 @@ func (p *PathBuilder) Cube(ctrl0, ctrl1, to f32.Point) {
 	p.approxCubeTo(0, l*0.001, ctrl0, ctrl1, to)
 }
 
-// approxCube approximates a cubic beziér by a series of quadratic
+// approxCube approximates a cubic Bézier by a series of quadratic
 // curves.
 func (p *PathBuilder) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to f32.Point) int {
 	// The idea is from
@@ -178,7 +178,7 @@ func (p *PathBuilder) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to
 	//
 	// C2 = (3ctrl1 - to)/2
 	//
-	// The combined quadratic beziér, Q, shares both start and end points with its cubic
+	// The combined quadratic Bézier, Q, shares both start and end points with its cubic
 	// and use the midpoint between the two curves Q1 and Q2 as control point:
 	//
 	// C = (3ctrl0 - pen + 3ctrl1 - to)/4
