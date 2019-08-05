@@ -35,9 +35,12 @@ func vanityHandler(w http.ResponseWriter, r *http.Request) {
 </head></html>`)
 		return
 	}
-	switch r.URL.Path {
-	case "/":
+	p := r.URL.Path
+	switch {
+	case p == "/":
 		http.Redirect(w, r, "https://git.sr.ht/~eliasnaur/gio", http.StatusFound)
+	case strings.HasPrefix(p, "/cmd"), strings.HasPrefix(p, "/ui"), strings.HasPrefix(p, "/apps"):
+		http.Redirect(w, r, "https://godoc.org/gioui.org"+p, http.StatusFound)
 	default:
 		http.NotFound(w, r)
 	}
