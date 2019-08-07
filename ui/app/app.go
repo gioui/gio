@@ -13,9 +13,9 @@ import (
 	"gioui.org/ui"
 )
 
-// DrawEvent is sent when a Window's Draw
+// UpdateEvent is sent when a Window's Update
 // method must be called.
-type DrawEvent struct {
+type UpdateEvent struct {
 	Config Config
 	Size   image.Point
 	Insets Insets
@@ -178,7 +178,7 @@ func newWindowRendezvous() *windowRendezvous {
 	return wr
 }
 
-func (_ DrawEvent) ImplementsEvent()     {}
+func (_ UpdateEvent) ImplementsEvent()   {}
 func (_ StageEvent) ImplementsEvent()    {}
 func (_ *CommandEvent) ImplementsEvent() {}
 func (_ DestroyEvent) ImplementsEvent()  {}

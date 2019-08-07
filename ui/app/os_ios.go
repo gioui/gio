@@ -80,7 +80,7 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int, to
 	if sync != 0 {
 		isSync = true
 	}
-	w.w.event(DrawEvent{
+	w.w.event(UpdateEvent{
 		Size: image.Point{
 			X: int(width + .5),
 			Y: int(height + .5),

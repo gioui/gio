@@ -1050,7 +1050,7 @@ func (w *window) draw(sync bool) {
 		C.gio_wl_callback_add_listener(w.lastFrameCallback, unsafe.Pointer(w.surf))
 	}
 	cfg.now = time.Now()
-	w.w.event(DrawEvent{
+	w.w.event(UpdateEvent{
 		Size: image.Point{
 			X: width,
 			Y: height,

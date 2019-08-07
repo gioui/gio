@@ -345,7 +345,7 @@ func (w *window) draw(sync bool) {
 	w.scale = float32(scale)
 	w.mu.Unlock()
 	cfg.now = time.Now()
-	w.w.event(DrawEvent{
+	w.w.event(UpdateEvent{
 		Size: image.Point{
 			X: width,
 			Y: height,

@@ -59,7 +59,7 @@ type driverEvent struct {
 // of a Window.
 var _ interface {
 	// setAnimating sets the animation flag. When the window is animating,
-	// DrawEvents are delivered as fast as the display can handle them.
+	// UpdateEvents are delivered as fast as the display can handle them.
 	setAnimating(anim bool)
 	// showTextInput updates the virtual keyboard state.
 	showTextInput(show bool)
@@ -104,7 +104,7 @@ func (w *Window) Queue() *Queue {
 	return &w.queue
 }
 
-func (w *Window) Draw(frame *ui.Ops) {
+func (w *Window) Update(frame *ui.Ops) {
 	w.frames <- frame
 }
 
@@ -138,7 +138,7 @@ func (w *Window) draw(size image.Point, frame *ui.Ops) {
 	w.updateAnimation()
 }
 
-// Invalidate the current window such that a DrawEvent will be generated
+// Invalidate the current window such that a UpdateEvent will be generated
 // immediately. If the window is not active, the redraw will trigger
 // when the window becomes active.
 func (w *Window) Invalidate() {
@@ -237,7 +237,7 @@ func (w *Window) run(opts *WindowOptions) {
 				w.updateAnimation()
 				w.out <- e
 				w.waitAck()
-			case DrawEvent:
+			case UpdateEvent:
 				if e2.Size == (image.Point{}) {
 					panic(errors.New("internal error: zero-sized Draw"))
 				}
