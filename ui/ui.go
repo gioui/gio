@@ -56,19 +56,23 @@ func (r *InvalidateOp) Decode(d []byte) {
 	}
 }
 
+// Offset the transformation.
 func (t TransformOp) Offset(o f32.Point) TransformOp {
-	return t.Mul(TransformOp{o})
+	return t.Multiply(TransformOp{o})
 }
 
-func (t TransformOp) InvTransform(p f32.Point) f32.Point {
-	return p.Sub(t.offset)
+// Invert the transformation.
+func (t TransformOp) Invert() TransformOp {
+	return TransformOp{offset: t.offset.Mul(-1)}
 }
 
+// Transform a point.
 func (t TransformOp) Transform(p f32.Point) f32.Point {
 	return p.Add(t.offset)
 }
 
-func (t TransformOp) Mul(t2 TransformOp) TransformOp {
+// Multiply by a transformation.
+func (t TransformOp) Multiply(t2 TransformOp) TransformOp {
 	return TransformOp{
 		offset: t.offset.Add(t2.offset),
 	}

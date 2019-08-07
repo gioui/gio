@@ -650,7 +650,7 @@ loop:
 		case ops.TypeTransform:
 			var op ui.TransformOp
 			op.Decode(encOp.Data)
-			state.t = state.t.Mul(op)
+			state.t = state.t.Multiply(op)
 		case ops.TypeAux:
 			aux = encOp.Data[ops.TypeAuxLen:]
 			auxKey = encOp.Key

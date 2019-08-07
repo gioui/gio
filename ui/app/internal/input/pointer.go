@@ -88,7 +88,7 @@ func (q *pointerQueue) collectHandlers(r *ui.OpsReader, events *handlerEvents, t
 		case ops.TypeTransform:
 			var op ui.TransformOp
 			op.Decode(encOp.Data)
-			t = t.Mul(op)
+			t = t.Multiply(op)
 		case ops.TypePointerHandler:
 			var op pointer.HandlerOp
 			op.Decode(encOp.Data, encOp.Refs)
@@ -150,7 +150,7 @@ func (q *pointerQueue) hit(areaIdx int, p f32.Point) bool {
 }
 
 func (a *areaNode) hit(p f32.Point) bool {
-	p = a.trans.InvTransform(p)
+	p = a.trans.Invert().Transform(p)
 	return a.area.Hit(p)
 }
 
@@ -246,7 +246,7 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 			e.Priority = pointer.Foremost
 		}
 		e.Hit = q.hit(h.area, e.Position)
-		e.Position = h.transform.InvTransform(e.Position)
+		e.Position = h.transform.Invert().Transform(e.Position)
 		events.Add(k, e)
 		if e.Type == pointer.Release {
 			// Release grab when the number of grabs reaches zero.
