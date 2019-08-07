@@ -119,12 +119,12 @@ type material struct {
 	uvOffset f32.Point
 }
 
-// opClip structure must match opClip in package ui/draw.
-type opClip struct {
+// clipOp is the shadow of draw.ClipOp.
+type clipOp struct {
 	bounds f32.Rectangle
 }
 
-func (op *opClip) decode(data []byte) {
+func (op *clipOp) decode(data []byte) {
 	if opconst.OpType(data[0]) != opconst.TypeClip {
 		panic("invalid op")
 	}
@@ -139,7 +139,7 @@ func (op *opClip) decode(data []byte) {
 			Y: math.Float32frombits(bo.Uint32(data[13:])),
 		},
 	}
-	*op = opClip{
+	*op = clipOp{
 		bounds: r,
 	}
 }
@@ -656,7 +656,7 @@ loop:
 			aux = encOp.Data[opconst.TypeAuxLen:]
 			auxKey = encOp.Key
 		case opconst.TypeClip:
-			var op opClip
+			var op clipOp
 			op.decode(encOp.Data)
 			off := state.t.Transform(f32.Point{})
 			state.clip = state.clip.Intersect(op.bounds.Add(off))
