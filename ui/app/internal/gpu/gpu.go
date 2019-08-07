@@ -14,10 +14,10 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/app/internal/gl"
-	gdraw "gioui.org/ui/draw"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/internal/opconst"
 	"gioui.org/ui/internal/ops"
+	"gioui.org/ui/paint"
 	"golang.org/x/image/draw"
 )
 
@@ -144,7 +144,7 @@ func (op *clipOp) decode(data []byte) {
 	}
 }
 
-func decodeImageOp(data []byte, refs []interface{}) gdraw.ImageOp {
+func decodeImageOp(data []byte, refs []interface{}) paint.ImageOp {
 	bo := binary.LittleEndian
 	if opconst.OpType(data[0]) != opconst.TypeImage {
 		panic("invalid op")
@@ -159,17 +159,17 @@ func decodeImageOp(data []byte, refs []interface{}) gdraw.ImageOp {
 			Y: int(int32(bo.Uint32(data[13:]))),
 		},
 	}
-	return gdraw.ImageOp{
+	return paint.ImageOp{
 		Src:  refs[0].(image.Image),
 		Rect: sr,
 	}
 }
 
-func decodeColorOp(data []byte, refs []interface{}) gdraw.ColorOp {
+func decodeColorOp(data []byte, refs []interface{}) paint.ColorOp {
 	if opconst.OpType(data[0]) != opconst.TypeColor {
 		panic("invalid op")
 	}
-	return gdraw.ColorOp{
+	return paint.ColorOp{
 		Color: color.RGBA{
 			R: data[1],
 			G: data[2],
@@ -179,9 +179,9 @@ func decodeColorOp(data []byte, refs []interface{}) gdraw.ColorOp {
 	}
 }
 
-func decodeDrawOp(data []byte, refs []interface{}) gdraw.DrawOp {
+func decodePaintOp(data []byte, refs []interface{}) paint.PaintOp {
 	bo := binary.LittleEndian
-	if opconst.OpType(data[0]) != opconst.TypeDraw {
+	if opconst.OpType(data[0]) != opconst.TypePaint {
 		panic("invalid op")
 	}
 	r := f32.Rectangle{
@@ -194,7 +194,7 @@ func decodeDrawOp(data []byte, refs []interface{}) gdraw.DrawOp {
 			Y: math.Float32frombits(bo.Uint32(data[13:])),
 		},
 	}
-	return gdraw.DrawOp{
+	return paint.PaintOp{
 		Rect: r,
 	}
 }
@@ -740,8 +740,8 @@ loop:
 			op := decodeImageOp(encOp.Data, encOp.Refs)
 			state.img = op.Src
 			state.imgRect = op.Rect
-		case opconst.TypeDraw:
-			op := decodeDrawOp(encOp.Data, encOp.Refs)
+		case opconst.TypePaint:
+			op := decodePaintOp(encOp.Data, encOp.Refs)
 			off := state.t.Transform(f32.Point{})
 			clip := state.clip.Intersect(op.Rect.Add(off))
 			if clip.Empty() {

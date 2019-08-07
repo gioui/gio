@@ -6,10 +6,10 @@ import (
 	"image"
 
 	"gioui.org/ui"
-	"gioui.org/ui/draw"
 	"gioui.org/ui/gesture"
 	"gioui.org/ui/input"
 	"gioui.org/ui/pointer"
+	"gioui.org/ui/paint"
 )
 
 type scrollChild struct {
@@ -230,7 +230,7 @@ func (l *List) Layout() Dimens {
 		}
 		var stack ui.StackOp
 		stack.Push(ops)
-		draw.RectClip(r).Add(ops)
+		paint.RectClip(r).Add(ops)
 		ui.TransformOp{}.Offset(toPointF(axisPoint(l.Axis, transPos, cross))).Add(ops)
 		child.macro.Add(ops)
 		stack.Pop()

@@ -10,12 +10,12 @@ import (
 	"unicode/utf8"
 
 	"gioui.org/ui"
-	"gioui.org/ui/draw"
 	"gioui.org/ui/gesture"
 	"gioui.org/ui/input"
 	"gioui.org/ui/key"
 	"gioui.org/ui/layout"
 	"gioui.org/ui/pointer"
+	"gioui.org/ui/paint"
 
 	"golang.org/x/image/math/fixed"
 )
@@ -196,10 +196,10 @@ func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, cs layout
 	stack.Push(ops)
 	// Apply material. Set a default color in case the material is empty.
 	if e.rr.len() > 0 {
-		draw.ColorOp{Color: color.RGBA{A: 0xff}}.Add(ops)
+		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(ops)
 		e.Material.Add(ops)
 	} else {
-		draw.ColorOp{Color: color.RGBA{A: 0xaa}}.Add(ops)
+		paint.ColorOp{Color: color.RGBA{A: 0xaa}}.Add(ops)
 		e.HintMaterial.Add(ops)
 	}
 	for {
@@ -211,7 +211,7 @@ func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, cs layout
 		stack.Push(ops)
 		ui.TransformOp{}.Offset(lineOff).Add(ops)
 		e.Face.Path(str).Add(ops)
-		draw.DrawOp{Rect: toRectF(clip).Sub(lineOff)}.Add(ops)
+		paint.PaintOp{Rect: toRectF(clip).Sub(lineOff)}.Add(ops)
 		stack.Pop()
 	}
 	if e.focused {
@@ -235,9 +235,9 @@ func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, cs layout
 			})
 			carRect = clip.Intersect(carRect)
 			if !carRect.Empty() {
-				draw.ColorOp{Color: color.RGBA{A: 0xff}}.Add(ops)
+				paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(ops)
 				e.Material.Add(ops)
-				draw.DrawOp{Rect: toRectF(carRect)}.Add(ops)
+				paint.PaintOp{Rect: toRectF(carRect)}.Add(ops)
 			}
 		}
 		if blinking {

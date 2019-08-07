@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package draw
+package paint
 
 import (
 	"encoding/binary"

@@ -8,9 +8,9 @@ import (
 	"unicode/utf8"
 
 	"gioui.org/ui"
-	"gioui.org/ui/draw"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/layout"
+	"gioui.org/ui/paint"
 
 	"golang.org/x/image/math/fixed"
 )
@@ -113,9 +113,9 @@ func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		ui.TransformOp{}.Offset(off).Add(ops)
 		l.Face.Path(str).Add(ops)
 		// Set a default color in case the material is empty.
-		draw.ColorOp{Color: color.RGBA{A: 0xff}}.Add(ops)
+		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(ops)
 		l.Material.Add(ops)
-		draw.DrawOp{Rect: lclip}.Add(ops)
+		paint.PaintOp{Rect: lclip}.Add(ops)
 		stack.Pop()
 	}
 	return dims

@@ -6,9 +6,9 @@ import (
 	"image"
 
 	"gioui.org/ui"
-	"gioui.org/ui/draw"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/layout"
+	"gioui.org/ui/paint"
 )
 
 type Image struct {
@@ -45,7 +45,7 @@ func (im Image) Layout(c ui.Config, ops *ui.Ops, cs layout.Constraints) layout.D
 	dr := f32.Rectangle{
 		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
 	}
-	draw.ImageOp{Src: im.Src, Rect: im.Rect}.Add(ops)
-	draw.DrawOp{Rect: dr}.Add(ops)
+	paint.ImageOp{Src: im.Src, Rect: im.Rect}.Add(ops)
+	paint.PaintOp{Rect: dr}.Add(ops)
 	return layout.Dimens{Size: d, Baseline: d.Y}
 }

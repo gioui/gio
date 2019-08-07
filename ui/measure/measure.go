@@ -8,9 +8,9 @@ import (
 	"unicode/utf8"
 
 	"gioui.org/ui"
-	"gioui.org/ui/draw"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/text"
+	"gioui.org/ui/paint"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
@@ -228,7 +228,7 @@ func layoutText(ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOpt
 
 func textPath(ppem fixed.Int26_6, f *opentype, str text.String) ui.MacroOp {
 	var lastPos f32.Point
-	var builder draw.PathBuilder
+	var builder paint.PathBuilder
 	ops := new(ui.Ops)
 	builder.Init(ops)
 	var x fixed.Int26_6

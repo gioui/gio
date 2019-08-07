@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package draw
+package paint
 
 import (
 	"encoding/binary"
@@ -22,7 +22,7 @@ type ColorOp struct {
 	Color color.RGBA
 }
 
-type DrawOp struct {
+type PaintOp struct {
 	Rect f32.Rectangle
 }
 
@@ -47,9 +47,9 @@ func (c ColorOp) Add(o *ui.Ops) {
 	o.Write(data)
 }
 
-func (d DrawOp) Add(o *ui.Ops) {
-	data := make([]byte, opconst.TypeDrawLen)
-	data[0] = byte(opconst.TypeDraw)
+func (d PaintOp) Add(o *ui.Ops) {
+	data := make([]byte, opconst.TypePaintLen)
+	data[0] = byte(opconst.TypePaint)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], math.Float32bits(d.Rect.Min.X))
 	bo.PutUint32(data[5:], math.Float32bits(d.Rect.Min.Y))
