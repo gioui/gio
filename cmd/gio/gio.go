@@ -33,7 +33,7 @@ type buildInfo struct {
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Gio is a tool for building gio programs.\n\n")
+		fmt.Fprintf(os.Stderr, "Gio is a tool for building and packaging Gio (gioui.org) programs.\n\n")
 		fmt.Fprintf(os.Stderr, "Usage:\n\n\tgio [flags] <pkg>\n\n")
 		flag.PrintDefaults()
 		os.Exit(2)
