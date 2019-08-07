@@ -125,12 +125,12 @@ func (a *App) run() error {
 						a.w.Invalidate()
 					}
 				}
-			case app.DrawEvent:
+			case app.UpdateEvent:
 				ops.Reset()
 				cfg = e.Config
 				cs := layout.RigidConstraints(e.Size)
 				a.ui.Layout(&cfg, a.w.Queue(), ops, cs)
-				a.w.Draw(ops)
+				a.w.Update(ops)
 			}
 		}
 	}

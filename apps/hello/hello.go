@@ -45,7 +45,7 @@ func loop(w *app.Window) error {
 		switch e := e.(type) {
 		case app.DestroyEvent:
 			return e.Err
-		case app.DrawEvent:
+		case app.UpdateEvent:
 			cfg = e.Config
 			faces.Reset(&cfg)
 			cs := layout.RigidConstraints(e.Size)
@@ -55,7 +55,7 @@ func loop(w *app.Window) error {
 			paint.ColorOp{Color: maroon}.Add(ops)
 			material.Stop()
 			text.Label{Material: material, Face: face, Alignment: text.Center, Text: message}.Layout(ops, cs)
-			w.Draw(ops)
+			w.Update(ops)
 		}
 	}
 }
