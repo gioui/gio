@@ -18,7 +18,7 @@ var (
 	target        = flag.String("target", "", "specify target (ios, tvos, android, js)")
 	archNames     = flag.String("arch", "", "specify architecture(s) to include")
 	buildMode     = flag.String("buildmode", "exe", "specify buildmode: archive or exe")
-	destPath      = flag.String("o", "", "output file (Android .aar or .apk file) or directory (iOS/tvOS .framework or webassembly files)")
+	destPath      = flag.String("o", "", `output path. Specify a path with the ".app" suffix for iOS simulators.`)
 	appID         = flag.String("appid", "org.gioui.app", "app identifier (for -buildmode=exe)")
 	printCommands = flag.Bool("x", false, "print the commands")
 	keepWorkdir   = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting.")
