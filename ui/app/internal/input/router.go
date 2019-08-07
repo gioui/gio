@@ -7,6 +7,7 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/input"
+	"gioui.org/ui/internal/opconst"
 	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
@@ -21,7 +22,7 @@ type Router struct {
 
 	handlers handlerEvents
 
-	reader ui.OpsReader
+	reader ops.Reader
 
 	// InvalidateOp summary.
 	wakeup     bool
@@ -71,15 +72,15 @@ func (q *Router) TextInputState() TextInputState {
 
 func (q *Router) collect() {
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
-		switch ops.OpType(encOp.Data[0]) {
-		case ops.TypeInvalidate:
+		switch opconst.OpType(encOp.Data[0]) {
+		case opconst.TypeInvalidate:
 			var op ui.InvalidateOp
 			op.Decode(encOp.Data)
 			if !q.wakeup || op.At.Before(q.wakeupTime) {
 				q.wakeup = true
 				q.wakeupTime = op.At
 			}
-		case ops.TypeProfile:
+		case opconst.TypeProfile:
 			var op system.ProfileOp
 			op.Decode(encOp.Data, encOp.Refs)
 			q.profHandlers = append(q.profHandlers, op.Key)

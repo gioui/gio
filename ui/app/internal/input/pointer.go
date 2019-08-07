@@ -9,6 +9,7 @@ import (
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/input"
+	"gioui.org/ui/internal/opconst"
 	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/pointer"
 )
@@ -18,7 +19,7 @@ type pointerQueue struct {
 	areas    []areaNode
 	handlers map[input.Key]*pointerHandler
 	pointers []pointerInfo
-	reader   ui.OpsReader
+	reader   ops.Reader
 	scratch  []input.Key
 }
 
@@ -63,18 +64,18 @@ const (
 	areaEllipse
 )
 
-func (q *pointerQueue) collectHandlers(r *ui.OpsReader, events *handlerEvents, t ui.TransformOp, area, node int, pass bool) {
+func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t ui.TransformOp, area, node int, pass bool) {
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
-		switch ops.OpType(encOp.Data[0]) {
-		case ops.TypePush:
+		switch opconst.OpType(encOp.Data[0]) {
+		case opconst.TypePush:
 			q.collectHandlers(r, events, t, area, node, pass)
-		case ops.TypePop:
+		case opconst.TypePop:
 			return
-		case ops.TypePass:
+		case opconst.TypePass:
 			var op pointer.PassOp
 			op.Decode(encOp.Data)
 			pass = op.Pass
-		case ops.TypeArea:
+		case opconst.TypeArea:
 			var op areaOp
 			op.Decode(encOp.Data)
 			q.areas = append(q.areas, areaNode{trans: t, next: area, area: op})
@@ -85,11 +86,11 @@ func (q *pointerQueue) collectHandlers(r *ui.OpsReader, events *handlerEvents, t
 				pass: pass,
 			})
 			node = len(q.hitTree) - 1
-		case ops.TypeTransform:
+		case opconst.TypeTransform:
 			var op ui.TransformOp
 			op.Decode(encOp.Data)
 			t = t.Multiply(op)
-		case ops.TypePointerHandler:
+		case opconst.TypePointerHandler:
 			var op pointer.HandlerOp
 			op.Decode(encOp.Data, encOp.Refs)
 			q.hitTree = append(q.hitTree, hitNode{
@@ -264,7 +265,7 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 }
 
 func (op *areaOp) Decode(d []byte) {
-	if ops.OpType(d[0]) != ops.TypeArea {
+	if opconst.OpType(d[0]) != opconst.TypeArea {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian

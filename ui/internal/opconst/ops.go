@@ -1,4 +1,4 @@
-package ops
+package opconst
 
 type OpType byte
 

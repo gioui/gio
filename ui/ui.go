@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"gioui.org/ui/f32"
-	"gioui.org/ui/internal/ops"
+	"gioui.org/ui/internal/opconst"
 )
 
 // Config represents the essential configuration for
@@ -33,8 +33,8 @@ type TransformOp struct {
 }
 
 func (r InvalidateOp) Add(o *Ops) {
-	data := make([]byte, ops.TypeRedrawLen)
-	data[0] = byte(ops.TypeInvalidate)
+	data := make([]byte, opconst.TypeRedrawLen)
+	data[0] = byte(opconst.TypeInvalidate)
 	bo := binary.LittleEndian
 	// UnixNano cannot represent the zero time.
 	if t := r.At; !t.IsZero() {
@@ -48,7 +48,7 @@ func (r InvalidateOp) Add(o *Ops) {
 
 func (r *InvalidateOp) Decode(d []byte) {
 	bo := binary.LittleEndian
-	if ops.OpType(d[0]) != ops.TypeInvalidate {
+	if opconst.OpType(d[0]) != opconst.TypeInvalidate {
 		panic("invalid op")
 	}
 	if nanos := bo.Uint64(d[1:]); nanos > 0 {
@@ -79,8 +79,8 @@ func (t TransformOp) Multiply(t2 TransformOp) TransformOp {
 }
 
 func (t TransformOp) Add(o *Ops) {
-	data := make([]byte, ops.TypeTransformLen)
-	data[0] = byte(ops.TypeTransform)
+	data := make([]byte, opconst.TypeTransformLen)
+	data[0] = byte(opconst.TypeTransform)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], math.Float32bits(t.offset.X))
 	bo.PutUint32(data[5:], math.Float32bits(t.offset.Y))
@@ -89,7 +89,7 @@ func (t TransformOp) Add(o *Ops) {
 
 func (t *TransformOp) Decode(d []byte) {
 	bo := binary.LittleEndian
-	if ops.OpType(d[0]) != ops.TypeTransform {
+	if opconst.OpType(d[0]) != opconst.TypeTransform {
 		panic("invalid op")
 	}
 	*t = TransformOp{f32.Point{

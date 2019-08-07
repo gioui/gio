@@ -16,6 +16,7 @@ import (
 	"gioui.org/ui/app/internal/gl"
 	gdraw "gioui.org/ui/draw"
 	"gioui.org/ui/f32"
+	"gioui.org/ui/internal/opconst"
 	"gioui.org/ui/internal/ops"
 	"golang.org/x/image/draw"
 )
@@ -58,7 +59,7 @@ type renderer struct {
 }
 
 type drawOps struct {
-	reader     ui.OpsReader
+	reader     ops.Reader
 	cache      *resourceCache
 	viewport   image.Point
 	clearColor [3]float32
@@ -90,7 +91,7 @@ type pathOp struct {
 	// clip is the union of all
 	// later clip rectangles.
 	clip      image.Rectangle
-	pathKey   ui.OpKey
+	pathKey   ops.Key
 	path      bool
 	pathVerts []byte
 	parent    *pathOp
@@ -124,7 +125,7 @@ type opClip struct {
 }
 
 func (op *opClip) decode(data []byte) {
-	if ops.OpType(data[0]) != ops.TypeClip {
+	if opconst.OpType(data[0]) != opconst.TypeClip {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
@@ -641,20 +642,20 @@ func (d *drawOps) newPathOp() *pathOp {
 	return &d.pathOpCache[len(d.pathOpCache)-1]
 }
 
-func (d *drawOps) collectOps(r *ui.OpsReader, state drawState) int {
+func (d *drawOps) collectOps(r *ops.Reader, state drawState) int {
 	var aux []byte
-	var auxKey ui.OpKey
+	var auxKey ops.Key
 loop:
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
-		switch ops.OpType(encOp.Data[0]) {
-		case ops.TypeTransform:
+		switch opconst.OpType(encOp.Data[0]) {
+		case opconst.TypeTransform:
 			var op ui.TransformOp
 			op.Decode(encOp.Data)
 			state.t = state.t.Multiply(op)
-		case ops.TypeAux:
-			aux = encOp.Data[ops.TypeAuxLen:]
+		case opconst.TypeAux:
+			aux = encOp.Data[opconst.TypeAuxLen:]
 			auxKey = encOp.Key
-		case ops.TypeClip:
+		case opconst.TypeClip:
 			var op opClip
 			op.decode(encOp.Data)
 			off := state.t.Transform(f32.Point{})
@@ -676,18 +677,18 @@ loop:
 				d.pathOps = append(d.pathOps, state.cpath)
 			}
 			aux = nil
-			auxKey = ui.OpKey{}
-		case ops.TypeColor:
+			auxKey = ops.Key{}
+		case opconst.TypeColor:
 			var op gdraw.ColorOp
 			op.Decode(encOp.Data, encOp.Refs)
 			state.img = nil
 			state.color = op.Color
-		case ops.TypeImage:
+		case opconst.TypeImage:
 			var op gdraw.ImageOp
 			op.Decode(encOp.Data, encOp.Refs)
 			state.img = op.Src
 			state.imgRect = op.Rect
-		case ops.TypeDraw:
+		case opconst.TypeDraw:
 			var op gdraw.DrawOp
 			op.Decode(encOp.Data, encOp.Refs)
 			off := state.t.Transform(f32.Point{})
@@ -723,9 +724,9 @@ loop:
 			} else {
 				d.imageOps = append(d.imageOps, img)
 			}
-		case ops.TypePush:
+		case opconst.TypePush:
 			state.z = d.collectOps(r, state)
-		case ops.TypePop:
+		case opconst.TypePop:
 			break loop
 		}
 	}

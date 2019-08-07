@@ -10,7 +10,7 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
-	"gioui.org/ui/internal/ops"
+	"gioui.org/ui/internal/opconst"
 )
 
 type ImageOp struct {
@@ -27,8 +27,8 @@ type DrawOp struct {
 }
 
 func (i ImageOp) Add(o *ui.Ops) {
-	data := make([]byte, ops.TypeImageLen)
-	data[0] = byte(ops.TypeImage)
+	data := make([]byte, opconst.TypeImageLen)
+	data[0] = byte(opconst.TypeImage)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(i.Rect.Min.X))
 	bo.PutUint32(data[5:], uint32(i.Rect.Min.Y))
@@ -39,7 +39,7 @@ func (i ImageOp) Add(o *ui.Ops) {
 
 func (i *ImageOp) Decode(data []byte, refs []interface{}) {
 	bo := binary.LittleEndian
-	if ops.OpType(data[0]) != ops.TypeImage {
+	if opconst.OpType(data[0]) != opconst.TypeImage {
 		panic("invalid op")
 	}
 	sr := image.Rectangle{
@@ -59,8 +59,8 @@ func (i *ImageOp) Decode(data []byte, refs []interface{}) {
 }
 
 func (c ColorOp) Add(o *ui.Ops) {
-	data := make([]byte, ops.TypeColorLen)
-	data[0] = byte(ops.TypeColor)
+	data := make([]byte, opconst.TypeColorLen)
+	data[0] = byte(opconst.TypeColor)
 	data[1] = c.Color.R
 	data[2] = c.Color.G
 	data[3] = c.Color.B
@@ -69,7 +69,7 @@ func (c ColorOp) Add(o *ui.Ops) {
 }
 
 func (c *ColorOp) Decode(data []byte, refs []interface{}) {
-	if ops.OpType(data[0]) != ops.TypeColor {
+	if opconst.OpType(data[0]) != opconst.TypeColor {
 		panic("invalid op")
 	}
 	*c = ColorOp{
@@ -83,8 +83,8 @@ func (c *ColorOp) Decode(data []byte, refs []interface{}) {
 }
 
 func (d DrawOp) Add(o *ui.Ops) {
-	data := make([]byte, ops.TypeDrawLen)
-	data[0] = byte(ops.TypeDraw)
+	data := make([]byte, opconst.TypeDrawLen)
+	data[0] = byte(opconst.TypeDraw)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], math.Float32bits(d.Rect.Min.X))
 	bo.PutUint32(data[5:], math.Float32bits(d.Rect.Min.Y))
@@ -95,7 +95,7 @@ func (d DrawOp) Add(o *ui.Ops) {
 
 func (d *DrawOp) Decode(data []byte, refs []interface{}) {
 	bo := binary.LittleEndian
-	if ops.OpType(data[0]) != ops.TypeDraw {
+	if opconst.OpType(data[0]) != opconst.TypeDraw {
 		panic("invalid op")
 	}
 	r := f32.Rectangle{

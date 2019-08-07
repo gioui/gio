@@ -9,7 +9,7 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
-	"gioui.org/ui/internal/ops"
+	"gioui.org/ui/internal/opconst"
 	"gioui.org/ui/internal/path"
 )
 
@@ -30,8 +30,8 @@ type ClipOp struct {
 }
 
 func (p ClipOp) Add(o *ui.Ops) {
-	data := make([]byte, ops.TypeClipLen)
-	data[0] = byte(ops.TypeClip)
+	data := make([]byte, opconst.TypeClipLen)
+	data[0] = byte(opconst.TypeClip)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], math.Float32bits(p.bounds.Min.X))
 	bo.PutUint32(data[5:], math.Float32bits(p.bounds.Min.Y))
@@ -239,7 +239,7 @@ func (p *PathBuilder) vertex(cornerx, cornery int16, ctrl, to f32.Point) {
 		ToY:     to.Y,
 	}
 	data := make([]byte, path.VertStride+1)
-	data[0] = byte(ops.TypeAux)
+	data[0] = byte(opconst.TypeAux)
 	bo := binary.LittleEndian
 	data[1] = byte(uint16(v.CornerX))
 	data[2] = byte(uint16(v.CornerX) >> 8)

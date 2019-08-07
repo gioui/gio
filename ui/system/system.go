@@ -7,7 +7,7 @@ package system
 import (
 	"gioui.org/ui"
 	"gioui.org/ui/input"
-	"gioui.org/ui/internal/ops"
+	"gioui.org/ui/internal/opconst"
 )
 
 // ProfileOp registers a handler for receiving
@@ -24,13 +24,13 @@ type ProfileEvent struct {
 }
 
 func (p ProfileOp) Add(o *ui.Ops) {
-	data := make([]byte, ops.TypeProfileLen)
-	data[0] = byte(ops.TypeProfile)
+	data := make([]byte, opconst.TypeProfileLen)
+	data[0] = byte(opconst.TypeProfile)
 	o.Write(data, p.Key)
 }
 
 func (p *ProfileOp) Decode(d []byte, refs []interface{}) {
-	if ops.OpType(d[0]) != ops.TypeProfile {
+	if opconst.OpType(d[0]) != opconst.TypeProfile {
 		panic("invalid op")
 	}
 	*p = ProfileOp{

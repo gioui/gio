@@ -10,7 +10,7 @@ import (
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/input"
-	"gioui.org/ui/internal/ops"
+	"gioui.org/ui/internal/opconst"
 )
 
 type Event struct {
@@ -95,8 +95,8 @@ func (op EllipseAreaOp) Add(ops *ui.Ops) {
 }
 
 func (op areaOp) add(o *ui.Ops) {
-	data := make([]byte, ops.TypeAreaLen)
-	data[0] = byte(ops.TypeArea)
+	data := make([]byte, opconst.TypeAreaLen)
+	data[0] = byte(opconst.TypeArea)
 	data[1] = byte(op.kind)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[2:], uint32(op.rect.Min.X))
@@ -107,8 +107,8 @@ func (op areaOp) add(o *ui.Ops) {
 }
 
 func (h HandlerOp) Add(o *ui.Ops) {
-	data := make([]byte, ops.TypePointerHandlerLen)
-	data[0] = byte(ops.TypePointerHandler)
+	data := make([]byte, opconst.TypePointerHandlerLen)
+	data[0] = byte(opconst.TypePointerHandler)
 	if h.Grab {
 		data[1] = 1
 	}
@@ -116,7 +116,7 @@ func (h HandlerOp) Add(o *ui.Ops) {
 }
 
 func (h *HandlerOp) Decode(d []byte, refs []interface{}) {
-	if ops.OpType(d[0]) != ops.TypePointerHandler {
+	if opconst.OpType(d[0]) != opconst.TypePointerHandler {
 		panic("invalid op")
 	}
 	*h = HandlerOp{
@@ -126,8 +126,8 @@ func (h *HandlerOp) Decode(d []byte, refs []interface{}) {
 }
 
 func (op PassOp) Add(o *ui.Ops) {
-	data := make([]byte, ops.TypePassLen)
-	data[0] = byte(ops.TypePass)
+	data := make([]byte, opconst.TypePassLen)
+	data[0] = byte(opconst.TypePass)
 	if op.Pass {
 		data[1] = 1
 	}
@@ -135,7 +135,7 @@ func (op PassOp) Add(o *ui.Ops) {
 }
 
 func (op *PassOp) Decode(d []byte) {
-	if ops.OpType(d[0]) != ops.TypePass {
+	if opconst.OpType(d[0]) != opconst.TypePass {
 		panic("invalid op")
 	}
 	*op = PassOp{

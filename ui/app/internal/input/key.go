@@ -5,6 +5,7 @@ package input
 import (
 	"gioui.org/ui"
 	"gioui.org/ui/input"
+	"gioui.org/ui/internal/opconst"
 	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/key"
 )
@@ -14,7 +15,7 @@ type TextInputState uint8
 type keyQueue struct {
 	focus    input.Key
 	handlers map[input.Key]*keyHandler
-	reader   ui.OpsReader
+	reader   ops.Reader
 	state    TextInputState
 }
 
@@ -94,8 +95,8 @@ func (q *keyQueue) resolveFocus(events *handlerEvents) (input.Key, listenerPrior
 	var hide bool
 loop:
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
-		switch ops.OpType(encOp.Data[0]) {
-		case ops.TypeKeyHandler:
+		switch opconst.OpType(encOp.Data[0]) {
+		case opconst.TypeKeyHandler:
 			var op key.HandlerOp
 			op.Decode(encOp.Data, encOp.Refs)
 			var newPri listenerPriority
@@ -119,15 +120,15 @@ loop:
 				events.Set(op.Key, []input.Event{key.FocusEvent{Focus: false}})
 			}
 			h.active = true
-		case ops.TypeHideInput:
+		case opconst.TypeHideInput:
 			hide = true
-		case ops.TypePush:
+		case opconst.TypePush:
 			newK, newPri, h := q.resolveFocus(events)
 			hide = hide || h
 			if newPri.replaces(pri) {
 				k, pri = newK, newPri
 			}
-		case ops.TypePop:
+		case opconst.TypePop:
 			break loop
 		}
 	}

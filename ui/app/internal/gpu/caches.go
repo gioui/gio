@@ -3,7 +3,7 @@ package gpu
 import (
 	"fmt"
 
-	"gioui.org/ui"
+	"gioui.org/ui/internal/ops"
 )
 
 type resourceCache struct {
@@ -11,11 +11,11 @@ type resourceCache struct {
 	newRes map[interface{}]resource
 }
 
-// opCache is like a resourceCache using the concrete OpKey
+// opCache is like a resourceCache using the concrete Key
 // key type to avoid allocations.
 type opCache struct {
-	res    map[ui.OpKey]resource
-	newRes map[ui.OpKey]resource
+	res    map[ops.Key]resource
+	newRes map[ops.Key]resource
 }
 
 func newResourceCache() *resourceCache {
@@ -64,12 +64,12 @@ func (r *resourceCache) release(ctx *context) {
 
 func newOpCache() *opCache {
 	return &opCache{
-		res:    make(map[ui.OpKey]resource),
-		newRes: make(map[ui.OpKey]resource),
+		res:    make(map[ops.Key]resource),
+		newRes: make(map[ops.Key]resource),
 	}
 }
 
-func (r *opCache) get(key ui.OpKey) (resource, bool) {
+func (r *opCache) get(key ops.Key) (resource, bool) {
 	v, exists := r.res[key]
 	if exists {
 		r.newRes[key] = v
@@ -77,7 +77,7 @@ func (r *opCache) get(key ui.OpKey) (resource, bool) {
 	return v, exists
 }
 
-func (r *opCache) put(key ui.OpKey, val resource) {
+func (r *opCache) put(key ops.Key, val resource) {
 	if _, exists := r.newRes[key]; exists {
 		panic(fmt.Errorf("key exists, %p", key))
 	}

@@ -3,55 +3,22 @@ package ui
 import (
 	"encoding/binary"
 
-	"gioui.org/ui/internal/ops"
+	"gioui.org/ui/internal/opconst"
 )
 
 // Ops holds a list of serialized Ops.
 type Ops struct {
-	version int
+	Version int
 	// Serialized ops.
-	data []byte
+	Data []byte
 	// Op references.
-	refs []interface{}
+	Refs []interface{}
 
 	stackDepth int
 
 	inAux  bool
 	auxOff int
 	auxLen int
-}
-
-// OpsReader parses an ops list. Internal use only.
-type OpsReader struct {
-	pc    pc
-	stack []macro
-	ops   *Ops
-}
-
-// EncodedOp represents an encoded op returned by
-// OpsReader. Internal use only.
-type EncodedOp struct {
-	Key  OpKey
-	Data []byte
-	Refs []interface{}
-}
-
-// OpKey is a unique key for a given op. Internal use only.
-type OpKey struct {
-	ops     *Ops
-	pc      int
-	version int
-}
-
-type macro struct {
-	ops   *Ops
-	retPC pc
-	endPC pc
-}
-
-type pc struct {
-	data int
-	refs int
 }
 
 type StackOp struct {
@@ -67,12 +34,9 @@ type MacroOp struct {
 	pc        pc
 }
 
-type opMacroDef struct {
-	endpc pc
-}
-
-type opAux struct {
-	len int
+type pc struct {
+	data int
+	refs int
 }
 
 func (s *StackOp) Push(o *Ops) {
@@ -83,7 +47,7 @@ func (s *StackOp) Push(o *Ops) {
 	s.ops = o
 	o.stackDepth++
 	s.depth = o.stackDepth
-	o.Write([]byte{byte(ops.TypePush)})
+	o.Write([]byte{byte(opconst.TypePush)})
 }
 
 func (s *StackOp) Pop() {
@@ -96,32 +60,7 @@ func (s *StackOp) Pop() {
 	}
 	s.active = false
 	s.ops.stackDepth--
-	s.ops.Write([]byte{byte(ops.TypePop)})
-}
-
-func (op *opAux) decode(data []byte) {
-	if ops.OpType(data[0]) != ops.TypeAux {
-		panic("invalid op")
-	}
-	bo := binary.LittleEndian
-	*op = opAux{
-		len: int(int32(bo.Uint32(data[1:]))),
-	}
-}
-
-func (op *opMacroDef) decode(data []byte) {
-	if ops.OpType(data[0]) != ops.TypeMacroDef {
-		panic("invalid op")
-	}
-	bo := binary.LittleEndian
-	dataIdx := int(int32(bo.Uint32(data[1:])))
-	refsIdx := int(int32(bo.Uint32(data[5:])))
-	*op = opMacroDef{
-		endpc: pc{
-			data: dataIdx,
-			refs: refsIdx,
-		},
-	}
+	s.ops.Write([]byte{byte(opconst.TypePop)})
 }
 
 // Reset the Ops, preparing it for re-use.
@@ -129,12 +68,12 @@ func (o *Ops) Reset() {
 	o.inAux = false
 	o.stackDepth = 0
 	// Leave references to the GC.
-	for i := range o.refs {
-		o.refs[i] = nil
+	for i := range o.Refs {
+		o.Refs[i] = nil
 	}
-	o.data = o.data[:0]
-	o.refs = o.refs[:0]
-	o.version++
+	o.Data = o.Data[:0]
+	o.Refs = o.Refs[:0]
+	o.Version++
 }
 
 // Internal use only.
@@ -142,29 +81,29 @@ func (o *Ops) Aux() []byte {
 	if !o.inAux {
 		return nil
 	}
-	return o.data[o.auxOff+ops.TypeAuxLen : o.auxOff+ops.TypeAuxLen+o.auxLen]
+	return o.Data[o.auxOff+opconst.TypeAuxLen : o.auxOff+opconst.TypeAuxLen+o.auxLen]
 }
 
 func (d *Ops) write(op []byte, refs ...interface{}) {
-	d.data = append(d.data, op...)
-	d.refs = append(d.refs, refs...)
+	d.Data = append(d.Data, op...)
+	d.Refs = append(d.Refs, refs...)
 }
 
 func (o *Ops) Write(op []byte, refs ...interface{}) {
-	t := ops.OpType(op[0])
+	t := opconst.OpType(op[0])
 	if len(refs) != t.NumRefs() {
 		panic("invalid ref count")
 	}
 	switch t {
-	case ops.TypeAux:
+	case opconst.TypeAux:
 		// Write only the data.
 		op = op[1:]
 		if !o.inAux {
 			o.inAux = true
 			o.auxOff = o.pc().data
 			o.auxLen = 0
-			header := make([]byte, ops.TypeAuxLen)
-			header[0] = byte(ops.TypeAux)
+			header := make([]byte, opconst.TypeAuxLen)
+			header[0] = byte(opconst.TypeAux)
 			o.write(header)
 		}
 		o.auxLen += len(op)
@@ -172,14 +111,14 @@ func (o *Ops) Write(op []byte, refs ...interface{}) {
 		if o.inAux {
 			o.inAux = false
 			bo := binary.LittleEndian
-			bo.PutUint32(o.data[o.auxOff+1:], uint32(o.auxLen))
+			bo.PutUint32(o.Data[o.auxOff+1:], uint32(o.auxLen))
 		}
 	}
 	o.write(op, refs...)
 }
 
 func (d *Ops) pc() pc {
-	return pc{data: len(d.data), refs: len(d.refs)}
+	return pc{data: len(d.Data), refs: len(d.Refs)}
 }
 
 // Record a macro of operations.
@@ -191,7 +130,7 @@ func (m *MacroOp) Record(o *Ops) {
 	m.ops = o
 	m.pc = o.pc()
 	// Make room for a macro definition. Filled out in Stop.
-	m.ops.Write(make([]byte, ops.TypeMacroDefLen))
+	m.ops.Write(make([]byte, opconst.TypeMacroDefLen))
 }
 
 // Stop recording the macro.
@@ -202,30 +141,12 @@ func (m *MacroOp) Stop() {
 	m.recording = false
 	pc := m.ops.pc()
 	// Fill out the macro definition reserved in Record.
-	data := m.ops.data[m.pc.data : m.pc.data+ops.TypeMacroDefLen]
-	data[0] = byte(ops.TypeMacroDef)
+	data := m.ops.Data[m.pc.data : m.pc.data+opconst.TypeMacroDefLen]
+	data[0] = byte(opconst.TypeMacroDef)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(pc.data))
 	bo.PutUint32(data[5:], uint32(pc.refs))
-	m.version = m.ops.version
-}
-
-func (m *MacroOp) decode(data []byte, refs []interface{}) {
-	if ops.OpType(data[0]) != ops.TypeMacro {
-		panic("invalid op")
-	}
-	bo := binary.LittleEndian
-	dataIdx := int(int32(bo.Uint32(data[1:])))
-	refsIdx := int(int32(bo.Uint32(data[5:])))
-	version := int(int32(bo.Uint32(data[9:])))
-	*m = MacroOp{
-		ops: refs[0].(*Ops),
-		pc: pc{
-			data: dataIdx,
-			refs: refsIdx,
-		},
-		version: version,
-	}
+	m.version = m.ops.Version
 }
 
 func (m MacroOp) Add(o *Ops) {
@@ -235,88 +156,11 @@ func (m MacroOp) Add(o *Ops) {
 	if m.ops == nil {
 		return
 	}
-	data := make([]byte, ops.TypeMacroLen)
-	data[0] = byte(ops.TypeMacro)
+	data := make([]byte, opconst.TypeMacroLen)
+	data[0] = byte(opconst.TypeMacro)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(m.pc.data))
 	bo.PutUint32(data[5:], uint32(m.pc.refs))
 	bo.PutUint32(data[9:], uint32(m.version))
 	o.Write(data, m.ops)
-}
-
-// Reset start reading from the op list.
-func (r *OpsReader) Reset(ops *Ops) {
-	r.stack = r.stack[:0]
-	r.pc = pc{}
-	r.ops = nil
-	if ops == nil {
-		return
-	}
-	r.ops = ops
-}
-
-func (r *OpsReader) Decode() (EncodedOp, bool) {
-	if r.ops == nil {
-		return EncodedOp{}, false
-	}
-	for {
-		if len(r.stack) > 0 {
-			b := r.stack[len(r.stack)-1]
-			if r.pc == b.endPC {
-				r.ops = b.ops
-				r.pc = b.retPC
-				r.stack = r.stack[:len(r.stack)-1]
-				continue
-			}
-		}
-		if r.pc.data == len(r.ops.data) {
-			return EncodedOp{}, false
-		}
-		key := OpKey{ops: r.ops, pc: r.pc.data, version: r.ops.version}
-		t := ops.OpType(r.ops.data[r.pc.data])
-		n := t.Size()
-		nrefs := t.NumRefs()
-		data := r.ops.data[r.pc.data : r.pc.data+n]
-		refs := r.ops.refs[r.pc.refs : r.pc.refs+nrefs]
-		switch t {
-		case ops.TypeAux:
-			var op opAux
-			op.decode(data)
-			n += op.len
-			data = r.ops.data[r.pc.data : r.pc.data+n]
-		case ops.TypeMacro:
-			var op MacroOp
-			op.decode(data, refs)
-			macroOps := op.ops
-			if ops.OpType(macroOps.data[op.pc.data]) != ops.TypeMacroDef {
-				panic("invalid macro reference")
-			}
-			if op.version != op.ops.version {
-				panic("invalid MacroOp reference to reset Ops")
-			}
-			var opDef opMacroDef
-			opDef.decode(macroOps.data[op.pc.data : op.pc.data+ops.TypeMacroDef.Size()])
-			retPC := r.pc
-			retPC.data += n
-			retPC.refs += nrefs
-			r.stack = append(r.stack, macro{
-				ops:   r.ops,
-				retPC: retPC,
-				endPC: opDef.endpc,
-			})
-			r.ops = macroOps
-			r.pc = op.pc
-			r.pc.data += ops.TypeMacroDef.Size()
-			r.pc.refs += ops.TypeMacroDef.NumRefs()
-			continue
-		case ops.TypeMacroDef:
-			var op opMacroDef
-			op.decode(data)
-			r.pc = op.endpc
-			continue
-		}
-		r.pc.data += n
-		r.pc.refs += nrefs
-		return EncodedOp{Key: key, Data: data, Refs: refs}, true
-	}
 }
