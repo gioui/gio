@@ -37,27 +37,6 @@ func (i ImageOp) Add(o *ui.Ops) {
 	o.Write(data, i.Src)
 }
 
-func (i *ImageOp) Decode(data []byte, refs []interface{}) {
-	bo := binary.LittleEndian
-	if opconst.OpType(data[0]) != opconst.TypeImage {
-		panic("invalid op")
-	}
-	sr := image.Rectangle{
-		Min: image.Point{
-			X: int(int32(bo.Uint32(data[1:]))),
-			Y: int(int32(bo.Uint32(data[5:]))),
-		},
-		Max: image.Point{
-			X: int(int32(bo.Uint32(data[9:]))),
-			Y: int(int32(bo.Uint32(data[13:]))),
-		},
-	}
-	*i = ImageOp{
-		Src:  refs[0].(image.Image),
-		Rect: sr,
-	}
-}
-
 func (c ColorOp) Add(o *ui.Ops) {
 	data := make([]byte, opconst.TypeColorLen)
 	data[0] = byte(opconst.TypeColor)
@@ -66,20 +45,6 @@ func (c ColorOp) Add(o *ui.Ops) {
 	data[3] = c.Color.B
 	data[4] = c.Color.A
 	o.Write(data)
-}
-
-func (c *ColorOp) Decode(data []byte, refs []interface{}) {
-	if opconst.OpType(data[0]) != opconst.TypeColor {
-		panic("invalid op")
-	}
-	*c = ColorOp{
-		Color: color.RGBA{
-			R: data[1],
-			G: data[2],
-			B: data[3],
-			A: data[4],
-		},
-	}
 }
 
 func (d DrawOp) Add(o *ui.Ops) {
@@ -91,26 +56,6 @@ func (d DrawOp) Add(o *ui.Ops) {
 	bo.PutUint32(data[9:], math.Float32bits(d.Rect.Max.X))
 	bo.PutUint32(data[13:], math.Float32bits(d.Rect.Max.Y))
 	o.Write(data)
-}
-
-func (d *DrawOp) Decode(data []byte, refs []interface{}) {
-	bo := binary.LittleEndian
-	if opconst.OpType(data[0]) != opconst.TypeDraw {
-		panic("invalid op")
-	}
-	r := f32.Rectangle{
-		Min: f32.Point{
-			X: math.Float32frombits(bo.Uint32(data[1:])),
-			Y: math.Float32frombits(bo.Uint32(data[5:])),
-		},
-		Max: f32.Point{
-			X: math.Float32frombits(bo.Uint32(data[9:])),
-			Y: math.Float32frombits(bo.Uint32(data[13:])),
-		},
-	}
-	*d = DrawOp{
-		Rect: r,
-	}
 }
 
 // RectClip returns a ClipOp op corresponding to

@@ -144,6 +144,61 @@ func (op *clipOp) decode(data []byte) {
 	}
 }
 
+func decodeImageOp(data []byte, refs []interface{}) gdraw.ImageOp {
+	bo := binary.LittleEndian
+	if opconst.OpType(data[0]) != opconst.TypeImage {
+		panic("invalid op")
+	}
+	sr := image.Rectangle{
+		Min: image.Point{
+			X: int(int32(bo.Uint32(data[1:]))),
+			Y: int(int32(bo.Uint32(data[5:]))),
+		},
+		Max: image.Point{
+			X: int(int32(bo.Uint32(data[9:]))),
+			Y: int(int32(bo.Uint32(data[13:]))),
+		},
+	}
+	return gdraw.ImageOp{
+		Src:  refs[0].(image.Image),
+		Rect: sr,
+	}
+}
+
+func decodeColorOp(data []byte, refs []interface{}) gdraw.ColorOp {
+	if opconst.OpType(data[0]) != opconst.TypeColor {
+		panic("invalid op")
+	}
+	return gdraw.ColorOp{
+		Color: color.RGBA{
+			R: data[1],
+			G: data[2],
+			B: data[3],
+			A: data[4],
+		},
+	}
+}
+
+func decodeDrawOp(data []byte, refs []interface{}) gdraw.DrawOp {
+	bo := binary.LittleEndian
+	if opconst.OpType(data[0]) != opconst.TypeDraw {
+		panic("invalid op")
+	}
+	r := f32.Rectangle{
+		Min: f32.Point{
+			X: math.Float32frombits(bo.Uint32(data[1:])),
+			Y: math.Float32frombits(bo.Uint32(data[5:])),
+		},
+		Max: f32.Point{
+			X: math.Float32frombits(bo.Uint32(data[9:])),
+			Y: math.Float32frombits(bo.Uint32(data[13:])),
+		},
+	}
+	return gdraw.DrawOp{
+		Rect: r,
+	}
+}
+
 type clipType uint8
 
 type resource interface {
@@ -649,9 +704,8 @@ loop:
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypeTransform:
-			var op ui.TransformOp
-			op.Decode(encOp.Data)
-			state.t = state.t.Multiply(op)
+			op := ops.DecodeTransformOp(encOp.Data)
+			state.t = state.t.Multiply(ui.TransformOp(op))
 		case opconst.TypeAux:
 			aux = encOp.Data[opconst.TypeAuxLen:]
 			auxKey = encOp.Key
@@ -679,18 +733,15 @@ loop:
 			aux = nil
 			auxKey = ops.Key{}
 		case opconst.TypeColor:
-			var op gdraw.ColorOp
-			op.Decode(encOp.Data, encOp.Refs)
+			op := decodeColorOp(encOp.Data, encOp.Refs)
 			state.img = nil
 			state.color = op.Color
 		case opconst.TypeImage:
-			var op gdraw.ImageOp
-			op.Decode(encOp.Data, encOp.Refs)
+			op := decodeImageOp(encOp.Data, encOp.Refs)
 			state.img = op.Src
 			state.imgRect = op.Rect
 		case opconst.TypeDraw:
-			var op gdraw.DrawOp
-			op.Decode(encOp.Data, encOp.Refs)
+			op := decodeDrawOp(encOp.Data, encOp.Refs)
 			off := state.t.Transform(f32.Point{})
 			clip := state.clip.Intersect(op.Rect.Add(off))
 			if clip.Empty() {

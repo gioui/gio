@@ -46,16 +46,6 @@ func (r InvalidateOp) Add(o *Ops) {
 	o.Write(data)
 }
 
-func (r *InvalidateOp) Decode(d []byte) {
-	bo := binary.LittleEndian
-	if opconst.OpType(d[0]) != opconst.TypeInvalidate {
-		panic("invalid op")
-	}
-	if nanos := bo.Uint64(d[1:]); nanos > 0 {
-		r.At = time.Unix(0, int64(nanos))
-	}
-}
-
 // Offset the transformation.
 func (t TransformOp) Offset(o f32.Point) TransformOp {
 	return t.Multiply(TransformOp{o})
@@ -85,15 +75,4 @@ func (t TransformOp) Add(o *Ops) {
 	bo.PutUint32(data[1:], math.Float32bits(t.offset.X))
 	bo.PutUint32(data[5:], math.Float32bits(t.offset.Y))
 	o.Write(data)
-}
-
-func (t *TransformOp) Decode(d []byte) {
-	bo := binary.LittleEndian
-	if opconst.OpType(d[0]) != opconst.TypeTransform {
-		panic("invalid op")
-	}
-	*t = TransformOp{f32.Point{
-		X: math.Float32frombits(bo.Uint32(d[1:])),
-		Y: math.Float32frombits(bo.Uint32(d[5:])),
-	}}
 }

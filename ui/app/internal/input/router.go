@@ -3,6 +3,7 @@
 package input
 
 import (
+	"encoding/binary"
 	"time"
 
 	"gioui.org/ui"
@@ -74,15 +75,13 @@ func (q *Router) collect() {
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypeInvalidate:
-			var op ui.InvalidateOp
-			op.Decode(encOp.Data)
+			op := decodeInvalidateOp(encOp.Data)
 			if !q.wakeup || op.At.Before(q.wakeupTime) {
 				q.wakeup = true
 				q.wakeupTime = op.At
 			}
 		case opconst.TypeProfile:
-			var op system.ProfileOp
-			op.Decode(encOp.Data, encOp.Refs)
+			op := decodeProfileOp(encOp.Data, encOp.Refs)
 			q.profHandlers = append(q.profHandlers, op.Key)
 		}
 	}
@@ -140,4 +139,25 @@ func (h *handlerEvents) Clear() {
 	for k := range h.handlers {
 		delete(h.handlers, k)
 	}
+}
+
+func decodeProfileOp(d []byte, refs []interface{}) system.ProfileOp {
+	if opconst.OpType(d[0]) != opconst.TypeProfile {
+		panic("invalid op")
+	}
+	return system.ProfileOp{
+		Key: refs[0].(input.Key),
+	}
+}
+
+func decodeInvalidateOp(d []byte) ui.InvalidateOp {
+	bo := binary.LittleEndian
+	if opconst.OpType(d[0]) != opconst.TypeInvalidate {
+		panic("invalid op")
+	}
+	var o ui.InvalidateOp
+	if nanos := bo.Uint64(d[1:]); nanos > 0 {
+		o.At = time.Unix(0, int64(nanos))
+	}
+	return o
 }

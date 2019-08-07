@@ -72,8 +72,7 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t u
 		case opconst.TypePop:
 			return
 		case opconst.TypePass:
-			var op pointer.PassOp
-			op.Decode(encOp.Data)
+			op := decodePassOp(encOp.Data)
 			pass = op.Pass
 		case opconst.TypeArea:
 			var op areaOp
@@ -87,12 +86,10 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t u
 			})
 			node = len(q.hitTree) - 1
 		case opconst.TypeTransform:
-			var op ui.TransformOp
-			op.Decode(encOp.Data)
-			t = t.Multiply(op)
+			op := ops.DecodeTransformOp(encOp.Data)
+			t = t.Multiply(ui.TransformOp(op))
 		case opconst.TypePointerHandler:
-			var op pointer.HandlerOp
-			op.Decode(encOp.Data, encOp.Refs)
+			op := decodePointerHandlerOp(encOp.Data, encOp.Refs)
 			q.hitTree = append(q.hitTree, hitNode{
 				next: node,
 				area: area,
@@ -314,5 +311,24 @@ func (op *areaOp) Hit(pos f32.Point) bool {
 		}
 	default:
 		panic("invalid area kind")
+	}
+}
+
+func decodePointerHandlerOp(d []byte, refs []interface{}) pointer.HandlerOp {
+	if opconst.OpType(d[0]) != opconst.TypePointerHandler {
+		panic("invalid op")
+	}
+	return pointer.HandlerOp{
+		Grab: d[1] != 0,
+		Key:  refs[0].(input.Key),
+	}
+}
+
+func decodePassOp(d []byte) pointer.PassOp {
+	if opconst.OpType(d[0]) != opconst.TypePass {
+		panic("invalid op")
+	}
+	return pointer.PassOp{
+		Pass: d[1] != 0,
 	}
 }

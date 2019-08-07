@@ -115,16 +115,6 @@ func (h HandlerOp) Add(o *ui.Ops) {
 	o.Write(data, h.Key)
 }
 
-func (h *HandlerOp) Decode(d []byte, refs []interface{}) {
-	if opconst.OpType(d[0]) != opconst.TypePointerHandler {
-		panic("invalid op")
-	}
-	*h = HandlerOp{
-		Grab: d[1] != 0,
-		Key:  refs[0].(input.Key),
-	}
-}
-
 func (op PassOp) Add(o *ui.Ops) {
 	data := make([]byte, opconst.TypePassLen)
 	data[0] = byte(opconst.TypePass)
@@ -132,15 +122,6 @@ func (op PassOp) Add(o *ui.Ops) {
 		data[1] = 1
 	}
 	o.Write(data)
-}
-
-func (op *PassOp) Decode(d []byte) {
-	if opconst.OpType(d[0]) != opconst.TypePass {
-		panic("invalid op")
-	}
-	*op = PassOp{
-		Pass: d[1] != 0,
-	}
 }
 
 func (t Type) String() string {

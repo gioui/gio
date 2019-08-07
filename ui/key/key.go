@@ -64,16 +64,6 @@ func (h HandlerOp) Add(o *ui.Ops) {
 	o.Write(data, h.Key)
 }
 
-func (h *HandlerOp) Decode(d []byte, refs []interface{}) {
-	if opconst.OpType(d[0]) != opconst.TypeKeyHandler {
-		panic("invalid op")
-	}
-	*h = HandlerOp{
-		Focus: d[1] != 0,
-		Key:   refs[0].(input.Key),
-	}
-}
-
 func (h HideInputOp) Add(o *ui.Ops) {
 	data := make([]byte, opconst.TypeHideInputLen)
 	data[0] = byte(opconst.TypeHideInput)

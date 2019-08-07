@@ -29,13 +29,4 @@ func (p ProfileOp) Add(o *ui.Ops) {
 	o.Write(data, p.Key)
 }
 
-func (p *ProfileOp) Decode(d []byte, refs []interface{}) {
-	if opconst.OpType(d[0]) != opconst.TypeProfile {
-		panic("invalid op")
-	}
-	*p = ProfileOp{
-		Key: refs[0].(input.Key),
-	}
-}
-
 func (p ProfileEvent) ImplementsEvent() {}

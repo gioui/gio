@@ -97,8 +97,7 @@ loop:
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypeKeyHandler:
-			var op key.HandlerOp
-			op.Decode(encOp.Data, encOp.Refs)
+			op := decodeKeyHandlerOp(encOp.Data, encOp.Refs)
 			var newPri listenerPriority
 			switch {
 			case op.Focus:
@@ -138,4 +137,14 @@ loop:
 func (p listenerPriority) replaces(p2 listenerPriority) bool {
 	// Favor earliest default focus or latest requested focus.
 	return p > p2 || p == p2 && p == priNewFocus
+}
+
+func decodeKeyHandlerOp(d []byte, refs []interface{}) key.HandlerOp {
+	if opconst.OpType(d[0]) != opconst.TypeKeyHandler {
+		panic("invalid op")
+	}
+	return key.HandlerOp{
+		Focus: d[1] != 0,
+		Key:   refs[0].(input.Key),
+	}
 }
