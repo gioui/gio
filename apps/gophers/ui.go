@@ -18,7 +18,6 @@ import (
 	_ "net/http/pprof"
 
 	"gioui.org/ui"
-	gdraw "gioui.org/ui/draw"
 	"gioui.org/ui/f32"
 	"gioui.org/ui/gesture"
 	"gioui.org/ui/input"
@@ -29,6 +28,7 @@ import (
 	"gioui.org/ui/system"
 	"gioui.org/ui/text"
 	"gioui.org/ui/widget"
+	"gioui.org/ui/paint"
 	"golang.org/x/exp/shiny/iconvg"
 
 	"github.com/google/go-github/v24/github"
@@ -107,7 +107,7 @@ var theme struct {
 func colorMaterial(ops *ui.Ops, color color.RGBA) ui.MacroOp {
 	var mat ui.MacroOp
 	mat.Record(ops)
-	gdraw.ColorOp{Color: color}.Add(ops)
+	paint.ColorOp{Color: color}.Add(ops)
 	mat.Stop()
 	return mat
 }
@@ -424,7 +424,7 @@ func (f fill) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
 	}
 	f.material.Add(ops)
-	gdraw.DrawOp{Rect: dr}.Add(ops)
+	paint.PaintOp{Rect: dr}.Add(ops)
 	return layout.Dimens{Size: d, Baseline: d.Y}
 }
 
@@ -474,9 +474,9 @@ func fab(ops *ui.Ops, cs layout.Constraints, ico image.Image, mat ui.MacroOp, si
 	rr := float32(size) * .5
 	rrect(ops, float32(size), float32(size), rr, rr, rr, rr)
 	mat.Add(ops)
-	gdraw.DrawOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(size), Y: float32(size)}}}.Add(ops)
-	gdraw.ImageOp{Src: ico, Rect: ico.Bounds()}.Add(ops)
-	gdraw.DrawOp{
+	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(size), Y: float32(size)}}}.Add(ops)
+	paint.ImageOp{Src: ico, Rect: ico.Bounds()}.Add(ops)
+	paint.PaintOp{
 		Rect: toRectF(ico.Bounds().Add(dp)),
 	}.Add(ops)
 	return layout.Dimens{Size: dims}
@@ -513,7 +513,7 @@ func (ic *icon) image(cfg ui.Config) image.Image {
 func rrect(ops *ui.Ops, width, height, se, sw, nw, ne float32) {
 	w, h := float32(width), float32(height)
 	const c = 0.55228475 // 4*(sqrt(2)-1)/3
-	var b gdraw.PathBuilder
+	var b paint.PathBuilder
 	b.Init(ops)
 	b.Move(f32.Point{X: w, Y: h - se})
 	b.Cube(f32.Point{X: 0, Y: se * c}, f32.Point{X: -se + se*c, Y: se}, f32.Point{X: -se, Y: se}) // SE

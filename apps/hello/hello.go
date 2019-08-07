@@ -10,9 +10,9 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/app"
-	"gioui.org/ui/draw"
 	"gioui.org/ui/layout"
 	"gioui.org/ui/measure"
+	"gioui.org/ui/paint"
 	"gioui.org/ui/text"
 
 	"golang.org/x/image/font/gofont/goregular"
@@ -52,7 +52,7 @@ func loop(w *app.Window) error {
 			ops.Reset()
 			var material ui.MacroOp
 			material.Record(ops)
-			draw.ColorOp{Color: maroon}.Add(ops)
+			paint.ColorOp{Color: maroon}.Add(ops)
 			material.Stop()
 			text.Label{Material: material, Face: face, Alignment: text.Center, Text: message}.Layout(ops, cs)
 			w.Draw(ops)
