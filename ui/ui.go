@@ -57,7 +57,7 @@ func (r *InvalidateOp) Decode(d []byte) {
 }
 
 func (t TransformOp) Offset(o f32.Point) TransformOp {
-	return TransformOp{o}
+	return t.Mul(TransformOp{o})
 }
 
 func (t TransformOp) InvTransform(p f32.Point) f32.Point {
