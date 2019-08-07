@@ -145,7 +145,7 @@ func newApp(w *app.Window) *App {
 	fetch := func(u string) {
 		a.fetchCommits(a.ctx, u)
 	}
-	a.ui = newUI(w.Invalidate, fetch)
+	a.ui = newUI(fetch)
 	return a
 }
 

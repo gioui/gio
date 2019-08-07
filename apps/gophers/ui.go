@@ -24,11 +24,11 @@ import (
 	"gioui.org/ui/key"
 	"gioui.org/ui/layout"
 	"gioui.org/ui/measure"
+	"gioui.org/ui/paint"
 	"gioui.org/ui/pointer"
 	"gioui.org/ui/system"
 	"gioui.org/ui/text"
 	"gioui.org/ui/widget"
-	"gioui.org/ui/paint"
 	"golang.org/x/exp/shiny/iconvg"
 
 	"github.com/google/go-github/v24/github"
@@ -49,7 +49,6 @@ type UI struct {
 	userClicks   []gesture.Click
 	selectedUser *userPage
 	edit, edit2  *text.Editor
-	invalidate   func()
 	fetchCommits func(u string)
 
 	// Profiling.
@@ -61,7 +60,6 @@ type UI struct {
 type userPage struct {
 	config      ui.Config
 	faces       measure.Faces
-	invalidate  func()
 	user        *user
 	commitsList *layout.List
 	commits     []*github.Commit
@@ -124,9 +122,8 @@ func init() {
 	theme.white = colorMaterial(&ops, rgb(0xffffff))
 }
 
-func newUI(invalidate func(), fetchCommits func(string)) *UI {
+func newUI(fetchCommits func(string)) *UI {
 	u := &UI{
-		invalidate:   invalidate,
 		fetchCommits: fetchCommits,
 	}
 	u.usersList = &layout.List{
@@ -223,7 +220,6 @@ func (u *UI) Layout(c ui.Config, q input.Queue, ops *ui.Ops, cs layout.Constrain
 func (u *UI) newUserPage(user *user) *userPage {
 	up := &userPage{
 		faces:       u.faces,
-		invalidate:  u.invalidate,
 		user:        user,
 		commitsList: &layout.List{Axis: layout.Vertical},
 	}

@@ -17,9 +17,8 @@ type queue struct{}
 type config struct{}
 
 func BenchmarkUI(b *testing.B) {
-	invalidate := func() {}
 	fetch := func(_ string) {}
-	u := newUI(invalidate, fetch)
+	u := newUI(fetch)
 	ops := new(ui.Ops)
 	q := new(queue)
 	c := new(config)
