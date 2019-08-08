@@ -10,12 +10,12 @@ import (
 
 // Ops holds a list of serialized operations.
 type Ops struct {
-	// Version is incremented at each Reset.
-	Version int
-	// Serialized operations.
-	Data []byte
+	// version is incremented at each Reset.
+	version int
+	// data contains the serialized operations.
+	data []byte
 	// External references for operations.
-	Refs []interface{}
+	refs []interface{}
 
 	stackDepth int
 
@@ -77,12 +77,27 @@ func (o *Ops) Reset() {
 	o.inAux = false
 	o.stackDepth = 0
 	// Leave references to the GC.
-	for i := range o.Refs {
-		o.Refs[i] = nil
+	for i := range o.refs {
+		o.refs[i] = nil
 	}
-	o.Data = o.Data[:0]
-	o.Refs = o.Refs[:0]
-	o.Version++
+	o.data = o.data[:0]
+	o.refs = o.refs[:0]
+	o.version++
+}
+
+// Internal use only.
+func (o *Ops) Data() []byte {
+	return o.data
+}
+
+// Internal use only.
+func (o *Ops) Refs() []interface{} {
+	return o.refs
+}
+
+// Internal use only.
+func (o *Ops) Version() int {
+	return o.version
 }
 
 // Internal use only.
@@ -90,12 +105,13 @@ func (o *Ops) Aux() []byte {
 	if !o.inAux {
 		return nil
 	}
-	return o.Data[o.auxOff+opconst.TypeAuxLen : o.auxOff+opconst.TypeAuxLen+o.auxLen]
+	aux := o.data[o.auxOff+opconst.TypeAuxLen:]
+	return aux[:o.auxLen]
 }
 
 func (d *Ops) write(op []byte, refs ...interface{}) {
-	d.Data = append(d.Data, op...)
-	d.Refs = append(d.Refs, refs...)
+	d.data = append(d.data, op...)
+	d.refs = append(d.refs, refs...)
 }
 
 // Internal use only.
@@ -121,14 +137,14 @@ func (o *Ops) Write(op []byte, refs ...interface{}) {
 		if o.inAux {
 			o.inAux = false
 			bo := binary.LittleEndian
-			bo.PutUint32(o.Data[o.auxOff+1:], uint32(o.auxLen))
+			bo.PutUint32(o.data[o.auxOff+1:], uint32(o.auxLen))
 		}
 	}
 	o.write(op, refs...)
 }
 
 func (d *Ops) pc() pc {
-	return pc{data: len(d.Data), refs: len(d.Refs)}
+	return pc{data: len(d.data), refs: len(d.refs)}
 }
 
 // Record a macro of operations.
@@ -151,12 +167,13 @@ func (m *MacroOp) Stop() {
 	m.recording = false
 	pc := m.ops.pc()
 	// Fill out the macro definition reserved in Record.
-	data := m.ops.Data[m.pc.data : m.pc.data+opconst.TypeMacroDefLen]
+	data := m.ops.data[m.pc.data:]
+	data = data[:opconst.TypeMacroDefLen]
 	data[0] = byte(opconst.TypeMacroDef)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(pc.data))
 	bo.PutUint32(data[5:], uint32(pc.refs))
-	m.version = m.ops.Version
+	m.version = m.ops.version
 }
 
 func (m MacroOp) Add(o *Ops) {

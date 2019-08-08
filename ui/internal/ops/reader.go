@@ -62,10 +62,6 @@ type opAux struct {
 func (r *Reader) Reset(ops *ui.Ops) {
 	r.stack = r.stack[:0]
 	r.pc = pc{}
-	r.ops = nil
-	if ops == nil {
-		return
-	}
 	r.ops = ops
 }
 
@@ -83,33 +79,39 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 				continue
 			}
 		}
-		if r.pc.data == len(r.ops.Data) {
+		data := r.ops.Data()
+		data = data[r.pc.data:]
+		if len(data) == 0 {
 			return EncodedOp{}, false
 		}
-		key := Key{ops: r.ops, pc: r.pc.data, version: r.ops.Version}
-		t := opconst.OpType(r.ops.Data[r.pc.data])
+		key := Key{ops: r.ops, pc: r.pc.data, version: r.ops.Version()}
+		t := opconst.OpType(data[0])
 		n := t.Size()
 		nrefs := t.NumRefs()
-		data := r.ops.Data[r.pc.data : r.pc.data+n]
-		refs := r.ops.Refs[r.pc.refs : r.pc.refs+nrefs]
+		data = data[:n]
+		refs := r.ops.Refs()
+		refs = refs[r.pc.refs:]
+		refs = refs[:nrefs]
 		switch t {
 		case opconst.TypeAux:
 			var op opAux
 			op.decode(data)
 			n += op.len
-			data = r.ops.Data[r.pc.data : r.pc.data+n]
+			data = data[:n]
 		case opconst.TypeMacro:
 			var op macroOp
 			op.decode(data, refs)
 			macroOps := op.ops
-			if opconst.OpType(macroOps.Data[op.pc.data]) != opconst.TypeMacroDef {
+			macroData := macroOps.Data()
+			macroData = macroData[op.pc.data:]
+			if opconst.OpType(macroData[0]) != opconst.TypeMacroDef {
 				panic("invalid macro reference")
 			}
-			if op.version != op.ops.Version {
+			if op.version != op.ops.Version() {
 				panic("invalid MacroOp reference to reset Ops")
 			}
 			var opDef opMacroDef
-			opDef.decode(macroOps.Data[op.pc.data : op.pc.data+opconst.TypeMacroDef.Size()])
+			opDef.decode(macroData[:opconst.TypeMacroDef.Size()])
 			retPC := r.pc
 			retPC.data += n
 			retPC.refs += nrefs
