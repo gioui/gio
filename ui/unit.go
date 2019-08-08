@@ -25,14 +25,18 @@ const (
 	UnitSp
 )
 
+// Px returns the Value for v device pixels.
 func Px(v float32) Value {
 	return Value{V: v, U: UnitPx}
 }
 
+// Px returns the Value for v device independent
+// pixels.
 func Dp(v float32) Value {
 	return Value{V: v, U: UnitDp}
 }
 
+// Sp returns the Value for v scaled dps.
 func Sp(v float32) Value {
 	return Value{V: v, U: UnitSp}
 }

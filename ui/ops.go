@@ -8,12 +8,13 @@ import (
 	"gioui.org/ui/internal/opconst"
 )
 
-// Ops holds a list of serialized Ops.
+// Ops holds a list of serialized operations.
 type Ops struct {
+	// Version is incremented at each Reset.
 	Version int
-	// Serialized ops.
+	// Serialized operations.
 	Data []byte
-	// Op references.
+	// External references for operations.
 	Refs []interface{}
 
 	stackDepth int
@@ -23,12 +24,16 @@ type Ops struct {
 	auxLen int
 }
 
+// StackOp can save and restore the operation state
+// in a stack-like manner.
 type StackOp struct {
 	depth  int
 	active bool
 	ops    *Ops
 }
 
+// MacroOp can record a list of operations for later
+// use.
 type MacroOp struct {
 	recording bool
 	ops       *Ops
@@ -41,6 +46,7 @@ type pc struct {
 	refs int
 }
 
+// Push (save) the current operations state.
 func (s *StackOp) Push(o *Ops) {
 	if s.active {
 		panic("unbalanced push")
@@ -52,6 +58,7 @@ func (s *StackOp) Push(o *Ops) {
 	o.Write([]byte{byte(opconst.TypePush)})
 }
 
+// Pop (restore) a previously Pushed operations state.
 func (s *StackOp) Pop() {
 	if !s.active {
 		panic("unbalanced pop")
@@ -91,6 +98,7 @@ func (d *Ops) write(op []byte, refs ...interface{}) {
 	d.Refs = append(d.Refs, refs...)
 }
 
+// Internal use only.
 func (o *Ops) Write(op []byte, refs ...interface{}) {
 	t := opconst.OpType(op[0])
 	if len(refs) != t.NumRefs() {
@@ -135,7 +143,7 @@ func (m *MacroOp) Record(o *Ops) {
 	m.ops.Write(make([]byte, opconst.TypeMacroDefLen))
 }
 
-// Stop recording the macro.
+// Stop ends a previously started recording.
 func (m *MacroOp) Stop() {
 	if !m.recording {
 		panic("not recording")
