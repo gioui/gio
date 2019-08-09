@@ -134,10 +134,12 @@ func DataDir() (string, error) {
 	return dataDir()
 }
 
-// Main must be called from the a program's main function.
+// Main must be called from the a program's main function. It
+// blocks until there are no more windows active.
+//
 // Calling Main is necessary because some operating systems
 // require control of the main thread of the program for
-// running user interfaces.
+// running windows.
 func Main() {
 	main()
 }
