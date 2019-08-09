@@ -15,12 +15,15 @@ import (
 	"gioui.org/ui/system"
 )
 
+// WindowOptions specifies a set of window properties
+// for creating new Windows.
 type WindowOptions struct {
 	Width  ui.Value
 	Height ui.Value
 	Title  string
 }
 
+// Window represents an operating system window.
 type Window struct {
 	driver    *window
 	lastFrame time.Time
@@ -43,8 +46,8 @@ type Window struct {
 }
 
 // Queue is an input.Queue implementation that distributes
-// system input events to the input handlers declared through
-// Draw.
+// system input events to the input handlers declared in the
+// most recent call to Update.
 type Queue struct {
 	q iinput.Router
 }
@@ -72,7 +75,8 @@ var ackEvent input.Event
 // options. The options are hints; the platform is free to
 // ignore or adjust them.
 // If the current program is running on iOS and Android,
-// NewWindow returns the window previously by the platform.
+// NewWindow returns the window previously created by the
+// platform.
 func NewWindow(opts *WindowOptions) *Window {
 	if opts == nil {
 		opts = &WindowOptions{
@@ -96,14 +100,21 @@ func NewWindow(opts *WindowOptions) *Window {
 	return w
 }
 
+// Events returns the channel where events are delivered.
 func (w *Window) Events() <-chan input.Event {
 	return w.out
 }
 
+// Queue returns the Window's event queue. The queue contains
+// the events received since the last UpdateEvent.
 func (w *Window) Queue() *Queue {
 	return &w.queue
 }
 
+// Update updates the Window. Paint operations updates the
+// window contents, input operations declare input handlers,
+// and so on. The supplied operations list completely replaces
+// the window state from previous calls.
 func (w *Window) Update(frame *ui.Ops) {
 	w.frames <- frame
 }
@@ -139,8 +150,8 @@ func (w *Window) draw(size image.Point, frame *ui.Ops) {
 }
 
 // Invalidate the current window such that a UpdateEvent will be generated
-// immediately. If the window is not active, the redraw will trigger
-// when the window becomes active.
+// immediately. If the window is inactive, the event is sent when the
+// window becomes active.
 func (w *Window) Invalidate() {
 	select {
 	case w.invalidates <- struct{}{}:

@@ -17,7 +17,9 @@ import (
 // method must be called.
 type UpdateEvent struct {
 	Config Config
-	Size   image.Point
+	// Size is the dimensions of the window.
+	Size image.Point
+	// Insets is the insets to apply.
 	Insets Insets
 	// Whether this draw is system generated
 	// and needs a complete frame before
@@ -40,6 +42,8 @@ type Insets struct {
 	Top, Bottom, Left, Right ui.Value
 }
 
+// StageEvent is sent whenever the stage of a
+// Window changes.
 type StageEvent struct {
 	Stage Stage
 }
@@ -51,7 +55,10 @@ type CommandEvent struct {
 	Cancel bool
 }
 
+// Stage of a Window.
 type Stage uint8
+
+// CommandType is the type of a CommandEvent.
 type CommandType uint8
 
 type windowRendezvous struct {
@@ -66,7 +73,10 @@ type windowAndOptions struct {
 }
 
 const (
+	// StagePaused is the Stage for inactive Windows.
+	// Inactive Windows don't receive UpdateEvents.
 	StagePaused Stage = iota
+	// StateRunning is for active Windows.
 	StageRunning
 )
 
