@@ -157,7 +157,7 @@ const _WM_REDRAW = _WM_USER + 0
 var onceMu sync.Mutex
 var mainDone = make(chan struct{})
 
-func Main() {
+func main() {
 	<-mainDone
 }
 

@@ -134,6 +134,14 @@ func DataDir() (string, error) {
 	return dataDir()
 }
 
+// Main must be called from the a program's main function.
+// Calling Main is necessary because some operating systems
+// require control of the main thread of the program for
+// running user interfaces.
+func Main() {
+	main()
+}
+
 // Config implements the ui.Config interface.
 type Config struct {
 	// Device pixels per dp.

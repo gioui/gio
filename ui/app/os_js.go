@@ -374,7 +374,7 @@ func (w *window) config() (int, int, float32, Config) {
 	}
 }
 
-func Main() {
+func main() {
 	<-mainDone
 }
 

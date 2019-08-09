@@ -152,7 +152,7 @@ var (
 	_XKB_MOD_NAME_SHIFT = []byte("Shift\x00")
 )
 
-func Main() {
+func main() {
 	<-mainDone
 }
 

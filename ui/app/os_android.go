@@ -419,7 +419,7 @@ func (w *window) showTextInput(show bool) {
 	})
 }
 
-func Main() {
+func main() {
 }
 
 func createWindow(window *Window, opts *WindowOptions) error {

@@ -251,5 +251,5 @@ func createWindow(win *Window, opts *WindowOptions) error {
 	return <-mainWindow.errs
 }
 
-func Main() {
+func main() {
 }
