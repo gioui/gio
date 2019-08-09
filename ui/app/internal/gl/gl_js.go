@@ -3,6 +3,7 @@
 package gl
 
 import (
+	"errors"
 	"strings"
 	"syscall/js"
 )
@@ -17,18 +18,23 @@ type Functions struct {
 	int32Buf js.Value
 }
 
-func (f *Functions) Init() {
-	f.EXT_disjoint_timer_query_webgl2 = f.getExtension("EXT_disjoint_timer_query_webgl2")
-	if f.EXT_disjoint_timer_query_webgl2 == js.Null() {
+func (f *Functions) Init(version int) error {
+	if version < 2 {
 		f.EXT_disjoint_timer_query = f.getExtension("EXT_disjoint_timer_query")
+		if f.getExtension("OES_texture_half_float") == js.Null() && f.getExtension("OES_texture_float") == js.Null() {
+			return errors.New("gl: no support for neither OES_texture_half_float nor OES_texture_float")
+		}
+		if f.getExtension("EXT_sRGB") == js.Null() {
+			return errors.New("gl: EXT_sRGB not supported")
+		}
+	} else {
+		// WebGL2 extensions.
+		f.EXT_disjoint_timer_query_webgl2 = f.getExtension("EXT_disjoint_timer_query_webgl2")
+		if f.getExtension("EXT_color_buffer_half_float") == js.Null() && f.getExtension("EXT_color_buffer_float") == js.Null() {
+			return errors.New("gl: no support for neither EXT_color_buffer_half_float nor EXT_color_buffer_float")
+		}
 	}
-	// Enable extensions.
-	f.getExtension("OES_texture_half_float")
-	f.getExtension("OES_texture_float")
-	f.getExtension("EXT_sRGB")
-	// WebGL2 extensions
-	f.getExtension("EXT_color_buffer_half_float")
-	f.getExtension("EXT_color_buffer_float")
+	return nil
 }
 
 func (f *Functions) getExtension(name string) js.Value {
