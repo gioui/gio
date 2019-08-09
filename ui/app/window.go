@@ -18,9 +18,10 @@ import (
 // WindowOptions specifies a set of window properties
 // for creating new Windows.
 type WindowOptions struct {
-	Width  ui.Value
-	Height ui.Value
-	Title  string
+	// Width and Height of the Window. Use the zero value
+	// to choose a default size.
+	Width, Height ui.Value
+	Title         string
 }
 
 // Window represents an operating system window.
@@ -74,19 +75,28 @@ var ackEvent input.Event
 // NewWindow creates a new window for a set of window
 // options. The options are hints; the platform is free to
 // ignore or adjust them.
+//
+// If opts are nil, a set of sensible defaults are used.
+//
 // If the current program is running on iOS and Android,
 // NewWindow returns the window previously created by the
 // platform.
+//
+// BUG: Calling NewWindow more than once is not yet supported.
 func NewWindow(opts *WindowOptions) *Window {
 	if opts == nil {
 		opts = &WindowOptions{
-			Width:  ui.Dp(800),
-			Height: ui.Dp(600),
-			Title:  "Gio",
+			Title: "Gio",
 		}
 	}
-	if opts.Width.V <= 0 || opts.Height.V <= 0 {
-		panic("window width and height must be larger than 0")
+	if opts.Width.V < 0 || opts.Height.V < 0 {
+		panic("window width and height must be larger than or equal to 0")
+	}
+	if opts.Width.V == 0 {
+		opts.Width = ui.Dp(800)
+	}
+	if opts.Height.V == 0 {
+		opts.Height = ui.Dp(600)
 	}
 
 	w := &Window{
