@@ -8,7 +8,9 @@ import (
 	"gioui.org/ui/internal/opconst"
 )
 
-// Ops holds a list of serialized operations.
+// Ops holds a list of operations. Operations are stored in
+// serialized form to avoid garbage during construction of
+// the ops list.
 type Ops struct {
 	// version is incremented at each Reset.
 	version int
@@ -176,6 +178,9 @@ func (m *MacroOp) Stop() {
 	m.version = m.ops.version
 }
 
+// Add the recorded list of operations. The Ops
+// argument may be different than the Ops argument
+// passed to Record.
 func (m MacroOp) Add(o *Ops) {
 	if m.recording {
 		panic("a recording is in progress")

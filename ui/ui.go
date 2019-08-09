@@ -11,8 +11,8 @@ import (
 	"gioui.org/ui/internal/opconst"
 )
 
-// Config represents the essential configuration for
-// updating and drawing a user interface.
+// Config define the essential properties of
+// the environment.
 type Config interface {
 	// Now returns the current animation time.
 	Now() time.Time
@@ -26,7 +26,7 @@ type InvalidateOp struct {
 	At time.Time
 }
 
-// TransformOp applies a transform to later ops.
+// TransformOp applies a transform to the current transform.
 type TransformOp struct {
 	// TODO: general transformations.
 	offset f32.Point
