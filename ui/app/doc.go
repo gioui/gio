@@ -6,7 +6,7 @@ functionality for running graphical user interfaces.
 
 Windows
 
-Create a new Window by callingNewWindow. On mobile platforms or when Gio
+Create a new Window by calling NewWindow. On mobile platforms or when Gio
 is embedded in another project, NewWindow merely connects with a previously
 created window.
 
@@ -54,6 +54,12 @@ For example, to display a blank but otherwise functional window:
 		app.Main()
 	}
 
+
+Event queue
+
+A Window's Queue method returns an input.Queue implementation that distributes
+incoming events to the input handlers declared in the latest call to Update.
+See the gioui.org/ui/input package for more information about input handlers.
 
 */
 package app

@@ -159,7 +159,7 @@ func (w *Window) draw(size image.Point, frame *ui.Ops) {
 	w.updateAnimation()
 }
 
-// Invalidate the current window such that a UpdateEvent will be generated
+// Invalidate the window such that a UpdateEvent will be generated
 // immediately. If the window is inactive, the event is sent when the
 // window becomes active.
 func (w *Window) Invalidate() {
