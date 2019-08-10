@@ -9,7 +9,7 @@ import (
 	"gioui.org/ui/f32"
 )
 
-// Flex lays out interface elements along an axis,
+// Flex lays out child elements along an axis,
 // according to alignment and weights.
 type Flex struct {
 	// Axis is the main axis, either Horizontal or Vertical.
@@ -30,11 +30,14 @@ type Flex struct {
 	maxBaseline int
 }
 
+// FlexChild is the layout result of a call to Rigid or
+// Flexible.
 type FlexChild struct {
 	macro ui.MacroOp
 	dims  Dimens
 }
 
+// Spacing determine the spacing mode for a Flex.
 type Spacing uint8
 
 type flexMode uint8
@@ -46,13 +49,13 @@ const (
 	SpaceStart
 	// SpaceSides shares space between the start and end.
 	SpaceSides
-	// SpaceAround distributes space evenly between elements,
+	// SpaceAround distributes space evenly between children,
 	// with half as much space at the start and end.
 	SpaceAround
-	// SpaceBetween distributes space evenly between elements,
+	// SpaceBetween distributes space evenly between children,
 	// leaving no space at the start and end.
 	SpaceBetween
-	// SpaceEvenly distributes space evenly between elements and
+	// SpaceEvenly distributes space evenly between children and
 	// at the start and end.
 	SpaceEvenly
 )
@@ -89,6 +92,8 @@ func (f *Flex) begin(mode flexMode) {
 	f.macro.Record(f.ops)
 }
 
+// Rigid begins a child and return its constraints. The main axis is constrained
+// to the range from 0 to the remaining space.
 func (f *Flex) Rigid() Constraints {
 	f.begin(modeRigid)
 	mainc := axisMainConstraint(f.Axis, f.cs)
@@ -99,6 +104,8 @@ func (f *Flex) Rigid() Constraints {
 	return axisConstraints(f.Axis, Constraint{Max: mainMax}, axisCrossConstraint(f.Axis, f.cs))
 }
 
+// Flexible is like Rigid, where the main axis size is also constrained to a
+// fraction of the space not taken up by Rigid children.
 func (f *Flex) Flexible(weight float32) Constraints {
 	f.begin(modeFlex)
 	mainc := axisMainConstraint(f.Axis, f.cs)
@@ -115,6 +122,8 @@ func (f *Flex) Flexible(weight float32) Constraints {
 	return axisConstraints(f.Axis, submainc, axisCrossConstraint(f.Axis, f.cs))
 }
 
+// End a child by specifying its dimensions. Pass the returned layout result
+// to Layout.
 func (f *Flex) End(dims Dimens) FlexChild {
 	if f.mode <= modeBegun {
 		panic("End called without an active child")
@@ -135,6 +144,8 @@ func (f *Flex) End(dims Dimens) FlexChild {
 	return FlexChild{f.macro, dims}
 }
 
+// Layout a list of children. The order of the children determines their laid
+// out order.
 func (f *Flex) Layout(children ...FlexChild) Dimens {
 	mainc := axisMainConstraint(f.Axis, f.cs)
 	crossSize := axisCrossConstraint(f.Axis, f.cs).Constrain(f.maxCross)

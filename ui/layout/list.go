@@ -58,10 +58,10 @@ const (
 
 const inf = 1e6
 
-// Init prepares the list for iterating through its elements with Next.
+// Init prepares the list for iterating through its children with Next.
 func (l *List) Init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, len int) {
 	if l.more {
-		panic("unfinished element")
+		panic("unfinished child")
 	}
 	l.config = cfg
 	l.queue = q
@@ -80,6 +80,7 @@ func (l *List) Init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, l
 	l.Next()
 }
 
+// Dragging reports whether the List is being dragged.
 func (l *List) Dragging() bool {
 	return l.scroll.Dragging()
 }
@@ -95,7 +96,7 @@ func (l *List) update() {
 	l.offset += d
 }
 
-// Next advances the list to the next element.
+// Next advances to the next child.
 func (l *List) Next() {
 	if !l.more {
 		panic("end of list reached")
@@ -112,16 +113,17 @@ func (l *List) Next() {
 	l.child.Record(l.ops)
 }
 
-// Index is the current element index.
+// Index is current child's position in the underlying list.
 func (l *List) Index() int {
 	return l.index
 }
 
-// Constraints is the constraints for the current element.
+// Constraints is the constraints for the current child.
 func (l *List) Constraints() Constraints {
 	return axisConstraints(l.Axis, Constraint{Max: inf}, axisCrossConstraint(l.Axis, l.cs))
 }
 
+// More reports whether more children are needed.
 func (l *List) More() bool {
 	return l.more
 }
@@ -150,8 +152,8 @@ func (l *List) next() (int, bool) {
 	return 0, false
 }
 
-// Elem completes an element.
-func (l *List) Elem(dims Dimens) {
+// End the current child by specifying its dimensions.
+func (l *List) End(dims Dimens) {
 	l.child.Stop()
 	child := scrollChild{dims.Size, l.child}
 	switch l.dir {
@@ -166,14 +168,15 @@ func (l *List) Elem(dims Dimens) {
 		l.maxSize += mainSize
 		l.children = append([]scrollChild{child}, l.children...)
 	default:
-		panic("call Next before Elem")
+		panic("call Next before End")
 	}
 	l.dir = iterateNone
 }
 
+// Layout the List and return its dimensions.
 func (l *List) Layout() Dimens {
 	if l.more {
-		panic("unfinished element")
+		panic("unfinished child")
 	}
 	mainc := axisMainConstraint(l.Axis, l.cs)
 	for len(l.children) > 0 {
