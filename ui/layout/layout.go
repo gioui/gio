@@ -107,6 +107,8 @@ type Align struct {
 	cs    Constraints
 }
 
+// Begin the inset operation and modify the input constraints to
+// account for the insets.
 func (in *Inset) Begin(c ui.Config, ops *ui.Ops, cs Constraints) Constraints {
 	if in.begun {
 		panic("must End before Begin")
@@ -139,6 +141,8 @@ func (in *Inset) Begin(c ui.Config, ops *ui.Ops, cs Constraints) Constraints {
 	return mcs
 }
 
+// End the inset operation and return the dimensions for the
+// inset child.
 func (in *Inset) End(dims Dimens) Dimens {
 	if !in.begun {
 		panic("must Begin before End")
@@ -157,6 +161,7 @@ func UniformInset(v ui.Value) Inset {
 	return Inset{Top: v, Right: v, Bottom: v, Left: v}
 }
 
+// Begin aligning and return the constraints with no minimum size.
 func (a *Align) Begin(ops *ui.Ops, cs Constraints) Constraints {
 	if a.begun {
 		panic("must End before Begin")
@@ -170,6 +175,8 @@ func (a *Align) Begin(ops *ui.Ops, cs Constraints) Constraints {
 	return cs
 }
 
+// End the align operation and return the dimensions for the
+// aligned child.
 func (a *Align) End(dims Dimens) Dimens {
 	if !a.begun {
 		panic("must Begin before End")
