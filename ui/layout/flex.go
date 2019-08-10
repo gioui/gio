@@ -14,7 +14,7 @@ import (
 type Flex struct {
 	// Axis is the main axis, either Horizontal or Vertical.
 	Axis Axis
-	// Spacing controls the distribution of any space left after
+	// Spacing controls the distribution of space left after
 	// layout.
 	Spacing Spacing
 	// Alignment is the alignment in the cross axis.

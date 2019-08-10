@@ -244,7 +244,7 @@ func (up *userPage) commit(c ui.Config, ops *ui.Ops, cs layout.Constraints, inde
 	label := text.Label{Material: theme.text, Face: up.faces.For(fonts.regular, ui.Sp(12)), Text: msg}
 	in := layout.Inset{Top: ui.Dp(16), Right: ui.Dp(8), Left: ui.Dp(8)}
 	cs = in.Begin(c, ops, cs)
-	f := (&layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}).Init(ops, cs)
+	f := (&layout.Flex{Axis: layout.Horizontal}).Init(ops, cs)
 	cs = f.Rigid()
 	sz := c.Px(ui.Dp(48))
 	cc := clipCircle{}
@@ -265,7 +265,7 @@ func (up *userPage) commit(c ui.Config, ops *ui.Ops, cs layout.Constraints, inde
 }
 
 func (u *UI) layoutUsers(c ui.Config, q input.Queue, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	st := (&layout.Stack{Alignment: layout.Start}).Init(ops, cs)
+	st := (&layout.Stack{}).Init(ops, cs)
 	cs = st.Rigid()
 	al := layout.Align{Alignment: layout.SE}
 	in := layout.UniformInset(ui.Dp(16))
@@ -276,7 +276,7 @@ func (u *UI) layoutUsers(c ui.Config, q input.Queue, ops *ui.Ops, cs layout.Cons
 
 	cs = st.Expand()
 	{
-		f := (&layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start}).Init(ops, cs)
+		f := (&layout.Flex{Axis: layout.Vertical}).Init(ops, cs)
 
 		cs = f.Rigid()
 		{
@@ -325,7 +325,7 @@ func (u *UI) layoutUsers(c ui.Config, q input.Queue, ops *ui.Ops, cs layout.Cons
 }
 
 func (a *ActionButton) Layout(c ui.Config, q input.Queue, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
-	f := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.End}
+	f := layout.Flex{Axis: layout.Vertical, Alignment: layout.End}
 	f.Init(ops, cs)
 	cs = f.Rigid()
 	in := layout.Inset{Top: ui.Dp(4)}
@@ -349,7 +349,7 @@ func (u *UI) layoutContributors(c ui.Config, q input.Queue, ops *ui.Ops, cs layo
 
 func (u *UI) user(c ui.Config, ops *ui.Ops, cs layout.Constraints, index int) layout.Dimens {
 	user := u.users[index]
-	elem := layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
+	elem := layout.Flex{Axis: layout.Vertical}
 	elem.Init(ops, cs)
 	cs = elem.Rigid()
 	var dims layout.Dimens
@@ -425,15 +425,15 @@ func (f fill) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
 }
 
 func column() layout.Flex {
-	return layout.Flex{Axis: layout.Vertical, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Start}
+	return layout.Flex{Axis: layout.Vertical}
 }
 
 func centerRowOpts() layout.Flex {
-	return layout.Flex{Axis: layout.Horizontal, MainAxisAlignment: layout.Start, CrossAxisAlignment: layout.Center}
+	return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}
 }
 
 func baseline() layout.Flex {
-	return layout.Flex{Axis: layout.Horizontal, CrossAxisAlignment: layout.Baseline}
+	return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Baseline}
 }
 
 type clipCircle struct {
