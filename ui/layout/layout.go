@@ -21,13 +21,22 @@ type Constraint struct {
 	Min, Max int
 }
 
+// Dimens are the resolved size and baseline for a user
+// interface element.
 type Dimens struct {
 	Size     image.Point
 	Baseline int
 }
 
+// Axis is the the Horizontal or Vertical direction.
 type Axis uint8
+
+// Alignment is the relative alignment of a list of
+// interface elements.
 type Alignment uint8
+
+// Direction is the alignment of a set of interface elements
+// relative to a containing space.
 type Direction uint8
 
 const (
@@ -54,6 +63,7 @@ const (
 	Vertical
 )
 
+// Constrain a value to the range [Min; Max].
 func (c Constraint) Constrain(v int) int {
 	if v < c.Min {
 		return c.Min
@@ -63,8 +73,9 @@ func (c Constraint) Constrain(v int) int {
 	return v
 }
 
-func (c Constraints) Constrain(p image.Point) image.Point {
-	return image.Point{X: c.Width.Constrain(p.X), Y: c.Height.Constrain(p.Y)}
+// Constrain a size to the Width and Height ranges.
+func (c Constraints) Constrain(size image.Point) image.Point {
+	return image.Point{X: c.Width.Constrain(size.X), Y: c.Height.Constrain(size.Y)}
 }
 
 // RigidConstraints returns the constraints that can only be
@@ -76,6 +87,7 @@ func RigidConstraints(size image.Point) Constraints {
 	}
 }
 
+// Inset adds space around an interface element.
 type Inset struct {
 	Top, Right, Bottom, Left ui.Value
 
@@ -83,6 +95,16 @@ type Inset struct {
 	top, right, bottom, left int
 	begun                    bool
 	cs                       Constraints
+}
+
+// Align aligns an interface element in the available space.
+type Align struct {
+	Alignment Direction
+
+	macro ui.MacroOp
+	ops   *ui.Ops
+	begun bool
+	cs    Constraints
 }
 
 func (in *Inset) Begin(c ui.Config, ops *ui.Ops, cs Constraints) Constraints {
@@ -133,15 +155,6 @@ func (in *Inset) End(dims Dimens) Dimens {
 // edges.
 func UniformInset(v ui.Value) Inset {
 	return Inset{Top: v, Right: v, Bottom: v, Left: v}
-}
-
-type Align struct {
-	Alignment Direction
-
-	macro ui.MacroOp
-	ops   *ui.Ops
-	begun bool
-	cs    Constraints
 }
 
 func (a *Align) Begin(ops *ui.Ops, cs Constraints) Constraints {
