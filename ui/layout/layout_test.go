@@ -85,6 +85,31 @@ func ExampleFlex() {
 	// 50%: {0 45}
 }
 
+func ExampleStack() {
+	ops := new(ui.Ops)
+
+	cs := layout.RigidConstraints(image.Point{X: 100, Y: 100})
+
+	stack := layout.Stack{}
+	stack.Init(ops, cs)
+
+	// Rigid 50x50 widget.
+	cs = stack.Rigid()
+	dims := layoutWidget(50, 50, cs)
+	child1 := stack.End(dims)
+
+	// Force widget to the same size as the first.
+	cs = stack.Expand()
+	fmt.Printf("Expand: %v\n", cs)
+	dims = layoutWidget(10, 10, cs)
+	child2 := stack.End(dims)
+
+	dims = stack.Layout(child1, child2)
+
+	// Output:
+	// Expand: {{50 50} {50 50}}
+}
+
 func layoutWidget(width, height int, cs layout.Constraints) layout.Dimens {
 	return layout.Dimens{
 		Size: image.Point{
