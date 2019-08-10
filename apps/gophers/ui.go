@@ -233,7 +233,7 @@ func (up *userPage) Layout(c ui.Config, q input.Queue, ops *ui.Ops, cs layout.Co
 		key.HideInputOp{}.Add(ops)
 	}
 	for l.Init(c, q, ops, cs, len(up.commits)); l.More(); l.Next() {
-		l.Elem(up.commit(c, ops, l.Constraints(), l.Index()))
+		l.End(up.commit(c, ops, l.Constraints(), l.Index()))
 	}
 	return l.Layout()
 }
@@ -342,7 +342,7 @@ func (u *UI) layoutContributors(c ui.Config, q input.Queue, ops *ui.Ops, cs layo
 		key.HideInputOp{}.Add(ops)
 	}
 	for l.Init(c, q, ops, cs, len(u.users)); l.More(); l.Next() {
-		l.Elem(u.user(c, ops, l.Constraints(), l.Index()))
+		l.End(u.user(c, ops, l.Constraints(), l.Index()))
 	}
 	return l.Layout()
 }
