@@ -6,11 +6,15 @@ import (
 	"time"
 
 	"gioui.org/ui"
+	"gioui.org/ui/input"
 	"gioui.org/ui/layout"
 )
 
+type queue struct{}
+
 type config struct{}
 
+var q queue
 var cfg = new(config)
 
 func ExampleInset() {
@@ -110,6 +114,32 @@ func ExampleStack() {
 	// Expand: {{50 50} {50 50}}
 }
 
+func ExampleList() {
+	ops := new(ui.Ops)
+
+	cs := layout.RigidConstraints(image.Point{X: 100, Y: 100})
+
+	// The list is 1e6 elements, but only 5 fit the constraints.
+	const listLen = 1e6
+
+	var list layout.List
+	list.Init(cfg, q, ops, cs, listLen)
+	count := 0
+	for ; list.More(); list.Next() {
+		dims := layoutWidget(20, 20, list.Constraints())
+		list.End(dims)
+		count++
+	}
+
+	fmt.Println(count)
+
+	dims := list.Layout()
+	_ = dims
+
+	// Output:
+	// 5
+}
+
 func layoutWidget(width, height int, cs layout.Constraints) layout.Dimens {
 	return layout.Dimens{
 		Size: image.Point{
@@ -125,4 +155,8 @@ func (config) Now() time.Time {
 
 func (config) Px(v ui.Value) int {
 	return int(v.V + .5)
+}
+
+func (queue) Next(k input.Key) (input.Event, bool) {
+	return nil, false
 }
