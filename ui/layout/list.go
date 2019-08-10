@@ -17,9 +17,14 @@ type scrollChild struct {
 	macro ui.MacroOp
 }
 
+// List displays a subsection of a potentially infinitely
+// large underlying list. List accepts user input to scroll
+// the subsection.
 type List struct {
-	Axis      Axis
-	Invert    bool
+	Axis Axis
+	// Invert inverts a List so it is anchored from its end.
+	Invert bool
+	// Alignment is the cross axis alignment.
 	Alignment Alignment
 
 	// The distance scrolled since last call to Init.

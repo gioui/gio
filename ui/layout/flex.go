@@ -30,8 +30,7 @@ type Flex struct {
 	maxBaseline int
 }
 
-// FlexChild is the layout result of a call to Rigid or
-// Flexible.
+// FlexChild is the layout result of a call End.
 type FlexChild struct {
 	macro ui.MacroOp
 	dims  Dimens
@@ -67,6 +66,7 @@ const (
 	modeFlex
 )
 
+// Init must be called before Rigid or Flexible.
 func (f *Flex) Init(ops *ui.Ops, cs Constraints) *Flex {
 	if f.mode > modeBegun {
 		panic("must End the current child before calling Init again")

@@ -8,7 +8,11 @@ import (
 	"gioui.org/ui"
 )
 
+// Stack lays out child elements on top of each other,
+// according to an alignment direction.
 type Stack struct {
+	// Alignment is the direction to align children
+	// smaller than the available space.
 	Alignment Direction
 
 	macro       ui.MacroOp
@@ -20,11 +24,13 @@ type Stack struct {
 	baseline    int
 }
 
+// StackChild is the layout result of a call to End.
 type StackChild struct {
 	macro ui.MacroOp
 	dims  Dimens
 }
 
+// Init a stack before calling Rigid or Expand.
 func (s *Stack) Init(ops *ui.Ops, cs Constraints) *Stack {
 	s.ops = ops
 	s.cs = cs
@@ -45,11 +51,15 @@ func (s *Stack) begin() {
 	s.macro.Record(s.ops)
 }
 
+// Rigid begins a child with the same constraints that were
+// passed to Init.
 func (s *Stack) Rigid() Constraints {
 	s.begin()
 	return s.cs
 }
 
+// Expand begins a child with constraints that exactly match
+// the biggest child previously added.
 func (s *Stack) Expand() Constraints {
 	s.begin()
 	return Constraints{
@@ -58,6 +68,7 @@ func (s *Stack) Expand() Constraints {
 	}
 }
 
+// End a child by specifying its dimensions.
 func (s *Stack) End(dims Dimens) StackChild {
 	s.macro.Stop()
 	s.begun = false
@@ -75,6 +86,8 @@ func (s *Stack) End(dims Dimens) StackChild {
 	return StackChild{s.macro, dims}
 }
 
+// Layout a list of children. The order of the children determines their laid
+// out order.
 func (s *Stack) Layout(children ...StackChild) Dimens {
 	for _, ch := range children {
 		sz := ch.dims.Size
