@@ -27,6 +27,27 @@ type Dimens struct {
 }
 
 type Axis uint8
+type Alignment uint8
+type Direction uint8
+
+const (
+	Start Alignment = iota
+	End
+	Middle
+	Baseline
+)
+
+const (
+	NW Direction = iota
+	N
+	NE
+	E
+	SE
+	S
+	SW
+	W
+	Center
+)
 
 const (
 	Horizontal Axis = iota
@@ -171,5 +192,56 @@ func (a *Align) End(dims Dimens) Dimens {
 	return Dimens{
 		Size:     sz,
 		Baseline: dims.Baseline,
+	}
+}
+
+func (a Alignment) String() string {
+	switch a {
+	case Start:
+		return "Start"
+	case End:
+		return "End"
+	case Middle:
+		return "Middle"
+	case Baseline:
+		return "Baseline"
+	default:
+		panic("unreachable")
+	}
+}
+
+func (a Axis) String() string {
+	switch a {
+	case Horizontal:
+		return "Horizontal"
+	case Vertical:
+		return "Vertical"
+	default:
+		panic("unreachable")
+	}
+}
+
+func (d Direction) String() string {
+	switch d {
+	case NW:
+		return "NW"
+	case N:
+		return "N"
+	case NE:
+		return "NE"
+	case E:
+		return "E"
+	case SE:
+		return "SE"
+	case S:
+		return "S"
+	case SW:
+		return "SW"
+	case W:
+		return "W"
+	case Center:
+		return "Center"
+	default:
+		panic("unreachable")
 	}
 }

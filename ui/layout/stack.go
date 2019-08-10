@@ -25,19 +25,6 @@ type StackChild struct {
 	dims  Dimens
 }
 
-type Direction uint8
-
-const (
-	NW Direction = iota
-	N
-	NE
-	E
-	SE
-	S
-	SW
-	W
-)
-
 func (s *Stack) Init(ops *ui.Ops, cs Constraints) *Stack {
 	s.ops = ops
 	s.cs = cs

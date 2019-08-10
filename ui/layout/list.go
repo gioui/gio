@@ -8,8 +8,8 @@ import (
 	"gioui.org/ui"
 	"gioui.org/ui/gesture"
 	"gioui.org/ui/input"
-	"gioui.org/ui/pointer"
 	"gioui.org/ui/paint"
+	"gioui.org/ui/pointer"
 )
 
 type scrollChild struct {
@@ -18,9 +18,9 @@ type scrollChild struct {
 }
 
 type List struct {
-	Axis               Axis
-	Invert             bool
-	CrossAxisAlignment CrossAxisAlignment
+	Axis      Axis
+	Invert    bool
+	Alignment Alignment
 
 	// The distance scrolled since last call to Init.
 	Distance int
@@ -204,10 +204,10 @@ func (l *List) Layout() Dimens {
 	for _, child := range l.children {
 		sz := child.size
 		var cross int
-		switch l.CrossAxisAlignment {
+		switch l.Alignment {
 		case End:
 			cross = maxCross - axisCross(l.Axis, sz)
-		case Center:
+		case Middle:
 			cross = (maxCross - axisCross(l.Axis, sz)) / 2
 		}
 		childSize := axisMain(l.Axis, sz)

@@ -9,10 +9,16 @@ import (
 	"gioui.org/ui/f32"
 )
 
+// Flex lays out interface elements along an axis,
+// according to alignment and weights.
 type Flex struct {
-	Axis               Axis
-	MainAxisAlignment  MainAxisAlignment
-	CrossAxisAlignment CrossAxisAlignment
+	// Axis is the main axis, either Horizontal or Vertical.
+	Axis Axis
+	// Spacing controls the distribution of any space left after
+	// layout.
+	Spacing Spacing
+	// Alignment is the alignment in the cross axis.
+	Alignment Alignment
 
 	macro       ui.MacroOp
 	ops         *ui.Ops
@@ -29,21 +35,26 @@ type FlexChild struct {
 	dims  Dimens
 }
 
-type MainAxisAlignment uint8
-type CrossAxisAlignment uint8
+type Spacing uint8
 
 type flexMode uint8
 
 const (
-	Start = 100 + iota
-	End
-	Center
-
-	SpaceAround MainAxisAlignment = iota
+	// SpaceEnd leaves space at the end.
+	SpaceEnd Spacing = iota
+	// SpaceStart leaves space at the start.
+	SpaceStart
+	// SpaceSides shares space between the start and end.
+	SpaceSides
+	// SpaceAround distributes space evenly between elements,
+	// with half as much space at the start and end.
+	SpaceAround
+	// SpaceBetween distributes space evenly between elements,
+	// leaving no space at the start and end.
 	SpaceBetween
+	// SpaceEvenly distributes space evenly between elements and
+	// at the start and end.
 	SpaceEvenly
-
-	Baseline CrossAxisAlignment = iota
 )
 
 const (
@@ -133,10 +144,10 @@ func (f *Flex) Layout(children ...FlexChild) Dimens {
 	}
 	var mainSize int
 	var baseline int
-	switch f.MainAxisAlignment {
-	case Center:
+	switch f.Spacing {
+	case SpaceSides:
 		mainSize += space / 2
-	case End:
+	case SpaceStart:
 		mainSize += space
 	case SpaceEvenly:
 		mainSize += space / (1 + len(children))
@@ -147,10 +158,10 @@ func (f *Flex) Layout(children ...FlexChild) Dimens {
 		dims := child.dims
 		b := dims.Baseline
 		var cross int
-		switch f.CrossAxisAlignment {
+		switch f.Alignment {
 		case End:
 			cross = crossSize - axisCross(f.Axis, dims.Size)
-		case Center:
+		case Middle:
 			cross = (crossSize - axisCross(f.Axis, dims.Size)) / 2
 		case Baseline:
 			if f.Axis == Horizontal {
@@ -164,7 +175,7 @@ func (f *Flex) Layout(children ...FlexChild) Dimens {
 		stack.Pop()
 		mainSize += axisMain(f.Axis, dims.Size)
 		if i < len(children)-1 {
-			switch f.MainAxisAlignment {
+			switch f.Spacing {
 			case SpaceEvenly:
 				mainSize += space / (1 + len(children))
 			case SpaceAround:
@@ -177,10 +188,10 @@ func (f *Flex) Layout(children ...FlexChild) Dimens {
 			baseline = b
 		}
 	}
-	switch f.MainAxisAlignment {
-	case Center:
+	switch f.Spacing {
+	case SpaceSides:
 		mainSize += space / 2
-	case Start:
+	case SpaceEnd:
 		mainSize += space
 	case SpaceEvenly:
 		mainSize += space / (1 + len(children))
@@ -244,4 +255,23 @@ func axisConstraints(a Axis, mainc, crossc Constraint) Constraints {
 
 func toPointF(p image.Point) f32.Point {
 	return f32.Point{X: float32(p.X), Y: float32(p.Y)}
+}
+
+func (s Spacing) String() string {
+	switch s {
+	case SpaceEnd:
+		return "SpaceEnd"
+	case SpaceStart:
+		return "SpaceStart"
+	case SpaceSides:
+		return "SpaceSides"
+	case SpaceAround:
+		return "SpaceAround"
+	case SpaceBetween:
+		return "SpaceAround"
+	case SpaceEvenly:
+		return "SpaceEvenly"
+	default:
+		panic("unreachable")
+	}
 }
