@@ -39,10 +39,12 @@ func ExampleInset() {
 func ExampleAlign() {
 	ops := new(ui.Ops)
 
+	// Rigid constraints with both minimum and maximum set.
 	cs := layout.RigidConstraints(image.Point{X: 100, Y: 100})
 
 	align := layout.Align{Alignment: layout.Center}
 	cs = align.Begin(ops, cs)
+
 	// Lay out a 50x50 sized widget.
 	dims := layoutWidget(50, 50, cs)
 	fmt.Println(dims.Size)
@@ -54,6 +56,33 @@ func ExampleAlign() {
 	// Output:
 	// (50,50)
 	// (100,100)
+}
+
+func ExampleFlex() {
+	ops := new(ui.Ops)
+
+	cs := layout.RigidConstraints(image.Point{X: 100, Y: 100})
+
+	flex := layout.Flex{}
+	flex.Init(ops, cs)
+
+	// Rigid 10x10 widget.
+	cs = flex.Rigid()
+	fmt.Printf("Rigid: %v\n", cs.Width)
+	dims := layoutWidget(10, 10, cs)
+	child1 := flex.End(dims)
+
+	// Child with 50% space allowance.
+	cs = flex.Flexible(0.5)
+	fmt.Printf("50%%: %v\n", cs.Width)
+	dims = layoutWidget(10, 10, cs)
+	child2 := flex.End(dims)
+
+	dims = flex.Layout(child1, child2)
+
+	// Output:
+	// Rigid: {0 100}
+	// 50%: {0 45}
 }
 
 func layoutWidget(width, height int, cs layout.Constraints) layout.Dimens {
