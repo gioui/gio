@@ -63,7 +63,7 @@ func eglChooseConfig(disp _EGLDisplay, attribs []_EGLint) (_EGLConfig, bool) {
 	var cfg _EGLConfig
 	var ncfg _EGLint
 	r, _, _ := _eglChooseConfig.Call(uintptr(disp), uintptr(unsafe.Pointer(&attribs[0])), uintptr(unsafe.Pointer(&cfg)), 1, uintptr(unsafe.Pointer(&ncfg)))
-	return cfg, r != 0 && ncfg > 0
+	return cfg, r != 0
 }
 
 func eglCreateContext(disp _EGLDisplay, cfg _EGLConfig, shareCtx _EGLContext, attribs []_EGLint) _EGLContext {
