@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
+/*
+Package key implements key and text input handling.
+
+The HandlerOp operations is used for declaring key
+input handlers. Use the Queue interface from package
+input to receive events.
+*/
 package key
 
 import (
@@ -8,13 +15,21 @@ import (
 	"gioui.org/ui/internal/opconst"
 )
 
+// HandlerOp declares a handler ready for key events.
+// Key events are in general only delivered to the
+// focused key handler. Set the Focus flag to request
+// the focus.
 type HandlerOp struct {
 	Key   input.Key
 	Focus bool
 }
 
+// HideInputOp request that any on screen text input
+// be hidden.
 type HideInputOp struct{}
 
+// FocusEvent is sent when a handler gains or looses
+// focus.
 type FocusEvent struct {
 	Focus bool
 }
