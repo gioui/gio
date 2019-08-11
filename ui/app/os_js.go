@@ -208,7 +208,7 @@ func (w *window) focus() {
 func (w *window) keyEvent(e js.Value) {
 	k := e.Get("key").String()
 	if n, ok := translateKey(k); ok {
-		cmd := key.ChordEvent{Name: n}
+		cmd := key.Event{Name: n}
 		if e.Call("getModifierState", "Control").Bool() {
 			cmd.Modifiers |= key.ModCommand
 		}

@@ -14,8 +14,8 @@ import (
 	"gioui.org/ui/input"
 	"gioui.org/ui/key"
 	"gioui.org/ui/layout"
-	"gioui.org/ui/pointer"
 	"gioui.org/ui/paint"
+	"gioui.org/ui/pointer"
 
 	"golang.org/x/image/math/fixed"
 )
@@ -118,7 +118,7 @@ func (e *Editor) Next(cfg ui.Config, queue input.Queue) (EditorEvent, bool) {
 		switch ke := ke.(type) {
 		case key.FocusEvent:
 			e.focused = ke.Focus
-		case key.ChordEvent:
+		case key.Event:
 			if !e.focused {
 				break
 			}
@@ -559,7 +559,7 @@ func (e *Editor) scrollToCaret(cfg ui.Config) {
 	}
 }
 
-func (e *Editor) command(k key.ChordEvent) bool {
+func (e *Editor) command(k key.Event) bool {
 	switch k.Name {
 	case key.NameReturn, key.NameEnter:
 		e.append("\n")

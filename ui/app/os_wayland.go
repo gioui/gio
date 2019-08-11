@@ -856,7 +856,7 @@ func (w *window) dispatchKey(keyCode C.uint32_t) {
 	}
 	sym := C.xkb_state_key_get_one_sym(conn.xkbState, C.xkb_keycode_t(keyCode))
 	if n, ok := convertKeysym(sym); ok {
-		cmd := key.ChordEvent{Name: n}
+		cmd := key.Event{Name: n}
 		if C.xkb_state_mod_name_is_active(conn.xkbState, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_CTRL[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
 			cmd.Modifiers |= key.ModCommand
 		}

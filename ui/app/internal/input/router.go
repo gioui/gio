@@ -61,7 +61,7 @@ func (q *Router) Add(e input.Event) bool {
 	switch e := e.(type) {
 	case pointer.Event:
 		q.pqueue.Push(e, &q.handlers)
-	case key.EditEvent, key.ChordEvent, key.FocusEvent:
+	case key.EditEvent, key.Event, key.FocusEvent:
 		q.kqueue.Push(e, &q.handlers)
 	}
 	return q.handlers.Updated()

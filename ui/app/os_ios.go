@@ -202,7 +202,7 @@ func (w *window) setAnimating(anim bool) {
 }
 
 func (w *window) onKeyCommand(name rune) {
-	w.w.event(key.ChordEvent{
+	w.w.event(key.Event{
 		Name: name,
 	})
 }

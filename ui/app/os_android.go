@@ -365,7 +365,7 @@ func convertKeyCode(code C.jint) (rune, bool) {
 func onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, keyCode, r C.jint, t C.jlong) {
 	w := views[handle]
 	if n, ok := convertKeyCode(keyCode); ok {
-		w.event(key.ChordEvent{Name: n})
+		w.event(key.Event{Name: n})
 	}
 	if r != 0 {
 		w.event(key.EditEvent{Text: string(rune(r))})

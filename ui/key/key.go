@@ -34,7 +34,7 @@ type FocusEvent struct {
 	Focus bool
 }
 
-type ChordEvent struct {
+type Event struct {
 	Name      rune
 	Modifiers Modifiers
 }
@@ -86,5 +86,5 @@ func (h HideInputOp) Add(o *ui.Ops) {
 }
 
 func (EditEvent) ImplementsEvent()  {}
-func (ChordEvent) ImplementsEvent() {}
+func (Event) ImplementsEvent()      {}
 func (FocusEvent) ImplementsEvent() {}
