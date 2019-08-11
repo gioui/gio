@@ -90,8 +90,8 @@ type Source uint8
 type areaKind uint8
 
 const (
-	// Cancel is sent when the current gesture is interrupted
-	// by other handlers or the system.
+	// A Cancel event is generated when the current gesture is
+	// interrupted by other handlers or the system.
 	Cancel Type = iota
 	// Press of a pointer.
 	Press

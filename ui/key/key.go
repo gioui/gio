@@ -29,13 +29,13 @@ type HandlerOp struct {
 // be hidden.
 type HideInputOp struct{}
 
-// FocusEvent is sent when a handler gains or loses
+// A FocusEvent is generated when a handler gains or loses
 // focus.
 type FocusEvent struct {
 	Focus bool
 }
 
-// Event is sent when a key is pressed. For text input
+// An Event is generated when a key is pressed. For text input
 // use EditEvent.
 type Event struct {
 	// Name is the rune character that most closely
@@ -47,7 +47,7 @@ type Event struct {
 	Modifiers Modifiers
 }
 
-// EditEvent is sent when text is input.
+// An EditEvent is generated when text is input.
 type EditEvent struct {
 	Text string
 }

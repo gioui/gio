@@ -13,7 +13,7 @@ import (
 	"gioui.org/ui"
 )
 
-// UpdateEvent is sent when a Window's Update
+// An UpdateEvent is generated when a Window's Update
 // method must be called.
 type UpdateEvent struct {
 	Config Config
@@ -42,7 +42,7 @@ type Insets struct {
 	Top, Bottom, Left, Right ui.Value
 }
 
-// StageEvent is sent whenever the stage of a
+// A StageEvent is generated whenever the stage of a
 // Window changes.
 type StageEvent struct {
 	Stage Stage
