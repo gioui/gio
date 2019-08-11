@@ -195,13 +195,13 @@ func createContext(disp _EGLNativeDisplayType) (*eglContext, error) {
 	if eglDisp == 0 {
 		return nil, fmt.Errorf("eglGetDisplay(_EGL_DEFAULT_DISPLAY) failed: 0x%x", eglGetError())
 	}
-	_, minor, ret := eglInitialize(eglDisp)
+	major, minor, ret := eglInitialize(eglDisp)
 	if !ret {
 		return nil, fmt.Errorf("eglInitialize failed: 0x%x", eglGetError())
 	}
 	// sRGB framebuffer support on EGL 1.5 or if EGL_KHR_gl_colorspace is supported.
 	exts := strings.Split(eglQueryString(eglDisp, _EGL_EXTENSIONS), " ")
-	srgb := minor >= 5 || hasExtension(exts, "EGL_KHR_gl_colorspace")
+	srgb := major > 1 || minor >= 5 || hasExtension(exts, "EGL_KHR_gl_colorspace")
 	attribs := []_EGLint{
 		_EGL_RENDERABLE_TYPE, _EGL_OPENGL_ES2_BIT,
 		_EGL_SURFACE_TYPE, _EGL_WINDOW_BIT,
