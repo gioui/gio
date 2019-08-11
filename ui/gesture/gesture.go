@@ -23,8 +23,8 @@ import (
 // Click detects click gestures in the form
 // of ClickEvents.
 type Click struct {
-	// State tracks the current state
-	State ClickState
+	// state tracks the gesture state.
+	state ClickState
 }
 
 type ClickState uint8
@@ -55,6 +55,8 @@ type Scroll struct {
 	scroll float32
 }
 
+type ScrollState uint8
+
 type flinger struct {
 	// Current offset in pixels.
 	x float32
@@ -72,8 +74,12 @@ const (
 )
 
 const (
+	// StateNormal is the default click state.
 	StateNormal ClickState = iota
+	// StateFocused is reported when a pointer
+	// is hovering over the handler.
 	StateFocused
+	// StatePressed is then a pointer is pressed.
 	StatePressed
 )
 
@@ -84,6 +90,16 @@ const (
 	// TypeClick is reporoted when a click action
 	// is complete.
 	TypeClick
+)
+
+const (
+	// StateIdle is the default scroll state.
+	StateIdle ScrollState = iota
+	// StateDrag is reported during drag gestures.
+	StateDragging
+	// StateFlinging is reported when a fling is
+	// in progress.
+	StateFlinging
 )
 
 var (
@@ -103,6 +119,11 @@ func (c *Click) Add(ops *ui.Ops) {
 	op.Add(ops)
 }
 
+// State reports the click state.
+func (c *Click) State() ClickState {
+	return c.state
+}
+
 // Events reports all click events for the available events.
 func (c *Click) Events(q input.Queue) []ClickEvent {
 	var events []ClickEvent
@@ -113,24 +134,24 @@ func (c *Click) Events(q input.Queue) []ClickEvent {
 		}
 		switch e.Type {
 		case pointer.Release:
-			wasPressed := c.State == StatePressed
-			c.State = StateNormal
+			wasPressed := c.state == StatePressed
+			c.state = StateNormal
 			if wasPressed {
 				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source})
 			}
 		case pointer.Cancel:
-			c.State = StateNormal
+			c.state = StateNormal
 		case pointer.Press:
-			if c.State == StatePressed || !e.Hit {
+			if c.state == StatePressed || !e.Hit {
 				break
 			}
-			c.State = StatePressed
+			c.state = StatePressed
 			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source})
 		case pointer.Move:
-			if c.State == StatePressed && !e.Hit {
-				c.State = StateNormal
-			} else if c.State < StateFocused {
-				c.State = StateFocused
+			if c.state == StatePressed && !e.Hit {
+				c.state = StateNormal
+			} else if c.state < StateFocused {
+				c.state = StateFocused
 			}
 		}
 	}
@@ -149,11 +170,6 @@ func (s *Scroll) Add(ops *ui.Ops) {
 // Stop any remaining fling movement.
 func (s *Scroll) Stop() {
 	s.flinger = flinger{}
-}
-
-// Dragging reports whether the user is dragging the Scroll.
-func (s *Scroll) Dragging() bool {
-	return s.dragging
 }
 
 // Scroll detects the scrolling distance from the available events and
@@ -243,9 +259,16 @@ func (s *Scroll) val(p f32.Point) float32 {
 	}
 }
 
-// Active reports whether a fling gesture is in progress.
-func (s *Scroll) Active() bool {
-	return s.flinger.Active()
+// State reports the scroll state.
+func (s *Scroll) State() ScrollState {
+	switch {
+	case s.flinger.Active():
+		return StateFlinging
+	case s.dragging:
+		return StateDragging
+	default:
+		return StateIdle
+	}
 }
 
 func (f *flinger) Init(now time.Time, v0 float32) {
@@ -330,5 +353,18 @@ func (cs ClickState) String() string {
 		return "StatePressed"
 	default:
 		panic("invalid ClickState")
+	}
+}
+
+func (s ScrollState) String() string {
+	switch s {
+	case StateIdle:
+		return "StateIdle"
+	case StateDragging:
+		return "StateDragging"
+	case StateFlinging:
+		return "StateFlinging"
+	default:
+		panic("unreachable")
 	}
 }

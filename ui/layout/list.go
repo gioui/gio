@@ -87,7 +87,7 @@ func (l *List) Init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, l
 
 // Dragging reports whether the List is being dragged.
 func (l *List) Dragging() bool {
-	return l.scroll.Dragging()
+	return l.scroll.State() == gesture.StateDragging
 }
 
 func (l *List) update() {

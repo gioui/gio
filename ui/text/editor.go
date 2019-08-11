@@ -105,7 +105,7 @@ func (e *Editor) Next(cfg ui.Config, queue input.Queue) (EditorEvent, bool) {
 				Y: int(math.Round(float64(evt.Position.Y))),
 			})
 			e.requestFocus = true
-			if !e.scroller.Active() {
+			if e.scroller.State() != gesture.StateFlinging {
 				e.scrollToCaret(cfg)
 			}
 		}
