@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
+/*
+Package gesture implements common pointer gestures.
+
+Gestures accept low level pointer Events from an input
+Queue and detect higher level actions such as clicks
+and scrolling.
+*/
 package gesture
 
 import (
@@ -13,19 +20,29 @@ import (
 	"gioui.org/ui/pointer"
 )
 
+// Click detects click gestures in the form
+// of ClickEvents.
+type Click struct {
+	// State tracks the current state
+	State ClickState
+}
+
+type ClickState uint8
+
+// ClickEvent represent a click action, either a
+// TypePress for the beginning of a click or a
+// TypeClick for a completed click.
 type ClickEvent struct {
 	Type     ClickType
 	Position f32.Point
 	Source   pointer.Source
 }
 
-type ClickState uint8
 type ClickType uint8
 
-type Click struct {
-	State ClickState
-}
-
+// Scroll detects scroll gestures and reduce them to
+// scroll distances. Scroll recognizes mouse wheel
+// movements as well as drag and fling touch gestures.
 type Scroll struct {
 	dragging  bool
 	axis      Axis
@@ -61,7 +78,11 @@ const (
 )
 
 const (
+	// TypePress is reported for the first pointer
+	// press.
 	TypePress ClickType = iota
+	// TypeClick is reporoted when a click action
+	// is complete.
 	TypeClick
 )
 
@@ -76,11 +97,13 @@ const (
 	thresholdVelocity = 1
 )
 
+// Add the handler to the operation list to receive click events.
 func (c *Click) Add(ops *ui.Ops) {
 	op := pointer.HandlerOp{Key: c}
 	op.Add(ops)
 }
 
+// Events reports all click events for the available events.
 func (c *Click) Events(q input.Queue) []ClickEvent {
 	var events []ClickEvent
 	for evt, ok := q.Next(c); ok; evt, ok = q.Next(c) {
@@ -114,6 +137,7 @@ func (c *Click) Events(q input.Queue) []ClickEvent {
 	return events
 }
 
+// Add the handler to the operation list to receive scroll events.
 func (s *Scroll) Add(ops *ui.Ops) {
 	oph := pointer.HandlerOp{Key: s, Grab: s.grab}
 	oph.Add(ops)
@@ -122,14 +146,18 @@ func (s *Scroll) Add(ops *ui.Ops) {
 	}
 }
 
+// Stop any remaining fling movement.
 func (s *Scroll) Stop() {
 	s.flinger = flinger{}
 }
 
+// Dragging reports whether the user is dragging the Scroll.
 func (s *Scroll) Dragging() bool {
 	return s.dragging
 }
 
+// Scroll detects the scrolling distance from the available events and
+// ongoing fling gestures.
 func (s *Scroll) Scroll(cfg ui.Config, q input.Queue, axis Axis) int {
 	if s.axis != axis {
 		s.axis = axis
@@ -215,6 +243,7 @@ func (s *Scroll) val(p f32.Point) float32 {
 	}
 }
 
+// Active reports whether a fling gesture is in progress.
 func (s *Scroll) Active() bool {
 	return s.flinger.Active()
 }
