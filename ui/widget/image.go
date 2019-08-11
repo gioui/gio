@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
+// Package widget implements common widgets.
 package widget
 
 import (
@@ -11,6 +12,7 @@ import (
 	"gioui.org/ui/paint"
 )
 
+// Image is a widget that displays an image.
 type Image struct {
 	// Src is the image to display.
 	Src image.Image
