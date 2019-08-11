@@ -2,7 +2,7 @@
 
 /*
 Package f32 is a float32 implementation of package image's
-Point and Rectangle
+Point and Rectangle.
 
 The coordinate space has the origin in the top left
 corner with the axes extending right and down.

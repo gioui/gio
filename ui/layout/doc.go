@@ -43,7 +43,7 @@ This example both aligns and insets a child:
 	dims = inset.End(dims)
 
 More complex layouts such as Stack and Flex lay out multiple children,
-but follow the same pattern of constraints and dimensions.
+and stateful layouts such as List accept user input.
 
 */
 package layout
