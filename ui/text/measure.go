@@ -11,6 +11,7 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
+// A Line contains the measurements of a line of text.
 type Line struct {
 	Text String
 	// Width is the width of the line.
@@ -25,22 +26,31 @@ type Line struct {
 }
 
 type String struct {
-	String   string
+	String string
+	// Advances contain the advance of each rune in String.
 	Advances []fixed.Int26_6
 }
 
+// A Layout contains the measurements of a body of text as
+// a list of Lines.
 type Layout struct {
 	Lines []Line
 }
 
+// LayoutOptions specify the constraints of a text layout.
 type LayoutOptions struct {
-	MaxWidth   int
+	// MaxWidth set the maximum width of the layout.
+	MaxWidth int
+	// SingleLine specify that line breaks are ignored.
 	SingleLine bool
 }
 
 type Face interface {
-	Layout(str string, opts LayoutOptions) *Layout
-	Path(str String) ui.MacroOp
+	// Layout returns the text layout for a string given a set of
+	// options.
+	Layout(s string, opts LayoutOptions) *Layout
+	// Path returns the ClipOp outline of a text recorded in a macro.
+	Path(s String) ui.MacroOp
 }
 
 type Alignment uint8
@@ -48,7 +58,7 @@ type Alignment uint8
 const (
 	Start Alignment = iota
 	End
-	Center
+	Middle
 )
 
 func linesDimens(lines []Line) layout.Dimens {
@@ -77,14 +87,10 @@ func linesDimens(lines []Line) layout.Dimens {
 	}
 }
 
-func IsNewline(r rune) bool {
-	return r == '\n'
-}
-
 func align(align Alignment, width fixed.Int26_6, maxWidth int) fixed.Int26_6 {
 	mw := fixed.I(maxWidth)
 	switch align {
-	case Center:
+	case Middle:
 		return fixed.I(((mw - width) / 2).Floor())
 	case End:
 		return fixed.I((mw - width).Floor())
@@ -92,5 +98,18 @@ func align(align Alignment, width fixed.Int26_6, maxWidth int) fixed.Int26_6 {
 		return 0
 	default:
 		panic(fmt.Errorf("unknown alignment %v", align))
+	}
+}
+
+func (a Alignment) String() string {
+	switch a {
+	case Start:
+		return "Start"
+	case End:
+		return "End"
+	case Middle:
+		return "Middle"
+	default:
+		panic("unreachable")
 	}
 }

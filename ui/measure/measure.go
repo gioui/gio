@@ -179,7 +179,7 @@ func layoutText(ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOpt
 	}
 	for prev.idx < len(str) {
 		c, s := utf8.DecodeRuneInString(str[prev.idx:])
-		nl := text.IsNewline(c)
+		nl := c == '\n'
 		if opts.SingleLine && nl {
 			nl = false
 			c = ' '

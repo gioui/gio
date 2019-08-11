@@ -334,7 +334,7 @@ func (e *Editor) layoutText() {
 		// up all available space.
 		if len(s) > 0 {
 			r, _ := utf8.DecodeLastRuneInString(s)
-			if !IsNewline(r) {
+			if r != '\n' {
 				dims.Size.X = e.maxWidth
 				break
 			}

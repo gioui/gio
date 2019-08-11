@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
+// Package text implements text widgets.
 package text
 
 import (
@@ -15,12 +16,20 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
+// Label is a widget for laying out and drawing text.
 type Label struct {
-	Face      Face
-	Material  ui.MacroOp
+	// Face define the font and style of the text.
+	Face Face
+	// Material is a macro recording the material to draw the
+	// text. Use a ColorOp for colored text.
+	Material ui.MacroOp
+	// Alignment specify the text alignment.
 	Alignment Alignment
-	Text      string
-	MaxLines  int
+	// Text is the string to draw.
+	Text string
+	// MaxLines specify the maximum number of lines the text
+	// may fill.
+	MaxLines int
 
 	it lineIterator
 }
