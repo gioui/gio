@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Unlicense OR MIT
+
 /*
 Package f32 is a float32 implementation of package image's
 Point and Rectangle
