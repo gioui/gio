@@ -13,6 +13,11 @@ import (
 	"gioui.org/ui/internal/path"
 )
 
+// PathBuilder builds and adds a general ClipOp clip path
+// from lines and curves.
+// PathBuilder generates no garbage and can be used for
+// dynamic paths; path data is stored directly in the Ops
+// list supplied to Init.
 type PathBuilder struct {
 	ops       *ui.Ops
 	firstVert int
@@ -23,8 +28,7 @@ type PathBuilder struct {
 	hasBounds bool
 }
 
-// ClipOp structure must match opClip in package ui/internal/gpu.
-
+// ClipOp sets the current clip path.
 type ClipOp struct {
 	bounds f32.Rectangle
 }
@@ -40,6 +44,8 @@ func (p ClipOp) Add(o *ui.Ops) {
 	o.Write(data)
 }
 
+// Init the builder and specify the operations list for
+// storing the path data and final ClipOp.
 func (p *PathBuilder) Init(ops *ui.Ops) {
 	p.ops = ops
 }
@@ -276,6 +282,8 @@ func (p *PathBuilder) simpleQuadTo(ctrl, to f32.Point) {
 	p.pen = to
 }
 
+// End the path and add the resulting ClipOp to
+// the operation list passed to Init.
 func (p *PathBuilder) End() {
 	p.end()
 	ClipOp{

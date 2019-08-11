@@ -13,15 +13,22 @@ import (
 	"gioui.org/ui/internal/opconst"
 )
 
+// ImageOp sets the material to a section of an
+// image.
 type ImageOp struct {
-	Src  image.Image
+	// Src is the image.
+	Src image.Image
+	// Rect defines the section of Src to use.
 	Rect image.Rectangle
 }
 
+// ColorOp sets the material to a constant color.
 type ColorOp struct {
 	Color color.RGBA
 }
 
+// PaintOp draws the current material, respecting the
+// clip path and transformation.
 type PaintOp struct {
 	Rect f32.Rectangle
 }
@@ -58,8 +65,8 @@ func (d PaintOp) Add(o *ui.Ops) {
 	o.Write(data)
 }
 
-// RectClip returns a ClipOp op corresponding to
-// a pixel aligned rectangular area.
+// RectClip returns a ClipOp corresponding to a pixel aligned
+// rectangular area.
 func RectClip(r image.Rectangle) ClipOp {
 	return ClipOp{bounds: toRectF(r)}
 }
