@@ -24,7 +24,7 @@ Drawing a colored square:
 	import "gioui.org/ui/paint"
 
 	var w app.Window
-	var ops ui.Ops
+	ops := new(ui.Ops)
 	...
 	ops.Reset()
 	paint.ColorOp{Color: ...}.Add(ops)
@@ -38,7 +38,7 @@ mutable state stack and execution flow can be controlled with macros.
 
 The StackOp saves the current state to the state stack and restores it later:
 
-	var ops ui.Ops
+	ops := new(ui.Ops)
 	var stack ui.StackOp
 	// Save the current state, in particular the transform.
 	stack.Push(ops)
@@ -50,7 +50,7 @@ The StackOp saves the current state to the state stack and restores it later:
 
 The MacroOp records a list of operations to be executed later:
 
-	var ops ui.Ops
+	ops := new(ui.Ops)
 	var macro ui.MacroOp
 	macro.Record()
 	// Record operations by adding them.

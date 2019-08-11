@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 /*
-Package key implements key and text input handling.
+Package key implements key and text events and
+operations.
 
 The HandlerOp operations is used for declaring key
 input handlers. Use the Queue interface from package
@@ -28,7 +29,7 @@ type HandlerOp struct {
 // be hidden.
 type HideInputOp struct{}
 
-// FocusEvent is sent when a handler gains or looses
+// FocusEvent is sent when a handler gains or loses
 // focus.
 type FocusEvent struct {
 	Focus bool

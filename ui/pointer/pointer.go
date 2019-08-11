@@ -13,22 +13,45 @@ import (
 	"gioui.org/ui/internal/opconst"
 )
 
+// Event is a pointer event.
 type Event struct {
-	Type      Type
-	Source    Source
+	Type   Type
+	Source Source
+	// PointerID is the id for the pointer and can be used
+	// to track a particular pointer from Press to
+	// Release or Cancel.
 	PointerID ID
-	Priority  Priority
-	Time      time.Duration
-	Hit       bool
-	Position  f32.Point
-	Scroll    f32.Point
+	// Priority is the priority of the receiving handler
+	// for this event.
+	Priority Priority
+	// Time is when the event was received. The
+	// timestamp is relative to an undefined base.
+	Time time.Duration
+	// Hit is set when the event was within the registered
+	// area for the handler. Hit can be false when a pointer
+	// was pressed within the hit area, and then dragged
+	// outside it.
+	Hit bool
+	// Position is the position of the event, relative to
+	// the current transformation, as set by ui.TransformOp.
+	Position f32.Point
+	// Scroll is the scroll amount, if any.
+	Scroll f32.Point
 }
 
+// RectAreaOp updates the hit area to the intersection
+// of the current hit area with a rectangular area.
 type RectAreaOp struct {
+	// Rect defines the rectangle. The current transform
+	// is applied to it.
 	Rect image.Rectangle
 }
 
+// EllipseAreaOp updates the hit area to the intersection
+// of the current hit area with an elliptical area.
 type EllipseAreaOp struct {
+	// Rect is the bounds for the ellipse. The current transform
+	// is applied to the rectangle.
 	Rect image.Rectangle
 }
 
@@ -38,40 +61,61 @@ type areaOp struct {
 	rect image.Rectangle
 }
 
+// HandlerOp declares an input handler ready for pointer
+// events.
 type HandlerOp struct {
-	Key  input.Key
+	Key input.Key
+	// Grab, if set, request that the handler get
+	// Grabbed priority.
 	Grab bool
 }
 
-// PassOp change the current event pass-through
-// setting.
+// PassOp sets the pass-through mode.
 type PassOp struct {
 	Pass bool
 }
 
 type ID uint16
+
+// Type of an Event.
 type Type uint8
+
+// Priority of an Event.
 type Priority uint8
+
+// Source of an Event.
 type Source uint8
 
 // Must match input.areaKind
 type areaKind uint8
 
 const (
+	// Cancel is sent when the current gesture is interrupted
+	// by other handlers or the system.
 	Cancel Type = iota
+	// Press of a pointer.
 	Press
+	// Release of a pointer.
 	Release
+	// Move of a pointer.
 	Move
 )
 
 const (
+	// Mouse generated event.
 	Mouse Source = iota
+	// Touch generated event.
 	Touch
 )
 
 const (
+	// Shared priority is for handlers that
+	// are part of a matching set larger than 1.
 	Shared Priority = iota
+	// Foremost is like Shared, but the handler is
+	// the foremost in the matching set.
 	Foremost
+	// Grabbed is used for matching sets of size 1.
 	Grabbed
 )
 
