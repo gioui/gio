@@ -90,7 +90,7 @@ func (a *App) run() error {
 			a.w.Invalidate()
 		case e := <-a.w.Events():
 			switch e := e.(type) {
-			case key.ChordEvent:
+			case key.Event:
 				switch e.Name {
 				case key.NameEscape:
 					os.Exit(0)
