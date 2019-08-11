@@ -34,23 +34,37 @@ type FocusEvent struct {
 	Focus bool
 }
 
+// Event is sent when a key is pressed. For text input
+// use EditEvent.
 type Event struct {
-	Name      rune
+	// Name is the rune character that most closely
+	// match the key. For letters, the upper case form
+	// is used.
+	Name rune
+	// Modifiers is the set of active modifiers when
+	// the key was pressed.
 	Modifiers Modifiers
 }
 
+// EditEvent is sent when text is input.
 type EditEvent struct {
 	Text string
 }
 
+// Modifiers
 type Modifiers uint32
 
 const (
+	// ModCommand is the command modifier. On macOS
+	// it is the Cmd key, on other platforms the Ctrl
+	// key.
 	ModCommand Modifiers = 1 << iota
+	// THe shift key.
 	ModShift
 )
 
 const (
+	// Runes for special keys.
 	NameLeftArrow      = '←'
 	NameRightArrow     = '→'
 	NameUpArrow        = '↑'
@@ -66,6 +80,8 @@ const (
 	NamePageDown       = '⇟'
 )
 
+// Contain reports whether m contains all modifiers
+// in m2.
 func (m Modifiers) Contain(m2 Modifiers) bool {
 	return m&m2 == m2
 }
