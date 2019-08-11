@@ -20,14 +20,24 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
+// Editor implements an editable and scrollable text area.
 type Editor struct {
-	Face       Face
-	Alignment  Alignment
+	Face      Face
+	Alignment Alignment
+	// SingleLine force the text to stay on a single line.
+	// SingleLine also sets the scrolling direction to
+	// horizontal.
 	SingleLine bool
-	Submit     bool
+	// Submit enabled translation of carriage return keys to SubmitEvents.
+	// If not enabled, carriage returns are inserted as newlines in the text.
+	Submit bool
 
-	Material     ui.MacroOp
-	Hint         string
+	// Material for drawing the text.
+	Material ui.MacroOp
+	// Hint contains the text displayed to the user when the
+	// Editor is empty.
+	Hint string
+	// Mmaterial is used to draw the hint.
 	HintMaterial ui.MacroOp
 
 	oldScale          int
@@ -59,7 +69,11 @@ type EditorEvent interface {
 	isEditorEvent()
 }
 
+// A ChangeEvent is generated for every user change to the text.
 type ChangeEvent struct{}
+
+// A SubmitEvent is generated when and Editor's Submit is set
+// and a carriage return key is pressed.
 type SubmitEvent struct{}
 
 const (
@@ -67,9 +81,7 @@ const (
 	maxBlinkDuration = 10 * time.Second
 )
 
-func (s ChangeEvent) isEditorEvent() {}
-func (s SubmitEvent) isEditorEvent() {}
-
+// Next returns the next available editor event, or false if none are available.
 func (e *Editor) Next(cfg ui.Config, queue input.Queue) (EditorEvent, bool) {
 	// Crude configuration change detection.
 	if scale := cfg.Px(ui.Sp(100)); scale != e.oldScale {
@@ -148,6 +160,7 @@ func (e *Editor) caretWidth(c ui.Config) fixed.Int26_6 {
 	return fixed.Int26_6(oneDp * 64)
 }
 
+// Focus requests the input focus for the Editor.
 func (e *Editor) Focus() {
 	e.requestFocus = true
 }
@@ -258,6 +271,18 @@ func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, cs layout
 	e.scroller.Add(ops)
 	e.clicker.Add(ops)
 	return layout.Dimens{Size: e.viewSize, Baseline: baseline}
+}
+
+// Text returns the contents of the editor.
+func (e *Editor) Text() string {
+	return e.rr.String()
+}
+
+// SetText replaces the contents of the editor.
+func (e *Editor) SetText(s string) {
+	e.rr = editBuffer{}
+	e.carXOff = 0
+	e.prepend(s)
 }
 
 func (e *Editor) layout() {
@@ -395,16 +420,6 @@ func (e *Editor) deleteRuneForward() {
 	e.rr.deleteRuneForward()
 	e.carXOff = 0
 	e.invalidate()
-}
-
-func (e *Editor) Text() string {
-	return e.rr.String()
-}
-
-func (e *Editor) SetText(s string) {
-	e.rr = editBuffer{}
-	e.carXOff = 0
-	e.prepend(s)
 }
 
 func (e *Editor) append(s string) {
@@ -590,3 +605,6 @@ func (e *Editor) command(k key.Event) bool {
 	}
 	return true
 }
+
+func (s ChangeEvent) isEditorEvent() {}
+func (s SubmitEvent) isEditorEvent() {}
