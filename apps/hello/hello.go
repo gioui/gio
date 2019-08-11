@@ -54,7 +54,7 @@ func loop(w *app.Window) error {
 			material.Record(ops)
 			paint.ColorOp{Color: maroon}.Add(ops)
 			material.Stop()
-			text.Label{Material: material, Face: face, Alignment: text.Center, Text: message}.Layout(ops, cs)
+			text.Label{Material: material, Face: face, Alignment: text.Middle, Text: message}.Layout(ops, cs)
 			w.Update(ops)
 		}
 	}
