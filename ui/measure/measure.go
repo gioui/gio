@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
+/*
+Package measure implements text layout and shaping.
+*/
 package measure
 
 import (
@@ -9,16 +12,17 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
-	"gioui.org/ui/text"
 	"gioui.org/ui/paint"
+	"gioui.org/ui/text"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
 )
 
+// Faces is a cache of text layouts and paths.
 type Faces struct {
 	config      ui.Config
-	faceCache   map[faceKey]*textFace
+	faceCache   map[faceKey]*Face
 	layoutCache map[layoutKey]cachedLayout
 	pathCache   map[pathKey]cachedPath
 }
@@ -51,12 +55,15 @@ type faceKey struct {
 	size ui.Value
 }
 
-type textFace struct {
+// Face is a cached implementation of text.Face.
+type Face struct {
 	faces *Faces
 	size  ui.Value
 	font  *opentype
 }
 
+// Reset the cache, discarding any measures or paths that
+// haven't been used since the last call to Reset.
 func (f *Faces) Reset(c ui.Config) {
 	f.config = c
 	f.init()
@@ -78,13 +85,14 @@ func (f *Faces) Reset(c ui.Config) {
 	}
 }
 
-func (f *Faces) For(fnt *sfnt.Font, size ui.Value) text.Face {
+// For returns a Face for the given font and size.
+func (f *Faces) For(fnt *sfnt.Font, size ui.Value) *Face {
 	f.init()
 	fk := faceKey{fnt, size}
 	if f, exist := f.faceCache[fk]; exist {
 		return f
 	}
-	face := &textFace{
+	face := &Face{
 		faces: f,
 		size:  size,
 		font:  &opentype{Font: fnt, Hinting: font.HintingFull},
@@ -97,12 +105,12 @@ func (f *Faces) init() {
 	if f.faceCache != nil {
 		return
 	}
-	f.faceCache = make(map[faceKey]*textFace)
+	f.faceCache = make(map[faceKey]*Face)
 	f.pathCache = make(map[pathKey]cachedPath)
 	f.layoutCache = make(map[layoutKey]cachedLayout)
 }
 
-func (f *textFace) Layout(str string, opts text.LayoutOptions) *text.Layout {
+func (f *Face) Layout(str string, opts text.LayoutOptions) *text.Layout {
 	ppem := fixed.Int26_6(f.faces.config.Px(f.size) * 64)
 	lk := layoutKey{
 		f:    f.font.Font,
@@ -120,7 +128,7 @@ func (f *textFace) Layout(str string, opts text.LayoutOptions) *text.Layout {
 	return l
 }
 
-func (f *textFace) Path(str text.String) ui.MacroOp {
+func (f *Face) Path(str text.String) ui.MacroOp {
 	ppem := fixed.Int26_6(f.faces.config.Px(f.size) * 64)
 	pk := pathKey{
 		f:    f.font.Font,
