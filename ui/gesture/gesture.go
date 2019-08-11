@@ -40,7 +40,7 @@ type ClickEvent struct {
 
 type ClickType uint8
 
-// Scroll detects scroll gestures and reduce them to
+// Scroll detects scroll gestures and reduces them to
 // scroll distances. Scroll recognizes mouse wheel
 // movements as well as drag and fling touch gestures.
 type Scroll struct {
