@@ -28,6 +28,8 @@ type buildInfo struct {
 	name    string
 	pkg     string
 	ldflags string
+	target  string
+	appID   string
 	archs   []string
 }
 
@@ -65,8 +67,10 @@ func main() {
 	}
 	name = filepath.Base(name)
 	bi := &buildInfo{
-		name: name,
-		pkg:  pkg,
+		name:   name,
+		pkg:    pkg,
+		target: *target,
+		appID:  *appID,
 	}
 	switch *target {
 	case "js":

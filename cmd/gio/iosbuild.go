@@ -179,8 +179,27 @@ int main(int argc, char * argv[]) {
 	if _, err := runCmd(lipo); err != nil {
 		return err
 	}
+	infoPlist := buildInfoPlist(bi)
+	plistFile := filepath.Join(app, "Info.plist")
+	if err := ioutil.WriteFile(plistFile, []byte(infoPlist), 0660); err != nil {
+		return err
+	}
+	if _, err := runCmd(exec.Command("plutil", "-convert", "binary1", plistFile)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func buildInfoPlist(bi *buildInfo) string {
 	appName := strings.Title(bi.name)
-	infoPlistSrc := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+	var platform string
+	switch bi.target {
+	case "ios":
+		platform = "iphoneos"
+	case "tvos":
+		platform = "appletvos"
+	}
+	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -202,16 +221,14 @@ int main(int argc, char * argv[]) {
 	<string>1</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array><string>arm64</string></array>
+	<key>DTPlatformName</key>
+	<string>%s</string>
+	<key>DTPlatformVersion</key>
+	<string>9.0</string>
 </dict>
-</plist>`, *appID, appName)
-	infoPlist := filepath.Join(app, "Info.plist")
-	if err := ioutil.WriteFile(infoPlist, []byte(infoPlistSrc), 0660); err != nil {
-		return err
-	}
-	if _, err := runCmd(exec.Command("plutil", "-convert", "binary1", infoPlist)); err != nil {
-		return err
-	}
-	return nil
+</plist>`, bi.appID, appName, platform)
 }
 
 func archiveIOS(tmpDir, target, frameworkRoot string, bi *buildInfo) error {
