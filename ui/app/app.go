@@ -118,8 +118,10 @@ func (l Stage) String() string {
 }
 
 func init() {
-	args := strings.Split(extraArgs, "|")
-	os.Args = append(os.Args, args...)
+	if extraArgs != "" {
+		args := strings.Split(extraArgs, "|")
+		os.Args = append(os.Args, args...)
+	}
 }
 
 // DataDir returns a path to use for application-specific
