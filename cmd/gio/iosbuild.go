@@ -244,6 +244,10 @@ func buildInfoPlist(bi *buildInfo) string {
 	<string>12.4</string>
 	<key>MinimumOSVersion</key>
 	<string>9.0</string>
+	<key>UIDeviceFamily</key>
+	<array>
+		<integer>1</integer>
+	</array>
 </dict>
 </plist>`, bi.appID, appName, platform)
 }
