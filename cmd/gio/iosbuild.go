@@ -100,6 +100,11 @@ func signIOS(tmpDir, app, ipa string) error {
 		if expAppID != provAppID {
 			continue
 		}
+		// Copy provisioning file.
+		embedded := filepath.Join(app, "embedded.mobileprovision")
+		if err := copyFile(embedded, prov); err != nil {
+			return err
+		}
 		certDER, err := runCmdRaw(exec.Command("/usr/libexec/PlistBuddy", "-c", "Print:DeveloperCertificates:0", provInfo))
 		if err != nil {
 			return err
