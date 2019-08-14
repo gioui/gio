@@ -28,19 +28,34 @@ func buildIOS(tmpDir, target string, bi *buildInfo) error {
 		}
 		return archiveIOS(tmpDir, target, framework, bi)
 	case "exe":
-		tmpFramework := filepath.Join(tmpDir, "Gio.framework")
-		if err := archiveIOS(tmpDir, target, tmpFramework, bi); err != nil {
-			return err
-		}
 		out := *destPath
 		if out == "" {
 			out = appName + ".ipa"
 		}
-		isIPA := strings.HasSuffix(out, ".ipa")
-		if !isIPA && !strings.HasSuffix(out, ".app") {
+		forDevice := strings.HasSuffix(out, ".ipa")
+		// Filter out unsupported architectures.
+		for i := len(bi.archs) - 1; i >= 0; i-- {
+			switch bi.archs[i] {
+			case "arm", "arm64":
+				if forDevice {
+					continue
+				}
+			case "386", "amd64":
+				if !forDevice {
+					continue
+				}
+			}
+
+			bi.archs = append(bi.archs[:i], bi.archs[i+1:]...)
+		}
+		tmpFramework := filepath.Join(tmpDir, "Gio.framework")
+		if err := archiveIOS(tmpDir, target, tmpFramework, bi); err != nil {
+			return err
+		}
+		if !forDevice && !strings.HasSuffix(out, ".app") {
 			return fmt.Errorf("the specified output directory %q does not end in .app or .ipa", out)
 		}
-		if !isIPA {
+		if !forDevice {
 			return exeIOS(tmpDir, target, out, bi)
 		}
 		payload := filepath.Join(tmpDir, "Payload")
@@ -226,6 +241,8 @@ func buildInfoPlist(bi *buildInfo) string {
 	<key>DTPlatformName</key>
 	<string>%s</string>
 	<key>DTPlatformVersion</key>
+	<string>12.4</string>
+	<key>MinimumOSVersion</key>
 	<string>9.0</string>
 </dict>
 </plist>`, bi.appID, appName, platform)
