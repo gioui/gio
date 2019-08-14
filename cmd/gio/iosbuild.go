@@ -320,7 +320,7 @@ func archiveIOS(tmpDir, target, frameworkRoot string, bi *buildInfo) error {
 	if _, err := runCmd(lipo); err != nil {
 		return err
 	}
-	appDir, err := appDir()
+	appDir, err := runCmd(exec.Command("go", "list", "-f", "{{.Dir}}", "gioui.org/ui/app"))
 	if err != nil {
 		return err
 	}

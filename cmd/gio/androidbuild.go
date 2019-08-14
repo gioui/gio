@@ -125,7 +125,7 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 			return err
 		})
 	}
-	appDir, err := appDir()
+	appDir, err := runCmd(exec.Command("go", "list", "-f", "{{.Dir}}", "gioui.org/ui/app"))
 	if err != nil {
 		return err
 	}

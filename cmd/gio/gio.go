@@ -158,11 +158,6 @@ func copyFile(dst, src string) (err error) {
 	return err
 }
 
-func appDir() (string, error) {
-	cmd := exec.Command("go", "list", "-f", "{{.Dir}}", "gioui.org/ui/app")
-	return runCmd(cmd)
-}
-
 type arch struct {
 	iosArch string
 	jniArch string
