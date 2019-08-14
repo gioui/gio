@@ -44,7 +44,7 @@ func buildIOS(tmpDir, target string, bi *buildInfo) error {
 			return exeIOS(tmpDir, target, out, bi)
 		}
 		payload := filepath.Join(tmpDir, "Payload")
-		appDir := filepath.Join(payload, "gio.app")
+		appDir := filepath.Join(payload, appName+".app")
 		if err := os.MkdirAll(appDir, 0755); err != nil {
 			return err
 		}
