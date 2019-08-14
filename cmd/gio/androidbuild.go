@@ -280,8 +280,8 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 	manifestSrc := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
 	package="%s"
-	android:versionCode="1"
-	android:versionName="1.0">
+	android:versionCode="%d"
+	android:versionName="1.0.%d">
 	<uses-sdk android:minSdkVersion="16" android:targetSdkVersion="28" />
 	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-feature android:glEsVersion="0x00030000"/>
@@ -297,7 +297,7 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 			</intent-filter>
 		</activity>
 	</application>
-</manifest>`, *appID, appName)
+</manifest>`, *appID, bi.version, bi.version, appName)
 	manifest := filepath.Join(tmpDir, "AndroidManifest.xml")
 	if err := ioutil.WriteFile(manifest, []byte(manifestSrc), 0660); err != nil {
 		return err

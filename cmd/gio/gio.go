@@ -20,6 +20,7 @@ var (
 	buildMode     = flag.String("buildmode", "exe", "specify buildmode: archive or exe")
 	destPath      = flag.String("o", "", `output path. Specify a path with the ".app" suffix for iOS simulators.`)
 	appID         = flag.String("appid", "org.gioui.app", "app identifier (for -buildmode=exe)")
+	version       = flag.Int("version", 1, "app version (for -buildmode=exe)")
 	printCommands = flag.Bool("x", false, "print the commands")
 	keepWorkdir   = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting.")
 )
@@ -30,6 +31,7 @@ type buildInfo struct {
 	ldflags string
 	target  string
 	appID   string
+	version int
 	archs   []string
 }
 
@@ -67,10 +69,11 @@ func main() {
 	}
 	name = filepath.Base(name)
 	bi := &buildInfo{
-		name:   name,
-		pkg:    pkg,
-		target: *target,
-		appID:  *appID,
+		name:    name,
+		pkg:     pkg,
+		target:  *target,
+		appID:   *appID,
+		version: *version,
 	}
 	switch *target {
 	case "js":

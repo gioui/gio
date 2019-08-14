@@ -231,9 +231,9 @@ func buildInfoPlist(bi *buildInfo) string {
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>1.0.%d</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>%d</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
@@ -249,7 +249,7 @@ func buildInfoPlist(bi *buildInfo) string {
 		<integer>1</integer>
 	</array>
 </dict>
-</plist>`, bi.appID, appName, platform)
+</plist>`, bi.appID, appName, bi.version, bi.version, platform)
 }
 
 func archiveIOS(tmpDir, target, frameworkRoot string, bi *buildInfo) error {
