@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -332,17 +331,23 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 	}()
 	apkw := newZipWriter(ap_)
 	defer apkw.Close()
-	apkFiles, err := filepath.Glob(filepath.Join(apkDir, "*"))
+	err = filepath.Walk(apkDir, func(path string, f os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if f.IsDir() {
+			return nil
+		}
+		zpath := path[len(apkDir)+1:]
+		if filepath.Base(path) == "resources.arsc" {
+			apkw.Store(zpath, path)
+		} else {
+			apkw.Add(zpath, path)
+		}
+		return nil
+	})
 	if err != nil {
 		return err
-	}
-	for _, f := range apkFiles {
-		name := filepath.Base(f)
-		if name == "resources.arsc" {
-			apkw.Store(name, f)
-		} else {
-			apkw.Add(name, f)
-		}
 	}
 	for _, a := range bi.archs {
 		arch := allArchs[a]
@@ -395,7 +400,10 @@ func unzip(dir, zipfile string) (err error) {
 	}
 	defer zipr.Close()
 	for _, f := range zipr.File {
-		path := filepath.Join(dir, path.Base(f.Name))
+		path := filepath.Join(dir, f.Name)
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			return err
+		}
 		out, err := os.Create(path)
 		if err != nil {
 			return err
