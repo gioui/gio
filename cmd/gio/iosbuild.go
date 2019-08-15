@@ -18,6 +18,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const minIOSVersion = "9.0"
+
 func buildIOS(tmpDir, target string, bi *buildInfo) error {
 	appName := bi.name
 	switch *buildMode {
@@ -199,21 +201,86 @@ int main(int argc, char * argv[]) {
 	if err := ioutil.WriteFile(plistFile, []byte(infoPlist), 0660); err != nil {
 		return err
 	}
+	icon := filepath.Join(bi.dir, "appicon.png")
+	if _, err := os.Stat(icon); err == nil {
+		assetPlist, err := iosIcons(bi, tmpDir, app, icon)
+		if err != nil {
+			return err
+		}
+		// Merge assets plist with Info.plist
+		cmd := exec.Command(
+			"/usr/libexec/PlistBuddy",
+			"-c", "Merge "+assetPlist,
+			plistFile,
+		)
+		if _, err := runCmd(cmd); err != nil {
+			return err
+		}
+	}
 	if _, err := runCmd(exec.Command("plutil", "-convert", "binary1", plistFile)); err != nil {
 		return err
 	}
 	return nil
 }
 
+// iosIcons builds an asset catalog and compile it with the Xcode command actool.
+// iosIcons returns the asset plist file to be merged into Info.plist.
+func iosIcons(bi *buildInfo, tmpDir, appDir, icon string) (string, error) {
+	assets := filepath.Join(tmpDir, "Assets.xcassets")
+	if err := os.Mkdir(assets, 0700); err != nil {
+		return "", err
+	}
+	appIcon := filepath.Join(assets, "AppIcon.appiconset")
+	err := buildIcons(appIcon, icon, []iconVariant{
+		{"ios_2x.png", 120},
+		{"ios_3x.png", 180},
+		{"ios_store.png", 1024},
+	})
+	if err != nil {
+		return "", err
+	}
+	contentJson := `{
+	"images" : [
+		{
+			"size" : "60x60",
+			"idiom" : "iphone",
+			"filename" : "ios_2x.png",
+			"scale" : "2x"
+		},
+		{
+			"size" : "60x60",
+			"idiom" : "iphone",
+			"filename" : "ios_3x.png",
+			"scale" : "3x"
+		},
+		{
+			"size" : "1024x1024",
+			"idiom" : "ios-marketing",
+			"filename" : "ios_store.png",
+			"scale" : "1x"
+		}
+	]
+}`
+	contentFile := filepath.Join(appIcon, "Contents.json")
+	if err := ioutil.WriteFile(contentFile, []byte(contentJson), 0600); err != nil {
+		return "", err
+	}
+	assetPlist := filepath.Join(tmpDir, "assets.plist")
+	compile := exec.Command(
+		"actool",
+		"--compile", appDir,
+		"--platform", iosPlatformFor(bi.target),
+		"--minimum-deployment-target", minIOSVersion,
+		"--app-icon", "AppIcon",
+		"--output-partial-info-plist", assetPlist,
+		assets)
+	_, err = runCmd(compile)
+	return assetPlist, err
+}
+
 func buildInfoPlist(bi *buildInfo) string {
 	appName := strings.Title(bi.name)
-	var platform string
-	switch bi.target {
-	case "ios":
-		platform = "iphoneos"
-	case "tvos":
-		platform = "appletvos"
-	}
+	platform := iosPlatformFor(bi.target)
 	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -243,7 +310,7 @@ func buildInfoPlist(bi *buildInfo) string {
 	<key>DTPlatformVersion</key>
 	<string>12.4</string>
 	<key>MinimumOSVersion</key>
-	<string>9.0</string>
+	<string>%s</string>
 	<key>UIDeviceFamily</key>
 	<array>
 		<integer>1</integer>
@@ -255,7 +322,18 @@ func buildInfoPlist(bi *buildInfo) string {
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 </dict>
-</plist>`, bi.appID, appName, bi.version, bi.version, platform)
+</plist>`, bi.appID, appName, bi.version, bi.version, platform, minIOSVersion)
+}
+
+func iosPlatformFor(target string) string {
+	switch target {
+	case "ios":
+		return "iphoneos"
+	case "tvos":
+		return "appletvos"
+	default:
+		panic("invalid platform " + target)
+	}
 }
 
 func archiveIOS(tmpDir, target, frameworkRoot string, bi *buildInfo) error {
@@ -379,7 +457,7 @@ func iosCompilerFor(target, arch string) (string, []string, error) {
 		"-Werror",
 		"-arch", allArchs[arch].iosArch,
 		"-isysroot", sdkPath,
-		"-m" + platformOS + "-version-min=9.0",
+		"-m" + platformOS + "-version-min=" + minIOSVersion,
 	}
 	return clang, cflags, nil
 }

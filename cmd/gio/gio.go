@@ -6,12 +6,17 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"image"
+	"image/png"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/image/draw"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -32,6 +37,7 @@ type buildInfo struct {
 	target  string
 	appID   string
 	version int
+	dir     string
 	archs   []string
 }
 
@@ -68,11 +74,16 @@ func main() {
 		errorf("gio: %v", err)
 	}
 	name = filepath.Base(name)
+	dir, err := runCmd(exec.Command("go", "list", "-f", "{{.Dir}}", pkg))
+	if err != nil {
+		errorf("gio: %v", err)
+	}
 	bi := &buildInfo{
 		name:    name,
 		pkg:     pkg,
 		target:  *target,
 		appID:   *appID,
+		dir:     dir,
 		version: *version,
 	}
 	switch *target {
@@ -188,4 +199,44 @@ var allArchs = map[string]arch{
 		jniArch: "x86_64",
 		clang:   "x86_64-linux-android21-clang",
 	},
+}
+
+type iconVariant struct {
+	path string
+	size int
+}
+
+func buildIcons(baseDir, icon string, variants []iconVariant) error {
+	f, err := os.Open(icon)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	img, _, err := image.Decode(f)
+	if err != nil {
+		return err
+	}
+	var resizes errgroup.Group
+	for _, v := range variants {
+		v := v
+		resizes.Go(func() (err error) {
+			scaled := image.NewNRGBA(image.Rectangle{Max: image.Point{X: v.size, Y: v.size}})
+			draw.CatmullRom.Scale(scaled, scaled.Bounds(), img, img.Bounds(), draw.Src, nil)
+			path := filepath.Join(baseDir, v.path)
+			if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+				return err
+			}
+			f, err := os.Create(path)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				if cerr := f.Close(); err == nil {
+					err = cerr
+				}
+			}()
+			return png.Encode(f, scaled)
+		})
+	}
+	return resizes.Wait()
 }

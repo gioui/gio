@@ -242,6 +242,20 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 			return err
 		}
 	}
+	icon := filepath.Join(bi.dir, "appicon.png")
+	iconSnip := ""
+	if _, err := os.Stat(icon); err == nil {
+		err := buildIcons(resDir, icon, []iconVariant{
+			{filepath.Join("mipmap-hdpi", "ic_launcher.png"), 72},
+			{filepath.Join("mipmap-xhdpi", "ic_launcher.png"), 96},
+			{filepath.Join("mipmap-xxhdpi", "ic_launcher.png"), 144},
+			{filepath.Join("mipmap-xxxhdpi", "ic_launcher.png"), 192},
+		})
+		if err != nil {
+			return err
+		}
+		iconSnip = `android:icon="@mipmap/ic_launcher"`
+	}
 	themes := `<?xml version="1.0" encoding="utf-8"?>
 <resources>
 	<style name="Theme.GioApp" parent="android:style/Theme.NoTitleBar">
@@ -284,7 +298,7 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 	<uses-sdk android:minSdkVersion="16" android:targetSdkVersion="28" />
 	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-feature android:glEsVersion="0x00030000"/>
-	<application android:label="Gio">
+	<application %s android:label="%s">
 		<activity android:name="org.gioui.GioActivity"
 			android:label="%s"
 			android:theme="@style/Theme.GioApp"
@@ -296,7 +310,7 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 			</intent-filter>
 		</activity>
 	</application>
-</manifest>`, *appID, bi.version, bi.version, appName)
+</manifest>`, *appID, bi.version, bi.version, iconSnip, appName, appName)
 	manifest := filepath.Join(tmpDir, "AndroidManifest.xml")
 	if err := ioutil.WriteFile(manifest, []byte(manifestSrc), 0660); err != nil {
 		return err
