@@ -248,6 +248,12 @@ func buildInfoPlist(bi *buildInfo) string {
 	<array>
 		<integer>1</integer>
 	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
 </dict>
 </plist>`, bi.appID, appName, bi.version, bi.version, platform)
 }
