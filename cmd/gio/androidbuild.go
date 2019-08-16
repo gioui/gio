@@ -246,10 +246,10 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 	iconSnip := ""
 	if _, err := os.Stat(icon); err == nil {
 		err := buildIcons(resDir, icon, []iconVariant{
-			{filepath.Join("mipmap-hdpi", "ic_launcher.png"), 72},
-			{filepath.Join("mipmap-xhdpi", "ic_launcher.png"), 96},
-			{filepath.Join("mipmap-xxhdpi", "ic_launcher.png"), 144},
-			{filepath.Join("mipmap-xxxhdpi", "ic_launcher.png"), 192},
+			{path: filepath.Join("mipmap-hdpi", "ic_launcher.png"), size: 72},
+			{path: filepath.Join("mipmap-xhdpi", "ic_launcher.png"), size: 96},
+			{path: filepath.Join("mipmap-xxhdpi", "ic_launcher.png"), size: 144},
+			{path: filepath.Join("mipmap-xxxhdpi", "ic_launcher.png"), size: 192},
 		})
 		if err != nil {
 			return err

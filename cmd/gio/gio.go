@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"image"
+	"image/color"
 	"image/png"
 	"io"
 	"io/ioutil"
@@ -204,6 +205,7 @@ var allArchs = map[string]arch{
 type iconVariant struct {
 	path string
 	size int
+	fill bool
 }
 
 func buildIcons(baseDir, icon string, variants []iconVariant) error {
@@ -221,7 +223,12 @@ func buildIcons(baseDir, icon string, variants []iconVariant) error {
 		v := v
 		resizes.Go(func() (err error) {
 			scaled := image.NewNRGBA(image.Rectangle{Max: image.Point{X: v.size, Y: v.size}})
-			draw.CatmullRom.Scale(scaled, scaled.Bounds(), img, img.Bounds(), draw.Src, nil)
+			op := draw.Src
+			if v.fill {
+				op = draw.Over
+				draw.Draw(scaled, scaled.Bounds(), &image.Uniform{color.White}, image.Point{}, draw.Src)
+			}
+			draw.CatmullRom.Scale(scaled, scaled.Bounds(), img, img.Bounds(), op, nil)
 			path := filepath.Join(baseDir, v.path)
 			if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 				return err
