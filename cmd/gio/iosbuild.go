@@ -334,8 +334,20 @@ func buildInfoPlist(bi *buildInfo) string {
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>DTCompiler</key>
+	<string>com.apple.compilers.llvm.clang.1_0</string>
+	<key>DTPlatformBuild</key>
+	<string>16G73</string>
+	<key>DTSDKBuild</key>
+	<string>16G73</string>
+	<key>DTSDKName</key>
+	<string>%s12.4</string>
+	<key>DTXcode</key>
+	<string>1030</string>
+	<key>DTXcodeBuild</key>
+	<string>10G8</string>
 </dict>
-</plist>`, bi.appID, appName, bi.version, bi.version, platform, minIOSVersion, supportPlatform)
+</plist>`, bi.appID, appName, bi.version, bi.version, platform, minIOSVersion, supportPlatform, platform)
 }
 
 func iosPlatformFor(target string) string {
