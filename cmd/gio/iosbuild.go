@@ -88,6 +88,7 @@ func signIOS(tmpDir, app, ipa string) error {
 		return err
 	}
 	provInfo := filepath.Join(tmpDir, "provision.plist")
+	var avail []string
 	for _, prov := range provisions {
 		// Decode the provision file to a plist.
 		_, err := runCmd(exec.Command("security", "cms", "-D", "-i", prov, "-o", provInfo))
@@ -114,6 +115,7 @@ func signIOS(tmpDir, app, ipa string) error {
 			return err
 		}
 		expAppID := fmt.Sprintf("%s.%s", appIDPrefix, *appID)
+		avail = append(avail, provAppID)
 		if expAppID != provAppID {
 			continue
 		}
@@ -144,7 +146,7 @@ func signIOS(tmpDir, app, ipa string) error {
 		_, err = runCmd(exec.Command("codesign", "-s", signIdentity, "--entitlements", entFile, app))
 		return err
 	}
-	return fmt.Errorf("sign: no valid provisioning profile found for bundle id %q", *appID)
+	return fmt.Errorf("sign: no valid provisioning profile found for bundle id %q among %v", *appID, avail)
 }
 
 func exeIOS(tmpDir, target, app string, bi *buildInfo) error {
