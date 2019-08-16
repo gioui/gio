@@ -283,6 +283,13 @@ func iosIcons(bi *buildInfo, tmpDir, appDir, icon string) (string, error) {
 func buildInfoPlist(bi *buildInfo) string {
 	appName := strings.Title(bi.name)
 	platform := iosPlatformFor(bi.target)
+	var supportPlatform string
+	switch bi.target {
+	case "ios":
+		supportPlatform = "iPhoneOS"
+	case "tvos":
+		supportPlatform = "AppleTVOS"
+	}
 	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -317,6 +324,10 @@ func buildInfoPlist(bi *buildInfo) string {
 	<array>
 		<integer>1</integer>
 	</array>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>%s</string>
+	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -324,7 +335,7 @@ func buildInfoPlist(bi *buildInfo) string {
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 </dict>
-</plist>`, bi.appID, appName, bi.version, bi.version, platform, minIOSVersion)
+</plist>`, bi.appID, appName, bi.version, bi.version, platform, minIOSVersion, supportPlatform)
 }
 
 func iosPlatformFor(target string) string {
