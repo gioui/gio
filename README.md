@@ -96,7 +96,7 @@ Open http://localhost:8080 in a browser to run the program.
 
 ## Integration with existing projects
 
-See the [integration guide](https://man.sr.ht/~eliasnaur/integrate.md) for details on using
+See the [integration guide](https://man.sr.ht/~eliasnaur/gio/integrate.md) for details on using
 Gio with existing projects.
 
 
