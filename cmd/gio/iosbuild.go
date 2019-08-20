@@ -171,7 +171,8 @@ int main(int argc, char * argv[]) {
 	if err := ioutil.WriteFile(mainm, []byte(mainmSrc), 0660); err != nil {
 		return err
 	}
-	exe := filepath.Join(app, "app")
+	appName := strings.Title(bi.name)
+	exe := filepath.Join(app, appName)
 	lipo := exec.Command("xcrun", "lipo", "-o", exe, "-create")
 	var builds errgroup.Group
 	for _, a := range bi.archs {
@@ -299,7 +300,7 @@ func buildInfoPlist(bi *buildInfo) string {
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleExecutable</key>
-	<string>app</string>
+	<string>%s</string>
 	<key>CFBundleIdentifier</key>
 	<string>%s</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -349,7 +350,7 @@ func buildInfoPlist(bi *buildInfo) string {
 	<key>DTXcodeBuild</key>
 	<string>10G8</string>
 </dict>
-</plist>`, bi.appID, appName, bi.version, bi.version, platform, minIOSVersion, supportPlatform, platform)
+</plist>`, appName, bi.appID, appName, bi.version, bi.version, platform, minIOSVersion, supportPlatform, platform)
 }
 
 func iosPlatformFor(target string) string {
