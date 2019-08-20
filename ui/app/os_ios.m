@@ -83,11 +83,6 @@ static void redraw(CFTypeRef viewRef, BOOL sync) {
 	onCreate((__bridge CFTypeRef)self.view);
 }
 
-- (void)viewWillAppear:(BOOL)animated {
-	[super viewWillAppear:animated];
-	CFTypeRef viewRef = (__bridge CFTypeRef)self.view;
-}
-
 - (void)viewDidDisappear:(BOOL)animated {
 	[super viewDidDisappear:animated];
 	CFTypeRef viewRef = (__bridge CFTypeRef)self.view;
