@@ -9,12 +9,12 @@
 #include "os_ios.h"
 #include "framework_ios.h"
 
-@interface GioViewController : UIViewController
-@property UIScreen *screen;
-@end
-
 @interface GioView: UIView <UIKeyInput>
 - (void)setAnimating:(BOOL)anim;
+@end
+
+@interface GioViewController : UIViewController
+@property(weak) UIScreen *screen;
 @end
 
 static void redraw(CFTypeRef viewRef, BOOL sync) {
@@ -48,15 +48,18 @@ static void redraw(CFTypeRef viewRef, BOOL sync) {
 }
 
 - (void)applicationDidEnterBackground:(UIApplication *)application {
-	if (self.window.rootViewController.view != nil) {
-		onStop((__bridge CFTypeRef)self.window.rootViewController.view);
+	GioViewController *vc = (GioViewController *)self.window.rootViewController;
+	UIView *drawView = vc.view.subviews[0];
+	if (drawView != nil) {
+		onStop((__bridge CFTypeRef)drawView);
 	}
 }
 
 - (void)applicationWillEnterForeground:(UIApplication *)application {
 	GioViewController *c = (GioViewController*)self.window.rootViewController;
-	if (c.view != nil) {
-		CFTypeRef viewRef = (__bridge CFTypeRef)c.view;
+	UIView *drawView = c.view.subviews[0];
+	if (drawView != nil) {
+		CFTypeRef viewRef = (__bridge CFTypeRef)drawView;
 		redraw(viewRef, YES);
 	}
 }
@@ -73,24 +76,60 @@ static void redraw(CFTypeRef viewRef, BOOL sync) {
 @end
 
 @implementation GioViewController
+CGFloat _keyboardHeight;
+
 - (void)loadView {
 	CGRect zeroFrame = CGRectMake(0, 0, 0, 0);
-	self.view = [[GioView alloc] initWithFrame:zeroFrame];
+	self.view = [[UIView alloc] initWithFrame:zeroFrame];
+	UIView *drawView = [[GioView alloc] initWithFrame:zeroFrame];
+	[self.view addSubview: drawView];
 #ifndef TARGET_OS_TV
-	self.view.multipleTouchEnabled = YES;
+	drawView.multipleTouchEnabled = YES;
 #endif
-	self.view.contentScaleFactor = self.screen.nativeScale;
-	onCreate((__bridge CFTypeRef)self.view);
+	drawView.contentScaleFactor = self.screen.nativeScale;
+	drawView.preservesSuperviewLayoutMargins = YES;
+	drawView.layoutMargins = UIEdgeInsetsMake(0, 0, 0, 0);
+	onCreate((__bridge CFTypeRef)drawView);
+	[[NSNotificationCenter defaultCenter] addObserver:self
+											 selector:@selector(keyboardWillChange:)
+												 name:UIKeyboardWillShowNotification
+											   object:nil];
+	[[NSNotificationCenter defaultCenter] addObserver:self
+											 selector:@selector(keyboardWillChange:)
+												 name:UIKeyboardWillChangeFrameNotification
+											   object:nil];
+	[[NSNotificationCenter defaultCenter] addObserver:self
+											 selector:@selector(keyboardWillHide:)
+												 name:UIKeyboardWillHideNotification
+											   object:nil];
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
 	[super viewDidDisappear:animated];
-	CFTypeRef viewRef = (__bridge CFTypeRef)self.view;
+	CFTypeRef viewRef = (__bridge CFTypeRef)self.view.subviews[0];
 	onDestroy(viewRef);
 }
 
 - (void)viewDidLayoutSubviews {
-	redraw((__bridge CFTypeRef)self.view, YES);
+	[super viewDidLayoutSubviews];
+	UIView *view = self.view.subviews[0];
+	CGRect frame = self.view.bounds;
+	// Adjust view bounds to make room for the keyboard.
+	frame.size.height -= _keyboardHeight;
+	view.frame = frame;
+	redraw((__bridge CFTypeRef)view, YES);
+}
+
+- (void)keyboardWillChange:(NSNotification *)note {
+	NSDictionary *userInfo = note.userInfo;
+	CGRect f = [userInfo[UIKeyboardFrameEndUserInfoKey] CGRectValue];
+	_keyboardHeight = f.size.height;
+	[self.view setNeedsLayout];
+}
+
+- (void)keyboardWillHide:(NSNotification *)note {
+	_keyboardHeight = 0.0;
+	[self.view setNeedsLayout];
 }
 @end
 
