@@ -63,16 +63,6 @@ static void redraw(CFTypeRef viewRef, BOOL sync) {
 		redraw(viewRef, YES);
 	}
 }
-
-- (void)applicationDidBecomeActive:(UIApplication *)application {
-}
-
-- (void)applicationWillTerminate:(UIApplication *)application {
-}
-
-- (void)applicationDidReceiveMemoryWarning:(UIApplication *)application {
-	onLowMemory();
-}
 @end
 
 @implementation GioViewController
@@ -118,6 +108,11 @@ CGFloat _keyboardHeight;
 	frame.size.height -= _keyboardHeight;
 	view.frame = frame;
 	redraw((__bridge CFTypeRef)view, YES);
+}
+
+- (void)didReceiveMemoryWarning {
+	onLowMemory();
+	[super didReceiveMemoryWarning];
 }
 
 - (void)keyboardWillChange:(NSNotification *)note {
