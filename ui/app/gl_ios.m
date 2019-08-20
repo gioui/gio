@@ -37,7 +37,6 @@ CFTypeRef gio_createGLLayer(void) {
 		return nil;
 	}
 	layer.drawableProperties = @{kEAGLDrawablePropertyColorFormat: kEAGLColorFormatSRGBA8};
-	//layer.presentsWithTransaction = YES;
 	layer.opaque = YES;
 	layer.anchorPoint = CGPointMake(0, 0);
 	return CFBridgingRetain(layer);
