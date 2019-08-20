@@ -238,7 +238,7 @@ NSArray<UIKeyCommand *> *_keyCommands;
 void gio_setAnimating(CFTypeRef viewRef, int anim) {
 	GioView *view = (__bridge GioView *)viewRef;
 	dispatch_async(dispatch_get_main_queue(), ^{
-			[view setAnimating:(anim ? YES : NO)];
+		[view setAnimating:(anim ? YES : NO)];
 	});
 }
 
