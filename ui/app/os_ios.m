@@ -40,16 +40,6 @@ static void redraw(CFTypeRef viewRef, BOOL sync) {
 	GioViewController *controller = [[GioViewController alloc] initWithNibName:nil bundle:nil];
 	controller.screen = self.window.screen;
     self.window.rootViewController = controller;
-	[[NSNotificationCenter defaultCenter] addObserverForName:UIWindowDidBecomeKeyNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notification) {
-		UIView *view = self.window.rootViewController.view;
-		if (view != nil)
-			onFocus((__bridge CFTypeRef)view, YES);
-	}];
-	[[NSNotificationCenter defaultCenter] addObserverForName:UIWindowDidResignKeyNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notification) {
-		UIView *view = self.window.rootViewController.view;
-		if (view != nil)
-			onFocus((__bridge CFTypeRef)view, NO);
-	}];
     [self.window makeKeyAndVisible];
 	return YES;
 }
@@ -144,6 +134,23 @@ NSArray<UIKeyCommand *> *_keyCommands;
 		displayLink = [CADisplayLink displayLinkWithTarget:weakSelf selector:@selector(onFrameCallback:)];
 	}
 	return self;
+}
+
+- (void)willMoveToWindow:(UIWindow *)newWindow {
+	if (self.window != nil) {
+		[[NSNotificationCenter defaultCenter] removeObserver:self name:UIWindowDidBecomeKeyNotification object:self.window];
+		[[NSNotificationCenter defaultCenter] removeObserver:self name:UIWindowDidResignKeyNotification object:self.window];
+	}
+	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onWindowDidBecomeKey:) name:UIWindowDidBecomeKeyNotification object:newWindow];
+	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onWindowDidResignKey:) name:UIWindowDidResignKeyNotification object:newWindow];
+}
+
+- (void)onWindowDidBecomeKey:(NSNotification *)note {
+	onFocus((__bridge CFTypeRef)self, YES);
+}
+
+- (void)onWindowDidResignKey:(NSNotification *)note {
+	onFocus((__bridge CFTypeRef)self, NO);
 }
 
 - (void)dealloc {
