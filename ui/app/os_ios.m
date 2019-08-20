@@ -167,19 +167,33 @@ NSArray<UIKeyCommand *> *_keyCommands;
 
 - (void)willMoveToWindow:(UIWindow *)newWindow {
 	if (self.window != nil) {
-		[[NSNotificationCenter defaultCenter] removeObserver:self name:UIWindowDidBecomeKeyNotification object:self.window];
-		[[NSNotificationCenter defaultCenter] removeObserver:self name:UIWindowDidResignKeyNotification object:self.window];
+		[[NSNotificationCenter defaultCenter] removeObserver:self
+														name:UIWindowDidBecomeKeyNotification
+													  object:self.window];
+		[[NSNotificationCenter defaultCenter] removeObserver:self
+														name:UIWindowDidResignKeyNotification
+													  object:self.window];
 	}
-	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onWindowDidBecomeKey:) name:UIWindowDidBecomeKeyNotification object:newWindow];
-	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onWindowDidResignKey:) name:UIWindowDidResignKeyNotification object:newWindow];
+	[[NSNotificationCenter defaultCenter] addObserver:self
+											 selector:@selector(onWindowDidBecomeKey:)
+												 name:UIWindowDidBecomeKeyNotification
+											   object:newWindow];
+	[[NSNotificationCenter defaultCenter] addObserver:self
+											 selector:@selector(onWindowDidResignKey:)
+												 name:UIWindowDidResignKeyNotification
+											   object:newWindow];
 }
 
 - (void)onWindowDidBecomeKey:(NSNotification *)note {
-	onFocus((__bridge CFTypeRef)self, YES);
+	if (self.isFirstResponder) {
+		onFocus((__bridge CFTypeRef)self, YES);
+	}
 }
 
 - (void)onWindowDidResignKey:(NSNotification *)note {
-	onFocus((__bridge CFTypeRef)self, NO);
+	if (self.isFirstResponder) {
+		onFocus((__bridge CFTypeRef)self, NO);
+	}
 }
 
 - (void)dealloc {
