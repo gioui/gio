@@ -69,7 +69,7 @@ type windowRendezvous struct {
 
 type windowAndOptions struct {
 	window *Window
-	opts   *WindowOptions
+	opts   *windowOptions
 }
 
 const (

@@ -156,7 +156,7 @@ func main() {
 	<-mainDone
 }
 
-func createWindow(window *Window, opts *WindowOptions) error {
+func createWindow(window *Window, opts *windowOptions) error {
 	connMu.Lock()
 	defer connMu.Unlock()
 	if len(winMap) > 0 {
@@ -182,7 +182,7 @@ func createWindow(window *Window, opts *WindowOptions) error {
 	return nil
 }
 
-func createNativeWindow(opts *WindowOptions) (*window, error) {
+func createNativeWindow(opts *windowOptions) (*window, error) {
 	pipe := make([]int, 2)
 	if err := syscall.Pipe2(pipe, syscall.O_NONBLOCK|syscall.O_CLOEXEC); err != nil {
 		return nil, fmt.Errorf("createNativeWindow: failed to create pipe: %v", err)

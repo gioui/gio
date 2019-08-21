@@ -15,11 +15,12 @@ import (
 	"gioui.org/ui/system"
 )
 
-// WindowOptions specifies a set of window properties
-// for creating new Windows.
-type WindowOptions struct {
-	// Width and Height of the Window. Use the zero value
-	// to choose a default size.
+// WindowOption configures a Window.
+type WindowOption struct{
+	apply func(opts *windowOptions)
+}
+
+type windowOptions struct {
 	Width, Height ui.Value
 	Title         string
 }
@@ -83,20 +84,15 @@ var ackEvent input.Event
 // platform.
 //
 // BUG: Calling NewWindow more than once is not yet supported.
-func NewWindow(opts *WindowOptions) *Window {
-	if opts == nil {
-		opts = &WindowOptions{
-			Title: "Gio",
-		}
+func NewWindow(options ...WindowOption) *Window {
+	opts := &windowOptions{
+		Width: ui.Dp(800),
+		Height: ui.Dp(600),
+		Title: "Gio",
 	}
-	if opts.Width.V < 0 || opts.Height.V < 0 {
-		panic("window width and height must be larger than or equal to 0")
-	}
-	if opts.Width.V == 0 {
-		opts.Width = ui.Dp(800)
-	}
-	if opts.Height.V == 0 {
-		opts.Height = ui.Dp(600)
+
+	for _, o := range options {
+		o.apply(opts)
 	}
 
 	w := &Window{
@@ -224,7 +220,7 @@ func (w *Window) destroy(err error) {
 	}
 }
 
-func (w *Window) run(opts *WindowOptions) {
+func (w *Window) run(opts *windowOptions) {
 	defer close(w.in)
 	defer close(w.out)
 	if err := createWindow(w, opts); err != nil {
@@ -330,6 +326,40 @@ func (w *Window) run(opts *WindowOptions) {
 
 func (q *Queue) Next(k input.Key) (input.Event, bool) {
 	return q.q.Next(k)
+}
+
+
+// WithTitle returns an option that sets the window title.
+func WithTitle(t string) WindowOption {
+	return WindowOption{
+		apply: func(opts *windowOptions) {
+			opts.Title = t
+		},
+	}
+}
+
+// WithWidth returns an option that sets the window width.
+func WithWidth(w ui.Value) WindowOption {
+	if w.V<= 0 {
+		panic("width must be larger than or equal to 0")
+	}
+	return WindowOption{
+		apply: func(opts *windowOptions) {
+			opts.Width= w
+		},
+	}
+}
+
+// WithHeight returns an option that sets the window height.
+func WithHeight(h ui.Value) WindowOption {
+	if h.V<= 0 {
+		panic("height must be larger than or equal to 0")
+	}
+	return WindowOption{
+		apply: func(opts *windowOptions) {
+			opts.Height = h
+		},
+	}
 }
 
 func (_ driverEvent) ImplementsEvent() {}

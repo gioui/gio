@@ -31,7 +31,7 @@ type window struct {
 
 var mainDone = make(chan struct{})
 
-func createWindow(win *Window, opts *WindowOptions) error {
+func createWindow(win *Window, opts *windowOptions) error {
 	doc := js.Global().Get("document")
 	cont := getContainer(doc)
 	cnv := createCanvas(doc)

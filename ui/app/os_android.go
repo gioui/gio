@@ -422,7 +422,7 @@ func (w *window) showTextInput(show bool) {
 func main() {
 }
 
-func createWindow(window *Window, opts *WindowOptions) error {
+func createWindow(window *Window, opts *windowOptions) error {
 	mainWindow.in <- windowAndOptions{window, opts}
 	return <-mainWindow.errs
 }

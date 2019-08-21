@@ -266,7 +266,7 @@ func gio_onCreate(view C.CFTypeRef) {
 	})
 }
 
-func createWindow(win *Window, opts *WindowOptions) error {
+func createWindow(win *Window, opts *windowOptions) error {
 	mainWindow.in <- windowAndOptions{win, opts}
 	return <-mainWindow.errs
 }

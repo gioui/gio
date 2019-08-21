@@ -161,7 +161,7 @@ func main() {
 	<-mainDone
 }
 
-func createWindow(window *Window, opts *WindowOptions) error {
+func createWindow(window *Window, opts *windowOptions) error {
 	onceMu.Lock()
 	defer onceMu.Unlock()
 	if len(winMap) > 0 {
@@ -191,7 +191,7 @@ func createWindow(window *Window, opts *WindowOptions) error {
 	return <-cerr
 }
 
-func createNativeWindow(opts *WindowOptions) (*window, error) {
+func createNativeWindow(opts *windowOptions) (*window, error) {
 	setProcessDPIAware()
 	screenDC, err := getDC(0)
 	if err != nil {
