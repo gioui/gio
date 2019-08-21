@@ -16,7 +16,7 @@ import (
 )
 
 // WindowOption configures a Window.
-type WindowOption struct{
+type WindowOption struct {
 	apply func(opts *windowOptions)
 }
 
@@ -86,9 +86,9 @@ var ackEvent input.Event
 // BUG: Calling NewWindow more than once is not yet supported.
 func NewWindow(options ...WindowOption) *Window {
 	opts := &windowOptions{
-		Width: ui.Dp(800),
+		Width:  ui.Dp(800),
 		Height: ui.Dp(600),
-		Title: "Gio",
+		Title:  "Gio",
 	}
 
 	for _, o := range options {
@@ -328,7 +328,6 @@ func (q *Queue) Next(k input.Key) (input.Event, bool) {
 	return q.q.Next(k)
 }
 
-
 // WithTitle returns an option that sets the window title.
 func WithTitle(t string) WindowOption {
 	return WindowOption{
@@ -340,19 +339,19 @@ func WithTitle(t string) WindowOption {
 
 // WithWidth returns an option that sets the window width.
 func WithWidth(w ui.Value) WindowOption {
-	if w.V<= 0 {
+	if w.V <= 0 {
 		panic("width must be larger than or equal to 0")
 	}
 	return WindowOption{
 		apply: func(opts *windowOptions) {
-			opts.Width= w
+			opts.Width = w
 		},
 	}
 }
 
 // WithHeight returns an option that sets the window height.
 func WithHeight(h ui.Value) WindowOption {
-	if h.V<= 0 {
+	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
 	return WindowOption{
