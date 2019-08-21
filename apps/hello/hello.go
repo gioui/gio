@@ -21,7 +21,7 @@ import (
 
 func main() {
 	go func() {
-		w := app.NewWindow(nil)
+		w := app.NewWindow()
 		if err := loop(w); err != nil {
 			log.Fatal(err)
 		}

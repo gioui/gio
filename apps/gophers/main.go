@@ -54,11 +54,11 @@ func main() {
 		fmt.Println("See https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line.")
 	}
 	go func() {
-		w := app.NewWindow(&app.WindowOptions{
-			Width:  ui.Dp(400),
-			Height: ui.Dp(800),
-			Title:  "Gophers",
-		})
+		w := app.NewWindow(
+			app.WithWidth(ui.Dp(400)),
+			app.WithHeight(ui.Dp(800)),
+			app.WithTitle("Gophers"),
+		)
 		if err := newApp(w).run(); err != nil {
 			log.Fatal(err)
 		}
