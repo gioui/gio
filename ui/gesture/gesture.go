@@ -124,9 +124,8 @@ func (c *Click) State() ClickState {
 	return c.state
 }
 
-// Events reports all click events for the available events.
-func (c *Click) Events(q input.Queue) []ClickEvent {
-	var events []ClickEvent
+// Next returns the next click event, if any.
+func (c *Click) Next(q input.Queue) (ClickEvent, bool) {
 	for evt, ok := q.Next(c); ok; evt, ok = q.Next(c) {
 		e, ok := evt.(pointer.Event)
 		if !ok {
@@ -137,7 +136,7 @@ func (c *Click) Events(q input.Queue) []ClickEvent {
 			wasPressed := c.state == StatePressed
 			c.state = StateNormal
 			if wasPressed {
-				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source})
+				return ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source}, true
 			}
 		case pointer.Cancel:
 			c.state = StateNormal
@@ -146,7 +145,7 @@ func (c *Click) Events(q input.Queue) []ClickEvent {
 				break
 			}
 			c.state = StatePressed
-			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source})
+			return ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source}, true
 		case pointer.Move:
 			if c.state == StatePressed && !e.Hit {
 				c.state = StateNormal
@@ -155,7 +154,7 @@ func (c *Click) Events(q input.Queue) []ClickEvent {
 			}
 		}
 	}
-	return events
+	return ClickEvent{}, false
 }
 
 // Add the handler to the operation list to receive scroll events.
