@@ -686,8 +686,9 @@ func (d *drawOps) collect(cache *resourceCache, root *ui.Ops, viewport image.Poi
 	}
 	d.reader.Reset(root)
 	state := drawState{
-		clip: clip,
-		rect: true,
+		clip:  clip,
+		rect:  true,
+		color: color.RGBA{A: 0xff},
 	}
 	d.collectOps(&d.reader, state)
 }
