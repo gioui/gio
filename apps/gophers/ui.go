@@ -201,7 +201,7 @@ func (u *UI) Layout(c ui.Config, q input.Queue, ops *ui.Ops, cs layout.Constrain
 	u.faces.Reset(c)
 	for i := range u.userClicks {
 		click := &u.userClicks[i]
-		for _, e := range click.Events(q) {
+		for e, ok := click.Next(q); ok; e, ok = click.Next(q) {
 			if e.Type == gesture.TypeClick {
 				u.selectedUser = u.newUserPage(u.users[i])
 			}
