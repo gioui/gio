@@ -23,10 +23,10 @@ import (
 )
 
 var (
-	target        = flag.String("target", "", "specify target (ios, tvos, android, js)")
-	archNames     = flag.String("arch", "", "specify architecture(s) to include")
-	buildMode     = flag.String("buildmode", "exe", "specify buildmode: archive or exe")
-	destPath      = flag.String("o", "", `output path. Specify a path with the ".app" suffix for iOS simulators.`)
+	target        = flag.String("target", "", "specify target (ios, tvos, android, js).\n")
+	archNames     = flag.String("arch", "", "specify architecture(s) to include (arm, arm64, amd64).")
+	buildMode     = flag.String("buildmode", "exe", "specify buildmode (archive, exe)")
+	destPath      = flag.String("o", "", "output file or directory.\nFor -target ios or tvos, use the .app suffix to target simulators.")
 	appID         = flag.String("appid", "org.gioui.app", "app identifier (for -buildmode=exe)")
 	version       = flag.Int("version", 1, "app version (for -buildmode=exe)")
 	printCommands = flag.Bool("x", false, "print the commands")
@@ -46,7 +46,7 @@ type buildInfo struct {
 
 func main() {
 	flag.Usage = func() {
-		mainUsage(os.Stderr)
+		fmt.Fprintf(os.Stderr, mainUsage)
 	}
 	flag.Parse()
 	if err := mainErr(); err != nil {
