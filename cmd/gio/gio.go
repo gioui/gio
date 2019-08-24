@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -74,7 +75,7 @@ func main() {
 	if err != nil {
 		errorf("gio: %v", err)
 	}
-	name = filepath.Base(name)
+	name = path.Base(name)
 	dir, err := runCmd(exec.Command("go", "list", "-f", "{{.Dir}}", pkg))
 	if err != nil {
 		errorf("gio: %v", err)
