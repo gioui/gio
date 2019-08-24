@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"image"
@@ -45,40 +46,43 @@ type buildInfo struct {
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Gio is a tool for building and packaging Gio (gioui.org) programs.\n\n")
-		fmt.Fprintf(os.Stderr, "Usage:\n\n\tgio [flags] <pkg>\n\n")
-		flag.PrintDefaults()
-		os.Exit(2)
+		mainUsage(os.Stderr)
 	}
 	flag.Parse()
+	if err := mainErr(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	os.Exit(0)
+}
+
+func mainErr() error {
 	pkg := flag.Arg(0)
 	if pkg == "" {
-		flag.Usage()
+		return errors.New("specify a package")
 	}
 	if *target == "" {
-		fmt.Fprintf(os.Stderr, "Please specify -target\n\n")
-		flag.PrintDefaults()
-		os.Exit(2)
+		return errors.New("please specify -target")
 	}
 	switch *target {
 	case "ios", "tvos", "android", "js":
 	default:
-		errorf("invalid -target %s\n", *target)
+		return fmt.Errorf("invalid -target %s\n", *target)
 	}
 	switch *buildMode {
 	case "archive", "exe":
 	default:
-		errorf("invalid -buildmode %s\n", *buildMode)
+		return fmt.Errorf("invalid -buildmode %s\n", *buildMode)
 	}
 	// Find package name.
 	name, err := runCmd(exec.Command("go", "list", "-f", "{{.ImportPath}}", pkg))
 	if err != nil {
-		errorf("gio: %v", err)
+		return fmt.Errorf("gio: %v", err)
 	}
 	name = path.Base(name)
 	dir, err := runCmd(exec.Command("go", "list", "-f", "{{.Dir}}", pkg))
 	if err != nil {
-		errorf("gio: %v", err)
+		return fmt.Errorf("gio: %v", err)
 	}
 	bi := &buildInfo{
 		name:    name,
@@ -105,8 +109,9 @@ func main() {
 		bi.ldflags = fmt.Sprintf("-X gioui.org/ui/app.extraArgs=%s", strings.Join(appArgs, "|"))
 	}
 	if err := build(bi); err != nil {
-		errorf("gio: %v", err)
+		return fmt.Errorf("gio: %v", err)
 	}
+	return nil
 }
 
 func build(bi *buildInfo) error {
@@ -129,11 +134,6 @@ func build(bi *buildInfo) error {
 	default:
 		panic("unreachable")
 	}
-}
-
-func errorf(format string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, format+"\n", args...)
-	os.Exit(2)
 }
 
 func runCmdRaw(cmd *exec.Cmd) ([]byte, error) {
