@@ -304,9 +304,8 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 				ops := frame.ops
 				// Upload path data to GPU before ack'ing the frame data for re-use.
 				for _, p := range ops.pathOps {
-					data, exists := g.pathCache.get(p.pathKey)
-					if !exists {
-						data = buildPath(r.ctx, p.pathVerts)
+					if _, exists := g.pathCache.get(p.pathKey); !exists {
+						data := buildPath(r.ctx, p.pathVerts)
 						g.pathCache.put(p.pathKey, data)
 					}
 					p.pathVerts = nil

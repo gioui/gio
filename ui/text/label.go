@@ -55,7 +55,7 @@ func (l *lineIterator) Next() (String, f32.Point, bool) {
 		l.prevDesc = line.Descent
 		// Align baseline and line start to the pixel grid.
 		off := fixed.Point26_6{X: fixed.I(x.Floor()), Y: fixed.I(l.y.Ceil())}
-		x, l.y = off.X, off.Y
+		l.y = off.Y
 		off.Y += fixed.I(l.Offset.Y)
 		if (off.Y + line.Bounds.Min.Y).Floor() > l.Clip.Max.Y {
 			break
