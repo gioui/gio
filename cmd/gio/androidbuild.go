@@ -200,7 +200,7 @@ func archiveAndroid(tmpDir string, bi *buildInfo) (err error) {
 }
 
 func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
-	if *appID == "" {
+	if bi.appID == "" {
 		return errors.New("app id is empty; use -appid to set it")
 	}
 	classes := filepath.Join(tmpDir, "classes")
@@ -310,7 +310,7 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 			</intent-filter>
 		</activity>
 	</application>
-</manifest>`, *appID, bi.version, bi.version, iconSnip, appName, appName)
+</manifest>`, bi.appID, bi.version, bi.version, iconSnip, appName, appName)
 	manifest := filepath.Join(tmpDir, "AndroidManifest.xml")
 	if err := ioutil.WriteFile(manifest, []byte(manifestSrc), 0660); err != nil {
 		return err

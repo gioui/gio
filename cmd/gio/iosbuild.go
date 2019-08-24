@@ -68,7 +68,7 @@ func buildIOS(tmpDir, target string, bi *buildInfo) error {
 		if err := exeIOS(tmpDir, target, appDir, bi); err != nil {
 			return err
 		}
-		if err := signIOS(tmpDir, appDir, out); err != nil {
+		if err := signIOS(bi, tmpDir, appDir, out); err != nil {
 			return err
 		}
 		return zipDir(out, tmpDir, "Payload")
@@ -77,7 +77,7 @@ func buildIOS(tmpDir, target string, bi *buildInfo) error {
 	}
 }
 
-func signIOS(tmpDir, app, ipa string) error {
+func signIOS(bi *buildInfo, tmpDir, app, ipa string) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -114,7 +114,7 @@ func signIOS(tmpDir, app, ipa string) error {
 		if err != nil {
 			return err
 		}
-		expAppID := fmt.Sprintf("%s.%s", appIDPrefix, *appID)
+		expAppID := fmt.Sprintf("%s.%s", appIDPrefix, bi.appID)
 		avail = append(avail, provAppID)
 		if expAppID != provAppID {
 			continue
@@ -146,11 +146,11 @@ func signIOS(tmpDir, app, ipa string) error {
 		_, err = runCmd(exec.Command("codesign", "-s", signIdentity, "--entitlements", entFile, app))
 		return err
 	}
-	return fmt.Errorf("sign: no valid provisioning profile found for bundle id %q among %v", *appID, avail)
+	return fmt.Errorf("sign: no valid provisioning profile found for bundle id %q among %v", bi.appID, avail)
 }
 
 func exeIOS(tmpDir, target, app string, bi *buildInfo) error {
-	if *appID == "" {
+	if bi.appID == "" {
 		return errors.New("app id is empty; use -appid to set it")
 	}
 	if err := os.RemoveAll(app); err != nil {
