@@ -1,4 +1,6 @@
 cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
+gioui.org/ui v0.0.0-20190824172537-c3f30188a573 h1:8Hz2KYYy143y4RaWEsVv/YjB7i8b2NW1sr5oz7mgXig=
+gioui.org/ui v0.0.0-20190824172537-c3f30188a573/go.mod h1:dmqi7kyK1sZ03VAkEqzKKpKWfRPCuqrd1eDtSqyhjzY=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/golang/protobuf v1.2.0 h1:P3YflyNX/ehuJFLhxviNdFxQPkGK5cDcApsge1SqnvM=
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
