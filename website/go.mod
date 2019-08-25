@@ -1,3 +1,3 @@
 module gioui.org/website
 
-go 1.13
+go 1.11
