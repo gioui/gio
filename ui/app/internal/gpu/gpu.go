@@ -165,7 +165,7 @@ func decodeImageOp(data []byte, refs []interface{}) paint.ImageOp {
 	}
 }
 
-func decodeColorOp(data []byte, refs []interface{}) paint.ColorOp {
+func decodeColorOp(data []byte) paint.ColorOp {
 	if opconst.OpType(data[0]) != opconst.TypeColor {
 		panic("invalid op")
 	}
@@ -179,7 +179,7 @@ func decodeColorOp(data []byte, refs []interface{}) paint.ColorOp {
 	}
 }
 
-func decodePaintOp(data []byte, refs []interface{}) paint.PaintOp {
+func decodePaintOp(data []byte) paint.PaintOp {
 	bo := binary.LittleEndian
 	if opconst.OpType(data[0]) != opconst.TypePaint {
 		panic("invalid op")
@@ -733,7 +733,7 @@ loop:
 			aux = nil
 			auxKey = ops.Key{}
 		case opconst.TypeColor:
-			op := decodeColorOp(encOp.Data, encOp.Refs)
+			op := decodeColorOp(encOp.Data)
 			state.img = nil
 			state.color = op.Color
 		case opconst.TypeImage:
@@ -741,7 +741,7 @@ loop:
 			state.img = op.Src
 			state.imgRect = op.Rect
 		case opconst.TypePaint:
-			op := decodePaintOp(encOp.Data, encOp.Refs)
+			op := decodePaintOp(encOp.Data)
 			off := state.t.Transform(f32.Point{})
 			clip := state.clip.Intersect(op.Rect.Add(off))
 			if clip.Empty() {
