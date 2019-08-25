@@ -33,7 +33,6 @@ type Key struct {
 
 // Shadow of ui.MacroOp.
 type macroOp struct {
-	recording bool
 	ops       *ui.Ops
 	version   int
 	pc        pc

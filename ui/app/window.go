@@ -361,4 +361,4 @@ func WithHeight(h ui.Value) WindowOption {
 	}
 }
 
-func (_ driverEvent) ImplementsEvent() {}
+func (driverEvent) ImplementsEvent() {}

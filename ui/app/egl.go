@@ -89,7 +89,7 @@ func (c *context) Present() error {
 		c.srgbFBO.Blit()
 	}
 	if !eglSwapBuffers(c.eglCtx.disp, c.eglSurf) {
-		return fmt.Errorf("eglSwapBuffers failed (%x%x)", eglGetError())
+		return fmt.Errorf("eglSwapBuffers failed (%x)", eglGetError())
 	}
 	if c.srgbFBO != nil {
 		c.srgbFBO.AfterPresent()

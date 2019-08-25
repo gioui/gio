@@ -349,7 +349,7 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 					zt, st, covt, cleant := zopsTimer.Elapsed, stencilTimer.Elapsed, coverTimer.Elapsed, cleanupTimer.Elapsed
 					ft := zt + st + covt + cleant
 					q := 100 * time.Microsecond
-					zt, st, covt, cleant = zt.Round(q), st.Round(q), covt.Round(q), cleant.Round(q)
+					zt, st, covt = zt.Round(q), st.Round(q), covt.Round(q)
 					ft = ft.Round(q)
 					res.summary = fmt.Sprintf("f:%7s zt:%7s st:%7s cov:%7s", ft, zt, st, covt)
 				}

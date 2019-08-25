@@ -58,7 +58,6 @@ type UI struct {
 }
 
 type userPage struct {
-	config      ui.Config
 	faces       measure.Faces
 	user        *user
 	commitsList *layout.List

@@ -38,7 +38,7 @@ type errWriter struct {
 func buildAndroid(tmpDir string, bi *buildInfo) error {
 	sdk := os.Getenv("ANDROID_HOME")
 	if sdk == "" {
-		return errors.New("Please set ANDROID_HOME to the Android SDK path")
+		return errors.New("please set ANDROID_HOME to the Android SDK path")
 	}
 	if _, err := os.Stat(sdk); err != nil {
 		return err
@@ -75,11 +75,11 @@ func buildAndroid(tmpDir string, bi *buildInfo) error {
 func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 	androidHome := os.Getenv("ANDROID_HOME")
 	if androidHome == "" {
-		return errors.New("ANDROID_HOME is not set. Please point it to the root of the Android SDK.")
+		return errors.New("ANDROID_HOME is not set. Please point it to the root of the Android SDK")
 	}
 	ndkRoot := filepath.Join(androidHome, "ndk-bundle")
 	if _, err := os.Stat(ndkRoot); err != nil {
-		return fmt.Errorf("No NDK found in $ANDROID_HOME/ndk-bundle (%s). Use `sdkmanager ndk-bundle` to install it.", ndkRoot)
+		return fmt.Errorf("no NDK found in $ANDROID_HOME/ndk-bundle (%s). Use `sdkmanager ndk-bundle` to install it", ndkRoot)
 	}
 	tcRoot := filepath.Join(ndkRoot, "toolchains", "llvm", "prebuilt", archNDK())
 	var builds errgroup.Group
@@ -87,7 +87,7 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 		arch := allArchs[a]
 		clang := filepath.Join(tcRoot, "bin", arch.clang)
 		if _, err := os.Stat(clang); err != nil {
-			return fmt.Errorf("No NDK compiler found. Please make sure you have NDK >= r19c installed. Use the command `sdkmanager ndk-bundle` to install it. Path %s", clang)
+			return fmt.Errorf("no NDK compiler found. Please make sure you have NDK >= r19c installed. Use the command `sdkmanager ndk-bundle` to install it. Path %s", clang)
 		}
 		if runtime.GOOS == "windows" {
 			// Because of https://github.com/android-ndk/ndk/issues/920,
@@ -95,7 +95,7 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 			// clang++.cmd which is only available in r19c.
 			clangpp := filepath.Join(tcRoot, "bin", arch.clang+"++.cmd")
 			if _, err := os.Stat(clangpp); err != nil {
-				return fmt.Errorf("NDK version r19b detected, but >= r19c is required. Use the command `sdkmanager ndk-bundle` to install it.")
+				return fmt.Errorf("NDK version r19b detected, but >= r19c is required. Use the command `sdkmanager ndk-bundle` to install it")
 			}
 		}
 		archDir := filepath.Join(tmpDir, "jni", arch.jniArch)

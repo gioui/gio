@@ -81,7 +81,7 @@ func (r *opCache) get(key ops.Key) (resource, bool) {
 
 func (r *opCache) put(key ops.Key, val resource) {
 	if _, exists := r.newRes[key]; exists {
-		panic(fmt.Errorf("key exists, %p", key))
+		panic(fmt.Errorf("key exists, %#v", key))
 	}
 	r.res[key] = val
 	r.newRes[key] = val
