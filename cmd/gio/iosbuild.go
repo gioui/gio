@@ -68,7 +68,7 @@ func buildIOS(tmpDir, target string, bi *buildInfo) error {
 		if err := exeIOS(tmpDir, target, appDir, bi); err != nil {
 			return err
 		}
-		if err := signIOS(bi, tmpDir, appDir, out); err != nil {
+		if err := signIOS(bi, tmpDir, appDir); err != nil {
 			return err
 		}
 		return zipDir(out, tmpDir, "Payload")
@@ -77,7 +77,7 @@ func buildIOS(tmpDir, target string, bi *buildInfo) error {
 	}
 }
 
-func signIOS(bi *buildInfo, tmpDir, app, ipa string) error {
+func signIOS(bi *buildInfo, tmpDir, app string) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err

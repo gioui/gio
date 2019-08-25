@@ -329,7 +329,7 @@ func (a *ActionButton) Layout(c ui.Config, q input.Queue, ops *ui.Ops, cs layout
 	cs = f.Rigid()
 	in := layout.Inset{Top: ui.Dp(4)}
 	cs = in.Begin(c, ops, cs)
-	dims := fab(ops, cs, a.sendIco.image(c), theme.brand, c.Px(ui.Dp(56)))
+	dims := fab(ops, a.sendIco.image(c), theme.brand, c.Px(ui.Dp(56)))
 	pointer.EllipseAreaOp{Rect: image.Rectangle{Max: dims.Size}}.Add(ops)
 	dims = in.End(dims)
 	return f.Layout(f.End(dims))
@@ -463,7 +463,7 @@ func (c *clipCircle) End(dims layout.Dimens) layout.Dimens {
 	return dims
 }
 
-func fab(ops *ui.Ops, cs layout.Constraints, ico image.Image, mat ui.MacroOp, size int) layout.Dimens {
+func fab(ops *ui.Ops, ico image.Image, mat ui.MacroOp, size int) layout.Dimens {
 	dp := image.Point{X: (size - ico.Bounds().Dx()) / 2, Y: (size - ico.Bounds().Dy()) / 2}
 	dims := image.Point{X: size, Y: size}
 	rr := float32(size) * .5
