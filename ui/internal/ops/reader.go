@@ -33,9 +33,9 @@ type Key struct {
 
 // Shadow of ui.MacroOp.
 type macroOp struct {
-	ops       *ui.Ops
-	version   int
-	pc        pc
+	ops     *ui.Ops
+	version int
+	pc      pc
 }
 
 type pc struct {
