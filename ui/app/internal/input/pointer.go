@@ -88,8 +88,8 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t u
 		case opconst.TypeTransform:
 			op := ops.DecodeTransformOp(encOp.Data)
 			t = t.Multiply(ui.TransformOp(op))
-		case opconst.TypePointerHandler:
-			op := decodePointerHandlerOp(encOp.Data, encOp.Refs)
+		case opconst.TypePointerInput:
+			op := decodePointerInputOp(encOp.Data, encOp.Refs)
 			q.hitTree = append(q.hitTree, hitNode{
 				next: node,
 				area: area,
@@ -314,11 +314,11 @@ func (op *areaOp) Hit(pos f32.Point) bool {
 	}
 }
 
-func decodePointerHandlerOp(d []byte, refs []interface{}) pointer.HandlerOp {
-	if opconst.OpType(d[0]) != opconst.TypePointerHandler {
+func decodePointerInputOp(d []byte, refs []interface{}) pointer.InputOp {
+	if opconst.OpType(d[0]) != opconst.TypePointerInput {
 		panic("invalid op")
 	}
-	return pointer.HandlerOp{
+	return pointer.InputOp{
 		Grab: d[1] != 0,
 		Key:  refs[0].(input.Key),
 	}

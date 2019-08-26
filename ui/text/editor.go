@@ -196,7 +196,7 @@ func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, cs layout
 		Min: image.Point{X: 0, Y: 0},
 		Max: image.Point{X: e.viewSize.X, Y: e.viewSize.Y},
 	}
-	key.HandlerOp{Key: e, Focus: e.requestFocus}.Add(ops)
+	key.InputOp{Key: e, Focus: e.requestFocus}.Add(ops)
 	e.requestFocus = false
 	e.it = lineIterator{
 		Lines:     lines,

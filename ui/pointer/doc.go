@@ -5,14 +5,14 @@ Package pointer implements pointer events and operations.
 A pointer is either a mouse controlled cursor or a touch
 object such as a finger.
 
-The HandlerOp operation is used to declare a handler ready
+The InputOp operation is used to declare a handler ready
 for pointer events. Use a Queue from package input to
 receive events.
 
 Areas
 
 The area operations are used for specifying the area where
-subsequent HandlerOps are active.
+subsequent InputOp are active.
 
 For example, to set up a rectangular hit area:
 
@@ -21,7 +21,7 @@ For example, to set up a rectangular hit area:
 
 	r := image.Rectangle{...}
 	pointer.RectAreaOp{Rect: r}.Add(ops)
-	pointer.HandlerOp{Key: h}.Add(ops)
+	pointer.InputOp{Key: h}.Add(ops)
 
 Note that areas compound: the effective area of multiple area
 operations is the intersection of the areas.
@@ -39,11 +39,11 @@ For example:
 	var h1, h2 *Handler
 
 	stack.Push(ops)
-	pointer.HandlerOp{Key: h1}.Add(Ops)
+	pointer.InputOp{Key: h1}.Add(Ops)
 	stack.Pop()
 
 	stack.Push(ops)
-	pointer.HandlerOp{Key: h2}.Add(ops)
+	pointer.InputOp{Key: h2}.Add(ops)
 	stack.Pop()
 
 implies a tree of two inner nodes, each with one pointer handler.
@@ -64,7 +64,7 @@ handlers have the same area (the entire screen).
 Pass-through
 
 The PassOp operations controls the pass-through setting. A handler's
-pass-through setting is recorded along with the HandlerOp.
+pass-through setting is recorded along with the InputOp.
 
 Pass-through handlers are useful for overlay widgets such as a hidden
 side drawer. When the user touches the side, both the (transparent)
@@ -81,11 +81,11 @@ matching handlers receive all events.
 When a pointer is pressed, the set of matching handlers is
 recorded. The set is not updated according to the pointer position
 and hit areas. Rather, handlers stay in the matching set until they
-no longer appear in a HandlerOp or when another handler in the set
+no longer appear in a InputOp or when another handler in the set
 grabs the pointer.
 
 A handler can exclude all other handler from its matching sets
-by setting the Grab flag in its HandlerOp. The Grab flag is sticky
+by setting the Grab flag in its InputOp. The Grab flag is sticky
 and stays in effect until the handler no longer appears in any
 matching sets.
 

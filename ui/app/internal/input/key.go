@@ -96,8 +96,8 @@ func (q *keyQueue) resolveFocus(events *handlerEvents) (input.Key, listenerPrior
 loop:
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
-		case opconst.TypeKeyHandler:
-			op := decodeKeyHandlerOp(encOp.Data, encOp.Refs)
+		case opconst.TypeKeyInput:
+			op := decodeKeyInputOp(encOp.Data, encOp.Refs)
 			var newPri listenerPriority
 			switch {
 			case op.Focus:
@@ -139,11 +139,11 @@ func (p listenerPriority) replaces(p2 listenerPriority) bool {
 	return p > p2 || p == p2 && p == priNewFocus
 }
 
-func decodeKeyHandlerOp(d []byte, refs []interface{}) key.HandlerOp {
-	if opconst.OpType(d[0]) != opconst.TypeKeyHandler {
+func decodeKeyInputOp(d []byte, refs []interface{}) key.InputOp {
+	if opconst.OpType(d[0]) != opconst.TypeKeyInput {
 		panic("invalid op")
 	}
-	return key.HandlerOp{
+	return key.InputOp{
 		Focus: d[1] != 0,
 		Key:   refs[0].(input.Key),
 	}

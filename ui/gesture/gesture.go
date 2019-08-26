@@ -115,7 +115,7 @@ const (
 
 // Add the handler to the operation list to receive click events.
 func (c *Click) Add(ops *ui.Ops) {
-	op := pointer.HandlerOp{Key: c}
+	op := pointer.InputOp{Key: c}
 	op.Add(ops)
 }
 
@@ -159,7 +159,7 @@ func (c *Click) Next(q input.Queue) (ClickEvent, bool) {
 
 // Add the handler to the operation list to receive scroll events.
 func (s *Scroll) Add(ops *ui.Ops) {
-	oph := pointer.HandlerOp{Key: s, Grab: s.grab}
+	oph := pointer.InputOp{Key: s, Grab: s.grab}
 	oph.Add(ops)
 	if s.flinger.Active() {
 		ui.InvalidateOp{}.Add(ops)

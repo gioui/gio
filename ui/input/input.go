@@ -25,7 +25,7 @@ The following example marks a handler ready for key input:
 
 	ops := new(ui.Ops)
 	var h *Handler = ...
-	key.HandlerOp{Key: h}.Add(ops)
+	key.InputOp{Key: h}.Add(ops)
 
 */
 package input

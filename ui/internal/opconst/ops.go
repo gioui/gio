@@ -17,9 +17,9 @@ const (
 	TypePaint
 	TypeColor
 	TypeArea
-	TypePointerHandler
+	TypePointerInput
 	TypePass
-	TypeKeyHandler
+	TypeKeyInput
 	TypeHideInput
 	TypePush
 	TypePop
@@ -29,24 +29,24 @@ const (
 )
 
 const (
-	TypeMacroDefLen       = 1 + 4 + 4
-	TypeMacroLen          = 1 + 4 + 4 + 4
-	TypeTransformLen      = 1 + 4*2
-	TypeLayerLen          = 1
-	TypeRedrawLen         = 1 + 8
-	TypeImageLen          = 1 + 4*4
-	TypePaintLen          = 1 + 4*4
-	TypeColorLen          = 1 + 4
-	TypeAreaLen           = 1 + 1 + 4*4
-	TypePointerHandlerLen = 1 + 1
-	TypePassLen           = 1 + 1
-	TypeKeyHandlerLen     = 1 + 1
-	TypeHideInputLen      = 1
-	TypePushLen           = 1
-	TypePopLen            = 1
-	TypeAuxLen            = 1 + 4
-	TypeClipLen           = 1 + 4*4
-	TypeProfileLen        = 1
+	TypeMacroDefLen     = 1 + 4 + 4
+	TypeMacroLen        = 1 + 4 + 4 + 4
+	TypeTransformLen    = 1 + 4*2
+	TypeLayerLen        = 1
+	TypeRedrawLen       = 1 + 8
+	TypeImageLen        = 1 + 4*4
+	TypePaintLen        = 1 + 4*4
+	TypeColorLen        = 1 + 4
+	TypeAreaLen         = 1 + 1 + 4*4
+	TypePointerInputLen = 1 + 1
+	TypePassLen         = 1 + 1
+	TypeKeyInputLen     = 1 + 1
+	TypeHideInputLen    = 1
+	TypePushLen         = 1
+	TypePopLen          = 1
+	TypeAuxLen          = 1 + 4
+	TypeClipLen         = 1 + 4*4
+	TypeProfileLen      = 1
 )
 
 func (t OpType) Size() int {
@@ -60,9 +60,9 @@ func (t OpType) Size() int {
 		TypePaintLen,
 		TypeColorLen,
 		TypeAreaLen,
-		TypePointerHandlerLen,
+		TypePointerInputLen,
 		TypePassLen,
-		TypeKeyHandlerLen,
+		TypeKeyInputLen,
 		TypeHideInputLen,
 		TypePushLen,
 		TypePopLen,
@@ -74,7 +74,7 @@ func (t OpType) Size() int {
 
 func (t OpType) NumRefs() int {
 	switch t {
-	case TypeMacro, TypeImage, TypeKeyHandler, TypePointerHandler, TypeProfile:
+	case TypeMacro, TypeImage, TypeKeyInput, TypePointerInput, TypeProfile:
 		return 1
 	default:
 		return 0

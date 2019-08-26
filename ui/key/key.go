@@ -4,7 +4,7 @@
 Package key implements key and text events and
 operations.
 
-The HandlerOp operations is used for declaring key
+The InputOp operations is used for declaring key
 input handlers. Use the Queue interface from package
 input to receive events.
 */
@@ -16,11 +16,11 @@ import (
 	"gioui.org/ui/internal/opconst"
 )
 
-// HandlerOp declares a handler ready for key events.
+// InputOp declares a handler ready for key events.
 // Key events are in general only delivered to the
 // focused key handler. Set the Focus flag to request
 // the focus.
-type HandlerOp struct {
+type InputOp struct {
 	Key   input.Key
 	Focus bool
 }
@@ -87,9 +87,9 @@ func (m Modifiers) Contain(m2 Modifiers) bool {
 	return m&m2 == m2
 }
 
-func (h HandlerOp) Add(o *ui.Ops) {
-	data := make([]byte, opconst.TypeKeyHandlerLen)
-	data[0] = byte(opconst.TypeKeyHandler)
+func (h InputOp) Add(o *ui.Ops) {
+	data := make([]byte, opconst.TypeKeyInputLen)
+	data[0] = byte(opconst.TypeKeyInput)
 	if h.Focus {
 		data[1] = 1
 	}

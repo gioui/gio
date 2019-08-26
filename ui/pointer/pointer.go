@@ -61,9 +61,9 @@ type areaOp struct {
 	rect image.Rectangle
 }
 
-// HandlerOp declares an input handler ready for pointer
+// InputOp declares an input handler ready for pointer
 // events.
-type HandlerOp struct {
+type InputOp struct {
 	Key input.Key
 	// Grab, if set, request that the handler get
 	// Grabbed priority.
@@ -150,9 +150,9 @@ func (op areaOp) add(o *ui.Ops) {
 	o.Write(data)
 }
 
-func (h HandlerOp) Add(o *ui.Ops) {
-	data := make([]byte, opconst.TypePointerHandlerLen)
-	data[0] = byte(opconst.TypePointerHandler)
+func (h InputOp) Add(o *ui.Ops) {
+	data := make([]byte, opconst.TypePointerInputLen)
+	data[0] = byte(opconst.TypePointerInput)
 	if h.Grab {
 		data[1] = 1
 	}
