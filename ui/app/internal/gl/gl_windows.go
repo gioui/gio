@@ -4,7 +4,6 @@ package gl
 
 import (
 	"math"
-	"reflect"
 	"syscall"
 	"unsafe"
 
@@ -284,7 +283,7 @@ func (c *Functions) GetShaderInfoLog(s Shader) string {
 }
 func (c *Functions) GetString(pname Enum) string {
 	s, _, _ := syscall.Syscall(_glGetString.Addr(), 1, uintptr(pname), 0, 0)
-	return goString(s)
+	return GoString(SliceOf(s))
 }
 func (c *Functions) GetUniformLocation(p Program, name string) Uniform {
 	cname := cString(name)
@@ -364,26 +363,4 @@ func cString(s string) []byte {
 	b := make([]byte, len(s)+1)
 	copy(b, s)
 	return b
-}
-
-func goString(s uintptr) string {
-	if s == 0 {
-		return ""
-	}
-	sh := reflect.SliceHeader{
-		Data: s,
-		Len:  1 << 30,
-		Cap:  1 << 30,
-	}
-	sl := *(*[]byte)(unsafe.Pointer(&sh))
-	var v string
-	for i, c := range sl {
-		if c == 0 {
-			if i > 0 {
-				v = string(sl[:i-1])
-			}
-			break
-		}
-	}
-	return v
 }

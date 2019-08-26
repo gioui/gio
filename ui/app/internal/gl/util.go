@@ -87,3 +87,28 @@ func ParseGLVersion(glVer string) ([2]int, error) {
 	}
 	return ver, fmt.Errorf("failed to parse OpenGL ES version (%s)", glVer)
 }
+
+func SliceOf(s uintptr) []byte {
+	if s == 0 {
+		return nil
+	}
+	sh := reflect.SliceHeader{
+		Data: s,
+		Len:  1 << 30,
+		Cap:  1 << 30,
+	}
+	return *(*[]byte)(unsafe.Pointer(&sh))
+}
+
+// GoString convert a NUL-terminated C string
+// to a Go string.
+func GoString(s []byte) string {
+	i := 0
+	for {
+		if s[i] == 0 {
+			break
+		}
+		i++
+	}
+	return string(s[:i])
+}

@@ -4,7 +4,6 @@ package app
 
 import (
 	"os"
-	"reflect"
 	"unsafe"
 
 	syscall "golang.org/x/sys/windows"
@@ -135,27 +134,5 @@ func eglTerminate(disp _EGLDisplay) bool {
 
 func eglQueryString(disp _EGLDisplay, name _EGLint) string {
 	r, _, _ := _eglQueryString.Call(uintptr(disp), uintptr(name))
-	return goString(r)
-}
-
-func goString(s uintptr) string {
-	if s == 0 {
-		return ""
-	}
-	sh := reflect.SliceHeader{
-		Data: s,
-		Len:  1 << 30,
-		Cap:  1 << 30,
-	}
-	sl := *(*[]byte)(unsafe.Pointer(&sh))
-	var v string
-	for i, c := range sl {
-		if c == 0 {
-			if i > 0 {
-				v = string(sl[:i-1])
-			}
-			break
-		}
-	}
-	return v
+	return gl.GoString(gl.SliceOf(r))
 }
