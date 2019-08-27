@@ -11,6 +11,9 @@ import (
 )
 
 func main() {
+	http.HandleFunc("/issue/", issueHandler)
+	http.HandleFunc("/commit/", commitHandler)
+	http.HandleFunc("/patches/", patchesHandler)
 	http.HandleFunc("/", vanityHandler)
 
 	port := os.Getenv("PORT")
@@ -19,6 +22,33 @@ func main() {
 	}
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
+}
+
+func patchesHandler(w http.ResponseWriter, r *http.Request) {
+	p := r.URL.Path
+	const pref = "/patches"
+	url := "https://lists.sr.ht/~eliasnaur/gio/patches" + p[len(pref):]
+	http.Redirect(w, r, url, http.StatusFound)
+}
+
+func issueHandler(w http.ResponseWriter, r *http.Request) {
+	p := r.URL.Path
+	const pref = "/issue"
+	url := "https://todo.sr.ht/~eliasnaur/gio" + p[len(pref):]
+	http.Redirect(w, r, url, http.StatusFound)
+}
+
+func commitHandler(w http.ResponseWriter, r *http.Request) {
+	p := r.URL.Path
+	const pref = "/commit"
+	commit := p[len(pref):]
+	var url string
+	if commit == "/" {
+		url = "https://git.sr.ht/~eliasnaur/gio/log"
+	} else {
+		url = "https://git.sr.ht/~eliasnaur/gio/commit" + commit
+	}
+	http.Redirect(w, r, url, http.StatusFound)
 }
 
 // vanityHandler serves git location meta headers for the go tool.
