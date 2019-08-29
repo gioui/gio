@@ -18,7 +18,7 @@ For example:
 
 	import "gioui.org/ui"
 
-	w := app.NewWindow(nil)
+	w := app.NewWindow()
 	for e := range w.Events() {
 		if e, ok := e.(app.UpdateEvent); ok {
 			ops.Reset()
@@ -47,7 +47,7 @@ For example, to display a blank but otherwise functional window:
 
 	func main() {
 		go func() {
-			w := app.NewWindow(nil)
+			w := app.NewWindow()
 			for range w.Events() {
 			}
 		}()
