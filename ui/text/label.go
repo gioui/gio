@@ -92,7 +92,7 @@ func (l *lineIterator) Next() (String, f32.Point, bool) {
 	return String{}, f32.Point{}, false
 }
 
-func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimensions {
 	textLayout := l.Face.Layout(l.Text, LayoutOptions{MaxWidth: cs.Width.Max})
 	lines := textLayout.Lines
 	if max := l.MaxLines; max > 0 && len(lines) > max {

@@ -61,7 +61,7 @@ const (
 	Middle
 )
 
-func linesDimens(lines []Line) layout.Dimens {
+func linesDimens(lines []Line) layout.Dimensions {
 	var width fixed.Int26_6
 	var h int
 	var baseline int
@@ -78,7 +78,7 @@ func linesDimens(lines []Line) layout.Dimens {
 		h += lines[len(lines)-1].Descent.Ceil()
 	}
 	w := width.Ceil()
-	return layout.Dimens{
+	return layout.Dimensions{
 		Size: image.Point{
 			X: w,
 			Y: h,

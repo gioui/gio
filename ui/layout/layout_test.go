@@ -140,8 +140,8 @@ func ExampleList() {
 	// 5
 }
 
-func layoutWidget(width, height int, cs layout.Constraints) layout.Dimens {
-	return layout.Dimens{
+func layoutWidget(width, height int, cs layout.Constraints) layout.Dimensions {
+	return layout.Dimensions{
 		Size: image.Point{
 			X: width,
 			Y: height,

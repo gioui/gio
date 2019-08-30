@@ -158,7 +158,7 @@ func (l *List) next() (int, bool) {
 }
 
 // End the current child by specifying its dimensions.
-func (l *List) End(dims Dimens) {
+func (l *List) End(dims Dimensions) {
 	l.child.Stop()
 	child := scrollChild{dims.Size, l.child}
 	switch l.dir {
@@ -179,7 +179,7 @@ func (l *List) End(dims Dimens) {
 }
 
 // Layout the List and return its dimensions.
-func (l *List) Layout() Dimens {
+func (l *List) Layout() Dimensions {
 	if l.more {
 		panic("unfinished child")
 	}
@@ -254,5 +254,5 @@ func (l *List) Layout() Dimens {
 	pointer.RectAreaOp{Rect: image.Rectangle{Max: dims}}.Add(ops)
 	l.scroll.Add(ops)
 	l.macro.Add(ops)
-	return Dimens{Size: dims}
+	return Dimensions{Size: dims}
 }

@@ -8,8 +8,8 @@ Constraints and dimensions
 Constraints and dimensions form the the interface between
 layouts and interface child elements. Every layout operation
 start with a set of constraints for acceptable widths and heights
-of a child. The operation ends by the child computing and returning
-its chosen size in the form of a Dimens.
+of a child. The operation ends with the child computing and returning
+its size and baseline (if any).
 
 For example, to add space above a widget:
 

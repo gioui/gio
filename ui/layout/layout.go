@@ -21,9 +21,9 @@ type Constraint struct {
 	Min, Max int
 }
 
-// Dimens are the resolved size and baseline for a user
+// Dimensions are the resolved size and baseline for a user
 // interface element.
-type Dimens struct {
+type Dimensions struct {
 	Size     image.Point
 	Baseline int
 }
@@ -143,13 +143,13 @@ func (in *Inset) Begin(c ui.Config, ops *ui.Ops, cs Constraints) Constraints {
 
 // End the inset operation and return the dimensions for the
 // inset child.
-func (in *Inset) End(dims Dimens) Dimens {
+func (in *Inset) End(dims Dimensions) Dimensions {
 	if !in.begun {
 		panic("must Begin before End")
 	}
 	in.begun = false
 	in.stack.Pop()
-	return Dimens{
+	return Dimensions{
 		Size:     in.cs.Constrain(dims.Size.Add(image.Point{X: in.right + in.left, Y: in.top + in.bottom})),
 		Baseline: dims.Baseline + in.top,
 	}
@@ -177,7 +177,7 @@ func (a *Align) Begin(ops *ui.Ops, cs Constraints) Constraints {
 
 // End the align operation and return the dimensions for the
 // aligned child.
-func (a *Align) End(dims Dimens) Dimens {
+func (a *Align) End(dims Dimensions) Dimensions {
 	if !a.begun {
 		panic("must Begin before End")
 	}
@@ -209,7 +209,7 @@ func (a *Align) End(dims Dimens) Dimens {
 	ui.TransformOp{}.Offset(toPointF(p)).Add(ops)
 	a.macro.Add(ops)
 	stack.Pop()
-	return Dimens{
+	return Dimensions{
 		Size:     sz,
 		Baseline: dims.Baseline,
 	}

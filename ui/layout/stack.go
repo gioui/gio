@@ -27,7 +27,7 @@ type Stack struct {
 // StackChild is the layout result of a call to End.
 type StackChild struct {
 	macro ui.MacroOp
-	dims  Dimens
+	dims  Dimensions
 }
 
 // Init a stack before calling Rigid or Expand.
@@ -69,7 +69,7 @@ func (s *Stack) Expand() Constraints {
 }
 
 // End a child by specifying its dimensions.
-func (s *Stack) End(dims Dimens) StackChild {
+func (s *Stack) End(dims Dimensions) StackChild {
 	s.macro.Stop()
 	s.begun = false
 	if w := dims.Size.X; w > s.maxSZ.X {
@@ -88,7 +88,7 @@ func (s *Stack) End(dims Dimens) StackChild {
 
 // Layout a list of children. The order of the children determines their laid
 // out order.
-func (s *Stack) Layout(children ...StackChild) Dimens {
+func (s *Stack) Layout(children ...StackChild) Dimensions {
 	for _, ch := range children {
 		sz := ch.dims.Size
 		var p image.Point
@@ -114,7 +114,7 @@ func (s *Stack) Layout(children ...StackChild) Dimens {
 	if b == 0 {
 		b = s.maxSZ.Y
 	}
-	return Dimens{
+	return Dimensions{
 		Size:     s.maxSZ,
 		Baseline: b,
 	}

@@ -48,7 +48,7 @@ type Editor struct {
 	viewSize          image.Point
 	valid             bool
 	lines             []Line
-	dims              layout.Dimens
+	dims              layout.Dimensions
 	padTop, padBottom int
 	padLeft, padRight int
 	requestFocus      bool
@@ -165,7 +165,7 @@ func (e *Editor) Focus() {
 	e.requestFocus = true
 }
 
-func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, cs layout.Constraints) layout.Dimensions {
 	for _, ok := e.Next(cfg, queue); ok; _, ok = e.Next(cfg, queue) {
 	}
 	twoDp := cfg.Px(ui.Dp(2))
@@ -270,7 +270,7 @@ func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, cs layout
 	pointer.RectAreaOp{Rect: r}.Add(ops)
 	e.scroller.Add(ops)
 	e.clicker.Add(ops)
-	return layout.Dimens{Size: e.viewSize, Baseline: baseline}
+	return layout.Dimensions{Size: e.viewSize, Baseline: baseline}
 }
 
 // Text returns the contents of the editor.

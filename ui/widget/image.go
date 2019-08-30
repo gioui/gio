@@ -25,7 +25,7 @@ type Image struct {
 	Scale float32
 }
 
-func (im Image) Layout(c ui.Config, ops *ui.Ops, cs layout.Constraints) layout.Dimens {
+func (im Image) Layout(c ui.Config, ops *ui.Ops, cs layout.Constraints) layout.Dimensions {
 	size := im.Src.Bounds()
 	wf, hf := float32(size.Dx()), float32(size.Dy())
 	var w, h int
@@ -49,5 +49,5 @@ func (im Image) Layout(c ui.Config, ops *ui.Ops, cs layout.Constraints) layout.D
 	}
 	paint.ImageOp{Src: im.Src, Rect: im.Rect}.Add(ops)
 	paint.PaintOp{Rect: dr}.Add(ops)
-	return layout.Dimens{Size: d, Baseline: d.Y}
+	return layout.Dimensions{Size: d, Baseline: d.Y}
 }

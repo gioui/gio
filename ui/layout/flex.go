@@ -33,7 +33,7 @@ type Flex struct {
 // FlexChild is the layout result of a call End.
 type FlexChild struct {
 	macro ui.MacroOp
-	dims  Dimens
+	dims  Dimensions
 }
 
 // Spacing determine the spacing mode for a Flex.
@@ -124,7 +124,7 @@ func (f *Flex) Flexible(weight float32) Constraints {
 
 // End a child by specifying its dimensions. Pass the returned layout result
 // to Layout.
-func (f *Flex) End(dims Dimens) FlexChild {
+func (f *Flex) End(dims Dimensions) FlexChild {
 	if f.mode <= modeBegun {
 		panic("End called without an active child")
 	}
@@ -146,7 +146,7 @@ func (f *Flex) End(dims Dimens) FlexChild {
 
 // Layout a list of children. The order of the children determines their laid
 // out order.
-func (f *Flex) Layout(children ...FlexChild) Dimens {
+func (f *Flex) Layout(children ...FlexChild) Dimensions {
 	mainc := axisMainConstraint(f.Axis, f.cs)
 	crossSize := axisCrossConstraint(f.Axis, f.cs).Constrain(f.maxCross)
 	var space int
@@ -213,7 +213,7 @@ func (f *Flex) Layout(children ...FlexChild) Dimens {
 	if baseline == 0 {
 		baseline = sz.Y
 	}
-	return Dimens{Size: sz, Baseline: baseline}
+	return Dimensions{Size: sz, Baseline: baseline}
 }
 
 func axisPoint(a Axis, main, cross int) image.Point {
