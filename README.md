@@ -133,3 +133,8 @@ See the [contribution guide](https://man.sr.ht/~eliasnaur/gio/contribute.md) for
 ## License
 
 Dual-licensed under [UNLICENSE](http://unlicense.org) or the MIT.
+
+## Donations
+
+Bitcoin donations are gladly accepted to [bc1q8xw95urett00f4xs3v66p2l6xp2mfk5erpe5ug](bitcoin:bc1q8xw95urett00f4xs3v66p2l6xp2mfk5erpe5ug).
+Donations will go toward hosting expenses and for supporting the author's full time work on Gio.
