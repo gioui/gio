@@ -20,12 +20,14 @@ type Flex struct {
 	// Alignment is the alignment in the cross axis.
 	Alignment Alignment
 
-	macro       ui.MacroOp
-	ops         *ui.Ops
-	cs          Constraints
-	mode        flexMode
-	size        int
-	rigidSize   int
+	macro     ui.MacroOp
+	ops       *ui.Ops
+	cs        Constraints
+	mode      flexMode
+	size      int
+	rigidSize int
+	// fraction is the rounding error from a Flexible weighting.
+	fraction    float32
 	maxCross    int
 	maxBaseline int
 }
@@ -111,11 +113,14 @@ func (f *Flex) Flexible(weight float32) Constraints {
 	mainc := axisMainConstraint(f.Axis, f.cs)
 	var flexSize int
 	if mainc.Max > f.size {
-		maxSize := mainc.Max - f.size
 		flexSize = mainc.Max - f.rigidSize
-		flexSize = int(float32(flexSize)*weight + .5)
-		if flexSize > maxSize {
-			flexSize = maxSize
+		// Apply weight and add any leftover fraction from a
+		// previous Flexible.
+		size := float32(flexSize)*weight + f.fraction
+		flexSize = int(size + .5)
+		f.fraction = size - float32(flexSize)
+		if max := mainc.Max - f.size; flexSize > max {
+			flexSize = max
 		}
 	}
 	submainc := Constraint{Max: flexSize}
