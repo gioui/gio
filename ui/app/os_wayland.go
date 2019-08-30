@@ -1118,9 +1118,12 @@ func waylandConnect() error {
 		return errors.New("wayland: wl_display_get_registry failed")
 	}
 	C.gio_wl_registry_add_listener(reg)
-	// Get globals.
+	// Wait for the server to register all its globals to the
+	// registry listener (gio_onRegistryGlobal).
 	C.wl_display_roundtrip(c.disp)
-	// Get output configurations.
+	// Configuration listeners are added to outputs by gio_onRegistryGlobal.
+	// We need another roundtrip to get the initial output configurations
+	// through the gio_onOutput* callbacks.
 	C.wl_display_roundtrip(c.disp)
 	if c.compositor == nil {
 		c.destroy()
