@@ -310,7 +310,6 @@ func gio_onXdgSurfaceConfigure(data unsafe.Pointer, wmSurf *C.struct_xdg_surface
 func gio_onToplevelClose(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel) {
 	w := winMap[topLvl]
 	w.dead = true
-	w.w.event(DestroyEvent{})
 }
 
 //export gio_onToplevelConfigure
@@ -772,6 +771,7 @@ loop:
 			break
 		}
 		if w.dead {
+			w.w.event(DestroyEvent{})
 			break
 		}
 		// Clear poll events.
