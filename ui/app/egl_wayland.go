@@ -11,6 +11,7 @@ import (
 
 /*
 #cgo LDFLAGS: -lwayland-egl
+#cgo CFLAGS: -DWL_EGL_PLATFORM
 
 #include <wayland-client.h>
 #include <wayland-egl.h>
