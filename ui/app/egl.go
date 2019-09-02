@@ -257,7 +257,7 @@ func createSurfaceAndMakeCurrent(eglCtx *eglContext, win _EGLNativeWindowType) (
 	surfAttribs = append(surfAttribs, _EGL_NONE)
 	eglSurf := eglCreateWindowSurface(eglCtx.disp, eglCtx.config, win, surfAttribs)
 	if eglSurf == nilEGLSurface {
-		return nilEGLSurface, fmt.Errorf("newContext: eglCreateWindowSurface failed 0x%x", eglGetError())
+		return nilEGLSurface, fmt.Errorf("newContext: eglCreateWindowSurface failed 0x%x (sRGB=%v)", eglGetError(), eglCtx.srgb)
 	}
 	if !eglMakeCurrent(eglCtx.disp, eglSurf, eglSurf, eglCtx.ctx) {
 		eglDestroySurface(eglCtx.disp, eglSurf)
