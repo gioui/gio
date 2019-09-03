@@ -117,7 +117,7 @@ Gio with existing projects.
 
 ## Issues
 
-File bugs and TODOs through the the [issue tracker](https://todo.sr.ht/~eliasnaur/gio) or send an email
+File bugs and TODOs through the [issue tracker](https://todo.sr.ht/~eliasnaur/gio) or send an email
 to [~eliasnaur/gio@todo.sr.ht](mailto:~eliasnaur/gio@todo.sr.ht). For general discussion, use the
 mailing list: [~eliasnaur/gio@lists.sr.ht](mailto:~eliasnaur/gio@lists.sr.ht).
 

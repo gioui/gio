@@ -28,7 +28,7 @@ type Dimensions struct {
 	Baseline int
 }
 
-// Axis is the the Horizontal or Vertical direction.
+// Axis is the Horizontal or Vertical direction.
 type Axis uint8
 
 // Alignment is the relative alignment of a list of

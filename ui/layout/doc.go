@@ -5,7 +5,7 @@ Package layout implements layouts common to GUI programs.
 
 Constraints and dimensions
 
-Constraints and dimensions form the the interface between
+Constraints and dimensions form the interface between
 layouts and interface child elements. Every layout operation
 start with a set of constraints for acceptable widths and heights
 of a child. The operation ends with the child computing and returning
