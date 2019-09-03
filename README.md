@@ -24,7 +24,7 @@ window management, input and GPU drawing.
 
 ## Running Gio programs
 
-With [Go 1.12](https://golang.org/dl/) or newer,
+With [Go 1.13](https://golang.org/dl/) or newer,
 
 	$ export GO111MODULE=on
 	$ go run gioui.org/apps/hello
