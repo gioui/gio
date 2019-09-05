@@ -22,9 +22,10 @@ type scrollChild struct {
 // the subsection.
 type List struct {
 	Axis Axis
-	// Inverted lists stay scrolled to the far end position
-	// until the user scrolls away.
-	Invert bool
+	// ScrollToEnd instructs the list to stay scrolled to the far end position
+	// once reahed. A List with ScrollToEnd enabled also align its content to
+	// the end.
+	ScrollToEnd bool
 	// Alignment is the cross axis alignment of list elements.
 	Alignment Alignment
 
@@ -78,8 +79,6 @@ func (l *List) Init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, l
 	l.children = l.children[:0]
 	l.cs = cs
 	l.len = len
-	// Inverted lists scroll to the very end as long as the user hasn't
-	// scrolled away.
 	if l.scrollToEnd() {
 		l.offset = 0
 		l.first = len
@@ -93,7 +92,7 @@ func (l *List) Init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, l
 }
 
 func (l *List) scrollToEnd() bool {
-	return l.Invert && !l.beforeEnd
+	return l.ScrollToEnd && !l.beforeEnd
 }
 
 // Dragging reports whether the List is being dragged.
@@ -217,8 +216,8 @@ func (l *List) Layout() Dimensions {
 	}
 	ops := l.ops
 	pos := -l.offset
-	// Inverted lists are end aligned.
-	if space := mainc.Max - size; l.Invert && space > 0 {
+	// ScrollToEnd lists lists are end aligned.
+	if space := mainc.Max - size; l.ScrollToEnd && space > 0 {
 		pos += space
 	}
 	for _, child := range children {
