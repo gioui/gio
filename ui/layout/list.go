@@ -22,35 +22,41 @@ type scrollChild struct {
 // the subsection.
 type List struct {
 	Axis Axis
-	// Invert inverts a List so it is anchored from its end.
+	// Inverted lists stay scrolled to the far end position
+	// until the user scrolls away.
 	Invert bool
-	// Alignment is the cross axis alignment.
+	// Alignment is the cross axis alignment of list elements.
 	Alignment Alignment
 
-	// The distance scrolled since last call to Init.
+	// Distance is the difference in scroll position
+	// since the last call to Init.
 	Distance int
 
-	config    ui.Config
-	ops       *ui.Ops
-	queue     input.Queue
-	macro     ui.MacroOp
-	child     ui.MacroOp
-	scroll    gesture.Scroll
-	scrollDir int
+	// beforeEnd tracks whether the List position is before
+	// the very end.
+	beforeEnd bool
 
+	config      ui.Config
+	ops         *ui.Ops
+	queue       input.Queue
+	macro       ui.MacroOp
+	child       ui.MacroOp
+	scroll      gesture.Scroll
+	scrollDelta int
+
+	// first is the index of the first visible child.
+	first int
+	// offset is the signed distance from the top edge
+	// to the child with index first.
 	offset int
-	first  int
 
 	cs  Constraints
 	len int
 
+	// maxSize is the total size of visible children.
 	maxSize  int
 	children []scrollChild
 	dir      iterationDir
-
-	// Iterator state.
-	index int
-	more  bool
 }
 
 type iterationDir uint8
@@ -65,24 +71,33 @@ const inf = 1e6
 
 // Init prepares the list for iterating through its children with Next.
 func (l *List) Init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, len int) {
-	if l.more {
+	if l.More() {
 		panic("unfinished child")
 	}
 	l.config = cfg
 	l.queue = q
 	l.update()
 	l.ops = ops
-	l.dir = iterateNone
 	l.maxSize = 0
 	l.children = l.children[:0]
 	l.cs = cs
 	l.len = len
-	l.more = true
+	// Inverted lists scroll to the very end as long as the user hasn't
+	// scrolled away.
+	if l.scrollToEnd() {
+		l.offset = 0
+		l.first = len
+	}
 	if l.first > len {
+		l.offset = 0
 		l.first = len
 	}
 	l.macro.Record(ops)
 	l.Next()
+}
+
+func (l *List) scrollToEnd() bool {
+	return l.Invert && !l.beforeEnd
 }
 
 // Dragging reports whether the List is being dragged.
@@ -93,34 +108,36 @@ func (l *List) Dragging() bool {
 func (l *List) update() {
 	l.Distance = 0
 	d := l.scroll.Scroll(l.config, l.queue, gesture.Axis(l.Axis))
-	if l.Invert {
-		d = -d
-	}
-	l.scrollDir = d
+	l.scrollDelta = d
 	l.Distance += d
 	l.offset += d
 }
 
 // Next advances to the next child.
 func (l *List) Next() {
-	if !l.more {
-		panic("end of list reached")
+	l.dir = l.next()
+	// The user scroll offset is applied after scrolling to
+	// list end.
+	if l.scrollToEnd() && !l.More() && l.scrollDelta < 0 {
+		l.beforeEnd = true
+		l.offset += l.scrollDelta
+		l.dir = l.next()
 	}
-	i, more := l.next()
-	l.more = more
-	if !more {
-		return
+	if l.More() {
+		l.child.Record(l.ops)
 	}
-	if l.Invert {
-		i = l.len - 1 - i
-	}
-	l.index = i
-	l.child.Record(l.ops)
 }
 
 // Index is current child's position in the underlying list.
 func (l *List) Index() int {
-	return l.index
+	switch l.dir {
+	case iterateBackward:
+		return l.first - 1
+	case iterateForward:
+		return l.first + len(l.children)
+	default:
+		panic("Index called before Next")
+	}
 }
 
 // Constraints is the constraints for the current child.
@@ -130,48 +147,43 @@ func (l *List) Constraints() Constraints {
 
 // More reports whether more children are needed.
 func (l *List) More() bool {
-	return l.more
+	return l.dir != iterateNone
 }
 
-func (l *List) next() (int, bool) {
-	mainc := axisMainConstraint(l.Axis, l.cs)
-	if l.offset <= 0 {
-		if l.first > 0 {
-			l.dir = iterateBackward
-			return l.first - 1, true
-		}
+func (l *List) next() iterationDir {
+	vsize := axisMainConstraint(l.Axis, l.cs).Max
+	last := l.first + len(l.children)
+	// Clamp offset.
+	if l.maxSize-l.offset < vsize && last == l.len {
+		l.offset = l.maxSize - vsize
+	}
+	if l.offset < 0 && l.first == 0 {
 		l.offset = 0
 	}
-	if l.maxSize-l.offset < mainc.Max {
-		i := l.first + len(l.children)
-		if i < l.len {
-			l.dir = iterateForward
-			return i, true
-		}
-		missing := mainc.Max - (l.maxSize - l.offset)
-		if missing > l.offset {
-			missing = l.offset
-		}
-		l.offset -= missing
+	switch {
+	case len(l.children) == l.len:
+		return iterateNone
+	case l.maxSize-l.offset < vsize:
+		return iterateForward
+	case l.offset < 0:
+		return iterateBackward
 	}
-	return 0, false
+	return iterateNone
 }
 
 // End the current child by specifying its dimensions.
 func (l *List) End(dims Dimensions) {
 	l.child.Stop()
 	child := scrollChild{dims.Size, l.child}
+	mainSize := axisMain(l.Axis, child.size)
+	l.maxSize += mainSize
 	switch l.dir {
 	case iterateForward:
-		mainSize := axisMain(l.Axis, child.size)
-		l.maxSize += mainSize
 		l.children = append(l.children, child)
 	case iterateBackward:
-		l.first--
-		mainSize := axisMain(l.Axis, child.size)
-		l.offset += mainSize
-		l.maxSize += mainSize
 		l.children = append([]scrollChild{child}, l.children...)
+		l.first--
+		l.offset += mainSize
 	default:
 		panic("call Next before End")
 	}
@@ -180,36 +192,42 @@ func (l *List) End(dims Dimensions) {
 
 // Layout the List and return its dimensions.
 func (l *List) Layout() Dimensions {
-	if l.more {
+	if l.More() {
 		panic("unfinished child")
 	}
 	mainc := axisMainConstraint(l.Axis, l.cs)
-	for len(l.children) > 0 {
-		sz := l.children[0].size
+	children := l.children
+	// Skip invisible children
+	for len(children) > 0 {
+		sz := children[0].size
 		mainSize := axisMain(l.Axis, sz)
 		if l.offset <= mainSize {
 			break
 		}
 		l.first++
 		l.offset -= mainSize
-		l.children = l.children[1:]
+		children = children[1:]
 	}
 	size := -l.offset
 	var maxCross int
-	for i, child := range l.children {
+	for i, child := range children {
 		sz := child.size
 		if c := axisCross(l.Axis, sz); c > maxCross {
 			maxCross = c
 		}
 		size += axisMain(l.Axis, sz)
 		if size >= mainc.Max {
-			l.children = l.children[:i+1]
+			children = children[:i+1]
 			break
 		}
 	}
 	ops := l.ops
 	pos := -l.offset
-	for _, child := range l.children {
+	// Inverted lists are end aligned.
+	if space := mainc.Max - size; l.Invert && space > 0 {
+		pos += space
+	}
+	for _, child := range children {
 		sz := child.size
 		var cross int
 		switch l.Alignment {
@@ -227,11 +245,6 @@ func (l *List) Layout() Dimensions {
 		if min < 0 {
 			min = 0
 		}
-		transPos := pos
-		if l.Invert {
-			transPos = mainc.Max - transPos - childSize
-			min, max = mainc.Max-max, mainc.Max-min
-		}
 		r := image.Rectangle{
 			Min: axisPoint(l.Axis, min, -inf),
 			Max: axisPoint(l.Axis, max, inf),
@@ -239,16 +252,17 @@ func (l *List) Layout() Dimensions {
 		var stack ui.StackOp
 		stack.Push(ops)
 		paint.RectClip(r).Add(ops)
-		ui.TransformOp{}.Offset(toPointF(axisPoint(l.Axis, transPos, cross))).Add(ops)
+		ui.TransformOp{}.Offset(toPointF(axisPoint(l.Axis, pos, cross))).Add(ops)
 		child.macro.Add(ops)
 		stack.Pop()
 		pos += childSize
 	}
 	atStart := l.first == 0 && l.offset <= 0
-	atEnd := l.first+len(l.children) == l.len && mainc.Max >= pos
-	if atStart && l.scrollDir < 0 || atEnd && l.scrollDir > 0 {
+	atEnd := l.first+len(children) == l.len && mainc.Max >= pos
+	if atStart && l.scrollDelta < 0 || atEnd && l.scrollDelta > 0 {
 		l.scroll.Stop()
 	}
+	l.beforeEnd = !atEnd
 	dims := axisPoint(l.Axis, mainc.Constrain(pos), maxCross)
 	l.macro.Stop()
 	pointer.RectAreaOp{Rect: image.Rectangle{Max: dims}}.Add(ops)
