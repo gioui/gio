@@ -28,10 +28,6 @@ type List struct {
 	// Alignment is the cross axis alignment of list elements.
 	Alignment Alignment
 
-	// Distance is the difference in scroll position
-	// since the last call to Init.
-	Distance int
-
 	// beforeEnd tracks whether the List position is before
 	// the very end.
 	beforeEnd bool
@@ -106,10 +102,8 @@ func (l *List) Dragging() bool {
 }
 
 func (l *List) update() {
-	l.Distance = 0
 	d := l.scroll.Scroll(l.config, l.queue, gesture.Axis(l.Axis))
 	l.scrollDelta = d
-	l.Distance += d
 	l.offset += d
 }
 
