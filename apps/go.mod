@@ -1,6 +1,6 @@
 module gioui.org/apps
 
-go 1.12
+go 1.13
 
 require (
 	gioui.org/ui v0.0.0-20190902131729-7ad60e08787b
