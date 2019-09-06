@@ -23,11 +23,12 @@ static void redraw(CFTypeRef viewRef, BOOL sync) {
 	// Use 163 as the standard ppi on iOS.
 	CGFloat dpi = 163*scale;
 	CGFloat sdpi = dpi;
+	UIEdgeInsets insets = v.layoutMargins;
 	if (@available(iOS 11.0, tvOS 11.0, *)) {
 		UIFontMetrics *metrics = [UIFontMetrics defaultMetrics];
 		sdpi = [metrics scaledValueForValue:sdpi];
+		insets = v.safeAreaInsets;
 	}
-	UIEdgeInsets insets = v.layoutMargins;
 	onDraw(viewRef, dpi, sdpi, v.bounds.size.width*scale, v.bounds.size.height*scale, sync,
 			insets.top*scale, insets.right*scale, insets.bottom*scale, insets.left*scale);
 }
@@ -71,6 +72,7 @@ CGFloat _keyboardHeight;
 - (void)loadView {
 	CGRect zeroFrame = CGRectMake(0, 0, 0, 0);
 	self.view = [[UIView alloc] initWithFrame:zeroFrame];
+	self.view.layoutMargins = UIEdgeInsetsMake(0, 0, 0, 0);
 	UIView *drawView = [[GioView alloc] initWithFrame:zeroFrame];
 	[self.view addSubview: drawView];
 #ifndef TARGET_OS_TV
