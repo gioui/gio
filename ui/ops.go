@@ -157,8 +157,9 @@ func (m *MacroOp) Record(o *Ops) {
 	m.recording = true
 	m.ops = o
 	m.pc = o.pc()
-	// Make room for a macro definition. Filled out in Stop.
+	// Reserve room for a macro definition. Updated in Stop.
 	m.ops.Write(make([]byte, opconst.TypeMacroDefLen))
+	m.fill()
 }
 
 // Stop ends a previously started recording.
@@ -167,6 +168,10 @@ func (m *MacroOp) Stop() {
 		panic("not recording")
 	}
 	m.recording = false
+	m.fill()
+}
+
+func (m *MacroOp) fill() {
 	pc := m.ops.pc()
 	// Fill out the macro definition reserved in Record.
 	data := m.ops.data[m.pc.data:]
