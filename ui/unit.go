@@ -57,3 +57,40 @@ func (u Unit) String() string {
 		panic("unknown unit")
 	}
 }
+
+// Add a list of Values.
+func Add(c Config, values ...Value) Value {
+	var sum Value
+	for _, v := range values {
+		sum, v = compatible(c, sum, v)
+		sum.V += v.V
+	}
+	return sum
+}
+
+// Max returns the maximum of a list of Values.
+func Max(c Config, values ...Value) Value {
+	var max Value
+	for _, v := range values {
+		max, v = compatible(c, max, v)
+		if v.V > max.V {
+			max.V = v.V
+		}
+	}
+	return max
+}
+
+func compatible(c Config, v1, v2 Value) (Value, Value) {
+	if v1.U == v2.U {
+		return v1, v2
+	}
+	if v1.V == 0 {
+		v1.U = v2.U
+		return v1, v2
+	}
+	if v2.V == 0 {
+		v2.U = v1.U
+		return v1, v2
+	}
+	return Px(float32(c.Px(v1))), Px(float32(c.Px(v2)))
+}
