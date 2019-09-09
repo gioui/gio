@@ -158,6 +158,7 @@ func (w *Window) draw(size image.Point, frame *ui.Ops) {
 // Invalidate the window such that a UpdateEvent will be generated
 // immediately. If the window is inactive, the event is sent when the
 // window becomes active.
+// Invalidate is safe for concurrent use.
 func (w *Window) Invalidate() {
 	select {
 	case w.invalidates <- struct{}{}:
