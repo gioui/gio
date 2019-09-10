@@ -176,10 +176,10 @@ func archiveAndroid(tmpDir string, bi *buildInfo) (err error) {
 	aarw.Create("R.txt")
 	aarw.Create("res/")
 	manifest := aarw.Create("AndroidManifest.xml")
-	manifest.Write([]byte(`<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.gioui.app">
+	manifest.Write([]byte(fmt.Sprintf(`<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="%s">
 	<uses-sdk android:minSdkVersion="16"/>
 	<uses-feature android:glEsVersion="0x00030000" android:required="true" />
-</manifest>`))
+</manifest>`, bi.appID)))
 	proguard := aarw.Create("proguard.txt")
 	proguard.Write([]byte(`-keep class org.gioui.** { *; }`))
 
@@ -200,9 +200,6 @@ func archiveAndroid(tmpDir string, bi *buildInfo) (err error) {
 }
 
 func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
-	if bi.appID == "" {
-		return errors.New("app id is empty; use -appid to set it")
-	}
 	classes := filepath.Join(tmpDir, "classes")
 	var classFiles []string
 	err = filepath.Walk(classes, func(path string, f os.FileInfo, err error) error {
