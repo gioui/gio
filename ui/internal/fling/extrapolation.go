@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package gesture
+package fling
 
 import (
 	"math"
@@ -9,15 +9,16 @@ import (
 	"time"
 )
 
-// Estimator computes a 1-dimensional velocity estimate
+// Extrapolation computes a 1-dimensional velocity estimate
 // for a set of timestamped points using the least squares
 // fit of a 2nd order polynomial. The same method is used
 // by Android.
-type estimator struct {
+type Extrapolation struct {
 	// Index into points.
 	idx int
 	// Circular buffer of samples.
-	samples []sample
+	samples   []sample
+	lastValue float32
 	// Pre-allocated cache for samples.
 	cache [historySize]sample
 
@@ -36,7 +37,7 @@ type matrix struct {
 	data       []float32
 }
 
-type estimate struct {
+type Estimate struct {
 	Velocity float32
 	Distance float32
 }
@@ -50,8 +51,15 @@ const (
 	maxSampleGap = 40 * time.Millisecond
 )
 
-// Sample adds a sample to the estimation.
-func (e *estimator) Sample(t time.Duration, val float32) {
+// SampleDelta adds a relative sample to the estimation.
+func (e *Extrapolation) SampleDelta(t time.Duration, delta float32) {
+	val := delta + e.lastValue
+	e.Sample(t, val)
+}
+
+// Sample adds an absolute sample to the estimation.
+func (e *Extrapolation) Sample(t time.Duration, val float32) {
+	e.lastValue = val
 	if e.samples == nil {
 		e.samples = e.cache[:0]
 	}
@@ -73,9 +81,9 @@ func (e *estimator) Sample(t time.Duration, val float32) {
 // Velocity returns an estimate of the implied velocity and
 // distance for the points sampled, or zero if the estimation method
 // failed.
-func (e *estimator) Estimate() estimate {
+func (e *Extrapolation) Estimate() Estimate {
 	if len(e.samples) == 0 {
-		return estimate{}
+		return Estimate{}
 	}
 	values := e.values[:0]
 	times := e.times[:0]
@@ -97,16 +105,16 @@ func (e *estimator) Estimate() estimate {
 	}
 	coef, ok := polyFit(times, values)
 	if !ok {
-		return estimate{}
+		return Estimate{}
 	}
 	dist := values[len(values)-1] - values[0]
-	return estimate{
+	return Estimate{
 		Velocity: coef[1],
 		Distance: dist,
 	}
 }
 
-func (e *estimator) get(i int) sample {
+func (e *Extrapolation) get(i int) sample {
 	idx := (e.idx + i - 1 + len(e.samples)) % len(e.samples)
 	return e.samples[idx]
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package gesture
+package fling
 
 import "testing"
 
