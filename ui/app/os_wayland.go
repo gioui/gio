@@ -523,6 +523,7 @@ func gio_onPointerLeave(data unsafe.Pointer, p *C.struct_wl_pointer, serial C.ui
 //export gio_onPointerMotion
 func gio_onPointerMotion(data unsafe.Pointer, p *C.struct_wl_pointer, t C.uint32_t, x, y C.wl_fixed_t) {
 	w := winMap[p]
+	w.resetFling()
 	w.onPointerMotion(x, y, t)
 }
 
