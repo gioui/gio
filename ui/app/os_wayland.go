@@ -107,15 +107,15 @@ type window struct {
 	ppdp, ppsp        float32
 	scrollTime        time.Duration
 	discScroll        image.Point
-	scroll    f32.Point
-	lastPos   f32.Point
-	lastTouch f32.Point
+	scroll            f32.Point
+	lastPos           f32.Point
+	lastTouch         f32.Point
 
 	// Flinging.
 	yExtrapolation fling.Extrapolation
 	xExtrapolation fling.Extrapolation
-	flinger    fling.Animation
-	startFling bool
+	flinger        fling.Animation
+	startFling     bool
 	// Fling direction.
 	flingDir f32.Point
 
