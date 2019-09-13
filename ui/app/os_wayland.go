@@ -702,6 +702,7 @@ func gio_onKeyboardKey(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, seri
 	t := time.Duration(timestamp) * time.Millisecond
 	conn.repeat.Stop(t)
 	w := winMap[keyboard]
+	w.resetFling()
 	if state != C.WL_KEYBOARD_KEY_STATE_PRESSED || conn.xkbMap == nil || conn.xkbState == nil || conn.xkbCompState == nil {
 		return
 	}
