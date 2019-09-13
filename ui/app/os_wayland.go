@@ -20,6 +20,7 @@ import (
 	"unsafe"
 
 	"gioui.org/ui/f32"
+	"gioui.org/ui/internal/fling"
 	"gioui.org/ui/key"
 	"gioui.org/ui/pointer"
 	syscall "golang.org/x/sys/unix"
@@ -105,12 +106,18 @@ type window struct {
 	notRead, notWrite int
 	ppdp, ppsp        float32
 	scrollTime        time.Duration
-	discScroll        struct {
-		x, y int
-	}
+	discScroll        image.Point
 	scroll    f32.Point
 	lastPos   f32.Point
 	lastTouch f32.Point
+
+	// Flinging.
+	yExtrapolation fling.Extrapolation
+	xExtrapolation fling.Extrapolation
+	flinger    fling.Animation
+	startFling bool
+	// Fling direction.
+	flingDir f32.Point
 
 	stage             Stage
 	dead              bool
@@ -535,6 +542,7 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 		typ = pointer.Press
 	}
 	w.flushScroll()
+	w.resetFling()
 	w.w.event(pointer.Event{
 		Type:     typ,
 		Source:   pointer.Mouse,
@@ -547,6 +555,7 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 func gio_onPointerAxis(data unsafe.Pointer, ptr *C.struct_wl_pointer, t, axis C.uint32_t, value C.wl_fixed_t) {
 	w := winMap[ptr]
 	v := fromFixed(value)
+	w.resetFling()
 	if w.scroll == (f32.Point{}) {
 		w.scrollTime = time.Duration(t) * time.Millisecond
 	}
@@ -562,6 +571,28 @@ func gio_onPointerAxis(data unsafe.Pointer, ptr *C.struct_wl_pointer, t, axis C.
 func gio_onPointerFrame(data unsafe.Pointer, pointer *C.struct_wl_pointer) {
 	w := winMap[pointer]
 	w.flushScroll()
+	w.flushFling()
+}
+
+func (w *window) flushFling() {
+	if !w.startFling {
+		return
+	}
+	w.startFling = false
+	estx, esty := w.xExtrapolation.Estimate(), w.yExtrapolation.Estimate()
+	w.xExtrapolation = fling.Extrapolation{}
+	w.yExtrapolation = fling.Extrapolation{}
+	vel := float32(math.Sqrt(float64(estx.Velocity*estx.Velocity + esty.Velocity*esty.Velocity)))
+	_, _, c := w.config()
+	c.now = time.Now()
+	if !w.flinger.Start(&c, vel) {
+		return
+	}
+	invDist := 1 / vel
+	w.flingDir.X = estx.Velocity * invDist
+	w.flingDir.Y = esty.Velocity * invDist
+	// Wake up the window loop.
+	w.notify()
 }
 
 //export gio_onPointerAxisSource
@@ -569,18 +600,26 @@ func gio_onPointerAxisSource(data unsafe.Pointer, pointer *C.struct_wl_pointer, 
 }
 
 //export gio_onPointerAxisStop
-func gio_onPointerAxisStop(data unsafe.Pointer, pointer *C.struct_wl_pointer, time, axis C.uint32_t) {
+func gio_onPointerAxisStop(data unsafe.Pointer, ptr *C.struct_wl_pointer, t, axis C.uint32_t) {
+	w := winMap[ptr]
+	w.startFling = true
 }
 
 //export gio_onPointerAxisDiscrete
 func gio_onPointerAxisDiscrete(data unsafe.Pointer, pointer *C.struct_wl_pointer, axis C.uint32_t, discrete C.int32_t) {
 	w := winMap[pointer]
+	w.resetFling()
 	switch axis {
 	case C.WL_POINTER_AXIS_HORIZONTAL_SCROLL:
-		w.discScroll.x += int(discrete)
+		w.discScroll.X += int(discrete)
 	case C.WL_POINTER_AXIS_VERTICAL_SCROLL:
-		w.discScroll.y += int(discrete)
+		w.discScroll.Y += int(discrete)
 	}
+}
+
+func (w *window) resetFling() {
+	w.startFling = false
+	w.flinger = fling.Animation{}
 }
 
 //export gio_onKeyboardKeymap
@@ -810,8 +849,9 @@ loop:
 func (w *window) setAnimating(anim bool) {
 	w.mu.Lock()
 	w.animating = anim
+	animating := w.isAnimating()
 	w.mu.Unlock()
-	if anim {
+	if animating {
 		w.notify()
 	}
 }
@@ -954,29 +994,38 @@ func (c *wlOutput) ppmm() (float32, error) {
 }
 
 func (w *window) flushScroll() {
-	if w.scroll == (f32.Point{}) {
+	var fling f32.Point
+	if w.flinger.Active() {
+		dist := float32(w.flinger.Tick(time.Now()))
+		fling = w.flingDir.Mul(dist)
+	}
+	total := w.scroll.Add(fling)
+	if total == (f32.Point{}) {
 		return
 	}
 	// The Wayland reported scroll distance for
 	// discrete scroll axis is only 10 pixels, where
 	// 100 seems more appropriate.
 	const discreteScale = 10
-	if w.discScroll.x != 0 {
+	if w.discScroll.X != 0 {
 		w.scroll.X *= discreteScale
 	}
-	if w.discScroll.y != 0 {
+	if w.discScroll.Y != 0 {
 		w.scroll.Y *= discreteScale
 	}
 	w.w.event(pointer.Event{
 		Type:     pointer.Move,
 		Source:   pointer.Mouse,
 		Position: w.lastPos,
-		Scroll:   w.scroll,
+		Scroll:   total,
 		Time:     w.scrollTime,
 	})
+	if w.discScroll == (image.Point{}) {
+		w.xExtrapolation.SampleDelta(w.scrollTime, -w.scroll.X)
+		w.yExtrapolation.SampleDelta(w.scrollTime, -w.scroll.Y)
+	}
 	w.scroll = f32.Point{}
-	w.discScroll.x = 0
-	w.discScroll.y = 0
+	w.discScroll = image.Point{}
 }
 
 func (w *window) onPointerMotion(x, y C.wl_fixed_t, t C.uint32_t) {
@@ -1032,9 +1081,14 @@ func (w *window) config() (int, int, Config) {
 	}
 }
 
+func (w *window) isAnimating() bool {
+	return w.animating || w.flinger.Active()
+}
+
 func (w *window) draw(sync bool) {
+	w.flushScroll()
 	w.mu.Lock()
-	animating := w.animating
+	animating := w.isAnimating()
 	dead := w.dead
 	w.mu.Unlock()
 	if dead || (!animating && !sync) {
