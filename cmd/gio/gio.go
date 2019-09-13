@@ -66,12 +66,12 @@ func mainErr() error {
 	switch *target {
 	case "ios", "tvos", "android", "js":
 	default:
-		return fmt.Errorf("invalid -target %s\n", *target)
+		return fmt.Errorf("invalid -target %s", *target)
 	}
 	switch *buildMode {
 	case "archive", "exe":
 	default:
-		return fmt.Errorf("invalid -buildmode %s\n", *buildMode)
+		return fmt.Errorf("invalid -buildmode %s", *buildMode)
 	}
 	// Find package name.
 	pkgPath, err := runCmd(exec.Command("go", "list", "-f", "{{.ImportPath}}", pkg))
