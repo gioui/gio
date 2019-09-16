@@ -1001,10 +1001,6 @@ func (w *window) flushScroll() {
 		dist := float32(w.flinger.Tick(time.Now()))
 		fling = w.flingDir.Mul(dist)
 	}
-	total := w.scroll.Add(fling)
-	if total == (f32.Point{}) {
-		return
-	}
 	// The Wayland reported scroll distance for
 	// discrete scroll axis is only 10 pixels, where
 	// 100 seems more appropriate.
@@ -1014,6 +1010,10 @@ func (w *window) flushScroll() {
 	}
 	if w.discScroll.Y != 0 {
 		w.scroll.Y *= discreteScale
+	}
+	total := w.scroll.Add(fling)
+	if total == (f32.Point{}) {
+		return
 	}
 	w.w.event(pointer.Event{
 		Type:     pointer.Move,
