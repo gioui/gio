@@ -94,21 +94,22 @@ func (f *Flex) begin(mode flexMode) {
 	f.macro.Record(f.ops)
 }
 
-// Rigid begins a child and return its constraints. The main axis is constrained
-// to the range from 0 to the remaining space.
-func (f *Flex) Rigid() Constraints {
+// Rigid lays out a widget with the main axis constrained to the range
+// from 0 to the remaining space.
+func (f *Flex) Rigid(w Widget) FlexChild {
 	f.begin(modeRigid)
 	mainc := axisMainConstraint(f.Axis, f.cs)
 	mainMax := mainc.Max - f.size
 	if mainMax < 0 {
 		mainMax = 0
 	}
-	return axisConstraints(f.Axis, Constraint{Max: mainMax}, axisCrossConstraint(f.Axis, f.cs))
+	cs := axisConstraints(f.Axis, Constraint{Max: mainMax}, axisCrossConstraint(f.Axis, f.cs))
+	return f.end(w(cs))
 }
 
 // Flexible is like Rigid, where the main axis size is also constrained to a
 // fraction of the space not taken up by Rigid children.
-func (f *Flex) Flexible(weight float32) Constraints {
+func (f *Flex) Flexible(weight float32, w Widget) FlexChild {
 	f.begin(modeFlex)
 	mainc := axisMainConstraint(f.Axis, f.cs)
 	var flexSize int
@@ -124,12 +125,13 @@ func (f *Flex) Flexible(weight float32) Constraints {
 		}
 	}
 	submainc := Constraint{Max: flexSize}
-	return axisConstraints(f.Axis, submainc, axisCrossConstraint(f.Axis, f.cs))
+	cs := axisConstraints(f.Axis, submainc, axisCrossConstraint(f.Axis, f.cs))
+	return f.end(w(cs))
 }
 
 // End a child by specifying its dimensions. Pass the returned layout result
 // to Layout.
-func (f *Flex) End(dims Dimensions) FlexChild {
+func (f *Flex) end(dims Dimensions) FlexChild {
 	if f.mode <= modeBegun {
 		panic("End called without an active child")
 	}
@@ -263,9 +265,9 @@ func axisCrossConstraint(a Axis, cs Constraints) Constraint {
 
 func axisConstraints(a Axis, mainc, crossc Constraint) Constraints {
 	if a == Horizontal {
-		return Constraints{mainc, crossc}
+		return Constraints{Width: mainc, Height: crossc}
 	} else {
-		return Constraints{crossc, mainc}
+		return Constraints{Width: crossc, Height: mainc}
 	}
 }
 

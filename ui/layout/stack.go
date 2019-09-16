@@ -51,25 +51,26 @@ func (s *Stack) begin() {
 	s.macro.Record(s.ops)
 }
 
-// Rigid begins a child with the same constraints that were
+// Rigid lays out a widget with the same constraints that were
 // passed to Init.
-func (s *Stack) Rigid() Constraints {
+func (s *Stack) Rigid(w Widget) StackChild {
 	s.begin()
-	return s.cs
+	return s.end(w(s.cs))
 }
 
-// Expand begins a child with constraints that exactly match
+// Expand lays out a widget with constraints that exactly match
 // the biggest child previously added.
-func (s *Stack) Expand() Constraints {
+func (s *Stack) Expand(w Widget) StackChild {
 	s.begin()
-	return Constraints{
+	cs := Constraints{
 		Width:  Constraint{Min: s.maxSZ.X, Max: s.maxSZ.X},
 		Height: Constraint{Min: s.maxSZ.Y, Max: s.maxSZ.Y},
 	}
+	return s.end(w(cs))
 }
 
 // End a child by specifying its dimensions.
-func (s *Stack) End(dims Dimensions) StackChild {
+func (s *Stack) end(dims Dimensions) StackChild {
 	s.macro.Stop()
 	s.begun = false
 	if w := dims.Size.X; w > s.maxSZ.X {

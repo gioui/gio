@@ -56,6 +56,10 @@ type List struct {
 	dir      iterationDir
 }
 
+// ListElement is a function that computes the dimensions of
+// a list element.
+type ListElement func(cs Constraints, index int) Dimensions
+
 type iterationDir uint8
 
 const (
@@ -67,8 +71,8 @@ const (
 const inf = 1e6
 
 // Init prepares the list for iterating through its children with Next.
-func (l *List) Init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, len int) {
-	if l.More() {
+func (l *List) init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, len int) {
+	if l.more() {
 		panic("unfinished child")
 	}
 	l.config = cfg
@@ -88,7 +92,15 @@ func (l *List) Init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, l
 		l.first = len
 	}
 	l.macro.Record(ops)
-	l.Next()
+	l.next()
+}
+
+// Layout the List and return its dimensions.
+func (l *List) Layout(c ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, len int, w ListElement) Dimensions {
+	for l.init(c, q, ops, cs, len); l.more(); l.next() {
+		l.end(w(l.constraints(), l.index()))
+	}
+	return l.layout()
 }
 
 func (l *List) scrollToEnd() bool {
@@ -106,23 +118,23 @@ func (l *List) update() {
 	l.offset += d
 }
 
-// Next advances to the next child.
-func (l *List) Next() {
-	l.dir = l.next()
+// next advances to the next child.
+func (l *List) next() {
+	l.dir = l.nextDir()
 	// The user scroll offset is applied after scrolling to
 	// list end.
-	if l.scrollToEnd() && !l.More() && l.scrollDelta < 0 {
+	if l.scrollToEnd() && !l.more() && l.scrollDelta < 0 {
 		l.beforeEnd = true
 		l.offset += l.scrollDelta
-		l.dir = l.next()
+		l.dir = l.nextDir()
 	}
-	if l.More() {
+	if l.more() {
 		l.child.Record(l.ops)
 	}
 }
 
-// Index is current child's position in the underlying list.
-func (l *List) Index() int {
+// index is current child's position in the underlying list.
+func (l *List) index() int {
 	switch l.dir {
 	case iterateBackward:
 		return l.first - 1
@@ -133,17 +145,17 @@ func (l *List) Index() int {
 	}
 }
 
-// Constraints is the constraints for the current child.
-func (l *List) Constraints() Constraints {
+// constraints is the constraints for the current child.
+func (l *List) constraints() Constraints {
 	return axisConstraints(l.Axis, Constraint{Max: inf}, axisCrossConstraint(l.Axis, l.cs))
 }
 
-// More reports whether more children are needed.
-func (l *List) More() bool {
+// more reports whether more children are needed.
+func (l *List) more() bool {
 	return l.dir != iterateNone
 }
 
-func (l *List) next() iterationDir {
+func (l *List) nextDir() iterationDir {
 	vsize := axisMainConstraint(l.Axis, l.cs).Max
 	last := l.first + len(l.children)
 	// Clamp offset.
@@ -165,7 +177,7 @@ func (l *List) next() iterationDir {
 }
 
 // End the current child by specifying its dimensions.
-func (l *List) End(dims Dimensions) {
+func (l *List) end(dims Dimensions) {
 	l.child.Stop()
 	child := scrollChild{dims.Size, l.child}
 	mainSize := axisMain(l.Axis, child.size)
@@ -184,8 +196,8 @@ func (l *List) End(dims Dimensions) {
 }
 
 // Layout the List and return its dimensions.
-func (l *List) Layout() Dimensions {
-	if l.More() {
+func (l *List) layout() Dimensions {
+	if l.more() {
 		panic("unfinished child")
 	}
 	mainc := axisMainConstraint(l.Axis, l.cs)

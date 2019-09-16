@@ -27,11 +27,12 @@ func ExampleInset() {
 
 	// Inset all edges by 10.
 	inset := layout.UniformInset(ui.Dp(10))
-	cs = inset.Begin(cfg, ops, cs)
-	// Lay out a 50x50 sized widget.
-	dims := layoutWidget(50, 50, cs)
-	fmt.Println(dims.Size)
-	dims = inset.End(dims)
+	dims := inset.Layout(cfg, ops, cs, func(cs layout.Constraints) layout.Dimensions {
+		// Lay out a 50x50 sized widget.
+		dims := layoutWidget(50, 50, cs)
+		fmt.Println(dims.Size)
+		return dims
+	})
 
 	fmt.Println(dims.Size)
 
@@ -47,13 +48,12 @@ func ExampleAlign() {
 	cs := layout.RigidConstraints(image.Point{X: 100, Y: 100})
 
 	align := layout.Align{Alignment: layout.Center}
-	cs = align.Begin(ops, cs)
-
-	// Lay out a 50x50 sized widget.
-	dims := layoutWidget(50, 50, cs)
-	fmt.Println(dims.Size)
-
-	dims = align.End(dims)
+	dims := align.Layout(ops, cs, func(cs layout.Constraints) layout.Dimensions {
+		// Lay out a 50x50 sized widget.
+		dims := layoutWidget(50, 50, cs)
+		fmt.Println(dims.Size)
+		return dims
+	})
 
 	fmt.Println(dims.Size)
 
@@ -71,18 +71,18 @@ func ExampleFlex() {
 	flex.Init(ops, cs)
 
 	// Rigid 10x10 widget.
-	cs = flex.Rigid()
-	fmt.Printf("Rigid: %v\n", cs.Width)
-	dims := layoutWidget(10, 10, cs)
-	child1 := flex.End(dims)
+	child1 := flex.Rigid(func(cs layout.Constraints) layout.Dimensions {
+		fmt.Printf("Rigid: %v\n", cs.Width)
+		return layoutWidget(10, 10, cs)
+	})
 
 	// Child with 50% space allowance.
-	cs = flex.Flexible(0.5)
-	fmt.Printf("50%%: %v\n", cs.Width)
-	dims = layoutWidget(10, 10, cs)
-	child2 := flex.End(dims)
+	child2 := flex.Flexible(0.5, func(cs layout.Constraints) layout.Dimensions {
+		fmt.Printf("50%%: %v\n", cs.Width)
+		return layoutWidget(10, 10, cs)
+	})
 
-	dims = flex.Layout(child1, child2)
+	flex.Layout(child1, child2)
 
 	// Output:
 	// Rigid: {0 100}
@@ -98,17 +98,17 @@ func ExampleStack() {
 	stack.Init(ops, cs)
 
 	// Rigid 50x50 widget.
-	cs = stack.Rigid()
-	dims := layoutWidget(50, 50, cs)
-	child1 := stack.End(dims)
+	child1 := stack.Rigid(func(cs layout.Constraints) layout.Dimensions {
+		return layoutWidget(50, 50, cs)
+	})
 
 	// Force widget to the same size as the first.
-	cs = stack.Expand()
-	fmt.Printf("Expand: %v\n", cs)
-	dims = layoutWidget(10, 10, cs)
-	child2 := stack.End(dims)
+	child2 := stack.Expand(func(cs layout.Constraints) layout.Dimensions {
+		fmt.Printf("Expand: %v\n", cs)
+		return layoutWidget(10, 10, cs)
+	})
 
-	dims = stack.Layout(child1, child2)
+	stack.Layout(child1, child2)
 
 	// Output:
 	// Expand: {{50 50} {50 50}}
@@ -123,18 +123,13 @@ func ExampleList() {
 	const listLen = 1e6
 
 	var list layout.List
-	list.Init(cfg, q, ops, cs, listLen)
 	count := 0
-	for ; list.More(); list.Next() {
-		dims := layoutWidget(20, 20, list.Constraints())
-		list.End(dims)
+	list.Layout(cfg, q, ops, cs, listLen, func(cs layout.Constraints, i int) layout.Dimensions {
 		count++
-	}
+		return layoutWidget(20, 20, cs)
+	})
 
 	fmt.Println(count)
-
-	dims := list.Layout()
-	_ = dims
 
 	// Output:
 	// 5

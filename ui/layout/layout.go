@@ -39,6 +39,10 @@ type Alignment uint8
 // relative to a containing space.
 type Direction uint8
 
+// Widget is a function that computes a set of dimensions that
+// satisfies the given cosntraints.
+type Widget func(cs Constraints) Dimensions
+
 const (
 	Start Alignment = iota
 	End
@@ -90,68 +94,44 @@ func RigidConstraints(size image.Point) Constraints {
 // Inset adds space around an interface element.
 type Inset struct {
 	Top, Right, Bottom, Left ui.Value
-
-	stack                    ui.StackOp
-	top, right, bottom, left int
-	begun                    bool
-	cs                       Constraints
 }
 
 // Align aligns an interface element in the available space.
 type Align struct {
 	Alignment Direction
-
-	macro ui.MacroOp
-	ops   *ui.Ops
-	begun bool
-	cs    Constraints
 }
 
-// Begin the inset operation and modify the input constraints to
-// account for the insets.
-func (in *Inset) Begin(c ui.Config, ops *ui.Ops, cs Constraints) Constraints {
-	if in.begun {
-		panic("must End before Begin")
-	}
-	in.top = c.Px(in.Top)
-	in.right = c.Px(in.Right)
-	in.bottom = c.Px(in.Bottom)
-	in.left = c.Px(in.Left)
-	in.begun = true
-	in.cs = cs
+// Layout a widget.
+func (in *Inset) Layout(c ui.Config, ops *ui.Ops, cs Constraints, w Widget) Dimensions {
+	top := c.Px(in.Top)
+	right := c.Px(in.Right)
+	bottom := c.Px(in.Bottom)
+	left := c.Px(in.Left)
 	mcs := cs
-	mcs.Width.Min -= in.left + in.right
-	mcs.Width.Max -= in.left + in.right
+	mcs.Width.Min -= left + right
+	mcs.Width.Max -= left + right
 	if mcs.Width.Min < 0 {
 		mcs.Width.Min = 0
 	}
 	if mcs.Width.Max < mcs.Width.Min {
 		mcs.Width.Max = mcs.Width.Min
 	}
-	mcs.Height.Min -= in.top + in.bottom
-	mcs.Height.Max -= in.top + in.bottom
+	mcs.Height.Min -= top + bottom
+	mcs.Height.Max -= top + bottom
 	if mcs.Height.Min < 0 {
 		mcs.Height.Min = 0
 	}
 	if mcs.Height.Max < mcs.Height.Min {
 		mcs.Height.Max = mcs.Height.Min
 	}
-	in.stack.Push(ops)
-	ui.TransformOp{}.Offset(toPointF(image.Point{X: in.left, Y: in.top})).Add(ops)
-	return mcs
-}
-
-// End the inset operation and return the dimensions for the
-// inset child.
-func (in *Inset) End(dims Dimensions) Dimensions {
-	if !in.begun {
-		panic("must Begin before End")
-	}
-	in.begun = false
-	in.stack.Pop()
+	var stack ui.StackOp
+	stack.Push(ops)
+	ui.TransformOp{}.Offset(toPointF(image.Point{X: left, Y: top})).Add(ops)
+	dims := w(mcs)
+	stack.Pop()
 	return Dimensions{
-		Size:     in.cs.Constrain(dims.Size.Add(image.Point{X: in.right + in.left, Y: in.top + in.bottom})),
-		Baseline: dims.Baseline + in.top,
+		Size:     cs.Constrain(dims.Size.Add(image.Point{X: right + left, Y: top + bottom})),
+		Baseline: dims.Baseline + top,
 	}
 }
 
@@ -161,35 +141,21 @@ func UniformInset(v ui.Value) Inset {
 	return Inset{Top: v, Right: v, Bottom: v, Left: v}
 }
 
-// Begin aligning and return the constraints with no minimum size.
-func (a *Align) Begin(ops *ui.Ops, cs Constraints) Constraints {
-	if a.begun {
-		panic("must End before Begin")
-	}
-	a.begun = true
-	a.ops = ops
-	a.cs = cs
-	a.macro.Record(ops)
-	cs.Width.Min = 0
-	cs.Height.Min = 0
-	return cs
-}
-
-// End the align operation and return the dimensions for the
-// aligned child.
-func (a *Align) End(dims Dimensions) Dimensions {
-	if !a.begun {
-		panic("must Begin before End")
-	}
-	a.begun = false
-	ops := a.ops
-	a.macro.Stop()
+// Layout a widget.
+func (a *Align) Layout(ops *ui.Ops, cs Constraints, w Widget) Dimensions {
+	var macro ui.MacroOp
+	mcs := cs
+	mcs.Width.Min = 0
+	mcs.Height.Min = 0
+	macro.Record(ops)
+	dims := w(mcs)
+	macro.Stop()
 	sz := dims.Size
-	if sz.X < a.cs.Width.Min {
-		sz.X = a.cs.Width.Min
+	if sz.X < cs.Width.Min {
+		sz.X = cs.Width.Min
 	}
-	if sz.Y < a.cs.Height.Min {
-		sz.Y = a.cs.Height.Min
+	if sz.Y < cs.Height.Min {
+		sz.Y = cs.Height.Min
 	}
 	var p image.Point
 	switch a.Alignment {
@@ -207,7 +173,7 @@ func (a *Align) End(dims Dimensions) Dimensions {
 	var stack ui.StackOp
 	stack.Push(ops)
 	ui.TransformOp{}.Offset(toPointF(p)).Add(ops)
-	a.macro.Add(ops)
+	macro.Add(ops)
 	stack.Pop()
 	return Dimensions{
 		Size:     sz,
