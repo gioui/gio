@@ -20,6 +20,7 @@ type Ops struct {
 	refs []interface{}
 
 	stackDepth int
+	macroDepth int
 
 	inAux  bool
 	auxOff int
@@ -29,9 +30,10 @@ type Ops struct {
 // StackOp can save and restore the operation state
 // in a stack-like manner.
 type StackOp struct {
-	depth  int
-	active bool
-	ops    *Ops
+	stackDepth int
+	macroDepth int
+	active     bool
+	ops        *Ops
 }
 
 // MacroOp can record a list of operations for later
@@ -56,7 +58,8 @@ func (s *StackOp) Push(o *Ops) {
 	s.active = true
 	s.ops = o
 	o.stackDepth++
-	s.depth = o.stackDepth
+	s.stackDepth = o.stackDepth
+	s.macroDepth = o.macroDepth
 	o.Write([]byte{byte(opconst.TypePush)})
 }
 
@@ -65,9 +68,11 @@ func (s *StackOp) Pop() {
 	if !s.active {
 		panic("unbalanced pop")
 	}
-	d := s.ops.stackDepth
-	if d != s.depth {
+	if s.ops.stackDepth != s.stackDepth {
 		panic("unbalanced pop")
+	}
+	if s.ops.macroDepth != s.macroDepth {
+		panic("pop in a different macro than push")
 	}
 	s.active = false
 	s.ops.stackDepth--
@@ -156,6 +161,7 @@ func (m *MacroOp) Record(o *Ops) {
 	}
 	m.recording = true
 	m.ops = o
+	m.ops.macroDepth++
 	m.pc = o.pc()
 	// Reserve room for a macro definition. Updated in Stop.
 	m.ops.Write(make([]byte, opconst.TypeMacroDefLen))
@@ -167,6 +173,7 @@ func (m *MacroOp) Stop() {
 	if !m.recording {
 		panic("not recording")
 	}
+	m.ops.macroDepth--
 	m.recording = false
 	m.fill()
 }
