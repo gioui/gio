@@ -17,12 +17,12 @@ For example, to add space above a widget:
 
 	// Configure a top inset.
 	inset := layout.Inset{Top: ui.Dp(8), ...}
-	// Start insetting and modify the constraints.
-	cs = inset.Begin(..., cs)
-	// Lay out widget and determine its size given the constraints.
-	dimensions := widget.Layout(..., cs)
-	// End the inset and account for the insets.
-	dimensions = inset.End(dimensions)
+	// Use the inset to lay out a widget.
+	inset.Layout(..., cs, func(cs layout.Constraints) layout.Dimensions {
+		// Lay out widget and determine its size given the constraints.
+		dimensions := widget.Layout(..., cs)
+		return dimensions
+	})
 
 Note that the example does not generate any garbage even though the
 Inset is transient. Layouts that don't accept user input are designed
@@ -35,12 +35,12 @@ be created from a few generic layouts.
 This example both aligns and insets a child:
 
 	inset := layout.Inset{...}
-	cs = inset.Begin(..., cs)
-	align := layout.Align{...}
-	cs = align.Begin(..., cs)
-	dims := widget.Layout(..., cs)
-	dims = align.End(dims)
-	dims = inset.End(dims)
+	inset.Layout(..., cs, func(cs layout.Constraints) layout.Dimensions {
+		align := layout.Align{...}
+		return align.Layout(..., cs, func(cs layout.Constraints) layout.Dimensions {
+			return widget.Layout(..., cs)
+		})
+	})
 
 More complex layouts such as Stack and Flex lay out multiple children,
 and stateful layouts such as List accept user input.
