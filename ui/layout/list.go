@@ -98,7 +98,8 @@ func (l *List) init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, l
 // Layout the List and return its dimensions.
 func (l *List) Layout(c ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, len int, w ListElement) Dimensions {
 	for l.init(c, q, ops, cs, len); l.more(); l.next() {
-		l.end(w(l.constraints(), l.index()))
+		cs := axisConstraints(l.Axis, Constraint{Max: inf}, axisCrossConstraint(l.Axis, l.cs))
+		l.end(w(cs, l.index()))
 	}
 	return l.layout()
 }
@@ -143,11 +144,6 @@ func (l *List) index() int {
 	default:
 		panic("Index called before Next")
 	}
-}
-
-// constraints is the constraints for the current child.
-func (l *List) constraints() Constraints {
-	return axisConstraints(l.Axis, Constraint{Max: inf}, axisCrossConstraint(l.Axis, l.cs))
 }
 
 // more reports whether more children are needed.

@@ -19,7 +19,6 @@ type Stack struct {
 	ops         *ui.Ops
 	constrained bool
 	cs          Constraints
-	begun       bool
 	maxSZ       image.Point
 	baseline    int
 }
@@ -44,10 +43,6 @@ func (s *Stack) begin() {
 	if !s.constrained {
 		panic("must Init before adding a child")
 	}
-	if s.begun {
-		panic("must End before adding a child")
-	}
-	s.begun = true
 	s.macro.Record(s.ops)
 }
 
@@ -72,7 +67,6 @@ func (s *Stack) Expand(w Widget) StackChild {
 // End a child by specifying its dimensions.
 func (s *Stack) end(dims Dimensions) StackChild {
 	s.macro.Stop()
-	s.begun = false
 	if w := dims.Size.X; w > s.maxSZ.X {
 		s.maxSZ.X = w
 	}
