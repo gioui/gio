@@ -46,25 +46,25 @@ with the `-token` flag:
 
 ## Running on mobiles
 
-For Android, iOS, tvOS the `gio` tool can build and package a Gio program for you.
+For Android, iOS, tvOS the `gogio` tool can build and package a Gio program for you.
 
 To build an Android .apk file from the `gophers` example:
 
-	$ go run gioui.org/cmd/gio -target android gioui.org/apps/gophers
+	$ go run gioui.org/cmd/gogio -target android gioui.org/apps/gophers
 
 The apk can be installed to a running emulator or attached device with adb:
 
 	$ adb install gophers.apk
 
-The gio tool passes command line arguments to os.Args at runtime:
+The `gogio` tool passes command line arguments to os.Args at runtime:
 
-	$ go run gioui.org/cmd/gio -target android gioui.org/apps/gophers -token <github token>
+	$ go run gioui.org/cmd/gogio -target android gioui.org/apps/gophers -token <github token>
 
 The `-appid` flag specifies the iOS bundle id or Android package id. The flag is required
 for creating signed .ipa files for iOS and tvOS devices, because the bundle id must match an id
 previously provisioned in Xcode. For example,
 
-	$ go run gioui.org/cmd/gio -target ios -appid <bundle-id> gioui.org/apps/gophers
+	$ go run gioui.org/cmd/gogio -target ios -appid <bundle-id> gioui.org/apps/gophers
 
 Use the `Window->Devices and Simulators` option in Xcode to install the ipa file to the device.
 If you have [ideviceinstaller](https://github.com/libimobiledevice/ideviceinstaller) installed,
@@ -75,7 +75,7 @@ you can install the app from the command line:
 If you just want to run a program on the iOS simulator, use the `-o` flag to specify a .app
 directory:
 
-	$ go run gioui.org/cmd/gio/ -o gophers.app -target ios gioui.org/apps/gophers
+	$ go run gioui.org/cmd/gogio -o gophers.app -target ios gioui.org/apps/gophers
 
 Install the app to a running simulator with simctl:
 
@@ -84,10 +84,10 @@ Install the app to a running simulator with simctl:
 
 ## Webassembly/WebGL
 
-To run a Gio program in a compatible browser, the `gio` tool can output a directory ready to
+To run a Gio program in a compatible browser, the `gogio` tool can output a directory ready to
 serve. With the `goxec` tool you don't even need a web server:
 
-	$ go run gioui.org/cmd/gio -target js gioui.org/apps/gophers
+	$ go run gioui.org/cmd/gogio -target js gioui.org/apps/gophers
 	$ go get github.com/shurcooL/goexec
 	$ goexec 'http.ListenAndServe(":8080", http.FileServer(http.Dir("gophers")))'
 

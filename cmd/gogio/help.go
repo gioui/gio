@@ -2,14 +2,14 @@
 
 package main
 
-const mainUsage = `The Gio command builds and packages Gio (gioui.org) programs.
+const mainUsage = `The gogio command builds and packages Gio (gioui.org) programs.
 
 Usage:
 
-	gio -target <target> [flags] <package> [run arguments]
+	gogio -target <target> [flags] <package> [run arguments]
 
 The go tool is sufficient to build, install and run Gio programs on platforms
-where a single executable is sufficient. The gio tool can build and package Gio
+where a single executable is sufficient. The gogio tool can build and package Gio
 programs for platforms where additional metadata or support files are required.
 
 The package argument specifies an import path or a single Go source file to
@@ -38,7 +38,7 @@ The other buildmode is archive, which will output an .aar library for Android
 or a .framework for iOS and tvOS.
 
 The -appid flag specifies the package name for Android or the bundle id for
-iOS and tvOS. A bundle id must be provisioned through Xcode before the gio
+iOS and tvOS. A bundle id must be provisioned through Xcode before the gogio
 tool can use it.
 
 The -version flag specifies the integer version for Android and the last
@@ -47,5 +47,5 @@ component of the 1.0.X version for iOS and tvOS.
 The -work flag prints the path to the working directory and suppress
 its deletion.
 
-The -x flag will print all the external commands executed by the gio tool.
+The -x flag will print all the external commands executed by the gogio tool.
 `

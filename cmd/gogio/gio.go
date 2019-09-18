@@ -49,7 +49,7 @@ func main() {
 	}
 	flag.Parse()
 	if err := mainErr(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "gogio: %v\n", err)
 		os.Exit(1)
 	}
 	os.Exit(0)
@@ -76,11 +76,11 @@ func mainErr() error {
 	// Find package name.
 	pkgPath, err := runCmd(exec.Command("go", "list", "-f", "{{.ImportPath}}", pkg))
 	if err != nil {
-		return fmt.Errorf("gio: %v", err)
+		return err
 	}
 	dir, err := runCmd(exec.Command("go", "list", "-f", "{{.Dir}}", pkg))
 	if err != nil {
-		return fmt.Errorf("gio: %v", err)
+		return err
 	}
 	elems := strings.Split(pkgPath, "/")
 	name := elems[len(elems)-1]
@@ -113,7 +113,7 @@ func mainErr() error {
 		bi.ldflags = fmt.Sprintf("-X gioui.org/ui/app.extraArgs=%s", strings.Join(appArgs, "|"))
 	}
 	if err := build(bi); err != nil {
-		return fmt.Errorf("gio: %v", err)
+		return err
 	}
 	return nil
 }
@@ -151,7 +151,7 @@ func appIDFromPackage(pkgPath string) string {
 }
 
 func build(bi *buildInfo) error {
-	tmpDir, err := ioutil.TempDir("", "gio-")
+	tmpDir, err := ioutil.TempDir("", "gogio-")
 	if err != nil {
 		return err
 	}
