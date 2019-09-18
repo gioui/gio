@@ -1032,7 +1032,10 @@ func (w *window) flushScroll() {
 
 func (w *window) onPointerMotion(x, y C.wl_fixed_t, t C.uint32_t) {
 	w.flushScroll()
-	w.lastPos = f32.Point{X: fromFixed(x), Y: fromFixed(y)}
+	w.lastPos = f32.Point{
+		X: fromFixed(x) * float32(w.scale),
+		Y: fromFixed(y) * float32(w.scale),
+	}
 	w.w.event(pointer.Event{
 		Type:     pointer.Move,
 		Position: w.lastPos,
