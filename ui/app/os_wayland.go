@@ -451,7 +451,10 @@ func gio_onRegistryGlobalRemove(data unsafe.Pointer, reg *C.struct_wl_registry, 
 func gio_onTouchDown(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.uint32_t, surf *C.struct_wl_surface, id C.int32_t, x, y C.wl_fixed_t) {
 	w := winMap[surf]
 	winMap[touch] = w
-	w.lastTouch = f32.Point{X: fromFixed(x), Y: fromFixed(y)}
+	w.lastTouch = f32.Point{
+		X: fromFixed(x) * float32(w.scale),
+		Y: fromFixed(y) * float32(w.scale),
+	}
 	w.w.event(pointer.Event{
 		Type:      pointer.Press,
 		Source:    pointer.Touch,
@@ -476,7 +479,10 @@ func gio_onTouchUp(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.ui
 //export gio_onTouchMotion
 func gio_onTouchMotion(data unsafe.Pointer, touch *C.struct_wl_touch, t C.uint32_t, id C.int32_t, x, y C.wl_fixed_t) {
 	w := winMap[touch]
-	w.lastTouch = f32.Point{X: fromFixed(x), Y: fromFixed(y)}
+	w.lastTouch = f32.Point{
+		X: fromFixed(x) * float32(w.scale),
+		Y: fromFixed(y) * float32(w.scale),
+	}
 	w.w.event(pointer.Event{
 		Type:      pointer.Move,
 		Position:  w.lastTouch,
