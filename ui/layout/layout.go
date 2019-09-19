@@ -40,7 +40,7 @@ type Alignment uint8
 type Direction uint8
 
 // Widget is a function that computes a set of dimensions that
-// satisfies the given cosntraints.
+// satisfies the given constraints.
 type Widget func(cs Constraints) Dimensions
 
 const (
