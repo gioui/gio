@@ -21,8 +21,7 @@ type Constraint struct {
 	Min, Max int
 }
 
-// Dimensions are the resolved size and baseline for a user
-// interface element.
+// Dimensions are the resolved size and baseline for a widget.
 type Dimensions struct {
 	Size     image.Point
 	Baseline int
@@ -31,12 +30,11 @@ type Dimensions struct {
 // Axis is the Horizontal or Vertical direction.
 type Axis uint8
 
-// Alignment is the relative alignment of a list of
-// interface elements.
+// Alignment is the mutual alignment of a list of widgets.
 type Alignment uint8
 
-// Direction is the alignment of a set of interface elements
-// relative to a containing space.
+// Direction is the alignment of widgets relative to a containing
+// space.
 type Direction uint8
 
 // Widget is a function that computes a set of dimensions that
@@ -91,12 +89,12 @@ func RigidConstraints(size image.Point) Constraints {
 	}
 }
 
-// Inset adds space around an interface element.
+// Inset adds space around a widget.
 type Inset struct {
 	Top, Right, Bottom, Left ui.Value
 }
 
-// Align aligns an interface element in the available space.
+// Align aligns a widget in the available space.
 type Align struct {
 	Alignment Direction
 }
