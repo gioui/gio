@@ -4,6 +4,7 @@ package gl
 
 import (
 	"math"
+	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -101,7 +102,9 @@ func (f *Functions) BeginQuery(target Enum, query Query) {
 }
 func (c *Functions) BindAttribLocation(p Program, a Attrib, name string) {
 	cname := cString(name)
-	syscall.Syscall(_glBindAttribLocation.Addr(), 3, uintptr(p.V), uintptr(a), uintptr(unsafe.Pointer(&cname[0])))
+	c0 := &cname[0]
+	syscall.Syscall(_glBindAttribLocation.Addr(), 3, uintptr(p.V), uintptr(a), uintptr(unsafe.Pointer(c0)))
+	issue34474KeepAlive(c)
 }
 func (c *Functions) BindBuffer(target Enum, b Buffer) {
 	syscall.Syscall(_glBindBuffer.Addr(), 2, uintptr(target), uintptr(b.V), 0)
@@ -125,7 +128,9 @@ func (c *Functions) BufferData(target Enum, src []byte, usage Enum) {
 	if n := len(src); n == 0 {
 		syscall.Syscall6(_glBufferData.Addr(), 4, uintptr(target), 0, 0, uintptr(usage), 0, 0)
 	} else {
-		syscall.Syscall6(_glBufferData.Addr(), 4, uintptr(target), uintptr(n), uintptr(unsafe.Pointer(&src[0])), uintptr(usage), 0, 0)
+		s0 := &src[0]
+		syscall.Syscall6(_glBufferData.Addr(), 4, uintptr(target), uintptr(n), uintptr(unsafe.Pointer(s0)), uintptr(usage), 0, 0)
+		issue34474KeepAlive(s0)
 	}
 }
 func (c *Functions) CheckFramebufferStatus(target Enum) Enum {
@@ -287,7 +292,9 @@ func (c *Functions) GetString(pname Enum) string {
 }
 func (c *Functions) GetUniformLocation(p Program, name string) Uniform {
 	cname := cString(name)
-	u, _, _ := syscall.Syscall(_glGetUniformLocation.Addr(), 2, uintptr(p.V), uintptr(unsafe.Pointer(&cname[0])), 0)
+	c0 := &cname[0]
+	u, _, _ := syscall.Syscall(_glGetUniformLocation.Addr(), 2, uintptr(p.V), uintptr(unsafe.Pointer(c0)), 0)
+	issue34474KeepAlive(c)
 	return Uniform{int(u)}
 }
 func (c *Functions) InvalidateFramebuffer(target, attachment Enum) {
@@ -305,7 +312,9 @@ func (c *Functions) PixelStorei(pname Enum, param int32) {
 	syscall.Syscall(_glPixelStorei.Addr(), 2, uintptr(pname), uintptr(param), 0)
 }
 func (f *Functions) ReadPixels(x, y, width, height int, format, ty Enum, data []byte) {
-	syscall.Syscall6(_glReadPixels.Addr(), uintptr(x), uintptr(y), uintptr(width), uintptr(height), uintptr(format), uintptr(ty), uintptr(unsafe.Pointer(&data[0])))
+	d0 := &data[0]
+	syscall.Syscall6(_glReadPixels.Addr(), uintptr(x), uintptr(y), uintptr(width), uintptr(height), uintptr(format), uintptr(ty), uintptr(unsafe.Pointer(d0)))
+	issue34474KeepAlive(d0)
 }
 func (c *Functions) RenderbufferStorage(target, internalformat Enum, width, height int) {
 	syscall.Syscall6(_glRenderbufferStorage.Addr(), 4, uintptr(target), uintptr(internalformat), uintptr(width), uintptr(height), 0, 0)
@@ -315,17 +324,23 @@ func (c *Functions) Scissor(x, y, width, height int32) {
 }
 func (c *Functions) ShaderSource(s Shader, src string) {
 	var n uintptr = uintptr(len(src))
-	syscall.Syscall6(_glShaderSource.Addr(), 4, uintptr(s.V), 1, uintptr(unsafe.Pointer(&src)), uintptr(unsafe.Pointer(&n)), 0, 0)
+	psrc := &src
+	syscall.Syscall6(_glShaderSource.Addr(), 4, uintptr(s.V), 1, uintptr(unsafe.Pointer(psrc)), uintptr(unsafe.Pointer(&n)), 0, 0)
+	issue34474KeepAlive(psrc)
 }
 func (c *Functions) TexImage2D(target Enum, level int, internalFormat int, width, height int, format, ty Enum, data []byte) {
 	if len(data) == 0 {
 		syscall.Syscall9(_glTexImage2D.Addr(), 9, uintptr(target), uintptr(level), uintptr(internalFormat), uintptr(width), uintptr(height), 0, uintptr(format), uintptr(ty), 0)
 	} else {
-		syscall.Syscall9(_glTexImage2D.Addr(), 9, uintptr(target), uintptr(level), uintptr(internalFormat), uintptr(width), uintptr(height), 0, uintptr(format), uintptr(ty), uintptr(unsafe.Pointer(&data[0])))
+		d0 := &data[0]
+		syscall.Syscall9(_glTexImage2D.Addr(), 9, uintptr(target), uintptr(level), uintptr(internalFormat), uintptr(width), uintptr(height), 0, uintptr(format), uintptr(ty), uintptr(unsafe.Pointer(d0)))
+		issue34474KeepAlive(d0)
 	}
 }
 func (c *Functions) TexSubImage2D(target Enum, level int, x, y, width, height int, format, ty Enum, data []byte) {
-	syscall.Syscall9(_glTexSubImage2D.Addr(), 9, uintptr(target), uintptr(level), uintptr(x), uintptr(y), uintptr(width), uintptr(height), uintptr(format), uintptr(ty), uintptr(unsafe.Pointer(&data[0])))
+	d0 := &data[0]
+	syscall.Syscall9(_glTexSubImage2D.Addr(), 9, uintptr(target), uintptr(level), uintptr(x), uintptr(y), uintptr(width), uintptr(height), uintptr(format), uintptr(ty), uintptr(unsafe.Pointer(d0)))
+	issue34474KeepAlive(d0)
 }
 func (c *Functions) TexParameteri(target, pname Enum, param int) {
 	syscall.Syscall(_glTexParameteri.Addr(), 3, uintptr(target), uintptr(pname), uintptr(param))
@@ -363,4 +378,10 @@ func cString(s string) []byte {
 	b := make([]byte, len(s)+1)
 	copy(b, s)
 	return b
+}
+
+// issue34474KeepAlive calls runtime.KeepAlive as a
+// workaround for golang.org/issue/34474.
+func issue34474KeepAlive(v interface{}) {
+	runtime.KeepAlive(v)
 }

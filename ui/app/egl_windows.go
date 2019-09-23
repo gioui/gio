@@ -61,17 +61,23 @@ func mustLoadDLL(dll *syscall.LazyDLL, name string) {
 func eglChooseConfig(disp _EGLDisplay, attribs []_EGLint) (_EGLConfig, bool) {
 	var cfg _EGLConfig
 	var ncfg _EGLint
-	r, _, _ := _eglChooseConfig.Call(uintptr(disp), uintptr(unsafe.Pointer(&attribs[0])), uintptr(unsafe.Pointer(&cfg)), 1, uintptr(unsafe.Pointer(&ncfg)))
+	a := &attribs[0]
+	r, _, _ := _eglChooseConfig.Call(uintptr(disp), uintptr(unsafe.Pointer(a)), uintptr(unsafe.Pointer(&cfg)), 1, uintptr(unsafe.Pointer(&ncfg)))
+	issue34474KeepAlive(a)
 	return cfg, r != 0
 }
 
 func eglCreateContext(disp _EGLDisplay, cfg _EGLConfig, shareCtx _EGLContext, attribs []_EGLint) _EGLContext {
-	c, _, _ := _eglCreateContext.Call(uintptr(disp), uintptr(cfg), uintptr(shareCtx), uintptr(unsafe.Pointer(&attribs[0])))
+	a := &attribs[0]
+	c, _, _ := _eglCreateContext.Call(uintptr(disp), uintptr(cfg), uintptr(shareCtx), uintptr(unsafe.Pointer(a)))
+	issue34474KeepAlive(a)
 	return _EGLContext(c)
 }
 
 func eglCreateWindowSurface(disp _EGLDisplay, cfg _EGLConfig, win _EGLNativeWindowType, attribs []_EGLint) _EGLSurface {
-	s, _, _ := _eglCreateWindowSurface.Call(uintptr(disp), uintptr(cfg), uintptr(win), uintptr(unsafe.Pointer(&attribs[0])))
+	a := &attribs[0]
+	s, _, _ := _eglCreateWindowSurface.Call(uintptr(disp), uintptr(cfg), uintptr(win), uintptr(unsafe.Pointer(a)))
+	issue34474KeepAlive(a)
 	return _EGLSurface(s)
 }
 

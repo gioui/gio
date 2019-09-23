@@ -549,18 +549,21 @@ func getModuleHandle() (syscall.Handle, error) {
 
 func adjustWindowRectEx(r *rect, dwStyle uint32, bMenu int, dwExStyle uint32) {
 	_AdjustWindowRectEx.Call(uintptr(unsafe.Pointer(r)), uintptr(dwStyle), uintptr(bMenu), uintptr(dwExStyle))
+	issue34474KeepAlive(r)
 }
 
 func callMsgFilter(m *msg, nCode uintptr) bool {
 	r, _, _ := _CallMsgFilter.Call(uintptr(unsafe.Pointer(m)), nCode)
+	issue34474KeepAlive(m)
 	return r != 0
 }
 
 func createWindowEx(dwExStyle uint32, lpClassName uint16, lpWindowName string, dwStyle uint32, x, y, w, h int32, hWndParent, hMenu, hInstance syscall.Handle, lpParam uintptr) (syscall.Handle, error) {
+	wname := syscall.StringToUTF16Ptr(lpWindowName)
 	hwnd, _, err := _CreateWindowEx.Call(
 		uintptr(dwExStyle),
 		uintptr(lpClassName),
-		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(lpWindowName))),
+		uintptr(unsafe.Pointer(wname)),
 		uintptr(dwStyle),
 		uintptr(x), uintptr(y),
 		uintptr(w), uintptr(h),
@@ -568,6 +571,7 @@ func createWindowEx(dwExStyle uint32, lpClassName uint16, lpWindowName string, d
 		uintptr(hMenu),
 		uintptr(hInstance),
 		uintptr(lpParam))
+	issue34474KeepAlive(wname)
 	if hwnd == 0 {
 		return 0, fmt.Errorf("CreateWindowEx failed: %v", err)
 	}
@@ -585,10 +589,12 @@ func destroyWindow(hwnd syscall.Handle) {
 
 func dispatchMessage(m *msg) {
 	_DispatchMessage.Call(uintptr(unsafe.Pointer(m)))
+	issue34474KeepAlive(m)
 }
 
 func getClientRect(hwnd syscall.Handle, r *rect) {
 	_GetClientRect.Call(uintptr(hwnd), uintptr(unsafe.Pointer(r)))
+	issue34474KeepAlive(r)
 }
 
 func getDC(hwnd syscall.Handle) (syscall.Handle, error) {
@@ -614,6 +620,7 @@ func getMessage(m *msg, hwnd syscall.Handle, wMsgFilterMin, wMsgFilterMax uint32
 		uintptr(hwnd),
 		uintptr(wMsgFilterMin),
 		uintptr(wMsgFilterMax))
+	issue34474KeepAlive(m)
 	return int32(r)
 }
 
@@ -649,6 +656,7 @@ func msgWaitForMultipleObjectsEx(nCount uint32, pHandles uintptr, millis, mask, 
 
 func peekMessage(m *msg, hwnd syscall.Handle, wMsgFilterMin, wMsgFilterMax, wRemoveMsg uint32) bool {
 	r, _, _ := _PeekMessage.Call(uintptr(unsafe.Pointer(m)), uintptr(hwnd), uintptr(wMsgFilterMin), uintptr(wMsgFilterMax), uintptr(wRemoveMsg))
+	issue34474KeepAlive(m)
 	return r != 0
 }
 
@@ -671,6 +679,7 @@ func releaseCapture() bool {
 
 func registerClassEx(cls *wndClassEx) (uint16, error) {
 	a, _, err := _RegisterClassExW.Call(uintptr(unsafe.Pointer(cls)))
+	issue34474KeepAlive(cls)
 	if a == 0 {
 		return 0, fmt.Errorf("RegisterClassExW failed: %v", err)
 	}
@@ -708,6 +717,7 @@ func setTimer(hwnd syscall.Handle, nIDEvent uintptr, uElapse uint32, timerProc u
 
 func screenToClient(hwnd syscall.Handle, p *point) {
 	_ScreenToClient.Call(uintptr(hwnd), uintptr(unsafe.Pointer(p)))
+	issue34474KeepAlive(p)
 }
 
 func showWindow(hwnd syscall.Handle, nCmdShow int32) {
@@ -716,6 +726,7 @@ func showWindow(hwnd syscall.Handle, nCmdShow int32) {
 
 func translateMessage(m *msg) {
 	_TranslateMessage.Call(uintptr(unsafe.Pointer(m)))
+	issue34474KeepAlive(m)
 }
 
 func unregisterClass(cls uint16, hInst syscall.Handle) {
@@ -724,4 +735,10 @@ func unregisterClass(cls uint16, hInst syscall.Handle) {
 
 func updateWindow(hwnd syscall.Handle) {
 	_UpdateWindow.Call(uintptr(hwnd))
+}
+
+// issue34474KeepAlive calls runtime.KeepAlive as a
+// workaround for golang.org/issue/34474.
+func issue34474KeepAlive(v interface{}) {
+	runtime.KeepAlive(v)
 }
