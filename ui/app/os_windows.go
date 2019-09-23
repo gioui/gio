@@ -219,7 +219,6 @@ func createNativeWindow(opts *windowOptions) (*window, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer unregisterClass(cls, hInst)
 	wr := rect{
 		right:  int32(cfg.Px(opts.Width)),
 		bottom: int32(cfg.Px(opts.Height)),
