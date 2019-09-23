@@ -695,7 +695,7 @@ func setProcessDPIAware() {
 }
 
 func setCapture(hwnd syscall.Handle) syscall.Handle {
-	r, _, _ := _SetCapture.Call(uintptr(unsafe.Pointer(hwnd)))
+	r, _, _ := _SetCapture.Call(uintptr(hwnd))
 	return syscall.Handle(r)
 }
 
