@@ -149,7 +149,8 @@ const (
 
 	_WAIT_OBJECT_0 = 0
 
-	_PM_REMOVE = 0x0001
+	_PM_REMOVE   = 0x0001
+	_PM_NOREMOVE = 0x0000
 )
 
 const _WM_REDRAW = _WM_USER + 0
@@ -178,8 +179,11 @@ func createWindow(window *Window, opts *windowOptions) error {
 		}
 		defer w.destroy()
 		cerr <- nil
+		winMap[w.hwnd] = w
+		defer delete(winMap, w.hwnd)
 		w.w = window
 		w.w.setDriver(w)
+		defer w.w.event(DestroyEvent{})
 		showWindow(w.hwnd, _SW_SHOWDEFAULT)
 		setForegroundWindow(w.hwnd)
 		setFocus(w.hwnd)
@@ -243,7 +247,6 @@ func createNativeWindow(opts *windowOptions) (*window, error) {
 	w := &window{
 		hwnd: hwnd,
 	}
-	winMap[hwnd] = w
 	w.hdc, err = getDC(hwnd)
 	if err != nil {
 		return nil, err
@@ -317,17 +320,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case _WM_MOUSEWHEEL:
 		w.scrollEvent(wParam, lParam)
 	case _WM_DESTROY:
-		delete(winMap, hwnd)
 		w.dead = true
-		w.w.event(DestroyEvent{})
-	case _WM_REDRAW:
-		w.mu.Lock()
-		anim := w.animating
-		w.mu.Unlock()
-		if anim {
-			w.draw(false)
-			w.postRedraw()
-		}
 	case _WM_PAINT:
 		w.draw(true)
 	case _WM_SIZE:
@@ -367,27 +360,22 @@ func (w *window) scrollEvent(wParam, lParam uintptr) {
 
 // Adapted from https://blogs.msdn.microsoft.com/oldnewthing/20060126-00/?p=32513/
 func (w *window) loop() error {
-loop:
+	msg := new(msg)
 	for !w.dead {
-		var msg msg
-		// Since posted messages are always returned before system messages,
-		// but we want our WM_REDRAW to always come last, just like WM_PAINT.
-		// So peek for system messages first, and fall back to processing
-		// all messages.
-		if !peekMessage(&msg, w.hwnd, 0, _WM_REDRAW-1, _PM_REMOVE) {
-			getMessage(&msg, w.hwnd, 0, 0)
+		w.mu.Lock()
+		anim := w.animating
+		w.mu.Unlock()
+		if anim && !peekMessage(msg, w.hwnd, 0, 0, _PM_NOREMOVE) {
+			w.draw(false)
+			continue
 		}
-		// Clear queue of all other redraws.
-		if msg.message == _WM_REDRAW {
-			for peekMessage(&msg, w.hwnd, _WM_REDRAW, _WM_REDRAW, _PM_REMOVE) {
-			}
-		}
+		getMessage(msg, w.hwnd, 0, 0)
 		if msg.message == _WM_QUIT {
 			postQuitMessage(msg.wParam)
-			break loop
+			break
 		}
-		translateMessage(&msg)
-		dispatchMessage(&msg)
+		translateMessage(msg)
+		dispatchMessage(msg)
 	}
 	return nil
 }
