@@ -180,7 +180,6 @@ func createWindow(window *Window, opts *windowOptions) error {
 	w.w = window
 	go func() {
 		w.w.setDriver(w)
-		w.setStage(StageRunning)
 		w.loop()
 		w.destroy()
 		conn.destroy()
@@ -310,6 +309,7 @@ func gio_onXdgSurfaceConfigure(data unsafe.Pointer, wmSurf *C.struct_xdg_surface
 	w.serial = serial
 	w.needAck = true
 	w.mu.Unlock()
+	w.setStage(StageRunning)
 	w.draw(true)
 }
 
