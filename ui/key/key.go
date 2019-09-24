@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 /*
-Package key implements key and text events and
-operations.
+Package key implements key and text events and operations.
 
-The InputOp operations is used for declaring key
-input handlers. Use the Queue interface from package
-input to receive events.
+The InputOp operations is used for declaring key input handlers. Use
+an implementation of the Queue interface from package ui to receive
+events.
 */
 package key
 
 import (
 	"gioui.org/ui"
-	"gioui.org/ui/input"
 	"gioui.org/ui/internal/opconst"
 )
 
@@ -21,7 +19,7 @@ import (
 // focused key handler. Set the Focus flag to request
 // the focus.
 type InputOp struct {
-	Key   input.Key
+	Key   ui.Key
 	Focus bool
 }
 

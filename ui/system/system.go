@@ -6,14 +6,13 @@ package system
 
 import (
 	"gioui.org/ui"
-	"gioui.org/ui/input"
 	"gioui.org/ui/internal/opconst"
 )
 
 // ProfileOp registers a handler for receiving
 // ProfileEvents.
 type ProfileOp struct {
-	Key input.Key
+	Key ui.Key
 }
 
 // ProfileEvent contain profile data from a single

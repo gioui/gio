@@ -6,7 +6,6 @@ import (
 	"image"
 
 	"gioui.org/ui"
-	"gioui.org/ui/input"
 )
 
 // Constraints represent a set of acceptable ranges for
@@ -38,7 +37,7 @@ type Alignment uint8
 // space.
 type Direction uint8
 
-// Widget is a function scope for drawing, processing input and
+// Widget is a function scope for drawing, processing events and
 // computing dimensions for a user interface element.
 type Widget func()
 
@@ -52,7 +51,7 @@ type Context struct {
 	Dimensions Dimensions
 
 	ui.Config
-	input.Queue
+	ui.Queue
 	*ui.Ops
 }
 

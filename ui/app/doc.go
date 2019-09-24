@@ -57,9 +57,9 @@ For example, to display a blank but otherwise functional window:
 
 Event queue
 
-A Window's Queue method returns an input.Queue implementation that distributes
-incoming events to the input handlers declared in the latest call to Update.
-See the gioui.org/ui/input package for more information about input handlers.
+A Window's Queue method returns an ui.Queue implementation that distributes
+incoming events to the event handlers declared in the latest call to Update.
+See the gioui.org/ui package for more information about event handlers.
 
 */
 package app

@@ -5,9 +5,8 @@ Package pointer implements pointer events and operations.
 A pointer is either a mouse controlled cursor or a touch
 object such as a finger.
 
-The InputOp operation is used to declare a handler ready
-for pointer events. Use a Queue from package input to
-receive events.
+The InputOp operation is used to declare a handler ready for pointer
+events. Use a ui.Queue to receive events.
 
 Areas
 
@@ -72,7 +71,7 @@ drawer handle and the interface below should receive pointer events.
 
 Disambiguation
 
-When more than one handler matches a pointer event, the input queue
+When more than one handler matches a pointer event, the event queue
 follows a set of rules for distributing the event.
 
 As long as the pointer has not received a Press event, all

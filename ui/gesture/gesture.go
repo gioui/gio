@@ -3,7 +3,7 @@
 /*
 Package gesture implements common pointer gestures.
 
-Gestures accept low level pointer Events from an input
+Gestures accept low level pointer Events from an event
 Queue and detect higher level actions such as clicks
 and scrolling.
 */
@@ -14,7 +14,6 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
-	"gioui.org/ui/input"
 	"gioui.org/ui/internal/fling"
 	"gioui.org/ui/pointer"
 )
@@ -106,7 +105,7 @@ func (c *Click) State() ClickState {
 }
 
 // Next returns the next click event, if any.
-func (c *Click) Next(q input.Queue) (ClickEvent, bool) {
+func (c *Click) Next(q ui.Queue) (ClickEvent, bool) {
 	for evt, ok := q.Next(c); ok; evt, ok = q.Next(c) {
 		e, ok := evt.(pointer.Event)
 		if !ok {
@@ -154,7 +153,7 @@ func (s *Scroll) Stop() {
 
 // Scroll detects the scrolling distance from the available events and
 // ongoing fling gestures.
-func (s *Scroll) Scroll(cfg ui.Config, q input.Queue, axis Axis) int {
+func (s *Scroll) Scroll(cfg ui.Config, q ui.Queue, axis Axis) int {
 	if s.axis != axis {
 		s.axis = axis
 		return 0

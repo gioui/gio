@@ -9,7 +9,6 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/f32"
-	"gioui.org/ui/input"
 	"gioui.org/ui/internal/opconst"
 )
 
@@ -64,7 +63,7 @@ type areaOp struct {
 // InputOp declares an input handler ready for pointer
 // events.
 type InputOp struct {
-	Key input.Key
+	Key ui.Key
 	// Grab, if set, request that the handler get
 	// Grabbed priority.
 	Grab bool
@@ -86,7 +85,7 @@ type Priority uint8
 // Source of an Event.
 type Source uint8
 
-// Must match input.areaKind
+// Must match app/internal/input.areaKind
 type areaKind uint8
 
 const (

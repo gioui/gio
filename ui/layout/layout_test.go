@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"gioui.org/ui"
-	"gioui.org/ui/input"
 	"gioui.org/ui/layout"
 )
 
@@ -150,6 +149,6 @@ func (config) Px(v ui.Value) int {
 	return int(v.V + .5)
 }
 
-func (queue) Next(k input.Key) (input.Event, bool) {
+func (queue) Next(k ui.Key) (ui.Event, bool) {
 	return nil, false
 }

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"gioui.org/ui"
-	"gioui.org/ui/input"
 	"gioui.org/ui/internal/opconst"
 	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/key"
@@ -30,15 +29,15 @@ type Router struct {
 	wakeupTime time.Time
 
 	// ProfileOp summary.
-	profHandlers []input.Key
+	profHandlers []ui.Key
 }
 
 type handlerEvents struct {
-	handlers map[input.Key][]input.Event
+	handlers map[ui.Key][]ui.Event
 	updated  bool
 }
 
-func (q *Router) Next(k input.Key) (input.Event, bool) {
+func (q *Router) Next(k ui.Key) (ui.Event, bool) {
 	return q.handlers.Next(k)
 }
 
@@ -57,7 +56,7 @@ func (q *Router) Frame(ops *ui.Ops) {
 	}
 }
 
-func (q *Router) Add(e input.Event) bool {
+func (q *Router) Add(e ui.Event) bool {
 	switch e := e.(type) {
 	case pointer.Event:
 		q.pqueue.Push(e, &q.handlers)
@@ -103,17 +102,17 @@ func (q *Router) WakeupTime() (time.Time, bool) {
 
 func (h *handlerEvents) init() {
 	if h.handlers == nil {
-		h.handlers = make(map[input.Key][]input.Event)
+		h.handlers = make(map[ui.Key][]ui.Event)
 	}
 }
 
-func (h *handlerEvents) Set(k input.Key, evts []input.Event) {
+func (h *handlerEvents) Set(k ui.Key, evts []ui.Event) {
 	h.init()
 	h.handlers[k] = evts
 	h.updated = true
 }
 
-func (h *handlerEvents) Add(k input.Key, e input.Event) {
+func (h *handlerEvents) Add(k ui.Key, e ui.Event) {
 	h.init()
 	h.handlers[k] = append(h.handlers[k], e)
 	h.updated = true
@@ -125,7 +124,7 @@ func (h *handlerEvents) Updated() bool {
 	return u
 }
 
-func (h *handlerEvents) Next(k input.Key) (input.Event, bool) {
+func (h *handlerEvents) Next(k ui.Key) (ui.Event, bool) {
 	events := h.handlers[k]
 	if len(events) == 0 {
 		return nil, false
@@ -146,7 +145,7 @@ func decodeProfileOp(d []byte, refs []interface{}) system.ProfileOp {
 		panic("invalid op")
 	}
 	return system.ProfileOp{
-		Key: refs[0].(input.Key),
+		Key: refs[0].(ui.Key),
 	}
 }
 

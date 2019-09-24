@@ -10,8 +10,7 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/app/internal/gpu"
-	iinput "gioui.org/ui/app/internal/input"
-	"gioui.org/ui/input"
+	"gioui.org/ui/app/internal/input"
 	"gioui.org/ui/system"
 )
 
@@ -32,8 +31,8 @@ type Window struct {
 	drawStart time.Time
 	gpu       *gpu.GPU
 
-	out         chan input.Event
-	in          chan input.Event
+	out         chan ui.Event
+	in          chan ui.Event
 	ack         chan struct{}
 	invalidates chan struct{}
 	frames      chan *ui.Ops
@@ -47,11 +46,10 @@ type Window struct {
 	queue Queue
 }
 
-// Queue is an input.Queue implementation that distributes
-// system input events to the input handlers declared in the
-// most recent call to Update.
+// Queue is an ui.Queue implementation that distributes system events
+// to the input handlers declared in the most recent call to Update.
 type Queue struct {
-	q iinput.Router
+	q input.Router
 }
 
 // driverEvent is sent when a new native driver
@@ -71,7 +69,7 @@ var _ interface {
 } = (*window)(nil)
 
 // Pre-allocate the ack event to avoid garbage.
-var ackEvent input.Event
+var ackEvent ui.Event
 
 // NewWindow creates a new window for a set of window
 // options. The options are hints; the platform is free to
@@ -96,8 +94,8 @@ func NewWindow(options ...WindowOption) *Window {
 	}
 
 	w := &Window{
-		in:          make(chan input.Event),
-		out:         make(chan input.Event),
+		in:          make(chan ui.Event),
+		out:         make(chan ui.Event),
 		ack:         make(chan struct{}),
 		invalidates: make(chan struct{}, 1),
 		frames:      make(chan *ui.Ops),
@@ -107,7 +105,7 @@ func NewWindow(options ...WindowOption) *Window {
 }
 
 // Events returns the channel where events are delivered.
-func (w *Window) Events() <-chan input.Event {
+func (w *Window) Events() <-chan ui.Event {
 	return w.out
 }
 
@@ -135,9 +133,9 @@ func (w *Window) draw(size image.Point, frame *ui.Ops) {
 	w.queue.q.Frame(frame)
 	now := time.Now()
 	switch w.queue.q.TextInputState() {
-	case iinput.TextInputOpen:
+	case input.TextInputOpen:
 		w.driver.showTextInput(true)
-	case iinput.TextInputClose:
+	case input.TextInputClose:
 		w.driver.showTextInput(false)
 	}
 	frameDur := now.Sub(w.lastFrame)
@@ -196,7 +194,7 @@ func (w *Window) setDriver(d *window) {
 	w.event(driverEvent{d})
 }
 
-func (w *Window) event(e input.Event) {
+func (w *Window) event(e ui.Event) {
 	w.in <- e
 	<-w.ack
 }
@@ -313,7 +311,7 @@ func (w *Window) run(opts *windowOptions) {
 				w.out <- e2
 				w.ack <- struct{}{}
 				return
-			case input.Event:
+			case ui.Event:
 				if w.queue.q.Add(e2) {
 					w.setNextFrame(time.Time{})
 					w.updateAnimation()
@@ -325,7 +323,7 @@ func (w *Window) run(opts *windowOptions) {
 	}
 }
 
-func (q *Queue) Next(k input.Key) (input.Event, bool) {
+func (q *Queue) Next(k ui.Key) (ui.Event, bool) {
 	return q.q.Next(k)
 }
 

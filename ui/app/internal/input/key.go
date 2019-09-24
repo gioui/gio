@@ -4,7 +4,6 @@ package input
 
 import (
 	"gioui.org/ui"
-	"gioui.org/ui/input"
 	"gioui.org/ui/internal/opconst"
 	"gioui.org/ui/internal/ops"
 	"gioui.org/ui/key"
@@ -13,8 +12,8 @@ import (
 type TextInputState uint8
 
 type keyQueue struct {
-	focus    input.Key
-	handlers map[input.Key]*keyHandler
+	focus    ui.Key
+	handlers map[ui.Key]*keyHandler
 	reader   ops.Reader
 	state    TextInputState
 }
@@ -46,7 +45,7 @@ func (q *keyQueue) InputState() TextInputState {
 
 func (q *keyQueue) Frame(root *ui.Ops, events *handlerEvents) {
 	if q.handlers == nil {
-		q.handlers = make(map[input.Key]*keyHandler)
+		q.handlers = make(map[ui.Key]*keyHandler)
 	}
 	for _, h := range q.handlers {
 		h.active = false
@@ -83,14 +82,14 @@ func (q *keyQueue) Frame(root *ui.Ops, events *handlerEvents) {
 	}
 }
 
-func (q *keyQueue) Push(e input.Event, events *handlerEvents) {
+func (q *keyQueue) Push(e ui.Event, events *handlerEvents) {
 	if q.focus != nil {
 		events.Add(q.focus, e)
 	}
 }
 
-func (q *keyQueue) resolveFocus(events *handlerEvents) (input.Key, listenerPriority, bool) {
-	var k input.Key
+func (q *keyQueue) resolveFocus(events *handlerEvents) (ui.Key, listenerPriority, bool) {
+	var k ui.Key
 	var pri listenerPriority
 	var hide bool
 loop:
@@ -116,7 +115,7 @@ loop:
 				h = new(keyHandler)
 				q.handlers[op.Key] = h
 				// Reset the handler on (each) first appearance.
-				events.Set(op.Key, []input.Event{key.FocusEvent{Focus: false}})
+				events.Set(op.Key, []ui.Event{key.FocusEvent{Focus: false}})
 			}
 			h.active = true
 		case opconst.TypeHideInput:
@@ -145,6 +144,6 @@ func decodeKeyInputOp(d []byte, refs []interface{}) key.InputOp {
 	}
 	return key.InputOp{
 		Focus: d[1] != 0,
-		Key:   refs[0].(input.Key),
+		Key:   refs[0].(ui.Key),
 	}
 }
