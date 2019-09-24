@@ -18,7 +18,7 @@ type Stack struct {
 	macro       ui.MacroOp
 	ops         *ui.Ops
 	constrained bool
-	cs          Constraints
+	ctx         *Context
 	maxSZ       image.Point
 	baseline    int
 }
@@ -30,9 +30,9 @@ type StackChild struct {
 }
 
 // Init a stack before calling Rigid or Expand.
-func (s *Stack) Init(ops *ui.Ops, cs Constraints) *Stack {
+func (s *Stack) Init(ops *ui.Ops, ctx *Context) *Stack {
 	s.ops = ops
-	s.cs = cs
+	s.ctx = ctx
 	s.constrained = true
 	s.maxSZ = image.Point{}
 	s.baseline = 0
@@ -50,7 +50,8 @@ func (s *Stack) begin() {
 // passed to Init.
 func (s *Stack) Rigid(w Widget) StackChild {
 	s.begin()
-	return s.end(w(s.cs))
+	dims := s.ctx.Layout(s.ctx.Constraints, w)
+	return s.end(dims)
 }
 
 // Expand lays out a widget with constraints that exactly match
@@ -61,7 +62,8 @@ func (s *Stack) Expand(w Widget) StackChild {
 		Width:  Constraint{Min: s.maxSZ.X, Max: s.maxSZ.X},
 		Height: Constraint{Min: s.maxSZ.Y, Max: s.maxSZ.Y},
 	}
-	return s.end(w(cs))
+	dims := s.ctx.Layout(cs, w)
+	return s.end(dims)
 }
 
 // End a child by specifying its dimensions.
@@ -83,7 +85,7 @@ func (s *Stack) end(dims Dimensions) StackChild {
 
 // Layout a list of children. The order of the children determines their laid
 // out order.
-func (s *Stack) Layout(children ...StackChild) Dimensions {
+func (s *Stack) Layout(children ...StackChild) {
 	for _, ch := range children {
 		sz := ch.dims.Size
 		var p image.Point
@@ -109,7 +111,7 @@ func (s *Stack) Layout(children ...StackChild) Dimensions {
 	if b == 0 {
 		b = s.maxSZ.Y
 	}
-	return Dimensions{
+	s.ctx.Dimensions = Dimensions{
 		Size:     s.maxSZ,
 		Baseline: b,
 	}

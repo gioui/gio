@@ -25,7 +25,7 @@ type Image struct {
 	Scale float32
 }
 
-func (im Image) Layout(c ui.Config, ops *ui.Ops, cs layout.Constraints) layout.Dimensions {
+func (im Image) Layout(c ui.Config, ops *ui.Ops, ctx *layout.Context) {
 	size := im.Src.Bounds()
 	wf, hf := float32(size.Dx()), float32(size.Dy())
 	var w, h int
@@ -35,6 +35,7 @@ func (im Image) Layout(c ui.Config, ops *ui.Ops, cs layout.Constraints) layout.D
 	} else {
 		w, h = int(wf*im.Scale+.5), int(hf*im.Scale+.5)
 	}
+	cs := ctx.Constraints
 	d := image.Point{X: cs.Width.Constrain(w), Y: cs.Height.Constrain(h)}
 	aspect := float32(w) / float32(h)
 	dw, dh := float32(d.X), float32(d.Y)
@@ -49,5 +50,5 @@ func (im Image) Layout(c ui.Config, ops *ui.Ops, cs layout.Constraints) layout.D
 	}
 	paint.ImageOp{Src: im.Src, Rect: im.Rect}.Add(ops)
 	paint.PaintOp{Rect: dr}.Add(ops)
-	return layout.Dimensions{Size: d, Baseline: d.Y}
+	ctx.Dimensions = layout.Dimensions{Size: d, Baseline: d.Y}
 }

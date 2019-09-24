@@ -58,7 +58,7 @@ type List struct {
 
 // ListElement is a function that computes the dimensions of
 // a list element.
-type ListElement func(cs Constraints, index int) Dimensions
+type ListElement func(index int)
 
 type iterationDir uint8
 
@@ -96,12 +96,16 @@ func (l *List) init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, l
 }
 
 // Layout the List and return its dimensions.
-func (l *List) Layout(c ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, len int, w ListElement) Dimensions {
+func (l *List) Layout(c ui.Config, q input.Queue, ops *ui.Ops, ctx *Context, len int, w ListElement) {
+	cs := ctx.Constraints
 	for l.init(c, q, ops, cs, len); l.more(); l.next() {
 		cs := axisConstraints(l.Axis, Constraint{Max: inf}, axisCrossConstraint(l.Axis, l.cs))
-		l.end(w(cs, l.index()))
+		i := l.index()
+		l.end(ctx.Layout(cs, func() {
+			w(i)
+		}))
 	}
-	return l.layout()
+	ctx.Dimensions = l.layout()
 }
 
 func (l *List) scrollToEnd() bool {

@@ -20,9 +20,9 @@ type Flex struct {
 	// Alignment is the alignment in the cross axis.
 	Alignment Alignment
 
+	ctx       *Context
 	macro     ui.MacroOp
 	ops       *ui.Ops
-	cs        Constraints
 	mode      flexMode
 	size      int
 	rigidSize int
@@ -69,13 +69,13 @@ const (
 )
 
 // Init must be called before Rigid or Flexible.
-func (f *Flex) Init(ops *ui.Ops, cs Constraints) *Flex {
+func (f *Flex) Init(ops *ui.Ops, ctx *Context) *Flex {
 	if f.mode > modeBegun {
 		panic("must End the current child before calling Init again")
 	}
 	f.mode = modeBegun
 	f.ops = ops
-	f.cs = cs
+	f.ctx = ctx
 	f.size = 0
 	f.rigidSize = 0
 	f.maxCross = 0
@@ -98,20 +98,23 @@ func (f *Flex) begin(mode flexMode) {
 // from 0 to the remaining space.
 func (f *Flex) Rigid(w Widget) FlexChild {
 	f.begin(modeRigid)
-	mainc := axisMainConstraint(f.Axis, f.cs)
+	cs := f.ctx.Constraints
+	mainc := axisMainConstraint(f.Axis, cs)
 	mainMax := mainc.Max - f.size
 	if mainMax < 0 {
 		mainMax = 0
 	}
-	cs := axisConstraints(f.Axis, Constraint{Max: mainMax}, axisCrossConstraint(f.Axis, f.cs))
-	return f.end(w(cs))
+	cs = axisConstraints(f.Axis, Constraint{Max: mainMax}, axisCrossConstraint(f.Axis, cs))
+	dims := f.ctx.Layout(cs, w)
+	return f.end(dims)
 }
 
 // Flexible is like Rigid, where the main axis size is also constrained to a
 // fraction of the space not taken up by Rigid children.
 func (f *Flex) Flexible(weight float32, w Widget) FlexChild {
 	f.begin(modeFlex)
-	mainc := axisMainConstraint(f.Axis, f.cs)
+	cs := f.ctx.Constraints
+	mainc := axisMainConstraint(f.Axis, cs)
 	var flexSize int
 	if mainc.Max > f.size {
 		flexSize = mainc.Max - f.rigidSize
@@ -125,8 +128,9 @@ func (f *Flex) Flexible(weight float32, w Widget) FlexChild {
 		}
 	}
 	submainc := Constraint{Max: flexSize}
-	cs := axisConstraints(f.Axis, submainc, axisCrossConstraint(f.Axis, f.cs))
-	return f.end(w(cs))
+	cs = axisConstraints(f.Axis, submainc, axisCrossConstraint(f.Axis, cs))
+	dims := f.ctx.Layout(cs, w)
+	return f.end(dims)
 }
 
 // End a child by specifying its dimensions. Pass the returned layout result
@@ -153,9 +157,10 @@ func (f *Flex) end(dims Dimensions) FlexChild {
 
 // Layout a list of children. The order of the children determines their laid
 // out order.
-func (f *Flex) Layout(children ...FlexChild) Dimensions {
-	mainc := axisMainConstraint(f.Axis, f.cs)
-	crossSize := axisCrossConstraint(f.Axis, f.cs).Constrain(f.maxCross)
+func (f *Flex) Layout(children ...FlexChild) {
+	cs := f.ctx.Constraints
+	mainc := axisMainConstraint(f.Axis, cs)
+	crossSize := axisCrossConstraint(f.Axis, cs).Constrain(f.maxCross)
 	var space int
 	if mainc.Min > f.size {
 		space = mainc.Min - f.size
@@ -220,7 +225,7 @@ func (f *Flex) Layout(children ...FlexChild) Dimensions {
 	if baseline == 0 {
 		baseline = sz.Y
 	}
-	return Dimensions{Size: sz, Baseline: baseline}
+	f.ctx.Dimensions = Dimensions{Size: sz, Baseline: baseline}
 }
 
 func axisPoint(a Axis, main, cross int) image.Point {

@@ -165,7 +165,8 @@ func (e *Editor) Focus() {
 	e.requestFocus = true
 }
 
-func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, cs layout.Constraints) layout.Dimensions {
+func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, ctx *layout.Context) {
+	cs := ctx.Constraints
 	for _, ok := e.Next(cfg, queue); ok; _, ok = e.Next(cfg, queue) {
 	}
 	twoDp := cfg.Px(ui.Dp(2))
@@ -270,7 +271,7 @@ func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, cs layout
 	pointer.RectAreaOp{Rect: r}.Add(ops)
 	e.scroller.Add(ops)
 	e.clicker.Add(ops)
-	return layout.Dimensions{Size: e.viewSize, Baseline: baseline}
+	ctx.Dimensions = layout.Dimensions{Size: e.viewSize, Baseline: baseline}
 }
 
 // Text returns the contents of the editor.

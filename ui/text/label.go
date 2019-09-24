@@ -92,7 +92,8 @@ func (l *lineIterator) Next() (String, f32.Point, bool) {
 	return String{}, f32.Point{}, false
 }
 
-func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimensions {
+func (l Label) Layout(ops *ui.Ops, ctx *layout.Context) {
+	cs := ctx.Constraints
 	textLayout := l.Face.Layout(l.Text, LayoutOptions{MaxWidth: cs.Width.Max})
 	lines := textLayout.Lines
 	if max := l.MaxLines; max > 0 && len(lines) > max {
@@ -127,7 +128,7 @@ func (l Label) Layout(ops *ui.Ops, cs layout.Constraints) layout.Dimensions {
 		paint.PaintOp{Rect: lclip}.Add(ops)
 		stack.Pop()
 	}
-	return dims
+	ctx.Dimensions = dims
 }
 
 func toRectF(r image.Rectangle) f32.Rectangle {

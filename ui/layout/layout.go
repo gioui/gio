@@ -37,9 +37,16 @@ type Alignment uint8
 // space.
 type Direction uint8
 
-// Widget is a function that computes a set of dimensions that
-// satisfies the given constraints.
-type Widget func(cs Constraints) Dimensions
+// Widget is a function scope for drawing, processing input and
+// computing dimensions for a user interface element.
+type Widget func()
+
+// Context tracks the current constraints and dimensions during
+// layout.
+type Context struct {
+	Constraints Constraints
+	Dimensions  Dimensions
+}
 
 const (
 	Start Alignment = iota
@@ -64,6 +71,17 @@ const (
 	Horizontal Axis = iota
 	Vertical
 )
+
+// Layout a widget with a set of constraints and return its
+// dimensions. The previous constraints are restored after layout.
+func (s *Context) Layout(cs Constraints, w Widget) Dimensions {
+	saved := s.Constraints
+	s.Constraints = cs
+	s.Dimensions = Dimensions{}
+	w()
+	s.Constraints = saved
+	return s.Dimensions
+}
 
 // Constrain a value to the range [Min; Max].
 func (c Constraint) Constrain(v int) int {
@@ -100,12 +118,12 @@ type Align struct {
 }
 
 // Layout a widget.
-func (in *Inset) Layout(c ui.Config, ops *ui.Ops, cs Constraints, w Widget) Dimensions {
+func (in Inset) Layout(c ui.Config, ops *ui.Ops, ctx *Context, w Widget) {
 	top := c.Px(in.Top)
 	right := c.Px(in.Right)
 	bottom := c.Px(in.Bottom)
 	left := c.Px(in.Left)
-	mcs := cs
+	mcs := ctx.Constraints
 	mcs.Width.Min -= left + right
 	mcs.Width.Max -= left + right
 	if mcs.Width.Min < 0 {
@@ -125,10 +143,10 @@ func (in *Inset) Layout(c ui.Config, ops *ui.Ops, cs Constraints, w Widget) Dime
 	var stack ui.StackOp
 	stack.Push(ops)
 	ui.TransformOp{}.Offset(toPointF(image.Point{X: left, Y: top})).Add(ops)
-	dims := w(mcs)
+	dims := ctx.Layout(mcs, w)
 	stack.Pop()
-	return Dimensions{
-		Size:     cs.Constrain(dims.Size.Add(image.Point{X: right + left, Y: top + bottom})),
+	ctx.Dimensions = Dimensions{
+		Size:     ctx.Constraints.Constrain(dims.Size.Add(image.Point{X: right + left, Y: top + bottom})),
 		Baseline: dims.Baseline + top,
 	}
 }
@@ -140,13 +158,14 @@ func UniformInset(v ui.Value) Inset {
 }
 
 // Layout a widget.
-func (a *Align) Layout(ops *ui.Ops, cs Constraints, w Widget) Dimensions {
+func (a Align) Layout(ops *ui.Ops, st *Context, w Widget) {
 	var macro ui.MacroOp
+	macro.Record(ops)
+	cs := st.Constraints
 	mcs := cs
 	mcs.Width.Min = 0
 	mcs.Height.Min = 0
-	macro.Record(ops)
-	dims := w(mcs)
+	dims := st.Layout(mcs, w)
 	macro.Stop()
 	sz := dims.Size
 	if sz.X < cs.Width.Min {
@@ -173,7 +192,7 @@ func (a *Align) Layout(ops *ui.Ops, cs Constraints, w Widget) Dimensions {
 	ui.TransformOp{}.Offset(toPointF(p)).Add(ops)
 	macro.Add(ops)
 	stack.Pop()
-	return Dimensions{
+	st.Dimensions = Dimensions{
 		Size:     sz,
 		Baseline: dims.Baseline,
 	}
