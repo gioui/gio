@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"gioui.org/ui"
-	"gioui.org/ui/input"
 	"gioui.org/ui/layout"
 )
 
@@ -19,18 +18,17 @@ type config struct{}
 func BenchmarkUI(b *testing.B) {
 	fetch := func(_ string) {}
 	u := newUI(fetch)
-	ops := new(ui.Ops)
-	q := new(queue)
-	c := new(config)
-	ctx := new(layout.Context)
-	ctx.Constraints = layout.RigidConstraints(image.Point{800, 600})
+	cfg := new(config)
+	c := &layout.Context{
+		Queue: new(queue),
+	}
 	for i := 0; i < b.N; i++ {
-		ops.Reset()
-		u.Layout(c, q, ops, ctx)
+		c.Reset(cfg, layout.RigidConstraints(image.Point{800, 600}))
+		u.Layout(c)
 	}
 }
 
-func (queue) Next(k input.Key) (input.Event, bool) {
+func (queue) Next(k ui.Key) (ui.Event, bool) {
 	return nil, false
 }
 

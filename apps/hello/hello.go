@@ -34,29 +34,27 @@ func loop(w *app.Window) error {
 	if err != nil {
 		panic("failed to load font")
 	}
-	var cfg app.Config
 	var faces measure.Faces
 	maroon := color.RGBA{127, 0, 0, 255}
 	face := faces.For(regular, ui.Sp(72))
 	message := "Hello, Gio"
-	ops := new(ui.Ops)
-	ctx := new(layout.Context)
+	c := &layout.Context{
+		Queue: w.Queue(),
+	}
 	for {
 		e := <-w.Events()
 		switch e := e.(type) {
 		case app.DestroyEvent:
 			return e.Err
 		case app.UpdateEvent:
-			cfg = e.Config
-			faces.Reset(&cfg)
-			ctx.Constraints = layout.RigidConstraints(e.Size)
-			ops.Reset()
+			c.Reset(&e.Config, layout.RigidConstraints(e.Size))
+			faces.Reset(c.Config)
 			var material ui.MacroOp
-			material.Record(ops)
-			paint.ColorOp{Color: maroon}.Add(ops)
+			material.Record(c.Ops)
+			paint.ColorOp{Color: maroon}.Add(c.Ops)
 			material.Stop()
-			text.Label{Material: material, Face: face, Alignment: text.Middle, Text: message}.Layout(ops, ctx)
-			w.Update(ops)
+			text.Label{Material: material, Face: face, Alignment: text.Middle, Text: message}.Layout(c)
+			w.Update(c.Ops)
 		}
 	}
 }

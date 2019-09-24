@@ -77,9 +77,9 @@ func initProfiling() {
 
 func (a *App) run() error {
 	a.ui.profiling = *stats
-	ops := new(ui.Ops)
-	var cfg app.Config
-	ctx := new(layout.Context)
+	c := &layout.Context{
+		Queue: a.w.Queue(),
+	}
 	for {
 		select {
 		case users := <-a.updateUsers:
@@ -127,11 +127,9 @@ func (a *App) run() error {
 					}
 				}
 			case app.UpdateEvent:
-				ops.Reset()
-				cfg = e.Config
-				ctx.Constraints = layout.RigidConstraints(e.Size)
-				a.ui.Layout(&cfg, a.w.Queue(), ops, ctx)
-				a.w.Update(ops)
+				c.Reset(&e.Config, layout.RigidConstraints(e.Size))
+				a.ui.Layout(c)
+				a.w.Update(c.Ops)
 			}
 		}
 	}
