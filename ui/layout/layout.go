@@ -6,6 +6,7 @@ import (
 	"image"
 
 	"gioui.org/ui"
+	"gioui.org/ui/input"
 )
 
 // Constraints represent a set of acceptable ranges for
@@ -41,11 +42,18 @@ type Direction uint8
 // computing dimensions for a user interface element.
 type Widget func()
 
-// Context tracks the current constraints and dimensions during
-// layout.
+// Context carry the state needed by almost all layouts and widgets.
 type Context struct {
+	// Constraints track the constraints for the active widget or
+	// layout.
 	Constraints Constraints
-	Dimensions  Dimensions
+	// Dimensions track the result of the most recent layout
+	// operation.
+	Dimensions Dimensions
+
+	ui.Config
+	input.Queue
+	*ui.Ops
 }
 
 const (
@@ -83,6 +91,16 @@ func (s *Context) Layout(cs Constraints, w Widget) Dimensions {
 	return s.Dimensions
 }
 
+// Reset the context.
+func (c *Context) Reset(cfg ui.Config, cs Constraints) {
+	c.Constraints = cs
+	c.Config = cfg
+	if c.Ops == nil {
+		c.Ops = new(ui.Ops)
+	}
+	c.Ops.Reset()
+}
+
 // Constrain a value to the range [Min; Max].
 func (c Constraint) Constrain(v int) int {
 	if v < c.Min {
@@ -116,12 +134,12 @@ type Inset struct {
 type Align Direction
 
 // Layout a widget.
-func (in Inset) Layout(c ui.Config, ops *ui.Ops, ctx *Context, w Widget) {
+func (in Inset) Layout(c *Context, w Widget) {
 	top := c.Px(in.Top)
 	right := c.Px(in.Right)
 	bottom := c.Px(in.Bottom)
 	left := c.Px(in.Left)
-	mcs := ctx.Constraints
+	mcs := c.Constraints
 	mcs.Width.Min -= left + right
 	mcs.Width.Max -= left + right
 	if mcs.Width.Min < 0 {
@@ -139,12 +157,12 @@ func (in Inset) Layout(c ui.Config, ops *ui.Ops, ctx *Context, w Widget) {
 		mcs.Height.Max = mcs.Height.Min
 	}
 	var stack ui.StackOp
-	stack.Push(ops)
-	ui.TransformOp{}.Offset(toPointF(image.Point{X: left, Y: top})).Add(ops)
-	dims := ctx.Layout(mcs, w)
+	stack.Push(c.Ops)
+	ui.TransformOp{}.Offset(toPointF(image.Point{X: left, Y: top})).Add(c.Ops)
+	dims := c.Layout(mcs, w)
 	stack.Pop()
-	ctx.Dimensions = Dimensions{
-		Size:     ctx.Constraints.Constrain(dims.Size.Add(image.Point{X: right + left, Y: top + bottom})),
+	c.Dimensions = Dimensions{
+		Size:     c.Constraints.Constrain(dims.Size.Add(image.Point{X: right + left, Y: top + bottom})),
 		Baseline: dims.Baseline + top,
 	}
 }
@@ -156,14 +174,14 @@ func UniformInset(v ui.Value) Inset {
 }
 
 // Layout a widget.
-func (a Align) Layout(ops *ui.Ops, st *Context, w Widget) {
+func (a Align) Layout(c *Context, w Widget) {
 	var macro ui.MacroOp
-	macro.Record(ops)
-	cs := st.Constraints
+	macro.Record(c.Ops)
+	cs := c.Constraints
 	mcs := cs
 	mcs.Width.Min = 0
 	mcs.Height.Min = 0
-	dims := st.Layout(mcs, w)
+	dims := c.Layout(mcs, w)
 	macro.Stop()
 	sz := dims.Size
 	if sz.X < cs.Width.Min {
@@ -186,11 +204,11 @@ func (a Align) Layout(ops *ui.Ops, st *Context, w Widget) {
 		p.Y = sz.Y - dims.Size.Y
 	}
 	var stack ui.StackOp
-	stack.Push(ops)
-	ui.TransformOp{}.Offset(toPointF(p)).Add(ops)
-	macro.Add(ops)
+	stack.Push(c.Ops)
+	ui.TransformOp{}.Offset(toPointF(p)).Add(c.Ops)
+	macro.Add(c.Ops)
 	stack.Pop()
-	st.Dimensions = Dimensions{
+	c.Dimensions = Dimensions{
 		Size:     sz,
 		Baseline: dims.Baseline,
 	}

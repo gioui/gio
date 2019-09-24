@@ -92,8 +92,8 @@ func (l *lineIterator) Next() (String, f32.Point, bool) {
 	return String{}, f32.Point{}, false
 }
 
-func (l Label) Layout(ops *ui.Ops, ctx *layout.Context) {
-	cs := ctx.Constraints
+func (l Label) Layout(c *layout.Context) {
+	cs := c.Constraints
 	textLayout := l.Face.Layout(l.Text, LayoutOptions{MaxWidth: cs.Width.Max})
 	lines := textLayout.Lines
 	if max := l.MaxLines; max > 0 && len(lines) > max {
@@ -119,16 +119,16 @@ func (l Label) Layout(ops *ui.Ops, ctx *layout.Context) {
 		}
 		lclip := toRectF(clip).Sub(off)
 		var stack ui.StackOp
-		stack.Push(ops)
-		ui.TransformOp{}.Offset(off).Add(ops)
-		l.Face.Path(str).Add(ops)
+		stack.Push(c.Ops)
+		ui.TransformOp{}.Offset(off).Add(c.Ops)
+		l.Face.Path(str).Add(c.Ops)
 		// Set a default color in case the material is empty.
-		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(ops)
-		l.Material.Add(ops)
-		paint.PaintOp{Rect: lclip}.Add(ops)
+		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(c.Ops)
+		l.Material.Add(c.Ops)
+		paint.PaintOp{Rect: lclip}.Add(c.Ops)
 		stack.Pop()
 	}
-	ctx.Dimensions = dims
+	c.Dimensions = dims
 }
 
 func toRectF(r image.Rectangle) f32.Rectangle {

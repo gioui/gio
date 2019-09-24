@@ -22,7 +22,6 @@ type Flex struct {
 
 	ctx       *Context
 	macro     ui.MacroOp
-	ops       *ui.Ops
 	mode      flexMode
 	size      int
 	rigidSize int
@@ -69,13 +68,12 @@ const (
 )
 
 // Init must be called before Rigid or Flexible.
-func (f *Flex) Init(ops *ui.Ops, ctx *Context) *Flex {
+func (f *Flex) Init(c *Context) *Flex {
 	if f.mode > modeBegun {
 		panic("must End the current child before calling Init again")
 	}
 	f.mode = modeBegun
-	f.ops = ops
-	f.ctx = ctx
+	f.ctx = c
 	f.size = 0
 	f.rigidSize = 0
 	f.maxCross = 0
@@ -91,7 +89,7 @@ func (f *Flex) begin(mode flexMode) {
 		panic("must End before adding a child")
 	}
 	f.mode = mode
-	f.macro.Record(f.ops)
+	f.macro.Record(f.ctx.Ops)
 }
 
 // Rigid lays out a widget with the main axis constrained to the range
@@ -192,9 +190,9 @@ func (f *Flex) Layout(children ...FlexChild) {
 			}
 		}
 		var stack ui.StackOp
-		stack.Push(f.ops)
-		ui.TransformOp{}.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))).Add(f.ops)
-		child.macro.Add(f.ops)
+		stack.Push(f.ctx.Ops)
+		ui.TransformOp{}.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))).Add(f.ctx.Ops)
+		child.macro.Add(f.ctx.Ops)
 		stack.Pop()
 		mainSize += axisMain(f.Axis, dims.Size)
 		if i < len(children)-1 {

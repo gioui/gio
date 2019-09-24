@@ -11,7 +11,6 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/gesture"
-	"gioui.org/ui/input"
 	"gioui.org/ui/key"
 	"gioui.org/ui/layout"
 	"gioui.org/ui/paint"
@@ -82,9 +81,9 @@ const (
 )
 
 // Next returns the next available editor event, or false if none are available.
-func (e *Editor) Next(cfg ui.Config, queue input.Queue) (EditorEvent, bool) {
+func (e *Editor) Next(c *layout.Context) (EditorEvent, bool) {
 	// Crude configuration change detection.
-	if scale := cfg.Px(ui.Sp(100)); scale != e.oldScale {
+	if scale := c.Px(ui.Sp(100)); scale != e.oldScale {
 		e.invalidate()
 		e.oldScale = scale
 	}
@@ -98,7 +97,7 @@ func (e *Editor) Next(cfg ui.Config, queue input.Queue) (EditorEvent, bool) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Scroll(cfg, queue, axis)
+	sdist := e.scroller.Scroll(c.Config, c.Queue, axis)
 	var soff int
 	if e.SingleLine {
 		e.scrollOff.X += sdist
@@ -107,26 +106,26 @@ func (e *Editor) Next(cfg ui.Config, queue input.Queue) (EditorEvent, bool) {
 		e.scrollOff.Y += sdist
 		soff = e.scrollOff.Y
 	}
-	for evt, ok := e.clicker.Next(queue); ok; evt, ok = e.clicker.Next(queue) {
+	for evt, ok := e.clicker.Next(c.Queue); ok; evt, ok = e.clicker.Next(c.Queue) {
 		switch {
 		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
 			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
-			e.blinkStart = cfg.Now()
+			e.blinkStart = c.Now()
 			e.moveCoord(image.Point{
 				X: int(math.Round(float64(evt.Position.X))),
 				Y: int(math.Round(float64(evt.Position.Y))),
 			})
 			e.requestFocus = true
 			if e.scroller.State() != gesture.StateFlinging {
-				e.scrollToCaret(cfg)
+				e.scrollToCaret(c)
 			}
 		}
 	}
 	if (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin) {
 		e.scroller.Stop()
 	}
-	for ke, ok := queue.Next(e); ok; ke, ok = queue.Next(e) {
-		e.blinkStart = cfg.Now()
+	for ke, ok := c.Queue.Next(e); ok; ke, ok = c.Queue.Next(e) {
+		e.blinkStart = c.Now()
 		switch ke := ke.(type) {
 		case key.FocusEvent:
 			e.focused = ke.Focus
@@ -140,11 +139,11 @@ func (e *Editor) Next(cfg ui.Config, queue input.Queue) (EditorEvent, bool) {
 				}
 			}
 			if e.command(ke) {
-				e.scrollToCaret(cfg)
+				e.scrollToCaret(c.Config)
 				e.scroller.Stop()
 			}
 		case key.EditEvent:
-			e.scrollToCaret(cfg)
+			e.scrollToCaret(c)
 			e.scroller.Stop()
 			e.append(ke.Text)
 		}
@@ -165,11 +164,11 @@ func (e *Editor) Focus() {
 	e.requestFocus = true
 }
 
-func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, ctx *layout.Context) {
-	cs := ctx.Constraints
-	for _, ok := e.Next(cfg, queue); ok; _, ok = e.Next(cfg, queue) {
+func (e *Editor) Layout(c *layout.Context) {
+	cs := c.Constraints
+	for _, ok := e.Next(c); ok; _, ok = e.Next(c) {
 	}
-	twoDp := cfg.Px(ui.Dp(2))
+	twoDp := c.Px(ui.Dp(2))
 	e.padLeft, e.padRight = twoDp, twoDp
 	maxWidth := cs.Width.Max
 	if e.SingleLine {
@@ -197,7 +196,7 @@ func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, ctx *layo
 		Min: image.Point{X: 0, Y: 0},
 		Max: image.Point{X: e.viewSize.X, Y: e.viewSize.Y},
 	}
-	key.InputOp{Key: e, Focus: e.requestFocus}.Add(ops)
+	key.InputOp{Key: e, Focus: e.requestFocus}.Add(c.Ops)
 	e.requestFocus = false
 	e.it = lineIterator{
 		Lines:     lines,
@@ -207,14 +206,14 @@ func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, ctx *layo
 		Offset:    off,
 	}
 	var stack ui.StackOp
-	stack.Push(ops)
+	stack.Push(c.Ops)
 	// Apply material. Set a default color in case the material is empty.
 	if e.rr.len() > 0 {
-		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(ops)
-		e.Material.Add(ops)
+		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(c.Ops)
+		e.Material.Add(c.Ops)
 	} else {
-		paint.ColorOp{Color: color.RGBA{A: 0xaa}}.Add(ops)
-		e.HintMaterial.Add(ops)
+		paint.ColorOp{Color: color.RGBA{A: 0xaa}}.Add(c.Ops)
+		e.HintMaterial.Add(c.Ops)
 	}
 	for {
 		str, lineOff, ok := e.it.Next()
@@ -222,21 +221,21 @@ func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, ctx *layo
 			break
 		}
 		var stack ui.StackOp
-		stack.Push(ops)
-		ui.TransformOp{}.Offset(lineOff).Add(ops)
-		e.Face.Path(str).Add(ops)
-		paint.PaintOp{Rect: toRectF(clip).Sub(lineOff)}.Add(ops)
+		stack.Push(c.Ops)
+		ui.TransformOp{}.Offset(lineOff).Add(c.Ops)
+		e.Face.Path(str).Add(c.Ops)
+		paint.PaintOp{Rect: toRectF(clip).Sub(lineOff)}.Add(c.Ops)
 		stack.Pop()
 	}
 	if e.focused {
-		now := cfg.Now()
+		now := c.Now()
 		dt := now.Sub(e.blinkStart)
 		blinking := dt < maxBlinkDuration
 		const timePerBlink = time.Second / blinksPerSecond
 		nextBlink := now.Add(timePerBlink/2 - dt%(timePerBlink/2))
 		on := !blinking || dt%timePerBlink < timePerBlink/2
 		if on {
-			carWidth := e.caretWidth(cfg)
+			carWidth := e.caretWidth(c)
 			carX -= carWidth / 2
 			carAsc, carDesc := -lines[carLine].Bounds.Min.Y, lines[carLine].Bounds.Max.Y
 			carRect := image.Rectangle{
@@ -249,29 +248,29 @@ func (e *Editor) Layout(cfg ui.Config, queue input.Queue, ops *ui.Ops, ctx *layo
 			})
 			carRect = clip.Intersect(carRect)
 			if !carRect.Empty() {
-				paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(ops)
-				e.Material.Add(ops)
-				paint.PaintOp{Rect: toRectF(carRect)}.Add(ops)
+				paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(c.Ops)
+				e.Material.Add(c.Ops)
+				paint.PaintOp{Rect: toRectF(carRect)}.Add(c.Ops)
 			}
 		}
 		if blinking {
 			redraw := ui.InvalidateOp{At: nextBlink}
-			redraw.Add(ops)
+			redraw.Add(c.Ops)
 		}
 	}
 	stack.Pop()
 
 	baseline := e.padTop + e.dims.Baseline
-	pointerPadding := cfg.Px(ui.Dp(4))
+	pointerPadding := c.Px(ui.Dp(4))
 	r := image.Rectangle{Max: e.viewSize}
 	r.Min.X -= pointerPadding
 	r.Min.Y -= pointerPadding
 	r.Max.X += pointerPadding
 	r.Max.X += pointerPadding
-	pointer.RectAreaOp{Rect: r}.Add(ops)
-	e.scroller.Add(ops)
-	e.clicker.Add(ops)
-	ctx.Dimensions = layout.Dimensions{Size: e.viewSize, Baseline: baseline}
+	pointer.RectAreaOp{Rect: r}.Add(c.Ops)
+	e.scroller.Add(c.Ops)
+	e.clicker.Add(c.Ops)
+	c.Dimensions = layout.Dimensions{Size: e.viewSize, Baseline: baseline}
 }
 
 // Text returns the contents of the editor.
@@ -550,8 +549,8 @@ func (e *Editor) moveEnd() {
 	e.carXOff = l.Width + a - x
 }
 
-func (e *Editor) scrollToCaret(cfg ui.Config) {
-	carWidth := e.caretWidth(cfg)
+func (e *Editor) scrollToCaret(c ui.Config) {
+	carWidth := e.caretWidth(c)
 	carLine, _, x, y := e.layoutCaret()
 	l := e.lines[carLine]
 	if e.SingleLine {

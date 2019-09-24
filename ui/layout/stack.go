@@ -16,7 +16,6 @@ type Stack struct {
 	Alignment Direction
 
 	macro       ui.MacroOp
-	ops         *ui.Ops
 	constrained bool
 	ctx         *Context
 	maxSZ       image.Point
@@ -30,9 +29,8 @@ type StackChild struct {
 }
 
 // Init a stack before calling Rigid or Expand.
-func (s *Stack) Init(ops *ui.Ops, ctx *Context) *Stack {
-	s.ops = ops
-	s.ctx = ctx
+func (s *Stack) Init(c *Context) *Stack {
+	s.ctx = c
 	s.constrained = true
 	s.maxSZ = image.Point{}
 	s.baseline = 0
@@ -43,7 +41,7 @@ func (s *Stack) begin() {
 	if !s.constrained {
 		panic("must Init before adding a child")
 	}
-	s.macro.Record(s.ops)
+	s.macro.Record(s.ctx.Ops)
 }
 
 // Rigid lays out a widget with the same constraints that were
@@ -102,9 +100,9 @@ func (s *Stack) Layout(children ...StackChild) {
 			p.Y = s.maxSZ.Y - sz.Y
 		}
 		var stack ui.StackOp
-		stack.Push(s.ops)
-		ui.TransformOp{}.Offset(toPointF(p)).Add(s.ops)
-		ch.macro.Add(s.ops)
+		stack.Push(s.ctx.Ops)
+		ui.TransformOp{}.Offset(toPointF(p)).Add(s.ctx.Ops)
+		ch.macro.Add(s.ctx.Ops)
 		stack.Pop()
 	}
 	b := s.baseline

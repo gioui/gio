@@ -7,7 +7,6 @@ import (
 
 	"gioui.org/ui"
 	"gioui.org/ui/gesture"
-	"gioui.org/ui/input"
 	"gioui.org/ui/paint"
 	"gioui.org/ui/pointer"
 )
@@ -33,9 +32,7 @@ type List struct {
 	// the very end.
 	beforeEnd bool
 
-	config      ui.Config
-	ops         *ui.Ops
-	queue       input.Queue
+	ctx         *Context
 	macro       ui.MacroOp
 	child       ui.MacroOp
 	scroll      gesture.Scroll
@@ -47,7 +44,6 @@ type List struct {
 	// to the child with index first.
 	offset int
 
-	cs  Constraints
 	len int
 
 	// maxSize is the total size of visible children.
@@ -71,18 +67,15 @@ const (
 const inf = 1e6
 
 // Init prepares the list for iterating through its children with Next.
-func (l *List) init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, len int) {
+func (l *List) init(c *Context, len int) {
 	if l.more() {
 		panic("unfinished child")
 	}
-	l.config = cfg
-	l.queue = q
-	l.update()
-	l.ops = ops
+	l.ctx = c
 	l.maxSize = 0
 	l.children = l.children[:0]
-	l.cs = cs
 	l.len = len
+	l.update()
 	if l.scrollToEnd() {
 		l.offset = 0
 		l.first = len
@@ -91,21 +84,20 @@ func (l *List) init(cfg ui.Config, q input.Queue, ops *ui.Ops, cs Constraints, l
 		l.offset = 0
 		l.first = len
 	}
-	l.macro.Record(ops)
+	l.macro.Record(c.Ops)
 	l.next()
 }
 
 // Layout the List and return its dimensions.
-func (l *List) Layout(c ui.Config, q input.Queue, ops *ui.Ops, ctx *Context, len int, w ListElement) {
-	cs := ctx.Constraints
-	for l.init(c, q, ops, cs, len); l.more(); l.next() {
-		cs := axisConstraints(l.Axis, Constraint{Max: inf}, axisCrossConstraint(l.Axis, l.cs))
+func (l *List) Layout(c *Context, len int, w ListElement) {
+	for l.init(c, len); l.more(); l.next() {
+		cs := axisConstraints(l.Axis, Constraint{Max: inf}, axisCrossConstraint(l.Axis, l.ctx.Constraints))
 		i := l.index()
-		l.end(ctx.Layout(cs, func() {
+		l.end(c.Layout(cs, func() {
 			w(i)
 		}))
 	}
-	ctx.Dimensions = l.layout()
+	c.Dimensions = l.layout()
 }
 
 func (l *List) scrollToEnd() bool {
@@ -118,7 +110,7 @@ func (l *List) Dragging() bool {
 }
 
 func (l *List) update() {
-	d := l.scroll.Scroll(l.config, l.queue, gesture.Axis(l.Axis))
+	d := l.scroll.Scroll(l.ctx.Config, l.ctx.Queue, gesture.Axis(l.Axis))
 	l.scrollDelta = d
 	l.offset += d
 }
@@ -134,7 +126,7 @@ func (l *List) next() {
 		l.dir = l.nextDir()
 	}
 	if l.more() {
-		l.child.Record(l.ops)
+		l.child.Record(l.ctx.Ops)
 	}
 }
 
@@ -156,7 +148,7 @@ func (l *List) more() bool {
 }
 
 func (l *List) nextDir() iterationDir {
-	vsize := axisMainConstraint(l.Axis, l.cs).Max
+	vsize := axisMainConstraint(l.Axis, l.ctx.Constraints).Max
 	last := l.first + len(l.children)
 	// Clamp offset.
 	if l.maxSize-l.offset < vsize && last == l.len {
@@ -200,7 +192,7 @@ func (l *List) layout() Dimensions {
 	if l.more() {
 		panic("unfinished child")
 	}
-	mainc := axisMainConstraint(l.Axis, l.cs)
+	mainc := axisMainConstraint(l.Axis, l.ctx.Constraints)
 	children := l.children
 	// Skip invisible children
 	for len(children) > 0 {
@@ -226,7 +218,7 @@ func (l *List) layout() Dimensions {
 			break
 		}
 	}
-	ops := l.ops
+	ops := l.ctx.Ops
 	pos := -l.offset
 	// ScrollToEnd lists lists are end aligned.
 	if space := mainc.Max - size; l.ScrollToEnd && space > 0 {

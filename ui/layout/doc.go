@@ -13,17 +13,17 @@ in an implicit Context to keep the Widget declaration short.
 
 For example, to add space above a widget:
 
-	ctx := new(layout.Context)
-	ctx.Constraints = ...
+	c := &layout.Context{...}
+	c.Reset(...)
 
 	// Configure a top inset.
 	inset := layout.Inset{Top: ui.Dp(8), ...}
 	// Use the inset to lay out a widget.
-	inset.Layout(..., ctx, func() {
+	inset.Layout(c, func() {
 		// Lay out widget and determine its size given the constraints.
 		...
 		dims := layout.Dimensions{...}
-		ctx.Dimensions = dims
+		c.Dimensions = dims
 	})
 
 Note that the example does not generate any garbage even though the
@@ -37,10 +37,10 @@ be created from a few generic layouts.
 This example both aligns and insets a child:
 
 	inset := layout.Inset{...}
-	inset.Layout(..., ctx, func() {
+	inset.Layout(c, func() {
 		align := layout.Align(...)
-		align.Layout(..., ctx, func() {
-			widget.Layout(..., ctx)
+		align.Layout(c, func() {
+			widget.Layout(c, ...)
 		})
 	})
 
