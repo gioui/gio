@@ -186,8 +186,7 @@ func (u *UI) layoutTimings(c ui.Config, q input.Queue, ops *ui.Ops, ctx *layout.
 	runtime.ReadMemStats(&mstats)
 	mallocs := mstats.Mallocs - u.lastMallocs
 	u.lastMallocs = mstats.Mallocs
-	al := layout.Align{Alignment: layout.NE}
-	al.Layout(ops, ctx, func() {
+	layout.Align(layout.NE).Layout(ops, ctx, func() {
 		layout.Inset{Top: ui.Dp(16)}.Layout(c, ops, ctx, func() {
 			txt := fmt.Sprintf("m: %d %s", mallocs, u.profile.Timings)
 			text.Label{Material: theme.text, Face: u.face(fonts.mono, 10), Text: txt}.Layout(ops, ctx)
@@ -261,8 +260,7 @@ func (up *userPage) commit(c ui.Config, ops *ui.Ops, ctx *layout.Context, index 
 func (u *UI) layoutUsers(c ui.Config, q input.Queue, ops *ui.Ops, ctx *layout.Context) {
 	st := (&layout.Stack{}).Init(ops, ctx)
 	c2 := st.Rigid(func() {
-		al := layout.Align{Alignment: layout.SE}
-		al.Layout(ops, ctx, func() {
+		layout.Align(layout.SE).Layout(ops, ctx, func() {
 			in := layout.UniformInset(ui.Dp(16))
 			in.Layout(c, ops, ctx, func() {
 				u.fab.Layout(c, q, ops, ctx)
@@ -370,11 +368,9 @@ func (u *UI) user(c ui.Config, ops *ui.Ops, ctx *layout.Context, index int) {
 					})
 					c2 := f.Flexible(1, func() {
 						ctx.Constraints.Width.Min = ctx.Constraints.Width.Max
-						al := layout.Align{Alignment: layout.E}
-						in := layout.Inset{Left: ui.Dp(2)}
-						lbl := text.Label{Material: theme.text, Face: u.face(fonts.regular, 10), Text: "3 hours ago"}
-						al.Layout(ops, ctx, func() {
-							in.Layout(c, ops, ctx, func() {
+						layout.Align(layout.E).Layout(ops, ctx, func() {
+							layout.Inset{Left: ui.Dp(2)}.Layout(c, ops, ctx, func() {
+								lbl := text.Label{Material: theme.text, Face: u.face(fonts.regular, 10), Text: "3 hours ago"}
 								lbl.Layout(ops, ctx)
 							})
 						})
