@@ -79,6 +79,7 @@ func (a *App) run() error {
 	a.ui.profiling = *stats
 	ops := new(ui.Ops)
 	var cfg app.Config
+	ctx := new(layout.Context)
 	for {
 		select {
 		case users := <-a.updateUsers:
@@ -128,8 +129,8 @@ func (a *App) run() error {
 			case app.UpdateEvent:
 				ops.Reset()
 				cfg = e.Config
-				cs := layout.RigidConstraints(e.Size)
-				a.ui.Layout(&cfg, a.w.Queue(), ops, cs)
+				ctx.Constraints = layout.RigidConstraints(e.Size)
+				a.ui.Layout(&cfg, a.w.Queue(), ops, ctx)
 				a.w.Update(ops)
 			}
 		}

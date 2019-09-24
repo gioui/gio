@@ -22,10 +22,11 @@ func BenchmarkUI(b *testing.B) {
 	ops := new(ui.Ops)
 	q := new(queue)
 	c := new(config)
-	cs := layout.RigidConstraints(image.Point{800, 600})
+	ctx := new(layout.Context)
+	ctx.Constraints = layout.RigidConstraints(image.Point{800, 600})
 	for i := 0; i < b.N; i++ {
 		ops.Reset()
-		u.Layout(c, q, ops, cs)
+		u.Layout(c, q, ops, ctx)
 	}
 }
 

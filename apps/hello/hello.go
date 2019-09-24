@@ -40,6 +40,7 @@ func loop(w *app.Window) error {
 	face := faces.For(regular, ui.Sp(72))
 	message := "Hello, Gio"
 	ops := new(ui.Ops)
+	ctx := new(layout.Context)
 	for {
 		e := <-w.Events()
 		switch e := e.(type) {
@@ -48,13 +49,13 @@ func loop(w *app.Window) error {
 		case app.UpdateEvent:
 			cfg = e.Config
 			faces.Reset(&cfg)
-			cs := layout.RigidConstraints(e.Size)
+			ctx.Constraints = layout.RigidConstraints(e.Size)
 			ops.Reset()
 			var material ui.MacroOp
 			material.Record(ops)
 			paint.ColorOp{Color: maroon}.Add(ops)
 			material.Stop()
-			text.Label{Material: material, Face: face, Alignment: text.Middle, Text: message}.Layout(ops, cs)
+			text.Label{Material: material, Face: face, Alignment: text.Middle, Text: message}.Layout(ops, ctx)
 			w.Update(ops)
 		}
 	}
