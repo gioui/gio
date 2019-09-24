@@ -113,9 +113,7 @@ type Inset struct {
 }
 
 // Align aligns a widget in the available space.
-type Align struct {
-	Alignment Direction
-}
+type Align Direction
 
 // Layout a widget.
 func (in Inset) Layout(c ui.Config, ops *ui.Ops, ctx *Context, w Widget) {
@@ -175,13 +173,13 @@ func (a Align) Layout(ops *ui.Ops, st *Context, w Widget) {
 		sz.Y = cs.Height.Min
 	}
 	var p image.Point
-	switch a.Alignment {
+	switch Direction(a) {
 	case N, S, Center:
 		p.X = (sz.X - dims.Size.X) / 2
 	case NE, SE, E:
 		p.X = sz.X - dims.Size.X
 	}
-	switch a.Alignment {
+	switch Direction(a) {
 	case W, Center, E:
 		p.Y = (sz.Y - dims.Size.Y) / 2
 	case SW, S, SE:

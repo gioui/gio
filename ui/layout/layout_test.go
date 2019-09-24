@@ -47,7 +47,7 @@ func ExampleAlign() {
 	// Rigid constraints with both minimum and maximum set.
 	ctx.Constraints = layout.RigidConstraints(image.Point{X: 100, Y: 100})
 
-	align := layout.Align{Alignment: layout.Center}
+	align := layout.Align(layout.Center)
 	align.Layout(ops, ctx, func() {
 		// Lay out a 50x50 sized widget.
 		layoutWidget(ctx, 50, 50)
