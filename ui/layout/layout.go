@@ -93,6 +93,7 @@ func (s *Context) Layout(cs Constraints, w Widget) Dimensions {
 // Reset the context.
 func (c *Context) Reset(cfg ui.Config, cs Constraints) {
 	c.Constraints = cs
+	c.Dimensions = Dimensions{}
 	c.Config = cfg
 	if c.Ops == nil {
 		c.Ops = new(ui.Ops)
