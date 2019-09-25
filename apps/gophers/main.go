@@ -77,7 +77,7 @@ func initProfiling() {
 
 func (a *App) run() error {
 	a.ui.profiling = *stats
-	c := &layout.Context{
+	gtx := &layout.Context{
 		Queue: a.w.Queue(),
 	}
 	for {
@@ -127,9 +127,9 @@ func (a *App) run() error {
 					}
 				}
 			case app.UpdateEvent:
-				c.Reset(&e.Config, layout.RigidConstraints(e.Size))
-				a.ui.Layout(c)
-				a.w.Update(c.Ops)
+				gtx.Reset(&e.Config, layout.RigidConstraints(e.Size))
+				a.ui.Layout(gtx)
+				a.w.Update(gtx.Ops)
 			}
 		}
 	}

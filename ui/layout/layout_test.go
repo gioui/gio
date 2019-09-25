@@ -17,22 +17,22 @@ var q queue
 var cfg = new(config)
 
 func ExampleInset() {
-	c := &layout.Context{Queue: q}
+	gtx := &layout.Context{Queue: q}
 	// Loose constraints with no minimal size.
 	var cs layout.Constraints
 	cs.Width.Max = 100
 	cs.Height.Max = 100
-	c.Reset(cfg, cs)
+	gtx.Reset(cfg, cs)
 
 	// Inset all edges by 10.
 	inset := layout.UniformInset(ui.Dp(10))
-	inset.Layout(c, func() {
+	inset.Layout(gtx, func() {
 		// Lay out a 50x50 sized widget.
-		layoutWidget(c, 50, 50)
-		fmt.Println(c.Dimensions.Size)
+		layoutWidget(gtx, 50, 50)
+		fmt.Println(gtx.Dimensions.Size)
 	})
 
-	fmt.Println(c.Dimensions.Size)
+	fmt.Println(gtx.Dimensions.Size)
 
 	// Output:
 	// (50,50)
@@ -40,19 +40,19 @@ func ExampleInset() {
 }
 
 func ExampleAlign() {
-	c := &layout.Context{Queue: q}
+	gtx := &layout.Context{Queue: q}
 	// Rigid constraints with both minimum and maximum set.
 	cs := layout.RigidConstraints(image.Point{X: 100, Y: 100})
-	c.Reset(cfg, cs)
+	gtx.Reset(cfg, cs)
 
 	align := layout.Align(layout.Center)
-	align.Layout(c, func() {
+	align.Layout(gtx, func() {
 		// Lay out a 50x50 sized widget.
-		layoutWidget(c, 50, 50)
-		fmt.Println(c.Dimensions.Size)
+		layoutWidget(gtx, 50, 50)
+		fmt.Println(gtx.Dimensions.Size)
 	})
 
-	fmt.Println(c.Dimensions.Size)
+	fmt.Println(gtx.Dimensions.Size)
 
 	// Output:
 	// (50,50)
@@ -60,23 +60,23 @@ func ExampleAlign() {
 }
 
 func ExampleFlex() {
-	c := &layout.Context{Queue: q}
+	gtx := &layout.Context{Queue: q}
 	cs := layout.RigidConstraints(image.Point{X: 100, Y: 100})
-	c.Reset(cfg, cs)
+	gtx.Reset(cfg, cs)
 
 	flex := layout.Flex{}
-	flex.Init(c)
+	flex.Init(gtx)
 
 	// Rigid 10x10 widget.
 	child1 := flex.Rigid(func() {
-		fmt.Printf("Rigid: %v\n", c.Constraints.Width)
-		layoutWidget(c, 10, 10)
+		fmt.Printf("Rigid: %v\n", gtx.Constraints.Width)
+		layoutWidget(gtx, 10, 10)
 	})
 
 	// Child with 50% space allowance.
 	child2 := flex.Flexible(0.5, func() {
-		fmt.Printf("50%%: %v\n", c.Constraints.Width)
-		layoutWidget(c, 10, 10)
+		fmt.Printf("50%%: %v\n", gtx.Constraints.Width)
+		layoutWidget(gtx, 10, 10)
 	})
 
 	flex.Layout(child1, child2)
@@ -87,22 +87,22 @@ func ExampleFlex() {
 }
 
 func ExampleStack() {
-	c := &layout.Context{Queue: q}
+	gtx := &layout.Context{Queue: q}
 	cs := layout.RigidConstraints(image.Point{X: 100, Y: 100})
-	c.Reset(cfg, cs)
+	gtx.Reset(cfg, cs)
 
 	stack := layout.Stack{}
-	stack.Init(c)
+	stack.Init(gtx)
 
 	// Rigid 50x50 widget.
 	child1 := stack.Rigid(func() {
-		layoutWidget(c, 50, 50)
+		layoutWidget(gtx, 50, 50)
 	})
 
 	// Force widget to the same size as the first.
 	child2 := stack.Expand(func() {
-		fmt.Printf("Expand: %v\n", c.Constraints)
-		layoutWidget(c, 10, 10)
+		fmt.Printf("Expand: %v\n", gtx.Constraints)
+		layoutWidget(gtx, 10, 10)
 	})
 
 	stack.Layout(child1, child2)
@@ -112,18 +112,18 @@ func ExampleStack() {
 }
 
 func ExampleList() {
-	c := &layout.Context{Queue: q}
+	gtx := &layout.Context{Queue: q}
 	cs := layout.RigidConstraints(image.Point{X: 100, Y: 100})
-	c.Reset(cfg, cs)
+	gtx.Reset(cfg, cs)
 
 	// The list is 1e6 elements, but only 5 fit the constraints.
 	const listLen = 1e6
 
 	var list layout.List
 	count := 0
-	list.Layout(c, listLen, func(i int) {
+	list.Layout(gtx, listLen, func(i int) {
 		count++
-		layoutWidget(c, 20, 20)
+		layoutWidget(gtx, 20, 20)
 	})
 
 	fmt.Println(count)
