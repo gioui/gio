@@ -25,17 +25,17 @@ type Image struct {
 	Scale float32
 }
 
-func (im Image) Layout(c *layout.Context) {
+func (im Image) Layout(gtx *layout.Context) {
 	size := im.Src.Bounds()
 	wf, hf := float32(size.Dx()), float32(size.Dy())
 	var w, h int
 	if im.Scale == 0 {
 		const dpPrPx = 160 / 72
-		w, h = c.Px(ui.Dp(wf*dpPrPx)), c.Px(ui.Dp(hf*dpPrPx))
+		w, h = gtx.Px(ui.Dp(wf*dpPrPx)), gtx.Px(ui.Dp(hf*dpPrPx))
 	} else {
 		w, h = int(wf*im.Scale+.5), int(hf*im.Scale+.5)
 	}
-	cs := c.Constraints
+	cs := gtx.Constraints
 	d := image.Point{X: cs.Width.Constrain(w), Y: cs.Height.Constrain(h)}
 	aspect := float32(w) / float32(h)
 	dw, dh := float32(d.X), float32(d.Y)
@@ -48,7 +48,7 @@ func (im Image) Layout(c *layout.Context) {
 	dr := f32.Rectangle{
 		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
 	}
-	paint.ImageOp{Src: im.Src, Rect: im.Rect}.Add(c.Ops)
-	paint.PaintOp{Rect: dr}.Add(c.Ops)
-	c.Dimensions = layout.Dimensions{Size: d, Baseline: d.Y}
+	paint.ImageOp{Src: im.Src, Rect: im.Rect}.Add(gtx.Ops)
+	paint.PaintOp{Rect: dr}.Add(gtx.Ops)
+	gtx.Dimensions = layout.Dimensions{Size: d, Baseline: d.Y}
 }

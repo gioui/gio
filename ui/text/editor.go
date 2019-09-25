@@ -81,9 +81,9 @@ const (
 )
 
 // Next returns the next available editor event, or false if none are available.
-func (e *Editor) Next(c *layout.Context) (EditorEvent, bool) {
+func (e *Editor) Next(gtx *layout.Context) (EditorEvent, bool) {
 	// Crude configuration change detection.
-	if scale := c.Px(ui.Sp(100)); scale != e.oldScale {
+	if scale := gtx.Px(ui.Sp(100)); scale != e.oldScale {
 		e.invalidate()
 		e.oldScale = scale
 	}
@@ -97,7 +97,7 @@ func (e *Editor) Next(c *layout.Context) (EditorEvent, bool) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Scroll(c.Config, c.Queue, axis)
+	sdist := e.scroller.Scroll(gtx.Config, gtx.Queue, axis)
 	var soff int
 	if e.SingleLine {
 		e.scrollOff.X += sdist
@@ -106,26 +106,26 @@ func (e *Editor) Next(c *layout.Context) (EditorEvent, bool) {
 		e.scrollOff.Y += sdist
 		soff = e.scrollOff.Y
 	}
-	for evt, ok := e.clicker.Next(c.Queue); ok; evt, ok = e.clicker.Next(c.Queue) {
+	for evt, ok := e.clicker.Next(gtx.Queue); ok; evt, ok = e.clicker.Next(gtx.Queue) {
 		switch {
 		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
 			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
-			e.blinkStart = c.Now()
+			e.blinkStart = gtx.Now()
 			e.moveCoord(image.Point{
 				X: int(math.Round(float64(evt.Position.X))),
 				Y: int(math.Round(float64(evt.Position.Y))),
 			})
 			e.requestFocus = true
 			if e.scroller.State() != gesture.StateFlinging {
-				e.scrollToCaret(c)
+				e.scrollToCaret(gtx)
 			}
 		}
 	}
 	if (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin) {
 		e.scroller.Stop()
 	}
-	for ke, ok := c.Queue.Next(e); ok; ke, ok = c.Queue.Next(e) {
-		e.blinkStart = c.Now()
+	for ke, ok := gtx.Queue.Next(e); ok; ke, ok = gtx.Queue.Next(e) {
+		e.blinkStart = gtx.Now()
 		switch ke := ke.(type) {
 		case key.FocusEvent:
 			e.focused = ke.Focus
@@ -139,11 +139,11 @@ func (e *Editor) Next(c *layout.Context) (EditorEvent, bool) {
 				}
 			}
 			if e.command(ke) {
-				e.scrollToCaret(c.Config)
+				e.scrollToCaret(gtx.Config)
 				e.scroller.Stop()
 			}
 		case key.EditEvent:
-			e.scrollToCaret(c)
+			e.scrollToCaret(gtx)
 			e.scroller.Stop()
 			e.append(ke.Text)
 		}
@@ -164,11 +164,11 @@ func (e *Editor) Focus() {
 	e.requestFocus = true
 }
 
-func (e *Editor) Layout(c *layout.Context) {
-	cs := c.Constraints
-	for _, ok := e.Next(c); ok; _, ok = e.Next(c) {
+func (e *Editor) Layout(gtx *layout.Context) {
+	cs := gtx.Constraints
+	for _, ok := e.Next(gtx); ok; _, ok = e.Next(gtx) {
 	}
-	twoDp := c.Px(ui.Dp(2))
+	twoDp := gtx.Px(ui.Dp(2))
 	e.padLeft, e.padRight = twoDp, twoDp
 	maxWidth := cs.Width.Max
 	if e.SingleLine {
@@ -196,7 +196,7 @@ func (e *Editor) Layout(c *layout.Context) {
 		Min: image.Point{X: 0, Y: 0},
 		Max: image.Point{X: e.viewSize.X, Y: e.viewSize.Y},
 	}
-	key.InputOp{Key: e, Focus: e.requestFocus}.Add(c.Ops)
+	key.InputOp{Key: e, Focus: e.requestFocus}.Add(gtx.Ops)
 	e.requestFocus = false
 	e.it = lineIterator{
 		Lines:     lines,
@@ -206,14 +206,14 @@ func (e *Editor) Layout(c *layout.Context) {
 		Offset:    off,
 	}
 	var stack ui.StackOp
-	stack.Push(c.Ops)
+	stack.Push(gtx.Ops)
 	// Apply material. Set a default color in case the material is empty.
 	if e.rr.len() > 0 {
-		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(c.Ops)
-		e.Material.Add(c.Ops)
+		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(gtx.Ops)
+		e.Material.Add(gtx.Ops)
 	} else {
-		paint.ColorOp{Color: color.RGBA{A: 0xaa}}.Add(c.Ops)
-		e.HintMaterial.Add(c.Ops)
+		paint.ColorOp{Color: color.RGBA{A: 0xaa}}.Add(gtx.Ops)
+		e.HintMaterial.Add(gtx.Ops)
 	}
 	for {
 		str, lineOff, ok := e.it.Next()
@@ -221,21 +221,21 @@ func (e *Editor) Layout(c *layout.Context) {
 			break
 		}
 		var stack ui.StackOp
-		stack.Push(c.Ops)
-		ui.TransformOp{}.Offset(lineOff).Add(c.Ops)
-		e.Face.Path(str).Add(c.Ops)
-		paint.PaintOp{Rect: toRectF(clip).Sub(lineOff)}.Add(c.Ops)
+		stack.Push(gtx.Ops)
+		ui.TransformOp{}.Offset(lineOff).Add(gtx.Ops)
+		e.Face.Path(str).Add(gtx.Ops)
+		paint.PaintOp{Rect: toRectF(clip).Sub(lineOff)}.Add(gtx.Ops)
 		stack.Pop()
 	}
 	if e.focused {
-		now := c.Now()
+		now := gtx.Now()
 		dt := now.Sub(e.blinkStart)
 		blinking := dt < maxBlinkDuration
 		const timePerBlink = time.Second / blinksPerSecond
 		nextBlink := now.Add(timePerBlink/2 - dt%(timePerBlink/2))
 		on := !blinking || dt%timePerBlink < timePerBlink/2
 		if on {
-			carWidth := e.caretWidth(c)
+			carWidth := e.caretWidth(gtx)
 			carX -= carWidth / 2
 			carAsc, carDesc := -lines[carLine].Bounds.Min.Y, lines[carLine].Bounds.Max.Y
 			carRect := image.Rectangle{
@@ -248,29 +248,29 @@ func (e *Editor) Layout(c *layout.Context) {
 			})
 			carRect = clip.Intersect(carRect)
 			if !carRect.Empty() {
-				paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(c.Ops)
-				e.Material.Add(c.Ops)
-				paint.PaintOp{Rect: toRectF(carRect)}.Add(c.Ops)
+				paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(gtx.Ops)
+				e.Material.Add(gtx.Ops)
+				paint.PaintOp{Rect: toRectF(carRect)}.Add(gtx.Ops)
 			}
 		}
 		if blinking {
 			redraw := ui.InvalidateOp{At: nextBlink}
-			redraw.Add(c.Ops)
+			redraw.Add(gtx.Ops)
 		}
 	}
 	stack.Pop()
 
 	baseline := e.padTop + e.dims.Baseline
-	pointerPadding := c.Px(ui.Dp(4))
+	pointerPadding := gtx.Px(ui.Dp(4))
 	r := image.Rectangle{Max: e.viewSize}
 	r.Min.X -= pointerPadding
 	r.Min.Y -= pointerPadding
 	r.Max.X += pointerPadding
 	r.Max.X += pointerPadding
-	pointer.RectAreaOp{Rect: r}.Add(c.Ops)
-	e.scroller.Add(c.Ops)
-	e.clicker.Add(c.Ops)
-	c.Dimensions = layout.Dimensions{Size: e.viewSize, Baseline: baseline}
+	pointer.RectAreaOp{Rect: r}.Add(gtx.Ops)
+	e.scroller.Add(gtx.Ops)
+	e.clicker.Add(gtx.Ops)
+	gtx.Dimensions = layout.Dimensions{Size: e.viewSize, Baseline: baseline}
 }
 
 // Text returns the contents of the editor.

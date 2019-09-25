@@ -68,12 +68,12 @@ const (
 )
 
 // Init must be called before Rigid or Flexible.
-func (f *Flex) Init(c *Context) *Flex {
+func (f *Flex) Init(gtx *Context) *Flex {
 	if f.mode > modeBegun {
 		panic("must End the current child before calling Init again")
 	}
 	f.mode = modeBegun
-	f.ctx = c
+	f.ctx = gtx
 	f.size = 0
 	f.rigidSize = 0
 	f.maxCross = 0

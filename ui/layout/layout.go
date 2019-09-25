@@ -133,12 +133,12 @@ type Inset struct {
 type Align Direction
 
 // Layout a widget.
-func (in Inset) Layout(c *Context, w Widget) {
-	top := c.Px(in.Top)
-	right := c.Px(in.Right)
-	bottom := c.Px(in.Bottom)
-	left := c.Px(in.Left)
-	mcs := c.Constraints
+func (in Inset) Layout(gtx *Context, w Widget) {
+	top := gtx.Px(in.Top)
+	right := gtx.Px(in.Right)
+	bottom := gtx.Px(in.Bottom)
+	left := gtx.Px(in.Left)
+	mcs := gtx.Constraints
 	mcs.Width.Min -= left + right
 	mcs.Width.Max -= left + right
 	if mcs.Width.Min < 0 {
@@ -156,12 +156,12 @@ func (in Inset) Layout(c *Context, w Widget) {
 		mcs.Height.Max = mcs.Height.Min
 	}
 	var stack ui.StackOp
-	stack.Push(c.Ops)
-	ui.TransformOp{}.Offset(toPointF(image.Point{X: left, Y: top})).Add(c.Ops)
-	dims := c.Layout(mcs, w)
+	stack.Push(gtx.Ops)
+	ui.TransformOp{}.Offset(toPointF(image.Point{X: left, Y: top})).Add(gtx.Ops)
+	dims := gtx.Layout(mcs, w)
 	stack.Pop()
-	c.Dimensions = Dimensions{
-		Size:     c.Constraints.Constrain(dims.Size.Add(image.Point{X: right + left, Y: top + bottom})),
+	gtx.Dimensions = Dimensions{
+		Size:     gtx.Constraints.Constrain(dims.Size.Add(image.Point{X: right + left, Y: top + bottom})),
 		Baseline: dims.Baseline + top,
 	}
 }
@@ -173,14 +173,14 @@ func UniformInset(v ui.Value) Inset {
 }
 
 // Layout a widget.
-func (a Align) Layout(c *Context, w Widget) {
+func (a Align) Layout(gtx *Context, w Widget) {
 	var macro ui.MacroOp
-	macro.Record(c.Ops)
-	cs := c.Constraints
+	macro.Record(gtx.Ops)
+	cs := gtx.Constraints
 	mcs := cs
 	mcs.Width.Min = 0
 	mcs.Height.Min = 0
-	dims := c.Layout(mcs, w)
+	dims := gtx.Layout(mcs, w)
 	macro.Stop()
 	sz := dims.Size
 	if sz.X < cs.Width.Min {
@@ -203,11 +203,11 @@ func (a Align) Layout(c *Context, w Widget) {
 		p.Y = sz.Y - dims.Size.Y
 	}
 	var stack ui.StackOp
-	stack.Push(c.Ops)
-	ui.TransformOp{}.Offset(toPointF(p)).Add(c.Ops)
-	macro.Add(c.Ops)
+	stack.Push(gtx.Ops)
+	ui.TransformOp{}.Offset(toPointF(p)).Add(gtx.Ops)
+	macro.Add(gtx.Ops)
 	stack.Pop()
-	c.Dimensions = Dimensions{
+	gtx.Dimensions = Dimensions{
 		Size:     sz,
 		Baseline: dims.Baseline,
 	}

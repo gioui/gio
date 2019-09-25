@@ -29,8 +29,8 @@ type StackChild struct {
 }
 
 // Init a stack before calling Rigid or Expand.
-func (s *Stack) Init(c *Context) *Stack {
-	s.ctx = c
+func (s *Stack) Init(gtx *Context) *Stack {
+	s.ctx = gtx
 	s.constrained = true
 	s.maxSZ = image.Point{}
 	s.baseline = 0

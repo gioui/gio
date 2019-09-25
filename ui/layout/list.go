@@ -67,11 +67,11 @@ const (
 const inf = 1e6
 
 // Init prepares the list for iterating through its children with Next.
-func (l *List) init(c *Context, len int) {
+func (l *List) init(gtx *Context, len int) {
 	if l.more() {
 		panic("unfinished child")
 	}
-	l.ctx = c
+	l.ctx = gtx
 	l.maxSize = 0
 	l.children = l.children[:0]
 	l.len = len
@@ -84,20 +84,20 @@ func (l *List) init(c *Context, len int) {
 		l.offset = 0
 		l.first = len
 	}
-	l.macro.Record(c.Ops)
+	l.macro.Record(gtx.Ops)
 	l.next()
 }
 
 // Layout the List and return its dimensions.
-func (l *List) Layout(c *Context, len int, w ListElement) {
-	for l.init(c, len); l.more(); l.next() {
+func (l *List) Layout(gtx *Context, len int, w ListElement) {
+	for l.init(gtx, len); l.more(); l.next() {
 		cs := axisConstraints(l.Axis, Constraint{Max: inf}, axisCrossConstraint(l.Axis, l.ctx.Constraints))
 		i := l.index()
-		l.end(c.Layout(cs, func() {
+		l.end(gtx.Layout(cs, func() {
 			w(i)
 		}))
 	}
-	c.Dimensions = l.layout()
+	gtx.Dimensions = l.layout()
 }
 
 func (l *List) scrollToEnd() bool {
