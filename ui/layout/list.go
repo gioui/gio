@@ -66,7 +66,7 @@ const (
 
 const inf = 1e6
 
-// Init prepares the list for iterating through its children with Next.
+// init prepares the list for iterating through its children with next.
 func (l *List) init(gtx *Context, len int) {
 	if l.more() {
 		panic("unfinished child")

@@ -98,21 +98,21 @@ type window struct {
 	notify struct {
 		read, write int
 	}
-	ppdp, ppsp        float32
-	scroll struct {
-		time        time.Duration
-		steps        image.Point
-		dist f32.Point
+	ppdp, ppsp float32
+	scroll     struct {
+		time  time.Duration
+		steps image.Point
+		dist  f32.Point
 	}
-	lastPos           f32.Point
-	lastTouch         f32.Point
+	lastPos   f32.Point
+	lastTouch f32.Point
 
 	fling struct {
 		yExtrapolation fling.Extrapolation
 		xExtrapolation fling.Extrapolation
-		anim        fling.Animation
-		start     bool
-		dir f32.Point
+		anim           fling.Animation
+		start          bool
+		dir            f32.Point
 	}
 
 	stage             Stage

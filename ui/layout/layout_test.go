@@ -149,6 +149,6 @@ func (config) Px(v ui.Value) int {
 	return int(v.V + .5)
 }
 
-func (queue) Next(k ui.Key) (ui.Event, bool) {
-	return nil, false
+func (queue) Events(k ui.Key) []ui.Event {
+	return nil
 }

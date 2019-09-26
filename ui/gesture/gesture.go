@@ -104,7 +104,7 @@ func (c *Click) State() ClickState {
 	return c.state
 }
 
-// Next returns the next click event, if any.
+// Events returns the next click event, if any.
 func (c *Click) Events(q ui.Queue) []ClickEvent {
 	var events []ClickEvent
 	for _, evt := range q.Events(c) {
