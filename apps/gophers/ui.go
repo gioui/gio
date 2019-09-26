@@ -175,7 +175,7 @@ func (u *UI) layoutTimings(gtx *layout.Context) {
 	if !u.profiling {
 		return
 	}
-	for e, ok := gtx.Next(u); ok; e, ok = gtx.Next(u) {
+	for _, e := range gtx.Events(u) {
 		if e, ok := e.(system.ProfileEvent); ok {
 			u.profile = e
 		}
@@ -197,7 +197,7 @@ func (u *UI) Layout(gtx *layout.Context) {
 	u.faces.Reset(gtx)
 	for i := range u.userClicks {
 		click := &u.userClicks[i]
-		for e, ok := click.Next(gtx); ok; e, ok = click.Next(gtx) {
+		for _, e := range click.Events(gtx) {
 			if e.Type == gesture.TypeClick {
 				u.selectedUser = u.newUserPage(u.users[i])
 			}

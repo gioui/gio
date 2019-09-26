@@ -28,8 +28,8 @@ func BenchmarkUI(b *testing.B) {
 	}
 }
 
-func (queue) Next(k ui.Key) (ui.Event, bool) {
-	return nil, false
+func (queue) Events(k ui.Key) []ui.Event {
+	return nil
 }
 
 func (config) Now() time.Time {
