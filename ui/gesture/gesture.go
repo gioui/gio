@@ -105,8 +105,9 @@ func (c *Click) State() ClickState {
 }
 
 // Next returns the next click event, if any.
-func (c *Click) Next(q ui.Queue) (ClickEvent, bool) {
-	for evt, ok := q.Next(c); ok; evt, ok = q.Next(c) {
+func (c *Click) Events(q ui.Queue) []ClickEvent {
+	var events []ClickEvent
+	for _, evt := range q.Events(c) {
 		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue
@@ -116,7 +117,7 @@ func (c *Click) Next(q ui.Queue) (ClickEvent, bool) {
 			wasPressed := c.state == StatePressed
 			c.state = StateNormal
 			if wasPressed {
-				return ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source}, true
+				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source})
 			}
 		case pointer.Cancel:
 			c.state = StateNormal
@@ -125,7 +126,7 @@ func (c *Click) Next(q ui.Queue) (ClickEvent, bool) {
 				break
 			}
 			c.state = StatePressed
-			return ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source}, true
+			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source})
 		case pointer.Move:
 			if c.state == StatePressed && !e.Hit {
 				c.state = StateNormal
@@ -134,7 +135,7 @@ func (c *Click) Next(q ui.Queue) (ClickEvent, bool) {
 			}
 		}
 	}
-	return ClickEvent{}, false
+	return events
 }
 
 // Add the handler to the operation list to receive scroll events.
@@ -159,7 +160,7 @@ func (s *Scroll) Scroll(cfg ui.Config, q ui.Queue, axis Axis) int {
 		return 0
 	}
 	total := 0
-	for evt, ok := q.Next(s); ok; evt, ok = q.Next(s) {
+	for _, evt := range q.Events(s) {
 		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue

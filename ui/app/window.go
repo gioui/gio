@@ -323,8 +323,8 @@ func (w *Window) run(opts *windowOptions) {
 	}
 }
 
-func (q *Queue) Next(k ui.Key) (ui.Event, bool) {
-	return q.q.Next(k)
+func (q *Queue) Events(k ui.Key) []ui.Event {
+	return q.q.Events(k)
 }
 
 // WithTitle returns an option that sets the window title.

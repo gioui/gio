@@ -62,6 +62,9 @@ type Editor struct {
 	scrollOff image.Point
 
 	clicker gesture.Click
+
+	// events is the list of events not yet processed.
+	events []ui.Event
 }
 
 type EditorEvent interface {
@@ -71,7 +74,7 @@ type EditorEvent interface {
 // A ChangeEvent is generated for every user change to the text.
 type ChangeEvent struct{}
 
-// A SubmitEvent is generated when and Editor's Submit is set
+// A SubmitEvent is generated when Submit is set
 // and a carriage return key is pressed.
 type SubmitEvent struct{}
 
@@ -80,8 +83,8 @@ const (
 	maxBlinkDuration = 10 * time.Second
 )
 
-// Next returns the next available editor event, or false if none are available.
-func (e *Editor) Next(gtx *layout.Context) (EditorEvent, bool) {
+// Event returns the next available editor event, or false if none are available.
+func (e *Editor) Event(gtx *layout.Context) (EditorEvent, bool) {
 	// Crude configuration change detection.
 	if scale := gtx.Px(ui.Sp(100)); scale != e.oldScale {
 		e.invalidate()
@@ -106,7 +109,7 @@ func (e *Editor) Next(gtx *layout.Context) (EditorEvent, bool) {
 		e.scrollOff.Y += sdist
 		soff = e.scrollOff.Y
 	}
-	for evt, ok := e.clicker.Next(gtx.Queue); ok; evt, ok = e.clicker.Next(gtx.Queue) {
+	for _, evt := range e.clicker.Events(gtx.Queue) {
 		switch {
 		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
 			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
@@ -124,7 +127,15 @@ func (e *Editor) Next(gtx *layout.Context) (EditorEvent, bool) {
 	if (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin) {
 		e.scroller.Stop()
 	}
-	for ke, ok := gtx.Queue.Next(e); ok; ke, ok = gtx.Queue.Next(e) {
+	e.events = append(e.events, gtx.Queue.Events(e)...)
+	return e.editorEvent(gtx)
+}
+
+func (e *Editor) editorEvent(gtx *layout.Context) (EditorEvent, bool) {
+	for len(e.events) > 0 {
+		ke := e.events[0]
+		copy(e.events, e.events[1:])
+		e.events = e.events[:len(e.events)-1]
 		e.blinkStart = gtx.Now()
 		switch ke := ke.(type) {
 		case key.FocusEvent:
@@ -133,7 +144,7 @@ func (e *Editor) Next(gtx *layout.Context) (EditorEvent, bool) {
 			if !e.focused {
 				break
 			}
-			if e.Submit && (ke.Name == key.NameReturn || ke.Name == key.NameEnter) {
+			if e.Submit && ke.Name == key.NameReturn || ke.Name == key.NameEnter {
 				if !ke.Modifiers.Contain(key.ModShift) {
 					return SubmitEvent{}, true
 				}
@@ -166,7 +177,7 @@ func (e *Editor) Focus() {
 
 func (e *Editor) Layout(gtx *layout.Context) {
 	cs := gtx.Constraints
-	for _, ok := e.Next(gtx); ok; _, ok = e.Next(gtx) {
+	for _, ok := e.Event(gtx); ok; _, ok = e.Event(gtx) {
 	}
 	twoDp := gtx.Px(ui.Dp(2))
 	e.padLeft, e.padRight = twoDp, twoDp

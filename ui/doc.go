@@ -89,7 +89,7 @@ For example:
 
 	var queue ui.Queue = ...
 
-	for e, ok := queue.Next(h); ok; e, ok = queue.Next(h) {
+	for _, e := range queue.Events(h) {
 		switch e.(type) {
 			...
 		}

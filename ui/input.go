@@ -5,9 +5,9 @@ package ui
 // Queue maps an event handler key to the events
 // available to the handler.
 type Queue interface {
-	// Next returns the next available event, or
-	// false if none are available.
-	Next(k Key) (Event, bool)
+	// Events returns the available events for a
+	// Key.
+	Events(k Key) []Event
 }
 
 // Key is the stable identifier for an event handler.
