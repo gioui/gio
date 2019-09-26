@@ -51,22 +51,24 @@ import (
 import "C"
 
 type wlConn struct {
-	disp        *C.struct_wl_display
-	compositor  *C.struct_wl_compositor
-	wm          *C.struct_xdg_wm_base
-	imm         *C.struct_zwp_text_input_manager_v3
-	im          *C.struct_zwp_text_input_v3
-	shm         *C.struct_wl_shm
-	cursorTheme *C.struct_wl_cursor_theme
-	cursor      *C.struct_wl_cursor
-	cursorSurf  *C.struct_wl_surface
-	decor       *C.struct_zxdg_decoration_manager_v1
-	seat        *C.struct_wl_seat
-	seatName    C.uint32_t
-	pointer     *C.struct_wl_pointer
-	touch       *C.struct_wl_touch
-	keyboard    *C.struct_wl_keyboard
-	xkb         *xkb
+	disp       *C.struct_wl_display
+	compositor *C.struct_wl_compositor
+	wm         *C.struct_xdg_wm_base
+	imm        *C.struct_zwp_text_input_manager_v3
+	im         *C.struct_zwp_text_input_v3
+	shm        *C.struct_wl_shm
+	cursor     struct {
+		theme  *C.struct_wl_cursor_theme
+		cursor *C.struct_wl_cursor
+		surf   *C.struct_wl_surface
+	}
+	decor    *C.struct_zxdg_decoration_manager_v1
+	seat     *C.struct_wl_seat
+	seatName C.uint32_t
+	pointer  *C.struct_wl_pointer
+	touch    *C.struct_wl_touch
+	keyboard *C.struct_wl_keyboard
+	xkb      *xkb
 
 	repeat repeatState
 }
@@ -93,21 +95,25 @@ type window struct {
 	topLvl *C.struct_xdg_toplevel
 	decor  *C.struct_zxdg_toplevel_decoration_v1
 	// Notification pipe fds.
-	notRead, notWrite int
+	notify struct {
+		read, write int
+	}
 	ppdp, ppsp        float32
-	scrollTime        time.Duration
-	discScroll        image.Point
-	scroll            f32.Point
+	scroll struct {
+		time        time.Duration
+		steps        image.Point
+		dist f32.Point
+	}
 	lastPos           f32.Point
 	lastTouch         f32.Point
 
-	// Flinging.
-	yExtrapolation fling.Extrapolation
-	xExtrapolation fling.Extrapolation
-	flinger        fling.Animation
-	startFling     bool
-	// Fling direction.
-	flingDir f32.Point
+	fling struct {
+		yExtrapolation fling.Extrapolation
+		xExtrapolation fling.Extrapolation
+		anim        fling.Animation
+		start     bool
+		dir f32.Point
+	}
 
 	stage             Stage
 	dead              bool
@@ -207,9 +213,9 @@ func createNativeWindow(opts *windowOptions) (*window, error) {
 		newScale: scale != 1,
 		ppdp:     ppdp,
 		ppsp:     ppsp,
-		notRead:  pipe[0],
-		notWrite: pipe[1],
 	}
+	w.notify.read = pipe[0]
+	w.notify.write = pipe[1]
 	w.surf = C.wl_compositor_create_surface(conn.compositor)
 	if w.surf == nil {
 		w.destroy()
@@ -494,15 +500,15 @@ func gio_onTouchCancel(data unsafe.Pointer, touch *C.struct_wl_touch) {
 //export gio_onPointerEnter
 func gio_onPointerEnter(data unsafe.Pointer, pointer *C.struct_wl_pointer, serial C.uint32_t, surf *C.struct_wl_surface, x, y C.wl_fixed_t) {
 	// Get images[0].
-	img := *conn.cursor.images
+	img := *conn.cursor.cursor.images
 	buf := C.wl_cursor_image_get_buffer(img)
 	if buf == nil {
 		return
 	}
-	C.wl_pointer_set_cursor(pointer, serial, conn.cursorSurf, C.int32_t(img.hotspot_x), C.int32_t(img.hotspot_y))
-	C.wl_surface_attach(conn.cursorSurf, buf, 0, 0)
-	C.wl_surface_damage(conn.cursorSurf, 0, 0, C.int32_t(img.width), C.int32_t(img.height))
-	C.wl_surface_commit(conn.cursorSurf)
+	C.wl_pointer_set_cursor(pointer, serial, conn.cursor.surf, C.int32_t(img.hotspot_x), C.int32_t(img.hotspot_y))
+	C.wl_surface_attach(conn.cursor.surf, buf, 0, 0)
+	C.wl_surface_damage(conn.cursor.surf, 0, 0, C.int32_t(img.width), C.int32_t(img.height))
+	C.wl_surface_commit(conn.cursor.surf)
 	w := winMap[surf]
 	winMap[pointer] = w
 	w.lastPos = f32.Point{X: fromFixed(x), Y: fromFixed(y)}
@@ -549,14 +555,14 @@ func gio_onPointerAxis(data unsafe.Pointer, ptr *C.struct_wl_pointer, t, axis C.
 	w := winMap[ptr]
 	v := fromFixed(value)
 	w.resetFling()
-	if w.scroll == (f32.Point{}) {
-		w.scrollTime = time.Duration(t) * time.Millisecond
+	if w.scroll.dist == (f32.Point{}) {
+		w.scroll.time = time.Duration(t) * time.Millisecond
 	}
 	switch axis {
 	case C.WL_POINTER_AXIS_HORIZONTAL_SCROLL:
-		w.scroll.X += v
+		w.scroll.dist.X += v
 	case C.WL_POINTER_AXIS_VERTICAL_SCROLL:
-		w.scroll.Y += v
+		w.scroll.dist.Y += v
 	}
 }
 
@@ -568,24 +574,24 @@ func gio_onPointerFrame(data unsafe.Pointer, pointer *C.struct_wl_pointer) {
 }
 
 func (w *window) flushFling() {
-	if !w.startFling {
+	if !w.fling.start {
 		return
 	}
-	w.startFling = false
-	estx, esty := w.xExtrapolation.Estimate(), w.yExtrapolation.Estimate()
-	w.xExtrapolation = fling.Extrapolation{}
-	w.yExtrapolation = fling.Extrapolation{}
+	w.fling.start = false
+	estx, esty := w.fling.xExtrapolation.Estimate(), w.fling.yExtrapolation.Estimate()
+	w.fling.xExtrapolation = fling.Extrapolation{}
+	w.fling.yExtrapolation = fling.Extrapolation{}
 	vel := float32(math.Sqrt(float64(estx.Velocity*estx.Velocity + esty.Velocity*esty.Velocity)))
 	_, _, c := w.config()
 	c.now = time.Now()
-	if !w.flinger.Start(&c, vel) {
+	if !w.fling.anim.Start(&c, vel) {
 		return
 	}
 	invDist := 1 / vel
-	w.flingDir.X = estx.Velocity * invDist
-	w.flingDir.Y = esty.Velocity * invDist
+	w.fling.dir.X = estx.Velocity * invDist
+	w.fling.dir.Y = esty.Velocity * invDist
 	// Wake up the window loop.
-	w.notify()
+	w.wakeup()
 }
 
 //export gio_onPointerAxisSource
@@ -595,7 +601,7 @@ func gio_onPointerAxisSource(data unsafe.Pointer, pointer *C.struct_wl_pointer, 
 //export gio_onPointerAxisStop
 func gio_onPointerAxisStop(data unsafe.Pointer, ptr *C.struct_wl_pointer, t, axis C.uint32_t) {
 	w := winMap[ptr]
-	w.startFling = true
+	w.fling.start = true
 }
 
 //export gio_onPointerAxisDiscrete
@@ -604,15 +610,15 @@ func gio_onPointerAxisDiscrete(data unsafe.Pointer, pointer *C.struct_wl_pointer
 	w.resetFling()
 	switch axis {
 	case C.WL_POINTER_AXIS_HORIZONTAL_SCROLL:
-		w.discScroll.X += int(discrete)
+		w.scroll.steps.X += int(discrete)
 	case C.WL_POINTER_AXIS_VERTICAL_SCROLL:
-		w.discScroll.Y += int(discrete)
+		w.scroll.steps.Y += int(discrete)
 	}
 }
 
 func (w *window) resetFling() {
-	w.startFling = false
-	w.flinger = fling.Animation{}
+	w.fling.start = false
+	w.fling.anim = fling.Animation{}
 }
 
 //export gio_onKeyboardKeymap
@@ -685,7 +691,7 @@ func (r *repeatState) Start(w *window, keyCode C.uint32_t, t time.Duration) {
 				return
 			}
 			r.Advance(delay)
-			w.notify()
+			w.wakeup()
 			delay = time.Second / time.Duration(rate)
 			timer.Reset(delay)
 		}
@@ -749,7 +755,7 @@ func (w *window) loop() {
 	// Poll for events and notifications.
 	pollfds := []syscall.PollFd{
 		{Fd: int32(dispfd), Events: syscall.POLLIN | syscall.POLLERR},
-		{Fd: int32(w.notRead), Events: syscall.POLLIN | syscall.POLLERR},
+		{Fd: int32(w.notify.read), Events: syscall.POLLIN | syscall.POLLERR},
 	}
 	dispEvents := &pollfds[0].Revents
 	// Plenty of room for a backlog of notifications.
@@ -772,7 +778,7 @@ loop:
 		redraw := false
 		// Clear notifications.
 		for {
-			_, err := syscall.Read(w.notRead, buf)
+			_, err := syscall.Read(w.notify.read, buf)
 			if err == syscall.EAGAIN {
 				break
 			}
@@ -803,26 +809,26 @@ func (w *window) setAnimating(anim bool) {
 	animating := w.isAnimating()
 	w.mu.Unlock()
 	if animating {
-		w.notify()
+		w.wakeup()
 	}
 }
 
 // Wakeup wakes up the event loop through the notification pipe.
-func (w *window) notify() {
+func (w *window) wakeup() {
 	oneByte := make([]byte, 1)
-	if _, err := syscall.Write(w.notWrite, oneByte); err != nil && err != syscall.EAGAIN {
+	if _, err := syscall.Write(w.notify.write, oneByte); err != nil && err != syscall.EAGAIN {
 		panic(fmt.Errorf("failed to write to pipe: %v", err))
 	}
 }
 
 func (w *window) destroy() {
-	if w.notWrite != 0 {
-		syscall.Close(w.notWrite)
-		w.notWrite = 0
+	if w.notify.write != 0 {
+		syscall.Close(w.notify.write)
+		w.notify.write = 0
 	}
-	if w.notRead != 0 {
-		syscall.Close(w.notRead)
-		w.notRead = 0
+	if w.notify.read != 0 {
+		syscall.Close(w.notify.read)
+		w.notify.read = 0
 	}
 	if w.topLvl != nil {
 		delete(winMap, w.topLvl)
@@ -894,21 +900,21 @@ func (c *wlOutput) ppmm() (float32, error) {
 
 func (w *window) flushScroll() {
 	var fling f32.Point
-	if w.flinger.Active() {
-		dist := float32(w.flinger.Tick(time.Now()))
-		fling = w.flingDir.Mul(dist)
+	if w.fling.anim.Active() {
+		dist := float32(w.fling.anim.Tick(time.Now()))
+		fling = w.fling.dir.Mul(dist)
 	}
 	// The Wayland reported scroll distance for
 	// discrete scroll axis is only 10 pixels, where
 	// 100 seems more appropriate.
 	const discreteScale = 10
-	if w.discScroll.X != 0 {
-		w.scroll.X *= discreteScale
+	if w.scroll.steps.X != 0 {
+		w.scroll.dist.X *= discreteScale
 	}
-	if w.discScroll.Y != 0 {
-		w.scroll.Y *= discreteScale
+	if w.scroll.steps.Y != 0 {
+		w.scroll.dist.Y *= discreteScale
 	}
-	total := w.scroll.Add(fling)
+	total := w.scroll.dist.Add(fling)
 	if total == (f32.Point{}) {
 		return
 	}
@@ -917,14 +923,14 @@ func (w *window) flushScroll() {
 		Source:   pointer.Mouse,
 		Position: w.lastPos,
 		Scroll:   total,
-		Time:     w.scrollTime,
+		Time:     w.scroll.time,
 	})
-	if w.discScroll == (image.Point{}) {
-		w.xExtrapolation.SampleDelta(w.scrollTime, -w.scroll.X)
-		w.yExtrapolation.SampleDelta(w.scrollTime, -w.scroll.Y)
+	if w.scroll.steps == (image.Point{}) {
+		w.fling.xExtrapolation.SampleDelta(w.scroll.time, -w.scroll.dist.X)
+		w.fling.yExtrapolation.SampleDelta(w.scroll.time, -w.scroll.dist.Y)
 	}
-	w.scroll = f32.Point{}
-	w.discScroll = image.Point{}
+	w.scroll.dist = f32.Point{}
+	w.scroll.steps = image.Point{}
 }
 
 func (w *window) onPointerMotion(x, y C.wl_fixed_t, t C.uint32_t) {
@@ -984,7 +990,7 @@ func (w *window) config() (int, int, Config) {
 }
 
 func (w *window) isAnimating() bool {
-	return w.animating || w.flinger.Active()
+	return w.animating || w.fling.anim.Active()
 }
 
 func (w *window) kill(err error) {
@@ -1104,20 +1110,20 @@ func waylandConnect() error {
 		c.destroy()
 		return errors.New("wayland: no outputs available")
 	}
-	c.cursorTheme = C.wl_cursor_theme_load(nil, 32, c.shm)
-	if c.cursorTheme == nil {
+	c.cursor.theme = C.wl_cursor_theme_load(nil, 32, c.shm)
+	if c.cursor.theme == nil {
 		c.destroy()
 		return errors.New("wayland: wl_cursor_theme_load failed")
 	}
 	cname := C.CString("left_ptr")
 	defer C.free(unsafe.Pointer(cname))
-	c.cursor = C.wl_cursor_theme_get_cursor(c.cursorTheme, cname)
-	if c.cursor == nil {
+	c.cursor.cursor = C.wl_cursor_theme_get_cursor(c.cursor.theme, cname)
+	if c.cursor.cursor == nil {
 		c.destroy()
 		return errors.New("wayland: wl_cursor_theme_get_cursor failed")
 	}
-	c.cursorSurf = C.wl_compositor_create_surface(conn.compositor)
-	if c.cursorSurf == nil {
+	c.cursor.surf = C.wl_compositor_create_surface(conn.compositor)
+	if c.cursor.surf == nil {
 		c.destroy()
 		return errors.New("wayland: wl_compositor_create_surface failed")
 	}
@@ -1130,11 +1136,11 @@ func (c *wlConn) destroy() {
 		c.xkb.Destroy()
 		c.xkb = nil
 	}
-	if c.cursorSurf != nil {
-		C.wl_surface_destroy(c.cursorSurf)
+	if c.cursor.surf != nil {
+		C.wl_surface_destroy(c.cursor.surf)
 	}
-	if c.cursorTheme != nil {
-		C.wl_cursor_theme_destroy(c.cursorTheme)
+	if c.cursor.theme != nil {
+		C.wl_cursor_theme_destroy(c.cursor.theme)
 	}
 	if c.keyboard != nil {
 		C.wl_keyboard_release(c.keyboard)
