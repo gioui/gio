@@ -10,13 +10,10 @@ import (
 	"fmt"
 	"image"
 	"math"
-	"os"
 	"os/exec"
 	"strconv"
 	"sync"
 	"time"
-	"unicode"
-	"unicode/utf8"
 	"unsafe"
 
 	"gioui.org/ui/f32"
@@ -41,13 +38,11 @@ import (
 //go:generate sed -i "1s;^;// +build linux,!android\\n\\n;" wayland_text_input.c
 
 /*
-#cgo LDFLAGS: -lwayland-client -lwayland-cursor -lxkbcommon
+#cgo LDFLAGS: -lwayland-client -lwayland-cursor
 
 #include <stdlib.h>
 #include <wayland-client.h>
 #include <wayland-cursor.h>
-#include <xkbcommon/xkbcommon.h>
-#include <xkbcommon/xkbcommon-compose.h>
 #include "wayland_text_input.h"
 #include "wayland_xdg_shell.h"
 #include "wayland_xdg_decoration.h"
@@ -56,27 +51,22 @@ import (
 import "C"
 
 type wlConn struct {
-	disp         *C.struct_wl_display
-	compositor   *C.struct_wl_compositor
-	wm           *C.struct_xdg_wm_base
-	imm          *C.struct_zwp_text_input_manager_v3
-	im           *C.struct_zwp_text_input_v3
-	shm          *C.struct_wl_shm
-	cursorTheme  *C.struct_wl_cursor_theme
-	cursor       *C.struct_wl_cursor
-	cursorSurf   *C.struct_wl_surface
-	decor        *C.struct_zxdg_decoration_manager_v1
-	seat         *C.struct_wl_seat
-	seatName     C.uint32_t
-	pointer      *C.struct_wl_pointer
-	touch        *C.struct_wl_touch
-	keyboard     *C.struct_wl_keyboard
-	xkb          *C.struct_xkb_context
-	xkbMap       *C.struct_xkb_keymap
-	xkbState     *C.struct_xkb_state
-	xkbCompTable *C.struct_xkb_compose_table
-	xkbCompState *C.struct_xkb_compose_state
-	utf8Buf      []byte
+	disp        *C.struct_wl_display
+	compositor  *C.struct_wl_compositor
+	wm          *C.struct_xdg_wm_base
+	imm         *C.struct_zwp_text_input_manager_v3
+	im          *C.struct_zwp_text_input_v3
+	shm         *C.struct_wl_shm
+	cursorTheme *C.struct_wl_cursor_theme
+	cursor      *C.struct_wl_cursor
+	cursorSurf  *C.struct_wl_surface
+	decor       *C.struct_zxdg_decoration_manager_v1
+	seat        *C.struct_wl_seat
+	seatName    C.uint32_t
+	pointer     *C.struct_wl_pointer
+	touch       *C.struct_wl_touch
+	keyboard    *C.struct_wl_keyboard
+	xkb         *xkb
 
 	repeat repeatState
 }
@@ -86,7 +76,7 @@ type repeatState struct {
 	delay time.Duration
 
 	key   C.uint32_t
-	win   *window
+	win   *Window
 	stopC chan struct{}
 
 	start time.Duration
@@ -121,6 +111,7 @@ type window struct {
 
 	stage             Stage
 	dead              bool
+	pendingErr        error
 	lastFrameCallback *C.struct_wl_callback
 
 	mu        sync.Mutex
@@ -152,11 +143,6 @@ var (
 	winMap       = make(map[interface{}]*window)
 	outputMap    = make(map[C.uint32_t]*C.struct_wl_output)
 	outputConfig = make(map[*C.struct_wl_output]*wlOutput)
-)
-
-var (
-	_XKB_MOD_NAME_CTRL  = []byte("Control\x00")
-	_XKB_MOD_NAME_SHIFT = []byte("Shift\x00")
 )
 
 func main() {
@@ -631,61 +617,20 @@ func (w *window) resetFling() {
 
 //export gio_onKeyboardKeymap
 func gio_onKeyboardKeymap(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, format C.uint32_t, fd C.int32_t, size C.uint32_t) {
-	conn.repeat.Stop(0)
 	defer syscall.Close(int(fd))
-	if conn.xkbCompState != nil {
-		C.xkb_compose_state_unref(conn.xkbCompState)
-		conn.xkbCompState = nil
-	}
-	if conn.xkbCompTable != nil {
-		C.xkb_compose_table_unref(conn.xkbCompTable)
-		conn.xkbCompTable = nil
-	}
-	if conn.xkbState != nil {
-		C.xkb_state_unref(conn.xkbState)
-		conn.xkbState = nil
-	}
-	if conn.xkbMap != nil {
-		C.xkb_keymap_unref(conn.xkbMap)
-		conn.xkbMap = nil
+	conn.repeat.Stop(0)
+	if conn.xkb != nil {
+		conn.xkb.Destroy()
 	}
 	if format != C.WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 {
 		return
 	}
-	if conn.xkb == nil {
-		conn.xkb = C.xkb_context_new(C.XKB_CONTEXT_NO_FLAGS)
-	}
-	if conn.xkb == nil {
-		return
-	}
-	if conn.xkbCompTable == nil {
-		locale := os.Getenv("LC_ALL")
-		if locale == "" {
-			locale = os.Getenv("LC_CTYPE")
-		}
-		if locale == "" {
-			locale = os.Getenv("LANG")
-		}
-		if locale == "" {
-			locale = "C"
-		}
-		cloc := C.CString(locale)
-		defer C.free(unsafe.Pointer(cloc))
-		conn.xkbCompTable = C.xkb_compose_table_new_from_locale(conn.xkb, cloc, C.XKB_COMPOSE_COMPILE_NO_FLAGS)
-		if conn.xkbCompTable != nil {
-			conn.xkbCompState = C.xkb_compose_state_new(conn.xkbCompTable, C.XKB_COMPOSE_STATE_NO_FLAGS)
-		}
-	}
-	mapData, err := syscall.Mmap(int(fd), 0, int(size), syscall.PROT_READ, syscall.MAP_SHARED)
+	xkb, err := newXKB(format, fd, size)
 	if err != nil {
-		return
+		// TODO: Do better.
+		panic(err)
 	}
-	defer syscall.Munmap(mapData)
-	conn.xkbMap = C.xkb_keymap_new_from_buffer(conn.xkb, (*C.char)(unsafe.Pointer(&mapData[0])), C.size_t(size-1), C.XKB_KEYMAP_FORMAT_TEXT_V1, C.XKB_KEYMAP_COMPILE_NO_FLAGS)
-	if conn.xkbMap == nil {
-		return
-	}
-	conn.xkbState = C.xkb_state_new(conn.xkbMap)
+	conn.xkb = xkb
 }
 
 //export gio_onKeyboardEnter
@@ -706,16 +651,14 @@ func gio_onKeyboardLeave(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, se
 //export gio_onKeyboardKey
 func gio_onKeyboardKey(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial, timestamp, keyCode, state C.uint32_t) {
 	t := time.Duration(timestamp) * time.Millisecond
-	conn.repeat.Stop(t)
 	w := winMap[keyboard]
 	w.resetFling()
-	if state != C.WL_KEYBOARD_KEY_STATE_PRESSED || conn.xkbMap == nil || conn.xkbState == nil || conn.xkbCompState == nil {
+	conn.repeat.Stop(t)
+	if state != C.WL_KEYBOARD_KEY_STATE_PRESSED || conn.xkb == nil {
 		return
 	}
-	// According to the xkb_v1 spec: "to determine the xkb keycode, clients must add 8 to the key event keycode."
-	keyCode += 8
-	w.dispatchKey(keyCode)
-	if C.xkb_keymap_key_repeats(conn.xkbMap, C.xkb_keycode_t(keyCode)) == 1 {
+	conn.xkb.dispatchKey(w.w, keyCode)
+	if conn.xkb.isRepeatKey(keyCode) {
 		conn.repeat.Start(w, keyCode, t)
 	}
 }
@@ -730,7 +673,7 @@ func (r *repeatState) Start(w *window, keyCode C.uint32_t, t time.Duration) {
 	r.now = 0
 	r.stopC = stopC
 	r.key = keyCode
-	r.win = w
+	r.win = w.w
 	rate, delay := r.rate, r.delay
 	go func() {
 		timer := time.NewTimer(delay)
@@ -785,7 +728,7 @@ func (r *repeatState) Repeat() {
 		if r.last+delay > now {
 			break
 		}
-		r.win.dispatchKey(r.key)
+		conn.xkb.dispatchKey(r.win, r.key)
 		r.last += delay
 	}
 }
@@ -818,7 +761,7 @@ loop:
 			break
 		}
 		if w.dead {
-			w.w.event(DestroyEvent{})
+			w.w.event(DestroyEvent{Err: w.pendingErr})
 			break
 		}
 		// Clear poll events.
@@ -898,65 +841,13 @@ func (w *window) destroy() {
 	}
 }
 
-func (w *window) dispatchKey(keyCode C.uint32_t) {
-	if len(conn.utf8Buf) == 0 {
-		conn.utf8Buf = make([]byte, 1)
-	}
-	sym := C.xkb_state_key_get_one_sym(conn.xkbState, C.xkb_keycode_t(keyCode))
-	if n, ok := convertKeysym(sym); ok {
-		cmd := key.Event{Name: n}
-		if C.xkb_state_mod_name_is_active(conn.xkbState, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_CTRL[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
-			cmd.Modifiers |= key.ModCommand
-		}
-		if C.xkb_state_mod_name_is_active(conn.xkbState, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_SHIFT[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
-			cmd.Modifiers |= key.ModShift
-		}
-		w.w.event(cmd)
-	}
-	C.xkb_compose_state_feed(conn.xkbCompState, sym)
-	var size C.int
-	switch C.xkb_compose_state_get_status(conn.xkbCompState) {
-	case C.XKB_COMPOSE_CANCELLED, C.XKB_COMPOSE_COMPOSING:
-		return
-	case C.XKB_COMPOSE_COMPOSED:
-		size = C.xkb_compose_state_get_utf8(conn.xkbCompState, (*C.char)(unsafe.Pointer(&conn.utf8Buf[0])), C.size_t(len(conn.utf8Buf)))
-		if int(size) >= len(conn.utf8Buf) {
-			conn.utf8Buf = make([]byte, size+1)
-			size = C.xkb_compose_state_get_utf8(conn.xkbCompState, (*C.char)(unsafe.Pointer(&conn.utf8Buf[0])), C.size_t(len(conn.utf8Buf)))
-		}
-		C.xkb_compose_state_reset(conn.xkbCompState)
-	case C.XKB_COMPOSE_NOTHING:
-		size = C.xkb_state_key_get_utf8(conn.xkbState, C.xkb_keycode_t(keyCode), (*C.char)(unsafe.Pointer(&conn.utf8Buf[0])), C.size_t(len(conn.utf8Buf)))
-		if int(size) >= len(conn.utf8Buf) {
-			conn.utf8Buf = make([]byte, size+1)
-			size = C.xkb_state_key_get_utf8(conn.xkbState, C.xkb_keycode_t(keyCode), (*C.char)(unsafe.Pointer(&conn.utf8Buf[0])), C.size_t(len(conn.utf8Buf)))
-		}
-	}
-	// Report only printable runes.
-	str := conn.utf8Buf[:size]
-	var n int
-	for n < len(str) {
-		r, s := utf8.DecodeRune(str)
-		if unicode.IsPrint(r) {
-			n += s
-		} else {
-			copy(str[n:], str[n+s:])
-			str = str[:len(str)-s]
-		}
-	}
-	if len(str) > 0 {
-		w.w.event(key.EditEvent{Text: string(str)})
-	}
-}
-
 //export gio_onKeyboardModifiers
 func gio_onKeyboardModifiers(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial, depressed, latched, locked, group C.uint32_t) {
 	conn.repeat.Stop(0)
-	if conn.xkbState == nil {
+	if conn.xkb == nil {
 		return
 	}
-	xkbGrp := C.xkb_layout_index_t(group)
-	C.xkb_state_update_mask(conn.xkbState, C.xkb_mod_mask_t(depressed), C.xkb_mod_mask_t(latched), C.xkb_mod_mask_t(locked), xkbGrp, xkbGrp, xkbGrp)
+	conn.xkb.updateMask(depressed, latched, locked, group)
 }
 
 //export gio_onKeyboardRepeatInfo
@@ -1096,6 +987,13 @@ func (w *window) isAnimating() bool {
 	return w.animating || w.flinger.Active()
 }
 
+func (w *window) kill(err error) {
+	if w.pendingErr == nil {
+		w.pendingErr = err
+	}
+	w.dead = true
+}
+
 func (w *window) draw(sync bool) {
 	w.flushScroll()
 	w.mu.Lock()
@@ -1228,22 +1126,9 @@ func waylandConnect() error {
 
 func (c *wlConn) destroy() {
 	c.repeat.Stop(0)
-	if c.xkbCompState != nil {
-		C.xkb_compose_state_unref(c.xkbCompState)
-		c.xkbCompState = nil
-	}
-	if c.xkbCompTable != nil {
-		C.xkb_compose_table_unref(c.xkbCompTable)
-		c.xkbCompTable = nil
-	}
-	if c.xkbState != nil {
-		C.xkb_state_unref(conn.xkbState)
-	}
-	if c.xkbMap != nil {
-		C.xkb_keymap_unref(c.xkbMap)
-	}
 	if c.xkb != nil {
-		C.xkb_context_unref(c.xkb)
+		c.xkb.Destroy()
+		c.xkb = nil
 	}
 	if c.cursorSurf != nil {
 		C.wl_surface_destroy(c.cursorSurf)
@@ -1296,45 +1181,4 @@ func fromFixed(v C.wl_fixed_t) float32 {
 	b := ((1023 + 44) << 52) + (1 << 51) + uint64(v)
 	f := math.Float64frombits(b) - (3 << 43)
 	return float32(f)
-}
-
-func convertKeysym(s C.xkb_keysym_t) (rune, bool) {
-	if '0' <= s && s <= '9' || 'A' <= s && s <= 'Z' {
-		return rune(s), true
-	}
-	if 'a' <= s && s <= 'z' {
-		return rune(s - 0x20), true
-	}
-	var n rune
-	switch s {
-	case C.XKB_KEY_Escape:
-		n = key.NameEscape
-	case C.XKB_KEY_Left:
-		n = key.NameLeftArrow
-	case C.XKB_KEY_Right:
-		n = key.NameRightArrow
-	case C.XKB_KEY_Return:
-		n = key.NameReturn
-	case C.XKB_KEY_KP_Enter:
-		n = key.NameEnter
-	case C.XKB_KEY_Up:
-		n = key.NameUpArrow
-	case C.XKB_KEY_Down:
-		n = key.NameDownArrow
-	case C.XKB_KEY_Home:
-		n = key.NameHome
-	case C.XKB_KEY_End:
-		n = key.NameEnd
-	case C.XKB_KEY_BackSpace:
-		n = key.NameDeleteBackward
-	case C.XKB_KEY_Delete:
-		n = key.NameDeleteForward
-	case C.XKB_KEY_Page_Up:
-		n = key.NamePageUp
-	case C.XKB_KEY_Page_Down:
-		n = key.NamePageDown
-	default:
-		return 0, false
-	}
-	return n, true
 }
