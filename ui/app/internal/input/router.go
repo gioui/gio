@@ -24,6 +24,15 @@ type Router struct {
 
 	reader ops.Reader
 
+	// deliveredEvents tracks whether events has been returned to the
+	// user from Events. If so, another frame is scheduled to flush
+	// half-updated state. This is important when a an event changes
+	// UI state that has already been laid out. In the worst case, we
+	// waste a frame, increasing power usage.
+	// Gio is expected to grow the ability to construct frame-to-frame
+	// differences and only render to changed areas. In that case, the
+	// waste of a spurious frame should be minimal.
+	deliveredEvents bool
 	// InvalidateOp summary.
 	wakeup     bool
 	wakeupTime time.Time
@@ -33,12 +42,14 @@ type Router struct {
 }
 
 type handlerEvents struct {
-	handlers map[ui.Key][]ui.Event
-	updated  bool
+	handlers  map[ui.Key][]ui.Event
+	hadEvents bool
 }
 
 func (q *Router) Events(k ui.Key) []ui.Event {
-	return q.handlers.Events(k)
+	events := q.handlers.Events(k)
+	q.deliveredEvents = q.deliveredEvents || len(events) > 0
+	return events
 }
 
 func (q *Router) Frame(ops *ui.Ops) {
@@ -50,7 +61,8 @@ func (q *Router) Frame(ops *ui.Ops) {
 
 	q.pqueue.Frame(ops, &q.handlers)
 	q.kqueue.Frame(ops, &q.handlers)
-	if q.handlers.Updated() {
+	if q.deliveredEvents || q.handlers.HadEvents() {
+		q.deliveredEvents = false
 		q.wakeup = true
 		q.wakeupTime = time.Time{}
 	}
@@ -63,7 +75,7 @@ func (q *Router) Add(e ui.Event) bool {
 	case key.EditEvent, key.Event, key.FocusEvent:
 		q.kqueue.Push(e, &q.handlers)
 	}
-	return q.handlers.Updated()
+	return q.handlers.HadEvents()
 }
 
 func (q *Router) TextInputState() TextInputState {
@@ -109,18 +121,18 @@ func (h *handlerEvents) init() {
 func (h *handlerEvents) Set(k ui.Key, evts []ui.Event) {
 	h.init()
 	h.handlers[k] = evts
-	h.updated = true
+	h.hadEvents = true
 }
 
 func (h *handlerEvents) Add(k ui.Key, e ui.Event) {
 	h.init()
 	h.handlers[k] = append(h.handlers[k], e)
-	h.updated = true
+	h.hadEvents = true
 }
 
-func (h *handlerEvents) Updated() bool {
-	u := h.updated
-	h.updated = false
+func (h *handlerEvents) HadEvents() bool {
+	u := h.hadEvents
+	h.hadEvents = false
 	return u
 }
 

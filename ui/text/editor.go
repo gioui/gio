@@ -175,6 +175,7 @@ func (e *Editor) Focus() {
 	e.requestFocus = true
 }
 
+// Layout flushes any remaining events and lays out the editor.
 func (e *Editor) Layout(gtx *layout.Context) {
 	cs := gtx.Constraints
 	for _, ok := e.Event(gtx); ok; _, ok = e.Event(gtx) {
