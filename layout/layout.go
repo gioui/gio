@@ -5,6 +5,7 @@ package layout
 import (
 	"image"
 
+	"gioui.org/io/event"
 	"gioui.org/ui"
 )
 
@@ -51,7 +52,7 @@ type Context struct {
 	Dimensions Dimensions
 
 	ui.Config
-	ui.Queue
+	event.Queue
 	*ui.Ops
 }
 

@@ -10,8 +10,9 @@ events.
 package key
 
 import (
-	"gioui.org/ui"
 	"gioui.org/internal/opconst"
+	"gioui.org/io/event"
+	"gioui.org/ui"
 )
 
 // InputOp declares a handler ready for key events.
@@ -19,7 +20,7 @@ import (
 // focused key handler. Set the Focus flag to request
 // the focus.
 type InputOp struct {
-	Key   ui.Key
+	Key   event.Key
 	Focus bool
 }
 

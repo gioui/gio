@@ -6,13 +6,14 @@ package profile
 
 import (
 	"gioui.org/internal/opconst"
+	"gioui.org/io/event"
 	"gioui.org/ui"
 )
 
 // Op registers a handler for receiving
 // Events.
 type Op struct {
-	Key ui.Key
+	Key event.Key
 }
 
 // Event contains profile data from a single

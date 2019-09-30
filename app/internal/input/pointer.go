@@ -9,6 +9,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
+	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/ui"
 )
@@ -16,10 +17,10 @@ import (
 type pointerQueue struct {
 	hitTree  []hitNode
 	areas    []areaNode
-	handlers map[ui.Key]*pointerHandler
+	handlers map[event.Key]*pointerHandler
 	pointers []pointerInfo
 	reader   ops.Reader
-	scratch  []ui.Key
+	scratch  []event.Key
 }
 
 type hitNode struct {
@@ -29,13 +30,13 @@ type hitNode struct {
 	pass bool
 
 	// For handler nodes.
-	key ui.Key
+	key event.Key
 }
 
 type pointerInfo struct {
 	id       pointer.ID
 	pressed  bool
-	handlers []ui.Key
+	handlers []event.Key
 }
 
 type pointerHandler struct {
@@ -100,7 +101,7 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t u
 			if !ok {
 				h = new(pointerHandler)
 				q.handlers[op.Key] = h
-				events.Set(op.Key, []ui.Event{pointer.Event{Type: pointer.Cancel}})
+				events.Set(op.Key, []event.Event{pointer.Event{Type: pointer.Cancel}})
 			}
 			h.active = true
 			h.area = area
@@ -110,7 +111,7 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t u
 	}
 }
 
-func (q *pointerQueue) opHit(handlers *[]ui.Key, pos f32.Point) {
+func (q *pointerQueue) opHit(handlers *[]event.Key, pos f32.Point) {
 	// Track whether we're passing through hits.
 	pass := true
 	idx := len(q.hitTree) - 1
@@ -153,7 +154,7 @@ func (a *areaNode) hit(p f32.Point) bool {
 
 func (q *pointerQueue) init() {
 	if q.handlers == nil {
-		q.handlers = make(map[ui.Key]*pointerHandler)
+		q.handlers = make(map[event.Key]*pointerHandler)
 	}
 }
 
@@ -175,7 +176,7 @@ func (q *pointerQueue) Frame(root *ui.Ops, events *handlerEvents) {
 	}
 }
 
-func (q *pointerQueue) dropHandler(k ui.Key) {
+func (q *pointerQueue) dropHandler(k event.Key) {
 	for i := range q.pointers {
 		p := &q.pointers[i]
 		for i := len(p.handlers) - 1; i >= 0; i-- {
@@ -319,7 +320,7 @@ func decodePointerInputOp(d []byte, refs []interface{}) pointer.InputOp {
 	}
 	return pointer.InputOp{
 		Grab: d[1] != 0,
-		Key:  refs[0].(ui.Key),
+		Key:  refs[0].(event.Key),
 	}
 }
 

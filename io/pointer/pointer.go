@@ -7,9 +7,10 @@ import (
 	"image"
 	"time"
 
-	"gioui.org/ui"
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
+	"gioui.org/io/event"
+	"gioui.org/ui"
 )
 
 // Event is a pointer event.
@@ -63,7 +64,7 @@ type areaOp struct {
 // InputOp declares an input handler ready for pointer
 // events.
 type InputOp struct {
-	Key ui.Key
+	Key event.Key
 	// Grab, if set, request that the handler get
 	// Grabbed priority.
 	Grab bool

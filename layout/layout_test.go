@@ -5,6 +5,7 @@ import (
 	"image"
 	"time"
 
+	"gioui.org/io/event"
 	"gioui.org/layout"
 	"gioui.org/ui"
 )
@@ -149,6 +150,6 @@ func (config) Px(v ui.Value) int {
 	return int(v.V + .5)
 }
 
-func (queue) Events(k ui.Key) []ui.Event {
+func (queue) Events(k event.Key) []event.Event {
 	return nil
 }

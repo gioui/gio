@@ -6,7 +6,7 @@ A pointer is either a mouse controlled cursor or a touch
 object such as a finger.
 
 The InputOp operation is used to declare a handler ready for pointer
-events. Use a ui.Queue to receive events.
+events. Use an event.Queue to receive events.
 
 Areas
 

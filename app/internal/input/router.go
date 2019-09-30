@@ -8,6 +8,7 @@ import (
 
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
+	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/profile"
@@ -38,15 +39,15 @@ type Router struct {
 	wakeupTime time.Time
 
 	// ProfileOp summary.
-	profHandlers []ui.Key
+	profHandlers []event.Key
 }
 
 type handlerEvents struct {
-	handlers  map[ui.Key][]ui.Event
+	handlers  map[event.Key][]event.Event
 	hadEvents bool
 }
 
-func (q *Router) Events(k ui.Key) []ui.Event {
+func (q *Router) Events(k event.Key) []event.Event {
 	events := q.handlers.Events(k)
 	q.deliveredEvents = q.deliveredEvents || len(events) > 0
 	return events
@@ -68,7 +69,7 @@ func (q *Router) Frame(ops *ui.Ops) {
 	}
 }
 
-func (q *Router) Add(e ui.Event) bool {
+func (q *Router) Add(e event.Event) bool {
 	switch e := e.(type) {
 	case pointer.Event:
 		q.pqueue.Push(e, &q.handlers)
@@ -114,17 +115,17 @@ func (q *Router) WakeupTime() (time.Time, bool) {
 
 func (h *handlerEvents) init() {
 	if h.handlers == nil {
-		h.handlers = make(map[ui.Key][]ui.Event)
+		h.handlers = make(map[event.Key][]event.Event)
 	}
 }
 
-func (h *handlerEvents) Set(k ui.Key, evts []ui.Event) {
+func (h *handlerEvents) Set(k event.Key, evts []event.Event) {
 	h.init()
 	h.handlers[k] = evts
 	h.hadEvents = true
 }
 
-func (h *handlerEvents) Add(k ui.Key, e ui.Event) {
+func (h *handlerEvents) Add(k event.Key, e event.Event) {
 	h.init()
 	h.handlers[k] = append(h.handlers[k], e)
 	h.hadEvents = true
@@ -136,7 +137,7 @@ func (h *handlerEvents) HadEvents() bool {
 	return u
 }
 
-func (h *handlerEvents) Events(k ui.Key) []ui.Event {
+func (h *handlerEvents) Events(k event.Key) []event.Event {
 	if events, ok := h.handlers[k]; ok {
 		h.handlers[k] = h.handlers[k][:0]
 		return events
@@ -155,7 +156,7 @@ func decodeProfileOp(d []byte, refs []interface{}) profile.Op {
 		panic("invalid op")
 	}
 	return profile.Op{
-		Key: refs[0].(ui.Key),
+		Key: refs[0].(event.Key),
 	}
 }
 

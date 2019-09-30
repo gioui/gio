@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"gioui.org/gesture"
+	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
@@ -64,7 +65,7 @@ type Editor struct {
 	clicker gesture.Click
 
 	// events is the list of events not yet processed.
-	events []ui.Event
+	events []event.Event
 }
 
 type EditorEvent interface {

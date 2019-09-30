@@ -14,6 +14,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/internal/fling"
+	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/ui"
 )
@@ -105,7 +106,7 @@ func (c *Click) State() ClickState {
 }
 
 // Events returns the next click event, if any.
-func (c *Click) Events(q ui.Queue) []ClickEvent {
+func (c *Click) Events(q event.Queue) []ClickEvent {
 	var events []ClickEvent
 	for _, evt := range q.Events(c) {
 		e, ok := evt.(pointer.Event)
@@ -154,7 +155,7 @@ func (s *Scroll) Stop() {
 
 // Scroll detects the scrolling distance from the available events and
 // ongoing fling gestures.
-func (s *Scroll) Scroll(cfg ui.Config, q ui.Queue, axis Axis) int {
+func (s *Scroll) Scroll(cfg ui.Config, q event.Queue, axis Axis) int {
 	if s.axis != axis {
 		s.axis = axis
 		return 0

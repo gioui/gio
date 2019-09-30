@@ -81,31 +81,5 @@ To maintain a constant visual size across platforms and displays, always
 use dps or sps to define user interfaces. Only use pixels for derived
 values.
 
-Events
-
-The Queue interface is the protocol for receiving external events.
-
-For example:
-
-	var queue ui.Queue = ...
-
-	for _, e := range queue.Events(h) {
-		switch e.(type) {
-			...
-		}
-	}
-
-In general, handlers must be declared before events become
-available. Other packages such as pointer and key provide
-the means for declaring handlers for specific event types.
-
-The following example declares a handler ready for key input:
-
-	import gioui.org/io/key
-
-	ops := new(ui.Ops)
-	var h *Handler = ...
-	key.InputOp{Key: h}.Add(ops)
-
 */
 package ui

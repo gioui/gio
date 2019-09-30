@@ -10,6 +10,7 @@ import (
 
 	"gioui.org/app/internal/gpu"
 	"gioui.org/app/internal/input"
+	"gioui.org/io/event"
 	"gioui.org/io/profile"
 	"gioui.org/ui"
 )
@@ -31,8 +32,8 @@ type Window struct {
 	drawStart time.Time
 	gpu       *gpu.GPU
 
-	out         chan ui.Event
-	in          chan ui.Event
+	out         chan event.Event
+	in          chan event.Event
 	ack         chan struct{}
 	invalidates chan struct{}
 	frames      chan *ui.Ops
@@ -46,7 +47,7 @@ type Window struct {
 	queue Queue
 }
 
-// Queue is an ui.Queue implementation that distributes system events
+// Queue is an event.Queue implementation that distributes system events
 // to the input handlers declared in the most recent call to Update.
 type Queue struct {
 	q input.Router
@@ -69,7 +70,7 @@ var _ interface {
 } = (*window)(nil)
 
 // Pre-allocate the ack event to avoid garbage.
-var ackEvent ui.Event
+var ackEvent event.Event
 
 // NewWindow creates a new window for a set of window
 // options. The options are hints; the platform is free to
@@ -94,8 +95,8 @@ func NewWindow(options ...WindowOption) *Window {
 	}
 
 	w := &Window{
-		in:          make(chan ui.Event),
-		out:         make(chan ui.Event),
+		in:          make(chan event.Event),
+		out:         make(chan event.Event),
 		ack:         make(chan struct{}),
 		invalidates: make(chan struct{}, 1),
 		frames:      make(chan *ui.Ops),
@@ -105,7 +106,7 @@ func NewWindow(options ...WindowOption) *Window {
 }
 
 // Events returns the channel where events are delivered.
-func (w *Window) Events() <-chan ui.Event {
+func (w *Window) Events() <-chan event.Event {
 	return w.out
 }
 
@@ -194,7 +195,7 @@ func (w *Window) setDriver(d *window) {
 	w.event(driverEvent{d})
 }
 
-func (w *Window) event(e ui.Event) {
+func (w *Window) event(e event.Event) {
 	w.in <- e
 	<-w.ack
 }
@@ -311,7 +312,7 @@ func (w *Window) run(opts *windowOptions) {
 				w.out <- e2
 				w.ack <- struct{}{}
 				return
-			case ui.Event:
+			case event.Event:
 				if w.queue.q.Add(e2) {
 					w.setNextFrame(time.Time{})
 					w.updateAnimation()
@@ -323,7 +324,7 @@ func (w *Window) run(opts *windowOptions) {
 	}
 }
 
-func (q *Queue) Events(k ui.Key) []ui.Event {
+func (q *Queue) Events(k event.Key) []event.Event {
 	return q.q.Events(k)
 }
 
