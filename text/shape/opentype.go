@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package measure
+package shape
 
 import (
 	"golang.org/x/image/font"

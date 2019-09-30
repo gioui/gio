@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 /*
-Package measure implements text layout and shaping.
+Package shape implements text layout and shaping.
 */
-package measure
+package shape
 
 import (
 	"math"
