@@ -17,7 +17,7 @@ import (
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
 	"gioui.org/op"
-	"gioui.org/paint"
+	"gioui.org/op/paint"
 	"golang.org/x/image/draw"
 )
 

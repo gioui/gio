@@ -6,10 +6,10 @@ package widget
 import (
 	"image"
 
-	"gioui.org/ui"
 	"gioui.org/f32"
 	"gioui.org/layout"
-	"gioui.org/paint"
+	"gioui.org/op/paint"
+	"gioui.org/ui"
 )
 
 // Image is a widget that displays an image.

@@ -11,7 +11,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/layout"
 	"gioui.org/op"
-	"gioui.org/paint"
+	"gioui.org/op/paint"
 
 	"golang.org/x/image/math/fixed"
 )

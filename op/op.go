@@ -17,7 +17,7 @@ Drawing a colored square:
 
 	import "gioui.org/ui"
 	import "gioui.org/app"
-	import "gioui.org/paint"
+	import "gioui.org/op/paint"
 
 	var w app.Window
 	ops := new(op.Ops)

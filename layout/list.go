@@ -8,7 +8,7 @@ import (
 	"gioui.org/gesture"
 	"gioui.org/io/pointer"
 	"gioui.org/op"
-	"gioui.org/paint"
+	"gioui.org/op/paint"
 )
 
 type scrollChild struct {

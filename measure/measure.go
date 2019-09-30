@@ -12,7 +12,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/op"
-	"gioui.org/paint"
+	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/ui"
 	"golang.org/x/image/font"

@@ -15,7 +15,7 @@ import (
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/op"
-	"gioui.org/paint"
+	"gioui.org/op/paint"
 	"gioui.org/ui"
 
 	"golang.org/x/image/math/fixed"
