@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"gioui.org/ui"
 	"gioui.org/app/internal/gl"
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
+	"gioui.org/op"
 	"gioui.org/paint"
 	"golang.org/x/image/draw"
 )
@@ -74,7 +74,7 @@ type drawOps struct {
 
 type drawState struct {
 	clip  f32.Rectangle
-	t     ui.TransformOp
+	t     op.TransformOp
 	cpath *pathOp
 	rect  bool
 	z     int
@@ -398,7 +398,7 @@ func (g *GPU) Refresh() {
 	g.setErr(<-g.refreshErr)
 }
 
-func (g *GPU) Draw(profile bool, viewport image.Point, root *ui.Ops) {
+func (g *GPU) Draw(profile bool, viewport image.Point, root *op.Ops) {
 	if g.err != nil {
 		return
 	}
@@ -678,7 +678,7 @@ func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
 	d.pathOpCache = d.pathOpCache[:0]
 }
 
-func (d *drawOps) collect(cache *resourceCache, root *ui.Ops, viewport image.Point) {
+func (d *drawOps) collect(cache *resourceCache, root *op.Ops, viewport image.Point) {
 	d.reset(cache, viewport)
 	clip := f32.Rectangle{
 		Max: f32.Point{X: float32(viewport.X), Y: float32(viewport.Y)},
@@ -704,8 +704,8 @@ loop:
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypeTransform:
-			op := ops.DecodeTransformOp(encOp.Data)
-			state.t = state.t.Multiply(ui.TransformOp(op))
+			dop := ops.DecodeTransformOp(encOp.Data)
+			state.t = state.t.Multiply(op.TransformOp(dop))
 		case opconst.TypeAux:
 			aux = encOp.Data[opconst.TypeAuxLen:]
 			auxKey = encOp.Key

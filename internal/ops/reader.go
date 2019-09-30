@@ -5,15 +5,15 @@ package ops
 import (
 	"encoding/binary"
 
-	"gioui.org/ui"
 	"gioui.org/internal/opconst"
+	"gioui.org/op"
 )
 
 // Reader parses an ops list.
 type Reader struct {
 	pc    pc
 	stack []macro
-	ops   *ui.Ops
+	ops   *op.Ops
 }
 
 // EncodedOp represents an encoded op returned by
@@ -26,14 +26,14 @@ type EncodedOp struct {
 
 // Key is a unique key for a given op.
 type Key struct {
-	ops     *ui.Ops
+	ops     *op.Ops
 	pc      int
 	version int
 }
 
-// Shadow of ui.MacroOp.
+// Shadow of op.MacroOp.
 type macroOp struct {
-	ops     *ui.Ops
+	ops     *op.Ops
 	version int
 	pc      pc
 }
@@ -44,7 +44,7 @@ type pc struct {
 }
 
 type macro struct {
-	ops   *ui.Ops
+	ops   *op.Ops
 	retPC pc
 	endPC pc
 }
@@ -58,7 +58,7 @@ type opAux struct {
 }
 
 // Reset start reading from the op list.
-func (r *Reader) Reset(ops *ui.Ops) {
+func (r *Reader) Reset(ops *op.Ops) {
 	r.stack = r.stack[:0]
 	r.pc = pc{}
 	r.ops = ops
@@ -170,7 +170,7 @@ func (m *macroOp) decode(data []byte, refs []interface{}) {
 	refsIdx := int(int32(bo.Uint32(data[5:])))
 	version := int(int32(bo.Uint32(data[9:])))
 	*m = macroOp{
-		ops: refs[0].(*ui.Ops),
+		ops: refs[0].(*op.Ops),
 		pc: pc{
 			data: dataIdx,
 			refs: refsIdx,

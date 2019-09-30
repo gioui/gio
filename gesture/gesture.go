@@ -16,6 +16,7 @@ import (
 	"gioui.org/internal/fling"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
+	"gioui.org/op"
 	"gioui.org/ui"
 )
 
@@ -95,7 +96,7 @@ const (
 var touchSlop = ui.Dp(3)
 
 // Add the handler to the operation list to receive click events.
-func (c *Click) Add(ops *ui.Ops) {
+func (c *Click) Add(ops *op.Ops) {
 	op := pointer.InputOp{Key: c}
 	op.Add(ops)
 }
@@ -140,11 +141,11 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 }
 
 // Add the handler to the operation list to receive scroll events.
-func (s *Scroll) Add(ops *ui.Ops) {
+func (s *Scroll) Add(ops *op.Ops) {
 	oph := pointer.InputOp{Key: s, Grab: s.grab}
 	oph.Add(ops)
 	if s.flinger.Active() {
-		ui.InvalidateOp{}.Add(ops)
+		op.InvalidateOp{}.Add(ops)
 	}
 }
 

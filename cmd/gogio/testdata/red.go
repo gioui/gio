@@ -7,7 +7,6 @@ import (
 	"image/color"
 	"log"
 
-	"gioui.org/ui"
 	"gioui.org/app"
 	"gioui.org/f32"
 	"gioui.org/paint"
@@ -25,7 +24,7 @@ func main() {
 
 func loop(w *app.Window) error {
 	background := color.RGBA{255, 0, 0, 255}
-	ops := new(ui.Ops)
+	ops := new(op.Ops)
 	for {
 		e := <-w.Events()
 		switch e := e.(type) {

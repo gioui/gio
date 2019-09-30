@@ -7,10 +7,10 @@ import (
 	"math"
 	"unsafe"
 
-	"gioui.org/ui"
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/path"
+	"gioui.org/op"
 )
 
 // PathBuilder builds and adds a general ClipOp clip path
@@ -19,7 +19,7 @@ import (
 // dynamic paths; path data is stored directly in the Ops
 // list supplied to Init.
 type PathBuilder struct {
-	ops       *ui.Ops
+	ops       *op.Ops
 	firstVert int
 	nverts    int
 	maxy      float32
@@ -33,7 +33,7 @@ type ClipOp struct {
 	bounds f32.Rectangle
 }
 
-func (p ClipOp) Add(o *ui.Ops) {
+func (p ClipOp) Add(o *op.Ops) {
 	data := make([]byte, opconst.TypeClipLen)
 	data[0] = byte(opconst.TypeClip)
 	bo := binary.LittleEndian
@@ -46,7 +46,7 @@ func (p ClipOp) Add(o *ui.Ops) {
 
 // Init the builder and specify the operations list for
 // storing the path data and final ClipOp.
-func (p *PathBuilder) Init(ops *ui.Ops) {
+func (p *PathBuilder) Init(ops *op.Ops) {
 	p.ops = ops
 }
 

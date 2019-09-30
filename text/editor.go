@@ -14,6 +14,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/paint"
 	"gioui.org/ui"
 
@@ -33,12 +34,12 @@ type Editor struct {
 	Submit bool
 
 	// Material for drawing the text.
-	Material ui.MacroOp
+	Material op.MacroOp
 	// Hint contains the text displayed to the user when the
 	// Editor is empty.
 	Hint string
 	// Mmaterial is used to draw the hint.
-	HintMaterial ui.MacroOp
+	HintMaterial op.MacroOp
 
 	oldScale          int
 	blinkStart        time.Time
@@ -218,7 +219,7 @@ func (e *Editor) Layout(gtx *layout.Context) {
 		Width:     e.viewWidth(),
 		Offset:    off,
 	}
-	var stack ui.StackOp
+	var stack op.StackOp
 	stack.Push(gtx.Ops)
 	// Apply material. Set a default color in case the material is empty.
 	if e.rr.len() > 0 {
@@ -233,9 +234,9 @@ func (e *Editor) Layout(gtx *layout.Context) {
 		if !ok {
 			break
 		}
-		var stack ui.StackOp
+		var stack op.StackOp
 		stack.Push(gtx.Ops)
-		ui.TransformOp{}.Offset(lineOff).Add(gtx.Ops)
+		op.TransformOp{}.Offset(lineOff).Add(gtx.Ops)
 		e.Face.Path(str).Add(gtx.Ops)
 		paint.PaintOp{Rect: toRectF(clip).Sub(lineOff)}.Add(gtx.Ops)
 		stack.Pop()
@@ -267,7 +268,7 @@ func (e *Editor) Layout(gtx *layout.Context) {
 			}
 		}
 		if blinking {
-			redraw := ui.InvalidateOp{At: nextBlink}
+			redraw := op.InvalidateOp{At: nextBlink}
 			redraw.Add(gtx.Ops)
 		}
 	}

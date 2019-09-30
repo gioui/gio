@@ -1,10 +1,67 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package ui
+/*
+
+Package op implements operations for updating a user interface.
+
+Gio programs use operations, or ops, for describing their user
+interfaces. There are operations for drawing, defining input
+handlers, changing window properties as well as operations for
+controlling the execution of other operations.
+
+Ops represents a list of operations. The most important use
+for an Ops list is to describe a complete user interface update
+to a ui/app.Window's Update method.
+
+Drawing a colored square:
+
+	import "gioui.org/ui"
+	import "gioui.org/app"
+	import "gioui.org/paint"
+
+	var w app.Window
+	ops := new(op.Ops)
+	...
+	ops.Reset()
+	paint.ColorOp{Color: ...}.Add(ops)
+	paint.PaintOp{Rect: ...}.Add(ops)
+	w.Update(ops)
+
+State
+
+An Ops list can be viewed as a very simple virtual machine: it has an implicit
+mutable state stack and execution flow can be controlled with macros.
+
+The StackOp saves the current state to the state stack and restores it later:
+
+	ops := new(op.Ops)
+	var stack op.StackOp
+	// Save the current state, in particular the transform.
+	stack.Push(ops)
+	// Apply a transform to subsequent operations.
+	op.TransformOp{}.Offset(...).Add(ops)
+	...
+	// Restore the previous transform.
+	stack.Pop()
+
+The MacroOp records a list of operations to be executed later:
+
+	ops := new(op.Ops)
+	var macro op.MacroOp
+	macro.Record()
+	// Record operations by adding them.
+	op.InvalidateOp{}.Add(ops)
+	...
+
+*/
+package op
 
 import (
 	"encoding/binary"
+	"math"
+	"time"
 
+	"gioui.org/f32"
 	"gioui.org/internal/opconst"
 )
 
@@ -43,6 +100,18 @@ type MacroOp struct {
 	ops       *Ops
 	version   int
 	pc        pc
+}
+
+// InvalidateOp requests a redraw at the given time. Use
+// the zero value to request an immediate redraw.
+type InvalidateOp struct {
+	At time.Time
+}
+
+// TransformOp applies a transform to the current transform.
+type TransformOp struct {
+	// TODO: general transformations.
+	offset f32.Point
 }
 
 type pc struct {
@@ -207,4 +276,49 @@ func (m MacroOp) Add(o *Ops) {
 	bo.PutUint32(data[5:], uint32(m.pc.refs))
 	bo.PutUint32(data[9:], uint32(m.version))
 	o.Write(data, m.ops)
+}
+
+func (r InvalidateOp) Add(o *Ops) {
+	data := make([]byte, opconst.TypeRedrawLen)
+	data[0] = byte(opconst.TypeInvalidate)
+	bo := binary.LittleEndian
+	// UnixNano cannot represent the zero time.
+	if t := r.At; !t.IsZero() {
+		nanos := t.UnixNano()
+		if nanos > 0 {
+			bo.PutUint64(data[1:], uint64(nanos))
+		}
+	}
+	o.Write(data)
+}
+
+// Offset the transformation.
+func (t TransformOp) Offset(o f32.Point) TransformOp {
+	return t.Multiply(TransformOp{o})
+}
+
+// Invert the transformation.
+func (t TransformOp) Invert() TransformOp {
+	return TransformOp{offset: t.offset.Mul(-1)}
+}
+
+// Transform a point.
+func (t TransformOp) Transform(p f32.Point) f32.Point {
+	return p.Add(t.offset)
+}
+
+// Multiply by a transformation.
+func (t TransformOp) Multiply(t2 TransformOp) TransformOp {
+	return TransformOp{
+		offset: t.offset.Add(t2.offset),
+	}
+}
+
+func (t TransformOp) Add(o *Ops) {
+	data := make([]byte, opconst.TypeTransformLen)
+	data[0] = byte(opconst.TypeTransform)
+	bo := binary.LittleEndian
+	bo.PutUint32(data[1:], math.Float32bits(t.offset.X))
+	bo.PutUint32(data[5:], math.Float32bits(t.offset.Y))
+	o.Write(data)
 }

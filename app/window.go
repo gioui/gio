@@ -12,6 +12,7 @@ import (
 	"gioui.org/app/internal/input"
 	"gioui.org/io/event"
 	"gioui.org/io/profile"
+	"gioui.org/op"
 	"gioui.org/ui"
 )
 
@@ -36,7 +37,7 @@ type Window struct {
 	in          chan event.Event
 	ack         chan struct{}
 	invalidates chan struct{}
-	frames      chan *ui.Ops
+	frames      chan *op.Ops
 
 	stage        Stage
 	animating    bool
@@ -99,7 +100,7 @@ func NewWindow(options ...WindowOption) *Window {
 		out:         make(chan event.Event),
 		ack:         make(chan struct{}),
 		invalidates: make(chan struct{}, 1),
-		frames:      make(chan *ui.Ops),
+		frames:      make(chan *op.Ops),
 	}
 	go w.run(opts)
 	return w
@@ -120,11 +121,11 @@ func (w *Window) Queue() *Queue {
 // window contents, input operations declare input handlers,
 // and so on. The supplied operations list completely replaces
 // the window state from previous calls.
-func (w *Window) Update(frame *ui.Ops) {
+func (w *Window) Update(frame *op.Ops) {
 	w.frames <- frame
 }
 
-func (w *Window) draw(size image.Point, frame *ui.Ops) {
+func (w *Window) draw(size image.Point, frame *op.Ops) {
 	var drawDur time.Duration
 	if !w.drawStart.IsZero() {
 		drawDur = time.Since(w.drawStart)
@@ -265,7 +266,7 @@ func (w *Window) run(opts *windowOptions) {
 				w.drawStart = time.Now()
 				w.hasNextFrame = false
 				w.out <- e
-				var frame *ui.Ops
+				var frame *op.Ops
 				// Wait for either a frame or the ack event,
 				// which meant that the client didn't draw.
 				select {

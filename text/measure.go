@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"image"
 
-	"gioui.org/ui"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -50,7 +50,7 @@ type Face interface {
 	// options.
 	Layout(s string, opts LayoutOptions) *Layout
 	// Path returns the ClipOp outline of a text recorded in a macro.
-	Path(s String) ui.MacroOp
+	Path(s String) op.MacroOp
 }
 
 type Alignment uint8

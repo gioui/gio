@@ -5,7 +5,7 @@ package layout
 import (
 	"image"
 
-	"gioui.org/ui"
+	"gioui.org/op"
 )
 
 // Stack lays out child elements on top of each other,
@@ -15,7 +15,7 @@ type Stack struct {
 	// smaller than the available space.
 	Alignment Direction
 
-	macro       ui.MacroOp
+	macro       op.MacroOp
 	constrained bool
 	ctx         *Context
 	maxSZ       image.Point
@@ -24,7 +24,7 @@ type Stack struct {
 
 // StackChild is the layout result of a call to End.
 type StackChild struct {
-	macro ui.MacroOp
+	macro op.MacroOp
 	dims  Dimensions
 }
 
@@ -99,9 +99,9 @@ func (s *Stack) Layout(children ...StackChild) {
 		case SW, S, SE:
 			p.Y = s.maxSZ.Y - sz.Y
 		}
-		var stack ui.StackOp
+		var stack op.StackOp
 		stack.Push(s.ctx.Ops)
-		ui.TransformOp{}.Offset(toPointF(p)).Add(s.ctx.Ops)
+		op.TransformOp{}.Offset(toPointF(p)).Add(s.ctx.Ops)
 		ch.macro.Add(s.ctx.Ops)
 		stack.Pop()
 	}

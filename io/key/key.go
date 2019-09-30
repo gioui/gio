@@ -12,7 +12,7 @@ package key
 import (
 	"gioui.org/internal/opconst"
 	"gioui.org/io/event"
-	"gioui.org/ui"
+	"gioui.org/op"
 )
 
 // InputOp declares a handler ready for key events.
@@ -86,7 +86,7 @@ func (m Modifiers) Contain(m2 Modifiers) bool {
 	return m&m2 == m2
 }
 
-func (h InputOp) Add(o *ui.Ops) {
+func (h InputOp) Add(o *op.Ops) {
 	data := make([]byte, opconst.TypeKeyInputLen)
 	data[0] = byte(opconst.TypeKeyInput)
 	if h.Focus {
@@ -95,7 +95,7 @@ func (h InputOp) Add(o *ui.Ops) {
 	o.Write(data, h.Key)
 }
 
-func (h HideInputOp) Add(o *ui.Ops) {
+func (h HideInputOp) Add(o *op.Ops) {
 	data := make([]byte, opconst.TypeHideInputLen)
 	data[0] = byte(opconst.TypeHideInput)
 	o.Write(data)

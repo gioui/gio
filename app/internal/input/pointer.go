@@ -11,7 +11,7 @@ import (
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
-	"gioui.org/ui"
+	"gioui.org/op"
 )
 
 type pointerQueue struct {
@@ -42,7 +42,7 @@ type pointerInfo struct {
 type pointerHandler struct {
 	area      int
 	active    bool
-	transform ui.TransformOp
+	transform op.TransformOp
 	wantsGrab bool
 }
 
@@ -52,7 +52,7 @@ type areaOp struct {
 }
 
 type areaNode struct {
-	trans ui.TransformOp
+	trans op.TransformOp
 	next  int
 	area  areaOp
 }
@@ -64,7 +64,7 @@ const (
 	areaEllipse
 )
 
-func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t ui.TransformOp, area, node int, pass bool) {
+func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t op.TransformOp, area, node int, pass bool) {
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypePush:
@@ -86,8 +86,8 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t u
 			})
 			node = len(q.hitTree) - 1
 		case opconst.TypeTransform:
-			op := ops.DecodeTransformOp(encOp.Data)
-			t = t.Multiply(ui.TransformOp(op))
+			dop := ops.DecodeTransformOp(encOp.Data)
+			t = t.Multiply(op.TransformOp(dop))
 		case opconst.TypePointerInput:
 			op := decodePointerInputOp(encOp.Data, encOp.Refs)
 			q.hitTree = append(q.hitTree, hitNode{
@@ -158,7 +158,7 @@ func (q *pointerQueue) init() {
 	}
 }
 
-func (q *pointerQueue) Frame(root *ui.Ops, events *handlerEvents) {
+func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	q.init()
 	for _, h := range q.handlers {
 		// Reset handler.
@@ -167,7 +167,7 @@ func (q *pointerQueue) Frame(root *ui.Ops, events *handlerEvents) {
 	q.hitTree = q.hitTree[:0]
 	q.areas = q.areas[:0]
 	q.reader.Reset(root)
-	q.collectHandlers(&q.reader, events, ui.TransformOp{}, -1, -1, false)
+	q.collectHandlers(&q.reader, events, op.TransformOp{}, -1, -1, false)
 	for k, h := range q.handlers {
 		if !h.active {
 			q.dropHandler(k)

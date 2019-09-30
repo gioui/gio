@@ -23,7 +23,7 @@ The following example declares a handler ready for key input:
 
 	import gioui.org/io/key
 
-	ops := new(ui.Ops)
+	ops := new(op.Ops)
 	var h *Handler = ...
 	key.InputOp{Key: h}.Add(ops)
 

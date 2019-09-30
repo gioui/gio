@@ -6,7 +6,7 @@ import (
 	"image"
 
 	"gioui.org/f32"
-	"gioui.org/ui"
+	"gioui.org/op"
 )
 
 // Flex lays out child elements along an axis,
@@ -21,7 +21,7 @@ type Flex struct {
 	Alignment Alignment
 
 	ctx       *Context
-	macro     ui.MacroOp
+	macro     op.MacroOp
 	mode      flexMode
 	size      int
 	rigidSize int
@@ -33,7 +33,7 @@ type Flex struct {
 
 // FlexChild is the layout result of a call End.
 type FlexChild struct {
-	macro ui.MacroOp
+	macro op.MacroOp
 	dims  Dimensions
 }
 
@@ -189,9 +189,9 @@ func (f *Flex) Layout(children ...FlexChild) {
 				cross = f.maxBaseline - b
 			}
 		}
-		var stack ui.StackOp
+		var stack op.StackOp
 		stack.Push(f.ctx.Ops)
-		ui.TransformOp{}.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))).Add(f.ctx.Ops)
+		op.TransformOp{}.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))).Add(f.ctx.Ops)
 		child.macro.Add(f.ctx.Ops)
 		stack.Pop()
 		mainSize += axisMain(f.Axis, dims.Size)

@@ -8,9 +8,9 @@ import (
 	"image/color"
 	"unicode/utf8"
 
-	"gioui.org/ui"
 	"gioui.org/f32"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/paint"
 
 	"golang.org/x/image/math/fixed"
@@ -22,7 +22,7 @@ type Label struct {
 	Face Face
 	// Material is a macro recording the material to draw the
 	// text. Use a ColorOp for colored text.
-	Material ui.MacroOp
+	Material op.MacroOp
 	// Alignment specify the text alignment.
 	Alignment Alignment
 	// Text is the string to draw.
@@ -118,9 +118,9 @@ func (l Label) Layout(gtx *layout.Context) {
 			break
 		}
 		lclip := toRectF(clip).Sub(off)
-		var stack ui.StackOp
+		var stack op.StackOp
 		stack.Push(gtx.Ops)
-		ui.TransformOp{}.Offset(off).Add(gtx.Ops)
+		op.TransformOp{}.Offset(off).Add(gtx.Ops)
 		l.Face.Path(str).Add(gtx.Ops)
 		// Set a default color in case the material is empty.
 		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(gtx.Ops)

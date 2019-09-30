@@ -10,10 +10,11 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"gioui.org/ui"
 	"gioui.org/f32"
+	"gioui.org/op"
 	"gioui.org/paint"
 	"gioui.org/text"
+	"gioui.org/ui"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
@@ -34,7 +35,7 @@ type cachedLayout struct {
 
 type cachedPath struct {
 	active bool
-	path   ui.MacroOp
+	path   op.MacroOp
 }
 
 type layoutKey struct {
@@ -128,7 +129,7 @@ func (f *Face) Layout(str string, opts text.LayoutOptions) *text.Layout {
 	return l
 }
 
-func (f *Face) Path(str text.String) ui.MacroOp {
+func (f *Face) Path(str text.String) op.MacroOp {
 	ppem := fixed.Int26_6(f.faces.config.Px(f.size) * 64)
 	pk := pathKey{
 		f:    f.font.Font,
@@ -234,14 +235,14 @@ func layoutText(ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOpt
 	return &text.Layout{Lines: lines}
 }
 
-func textPath(ppem fixed.Int26_6, f *opentype, str text.String) ui.MacroOp {
+func textPath(ppem fixed.Int26_6, f *opentype, str text.String) op.MacroOp {
 	var lastPos f32.Point
 	var builder paint.PathBuilder
-	ops := new(ui.Ops)
+	ops := new(op.Ops)
 	builder.Init(ops)
 	var x fixed.Int26_6
 	var advIdx int
-	var m ui.MacroOp
+	var m op.MacroOp
 	m.Record(ops)
 	for _, r := range str.String {
 		if !unicode.IsSpace(r) {

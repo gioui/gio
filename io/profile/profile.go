@@ -7,7 +7,7 @@ package profile
 import (
 	"gioui.org/internal/opconst"
 	"gioui.org/io/event"
-	"gioui.org/ui"
+	"gioui.org/op"
 )
 
 // Op registers a handler for receiving
@@ -23,7 +23,7 @@ type Event struct {
 	Timings string
 }
 
-func (p Op) Add(o *ui.Ops) {
+func (p Op) Add(o *op.Ops) {
 	data := make([]byte, opconst.TypeProfileLen)
 	data[0] = byte(opconst.TypeProfile)
 	o.Write(data, p.Key)

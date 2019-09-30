@@ -10,7 +10,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
 	"gioui.org/io/event"
-	"gioui.org/ui"
+	"gioui.org/op"
 )
 
 // Event is a pointer event.
@@ -33,7 +33,7 @@ type Event struct {
 	// outside it.
 	Hit bool
 	// Position is the position of the event, relative to
-	// the current transformation, as set by ui.TransformOp.
+	// the current transformation, as set by op.TransformOp.
 	Position f32.Point
 	// Scroll is the scroll amount, if any.
 	Scroll f32.Point
@@ -124,21 +124,21 @@ const (
 	areaEllipse
 )
 
-func (op RectAreaOp) Add(ops *ui.Ops) {
+func (op RectAreaOp) Add(ops *op.Ops) {
 	areaOp{
 		kind: areaRect,
 		rect: op.Rect,
 	}.add(ops)
 }
 
-func (op EllipseAreaOp) Add(ops *ui.Ops) {
+func (op EllipseAreaOp) Add(ops *op.Ops) {
 	areaOp{
 		kind: areaEllipse,
 		rect: op.Rect,
 	}.add(ops)
 }
 
-func (op areaOp) add(o *ui.Ops) {
+func (op areaOp) add(o *op.Ops) {
 	data := make([]byte, opconst.TypeAreaLen)
 	data[0] = byte(opconst.TypeArea)
 	data[1] = byte(op.kind)
@@ -150,7 +150,7 @@ func (op areaOp) add(o *ui.Ops) {
 	o.Write(data)
 }
 
-func (h InputOp) Add(o *ui.Ops) {
+func (h InputOp) Add(o *op.Ops) {
 	data := make([]byte, opconst.TypePointerInputLen)
 	data[0] = byte(opconst.TypePointerInput)
 	if h.Grab {
@@ -159,7 +159,7 @@ func (h InputOp) Add(o *ui.Ops) {
 	o.Write(data, h.Key)
 }
 
-func (op PassOp) Add(o *ui.Ops) {
+func (op PassOp) Add(o *op.Ops) {
 	data := make([]byte, opconst.TypePassLen)
 	data[0] = byte(opconst.TypePass)
 	if op.Pass {

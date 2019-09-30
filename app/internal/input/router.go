@@ -12,7 +12,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/profile"
-	"gioui.org/ui"
+	"gioui.org/op"
 )
 
 // Router is a Queue implementation that routes events from
@@ -53,7 +53,7 @@ func (q *Router) Events(k event.Key) []event.Event {
 	return events
 }
 
-func (q *Router) Frame(ops *ui.Ops) {
+func (q *Router) Frame(ops *op.Ops) {
 	q.handlers.Clear()
 	q.wakeup = false
 	q.profHandlers = q.profHandlers[:0]
@@ -160,12 +160,12 @@ func decodeProfileOp(d []byte, refs []interface{}) profile.Op {
 	}
 }
 
-func decodeInvalidateOp(d []byte) ui.InvalidateOp {
+func decodeInvalidateOp(d []byte) op.InvalidateOp {
 	bo := binary.LittleEndian
 	if opconst.OpType(d[0]) != opconst.TypeInvalidate {
 		panic("invalid op")
 	}
-	var o ui.InvalidateOp
+	var o op.InvalidateOp
 	if nanos := bo.Uint64(d[1:]); nanos > 0 {
 		o.At = time.Unix(0, int64(nanos))
 	}

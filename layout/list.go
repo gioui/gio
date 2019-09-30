@@ -7,13 +7,13 @@ import (
 
 	"gioui.org/gesture"
 	"gioui.org/io/pointer"
+	"gioui.org/op"
 	"gioui.org/paint"
-	"gioui.org/ui"
 )
 
 type scrollChild struct {
 	size  image.Point
-	macro ui.MacroOp
+	macro op.MacroOp
 }
 
 // List displays a subsection of a potentially infinitely
@@ -33,8 +33,8 @@ type List struct {
 	beforeEnd bool
 
 	ctx         *Context
-	macro       ui.MacroOp
-	child       ui.MacroOp
+	macro       op.MacroOp
+	child       op.MacroOp
 	scroll      gesture.Scroll
 	scrollDelta int
 
@@ -246,10 +246,10 @@ func (l *List) layout() Dimensions {
 			Min: axisPoint(l.Axis, min, -inf),
 			Max: axisPoint(l.Axis, max, inf),
 		}
-		var stack ui.StackOp
+		var stack op.StackOp
 		stack.Push(ops)
 		paint.RectClip(r).Add(ops)
-		ui.TransformOp{}.Offset(toPointF(axisPoint(l.Axis, pos, cross))).Add(ops)
+		op.TransformOp{}.Offset(toPointF(axisPoint(l.Axis, pos, cross))).Add(ops)
 		child.macro.Add(ops)
 		stack.Pop()
 		pos += childSize

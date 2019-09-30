@@ -7,7 +7,7 @@ import (
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
-	"gioui.org/ui"
+	"gioui.org/op"
 )
 
 type TextInputState uint8
@@ -44,7 +44,7 @@ func (q *keyQueue) InputState() TextInputState {
 	return q.state
 }
 
-func (q *keyQueue) Frame(root *ui.Ops, events *handlerEvents) {
+func (q *keyQueue) Frame(root *op.Ops, events *handlerEvents) {
 	if q.handlers == nil {
 		q.handlers = make(map[event.Key]*keyHandler)
 	}

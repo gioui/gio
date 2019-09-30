@@ -8,9 +8,9 @@ import (
 	"image/color"
 	"math"
 
-	"gioui.org/ui"
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
+	"gioui.org/op"
 )
 
 // ImageOp sets the material to a section of an
@@ -33,7 +33,7 @@ type PaintOp struct {
 	Rect f32.Rectangle
 }
 
-func (i ImageOp) Add(o *ui.Ops) {
+func (i ImageOp) Add(o *op.Ops) {
 	data := make([]byte, opconst.TypeImageLen)
 	data[0] = byte(opconst.TypeImage)
 	bo := binary.LittleEndian
@@ -44,7 +44,7 @@ func (i ImageOp) Add(o *ui.Ops) {
 	o.Write(data, i.Src)
 }
 
-func (c ColorOp) Add(o *ui.Ops) {
+func (c ColorOp) Add(o *op.Ops) {
 	data := make([]byte, opconst.TypeColorLen)
 	data[0] = byte(opconst.TypeColor)
 	data[1] = c.Color.R
@@ -54,7 +54,7 @@ func (c ColorOp) Add(o *ui.Ops) {
 	o.Write(data)
 }
 
-func (d PaintOp) Add(o *ui.Ops) {
+func (d PaintOp) Add(o *op.Ops) {
 	data := make([]byte, opconst.TypePaintLen)
 	data[0] = byte(opconst.TypePaint)
 	bo := binary.LittleEndian

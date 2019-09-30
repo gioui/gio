@@ -15,7 +15,7 @@ subsequent InputOp are active.
 
 For example, to set up a rectangular hit area:
 
-	var ops ui.Ops
+	var ops op.Ops
 	var h *Handler = ...
 
 	r := image.Rectangle{...}
@@ -33,8 +33,8 @@ with the most recent node.
 
 For example:
 
-	ops := new(ui.Ops)
-	var stack ui.StackOp
+	ops := new(op.Ops)
+	var stack op.StackOp
 	var h1, h2 *Handler
 
 	stack.Push(ops)

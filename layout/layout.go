@@ -6,6 +6,7 @@ import (
 	"image"
 
 	"gioui.org/io/event"
+	"gioui.org/op"
 	"gioui.org/ui"
 )
 
@@ -53,7 +54,7 @@ type Context struct {
 
 	ui.Config
 	event.Queue
-	*ui.Ops
+	*op.Ops
 }
 
 const (
@@ -97,7 +98,7 @@ func (c *Context) Reset(cfg ui.Config, cs Constraints) {
 	c.Dimensions = Dimensions{}
 	c.Config = cfg
 	if c.Ops == nil {
-		c.Ops = new(ui.Ops)
+		c.Ops = new(op.Ops)
 	}
 	c.Ops.Reset()
 }
@@ -157,9 +158,9 @@ func (in Inset) Layout(gtx *Context, w Widget) {
 	if mcs.Height.Max < mcs.Height.Min {
 		mcs.Height.Max = mcs.Height.Min
 	}
-	var stack ui.StackOp
+	var stack op.StackOp
 	stack.Push(gtx.Ops)
-	ui.TransformOp{}.Offset(toPointF(image.Point{X: left, Y: top})).Add(gtx.Ops)
+	op.TransformOp{}.Offset(toPointF(image.Point{X: left, Y: top})).Add(gtx.Ops)
 	dims := gtx.Layout(mcs, w)
 	stack.Pop()
 	gtx.Dimensions = Dimensions{
@@ -176,7 +177,7 @@ func UniformInset(v ui.Value) Inset {
 
 // Layout a widget.
 func (a Align) Layout(gtx *Context, w Widget) {
-	var macro ui.MacroOp
+	var macro op.MacroOp
 	macro.Record(gtx.Ops)
 	cs := gtx.Constraints
 	mcs := cs
@@ -204,9 +205,9 @@ func (a Align) Layout(gtx *Context, w Widget) {
 	case SW, S, SE:
 		p.Y = sz.Y - dims.Size.Y
 	}
-	var stack ui.StackOp
+	var stack op.StackOp
 	stack.Push(gtx.Ops)
-	ui.TransformOp{}.Offset(toPointF(p)).Add(gtx.Ops)
+	op.TransformOp{}.Offset(toPointF(p)).Add(gtx.Ops)
 	macro.Add(gtx.Ops)
 	stack.Pop()
 	gtx.Dimensions = Dimensions{
