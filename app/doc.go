@@ -4,6 +4,8 @@
 Package app provides a platform-independent interface to operating system
 functionality for running graphical user interfaces.
 
+See https://gioui.org for instructions to set up and run Gio programs.
+
 Windows
 
 Create a new Window by calling NewWindow. On mobile platforms or when Gio

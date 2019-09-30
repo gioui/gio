@@ -4,8 +4,6 @@
 Package ui defines operations buffers, units and common operations
 for GUI programs written with the Gio module.
 
-See https://gioui.org for instructions to setup and run Gio programs.
-
 Operations
 
 Gio programs use operations, or ops, for describing their user
