@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"gioui.org/ui"
+	"gioui.org/unit"
 )
 
 // An UpdateEvent is generated when a Window's Update
@@ -39,7 +39,7 @@ type DestroyEvent struct {
 // system decoration such as translucent
 // system bars and software keyboards.
 type Insets struct {
-	Top, Bottom, Left, Right ui.Value
+	Top, Bottom, Left, Right unit.Value
 }
 
 // A StageEvent is generated whenever the stage of a
@@ -146,7 +146,7 @@ func Main() {
 	main()
 }
 
-// Config implements the ui.Config interface.
+// Config implements the layout.Config interface.
 type Config struct {
 	// Device pixels per dp.
 	pxPerDp float32
@@ -159,14 +159,14 @@ func (c *Config) Now() time.Time {
 	return c.now
 }
 
-func (c *Config) Px(v ui.Value) int {
+func (c *Config) Px(v unit.Value) int {
 	var r float32
 	switch v.U {
-	case ui.UnitPx:
+	case unit.UnitPx:
 		r = v.V
-	case ui.UnitDp:
+	case unit.UnitDp:
 		r = c.pxPerDp * v.V
-	case ui.UnitSp:
+	case unit.UnitSp:
 		r = c.pxPerSp * v.V
 	default:
 		panic("unknown unit")

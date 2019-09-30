@@ -11,13 +11,14 @@ package gesture
 
 import (
 	"math"
+	"time"
 
 	"gioui.org/f32"
 	"gioui.org/internal/fling"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/op"
-	"gioui.org/ui"
+	"gioui.org/unit"
 )
 
 // Click detects click gestures in the form
@@ -93,7 +94,7 @@ const (
 	StateFlinging
 )
 
-var touchSlop = ui.Dp(3)
+var touchSlop = unit.Dp(3)
 
 // Add the handler to the operation list to receive click events.
 func (c *Click) Add(ops *op.Ops) {
@@ -156,7 +157,7 @@ func (s *Scroll) Stop() {
 
 // Scroll detects the scrolling distance from the available events and
 // ongoing fling gestures.
-func (s *Scroll) Scroll(cfg ui.Config, q event.Queue, axis Axis) int {
+func (s *Scroll) Scroll(cfg unit.Converter, q event.Queue, t time.Time, axis Axis) int {
 	if s.axis != axis {
 		s.axis = axis
 		return 0
@@ -185,7 +186,7 @@ func (s *Scroll) Scroll(cfg ui.Config, q event.Queue, axis Axis) int {
 			}
 			fling := s.estimator.Estimate()
 			if slop, d := float32(cfg.Px(touchSlop)), fling.Distance; d < -slop || d > slop {
-				s.flinger.Start(cfg, fling.Velocity)
+				s.flinger.Start(cfg, t, fling.Velocity)
 			}
 			fallthrough
 		case pointer.Cancel:
@@ -221,7 +222,7 @@ func (s *Scroll) Scroll(cfg ui.Config, q event.Queue, axis Axis) int {
 			}
 		}
 	}
-	total += s.flinger.Tick(cfg.Now())
+	total += s.flinger.Tick(t)
 	return total
 }
 

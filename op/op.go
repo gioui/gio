@@ -15,7 +15,7 @@ to a ui/app.Window's Update method.
 
 Drawing a colored square:
 
-	import "gioui.org/ui"
+	import "gioui.org/unit"
 	import "gioui.org/app"
 	import "gioui.org/op/paint"
 

@@ -7,7 +7,7 @@ import (
 
 	"gioui.org/io/event"
 	"gioui.org/layout"
-	"gioui.org/ui"
+	"gioui.org/unit"
 )
 
 type queue struct{}
@@ -26,7 +26,7 @@ func ExampleInset() {
 	gtx.Reset(cfg, cs)
 
 	// Inset all edges by 10.
-	inset := layout.UniformInset(ui.Dp(10))
+	inset := layout.UniformInset(unit.Dp(10))
 	inset.Layout(gtx, func() {
 		// Lay out a 50x50 sized widget.
 		layoutWidget(gtx, 50, 50)
@@ -146,7 +146,7 @@ func (config) Now() time.Time {
 	return time.Now()
 }
 
-func (config) Px(v ui.Value) int {
+func (config) Px(v unit.Value) int {
 	return int(v.V + .5)
 }
 

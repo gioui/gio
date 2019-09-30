@@ -1,6 +1,26 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package ui
+/*
+
+Package unit implements device independent units and values.
+
+A Value is a value with a Unit attached.
+
+Device independent pixel, or dp, is the unit for sizes independent of
+the underlying display device.
+
+Scaled pixels, or sp, is the unit for text sizes. An sp is like dp with
+text scaling applied.
+
+Finally, pixels, or px, is the unit for display dependent pixels. Their
+size vary between platforms and displays.
+
+To maintain a constant visual size across platforms and displays, always
+use dps or sps to define user interfaces. Only use pixels for derived
+values.
+
+*/
+package unit
 
 import "fmt"
 
@@ -12,6 +32,11 @@ type Value struct {
 
 // Unit represents a unit for a Value.
 type Unit uint8
+
+// Converter converts Values to pixels.
+type Converter interface {
+	Px(v Value) int
+}
 
 const (
 	// UnitPx represent device pixels in the resolution of
@@ -59,7 +84,7 @@ func (u Unit) String() string {
 }
 
 // Add a list of Values.
-func Add(c Config, values ...Value) Value {
+func Add(c Converter, values ...Value) Value {
 	var sum Value
 	for _, v := range values {
 		sum, v = compatible(c, sum, v)
@@ -69,7 +94,7 @@ func Add(c Config, values ...Value) Value {
 }
 
 // Max returns the maximum of a list of Values.
-func Max(c Config, values ...Value) Value {
+func Max(c Converter, values ...Value) Value {
 	var max Value
 	for _, v := range values {
 		max, v = compatible(c, max, v)
@@ -80,7 +105,7 @@ func Max(c Config, values ...Value) Value {
 	return max
 }
 
-func compatible(c Config, v1, v2 Value) (Value, Value) {
+func compatible(c Converter, v1, v2 Value) (Value, Value) {
 	if v1.U == v2.U {
 		return v1, v2
 	}

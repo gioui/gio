@@ -14,7 +14,7 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/paint"
 	"gioui.org/text"
-	"gioui.org/ui"
+	"gioui.org/unit"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
@@ -22,7 +22,7 @@ import (
 
 // Faces is a cache of text layouts and paths.
 type Faces struct {
-	config      ui.Config
+	config      unit.Converter
 	faceCache   map[faceKey]*Face
 	layoutCache map[layoutKey]cachedLayout
 	pathCache   map[pathKey]cachedPath
@@ -53,19 +53,19 @@ type pathKey struct {
 
 type faceKey struct {
 	font *sfnt.Font
-	size ui.Value
+	size unit.Value
 }
 
 // Face is a cached implementation of text.Face.
 type Face struct {
 	faces *Faces
-	size  ui.Value
+	size  unit.Value
 	font  *opentype
 }
 
 // Reset the cache, discarding any measures or paths that
 // haven't been used since the last call to Reset.
-func (f *Faces) Reset(c ui.Config) {
+func (f *Faces) Reset(c unit.Converter) {
 	f.config = c
 	f.init()
 	for pk, p := range f.pathCache {
@@ -87,7 +87,7 @@ func (f *Faces) Reset(c ui.Config) {
 }
 
 // For returns a Face for the given font and size.
-func (f *Faces) For(fnt *sfnt.Font, size ui.Value) *Face {
+func (f *Faces) For(fnt *sfnt.Font, size unit.Value) *Face {
 	f.init()
 	fk := faceKey{fnt, size}
 	if f, exist := f.faceCache[fk]; exist {

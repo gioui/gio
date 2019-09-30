@@ -9,7 +9,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/layout"
 	"gioui.org/op/paint"
-	"gioui.org/ui"
+	"gioui.org/unit"
 )
 
 // Image is a widget that displays an image.
@@ -31,7 +31,7 @@ func (im Image) Layout(gtx *layout.Context) {
 	var w, h int
 	if im.Scale == 0 {
 		const dpPrPx = 160 / 72
-		w, h = gtx.Px(ui.Dp(wf*dpPrPx)), gtx.Px(ui.Dp(hf*dpPrPx))
+		w, h = gtx.Px(unit.Dp(wf*dpPrPx)), gtx.Px(unit.Dp(hf*dpPrPx))
 	} else {
 		w, h = int(wf*im.Scale+.5), int(hf*im.Scale+.5)
 	}

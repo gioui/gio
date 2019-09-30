@@ -583,8 +583,7 @@ func (w *window) flushFling() {
 	w.fling.yExtrapolation = fling.Extrapolation{}
 	vel := float32(math.Sqrt(float64(estx.Velocity*estx.Velocity + esty.Velocity*esty.Velocity)))
 	_, _, c := w.config()
-	c.now = time.Now()
-	if !w.fling.anim.Start(&c, vel) {
+	if !w.fling.anim.Start(&c, time.Now(), vel) {
 		return
 	}
 	invDist := 1 / vel

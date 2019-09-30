@@ -13,7 +13,7 @@ import (
 	"gioui.org/io/event"
 	"gioui.org/io/profile"
 	"gioui.org/op"
-	"gioui.org/ui"
+	"gioui.org/unit"
 )
 
 // WindowOption configures a Window.
@@ -22,7 +22,7 @@ type WindowOption struct {
 }
 
 type windowOptions struct {
-	Width, Height ui.Value
+	Width, Height unit.Value
 	Title         string
 }
 
@@ -86,8 +86,8 @@ var ackEvent event.Event
 // BUG: Calling NewWindow more than once is not yet supported.
 func NewWindow(options ...WindowOption) *Window {
 	opts := &windowOptions{
-		Width:  ui.Dp(800),
-		Height: ui.Dp(600),
+		Width:  unit.Dp(800),
+		Height: unit.Dp(600),
 		Title:  "Gio",
 	}
 
@@ -339,7 +339,7 @@ func WithTitle(t string) WindowOption {
 }
 
 // WithWidth returns an option that sets the window width.
-func WithWidth(w ui.Value) WindowOption {
+func WithWidth(w unit.Value) WindowOption {
 	if w.V <= 0 {
 		panic("width must be larger than or equal to 0")
 	}
@@ -351,7 +351,7 @@ func WithWidth(w ui.Value) WindowOption {
 }
 
 // WithHeight returns an option that sets the window height.
-func WithHeight(h ui.Value) WindowOption {
+func WithHeight(h unit.Value) WindowOption {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}

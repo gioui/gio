@@ -18,7 +18,7 @@ contents and state.
 
 For example:
 
-	import "gioui.org/ui"
+	import "gioui.org/unit"
 
 	w := app.NewWindow()
 	for e := range w.Events() {

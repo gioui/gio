@@ -27,7 +27,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
-	"gioui.org/ui"
+	"gioui.org/unit"
 )
 
 type window struct {

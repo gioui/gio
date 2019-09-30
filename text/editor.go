@@ -16,7 +16,7 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/paint"
-	"gioui.org/ui"
+	"gioui.org/unit"
 
 	"golang.org/x/image/math/fixed"
 )
@@ -88,7 +88,7 @@ const (
 // Event returns the next available editor event, or false if none are available.
 func (e *Editor) Event(gtx *layout.Context) (EditorEvent, bool) {
 	// Crude configuration change detection.
-	if scale := gtx.Px(ui.Sp(100)); scale != e.oldScale {
+	if scale := gtx.Px(unit.Sp(100)); scale != e.oldScale {
 		e.invalidate()
 		e.oldScale = scale
 	}
@@ -102,7 +102,7 @@ func (e *Editor) Event(gtx *layout.Context) (EditorEvent, bool) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Scroll(gtx.Config, gtx.Queue, axis)
+	sdist := e.scroller.Scroll(gtx.Config, gtx.Queue, gtx.Now(), axis)
 	var soff int
 	if e.SingleLine {
 		e.scrollOff.X += sdist
@@ -167,8 +167,8 @@ func (e *Editor) editorEvent(gtx *layout.Context) (EditorEvent, bool) {
 	return nil, false
 }
 
-func (e *Editor) caretWidth(c ui.Config) fixed.Int26_6 {
-	oneDp := c.Px(ui.Dp(1))
+func (e *Editor) caretWidth(c unit.Converter) fixed.Int26_6 {
+	oneDp := c.Px(unit.Dp(1))
 	return fixed.Int26_6(oneDp * 64)
 }
 
@@ -182,7 +182,7 @@ func (e *Editor) Layout(gtx *layout.Context) {
 	cs := gtx.Constraints
 	for _, ok := e.Event(gtx); ok; _, ok = e.Event(gtx) {
 	}
-	twoDp := gtx.Px(ui.Dp(2))
+	twoDp := gtx.Px(unit.Dp(2))
 	e.padLeft, e.padRight = twoDp, twoDp
 	maxWidth := cs.Width.Max
 	if e.SingleLine {
@@ -275,7 +275,7 @@ func (e *Editor) Layout(gtx *layout.Context) {
 	stack.Pop()
 
 	baseline := e.padTop + e.dims.Baseline
-	pointerPadding := gtx.Px(ui.Dp(4))
+	pointerPadding := gtx.Px(unit.Dp(4))
 	r := image.Rectangle{Max: e.viewSize}
 	r.Min.X -= pointerPadding
 	r.Min.Y -= pointerPadding
@@ -563,7 +563,7 @@ func (e *Editor) moveEnd() {
 	e.carXOff = l.Width + a - x
 }
 
-func (e *Editor) scrollToCaret(c ui.Config) {
+func (e *Editor) scrollToCaret(c unit.Converter) {
 	carWidth := e.caretWidth(c)
 	carLine, _, x, y := e.layoutCaret()
 	l := e.lines[carLine]

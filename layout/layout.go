@@ -4,10 +4,11 @@ package layout
 
 import (
 	"image"
+	"time"
 
 	"gioui.org/io/event"
 	"gioui.org/op"
-	"gioui.org/ui"
+	"gioui.org/unit"
 )
 
 // Constraints represent a set of acceptable ranges for
@@ -52,9 +53,18 @@ type Context struct {
 	// operation.
 	Dimensions Dimensions
 
-	ui.Config
+	Config
 	event.Queue
 	*op.Ops
+}
+
+// Config define the essential properties of
+// the environment.
+type Config interface {
+	// Now returns the current animation time.
+	Now() time.Time
+
+	unit.Converter
 }
 
 const (
@@ -93,7 +103,7 @@ func (s *Context) Layout(cs Constraints, w Widget) Dimensions {
 }
 
 // Reset the context.
-func (c *Context) Reset(cfg ui.Config, cs Constraints) {
+func (c *Context) Reset(cfg Config, cs Constraints) {
 	c.Constraints = cs
 	c.Dimensions = Dimensions{}
 	c.Config = cfg
@@ -129,7 +139,7 @@ func RigidConstraints(size image.Point) Constraints {
 
 // Inset adds space around a widget.
 type Inset struct {
-	Top, Right, Bottom, Left ui.Value
+	Top, Right, Bottom, Left unit.Value
 }
 
 // Align aligns a widget in the available space.
@@ -171,7 +181,7 @@ func (in Inset) Layout(gtx *Context, w Widget) {
 
 // UniformInset returns an Inset with a single inset applied to all
 // edges.
-func UniformInset(v ui.Value) Inset {
+func UniformInset(v unit.Value) Inset {
 	return Inset{Top: v, Right: v, Bottom: v, Left: v}
 }
 

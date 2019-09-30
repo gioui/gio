@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"time"
 
-	"gioui.org/ui"
+	"gioui.org/unit"
 )
 
 type Animation struct {
@@ -21,8 +21,8 @@ type Animation struct {
 
 var (
 	// Pixels/second.
-	minFlingVelocity = ui.Dp(50)
-	maxFlingVelocity = ui.Dp(8000)
+	minFlingVelocity = unit.Dp(50)
+	maxFlingVelocity = unit.Dp(8000)
 )
 
 const (
@@ -31,7 +31,7 @@ const (
 
 // Start a fling given a starting velocity. Returns whether a
 // fling was started.
-func (f *Animation) Start(c ui.Config, velocity float32) bool {
+func (f *Animation) Start(c unit.Converter, now time.Time, velocity float32) bool {
 	min := float32(c.Px(minFlingVelocity))
 	v := velocity
 	if -min <= v && v <= min {
@@ -43,7 +43,7 @@ func (f *Animation) Start(c ui.Config, velocity float32) bool {
 	} else if v < -max {
 		v = -max
 	}
-	f.init(c.Now(), v)
+	f.init(now, v)
 	return true
 }
 

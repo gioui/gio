@@ -15,7 +15,7 @@ import (
 
 	"github.com/chromedp/chromedp"
 
-	_ "gioui.org/ui" // the build tool adds it to go.mod, so keep it there
+	_ "gioui.org/unit" // the build tool adds it to go.mod, so keep it there
 )
 
 func TestJSOnChrome(t *testing.T) {
