@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"gioui.org/layout"
 	"gioui.org/ui"
-	"gioui.org/ui/layout"
 )
 
 type queue struct{}

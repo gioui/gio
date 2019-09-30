@@ -3,7 +3,7 @@ module gioui.org/apps
 go 1.13
 
 require (
-	gioui.org/ui v0.0.0-20190926164103-dc6fedc163d5
+	gioui.org v0.0.0-20190930103706-22cd88df9f7f
 	github.com/google/go-github/v24 v24.0.1
 	golang.org/x/exp v0.0.0-20190627132806-fd42eb6b336f
 	golang.org/x/image v0.0.0-20190703141733-d6a02ce849c9

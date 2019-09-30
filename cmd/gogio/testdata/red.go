@@ -8,9 +8,9 @@ import (
 	"log"
 
 	"gioui.org/ui"
-	"gioui.org/ui/app"
-	"gioui.org/ui/f32"
-	"gioui.org/ui/paint"
+	"gioui.org/app"
+	"gioui.org/f32"
+	"gioui.org/paint"
 )
 
 func main() {

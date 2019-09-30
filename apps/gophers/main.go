@@ -21,10 +21,10 @@ import (
 	_ "net/http/pprof"
 
 	"gioui.org/ui"
-	"gioui.org/ui/app"
-	"gioui.org/ui/gesture"
-	"gioui.org/ui/key"
-	"gioui.org/ui/layout"
+	"gioui.org/app"
+	"gioui.org/gesture"
+	"gioui.org/key"
+	"gioui.org/layout"
 
 	"github.com/google/go-github/v24/github"
 )
