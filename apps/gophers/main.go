@@ -20,11 +20,11 @@ import (
 
 	_ "net/http/pprof"
 
-	"gioui.org/ui"
 	"gioui.org/app"
 	"gioui.org/gesture"
-	"gioui.org/key"
+	"gioui.org/io/key"
 	"gioui.org/layout"
+	"gioui.org/unit"
 
 	"github.com/google/go-github/v24/github"
 )
@@ -41,9 +41,9 @@ type App struct {
 }
 
 var (
-	profile = flag.Bool("profile", false, "serve profiling data at http://localhost:6060")
-	stats   = flag.Bool("stats", false, "show rendering statistics")
-	token   = flag.String("token", "", "Github authentication token")
+	prof  = flag.Bool("profile", false, "serve profiling data at http://localhost:6060")
+	stats = flag.Bool("stats", false, "show rendering statistics")
+	token = flag.String("token", "", "Github authentication token")
 )
 
 func main() {
@@ -55,8 +55,8 @@ func main() {
 	}
 	go func() {
 		w := app.NewWindow(
-			app.WithWidth(ui.Dp(400)),
-			app.WithHeight(ui.Dp(800)),
+			app.WithWidth(unit.Dp(400)),
+			app.WithHeight(unit.Dp(800)),
 			app.WithTitle("Gophers"),
 		)
 		if err := newApp(w).run(); err != nil {
@@ -67,7 +67,7 @@ func main() {
 }
 
 func initProfiling() {
-	if !*profile {
+	if !*prof {
 		return
 	}
 	go func() {

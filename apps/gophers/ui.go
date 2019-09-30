@@ -17,16 +17,17 @@ import (
 
 	_ "net/http/pprof"
 
-	"gioui.org/ui"
 	"gioui.org/f32"
 	"gioui.org/gesture"
-	"gioui.org/key"
+	"gioui.org/io/key"
+	"gioui.org/io/pointer"
+	"gioui.org/io/profile"
 	"gioui.org/layout"
-	"gioui.org/measure"
-	"gioui.org/paint"
-	"gioui.org/pointer"
-	"gioui.org/system"
+	"gioui.org/op"
+	"gioui.org/op/paint"
 	"gioui.org/text"
+	"gioui.org/text/shape"
+	"gioui.org/unit"
 	"gioui.org/widget"
 	"golang.org/x/exp/shiny/iconvg"
 
@@ -41,7 +42,7 @@ import (
 )
 
 type UI struct {
-	faces        measure.Faces
+	faces        shape.Faces
 	fab          *ActionButton
 	usersList    *layout.List
 	users        []*user
@@ -52,12 +53,12 @@ type UI struct {
 
 	// Profiling.
 	profiling   bool
-	profile     system.ProfileEvent
+	profile     profile.Event
 	lastMallocs uint64
 }
 
 type userPage struct {
-	faces       measure.Faces
+	faces       shape.Faces
 	user        *user
 	commitsList *layout.List
 	commits     []*github.Commit
@@ -72,7 +73,7 @@ type user struct {
 
 type icon struct {
 	src  []byte
-	size ui.Value
+	size unit.Value
 
 	// Cached values.
 	img     image.Image
@@ -94,14 +95,14 @@ var fonts struct {
 }
 
 var theme struct {
-	text     ui.MacroOp
-	tertText ui.MacroOp
-	brand    ui.MacroOp
-	white    ui.MacroOp
+	text     op.MacroOp
+	tertText op.MacroOp
+	brand    op.MacroOp
+	white    op.MacroOp
 }
 
-func colorMaterial(ops *ui.Ops, color color.RGBA) ui.MacroOp {
-	var mat ui.MacroOp
+func colorMaterial(ops *op.Ops, color color.RGBA) op.MacroOp {
+	var mat op.MacroOp
 	mat.Record(ops)
 	paint.ColorOp{Color: color}.Add(ops)
 	mat.Stop()
@@ -113,7 +114,7 @@ func init() {
 	fonts.bold = mustLoadFont(gobold.TTF)
 	fonts.italic = mustLoadFont(goitalic.TTF)
 	fonts.mono = mustLoadFont(gomono.TTF)
-	var ops ui.Ops
+	var ops op.Ops
 	theme.text = colorMaterial(&ops, rgb(0x333333))
 	theme.tertText = colorMaterial(&ops, rgb(0xbbbbbb))
 	theme.brand = colorMaterial(&ops, rgb(0x62798c))
@@ -129,7 +130,7 @@ func newUI(fetchCommits func(string)) *UI {
 	}
 	u.fab = &ActionButton{
 		face:    u.face(fonts.regular, 11),
-		sendIco: &icon{src: icons.ContentSend, size: ui.Dp(24)},
+		sendIco: &icon{src: icons.ContentSend, size: unit.Dp(24)},
 		icons:   []*icon{},
 	}
 	u.edit2 = &text.Editor{
@@ -168,7 +169,7 @@ func argb(c uint32) color.RGBA {
 }
 
 func (u *UI) face(f *sfnt.Font, size float32) text.Face {
-	return u.faces.For(f, ui.Sp(size))
+	return u.faces.For(f, unit.Sp(size))
 }
 
 func (u *UI) layoutTimings(gtx *layout.Context) {
@@ -176,17 +177,17 @@ func (u *UI) layoutTimings(gtx *layout.Context) {
 		return
 	}
 	for _, e := range gtx.Events(u) {
-		if e, ok := e.(system.ProfileEvent); ok {
+		if e, ok := e.(profile.Event); ok {
 			u.profile = e
 		}
 	}
-	system.ProfileOp{Key: u}.Add(gtx.Ops)
+	profile.Op{Key: u}.Add(gtx.Ops)
 	var mstats runtime.MemStats
 	runtime.ReadMemStats(&mstats)
 	mallocs := mstats.Mallocs - u.lastMallocs
 	u.lastMallocs = mstats.Mallocs
 	layout.Align(layout.NE).Layout(gtx, func() {
-		layout.Inset{Top: ui.Dp(16)}.Layout(gtx, func() {
+		layout.Inset{Top: unit.Dp(16)}.Layout(gtx, func() {
 			txt := fmt.Sprintf("m: %d %s", mallocs, u.profile.Timings)
 			text.Label{Material: theme.text, Face: u.face(fonts.mono, 10), Text: txt}.Layout(gtx)
 		})
@@ -234,12 +235,12 @@ func (up *userPage) Layout(gtx *layout.Context) {
 func (up *userPage) commit(gtx *layout.Context, index int) {
 	u := up.user
 	msg := up.commits[index].GetMessage()
-	label := text.Label{Material: theme.text, Face: up.faces.For(fonts.regular, ui.Sp(12)), Text: msg}
-	in := layout.Inset{Top: ui.Dp(16), Right: ui.Dp(8), Left: ui.Dp(8)}
+	label := text.Label{Material: theme.text, Face: up.faces.For(fonts.regular, unit.Sp(12)), Text: msg}
+	in := layout.Inset{Top: unit.Dp(16), Right: unit.Dp(8), Left: unit.Dp(8)}
 	in.Layout(gtx, func() {
 		f := (&layout.Flex{Axis: layout.Horizontal}).Init(gtx)
 		c1 := f.Rigid(func() {
-			sz := gtx.Px(ui.Dp(48))
+			sz := gtx.Px(unit.Dp(48))
 			cc := clipCircle{}
 			cc.Layout(gtx, func() {
 				gtx.Constraints = layout.RigidConstraints(gtx.Constraints.Constrain(image.Point{X: sz, Y: sz}))
@@ -248,7 +249,7 @@ func (up *userPage) commit(gtx *layout.Context, index int) {
 		})
 		c2 := f.Flexible(1, func() {
 			gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
-			layout.Inset{Left: ui.Dp(8)}.Layout(gtx, func() {
+			layout.Inset{Left: unit.Dp(8)}.Layout(gtx, func() {
 				label.Layout(gtx)
 			})
 		})
@@ -260,7 +261,7 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 	st := (&layout.Stack{}).Init(gtx)
 	c2 := st.Rigid(func() {
 		layout.Align(layout.SE).Layout(gtx, func() {
-			in := layout.UniformInset(ui.Dp(16))
+			in := layout.UniformInset(unit.Dp(16))
 			in.Layout(gtx, func() {
 				u.fab.Layout(gtx)
 			})
@@ -272,8 +273,8 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 
 		c1 := f.Rigid(func() {
 			gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
-			layout.UniformInset(ui.Dp(16)).Layout(gtx, func() {
-				sz := gtx.Px(ui.Dp(200))
+			layout.UniformInset(unit.Dp(16)).Layout(gtx, func() {
+				sz := gtx.Px(unit.Dp(200))
 				cs := gtx.Constraints
 				gtx.Constraints = layout.RigidConstraints(cs.Constrain(image.Point{X: sz, Y: sz}))
 				u.edit.Layout(gtx)
@@ -282,7 +283,7 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 
 		c2 := f.Rigid(func() {
 			gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
-			in := layout.Inset{Bottom: ui.Dp(16), Left: ui.Dp(16), Right: ui.Dp(16)}
+			in := layout.Inset{Bottom: unit.Dp(16), Left: unit.Dp(16), Right: unit.Dp(16)}
 			in.Layout(gtx, func() {
 				u.edit2.Layout(gtx)
 			})
@@ -294,7 +295,7 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 			s.Init(gtx)
 			c2 := s.Rigid(func() {
 				grey := colorMaterial(gtx.Ops, rgb(0x888888))
-				in := layout.Inset{Top: ui.Dp(16), Right: ui.Dp(8), Bottom: ui.Dp(8), Left: ui.Dp(8)}
+				in := layout.Inset{Top: unit.Dp(16), Right: unit.Dp(8), Bottom: unit.Dp(8), Left: unit.Dp(8)}
 				in.Layout(gtx, func() {
 					lbl := text.Label{Material: grey, Face: u.face(fonts.regular, 11), Text: "GOPHERS"}
 					lbl.Layout(gtx)
@@ -319,8 +320,8 @@ func (a *ActionButton) Layout(gtx *layout.Context) {
 	f := layout.Flex{Axis: layout.Vertical, Alignment: layout.End}
 	f.Init(gtx)
 	f.Layout(f.Rigid(func() {
-		layout.Inset{Top: ui.Dp(4)}.Layout(gtx, func() {
-			fab(gtx, a.sendIco.image(gtx), theme.brand, gtx.Px(ui.Dp(56)))
+		layout.Inset{Top: unit.Dp(4)}.Layout(gtx, func() {
+			fab(gtx, a.sendIco.image(gtx), theme.brand, gtx.Px(unit.Dp(56)))
 			pointer.EllipseAreaOp{Rect: image.Rectangle{Max: gtx.Dimensions.Size}}.Add(gtx.Ops)
 		})
 	}))
@@ -341,16 +342,16 @@ func (u *UI) user(gtx *layout.Context, index int) {
 	elem := layout.Flex{Axis: layout.Vertical}
 	elem.Init(gtx)
 	c1 := elem.Rigid(func() {
-		in := layout.UniformInset(ui.Dp(8))
+		in := layout.UniformInset(unit.Dp(8))
 		in.Layout(gtx, func() {
 			f := centerRowOpts()
 			f.Init(gtx)
 			c1 := f.Rigid(func() {
-				in := layout.Inset{Right: ui.Dp(8)}
+				in := layout.Inset{Right: unit.Dp(8)}
 				cc := clipCircle{}
 				in.Layout(gtx, func() {
 					cc.Layout(gtx, func() {
-						sz := image.Point{X: gtx.Px(ui.Dp(48)), Y: gtx.Px(ui.Dp(48))}
+						sz := image.Point{X: gtx.Px(unit.Dp(48)), Y: gtx.Px(unit.Dp(48))}
 						gtx.Constraints = layout.RigidConstraints(gtx.Constraints.Constrain(sz))
 						widget.Image{Src: user.avatar, Rect: user.avatar.Bounds()}.Layout(gtx)
 					})
@@ -368,7 +369,7 @@ func (u *UI) user(gtx *layout.Context, index int) {
 					c2 := f.Flexible(1, func() {
 						gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
 						layout.Align(layout.E).Layout(gtx, func() {
-							layout.Inset{Left: ui.Dp(2)}.Layout(gtx, func() {
+							layout.Inset{Left: unit.Dp(2)}.Layout(gtx, func() {
 								lbl := text.Label{Material: theme.text, Face: u.face(fonts.regular, 10), Text: "3 hours ago"}
 								lbl.Layout(gtx)
 							})
@@ -377,7 +378,7 @@ func (u *UI) user(gtx *layout.Context, index int) {
 					f.Layout(c1, c2)
 				})
 				c2 := f.Rigid(func() {
-					in := layout.Inset{Top: ui.Dp(4)}
+					in := layout.Inset{Top: unit.Dp(4)}
 					in.Layout(gtx, func() {
 						text.Label{Material: theme.tertText, Face: u.face(fonts.regular, 12), Text: user.company}.Layout(gtx)
 					})
@@ -394,7 +395,7 @@ func (u *UI) user(gtx *layout.Context, index int) {
 }
 
 type fill struct {
-	material ui.MacroOp
+	material op.MacroOp
 }
 
 func (f fill) Layout(gtx *layout.Context) {
@@ -424,7 +425,7 @@ type clipCircle struct {
 }
 
 func (c *clipCircle) Layout(gtx *layout.Context, w layout.Widget) {
-	var m ui.MacroOp
+	var m op.MacroOp
 	m.Record(gtx.Ops)
 	w()
 	m.Stop()
@@ -435,14 +436,14 @@ func (c *clipCircle) Layout(gtx *layout.Context, w layout.Widget) {
 	}
 	szf := float32(max)
 	rr := szf * .5
-	var stack ui.StackOp
+	var stack op.StackOp
 	stack.Push(gtx.Ops)
 	rrect(gtx.Ops, szf, szf, rr, rr, rr, rr)
 	m.Add(gtx.Ops)
 	stack.Pop()
 }
 
-func fab(gtx *layout.Context, ico image.Image, mat ui.MacroOp, size int) {
+func fab(gtx *layout.Context, ico image.Image, mat op.MacroOp, size int) {
 	dp := image.Point{X: (size - ico.Bounds().Dx()) / 2, Y: (size - ico.Bounds().Dy()) / 2}
 	dims := image.Point{X: size, Y: size}
 	rr := float32(size) * .5
@@ -463,7 +464,7 @@ func toRectF(r image.Rectangle) f32.Rectangle {
 	}
 }
 
-func (ic *icon) image(cfg ui.Config) image.Image {
+func (ic *icon) image(cfg unit.Converter) image.Image {
 	sz := cfg.Px(ic.size)
 	if sz == ic.imgSize {
 		return ic.img
@@ -484,7 +485,7 @@ func (ic *icon) image(cfg ui.Config) image.Image {
 }
 
 // https://pomax.github.io/bezierinfo/#circles_cubic.
-func rrect(ops *ui.Ops, width, height, se, sw, nw, ne float32) {
+func rrect(ops *op.Ops, width, height, se, sw, nw, ne float32) {
 	w, h := float32(width), float32(height)
 	const c = 0.55228475 // 4*(sqrt(2)-1)/3
 	var b paint.PathBuilder

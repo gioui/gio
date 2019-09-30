@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"gioui.org/io/event"
 	"gioui.org/layout"
-	"gioui.org/ui"
+	"gioui.org/unit"
 )
 
 type queue struct{}
@@ -28,7 +29,7 @@ func BenchmarkUI(b *testing.B) {
 	}
 }
 
-func (queue) Events(k ui.Key) []ui.Event {
+func (queue) Events(k event.Key) []event.Event {
 	return nil
 }
 

@@ -8,12 +8,13 @@ import (
 	"image/color"
 	"log"
 
-	"gioui.org/ui"
 	"gioui.org/app"
 	"gioui.org/layout"
-	"gioui.org/measure"
-	"gioui.org/paint"
+	"gioui.org/op"
+	"gioui.org/op/paint"
 	"gioui.org/text"
+	"gioui.org/text/shape"
+	"gioui.org/unit"
 
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/sfnt"
@@ -34,9 +35,9 @@ func loop(w *app.Window) error {
 	if err != nil {
 		panic("failed to load font")
 	}
-	var faces measure.Faces
+	var faces shape.Faces
 	maroon := color.RGBA{127, 0, 0, 255}
-	face := faces.For(regular, ui.Sp(72))
+	face := faces.For(regular, unit.Sp(72))
 	message := "Hello, Gio"
 	c := &layout.Context{
 		Queue: w.Queue(),
@@ -49,7 +50,7 @@ func loop(w *app.Window) error {
 		case app.UpdateEvent:
 			c.Reset(&e.Config, layout.RigidConstraints(e.Size))
 			faces.Reset(c.Config)
-			var material ui.MacroOp
+			var material op.MacroOp
 			material.Record(c.Ops)
 			paint.ColorOp{Color: maroon}.Add(c.Ops)
 			material.Stop()
