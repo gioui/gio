@@ -9,12 +9,12 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"gioui.org/ui"
 	"gioui.org/gesture"
-	"gioui.org/key"
+	"gioui.org/io/key"
+	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/paint"
-	"gioui.org/pointer"
+	"gioui.org/ui"
 
 	"golang.org/x/image/math/fixed"
 )

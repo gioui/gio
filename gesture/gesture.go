@@ -12,10 +12,10 @@ package gesture
 import (
 	"math"
 
-	"gioui.org/ui"
 	"gioui.org/f32"
 	"gioui.org/internal/fling"
-	"gioui.org/pointer"
+	"gioui.org/io/pointer"
+	"gioui.org/ui"
 )
 
 // Click detects click gestures in the form

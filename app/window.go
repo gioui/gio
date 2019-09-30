@@ -8,10 +8,10 @@ import (
 	"image"
 	"time"
 
-	"gioui.org/ui"
 	"gioui.org/app/internal/gpu"
 	"gioui.org/app/internal/input"
-	"gioui.org/system"
+	"gioui.org/io/profile"
+	"gioui.org/ui"
 )
 
 // WindowOption configures a Window.
@@ -144,7 +144,7 @@ func (w *Window) draw(size image.Point, frame *ui.Ops) {
 	if w.queue.q.Profiling() {
 		q := 100 * time.Microsecond
 		timings := fmt.Sprintf("tot:%7s cpu:%7s %s", frameDur.Round(q), drawDur.Round(q), w.gpu.Timings())
-		w.queue.q.AddProfile(system.ProfileEvent{Timings: timings})
+		w.queue.q.AddProfile(profile.Event{Timings: timings})
 		w.setNextFrame(time.Time{})
 	}
 	if t, ok := w.queue.q.WakeupTime(); ok {

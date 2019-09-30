@@ -3,10 +3,10 @@
 package input
 
 import (
-	"gioui.org/ui"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
-	"gioui.org/key"
+	"gioui.org/io/key"
+	"gioui.org/ui"
 )
 
 type TextInputState uint8

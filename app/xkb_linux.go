@@ -22,7 +22,7 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	"gioui.org/key"
+	"gioui.org/io/key"
 )
 
 type xkb struct {

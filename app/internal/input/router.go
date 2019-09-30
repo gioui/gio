@@ -6,12 +6,12 @@ import (
 	"encoding/binary"
 	"time"
 
-	"gioui.org/ui"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
-	"gioui.org/key"
-	"gioui.org/pointer"
-	"gioui.org/system"
+	"gioui.org/io/key"
+	"gioui.org/io/pointer"
+	"gioui.org/io/profile"
+	"gioui.org/ui"
 )
 
 // Router is a Queue implementation that routes events from
@@ -98,7 +98,7 @@ func (q *Router) collect() {
 	}
 }
 
-func (q *Router) AddProfile(e system.ProfileEvent) {
+func (q *Router) AddProfile(e profile.Event) {
 	for _, h := range q.profHandlers {
 		q.handlers.Add(h, e)
 	}
@@ -150,11 +150,11 @@ func (h *handlerEvents) Clear() {
 	}
 }
 
-func decodeProfileOp(d []byte, refs []interface{}) system.ProfileOp {
+func decodeProfileOp(d []byte, refs []interface{}) profile.Op {
 	if opconst.OpType(d[0]) != opconst.TypeProfile {
 		panic("invalid op")
 	}
-	return system.ProfileOp{
+	return profile.Op{
 		Key: refs[0].(ui.Key),
 	}
 }

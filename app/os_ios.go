@@ -22,10 +22,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gioui.org/ui"
 	"gioui.org/f32"
-	"gioui.org/key"
-	"gioui.org/pointer"
+	"gioui.org/io/key"
+	"gioui.org/io/pointer"
+	"gioui.org/ui"
 )
 
 type window struct {

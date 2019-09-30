@@ -6,11 +6,11 @@ import (
 	"encoding/binary"
 	"image"
 
-	"gioui.org/ui"
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
-	"gioui.org/pointer"
+	"gioui.org/io/pointer"
+	"gioui.org/ui"
 )
 
 type pointerQueue struct {

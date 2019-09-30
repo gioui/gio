@@ -15,8 +15,8 @@ import (
 	syscall "golang.org/x/sys/windows"
 
 	"gioui.org/f32"
-	"gioui.org/key"
-	"gioui.org/pointer"
+	"gioui.org/io/key"
+	"gioui.org/io/pointer"
 )
 
 var winMap = make(map[syscall.Handle]*window)

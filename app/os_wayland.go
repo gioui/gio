@@ -18,8 +18,8 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/internal/fling"
-	"gioui.org/key"
-	"gioui.org/pointer"
+	"gioui.org/io/key"
+	"gioui.org/io/pointer"
 	syscall "golang.org/x/sys/unix"
 )
 

@@ -101,7 +101,7 @@ the means for declaring handlers for specific event types.
 
 The following example declares a handler ready for key input:
 
-	import gioui.org/key
+	import gioui.org/io/key
 
 	ops := new(ui.Ops)
 	var h *Handler = ...
