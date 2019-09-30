@@ -110,7 +110,7 @@ func mainErr() error {
 	}
 	if appArgs := flag.Args()[1:]; len(appArgs) > 0 {
 		// Pass along arguments to the app.
-		bi.ldflags = fmt.Sprintf("-X gioui.org/ui/app.extraArgs=%s", strings.Join(appArgs, "|"))
+		bi.ldflags = fmt.Sprintf("-X gioui.org/app.extraArgs=%s", strings.Join(appArgs, "|"))
 	}
 	if err := build(bi); err != nil {
 		return err
