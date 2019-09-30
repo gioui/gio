@@ -5,7 +5,7 @@ package ui
 import (
 	"encoding/binary"
 
-	"gioui.org/ui/internal/opconst"
+	"gioui.org/internal/opconst"
 )
 
 // Ops holds a list of operations. Operations are stored in

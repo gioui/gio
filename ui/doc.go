@@ -20,8 +20,8 @@ to a ui/app.Window's Update method.
 Drawing a colored square:
 
 	import "gioui.org/ui"
-	import "gioui.org/ui/app"
-	import "gioui.org/ui/paint"
+	import "gioui.org/app"
+	import "gioui.org/paint"
 
 	var w app.Window
 	ops := new(ui.Ops)

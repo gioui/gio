@@ -7,8 +7,8 @@ import (
 	"math"
 	"time"
 
-	"gioui.org/ui/f32"
-	"gioui.org/ui/internal/opconst"
+	"gioui.org/f32"
+	"gioui.org/internal/opconst"
 )
 
 // Config define the essential properties of
