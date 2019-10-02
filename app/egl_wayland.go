@@ -6,7 +6,7 @@ package app
 
 import (
 	"errors"
-	"unsafe"
+	"sync"
 )
 
 /*
@@ -24,29 +24,48 @@ type (
 	_EGLNativeWindowType  = C.EGLNativeWindowType
 )
 
-type eglWindow struct {
-	w *C.struct_wl_egl_window
+var eglWindows struct {
+	mu      sync.Mutex
+	windows map[*C.struct_wl_surface]*C.struct_wl_egl_window
 }
 
-func newEGLWindow(w _EGLNativeWindowType, width, height int) (*eglWindow, error) {
-	surf := (*C.struct_wl_surface)(unsafe.Pointer(w))
-	win := C.wl_egl_window_create(surf, C.int(width), C.int(height))
-	if win == nil {
-		return nil, errors.New("wl_egl_create_window failed")
+func (w *window) eglDestroy() {
+	surf, _, _ := w.surface()
+	if surf == nil {
+		return
 	}
-	return &eglWindow{win}, nil
+	eglWindows.mu.Lock()
+	defer eglWindows.mu.Unlock()
+	if eglWin, ok := eglWindows.windows[surf]; ok {
+		C.wl_egl_window_destroy(eglWin)
+		delete(eglWindows.windows, surf)
+	}
 }
 
-func (w *eglWindow) window() _EGLNativeWindowType {
-	return w.w
+func (w *window) eglDisplay() _EGLNativeDisplayType {
+	return w.display()
 }
 
-func (w *eglWindow) resize(width, height int) {
-	C.wl_egl_window_resize(w.w, C.int(width), C.int(height), 0, 0)
-}
-
-func (w *eglWindow) destroy() {
-	C.wl_egl_window_destroy(w.w)
+func (w *window) eglWindow(visID int) (_EGLNativeWindowType, int, int, error) {
+	surf, width, height := w.surface()
+	if surf == nil {
+		return nilEGLNativeWindowType, 0, 0, errors.New("wayland: no surface")
+	}
+	eglWindows.mu.Lock()
+	defer eglWindows.mu.Unlock()
+	eglWin, ok := eglWindows.windows[surf]
+	if !ok {
+		if eglWindows.windows == nil {
+			eglWindows.windows = make(map[*C.struct_wl_surface]*C.struct_wl_egl_window)
+		}
+		eglWin = C.wl_egl_window_create(surf, C.int(width), C.int(height))
+		if eglWin == nil {
+			return nilEGLNativeWindowType, 0, 0, errors.New("wayland: wl_egl_create_window failed")
+		}
+		eglWindows.windows[surf] = eglWin
+	}
+	C.wl_egl_window_resize(eglWin, C.int(width), C.int(height), 0, 0)
+	return eglWin, width, height, nil
 }
 
 func eglGetDisplay(disp _EGLNativeDisplayType) _EGLDisplay {

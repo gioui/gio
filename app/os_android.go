@@ -245,11 +245,7 @@ func (w *window) setStage(stage Stage) {
 	w.event(StageEvent{stage})
 }
 
-func (w *window) display() unsafe.Pointer {
-	return nil
-}
-
-func (w *window) nativeWindow(visID int) (unsafe.Pointer, int, int) {
+func (w *window) nativeWindow(visID int) (*C.ANativeWindow, int, int) {
 	win := w.aNativeWindow()
 	var width, height int
 	if win != nil {
@@ -259,7 +255,7 @@ func (w *window) nativeWindow(visID int) (unsafe.Pointer, int, int) {
 		w, h := C.ANativeWindow_getWidth(win), C.ANativeWindow_getHeight(win)
 		width, height = int(w), int(h)
 	}
-	return unsafe.Pointer(win), width, height
+	return win, width, height
 }
 
 func (w *window) aNativeWindow() *C.ANativeWindow {

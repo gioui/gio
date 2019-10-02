@@ -430,12 +430,12 @@ func (w *window) destroy() {
 
 func (w *window) showTextInput(show bool) {}
 
-func (w *window) display() uintptr {
-	return uintptr(w.hdc)
+func (w *window) HDC() syscall.Handle {
+	return w.hdc
 }
 
-func (w *window) nativeWindow(visID int) (uintptr, int, int) {
-	return uintptr(w.hwnd), w.width, w.height
+func (w *window) HWND() (syscall.Handle, int, int) {
+	return w.hwnd, w.width, w.height
 }
 
 func convertKeyCode(code uintptr) (rune, bool) {

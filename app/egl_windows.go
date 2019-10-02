@@ -142,3 +142,15 @@ func eglQueryString(disp _EGLDisplay, name _EGLint) string {
 	r, _, _ := _eglQueryString.Call(uintptr(disp), uintptr(name))
 	return gl.GoString(gl.SliceOf(r))
 }
+
+func (w *window) eglDestroy() {
+}
+
+func (w *window) eglDisplay() _EGLNativeDisplayType {
+	return _EGLNativeDisplayType(w.HDC())
+}
+
+func (w *window) eglWindow(visID int) (_EGLNativeWindowType, int, int, error) {
+	hwnd, width, height := w.HWND()
+	return _EGLNativeWindowType(hwnd), width, height, nil
+}

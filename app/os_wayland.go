@@ -1036,11 +1036,11 @@ func (w *window) setStage(s Stage) {
 	w.w.event(StageEvent{s})
 }
 
-func (w *window) display() unsafe.Pointer {
-	return unsafe.Pointer(w.disp)
+func (w *window) display() *C.struct_wl_display {
+	return w.disp
 }
 
-func (w *window) nativeWindow(visID int) (unsafe.Pointer, int, int) {
+func (w *window) surface() (*C.struct_wl_surface, int, int) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.needAck {
@@ -1052,7 +1052,7 @@ func (w *window) nativeWindow(visID int) (unsafe.Pointer, int, int) {
 		C.wl_surface_set_buffer_scale(w.surf, C.int32_t(scale))
 		w.newScale = false
 	}
-	return unsafe.Pointer(w.surf), width * scale, height * scale
+	return w.surf, width * scale, height * scale
 }
 
 func (w *window) showTextInput(show bool) {}

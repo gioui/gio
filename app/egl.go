@@ -15,14 +15,19 @@ import (
 
 type context struct {
 	c             *gl.Functions
-	driver        *window
+	driver        eglDriver
 	eglCtx        *eglContext
-	nwindow       _EGLNativeWindowType
-	eglWin        *eglWindow
+	eglWin        _EGLNativeWindowType
 	eglSurf       _EGLSurface
 	width, height int
 	// For sRGB emulation.
 	srgbFBO *gl.SRGBFBO
+}
+
+type eglDriver interface {
+	eglDisplay() _EGLNativeDisplayType
+	eglWindow(visID int) (_EGLNativeWindowType, int, int, error)
+	eglDestroy()
 }
 
 type eglContext struct {
@@ -62,27 +67,28 @@ const (
 func (c *context) Release() {
 	if c.srgbFBO != nil {
 		c.srgbFBO.Release()
+		c.srgbFBO = nil
 	}
 	if c.eglSurf != nilEGLSurface {
 		eglMakeCurrent(c.eglCtx.disp, nilEGLSurface, nilEGLSurface, nilEGLContext)
 		eglDestroySurface(c.eglCtx.disp, c.eglSurf)
 		c.eglSurf = nilEGLSurface
 	}
-	if c.eglWin != nil {
-		c.eglWin.destroy()
-		c.eglWin = nil
-	}
+	c.eglWin = nilEGLNativeWindowType
 	if c.eglCtx != nil {
 		eglDestroyContext(c.eglCtx.disp, c.eglCtx.ctx)
 		eglTerminate(c.eglCtx.disp)
 		eglReleaseThread()
 		c.eglCtx = nil
 	}
-	c.driver = nil
+	if c.driver != nil {
+		c.driver.eglDestroy()
+		c.driver = nil
+	}
 }
 
 func (c *context) Present() error {
-	if c.eglWin == nil {
+	if c.eglWin == nilEGLNativeWindowType {
 		panic("context is not active")
 	}
 	if c.srgbFBO != nil {
@@ -97,13 +103,13 @@ func (c *context) Present() error {
 	return nil
 }
 
-func newContext(w *window) (*context, error) {
-	eglCtx, err := createContext(_EGLNativeDisplayType(w.display()))
+func newContext(d eglDriver) (*context, error) {
+	eglCtx, err := createContext(d.eglDisplay())
 	if err != nil {
 		return nil, err
 	}
 	c := &context{
-		driver: w,
+		driver: d,
 		eglCtx: eglCtx,
 		c:      new(gl.Functions),
 	}
@@ -119,9 +125,11 @@ func (c *context) Lock() {}
 func (c *context) Unlock() {}
 
 func (c *context) MakeCurrent() error {
-	w, width, height := c.driver.nativeWindow(int(c.eglCtx.visualID))
-	win := _EGLNativeWindowType(w)
-	if c.nwindow == win && width == c.width && height == c.height {
+	win, width, height, err := c.driver.eglWindow(int(c.eglCtx.visualID))
+	if err != nil {
+		return err
+	}
+	if c.eglWin == win && width == c.width && height == c.height {
 		return nil
 	}
 	if win == nilEGLNativeWindowType {
@@ -138,29 +146,14 @@ func (c *context) MakeCurrent() error {
 		c.eglSurf = nilEGLSurface
 	}
 	c.width, c.height = width, height
-	c.nwindow = win
-	if c.nwindow == nilEGLNativeWindowType {
-		if c.eglWin != nil {
-			c.eglWin.destroy()
-			c.eglWin = nil
-		}
+	c.eglWin = win
+	if c.eglWin == nilEGLNativeWindowType {
 		return nil
 	}
-	if c.eglWin == nil {
-		var err error
-		c.eglWin, err = newEGLWindow(win, width, height)
-		if err != nil {
-			return err
-		}
-	} else {
-		c.eglWin.resize(width, height)
-	}
-	eglSurf, err := createSurfaceAndMakeCurrent(c.eglCtx, c.eglWin.window())
+	eglSurf, err := createSurfaceAndMakeCurrent(c.eglCtx, win)
 	c.eglSurf = eglSurf
 	if err != nil {
-		c.eglWin.destroy()
-		c.eglWin = nil
-		c.nwindow = nilEGLNativeWindowType
+		c.eglWin = nilEGLNativeWindowType
 		return err
 	}
 	if c.eglCtx.srgb {
