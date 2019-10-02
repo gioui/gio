@@ -4,6 +4,7 @@ package app
 
 /*
 #cgo LDFLAGS: -lEGL
+#cgo CFLAGS: -DMESA_EGL_NO_X11_HEADERS
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -13,11 +14,13 @@ package app
 import "C"
 
 type (
-	_EGLint     = C.EGLint
-	_EGLDisplay = C.EGLDisplay
-	_EGLConfig  = C.EGLConfig
-	_EGLContext = C.EGLContext
-	_EGLSurface = C.EGLSurface
+	_EGLint               = C.EGLint
+	_EGLDisplay           = C.EGLDisplay
+	_EGLConfig            = C.EGLConfig
+	_EGLContext           = C.EGLContext
+	_EGLSurface           = C.EGLSurface
+	_EGLNativeDisplayType = C.EGLNativeDisplayType
+	_EGLNativeWindowType  = C.EGLNativeWindowType
 )
 
 func eglChooseConfig(disp _EGLDisplay, attribs []_EGLint) (_EGLConfig, bool) {
@@ -80,4 +83,13 @@ func eglTerminate(disp _EGLDisplay) bool {
 
 func eglQueryString(disp _EGLDisplay, name _EGLint) string {
 	return C.GoString(C.eglQueryString(disp, name))
+}
+
+func eglGetDisplay(disp _EGLNativeDisplayType) _EGLDisplay {
+	return C.eglGetDisplay(disp)
+}
+
+func eglCreateWindowSurface(disp _EGLDisplay, conf _EGLConfig, win _EGLNativeWindowType, attribs []_EGLint) _EGLSurface {
+	eglSurf := C.eglCreateWindowSurface(disp, conf, win, &attribs[0])
+	return eglSurf
 }

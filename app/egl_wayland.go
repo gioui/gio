@@ -7,22 +7,17 @@ package app
 import (
 	"errors"
 	"sync"
+	"unsafe"
 )
 
 /*
 #cgo LDFLAGS: -lwayland-egl
-#cgo CFLAGS: -DWL_EGL_PLATFORM
 
+#include <EGL/egl.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
-#include <EGL/egl.h>
 */
 import "C"
-
-type (
-	_EGLNativeDisplayType = C.EGLNativeDisplayType
-	_EGLNativeWindowType  = C.EGLNativeWindowType
-)
 
 var eglWindows struct {
 	mu      sync.Mutex
@@ -43,7 +38,7 @@ func (w *window) eglDestroy() {
 }
 
 func (w *window) eglDisplay() _EGLNativeDisplayType {
-	return w.display()
+	return _EGLNativeDisplayType(w.display())
 }
 
 func (w *window) eglWindow(visID int) (_EGLNativeWindowType, int, int, error) {
@@ -65,14 +60,5 @@ func (w *window) eglWindow(visID int) (_EGLNativeWindowType, int, int, error) {
 		eglWindows.windows[surf] = eglWin
 	}
 	C.wl_egl_window_resize(eglWin, C.int(width), C.int(height), 0, 0)
-	return eglWin, width, height, nil
-}
-
-func eglGetDisplay(disp _EGLNativeDisplayType) _EGLDisplay {
-	return C.eglGetDisplay(disp)
-}
-
-func eglCreateWindowSurface(disp _EGLDisplay, conf _EGLConfig, win _EGLNativeWindowType, attribs []_EGLint) _EGLSurface {
-	eglSurf := C.eglCreateWindowSurface(disp, conf, win, &attribs[0])
-	return eglSurf
+	return _EGLNativeWindowType(uintptr(unsafe.Pointer(eglWin))), width, height, nil
 }
