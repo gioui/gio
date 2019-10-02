@@ -39,7 +39,7 @@ func loop(w *app.Window) error {
 	maroon := color.RGBA{127, 0, 0, 255}
 	face := faces.For(regular, unit.Sp(72))
 	message := "Hello, Gio"
-	c := &layout.Context{
+	gtx := &layout.Context{
 		Queue: w.Queue(),
 	}
 	for {
@@ -48,14 +48,14 @@ func loop(w *app.Window) error {
 		case app.DestroyEvent:
 			return e.Err
 		case app.UpdateEvent:
-			c.Reset(&e.Config, e.Size)
-			faces.Reset(c.Config)
+			gtx.Reset(&e.Config, e.Size)
+			faces.Reset(gtx.Config)
 			var material op.MacroOp
-			material.Record(c.Ops)
-			paint.ColorOp{Color: maroon}.Add(c.Ops)
+			material.Record(gtx.Ops)
+			paint.ColorOp{Color: maroon}.Add(gtx.Ops)
 			material.Stop()
-			text.Label{Material: material, Face: face, Alignment: text.Middle, Text: message}.Layout(c)
-			w.Update(c.Ops)
+			text.Label{Material: material, Face: face, Alignment: text.Middle, Text: message}.Layout(gtx)
+			w.Update(gtx.Ops)
 		}
 	}
 }
