@@ -86,10 +86,10 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int, to
 			Y: int(height + .5),
 		},
 		Insets: Insets{
-			Top:    ui.Px(float32(top)),
-			Right:  ui.Px(float32(right)),
-			Bottom: ui.Px(float32(bottom)),
-			Left:   ui.Px(float32(left)),
+			Top:    unit.Px(float32(top)),
+			Right:  unit.Px(float32(right)),
+			Bottom: unit.Px(float32(bottom)),
+			Left:   unit.Px(float32(left)),
 		},
 		Config: Config{
 			pxPerDp: float32(dpi) * inchPrDp,
