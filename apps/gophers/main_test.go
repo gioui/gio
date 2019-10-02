@@ -37,6 +37,6 @@ func (config) Now() time.Time {
 	return time.Now()
 }
 
-func (config) Px(v ui.Value) int {
+func (config) Px(v unit.Value) int {
 	return int(v.V + .5)
 }
