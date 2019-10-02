@@ -127,7 +127,7 @@ func (a *App) run() error {
 					}
 				}
 			case app.UpdateEvent:
-				gtx.Reset(&e.Config, layout.RigidConstraints(e.Size))
+				gtx.Reset(&e.Config, e.Size)
 				a.ui.Layout(gtx)
 				a.w.Update(gtx.Ops)
 			}

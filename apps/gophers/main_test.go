@@ -24,7 +24,7 @@ func BenchmarkUI(b *testing.B) {
 		Queue: new(queue),
 	}
 	for i := 0; i < b.N; i++ {
-		gtx.Reset(cfg, layout.RigidConstraints(image.Point{800, 600}))
+		gtx.Reset(cfg, image.Point{800, 600})
 		u.Layout(gtx)
 	}
 }

@@ -48,7 +48,7 @@ func loop(w *app.Window) error {
 		case app.DestroyEvent:
 			return e.Err
 		case app.UpdateEvent:
-			c.Reset(&e.Config, layout.RigidConstraints(e.Size))
+			c.Reset(&e.Config, e.Size)
 			faces.Reset(c.Config)
 			var material op.MacroOp
 			material.Record(c.Ops)
