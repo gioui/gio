@@ -102,9 +102,10 @@ func (s *Context) Layout(cs Constraints, w Widget) Dimensions {
 	return s.Dimensions
 }
 
-// Reset the context.
-func (c *Context) Reset(cfg Config, cs Constraints) {
-	c.Constraints = cs
+// Reset the context. The constraints' minimum and maximum values are
+// set to the size.
+func (c *Context) Reset(cfg Config, size image.Point) {
+	c.Constraints = RigidConstraints(size)
 	c.Dimensions = Dimensions{}
 	c.Config = cfg
 	if c.Ops == nil {

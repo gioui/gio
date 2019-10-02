@@ -19,11 +19,10 @@ var cfg = new(config)
 
 func ExampleInset() {
 	gtx := &layout.Context{Queue: q}
+	gtx.Reset(cfg, image.Point{X: 100, Y: 100})
 	// Loose constraints with no minimal size.
-	var cs layout.Constraints
-	cs.Width.Max = 100
-	cs.Height.Max = 100
-	gtx.Reset(cfg, cs)
+	gtx.Constraints.Width.Min = 0
+	gtx.Constraints.Height.Min = 0
 
 	// Inset all edges by 10.
 	inset := layout.UniformInset(unit.Dp(10))
@@ -43,8 +42,7 @@ func ExampleInset() {
 func ExampleAlign() {
 	gtx := &layout.Context{Queue: q}
 	// Rigid constraints with both minimum and maximum set.
-	cs := layout.RigidConstraints(image.Point{X: 100, Y: 100})
-	gtx.Reset(cfg, cs)
+	gtx.Reset(cfg, image.Point{X: 100, Y: 100})
 
 	align := layout.Align(layout.Center)
 	align.Layout(gtx, func() {
@@ -62,8 +60,7 @@ func ExampleAlign() {
 
 func ExampleFlex() {
 	gtx := &layout.Context{Queue: q}
-	cs := layout.RigidConstraints(image.Point{X: 100, Y: 100})
-	gtx.Reset(cfg, cs)
+	gtx.Reset(cfg, image.Point{X: 100, Y: 100})
 
 	flex := layout.Flex{}
 	flex.Init(gtx)
@@ -89,8 +86,7 @@ func ExampleFlex() {
 
 func ExampleStack() {
 	gtx := &layout.Context{Queue: q}
-	cs := layout.RigidConstraints(image.Point{X: 100, Y: 100})
-	gtx.Reset(cfg, cs)
+	gtx.Reset(cfg, image.Point{X: 100, Y: 100})
 
 	stack := layout.Stack{}
 	stack.Init(gtx)
@@ -114,8 +110,7 @@ func ExampleStack() {
 
 func ExampleList() {
 	gtx := &layout.Context{Queue: q}
-	cs := layout.RigidConstraints(image.Point{X: 100, Y: 100})
-	gtx.Reset(cfg, cs)
+	gtx.Reset(cfg, image.Point{X: 100, Y: 100})
 
 	// The list is 1e6 elements, but only 5 fit the constraints.
 	const listLen = 1e6
