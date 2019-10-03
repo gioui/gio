@@ -488,8 +488,8 @@ func (ic *icon) image(cfg unit.Converter) image.Image {
 func rrect(ops *op.Ops, width, height, se, sw, nw, ne float32) {
 	w, h := float32(width), float32(height)
 	const c = 0.55228475 // 4*(sqrt(2)-1)/3
-	var b paint.PathBuilder
-	b.Init(ops)
+	var b paint.Path
+	b.Begin(ops)
 	b.Move(f32.Point{X: w, Y: h - se})
 	b.Cube(f32.Point{X: 0, Y: se * c}, f32.Point{X: -se + se*c, Y: se}, f32.Point{X: -se, Y: se}) // SE
 	b.Line(f32.Point{X: sw - w + se, Y: 0})
