@@ -13,12 +13,11 @@ import (
 	"gioui.org/op"
 )
 
-// PathBuilder builds and adds a general ClipOp clip path
-// from lines and curves.
-// PathBuilder generates no garbage and can be used for
-// dynamic paths; path data is stored directly in the Ops
-// list supplied to Init.
-type PathBuilder struct {
+// Path constructs and adds a ClipOp clip path consisting of lines and
+// Bézier curves. Path generates no garbage and can be used for
+// dynamic paths; path data is stored directly in the Ops list
+// supplied to Begin.
+type Path struct {
 	ops       *op.Ops
 	firstVert int
 	nverts    int
@@ -44,14 +43,13 @@ func (p ClipOp) Add(o *op.Ops) {
 	o.Write(data)
 }
 
-// Init the builder and specify the operations list for
-// storing the path data and final ClipOp.
-func (p *PathBuilder) Init(ops *op.Ops) {
+// Begin the path, storing the path data and final ClipOp into ops.
+func (p *Path) Begin(ops *op.Ops) {
 	p.ops = ops
 }
 
 // MoveTo moves the pen to the given position.
-func (p *PathBuilder) Move(to f32.Point) {
+func (p *Path) Move(to f32.Point) {
 	p.end()
 	to = to.Add(p.pen)
 	p.maxy = to.Y
@@ -59,7 +57,7 @@ func (p *PathBuilder) Move(to f32.Point) {
 }
 
 // end completes the current contour.
-func (p *PathBuilder) end() {
+func (p *Path) end() {
 	aux := p.ops.Aux()
 	bo := binary.LittleEndian
 	// Fill in maximal Y coordinates of the NW and NE corners.
@@ -71,25 +69,25 @@ func (p *PathBuilder) end() {
 }
 
 // Line records a line from the pen to end.
-func (p *PathBuilder) Line(to f32.Point) {
+func (p *Path) Line(to f32.Point) {
 	to = to.Add(p.pen)
 	p.lineTo(to)
 }
 
-func (p *PathBuilder) lineTo(to f32.Point) {
+func (p *Path) lineTo(to f32.Point) {
 	// Model lines as degenerate quadratic Béziers.
 	p.quadTo(to.Add(p.pen).Mul(.5), to)
 }
 
 // Quad records a quadratic Bézier from the pen to end
 // with the control point ctrl.
-func (p *PathBuilder) Quad(ctrl, to f32.Point) {
+func (p *Path) Quad(ctrl, to f32.Point) {
 	ctrl = ctrl.Add(p.pen)
 	to = to.Add(p.pen)
 	p.quadTo(ctrl, to)
 }
 
-func (p *PathBuilder) quadTo(ctrl, to f32.Point) {
+func (p *Path) quadTo(ctrl, to f32.Point) {
 	// Zero width curves don't contribute to stenciling.
 	if p.pen.X == to.X && p.pen.X == ctrl.X {
 		p.pen = to
@@ -144,7 +142,7 @@ func (p *PathBuilder) quadTo(ctrl, to f32.Point) {
 
 // Cube records a cubic Bézier from the pen through
 // two control points ending in to.
-func (p *PathBuilder) Cube(ctrl0, ctrl1, to f32.Point) {
+func (p *Path) Cube(ctrl0, ctrl1, to f32.Point) {
 	ctrl0 = ctrl0.Add(p.pen)
 	ctrl1 = ctrl1.Add(p.pen)
 	to = to.Add(p.pen)
@@ -163,7 +161,7 @@ func (p *PathBuilder) Cube(ctrl0, ctrl1, to f32.Point) {
 
 // approxCube approximates a cubic Bézier by a series of quadratic
 // curves.
-func (p *PathBuilder) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to f32.Point) int {
+func (p *Path) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to f32.Point) int {
 	// The idea is from
 	// https://caffeineowl.com/graphics/2d/vectorial/cubic2quad01.html
 	// where a quadratic approximates a cubic by eliminating its t³ term
@@ -220,7 +218,7 @@ func (p *PathBuilder) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to
 	return splits
 }
 
-func (p *PathBuilder) expand(b f32.Rectangle) {
+func (p *Path) expand(b f32.Rectangle) {
 	if !p.hasBounds {
 		p.hasBounds = true
 		inf := float32(math.Inf(+1))
@@ -232,7 +230,7 @@ func (p *PathBuilder) expand(b f32.Rectangle) {
 	p.bounds = p.bounds.Union(b)
 }
 
-func (p *PathBuilder) vertex(cornerx, cornery int16, ctrl, to f32.Point) {
+func (p *Path) vertex(cornerx, cornery int16, ctrl, to f32.Point) {
 	p.nverts++
 	v := path.Vertex{
 		CornerX: cornerx,
@@ -261,7 +259,7 @@ func (p *PathBuilder) vertex(cornerx, cornery int16, ctrl, to f32.Point) {
 	p.ops.Write(data)
 }
 
-func (p *PathBuilder) simpleQuadTo(ctrl, to f32.Point) {
+func (p *Path) simpleQuadTo(ctrl, to f32.Point) {
 	if p.pen.Y > p.maxy {
 		p.maxy = p.pen.Y
 	}
@@ -284,7 +282,7 @@ func (p *PathBuilder) simpleQuadTo(ctrl, to f32.Point) {
 
 // End the path and add the resulting ClipOp to
 // the operation list passed to Init.
-func (p *PathBuilder) End() {
+func (p *Path) End() {
 	p.end()
 	ClipOp{
 		bounds: p.bounds,

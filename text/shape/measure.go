@@ -237,13 +237,13 @@ func layoutText(ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOpt
 
 func textPath(ppem fixed.Int26_6, f *opentype, str text.String) op.MacroOp {
 	var lastPos f32.Point
-	var builder paint.PathBuilder
+	var builder paint.Path
 	ops := new(op.Ops)
-	builder.Init(ops)
 	var x fixed.Int26_6
 	var advIdx int
 	var m op.MacroOp
 	m.Record(ops)
+	builder.Begin(ops)
 	for _, r := range str.String {
 		if !unicode.IsSpace(r) {
 			segs, ok := f.LoadGlyph(ppem, r)
