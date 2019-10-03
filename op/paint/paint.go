@@ -16,7 +16,10 @@ import (
 // ImageOp sets the material to a section of an
 // image.
 type ImageOp struct {
-	// Src is the image.
+	// Src is the image. Note that once a particular image.Image has
+	// been used by an ImageOp, updating the image contents might not
+	// be reflected in the rendered image. Use a new image.Image
+	// instead.
 	Src image.Image
 	// Rect defines the section of Src to use.
 	Rect image.Rectangle
