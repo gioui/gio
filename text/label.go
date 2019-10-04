@@ -27,8 +27,7 @@ type Label struct {
 	Alignment Alignment
 	// Text is the string to draw.
 	Text string
-	// MaxLines specify the maximum number of lines the text
-	// may fill.
+	// MaxLines limits the number of lines. Zero means no limit.
 	MaxLines int
 
 	it lineIterator
