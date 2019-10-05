@@ -42,7 +42,8 @@ import (
 )
 
 type UI struct {
-	faces        shape.Faces
+	family       *shape.Family
+	mono         *shape.Family
 	fab          *ActionButton
 	usersList    *layout.List
 	users        []*user
@@ -58,7 +59,7 @@ type UI struct {
 }
 
 type userPage struct {
-	faces       shape.Faces
+	family      *shape.Family
 	user        *user
 	commitsList *layout.List
 	commits     []*github.Commit
@@ -123,6 +124,14 @@ func init() {
 func newUI(fetchCommits func(string)) *UI {
 	u := &UI{
 		fetchCommits: fetchCommits,
+		family: &shape.Family{
+			Regular: fonts.regular,
+			Italic:  fonts.italic,
+			Bold:    fonts.bold,
+		},
+		mono: &shape.Family{
+			Regular: fonts.mono,
+		},
 	}
 	u.usersList = &layout.List{
 		Axis: layout.Vertical,
@@ -132,7 +141,10 @@ func newUI(fetchCommits func(string)) *UI {
 		icons:   []*icon{},
 	}
 	u.edit2 = &text.Editor{
-		Face: u.faces.For(fonts.italic),
+		Family: u.family,
+		Face: text.Face{
+			Style: text.Italic,
+		},
 		Size: unit.Sp(14),
 		//Alignment: text.End,
 		SingleLine:   true,
@@ -142,7 +154,7 @@ func newUI(fetchCommits func(string)) *UI {
 	}
 	u.edit2.SetText("Single line editor. Edit me!")
 	u.edit = &text.Editor{
-		Face:     u.faces.For(fonts.regular),
+		Family:   u.family,
 		Size:     unit.Sp(16),
 		Material: theme.text,
 		//Alignment: text.End,
@@ -185,13 +197,12 @@ func (u *UI) layoutTimings(gtx *layout.Context) {
 	layout.Align(layout.NE).Layout(gtx, func() {
 		layout.Inset{Top: unit.Dp(16)}.Layout(gtx, func() {
 			txt := fmt.Sprintf("m: %d %s", mallocs, u.profile.Timings)
-			text.Label{Material: theme.text, Face: u.faces.For(fonts.mono), Size: unit.Sp(10), Text: txt}.Layout(gtx)
+			text.Label{Material: theme.text, Size: unit.Sp(10), Text: txt}.Layout(gtx, u.mono)
 		})
 	})
 }
 
 func (u *UI) Layout(gtx *layout.Context) {
-	u.faces.Reset()
 	for i := range u.userClicks {
 		click := &u.userClicks[i]
 		for _, e := range click.Events(gtx) {
@@ -210,7 +221,7 @@ func (u *UI) Layout(gtx *layout.Context) {
 
 func (u *UI) newUserPage(user *user) *userPage {
 	up := &userPage{
-		faces:       u.faces,
+		family:      u.family,
 		user:        user,
 		commitsList: &layout.List{Axis: layout.Vertical},
 	}
@@ -231,7 +242,7 @@ func (up *userPage) Layout(gtx *layout.Context) {
 func (up *userPage) commit(gtx *layout.Context, index int) {
 	u := up.user
 	msg := up.commits[index].GetMessage()
-	label := text.Label{Material: theme.text, Face: up.faces.For(fonts.regular), Size: unit.Sp(12), Text: msg}
+	label := text.Label{Material: theme.text, Size: unit.Sp(12), Text: msg}
 	in := layout.Inset{Top: unit.Dp(16), Right: unit.Dp(8), Left: unit.Dp(8)}
 	in.Layout(gtx, func() {
 		f := (&layout.Flex{Axis: layout.Horizontal}).Init(gtx)
@@ -246,7 +257,7 @@ func (up *userPage) commit(gtx *layout.Context, index int) {
 		c2 := f.Flexible(1, func() {
 			gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
 			layout.Inset{Left: unit.Dp(8)}.Layout(gtx, func() {
-				label.Layout(gtx)
+				label.Layout(gtx, up.family)
 			})
 		})
 		f.Layout(c1, c2)
@@ -293,8 +304,8 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 				grey := colorMaterial(gtx.Ops, rgb(0x888888))
 				in := layout.Inset{Top: unit.Dp(16), Right: unit.Dp(8), Bottom: unit.Dp(8), Left: unit.Dp(8)}
 				in.Layout(gtx, func() {
-					lbl := text.Label{Material: grey, Face: u.faces.For(fonts.regular), Size: unit.Sp(11), Text: "GOPHERS"}
-					lbl.Layout(gtx)
+					lbl := text.Label{Material: grey, Size: unit.Sp(11), Text: "GOPHERS"}
+					lbl.Layout(gtx, u.family)
 				})
 			})
 			c1 := s.Expand(func() {
@@ -360,14 +371,14 @@ func (u *UI) user(gtx *layout.Context, index int) {
 					f := baseline()
 					f.Init(gtx)
 					c1 := f.Rigid(func() {
-						text.Label{Material: theme.text, Face: u.faces.For(fonts.regular), Size: unit.Sp(13), Text: user.name}.Layout(gtx)
+						text.Label{Material: theme.text, Size: unit.Sp(13), Text: user.name}.Layout(gtx, u.family)
 					})
 					c2 := f.Flexible(1, func() {
 						gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
 						layout.Align(layout.E).Layout(gtx, func() {
 							layout.Inset{Left: unit.Dp(2)}.Layout(gtx, func() {
-								lbl := text.Label{Material: theme.text, Face: u.faces.For(fonts.regular), Size: unit.Sp(10), Text: "3 hours ago"}
-								lbl.Layout(gtx)
+								lbl := text.Label{Material: theme.text, Size: unit.Sp(10), Text: "3 hours ago"}
+								lbl.Layout(gtx, u.family)
 							})
 						})
 					})
@@ -376,7 +387,7 @@ func (u *UI) user(gtx *layout.Context, index int) {
 				c2 := f.Rigid(func() {
 					in := layout.Inset{Top: unit.Dp(4)}
 					in.Layout(gtx, func() {
-						text.Label{Material: theme.tertText, Face: u.faces.For(fonts.regular), Size: unit.Sp(12), Text: user.company}.Layout(gtx)
+						text.Label{Material: theme.tertText, Size: unit.Sp(12), Text: user.company}.Layout(gtx, u.family)
 					})
 				})
 				f.Layout(c1, c2)

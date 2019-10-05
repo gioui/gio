@@ -35,9 +35,10 @@ func loop(w *app.Window) error {
 	if err != nil {
 		panic("failed to load font")
 	}
-	var faces shape.Faces
+	family := &shape.Family{
+		Regular: regular,
+	}
 	maroon := color.RGBA{127, 0, 0, 255}
-	face := faces.For(regular)
 	message := "Hello, Gio"
 	gtx := &layout.Context{
 		Queue: w.Queue(),
@@ -49,12 +50,11 @@ func loop(w *app.Window) error {
 			return e.Err
 		case app.UpdateEvent:
 			gtx.Reset(&e.Config, e.Size)
-			faces.Reset()
 			var material op.MacroOp
 			material.Record(gtx.Ops)
 			paint.ColorOp{Color: maroon}.Add(gtx.Ops)
 			material.Stop()
-			text.Label{Material: material, Face: face, Size: unit.Sp(72), Alignment: text.Middle, Text: message}.Layout(gtx)
+			text.Label{Material: material, Size: unit.Sp(72), Alignment: text.Middle, Text: message}.Layout(gtx, family)
 			w.Update(gtx.Ops)
 		}
 	}
