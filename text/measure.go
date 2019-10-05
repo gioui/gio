@@ -45,12 +45,27 @@ type LayoutOptions struct {
 	SingleLine bool
 }
 
-type Face interface {
+// Face specify a particular configuration of a Family.
+type Face struct {
+	// Weight is the text weight. If zero, Normal is used instead.
+	Weight Weight
+	Style  Style
+}
+
+// Style is the font style.
+type Style int
+
+// Weight is a font weight, in CSS units.
+type Weight int
+
+// Family implements a font family. It can layout and shape text from
+// a Face and size.
+type Family interface {
 	// Layout returns the text layout for a string given a set of
 	// options.
-	Layout(size float32, s string, opts LayoutOptions) *Layout
+	Layout(face Face, size float32, s string, opts LayoutOptions) *Layout
 	// Path returns the ClipOp outline of a text recorded in a macro.
-	Path(size float32, s String) op.MacroOp
+	Shape(face Face, size float32, s String) op.MacroOp
 }
 
 type Alignment uint8
@@ -59,6 +74,16 @@ const (
 	Start Alignment = iota
 	End
 	Middle
+)
+
+const (
+	Regular Style = iota
+	Italic
+)
+
+const (
+	Normal Weight = 400
+	Bold   Weight = 700
 )
 
 func linesDimens(lines []Line) layout.Dimensions {

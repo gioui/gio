@@ -23,10 +23,13 @@ import (
 
 // Editor implements an editable and scrollable text area.
 type Editor struct {
-	// Face defines the font and style of the text.
+	// Family defines the font and style of the text.
+	Family Family
+	// Face specifies the font family configuration.
 	Face Face
-	// Size is the text size. If zero, a reasonable default is used.
-	Size      unit.Value
+	// Size is the text size. If zero, a default size is used.
+	Size unit.Value
+
 	Alignment Alignment
 	// SingleLine force the text to stay on a single line.
 	// SingleLine also sets the scrolling direction to
@@ -241,7 +244,7 @@ func (e *Editor) Layout(gtx *layout.Context) {
 		var stack op.StackOp
 		stack.Push(gtx.Ops)
 		op.TransformOp{}.Offset(lineOff).Add(gtx.Ops)
-		e.Face.Path(tsize, str).Add(gtx.Ops)
+		e.Family.Shape(e.Face, tsize, str).Add(gtx.Ops)
 		paint.PaintOp{Rect: toRectF(clip).Sub(lineOff)}.Add(gtx.Ops)
 		stack.Pop()
 	}
@@ -369,7 +372,8 @@ func (e *Editor) layoutText(c unit.Converter) {
 		s = e.Hint
 	}
 	tsize := textSize(c, e.Size)
-	textLayout := e.Face.Layout(tsize, s, LayoutOptions{SingleLine: e.SingleLine, MaxWidth: e.maxWidth})
+	opts := LayoutOptions{SingleLine: e.SingleLine, MaxWidth: e.maxWidth}
+	textLayout := e.Family.Layout(e.Face, tsize, s, opts)
 	lines := textLayout.Lines
 	dims := linesDimens(lines)
 	for i := 0; i < len(lines)-1; i++ {

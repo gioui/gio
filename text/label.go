@@ -19,10 +19,11 @@ import (
 
 // Label is a widget for laying out and drawing text.
 type Label struct {
-	// Face defines the font and style of the text.
+	// Face defines the style of the text.
 	Face Face
 	// Size is the text size. If zero, a default size is used.
 	Size unit.Value
+
 	// Material is a macro recording the material to draw the
 	// text. Use a ColorOp for colored text.
 	Material op.MacroOp
@@ -94,10 +95,10 @@ func (l *lineIterator) Next() (String, f32.Point, bool) {
 	return String{}, f32.Point{}, false
 }
 
-func (l Label) Layout(gtx *layout.Context) {
+func (l Label) Layout(gtx *layout.Context, family Family) {
 	cs := gtx.Constraints
 	tsize := textSize(gtx, l.Size)
-	textLayout := l.Face.Layout(tsize, l.Text, LayoutOptions{MaxWidth: cs.Width.Max})
+	textLayout := family.Layout(l.Face, tsize, l.Text, LayoutOptions{MaxWidth: cs.Width.Max})
 	lines := textLayout.Lines
 	if max := l.MaxLines; max > 0 && len(lines) > max {
 		lines = lines[:max]
@@ -124,7 +125,7 @@ func (l Label) Layout(gtx *layout.Context) {
 		var stack op.StackOp
 		stack.Push(gtx.Ops)
 		op.TransformOp{}.Offset(off).Add(gtx.Ops)
-		l.Face.Path(tsize, str).Add(gtx.Ops)
+		family.Shape(l.Face, tsize, str).Add(gtx.Ops)
 		// Set a default color in case the material is empty.
 		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(gtx.Ops)
 		l.Material.Add(gtx.Ops)

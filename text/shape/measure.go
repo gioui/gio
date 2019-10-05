@@ -19,9 +19,14 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-// Faces is a cache of text layouts and paths.
-type Faces struct {
-	faceCache   map[faceKey]*Face
+// Family is an implementation of text.Family. It caches
+// layouts and paths.
+// A Family must specify at least the Regular font to be useful.
+type Family struct {
+	Regular *sfnt.Font
+	Italic  *sfnt.Font
+	Bold    *sfnt.Font
+
 	layoutCache map[layoutKey]cachedLayout
 	pathCache   map[pathKey]cachedPath
 }
@@ -49,20 +54,9 @@ type pathKey struct {
 	str  string
 }
 
-type faceKey struct {
-	font *sfnt.Font
-}
-
-// Face is a cached implementation of text.Face.
-type Face struct {
-	faces *Faces
-	font  *opentype
-}
-
-// Reset the cache, discarding any measures or paths that
+// Reset the cache, discarding any layouts or paths that
 // haven't been used since the last call to Reset.
-func (f *Faces) Reset() {
-	f.init()
+func (f *Family) Reset() {
 	for pk, p := range f.pathCache {
 		if !p.active {
 			delete(f.pathCache, pk)
@@ -81,62 +75,65 @@ func (f *Faces) Reset() {
 	}
 }
 
-// For returns a Face for the given font.
-func (f *Faces) For(fnt *sfnt.Font) *Face {
-	f.init()
-	fk := faceKey{fnt}
-	if f, exist := f.faceCache[fk]; exist {
-		return f
+// for returns a font for the given face.
+func (f *Family) fontFor(face text.Face) *sfnt.Font {
+	var font *sfnt.Font
+	switch {
+	case face.Style == text.Italic:
+		font = f.Italic
+	case face.Weight >= 600:
+		font = f.Bold
 	}
-	face := &Face{
-		faces: f,
-		font:  &opentype{Font: fnt, Hinting: font.HintingFull},
+	if font == nil {
+		font = f.Regular
 	}
-	f.faceCache[fk] = face
-	return face
+	return font
 }
 
-func (f *Faces) init() {
-	if f.faceCache != nil {
+func (f *Family) init() {
+	if f.pathCache != nil {
 		return
 	}
-	f.faceCache = make(map[faceKey]*Face)
 	f.pathCache = make(map[pathKey]cachedPath)
 	f.layoutCache = make(map[layoutKey]cachedLayout)
 }
 
-func (f *Face) Layout(size float32, str string, opts text.LayoutOptions) *text.Layout {
+func (f *Family) Layout(face text.Face, size float32, str string, opts text.LayoutOptions) *text.Layout {
+	f.init()
+	fnt := f.fontFor(face)
 	ppem := fixed.Int26_6(size * 64)
 	lk := layoutKey{
-		f:    f.font.Font,
+		f:    fnt,
 		ppem: ppem,
 		str:  str,
 		opts: opts,
 	}
-	if l, ok := f.faces.layoutCache[lk]; ok {
+	if l, ok := f.layoutCache[lk]; ok {
 		l.active = true
-		f.faces.layoutCache[lk] = l
+		f.layoutCache[lk] = l
 		return l.layout
 	}
-	l := layoutText(ppem, str, f.font, opts)
-	f.faces.layoutCache[lk] = cachedLayout{active: true, layout: l}
+	l := layoutText(ppem, str, &opentype{Font: fnt, Hinting: font.HintingFull}, opts)
+	f.layoutCache[lk] = cachedLayout{active: true, layout: l}
 	return l
 }
 
-func (f *Face) Path(size float32, str text.String) op.MacroOp {
+func (f *Family) Shape(face text.Face, size float32, str text.String) op.MacroOp {
+	f.init()
+	fnt := f.fontFor(face)
 	ppem := fixed.Int26_6(size * 64)
 	pk := pathKey{
-		f:    f.font.Font,
+		f:    fnt,
 		ppem: ppem,
 		str:  str.String,
 	}
-	if p, ok := f.faces.pathCache[pk]; ok {
+	if p, ok := f.pathCache[pk]; ok {
 		p.active = true
-		f.faces.pathCache[pk] = p
+		f.pathCache[pk] = p
 		return p.path
 	}
-	p := textPath(ppem, f.font, str)
-	f.faces.pathCache[pk] = cachedPath{active: true, path: p}
+	p := textPath(ppem, &opentype{Font: fnt, Hinting: font.HintingFull}, str)
+	f.pathCache[pk] = cachedPath{active: true, path: p}
 	return p
 }
 
