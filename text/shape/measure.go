@@ -14,7 +14,6 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/paint"
 	"gioui.org/text"
-	"gioui.org/unit"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
@@ -22,7 +21,6 @@ import (
 
 // Faces is a cache of text layouts and paths.
 type Faces struct {
-	config      unit.Converter
 	faceCache   map[faceKey]*Face
 	layoutCache map[layoutKey]cachedLayout
 	pathCache   map[pathKey]cachedPath
@@ -53,20 +51,17 @@ type pathKey struct {
 
 type faceKey struct {
 	font *sfnt.Font
-	size unit.Value
 }
 
 // Face is a cached implementation of text.Face.
 type Face struct {
 	faces *Faces
-	size  unit.Value
 	font  *opentype
 }
 
 // Reset the cache, discarding any measures or paths that
 // haven't been used since the last call to Reset.
-func (f *Faces) Reset(c unit.Converter) {
-	f.config = c
+func (f *Faces) Reset() {
 	f.init()
 	for pk, p := range f.pathCache {
 		if !p.active {
@@ -86,16 +81,15 @@ func (f *Faces) Reset(c unit.Converter) {
 	}
 }
 
-// For returns a Face for the given font and size.
-func (f *Faces) For(fnt *sfnt.Font, size unit.Value) *Face {
+// For returns a Face for the given font.
+func (f *Faces) For(fnt *sfnt.Font) *Face {
 	f.init()
-	fk := faceKey{fnt, size}
+	fk := faceKey{fnt}
 	if f, exist := f.faceCache[fk]; exist {
 		return f
 	}
 	face := &Face{
 		faces: f,
-		size:  size,
 		font:  &opentype{Font: fnt, Hinting: font.HintingFull},
 	}
 	f.faceCache[fk] = face
@@ -111,8 +105,8 @@ func (f *Faces) init() {
 	f.layoutCache = make(map[layoutKey]cachedLayout)
 }
 
-func (f *Face) Layout(str string, opts text.LayoutOptions) *text.Layout {
-	ppem := fixed.Int26_6(f.faces.config.Px(f.size) * 64)
+func (f *Face) Layout(size float32, str string, opts text.LayoutOptions) *text.Layout {
+	ppem := fixed.Int26_6(size * 64)
 	lk := layoutKey{
 		f:    f.font.Font,
 		ppem: ppem,
@@ -129,8 +123,8 @@ func (f *Face) Layout(str string, opts text.LayoutOptions) *text.Layout {
 	return l
 }
 
-func (f *Face) Path(str text.String) op.MacroOp {
-	ppem := fixed.Int26_6(f.faces.config.Px(f.size) * 64)
+func (f *Face) Path(size float32, str text.String) op.MacroOp {
+	ppem := fixed.Int26_6(size * 64)
 	pk := pathKey{
 		f:    f.font.Font,
 		ppem: ppem,

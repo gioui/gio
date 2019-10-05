@@ -12,14 +12,17 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/paint"
+	"gioui.org/unit"
 
 	"golang.org/x/image/math/fixed"
 )
 
 // Label is a widget for laying out and drawing text.
 type Label struct {
-	// Face define the font and style of the text.
+	// Face defines the font and style of the text.
 	Face Face
+	// Size is the text size. If zero, a default size is used.
+	Size unit.Value
 	// Material is a macro recording the material to draw the
 	// text. Use a ColorOp for colored text.
 	Material op.MacroOp
@@ -93,7 +96,8 @@ func (l *lineIterator) Next() (String, f32.Point, bool) {
 
 func (l Label) Layout(gtx *layout.Context) {
 	cs := gtx.Constraints
-	textLayout := l.Face.Layout(l.Text, LayoutOptions{MaxWidth: cs.Width.Max})
+	tsize := textSize(gtx, l.Size)
+	textLayout := l.Face.Layout(tsize, l.Text, LayoutOptions{MaxWidth: cs.Width.Max})
 	lines := textLayout.Lines
 	if max := l.MaxLines; max > 0 && len(lines) > max {
 		lines = lines[:max]
@@ -120,7 +124,7 @@ func (l Label) Layout(gtx *layout.Context) {
 		var stack op.StackOp
 		stack.Push(gtx.Ops)
 		op.TransformOp{}.Offset(off).Add(gtx.Ops)
-		l.Face.Path(str).Add(gtx.Ops)
+		l.Face.Path(tsize, str).Add(gtx.Ops)
 		// Set a default color in case the material is empty.
 		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(gtx.Ops)
 		l.Material.Add(gtx.Ops)
@@ -149,4 +153,11 @@ func textPadding(lines []Line) (padTop int, padBottom int) {
 		}
 	}
 	return
+}
+
+func textSize(c unit.Converter, s unit.Value) float32 {
+	if s.V == 0 {
+		s = unit.Sp(12)
+	}
+	return float32(c.Px(s))
 }

@@ -48,9 +48,9 @@ type LayoutOptions struct {
 type Face interface {
 	// Layout returns the text layout for a string given a set of
 	// options.
-	Layout(s string, opts LayoutOptions) *Layout
+	Layout(size float32, s string, opts LayoutOptions) *Layout
 	// Path returns the ClipOp outline of a text recorded in a macro.
-	Path(s String) op.MacroOp
+	Path(size float32, s String) op.MacroOp
 }
 
 type Alignment uint8

@@ -23,7 +23,10 @@ import (
 
 // Editor implements an editable and scrollable text area.
 type Editor struct {
-	Face      Face
+	// Face defines the font and style of the text.
+	Face Face
+	// Size is the text size. If zero, a reasonable default is used.
+	Size      unit.Value
 	Alignment Alignment
 	// SingleLine force the text to stay on a single line.
 	// SingleLine also sets the scrolling direction to
@@ -116,7 +119,7 @@ func (e *Editor) Event(gtx *layout.Context) (EditorEvent, bool) {
 		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
 			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
 			e.blinkStart = gtx.Now()
-			e.moveCoord(image.Point{
+			e.moveCoord(gtx, image.Point{
 				X: int(math.Round(float64(evt.Position.X))),
 				Y: int(math.Round(float64(evt.Position.Y))),
 			})
@@ -151,7 +154,7 @@ func (e *Editor) editorEvent(gtx *layout.Context) (EditorEvent, bool) {
 					return SubmitEvent{}, true
 				}
 			}
-			if e.command(ke) {
+			if e.command(gtx, ke) {
 				e.scrollToCaret(gtx.Config)
 				e.scroller.Stop()
 			}
@@ -196,11 +199,11 @@ func (e *Editor) Layout(gtx *layout.Context) {
 		e.invalidate()
 	}
 
-	e.layout()
+	e.layout(gtx)
 	lines, size := e.lines, e.dims.Size
 	e.viewSize = cs.Constrain(size)
 
-	carLine, _, carX, carY := e.layoutCaret()
+	carLine, _, carX, carY := e.layoutCaret(gtx)
 
 	off := image.Point{
 		X: -e.scrollOff.X + e.padLeft,
@@ -229,6 +232,7 @@ func (e *Editor) Layout(gtx *layout.Context) {
 		paint.ColorOp{Color: color.RGBA{A: 0xaa}}.Add(gtx.Ops)
 		e.HintMaterial.Add(gtx.Ops)
 	}
+	tsize := textSize(gtx, e.Size)
 	for {
 		str, lineOff, ok := e.it.Next()
 		if !ok {
@@ -237,7 +241,7 @@ func (e *Editor) Layout(gtx *layout.Context) {
 		var stack op.StackOp
 		stack.Push(gtx.Ops)
 		op.TransformOp{}.Offset(lineOff).Add(gtx.Ops)
-		e.Face.Path(str).Add(gtx.Ops)
+		e.Face.Path(tsize, str).Add(gtx.Ops)
 		paint.PaintOp{Rect: toRectF(clip).Sub(lineOff)}.Add(gtx.Ops)
 		stack.Pop()
 	}
@@ -299,12 +303,12 @@ func (e *Editor) SetText(s string) {
 	e.prepend(s)
 }
 
-func (e *Editor) layout() {
+func (e *Editor) layout(c unit.Converter) {
 	e.adjustScroll()
 	if e.valid {
 		return
 	}
-	e.layoutText()
+	e.layoutText(c)
 	e.valid = true
 }
 
@@ -340,8 +344,8 @@ func (e *Editor) adjustScroll() {
 	}
 }
 
-func (e *Editor) moveCoord(pos image.Point) {
-	e.layout()
+func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
+	e.layout(c)
 	var (
 		prevDesc fixed.Int26_6
 		carLine  int
@@ -356,15 +360,16 @@ func (e *Editor) moveCoord(pos image.Point) {
 		carLine++
 	}
 	x := fixed.I(pos.X + e.scrollOff.X - e.padLeft)
-	e.moveToLine(x, carLine)
+	e.moveToLine(c, x, carLine)
 }
 
-func (e *Editor) layoutText() {
+func (e *Editor) layoutText(c unit.Converter) {
 	s := e.rr.String()
 	if s == "" {
 		s = e.Hint
 	}
-	textLayout := e.Face.Layout(s, LayoutOptions{SingleLine: e.SingleLine, MaxWidth: e.maxWidth})
+	tsize := textSize(c, e.Size)
+	textLayout := e.Face.Layout(tsize, s, LayoutOptions{SingleLine: e.SingleLine, MaxWidth: e.maxWidth})
 	lines := textLayout.Lines
 	dims := linesDimens(lines)
 	for i := 0; i < len(lines)-1; i++ {
@@ -391,8 +396,8 @@ func (e *Editor) viewWidth() int {
 	return e.viewSize.X - e.padLeft - e.padRight
 }
 
-func (e *Editor) layoutCaret() (carLine, carCol int, x fixed.Int26_6, y int) {
-	e.layout()
+func (e *Editor) layoutCaret(c unit.Converter) (carLine, carCol int, x fixed.Int26_6, y int) {
+	e.layout(c)
 	var idx int
 	var prevDesc fixed.Int26_6
 loop:
@@ -450,9 +455,9 @@ func (e *Editor) prepend(s string) {
 	e.invalidate()
 }
 
-func (e *Editor) movePages(pages int) {
-	e.layout()
-	_, _, carX, carY := e.layoutCaret()
+func (e *Editor) movePages(c unit.Converter, pages int) {
+	e.layout(c)
+	_, _, carX, carY := e.layoutCaret(c)
 	y := carY + pages*e.viewSize.Y
 	var (
 		prevDesc fixed.Int26_6
@@ -472,12 +477,12 @@ func (e *Editor) movePages(pages int) {
 		y2 += h
 		carLine2++
 	}
-	e.carXOff = e.moveToLine(carX+e.carXOff, carLine2)
+	e.carXOff = e.moveToLine(c, carX+e.carXOff, carLine2)
 }
 
-func (e *Editor) moveToLine(carX fixed.Int26_6, carLine2 int) fixed.Int26_6 {
-	e.layout()
-	carLine, carCol, _, _ := e.layoutCaret()
+func (e *Editor) moveToLine(c unit.Converter, carX fixed.Int26_6, carLine2 int) fixed.Int26_6 {
+	e.layout(c)
+	carLine, carCol, _, _ := e.layoutCaret(c)
 	if carLine2 < 0 {
 		carLine2 = 0
 	}
@@ -534,8 +539,8 @@ func (e *Editor) moveRight() {
 	e.carXOff = 0
 }
 
-func (e *Editor) moveStart() {
-	carLine, carCol, x, _ := e.layoutCaret()
+func (e *Editor) moveStart(c unit.Converter) {
+	carLine, carCol, x, _ := e.layoutCaret(c)
 	advances := e.lines[carLine].Text.Advances
 	for i := carCol - 1; i >= 0; i-- {
 		_, s := e.rr.runeBefore(e.rr.caret)
@@ -545,8 +550,8 @@ func (e *Editor) moveStart() {
 	e.carXOff = -x
 }
 
-func (e *Editor) moveEnd() {
-	carLine, carCol, x, _ := e.layoutCaret()
+func (e *Editor) moveEnd(c unit.Converter) {
+	carLine, carCol, x, _ := e.layoutCaret(c)
 	l := e.lines[carLine]
 	// Only move past the end of the last line
 	end := 0
@@ -565,7 +570,7 @@ func (e *Editor) moveEnd() {
 
 func (e *Editor) scrollToCaret(c unit.Converter) {
 	carWidth := e.caretWidth(c)
-	carLine, _, x, y := e.layoutCaret()
+	carLine, _, x, y := e.layoutCaret(c)
 	l := e.lines[carLine]
 	if e.SingleLine {
 		minx := (x - carWidth/2).Ceil()
@@ -588,7 +593,7 @@ func (e *Editor) scrollToCaret(c unit.Converter) {
 	}
 }
 
-func (e *Editor) command(k key.Event) bool {
+func (e *Editor) command(c unit.Converter, k key.Event) bool {
 	switch k.Name {
 	case key.NameReturn, key.NameEnter:
 		e.append("\n")
@@ -597,23 +602,23 @@ func (e *Editor) command(k key.Event) bool {
 	case key.NameDeleteForward:
 		e.deleteRuneForward()
 	case key.NameUpArrow:
-		line, _, carX, _ := e.layoutCaret()
-		e.carXOff = e.moveToLine(carX+e.carXOff, line-1)
+		line, _, carX, _ := e.layoutCaret(c)
+		e.carXOff = e.moveToLine(c, carX+e.carXOff, line-1)
 	case key.NameDownArrow:
-		line, _, carX, _ := e.layoutCaret()
-		e.carXOff = e.moveToLine(carX+e.carXOff, line+1)
+		line, _, carX, _ := e.layoutCaret(c)
+		e.carXOff = e.moveToLine(c, carX+e.carXOff, line+1)
 	case key.NameLeftArrow:
 		e.moveLeft()
 	case key.NameRightArrow:
 		e.moveRight()
 	case key.NamePageUp:
-		e.movePages(-1)
+		e.movePages(c, -1)
 	case key.NamePageDown:
-		e.movePages(+1)
+		e.movePages(c, +1)
 	case key.NameHome:
-		e.moveStart()
+		e.moveStart(c)
 	case key.NameEnd:
-		e.moveEnd()
+		e.moveEnd(c)
 	default:
 		return false
 	}
