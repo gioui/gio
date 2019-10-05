@@ -81,7 +81,6 @@ type icon struct {
 }
 
 type ActionButton struct {
-	face    text.Face
 	Open    bool
 	icons   []*icon
 	sendIco *icon
@@ -129,12 +128,12 @@ func newUI(fetchCommits func(string)) *UI {
 		Axis: layout.Vertical,
 	}
 	u.fab = &ActionButton{
-		face:    u.face(fonts.regular, 11),
 		sendIco: &icon{src: icons.ContentSend, size: unit.Dp(24)},
 		icons:   []*icon{},
 	}
 	u.edit2 = &text.Editor{
-		Face: u.face(fonts.italic, 14),
+		Face: u.faces.For(fonts.italic),
+		Size: unit.Sp(14),
 		//Alignment: text.End,
 		SingleLine:   true,
 		Hint:         "Hint",
@@ -143,7 +142,8 @@ func newUI(fetchCommits func(string)) *UI {
 	}
 	u.edit2.SetText("Single line editor. Edit me!")
 	u.edit = &text.Editor{
-		Face:     u.face(fonts.regular, 16),
+		Face:     u.faces.For(fonts.regular),
+		Size:     unit.Sp(16),
 		Material: theme.text,
 		//Alignment: text.End,
 		//SingleLine: true,
@@ -168,10 +168,6 @@ func argb(c uint32) color.RGBA {
 	return color.RGBA{A: uint8(c >> 24), R: uint8(c >> 16), G: uint8(c >> 8), B: uint8(c)}
 }
 
-func (u *UI) face(f *sfnt.Font, size float32) text.Face {
-	return u.faces.For(f, unit.Sp(size))
-}
-
 func (u *UI) layoutTimings(gtx *layout.Context) {
 	if !u.profiling {
 		return
@@ -189,13 +185,13 @@ func (u *UI) layoutTimings(gtx *layout.Context) {
 	layout.Align(layout.NE).Layout(gtx, func() {
 		layout.Inset{Top: unit.Dp(16)}.Layout(gtx, func() {
 			txt := fmt.Sprintf("m: %d %s", mallocs, u.profile.Timings)
-			text.Label{Material: theme.text, Face: u.face(fonts.mono, 10), Text: txt}.Layout(gtx)
+			text.Label{Material: theme.text, Face: u.faces.For(fonts.mono), Size: unit.Sp(10), Text: txt}.Layout(gtx)
 		})
 	})
 }
 
 func (u *UI) Layout(gtx *layout.Context) {
-	u.faces.Reset(gtx)
+	u.faces.Reset()
 	for i := range u.userClicks {
 		click := &u.userClicks[i]
 		for _, e := range click.Events(gtx) {
@@ -235,7 +231,7 @@ func (up *userPage) Layout(gtx *layout.Context) {
 func (up *userPage) commit(gtx *layout.Context, index int) {
 	u := up.user
 	msg := up.commits[index].GetMessage()
-	label := text.Label{Material: theme.text, Face: up.faces.For(fonts.regular, unit.Sp(12)), Text: msg}
+	label := text.Label{Material: theme.text, Face: up.faces.For(fonts.regular), Size: unit.Sp(12), Text: msg}
 	in := layout.Inset{Top: unit.Dp(16), Right: unit.Dp(8), Left: unit.Dp(8)}
 	in.Layout(gtx, func() {
 		f := (&layout.Flex{Axis: layout.Horizontal}).Init(gtx)
@@ -297,7 +293,7 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 				grey := colorMaterial(gtx.Ops, rgb(0x888888))
 				in := layout.Inset{Top: unit.Dp(16), Right: unit.Dp(8), Bottom: unit.Dp(8), Left: unit.Dp(8)}
 				in.Layout(gtx, func() {
-					lbl := text.Label{Material: grey, Face: u.face(fonts.regular, 11), Text: "GOPHERS"}
+					lbl := text.Label{Material: grey, Face: u.faces.For(fonts.regular), Size: unit.Sp(11), Text: "GOPHERS"}
 					lbl.Layout(gtx)
 				})
 			})
@@ -364,13 +360,13 @@ func (u *UI) user(gtx *layout.Context, index int) {
 					f := baseline()
 					f.Init(gtx)
 					c1 := f.Rigid(func() {
-						text.Label{Material: theme.text, Face: u.face(fonts.regular, 13), Text: user.name}.Layout(gtx)
+						text.Label{Material: theme.text, Face: u.faces.For(fonts.regular), Size: unit.Sp(13), Text: user.name}.Layout(gtx)
 					})
 					c2 := f.Flexible(1, func() {
 						gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
 						layout.Align(layout.E).Layout(gtx, func() {
 							layout.Inset{Left: unit.Dp(2)}.Layout(gtx, func() {
-								lbl := text.Label{Material: theme.text, Face: u.face(fonts.regular, 10), Text: "3 hours ago"}
+								lbl := text.Label{Material: theme.text, Face: u.faces.For(fonts.regular), Size: unit.Sp(10), Text: "3 hours ago"}
 								lbl.Layout(gtx)
 							})
 						})
@@ -380,7 +376,7 @@ func (u *UI) user(gtx *layout.Context, index int) {
 				c2 := f.Rigid(func() {
 					in := layout.Inset{Top: unit.Dp(4)}
 					in.Layout(gtx, func() {
-						text.Label{Material: theme.tertText, Face: u.face(fonts.regular, 12), Text: user.company}.Layout(gtx)
+						text.Label{Material: theme.tertText, Face: u.faces.For(fonts.regular), Size: unit.Sp(12), Text: user.company}.Layout(gtx)
 					})
 				})
 				f.Layout(c1, c2)
