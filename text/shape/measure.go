@@ -29,6 +29,7 @@ type Family struct {
 
 	layoutCache layoutCache
 	pathCache   pathCache
+	buf         sfnt.Buffer
 }
 
 // for returns a font for the given face.
@@ -58,7 +59,7 @@ func (f *Family) Layout(face text.Face, size float32, str string, opts text.Layo
 	if l, ok := f.layoutCache.Get(lk); ok {
 		return l
 	}
-	l := layoutText(ppem, str, &opentype{Font: fnt, Hinting: font.HintingFull}, opts)
+	l := layoutText(&f.buf, ppem, str, &opentype{Font: fnt, Hinting: font.HintingFull}, opts)
 	f.layoutCache.Put(lk, l)
 	return l
 }
@@ -74,19 +75,19 @@ func (f *Family) Shape(face text.Face, size float32, str text.String) op.MacroOp
 	if p, ok := f.pathCache.Get(pk); ok {
 		return p
 	}
-	p := textPath(ppem, &opentype{Font: fnt, Hinting: font.HintingFull}, str)
+	p := textPath(&f.buf, ppem, &opentype{Font: fnt, Hinting: font.HintingFull}, str)
 	f.pathCache.Put(pk, p)
 	return p
 }
 
-func layoutText(ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOptions) *text.Layout {
-	m := f.Metrics(ppem)
+func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOptions) *text.Layout {
+	m := f.Metrics(buf, ppem)
 	lineTmpl := text.Line{
 		Ascent: m.Ascent,
 		// m.Height is equal to m.Ascent + m.Descent + linegap.
 		// Compute the descent including the linegap.
 		Descent: m.Height - m.Ascent,
-		Bounds:  f.Bounds(ppem),
+		Bounds:  f.Bounds(buf, ppem),
 	}
 	var lines []text.Line
 	maxDotX := fixed.Int26_6(math.MaxInt32)
@@ -119,7 +120,7 @@ func layoutText(ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOpt
 			c = ' '
 			s = 1
 		}
-		a, ok := f.GlyphAdvance(ppem, c)
+		a, ok := f.GlyphAdvance(buf, ppem, c)
 		if !ok {
 			prev.idx += s
 			continue
@@ -142,7 +143,7 @@ func layoutText(ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOpt
 		next.adv = a
 		var k fixed.Int26_6
 		if prev.valid {
-			k = f.Kern(ppem, prev.r, next.r)
+			k = f.Kern(buf, ppem, prev.r, next.r)
 		}
 		// Break the line if we're out of space.
 		if prev.idx > 0 && next.x+next.adv+k >= maxDotX {
@@ -168,7 +169,7 @@ func layoutText(ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOpt
 	return &text.Layout{Lines: lines}
 }
 
-func textPath(ppem fixed.Int26_6, f *opentype, str text.String) op.MacroOp {
+func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str text.String) op.MacroOp {
 	var lastPos f32.Point
 	var builder paint.Path
 	ops := new(op.Ops)
@@ -179,7 +180,7 @@ func textPath(ppem fixed.Int26_6, f *opentype, str text.String) op.MacroOp {
 	builder.Begin(ops)
 	for _, r := range str.String {
 		if !unicode.IsSpace(r) {
-			segs, ok := f.LoadGlyph(ppem, r)
+			segs, ok := f.LoadGlyph(buf, ppem, r)
 			if !ok {
 				continue
 			}
