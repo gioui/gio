@@ -27,52 +27,8 @@ type Family struct {
 	Italic  *sfnt.Font
 	Bold    *sfnt.Font
 
-	layoutCache map[layoutKey]cachedLayout
-	pathCache   map[pathKey]cachedPath
-}
-
-type cachedLayout struct {
-	active bool
-	layout *text.Layout
-}
-
-type cachedPath struct {
-	active bool
-	path   op.MacroOp
-}
-
-type layoutKey struct {
-	f    *sfnt.Font
-	ppem fixed.Int26_6
-	str  string
-	opts text.LayoutOptions
-}
-
-type pathKey struct {
-	f    *sfnt.Font
-	ppem fixed.Int26_6
-	str  string
-}
-
-// Reset the cache, discarding any layouts or paths that
-// haven't been used since the last call to Reset.
-func (f *Family) Reset() {
-	for pk, p := range f.pathCache {
-		if !p.active {
-			delete(f.pathCache, pk)
-			continue
-		}
-		p.active = false
-		f.pathCache[pk] = p
-	}
-	for lk, l := range f.layoutCache {
-		if !l.active {
-			delete(f.layoutCache, lk)
-			continue
-		}
-		l.active = false
-		f.layoutCache[lk] = l
-	}
+	layoutCache layoutCache
+	pathCache   pathCache
 }
 
 // for returns a font for the given face.
@@ -90,16 +46,7 @@ func (f *Family) fontFor(face text.Face) *sfnt.Font {
 	return font
 }
 
-func (f *Family) init() {
-	if f.pathCache != nil {
-		return
-	}
-	f.pathCache = make(map[pathKey]cachedPath)
-	f.layoutCache = make(map[layoutKey]cachedLayout)
-}
-
 func (f *Family) Layout(face text.Face, size float32, str string, opts text.LayoutOptions) *text.Layout {
-	f.init()
 	fnt := f.fontFor(face)
 	ppem := fixed.Int26_6(size * 64)
 	lk := layoutKey{
@@ -108,18 +55,15 @@ func (f *Family) Layout(face text.Face, size float32, str string, opts text.Layo
 		str:  str,
 		opts: opts,
 	}
-	if l, ok := f.layoutCache[lk]; ok {
-		l.active = true
-		f.layoutCache[lk] = l
-		return l.layout
+	if l, ok := f.layoutCache.Get(lk); ok {
+		return l
 	}
 	l := layoutText(ppem, str, &opentype{Font: fnt, Hinting: font.HintingFull}, opts)
-	f.layoutCache[lk] = cachedLayout{active: true, layout: l}
+	f.layoutCache.Put(lk, l)
 	return l
 }
 
 func (f *Family) Shape(face text.Face, size float32, str text.String) op.MacroOp {
-	f.init()
 	fnt := f.fontFor(face)
 	ppem := fixed.Int26_6(size * 64)
 	pk := pathKey{
@@ -127,13 +71,11 @@ func (f *Family) Shape(face text.Face, size float32, str text.String) op.MacroOp
 		ppem: ppem,
 		str:  str.String,
 	}
-	if p, ok := f.pathCache[pk]; ok {
-		p.active = true
-		f.pathCache[pk] = p
-		return p.path
+	if p, ok := f.pathCache.Get(pk); ok {
+		return p
 	}
 	p := textPath(ppem, &opentype{Font: fnt, Hinting: font.HintingFull}, str)
-	f.pathCache[pk] = cachedPath{active: true, path: p}
+	f.pathCache.Put(pk, p)
 	return p
 }
 
