@@ -44,7 +44,7 @@ type Editor struct {
 	// Hint contains the text displayed to the user when the
 	// Editor is empty.
 	Hint string
-	// Mmaterial is used to draw the hint.
+	// Material is used to draw the hint.
 	HintMaterial op.MacroOp
 
 	oldScale          int
