@@ -22,7 +22,7 @@ type Flex struct {
 
 	size      int
 	rigidSize int
-	// fraction is the rounding error from a Flexible weighting.
+	// fraction is the rounding error from a Flex weighting.
 	fraction    float32
 	maxCross    int
 	maxBaseline int
@@ -76,16 +76,16 @@ func (f *Flex) Rigid(gtx *Context, w Widget) FlexChild {
 	return FlexChild{m, dims}
 }
 
-// Flexible is like Rigid, where the main axis size is also constrained to a
+// Flex is like Rigid, where the main axis size is also constrained to a
 // fraction of the space not taken up by Rigid children.
-func (f *Flex) Flexible(gtx *Context, weight float32, w Widget) FlexChild {
+func (f *Flex) Flex(gtx *Context, weight float32, w Widget) FlexChild {
 	cs := gtx.Constraints
 	mainc := axisMainConstraint(f.Axis, cs)
 	var flexSize int
 	if mainc.Max > f.size {
 		flexSize = mainc.Max - f.rigidSize
 		// Apply weight and add any leftover fraction from a
-		// previous Flexible.
+		// previous Flex.
 		size := float32(flexSize)*weight + f.fraction
 		flexSize = int(size + .5)
 		f.fraction = size - float32(flexSize)

@@ -71,7 +71,7 @@ func ExampleFlex() {
 	})
 
 	// Child with 50% space allowance.
-	child2 := flex.Flexible(gtx, 0.5, func() {
+	child2 := flex.Flex(gtx, 0.5, func() {
 		fmt.Printf("50%%: %v\n", gtx.Constraints.Width)
 		layoutWidget(gtx, 10, 10)
 	})
