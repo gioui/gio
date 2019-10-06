@@ -85,8 +85,8 @@ type ActionButton struct {
 }
 
 var families struct {
-	primary *shape.Family
-	mono    *shape.Family
+	primary text.Family
+	mono    text.Family
 }
 
 var theme struct {
