@@ -33,8 +33,6 @@ type Label struct {
 	Text string
 	// MaxLines limits the number of lines. Zero means no limit.
 	MaxLines int
-
-	it lineIterator
 }
 
 type lineIterator struct {
@@ -110,14 +108,14 @@ func (l Label) Layout(gtx *layout.Context, family Family) {
 		Min: image.Point{X: -inf, Y: -padTop},
 		Max: image.Point{X: inf, Y: dims.Size.Y + padBottom},
 	}
-	l.it = lineIterator{
+	it := lineIterator{
 		Lines:     lines,
 		Clip:      clip,
 		Alignment: l.Alignment,
 		Width:     dims.Size.X,
 	}
 	for {
-		str, off, ok := l.it.Next()
+		str, off, ok := it.Next()
 		if !ok {
 			break
 		}
