@@ -15,11 +15,8 @@ type Stack struct {
 	// smaller than the available space.
 	Alignment Direction
 
-	macro       op.MacroOp
-	constrained bool
-	ctx         *Context
-	maxSZ       image.Point
-	baseline    int
+	maxSZ    image.Point
+	baseline int
 }
 
 // StackChild is the layout result of a call to End.
@@ -28,45 +25,33 @@ type StackChild struct {
 	dims  Dimensions
 }
 
-// Init a stack before calling Rigid or Expand.
-func (s *Stack) Init(gtx *Context) *Stack {
-	s.ctx = gtx
-	s.constrained = true
-	s.maxSZ = image.Point{}
-	s.baseline = 0
-	return s
-}
-
-func (s *Stack) begin() {
-	if !s.constrained {
-		panic("must Init before adding a child")
-	}
-	s.macro.Record(s.ctx.Ops)
-}
-
 // Rigid lays out a widget with the same constraints that were
 // passed to Init.
-func (s *Stack) Rigid(w Widget) StackChild {
-	s.begin()
-	dims := s.ctx.Layout(s.ctx.Constraints, w)
-	return s.end(dims)
+func (s *Stack) Rigid(gtx *Context, w Widget) StackChild {
+	var m op.MacroOp
+	m.Record(gtx.Ops)
+	dims := gtx.Layout(gtx.Constraints, w)
+	m.Stop()
+	s.expand(dims)
+	return StackChild{m, dims}
 }
 
 // Expand lays out a widget with constraints that exactly match
 // the biggest child previously added.
-func (s *Stack) Expand(w Widget) StackChild {
-	s.begin()
+func (s *Stack) Expand(gtx *Context, w Widget) StackChild {
+	var m op.MacroOp
+	m.Record(gtx.Ops)
 	cs := Constraints{
 		Width:  Constraint{Min: s.maxSZ.X, Max: s.maxSZ.X},
 		Height: Constraint{Min: s.maxSZ.Y, Max: s.maxSZ.Y},
 	}
-	dims := s.ctx.Layout(cs, w)
-	return s.end(dims)
+	dims := gtx.Layout(cs, w)
+	m.Stop()
+	s.expand(dims)
+	return StackChild{m, dims}
 }
 
-// End a child by specifying its dimensions.
-func (s *Stack) end(dims Dimensions) StackChild {
-	s.macro.Stop()
+func (s *Stack) expand(dims Dimensions) {
 	if w := dims.Size.X; w > s.maxSZ.X {
 		s.maxSZ.X = w
 	}
@@ -78,12 +63,11 @@ func (s *Stack) end(dims Dimensions) StackChild {
 			s.baseline = b
 		}
 	}
-	return StackChild{s.macro, dims}
 }
 
 // Layout a list of children. The order of the children determines their laid
 // out order.
-func (s *Stack) Layout(children ...StackChild) {
+func (s *Stack) Layout(gtx *Context, children ...StackChild) {
 	for _, ch := range children {
 		sz := ch.dims.Size
 		var p image.Point
@@ -100,17 +84,19 @@ func (s *Stack) Layout(children ...StackChild) {
 			p.Y = s.maxSZ.Y - sz.Y
 		}
 		var stack op.StackOp
-		stack.Push(s.ctx.Ops)
-		op.TransformOp{}.Offset(toPointF(p)).Add(s.ctx.Ops)
-		ch.macro.Add(s.ctx.Ops)
+		stack.Push(gtx.Ops)
+		op.TransformOp{}.Offset(toPointF(p)).Add(gtx.Ops)
+		ch.macro.Add(gtx.Ops)
 		stack.Pop()
 	}
 	b := s.baseline
 	if b == 0 {
 		b = s.maxSZ.Y
 	}
-	s.ctx.Dimensions = Dimensions{
+	gtx.Dimensions = Dimensions{
 		Size:     s.maxSZ,
 		Baseline: b,
 	}
+	s.maxSZ = image.Point{}
+	s.baseline = 0
 }

@@ -20,9 +20,6 @@ type Flex struct {
 	// Alignment is the alignment in the cross axis.
 	Alignment Alignment
 
-	ctx       *Context
-	macro     op.MacroOp
-	mode      flexMode
 	size      int
 	rigidSize int
 	// fraction is the rounding error from a Flexible weighting.
@@ -60,58 +57,29 @@ const (
 	SpaceEvenly
 )
 
-const (
-	modeNone flexMode = iota
-	modeBegun
-	modeRigid
-	modeFlex
-)
-
-// Init must be called before Rigid or Flexible.
-func (f *Flex) Init(gtx *Context) *Flex {
-	if f.mode > modeBegun {
-		panic("must End the current child before calling Init again")
-	}
-	f.mode = modeBegun
-	f.ctx = gtx
-	f.size = 0
-	f.rigidSize = 0
-	f.maxCross = 0
-	f.maxBaseline = 0
-	return f
-}
-
-func (f *Flex) begin(mode flexMode) {
-	switch {
-	case f.mode == modeNone:
-		panic("must Init before adding a child")
-	case f.mode > modeBegun:
-		panic("must End before adding a child")
-	}
-	f.mode = mode
-	f.macro.Record(f.ctx.Ops)
-}
-
 // Rigid lays out a widget with the main axis constrained to the range
 // from 0 to the remaining space.
-func (f *Flex) Rigid(w Widget) FlexChild {
-	f.begin(modeRigid)
-	cs := f.ctx.Constraints
+func (f *Flex) Rigid(gtx *Context, w Widget) FlexChild {
+	cs := gtx.Constraints
 	mainc := axisMainConstraint(f.Axis, cs)
 	mainMax := mainc.Max - f.size
 	if mainMax < 0 {
 		mainMax = 0
 	}
 	cs = axisConstraints(f.Axis, Constraint{Max: mainMax}, axisCrossConstraint(f.Axis, cs))
-	dims := f.ctx.Layout(cs, w)
-	return f.end(dims)
+	var m op.MacroOp
+	m.Record(gtx.Ops)
+	dims := gtx.Layout(cs, w)
+	m.Stop()
+	f.rigidSize += axisMain(f.Axis, dims.Size)
+	f.expand(dims)
+	return FlexChild{m, dims}
 }
 
 // Flexible is like Rigid, where the main axis size is also constrained to a
 // fraction of the space not taken up by Rigid children.
-func (f *Flex) Flexible(weight float32, w Widget) FlexChild {
-	f.begin(modeFlex)
-	cs := f.ctx.Constraints
+func (f *Flex) Flexible(gtx *Context, weight float32, w Widget) FlexChild {
+	cs := gtx.Constraints
 	mainc := axisMainConstraint(f.Axis, cs)
 	var flexSize int
 	if mainc.Max > f.size {
@@ -127,36 +95,31 @@ func (f *Flex) Flexible(weight float32, w Widget) FlexChild {
 	}
 	submainc := Constraint{Max: flexSize}
 	cs = axisConstraints(f.Axis, submainc, axisCrossConstraint(f.Axis, cs))
-	dims := f.ctx.Layout(cs, w)
-	return f.end(dims)
+	var m op.MacroOp
+	m.Record(gtx.Ops)
+	dims := gtx.Layout(cs, w)
+	m.Stop()
+	f.expand(dims)
+	return FlexChild{m, dims}
 }
 
 // End a child by specifying its dimensions. Pass the returned layout result
 // to Layout.
-func (f *Flex) end(dims Dimensions) FlexChild {
-	if f.mode <= modeBegun {
-		panic("End called without an active child")
-	}
-	f.macro.Stop()
+func (f *Flex) expand(dims Dimensions) {
 	sz := axisMain(f.Axis, dims.Size)
 	f.size += sz
-	if f.mode == modeRigid {
-		f.rigidSize += sz
-	}
-	f.mode = modeBegun
 	if c := axisCross(f.Axis, dims.Size); c > f.maxCross {
 		f.maxCross = c
 	}
 	if b := dims.Baseline; b > f.maxBaseline {
 		f.maxBaseline = b
 	}
-	return FlexChild{f.macro, dims}
 }
 
 // Layout a list of children. The order of the children determines their laid
 // out order.
-func (f *Flex) Layout(children ...FlexChild) {
-	cs := f.ctx.Constraints
+func (f *Flex) Layout(gtx *Context, children ...FlexChild) {
+	cs := gtx.Constraints
 	mainc := axisMainConstraint(f.Axis, cs)
 	crossSize := axisCrossConstraint(f.Axis, cs).Constrain(f.maxCross)
 	var space int
@@ -190,9 +153,9 @@ func (f *Flex) Layout(children ...FlexChild) {
 			}
 		}
 		var stack op.StackOp
-		stack.Push(f.ctx.Ops)
-		op.TransformOp{}.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))).Add(f.ctx.Ops)
-		child.macro.Add(f.ctx.Ops)
+		stack.Push(gtx.Ops)
+		op.TransformOp{}.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))).Add(gtx.Ops)
+		child.macro.Add(gtx.Ops)
 		stack.Pop()
 		mainSize += axisMain(f.Axis, dims.Size)
 		if i < len(children)-1 {
@@ -223,7 +186,11 @@ func (f *Flex) Layout(children ...FlexChild) {
 	if baseline == 0 {
 		baseline = sz.Y
 	}
-	f.ctx.Dimensions = Dimensions{Size: sz, Baseline: baseline}
+	gtx.Dimensions = Dimensions{Size: sz, Baseline: baseline}
+	f.size = 0
+	f.rigidSize = 0
+	f.maxCross = 0
+	f.maxBaseline = 0
 }
 
 func axisPoint(a Axis, main, cross int) image.Point {
