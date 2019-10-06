@@ -1,4 +1,4 @@
-module gioui.org/apps
+module gioui.org/example
 
 go 1.13
 

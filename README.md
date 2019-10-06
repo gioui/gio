@@ -27,13 +27,13 @@ window management, input and GPU drawing.
 With [Go 1.13](https://golang.org/dl/) or newer,
 
 	$ export GO111MODULE=on
-	$ go run gioui.org/apps/hello
+	$ go run gioui.org/example/hello
 
 should display a simple message in a window.
 
 The command
 
-	$ go run gioui.org/apps/gophers
+	$ go run gioui.org/example/gophers
 
 runs a simple (nonsense) demo that displays Go contributors fetched from GitHub.
 
@@ -41,7 +41,7 @@ If you run into quota issues, supply a
 [Github token](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line)
 with the `-token` flag:
 
-	$ go run gioui.org/apps/gophers -token <github token>
+	$ go run gioui.org/example/gophers -token <github token>
 
 
 ## Running on mobiles
@@ -50,7 +50,7 @@ For Android, iOS, tvOS the `gogio` tool can build and package a Gio program for 
 
 To build an Android .apk file from the `gophers` example:
 
-	$ go run gioui.org/cmd/gogio -target android gioui.org/apps/gophers
+	$ go run gioui.org/cmd/gogio -target android gioui.org/example/gophers
 
 The apk can be installed to a running emulator or attached device with adb:
 
@@ -58,13 +58,13 @@ The apk can be installed to a running emulator or attached device with adb:
 
 The `gogio` tool passes command line arguments to os.Args at runtime:
 
-	$ go run gioui.org/cmd/gogio -target android gioui.org/apps/gophers -token <github token>
+	$ go run gioui.org/cmd/gogio -target android gioui.org/example/gophers -token <github token>
 
 The `-appid` flag specifies the iOS bundle id or Android package id. The flag is required
 for creating signed .ipa files for iOS and tvOS devices, because the bundle id must match an id
 previously provisioned in Xcode. For example,
 
-	$ go run gioui.org/cmd/gogio -target ios -appid <bundle-id> gioui.org/apps/gophers
+	$ go run gioui.org/cmd/gogio -target ios -appid <bundle-id> gioui.org/example/gophers
 
 Use the `Window->Devices and Simulators` option in Xcode to install the ipa file to the device.
 If you have [ideviceinstaller](https://github.com/libimobiledevice/ideviceinstaller) installed,
@@ -75,7 +75,7 @@ you can install the app from the command line:
 If you just want to run a program on the iOS simulator, use the `-o` flag to specify a .app
 directory:
 
-	$ go run gioui.org/cmd/gogio -o gophers.app -target ios gioui.org/apps/gophers
+	$ go run gioui.org/cmd/gogio -o gophers.app -target ios gioui.org/example/gophers
 
 Install the app to a running simulator with simctl:
 
@@ -87,7 +87,7 @@ Install the app to a running simulator with simctl:
 To run a Gio program in a compatible browser, the `gogio` tool can output a directory ready to
 serve. With the `goxec` tool you don't even need a web server:
 
-	$ go run gioui.org/cmd/gogio -target js gioui.org/apps/gophers
+	$ go run gioui.org/cmd/gogio -target js gioui.org/example/gophers
 	$ go get github.com/shurcooL/goexec
 	$ goexec 'http.ListenAndServe(":8080", http.FileServer(http.Dir("gophers")))'
 
