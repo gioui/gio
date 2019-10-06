@@ -7,7 +7,7 @@ Gio includes an efficient vector renderer based on the Pathfinder project (https
 Text and other shapes are rendered using only their outlines without baking them into texture images,
 to support efficient animations, transformed drawing and pixel resolution independence.
 
-[![GoDoc](https://godoc.org/gioui.org/ui?status.svg)](https://godoc.org/gioui.org/ui)
+[![GoDoc](https://godoc.org/gioui.org?status.svg)](https://godoc.org/gioui.org)
 
 
 ## Installation
