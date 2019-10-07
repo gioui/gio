@@ -17,9 +17,7 @@ import (
 )
 
 // WindowOption configures a Window.
-type WindowOption struct {
-	apply func(opts *windowOptions)
-}
+type Option func(opts *windowOptions)
 
 type windowOptions struct {
 	Width, Height unit.Value
@@ -84,7 +82,7 @@ var ackEvent event.Event
 // platform.
 //
 // BUG: Calling NewWindow more than once is not yet supported.
-func NewWindow(options ...WindowOption) *Window {
+func NewWindow(options ...Option) *Window {
 	opts := &windowOptions{
 		Width:  unit.Dp(800),
 		Height: unit.Dp(600),
@@ -92,7 +90,7 @@ func NewWindow(options ...WindowOption) *Window {
 	}
 
 	for _, o := range options {
-		o.apply(opts)
+		o(opts)
 	}
 
 	w := &Window{
@@ -329,36 +327,24 @@ func (q *Queue) Events(k event.Key) []event.Event {
 	return q.q.Events(k)
 }
 
-// WithTitle returns an option that sets the window title.
-func WithTitle(t string) WindowOption {
-	return WindowOption{
-		apply: func(opts *windowOptions) {
-			opts.Title = t
-		},
+// Title sets the title of the window.
+func Title(t string) Option {
+	return func(opts *windowOptions) {
+		opts.Title = t
 	}
 }
 
-// WithWidth returns an option that sets the window width.
-func WithWidth(w unit.Value) WindowOption {
+// Size sets the size of the window.
+func Size(w, h unit.Value) Option {
 	if w.V <= 0 {
 		panic("width must be larger than or equal to 0")
 	}
-	return WindowOption{
-		apply: func(opts *windowOptions) {
-			opts.Width = w
-		},
-	}
-}
-
-// WithHeight returns an option that sets the window height.
-func WithHeight(h unit.Value) WindowOption {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
-	return WindowOption{
-		apply: func(opts *windowOptions) {
-			opts.Height = h
-		},
+	return func(opts *windowOptions) {
+		opts.Width = w
+		opts.Height = h
 	}
 }
 
