@@ -55,9 +55,8 @@ func main() {
 	}
 	go func() {
 		w := app.NewWindow(
-			app.WithWidth(unit.Dp(400)),
-			app.WithHeight(unit.Dp(800)),
-			app.WithTitle("Gophers"),
+			app.Size(unit.Dp(400), unit.Dp(800)),
+			app.Title("Gophers"),
 		)
 		if err := newApp(w).run(); err != nil {
 			log.Fatal(err)
