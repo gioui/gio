@@ -24,6 +24,7 @@ import (
 var (
 	target        = flag.String("target", "", "specify target (ios, tvos, android, js).\n")
 	archNames     = flag.String("arch", "", "specify architecture(s) to include (arm, arm64, amd64).")
+	minsdk        = flag.Int("minsdk", 16, "specify minimum supported Android platform sdk version (e.g. 28 for android28 a.k.a. Android 9 Pie).")
 	buildMode     = flag.String("buildmode", "exe", "specify buildmode (archive, exe)")
 	destPath      = flag.String("o", "", "output file or directory.\nFor -target ios or tvos, use the .app suffix to target simulators.")
 	appID         = flag.String("appid", "", "app identifier (for -buildmode=exe)")
@@ -41,6 +42,7 @@ type buildInfo struct {
 	version int
 	dir     string
 	archs   []string
+	minsdk  int
 }
 
 func main() {
@@ -91,6 +93,7 @@ func mainErr() error {
 		appID:   *appID,
 		dir:     dir,
 		version: *version,
+		minsdk:  *minsdk,
 	}
 	if bi.appID == "" {
 		bi.appID = appIDFromPackage(pkgPath)
@@ -211,31 +214,31 @@ func copyFile(dst, src string) (err error) {
 }
 
 type arch struct {
-	iosArch string
-	jniArch string
-	clang   string
+	iosArch   string
+	jniArch   string
+	clangArch string
 }
 
 var allArchs = map[string]arch{
 	"arm": arch{
-		iosArch: "armv7",
-		jniArch: "armeabi-v7a",
-		clang:   "armv7a-linux-androideabi16-clang",
+		iosArch:   "armv7",
+		jniArch:   "armeabi-v7a",
+		clangArch: "armv7a-linux-androideabi",
 	},
 	"arm64": arch{
-		iosArch: "arm64",
-		jniArch: "arm64-v8a",
-		clang:   "aarch64-linux-android21-clang",
+		iosArch:   "arm64",
+		jniArch:   "arm64-v8a",
+		clangArch: "aarch64-linux-android",
 	},
 	"386": arch{
-		iosArch: "i386",
-		jniArch: "x86",
-		clang:   "i686-linux-android16-clang",
+		iosArch:   "i386",
+		jniArch:   "x86",
+		clangArch: "i686-linux-android",
 	},
 	"amd64": arch{
-		iosArch: "x86_64",
-		jniArch: "x86_64",
-		clang:   "x86_64-linux-android21-clang",
+		iosArch:   "x86_64",
+		jniArch:   "x86_64",
+		clangArch: "x86_64-linux-android",
 	},
 }
 

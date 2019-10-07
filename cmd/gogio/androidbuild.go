@@ -85,15 +85,15 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 	var builds errgroup.Group
 	for _, a := range bi.archs {
 		arch := allArchs[a]
-		clang := filepath.Join(tcRoot, "bin", arch.clang)
-		if _, err := os.Stat(clang); err != nil {
-			return fmt.Errorf("no NDK compiler found. Please make sure you have NDK >= r19c installed. Use the command `sdkmanager ndk-bundle` to install it. Path %s", clang)
+		clang, err := latestCompiler(tcRoot, a, bi.minsdk)
+		if err != nil {
+			return fmt.Errorf("%s. Please make sure you have NDK >= r19c installed. Use the command `sdkmanager ndk-bundle` to install it.", err)
 		}
 		if runtime.GOOS == "windows" {
 			// Because of https://github.com/android-ndk/ndk/issues/920,
 			// we need NDK r19c, not just r19b. Check for the presence of
 			// clang++.cmd which is only available in r19c.
-			clangpp := filepath.Join(tcRoot, "bin", arch.clang+"++.cmd")
+			clangpp := clang + "++.cmd"
 			if _, err := os.Stat(clangpp); err != nil {
 				return fmt.Errorf("NDK version r19b detected, but >= r19c is required. Use the command `sdkmanager ndk-bundle` to install it")
 			}
@@ -177,9 +177,9 @@ func archiveAndroid(tmpDir string, bi *buildInfo) (err error) {
 	aarw.Create("res/")
 	manifest := aarw.Create("AndroidManifest.xml")
 	manifest.Write([]byte(fmt.Sprintf(`<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="%s">
-	<uses-sdk android:minSdkVersion="16"/>
+	<uses-sdk android:minSdkVersion="%d"/>
 	<uses-feature android:glEsVersion="0x00030000" android:required="true" />
-</manifest>`, bi.appID)))
+</manifest>`, bi.appID, bi.minsdk)))
 	proguard := aarw.Create("proguard.txt")
 	proguard.Write([]byte(`-keep class org.gioui.** { *; }`))
 
@@ -286,13 +286,19 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 	}
 
 	// Link APK.
+	// Currently, new apps must have a target SDK version of at least 28.
+	// https://developer.android.com/distribute/best-practices/develop/target-sdk
+	targetSDK := 28
+	if bi.minsdk > targetSDK {
+		targetSDK = bi.minsdk
+	}
 	appName := strings.Title(bi.name)
 	manifestSrc := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
 	package="%s"
 	android:versionCode="%d"
 	android:versionName="1.0.%d">
-	<uses-sdk android:minSdkVersion="16" android:targetSdkVersion="28" />
+	<uses-sdk android:minSdkVersion="%d" android:targetSdkVersion="%d" />
 	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-feature android:glEsVersion="0x00030000"/>
 	<application %s android:label="%s">
@@ -307,7 +313,7 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 			</intent-filter>
 		</activity>
 	</application>
-</manifest>`, bi.appID, bi.version, bi.version, iconSnip, appName, appName)
+</manifest>`, bi.appID, bi.version, bi.version, bi.minsdk, targetSDK, iconSnip, appName, appName)
 	manifest := filepath.Join(tmpDir, "AndroidManifest.xml")
 	if err := ioutil.WriteFile(manifest, []byte(manifestSrc), 0660); err != nil {
 		return err
@@ -513,6 +519,44 @@ func latestPlatform(sdk string) (string, error) {
 		return "", fmt.Errorf("no platforms found in %q", sdk)
 	}
 	return bestPlat, nil
+}
+
+func latestCompiler(tcRoot, a string, minsdk int) (string, error) {
+	arch := allArchs[a]
+	allComps, err := filepath.Glob(filepath.Join(tcRoot, "bin", arch.clangArch+"*-clang"))
+	if err != nil {
+		return "", err
+	}
+	var bestVer int
+	var firstVer int
+	var bestCompiler string
+	var firstCompiler string
+	for _, compiler := range allComps {
+		var ver int
+		pattern := filepath.Join(tcRoot, "bin", arch.clangArch) + "%d-clang"
+		if n, err := fmt.Sscanf(compiler, pattern, &ver); n < 1 || err != nil {
+			continue
+		}
+		if firstCompiler == "" || ver < firstVer {
+			firstVer = ver
+			firstCompiler = compiler
+		}
+		if ver < bestVer {
+			continue
+		}
+		if ver > minsdk {
+			continue
+		}
+		bestVer = ver
+		bestCompiler = compiler
+	}
+	if bestCompiler == "" {
+		bestCompiler = firstCompiler
+	}
+	if bestCompiler == "" {
+		return "", fmt.Errorf("no NDK compiler found for architecture %s", a)
+	}
+	return bestCompiler, nil
 }
 
 func latestTools(sdk string) (string, error) {
