@@ -105,7 +105,7 @@ void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat heigh
 
 		NSRect rect = NSMakeRect(0, 0, width, height);
 		NSUInteger styleMask = NSTitledWindowMask |
-			NSWindowStyleMaskResizable |
+			NSResizableWindowMask |
 			NSMiniaturizableWindowMask |
 			NSClosableWindowMask;
 		NSWindow* window = [[NSWindow alloc] initWithContentRect:rect
