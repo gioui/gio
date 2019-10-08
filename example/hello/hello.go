@@ -10,14 +10,11 @@ import (
 
 	"gioui.org/app"
 	"gioui.org/layout"
-	"gioui.org/op"
-	"gioui.org/op/paint"
 	"gioui.org/text"
-	"gioui.org/text/shape"
-	"gioui.org/unit"
+	"gioui.org/text/opentype"
+	"gioui.org/widget/material"
 
 	"golang.org/x/image/font/gofont/goregular"
-	"golang.org/x/image/font/sfnt"
 )
 
 func main() {
@@ -31,15 +28,11 @@ func main() {
 }
 
 func loop(w *app.Window) error {
-	regular, err := sfnt.Parse(goregular.TTF)
-	if err != nil {
-		panic("failed to load font")
-	}
-	family := &shape.Family{
-		Regular: regular,
-	}
-	maroon := color.RGBA{127, 0, 0, 255}
-	message := "Hello, Gio"
+	shaper := new(text.Shaper)
+	shaper.Register(text.Font{}, opentype.Must(
+		opentype.Parse(goregular.TTF),
+	))
+	th := material.NewTheme(shaper)
 	gtx := &layout.Context{
 		Queue: w.Queue(),
 	}
@@ -48,14 +41,14 @@ func loop(w *app.Window) error {
 		switch e := e.(type) {
 		case app.DestroyEvent:
 			return e.Err
-		case app.UpdateEvent:
+		case app.FrameEvent:
 			gtx.Reset(&e.Config, e.Size)
-			var material op.MacroOp
-			material.Record(gtx.Ops)
-			paint.ColorOp{Color: maroon}.Add(gtx.Ops)
-			material.Stop()
-			text.Label{Material: material, Size: unit.Sp(72), Alignment: text.Middle, Text: message}.Layout(gtx, family)
-			w.Update(gtx.Ops)
+			l := th.H1("Hello, Gio")
+			maroon := color.RGBA{127, 0, 0, 255}
+			l.Color = maroon
+			l.Alignment = text.Middle
+			l.Layout(gtx)
+			e.Frame(gtx.Ops)
 		}
 	}
 }

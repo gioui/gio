@@ -125,10 +125,10 @@ func (a *App) run() error {
 						a.w.Invalidate()
 					}
 				}
-			case app.UpdateEvent:
+			case app.FrameEvent:
 				gtx.Reset(&e.Config, e.Size)
 				a.ui.Layout(gtx)
-				a.w.Update(gtx.Ops)
+				e.Frame(gtx.Ops)
 			}
 		}
 	}
