@@ -21,14 +21,30 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
+type editorFont struct {
+	// Family defines the font and style of the text.
+	Family Family
+	// Face specifies the font family configuration.
+	Face Face
+	// Size is the text size.
+	Size unit.Value
+}
+
 // Editor implements an editable and scrollable text area.
 type Editor struct {
 	// Family defines the font and style of the text.
 	Family Family
 	// Face specifies the font family configuration.
 	Face Face
-	// Size is the text size. If zero, a default size is used.
+	// Size is the text size.
 	Size unit.Value
+	// Material for drawing the text.
+	Material op.MacroOp
+	// Hint contains the text displayed to the user when the
+	// Editor is empty.
+	Hint string
+	// Material is used to draw the hint.
+	HintMaterial op.MacroOp
 
 	Alignment Alignment
 	// SingleLine force the text to stay on a single line.
@@ -39,15 +55,8 @@ type Editor struct {
 	// If not enabled, carriage returns are inserted as newlines in the text.
 	Submit bool
 
-	// Material for drawing the text.
-	Material op.MacroOp
-	// Hint contains the text displayed to the user when the
-	// Editor is empty.
-	Hint string
-	// Material is used to draw the hint.
-	HintMaterial op.MacroOp
-
-	oldScale          int
+	scale             int
+	font              editorFont
 	blinkStart        time.Time
 	focused           bool
 	rr                editBuffer
@@ -58,9 +67,10 @@ type Editor struct {
 	dims              layout.Dimensions
 	padTop, padBottom int
 	padLeft, padRight int
+	carWidth          fixed.Int26_6
 	requestFocus      bool
-
-	it lineIterator
+	caretOn           bool
+	caretScroll       bool
 
 	// carXOff is the offset to the current caret
 	// position when moving between lines.
@@ -93,11 +103,6 @@ const (
 
 // Event returns the next available editor event, or false if none are available.
 func (e *Editor) Event(gtx *layout.Context) (EditorEvent, bool) {
-	// Crude configuration change detection.
-	if scale := gtx.Px(unit.Sp(100)); scale != e.oldScale {
-		e.invalidate()
-		e.oldScale = scale
-	}
 	sbounds := e.scrollBounds()
 	var smin, smax int
 	var axis gesture.Axis
@@ -128,7 +133,7 @@ func (e *Editor) Event(gtx *layout.Context) (EditorEvent, bool) {
 			})
 			e.requestFocus = true
 			if e.scroller.State() != gesture.StateFlinging {
-				e.scrollToCaret(gtx)
+				e.caretScroll = true
 			}
 		}
 	}
@@ -157,12 +162,12 @@ func (e *Editor) editorEvent(gtx *layout.Context) (EditorEvent, bool) {
 					return SubmitEvent{}, true
 				}
 			}
-			if e.command(gtx, ke) {
-				e.scrollToCaret(gtx.Config)
+			if e.command(ke) {
+				e.caretScroll = true
 				e.scroller.Stop()
 			}
 		case key.EditEvent:
-			e.scrollToCaret(gtx)
+			e.caretScroll = true
 			e.scroller.Stop()
 			e.append(ke.Text)
 		}
@@ -173,11 +178,6 @@ func (e *Editor) editorEvent(gtx *layout.Context) (EditorEvent, bool) {
 	return nil, false
 }
 
-func (e *Editor) caretWidth(c unit.Converter) fixed.Int26_6 {
-	oneDp := c.Px(unit.Dp(1))
-	return fixed.Int26_6(oneDp * 64)
-}
-
 // Focus requests the input focus for the Editor.
 func (e *Editor) Focus() {
 	e.requestFocus = true
@@ -185,10 +185,44 @@ func (e *Editor) Focus() {
 
 // Layout flushes any remaining events and lays out the editor.
 func (e *Editor) Layout(gtx *layout.Context) {
-	cs := gtx.Constraints
+	font := editorFont{
+		e.Family,
+		e.Face,
+		e.Size,
+	}
+	e.layout(gtx, font)
+	var stack op.StackOp
+	stack.Push(gtx.Ops)
+	if e.Len() > 0 {
+		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(gtx.Ops)
+		e.Material.Add(gtx.Ops)
+	} else {
+		paint.ColorOp{Color: color.RGBA{A: 0xaa}}.Add(gtx.Ops)
+		e.HintMaterial.Add(gtx.Ops)
+	}
+	e.draw(gtx, font)
+	paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(gtx.Ops)
+	e.Material.Add(gtx.Ops)
+	e.drawCaret(gtx)
+	stack.Pop()
+}
+
+func (e *Editor) layout(gtx *layout.Context, font editorFont) {
 	for _, ok := e.Event(gtx); ok; _, ok = e.Event(gtx) {
 	}
+	if e.font != font {
+		e.invalidate()
+		e.font = font
+	}
+	// Crude configuration change detection.
+	if scale := gtx.Px(unit.Sp(100)); scale != e.scale {
+		e.invalidate()
+		e.scale = scale
+	}
+	cs := gtx.Constraints
 	twoDp := gtx.Px(unit.Dp(2))
+	e.carWidth = fixed.I(gtx.Px(unit.Dp(1)))
+
 	e.padLeft, e.padRight = twoDp, twoDp
 	maxWidth := cs.Width.Max
 	if e.SingleLine {
@@ -202,84 +236,21 @@ func (e *Editor) Layout(gtx *layout.Context) {
 		e.invalidate()
 	}
 
-	e.layout(gtx)
-	lines, size := e.lines, e.dims.Size
-	e.viewSize = cs.Constrain(size)
-
-	carLine, _, carX, carY := e.layoutCaret(gtx)
-
-	off := image.Point{
-		X: -e.scrollOff.X + e.padLeft,
-		Y: -e.scrollOff.Y + e.padTop,
+	if !e.valid {
+		e.layoutText(gtx, font)
+		e.valid = true
 	}
-	clip := image.Rectangle{
-		Min: image.Point{X: 0, Y: 0},
-		Max: image.Point{X: e.viewSize.X, Y: e.viewSize.Y},
+
+	e.viewSize = cs.Constrain(e.dims.Size)
+	e.adjustScroll()
+
+	if e.caretScroll {
+		e.caretScroll = false
+		e.scrollToCaret()
 	}
+
 	key.InputOp{Key: e, Focus: e.requestFocus}.Add(gtx.Ops)
 	e.requestFocus = false
-	e.it = lineIterator{
-		Lines:     lines,
-		Clip:      clip,
-		Alignment: e.Alignment,
-		Width:     e.viewWidth(),
-		Offset:    off,
-	}
-	var stack op.StackOp
-	stack.Push(gtx.Ops)
-	// Apply material. Set a default color in case the material is empty.
-	if e.rr.len() > 0 {
-		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(gtx.Ops)
-		e.Material.Add(gtx.Ops)
-	} else {
-		paint.ColorOp{Color: color.RGBA{A: 0xaa}}.Add(gtx.Ops)
-		e.HintMaterial.Add(gtx.Ops)
-	}
-	tsize := textSize(gtx, e.Size)
-	for {
-		str, lineOff, ok := e.it.Next()
-		if !ok {
-			break
-		}
-		var stack op.StackOp
-		stack.Push(gtx.Ops)
-		op.TransformOp{}.Offset(lineOff).Add(gtx.Ops)
-		e.Family.Shape(e.Face, tsize, str).Add(gtx.Ops)
-		paint.PaintOp{Rect: toRectF(clip).Sub(lineOff)}.Add(gtx.Ops)
-		stack.Pop()
-	}
-	if e.focused {
-		now := gtx.Now()
-		dt := now.Sub(e.blinkStart)
-		blinking := dt < maxBlinkDuration
-		const timePerBlink = time.Second / blinksPerSecond
-		nextBlink := now.Add(timePerBlink/2 - dt%(timePerBlink/2))
-		on := !blinking || dt%timePerBlink < timePerBlink/2
-		if on {
-			carWidth := e.caretWidth(gtx)
-			carX -= carWidth / 2
-			carAsc, carDesc := -lines[carLine].Bounds.Min.Y, lines[carLine].Bounds.Max.Y
-			carRect := image.Rectangle{
-				Min: image.Point{X: carX.Ceil(), Y: carY - carAsc.Ceil()},
-				Max: image.Point{X: carX.Ceil() + carWidth.Ceil(), Y: carY + carDesc.Ceil()},
-			}
-			carRect = carRect.Add(image.Point{
-				X: -e.scrollOff.X + e.padLeft,
-				Y: -e.scrollOff.Y + e.padTop,
-			})
-			carRect = clip.Intersect(carRect)
-			if !carRect.Empty() {
-				paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(gtx.Ops)
-				e.Material.Add(gtx.Ops)
-				paint.PaintOp{Rect: toRectF(carRect)}.Add(gtx.Ops)
-			}
-		}
-		if blinking {
-			redraw := op.InvalidateOp{At: nextBlink}
-			redraw.Add(gtx.Ops)
-		}
-	}
-	stack.Pop()
 
 	baseline := e.padTop + e.dims.Baseline
 	pointerPadding := gtx.Px(unit.Dp(4))
@@ -292,6 +263,85 @@ func (e *Editor) Layout(gtx *layout.Context) {
 	e.scroller.Add(gtx.Ops)
 	e.clicker.Add(gtx.Ops)
 	gtx.Dimensions = layout.Dimensions{Size: e.viewSize, Baseline: baseline}
+	e.caretOn = false
+	if e.focused {
+		now := gtx.Now()
+		dt := now.Sub(e.blinkStart)
+		blinking := dt < maxBlinkDuration
+		const timePerBlink = time.Second / blinksPerSecond
+		nextBlink := now.Add(timePerBlink/2 - dt%(timePerBlink/2))
+		if blinking {
+			redraw := op.InvalidateOp{At: nextBlink}
+			redraw.Add(gtx.Ops)
+		}
+		e.caretOn = e.focused && (!blinking || dt%timePerBlink < timePerBlink/2)
+	}
+}
+
+func (e *Editor) draw(gtx *layout.Context, font editorFont) {
+	var stack op.StackOp
+	stack.Push(gtx.Ops)
+	off := image.Point{
+		X: -e.scrollOff.X + e.padLeft,
+		Y: -e.scrollOff.Y + e.padTop,
+	}
+	clip := image.Rectangle{
+		Max: image.Point{X: e.viewSize.X, Y: e.viewSize.Y},
+	}
+	it := lineIterator{
+		Lines:     e.lines,
+		Clip:      clip,
+		Alignment: e.Alignment,
+		Width:     e.viewWidth(),
+		Offset:    off,
+	}
+	fsize := float32(gtx.Px(font.Size))
+	for {
+		str, lineOff, ok := it.Next()
+		if !ok {
+			break
+		}
+		var stack op.StackOp
+		stack.Push(gtx.Ops)
+		op.TransformOp{}.Offset(lineOff).Add(gtx.Ops)
+		font.Family.Shape(font.Face, fsize, str).Add(gtx.Ops)
+		paint.PaintOp{Rect: toRectF(clip).Sub(lineOff)}.Add(gtx.Ops)
+		stack.Pop()
+	}
+	stack.Pop()
+}
+
+func (e *Editor) drawCaret(gtx *layout.Context) {
+	if !e.caretOn {
+		return
+	}
+	carLine, _, carX, carY := e.layoutCaret()
+
+	clip := image.Rectangle{
+		Max: e.viewSize,
+	}
+	var stack op.StackOp
+	stack.Push(gtx.Ops)
+	carX -= e.carWidth / 2
+	carAsc, carDesc := -e.lines[carLine].Bounds.Min.Y, e.lines[carLine].Bounds.Max.Y
+	carRect := image.Rectangle{
+		Min: image.Point{X: carX.Ceil(), Y: carY - carAsc.Ceil()},
+		Max: image.Point{X: carX.Ceil() + e.carWidth.Ceil(), Y: carY + carDesc.Ceil()},
+	}
+	carRect = carRect.Add(image.Point{
+		X: -e.scrollOff.X + e.padLeft,
+		Y: -e.scrollOff.Y + e.padTop,
+	})
+	carRect = clip.Intersect(carRect)
+	if !carRect.Empty() {
+		paint.PaintOp{Rect: toRectF(carRect)}.Add(gtx.Ops)
+	}
+	stack.Pop()
+}
+
+// Len is the length of the editor contents.
+func (e *Editor) Len() int {
+	return e.rr.len()
 }
 
 // Text returns the contents of the editor.
@@ -304,15 +354,6 @@ func (e *Editor) SetText(s string) {
 	e.rr = editBuffer{}
 	e.carXOff = 0
 	e.prepend(s)
-}
-
-func (e *Editor) layout(c unit.Converter) {
-	e.adjustScroll()
-	if e.valid {
-		return
-	}
-	e.layoutText(c)
-	e.valid = true
 }
 
 func (e *Editor) scrollBounds() image.Rectangle {
@@ -348,7 +389,7 @@ func (e *Editor) adjustScroll() {
 }
 
 func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
-	e.layout(c)
+	e.adjustScroll()
 	var (
 		prevDesc fixed.Int26_6
 		carLine  int
@@ -363,17 +404,17 @@ func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
 		carLine++
 	}
 	x := fixed.I(pos.X + e.scrollOff.X - e.padLeft)
-	e.moveToLine(c, x, carLine)
+	e.moveToLine(x, carLine)
 }
 
-func (e *Editor) layoutText(c unit.Converter) {
-	s := e.rr.String()
-	if s == "" {
-		s = e.Hint
+func (e *Editor) layoutText(c unit.Converter, font editorFont) {
+	txt := e.rr.String()
+	if txt == "" {
+		txt = e.Hint
 	}
-	tsize := textSize(c, e.Size)
 	opts := LayoutOptions{SingleLine: e.SingleLine, MaxWidth: e.maxWidth}
-	textLayout := e.Family.Layout(e.Face, tsize, s, opts)
+	fsize := float32(c.Px(font.Size))
+	textLayout := font.Family.Layout(font.Face, fsize, txt, opts)
 	lines := textLayout.Lines
 	dims := linesDimens(lines)
 	for i := 0; i < len(lines)-1; i++ {
@@ -400,8 +441,8 @@ func (e *Editor) viewWidth() int {
 	return e.viewSize.X - e.padLeft - e.padRight
 }
 
-func (e *Editor) layoutCaret(c unit.Converter) (carLine, carCol int, x fixed.Int26_6, y int) {
-	e.layout(c)
+func (e *Editor) layoutCaret() (carLine, carCol int, x fixed.Int26_6, y int) {
+	e.adjustScroll()
 	var idx int
 	var prevDesc fixed.Int26_6
 loop:
@@ -459,9 +500,8 @@ func (e *Editor) prepend(s string) {
 	e.invalidate()
 }
 
-func (e *Editor) movePages(c unit.Converter, pages int) {
-	e.layout(c)
-	_, _, carX, carY := e.layoutCaret(c)
+func (e *Editor) movePages(pages int) {
+	_, _, carX, carY := e.layoutCaret()
 	y := carY + pages*e.viewSize.Y
 	var (
 		prevDesc fixed.Int26_6
@@ -481,12 +521,11 @@ func (e *Editor) movePages(c unit.Converter, pages int) {
 		y2 += h
 		carLine2++
 	}
-	e.carXOff = e.moveToLine(c, carX+e.carXOff, carLine2)
+	e.carXOff = e.moveToLine(carX+e.carXOff, carLine2)
 }
 
-func (e *Editor) moveToLine(c unit.Converter, carX fixed.Int26_6, carLine2 int) fixed.Int26_6 {
-	e.layout(c)
-	carLine, carCol, _, _ := e.layoutCaret(c)
+func (e *Editor) moveToLine(carX fixed.Int26_6, carLine2 int) fixed.Int26_6 {
+	carLine, carCol, _, _ := e.layoutCaret()
 	if carLine2 < 0 {
 		carLine2 = 0
 	}
@@ -543,8 +582,8 @@ func (e *Editor) moveRight() {
 	e.carXOff = 0
 }
 
-func (e *Editor) moveStart(c unit.Converter) {
-	carLine, carCol, x, _ := e.layoutCaret(c)
+func (e *Editor) moveStart() {
+	carLine, carCol, x, _ := e.layoutCaret()
 	advances := e.lines[carLine].Text.Advances
 	for i := carCol - 1; i >= 0; i-- {
 		_, s := e.rr.runeBefore(e.rr.caret)
@@ -554,8 +593,8 @@ func (e *Editor) moveStart(c unit.Converter) {
 	e.carXOff = -x
 }
 
-func (e *Editor) moveEnd(c unit.Converter) {
-	carLine, carCol, x, _ := e.layoutCaret(c)
+func (e *Editor) moveEnd() {
+	carLine, carCol, x, _ := e.layoutCaret()
 	l := e.lines[carLine]
 	// Only move past the end of the last line
 	end := 0
@@ -572,16 +611,15 @@ func (e *Editor) moveEnd(c unit.Converter) {
 	e.carXOff = l.Width + a - x
 }
 
-func (e *Editor) scrollToCaret(c unit.Converter) {
-	carWidth := e.caretWidth(c)
-	carLine, _, x, y := e.layoutCaret(c)
+func (e *Editor) scrollToCaret() {
+	carLine, _, x, y := e.layoutCaret()
 	l := e.lines[carLine]
 	if e.SingleLine {
-		minx := (x - carWidth/2).Ceil()
+		minx := (x - e.carWidth/2).Ceil()
 		if d := minx - e.scrollOff.X + e.padLeft; d < 0 {
 			e.scrollOff.X += d
 		}
-		maxx := (x + carWidth/2).Ceil()
+		maxx := (x + e.carWidth/2).Ceil()
 		if d := maxx - (e.scrollOff.X + e.viewSize.X - e.padRight); d > 0 {
 			e.scrollOff.X += d
 		}
@@ -597,7 +635,7 @@ func (e *Editor) scrollToCaret(c unit.Converter) {
 	}
 }
 
-func (e *Editor) command(c unit.Converter, k key.Event) bool {
+func (e *Editor) command(k key.Event) bool {
 	switch k.Name {
 	case key.NameReturn, key.NameEnter:
 		e.append("\n")
@@ -606,23 +644,23 @@ func (e *Editor) command(c unit.Converter, k key.Event) bool {
 	case key.NameDeleteForward:
 		e.deleteRuneForward()
 	case key.NameUpArrow:
-		line, _, carX, _ := e.layoutCaret(c)
-		e.carXOff = e.moveToLine(c, carX+e.carXOff, line-1)
+		line, _, carX, _ := e.layoutCaret()
+		e.carXOff = e.moveToLine(carX+e.carXOff, line-1)
 	case key.NameDownArrow:
-		line, _, carX, _ := e.layoutCaret(c)
-		e.carXOff = e.moveToLine(c, carX+e.carXOff, line+1)
+		line, _, carX, _ := e.layoutCaret()
+		e.carXOff = e.moveToLine(carX+e.carXOff, line+1)
 	case key.NameLeftArrow:
 		e.moveLeft()
 	case key.NameRightArrow:
 		e.moveRight()
 	case key.NamePageUp:
-		e.movePages(c, -1)
+		e.movePages(-1)
 	case key.NamePageDown:
-		e.movePages(c, +1)
+		e.movePages(+1)
 	case key.NameHome:
-		e.moveStart(c)
+		e.moveStart()
 	case key.NameEnd:
-		e.moveEnd(c)
+		e.moveEnd()
 	default:
 		return false
 	}
