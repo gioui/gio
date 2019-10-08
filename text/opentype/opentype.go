@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-/*
-Package shape implements text layout and shaping.
-*/
-package shape
+// Package opentype implements text layout and shaping for OpenType
+// files.
+package opentype
 
 import (
 	"math"
@@ -19,65 +18,42 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-// Family is an implementation of text.Family. It caches
-// layouts and paths.
-// A Family must specify at least the Regular font to be useful.
-type Family struct {
-	Regular *sfnt.Font
-	Italic  *sfnt.Font
-	Bold    *sfnt.Font
-
-	layoutCache layoutCache
-	pathCache   pathCache
-	buf         sfnt.Buffer
+// Font implementats text.Face.
+type Font struct {
+	font *sfnt.Font
+	buf  sfnt.Buffer
 }
 
-// for returns a font for the given face.
-func (f *Family) fontFor(face text.Face) *sfnt.Font {
-	var font *sfnt.Font
-	switch {
-	case face.Style == text.Italic:
-		font = f.Italic
-	case face.Weight >= 600:
-		font = f.Bold
+type opentype struct {
+	Font    *sfnt.Font
+	Hinting font.Hinting
+}
+
+// NewFont parses an SFNT font, such as TTF or OTF data, from a []byte
+// data source.
+func Parse(src []byte) (*Font, error) {
+	fnt, err := sfnt.Parse(src)
+	if err != nil {
+		return nil, err
 	}
-	if font == nil {
-		font = f.Regular
+	return &Font{font: fnt}, nil
+}
+
+// Must is a helper that wraps a call to a function returning (*Font,
+// error) and panics if the error is non-nil.
+func Must(font *Font, err error) *Font {
+	if err != nil {
+		panic(err)
 	}
 	return font
 }
 
-func (f *Family) Layout(face text.Face, size float32, str string, opts text.LayoutOptions) *text.Layout {
-	fnt := f.fontFor(face)
-	ppem := fixed.Int26_6(size * 64)
-	lk := layoutKey{
-		f:    fnt,
-		ppem: ppem,
-		str:  str,
-		opts: opts,
-	}
-	if l, ok := f.layoutCache.Get(lk); ok {
-		return l
-	}
-	l := layoutText(&f.buf, ppem, str, &opentype{Font: fnt, Hinting: font.HintingFull}, opts)
-	f.layoutCache.Put(lk, l)
-	return l
+func (f *Font) Layout(ppem fixed.Int26_6, str string, opts text.LayoutOptions) *text.Layout {
+	return layoutText(&f.buf, ppem, str, &opentype{Font: f.font, Hinting: font.HintingFull}, opts)
 }
 
-func (f *Family) Shape(face text.Face, size float32, str text.String) paint.ClipOp {
-	fnt := f.fontFor(face)
-	ppem := fixed.Int26_6(size * 64)
-	pk := pathKey{
-		f:    fnt,
-		ppem: ppem,
-		str:  str.String,
-	}
-	if p, ok := f.pathCache.Get(pk); ok {
-		return p
-	}
-	p := textPath(&f.buf, ppem, &opentype{Font: fnt, Hinting: font.HintingFull}, str)
-	f.pathCache.Put(pk, p)
-	return p
+func (f *Font) Shape(ppem fixed.Int26_6, str text.String) paint.ClipOp {
+	return textPath(&f.buf, ppem, &opentype{Font: f.font, Hinting: font.HintingFull}, str)
 }
 
 func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOptions) *text.Layout {
@@ -228,4 +204,51 @@ func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str text.String
 		advIdx++
 	}
 	return builder.End()
+}
+
+func (f *opentype) GlyphAdvance(buf *sfnt.Buffer, ppem fixed.Int26_6, r rune) (advance fixed.Int26_6, ok bool) {
+	g, err := f.Font.GlyphIndex(buf, r)
+	if err != nil {
+		return 0, false
+	}
+	adv, err := f.Font.GlyphAdvance(buf, g, ppem, f.Hinting)
+	return adv, err == nil
+}
+
+func (f *opentype) Kern(buf *sfnt.Buffer, ppem fixed.Int26_6, r0, r1 rune) fixed.Int26_6 {
+	g0, err := f.Font.GlyphIndex(buf, r0)
+	if err != nil {
+		return 0
+	}
+	g1, err := f.Font.GlyphIndex(buf, r1)
+	if err != nil {
+		return 0
+	}
+	adv, err := f.Font.Kern(buf, g0, g1, ppem, f.Hinting)
+	if err != nil {
+		return 0
+	}
+	return adv
+}
+
+func (f *opentype) Metrics(buf *sfnt.Buffer, ppem fixed.Int26_6) font.Metrics {
+	m, _ := f.Font.Metrics(buf, ppem, f.Hinting)
+	return m
+}
+
+func (f *opentype) Bounds(buf *sfnt.Buffer, ppem fixed.Int26_6) fixed.Rectangle26_6 {
+	r, _ := f.Font.Bounds(buf, ppem, f.Hinting)
+	return r
+}
+
+func (f *opentype) LoadGlyph(buf *sfnt.Buffer, ppem fixed.Int26_6, r rune) ([]sfnt.Segment, bool) {
+	g, err := f.Font.GlyphIndex(buf, r)
+	if err != nil {
+		return nil, false
+	}
+	segs, err := f.Font.LoadGlyph(buf, g, ppem, nil)
+	if err != nil {
+		return nil, false
+	}
+	return segs, true
 }

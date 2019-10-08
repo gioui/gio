@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package shape
+package text
 
 import (
 	"gioui.org/op/paint"
-	"gioui.org/text"
-	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
 )
 
 type layoutCache struct {
-	m          map[layoutKey]*layout
-	head, tail *layout
+	m          map[layoutKey]*layoutElem
+	head, tail *layoutElem
 }
 
 type pathCache struct {
@@ -19,10 +17,10 @@ type pathCache struct {
 	head, tail *path
 }
 
-type layout struct {
-	next, prev *layout
+type layoutElem struct {
+	next, prev *layoutElem
 	key        layoutKey
-	layout     *text.Layout
+	layout     *Layout
 }
 
 type path struct {
@@ -32,21 +30,19 @@ type path struct {
 }
 
 type layoutKey struct {
-	f    *sfnt.Font
 	ppem fixed.Int26_6
 	str  string
-	opts text.LayoutOptions
+	opts LayoutOptions
 }
 
 type pathKey struct {
-	f    *sfnt.Font
 	ppem fixed.Int26_6
 	str  string
 }
 
 const maxSize = 1000
 
-func (l *layoutCache) Get(k layoutKey) (*text.Layout, bool) {
+func (l *layoutCache) Get(k layoutKey) (*Layout, bool) {
 	if lt, ok := l.m[k]; ok {
 		l.remove(lt)
 		l.insert(lt)
@@ -55,15 +51,15 @@ func (l *layoutCache) Get(k layoutKey) (*text.Layout, bool) {
 	return nil, false
 }
 
-func (l *layoutCache) Put(k layoutKey, lt *text.Layout) {
+func (l *layoutCache) Put(k layoutKey, lt *Layout) {
 	if l.m == nil {
-		l.m = make(map[layoutKey]*layout)
-		l.head = new(layout)
-		l.tail = new(layout)
+		l.m = make(map[layoutKey]*layoutElem)
+		l.head = new(layoutElem)
+		l.tail = new(layoutElem)
 		l.head.prev = l.tail
 		l.tail.next = l.head
 	}
-	val := &layout{key: k, layout: lt}
+	val := &layoutElem{key: k, layout: lt}
 	l.m[k] = val
 	l.insert(val)
 	if len(l.m) > maxSize {
@@ -73,12 +69,12 @@ func (l *layoutCache) Put(k layoutKey, lt *text.Layout) {
 	}
 }
 
-func (l *layoutCache) remove(lt *layout) {
+func (l *layoutCache) remove(lt *layoutElem) {
 	lt.next.prev = lt.prev
 	lt.prev.next = lt.next
 }
 
-func (l *layoutCache) insert(lt *layout) {
+func (l *layoutCache) insert(lt *layoutElem) {
 	lt.next = l.head
 	lt.prev = l.head.prev
 	lt.prev.next = lt

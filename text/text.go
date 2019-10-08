@@ -8,6 +8,7 @@ import (
 
 	"gioui.org/layout"
 	"gioui.org/op/paint"
+	"gioui.org/unit"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -45,27 +46,27 @@ type LayoutOptions struct {
 	SingleLine bool
 }
 
-// Face specify a particular configuration of a Family.
-type Face struct {
-	// Weight is the text weight. If zero, Normal is used instead.
-	Weight Weight
-	Style  Style
-}
-
 // Style is the font style.
 type Style int
 
 // Weight is a font weight, in CSS units.
 type Weight int
 
-// Family implements a font family. It can layout and shape text from
-// a Face and size.
-type Family interface {
-	// Layout returns the text layout for a string given a set of
-	// options.
-	Layout(face Face, size float32, s string, opts LayoutOptions) *Layout
-	// Path returns the ClipOp outline of a text.
-	Shape(face Face, size float32, s String) paint.ClipOp
+// Font specify a particular typeface, style and size.
+type Font struct {
+	// Typeface identifies a particular typeface design. The empty
+	// string denotes the default typeface.
+	Typeface string
+	Size     unit.Value
+	Style    Style
+	// Weight is the text weight. If zero, Normal is used instead.
+	Weight Weight
+}
+
+// Face implements text layout and shaping for a particular font.
+type Face interface {
+	Layout(ppem fixed.Int26_6, str string, opts LayoutOptions) *Layout
+	Shape(ppem fixed.Int26_6, str String) paint.ClipOp
 }
 
 type Alignment uint8

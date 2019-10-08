@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package shape
+package text
 
 import (
 	"strconv"
@@ -21,7 +21,7 @@ func TestLayoutLRU(t *testing.T) {
 	testLRU(t, put, get)
 }
 
-func TestuPathLRU(t *testing.T) {
+func TestPathLRU(t *testing.T) {
 	c := new(pathCache)
 	put := func(i int) {
 		c.Put(pathKey{str: strconv.Itoa(i)}, paint.ClipOp{})

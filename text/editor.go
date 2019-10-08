@@ -21,23 +21,9 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-type editorFont struct {
-	// Family defines the font and style of the text.
-	Family Family
-	// Face specifies the font family configuration.
-	Face Face
-	// Size is the text size.
-	Size unit.Value
-}
-
 // Editor implements an editable and scrollable text area.
 type Editor struct {
-	// Family defines the font and style of the text.
-	Family Family
-	// Face specifies the font family configuration.
-	Face Face
-	// Size is the text size.
-	Size unit.Value
+	Font Font
 	// Material for drawing the text.
 	Material op.MacroOp
 	// Hint contains the text displayed to the user when the
@@ -184,13 +170,8 @@ func (e *Editor) Focus() {
 }
 
 // Layout flushes any remaining events and lays out the editor.
-func (e *Editor) Layout(gtx *layout.Context) {
-	font := editorFont{
-		e.Family,
-		e.Face,
-		e.Size,
-	}
-	e.layout(gtx, font)
+func (e *Editor) Layout(gtx *layout.Context, s *Shaper) {
+	e.layout(gtx, s, e.Font)
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
 	if e.Len() > 0 {
@@ -200,14 +181,14 @@ func (e *Editor) Layout(gtx *layout.Context) {
 		paint.ColorOp{Color: color.RGBA{A: 0xaa}}.Add(gtx.Ops)
 		e.HintMaterial.Add(gtx.Ops)
 	}
-	e.draw(gtx, font)
+	e.draw(gtx, s, e.Font)
 	paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(gtx.Ops)
 	e.Material.Add(gtx.Ops)
 	e.drawCaret(gtx)
 	stack.Pop()
 }
 
-func (e *Editor) layout(gtx *layout.Context, font editorFont) {
+func (e *Editor) layout(gtx *layout.Context, s *Shaper, font Font) {
 	for _, ok := e.Event(gtx); ok; _, ok = e.Event(gtx) {
 	}
 	if e.font != font {
@@ -237,7 +218,7 @@ func (e *Editor) layout(gtx *layout.Context, font editorFont) {
 	}
 
 	if !e.valid {
-		e.layoutText(gtx, font)
+		e.layoutText(gtx, s, font)
 		e.valid = true
 	}
 
@@ -278,7 +259,7 @@ func (e *Editor) layout(gtx *layout.Context, font editorFont) {
 	}
 }
 
-func (e *Editor) draw(gtx *layout.Context, font editorFont) {
+func (e *Editor) draw(gtx *layout.Context, s *Shaper, font Font) {
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
 	off := image.Point{
@@ -295,7 +276,6 @@ func (e *Editor) draw(gtx *layout.Context, font editorFont) {
 		Width:     e.viewWidth(),
 		Offset:    off,
 	}
-	fsize := float32(gtx.Px(font.Size))
 	for {
 		str, lineOff, ok := it.Next()
 		if !ok {
@@ -304,7 +284,7 @@ func (e *Editor) draw(gtx *layout.Context, font editorFont) {
 		var stack op.StackOp
 		stack.Push(gtx.Ops)
 		op.TransformOp{}.Offset(lineOff).Add(gtx.Ops)
-		font.Family.Shape(font.Face, fsize, str).Add(gtx.Ops)
+		s.Shape(gtx, font, str).Add(gtx.Ops)
 		paint.PaintOp{Rect: toRectF(clip).Sub(lineOff)}.Add(gtx.Ops)
 		stack.Pop()
 	}
@@ -407,14 +387,13 @@ func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
 	e.moveToLine(x, carLine)
 }
 
-func (e *Editor) layoutText(c unit.Converter, font editorFont) {
+func (e *Editor) layoutText(c unit.Converter, s *Shaper, font Font) {
 	txt := e.rr.String()
 	if txt == "" {
 		txt = e.Hint
 	}
 	opts := LayoutOptions{SingleLine: e.SingleLine, MaxWidth: e.maxWidth}
-	fsize := float32(c.Px(font.Size))
-	textLayout := font.Family.Layout(font.Face, fsize, txt, opts)
+	textLayout := s.Layout(c, font, txt, opts)
 	lines := textLayout.Lines
 	dims := linesDimens(lines)
 	for i := 0; i < len(lines)-1; i++ {
