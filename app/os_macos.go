@@ -5,7 +5,7 @@
 package app
 
 /*
-#cgo CFLAGS: -DGL_SILENCE_DEPRECATION -Werror -fmodules -fobjc-arc -x objective-c
+#cgo CFLAGS: -DGL_SILENCE_DEPRECATION -Werror -Wno-deprecated-declarations -fmodules -fobjc-arc -x objective-c
 
 #include <AppKit/AppKit.h>
 #include "os_macos.h"

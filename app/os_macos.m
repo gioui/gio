@@ -104,10 +104,10 @@ void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat heigh
 		[NSApp setMainMenu:menuBar];
 
 		NSRect rect = NSMakeRect(0, 0, width, height);
-		NSWindowStyleMask styleMask = NSWindowStyleMaskTitled |
+		NSUInteger styleMask = NSTitledWindowMask |
 			NSWindowStyleMaskResizable |
-			NSWindowStyleMaskMiniaturizable |
-			NSWindowStyleMaskClosable;
+			NSMiniaturizableWindowMask |
+			NSClosableWindowMask;
 		NSWindow* window = [[NSWindow alloc] initWithContentRect:rect
 													   styleMask:styleMask
 														 backing:NSBackingStoreBuffered
