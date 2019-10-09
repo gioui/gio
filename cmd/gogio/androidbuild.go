@@ -77,6 +77,7 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 	if androidHome == "" {
 		return errors.New("ANDROID_HOME is not set. Please point it to the root of the Android SDK")
 	}
+	javac, err := findJavaC()
 	ndkRoot := filepath.Join(androidHome, "ndk-bundle")
 	if _, err := os.Stat(ndkRoot); err != nil {
 		return fmt.Errorf("no NDK found in $ANDROID_HOME/ndk-bundle (%s). Use `sdkmanager ndk-bundle` to install it", ndkRoot)
@@ -138,7 +139,7 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 			return err
 		}
 		javac := exec.Command(
-			"javac",
+			javac,
 			"-target", "1.8",
 			"-source", "1.8",
 			"-sourcepath", appDir,
@@ -440,6 +441,25 @@ func unzip(dir, zipfile string) (err error) {
 		}
 	}
 	return nil
+}
+
+func findJavaC() (string, error) {
+	javac, err := exec.LookPath("javac")
+	if err == nil {
+		return javac, err
+	}
+	javaHome := os.Getenv("JAVA_HOME")
+	if javaHome == "" {
+		return "", err
+	}
+	javac = filepath.Join(javaHome, "bin", "javac")
+	if runtime.GOOS == "windows" {
+		javac += ".exe"
+	}
+	if _, serr := os.Stat(javac); serr == nil {
+		return javac, nil
+	}
+	return "", err
 }
 
 func writeJar(jarFile, dir string) (err error) {
