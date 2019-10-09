@@ -37,13 +37,6 @@ The command
 
 runs a simple (nonsense) demo that displays Go contributors fetched from GitHub.
 
-If you run into quota issues, supply a
-[Github token](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line)
-with the `-token` flag:
-
-	$ go run gioui.org/example/gophers -token <github token>
-
-
 ## Running on mobiles
 
 For Android, iOS, tvOS the `gogio` tool can build and package a Gio program for you.
