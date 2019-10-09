@@ -478,7 +478,7 @@ Created-By: 1.0 (Go)
 }
 
 func archNDK() string {
-	if runtime.GOOS == "windows" && runtime.GOARCH == "386" {
+	if runtime.GOOS == "windows" {
 		return "windows"
 	} else {
 		var arch string
