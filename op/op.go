@@ -210,17 +210,22 @@ func (o *Ops) Write(op []byte, refs ...interface{}) {
 		}
 		o.auxLen += len(op)
 	default:
-		if o.inAux {
-			o.inAux = false
-			bo := binary.LittleEndian
-			bo.PutUint32(o.data[o.auxOff+1:], uint32(o.auxLen))
-		}
+		o.endAux()
 	}
 	o.write(op, refs...)
 }
 
-func (d *Ops) pc() pc {
-	return pc{data: len(d.data), refs: len(d.refs)}
+func (o *Ops) endAux() {
+	if !o.inAux {
+		return
+	}
+	o.inAux = false
+	bo := binary.LittleEndian
+	bo.PutUint32(o.data[o.auxOff+1:], uint32(o.auxLen))
+}
+
+func (o *Ops) pc() pc {
+	return pc{data: len(o.data), refs: len(o.refs)}
 }
 
 // Record a macro of operations.
@@ -242,6 +247,7 @@ func (m *MacroOp) Stop() {
 	if !m.recording {
 		panic("not recording")
 	}
+	m.ops.endAux()
 	m.ops.macroDepth--
 	m.recording = false
 	m.fill()

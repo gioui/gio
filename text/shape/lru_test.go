@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"gioui.org/op"
+	"gioui.org/op/paint"
 )
 
 func TestLayoutLRU(t *testing.T) {
@@ -24,7 +24,7 @@ func TestLayoutLRU(t *testing.T) {
 func TestuPathLRU(t *testing.T) {
 	c := new(pathCache)
 	put := func(i int) {
-		c.Put(pathKey{str: strconv.Itoa(i)}, op.MacroOp{})
+		c.Put(pathKey{str: strconv.Itoa(i)}, paint.ClipOp{})
 	}
 	get := func(i int) bool {
 		_, ok := c.Get(pathKey{str: strconv.Itoa(i)})

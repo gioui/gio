@@ -3,7 +3,7 @@
 package shape
 
 import (
-	"gioui.org/op"
+	"gioui.org/op/paint"
 	"gioui.org/text"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
@@ -28,7 +28,7 @@ type layout struct {
 type path struct {
 	next, prev *path
 	key        pathKey
-	val        op.MacroOp
+	val        paint.ClipOp
 }
 
 type layoutKey struct {
@@ -85,16 +85,16 @@ func (l *layoutCache) insert(lt *layout) {
 	lt.next.prev = lt
 }
 
-func (c *pathCache) Get(k pathKey) (op.MacroOp, bool) {
+func (c *pathCache) Get(k pathKey) (paint.ClipOp, bool) {
 	if v, ok := c.m[k]; ok {
 		c.remove(v)
 		c.insert(v)
 		return v.val, true
 	}
-	return op.MacroOp{}, false
+	return paint.ClipOp{}, false
 }
 
-func (c *pathCache) Put(k pathKey, v op.MacroOp) {
+func (c *pathCache) Put(k pathKey, v paint.ClipOp) {
 	if c.m == nil {
 		c.m = make(map[pathKey]*path)
 		c.head = new(path)

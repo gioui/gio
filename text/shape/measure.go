@@ -64,7 +64,7 @@ func (f *Family) Layout(face text.Face, size float32, str string, opts text.Layo
 	return l
 }
 
-func (f *Family) Shape(face text.Face, size float32, str text.String) op.MacroOp {
+func (f *Family) Shape(face text.Face, size float32, str text.String) paint.ClipOp {
 	fnt := f.fontFor(face)
 	ppem := fixed.Int26_6(size * 64)
 	pk := pathKey{
@@ -169,14 +169,12 @@ func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, o
 	return &text.Layout{Lines: lines}
 }
 
-func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str text.String) op.MacroOp {
+func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str text.String) paint.ClipOp {
 	var lastPos f32.Point
 	var builder paint.Path
 	ops := new(op.Ops)
 	var x fixed.Int26_6
 	var advIdx int
-	var m op.MacroOp
-	m.Record(ops)
 	builder.Begin(ops)
 	for _, r := range str.String {
 		if !unicode.IsSpace(r) {
@@ -229,7 +227,5 @@ func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str text.String
 		x += str.Advances[advIdx]
 		advIdx++
 	}
-	builder.End()
-	m.Stop()
-	return m
+	return builder.End()
 }

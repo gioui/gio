@@ -25,14 +25,17 @@ type Path struct {
 	pen       f32.Point
 	bounds    f32.Rectangle
 	hasBounds bool
+	macro     op.MacroOp
 }
 
 // ClipOp sets the current clip path.
 type ClipOp struct {
+	macro  op.MacroOp
 	bounds f32.Rectangle
 }
 
 func (p ClipOp) Add(o *op.Ops) {
+	p.macro.Add(o)
 	data := make([]byte, opconst.TypeClipLen)
 	data[0] = byte(opconst.TypeClip)
 	bo := binary.LittleEndian
@@ -46,6 +49,7 @@ func (p ClipOp) Add(o *op.Ops) {
 // Begin the path, storing the path data and final ClipOp into ops.
 func (p *Path) Begin(ops *op.Ops) {
 	p.ops = ops
+	p.macro.Record(ops)
 }
 
 // MoveTo moves the pen to the given position.
@@ -280,11 +284,12 @@ func (p *Path) simpleQuadTo(ctrl, to f32.Point) {
 	p.pen = to
 }
 
-// End the path and add the resulting ClipOp to
-// the operation list passed to Init.
-func (p *Path) End() {
+// End the path and return the resulting ClipOp.
+func (p *Path) End() ClipOp {
 	p.end()
-	ClipOp{
+	p.macro.Stop()
+	return ClipOp{
+		macro:  p.macro,
 		bounds: p.bounds,
-	}.Add(p.ops)
+	}
 }

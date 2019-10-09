@@ -7,7 +7,7 @@ import (
 	"image"
 
 	"gioui.org/layout"
-	"gioui.org/op"
+	"gioui.org/op/paint"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -64,8 +64,8 @@ type Family interface {
 	// Layout returns the text layout for a string given a set of
 	// options.
 	Layout(face Face, size float32, s string, opts LayoutOptions) *Layout
-	// Path returns the ClipOp outline of a text recorded in a macro.
-	Shape(face Face, size float32, s String) op.MacroOp
+	// Path returns the ClipOp outline of a text.
+	Shape(face Face, size float32, s String) paint.ClipOp
 }
 
 type Alignment uint8
