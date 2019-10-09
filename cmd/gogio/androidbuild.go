@@ -35,6 +35,14 @@ type errWriter struct {
 	err *error
 }
 
+var exeSuffix string
+
+func init() {
+	if runtime.GOOS == "windows" {
+		exeSuffix = ".exe"
+	}
+}
+
 func buildAndroid(tmpDir string, bi *buildInfo) error {
 	sdk := os.Getenv("ANDROID_HOME")
 	if sdk == "" {
@@ -398,6 +406,27 @@ func signAPK(tmpDir string, tools *androidTools, bi *buildInfo) error {
 		return err
 	}
 	keystore := filepath.Join(home, ".android", "debug.keystore")
+	if _, err := os.Stat(keystore); err != nil {
+		keystore = filepath.Join(tmpDir, "sign.keystore")
+		keytool, err := findKeytool()
+		if err != nil {
+			return err
+		}
+		_, err = runCmd(exec.Command(
+			keytool,
+			"-genkey",
+			"-keystore", keystore,
+			"-storepass", "android",
+			"-alias", "android",
+			"-keyalg", "RSA", "-keysize", "2048",
+			"-validity", "10000",
+			"-noprompt",
+			"-dname", "CN=android",
+		))
+		if err != nil {
+			return err
+		}
+	}
 	_, err = runCmd(exec.Command(
 		filepath.Join(tools.buildtools, "apksigner"),
 		"sign",
@@ -443,6 +472,22 @@ func unzip(dir, zipfile string) (err error) {
 	return nil
 }
 
+func findKeytool() (string, error) {
+	keytool, err := exec.LookPath("keytool")
+	if err == nil {
+		return keytool, err
+	}
+	javaHome := os.Getenv("JAVA_HOME")
+	if javaHome == "" {
+		return "", err
+	}
+	keytool = filepath.Join(javaHome, "jre", "bin", "keytool"+exeSuffix)
+	if _, serr := os.Stat(keytool); serr == nil {
+		return keytool, nil
+	}
+	return "", err
+}
+
 func findJavaC() (string, error) {
 	javac, err := exec.LookPath("javac")
 	if err == nil {
@@ -452,10 +497,7 @@ func findJavaC() (string, error) {
 	if javaHome == "" {
 		return "", err
 	}
-	javac = filepath.Join(javaHome, "bin", "javac")
-	if runtime.GOOS == "windows" {
-		javac += ".exe"
-	}
+	javac = filepath.Join(javaHome, "bin", "javac"+exeSuffix)
 	if _, serr := os.Stat(javac); serr == nil {
 		return javac, nil
 	}
