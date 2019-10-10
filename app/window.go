@@ -47,7 +47,7 @@ type Window struct {
 }
 
 // Queue is an event.Queue implementation that distributes system events
-// to the input handlers declared in the most recent call to Update.
+// to the input handlers declared in the most recent frame.
 type Queue struct {
 	q input.Router
 }
@@ -62,7 +62,7 @@ type driverEvent struct {
 // of a Window.
 var _ interface {
 	// setAnimating sets the animation flag. When the window is animating,
-	// UpdateEvents are delivered as fast as the display can handle them.
+	// FrameEvents are delivered as fast as the display can handle them.
 	setAnimating(anim bool)
 	// showTextInput updates the virtual keyboard state.
 	showTextInput(show bool)
@@ -110,16 +110,16 @@ func (w *Window) Events() <-chan event.Event {
 }
 
 // Queue returns the Window's event queue. The queue contains
-// the events received since the last UpdateEvent.
+// the events received since the last frame.
 func (w *Window) Queue() *Queue {
 	return &w.queue
 }
 
-// Update updates the Window. Paint operations updates the
+// update updates the Window. Paint operations updates the
 // window contents, input operations declare input handlers,
 // and so on. The supplied operations list completely replaces
 // the window state from previous calls.
-func (w *Window) Update(frame *op.Ops) {
+func (w *Window) update(frame *op.Ops) {
 	w.frames <- frame
 }
 
@@ -153,7 +153,7 @@ func (w *Window) draw(size image.Point, frame *op.Ops) {
 	w.updateAnimation()
 }
 
-// Invalidate the window such that a UpdateEvent will be generated
+// Invalidate the window such that a FrameEvent will be generated
 // immediately. If the window is inactive, the event is sent when the
 // window becomes active.
 // Invalidate is safe for concurrent use.
@@ -253,7 +253,7 @@ func (w *Window) run(opts *windowOptions) {
 				w.updateAnimation()
 				w.out <- e
 				w.waitAck()
-			case UpdateEvent:
+			case FrameEvent:
 				if e2.Size == (image.Point{}) {
 					panic(errors.New("internal error: zero-sized Draw"))
 				}
@@ -263,7 +263,8 @@ func (w *Window) run(opts *windowOptions) {
 				}
 				w.drawStart = time.Now()
 				w.hasNextFrame = false
-				w.out <- e
+				e2.Frame = w.update
+				w.out <- e2
 				var frame *op.Ops
 				// Wait for either a frame or the ack event,
 				// which meant that the client didn't draw.

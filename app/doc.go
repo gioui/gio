@@ -13,7 +13,7 @@ is embedded in another project, NewWindow merely connects with a previously
 created window.
 
 A Window is run by receiving events from its Events channel. The most
-important event is UpdateEvent that prompts an update of the window
+important event is FrameEvent that prompts an update of the window
 contents and state.
 
 For example:
@@ -22,7 +22,7 @@ For example:
 
 	w := app.NewWindow()
 	for e := range w.Events() {
-		if e, ok := e.(app.UpdateEvent); ok {
+		if e, ok := e.(app.FrameEvent); ok {
 			ops.Reset()
 			// Add operations to ops.
 			...
@@ -60,7 +60,7 @@ For example, to display a blank but otherwise functional window:
 Event queue
 
 A Window's Queue method returns an event.Queue implementation that distributes
-incoming events to the event handlers declared in the latest call to Update.
+incoming events to the event handlers declared in the latest frame.
 See the gioui.org/ui package for more information about event handlers.
 
 */

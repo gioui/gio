@@ -296,7 +296,7 @@ func (w *window) draw(sync bool) {
 		return
 	}
 	ppdp := float32(w.dpi) * inchPrDp
-	w.event(UpdateEvent{
+	w.event(FrameEvent{
 		Size: image.Point{
 			X: int(width),
 			Y: int(height),

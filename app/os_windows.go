@@ -407,7 +407,7 @@ func (w *window) draw(sync bool) {
 	w.height = int(r.bottom - r.top)
 	cfg := configForDC(w.hdc)
 	cfg.now = time.Now()
-	w.w.event(UpdateEvent{
+	w.w.event(FrameEvent{
 		Size: image.Point{
 			X: w.width,
 			Y: w.height,

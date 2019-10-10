@@ -198,7 +198,7 @@ func (w *window) draw(sync bool) {
 	cfg := configFor(w.ppdp, w.scale)
 	cfg.now = time.Now()
 	w.setStage(StageRunning)
-	w.w.event(UpdateEvent{
+	w.w.event(FrameEvent{
 		Size: image.Point{
 			X: width,
 			Y: height,

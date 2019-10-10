@@ -10,20 +10,23 @@ import (
 	"strings"
 	"time"
 
+	"gioui.org/op"
 	"gioui.org/unit"
 )
 
-// An UpdateEvent is generated when a Window's Update
-// method must be called.
-type UpdateEvent struct {
+// A FrameEvent asks for a new frame in the form of a list of
+// operations.
+type FrameEvent struct {
 	Config Config
 	// Size is the dimensions of the window.
 	Size image.Point
 	// Insets is the insets to apply.
 	Insets Insets
-	// Whether this draw is system generated
-	// and needs a complete frame before
-	// proceeding.
+	// Frame replaces the window's frame with the new
+	// frame.
+	Frame func(frame *op.Ops)
+	// Whether this draw is system generated and needs a complete
+	// frame before proceeding.
 	sync bool
 }
 
@@ -74,7 +77,7 @@ type windowAndOptions struct {
 
 const (
 	// StagePaused is the Stage for inactive Windows.
-	// Inactive Windows don't receive UpdateEvents.
+	// Inactive Windows don't receive FrameEvents.
 	StagePaused Stage = iota
 	// StateRunning is for active Windows.
 	StageRunning
@@ -200,7 +203,7 @@ func newWindowRendezvous() *windowRendezvous {
 	return wr
 }
 
-func (_ UpdateEvent) ImplementsEvent()   {}
+func (_ FrameEvent) ImplementsEvent()    {}
 func (_ StageEvent) ImplementsEvent()    {}
 func (_ *CommandEvent) ImplementsEvent() {}
 func (_ DestroyEvent) ImplementsEvent()  {}
