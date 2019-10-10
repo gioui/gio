@@ -154,7 +154,7 @@ func (e *editBuffer) moveRight() {
 }
 
 func (e *editBuffer) runeBefore(idx int) (rune, int) {
-	if idx >= e.gapstart {
+	if idx > e.gapstart {
 		idx += e.gapLen()
 	}
 	return utf8.DecodeLastRune(e.text[:idx])
