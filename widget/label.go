@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// Package text implements text widgets.
-package text
+package widget
 
 import (
+	"fmt"
 	"image"
 	"unicode/utf8"
 
@@ -11,6 +11,7 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/paint"
+	"gioui.org/text"
 
 	"golang.org/x/image/math/fixed"
 )
@@ -18,15 +19,15 @@ import (
 // Label is a widget for laying out and drawing text.
 type Label struct {
 	// Alignment specify the text alignment.
-	Alignment Alignment
+	Alignment text.Alignment
 	// MaxLines limits the number of lines. Zero means no limit.
 	MaxLines int
 }
 
 type lineIterator struct {
-	Lines     []Line
+	Lines     []text.Line
 	Clip      image.Rectangle
-	Alignment Alignment
+	Alignment text.Alignment
 	Width     int
 	Offset    image.Point
 
@@ -35,7 +36,7 @@ type lineIterator struct {
 
 const inf = 1e6
 
-func (l *lineIterator) Next() (String, f32.Point, bool) {
+func (l *lineIterator) Next() (text.String, f32.Point, bool) {
 	for len(l.Lines) > 0 {
 		line := l.Lines[0]
 		l.Lines = l.Lines[1:]
@@ -78,12 +79,12 @@ func (l *lineIterator) Next() (String, f32.Point, bool) {
 		offf := f32.Point{X: float32(off.X) / 64, Y: float32(off.Y) / 64}
 		return str, offf, true
 	}
-	return String{}, f32.Point{}, false
+	return text.String{}, f32.Point{}, false
 }
 
-func (l Label) Layout(gtx *layout.Context, s *Shaper, font Font, txt string) {
+func (l Label) Layout(gtx *layout.Context, s *text.Shaper, font text.Font, txt string) {
 	cs := gtx.Constraints
-	textLayout := s.Layout(gtx, font, txt, LayoutOptions{MaxWidth: cs.Width.Max})
+	textLayout := s.Layout(gtx, font, txt, text.LayoutOptions{MaxWidth: cs.Width.Max})
 	lines := textLayout.Lines
 	if max := l.MaxLines; max > 0 && len(lines) > max {
 		lines = lines[:max]
@@ -121,7 +122,7 @@ func toRectF(r image.Rectangle) f32.Rectangle {
 	}
 }
 
-func textPadding(lines []Line) (padding image.Rectangle) {
+func textPadding(lines []text.Line) (padding image.Rectangle) {
 	if len(lines) == 0 {
 		return
 	}
@@ -140,4 +141,44 @@ func textPadding(lines []Line) (padding image.Rectangle) {
 		padding.Max.X = d.Ceil()
 	}
 	return
+}
+
+func linesDimens(lines []text.Line) layout.Dimensions {
+	var width fixed.Int26_6
+	var h int
+	var baseline int
+	if len(lines) > 0 {
+		baseline = lines[0].Ascent.Ceil()
+		var prevDesc fixed.Int26_6
+		for _, l := range lines {
+			h += (prevDesc + l.Ascent).Ceil()
+			prevDesc = l.Descent
+			if l.Width > width {
+				width = l.Width
+			}
+		}
+		h += lines[len(lines)-1].Descent.Ceil()
+	}
+	w := width.Ceil()
+	return layout.Dimensions{
+		Size: image.Point{
+			X: w,
+			Y: h,
+		},
+		Baseline: baseline,
+	}
+}
+
+func align(align text.Alignment, width fixed.Int26_6, maxWidth int) fixed.Int26_6 {
+	mw := fixed.I(maxWidth)
+	switch align {
+	case text.Middle:
+		return fixed.I(((mw - width) / 2).Floor())
+	case text.End:
+		return fixed.I((mw - width).Floor())
+	case text.Start:
+		return 0
+	default:
+		panic(fmt.Errorf("unknown alignment %v", align))
+	}
 }

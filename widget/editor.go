@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package text
+package widget
 
 import (
 	"image"
@@ -15,6 +15,7 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/paint"
+	"gioui.org/text"
 	"gioui.org/unit"
 
 	"golang.org/x/image/math/fixed"
@@ -22,7 +23,7 @@ import (
 
 // Editor implements an editable and scrollable text area.
 type Editor struct {
-	Alignment Alignment
+	Alignment text.Alignment
 	// SingleLine force the text to stay on a single line.
 	// SingleLine also sets the scrolling direction to
 	// horizontal.
@@ -33,14 +34,14 @@ type Editor struct {
 
 	eventKey     int
 	scale        int
-	font         Font
+	font         text.Font
 	blinkStart   time.Time
 	focused      bool
 	rr           editBuffer
 	maxWidth     int
 	viewSize     image.Point
 	valid        bool
-	lines        []Line
+	lines        []text.Line
 	shapes       []line
 	dims         layout.Dimensions
 	carWidth     fixed.Int26_6
@@ -175,7 +176,7 @@ func (e *Editor) Focus() {
 }
 
 // Layout lays out the editor.
-func (e *Editor) Layout(gtx *layout.Context, sh *Shaper, font Font) {
+func (e *Editor) Layout(gtx *layout.Context, sh *text.Shaper, font text.Font) {
 	if e.font != font {
 		e.invalidate()
 		e.font = font
@@ -187,7 +188,7 @@ func (e *Editor) Layout(gtx *layout.Context, sh *Shaper, font Font) {
 	}
 }
 
-func (e *Editor) layout(gtx *layout.Context, sh *Shaper) {
+func (e *Editor) layout(gtx *layout.Context, sh *text.Shaper) {
 	// Crude configuration change detection.
 	if scale := gtx.Px(unit.Sp(100)); scale != e.scale {
 		e.invalidate()
@@ -391,9 +392,9 @@ func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
 	e.moveToLine(x, carLine)
 }
 
-func (e *Editor) layoutText(c unit.Converter, s *Shaper, font Font) ([]Line, layout.Dimensions) {
+func (e *Editor) layoutText(c unit.Converter, s *text.Shaper, font text.Font) ([]text.Line, layout.Dimensions) {
 	txt := e.rr.String()
-	opts := LayoutOptions{SingleLine: e.SingleLine, MaxWidth: e.maxWidth}
+	opts := text.LayoutOptions{SingleLine: e.SingleLine, MaxWidth: e.maxWidth}
 	textLayout := s.Layout(c, font, txt, opts)
 	lines := textLayout.Lines
 	dims := linesDimens(lines)

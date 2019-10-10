@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package text
+package widget
 
 import (
 	"fmt"

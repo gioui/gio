@@ -3,10 +3,6 @@
 package text
 
 import (
-	"fmt"
-	"image"
-
-	"gioui.org/layout"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
 	"golang.org/x/image/math/fixed"
@@ -86,46 +82,6 @@ const (
 	Normal Weight = 400
 	Bold   Weight = 700
 )
-
-func linesDimens(lines []Line) layout.Dimensions {
-	var width fixed.Int26_6
-	var h int
-	var baseline int
-	if len(lines) > 0 {
-		baseline = lines[0].Ascent.Ceil()
-		var prevDesc fixed.Int26_6
-		for _, l := range lines {
-			h += (prevDesc + l.Ascent).Ceil()
-			prevDesc = l.Descent
-			if l.Width > width {
-				width = l.Width
-			}
-		}
-		h += lines[len(lines)-1].Descent.Ceil()
-	}
-	w := width.Ceil()
-	return layout.Dimensions{
-		Size: image.Point{
-			X: w,
-			Y: h,
-		},
-		Baseline: baseline,
-	}
-}
-
-func align(align Alignment, width fixed.Int26_6, maxWidth int) fixed.Int26_6 {
-	mw := fixed.I(maxWidth)
-	switch align {
-	case Middle:
-		return fixed.I(((mw - width) / 2).Floor())
-	case End:
-		return fixed.I((mw - width).Floor())
-	case Start:
-		return 0
-	default:
-		panic(fmt.Errorf("unknown alignment %v", align))
-	}
-}
 
 func (a Alignment) String() string {
 	switch a {
