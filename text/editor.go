@@ -41,22 +41,20 @@ type Editor struct {
 	// If not enabled, carriage returns are inserted as newlines in the text.
 	Submit bool
 
-	scale             int
-	font              editorFont
-	blinkStart        time.Time
-	focused           bool
-	rr                editBuffer
-	maxWidth          int
-	viewSize          image.Point
-	valid             bool
-	lines             []Line
-	dims              layout.Dimensions
-	padTop, padBottom int
-	padLeft, padRight int
-	carWidth          fixed.Int26_6
-	requestFocus      bool
-	caretOn           bool
-	caretScroll       bool
+	scale        int
+	font         Font
+	blinkStart   time.Time
+	focused      bool
+	rr           editBuffer
+	maxWidth     int
+	viewSize     image.Point
+	valid        bool
+	lines        []Line
+	dims         layout.Dimensions
+	carWidth     fixed.Int26_6
+	requestFocus bool
+	caretOn      bool
+	caretScroll  bool
 
 	// carXOff is the offset to the current caret
 	// position when moving between lines.
@@ -201,16 +199,11 @@ func (e *Editor) layout(gtx *layout.Context, s *Shaper, font Font) {
 		e.scale = scale
 	}
 	cs := gtx.Constraints
-	twoDp := gtx.Px(unit.Dp(2))
 	e.carWidth = fixed.I(gtx.Px(unit.Dp(1)))
 
-	e.padLeft, e.padRight = twoDp, twoDp
 	maxWidth := cs.Width.Max
 	if e.SingleLine {
 		maxWidth = inf
-	}
-	if maxWidth != inf {
-		maxWidth -= e.padLeft + e.padRight
 	}
 	if maxWidth != e.maxWidth {
 		e.maxWidth = maxWidth
@@ -232,8 +225,6 @@ func (e *Editor) layout(gtx *layout.Context, s *Shaper, font Font) {
 
 	key.InputOp{Key: e, Focus: e.requestFocus}.Add(gtx.Ops)
 	e.requestFocus = false
-
-	baseline := e.padTop + e.dims.Baseline
 	pointerPadding := gtx.Px(unit.Dp(4))
 	r := image.Rectangle{Max: e.viewSize}
 	r.Min.X -= pointerPadding
@@ -243,7 +234,6 @@ func (e *Editor) layout(gtx *layout.Context, s *Shaper, font Font) {
 	pointer.RectAreaOp{Rect: r}.Add(gtx.Ops)
 	e.scroller.Add(gtx.Ops)
 	e.clicker.Add(gtx.Ops)
-	gtx.Dimensions = layout.Dimensions{Size: e.viewSize, Baseline: baseline}
 	e.caretOn = false
 	if e.focused {
 		now := gtx.Now()
@@ -257,21 +247,24 @@ func (e *Editor) layout(gtx *layout.Context, s *Shaper, font Font) {
 		}
 		e.caretOn = e.focused && (!blinking || dt%timePerBlink < timePerBlink/2)
 	}
+
+	gtx.Dimensions = layout.Dimensions{Size: e.viewSize, Baseline: e.dims.Baseline}
 }
 
 func (e *Editor) draw(gtx *layout.Context, s *Shaper, font Font) {
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
 	off := image.Point{
-		X: -e.scrollOff.X + e.padLeft,
-		Y: -e.scrollOff.Y + e.padTop,
+		X: -e.scrollOff.X,
+		Y: -e.scrollOff.Y,
 	}
-	clip := e.clipRect()
+	clip := textPadding(e.lines)
+	clip.Max = clip.Max.Add(e.viewSize)
 	it := lineIterator{
 		Lines:     e.lines,
 		Clip:      clip,
 		Alignment: e.Alignment,
-		Width:     e.viewWidth(),
+		Width:     e.viewSize.X,
 		Offset:    off,
 	}
 	for {
@@ -304,10 +297,20 @@ func (e *Editor) drawCaret(gtx *layout.Context) {
 		Max: image.Point{X: carX.Ceil() + e.carWidth.Ceil(), Y: carY + carDesc.Ceil()},
 	}
 	carRect = carRect.Add(image.Point{
-		X: -e.scrollOff.X + e.padLeft,
-		Y: -e.scrollOff.Y + e.padTop,
+		X: -e.scrollOff.X,
+		Y: -e.scrollOff.Y,
 	})
-	carRect = e.clipRect().Intersect(carRect)
+	clip := textPadding(e.lines)
+	// Account for caret width to each side.
+	whalf := (e.carWidth / 2).Ceil()
+	if clip.Max.X < whalf {
+		clip.Max.X = whalf
+	}
+	if clip.Min.X > -whalf {
+		clip.Min.X = -whalf
+	}
+	clip.Max = clip.Max.Add(e.viewSize)
+	carRect = clip.Intersect(carRect)
 	if !carRect.Empty() {
 		paint.PaintOp{Rect: toRectF(carRect)}.Add(gtx.Ops)
 	}
@@ -331,17 +334,11 @@ func (e *Editor) SetText(s string) {
 	e.prepend(s)
 }
 
-func (e *Editor) clipRect() image.Rectangle {
-	clip := textPadding(e.lines)
-	clip.Max = clip.Max.Add(e.viewSize)
-	return clip
-}
-
 func (e *Editor) scrollBounds() image.Rectangle {
 	var b image.Rectangle
 	if e.SingleLine {
 		if len(e.lines) > 0 {
-			b.Min.X = align(e.Alignment, e.lines[0].Width, e.viewWidth()).Floor()
+			b.Min.X = align(e.Alignment, e.lines[0].Width, e.viewSize.X).Floor()
 			if b.Min.X > 0 {
 				b.Min.X = 0
 			}
@@ -379,12 +376,12 @@ func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
 	for _, l := range e.lines {
 		y += (prevDesc + l.Ascent).Ceil()
 		prevDesc = l.Descent
-		if y+prevDesc.Ceil() >= pos.Y+e.scrollOff.Y-e.padTop {
+		if y+prevDesc.Ceil() >= pos.Y+e.scrollOff.Y {
 			break
 		}
 		carLine++
 	}
-	x := fixed.I(pos.X + e.scrollOff.X - e.padLeft)
+	x := fixed.I(pos.X + e.scrollOff.X)
 	e.moveToLine(x, carLine)
 }
 
@@ -409,16 +406,7 @@ func (e *Editor) layoutText(c unit.Converter, s *Shaper, font Font) {
 			}
 		}
 	}
-	padTop, padBottom := textPadding(lines)
-	dims.Size.Y += padTop + padBottom
-	dims.Size.X += e.padLeft + e.padRight
-	e.padTop = padTop
-	e.padBottom = padBottom
 	e.lines, e.dims = lines, dims
-}
-
-func (e *Editor) viewWidth() int {
-	return e.viewSize.X - e.padLeft - e.padRight
 }
 
 func (e *Editor) layoutCaret() (carLine, carCol int, x fixed.Int26_6, y int) {
@@ -446,7 +434,7 @@ loop:
 		}
 		idx += len(l.Text.String)
 	}
-	x += align(e.Alignment, e.lines[carLine].Width, e.viewWidth())
+	x += align(e.Alignment, e.lines[carLine].Width, e.viewSize.X)
 	return
 }
 
@@ -530,7 +518,7 @@ func (e *Editor) moveToLine(carX fixed.Int26_6, carLine2 int) fixed.Int26_6 {
 		}
 	}
 	l2 := e.lines[carLine2]
-	carX2 := align(e.Alignment, l2.Width, e.viewWidth())
+	carX2 := align(e.Alignment, l2.Width, e.viewSize.X)
 	// Only move past the end of the last line
 	end := 0
 	if carLine2 < len(e.lines)-1 {
@@ -587,7 +575,7 @@ func (e *Editor) moveEnd() {
 		e.rr.caret += s
 		x += adv
 	}
-	a := align(e.Alignment, l.Width, e.viewWidth())
+	a := align(e.Alignment, l.Width, e.viewSize.X)
 	e.carXOff = l.Width + a - x
 }
 
@@ -595,21 +583,19 @@ func (e *Editor) scrollToCaret() {
 	carLine, _, x, y := e.layoutCaret()
 	l := e.lines[carLine]
 	if e.SingleLine {
-		minx := (x - e.carWidth/2).Ceil()
-		if d := minx - e.scrollOff.X + e.padLeft; d < 0 {
+		if d := x.Floor() - e.scrollOff.X; d < 0 {
 			e.scrollOff.X += d
 		}
-		maxx := (x + e.carWidth/2).Ceil()
-		if d := maxx - (e.scrollOff.X + e.viewSize.X - e.padRight); d > 0 {
+		if d := x.Ceil() - (e.scrollOff.X + e.viewSize.X); d > 0 {
 			e.scrollOff.X += d
 		}
 	} else {
-		miny := y + l.Bounds.Min.Y.Floor()
-		if d := miny - e.scrollOff.Y + e.padTop; d < 0 {
+		miny := y - l.Ascent.Ceil()
+		if d := miny - e.scrollOff.Y; d < 0 {
 			e.scrollOff.Y += d
 		}
-		maxy := y + l.Bounds.Max.Y.Ceil()
-		if d := maxy - (e.scrollOff.Y + e.viewSize.Y - e.padBottom); d > 0 {
+		maxy := y + l.Descent.Ceil()
+		if d := maxy - (e.scrollOff.Y + e.viewSize.Y); d > 0 {
 			e.scrollOff.Y += d
 		}
 	}
