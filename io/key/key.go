@@ -10,6 +10,8 @@ events.
 package key
 
 import (
+	"strings"
+
 	"gioui.org/internal/opconst"
 	"gioui.org/io/event"
 	"gioui.org/op"
@@ -104,3 +106,18 @@ func (h HideInputOp) Add(o *op.Ops) {
 func (EditEvent) ImplementsEvent()  {}
 func (Event) ImplementsEvent()      {}
 func (FocusEvent) ImplementsEvent() {}
+
+func (e Event) String() string {
+	return "{" + string(e.Name) + " " + e.Modifiers.String() + "}"
+}
+
+func (m Modifiers) String() string {
+	var strs []string
+	if m.Contain(ModCommand) {
+		strs = append(strs, "ModCommand")
+	}
+	if m.Contain(ModShift) {
+		strs = append(strs, "ModShift")
+	}
+	return strings.Join(strs, "|")
+}
