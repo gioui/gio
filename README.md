@@ -24,9 +24,10 @@ window management, input and GPU drawing.
 
 ## Running Gio programs
 
-With [Go 1.13](https://golang.org/dl/) or newer,
+With [Go 1.13](https://golang.org/dl/) or newer, initialize a new module and run
+the "hello" example:
 
-	$ export GO111MODULE=on
+	$ go mod init example.com
 	$ go run gioui.org/example/hello
 
 should display a simple message in a window.
@@ -35,7 +36,7 @@ The command
 
 	$ go run gioui.org/example/gophers
 
-runs a simple (nonsense) demo that displays Go contributors fetched from GitHub.
+runs another example that displays Go contributors fetched from GitHub.
 
 ## Running on mobiles
 
