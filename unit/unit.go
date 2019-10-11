@@ -66,6 +66,12 @@ func Sp(v float32) Value {
 	return Value{V: v, U: UnitSp}
 }
 
+// Scale returns the value scaled by s.
+func (v Value) Scale(s float32) Value {
+	v.V *= s
+	return v
+}
+
 func (v Value) String() string {
 	return fmt.Sprintf("%g%s", v.V, v.U)
 }
