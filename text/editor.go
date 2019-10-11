@@ -4,11 +4,11 @@ package text
 
 import (
 	"image"
-	"image/color"
 	"math"
 	"time"
 	"unicode/utf8"
 
+	"gioui.org/f32"
 	"gioui.org/gesture"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
@@ -23,15 +23,6 @@ import (
 
 // Editor implements an editable and scrollable text area.
 type Editor struct {
-	Font Font
-	// Material for drawing the text.
-	Material op.MacroOp
-	// Hint contains the text displayed to the user when the
-	// Editor is empty.
-	Hint string
-	// Material is used to draw the hint.
-	HintMaterial op.MacroOp
-
 	Alignment Alignment
 	// SingleLine force the text to stay on a single line.
 	// SingleLine also sets the scrolling direction to
@@ -50,6 +41,7 @@ type Editor struct {
 	viewSize     image.Point
 	valid        bool
 	lines        []Line
+	shapes       []line
 	dims         layout.Dimensions
 	carWidth     fixed.Int26_6
 	requestFocus bool
@@ -79,6 +71,11 @@ type ChangeEvent struct{}
 // A SubmitEvent is generated when Submit is set
 // and a carriage return key is pressed.
 type SubmitEvent struct{}
+
+type line struct {
+	offset f32.Point
+	clip   paint.ClipOp
+}
 
 const (
 	blinksPerSecond  = 1
@@ -168,30 +165,16 @@ func (e *Editor) Focus() {
 }
 
 // Layout flushes any remaining events and lays out the editor.
-func (e *Editor) Layout(gtx *layout.Context, s *Shaper) {
-	e.layout(gtx, s, e.Font)
-	var stack op.StackOp
-	stack.Push(gtx.Ops)
-	if e.Len() > 0 {
-		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(gtx.Ops)
-		e.Material.Add(gtx.Ops)
-	} else {
-		paint.ColorOp{Color: color.RGBA{A: 0xaa}}.Add(gtx.Ops)
-		e.HintMaterial.Add(gtx.Ops)
-	}
-	e.draw(gtx, s, e.Font)
-	paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(gtx.Ops)
-	e.Material.Add(gtx.Ops)
-	e.drawCaret(gtx)
-	stack.Pop()
-}
-
-func (e *Editor) layout(gtx *layout.Context, s *Shaper, font Font) {
-	for _, ok := e.Event(gtx); ok; _, ok = e.Event(gtx) {
-	}
+func (e *Editor) Layout(gtx *layout.Context, sh *Shaper, font Font) {
 	if e.font != font {
 		e.invalidate()
 		e.font = font
+	}
+	e.layout(gtx, sh)
+}
+
+func (e *Editor) layout(gtx *layout.Context, sh *Shaper) {
+	for _, ok := e.Event(gtx); ok; _, ok = e.Event(gtx) {
 	}
 	// Crude configuration change detection.
 	if scale := gtx.Px(unit.Sp(100)); scale != e.scale {
@@ -211,7 +194,7 @@ func (e *Editor) layout(gtx *layout.Context, s *Shaper, font Font) {
 	}
 
 	if !e.valid {
-		e.layoutText(gtx, s, font)
+		e.layoutText(gtx, sh, e.font)
 		e.valid = true
 	}
 
@@ -221,6 +204,29 @@ func (e *Editor) layout(gtx *layout.Context, s *Shaper, font Font) {
 	if e.caretScroll {
 		e.caretScroll = false
 		e.scrollToCaret()
+	}
+
+	off := image.Point{
+		X: -e.scrollOff.X,
+		Y: -e.scrollOff.Y,
+	}
+	clip := textPadding(e.lines)
+	clip.Max = clip.Max.Add(e.viewSize)
+	it := lineIterator{
+		Lines:     e.lines,
+		Clip:      clip,
+		Alignment: e.Alignment,
+		Width:     e.viewSize.X,
+		Offset:    off,
+	}
+	e.shapes = e.shapes[:0]
+	for {
+		str, off, ok := it.Next()
+		if !ok {
+			break
+		}
+		path := sh.Shape(gtx, e.font, str)
+		e.shapes = append(e.shapes, line{off, path})
 	}
 
 	key.InputOp{Key: e, Focus: e.requestFocus}.Add(gtx.Ops)
@@ -251,38 +257,20 @@ func (e *Editor) layout(gtx *layout.Context, s *Shaper, font Font) {
 	gtx.Dimensions = layout.Dimensions{Size: e.viewSize, Baseline: e.dims.Baseline}
 }
 
-func (e *Editor) draw(gtx *layout.Context, s *Shaper, font Font) {
-	var stack op.StackOp
-	stack.Push(gtx.Ops)
-	off := image.Point{
-		X: -e.scrollOff.X,
-		Y: -e.scrollOff.Y,
-	}
+func (e *Editor) PaintText(gtx *layout.Context) {
 	clip := textPadding(e.lines)
 	clip.Max = clip.Max.Add(e.viewSize)
-	it := lineIterator{
-		Lines:     e.lines,
-		Clip:      clip,
-		Alignment: e.Alignment,
-		Width:     e.viewSize.X,
-		Offset:    off,
-	}
-	for {
-		str, lineOff, ok := it.Next()
-		if !ok {
-			break
-		}
+	for _, shape := range e.shapes {
 		var stack op.StackOp
 		stack.Push(gtx.Ops)
-		op.TransformOp{}.Offset(lineOff).Add(gtx.Ops)
-		s.Shape(gtx, font, str).Add(gtx.Ops)
-		paint.PaintOp{Rect: toRectF(clip).Sub(lineOff)}.Add(gtx.Ops)
+		op.TransformOp{}.Offset(shape.offset).Add(gtx.Ops)
+		shape.clip.Add(gtx.Ops)
+		paint.PaintOp{Rect: toRectF(clip).Sub(shape.offset)}.Add(gtx.Ops)
 		stack.Pop()
 	}
-	stack.Pop()
 }
 
-func (e *Editor) drawCaret(gtx *layout.Context) {
+func (e *Editor) PaintCaret(gtx *layout.Context) {
 	if !e.caretOn {
 		return
 	}
@@ -387,9 +375,6 @@ func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
 
 func (e *Editor) layoutText(c unit.Converter, s *Shaper, font Font) {
 	txt := e.rr.String()
-	if txt == "" {
-		txt = e.Hint
-	}
 	opts := LayoutOptions{SingleLine: e.SingleLine, MaxWidth: e.maxWidth}
 	textLayout := s.Layout(c, font, txt, opts)
 	lines := textLayout.Lines

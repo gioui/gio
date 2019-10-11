@@ -5,7 +5,6 @@ package text
 
 import (
 	"image"
-	"image/color"
 	"unicode/utf8"
 
 	"gioui.org/f32"
@@ -18,15 +17,8 @@ import (
 
 // Label is a widget for laying out and drawing text.
 type Label struct {
-	Font Font
-
-	// Material is a macro recording the material to draw the
-	// text. Use a ColorOp for colored text.
-	Material op.MacroOp
 	// Alignment specify the text alignment.
 	Alignment Alignment
-	// Text is the string to draw.
-	Text string
 	// MaxLines limits the number of lines. Zero means no limit.
 	MaxLines int
 }
@@ -89,9 +81,9 @@ func (l *lineIterator) Next() (String, f32.Point, bool) {
 	return String{}, f32.Point{}, false
 }
 
-func (l Label) Layout(gtx *layout.Context, s *Shaper) {
+func (l Label) Layout(gtx *layout.Context, s *Shaper, font Font, txt string) {
 	cs := gtx.Constraints
-	textLayout := s.Layout(gtx, l.Font, l.Text, LayoutOptions{MaxWidth: cs.Width.Max})
+	textLayout := s.Layout(gtx, font, txt, LayoutOptions{MaxWidth: cs.Width.Max})
 	lines := textLayout.Lines
 	if max := l.MaxLines; max > 0 && len(lines) > max {
 		lines = lines[:max]
@@ -115,10 +107,7 @@ func (l Label) Layout(gtx *layout.Context, s *Shaper) {
 		var stack op.StackOp
 		stack.Push(gtx.Ops)
 		op.TransformOp{}.Offset(off).Add(gtx.Ops)
-		s.Shape(gtx, l.Font, str).Add(gtx.Ops)
-		// Set a default color in case the material is empty.
-		paint.ColorOp{Color: color.RGBA{A: 0xff}}.Add(gtx.Ops)
-		l.Material.Add(gtx.Ops)
+		s.Shape(gtx, font, str).Add(gtx.Ops)
 		paint.PaintOp{Rect: lclip}.Add(gtx.Ops)
 		stack.Pop()
 	}
