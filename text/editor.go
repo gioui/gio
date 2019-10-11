@@ -266,9 +266,7 @@ func (e *Editor) draw(gtx *layout.Context, s *Shaper, font Font) {
 		X: -e.scrollOff.X + e.padLeft,
 		Y: -e.scrollOff.Y + e.padTop,
 	}
-	clip := image.Rectangle{
-		Max: image.Point{X: e.viewSize.X, Y: e.viewSize.Y},
-	}
+	clip := e.clipRect()
 	it := lineIterator{
 		Lines:     e.lines,
 		Clip:      clip,
@@ -297,9 +295,6 @@ func (e *Editor) drawCaret(gtx *layout.Context) {
 	}
 	carLine, _, carX, carY := e.layoutCaret()
 
-	clip := image.Rectangle{
-		Max: e.viewSize,
-	}
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
 	carX -= e.carWidth / 2
@@ -312,7 +307,7 @@ func (e *Editor) drawCaret(gtx *layout.Context) {
 		X: -e.scrollOff.X + e.padLeft,
 		Y: -e.scrollOff.Y + e.padTop,
 	})
-	carRect = clip.Intersect(carRect)
+	carRect = e.clipRect().Intersect(carRect)
 	if !carRect.Empty() {
 		paint.PaintOp{Rect: toRectF(carRect)}.Add(gtx.Ops)
 	}
@@ -334,6 +329,12 @@ func (e *Editor) SetText(s string) {
 	e.rr = editBuffer{}
 	e.carXOff = 0
 	e.prepend(s)
+}
+
+func (e *Editor) clipRect() image.Rectangle {
+	clip := textPadding(e.lines)
+	clip.Max = clip.Max.Add(e.viewSize)
+	return clip
 }
 
 func (e *Editor) scrollBounds() image.Rectangle {

@@ -98,11 +98,8 @@ func (l Label) Layout(gtx *layout.Context, s *Shaper) {
 	}
 	dims := linesDimens(lines)
 	dims.Size = cs.Constrain(dims.Size)
-	padTop, padBottom := textPadding(lines)
-	clip := image.Rectangle{
-		Min: image.Point{X: -inf, Y: -padTop},
-		Max: image.Point{X: inf, Y: dims.Size.Y + padBottom},
-	}
+	clip := textPadding(lines)
+	clip.Max = clip.Max.Add(dims.Size)
 	it := lineIterator{
 		Lines:     lines,
 		Clip:      clip,
@@ -135,16 +132,23 @@ func toRectF(r image.Rectangle) f32.Rectangle {
 	}
 }
 
-func textPadding(lines []Line) (padTop int, padBottom int) {
-	if len(lines) > 0 {
-		first := lines[0]
-		if d := -first.Bounds.Min.Y - first.Ascent; d > 0 {
-			padTop = d.Ceil()
-		}
-		last := lines[len(lines)-1]
-		if d := last.Bounds.Max.Y - last.Descent; d > 0 {
-			padBottom = d.Ceil()
-		}
+func textPadding(lines []Line) (padding image.Rectangle) {
+	if len(lines) == 0 {
+		return
+	}
+	first := lines[0]
+	if d := first.Ascent + first.Bounds.Min.Y; d < 0 {
+		padding.Min.Y = d.Ceil()
+	}
+	last := lines[len(lines)-1]
+	if d := last.Bounds.Max.Y - last.Descent; d > 0 {
+		padding.Max.Y = d.Ceil()
+	}
+	if d := first.Bounds.Min.X; d < 0 {
+		padding.Min.X = d.Ceil()
+	}
+	if d := first.Bounds.Max.X - first.Width; d > 0 {
+		padding.Max.X = d.Ceil()
 	}
 	return
 }
