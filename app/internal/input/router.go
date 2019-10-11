@@ -25,15 +25,6 @@ type Router struct {
 
 	reader ops.Reader
 
-	// deliveredEvents tracks whether events has been returned to the
-	// user from Events. If so, another frame is scheduled to flush
-	// half-updated state. This is important when a an event changes
-	// UI state that has already been laid out. In the worst case, we
-	// waste a frame, increasing power usage.
-	// Gio is expected to grow the ability to construct frame-to-frame
-	// differences and only render to changed areas. In that case, the
-	// waste of a spurious frame should be minimal.
-	deliveredEvents bool
 	// InvalidateOp summary.
 	wakeup     bool
 	wakeupTime time.Time
@@ -48,9 +39,7 @@ type handlerEvents struct {
 }
 
 func (q *Router) Events(k event.Key) []event.Event {
-	events := q.handlers.Events(k)
-	q.deliveredEvents = q.deliveredEvents || len(events) > 0
-	return events
+	return q.handlers.Events(k)
 }
 
 func (q *Router) Frame(ops *op.Ops) {
@@ -62,8 +51,7 @@ func (q *Router) Frame(ops *op.Ops) {
 
 	q.pqueue.Frame(ops, &q.handlers)
 	q.kqueue.Frame(ops, &q.handlers)
-	if q.deliveredEvents || q.handlers.HadEvents() {
-		q.deliveredEvents = false
+	if q.handlers.HadEvents() {
 		q.wakeup = true
 		q.wakeupTime = time.Time{}
 	}
@@ -140,6 +128,16 @@ func (h *handlerEvents) HadEvents() bool {
 func (h *handlerEvents) Events(k event.Key) []event.Event {
 	if events, ok := h.handlers[k]; ok {
 		h.handlers[k] = h.handlers[k][:0]
+		// Schedule another frame if we delivered events to the user
+		// to flush half-updated state. This is important when a an
+		// event changes UI state that has already been laid out. In
+		// the worst case, we waste a frame, increasing power usage.
+		//
+		// Gio is expected to grow the ability to construct
+		// frame-to-frame differences and only render to changed
+		// areas. In that case, the waste of a spurious frame should
+		// be minimal.
+		h.hadEvents = h.hadEvents || len(events) > 0
 		return events
 	}
 	return nil
