@@ -164,12 +164,12 @@ func (x *xkb) dispatchKey(w *Window, keyCode C.uint32_t) {
 
 func (x *xkb) isRepeatKey(keyCode C.uint32_t) bool {
 	keyCode = mapXKBKeyCode(keyCode)
-	return C.xkb_keymap_key_repeats(conn.xkb.keyMap, C.xkb_keycode_t(keyCode)) == 1
+	return C.xkb_keymap_key_repeats(x.keyMap, C.xkb_keycode_t(keyCode)) == 1
 }
 
 func (x *xkb) updateMask(depressed, latched, locked, group C.uint32_t) {
 	xkbGrp := C.xkb_layout_index_t(group)
-	C.xkb_state_update_mask(conn.xkb.state, C.xkb_mod_mask_t(depressed), C.xkb_mod_mask_t(latched), C.xkb_mod_mask_t(locked), xkbGrp, xkbGrp, xkbGrp)
+	C.xkb_state_update_mask(x.state, C.xkb_mod_mask_t(depressed), C.xkb_mod_mask_t(latched), C.xkb_mod_mask_t(locked), xkbGrp, xkbGrp, xkbGrp)
 }
 
 func mapXKBKeyCode(keyCode C.uint32_t) C.uint32_t {
