@@ -10,7 +10,6 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/gesture"
-	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
@@ -32,6 +31,7 @@ type Editor struct {
 	// If not enabled, carriage returns are inserted as newlines in the text.
 	Submit bool
 
+	eventKey     int
 	scale        int
 	font         Font
 	blinkStart   time.Time
@@ -58,7 +58,7 @@ type Editor struct {
 	clicker gesture.Click
 
 	// events is the list of events not yet processed.
-	events []event.Event
+	events []EditorEvent
 }
 
 type EditorEvent interface {
@@ -70,7 +70,9 @@ type ChangeEvent struct{}
 
 // A SubmitEvent is generated when Submit is set
 // and a carriage return key is pressed.
-type SubmitEvent struct{}
+type SubmitEvent struct {
+	Text string
+}
 
 type line struct {
 	offset f32.Point
@@ -82,8 +84,20 @@ const (
 	maxBlinkDuration = 10 * time.Second
 )
 
-// Event returns the next available editor event, or false if none are available.
-func (e *Editor) Event(gtx *layout.Context) (EditorEvent, bool) {
+// Events returns available editor events.
+func (e *Editor) Events(gtx *layout.Context) []EditorEvent {
+	e.processEvents(gtx)
+	events := e.events
+	e.events = nil
+	return events
+}
+
+func (e *Editor) processEvents(gtx *layout.Context) {
+	e.processPointer(gtx)
+	e.processKey(gtx)
+}
+
+func (e *Editor) processPointer(gtx *layout.Context) {
 	sbounds := e.scrollBounds()
 	var smin, smax int
 	var axis gesture.Axis
@@ -103,7 +117,7 @@ func (e *Editor) Event(gtx *layout.Context) (EditorEvent, bool) {
 		e.scrollRel(0, sdist)
 		soff = e.scrollOff.Y
 	}
-	for _, evt := range e.clicker.Events(gtx.Queue) {
+	for _, evt := range e.clicker.Events(gtx) {
 		switch {
 		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
 			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
@@ -121,15 +135,10 @@ func (e *Editor) Event(gtx *layout.Context) (EditorEvent, bool) {
 	if (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin) {
 		e.scroller.Stop()
 	}
-	e.events = append(e.events, gtx.Queue.Events(e)...)
-	return e.editorEvent(gtx)
 }
 
-func (e *Editor) editorEvent(gtx *layout.Context) (EditorEvent, bool) {
-	for len(e.events) > 0 {
-		ke := e.events[0]
-		copy(e.events, e.events[1:])
-		e.events = e.events[:len(e.events)-1]
+func (e *Editor) processKey(gtx *layout.Context) {
+	for _, ke := range gtx.Events(&e.eventKey) {
 		e.blinkStart = gtx.Now()
 		switch ke := ke.(type) {
 		case key.FocusEvent:
@@ -140,7 +149,9 @@ func (e *Editor) editorEvent(gtx *layout.Context) (EditorEvent, bool) {
 			}
 			if e.Submit && ke.Name == key.NameReturn || ke.Name == key.NameEnter {
 				if !ke.Modifiers.Contain(key.ModShift) {
-					return SubmitEvent{}, true
+					e.events = append(e.events, SubmitEvent{
+						Text: e.Text(),
+					})
 				}
 			}
 			if e.command(ke) {
@@ -153,10 +164,9 @@ func (e *Editor) editorEvent(gtx *layout.Context) (EditorEvent, bool) {
 			e.append(ke.Text)
 		}
 		if e.rr.Changed() {
-			return ChangeEvent{}, true
+			e.events = append(e.events, ChangeEvent{})
 		}
 	}
-	return nil, false
 }
 
 // Focus requests the input focus for the Editor.
@@ -164,18 +174,20 @@ func (e *Editor) Focus() {
 	e.requestFocus = true
 }
 
-// Layout flushes any remaining events and lays out the editor.
+// Layout lays out the editor.
 func (e *Editor) Layout(gtx *layout.Context, sh *Shaper, font Font) {
 	if e.font != font {
 		e.invalidate()
 		e.font = font
 	}
+	e.processEvents(gtx)
 	e.layout(gtx, sh)
+	if !e.clicker.Active() {
+		e.events = nil
+	}
 }
 
 func (e *Editor) layout(gtx *layout.Context, sh *Shaper) {
-	for _, ok := e.Event(gtx); ok; _, ok = e.Event(gtx) {
-	}
 	// Crude configuration change detection.
 	if scale := gtx.Px(unit.Sp(100)); scale != e.scale {
 		e.invalidate()
@@ -230,7 +242,7 @@ func (e *Editor) layout(gtx *layout.Context, sh *Shaper) {
 		e.shapes = append(e.shapes, line{off, path})
 	}
 
-	key.InputOp{Key: e, Focus: e.requestFocus}.Add(gtx.Ops)
+	key.InputOp{Key: &e.eventKey, Focus: e.requestFocus}.Add(gtx.Ops)
 	e.requestFocus = false
 	pointerPadding := gtx.Px(unit.Dp(4))
 	r := image.Rectangle{Max: e.viewSize}
