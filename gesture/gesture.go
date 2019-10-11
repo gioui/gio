@@ -26,6 +26,8 @@ import (
 type Click struct {
 	// state tracks the gesture state.
 	state ClickState
+
+	activity activity
 }
 
 type ClickState uint8
@@ -53,7 +55,14 @@ type Scroll struct {
 	grab      bool
 	last      int
 	// Leftover scroll.
-	scroll float32
+	scroll   float32
+	activity activity
+}
+
+// activity tracks whether events have been processed
+// since the previous frame.
+type activity struct {
+	inactive int
 }
 
 type ScrollState uint8
@@ -98,8 +107,10 @@ var touchSlop = unit.Dp(3)
 
 // Add the handler to the operation list to receive click events.
 func (c *Click) Add(ops *op.Ops) {
-	op := pointer.InputOp{Key: c}
-	op.Add(ops)
+	c.activity.Frame(ops)
+	if c.activity.Active() {
+		pointer.InputOp{Key: c}.Add(ops)
+	}
 }
 
 // State reports the click state.
@@ -107,8 +118,15 @@ func (c *Click) State() ClickState {
 	return c.state
 }
 
+// Active reports whether Events has been called since the previous
+// Add.
+func (c *Click) Active() bool {
+	return c.activity.Active()
+}
+
 // Events returns the next click event, if any.
 func (c *Click) Events(q event.Queue) []ClickEvent {
+	c.activity.Reset()
 	var events []ClickEvent
 	for _, evt := range q.Events(c) {
 		e, ok := evt.(pointer.Event)
@@ -143,8 +161,11 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 
 // Add the handler to the operation list to receive scroll events.
 func (s *Scroll) Add(ops *op.Ops) {
-	oph := pointer.InputOp{Key: s, Grab: s.grab}
-	oph.Add(ops)
+	s.activity.Frame(ops)
+	if !s.activity.Active() {
+		return
+	}
+	pointer.InputOp{Key: s, Grab: s.grab}.Add(ops)
 	if s.flinger.Active() {
 		op.InvalidateOp{}.Add(ops)
 	}
@@ -155,9 +176,16 @@ func (s *Scroll) Stop() {
 	s.flinger = fling.Animation{}
 }
 
+// Active reports whether Events has been called since the previous
+// Add.
+func (s *Scroll) Active() bool {
+	return s.activity.Active()
+}
+
 // Scroll detects the scrolling distance from the available events and
 // ongoing fling gestures.
 func (s *Scroll) Scroll(cfg unit.Converter, q event.Queue, t time.Time, axis Axis) int {
+	s.activity.Reset()
 	if s.axis != axis {
 		s.axis = axis
 		return 0
@@ -292,4 +320,20 @@ func (s ScrollState) String() string {
 	default:
 		panic("unreachable")
 	}
+}
+
+func (a *activity) Frame(ops *op.Ops) {
+	wasActive := a.Active()
+	a.inactive++
+	if a.Active() != wasActive {
+		op.InvalidateOp{}.Add(ops)
+	}
+}
+
+func (a *activity) Active() bool {
+	return a.inactive <= 1
+}
+
+func (a *activity) Reset() {
+	a.inactive = 0
 }
