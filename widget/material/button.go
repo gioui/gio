@@ -1,0 +1,209 @@
+// SPDX-License-Identifier: Unlicense OR MIT
+
+// Package material implements the Material design.
+package material
+
+import (
+	"image"
+	"image/color"
+	"image/draw"
+
+	"gioui.org/f32"
+	"gioui.org/io/pointer"
+	"gioui.org/layout"
+	"gioui.org/op"
+	"gioui.org/op/paint"
+	"gioui.org/text"
+	"gioui.org/unit"
+	"gioui.org/widget"
+	"golang.org/x/exp/shiny/iconvg"
+)
+
+type Button struct {
+	Text string
+	// Color is the text color.
+	Color      color.RGBA
+	Font       text.Font
+	Background color.RGBA
+
+	shaper *text.Shaper
+}
+
+type IconButton struct {
+	Background color.RGBA
+	Icon       *Icon
+	Size       unit.Value
+	Padding    unit.Value
+}
+
+type Icon struct {
+	src  []byte
+	size unit.Value
+
+	// Cached values.
+	img     image.Image
+	imgSize int
+}
+
+func (t *Theme) Button(txt string) Button {
+	return Button{
+		Text:       txt,
+		Color:      rgb(0xffffff),
+		Background: t.Color.Primary,
+		Font: text.Font{
+			Size: t.TextSize.Scale(14.0 / 16.0),
+		},
+		shaper: t.Shaper,
+	}
+}
+
+// NewIcon returns a new Icon from IconVG data.
+func NewIcon(data []byte) (*Icon, error) {
+	_, err := iconvg.DecodeMetadata(data)
+	if err != nil {
+		return nil, err
+	}
+	return &Icon{src: data}, nil
+}
+
+func (t *Theme) IconButton(icon *Icon) IconButton {
+	return IconButton{
+		Background: t.Color.Primary,
+		Icon:       icon,
+		Size:       unit.Dp(56),
+		Padding:    unit.Dp(20),
+	}
+}
+
+func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
+	col := b.Color
+	bgcol := b.Background
+	if !button.Active() {
+		col.A = 0xaa
+		bgcol.A = 0xaa
+	}
+	st := layout.Stack{}
+	lbl := st.Rigid(gtx, func() {
+		layout.UniformInset(unit.Dp(16)).Layout(gtx, func() {
+			paint.ColorOp{Color: col}.Add(gtx.Ops)
+			widget.Label{Alignment: text.Middle}.Layout(gtx, b.shaper, b.Font, b.Text)
+		})
+		pointer.RectAreaOp{Rect: image.Rectangle{Max: gtx.Dimensions.Size}}.Add(gtx.Ops)
+		button.Layout(gtx)
+	})
+	bg := st.Expand(gtx, func() {
+		rr := float32(gtx.Px(unit.Dp(4)))
+		rrect(gtx.Ops,
+			float32(gtx.Constraints.Width.Max),
+			float32(gtx.Constraints.Height.Max),
+			rr, rr, rr, rr,
+		)
+		fill(gtx, bgcol)
+		for _, c := range button.History() {
+			drawInk(gtx, c)
+		}
+	})
+	st.Layout(gtx, bg, lbl)
+}
+
+func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
+	st := layout.Stack{}
+	ico := st.Rigid(gtx, func() {
+		layout.UniformInset(b.Padding).Layout(gtx, func() {
+			size := gtx.Px(b.Size) - gtx.Px(b.Padding)
+			ico := b.Icon.image(size)
+			paint.ImageOp{Src: ico, Rect: ico.Bounds()}.Add(gtx.Ops)
+			paint.PaintOp{
+				Rect: toRectF(ico.Bounds()),
+			}.Add(gtx.Ops)
+			gtx.Dimensions = layout.Dimensions{
+				Size: image.Point{X: size, Y: size},
+			}
+		})
+		pointer.EllipseAreaOp{Rect: image.Rectangle{Max: gtx.Dimensions.Size}}.Add(gtx.Ops)
+		button.Layout(gtx)
+	})
+	bgcol := b.Background
+	if !button.Active() {
+		bgcol.A = 0xaa
+	}
+	bg := st.Expand(gtx, func() {
+		size := float32(gtx.Constraints.Width.Max)
+		rr := float32(size) * .5
+		rrect(gtx.Ops,
+			size,
+			size,
+			rr, rr, rr, rr,
+		)
+		fill(gtx, bgcol)
+		for _, c := range button.History() {
+			drawInk(gtx, c)
+		}
+	})
+	st.Layout(gtx, bg, ico)
+}
+
+func (ic *Icon) image(sz int) image.Image {
+	if sz == ic.imgSize {
+		return ic.img
+	}
+	m, _ := iconvg.DecodeMetadata(ic.src)
+	dx, dy := m.ViewBox.AspectRatio()
+	img := image.NewRGBA(image.Rectangle{Max: image.Point{X: sz, Y: int(float32(sz) * dy / dx)}})
+	var ico iconvg.Rasterizer
+	ico.SetDstImage(img, img.Bounds(), draw.Src)
+	// Use white for icons.
+	m.Palette[0] = color.RGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff}
+	iconvg.Decode(&ico, ic.src, &iconvg.DecodeOptions{
+		Palette: &m.Palette,
+	})
+	ic.img = img
+	ic.imgSize = sz
+	return img
+}
+
+func fab(gtx *layout.Context, ico image.Image, col color.RGBA, size int) {
+	dp := image.Point{X: (size - ico.Bounds().Dx()) / 2, Y: (size - ico.Bounds().Dy()) / 2}
+	dims := image.Point{X: size, Y: size}
+	rr := float32(size) * .5
+	rrect(gtx.Ops, float32(size), float32(size), rr, rr, rr, rr)
+	paint.ColorOp{Color: col}.Add(gtx.Ops)
+	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(size), Y: float32(size)}}}.Add(gtx.Ops)
+	paint.ImageOp{Src: ico, Rect: ico.Bounds()}.Add(gtx.Ops)
+	paint.PaintOp{
+		Rect: toRectF(ico.Bounds().Add(dp)),
+	}.Add(gtx.Ops)
+	gtx.Dimensions = layout.Dimensions{Size: dims}
+}
+
+func toRectF(r image.Rectangle) f32.Rectangle {
+	return f32.Rectangle{
+		Min: f32.Point{X: float32(r.Min.X), Y: float32(r.Min.Y)},
+		Max: f32.Point{X: float32(r.Max.X), Y: float32(r.Max.Y)},
+	}
+}
+
+func drawInk(gtx *layout.Context, c widget.Click) {
+	d := gtx.Now().Sub(c.Time)
+	t := float32(d.Seconds())
+	const duration = 0.5
+	if t > duration {
+		return
+	}
+	t = t / duration
+	var stack op.StackOp
+	stack.Push(gtx.Ops)
+	size := float32(gtx.Px(unit.Dp(700))) * t
+	rr := size * .5
+	col := byte(0xaa * (1 - t*t))
+	ink := paint.ColorOp{Color: color.RGBA{A: col, R: col, G: col, B: col}}
+	ink.Add(gtx.Ops)
+	op.TransformOp{}.Offset(c.Position).Offset(f32.Point{
+		X: -rr,
+		Y: -rr,
+	}).Add(gtx.Ops)
+	rrect(gtx.Ops, float32(size), float32(size), rr, rr, rr, rr)
+	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(size), Y: float32(size)}}}.Add(gtx.Ops)
+	stack.Pop()
+	op.InvalidateOp{}.Add(gtx.Ops)
+}

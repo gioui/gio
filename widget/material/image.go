@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// Package widget implements common widgets.
-package widget
+package material
 
 import (
 	"image"
@@ -19,22 +18,22 @@ type Image struct {
 	// Rect is the source rectangle.
 	Rect image.Rectangle
 	// Scale is the ratio of image pixels to
-	// device pixels. If zero, a scale that
-	// makes the image appear at approximately
-	// 72 DPI is used.
+	// dps.
 	Scale float32
+}
+
+func (t *Theme) Image(img image.Image) Image {
+	return Image{
+		Src:   img,
+		Rect:  img.Bounds(),
+		Scale: 160 / 72, // About 72 DPI.
+	}
 }
 
 func (im Image) Layout(gtx *layout.Context) {
 	size := im.Src.Bounds()
 	wf, hf := float32(size.Dx()), float32(size.Dy())
-	var w, h int
-	if im.Scale == 0 {
-		const dpPrPx = 160 / 72
-		w, h = gtx.Px(unit.Dp(wf*dpPrPx)), gtx.Px(unit.Dp(hf*dpPrPx))
-	} else {
-		w, h = int(wf*im.Scale+.5), int(hf*im.Scale+.5)
-	}
+	w, h := gtx.Px(unit.Dp(wf*im.Scale)), gtx.Px(unit.Dp(hf*im.Scale))
 	cs := gtx.Constraints
 	d := image.Point{X: cs.Width.Constrain(w), Y: cs.Height.Constrain(h)}
 	aspect := float32(w) / float32(h)
