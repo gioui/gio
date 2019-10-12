@@ -104,24 +104,35 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 			}
 		},
 		func() {
-			for button.Clicked(gtx) {
-				enabled = !enabled
-			}
-			th.Button("Click me!").Layout(gtx, button)
-		},
-		func() {
-			if enabled {
-				for disabledButton.Clicked(gtx) {
-				}
-				th.Button("Enabled").Layout(gtx, disabledButton)
-			} else {
-				th.Button("Disabled").Layout(gtx, disabledButton)
-			}
-		},
-		func() {
-			for iconButton.Clicked(gtx) {
-			}
-			th.IconButton(icon).Layout(gtx, iconButton)
+			buttons := layout.Flex{Alignment: layout.Middle}
+			in := layout.UniformInset(unit.Dp(8))
+			b1 := buttons.Rigid(gtx, func() {
+				in.Layout(gtx, func() {
+					for iconButton.Clicked(gtx) {
+					}
+					th.IconButton(icon).Layout(gtx, iconButton)
+				})
+			})
+			b2 := buttons.Rigid(gtx, func() {
+				in.Layout(gtx, func() {
+					for button.Clicked(gtx) {
+						enabled = !enabled
+					}
+					th.Button("Click me!").Layout(gtx, button)
+				})
+			})
+			b3 := buttons.Rigid(gtx, func() {
+				in.Layout(gtx, func() {
+					if enabled {
+						for disabledButton.Clicked(gtx) {
+						}
+						th.Button("Enabled").Layout(gtx, disabledButton)
+					} else {
+						th.Button("Disabled").Layout(gtx, disabledButton)
+					}
+				})
+			})
+			buttons.Layout(gtx, b1, b2, b3)
 		},
 	}
 	list.Layout(gtx, len(widgets), func(i int) {
