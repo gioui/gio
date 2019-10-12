@@ -97,10 +97,10 @@ func (e *Editor) Event(gtx *layout.Context) (EditorEvent, bool) {
 	sdist := e.scroller.Scroll(gtx.Config, gtx.Queue, gtx.Now(), axis)
 	var soff int
 	if e.SingleLine {
-		e.scrollOff.X += sdist
+		e.scrollRel(sdist, 0)
 		soff = e.scrollOff.X
 	} else {
-		e.scrollOff.Y += sdist
+		e.scrollRel(0, sdist)
 		soff = e.scrollOff.Y
 	}
 	for _, evt := range e.clicker.Events(gtx.Queue) {
@@ -194,12 +194,13 @@ func (e *Editor) layout(gtx *layout.Context, sh *Shaper) {
 	}
 
 	if !e.valid {
-		e.layoutText(gtx, sh, e.font)
+		e.lines, e.dims = e.layoutText(gtx, sh, e.font)
 		e.valid = true
 	}
 
 	e.viewSize = cs.Constrain(e.dims.Size)
-	e.adjustScroll()
+	// Adjust scrolling for new viewport and layout.
+	e.scrollRel(0, 0)
 
 	if e.caretScroll {
 		e.caretScroll = false
@@ -338,7 +339,13 @@ func (e *Editor) scrollBounds() image.Rectangle {
 	return b
 }
 
-func (e *Editor) adjustScroll() {
+func (e *Editor) scrollRel(dx, dy int) {
+	e.scrollAbs(e.scrollOff.X+dx, e.scrollOff.Y+dy)
+}
+
+func (e *Editor) scrollAbs(x, y int) {
+	e.scrollOff.X = x
+	e.scrollOff.Y = y
 	b := e.scrollBounds()
 	if e.scrollOff.X > b.Max.X {
 		e.scrollOff.X = b.Max.X
@@ -355,7 +362,6 @@ func (e *Editor) adjustScroll() {
 }
 
 func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
-	e.adjustScroll()
 	var (
 		prevDesc fixed.Int26_6
 		carLine  int
@@ -373,7 +379,7 @@ func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
 	e.moveToLine(x, carLine)
 }
 
-func (e *Editor) layoutText(c unit.Converter, s *Shaper, font Font) {
+func (e *Editor) layoutText(c unit.Converter, s *Shaper, font Font) ([]Line, layout.Dimensions) {
 	txt := e.rr.String()
 	opts := LayoutOptions{SingleLine: e.SingleLine, MaxWidth: e.maxWidth}
 	textLayout := s.Layout(c, font, txt, opts)
@@ -391,11 +397,10 @@ func (e *Editor) layoutText(c unit.Converter, s *Shaper, font Font) {
 			}
 		}
 	}
-	e.lines, e.dims = lines, dims
+	return lines, dims
 }
 
 func (e *Editor) layoutCaret() (carLine, carCol int, x fixed.Int26_6, y int) {
-	e.adjustScroll()
 	var idx int
 	var prevDesc fixed.Int26_6
 loop:
@@ -568,21 +573,23 @@ func (e *Editor) scrollToCaret() {
 	carLine, _, x, y := e.layoutCaret()
 	l := e.lines[carLine]
 	if e.SingleLine {
+		var dist int
 		if d := x.Floor() - e.scrollOff.X; d < 0 {
-			e.scrollOff.X += d
+			dist = d
+		} else if d := x.Ceil() - (e.scrollOff.X + e.viewSize.X); d > 0 {
+			dist = d
 		}
-		if d := x.Ceil() - (e.scrollOff.X + e.viewSize.X); d > 0 {
-			e.scrollOff.X += d
-		}
+		e.scrollRel(dist, 0)
 	} else {
 		miny := y - l.Ascent.Ceil()
-		if d := miny - e.scrollOff.Y; d < 0 {
-			e.scrollOff.Y += d
-		}
 		maxy := y + l.Descent.Ceil()
-		if d := maxy - (e.scrollOff.Y + e.viewSize.Y); d > 0 {
-			e.scrollOff.Y += d
+		var dist int
+		if d := miny - e.scrollOff.Y; d < 0 {
+			dist = d
+		} else if d := maxy - (e.scrollOff.Y + e.viewSize.Y); d > 0 {
+			dist = d
 		}
+		e.scrollRel(0, dist)
 	}
 }
 
