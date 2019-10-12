@@ -236,14 +236,11 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	if e.Type == pointer.Release {
 		q.pointers = append(q.pointers[:pidx], q.pointers[pidx+1:]...)
 	}
-	for i, k := range p.handlers {
+	for _, k := range p.handlers {
 		h := q.handlers[k]
 		e := e
-		switch {
-		case p.pressed && len(p.handlers) == 1:
+		if p.pressed && len(p.handlers) == 1 {
 			e.Priority = pointer.Grabbed
-		case i == 0:
-			e.Priority = pointer.Foremost
 		}
 		e.Hit = q.hit(h.area, e.Position)
 		e.Position = h.transform.Invert().Transform(e.Position)

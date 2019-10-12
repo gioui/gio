@@ -95,8 +95,8 @@ For multiple grabbing handlers, the foremost handler wins.
 Priorities
 
 Handlers know their position in a matching set of a pointer through
-event priorities. The Shared and Foremost priorities are for matching sets
-with multiple handlers; the Grabbed priority indicate exclusive access.
+event priorities. The Shared priority is for matching sets with
+multiple handlers; the Grabbed priority indicate exclusive access.
 
 Priorities are useful for deferred gesture matching.
 
