@@ -31,14 +31,14 @@ func loop(w *app.Window) error {
 		switch e := e.(type) {
 		case app.DestroyEvent:
 			return e.Err
-		case app.UpdateEvent:
+		case app.FrameEvent:
 			ops.Reset()
 			paint.ColorOp{Color: background}.Add(ops)
 			paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{
 				X: float32(e.Size.X),
 				Y: float32(e.Size.Y),
 			}}}.Add(ops)
-			w.Update(ops)
+			e.Frame(ops)
 		}
 	}
 }
