@@ -170,13 +170,15 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	q.collectHandlers(&q.reader, events, op.TransformOp{}, -1, -1, false)
 	for k, h := range q.handlers {
 		if !h.active {
-			q.dropHandler(k)
+			q.dropHandler(k, events)
 			delete(q.handlers, k)
 		}
 	}
 }
 
-func (q *pointerQueue) dropHandler(k event.Key) {
+func (q *pointerQueue) dropHandler(k event.Key, events *handlerEvents) {
+	events.Add(k, pointer.Event{Type: pointer.Cancel})
+	q.handlers[k].wantsGrab = false
 	for i := range q.pointers {
 		p := &q.pointers[i]
 		for i := len(p.handlers) - 1; i >= 0; i-- {
@@ -192,7 +194,7 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	if e.Type == pointer.Cancel {
 		q.pointers = q.pointers[:0]
 		for k := range q.handlers {
-			q.dropHandler(k)
+			q.dropHandler(k, events)
 		}
 		return
 	}
@@ -228,7 +230,7 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 		}
 		// Drop handlers that lost their grab.
 		for _, k := range q.scratch {
-			q.dropHandler(k)
+			q.dropHandler(k, events)
 		}
 	}
 	if e.Type == pointer.Release {
