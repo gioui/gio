@@ -39,15 +39,6 @@ func Parse(src []byte) (*Font, error) {
 	return &Font{font: fnt}, nil
 }
 
-// Must is a helper that wraps a call to a function returning (*Font,
-// error) and panics if the error is non-nil.
-func Must(font *Font, err error) *Font {
-	if err != nil {
-		panic(err)
-	}
-	return font
-}
-
 func (f *Font) Layout(ppem fixed.Int26_6, str string, opts text.LayoutOptions) *text.Layout {
 	return layoutText(&f.buf, ppem, str, &opentype{Font: f.font, Hinting: font.HintingFull}, opts)
 }
