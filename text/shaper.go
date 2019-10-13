@@ -14,6 +14,7 @@ import (
 // Specify the default and fallback font by calling Register with the
 // empty Font.
 type Shaper struct {
+	def   Typeface
 	faces map[Font]*face
 }
 
@@ -25,6 +26,7 @@ type face struct {
 
 func (s *Shaper) Register(font Font, tf Face) {
 	if s.faces == nil {
+		s.def = font.Typeface
 		s.faces = make(map[Font]*face)
 	}
 	// Treat all font sizes equally.
@@ -72,7 +74,7 @@ func (s *Shaper) faceForFont(font Font) *face {
 	font.Size = unit.Value{}
 	tf := s.faceForStyle(font)
 	if tf == nil {
-		font.Typeface = ""
+		font.Typeface = s.def
 		tf = s.faceForStyle(font)
 	}
 	if tf == nil {
