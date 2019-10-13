@@ -17,6 +17,7 @@ import (
 	_ "net/http/pprof"
 
 	"gioui.org/f32"
+	_ "gioui.org/font/gofont"
 	"gioui.org/gesture"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
@@ -25,16 +26,11 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/paint"
 	"gioui.org/text"
-	"gioui.org/text/opentype"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
 	"github.com/google/go-github/v24/github"
-	"golang.org/x/image/font/gofont/gobold"
-	"golang.org/x/image/font/gofont/goitalic"
-	"golang.org/x/image/font/gofont/gomono"
-	"golang.org/x/image/font/gofont/goregular"
 
 	"golang.org/x/exp/shiny/materialdesign/icons"
 )
@@ -68,18 +64,10 @@ type user struct {
 	avatar  image.Image
 }
 
-var shaper *text.Shaper
-
 var theme *material.Theme
 
 func init() {
-	s := new(text.Shaper)
-	s.Register(text.Font{}, opentype.Must(opentype.Parse(goregular.TTF)))
-	s.Register(text.Font{Style: text.Italic}, opentype.Must(opentype.Parse(goitalic.TTF)))
-	s.Register(text.Font{Weight: text.Bold}, opentype.Must(opentype.Parse(gobold.TTF)))
-	s.Register(text.Font{Typeface: "mono"}, opentype.Must(opentype.Parse(gomono.TTF)))
-	shaper = s
-	theme = material.NewTheme(s)
+	theme = material.NewTheme()
 	theme.Color.Text = rgb(0x333333)
 	theme.Color.Hint = rgb(0xbbbbbb)
 }
@@ -136,7 +124,7 @@ func (u *UI) layoutTimings(gtx *layout.Context) {
 		layout.Inset{Top: unit.Dp(16)}.Layout(gtx, func() {
 			txt := fmt.Sprintf("m: %d %s", mallocs, u.profile.Timings)
 			lbl := theme.Caption(txt)
-			lbl.Font.Typeface = "mono"
+			lbl.Font.Variant = "Mono"
 			lbl.Layout(gtx)
 		})
 	})

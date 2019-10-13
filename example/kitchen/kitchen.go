@@ -10,14 +10,12 @@ import (
 	"gioui.org/app"
 	"gioui.org/layout"
 	"gioui.org/text"
-	"gioui.org/text/opentype"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
+	_ "gioui.org/font/gofont"
 	"golang.org/x/exp/shiny/materialdesign/icons"
-	"golang.org/x/image/font/gofont/goitalic"
-	"golang.org/x/image/font/gofont/goregular"
 )
 
 func main() {
@@ -36,14 +34,7 @@ func main() {
 }
 
 func loop(w *app.Window) error {
-	shaper := new(text.Shaper)
-	shaper.Register(text.Font{}, opentype.Must(
-		opentype.Parse(goregular.TTF),
-	))
-	shaper.Register(text.Font{Style: text.Italic}, opentype.Must(
-		opentype.Parse(goitalic.TTF),
-	))
-	th := material.NewTheme(shaper)
+	th := material.NewTheme()
 	gtx := &layout.Context{
 		Queue: w.Queue(),
 	}
