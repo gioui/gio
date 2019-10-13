@@ -50,9 +50,8 @@ type Weight int
 
 // Font specify a particular typeface, style and size.
 type Font struct {
-	// Typeface identifies a particular typeface design. The empty
-	// string denotes the default typeface.
-	Typeface string
+	Typeface Typeface
+	Variant  Variant
 	Size     unit.Value
 	Style    Style
 	// Weight is the text weight. If zero, Normal is used instead.
@@ -64,6 +63,13 @@ type Face interface {
 	Layout(ppem fixed.Int26_6, str string, opts LayoutOptions) *Layout
 	Shape(ppem fixed.Int26_6, str String) paint.ClipOp
 }
+
+// Typeface identifies a particular typeface design. The empty
+// string denotes the default typeface.
+type Typeface string
+
+// Variant denotes a typeface variant such as "Mono" or "Smallcaps".
+type Variant string
 
 type Alignment uint8
 
@@ -80,7 +86,8 @@ const (
 
 const (
 	Normal Weight = 400
-	Bold   Weight = 700
+	Medium Weight = 500
+	Bold   Weight = 600
 )
 
 func (a Alignment) String() string {
