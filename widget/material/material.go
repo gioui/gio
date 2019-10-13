@@ -8,6 +8,7 @@ import (
 	"image/color"
 
 	"gioui.org/f32"
+	"gioui.org/font"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/paint"
@@ -25,9 +26,9 @@ type Theme struct {
 	TextSize unit.Value
 }
 
-func NewTheme(shaper *text.Shaper) *Theme {
+func NewTheme() *Theme {
 	t := &Theme{
-		Shaper: shaper,
+		Shaper: font.Default(),
 	}
 	t.Color.Primary = rgb(0x3f51b5)
 	t.Color.Text = rgb(0x000000)
