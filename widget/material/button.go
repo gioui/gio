@@ -79,8 +79,8 @@ func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 	col := b.Color
 	bgcol := b.Background
 	if !button.Active() {
-		col.A = 0xaa
-		bgcol.A = 0xaa
+		col = rgb(0x888888)
+		bgcol = rgb(0xcccccc)
 	}
 	st := layout.Stack{}
 	lbl := st.Rigid(gtx, func() {
