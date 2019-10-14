@@ -136,7 +136,7 @@ func (op EllipseAreaOp) Add(ops *op.Ops) {
 }
 
 func (op areaOp) add(o *op.Ops) {
-	data := make([]byte, opconst.TypeAreaLen)
+	data := o.Write(opconst.TypeAreaLen)
 	data[0] = byte(opconst.TypeArea)
 	data[1] = byte(op.kind)
 	bo := binary.LittleEndian
@@ -144,25 +144,22 @@ func (op areaOp) add(o *op.Ops) {
 	bo.PutUint32(data[6:], uint32(op.rect.Min.Y))
 	bo.PutUint32(data[10:], uint32(op.rect.Max.X))
 	bo.PutUint32(data[14:], uint32(op.rect.Max.Y))
-	o.Write(data)
 }
 
 func (h InputOp) Add(o *op.Ops) {
-	data := make([]byte, opconst.TypePointerInputLen)
+	data := o.Write(opconst.TypePointerInputLen, h.Key)
 	data[0] = byte(opconst.TypePointerInput)
 	if h.Grab {
 		data[1] = 1
 	}
-	o.Write(data, h.Key)
 }
 
 func (op PassOp) Add(o *op.Ops) {
-	data := make([]byte, opconst.TypePassLen)
+	data := o.Write(opconst.TypePassLen)
 	data[0] = byte(opconst.TypePass)
 	if op.Pass {
 		data[1] = 1
 	}
-	o.Write(data)
 }
 
 func (t Type) String() string {

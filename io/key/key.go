@@ -89,18 +89,16 @@ func (m Modifiers) Contain(m2 Modifiers) bool {
 }
 
 func (h InputOp) Add(o *op.Ops) {
-	data := make([]byte, opconst.TypeKeyInputLen)
+	data := o.Write(opconst.TypeKeyInputLen, h.Key)
 	data[0] = byte(opconst.TypeKeyInput)
 	if h.Focus {
 		data[1] = 1
 	}
-	o.Write(data, h.Key)
 }
 
 func (h HideInputOp) Add(o *op.Ops) {
-	data := make([]byte, opconst.TypeHideInputLen)
+	data := o.Write(opconst.TypeHideInputLen)
 	data[0] = byte(opconst.TypeHideInput)
-	o.Write(data)
 }
 
 func (EditEvent) ImplementsEvent()  {}

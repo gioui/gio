@@ -125,7 +125,8 @@ func (s *StackOp) Push(o *Ops) {
 	o.stackDepth++
 	s.stackDepth = o.stackDepth
 	s.macroDepth = o.macroDepth
-	o.Write([]byte{byte(opconst.TypePush)})
+	data := o.Write(opconst.TypePushLen)
+	data[0] = byte(opconst.TypePush)
 }
 
 // Pop (restore) a previously Pushed operations state.
@@ -141,7 +142,8 @@ func (s *StackOp) Pop() {
 	}
 	s.active = false
 	s.ops.stackDepth--
-	s.ops.Write([]byte{byte(opconst.TypePop)})
+	data := s.ops.Write(opconst.TypePopLen)
+	data[0] = byte(opconst.TypePop)
 }
 
 // Reset the Ops, preparing it for re-use.
@@ -172,9 +174,10 @@ func (o *Ops) Version() int {
 }
 
 // Write is for internal use only.
-func (o *Ops) Write(op []byte, refs ...interface{}) {
-	o.data = append(o.data, op...)
+func (o *Ops) Write(n int, refs ...interface{}) []byte {
+	o.data = append(o.data, make([]byte, n)...)
 	o.refs = append(o.refs, refs...)
+	return o.data[len(o.data)-n:]
 }
 
 func (o *Ops) pc() pc {
@@ -191,7 +194,7 @@ func (m *MacroOp) Record(o *Ops) {
 	m.ops.macroDepth++
 	m.pc = o.pc()
 	// Reserve room for a macro definition. Updated in Stop.
-	m.ops.Write(make([]byte, opconst.TypeMacroDefLen))
+	m.ops.Write(opconst.TypeMacroDefLen)
 	m.fill()
 }
 
@@ -227,17 +230,16 @@ func (m MacroOp) Add(o *Ops) {
 	if m.ops == nil {
 		return
 	}
-	data := make([]byte, opconst.TypeMacroLen)
+	data := o.Write(opconst.TypeMacroLen, m.ops)
 	data[0] = byte(opconst.TypeMacro)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(m.pc.data))
 	bo.PutUint32(data[5:], uint32(m.pc.refs))
 	bo.PutUint32(data[9:], uint32(m.version))
-	o.Write(data, m.ops)
 }
 
 func (r InvalidateOp) Add(o *Ops) {
-	data := make([]byte, opconst.TypeRedrawLen)
+	data := o.Write(opconst.TypeRedrawLen)
 	data[0] = byte(opconst.TypeInvalidate)
 	bo := binary.LittleEndian
 	// UnixNano cannot represent the zero time.
@@ -247,7 +249,6 @@ func (r InvalidateOp) Add(o *Ops) {
 			bo.PutUint64(data[1:], uint64(nanos))
 		}
 	}
-	o.Write(data)
 }
 
 // Offset the transformation.
@@ -273,10 +274,9 @@ func (t TransformOp) Multiply(t2 TransformOp) TransformOp {
 }
 
 func (t TransformOp) Add(o *Ops) {
-	data := make([]byte, opconst.TypeTransformLen)
+	data := o.Write(opconst.TypeTransformLen)
 	data[0] = byte(opconst.TypeTransform)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], math.Float32bits(t.offset.X))
 	bo.PutUint32(data[5:], math.Float32bits(t.offset.Y))
-	o.Write(data)
 }

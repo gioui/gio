@@ -33,14 +33,13 @@ type ClipOp struct {
 
 func (p ClipOp) Add(o *op.Ops) {
 	p.macro.Add(o)
-	data := make([]byte, opconst.TypeClipLen)
+	data := o.Write(opconst.TypeClipLen)
 	data[0] = byte(opconst.TypeClip)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], math.Float32bits(p.bounds.Min.X))
 	bo.PutUint32(data[5:], math.Float32bits(p.bounds.Min.Y))
 	bo.PutUint32(data[9:], math.Float32bits(p.bounds.Max.X))
 	bo.PutUint32(data[13:], math.Float32bits(p.bounds.Max.Y))
-	o.Write(data)
 }
 
 // Begin the path, storing the path data and final ClipOp into ops.
@@ -50,7 +49,8 @@ func (p *Path) Begin(ops *op.Ops) {
 	// Write the TypeAux opcode and a byte for marking whether the
 	// path has had its MaxY filled out. If not, the gpu will fill it
 	// before using it.
-	ops.Write([]byte{byte(opconst.TypeAux), 0})
+	data := ops.Write(2)
+	data[0] = byte(opconst.TypeAux)
 }
 
 // MoveTo moves the pen to the given position.
@@ -238,7 +238,7 @@ func (p *Path) vertex(cornerx, cornery int16, ctrl, to f32.Point) {
 		ToX:     to.X,
 		ToY:     to.Y,
 	}
-	data := make([]byte, path.VertStride)
+	data := p.ops.Write(path.VertStride)
 	bo := binary.LittleEndian
 	data[0] = byte(uint16(v.CornerX))
 	data[1] = byte(uint16(v.CornerX) >> 8)
@@ -252,7 +252,6 @@ func (p *Path) vertex(cornerx, cornery int16, ctrl, to f32.Point) {
 	bo.PutUint32(data[20:], math.Float32bits(v.CtrlY))
 	bo.PutUint32(data[24:], math.Float32bits(v.ToX))
 	bo.PutUint32(data[28:], math.Float32bits(v.ToY))
-	p.ops.Write(data)
 }
 
 func (p *Path) simpleQuadTo(ctrl, to f32.Point) {

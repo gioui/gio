@@ -66,33 +66,30 @@ func (i ImageOp) Add(o *op.Ops) {
 		}.Add(o)
 		return
 	}
-	data := make([]byte, opconst.TypeImageLen)
+	data := o.Write(opconst.TypeImageLen, i.src)
 	data[0] = byte(opconst.TypeImage)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(i.size.X))
 	bo.PutUint32(data[5:], uint32(i.size.Y))
-	o.Write(data, i.src)
 }
 
 func (c ColorOp) Add(o *op.Ops) {
-	data := make([]byte, opconst.TypeColorLen)
+	data := o.Write(opconst.TypeColorLen)
 	data[0] = byte(opconst.TypeColor)
 	data[1] = c.Color.R
 	data[2] = c.Color.G
 	data[3] = c.Color.B
 	data[4] = c.Color.A
-	o.Write(data)
 }
 
 func (d PaintOp) Add(o *op.Ops) {
-	data := make([]byte, opconst.TypePaintLen)
+	data := o.Write(opconst.TypePaintLen)
 	data[0] = byte(opconst.TypePaint)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], math.Float32bits(d.Rect.Min.X))
 	bo.PutUint32(data[5:], math.Float32bits(d.Rect.Min.Y))
 	bo.PutUint32(data[9:], math.Float32bits(d.Rect.Max.X))
 	bo.PutUint32(data[13:], math.Float32bits(d.Rect.Max.Y))
-	o.Write(data)
 }
 
 // RectClip returns a ClipOp corresponding to a pixel aligned
