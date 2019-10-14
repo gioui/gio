@@ -53,10 +53,6 @@ type opMacroDef struct {
 	endpc pc
 }
 
-type opAux struct {
-	len int
-}
-
 // Reset start reading from the op list.
 func (r *Reader) Reset(ops *op.Ops) {
 	r.stack = r.stack[:0]
@@ -93,9 +89,10 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 		refs = refs[:nrefs]
 		switch t {
 		case opconst.TypeAux:
-			var op opAux
-			op.decode(data)
-			n += op.len
+			// An Aux operations is always wrapped in a macro, and
+			// its length is the remaining space.
+			block := r.stack[len(r.stack)-1]
+			n += block.endPC.data - r.pc.data - opconst.TypeAuxLen
 			data = data[:n]
 		case opconst.TypeMacro:
 			var op macroOp
@@ -148,16 +145,6 @@ func (op *opMacroDef) decode(data []byte) {
 			data: dataIdx,
 			refs: refsIdx,
 		},
-	}
-}
-
-func (op *opAux) decode(data []byte) {
-	if opconst.OpType(data[0]) != opconst.TypeAux {
-		panic("invalid op")
-	}
-	bo := binary.LittleEndian
-	*op = opAux{
-		len: int(int32(bo.Uint32(data[1:]))),
 	}
 }
 

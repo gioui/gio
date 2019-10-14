@@ -44,7 +44,7 @@ const (
 	TypeHideInputLen    = 1
 	TypePushLen         = 1
 	TypePopLen          = 1
-	TypeAuxLen          = 1 + 4
+	TypeAuxLen          = 1
 	TypeClipLen         = 1 + 4*4
 	TypeProfileLen      = 1
 )

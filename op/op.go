@@ -216,12 +216,7 @@ func (o *Ops) Write(op []byte, refs ...interface{}) {
 }
 
 func (o *Ops) endAux() {
-	if !o.inAux {
-		return
-	}
 	o.inAux = false
-	bo := binary.LittleEndian
-	bo.PutUint32(o.data[o.auxOff+1:], uint32(o.auxLen))
 }
 
 func (o *Ops) pc() pc {
