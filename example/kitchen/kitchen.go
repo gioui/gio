@@ -5,6 +5,7 @@ package main
 // A Gio program that demonstrates Gio widgets. See https://gioui.org for more information.
 
 import (
+	"image/color"
 	"log"
 
 	"gioui.org/app"
@@ -19,7 +20,7 @@ import (
 )
 
 func main() {
-	ic, err := material.NewIcon(icons.ContentSend)
+	ic, err := material.NewIcon(icons.ContentAdd)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -114,13 +115,16 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 			})
 			b3 := buttons.Rigid(gtx, func() {
 				in.Layout(gtx, func() {
+					var btn material.Button
 					if enabled {
 						for disabledButton.Clicked(gtx) {
 						}
-						th.Button("Enabled").Layout(gtx, disabledButton)
+						btn = th.Button("Enabled")
 					} else {
-						th.Button("Disabled").Layout(gtx, disabledButton)
+						btn = th.Button("Disabled")
 					}
+					btn.Background = color.RGBA{A: 0xff, R: 0x9e, G: 0x9d, B: 0x24}
+					btn.Layout(gtx, disabledButton)
 				})
 			})
 			buttons.Layout(gtx, b1, b2, b3)
