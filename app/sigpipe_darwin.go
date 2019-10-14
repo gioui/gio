@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
+// +build !go1.14
+
+// Work around golang.org/issue/33384, fixed in CL 191785,
+// to be released in Go 1.14.
+
 package app
 
 import (
@@ -9,6 +14,5 @@ import (
 )
 
 func init() {
-	// Work around golang.org/issue/33384
 	signal.Notify(make(chan os.Signal), syscall.SIGPIPE)
 }
