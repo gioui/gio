@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package app
+package window
 
 import (
 	"errors"
@@ -58,7 +58,7 @@ type point struct {
 type window struct {
 	hwnd   syscall.Handle
 	hdc    syscall.Handle
-	w      *Window
+	w      Callbacks
 	width  int
 	height int
 	stage  system.Stage
@@ -159,11 +159,11 @@ const _WM_REDRAW = _WM_USER + 0
 var onceMu sync.Mutex
 var mainDone = make(chan struct{})
 
-func main() {
+func Main() {
 	<-mainDone
 }
 
-func createWindow(window *Window, opts *windowOptions) error {
+func NewWindow(window Callbacks, opts *Options) error {
 	onceMu.Lock()
 	defer onceMu.Unlock()
 	if len(winMap) > 0 {
@@ -183,8 +183,8 @@ func createWindow(window *Window, opts *windowOptions) error {
 		winMap[w.hwnd] = w
 		defer delete(winMap, w.hwnd)
 		w.w = window
-		w.w.setDriver(w)
-		defer w.w.event(system.DestroyEvent{})
+		w.w.SetDriver(w)
+		defer w.w.Event(system.DestroyEvent{})
 		showWindow(w.hwnd, _SW_SHOWDEFAULT)
 		setForegroundWindow(w.hwnd)
 		setFocus(w.hwnd)
@@ -196,7 +196,7 @@ func createWindow(window *Window, opts *windowOptions) error {
 	return <-cerr
 }
 
-func createNativeWindow(opts *windowOptions) (*window, error) {
+func createNativeWindow(opts *Options) (*window, error) {
 	setProcessDPIAware()
 	screenDC, err := getDC(0)
 	if err != nil {
@@ -266,7 +266,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		fallthrough
 	case _WM_CHAR:
 		if r := rune(wParam); unicode.IsPrint(r) {
-			w.w.event(key.EditEvent{Text: string(r)})
+			w.w.Event(key.EditEvent{Text: string(r)})
 		}
 		// The message is processed.
 		return 1
@@ -279,31 +279,31 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			if getKeyState(_VK_SHIFT)&0x1000 != 0 {
 				cmd.Modifiers |= key.ModShift
 			}
-			w.w.event(cmd)
+			w.w.Event(cmd)
 		}
 	case _WM_LBUTTONDOWN:
 		setCapture(w.hwnd)
 		x, y := coordsFromlParam(lParam)
 		p := f32.Point{X: float32(x), Y: float32(y)}
-		w.w.event(pointer.Event{
+		w.w.Event(pointer.Event{
 			Type:     pointer.Press,
 			Source:   pointer.Mouse,
 			Position: p,
 			Time:     getMessageTime(),
 		})
 	case _WM_CANCELMODE:
-		w.w.event(pointer.Event{
+		w.w.Event(pointer.Event{
 			Type: pointer.Cancel,
 		})
 	case _WM_SETFOCUS:
-		w.w.event(key.FocusEvent{Focus: true})
+		w.w.Event(key.FocusEvent{Focus: true})
 	case _WM_KILLFOCUS:
-		w.w.event(key.FocusEvent{Focus: false})
+		w.w.Event(key.FocusEvent{Focus: false})
 	case _WM_LBUTTONUP:
 		releaseCapture()
 		x, y := coordsFromlParam(lParam)
 		p := f32.Point{X: float32(x), Y: float32(y)}
-		w.w.event(pointer.Event{
+		w.w.Event(pointer.Event{
 			Type:     pointer.Release,
 			Source:   pointer.Mouse,
 			Position: p,
@@ -312,7 +312,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case _WM_MOUSEMOVE:
 		x, y := coordsFromlParam(lParam)
 		p := f32.Point{X: float32(x), Y: float32(y)}
-		w.w.event(pointer.Event{
+		w.w.Event(pointer.Event{
 			Type:     pointer.Move,
 			Source:   pointer.Mouse,
 			Position: p,
@@ -350,7 +350,7 @@ func (w *window) scrollEvent(wParam, lParam uintptr) {
 	screenToClient(w.hwnd, &np)
 	p := f32.Point{X: float32(np.x), Y: float32(np.y)}
 	dist := float32(int16(wParam >> 16))
-	w.w.event(pointer.Event{
+	w.w.Event(pointer.Event{
 		Type:     pointer.Move,
 		Source:   pointer.Mouse,
 		Position: p,
@@ -381,7 +381,7 @@ func (w *window) loop() error {
 	return nil
 }
 
-func (w *window) setAnimating(anim bool) {
+func (w *window) SetAnimating(anim bool) {
 	w.mu.Lock()
 	w.animating = anim
 	w.mu.Unlock()
@@ -398,7 +398,7 @@ func (w *window) postRedraw() {
 
 func (w *window) setStage(s system.Stage) {
 	w.stage = s
-	w.w.event(system.StageEvent{Stage: s})
+	w.w.Event(system.StageEvent{Stage: s})
 }
 
 func (w *window) draw(sync bool) {
@@ -408,7 +408,7 @@ func (w *window) draw(sync bool) {
 	w.height = int(r.bottom - r.top)
 	cfg := configForDC(w.hdc)
 	cfg.now = time.Now()
-	w.w.event(frameEvent{
+	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
 			Size: image.Point{
 				X: w.width,
@@ -416,7 +416,7 @@ func (w *window) draw(sync bool) {
 			},
 			Config: &cfg,
 		},
-		sync: sync,
+		Sync: sync,
 	})
 }
 
@@ -431,7 +431,7 @@ func (w *window) destroy() {
 	}
 }
 
-func (w *window) showTextInput(show bool) {}
+func (w *window) ShowTextInput(show bool) {}
 
 func (w *window) HDC() syscall.Handle {
 	return w.hdc

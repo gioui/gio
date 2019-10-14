@@ -10,6 +10,7 @@ import (
 
 	"gioui.org/app/internal/gpu"
 	"gioui.org/app/internal/input"
+	"gioui.org/app/internal/window"
 	"gioui.org/io/event"
 	"gioui.org/io/profile"
 	"gioui.org/io/system"
@@ -18,22 +19,11 @@ import (
 )
 
 // WindowOption configures a Window.
-type Option func(opts *windowOptions)
-
-type windowOptions struct {
-	Width, Height unit.Value
-	Title         string
-}
-
-type frameEvent struct {
-	system.FrameEvent
-
-	sync bool
-}
+type Option func(opts *window.Options)
 
 // Window represents an operating system window.
 type Window struct {
-	driver    *window
+	driver    window.Driver
 	lastFrame time.Time
 	drawStart time.Time
 	gpu       *gpu.GPU
@@ -51,6 +41,12 @@ type Window struct {
 	delayedDraw  *time.Timer
 
 	queue Queue
+
+	callbacks callbacks
+}
+
+type callbacks struct {
+	w *Window
 }
 
 // Queue is an event.Queue implementation that distributes system events
@@ -62,18 +58,8 @@ type Queue struct {
 // driverEvent is sent when a new native driver
 // is available for the Window.
 type driverEvent struct {
-	driver *window
+	driver window.Driver
 }
-
-// driver is the interface for the platform implementation
-// of a Window.
-var _ interface {
-	// setAnimating sets the animation flag. When the window is animating,
-	// FrameEvents are delivered as fast as the display can handle them.
-	setAnimating(anim bool)
-	// showTextInput updates the virtual keyboard state.
-	showTextInput(show bool)
-} = (*window)(nil)
 
 // Pre-allocate the ack event to avoid garbage.
 var ackEvent event.Event
@@ -90,7 +76,7 @@ var ackEvent event.Event
 //
 // BUG: Calling NewWindow more than once is not yet supported.
 func NewWindow(options ...Option) *Window {
-	opts := &windowOptions{
+	opts := &window.Options{
 		Width:  unit.Dp(800),
 		Height: unit.Dp(600),
 		Title:  "Gio",
@@ -107,6 +93,7 @@ func NewWindow(options ...Option) *Window {
 		invalidates: make(chan struct{}, 1),
 		frames:      make(chan *op.Ops),
 	}
+	w.callbacks.w = w
 	go w.run(opts)
 	return w
 }
@@ -141,9 +128,9 @@ func (w *Window) draw(size image.Point, frame *op.Ops) {
 	now := time.Now()
 	switch w.queue.q.TextInputState() {
 	case input.TextInputOpen:
-		w.driver.showTextInput(true)
+		w.driver.ShowTextInput(true)
 	case input.TextInputClose:
-		w.driver.showTextInput(false)
+		w.driver.ShowTextInput(false)
 	}
 	frameDur := now.Sub(w.lastFrame)
 	frameDur = frameDur.Truncate(100 * time.Microsecond)
@@ -186,7 +173,7 @@ func (w *Window) updateAnimation() {
 	}
 	if animate != w.animating {
 		w.animating = animate
-		w.driver.setAnimating(animate)
+		w.driver.SetAnimating(animate)
 	}
 }
 
@@ -197,13 +184,13 @@ func (w *Window) setNextFrame(at time.Time) {
 	}
 }
 
-func (w *Window) setDriver(d *window) {
-	w.event(driverEvent{d})
+func (c *callbacks) SetDriver(d window.Driver) {
+	c.Event(driverEvent{d})
 }
 
-func (w *Window) event(e event.Event) {
-	w.in <- e
-	<-w.ack
+func (c *callbacks) Event(e event.Event) {
+	c.w.in <- e
+	<-c.w.ack
 }
 
 func (w *Window) waitAck() {
@@ -226,10 +213,10 @@ func (w *Window) destroy(err error) {
 	}
 }
 
-func (w *Window) run(opts *windowOptions) {
+func (w *Window) run(opts *window.Options) {
 	defer close(w.in)
 	defer close(w.out)
-	if err := createWindow(w, opts); err != nil {
+	if err := window.NewWindow(&w.callbacks, opts); err != nil {
 		w.out <- system.DestroyEvent{Err: err}
 		return
 	}
@@ -260,7 +247,7 @@ func (w *Window) run(opts *windowOptions) {
 				w.updateAnimation()
 				w.out <- e
 				w.waitAck()
-			case frameEvent:
+			case window.FrameEvent:
 				if e2.Size == (image.Point{}) {
 					panic(errors.New("internal error: zero-sized Draw"))
 				}
@@ -280,7 +267,7 @@ func (w *Window) run(opts *windowOptions) {
 				case w.out <- ackEvent:
 				}
 				if w.gpu != nil {
-					if e2.sync {
+					if e2.Sync {
 						w.gpu.Refresh()
 					}
 					if err := w.gpu.Flush(); err != nil {
@@ -290,7 +277,7 @@ func (w *Window) run(opts *windowOptions) {
 						return
 					}
 				} else {
-					ctx, err := newContext(w.driver)
+					ctx, err := w.driver.NewContext()
 					if err != nil {
 						w.destroy(err)
 						return
@@ -302,7 +289,7 @@ func (w *Window) run(opts *windowOptions) {
 					}
 				}
 				w.draw(e2.Size, frame)
-				if e2.sync {
+				if e2.Sync {
 					if err := w.gpu.Flush(); err != nil {
 						w.gpu.Release()
 						w.gpu = nil
@@ -337,7 +324,7 @@ func (q *Queue) Events(k event.Key) []event.Event {
 
 // Title sets the title of the window.
 func Title(t string) Option {
-	return func(opts *windowOptions) {
+	return func(opts *window.Options) {
 		opts.Title = t
 	}
 }
@@ -350,7 +337,7 @@ func Size(w, h unit.Value) Option {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
-	return func(opts *windowOptions) {
+	return func(opts *window.Options) {
 		opts.Width = w
 		opts.Height = h
 	}

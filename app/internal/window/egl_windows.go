@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package app
+package window
 
 import (
 	"os"
@@ -153,4 +153,8 @@ func (w *window) eglDisplay() _EGLNativeDisplayType {
 func (w *window) eglWindow(visID int) (_EGLNativeWindowType, int, int, error) {
 	hwnd, width, height := w.HWND()
 	return _EGLNativeWindowType(hwnd), width, height, nil
+}
+
+func (w *window) NewContext() (gl.Context, error) {
+	return newContext(w)
 }

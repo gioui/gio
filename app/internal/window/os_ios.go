@@ -2,7 +2,7 @@
 
 // +build darwin,ios
 
-package app
+package window
 
 /*
 #cgo CFLAGS: -fmodules -fobjc-arc -x objective-c
@@ -31,7 +31,7 @@ import (
 
 type window struct {
 	view C.CFTypeRef
-	w    *Window
+	w    Callbacks
 
 	layer   C.CFTypeRef
 	visible atomic.Value
@@ -57,12 +57,12 @@ func onCreate(view C.CFTypeRef) {
 	}
 	wopts := <-mainWindow.out
 	w.w = wopts.window
-	w.w.setDriver(w)
+	w.w.SetDriver(w)
 	w.visible.Store(false)
 	w.layer = C.CFTypeRef(layerFactory())
 	C.gio_addLayerToView(view, w.layer)
 	views[view] = w
-	w.w.event(system.StageEvent{Stage: system.StagePaused})
+	w.w.Event(system.StageEvent{Stage: system.StagePaused})
 }
 
 //export onDraw
@@ -75,13 +75,13 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int, to
 	w.visible.Store(true)
 	C.gio_updateView(view, w.layer)
 	if !wasVisible {
-		w.w.event(system.StageEvent{Stage: system.StageRunning})
+		w.w.Event(system.StageEvent{Stage: system.StageRunning})
 	}
 	isSync := false
 	if sync != 0 {
 		isSync = true
 	}
-	w.w.event(frameEvent{
+	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
 			Size: image.Point{
 				X: int(width + .5),
@@ -99,7 +99,7 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int, to
 				now:     time.Now(),
 			},
 		},
-		sync: isSync,
+		Sync: isSync,
 	})
 }
 
@@ -107,14 +107,14 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int, to
 func onStop(view C.CFTypeRef) {
 	w := views[view]
 	w.visible.Store(false)
-	w.w.event(system.StageEvent{Stage: system.StagePaused})
+	w.w.Event(system.StageEvent{Stage: system.StagePaused})
 }
 
 //export onDestroy
 func onDestroy(view C.CFTypeRef) {
 	w := views[view]
 	delete(views, view)
-	w.w.event(system.DestroyEvent{})
+	w.w.Event(system.DestroyEvent{})
 	C.gio_removeLayer(w.layer)
 	C.CFRelease(w.layer)
 	w.layer = 0
@@ -124,7 +124,7 @@ func onDestroy(view C.CFTypeRef) {
 //export onFocus
 func onFocus(view C.CFTypeRef, focus int) {
 	w := views[view]
-	w.w.event(key.FocusEvent{Focus: focus != 0})
+	w.w.Event(key.FocusEvent{Focus: focus != 0})
 }
 
 //export onLowMemory
@@ -161,7 +161,7 @@ func onDeleteBackward(view C.CFTypeRef) {
 //export onText
 func onText(view C.CFTypeRef, str *C.char) {
 	w := views[view]
-	w.w.event(key.EditEvent{
+	w.w.Event(key.EditEvent{
 		Text: C.GoString(str),
 	})
 }
@@ -184,7 +184,7 @@ func onTouch(last C.int, view, touchRef C.CFTypeRef, phase C.NSInteger, x, y C.C
 	w := views[view]
 	t := time.Duration(float64(ti) * float64(time.Second))
 	p := f32.Point{X: float32(x), Y: float32(y)}
-	w.w.event(pointer.Event{
+	w.w.Event(pointer.Event{
 		Type:      typ,
 		Source:    pointer.Touch,
 		PointerID: w.lookupTouch(last != 0, touchRef),
@@ -193,7 +193,7 @@ func onTouch(last C.int, view, touchRef C.CFTypeRef, phase C.NSInteger, x, y C.C
 	})
 }
 
-func (w *window) setAnimating(anim bool) {
+func (w *window) SetAnimating(anim bool) {
 	if w.view == 0 {
 		return
 	}
@@ -205,7 +205,7 @@ func (w *window) setAnimating(anim bool) {
 }
 
 func (w *window) onKeyCommand(name rune) {
-	w.w.event(key.Event{
+	w.w.Event(key.Event{
 		Name: name,
 	})
 }
@@ -238,7 +238,7 @@ func (w *window) isVisible() bool {
 	return w.visible.Load().(bool)
 }
 
-func (w *window) showTextInput(show bool) {
+func (w *window) ShowTextInput(show bool) {
 	if w.view == 0 {
 		return
 	}
@@ -249,10 +249,10 @@ func (w *window) showTextInput(show bool) {
 	}
 }
 
-func createWindow(win *Window, opts *windowOptions) error {
+func NewWindow(win Callbacks, opts *Options) error {
 	mainWindow.in <- windowAndOptions{win, opts}
 	return <-mainWindow.errs
 }
 
-func main() {
+func Main() {
 }

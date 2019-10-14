@@ -2,7 +2,7 @@
 
 // +build linux,!android
 
-package app
+package window
 
 import (
 	"bytes"
@@ -80,7 +80,7 @@ type repeatState struct {
 	delay time.Duration
 
 	key   uint32
-	win   *Window
+	win   Callbacks
 	stopC chan struct{}
 
 	start time.Duration
@@ -90,7 +90,7 @@ type repeatState struct {
 }
 
 type window struct {
-	w      *Window
+	w      Callbacks
 	disp   *C.struct_wl_display
 	surf   *C.struct_wl_surface
 	wmSurf *C.struct_xdg_surface
@@ -153,11 +153,11 @@ var (
 	outputConfig = make(map[*C.struct_wl_output]*wlOutput)
 )
 
-func main() {
+func Main() {
 	<-mainDone
 }
 
-func createWindow(window *Window, opts *windowOptions) error {
+func NewWindow(window Callbacks, opts *Options) error {
 	connMu.Lock()
 	defer connMu.Unlock()
 	if len(winMap) > 0 {
@@ -173,7 +173,7 @@ func createWindow(window *Window, opts *windowOptions) error {
 	}
 	w.w = window
 	go func() {
-		w.w.setDriver(w)
+		w.w.SetDriver(w)
 		w.loop()
 		w.destroy()
 		conn.destroy()
@@ -182,7 +182,7 @@ func createWindow(window *Window, opts *windowOptions) error {
 	return nil
 }
 
-func createNativeWindow(opts *windowOptions) (*window, error) {
+func createNativeWindow(opts *Options) (*window, error) {
 	pipe := make([]int, 2)
 	if err := syscall.Pipe2(pipe, syscall.O_NONBLOCK|syscall.O_CLOEXEC); err != nil {
 		return nil, fmt.Errorf("createNativeWindow: failed to create pipe: %v", err)
@@ -449,7 +449,7 @@ func gio_onTouchDown(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.
 		X: fromFixed(x) * float32(w.scale),
 		Y: fromFixed(y) * float32(w.scale),
 	}
-	w.w.event(pointer.Event{
+	w.w.Event(pointer.Event{
 		Type:      pointer.Press,
 		Source:    pointer.Touch,
 		Position:  w.lastTouch,
@@ -461,7 +461,7 @@ func gio_onTouchDown(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.
 //export gio_onTouchUp
 func gio_onTouchUp(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.uint32_t, id C.int32_t) {
 	w := winMap[touch]
-	w.w.event(pointer.Event{
+	w.w.Event(pointer.Event{
 		Type:      pointer.Release,
 		Source:    pointer.Touch,
 		Position:  w.lastTouch,
@@ -477,7 +477,7 @@ func gio_onTouchMotion(data unsafe.Pointer, touch *C.struct_wl_touch, t C.uint32
 		X: fromFixed(x) * float32(w.scale),
 		Y: fromFixed(y) * float32(w.scale),
 	}
-	w.w.event(pointer.Event{
+	w.w.Event(pointer.Event{
 		Type:      pointer.Move,
 		Position:  w.lastTouch,
 		Source:    pointer.Touch,
@@ -493,7 +493,7 @@ func gio_onTouchFrame(data unsafe.Pointer, touch *C.struct_wl_touch) {
 //export gio_onTouchCancel
 func gio_onTouchCancel(data unsafe.Pointer, touch *C.struct_wl_touch) {
 	w := winMap[touch]
-	w.w.event(pointer.Event{
+	w.w.Event(pointer.Event{
 		Type:   pointer.Cancel,
 		Source: pointer.Touch,
 	})
@@ -544,7 +544,7 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 	}
 	w.flushScroll()
 	w.resetFling()
-	w.w.event(pointer.Event{
+	w.w.Event(pointer.Event{
 		Type:     typ,
 		Source:   pointer.Mouse,
 		Position: w.lastPos,
@@ -645,14 +645,14 @@ func gio_onKeyboardEnter(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, se
 	conn.repeat.Stop(0)
 	w := winMap[surf]
 	winMap[keyboard] = w
-	w.w.event(key.FocusEvent{Focus: true})
+	w.w.Event(key.FocusEvent{Focus: true})
 }
 
 //export gio_onKeyboardLeave
 func gio_onKeyboardLeave(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial C.uint32_t, surf *C.struct_wl_surface) {
 	conn.repeat.Stop(0)
 	w := winMap[keyboard]
-	w.w.event(key.FocusEvent{Focus: false})
+	w.w.Event(key.FocusEvent{Focus: false})
 }
 
 //export gio_onKeyboardKey
@@ -666,7 +666,7 @@ func gio_onKeyboardKey(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, seri
 	}
 	kc := uint32(keyCode)
 	for _, e := range conn.xkb.DispatchKey(kc) {
-		w.w.event(e)
+		w.w.Event(e)
 	}
 	if conn.xkb.IsRepeatKey(kc) {
 		conn.repeat.Start(w, kc, t)
@@ -739,7 +739,7 @@ func (r *repeatState) Repeat() {
 			break
 		}
 		for _, e := range conn.xkb.DispatchKey(r.key) {
-			r.win.event(e)
+			r.win.Event(e)
 		}
 		r.last += delay
 	}
@@ -773,7 +773,7 @@ loop:
 			break
 		}
 		if w.dead {
-			w.w.event(system.DestroyEvent{Err: w.pendingErr})
+			w.w.Event(system.DestroyEvent{Err: w.pendingErr})
 			break
 		}
 		// Clear poll events.
@@ -809,7 +809,7 @@ loop:
 	}
 }
 
-func (w *window) setAnimating(anim bool) {
+func (w *window) SetAnimating(anim bool) {
 	w.mu.Lock()
 	w.animating = anim
 	animating := w.isAnimating()
@@ -924,7 +924,7 @@ func (w *window) flushScroll() {
 	if total == (f32.Point{}) {
 		return
 	}
-	w.w.event(pointer.Event{
+	w.w.Event(pointer.Event{
 		Type:     pointer.Move,
 		Source:   pointer.Mouse,
 		Position: w.lastPos,
@@ -945,7 +945,7 @@ func (w *window) onPointerMotion(x, y C.wl_fixed_t, t C.uint32_t) {
 		X: fromFixed(x) * float32(w.scale),
 		Y: fromFixed(y) * float32(w.scale),
 	}
-	w.w.event(pointer.Event{
+	w.w.Event(pointer.Event{
 		Type:     pointer.Move,
 		Position: w.lastPos,
 		Source:   pointer.Mouse,
@@ -1025,7 +1025,7 @@ func (w *window) draw(sync bool) {
 		C.gio_wl_callback_add_listener(w.lastFrameCallback, unsafe.Pointer(w.surf))
 	}
 	cfg.now = time.Now()
-	w.w.event(frameEvent{
+	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
 			Size: image.Point{
 				X: width,
@@ -1033,7 +1033,7 @@ func (w *window) draw(sync bool) {
 			},
 			Config: &cfg,
 		},
-		sync: sync,
+		Sync: sync,
 	})
 }
 
@@ -1042,7 +1042,7 @@ func (w *window) setStage(s system.Stage) {
 		return
 	}
 	w.stage = s
-	w.w.event(system.StageEvent{s})
+	w.w.Event(system.StageEvent{s})
 }
 
 func (w *window) display() *C.struct_wl_display {
@@ -1064,7 +1064,7 @@ func (w *window) surface() (*C.struct_wl_surface, int, int) {
 	return w.surf, width * scale, height * scale
 }
 
-func (w *window) showTextInput(show bool) {}
+func (w *window) ShowTextInput(show bool) {}
 
 // detectFontScale reports current font scale, or 1.0
 // if it fails.

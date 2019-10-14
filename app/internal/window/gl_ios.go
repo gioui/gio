@@ -2,7 +2,7 @@
 
 // +build darwin,ios
 
-package app
+package window
 
 /*
 #cgo CFLAGS: -fmodules -fobjc-arc -x objective-c
@@ -121,4 +121,8 @@ func (c *context) MakeCurrent() error {
 		return fmt.Errorf("framebuffer incomplete, status: %#x\n", st)
 	}
 	return nil
+}
+
+func (w *window) NewContext() (gl.Context, error) {
+	return newContext(w)
 }

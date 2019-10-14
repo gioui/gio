@@ -2,7 +2,7 @@
 
 // +build linux,!android
 
-package app
+package window
 
 import (
 	"errors"

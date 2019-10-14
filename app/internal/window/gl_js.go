@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package app
+package window
 
 import (
 	"errors"
@@ -88,4 +88,8 @@ func (c *context) MakeCurrent() error {
 		return err
 	}
 	return nil
+}
+
+func (w *window) NewContext() (gl.Context, error) {
+	return newContext(w)
 }

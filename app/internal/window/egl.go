@@ -2,7 +2,7 @@
 
 // +build linux windows
 
-package app
+package window
 
 import (
 	"errors"

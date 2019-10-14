@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package app
+package window
 
 import (
 	"image"
@@ -18,7 +18,7 @@ type window struct {
 	window                js.Value
 	cnv                   js.Value
 	tarea                 js.Value
-	w                     *Window
+	w                     Callbacks
 	redraw                js.Func
 	requestAnimationFrame js.Value
 	cleanfuncs            []func()
@@ -32,7 +32,7 @@ type window struct {
 
 var mainDone = make(chan struct{})
 
-func createWindow(win *Window, opts *windowOptions) error {
+func NewWindow(win Callbacks, opts *Options) error {
 	doc := js.Global().Get("document")
 	cont := getContainer(doc)
 	cnv := createCanvas(doc)
@@ -52,9 +52,9 @@ func createWindow(win *Window, opts *windowOptions) error {
 	w.addEventListeners()
 	w.w = win
 	go func() {
-		w.w.setDriver(w)
+		w.w.SetDriver(w)
 		w.focus()
-		w.w.event(system.StageEvent{Stage: system.StageRunning})
+		w.w.Event(system.StageEvent{Stage: system.StageRunning})
 		w.draw(true)
 		select {}
 		w.cleanup()
@@ -156,18 +156,18 @@ func (w *window) addEventListeners() {
 			w.touches[i] = js.Null()
 		}
 		w.touches = w.touches[:0]
-		w.w.event(pointer.Event{
+		w.w.Event(pointer.Event{
 			Type:   pointer.Cancel,
 			Source: pointer.Touch,
 		})
 		return nil
 	})
 	w.addEventListener(w.tarea, "focus", func(this js.Value, args []js.Value) interface{} {
-		w.w.event(key.FocusEvent{Focus: true})
+		w.w.Event(key.FocusEvent{Focus: true})
 		return nil
 	})
 	w.addEventListener(w.tarea, "blur", func(this js.Value, args []js.Value) interface{} {
-		w.w.event(key.FocusEvent{Focus: false})
+		w.w.Event(key.FocusEvent{Focus: false})
 		return nil
 	})
 	w.addEventListener(w.tarea, "keydown", func(this js.Value, args []js.Value) interface{} {
@@ -195,7 +195,7 @@ func (w *window) addEventListeners() {
 func (w *window) flushInput() {
 	val := w.tarea.Get("value").String()
 	w.tarea.Set("value", "")
-	w.w.event(key.EditEvent{Text: string(val)})
+	w.w.Event(key.EditEvent{Text: string(val)})
 }
 
 func (w *window) blur() {
@@ -216,7 +216,7 @@ func (w *window) keyEvent(e js.Value) {
 		if e.Call("getModifierState", "Shift").Bool() {
 			cmd.Modifiers |= key.ModShift
 		}
-		w.w.event(cmd)
+		w.w.Event(cmd)
 	}
 }
 
@@ -239,7 +239,7 @@ func (w *window) touchEvent(typ pointer.Type, e js.Value) {
 			X: float32(x) * scale,
 			Y: float32(y) * scale,
 		}
-		w.w.event(pointer.Event{
+		w.w.Event(pointer.Event{
 			Type:      typ,
 			Source:    pointer.Touch,
 			Position:  pos,
@@ -279,7 +279,7 @@ func (w *window) pointerEvent(typ pointer.Type, dx, dy float32, e js.Value) {
 		Y: dy * scale,
 	}
 	t := time.Duration(e.Get("timeStamp").Int()) * time.Millisecond
-	w.w.event(pointer.Event{
+	w.w.Event(pointer.Event{
 		Type:     typ,
 		Source:   pointer.Mouse,
 		Position: pos,
@@ -316,7 +316,7 @@ func (w *window) animCallback() {
 	}
 }
 
-func (w *window) setAnimating(anim bool) {
+func (w *window) SetAnimating(anim bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if anim && !w.animating {
@@ -325,7 +325,7 @@ func (w *window) setAnimating(anim bool) {
 	w.animating = anim
 }
 
-func (w *window) showTextInput(show bool) {
+func (w *window) ShowTextInput(show bool) {
 	// Run in a goroutine to avoid a deadlock if the
 	// focus change result in an event.
 	go func() {
@@ -346,7 +346,7 @@ func (w *window) draw(sync bool) {
 	w.scale = float32(scale)
 	w.mu.Unlock()
 	cfg.now = time.Now()
-	w.w.event(frameEvent{
+	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
 			Size: image.Point{
 				X: width,
@@ -354,7 +354,7 @@ func (w *window) draw(sync bool) {
 			},
 			Config: &cfg,
 		},
-		sync: sync,
+		Sync: sync,
 	})
 }
 
@@ -377,7 +377,7 @@ func (w *window) config() (int, int, float32, config) {
 	}
 }
 
-func main() {
+func Main() {
 	<-mainDone
 }
 

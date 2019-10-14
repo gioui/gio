@@ -5,21 +5,21 @@
 package app
 
 import "C"
-import "sync"
+
+import (
+	"sync"
+
+	"gioui.org/app/internal/window"
+)
 
 var (
 	dataDirOnce sync.Once
-	dataDirChan = make(chan string, 1)
 	dataPath    string
 )
 
 func dataDir() (string, error) {
 	dataDirOnce.Do(func() {
-		dataPath = <-dataDirChan
+		dataPath = window.GetDataDir()
 	})
 	return dataPath, nil
-}
-
-func setDataDir(dir string) {
-	dataDirChan <- dir
 }

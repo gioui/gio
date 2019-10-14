@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: Unlicense OR MIT
+
 // +build darwin,ios
 
-package app
+package window
 
 import "C"
 

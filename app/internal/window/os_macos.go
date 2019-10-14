@@ -2,7 +2,7 @@
 
 // +build darwin,!ios
 
-package app
+package window
 
 import (
 	"errors"
@@ -33,7 +33,7 @@ func init() {
 
 type window struct {
 	view  C.CFTypeRef
-	w     *Window
+	w     Callbacks
 	stage system.Stage
 	ppdp  float32
 	scale float32
@@ -81,9 +81,9 @@ func (w *window) contextView() C.CFTypeRef {
 	return w.view
 }
 
-func (w *window) showTextInput(show bool) {}
+func (w *window) ShowTextInput(show bool) {}
 
-func (w *window) setAnimating(anim bool) {
+func (w *window) SetAnimating(anim bool) {
 	var animb C.BOOL
 	if anim {
 		animb = 1
@@ -96,7 +96,7 @@ func (w *window) setStage(stage system.Stage) {
 		return
 	}
 	w.stage = stage
-	w.w.event(system.StageEvent{Stage: stage})
+	w.w.Event(system.StageEvent{Stage: stage})
 }
 
 // Use a top level func for onFrameCallback to avoid
@@ -129,7 +129,7 @@ func gio_onKeys(view C.CFTypeRef, cstr *C.char, ti C.double, mods C.NSUInteger) 
 		w := views[view]
 		for _, k := range str {
 			if n, ok := convertKey(k); ok {
-				w.w.event(key.Event{Name: n, Modifiers: kmods})
+				w.w.Event(key.Event{Name: n, Modifiers: kmods})
 			}
 		}
 	})
@@ -140,7 +140,7 @@ func gio_onText(view C.CFTypeRef, cstr *C.char) {
 	str := C.GoString(cstr)
 	viewDo(view, func(views viewMap, view C.CFTypeRef) {
 		w := views[view]
-		w.w.event(key.EditEvent{Text: str})
+		w.w.Event(key.EditEvent{Text: str})
 	})
 }
 
@@ -162,7 +162,7 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, x, y, dx, dy C.CGFloat, ti C.doub
 		w := views[view]
 		x, y := float32(x)*w.scale, float32(y)*w.scale
 		dx, dy := float32(dx)*w.scale, float32(dy)*w.scale
-		w.w.event(pointer.Event{
+		w.w.Event(pointer.Event{
 			Type:     typ,
 			Source:   pointer.Mouse,
 			Time:     t,
@@ -185,7 +185,7 @@ func gio_onDraw(view C.CFTypeRef) {
 func gio_onFocus(view C.CFTypeRef, focus C.BOOL) {
 	viewDo(view, func(views viewMap, view C.CFTypeRef) {
 		w := views[view]
-		w.w.event(key.FocusEvent{Focus: focus == C.YES})
+		w.w.Event(key.FocusEvent{Focus: focus == C.YES})
 	})
 }
 
@@ -200,7 +200,7 @@ func (w *window) draw(sync bool) {
 	cfg := configFor(w.ppdp, w.scale)
 	cfg.now = time.Now()
 	w.setStage(system.StageRunning)
-	w.w.event(frameEvent{
+	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
 			Size: image.Point{
 				X: width,
@@ -208,7 +208,7 @@ func (w *window) draw(sync bool) {
 			},
 			Config: &cfg,
 		},
-		sync: sync,
+		Sync: sync,
 	})
 }
 
@@ -234,7 +234,7 @@ func gio_onTerminate(view C.CFTypeRef) {
 	viewDo(view, func(views viewMap, view C.CFTypeRef) {
 		w := views[view]
 		delete(views, view)
-		w.w.event(system.DestroyEvent{})
+		w.w.Event(system.DestroyEvent{})
 	})
 }
 
@@ -265,17 +265,17 @@ func gio_onCreate(view C.CFTypeRef) {
 		}
 		wopts := <-mainWindow.out
 		w.w = wopts.window
-		w.w.setDriver(w)
+		w.w.SetDriver(w)
 		views[view] = w
 	})
 }
 
-func createWindow(win *Window, opts *windowOptions) error {
+func NewWindow(win Callbacks, opts *Options) error {
 	mainWindow.in <- windowAndOptions{win, opts}
 	return <-mainWindow.errs
 }
 
-func main() {
+func Main() {
 	wopts := <-mainWindow.out
 	view := viewFactory()
 	if view == 0 {

@@ -3,37 +3,10 @@
 package app
 
 import (
-	"errors"
-	"math"
 	"os"
 	"strings"
-	"time"
 
-	"gioui.org/unit"
-)
-
-type windowRendezvous struct {
-	in   chan windowAndOptions
-	out  chan windowAndOptions
-	errs chan error
-}
-
-type windowAndOptions struct {
-	window *Window
-	opts   *windowOptions
-}
-
-const (
-	inchPrDp = 1.0 / 160
-	mmPrDp   = 25.4 / 160
-	// monitorScale is the extra scale applied to
-	// monitor outputs to compensate for the extra
-	// viewing distance compared to phone and tables.
-	monitorScale = 1.20
-	// minDensity is the minimum pixels per dp to
-	// ensure font and ui legibility on low-dpi
-	// screens.
-	minDensity = 1.25
+	"gioui.org/app/internal/window"
 )
 
 // extraArgs contains extra arguments to append to
@@ -69,59 +42,5 @@ func DataDir() (string, error) {
 // require control of the main thread of the program for
 // running windows.
 func Main() {
-	main()
-}
-
-// config implements the system.Config interface.
-type config struct {
-	// Device pixels per dp.
-	pxPerDp float32
-	// Device pixels per sp.
-	pxPerSp float32
-	now     time.Time
-}
-
-func (c *config) Now() time.Time {
-	return c.now
-}
-
-func (c *config) Px(v unit.Value) int {
-	var r float32
-	switch v.U {
-	case unit.UnitPx:
-		r = v.V
-	case unit.UnitDp:
-		r = c.pxPerDp * v.V
-	case unit.UnitSp:
-		r = c.pxPerSp * v.V
-	default:
-		panic("unknown unit")
-	}
-	return int(math.Round(float64(r)))
-}
-
-func newWindowRendezvous() *windowRendezvous {
-	wr := &windowRendezvous{
-		in:   make(chan windowAndOptions),
-		out:  make(chan windowAndOptions),
-		errs: make(chan error),
-	}
-	go func() {
-		var main windowAndOptions
-		var out chan windowAndOptions
-		for {
-			select {
-			case w := <-wr.in:
-				var err error
-				if main.window != nil {
-					err = errors.New("multiple windows are not supported")
-				}
-				wr.errs <- err
-				main = w
-				out = wr.out
-			case out <- main:
-			}
-		}
-	}()
-	return wr
+	window.Main()
 }

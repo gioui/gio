@@ -2,7 +2,7 @@
 
 // +build darwin,!ios
 
-package app
+package window
 
 import (
 	"gioui.org/app/internal/gl"
@@ -71,4 +71,8 @@ func (c *context) MakeCurrent() error {
 	defer c.Unlock()
 	C.gio_makeCurrentContext(c.ctx)
 	return nil
+}
+
+func (w *window) NewContext() (gl.Context, error) {
+	return newContext(w)
 }

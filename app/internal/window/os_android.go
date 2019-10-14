@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package app
+package window
 
 /*
 #cgo LDFLAGS: -landroid
@@ -32,7 +32,7 @@ import (
 )
 
 type window struct {
-	*Window
+	callbacks Callbacks
 
 	view C.jobject
 
@@ -54,6 +54,8 @@ type window struct {
 	mpostFrameCallback             C.jmethodID
 	mpostFrameCallbackOnMainThread C.jmethodID
 }
+
+var dataDirChan = make(chan string, 1)
 
 var theJVM *C.JavaVM
 
@@ -85,9 +87,13 @@ func runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyteArray) {
 	}
 	n := C.gio_jni_GetArrayLength(env, jdataDir)
 	dataDir := C.GoStringN((*C.char)(unsafe.Pointer(dirBytes)), n)
-	setDataDir(dataDir)
+	dataDirChan <- dataDir
 	C.gio_jni_ReleaseByteArrayElements(env, jdataDir, dirBytes)
 	runMain()
+}
+
+func GetDataDir() string {
+	return <-dataDirChan
 }
 
 //export setJVM
@@ -108,8 +114,8 @@ func onCreateView(env *C.JNIEnv, class C.jclass, view C.jobject) C.jlong {
 		mpostFrameCallbackOnMainThread: jniGetMethodID(env, class, "postFrameCallbackOnMainThread", "()V"),
 	}
 	wopts := <-mainWindow.out
-	w.Window = wopts.window
-	w.Window.setDriver(w)
+	w.callbacks = wopts.window
+	w.callbacks.SetDriver(w)
 	handle := C.jlong(view)
 	views[handle] = w
 	w.loadConfig(env, class)
@@ -120,7 +126,7 @@ func onCreateView(env *C.JNIEnv, class C.jclass, view C.jobject) C.jlong {
 //export onDestroyView
 func onDestroyView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := views[handle]
-	w.setDriver(nil)
+	w.callbacks.SetDriver(nil)
 	delete(views, handle)
 	C.gio_jni_DeleteGlobalRef(env, w.view)
 	w.view = 0
@@ -201,7 +207,7 @@ func onFrameCallback(env *C.JNIEnv, class C.jclass, view C.jlong, nanos C.jlong)
 func onBack(env *C.JNIEnv, class C.jclass, view C.jlong) C.jboolean {
 	w := views[view]
 	ev := &system.CommandEvent{Type: system.CommandBack}
-	w.event(ev)
+	w.callbacks.Event(ev)
 	if ev.Cancel {
 		return C.JNI_TRUE
 	}
@@ -211,7 +217,7 @@ func onBack(env *C.JNIEnv, class C.jclass, view C.jlong) C.jboolean {
 //export onFocusChange
 func onFocusChange(env *C.JNIEnv, class C.jclass, view C.jlong, focus C.jboolean) {
 	w := views[view]
-	w.event(key.FocusEvent{Focus: focus == C.JNI_TRUE})
+	w.callbacks.Event(key.FocusEvent{Focus: focus == C.JNI_TRUE})
 }
 
 //export onWindowInsets
@@ -243,7 +249,7 @@ func (w *window) setStage(stage system.Stage) {
 		return
 	}
 	w.stage = stage
-	w.event(system.StageEvent{stage})
+	w.callbacks.Event(system.StageEvent{stage})
 }
 
 func (w *window) nativeWindow(visID int) (*C.ANativeWindow, int, int) {
@@ -279,7 +285,7 @@ func (w *window) loadConfig(env *C.JNIEnv, class C.jclass) {
 	}
 }
 
-func (w *window) setAnimating(anim bool) {
+func (w *window) SetAnimating(anim bool) {
 	w.mu.Lock()
 	w.animating = anim
 	w.mu.Unlock()
@@ -297,7 +303,7 @@ func (w *window) draw(sync bool) {
 		return
 	}
 	ppdp := float32(w.dpi) * inchPrDp
-	w.event(frameEvent{
+	w.callbacks.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
 			Size: image.Point{
 				X: int(width),
@@ -310,7 +316,7 @@ func (w *window) draw(sync bool) {
 				now:     time.Now(),
 			},
 		},
-		sync: sync,
+		Sync: sync,
 	})
 }
 
@@ -364,10 +370,10 @@ func convertKeyCode(code C.jint) (rune, bool) {
 func onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, keyCode, r C.jint, t C.jlong) {
 	w := views[handle]
 	if n, ok := convertKeyCode(keyCode); ok {
-		w.event(key.Event{Name: n})
+		w.callbacks.Event(key.Event{Name: n})
 	}
 	if r != 0 {
-		w.event(key.EditEvent{Text: string(rune(r))})
+		w.callbacks.Event(key.EditEvent{Text: string(rune(r))})
 	}
 }
 
@@ -396,7 +402,7 @@ func onTouchEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, action, pointer
 	default:
 		return
 	}
-	w.event(pointer.Event{
+	w.callbacks.Event(pointer.Event{
 		Type:      typ,
 		Source:    src,
 		PointerID: pointer.ID(pointerID),
@@ -405,7 +411,7 @@ func onTouchEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, action, pointer
 	})
 }
 
-func (w *window) showTextInput(show bool) {
+func (w *window) ShowTextInput(show bool) {
 	if w.view == 0 {
 		return
 	}
@@ -418,10 +424,10 @@ func (w *window) showTextInput(show bool) {
 	})
 }
 
-func main() {
+func Main() {
 }
 
-func createWindow(window *Window, opts *windowOptions) error {
+func NewWindow(window Callbacks, opts *Options) error {
 	mainWindow.in <- windowAndOptions{window, opts}
 	return <-mainWindow.errs
 }

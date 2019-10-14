@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: Unlicense OR MIT
+
 // +build android darwin,ios
 
-package app
+package window
 
 // Android only supports non-Java programs as c-shared libraries.
 // Unfortunately, Go does not run a program's main function in
