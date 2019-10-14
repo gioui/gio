@@ -25,6 +25,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/system"
 	"gioui.org/layout"
+	"gioui.org/op/paint"
 	"gioui.org/unit"
 
 	"github.com/google/go-github/v24/github"
@@ -191,7 +192,9 @@ func (a *App) fetchContributors() {
 		}()
 		go func() {
 			a, err := fetchImage(avatar)
-			u.avatar = a
+			if a != nil {
+				u.avatar = paint.NewImageOp(a)
+			}
 			userErrs <- err
 		}()
 	}
@@ -205,7 +208,7 @@ func (a *App) fetchContributors() {
 	}
 	// Drop users with no avatar or name.
 	for i := len(users) - 1; i >= 0; i-- {
-		if u := users[i]; u.name == "" || u.avatar == nil {
+		if u := users[i]; u.name == "" || u.avatar.Size() == (image.Point{}) {
 			users = append(users[:i], users[i+1:]...)
 		}
 	}

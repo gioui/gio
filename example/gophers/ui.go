@@ -61,7 +61,7 @@ type user struct {
 	name    string
 	login   string
 	company string
-	avatar  image.Image
+	avatar  paint.ImageOp
 }
 
 var theme *material.Theme
