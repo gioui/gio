@@ -4,9 +4,9 @@ package layout
 
 import (
 	"image"
-	"time"
 
 	"gioui.org/io/event"
+	"gioui.org/io/system"
 	"gioui.org/op"
 	"gioui.org/unit"
 )
@@ -53,18 +53,9 @@ type Context struct {
 	// operation.
 	Dimensions Dimensions
 
-	Config
+	system.Config
 	event.Queue
 	*op.Ops
-}
-
-// Config define the essential properties of
-// the environment.
-type Config interface {
-	// Now returns the current animation time.
-	Now() time.Time
-
-	unit.Converter
 }
 
 const (
@@ -104,7 +95,7 @@ func (s *Context) Layout(cs Constraints, w Widget) Dimensions {
 
 // Reset the context. The constraints' minimum and maximum values are
 // set to the size.
-func (c *Context) Reset(cfg Config, size image.Point) {
+func (c *Context) Reset(cfg system.Config, size image.Point) {
 	c.Constraints = RigidConstraints(size)
 	c.Dimensions = Dimensions{}
 	c.Config = cfg

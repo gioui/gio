@@ -25,6 +25,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
+	"gioui.org/io/system"
 	"gioui.org/unit"
 )
 
@@ -61,7 +62,7 @@ func onCreate(view C.CFTypeRef) {
 	w.layer = C.CFTypeRef(layerFactory())
 	C.gio_addLayerToView(view, w.layer)
 	views[view] = w
-	w.w.event(StageEvent{StagePaused})
+	w.w.event(system.StageEvent{Stage: system.StagePaused})
 }
 
 //export onDraw
@@ -74,27 +75,29 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int, to
 	w.visible.Store(true)
 	C.gio_updateView(view, w.layer)
 	if !wasVisible {
-		w.w.event(StageEvent{StageRunning})
+		w.w.event(system.StageEvent{Stage: system.StageRunning})
 	}
 	isSync := false
 	if sync != 0 {
 		isSync = true
 	}
-	w.w.event(FrameEvent{
-		Size: image.Point{
-			X: int(width + .5),
-			Y: int(height + .5),
-		},
-		Insets: Insets{
-			Top:    unit.Px(float32(top)),
-			Right:  unit.Px(float32(right)),
-			Bottom: unit.Px(float32(bottom)),
-			Left:   unit.Px(float32(left)),
-		},
-		Config: Config{
-			pxPerDp: float32(dpi) * inchPrDp,
-			pxPerSp: float32(sdpi) * inchPrDp,
-			now:     time.Now(),
+	w.w.event(frameEvent{
+		FrameEvent: system.FrameEvent{
+			Size: image.Point{
+				X: int(width + .5),
+				Y: int(height + .5),
+			},
+			Insets: system.Insets{
+				Top:    unit.Px(float32(top)),
+				Right:  unit.Px(float32(right)),
+				Bottom: unit.Px(float32(bottom)),
+				Left:   unit.Px(float32(left)),
+			},
+			Config: &config{
+				pxPerDp: float32(dpi) * inchPrDp,
+				pxPerSp: float32(sdpi) * inchPrDp,
+				now:     time.Now(),
+			},
 		},
 		sync: isSync,
 	})
@@ -104,14 +107,14 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int, to
 func onStop(view C.CFTypeRef) {
 	w := views[view]
 	w.visible.Store(false)
-	w.w.event(StageEvent{StagePaused})
+	w.w.event(system.StageEvent{Stage: system.StagePaused})
 }
 
 //export onDestroy
 func onDestroy(view C.CFTypeRef) {
 	w := views[view]
 	delete(views, view)
-	w.w.event(DestroyEvent{})
+	w.w.event(system.DestroyEvent{})
 	C.gio_removeLayer(w.layer)
 	C.CFRelease(w.layer)
 	w.layer = 0

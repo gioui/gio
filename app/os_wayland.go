@@ -21,6 +21,7 @@ import (
 	"gioui.org/internal/fling"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
+	"gioui.org/io/system"
 	syscall "golang.org/x/sys/unix"
 )
 
@@ -116,7 +117,7 @@ type window struct {
 		dir            f32.Point
 	}
 
-	stage             Stage
+	stage             system.Stage
 	dead              bool
 	pendingErr        error
 	lastFrameCallback *C.struct_wl_callback
@@ -302,7 +303,7 @@ func gio_onXdgSurfaceConfigure(data unsafe.Pointer, wmSurf *C.struct_xdg_surface
 	w.serial = serial
 	w.needAck = true
 	w.mu.Unlock()
-	w.setStage(StageRunning)
+	w.setStage(system.StageRunning)
 	w.draw(true)
 }
 
@@ -772,7 +773,7 @@ loop:
 			break
 		}
 		if w.dead {
-			w.w.event(DestroyEvent{Err: w.pendingErr})
+			w.w.event(system.DestroyEvent{Err: w.pendingErr})
 			break
 		}
 		// Clear poll events.
@@ -979,16 +980,16 @@ func (w *window) updateOutputs() {
 	}
 	w.mu.Unlock()
 	if !found {
-		w.setStage(StagePaused)
+		w.setStage(system.StagePaused)
 	} else {
-		w.setStage(StageRunning)
+		w.setStage(system.StageRunning)
 		w.draw(true)
 	}
 }
 
-func (w *window) config() (int, int, Config) {
+func (w *window) config() (int, int, config) {
 	width, height := w.width*w.scale, w.height*w.scale
-	return width, height, Config{
+	return width, height, config{
 		pxPerDp: w.ppdp * float32(w.scale),
 		pxPerSp: w.ppsp * float32(w.scale),
 	}
@@ -1015,7 +1016,7 @@ func (w *window) draw(sync bool) {
 		return
 	}
 	width, height, cfg := w.config()
-	if cfg == (Config{}) {
+	if cfg == (config{}) {
 		return
 	}
 	if animating && w.lastFrameCallback == nil {
@@ -1024,22 +1025,24 @@ func (w *window) draw(sync bool) {
 		C.gio_wl_callback_add_listener(w.lastFrameCallback, unsafe.Pointer(w.surf))
 	}
 	cfg.now = time.Now()
-	w.w.event(FrameEvent{
-		Size: image.Point{
-			X: width,
-			Y: height,
+	w.w.event(frameEvent{
+		FrameEvent: system.FrameEvent{
+			Size: image.Point{
+				X: width,
+				Y: height,
+			},
+			Config: &cfg,
 		},
-		Config: cfg,
-		sync:   sync,
+		sync: sync,
 	})
 }
 
-func (w *window) setStage(s Stage) {
+func (w *window) setStage(s system.Stage) {
 	if s == w.stage {
 		return
 	}
 	w.stage = s
-	w.w.event(StageEvent{s})
+	w.w.event(system.StageEvent{s})
 }
 
 func (w *window) display() *C.struct_wl_display {

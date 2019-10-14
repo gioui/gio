@@ -11,6 +11,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
+	"gioui.org/io/system"
 )
 
 type window struct {
@@ -53,7 +54,7 @@ func createWindow(win *Window, opts *windowOptions) error {
 	go func() {
 		w.w.setDriver(w)
 		w.focus()
-		w.w.event(StageEvent{StageRunning})
+		w.w.event(system.StageEvent{Stage: system.StageRunning})
 		w.draw(true)
 		select {}
 		w.cleanup()
@@ -338,24 +339,26 @@ func (w *window) showTextInput(show bool) {
 
 func (w *window) draw(sync bool) {
 	width, height, scale, cfg := w.config()
-	if cfg == (Config{}) {
+	if cfg == (config{}) {
 		return
 	}
 	w.mu.Lock()
 	w.scale = float32(scale)
 	w.mu.Unlock()
 	cfg.now = time.Now()
-	w.w.event(FrameEvent{
-		Size: image.Point{
-			X: width,
-			Y: height,
+	w.w.event(frameEvent{
+		FrameEvent: system.FrameEvent{
+			Size: image.Point{
+				X: width,
+				Y: height,
+			},
+			Config: &cfg,
 		},
-		Config: cfg,
-		sync:   sync,
+		sync: sync,
 	})
 }
 
-func (w *window) config() (int, int, float32, Config) {
+func (w *window) config() (int, int, float32, config) {
 	rect := w.cnv.Call("getBoundingClientRect")
 	width, height := rect.Get("width").Float(), rect.Get("height").Float()
 	scale := w.window.Get("devicePixelRatio").Float()
@@ -368,7 +371,7 @@ func (w *window) config() (int, int, float32, Config) {
 		w.cnv.Set("height", ih)
 	}
 	const ppdp = 96 * inchPrDp * monitorScale
-	return iw, ih, float32(scale), Config{
+	return iw, ih, float32(scale), config{
 		pxPerDp: ppdp * float32(scale),
 		pxPerSp: ppdp * float32(scale),
 	}

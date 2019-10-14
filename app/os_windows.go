@@ -17,6 +17,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
+	"gioui.org/io/system"
 )
 
 var winMap = make(map[syscall.Handle]*window)
@@ -60,7 +61,7 @@ type window struct {
 	w      *Window
 	width  int
 	height int
-	stage  Stage
+	stage  system.Stage
 	dead   bool
 
 	mu        sync.Mutex
@@ -183,7 +184,7 @@ func createWindow(window *Window, opts *windowOptions) error {
 		defer delete(winMap, w.hwnd)
 		w.w = window
 		w.w.setDriver(w)
-		defer w.w.event(DestroyEvent{})
+		defer w.w.event(system.DestroyEvent{})
 		showWindow(w.hwnd, _SW_SHOWDEFAULT)
 		setForegroundWindow(w.hwnd)
 		setFocus(w.hwnd)
@@ -326,9 +327,9 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case _WM_SIZE:
 		switch wParam {
 		case _SIZE_MINIMIZED:
-			w.setStage(StagePaused)
+			w.setStage(system.StagePaused)
 		case _SIZE_MAXIMIZED, _SIZE_RESTORED:
-			w.setStage(StageRunning)
+			w.setStage(system.StageRunning)
 			w.draw(true)
 		}
 	}
@@ -395,9 +396,9 @@ func (w *window) postRedraw() {
 	}
 }
 
-func (w *window) setStage(s Stage) {
+func (w *window) setStage(s system.Stage) {
 	w.stage = s
-	w.w.event(StageEvent{s})
+	w.w.event(system.StageEvent{Stage: s})
 }
 
 func (w *window) draw(sync bool) {
@@ -407,13 +408,15 @@ func (w *window) draw(sync bool) {
 	w.height = int(r.bottom - r.top)
 	cfg := configForDC(w.hdc)
 	cfg.now = time.Now()
-	w.w.event(FrameEvent{
-		Size: image.Point{
-			X: w.width,
-			Y: w.height,
+	w.w.event(frameEvent{
+		FrameEvent: system.FrameEvent{
+			Size: image.Point{
+				X: w.width,
+				Y: w.height,
+			},
+			Config: &cfg,
 		},
-		Config: cfg,
-		sync:   sync,
+		sync: sync,
 	})
 }
 
@@ -474,14 +477,14 @@ func convertKeyCode(code uintptr) (rune, bool) {
 	return r, true
 }
 
-func configForDC(hdc syscall.Handle) Config {
+func configForDC(hdc syscall.Handle) config {
 	dpi := getDeviceCaps(hdc, _LOGPIXELSX)
 	ppdp := float32(dpi) * inchPrDp * monitorScale
 	// Force a minimum density to keep text legible and to handle bogus output geometry.
 	if ppdp < minDensity {
 		ppdp = minDensity
 	}
-	return Config{
+	return config{
 		pxPerDp: ppdp,
 		pxPerSp: ppdp,
 	}

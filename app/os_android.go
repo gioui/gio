@@ -27,6 +27,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
+	"gioui.org/io/system"
 	"gioui.org/unit"
 )
 
@@ -37,9 +38,9 @@ type window struct {
 
 	dpi       int
 	fontScale float32
-	insets    Insets
+	insets    system.Insets
 
-	stage   Stage
+	stage   system.Stage
 	started bool
 
 	mu        sync.Mutex
@@ -112,7 +113,7 @@ func onCreateView(env *C.JNIEnv, class C.jclass, view C.jobject) C.jlong {
 	handle := C.jlong(view)
 	views[handle] = w
 	w.loadConfig(env, class)
-	w.setStage(StagePaused)
+	w.setStage(system.StagePaused)
 	return handle
 }
 
@@ -129,7 +130,7 @@ func onDestroyView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 func onStopView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := views[handle]
 	w.started = false
-	w.setStage(StagePaused)
+	w.setStage(system.StagePaused)
 }
 
 //export onStartView
@@ -147,7 +148,7 @@ func onSurfaceDestroyed(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w.mu.Lock()
 	w.win = nil
 	w.mu.Unlock()
-	w.setStage(StagePaused)
+	w.setStage(system.StagePaused)
 }
 
 //export onSurfaceChanged
@@ -171,7 +172,7 @@ func onLowMemory() {
 func onConfigurationChanged(env *C.JNIEnv, class C.jclass, view C.jlong) {
 	w := views[view]
 	w.loadConfig(env, class)
-	if w.stage >= StageRunning {
+	if w.stage >= system.StageRunning {
 		w.draw(true)
 	}
 }
@@ -182,7 +183,7 @@ func onFrameCallback(env *C.JNIEnv, class C.jclass, view C.jlong, nanos C.jlong)
 	if !exist {
 		return
 	}
-	if w.stage < StageRunning {
+	if w.stage < system.StageRunning {
 		return
 	}
 	w.mu.Lock()
@@ -199,7 +200,7 @@ func onFrameCallback(env *C.JNIEnv, class C.jclass, view C.jlong, nanos C.jlong)
 //export onBack
 func onBack(env *C.JNIEnv, class C.jclass, view C.jlong) C.jboolean {
 	w := views[view]
-	ev := &CommandEvent{Type: CommandBack}
+	ev := &system.CommandEvent{Type: system.CommandBack}
 	w.event(ev)
 	if ev.Cancel {
 		return C.JNI_TRUE
@@ -216,13 +217,13 @@ func onFocusChange(env *C.JNIEnv, class C.jclass, view C.jlong, focus C.jboolean
 //export onWindowInsets
 func onWindowInsets(env *C.JNIEnv, class C.jclass, view C.jlong, top, right, bottom, left C.jint) {
 	w := views[view]
-	w.insets = Insets{
+	w.insets = system.Insets{
 		Top:    unit.Px(float32(top)),
 		Right:  unit.Px(float32(right)),
 		Bottom: unit.Px(float32(bottom)),
 		Left:   unit.Px(float32(left)),
 	}
-	if w.stage >= StageRunning {
+	if w.stage >= system.StageRunning {
 		w.draw(true)
 	}
 }
@@ -233,16 +234,16 @@ func (w *window) setVisible() {
 	if width == 0 || height == 0 {
 		return
 	}
-	w.setStage(StageRunning)
+	w.setStage(system.StageRunning)
 	w.draw(true)
 }
 
-func (w *window) setStage(stage Stage) {
+func (w *window) setStage(stage system.Stage) {
 	if stage == w.stage {
 		return
 	}
 	w.stage = stage
-	w.event(StageEvent{stage})
+	w.event(system.StageEvent{stage})
 }
 
 func (w *window) nativeWindow(visID int) (*C.ANativeWindow, int, int) {
@@ -296,16 +297,18 @@ func (w *window) draw(sync bool) {
 		return
 	}
 	ppdp := float32(w.dpi) * inchPrDp
-	w.event(FrameEvent{
-		Size: image.Point{
-			X: int(width),
-			Y: int(height),
-		},
-		Insets: w.insets,
-		Config: Config{
-			pxPerDp: ppdp,
-			pxPerSp: w.fontScale * ppdp,
-			now:     time.Now(),
+	w.event(frameEvent{
+		FrameEvent: system.FrameEvent{
+			Size: image.Point{
+				X: int(width),
+				Y: int(height),
+			},
+			Insets: w.insets,
+			Config: &config{
+				pxPerDp: ppdp,
+				pxPerSp: w.fontScale * ppdp,
+				now:     time.Now(),
+			},
 		},
 		sync: sync,
 	})

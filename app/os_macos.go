@@ -4,13 +4,6 @@
 
 package app
 
-/*
-#cgo CFLAGS: -DGL_SILENCE_DEPRECATION -Werror -Wno-deprecated-declarations -fmodules -fobjc-arc -x objective-c
-
-#include <AppKit/AppKit.h>
-#include "os_macos.h"
-*/
-import "C"
 import (
 	"errors"
 	"image"
@@ -22,7 +15,16 @@ import (
 	"gioui.org/f32"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
+	"gioui.org/io/system"
 )
+
+/*
+#cgo CFLAGS: -DGL_SILENCE_DEPRECATION -Werror -Wno-deprecated-declarations -fmodules -fobjc-arc -x objective-c
+
+#include <AppKit/AppKit.h>
+#include "os_macos.h"
+*/
+import "C"
 
 func init() {
 	// Darwin requires that UI operations happen on the main thread only.
@@ -32,7 +34,7 @@ func init() {
 type window struct {
 	view  C.CFTypeRef
 	w     *Window
-	stage Stage
+	stage system.Stage
 	ppdp  float32
 	scale float32
 }
@@ -89,12 +91,12 @@ func (w *window) setAnimating(anim bool) {
 	C.gio_setAnimating(w.view, animb)
 }
 
-func (w *window) setStage(stage Stage) {
+func (w *window) setStage(stage system.Stage) {
 	if stage == w.stage {
 		return
 	}
 	w.stage = stage
-	w.w.event(StageEvent{stage})
+	w.w.event(system.StageEvent{Stage: stage})
 }
 
 // Use a top level func for onFrameCallback to avoid
@@ -197,14 +199,16 @@ func (w *window) draw(sync bool) {
 	height := int(hf*w.scale + .5)
 	cfg := configFor(w.ppdp, w.scale)
 	cfg.now = time.Now()
-	w.setStage(StageRunning)
-	w.w.event(FrameEvent{
-		Size: image.Point{
-			X: width,
-			Y: height,
+	w.setStage(system.StageRunning)
+	w.w.event(frameEvent{
+		FrameEvent: system.FrameEvent{
+			Size: image.Point{
+				X: width,
+				Y: height,
+			},
+			Config: &cfg,
 		},
-		Config: cfg,
-		sync:   sync,
+		sync: sync,
 	})
 }
 
@@ -217,9 +221,9 @@ func getPixelsPerDp(scale float32) float32 {
 	return ppdp / scale
 }
 
-func configFor(ppdp, scale float32) Config {
+func configFor(ppdp, scale float32) config {
 	ppdp = ppdp * scale
-	return Config{
+	return config{
 		pxPerDp: ppdp,
 		pxPerSp: ppdp,
 	}
@@ -230,7 +234,7 @@ func gio_onTerminate(view C.CFTypeRef) {
 	viewDo(view, func(views viewMap, view C.CFTypeRef) {
 		w := views[view]
 		delete(views, view)
-		w.w.event(DestroyEvent{})
+		w.w.event(system.DestroyEvent{})
 	})
 }
 
@@ -238,7 +242,7 @@ func gio_onTerminate(view C.CFTypeRef) {
 func gio_onHide(view C.CFTypeRef) {
 	viewDo(view, func(views viewMap, view C.CFTypeRef) {
 		w := views[view]
-		w.setStage(StagePaused)
+		w.setStage(system.StagePaused)
 	})
 }
 
@@ -246,7 +250,7 @@ func gio_onHide(view C.CFTypeRef) {
 func gio_onShow(view C.CFTypeRef) {
 	viewDo(view, func(views viewMap, view C.CFTypeRef) {
 		w := views[view]
-		w.setStage(StageRunning)
+		w.setStage(system.StageRunning)
 	})
 }
 

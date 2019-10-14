@@ -12,6 +12,7 @@ import (
 	"gioui.org/app/internal/input"
 	"gioui.org/io/event"
 	"gioui.org/io/profile"
+	"gioui.org/io/system"
 	"gioui.org/op"
 	"gioui.org/unit"
 )
@@ -22,6 +23,12 @@ type Option func(opts *windowOptions)
 type windowOptions struct {
 	Width, Height unit.Value
 	Title         string
+}
+
+type frameEvent struct {
+	system.FrameEvent
+
+	sync bool
 }
 
 // Window represents an operating system window.
@@ -37,7 +44,7 @@ type Window struct {
 	invalidates chan struct{}
 	frames      chan *op.Ops
 
-	stage        Stage
+	stage        system.Stage
 	animating    bool
 	hasNextFrame bool
 	nextFrame    time.Time
@@ -170,7 +177,7 @@ func (w *Window) updateAnimation() {
 		w.delayedDraw.Stop()
 		w.delayedDraw = nil
 	}
-	if w.stage >= StageRunning && w.hasNextFrame {
+	if w.stage >= system.StageRunning && w.hasNextFrame {
 		if dt := time.Until(w.nextFrame); dt <= 0 {
 			animate = true
 		} else {
@@ -210,10 +217,10 @@ func (w *Window) waitAck() {
 func (w *Window) destroy(err error) {
 	// Ack the current event.
 	w.ack <- struct{}{}
-	w.out <- DestroyEvent{err}
+	w.out <- system.DestroyEvent{Err: err}
 	for e := range w.in {
 		w.ack <- struct{}{}
-		if _, ok := e.(DestroyEvent); ok {
+		if _, ok := e.(system.DestroyEvent); ok {
 			return
 		}
 	}
@@ -223,7 +230,7 @@ func (w *Window) run(opts *windowOptions) {
 	defer close(w.in)
 	defer close(w.out)
 	if err := createWindow(w, opts); err != nil {
-		w.out <- DestroyEvent{err}
+		w.out <- system.DestroyEvent{Err: err}
 		return
 	}
 	for {
@@ -240,9 +247,9 @@ func (w *Window) run(opts *windowOptions) {
 			w.updateAnimation()
 		case e := <-w.in:
 			switch e2 := e.(type) {
-			case StageEvent:
+			case system.StageEvent:
 				if w.gpu != nil {
-					if e2.Stage < StageRunning {
+					if e2.Stage < system.StageRunning {
 						w.gpu.Release()
 						w.gpu = nil
 					} else {
@@ -253,18 +260,18 @@ func (w *Window) run(opts *windowOptions) {
 				w.updateAnimation()
 				w.out <- e
 				w.waitAck()
-			case FrameEvent:
+			case frameEvent:
 				if e2.Size == (image.Point{}) {
 					panic(errors.New("internal error: zero-sized Draw"))
 				}
-				if w.stage < StageRunning {
+				if w.stage < system.StageRunning {
 					// No drawing if not visible.
 					break
 				}
 				w.drawStart = time.Now()
 				w.hasNextFrame = false
 				e2.Frame = w.update
-				w.out <- e2
+				w.out <- e2.FrameEvent
 				var frame *op.Ops
 				// Wait for either a frame or the ack event,
 				// which meant that the client didn't draw.
@@ -303,12 +310,12 @@ func (w *Window) run(opts *windowOptions) {
 						return
 					}
 				}
-			case *CommandEvent:
+			case *system.CommandEvent:
 				w.out <- e
 				w.waitAck()
 			case driverEvent:
 				w.driver = e2.driver
-			case DestroyEvent:
+			case system.DestroyEvent:
 				w.out <- e2
 				w.ack <- struct{}{}
 				return
