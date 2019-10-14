@@ -18,7 +18,6 @@ import (
 	"gioui.org/internal/ops"
 	"gioui.org/op"
 	"gioui.org/op/paint"
-	"golang.org/x/image/draw"
 )
 
 type GPU struct {
@@ -79,9 +78,9 @@ type drawState struct {
 	rect  bool
 	z     int
 
-	// Current ImageOp image and rect, if any.
-	img     image.Image
-	imgRect image.Rectangle
+	// Current ImageOp image and size, if any.
+	img     *image.RGBA
+	imgSize image.Point
 	// Current ColorOp, if any.
 	color color.RGBA
 }
@@ -119,7 +118,7 @@ type material struct {
 	uvOffset f32.Point
 }
 
-// clipOp is the shadow of draw.ClipOp.
+// clipOp is the shadow of paint.ClipOp.
 type clipOp struct {
 	bounds f32.Rectangle
 }
@@ -144,25 +143,16 @@ func (op *clipOp) decode(data []byte) {
 	}
 }
 
-func decodeImageOp(data []byte, refs []interface{}) paint.ImageOp {
+func decodeImageOp(data []byte, refs []interface{}) (*image.RGBA, image.Point) {
 	bo := binary.LittleEndian
 	if opconst.OpType(data[0]) != opconst.TypeImage {
 		panic("invalid op")
 	}
-	sr := image.Rectangle{
-		Min: image.Point{
-			X: int(int32(bo.Uint32(data[1:]))),
-			Y: int(int32(bo.Uint32(data[5:]))),
-		},
-		Max: image.Point{
-			X: int(int32(bo.Uint32(data[9:]))),
-			Y: int(int32(bo.Uint32(data[13:]))),
-		},
+	sz := image.Point{
+		X: int(int32(bo.Uint32(data[1:]))),
+		Y: int(int32(bo.Uint32(data[5:]))),
 	}
-	return paint.ImageOp{
-		Src:  refs[0].(image.Image),
-		Rect: sr,
-	}
+	return refs[0].(*image.RGBA), sz
 }
 
 func decodeColorOp(data []byte) paint.ColorOp {
@@ -206,7 +196,7 @@ type resource interface {
 }
 
 type texture struct {
-	src image.Image
+	src *image.RGBA
 	id  gl.Texture
 }
 
@@ -737,9 +727,7 @@ loop:
 			state.img = nil
 			state.color = op.Color
 		case opconst.TypeImage:
-			op := decodeImageOp(encOp.Data, encOp.Refs)
-			state.img = op.Src
-			state.imgRect = op.Rect
+			state.img, state.imgSize = decodeImageOp(encOp.Data, encOp.Refs)
 		case opconst.TypePaint:
 			op := decodePaintOp(encOp.Data)
 			off := state.t.Transform(f32.Point{})
@@ -801,14 +789,12 @@ func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f3
 		m.material = materialColor
 		m.color = gamma(d.color.RGBA())
 		m.opaque = m.color[3] == 1.0
-	} else if uniform, ok := d.img.(*image.Uniform); ok {
-		m.material = materialColor
-		m.color = gamma(uniform.RGBA())
-		m.opaque = m.color[3] == 1.0
 	} else {
 		m.material = materialTexture
 		dr := boundRectF(rect.Add(off))
-		sr := d.imgRect
+		sr := image.Rectangle{
+			Max: d.imgSize,
+		}
 		if dx := dr.Dx(); dx != 0 {
 			// Don't clip 1 px width sources.
 			if sdx := sr.Dx(); sdx > 1 {
@@ -908,25 +894,18 @@ func (r *renderer) drawOps(ops []imageOp) {
 	r.ctx.Disable(gl.DEPTH_TEST)
 }
 
-func (r *renderer) uploadTexture(img image.Image) {
+func (r *renderer) uploadTexture(img *image.RGBA) {
 	var pixels []byte
 	b := img.Bounds()
 	w, h := b.Dx(), b.Dy()
-	switch img := img.(type) {
-	case *image.RGBA:
-		if img.Stride == w*4 {
-			start := (b.Min.X + b.Min.Y*w) * 4
-			end := (b.Max.X + (b.Max.Y-1)*w) * 4
-			pixels = img.Pix[start:end]
-		} else {
-			pixels = copyImage(img, b).Pix
-		}
-	default:
-		pixels = copyImage(img, b).Pix
+	if img.Stride != w*4 {
+		panic("unsupported stride")
 	}
+	start := (b.Min.X + b.Min.Y*w) * 4
+	end := (b.Max.X + (b.Max.Y-1)*w) * 4
+	pixels = img.Pix[start:end]
 	tt := r.ctx.caps.srgbaTriple
 	r.ctx.TexImage2D(gl.TEXTURE_2D, 0, tt.internalFormat, w, h, tt.format, tt.typ, pixels)
-
 }
 
 func gamma(r, g, b, a uint32) [4]float32 {
@@ -1006,12 +985,6 @@ func createTexture(ctx *context) gl.Texture {
 	ctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 	ctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 	return tex
-}
-
-func copyImage(img image.Image, r image.Rectangle) *image.RGBA {
-	tmp := image.NewRGBA(r)
-	draw.Draw(tmp, r, img, r.Min, draw.Src)
-	return tmp
 }
 
 const blitVSrc = `

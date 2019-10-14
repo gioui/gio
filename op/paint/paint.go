@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"image"
 	"image/color"
+	"image/draw"
 	"math"
 
 	"gioui.org/f32"
@@ -13,16 +14,12 @@ import (
 	"gioui.org/op"
 )
 
-// ImageOp sets the material to a section of an
-// image.
+// ImageOp sets the material to an image.
 type ImageOp struct {
-	// Src is the image. Note that once a particular image.Image has
-	// been used by an ImageOp, updating the image contents might not
-	// be reflected in the rendered image. Use a new image.Image
-	// instead.
-	Src image.Image
-	// Rect defines the section of Src to use.
-	Rect image.Rectangle
+	uniform bool
+	color   color.RGBA
+	src     *image.RGBA
+	size    image.Point
 }
 
 // ColorOp sets the material to a constant color.
@@ -36,15 +33,45 @@ type PaintOp struct {
 	Rect f32.Rectangle
 }
 
+func NewImageOp(src image.Image) ImageOp {
+	switch src := src.(type) {
+	case *image.Uniform:
+		col := color.RGBAModel.Convert(src.C).(color.RGBA)
+		return ImageOp{
+			uniform: true,
+			color:   col,
+		}
+	default:
+		sz := src.Bounds().Size()
+		// Copy the image into a GPU friendly format.
+		dst := image.NewRGBA(image.Rectangle{
+			Max: sz,
+		})
+		draw.Draw(dst, src.Bounds(), src, image.Point{}, draw.Src)
+		return ImageOp{
+			src:  dst,
+			size: sz,
+		}
+	}
+}
+
+func (i ImageOp) Size() image.Point {
+	return i.size
+}
+
 func (i ImageOp) Add(o *op.Ops) {
+	if i.uniform {
+		ColorOp{
+			Color: i.color,
+		}.Add(o)
+		return
+	}
 	data := make([]byte, opconst.TypeImageLen)
 	data[0] = byte(opconst.TypeImage)
 	bo := binary.LittleEndian
-	bo.PutUint32(data[1:], uint32(i.Rect.Min.X))
-	bo.PutUint32(data[5:], uint32(i.Rect.Min.Y))
-	bo.PutUint32(data[9:], uint32(i.Rect.Max.X))
-	bo.PutUint32(data[13:], uint32(i.Rect.Max.Y))
-	o.Write(data, i.Src)
+	bo.PutUint32(data[1:], uint32(i.size.X))
+	bo.PutUint32(data[5:], uint32(i.size.Y))
+	o.Write(data, i.src)
 }
 
 func (c ColorOp) Add(o *op.Ops) {

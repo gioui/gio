@@ -41,7 +41,7 @@ type Icon struct {
 	size unit.Value
 
 	// Cached values.
-	img     image.Image
+	op      paint.ImageOp
 	imgSize int
 }
 
@@ -112,9 +112,11 @@ func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
 		layout.UniformInset(b.Padding).Layout(gtx, func() {
 			size := gtx.Px(b.Size) - gtx.Px(b.Padding)
 			ico := b.Icon.image(size)
-			paint.ImageOp{Src: ico, Rect: ico.Bounds()}.Add(gtx.Ops)
+			ico.Add(gtx.Ops)
 			paint.PaintOp{
-				Rect: toRectF(ico.Bounds()),
+				Rect: f32.Rectangle{
+					Max: toPointF(ico.Size()),
+				},
 			}.Add(gtx.Ops)
 			gtx.Dimensions = layout.Dimensions{
 				Size: image.Point{X: size, Y: size},
@@ -143,9 +145,9 @@ func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
 	st.Layout(gtx, bg, ico)
 }
 
-func (ic *Icon) image(sz int) image.Image {
+func (ic *Icon) image(sz int) paint.ImageOp {
 	if sz == ic.imgSize {
-		return ic.img
+		return ic.op
 	}
 	m, _ := iconvg.DecodeMetadata(ic.src)
 	dx, dy := m.ViewBox.AspectRatio()
@@ -157,15 +159,19 @@ func (ic *Icon) image(sz int) image.Image {
 	iconvg.Decode(&ico, ic.src, &iconvg.DecodeOptions{
 		Palette: &m.Palette,
 	})
-	ic.img = img
+	ic.op = paint.NewImageOp(img)
 	ic.imgSize = sz
-	return img
+	return ic.op
+}
+
+func toPointF(p image.Point) f32.Point {
+	return f32.Point{X: float32(p.X), Y: float32(p.Y)}
 }
 
 func toRectF(r image.Rectangle) f32.Rectangle {
 	return f32.Rectangle{
-		Min: f32.Point{X: float32(r.Min.X), Y: float32(r.Min.Y)},
-		Max: f32.Point{X: float32(r.Max.X), Y: float32(r.Max.Y)},
+		Min: toPointF(r.Min),
+		Max: toPointF(r.Max),
 	}
 }
 

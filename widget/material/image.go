@@ -15,8 +15,6 @@ import (
 type Image struct {
 	// Src is the image to display.
 	Src image.Image
-	// Rect is the source rectangle.
-	Rect image.Rectangle
 	// Scale is the ratio of image pixels to
 	// dps.
 	Scale float32
@@ -25,7 +23,6 @@ type Image struct {
 func (t *Theme) Image(img image.Image) Image {
 	return Image{
 		Src:   img,
-		Rect:  img.Bounds(),
 		Scale: 160 / 72, // About 72 DPI.
 	}
 }
@@ -47,7 +44,7 @@ func (im Image) Layout(gtx *layout.Context) {
 	dr := f32.Rectangle{
 		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
 	}
-	paint.ImageOp{Src: im.Src, Rect: im.Rect}.Add(gtx.Ops)
+	paint.NewImageOp(im.Src).Add(gtx.Ops)
 	paint.PaintOp{Rect: dr}.Add(gtx.Ops)
 	gtx.Dimensions = layout.Dimensions{Size: d, Baseline: d.Y}
 }
