@@ -78,10 +78,6 @@ type Ops struct {
 
 	stackDepth int
 	macroDepth int
-
-	inAux  bool
-	auxOff int
-	auxLen int
 }
 
 // StackOp can save and restore the operation state
@@ -150,7 +146,6 @@ func (s *StackOp) Pop() {
 
 // Reset the Ops, preparing it for re-use.
 func (o *Ops) Reset() {
-	o.inAux = false
 	o.stackDepth = 0
 	// Leave references to the GC.
 	for i := range o.refs {
@@ -161,62 +156,30 @@ func (o *Ops) Reset() {
 	o.version++
 }
 
-// Internal use only.
+// Data is for internal use only.
 func (o *Ops) Data() []byte {
 	return o.data
 }
 
-// Internal use only.
+// Refs is for internal use only.
 func (o *Ops) Refs() []interface{} {
 	return o.refs
 }
 
-// Internal use only.
+// PC is for internal use only.
+func (o *Ops) PC() int {
+	return o.pc().data
+}
+
+// Version is for internal use only.
 func (o *Ops) Version() int {
 	return o.version
 }
 
-// Internal use only.
-func (o *Ops) Aux() []byte {
-	if !o.inAux {
-		return nil
-	}
-	aux := o.data[o.auxOff+opconst.TypeAuxLen:]
-	return aux[:o.auxLen]
-}
-
-func (d *Ops) write(op []byte, refs ...interface{}) {
-	d.data = append(d.data, op...)
-	d.refs = append(d.refs, refs...)
-}
-
-// Internal use only.
+// Write is for internal use only.
 func (o *Ops) Write(op []byte, refs ...interface{}) {
-	t := opconst.OpType(op[0])
-	if len(refs) != t.NumRefs() {
-		panic("invalid ref count")
-	}
-	switch t {
-	case opconst.TypeAux:
-		// Write only the data.
-		op = op[1:]
-		if !o.inAux {
-			o.inAux = true
-			o.auxOff = o.pc().data
-			o.auxLen = 0
-			header := make([]byte, opconst.TypeAuxLen)
-			header[0] = byte(opconst.TypeAux)
-			o.write(header)
-		}
-		o.auxLen += len(op)
-	default:
-		o.endAux()
-	}
-	o.write(op, refs...)
-}
-
-func (o *Ops) endAux() {
-	o.inAux = false
+	o.data = append(o.data, op...)
+	o.refs = append(o.refs, refs...)
 }
 
 func (o *Ops) pc() pc {
@@ -242,7 +205,6 @@ func (m *MacroOp) Stop() {
 	if !m.recording {
 		panic("not recording")
 	}
-	m.ops.endAux()
 	m.ops.macroDepth--
 	m.recording = false
 	m.fill()

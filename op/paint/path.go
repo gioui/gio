@@ -19,6 +19,7 @@ import (
 // supplied to Begin.
 type Path struct {
 	ops       *op.Ops
+	pc        int
 	firstVert int
 	nverts    int
 	maxy      float32
@@ -50,6 +51,8 @@ func (p ClipOp) Add(o *op.Ops) {
 func (p *Path) Begin(ops *op.Ops) {
 	p.ops = ops
 	p.macro.Record(ops)
+	ops.Write([]byte{byte(opconst.TypeAux)})
+	p.pc = ops.PC()
 }
 
 // MoveTo moves the pen to the given position.
@@ -62,7 +65,7 @@ func (p *Path) Move(to f32.Point) {
 
 // end completes the current contour.
 func (p *Path) end() {
-	aux := p.ops.Aux()
+	aux := p.ops.Data()[p.pc:]
 	bo := binary.LittleEndian
 	// Fill in maximal Y coordinates of the NW and NE corners.
 	for i := p.firstVert; i < p.nverts; i++ {
@@ -246,20 +249,19 @@ func (p *Path) vertex(cornerx, cornery int16, ctrl, to f32.Point) {
 		ToX:     to.X,
 		ToY:     to.Y,
 	}
-	data := make([]byte, path.VertStride+1)
-	data[0] = byte(opconst.TypeAux)
+	data := make([]byte, path.VertStride)
 	bo := binary.LittleEndian
-	data[1] = byte(uint16(v.CornerX))
-	data[2] = byte(uint16(v.CornerX) >> 8)
-	data[3] = byte(uint16(v.CornerY))
-	data[4] = byte(uint16(v.CornerY) >> 8)
-	bo.PutUint32(data[5:], math.Float32bits(v.MaxY))
-	bo.PutUint32(data[9:], math.Float32bits(v.FromX))
-	bo.PutUint32(data[13:], math.Float32bits(v.FromY))
-	bo.PutUint32(data[17:], math.Float32bits(v.CtrlX))
-	bo.PutUint32(data[21:], math.Float32bits(v.CtrlY))
-	bo.PutUint32(data[25:], math.Float32bits(v.ToX))
-	bo.PutUint32(data[29:], math.Float32bits(v.ToY))
+	data[0] = byte(uint16(v.CornerX))
+	data[1] = byte(uint16(v.CornerX) >> 8)
+	data[2] = byte(uint16(v.CornerY))
+	data[3] = byte(uint16(v.CornerY) >> 8)
+	bo.PutUint32(data[6:], math.Float32bits(v.MaxY))
+	bo.PutUint32(data[8:], math.Float32bits(v.FromX))
+	bo.PutUint32(data[12:], math.Float32bits(v.FromY))
+	bo.PutUint32(data[16:], math.Float32bits(v.CtrlX))
+	bo.PutUint32(data[20:], math.Float32bits(v.CtrlY))
+	bo.PutUint32(data[24:], math.Float32bits(v.ToX))
+	bo.PutUint32(data[28:], math.Float32bits(v.ToY))
 	p.ops.Write(data)
 }
 
