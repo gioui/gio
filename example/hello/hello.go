@@ -9,6 +9,7 @@ import (
 	"log"
 
 	"gioui.org/app"
+	"gioui.org/io/system"
 	_ "gioui.org/font/gofont"
 	"gioui.org/layout"
 	"gioui.org/text"
@@ -33,10 +34,10 @@ func loop(w *app.Window) error {
 	for {
 		e := <-w.Events()
 		switch e := e.(type) {
-		case app.DestroyEvent:
+		case system.DestroyEvent:
 			return e.Err
-		case app.FrameEvent:
-			gtx.Reset(&e.Config, e.Size)
+		case system.FrameEvent:
+			gtx.Reset(e.Config, e.Size)
 			l := th.H1("Hello, Gio")
 			maroon := color.RGBA{127, 0, 0, 255}
 			l.Color = maroon

@@ -12,6 +12,7 @@ import (
 	"gioui.org/layout"
 	"gioui.org/text"
 	"gioui.org/unit"
+	"gioui.org/io/system"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
@@ -42,10 +43,10 @@ func loop(w *app.Window) error {
 	for {
 		e := <-w.Events()
 		switch e := e.(type) {
-		case app.DestroyEvent:
+		case system.DestroyEvent:
 			return e.Err
-		case app.FrameEvent:
-			gtx.Reset(&e.Config, e.Size)
+		case system.FrameEvent:
+			gtx.Reset(e.Config, e.Size)
 			kitchen(gtx, th)
 			e.Frame(gtx.Ops)
 		}

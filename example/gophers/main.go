@@ -23,6 +23,7 @@ import (
 	"gioui.org/app"
 	"gioui.org/gesture"
 	"gioui.org/io/key"
+	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/unit"
 
@@ -100,10 +101,10 @@ func (a *App) run() error {
 						a.w.Invalidate()
 					}
 				}
-			case app.DestroyEvent:
+			case system.DestroyEvent:
 				return e.Err
-			case app.StageEvent:
-				if e.Stage >= app.StageRunning {
+			case system.StageEvent:
+				if e.Stage >= system.StageRunning {
 					if a.ctxCancel == nil {
 						a.ctx, a.ctxCancel = context.WithCancel(context.Background())
 					}
@@ -116,17 +117,17 @@ func (a *App) run() error {
 						a.ctxCancel = nil
 					}
 				}
-			case *app.CommandEvent:
+			case *system.CommandEvent:
 				switch e.Type {
-				case app.CommandBack:
+				case system.CommandBack:
 					if a.ui.selectedUser != nil {
 						a.ui.selectedUser = nil
 						e.Cancel = true
 						a.w.Invalidate()
 					}
 				}
-			case app.FrameEvent:
-				gtx.Reset(&e.Config, e.Size)
+			case system.FrameEvent:
+				gtx.Reset(e.Config, e.Size)
 				a.ui.Layout(gtx)
 				e.Frame(gtx.Ops)
 			}
