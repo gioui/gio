@@ -11,11 +11,13 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	"unsafe"
 
 	"gioui.org/app/internal/gl"
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
+	"gioui.org/internal/path"
 	"gioui.org/op"
 	"gioui.org/op/paint"
 )
@@ -698,6 +700,14 @@ loop:
 			state.t = state.t.Multiply(op.TransformOp(dop))
 		case opconst.TypeAux:
 			aux = encOp.Data[opconst.TypeAuxLen:]
+			// The first data byte stores whether the MaxY
+			// fields have been initialized.
+			maxyFilled := aux[0] == 1
+			aux[0] = 1
+			aux = aux[1:]
+			if !maxyFilled {
+				fillMaxY(aux)
+			}
 			auxKey = encOp.Key
 		case opconst.TypeClip:
 			var op clipOp
@@ -985,6 +995,47 @@ func createTexture(ctx *context) gl.Texture {
 	ctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 	ctx.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 	return tex
+}
+
+// Fill in maximal Y coordinates of the NW and NE corners.
+func fillMaxY(verts []byte) {
+	contour := 0
+	bo := binary.LittleEndian
+	for len(verts) > 0 {
+		maxy := float32(math.Inf(-1))
+		i := 0
+		for ; i+path.VertStride*4 <= len(verts); i += path.VertStride * 4 {
+			vert := verts[i : i+path.VertStride]
+			// MaxY contains the integer contour index.
+			pathContour := int(bo.Uint32(vert[int(unsafe.Offsetof(((*path.Vertex)(nil)).MaxY)):]))
+			if contour != pathContour {
+				contour = pathContour
+				break
+			}
+			fromy := math.Float32frombits(bo.Uint32(vert[int(unsafe.Offsetof(((*path.Vertex)(nil)).FromY)):]))
+			ctrly := math.Float32frombits(bo.Uint32(vert[int(unsafe.Offsetof(((*path.Vertex)(nil)).CtrlY)):]))
+			toy := math.Float32frombits(bo.Uint32(vert[int(unsafe.Offsetof(((*path.Vertex)(nil)).ToY)):]))
+			if fromy > maxy {
+				maxy = fromy
+			}
+			if ctrly > maxy {
+				maxy = ctrly
+			}
+			if toy > maxy {
+				maxy = toy
+			}
+		}
+		fillContourMaxY(maxy, verts[:i])
+		verts = verts[i:]
+	}
+}
+
+func fillContourMaxY(maxy float32, verts []byte) {
+	bo := binary.LittleEndian
+	for i := 0; i < len(verts); i += path.VertStride {
+		off := int(unsafe.Offsetof(((*path.Vertex)(nil)).MaxY))
+		bo.PutUint32(verts[i+off:], math.Float32bits(maxy))
+	}
 }
 
 const blitVSrc = `

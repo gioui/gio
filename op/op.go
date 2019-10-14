@@ -166,11 +166,6 @@ func (o *Ops) Refs() []interface{} {
 	return o.refs
 }
 
-// PC is for internal use only.
-func (o *Ops) PC() int {
-	return o.pc().data
-}
-
 // Version is for internal use only.
 func (o *Ops) Version() int {
 	return o.version

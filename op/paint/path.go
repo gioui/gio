@@ -5,7 +5,6 @@ package paint
 import (
 	"encoding/binary"
 	"math"
-	"unsafe"
 
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
@@ -19,10 +18,7 @@ import (
 // supplied to Begin.
 type Path struct {
 	ops       *op.Ops
-	pc        int
-	firstVert int
-	nverts    int
-	maxy      float32
+	contour   int
 	pen       f32.Point
 	bounds    f32.Rectangle
 	hasBounds bool
@@ -51,28 +47,22 @@ func (p ClipOp) Add(o *op.Ops) {
 func (p *Path) Begin(ops *op.Ops) {
 	p.ops = ops
 	p.macro.Record(ops)
-	ops.Write([]byte{byte(opconst.TypeAux)})
-	p.pc = ops.PC()
+	// Write the TypeAux opcode and a byte for marking whether the
+	// path has had its MaxY filled out. If not, the gpu will fill it
+	// before using it.
+	ops.Write([]byte{byte(opconst.TypeAux), 0})
 }
 
 // MoveTo moves the pen to the given position.
 func (p *Path) Move(to f32.Point) {
 	p.end()
 	to = to.Add(p.pen)
-	p.maxy = to.Y
 	p.pen = to
 }
 
 // end completes the current contour.
 func (p *Path) end() {
-	aux := p.ops.Data()[p.pc:]
-	bo := binary.LittleEndian
-	// Fill in maximal Y coordinates of the NW and NE corners.
-	for i := p.firstVert; i < p.nverts; i++ {
-		off := path.VertStride*i + int(unsafe.Offsetof(((*path.Vertex)(nil)).MaxY))
-		bo.PutUint32(aux[off:], math.Float32bits(p.maxy))
-	}
-	p.firstVert = p.nverts
+	p.contour++
 }
 
 // Line records a line from the pen to end.
@@ -238,7 +228,6 @@ func (p *Path) expand(b f32.Rectangle) {
 }
 
 func (p *Path) vertex(cornerx, cornery int16, ctrl, to f32.Point) {
-	p.nverts++
 	v := path.Vertex{
 		CornerX: cornerx,
 		CornerY: cornery,
@@ -255,7 +244,8 @@ func (p *Path) vertex(cornerx, cornery int16, ctrl, to f32.Point) {
 	data[1] = byte(uint16(v.CornerX) >> 8)
 	data[2] = byte(uint16(v.CornerY))
 	data[3] = byte(uint16(v.CornerY) >> 8)
-	bo.PutUint32(data[6:], math.Float32bits(v.MaxY))
+	// Put the contour index in MaxY.
+	bo.PutUint32(data[4:], uint32(p.contour))
 	bo.PutUint32(data[8:], math.Float32bits(v.FromX))
 	bo.PutUint32(data[12:], math.Float32bits(v.FromY))
 	bo.PutUint32(data[16:], math.Float32bits(v.CtrlX))
@@ -266,15 +256,6 @@ func (p *Path) vertex(cornerx, cornery int16, ctrl, to f32.Point) {
 }
 
 func (p *Path) simpleQuadTo(ctrl, to f32.Point) {
-	if p.pen.Y > p.maxy {
-		p.maxy = p.pen.Y
-	}
-	if ctrl.Y > p.maxy {
-		p.maxy = ctrl.Y
-	}
-	if to.Y > p.maxy {
-		p.maxy = to.Y
-	}
 	// NW.
 	p.vertex(-1, 1, ctrl, to)
 	// NE.
