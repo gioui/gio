@@ -2,7 +2,7 @@
 
 // +build darwin,ios
 
-package app
+package log
 
 /*
 #include "log_ios.h"

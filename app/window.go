@@ -16,6 +16,8 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/op"
 	"gioui.org/unit"
+
+	_ "gioui.org/app/internal/log"
 )
 
 // WindowOption configures a Window.

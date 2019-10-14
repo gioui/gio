@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package app
+package log
 
 /*
 #cgo LDFLAGS: -llog
