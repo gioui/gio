@@ -2,7 +2,10 @@
 
 // +build !android
 
-package app
+// Package xkb implements a Go interface for the X Keyboard Extension library.
+package xkb
+
+import "gioui.org/io/event"
 
 /*
 #cgo LDFLAGS: -lxkbcommon
@@ -25,7 +28,7 @@ import (
 	"gioui.org/io/key"
 )
 
-type xkb struct {
+type Context struct {
 	ctx       *C.struct_xkb_context
 	keyMap    *C.struct_xkb_keymap
 	state     *C.struct_xkb_state
@@ -39,7 +42,7 @@ var (
 	_XKB_MOD_NAME_SHIFT = []byte("Shift\x00")
 )
 
-func (x *xkb) Destroy() {
+func (x *Context) Destroy() {
 	if x.state != nil {
 		C.xkb_compose_state_unref(x.compState)
 		x.compState = nil
@@ -62,11 +65,11 @@ func (x *xkb) Destroy() {
 	}
 }
 
-func newXKB(format C.uint32_t, fd C.int32_t, size C.uint32_t) (*xkb, error) {
-	xkb := &xkb{
+func New(format int, fd int, size int) (*Context, error) {
+	ctx := &Context{
 		ctx: C.xkb_context_new(C.XKB_CONTEXT_NO_FLAGS),
 	}
-	if xkb.ctx == nil {
+	if ctx.ctx == nil {
 		return nil, errors.New("newXKB: xkb_context_new failed")
 	}
 	locale := os.Getenv("LC_ALL")
@@ -81,36 +84,36 @@ func newXKB(format C.uint32_t, fd C.int32_t, size C.uint32_t) (*xkb, error) {
 	}
 	cloc := C.CString(locale)
 	defer C.free(unsafe.Pointer(cloc))
-	xkb.compTable = C.xkb_compose_table_new_from_locale(xkb.ctx, cloc, C.XKB_COMPOSE_COMPILE_NO_FLAGS)
-	if xkb.compTable == nil {
-		xkb.Destroy()
+	ctx.compTable = C.xkb_compose_table_new_from_locale(ctx.ctx, cloc, C.XKB_COMPOSE_COMPILE_NO_FLAGS)
+	if ctx.compTable == nil {
+		ctx.Destroy()
 		return nil, errors.New("newXKB: xkb_compose_table_new_from_locale failed")
 	}
-	xkb.compState = C.xkb_compose_state_new(xkb.compTable, C.XKB_COMPOSE_STATE_NO_FLAGS)
-	if xkb.compState == nil {
-		xkb.Destroy()
+	ctx.compState = C.xkb_compose_state_new(ctx.compTable, C.XKB_COMPOSE_STATE_NO_FLAGS)
+	if ctx.compState == nil {
+		ctx.Destroy()
 		return nil, errors.New("newXKB: xkb_compose_state_new failed")
 	}
 	mapData, err := syscall.Mmap(int(fd), 0, int(size), syscall.PROT_READ, syscall.MAP_SHARED)
 	if err != nil {
-		xkb.Destroy()
+		ctx.Destroy()
 		return nil, fmt.Errorf("newXKB: mmap of keymap failed: %v", err)
 	}
 	defer syscall.Munmap(mapData)
-	xkb.keyMap = C.xkb_keymap_new_from_buffer(xkb.ctx, (*C.char)(unsafe.Pointer(&mapData[0])), C.size_t(size-1), C.XKB_KEYMAP_FORMAT_TEXT_V1, C.XKB_KEYMAP_COMPILE_NO_FLAGS)
-	if xkb.keyMap == nil {
-		xkb.Destroy()
+	ctx.keyMap = C.xkb_keymap_new_from_buffer(ctx.ctx, (*C.char)(unsafe.Pointer(&mapData[0])), C.size_t(size-1), C.XKB_KEYMAP_FORMAT_TEXT_V1, C.XKB_KEYMAP_COMPILE_NO_FLAGS)
+	if ctx.keyMap == nil {
+		ctx.Destroy()
 		return nil, errors.New("newXKB: xkb_keymap_new_from_buffer failed")
 	}
-	xkb.state = C.xkb_state_new(xkb.keyMap)
-	if xkb.state == nil {
-		xkb.Destroy()
+	ctx.state = C.xkb_state_new(ctx.keyMap)
+	if ctx.state == nil {
+		ctx.Destroy()
 		return nil, errors.New("newXKB: xkb_state_new failed")
 	}
-	return xkb, nil
+	return ctx, nil
 }
 
-func (x *xkb) dispatchKey(w *Window, keyCode C.uint32_t) {
+func (x *Context) DispatchKey(keyCode uint32) (events []event.Event) {
 	keyCode = mapXKBKeyCode(keyCode)
 	if len(x.utf8Buf) == 0 {
 		x.utf8Buf = make([]byte, 1)
@@ -124,7 +127,7 @@ func (x *xkb) dispatchKey(w *Window, keyCode C.uint32_t) {
 		if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_SHIFT[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
 			cmd.Modifiers |= key.ModShift
 		}
-		w.event(cmd)
+		events = append(events, cmd)
 	}
 	C.xkb_compose_state_feed(x.compState, sym)
 	var size C.int
@@ -158,21 +161,22 @@ func (x *xkb) dispatchKey(w *Window, keyCode C.uint32_t) {
 		}
 	}
 	if len(str) > 0 {
-		w.event(key.EditEvent{Text: string(str)})
+		events = append(events, key.EditEvent{Text: string(str)})
 	}
+	return
 }
 
-func (x *xkb) isRepeatKey(keyCode C.uint32_t) bool {
+func (x *Context) IsRepeatKey(keyCode uint32) bool {
 	keyCode = mapXKBKeyCode(keyCode)
 	return C.xkb_keymap_key_repeats(x.keyMap, C.xkb_keycode_t(keyCode)) == 1
 }
 
-func (x *xkb) updateMask(depressed, latched, locked, group C.uint32_t) {
+func (x *Context) UpdateMask(depressed, latched, locked, group uint32) {
 	xkbGrp := C.xkb_layout_index_t(group)
 	C.xkb_state_update_mask(x.state, C.xkb_mod_mask_t(depressed), C.xkb_mod_mask_t(latched), C.xkb_mod_mask_t(locked), xkbGrp, xkbGrp, xkbGrp)
 }
 
-func mapXKBKeyCode(keyCode C.uint32_t) C.uint32_t {
+func mapXKBKeyCode(keyCode uint32) uint32 {
 	// According to the xkb_v1 spec: "to determine the xkb keycode, clients must add 8 to the key event keycode."
 	return keyCode + 8
 }

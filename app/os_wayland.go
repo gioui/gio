@@ -16,6 +16,7 @@ import (
 	"time"
 	"unsafe"
 
+	"gioui.org/app/internal/xkb"
 	"gioui.org/f32"
 	"gioui.org/internal/fling"
 	"gioui.org/io/key"
@@ -68,7 +69,7 @@ type wlConn struct {
 	pointer  *C.struct_wl_pointer
 	touch    *C.struct_wl_touch
 	keyboard *C.struct_wl_keyboard
-	xkb      *xkb
+	xkb      *xkb.Context
 
 	repeat repeatState
 }
@@ -77,7 +78,7 @@ type repeatState struct {
 	rate  int
 	delay time.Duration
 
-	key   C.uint32_t
+	key   uint32
 	win   *Window
 	stopC chan struct{}
 
@@ -630,7 +631,7 @@ func gio_onKeyboardKeymap(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, f
 	if format != C.WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 {
 		return
 	}
-	xkb, err := newXKB(format, fd, size)
+	xkb, err := xkb.New(int(format), int(fd), int(size))
 	if err != nil {
 		// TODO: Do better.
 		panic(err)
@@ -662,13 +663,16 @@ func gio_onKeyboardKey(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, seri
 	if state != C.WL_KEYBOARD_KEY_STATE_PRESSED || conn.xkb == nil {
 		return
 	}
-	conn.xkb.dispatchKey(w.w, keyCode)
-	if conn.xkb.isRepeatKey(keyCode) {
-		conn.repeat.Start(w, keyCode, t)
+	kc := uint32(keyCode)
+	for _, e := range conn.xkb.DispatchKey(kc) {
+		w.w.event(e)
+	}
+	if conn.xkb.IsRepeatKey(kc) {
+		conn.repeat.Start(w, kc, t)
 	}
 }
 
-func (r *repeatState) Start(w *window, keyCode C.uint32_t, t time.Duration) {
+func (r *repeatState) Start(w *window, keyCode uint32, t time.Duration) {
 	if r.rate <= 0 {
 		return
 	}
@@ -733,7 +737,9 @@ func (r *repeatState) Repeat() {
 		if r.last+delay > now {
 			break
 		}
-		conn.xkb.dispatchKey(r.win, r.key)
+		for _, e := range conn.xkb.DispatchKey(r.key) {
+			r.win.event(e)
+		}
 		r.last += delay
 	}
 }
@@ -852,7 +858,7 @@ func gio_onKeyboardModifiers(data unsafe.Pointer, keyboard *C.struct_wl_keyboard
 	if conn.xkb == nil {
 		return
 	}
-	conn.xkb.updateMask(depressed, latched, locked, group)
+	conn.xkb.UpdateMask(uint32(depressed), uint32(latched), uint32(locked), uint32(group))
 }
 
 //export gio_onKeyboardRepeatInfo
