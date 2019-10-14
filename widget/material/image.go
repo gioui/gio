@@ -14,13 +14,13 @@ import (
 // Image is a widget that displays an image.
 type Image struct {
 	// Src is the image to display.
-	Src image.Image
+	Src paint.ImageOp
 	// Scale is the ratio of image pixels to
 	// dps.
 	Scale float32
 }
 
-func (t *Theme) Image(img image.Image) Image {
+func (t *Theme) Image(img paint.ImageOp) Image {
 	return Image{
 		Src:   img,
 		Scale: 160 / 72, // About 72 DPI.
@@ -28,8 +28,8 @@ func (t *Theme) Image(img image.Image) Image {
 }
 
 func (im Image) Layout(gtx *layout.Context) {
-	size := im.Src.Bounds()
-	wf, hf := float32(size.Dx()), float32(size.Dy())
+	size := im.Src.Size()
+	wf, hf := float32(size.X), float32(size.Y)
 	w, h := gtx.Px(unit.Dp(wf*im.Scale)), gtx.Px(unit.Dp(hf*im.Scale))
 	cs := gtx.Constraints
 	d := image.Point{X: cs.Width.Constrain(w), Y: cs.Height.Constrain(h)}
@@ -44,7 +44,7 @@ func (im Image) Layout(gtx *layout.Context) {
 	dr := f32.Rectangle{
 		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
 	}
-	paint.NewImageOp(im.Src).Add(gtx.Ops)
+	im.Src.Add(gtx.Ops)
 	paint.PaintOp{Rect: dr}.Add(gtx.Ops)
 	gtx.Dimensions = layout.Dimensions{Size: d, Baseline: d.Y}
 }
