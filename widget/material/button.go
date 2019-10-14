@@ -162,20 +162,6 @@ func (ic *Icon) image(sz int) image.Image {
 	return img
 }
 
-func fab(gtx *layout.Context, ico image.Image, col color.RGBA, size int) {
-	dp := image.Point{X: (size - ico.Bounds().Dx()) / 2, Y: (size - ico.Bounds().Dy()) / 2}
-	dims := image.Point{X: size, Y: size}
-	rr := float32(size) * .5
-	rrect(gtx.Ops, float32(size), float32(size), rr, rr, rr, rr)
-	paint.ColorOp{Color: col}.Add(gtx.Ops)
-	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(size), Y: float32(size)}}}.Add(gtx.Ops)
-	paint.ImageOp{Src: ico, Rect: ico.Bounds()}.Add(gtx.Ops)
-	paint.PaintOp{
-		Rect: toRectF(ico.Bounds().Add(dp)),
-	}.Add(gtx.Ops)
-	gtx.Dimensions = layout.Dimensions{Size: dims}
-}
-
 func toRectF(r image.Rectangle) f32.Rectangle {
 	return f32.Rectangle{
 		Min: f32.Point{X: float32(r.Min.X), Y: float32(r.Min.Y)},
