@@ -48,10 +48,15 @@ The MacroOp records a list of operations to be executed later:
 
 	ops := new(op.Ops)
 	var macro op.MacroOp
-	macro.Record()
+	macro.Record(ops)
 	// Record operations by adding them.
 	op.InvalidateOp{}.Add(ops)
 	...
+	// End recording.
+	macro.Stop()
+
+	// replay the recorded operations by calling Add:
+	macro.Add(ops)
 
 */
 package op
