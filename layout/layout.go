@@ -217,7 +217,7 @@ func (a Align) Layout(gtx *Context, w Widget) {
 	stack.Pop()
 	gtx.Dimensions = Dimensions{
 		Size:     sz,
-		Baseline: dims.Baseline,
+		Baseline: dims.Baseline + p.Y,
 	}
 }
 
