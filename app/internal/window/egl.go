@@ -220,18 +220,25 @@ func createContext(disp _EGLNativeDisplayType) (*eglContext, error) {
 	if eglCfg == nilEGLConfig {
 		return nil, errors.New("eglChooseConfig returned 0 configs")
 	}
-	var eglCtx _EGLContext
+	visID, ret := eglGetConfigAttrib(eglDisp, eglCfg, _EGL_NATIVE_VISUAL_ID)
+	if !ret {
+		return nil, errors.New("newContext: eglGetConfigAttrib for _EGL_NATIVE_VISUAL_ID failed")
+	}
 	ctxAttribs := []_EGLint{
 		_EGL_CONTEXT_CLIENT_VERSION, 3,
 		_EGL_NONE,
 	}
-	eglCtx = eglCreateContext(eglDisp, eglCfg, nilEGLContext, ctxAttribs)
+	eglCtx := eglCreateContext(eglDisp, eglCfg, nilEGLContext, ctxAttribs)
 	if eglCtx == nilEGLContext {
-		return nil, fmt.Errorf("eglCreateContext failed: 0x%x", eglGetError())
-	}
-	visID, ret := eglGetConfigAttrib(eglDisp, eglCfg, _EGL_NATIVE_VISUAL_ID)
-	if !ret {
-		return nil, errors.New("newContext: eglGetConfigAttrib for _EGL_NATIVE_VISUAL_ID failed")
+		// Fall back to OpenGL ES 2 and rely on extensions.
+		ctxAttribs := []_EGLint{
+			_EGL_CONTEXT_CLIENT_VERSION, 2,
+			_EGL_NONE,
+		}
+		eglCtx = eglCreateContext(eglDisp, eglCfg, nilEGLContext, ctxAttribs)
+		if eglCtx == nil {
+			return nil, fmt.Errorf("eglCreateContext failed: 0x%x", eglGetError())
+		}
 	}
 	return &eglContext{
 		disp:     eglDisp,
