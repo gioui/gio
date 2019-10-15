@@ -186,19 +186,8 @@ func (up *userPage) commit(gtx *layout.Context, index int) {
 }
 
 func (u *UI) layoutUsers(gtx *layout.Context) {
-	var st layout.Stack
-	c2 := st.Rigid(gtx, func() {
-		layout.Align(layout.SE).Layout(gtx, func() {
-			in := layout.UniformInset(unit.Dp(16))
-			in.Layout(gtx, func() {
-				for u.fab.Clicked(gtx) {
-				}
-				theme.IconButton(u.fabIcon).Layout(gtx, u.fab)
-			})
-		})
-	})
-
-	c1 := st.Expand(gtx, func() {
+	st := layout.Stack{Alignment: layout.SE}
+	c1 := st.Rigid(gtx, func() {
 		f := layout.Flex{Axis: layout.Vertical}
 
 		c1 := f.Rigid(gtx, func() {
@@ -223,8 +212,7 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 		})
 
 		c3 := f.Rigid(gtx, func() {
-			gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
-			s := layout.Stack{Alignment: layout.Center}
+			s := layout.Stack{}
 			c2 := s.Rigid(gtx, func() {
 				in := layout.Inset{Top: unit.Dp(16), Right: unit.Dp(8), Bottom: unit.Dp(8), Left: unit.Dp(8)}
 				in.Layout(gtx, func() {
@@ -234,6 +222,7 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 				})
 			})
 			c1 := s.Expand(gtx, func() {
+				gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
 				fill{rgb(0xf2f2f2)}.Layout(gtx)
 			})
 			s.Layout(gtx, c1, c2)
@@ -245,6 +234,15 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 		})
 		f.Layout(gtx, c1, c2, c3, c4)
 	})
+	c2 := st.Rigid(gtx, func() {
+		in := layout.UniformInset(unit.Dp(16))
+		in.Layout(gtx, func() {
+			for u.fab.Clicked(gtx) {
+			}
+			theme.IconButton(u.fabIcon).Layout(gtx, u.fab)
+		})
+	})
+
 	st.Layout(gtx, c1, c2)
 }
 
@@ -318,7 +316,7 @@ type fill struct {
 
 func (f fill) Layout(gtx *layout.Context) {
 	cs := gtx.Constraints
-	d := image.Point{X: cs.Width.Max, Y: cs.Height.Max}
+	d := image.Point{X: cs.Width.Min, Y: cs.Height.Min}
 	dr := f32.Rectangle{
 		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
 	}
