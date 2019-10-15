@@ -15,11 +15,6 @@ import (
 
 	"golang.org/x/oauth2"
 
-	_ "image/jpeg"
-	_ "image/png"
-
-	_ "net/http/pprof"
-
 	"gioui.org/app"
 	"gioui.org/gesture"
 	"gioui.org/io/key"
@@ -29,6 +24,13 @@ import (
 	"gioui.org/unit"
 
 	"github.com/google/go-github/v24/github"
+
+	_ "image/jpeg"
+	_ "image/png"
+
+	_ "net/http/pprof"
+
+	_ "gioui.org/font/gofont"
 )
 
 type App struct {

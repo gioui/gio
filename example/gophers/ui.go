@@ -11,13 +11,7 @@ import (
 	"log"
 	"runtime"
 
-	_ "image/jpeg"
-	_ "image/png"
-
-	_ "net/http/pprof"
-
 	"gioui.org/f32"
-	_ "gioui.org/font/gofont"
 	"gioui.org/gesture"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"

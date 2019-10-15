@@ -10,10 +10,11 @@ import (
 
 	"gioui.org/app"
 	"gioui.org/io/system"
-	_ "gioui.org/font/gofont"
 	"gioui.org/layout"
 	"gioui.org/text"
 	"gioui.org/widget/material"
+
+	_ "gioui.org/font/gofont"
 )
 
 func main() {

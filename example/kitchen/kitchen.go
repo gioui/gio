@@ -9,15 +9,16 @@ import (
 	"log"
 
 	"gioui.org/app"
+	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/text"
 	"gioui.org/unit"
-	"gioui.org/io/system"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
-	_ "gioui.org/font/gofont"
 	"golang.org/x/exp/shiny/materialdesign/icons"
+
+	_ "gioui.org/font/gofont"
 )
 
 func main() {
