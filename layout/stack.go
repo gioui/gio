@@ -36,8 +36,7 @@ func (s *Stack) Rigid(gtx *Context, w Widget) StackChild {
 	return StackChild{m, dims}
 }
 
-// Expand lays out a widget with constraints that exactly match
-// the biggest child previously added.
+// Expand lays out a widget.
 func (s *Stack) Expand(gtx *Context, w Widget) StackChild {
 	var m op.MacroOp
 	m.Record(gtx.Ops)
