@@ -93,7 +93,7 @@ func (f *Flex) Flex(gtx *Context, weight float32, w Widget) FlexChild {
 			flexSize = max
 		}
 	}
-	submainc := Constraint{Max: flexSize}
+	submainc := Constraint{Min: flexSize, Max: flexSize}
 	cs = axisConstraints(f.Axis, submainc, axisCrossConstraint(f.Axis, cs))
 	var m op.MacroOp
 	m.Record(gtx.Ops)
