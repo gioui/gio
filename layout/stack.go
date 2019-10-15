@@ -28,9 +28,12 @@ type StackChild struct {
 // Rigid lays out a widget with the same constraints that were
 // passed to Init.
 func (s *Stack) Rigid(gtx *Context, w Widget) StackChild {
+	cs := gtx.Constraints
+	cs.Width.Min = 0
+	cs.Height.Min = 0
 	var m op.MacroOp
 	m.Record(gtx.Ops)
-	dims := gtx.Layout(gtx.Constraints, w)
+	dims := gtx.Layout(cs, w)
 	m.Stop()
 	s.expand(dims)
 	return StackChild{m, dims}
@@ -67,20 +70,22 @@ func (s *Stack) expand(dims Dimensions) {
 // Layout a list of children. The order of the children determines their laid
 // out order.
 func (s *Stack) Layout(gtx *Context, children ...StackChild) {
+	maxSZ := gtx.Constraints.Constrain(s.maxSZ)
+	s.maxSZ = image.Point{}
 	for _, ch := range children {
 		sz := ch.dims.Size
 		var p image.Point
 		switch s.Alignment {
 		case N, S, Center:
-			p.X = (s.maxSZ.X - sz.X) / 2
+			p.X = (maxSZ.X - sz.X) / 2
 		case NE, SE, E:
-			p.X = s.maxSZ.X - sz.X
+			p.X = maxSZ.X - sz.X
 		}
 		switch s.Alignment {
 		case W, Center, E:
-			p.Y = (s.maxSZ.Y - sz.Y) / 2
+			p.Y = (maxSZ.Y - sz.Y) / 2
 		case SW, S, SE:
-			p.Y = s.maxSZ.Y - sz.Y
+			p.Y = maxSZ.Y - sz.Y
 		}
 		var stack op.StackOp
 		stack.Push(gtx.Ops)
@@ -90,12 +95,11 @@ func (s *Stack) Layout(gtx *Context, children ...StackChild) {
 	}
 	b := s.baseline
 	if b == 0 {
-		b = s.maxSZ.Y
+		b = maxSZ.Y
 	}
 	gtx.Dimensions = Dimensions{
-		Size:     s.maxSZ,
+		Size:     maxSZ,
 		Baseline: b,
 	}
-	s.maxSZ = image.Point{}
 	s.baseline = 0
 }
