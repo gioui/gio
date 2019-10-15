@@ -47,7 +47,7 @@ func argb(c uint32) color.RGBA {
 
 func fill(gtx *layout.Context, col color.RGBA) {
 	cs := gtx.Constraints
-	d := image.Point{X: cs.Width.Max, Y: cs.Height.Max}
+	d := image.Point{X: cs.Width.Min, Y: cs.Height.Min}
 	dr := f32.Rectangle{
 		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
 	}

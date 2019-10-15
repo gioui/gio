@@ -94,8 +94,8 @@ func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 	bg := st.Expand(gtx, func() {
 		rr := float32(gtx.Px(unit.Dp(4)))
 		rrect(gtx.Ops,
-			float32(gtx.Constraints.Width.Max),
-			float32(gtx.Constraints.Height.Max),
+			float32(gtx.Constraints.Width.Min),
+			float32(gtx.Constraints.Height.Min),
 			rr, rr, rr, rr,
 		)
 		fill(gtx, bgcol)
@@ -130,7 +130,7 @@ func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
 		bgcol.A = 0xaa
 	}
 	bg := st.Expand(gtx, func() {
-		size := float32(gtx.Constraints.Width.Max)
+		size := float32(gtx.Constraints.Width.Min)
 		rr := float32(size) * .5
 		rrect(gtx.Ops,
 			size,
