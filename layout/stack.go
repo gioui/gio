@@ -15,8 +15,7 @@ type Stack struct {
 	// smaller than the available space.
 	Alignment Direction
 
-	maxSZ    image.Point
-	baseline int
+	maxSZ image.Point
 }
 
 // StackChild is the layout result of a call to End.
@@ -60,11 +59,6 @@ func (s *Stack) expand(dims Dimensions) {
 	if h := dims.Size.Y; h > s.maxSZ.Y {
 		s.maxSZ.Y = h
 	}
-	if s.baseline == 0 {
-		if b := dims.Baseline; b != dims.Size.Y {
-			s.baseline = b
-		}
-	}
 }
 
 // Layout a list of children. The order of the children determines their laid
@@ -72,6 +66,7 @@ func (s *Stack) expand(dims Dimensions) {
 func (s *Stack) Layout(gtx *Context, children ...StackChild) {
 	maxSZ := gtx.Constraints.Constrain(s.maxSZ)
 	s.maxSZ = image.Point{}
+	var baseline int
 	for _, ch := range children {
 		sz := ch.dims.Size
 		var p image.Point
@@ -92,14 +87,14 @@ func (s *Stack) Layout(gtx *Context, children ...StackChild) {
 		op.TransformOp{}.Offset(toPointF(p)).Add(gtx.Ops)
 		ch.macro.Add(gtx.Ops)
 		stack.Pop()
-	}
-	b := s.baseline
-	if b == 0 {
-		b = maxSZ.Y
+		if baseline == 0 {
+			if b := ch.dims.Baseline; b != 0 {
+				baseline = b + maxSZ.Y - sz.Y - p.Y
+			}
+		}
 	}
 	gtx.Dimensions = Dimensions{
 		Size:     maxSZ,
-		Baseline: b,
+		Baseline: baseline,
 	}
-	s.baseline = 0
 }

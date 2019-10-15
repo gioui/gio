@@ -46,5 +46,5 @@ func (im Image) Layout(gtx *layout.Context) {
 	}
 	im.Src.Add(gtx.Ops)
 	paint.PaintOp{Rect: dr}.Add(gtx.Ops)
-	gtx.Dimensions = layout.Dimensions{Size: d, Baseline: d.Y}
+	gtx.Dimensions = layout.Dimensions{Size: d}
 }

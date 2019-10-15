@@ -165,7 +165,7 @@ func linesDimens(lines []text.Line) layout.Dimensions {
 			X: w,
 			Y: h,
 		},
-		Baseline: baseline,
+		Baseline: h - baseline,
 	}
 }
 

@@ -23,9 +23,7 @@ type Flex struct {
 	size      int
 	rigidSize int
 	// fraction is the rounding error from a Flex weighting.
-	fraction    float32
-	maxCross    int
-	maxBaseline int
+	fraction float32
 }
 
 // FlexChild is the layout result of a call End.
@@ -108,20 +106,23 @@ func (f *Flex) Flex(gtx *Context, weight float32, w Widget) FlexChild {
 func (f *Flex) expand(dims Dimensions) {
 	sz := axisMain(f.Axis, dims.Size)
 	f.size += sz
-	if c := axisCross(f.Axis, dims.Size); c > f.maxCross {
-		f.maxCross = c
-	}
-	if b := dims.Baseline; b > f.maxBaseline {
-		f.maxBaseline = b
-	}
 }
 
 // Layout a list of children. The order of the children determines their laid
 // out order.
 func (f *Flex) Layout(gtx *Context, children ...FlexChild) {
+	var maxCross int
+	var maxBaseline int
+	for _, child := range children {
+		if c := axisCross(f.Axis, child.dims.Size); c > maxCross {
+			maxCross = c
+		}
+		if b := child.dims.Size.Y - child.dims.Baseline; b > maxBaseline {
+			maxBaseline = b
+		}
+	}
 	cs := gtx.Constraints
 	mainc := axisMainConstraint(f.Axis, cs)
-	crossSize := axisCrossConstraint(f.Axis, cs).Constrain(f.maxCross)
 	var space int
 	if mainc.Min > f.size {
 		space = mainc.Min - f.size
@@ -140,16 +141,19 @@ func (f *Flex) Layout(gtx *Context, children ...FlexChild) {
 	}
 	for i, child := range children {
 		dims := child.dims
-		b := dims.Baseline
+		b := dims.Size.Y - dims.Baseline
 		var cross int
 		switch f.Alignment {
 		case End:
-			cross = crossSize - axisCross(f.Axis, dims.Size)
+			cross = maxCross - axisCross(f.Axis, dims.Size)
 		case Middle:
-			cross = (crossSize - axisCross(f.Axis, dims.Size)) / 2
+			cross = (maxCross - axisCross(f.Axis, dims.Size)) / 2
 		case Baseline:
 			if f.Axis == Horizontal {
-				cross = f.maxBaseline - b
+				cross = maxBaseline - b
+				if dims.Baseline != 0 {
+					baseline = maxCross - b
+				}
 			}
 		}
 		var stack op.StackOp
@@ -168,9 +172,6 @@ func (f *Flex) Layout(gtx *Context, children ...FlexChild) {
 				mainSize += space / (len(children) - 1)
 			}
 		}
-		if b != dims.Size.Y {
-			baseline = b
-		}
 	}
 	switch f.Spacing {
 	case SpaceSides:
@@ -182,15 +183,10 @@ func (f *Flex) Layout(gtx *Context, children ...FlexChild) {
 	case SpaceAround:
 		mainSize += space / (len(children) * 2)
 	}
-	sz := axisPoint(f.Axis, mainSize, crossSize)
-	if baseline == 0 {
-		baseline = sz.Y
-	}
+	sz := axisPoint(f.Axis, mainSize, maxCross)
 	gtx.Dimensions = Dimensions{Size: sz, Baseline: baseline}
 	f.size = 0
 	f.rigidSize = 0
-	f.maxCross = 0
-	f.maxBaseline = 0
 }
 
 func axisPoint(a Axis, main, cross int) image.Point {

@@ -53,7 +53,7 @@ func fill(gtx *layout.Context, col color.RGBA) {
 	}
 	paint.ColorOp{Color: col}.Add(gtx.Ops)
 	paint.PaintOp{Rect: dr}.Add(gtx.Ops)
-	gtx.Dimensions = layout.Dimensions{Size: d, Baseline: d.Y}
+	gtx.Dimensions = layout.Dimensions{Size: d}
 }
 
 // https://pomax.github.io/bezierinfo/#circles_cubic.

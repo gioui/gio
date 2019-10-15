@@ -170,7 +170,7 @@ func (in Inset) Layout(gtx *Context, w Widget) {
 	stack.Pop()
 	gtx.Dimensions = Dimensions{
 		Size:     dims.Size.Add(image.Point{X: right + left, Y: top + bottom}),
-		Baseline: dims.Baseline + top,
+		Baseline: dims.Baseline + bottom,
 	}
 }
 
@@ -217,7 +217,7 @@ func (a Align) Layout(gtx *Context, w Widget) {
 	stack.Pop()
 	gtx.Dimensions = Dimensions{
 		Size:     sz,
-		Baseline: dims.Baseline + p.Y,
+		Baseline: dims.Baseline + sz.Y - dims.Size.Y - p.Y,
 	}
 }
 
