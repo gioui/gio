@@ -89,6 +89,7 @@ func (s *Context) Layout(cs Constraints, w Widget) Dimensions {
 	s.Constraints = cs
 	s.Dimensions = Dimensions{}
 	w()
+	s.Dimensions.Size = cs.Constrain(s.Dimensions.Size)
 	s.Constraints = saved
 	return s.Dimensions
 }
