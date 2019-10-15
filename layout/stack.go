@@ -44,8 +44,8 @@ func (s *Stack) Expand(gtx *Context, w Widget) StackChild {
 	var m op.MacroOp
 	m.Record(gtx.Ops)
 	cs := Constraints{
-		Width:  Constraint{Min: s.maxSZ.X, Max: s.maxSZ.X},
-		Height: Constraint{Min: s.maxSZ.Y, Max: s.maxSZ.Y},
+		Width:  Constraint{Min: s.maxSZ.X, Max: gtx.Constraints.Width.Max},
+		Height: Constraint{Min: s.maxSZ.Y, Max: gtx.Constraints.Height.Max},
 	}
 	dims := gtx.Layout(cs, w)
 	m.Stop()
