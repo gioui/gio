@@ -3,6 +3,8 @@
 package text
 
 import (
+	"unicode/utf8"
+
 	"gioui.org/op/paint"
 	"gioui.org/unit"
 	"golang.org/x/image/math/fixed"
@@ -77,13 +79,13 @@ func (s *Shaper) faceForFont(font Font) *face {
 		font.Typeface = s.def
 		tf = s.faceForStyle(font)
 	}
-	if tf == nil {
-		panic("no default typeface defined")
-	}
 	return tf
 }
 
 func (t *face) layout(ppem fixed.Int26_6, str string, opts LayoutOptions) *Layout {
+	if t == nil {
+		return fallbackLayout(str)
+	}
 	lk := layoutKey{
 		ppem: ppem,
 		str:  str,
@@ -98,6 +100,9 @@ func (t *face) layout(ppem fixed.Int26_6, str string, opts LayoutOptions) *Layou
 }
 
 func (t *face) shape(ppem fixed.Int26_6, str String) paint.ClipOp {
+	if t == nil {
+		return paint.ClipOp{}
+	}
 	pk := pathKey{
 		ppem: ppem,
 		str:  str.String,
@@ -108,4 +113,17 @@ func (t *face) shape(ppem fixed.Int26_6, str String) paint.ClipOp {
 	clip := t.face.Shape(ppem, str)
 	t.pathCache.Put(pk, clip)
 	return clip
+}
+
+func fallbackLayout(str string) *Layout {
+	l := &Layout{
+		Lines: []Line{
+			{Text: String{
+				String: str,
+			}},
+		},
+	}
+	strlen := utf8.RuneCountInString(str)
+	l.Lines[0].Text.Advances = make([]fixed.Int26_6, strlen)
+	return l
 }
