@@ -145,21 +145,23 @@ func (in Inset) Layout(gtx *Context, w Widget) {
 	bottom := gtx.Px(in.Bottom)
 	left := gtx.Px(in.Left)
 	mcs := gtx.Constraints
-	mcs.Width.Min -= left + right
 	mcs.Width.Max -= left + right
-	if mcs.Width.Min < 0 {
-		mcs.Width.Min = 0
+	if mcs.Width.Max < 0 {
+		left = 0
+		right = 0
+		mcs.Width.Max = 0
 	}
-	if mcs.Width.Max < mcs.Width.Min {
-		mcs.Width.Max = mcs.Width.Min
+	if mcs.Width.Min > mcs.Width.Max {
+		mcs.Width.Min = mcs.Width.Max
 	}
-	mcs.Height.Min -= top + bottom
 	mcs.Height.Max -= top + bottom
-	if mcs.Height.Min < 0 {
-		mcs.Height.Min = 0
+	if mcs.Height.Max < 0 {
+		bottom = 0
+		top = 0
+		mcs.Height.Max = 0
 	}
-	if mcs.Height.Max < mcs.Height.Min {
-		mcs.Height.Max = mcs.Height.Min
+	if mcs.Height.Min > mcs.Height.Max {
+		mcs.Height.Min = mcs.Height.Max
 	}
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
@@ -167,7 +169,7 @@ func (in Inset) Layout(gtx *Context, w Widget) {
 	dims := gtx.Layout(mcs, w)
 	stack.Pop()
 	gtx.Dimensions = Dimensions{
-		Size:     gtx.Constraints.Constrain(dims.Size.Add(image.Point{X: right + left, Y: top + bottom})),
+		Size:     dims.Size.Add(image.Point{X: right + left, Y: top + bottom}),
 		Baseline: dims.Baseline + top,
 	}
 }
