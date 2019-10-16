@@ -32,7 +32,7 @@ func (s *Stack) Rigid(gtx *Context, w Widget) StackChild {
 	cs.Height.Min = 0
 	var m op.MacroOp
 	m.Record(gtx.Ops)
-	dims := gtx.Layout(cs, w)
+	dims := ctxLayout(gtx, cs, w)
 	m.Stop()
 	s.expand(dims)
 	return StackChild{m, dims}
@@ -46,7 +46,7 @@ func (s *Stack) Expand(gtx *Context, w Widget) StackChild {
 		Width:  Constraint{Min: s.maxSZ.X, Max: gtx.Constraints.Width.Max},
 		Height: Constraint{Min: s.maxSZ.Y, Max: gtx.Constraints.Height.Max},
 	}
-	dims := gtx.Layout(cs, w)
+	dims := ctxLayout(gtx, cs, w)
 	m.Stop()
 	s.expand(dims)
 	return StackChild{m, dims}

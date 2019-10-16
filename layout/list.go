@@ -93,7 +93,7 @@ func (l *List) Layout(gtx *Context, len int, w ListElement) {
 	for l.init(gtx, len); l.more(); l.next() {
 		cs := axisConstraints(l.Axis, Constraint{Max: inf}, axisCrossConstraint(l.Axis, l.ctx.Constraints))
 		i := l.index()
-		l.end(gtx.Layout(cs, func() {
+		l.end(ctxLayout(gtx, cs, func() {
 			w(i)
 		}))
 	}

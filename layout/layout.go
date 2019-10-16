@@ -82,16 +82,17 @@ const (
 	Vertical
 )
 
-// Layout a widget with a set of constraints and return its
-// dimensions. The previous constraints are restored after layout.
-func (s *Context) Layout(cs Constraints, w Widget) Dimensions {
-	saved := s.Constraints
-	s.Constraints = cs
-	s.Dimensions = Dimensions{}
+// layout a widget with a set of constraints and return its
+// dimensions. The widget dimensions are constrained abd the previous
+// constraints are restored after layout.
+func ctxLayout(gtx *Context, cs Constraints, w Widget) Dimensions {
+	saved := gtx.Constraints
+	gtx.Constraints = cs
+	gtx.Dimensions = Dimensions{}
 	w()
-	s.Dimensions.Size = cs.Constrain(s.Dimensions.Size)
-	s.Constraints = saved
-	return s.Dimensions
+	gtx.Dimensions.Size = cs.Constrain(gtx.Dimensions.Size)
+	gtx.Constraints = saved
+	return gtx.Dimensions
 }
 
 // Reset the context. The constraints' minimum and maximum values are
@@ -166,7 +167,7 @@ func (in Inset) Layout(gtx *Context, w Widget) {
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
 	op.TransformOp{}.Offset(toPointF(image.Point{X: left, Y: top})).Add(gtx.Ops)
-	dims := gtx.Layout(mcs, w)
+	dims := ctxLayout(gtx, mcs, w)
 	stack.Pop()
 	gtx.Dimensions = Dimensions{
 		Size:     dims.Size.Add(image.Point{X: right + left, Y: top + bottom}),
@@ -188,7 +189,7 @@ func (a Align) Layout(gtx *Context, w Widget) {
 	mcs := cs
 	mcs.Width.Min = 0
 	mcs.Height.Min = 0
-	dims := gtx.Layout(mcs, w)
+	dims := ctxLayout(gtx, mcs, w)
 	macro.Stop()
 	sz := dims.Size
 	if sz.X < cs.Width.Min {

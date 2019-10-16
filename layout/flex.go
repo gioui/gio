@@ -67,7 +67,7 @@ func (f *Flex) Rigid(gtx *Context, w Widget) FlexChild {
 	cs = axisConstraints(f.Axis, Constraint{Max: mainMax}, axisCrossConstraint(f.Axis, cs))
 	var m op.MacroOp
 	m.Record(gtx.Ops)
-	dims := gtx.Layout(cs, w)
+	dims := ctxLayout(gtx, cs, w)
 	m.Stop()
 	f.rigidSize += axisMain(f.Axis, dims.Size)
 	f.expand(dims)
@@ -95,7 +95,7 @@ func (f *Flex) Flex(gtx *Context, weight float32, w Widget) FlexChild {
 	cs = axisConstraints(f.Axis, submainc, axisCrossConstraint(f.Axis, cs))
 	var m op.MacroOp
 	m.Record(gtx.Ops)
-	dims := gtx.Layout(cs, w)
+	dims := ctxLayout(gtx, cs, w)
 	m.Stop()
 	f.expand(dims)
 	return FlexChild{m, dims}
