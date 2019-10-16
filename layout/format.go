@@ -211,7 +211,9 @@ loop:
 	for {
 		switch peek(state) {
 		case ')':
-			st.Layout(gtx, children...)
+			if state.skip == 0 {
+				st.Layout(gtx, children...)
+			}
 			return
 		case ',':
 			expect(state, ",")
@@ -291,7 +293,9 @@ loop:
 	for {
 		switch peek(state) {
 		case ')':
-			fl.Layout(gtx, children...)
+			if state.skip == 0 {
+				fl.Layout(gtx, children...)
+			}
 			return
 		case ',':
 			expect(state, ",")
