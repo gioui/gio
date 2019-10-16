@@ -128,7 +128,6 @@ func (f *Flex) Layout(gtx *Context, children ...FlexChild) {
 		space = mainc.Min - f.size
 	}
 	var mainSize int
-	var baseline int
 	switch f.Spacing {
 	case SpaceSides:
 		mainSize += space / 2
@@ -151,9 +150,6 @@ func (f *Flex) Layout(gtx *Context, children ...FlexChild) {
 		case Baseline:
 			if f.Axis == Horizontal {
 				cross = maxBaseline - b
-				if dims.Baseline != 0 {
-					baseline = maxCross - b
-				}
 			}
 		}
 		var stack op.StackOp
@@ -184,7 +180,7 @@ func (f *Flex) Layout(gtx *Context, children ...FlexChild) {
 		mainSize += space / (len(children) * 2)
 	}
 	sz := axisPoint(f.Axis, mainSize, maxCross)
-	gtx.Dimensions = Dimensions{Size: sz, Baseline: baseline}
+	gtx.Dimensions = Dimensions{Size: sz, Baseline: sz.Y - maxBaseline}
 	f.size = 0
 	f.rigidSize = 0
 }
