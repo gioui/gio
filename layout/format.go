@@ -47,7 +47,7 @@ type formatError string
 // is one of north, northeast, east, southeast, south, southwest, west,
 // northwest, center.
 //
-// hexpand/vexpand(widget) forces the horizontalor or vertical
+// hexp/vexp/exp(widget) forces the horizontal, vertical or both
 // constraints to their maximum before laying out widget.
 //
 // hcap/vcap(size, widget) caps the maximum horizontal or vertical
@@ -127,6 +127,13 @@ func formatLayout(gtx *Context, state *formatState, widgets []Widget) {
 		})
 	case "vexp":
 		cs := gtx.Constraints
+		cs.Height.Min = cs.Height.Max
+		ctxLayout(gtx, cs, func() {
+			formatExpr(gtx, state, widgets)
+		})
+	case "exp":
+		cs := gtx.Constraints
+		cs.Width.Min = cs.Width.Max
 		cs.Height.Min = cs.Height.Max
 		ctxLayout(gtx, cs, func() {
 			formatExpr(gtx, state, widgets)
