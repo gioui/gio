@@ -38,32 +38,32 @@ type formatError string
 //
 // Available layouts:
 //
-//   inset(insets, widget) applies Inset to widget. Insets are either:
-//   one value for uniform insets; two values for top/bottom and
-//   right/left insets; three values for top, bottom and right/left
-//   insets; or four values for top, right, bottom, left insets.
+// inset(insets, widget) applies Inset to widget. Insets are either:
+// one value for uniform insets; two values for top/bottom and
+// right/left insets; three values for top, bottom and right/left
+// insets; or four values for top, right, bottom, left insets.
 //
-//   <direction>(widget) applies a directed ALign to widget. Direction
-//   is one of north, northeast, east, southeast, south, southwest, west,
-//   northwest, center.
+// <direction>(widget) applies a directed ALign to widget. Direction
+// is one of north, northeast, east, southeast, south, southwest, west,
+// northwest, center.
 //
-//   hexpand/vexpand(widget) forces the horizontalor or vertical
-//   constraints to their maximum before laying out widget.
+// hexpand/vexpand(widget) forces the horizontalor or vertical
+// constraints to their maximum before laying out widget.
 //
-//   hcap/vcap(<size>, widget) caps the maximum horizontal or vertical
-//   constraints to size.
+// hcap/vcap(<size>, widget) caps the maximum horizontal or vertical
+// constraints to size.
 //
-//   hflex/vflex(<alignment>, children...) lays out children with a
-//   horizontal or vertical Flex. Each rigid child must be on the form
-//   r(widget), and each flex child on the form f(<weight>, widget).
-//   If alignment is specified, it must be one of: start, middle, end,
-//   baseline. The default alignment is start.
+// hflex/vflex(<alignment>, children...) lays out children with a
+// horizontal or vertical Flex. Each rigid child must be on the form
+// r(widget), and each flex child on the form f(<weight>, widget).
+// If alignment is specified, it must be one of: start, middle, end,
+// baseline. The default alignment is start.
 //
-//   stack(<alignment>, children) lays out children with a Stack. Each
-//   Rigid child must be on the form r(widget), and each expand child
-//   on the form e(widget).
-//   If alignment is specified it must be one of the directions listed
-//   above.
+// stack(<alignment>, children) lays out children with a Stack. Each
+// Rigid child must be on the form r(widget), and each expand child
+// on the form e(widget).
+// If alignment is specified it must be one of the directions listed
+// above.
 func Format(gtx *Context, format string, widgets ...Widget) {
 	if format == "" {
 		return
