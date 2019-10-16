@@ -127,7 +127,7 @@ func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
 	})
 	bgcol := b.Background
 	if !button.Active() {
-		bgcol.A = 0xaa
+		bgcol = rgb(0xcccccc)
 	}
 	bg := st.Expand(gtx, func() {
 		size := float32(gtx.Constraints.Width.Min)
