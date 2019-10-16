@@ -322,7 +322,7 @@ func (f fill) Layout(gtx *layout.Context) {
 	}
 	paint.ColorOp{Color: f.col}.Add(gtx.Ops)
 	paint.PaintOp{Rect: dr}.Add(gtx.Ops)
-	gtx.Dimensions = layout.Dimensions{Size: d, Baseline: d.Y}
+	gtx.Dimensions = layout.Dimensions{Size: d}
 }
 
 func column() layout.Flex {
