@@ -111,13 +111,15 @@ func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
 	ico := st.Rigid(gtx, func() {
 		layout.UniformInset(b.Padding).Layout(gtx, func() {
 			size := gtx.Px(b.Size) - gtx.Px(b.Padding)
-			ico := b.Icon.image(size)
-			ico.Add(gtx.Ops)
-			paint.PaintOp{
-				Rect: f32.Rectangle{
-					Max: toPointF(ico.Size()),
-				},
-			}.Add(gtx.Ops)
+			if b.Icon != nil {
+				ico := b.Icon.image(size)
+				ico.Add(gtx.Ops)
+				paint.PaintOp{
+					Rect: f32.Rectangle{
+						Max: toPointF(ico.Size()),
+					},
+				}.Add(gtx.Ops)
+			}
 			gtx.Dimensions = layout.Dimensions{
 				Size: image.Point{X: size, Y: size},
 			}
