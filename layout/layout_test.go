@@ -80,7 +80,7 @@ func ExampleFlex() {
 
 	// Output:
 	// Rigid: {0 100}
-	// 50%: {0 45}
+	// 50%: {45 45}
 }
 
 func ExampleStack() {
@@ -103,7 +103,7 @@ func ExampleStack() {
 	stack.Layout(gtx, child1, child2)
 
 	// Output:
-	// Expand: {{50 50} {50 50}}
+	// Expand: {{50 100} {50 100}}
 }
 
 func ExampleList() {
