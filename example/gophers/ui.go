@@ -27,6 +27,8 @@ import (
 	"github.com/google/go-github/v24/github"
 
 	"golang.org/x/exp/shiny/materialdesign/icons"
+
+	"golang.org/x/image/draw"
 )
 
 type UI struct {
@@ -52,10 +54,11 @@ type userPage struct {
 }
 
 type user struct {
-	name    string
-	login   string
-	company string
-	avatar  paint.ImageOp
+	name     string
+	login    string
+	company  string
+	avatar   image.Image
+	avatarOp paint.ImageOp
 }
 
 var theme *material.Theme
@@ -172,7 +175,7 @@ func (up *userPage) commit(gtx *layout.Context, index int) {
 			cc := clipCircle{}
 			cc.Layout(gtx, func() {
 				gtx.Constraints = layout.RigidConstraints(gtx.Constraints.Constrain(image.Point{X: sz, Y: sz}))
-				theme.Image(u.avatar).Layout(gtx)
+				u.layoutAvatar(gtx)
 			})
 		})
 		c2 := f.Flex(gtx, 1, func() {
@@ -268,9 +271,10 @@ func (u *UI) user(gtx *layout.Context, index int) {
 				cc := clipCircle{}
 				in.Layout(gtx, func() {
 					cc.Layout(gtx, func() {
-						sz := image.Point{X: gtx.Px(unit.Dp(48)), Y: gtx.Px(unit.Dp(48))}
+						dim := gtx.Px(unit.Dp(48))
+						sz := image.Point{X: dim, Y: dim}
 						gtx.Constraints = layout.RigidConstraints(gtx.Constraints.Constrain(sz))
-						theme.Image(user.avatar).Layout(gtx)
+						user.layoutAvatar(gtx)
 					})
 				})
 			})
@@ -308,6 +312,18 @@ func (u *UI) user(gtx *layout.Context, index int) {
 		click.Add(gtx.Ops)
 	})
 	elem.Layout(gtx, c1)
+}
+
+func (u *user) layoutAvatar(gtx *layout.Context) {
+	sz := gtx.Constraints.Width.Min
+	if u.avatarOp.Size().X != sz {
+		img := image.NewRGBA(image.Rectangle{Max: image.Point{X: sz, Y: sz}})
+		draw.ApproxBiLinear.Scale(img, img.Bounds(), u.avatar, u.avatar.Bounds(), draw.Src, nil)
+		u.avatarOp = paint.NewImageOp(img)
+	}
+	img := theme.Image(u.avatarOp)
+	img.Scale = float32(sz) / float32(gtx.Px(unit.Dp(float32(sz))))
+	img.Layout(gtx)
 }
 
 type fill struct {
