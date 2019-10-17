@@ -921,7 +921,8 @@ func (r *renderer) uploadTexture(img *image.RGBA) {
 func gamma(r, g, b, a uint32) [4]float32 {
 	color := [4]float32{float32(r) / 0xffff, float32(g) / 0xffff, float32(b) / 0xffff, float32(a) / 0xffff}
 	// Assume that image.Uniform colors are in sRGB space. Linearize.
-	for i, c := range color {
+	for i := 0; i <= 2; i++ {
+		c := color[i]
 		// Use the formula from EXT_sRGB.
 		if c <= 0.04045 {
 			c = c / 12.92
