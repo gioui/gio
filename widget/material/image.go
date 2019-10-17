@@ -7,6 +7,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
 )
@@ -33,18 +34,11 @@ func (im Image) Layout(gtx *layout.Context) {
 	w, h := gtx.Px(unit.Dp(wf*im.Scale)), gtx.Px(unit.Dp(hf*im.Scale))
 	cs := gtx.Constraints
 	d := image.Point{X: cs.Width.Constrain(w), Y: cs.Height.Constrain(h)}
-	aspect := float32(w) / float32(h)
-	dw, dh := float32(d.X), float32(d.Y)
-	dAspect := dw / dh
-	if aspect < dAspect {
-		d.X = int(dh*aspect + 0.5)
-	} else {
-		d.Y = int(dw/aspect + 0.5)
-	}
-	dr := f32.Rectangle{
-		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
-	}
+	var s op.StackOp
+	s.Push(gtx.Ops)
+	paint.RectClip(image.Rectangle{Max: d}).Add(gtx.Ops)
 	im.Src.Add(gtx.Ops)
-	paint.PaintOp{Rect: dr}.Add(gtx.Ops)
+	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(w), Y: float32(h)}}}.Add(gtx.Ops)
+	s.Pop()
 	gtx.Dimensions = layout.Dimensions{Size: d}
 }
