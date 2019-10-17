@@ -47,8 +47,11 @@ type formatError string
 // is one of north, northeast, east, southeast, south, southwest, west,
 // northwest, center.
 //
-// hexp/vexp/exp(widget) forces the horizontal, vertical or both
+// hmax/vmax/max(widget) forces the horizontal, vertical or both
 // constraints to their maximum before laying out widget.
+//
+// hmin/vmin/min(widget) forces the horizontal, vertical or both
+// constraints to their minimum before laying out widget.
 //
 // hcap/vcap(size, widget) caps the maximum horizontal or vertical
 // constraints to size.
@@ -119,22 +122,41 @@ func formatLayout(gtx *Context, state *formatState, widgets []Widget) {
 		formatFlex(gtx, Vertical, state, widgets)
 	case "stack":
 		formatStack(gtx, state, widgets)
-	case "hexp":
+	case "hmax":
 		cs := gtx.Constraints
 		cs.Width.Min = cs.Width.Max
 		ctxLayout(gtx, cs, func() {
 			formatExpr(gtx, state, widgets)
 		})
-	case "vexp":
+	case "vmax":
 		cs := gtx.Constraints
 		cs.Height.Min = cs.Height.Max
 		ctxLayout(gtx, cs, func() {
 			formatExpr(gtx, state, widgets)
 		})
-	case "exp":
+	case "max":
 		cs := gtx.Constraints
 		cs.Width.Min = cs.Width.Max
 		cs.Height.Min = cs.Height.Max
+		ctxLayout(gtx, cs, func() {
+			formatExpr(gtx, state, widgets)
+		})
+	case "hmin":
+		cs := gtx.Constraints
+		cs.Width.Max = cs.Width.Min
+		ctxLayout(gtx, cs, func() {
+			formatExpr(gtx, state, widgets)
+		})
+	case "vmin":
+		cs := gtx.Constraints
+		cs.Height.Max = cs.Height.Min
+		ctxLayout(gtx, cs, func() {
+			formatExpr(gtx, state, widgets)
+		})
+	case "min":
+		cs := gtx.Constraints
+		cs.Width.Max = cs.Width.Min
+		cs.Height.Max = cs.Height.Min
 		ctxLayout(gtx, cs, func() {
 			formatExpr(gtx, state, widgets)
 		})
