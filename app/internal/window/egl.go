@@ -236,7 +236,7 @@ func createContext(disp _EGLNativeDisplayType) (*eglContext, error) {
 			_EGL_NONE,
 		}
 		eglCtx = eglCreateContext(eglDisp, eglCfg, nilEGLContext, ctxAttribs)
-		if eglCtx == nil {
+		if eglCtx == nilEGLContext {
 			return nil, fmt.Errorf("eglCreateContext failed: 0x%x", eglGetError())
 		}
 	}
