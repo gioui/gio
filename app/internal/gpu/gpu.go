@@ -576,7 +576,7 @@ func (r *renderer) intersectPath(p *pathOp, clip image.Rectangle) {
 	}
 	fbo := r.pather.stenciler.cover(p.place.Idx)
 	r.ctx.BindTexture(gl.TEXTURE_2D, fbo.tex)
-	coverScale, coverOff := texSpaceTransform(uv, fbo.size)
+	coverScale, coverOff := texSpaceTransform(toRectF(uv), fbo.size)
 	r.ctx.Uniform2f(r.pather.stenciler.uIntersectUVScale, coverScale.X, coverScale.Y)
 	r.ctx.Uniform2f(r.pather.stenciler.uIntersectUVOffset, coverOff.X, coverOff.Y)
 	r.ctx.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
@@ -648,6 +648,19 @@ func boundRectF(r f32.Rectangle) image.Rectangle {
 		Max: image.Point{
 			X: int(ceil(r.Max.X)),
 			Y: int(ceil(r.Max.Y)),
+		},
+	}
+}
+
+func toRectF(r image.Rectangle) f32.Rectangle {
+	return f32.Rectangle{
+		Min: f32.Point{
+			X: float32(r.Min.X),
+			Y: float32(r.Min.Y),
+		},
+		Max: f32.Point{
+			X: float32(r.Max.X),
+			Y: float32(r.Max.Y),
 		},
 	}
 }
@@ -802,21 +815,21 @@ func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f3
 	} else {
 		m.material = materialTexture
 		dr := boundRectF(rect.Add(off))
-		sr := image.Rectangle{
-			Max: d.imgSize,
+		sr := f32.Rectangle{
+			Max: f32.Point{X: float32(d.imgSize.X), Y: float32(d.imgSize.Y)},
 		}
-		if dx := dr.Dx(); dx != 0 {
+		if dx := float32(dr.Dx()); dx != 0 {
 			// Don't clip 1 px width sources.
 			if sdx := sr.Dx(); sdx > 1 {
-				sr.Min.X += ((clip.Min.X-dr.Min.X)*sdx + dx/2) / dx
-				sr.Max.X -= ((dr.Max.X-clip.Max.X)*sdx + dx/2) / dx
+				sr.Min.X += (float32(clip.Min.X-dr.Min.X)*sdx + dx/2) / dx
+				sr.Max.X -= (float32(dr.Max.X-clip.Max.X)*sdx + dx/2) / dx
 			}
 		}
-		if dy := dr.Dy(); dy != 0 {
+		if dy := float32(dr.Dy()); dy != 0 {
 			// Don't clip 1 px height sources.
 			if sdy := sr.Dy(); sdy > 1 {
-				sr.Min.Y += ((clip.Min.Y-dr.Min.Y)*sdy + dy/2) / dy
-				sr.Max.Y -= ((dr.Max.Y-clip.Max.Y)*sdy + dy/2) / dy
+				sr.Min.Y += (float32(clip.Min.Y-dr.Min.Y)*sdy + dy/2) / dy
+				sr.Max.Y -= (float32(dr.Max.Y-clip.Max.Y)*sdy + dy/2) / dy
 			}
 		}
 		tex, exists := cache.get(d.img)
@@ -895,7 +908,7 @@ func (r *renderer) drawOps(ops []imageOp) {
 			Min: img.place.Pos,
 			Max: img.place.Pos.Add(drc.Size()),
 		}
-		coverScale, coverOff := texSpaceTransform(uv, fbo.size)
+		coverScale, coverOff := texSpaceTransform(toRectF(uv), fbo.size)
 		r.pather.cover(img.z, m.material, m.color, scale, off, m.uvScale, m.uvOffset, coverScale, coverOff)
 	}
 	r.ctx.DisableVertexAttribArray(attribPos)
@@ -951,10 +964,10 @@ func (b *blitter) blit(z float32, mat materialType, col [4]float32, scale, off, 
 
 // texSpaceTransform return the scale and offset that transforms the given subimage
 // into quad texture coordinates.
-func texSpaceTransform(r image.Rectangle, bounds image.Point) (f32.Point, f32.Point) {
+func texSpaceTransform(r f32.Rectangle, bounds image.Point) (f32.Point, f32.Point) {
 	size := f32.Point{X: float32(bounds.X), Y: float32(bounds.Y)}
-	scale := f32.Point{X: float32(r.Dx()) / size.X, Y: float32(r.Dy()) / size.Y}
-	offset := f32.Point{X: float32(r.Min.X) / size.X, Y: float32(r.Min.Y) / size.Y}
+	scale := f32.Point{X: r.Dx() / size.X, Y: r.Dy() / size.Y}
+	offset := f32.Point{X: r.Min.X / size.X, Y: r.Min.Y / size.Y}
 	return scale, offset
 }
 
