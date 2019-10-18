@@ -46,7 +46,7 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 				throw new RuntimeException(e);
 			}
 			System.loadLibrary("gio");
-			runGoMain(dataDirUTF8);
+			runGoMain(dataDirUTF8, appCtx);
 			jniLoaded = true;
 		}
 	}
@@ -219,7 +219,7 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 	static private native void onFrameCallback(long handle, long nanos);
 	static private native boolean onBack(long handle);
 	static private native void onFocusChange(long handle, boolean focus);
-	static private native void runGoMain(byte[] dataDir);
+	static private native void runGoMain(byte[] dataDir, Context context);
 
 	private static class InputConnection extends BaseInputConnection {
 		private final Editable editable;

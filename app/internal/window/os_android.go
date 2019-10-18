@@ -80,7 +80,7 @@ func jniGetStaticMethodID(env *C.JNIEnv, class C.jclass, method, sig string) C.j
 }
 
 //export runGoMain
-func runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyteArray) {
+func runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyteArray, context C.jobject) {
 	dirBytes := C.gio_jni_GetByteArrayElements(env, jdataDir)
 	if dirBytes == nil {
 		panic("runGoMain: GetByteArrayElements failed")
@@ -89,6 +89,12 @@ func runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyteArray) {
 	dataDir := C.GoStringN((*C.char)(unsafe.Pointer(dirBytes)), n)
 	dataDirChan <- dataDir
 	C.gio_jni_ReleaseByteArrayElements(env, jdataDir, dirBytes)
+	context = C.gio_jni_NewGlobalRef(env, context)
+
+	PlatformHandle = &Handle{
+		JVM:     uintptr(unsafe.Pointer(theJVM)),
+		Context: uintptr(context),
+	}
 	runMain()
 }
 

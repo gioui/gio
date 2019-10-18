@@ -22,7 +22,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
 	static const JNINativeMethod methods[] = {
 		{
 			.name = "runGoMain",
-			.signature = "([B)V",
+			.signature = "([BLandroid/content/Context;)V",
 			.fnPtr = runGoMain
 		},
 		{
