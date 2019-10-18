@@ -220,6 +220,10 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 		}
 		return nil
 	})
+	extraJars, err := filepath.Glob(filepath.Join(bi.dir, "*.jar"))
+	if err == nil {
+		classFiles = append(classFiles, extraJars...)
+	}
 	if err != nil {
 		return err
 	}
