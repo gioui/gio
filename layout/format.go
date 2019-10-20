@@ -409,20 +409,19 @@ func parseValue(f *formatter) unit.Value {
 
 func parseName(f *formatter) string {
 	i := 0
+loop:
 	for ; i < len(f.expr); i++ {
 		c := f.expr[i]
 		switch {
 		case c == '(' || c == ',' || c == ')':
-			fname := f.expr[:i]
-			f.expr = f.expr[i:]
-			return fname
+			break loop
 		case c < 'a' || 'z' < c:
 			errorf("invalid character '%c' in layout name", c)
 		}
 	}
+	fname := f.expr[:i]
 	f.expr = f.expr[i:]
-	errorf("missing ( after layout function")
-	return ""
+	return fname
 }
 
 func parseFloat(f *formatter) float32 {
