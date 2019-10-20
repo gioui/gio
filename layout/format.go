@@ -195,27 +195,30 @@ func formatWidget(gtx *Context, f *formatter, widgets []Widget) {
 
 func formatStack(gtx *Context, f *formatter, widgets []Widget) {
 	st := Stack{}
+	backup := *f
 	// Parse alignment, if present.
-	switch peek(f) {
-	case 'r', 'e', ')':
-	default:
-		name := parseName(f)
-		align, ok := dirFor(name)
-		if !ok {
-			errorf("invalid stack alignment: %q", name)
-		}
+	name := parseName(f)
+	align, ok := dirFor(name)
+	if ok {
 		st.Alignment = align
 		expect(f, ",")
+		backup = *f
+	} else {
+		*f = backup
 	}
 	var children []StackChild
+	commaOK := false
 	// First, lay out rigid children.
-	backup := *f
 loop:
 	for {
 		switch peek(f) {
 		case ')':
 			break loop
 		case ',':
+			if !commaOK {
+				errorf("unexpected ,")
+			}
+			commaOK = false
 			expect(f, ",")
 		case 'r':
 			expect(f, "r(")
@@ -223,6 +226,7 @@ loop:
 				formatExpr(gtx, f, widgets)
 			}))
 			expect(f, ")")
+			commaOK = true
 		case 'e':
 			expect(f, "e(")
 			f.skip++
@@ -230,6 +234,7 @@ loop:
 			children = append(children, StackChild{})
 			f.skip--
 			expect(f, ")")
+			commaOK = true
 		default:
 			errorf("invalid flex child")
 		}
@@ -268,34 +273,29 @@ loop:
 
 func formatFlex(gtx *Context, axis Axis, f *formatter, widgets []Widget) {
 	fl := Flex{Axis: axis}
+	backup := *f
 	// Parse alignment, if present.
-	switch peek(f) {
-	case 'r', 'f', ')':
-	default:
-		name := parseName(f)
-		switch name {
-		case "start":
-			fl.Alignment = Start
-		case "middle":
-			fl.Alignment = Middle
-		case "end":
-			fl.Alignment = End
-		case "baseline":
-			fl.Alignment = Baseline
-		default:
-			errorf("invalid flex alignment: %q", name)
-		}
+	name := parseName(f)
+	al, ok := alignmentFor(name)
+	if ok {
+		fl.Alignment = al
 		expect(f, ",")
+		backup = *f
+	} else {
+		*f = backup
 	}
 	var children []FlexChild
+	commaOK := false
 	// First, lay out rigid children.
-	backup := *f
 loop:
 	for {
 		switch peek(f) {
 		case ')':
 			break loop
 		case ',':
+			if !commaOK {
+				errorf("unexpected ,")
+			}
 			expect(f, ",")
 		case 'r':
 			expect(f, "r(")
@@ -303,6 +303,7 @@ loop:
 				formatExpr(gtx, f, widgets)
 			}))
 			expect(f, ")")
+			commaOK = true
 		case 'f':
 			expect(f, "f(")
 			parseFloat(f)
@@ -312,6 +313,7 @@ loop:
 			children = append(children, FlexChild{})
 			f.skip--
 			expect(f, ")")
+			commaOK = true
 		default:
 			errorf("invalid flex child")
 		}
@@ -408,6 +410,7 @@ func parseValue(f *formatter) unit.Value {
 }
 
 func parseName(f *formatter) string {
+	skipWhitespace(f)
 	i := 0
 loop:
 	for ; i < len(f.expr); i++ {
@@ -425,6 +428,7 @@ loop:
 }
 
 func parseFloat(f *formatter) float32 {
+	skipWhitespace(f)
 	i := 0
 	for ; i < len(f.expr); i++ {
 		c := f.expr[i]
@@ -442,6 +446,7 @@ func parseFloat(f *formatter) float32 {
 }
 
 func parseInt(f *formatter) int {
+	skipWhitespace(f)
 	i := 0
 	for ; i < len(f.expr); i++ {
 		c := f.expr[i]
@@ -484,6 +489,23 @@ func skipWhitespace(f *formatter) {
 			return
 		}
 	}
+}
+
+func alignmentFor(name string) (Alignment, bool) {
+	var a Alignment
+	switch name {
+	case "start":
+		a = Start
+	case "middle":
+		a = Middle
+	case "end":
+		a = End
+	case "baseline":
+		a = Baseline
+	default:
+		return 0, false
+	}
+	return a, true
 }
 
 func dirFor(name string) (Direction, bool) {
