@@ -9,7 +9,7 @@ import (
 	"gioui.org/unit"
 )
 
-type formatState struct {
+type formatter struct {
 	current int
 	orig    string
 	expr    string
@@ -71,7 +71,7 @@ func Format(gtx *Context, format string, widgets ...Widget) {
 	if format == "" {
 		return
 	}
-	state := formatState{
+	f := formatter{
 		orig: format,
 		expr: format,
 	}
@@ -80,185 +80,185 @@ func Format(gtx *Context, format string, widgets ...Widget) {
 			if _, ok := err.(formatError); !ok {
 				panic(err)
 			}
-			pos := len(state.orig) - len(state.expr)
-			msg := state.orig[:pos] + "✗" + state.orig[pos:]
+			pos := len(f.orig) - len(f.expr)
+			msg := f.orig[:pos] + "✗" + f.orig[pos:]
 			panic(fmt.Errorf("Format: %s:%d: %s", msg, pos, err))
 		}
 	}()
-	formatExpr(gtx, &state, widgets)
+	formatExpr(gtx, &f, widgets)
 }
 
-func formatExpr(gtx *Context, state *formatState, widgets []Widget) {
-	switch peek(state) {
+func formatExpr(gtx *Context, f *formatter, widgets []Widget) {
+	switch peek(f) {
 	case '_':
-		formatWidget(gtx, state, widgets)
+		formatWidget(gtx, f, widgets)
 	default:
-		formatLayout(gtx, state, widgets)
+		formatLayout(gtx, f, widgets)
 	}
 }
 
-func formatLayout(gtx *Context, state *formatState, widgets []Widget) {
-	name := parseName(state)
+func formatLayout(gtx *Context, f *formatter, widgets []Widget) {
+	name := parseName(f)
 	if name == "" {
 		errorf("missing layout name")
 	}
-	expect(state, "(")
-	f := func() {
-		formatExpr(gtx, state, widgets)
+	expect(f, "(")
+	fexpr := func() {
+		formatExpr(gtx, f, widgets)
 	}
 	align, ok := dirFor(name)
 	if ok {
-		Align(align).Layout(gtx, f)
-		expect(state, ")")
+		Align(align).Layout(gtx, fexpr)
+		expect(f, ")")
 		return
 	}
 	switch name {
 	case "inset":
-		in := parseInset(gtx, state, widgets)
-		in.Layout(gtx, f)
+		in := parseInset(gtx, f, widgets)
+		in.Layout(gtx, fexpr)
 	case "hflex":
-		formatFlex(gtx, Horizontal, state, widgets)
+		formatFlex(gtx, Horizontal, f, widgets)
 	case "vflex":
-		formatFlex(gtx, Vertical, state, widgets)
+		formatFlex(gtx, Vertical, f, widgets)
 	case "stack":
-		formatStack(gtx, state, widgets)
+		formatStack(gtx, f, widgets)
 	case "hmax":
 		cs := gtx.Constraints
 		cs.Width.Min = cs.Width.Max
 		ctxLayout(gtx, cs, func() {
-			formatExpr(gtx, state, widgets)
+			formatExpr(gtx, f, widgets)
 		})
 	case "vmax":
 		cs := gtx.Constraints
 		cs.Height.Min = cs.Height.Max
 		ctxLayout(gtx, cs, func() {
-			formatExpr(gtx, state, widgets)
+			formatExpr(gtx, f, widgets)
 		})
 	case "max":
 		cs := gtx.Constraints
 		cs.Width.Min = cs.Width.Max
 		cs.Height.Min = cs.Height.Max
 		ctxLayout(gtx, cs, func() {
-			formatExpr(gtx, state, widgets)
+			formatExpr(gtx, f, widgets)
 		})
 	case "hmin":
 		cs := gtx.Constraints
 		cs.Width.Max = cs.Width.Min
 		ctxLayout(gtx, cs, func() {
-			formatExpr(gtx, state, widgets)
+			formatExpr(gtx, f, widgets)
 		})
 	case "vmin":
 		cs := gtx.Constraints
 		cs.Height.Max = cs.Height.Min
 		ctxLayout(gtx, cs, func() {
-			formatExpr(gtx, state, widgets)
+			formatExpr(gtx, f, widgets)
 		})
 	case "min":
 		cs := gtx.Constraints
 		cs.Width.Max = cs.Width.Min
 		cs.Height.Max = cs.Height.Min
 		ctxLayout(gtx, cs, func() {
-			formatExpr(gtx, state, widgets)
+			formatExpr(gtx, f, widgets)
 		})
 	case "hcap":
-		w := parseValue(state)
-		expect(state, ",")
+		w := parseValue(f)
+		expect(f, ",")
 		cs := gtx.Constraints
 		cs.Width.Max = cs.Width.Constrain(gtx.Px(w))
 		ctxLayout(gtx, cs, func() {
-			formatExpr(gtx, state, widgets)
+			formatExpr(gtx, f, widgets)
 		})
 	case "vcap":
-		h := parseValue(state)
-		expect(state, ",")
+		h := parseValue(f)
+		expect(f, ",")
 		cs := gtx.Constraints
 		cs.Height.Max = cs.Height.Constrain(gtx.Px(h))
 		ctxLayout(gtx, cs, func() {
-			formatExpr(gtx, state, widgets)
+			formatExpr(gtx, f, widgets)
 		})
 	default:
 		errorf("invalid layout %q", name)
 	}
-	expect(state, ")")
+	expect(f, ")")
 }
 
-func formatWidget(gtx *Context, state *formatState, widgets []Widget) {
-	expect(state, "_")
-	if i, max := state.current, len(widgets)-1; i > max {
+func formatWidget(gtx *Context, f *formatter, widgets []Widget) {
+	expect(f, "_")
+	if i, max := f.current, len(widgets)-1; i > max {
 		errorf("widget index %d out of bounds [0;%d]", i, max)
 	}
-	if state.skip == 0 {
-		widgets[state.current]()
+	if f.skip == 0 {
+		widgets[f.current]()
 	}
-	state.current++
+	f.current++
 }
 
-func formatStack(gtx *Context, state *formatState, widgets []Widget) {
+func formatStack(gtx *Context, f *formatter, widgets []Widget) {
 	st := Stack{}
 	// Parse alignment, if present.
-	switch peek(state) {
+	switch peek(f) {
 	case 'r', 'e', ')':
 	default:
-		name := parseName(state)
+		name := parseName(f)
 		align, ok := dirFor(name)
 		if !ok {
 			errorf("invalid stack alignment: %q", name)
 		}
 		st.Alignment = align
-		expect(state, ",")
+		expect(f, ",")
 	}
 	var children []StackChild
 	// First, lay out rigid children.
-	backup := *state
+	backup := *f
 loop:
 	for {
-		switch peek(state) {
+		switch peek(f) {
 		case ')':
 			break loop
 		case ',':
-			expect(state, ",")
+			expect(f, ",")
 		case 'r':
-			expect(state, "r(")
+			expect(f, "r(")
 			children = append(children, st.Rigid(gtx, func() {
-				formatExpr(gtx, state, widgets)
+				formatExpr(gtx, f, widgets)
 			}))
-			expect(state, ")")
+			expect(f, ")")
 		case 'e':
-			expect(state, "e(")
-			state.skip++
-			formatExpr(gtx, state, widgets)
+			expect(f, "e(")
+			f.skip++
+			formatExpr(gtx, f, widgets)
 			children = append(children, StackChild{})
-			state.skip--
-			expect(state, ")")
+			f.skip--
+			expect(f, ")")
 		default:
 			errorf("invalid flex child")
 		}
 	}
 	// Then, lay out expanded children.
-	*state = backup
+	*f = backup
 	child := 0
 	for {
-		switch peek(state) {
+		switch peek(f) {
 		case ')':
-			if state.skip == 0 {
+			if f.skip == 0 {
 				st.Layout(gtx, children...)
 			}
 			return
 		case ',':
-			expect(state, ",")
+			expect(f, ",")
 		case 'r':
-			expect(state, "r(")
-			state.skip++
-			formatExpr(gtx, state, widgets)
-			state.skip--
-			expect(state, ")")
+			expect(f, "r(")
+			f.skip++
+			formatExpr(gtx, f, widgets)
+			f.skip--
+			expect(f, ")")
 			child++
 		case 'e':
-			expect(state, "e(")
+			expect(f, "e(")
 			children[child] = st.Expand(gtx, func() {
-				formatExpr(gtx, state, widgets)
+				formatExpr(gtx, f, widgets)
 			})
-			expect(state, ")")
+			expect(f, ")")
 			child++
 		default:
 			errorf("invalid flex child")
@@ -266,13 +266,13 @@ loop:
 	}
 }
 
-func formatFlex(gtx *Context, axis Axis, state *formatState, widgets []Widget) {
+func formatFlex(gtx *Context, axis Axis, f *formatter, widgets []Widget) {
 	fl := Flex{Axis: axis}
 	// Parse alignment, if present.
-	switch peek(state) {
+	switch peek(f) {
 	case 'r', 'f', ')':
 	default:
-		name := parseName(state)
+		name := parseName(f)
 		switch name {
 		case "start":
 			fl.Alignment = Start
@@ -285,64 +285,64 @@ func formatFlex(gtx *Context, axis Axis, state *formatState, widgets []Widget) {
 		default:
 			errorf("invalid flex alignment: %q", name)
 		}
-		expect(state, ",")
+		expect(f, ",")
 	}
 	var children []FlexChild
 	// First, lay out rigid children.
-	backup := *state
+	backup := *f
 loop:
 	for {
-		switch peek(state) {
+		switch peek(f) {
 		case ')':
 			break loop
 		case ',':
-			expect(state, ",")
+			expect(f, ",")
 		case 'r':
-			expect(state, "r(")
+			expect(f, "r(")
 			children = append(children, fl.Rigid(gtx, func() {
-				formatExpr(gtx, state, widgets)
+				formatExpr(gtx, f, widgets)
 			}))
-			expect(state, ")")
+			expect(f, ")")
 		case 'f':
-			expect(state, "f(")
-			parseFloat(state)
-			expect(state, ",")
-			state.skip++
-			formatExpr(gtx, state, widgets)
+			expect(f, "f(")
+			parseFloat(f)
+			expect(f, ",")
+			f.skip++
+			formatExpr(gtx, f, widgets)
 			children = append(children, FlexChild{})
-			state.skip--
-			expect(state, ")")
+			f.skip--
+			expect(f, ")")
 		default:
 			errorf("invalid flex child")
 		}
 	}
 	// Then, lay out flexible children.
-	*state = backup
+	*f = backup
 	child := 0
 	for {
-		switch peek(state) {
+		switch peek(f) {
 		case ')':
-			if state.skip == 0 {
+			if f.skip == 0 {
 				fl.Layout(gtx, children...)
 			}
 			return
 		case ',':
-			expect(state, ",")
+			expect(f, ",")
 		case 'r':
-			expect(state, "r(")
-			state.skip++
-			formatExpr(gtx, state, widgets)
-			state.skip--
-			expect(state, ")")
+			expect(f, "r(")
+			f.skip++
+			formatExpr(gtx, f, widgets)
+			f.skip--
+			expect(f, ")")
 			child++
 		case 'f':
-			expect(state, "f(")
-			weight := parseFloat(state)
-			expect(state, ",")
+			expect(f, "f(")
+			weight := parseFloat(f)
+			expect(f, ",")
 			children[child] = fl.Flex(gtx, weight, func() {
-				formatExpr(gtx, state, widgets)
+				formatExpr(gtx, f, widgets)
 			})
-			expect(state, ")")
+			expect(f, ")")
 			child++
 		default:
 			errorf("invalid flex child")
@@ -350,15 +350,15 @@ loop:
 	}
 }
 
-func parseInset(gtx *Context, state *formatState, widgets []Widget) Inset {
-	v1 := parseValue(state)
-	if peek(state) == ',' {
-		expect(state, ",")
+func parseInset(gtx *Context, f *formatter, widgets []Widget) Inset {
+	v1 := parseValue(f)
+	if peek(f) == ',' {
+		expect(f, ",")
 		return UniformInset(v1)
 	}
-	v2 := parseValue(state)
-	if peek(state) == ',' {
-		expect(state, ",")
+	v2 := parseValue(f)
+	if peek(f) == ',' {
+		expect(f, ",")
 		return Inset{
 			Top:    v1,
 			Right:  v2,
@@ -366,9 +366,9 @@ func parseInset(gtx *Context, state *formatState, widgets []Widget) Inset {
 			Left:   v2,
 		}
 	}
-	v3 := parseValue(state)
-	if peek(state) == ',' {
-		expect(state, ",")
+	v3 := parseValue(f)
+	if peek(f) == ',' {
+		expect(f, ",")
 		return Inset{
 			Top:    v1,
 			Right:  v2,
@@ -376,8 +376,8 @@ func parseInset(gtx *Context, state *formatState, widgets []Widget) Inset {
 			Left:   v2,
 		}
 	}
-	v4 := parseValue(state)
-	expect(state, ",")
+	v4 := parseValue(f)
+	expect(f, ",")
 	return Inset{
 		Top:    v1,
 		Right:  v2,
@@ -386,12 +386,12 @@ func parseInset(gtx *Context, state *formatState, widgets []Widget) Inset {
 	}
 }
 
-func parseValue(state *formatState) unit.Value {
-	i := parseFloat(state)
-	if len(state.expr) < 2 {
+func parseValue(f *formatter) unit.Value {
+	i := parseFloat(f)
+	if len(f.expr) < 2 {
 		errorf("missing unit")
 	}
-	u := state.expr[:2]
+	u := f.expr[:2]
 	var v unit.Value
 	switch u {
 	case "dp":
@@ -403,84 +403,84 @@ func parseValue(state *formatState) unit.Value {
 	default:
 		errorf("unknown unit")
 	}
-	state.expr = state.expr[len(u):]
+	f.expr = f.expr[len(u):]
 	return v
 }
 
-func parseName(state *formatState) string {
+func parseName(f *formatter) string {
 	i := 0
-	for ; i < len(state.expr); i++ {
-		c := state.expr[i]
+	for ; i < len(f.expr); i++ {
+		c := f.expr[i]
 		switch {
 		case c == '(' || c == ',' || c == ')':
-			fname := state.expr[:i]
-			state.expr = state.expr[i:]
+			fname := f.expr[:i]
+			f.expr = f.expr[i:]
 			return fname
 		case c < 'a' || 'z' < c:
 			errorf("invalid character '%c' in layout name", c)
 		}
 	}
-	state.expr = state.expr[i:]
+	f.expr = f.expr[i:]
 	errorf("missing ( after layout function")
 	return ""
 }
 
-func parseFloat(state *formatState) float32 {
+func parseFloat(f *formatter) float32 {
 	i := 0
-	for ; i < len(state.expr); i++ {
-		c := state.expr[i]
+	for ; i < len(f.expr); i++ {
+		c := f.expr[i]
 		if (c < '0' || c > '9') && c != '.' {
 			break
 		}
 	}
-	expr := state.expr[:i]
+	expr := f.expr[:i]
 	v, err := strconv.ParseFloat(expr, 32)
 	if err != nil {
 		errorf("invalid number %q", expr)
 	}
-	state.expr = state.expr[i:]
+	f.expr = f.expr[i:]
 	return float32(v)
 }
 
-func parseInt(state *formatState) int {
+func parseInt(f *formatter) int {
 	i := 0
-	for ; i < len(state.expr); i++ {
-		c := state.expr[i]
+	for ; i < len(f.expr); i++ {
+		c := f.expr[i]
 		if c < '0' || c > '9' {
 			break
 		}
 	}
-	expr := state.expr[:i]
+	expr := f.expr[:i]
 	v, err := strconv.Atoi(expr)
 	if err != nil {
 		errorf("invalid number %q", expr)
 	}
-	state.expr = state.expr[i:]
+	f.expr = f.expr[i:]
 	return v
 }
 
-func peek(state *formatState) rune {
-	skipWhitespace(state)
-	if len(state.expr) == 0 {
+func peek(f *formatter) rune {
+	skipWhitespace(f)
+	if len(f.expr) == 0 {
 		errorf("unexpected end")
 	}
-	return rune(state.expr[0])
+	return rune(f.expr[0])
 }
 
-func expect(state *formatState, str string) {
-	skipWhitespace(state)
+func expect(f *formatter, str string) {
+	skipWhitespace(f)
 	n := len(str)
-	if len(state.expr) < n || state.expr[:n] != str {
+	if len(f.expr) < n || f.expr[:n] != str {
 		errorf("expected %q", str)
 	}
-	state.expr = state.expr[n:]
+	f.expr = f.expr[n:]
 }
 
-func skipWhitespace(state *formatState) {
-	for len(state.expr) > 0 {
-		switch state.expr[0] {
+func skipWhitespace(f *formatter) {
+	for len(f.expr) > 0 {
+		switch f.expr[0] {
 		case '\t', '\n', '\v', '\f', '\r', ' ':
-			state.expr = state.expr[1:]
+			f.expr = f.expr[1:]
 		default:
 			return
 		}
