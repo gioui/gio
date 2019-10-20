@@ -496,7 +496,7 @@ func dirFor(name string) (Direction, bool) {
 		d = NW
 	case "north":
 		d = N
-	case "northeeast":
+	case "northeast":
 		d = NE
 	case "east":
 		d = E
