@@ -83,7 +83,9 @@ func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 		bgcol = rgb(0xcccccc)
 	}
 	st := layout.Stack{}
+	min := gtx.Constraints.Width.Min
 	lbl := st.Rigid(gtx, func() {
+		gtx.Constraints.Width.Min = min
 		layout.UniformInset(unit.Dp(16)).Layout(gtx, func() {
 			paint.ColorOp{Color: col}.Add(gtx.Ops)
 			widget.Label{Alignment: text.Middle}.Layout(gtx, b.shaper, b.Font, b.Text)
