@@ -112,13 +112,7 @@ func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
 		layout.UniformInset(b.Padding).Layout(gtx, func() {
 			size := gtx.Px(b.Size) - gtx.Px(b.Padding)
 			if b.Icon != nil {
-				ico := b.Icon.image(size)
-				ico.Add(gtx.Ops)
-				paint.PaintOp{
-					Rect: f32.Rectangle{
-						Max: toPointF(ico.Size()),
-					},
-				}.Add(gtx.Ops)
+				b.Icon.Layout(gtx, unit.Px(float32(size)))
 			}
 			gtx.Dimensions = layout.Dimensions{
 				Size: image.Point{X: size, Y: size},
@@ -145,6 +139,16 @@ func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
 		}
 	})
 	st.Layout(gtx, bg, ico)
+}
+
+func (ic *Icon) Layout(gtx *layout.Context, sz unit.Value) {
+	ico := ic.image(gtx.Px(sz))
+	ico.Add(gtx.Ops)
+	paint.PaintOp{
+		Rect: f32.Rectangle{
+			Max: toPointF(ico.Size()),
+		},
+	}.Add(gtx.Ops)
 }
 
 func (ic *Icon) image(sz int) paint.ImageOp {
