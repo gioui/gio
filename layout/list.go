@@ -88,7 +88,7 @@ func (l *List) init(gtx *Context, len int) {
 	l.next()
 }
 
-// Layout the List and return its dimensions.
+// Layout the List.
 func (l *List) Layout(gtx *Context, len int, w ListElement) {
 	for l.init(gtx, len); l.more(); l.next() {
 		cs := axisConstraints(l.Axis, Constraint{Max: inf}, axisCrossConstraint(l.Axis, l.ctx.Constraints))
