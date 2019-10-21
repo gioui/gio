@@ -71,7 +71,7 @@ func (t *Theme) IconButton(icon *Icon) IconButton {
 		Background: t.Color.Primary,
 		Icon:       icon,
 		Size:       unit.Dp(56),
-		Padding:    unit.Dp(20),
+		Padding:    unit.Dp(16),
 	}
 }
 
@@ -110,7 +110,7 @@ func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
 	st := layout.Stack{}
 	ico := st.Rigid(gtx, func() {
 		layout.UniformInset(b.Padding).Layout(gtx, func() {
-			size := gtx.Px(b.Size) - gtx.Px(b.Padding)
+			size := gtx.Px(b.Size) - 2*gtx.Px(b.Padding)
 			if b.Icon != nil {
 				b.Icon.Layout(gtx, unit.Px(float32(size)))
 			}
