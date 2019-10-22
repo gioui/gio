@@ -22,6 +22,7 @@ import (
 )
 
 func main() {
+	editor.SetText(longText)
 	ic, err := material.NewIcon(icons.ContentAdd)
 	if err != nil {
 		log.Fatal(err)
@@ -71,13 +72,7 @@ var (
 	icon     *material.Icon
 )
 
-func init() {
-	editor.SetText(longText)
-}
-
 func kitchen(gtx *layout.Context, th *material.Theme) {
-	gtx.Constraints.Width.Min = 0
-	gtx.Constraints.Height.Min = 0
 	widgets := []func(){
 		func() {
 			th.H3(topLabel).Layout(gtx)
