@@ -27,7 +27,7 @@ import (
 	"golang.org/x/image/font/gofont/gosmallcapsitalic"
 )
 
-func init() {
+func Register() {
 	register(text.Font{}, goregular.TTF)
 	register(text.Font{Style: text.Italic}, goitalic.TTF)
 	register(text.Font{Weight: text.Bold}, gobold.TTF)
