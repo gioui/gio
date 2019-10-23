@@ -12,6 +12,7 @@ import (
 	"runtime"
 
 	"gioui.org/f32"
+	"gioui.org/font/gofont"
 	"gioui.org/gesture"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
@@ -64,6 +65,7 @@ type user struct {
 var theme *material.Theme
 
 func init() {
+	gofont.Register()
 	theme = material.NewTheme()
 	theme.Color.Text = rgb(0x333333)
 	theme.Color.Hint = rgb(0xbbbbbb)

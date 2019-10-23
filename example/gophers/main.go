@@ -28,8 +28,6 @@ import (
 	_ "image/png"
 
 	_ "net/http/pprof"
-
-	_ "gioui.org/font/gofont"
 )
 
 type App struct {

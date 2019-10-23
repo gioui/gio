@@ -18,7 +18,7 @@ import (
 
 	"golang.org/x/exp/shiny/materialdesign/icons"
 
-	_ "gioui.org/font/gofont"
+	"gioui.org/font/gofont"
 )
 
 func main() {
@@ -28,6 +28,7 @@ func main() {
 		log.Fatal(err)
 	}
 	icon = ic
+	gofont.Register()
 	go func() {
 		w := app.NewWindow()
 		if err := loop(w); err != nil {

@@ -14,7 +14,7 @@ import (
 	"gioui.org/text"
 	"gioui.org/widget/material"
 
-	_ "gioui.org/font/gofont"
+	"gioui.org/font/gofont"
 )
 
 func main() {
@@ -28,6 +28,7 @@ func main() {
 }
 
 func loop(w *app.Window) error {
+	gofont.Register()
 	th := material.NewTheme()
 	gtx := &layout.Context{
 		Queue: w.Queue(),
