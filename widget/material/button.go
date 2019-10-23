@@ -82,13 +82,17 @@ func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 		col = rgb(0x888888)
 		bgcol = rgb(0xcccccc)
 	}
-	st := layout.Stack{}
-	min := gtx.Constraints.Width.Min
+	st := layout.Stack{Alignment: layout.Center}
+	hmin := gtx.Constraints.Width.Min
+	vmin := gtx.Constraints.Height.Min
 	lbl := st.Rigid(gtx, func() {
-		gtx.Constraints.Width.Min = min
-		layout.UniformInset(unit.Dp(16)).Layout(gtx, func() {
-			paint.ColorOp{Color: col}.Add(gtx.Ops)
-			widget.Label{Alignment: text.Middle}.Layout(gtx, b.shaper, b.Font, b.Text)
+		gtx.Constraints.Width.Min = hmin
+		gtx.Constraints.Height.Min = vmin
+		layout.Align(layout.Center).Layout(gtx, func() {
+			layout.UniformInset(unit.Dp(16)).Layout(gtx, func() {
+				paint.ColorOp{Color: col}.Add(gtx.Ops)
+				widget.Label{}.Layout(gtx, b.shaper, b.Font, b.Text)
+			})
 		})
 		pointer.RectAreaOp{Rect: image.Rectangle{Max: gtx.Dimensions.Size}}.Add(gtx.Ops)
 		button.Layout(gtx)
