@@ -1,9 +1,0 @@
-# SPDX-License-Identifier: Unlicense OR MIT
-
-runtime: go112
-
-handlers:
-
-- url: .*
-  script: auto
-  secure: always
