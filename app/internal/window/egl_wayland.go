@@ -62,3 +62,5 @@ func (w *window) eglWindow(visID int) (_EGLNativeWindowType, int, int, error) {
 	C.wl_egl_window_resize(eglWin, C.int(width), C.int(height), 0, 0)
 	return _EGLNativeWindowType(uintptr(unsafe.Pointer(eglWin))), width, height, nil
 }
+
+func (w *window) needVSync() bool { return false }

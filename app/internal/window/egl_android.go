@@ -18,3 +18,5 @@ func (w *window) eglWindow(visID int) (_EGLNativeWindowType, int, int, error) {
 	win, width, height := w.nativeWindow(visID)
 	return _EGLNativeWindowType(win), width, height, nil
 }
+
+func (w *window) needVSync() bool { return false }

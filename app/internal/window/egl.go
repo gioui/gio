@@ -28,6 +28,7 @@ type eglDriver interface {
 	eglDisplay() _EGLNativeDisplayType
 	eglWindow(visID int) (_EGLNativeWindowType, int, int, error)
 	eglDestroy()
+	needVSync() bool
 }
 
 type eglContext struct {
@@ -156,6 +157,14 @@ func (c *context) MakeCurrent() error {
 		c.eglWin = nilEGLNativeWindowType
 		return err
 	}
+	// eglSwapInterval 1 leads to erratic frame rates and unnecessary blocking.
+	// We rely on platform specific frame rate limiting instead, except on Windows
+	// and X11 where eglSwapInterval is all there is.
+	if c.driver.needVSync() {
+		eglSwapInterval(c.eglCtx.disp, 1)
+	} else {
+		eglSwapInterval(c.eglCtx.disp, 0)
+	}
 	if c.eglCtx.srgb {
 		return nil
 	}
@@ -268,14 +277,6 @@ func createSurfaceAndMakeCurrent(eglCtx *eglContext, win _EGLNativeWindowType) (
 	if !eglMakeCurrent(eglCtx.disp, eglSurf, eglSurf, eglCtx.ctx) {
 		eglDestroySurface(eglCtx.disp, eglSurf)
 		return nilEGLSurface, fmt.Errorf("eglMakeCurrent error 0x%x", eglGetError())
-	}
-	// eglSwapInterval 1 leads to erratic frame rates and unnecessary blocking.
-	// We rely on platform specific frame rate limiting instead, except on Windows
-	// where eglSwapInterval is all there is.
-	if runtime.GOOS != "windows" {
-		eglSwapInterval(eglCtx.disp, 0)
-	} else {
-		eglSwapInterval(eglCtx.disp, 1)
 	}
 	return eglSurf, nil
 }

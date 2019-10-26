@@ -158,3 +158,5 @@ func (w *window) eglWindow(visID int) (_EGLNativeWindowType, int, int, error) {
 func (w *window) NewContext() (gl.Context, error) {
 	return newContext(w)
 }
+
+func (w *window) needVSync() bool { return true }
