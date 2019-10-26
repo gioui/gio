@@ -38,7 +38,7 @@ func (w *window) eglDestroy() {
 }
 
 func (w *window) eglDisplay() _EGLNativeDisplayType {
-	return _EGLNativeDisplayType(w.display())
+	return _EGLNativeDisplayType(unsafe.Pointer(w.display()))
 }
 
 func (w *window) eglWindow(visID int) (_EGLNativeWindowType, int, int, error) {

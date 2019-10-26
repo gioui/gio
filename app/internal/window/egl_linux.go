@@ -4,7 +4,6 @@ package window
 
 /*
 #cgo LDFLAGS: -lEGL
-#cgo CFLAGS: -DMESA_EGL_NO_X11_HEADERS
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
