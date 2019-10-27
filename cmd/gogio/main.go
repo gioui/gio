@@ -220,22 +220,22 @@ type arch struct {
 }
 
 var allArchs = map[string]arch{
-	"arm": arch{
+	"arm": {
 		iosArch:   "armv7",
 		jniArch:   "armeabi-v7a",
 		clangArch: "armv7a-linux-androideabi",
 	},
-	"arm64": arch{
+	"arm64": {
 		iosArch:   "arm64",
 		jniArch:   "arm64-v8a",
 		clangArch: "aarch64-linux-android",
 	},
-	"386": arch{
+	"386": {
 		iosArch:   "i386",
 		jniArch:   "x86",
 		clangArch: "i686-linux-android",
 	},
-	"amd64": arch{
+	"amd64": {
 		iosArch:   "x86_64",
 		jniArch:   "x86_64",
 		clangArch: "x86_64-linux-android",

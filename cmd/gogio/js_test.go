@@ -5,6 +5,8 @@ package main_test
 import (
 	"bytes"
 	"context"
+	"errors"
+	"flag"
 	"image/png"
 	"io/ioutil"
 	"net/http"
@@ -17,6 +19,8 @@ import (
 
 	_ "gioui.org/unit" // the build tool adds it to go.mod, so keep it there
 )
+
+var headless = flag.Bool("headless", true, "run end-to-end tests in headless mode")
 
 func TestJSOnChrome(t *testing.T) {
 	// First, build the app.
@@ -35,8 +39,8 @@ func TestJSOnChrome(t *testing.T) {
 
 	// Second, start Chrome.
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		// Uncomment to get the browser's GUI.
-		// chromedp.Flag("headless", false),
+		chromedp.Flag("headless", *headless),
+
 		// We need use-gl=egl instead of the default of use-gl=desktop;
 		// "desktop" doesn't seem to work when we're in headless mode.
 		// TODO(mvdan): Does egl require a GPU? If so, consider
@@ -52,8 +56,10 @@ func TestJSOnChrome(t *testing.T) {
 	defer cancel()
 
 	if err := chromedp.Run(ctx); err != nil {
-		// TODO(mvdan): Skip the test if chrome/chromium/headless-shell
-		// aren't installed.
+		if errors.Is(err, exec.ErrNotFound) {
+			t.Skipf("test requires Chrome to be installed: %v", err)
+			return
+		}
 		t.Fatal(err)
 	}
 
