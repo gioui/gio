@@ -12,8 +12,6 @@ package window
 */
 import "C"
 
-import "gioui.org/app/internal/gl"
-
 type (
 	_EGLint               = C.EGLint
 	_EGLDisplay           = C.EGLDisplay
@@ -93,8 +91,4 @@ func eglGetDisplay(disp _EGLNativeDisplayType) _EGLDisplay {
 func eglCreateWindowSurface(disp _EGLDisplay, conf _EGLConfig, win _EGLNativeWindowType, attribs []_EGLint) _EGLSurface {
 	eglSurf := C.eglCreateWindowSurface(disp, conf, win, &attribs[0])
 	return eglSurf
-}
-
-func (w *window) NewContext() (gl.Context, error) {
-	return newContext(w)
 }

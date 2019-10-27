@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build linux,!android
+// +build linux,!android,!nowayland
 
 package window
 
@@ -8,6 +8,8 @@ import (
 	"errors"
 	"sync"
 	"unsafe"
+
+	"gioui.org/app/internal/gl"
 )
 
 /*
@@ -61,6 +63,10 @@ func (w *window) eglWindow(visID int) (_EGLNativeWindowType, int, int, error) {
 	}
 	C.wl_egl_window_resize(eglWin, C.int(width), C.int(height), 0, 0)
 	return _EGLNativeWindowType(uintptr(unsafe.Pointer(eglWin))), width, height, nil
+}
+
+func (w *window) NewContext() (gl.Context, error) {
+	return newContext(w)
 }
 
 func (w *window) needVSync() bool { return false }

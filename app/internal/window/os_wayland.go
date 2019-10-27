@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build linux,!android
+// +build linux,!android,!nowayland
 
 package window
 
@@ -35,9 +35,9 @@ import (
 //go:generate wayland-scanner client-header /usr/share/wayland-protocols/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml wayland_xdg_decoration.h
 //go:generate wayland-scanner private-code /usr/share/wayland-protocols/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml wayland_xdg_decoration.c
 
-//go:generate sed -i "1s;^;// +build linux,!android\\n\\n;" wayland_xdg_shell.c
-//go:generate sed -i "1s;^;// +build linux,!android\\n\\n;" wayland_xdg_decoration.c
-//go:generate sed -i "1s;^;// +build linux,!android\\n\\n;" wayland_text_input.c
+//go:generate sed -i "1s;^;// +build linux,!android,!nowayland\\n\\n;" wayland_xdg_shell.c
+//go:generate sed -i "1s;^;// +build linux,!android,!nowayland\\n\\n;" wayland_xdg_decoration.c
+//go:generate sed -i "1s;^;// +build linux,!android,!nowayland\\n\\n;" wayland_text_input.c
 
 /*
 #cgo LDFLAGS: -lwayland-client -lwayland-cursor
@@ -145,7 +145,6 @@ type wlOutput struct {
 
 var connMu sync.Mutex
 var conn *wlConn
-var mainDone = make(chan struct{})
 
 var (
 	winMap       = make(map[interface{}]*window)
@@ -153,11 +152,11 @@ var (
 	outputConfig = make(map[*C.struct_wl_output]*wlOutput)
 )
 
-func Main() {
-	<-mainDone
+func init() {
+	wlDriver = newWLWindow
 }
 
-func NewWindow(window Callbacks, opts *Options) error {
+func newWLWindow(window Callbacks, opts *Options) error {
 	connMu.Lock()
 	defer connMu.Unlock()
 	if len(winMap) > 0 {
