@@ -9,6 +9,7 @@ import (
 
 	"gioui.org/app"
 	"gioui.org/f32"
+	"gioui.org/io/system"
 	"gioui.org/op"
 	"gioui.org/op/paint"
 )
@@ -29,9 +30,9 @@ func loop(w *app.Window) error {
 	for {
 		e := <-w.Events()
 		switch e := e.(type) {
-		case app.DestroyEvent:
+		case system.DestroyEvent:
 			return e.Err
-		case app.FrameEvent:
+		case system.FrameEvent:
 			ops.Reset()
 			paint.ColorOp{Color: background}.Add(ops)
 			paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{
