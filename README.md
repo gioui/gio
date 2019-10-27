@@ -3,6 +3,8 @@
 Immediate mode GUI programs in Go. See [gioui.org](https://gioui.org)
 for details and documentation.
 
+[![builds.sr.ht status](https://builds.sr.ht/~eliasnaur/gio.svg)](https://builds.sr.ht/~eliasnaur/gio)
+
 ## Issues
 
 File bugs and TODOs through the [issue tracker](https://todo.sr.ht/~eliasnaur/gio) or send an email

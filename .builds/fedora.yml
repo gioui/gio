@@ -1,0 +1,33 @@
+image: fedora/latest
+packages:
+ - tar
+ - wayland-devel
+ - libX11-devel
+ - libxkbcommon-devel
+ - mesa-libGLES-devel
+ - mesa-libEGL-devel
+ - chromium
+ - wine
+sources:
+ - https://git.sr.ht/~eliasnaur/gio
+environment:
+ PATH: $PATH:/usr/bin:/home/build/goroot/go/bin
+tasks:
+ - install_go: |
+     mkdir goroot
+     cd goroot
+     curl -s -o go.tar.gz https://dl.google.com/go/go1.13.3.linux-amd64.tar.gz
+     tar xzf go.tar.gz
+ - test_gio: |
+     cd gio
+     go test ./...
+     GOOS=windows go test -exec=wine ./...
+ - test_example: |
+     cd gio/example
+     go test ./...
+ - test_cmd: |
+     cd gio/cmd
+     go test ./...
+ - check_gofmt: |
+     cd gio
+     test -z $(gofmt -s -l .)
