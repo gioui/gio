@@ -5,7 +5,7 @@
 package window
 
 /*
-#cgo CFLAGS: -fmodules -fobjc-arc -x objective-c
+#cgo CFLAGS: -DGLES_SILENCE_DEPRECATION -Werror -Wno-deprecated-declarations -fmodules -fobjc-arc -x objective-c
 
 #include <CoreGraphics/CoreGraphics.h>
 #include <UIKit/UIKit.h>

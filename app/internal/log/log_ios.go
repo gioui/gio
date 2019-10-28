@@ -5,6 +5,8 @@
 package log
 
 /*
+#cgo CFLAGS: -fmodules -fobjc-arc -x objective-c
+
 #include "log_ios.h"
 */
 import "C"

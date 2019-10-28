@@ -10,12 +10,14 @@ import (
 
 /*
 #cgo linux LDFLAGS: -lGLESv2 -ldl
+#cgo darwin,!ios CFLAGS: -DGL_SILENCE_DEPRECATION
 #cgo darwin,!ios LDFLAGS: -framework OpenGL
+#cgo darwin,ios CFLAGS: -DGLES_SILENCE_DEPRECATION
+#cgo darwin,ios LDFLAGS: -framework OpenGLES
 
 #include <stdlib.h>
 
 #ifdef __APPLE__
-#cgo CFLAGS: -DGL_SILENCE_DEPRECATION
 	#include "TargetConditionals.h"
 	#if TARGET_OS_IPHONE
 	#include <OpenGLES/ES3/gl.h>

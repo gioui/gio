@@ -184,6 +184,9 @@ int main(int argc, char * argv[]) {
 		lipo.Args = append(lipo.Args, exeSlice)
 		compile := exec.Command(clang, cflags...)
 		compile.Args = append(compile.Args,
+			"-fmodules",
+			"-fobjc-arc",
+			"-x", "objective-c",
 			"-F", tmpDir,
 			"-o", exeSlice,
 			mainm,
@@ -479,8 +482,6 @@ func iosCompilerFor(target, arch string) (string, []string, error) {
 		return "", nil, err
 	}
 	cflags := []string{
-		"-fmodules",
-		"-fobjc-arc",
 		"-fembed-bitcode",
 		"-Werror",
 		"-arch", allArchs[arch].iosArch,
