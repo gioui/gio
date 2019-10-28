@@ -31,7 +31,7 @@ tasks:
      ln -s /home/build/cctools-port/cctools/misc/lipo lipo
      ln -s ../tools/appletoolchain xcrun
      ln -s /usr/bin/plistutil plutil
-     cd tools
+     cd ../tools
      ln -s appletoolchain clang-ios
      ln -s appletoolchain clang-macos
  - build_libtapi: |
