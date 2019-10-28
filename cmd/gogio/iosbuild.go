@@ -483,7 +483,6 @@ func iosCompilerFor(target, arch string) (string, []string, error) {
 	}
 	cflags := []string{
 		"-fembed-bitcode",
-		"-Werror",
 		"-arch", allArchs[arch].iosArch,
 		"-isysroot", sdkPath,
 		"-m" + platformOS + "-version-min=" + minIOSVersion,

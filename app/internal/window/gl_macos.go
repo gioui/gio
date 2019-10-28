@@ -9,8 +9,6 @@ import (
 )
 
 /*
-#cgo CFLAGS: -DGL_SILENCE_DEPRECATION -fmodules -fobjc-arc -x objective-c
-
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
 #include <AppKit/AppKit.h>

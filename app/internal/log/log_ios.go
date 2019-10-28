@@ -5,7 +5,7 @@
 package log
 
 /*
-#cgo CFLAGS: -fmodules -fobjc-arc -x objective-c
+#cgo CFLAGS: -Werror -fmodules -fobjc-arc -x objective-c
 
 #include "log_ios.h"
 */

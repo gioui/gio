@@ -126,7 +126,6 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 			"GOARCH="+a,
 			"CGO_ENABLED=1",
 			"CC="+clang,
-			"CGO_CFLAGS=-Werror",
 		)
 		builds.Go(func() error {
 			_, err := runCmd(cmd)

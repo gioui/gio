@@ -9,6 +9,7 @@ import (
 )
 
 /*
+#cgo CFLAGS: -Werror
 #cgo linux LDFLAGS: -lGLESv2 -ldl
 #cgo darwin,!ios CFLAGS: -DGL_SILENCE_DEPRECATION
 #cgo darwin,!ios LDFLAGS: -framework OpenGL

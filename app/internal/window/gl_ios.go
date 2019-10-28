@@ -5,8 +5,6 @@
 package window
 
 /*
-#cgo CFLAGS: -fmodules -fobjc-arc -x objective-c
-
 #include <CoreFoundation/CoreFoundation.h>
 #include <OpenGLES/ES2/gl.h>
 #include <OpenGLES/ES2/glext.h>

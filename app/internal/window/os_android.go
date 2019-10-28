@@ -3,7 +3,7 @@
 package window
 
 /*
-#cgo LDFLAGS: -landroid
+#cgo LDFLAGS: -Werror -landroid
 
 #include <android/native_window_jni.h>
 #include <android/configuration.h>
