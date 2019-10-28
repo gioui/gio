@@ -762,21 +762,27 @@ func (w *window) loop() {
 		{Fd: int32(dispfd), Events: syscall.POLLIN | syscall.POLLERR},
 		{Fd: int32(w.notify.read), Events: syscall.POLLIN | syscall.POLLERR},
 	}
-	dispEvents := &pollfds[0].Revents
+	dispFd := &pollfds[0]
 	// Plenty of room for a backlog of notifications.
 	var buf = make([]byte, 100)
 loop:
 	for {
 		C.wl_display_dispatch_pending(conn.disp)
-		if ret := C.wl_display_flush(conn.disp); ret < 0 {
-			break
+		dispFd.Events &^= syscall.POLLOUT
+		if _, err := C.wl_display_flush(conn.disp); err != nil {
+			if err != syscall.EAGAIN {
+				break
+			}
+			// EAGAIN means the output buffer was full. Poll for
+			// POLLOUT to know when we can write again.
+			dispFd.Events |= syscall.POLLOUT
 		}
 		if w.dead {
 			w.w.Event(system.DestroyEvent{Err: w.pendingErr})
 			break
 		}
 		// Clear poll events.
-		*dispEvents = 0
+		dispFd.Revents = 0
 		if _, err := syscall.Ppoll(pollfds, nil, nil); err != nil && err != syscall.EINTR {
 			panic(fmt.Errorf("ppoll failed: %v", err))
 		}
@@ -794,11 +800,11 @@ loop:
 		}
 		// Handle events
 		switch {
-		case *dispEvents&syscall.POLLIN != 0:
+		case dispFd.Revents&syscall.POLLIN != 0:
 			if ret := C.wl_display_dispatch(conn.disp); ret < 0 {
 				break loop
 			}
-		case *dispEvents&(syscall.POLLERR|syscall.POLLHUP) != 0:
+		case dispFd.Revents&(syscall.POLLERR|syscall.POLLHUP) != 0:
 			break loop
 		}
 		conn.repeat.Repeat()
