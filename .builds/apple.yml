@@ -16,7 +16,7 @@ sources:
  - https://github.com/tpoechtrager/apple-libtapi.git
 environment:
    APPLE_TOOLCHAIN_ROOT: /home/build/appletools
-   PATH: /home/build/goroot/go/bin:/home/build/go/bin:/home/build/appletools/bin:/usr/bin:$PATH
+   PATH: /home/build/goroot/go/bin:/home/build/go/bin:/usr/bin:$PATH
 secrets:
  - 6363dfe0-15d9-4bd2-88a5-ae53243568c9
 tasks:
@@ -56,7 +56,9 @@ tasks:
      go build -o $APPLE_TOOLCHAIN_ROOT/tools ./cmd/appletoolchain
  - test_macos: |
      cd gio/example
+     export PATH=/home/build/appletools/bin:$PATH
      CC=$APPLE_TOOLCHAIN_ROOT/tools/clang-macos CGO_CFLAGS="--sysroot $APPLE_TOOLCHAIN_ROOT/MacOSX.sdk -arch x86_64" CGO_LDFLAGS="--sysroot $APPLE_TOOLCHAIN_ROOT/MacOSX.sdk -arch x86_64" GOOS=darwin CGO_ENABLED=1 go build -o /dev/null ./kitchen
  - test_ios: |
      cd gio/example
+     export PATH=/home/build/appletools/bin:$PATH
      gogio -target ios -o app.app ./kitchen
