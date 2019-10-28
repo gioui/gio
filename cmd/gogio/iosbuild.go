@@ -184,6 +184,7 @@ int main(int argc, char * argv[]) {
 		lipo.Args = append(lipo.Args, exeSlice)
 		compile := exec.Command(clang, cflags...)
 		compile.Args = append(compile.Args,
+			"-Werror",
 			"-fmodules",
 			"-fobjc-arc",
 			"-x", "objective-c",
