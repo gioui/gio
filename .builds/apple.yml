@@ -1,0 +1,62 @@
+image: fedora/latest
+packages:
+ - tar
+ - clang
+ - cmake
+ - python
+ - llvm-devel
+ - uuid-devel
+ - xar-devel
+ - libplist
+sources:
+ - git@git.sr.ht:~eliasnaur/applesdks
+ - https://git.sr.ht/~eliasnaur/gio
+ - https://git.sr.ht/~eliasnaur/giouiorg
+ - https://github.com/tpoechtrager/cctools-port.git
+ - https://github.com/tpoechtrager/apple-libtapi.git
+environment:
+   APPLE_TOOLCHAIN_ROOT: /home/build/appletools
+   PATH: /home/build/goroot/go/bin:/home/build/go/bin:/home/build/appletools/bin:/usr/bin:$PATH
+secrets:
+ - 6363dfe0-15d9-4bd2-88a5-ae53243568c9
+tasks:
+ - prepare_toolchain: |
+     mkdir -p $APPLE_TOOLCHAIN_ROOT
+     cd $APPLE_TOOLCHAIN_ROOT
+     tar xJvf /home/build/applesdks/applesdks.tar.xz
+     mkdir bin tools
+     cd bin
+     ln -s ../toolchain/bin/x86_64-apple-darwin19-ld ld
+     ln -s ../toolchain/bin/x86_64-apple-darwin19-ar ar
+     ln -s /home/build/cctools-port/cctools/misc/lipo lipo
+     ln -s ../tools/appletoolchain xcrun
+     ln -s /usr/bin/plistutil plutil
+     cd tools
+     ln -s appletoolchain clang-ios
+     ln -s appletoolchain clang-macos
+ - build_libtapi: |
+     cd apple-libtapi
+     INSTALLPREFIX=$APPLE_TOOLCHAIN_ROOT/libtapi ./build.sh
+     ./install.sh
+ - build_cctools: |
+     cd cctools-port/cctools
+     ./configure --prefix $APPLE_TOOLCHAIN_ROOT/toolchain --with-libtapi=$APPLE_TOOLCHAIN_ROOT/libtapi --target=x86_64-apple-darwin19
+     make install
+ - install_go: |
+     mkdir goroot
+     cd goroot
+     curl -s -o go.tar.gz https://dl.google.com/go/go1.13.3.linux-amd64.tar.gz
+     tar xzf go.tar.gz
+     rm go.tar.gz
+ - install_gogio: |
+     cd gio/cmd
+     go install ./gogio
+ - install_appletoolchain: |
+     cd giouiorg
+     go build -o $APPLE_TOOLCHAIN_ROOT/tools ./cmd/appletoolchain
+ - test_macos: |
+     cd gio/example
+     CC=$APPLE_TOOLCHAIN_ROOT/tools/clang-macos CGO_CFLAGS="--sysroot $APPLE_TOOLCHAIN_ROOT/MacOSX.sdk -arch x86_64" CGO_LDFLAGS="--sysroot $APPLE_TOOLCHAIN_ROOT/MacOSX.sdk -arch x86_64" GOOS=darwin CGO_ENABLED=1 go build -o /dev/null ./kitchen
+ - test_ios: |
+     cd gio/example
+     gogio -target ios -o app.app ./kitchen
