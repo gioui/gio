@@ -8,6 +8,7 @@ packages:
  - libegl1-mesa-dev
  - wine
  - golang
+ - xvfb
 sources:
  - https://git.sr.ht/~eliasnaur/gio
 environment:
