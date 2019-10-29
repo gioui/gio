@@ -1,6 +1,6 @@
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
-gioui.org v0.0.0-20191029003539-a7ae8b6e3d3c h1:ddqeTxQ7Yjs4c16xyQY1iK+iXv8l5NsJuI0nPkBGNbc=
-gioui.org v0.0.0-20191029003539-a7ae8b6e3d3c/go.mod h1:KqFFi2Dq5gYA3FJ0sDOt8OBXoMsuxMtE8v2f0JExXAY=
+gioui.org v0.0.0-20191029130630-4641607cd6a4 h1:WKYMON5AGU5/Xs5ezSWq9i/hiobSXBsQlsPSVXybScM=
+gioui.org v0.0.0-20191029130630-4641607cd6a4/go.mod h1:KqFFi2Dq5gYA3FJ0sDOt8OBXoMsuxMtE8v2f0JExXAY=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/chromedp/cdproto v0.0.0-20191009033829-c22f49c9ff0a h1:AuIGvB6IuWpMEdfKQ+t77D6dzLpNftzxAsktehYyWn8=
 github.com/chromedp/cdproto v0.0.0-20191009033829-c22f49c9ff0a/go.mod h1:PfAWWKJqjlGFYJEidUM6aVIWPr0EpobeyVWEEmplX7g=
