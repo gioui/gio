@@ -9,6 +9,8 @@ type expval struct {
 }
 
 func TestAppID(t *testing.T) {
+	t.Parallel()
+
 	tests := []expval{
 		{"example", "localhost.example"},
 		{"example.com", "com.example"},

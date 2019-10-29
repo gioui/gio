@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"image"
 	"image/png"
 	"io/ioutil"
 	"net/http"
@@ -25,6 +26,8 @@ import (
 var headless = flag.Bool("headless", true, "run end-to-end tests in headless mode")
 
 func TestJSOnChrome(t *testing.T) {
+	t.Parallel()
+
 	// First, build the app.
 	dir, err := ioutil.TempDir("", "gio-endtoend-js")
 	if err != nil {
@@ -124,14 +127,15 @@ func TestJSOnChrome(t *testing.T) {
 		t.Fatalf("expected dimensions to be %d*%d, got %d*%d",
 			wantSize, wantSize, size.X, size.Y)
 	}
-	wantColor := func(x, y int, r, g, b, a uint32) {
-		color := img.At(x, y)
-		r_, g_, b_, a_ := color.RGBA()
-		if r_ != r || g_ != g || b_ != b || a_ != a {
-			t.Errorf("got 0x%04x%04x%04x%04x at (%d,%d), want 0x%04x%04x%04x%04x",
-				r_, g_, b_, a_, x, y, r, g, b, a)
-		}
+	wantColor(t, img, 5, 5, 0xffff, 0x0, 0x0, 0xffff)
+	wantColor(t, img, 595, 595, 0xffff, 0x0, 0x0, 0xffff)
+}
+
+func wantColor(t *testing.T, img image.Image, x, y int, r, g, b, a uint32) {
+	color := img.At(x, y)
+	r_, g_, b_, a_ := color.RGBA()
+	if r_ != r || g_ != g || b_ != b || a_ != a {
+		t.Errorf("got 0x%04x%04x%04x%04x at (%d,%d), want 0x%04x%04x%04x%04x",
+			r_, g_, b_, a_, x, y, r, g, b, a)
 	}
-	wantColor(5, 5, 0xffff, 0x0, 0x0, 0xffff)
-	wantColor(595, 595, 0xffff, 0x0, 0x0, 0xffff)
 }
