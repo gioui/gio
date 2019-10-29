@@ -9,8 +9,10 @@ package main_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,9 +29,11 @@ import (
 func TestX11(t *testing.T) {
 	t.Parallel()
 
-	// TODO(mvdan): pick a random one between a large pool, and retry if
-	// it's already taken.
-	const display = ":15"
+	// Pick a random display number between 1 and 100,000. Most machines
+	// will only be using :0, so there's only a 0.001% chance of two
+	// concurrent test runs to run into a conflict.
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	display := fmt.Sprintf(":%d", rnd.Intn(100000)+1)
 
 	var xprog string
 	xflags := []string{"-wr"}
@@ -65,20 +69,41 @@ func TestX11(t *testing.T) {
 	{
 		ctx, cancel := context.WithCancel(context.Background())
 		cmd := exec.CommandContext(ctx, xprog, xflags...)
-		out := &bytes.Buffer{}
-		cmd.Stdout = out
-		cmd.Stderr = out
+		combined := &bytes.Buffer{}
+		cmd.Stdout = combined
+		cmd.Stderr = combined
 		if err := cmd.Start(); err != nil {
 			t.Fatal(err)
 		}
 		defer cancel()
-		// TODO(mvdan): properly wait for the display to be ready instead.
-		time.Sleep(200 * time.Millisecond)
+		defer func() {
+			// Give Xserver a chance to exit gracefully, cleaning up
+			// after itself in /tmp. After 10ms, the deferred cancel
+			// above will signal an os.Kill.
+			cmd.Process.Signal(os.Interrupt)
+			time.Sleep(10 * time.Millisecond)
+		}()
+
+		// Wait for up to 1s (100 * 10ms) for the X server to be ready.
+		for i := 0; ; i++ {
+			time.Sleep(10 * time.Millisecond)
+			// This socket path isn't terribly portable, but the xgb
+			// library we use does the same, and we only really care
+			// about Linux here.
+			socket := fmt.Sprintf("/tmp/.X11-unix/X%s", display[1:])
+			if _, err := os.Stat(socket); err == nil {
+				break
+			}
+			if i >= 100 {
+				t.Fatalf("timed out waiting for %s", socket)
+			}
+		}
+
 		wg.Add(1)
 		go func() {
 			if err := cmd.Wait(); err != nil && ctx.Err() == nil {
 				// Print all output and error.
-				io.Copy(os.Stdout, out)
+				io.Copy(os.Stdout, combined)
 				t.Error(err)
 			}
 			wg.Done()
@@ -126,7 +151,7 @@ func TestX11(t *testing.T) {
 			// encounter a panic if the Xorg server exits before xgb
 			// has shut down fully.
 			// See: https://github.com/BurntSushi/xgb/pull/44
-			time.Sleep(20 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 		}()
 
 		// Wait for the gio app to render.
