@@ -261,13 +261,6 @@ func (w *Window) run(opts *window.Options) {
 				w.hasNextFrame = false
 				e2.Frame = w.update
 				w.out <- e2.FrameEvent
-				var frame *op.Ops
-				// Wait for either a frame or the ack event,
-				// which meant that the client didn't draw.
-				select {
-				case frame = <-w.frames:
-				case w.out <- ackEvent:
-				}
 				if w.gpu != nil {
 					if e2.Sync {
 						w.gpu.Refresh()
@@ -289,6 +282,13 @@ func (w *Window) run(opts *window.Options) {
 						w.destroy(err)
 						return
 					}
+				}
+				var frame *op.Ops
+				// Wait for either a frame or the ack event,
+				// which meant that the client didn't draw.
+				select {
+				case frame = <-w.frames:
+				case w.out <- ackEvent:
 				}
 				w.draw(e2.Size, frame)
 				if e2.Sync {
