@@ -43,11 +43,20 @@ func TestJSOnChrome(t *testing.T) {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", *headless),
 
-		// We need use-gl=egl instead of the default of use-gl=desktop;
-		// "desktop" doesn't seem to work when we're in headless mode.
-		// TODO(mvdan): Does egl require a GPU? If so, consider
-		// use-gl=swiftshader, which will use CPU-based rendering. That
-		// might be necessary for some CI or headless environments.
+		// The default would be use-gl=desktop when there's a GPU we can
+		// use, falling back to use-gl=swiftshader otherwise or when we
+		// are running in headless mode. Swiftshader allows full WebGL
+		// support with just a CPU.
+		//
+		// Unfortunately, many Linux distros like Arch and Alpine
+		// package Chromium without Swiftshader, so we can't rely on the
+		// defaults above. use-gl=egl works on any machine with a GPU,
+		// even if we run Chrome in headless mode, which is OK for now.
+		//
+		// TODO(mvdan): remove all of this once these issues are fixed:
+		//
+		//    https://bugs.archlinux.org/task/64307
+		//    https://gitlab.alpinelinux.org/alpine/aports/issues/10920
 		chromedp.Flag("use-gl", "egl"),
 	)
 
