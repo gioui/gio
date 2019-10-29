@@ -23,7 +23,7 @@ tasks:
  - prepare_toolchain: |
      mkdir -p $APPLE_TOOLCHAIN_ROOT
      cd $APPLE_TOOLCHAIN_ROOT
-     tar xJvf /home/build/applesdks/applesdks.tar.xz
+     tar xJf /home/build/applesdks/applesdks.tar.xz
      mkdir bin tools
      cd bin
      ln -s ../toolchain/bin/x86_64-apple-darwin19-ld ld
