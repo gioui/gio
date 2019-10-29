@@ -112,11 +112,6 @@ func (w *x11Window) wakeup() {
 }
 
 func (w *x11Window) display() unsafe.Pointer {
-	// TODO(dennwc): We have an awesome X library written in pure Go, however,
-	//               we can't use it because of this specific function.
-	//               The *C.Display pointer is required to call eglGetDisplay,
-	//               so we can't really implement the call in pure Go.
-	//               Thus, we have to use Xlib for everything.
 	return unsafe.Pointer(w.x)
 }
 
@@ -137,23 +132,39 @@ func (w *x11Window) loop() {
 		{Fd: int32(xfd), Events: syscall.POLLIN | syscall.POLLERR},
 		{Fd: int32(w.notify.read), Events: syscall.POLLIN | syscall.POLLERR},
 	}
-	dispEvents := &pollfds[0].Revents
+	xEvents := &pollfds[0].Revents
 	// Plenty of room for a backlog of notifications.
 	buf := make([]byte, 100)
 
-	var syn, redraw bool
 loop:
 	for !w.dead {
-		w.mu.Lock()
-		animating := w.animating
-		w.mu.Unlock()
-		// Clear poll events.
-		*dispEvents = 0
-		if animating {
-			redraw = true
-			syn = h.handleEvents()
-		} else if _, err := syscall.Ppoll(pollfds, nil, nil); err != nil && err != syscall.EINTR {
-			panic(fmt.Errorf("x11 loop: poll failed: %w", err))
+		var syn, redraw bool
+		// Check for pending draw events before checking animation or blocking.
+		// This fixes an issue on Xephyr where on startup XPending() > 0 but
+		// Ppoll will still block. This also prevents no-op calls to Ppoll.
+		if syn = h.handleEvents(); !syn {
+			w.mu.Lock()
+			animating := w.animating
+			w.mu.Unlock()
+			if animating {
+				redraw = true
+			} else {
+				// Clear poll events.
+				*xEvents = 0
+				// Wait for X event or gio notification.
+				if _, err := syscall.Ppoll(pollfds, nil, nil); err != nil && err != syscall.EINTR {
+					panic(fmt.Errorf("x11 loop: poll failed: %w", err))
+				}
+				switch {
+				case *xEvents&syscall.POLLIN != 0:
+					syn = h.handleEvents()
+					if w.dead {
+						break loop
+					}
+				case *xEvents&(syscall.POLLERR|syscall.POLLHUP) != 0:
+					break loop
+				}
+			}
 		}
 		// Clear notifications.
 		for {
@@ -165,15 +176,6 @@ loop:
 				panic(fmt.Errorf("x11 loop: read from notify pipe failed: %w", err))
 			}
 			redraw = true
-		}
-		switch {
-		case *dispEvents&syscall.POLLIN != 0:
-			syn = h.handleEvents() || syn
-			if w.dead {
-				break loop
-			}
-		case *dispEvents&(syscall.POLLERR|syscall.POLLHUP) != 0:
-			break loop
 		}
 
 		if redraw || syn {
@@ -188,8 +190,6 @@ loop:
 				},
 				Sync: syn,
 			})
-			redraw = false
-			syn = false
 		}
 	}
 	w.w.Event(system.DestroyEvent{Err: nil})
