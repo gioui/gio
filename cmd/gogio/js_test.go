@@ -13,8 +13,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 
+	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
 
 	_ "gioui.org/unit" // the build tool adds it to go.mod, so keep it there
@@ -62,6 +64,22 @@ func TestJSOnChrome(t *testing.T) {
 		}
 		t.Fatal(err)
 	}
+	chromedp.ListenTarget(ctx, func(ev interface{}) {
+		switch ev := ev.(type) {
+		case *runtime.EventConsoleAPICalled:
+			switch ev.Type {
+			case "log", "info", "warning", "error":
+				var args strings.Builder
+				for i, arg := range ev.Args {
+					if i > 0 {
+						args.WriteString(", ")
+					}
+					args.Write(arg.Value)
+				}
+				t.Logf("console %s: %s", ev.Type, args.String())
+			}
+		}
+	})
 
 	// Third, serve the app folder, set the browser tab dimensions, and
 	// navigate to the folder.
