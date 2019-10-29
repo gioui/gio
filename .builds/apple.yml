@@ -1,19 +1,23 @@
-image: fedora/latest
+image: debian/testing
 packages:
- - tar
  - clang
  - cmake
  - python
- - llvm-devel
- - uuid-devel
- - xar-devel
- - libplist
+ - autoconf
+ - libxml2-dev
+ - libssl-dev
+ - libz-dev
+ - llvm-dev # for cctools
+ - uuid-dev ## for cctools
+ - libplist-utils # for gogio
+ - golang
 sources:
  - git@git.sr.ht:~eliasnaur/applesdks
  - https://git.sr.ht/~eliasnaur/gio
  - https://git.sr.ht/~eliasnaur/giouiorg
  - https://github.com/tpoechtrager/cctools-port.git
  - https://github.com/tpoechtrager/apple-libtapi.git
+ - https://github.com/mackyle/xar.git
 environment:
    APPLE_TOOLCHAIN_ROOT: /home/build/appletools
    PATH: /home/build/goroot/go/bin:/home/build/go/bin:/usr/bin:$PATH
@@ -34,6 +38,17 @@ tasks:
      cd ../tools
      ln -s appletoolchain clang-ios
      ln -s appletoolchain clang-macos
+ - install_gogio: |
+     cd gio/cmd
+     go install ./gogio
+ - install_appletoolchain: |
+     cd giouiorg
+     go build -o $APPLE_TOOLCHAIN_ROOT/tools ./cmd/appletoolchain
+ - build_xar: |
+     cd xar/xar
+     ac_cv_lib_crypto_OpenSSL_add_all_ciphers=yes CC=clang ./autogen.sh --prefix=/usr
+     make
+     sudo make install
  - build_libtapi: |
      cd apple-libtapi
      INSTALLPREFIX=$APPLE_TOOLCHAIN_ROOT/libtapi ./build.sh
@@ -42,16 +57,6 @@ tasks:
      cd cctools-port/cctools
      ./configure --prefix $APPLE_TOOLCHAIN_ROOT/toolchain --with-libtapi=$APPLE_TOOLCHAIN_ROOT/libtapi --target=x86_64-apple-darwin19
      make install
- - install_go: |
-     mkdir goroot
-     cd goroot
-     curl -s https://dl.google.com/go/go1.13.3.linux-amd64.tar.gz | tar xz
- - install_gogio: |
-     cd gio/cmd
-     go install ./gogio
- - install_appletoolchain: |
-     cd giouiorg
-     go build -o $APPLE_TOOLCHAIN_ROOT/tools ./cmd/appletoolchain
  - test_macos: |
      cd gio/example
      export PATH=/home/build/appletools/bin:$PATH

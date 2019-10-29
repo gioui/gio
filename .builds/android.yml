@@ -1,7 +1,8 @@
-image: fedora/latest
+image: debian/testing
 packages:
- - tar
- - java-1.8.0-openjdk-devel
+ - curl
+ - unzip
+ - golang
 sources:
  - https://git.sr.ht/~eliasnaur/gio
 environment:
@@ -10,10 +11,9 @@ environment:
    android_sdk_tools_zip: sdk-tools-linux-3859397.zip
    android_ndk_zip: android-ndk-r20-linux-x86_64.zip
 tasks:
- - install_go: |
-     mkdir goroot
-     cd goroot
-     curl -s https://dl.google.com/go/go1.13.3.linux-amd64.tar.gz | tar xz
+ - install_jdk8: |
+     curl -so jdk.deb "https://cdn.azul.com/zulu/bin/zulu8.42.0.21-ca-jdk8.0.232-linux_amd64.deb"
+     sudo apt install -y -f ./jdk.deb
  - install_android: |
      mkdir android
      cd android
