@@ -13,9 +13,7 @@ tasks:
  - install_go: |
      mkdir goroot
      cd goroot
-     curl -s -o go.tar.gz https://dl.google.com/go/go1.13.3.linux-amd64.tar.gz
-     tar xzf go.tar.gz
-     rm go.tar.gz
+     curl -s https://dl.google.com/go/go1.13.3.linux-amd64.tar.gz | tar xz
  - install_android: |
      mkdir android
      cd android
