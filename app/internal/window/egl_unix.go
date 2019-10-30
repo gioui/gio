@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
+// +build linux freebsd
+
 package window
 
 /*
 #cgo LDFLAGS: -lEGL
+#cgo freebsd CFLAGS: -I/usr/local/include
+#cgo freebsd LDFLAGS: -L/usr/local/lib
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>

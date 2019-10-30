@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build linux,!android,!nowayland
+// +build linux,!android,!nowayland freebsd
 
 #include <wayland-client.h>
 #include "wayland_xdg_shell.h"

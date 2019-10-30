@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build linux,!android,!nox11
+// +build linux,!android,!nox11 freebsd
 
 package window
 

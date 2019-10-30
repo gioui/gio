@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build linux,!android,!nowayland
+// +build linux,!android,!nowayland freebsd
 
 package window
 

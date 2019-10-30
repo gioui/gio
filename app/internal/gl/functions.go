@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build darwin linux
+// +build darwin linux freebsd
 
 package gl
 
@@ -10,7 +10,9 @@ import (
 
 /*
 #cgo CFLAGS: -Werror
-#cgo linux LDFLAGS: -lGLESv2 -ldl
+#cgo linux freebsd LDFLAGS: -lGLESv2 -ldl
+#cgo freebsd CFLAGS: -I/usr/local/include
+#cgo freebsd LDFLAGS: -L/usr/local/lib
 #cgo darwin,!ios CFLAGS: -DGL_SILENCE_DEPRECATION
 #cgo darwin,!ios LDFLAGS: -framework OpenGL
 #cgo darwin,ios CFLAGS: -DGLES_SILENCE_DEPRECATION

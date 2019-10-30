@@ -1,0 +1,25 @@
+image: freebsd/latest
+packages:
+ - libX11
+ - libxkbcommon
+ - wayland
+ - mesa-libs
+ - xorg-vfbserver
+ - go
+sources:
+ - https://git.sr.ht/~eliasnaur/gio
+environment:
+    PATH: /bin:/usr/local/bin:/usr/bin
+tasks:
+ - test_gio: |
+     cd gio
+     go test ./...
+ - test_example: |
+     cd gio/example
+     go test ./...
+ - test_cmd: |
+     cd gio/cmd
+     go test ./...
+ - check_gofmt: |
+     cd gio
+     test -z $(gofmt -s -l .)

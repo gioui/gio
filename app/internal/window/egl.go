@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build linux windows
+// +build linux windows freebsd
 
 package window
 
