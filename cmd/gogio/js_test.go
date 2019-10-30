@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"flag"
 	"image"
 	"image/png"
 	"io/ioutil"
@@ -23,23 +22,28 @@ import (
 	_ "gioui.org/unit" // the build tool adds it to go.mod, so keep it there
 )
 
-var headless = flag.Bool("headless", true, "run end-to-end tests in headless mode")
+type JSTestDriver struct {
+	t *testing.T
 
-func TestJSOnChrome(t *testing.T) {
-	t.Parallel()
+	// ctx is the chromedp context.
+	ctx context.Context
+}
+
+func (d *JSTestDriver) Start(t_ *testing.T, path string, width, height int) (cleanups []func()) {
+	d.t = t_
 
 	// First, build the app.
 	dir, err := ioutil.TempDir("", "gio-endtoend-js")
 	if err != nil {
-		t.Fatal(err)
+		d.t.Fatal(err)
 	}
-	defer os.RemoveAll(dir)
+	cleanups = append(cleanups, func() { os.RemoveAll(dir) })
 
 	// TODO(mvdan): This is inefficient, as we link the gogio tool every time.
 	// Consider options in the future. On the plus side, this is simple.
-	cmd := exec.Command("go", "run", ".", "-target=js", "-o="+dir, "testdata/red.go")
+	cmd := exec.Command("go", "run", ".", "-target=js", "-o="+dir, path)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("could not build app: %s:\n%s", err, out)
+		d.t.Fatalf("could not build app: %s:\n%s", err, out)
 	}
 
 	// Second, start Chrome.
@@ -64,20 +68,21 @@ func TestJSOnChrome(t *testing.T) {
 	)
 
 	actx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	defer cancel()
+	cleanups = append(cleanups, cancel)
 
 	ctx, cancel := chromedp.NewContext(actx,
 		// Send all logf/errf calls to t.Logf
-		chromedp.WithLogf(t.Logf),
+		chromedp.WithLogf(d.t.Logf),
 	)
-	defer cancel()
+	cleanups = append(cleanups, cancel)
+	d.ctx = ctx
 
 	if err := chromedp.Run(ctx); err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
-			t.Skipf("test requires Chrome to be installed: %v", err)
+			d.t.Skipf("test requires Chrome to be installed: %v", err)
 			return
 		}
-		t.Fatal(err)
+		d.t.Fatal(err)
 	}
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		switch ev := ev.(type) {
@@ -91,7 +96,7 @@ func TestJSOnChrome(t *testing.T) {
 					}
 					args.Write(arg.Value)
 				}
-				t.Logf("console %s: %s", ev.Type, args.String())
+				d.t.Logf("console %s: %s", ev.Type, args.String())
 			}
 		}
 	})
@@ -99,46 +104,40 @@ func TestJSOnChrome(t *testing.T) {
 	// Third, serve the app folder, set the browser tab dimensions, and
 	// navigate to the folder.
 	ts := httptest.NewServer(http.FileServer(http.Dir(dir)))
-	defer ts.Close()
+	cleanups = append(cleanups, ts.Close)
 
 	if err := chromedp.Run(ctx,
-		// A small window with 2x HiDPI.
-		chromedp.EmulateViewport(300, 300, chromedp.EmulateScale(2.0)),
+		chromedp.EmulateViewport(int64(width), int64(height)),
 		chromedp.Navigate(ts.URL),
 	); err != nil {
-		t.Fatal(err)
+		d.t.Fatal(err)
 	}
 
-	// Finally, run the test.
-
-	// 1: Once the canvas is ready, grab a screenshot to check that the
-	//    entirety of the viewport is red, as per the background color.
-	var buf []byte
 	if err := chromedp.Run(ctx,
 		chromedp.WaitReady("canvas", chromedp.ByQuery),
+	); err != nil {
+		d.t.Fatal(err)
+	}
+
+	return cleanups
+}
+
+func (d *JSTestDriver) Screenshot() image.Image {
+	var buf []byte
+	if err := chromedp.Run(d.ctx,
 		chromedp.CaptureScreenshot(&buf),
 	); err != nil {
-		t.Fatal(err)
+		d.t.Fatal(err)
 	}
 	img, err := png.Decode(bytes.NewReader(buf))
 	if err != nil {
-		t.Fatal(err)
+		d.t.Fatal(err)
 	}
-	size := img.Bounds().Size()
-	wantSize := 600 // 300px at 2.0 scaling factor
-	if size.X != wantSize || size.Y != wantSize {
-		t.Fatalf("expected dimensions to be %d*%d, got %d*%d",
-			wantSize, wantSize, size.X, size.Y)
-	}
-	wantColor(t, img, 5, 5, 0xdede, 0xadad, 0xbebe)
-	wantColor(t, img, 595, 595, 0xdede, 0xadad, 0xbebe)
+	return img
 }
 
-func wantColor(t *testing.T, img image.Image, x, y int, r, g, b uint32) {
-	color := img.At(x, y)
-	r_, g_, b_, _ := color.RGBA()
-	if r_ != r || g_ != g || b_ != b {
-		t.Errorf("got 0x%04x%04x%04x at (%d,%d), want 0x%04x%04x%04x",
-			r_, g_, b_, x, y, r, g, b)
-	}
+func TestJS(t *testing.T) {
+	t.Parallel()
+
+	runEndToEndTest(t, &JSTestDriver{})
 }

@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"image"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -26,8 +27,15 @@ import (
 	"github.com/BurntSushi/xgbutil/xgraphics"
 )
 
-func TestX11(t *testing.T) {
-	t.Parallel()
+type X11TestDriver struct {
+	t *testing.T
+
+	// conn holds the connection to X.
+	conn *xgbutil.XUtil
+}
+
+func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cleanups []func()) {
+	d.t = t_
 
 	// Pick a random display number between 1 and 100,000. Most machines
 	// will only be using :0, so there's only a 0.001% chance of two
@@ -39,31 +47,31 @@ func TestX11(t *testing.T) {
 	xflags := []string{"-wr"}
 	if *headless {
 		xprog = "Xvfb" // virtual X server
-		xflags = append(xflags, "-screen", "0", "600x600x24")
+		xflags = append(xflags, "-screen", "0", fmt.Sprintf("%dx%dx24", width, height))
 	} else {
 		xprog = "Xephyr" // nested X server as a window
-		xflags = append(xflags, "-screen", "600x600")
+		xflags = append(xflags, "-screen", fmt.Sprintf("%dx%d", width, height))
 	}
 	xflags = append(xflags, display)
 	if _, err := exec.LookPath(xprog); err != nil {
-		t.Skipf("%s needed to run with -headless=%t", xprog, *headless)
+		d.t.Skipf("%s needed to run with -headless=%t", xprog, *headless)
 	}
 
 	// First, build the app.
 	dir, err := ioutil.TempDir("", "gio-endtoend-x11")
 	if err != nil {
-		t.Fatal(err)
+		d.t.Fatal(err)
 	}
-	defer os.RemoveAll(dir)
+	cleanups = append(cleanups, func() { os.RemoveAll(dir) })
 
 	bin := filepath.Join(dir, "red")
-	cmd := exec.Command("go", "build", "-o="+bin, "testdata/red.go")
+	cmd := exec.Command("go", "build", "-o="+bin, path)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("could not build app: %s:\n%s", err, out)
+		d.t.Fatalf("could not build app: %s:\n%s", err, out)
 	}
 
 	var wg sync.WaitGroup
-	defer wg.Wait()
+	cleanups = append(cleanups, wg.Wait)
 
 	// First, start the X server.
 	{
@@ -73,16 +81,16 @@ func TestX11(t *testing.T) {
 		cmd.Stdout = combined
 		cmd.Stderr = combined
 		if err := cmd.Start(); err != nil {
-			t.Fatal(err)
+			d.t.Fatal(err)
 		}
-		defer cancel()
-		defer func() {
+		cleanups = append(cleanups, cancel)
+		cleanups = append(cleanups, func() {
 			// Give Xserver a chance to exit gracefully, cleaning up
 			// after itself in /tmp. After 10ms, the deferred cancel
 			// above will signal an os.Kill.
 			cmd.Process.Signal(os.Interrupt)
 			time.Sleep(10 * time.Millisecond)
-		}()
+		})
 
 		// Wait for up to 1s (100 * 10ms) for the X server to be ready.
 		for i := 0; ; i++ {
@@ -95,7 +103,7 @@ func TestX11(t *testing.T) {
 				break
 			}
 			if i >= 100 {
-				t.Fatalf("timed out waiting for %s", socket)
+				d.t.Fatalf("timed out waiting for %s", socket)
 			}
 		}
 
@@ -104,7 +112,7 @@ func TestX11(t *testing.T) {
 			if err := cmd.Wait(); err != nil && ctx.Err() == nil {
 				// Print all output and error.
 				io.Copy(os.Stdout, combined)
-				t.Error(err)
+				d.t.Error(err)
 			}
 			wg.Done()
 		}()
@@ -119,58 +127,58 @@ func TestX11(t *testing.T) {
 		cmd.Stdout = out
 		cmd.Stderr = out
 		if err := cmd.Start(); err != nil {
-			t.Fatal(err)
+			d.t.Fatal(err)
 		}
-		defer cancel()
+		cleanups = append(cleanups, cancel)
 		wg.Add(1)
 		go func() {
 			if err := cmd.Wait(); err != nil && ctx.Err() == nil {
 				// Print all output and error.
 				io.Copy(os.Stdout, out)
-				t.Error(err)
+				d.t.Error(err)
 			}
 			wg.Done()
 		}()
 	}
 
-	// Finally, run our tests. A connection to the X server is used to
-	// interact with it.
-	{
-		xgb.Logger.SetOutput(testLogWriter{t})
-		xgbutil.Logger.SetOutput(testLogWriter{t})
-		xu, err := xgbutil.NewConnDisplay(display)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			xu.Conn().Close()
-			// TODO(mvdan): Figure out a way to remove this sleep
-			// without introducing a panic. The xgb code will
-			// encounter a panic if the Xorg server exits before xgb
-			// has shut down fully.
-			// See: https://github.com/BurntSushi/xgb/pull/44
-			time.Sleep(10 * time.Millisecond)
-		}()
-
-		// Wait for the gio app to render.
-		// TODO(mvdan): do this properly, e.g. via waiting for log lines
-		// from the gio program.
-		time.Sleep(200 * time.Millisecond)
-
-		img, err := xgraphics.NewDrawable(xu, xproto.Drawable(xu.RootWin()))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		size := img.Bounds().Size()
-		wantSize := 600 // 300px at 2.0 scaling factor
-		if size.X != wantSize || size.Y != wantSize {
-			t.Fatalf("expected dimensions to be %d*%d, got %d*%d",
-				wantSize, wantSize, size.X, size.Y)
-		}
-		wantColor(t, img, 5, 5, 0xdede, 0xadad, 0xbebe)
-		wantColor(t, img, 595, 595, 0xdede, 0xadad, 0xbebe)
+	// Finally, connect to the X server.
+	xgb.Logger.SetOutput(testLogWriter{d.t})
+	xgbutil.Logger.SetOutput(testLogWriter{d.t})
+	conn, err := xgbutil.NewConnDisplay(display)
+	if err != nil {
+		d.t.Fatal(err)
 	}
+	d.conn = conn
+	cleanups = append(cleanups, func() {
+		conn.Conn().Close()
+		// TODO(mvdan): Figure out a way to remove this sleep
+		// without introducing a panic. The xgb code will
+		// encounter a panic if the Xorg server exits before xgb
+		// has shut down fully.
+		// See: https://github.com/BurntSushi/xgb/pull/44
+		time.Sleep(10 * time.Millisecond)
+	})
+
+	// Wait for the gio app to render.
+	// TODO(mvdan): do this properly, e.g. via waiting for log lines
+	// from the gio program.
+	time.Sleep(200 * time.Millisecond)
+
+	return cleanups
+}
+
+func (d *X11TestDriver) Screenshot() image.Image {
+	img, err := xgraphics.NewDrawable(d.conn, xproto.Drawable(d.conn.RootWin()))
+	if err != nil {
+		d.t.Fatal(err)
+	}
+	return img
+}
+
+func TestX11(t *testing.T) {
+	t.Parallel()
+
+	runEndToEndTest(t, &X11TestDriver{})
 }
 
 // testLogWriter is a bit of a hack to redirect libraries that use a *log.Logger
