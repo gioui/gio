@@ -141,7 +141,7 @@ loop:
 		var syn, redraw bool
 		// Check for pending draw events before checking animation or blocking.
 		// This fixes an issue on Xephyr where on startup XPending() > 0 but
-		// Ppoll will still block. This also prevents no-op calls to Ppoll.
+		// poll will still block. This also prevents no-op calls to poll.
 		if syn = h.handleEvents(); !syn {
 			w.mu.Lock()
 			animating := w.animating
@@ -152,7 +152,7 @@ loop:
 				// Clear poll events.
 				*xEvents = 0
 				// Wait for X event or gio notification.
-				if _, err := syscall.Ppoll(pollfds, nil, nil); err != nil && err != syscall.EINTR {
+				if _, err := syscall.Poll(pollfds, -1); err != nil && err != syscall.EINTR {
 					panic(fmt.Errorf("x11 loop: poll failed: %w", err))
 				}
 				switch {

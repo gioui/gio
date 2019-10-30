@@ -783,8 +783,8 @@ loop:
 		}
 		// Clear poll events.
 		dispFd.Revents = 0
-		if _, err := syscall.Ppoll(pollfds, nil, nil); err != nil && err != syscall.EINTR {
-			panic(fmt.Errorf("ppoll failed: %v", err))
+		if _, err := syscall.Poll(pollfds, -1); err != nil && err != syscall.EINTR {
+			panic(fmt.Errorf("poll failed: %v", err))
 		}
 		redraw := false
 		// Clear notifications.
