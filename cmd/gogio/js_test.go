@@ -127,15 +127,15 @@ func TestJSOnChrome(t *testing.T) {
 		t.Fatalf("expected dimensions to be %d*%d, got %d*%d",
 			wantSize, wantSize, size.X, size.Y)
 	}
-	wantColor(t, img, 5, 5, 0xffff, 0x0, 0x0, 0xffff)
-	wantColor(t, img, 595, 595, 0xffff, 0x0, 0x0, 0xffff)
+	wantColor(t, img, 5, 5, 0xffff, 0x0, 0x0)
+	wantColor(t, img, 595, 595, 0xffff, 0x0, 0x0)
 }
 
-func wantColor(t *testing.T, img image.Image, x, y int, r, g, b, a uint32) {
+func wantColor(t *testing.T, img image.Image, x, y int, r, g, b uint32) {
 	color := img.At(x, y)
-	r_, g_, b_, a_ := color.RGBA()
-	if r_ != r || g_ != g || b_ != b || a_ != a {
-		t.Errorf("got 0x%04x%04x%04x%04x at (%d,%d), want 0x%04x%04x%04x%04x",
-			r_, g_, b_, a_, x, y, r, g, b, a)
+	r_, g_, b_, _ := color.RGBA()
+	if r_ != r || g_ != g || b_ != b {
+		t.Errorf("got 0x%04x%04x%04x at (%d,%d), want 0x%04x%04x%04x",
+			r_, g_, b_, x, y, r, g, b)
 	}
 }
