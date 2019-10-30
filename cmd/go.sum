@@ -1,6 +1,6 @@
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
-gioui.org v0.0.0-20191029235321-2e605f2dcb71 h1:J+59W0JA01fsrrpbrgYQHdnifGjNzl+LOuBzCiyeU64=
-gioui.org v0.0.0-20191029235321-2e605f2dcb71/go.mod h1:KqFFi2Dq5gYA3FJ0sDOt8OBXoMsuxMtE8v2f0JExXAY=
+gioui.org v0.0.0-20191030130102-3425b25ecc8c h1:h0VrBMpHZWFiCL/Hy6TYgLi4sJFQnIT59sHqgEW9fYE=
+gioui.org v0.0.0-20191030130102-3425b25ecc8c/go.mod h1:KqFFi2Dq5gYA3FJ0sDOt8OBXoMsuxMtE8v2f0JExXAY=
 github.com/BurntSushi/freetype-go v0.0.0-20160129220410-b763ddbfe298 h1:1qlsVAQJXZHsaM8b6OLVo6muQUQd4CwkH/D3fnnbHXA=
 github.com/BurntSushi/freetype-go v0.0.0-20160129220410-b763ddbfe298/go.mod h1:D+QujdIlUNfa0igpNMk6UIvlb6C252URs4yupRUV4lQ=
 github.com/BurntSushi/graphics-go v0.0.0-20160129215708-b43f31a4a966 h1:lTG4HQym5oPKjL7nGs+csTgiDna685ZXjxijkne828g=
