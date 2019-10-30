@@ -6,7 +6,7 @@ packages:
 sources:
  - https://git.sr.ht/~eliasnaur/gio
 environment:
-   PATH: $PATH:/usr/bin:/home/build/goroot/go/bin:/home/build/go/bin:/home/build/android/tools/bin
+   PATH: $PATH:/usr/bin:/home/build/go/bin:/home/build/android/tools/bin
    ANDROID_HOME: /home/build/android
    android_sdk_tools_zip: sdk-tools-linux-3859397.zip
    android_ndk_zip: android-ndk-r20-linux-x86_64.zip
