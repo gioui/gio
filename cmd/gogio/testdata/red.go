@@ -25,7 +25,7 @@ func main() {
 }
 
 func loop(w *app.Window) error {
-	background := color.RGBA{255, 0, 0, 255}
+	background := color.RGBA{R: 0xde, G: 0xad, B: 0xbe, A: 0xff}
 	ops := new(op.Ops)
 	for {
 		e := <-w.Events()

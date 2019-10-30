@@ -127,8 +127,8 @@ func TestJSOnChrome(t *testing.T) {
 		t.Fatalf("expected dimensions to be %d*%d, got %d*%d",
 			wantSize, wantSize, size.X, size.Y)
 	}
-	wantColor(t, img, 5, 5, 0xffff, 0x0, 0x0)
-	wantColor(t, img, 595, 595, 0xffff, 0x0, 0x0)
+	wantColor(t, img, 5, 5, 0xdede, 0xadad, 0xbebe)
+	wantColor(t, img, 595, 595, 0xdede, 0xadad, 0xbebe)
 }
 
 func wantColor(t *testing.T, img image.Image, x, y int, r, g, b uint32) {
