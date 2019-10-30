@@ -12,7 +12,7 @@ packages:
 sources:
  - https://git.sr.ht/~eliasnaur/gio
 environment:
- PATH: $PATH:/usr/bin
+ PATH: /usr/bin
 tasks:
  - install_chrome: |
      curl -s https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -

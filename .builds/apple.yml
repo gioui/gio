@@ -20,7 +20,7 @@ sources:
  - https://github.com/mackyle/xar.git
 environment:
    APPLE_TOOLCHAIN_ROOT: /home/build/appletools
-   PATH: /home/build/go/bin:/usr/bin:$PATH
+   PATH: /home/build/go/bin:/usr/bin
 secrets:
  - 6363dfe0-15d9-4bd2-88a5-ae53243568c9
 tasks:
