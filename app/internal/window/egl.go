@@ -40,6 +40,7 @@ type eglContext struct {
 }
 
 var (
+	nilEGLDisplay          _EGLDisplay
 	nilEGLSurface          _EGLSurface
 	nilEGLContext          _EGLContext
 	nilEGLConfig           _EGLConfig
@@ -194,7 +195,7 @@ func hasExtension(exts []string, ext string) bool {
 
 func createContext(disp _EGLNativeDisplayType) (*eglContext, error) {
 	eglDisp := eglGetDisplay(disp)
-	if eglDisp == 0 {
+	if eglDisp == nilEGLDisplay {
 		return nil, fmt.Errorf("eglGetDisplay(_EGL_DEFAULT_DISPLAY) failed: 0x%x", eglGetError())
 	}
 	major, minor, ret := eglInitialize(eglDisp)
