@@ -66,7 +66,10 @@ func TestJSOnChrome(t *testing.T) {
 	actx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
 	defer cancel()
 
-	ctx, cancel := chromedp.NewContext(actx)
+	ctx, cancel := chromedp.NewContext(actx,
+		// Send all logf/errf calls to t.Logf
+		chromedp.WithLogf(t.Logf),
+	)
 	defer cancel()
 
 	if err := chromedp.Run(ctx); err != nil {

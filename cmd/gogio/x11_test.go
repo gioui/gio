@@ -136,10 +136,8 @@ func TestX11(t *testing.T) {
 	// Finally, run our tests. A connection to the X server is used to
 	// interact with it.
 	{
-		if !testing.Verbose() {
-			xgb.Logger.SetOutput(ioutil.Discard)
-			xgbutil.Logger.SetOutput(ioutil.Discard)
-		}
+		xgb.Logger.SetOutput(testLogWriter{t})
+		xgbutil.Logger.SetOutput(testLogWriter{t})
 		xu, err := xgbutil.NewConnDisplay(display)
 		if err != nil {
 			t.Fatal(err)
@@ -173,4 +171,19 @@ func TestX11(t *testing.T) {
 		wantColor(t, img, 5, 5, 0xdede, 0xadad, 0xbebe)
 		wantColor(t, img, 595, 595, 0xdede, 0xadad, 0xbebe)
 	}
+}
+
+// testLogWriter is a bit of a hack to redirect libraries that use a *log.Logger
+// variable to instead send their logs to t.Logf.
+//
+// Since *log.Logger isn't an interface and can only take an io.Writer, all we
+// can do is implement an io.Writer that sends its output to t.Logf. We end up
+// with duplicate log prefixes, but that doesn't seem so bad.
+type testLogWriter struct {
+	t *testing.T
+}
+
+func (w testLogWriter) Write(p []byte) (n int, err error) {
+	w.t.Logf("%s", p)
+	return len(p), nil
 }
