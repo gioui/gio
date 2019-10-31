@@ -32,16 +32,58 @@ func runEndToEndTest(t *testing.T, driver TestDriver) {
 	width, height := 800, 600
 	cleanups := driver.Start(t, "testdata/red.go", width, height)
 
-	// We expect to receive a 800x600px screenshot that's filled with
-	// 0xdeadbeef as the color.
+	// We expect to receive a 800x600px screenshot.
 	img := driver.Screenshot()
 	size := img.Bounds().Size()
 	if size.X != width || size.Y != height {
 		t.Fatalf("expected dimensions to be %d*%d, got %d*%d",
 			width, height, size.X, size.Y)
 	}
-	wantColor(t, img, 5, 5, 0xdede, 0xadad, 0xbebe)
-	wantColor(t, img, width-5, height-5, 0xdede, 0xadad, 0xbebe)
+
+	// The colors are split in four rectangular sections. Check the corners
+	// of each of the sections. We check the corners left to right, top to
+	// bottom, like when reading left-to-right text.
+
+	// The top left should be 0xdeadbe.
+	{
+		minX, minY := 5, 5
+		maxX, maxY := (width/2)-5, (height/2)-5
+		wantColor(t, img, minX, minY, 0xdede, 0xadad, 0xbebe)
+		wantColor(t, img, maxX, minY, 0xdede, 0xadad, 0xbebe)
+		wantColor(t, img, minX, maxY, 0xdede, 0xadad, 0xbebe)
+		wantColor(t, img, maxX, maxY, 0xdede, 0xadad, 0xbebe)
+	}
+
+	// The top right should be 0xffffff.
+	{
+		minX, minY := (width/2)+5, 5
+		maxX, maxY := width-5, (height/2)-5
+		wantColor(t, img, minX, minY, 0xffff, 0xffff, 0xffff)
+		wantColor(t, img, maxX, minY, 0xffff, 0xffff, 0xffff)
+		wantColor(t, img, minX, maxY, 0xffff, 0xffff, 0xffff)
+		wantColor(t, img, maxX, maxY, 0xffff, 0xffff, 0xffff)
+	}
+
+	// The bottom left should be 0x000000.
+	{
+		minX, minY := 5, (height/2)+5
+		maxX, maxY := (width/2)-5, height-5
+		wantColor(t, img, minX, minY, 0x0000, 0x0000, 0x0000)
+		wantColor(t, img, maxX, minY, 0x0000, 0x0000, 0x0000)
+		wantColor(t, img, minX, maxY, 0x0000, 0x0000, 0x0000)
+		wantColor(t, img, maxX, maxY, 0x0000, 0x0000, 0x0000)
+	}
+
+	// The bottom right is black (0x000000) with 0x80 alpha, so we should
+	// see gray (0xbbbbbb).
+	{
+		minX, minY := (width/2)+5, (height/2)+5
+		maxX, maxY := width-5, height-5
+		wantColor(t, img, minX, minY, 0xbbbb, 0xbbbb, 0xbbbb)
+		wantColor(t, img, maxX, minY, 0xbbbb, 0xbbbb, 0xbbbb)
+		wantColor(t, img, minX, maxY, 0xbbbb, 0xbbbb, 0xbbbb)
+		wantColor(t, img, maxX, maxY, 0xbbbb, 0xbbbb, 0xbbbb)
+	}
 
 	// Run the cleanup funcs from last to first, as if they were defers.
 	for i := len(cleanups) - 1; i >= 0; i-- {
