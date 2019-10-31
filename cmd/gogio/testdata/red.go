@@ -46,20 +46,20 @@ func loop(w *app.Window) error {
 					Y: 0,
 				},
 				Max: f32.Point{
-					X: float32(e.Size.X)/2,
-					Y: float32(e.Size.Y)/2,
+					X: float32(e.Size.X) / 2,
+					Y: float32(e.Size.Y) / 2,
 				},
 			}}.Add(ops)
 
 			paint.ColorOp{Color: topRight}.Add(ops)
 			paint.PaintOp{Rect: f32.Rectangle{
 				Min: f32.Point{
-					X: float32(e.Size.X)/2,
+					X: float32(e.Size.X) / 2,
 					Y: 0,
 				},
 				Max: f32.Point{
 					X: float32(e.Size.X),
-					Y: float32(e.Size.Y)/2,
+					Y: float32(e.Size.Y) / 2,
 				},
 			}}.Add(ops)
 
@@ -67,10 +67,10 @@ func loop(w *app.Window) error {
 			paint.PaintOp{Rect: f32.Rectangle{
 				Min: f32.Point{
 					X: 0,
-					Y: float32(e.Size.Y)/2,
+					Y: float32(e.Size.Y) / 2,
 				},
 				Max: f32.Point{
-					X: float32(e.Size.X)/2,
+					X: float32(e.Size.X) / 2,
 					Y: float32(e.Size.Y),
 				},
 			}}.Add(ops)
@@ -78,8 +78,8 @@ func loop(w *app.Window) error {
 			paint.ColorOp{Color: botRight}.Add(ops)
 			paint.PaintOp{Rect: f32.Rectangle{
 				Min: f32.Point{
-					X: float32(e.Size.X)/2,
-					Y: float32(e.Size.Y)/2,
+					X: float32(e.Size.X) / 2,
+					Y: float32(e.Size.Y) / 2,
 				},
 				Max: f32.Point{
 					X: float32(e.Size.X),
