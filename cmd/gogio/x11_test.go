@@ -44,7 +44,9 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 	display := fmt.Sprintf(":%d", rnd.Intn(100000)+1)
 
 	var xprog string
-	xflags := []string{"-wr"}
+	xflags := []string{
+		"-wr", // we want a white background; the default is black
+	}
 	if *headless {
 		xprog = "Xvfb" // virtual X server
 		xflags = append(xflags, "-screen", "0", fmt.Sprintf("%dx%dx24", width, height))

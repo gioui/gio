@@ -16,8 +16,11 @@ var headless = flag.Bool("headless", true, "run end-to-end tests in headless mod
 type TestDriver interface {
 	// Start provides the test driver with a testing.T, as well as the path
 	// to the Gio app to use for the test. The app will be run with the
-	// given width and height. When the function returns, the gio app must
-	// be ready to use on the platform.
+	// given width and height, and the platform's background should be
+	// white.
+	//
+	// When the function returns, the gio app must be ready to use on the
+	// platform.
 	//
 	// The returned cleanup funcs must be run in reverse order, to mimic
 	// deferred funcs.
