@@ -162,7 +162,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 	// Wait for the gio app to render.
 	// TODO(mvdan): do this properly, e.g. via waiting for log lines
 	// from the gio program.
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(400 * time.Millisecond)
 
 	return cleanups
 }
