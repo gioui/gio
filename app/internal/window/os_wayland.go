@@ -1071,17 +1071,17 @@ func (w *window) surface() (*C.struct_wl_surface, int, int) {
 
 func (w *window) ShowTextInput(show bool) {}
 
-// detectFontScale reports current font scale, or 1.0
+// detectFontScale reports the system font scale, or monitorScale
 // if it fails.
 func detectFontScale() float32 {
 	// TODO: What about other window environments?
 	out, err := exec.Command("gsettings", "get", "org.gnome.desktop.interface", "text-scaling-factor").Output()
 	if err != nil {
-		return 1.0
+		return monitorScale
 	}
 	scale, err := strconv.ParseFloat(string(bytes.TrimSpace(out)), 32)
 	if err != nil {
-		return 1.0
+		return monitorScale
 	}
 	return float32(scale)
 }
