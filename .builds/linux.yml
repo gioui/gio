@@ -9,6 +9,7 @@ packages:
  - wine
  - golang
  - xvfb
+ - xdotool
 sources:
  - https://git.sr.ht/~eliasnaur/gio
 environment:
