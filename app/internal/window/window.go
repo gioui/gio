@@ -117,5 +117,5 @@ const (
 	// minDensity is the minimum pixels per dp to
 	// ensure font and ui legibility on low-dpi
 	// screens.
-	minDensity = 1.25
+	minDensity = 1.0
 )
