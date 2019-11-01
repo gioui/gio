@@ -10,12 +10,14 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/tools/go/packages"
 )
 
 type androidTools struct {
@@ -64,6 +66,48 @@ func buildAndroid(tmpDir string, bi *buildInfo) error {
 		buildtools: buildtools,
 		androidjar: filepath.Join(platform, "android.jar"),
 	}
+
+	cfg := &packages.Config{
+		Mode: packages.NeedName +
+			packages.NeedFiles +
+			packages.NeedImports +
+			packages.NeedDeps,
+		Env: append(
+			os.Environ(),
+			"GOOS=android",
+			"CGO_ENABLED=1",
+		),
+	}
+	pkgs, err := packages.Load(cfg, bi.pkg)
+	if err != nil {
+		return err
+	}
+	var extraJars []string
+	visitedPkgs := make(map[string]bool)
+	var visitPkg func(*packages.Package) error
+	visitPkg = func(p *packages.Package) error {
+		if len(p.GoFiles) == 0 {
+			return nil
+		}
+		dir := path.Dir(p.GoFiles[0])
+		jars, err := filepath.Glob(filepath.Join(dir, "*.jar"))
+		if err != nil {
+			return err
+		}
+		extraJars = append(extraJars, jars...)
+
+		for _, imp := range p.Imports {
+			if !visitedPkgs[imp.ID] {
+				visitPkg(imp)
+				visitedPkgs[imp.ID] = true
+			}
+		}
+		return nil
+	}
+	if err := visitPkg(pkgs[0]); err != nil {
+		return err
+	}
+
 	if err := compileAndroid(tmpDir, tools, bi); err != nil {
 		return err
 	}
@@ -71,7 +115,7 @@ func buildAndroid(tmpDir string, bi *buildInfo) error {
 	case "archive":
 		return archiveAndroid(tmpDir, bi)
 	case "exe":
-		if err := exeAndroid(tmpDir, tools, bi); err != nil {
+		if err := exeAndroid(tmpDir, tools, bi, extraJars); err != nil {
 			return err
 		}
 		return signAPK(tmpDir, tools, bi)
@@ -207,7 +251,7 @@ func archiveAndroid(tmpDir string, bi *buildInfo) (err error) {
 	return aarw.Close()
 }
 
-func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
+func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars []string) (err error) {
 	classes := filepath.Join(tmpDir, "classes")
 	var classFiles []string
 	err = filepath.Walk(classes, func(path string, f os.FileInfo, err error) error {
@@ -219,13 +263,7 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
 		}
 		return nil
 	})
-	extraJars, err := filepath.Glob(filepath.Join(bi.dir, "*.jar"))
-	if err == nil {
-		classFiles = append(classFiles, extraJars...)
-	}
-	if err != nil {
-		return err
-	}
+	classFiles = append(classFiles, extraJars...)
 	apkDir := filepath.Join(tmpDir, "apk")
 	if err := os.MkdirAll(apkDir, 0755); err != nil {
 		return err

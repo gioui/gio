@@ -12,4 +12,5 @@ require (
 	github.com/chromedp/chromedp v0.5.1
 	golang.org/x/image v0.0.0-20190802002840-cff245a6509b
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	golang.org/x/tools v0.0.0-20190927191325-030b2cf1153e
 )
