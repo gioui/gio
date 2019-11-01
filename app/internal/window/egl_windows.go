@@ -52,7 +52,7 @@ func mustLoadDLL(dll *syscall.LazyDLL, name string) {
 	if loadErr == nil {
 		return
 	}
-	pmsg := syscall.StringToUTF16Ptr("Failed to load " + name)
+	pmsg := syscall.StringToUTF16Ptr("Failed to load " + name+ ". Gio requires the ANGLE OpenGL ES driver to run. A prebuilt version can be downloaded from https://gioui.org/doc/install.")
 	ptitle := syscall.StringToUTF16Ptr("Error")
 	syscall.MessageBox(0 /* HWND */, pmsg, ptitle, syscall.MB_ICONERROR|syscall.MB_SYSTEMMODAL)
 	os.Exit(1)
