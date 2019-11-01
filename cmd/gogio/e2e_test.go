@@ -39,11 +39,15 @@ type TestDriver interface {
 func runEndToEndTest(t *testing.T, driver TestDriver) {
 	width, height := 800, 600
 	cleanups := driver.Start(t, "testdata/red.go", width, height)
+	for _, cleanup := range cleanups {
+		defer cleanup()
+	}
 
 	// The colors are split in four rectangular sections. Check the corners
 	// of each of the sections. We check the corners left to right, top to
 	// bottom, like when reading left-to-right text.
 	wantColors := func(topLeft, topRight, botLeft, botRight color.RGBA) {
+		t.Helper()
 		img := driver.Screenshot()
 		size := img.Bounds().Size()
 		// We expect to receive a width*height screenshot.
@@ -98,14 +102,10 @@ func runEndToEndTest(t *testing.T, driver TestDriver) {
 	driver.Click(1*(width/4), 1*(height/4))
 	driver.Click(3*(width/4), 3*(height/4))
 	wantColors(red, white, black, red)
-
-	// Run the cleanup funcs from last to first, as if they were defers.
-	for i := len(cleanups) - 1; i >= 0; i-- {
-		cleanups[i]()
-	}
 }
 
 func wantColor(t *testing.T, img image.Image, x, y int, want color.Color) {
+	t.Helper()
 	r, g, b, _ := want.RGBA()
 	got := img.At(x, y)
 	r_, g_, b_, _ := got.RGBA()

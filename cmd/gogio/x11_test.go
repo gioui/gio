@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"image"
+	"image/png"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -20,20 +21,12 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/BurntSushi/xgb"
-	"github.com/BurntSushi/xgb/xproto"
-	"github.com/BurntSushi/xgbutil"
-	"github.com/BurntSushi/xgbutil/xgraphics"
 )
 
 type X11TestDriver struct {
 	t *testing.T
 
 	display string
-
-	// conn holds the connection to X.
-	conn *xgbutil.XUtil
 }
 
 func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cleanups []func()) {
@@ -57,8 +50,15 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 		xflags = append(xflags, "-screen", fmt.Sprintf("%dx%d", width, height))
 	}
 	xflags = append(xflags, d.display)
-	if _, err := exec.LookPath(xprog); err != nil {
-		d.t.Skipf("%s needed to run with -headless=%t", xprog, *headless)
+
+	for _, prog := range []string{
+		xprog,     // to run the X server
+		"scrot",   // to take screenshots
+		"xdotool", // to send input
+	} {
+		if _, err := exec.LookPath(prog); err != nil {
+			d.t.Skipf("%s needed to run", prog)
+		}
 	}
 
 	// First, build the app.
@@ -99,9 +99,8 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 		// Wait for up to 1s (100 * 10ms) for the X server to be ready.
 		for i := 0; ; i++ {
 			time.Sleep(10 * time.Millisecond)
-			// This socket path isn't terribly portable, but the xgb
-			// library we use does the same, and we only really care
-			// about Linux here.
+			// This socket path isn't terribly portable, but it's
+			// okay for now.
 			socket := fmt.Sprintf("/tmp/.X11-unix/X%s", d.display[1:])
 			if _, err := os.Stat(socket); err == nil {
 				break
@@ -127,7 +126,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 		ctx, cancel := context.WithCancel(context.Background())
 		cmd := exec.CommandContext(ctx, bin)
 		out := &bytes.Buffer{}
-		cmd.Env = append(os.Environ(), "DISPLAY="+d.display)
+		cmd.Env = []string{"DISPLAY=" + d.display}
 		cmd.Stdout = out
 		cmd.Stderr = out
 		if err := cmd.Start(); err != nil {
@@ -145,24 +144,6 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 		}()
 	}
 
-	// Finally, connect to the X server.
-	xgb.Logger.SetOutput(testLogWriter{d.t})
-	xgbutil.Logger.SetOutput(testLogWriter{d.t})
-	conn, err := xgbutil.NewConnDisplay(d.display)
-	if err != nil {
-		d.t.Fatal(err)
-	}
-	d.conn = conn
-	cleanups = append(cleanups, func() {
-		conn.Conn().Close()
-		// TODO(mvdan): Figure out a way to remove this sleep
-		// without introducing a panic. The xgb code will
-		// encounter a panic if the Xorg server exits before xgb
-		// has shut down fully.
-		// See: https://github.com/BurntSushi/xgb/pull/44
-		time.Sleep(10 * time.Millisecond)
-	})
-
 	// Wait for the gio app to render.
 	// TODO(mvdan): synchronize with the app instead
 	time.Sleep(400 * time.Millisecond)
@@ -171,7 +152,14 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 }
 
 func (d *X11TestDriver) Screenshot() image.Image {
-	img, err := xgraphics.NewDrawable(d.conn, xproto.Drawable(d.conn.RootWin()))
+	cmd := exec.Command("scrot", "--silent", "--overwrite", "/dev/stdout")
+	cmd.Env = []string{"DISPLAY=" + d.display}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		d.t.Errorf("%s", out)
+		d.t.Fatal(err)
+	}
+	img, err := png.Decode(bytes.NewReader(out))
 	if err != nil {
 		d.t.Fatal(err)
 	}
@@ -184,7 +172,7 @@ func (d *X11TestDriver) xdotool(args ...interface{}) {
 		strs[i] = fmt.Sprint(arg)
 	}
 	cmd := exec.Command("xdotool", strs...)
-	cmd.Env = append(os.Environ(), "DISPLAY="+d.display)
+	cmd.Env = []string{"DISPLAY=" + d.display}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		d.t.Errorf("%s", out)
 		d.t.Fatal(err)
