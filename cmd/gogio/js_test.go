@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
@@ -118,6 +119,8 @@ func (d *JSTestDriver) Start(t_ *testing.T, path string, width, height int) (cle
 	); err != nil {
 		d.t.Fatal(err)
 	}
+	// TODO(mvdan): synchronize with the app instead
+	time.Sleep(200 * time.Millisecond)
 
 	return cleanups
 }
@@ -134,6 +137,16 @@ func (d *JSTestDriver) Screenshot() image.Image {
 		d.t.Fatal(err)
 	}
 	return img
+}
+
+func (d *JSTestDriver) Click(x, y int) {
+	if err := chromedp.Run(d.ctx,
+		chromedp.MouseClickXY(float64(x), float64(y)),
+	); err != nil {
+		d.t.Fatal(err)
+	}
+	// TODO(mvdan): synchronize with the app instead
+	time.Sleep(200 * time.Millisecond)
 }
 
 func TestJS(t *testing.T) {

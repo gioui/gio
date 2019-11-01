@@ -30,6 +30,8 @@ import (
 type X11TestDriver struct {
 	t *testing.T
 
+	display string
+
 	// conn holds the connection to X.
 	conn *xgbutil.XUtil
 }
@@ -41,7 +43,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 	// will only be using :0, so there's only a 0.001% chance of two
 	// concurrent test runs to run into a conflict.
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
-	display := fmt.Sprintf(":%d", rnd.Intn(100000)+1)
+	d.display = fmt.Sprintf(":%d", rnd.Intn(100000)+1)
 
 	var xprog string
 	xflags := []string{
@@ -54,7 +56,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 		xprog = "Xephyr" // nested X server as a window
 		xflags = append(xflags, "-screen", fmt.Sprintf("%dx%d", width, height))
 	}
-	xflags = append(xflags, display)
+	xflags = append(xflags, d.display)
 	if _, err := exec.LookPath(xprog); err != nil {
 		d.t.Skipf("%s needed to run with -headless=%t", xprog, *headless)
 	}
@@ -100,7 +102,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 			// This socket path isn't terribly portable, but the xgb
 			// library we use does the same, and we only really care
 			// about Linux here.
-			socket := fmt.Sprintf("/tmp/.X11-unix/X%s", display[1:])
+			socket := fmt.Sprintf("/tmp/.X11-unix/X%s", d.display[1:])
 			if _, err := os.Stat(socket); err == nil {
 				break
 			}
@@ -125,7 +127,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 		ctx, cancel := context.WithCancel(context.Background())
 		cmd := exec.CommandContext(ctx, bin)
 		out := &bytes.Buffer{}
-		cmd.Env = append(os.Environ(), "DISPLAY="+display)
+		cmd.Env = append(os.Environ(), "DISPLAY="+d.display)
 		cmd.Stdout = out
 		cmd.Stderr = out
 		if err := cmd.Start(); err != nil {
@@ -146,7 +148,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 	// Finally, connect to the X server.
 	xgb.Logger.SetOutput(testLogWriter{d.t})
 	xgbutil.Logger.SetOutput(testLogWriter{d.t})
-	conn, err := xgbutil.NewConnDisplay(display)
+	conn, err := xgbutil.NewConnDisplay(d.display)
 	if err != nil {
 		d.t.Fatal(err)
 	}
@@ -162,8 +164,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 	})
 
 	// Wait for the gio app to render.
-	// TODO(mvdan): do this properly, e.g. via waiting for log lines
-	// from the gio program.
+	// TODO(mvdan): synchronize with the app instead
 	time.Sleep(400 * time.Millisecond)
 
 	return cleanups
@@ -175,6 +176,27 @@ func (d *X11TestDriver) Screenshot() image.Image {
 		d.t.Fatal(err)
 	}
 	return img
+}
+
+func (d *X11TestDriver) xdotool(args ...interface{}) {
+	strs := make([]string, len(args))
+	for i, arg := range args {
+		strs[i] = fmt.Sprint(arg)
+	}
+	cmd := exec.Command("xdotool", strs...)
+	cmd.Env = append(os.Environ(), "DISPLAY="+d.display)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		d.t.Errorf("%s", out)
+		d.t.Fatal(err)
+	}
+}
+
+func (d *X11TestDriver) Click(x, y int) {
+	d.xdotool("mousemove", x, y)
+	d.xdotool("click", "1")
+
+	// TODO(mvdan): synchronize with the app instead
+	time.Sleep(200 * time.Millisecond)
 }
 
 func TestX11(t *testing.T) {

@@ -5,6 +5,7 @@ package main_test
 import (
 	"flag"
 	"image"
+	"image/color"
 	"testing"
 )
 
@@ -29,64 +30,74 @@ type TestDriver interface {
 
 	// Screenshot takes a screenshot of the Gio app on the platform.
 	Screenshot() image.Image
+
+	// Click performs a pointer click at the specified coordinates,
+	// including both press and release.
+	Click(x, y int)
 }
 
 func runEndToEndTest(t *testing.T, driver TestDriver) {
 	width, height := 800, 600
 	cleanups := driver.Start(t, "testdata/red.go", width, height)
 
-	// We expect to receive a 800x600px screenshot.
-	img := driver.Screenshot()
-	size := img.Bounds().Size()
-	if size.X != width || size.Y != height {
-		t.Fatalf("expected dimensions to be %d*%d, got %d*%d",
-			width, height, size.X, size.Y)
-	}
-
 	// The colors are split in four rectangular sections. Check the corners
 	// of each of the sections. We check the corners left to right, top to
 	// bottom, like when reading left-to-right text.
-
-	// The top left should be 0xdeadbe.
-	{
-		minX, minY := 5, 5
-		maxX, maxY := (width/2)-5, (height/2)-5
-		wantColor(t, img, minX, minY, 0xdede, 0xadad, 0xbebe)
-		wantColor(t, img, maxX, minY, 0xdede, 0xadad, 0xbebe)
-		wantColor(t, img, minX, maxY, 0xdede, 0xadad, 0xbebe)
-		wantColor(t, img, maxX, maxY, 0xdede, 0xadad, 0xbebe)
+	wantColors := func(topLeft, topRight, botLeft, botRight color.RGBA) {
+		img := driver.Screenshot()
+		size := img.Bounds().Size()
+		// We expect to receive a width*height screenshot.
+		if size.X != width || size.Y != height {
+			t.Fatalf("expected dimensions to be %d*%d, got %d*%d",
+				width, height, size.X, size.Y)
+		}
+		{
+			minX, minY := 5, 5
+			maxX, maxY := (width/2)-5, (height/2)-5
+			wantColor(t, img, minX, minY, topLeft)
+			wantColor(t, img, maxX, minY, topLeft)
+			wantColor(t, img, minX, maxY, topLeft)
+			wantColor(t, img, maxX, maxY, topLeft)
+		}
+		{
+			minX, minY := (width/2)+5, 5
+			maxX, maxY := width-5, (height/2)-5
+			wantColor(t, img, minX, minY, topRight)
+			wantColor(t, img, maxX, minY, topRight)
+			wantColor(t, img, minX, maxY, topRight)
+			wantColor(t, img, maxX, maxY, topRight)
+		}
+		{
+			minX, minY := 5, (height/2)+5
+			maxX, maxY := (width/2)-5, height-5
+			wantColor(t, img, minX, minY, botLeft)
+			wantColor(t, img, maxX, minY, botLeft)
+			wantColor(t, img, minX, maxY, botLeft)
+			wantColor(t, img, maxX, maxY, botLeft)
+		}
+		{
+			minX, minY := (width/2)+5, (height/2)+5
+			maxX, maxY := width-5, height-5
+			wantColor(t, img, minX, minY, botRight)
+			wantColor(t, img, maxX, minY, botRight)
+			wantColor(t, img, minX, maxY, botRight)
+			wantColor(t, img, maxX, maxY, botRight)
+		}
 	}
 
-	// The top right should be 0xffffff.
-	{
-		minX, minY := (width/2)+5, 5
-		maxX, maxY := width-5, (height/2)-5
-		wantColor(t, img, minX, minY, 0xffff, 0xffff, 0xffff)
-		wantColor(t, img, maxX, minY, 0xffff, 0xffff, 0xffff)
-		wantColor(t, img, minX, maxY, 0xffff, 0xffff, 0xffff)
-		wantColor(t, img, maxX, maxY, 0xffff, 0xffff, 0xffff)
-	}
+	beef := color.RGBA{R: 0xde, G: 0xad, B: 0xbe}
+	white := color.RGBA{R: 0xff, G: 0xff, B: 0xff}
+	black := color.RGBA{R: 0x00, G: 0x00, B: 0x00}
+	gray := color.RGBA{R: 0xbb, G: 0xbb, B: 0xbb}
+	red := color.RGBA{R: 0xff, G: 0x00, B: 0x00}
 
-	// The bottom left should be 0x000000.
-	{
-		minX, minY := 5, (height/2)+5
-		maxX, maxY := (width/2)-5, height-5
-		wantColor(t, img, minX, minY, 0x0000, 0x0000, 0x0000)
-		wantColor(t, img, maxX, minY, 0x0000, 0x0000, 0x0000)
-		wantColor(t, img, minX, maxY, 0x0000, 0x0000, 0x0000)
-		wantColor(t, img, maxX, maxY, 0x0000, 0x0000, 0x0000)
-	}
+	// These are the four colors at the beginning.
+	wantColors(beef, white, black, gray)
 
-	// The bottom right is black (0x000000) with 0x80 alpha, so we should
-	// see gray (0xbbbbbb).
-	{
-		minX, minY := (width/2)+5, (height/2)+5
-		maxX, maxY := width-5, height-5
-		wantColor(t, img, minX, minY, 0xbbbb, 0xbbbb, 0xbbbb)
-		wantColor(t, img, maxX, minY, 0xbbbb, 0xbbbb, 0xbbbb)
-		wantColor(t, img, minX, maxY, 0xbbbb, 0xbbbb, 0xbbbb)
-		wantColor(t, img, maxX, maxY, 0xbbbb, 0xbbbb, 0xbbbb)
-	}
+	// Click the first and last sections to turn them red.
+	driver.Click(1*(width/4), 1*(height/4))
+	driver.Click(3*(width/4), 3*(height/4))
+	wantColors(red, white, black, red)
 
 	// Run the cleanup funcs from last to first, as if they were defers.
 	for i := len(cleanups) - 1; i >= 0; i-- {
@@ -94,9 +105,10 @@ func runEndToEndTest(t *testing.T, driver TestDriver) {
 	}
 }
 
-func wantColor(t *testing.T, img image.Image, x, y int, r, g, b uint32) {
-	color := img.At(x, y)
-	r_, g_, b_, _ := color.RGBA()
+func wantColor(t *testing.T, img image.Image, x, y int, want color.Color) {
+	r, g, b, _ := want.RGBA()
+	got := img.At(x, y)
+	r_, g_, b_, _ := got.RGBA()
 	if r_ != r || g_ != g || b_ != b {
 		t.Errorf("got 0x%04x%04x%04x at (%d,%d), want 0x%04x%04x%04x",
 			r_, g_, b_, x, y, r, g, b)
