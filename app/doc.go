@@ -36,7 +36,7 @@ DestroyEvent is received.
 
 Main
 
-The Main function must be called from a programs main function, to hand over
+The Main function must be called from a program's main function, to hand over
 control of the main thread to operating systems that need it.
 
 Because Main is also blocking, the event loop of a Window must run in a goroutine.
@@ -63,5 +63,39 @@ A Window's Queue method returns an event.Queue implementation that distributes
 incoming events to the event handlers declared in the latest frame.
 See the gioui.org/ui package for more information about event handlers.
 
+Permissions
+
+The packages under gioui.org/app/permission should be imported
+by a Gio program or by one of its dependencies to indicate that specific
+operating-system permissions are required. For example, if a Gio
+program requires access to a device's Bluetooth interface, it
+should import "gioui.org/app/permission/bluetooth" as follows:
+
+	package main
+
+	import (
+		"gioui.org/app"
+		_ "gioui.org/app/permission/bluetooth"
+	)
+
+	func main() {
+		...
+	}
+
+Since there are no exported identifiers in the app/permission/bluetooth
+package, the import uses the anonymous identifier (_) as the imported
+package name.
+
+As a special case, the gogio tool detects when a program directly or
+indirectly depends on the "net" package from the Go standard library as an
+indication that the program requires network access permissions. If a program
+requires network permissions but does not directly or indirectly import
+"net", it will be necessary to add the following code somewhere in the
+program's source code:
+
+	import (
+		...
+		_ "net"
+	)
 */
 package app

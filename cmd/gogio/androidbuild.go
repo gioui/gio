@@ -4,6 +4,7 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"text/template"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/tools/go/packages"
@@ -38,6 +40,17 @@ type errWriter struct {
 }
 
 var exeSuffix string
+
+type manifestData struct {
+	AppID       string
+	Version     int
+	MinSDK      int
+	TargetSDK   int
+	Permissions []string
+	Features    []string
+	IconSnip    string
+	AppName     string
+}
 
 func init() {
 	if runtime.GOOS == "windows" {
@@ -67,6 +80,8 @@ func buildAndroid(tmpDir string, bi *buildInfo) error {
 		androidjar: filepath.Join(platform, "android.jar"),
 	}
 
+	perms := []string{"default"}
+	const permPref = "gioui.org/app/permission/"
 	cfg := &packages.Config{
 		Mode: packages.NeedName +
 			packages.NeedFiles +
@@ -95,6 +110,12 @@ func buildAndroid(tmpDir string, bi *buildInfo) error {
 			return err
 		}
 		extraJars = append(extraJars, jars...)
+		switch {
+		case p.PkgPath == "net":
+			perms = append(perms, "network")
+		case strings.HasPrefix(p.PkgPath, permPref):
+			perms = append(perms, p.PkgPath[len(permPref):])
+		}
 
 		for _, imp := range p.Imports {
 			if !visitedPkgs[imp.ID] {
@@ -113,9 +134,9 @@ func buildAndroid(tmpDir string, bi *buildInfo) error {
 	}
 	switch *buildMode {
 	case "archive":
-		return archiveAndroid(tmpDir, bi)
+		return archiveAndroid(tmpDir, bi, perms)
 	case "exe":
-		if err := exeAndroid(tmpDir, tools, bi, extraJars); err != nil {
+		if err := exeAndroid(tmpDir, tools, bi, extraJars, perms); err != nil {
 			return err
 		}
 		return signAPK(tmpDir, tools, bi)
@@ -206,7 +227,7 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 	return builds.Wait()
 }
 
-func archiveAndroid(tmpDir string, bi *buildInfo) (err error) {
+func archiveAndroid(tmpDir string, bi *buildInfo, perms []string) (err error) {
 	aarFile := *destPath
 	if aarFile == "" {
 		aarFile = fmt.Sprintf("%s.aar", bi.name)
@@ -227,11 +248,25 @@ func archiveAndroid(tmpDir string, bi *buildInfo) (err error) {
 	defer aarw.Close()
 	aarw.Create("R.txt")
 	aarw.Create("res/")
+	permissions, features := getPermissions(perms)
 	manifest := aarw.Create("AndroidManifest.xml")
-	manifest.Write([]byte(fmt.Sprintf(`<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="%s">
-	<uses-sdk android:minSdkVersion="%d"/>
-	<uses-feature android:glEsVersion="0x00030000" android:required="true" />
-</manifest>`, bi.appID, bi.minsdk)))
+	manifestSrc := manifestData{
+		AppID:       bi.appID,
+		MinSDK:      bi.minsdk,
+		Permissions: permissions,
+		Features:    features,
+	}
+	tmpl, err := template.New("manifest").Parse(
+		`<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="{{.AppID}}">
+        <uses-sdk android:minSdkVersion="{{.MinSDK}}"/>
+{{range .Permissions}}	<uses-permission android:name="{{.}}"/>
+{{end}}{{range .Features}}	<uses-feature android:{{.}} android:required="false"/>
+{{end}}</manifest>
+`)
+	if err != nil {
+		panic(err)
+	}
+	err = tmpl.Execute(manifest, manifestSrc)
 	proguard := aarw.Create("proguard.txt")
 	proguard.Write([]byte(`-keep class org.gioui.** { *; }`))
 
@@ -251,7 +286,7 @@ func archiveAndroid(tmpDir string, bi *buildInfo) (err error) {
 	return aarw.Close()
 }
 
-func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars []string) (err error) {
+func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, perms []string) (err error) {
 	classes := filepath.Join(tmpDir, "classes")
 	var classFiles []string
 	err = filepath.Walk(classes, func(path string, f os.FileInfo, err error) error {
@@ -342,18 +377,30 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars []s
 	if bi.minsdk > targetSDK {
 		targetSDK = bi.minsdk
 	}
+	permissions, features := getPermissions(perms)
 	appName := strings.Title(bi.name)
-	manifestSrc := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
+	manifestSrc := manifestData{
+		AppID:       bi.appID,
+		Version:     bi.version,
+		MinSDK:      bi.minsdk,
+		TargetSDK:   targetSDK,
+		Permissions: permissions,
+		Features:    features,
+		IconSnip:    iconSnip,
+		AppName:     appName,
+	}
+	tmpl, err := template.New("test").Parse(
+		`<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-	package="%s"
-	android:versionCode="%d"
-	android:versionName="1.0.%d">
-	<uses-sdk android:minSdkVersion="%d" android:targetSdkVersion="%d" />
-	<uses-permission android:name="android.permission.INTERNET" />
-	<uses-feature android:glEsVersion="0x00030000"/>
-	<application %s android:label="%s">
+	package="{{.AppID}}"
+	android:versionCode="{{.Version}}"
+	android:versionName="1.0.{{.Version}}">
+	<uses-sdk android:minSdkVersion="{{.MinSDK}}" android:targetSdkVersion="{{.TargetSDK}}" />
+{{range .Permissions}}	<uses-permission android:name="{{.}}"/>
+{{end}}{{range .Features}}	<uses-feature android:{{.}} android:required="false"/>
+{{end}}	<application {{.IconSnip}} android:label="{{.AppName}}">
 		<activity android:name="org.gioui.GioActivity"
-			android:label="%s"
+			android:label="{{.AppName}}"
 			android:theme="@style/Theme.GioApp"
 			android:configChanges="orientation|keyboardHidden"
 			android:windowSoftInputMode="adjustResize">
@@ -363,11 +410,16 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars []s
 			</intent-filter>
 		</activity>
 	</application>
-</manifest>`, bi.appID, bi.version, bi.version, bi.minsdk, targetSDK, iconSnip, appName, appName)
-	manifest := filepath.Join(tmpDir, "AndroidManifest.xml")
-	if err := ioutil.WriteFile(manifest, []byte(manifestSrc), 0660); err != nil {
+</manifest>`)
+	var manifestBuffer bytes.Buffer
+	if err := tmpl.Execute(&manifestBuffer, manifestSrc); err != nil {
 		return err
 	}
+	manifest := filepath.Join(tmpDir, "AndroidManifest.xml")
+	if err := ioutil.WriteFile(manifest, manifestBuffer.Bytes(), 0660); err != nil {
+		return err
+	}
+
 	tmpapk := filepath.Join(tmpDir, "link.apk")
 	link := exec.Command(
 		aapt2,
@@ -595,6 +647,27 @@ func archNDK() string {
 		}
 		return runtime.GOOS + "-" + arch
 	}
+}
+
+func getPermissions(ps []string) ([]string, []string) {
+	var permissions, features []string
+	seenPermissions := make(map[string]bool)
+	seenFeatures := make(map[string]bool)
+	for _, perm := range ps {
+		for _, x := range AndroidPermissions[perm] {
+			if !seenPermissions[x] {
+				permissions = append(permissions, x)
+				seenPermissions[x] = true
+			}
+		}
+		for _, x := range AndroidFeatures[perm] {
+			if !seenFeatures[x] {
+				features = append(features, x)
+				seenFeatures[x] = true
+			}
+		}
+	}
+	return permissions, features
 }
 
 func latestPlatform(sdk string) (string, error) {
