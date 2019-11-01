@@ -8,6 +8,7 @@ import (
 	"image"
 	"time"
 
+	"gioui.org/app/internal/gl"
 	"gioui.org/app/internal/gpu"
 	"gioui.org/app/internal/input"
 	"gioui.org/app/internal/window"
@@ -261,26 +262,20 @@ func (w *Window) run(opts *window.Options) {
 				w.hasNextFrame = false
 				e2.Frame = w.update
 				w.out <- e2.FrameEvent
+				var err error
 				if w.gpu != nil {
 					if e2.Sync {
 						w.gpu.Refresh()
 					}
-					if err := w.gpu.Flush(); err != nil {
+					if err = w.gpu.Flush(); err != nil {
 						w.gpu.Release()
 						w.gpu = nil
-						w.destroy(err)
-						return
 					}
 				} else {
-					ctx, err := w.driver.NewContext()
-					if err != nil {
-						w.destroy(err)
-						return
-					}
-					w.gpu, err = gpu.NewGPU(ctx)
-					if err != nil {
-						w.destroy(err)
-						return
+					var ctx gl.Context
+					ctx, err = w.driver.NewContext()
+					if err == nil {
+						w.gpu, err = gpu.NewGPU(ctx)
 					}
 				}
 				var frame *op.Ops
@@ -289,6 +284,10 @@ func (w *Window) run(opts *window.Options) {
 				select {
 				case frame = <-w.frames:
 				case w.out <- ackEvent:
+				}
+				if err != nil {
+					w.destroy(err)
+					return
 				}
 				w.draw(e2.Size, frame)
 				if e2.Sync {
