@@ -4,9 +4,11 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"log"
+	"runtime"
 
 	"gioui.org/app"
 	"gioui.org/f32"
@@ -25,6 +27,18 @@ func main() {
 	}()
 	app.Main()
 }
+
+type notifyFrame int
+
+const (
+	notifyNone notifyFrame = iota
+	notifyInvalidate
+	notifyPrint
+)
+
+// notify keeps track of whether we want to print to stdout to notify the user
+// when a frame is ready. Initially we want to notify about the first frame.
+var notify = notifyInvalidate
 
 func loop(w *app.Window) error {
 	topLeft := quarterWidget{
@@ -67,6 +81,22 @@ func loop(w *app.Window) error {
 			rows.Layout(gtx, r1, r2)
 
 			e.Frame(gtx.Ops)
+
+			if runtime.GOOS == "js" {
+				// TODO(mvdan): Unfortunately, printing to
+				// stdout crashes the js/wasm port. Use the
+				// prints once the issue is fixed:
+				// https://github.com/golang/go/issues/35256
+				break
+			}
+			switch notify {
+			case notifyInvalidate:
+				notify = notifyPrint
+				w.Invalidate()
+			case notifyPrint:
+				notify = notifyNone
+				fmt.Println("frame ready")
+			}
 		}
 	}
 }
@@ -100,6 +130,8 @@ func (w *quarterWidget) Layout(gtx *layout.Context) {
 	for _, e := range gtx.Events(w) {
 		if e, ok := e.(pointer.Event); ok && e.Type == pointer.Press {
 			w.clicked = !w.clicked
+			// notify when we're done updating the frame.
+			notify = notifyInvalidate
 		}
 	}
 }

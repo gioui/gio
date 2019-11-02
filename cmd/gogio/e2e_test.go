@@ -21,7 +21,7 @@ type TestDriver interface {
 	// white.
 	//
 	// When the function returns, the gio app must be ready to use on the
-	// platform.
+	// platform, with its initial frame fully drawn.
 	//
 	// The returned cleanup funcs must be run in reverse order, to mimic
 	// deferred funcs.
@@ -32,7 +32,8 @@ type TestDriver interface {
 	Screenshot() image.Image
 
 	// Click performs a pointer click at the specified coordinates,
-	// including both press and release.
+	// including both press and release. It returns when the next frame is
+	// fully drawn.
 	Click(x, y int)
 }
 

@@ -7,6 +7,7 @@
 package main_test
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -26,10 +27,13 @@ import (
 type X11TestDriver struct {
 	t *testing.T
 
+	frameNotifs chan bool
+
 	display string
 }
 
 func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cleanups []func()) {
+	d.frameNotifs = make(chan bool, 1)
 	d.t = t_
 
 	// Pick a random display number between 1 and 100,000. Most machines
@@ -125,10 +129,14 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 	{
 		ctx, cancel := context.WithCancel(context.Background())
 		cmd := exec.CommandContext(ctx, bin)
-		out := &bytes.Buffer{}
 		cmd.Env = []string{"DISPLAY=" + d.display}
-		cmd.Stdout = out
-		cmd.Stderr = out
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			d.t.Fatal(err)
+		}
+		stderr := &bytes.Buffer{}
+		cmd.Stderr = stderr
+
 		if err := cmd.Start(); err != nil {
 			d.t.Fatal(err)
 		}
@@ -136,17 +144,26 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 		wg.Add(1)
 		go func() {
 			if err := cmd.Wait(); err != nil && ctx.Err() == nil {
-				// Print all output and error.
-				io.Copy(os.Stdout, out)
+				// Print stderr and error.
+				io.Copy(os.Stdout, stderr)
 				d.t.Error(err)
 			}
 			wg.Done()
 		}()
+		go func() {
+			scanner := bufio.NewScanner(stdout)
+			for scanner.Scan() {
+				line := scanner.Text()
+				if line == "frame ready" {
+					d.frameNotifs <- true
+				}
+			}
+		}()
+
 	}
 
 	// Wait for the gio app to render.
-	// TODO(mvdan): synchronize with the app instead
-	time.Sleep(400 * time.Millisecond)
+	<-d.frameNotifs
 
 	return cleanups
 }
@@ -183,8 +200,7 @@ func (d *X11TestDriver) Click(x, y int) {
 	d.xdotool("mousemove", x, y)
 	d.xdotool("click", "1")
 
-	// TODO(mvdan): synchronize with the app instead
-	time.Sleep(200 * time.Millisecond)
+	<-d.frameNotifs
 }
 
 func TestX11(t *testing.T) {
