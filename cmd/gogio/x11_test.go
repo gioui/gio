@@ -1,9 +1,5 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// TODO(mvdan): come up with an end-to-end platform interface, including methods
-// like "take screenshot" or "close app", so that we can run the same tests on
-// all supported platforms without writing them many times.
-
 package main_test
 
 import (
@@ -93,9 +89,9 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 		}
 		cleanups = append(cleanups, cancel)
 		cleanups = append(cleanups, func() {
-			// Give Xserver a chance to exit gracefully, cleaning up
-			// after itself in /tmp. After 10ms, the deferred cancel
-			// above will signal an os.Kill.
+			// Give it a chance to exit gracefully, cleaning up
+			// after itself. After 10ms, the deferred cancel above
+			// will signal an os.Kill.
 			cmd.Process.Signal(os.Interrupt)
 			time.Sleep(10 * time.Millisecond)
 		})
@@ -200,6 +196,7 @@ func (d *X11TestDriver) Click(x, y int) {
 	d.xdotool("mousemove", x, y)
 	d.xdotool("click", "1")
 
+	// Wait for the gio app to render after this click.
 	<-d.frameNotifs
 }
 
@@ -207,19 +204,4 @@ func TestX11(t *testing.T) {
 	t.Parallel()
 
 	runEndToEndTest(t, &X11TestDriver{})
-}
-
-// testLogWriter is a bit of a hack to redirect libraries that use a *log.Logger
-// variable to instead send their logs to t.Logf.
-//
-// Since *log.Logger isn't an interface and can only take an io.Writer, all we
-// can do is implement an io.Writer that sends its output to t.Logf. We end up
-// with duplicate log prefixes, but that doesn't seem so bad.
-type testLogWriter struct {
-	t *testing.T
-}
-
-func (w testLogWriter) Write(p []byte) (n int, err error) {
-	w.t.Logf("%s", p)
-	return len(p), nil
 }

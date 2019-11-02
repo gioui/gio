@@ -38,8 +38,8 @@ type TestDriver interface {
 }
 
 func runEndToEndTest(t *testing.T, driver TestDriver) {
-	width, height := 800, 600
-	cleanups := driver.Start(t, "testdata/red.go", width, height)
+	size := image.Point{X: 800, Y: 600}
+	cleanups := driver.Start(t, "testdata/red.go", size.X, size.Y)
 	for _, cleanup := range cleanups {
 		defer cleanup()
 	}
@@ -50,39 +50,45 @@ func runEndToEndTest(t *testing.T, driver TestDriver) {
 	wantColors := func(topLeft, topRight, botLeft, botRight color.RGBA) {
 		t.Helper()
 		img := driver.Screenshot()
-		size := img.Bounds().Size()
-		// We expect to receive a width*height screenshot.
-		if size.X != width || size.Y != height {
-			t.Fatalf("expected dimensions to be %d*%d, got %d*%d",
-				width, height, size.X, size.Y)
+		size_ := img.Bounds().Size()
+		if size_ != size {
+			if !*headless {
+				// Some non-headless drivers, like Sway, may get
+				// their window resized by the host window manager.
+				// Run the rest of the test with the new size.
+				size = size_
+			} else {
+				t.Fatalf("expected dimensions to be %v, got %v",
+					size, size_)
+			}
 		}
 		{
 			minX, minY := 5, 5
-			maxX, maxY := (width/2)-5, (height/2)-5
+			maxX, maxY := (size.X/2)-5, (size.Y/2)-5
 			wantColor(t, img, minX, minY, topLeft)
 			wantColor(t, img, maxX, minY, topLeft)
 			wantColor(t, img, minX, maxY, topLeft)
 			wantColor(t, img, maxX, maxY, topLeft)
 		}
 		{
-			minX, minY := (width/2)+5, 5
-			maxX, maxY := width-5, (height/2)-5
+			minX, minY := (size.X/2)+5, 5
+			maxX, maxY := size.X-5, (size.Y/2)-5
 			wantColor(t, img, minX, minY, topRight)
 			wantColor(t, img, maxX, minY, topRight)
 			wantColor(t, img, minX, maxY, topRight)
 			wantColor(t, img, maxX, maxY, topRight)
 		}
 		{
-			minX, minY := 5, (height/2)+5
-			maxX, maxY := (width/2)-5, height-5
+			minX, minY := 5, (size.Y/2)+5
+			maxX, maxY := (size.X/2)-5, size.Y-5
 			wantColor(t, img, minX, minY, botLeft)
 			wantColor(t, img, maxX, minY, botLeft)
 			wantColor(t, img, minX, maxY, botLeft)
 			wantColor(t, img, maxX, maxY, botLeft)
 		}
 		{
-			minX, minY := (width/2)+5, (height/2)+5
-			maxX, maxY := width-5, height-5
+			minX, minY := (size.X/2)+5, (size.Y/2)+5
+			maxX, maxY := size.X-5, size.Y-5
 			wantColor(t, img, minX, minY, botRight)
 			wantColor(t, img, maxX, minY, botRight)
 			wantColor(t, img, minX, maxY, botRight)
@@ -100,8 +106,14 @@ func runEndToEndTest(t *testing.T, driver TestDriver) {
 	wantColors(beef, white, black, gray)
 
 	// Click the first and last sections to turn them red.
-	driver.Click(1*(width/4), 1*(height/4))
-	driver.Click(3*(width/4), 3*(height/4))
+	// TODO(mvdan): implement this properly in the Wayland driver; swaymsg
+	// almost works to automate clicks, but the button presses end up in the
+	// wrong coordinates.
+	if _, ok := driver.(*WaylandTestDriver); ok {
+		return
+	}
+	driver.Click(1*(size.X/4), 1*(size.Y/4))
+	driver.Click(3*(size.X/4), 3*(size.Y/4))
 	wantColors(red, white, black, red)
 }
 
