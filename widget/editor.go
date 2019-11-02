@@ -60,6 +60,8 @@ type Editor struct {
 
 	// events is the list of events not yet processed.
 	events []EditorEvent
+	// prevEvents is the number of events from the previous frame.
+	prevEvents int
 }
 
 type EditorEvent interface {
@@ -90,6 +92,7 @@ func (e *Editor) Events(gtx *layout.Context) []EditorEvent {
 	e.processEvents(gtx)
 	events := e.events
 	e.events = nil
+	e.prevEvents = 0
 	return events
 }
 
@@ -177,15 +180,16 @@ func (e *Editor) Focus() {
 
 // Layout lays out the editor.
 func (e *Editor) Layout(gtx *layout.Context, sh *text.Shaper, font text.Font) {
+	// Flush events from before the previous frame.
+	copy(e.events, e.events[e.prevEvents:])
+	e.events = e.events[:len(e.events)-e.prevEvents]
+	e.prevEvents = len(e.events)
 	if e.font != font {
 		e.invalidate()
 		e.font = font
 	}
 	e.processEvents(gtx)
 	e.layout(gtx, sh)
-	if !e.clicker.Active() {
-		e.events = nil
-	}
 }
 
 func (e *Editor) layout(gtx *layout.Context, sh *text.Shaper) {

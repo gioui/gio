@@ -78,10 +78,6 @@ func (t *Theme) IconButton(icon *Icon) IconButton {
 func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 	col := b.Color
 	bgcol := b.Background
-	if !button.Active() {
-		col = rgb(0x888888)
-		bgcol = rgb(0xcccccc)
-	}
 	st := layout.Stack{Alignment: layout.Center}
 	hmin := gtx.Constraints.Width.Min
 	vmin := gtx.Constraints.Height.Min
@@ -128,9 +124,6 @@ func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
 		button.Layout(gtx)
 	})
 	bgcol := b.Background
-	if !button.Active() {
-		bgcol = rgb(0xcccccc)
-	}
 	bg := st.Expand(gtx, func() {
 		size := float32(gtx.Constraints.Width.Min)
 		rr := float32(size) * .5

@@ -62,13 +62,13 @@ var (
 		SingleLine: true,
 		Submit:     true,
 	}
-	button         = new(widget.Button)
-	disabledButton = new(widget.Button)
-	iconButton     = new(widget.Button)
-	list           = &layout.List{
+	button      = new(widget.Button)
+	greenButton = new(widget.Button)
+	iconButton  = new(widget.Button)
+	list        = &layout.List{
 		Axis: layout.Vertical,
 	}
-	enabled  bool
+	green    = true
 	topLabel = "Hello, Gio"
 	icon     *material.Icon
 )
@@ -98,15 +98,13 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 			in := layout.UniformInset(unit.Dp(8))
 			b1 := buttons.Rigid(gtx, func() {
 				in.Layout(gtx, func() {
-					for iconButton.Clicked(gtx) {
-					}
 					th.IconButton(icon).Layout(gtx, iconButton)
 				})
 			})
 			b2 := buttons.Rigid(gtx, func() {
 				in.Layout(gtx, func() {
 					for button.Clicked(gtx) {
-						enabled = !enabled
+						green = !green
 					}
 					th.Button("Click me!").Layout(gtx, button)
 				})
@@ -114,15 +112,11 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 			b3 := buttons.Rigid(gtx, func() {
 				in.Layout(gtx, func() {
 					var btn material.Button
-					if enabled {
-						for disabledButton.Clicked(gtx) {
-						}
-						btn = th.Button("Enabled")
-					} else {
-						btn = th.Button("Disabled")
+					btn = th.Button("Green button")
+					if green {
+						btn.Background = color.RGBA{A: 0xff, R: 0x9e, G: 0x9d, B: 0x24}
 					}
-					btn.Background = color.RGBA{A: 0xff, R: 0x9e, G: 0x9d, B: 0x24}
-					btn.Layout(gtx, disabledButton)
+					btn.Layout(gtx, greenButton)
 				})
 			})
 			buttons.Layout(gtx, b1, b2, b3)
