@@ -10,6 +10,7 @@ packages:
  - golang
  - xvfb
  - xdotool
+ - scrot
 sources:
  - https://git.sr.ht/~eliasnaur/gio
 environment:
