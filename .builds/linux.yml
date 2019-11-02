@@ -1,4 +1,6 @@
 image: debian/testing
+repositories:
+ experimental: http://deb.debian.org/debian experimental main
 packages:
  - curl
  - libwayland-dev
@@ -11,6 +13,8 @@ packages:
  - xvfb
  - xdotool
  - scrot
+ - sway
+ - grim
 sources:
  - https://git.sr.ht/~eliasnaur/gio
 environment:
