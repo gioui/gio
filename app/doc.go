@@ -61,7 +61,7 @@ Event queue
 
 A Window's Queue method returns an event.Queue implementation that distributes
 incoming events to the event handlers declared in the latest frame.
-See the gioui.org/ui package for more information about event handlers.
+See the gioui.org/io/event package for more information about event handlers.
 
 Permissions
 
