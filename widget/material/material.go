@@ -14,6 +14,7 @@ import (
 	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
+	"golang.org/x/exp/shiny/materialdesign/icons"
 )
 
 type Theme struct {
@@ -22,8 +23,11 @@ type Theme struct {
 		Primary color.RGBA
 		Text    color.RGBA
 		Hint    color.RGBA
+		InvText color.RGBA
 	}
-	TextSize unit.Value
+	TextSize           unit.Value
+	checkedStateIcon   *Icon
+	uncheckedStateIcon *Icon
 }
 
 func NewTheme() *Theme {
@@ -33,8 +37,20 @@ func NewTheme() *Theme {
 	t.Color.Primary = rgb(0x3f51b5)
 	t.Color.Text = rgb(0x000000)
 	t.Color.Hint = rgb(0xbbbbbb)
+	t.Color.InvText = rgb(0xffffff)
 	t.TextSize = unit.Sp(16)
+
+	t.checkedStateIcon = mustIcon(NewIcon(icons.ToggleCheckBox))
+	t.uncheckedStateIcon = mustIcon(NewIcon(icons.ToggleCheckBoxOutlineBlank))
+
 	return t
+}
+
+func mustIcon(ic *Icon, err error) *Icon {
+	if err != nil {
+		panic(err)
+	}
+	return ic
 }
 
 func rgb(c uint32) color.RGBA {

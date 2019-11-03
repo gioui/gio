@@ -6,7 +6,6 @@ package material
 import (
 	"image"
 	"image/color"
-	"image/draw"
 
 	"gioui.org/f32"
 	"gioui.org/io/pointer"
@@ -16,33 +15,24 @@ import (
 	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
-	"golang.org/x/exp/shiny/iconvg"
 )
 
 type Button struct {
 	Text string
 	// Color is the text color.
-	Color      color.RGBA
-	Font       text.Font
-	Background color.RGBA
-
-	shaper *text.Shaper
+	Color        color.RGBA
+	Font         text.Font
+	Background   color.RGBA
+	CornerRadius unit.Value
+	shaper       *text.Shaper
 }
 
 type IconButton struct {
 	Background color.RGBA
+	Color      color.RGBA
 	Icon       *Icon
 	Size       unit.Value
 	Padding    unit.Value
-}
-
-type Icon struct {
-	src  []byte
-	size unit.Value
-
-	// Cached values.
-	op      paint.ImageOp
-	imgSize int
 }
 
 func (t *Theme) Button(txt string) Button {
@@ -57,18 +47,10 @@ func (t *Theme) Button(txt string) Button {
 	}
 }
 
-// NewIcon returns a new Icon from IconVG data.
-func NewIcon(data []byte) (*Icon, error) {
-	_, err := iconvg.DecodeMetadata(data)
-	if err != nil {
-		return nil, err
-	}
-	return &Icon{src: data}, nil
-}
-
 func (t *Theme) IconButton(icon *Icon) IconButton {
 	return IconButton{
 		Background: t.Color.Primary,
+		Color:      t.Color.InvText,
 		Icon:       icon,
 		Size:       unit.Dp(56),
 		Padding:    unit.Dp(16),
@@ -114,6 +96,7 @@ func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
 		layout.UniformInset(b.Padding).Layout(gtx, func() {
 			size := gtx.Px(b.Size) - 2*gtx.Px(b.Padding)
 			if b.Icon != nil {
+				b.Icon.Color = b.Color
 				b.Icon.Layout(gtx, unit.Px(float32(size)))
 			}
 			gtx.Dimensions = layout.Dimensions{
@@ -138,35 +121,6 @@ func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
 		}
 	})
 	st.Layout(gtx, bg, ico)
-}
-
-func (ic *Icon) Layout(gtx *layout.Context, sz unit.Value) {
-	ico := ic.image(gtx.Px(sz))
-	ico.Add(gtx.Ops)
-	paint.PaintOp{
-		Rect: f32.Rectangle{
-			Max: toPointF(ico.Size()),
-		},
-	}.Add(gtx.Ops)
-}
-
-func (ic *Icon) image(sz int) paint.ImageOp {
-	if sz == ic.imgSize {
-		return ic.op
-	}
-	m, _ := iconvg.DecodeMetadata(ic.src)
-	dx, dy := m.ViewBox.AspectRatio()
-	img := image.NewRGBA(image.Rectangle{Max: image.Point{X: sz, Y: int(float32(sz) * dy / dx)}})
-	var ico iconvg.Rasterizer
-	ico.SetDstImage(img, img.Bounds(), draw.Src)
-	// Use white for icons.
-	m.Palette[0] = color.RGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff}
-	iconvg.Decode(&ico, ic.src, &iconvg.DecodeOptions{
-		Palette: &m.Palette,
-	})
-	ic.op = paint.NewImageOp(img)
-	ic.imgSize = sz
-	return ic.op
 }
 
 func toPointF(p image.Point) f32.Point {
