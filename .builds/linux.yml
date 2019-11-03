@@ -36,6 +36,7 @@ tasks:
  - test_cmd: |
      cd gio/cmd
      go test ./...
+     GOFLAGS=-race go test ./...
  - check_gofmt: |
      cd gio
      test -z $(gofmt -s -l .)
