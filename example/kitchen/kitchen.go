@@ -71,6 +71,7 @@ var (
 	green    = true
 	topLabel = "Hello, Gio"
 	icon     *material.Icon
+	checkbox = new(widget.CheckBox)
 )
 
 func kitchen(gtx *layout.Context, th *material.Theme) {
@@ -120,6 +121,9 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 				})
 			})
 			buttons.Layout(gtx, b1, b2, b3)
+		},
+		func() {
+			th.CheckBox("Checkbox").Layout(gtx, checkbox)
 		},
 	}
 	list.Layout(gtx, len(widgets), func(i int) {
