@@ -151,6 +151,9 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 		return errors.New("ANDROID_HOME is not set. Please point it to the root of the Android SDK")
 	}
 	javac, err := findJavaC()
+	if err != nil {
+		return fmt.Errorf("could not find javac: %v", err)
+	}
 	ndkRoot := filepath.Join(androidHome, "ndk-bundle")
 	if _, err := os.Stat(ndkRoot); err != nil {
 		return fmt.Errorf("no NDK found in $ANDROID_HOME/ndk-bundle (%s). Use `sdkmanager ndk-bundle` to install it", ndkRoot)

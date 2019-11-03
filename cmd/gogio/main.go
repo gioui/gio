@@ -47,7 +47,7 @@ type buildInfo struct {
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, mainUsage)
+		fmt.Fprint(os.Stderr, mainUsage)
 	}
 	flag.Parse()
 	if err := mainErr(); err != nil {
