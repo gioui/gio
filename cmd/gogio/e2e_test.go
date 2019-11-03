@@ -9,6 +9,8 @@ import (
 	"testing"
 )
 
+var raceEnabled = false
+
 var headless = flag.Bool("headless", true, "run end-to-end tests in headless mode")
 
 // TestDriver is implemented by each of the platforms we can run end-to-end

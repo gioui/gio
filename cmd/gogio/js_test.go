@@ -33,6 +33,10 @@ type JSTestDriver struct {
 func (d *JSTestDriver) Start(t_ *testing.T, path string, width, height int) (cleanups []func()) {
 	d.t = t_
 
+	if raceEnabled {
+		d.t.Skipf("js/wasm doesn't support -race; skipping")
+	}
+
 	// First, build the app.
 	dir, err := ioutil.TempDir("", "gio-endtoend-js")
 	if err != nil {
