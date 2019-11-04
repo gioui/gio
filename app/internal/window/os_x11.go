@@ -51,10 +51,6 @@ void gio_x11_init_ime(Display *dpy, Window win, XIM *xim, XIC *xic) {
 
 	XSetICFocus(*xic);
 }
-
-int gio_x11_connection_number(Display *dpy) {
-	return ConnectionNumber(dpy);
-}
 */
 import "C"
 import (
@@ -127,7 +123,7 @@ func (w *x11Window) setStage(s system.Stage) {
 
 func (w *x11Window) loop() {
 	h := x11EventHandler{w: w, xev: new(xEvent), text: make([]byte, 4)}
-	xfd := C.gio_x11_connection_number(w.x)
+	xfd := C.XConnectionNumber(w.x)
 
 	// Poll for events and notifications.
 	pollfds := []syscall.PollFd{
