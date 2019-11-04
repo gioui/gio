@@ -10,6 +10,10 @@ type CheckBox struct {
 	checked bool
 }
 
+func (c *CheckBox) SetChecked(value bool) {
+	c.checked = value
+}
+
 func (c *CheckBox) Checked(gtx *layout.Context) bool {
 	for _, e := range c.click.Events(gtx) {
 		switch e.Type {
