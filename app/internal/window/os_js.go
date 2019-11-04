@@ -339,7 +339,7 @@ func (w *window) ShowTextInput(show bool) {
 
 func (w *window) draw(sync bool) {
 	width, height, scale, cfg := w.config()
-	if cfg == (config{}) {
+	if cfg == (config{}) || width == 0 || height == 0 {
 		return
 	}
 	w.mu.Lock()
