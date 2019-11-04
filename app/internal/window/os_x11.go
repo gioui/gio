@@ -11,6 +11,7 @@ package window
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
+#include <X11/Xresource.h>
 #define GIO_FIELD_OFFSET(typ, field) const int gio_##typ##_##field##_off = offsetof(typ, field)
 GIO_FIELD_OFFSET(XClientMessageEvent, data);
 GIO_FIELD_OFFSET(XExposeEvent, count);
@@ -60,6 +61,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"strconv"
 	"sync"
 	"time"
 	"unsafe"
@@ -504,6 +506,7 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 		if C.XInitThreads() == 0 {
 			err = errors.New("x11: threads init failed")
 		}
+		C.XrmInitialize()
 	})
 	if err != nil {
 		return err
@@ -512,15 +515,16 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	if dpy == nil {
 		return errors.New("x11: cannot connect to the X server")
 	}
-	root := C.XDefaultRootWindow(dpy)
 
+	root := C.XDefaultRootWindow(dpy)
+	screen := C.XDefaultScreen(dpy)
+	ppsp := x11DetectUIScale(dpy, screen)
+	cfg := config{pxPerDp: ppsp, pxPerSp: ppsp}
 	var (
 		swa C.XSetWindowAttributes
 		xim C.XIM
 		xic C.XIC
 	)
-
-	cfg := config{pxPerDp: 1, pxPerSp: 1} // TODO(dennwc): real config
 	swa.event_mask = C.ExposureMask | C.PointerMotionMask | C.KeyPressMask
 	win := C.XCreateWindow(dpy, root,
 		0, 0, C.uint(cfg.Px(opts.Width)), C.uint(cfg.Px(opts.Height)), 0,
@@ -578,4 +582,37 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 		close(mainDone)
 	}()
 	return nil
+}
+
+// detectUIScale reports the system UI scale, or 1.0 if it fails.
+func x11DetectUIScale(dpy *C.Display, screen C.int) float32 {
+	// default fixed DPI value used in most desktop UI toolkits
+	const defaultDesktopDPI = 96
+	var scale float32 = 1.0
+
+	// Get actual DPI from X resource Xft.dpi (set by GTK and Qt).
+	// This value is entirely based on user preferences and conflates both
+	// screen (UI) scaling and font scale.
+	rms := C.XResourceManagerString(dpy)
+	if rms != nil {
+		db := C.XrmGetStringDatabase(rms)
+		if db != nil {
+			var (
+				t *C.char
+				v C.XrmValue
+			)
+			if C.XrmGetResource(db, (*C.char)(unsafe.Pointer(&[]byte("Xft.dpi\x00")[0])),
+				(*C.char)(unsafe.Pointer(&[]byte("Xft.Dpi\x00")[0])), &t, &v) != C.False {
+				if t != nil && C.GoString(t) == "String" {
+					f, err := strconv.ParseFloat(C.GoString(v.addr), 32)
+					if err == nil {
+						scale = float32(f) / defaultDesktopDPI
+					}
+				}
+			}
+			C.XrmDestroyDatabase(db)
+		}
+	}
+
+	return scale
 }
