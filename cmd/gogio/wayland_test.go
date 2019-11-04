@@ -72,7 +72,12 @@ func (d *WaylandTestDriver) Start(t_ *testing.T, path string, width, height int)
 	cleanups = append(cleanups, func() { os.RemoveAll(dir) })
 
 	bin := filepath.Join(dir, "red")
-	cmd := exec.Command("go", "build", "-tags", "nox11", "-o="+bin, path)
+	flags := []string{"build", "-tags", "nox11", "-o="+bin}
+	if raceEnabled {
+		flags = append(flags, "-race")
+	}
+	flags = append(flags, path)
+	cmd := exec.Command("go", flags...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		d.t.Fatalf("could not build app: %s:\n%s", err, out)
 	}

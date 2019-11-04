@@ -69,7 +69,12 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 	cleanups = append(cleanups, func() { os.RemoveAll(dir) })
 
 	bin := filepath.Join(dir, "red")
-	cmd := exec.Command("go", "build", "-tags", "nowayland", "-o="+bin, path)
+	flags := []string{"build", "-tags", "nowayland", "-o="+bin}
+	if raceEnabled {
+		flags = append(flags, "-race")
+	}
+	flags = append(flags, path)
+	cmd := exec.Command("go", flags...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		d.t.Fatalf("could not build app: %s:\n%s", err, out)
 	}
