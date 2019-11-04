@@ -106,7 +106,3 @@ func newWindowRendezvous() *windowRendezvous {
 	}()
 	return wr
 }
-
-const (
-	inchPrDp = 1.0 / 160
-)

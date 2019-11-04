@@ -81,6 +81,7 @@ func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int, to
 	if sync != 0 {
 		isSync = true
 	}
+	const inchPrDp = 1.0 / 163
 	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
 			Size: image.Point{

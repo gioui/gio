@@ -309,6 +309,7 @@ func (w *window) draw(sync bool) {
 	if width == 0 || height == 0 {
 		return
 	}
+	const inchPrDp = 1.0 / 160
 	ppdp := float32(w.dpi) * inchPrDp
 	w.callbacks.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{

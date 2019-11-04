@@ -486,6 +486,7 @@ func convertKeyCode(code uintptr) (rune, bool) {
 func configForDC(hdc syscall.Handle) config {
 	hmon := monitorFromPoint(point{}, _MONITOR_DEFAULTTOPRIMARY)
 	dpi := getDpiForMonitor(hmon, _MDT_EFFECTIVE_DPI)
+	const inchPrDp = 1.0 / 96.0
 	ppdp := float32(dpi) * inchPrDp
 	return config{
 		pxPerDp: ppdp,
