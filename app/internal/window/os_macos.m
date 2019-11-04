@@ -57,25 +57,6 @@ CGFloat gio_viewWidth(CFTypeRef viewRef) {
 	return [view bounds].size.width;
 }
 
-// Points pr. dp.
-static CGFloat getPointsPerDP(NSScreen *screen) {
-	NSDictionary *description = [screen deviceDescription];
-	NSSize displayPixelSize = [[description objectForKey:NSDeviceSize] sizeValue];
-	CGSize displayPhysicalSize = CGDisplayScreenSize([[description objectForKey:@"NSScreenNumber"] unsignedIntValue]);
-	return (25.4/160)*displayPixelSize.width / displayPhysicalSize.width;
-}
-
-// Pixels pr dp.
-CGFloat gio_getPixelsPerDP(void) {
-	NSScreen *screen = [NSScreen mainScreen];
-	return getPointsPerDP(screen);
-}
-
-CGFloat gio_getBackingScale() {
-	NSScreen *screen = [NSScreen mainScreen];
-	return [screen backingScaleFactor];
-}
-
 CGFloat gio_getViewBackingScale(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
 	return [view.window backingScaleFactor];

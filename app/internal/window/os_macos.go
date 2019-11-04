@@ -36,7 +36,6 @@ type window struct {
 	view  C.CFTypeRef
 	w     Callbacks
 	stage system.Stage
-	ppdp  float32
 	scale float32
 }
 
@@ -198,7 +197,7 @@ func (w *window) draw(sync bool) {
 	}
 	width := int(wf*w.scale + .5)
 	height := int(hf*w.scale + .5)
-	cfg := configFor(w.ppdp, w.scale)
+	cfg := configFor(w.scale)
 	cfg.now = time.Now()
 	w.setStage(system.StageRunning)
 	w.w.Event(FrameEvent{
@@ -213,20 +212,10 @@ func (w *window) draw(sync bool) {
 	})
 }
 
-func getPixelsPerDp(scale float32) float32 {
-	ppdp := float32(C.gio_getPixelsPerDP())
-	ppdp = ppdp * scale * monitorScale
-	if ppdp < minDensity {
-		ppdp = minDensity
-	}
-	return ppdp / scale
-}
-
-func configFor(ppdp, scale float32) config {
-	ppdp = ppdp * scale
+func configFor(scale float32) config {
 	return config{
-		pxPerDp: ppdp,
-		pxPerSp: ppdp,
+		pxPerDp: scale,
+		pxPerSp: scale,
 	}
 }
 
@@ -258,10 +247,9 @@ func gio_onShow(view C.CFTypeRef) {
 //export gio_onCreate
 func gio_onCreate(view C.CFTypeRef) {
 	viewDo(view, func(views viewMap, view C.CFTypeRef) {
-		scale := float32(C.gio_getBackingScale())
+		scale := float32(C.gio_getViewBackingScale(view))
 		w := &window{
 			view:  view,
-			ppdp:  getPixelsPerDp(scale),
 			scale: scale,
 		}
 		wopts := <-mainWindow.out
@@ -283,15 +271,13 @@ func Main() {
 		// TODO: return this error from CreateWindow.
 		panic(errors.New("CreateWindow: failed to create view"))
 	}
-	scale := float32(C.gio_getBackingScale())
-	ppdp := getPixelsPerDp(scale)
-	cfg := configFor(ppdp, scale)
+	// Window sizes is in unscaled screen coordinates, not device pixels.
+	cfg := configFor(1.0)
 	opts := wopts.opts
 	w := cfg.Px(opts.Width)
 	h := cfg.Px(opts.Height)
-	// Window sizes is on screen coordinates, not device pixels.
-	w = int(float32(w) / scale)
-	h = int(float32(h) / scale)
+	w = int(float32(w))
+	h = int(float32(h))
 	title := C.CString(opts.Title)
 	defer C.free(unsafe.Pointer(title))
 	C.gio_main(view, title, C.CGFloat(w), C.CGFloat(h))

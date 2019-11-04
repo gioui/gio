@@ -187,21 +187,13 @@ func createNativeWindow(opts *Options) (*window, error) {
 		return nil, fmt.Errorf("createNativeWindow: failed to create pipe: %v", err)
 	}
 
-	fontScale := detectFontScale()
-	var ppmm float32
 	var scale int
 	for _, conf := range outputConfig {
-		if d, err := conf.ppmm(); err == nil && d > ppmm {
-			ppmm = d
-		}
 		if s := conf.scale; s > scale {
 			scale = s
 		}
 	}
-	ppdp := ppmm * mmPrDp * fontScale
-	if ppdp < minDensity {
-		ppdp = minDensity
-	}
+	ppdp := detectUIScale()
 
 	w := &window{
 		disp:     conn.disp,
@@ -893,17 +885,6 @@ func gio_onTextInputDeleteSurroundingText(data unsafe.Pointer, im *C.struct_zwp_
 func gio_onTextInputDone(data unsafe.Pointer, im *C.struct_zwp_text_input_v3, serial C.uint32_t) {
 }
 
-// ppmm returns the approximate pixels per millimeter for the output.
-func (c *wlOutput) ppmm() (float32, error) {
-	if c.physWidth == 0 || c.physHeight == 0 {
-		return 0, errors.New("no physical size data for output")
-	}
-	// Because of https://gitlab.gnome.org/GNOME/mutter/issues/369, output dimensions might be undetectably swapped.
-	// Instead, compute and return sqrt(px²/mm²).
-	density := float32(math.Sqrt(float64(c.width*c.height) / float64(c.physWidth*c.physHeight)))
-	return density, nil
-}
-
 func (w *window) flushScroll() {
 	var fling f32.Point
 	if w.fling.anim.Active() {
@@ -911,7 +892,7 @@ func (w *window) flushScroll() {
 		fling = w.fling.dir.Mul(dist)
 	}
 	// The Wayland reported scroll distance for
-	// discrete scroll axis is only 10 pixels, where
+	// discrete scroll axes is only 10 pixels, where
 	// 100 seems more appropriate.
 	const discreteScale = 10
 	if w.scroll.steps.X != 0 {
@@ -1066,17 +1047,16 @@ func (w *window) surface() (*C.struct_wl_surface, int, int) {
 
 func (w *window) ShowTextInput(show bool) {}
 
-// detectFontScale reports the system font scale, or monitorScale
-// if it fails.
-func detectFontScale() float32 {
+// detectUIScale reports the system UI scale, or 1.0 if it fails.
+func detectUIScale() float32 {
 	// TODO: What about other window environments?
 	out, err := exec.Command("gsettings", "get", "org.gnome.desktop.interface", "text-scaling-factor").Output()
 	if err != nil {
-		return monitorScale
+		return 1.0
 	}
 	scale, err := strconv.ParseFloat(string(bytes.TrimSpace(out)), 32)
 	if err != nil {
-		return monitorScale
+		return 1.0
 	}
 	return float32(scale)
 }

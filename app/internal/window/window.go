@@ -109,13 +109,4 @@ func newWindowRendezvous() *windowRendezvous {
 
 const (
 	inchPrDp = 1.0 / 160
-	mmPrDp   = 25.4 / 160
-	// monitorScale is the extra scale applied to
-	// monitor outputs to compensate for the extra
-	// viewing distance compared to phone and tables.
-	monitorScale = 1.20
-	// minDensity is the minimum pixels per dp to
-	// ensure font and ui legibility on low-dpi
-	// screens.
-	minDensity = 1.0
 )

@@ -79,7 +79,9 @@ const (
 
 	_INFINITE = 0xFFFFFFFF
 
-	_LOGPIXELSX = 88
+	_MDT_EFFECTIVE_DPI = 0
+
+	_MONITOR_DEFAULTTOPRIMARY = 1
 
 	_SIZE_MAXIMIZED = 2
 	_SIZE_MINIMIZED = 1
@@ -110,6 +112,7 @@ const (
 	_WM_CANCELMODE  = 0x001F
 	_WM_CHAR        = 0x0102
 	_WM_CREATE      = 0x0001
+	_WM_DPICHANGED  = 0x02E0
 	_WM_DESTROY     = 0x0002
 	_WM_KEYDOWN     = 0x0100
 	_WM_KEYUP       = 0x0101
@@ -269,6 +272,9 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			w.w.Event(key.EditEvent{Text: string(r)})
 		}
 		// The message is processed.
+		return 1
+	case _WM_DPICHANGED:
+		// Let Windows know we're prepared for runtime DPI changes.
 		return 1
 	case _WM_KEYDOWN, _WM_SYSKEYDOWN:
 		if n, ok := convertKeyCode(wParam); ok {
@@ -478,12 +484,9 @@ func convertKeyCode(code uintptr) (rune, bool) {
 }
 
 func configForDC(hdc syscall.Handle) config {
-	dpi := getDeviceCaps(hdc, _LOGPIXELSX)
-	ppdp := float32(dpi) * inchPrDp * monitorScale
-	// Force a minimum density to keep text legible and to handle bogus output geometry.
-	if ppdp < minDensity {
-		ppdp = minDensity
-	}
+	hmon := monitorFromPoint(point{}, _MONITOR_DEFAULTTOPRIMARY)
+	dpi := getDpiForMonitor(hmon, _MDT_EFFECTIVE_DPI)
+	ppdp := float32(dpi) * inchPrDp
 	return config{
 		pxPerDp: ppdp,
 		pxPerSp: ppdp,
@@ -508,6 +511,7 @@ var (
 	_GetMessageTime              = user32.NewProc("GetMessageTime")
 	_KillTimer                   = user32.NewProc("KillTimer")
 	_LoadCursor                  = user32.NewProc("LoadCursorW")
+	_MonitorFromPoint            = user32.NewProc("MonitorFromPoint")
 	_MsgWaitForMultipleObjectsEx = user32.NewProc("MsgWaitForMultipleObjectsEx")
 	_PeekMessage                 = user32.NewProc("PeekMessageW")
 	_PostMessage                 = user32.NewProc("PostMessageW")
@@ -526,8 +530,8 @@ var (
 	_UnregisterClass             = user32.NewProc("UnregisterClassW")
 	_UpdateWindow                = user32.NewProc("UpdateWindow")
 
-	gdi32          = syscall.NewLazySystemDLL("gdi32")
-	_GetDeviceCaps = gdi32.NewProc("GetDeviceCaps")
+	shcore            = syscall.NewLazySystemDLL("shcore")
+	_GetDpiForMonitor = shcore.NewProc("GetDpiForMonitor")
 )
 
 func getModuleHandle() (syscall.Handle, error) {
@@ -596,9 +600,10 @@ func getDC(hwnd syscall.Handle) (syscall.Handle, error) {
 	return syscall.Handle(hdc), nil
 }
 
-func getDeviceCaps(hdc syscall.Handle, index int32) int {
-	c, _, _ := _GetDeviceCaps.Call(uintptr(hdc), uintptr(index))
-	return int(c)
+func getDpiForMonitor(hmonitor syscall.Handle, dpiType uint32) int {
+	var dpiX, dpiY uintptr
+	_GetDpiForMonitor.Call(uintptr(hmonitor), uintptr(dpiType), uintptr(unsafe.Pointer(&dpiX)), uintptr(unsafe.Pointer(&dpiY)))
+	return int(dpiX)
 }
 
 func getKeyState(nVirtKey int32) int16 {
@@ -634,6 +639,11 @@ func loadCursor(curID uint16) (syscall.Handle, error) {
 		return 0, fmt.Errorf("LoadCursorW failed: %v", err)
 	}
 	return syscall.Handle(h), nil
+}
+
+func monitorFromPoint(pt point, flags uint32) syscall.Handle {
+	r, _, _ := _MonitorFromPoint.Call(uintptr(pt.x), uintptr(pt.y), uintptr(flags))
+	return syscall.Handle(r)
 }
 
 func msgWaitForMultipleObjectsEx(nCount uint32, pHandles uintptr, millis, mask, flags uint32) (uint32, error) {
