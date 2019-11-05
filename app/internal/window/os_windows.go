@@ -79,6 +79,8 @@ const (
 
 	_INFINITE = 0xFFFFFFFF
 
+	_LOGPIXELSX = 88
+
 	_MDT_EFFECTIVE_DPI = 0
 
 	_MONITOR_DEFAULTTOPRIMARY = 1
@@ -201,12 +203,7 @@ func NewWindow(window Callbacks, opts *Options) error {
 
 func createNativeWindow(opts *Options) (*window, error) {
 	setProcessDPIAware()
-	screenDC, err := getDC(0)
-	if err != nil {
-		return nil, err
-	}
-	cfg := configForDC(screenDC)
-	releaseDC(screenDC)
+	cfg := configForDC()
 	hInst, err := getModuleHandle()
 	if err != nil {
 		return nil, err
@@ -412,7 +409,7 @@ func (w *window) draw(sync bool) {
 	getClientRect(w.hwnd, &r)
 	w.width = int(r.right - r.left)
 	w.height = int(r.bottom - r.top)
-	cfg := configForDC(w.hdc)
+	cfg := configForDC()
 	cfg.now = time.Now()
 	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
@@ -483,9 +480,8 @@ func convertKeyCode(code uintptr) (rune, bool) {
 	return r, true
 }
 
-func configForDC(hdc syscall.Handle) config {
-	hmon := monitorFromPoint(point{}, _MONITOR_DEFAULTTOPRIMARY)
-	dpi := getDpiForMonitor(hmon, _MDT_EFFECTIVE_DPI)
+func configForDC() config {
+	dpi := getSystemDPI()
 	const inchPrDp = 1.0 / 96.0
 	ppdp := float32(dpi) * inchPrDp
 	return config{
@@ -533,6 +529,9 @@ var (
 
 	shcore            = syscall.NewLazySystemDLL("shcore")
 	_GetDpiForMonitor = shcore.NewProc("GetDpiForMonitor")
+
+	gdi32          = syscall.NewLazySystemDLL("gdi32")
+	_GetDeviceCaps = gdi32.NewProc("GetDeviceCaps")
 )
 
 func getModuleHandle() (syscall.Handle, error) {
@@ -601,10 +600,32 @@ func getDC(hwnd syscall.Handle) (syscall.Handle, error) {
 	return syscall.Handle(hdc), nil
 }
 
+func getDeviceCaps(hdc syscall.Handle, index int32) int {
+	c, _, _ := _GetDeviceCaps.Call(uintptr(hdc), uintptr(index))
+	return int(c)
+}
+
 func getDpiForMonitor(hmonitor syscall.Handle, dpiType uint32) int {
 	var dpiX, dpiY uintptr
 	_GetDpiForMonitor.Call(uintptr(hmonitor), uintptr(dpiType), uintptr(unsafe.Pointer(&dpiX)), uintptr(unsafe.Pointer(&dpiY)))
 	return int(dpiX)
+}
+
+// getSystemDPI returns the effective DPI of the system.
+func getSystemDPI() int {
+	// Check for GetDpiForMonitor, introduced in Windows 8.1.
+	if _GetDpiForMonitor.Find() == nil {
+		hmon := monitorFromPoint(point{}, _MONITOR_DEFAULTTOPRIMARY)
+		return getDpiForMonitor(hmon, _MDT_EFFECTIVE_DPI)
+	} else {
+		// Fall back to the physical device DPI.
+		screenDC, err := getDC(0)
+		if err != nil {
+			return 96
+		}
+		defer releaseDC(screenDC)
+		return getDeviceCaps(screenDC, _LOGPIXELSX)
+	}
 }
 
 func getKeyState(nVirtKey int32) int16 {
