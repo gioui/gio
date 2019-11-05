@@ -134,37 +134,40 @@ func (c *context) MakeCurrent() error {
 	if c.eglWin == win && width == c.width && height == c.height {
 		return nil
 	}
-	if win == nilEGLNativeWindowType {
-		if c.srgbFBO != nil {
+	c.width, c.height = width, height
+	// Do not re-create surfaces when only resizing. This prevents flickering when resizing on X11.
+	if c.eglWin != win {
+		if win == nilEGLNativeWindowType && c.srgbFBO != nil {
 			c.srgbFBO.Release()
 			c.srgbFBO = nil
 		}
-	}
-	if c.eglSurf != nilEGLSurface {
-		// Make sure any in-flight GL commands are complete.
-		c.c.Finish()
-		eglMakeCurrent(c.eglCtx.disp, nilEGLSurface, nilEGLSurface, nilEGLContext)
-		eglDestroySurface(c.eglCtx.disp, c.eglSurf)
-		c.eglSurf = nilEGLSurface
-	}
-	c.width, c.height = width, height
-	c.eglWin = win
-	if c.eglWin == nilEGLNativeWindowType {
+		if c.eglSurf != nilEGLSurface {
+			// Make sure any in-flight GL commands are complete.
+			c.c.Finish()
+			eglMakeCurrent(c.eglCtx.disp, nilEGLSurface, nilEGLSurface, nilEGLContext)
+			eglDestroySurface(c.eglCtx.disp, c.eglSurf)
+			c.eglSurf = nilEGLSurface
+		}
+		c.eglWin = win
+		if c.eglWin == nilEGLNativeWindowType {
+			return nil
+		}
+		eglSurf, err := createSurfaceAndMakeCurrent(c.eglCtx, win)
+		c.eglSurf = eglSurf
+		if err != nil {
+			c.eglWin = nilEGLNativeWindowType
+			return err
+		}
+		// eglSwapInterval 1 leads to erratic frame rates and unnecessary blocking.
+		// We rely on platform specific frame rate limiting instead, except on Windows
+		// and X11 where eglSwapInterval is all there is.
+		if c.driver.needVSync() {
+			eglSwapInterval(c.eglCtx.disp, 1)
+		} else {
+			eglSwapInterval(c.eglCtx.disp, 0)
+		}
+	} else if c.eglWin == nilEGLNativeWindowType {
 		return nil
-	}
-	eglSurf, err := createSurfaceAndMakeCurrent(c.eglCtx, win)
-	c.eglSurf = eglSurf
-	if err != nil {
-		c.eglWin = nilEGLNativeWindowType
-		return err
-	}
-	// eglSwapInterval 1 leads to erratic frame rates and unnecessary blocking.
-	// We rely on platform specific frame rate limiting instead, except on Windows
-	// and X11 where eglSwapInterval is all there is.
-	if c.driver.needVSync() {
-		eglSwapInterval(c.eglCtx.disp, 1)
-	} else {
-		eglSwapInterval(c.eglCtx.disp, 0)
 	}
 	if c.eglCtx.srgb {
 		return nil
