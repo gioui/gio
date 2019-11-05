@@ -65,9 +65,9 @@ func (p *Path) end() {
 	p.contour++
 }
 
-// Line records a line from the pen to end.
-func (p *Path) Line(to f32.Point) {
-	to = to.Add(p.pen)
+// Line moves the pen by the amount specified by delta, recording a line.
+func (p *Path) Line(delta f32.Point) {
+	to := delta.Add(p.pen)
 	p.lineTo(to)
 }
 
