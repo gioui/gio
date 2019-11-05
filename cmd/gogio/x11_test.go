@@ -69,7 +69,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 	cleanups = append(cleanups, func() { os.RemoveAll(dir) })
 
 	bin := filepath.Join(dir, "red")
-	flags := []string{"build", "-tags", "nowayland", "-o="+bin}
+	flags := []string{"build", "-tags", "nowayland", "-o=" + bin}
 	if raceEnabled {
 		flags = append(flags, "-race")
 	}

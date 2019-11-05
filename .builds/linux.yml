@@ -39,4 +39,4 @@ tasks:
      go test -race ./...
  - check_gofmt: |
      cd gio
-     test -z $(gofmt -s -l .)
+     test -z "$(gofmt -s -l .)"

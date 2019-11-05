@@ -72,7 +72,7 @@ func (d *WaylandTestDriver) Start(t_ *testing.T, path string, width, height int)
 	cleanups = append(cleanups, func() { os.RemoveAll(dir) })
 
 	bin := filepath.Join(dir, "red")
-	flags := []string{"build", "-tags", "nox11", "-o="+bin}
+	flags := []string{"build", "-tags", "nox11", "-o=" + bin}
 	if raceEnabled {
 		flags = append(flags, "-race")
 	}
