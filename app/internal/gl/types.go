@@ -17,3 +17,19 @@ type (
 func (u Uniform) Valid() bool {
 	return u.V != -1
 }
+
+func (p Program) Valid() bool {
+	return p.V != 0
+}
+
+func (s Shader) Valid() bool {
+	return s.V != 0
+}
+
+func (t Texture) Valid() bool {
+	return t.V != 0
+}
+
+func (t Texture) Equal(t2 Texture) bool {
+	return t == t2
+}

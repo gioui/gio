@@ -65,7 +65,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 
 func getContainer(doc js.Value) js.Value {
 	cont := doc.Call("getElementById", "giowindow")
-	if cont != js.Null() {
+	if !cont.IsNull() {
 		return cont
 	}
 	cont = doc.Call("createElement", "DIV")
@@ -252,7 +252,7 @@ func (w *window) touchEvent(typ pointer.Type, e js.Value) {
 func (w *window) touchIDFor(touch js.Value) pointer.ID {
 	id := touch.Get("identifier")
 	for i, id2 := range w.touches {
-		if id2 == id {
+		if id2.Equal(id) {
 			return pointer.ID(i)
 		}
 	}

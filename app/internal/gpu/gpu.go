@@ -409,7 +409,7 @@ func (g *GPU) setErr(err error) {
 }
 
 func (r *renderer) texHandle(t *texture) gl.Texture {
-	if t.id != (gl.Texture{}) {
+	if t.id.Valid() {
 		return t.id
 	}
 	t.id = createTexture(r.ctx)
@@ -419,7 +419,7 @@ func (r *renderer) texHandle(t *texture) gl.Texture {
 }
 
 func (t *texture) release(ctx *context) {
-	if t.id != (gl.Texture{}) {
+	if t.id.Valid() {
 		ctx.DeleteTexture(t.id)
 	}
 }
@@ -898,7 +898,7 @@ func (r *renderer) drawOps(ops []imageOp) {
 		case clipTypeIntersection:
 			fbo = r.pather.stenciler.intersections.fbos[img.place.Idx]
 		}
-		if coverTex != fbo.tex {
+		if !coverTex.Equal(fbo.tex) {
 			coverTex = fbo.tex
 			r.ctx.ActiveTexture(gl.TEXTURE1)
 			r.ctx.BindTexture(gl.TEXTURE_2D, coverTex)

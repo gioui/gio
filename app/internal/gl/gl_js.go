@@ -21,16 +21,16 @@ type Functions struct {
 func (f *Functions) Init(version int) error {
 	if version < 2 {
 		f.EXT_disjoint_timer_query = f.getExtension("EXT_disjoint_timer_query")
-		if f.getExtension("OES_texture_half_float") == js.Null() && f.getExtension("OES_texture_float") == js.Null() {
+		if f.getExtension("OES_texture_half_float").IsNull() && f.getExtension("OES_texture_float").IsNull() {
 			return errors.New("gl: no support for neither OES_texture_half_float nor OES_texture_float")
 		}
-		if f.getExtension("EXT_sRGB") == js.Null() {
+		if f.getExtension("EXT_sRGB").IsNull() {
 			return errors.New("gl: EXT_sRGB not supported")
 		}
 	} else {
 		// WebGL2 extensions.
 		f.EXT_disjoint_timer_query_webgl2 = f.getExtension("EXT_disjoint_timer_query_webgl2")
-		if f.getExtension("EXT_color_buffer_half_float") == js.Null() && f.getExtension("EXT_color_buffer_float") == js.Null() {
+		if f.getExtension("EXT_color_buffer_half_float").IsNull() && f.getExtension("EXT_color_buffer_float").IsNull() {
 			return errors.New("gl: no support for neither EXT_color_buffer_half_float nor EXT_color_buffer_float")
 		}
 	}
@@ -48,7 +48,7 @@ func (f *Functions) AttachShader(p Program, s Shader) {
 	f.Ctx.Call("attachShader", js.Value(p), js.Value(s))
 }
 func (f *Functions) BeginQuery(target Enum, query Query) {
-	if f.EXT_disjoint_timer_query_webgl2 != js.Null() {
+	if !f.EXT_disjoint_timer_query_webgl2.IsNull() {
 		f.Ctx.Call("beginQuery", int(target), js.Value(query))
 	} else {
 		f.EXT_disjoint_timer_query.Call("beginQueryEXT", int(target), js.Value(query))
@@ -124,7 +124,7 @@ func (f *Functions) DeleteProgram(p Program) {
 	f.Ctx.Call("deleteProgram", js.Value(p))
 }
 func (f *Functions) DeleteQuery(query Query) {
-	if f.EXT_disjoint_timer_query_webgl2 != js.Null() {
+	if !f.EXT_disjoint_timer_query_webgl2.IsNull() {
 		f.Ctx.Call("deleteQuery", js.Value(query))
 	} else {
 		f.EXT_disjoint_timer_query.Call("deleteQueryEXT", js.Value(query))
@@ -164,7 +164,7 @@ func (f *Functions) EnableVertexAttribArray(a Attrib) {
 	f.Ctx.Call("enableVertexAttribArray", int(a))
 }
 func (f *Functions) EndQuery(target Enum) {
-	if f.EXT_disjoint_timer_query_webgl2 != js.Null() {
+	if !f.EXT_disjoint_timer_query_webgl2.IsNull() {
 		f.Ctx.Call("endQuery", int(target))
 	} else {
 		f.EXT_disjoint_timer_query.Call("endQueryEXT", int(target))
@@ -201,7 +201,7 @@ func (f *Functions) GetProgramInfoLog(p Program) string {
 	return f.Ctx.Call("getProgramInfoLog", js.Value(p)).String()
 }
 func (f *Functions) GetQueryObjectuiv(query Query, pname Enum) uint {
-	if f.EXT_disjoint_timer_query_webgl2 != js.Null() {
+	if !f.EXT_disjoint_timer_query_webgl2.IsNull() {
 		return uint(paramVal(f.Ctx.Call("getQueryParameter", js.Value(query), int(pname))))
 	} else {
 		return uint(paramVal(f.EXT_disjoint_timer_query.Call("getQueryObjectEXT", js.Value(query), int(pname))))
@@ -231,8 +231,8 @@ func (f *Functions) GetUniformLocation(p Program, name string) Uniform {
 }
 func (f *Functions) InvalidateFramebuffer(target, attachment Enum) {
 	fn := f.Ctx.Get("invalidateFramebuffer")
-	if fn != js.Undefined() {
-		if f.int32Buf == (js.Value{}) {
+	if !fn.IsUndefined() {
+		if f.int32Buf.IsUndefined() {
 			f.int32Buf = js.Global().Get("Int32Array").New(1)
 		}
 		f.int32Buf.SetIndex(0, int32(attachment))
@@ -306,7 +306,7 @@ func (f *Functions) resizeByteBuffer(n int) {
 	if n == 0 {
 		return
 	}
-	if f.byteBuf != (js.Value{}) && f.byteBuf.Length() >= n {
+	if !f.byteBuf.IsUndefined() && f.byteBuf.Length() >= n {
 		return
 	}
 	f.byteBuf = js.Global().Get("Uint8Array").New(n)

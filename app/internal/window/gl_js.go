@@ -25,11 +25,11 @@ func newContext(w *window) (*context, error) {
 	}
 	version := 2
 	ctx := w.cnv.Call("getContext", "webgl2", args)
-	if ctx == js.Null() {
+	if ctx.IsNull() {
 		version = 1
 		ctx = w.cnv.Call("getContext", "webgl", args)
 	}
-	if ctx == js.Null() {
+	if ctx.IsNull() {
 		return nil, errors.New("app: webgl is not supported")
 	}
 	f := &gl.Functions{Ctx: ctx}
