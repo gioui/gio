@@ -25,8 +25,10 @@ type Theme struct {
 		InvText color.RGBA
 	}
 	TextSize           unit.Value
-	checkedStateIcon   *Icon
-	uncheckedStateIcon *Icon
+	checkBoxCheckedIcon   *Icon
+	checkBoxUncheckedIcon *Icon
+	radioCheckedIcon   *Icon
+	radioUncheckedIcon *Icon
 }
 
 func NewTheme() *Theme {
@@ -39,8 +41,10 @@ func NewTheme() *Theme {
 	t.Color.InvText = rgb(0xffffff)
 	t.TextSize = unit.Sp(16)
 
-	t.checkedStateIcon = mustIcon(NewIcon(icons.ToggleCheckBox))
-	t.uncheckedStateIcon = mustIcon(NewIcon(icons.ToggleCheckBoxOutlineBlank))
+	t.checkBoxCheckedIcon = mustIcon(NewIcon(icons.ToggleCheckBox))
+	t.checkBoxUncheckedIcon = mustIcon(NewIcon(icons.ToggleCheckBoxOutlineBlank))
+	t.radioCheckedIcon = mustIcon(NewIcon(icons.ToggleRadioButtonChecked))
+	t.radioUncheckedIcon = mustIcon(NewIcon(icons.ToggleRadioButtonUnchecked))
 
 	return t
 }

@@ -62,10 +62,11 @@ var (
 		SingleLine: true,
 		Submit:     true,
 	}
-	button      = new(widget.Button)
-	greenButton = new(widget.Button)
-	iconButton  = new(widget.Button)
-	list        = &layout.List{
+	button            = new(widget.Button)
+	greenButton       = new(widget.Button)
+	iconButton        = new(widget.Button)
+	radioButtonsGroup = new(widget.Enum)
+	list              = &layout.List{
 		Axis: layout.Vertical,
 	}
 	green    = true
@@ -124,6 +125,19 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 		},
 		func() {
 			th.CheckBox("Checkbox").Layout(gtx, checkbox)
+		},
+		func() {
+			group := layout.Flex{}
+			r1 := group.Rigid(gtx, func() {
+				th.RadioButton("r1", "RadioButton1").Layout(gtx, radioButtonsGroup)
+			})
+			r2 := group.Rigid(gtx, func() {
+				th.RadioButton("r2", "RadioButton2").Layout(gtx, radioButtonsGroup)
+			})
+			r3 := group.Rigid(gtx, func() {
+				th.RadioButton("r3", "RadioButton3").Layout(gtx, radioButtonsGroup)
+			})
+			group.Layout(gtx, r1, r2, r3)
 		},
 	}
 	list.Layout(gtx, len(widgets), func(i int) {
