@@ -71,11 +71,7 @@ func (c *context) Release() {
 		c.srgbFBO.Release()
 		c.srgbFBO = nil
 	}
-	if c.eglSurf != nilEGLSurface {
-		eglMakeCurrent(c.eglCtx.disp, nilEGLSurface, nilEGLSurface, nilEGLContext)
-		eglDestroySurface(c.eglCtx.disp, c.eglSurf)
-		c.eglSurf = nilEGLSurface
-	}
+	c.destroySurface()
 	c.eglWin = nilEGLNativeWindowType
 	if c.eglCtx != nil {
 		eglDestroyContext(c.eglCtx.disp, c.eglCtx.ctx)
@@ -126,6 +122,17 @@ func (c *context) Lock() {}
 
 func (c *context) Unlock() {}
 
+func (c *context) destroySurface() {
+	if c.eglSurf == nilEGLSurface {
+		return
+	}
+	// Make sure any in-flight GL commands are complete.
+	c.c.Finish()
+	eglMakeCurrent(c.eglCtx.disp, nilEGLSurface, nilEGLSurface, nilEGLContext)
+	eglDestroySurface(c.eglCtx.disp, c.eglSurf)
+	c.eglSurf = nilEGLSurface
+}
+
 func (c *context) MakeCurrent() error {
 	win, width, height, err := c.driver.eglWindow(int(c.eglCtx.visualID))
 	if err != nil {
@@ -141,13 +148,7 @@ func (c *context) MakeCurrent() error {
 			c.srgbFBO.Release()
 			c.srgbFBO = nil
 		}
-		if c.eglSurf != nilEGLSurface {
-			// Make sure any in-flight GL commands are complete.
-			c.c.Finish()
-			eglMakeCurrent(c.eglCtx.disp, nilEGLSurface, nilEGLSurface, nilEGLContext)
-			eglDestroySurface(c.eglCtx.disp, c.eglSurf)
-			c.eglSurf = nilEGLSurface
-		}
+		c.destroySurface()
 		c.eglWin = win
 		if c.eglWin == nilEGLNativeWindowType {
 			return nil
