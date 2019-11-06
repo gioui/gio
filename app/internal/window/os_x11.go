@@ -530,10 +530,11 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 		xic C.XIC
 	)
 	swa.event_mask = C.ExposureMask | C.PointerMotionMask | C.KeyPressMask
+	swa.background_pixmap = C.None
 	win := C.XCreateWindow(dpy, root,
 		0, 0, C.uint(cfg.Px(opts.Width)), C.uint(cfg.Px(opts.Height)), 0,
 		C.CopyFromParent, C.InputOutput,
-		nil, C.CWEventMask|C.CWBackPixel,
+		nil, C.CWEventMask|C.CWBackPixmap,
 		&swa)
 	C.gio_x11_init_ime(dpy, win, &xim, &xic)
 	C.XSelectInput(dpy, win, 0|
