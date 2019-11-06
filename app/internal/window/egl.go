@@ -134,6 +134,8 @@ func (c *context) MakeCurrent() error {
 	if c.eglWin == win && width == c.width && height == c.height {
 		return nil
 	}
+	// Make sure any in-flight GL commands are complete.
+	c.c.Finish()
 	c.width, c.height = width, height
 	// Do not re-create surfaces when only resizing. This prevents flickering when resizing on X11.
 	if c.eglWin != win {
@@ -142,8 +144,6 @@ func (c *context) MakeCurrent() error {
 			c.srgbFBO = nil
 		}
 		if c.eglSurf != nilEGLSurface {
-			// Make sure any in-flight GL commands are complete.
-			c.c.Finish()
 			eglMakeCurrent(c.eglCtx.disp, nilEGLSurface, nilEGLSurface, nilEGLContext)
 			eglDestroySurface(c.eglCtx.disp, c.eglSurf)
 			c.eglSurf = nilEGLSurface
