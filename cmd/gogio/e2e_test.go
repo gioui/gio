@@ -47,7 +47,7 @@ func TestEndToEnd(t *testing.T) {
 	t.Parallel()
 
 	// Keep this list local, to not reuse TestDriver objects.
-	subtests := []struct{
+	subtests := []struct {
 		name   string
 		driver TestDriver
 	}{
