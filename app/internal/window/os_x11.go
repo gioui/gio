@@ -12,20 +12,6 @@ package window
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
 #include <X11/Xresource.h>
-#define GIO_FIELD_OFFSET(typ, field) const int gio_##typ##_##field##_off = offsetof(typ, field)
-GIO_FIELD_OFFSET(XClientMessageEvent, data);
-GIO_FIELD_OFFSET(XExposeEvent, count);
-GIO_FIELD_OFFSET(XConfigureEvent, width);
-GIO_FIELD_OFFSET(XConfigureEvent, height);
-GIO_FIELD_OFFSET(XButtonEvent, x);
-GIO_FIELD_OFFSET(XButtonEvent, y);
-GIO_FIELD_OFFSET(XButtonEvent, state);
-GIO_FIELD_OFFSET(XButtonEvent, button);
-GIO_FIELD_OFFSET(XButtonEvent, time);
-GIO_FIELD_OFFSET(XMotionEvent, x);
-GIO_FIELD_OFFSET(XMotionEvent, y);
-GIO_FIELD_OFFSET(XMotionEvent, time);
-GIO_FIELD_OFFSET(XKeyEvent, state);
 
 void gio_x11_init_ime(Display *dpy, Window win, XIM *xim, XIC *xic) {
 	// adjust locale temporarily for XOpenIM
@@ -124,7 +110,7 @@ func (w *x11Window) setStage(s system.Stage) {
 }
 
 func (w *x11Window) loop() {
-	h := x11EventHandler{w: w, xev: new(xEvent), text: make([]byte, 4)}
+	h := x11EventHandler{w: w, xev: new(C.XEvent), text: make([]byte, 4)}
 	xfd := C.XConnectionNumber(w.x)
 
 	// Poll for events and notifications.
@@ -217,7 +203,7 @@ func (w *x11Window) destroy() {
 type x11EventHandler struct {
 	w      *x11Window
 	text   []byte
-	xev    *xEvent
+	xev    *C.XEvent
 	status C.Status
 	keysym C.KeySym
 }
@@ -229,12 +215,13 @@ func (h *x11EventHandler) handleEvents() bool {
 	xev := h.xev
 	redraw := false
 	for C.XPending(w.x) != 0 {
-		C.XNextEvent(w.x, (*C.XEvent)(unsafe.Pointer(xev)))
-		if C.XFilterEvent((*C.XEvent)(unsafe.Pointer(xev)), C.None) == C.True {
+		C.XNextEvent(w.x, xev)
+		if C.XFilterEvent(xev, C.None) == C.True {
 			continue
 		}
-		switch xev.Type {
+		switch (*C.XAnyEvent)(unsafe.Pointer(xev))._type {
 		case C.KeyPress:
+			kevt := (*C.XKeyPressedEvent)(unsafe.Pointer(xev))
 		lookup:
 			// Save state then clear CTRL & Shift bits in order to have
 			// Xutf8LookupString return the unmodified key name in text[:l].
@@ -243,13 +230,12 @@ func (h *x11EventHandler) handleEvents() bool {
 			// like CTRL-SHIFT-/ on QWERTY layouts, but CTRL-? is completely
 			// masked. The same applies to AZERTY layouts where CTRL-SHIFT-É is
 			// available but not CTRL-2.
-			state := xev.GetKeyState()
+			state := kevt.state
 			mods := x11KeyStateToModifiers(state)
 			if mods.Contain(key.ModCommand) {
-				xev.SetKeyState(state & ^(C.uint(C.ControlMask) | C.uint(C.ShiftMask)))
+				kevt.state &^= (C.uint(C.ControlMask) | C.uint(C.ShiftMask))
 			}
-			l := int(C.Xutf8LookupString(w.xic,
-				(*C.XKeyPressedEvent)(unsafe.Pointer(xev)),
+			l := int(C.Xutf8LookupString(w.xic, kevt,
 				(*C.char)(unsafe.Pointer(&h.text[0])), C.int(len(h.text)),
 				&h.keysym, &h.status))
 			switch h.status {
@@ -282,20 +268,21 @@ func (h *x11EventHandler) handleEvents() bool {
 			}
 		case C.KeyRelease:
 		case C.ButtonPress, C.ButtonRelease:
+			bevt := (*C.XButtonEvent)(unsafe.Pointer(xev))
 			ev := pointer.Event{
 				Type:   pointer.Press,
 				Source: pointer.Mouse,
 				Position: f32.Point{
-					X: float32(xev.GetButtonX()),
-					Y: float32(xev.GetButtonY()),
+					X: float32(bevt.x),
+					Y: float32(bevt.y),
 				},
-				Time: xev.GetButtonTime(),
+				Time: time.Duration(bevt.time) * time.Millisecond,
 			}
-			if xev.Type == C.ButtonRelease {
+			if bevt._type == C.ButtonRelease {
 				ev.Type = pointer.Release
 			}
 			const scrollScale = 10
-			switch xev.GetButtonButton() {
+			switch bevt.button {
 			case C.Button1:
 				// left click by default
 			case C.Button4:
@@ -311,28 +298,31 @@ func (h *x11EventHandler) handleEvents() bool {
 			}
 			w.w.Event(ev)
 		case C.MotionNotify:
+			mevt := (*C.XMotionEvent)(unsafe.Pointer(xev))
 			w.w.Event(pointer.Event{
 				Type:   pointer.Move,
 				Source: pointer.Mouse,
 				Position: f32.Point{
-					X: float32(xev.GetMotionX()),
-					Y: float32(xev.GetMotionY()),
+					X: float32(mevt.x),
+					Y: float32(mevt.y),
 				},
-				Time: xev.GetMotionTime(),
+				Time: time.Duration(mevt.time) * time.Millisecond,
 			})
 		case C.Expose: // update
 			// redraw only on the last expose event
-			redraw = xev.GetExposeCount() == 0
+			redraw = (*C.XExposeEvent)(unsafe.Pointer(xev)).count == 0
 		case C.FocusIn:
 			w.w.Event(key.FocusEvent{Focus: true})
 		case C.FocusOut:
 			w.w.Event(key.FocusEvent{Focus: false})
 		case C.ConfigureNotify: // window configuration change
-			w.width = int(xev.GetConfigureWidth())
-			w.height = int(xev.GetConfigureHeight())
+			cevt := (*C.XConfigureEvent)(unsafe.Pointer(xev))
+			w.width = int(cevt.width)
+			w.height = int(cevt.height)
 			// redraw will be done by a later expose event
 		case C.ClientMessage: // extensions
-			switch xev.GetClientDataLong()[0] {
+			cevt := (*C.XClientMessageEvent)(unsafe.Pointer(xev))
+			switch *(*C.long)(unsafe.Pointer(&cevt.data)) {
 			case C.long(w.evDelWindow):
 				w.dead = true
 				return false
@@ -386,108 +376,6 @@ func x11SpecialKeySymToRune(s C.KeySym) (rune, bool) {
 		return 0, false
 	}
 	return n, true
-}
-
-const xEventSize = unsafe.Sizeof(C.XEvent{})
-
-// Make sure the Go struct has the same size.
-// We can't use C.XEvent directly because it's a union.
-var _ = [1]struct{}{}[unsafe.Sizeof(xEvent{})-xEventSize]
-
-type xEvent struct {
-	Type C.int
-	Data [xEventSize - unsafe.Sizeof(C.int(0))]byte
-}
-
-func (e *xEvent) getInt(off int) C.int {
-	return *(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(e)) + uintptr(off)))
-}
-
-func (e *xEvent) getUint(off int) C.uint {
-	return *(*C.uint)(unsafe.Pointer(uintptr(unsafe.Pointer(e)) + uintptr(off)))
-}
-
-func (e *xEvent) setUint(off int, v C.uint) {
-	*(*C.uint)(unsafe.Pointer(uintptr(unsafe.Pointer(e)) + uintptr(off))) = v
-}
-
-func (e *xEvent) getUlong(off int) C.ulong {
-	return *(*C.ulong)(unsafe.Pointer(uintptr(unsafe.Pointer(e)) + uintptr(off)))
-}
-
-func (e *xEvent) getUlongMs(off int) time.Duration {
-	return time.Duration(e.getUlong(off)) * time.Millisecond
-}
-
-// GetExposeCount returns a XEvent.xexpose.count field.
-func (e *xEvent) GetExposeCount() C.int {
-	return e.getInt(int(C.gio_XExposeEvent_count_off))
-}
-
-// GetConfigureWidth returns a XEvent.xconfigure.width field.
-func (e *xEvent) GetConfigureWidth() C.int {
-	return e.getInt(int(C.gio_XConfigureEvent_width_off))
-}
-
-// GetConfigureWidth returns a XEvent.xconfigure.height field.
-func (e *xEvent) GetConfigureHeight() C.int {
-	return e.getInt(int(C.gio_XConfigureEvent_height_off))
-}
-
-// GetButtonX returns a XEvent.xbutton.x field.
-func (e *xEvent) GetButtonX() C.int {
-	return e.getInt(int(C.gio_XButtonEvent_x_off))
-}
-
-// GetButtonY returns a XEvent.xbutton.y field.
-func (e *xEvent) GetButtonY() C.int {
-	return e.getInt(int(C.gio_XButtonEvent_y_off))
-}
-
-// GetButtonState returns a XEvent.xbutton.state field.
-func (e *xEvent) GetButtonState() C.uint {
-	return e.getUint(int(C.gio_XButtonEvent_state_off))
-}
-
-// GetButtonButton returns a XEvent.xbutton.button field.
-func (e *xEvent) GetButtonButton() C.uint {
-	return e.getUint(int(C.gio_XButtonEvent_button_off))
-}
-
-// GetButtonTime returns a XEvent.xbutton.time field.
-func (e *xEvent) GetButtonTime() time.Duration {
-	return e.getUlongMs(int(C.gio_XButtonEvent_time_off))
-}
-
-// GetMotionX returns a XEvent.xmotion.x field.
-func (e *xEvent) GetMotionX() C.int {
-	return e.getInt(int(C.gio_XMotionEvent_x_off))
-}
-
-// GetMotionY returns a XEvent.xmotion.y field.
-func (e *xEvent) GetMotionY() C.int {
-	return e.getInt(int(C.gio_XMotionEvent_y_off))
-}
-
-// GetMotionTime returns a XEvent.xmotion.time field.
-func (e *xEvent) GetMotionTime() time.Duration {
-	return e.getUlongMs(int(C.gio_XMotionEvent_time_off))
-}
-
-// GetClientDataLong returns a XEvent.xclient.data.l field.
-func (e *xEvent) GetClientDataLong() [5]C.long {
-	ptr := (*[5]C.long)(unsafe.Pointer(uintptr(unsafe.Pointer(e)) + uintptr(C.gio_XClientMessageEvent_data_off)))
-	return *ptr
-}
-
-// GetKeyState returns a XKeyEvent.state field.
-func (e *xEvent) GetKeyState() C.uint {
-	return e.getUint(int(C.gio_XKeyEvent_state_off))
-}
-
-// GetKeyState returns a XKeyEvent.state field.
-func (e *xEvent) SetKeyState(v C.uint) {
-	e.setUint(int(C.gio_XKeyEvent_state_off), v)
 }
 
 var (
