@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// Package material implements the Material design.
 package material
 
 import (
