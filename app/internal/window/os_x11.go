@@ -60,6 +60,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 	"unsafe"
 
 	"gioui.org/f32"
@@ -234,6 +236,18 @@ func (h *x11EventHandler) handleEvents() bool {
 		switch xev.Type {
 		case C.KeyPress:
 		lookup:
+			// Save state then clear CTRL & Shift bits in order to have
+			// Xutf8LookupString return the unmodified key name in text[:l].
+			//
+			// Note that this enables sending a key.Event for key combinations
+			// like CTRL-SHIFT-/ on QWERTY layouts, but CTRL-? is completely
+			// masked. The same applies to AZERTY layouts where CTRL-SHIFT-É is
+			// available but not CTRL-2.
+			state := xev.GetKeyState()
+			mods := x11KeyStateToModifiers(state)
+			if mods.Contain(key.ModCommand) {
+				xev.SetKeyState(state & ^(C.uint(C.ControlMask) | C.uint(C.ShiftMask)))
+			}
 			l := int(C.Xutf8LookupString(w.xic,
 				(*C.XKeyPressedEvent)(unsafe.Pointer(xev)),
 				(*C.char)(unsafe.Pointer(&h.text[0])), C.int(len(h.text)),
@@ -243,32 +257,27 @@ func (h *x11EventHandler) handleEvents() bool {
 				h.text = make([]byte, l)
 				goto lookup
 			case C.XLookupChars:
+				// Synthetic event from XIM.
 				w.w.Event(key.EditEvent{Text: string(h.text[:l])})
 			case C.XLookupKeySym:
-				if r, ok := x11KeySymToRune(h.keysym); ok {
+				// Special keys.
+				if r, ok := x11SpecialKeySymToRune(h.keysym); ok {
 					w.w.Event(key.Event{
 						Name:      r,
-						Modifiers: x11KeyStateToModifiers(xev.GetKeyState()),
+						Modifiers: mods,
 					})
 				}
 			case C.XLookupBoth:
-				// here we need to choose if we send a key.Event or key.EditEvent
-				mods := x11KeyStateToModifiers(xev.GetKeyState())
-				if mods&key.ModCommand != 0 {
-					r, ok := x11KeySymToRune(h.keysym)
-					if !ok {
-						// on AZERTY keyboards, CTRL-1, 2, etc do not have a consistent behavior.
-						// Since keysim as set by Xutf8LookupString is layout dependent, get its layout independent
-						// version and use that instead (i.e. send CTRL-1, CTRL-2, etc. instead of CTRL-&, CTRL-é, …)
-						r, ok = x11KeySymToRune(C.XLookupKeysym((*C.XKeyEvent)(unsafe.Pointer(xev)), 0))
-					}
-					if ok {
-						w.w.Event(key.Event{Name: r, Modifiers: mods})
-					}
-				} else if r, ok := x11SpecialKeySymToRune(h.keysym); ok {
+				if r, ok := x11SpecialKeySymToRune(h.keysym); ok {
 					w.w.Event(key.Event{Name: r, Modifiers: mods})
 				} else {
-					w.w.Event(key.EditEvent{Text: string(h.text[:l])})
+					if r, _ = utf8.DecodeRune(h.text[:l]); r != utf8.RuneError {
+						w.w.Event(key.Event{Name: unicode.ToUpper(r), Modifiers: mods})
+					}
+					// Send EditEvent only when not a CTRL key combination.
+					if !mods.Contain(key.ModCommand) {
+						w.w.Event(key.EditEvent{Text: string(h.text[:l])})
+					}
 				}
 			}
 		case C.KeyRelease:
@@ -344,16 +353,6 @@ func x11KeyStateToModifiers(s C.uint) key.Modifiers {
 	return m
 }
 
-func x11KeySymToRune(s C.KeySym) (rune, bool) {
-	if '0' <= s && s <= '9' || 'A' <= s && s <= 'Z' {
-		return rune(s), true
-	}
-	if 'a' <= s && s <= 'z' {
-		return rune(s - 0x20), true
-	}
-	return x11SpecialKeySymToRune(s)
-}
-
 func x11SpecialKeySymToRune(s C.KeySym) (rune, bool) {
 	var n rune
 	switch s {
@@ -406,6 +405,10 @@ func (e *xEvent) getInt(off int) C.int {
 
 func (e *xEvent) getUint(off int) C.uint {
 	return *(*C.uint)(unsafe.Pointer(uintptr(unsafe.Pointer(e)) + uintptr(off)))
+}
+
+func (e *xEvent) setUint(off int, v C.uint) {
+	*(*C.uint)(unsafe.Pointer(uintptr(unsafe.Pointer(e)) + uintptr(off))) = v
 }
 
 func (e *xEvent) getUlong(off int) C.ulong {
@@ -480,6 +483,11 @@ func (e *xEvent) GetClientDataLong() [5]C.long {
 // GetKeyState returns a XKeyEvent.state field.
 func (e *xEvent) GetKeyState() C.uint {
 	return e.getUint(int(C.gio_XKeyEvent_state_off))
+}
+
+// GetKeyState returns a XKeyEvent.state field.
+func (e *xEvent) SetKeyState(v C.uint) {
+	e.setUint(int(C.gio_XKeyEvent_state_off), v)
 }
 
 var (
