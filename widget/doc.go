@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// Package widget implements common user interface controls. Widgets
-// contain peristent state and process user events. Theme packages
-// such as `widget/material` implements drawing of widgets.
+// Package widget implements state tracking and event handling of
+// common user interface controls. To draw widgets, use a theme
+// packages such as package gioui.org/widget/material.
 package widget
