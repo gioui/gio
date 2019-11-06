@@ -116,6 +116,7 @@ const (
 	_WM_CREATE      = 0x0001
 	_WM_DPICHANGED  = 0x02E0
 	_WM_DESTROY     = 0x0002
+	_WM_ERASEBKGND  = 0x0014
 	_WM_KEYDOWN     = 0x0100
 	_WM_KEYUP       = 0x0101
 	_WM_LBUTTONDOWN = 0x0201
@@ -272,6 +273,9 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		return 1
 	case _WM_DPICHANGED:
 		// Let Windows know we're prepared for runtime DPI changes.
+		return 1
+	case _WM_ERASEBKGND:
+		// Avoid flickering between GPU content and background color.
 		return 1
 	case _WM_KEYDOWN, _WM_SYSKEYDOWN:
 		if n, ok := convertKeyCode(wParam); ok {

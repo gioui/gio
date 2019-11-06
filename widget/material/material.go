@@ -24,11 +24,11 @@ type Theme struct {
 		Hint    color.RGBA
 		InvText color.RGBA
 	}
-	TextSize           unit.Value
+	TextSize              unit.Value
 	checkBoxCheckedIcon   *Icon
 	checkBoxUncheckedIcon *Icon
-	radioCheckedIcon   *Icon
-	radioUncheckedIcon *Icon
+	radioCheckedIcon      *Icon
+	radioUncheckedIcon    *Icon
 }
 
 func NewTheme() *Theme {
