@@ -204,9 +204,3 @@ func (d *X11TestDriver) Click(x, y int) {
 	// Wait for the gio app to render after this click.
 	<-d.frameNotifs
 }
-
-func TestX11(t *testing.T) {
-	t.Parallel()
-
-	runEndToEndTest(t, &X11TestDriver{})
-}

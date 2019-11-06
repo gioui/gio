@@ -39,6 +39,32 @@ type TestDriver interface {
 	Click(x, y int)
 }
 
+func TestEndToEnd(t *testing.T) {
+	if testing.Short() {
+		t.Skipf("end-to-end tests tend to be slow")
+	}
+
+	t.Parallel()
+
+	// Keep this list local, to not reuse TestDriver objects.
+	subtests := []struct{
+		name   string
+		driver TestDriver
+	}{
+		{"X11", &X11TestDriver{}},
+		{"Wayland", &WaylandTestDriver{}},
+		{"JS", &JSTestDriver{}},
+	}
+
+	for _, subtest := range subtests {
+		t.Run(subtest.name, func(t *testing.T) {
+			subtest := subtest // copy the changing loop variable
+			t.Parallel()
+			runEndToEndTest(t, subtest.driver)
+		})
+	}
+}
+
 func runEndToEndTest(t *testing.T, driver TestDriver) {
 	size := image.Point{X: 800, Y: 600}
 	cleanups := driver.Start(t, "testdata/red.go", size.X, size.Y)

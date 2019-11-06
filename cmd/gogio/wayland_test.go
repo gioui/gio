@@ -231,9 +231,3 @@ func (d *WaylandTestDriver) Click(x, y int) {
 	// Wait for the gio app to render after this click.
 	<-d.frameNotifs
 }
-
-func TestWayland(t *testing.T) {
-	t.Parallel()
-
-	runEndToEndTest(t, &WaylandTestDriver{})
-}

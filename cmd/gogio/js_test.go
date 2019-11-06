@@ -152,9 +152,3 @@ func (d *JSTestDriver) Click(x, y int) {
 	// TODO(mvdan): synchronize with the app instead
 	time.Sleep(200 * time.Millisecond)
 }
-
-func TestJS(t *testing.T) {
-	t.Parallel()
-
-	runEndToEndTest(t, &JSTestDriver{})
-}
