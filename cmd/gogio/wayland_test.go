@@ -42,7 +42,7 @@ default_border none
 
 var rxSwayReady = regexp.MustCompile(`Running compositor on wayland display '(.*)'`)
 
-func (d *WaylandTestDriver) Start(t_ *testing.T, path string, width, height int) (cleanups []func()) {
+func (d *WaylandTestDriver) Start(t_ *testing.T, path string, width, height int) {
 	d.frameNotifs = make(chan bool, 1)
 	d.t = t_
 
@@ -69,7 +69,7 @@ func (d *WaylandTestDriver) Start(t_ *testing.T, path string, width, height int)
 	if err != nil {
 		d.t.Fatal(err)
 	}
-	cleanups = append(cleanups, func() { os.RemoveAll(dir) })
+	d.t.Cleanup(func() { os.RemoveAll(dir) })
 
 	bin := filepath.Join(dir, "red")
 	flags := []string{"build", "-tags", "nox11", "-o=" + bin}
@@ -100,7 +100,7 @@ func (d *WaylandTestDriver) Start(t_ *testing.T, path string, width, height int)
 	env = append(env, "XDG_RUNTIME_DIR="+d.runtimeDir)
 
 	var wg sync.WaitGroup
-	cleanups = append(cleanups, wg.Wait)
+	d.t.Cleanup(wg.Wait)
 
 	// First, start sway.
 	{
@@ -114,8 +114,8 @@ func (d *WaylandTestDriver) Start(t_ *testing.T, path string, width, height int)
 		if err := cmd.Start(); err != nil {
 			d.t.Fatal(err)
 		}
-		cleanups = append(cleanups, cancel)
-		cleanups = append(cleanups, func() {
+		d.t.Cleanup(cancel)
+		d.t.Cleanup(func() {
 			// Give it a chance to exit gracefully, cleaning up
 			// after itself. After 10ms, the deferred cancel above
 			// will signal an os.Kill.
@@ -163,7 +163,7 @@ func (d *WaylandTestDriver) Start(t_ *testing.T, path string, width, height int)
 		if err := cmd.Start(); err != nil {
 			d.t.Fatal(err)
 		}
-		cleanups = append(cleanups, cancel)
+		d.t.Cleanup(cancel)
 		wg.Add(1)
 		go func() {
 			if err := cmd.Wait(); err != nil && ctx.Err() == nil {
@@ -186,8 +186,6 @@ func (d *WaylandTestDriver) Start(t_ *testing.T, path string, width, height int)
 
 	// Wait for the gio app to render.
 	<-d.frameNotifs
-
-	return cleanups
 }
 
 func (d *WaylandTestDriver) Screenshot() image.Image {
@@ -216,9 +214,6 @@ func (d *WaylandTestDriver) swaymsg(args ...interface{}) {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		d.t.Errorf("%s", out)
 		d.t.Fatal(err)
-	} else {
-		d.t.Logf("%v", args)
-		d.t.Logf("%s", out)
 	}
 }
 

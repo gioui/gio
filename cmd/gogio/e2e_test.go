@@ -24,11 +24,7 @@ type TestDriver interface {
 	//
 	// When the function returns, the gio app must be ready to use on the
 	// platform, with its initial frame fully drawn.
-	//
-	// The returned cleanup funcs must be run in reverse order, to mimic
-	// deferred funcs.
-	// TODO(mvdan): replace with testing.T.Cleanup once Go 1.14 is out.
-	Start(t *testing.T, path string, width, height int) (cleanups []func())
+	Start(t *testing.T, path string, width, height int)
 
 	// Screenshot takes a screenshot of the Gio app on the platform.
 	Screenshot() image.Image
@@ -67,10 +63,7 @@ func TestEndToEnd(t *testing.T) {
 
 func runEndToEndTest(t *testing.T, driver TestDriver) {
 	size := image.Point{X: 800, Y: 600}
-	cleanups := driver.Start(t, "testdata/red.go", size.X, size.Y)
-	for _, cleanup := range cleanups {
-		defer cleanup()
-	}
+	driver.Start(t, "testdata/red.go", size.X, size.Y)
 
 	// The colors are split in four rectangular sections. Check the corners
 	// of each of the sections. We check the corners left to right, top to

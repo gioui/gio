@@ -28,7 +28,7 @@ type X11TestDriver struct {
 	display string
 }
 
-func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cleanups []func()) {
+func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) {
 	d.frameNotifs = make(chan bool, 1)
 	d.t = t_
 
@@ -66,7 +66,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 	if err != nil {
 		d.t.Fatal(err)
 	}
-	cleanups = append(cleanups, func() { os.RemoveAll(dir) })
+	d.t.Cleanup(func() { os.RemoveAll(dir) })
 
 	bin := filepath.Join(dir, "red")
 	flags := []string{"build", "-tags", "nowayland", "-o=" + bin}
@@ -80,7 +80,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 	}
 
 	var wg sync.WaitGroup
-	cleanups = append(cleanups, wg.Wait)
+	d.t.Cleanup(wg.Wait)
 
 	// First, start the X server.
 	{
@@ -92,8 +92,8 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 		if err := cmd.Start(); err != nil {
 			d.t.Fatal(err)
 		}
-		cleanups = append(cleanups, cancel)
-		cleanups = append(cleanups, func() {
+		d.t.Cleanup(cancel)
+		d.t.Cleanup(func() {
 			// Give it a chance to exit gracefully, cleaning up
 			// after itself. After 10ms, the deferred cancel above
 			// will signal an os.Kill.
@@ -141,7 +141,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 		if err := cmd.Start(); err != nil {
 			d.t.Fatal(err)
 		}
-		cleanups = append(cleanups, cancel)
+		d.t.Cleanup(cancel)
 		wg.Add(1)
 		go func() {
 			if err := cmd.Wait(); err != nil && ctx.Err() == nil {
@@ -165,8 +165,6 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) (cl
 
 	// Wait for the gio app to render.
 	<-d.frameNotifs
-
-	return cleanups
 }
 
 func (d *X11TestDriver) Screenshot() image.Image {

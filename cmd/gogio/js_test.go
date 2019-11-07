@@ -30,7 +30,7 @@ type JSTestDriver struct {
 	ctx context.Context
 }
 
-func (d *JSTestDriver) Start(t_ *testing.T, path string, width, height int) (cleanups []func()) {
+func (d *JSTestDriver) Start(t_ *testing.T, path string, width, height int) {
 	d.t = t_
 
 	if raceEnabled {
@@ -42,7 +42,7 @@ func (d *JSTestDriver) Start(t_ *testing.T, path string, width, height int) (cle
 	if err != nil {
 		d.t.Fatal(err)
 	}
-	cleanups = append(cleanups, func() { os.RemoveAll(dir) })
+	d.t.Cleanup(func() { os.RemoveAll(dir) })
 
 	// TODO(mvdan): This is inefficient, as we link the gogio tool every time.
 	// Consider options in the future. On the plus side, this is simple.
@@ -73,13 +73,13 @@ func (d *JSTestDriver) Start(t_ *testing.T, path string, width, height int) (cle
 	)
 
 	actx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	cleanups = append(cleanups, cancel)
+	d.t.Cleanup(cancel)
 
 	ctx, cancel := chromedp.NewContext(actx,
 		// Send all logf/errf calls to t.Logf
 		chromedp.WithLogf(d.t.Logf),
 	)
-	cleanups = append(cleanups, cancel)
+	d.t.Cleanup(cancel)
 	d.ctx = ctx
 
 	if err := chromedp.Run(ctx); err != nil {
@@ -109,7 +109,7 @@ func (d *JSTestDriver) Start(t_ *testing.T, path string, width, height int) (cle
 	// Third, serve the app folder, set the browser tab dimensions, and
 	// navigate to the folder.
 	ts := httptest.NewServer(http.FileServer(http.Dir(dir)))
-	cleanups = append(cleanups, ts.Close)
+	d.t.Cleanup(ts.Close)
 
 	if err := chromedp.Run(ctx,
 		chromedp.EmulateViewport(int64(width), int64(height)),
@@ -125,8 +125,6 @@ func (d *JSTestDriver) Start(t_ *testing.T, path string, width, height int) (cle
 	}
 	// TODO(mvdan): synchronize with the app instead
 	time.Sleep(200 * time.Millisecond)
-
-	return cleanups
 }
 
 func (d *JSTestDriver) Screenshot() image.Image {
