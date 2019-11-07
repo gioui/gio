@@ -36,6 +36,7 @@ type Window struct {
 	ack         chan struct{}
 	invalidates chan struct{}
 	frames      chan *op.Ops
+	frameAck    chan struct{}
 
 	stage        system.Stage
 	animating    bool
@@ -95,6 +96,7 @@ func NewWindow(options ...Option) *Window {
 		ack:         make(chan struct{}),
 		invalidates: make(chan struct{}, 1),
 		frames:      make(chan *op.Ops),
+		frameAck:    make(chan struct{}),
 	}
 	w.callbacks.w = w
 	go w.run(opts)
@@ -118,6 +120,7 @@ func (w *Window) Queue() *Queue {
 // the window state from previous calls.
 func (w *Window) update(frame *op.Ops) {
 	w.frames <- frame
+	<-w.frameAck
 }
 
 func (w *Window) draw(size image.Point, frame *op.Ops) {
@@ -279,17 +282,27 @@ func (w *Window) run(opts *window.Options) {
 					}
 				}
 				var frame *op.Ops
-				// Wait for either a frame or the ack event,
-				// which meant that the client didn't draw.
+				// Wait for either a frame or an ack event to go
+				// through, which means that the client didn't give us
+				// a frame.
+				gotFrame := false
 				select {
 				case frame = <-w.frames:
+					gotFrame = true
 				case w.out <- ackEvent:
 				}
 				if err != nil {
+					if gotFrame {
+						w.frameAck <- struct{}{}
+					}
 					w.destroy(err)
 					return
 				}
-				w.draw(e2.Size, frame)
+				if gotFrame {
+					w.draw(e2.Size, frame)
+					// We're done with frame, let the client continue.
+					w.frameAck <- struct{}{}
+				}
 				if e2.Sync {
 					if err := w.gpu.Flush(); err != nil {
 						w.gpu.Release()
