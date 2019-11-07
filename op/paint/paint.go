@@ -20,6 +20,10 @@ type ImageOp struct {
 	color   color.RGBA
 	src     *image.RGBA
 	size    image.Point
+
+	// handle is a key to uniquely identify this ImageOp
+	// in a map of cached textures.
+	handle interface{}
 }
 
 // ColorOp sets the material to a constant color.
@@ -49,8 +53,9 @@ func NewImageOp(src image.Image) ImageOp {
 		})
 		draw.Draw(dst, src.Bounds(), src, image.Point{}, draw.Src)
 		return ImageOp{
-			src:  dst,
-			size: sz,
+			src:    dst,
+			size:   sz,
+			handle: new(int),
 		}
 	}
 }
@@ -66,11 +71,8 @@ func (i ImageOp) Add(o *op.Ops) {
 		}.Add(o)
 		return
 	}
-	data := o.Write(opconst.TypeImageLen, i.src)
+	data := o.Write(opconst.TypeImageLen, i.src, i.handle)
 	data[0] = byte(opconst.TypeImage)
-	bo := binary.LittleEndian
-	bo.PutUint32(data[1:], uint32(i.size.X))
-	bo.PutUint32(data[5:], uint32(i.size.Y))
 }
 
 func (c ColorOp) Add(o *op.Ops) {

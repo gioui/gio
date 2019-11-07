@@ -34,7 +34,7 @@ const (
 	TypeTransformLen    = 1 + 4*2
 	TypeLayerLen        = 1
 	TypeRedrawLen       = 1 + 8
-	TypeImageLen        = 1 + 4*4
+	TypeImageLen        = 1
 	TypePaintLen        = 1 + 4*4
 	TypeColorLen        = 1 + 4
 	TypeAreaLen         = 1 + 1 + 4*4
@@ -74,8 +74,10 @@ func (t OpType) Size() int {
 
 func (t OpType) NumRefs() int {
 	switch t {
-	case TypeMacro, TypeImage, TypeKeyInput, TypePointerInput, TypeProfile:
+	case TypeMacro, TypeKeyInput, TypePointerInput, TypeProfile:
 		return 1
+	case TypeImage:
+		return 2
 	default:
 		return 0
 	}

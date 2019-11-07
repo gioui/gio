@@ -80,10 +80,10 @@ type drawState struct {
 	rect  bool
 	z     int
 
-	// Current ImageOp image and size, if any.
-	img     *image.RGBA
-	imgSize image.Point
-	// Current ColorOp, if any.
+	matType materialType
+	// Current paint.ImageOp
+	image imageOpData
+	// Current paint.ColorOp, if any.
 	color color.RGBA
 }
 
@@ -125,6 +125,12 @@ type clipOp struct {
 	bounds f32.Rectangle
 }
 
+// imageOpData is the shadow of paint.ImageOp.
+type imageOpData struct {
+	src    *image.RGBA
+	handle interface{}
+}
+
 func (op *clipOp) decode(data []byte) {
 	if opconst.OpType(data[0]) != opconst.TypeClip {
 		panic("invalid op")
@@ -145,29 +151,29 @@ func (op *clipOp) decode(data []byte) {
 	}
 }
 
-func decodeImageOp(data []byte, refs []interface{}) (*image.RGBA, image.Point) {
-	bo := binary.LittleEndian
+func decodeImageOp(data []byte, refs []interface{}) imageOpData {
 	if opconst.OpType(data[0]) != opconst.TypeImage {
 		panic("invalid op")
 	}
-	sz := image.Point{
-		X: int(int32(bo.Uint32(data[1:]))),
-		Y: int(int32(bo.Uint32(data[5:]))),
+	handle := refs[1]
+	if handle == nil {
+		panic("nil handle")
 	}
-	return refs[0].(*image.RGBA), sz
+	return imageOpData{
+		src:    refs[0].(*image.RGBA),
+		handle: handle,
+	}
 }
 
-func decodeColorOp(data []byte) paint.ColorOp {
+func decodeColorOp(data []byte) color.RGBA {
 	if opconst.OpType(data[0]) != opconst.TypeColor {
 		panic("invalid op")
 	}
-	return paint.ColorOp{
-		Color: color.RGBA{
-			R: data[1],
-			G: data[2],
-			B: data[3],
-			A: data[4],
-		},
+	return color.RGBA{
+		R: data[1],
+		G: data[2],
+		B: data[3],
+		A: data[4],
 	}
 }
 
@@ -746,11 +752,11 @@ loop:
 			aux = nil
 			auxKey = ops.Key{}
 		case opconst.TypeColor:
-			op := decodeColorOp(encOp.Data)
-			state.img = nil
-			state.color = op.Color
+			state.matType = materialColor
+			state.color = decodeColorOp(encOp.Data)
 		case opconst.TypeImage:
-			state.img, state.imgSize = decodeImageOp(encOp.Data, encOp.Refs)
+			state.matType = materialTexture
+			state.image = decodeImageOp(encOp.Data, encOp.Refs)
 		case opconst.TypePaint:
 			op := decodePaintOp(encOp.Data)
 			off := state.t.Transform(f32.Point{})
@@ -808,15 +814,20 @@ func expandPathOp(p *pathOp, clip image.Rectangle) {
 
 func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f32.Point, clip image.Rectangle) material {
 	var m material
-	if d.img == nil {
+	switch d.matType {
+	case materialColor:
 		m.material = materialColor
 		m.color = gamma(d.color.RGBA())
 		m.opaque = m.color[3] == 1.0
-	} else {
+	case materialTexture:
 		m.material = materialTexture
 		dr := boundRectF(rect.Add(off))
+		sz := d.image.src.Bounds().Size()
 		sr := f32.Rectangle{
-			Max: f32.Point{X: float32(d.imgSize.X), Y: float32(d.imgSize.Y)},
+			Max: f32.Point{
+				X: float32(sz.X),
+				Y: float32(sz.Y),
+			},
 		}
 		if dx := float32(dr.Dx()); dx != 0 {
 			// Don't clip 1 px width sources.
@@ -832,16 +843,16 @@ func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f3
 				sr.Max.Y -= (float32(dr.Max.Y-clip.Max.Y)*sdy + dy/2) / dy
 			}
 		}
-		tex, exists := cache.get(d.img)
+		tex, exists := cache.get(d.image.handle)
 		if !exists {
 			t := &texture{
-				src: d.img,
+				src: d.image.src,
 			}
-			cache.put(d.img, t)
+			cache.put(d.image.handle, t)
 			tex = t
 		}
 		m.texture = tex.(*texture)
-		m.uvScale, m.uvOffset = texSpaceTransform(sr, d.img.Bounds().Size())
+		m.uvScale, m.uvOffset = texSpaceTransform(sr, sz)
 	}
 	return m
 }
