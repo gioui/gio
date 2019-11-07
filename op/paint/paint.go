@@ -67,6 +67,9 @@ func NewImageOp(src image.Image) ImageOp {
 }
 
 func (i ImageOp) Size() image.Point {
+	if i.src == nil {
+		return image.Point{}
+	}
 	return i.src.Bounds().Size()
 }
 
