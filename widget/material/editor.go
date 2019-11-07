@@ -9,7 +9,6 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/paint"
 	"gioui.org/text"
-	"gioui.org/unit"
 	"gioui.org/widget"
 )
 
@@ -28,7 +27,7 @@ type Editor struct {
 func (t *Theme) Editor(hint string) Editor {
 	return Editor{
 		Font: text.Font{
-			Size: unit.Sp(16),
+			Size: t.TextSize,
 		},
 		Color:     t.Color.Text,
 		shaper:    t.Shaper,
