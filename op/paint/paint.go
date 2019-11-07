@@ -19,7 +19,6 @@ type ImageOp struct {
 	uniform bool
 	color   color.RGBA
 	src     *image.RGBA
-	size    image.Point
 
 	// handle is a key to uniquely identify this ImageOp
 	// in a map of cached textures.
@@ -45,23 +44,30 @@ func NewImageOp(src image.Image) ImageOp {
 			uniform: true,
 			color:   col,
 		}
-	default:
-		sz := src.Bounds().Size()
-		// Copy the image into a GPU friendly format.
-		dst := image.NewRGBA(image.Rectangle{
-			Max: sz,
-		})
-		draw.Draw(dst, src.Bounds(), src, image.Point{}, draw.Src)
-		return ImageOp{
-			src:    dst,
-			size:   sz,
-			handle: new(int),
+	case *image.RGBA:
+		bounds := src.Bounds()
+		if bounds.Min == (image.Point{}) && src.Stride == bounds.Dx()*4 {
+			return ImageOp{
+				src:    src,
+				handle: new(int),
+			}
 		}
+	}
+
+	sz := src.Bounds().Size()
+	// Copy the image into a GPU friendly format.
+	dst := image.NewRGBA(image.Rectangle{
+		Max: sz,
+	})
+	draw.Draw(dst, src.Bounds(), src, image.Point{}, draw.Src)
+	return ImageOp{
+		src:    dst,
+		handle: new(int),
 	}
 }
 
 func (i ImageOp) Size() image.Point {
-	return i.size
+	return i.src.Bounds().Size()
 }
 
 func (i ImageOp) Add(o *op.Ops) {
