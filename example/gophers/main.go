@@ -96,7 +96,7 @@ func (a *App) run() error {
 				case key.NameEscape:
 					os.Exit(0)
 				case 'P':
-					if e.Modifiers.Contain(key.ModCommand) {
+					if e.Modifiers.Contain(key.ModShortcut) {
 						a.ui.profiling = !a.ui.profiling
 						a.w.Invalidate()
 					}
