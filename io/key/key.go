@@ -39,10 +39,10 @@ type FocusEvent struct {
 // An Event is generated when a key is pressed. For text input
 // use EditEvent.
 type Event struct {
-	// Name is the rune character that most closely
-	// match the key. For letters, the upper case form
-	// is used.
-	Name rune
+	// Name of the key. For letters, the upper case form is used.
+	// Use the Name* constants for special keys suchs as the arrow
+	// keys.
+	Name string
 	// Modifiers is the set of active modifiers when
 	// the key was pressed.
 	Modifiers Modifiers
@@ -73,20 +73,20 @@ const (
 )
 
 const (
-	// Runes for special keys.
-	NameLeftArrow      = '←'
-	NameRightArrow     = '→'
-	NameUpArrow        = '↑'
-	NameDownArrow      = '↓'
-	NameReturn         = '⏎'
-	NameEnter          = '⌤'
-	NameEscape         = '⎋'
-	NameHome           = '⇱'
-	NameEnd            = '⇲'
-	NameDeleteBackward = '⌫'
-	NameDeleteForward  = '⌦'
-	NamePageUp         = '⇞'
-	NamePageDown       = '⇟'
+	// Names for special keys.
+	NameLeftArrow      = "←"
+	NameRightArrow     = "→"
+	NameUpArrow        = "↑"
+	NameDownArrow      = "↓"
+	NameReturn         = "⏎"
+	NameEnter          = "⌤"
+	NameEscape         = "⎋"
+	NameHome           = "⇱"
+	NameEnd            = "⇲"
+	NameDeleteBackward = "⌫"
+	NameDeleteForward  = "⌦"
+	NamePageUp         = "⇞"
+	NamePageDown       = "⇟"
 )
 
 // Contain reports whether m contains all modifiers

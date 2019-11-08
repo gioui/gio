@@ -112,6 +112,19 @@ const (
 	_VK_RETURN = 0x0d
 	_VK_UP     = 0x26
 
+	_VK_F1  = 0x70
+	_VK_F2  = 0x71
+	_VK_F3  = 0x72
+	_VK_F4  = 0x73
+	_VK_F5  = 0x74
+	_VK_F6  = 0x75
+	_VK_F7  = 0x76
+	_VK_F8  = 0x77
+	_VK_F9  = 0x78
+	_VK_F10 = 0x79
+	_VK_F11 = 0x7A
+	_VK_F12 = 0x7B
+
 	_UNICODE_NOCHAR = 65535
 
 	_WM_CANCELMODE  = 0x001F
@@ -457,11 +470,11 @@ func (w *window) HWND() (syscall.Handle, int, int) {
 	return w.hwnd, w.width, w.height
 }
 
-func convertKeyCode(code uintptr) (rune, bool) {
+func convertKeyCode(code uintptr) (string, bool) {
 	if '0' <= code && code <= '9' || 'A' <= code && code <= 'Z' {
-		return rune(code), true
+		return string(code), true
 	}
-	var r rune
+	var r string
 	switch code {
 	case _VK_ESCAPE:
 		r = key.NameEscape
@@ -487,8 +500,32 @@ func convertKeyCode(code uintptr) (rune, bool) {
 		r = key.NamePageUp
 	case _VK_NEXT:
 		r = key.NamePageDown
+	case _VK_F1:
+		r = "F1"
+	case _VK_F2:
+		r = "F2"
+	case _VK_F3:
+		r = "F3"
+	case _VK_F4:
+		r = "F4"
+	case _VK_F5:
+		r = "F5"
+	case _VK_F6:
+		r = "F6"
+	case _VK_F7:
+		r = "F7"
+	case _VK_F8:
+		r = "F8"
+	case _VK_F9:
+		r = "F9"
+	case _VK_F10:
+		r = "F10"
+	case _VK_F11:
+		r = "F11"
+	case _VK_F12:
+		r = "F12"
 	default:
-		return 0, false
+		return "", false
 	}
 	return r, true
 }

@@ -289,14 +289,14 @@ func Main() {
 	C.gio_main(view, title, C.CGFloat(w), C.CGFloat(h))
 }
 
-func convertKey(k rune) (rune, bool) {
+func convertKey(k rune) (string, bool) {
 	if '0' <= k && k <= '9' || 'A' <= k && k <= 'Z' {
-		return k, true
+		return string(k), true
 	}
 	if 'a' <= k && k <= 'z' {
-		return k - 0x20, true
+		return string(k - 0x20), true
 	}
-	var n rune
+	var n string
 	switch k {
 	case 0x1b:
 		n = key.NameEscape
@@ -322,8 +322,32 @@ func convertKey(k rune) (rune, bool) {
 		n = key.NamePageUp
 	case C.NSPageDownFunctionKey:
 		n = key.NamePageDown
+	case C.NSF1FunctionKey:
+		n = "F1"
+	case C.NSF2FunctionKey:
+		n = "F2"
+	case C.NSF3FunctionKey:
+		n = "F3"
+	case C.NSF4FunctionKey:
+		n = "F4"
+	case C.NSF5FunctionKey:
+		n = "F5"
+	case C.NSF6FunctionKey:
+		n = "F6"
+	case C.NSF7FunctionKey:
+		n = "F7"
+	case C.NSF8FunctionKey:
+		n = "F8"
+	case C.NSF9FunctionKey:
+		n = "F9"
+	case C.NSF10FunctionKey:
+		n = "F10"
+	case C.NSF11FunctionKey:
+		n = "F11"
+	case C.NSF12FunctionKey:
+		n = "F12"
 	default:
-		return 0, false
+		return "", false
 	}
 	return n, true
 }

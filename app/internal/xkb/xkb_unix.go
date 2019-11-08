@@ -5,7 +5,18 @@
 // Package xkb implements a Go interface for the X Keyboard Extension library.
 package xkb
 
-import "gioui.org/io/event"
+import (
+	"errors"
+	"fmt"
+	"os"
+	"syscall"
+	"unicode"
+	"unicode/utf8"
+	"unsafe"
+
+	"gioui.org/io/event"
+	"gioui.org/io/key"
+)
 
 /*
 #cgo LDFLAGS: -lxkbcommon
@@ -17,18 +28,6 @@ import "gioui.org/io/event"
 #include <xkbcommon/xkbcommon-compose.h>
 */
 import "C"
-
-import (
-	"errors"
-	"fmt"
-	"os"
-	"syscall"
-	"unicode"
-	"unicode/utf8"
-	"unsafe"
-
-	"gioui.org/io/key"
-)
 
 type Context struct {
 	ctx       *C.struct_xkb_context
@@ -191,14 +190,14 @@ func mapXKBKeyCode(keyCode uint32) uint32 {
 	return keyCode + 8
 }
 
-func convertKeysym(s C.xkb_keysym_t) (rune, bool) {
+func convertKeysym(s C.xkb_keysym_t) (string, bool) {
 	if '0' <= s && s <= '9' || 'A' <= s && s <= 'Z' {
-		return rune(s), true
+		return string(s), true
 	}
 	if 'a' <= s && s <= 'z' {
-		return rune(s - 0x20), true
+		return string(s - 0x20), true
 	}
-	var n rune
+	var n string
 	switch s {
 	case C.XKB_KEY_Escape:
 		n = key.NameEscape
@@ -226,8 +225,32 @@ func convertKeysym(s C.xkb_keysym_t) (rune, bool) {
 		n = key.NamePageUp
 	case C.XKB_KEY_Page_Down:
 		n = key.NamePageDown
+	case C.XKB_KEY_F1:
+		n = "F1"
+	case C.XKB_KEY_F2:
+		n = "F2"
+	case C.XKB_KEY_F3:
+		n = "F3"
+	case C.XKB_KEY_F4:
+		n = "F4"
+	case C.XKB_KEY_F5:
+		n = "F5"
+	case C.XKB_KEY_F6:
+		n = "F6"
+	case C.XKB_KEY_F7:
+		n = "F7"
+	case C.XKB_KEY_F8:
+		n = "F8"
+	case C.XKB_KEY_F9:
+		n = "F9"
+	case C.XKB_KEY_F10:
+		n = "F10"
+	case C.XKB_KEY_F11:
+		n = "F11"
+	case C.XKB_KEY_F12:
+		n = "F12"
 	default:
-		return 0, false
+		return "", false
 	}
 	return n, true
 }

@@ -353,8 +353,8 @@ func runInJVM(f func(env *C.JNIEnv)) {
 	f(env)
 }
 
-func convertKeyCode(code C.jint) (rune, bool) {
-	var n rune
+func convertKeyCode(code C.jint) (string, bool) {
+	var n string
 	switch code {
 	case C.AKEYCODE_DPAD_UP:
 		n = key.NameUpArrow
@@ -369,7 +369,7 @@ func convertKeyCode(code C.jint) (rune, bool) {
 	case C.AKEYCODE_DEL:
 		n = key.NameDeleteBackward
 	default:
-		return 0, false
+		return "", false
 	}
 	return n, true
 }

@@ -257,8 +257,8 @@ func (h *x11EventHandler) handleEvents() bool {
 				if r, ok := x11SpecialKeySymToRune(h.keysym); ok {
 					w.w.Event(key.Event{Name: r, Modifiers: mods})
 				} else {
-					if r, _ = utf8.DecodeRune(h.text[:l]); r != utf8.RuneError {
-						w.w.Event(key.Event{Name: unicode.ToUpper(r), Modifiers: mods})
+					if r, _ := utf8.DecodeRune(h.text[:l]); r != utf8.RuneError {
+						w.w.Event(key.Event{Name: string(unicode.ToUpper(r)), Modifiers: mods})
 					}
 					// Send EditEvent only when not a CTRL key combination.
 					if !mods.Contain(key.ModCtrl) {
@@ -349,8 +349,8 @@ func x11KeyStateToModifiers(s C.uint) key.Modifiers {
 	return m
 }
 
-func x11SpecialKeySymToRune(s C.KeySym) (rune, bool) {
-	var n rune
+func x11SpecialKeySymToRune(s C.KeySym) (string, bool) {
+	var n string
 	switch s {
 	case C.XK_Escape:
 		n = key.NameEscape
@@ -378,8 +378,32 @@ func x11SpecialKeySymToRune(s C.KeySym) (rune, bool) {
 		n = key.NamePageUp
 	case C.XK_Page_Down, C.XK_KP_Next:
 		n = key.NamePageDown
+	case C.XK_F1:
+		n = "F1"
+	case C.XK_F2:
+		n = "F2"
+	case C.XK_F3:
+		n = "F3"
+	case C.XK_F4:
+		n = "F4"
+	case C.XK_F5:
+		n = "F5"
+	case C.XK_F6:
+		n = "F6"
+	case C.XK_F7:
+		n = "F7"
+	case C.XK_F8:
+		n = "F8"
+	case C.XK_F9:
+		n = "F9"
+	case C.XK_F10:
+		n = "F10"
+	case C.XK_F11:
+		n = "F11"
+	case C.XK_F12:
+		n = "F12"
 	default:
-		return 0, false
+		return "", false
 	}
 	return n, true
 }

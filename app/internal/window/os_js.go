@@ -383,17 +383,17 @@ func Main() {
 	<-mainDone
 }
 
-func translateKey(k string) (rune, bool) {
+func translateKey(k string) (string, bool) {
 	if len(k) == 1 {
 		c := k[0]
 		if '0' <= c && c <= '9' || 'A' <= c && c <= 'Z' {
-			return rune(c), true
+			return string(c), true
 		}
 		if 'a' <= c && c <= 'z' {
-			return rune(c - 0x20), true
+			return string(c - 0x20), true
 		}
 	}
-	var n rune
+	var n string
 	switch k {
 	case "ArrowUp":
 		n = key.NameUpArrow
@@ -419,8 +419,10 @@ func translateKey(k string) (rune, bool) {
 		n = key.NamePageUp
 	case "PageDown":
 		n = key.NamePageDown
+	case "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12":
+		n = k
 	default:
-		return 0, false
+		return "", false
 	}
 	return n, true
 }

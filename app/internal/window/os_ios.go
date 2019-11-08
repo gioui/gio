@@ -205,7 +205,7 @@ func (w *window) SetAnimating(anim bool) {
 	C.gio_setAnimating(w.view, animi)
 }
 
-func (w *window) onKeyCommand(name rune) {
+func (w *window) onKeyCommand(name string) {
 	w.w.Event(key.Event{
 		Name: name,
 	})
