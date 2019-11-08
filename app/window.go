@@ -145,7 +145,6 @@ func (w *Window) draw(size image.Point, frame *op.Ops) {
 		q := 100 * time.Microsecond
 		timings := fmt.Sprintf("tot:%7s cpu:%7s %s", frameDur.Round(q), drawDur.Round(q), w.gpu.Timings())
 		w.queue.q.AddProfile(profile.Event{Timings: timings})
-		w.setNextFrame(time.Time{})
 	}
 	if t, ok := w.queue.q.WakeupTime(); ok {
 		w.setNextFrame(t)

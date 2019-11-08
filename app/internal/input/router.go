@@ -30,7 +30,9 @@ type Router struct {
 	wakeupTime time.Time
 
 	// ProfileOp summary.
-	profHandlers []event.Key
+	profiling    bool
+	profHandlers map[event.Key]struct{}
+	profile      profile.Event
 }
 
 type handlerEvents struct {
@@ -39,13 +41,21 @@ type handlerEvents struct {
 }
 
 func (q *Router) Events(k event.Key) []event.Event {
-	return q.handlers.Events(k)
+	events := q.handlers.Events(k)
+	if _, isprof := q.profHandlers[k]; isprof {
+		delete(q.profHandlers, k)
+		events = append(events, q.profile)
+	}
+	return events
 }
 
 func (q *Router) Frame(ops *op.Ops) {
 	q.handlers.Clear()
 	q.wakeup = false
-	q.profHandlers = q.profHandlers[:0]
+	q.profiling = false
+	for k := range q.profHandlers {
+		delete(q.profHandlers, k)
+	}
 	q.reader.Reset(ops)
 	q.collect()
 
@@ -82,19 +92,21 @@ func (q *Router) collect() {
 			}
 		case opconst.TypeProfile:
 			op := decodeProfileOp(encOp.Data, encOp.Refs)
-			q.profHandlers = append(q.profHandlers, op.Key)
+			if q.profHandlers == nil {
+				q.profHandlers = make(map[event.Key]struct{})
+			}
+			q.profiling = true
+			q.profHandlers[op.Key] = struct{}{}
 		}
 	}
 }
 
-func (q *Router) AddProfile(e profile.Event) {
-	for _, h := range q.profHandlers {
-		q.handlers.Add(h, e)
-	}
+func (q *Router) AddProfile(profile profile.Event) {
+	q.profile = profile
 }
 
 func (q *Router) Profiling() bool {
-	return len(q.profHandlers) > 0
+	return q.profiling
 }
 
 func (q *Router) WakeupTime() (time.Time, bool) {
