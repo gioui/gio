@@ -281,7 +281,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		if n, ok := convertKeyCode(wParam); ok {
 			cmd := key.Event{Name: n}
 			if getKeyState(_VK_CONTROL)&0x1000 != 0 {
-				cmd.Modifiers |= key.ModCommand
+				cmd.Modifiers |= key.ModCtrl
 			}
 			if getKeyState(_VK_SHIFT)&0x1000 != 0 {
 				cmd.Modifiers |= key.ModShift

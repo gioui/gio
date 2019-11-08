@@ -124,7 +124,7 @@ func (x *Context) DispatchKey(keyCode uint32) (events []event.Event) {
 	if n, ok := convertKeysym(sym); ok {
 		cmd := key.Event{Name: n}
 		if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_CTRL[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
-			cmd.Modifiers |= key.ModCommand
+			cmd.Modifiers |= key.ModCtrl
 		}
 		if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_SHIFT[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
 			cmd.Modifiers |= key.ModShift

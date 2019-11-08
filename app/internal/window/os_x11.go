@@ -232,7 +232,7 @@ func (h *x11EventHandler) handleEvents() bool {
 			// available but not CTRL-2.
 			state := kevt.state
 			mods := x11KeyStateToModifiers(state)
-			if mods.Contain(key.ModCommand) {
+			if mods.Contain(key.ModCtrl) {
 				kevt.state &^= (C.uint(C.ControlMask) | C.uint(C.ShiftMask))
 			}
 			l := int(C.Xutf8LookupString(w.xic, kevt,
@@ -261,7 +261,7 @@ func (h *x11EventHandler) handleEvents() bool {
 						w.w.Event(key.Event{Name: unicode.ToUpper(r), Modifiers: mods})
 					}
 					// Send EditEvent only when not a CTRL key combination.
-					if !mods.Contain(key.ModCommand) {
+					if !mods.Contain(key.ModCtrl) {
 						w.w.Event(key.EditEvent{Text: string(h.text[:l])})
 					}
 				}
@@ -335,7 +335,7 @@ func (h *x11EventHandler) handleEvents() bool {
 func x11KeyStateToModifiers(s C.uint) key.Modifiers {
 	var m key.Modifiers
 	if s&C.ControlMask != 0 {
-		m |= key.ModCommand
+		m |= key.ModCtrl
 	}
 	if s&C.ShiftMask != 0 {
 		m |= key.ModShift

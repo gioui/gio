@@ -57,11 +57,12 @@ type EditEvent struct {
 type Modifiers uint32
 
 const (
-	// ModCommand is the command modifier. On macOS
-	// it is the Cmd key, on other platforms the Ctrl
-	// key.
-	ModCommand Modifiers = 1 << iota
-	// THe shift key.
+	// ModCtrl is the ctrl modifier key.
+	ModCtrl Modifiers = 1 << iota
+	// ModCommand is the command modifier key
+	// found on Apple keyboards.
+	ModCommand
+	// ModShift is the shift modifier key.
 	ModShift
 )
 
@@ -111,6 +112,9 @@ func (e Event) String() string {
 
 func (m Modifiers) String() string {
 	var strs []string
+	if m.Contain(ModCtrl) {
+		strs = append(strs, "ModCtrl")
+	}
 	if m.Contain(ModCommand) {
 		strs = append(strs, "ModCommand")
 	}
