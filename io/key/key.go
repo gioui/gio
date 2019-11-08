@@ -64,6 +64,12 @@ const (
 	ModCommand
 	// ModShift is the shift modifier key.
 	ModShift
+	// ModAlt is the alt modifier key, or the option
+	// key on Apple keyboards.
+	ModAlt
+	// ModSuper is the "logo" modifier key, often
+	// represented by a Windows logo.
+	ModSuper
 )
 
 const (
@@ -120,6 +126,12 @@ func (m Modifiers) String() string {
 	}
 	if m.Contain(ModShift) {
 		strs = append(strs, "ModShift")
+	}
+	if m.Contain(ModAlt) {
+		strs = append(strs, "ModAlt")
+	}
+	if m.Contain(ModSuper) {
+		strs = append(strs, "ModSuper")
 	}
 	return strings.Join(strs, "|")
 }

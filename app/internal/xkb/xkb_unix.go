@@ -42,6 +42,8 @@ type Context struct {
 var (
 	_XKB_MOD_NAME_CTRL  = []byte("Control\x00")
 	_XKB_MOD_NAME_SHIFT = []byte("Shift\x00")
+	_XKB_MOD_NAME_ALT   = []byte("Mod1\x00")
+	_XKB_MOD_NAME_LOGO  = []byte("Mod4\x00")
 )
 
 func (x *Context) Destroy() {
@@ -128,6 +130,12 @@ func (x *Context) DispatchKey(keyCode uint32) (events []event.Event) {
 		}
 		if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_SHIFT[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
 			cmd.Modifiers |= key.ModShift
+		}
+		if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_ALT[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
+			cmd.Modifiers |= key.ModAlt
+		}
+		if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_LOGO[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
+			cmd.Modifiers |= key.ModSuper
 		}
 		events = append(events, cmd)
 	}

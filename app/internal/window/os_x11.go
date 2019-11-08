@@ -334,6 +334,12 @@ func (h *x11EventHandler) handleEvents() bool {
 
 func x11KeyStateToModifiers(s C.uint) key.Modifiers {
 	var m key.Modifiers
+	if s&C.Mod1Mask != 0 {
+		m |= key.ModAlt
+	}
+	if s&C.Mod4Mask != 0 {
+		m |= key.ModSuper
+	}
 	if s&C.ControlMask != 0 {
 		m |= key.ModCtrl
 	}

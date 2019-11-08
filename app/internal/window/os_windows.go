@@ -94,6 +94,9 @@ const (
 	_USER_TIMER_MINIMUM = 0x0000000A
 
 	_VK_CONTROL = 0x11
+	_VK_LWIN    = 0x5B
+	_VK_MENU    = 0x12
+	_VK_RWIN    = 0x5C
 	_VK_SHIFT   = 0x10
 
 	_VK_BACK   = 0x08
@@ -280,6 +283,12 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case _WM_KEYDOWN, _WM_SYSKEYDOWN:
 		if n, ok := convertKeyCode(wParam); ok {
 			cmd := key.Event{Name: n}
+			if getKeyState(_VK_LWIN)&0x1000 != 0 || getKeyState(_VK_RWIN)&0x1000 != 0 {
+				cmd.Modifiers |= key.ModSuper
+			}
+			if getKeyState(_VK_MENU)&0x1000 != 0 {
+				cmd.Modifiers |= key.ModAlt
+			}
 			if getKeyState(_VK_CONTROL)&0x1000 != 0 {
 				cmd.Modifiers |= key.ModCtrl
 			}

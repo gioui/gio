@@ -210,8 +210,11 @@ func (w *window) keyEvent(e js.Value) {
 	k := e.Get("key").String()
 	if n, ok := translateKey(k); ok {
 		cmd := key.Event{Name: n}
+		if e.Call("getModifierState", "Alt").Bool() {
+			cmd.Modifiers |= key.ModAlt
+		}
 		if e.Call("getModifierState", "Control").Bool() {
-			cmd.Modifiers |= key.ModCommand
+			cmd.Modifiers |= key.ModCtrl
 		}
 		if e.Call("getModifierState", "Shift").Bool() {
 			cmd.Modifiers |= key.ModShift

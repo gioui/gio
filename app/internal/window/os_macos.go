@@ -119,6 +119,12 @@ func gio_onFrameCallback(view C.CFTypeRef) {
 func gio_onKeys(view C.CFTypeRef, cstr *C.char, ti C.double, mods C.NSUInteger) {
 	str := C.GoString(cstr)
 	var kmods key.Modifiers
+	if mods&C.NSAlternateKeyMask != 0 {
+		kmods |= key.ModAlt
+	}
+	if mods&C.NSControlKeyMask != 0 {
+		kmods |= key.ModCtrl
+	}
 	if mods&C.NSCommandKeyMask != 0 {
 		kmods |= key.ModCommand
 	}
