@@ -9,8 +9,13 @@ packages:
 sources:
  - https://git.sr.ht/~eliasnaur/gio
 environment:
-    PATH: /bin:/usr/local/bin:/usr/bin
+    PATH: /home/build/bin:/bin:/usr/local/bin:/usr/bin
 tasks:
+ - install_gotip: |
+     go get golang.org/dl/gotip
+     /home/build/go/bin/gotip download
+     mkdir /home/build/bin
+     ln -s /home/build/go/bin/gotip /home/build/bin/go
  - test_gio: |
      cd gio
      go test ./...
