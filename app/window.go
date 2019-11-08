@@ -122,7 +122,7 @@ func (w *Window) update(frame *op.Ops) {
 }
 
 func (w *Window) draw(frameStart time.Time, size image.Point, frame *op.Ops) {
-	w.gpu.Draw(w.queue.q.Profiling(), size, frame)
+	sync := w.gpu.Draw(w.queue.q.Profiling(), size, frame)
 	w.queue.q.Frame(frame)
 	switch w.queue.q.TextInputState() {
 	case input.TextInputOpen:
@@ -141,6 +141,8 @@ func (w *Window) draw(frameStart time.Time, size image.Point, frame *op.Ops) {
 		w.setNextFrame(t)
 	}
 	w.updateAnimation()
+	// Wait for the GPU goroutine to finish processing frame.
+	<-sync
 }
 
 // Invalidate the window such that a FrameEvent will be generated

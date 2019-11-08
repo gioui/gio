@@ -37,13 +37,12 @@ type GPU struct {
 	ack        chan struct{}
 	stop       chan struct{}
 	stopped    chan struct{}
-	ops        drawOps
 }
 
 type frame struct {
 	collectStats bool
 	viewport     image.Point
-	ops          drawOps
+	ops          *op.Ops
 }
 
 type frameResult struct {
@@ -246,11 +245,13 @@ func NewGPU(ctx gl.Context) (*GPU, error) {
 		results:    make(chan frameResult),
 		refresh:    make(chan struct{}),
 		refreshErr: make(chan error),
-		ack:        make(chan struct{}),
-		stop:       make(chan struct{}),
-		stopped:    make(chan struct{}),
-		pathCache:  newOpCache(),
-		cache:      newResourceCache(),
+		// Ack is buffered so GPU commands can be issued after
+		// ack'ing the frame.
+		ack:       make(chan struct{}, 1),
+		stop:      make(chan struct{}),
+		stopped:   make(chan struct{}),
+		pathCache: newOpCache(),
+		cache:     newResourceCache(),
 	}
 	if err := g.renderLoop(ctx); err != nil {
 		return nil, err
@@ -284,12 +285,15 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 		var timers *timers
 		var zopsTimer, stencilTimer, coverTimer, cleanupTimer *timer
 		initErr <- nil
+		var drawOps drawOps
 	loop:
 		for {
 			select {
 			case <-g.refresh:
 				g.refreshErr <- glctx.MakeCurrent()
 			case frame := <-g.frames:
+				drawOps.reset(g.cache, frame.viewport)
+				drawOps.collect(g.cache, frame.ops, frame.viewport)
 				glctx.Lock()
 				frameStart := time.Now()
 				if frame.collectStats && timers == nil && ctx.caps.EXT_disjoint_timer_query {
@@ -300,41 +304,42 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 					cleanupTimer = timers.newTimer()
 					defer timers.release()
 				}
-				ops := frame.ops
-				// Upload path data to GPU before ack'ing the frame data for re-use.
-				for _, p := range ops.pathOps {
+				// Upload path data to GPU before ack'ing the frame
+				// ops for re-use.
+				for _, p := range drawOps.pathOps {
 					if _, exists := g.pathCache.get(p.pathKey); !exists {
 						data := buildPath(r.ctx, p.pathVerts)
 						g.pathCache.put(p.pathKey, data)
 					}
 					p.pathVerts = nil
 				}
+				// Signal that we're done with the frame ops.
 				g.ack <- struct{}{}
 				r.blitter.viewport = frame.viewport
 				r.pather.viewport = frame.viewport
-				for _, img := range ops.imageOps {
+				for _, img := range drawOps.imageOps {
 					expandPathOp(img.path, img.clip)
 				}
 				if frame.collectStats {
 					zopsTimer.begin()
 				}
 				ctx.DepthFunc(gl.GREATER)
-				ctx.ClearColor(ops.clearColor[0], ops.clearColor[1], ops.clearColor[2], 1.0)
+				ctx.ClearColor(drawOps.clearColor[0], drawOps.clearColor[1], drawOps.clearColor[2], 1.0)
 				ctx.ClearDepthf(0.0)
 				ctx.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 				ctx.Viewport(0, 0, frame.viewport.X, frame.viewport.Y)
-				r.drawZOps(ops.zimageOps)
+				r.drawZOps(drawOps.zimageOps)
 				zopsTimer.end()
 				stencilTimer.begin()
 				ctx.Enable(gl.BLEND)
-				r.packStencils(&ops.pathOps)
-				r.stencilClips(g.pathCache, ops.pathOps)
-				r.packIntersections(ops.imageOps)
-				r.intersect(ops.imageOps)
+				r.packStencils(&drawOps.pathOps)
+				r.stencilClips(g.pathCache, drawOps.pathOps)
+				r.packIntersections(drawOps.imageOps)
+				r.intersect(drawOps.imageOps)
 				stencilTimer.end()
 				coverTimer.begin()
 				ctx.Viewport(0, 0, frame.viewport.X, frame.viewport.Y)
-				r.drawOps(ops.imageOps)
+				r.drawOps(drawOps.imageOps)
 				ctx.Disable(gl.BLEND)
 				r.pather.stenciler.invalidateFBO()
 				coverTimer.end()
@@ -398,16 +403,17 @@ func (g *GPU) Refresh() {
 	g.setErr(<-g.refreshErr)
 }
 
-func (g *GPU) Draw(profile bool, viewport image.Point, root *op.Ops) {
+// Draw initiates a draw of a frame. It returns a channel
+// than signals when the frame is no longer being accessed.
+func (g *GPU) Draw(profile bool, viewport image.Point, frameOps *op.Ops) <-chan struct{} {
 	if g.err != nil {
-		return
+		g.ack <- struct{}{}
+		return g.ack
 	}
 	g.Flush()
-	g.ops.reset(g.cache, viewport)
-	g.ops.collect(g.cache, root, viewport)
-	g.frames <- frame{profile, viewport, g.ops}
-	<-g.ack
+	g.frames <- frame{profile, viewport, frameOps}
 	g.drawing = true
+	return g.ack
 }
 
 func (g *GPU) setErr(err error) {
