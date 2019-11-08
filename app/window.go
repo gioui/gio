@@ -26,10 +26,8 @@ type Option func(opts *window.Options)
 
 // Window represents an operating system window.
 type Window struct {
-	driver    window.Driver
-	lastFrame time.Time
-	drawStart time.Time
-	gpu       *gpu.GPU
+	driver window.Driver
+	gpu    *gpu.GPU
 
 	out         chan event.Event
 	in          chan event.Event
@@ -123,27 +121,20 @@ func (w *Window) update(frame *op.Ops) {
 	<-w.frameAck
 }
 
-func (w *Window) draw(size image.Point, frame *op.Ops) {
-	var drawDur time.Duration
-	if !w.drawStart.IsZero() {
-		drawDur = time.Since(w.drawStart)
-		w.drawStart = time.Time{}
-	}
+func (w *Window) draw(frameStart time.Time, size image.Point, frame *op.Ops) {
 	w.gpu.Draw(w.queue.q.Profiling(), size, frame)
 	w.queue.q.Frame(frame)
-	now := time.Now()
 	switch w.queue.q.TextInputState() {
 	case input.TextInputOpen:
 		w.driver.ShowTextInput(true)
 	case input.TextInputClose:
 		w.driver.ShowTextInput(false)
 	}
-	frameDur := now.Sub(w.lastFrame)
-	frameDur = frameDur.Truncate(100 * time.Microsecond)
-	w.lastFrame = now
 	if w.queue.q.Profiling() {
+		frameDur := time.Since(frameStart)
+		frameDur = frameDur.Truncate(100 * time.Microsecond)
 		q := 100 * time.Microsecond
-		timings := fmt.Sprintf("tot:%7s cpu:%7s %s", frameDur.Round(q), drawDur.Round(q), w.gpu.Timings())
+		timings := fmt.Sprintf("tot:%7s %s", frameDur.Round(q), w.gpu.Timings())
 		w.queue.q.AddProfile(profile.Event{Timings: timings})
 	}
 	if t, ok := w.queue.q.WakeupTime(); ok {
@@ -260,7 +251,7 @@ func (w *Window) run(opts *window.Options) {
 					// No drawing if not visible.
 					break
 				}
-				w.drawStart = time.Now()
+				frameStart := time.Now()
 				w.hasNextFrame = false
 				e2.Frame = w.update
 				w.out <- e2.FrameEvent
@@ -297,8 +288,8 @@ func (w *Window) run(opts *window.Options) {
 					w.destroy(err)
 					return
 				}
+				w.draw(frameStart, e2.Size, frame)
 				if gotFrame {
-					w.draw(e2.Size, frame)
 					// We're done with frame, let the client continue.
 					w.frameAck <- struct{}{}
 				}

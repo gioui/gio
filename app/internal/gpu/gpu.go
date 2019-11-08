@@ -291,6 +291,7 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 				g.refreshErr <- glctx.MakeCurrent()
 			case frame := <-g.frames:
 				glctx.Lock()
+				frameStart := time.Now()
 				if frame.collectStats && timers == nil && ctx.caps.EXT_disjoint_timer_query {
 					timers = newTimers(ctx)
 					zopsTimer = timers.newTimer()
@@ -348,8 +349,9 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 					ft := zt + st + covt + cleant
 					q := 100 * time.Microsecond
 					zt, st, covt = zt.Round(q), st.Round(q), covt.Round(q)
+					frameDur := time.Since(frameStart).Round(q)
 					ft = ft.Round(q)
-					res.summary = fmt.Sprintf("f:%7s zt:%7s st:%7s cov:%7s", ft, zt, st, covt)
+					res.summary = fmt.Sprintf("draw:%7s gpu:%7s zt:%7s st:%7s cov:%7s", frameDur, ft, zt, st, covt)
 				}
 				res.err = err
 				glctx.Unlock()
