@@ -11,7 +11,6 @@ func (w *x11Window) NewContext() (gl.Context, error) {
 }
 
 func (w *x11Window) eglDestroy() {
-	w.destroy()
 }
 
 func (w *x11Window) eglDisplay() _EGLNativeDisplayType {
