@@ -119,7 +119,7 @@ type material struct {
 	uvOffset f32.Point
 }
 
-// clipOp is the shadow of paint.ClipOp.
+// clipOp is the shadow of clip.Op.
 type clipOp struct {
 	bounds f32.Rectangle
 }

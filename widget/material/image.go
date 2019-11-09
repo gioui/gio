@@ -8,6 +8,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
 )
@@ -36,7 +37,7 @@ func (im Image) Layout(gtx *layout.Context) {
 	d := image.Point{X: cs.Width.Constrain(w), Y: cs.Height.Constrain(h)}
 	var s op.StackOp
 	s.Push(gtx.Ops)
-	paint.RectClip(image.Rectangle{Max: d}).Add(gtx.Ops)
+	clip.Rect(image.Rectangle{Max: d}).Add(gtx.Ops)
 	im.Src.Add(gtx.Ops)
 	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(w), Y: float32(h)}}}.Add(gtx.Ops)
 	s.Pop()

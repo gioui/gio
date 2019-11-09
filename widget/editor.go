@@ -14,6 +14,7 @@ import (
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
@@ -79,7 +80,7 @@ type SubmitEvent struct {
 
 type line struct {
 	offset f32.Point
-	clip   paint.ClipOp
+	clip   clip.Op
 }
 
 const (

@@ -11,7 +11,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/op"
-	"gioui.org/op/paint"
+	"gioui.org/op/clip"
 	"gioui.org/text"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/sfnt"
@@ -43,7 +43,7 @@ func (f *Font) Layout(ppem fixed.Int26_6, str string, opts text.LayoutOptions) *
 	return layoutText(&f.buf, ppem, str, &opentype{Font: f.font, Hinting: font.HintingFull}, opts)
 }
 
-func (f *Font) Shape(ppem fixed.Int26_6, str text.String) paint.ClipOp {
+func (f *Font) Shape(ppem fixed.Int26_6, str text.String) clip.Op {
 	return textPath(&f.buf, ppem, &opentype{Font: f.font, Hinting: font.HintingFull}, str)
 }
 
@@ -136,9 +136,9 @@ func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, o
 	return &text.Layout{Lines: lines}
 }
 
-func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str text.String) paint.ClipOp {
+func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str text.String) clip.Op {
 	var lastPos f32.Point
-	var builder paint.Path
+	var builder clip.Path
 	ops := new(op.Ops)
 	var x fixed.Int26_6
 	var advIdx int

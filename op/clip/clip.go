@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package paint
+package clip
 
 import (
 	"encoding/binary"
+	"image"
 	"math"
 
 	"gioui.org/f32"
@@ -12,10 +13,13 @@ import (
 	"gioui.org/op"
 )
 
-// Path constructs a ClipOp clip path described by lines and
-// Bézier curves. Path generates no garbage and can be used for
-// dynamic paths; path data is stored directly in the Ops list
-// supplied to Begin.
+// Path constructs a Op clip path described by lines and
+// Bézier curves, where drawing outside the Path is discarded.
+// The inside-ness of a pixel is determines by the even-odd rule,
+// similar to the SVG rule of the same name.
+//
+// Path generates no garbage and can be used for dynamic paths; path
+// data is stored directly in the Ops list supplied to Begin.
 type Path struct {
 	ops       *op.Ops
 	contour   int
@@ -25,17 +29,17 @@ type Path struct {
 	macro     op.MacroOp
 }
 
-// ClipOp sets the current clip to the intersection of
+// Op sets the current clip to the intersection of
 // the existing clip with this clip.
 //
 // If you need to reset the clip to its previous values after
-// applying a ClipOp, use op.StackOp.
-type ClipOp struct {
+// applying a Op, use op.StackOp.
+type Op struct {
 	macro  op.MacroOp
 	bounds f32.Rectangle
 }
 
-func (p ClipOp) Add(o *op.Ops) {
+func (p Op) Add(o *op.Ops) {
 	p.macro.Add(o)
 	data := o.Write(opconst.TypeClipLen)
 	data[0] = byte(opconst.TypeClip)
@@ -46,7 +50,7 @@ func (p ClipOp) Add(o *op.Ops) {
 	bo.PutUint32(data[13:], math.Float32bits(p.bounds.Max.Y))
 }
 
-// Begin the path, storing the path data and final ClipOp into ops.
+// Begin the path, storing the path data and final Op into ops.
 func (p *Path) Begin(ops *op.Ops) {
 	p.ops = ops
 	p.macro.Record(ops)
@@ -270,12 +274,24 @@ func (p *Path) simpleQuadTo(ctrl, to f32.Point) {
 	p.pen = to
 }
 
-// End the path and return the resulting ClipOp.
-func (p *Path) End() ClipOp {
+// End the path and return a clip operation that represents it.
+func (p *Path) End() Op {
 	p.end()
 	p.macro.Stop()
-	return ClipOp{
+	return Op{
 		macro:  p.macro,
 		bounds: p.bounds,
+	}
+}
+
+// Rect returns the clip area of a pixel aligned rectangular area.
+func Rect(r image.Rectangle) Op {
+	return Op{bounds: toRectF(r)}
+}
+
+func toRectF(r image.Rectangle) f32.Rectangle {
+	return f32.Rectangle{
+		Min: f32.Point{X: float32(r.Min.X), Y: float32(r.Min.Y)},
+		Max: f32.Point{X: float32(r.Max.X), Y: float32(r.Max.Y)},
 	}
 }

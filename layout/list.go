@@ -8,7 +8,7 @@ import (
 	"gioui.org/gesture"
 	"gioui.org/io/pointer"
 	"gioui.org/op"
-	"gioui.org/op/paint"
+	"gioui.org/op/clip"
 )
 
 type scrollChild struct {
@@ -248,7 +248,7 @@ func (l *List) layout() Dimensions {
 		}
 		var stack op.StackOp
 		stack.Push(ops)
-		paint.RectClip(r).Add(ops)
+		clip.Rect(r).Add(ops)
 		op.TransformOp{}.Offset(toPointF(axisPoint(l.Axis, pos, cross))).Add(ops)
 		child.macro.Add(ops)
 		stack.Pop()

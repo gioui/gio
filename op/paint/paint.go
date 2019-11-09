@@ -102,16 +102,3 @@ func (d PaintOp) Add(o *op.Ops) {
 	bo.PutUint32(data[9:], math.Float32bits(d.Rect.Max.X))
 	bo.PutUint32(data[13:], math.Float32bits(d.Rect.Max.Y))
 }
-
-// RectClip returns a ClipOp corresponding to a pixel aligned
-// rectangular area.
-func RectClip(r image.Rectangle) ClipOp {
-	return ClipOp{bounds: toRectF(r)}
-}
-
-func toRectF(r image.Rectangle) f32.Rectangle {
-	return f32.Rectangle{
-		Min: f32.Point{X: float32(r.Min.X), Y: float32(r.Min.Y)},
-		Max: f32.Point{X: float32(r.Max.X), Y: float32(r.Max.Y)},
-	}
-}

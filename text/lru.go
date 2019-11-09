@@ -3,7 +3,7 @@
 package text
 
 import (
-	"gioui.org/op/paint"
+	"gioui.org/op/clip"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -26,7 +26,7 @@ type layoutElem struct {
 type path struct {
 	next, prev *path
 	key        pathKey
-	val        paint.ClipOp
+	val        clip.Op
 }
 
 type layoutKey struct {
@@ -81,16 +81,16 @@ func (l *layoutCache) insert(lt *layoutElem) {
 	lt.next.prev = lt
 }
 
-func (c *pathCache) Get(k pathKey) (paint.ClipOp, bool) {
+func (c *pathCache) Get(k pathKey) (clip.Op, bool) {
 	if v, ok := c.m[k]; ok {
 		c.remove(v)
 		c.insert(v)
 		return v.val, true
 	}
-	return paint.ClipOp{}, false
+	return clip.Op{}, false
 }
 
-func (c *pathCache) Put(k pathKey, v paint.ClipOp) {
+func (c *pathCache) Put(k pathKey, v clip.Op) {
 	if c.m == nil {
 		c.m = make(map[pathKey]*path)
 		c.head = new(path)
