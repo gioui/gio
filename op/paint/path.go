@@ -12,7 +12,7 @@ import (
 	"gioui.org/op"
 )
 
-// Path constructs and adds a ClipOp clip path consisting of lines and
+// Path constructs a ClipOp clip path described by lines and
 // Bézier curves. Path generates no garbage and can be used for
 // dynamic paths; path data is stored directly in the Ops list
 // supplied to Begin.
@@ -25,7 +25,11 @@ type Path struct {
 	macro     op.MacroOp
 }
 
-// ClipOp sets the current clip path.
+// ClipOp sets the current clip to the intersection of
+// the existing clip with this clip.
+//
+// If you need to reset the clip to its previous values after
+// applying a ClipOp, use op.StackOp.
 type ClipOp struct {
 	macro  op.MacroOp
 	bounds f32.Rectangle
