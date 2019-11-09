@@ -36,10 +36,8 @@ type Layout struct {
 
 // LayoutOptions specify the constraints of a text layout.
 type LayoutOptions struct {
-	// MaxWidth set the maximum width of the layout.
+	// MaxWidth is the available width of the layout.
 	MaxWidth int
-	// SingleLine specify that line breaks are ignored.
-	SingleLine bool
 }
 
 // Style is the font style.

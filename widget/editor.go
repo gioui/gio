@@ -5,6 +5,7 @@ package widget
 import (
 	"image"
 	"math"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -399,7 +400,7 @@ func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
 
 func (e *Editor) layoutText(c unit.Converter, s *text.Shaper, font text.Font) ([]text.Line, layout.Dimensions) {
 	txt := e.rr.String()
-	opts := text.LayoutOptions{SingleLine: e.SingleLine, MaxWidth: e.maxWidth}
+	opts := text.LayoutOptions{MaxWidth: e.maxWidth}
 	textLayout := s.Layout(c, font, txt, opts)
 	lines := textLayout.Lines
 	dims := linesDimens(lines)
@@ -463,8 +464,8 @@ func (e *Editor) deleteRuneForward() {
 }
 
 func (e *Editor) append(s string) {
-	if e.SingleLine && s == "\n" {
-		return
+	if e.SingleLine {
+		s = strings.ReplaceAll(s, "\n", "")
 	}
 	e.prepend(s)
 	e.rr.caret += len(s)

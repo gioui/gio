@@ -81,12 +81,6 @@ func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, o
 	}
 	for prev.idx < len(str) {
 		c, s := utf8.DecodeRuneInString(str[prev.idx:])
-		nl := c == '\n'
-		if opts.SingleLine && nl {
-			nl = false
-			c = ' '
-			s = 1
-		}
 		a, ok := f.GlyphAdvance(buf, ppem, c)
 		if !ok {
 			prev.idx += s
@@ -99,7 +93,7 @@ func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, o
 			x:     prev.x + prev.adv,
 			valid: true,
 		}
-		if nl {
+		if c == '\n' {
 			// The newline is zero width; use the previous
 			// character for line measurements.
 			prev.advs = append(prev.advs, 0)
