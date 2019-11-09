@@ -346,7 +346,7 @@ func convertKey(k rune) (string, bool) {
 		n = "F11"
 	case C.NSF12FunctionKey:
 		n = "F12"
-	case 0x09:
+	case 0x09, 0x19:
 		n = key.NameTab
 	case 0x20:
 		n = "Space"
