@@ -282,9 +282,21 @@ func (w *window) pointerEvent(typ pointer.Type, dx, dy float32, e js.Value) {
 		Y: dy * scale,
 	}
 	t := time.Duration(e.Get("timeStamp").Int()) * time.Millisecond
+	jbtns := e.Get("buttons").Int()
+	var btns pointer.Buttons
+	if jbtns&1 != 0 {
+		btns |= pointer.ButtonLeft
+	}
+	if jbtns&2 != 0 {
+		btns |= pointer.ButtonRight
+	}
+	if jbtns&4 != 0 {
+		btns |= pointer.ButtonMiddle
+	}
 	w.w.Event(pointer.Event{
 		Type:     typ,
 		Source:   pointer.Mouse,
+		Buttons:  btns,
 		Position: pos,
 		Scroll:   scroll,
 		Time:     t,

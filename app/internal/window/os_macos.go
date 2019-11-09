@@ -151,7 +151,7 @@ func gio_onText(view C.CFTypeRef, cstr *C.char) {
 }
 
 //export gio_onMouse
-func gio_onMouse(view C.CFTypeRef, cdir C.int, x, y, dx, dy C.CGFloat, ti C.double) {
+func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy C.CGFloat, ti C.double) {
 	var typ pointer.Type
 	switch cdir {
 	case C.GIO_MOUSE_MOVE:
@@ -163,6 +163,16 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, x, y, dx, dy C.CGFloat, ti C.doub
 	default:
 		panic("invalid direction")
 	}
+	var btns pointer.Buttons
+	if cbtns&(1<<0) != 0 {
+		btns |= pointer.ButtonLeft
+	}
+	if cbtns&(1<<1) != 0 {
+		btns |= pointer.ButtonRight
+	}
+	if cbtns&(1<<2) != 0 {
+		btns |= pointer.ButtonMiddle
+	}
 	t := time.Duration(float64(ti)*float64(time.Second) + .5)
 	viewDo(view, func(views viewMap, view C.CFTypeRef) {
 		w := views[view]
@@ -172,6 +182,7 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, x, y, dx, dy C.CGFloat, ti C.doub
 			Type:     typ,
 			Source:   pointer.Mouse,
 			Time:     t,
+			Buttons:  btns,
 			Position: f32.Point{X: x, Y: y},
 			Scroll:   f32.Point{X: dx, Y: dy},
 		})

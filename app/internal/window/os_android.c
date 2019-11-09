@@ -72,7 +72,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
 		},
 		{
 			.name = "onTouchEvent",
-			.signature = "(JIIIFFJ)V",
+			.signature = "(JIIIFFIJ)V",
 			.fnPtr = onTouchEvent
 		},
 		{

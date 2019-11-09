@@ -18,7 +18,7 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 		dx *= 10;
 		dy *= 10;
 	}
-	gio_onMouse((__bridge CFTypeRef)view, typ, p.x, p.y, dx, dy, [event timestamp]);
+	gio_onMouse((__bridge CFTypeRef)view, typ, [NSEvent pressedMouseButtons], p.x, p.y, dx, dy, [event timestamp]);
 }
 
 static CVReturn displayLinkCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext) {
@@ -77,6 +77,18 @@ CVDisplayLinkRef displayLink;
 	handleMouse(self, event, GIO_MOUSE_DOWN, 0, 0);
 }
 - (void)mouseUp:(NSEvent *)event {
+	handleMouse(self, event, GIO_MOUSE_UP, 0, 0);
+}
+- (void)middleMouseDown:(NSEvent *)event {
+	handleMouse(self, event, GIO_MOUSE_DOWN, 0, 0);
+}
+- (void)middletMouseUp:(NSEvent *)event {
+	handleMouse(self, event, GIO_MOUSE_UP, 0, 0);
+}
+- (void)rightMouseDown:(NSEvent *)event {
+	handleMouse(self, event, GIO_MOUSE_DOWN, 0, 0);
+}
+- (void)rightMouseUp:(NSEvent *)event {
 	handleMouse(self, event, GIO_MOUSE_UP, 0, 0);
 }
 - (void)mouseMoved:(NSEvent *)event {

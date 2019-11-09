@@ -386,7 +386,7 @@ func onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, keyCode, r C.jint
 }
 
 //export onTouchEvent
-func onTouchEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, action, pointerID, tool C.jint, x, y C.jfloat, t C.jlong) {
+func onTouchEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, action, pointerID, tool C.jint, x, y C.jfloat, jbtns C.jint, t C.jlong) {
 	w := views[handle]
 	var typ pointer.Type
 	switch action {
@@ -402,6 +402,16 @@ func onTouchEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, action, pointer
 		return
 	}
 	var src pointer.Source
+	var btns pointer.Buttons
+	if jbtns&C.AMOTION_EVENT_BUTTON_PRIMARY != 0 {
+		btns |= pointer.ButtonLeft
+	}
+	if jbtns&C.AMOTION_EVENT_BUTTON_SECONDARY != 0 {
+		btns |= pointer.ButtonRight
+	}
+	if jbtns&C.AMOTION_EVENT_BUTTON_TERTIARY != 0 {
+		btns |= pointer.ButtonMiddle
+	}
 	switch tool {
 	case C.AMOTION_EVENT_TOOL_TYPE_FINGER:
 		src = pointer.Touch
@@ -413,6 +423,7 @@ func onTouchEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, action, pointer
 	w.callbacks.Event(pointer.Event{
 		Type:      typ,
 		Source:    src,
+		Buttons:   btns,
 		PointerID: pointer.ID(pointerID),
 		Time:      time.Duration(t) * time.Millisecond,
 		Position:  f32.Point{X: float32(x), Y: float32(y)},

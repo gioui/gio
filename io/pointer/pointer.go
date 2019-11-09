@@ -5,6 +5,7 @@ package pointer
 import (
 	"encoding/binary"
 	"image"
+	"strings"
 	"time"
 
 	"gioui.org/f32"
@@ -27,6 +28,8 @@ type Event struct {
 	// Time is when the event was received. The
 	// timestamp is relative to an undefined base.
 	Time time.Duration
+	// Buttons are the set of pressed mouse buttons for this event.
+	Buttons Buttons
 	// Hit is set when the event was within the registered
 	// area for the handler. Hit can be false when a pointer
 	// was pressed within the hit area, and then dragged
@@ -86,6 +89,9 @@ type Priority uint8
 // Source of an Event.
 type Source uint8
 
+// Buttons is a set of mouse buttons
+type Buttons uint8
+
 // Must match app/internal/input.areaKind
 type areaKind uint8
 
@@ -114,6 +120,12 @@ const (
 	Shared Priority = iota
 	// Grabbed is used for matching sets of size 1.
 	Grabbed
+)
+
+const (
+	ButtonLeft Buttons = 1 << iota
+	ButtonRight
+	ButtonMiddle
 )
 
 const (
@@ -197,6 +209,26 @@ func (s Source) String() string {
 	default:
 		panic("unknown source")
 	}
+}
+
+// Contain reports whether the set b contains
+// all of the buttons.
+func (b Buttons) Contain(buttons Buttons) bool {
+	return b&buttons == buttons
+}
+
+func (b Buttons) String() string {
+	var strs []string
+	if b.Contain(ButtonLeft) {
+		strs = append(strs, "ButtonLeft")
+	}
+	if b.Contain(ButtonRight) {
+		strs = append(strs, "ButtonRight")
+	}
+	if b.Contain(ButtonMiddle) {
+		strs = append(strs, "ButtonMiddle")
+	}
+	return strings.Join(strs, "|")
 }
 
 func (Event) ImplementsEvent() {}

@@ -56,13 +56,14 @@ type point struct {
 }
 
 type window struct {
-	hwnd   syscall.Handle
-	hdc    syscall.Handle
-	w      Callbacks
-	width  int
-	height int
-	stage  system.Stage
-	dead   bool
+	hwnd        syscall.Handle
+	hdc         syscall.Handle
+	w           Callbacks
+	width       int
+	height      int
+	stage       system.Stage
+	dead        bool
+	pointerBtns pointer.Buttons
 
 	mu        sync.Mutex
 	animating bool
@@ -139,6 +140,8 @@ const (
 	_WM_KEYUP       = 0x0101
 	_WM_LBUTTONDOWN = 0x0201
 	_WM_LBUTTONUP   = 0x0202
+	_WM_MBUTTONDOWN                  =0x0207
+	_WM_MBUTTONUP                    =0x0208
 	_WM_MOUSEMOVE   = 0x0200
 	_WM_MOUSEWHEEL  = 0x020A
 	_WM_PAINT       = 0x000F
@@ -148,6 +151,8 @@ const (
 	_WM_SHOWWINDOW  = 0x0018
 	_WM_SIZE        = 0x0005
 	_WM_SYSKEYDOWN  = 0x0104
+	_WM_RBUTTONDOWN                  =0x0204
+	_WM_RBUTTONUP = 0x0205
 	_WM_TIMER       = 0x0113
 	_WM_UNICHAR     = 0x0109
 	_WM_USER        = 0x0400
@@ -313,15 +318,17 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			w.w.Event(cmd)
 		}
 	case _WM_LBUTTONDOWN:
-		setCapture(w.hwnd)
-		x, y := coordsFromlParam(lParam)
-		p := f32.Point{X: float32(x), Y: float32(y)}
-		w.w.Event(pointer.Event{
-			Type:     pointer.Press,
-			Source:   pointer.Mouse,
-			Position: p,
-			Time:     getMessageTime(),
-		})
+		w.pointerButton(pointer.ButtonLeft, true, lParam)
+	case _WM_LBUTTONUP:
+		w.pointerButton(pointer.ButtonLeft, false, lParam)
+	case _WM_RBUTTONDOWN:
+		w.pointerButton(pointer.ButtonRight, true, lParam)
+	case _WM_RBUTTONUP:
+		w.pointerButton(pointer.ButtonRight, false, lParam)
+	case _WM_MBUTTONDOWN:
+		w.pointerButton(pointer.ButtonMiddle, true, lParam)
+	case _WM_MBUTTONUP:
+		w.pointerButton(pointer.ButtonMiddle, false, lParam)
 	case _WM_CANCELMODE:
 		w.w.Event(pointer.Event{
 			Type: pointer.Cancel,
@@ -330,16 +337,6 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.w.Event(key.FocusEvent{Focus: true})
 	case _WM_KILLFOCUS:
 		w.w.Event(key.FocusEvent{Focus: false})
-	case _WM_LBUTTONUP:
-		releaseCapture()
-		x, y := coordsFromlParam(lParam)
-		p := f32.Point{X: float32(x), Y: float32(y)}
-		w.w.Event(pointer.Event{
-			Type:     pointer.Release,
-			Source:   pointer.Mouse,
-			Position: p,
-			Time:     getMessageTime(),
-		})
 	case _WM_MOUSEMOVE:
 		x, y := coordsFromlParam(lParam)
 		p := f32.Point{X: float32(x), Y: float32(y)}
@@ -365,6 +362,32 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		}
 	}
 	return defWindowProc(hwnd, msg, wParam, lParam)
+}
+
+func (w *window) pointerButton(btn pointer.Buttons, press bool, lParam uintptr) {
+	var typ pointer.Type
+	if press {
+		typ = pointer.Press
+		if w.pointerBtns == 0 {
+			setCapture(w.hwnd)
+		}
+		w.pointerBtns |= btn
+	} else {
+		typ = pointer.Release
+		w.pointerBtns &^= btn
+		if w.pointerBtns == 0 {
+			releaseCapture()
+		}
+	}
+	x, y := coordsFromlParam(lParam)
+	p := f32.Point{X: float32(x), Y: float32(y)}
+	w.w.Event(pointer.Event{
+		Type:     typ,
+		Source:   pointer.Mouse,
+		Position: p,
+		Buttons:  w.pointerBtns,
+		Time:     getMessageTime(),
+	})
 }
 
 func coordsFromlParam(lParam uintptr) (int, int) {

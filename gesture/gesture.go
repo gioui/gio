@@ -128,6 +128,9 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 			if c.state == StatePressed || !e.Hit {
 				break
 			}
+			if e.Source == pointer.Mouse && e.Buttons != pointer.ButtonLeft {
+				break
+			}
 			c.state = StatePressed
 			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source})
 		case pointer.Move:

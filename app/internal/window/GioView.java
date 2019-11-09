@@ -106,6 +106,7 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 						event.getToolType(i),
 						event.getHistoricalX(i, j),
 						event.getHistoricalY(i, j),
+						event.getButtonState(),
 						time);
 			}
 		}
@@ -123,6 +124,7 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 					event.getToolType(i),
 					event.getX(i),
 					event.getY(i),
+					event.getButtonState(),
 					event.getEventTime());
 		}
 		return true;
@@ -214,7 +216,7 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 	static private native void onConfigurationChanged(long handle);
 	static private native void onWindowInsets(long handle, int top, int right, int bottom, int left);
 	static private native void onLowMemory();
-	static private native void onTouchEvent(long handle, int action, int pointerID, int tool, float x, float y, long time);
+	static private native void onTouchEvent(long handle, int action, int pointerID, int tool, float x, float y, int buttons, long time);
 	static private native void onKeyEvent(long handle, int code, int character, long time);
 	static private native void onFrameCallback(long handle, long nanos);
 	static private native boolean onBack(long handle);

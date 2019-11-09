@@ -106,8 +106,9 @@ type window struct {
 		steps image.Point
 		dist  f32.Point
 	}
-	lastPos   f32.Point
-	lastTouch f32.Point
+	pointerBtns pointer.Buttons
+	lastPos     f32.Point
+	lastTouch   f32.Point
 
 	fling struct {
 		yExtrapolation fling.Extrapolation
@@ -514,18 +515,32 @@ func gio_onPointerMotion(data unsafe.Pointer, p *C.struct_wl_pointer, t C.uint32
 }
 
 //export gio_onPointerButton
-func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t, button, state C.uint32_t) {
+func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t, wbtn, state C.uint32_t) {
 	w := winMap[p]
 	// From linux-event-codes.h.
-	const BTN_LEFT = 0x110
-	if button != BTN_LEFT {
+	const (
+		BTN_LEFT   = 0x110
+		BTN_RIGHT  = 0x111
+		BTN_MIDDLE = 0x112
+	)
+	var btn pointer.Buttons
+	switch wbtn {
+	case BTN_LEFT:
+		btn = pointer.ButtonLeft
+	case BTN_RIGHT:
+		btn = pointer.ButtonRight
+	case BTN_MIDDLE:
+		btn = pointer.ButtonMiddle
+	default:
 		return
 	}
 	var typ pointer.Type
 	switch state {
 	case 0:
+		w.pointerBtns &^= btn
 		typ = pointer.Release
 	case 1:
+		w.pointerBtns |= btn
 		typ = pointer.Press
 	}
 	w.flushScroll()
@@ -533,6 +548,7 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 	w.w.Event(pointer.Event{
 		Type:     typ,
 		Source:   pointer.Mouse,
+		Buttons:  w.pointerBtns,
 		Position: w.lastPos,
 		Time:     time.Duration(t) * time.Millisecond,
 	})
@@ -908,6 +924,7 @@ func (w *window) flushScroll() {
 	w.w.Event(pointer.Event{
 		Type:     pointer.Move,
 		Source:   pointer.Mouse,
+		Buttons:  w.pointerBtns,
 		Position: w.lastPos,
 		Scroll:   total,
 		Time:     w.scroll.time,
@@ -929,6 +946,7 @@ func (w *window) onPointerMotion(x, y C.wl_fixed_t, t C.uint32_t) {
 	w.w.Event(pointer.Event{
 		Type:     pointer.Move,
 		Position: w.lastPos,
+		Buttons:  w.pointerBtns,
 		Source:   pointer.Mouse,
 		Time:     time.Duration(t) * time.Millisecond,
 	})
