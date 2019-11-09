@@ -402,6 +402,10 @@ func x11SpecialKeySymToRune(s C.KeySym) (string, bool) {
 		n = "F11"
 	case C.XK_F12:
 		n = "F12"
+	case C.XK_Tab:
+		n = key.NameTab
+	case 0x20, C.XK_KP_Space:
+		n = "Space"
 	default:
 		return "", false
 	}

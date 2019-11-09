@@ -87,6 +87,7 @@ const (
 	NameDeleteForward  = "⌦"
 	NamePageUp         = "⇞"
 	NamePageDown       = "⇟"
+	NameTab            = "⇥"
 )
 
 // Contain reports whether m contains all modifiers

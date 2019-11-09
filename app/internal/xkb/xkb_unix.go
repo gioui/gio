@@ -249,6 +249,10 @@ func convertKeysym(s C.xkb_keysym_t) (string, bool) {
 		n = "F11"
 	case C.XKB_KEY_F12:
 		n = "F12"
+	case C.XKB_KEY_Tab, C.XKB_KEY_KP_Tab:
+		n = key.NameTab
+	case 0x20, C.XKB_KEY_KP_Space:
+		n = "Space"
 	default:
 		return "", false
 	}

@@ -110,6 +110,8 @@ const (
 	_VK_PRIOR  = 0x21
 	_VK_RIGHT  = 0x27
 	_VK_RETURN = 0x0d
+	_VK_SPACE  = 0x20
+	_VK_TAB    = 0x09
 	_VK_UP     = 0x26
 
 	_VK_F1  = 0x70
@@ -524,6 +526,10 @@ func convertKeyCode(code uintptr) (string, bool) {
 		r = "F11"
 	case _VK_F12:
 		r = "F12"
+	case _VK_TAB:
+		r = key.NameTab
+	case _VK_SPACE:
+		r = "Space"
 	default:
 		return "", false
 	}
