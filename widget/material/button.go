@@ -10,6 +10,7 @@ import (
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
@@ -76,11 +77,13 @@ func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 	})
 	bg := st.Expand(gtx, func() {
 		rr := float32(gtx.Px(unit.Dp(4)))
-		rrect(gtx.Ops,
-			float32(gtx.Constraints.Width.Min),
-			float32(gtx.Constraints.Height.Min),
+		clip.RoundRect(gtx.Ops,
+			f32.Rectangle{Max: f32.Point{
+				X: float32(gtx.Constraints.Width.Min),
+				Y: float32(gtx.Constraints.Height.Min),
+			}},
 			rr, rr, rr, rr,
-		)
+		).Add(gtx.Ops)
 		fill(gtx, bgcol)
 		for _, c := range button.History() {
 			drawInk(gtx, c)
@@ -109,11 +112,10 @@ func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
 	bg := st.Expand(gtx, func() {
 		size := float32(gtx.Constraints.Width.Min)
 		rr := float32(size) * .5
-		rrect(gtx.Ops,
-			size,
-			size,
+		clip.RoundRect(gtx.Ops,
+			f32.Rectangle{Max: f32.Point{X: size, Y: size}},
 			rr, rr, rr, rr,
-		)
+		).Add(gtx.Ops)
 		fill(gtx, bgcol)
 		for _, c := range button.History() {
 			drawInk(gtx, c)
@@ -152,7 +154,10 @@ func drawInk(gtx *layout.Context, c widget.Click) {
 		X: -rr,
 		Y: -rr,
 	}).Add(gtx.Ops)
-	rrect(gtx.Ops, float32(size), float32(size), rr, rr, rr, rr)
+	clip.RoundRect(gtx.Ops, f32.Rectangle{Max: f32.Point{
+		X: float32(size),
+		Y: float32(size),
+	}}, rr, rr, rr, rr).Add(gtx.Ops)
 	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(size), Y: float32(size)}}}.Add(gtx.Ops)
 	stack.Pop()
 	op.InvalidateOp{}.Add(gtx.Ops)

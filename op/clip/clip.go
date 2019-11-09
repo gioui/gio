@@ -289,6 +289,30 @@ func Rect(r image.Rectangle) Op {
 	return Op{bounds: toRectF(r)}
 }
 
+// RoundRect returns the clip area of a rectangle with rounded
+// corners defined by their radii. The origin is in the upper left
+// corner.
+// Specify a square with corner radii equal to half the square size to
+// construct a circular clip area.
+func RoundRect(ops *op.Ops, r f32.Rectangle, se, sw, nw, ne float32) Op {
+	size := r.Size()
+	// https://pomax.github.io/bezierinfo/#circles_cubic.
+	w, h := float32(size.X), float32(size.Y)
+	const c = 0.55228475 // 4*(sqrt(2)-1)/3
+	var p Path
+	p.Begin(ops)
+	p.Move(r.Min)
+	p.Move(f32.Point{X: w, Y: h - se})
+	p.Cube(f32.Point{X: 0, Y: se * c}, f32.Point{X: -se + se*c, Y: se}, f32.Point{X: -se, Y: se}) // SE
+	p.Line(f32.Point{X: sw - w + se, Y: 0})
+	p.Cube(f32.Point{X: -sw * c, Y: 0}, f32.Point{X: -sw, Y: -sw + sw*c}, f32.Point{X: -sw, Y: -sw}) // SW
+	p.Line(f32.Point{X: 0, Y: nw - h + sw})
+	p.Cube(f32.Point{X: 0, Y: -nw * c}, f32.Point{X: nw - nw*c, Y: -nw}, f32.Point{X: nw, Y: -nw}) // NW
+	p.Line(f32.Point{X: w - ne - nw, Y: 0})
+	p.Cube(f32.Point{X: ne * c, Y: 0}, f32.Point{X: ne, Y: ne - ne*c}, f32.Point{X: ne, Y: ne}) // NE
+	return p.End()
+}
+
 func toRectF(r image.Rectangle) f32.Rectangle {
 	return f32.Rectangle{
 		Min: f32.Point{X: float32(r.Min.X), Y: float32(r.Min.Y)},
