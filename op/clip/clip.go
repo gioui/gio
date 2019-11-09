@@ -284,9 +284,17 @@ func (p *Path) End() Op {
 	}
 }
 
-// Rect returns the clip area of a pixel aligned rectangular area.
-func Rect(r image.Rectangle) Op {
-	return Op{bounds: toRectF(r)}
+// Rect returns the clip area of a rectangle.
+func Rect(ops *op.Ops, r f32.Rectangle) Op {
+	ri := image.Rectangle{
+		Min: image.Point{X: int(r.Min.X), Y: int(r.Min.Y)},
+		Max: image.Point{X: int(r.Max.X), Y: int(r.Max.Y)},
+	}
+	// Optimize pixel-aligned rectangles to just its bounds.
+	if r == toRectF(ri) {
+		return Op{bounds: r}
+	}
+	return RoundRect(ops, r, 0, 0, 0, 0)
 }
 
 // RoundRect returns the clip area of a rectangle with rounded
