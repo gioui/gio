@@ -225,6 +225,8 @@ func (h *x11EventHandler) handleEvents() bool {
 		lookup:
 			// Save state then clear CTRL & Shift bits in order to have
 			// Xutf8LookupString return the unmodified key name in text[:l].
+			// This addresses an issue on some non US keyboard layouts where
+			// CTRL-[0..9] do not behave consistently.
 			//
 			// Note that this enables sending a key.Event for key combinations
 			// like CTRL-SHIFT-/ on QWERTY layouts, but CTRL-? is completely
@@ -247,23 +249,30 @@ func (h *x11EventHandler) handleEvents() bool {
 				w.w.Event(key.EditEvent{Text: string(h.text[:l])})
 			case C.XLookupKeySym:
 				// Special keys.
-				if r, ok := x11SpecialKeySymToRune(h.keysym); ok {
-					w.w.Event(key.Event{
-						Name:      r,
-						Modifiers: mods,
-					})
+				if n, m, ok := x11ConvertKeysym(h.keysym, mods); ok {
+					w.w.Event(key.Event{Name: n, Modifiers: m})
 				}
 			case C.XLookupBoth:
-				if r, ok := x11SpecialKeySymToRune(h.keysym); ok {
-					w.w.Event(key.Event{Name: r, Modifiers: mods})
-				} else {
-					if r, _ := utf8.DecodeRune(h.text[:l]); r != utf8.RuneError {
-						w.w.Event(key.Event{Name: string(unicode.ToUpper(r)), Modifiers: mods})
+				if n, m, ok := x11ConvertKeysym(h.keysym, mods); ok {
+					w.w.Event(key.Event{Name: n, Modifiers: m})
+				}
+				// Do not send EditEvent for CTRL key combinations.
+				if mods.Contain(key.ModCtrl) {
+					break
+				}
+				// Report only printable runes.
+				str := h.text[:l]
+				for n := 0; n < len(str); {
+					r, s := utf8.DecodeRune(str)
+					if unicode.IsPrint(r) {
+						n += s
+					} else {
+						copy(str[n:], str[n+s:])
+						str = str[:len(str)-s]
 					}
-					// Send EditEvent only when not a CTRL key combination.
-					if !mods.Contain(key.ModCtrl) {
-						w.w.Event(key.EditEvent{Text: string(h.text[:l])})
-					}
+				}
+				if len(str) > 0 {
+					w.w.Event(key.EditEvent{Text: string(str)})
 				}
 			}
 		case C.KeyRelease:
@@ -349,7 +358,16 @@ func x11KeyStateToModifiers(s C.uint) key.Modifiers {
 	return m
 }
 
-func x11SpecialKeySymToRune(s C.KeySym) (string, bool) {
+// x11ConvertKeysym returns the Gio special key that matches keysym s. For
+// portability reasons, some keysyms might be translated and modifiers changed
+// (like BackTab -> ModShift+Tab)
+func x11ConvertKeysym(s C.KeySym, mods key.Modifiers) (string, key.Modifiers, bool) {
+	if '0' <= s && s <= '9' || 'A' <= s && s <= 'Z' {
+		return string(s), mods, true
+	}
+	if 'a' <= s && s <= 'z' {
+		return string(s - 0x20), mods, true
+	}
 	var n string
 	switch s {
 	case C.XK_Escape:
@@ -402,14 +420,17 @@ func x11SpecialKeySymToRune(s C.KeySym) (string, bool) {
 		n = "F11"
 	case C.XK_F12:
 		n = "F12"
+	case C.XK_ISO_Left_Tab:
+		mods |= key.ModShift
+		fallthrough
 	case C.XK_Tab:
 		n = key.NameTab
 	case 0x20, C.XK_KP_Space:
 		n = "Space"
 	default:
-		return "", false
+		return "", mods, false
 	}
-	return n, true
+	return n, mods, true
 }
 
 var (
