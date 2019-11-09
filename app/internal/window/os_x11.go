@@ -76,6 +76,8 @@ type x11Window struct {
 
 	mu        sync.Mutex
 	animating bool
+
+	pointerBtns pointer.Buttons
 }
 
 func (w *x11Window) SetAnimating(anim bool) {
@@ -219,7 +221,7 @@ func (h *x11EventHandler) handleEvents() bool {
 		if C.XFilterEvent(xev, C.None) == C.True {
 			continue
 		}
-		switch (*C.XAnyEvent)(unsafe.Pointer(xev))._type {
+		switch _type := (*C.XAnyEvent)(unsafe.Pointer(xev))._type; _type {
 		case C.KeyPress:
 			kevt := (*C.XKeyPressedEvent)(unsafe.Pointer(xev))
 		lookup:
@@ -290,10 +292,15 @@ func (h *x11EventHandler) handleEvents() bool {
 			if bevt._type == C.ButtonRelease {
 				ev.Type = pointer.Release
 			}
+			var btn pointer.Buttons
 			const scrollScale = 10
 			switch bevt.button {
 			case C.Button1:
-				// left click by default
+				btn = pointer.ButtonLeft
+			case C.Button2:
+				btn = pointer.ButtonMiddle
+			case C.Button3:
+				btn = pointer.ButtonRight
 			case C.Button4:
 				// scroll up
 				ev.Type = pointer.Move
@@ -305,12 +312,20 @@ func (h *x11EventHandler) handleEvents() bool {
 			default:
 				continue
 			}
+			switch _type {
+			case C.ButtonPress:
+				w.pointerBtns |= btn
+			case C.ButtonRelease:
+				w.pointerBtns &^= btn
+			}
+			ev.Buttons = w.pointerBtns
 			w.w.Event(ev)
 		case C.MotionNotify:
 			mevt := (*C.XMotionEvent)(unsafe.Pointer(xev))
 			w.w.Event(pointer.Event{
-				Type:   pointer.Move,
-				Source: pointer.Mouse,
+				Type:    pointer.Move,
+				Source:  pointer.Mouse,
+				Buttons: w.pointerBtns,
 				Position: f32.Point{
 					X: float32(mevt.x),
 					Y: float32(mevt.y),
