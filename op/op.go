@@ -20,12 +20,13 @@ Drawing a colored square:
 	import "gioui.org/op/paint"
 
 	var w app.Window
+	var e system.FrameEvent
 	ops := new(op.Ops)
 	...
 	ops.Reset()
 	paint.ColorOp{Color: ...}.Add(ops)
 	paint.PaintOp{Rect: ...}.Add(ops)
-	w.Update(ops)
+	e.Frame(ops)
 
 State
 

@@ -27,7 +27,7 @@ For example:
 			// Add operations to ops.
 			...
 			// Completely replace the window contents and state.
-			w.Update(ops)
+			e.Frame(ops)
 		}
 	}
 
