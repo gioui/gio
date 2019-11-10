@@ -153,11 +153,12 @@ func (e *Editor) processKey(gtx *layout.Context) {
 			if !e.focused {
 				break
 			}
-			if e.Submit && ke.Name == key.NameReturn || ke.Name == key.NameEnter {
+			if e.Submit && (ke.Name == key.NameReturn || ke.Name == key.NameEnter) {
 				if !ke.Modifiers.Contain(key.ModShift) {
 					e.events = append(e.events, SubmitEvent{
 						Text: e.Text(),
 					})
+					return
 				}
 			}
 			if e.command(ke) {
