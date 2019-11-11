@@ -478,30 +478,26 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 		return errors.New("x11: cannot connect to the X server")
 	}
 
-	root := C.XDefaultRootWindow(dpy)
-	screen := C.XDefaultScreen(dpy)
-	ppsp := x11DetectUIScale(dpy, screen)
+	ppsp := x11DetectUIScale(dpy)
 	cfg := config{pxPerDp: ppsp, pxPerSp: ppsp}
+	swa := C.XSetWindowAttributes{
+		event_mask: C.ExposureMask | C.FocusChangeMask | // update
+			C.KeyPressMask | C.KeyReleaseMask | // keyboard
+			C.ButtonPressMask | C.ButtonReleaseMask | // mouse clicks
+			C.PointerMotionMask | // mouse movement
+			C.StructureNotifyMask, // resize
+		background_pixmap: C.None,
+		override_redirect: C.False,
+	}
+	win := C.XCreateWindow(dpy, C.XDefaultRootWindow(dpy),
+		0, 0, C.uint(cfg.Px(opts.Width)), C.uint(cfg.Px(opts.Height)),
+		0, C.CopyFromParent, C.InputOutput, nil,
+		C.CWEventMask|C.CWBackPixmap|C.CWOverrideRedirect, &swa)
 	var (
-		swa C.XSetWindowAttributes
 		xim C.XIM
 		xic C.XIC
 	)
-	swa.event_mask = C.ExposureMask | C.PointerMotionMask | C.KeyPressMask
-	swa.background_pixmap = C.None
-	win := C.XCreateWindow(dpy, root,
-		0, 0, C.uint(cfg.Px(opts.Width)), C.uint(cfg.Px(opts.Height)), 0,
-		C.CopyFromParent, C.InputOutput,
-		nil, C.CWEventMask|C.CWBackPixmap,
-		&swa)
 	C.gio_x11_init_ime(dpy, win, &xim, &xic)
-	C.XSelectInput(dpy, win, 0|
-		C.ExposureMask|C.FocusChangeMask| // update
-		C.KeyPressMask|C.KeyReleaseMask| // keyboard
-		C.ButtonPressMask|C.ButtonReleaseMask| // mouse clicks
-		C.PointerMotionMask| // mouse movement
-		C.StructureNotifyMask, // resize
-	)
 
 	w := &x11Window{
 		w: gioWin, x: dpy, xw: win,
@@ -513,10 +509,6 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	}
 	w.notify.read = pipe[0]
 	w.notify.write = pipe[1]
-
-	var xattr C.XSetWindowAttributes
-	xattr.override_redirect = C.False
-	C.XChangeWindowAttributes(dpy, win, C.CWOverrideRedirect, &xattr)
 
 	var hints C.XWMHints
 	hints.input = C.True
@@ -548,7 +540,7 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 }
 
 // detectUIScale reports the system UI scale, or 1.0 if it fails.
-func x11DetectUIScale(dpy *C.Display, screen C.int) float32 {
+func x11DetectUIScale(dpy *C.Display) float32 {
 	// default fixed DPI value used in most desktop UI toolkits
 	const defaultDesktopDPI = 96
 	var scale float32 = 1.0
