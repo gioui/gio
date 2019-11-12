@@ -218,12 +218,6 @@ func (w *Window) run(opts *window.Options) {
 		w.out <- system.DestroyEvent{Err: err}
 		return
 	}
-	defer func() {
-		if w.gpu != nil {
-			w.gpu.Release()
-			w.gpu = nil
-		}
-	}()
 	for {
 		var timer <-chan time.Time
 		if w.delayedDraw != nil {
@@ -303,6 +297,8 @@ func (w *Window) run(opts *window.Options) {
 				}
 				if e2.Sync {
 					if err := w.gpu.Flush(); err != nil {
+						w.gpu.Release()
+						w.gpu = nil
 						w.destroy(err)
 						return
 					}
