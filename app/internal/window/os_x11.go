@@ -198,6 +198,19 @@ func (w *x11Window) destroy() {
 	C.XCloseDisplay(w.x)
 }
 
+// atom is a wrapper around XInternAtom. Callers should cache the result
+// in order to limit round-trips to the X server.
+//
+func (w *x11Window) atom(name string, onlyIfExists bool) C.Atom {
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+	flag := C.Bool(C.False)
+	if onlyIfExists {
+		flag = C.True
+	}
+	return C.XInternAtom(w.x, cname, flag)
+}
+
 // x11EventHandler wraps static variables for the main event loop.
 // Its sole purpose is to prevent heap allocation and reduce clutter
 // in x11window.loop.
@@ -520,13 +533,20 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 
 	// set the name
 	ctitle := C.CString(opts.Title)
+	defer C.free(unsafe.Pointer(ctitle))
 	C.XStoreName(dpy, win, ctitle)
-	C.free(unsafe.Pointer(ctitle))
+	// set _NET_WM_NAME as well for UTF-8 support in window title.
+	C.XSetTextProperty(dpy, win,
+		&C.XTextProperty{
+			value:    (*C.uchar)(unsafe.Pointer(ctitle)),
+			encoding: w.atom("UTF8_STRING", false),
+			format:   8,
+			nitems:   C.ulong(len(opts.Title)),
+		},
+		w.atom("_NET_WM_NAME", false))
 
 	// extensions
-	ckey := C.CString("WM_DELETE_WINDOW")
-	w.evDelWindow = C.XInternAtom(dpy, ckey, C.False)
-	C.free(unsafe.Pointer(ckey))
+	w.evDelWindow = w.atom("WM_DELETE_WINDOW", false)
 	C.XSetWMProtocols(dpy, win, &w.evDelWindow, 1)
 
 	go func() {
