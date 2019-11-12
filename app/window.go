@@ -200,6 +200,7 @@ func (w *Window) waitAck() {
 // Prematurely destroy the window and wait for the native window
 // destroy event.
 func (w *Window) destroy(err error) {
+	w.destroyGPU()
 	// Ack the current event.
 	w.ack <- struct{}{}
 	w.out <- system.DestroyEvent{Err: err}
@@ -208,6 +209,13 @@ func (w *Window) destroy(err error) {
 		if _, ok := e.(system.DestroyEvent); ok {
 			return
 		}
+	}
+}
+
+func (w *Window) destroyGPU() {
+	if w.gpu != nil {
+		w.gpu.Release()
+		w.gpu = nil
 	}
 }
 
@@ -309,6 +317,7 @@ func (w *Window) run(opts *window.Options) {
 			case driverEvent:
 				w.driver = e2.driver
 			case system.DestroyEvent:
+				w.destroyGPU()
 				w.out <- e2
 				w.ack <- struct{}{}
 				return
