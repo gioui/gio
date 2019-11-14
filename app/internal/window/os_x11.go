@@ -528,9 +528,6 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	hints.flags = C.InputHint
 	C.XSetWMHints(dpy, win, &hints)
 
-	// make the window visible on the screen
-	C.XMapWindow(dpy, win)
-
 	// set the name
 	ctitle := C.CString(opts.Title)
 	defer C.free(unsafe.Pointer(ctitle))
@@ -548,6 +545,9 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	// extensions
 	w.evDelWindow = w.atom("WM_DELETE_WINDOW", false)
 	C.XSetWMProtocols(dpy, win, &w.evDelWindow, 1)
+
+	// make the window visible on the screen
+	C.XMapWindow(dpy, win)
 
 	go func() {
 		w.w.SetDriver(w)
