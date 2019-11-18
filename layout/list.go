@@ -263,7 +263,7 @@ func (l *List) layout() Dimensions {
 	l.beforeEnd = !atEnd
 	dims := axisPoint(l.Axis, mainc.Constrain(pos), maxCross)
 	l.macro.Stop()
-	pointer.RectAreaOp{Rect: image.Rectangle{Max: dims}}.Add(ops)
+	pointer.Rect(image.Rectangle{Max: dims}).Add(ops)
 	l.scroll.Add(ops)
 	l.macro.Add(ops)
 	return Dimensions{Size: dims}

@@ -42,24 +42,10 @@ type Event struct {
 	Scroll f32.Point
 }
 
-// RectAreaOp updates the hit area to the intersection
-// of the current hit area with a rectangular area.
-type RectAreaOp struct {
-	// Rect defines the rectangle. The current transform
-	// is applied to it.
-	Rect image.Rectangle
-}
-
-// EllipseAreaOp updates the hit area to the intersection
-// of the current hit area with an elliptical area.
-type EllipseAreaOp struct {
-	// Rect is the bounds for the ellipse. The current transform
-	// is applied to the rectangle.
-	Rect image.Rectangle
-}
-
-// Must match the structure in input.areaOp
-type areaOp struct {
+// AreaOp updates the hit area to the intersection of the current
+// hit area and the area. The area is transformed before applying
+// it.
+type AreaOp struct {
 	kind areaKind
 	rect image.Rectangle
 }
@@ -133,21 +119,23 @@ const (
 	areaEllipse
 )
 
-func (op RectAreaOp) Add(ops *op.Ops) {
-	areaOp{
+// Rect constructs a rectangular hit area.
+func Rect(size image.Rectangle) AreaOp {
+	return AreaOp{
 		kind: areaRect,
-		rect: op.Rect,
-	}.add(ops)
+		rect: size,
+	}
 }
 
-func (op EllipseAreaOp) Add(ops *op.Ops) {
-	areaOp{
+// Ellipse constructs an ellipsoid hit area.
+func Ellipse(size image.Rectangle) AreaOp {
+	return AreaOp{
 		kind: areaEllipse,
-		rect: op.Rect,
-	}.add(ops)
+		rect: size,
+	}
 }
 
-func (op areaOp) add(o *op.Ops) {
+func (op AreaOp) Add(o *op.Ops) {
 	data := o.Write(opconst.TypeAreaLen)
 	data[0] = byte(opconst.TypeArea)
 	data[1] = byte(op.kind)

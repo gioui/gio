@@ -63,5 +63,5 @@ func (c *checkable) layout(gtx *layout.Context, checked bool) {
 	})
 
 	flex.Layout(gtx, ico, lbl)
-	pointer.RectAreaOp{Rect: image.Rectangle{Max: gtx.Dimensions.Size}}.Add(gtx.Ops)
+	pointer.Rect(image.Rectangle{Max: gtx.Dimensions.Size}).Add(gtx.Ops)
 }

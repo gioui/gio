@@ -72,7 +72,7 @@ func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 				widget.Label{}.Layout(gtx, b.shaper, b.Font, b.Text)
 			})
 		})
-		pointer.RectAreaOp{Rect: image.Rectangle{Max: gtx.Dimensions.Size}}.Add(gtx.Ops)
+		pointer.Rect(image.Rectangle{Max: gtx.Dimensions.Size}).Add(gtx.Ops)
 		button.Layout(gtx)
 	})
 	bg := st.Expand(gtx, func() {
@@ -105,7 +105,7 @@ func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
 				Size: image.Point{X: size, Y: size},
 			}
 		})
-		pointer.EllipseAreaOp{Rect: image.Rectangle{Max: gtx.Dimensions.Size}}.Add(gtx.Ops)
+		pointer.Ellipse(image.Rectangle{Max: gtx.Dimensions.Size}).Add(gtx.Ops)
 		button.Layout(gtx)
 	})
 	bgcol := b.Background

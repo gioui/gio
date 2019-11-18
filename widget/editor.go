@@ -258,7 +258,7 @@ func (e *Editor) layout(gtx *layout.Context, sh *text.Shaper) {
 	r.Min.Y -= pointerPadding
 	r.Max.X += pointerPadding
 	r.Max.X += pointerPadding
-	pointer.RectAreaOp{Rect: r}.Add(gtx.Ops)
+	pointer.Rect(r).Add(gtx.Ops)
 	e.scroller.Add(gtx.Ops)
 	e.clicker.Add(gtx.Ops)
 	e.caretOn = false
