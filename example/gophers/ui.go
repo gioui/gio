@@ -310,7 +310,7 @@ func (u *UI) user(gtx *layout.Context, index int) {
 			})
 			f.Layout(gtx, c1, c2)
 		})
-		pointer.RectAreaOp{Rect: image.Rectangle{Max: gtx.Dimensions.Size}}.Add(gtx.Ops)
+		pointer.Rect(image.Rectangle{Max: gtx.Dimensions.Size}).Add(gtx.Ops)
 		click := &u.userClicks[index]
 		click.Add(gtx.Ops)
 	})

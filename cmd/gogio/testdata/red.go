@@ -122,9 +122,9 @@ func (w *quarterWidget) Layout(gtx *layout.Context) {
 		Y: float32(gtx.Constraints.Height.Max),
 	}}}.Add(gtx.Ops)
 
-	pointer.RectAreaOp{Rect: image.Rectangle{
+	pointer.Rect(image.Rectangle{
 		Max: image.Pt(gtx.Constraints.Width.Max, gtx.Constraints.Height.Max),
-	}}.Add(gtx.Ops)
+	}).Add(gtx.Ops)
 	pointer.InputOp{Key: w}.Add(gtx.Ops)
 
 	for _, e := range gtx.Events(w) {
