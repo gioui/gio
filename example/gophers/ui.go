@@ -373,7 +373,10 @@ func (c *clipCircle) Layout(gtx *layout.Context, w layout.Widget) {
 	rr := szf * .5
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
-	clip.RoundRect(gtx.Ops, f32.Rectangle{Max: f32.Point{X: szf, Y: szf}}, rr, rr, rr, rr).Add(gtx.Ops)
+	clip.Rect{
+		Rect: f32.Rectangle{Max: f32.Point{X: szf, Y: szf}},
+		NE:   rr, NW: rr, SE: rr, SW: rr,
+	}.Op(gtx.Ops).Add(gtx.Ops)
 	m.Add(gtx.Ops)
 	stack.Pop()
 }
