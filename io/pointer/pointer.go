@@ -11,6 +11,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
 	"gioui.org/io/event"
+	"gioui.org/io/key"
 	"gioui.org/op"
 )
 
@@ -40,6 +41,9 @@ type Event struct {
 	Position f32.Point
 	// Scroll is the scroll amount, if any.
 	Scroll f32.Point
+	// Modifiers is the set of active modifiers when
+	// the mouse button was pressed.
+	Modifiers key.Modifiers
 }
 
 // AreaOp updates the hit area to the intersection of the current

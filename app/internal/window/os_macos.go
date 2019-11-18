@@ -118,24 +118,14 @@ func gio_onFrameCallback(view C.CFTypeRef) {
 //export gio_onKeys
 func gio_onKeys(view C.CFTypeRef, cstr *C.char, ti C.double, mods C.NSUInteger) {
 	str := C.GoString(cstr)
-	var kmods key.Modifiers
-	if mods&C.NSAlternateKeyMask != 0 {
-		kmods |= key.ModAlt
-	}
-	if mods&C.NSControlKeyMask != 0 {
-		kmods |= key.ModCtrl
-	}
-	if mods&C.NSCommandKeyMask != 0 {
-		kmods |= key.ModCommand
-	}
-	if mods&C.NSShiftKeyMask != 0 {
-		kmods |= key.ModShift
-	}
 	viewDo(view, func(views viewMap, view C.CFTypeRef) {
 		w := views[view]
 		for _, k := range str {
 			if n, ok := convertKey(k); ok {
-				w.w.Event(key.Event{Name: n, Modifiers: kmods})
+				w.w.Event(key.Event{
+					Name:      n,
+					Modifiers: convertMods(mods),
+				})
 			}
 		}
 	})
@@ -151,7 +141,7 @@ func gio_onText(view C.CFTypeRef, cstr *C.char) {
 }
 
 //export gio_onMouse
-func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy C.CGFloat, ti C.double) {
+func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy C.CGFloat, ti C.double, mods C.NSUInteger) {
 	var typ pointer.Type
 	switch cdir {
 	case C.GIO_MOUSE_MOVE:
@@ -179,12 +169,13 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy 
 		x, y := float32(x)*w.scale, float32(y)*w.scale
 		dx, dy := float32(dx)*w.scale, float32(dy)*w.scale
 		w.w.Event(pointer.Event{
-			Type:     typ,
-			Source:   pointer.Mouse,
-			Time:     t,
-			Buttons:  btns,
-			Position: f32.Point{X: x, Y: y},
-			Scroll:   f32.Point{X: dx, Y: dy},
+			Type:      typ,
+			Source:    pointer.Mouse,
+			Time:      t,
+			Buttons:   btns,
+			Position:  f32.Point{X: x, Y: y},
+			Scroll:    f32.Point{X: dx, Y: dy},
+			Modifiers: convertMods(mods),
 		})
 	})
 }
@@ -365,4 +356,21 @@ func convertKey(k rune) (string, bool) {
 		return "", false
 	}
 	return n, true
+}
+
+func convertMods(mods C.NSUInteger) key.Modifiers {
+	var kmods key.Modifiers
+	if mods&C.NSAlternateKeyMask != 0 {
+		kmods |= key.ModAlt
+	}
+	if mods&C.NSControlKeyMask != 0 {
+		kmods |= key.ModCtrl
+	}
+	if mods&C.NSCommandKeyMask != 0 {
+		kmods |= key.ModCommand
+	}
+	if mods&C.NSShiftKeyMask != 0 {
+		kmods |= key.ModShift
+	}
+	return kmods
 }

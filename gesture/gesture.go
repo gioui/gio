@@ -16,6 +16,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/internal/fling"
 	"gioui.org/io/event"
+	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/op"
 	"gioui.org/unit"
@@ -34,9 +35,10 @@ type ClickState uint8
 // TypePress for the beginning of a click or a
 // TypeClick for a completed click.
 type ClickEvent struct {
-	Type     ClickType
-	Position f32.Point
-	Source   pointer.Source
+	Type      ClickType
+	Position  f32.Point
+	Source    pointer.Source
+	Modifiers key.Modifiers
 }
 
 type ClickType uint8
@@ -120,7 +122,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 			wasPressed := c.state == StatePressed
 			c.state = StateNormal
 			if wasPressed {
-				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source})
+				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers})
 			}
 		case pointer.Cancel:
 			c.state = StateNormal
@@ -132,7 +134,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 				break
 			}
 			c.state = StatePressed
-			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source})
+			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers})
 		case pointer.Move:
 			if c.state == StatePressed && !e.Hit {
 				c.state = StateNormal
