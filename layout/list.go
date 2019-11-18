@@ -249,7 +249,7 @@ func (l *List) layout() Dimensions {
 		}
 		var stack op.StackOp
 		stack.Push(ops)
-		clip.Rect(ops, toRectF(r)).Add(ops)
+		clip.Rect{Rect: toRectF(r)}.Op(ops).Add(ops)
 		op.TransformOp{}.Offset(toPointF(axisPoint(l.Axis, pos, cross))).Add(ops)
 		child.macro.Add(ops)
 		stack.Pop()

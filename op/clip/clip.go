@@ -284,25 +284,38 @@ func (p *Path) End() Op {
 	}
 }
 
-// Rect returns the clip area of a rectangle.
-func Rect(ops *op.Ops, r f32.Rectangle) Op {
-	ri := image.Rectangle{
-		Min: image.Point{X: int(r.Min.X), Y: int(r.Min.Y)},
-		Max: image.Point{X: int(r.Max.X), Y: int(r.Max.Y)},
-	}
-	// Optimize pixel-aligned rectangles to just its bounds.
-	if r == toRectF(ri) {
-		return Op{bounds: r}
-	}
-	return RoundRect(ops, r, 0, 0, 0, 0)
-}
-
-// RoundRect returns the clip area of a rectangle with rounded
-// corners defined by their radii. The origin is in the upper left
+// Rect represents the clip area of a rectangle with rounded
+// corners.The origin is in the upper left
 // corner.
 // Specify a square with corner radii equal to half the square size to
 // construct a circular clip area.
-func RoundRect(ops *op.Ops, r f32.Rectangle, se, sw, nw, ne float32) Op {
+type Rect struct {
+	Rect f32.Rectangle
+	// The corner radii.
+	SE, SW, NW, NE float32
+}
+
+// Op returns the Op for the rectangle.
+func (rr Rect) Op(ops *op.Ops) Op {
+	r := rr.Rect
+	// Optimize for the common pixel aligned rectangle with no
+	// corner rounding.
+	if rr.SE == 0 && rr.SW == 0 && rr.NW == 0 && rr.NE == 0 {
+		ri := image.Rectangle{
+			Min: image.Point{X: int(r.Min.X), Y: int(r.Min.Y)},
+			Max: image.Point{X: int(r.Max.X), Y: int(r.Max.Y)},
+		}
+		// Optimize pixel-aligned rectangles to just its bounds.
+		if r == toRectF(ri) {
+			return Op{bounds: r}
+		}
+	}
+	return roundRect(ops, r, rr.SE, rr.SW, rr.NW, rr.NE)
+}
+
+// roundRect returns the clip area of a rectangle with rounded
+// corners defined by their radii.
+func roundRect(ops *op.Ops, r f32.Rectangle, se, sw, nw, ne float32) Op {
 	size := r.Size()
 	// https://pomax.github.io/bezierinfo/#circles_cubic.
 	w, h := float32(size.X), float32(size.Y)
