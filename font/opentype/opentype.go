@@ -79,18 +79,14 @@ func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, o
 	}
 	for prev.idx < len(str) {
 		c, s := utf8.DecodeRuneInString(str[prev.idx:])
-		a, ok := f.GlyphAdvance(buf, ppem, c)
-		if !ok {
-			prev.idx += s
-			continue
-		}
+		a, valid := f.GlyphAdvance(buf, ppem, c)
 		next := state{
 			r:     c,
 			advs:  prev.advs,
 			idx:   prev.idx + s,
 			x:     prev.x + prev.adv,
 			adv:   a,
-			valid: true,
+			valid: valid,
 		}
 		if c == '\n' {
 			// The newline is zero width; use the previous
