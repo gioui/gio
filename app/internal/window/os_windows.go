@@ -358,7 +358,6 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			w.setStage(system.StagePaused)
 		case _SIZE_MAXIMIZED, _SIZE_RESTORED:
 			w.setStage(system.StageRunning)
-			w.draw(true)
 		}
 	}
 	return defWindowProc(hwnd, msg, wParam, lParam)
