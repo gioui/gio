@@ -5,7 +5,6 @@
 package opentype
 
 import (
-	"math"
 	"unicode"
 	"unicode/utf8"
 
@@ -57,8 +56,7 @@ func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, o
 		Bounds:  f.Bounds(buf, ppem),
 	}
 	var lines []text.Line
-	maxDotX := fixed.Int26_6(math.MaxInt32)
-	maxDotX = fixed.I(opts.MaxWidth)
+	maxDotX := fixed.I(opts.MaxWidth)
 	type state struct {
 		r     rune
 		advs  []fixed.Int26_6
@@ -91,6 +89,7 @@ func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, o
 			advs:  prev.advs,
 			idx:   prev.idx + s,
 			x:     prev.x + prev.adv,
+			adv:   a,
 			valid: true,
 		}
 		if c == '\n' {
@@ -101,13 +100,12 @@ func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, o
 			endLine()
 			continue
 		}
-		next.adv = a
 		var k fixed.Int26_6
 		if prev.valid {
 			k = f.Kern(buf, ppem, prev.r, next.r)
 		}
 		// Break the line if we're out of space.
-		if prev.idx > 0 && next.x+next.adv+k >= maxDotX {
+		if prev.idx > 0 && next.x+next.adv+k > maxDotX {
 			// If the line contains no word breaks, break off the last rune.
 			if word.idx == 0 {
 				word = prev
@@ -117,8 +115,9 @@ func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, o
 			next.advs = next.advs[len(word.advs):]
 			prev = word
 			endLine()
-		} else {
-			next.adv += k
+		} else if k != 0 {
+			next.advs[len(next.advs)-1] += k
+			next.x += k
 		}
 		next.advs = append(next.advs, next.adv)
 		if unicode.IsSpace(next.r) {
