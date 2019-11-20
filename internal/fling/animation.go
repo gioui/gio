@@ -85,7 +85,7 @@ func (f *Animation) Tick(now time.Time) int {
 	ekt := float32(math.Exp(float64(k) * t.Seconds()))
 	x := f.v0*ekt/k - f.v0/k
 	dist := x - f.x
-	idist := int(math.Round(float64(dist)))
+	idist := int(dist)
 	f.x += float32(idist)
 	// Solving for the velocity x'(t) gives us
 	//

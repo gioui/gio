@@ -205,7 +205,7 @@ func (s *Scroll) Scroll(cfg unit.Converter, q event.Queue, t time.Time, axis Axi
 			case Vertical:
 				s.scroll += e.Scroll.Y
 			}
-			iscroll := int(math.Round(float64(s.scroll)))
+			iscroll := int(s.scroll)
 			s.scroll -= float32(iscroll)
 			total += iscroll
 			if !s.dragging || s.pid != e.PointerID {
