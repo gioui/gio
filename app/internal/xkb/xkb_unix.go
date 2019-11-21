@@ -9,8 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"syscall"
 	"unicode"
+	"syscall"
 	"unicode/utf8"
 	"unsafe"
 
@@ -46,7 +46,7 @@ var (
 )
 
 func (x *Context) Destroy() {
-	if x.state != nil {
+	if x.compState != nil {
 		C.xkb_compose_state_unref(x.compState)
 		x.compState = nil
 	}
