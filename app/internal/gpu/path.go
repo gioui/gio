@@ -3,7 +3,7 @@
 package gpu
 
 // GPU accelerated path drawing using the algorithms from
-// Pathfinder (https://github.com/pcwalton/pathfinder).
+// Pathfinder (https://github.com/servo/pathfinder).
 
 import (
 	"image"
