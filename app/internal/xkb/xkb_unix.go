@@ -9,8 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"unicode"
 	"syscall"
+	"unicode"
 	"unicode/utf8"
 	"unsafe"
 
@@ -30,7 +30,7 @@ import (
 import "C"
 
 type Context struct {
-	ctx       *C.struct_xkb_context
+	Ctx       *C.struct_xkb_context
 	keyMap    *C.struct_xkb_keymap
 	state     *C.struct_xkb_state
 	compTable *C.struct_xkb_compose_table
@@ -54,25 +54,18 @@ func (x *Context) Destroy() {
 		C.xkb_compose_table_unref(x.compTable)
 		x.compTable = nil
 	}
-	if x.state != nil {
-		C.xkb_state_unref(x.state)
-		x.state = nil
-	}
-	if x.keyMap != nil {
-		C.xkb_keymap_unref(x.keyMap)
-		x.keyMap = nil
-	}
-	if x.ctx != nil {
-		C.xkb_context_unref(x.ctx)
-		x.ctx = nil
+	x.DestroyKeymapState()
+	if x.Ctx != nil {
+		C.xkb_context_unref(x.Ctx)
+		x.Ctx = nil
 	}
 }
 
-func New(format int, fd int, size int) (*Context, error) {
+func New() (*Context, error) {
 	ctx := &Context{
-		ctx: C.xkb_context_new(C.XKB_CONTEXT_NO_FLAGS),
+		Ctx: C.xkb_context_new(C.XKB_CONTEXT_NO_FLAGS),
 	}
-	if ctx.ctx == nil {
+	if ctx.Ctx == nil {
 		return nil, errors.New("newXKB: xkb_context_new failed")
 	}
 	locale := os.Getenv("LC_ALL")
@@ -87,7 +80,7 @@ func New(format int, fd int, size int) (*Context, error) {
 	}
 	cloc := C.CString(locale)
 	defer C.free(unsafe.Pointer(cloc))
-	ctx.compTable = C.xkb_compose_table_new_from_locale(ctx.ctx, cloc, C.XKB_COMPOSE_COMPILE_NO_FLAGS)
+	ctx.compTable = C.xkb_compose_table_new_from_locale(ctx.Ctx, cloc, C.XKB_COMPOSE_COMPILE_NO_FLAGS)
 	if ctx.compTable == nil {
 		ctx.Destroy()
 		return nil, errors.New("newXKB: xkb_compose_table_new_from_locale failed")
@@ -97,27 +90,54 @@ func New(format int, fd int, size int) (*Context, error) {
 		ctx.Destroy()
 		return nil, errors.New("newXKB: xkb_compose_state_new failed")
 	}
-	mapData, err := syscall.Mmap(int(fd), 0, int(size), syscall.PROT_READ, syscall.MAP_SHARED)
-	if err != nil {
-		ctx.Destroy()
-		return nil, fmt.Errorf("newXKB: mmap of keymap failed: %v", err)
-	}
-	defer syscall.Munmap(mapData)
-	ctx.keyMap = C.xkb_keymap_new_from_buffer(ctx.ctx, (*C.char)(unsafe.Pointer(&mapData[0])), C.size_t(size-1), C.XKB_KEYMAP_FORMAT_TEXT_V1, C.XKB_KEYMAP_COMPILE_NO_FLAGS)
-	if ctx.keyMap == nil {
-		ctx.Destroy()
-		return nil, errors.New("newXKB: xkb_keymap_new_from_buffer failed")
-	}
-	ctx.state = C.xkb_state_new(ctx.keyMap)
-	if ctx.state == nil {
-		ctx.Destroy()
-		return nil, errors.New("newXKB: xkb_state_new failed")
-	}
 	return ctx, nil
 }
 
+func (x *Context) DestroyKeymapState() {
+	if x.state != nil {
+		C.xkb_state_unref(x.state)
+		x.state = nil
+	}
+	if x.keyMap != nil {
+		C.xkb_keymap_unref(x.keyMap)
+		x.keyMap = nil
+	}
+}
+
+// SetKeymap sets the keymap and state. The context takes ownership of the
+// keymap and state and frees them in Destroy.
+func (x *Context) SetKeymap(xkbKeyMap, xkbState unsafe.Pointer) {
+	x.DestroyKeymapState()
+	x.keyMap = (*C.struct_xkb_keymap)(xkbKeyMap)
+	x.state = (*C.struct_xkb_state)(xkbState)
+}
+
+func (x *Context) LoadKeymap(format int, fd int, size int) error {
+	x.DestroyKeymapState()
+	mapData, err := syscall.Mmap(int(fd), 0, int(size), syscall.PROT_READ, syscall.MAP_SHARED)
+	if err != nil {
+		return fmt.Errorf("newXKB: mmap of keymap failed: %v", err)
+	}
+	defer syscall.Munmap(mapData)
+	keyMap := C.xkb_keymap_new_from_buffer(x.Ctx, (*C.char)(unsafe.Pointer(&mapData[0])), C.size_t(size-1), C.XKB_KEYMAP_FORMAT_TEXT_V1, C.XKB_KEYMAP_COMPILE_NO_FLAGS)
+	if keyMap == nil {
+		return errors.New("newXKB: xkb_keymap_new_from_buffer failed")
+	}
+	state := C.xkb_state_new(keyMap)
+	if state == nil {
+		C.xkb_keymap_unref(keyMap)
+		return errors.New("newXKB: xkb_state_new failed")
+	}
+	x.keyMap = keyMap
+	x.state = state
+	return nil
+}
+
 func (x *Context) DispatchKey(keyCode uint32) (events []event.Event) {
-	kc := mapXKBKeyCode(keyCode)
+	if x.state == nil {
+		return
+	}
+	kc := C.xkb_keycode_t(keyCode)
 	if len(x.utf8Buf) == 0 {
 		x.utf8Buf = make([]byte, 1)
 	}
@@ -186,18 +206,16 @@ func (x *Context) charsForKeycode(keyCode C.xkb_keycode_t) []byte {
 }
 
 func (x *Context) IsRepeatKey(keyCode uint32) bool {
-	kc := mapXKBKeyCode(keyCode)
+	kc := C.xkb_keycode_t(keyCode)
 	return C.xkb_keymap_key_repeats(x.keyMap, kc) == 1
 }
 
-func (x *Context) UpdateMask(depressed, latched, locked, group uint32) {
-	xkbGrp := C.xkb_layout_index_t(group)
-	C.xkb_state_update_mask(x.state, C.xkb_mod_mask_t(depressed), C.xkb_mod_mask_t(latched), C.xkb_mod_mask_t(locked), xkbGrp, xkbGrp, xkbGrp)
-}
-
-func mapXKBKeyCode(keyCode uint32) C.xkb_keycode_t {
-	// According to the xkb_v1 spec: "to determine the xkb keycode, clients must add 8 to the key event keycode."
-	return C.xkb_keycode_t(keyCode + 8)
+func (x *Context) UpdateMask(depressed, latched, locked, depressedGroup, latchedGroup, lockedGroup uint32) {
+	if x.state == nil {
+		return
+	}
+	C.xkb_state_update_mask(x.state, C.xkb_mod_mask_t(depressed), C.xkb_mod_mask_t(latched), C.xkb_mod_mask_t(locked),
+		C.xkb_layout_index_t(depressedGroup), C.xkb_layout_index_t(latchedGroup), C.xkb_layout_index_t(lockedGroup))
 }
 
 func convertKeysym(s C.xkb_keysym_t) (string, bool) {

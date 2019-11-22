@@ -628,18 +628,14 @@ func (w *window) resetFling() {
 func gio_onKeyboardKeymap(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, format C.uint32_t, fd C.int32_t, size C.uint32_t) {
 	defer syscall.Close(int(fd))
 	conn.repeat.Stop(0)
-	if conn.xkb != nil {
-		conn.xkb.Destroy()
-	}
+	conn.xkb.DestroyKeymapState()
 	if format != C.WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 {
 		return
 	}
-	xkb, err := xkb.New(int(format), int(fd), int(size))
-	if err != nil {
+	if err := conn.xkb.LoadKeymap(int(format), int(fd), int(size)); err != nil {
 		// TODO: Do better.
 		panic(err)
 	}
-	conn.xkb = xkb
 }
 
 //export gio_onKeyboardEnter
@@ -663,16 +659,21 @@ func gio_onKeyboardKey(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, seri
 	w := winMap[keyboard]
 	w.resetFling()
 	conn.repeat.Stop(t)
-	if state != C.WL_KEYBOARD_KEY_STATE_PRESSED || conn.xkb == nil {
+	if state != C.WL_KEYBOARD_KEY_STATE_PRESSED {
 		return
 	}
-	kc := uint32(keyCode)
+	kc := mapXKBKeycode(uint32(keyCode))
 	for _, e := range conn.xkb.DispatchKey(kc) {
 		w.w.Event(e)
 	}
 	if conn.xkb.IsRepeatKey(kc) {
 		conn.repeat.Start(w, kc, t)
 	}
+}
+
+func mapXKBKeycode(keyCode uint32) uint32 {
+	// According to the xkb_v1 spec: "to determine the xkb keycode, clients must add 8 to the key event keycode."
+	return keyCode + 8
 }
 
 func (r *repeatState) Start(w *window, keyCode uint32, t time.Duration) {
@@ -867,7 +868,7 @@ func gio_onKeyboardModifiers(data unsafe.Pointer, keyboard *C.struct_wl_keyboard
 	if conn.xkb == nil {
 		return
 	}
-	conn.xkb.UpdateMask(uint32(depressed), uint32(latched), uint32(locked), uint32(group))
+	conn.xkb.UpdateMask(uint32(depressed), uint32(latched), uint32(locked), uint32(group), uint32(group), uint32(group))
 }
 
 //export gio_onKeyboardRepeatInfo
@@ -1082,6 +1083,12 @@ func detectUIScale() float32 {
 func waylandConnect() error {
 	c := new(wlConn)
 	conn = c
+	xkb, err := xkb.New()
+	if err != nil {
+		c.destroy()
+		return fmt.Errorf("wayland: %v", err)
+	}
+	c.xkb = xkb
 	c.disp = C.wl_display_connect(nil)
 	if c.disp == nil {
 		c.destroy()

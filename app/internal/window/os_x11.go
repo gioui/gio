@@ -5,38 +5,17 @@
 package window
 
 /*
-#cgo LDFLAGS: -lX11
+#cgo LDFLAGS: -lX11 -lxkbcommon -lxkbcommon-x11 -lX11-xcb
 #include <stdlib.h>
 #include <locale.h>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
 #include <X11/Xresource.h>
+#include <X11/XKBlib.h>
+#include <X11/Xlib-xcb.h>
+#include <xkbcommon/xkbcommon-x11.h>
 
-void gio_x11_init_ime(Display *dpy, Window win, XIM *xim, XIC *xic) {
-	// adjust locale temporarily for XOpenIM
-	char *lc = setlocale(LC_CTYPE, NULL);
-	setlocale(LC_CTYPE, "");
-	XSetLocaleModifiers("");
-
-	*xim = XOpenIM(dpy, 0, 0, 0);
-	if (!*xim) {
-		// fallback to internal input method
-		XSetLocaleModifiers("@im=none");
-		*xim = XOpenIM(dpy, 0, 0, 0);
-	}
-
-	// revert locale to prevent any unexpected side effects
-	setlocale(LC_CTYPE, lc);
-
-	*xic = XCreateIC(*xim,
-		XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
-		XNClientWindow, win,
-		XNFocusWindow, win,
-		NULL);
-
-	XSetICFocus(*xic);
-}
 */
 import "C"
 import (
@@ -46,29 +25,29 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"unicode"
-	"unicode/utf8"
 	"unsafe"
 
 	"gioui.org/f32"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+
+	"gioui.org/app/internal/xkb"
 	syscall "golang.org/x/sys/unix"
 )
 
 type x11Window struct {
-	w  Callbacks
-	x  *C.Display
-	xw C.Window
+	w            Callbacks
+	x            *C.Display
+	xkb          *xkb.Context
+	xkbEventBase C.int
+	xw           C.Window
 
 	evDelWindow C.Atom
 	stage       system.Stage
 	cfg         config
 	width       int
 	height      int
-	xim         C.XIM
-	xic         C.XIC
 	notify      struct {
 		read, write int
 	}
@@ -192,8 +171,10 @@ func (w *x11Window) destroy() {
 		syscall.Close(w.notify.read)
 		w.notify.read = 0
 	}
-	C.XDestroyIC(w.xic)
-	C.XCloseIM(w.xim)
+	if w.xkb != nil {
+		w.xkb.Destroy()
+		w.xkb = nil
+	}
 	C.XDestroyWindow(w.x, w.xw)
 	C.XCloseDisplay(w.x)
 }
@@ -235,60 +216,22 @@ func (h *x11EventHandler) handleEvents() bool {
 			continue
 		}
 		switch _type := (*C.XAnyEvent)(unsafe.Pointer(xev))._type; _type {
+		case h.w.xkbEventBase:
+			xkbEvent := (*C.XkbAnyEvent)(unsafe.Pointer(xev))
+			switch xkbEvent.xkb_type {
+			case C.XkbNewKeyboardNotify, C.XkbMapNotify:
+				if err := h.w.updateXkbKeymap(); err != nil {
+					panic(err)
+				}
+			case C.XkbStateNotify:
+				state := (*C.XkbStateNotifyEvent)(unsafe.Pointer(xev))
+				h.w.xkb.UpdateMask(uint32(state.base_mods), uint32(state.latched_mods), uint32(state.locked_mods),
+					uint32(state.base_group), uint32(state.latched_group), uint32(state.locked_group))
+			}
 		case C.KeyPress:
 			kevt := (*C.XKeyPressedEvent)(unsafe.Pointer(xev))
-		lookup:
-			// Save state then clear CTRL & Shift bits in order to have
-			// Xutf8LookupString return the unmodified key name in text[:l].
-			// This addresses an issue on some non US keyboard layouts where
-			// CTRL-[0..9] do not behave consistently.
-			//
-			// Note that this enables sending a key.Event for key combinations
-			// like CTRL-SHIFT-/ on QWERTY layouts, but CTRL-? is completely
-			// masked. The same applies to AZERTY layouts where CTRL-SHIFT-É is
-			// available but not CTRL-2.
-			state := kevt.state
-			mods := x11KeyStateToModifiers(state)
-			if mods.Contain(key.ModCtrl) {
-				kevt.state &^= (C.uint(C.ControlMask) | C.uint(C.ShiftMask))
-			}
-			l := int(C.Xutf8LookupString(w.xic, kevt,
-				(*C.char)(unsafe.Pointer(&h.text[0])), C.int(len(h.text)),
-				&h.keysym, &h.status))
-			switch h.status {
-			case C.XBufferOverflow:
-				h.text = make([]byte, l)
-				goto lookup
-			case C.XLookupChars:
-				// Synthetic event from XIM.
-				w.w.Event(key.EditEvent{Text: string(h.text[:l])})
-			case C.XLookupKeySym:
-				// Special keys.
-				if n, m, ok := x11ConvertKeysym(h.keysym, mods); ok {
-					w.w.Event(key.Event{Name: n, Modifiers: m})
-				}
-			case C.XLookupBoth:
-				if n, m, ok := x11ConvertKeysym(h.keysym, mods); ok {
-					w.w.Event(key.Event{Name: n, Modifiers: m})
-				}
-				// Do not send EditEvent for CTRL key combinations.
-				if mods.Contain(key.ModCtrl) {
-					break
-				}
-				// Report only printable runes.
-				str := h.text[:l]
-				for n := 0; n < len(str); {
-					r, s := utf8.DecodeRune(str)
-					if unicode.IsPrint(r) {
-						n += s
-					} else {
-						copy(str[n:], str[n+s:])
-						str = str[:len(str)-s]
-					}
-				}
-				if len(str) > 0 {
-					w.w.Event(key.EditEvent{Text: string(str)})
-				}
+			for _, e := range h.w.xkb.DispatchKey(uint32(kevt.keycode)) {
+				w.w.Event(e)
 			}
 		case C.KeyRelease:
 		case C.ButtonPress, C.ButtonRelease:
@@ -369,98 +312,6 @@ func (h *x11EventHandler) handleEvents() bool {
 	return redraw
 }
 
-func x11KeyStateToModifiers(s C.uint) key.Modifiers {
-	var m key.Modifiers
-	if s&C.Mod1Mask != 0 {
-		m |= key.ModAlt
-	}
-	if s&C.Mod4Mask != 0 {
-		m |= key.ModSuper
-	}
-	if s&C.ControlMask != 0 {
-		m |= key.ModCtrl
-	}
-	if s&C.ShiftMask != 0 {
-		m |= key.ModShift
-	}
-	return m
-}
-
-// x11ConvertKeysym returns the Gio special key that matches keysym s. For
-// portability reasons, some keysyms might be translated and modifiers changed
-// (like BackTab -> ModShift+Tab)
-func x11ConvertKeysym(s C.KeySym, mods key.Modifiers) (string, key.Modifiers, bool) {
-	if '0' <= s && s <= '9' || 'A' <= s && s <= 'Z' {
-		return string(s), mods, true
-	}
-	if 'a' <= s && s <= 'z' {
-		return string(s - 0x20), mods, true
-	}
-	var n string
-	switch s {
-	case C.XK_Escape:
-		n = key.NameEscape
-	case C.XK_Left, C.XK_KP_Left:
-		n = key.NameLeftArrow
-	case C.XK_Right, C.XK_KP_Right:
-		n = key.NameRightArrow
-	case C.XK_Return:
-		n = key.NameReturn
-	case C.XK_KP_Enter:
-		n = key.NameEnter
-	case C.XK_Up, C.XK_KP_Up:
-		n = key.NameUpArrow
-	case C.XK_Down, C.XK_KP_Down:
-		n = key.NameDownArrow
-	case C.XK_Home, C.XK_KP_Home:
-		n = key.NameHome
-	case C.XK_End, C.XK_KP_End:
-		n = key.NameEnd
-	case C.XK_BackSpace:
-		n = key.NameDeleteBackward
-	case C.XK_Delete, C.XK_KP_Delete:
-		n = key.NameDeleteForward
-	case C.XK_Page_Up, C.XK_KP_Prior:
-		n = key.NamePageUp
-	case C.XK_Page_Down, C.XK_KP_Next:
-		n = key.NamePageDown
-	case C.XK_F1:
-		n = "F1"
-	case C.XK_F2:
-		n = "F2"
-	case C.XK_F3:
-		n = "F3"
-	case C.XK_F4:
-		n = "F4"
-	case C.XK_F5:
-		n = "F5"
-	case C.XK_F6:
-		n = "F6"
-	case C.XK_F7:
-		n = "F7"
-	case C.XK_F8:
-		n = "F8"
-	case C.XK_F9:
-		n = "F9"
-	case C.XK_F10:
-		n = "F10"
-	case C.XK_F11:
-		n = "F11"
-	case C.XK_F12:
-		n = "F12"
-	case C.XK_ISO_Left_Tab:
-		mods |= key.ModShift
-		fallthrough
-	case C.XK_Tab:
-		n = key.NameTab
-	case 0x20, C.XK_KP_Space:
-		n = "Space"
-	default:
-		return "", mods, false
-	}
-	return n, mods, true
-}
-
 var (
 	x11Threads sync.Once
 )
@@ -490,6 +341,22 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	if dpy == nil {
 		return errors.New("x11: cannot connect to the X server")
 	}
+	var major, minor C.int = C.XkbMajorVersion, C.XkbMinorVersion
+	var xkbEventBase C.int
+	if C.XkbQueryExtension(dpy, nil, &xkbEventBase, nil, &major, &minor) != C.True {
+		C.XCloseDisplay(dpy)
+		return errors.New("x11: XkbQueryExtension failed")
+	}
+	const bits = C.uint(C.XkbNewKeyboardNotifyMask | C.XkbMapNotifyMask | C.XkbStateNotifyMask)
+	if C.XkbSelectEvents(dpy, C.XkbUseCoreKbd, bits, bits) != C.True {
+		C.XCloseDisplay(dpy)
+		return errors.New("x11: XkbSelectEvents failed")
+	}
+	xkb, err := xkb.New()
+	if err != nil {
+		C.XCloseDisplay(dpy)
+		return fmt.Errorf("x11: %v", err)
+	}
 
 	ppsp := x11DetectUIScale(dpy)
 	cfg := config{pxPerDp: ppsp, pxPerSp: ppsp}
@@ -506,22 +373,22 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 		0, 0, C.uint(cfg.Px(opts.Width)), C.uint(cfg.Px(opts.Height)),
 		0, C.CopyFromParent, C.InputOutput, nil,
 		C.CWEventMask|C.CWBackPixmap|C.CWOverrideRedirect, &swa)
-	var (
-		xim C.XIM
-		xic C.XIC
-	)
-	C.gio_x11_init_ime(dpy, win, &xim, &xic)
 
 	w := &x11Window{
 		w: gioWin, x: dpy, xw: win,
-		width:  cfg.Px(opts.Width),
-		height: cfg.Px(opts.Height),
-		cfg:    cfg,
-		xim:    xim,
-		xic:    xic,
+		width:        cfg.Px(opts.Width),
+		height:       cfg.Px(opts.Height),
+		cfg:          cfg,
+		xkb:          xkb,
+		xkbEventBase: xkbEventBase,
 	}
 	w.notify.read = pipe[0]
 	w.notify.write = pipe[1]
+
+	if err := w.updateXkbKeymap(); err != nil {
+		w.destroy()
+		return err
+	}
 
 	var hints C.XWMHints
 	hints.input = C.True
@@ -590,4 +457,28 @@ func x11DetectUIScale(dpy *C.Display) float32 {
 	}
 
 	return scale
+}
+
+func (w *x11Window) updateXkbKeymap() error {
+	w.xkb.DestroyKeymapState()
+	ctx := (*C.struct_xkb_context)(unsafe.Pointer(w.xkb.Ctx))
+	xcb := C.XGetXCBConnection(w.x)
+	if xcb == nil {
+		return errors.New("x11: XGetXCBConnection failed")
+	}
+	xkbDevID := C.xkb_x11_get_core_keyboard_device_id(xcb)
+	if xkbDevID == -1 {
+		return errors.New("x11: xkb_x11_get_core_keyboard_device_id failed")
+	}
+	keymap := C.xkb_x11_keymap_new_from_device(ctx, xcb, xkbDevID, C.XKB_KEYMAP_COMPILE_NO_FLAGS)
+	if keymap == nil {
+		return errors.New("x11: xkb_x11_keymap_new_from_device failed")
+	}
+	state := C.xkb_x11_state_new_from_device(keymap, xcb, xkbDevID)
+	if state == nil {
+		C.xkb_keymap_unref(keymap)
+		return errors.New("x11: xkb_x11_keymap_new_from_device failed")
+	}
+	w.xkb.SetKeymap(unsafe.Pointer(keymap), unsafe.Pointer(state))
+	return nil
 }
