@@ -117,13 +117,13 @@ func New(format int, fd int, size int) (*Context, error) {
 }
 
 func (x *Context) DispatchKey(keyCode uint32) (events []event.Event) {
-	keyCode = mapXKBKeyCode(keyCode)
+	kc := mapXKBKeyCode(keyCode)
 	if len(x.utf8Buf) == 0 {
 		x.utf8Buf = make([]byte, 1)
 	}
-	sym := C.xkb_state_key_get_one_sym(x.state, C.xkb_keycode_t(keyCode))
-	if n, ok := convertKeysym(sym); ok {
-		cmd := key.Event{Name: n}
+	sym := C.xkb_state_key_get_one_sym(x.state, kc)
+	if name, ok := convertKeysym(sym); ok {
+		cmd := key.Event{Name: name}
 		// Ensure that a physical backtab key is translated to
 		// Shift-Tab.
 		if sym == C.XKB_KEY_ISO_Left_Tab {
@@ -144,26 +144,22 @@ func (x *Context) DispatchKey(keyCode uint32) (events []event.Event) {
 		events = append(events, cmd)
 	}
 	C.xkb_compose_state_feed(x.compState, sym)
-	var size C.int
+	var str []byte
 	switch C.xkb_compose_state_get_status(x.compState) {
 	case C.XKB_COMPOSE_CANCELLED, C.XKB_COMPOSE_COMPOSING:
 		return
 	case C.XKB_COMPOSE_COMPOSED:
-		size = C.xkb_compose_state_get_utf8(x.compState, (*C.char)(unsafe.Pointer(&x.utf8Buf[0])), C.size_t(len(x.utf8Buf)))
+		size := C.xkb_compose_state_get_utf8(x.compState, (*C.char)(unsafe.Pointer(&x.utf8Buf[0])), C.size_t(len(x.utf8Buf)))
 		if int(size) >= len(x.utf8Buf) {
 			x.utf8Buf = make([]byte, size+1)
 			size = C.xkb_compose_state_get_utf8(x.compState, (*C.char)(unsafe.Pointer(&x.utf8Buf[0])), C.size_t(len(x.utf8Buf)))
 		}
 		C.xkb_compose_state_reset(x.compState)
+		str = x.utf8Buf[:size]
 	case C.XKB_COMPOSE_NOTHING:
-		size = C.xkb_state_key_get_utf8(x.state, C.xkb_keycode_t(keyCode), (*C.char)(unsafe.Pointer(&x.utf8Buf[0])), C.size_t(len(x.utf8Buf)))
-		if int(size) >= len(x.utf8Buf) {
-			x.utf8Buf = make([]byte, size+1)
-			size = C.xkb_state_key_get_utf8(x.state, C.xkb_keycode_t(keyCode), (*C.char)(unsafe.Pointer(&x.utf8Buf[0])), C.size_t(len(x.utf8Buf)))
-		}
+		str = x.charsForKeycode(kc)
 	}
 	// Report only printable runes.
-	str := x.utf8Buf[:size]
 	var n int
 	for n < len(str) {
 		r, s := utf8.DecodeRune(str)
@@ -180,9 +176,18 @@ func (x *Context) DispatchKey(keyCode uint32) (events []event.Event) {
 	return
 }
 
+func (x *Context) charsForKeycode(keyCode C.xkb_keycode_t) []byte {
+	size := C.xkb_state_key_get_utf8(x.state, keyCode, (*C.char)(unsafe.Pointer(&x.utf8Buf[0])), C.size_t(len(x.utf8Buf)))
+	if int(size) >= len(x.utf8Buf) {
+		x.utf8Buf = make([]byte, size+1)
+		size = C.xkb_state_key_get_utf8(x.state, keyCode, (*C.char)(unsafe.Pointer(&x.utf8Buf[0])), C.size_t(len(x.utf8Buf)))
+	}
+	return x.utf8Buf[:size]
+}
+
 func (x *Context) IsRepeatKey(keyCode uint32) bool {
-	keyCode = mapXKBKeyCode(keyCode)
-	return C.xkb_keymap_key_repeats(x.keyMap, C.xkb_keycode_t(keyCode)) == 1
+	kc := mapXKBKeyCode(keyCode)
+	return C.xkb_keymap_key_repeats(x.keyMap, kc) == 1
 }
 
 func (x *Context) UpdateMask(depressed, latched, locked, group uint32) {
@@ -190,17 +195,17 @@ func (x *Context) UpdateMask(depressed, latched, locked, group uint32) {
 	C.xkb_state_update_mask(x.state, C.xkb_mod_mask_t(depressed), C.xkb_mod_mask_t(latched), C.xkb_mod_mask_t(locked), xkbGrp, xkbGrp, xkbGrp)
 }
 
-func mapXKBKeyCode(keyCode uint32) uint32 {
+func mapXKBKeyCode(keyCode uint32) C.xkb_keycode_t {
 	// According to the xkb_v1 spec: "to determine the xkb keycode, clients must add 8 to the key event keycode."
-	return keyCode + 8
+	return C.xkb_keycode_t(keyCode + 8)
 }
 
 func convertKeysym(s C.xkb_keysym_t) (string, bool) {
-	if '0' <= s && s <= '9' || 'A' <= s && s <= 'Z' {
-		return string(s), true
-	}
 	if 'a' <= s && s <= 'z' {
-		return string(s - 0x20), true
+		return string(s - 'a' + 'A'), true
+	}
+	if ' ' <= s && s <= '~' {
+		return string(s), true
 	}
 	var n string
 	switch s {
