@@ -46,6 +46,11 @@ func (f *Font) Shape(ppem fixed.Int26_6, str text.String) clip.Op {
 	return textPath(&f.buf, ppem, &opentype{Font: f.font, Hinting: font.HintingFull}, str)
 }
 
+func (f *Font) Metrics(ppem fixed.Int26_6) font.Metrics {
+	o := &opentype{Font: f.font, Hinting: font.HintingFull}
+	return o.Metrics(&f.buf, ppem)
+}
+
 func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOptions) *text.Layout {
 	m := f.Metrics(buf, ppem)
 	lineTmpl := text.Line{

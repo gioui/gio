@@ -5,6 +5,7 @@ package text
 import (
 	"gioui.org/op/clip"
 	"gioui.org/unit"
+	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -60,6 +61,7 @@ type Font struct {
 type Face interface {
 	Layout(ppem fixed.Int26_6, str string, opts LayoutOptions) *Layout
 	Shape(ppem fixed.Int26_6, str String) clip.Op
+	Metrics(ppem fixed.Int26_6) font.Metrics
 }
 
 // Typeface identifies a particular typeface design. The empty
