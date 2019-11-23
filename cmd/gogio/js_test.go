@@ -15,7 +15,6 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
@@ -26,11 +25,14 @@ import (
 type JSTestDriver struct {
 	t *testing.T
 
+	frameNotifs chan bool
+
 	// ctx is the chromedp context.
 	ctx context.Context
 }
 
 func (d *JSTestDriver) Start(t_ *testing.T, path string, width, height int) {
+	d.frameNotifs = make(chan bool, 1)
 	d.t = t_
 
 	if raceEnabled {
@@ -92,6 +94,14 @@ func (d *JSTestDriver) Start(t_ *testing.T, path string, width, height int) {
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		switch ev := ev.(type) {
 		case *runtime.EventConsoleAPICalled:
+			if ev.Type == "log" && len(ev.Args) == 1 &&
+				// Note that the argument values are JSON.
+				string(ev.Args[0].Value) == `"frame ready"` {
+
+				d.frameNotifs <- true
+				// These logs are expected. Don't show them.
+				break
+			}
 			switch ev.Type {
 			case "log", "info", "warning", "error":
 				var args strings.Builder
@@ -123,8 +133,9 @@ func (d *JSTestDriver) Start(t_ *testing.T, path string, width, height int) {
 	); err != nil {
 		d.t.Fatal(err)
 	}
-	// TODO(mvdan): synchronize with the app instead
-	time.Sleep(200 * time.Millisecond)
+
+	// Wait for the gio app to render.
+	<-d.frameNotifs
 }
 
 func (d *JSTestDriver) Screenshot() image.Image {
@@ -147,6 +158,7 @@ func (d *JSTestDriver) Click(x, y int) {
 	); err != nil {
 		d.t.Fatal(err)
 	}
-	// TODO(mvdan): synchronize with the app instead
-	time.Sleep(200 * time.Millisecond)
+
+	// Wait for the gio app to render after this click.
+	<-d.frameNotifs
 }

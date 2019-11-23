@@ -8,7 +8,6 @@ import (
 	"image"
 	"image/color"
 	"log"
-	"runtime"
 
 	"gioui.org/app"
 	"gioui.org/f32"
@@ -82,13 +81,6 @@ func loop(w *app.Window) error {
 
 			e.Frame(gtx.Ops)
 
-			if runtime.GOOS == "js" {
-				// TODO(mvdan): Unfortunately, printing to
-				// stdout crashes the js/wasm port. Use the
-				// prints once the issue is fixed:
-				// https://github.com/golang/go/issues/35256
-				break
-			}
 			switch notify {
 			case notifyInvalidate:
 				notify = notifyPrint
