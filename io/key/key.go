@@ -39,12 +39,12 @@ type FocusEvent struct {
 // An Event is generated when a key is pressed. For text input
 // use EditEvent.
 type Event struct {
-	// Name of the key. For letters, the upper case form is used.
-	// Use the Name* constants for special keys suchs as the arrow
-	// keys.
+	// Name of the key. For letters, the upper case form is used, via
+	// unicode.ToUpper. The shift modifier is taken into account, all other
+	// modifiers are ignored. For example, the "shift-1" and "ctrl-shift-1"
+	// combinations both give the Name "!" with the US keyboard layout.
 	Name string
-	// Modifiers is the set of active modifiers when
-	// the key was pressed.
+	// Modifiers is the set of active modifiers when the key was pressed.
 	Modifiers Modifiers
 }
 

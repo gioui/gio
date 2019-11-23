@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	"unicode"
 	"unsafe"
 
 	"gioui.org/f32"
@@ -118,13 +119,14 @@ func gio_onFrameCallback(view C.CFTypeRef) {
 //export gio_onKeys
 func gio_onKeys(view C.CFTypeRef, cstr *C.char, ti C.double, mods C.NSUInteger) {
 	str := C.GoString(cstr)
+	kmods := convertMods(mods)
 	viewDo(view, func(views viewMap, view C.CFTypeRef) {
 		w := views[view]
 		for _, k := range str {
 			if n, ok := convertKey(k); ok {
 				w.w.Event(key.Event{
 					Name:      n,
-					Modifiers: convertMods(mods),
+					Modifiers: kmods,
 				})
 			}
 		}
@@ -292,12 +294,6 @@ func Main() {
 }
 
 func convertKey(k rune) (string, bool) {
-	if '0' <= k && k <= '9' || 'A' <= k && k <= 'Z' {
-		return string(k), true
-	}
-	if 'a' <= k && k <= 'z' {
-		return string(k - 0x20), true
-	}
 	var n string
 	switch k {
 	case 0x1b:
@@ -312,6 +308,8 @@ func convertKey(k rune) (string, bool) {
 		n = key.NameDownArrow
 	case 0xd:
 		n = key.NameReturn
+	case 0x3:
+		n = key.NameEnter
 	case C.NSHomeFunctionKey:
 		n = key.NameHome
 	case C.NSEndFunctionKey:
@@ -353,7 +351,11 @@ func convertKey(k rune) (string, bool) {
 	case 0x20:
 		n = "Space"
 	default:
-		return "", false
+		k = unicode.ToUpper(k)
+		if !unicode.IsPrint(k) {
+			return "", false
+		}
+		n = string(k)
 	}
 	return n, true
 }
