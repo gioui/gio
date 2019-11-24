@@ -4,9 +4,12 @@ package window
 
 import (
 	"image"
+	"strings"
 	"sync"
 	"syscall/js"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"gioui.org/f32"
 	"gioui.org/io/key"
@@ -396,15 +399,6 @@ func Main() {
 }
 
 func translateKey(k string) (string, bool) {
-	if len(k) == 1 {
-		c := k[0]
-		if '0' <= c && c <= '9' || 'A' <= c && c <= 'Z' {
-			return string(c), true
-		}
-		if 'a' <= c && c <= 'z' {
-			return string(c - 0x20), true
-		}
-	}
 	var n string
 	switch k {
 	case "ArrowUp":
@@ -438,6 +432,11 @@ func translateKey(k string) (string, bool) {
 	case "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12":
 		n = k
 	default:
+		r, s := utf8.DecodeRuneInString(k)
+		// If there is exactly one printable character, return that.
+		if s == len(k) && unicode.IsPrint(r) {
+			return strings.ToUpper(k), true
+		}
 		return "", false
 	}
 	return n, true
