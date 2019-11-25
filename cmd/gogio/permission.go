@@ -9,15 +9,16 @@ var AndroidPermissions = map[string][]string{
 		"android.permission.BLUETOOTH_ADMIN",
 		"android.permission.ACCESS_FINE_LOCATION",
 	},
-	"bluetooth_le": {
-		"android.permission.BLUETOOTH",
-		"android.permission.BLUETOOTH_ADMIN",
-		"android.permission.ACCESS_FINE_LOCATION",
+	"storage": {
+		"android.permission.READ_EXTERNAL_STORAGE",
+		"android.permission.WRITE_EXTERNAL_STORAGE",
 	},
 }
 
 var AndroidFeatures = map[string][]string{
-	"default":      {`glEsVersion="0x00030000"`},
-	"bluetooth":    {`name="android.hardware.bluetooth"`},
-	"bluetooth_le": {`name="android.hardware.bluetooth_le"`},
+	"default": {`glEsVersion="0x00030000"`},
+	"bluetooth": {
+		`name="android.hardware.bluetooth"`,
+		`name="android.hardware.bluetooth_le"`,
+	},
 }
