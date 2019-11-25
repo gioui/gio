@@ -128,12 +128,6 @@ func (d *JSTestDriver) Start(t_ *testing.T, path string, width, height int) {
 		d.t.Fatal(err)
 	}
 
-	if err := chromedp.Run(ctx,
-		chromedp.WaitReady("canvas", chromedp.ByQuery),
-	); err != nil {
-		d.t.Fatal(err)
-	}
-
 	// Wait for the gio app to render.
 	<-d.frameNotifs
 }
