@@ -23,15 +23,12 @@ type scrollChild struct {
 type List struct {
 	Axis Axis
 	// ScrollToEnd instructs the list to stay scrolled to the far end position
-	// once reahed. A List with ScrollToEnd enabled also align its content to
-	// the end.
+	// once reached. A List with ScrollToEnd == true and Position.BeforeEnd ==
+	// false draws its content with the last item at the bottom of the list
+	// area.
 	ScrollToEnd bool
 	// Alignment is the cross axis alignment of list elements.
 	Alignment Alignment
-
-	// beforeEnd tracks whether the List position is before
-	// the very end.
-	beforeEnd bool
 
 	ctx         *Context
 	macro       op.MacroOp
@@ -39,11 +36,11 @@ type List struct {
 	scroll      gesture.Scroll
 	scrollDelta int
 
-	// first is the index of the first visible child.
-	first int
-	// offset is the signed distance from the top edge
-	// to the child with index first.
-	offset int
+	// Position is updated during Layout. To save the list scroll position,
+	// just save Position after Layout finishes. To scroll the list
+	// programatically, update Position (e.g. restore it from a saved value)
+	// before calling Layout.
+	Position Position
 
 	len int
 
@@ -58,6 +55,24 @@ type List struct {
 type ListElement func(index int)
 
 type iterationDir uint8
+
+// Position is a List scroll offset represented as an offset from the top edge
+// of a child element.
+type Position struct {
+	// BeforeEnd tracks whether the List position is before the very end. We
+	// use "before end" instead of "at end" so that the zero value of a
+	// Position struct is useful.
+	//
+	// When laying out a list, if ScrollToEnd is true and BeforeEnd is false,
+	// then First and Offset are ignored, and the list is drawn with the last
+	// item at the bottom. If ScrollToEnd is false then BeforeEnd is ignored.
+	BeforeEnd bool
+	// First is the index of the first visible child.
+	First int
+	// Offset is the distance in pixels from the top edge to the child at index
+	// First.
+	Offset int
+}
 
 const (
 	iterateNone iterationDir = iota
@@ -77,13 +92,9 @@ func (l *List) init(gtx *Context, len int) {
 	l.children = l.children[:0]
 	l.len = len
 	l.update()
-	if l.scrollToEnd() {
-		l.offset = 0
-		l.first = len
-	}
-	if l.first > len {
-		l.offset = 0
-		l.first = len
+	if l.scrollToEnd() || l.Position.First > len {
+		l.Position.Offset = 0
+		l.Position.First = len
 	}
 	l.macro.Record(gtx.Ops)
 	l.next()
@@ -102,7 +113,7 @@ func (l *List) Layout(gtx *Context, len int, w ListElement) {
 }
 
 func (l *List) scrollToEnd() bool {
-	return l.ScrollToEnd && !l.beforeEnd
+	return l.ScrollToEnd && !l.Position.BeforeEnd
 }
 
 // Dragging reports whether the List is being dragged.
@@ -113,7 +124,7 @@ func (l *List) Dragging() bool {
 func (l *List) update() {
 	d := l.scroll.Scroll(l.ctx.Config, l.ctx.Queue, l.ctx.Now(), gesture.Axis(l.Axis))
 	l.scrollDelta = d
-	l.offset += d
+	l.Position.Offset += d
 }
 
 // next advances to the next child.
@@ -122,8 +133,8 @@ func (l *List) next() {
 	// The user scroll offset is applied after scrolling to
 	// list end.
 	if l.scrollToEnd() && !l.more() && l.scrollDelta < 0 {
-		l.beforeEnd = true
-		l.offset += l.scrollDelta
+		l.Position.BeforeEnd = true
+		l.Position.Offset += l.scrollDelta
 		l.dir = l.nextDir()
 	}
 	if l.more() {
@@ -135,9 +146,9 @@ func (l *List) next() {
 func (l *List) index() int {
 	switch l.dir {
 	case iterateBackward:
-		return l.first - 1
+		return l.Position.First - 1
 	case iterateForward:
-		return l.first + len(l.children)
+		return l.Position.First + len(l.children)
 	default:
 		panic("Index called before Next")
 	}
@@ -150,20 +161,20 @@ func (l *List) more() bool {
 
 func (l *List) nextDir() iterationDir {
 	vsize := axisMainConstraint(l.Axis, l.ctx.Constraints).Max
-	last := l.first + len(l.children)
+	last := l.Position.First + len(l.children)
 	// Clamp offset.
-	if l.maxSize-l.offset < vsize && last == l.len {
-		l.offset = l.maxSize - vsize
+	if l.maxSize-l.Position.Offset < vsize && last == l.len {
+		l.Position.Offset = l.maxSize - vsize
 	}
-	if l.offset < 0 && l.first == 0 {
-		l.offset = 0
+	if l.Position.Offset < 0 && l.Position.First == 0 {
+		l.Position.Offset = 0
 	}
 	switch {
 	case len(l.children) == l.len:
 		return iterateNone
-	case l.maxSize-l.offset < vsize:
+	case l.maxSize-l.Position.Offset < vsize:
 		return iterateForward
-	case l.offset < 0:
+	case l.Position.Offset < 0:
 		return iterateBackward
 	}
 	return iterateNone
@@ -180,8 +191,8 @@ func (l *List) end(dims Dimensions) {
 		l.children = append(l.children, child)
 	case iterateBackward:
 		l.children = append([]scrollChild{child}, l.children...)
-		l.first--
-		l.offset += mainSize
+		l.Position.First--
+		l.Position.Offset += mainSize
 	default:
 		panic("call Next before End")
 	}
@@ -199,14 +210,14 @@ func (l *List) layout() Dimensions {
 	for len(children) > 0 {
 		sz := children[0].size
 		mainSize := axisMain(l.Axis, sz)
-		if l.offset <= mainSize {
+		if l.Position.Offset <= mainSize {
 			break
 		}
-		l.first++
-		l.offset -= mainSize
+		l.Position.First++
+		l.Position.Offset -= mainSize
 		children = children[1:]
 	}
-	size := -l.offset
+	size := -l.Position.Offset
 	var maxCross int
 	for i, child := range children {
 		sz := child.size
@@ -220,8 +231,8 @@ func (l *List) layout() Dimensions {
 		}
 	}
 	ops := l.ctx.Ops
-	pos := -l.offset
-	// ScrollToEnd lists lists are end aligned.
+	pos := -l.Position.Offset
+	// ScrollToEnd lists are end aligned.
 	if space := mainc.Max - size; l.ScrollToEnd && space > 0 {
 		pos += space
 	}
@@ -255,12 +266,12 @@ func (l *List) layout() Dimensions {
 		stack.Pop()
 		pos += childSize
 	}
-	atStart := l.first == 0 && l.offset <= 0
-	atEnd := l.first+len(children) == l.len && mainc.Max >= pos
+	atStart := l.Position.First == 0 && l.Position.Offset <= 0
+	atEnd := l.Position.First+len(children) == l.len && mainc.Max >= pos
 	if atStart && l.scrollDelta < 0 || atEnd && l.scrollDelta > 0 {
 		l.scroll.Stop()
 	}
-	l.beforeEnd = !atEnd
+	l.Position.BeforeEnd = !atEnd
 	dims := axisPoint(l.Axis, mainc.Constrain(pos), maxCross)
 	l.macro.Stop()
 	pointer.Rect(image.Rectangle{Max: dims}).Add(ops)
