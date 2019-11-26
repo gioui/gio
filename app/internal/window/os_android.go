@@ -54,6 +54,7 @@ type window struct {
 	mhideTextInput                 C.jmethodID
 	mpostFrameCallback             C.jmethodID
 	mpostFrameCallbackOnMainThread C.jmethodID
+	mRegisterFragment              C.jmethodID
 }
 
 var dataDirChan = make(chan string, 1)
@@ -119,6 +120,7 @@ func onCreateView(env *C.JNIEnv, class C.jclass, view C.jobject) C.jlong {
 		mhideTextInput:                 jniGetMethodID(env, class, "hideTextInput", "()V"),
 		mpostFrameCallback:             jniGetMethodID(env, class, "postFrameCallback", "()V"),
 		mpostFrameCallbackOnMainThread: jniGetMethodID(env, class, "postFrameCallbackOnMainThread", "()V"),
+		mRegisterFragment:              jniGetMethodID(env, class, "registerFragment", "(Ljava/lang/String;)V"),
 	}
 	wopts := <-mainWindow.out
 	w.callbacks = wopts.window
@@ -440,6 +442,14 @@ func (w *window) ShowTextInput(show bool) {
 		} else {
 			C.gio_jni_CallVoidMethod(env, w.view, w.mhideTextInput)
 		}
+	})
+}
+
+func (w *window) RegisterFragment(del string) {
+	runInJVM(func(env *C.JNIEnv) {
+		cdel := C.CString(del)
+		defer C.free(unsafe.Pointer(cdel))
+		C.gio_jni_RegisterFragment(env, w.view, w.mRegisterFragment, cdel)
 	})
 }
 

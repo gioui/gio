@@ -29,6 +29,10 @@ type Window struct {
 	driver window.Driver
 	gpu    *gpu.GPU
 
+	// driverFuncs is a channel of functions to run when
+	// the Window has a valid driver.
+	driverFuncs chan func()
+
 	out         chan event.Event
 	in          chan event.Event
 	ack         chan struct{}
@@ -95,6 +99,7 @@ func NewWindow(options ...Option) *Window {
 		invalidates: make(chan struct{}, 1),
 		frames:      make(chan *op.Ops),
 		frameAck:    make(chan struct{}),
+		driverFuncs: make(chan func()),
 	}
 	w.callbacks.w = w
 	go w.run(opts)
@@ -227,6 +232,10 @@ func (w *Window) run(opts *window.Options) {
 		return
 	}
 	for {
+		var driverFuncs chan func() = nil
+		if w.driver != nil {
+			driverFuncs = w.driverFuncs
+		}
 		var timer <-chan time.Time
 		if w.delayedDraw != nil {
 			timer = w.delayedDraw.C
@@ -238,6 +247,8 @@ func (w *Window) run(opts *window.Options) {
 		case <-w.invalidates:
 			w.setNextFrame(time.Time{})
 			w.updateAnimation()
+		case f := <-driverFuncs:
+			f()
 		case e := <-w.in:
 			switch e2 := e.(type) {
 			case system.StageEvent:

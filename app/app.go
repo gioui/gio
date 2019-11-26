@@ -9,13 +9,6 @@ import (
 	"gioui.org/app/internal/window"
 )
 
-type Handle window.Handle
-
-// PlatformHandle returns the platform specific Handle.
-func PlatformHandle() *Handle {
-	return (*Handle)(window.PlatformHandle)
-}
-
 // extraArgs contains extra arguments to append to
 // os.Args. The arguments are separated with |.
 // Useful for running programs on mobiles where the

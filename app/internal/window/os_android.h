@@ -17,3 +17,4 @@ __attribute__ ((visibility ("hidden"))) void gio_jni_CallVoidMethod_J(JNIEnv *en
 __attribute__ ((visibility ("hidden"))) jbyte *gio_jni_GetByteArrayElements(JNIEnv *env, jbyteArray arr);
 __attribute__ ((visibility ("hidden"))) void gio_jni_ReleaseByteArrayElements(JNIEnv *env, jbyteArray arr, jbyte *bytes);
 __attribute__ ((visibility ("hidden"))) jsize gio_jni_GetArrayLength(JNIEnv *env, jbyteArray arr);
+__attribute__ ((visibility ("hidden"))) void gio_jni_RegisterFragment(JNIEnv *env, jobject view, jmethodID mid, char* del);

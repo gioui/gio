@@ -2,12 +2,21 @@
 
 package org.gioui;
 
+import java.lang.Class;
+import java.lang.IllegalAccessException;
+import java.lang.InstantiationException;
+import java.lang.ExceptionInInitializerError;
+import java.lang.SecurityException;
+import android.app.Activity;
+import android.app.Fragment;
+import android.app.FragmentManager;
+import android.app.FragmentTransaction;
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Handler;
-import android.util.AttributeSet;
 import android.text.Editable;
+import android.util.AttributeSet;
 import android.view.Choreographer;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
@@ -57,11 +66,12 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 
 	public GioView(Context context, AttributeSet attrs) {
 		super(context, attrs);
+
+		handler = new Handler();
 		// Late initialization of the Go runtime to wait for a valid context.
 		initialize(context.getApplicationContext());
 
 		nhandle = onCreateView(this);
-		handler = new Handler();
 		imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
 		setFocusable(true);
 		setFocusableInTouchMode(true);
@@ -205,6 +215,35 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 
 	boolean backPressed() {
 		return onBack(nhandle);
+	}
+
+	public void registerFragment(String del) {
+		final Class cls;
+		try {
+			cls = getContext().getClassLoader().loadClass(del);
+		} catch (ClassNotFoundException e) {
+			throw new RuntimeException("RegisterFragment: fragment class not found: " + e.getMessage());
+		}
+
+		handler.post(new Runnable() {
+			public void run() {
+				final Fragment frag;
+				try {
+					frag = (Fragment)cls.newInstance();
+				} catch (IllegalAccessException | InstantiationException | ExceptionInInitializerError | SecurityException | ClassCastException e) {
+					throw new RuntimeException("RegisterFragment: error instantiating fragment: " + e.getMessage());
+				}
+				final FragmentManager fm;
+				try {
+					fm = ((Activity)getContext()).getFragmentManager();
+				} catch (ClassCastException e) {
+					throw new RuntimeException("RegisterFragment: cannot get fragment manager from View Context: " + e.getMessage());
+				}
+				FragmentTransaction ft = fm.beginTransaction();
+				ft.add(frag, del);
+				ft.commitNow();
+			}
+		});
 	}
 
 	static private native long onCreateView(GioView view);

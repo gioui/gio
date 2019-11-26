@@ -166,3 +166,8 @@ void gio_jni_ReleaseByteArrayElements(JNIEnv *env, jbyteArray arr, jbyte *bytes)
 jsize gio_jni_GetArrayLength(JNIEnv *env, jbyteArray arr) {
 	return (*env)->GetArrayLength(env, arr);
 }
+
+void gio_jni_RegisterFragment(JNIEnv *env, jobject view, jmethodID mid, char* del) {
+	jstring jdel = (*env)->NewStringUTF(env, del);
+	(*env)->CallObjectMethod(env, view, mid, jdel);
+}
