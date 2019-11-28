@@ -17,6 +17,7 @@ type SRGBFBO struct {
 	frameBuffer   Framebuffer
 	depthBuffer   Renderbuffer
 	colorTex      Texture
+	blitted       bool
 	quad          Buffer
 	prog          Program
 	es3           bool
@@ -37,30 +38,13 @@ func NewSRGBFBO(f *Functions) (*SRGBFBO, error) {
 			return nil, fmt.Errorf("no support for OpenGL ES 3 nor EXT_sRGB")
 		}
 	}
-	prog, err := CreateProgram(f, blitVSrc, blitFSrc, []string{"pos", "uv"})
-	if err != nil {
-		return nil, err
-	}
-	f.UseProgram(prog)
-	f.Uniform1i(GetUniformLocation(f, prog, "tex"), 0)
 	s := &SRGBFBO{
 		c:           f,
 		es3:         es3,
-		prog:        prog,
 		frameBuffer: f.CreateFramebuffer(),
 		colorTex:    f.CreateTexture(),
 		depthBuffer: f.CreateRenderbuffer(),
 	}
-	s.quad = f.CreateBuffer()
-	f.BindBuffer(ARRAY_BUFFER, s.quad)
-	f.BufferData(ARRAY_BUFFER,
-		BytesView([]float32{
-			-1, +1, 0, 1,
-			+1, +1, 1, 1,
-			-1, -1, 0, 0,
-			+1, -1, 1, 0,
-		}),
-		STATIC_DRAW)
 	f.BindTexture(TEXTURE_2D, s.colorTex)
 	f.TexParameteri(TEXTURE_2D, TEXTURE_WRAP_S, CLAMP_TO_EDGE)
 	f.TexParameteri(TEXTURE_2D, TEXTURE_WRAP_T, CLAMP_TO_EDGE)
@@ -70,6 +54,26 @@ func NewSRGBFBO(f *Functions) (*SRGBFBO, error) {
 }
 
 func (s *SRGBFBO) Blit() {
+	if !s.blitted {
+		prog, err := CreateProgram(s.c, blitVSrc, blitFSrc, []string{"pos", "uv"})
+		if err != nil {
+			panic(err)
+		}
+		s.prog = prog
+		s.c.UseProgram(prog)
+		s.c.Uniform1i(GetUniformLocation(s.c, prog, "tex"), 0)
+		s.quad = s.c.CreateBuffer()
+		s.c.BindBuffer(ARRAY_BUFFER, s.quad)
+		s.c.BufferData(ARRAY_BUFFER,
+			BytesView([]float32{
+				-1, +1, 0, 1,
+				+1, +1, 1, 1,
+				-1, -1, 0, 0,
+				+1, -1, 1, 0,
+			}),
+			STATIC_DRAW)
+		s.blitted = true
+	}
 	s.c.BindFramebuffer(FRAMEBUFFER, Framebuffer{})
 	s.c.ClearColor(1, 0, 1, 1)
 	s.c.Clear(COLOR_BUFFER_BIT)
@@ -141,8 +145,10 @@ func (s *SRGBFBO) Release() {
 	s.c.DeleteFramebuffer(s.frameBuffer)
 	s.c.DeleteTexture(s.colorTex)
 	s.c.DeleteRenderbuffer(s.depthBuffer)
-	s.c.DeleteBuffer(s.quad)
-	s.c.DeleteProgram(s.prog)
+	if s.blitted {
+		s.c.DeleteBuffer(s.quad)
+		s.c.DeleteProgram(s.prog)
+	}
 	s.c = nil
 }
 
