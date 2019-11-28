@@ -38,6 +38,7 @@ var (
 	nilEGLContext          _EGLContext
 	nilEGLConfig           _EGLConfig
 	nilEGLNativeWindowType NativeWindowType
+	EGL_DEFAULT_DISPLAY    NativeDisplayType
 )
 
 const (
@@ -71,6 +72,7 @@ func (c *Context) Release() {
 		eglReleaseThread()
 		c.eglCtx = nil
 	}
+	c.disp = nilEGLDisplay
 }
 
 func (c *Context) Present() error {
@@ -116,7 +118,7 @@ func (c *Context) ReleaseSurface() {
 	}
 	// Make sure any in-flight GL commands are complete.
 	c.c.Finish()
-	eglMakeCurrent(c.disp, nilEGLSurface, nilEGLSurface, nilEGLContext)
+	c.ReleaseCurrent()
 	eglDestroySurface(c.disp, c.eglSurf)
 	c.eglSurf = nilEGLSurface
 }
@@ -132,6 +134,12 @@ func (c *Context) CreateSurface(win NativeWindowType, width, height int) error {
 	c.height = height
 	c.refreshFBO = true
 	return err
+}
+
+func (c *Context) ReleaseCurrent() {
+	if c.disp != nilEGLDisplay {
+		eglMakeCurrent(c.disp, nilEGLSurface, nilEGLSurface, nilEGLContext)
+	}
 }
 
 func (c *Context) MakeCurrent() error {
