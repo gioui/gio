@@ -290,6 +290,9 @@ func (w *Window) run(opts *window.Options) {
 					ctx, err = w.driver.NewContext()
 					if err == nil {
 						w.gpu, err = gpu.New(ctx)
+						if err != nil {
+							ctx.Release()
+						}
 					}
 				}
 				var frame *op.Ops

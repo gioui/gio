@@ -267,7 +267,6 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 		runtime.LockOSThread()
 		// Don't UnlockOSThread to avoid reuse by the Go runtime.
 		defer close(g.stopped)
-		defer glctx.Release()
 
 		if err := glctx.MakeCurrent(); err != nil {
 			initErr <- err
@@ -278,13 +277,14 @@ func (g *GPU) renderLoop(glctx gl.Context) error {
 			initErr <- err
 			return
 		}
+		initErr <- nil
+		defer glctx.Release()
 		defer g.cache.release(ctx)
 		defer g.pathCache.release(ctx)
 		r := newRenderer(ctx)
 		defer r.release()
 		var timers *timers
 		var zopsTimer, stencilTimer, coverTimer, cleanupTimer *timer
-		initErr <- nil
 		var drawOps drawOps
 	loop:
 		for {
