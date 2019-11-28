@@ -151,11 +151,14 @@ func (c *Context) MakeCurrent() error {
 	if c.eglWin == nilEGLNativeWindowType {
 		return nil
 	}
-	eglSurf, err := createSurfaceAndMakeCurrent(c.eglCtx, win)
+	eglSurf, err := createSurface(c.eglCtx, win)
 	c.eglSurf = eglSurf
 	if err != nil {
 		c.eglWin = nilEGLNativeWindowType
 		return err
+	}
+	if !eglMakeCurrent(c.eglCtx.disp, eglSurf, eglSurf, c.eglCtx.ctx) {
+		return fmt.Errorf("eglMakeCurrent error 0x%x", eglGetError())
 	}
 	// eglSwapInterval 1 leads to erratic frame rates and unnecessary blocking.
 	// We rely on platform specific frame rate limiting instead, except on Windows
@@ -258,7 +261,7 @@ func createContext(disp NativeDisplayType) (*eglContext, error) {
 	}, nil
 }
 
-func createSurfaceAndMakeCurrent(eglCtx *eglContext, win NativeWindowType) (_EGLSurface, error) {
+func createSurface(eglCtx *eglContext, win NativeWindowType) (_EGLSurface, error) {
 	var surfAttribs []_EGLint
 	if eglCtx.srgb {
 		surfAttribs = append(surfAttribs, _EGL_GL_COLORSPACE_KHR, _EGL_GL_COLORSPACE_SRGB_KHR)
@@ -273,10 +276,6 @@ func createSurfaceAndMakeCurrent(eglCtx *eglContext, win NativeWindowType) (_EGL
 	}
 	if eglSurf == nilEGLSurface {
 		return nilEGLSurface, fmt.Errorf("newContext: eglCreateWindowSurface failed 0x%x (sRGB=%v)", eglGetError(), eglCtx.srgb)
-	}
-	if !eglMakeCurrent(eglCtx.disp, eglSurf, eglSurf, eglCtx.ctx) {
-		eglDestroySurface(eglCtx.disp, eglSurf)
-		return nilEGLSurface, fmt.Errorf("eglMakeCurrent error 0x%x", eglGetError())
 	}
 	return eglSurf, nil
 }
