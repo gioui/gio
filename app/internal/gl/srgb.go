@@ -141,6 +141,9 @@ func (s *SRGBFBO) Release() {
 	s.c.DeleteFramebuffer(s.frameBuffer)
 	s.c.DeleteTexture(s.colorTex)
 	s.c.DeleteRenderbuffer(s.depthBuffer)
+	s.c.DeleteBuffer(s.quad)
+	s.c.DeleteProgram(s.prog)
+	s.c = nil
 }
 
 const (
