@@ -4,21 +4,24 @@
 
 package window
 
-import "gioui.org/app/internal/gl"
+import (
+	"gioui.org/app/internal/egl"
+	"gioui.org/app/internal/gl"
+)
 
 func (w *x11Window) NewContext() (gl.Context, error) {
-	return newContext(w)
+	return egl.NewContext(w)
 }
 
-func (w *x11Window) eglDestroy() {
+func (w *x11Window) EGLDestroy() {
 }
 
-func (w *x11Window) eglDisplay() _EGLNativeDisplayType {
-	return _EGLNativeDisplayType(w.display())
+func (w *x11Window) EGLDisplay() egl.NativeDisplayType {
+	return egl.NativeDisplayType(w.display())
 }
 
-func (w *x11Window) eglWindow(visID int) (_EGLNativeWindowType, int, int, error) {
-	return _EGLNativeWindowType(uintptr(w.xw)), w.width, w.height, nil
+func (w *x11Window) EGLWindow(visID int) (egl.NativeWindowType, int, int, error) {
+	return egl.NativeWindowType(uintptr(w.xw)), w.width, w.height, nil
 }
 
-func (w *x11Window) needVSync() bool { return true }
+func (w *x11Window) NeedVSync() bool { return true }

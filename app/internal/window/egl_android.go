@@ -6,22 +6,28 @@ package window
 #include <EGL/egl.h>
 */
 import "C"
-import "gioui.org/app/internal/gl"
 
-func (w *window) eglDestroy() {
+import (
+	"unsafe"
+
+	"gioui.org/app/internal/egl"
+	"gioui.org/app/internal/gl"
+)
+
+func (w *window) EGLDestroy() {
 }
 
-func (w *window) eglDisplay() _EGLNativeDisplayType {
+func (w *window) EGLDisplay() egl.NativeDisplayType {
 	return nil
 }
 
-func (w *window) eglWindow(visID int) (_EGLNativeWindowType, int, int, error) {
+func (w *window) EGLWindow(visID int) (egl.NativeWindowType, int, int, error) {
 	win, width, height := w.nativeWindow(visID)
-	return _EGLNativeWindowType(win), width, height, nil
+	return egl.NativeWindowType(unsafe.Pointer(win)), width, height, nil
 }
 
 func (w *window) NewContext() (gl.Context, error) {
-	return newContext(w)
+	return egl.NewContext(w)
 }
 
-func (w *window) needVSync() bool { return false }
+func (w *window) NeedVSync() bool { return false }

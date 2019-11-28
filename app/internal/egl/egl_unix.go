@@ -2,7 +2,7 @@
 
 // +build linux freebsd
 
-package window
+package egl
 
 /*
 #cgo LDFLAGS: -lEGL
@@ -17,13 +17,13 @@ package window
 import "C"
 
 type (
-	_EGLint               = C.EGLint
-	_EGLDisplay           = C.EGLDisplay
-	_EGLConfig            = C.EGLConfig
-	_EGLContext           = C.EGLContext
-	_EGLSurface           = C.EGLSurface
-	_EGLNativeDisplayType = C.EGLNativeDisplayType
-	_EGLNativeWindowType  = C.EGLNativeWindowType
+	_EGLint           = C.EGLint
+	_EGLDisplay       = C.EGLDisplay
+	_EGLConfig        = C.EGLConfig
+	_EGLContext       = C.EGLContext
+	_EGLSurface       = C.EGLSurface
+	NativeDisplayType = C.EGLNativeDisplayType
+	NativeWindowType  = C.EGLNativeWindowType
 )
 
 func eglChooseConfig(disp _EGLDisplay, attribs []_EGLint) (_EGLConfig, bool) {
@@ -88,11 +88,11 @@ func eglQueryString(disp _EGLDisplay, name _EGLint) string {
 	return C.GoString(C.eglQueryString(disp, name))
 }
 
-func eglGetDisplay(disp _EGLNativeDisplayType) _EGLDisplay {
+func eglGetDisplay(disp NativeDisplayType) _EGLDisplay {
 	return C.eglGetDisplay(disp)
 }
 
-func eglCreateWindowSurface(disp _EGLDisplay, conf _EGLConfig, win _EGLNativeWindowType, attribs []_EGLint) _EGLSurface {
+func eglCreateWindowSurface(disp _EGLDisplay, conf _EGLConfig, win NativeWindowType, attribs []_EGLint) _EGLSurface {
 	eglSurf := C.eglCreateWindowSurface(disp, conf, win, &attribs[0])
 	return eglSurf
 }

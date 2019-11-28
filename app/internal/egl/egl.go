@@ -2,7 +2,7 @@
 
 // +build linux windows freebsd
 
-package window
+package egl
 
 import (
 	"errors"
@@ -13,22 +13,22 @@ import (
 	"gioui.org/app/internal/gl"
 )
 
-type context struct {
+type Context struct {
 	c             *gl.Functions
-	driver        eglDriver
+	driver        Driver
 	eglCtx        *eglContext
-	eglWin        _EGLNativeWindowType
+	eglWin        NativeWindowType
 	eglSurf       _EGLSurface
 	width, height int
 	// For sRGB emulation.
 	srgbFBO *gl.SRGBFBO
 }
 
-type eglDriver interface {
-	eglDisplay() _EGLNativeDisplayType
-	eglWindow(visID int) (_EGLNativeWindowType, int, int, error)
-	eglDestroy()
-	needVSync() bool
+type Driver interface {
+	EGLDisplay() NativeDisplayType
+	EGLWindow(visID int) (NativeWindowType, int, int, error)
+	EGLDestroy()
+	NeedVSync() bool
 }
 
 type eglContext struct {
@@ -44,7 +44,7 @@ var (
 	nilEGLSurface          _EGLSurface
 	nilEGLContext          _EGLContext
 	nilEGLConfig           _EGLConfig
-	nilEGLNativeWindowType _EGLNativeWindowType
+	nilEGLNativeWindowType NativeWindowType
 )
 
 const (
@@ -66,7 +66,7 @@ const (
 	_EGL_WINDOW_BIT             = 0x4
 )
 
-func (c *context) Release() {
+func (c *Context) Release() {
 	if c.srgbFBO != nil {
 		c.srgbFBO.Release()
 		c.srgbFBO = nil
@@ -80,12 +80,12 @@ func (c *context) Release() {
 		c.eglCtx = nil
 	}
 	if c.driver != nil {
-		c.driver.eglDestroy()
+		c.driver.EGLDestroy()
 		c.driver = nil
 	}
 }
 
-func (c *context) Present() error {
+func (c *Context) Present() error {
 	if c.eglWin == nilEGLNativeWindowType {
 		panic("context is not active")
 	}
@@ -101,12 +101,12 @@ func (c *context) Present() error {
 	return nil
 }
 
-func newContext(d eglDriver) (*context, error) {
-	eglCtx, err := createContext(d.eglDisplay())
+func NewContext(d Driver) (*Context, error) {
+	eglCtx, err := createContext(d.EGLDisplay())
 	if err != nil {
 		return nil, err
 	}
-	c := &context{
+	c := &Context{
 		driver: d,
 		eglCtx: eglCtx,
 		c:      new(gl.Functions),
@@ -114,15 +114,15 @@ func newContext(d eglDriver) (*context, error) {
 	return c, nil
 }
 
-func (c *context) Functions() *gl.Functions {
+func (c *Context) Functions() *gl.Functions {
 	return c.c
 }
 
-func (c *context) Lock() {}
+func (c *Context) Lock() {}
 
-func (c *context) Unlock() {}
+func (c *Context) Unlock() {}
 
-func (c *context) destroySurface() {
+func (c *Context) destroySurface() {
 	if c.eglSurf == nilEGLSurface {
 		return
 	}
@@ -133,8 +133,8 @@ func (c *context) destroySurface() {
 	c.eglSurf = nilEGLSurface
 }
 
-func (c *context) MakeCurrent() error {
-	win, width, height, err := c.driver.eglWindow(int(c.eglCtx.visualID))
+func (c *Context) MakeCurrent() error {
+	win, width, height, err := c.driver.EGLWindow(int(c.eglCtx.visualID))
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func (c *context) MakeCurrent() error {
 	// eglSwapInterval 1 leads to erratic frame rates and unnecessary blocking.
 	// We rely on platform specific frame rate limiting instead, except on Windows
 	// and X11 where eglSwapInterval is all there is.
-	if c.driver.needVSync() {
+	if c.driver.NeedVSync() {
 		eglSwapInterval(c.eglCtx.disp, 1)
 	} else {
 		eglSwapInterval(c.eglCtx.disp, 0)
@@ -192,7 +192,7 @@ func hasExtension(exts []string, ext string) bool {
 	return false
 }
 
-func createContext(disp _EGLNativeDisplayType) (*eglContext, error) {
+func createContext(disp NativeDisplayType) (*eglContext, error) {
 	eglDisp := eglGetDisplay(disp)
 	if eglDisp == nilEGLDisplay {
 		return nil, fmt.Errorf("eglGetDisplay(_EGL_DEFAULT_DISPLAY) failed: 0x%x", eglGetError())
@@ -258,7 +258,7 @@ func createContext(disp _EGLNativeDisplayType) (*eglContext, error) {
 	}, nil
 }
 
-func createSurfaceAndMakeCurrent(eglCtx *eglContext, win _EGLNativeWindowType) (_EGLSurface, error) {
+func createSurfaceAndMakeCurrent(eglCtx *eglContext, win NativeWindowType) (_EGLSurface, error) {
 	var surfAttribs []_EGLint
 	if eglCtx.srgb {
 		surfAttribs = append(surfAttribs, _EGL_GL_COLORSPACE_KHR, _EGL_GL_COLORSPACE_SRGB_KHR)

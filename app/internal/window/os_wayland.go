@@ -41,6 +41,8 @@ import (
 
 /*
 #cgo LDFLAGS: -lwayland-client -lwayland-cursor
+#cgo freebsd CFLAGS: -I/usr/local/include
+#cgo freebsd LDFLAGS: -L/usr/local/lib
 
 #include <stdlib.h>
 #include <wayland-client.h>

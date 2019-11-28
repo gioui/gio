@@ -9,6 +9,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"gioui.org/app/internal/egl"
 	"gioui.org/app/internal/gl"
 )
 
@@ -26,7 +27,7 @@ var eglWindows struct {
 	windows map[*C.struct_wl_surface]*C.struct_wl_egl_window
 }
 
-func (w *window) eglDestroy() {
+func (w *window) EGLDestroy() {
 	surf, _, _ := w.surface()
 	if surf == nil {
 		return
@@ -39,14 +40,14 @@ func (w *window) eglDestroy() {
 	}
 }
 
-func (w *window) eglDisplay() _EGLNativeDisplayType {
-	return _EGLNativeDisplayType(unsafe.Pointer(w.display()))
+func (w *window) EGLDisplay() egl.NativeDisplayType {
+	return egl.NativeDisplayType(unsafe.Pointer(w.display()))
 }
 
-func (w *window) eglWindow(visID int) (_EGLNativeWindowType, int, int, error) {
+func (w *window) EGLWindow(visID int) (egl.NativeWindowType, int, int, error) {
 	surf, width, height := w.surface()
 	if surf == nil {
-		return nilEGLNativeWindowType, 0, 0, errors.New("wayland: no surface")
+		return 0, 0, 0, errors.New("wayland: no surface")
 	}
 	eglWindows.mu.Lock()
 	defer eglWindows.mu.Unlock()
@@ -57,16 +58,16 @@ func (w *window) eglWindow(visID int) (_EGLNativeWindowType, int, int, error) {
 		}
 		eglWin = C.wl_egl_window_create(surf, C.int(width), C.int(height))
 		if eglWin == nil {
-			return nilEGLNativeWindowType, 0, 0, errors.New("wayland: wl_egl_create_window failed")
+			return 0, 0, 0, errors.New("wayland: wl_egl_create_window failed")
 		}
 		eglWindows.windows[surf] = eglWin
 	}
 	C.wl_egl_window_resize(eglWin, C.int(width), C.int(height), 0, 0)
-	return _EGLNativeWindowType(uintptr(unsafe.Pointer(eglWin))), width, height, nil
+	return egl.NativeWindowType(uintptr(unsafe.Pointer(eglWin))), width, height, nil
 }
 
 func (w *window) NewContext() (gl.Context, error) {
-	return newContext(w)
+	return egl.NewContext(w)
 }
 
-func (w *window) needVSync() bool { return false }
+func (w *window) NeedVSync() bool { return false }
