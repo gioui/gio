@@ -14,20 +14,38 @@ import (
 	"gioui.org/app/internal/gl"
 )
 
-func (w *window) EGLDestroy() {
-}
-
-func (w *window) EGLDisplay() egl.NativeDisplayType {
-	return nil
-}
-
-func (w *window) EGLWindow(visID int) (egl.NativeWindowType, int, int, error) {
-	win, width, height := w.nativeWindow(visID)
-	return egl.NativeWindowType(unsafe.Pointer(win)), width, height, nil
+type context struct {
+	win *window
+	*egl.Context
 }
 
 func (w *window) NewContext() (gl.Context, error) {
-	return egl.NewContext(w)
+	ctx, err := egl.NewContext(nil)
+	if err != nil {
+		return nil, err
+	}
+	return &context{win: w, Context: ctx}, nil
 }
 
-func (w *window) NeedVSync() bool { return false }
+func (c *context) Release() {
+	if c.Context != nil {
+		c.Context.Release()
+		c.Context = nil
+	}
+}
+
+func (c *context) MakeCurrent() error {
+	c.Context.ReleaseSurface()
+	win, width, height := c.win.nativeWindow(c.Context.VisualID())
+	if win == nil {
+		return nil
+	}
+	eglSurf := egl.NativeWindowType(unsafe.Pointer(win))
+	if err := c.Context.CreateSurface(eglSurf, width, height); err != nil {
+		return err
+	}
+	if err := c.Context.MakeCurrent(); err != nil {
+		return err
+	}
+	return nil
+}

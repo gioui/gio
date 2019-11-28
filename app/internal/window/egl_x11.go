@@ -5,23 +5,43 @@
 package window
 
 import (
+	"unsafe"
+
 	"gioui.org/app/internal/egl"
 	"gioui.org/app/internal/gl"
 )
 
+type x11Context struct {
+	win *x11Window
+	*egl.Context
+}
+
 func (w *x11Window) NewContext() (gl.Context, error) {
-	return egl.NewContext(w)
+	disp := egl.NativeDisplayType(unsafe.Pointer(w.display()))
+	ctx, err := egl.NewContext(disp)
+	if err != nil {
+		return nil, err
+	}
+	return &x11Context{win: w, Context: ctx}, nil
 }
 
-func (w *x11Window) EGLDestroy() {
+func (c *x11Context) Release() {
+	if c.Context != nil {
+		c.Context.Release()
+		c.Context = nil
+	}
 }
 
-func (w *x11Window) EGLDisplay() egl.NativeDisplayType {
-	return egl.NativeDisplayType(w.display())
+func (c *x11Context) MakeCurrent() error {
+	c.Context.ReleaseSurface()
+	win, width, height := c.win.window()
+	eglSurf := egl.NativeWindowType(uintptr(win))
+	if err := c.Context.CreateSurface(eglSurf, width, height); err != nil {
+		return err
+	}
+	if err := c.Context.MakeCurrent(); err != nil {
+		return err
+	}
+	c.Context.EnableVSync(true)
+	return nil
 }
-
-func (w *x11Window) EGLWindow(visID int) (egl.NativeWindowType, int, int, error) {
-	return egl.NativeWindowType(uintptr(w.xw)), w.width, w.height, nil
-}
-
-func (w *x11Window) NeedVSync() bool { return true }

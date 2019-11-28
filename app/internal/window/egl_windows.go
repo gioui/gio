@@ -3,24 +3,43 @@
 package window
 
 import (
+	"unsafe"
+
 	"gioui.org/app/internal/egl"
 	"gioui.org/app/internal/gl"
 )
 
-func (w *window) EGLDestroy() {
-}
-
-func (w *window) EGLDisplay() egl.NativeDisplayType {
-	return egl.NativeDisplayType(w.HDC())
-}
-
-func (w *window) EGLWindow(visID int) (egl.NativeWindowType, int, int, error) {
-	hwnd, width, height := w.HWND()
-	return egl.NativeWindowType(hwnd), width, height, nil
+type context struct {
+	win *window
+	*egl.Context
 }
 
 func (w *window) NewContext() (gl.Context, error) {
-	return egl.NewContext(w)
+	disp := egl.NativeDisplayType(unsafe.Pointer(w.HDC()))
+	ctx, err := egl.NewContext(disp)
+	if err != nil {
+		return nil, err
+	}
+	return &context{win: w, Context: ctx}, nil
 }
 
-func (w *window) NeedVSync() bool { return true }
+func (c *context) Release() {
+	if c.Context != nil {
+		c.Context.Release()
+		c.Context = nil
+	}
+}
+
+func (c *context) MakeCurrent() error {
+	c.Context.ReleaseSurface()
+	win, width, height := c.win.HWND()
+	eglSurf := egl.NativeWindowType(win)
+	if err := c.Context.CreateSurface(eglSurf, width, height); err != nil {
+		return err
+	}
+	if err := c.Context.MakeCurrent(); err != nil {
+		return err
+	}
+	c.Context.EnableVSync(true)
+	return nil
+}

@@ -15,27 +15,15 @@ import (
 
 type Context struct {
 	c             *gl.Functions
-	driver        Driver
+	disp          _EGLDisplay
 	eglCtx        *eglContext
-	eglWin        NativeWindowType
 	eglSurf       _EGLSurface
 	width, height int
 	// For sRGB emulation.
 	srgbFBO *gl.SRGBFBO
 }
 
-type Driver interface {
-	EGLDisplay() NativeDisplayType
-	EGLDestroy()
-}
-
-type WindowDriver interface {
-	EGLWindow(visID int) (NativeWindowType, int, int, error)
-	NeedVSync() bool
-}
-
 type eglContext struct {
-	disp        _EGLDisplay
 	config      _EGLConfig
 	ctx         _EGLContext
 	visualID    int
@@ -75,28 +63,20 @@ func (c *Context) Release() {
 		c.srgbFBO.Release()
 		c.srgbFBO = nil
 	}
-	c.destroySurface()
-	c.eglWin = nilEGLNativeWindowType
+	c.ReleaseSurface()
 	if c.eglCtx != nil {
-		eglDestroyContext(c.eglCtx.disp, c.eglCtx.ctx)
-		eglTerminate(c.eglCtx.disp)
+		eglDestroyContext(c.disp, c.eglCtx.ctx)
+		eglTerminate(c.disp)
 		eglReleaseThread()
 		c.eglCtx = nil
-	}
-	if c.driver != nil {
-		c.driver.EGLDestroy()
-		c.driver = nil
 	}
 }
 
 func (c *Context) Present() error {
-	if c.eglWin == nilEGLNativeWindowType {
-		panic("context is not active")
-	}
 	if c.srgbFBO != nil {
 		c.srgbFBO.Blit()
 	}
-	if !eglSwapBuffers(c.eglCtx.disp, c.eglSurf) {
+	if !eglSwapBuffers(c.disp, c.eglSurf) {
 		return fmt.Errorf("eglSwapBuffers failed (%x)", eglGetError())
 	}
 	if c.srgbFBO != nil {
@@ -105,17 +85,17 @@ func (c *Context) Present() error {
 	return nil
 }
 
-func NewContext(d Driver) (*Context, error) {
-	eglCtx, err := createContext(d.EGLDisplay())
+func NewContext(disp NativeDisplayType) (*Context, error) {
+	eglDisp := eglGetDisplay(disp)
+	if eglDisp == nilEGLDisplay {
+		return nil, fmt.Errorf("eglGetDisplay failed: 0x%x", eglGetError())
+	}
+	eglCtx, err := createContext(eglDisp)
 	if err != nil {
 		return nil, err
 	}
-	if _, windowed := d.(WindowDriver); !windowed && !eglCtx.surfaceless {
-		eglDestroyContext(eglCtx.disp, eglCtx.ctx)
-		return nil, errors.New("EGL_KHR_surfaceless_context not supported")
-	}
 	c := &Context{
-		driver: d,
+		disp:   eglDisp,
 		eglCtx: eglCtx,
 		c:      new(gl.Functions),
 	}
@@ -130,58 +110,35 @@ func (c *Context) Lock() {}
 
 func (c *Context) Unlock() {}
 
-func (c *Context) destroySurface() {
+func (c *Context) ReleaseSurface() {
 	if c.eglSurf == nilEGLSurface {
 		return
 	}
 	// Make sure any in-flight GL commands are complete.
 	c.c.Finish()
-	eglMakeCurrent(c.eglCtx.disp, nilEGLSurface, nilEGLSurface, nilEGLContext)
-	eglDestroySurface(c.eglCtx.disp, c.eglSurf)
+	eglMakeCurrent(c.disp, nilEGLSurface, nilEGLSurface, nilEGLContext)
+	eglDestroySurface(c.disp, c.eglSurf)
 	c.eglSurf = nilEGLSurface
 }
 
-func (c *Context) MakeCurrent() error {
-	wdriver, ok := c.driver.(WindowDriver)
-	if !ok {
-		if !eglMakeCurrent(c.eglCtx.disp, nilEGLSurface, nilEGLSurface, c.eglCtx.ctx) {
-			return fmt.Errorf("eglMakeCurrent error 0x%x", eglGetError())
-		}
-		return nil
-	}
-	win, width, height, err := wdriver.EGLWindow(int(c.eglCtx.visualID))
-	if err != nil {
-		return err
-	}
-	if c.eglWin == win && width == c.width && height == c.height {
-		return nil
-	}
-	c.width, c.height = width, height
-	if win == nilEGLNativeWindowType && c.srgbFBO != nil {
-		c.srgbFBO.Release()
-		c.srgbFBO = nil
-	}
-	c.destroySurface()
-	c.eglWin = win
-	if c.eglWin == nilEGLNativeWindowType {
-		return nil
-	}
-	eglSurf, err := createSurface(c.eglCtx, win)
+func (c *Context) VisualID() int {
+	return c.eglCtx.visualID
+}
+
+func (c *Context) CreateSurface(win NativeWindowType, width, height int) error {
+	eglSurf, err := createSurface(c.disp, c.eglCtx, win)
 	c.eglSurf = eglSurf
-	if err != nil {
-		c.eglWin = nilEGLNativeWindowType
-		return err
+	c.width = width
+	c.height = height
+	return err
+}
+
+func (c *Context) MakeCurrent() error {
+	if c.eglSurf == nilEGLSurface && !c.eglCtx.surfaceless {
+		return errors.New("no surface created yet EGL_KHR_surfaceless_context is not supported")
 	}
-	if !eglMakeCurrent(c.eglCtx.disp, eglSurf, eglSurf, c.eglCtx.ctx) {
+	if !eglMakeCurrent(c.disp, c.eglSurf, c.eglSurf, c.eglCtx.ctx) {
 		return fmt.Errorf("eglMakeCurrent error 0x%x", eglGetError())
-	}
-	// eglSwapInterval 1 leads to erratic frame rates and unnecessary blocking.
-	// We rely on platform specific frame rate limiting instead, except on Windows
-	// and X11 where eglSwapInterval is all there is.
-	if wdriver.NeedVSync() {
-		eglSwapInterval(c.eglCtx.disp, 1)
-	} else {
-		eglSwapInterval(c.eglCtx.disp, 0)
 	}
 	if c.eglCtx.srgb {
 		return nil
@@ -190,15 +147,18 @@ func (c *Context) MakeCurrent() error {
 		var err error
 		c.srgbFBO, err = gl.NewSRGBFBO(c.c)
 		if err != nil {
-			c.Release()
 			return err
 		}
 	}
-	if err := c.srgbFBO.Refresh(c.width, c.height); err != nil {
-		c.Release()
-		return err
+	return c.srgbFBO.Refresh(c.width, c.height)
+}
+
+func (c *Context) EnableVSync(enable bool) {
+	if enable {
+		eglSwapInterval(c.disp, 1)
+	} else {
+		eglSwapInterval(c.disp, 0)
 	}
-	return nil
 }
 
 func hasExtension(exts []string, ext string) bool {
@@ -210,17 +170,13 @@ func hasExtension(exts []string, ext string) bool {
 	return false
 }
 
-func createContext(disp NativeDisplayType) (*eglContext, error) {
-	eglDisp := eglGetDisplay(disp)
-	if eglDisp == nilEGLDisplay {
-		return nil, fmt.Errorf("eglGetDisplay(_EGL_DEFAULT_DISPLAY) failed: 0x%x", eglGetError())
-	}
-	major, minor, ret := eglInitialize(eglDisp)
+func createContext(disp _EGLDisplay) (*eglContext, error) {
+	major, minor, ret := eglInitialize(disp)
 	if !ret {
 		return nil, fmt.Errorf("eglInitialize failed: 0x%x", eglGetError())
 	}
 	// sRGB framebuffer support on EGL 1.5 or if EGL_KHR_gl_colorspace is supported.
-	exts := strings.Split(eglQueryString(eglDisp, _EGL_EXTENSIONS), " ")
+	exts := strings.Split(eglQueryString(disp, _EGL_EXTENSIONS), " ")
 	srgb := major > 1 || minor >= 5 || hasExtension(exts, "EGL_KHR_gl_colorspace")
 	attribs := []_EGLint{
 		_EGL_RENDERABLE_TYPE, _EGL_OPENGL_ES2_BIT,
@@ -240,14 +196,14 @@ func createContext(disp NativeDisplayType) (*eglContext, error) {
 		attribs = append(attribs, _EGL_DEPTH_SIZE, 16)
 	}
 	attribs = append(attribs, _EGL_NONE)
-	eglCfg, ret := eglChooseConfig(eglDisp, attribs)
+	eglCfg, ret := eglChooseConfig(disp, attribs)
 	if !ret {
 		return nil, fmt.Errorf("eglChooseConfig failed: 0x%x", eglGetError())
 	}
 	if eglCfg == nilEGLConfig {
 		return nil, errors.New("eglChooseConfig returned 0 configs")
 	}
-	visID, ret := eglGetConfigAttrib(eglDisp, eglCfg, _EGL_NATIVE_VISUAL_ID)
+	visID, ret := eglGetConfigAttrib(disp, eglCfg, _EGL_NATIVE_VISUAL_ID)
 	if !ret {
 		return nil, errors.New("newContext: eglGetConfigAttrib for _EGL_NATIVE_VISUAL_ID failed")
 	}
@@ -255,20 +211,19 @@ func createContext(disp NativeDisplayType) (*eglContext, error) {
 		_EGL_CONTEXT_CLIENT_VERSION, 3,
 		_EGL_NONE,
 	}
-	eglCtx := eglCreateContext(eglDisp, eglCfg, nilEGLContext, ctxAttribs)
+	eglCtx := eglCreateContext(disp, eglCfg, nilEGLContext, ctxAttribs)
 	if eglCtx == nilEGLContext {
 		// Fall back to OpenGL ES 2 and rely on extensions.
 		ctxAttribs := []_EGLint{
 			_EGL_CONTEXT_CLIENT_VERSION, 2,
 			_EGL_NONE,
 		}
-		eglCtx = eglCreateContext(eglDisp, eglCfg, nilEGLContext, ctxAttribs)
+		eglCtx = eglCreateContext(disp, eglCfg, nilEGLContext, ctxAttribs)
 		if eglCtx == nilEGLContext {
 			return nil, fmt.Errorf("eglCreateContext failed: 0x%x", eglGetError())
 		}
 	}
 	return &eglContext{
-		disp:        eglDisp,
 		config:      _EGLConfig(eglCfg),
 		ctx:         _EGLContext(eglCtx),
 		visualID:    int(visID),
@@ -277,18 +232,18 @@ func createContext(disp NativeDisplayType) (*eglContext, error) {
 	}, nil
 }
 
-func createSurface(eglCtx *eglContext, win NativeWindowType) (_EGLSurface, error) {
+func createSurface(disp _EGLDisplay, eglCtx *eglContext, win NativeWindowType) (_EGLSurface, error) {
 	var surfAttribs []_EGLint
 	if eglCtx.srgb {
 		surfAttribs = append(surfAttribs, _EGL_GL_COLORSPACE_KHR, _EGL_GL_COLORSPACE_SRGB_KHR)
 	}
 	surfAttribs = append(surfAttribs, _EGL_NONE)
-	eglSurf := eglCreateWindowSurface(eglCtx.disp, eglCtx.config, win, surfAttribs)
+	eglSurf := eglCreateWindowSurface(disp, eglCtx.config, win, surfAttribs)
 	if eglSurf == nilEGLSurface && eglCtx.srgb {
 		// Try again without sRGB
 		eglCtx.srgb = false
 		surfAttribs = []_EGLint{_EGL_NONE}
-		eglSurf = eglCreateWindowSurface(eglCtx.disp, eglCtx.config, win, surfAttribs)
+		eglSurf = eglCreateWindowSurface(disp, eglCtx.config, win, surfAttribs)
 	}
 	if eglSurf == nilEGLSurface {
 		return nilEGLSurface, fmt.Errorf("newContext: eglCreateWindowSurface failed 0x%x (sRGB=%v)", eglGetError(), eglCtx.srgb)

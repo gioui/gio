@@ -78,8 +78,12 @@ func (w *x11Window) wakeup() {
 	}
 }
 
-func (w *x11Window) display() unsafe.Pointer {
-	return unsafe.Pointer(w.x)
+func (w *x11Window) display() *C.Display {
+	return w.x
+}
+
+func (w *x11Window) window() (C.Window, int, int) {
+	return w.xw, w.width, w.height
 }
 
 func (w *x11Window) setStage(s system.Stage) {
