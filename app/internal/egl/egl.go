@@ -26,17 +26,21 @@ type Context struct {
 
 type Driver interface {
 	EGLDisplay() NativeDisplayType
-	EGLWindow(visID int) (NativeWindowType, int, int, error)
 	EGLDestroy()
+}
+
+type WindowDriver interface {
+	EGLWindow(visID int) (NativeWindowType, int, int, error)
 	NeedVSync() bool
 }
 
 type eglContext struct {
-	disp     _EGLDisplay
-	config   _EGLConfig
-	ctx      _EGLContext
-	visualID int
-	srgb     bool
+	disp        _EGLDisplay
+	config      _EGLConfig
+	ctx         _EGLContext
+	visualID    int
+	srgb        bool
+	surfaceless bool
 }
 
 var (
@@ -106,6 +110,10 @@ func NewContext(d Driver) (*Context, error) {
 	if err != nil {
 		return nil, err
 	}
+	if _, windowed := d.(WindowDriver); !windowed && !eglCtx.surfaceless {
+		eglDestroyContext(eglCtx.disp, eglCtx.ctx)
+		return nil, errors.New("EGL_KHR_surfaceless_context not supported")
+	}
 	c := &Context{
 		driver: d,
 		eglCtx: eglCtx,
@@ -134,7 +142,14 @@ func (c *Context) destroySurface() {
 }
 
 func (c *Context) MakeCurrent() error {
-	win, width, height, err := c.driver.EGLWindow(int(c.eglCtx.visualID))
+	wdriver, ok := c.driver.(WindowDriver)
+	if !ok {
+		if !eglMakeCurrent(c.eglCtx.disp, nilEGLSurface, nilEGLSurface, c.eglCtx.ctx) {
+			return fmt.Errorf("eglMakeCurrent error 0x%x", eglGetError())
+		}
+		return nil
+	}
+	win, width, height, err := wdriver.EGLWindow(int(c.eglCtx.visualID))
 	if err != nil {
 		return err
 	}
@@ -163,7 +178,7 @@ func (c *Context) MakeCurrent() error {
 	// eglSwapInterval 1 leads to erratic frame rates and unnecessary blocking.
 	// We rely on platform specific frame rate limiting instead, except on Windows
 	// and X11 where eglSwapInterval is all there is.
-	if c.driver.NeedVSync() {
+	if wdriver.NeedVSync() {
 		eglSwapInterval(c.eglCtx.disp, 1)
 	} else {
 		eglSwapInterval(c.eglCtx.disp, 0)
@@ -253,11 +268,12 @@ func createContext(disp NativeDisplayType) (*eglContext, error) {
 		}
 	}
 	return &eglContext{
-		disp:     eglDisp,
-		config:   _EGLConfig(eglCfg),
-		ctx:      _EGLContext(eglCtx),
-		visualID: int(visID),
-		srgb:     srgb,
+		disp:        eglDisp,
+		config:      _EGLConfig(eglCfg),
+		ctx:         _EGLContext(eglCtx),
+		visualID:    int(visID),
+		srgb:        srgb,
+		surfaceless: hasExtension(exts, "EGL_KHR_surfaceless_context"),
 	}, nil
 }
 
