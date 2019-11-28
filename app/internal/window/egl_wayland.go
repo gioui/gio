@@ -58,7 +58,7 @@ func (w *window) EGLWindow(visID int) (egl.NativeWindowType, int, int, error) {
 		}
 		eglWin = C.wl_egl_window_create(surf, C.int(width), C.int(height))
 		if eglWin == nil {
-			return 0, 0, 0, errors.New("wayland: wl_egl_create_window failed")
+			return 0, 0, 0, errors.New("wayland: wl_egl_window_create failed")
 		}
 		eglWindows.windows[surf] = eglWin
 	}
