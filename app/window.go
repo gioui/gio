@@ -289,7 +289,7 @@ func (w *Window) run(opts *window.Options) {
 					var ctx gl.Context
 					ctx, err = w.driver.NewContext()
 					if err == nil {
-						w.gpu, err = gpu.NewGPU(ctx)
+						w.gpu, err = gpu.New(ctx)
 					}
 				}
 				var frame *op.Ops

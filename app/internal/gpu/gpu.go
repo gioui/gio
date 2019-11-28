@@ -239,7 +239,7 @@ var (
 	attribUV    gl.Attrib = 1
 )
 
-func NewGPU(ctx gl.Context) (*GPU, error) {
+func New(ctx gl.Context) (*GPU, error) {
 	g := &GPU{
 		frames:     make(chan frame),
 		results:    make(chan frameResult),
