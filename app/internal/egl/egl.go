@@ -107,10 +107,6 @@ func (c *Context) Functions() *gl.Functions {
 	return c.c
 }
 
-func (c *Context) Lock() {}
-
-func (c *Context) Unlock() {}
-
 func (c *Context) ReleaseSurface() {
 	if c.eglSurf == nilEGLSurface {
 		return

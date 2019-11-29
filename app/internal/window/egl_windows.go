@@ -42,3 +42,7 @@ func (c *context) MakeCurrent() error {
 	c.Context.EnableVSync(true)
 	return nil
 }
+
+func (c *context) Lock() {}
+
+func (c *context) Unlock() {}

@@ -44,3 +44,7 @@ func (c *x11Context) MakeCurrent() error {
 	c.Context.EnableVSync(true)
 	return nil
 }
+
+func (c *x11Context) Lock() {}
+
+func (c *x11Context) Unlock() {}

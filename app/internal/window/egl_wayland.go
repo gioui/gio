@@ -67,3 +67,7 @@ func (c *context) MakeCurrent() error {
 	}
 	return c.Context.MakeCurrent()
 }
+
+func (c *context) Lock() {}
+
+func (c *context) Unlock() {}

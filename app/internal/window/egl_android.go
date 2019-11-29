@@ -48,3 +48,7 @@ func (c *context) MakeCurrent() error {
 	}
 	return nil
 }
+
+func (c *context) Lock() {}
+
+func (c *context) Unlock() {}
