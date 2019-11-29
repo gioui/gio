@@ -11,7 +11,6 @@ import (
 	"unsafe"
 
 	"gioui.org/app/internal/egl"
-	"gioui.org/app/internal/gl"
 )
 
 type context struct {
@@ -19,7 +18,7 @@ type context struct {
 	*egl.Context
 }
 
-func (w *window) NewContext() (gl.Context, error) {
+func (w *window) NewContext() (Context, error) {
 	ctx, err := egl.NewContext(nil)
 	if err != nil {
 		return nil, err

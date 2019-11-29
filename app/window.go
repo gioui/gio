@@ -8,7 +8,6 @@ import (
 	"image"
 	"time"
 
-	"gioui.org/app/internal/gl"
 	"gioui.org/app/internal/input"
 	"gioui.org/app/internal/window"
 	"gioui.org/io/event"
@@ -285,7 +284,7 @@ func (w *Window) run(opts *window.Options) {
 						w.loop = nil
 					}
 				} else {
-					var ctx gl.Context
+					var ctx window.Context
 					ctx, err = w.driver.NewContext()
 					if err == nil {
 						w.loop, err = newLoop(ctx)

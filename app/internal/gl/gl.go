@@ -7,15 +7,6 @@ type (
 	Enum   uint
 )
 
-type Context interface {
-	Functions() *Functions
-	Present() error
-	MakeCurrent() error
-	Release()
-	Lock()
-	Unlock()
-}
-
 const (
 	ARRAY_BUFFER                          = 0x8892
 	BLEND                                 = 0xbe2

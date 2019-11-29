@@ -9,7 +9,6 @@ import (
 	"unsafe"
 
 	"gioui.org/app/internal/egl"
-	"gioui.org/app/internal/gl"
 )
 
 /*
@@ -27,7 +26,7 @@ type context struct {
 	eglWin *C.struct_wl_egl_window
 }
 
-func (w *window) NewContext() (gl.Context, error) {
+func (w *window) NewContext() (Context, error) {
 	disp := egl.NativeDisplayType(unsafe.Pointer(w.display()))
 	ctx, err := egl.NewContext(disp)
 	if err != nil {

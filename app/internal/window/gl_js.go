@@ -90,6 +90,6 @@ func (c *context) MakeCurrent() error {
 	return nil
 }
 
-func (w *window) NewContext() (gl.Context, error) {
+func (w *window) NewContext() (Context, error) {
 	return newContext(w)
 }
