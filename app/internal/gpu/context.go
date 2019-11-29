@@ -32,9 +32,9 @@ type textureTriple struct {
 	typ            gl.Enum
 }
 
-func newContext(glctx gl.Context) (*context, error) {
+func newContext(glctx *gl.Functions) (*context, error) {
 	ctx := &context{
-		Functions: glctx.Functions(),
+		Functions: glctx,
 	}
 	exts := strings.Split(ctx.GetString(gl.EXTENSIONS), " ")
 	glVer := ctx.GetString(gl.VERSION)

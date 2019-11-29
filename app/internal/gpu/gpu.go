@@ -8,7 +8,6 @@ import (
 	"image"
 	"image/color"
 	"math"
-	"runtime"
 	"strings"
 	"time"
 	"unsafe"
@@ -23,31 +22,15 @@ import (
 )
 
 type GPU struct {
-	drawing bool
-	summary string
-	err     error
-
 	pathCache *opCache
 	cache     *resourceCache
 
-	frames     chan frame
-	results    chan frameResult
-	refresh    chan struct{}
-	refreshErr chan error
-	ack        chan struct{}
-	stop       chan struct{}
-	stopped    chan struct{}
-}
-
-type frame struct {
-	collectStats bool
-	viewport     image.Point
-	ops          *op.Ops
-}
-
-type frameResult struct {
-	summary string
-	err     error
+	timers                                            *timers
+	frameStart                                        time.Time
+	zopsTimer, stencilTimer, coverTimer, cleanupTimer *timer
+	drawOps                                           drawOps
+	ctx                                               *context
+	renderer                                          *renderer
 }
 
 type renderer struct {
@@ -239,187 +222,103 @@ var (
 	attribUV    gl.Attrib = 1
 )
 
-func New(ctx gl.Context) (*GPU, error) {
+func New(ctx *gl.Functions) (*GPU, error) {
 	g := &GPU{
-		frames:     make(chan frame),
-		results:    make(chan frameResult),
-		refresh:    make(chan struct{}),
-		refreshErr: make(chan error),
-		// Ack is buffered so GPU commands can be issued after
-		// ack'ing the frame.
-		ack:       make(chan struct{}, 1),
-		stop:      make(chan struct{}),
-		stopped:   make(chan struct{}),
 		pathCache: newOpCache(),
 		cache:     newResourceCache(),
 	}
-	if err := g.renderLoop(ctx); err != nil {
+	if err := g.init(ctx); err != nil {
 		return nil, err
 	}
 	return g, nil
 }
 
-func (g *GPU) renderLoop(glctx gl.Context) error {
-	// GL Operations must happen on a single OS thread, so
-	// pass initialization result through a channel.
-	initErr := make(chan error)
-	go func() {
-		runtime.LockOSThread()
-		// Don't UnlockOSThread to avoid reuse by the Go runtime.
-		defer close(g.stopped)
-
-		if err := glctx.MakeCurrent(); err != nil {
-			initErr <- err
-			return
-		}
-		ctx, err := newContext(glctx)
-		if err != nil {
-			initErr <- err
-			return
-		}
-		initErr <- nil
-		defer glctx.Release()
-		defer g.cache.release(ctx)
-		defer g.pathCache.release(ctx)
-		r := newRenderer(ctx)
-		defer r.release()
-		var timers *timers
-		var zopsTimer, stencilTimer, coverTimer, cleanupTimer *timer
-		var drawOps drawOps
-	loop:
-		for {
-			select {
-			case <-g.refresh:
-				g.refreshErr <- glctx.MakeCurrent()
-			case frame := <-g.frames:
-				drawOps.reset(g.cache, frame.viewport)
-				drawOps.collect(g.cache, frame.ops, frame.viewport)
-				glctx.Lock()
-				frameStart := time.Now()
-				if frame.collectStats && timers == nil && ctx.caps.EXT_disjoint_timer_query {
-					timers = newTimers(ctx)
-					zopsTimer = timers.newTimer()
-					stencilTimer = timers.newTimer()
-					coverTimer = timers.newTimer()
-					cleanupTimer = timers.newTimer()
-					defer timers.release()
-				}
-				// Upload path data to GPU before ack'ing the frame
-				// ops for re-use.
-				for _, p := range drawOps.pathOps {
-					if _, exists := g.pathCache.get(p.pathKey); !exists {
-						data := buildPath(r.ctx, p.pathVerts)
-						g.pathCache.put(p.pathKey, data)
-					}
-					p.pathVerts = nil
-				}
-				// Signal that we're done with the frame ops.
-				g.ack <- struct{}{}
-				r.blitter.viewport = frame.viewport
-				r.pather.viewport = frame.viewport
-				for _, img := range drawOps.imageOps {
-					expandPathOp(img.path, img.clip)
-				}
-				if frame.collectStats {
-					zopsTimer.begin()
-				}
-				ctx.DepthFunc(gl.GREATER)
-				ctx.ClearColor(drawOps.clearColor[0], drawOps.clearColor[1], drawOps.clearColor[2], 1.0)
-				ctx.ClearDepthf(0.0)
-				ctx.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-				ctx.Viewport(0, 0, frame.viewport.X, frame.viewport.Y)
-				r.drawZOps(drawOps.zimageOps)
-				zopsTimer.end()
-				stencilTimer.begin()
-				ctx.Enable(gl.BLEND)
-				r.packStencils(&drawOps.pathOps)
-				r.stencilClips(g.pathCache, drawOps.pathOps)
-				r.packIntersections(drawOps.imageOps)
-				r.intersect(drawOps.imageOps)
-				stencilTimer.end()
-				coverTimer.begin()
-				ctx.Viewport(0, 0, frame.viewport.X, frame.viewport.Y)
-				r.drawOps(drawOps.imageOps)
-				ctx.Disable(gl.BLEND)
-				r.pather.stenciler.invalidateFBO()
-				coverTimer.end()
-				err := glctx.Present()
-				cleanupTimer.begin()
-				g.cache.frame(ctx)
-				g.pathCache.frame(ctx)
-				cleanupTimer.end()
-				var res frameResult
-				if frame.collectStats && timers.ready() {
-					zt, st, covt, cleant := zopsTimer.Elapsed, stencilTimer.Elapsed, coverTimer.Elapsed, cleanupTimer.Elapsed
-					ft := zt + st + covt + cleant
-					q := 100 * time.Microsecond
-					zt, st, covt = zt.Round(q), st.Round(q), covt.Round(q)
-					frameDur := time.Since(frameStart).Round(q)
-					ft = ft.Round(q)
-					res.summary = fmt.Sprintf("draw:%7s gpu:%7s zt:%7s st:%7s cov:%7s", frameDur, ft, zt, st, covt)
-				}
-				res.err = err
-				glctx.Unlock()
-				g.results <- res
-			case <-g.stop:
-				break loop
-			}
-		}
-	}()
-	return <-initErr
+func (g *GPU) init(glctx *gl.Functions) error {
+	ctx, err := newContext(glctx)
+	if err != nil {
+		return err
+	}
+	g.ctx = ctx
+	g.renderer = newRenderer(ctx)
+	return nil
 }
 
 func (g *GPU) Release() {
-	// Flush error.
-	g.Flush()
-	close(g.stop)
-	<-g.stopped
-	g.stop = nil
+	g.renderer.release()
+	g.pathCache.release(g.ctx)
+	g.cache.release(g.ctx)
+	if g.timers != nil {
+		g.timers.release()
+	}
 }
 
-func (g *GPU) Flush() error {
-	if g.drawing {
-		st := <-g.results
-		g.setErr(st.err)
-		if st.summary != "" {
-			g.summary = st.summary
+func (g *GPU) Collect(profile bool, viewport image.Point, frameOps *op.Ops) {
+	g.drawOps.reset(g.cache, viewport)
+	g.drawOps.collect(g.cache, frameOps, viewport)
+	g.frameStart = time.Now()
+	if profile && g.timers == nil && g.ctx.caps.EXT_disjoint_timer_query {
+		g.timers = newTimers(g.ctx)
+		g.zopsTimer = g.timers.newTimer()
+		g.stencilTimer = g.timers.newTimer()
+		g.coverTimer = g.timers.newTimer()
+		g.cleanupTimer = g.timers.newTimer()
+	}
+	for _, p := range g.drawOps.pathOps {
+		if _, exists := g.pathCache.get(p.pathKey); !exists {
+			data := buildPath(g.ctx, p.pathVerts)
+			g.pathCache.put(p.pathKey, data)
 		}
-		g.drawing = false
+		p.pathVerts = nil
 	}
-	return g.err
 }
 
-func (g *GPU) Timings() string {
-	return g.summary
+func (g *GPU) Frame(profile bool, viewport image.Point) {
+	g.renderer.blitter.viewport = viewport
+	g.renderer.pather.viewport = viewport
+	for _, img := range g.drawOps.imageOps {
+		expandPathOp(img.path, img.clip)
+	}
+	if profile {
+		g.zopsTimer.begin()
+	}
+	g.ctx.DepthFunc(gl.GREATER)
+	g.ctx.ClearColor(g.drawOps.clearColor[0], g.drawOps.clearColor[1], g.drawOps.clearColor[2], 1.0)
+	g.ctx.ClearDepthf(0.0)
+	g.ctx.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
+	g.renderer.drawZOps(g.drawOps.zimageOps)
+	g.zopsTimer.end()
+	g.stencilTimer.begin()
+	g.ctx.Enable(gl.BLEND)
+	g.renderer.packStencils(&g.drawOps.pathOps)
+	g.renderer.stencilClips(g.pathCache, g.drawOps.pathOps)
+	g.renderer.packIntersections(g.drawOps.imageOps)
+	g.renderer.intersect(g.drawOps.imageOps)
+	g.stencilTimer.end()
+	g.coverTimer.begin()
+	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
+	g.renderer.drawOps(g.drawOps.imageOps)
+	g.ctx.Disable(gl.BLEND)
+	g.renderer.pather.stenciler.invalidateFBO()
+	g.coverTimer.end()
 }
 
-func (g *GPU) Refresh() {
-	if g.err != nil {
-		return
+func (g *GPU) EndFrame(profile bool) string {
+	g.cleanupTimer.begin()
+	g.cache.frame(g.ctx)
+	g.pathCache.frame(g.ctx)
+	g.cleanupTimer.end()
+	var summary string
+	if profile && g.timers.ready() {
+		zt, st, covt, cleant := g.zopsTimer.Elapsed, g.stencilTimer.Elapsed, g.coverTimer.Elapsed, g.cleanupTimer.Elapsed
+		ft := zt + st + covt + cleant
+		q := 100 * time.Microsecond
+		zt, st, covt = zt.Round(q), st.Round(q), covt.Round(q)
+		frameDur := time.Since(g.frameStart).Round(q)
+		ft = ft.Round(q)
+		summary = fmt.Sprintf("draw:%7s gpu:%7s zt:%7s st:%7s cov:%7s", frameDur, ft, zt, st, covt)
 	}
-	// Make sure any pending frame is complete.
-	g.Flush()
-	g.refresh <- struct{}{}
-	g.setErr(<-g.refreshErr)
-}
-
-// Draw initiates a draw of a frame. It returns a channel
-// than signals when the frame is no longer being accessed.
-func (g *GPU) Draw(profile bool, viewport image.Point, frameOps *op.Ops) <-chan struct{} {
-	if g.err != nil {
-		g.ack <- struct{}{}
-		return g.ack
-	}
-	g.Flush()
-	g.frames <- frame{profile, viewport, frameOps}
-	g.drawing = true
-	return g.ack
-}
-
-func (g *GPU) setErr(err error) {
-	if g.err == nil {
-		g.err = err
-	}
+	return summary
 }
 
 func (r *renderer) texHandle(t *texture) gl.Texture {
