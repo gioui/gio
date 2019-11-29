@@ -19,6 +19,7 @@ type Context struct {
 	eglCtx        *eglContext
 	eglSurf       _EGLSurface
 	width, height int
+	refreshFBO    bool
 	// For sRGB emulation.
 	srgbFBO *gl.SRGBFBO
 }
@@ -130,6 +131,7 @@ func (c *Context) CreateSurface(win NativeWindowType, width, height int) error {
 	c.eglSurf = eglSurf
 	c.width = width
 	c.height = height
+	c.refreshFBO = true
 	return err
 }
 
@@ -140,7 +142,7 @@ func (c *Context) MakeCurrent() error {
 	if !eglMakeCurrent(c.disp, c.eglSurf, c.eglSurf, c.eglCtx.ctx) {
 		return fmt.Errorf("eglMakeCurrent error 0x%x", eglGetError())
 	}
-	if c.eglCtx.srgb {
+	if c.eglCtx.srgb || c.eglSurf == nilEGLSurface {
 		return nil
 	}
 	if c.srgbFBO == nil {
@@ -150,7 +152,11 @@ func (c *Context) MakeCurrent() error {
 			return err
 		}
 	}
-	return c.srgbFBO.Refresh(c.width, c.height)
+	if c.refreshFBO {
+		c.refreshFBO = false
+		return c.srgbFBO.Refresh(c.width, c.height)
+	}
+	return nil
 }
 
 func (c *Context) EnableVSync(enable bool) {
