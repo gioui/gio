@@ -128,6 +128,19 @@ const (
 	_VK_F11 = 0x7A
 	_VK_F12 = 0x7B
 
+	_VK_OEM_1      = 0xba
+	_VK_OEM_PLUS   = 0xbb
+	_VK_OEM_COMMA  = 0xbc
+	_VK_OEM_MINUS  = 0xbd
+	_VK_OEM_PERIOD = 0xbe
+	_VK_OEM_2      = 0xbf
+	_VK_OEM_3      = 0xc0
+	_VK_OEM_4      = 0xdb
+	_VK_OEM_5      = 0xdc
+	_VK_OEM_6      = 0xdd
+	_VK_OEM_7      = 0xde
+	_VK_OEM_102    = 0xe2
+
 	_UNICODE_NOCHAR = 65535
 
 	_WM_CANCELMODE  = 0x001F
@@ -302,33 +315,20 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		return 1
 	case _WM_KEYDOWN, _WM_SYSKEYDOWN:
 		if n, ok := convertKeyCode(wParam); ok {
-			cmd := key.Event{Name: n}
-			if getKeyState(_VK_LWIN)&0x1000 != 0 || getKeyState(_VK_RWIN)&0x1000 != 0 {
-				cmd.Modifiers |= key.ModSuper
-			}
-			if getKeyState(_VK_MENU)&0x1000 != 0 {
-				cmd.Modifiers |= key.ModAlt
-			}
-			if getKeyState(_VK_CONTROL)&0x1000 != 0 {
-				cmd.Modifiers |= key.ModCtrl
-			}
-			if getKeyState(_VK_SHIFT)&0x1000 != 0 {
-				cmd.Modifiers |= key.ModShift
-			}
-			w.w.Event(cmd)
+			w.w.Event(key.Event{Name: n, Modifiers: getModifiers()})
 		}
 	case _WM_LBUTTONDOWN:
-		w.pointerButton(pointer.ButtonLeft, true, lParam)
+		w.pointerButton(pointer.ButtonLeft, true, lParam, getModifiers())
 	case _WM_LBUTTONUP:
-		w.pointerButton(pointer.ButtonLeft, false, lParam)
+		w.pointerButton(pointer.ButtonLeft, false, lParam, getModifiers())
 	case _WM_RBUTTONDOWN:
-		w.pointerButton(pointer.ButtonRight, true, lParam)
+		w.pointerButton(pointer.ButtonRight, true, lParam, getModifiers())
 	case _WM_RBUTTONUP:
-		w.pointerButton(pointer.ButtonRight, false, lParam)
+		w.pointerButton(pointer.ButtonRight, false, lParam, getModifiers())
 	case _WM_MBUTTONDOWN:
-		w.pointerButton(pointer.ButtonMiddle, true, lParam)
+		w.pointerButton(pointer.ButtonMiddle, true, lParam, getModifiers())
 	case _WM_MBUTTONUP:
-		w.pointerButton(pointer.ButtonMiddle, false, lParam)
+		w.pointerButton(pointer.ButtonMiddle, false, lParam, getModifiers())
 	case _WM_CANCELMODE:
 		w.w.Event(pointer.Event{
 			Type: pointer.Cancel,
@@ -363,7 +363,24 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	return defWindowProc(hwnd, msg, wParam, lParam)
 }
 
-func (w *window) pointerButton(btn pointer.Buttons, press bool, lParam uintptr) {
+func getModifiers() key.Modifiers {
+	var kmods key.Modifiers
+	if getKeyState(_VK_LWIN)&0x1000 != 0 || getKeyState(_VK_RWIN)&0x1000 != 0 {
+		kmods |= key.ModSuper
+	}
+	if getKeyState(_VK_MENU)&0x1000 != 0 {
+		kmods |= key.ModAlt
+	}
+	if getKeyState(_VK_CONTROL)&0x1000 != 0 {
+		kmods |= key.ModCtrl
+	}
+	if getKeyState(_VK_SHIFT)&0x1000 != 0 {
+		kmods |= key.ModShift
+	}
+	return kmods
+}
+
+func (w *window) pointerButton(btn pointer.Buttons, press bool, lParam uintptr, kmods key.Modifiers) {
 	var typ pointer.Type
 	if press {
 		typ = pointer.Press
@@ -381,11 +398,12 @@ func (w *window) pointerButton(btn pointer.Buttons, press bool, lParam uintptr) 
 	x, y := coordsFromlParam(lParam)
 	p := f32.Point{X: float32(x), Y: float32(y)}
 	w.w.Event(pointer.Event{
-		Type:     typ,
-		Source:   pointer.Mouse,
-		Position: p,
-		Buttons:  w.pointerBtns,
-		Time:     getMessageTime(),
+		Type:      typ,
+		Source:    pointer.Mouse,
+		Position:  p,
+		Buttons:   w.pointerBtns,
+		Time:      getMessageTime(),
+		Modifiers: kmods,
 	})
 }
 
@@ -552,6 +570,28 @@ func convertKeyCode(code uintptr) (string, bool) {
 		r = key.NameTab
 	case _VK_SPACE:
 		r = "Space"
+	case _VK_OEM_1:
+		r = ";"
+	case _VK_OEM_PLUS:
+		r = "+"
+	case _VK_OEM_COMMA:
+		r = ","
+	case _VK_OEM_MINUS:
+		r = "-"
+	case _VK_OEM_PERIOD:
+		r = "."
+	case _VK_OEM_2:
+		r = "/"
+	case _VK_OEM_3:
+		r = "`"
+	case _VK_OEM_4:
+		r = "["
+	case _VK_OEM_5, _VK_OEM_102:
+		r = "\\"
+	case _VK_OEM_6:
+		r = "]"
+	case _VK_OEM_7:
+		r = "'"
 	default:
 		return "", false
 	}
