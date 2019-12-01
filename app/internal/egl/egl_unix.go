@@ -26,6 +26,10 @@ type (
 	NativeWindowType  = C.EGLNativeWindowType
 )
 
+func loadEGL() error {
+	return nil
+}
+
 func eglChooseConfig(disp _EGLDisplay, attribs []_EGLint) (_EGLConfig, bool) {
 	var cfg C.EGLConfig
 	var ncfg C.EGLint

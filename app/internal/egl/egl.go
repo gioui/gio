@@ -87,6 +87,9 @@ func (c *Context) Present() error {
 }
 
 func NewContext(disp NativeDisplayType) (*Context, error) {
+	if err := loadEGL(); err != nil {
+		return nil, err
+	}
 	eglDisp := eglGetDisplay(disp)
 	if eglDisp == nilEGLDisplay {
 		return nil, fmt.Errorf("eglGetDisplay failed: 0x%x", eglGetError())

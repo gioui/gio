@@ -3,8 +3,9 @@
 package egl
 
 import (
-	"os"
+	"fmt"
 	"runtime"
+	"sync"
 	"unsafe"
 
 	syscall "golang.org/x/sys/windows"
@@ -41,22 +42,36 @@ var (
 	_eglQueryString         = libEGL.NewProc("eglQueryString")
 )
 
-func init() {
-	mustLoadDLL(libEGL, "libEGL.dll")
-	mustLoadDLL(gl.LibGLESv2, "libGLESv2.dll")
-	// d3dcompiler_47.dll is needed internally for shader compilation to function.
-	mustLoadDLL(syscall.NewLazyDLL("d3dcompiler_47.dll"), "d3dcompiler_47.dll")
+var loadOnce sync.Once
+
+func loadEGL() error {
+	var err error
+	loadOnce.Do(func() {
+		err = loadDLLs()
+	})
+	return err
 }
 
-func mustLoadDLL(dll *syscall.LazyDLL, name string) {
+func loadDLLs() error {
+	if err := loadDLL(libEGL, "libEGL.dll"); err != nil {
+		return err
+	}
+	if err := loadDLL(gl.LibGLESv2, "libGLESv2.dll"); err != nil {
+		return err
+	}
+	// d3dcompiler_47.dll is needed internally for shader compilation to function.
+	return loadDLL(syscall.NewLazyDLL("d3dcompiler_47.dll"), "d3dcompiler_47.dll")
+}
+
+func loadDLL(dll *syscall.LazyDLL, name string) error {
 	loadErr := dll.Load()
 	if loadErr == nil {
-		return
+		return nil
 	}
 	pmsg := syscall.StringToUTF16Ptr("Failed to load " + name + ". Gio requires the ANGLE OpenGL ES driver to run. A prebuilt version can be downloaded from https://gioui.org/doc/install.")
 	ptitle := syscall.StringToUTF16Ptr("Error")
 	syscall.MessageBox(0 /* HWND */, pmsg, ptitle, syscall.MB_ICONERROR|syscall.MB_SYSTEMMODAL)
-	os.Exit(1)
+	return fmt.Errorf("egl: failed to load %s", name)
 }
 
 func eglChooseConfig(disp _EGLDisplay, attribs []_EGLint) (_EGLConfig, bool) {
