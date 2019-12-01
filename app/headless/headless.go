@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
+// Package headless implements headless windows for rendering
+// an operation list to an image.
 package headless
 
 import (
