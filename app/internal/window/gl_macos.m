@@ -164,7 +164,7 @@ void gio_clearCurrentContext(void) {
 
 void gio_makeCurrentContext(CFTypeRef ctxRef) {
 	NSOpenGLContext *ctx = (__bridge NSOpenGLContext *)ctxRef;
-	return [ctx makeCurrentContext];
+	[ctx makeCurrentContext];
 }
 
 void gio_lockContext(CFTypeRef ctxRef) {
