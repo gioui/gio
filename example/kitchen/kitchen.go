@@ -48,7 +48,7 @@ func main() {
 	gofont.Register()
 	if *screenshot != "" {
 		if err := saveScreenshot(*screenshot); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to save screenshot: %v", err)
+			fmt.Fprintf(os.Stderr, "failed to save screenshot: %v\n", err)
 			os.Exit(1)
 		}
 		os.Exit(0)
