@@ -13,7 +13,9 @@ import (
 	"image/png"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
+	"time"
 
 	"gioui.org/app"
 	"gioui.org/app/headless"
@@ -30,6 +32,10 @@ import (
 )
 
 var screenshot = flag.String("screenshot", "", "save a screenshot to a file and exit")
+
+type scaledConfig struct {
+	Scale float32
+}
 
 func main() {
 	flag.Parse()
@@ -57,13 +63,14 @@ func main() {
 }
 
 func saveScreenshot(f string) error {
-	sz := image.Point{X: 800, Y: 600}
+	const scale = 1.5
+	sz := image.Point{X: 800 * scale, Y: 600 * scale}
 	w, err := headless.NewWindow(sz.X, sz.Y)
 	if err != nil {
 		return err
 	}
 	gtx := new(layout.Context)
-	gtx.Reset(nil, sz)
+	gtx.Reset(&scaledConfig{scale}, sz)
 	th := material.NewTheme()
 	kitchen(gtx, th)
 	w.Frame(gtx.Ops)
@@ -181,6 +188,18 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 	list.Layout(gtx, len(widgets), func(i int) {
 		layout.UniformInset(unit.Dp(16)).Layout(gtx, widgets[i])
 	})
+}
+
+func (s *scaledConfig) Now() time.Time {
+	return time.Now()
+}
+
+func (s *scaledConfig) Px(v unit.Value) int {
+	scale := s.Scale
+	if v.U == unit.UnitPx {
+		scale = 1
+	}
+	return int(math.Round(float64(scale * v.V)))
 }
 
 const longText = `1. I learned from my grandfather, Verus, to use good manners, and to
