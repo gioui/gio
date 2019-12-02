@@ -44,7 +44,7 @@ type Direction uint8
 // computing dimensions for a user interface element.
 type Widget func()
 
-// Context carry the state needed by almost all layouts and widgets.
+// Context carries the state needed by almost all layouts and widgets.
 type Context struct {
 	// Constraints track the constraints for the active widget or
 	// layout.
