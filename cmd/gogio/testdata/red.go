@@ -53,9 +53,7 @@ func loop(w *app.Window) error {
 		color: color.RGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x80},
 	}
 
-	gtx := &layout.Context{
-		Queue: w.Queue(),
-	}
+	gtx := layout.NewContext(w.Queue())
 	for {
 		e := <-w.Events()
 		switch e := e.(type) {

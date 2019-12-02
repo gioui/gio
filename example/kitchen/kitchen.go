@@ -40,9 +40,7 @@ func main() {
 
 func loop(w *app.Window) error {
 	th := material.NewTheme()
-	gtx := &layout.Context{
-		Queue: w.Queue(),
-	}
+	gtx := layout.NewContext(w.Queue())
 	for {
 		e := <-w.Events()
 		switch e := e.(type) {

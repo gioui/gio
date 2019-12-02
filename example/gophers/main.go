@@ -77,9 +77,7 @@ func initProfiling() {
 
 func (a *App) run() error {
 	a.ui.profiling = *stats
-	gtx := &layout.Context{
-		Queue: a.w.Queue(),
-	}
+	gtx := layout.NewContext(a.w.Queue())
 	for {
 		select {
 		case users := <-a.updateUsers:
