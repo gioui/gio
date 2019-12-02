@@ -82,15 +82,16 @@ type Ops struct {
 	// External references for operations.
 	refs []interface{}
 
-	stackDepth int
-	macroDepth int
+	stackStack stack
+	macroStack stack
 }
 
 // StackOp saves and restores the operation state
 // in a stack-like manner.
 type StackOp struct {
 	stackDepth int
-	macroDepth int
+	id         stackID
+	macroID    int
 	active     bool
 	ops        *Ops
 }
@@ -100,6 +101,7 @@ type MacroOp struct {
 	recording bool
 	ops       *Ops
 	version   int
+	id        stackID
 	pc        pc
 }
 
@@ -115,6 +117,18 @@ type TransformOp struct {
 	offset f32.Point
 }
 
+// stack tracks the integer identities of StackOp and MacroOp
+// operations to ensure correct pairing of Push/Pop and Record/End.
+type stack struct {
+	currentID int
+	nextID    int
+}
+
+type stackID struct {
+	id   int
+	prev int
+}
+
 type pc struct {
 	data int
 	refs int
@@ -127,9 +141,8 @@ func (s *StackOp) Push(o *Ops) {
 	}
 	s.active = true
 	s.ops = o
-	o.stackDepth++
-	s.stackDepth = o.stackDepth
-	s.macroDepth = o.macroDepth
+	s.id = o.stackStack.push()
+	s.macroID = o.macroStack.currentID
 	data := o.Write(opconst.TypePushLen)
 	data[0] = byte(opconst.TypePush)
 }
@@ -139,21 +152,19 @@ func (s *StackOp) Pop() {
 	if !s.active {
 		panic("unbalanced pop")
 	}
-	if s.ops.stackDepth != s.stackDepth {
-		panic("unbalanced pop")
-	}
-	if s.ops.macroDepth != s.macroDepth {
+	if s.ops.macroStack.currentID != s.macroID {
 		panic("pop in a different macro than push")
 	}
+	s.ops.stackStack.pop(s.id)
 	s.active = false
-	s.ops.stackDepth--
 	data := s.ops.Write(opconst.TypePopLen)
 	data[0] = byte(opconst.TypePop)
 }
 
 // Reset the Ops, preparing it for re-use.
 func (o *Ops) Reset() {
-	o.stackDepth = 0
+	o.stackStack = stack{}
+	o.macroStack = stack{}
 	// Leave references to the GC.
 	for i := range o.refs {
 		o.refs[i] = nil
@@ -196,7 +207,7 @@ func (m *MacroOp) Record(o *Ops) {
 	}
 	m.recording = true
 	m.ops = o
-	m.ops.macroDepth++
+	m.id = m.ops.macroStack.push()
 	m.pc = o.pc()
 	// Reserve room for a macro definition. Updated in Stop.
 	m.ops.Write(opconst.TypeMacroDefLen)
@@ -208,7 +219,7 @@ func (m *MacroOp) Stop() {
 	if !m.recording {
 		panic("not recording")
 	}
-	m.ops.macroDepth--
+	m.ops.macroStack.pop(m.id)
 	m.recording = false
 	m.fill()
 }
@@ -284,4 +295,25 @@ func (t TransformOp) Add(o *Ops) {
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], math.Float32bits(t.offset.X))
 	bo.PutUint32(data[5:], math.Float32bits(t.offset.Y))
+}
+
+func (s *stack) push() stackID {
+	s.nextID++
+	sid := stackID{
+		id:   s.nextID,
+		prev: s.currentID,
+	}
+	s.currentID = s.nextID
+	return sid
+}
+
+func (s *stack) check(sid stackID) {
+	if s.currentID != sid.id {
+		panic("unbalanced operation")
+	}
+}
+
+func (s *stack) pop(sid stackID) {
+	s.check(sid)
+	s.currentID = sid.prev
 }
