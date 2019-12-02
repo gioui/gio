@@ -24,6 +24,11 @@ type Flex struct {
 	rigidSize int
 	// fraction is the rounding error from a Flex weighting.
 	fraction float32
+
+	// Use an empty StackOp for tracking whether Rigid, Flex
+	// is called in the same layout scope as Layout.
+	begun bool
+	stack op.StackOp
 }
 
 // FlexChild is the layout result of a call End.
@@ -58,6 +63,7 @@ const (
 // Rigid lays out a widget with the main axis constrained to the range
 // from 0 to the remaining space.
 func (f *Flex) Rigid(gtx *Context, w Widget) FlexChild {
+	f.begin(gtx.Ops)
 	cs := gtx.Constraints
 	mainc := axisMainConstraint(f.Axis, cs)
 	mainMax := mainc.Max - f.size
@@ -74,9 +80,18 @@ func (f *Flex) Rigid(gtx *Context, w Widget) FlexChild {
 	return FlexChild{m, dims}
 }
 
+func (f *Flex) begin(ops *op.Ops) {
+	if f.begun {
+		return
+	}
+	f.stack.Push(ops)
+	f.begun = true
+}
+
 // Flex is like Rigid, where the main axis size is also constrained to a
 // fraction of the space not taken up by Rigid children.
 func (f *Flex) Flex(gtx *Context, weight float32, w Widget) FlexChild {
+	f.begin(gtx.Ops)
 	cs := gtx.Constraints
 	mainc := axisMainConstraint(f.Axis, cs)
 	var flexSize int
@@ -111,6 +126,9 @@ func (f *Flex) expand(dims Dimensions) {
 // Layout a list of children. The order of the children determines their laid
 // out order.
 func (f *Flex) Layout(gtx *Context, children ...FlexChild) {
+	if len(children) > 0 {
+		f.stack.Pop()
+	}
 	var maxCross int
 	var maxBaseline int
 	for _, child := range children {
@@ -181,6 +199,7 @@ func (f *Flex) Layout(gtx *Context, children ...FlexChild) {
 	}
 	sz := axisPoint(f.Axis, mainSize, maxCross)
 	gtx.Dimensions = Dimensions{Size: sz, Baseline: sz.Y - maxBaseline}
+	f.begun = false
 	f.size = 0
 	f.rigidSize = 0
 }

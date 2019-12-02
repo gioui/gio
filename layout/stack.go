@@ -16,6 +16,10 @@ type Stack struct {
 	Alignment Direction
 
 	maxSZ image.Point
+	// Use an empty StackOp for tracking whether Rigid, Flex
+	// is called in the same layout scope as Layout.
+	begun bool
+	stack op.StackOp
 }
 
 // StackChild is the layout result of a call to End.
@@ -34,7 +38,7 @@ func (s *Stack) Rigid(gtx *Context, w Widget) StackChild {
 	m.Record(gtx.Ops)
 	dims := ctxLayout(gtx, cs, w)
 	m.Stop()
-	s.expand(dims)
+	s.expand(gtx.Ops, dims)
 	return StackChild{m, dims}
 }
 
@@ -48,11 +52,15 @@ func (s *Stack) Expand(gtx *Context, w Widget) StackChild {
 	}
 	dims := ctxLayout(gtx, cs, w)
 	m.Stop()
-	s.expand(dims)
+	s.expand(gtx.Ops, dims)
 	return StackChild{m, dims}
 }
 
-func (s *Stack) expand(dims Dimensions) {
+func (s *Stack) expand(ops *op.Ops, dims Dimensions) {
+	if !s.begun {
+		s.stack.Push(ops)
+		s.begun = true
+	}
 	if w := dims.Size.X; w > s.maxSZ.X {
 		s.maxSZ.X = w
 	}
@@ -64,8 +72,12 @@ func (s *Stack) expand(dims Dimensions) {
 // Layout a list of children. The order of the children determines their laid
 // out order.
 func (s *Stack) Layout(gtx *Context, children ...StackChild) {
+	if len(children) > 0 {
+		s.stack.Pop()
+	}
 	maxSZ := gtx.Constraints.Constrain(s.maxSZ)
 	s.maxSZ = image.Point{}
+	s.begun = false
 	var baseline int
 	for _, ch := range children {
 		sz := ch.dims.Size
