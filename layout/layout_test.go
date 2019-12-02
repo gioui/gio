@@ -3,23 +3,14 @@ package layout_test
 import (
 	"fmt"
 	"image"
-	"time"
 
-	"gioui.org/io/event"
 	"gioui.org/layout"
 	"gioui.org/unit"
 )
 
-type queue struct{}
-
-type config struct{}
-
-var q queue
-var cfg = new(config)
-
 func ExampleInset() {
-	gtx := &layout.Context{Queue: q}
-	gtx.Reset(cfg, image.Point{X: 100, Y: 100})
+	gtx := new(layout.Context)
+	gtx.Reset(nil, image.Point{X: 100, Y: 100})
 	// Loose constraints with no minimal size.
 	gtx.Constraints.Width.Min = 0
 	gtx.Constraints.Height.Min = 0
@@ -40,9 +31,9 @@ func ExampleInset() {
 }
 
 func ExampleAlign() {
-	gtx := &layout.Context{Queue: q}
+	gtx := new(layout.Context)
 	// Rigid constraints with both minimum and maximum set.
-	gtx.Reset(cfg, image.Point{X: 100, Y: 100})
+	gtx.Reset(nil, image.Point{X: 100, Y: 100})
 
 	align := layout.Align(layout.Center)
 	align.Layout(gtx, func() {
@@ -59,8 +50,8 @@ func ExampleAlign() {
 }
 
 func ExampleFlex() {
-	gtx := &layout.Context{Queue: q}
-	gtx.Reset(cfg, image.Point{X: 100, Y: 100})
+	gtx := new(layout.Context)
+	gtx.Reset(nil, image.Point{X: 100, Y: 100})
 
 	flex := layout.Flex{}
 
@@ -84,8 +75,8 @@ func ExampleFlex() {
 }
 
 func ExampleStack() {
-	gtx := &layout.Context{Queue: q}
-	gtx.Reset(cfg, image.Point{X: 100, Y: 100})
+	gtx := new(layout.Context)
+	gtx.Reset(nil, image.Point{X: 100, Y: 100})
 
 	stack := layout.Stack{}
 
@@ -107,8 +98,8 @@ func ExampleStack() {
 }
 
 func ExampleList() {
-	gtx := &layout.Context{Queue: q}
-	gtx.Reset(cfg, image.Point{X: 100, Y: 100})
+	gtx := new(layout.Context)
+	gtx.Reset(nil, image.Point{X: 100, Y: 100})
 
 	// The list is 1e6 elements, but only 5 fit the constraints.
 	const listLen = 1e6
@@ -133,16 +124,4 @@ func layoutWidget(ctx *layout.Context, width, height int) {
 			Y: height,
 		},
 	}
-}
-
-func (config) Now() time.Time {
-	return time.Now()
-}
-
-func (config) Px(v unit.Value) int {
-	return int(v.V + .5)
-}
-
-func (queue) Events(k event.Key) []event.Event {
-	return nil
 }

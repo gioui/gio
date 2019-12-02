@@ -114,7 +114,7 @@ func (e *Editor) processPointer(gtx *layout.Context) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Scroll(gtx.Config, gtx.Queue, gtx.Now(), axis)
+	sdist := e.scroller.Scroll(gtx, gtx, gtx.Now(), axis)
 	var soff int
 	if e.SingleLine {
 		e.scrollRel(sdist, 0)

@@ -122,7 +122,7 @@ func (l *List) Dragging() bool {
 }
 
 func (l *List) update() {
-	d := l.scroll.Scroll(l.ctx.Config, l.ctx.Queue, l.ctx.Now(), gesture.Axis(l.Axis))
+	d := l.scroll.Scroll(l.ctx, l.ctx, l.ctx.Now(), gesture.Axis(l.Axis))
 	l.scrollDelta = d
 	l.Position.Offset += d
 }
