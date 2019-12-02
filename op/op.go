@@ -86,7 +86,7 @@ type Ops struct {
 	macroDepth int
 }
 
-// StackOp can save and restore the operation state
+// StackOp saves and restores the operation state
 // in a stack-like manner.
 type StackOp struct {
 	stackDepth int
@@ -95,8 +95,7 @@ type StackOp struct {
 	ops        *Ops
 }
 
-// MacroOp can record a list of operations for later
-// use.
+// MacroOp records a list of operations for later use.
 type MacroOp struct {
 	recording bool
 	ops       *Ops
