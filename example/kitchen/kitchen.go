@@ -5,10 +5,18 @@ package main
 // A Gio program that demonstrates Gio widgets. See https://gioui.org for more information.
 
 import (
+	"bytes"
+	"flag"
+	"fmt"
+	"image"
 	"image/color"
+	"image/png"
+	"io/ioutil"
 	"log"
+	"os"
 
 	"gioui.org/app"
+	"gioui.org/app/headless"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/text"
@@ -21,7 +29,10 @@ import (
 	"gioui.org/font/gofont"
 )
 
+var screenshot = flag.String("screenshot", "", "save a screenshot to a file and exit")
+
 func main() {
+	flag.Parse()
 	editor.SetText(longText)
 	ic, err := material.NewIcon(icons.ContentAdd)
 	if err != nil {
@@ -29,6 +40,13 @@ func main() {
 	}
 	icon = ic
 	gofont.Register()
+	if *screenshot != "" {
+		if err := saveScreenshot(*screenshot); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to save screenshot: %v", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 	go func() {
 		w := app.NewWindow()
 		if err := loop(w); err != nil {
@@ -36,6 +54,28 @@ func main() {
 		}
 	}()
 	app.Main()
+}
+
+func saveScreenshot(f string) error {
+	sz := image.Point{X: 800, Y: 600}
+	w, err := headless.NewWindow(sz.X, sz.Y)
+	if err != nil {
+		return err
+	}
+	gtx := new(layout.Context)
+	gtx.Reset(nil, sz)
+	th := material.NewTheme()
+	kitchen(gtx, th)
+	w.Frame(gtx.Ops)
+	img, err := w.Screenshot()
+	if err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return err
+	}
+	return ioutil.WriteFile(f, buf.Bytes(), 0666)
 }
 
 func loop(w *app.Window) error {
