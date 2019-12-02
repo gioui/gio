@@ -28,7 +28,7 @@ type FrameEvent struct {
 	sync bool
 }
 
-// Config define the essential properties of
+// Config defines the essential properties of
 // the environment.
 type Config interface {
 	// Now returns the current animation time.
