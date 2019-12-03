@@ -1,0 +1,3 @@
+# Treat all files as binary, with no git magic updating
+# line endings.
+* -text
