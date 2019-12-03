@@ -212,8 +212,8 @@ const (
 )
 
 const (
-	materialTexture materialType = iota
-	materialColor
+	materialColor materialType = iota
+	materialTexture
 )
 
 var (
