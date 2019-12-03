@@ -37,6 +37,7 @@ const (
 	MAX_TEXTURE_SIZE                      = 0xd33
 	NEAREST                               = 0x2600
 	NO_ERROR                              = 0x0
+	NUM_EXTENSIONS                        = 0x821D
 	ONE                                   = 0x1
 	ONE_MINUS_SRC_ALPHA                   = 0x303
 	QUERY_RESULT                          = 0x8866

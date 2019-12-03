@@ -6,6 +6,8 @@ package gl
 
 import (
 	"unsafe"
+	"runtime"
+	"strings"
 )
 
 /*
@@ -41,6 +43,7 @@ static void (*_glDeleteQueries)(GLsizei n, const GLuint *ids);
 static void (*_glEndQuery)(GLenum target);
 static void (*_glGenQueries)(GLsizei n, GLuint *ids);
 static void (*_glGetQueryObjectuiv)(GLuint id, GLenum pname, GLuint *params);
+static const GLubyte* (*_glGetStringi)(GLenum name, GLuint index);
 
 // The pointer-free version of glVertexAttribPointer, to avoid the Cgo pointer checks.
 __attribute__ ((visibility ("hidden"))) void gio_glVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, uintptr_t offset) {
@@ -71,6 +74,13 @@ __attribute__ ((visibility ("hidden"))) void gio_glEndQuery(GLenum target) {
 	_glEndQuery(target);
 }
 
+__attribute__ ((visibility ("hidden"))) const GLubyte* gio_glGetStringi(GLenum name, GLuint index) {
+	if (_glGetStringi == NULL) {
+		return NULL;
+	}
+	return _glGetStringi(name, index);
+}
+
 __attribute__ ((visibility ("hidden"))) void gio_glGenQueries(GLsizei n, GLuint *ids) {
 	_glGenQueries(n, ids);
 }
@@ -89,10 +99,12 @@ __attribute__((constructor)) static void gio_loadGLFunctions() {
 	_glGenQueries = glGenQueries;
 	_glGetQueryObjectuiv = glGetQueryObjectuiv;
 	#endif
+	_glGetStringi = glGetStringi;
 #else
 	// Load libGLESv3 if available.
 	dlopen("libGLESv3.so", RTLD_NOW | RTLD_GLOBAL);
 	_glInvalidateFramebuffer = dlsym(RTLD_DEFAULT, "glInvalidateFramebuffer");
+	_glGetStringi = dlsym(RTLD_DEFAULT, "glGetStringi");
 	// Fall back to EXT_invalidate_framebuffer if available.
 	if (_glInvalidateFramebuffer == NULL) {
 		_glInvalidateFramebuffer = dlsym(RTLD_DEFAULT, "glDiscardFramebufferEXT");
@@ -364,9 +376,30 @@ func (f *Functions) GetShaderInfoLog(s Shader) string {
 	return string(buf)
 }
 
-func (f *Functions) GetString(pname Enum) string {
-	str := C.glGetString(C.GLenum(pname))
+func (f *Functions) GetStringi(pname Enum, index int) string {
+	str := C.gio_glGetStringi(C.GLenum(pname), C.GLuint(index))
+	if str == nil {
+		return ""
+	}
 	return C.GoString((*C.char)(unsafe.Pointer(str)))
+}
+
+func (f *Functions) GetString(pname Enum) string {
+	switch {
+	case runtime.GOOS == "darwin" && pname == EXTENSIONS:
+		// macOS OpenGL 3 core profile doesn't support glGetString(GL_EXTENSIONS).
+		// Use glGetStringi(GL_EXTENSIONS, <index>).
+		var exts []string
+		nexts := f.GetInteger(NUM_EXTENSIONS)
+		for i := 0; i < nexts; i++ {
+			ext := f.GetStringi(EXTENSIONS, i)
+			exts = append(exts, ext)
+		}
+		return strings.Join(exts, " ")
+	default:
+		str := C.glGetString(C.GLenum(pname))
+		return C.GoString((*C.char)(unsafe.Pointer(str)))
+	}
 }
 
 func (f *Functions) GetUniformLocation(p Program, name string) Uniform {
