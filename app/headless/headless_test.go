@@ -22,9 +22,10 @@ func TestHeadless(t *testing.T) {
 	col := color.RGBA{A: 0xff, R: 0xcc, G: 0xcc}
 	var ops op.Ops
 	paint.ColorOp{Color: col}.Add(&ops)
+	// Paint only part of the screen to avoid the glClear optimization.
 	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{
-		X: float32(sz.X),
-		Y: float32(sz.Y),
+		X: float32(sz.X) - 100,
+		Y: float32(sz.Y) - 100,
 	}}}.Add(&ops)
 	w.Frame(&ops)
 

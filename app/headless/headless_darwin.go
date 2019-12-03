@@ -13,8 +13,9 @@ import "gioui.org/app/internal/gl"
 import "C"
 
 type nsContext struct {
-	c   *gl.Functions
-	ctx C.CFTypeRef
+	c        *gl.Functions
+	ctx      C.CFTypeRef
+	prepared bool
 }
 
 func newContext() (context, error) {
@@ -24,6 +25,10 @@ func newContext() (context, error) {
 
 func (c *nsContext) MakeCurrent() error {
 	C.gio_headless_makeCurrentContext(c.ctx)
+	if !c.prepared {
+		C.gio_headless_prepareContext(c.ctx)
+		c.prepared = true
+	}
 	return nil
 }
 

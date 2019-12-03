@@ -5,6 +5,7 @@
 @import AppKit;
 @import OpenGL;
 @import OpenGL.GL;
+@import OpenGL.GL3;
 
 #include <CoreFoundation/CoreFoundation.h>
 #include "headless_darwin.h"
@@ -40,6 +41,13 @@ void gio_headless_clearCurrentContext(CFTypeRef ctxRef) {
 void gio_headless_makeCurrentContext(CFTypeRef ctxRef) {
 	NSOpenGLContext *ctx = (__bridge NSOpenGLContext *)ctxRef;
 	[ctx makeCurrentContext];
-	glEnable(GL_FRAMEBUFFER_SRGB);
 	CGLLockContext([ctx CGLContextObj]);
+}
+
+void gio_headless_prepareContext(CFTypeRef ctxRef) {
+	// Bind a default VBA to emulate OpenGL ES 2.
+	GLuint defVBA;
+	glGenVertexArrays(1, &defVBA);
+	glBindVertexArray(defVBA);
+	glEnable(GL_FRAMEBUFFER_SRGB);
 }
