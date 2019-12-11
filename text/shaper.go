@@ -5,7 +5,7 @@ package text
 import (
 	"unicode/utf8"
 
-	"gioui.org/op/clip"
+	"gioui.org/op"
 	"gioui.org/unit"
 	"golang.org/x/image/math/fixed"
 )
@@ -46,7 +46,7 @@ func (s *Shaper) Layout(c unit.Converter, font Font, str string, opts LayoutOpti
 	return tf.layout(fixed.I(c.Px(font.Size)), str, opts)
 }
 
-func (s *Shaper) Shape(c unit.Converter, font Font, str String) clip.Op {
+func (s *Shaper) Shape(c unit.Converter, font Font, str String) op.CallOp {
 	tf := s.faceForFont(font)
 	return tf.shape(fixed.I(c.Px(font.Size)), str)
 }
@@ -99,9 +99,9 @@ func (t *face) layout(ppem fixed.Int26_6, str string, opts LayoutOptions) *Layou
 	return l
 }
 
-func (t *face) shape(ppem fixed.Int26_6, str String) clip.Op {
+func (t *face) shape(ppem fixed.Int26_6, str String) op.CallOp {
 	if t == nil {
-		return clip.Op{}
+		return op.CallOp{}
 	}
 	pk := pathKey{
 		ppem: ppem,

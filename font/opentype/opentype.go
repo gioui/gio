@@ -42,7 +42,7 @@ func (f *Font) Layout(ppem fixed.Int26_6, str string, opts text.LayoutOptions) *
 	return layoutText(&f.buf, ppem, str, &opentype{Font: f.font, Hinting: font.HintingFull}, opts)
 }
 
-func (f *Font) Shape(ppem fixed.Int26_6, str text.String) clip.Op {
+func (f *Font) Shape(ppem fixed.Int26_6, str text.String) op.CallOp {
 	return textPath(&f.buf, ppem, &opentype{Font: f.font, Hinting: font.HintingFull}, str)
 }
 
@@ -130,7 +130,7 @@ func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, o
 	return &text.Layout{Lines: lines}
 }
 
-func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str text.String) clip.Op {
+func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str text.String) op.CallOp {
 	var lastPos f32.Point
 	var builder clip.Path
 	ops := new(op.Ops)
@@ -188,7 +188,8 @@ func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str text.String
 		x += str.Advances[advIdx]
 		advIdx++
 	}
-	return builder.End()
+	builder.End().Add(ops)
+	return op.CallOp{Ops: ops}
 }
 
 func (f *opentype) GlyphAdvance(buf *sfnt.Buffer, ppem fixed.Int26_6, r rune) (advance fixed.Int26_6, ok bool) {
