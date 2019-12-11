@@ -60,68 +60,67 @@ func (t *Theme) IconButton(icon *Icon) IconButton {
 func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 	col := b.Color
 	bgcol := b.Background
-	st := layout.Stack{Alignment: layout.Center}
 	hmin := gtx.Constraints.Width.Min
 	vmin := gtx.Constraints.Height.Min
-	lbl := st.Rigid(gtx, func() {
-		gtx.Constraints.Width.Min = hmin
-		gtx.Constraints.Height.Min = vmin
-		layout.Align(layout.Center).Layout(gtx, func() {
-			layout.Inset{Top: unit.Dp(10), Bottom: unit.Dp(10), Left: unit.Dp(12), Right: unit.Dp(12)}.Layout(gtx, func() {
-				paint.ColorOp{Color: col}.Add(gtx.Ops)
-				widget.Label{}.Layout(gtx, b.shaper, b.Font, b.Text)
+	layout.Stack{Alignment: layout.Center}.Layout(gtx,
+		layout.Expanded(func() {
+			rr := float32(gtx.Px(unit.Dp(4)))
+			clip.Rect{
+				Rect: f32.Rectangle{Max: f32.Point{
+					X: float32(gtx.Constraints.Width.Min),
+					Y: float32(gtx.Constraints.Height.Min),
+				}},
+				NE: rr, NW: rr, SE: rr, SW: rr,
+			}.Op(gtx.Ops).Add(gtx.Ops)
+			fill(gtx, bgcol)
+			for _, c := range button.History() {
+				drawInk(gtx, c)
+			}
+		}),
+		layout.Stacked(func() {
+			gtx.Constraints.Width.Min = hmin
+			gtx.Constraints.Height.Min = vmin
+			layout.Align(layout.Center).Layout(gtx, func() {
+				layout.Inset{Top: unit.Dp(10), Bottom: unit.Dp(10), Left: unit.Dp(12), Right: unit.Dp(12)}.Layout(gtx, func() {
+					paint.ColorOp{Color: col}.Add(gtx.Ops)
+					widget.Label{}.Layout(gtx, b.shaper, b.Font, b.Text)
+				})
 			})
-		})
-		pointer.Rect(image.Rectangle{Max: gtx.Dimensions.Size}).Add(gtx.Ops)
-		button.Layout(gtx)
-	})
-	bg := st.Expand(gtx, func() {
-		rr := float32(gtx.Px(unit.Dp(4)))
-		clip.Rect{
-			Rect: f32.Rectangle{Max: f32.Point{
-				X: float32(gtx.Constraints.Width.Min),
-				Y: float32(gtx.Constraints.Height.Min),
-			}},
-			NE: rr, NW: rr, SE: rr, SW: rr,
-		}.Op(gtx.Ops).Add(gtx.Ops)
-		fill(gtx, bgcol)
-		for _, c := range button.History() {
-			drawInk(gtx, c)
-		}
-	})
-	st.Layout(gtx, bg, lbl)
+			pointer.Rect(image.Rectangle{Max: gtx.Dimensions.Size}).Add(gtx.Ops)
+			button.Layout(gtx)
+		}),
+	)
 }
 
 func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
-	st := layout.Stack{}
-	ico := st.Rigid(gtx, func() {
-		layout.UniformInset(b.Padding).Layout(gtx, func() {
-			size := gtx.Px(b.Size) - 2*gtx.Px(b.Padding)
-			if b.Icon != nil {
-				b.Icon.Color = b.Color
-				b.Icon.Layout(gtx, unit.Px(float32(size)))
+	layout.Stack{}.Layout(gtx,
+		layout.Expanded(func() {
+			size := float32(gtx.Constraints.Width.Min)
+			rr := float32(size) * .5
+			clip.Rect{
+				Rect: f32.Rectangle{Max: f32.Point{X: size, Y: size}},
+				NE:   rr, NW: rr, SE: rr, SW: rr,
+			}.Op(gtx.Ops).Add(gtx.Ops)
+			fill(gtx, b.Background)
+			for _, c := range button.History() {
+				drawInk(gtx, c)
 			}
-			gtx.Dimensions = layout.Dimensions{
-				Size: image.Point{X: size, Y: size},
-			}
-		})
-		pointer.Ellipse(image.Rectangle{Max: gtx.Dimensions.Size}).Add(gtx.Ops)
-		button.Layout(gtx)
-	})
-	bgcol := b.Background
-	bg := st.Expand(gtx, func() {
-		size := float32(gtx.Constraints.Width.Min)
-		rr := float32(size) * .5
-		clip.Rect{
-			Rect: f32.Rectangle{Max: f32.Point{X: size, Y: size}},
-			NE:   rr, NW: rr, SE: rr, SW: rr,
-		}.Op(gtx.Ops).Add(gtx.Ops)
-		fill(gtx, bgcol)
-		for _, c := range button.History() {
-			drawInk(gtx, c)
-		}
-	})
-	st.Layout(gtx, bg, ico)
+		}),
+		layout.Stacked(func() {
+			layout.UniformInset(b.Padding).Layout(gtx, func() {
+				size := gtx.Px(b.Size) - 2*gtx.Px(b.Padding)
+				if b.Icon != nil {
+					b.Icon.Color = b.Color
+					b.Icon.Layout(gtx, unit.Px(float32(size)))
+				}
+				gtx.Dimensions = layout.Dimensions{
+					Size: image.Point{X: size, Y: size},
+				}
+			})
+			pointer.Ellipse(image.Rectangle{Max: gtx.Dimensions.Size}).Add(gtx.Ops)
+			button.Layout(gtx)
+		}),
+	)
 }
 
 func toPointF(p image.Point) f32.Point {

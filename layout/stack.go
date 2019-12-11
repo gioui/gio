@@ -14,70 +14,79 @@ type Stack struct {
 	// Alignment is the direction to align children
 	// smaller than the available space.
 	Alignment Direction
-
-	maxSZ image.Point
-	// Use an empty StackOp for tracking whether Rigid, Flex
-	// is called in the same layout scope as Layout.
-	begun bool
-	stack op.StackOp
 }
 
-// StackChild is the layout result of a call to End.
+// StackChild represents a child for a Stack layout.
 type StackChild struct {
+	expanded bool
+	widget   Widget
+
+	// Scratch space.
 	macro op.MacroOp
 	dims  Dimensions
 }
 
-// Rigid lays out a widget with the same constraints that were
-// passed to Init.
-func (s *Stack) Rigid(gtx *Context, w Widget) StackChild {
-	cs := gtx.Constraints
-	cs.Width.Min = 0
-	cs.Height.Min = 0
-	var m op.MacroOp
-	m.Record(gtx.Ops)
-	dims := ctxLayout(gtx, cs, w)
-	m.Stop()
-	s.expand(gtx.Ops, dims)
-	return StackChild{m, dims}
-}
-
-// Expand lays out a widget.
-func (s *Stack) Expand(gtx *Context, w Widget) StackChild {
-	var m op.MacroOp
-	m.Record(gtx.Ops)
-	cs := Constraints{
-		Width:  Constraint{Min: s.maxSZ.X, Max: gtx.Constraints.Width.Max},
-		Height: Constraint{Min: s.maxSZ.Y, Max: gtx.Constraints.Height.Max},
-	}
-	dims := ctxLayout(gtx, cs, w)
-	m.Stop()
-	s.expand(gtx.Ops, dims)
-	return StackChild{m, dims}
-}
-
-func (s *Stack) expand(ops *op.Ops, dims Dimensions) {
-	if !s.begun {
-		s.stack.Push(ops)
-		s.begun = true
-	}
-	if w := dims.Size.X; w > s.maxSZ.X {
-		s.maxSZ.X = w
-	}
-	if h := dims.Size.Y; h > s.maxSZ.Y {
-		s.maxSZ.Y = h
+// Stacked returns a Stack child that laid out with the same maximum
+// constraints as the Stack.
+func Stacked(w Widget) StackChild {
+	return StackChild{
+		widget: w,
 	}
 }
 
-// Layout a list of children. The order of the children determines their laid
-// out order.
-func (s *Stack) Layout(gtx *Context, children ...StackChild) {
-	if len(children) > 0 {
-		s.stack.Pop()
+// Expanded returns a Stack child that is forced to take up at least
+// the the space as the largest Stacked.
+func Expanded(w Widget) StackChild {
+	return StackChild{
+		expanded: true,
+		widget:   w,
 	}
-	maxSZ := gtx.Constraints.Constrain(s.maxSZ)
-	s.maxSZ = image.Point{}
-	s.begun = false
+}
+
+// Layout a stack of children. The position of the children are
+// determined by the specified order, but Stacked children are laid out
+// before Expanded children.
+func (s Stack) Layout(gtx *Context, children ...StackChild) {
+	var maxSZ image.Point
+	// First lay out Stacked children.
+	for i, w := range children {
+		if w.expanded {
+			continue
+		}
+		cs := gtx.Constraints
+		cs.Width.Min = 0
+		cs.Height.Min = 0
+		var m op.MacroOp
+		m.Record(gtx.Ops)
+		dims := ctxLayout(gtx, cs, w.widget)
+		m.Stop()
+		if w := dims.Size.X; w > maxSZ.X {
+			maxSZ.X = w
+		}
+		if h := dims.Size.Y; h > maxSZ.Y {
+			maxSZ.Y = h
+		}
+		children[i].macro = m
+		children[i].dims = dims
+	}
+	maxSZ = gtx.Constraints.Constrain(maxSZ)
+	// Then lay out Expanded children.
+	for i, w := range children {
+		if !w.expanded {
+			continue
+		}
+		var m op.MacroOp
+		m.Record(gtx.Ops)
+		cs := Constraints{
+			Width:  Constraint{Min: maxSZ.X, Max: gtx.Constraints.Width.Max},
+			Height: Constraint{Min: maxSZ.Y, Max: gtx.Constraints.Height.Max},
+		}
+		dims := ctxLayout(gtx, cs, w.widget)
+		m.Stop()
+		children[i].macro = m
+		children[i].dims = dims
+	}
+
 	var baseline int
 	for _, ch := range children {
 		sz := ch.dims.Size

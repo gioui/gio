@@ -74,21 +74,20 @@ func ExampleFlex() {
 func ExampleStack() {
 	gtx := new(layout.Context)
 	gtx.Reset(nil, image.Point{X: 100, Y: 100})
+	gtx.Constraints.Width.Min = 0
+	gtx.Constraints.Height.Min = 0
 
-	stack := layout.Stack{}
-
-	// Rigid 50x50 widget.
-	child1 := stack.Rigid(gtx, func() {
-		layoutWidget(gtx, 50, 50)
-	})
-
-	// Force widget to the same size as the first.
-	child2 := stack.Expand(gtx, func() {
-		fmt.Printf("Expand: %v\n", gtx.Constraints)
-		layoutWidget(gtx, 10, 10)
-	})
-
-	stack.Layout(gtx, child1, child2)
+	layout.Stack{}.Layout(gtx,
+		// Force widget to the same size as the second.
+		layout.Expanded(func() {
+			fmt.Printf("Expand: %v\n", gtx.Constraints)
+			layoutWidget(gtx, 10, 10)
+		}),
+		// Rigid 50x50 widget.
+		layout.Stacked(func() {
+			layoutWidget(gtx, 50, 50)
+		}),
+	)
 
 	// Output:
 	// Expand: {{50 100} {50 100}}
