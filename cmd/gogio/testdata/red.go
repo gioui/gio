@@ -62,20 +62,24 @@ func loop(w *app.Window) error {
 		case system.FrameEvent:
 
 			gtx.Reset(e.Config, e.Size)
-			rows := layout.Flex{Axis: layout.Vertical}
-			r1 := rows.Flex(gtx, 0.5, func() {
-				columns := layout.Flex{Axis: layout.Horizontal}
-				r1c1 := columns.Flex(gtx, 0.5, func() { topLeft.Layout(gtx) })
-				r1c2 := columns.Flex(gtx, 0.5, func() { topRight.Layout(gtx) })
-				columns.Layout(gtx, r1c1, r1c2)
-			})
-			r2 := rows.Flex(gtx, 0.5, func() {
-				columns := layout.Flex{Axis: layout.Horizontal}
-				r2c1 := columns.Flex(gtx, 0.5, func() { botLeft.Layout(gtx) })
-				r2c2 := columns.Flex(gtx, 0.5, func() { botRight.Layout(gtx) })
-				columns.Layout(gtx, r2c1, r2c2)
-			})
-			rows.Layout(gtx, r1, r2)
+			layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+				layout.Flexed(0.5, func() {
+					layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
+						// r1c1
+						layout.Flexed(0.5, func() { topLeft.Layout(gtx) }),
+						// r1c2
+						layout.Flexed(0.5, func() { topRight.Layout(gtx) }),
+					)
+				}),
+				layout.Flexed(0.5, func() {
+					layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
+						// r2c1
+						layout.Flexed(0.5, func() { botLeft.Layout(gtx) }),
+						// r2c2
+						layout.Flexed(0.5, func() { botRight.Layout(gtx) }),
+					)
+				}),
+			)
 
 			e.Frame(gtx.Ops)
 

@@ -141,48 +141,48 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 			}
 		},
 		func() {
-			buttons := layout.Flex{Alignment: layout.Middle}
 			in := layout.UniformInset(unit.Dp(8))
-			b1 := buttons.Rigid(gtx, func() {
-				in.Layout(gtx, func() {
-					th.IconButton(icon).Layout(gtx, iconButton)
-				})
-			})
-			b2 := buttons.Rigid(gtx, func() {
-				in.Layout(gtx, func() {
-					for button.Clicked(gtx) {
-						green = !green
-					}
-					th.Button("Click me!").Layout(gtx, button)
-				})
-			})
-			b3 := buttons.Rigid(gtx, func() {
-				in.Layout(gtx, func() {
-					var btn material.Button
-					btn = th.Button("Green button")
-					if green {
-						btn.Background = color.RGBA{A: 0xff, R: 0x9e, G: 0x9d, B: 0x24}
-					}
-					btn.Layout(gtx, greenButton)
-				})
-			})
-			buttons.Layout(gtx, b1, b2, b3)
+			layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Rigid(func() {
+					in.Layout(gtx, func() {
+						th.IconButton(icon).Layout(gtx, iconButton)
+					})
+				}),
+				layout.Rigid(func() {
+					in.Layout(gtx, func() {
+						for button.Clicked(gtx) {
+							green = !green
+						}
+						th.Button("Click me!").Layout(gtx, button)
+					})
+				}),
+				layout.Rigid(func() {
+					in.Layout(gtx, func() {
+						var btn material.Button
+						btn = th.Button("Green button")
+						if green {
+							btn.Background = color.RGBA{A: 0xff, R: 0x9e, G: 0x9d, B: 0x24}
+						}
+						btn.Layout(gtx, greenButton)
+					})
+				}),
+			)
 		},
 		func() {
 			th.CheckBox("Checkbox").Layout(gtx, checkbox)
 		},
 		func() {
-			group := layout.Flex{}
-			r1 := group.Rigid(gtx, func() {
-				th.RadioButton("r1", "RadioButton1").Layout(gtx, radioButtonsGroup)
-			})
-			r2 := group.Rigid(gtx, func() {
-				th.RadioButton("r2", "RadioButton2").Layout(gtx, radioButtonsGroup)
-			})
-			r3 := group.Rigid(gtx, func() {
-				th.RadioButton("r3", "RadioButton3").Layout(gtx, radioButtonsGroup)
-			})
-			group.Layout(gtx, r1, r2, r3)
+			layout.Flex{}.Layout(gtx,
+				layout.Rigid(func() {
+					th.RadioButton("r1", "RadioButton1").Layout(gtx, radioButtonsGroup)
+				}),
+				layout.Rigid(func() {
+					th.RadioButton("r2", "RadioButton2").Layout(gtx, radioButtonsGroup)
+				}),
+				layout.Rigid(func() {
+					th.RadioButton("r3", "RadioButton3").Layout(gtx, radioButtonsGroup)
+				}),
+			)
 		},
 	}
 	list.Layout(gtx, len(widgets), func(i int) {
