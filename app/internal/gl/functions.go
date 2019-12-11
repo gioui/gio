@@ -5,9 +5,9 @@
 package gl
 
 import (
-	"unsafe"
 	"runtime"
 	"strings"
+	"unsafe"
 )
 
 /*
