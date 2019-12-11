@@ -173,7 +173,7 @@ func (f *Flex) Layout(gtx *Context, children ...FlexChild) {
 		var stack op.StackOp
 		stack.Push(gtx.Ops)
 		op.TransformOp{}.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))).Add(gtx.Ops)
-		child.macro.Add(gtx.Ops)
+		child.macro.Add()
 		stack.Pop()
 		mainSize += axisMain(f.Axis, dims.Size)
 		if i < len(children)-1 {

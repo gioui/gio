@@ -31,7 +31,7 @@ const (
 
 const (
 	TypeMacroDefLen     = 1 + 4 + 4
-	TypeMacroLen        = 1 + 4 + 4 + 4
+	TypeMacroLen        = 1 + 4 + 4
 	TypeTransformLen    = 1 + 4*2
 	TypeLayerLen        = 1
 	TypeRedrawLen       = 1 + 8
@@ -77,7 +77,7 @@ func (t OpType) Size() int {
 
 func (t OpType) NumRefs() int {
 	switch t {
-	case TypeMacro, TypeKeyInput, TypePointerInput, TypeProfile, TypeCall:
+	case TypeKeyInput, TypePointerInput, TypeProfile, TypeCall:
 		return 1
 	case TypeImage:
 		return 2

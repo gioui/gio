@@ -56,7 +56,7 @@ func (e Editor) Layout(gtx *layout.Context, editor *widget.Editor) {
 		paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
 		editor.PaintText(gtx)
 	} else {
-		macro.Add(gtx.Ops)
+		macro.Add()
 	}
 	paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
 	editor.PaintCaret(gtx)
