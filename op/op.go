@@ -45,6 +45,12 @@ The StackOp saves the current state to the state stack and restores it later:
 	// Restore the previous transform.
 	stack.Pop()
 
+The CallOp invokes another operation list:
+
+	ops := new(op.Ops)
+	ops2 := new(op.Ops)
+	op.CallOp{Ops: ops2}.Add(ops)
+
 The MacroOp records a list of operations to be executed later:
 
 	ops := new(op.Ops)
@@ -105,6 +111,13 @@ type MacroOp struct {
 	pc        pc
 }
 
+// CallOp invokes all the operations from a separate
+// operations list.
+type CallOp struct {
+	// Ops is the list of operations to invoke.
+	Ops *Ops
+}
+
 // InvalidateOp requests a redraw at the given time. Use
 // the zero value to request an immediate redraw.
 type InvalidateOp struct {
@@ -132,6 +145,15 @@ type stackID struct {
 type pc struct {
 	data int
 	refs int
+}
+
+// Add the call to the operation list.
+func (c CallOp) Add(o *Ops) {
+	if c.Ops == nil {
+		return
+	}
+	data := o.Write(opconst.TypeCallLen, c.Ops)
+	data[0] = byte(opconst.TypeCall)
 }
 
 // Push (save) the current operations state.

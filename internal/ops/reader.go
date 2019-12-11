@@ -38,6 +38,11 @@ type macroOp struct {
 	pc      pc
 }
 
+// Shadow of op.CallOp.
+type callOp struct {
+	ops *op.Ops
+}
+
 type pc struct {
 	data int
 	refs int
@@ -94,6 +99,24 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 			block := r.stack[len(r.stack)-1]
 			n += block.endPC.data - r.pc.data - opconst.TypeAuxLen
 			data = data[:n]
+		case opconst.TypeCall:
+			var op callOp
+			op.decode(data, refs)
+			endPC := pc{
+				data: len(op.ops.Data()),
+				refs: len(op.ops.Refs()),
+			}
+			retPC := r.pc
+			retPC.data += n
+			retPC.refs += nrefs
+			r.stack = append(r.stack, macro{
+				ops:   r.ops,
+				retPC: retPC,
+				endPC: endPC,
+			})
+			r.pc = pc{}
+			r.ops = op.ops
+			continue
 		case opconst.TypeMacro:
 			var op macroOp
 			op.decode(data, refs)
@@ -145,6 +168,15 @@ func (op *opMacroDef) decode(data []byte) {
 			data: dataIdx,
 			refs: refsIdx,
 		},
+	}
+}
+
+func (m *callOp) decode(data []byte, refs []interface{}) {
+	if opconst.OpType(data[0]) != opconst.TypeCall {
+		panic("invalid op")
+	}
+	*m = callOp{
+		ops: refs[0].(*op.Ops),
 	}
 }
 

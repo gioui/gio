@@ -26,6 +26,7 @@ const (
 	TypeAux
 	TypeClip
 	TypeProfile
+	TypeCall
 )
 
 const (
@@ -47,6 +48,7 @@ const (
 	TypeAuxLen          = 1
 	TypeClipLen         = 1 + 4*4
 	TypeProfileLen      = 1
+	TypeCallLen         = 1
 )
 
 func (t OpType) Size() int {
@@ -69,12 +71,13 @@ func (t OpType) Size() int {
 		TypeAuxLen,
 		TypeClipLen,
 		TypeProfileLen,
+		TypeCallLen,
 	}[t-firstOpIndex]
 }
 
 func (t OpType) NumRefs() int {
 	switch t {
-	case TypeMacro, TypeKeyInput, TypePointerInput, TypeProfile:
+	case TypeMacro, TypeKeyInput, TypePointerInput, TypeProfile, TypeCall:
 		return 1
 	case TypeImage:
 		return 2
