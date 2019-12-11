@@ -53,21 +53,18 @@ func ExampleFlex() {
 	gtx := new(layout.Context)
 	gtx.Reset(nil, image.Point{X: 100, Y: 100})
 
-	flex := layout.Flex{}
-
-	// Rigid 10x10 widget.
-	child1 := flex.Rigid(gtx, func() {
-		fmt.Printf("Rigid: %v\n", gtx.Constraints.Width)
-		layoutWidget(gtx, 10, 10)
-	})
-
-	// Child with 50% space allowance.
-	child2 := flex.Flex(gtx, 0.5, func() {
-		fmt.Printf("50%%: %v\n", gtx.Constraints.Width)
-		layoutWidget(gtx, 10, 10)
-	})
-
-	flex.Layout(gtx, child1, child2)
+	layout.Flex{}.Layout(gtx,
+		// Rigid 10x10 widget.
+		layout.Rigid(func() {
+			fmt.Printf("Rigid: %v\n", gtx.Constraints.Width)
+			layoutWidget(gtx, 10, 10)
+		}),
+		// Child with 50% space allowance.
+		layout.Flexed(0.5, func() {
+			fmt.Printf("50%%: %v\n", gtx.Constraints.Width)
+			layoutWidget(gtx, 10, 10)
+		}),
+	)
 
 	// Output:
 	// Rigid: {0 100}
