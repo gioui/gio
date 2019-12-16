@@ -39,7 +39,7 @@ Main
 The Main function must be called from a program's main function, to hand over
 control of the main thread to operating systems that need it.
 
-Because Main is also blocking, the event loop of a Window must run in a goroutine.
+Because Main is also blocking on some platforms, the event loop of a Window must run in a goroutine.
 
 For example, to display a blank but otherwise functional window:
 
