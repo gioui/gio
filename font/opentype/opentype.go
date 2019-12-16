@@ -17,7 +17,7 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-// Font implementats text.Face.
+// Font implements text.Face.
 type Font struct {
 	font *sfnt.Font
 	buf  sfnt.Buffer
