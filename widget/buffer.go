@@ -35,20 +35,19 @@ func (e *editBuffer) Changed() bool {
 	return c
 }
 
-func (e *editBuffer) deleteRuneForward() {
+func (e *editBuffer) deleteRunes(runes int) {
 	e.moveGap(0)
-	_, s := utf8.DecodeRune(e.text[e.gapend:])
-	e.gapend += s
-	e.changed = e.changed || s > 0
-	e.dump()
-}
-
-func (e *editBuffer) deleteRune() {
-	e.moveGap(0)
-	_, s := utf8.DecodeLastRune(e.text[:e.gapstart])
-	e.gapstart -= s
-	e.caret -= s
-	e.changed = e.changed || s > 0
+	for ; runes < 0 && e.gapstart > 0; runes++ {
+		_, s := utf8.DecodeLastRune(e.text[:e.gapstart])
+		e.gapstart -= s
+		e.caret -= s
+		e.changed = e.changed || s > 0
+	}
+	for ; runes > 0 && e.gapend < len(e.text); runes-- {
+		_, s := utf8.DecodeRune(e.text[e.gapend:])
+		e.gapend += s
+		e.changed = e.changed || s > 0
+	}
 	e.dump()
 }
 
@@ -141,15 +140,15 @@ func (e *editBuffer) dump() {
 	}
 }
 
-func (e *editBuffer) moveLeft() {
-	_, s := e.runeBefore(e.caret)
-	e.caret -= s
-	e.dump()
-}
-
-func (e *editBuffer) moveRight() {
-	_, s := e.runeAt(e.caret)
-	e.caret += s
+func (e *editBuffer) move(runes int) {
+	for ; runes < 0 && e.caret > 0; runes++ {
+		_, s := e.runeBefore(e.caret)
+		e.caret -= s
+	}
+	for ; runes > 0 && e.caret < len(e.text); runes-- {
+		_, s := e.runeAt(e.caret)
+		e.caret += s
+	}
 	e.dump()
 }
 
