@@ -19,8 +19,3 @@ Post discussion to the [mailing list](https://lists.sr.ht/~eliasnaur/gio) and pa
 account is required and you can post without being subscribed.
 
 See the [contribution guide](https://gioui.org/doc/contribute) for more details.
-
-
-## License
-
-Dual-licensed under [UNLICENSE](https://unlicense.org) or the [MIT](https://spdx.org/licenses/MIT.html).
