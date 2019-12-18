@@ -5,6 +5,8 @@
 package opentype
 
 import (
+	"io"
+
 	"unicode"
 	"unicode/utf8"
 
@@ -23,6 +25,11 @@ type Font struct {
 	buf  sfnt.Buffer
 }
 
+// Collection is a collection of one or more fonts.
+type Collection struct {
+	coll *sfnt.Collection
+}
+
 type opentype struct {
 	Font    *sfnt.Font
 	Hinting font.Hinting
@@ -32,6 +39,46 @@ type opentype struct {
 // data source.
 func Parse(src []byte) (*Font, error) {
 	fnt, err := sfnt.Parse(src)
+	if err != nil {
+		return nil, err
+	}
+	return &Font{font: fnt}, nil
+}
+
+// ParseCollection parses an SFNT font collection, such as TTC or OTC data,
+// from a []byte data source.
+//
+// If passed data for a single font, a TTF or OTF instead of a TTC or OTC,
+// it will return a collection containing 1 font.
+func ParseCollection(src []byte) (*Collection, error) {
+	c, err := sfnt.ParseCollection(src)
+	if err != nil {
+		return nil, err
+	}
+	return &Collection{c}, nil
+}
+
+// ParseCollectionReaderAt parses an SFNT collection, such as TTC or OTC data,
+// from an io.ReaderAt data source.
+//
+// If passed data for a single font, a TTF or OTF instead of a TTC or OTC, it
+// will return a collection containing 1 font.
+func ParseCollectionReaderAt(src io.ReaderAt) (*Collection, error) {
+	c, err := sfnt.ParseCollectionReaderAt(src)
+	if err != nil {
+		return nil, err
+	}
+	return &Collection{c}, nil
+}
+
+// NumFonts returns the number of fonts in the collection.
+func (c *Collection) NumFonts() int {
+	return c.coll.NumFonts()
+}
+
+// Font returns the i'th font in the collection.
+func (c *Collection) Font(i int) (*Font, error) {
+	fnt, err := c.coll.Font(i)
 	if err != nil {
 		return nil, err
 	}
