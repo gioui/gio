@@ -1089,10 +1089,10 @@ func waylandConnect() error {
 		return fmt.Errorf("wayland: %v", err)
 	}
 	c.xkb = xkb
-	c.disp = C.wl_display_connect(nil)
+	c.disp, err = C.wl_display_connect(nil)
 	if c.disp == nil {
 		c.destroy()
-		return errors.New("wayland: wl_display_connect failed")
+		return fmt.Errorf("wayland: wl_display_connect failed: %v", err)
 	}
 	reg := C.wl_display_get_registry(c.disp)
 	if reg == nil {
