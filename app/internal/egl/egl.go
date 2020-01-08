@@ -33,7 +33,6 @@ type eglContext struct {
 }
 
 var (
-	nilEGLDisplay          _EGLDisplay
 	nilEGLSurface          _EGLSurface
 	nilEGLContext          _EGLContext
 	nilEGLConfig           _EGLConfig
@@ -56,6 +55,7 @@ const (
 	_EGL_OPENGL_ES2_BIT         = 0x4
 	_EGL_RED_SIZE               = 0x3024
 	_EGL_RENDERABLE_TYPE        = 0x3040
+	_EGL_SUCCESS                = 0x3000
 	_EGL_SURFACE_TYPE           = 0x3033
 	_EGL_WINDOW_BIT             = 0x4
 )
@@ -72,7 +72,6 @@ func (c *Context) Release() {
 		eglReleaseThread()
 		c.eglCtx = nil
 	}
-	c.disp = nilEGLDisplay
 }
 
 func (c *Context) Present() error {
@@ -80,7 +79,7 @@ func (c *Context) Present() error {
 		c.srgbFBO.Blit()
 	}
 	if !eglSwapBuffers(c.disp, c.eglSurf) {
-		return fmt.Errorf("eglSwapBuffers failed (%x)", eglGetError())
+		return fmt.Errorf("eglSwapBuffers: %v", eglErr())
 	}
 	if c.srgbFBO != nil {
 		c.srgbFBO.AfterPresent()
@@ -93,8 +92,8 @@ func NewContext(disp NativeDisplayType) (*Context, error) {
 		return nil, err
 	}
 	eglDisp := eglGetDisplay(disp)
-	if eglDisp == nilEGLDisplay {
-		return nil, fmt.Errorf("eglGetDisplay failed: 0x%x", eglGetError())
+	if err := eglErr(); err != nil {
+		return nil, fmt.Errorf("eglGetDisplay: %v", err)
 	}
 	eglCtx, err := createContext(eglDisp)
 	if err != nil {
@@ -106,6 +105,14 @@ func NewContext(disp NativeDisplayType) (*Context, error) {
 		c:      new(gl.Functions),
 	}
 	return c, nil
+}
+
+func eglErr() error {
+	errCode := eglGetError()
+	if errCode == _EGL_SUCCESS {
+		return nil
+	}
+	return fmt.Errorf("EGL error 0x%x", errCode)
 }
 
 func (c *Context) Functions() *gl.Functions {
@@ -137,9 +144,7 @@ func (c *Context) CreateSurface(win NativeWindowType, width, height int) error {
 }
 
 func (c *Context) ReleaseCurrent() {
-	if c.disp != nilEGLDisplay {
-		eglMakeCurrent(c.disp, nilEGLSurface, nilEGLSurface, nilEGLContext)
-	}
+	eglMakeCurrent(c.disp, nilEGLSurface, nilEGLSurface, nilEGLContext)
 }
 
 func (c *Context) MakeCurrent() error {
@@ -147,7 +152,7 @@ func (c *Context) MakeCurrent() error {
 		return errors.New("no surface created yet EGL_KHR_surfaceless_context is not supported")
 	}
 	if !eglMakeCurrent(c.disp, c.eglSurf, c.eglSurf, c.eglCtx.ctx) {
-		return fmt.Errorf("eglMakeCurrent error 0x%x", eglGetError())
+		return fmt.Errorf("eglMakeCurrent: %v", eglErr())
 	}
 	if c.eglCtx.srgb || c.eglSurf == nilEGLSurface {
 		return nil
@@ -186,7 +191,7 @@ func hasExtension(exts []string, ext string) bool {
 func createContext(disp _EGLDisplay) (*eglContext, error) {
 	major, minor, ret := eglInitialize(disp)
 	if !ret {
-		return nil, fmt.Errorf("eglInitialize failed: 0x%x", eglGetError())
+		return nil, fmt.Errorf("eglInitialize: %v", eglErr())
 	}
 	// sRGB framebuffer support on EGL 1.5 or if EGL_KHR_gl_colorspace is supported.
 	exts := strings.Split(eglQueryString(disp, _EGL_EXTENSIONS), " ")
@@ -211,7 +216,7 @@ func createContext(disp _EGLDisplay) (*eglContext, error) {
 	attribs = append(attribs, _EGL_NONE)
 	eglCfg, ret := eglChooseConfig(disp, attribs)
 	if !ret {
-		return nil, fmt.Errorf("eglChooseConfig failed: 0x%x", eglGetError())
+		return nil, fmt.Errorf("eglChooseConfig: %v", eglErr())
 	}
 	if eglCfg == nilEGLConfig {
 		return nil, errors.New("eglChooseConfig returned 0 configs")
@@ -233,7 +238,7 @@ func createContext(disp _EGLDisplay) (*eglContext, error) {
 		}
 		eglCtx = eglCreateContext(disp, eglCfg, nilEGLContext, ctxAttribs)
 		if eglCtx == nilEGLContext {
-			return nil, fmt.Errorf("eglCreateContext failed: 0x%x", eglGetError())
+			return nil, fmt.Errorf("eglCreateContext: %v", eglErr())
 		}
 	}
 	return &eglContext{
@@ -259,7 +264,7 @@ func createSurface(disp _EGLDisplay, eglCtx *eglContext, win NativeWindowType) (
 		eglSurf = eglCreateWindowSurface(disp, eglCtx.config, win, surfAttribs)
 	}
 	if eglSurf == nilEGLSurface {
-		return nilEGLSurface, fmt.Errorf("newContext: eglCreateWindowSurface failed 0x%x (sRGB=%v)", eglGetError(), eglCtx.srgb)
+		return nilEGLSurface, fmt.Errorf("newContext: eglCreateWindowSurface (sRGB=%v): %v", eglCtx.srgb, eglErr())
 	}
 	return eglSurf, nil
 }
