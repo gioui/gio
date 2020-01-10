@@ -59,7 +59,7 @@ func NewImageOp(src image.Image) ImageOp {
 	dst := image.NewRGBA(image.Rectangle{
 		Max: sz,
 	})
-	draw.Draw(dst, src.Bounds(), src, image.Point{}, draw.Src)
+	draw.Draw(dst, dst.Bounds(), src, src.Bounds().Min, draw.Src)
 	return ImageOp{
 		src:    dst,
 		handle: new(int),
