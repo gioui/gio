@@ -93,6 +93,12 @@ func NewContext(disp NativeDisplayType) (*Context, error) {
 		return nil, err
 	}
 	eglDisp := eglGetDisplay(disp)
+	// eglGetDisplay can return EGL_NO_DISPLAY yet no error
+	// (EGL_SUCCESS), in which case a default EGL display might be
+	// available.
+	if eglDisp == nilEGLDisplay {
+		eglDisp = eglGetDisplay(EGL_DEFAULT_DISPLAY)
+	}
 	if eglDisp == nilEGLDisplay {
 		return nil, fmt.Errorf("eglGetDisplay failed: 0x%x", eglGetError())
 	}
