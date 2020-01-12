@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/color"
 	"testing"
+	"time"
 )
 
 var raceEnabled = false
@@ -146,5 +147,22 @@ func wantColor(t *testing.T, img image.Image, x, y int, want color.Color) {
 	if r_ != r || g_ != g || b_ != b {
 		t.Errorf("got 0x%04x%04x%04x at (%d,%d), want 0x%04x%04x%04x",
 			r_, g_, b_, x, y, r, g, b)
+	}
+}
+
+func waitForFrame(t *testing.T, frameNotifs <-chan bool) {
+	// Unfortunately, there isn't a way to select on a test failing, since
+	// testing.T doesn't have anything like a context or a "done" channel.
+	//
+	// We can't let selects block forever, since the default -test.timeout
+	// is ten minutes - far too long for tests that take seconds.
+	//
+	// For now, a static short timeout is better than nothing. 2s is plenty
+	// for our simple test app to render on any device.
+
+	select {
+	case <-frameNotifs:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for a frame to be ready")
 	}
 }

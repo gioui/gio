@@ -185,7 +185,7 @@ func (d *WaylandTestDriver) Start(t_ *testing.T, path string, width, height int)
 	}
 
 	// Wait for the gio app to render.
-	<-d.frameNotifs
+	waitForFrame(d.t, d.frameNotifs)
 }
 
 func (d *WaylandTestDriver) Screenshot() image.Image {
@@ -204,9 +204,7 @@ func (d *WaylandTestDriver) Screenshot() image.Image {
 }
 
 func (d *WaylandTestDriver) swaymsg(args ...interface{}) {
-	strs := []string{
-		"--socket", d.socket,
-	}
+	strs := []string{"--socket", d.socket}
 	for _, arg := range args {
 		strs = append(strs, fmt.Sprint(arg))
 	}
@@ -218,11 +216,10 @@ func (d *WaylandTestDriver) swaymsg(args ...interface{}) {
 }
 
 func (d *WaylandTestDriver) Click(x, y int) {
-	d.swaymsg("-t", "get_seats")
 	d.swaymsg("seat", "-", "cursor", "set", x, y)
 	d.swaymsg("seat", "-", "cursor", "press", "button1")
 	d.swaymsg("seat", "-", "cursor", "release", "button1")
 
 	// Wait for the gio app to render after this click.
-	<-d.frameNotifs
+	waitForFrame(d.t, d.frameNotifs)
 }

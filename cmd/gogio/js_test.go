@@ -129,7 +129,7 @@ func (d *JSTestDriver) Start(t_ *testing.T, path string, width, height int) {
 	}
 
 	// Wait for the gio app to render.
-	<-d.frameNotifs
+	waitForFrame(d.t, d.frameNotifs)
 }
 
 func (d *JSTestDriver) Screenshot() image.Image {
@@ -154,5 +154,5 @@ func (d *JSTestDriver) Click(x, y int) {
 	}
 
 	// Wait for the gio app to render after this click.
-	<-d.frameNotifs
+	waitForFrame(d.t, d.frameNotifs)
 }

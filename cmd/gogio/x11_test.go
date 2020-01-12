@@ -164,7 +164,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) {
 	}
 
 	// Wait for the gio app to render.
-	<-d.frameNotifs
+	waitForFrame(d.t, d.frameNotifs)
 }
 
 func (d *X11TestDriver) Screenshot() image.Image {
@@ -200,5 +200,5 @@ func (d *X11TestDriver) Click(x, y int) {
 	d.xdotool("click", "1")
 
 	// Wait for the gio app to render after this click.
-	<-d.frameNotifs
+	waitForFrame(d.t, d.frameNotifs)
 }
