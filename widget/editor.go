@@ -273,13 +273,11 @@ func (e *Editor) layout(gtx *layout.Context, sh text.Shaper) {
 	}
 	e.shapes = e.shapes[:0]
 	for {
-		start, end, layout, off, ok := it.Next()
+		_, _, layout, off, ok := it.Next()
 		if !ok {
 			break
 		}
-		// TODO: remove
-		str := e.rr.String()[start:end]
-		path := sh.Shape(gtx, e.font, str, layout)
+		path := sh.Shape(gtx, e.font, layout)
 		e.shapes = append(e.shapes, line{off, path})
 	}
 
@@ -433,9 +431,9 @@ func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
 }
 
 func (e *Editor) layoutText(c unit.Converter, s text.Shaper, font text.Font) ([]text.Line, layout.Dimensions) {
-	txt := e.rr.String()
+	e.rr.Reset()
 	opts := text.LayoutOptions{MaxWidth: e.maxWidth}
-	lines := s.Layout(c, font, txt, opts)
+	lines, _ := s.Layout(c, font, &e.rr, opts)
 	dims := linesDimens(lines)
 	for i := 0; i < len(lines)-1; i++ {
 		// To avoid layout flickering while editing, assume a soft newline takes

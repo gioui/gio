@@ -3,6 +3,8 @@
 package text
 
 import (
+	"io"
+
 	"gioui.org/op"
 	"gioui.org/unit"
 	"golang.org/x/image/font"
@@ -54,7 +56,7 @@ type Font struct {
 
 // Face implements text layout and shaping for a particular font.
 type Face interface {
-	Layout(ppem fixed.Int26_6, str string, opts LayoutOptions) []Line
+	Layout(ppem fixed.Int26_6, txt io.Reader, opts LayoutOptions) ([]Line, error)
 	Shape(ppem fixed.Int26_6, str []Glyph) op.CallOp
 	Metrics(ppem fixed.Int26_6) font.Metrics
 }

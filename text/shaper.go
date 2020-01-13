@@ -3,6 +3,9 @@
 package text
 
 import (
+	"io"
+	"strings"
+
 	"golang.org/x/image/font"
 
 	"gioui.org/op"
@@ -13,17 +16,27 @@ import (
 // Shaper implements layout and shaping of text.
 type Shaper interface {
 	// Layout a text according to a set of options.
-	Layout(c unit.Converter, font Font, str string, opts LayoutOptions) []Line
-	// Shape a line of text previously laid out by Layout.
-	Shape(c unit.Converter, font Font, str string, layout []Glyph) op.CallOp
+	Layout(c unit.Converter, font Font, txt io.Reader, opts LayoutOptions) ([]Line, error)
+	// Shape a line of text and return a clipping operation for its outline.
+	Shape(c unit.Converter, font Font, layout []Glyph) op.CallOp
+
+	// LayoutString is like Layout, but for strings..
+	LayoutString(c unit.Converter, font Font, str string, opts LayoutOptions) []Line
+	// ShapeString is like Shape for lines previously laid out by LayoutString.
+	ShapeString(c unit.Converter, font Font, str string, layout []Glyph) op.CallOp
+
+	// Metrics returns the font metrics for font.
 	Metrics(c unit.Converter, font Font) font.Metrics
 }
 
-// FontRegistry implements layout and shaping of text and a cache of
-// computed results.
+// FontRegistry implements layout and shaping of text from a set of
+// registered fonts.
 //
 // If a font matches no registered shape, FontRegistry falls back to the
 // first registered face.
+//
+// The LayoutString and ShapeString results are cached and re-used if
+// possible.
 type FontRegistry struct {
 	def   Typeface
 	faces map[Font]*face
@@ -50,12 +63,24 @@ func (s *FontRegistry) Register(font Font, tf Face) {
 	}
 }
 
-func (s *FontRegistry) Layout(c unit.Converter, font Font, str string, opts LayoutOptions) []Line {
+func (s *FontRegistry) Layout(c unit.Converter, font Font, txt io.Reader, opts LayoutOptions) ([]Line, error) {
+	tf := s.faceForFont(font)
+	ppem := fixed.I(c.Px(font.Size))
+	return tf.face.Layout(ppem, txt, opts)
+}
+
+func (s *FontRegistry) Shape(c unit.Converter, font Font, layout []Glyph) op.CallOp {
+	tf := s.faceForFont(font)
+	ppem := fixed.I(c.Px(font.Size))
+	return tf.face.Shape(ppem, layout)
+}
+
+func (s *FontRegistry) LayoutString(c unit.Converter, font Font, str string, opts LayoutOptions) []Line {
 	tf := s.faceForFont(font)
 	return tf.layout(fixed.I(c.Px(font.Size)), str, opts)
 }
 
-func (s *FontRegistry) Shape(c unit.Converter, font Font, str string, layout []Glyph) op.CallOp {
+func (s *FontRegistry) ShapeString(c unit.Converter, font Font, str string, layout []Glyph) op.CallOp {
 	tf := s.faceForFont(font)
 	return tf.shape(fixed.I(c.Px(font.Size)), str, layout)
 }
@@ -108,7 +133,7 @@ func (t *face) layout(ppem fixed.Int26_6, str string, opts LayoutOptions) []Line
 	if l, ok := t.layoutCache.Get(lk); ok {
 		return l
 	}
-	l := t.face.Layout(ppem, str, opts)
+	l, _ := t.face.Layout(ppem, strings.NewReader(str), opts)
 	t.layoutCache.Put(lk, l)
 	return l
 }

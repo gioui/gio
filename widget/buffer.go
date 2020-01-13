@@ -95,18 +95,30 @@ func (e *editBuffer) gapLen() int {
 	return e.gapend - e.gapstart
 }
 
+func (e *editBuffer) Reset() {
+	e.pos = 0
+}
+
 func (e *editBuffer) Read(p []byte) (int, error) {
 	if e.pos == e.len() {
 		return 0, io.EOF
 	}
-	var n int
+	var total int
 	if e.pos < e.gapstart {
-		n += copy(p, e.text[e.pos:e.gapstart])
+		n := copy(p, e.text[e.pos:e.gapstart])
 		p = p[n:]
+		total += n
+		e.pos += n
 	}
-	n += copy(p, e.text[e.gapend:])
-	e.pos += n
-	return n, nil
+	if e.pos >= e.gapstart {
+		n := copy(p, e.text[e.pos+e.gapLen():])
+		total += n
+		e.pos += n
+	}
+	if e.pos > e.len() {
+		panic("hey!")
+	}
+	return total, nil
 }
 
 func (e *editBuffer) ReadRune() (rune, int, error) {

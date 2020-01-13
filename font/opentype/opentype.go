@@ -85,8 +85,12 @@ func (c *Collection) Font(i int) (*Font, error) {
 	return &Font{font: fnt}, nil
 }
 
-func (f *Font) Layout(ppem fixed.Int26_6, str string, opts text.LayoutOptions) []text.Line {
-	return layoutText(&f.buf, ppem, str, &opentype{Font: f.font, Hinting: font.HintingFull}, opts)
+func (f *Font) Layout(ppem fixed.Int26_6, txt io.Reader, opts text.LayoutOptions) ([]text.Line, error) {
+	glyphs, err := readGlyphs(txt)
+	if err != nil {
+		return nil, err
+	}
+	return layoutText(&f.buf, ppem, &opentype{Font: f.font, Hinting: font.HintingFull}, glyphs, opts)
 }
 
 func (f *Font) Shape(ppem fixed.Int26_6, str []text.Glyph) op.CallOp {
@@ -98,59 +102,59 @@ func (f *Font) Metrics(ppem fixed.Int26_6) font.Metrics {
 	return o.Metrics(&f.buf, ppem)
 }
 
-func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOptions) []text.Line {
-	m := f.Metrics(buf, ppem)
+func layoutText(sbuf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, glyphs []text.Glyph, opts text.LayoutOptions) ([]text.Line, error) {
+	m := f.Metrics(sbuf, ppem)
 	lineTmpl := text.Line{
 		Ascent: m.Ascent,
 		// m.Height is equal to m.Ascent + m.Descent + linegap.
 		// Compute the descent including the linegap.
 		Descent: m.Height - m.Ascent,
-		Bounds:  f.Bounds(buf, ppem),
+		Bounds:  f.Bounds(sbuf, ppem),
 	}
 	var lines []text.Line
 	maxDotX := fixed.I(opts.MaxWidth)
 	type state struct {
-		r      rune
-		layout []text.Glyph
-		adv    fixed.Int26_6
-		x      fixed.Int26_6
-		idx    int
-		valid  bool
+		r     rune
+		adv   fixed.Int26_6
+		x     fixed.Int26_6
+		idx   int
+		len   int
+		valid bool
 	}
 	var prev, word state
 	endLine := func() {
 		line := lineTmpl
-		line.Layout = prev.layout
-		line.Len = prev.idx
+		line.Layout = glyphs[:prev.idx:prev.idx]
+		line.Len = prev.len
 		line.Width = prev.x + prev.adv
 		line.Bounds.Max.X += prev.x
 		lines = append(lines, line)
-		str = str[prev.idx:]
+		glyphs = glyphs[prev.idx:]
 		prev = state{}
 		word = state{}
 	}
-	for prev.idx < len(str) {
-		c, s := utf8.DecodeRuneInString(str[prev.idx:])
-		a, valid := f.GlyphAdvance(buf, ppem, c)
+	for prev.idx < len(glyphs) {
+		g := &glyphs[prev.idx]
+		a, valid := f.GlyphAdvance(sbuf, ppem, g.Rune)
 		next := state{
-			r:      c,
-			layout: prev.layout,
-			idx:    prev.idx + s,
-			x:      prev.x + prev.adv,
-			adv:    a,
-			valid:  valid,
+			r:     g.Rune,
+			idx:   prev.idx + 1,
+			len:   prev.len + utf8.RuneLen(g.Rune),
+			x:     prev.x + prev.adv,
+			adv:   a,
+			valid: valid,
 		}
-		if c == '\n' {
+		if g.Rune == '\n' {
 			// The newline is zero width; use the previous
 			// character for line measurements.
-			prev.layout = append(prev.layout, text.Glyph{Rune: c, Advance: 0})
 			prev.idx = next.idx
+			prev.len = next.len
 			endLine()
 			continue
 		}
 		var k fixed.Int26_6
 		if prev.valid {
-			k = f.Kern(buf, ppem, prev.r, next.r)
+			k = f.Kern(sbuf, ppem, prev.r, next.r)
 		}
 		// Break the line if we're out of space.
 		if prev.idx > 0 && next.x+next.adv+k > maxDotX {
@@ -160,21 +164,21 @@ func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, o
 			}
 			next.x -= word.x + word.adv
 			next.idx -= word.idx
-			next.layout = next.layout[len(word.layout):]
+			next.len -= word.len
 			prev = word
 			endLine()
 		} else if k != 0 {
-			next.layout[len(next.layout)-1].Advance += k
+			glyphs[prev.idx-1].Advance += k
 			next.x += k
 		}
-		next.layout = append(next.layout, text.Glyph{Rune: c, Advance: next.adv})
-		if unicode.IsSpace(c) {
+		g.Advance = next.adv
+		if unicode.IsSpace(g.Rune) {
 			word = next
 		}
 		prev = next
 	}
 	endLine()
-	return lines
+	return lines, nil
 }
 
 func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str []text.Glyph) op.CallOp {
@@ -235,6 +239,35 @@ func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str []text.Glyp
 	}
 	builder.End().Add(ops)
 	return op.CallOp{Ops: ops}
+}
+
+func readGlyphs(r io.Reader) ([]text.Glyph, error) {
+	var glyphs []text.Glyph
+	buf := make([]byte, 0, 1024)
+	for {
+		n, err := r.Read(buf[len(buf):cap(buf)])
+		buf = buf[:len(buf)+n]
+		lim := len(buf)
+		// Read full runes if possible.
+		if err != io.EOF {
+			lim -= utf8.UTFMax - 1
+		}
+		i := 0
+		for i < lim {
+			c, s := utf8.DecodeRune(buf[i:])
+			i += s
+			glyphs = append(glyphs, text.Glyph{Rune: c})
+		}
+		n = copy(buf, buf[i:])
+		buf = buf[:n]
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+	}
+	return glyphs, nil
 }
 
 func (f *opentype) GlyphAdvance(buf *sfnt.Buffer, ppem fixed.Int26_6, r rune) (advance fixed.Int26_6, ok bool) {
