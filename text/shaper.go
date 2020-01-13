@@ -12,12 +12,19 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-// Shaper implements layout and shaping of text and a cache of
+// Shaper implements layout and shaping of text.
+type Shaper interface {
+	Layout(c unit.Converter, font Font, str string, opts LayoutOptions) *Layout
+	Shape(c unit.Converter, font Font, str String) op.CallOp
+	Metrics(c unit.Converter, font Font) font.Metrics
+}
+
+// FontRegistry implements layout and shaping of text and a cache of
 // computed results.
 //
-// If a font matches no registered shape, Shaper falls back to the
+// If a font matches no registered shape, FontRegistry falls back to the
 // first registered face.
-type Shaper struct {
+type FontRegistry struct {
 	def   Typeface
 	faces map[Font]*face
 }
@@ -28,7 +35,7 @@ type face struct {
 	pathCache   pathCache
 }
 
-func (s *Shaper) Register(font Font, tf Face) {
+func (s *FontRegistry) Register(font Font, tf Face) {
 	if s.faces == nil {
 		s.def = font.Typeface
 		s.faces = make(map[Font]*face)
@@ -43,22 +50,22 @@ func (s *Shaper) Register(font Font, tf Face) {
 	}
 }
 
-func (s *Shaper) Layout(c unit.Converter, font Font, str string, opts LayoutOptions) *Layout {
+func (s *FontRegistry) Layout(c unit.Converter, font Font, str string, opts LayoutOptions) *Layout {
 	tf := s.faceForFont(font)
 	return tf.layout(fixed.I(c.Px(font.Size)), str, opts)
 }
 
-func (s *Shaper) Shape(c unit.Converter, font Font, str String) op.CallOp {
+func (s *FontRegistry) Shape(c unit.Converter, font Font, str String) op.CallOp {
 	tf := s.faceForFont(font)
 	return tf.shape(fixed.I(c.Px(font.Size)), str)
 }
 
-func (s *Shaper) Metrics(c unit.Converter, font Font) font.Metrics {
+func (s *FontRegistry) Metrics(c unit.Converter, font Font) font.Metrics {
 	tf := s.faceForFont(font)
 	return tf.metrics(fixed.I(c.Px(font.Size)))
 }
 
-func (s *Shaper) faceForStyle(font Font) *face {
+func (s *FontRegistry) faceForStyle(font Font) *face {
 	tf := s.faces[font]
 	if tf == nil {
 		font := font
@@ -79,7 +86,7 @@ func (s *Shaper) faceForStyle(font Font) *face {
 	return tf
 }
 
-func (s *Shaper) faceForFont(font Font) *face {
+func (s *FontRegistry) faceForFont(font Font) *face {
 	font.Size = unit.Value{}
 	tf := s.faceForStyle(font)
 	if tf == nil {

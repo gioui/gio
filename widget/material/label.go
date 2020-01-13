@@ -23,7 +23,7 @@ type Label struct {
 	MaxLines int
 	Text     string
 
-	shaper *text.Shaper
+	shaper text.Shaper
 }
 
 func (t *Theme) H1(txt string) Label {

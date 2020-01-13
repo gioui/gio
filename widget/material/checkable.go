@@ -20,7 +20,7 @@ type checkable struct {
 	Font               text.Font
 	IconColor          color.RGBA
 	Size               unit.Value
-	shaper             *text.Shaper
+	shaper             text.Shaper
 	checkedStateIcon   *Icon
 	uncheckedStateIcon *Icon
 }

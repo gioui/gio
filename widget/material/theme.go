@@ -16,7 +16,7 @@ import (
 )
 
 type Theme struct {
-	Shaper *text.Shaper
+	Shaper text.Shaper
 	Color  struct {
 		Primary color.RGBA
 		Text    color.RGBA

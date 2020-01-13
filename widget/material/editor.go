@@ -21,7 +21,7 @@ type Editor struct {
 	// HintColor is the color of hint text.
 	HintColor color.RGBA
 
-	shaper *text.Shaper
+	shaper text.Shaper
 }
 
 func (t *Theme) Editor(hint string) Editor {

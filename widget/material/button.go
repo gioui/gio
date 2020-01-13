@@ -24,7 +24,7 @@ type Button struct {
 	Font         text.Font
 	Background   color.RGBA
 	CornerRadius unit.Value
-	shaper       *text.Shaper
+	shaper       text.Shaper
 }
 
 type IconButton struct {

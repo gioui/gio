@@ -82,7 +82,7 @@ func (l *lineIterator) Next() (text.String, f32.Point, bool) {
 	return text.String{}, f32.Point{}, false
 }
 
-func (l Label) Layout(gtx *layout.Context, s *text.Shaper, font text.Font, txt string) {
+func (l Label) Layout(gtx *layout.Context, s text.Shaper, font text.Font, txt string) {
 	cs := gtx.Constraints
 	textLayout := s.Layout(gtx, font, txt, text.LayoutOptions{MaxWidth: cs.Width.Max})
 	lines := textLayout.Lines

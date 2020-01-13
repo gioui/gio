@@ -12,12 +12,12 @@ import (
 var (
 	mu          sync.Mutex
 	initialized bool
-	shaper      = new(text.Shaper)
+	shaper      = new(text.FontRegistry)
 )
 
 // Default returns a singleton *text.Shaper that contains
 // the registered fonts.
-func Default() *text.Shaper {
+func Default() *text.FontRegistry {
 	mu.Lock()
 	defer mu.Unlock()
 	initialized = true

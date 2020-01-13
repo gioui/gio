@@ -213,7 +213,7 @@ func (e *Editor) Focus() {
 }
 
 // Layout lays out the editor.
-func (e *Editor) Layout(gtx *layout.Context, sh *text.Shaper, font text.Font) {
+func (e *Editor) Layout(gtx *layout.Context, sh text.Shaper, font text.Font) {
 	// Flush events from before the previous frame.
 	copy(e.events, e.events[e.prevEvents:])
 	e.events = e.events[:len(e.events)-e.prevEvents]
@@ -226,7 +226,7 @@ func (e *Editor) Layout(gtx *layout.Context, sh *text.Shaper, font text.Font) {
 	e.layout(gtx, sh)
 }
 
-func (e *Editor) layout(gtx *layout.Context, sh *text.Shaper) {
+func (e *Editor) layout(gtx *layout.Context, sh text.Shaper) {
 	// Crude configuration change detection.
 	if scale := gtx.Px(unit.Sp(100)); scale != e.scale {
 		e.invalidate()
@@ -430,7 +430,7 @@ func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
 	e.moveToLine(x, carLine)
 }
 
-func (e *Editor) layoutText(c unit.Converter, s *text.Shaper, font text.Font) ([]text.Line, layout.Dimensions) {
+func (e *Editor) layoutText(c unit.Converter, s text.Shaper, font text.Font) ([]text.Line, layout.Dimensions) {
 	txt := e.rr.String()
 	opts := text.LayoutOptions{MaxWidth: e.maxWidth}
 	textLayout := s.Layout(c, font, txt, opts)
