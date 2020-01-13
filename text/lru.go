@@ -20,7 +20,7 @@ type pathCache struct {
 type layoutElem struct {
 	next, prev *layoutElem
 	key        layoutKey
-	layout     *Layout
+	layout     []Line
 }
 
 type path struct {
@@ -42,7 +42,7 @@ type pathKey struct {
 
 const maxSize = 1000
 
-func (l *layoutCache) Get(k layoutKey) (*Layout, bool) {
+func (l *layoutCache) Get(k layoutKey) ([]Line, bool) {
 	if lt, ok := l.m[k]; ok {
 		l.remove(lt)
 		l.insert(lt)
@@ -51,7 +51,7 @@ func (l *layoutCache) Get(k layoutKey) (*Layout, bool) {
 	return nil, false
 }
 
-func (l *layoutCache) Put(k layoutKey, lt *Layout) {
+func (l *layoutCache) Put(k layoutKey, lt []Line) {
 	if l.m == nil {
 		l.m = make(map[layoutKey]*layoutElem)
 		l.head = new(layoutElem)

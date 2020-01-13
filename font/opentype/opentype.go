@@ -85,11 +85,11 @@ func (c *Collection) Font(i int) (*Font, error) {
 	return &Font{font: fnt}, nil
 }
 
-func (f *Font) Layout(ppem fixed.Int26_6, str string, opts text.LayoutOptions) *text.Layout {
+func (f *Font) Layout(ppem fixed.Int26_6, str string, opts text.LayoutOptions) []text.Line {
 	return layoutText(&f.buf, ppem, str, &opentype{Font: f.font, Hinting: font.HintingFull}, opts)
 }
 
-func (f *Font) Shape(ppem fixed.Int26_6, str text.String) op.CallOp {
+func (f *Font) Shape(ppem fixed.Int26_6, str []text.Glyph) op.CallOp {
 	return textPath(&f.buf, ppem, &opentype{Font: f.font, Hinting: font.HintingFull}, str)
 }
 
@@ -98,7 +98,7 @@ func (f *Font) Metrics(ppem fixed.Int26_6) font.Metrics {
 	return o.Metrics(&f.buf, ppem)
 }
 
-func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOptions) *text.Layout {
+func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, opts text.LayoutOptions) []text.Line {
 	m := f.Metrics(buf, ppem)
 	lineTmpl := text.Line{
 		Ascent: m.Ascent,
@@ -110,18 +110,18 @@ func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, o
 	var lines []text.Line
 	maxDotX := fixed.I(opts.MaxWidth)
 	type state struct {
-		r     rune
-		advs  []fixed.Int26_6
-		adv   fixed.Int26_6
-		x     fixed.Int26_6
-		idx   int
-		valid bool
+		r      rune
+		layout []text.Glyph
+		adv    fixed.Int26_6
+		x      fixed.Int26_6
+		idx    int
+		valid  bool
 	}
 	var prev, word state
 	endLine := func() {
 		line := lineTmpl
-		line.Text.Advances = prev.advs
-		line.Text.String = str[:prev.idx]
+		line.Layout = prev.layout
+		line.Len = prev.idx
 		line.Width = prev.x + prev.adv
 		line.Bounds.Max.X += prev.x
 		lines = append(lines, line)
@@ -133,17 +133,17 @@ func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, o
 		c, s := utf8.DecodeRuneInString(str[prev.idx:])
 		a, valid := f.GlyphAdvance(buf, ppem, c)
 		next := state{
-			r:     c,
-			advs:  prev.advs,
-			idx:   prev.idx + s,
-			x:     prev.x + prev.adv,
-			adv:   a,
-			valid: valid,
+			r:      c,
+			layout: prev.layout,
+			idx:    prev.idx + s,
+			x:      prev.x + prev.adv,
+			adv:    a,
+			valid:  valid,
 		}
 		if c == '\n' {
 			// The newline is zero width; use the previous
 			// character for line measurements.
-			prev.advs = append(prev.advs, 0)
+			prev.layout = append(prev.layout, text.Glyph{Rune: c, Advance: 0})
 			prev.idx = next.idx
 			endLine()
 			continue
@@ -160,33 +160,32 @@ func layoutText(buf *sfnt.Buffer, ppem fixed.Int26_6, str string, f *opentype, o
 			}
 			next.x -= word.x + word.adv
 			next.idx -= word.idx
-			next.advs = next.advs[len(word.advs):]
+			next.layout = next.layout[len(word.layout):]
 			prev = word
 			endLine()
 		} else if k != 0 {
-			next.advs[len(next.advs)-1] += k
+			next.layout[len(next.layout)-1].Advance += k
 			next.x += k
 		}
-		next.advs = append(next.advs, next.adv)
-		if unicode.IsSpace(next.r) {
+		next.layout = append(next.layout, text.Glyph{Rune: c, Advance: next.adv})
+		if unicode.IsSpace(c) {
 			word = next
 		}
 		prev = next
 	}
 	endLine()
-	return &text.Layout{Lines: lines}
+	return lines
 }
 
-func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str text.String) op.CallOp {
+func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str []text.Glyph) op.CallOp {
 	var lastPos f32.Point
 	var builder clip.Path
 	ops := new(op.Ops)
 	var x fixed.Int26_6
-	var advIdx int
 	builder.Begin(ops)
-	for _, r := range str.String {
-		if !unicode.IsSpace(r) {
-			segs, ok := f.LoadGlyph(buf, ppem, r)
+	for _, g := range str {
+		if !unicode.IsSpace(g.Rune) {
+			segs, ok := f.LoadGlyph(buf, ppem, g.Rune)
 			if !ok {
 				continue
 			}
@@ -232,8 +231,7 @@ func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str text.String
 			}
 			lastPos = lastPos.Add(lastArg)
 		}
-		x += str.Advances[advIdx]
-		advIdx++
+		x += g.Advance
 	}
 	builder.End().Add(ops)
 	return op.CallOp{Ops: ops}

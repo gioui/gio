@@ -273,11 +273,13 @@ func (e *Editor) layout(gtx *layout.Context, sh text.Shaper) {
 	}
 	e.shapes = e.shapes[:0]
 	for {
-		str, off, ok := it.Next()
+		start, end, layout, off, ok := it.Next()
 		if !ok {
 			break
 		}
-		path := sh.Shape(gtx, e.font, str)
+		// TODO: remove
+		str := e.rr.String()[start:end]
+		path := sh.Shape(gtx, e.font, str, layout)
 		e.shapes = append(e.shapes, line{off, path})
 	}
 
@@ -433,15 +435,13 @@ func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
 func (e *Editor) layoutText(c unit.Converter, s text.Shaper, font text.Font) ([]text.Line, layout.Dimensions) {
 	txt := e.rr.String()
 	opts := text.LayoutOptions{MaxWidth: e.maxWidth}
-	textLayout := s.Layout(c, font, txt, opts)
-	lines := textLayout.Lines
+	lines := s.Layout(c, font, txt, opts)
 	dims := linesDimens(lines)
 	for i := 0; i < len(lines)-1; i++ {
-		s := lines[i].Text.String
 		// To avoid layout flickering while editing, assume a soft newline takes
 		// up all available space.
-		if len(s) > 0 {
-			r, _ := utf8.DecodeLastRuneInString(s)
+		if layout := lines[i].Layout; len(layout) > 0 {
+			r := layout[len(layout)-1].Rune
 			if r != '\n' {
 				dims.Size.X = e.maxWidth
 				break
@@ -459,21 +459,18 @@ loop:
 		l := e.lines[carLine]
 		y += (prevDesc + l.Ascent).Ceil()
 		prevDesc = l.Descent
-		if carLine == len(e.lines)-1 || idx+len(l.Text.String) > e.rr.caret {
-			str := l.Text.String
-			for _, adv := range l.Text.Advances {
+		if carLine == len(e.lines)-1 || idx+len(l.Layout) > e.rr.caret {
+			for _, g := range l.Layout {
 				if idx == e.rr.caret {
 					break loop
 				}
-				x += adv
-				_, s := utf8.DecodeRuneInString(str)
-				idx += s
-				str = str[s:]
+				x += g.Advance
+				idx += utf8.RuneLen(g.Rune)
 				carCol++
 			}
 			break
 		}
-		idx += len(l.Text.String)
+		idx += l.Len
 	}
 	x += align(e.Alignment, e.lines[carLine].Width, e.viewSize.X)
 	return
@@ -553,11 +550,11 @@ func (e *Editor) moveToLine(carX fixed.Int26_6, carLine2 int) fixed.Int26_6 {
 		// Move to start of line2.
 		if carLine2 > carLine {
 			for i := carLine; i < carLine2; i++ {
-				e.rr.caret += len(e.lines[i].Text.String)
+				e.rr.caret += e.lines[i].Len
 			}
 		} else {
 			for i := carLine - 1; i >= carLine2; i-- {
-				e.rr.caret -= len(e.lines[i].Text.String)
+				e.rr.caret -= e.lines[i].Len
 			}
 		}
 	}
@@ -569,15 +566,15 @@ func (e *Editor) moveToLine(carX fixed.Int26_6, carLine2 int) fixed.Int26_6 {
 		end = 1
 	}
 	// Move to rune closest to previous horizontal position.
-	for i := 0; i < len(l2.Text.Advances)-end; i++ {
-		adv := l2.Text.Advances[i]
+	for i := 0; i < len(l2.Layout)-end; i++ {
+		g := l2.Layout[i]
 		if carX2 >= carX {
 			break
 		}
-		if carX2+adv-carX >= carX-carX2 {
+		if carX2+g.Advance-carX >= carX-carX2 {
 			break
 		}
-		carX2 += adv
+		carX2 += g.Advance
 		_, s := e.rr.runeAt(e.rr.caret)
 		e.rr.caret += s
 	}
@@ -593,11 +590,11 @@ func (e *Editor) Move(distance int) {
 
 func (e *Editor) moveStart() {
 	carLine, carCol, x, _ := e.layoutCaret()
-	advances := e.lines[carLine].Text.Advances
+	layout := e.lines[carLine].Layout
 	for i := carCol - 1; i >= 0; i-- {
 		_, s := e.rr.runeBefore(e.rr.caret)
 		e.rr.caret -= s
-		x -= advances[i]
+		x -= layout[i].Advance
 	}
 	e.carXOff = -x
 }
@@ -610,8 +607,9 @@ func (e *Editor) moveEnd() {
 	if carLine < len(e.lines)-1 {
 		end = 1
 	}
-	for i := carCol; i < len(l.Text.Advances)-end; i++ {
-		adv := l.Text.Advances[i]
+	layout := l.Layout
+	for i := carCol; i < len(layout)-end; i++ {
+		adv := layout[i].Advance
 		_, s := e.rr.runeAt(e.rr.caret)
 		e.rr.caret += s
 		x += adv

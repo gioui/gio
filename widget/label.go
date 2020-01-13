@@ -32,11 +32,12 @@ type lineIterator struct {
 	Offset    image.Point
 
 	y, prevDesc fixed.Int26_6
+	txtOff      int
 }
 
 const inf = 1e6
 
-func (l *lineIterator) Next() (text.String, f32.Point, bool) {
+func (l *lineIterator) Next() (int, int, []text.Glyph, f32.Point, bool) {
 	for len(l.Lines) > 0 {
 		line := l.Lines[0]
 		l.Lines = l.Lines[1:]
@@ -50,42 +51,41 @@ func (l *lineIterator) Next() (text.String, f32.Point, bool) {
 		if (off.Y + line.Bounds.Min.Y).Floor() > l.Clip.Max.Y {
 			break
 		}
+		layout := line.Layout
+		start := l.txtOff
+		l.txtOff += line.Len
 		if (off.Y + line.Bounds.Max.Y).Ceil() < l.Clip.Min.Y {
 			continue
 		}
-		str := line.Text
-		for len(str.Advances) > 0 {
-			adv := str.Advances[0]
+		for len(layout) > 0 {
+			g := layout[0]
+			adv := g.Advance
 			if (off.X + adv + line.Bounds.Max.X - line.Width).Ceil() >= l.Clip.Min.X {
 				break
 			}
 			off.X += adv
-			_, s := utf8.DecodeRuneInString(str.String)
-			str.String = str.String[s:]
-			str.Advances = str.Advances[1:]
+			layout = layout[1:]
+			start += utf8.RuneLen(g.Rune)
 		}
-		n := 0
+		end := start
 		endx := off.X
-		for i, adv := range str.Advances {
+		for i, g := range layout {
 			if (endx + line.Bounds.Min.X).Floor() > l.Clip.Max.X {
-				str.String = str.String[:n]
-				str.Advances = str.Advances[:i]
+				layout = layout[:i]
 				break
 			}
-			_, s := utf8.DecodeRuneInString(str.String[n:])
-			n += s
-			endx += adv
+			end += utf8.RuneLen(g.Rune)
+			endx += g.Advance
 		}
 		offf := f32.Point{X: float32(off.X) / 64, Y: float32(off.Y) / 64}
-		return str, offf, true
+		return start, end, layout, offf, true
 	}
-	return text.String{}, f32.Point{}, false
+	return 0, 0, nil, f32.Point{}, false
 }
 
 func (l Label) Layout(gtx *layout.Context, s text.Shaper, font text.Font, txt string) {
 	cs := gtx.Constraints
-	textLayout := s.Layout(gtx, font, txt, text.LayoutOptions{MaxWidth: cs.Width.Max})
-	lines := textLayout.Lines
+	lines := s.Layout(gtx, font, txt, text.LayoutOptions{MaxWidth: cs.Width.Max})
 	if max := l.MaxLines; max > 0 && len(lines) > max {
 		lines = lines[:max]
 	}
@@ -100,7 +100,7 @@ func (l Label) Layout(gtx *layout.Context, s text.Shaper, font text.Font, txt st
 		Width:     dims.Size.X,
 	}
 	for {
-		str, off, ok := it.Next()
+		start, end, layout, off, ok := it.Next()
 		if !ok {
 			break
 		}
@@ -108,7 +108,8 @@ func (l Label) Layout(gtx *layout.Context, s text.Shaper, font text.Font, txt st
 		var stack op.StackOp
 		stack.Push(gtx.Ops)
 		op.TransformOp{}.Offset(off).Add(gtx.Ops)
-		s.Shape(gtx, font, str).Add(gtx.Ops)
+		str := txt[start:end]
+		s.Shape(gtx, font, str, layout).Add(gtx.Ops)
 		paint.PaintOp{Rect: lclip}.Add(gtx.Ops)
 		stack.Pop()
 	}

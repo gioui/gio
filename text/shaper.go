@@ -3,8 +3,6 @@
 package text
 
 import (
-	"unicode/utf8"
-
 	"golang.org/x/image/font"
 
 	"gioui.org/op"
@@ -14,8 +12,10 @@ import (
 
 // Shaper implements layout and shaping of text.
 type Shaper interface {
-	Layout(c unit.Converter, font Font, str string, opts LayoutOptions) *Layout
-	Shape(c unit.Converter, font Font, str String) op.CallOp
+	// Layout a text according to a set of options.
+	Layout(c unit.Converter, font Font, str string, opts LayoutOptions) []Line
+	// Shape a line of text previously laid out by Layout.
+	Shape(c unit.Converter, font Font, str string, layout []Glyph) op.CallOp
 	Metrics(c unit.Converter, font Font) font.Metrics
 }
 
@@ -50,14 +50,14 @@ func (s *FontRegistry) Register(font Font, tf Face) {
 	}
 }
 
-func (s *FontRegistry) Layout(c unit.Converter, font Font, str string, opts LayoutOptions) *Layout {
+func (s *FontRegistry) Layout(c unit.Converter, font Font, str string, opts LayoutOptions) []Line {
 	tf := s.faceForFont(font)
 	return tf.layout(fixed.I(c.Px(font.Size)), str, opts)
 }
 
-func (s *FontRegistry) Shape(c unit.Converter, font Font, str String) op.CallOp {
+func (s *FontRegistry) Shape(c unit.Converter, font Font, str string, layout []Glyph) op.CallOp {
 	tf := s.faceForFont(font)
-	return tf.shape(fixed.I(c.Px(font.Size)), str)
+	return tf.shape(fixed.I(c.Px(font.Size)), str, layout)
 }
 
 func (s *FontRegistry) Metrics(c unit.Converter, font Font) font.Metrics {
@@ -96,9 +96,9 @@ func (s *FontRegistry) faceForFont(font Font) *face {
 	return tf
 }
 
-func (t *face) layout(ppem fixed.Int26_6, str string, opts LayoutOptions) *Layout {
+func (t *face) layout(ppem fixed.Int26_6, str string, opts LayoutOptions) []Line {
 	if t == nil {
-		return fallbackLayout(str)
+		return nil
 	}
 	lk := layoutKey{
 		ppem: ppem,
@@ -113,35 +113,22 @@ func (t *face) layout(ppem fixed.Int26_6, str string, opts LayoutOptions) *Layou
 	return l
 }
 
-func (t *face) shape(ppem fixed.Int26_6, str String) op.CallOp {
+func (t *face) shape(ppem fixed.Int26_6, str string, layout []Glyph) op.CallOp {
 	if t == nil {
 		return op.CallOp{}
 	}
 	pk := pathKey{
 		ppem: ppem,
-		str:  str.String,
+		str:  str,
 	}
 	if clip, ok := t.pathCache.Get(pk); ok {
 		return clip
 	}
-	clip := t.face.Shape(ppem, str)
+	clip := t.face.Shape(ppem, layout)
 	t.pathCache.Put(pk, clip)
 	return clip
 }
 
 func (t *face) metrics(ppem fixed.Int26_6) font.Metrics {
 	return t.face.Metrics(ppem)
-}
-
-func fallbackLayout(str string) *Layout {
-	l := &Layout{
-		Lines: []Line{
-			{Text: String{
-				String: str,
-			}},
-		},
-	}
-	strlen := utf8.RuneCountInString(str)
-	l.Lines[0].Text.Advances = make([]fixed.Int26_6, strlen)
-	return l
 }
