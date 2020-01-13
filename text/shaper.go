@@ -3,8 +3,9 @@
 package text
 
 import (
-	"golang.org/x/image/font"
 	"unicode/utf8"
+
+	"golang.org/x/image/font"
 
 	"gioui.org/op"
 	"gioui.org/unit"
@@ -14,8 +15,8 @@ import (
 // Shaper implements layout and shaping of text and a cache of
 // computed results.
 //
-// Specify the default and fallback font by calling Register with the
-// empty Font.
+// If a font matches no registered shape, Shaper falls back to the
+// first registered face.
 type Shaper struct {
 	def   Typeface
 	faces map[Font]*face
