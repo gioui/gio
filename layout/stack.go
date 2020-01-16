@@ -83,6 +83,12 @@ func (s Stack) Layout(gtx *Context, children ...StackChild) {
 		}
 		dims := ctxLayout(gtx, cs, w.widget)
 		m.Stop()
+		if w := dims.Size.X; w > maxSZ.X {
+			maxSZ.X = w
+		}
+		if h := dims.Size.Y; h > maxSZ.Y {
+			maxSZ.Y = h
+		}
 		children[i].macro = m
 		children[i].dims = dims
 	}
