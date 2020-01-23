@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build linux,!android,!nox11 freebsd
+// +build linux,!android,!nox11 freebsd openbsd
 
 package window
 
 /*
+#cgo openbsd CFLAGS: -I/usr/X11R6/include -I/usr/local/include
+#cgo openbsd LDFLAGS: -L/usr/X11R6/lib -L/usr/local/lib
 #cgo LDFLAGS: -lX11 -lxkbcommon -lxkbcommon-x11 -lX11-xcb
 #include <stdlib.h>
 #include <locale.h>

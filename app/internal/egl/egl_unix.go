@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build linux freebsd
+// +build linux freebsd openbsd
 
 package egl
 
@@ -8,6 +8,8 @@ package egl
 #cgo LDFLAGS: -lEGL
 #cgo freebsd CFLAGS: -I/usr/local/include
 #cgo freebsd LDFLAGS: -L/usr/local/lib
+#cgo openbsd CFLAGS: -I/usr/X11R6/include
+#cgo openbsd LDFLAGS: -L/usr/X11R6/lib
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
