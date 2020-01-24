@@ -5,6 +5,7 @@ packages:
  - curl
  - libwayland-dev
  - libx11-dev
+ - libx11-xcb-dev
  - libxkbcommon-dev
  - libxkbcommon-x11-dev
  - libgles2-mesa-dev
