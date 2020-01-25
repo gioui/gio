@@ -419,6 +419,10 @@ func onTouchEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, action, pointer
 		src = pointer.Touch
 	case C.AMOTION_EVENT_TOOL_TYPE_MOUSE:
 		src = pointer.Mouse
+	case C.AMOTION_EVENT_TOOL_TYPE_UNKNOWN:
+		// For example, triggered via 'adb shell input tap'.
+		// Instead of discarding it, treat it as a touch event.
+		src = pointer.Touch
 	default:
 		return
 	}
