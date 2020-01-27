@@ -154,9 +154,9 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 	if err != nil {
 		return fmt.Errorf("could not find javac: %v", err)
 	}
-	ndkRoot := filepath.Join(androidHome, "ndk-bundle")
-	if _, err := os.Stat(ndkRoot); err != nil {
-		return fmt.Errorf("no NDK found in $ANDROID_HOME/ndk-bundle (%s). Use `sdkmanager ndk-bundle` to install it", ndkRoot)
+	ndkRoot, err := findNDK(androidHome)
+	if err != nil {
+		return err
 	}
 	tcRoot := filepath.Join(ndkRoot, "toolchains", "llvm", "prebuilt", archNDK())
 	var builds errgroup.Group
@@ -568,6 +568,22 @@ func unzip(dir, zipfile string) (err error) {
 	return nil
 }
 
+func findNDK(androidHome string) (string, error) {
+	ndks, err := filepath.Glob(filepath.Join(androidHome, "ndk", "*"))
+	if err != nil {
+		return "", err
+	}
+	if bestNDK, found := latestVersionPath(ndks); found {
+		return bestNDK, nil
+	}
+	// The old NDK path was $ANDROID_HOME/ndk-bundle.
+	ndkBundle := filepath.Join(androidHome, "ndk-bundle")
+	if _, err := os.Stat(ndkBundle); err == nil {
+		return ndkBundle, nil
+	}
+	return "", fmt.Errorf("no NDK found in $ANDROID_HOME (%s). Use `sdkmanager ndk-bundle` to install it", androidHome)
+}
+
 func findKeytool() (string, error) {
 	keytool, err := exec.LookPath("keytool")
 	if err == nil {
@@ -636,20 +652,16 @@ Created-By: 1.0 (Go)
 }
 
 func archNDK() string {
-	if runtime.GOOS == "windows" {
-		return "windows"
-	} else {
-		var arch string
-		switch runtime.GOARCH {
-		case "386":
-			arch = "x86"
-		case "amd64":
-			arch = "x86_64"
-		default:
-			panic("unsupported GOARCH: " + runtime.GOARCH)
-		}
-		return runtime.GOOS + "-" + arch
+	var arch string
+	switch runtime.GOARCH {
+	case "386":
+		arch = "x86"
+	case "amd64":
+		arch = "x86_64"
+	default:
+		panic("unsupported GOARCH: " + runtime.GOARCH)
 	}
+	return runtime.GOOS + "-" + arch
 }
 
 func getPermissions(ps []string) ([]string, []string) {
@@ -733,7 +745,7 @@ func latestCompiler(tcRoot, a string, minsdk int) (string, error) {
 		bestCompiler = firstCompiler
 	}
 	if bestCompiler == "" {
-		return "", fmt.Errorf("no NDK compiler found for architecture %s", a)
+		return "", fmt.Errorf("no NDK compiler found for architecture %s in %s", a, tcRoot)
 	}
 	return bestCompiler, nil
 }
@@ -743,11 +755,23 @@ func latestTools(sdk string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	tools, found := latestVersionPath(allTools)
+	if !found {
+		return "", fmt.Errorf("no build-tools found in %q", sdk)
+	}
+	return tools, nil
+}
+
+// latestVersionFile finds the path with the highest version
+// among paths on the form
+//
+//	/some/path/major.minor.patch
+func latestVersionPath(paths []string) (string, bool) {
 	var bestVer [3]int
-	var bestTools string
+	var bestDir string
 loop:
-	for _, tools := range allTools {
-		_, name := filepath.Split(tools)
+	for _, path := range paths {
+		name := filepath.Base(path)
 		s := strings.SplitN(name, ".", 3)
 		if len(s) != len(bestVer) {
 			continue
@@ -767,12 +791,9 @@ loop:
 			version[i] = v
 		}
 		bestVer = version
-		bestTools = tools
+		bestDir = path
 	}
-	if bestTools == "" {
-		return "", fmt.Errorf("no build-tools found in %q", sdk)
-	}
-	return bestTools, nil
+	return bestDir, bestDir != ""
 }
 
 func newZipWriter(w io.Writer) *zipWriter {
