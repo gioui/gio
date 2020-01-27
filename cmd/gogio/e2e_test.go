@@ -64,6 +64,7 @@ func TestEndToEnd(t *testing.T) {
 
 func runEndToEndTest(t *testing.T, driver TestDriver) {
 	size := image.Point{X: 800, Y: 600}
+	t.Log("starting driver and gio app")
 	driver.Start(t, "testdata/red.go", size.X, size.Y)
 
 	// The colors are split in four rectangular sections. Check the corners
@@ -125,15 +126,18 @@ func runEndToEndTest(t *testing.T, driver TestDriver) {
 	red := color.RGBA{R: 0xff, G: 0x00, B: 0x00}
 
 	// These are the four colors at the beginning.
+	t.Log("taking initial screenshot")
 	wantColors(beef, white, black, gray)
 
-	// Click the first and last sections to turn them red.
 	// TODO(mvdan): implement this properly in the Wayland driver; swaymsg
 	// almost works to automate clicks, but the button presses end up in the
 	// wrong coordinates.
 	if _, ok := driver.(*WaylandTestDriver); ok {
 		return
 	}
+
+	// Click the first and last sections to turn them red.
+	t.Log("clicking twice and taking another screenshot")
 	driver.Click(1*(size.X/4), 1*(size.Y/4))
 	driver.Click(3*(size.X/4), 3*(size.Y/4))
 	wantColors(red, white, black, red)
@@ -151,6 +155,8 @@ func wantColor(t *testing.T, img image.Image, x, y int, want color.Color) {
 }
 
 func waitForFrame(t *testing.T, frameNotifs <-chan bool) {
+	t.Helper()
+
 	// Unfortunately, there isn't a way to select on a test failing, since
 	// testing.T doesn't have anything like a context or a "done" channel.
 	//
@@ -159,10 +165,9 @@ func waitForFrame(t *testing.T, frameNotifs <-chan bool) {
 	//
 	// For now, a static short timeout is better than nothing. 2s is plenty
 	// for our simple test app to render on any device.
-
 	select {
 	case <-frameNotifs:
-	case <-time.After(2 * time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatalf("timed out waiting for a frame to be ready")
 	}
 }
