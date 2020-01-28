@@ -1,0 +1,23 @@
+image: openbsd/latest
+packages:
+ - libxkbcommon
+ - go
+sources:
+ - https://git.sr.ht/~eliasnaur/gio
+environment:
+    PATH: /home/build/bin:/bin:/usr/local/bin:/usr/bin
+tasks:
+ - install_gotip: |
+     go get golang.org/dl/gotip
+     /home/build/go/bin/gotip download
+     mkdir /home/build/bin
+     ln -s /home/build/go/bin/gotip /home/build/bin/go
+ - test_gio: |
+     cd gio
+     go test ./...
+ - test_example: |
+     cd gio/example
+     go test ./...
+ - test_cmd: |
+     cd gio/cmd
+     go test ./...
