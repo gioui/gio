@@ -14,14 +14,16 @@ var raceEnabled = false
 
 var headless = flag.Bool("headless", true, "run end-to-end tests in headless mode")
 
+const appid = "localhost.gogio.endtoend"
+
 // TestDriver is implemented by each of the platforms we can run end-to-end
 // tests on. None of its methods return any errors, as the errors are directly
 // reported to testing.T via methods like Fatal.
 type TestDriver interface {
 	// Start provides the test driver with a testing.T, as well as the path
-	// to the Gio app to use for the test. The app will be run with the
-	// given width and height, and the platform's background should be
-	// white.
+	// to the Gio app to use for the test. The driver should attempt to run
+	// the app with the given width and height, and the platform's
+	// background should be white.
 	//
 	// When the function returns, the gio app must be ready to use on the
 	// platform, with its initial frame fully drawn.
@@ -51,6 +53,7 @@ func TestEndToEnd(t *testing.T) {
 		{"X11", &X11TestDriver{}},
 		{"Wayland", &WaylandTestDriver{}},
 		{"JS", &JSTestDriver{}},
+		{"Android", &AndroidTestDriver{}},
 	}
 
 	for _, subtest := range subtests {
@@ -73,18 +76,7 @@ func runEndToEndTest(t *testing.T, driver TestDriver) {
 	wantColors := func(topLeft, topRight, botLeft, botRight color.RGBA) {
 		t.Helper()
 		img := driver.Screenshot()
-		size_ := img.Bounds().Size()
-		if size_ != size {
-			if !*headless {
-				// Some non-headless drivers, like Sway, may get
-				// their window resized by the host window manager.
-				// Run the rest of the test with the new size.
-				size = size_
-			} else {
-				t.Fatalf("expected dimensions to be %v, got %v",
-					size, size_)
-			}
-		}
+		size = img.Bounds().Size()
 		{
 			minX, minY := 5, 5
 			maxX, maxY := (size.X/2)-5, (size.Y/2)-5
