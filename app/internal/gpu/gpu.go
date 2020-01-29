@@ -139,7 +139,7 @@ func decodeImageOp(data []byte, refs []interface{}) imageOpData {
 	}
 	handle := refs[1]
 	if handle == nil {
-		panic("nil handle")
+		return imageOpData{}
 	}
 	return imageOpData{
 		src:    refs[0].(*image.RGBA),
