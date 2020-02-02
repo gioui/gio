@@ -120,7 +120,7 @@ func (u *UI) layoutTimings(gtx *layout.Context) {
 	runtime.ReadMemStats(&mstats)
 	mallocs := mstats.Mallocs - u.lastMallocs
 	u.lastMallocs = mstats.Mallocs
-	layout.Align(layout.NE).Layout(gtx, func() {
+	layout.NE.Layout(gtx, func() {
 		layout.Inset{Top: unit.Dp(16)}.Layout(gtx, func() {
 			txt := fmt.Sprintf("m: %d %s", mallocs, u.profile.Timings)
 			lbl := theme.Caption(txt)
@@ -283,7 +283,7 @@ func (u *UI) user(gtx *layout.Context, index int) {
 							}),
 							layout.Flexed(1, func() {
 								gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
-								layout.Align(layout.E).Layout(gtx, func() {
+								layout.E.Layout(gtx, func() {
 									layout.Inset{Left: unit.Dp(2)}.Layout(gtx, func() {
 										theme.Caption("3 hours ago").Layout(gtx)
 									})
