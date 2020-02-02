@@ -80,7 +80,7 @@ func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 		layout.Stacked(func() {
 			gtx.Constraints.Width.Min = hmin
 			gtx.Constraints.Height.Min = vmin
-			layout.Align(layout.Center).Layout(gtx, func() {
+			layout.Center.Layout(gtx, func() {
 				layout.Inset{Top: unit.Dp(10), Bottom: unit.Dp(10), Left: unit.Dp(12), Right: unit.Dp(12)}.Layout(gtx, func() {
 					paint.ColorOp{Color: col}.Add(gtx.Ops)
 					widget.Label{}.Layout(gtx, b.shaper, b.Font, b.Text)

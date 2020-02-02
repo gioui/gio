@@ -38,7 +38,7 @@ func (c *checkable) layout(gtx *layout.Context, checked bool) {
 	vmin := gtx.Constraints.Height.Min
 	layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 		layout.Rigid(func() {
-			layout.Align(layout.Center).Layout(gtx, func() {
+			layout.Center.Layout(gtx, func() {
 				layout.UniformInset(unit.Dp(2)).Layout(gtx, func() {
 					size := gtx.Px(c.Size)
 					icon.Color = c.IconColor
@@ -53,7 +53,7 @@ func (c *checkable) layout(gtx *layout.Context, checked bool) {
 		layout.Rigid(func() {
 			gtx.Constraints.Width.Min = hmin
 			gtx.Constraints.Height.Min = vmin
-			layout.Align(layout.Start).Layout(gtx, func() {
+			layout.W.Layout(gtx, func() {
 				layout.UniformInset(unit.Dp(2)).Layout(gtx, func() {
 					paint.ColorOp{Color: c.Color}.Add(gtx.Ops)
 					widget.Label{}.Layout(gtx, c.shaper, c.Font, c.Label)

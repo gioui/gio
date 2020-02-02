@@ -30,13 +30,12 @@ func ExampleInset() {
 	// (70,70)
 }
 
-func ExampleAlign() {
+func ExampleDirection() {
 	gtx := new(layout.Context)
 	// Rigid constraints with both minimum and maximum set.
 	gtx.Reset(nil, image.Point{X: 100, Y: 100})
 
-	align := layout.Align(layout.Center)
-	align.Layout(gtx, func() {
+	layout.Center.Layout(gtx, func() {
 		// Lay out a 50x50 sized widget.
 		layoutWidget(gtx, 50, 50)
 		fmt.Println(gtx.Dimensions.Size)

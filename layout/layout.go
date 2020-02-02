@@ -95,9 +95,6 @@ type Inset struct {
 	Top, Right, Bottom, Left unit.Value
 }
 
-// Align aligns a widget in the available space.
-type Align Direction
-
 // Layout a widget.
 func (in Inset) Layout(gtx *Context, w Widget) {
 	top := gtx.Px(in.Top)
@@ -140,8 +137,8 @@ func UniformInset(v unit.Value) Inset {
 	return Inset{Top: v, Right: v, Bottom: v, Left: v}
 }
 
-// Layout a widget.
-func (a Align) Layout(gtx *Context, w Widget) {
+// Layout a widget according to the direction.
+func (a Direction) Layout(gtx *Context, w Widget) {
 	var macro op.MacroOp
 	macro.Record(gtx.Ops)
 	cs := gtx.Constraints
