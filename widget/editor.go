@@ -45,7 +45,6 @@ type Editor struct {
 	lines        []text.Line
 	shapes       []line
 	dims         layout.Dimensions
-	carWidth     fixed.Int26_6
 	requestFocus bool
 	caretOn      bool
 	caretScroll  bool
@@ -230,7 +229,6 @@ func (e *Editor) Layout(gtx *layout.Context, sh text.Shaper, font text.Font, siz
 
 func (e *Editor) layout(gtx *layout.Context, sh text.Shaper) {
 	cs := gtx.Constraints
-	e.carWidth = fixed.I(gtx.Px(unit.Dp(1)))
 
 	maxWidth := cs.Width.Max
 	if e.SingleLine {
@@ -323,15 +321,16 @@ func (e *Editor) PaintCaret(gtx *layout.Context) {
 	if !e.caretOn {
 		return
 	}
+	carWidth := fixed.I(gtx.Px(unit.Dp(1)))
 	carLine, _, carX, carY := e.layoutCaret()
 
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
-	carX -= e.carWidth / 2
+	carX -= carWidth / 2
 	carAsc, carDesc := -e.lines[carLine].Bounds.Min.Y, e.lines[carLine].Bounds.Max.Y
 	carRect := image.Rectangle{
 		Min: image.Point{X: carX.Ceil(), Y: carY - carAsc.Ceil()},
-		Max: image.Point{X: carX.Ceil() + e.carWidth.Ceil(), Y: carY + carDesc.Ceil()},
+		Max: image.Point{X: carX.Ceil() + carWidth.Ceil(), Y: carY + carDesc.Ceil()},
 	}
 	carRect = carRect.Add(image.Point{
 		X: -e.scrollOff.X,
@@ -339,7 +338,7 @@ func (e *Editor) PaintCaret(gtx *layout.Context) {
 	})
 	clip := textPadding(e.lines)
 	// Account for caret width to each side.
-	whalf := (e.carWidth / 2).Ceil()
+	whalf := (carWidth / 2).Ceil()
 	if clip.Max.X < whalf {
 		clip.Max.X = whalf
 	}
