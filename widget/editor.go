@@ -34,7 +34,6 @@ type Editor struct {
 	Submit bool
 
 	eventKey     int
-	scale        int
 	font         text.Font
 	textSize     fixed.Int26_6
 	blinkStart   time.Time
@@ -230,11 +229,6 @@ func (e *Editor) Layout(gtx *layout.Context, sh text.Shaper, font text.Font, siz
 }
 
 func (e *Editor) layout(gtx *layout.Context, sh text.Shaper) {
-	// Crude configuration change detection.
-	if scale := gtx.Px(unit.Sp(100)); scale != e.scale {
-		e.invalidate()
-		e.scale = scale
-	}
 	cs := gtx.Constraints
 	e.carWidth = fixed.I(gtx.Px(unit.Dp(1)))
 
