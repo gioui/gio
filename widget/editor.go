@@ -35,6 +35,7 @@ type Editor struct {
 
 	eventKey     int
 	font         text.Font
+	shaper       text.Shaper
 	textSize     fixed.Int26_6
 	blinkStart   time.Time
 	focused      bool
@@ -97,8 +98,20 @@ func (e *Editor) Events(gtx *layout.Context) []EditorEvent {
 }
 
 func (e *Editor) processEvents(gtx *layout.Context) {
+	if e.shaper == nil {
+		// Can't process events without a shaper.
+		return
+	}
+	e.makeValid()
 	e.processPointer(gtx)
 	e.processKey(gtx)
+}
+
+func (e *Editor) makeValid() {
+	if !e.valid {
+		e.lines, e.dims = e.layoutText(e.shaper)
+		e.valid = true
+	}
 }
 
 func (e *Editor) processPointer(gtx *layout.Context) {
@@ -223,14 +236,7 @@ func (e *Editor) Layout(gtx *layout.Context, sh text.Shaper, font text.Font, siz
 		e.font = font
 		e.textSize = textSize
 	}
-	e.processEvents(gtx)
-	e.layout(gtx, sh)
-}
-
-func (e *Editor) layout(gtx *layout.Context, sh text.Shaper) {
-	cs := gtx.Constraints
-
-	maxWidth := cs.Width.Max
+	maxWidth := gtx.Constraints.Width.Max
 	if e.SingleLine {
 		maxWidth = inf
 	}
@@ -238,13 +244,19 @@ func (e *Editor) layout(gtx *layout.Context, sh text.Shaper) {
 		e.maxWidth = maxWidth
 		e.invalidate()
 	}
-
-	if !e.valid {
-		e.lines, e.dims = e.layoutText(sh)
-		e.valid = true
+	if sh != e.shaper {
+		e.shaper = sh
+		e.invalidate()
 	}
 
-	e.viewSize = cs.Constrain(e.dims.Size)
+	e.processEvents(gtx)
+	e.layout(gtx)
+}
+
+func (e *Editor) layout(gtx *layout.Context) {
+	e.makeValid()
+
+	e.viewSize = gtx.Constraints.Constrain(e.dims.Size)
 	// Adjust scrolling for new viewport and layout.
 	e.scrollRel(0, 0)
 
@@ -272,7 +284,7 @@ func (e *Editor) layout(gtx *layout.Context, sh text.Shaper) {
 		if !ok {
 			break
 		}
-		path := sh.Shape(e.font, e.textSize, layout)
+		path := e.shaper.Shape(e.font, e.textSize, layout)
 		e.shapes = append(e.shapes, line{off, path})
 	}
 
