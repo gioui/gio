@@ -209,7 +209,7 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 					in := layout.Inset{Bottom: unit.Dp(16), Left: unit.Dp(16), Right: unit.Dp(16)}
 					in.Layout(gtx, func() {
 						e := theme.Editor("Hint")
-						e.Font.Size = unit.Sp(14)
+						e.TextSize = unit.Sp(14)
 						e.Font.Style = text.Italic
 						e.Layout(gtx, u.edit2)
 					})
