@@ -15,7 +15,6 @@ packages:
  - xvfb
  - xdotool
  - scrot
- - sway
  - grim
 sources:
  - https://git.sr.ht/~eliasnaur/gio
@@ -23,6 +22,8 @@ environment:
  GOFLAGS: -mod=readonly
  PATH: /home/build/bin:/usr/bin
 tasks:
+ - maybe_install_sway: |
+     sudo apt-get install sway || true
  - install_gotip: |
      go get golang.org/dl/gotip
      /home/build/go/bin/gotip download
