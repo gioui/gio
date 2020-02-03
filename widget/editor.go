@@ -36,6 +36,7 @@ type Editor struct {
 	eventKey     int
 	scale        int
 	font         text.Font
+	textSize     fixed.Int26_6
 	blinkStart   time.Time
 	focused      bool
 	rr           editBuffer
@@ -213,14 +214,16 @@ func (e *Editor) Focus() {
 }
 
 // Layout lays out the editor.
-func (e *Editor) Layout(gtx *layout.Context, sh text.Shaper, font text.Font) {
+func (e *Editor) Layout(gtx *layout.Context, sh text.Shaper, font text.Font, size unit.Value) {
 	// Flush events from before the previous frame.
 	copy(e.events, e.events[e.prevEvents:])
 	e.events = e.events[:len(e.events)-e.prevEvents]
 	e.prevEvents = len(e.events)
-	if e.font != font {
+	textSize := fixed.I(gtx.Px(size))
+	if e.font != font || e.textSize != textSize {
 		e.invalidate()
 		e.font = font
+		e.textSize = textSize
 	}
 	e.processEvents(gtx)
 	e.layout(gtx, sh)
@@ -245,7 +248,7 @@ func (e *Editor) layout(gtx *layout.Context, sh text.Shaper) {
 	}
 
 	if !e.valid {
-		e.lines, e.dims = e.layoutText(gtx, sh, e.font)
+		e.lines, e.dims = e.layoutText(sh)
 		e.valid = true
 	}
 
@@ -277,7 +280,7 @@ func (e *Editor) layout(gtx *layout.Context, sh text.Shaper) {
 		if !ok {
 			break
 		}
-		path := sh.Shape(gtx, e.font, layout)
+		path := sh.Shape(e.font, e.textSize, layout)
 		e.shapes = append(e.shapes, line{off, path})
 	}
 
@@ -430,10 +433,9 @@ func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
 	e.moveToLine(x, carLine)
 }
 
-func (e *Editor) layoutText(c unit.Converter, s text.Shaper, font text.Font) ([]text.Line, layout.Dimensions) {
+func (e *Editor) layoutText(s text.Shaper) ([]text.Line, layout.Dimensions) {
 	e.rr.Reset()
-	opts := text.LayoutOptions{MaxWidth: e.maxWidth}
-	lines, _ := s.Layout(c, font, &e.rr, opts)
+	lines, _ := s.Layout(e.font, e.textSize, e.maxWidth, &e.rr)
 	dims := linesDimens(lines)
 	for i := 0; i < len(lines)-1; i++ {
 		// To avoid layout flickering while editing, assume a soft newline takes

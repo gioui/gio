@@ -85,12 +85,12 @@ func (c *Collection) Font(i int) (*Font, error) {
 	return &Font{font: fnt}, nil
 }
 
-func (f *Font) Layout(ppem fixed.Int26_6, txt io.Reader, opts text.LayoutOptions) ([]text.Line, error) {
+func (f *Font) Layout(ppem fixed.Int26_6, maxWidth int, txt io.Reader) ([]text.Line, error) {
 	glyphs, err := readGlyphs(txt)
 	if err != nil {
 		return nil, err
 	}
-	return layoutText(&f.buf, ppem, &opentype{Font: f.font, Hinting: font.HintingFull}, glyphs, opts)
+	return layoutText(&f.buf, ppem, maxWidth, &opentype{Font: f.font, Hinting: font.HintingFull}, glyphs)
 }
 
 func (f *Font) Shape(ppem fixed.Int26_6, str []text.Glyph) op.CallOp {
@@ -102,7 +102,7 @@ func (f *Font) Metrics(ppem fixed.Int26_6) font.Metrics {
 	return o.Metrics(&f.buf, ppem)
 }
 
-func layoutText(sbuf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, glyphs []text.Glyph, opts text.LayoutOptions) ([]text.Line, error) {
+func layoutText(sbuf *sfnt.Buffer, ppem fixed.Int26_6, maxWidth int, f *opentype, glyphs []text.Glyph) ([]text.Line, error) {
 	m := f.Metrics(sbuf, ppem)
 	lineTmpl := text.Line{
 		Ascent: m.Ascent,
@@ -112,7 +112,7 @@ func layoutText(sbuf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, glyphs []tex
 		Bounds:  f.Bounds(sbuf, ppem),
 	}
 	var lines []text.Line
-	maxDotX := fixed.I(opts.MaxWidth)
+	maxDotX := fixed.I(maxWidth)
 	type state struct {
 		r     rune
 		adv   fixed.Int26_6

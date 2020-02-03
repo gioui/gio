@@ -22,6 +22,7 @@ type Button struct {
 	// Color is the text color.
 	Color        color.RGBA
 	Font         text.Font
+	TextSize     unit.Value
 	Background   color.RGBA
 	CornerRadius unit.Value
 	shaper       text.Shaper
@@ -40,10 +41,8 @@ func (t *Theme) Button(txt string) Button {
 		Text:       txt,
 		Color:      rgb(0xffffff),
 		Background: t.Color.Primary,
-		Font: text.Font{
-			Size: t.TextSize.Scale(14.0 / 16.0),
-		},
-		shaper: t.Shaper,
+		TextSize:   t.TextSize.Scale(14.0 / 16.0),
+		shaper:     t.Shaper,
 	}
 }
 
@@ -83,7 +82,7 @@ func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 			layout.Center.Layout(gtx, func() {
 				layout.Inset{Top: unit.Dp(10), Bottom: unit.Dp(10), Left: unit.Dp(12), Right: unit.Dp(12)}.Layout(gtx, func() {
 					paint.ColorOp{Color: col}.Add(gtx.Ops)
-					widget.Label{}.Layout(gtx, b.shaper, b.Font, b.Text)
+					widget.Label{}.Layout(gtx, b.shaper, b.Font, b.TextSize, b.Text)
 				})
 			})
 			pointer.Rect(image.Rectangle{Max: gtx.Dimensions.Size}).Add(gtx.Ops)

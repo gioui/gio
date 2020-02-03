@@ -12,6 +12,7 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/paint"
 	"gioui.org/text"
+	"gioui.org/unit"
 
 	"golang.org/x/image/math/fixed"
 )
@@ -83,9 +84,10 @@ func (l *lineIterator) Next() (int, int, []text.Glyph, f32.Point, bool) {
 	return 0, 0, nil, f32.Point{}, false
 }
 
-func (l Label) Layout(gtx *layout.Context, s text.Shaper, font text.Font, txt string) {
+func (l Label) Layout(gtx *layout.Context, s text.Shaper, font text.Font, size unit.Value, txt string) {
 	cs := gtx.Constraints
-	lines := s.LayoutString(gtx, font, txt, text.LayoutOptions{MaxWidth: cs.Width.Max})
+	textSize := fixed.I(gtx.Px(size))
+	lines := s.LayoutString(font, textSize, cs.Width.Max, txt)
 	if max := l.MaxLines; max > 0 && len(lines) > max {
 		lines = lines[:max]
 	}
@@ -109,7 +111,7 @@ func (l Label) Layout(gtx *layout.Context, s text.Shaper, font text.Font, txt st
 		stack.Push(gtx.Ops)
 		op.TransformOp{}.Offset(off).Add(gtx.Ops)
 		str := txt[start:end]
-		s.ShapeString(gtx, font, str, layout).Add(gtx.Ops)
+		s.ShapeString(font, textSize, str, layout).Add(gtx.Ops)
 		paint.PaintOp{Rect: lclip}.Add(gtx.Ops)
 		stack.Pop()
 	}

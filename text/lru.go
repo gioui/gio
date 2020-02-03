@@ -30,9 +30,9 @@ type path struct {
 }
 
 type layoutKey struct {
-	ppem fixed.Int26_6
-	str  string
-	opts LayoutOptions
+	ppem     fixed.Int26_6
+	maxWidth int
+	str      string
 }
 
 type pathKey struct {

@@ -9,24 +9,23 @@ import (
 	"golang.org/x/image/font"
 
 	"gioui.org/op"
-	"gioui.org/unit"
 	"golang.org/x/image/math/fixed"
 )
 
 // Shaper implements layout and shaping of text.
 type Shaper interface {
 	// Layout a text according to a set of options.
-	Layout(c unit.Converter, font Font, txt io.Reader, opts LayoutOptions) ([]Line, error)
+	Layout(font Font, size fixed.Int26_6, maxWidth int, txt io.Reader) ([]Line, error)
 	// Shape a line of text and return a clipping operation for its outline.
-	Shape(c unit.Converter, font Font, layout []Glyph) op.CallOp
+	Shape(font Font, size fixed.Int26_6, layout []Glyph) op.CallOp
 
 	// LayoutString is like Layout, but for strings..
-	LayoutString(c unit.Converter, font Font, str string, opts LayoutOptions) []Line
+	LayoutString(font Font, size fixed.Int26_6, maxWidth int, str string) []Line
 	// ShapeString is like Shape for lines previously laid out by LayoutString.
-	ShapeString(c unit.Converter, font Font, str string, layout []Glyph) op.CallOp
+	ShapeString(font Font, size fixed.Int26_6, str string, layout []Glyph) op.CallOp
 
 	// Metrics returns the font metrics for font.
-	Metrics(c unit.Converter, font Font) font.Metrics
+	Metrics(font Font, size fixed.Int26_6) font.Metrics
 }
 
 // FontRegistry implements layout and shaping of text from a set of
@@ -53,8 +52,6 @@ func (s *FontRegistry) Register(font Font, tf Face) {
 		s.def = font.Typeface
 		s.faces = make(map[Font]*face)
 	}
-	// Treat all font sizes equally.
-	font.Size = unit.Value{}
 	if font.Weight == 0 {
 		font.Weight = Normal
 	}
@@ -63,31 +60,29 @@ func (s *FontRegistry) Register(font Font, tf Face) {
 	}
 }
 
-func (s *FontRegistry) Layout(c unit.Converter, font Font, txt io.Reader, opts LayoutOptions) ([]Line, error) {
+func (s *FontRegistry) Layout(font Font, size fixed.Int26_6, maxWidth int, txt io.Reader) ([]Line, error) {
 	tf := s.faceForFont(font)
-	ppem := fixed.I(c.Px(font.Size))
-	return tf.face.Layout(ppem, txt, opts)
+	return tf.face.Layout(size, maxWidth, txt)
 }
 
-func (s *FontRegistry) Shape(c unit.Converter, font Font, layout []Glyph) op.CallOp {
+func (s *FontRegistry) Shape(font Font, size fixed.Int26_6, layout []Glyph) op.CallOp {
 	tf := s.faceForFont(font)
-	ppem := fixed.I(c.Px(font.Size))
-	return tf.face.Shape(ppem, layout)
+	return tf.face.Shape(size, layout)
 }
 
-func (s *FontRegistry) LayoutString(c unit.Converter, font Font, str string, opts LayoutOptions) []Line {
+func (s *FontRegistry) LayoutString(font Font, size fixed.Int26_6, maxWidth int, str string) []Line {
 	tf := s.faceForFont(font)
-	return tf.layout(fixed.I(c.Px(font.Size)), str, opts)
+	return tf.layout(size, maxWidth, str)
 }
 
-func (s *FontRegistry) ShapeString(c unit.Converter, font Font, str string, layout []Glyph) op.CallOp {
+func (s *FontRegistry) ShapeString(font Font, size fixed.Int26_6, str string, layout []Glyph) op.CallOp {
 	tf := s.faceForFont(font)
-	return tf.shape(fixed.I(c.Px(font.Size)), str, layout)
+	return tf.shape(size, str, layout)
 }
 
-func (s *FontRegistry) Metrics(c unit.Converter, font Font) font.Metrics {
+func (s *FontRegistry) Metrics(font Font, size fixed.Int26_6) font.Metrics {
 	tf := s.faceForFont(font)
-	return tf.metrics(fixed.I(c.Px(font.Size)))
+	return tf.metrics(size)
 }
 
 func (s *FontRegistry) faceForStyle(font Font) *face {
@@ -112,7 +107,6 @@ func (s *FontRegistry) faceForStyle(font Font) *face {
 }
 
 func (s *FontRegistry) faceForFont(font Font) *face {
-	font.Size = unit.Value{}
 	tf := s.faceForStyle(font)
 	if tf == nil {
 		font.Typeface = s.def
@@ -121,19 +115,19 @@ func (s *FontRegistry) faceForFont(font Font) *face {
 	return tf
 }
 
-func (t *face) layout(ppem fixed.Int26_6, str string, opts LayoutOptions) []Line {
+func (t *face) layout(ppem fixed.Int26_6, maxWidth int, str string) []Line {
 	if t == nil {
 		return nil
 	}
 	lk := layoutKey{
-		ppem: ppem,
-		str:  str,
-		opts: opts,
+		ppem:     ppem,
+		maxWidth: maxWidth,
+		str:      str,
 	}
 	if l, ok := t.layoutCache.Get(lk); ok {
 		return l
 	}
-	l, _ := t.face.Layout(ppem, strings.NewReader(str), opts)
+	l, _ := t.face.Layout(ppem, maxWidth, strings.NewReader(str))
 	t.layoutCache.Put(lk, l)
 	return l
 }

@@ -18,6 +18,7 @@ type checkable struct {
 	Label              string
 	Color              color.RGBA
 	Font               text.Font
+	TextSize           unit.Value
 	IconColor          color.RGBA
 	Size               unit.Value
 	shaper             text.Shaper
@@ -56,7 +57,7 @@ func (c *checkable) layout(gtx *layout.Context, checked bool) {
 			layout.W.Layout(gtx, func() {
 				layout.UniformInset(unit.Dp(2)).Layout(gtx, func() {
 					paint.ColorOp{Color: c.Color}.Add(gtx.Ops)
-					widget.Label{}.Layout(gtx, c.shaper, c.Font, c.Label)
+					widget.Label{}.Layout(gtx, c.shaper, c.Font, c.TextSize, c.Label)
 				})
 			})
 		}),

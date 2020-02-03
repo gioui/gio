@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"gioui.org/op"
-	"gioui.org/unit"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 )
@@ -32,23 +31,16 @@ type Glyph struct {
 	Advance fixed.Int26_6
 }
 
-// LayoutOptions specify the constraints of a text layout.
-type LayoutOptions struct {
-	// MaxWidth is the available width of the layout.
-	MaxWidth int
-}
-
 // Style is the font style.
 type Style int
 
 // Weight is a font weight, in CSS units.
 type Weight int
 
-// Font specify a particular typeface, style and size.
+// Font specify a particular typeface variant, style and weight.
 type Font struct {
 	Typeface Typeface
 	Variant  Variant
-	Size     unit.Value
 	Style    Style
 	// Weight is the text weight. If zero, Normal is used instead.
 	Weight Weight
@@ -56,7 +48,7 @@ type Font struct {
 
 // Face implements text layout and shaping for a particular font.
 type Face interface {
-	Layout(ppem fixed.Int26_6, txt io.Reader, opts LayoutOptions) ([]Line, error)
+	Layout(ppem fixed.Int26_6, maxWidth int, txt io.Reader) ([]Line, error)
 	Shape(ppem fixed.Int26_6, str []Glyph) op.CallOp
 	Metrics(ppem fixed.Int26_6) font.Metrics
 }

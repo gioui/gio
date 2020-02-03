@@ -9,11 +9,13 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/paint"
 	"gioui.org/text"
+	"gioui.org/unit"
 	"gioui.org/widget"
 )
 
 type Editor struct {
-	Font text.Font
+	Font     text.Font
+	TextSize unit.Value
 	// Color is the text color.
 	Color color.RGBA
 	// Hint contains the text displayed when the editor is empty.
@@ -26,9 +28,7 @@ type Editor struct {
 
 func (t *Theme) Editor(hint string) Editor {
 	return Editor{
-		Font: text.Font{
-			Size: t.TextSize,
-		},
+		TextSize:  t.TextSize,
 		Color:     t.Color.Text,
 		shaper:    t.Shaper,
 		Hint:      hint,
@@ -43,7 +43,7 @@ func (e Editor) Layout(gtx *layout.Context, editor *widget.Editor) {
 	macro.Record(gtx.Ops)
 	paint.ColorOp{Color: e.HintColor}.Add(gtx.Ops)
 	tl := widget.Label{Alignment: editor.Alignment}
-	tl.Layout(gtx, e.shaper, e.Font, e.Hint)
+	tl.Layout(gtx, e.shaper, e.Font, e.TextSize, e.Hint)
 	macro.Stop()
 	if w := gtx.Dimensions.Size.X; gtx.Constraints.Width.Min < w {
 		gtx.Constraints.Width.Min = w
@@ -51,7 +51,7 @@ func (e Editor) Layout(gtx *layout.Context, editor *widget.Editor) {
 	if h := gtx.Dimensions.Size.Y; gtx.Constraints.Height.Min < h {
 		gtx.Constraints.Height.Min = h
 	}
-	editor.Layout(gtx, e.shaper, e.Font)
+	editor.Layout(gtx, e.shaper, e.Font, e.TextSize)
 	if editor.Len() > 0 {
 		paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
 		editor.PaintText(gtx)

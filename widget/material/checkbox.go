@@ -4,7 +4,6 @@ package material
 
 import (
 	"gioui.org/layout"
-	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
 )
@@ -16,12 +15,10 @@ type CheckBox struct {
 func (t *Theme) CheckBox(label string) CheckBox {
 	return CheckBox{
 		checkable{
-			Label:     label,
-			Color:     t.Color.Text,
-			IconColor: t.Color.Primary,
-			Font: text.Font{
-				Size: t.TextSize.Scale(14.0 / 16.0),
-			},
+			Label:              label,
+			Color:              t.Color.Text,
+			IconColor:          t.Color.Primary,
+			TextSize:           t.TextSize.Scale(14.0 / 16.0),
 			Size:               unit.Dp(26),
 			shaper:             t.Shaper,
 			checkedStateIcon:   t.checkBoxCheckedIcon,

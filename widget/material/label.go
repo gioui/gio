@@ -22,6 +22,7 @@ type Label struct {
 	// MaxLines limits the number of lines. Zero means no limit.
 	MaxLines int
 	Text     string
+	TextSize unit.Value
 
 	shaper text.Shaper
 }
@@ -64,17 +65,15 @@ func (t *Theme) Caption(txt string) Label {
 
 func (t *Theme) Label(size unit.Value, txt string) Label {
 	return Label{
-		Text:  txt,
-		Color: t.Color.Text,
-		Font: text.Font{
-			Size: size,
-		},
-		shaper: t.Shaper,
+		Text:     txt,
+		Color:    t.Color.Text,
+		TextSize: size,
+		shaper:   t.Shaper,
 	}
 }
 
 func (l Label) Layout(gtx *layout.Context) {
 	paint.ColorOp{Color: l.Color}.Add(gtx.Ops)
 	tl := widget.Label{Alignment: l.Alignment, MaxLines: l.MaxLines}
-	tl.Layout(gtx, l.shaper, l.Font, l.Text)
+	tl.Layout(gtx, l.shaper, l.Font, l.TextSize, l.Text)
 }
