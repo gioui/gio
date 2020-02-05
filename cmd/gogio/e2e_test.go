@@ -20,14 +20,15 @@ const appid = "localhost.gogio.endtoend"
 // tests on. None of its methods return any errors, as the errors are directly
 // reported to testing.T via methods like Fatal.
 type TestDriver interface {
-	// Start provides the test driver with a testing.T, as well as the path
-	// to the Gio app to use for the test. The driver should attempt to run
-	// the app with the given width and height, and the platform's
+	initBase(*testing.T)
+
+	// Start opens the Gio app found at path. The driver should attempt to
+	// run the app with the given width and height, and the platform's
 	// background should be white.
 	//
 	// When the function returns, the gio app must be ready to use on the
 	// platform, with its initial frame fully drawn.
-	Start(t *testing.T, path string, width, height int)
+	Start(path string, width, height int)
 
 	// Screenshot takes a screenshot of the Gio app on the platform.
 	Screenshot() image.Image
@@ -36,6 +37,17 @@ type TestDriver interface {
 	// including both press and release. It returns when the next frame is
 	// fully drawn.
 	Click(x, y int)
+}
+
+type driverBase struct {
+	*testing.T
+
+	frameNotifs chan bool
+}
+
+func (d *driverBase) initBase(t *testing.T) {
+	d.T = t
+	d.frameNotifs = make(chan bool, 1)
 }
 
 func TestEndToEnd(t *testing.T) {
@@ -66,9 +78,11 @@ func TestEndToEnd(t *testing.T) {
 }
 
 func runEndToEndTest(t *testing.T, driver TestDriver) {
+	driver.initBase(t)
+
 	size := image.Point{X: 800, Y: 600}
 	t.Log("starting driver and gio app")
-	driver.Start(t, "testdata/red.go", size.X, size.Y)
+	driver.Start("testdata/red.go", size.X, size.Y)
 
 	// The colors are split in four rectangular sections. Check the corners
 	// of each of the sections. We check the corners left to right, top to
@@ -146,8 +160,8 @@ func wantColor(t *testing.T, img image.Image, x, y int, want color.Color) {
 	}
 }
 
-func waitForFrame(t *testing.T, frameNotifs <-chan bool) {
-	t.Helper()
+func (d *driverBase) waitForFrame() {
+	d.Helper()
 
 	// Unfortunately, there isn't a way to select on a test failing, since
 	// testing.T doesn't have anything like a context or a "done" channel.
@@ -158,8 +172,8 @@ func waitForFrame(t *testing.T, frameNotifs <-chan bool) {
 	// For now, a static short timeout is better than nothing. 2s is plenty
 	// for our simple test app to render on any device.
 	select {
-	case <-frameNotifs:
+	case <-d.frameNotifs:
 	case <-time.After(5 * time.Second):
-		t.Fatalf("timed out waiting for a frame to be ready")
+		d.Fatalf("timed out waiting for a frame to be ready")
 	}
 }

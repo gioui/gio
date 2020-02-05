@@ -16,22 +16,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
-	"testing"
 	"time"
 )
 
 type X11TestDriver struct {
-	t *testing.T
-
-	frameNotifs chan bool
+	driverBase
 
 	display string
 }
 
-func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) {
-	d.frameNotifs = make(chan bool, 1)
-	d.t = t_
-
+func (d *X11TestDriver) Start(path string, width, height int) {
 	// Pick a random display number between 1 and 100,000. Most machines
 	// will only be using :0, so there's only a 0.001% chance of two
 	// concurrent test runs to run into a conflict.
@@ -57,16 +51,16 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) {
 		"xdotool", // to send input
 	} {
 		if _, err := exec.LookPath(prog); err != nil {
-			d.t.Skipf("%s needed to run", prog)
+			d.Skipf("%s needed to run", prog)
 		}
 	}
 
 	// First, build the app.
 	dir, err := ioutil.TempDir("", "gio-endtoend-x11")
 	if err != nil {
-		d.t.Fatal(err)
+		d.Fatal(err)
 	}
-	d.t.Cleanup(func() { os.RemoveAll(dir) })
+	d.Cleanup(func() { os.RemoveAll(dir) })
 
 	bin := filepath.Join(dir, "red")
 	flags := []string{"build", "-tags", "nowayland", "-o=" + bin}
@@ -76,11 +70,11 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) {
 	flags = append(flags, path)
 	cmd := exec.Command("go", flags...)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		d.t.Fatalf("could not build app: %s:\n%s", err, out)
+		d.Fatalf("could not build app: %s:\n%s", err, out)
 	}
 
 	var wg sync.WaitGroup
-	d.t.Cleanup(wg.Wait)
+	d.Cleanup(wg.Wait)
 
 	// First, start the X server.
 	{
@@ -90,10 +84,10 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) {
 		cmd.Stdout = combined
 		cmd.Stderr = combined
 		if err := cmd.Start(); err != nil {
-			d.t.Fatal(err)
+			d.Fatal(err)
 		}
-		d.t.Cleanup(cancel)
-		d.t.Cleanup(func() {
+		d.Cleanup(cancel)
+		d.Cleanup(func() {
 			// Give it a chance to exit gracefully, cleaning up
 			// after itself. After 10ms, the deferred cancel above
 			// will signal an os.Kill.
@@ -111,7 +105,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) {
 				break
 			}
 			if i >= 100 {
-				d.t.Fatalf("timed out waiting for %s", socket)
+				d.Fatalf("timed out waiting for %s", socket)
 			}
 		}
 
@@ -120,7 +114,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) {
 			if err := cmd.Wait(); err != nil && ctx.Err() == nil {
 				// Print all output and error.
 				io.Copy(os.Stdout, combined)
-				d.t.Error(err)
+				d.Error(err)
 			}
 			wg.Done()
 		}()
@@ -133,21 +127,21 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) {
 		cmd.Env = []string{"DISPLAY=" + d.display}
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
-			d.t.Fatal(err)
+			d.Fatal(err)
 		}
 		stderr := &bytes.Buffer{}
 		cmd.Stderr = stderr
 
 		if err := cmd.Start(); err != nil {
-			d.t.Fatal(err)
+			d.Fatal(err)
 		}
-		d.t.Cleanup(cancel)
+		d.Cleanup(cancel)
 		wg.Add(1)
 		go func() {
 			if err := cmd.Wait(); err != nil && ctx.Err() == nil {
 				// Print stderr and error.
 				io.Copy(os.Stdout, stderr)
-				d.t.Error(err)
+				d.Error(err)
 			}
 			wg.Done()
 		}()
@@ -164,7 +158,7 @@ func (d *X11TestDriver) Start(t_ *testing.T, path string, width, height int) {
 	}
 
 	// Wait for the gio app to render.
-	waitForFrame(d.t, d.frameNotifs)
+	d.waitForFrame()
 }
 
 func (d *X11TestDriver) Screenshot() image.Image {
@@ -172,12 +166,12 @@ func (d *X11TestDriver) Screenshot() image.Image {
 	cmd.Env = []string{"DISPLAY=" + d.display}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		d.t.Errorf("%s", out)
-		d.t.Fatal(err)
+		d.Errorf("%s", out)
+		d.Fatal(err)
 	}
 	img, err := png.Decode(bytes.NewReader(out))
 	if err != nil {
-		d.t.Fatal(err)
+		d.Fatal(err)
 	}
 	return img
 }
@@ -190,8 +184,8 @@ func (d *X11TestDriver) xdotool(args ...interface{}) {
 	cmd := exec.Command("xdotool", strs...)
 	cmd.Env = []string{"DISPLAY=" + d.display}
 	if out, err := cmd.CombinedOutput(); err != nil {
-		d.t.Errorf("%s", out)
-		d.t.Fatal(err)
+		d.Errorf("%s", out)
+		d.Fatal(err)
 	}
 }
 
@@ -200,5 +194,5 @@ func (d *X11TestDriver) Click(x, y int) {
 	d.xdotool("click", "1")
 
 	// Wait for the gio app to render after this click.
-	waitForFrame(d.t, d.frameNotifs)
+	d.waitForFrame()
 }

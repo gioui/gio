@@ -15,14 +15,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"testing"
 	"time"
 )
 
 type AndroidTestDriver struct {
-	t *testing.T
-
-	frameNotifs chan bool
+	driverBase
 
 	sdkDir  string
 	adbPath string
@@ -30,13 +27,10 @@ type AndroidTestDriver struct {
 
 var rxAdbDevice = regexp.MustCompile(`(.*)\s+device$`)
 
-func (d *AndroidTestDriver) Start(t_ *testing.T, path string, width, height int) {
-	d.frameNotifs = make(chan bool, 1)
-	d.t = t_
-
+func (d *AndroidTestDriver) Start(path string, width, height int) {
 	d.sdkDir = os.Getenv("ANDROID_HOME")
 	if d.sdkDir == "" {
-		d.t.Skipf("Android SDK is required; set $ANDROID_HOME")
+		d.Skipf("Android SDK is required; set $ANDROID_HOME")
 	}
 	d.adbPath = filepath.Join(d.sdkDir, "platform-tools", "adb")
 
@@ -44,10 +38,10 @@ func (d *AndroidTestDriver) Start(t_ *testing.T, path string, width, height int)
 	devices := rxAdbDevice.FindAllSubmatch(devOut, -1)
 	switch len(devices) {
 	case 0:
-		d.t.Skipf("no Android devices attached via adb; skipping")
+		d.Skipf("no Android devices attached via adb; skipping")
 	case 1:
 	default:
-		d.t.Skipf("multiple Android devices attached via adb; skipping")
+		d.Skipf("multiple Android devices attached via adb; skipping")
 	}
 
 	// If the device is attached but asleep, it's probably just charging.
@@ -57,29 +51,29 @@ func (d *AndroidTestDriver) Start(t_ *testing.T, path string, width, height int)
 		d.adb("shell", "dumpsys", "power"),
 		[]byte(" mWakefulness=Awake"),
 	) {
-		d.t.Skipf("Android device isn't awake; skipping")
+		d.Skipf("Android device isn't awake; skipping")
 	}
 
 	// First, build the app.
 	dir, err := ioutil.TempDir("", "gio-endtoend-android")
 	if err != nil {
-		d.t.Fatal(err)
+		d.Fatal(err)
 	}
-	d.t.Cleanup(func() { os.RemoveAll(dir) })
+	d.Cleanup(func() { os.RemoveAll(dir) })
 	apk := filepath.Join(dir, "e2e.apk")
 
 	// TODO(mvdan): This is inefficient, as we link the gogio tool every time.
 	// Consider options in the future. On the plus side, this is simple.
 	cmd := exec.Command("go", "run", ".", "-target=android", "-appid="+appid, "-o="+apk, path)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		d.t.Fatalf("could not build app: %s:\n%s", err, out)
+		d.Fatalf("could not build app: %s:\n%s", err, out)
 	}
 
 	// Make sure the app isn't installed already, and try to uninstall it
 	// when we finish. Previous failed test runs might have left the app.
 	d.tryUninstall()
 	d.adb("install", apk)
-	d.t.Cleanup(d.tryUninstall)
+	d.Cleanup(d.tryUninstall)
 
 	// Force our e2e app to be fullscreen, so that the android system bar at
 	// the top doesn't mess with our screenshots.
@@ -101,13 +95,13 @@ func (d *AndroidTestDriver) Start(t_ *testing.T, path string, width, height int)
 		)
 		logcat, err := cmd.StdoutPipe()
 		if err != nil {
-			d.t.Fatal(err)
+			d.Fatal(err)
 		}
 		cmd.Stderr = os.Stderr
 		if err := cmd.Start(); err != nil {
-			d.t.Fatal(err)
+			d.Fatal(err)
 		}
-		d.t.Cleanup(cancel)
+		d.Cleanup(cancel)
 		go func() {
 			scanner := bufio.NewScanner(logcat)
 			for scanner.Scan() {
@@ -130,14 +124,14 @@ func (d *AndroidTestDriver) Start(t_ *testing.T, path string, width, height int)
 	time.Sleep(500 * time.Millisecond)
 
 	// Wait for the gio app to render.
-	waitForFrame(d.t, d.frameNotifs)
+	d.waitForFrame()
 }
 
 func (d *AndroidTestDriver) Screenshot() image.Image {
 	out := d.adb("shell", "screencap", "-p")
 	img, err := png.Decode(bytes.NewReader(out))
 	if err != nil {
-		d.t.Fatal(err)
+		d.Fatal(err)
 	}
 	return img
 }
@@ -150,7 +144,7 @@ func (d *AndroidTestDriver) tryUninstall() {
 			// The package is not installed. Don't log anything.
 			return
 		}
-		d.t.Logf("could not uninstall: %v\n%s", err, out)
+		d.Logf("could not uninstall: %v\n%s", err, out)
 	}
 }
 
@@ -162,8 +156,8 @@ func (d *AndroidTestDriver) adb(args ...interface{}) []byte {
 	cmd := exec.Command(d.adbPath, strs...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		d.t.Errorf("%s", out)
-		d.t.Fatal(err)
+		d.Errorf("%s", out)
+		d.Fatal(err)
 	}
 	return out
 }
@@ -172,5 +166,5 @@ func (d *AndroidTestDriver) Click(x, y int) {
 	d.adb("shell", "input", "tap", x, y)
 
 	// Wait for the gio app to render after this click.
-	waitForFrame(d.t, d.frameNotifs)
+	d.waitForFrame()
 }
