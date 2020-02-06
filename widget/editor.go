@@ -224,6 +224,11 @@ func (e *Editor) Focus() {
 	e.requestFocus = true
 }
 
+// Focused returns whether the editor is focused or not.
+func (e *Editor) Focused() bool {
+	return e.focused
+}
+
 // Layout lays out the editor.
 func (e *Editor) Layout(gtx *layout.Context, sh text.Shaper, font text.Font, size unit.Value) {
 	// Flush events from before the previous frame.
@@ -456,6 +461,19 @@ func (e *Editor) layoutText(s text.Shaper) ([]text.Line, layout.Dimensions) {
 	return lines, dims
 }
 
+// CaretPos returns the line & column numbers of the caret.
+func (e *Editor) CaretPos() (line, col int) {
+	line, col, _, _ = e.layoutCaret()
+	return
+}
+
+// CaretCoords returns the x & y coordinates of the caret, relative to the
+// editor itself.
+func (e *Editor) CaretCoords() (x fixed.Int26_6, y int) {
+	_, _, x, y = e.layoutCaret()
+	return
+}
+
 func (e *Editor) layoutCaret() (carLine, carCol int, x fixed.Int26_6, y int) {
 	var idx int
 	var prevDesc fixed.Int26_6
@@ -645,6 +663,12 @@ func (e *Editor) scrollToCaret() {
 		}
 		e.scrollRel(0, dist)
 	}
+}
+
+// NumLines returns the number of lines in the editor.
+func (e *Editor) NumLines() int {
+	e.makeValid()
+	return len(e.lines)
 }
 
 func (s ChangeEvent) isEditorEvent() {}
