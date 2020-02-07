@@ -10,8 +10,8 @@ import (
 
 	syscall "golang.org/x/sys/windows"
 
-	"gioui.org/gpu/gl"
 	"gioui.org/app/internal/glimpl"
+	"gioui.org/gpu/gl"
 )
 
 type (

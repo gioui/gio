@@ -5,8 +5,8 @@
 package window
 
 import (
-	"gioui.org/gpu/gl"
 	"gioui.org/app/internal/glimpl"
+	"gioui.org/gpu/gl"
 )
 
 /*

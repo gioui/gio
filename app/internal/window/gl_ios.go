@@ -16,8 +16,8 @@ import (
 	"errors"
 	"fmt"
 
-	"gioui.org/gpu/gl"
 	"gioui.org/app/internal/glimpl"
+	"gioui.org/gpu/gl"
 )
 
 type context struct {
