@@ -125,7 +125,7 @@ func (w *Window) update(frame *op.Ops) {
 }
 
 func (w *Window) draw(frameStart time.Time, size image.Point, frame *op.Ops) {
-	sync := w.loop.Draw(w.queue.q.Profiling(), size, frame)
+	sync := w.loop.Draw(size, frame)
 	w.queue.q.Frame(frame)
 	switch w.queue.q.TextInputState() {
 	case input.TextInputOpen:

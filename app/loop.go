@@ -26,9 +26,8 @@ type renderLoop struct {
 }
 
 type frame struct {
-	collectStats bool
-	viewport     image.Point
-	ops          *op.Ops
+	viewport image.Point
+	ops      *op.Ops
 }
 
 type frameResult struct {
@@ -81,13 +80,13 @@ func (l *renderLoop) renderLoop(glctx window.Context) error {
 				l.refreshErr <- glctx.MakeCurrent()
 			case frame := <-l.frames:
 				glctx.Lock()
-				g.Collect(frame.collectStats, frame.viewport, frame.ops)
+				g.Collect(frame.viewport, frame.ops)
 				// Signal that we're done with the frame ops.
 				l.ack <- struct{}{}
-				g.Frame(frame.collectStats, frame.viewport)
+				g.Frame(frame.viewport)
 				var res frameResult
 				res.err = glctx.Present()
-				res.summary = g.EndFrame(frame.collectStats)
+				res.summary = g.EndFrame()
 				glctx.Unlock()
 				l.results <- res
 			case <-l.stop:
@@ -134,13 +133,13 @@ func (l *renderLoop) Refresh() {
 
 // Draw initiates a draw of a frame. It returns a channel
 // than signals when the frame is no longer being accessed.
-func (l *renderLoop) Draw(profile bool, viewport image.Point, frameOps *op.Ops) <-chan struct{} {
+func (l *renderLoop) Draw(viewport image.Point, frameOps *op.Ops) <-chan struct{} {
 	if l.err != nil {
 		l.ack <- struct{}{}
 		return l.ack
 	}
 	l.Flush()
-	l.frames <- frame{profile, viewport, frameOps}
+	l.frames <- frame{viewport, frameOps}
 	l.drawing = true
 	return l.ack
 }

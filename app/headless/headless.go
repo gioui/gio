@@ -90,9 +90,9 @@ func (w *Window) Release() {
 // operation list.
 func (w *Window) Frame(frame *op.Ops) {
 	contextDo(w.ctx, func() error {
-		w.gpu.Collect(false, w.size, frame)
-		w.gpu.Frame(false, w.size)
-		w.gpu.EndFrame(false)
+		w.gpu.Collect(w.size, frame)
+		w.gpu.Frame(w.size)
+		w.gpu.EndFrame()
 		return nil
 	})
 }

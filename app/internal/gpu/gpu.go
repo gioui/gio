@@ -42,6 +42,7 @@ type renderer struct {
 }
 
 type drawOps struct {
+	profile    bool
 	reader     ops.Reader
 	cache      *resourceCache
 	viewport   image.Point
@@ -252,11 +253,11 @@ func (g *GPU) Release() {
 	}
 }
 
-func (g *GPU) Collect(profile bool, viewport image.Point, frameOps *op.Ops) {
+func (g *GPU) Collect(viewport image.Point, frameOps *op.Ops) {
 	g.drawOps.reset(g.cache, viewport)
 	g.drawOps.collect(g.cache, frameOps, viewport)
 	g.frameStart = time.Now()
-	if profile && g.timers == nil && g.ctx.caps.EXT_disjoint_timer_query {
+	if g.drawOps.profile && g.timers == nil && g.ctx.caps.EXT_disjoint_timer_query {
 		g.timers = newTimers(g.ctx)
 		g.zopsTimer = g.timers.newTimer()
 		g.stencilTimer = g.timers.newTimer()
@@ -272,13 +273,13 @@ func (g *GPU) Collect(profile bool, viewport image.Point, frameOps *op.Ops) {
 	}
 }
 
-func (g *GPU) Frame(profile bool, viewport image.Point) {
+func (g *GPU) Frame(viewport image.Point) {
 	g.renderer.blitter.viewport = viewport
 	g.renderer.pather.viewport = viewport
 	for _, img := range g.drawOps.imageOps {
 		expandPathOp(img.path, img.clip)
 	}
-	if profile {
+	if g.drawOps.profile {
 		g.zopsTimer.begin()
 	}
 	g.ctx.DepthFunc(gl.GREATER)
@@ -303,13 +304,13 @@ func (g *GPU) Frame(profile bool, viewport image.Point) {
 	g.coverTimer.end()
 }
 
-func (g *GPU) EndFrame(profile bool) string {
+func (g *GPU) EndFrame() string {
 	g.cleanupTimer.begin()
 	g.cache.frame(g.ctx)
 	g.pathCache.frame(g.ctx)
 	g.cleanupTimer.end()
 	var summary string
-	if profile && g.timers.ready() {
+	if g.drawOps.profile && g.timers.ready() {
 		zt, st, covt, cleant := g.zopsTimer.Elapsed, g.stencilTimer.Elapsed, g.coverTimer.Elapsed, g.cleanupTimer.Elapsed
 		ft := zt + st + covt + cleant
 		q := 100 * time.Microsecond
@@ -587,6 +588,7 @@ func floor(v float32) int {
 }
 
 func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
+	d.profile = false
 	d.clearColor = [3]float32{1.0, 1.0, 1.0}
 	d.cache = cache
 	d.viewport = viewport
@@ -621,6 +623,8 @@ func (d *drawOps) collectOps(r *ops.Reader, state drawState) int {
 loop:
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
+		case opconst.TypeProfile:
+			d.profile = true
 		case opconst.TypeTransform:
 			dop := ops.DecodeTransformOp(encOp.Data)
 			state.t = state.t.Multiply(op.TransformOp(dop))
