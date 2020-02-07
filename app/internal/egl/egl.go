@@ -10,8 +10,8 @@ import (
 	"runtime"
 	"strings"
 
-	"gioui.org/app/internal/gl"
-	"gioui.org/app/internal/gl/impl"
+	"gioui.org/app/internal/glimpl"
+	"gioui.org/gpu/gl"
 )
 
 type Context struct {
@@ -110,7 +110,7 @@ func NewContext(disp NativeDisplayType) (*Context, error) {
 	c := &Context{
 		disp:   eglDisp,
 		eglCtx: eglCtx,
-		c:      new(impl.Functions),
+		c:      new(glimpl.Functions),
 	}
 	return c, nil
 }

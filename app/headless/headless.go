@@ -9,8 +9,8 @@ import (
 	"image"
 	"runtime"
 
-	"gioui.org/app/internal/gl"
-	"gioui.org/app/internal/gpu"
+	"gioui.org/gpu"
+	"gioui.org/gpu/gl"
 	"gioui.org/op"
 )
 

@@ -10,8 +10,8 @@ import (
 
 	syscall "golang.org/x/sys/windows"
 
-	"gioui.org/app/internal/gl"
-	"gioui.org/app/internal/gl/impl"
+	"gioui.org/gpu/gl"
+	"gioui.org/app/internal/glimpl"
 )
 
 type (
@@ -57,7 +57,7 @@ func loadDLLs() error {
 	if err := loadDLL(libEGL, "libEGL.dll"); err != nil {
 		return err
 	}
-	if err := loadDLL(impl.LibGLESv2, "libGLESv2.dll"); err != nil {
+	if err := loadDLL(glimpl.LibGLESv2, "libGLESv2.dll"); err != nil {
 		return err
 	}
 	// d3dcompiler_47.dll is needed internally for shader compilation to function.

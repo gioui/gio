@@ -6,7 +6,7 @@ import (
 	"errors"
 	"strings"
 
-	"gioui.org/app/internal/gl"
+	"gioui.org/gpu/gl"
 )
 
 type context struct {

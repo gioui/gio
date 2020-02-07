@@ -5,8 +5,8 @@
 package window
 
 import (
-	"gioui.org/app/internal/gl"
-	"gioui.org/app/internal/gl/impl"
+	"gioui.org/gpu/gl"
+	"gioui.org/app/internal/glimpl"
 )
 
 /*
@@ -35,7 +35,7 @@ func newContext(w *window) (*context, error) {
 	ctx := C.gio_contextForView(view)
 	c := &context{
 		ctx:  ctx,
-		c:    new(impl.Functions),
+		c:    new(glimpl.Functions),
 		view: view,
 	}
 	return c, nil

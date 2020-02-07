@@ -16,8 +16,8 @@ import (
 	"errors"
 	"fmt"
 
-	"gioui.org/app/internal/gl"
-	"gioui.org/app/internal/gl/impl"
+	"gioui.org/gpu/gl"
+	"gioui.org/app/internal/glimpl"
 )
 
 type context struct {
@@ -45,7 +45,7 @@ func newContext(w *window) (*context, error) {
 		ctx:   ctx,
 		owner: w,
 		layer: C.CFTypeRef(w.contextLayer()),
-		c:     new(impl.Functions),
+		c:     new(glimpl.Functions),
 	}
 	return c, nil
 }

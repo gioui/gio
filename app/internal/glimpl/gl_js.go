@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package impl
+package glimpl
 
 import (
 	"errors"
 	"strings"
 	"syscall/js"
 
-	"gioui.org/app/internal/gl"
+	"gioui.org/gpu/gl"
 )
 
 type Functions struct {

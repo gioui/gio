@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package impl
+package glimpl
 
 import (
 	"math"
@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"gioui.org/app/internal/gl"
+	"gioui.org/gpu/gl"
 )
 
 var (

@@ -9,7 +9,7 @@ import (
 	"math"
 	"time"
 
-	"gioui.org/app/internal/gl"
+	"gioui.org/gpu/gl"
 	"gioui.org/io/event"
 	"gioui.org/io/system"
 	"gioui.org/unit"

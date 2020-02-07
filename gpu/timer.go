@@ -5,7 +5,7 @@ package gpu
 import (
 	"time"
 
-	"gioui.org/app/internal/gl"
+	"gioui.org/gpu/gl"
 )
 
 type timers struct {

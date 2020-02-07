@@ -2,14 +2,14 @@
 
 // +build darwin linux freebsd openbsd
 
-package impl
+package glimpl
 
 import (
 	"runtime"
 	"strings"
 	"unsafe"
 
-	"gioui.org/app/internal/gl"
+	"gioui.org/gpu/gl"
 )
 
 /*

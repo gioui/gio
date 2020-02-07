@@ -9,8 +9,8 @@ import (
 	"image"
 	"unsafe"
 
-	"gioui.org/app/internal/gl"
 	"gioui.org/f32"
+	"gioui.org/gpu/gl"
 	"gioui.org/internal/path"
 )
 

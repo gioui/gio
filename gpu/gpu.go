@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
+/*
+Package gpu implements the rendering of Gio drawing operations. It
+is used by package app and package app/headless and is otherwise not
+useful except for integrating with external window implementations.
+*/
 package gpu
 
 import (
@@ -12,8 +17,8 @@ import (
 	"time"
 	"unsafe"
 
-	"gioui.org/app/internal/gl"
 	"gioui.org/f32"
+	"gioui.org/gpu/gl"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
 	"gioui.org/internal/path"

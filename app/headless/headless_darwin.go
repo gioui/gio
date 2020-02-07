@@ -2,8 +2,10 @@
 
 package headless
 
-import "gioui.org/app/internal/gl"
-import "gioui.org/app/internal/gl/impl"
+import (
+	"gioui.org/app/internal/glimpl"
+	"gioui.org/gpu/gl"
+)
 
 /*
 #cgo CFLAGS: -DGL_SILENCE_DEPRECATION -Werror -Wno-deprecated-declarations -fmodules -fobjc-arc -x objective-c
@@ -21,7 +23,7 @@ type nsContext struct {
 
 func newContext() (context, error) {
 	ctx := C.gio_headless_newContext()
-	return &nsContext{ctx: ctx, c: new(impl.Functions)}, nil
+	return &nsContext{ctx: ctx, c: new(glimpl.Functions)}, nil
 }
 
 func (c *nsContext) MakeCurrent() error {

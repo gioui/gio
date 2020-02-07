@@ -6,8 +6,8 @@ import (
 	"errors"
 	"syscall/js"
 
-	"gioui.org/app/internal/gl"
-	"gioui.org/app/internal/gl/impl"
+	"gioui.org/gpu/gl"
+	"gioui.org/app/internal/glimpl"
 )
 
 type jsContext struct {
@@ -27,7 +27,7 @@ func newContext() (*jsContext, error) {
 	if ctx.IsNull() {
 		return nil, errors.New("headless: webgl is not supported")
 	}
-	f := &impl.Functions{Ctx: ctx}
+	f := &glimpl.Functions{Ctx: ctx}
 	if err := f.Init(version); err != nil {
 		return nil, err
 	}

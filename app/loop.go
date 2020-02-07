@@ -6,8 +6,8 @@ import (
 	"image"
 	"runtime"
 
-	"gioui.org/app/internal/gpu"
 	"gioui.org/app/internal/window"
+	"gioui.org/gpu"
 	"gioui.org/op"
 )
 
