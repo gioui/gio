@@ -25,6 +25,7 @@ type GPU struct {
 	pathCache *opCache
 	cache     *resourceCache
 
+	profile                                           string
 	timers                                            *timers
 	frameStart                                        time.Time
 	zopsTimer, stencilTimer, coverTimer, cleanupTimer *timer
@@ -304,12 +305,11 @@ func (g *GPU) Frame(viewport image.Point) {
 	g.coverTimer.end()
 }
 
-func (g *GPU) EndFrame() string {
+func (g *GPU) EndFrame() {
 	g.cleanupTimer.begin()
 	g.cache.frame(g.ctx)
 	g.pathCache.frame(g.ctx)
 	g.cleanupTimer.end()
-	var summary string
 	if g.drawOps.profile && g.timers.ready() {
 		zt, st, covt, cleant := g.zopsTimer.Elapsed, g.stencilTimer.Elapsed, g.coverTimer.Elapsed, g.cleanupTimer.Elapsed
 		ft := zt + st + covt + cleant
@@ -317,9 +317,12 @@ func (g *GPU) EndFrame() string {
 		zt, st, covt = zt.Round(q), st.Round(q), covt.Round(q)
 		frameDur := time.Since(g.frameStart).Round(q)
 		ft = ft.Round(q)
-		summary = fmt.Sprintf("draw:%7s gpu:%7s zt:%7s st:%7s cov:%7s", frameDur, ft, zt, st, covt)
+		g.profile = fmt.Sprintf("draw:%7s gpu:%7s zt:%7s st:%7s cov:%7s", frameDur, ft, zt, st, covt)
 	}
-	return summary
+}
+
+func (g *GPU) Profile() string {
+	return g.profile
 }
 
 func (r *renderer) texHandle(t *texture) gl.Texture {

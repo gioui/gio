@@ -31,7 +31,7 @@ type frame struct {
 }
 
 type frameResult struct {
-	summary string
+	profile string
 	err     error
 }
 
@@ -86,7 +86,8 @@ func (l *renderLoop) renderLoop(glctx window.Context) error {
 				g.Frame(frame.viewport)
 				var res frameResult
 				res.err = glctx.Present()
-				res.summary = g.EndFrame()
+				g.EndFrame()
+				res.profile = g.Profile()
 				glctx.Unlock()
 				l.results <- res
 			case <-l.stop:
@@ -109,8 +110,8 @@ func (l *renderLoop) Flush() error {
 	if l.drawing {
 		st := <-l.results
 		l.setErr(st.err)
-		if st.summary != "" {
-			l.summary = st.summary
+		if st.profile != "" {
+			l.summary = st.profile
 		}
 		l.drawing = false
 	}
