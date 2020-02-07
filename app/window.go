@@ -8,10 +8,10 @@ import (
 	"image"
 	"time"
 
-	"gioui.org/app/internal/input"
 	"gioui.org/app/internal/window"
 	"gioui.org/io/event"
 	"gioui.org/io/profile"
+	"gioui.org/io/router"
 	"gioui.org/io/system"
 	"gioui.org/op"
 	"gioui.org/unit"
@@ -56,7 +56,7 @@ type callbacks struct {
 // Queue is an event.Queue implementation that distributes system events
 // to the input handlers declared in the most recent frame.
 type Queue struct {
-	q input.Router
+	q router.Router
 }
 
 // driverEvent is sent when a new native driver
@@ -128,9 +128,9 @@ func (w *Window) draw(frameStart time.Time, size image.Point, frame *op.Ops) {
 	sync := w.loop.Draw(size, frame)
 	w.queue.q.Frame(frame)
 	switch w.queue.q.TextInputState() {
-	case input.TextInputOpen:
+	case router.TextInputOpen:
 		w.driver.ShowTextInput(true)
-	case input.TextInputClose:
+	case router.TextInputClose:
 		w.driver.ShowTextInput(false)
 	}
 	if w.queue.q.Profiling() {

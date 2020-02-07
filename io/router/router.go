@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package input
+/*
+Package router implements Router, a event.Queue implementation
+that that disambiguates and routes events to handlers declared
+in operation lists.
+
+Router is used by app.Window and is otherwise only useful for
+using Gio with external window implementations.
+*/
+package router
 
 import (
 	"encoding/binary"
@@ -15,8 +23,8 @@ import (
 	"gioui.org/op"
 )
 
-// Router is a Queue implementation that routes events from
-// all available input sources to registered handlers.
+// Router is a Queue implementation that routes events
+// to handlers declared in operation lists.
 type Router struct {
 	pqueue pointerQueue
 	kqueue keyQueue
@@ -40,6 +48,7 @@ type handlerEvents struct {
 	hadEvents bool
 }
 
+// Events returns the available events for the handler key.
 func (q *Router) Events(k event.Key) []event.Event {
 	events := q.handlers.Events(k)
 	if _, isprof := q.profHandlers[k]; isprof {
@@ -49,6 +58,9 @@ func (q *Router) Events(k event.Key) []event.Event {
 	return events
 }
 
+// Frame replaces the declared handlers from the supplied
+// operation list. The text input state, wakeup time and whether
+// there are active profile handlers is also saved.
 func (q *Router) Frame(ops *op.Ops) {
 	q.handlers.Clear()
 	q.wakeup = false
@@ -79,6 +91,8 @@ func (q *Router) Add(e event.Event) bool {
 	return q.handlers.HadEvents()
 }
 
+// TextInputState returns the input state from the most recent
+// call to Frame.
 func (q *Router) TextInputState() TextInputState {
 	return q.kqueue.InputState()
 }
@@ -103,10 +117,14 @@ func (q *Router) collect() {
 	}
 }
 
+// Profiling reports whether there was profile handlers in the
+// most recent Frame call.
 func (q *Router) Profiling() bool {
 	return q.profiling
 }
 
+// WakeupTime returns the most recent time for doing another frame,
+// as determined from the last call to Frame.
 func (q *Router) WakeupTime() (time.Time, bool) {
 	return q.wakeupTime, q.wakeup
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package input
+package router
 
 import (
 	"encoding/binary"
