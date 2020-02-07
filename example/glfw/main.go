@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: Unlicense OR MIT
+
+// package glfw doesn't build on OpenBSD and FreeBSD.
+// +build !openbsd,!freebsd,!windows,!android,!ios,!js
+
 package main
 
 import (

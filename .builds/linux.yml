@@ -10,6 +10,11 @@ packages:
  - libxkbcommon-x11-dev
  - libgles2-mesa-dev
  - libegl1-mesa-dev
+ - libxcursor-dev
+ - libxrandr-dev
+ - libxinerama-dev
+ - libxi-dev
+ - libxxf86vm-dev
  - wine
  - golang
  - xvfb
@@ -38,12 +43,12 @@ tasks:
      cd gio
      go test -race ./...
      GOOS=windows go test -exec=wine ./...
- - test_example: |
-     cd gio/example
-     go test -race ./...
  - test_cmd: |
      cd gio/cmd
      go test ./...
+     go test -race ./...
+ - test_example: |
+     cd gio/example
      go test -race ./...
  - check_gofmt: |
      cd gio
