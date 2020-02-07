@@ -11,7 +11,7 @@ import (
 
 type context struct {
 	caps caps
-	*gl.Functions
+	gl.Functions
 }
 
 type caps struct {
@@ -32,7 +32,7 @@ type textureTriple struct {
 	typ            gl.Enum
 }
 
-func newContext(glctx *gl.Functions) (*context, error) {
+func newContext(glctx gl.Functions) (*context, error) {
 	ctx := &context{
 		Functions: glctx,
 	}

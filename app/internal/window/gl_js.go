@@ -7,12 +7,13 @@ import (
 	"syscall/js"
 
 	"gioui.org/app/internal/gl"
+	"gioui.org/app/internal/gl/impl"
 )
 
 type context struct {
 	ctx     js.Value
 	cnv     js.Value
-	f       *gl.Functions
+	f       gl.Functions
 	srgbFBO *gl.SRGBFBO
 }
 
@@ -32,7 +33,7 @@ func newContext(w *window) (*context, error) {
 	if ctx.IsNull() {
 		return nil, errors.New("app: webgl is not supported")
 	}
-	f := &gl.Functions{Ctx: ctx}
+	f := &impl.Functions{Ctx: ctx}
 	if err := f.Init(version); err != nil {
 		return nil, err
 	}
@@ -44,7 +45,7 @@ func newContext(w *window) (*context, error) {
 	return c, nil
 }
 
-func (c *context) Functions() *gl.Functions {
+func (c *context) Functions() gl.Functions {
 	return c.f
 }
 

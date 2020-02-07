@@ -222,7 +222,7 @@ var (
 	attribUV    gl.Attrib = 1
 )
 
-func New(ctx *gl.Functions) (*GPU, error) {
+func New(ctx gl.Functions) (*GPU, error) {
 	g := &GPU{
 		pathCache: newOpCache(),
 		cache:     newResourceCache(),
@@ -233,7 +233,7 @@ func New(ctx *gl.Functions) (*GPU, error) {
 	return g, nil
 }
 
-func (g *GPU) init(glctx *gl.Functions) error {
+func (g *GPU) init(glctx gl.Functions) error {
 	ctx, err := newContext(glctx)
 	if err != nil {
 		return err

@@ -11,10 +11,11 @@ import (
 	"strings"
 
 	"gioui.org/app/internal/gl"
+	"gioui.org/app/internal/gl/impl"
 )
 
 type Context struct {
-	c             *gl.Functions
+	c             gl.Functions
 	disp          _EGLDisplay
 	eglCtx        *eglContext
 	eglSurf       _EGLSurface
@@ -109,12 +110,12 @@ func NewContext(disp NativeDisplayType) (*Context, error) {
 	c := &Context{
 		disp:   eglDisp,
 		eglCtx: eglCtx,
-		c:      new(gl.Functions),
+		c:      new(impl.Functions),
 	}
 	return c, nil
 }
 
-func (c *Context) Functions() *gl.Functions {
+func (c *Context) Functions() gl.Functions {
 	return c.c
 }
 

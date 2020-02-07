@@ -23,7 +23,7 @@ type Window struct {
 }
 
 type context interface {
-	Functions() *gl.Functions
+	Functions() gl.Functions
 	MakeCurrent() error
 	ReleaseCurrent()
 	Release()

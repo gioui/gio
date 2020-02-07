@@ -3,6 +3,7 @@
 package headless
 
 import "gioui.org/app/internal/gl"
+import "gioui.org/app/internal/gl/impl"
 
 /*
 #cgo CFLAGS: -DGL_SILENCE_DEPRECATION -Werror -Wno-deprecated-declarations -fmodules -fobjc-arc -x objective-c
@@ -13,14 +14,14 @@ import "gioui.org/app/internal/gl"
 import "C"
 
 type nsContext struct {
-	c        *gl.Functions
+	c        gl.Functions
 	ctx      C.CFTypeRef
 	prepared bool
 }
 
 func newContext() (context, error) {
 	ctx := C.gio_headless_newContext()
-	return &nsContext{ctx: ctx, c: new(gl.Functions)}, nil
+	return &nsContext{ctx: ctx, c: new(impl.Functions)}, nil
 }
 
 func (c *nsContext) MakeCurrent() error {
@@ -36,7 +37,7 @@ func (c *nsContext) ReleaseCurrent() {
 	C.gio_headless_clearCurrentContext(c.ctx)
 }
 
-func (c *nsContext) Functions() *gl.Functions {
+func (c *nsContext) Functions() gl.Functions {
 	return c.c
 }
 

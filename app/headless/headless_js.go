@@ -7,11 +7,12 @@ import (
 	"syscall/js"
 
 	"gioui.org/app/internal/gl"
+	"gioui.org/app/internal/gl/impl"
 )
 
 type jsContext struct {
 	ctx js.Value
-	f   *gl.Functions
+	f   gl.Functions
 }
 
 func newContext() (*jsContext, error) {
@@ -26,7 +27,7 @@ func newContext() (*jsContext, error) {
 	if ctx.IsNull() {
 		return nil, errors.New("headless: webgl is not supported")
 	}
-	f := &gl.Functions{Ctx: ctx}
+	f := &impl.Functions{Ctx: ctx}
 	if err := f.Init(version); err != nil {
 		return nil, err
 	}
@@ -37,7 +38,7 @@ func newContext() (*jsContext, error) {
 	return c, nil
 }
 
-func (c *jsContext) Functions() *gl.Functions {
+func (c *jsContext) Functions() gl.Functions {
 	return c.f
 }
 

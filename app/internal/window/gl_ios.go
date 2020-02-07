@@ -17,11 +17,12 @@ import (
 	"fmt"
 
 	"gioui.org/app/internal/gl"
+	"gioui.org/app/internal/gl/impl"
 )
 
 type context struct {
 	owner                    *window
-	c                        *gl.Functions
+	c                        gl.Functions
 	ctx                      C.CFTypeRef
 	layer                    C.CFTypeRef
 	init                     bool
@@ -44,12 +45,12 @@ func newContext(w *window) (*context, error) {
 		ctx:   ctx,
 		owner: w,
 		layer: C.CFTypeRef(w.contextLayer()),
-		c:     new(gl.Functions),
+		c:     new(impl.Functions),
 	}
 	return c, nil
 }
 
-func (c *context) Functions() *gl.Functions {
+func (c *context) Functions() gl.Functions {
 	return c.c
 }
 

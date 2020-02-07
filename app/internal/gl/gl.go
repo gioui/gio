@@ -81,8 +81,7 @@ const (
 	GPU_DISJOINT_EXT = 0x8FBB
 )
 
-// Enforce Functions interface.
-var _ interface {
+type Functions interface {
 	ActiveTexture(texture Enum)
 	AttachShader(p Program, s Shader)
 	BeginQuery(target Enum, query Query)
@@ -140,6 +139,7 @@ var _ interface {
 	InvalidateFramebuffer(target, attachment Enum)
 	LinkProgram(p Program)
 	PixelStorei(pname Enum, param int32)
+	ReadPixels(x, y, width, height int, format, ty Enum, data []byte)
 	RenderbufferStorage(target, internalformat Enum, width, height int)
 	Scissor(x, y, width, height int32)
 	ShaderSource(s Shader, src string)
@@ -154,4 +154,4 @@ var _ interface {
 	UseProgram(p Program)
 	VertexAttribPointer(dst Attrib, size int, ty Enum, normalized bool, stride, offset int)
 	Viewport(x, y, width, height int)
-} = (*Functions)(nil)
+}

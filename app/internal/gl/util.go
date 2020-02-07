@@ -10,7 +10,7 @@ import (
 	"unsafe"
 )
 
-func CreateProgram(ctx *Functions, vsSrc, fsSrc string, attribs []string) (Program, error) {
+func CreateProgram(ctx Functions, vsSrc, fsSrc string, attribs []string) (Program, error) {
 	vs, err := createShader(ctx, VERTEX_SHADER, vsSrc)
 	if err != nil {
 		return Program{}, err
@@ -39,7 +39,7 @@ func CreateProgram(ctx *Functions, vsSrc, fsSrc string, attribs []string) (Progr
 	return prog, nil
 }
 
-func GetUniformLocation(ctx *Functions, prog Program, name string) Uniform {
+func GetUniformLocation(ctx Functions, prog Program, name string) Uniform {
 	loc := ctx.GetUniformLocation(prog, name)
 	if !loc.Valid() {
 		panic(fmt.Errorf("uniform %s not found", name))
@@ -47,7 +47,7 @@ func GetUniformLocation(ctx *Functions, prog Program, name string) Uniform {
 	return loc
 }
 
-func createShader(ctx *Functions, typ Enum, src string) (Shader, error) {
+func createShader(ctx Functions, typ Enum, src string) (Shader, error) {
 	sh := ctx.CreateShader(typ)
 	if !sh.Valid() {
 		return Shader{}, errors.New("glCreateShader failed")

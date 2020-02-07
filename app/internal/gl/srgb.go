@@ -12,7 +12,7 @@ import (
 // for gamma-correct rendering on platforms without
 // sRGB enabled native framebuffers.
 type SRGBFBO struct {
-	c             *Functions
+	c             Functions
 	width, height int
 	frameBuffer   Framebuffer
 	depthBuffer   Renderbuffer
@@ -23,7 +23,7 @@ type SRGBFBO struct {
 	es3           bool
 }
 
-func NewSRGBFBO(f *Functions) (*SRGBFBO, error) {
+func NewSRGBFBO(f Functions) (*SRGBFBO, error) {
 	var es3 bool
 	glVer := f.GetString(VERSION)
 	ver, err := ParseGLVersion(glVer)

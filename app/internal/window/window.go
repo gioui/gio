@@ -32,7 +32,7 @@ type Callbacks interface {
 }
 
 type Context interface {
-	Functions() *gl.Functions
+	Functions() gl.Functions
 	Present() error
 	MakeCurrent() error
 	Release()
