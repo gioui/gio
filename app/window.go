@@ -138,7 +138,7 @@ func (w *Window) draw(frameStart time.Time, size image.Point, frame *op.Ops) {
 		frameDur = frameDur.Truncate(100 * time.Microsecond)
 		q := 100 * time.Microsecond
 		timings := fmt.Sprintf("tot:%7s %s", frameDur.Round(q), w.loop.Summary())
-		w.queue.q.AddProfile(profile.Event{Timings: timings})
+		w.queue.q.Add(profile.Event{Timings: timings})
 	}
 	if t, ok := w.queue.q.WakeupTime(); ok {
 		w.setNextFrame(t)

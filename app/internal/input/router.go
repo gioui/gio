@@ -69,6 +69,8 @@ func (q *Router) Frame(ops *op.Ops) {
 
 func (q *Router) Add(e event.Event) bool {
 	switch e := e.(type) {
+	case profile.Event:
+		q.profile = e
 	case pointer.Event:
 		q.pqueue.Push(e, &q.handlers)
 	case key.EditEvent, key.Event, key.FocusEvent:
@@ -99,10 +101,6 @@ func (q *Router) collect() {
 			q.profHandlers[op.Key] = struct{}{}
 		}
 	}
-}
-
-func (q *Router) AddProfile(profile profile.Event) {
-	q.profile = profile
 }
 
 func (q *Router) Profiling() bool {
