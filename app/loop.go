@@ -83,7 +83,7 @@ func (l *renderLoop) renderLoop(glctx window.Context) error {
 				g.Collect(frame.viewport, frame.ops)
 				// Signal that we're done with the frame ops.
 				l.ack <- struct{}{}
-				g.Frame(frame.viewport)
+				g.BeginFrame()
 				var res frameResult
 				res.err = glctx.Present()
 				g.EndFrame()

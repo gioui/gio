@@ -260,6 +260,8 @@ func (g *GPU) Release() {
 }
 
 func (g *GPU) Collect(viewport image.Point, frameOps *op.Ops) {
+	g.renderer.blitter.viewport = viewport
+	g.renderer.pather.viewport = viewport
 	g.drawOps.reset(g.cache, viewport)
 	g.drawOps.collect(g.cache, frameOps, viewport)
 	g.frameStart = time.Now()
@@ -279,9 +281,8 @@ func (g *GPU) Collect(viewport image.Point, frameOps *op.Ops) {
 	}
 }
 
-func (g *GPU) Frame(viewport image.Point) {
-	g.renderer.blitter.viewport = viewport
-	g.renderer.pather.viewport = viewport
+func (g *GPU) BeginFrame() {
+	viewport := g.renderer.blitter.viewport
 	for _, img := range g.drawOps.imageOps {
 		expandPathOp(img.path, img.clip)
 	}

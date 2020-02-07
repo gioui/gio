@@ -91,7 +91,7 @@ func (w *Window) Release() {
 func (w *Window) Frame(frame *op.Ops) {
 	contextDo(w.ctx, func() error {
 		w.gpu.Collect(w.size, frame)
-		w.gpu.Frame(w.size)
+		w.gpu.BeginFrame()
 		w.gpu.EndFrame()
 		return nil
 	})
