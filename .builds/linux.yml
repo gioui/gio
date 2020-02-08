@@ -1,8 +1,7 @@
-image: debian/testing
-repositories:
- experimental: http://deb.debian.org/debian experimental main
+image: debian/unstable # TODO(mvdan): switch back to testing once sway hits that repo
 packages:
  - curl
+ - pkg-config
  - libwayland-dev
  - libx11-dev
  - libx11-xcb-dev
@@ -16,24 +15,20 @@ packages:
  - libxi-dev
  - libxxf86vm-dev
  - wine
- - golang
  - xvfb
  - xdotool
  - scrot
+ # - sway TODO: uncomment once the wayland e2e test passes again
  - grim
 sources:
  - https://git.sr.ht/~eliasnaur/gio
 environment:
  GOFLAGS: -mod=readonly
- PATH: /home/build/bin:/usr/bin
+ PATH: /home/build/sdk/go/bin:/usr/bin
 tasks:
- - maybe_install_sway: |
-     sudo apt-get install sway || true
- - install_gotip: |
-     go get golang.org/dl/gotip
-     /home/build/go/bin/gotip download
-     mkdir /home/build/bin
-     ln -s /home/build/go/bin/gotip /home/build/bin/go
+ - install_go1_14rc1: |
+     mkdir -p /home/build/sdk
+     curl https://dl.google.com/go/go1.14rc1.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
  - install_chrome: |
      curl -s https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
      sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'

@@ -5,17 +5,14 @@ packages:
  - wayland
  - mesa-libs
  - xorg-vfbserver
- - go
 sources:
  - https://git.sr.ht/~eliasnaur/gio
 environment:
-    PATH: /home/build/bin:/bin:/usr/local/bin:/usr/bin
+ PATH: /home/build/sdk/go/bin:/bin:/usr/local/bin:/usr/bin
 tasks:
- - install_gotip: |
-     go get golang.org/dl/gotip
-     /home/build/go/bin/gotip download
-     mkdir /home/build/bin
-     ln -s /home/build/go/bin/gotip /home/build/bin/go
+ - install_go1_14rc1: |
+     mkdir -p /home/build/sdk
+     curl https://dl.google.com/go/go1.14rc1.freebsd-amd64.tar.gz | tar -C /home/build/sdk -xzf -
  - test_gio: |
      cd gio
      go test ./...
