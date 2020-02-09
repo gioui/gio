@@ -8,6 +8,7 @@ import (
 
 	"gioui.org/app/internal/window"
 	"gioui.org/gpu"
+	"gioui.org/gpu/gl"
 	"gioui.org/op"
 )
 
@@ -66,7 +67,12 @@ func (l *renderLoop) renderLoop(glctx window.Context) error {
 			initErr <- err
 			return
 		}
-		g, err := gpu.New(glctx.Functions())
+		ctx, err := gl.NewBackend(glctx.Functions())
+		if err != nil {
+			initErr <- err
+			return
+		}
+		g, err := gpu.New(ctx)
 		if err != nil {
 			initErr <- err
 			return

@@ -5,12 +5,10 @@ package gl
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
-	"unsafe"
 )
 
-func CreateProgram(ctx Functions, vsSrc, fsSrc string, attribs []string) (Program, error) {
+func createProgram(ctx Functions, vsSrc, fsSrc string, attribs []string) (Program, error) {
 	vs, err := createShader(ctx, VERTEX_SHADER, vsSrc)
 	if err != nil {
 		return Program{}, err
@@ -39,7 +37,7 @@ func CreateProgram(ctx Functions, vsSrc, fsSrc string, attribs []string) (Progra
 	return prog, nil
 }
 
-func GetUniformLocation(ctx Functions, prog Program, name string) Uniform {
+func getUniformLocation(ctx Functions, prog Program, name string) Uniform {
 	loc := ctx.GetUniformLocation(prog, name)
 	if !loc.Valid() {
 		panic(fmt.Errorf("uniform %s not found", name))
@@ -62,19 +60,7 @@ func createShader(ctx Functions, typ Enum, src string) (Shader, error) {
 	return sh, nil
 }
 
-// BytesView returns a byte slice view of a slice.
-func BytesView(s interface{}) []byte {
-	v := reflect.ValueOf(s)
-	first := v.Index(0)
-	sz := int(first.Type().Size())
-	return *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
-		Data: uintptr(unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(first.UnsafeAddr())))),
-		Len:  v.Len() * sz,
-		Cap:  v.Cap() * sz,
-	}))
-}
-
-func ParseGLVersion(glVer string) ([2]int, error) {
+func parseGLVersion(glVer string) ([2]int, error) {
 	var ver [2]int
 	if _, err := fmt.Sscanf(glVer, "OpenGL ES %d.%d", &ver[0], &ver[1]); err == nil {
 		return ver, nil
@@ -86,29 +72,4 @@ func ParseGLVersion(glVer string) ([2]int, error) {
 		return ver, nil
 	}
 	return ver, fmt.Errorf("failed to parse OpenGL ES version (%s)", glVer)
-}
-
-func SliceOf(s uintptr) []byte {
-	if s == 0 {
-		return nil
-	}
-	sh := reflect.SliceHeader{
-		Data: s,
-		Len:  1 << 30,
-		Cap:  1 << 30,
-	}
-	return *(*[]byte)(unsafe.Pointer(&sh))
-}
-
-// GoString convert a NUL-terminated C string
-// to a Go string.
-func GoString(s []byte) string {
-	i := 0
-	for {
-		if s[i] == 0 {
-			break
-		}
-		i++
-	}
-	return string(s[:i])
 }

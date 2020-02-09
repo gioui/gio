@@ -4,19 +4,17 @@ package gpu
 
 import (
 	"time"
-
-	"gioui.org/gpu/gl"
 )
 
 type timers struct {
-	ctx    *context
-	timers []*timer
+	backend Backend
+	timers  []*timer
 }
 
 type timer struct {
 	Elapsed time.Duration
-	ctx     *context
-	obj     gl.Query
+	backend Backend
+	timer   Timer
 	state   timerState
 }
 
@@ -28,9 +26,9 @@ const (
 	timerWaiting
 )
 
-func newTimers(ctx *context) *timers {
+func newTimers(b Backend) *timers {
 	return &timers{
-		ctx: ctx,
+		backend: b,
 	}
 }
 
@@ -39,8 +37,8 @@ func (t *timers) newTimer() *timer {
 		return nil
 	}
 	tt := &timer{
-		ctx: t.ctx,
-		obj: t.ctx.CreateQuery(),
+		backend: t.backend,
+		timer:   t.backend.NewTimer(),
 	}
 	t.timers = append(t.timers, tt)
 	return tt
@@ -50,7 +48,7 @@ func (t *timer) begin() {
 	if t == nil || t.state != timerIdle {
 		return
 	}
-	t.ctx.BeginQuery(gl.TIME_ELAPSED_EXT, t.obj)
+	t.timer.Begin()
 	t.state = timerRunning
 }
 
@@ -58,7 +56,7 @@ func (t *timer) end() {
 	if t == nil || t.state != timerRunning {
 		return
 	}
-	t.ctx.EndQuery(gl.TIME_ELAPSED_EXT)
+	t.timer.End()
 	t.state = timerWaiting
 }
 
@@ -67,19 +65,20 @@ func (t *timers) ready() bool {
 		return false
 	}
 	for _, tt := range t.timers {
-		if tt.state != timerWaiting {
+		switch tt.state {
+		case timerIdle:
+			continue
+		case timerRunning:
 			return false
 		}
-		if t.ctx.GetQueryObjectuiv(tt.obj, gl.QUERY_RESULT_AVAILABLE) == 0 {
+		d, ok := tt.timer.Duration()
+		if !ok {
 			return false
 		}
-	}
-	for _, tt := range t.timers {
 		tt.state = timerIdle
-		nanos := t.ctx.GetQueryObjectuiv(tt.obj, gl.QUERY_RESULT)
-		tt.Elapsed = time.Duration(nanos)
+		tt.Elapsed = d
 	}
-	return t.ctx.GetInteger(gl.GPU_DISJOINT_EXT) == 0
+	return t.backend.IsTimeContinuous()
 }
 
 func (t *timers) release() {
@@ -87,7 +86,7 @@ func (t *timers) release() {
 		return
 	}
 	for _, tt := range t.timers {
-		t.ctx.DeleteQuery(tt.obj)
+		tt.timer.Release()
 	}
 	t.timers = nil
 }

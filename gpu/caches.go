@@ -43,11 +43,11 @@ func (r *resourceCache) put(key interface{}, val resource) {
 	r.newRes[key] = val
 }
 
-func (r *resourceCache) frame(ctx *context) {
+func (r *resourceCache) frame() {
 	for k, v := range r.res {
 		if _, exists := r.newRes[k]; !exists {
 			delete(r.res, k)
-			v.release(ctx)
+			v.release()
 		}
 	}
 	for k, v := range r.newRes {
@@ -56,9 +56,9 @@ func (r *resourceCache) frame(ctx *context) {
 	}
 }
 
-func (r *resourceCache) release(ctx *context) {
+func (r *resourceCache) release() {
 	for _, v := range r.newRes {
-		v.release(ctx)
+		v.release()
 	}
 	r.newRes = nil
 	r.res = nil
@@ -87,11 +87,11 @@ func (r *opCache) put(key ops.Key, val resource) {
 	r.newRes[key] = val
 }
 
-func (r *opCache) frame(ctx *context) {
+func (r *opCache) frame() {
 	for k, v := range r.res {
 		if _, exists := r.newRes[k]; !exists {
 			delete(r.res, k)
-			v.release(ctx)
+			v.release()
 		}
 	}
 	for k, v := range r.newRes {
@@ -100,9 +100,9 @@ func (r *opCache) frame(ctx *context) {
 	}
 }
 
-func (r *opCache) release(ctx *context) {
+func (r *opCache) release() {
 	for _, v := range r.newRes {
-		v.release(ctx)
+		v.release()
 	}
 	r.newRes = nil
 	r.res = nil

@@ -21,6 +21,7 @@ const (
 	DST_COLOR                             = 0x306
 	ELEMENT_ARRAY_BUFFER                  = 0x8893
 	EXTENSIONS                            = 0x1f03
+	FALSE                                 = 0
 	FLOAT                                 = 0x1406
 	FRAGMENT_SHADER                       = 0x8b30
 	FRAMEBUFFER                           = 0x8d40
@@ -69,6 +70,7 @@ const (
 	TEXTURE1                              = 0x84c1
 	TRIANGLE_STRIP                        = 0x5
 	TRIANGLES                             = 0x4
+	TRUE                                  = 1
 	UNPACK_ALIGNMENT                      = 0xcf5
 	UNSIGNED_BYTE                         = 0x1401
 	UNSIGNED_SHORT                        = 0x1403

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+
+	"gioui.org/internal/unsafe"
 )
 
 // SRGBFBO implements an intermediate sRGB FBO
@@ -26,7 +28,7 @@ type SRGBFBO struct {
 func NewSRGBFBO(f Functions) (*SRGBFBO, error) {
 	var es3 bool
 	glVer := f.GetString(VERSION)
-	ver, err := ParseGLVersion(glVer)
+	ver, err := parseGLVersion(glVer)
 	if err != nil {
 		return nil, err
 	}
@@ -55,17 +57,17 @@ func NewSRGBFBO(f Functions) (*SRGBFBO, error) {
 
 func (s *SRGBFBO) Blit() {
 	if !s.blitted {
-		prog, err := CreateProgram(s.c, blitVSrc, blitFSrc, []string{"pos", "uv"})
+		prog, err := createProgram(s.c, blitVSrc, blitFSrc, []string{"pos", "uv"})
 		if err != nil {
 			panic(err)
 		}
 		s.prog = prog
 		s.c.UseProgram(prog)
-		s.c.Uniform1i(GetUniformLocation(s.c, prog, "tex"), 0)
+		s.c.Uniform1i(getUniformLocation(s.c, prog, "tex"), 0)
 		s.quad = s.c.CreateBuffer()
 		s.c.BindBuffer(ARRAY_BUFFER, s.quad)
 		s.c.BufferData(ARRAY_BUFFER,
-			BytesView([]float32{
+			unsafe.BytesView([]float32{
 				-1, +1, 0, 1,
 				+1, +1, 1, 1,
 				-1, -1, 0, 0,

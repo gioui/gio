@@ -51,7 +51,13 @@ func NewWindow(width, height int) (*Window, error) {
 			ctx.Release()
 			return err
 		}
-		gpu, err := gpu.New(f)
+		backend, err := gl.NewBackend(f)
+		if err != nil {
+			fbo.Release()
+			ctx.Release()
+			return err
+		}
+		gpu, err := gpu.New(backend)
 		if err != nil {
 			fbo.Release()
 			ctx.Release()
