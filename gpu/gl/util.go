@@ -20,7 +20,7 @@ func CreateProgram(ctx Functions, vsSrc, fsSrc string, attribs []string) (Progra
 	}
 	defer ctx.DeleteShader(fs)
 	prog := ctx.CreateProgram()
-	if !prog.Valid() {
+	if !prog.valid() {
 		return Program{}, errors.New("glCreateProgram failed")
 	}
 	ctx.AttachShader(prog, vs)
@@ -39,7 +39,7 @@ func CreateProgram(ctx Functions, vsSrc, fsSrc string, attribs []string) (Progra
 
 func GetUniformLocation(ctx Functions, prog Program, name string) Uniform {
 	loc := ctx.GetUniformLocation(prog, name)
-	if !loc.Valid() {
+	if !loc.valid() {
 		panic(fmt.Errorf("uniform %s not found", name))
 	}
 	return loc
@@ -47,7 +47,7 @@ func GetUniformLocation(ctx Functions, prog Program, name string) Uniform {
 
 func createShader(ctx Functions, typ Enum, src string) (Shader, error) {
 	sh := ctx.CreateShader(typ)
-	if !sh.Valid() {
+	if !sh.valid() {
 		return Shader{}, errors.New("glCreateShader failed")
 	}
 	ctx.ShaderSource(sh, src)

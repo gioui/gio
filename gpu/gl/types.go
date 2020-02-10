@@ -14,22 +14,14 @@ type (
 	Object       struct{ V uint }
 )
 
-func (u Uniform) Valid() bool {
+func (u Uniform) valid() bool {
 	return u.V != -1
 }
 
-func (p Program) Valid() bool {
+func (p Program) valid() bool {
 	return p.V != 0
 }
 
-func (s Shader) Valid() bool {
+func (s Shader) valid() bool {
 	return s.V != 0
-}
-
-func (t Texture) Valid() bool {
-	return t.V != 0
-}
-
-func (t Texture) Equal(t2 Texture) bool {
-	return t == t2
 }
