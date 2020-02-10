@@ -4,7 +4,6 @@ package headless
 
 import (
 	"gioui.org/app/internal/glimpl"
-	"gioui.org/gpu/gl"
 )
 
 /*
@@ -16,7 +15,7 @@ import (
 import "C"
 
 type nsContext struct {
-	c        gl.Functions
+	c        *glimpl.Functions
 	ctx      C.CFTypeRef
 	prepared bool
 }
@@ -39,7 +38,7 @@ func (c *nsContext) ReleaseCurrent() {
 	C.gio_headless_clearCurrentContext(c.ctx)
 }
 
-func (c *nsContext) Functions() gl.Functions {
+func (c *nsContext) Functions() *glimpl.Functions {
 	return c.c
 }
 

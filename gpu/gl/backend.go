@@ -74,7 +74,7 @@ type textureTriple struct {
 func NewBackend(f Functions) (*Backend, error) {
 	exts := strings.Split(f.GetString(EXTENSIONS), " ")
 	glVer := f.GetString(VERSION)
-	ver, err := parseGLVersion(glVer)
+	ver, err := ParseGLVersion(glVer)
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +282,7 @@ func (b *Backend) DepthFunc(f gpu.DepthFunc) {
 }
 
 func (b *Backend) NewProgram(vssrc, fssrc string, attr []string) (gpu.Program, error) {
-	p, err := createProgram(b.funcs, vssrc, fssrc, attr)
+	p, err := CreateProgram(b.funcs, vssrc, fssrc, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +316,7 @@ func (p *gpuProgram) Bind() {
 
 func (p *gpuProgram) UniformFor(uniform string) gpu.Uniform {
 	f := p.backend.funcs
-	return getUniformLocation(f, p.obj, uniform)
+	return GetUniformLocation(f, p.obj, uniform)
 }
 
 func (b *Backend) SetupVertexArray(slot int, size int, dataType gpu.DataType, stride, offset int) {

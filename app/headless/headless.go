@@ -9,6 +9,8 @@ import (
 	"image"
 	"runtime"
 
+	"gioui.org/app/internal/glimpl"
+	"gioui.org/app/internal/srgb"
 	"gioui.org/gpu"
 	"gioui.org/gpu/gl"
 	"gioui.org/op"
@@ -18,12 +20,12 @@ import (
 type Window struct {
 	size image.Point
 	ctx  context
-	fbo  *gl.SRGBFBO
+	fbo  *srgb.SRGBFBO
 	gpu  *gpu.GPU
 }
 
 type context interface {
-	Functions() gl.Functions
+	Functions() *glimpl.Functions
 	MakeCurrent() error
 	ReleaseCurrent()
 	Release()
@@ -41,7 +43,7 @@ func NewWindow(width, height int) (*Window, error) {
 	}
 	err = contextDo(ctx, func() error {
 		f := ctx.Functions()
-		fbo, err := gl.NewSRGBFBO(f)
+		fbo, err := srgb.NewSRGBFBO(f)
 		if err != nil {
 			ctx.Release()
 			return err

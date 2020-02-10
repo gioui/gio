@@ -22,7 +22,7 @@ import (
 
 type context struct {
 	owner                    *window
-	c                        gl.Functions
+	c                        *glimpl.Functions
 	ctx                      C.CFTypeRef
 	layer                    C.CFTypeRef
 	init                     bool
@@ -50,7 +50,7 @@ func newContext(w *window) (*context, error) {
 	return c, nil
 }
 
-func (c *context) Functions() gl.Functions {
+func (c *context) Functions() *glimpl.Functions {
 	return c.c
 }
 

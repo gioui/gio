@@ -6,7 +6,6 @@ package window
 
 import (
 	"gioui.org/app/internal/glimpl"
-	"gioui.org/gpu/gl"
 )
 
 /*
@@ -19,7 +18,7 @@ import (
 import "C"
 
 type context struct {
-	c    gl.Functions
+	c    *glimpl.Functions
 	ctx  C.CFTypeRef
 	view C.CFTypeRef
 }
@@ -41,7 +40,7 @@ func newContext(w *window) (*context, error) {
 	return c, nil
 }
 
-func (c *context) Functions() gl.Functions {
+func (c *context) Functions() *glimpl.Functions {
 	return c.c
 }
 

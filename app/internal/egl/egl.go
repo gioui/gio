@@ -11,18 +11,18 @@ import (
 	"strings"
 
 	"gioui.org/app/internal/glimpl"
-	"gioui.org/gpu/gl"
+	"gioui.org/app/internal/srgb"
 )
 
 type Context struct {
-	c             gl.Functions
+	c             *glimpl.Functions
 	disp          _EGLDisplay
 	eglCtx        *eglContext
 	eglSurf       _EGLSurface
 	width, height int
 	refreshFBO    bool
 	// For sRGB emulation.
-	srgbFBO *gl.SRGBFBO
+	srgbFBO *srgb.SRGBFBO
 }
 
 type eglContext struct {
@@ -115,7 +115,7 @@ func NewContext(disp NativeDisplayType) (*Context, error) {
 	return c, nil
 }
 
-func (c *Context) Functions() gl.Functions {
+func (c *Context) Functions() *glimpl.Functions {
 	return c.c
 }
 
@@ -161,7 +161,7 @@ func (c *Context) MakeCurrent() error {
 	}
 	if c.srgbFBO == nil {
 		var err error
-		c.srgbFBO, err = gl.NewSRGBFBO(c.c)
+		c.srgbFBO, err = srgb.NewSRGBFBO(c.c)
 		if err != nil {
 			return err
 		}

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func createProgram(ctx Functions, vsSrc, fsSrc string, attribs []string) (Program, error) {
+func CreateProgram(ctx Functions, vsSrc, fsSrc string, attribs []string) (Program, error) {
 	vs, err := createShader(ctx, VERTEX_SHADER, vsSrc)
 	if err != nil {
 		return Program{}, err
@@ -37,7 +37,7 @@ func createProgram(ctx Functions, vsSrc, fsSrc string, attribs []string) (Progra
 	return prog, nil
 }
 
-func getUniformLocation(ctx Functions, prog Program, name string) Uniform {
+func GetUniformLocation(ctx Functions, prog Program, name string) Uniform {
 	loc := ctx.GetUniformLocation(prog, name)
 	if !loc.Valid() {
 		panic(fmt.Errorf("uniform %s not found", name))
@@ -60,7 +60,7 @@ func createShader(ctx Functions, typ Enum, src string) (Shader, error) {
 	return sh, nil
 }
 
-func parseGLVersion(glVer string) ([2]int, error) {
+func ParseGLVersion(glVer string) ([2]int, error) {
 	var ver [2]int
 	if _, err := fmt.Sscanf(glVer, "OpenGL ES %d.%d", &ver[0], &ver[1]); err == nil {
 		return ver, nil
