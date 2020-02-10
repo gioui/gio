@@ -90,7 +90,6 @@ type Functions interface {
 	BindAttribLocation(p Program, a Attrib, name string)
 	BindBuffer(target Enum, b Buffer)
 	BindFramebuffer(target Enum, fb Framebuffer)
-	BindRenderbuffer(target Enum, rb Renderbuffer)
 	BindTexture(target Enum, t Texture)
 	BlendEquation(mode Enum)
 	BlendFunc(sfactor, dfactor Enum)
@@ -104,14 +103,12 @@ type Functions interface {
 	CreateFramebuffer() Framebuffer
 	CreateProgram() Program
 	CreateQuery() Query
-	CreateRenderbuffer() Renderbuffer
 	CreateShader(ty Enum) Shader
 	CreateTexture() Texture
 	DeleteBuffer(v Buffer)
 	DeleteFramebuffer(v Framebuffer)
 	DeleteProgram(p Program)
 	DeleteQuery(query Query)
-	DeleteRenderbuffer(v Renderbuffer)
 	DeleteShader(s Shader)
 	DeleteTexture(v Texture)
 	DepthFunc(f Enum)
@@ -123,13 +120,9 @@ type Functions interface {
 	Enable(cap Enum)
 	EnableVertexAttribArray(a Attrib)
 	EndQuery(target Enum)
-	Finish()
-	FramebufferRenderbuffer(target, attachment, renderbuffertarget Enum, renderbuffer Renderbuffer)
 	FramebufferTexture2D(target, attachment, texTarget Enum, t Texture, level int)
 	GetBinding(pname Enum) Object
 	GetError() Enum
-	GetRenderbufferParameteri(target, pname Enum) int
-	GetFramebufferAttachmentParameteri(target, attachment, pname Enum) int
 	GetInteger(pname Enum) int
 	GetProgrami(p Program, pname Enum) int
 	GetProgramInfoLog(p Program) string
@@ -140,13 +133,8 @@ type Functions interface {
 	GetUniformLocation(p Program, name string) Uniform
 	InvalidateFramebuffer(target, attachment Enum)
 	LinkProgram(p Program)
-	PixelStorei(pname Enum, param int32)
-	ReadPixels(x, y, width, height int, format, ty Enum, data []byte)
-	RenderbufferStorage(target, internalformat Enum, width, height int)
-	Scissor(x, y, width, height int32)
 	ShaderSource(s Shader, src string)
 	TexImage2D(target Enum, level int, internalFormat int, width, height int, format, ty Enum, data []byte)
-	TexSubImage2D(target Enum, level int, x, y, width, height int, format, ty Enum, data []byte)
 	TexParameteri(target, pname Enum, param int)
 	Uniform1f(dst Uniform, v float32)
 	Uniform1i(dst Uniform, v int)
