@@ -11,7 +11,6 @@ import (
 	"image/png"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -103,7 +102,7 @@ func (d *WaylandTestDriver) Start(path string, width, height int) {
 		cmd.Env = env
 		stderr, err := cmd.StderrPipe()
 		if err != nil {
-			log.Fatal(err)
+			d.Fatal(err)
 		}
 		if err := cmd.Start(); err != nil {
 			d.Fatal(err)

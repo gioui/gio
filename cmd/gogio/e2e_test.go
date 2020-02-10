@@ -3,9 +3,12 @@
 package main_test
 
 import (
+	"errors"
 	"flag"
+	"fmt"
 	"image"
 	"image/color"
+	"strings"
 	"testing"
 	"time"
 )
@@ -84,47 +87,6 @@ func runEndToEndTest(t *testing.T, driver TestDriver) {
 	t.Log("starting driver and gio app")
 	driver.Start("testdata/red.go", size.X, size.Y)
 
-	// The colors are split in four rectangular sections. Check the corners
-	// of each of the sections. We check the corners left to right, top to
-	// bottom, like when reading left-to-right text.
-	wantColors := func(topLeft, topRight, botLeft, botRight color.RGBA) {
-		t.Helper()
-		img := driver.Screenshot()
-		size = img.Bounds().Size()
-		{
-			minX, minY := 5, 5
-			maxX, maxY := (size.X/2)-5, (size.Y/2)-5
-			wantColor(t, img, minX, minY, topLeft)
-			wantColor(t, img, maxX, minY, topLeft)
-			wantColor(t, img, minX, maxY, topLeft)
-			wantColor(t, img, maxX, maxY, topLeft)
-		}
-		{
-			minX, minY := (size.X/2)+5, 5
-			maxX, maxY := size.X-5, (size.Y/2)-5
-			wantColor(t, img, minX, minY, topRight)
-			wantColor(t, img, maxX, minY, topRight)
-			wantColor(t, img, minX, maxY, topRight)
-			wantColor(t, img, maxX, maxY, topRight)
-		}
-		{
-			minX, minY := 5, (size.Y/2)+5
-			maxX, maxY := (size.X/2)-5, size.Y-5
-			wantColor(t, img, minX, minY, botLeft)
-			wantColor(t, img, maxX, minY, botLeft)
-			wantColor(t, img, minX, maxY, botLeft)
-			wantColor(t, img, maxX, maxY, botLeft)
-		}
-		{
-			minX, minY := (size.X/2)+5, (size.Y/2)+5
-			maxX, maxY := size.X-5, size.Y-5
-			wantColor(t, img, minX, minY, botRight)
-			wantColor(t, img, maxX, minY, botRight)
-			wantColor(t, img, minX, maxY, botRight)
-			wantColor(t, img, maxX, maxY, botRight)
-		}
-	}
-
 	beef := color.RGBA{R: 0xde, G: 0xad, B: 0xbe}
 	white := color.RGBA{R: 0xff, G: 0xff, B: 0xff}
 	black := color.RGBA{R: 0x00, G: 0x00, B: 0x00}
@@ -133,7 +95,11 @@ func runEndToEndTest(t *testing.T, driver TestDriver) {
 
 	// These are the four colors at the beginning.
 	t.Log("taking initial screenshot")
-	wantColors(beef, white, black, gray)
+	withRetries(t, 2*time.Second, func() error {
+		img := driver.Screenshot()
+		size = img.Bounds().Size() // override the default size
+		return checkImageCorners(img, beef, white, black, gray)
+	})
 
 	// TODO(mvdan): implement this properly in the Wayland driver; swaymsg
 	// almost works to automate clicks, but the button presses end up in the
@@ -146,18 +112,129 @@ func runEndToEndTest(t *testing.T, driver TestDriver) {
 	t.Log("clicking twice and taking another screenshot")
 	driver.Click(1*(size.X/4), 1*(size.Y/4))
 	driver.Click(3*(size.X/4), 3*(size.Y/4))
-	wantColors(red, white, black, red)
+	withRetries(t, 2*time.Second, func() error {
+		img := driver.Screenshot()
+		return checkImageCorners(img, red, white, black, red)
+	})
 }
 
-func wantColor(t *testing.T, img image.Image, x, y int, want color.Color) {
+// withRetries keeps retrying fn until it succeeds, or until the timeout is hit.
+// It uses a rudimentary kind of backoff, which starts with 100ms delays. As
+// such, timeout should generally be in the order of seconds.
+func withRetries(t *testing.T, timeout time.Duration, fn func() error) {
 	t.Helper()
-	r, g, b, _ := want.RGBA()
-	got := img.At(x, y)
-	r_, g_, b_, _ := got.RGBA()
-	if r_ != r || g_ != g || b_ != b {
-		t.Errorf("got 0x%04x%04x%04x at (%d,%d), want 0x%04x%04x%04x",
-			r_, g_, b_, x, y, r, g, b)
+
+	timeoutTimer := time.NewTimer(timeout)
+	defer timeoutTimer.Stop()
+	backoff := 100 * time.Millisecond
+
+	tries := 0
+	var lastErr error
+	for {
+		if lastErr = fn(); lastErr == nil {
+			return
+		}
+		tries++
+		t.Logf("retrying after %s", backoff)
+
+		// Use a timer instead of a sleep, so that the timeout can stop
+		// the backoff early. Don't reuse this timer, since we're not in
+		// a hot loop, and we don't want tricky code.
+		backoffTimer := time.NewTimer(backoff)
+		defer backoffTimer.Stop()
+
+		select {
+		case <-timeoutTimer.C:
+			t.Errorf("last error: %v", lastErr)
+			t.Fatalf("hit timeout of %s after %d tries", timeout, tries)
+		case <-backoffTimer.C:
+		}
+
+		// Keep doubling it until a maximum. With the start at 100ms,
+		// we'll do: 100ms, 200ms, 400ms, 800ms, 1.6s, and 2s forever.
+		backoff *= 2
+		if max := 2 * time.Second; backoff > max {
+			backoff = max
+		}
 	}
+}
+
+type colorMismatch struct {
+	x, y            int
+	wantRGB, gotRGB [3]uint32
+}
+
+func (m colorMismatch) String() string {
+	return fmt.Sprintf("%3d,%-3d got 0x%04x%04x%04x, want 0x%04x%04x%04x",
+		m.x, m.y,
+		m.gotRGB[0], m.gotRGB[1], m.gotRGB[2],
+		m.wantRGB[0], m.wantRGB[1], m.wantRGB[2],
+	)
+}
+
+func checkImageCorners(img image.Image, topLeft, topRight, botLeft, botRight color.RGBA) error {
+	// The colors are split in four rectangular sections. Check the corners
+	// of each of the sections. We check the corners left to right, top to
+	// bottom, like when reading left-to-right text.
+
+	size := img.Bounds().Size()
+	var mismatches []colorMismatch
+
+	checkColor := func(x, y int, want color.Color) {
+		r, g, b, _ := want.RGBA()
+		got := img.At(x, y)
+		r_, g_, b_, _ := got.RGBA()
+		if r_ != r || g_ != g || b_ != b {
+			mismatches = append(mismatches, colorMismatch{
+				x:       x,
+				y:       y,
+				wantRGB: [3]uint32{r, g, b},
+				gotRGB:  [3]uint32{r_, g_, b_},
+			})
+		}
+	}
+
+	{
+		minX, minY := 5, 5
+		maxX, maxY := (size.X/2)-5, (size.Y/2)-5
+		checkColor(minX, minY, topLeft)
+		checkColor(maxX, minY, topLeft)
+		checkColor(minX, maxY, topLeft)
+		checkColor(maxX, maxY, topLeft)
+	}
+	{
+		minX, minY := (size.X/2)+5, 5
+		maxX, maxY := size.X-5, (size.Y/2)-5
+		checkColor(minX, minY, topRight)
+		checkColor(maxX, minY, topRight)
+		checkColor(minX, maxY, topRight)
+		checkColor(maxX, maxY, topRight)
+	}
+	{
+		minX, minY := 5, (size.Y/2)+5
+		maxX, maxY := (size.X/2)-5, size.Y-5
+		checkColor(minX, minY, botLeft)
+		checkColor(maxX, minY, botLeft)
+		checkColor(minX, maxY, botLeft)
+		checkColor(maxX, maxY, botLeft)
+	}
+	{
+		minX, minY := (size.X/2)+5, (size.Y/2)+5
+		maxX, maxY := size.X-5, size.Y-5
+		checkColor(minX, minY, botRight)
+		checkColor(maxX, minY, botRight)
+		checkColor(minX, maxY, botRight)
+		checkColor(maxX, maxY, botRight)
+	}
+	if n := len(mismatches); n > 0 {
+		b := new(strings.Builder)
+		fmt.Fprintf(b, "encountered %d color mismatches:\n", n)
+		for _, m := range mismatches {
+			fmt.Fprintf(b, "%s\n", m)
+		}
+		return errors.New(b.String())
+	}
+	return nil
 }
 
 func (d *driverBase) waitForFrame() {

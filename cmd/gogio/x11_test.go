@@ -95,19 +95,13 @@ func (d *X11TestDriver) Start(path string, width, height int) {
 			time.Sleep(10 * time.Millisecond)
 		})
 
-		// Wait for up to 1s (100 * 10ms) for the X server to be ready.
-		for i := 0; ; i++ {
-			time.Sleep(10 * time.Millisecond)
-			// This socket path isn't terribly portable, but it's
-			// okay for now.
+		// Wait for the X server to be ready. The socket path isn't
+		// terribly portable, but that's okay for now.
+		withRetries(d.T, time.Second, func() error {
 			socket := fmt.Sprintf("/tmp/.X11-unix/X%s", d.display[1:])
-			if _, err := os.Stat(socket); err == nil {
-				break
-			}
-			if i >= 100 {
-				d.Fatalf("timed out waiting for %s", socket)
-			}
-		}
+			_, err := os.Stat(socket)
+			return err
+		})
 
 		wg.Add(1)
 		go func() {
