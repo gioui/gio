@@ -65,7 +65,11 @@ func main() {
 	var queue router.Router
 	gtx := layout.NewContext(&queue)
 	th := material.NewTheme()
-	gpu, err := gpu.New(f)
+	backend, err := giogl.NewBackend(f)
+	if err != nil {
+		log.Fatal(err)
+	}
+	gpu, err := gpu.New(backend)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -177,10 +181,6 @@ func (f *goglFunctions) BindFramebuffer(target giogl.Enum, fb giogl.Framebuffer)
 	gl.BindFramebuffer(uint32(target), uint32(fb.V))
 }
 
-func (f *goglFunctions) BindRenderbuffer(target giogl.Enum, rb giogl.Renderbuffer) {
-	gl.BindRenderbuffer(uint32(target), uint32(rb.V))
-}
-
 func (f *goglFunctions) BindTexture(target giogl.Enum, t giogl.Texture) {
 	gl.BindTexture(uint32(target), uint32(t.V))
 }
@@ -239,12 +239,6 @@ func (f *goglFunctions) CreateQuery() giogl.Query {
 	return giogl.Query{uint(q)}
 }
 
-func (f *goglFunctions) CreateRenderbuffer() giogl.Renderbuffer {
-	var rb uint32
-	gl.GenRenderbuffers(1, &rb)
-	return giogl.Renderbuffer{uint(rb)}
-}
-
 func (f *goglFunctions) CreateShader(ty giogl.Enum) giogl.Shader {
 	return giogl.Shader{uint(gl.CreateShader(uint32(ty)))}
 }
@@ -272,11 +266,6 @@ func (f *goglFunctions) DeleteProgram(p giogl.Program) {
 func (f *goglFunctions) DeleteQuery(query giogl.Query) {
 	q := uint32(query.V)
 	gl.DeleteQueries(1, &q)
-}
-
-func (f *goglFunctions) DeleteRenderbuffer(v giogl.Renderbuffer) {
-	rb := uint32(v.V)
-	gl.DeleteRenderbuffers(1, &rb)
 }
 
 func (f *goglFunctions) DeleteShader(s giogl.Shader) {
@@ -324,14 +313,6 @@ func (f *goglFunctions) EndQuery(target giogl.Enum) {
 	gl.EndQuery(uint32(target))
 }
 
-func (f *goglFunctions) Finish() {
-	gl.Finish()
-}
-
-func (f *goglFunctions) FramebufferRenderbuffer(target, attachment, renderbuffertarget giogl.Enum, renderbuffer giogl.Renderbuffer) {
-	gl.FramebufferRenderbuffer(uint32(target), uint32(attachment), uint32(renderbuffertarget), uint32(renderbuffer.V))
-}
-
 func (f *goglFunctions) FramebufferTexture2D(target, attachment, texTarget giogl.Enum, t giogl.Texture, level int) {
 	gl.FramebufferTexture2D(uint32(target), uint32(attachment), uint32(texTarget), uint32(t.V), int32(level))
 }
@@ -344,18 +325,6 @@ func (f *goglFunctions) GetBinding(pname giogl.Enum) giogl.Object {
 
 func (f *goglFunctions) GetError() giogl.Enum {
 	return giogl.Enum(gl.GetError())
-}
-
-func (f *goglFunctions) GetRenderbufferParameteri(target, pname giogl.Enum) int {
-	var p [100]int32
-	gl.GetRenderbufferParameteriv(uint32(target), uint32(pname), &p[0])
-	return int(p[0])
-}
-
-func (f *goglFunctions) GetFramebufferAttachmentParameteri(target, attachment, pname giogl.Enum) int {
-	var p [100]int32
-	gl.GetFramebufferAttachmentParameteriv(uint32(target), uint32(attachment), uint32(pname), &p[0])
-	return int(p[0])
 }
 
 func (f *goglFunctions) GetInteger(pname giogl.Enum) int {
@@ -427,22 +396,6 @@ func (f *goglFunctions) LinkProgram(p giogl.Program) {
 	gl.LinkProgram(uint32(p.V))
 }
 
-func (f *goglFunctions) PixelStorei(pname giogl.Enum, param int32) {
-	gl.PixelStorei(uint32(pname), param)
-}
-
-func (f *goglFunctions) ReadPixels(x, y, width, height int, format, ty giogl.Enum, data []byte) {
-	gl.ReadPixels(int32(x), int32(y), int32(width), int32(height), uint32(format), uint32(ty), unsafe.Pointer(&data[0]))
-}
-
-func (f *goglFunctions) RenderbufferStorage(target, internalformat giogl.Enum, width, height int) {
-	gl.RenderbufferStorage(uint32(target), uint32(internalformat), int32(width), int32(height))
-}
-
-func (f *goglFunctions) Scissor(x, y, width, height int32) {
-	gl.Scissor(x, y, width, height)
-}
-
 func (f *goglFunctions) ShaderSource(s giogl.Shader, src string) {
 	csources, free := gl.Strs(src + "\x00")
 	gl.ShaderSource(uint32(s.V), 1, csources, nil)
@@ -455,10 +408,6 @@ func (f *goglFunctions) TexImage2D(target giogl.Enum, level int, internalFormat 
 		p = unsafe.Pointer(&data[0])
 	}
 	gl.TexImage2D(uint32(target), int32(level), int32(internalFormat), int32(width), int32(height), 0, uint32(format), uint32(ty), p)
-}
-
-func (f *goglFunctions) TexSubImage2D(target giogl.Enum, level int, x, y, width, height int, format, ty giogl.Enum, data []byte) {
-	gl.TexSubImage2D(uint32(target), int32(level), int32(x), int32(y), int32(width), int32(height), uint32(format), uint32(ty), unsafe.Pointer(&data[0]))
 }
 
 func (f *goglFunctions) TexParameteri(target, pname giogl.Enum, param int) {
