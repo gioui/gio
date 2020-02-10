@@ -75,8 +75,6 @@ func (s *SRGBFBO) Blit() {
 		s.blitted = true
 	}
 	s.c.BindFramebuffer(FRAMEBUFFER, Framebuffer{})
-	s.c.ClearColor(1, 0, 1, 1)
-	s.c.Clear(COLOR_BUFFER_BIT)
 	s.c.UseProgram(s.prog)
 	s.c.BindTexture(TEXTURE_2D, s.colorTex)
 	s.c.BindBuffer(ARRAY_BUFFER, s.quad)
