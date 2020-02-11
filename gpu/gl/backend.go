@@ -473,15 +473,18 @@ func floatTripleFor(f Functions, ver [2]int, exts []string) (textureTriple, erro
 	defFBO := Framebuffer(f.GetBinding(FRAMEBUFFER_BINDING))
 	f.BindFramebuffer(FRAMEBUFFER, fbo)
 	defer f.BindFramebuffer(FRAMEBUFFER, defFBO)
+	var attempts []string
 	for _, tt := range triples {
 		const size = 256
 		f.TexImage2D(TEXTURE_2D, 0, tt.internalFormat, size, size, tt.format, tt.typ, nil)
 		f.FramebufferTexture2D(FRAMEBUFFER, COLOR_ATTACHMENT0, TEXTURE_2D, tex, 0)
-		if st := f.CheckFramebufferStatus(FRAMEBUFFER); st == FRAMEBUFFER_COMPLETE {
+		st := f.CheckFramebufferStatus(FRAMEBUFFER)
+		if st == FRAMEBUFFER_COMPLETE {
 			return tt, nil
 		}
+		attempts = append(attempts, fmt.Sprintf("(0x%x, 0x%x, 0x%x): 0x%x", tt.internalFormat, tt.format, tt.typ, st))
 	}
-	return textureTriple{}, errors.New("floating point fbos not supported")
+	return textureTriple{}, fmt.Errorf("floating point fbos not supported (attempted %s)", attempts)
 }
 
 func srgbaTripleFor(ver [2]int, exts []string) (textureTriple, error) {
