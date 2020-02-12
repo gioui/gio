@@ -19,7 +19,7 @@ For example, to set up a rectangular hit area:
 	var h *Handler = ...
 
 	r := image.Rectangle{...}
-	pointer.Rect().Add(ops)
+	pointer.Rect(r).Add(ops)
 	pointer.InputOp{Key: h}.Add(ops)
 
 Note that areas compound: the effective area of multiple area
