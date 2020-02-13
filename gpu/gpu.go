@@ -116,6 +116,7 @@ type clipOp struct {
 
 // imageOpData is the shadow of paint.ImageOp.
 type imageOpData struct {
+	rect   image.Rectangle
 	src    *image.RGBA
 	handle interface{}
 }
@@ -148,7 +149,18 @@ func decodeImageOp(data []byte, refs []interface{}) imageOpData {
 	if handle == nil {
 		return imageOpData{}
 	}
+	bo := binary.LittleEndian
 	return imageOpData{
+		rect: image.Rectangle{
+			Min: image.Point{
+				X: int(bo.Uint32(data[1:])),
+				Y: int(bo.Uint32(data[5:])),
+			},
+			Max: image.Point{
+				X: int(bo.Uint32(data[9:])),
+				Y: int(bo.Uint32(data[13:])),
+			},
+		},
 		src:    refs[0].(*image.RGBA),
 		handle: handle,
 	}
@@ -736,12 +748,7 @@ func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f3
 		m.material = materialTexture
 		dr := boundRectF(rect.Add(off))
 		sz := d.image.src.Bounds().Size()
-		sr := f32.Rectangle{
-			Max: f32.Point{
-				X: float32(sz.X),
-				Y: float32(sz.Y),
-			},
-		}
+		sr := toRectF(d.image.rect)
 		if dx := float32(dr.Dx()); dx != 0 {
 			// Don't clip 1 px width sources.
 			if sdx := sr.Dx(); sdx > 1 {

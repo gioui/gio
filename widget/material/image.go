@@ -30,7 +30,7 @@ func (t *Theme) Image(img paint.ImageOp) Image {
 }
 
 func (im Image) Layout(gtx *layout.Context) {
-	size := im.Src.Size()
+	size := im.Src.Rect.Size()
 	wf, hf := float32(size.X), float32(size.Y)
 	w, h := gtx.Px(unit.Dp(wf*im.Scale)), gtx.Px(unit.Dp(hf*im.Scale))
 	cs := gtx.Constraints
