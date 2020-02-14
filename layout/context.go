@@ -61,7 +61,7 @@ func (c *Context) Reset(cfg system.Config, size image.Point) {
 	c.Ops.Reset()
 }
 
-// Now returns the configuration time or the the zero time.
+// Now returns the configuration time or the zero time.
 func (c *Context) Now() time.Time {
 	if c.cfg == nil {
 		return time.Time{}

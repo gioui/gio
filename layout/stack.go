@@ -35,7 +35,7 @@ func Stacked(w Widget) StackChild {
 }
 
 // Expanded returns a Stack child that is forced to take up at least
-// the the space as the largest Stacked.
+// the space as the largest Stacked.
 func Expanded(w Widget) StackChild {
 	return StackChild{
 		expanded: true,
