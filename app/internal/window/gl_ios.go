@@ -17,6 +17,7 @@ import (
 	"fmt"
 
 	"gioui.org/app/internal/glimpl"
+	"gioui.org/gpu"
 	"gioui.org/gpu/gl"
 )
 
@@ -50,8 +51,8 @@ func newContext(w *window) (*context, error) {
 	return c, nil
 }
 
-func (c *context) Functions() *glimpl.Functions {
-	return c.c
+func (c *context) Backend() (gpu.Backend, error) {
+	return gl.NewBackend(c.c)
 }
 
 func (c *context) Release() {

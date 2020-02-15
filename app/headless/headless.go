@@ -26,6 +26,7 @@ type Window struct {
 
 type context interface {
 	Functions() *glimpl.Functions
+	Backend() (gpu.Backend, error)
 	MakeCurrent() error
 	ReleaseCurrent()
 	Release()
@@ -53,7 +54,7 @@ func NewWindow(width, height int) (*Window, error) {
 			ctx.Release()
 			return err
 		}
-		backend, err := gl.NewBackend(f)
+		backend, err := ctx.Backend()
 		if err != nil {
 			fbo.Release()
 			ctx.Release()

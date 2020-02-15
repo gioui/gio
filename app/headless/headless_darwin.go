@@ -4,6 +4,8 @@ package headless
 
 import (
 	"gioui.org/app/internal/glimpl"
+	"gioui.org/gpu"
+	"gioui.org/gpu/gl"
 )
 
 /*
@@ -36,6 +38,10 @@ func (c *nsContext) MakeCurrent() error {
 
 func (c *nsContext) ReleaseCurrent() {
 	C.gio_headless_clearCurrentContext(c.ctx)
+}
+
+func (c *nsContext) Backend() (gpu.Backend, error) {
+	return gl.NewBackend(c.c)
 }
 
 func (c *nsContext) Functions() *glimpl.Functions {

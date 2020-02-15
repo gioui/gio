@@ -9,7 +9,7 @@ import (
 	"math"
 	"time"
 
-	"gioui.org/app/internal/glimpl"
+	"gioui.org/gpu"
 	"gioui.org/io/event"
 	"gioui.org/io/system"
 	"gioui.org/unit"
@@ -32,7 +32,7 @@ type Callbacks interface {
 }
 
 type Context interface {
-	Functions() *glimpl.Functions
+	Backend() (gpu.Backend, error)
 	Present() error
 	MakeCurrent() error
 	Release()

@@ -12,6 +12,8 @@ import (
 
 	"gioui.org/app/internal/glimpl"
 	"gioui.org/app/internal/srgb"
+	"gioui.org/gpu"
+	"gioui.org/gpu/gl"
 )
 
 type Context struct {
@@ -117,6 +119,10 @@ func NewContext(disp NativeDisplayType) (*Context, error) {
 
 func (c *Context) Functions() *glimpl.Functions {
 	return c.c
+}
+
+func (c *Context) Backend() (gpu.Backend, error) {
+	return gl.NewBackend(c.c)
 }
 
 func (c *Context) ReleaseSurface() {

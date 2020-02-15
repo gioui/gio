@@ -8,7 +8,6 @@ import (
 
 	"gioui.org/app/internal/window"
 	"gioui.org/gpu"
-	"gioui.org/gpu/gl"
 	"gioui.org/op"
 )
 
@@ -54,7 +53,7 @@ func newLoop(ctx window.Context) (*renderLoop, error) {
 	return l, nil
 }
 
-func (l *renderLoop) renderLoop(glctx window.Context) error {
+func (l *renderLoop) renderLoop(ctx window.Context) error {
 	// GL Operations must happen on a single OS thread, so
 	// pass initialization result through a channel.
 	initErr := make(chan error)
@@ -63,38 +62,38 @@ func (l *renderLoop) renderLoop(glctx window.Context) error {
 		runtime.LockOSThread()
 		// Don't UnlockOSThread to avoid reuse by the Go runtime.
 
-		if err := glctx.MakeCurrent(); err != nil {
+		if err := ctx.MakeCurrent(); err != nil {
 			initErr <- err
 			return
 		}
-		ctx, err := gl.NewBackend(glctx.Functions())
+		b, err := ctx.Backend()
 		if err != nil {
 			initErr <- err
 			return
 		}
-		g, err := gpu.New(ctx)
+		g, err := gpu.New(b)
 		if err != nil {
 			initErr <- err
 			return
 		}
-		defer glctx.Release()
+		defer ctx.Release()
 		initErr <- nil
 	loop:
 		for {
 			select {
 			case <-l.refresh:
-				l.refreshErr <- glctx.MakeCurrent()
+				l.refreshErr <- ctx.MakeCurrent()
 			case frame := <-l.frames:
-				glctx.Lock()
+				ctx.Lock()
 				g.Collect(frame.viewport, frame.ops)
 				// Signal that we're done with the frame ops.
 				l.ack <- struct{}{}
 				g.BeginFrame()
 				var res frameResult
-				res.err = glctx.Present()
+				res.err = ctx.Present()
 				g.EndFrame()
 				res.profile = g.Profile()
-				glctx.Unlock()
+				ctx.Unlock()
 				l.results <- res
 			case <-l.stop:
 				break loop

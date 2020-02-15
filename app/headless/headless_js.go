@@ -7,6 +7,8 @@ import (
 	"syscall/js"
 
 	"gioui.org/app/internal/glimpl"
+	"gioui.org/gpu"
+	"gioui.org/gpu/gl"
 )
 
 type jsContext struct {
@@ -35,6 +37,10 @@ func newContext() (*jsContext, error) {
 		f:   f,
 	}
 	return c, nil
+}
+
+func (c *jsContext) Backend() (gpu.Backend, error) {
+	return gl.NewBackend(c.f)
 }
 
 func (c *jsContext) Functions() *glimpl.Functions {

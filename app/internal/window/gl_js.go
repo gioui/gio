@@ -8,6 +8,8 @@ import (
 
 	"gioui.org/app/internal/glimpl"
 	"gioui.org/app/internal/srgb"
+	"gioui.org/gpu"
+	"gioui.org/gpu/gl"
 )
 
 type context struct {
@@ -45,8 +47,8 @@ func newContext(w *window) (*context, error) {
 	return c, nil
 }
 
-func (c *context) Functions() *glimpl.Functions {
-	return c.f
+func (c *context) Backend() (gpu.Backend, error) {
+	return gl.NewBackend(c.f)
 }
 
 func (c *context) Release() {
