@@ -6,6 +6,7 @@ import (
 	"errors"
 	"image"
 	"runtime"
+	"sort"
 	"sync"
 	"time"
 	"unicode"
@@ -41,6 +42,15 @@ const _WM_REDRAW = windows.WM_USER + 0
 
 var onceMu sync.Mutex
 var mainDone = make(chan struct{})
+
+// backends is the list of potential Context
+// implementations.
+var backends []gpuAPI
+
+type gpuAPI struct {
+	priority    int
+	initializer func(w *window) (Context, error)
+}
 
 func Main() {
 	<-mainDone
@@ -343,6 +353,26 @@ func (w *window) destroy() {
 		windows.DestroyWindow(w.hwnd)
 		w.hwnd = 0
 	}
+}
+
+func (w *window) NewContext() (Context, error) {
+	sort.Slice(backends, func(i, j int) bool {
+		return backends[i].priority < backends[j].priority
+	})
+	var cerr error
+	for _, b := range backends {
+		ctx, err := b.initializer(w)
+		if err == nil {
+			return ctx, nil
+		}
+		if cerr == nil {
+			cerr = err
+		}
+	}
+	if cerr != nil {
+		return nil, cerr
+	}
+	return nil, errors.New("NewContext: no available backends")
 }
 
 func (w *window) ShowTextInput(show bool) {}

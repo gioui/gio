@@ -6,28 +6,33 @@ import (
 	"gioui.org/app/internal/egl"
 )
 
-type context struct {
+type glContext struct {
 	win *window
 	*egl.Context
 }
 
-func (w *window) NewContext() (Context, error) {
-	disp := egl.NativeDisplayType(w.HDC())
-	ctx, err := egl.NewContext(disp)
-	if err != nil {
-		return nil, err
-	}
-	return &context{win: w, Context: ctx}, nil
+func init() {
+	backends = append(backends, gpuAPI{
+		priority: 2,
+		initializer: func(w *window) (Context, error) {
+			disp := egl.NativeDisplayType(w.HDC())
+			ctx, err := egl.NewContext(disp)
+			if err != nil {
+				return nil, err
+			}
+			return &glContext{win: w, Context: ctx}, nil
+		},
+	})
 }
 
-func (c *context) Release() {
+func (c *glContext) Release() {
 	if c.Context != nil {
 		c.Context.Release()
 		c.Context = nil
 	}
 }
 
-func (c *context) MakeCurrent() error {
+func (c *glContext) MakeCurrent() error {
 	c.Context.ReleaseSurface()
 	win, width, height := c.win.HWND()
 	eglSurf := egl.NativeWindowType(win)
@@ -41,6 +46,6 @@ func (c *context) MakeCurrent() error {
 	return nil
 }
 
-func (c *context) Lock() {}
+func (c *glContext) Lock() {}
 
-func (c *context) Unlock() {}
+func (c *glContext) Unlock() {}

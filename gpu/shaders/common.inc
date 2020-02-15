@@ -7,15 +7,25 @@
 // to be [0, 0, 1].
 vec3[2] fboTextureTransform() {
 	vec3[2] t;
+#ifdef HLSL
+	t[0] = vec3(1.0, 0.0, 0.0);
+	t[1] = vec3(0.0, -1.0, 1.0);
+#else
 	t[0] = vec3(1.0, 0.0, 0.0);
 	t[1] = vec3(0.0, 1.0, 0.0);
+#endif
 	return t;
 }
 
 // toClipSpace converts an OpenGL gl_Position value to a
 // native GPU position.
 vec4 toClipSpace(vec4 pos) {
+#ifdef HLSL
+	// Map depths to the Direct3D [0; 1] range.
+	return vec4(pos.xy, (pos.z + pos.w)*.5, pos.w);
+#else
 	return pos;
+#endif
 }
 
 vec3 transform3x2(vec3[2] t, vec3 v) {
