@@ -16,7 +16,7 @@ type jsContext struct {
 	f   *glimpl.Functions
 }
 
-func newContext() (*jsContext, error) {
+func newGLContext() (glContext, error) {
 	version := 2
 	doc := js.Global().Get("document")
 	cnv := doc.Call("createElement", "canvas")

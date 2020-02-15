@@ -22,7 +22,7 @@ type nsContext struct {
 	prepared bool
 }
 
-func newContext() (context, error) {
+func newGLContext() (glContext, error) {
 	ctx := C.gio_headless_newContext()
 	return &nsContext{ctx: ctx, c: new(glimpl.Functions)}, nil
 }

@@ -5,27 +5,22 @@
 package headless
 
 import (
-	"fmt"
 	"image"
 	"runtime"
 
-	"gioui.org/app/internal/glimpl"
-	"gioui.org/app/internal/srgb"
 	"gioui.org/gpu"
-	"gioui.org/gpu/gl"
 	"gioui.org/op"
 )
 
 // Window is a headless window.
 type Window struct {
 	size image.Point
-	ctx  context
-	fbo  *srgb.SRGBFBO
+	ctx  backend
 	gpu  *gpu.GPU
 }
 
-type context interface {
-	Functions() *glimpl.Functions
+type backend interface {
+	Screenshot(width, height int, pixels []byte) error
 	Backend() (gpu.Backend, error)
 	MakeCurrent() error
 	ReleaseCurrent()
@@ -34,7 +29,7 @@ type context interface {
 
 // NewWindow creates a new headless window.
 func NewWindow(width, height int) (*Window, error) {
-	ctx, err := newContext()
+	ctx, err := newContext(width, height)
 	if err != nil {
 		return nil, err
 	}
@@ -43,30 +38,16 @@ func NewWindow(width, height int) (*Window, error) {
 		ctx:  ctx,
 	}
 	err = contextDo(ctx, func() error {
-		f := ctx.Functions()
-		fbo, err := srgb.NewSRGBFBO(f)
-		if err != nil {
-			ctx.Release()
-			return err
-		}
-		if err := fbo.Refresh(width, height); err != nil {
-			fbo.Release()
-			ctx.Release()
-			return err
-		}
 		backend, err := ctx.Backend()
 		if err != nil {
-			fbo.Release()
 			ctx.Release()
 			return err
 		}
 		gpu, err := gpu.New(backend)
 		if err != nil {
-			fbo.Release()
 			ctx.Release()
 			return err
 		}
-		w.fbo = fbo
 		w.gpu = gpu
 		return err
 	})
@@ -82,10 +63,6 @@ func (w *Window) Release() {
 		if w.gpu != nil {
 			w.gpu.Release()
 			w.gpu = nil
-		}
-		if w.fbo != nil {
-			w.fbo.Release()
-			w.fbo = nil
 		}
 		if w.ctx != nil {
 			w.ctx.Release()
@@ -109,16 +86,8 @@ func (w *Window) Frame(frame *op.Ops) {
 // Screenshot returns an image with the content of the window.
 func (w *Window) Screenshot() (*image.RGBA, error) {
 	img := image.NewRGBA(image.Rectangle{Max: w.size})
-	if len(img.Pix) != w.size.X*w.size.Y*4 {
-		panic("unexpected RGBA size")
-	}
 	contextDo(w.ctx, func() error {
-		f := w.ctx.Functions()
-		f.ReadPixels(0, 0, w.size.X, w.size.Y, gl.RGBA, gl.UNSIGNED_BYTE, img.Pix)
-		if glErr := f.GetError(); glErr != gl.NO_ERROR {
-			return fmt.Errorf("glReadPixels failed: %d", glErr)
-		}
-		return nil
+		return w.ctx.Screenshot(w.size.X, w.size.Y, img.Pix)
 	})
 	// Flip image in y-direction. OpenGL's origin is in the lower
 	// left corner.
@@ -134,7 +103,7 @@ func (w *Window) Screenshot() (*image.RGBA, error) {
 	return img, nil
 }
 
-func contextDo(ctx context, f func() error) error {
+func contextDo(ctx backend, f func() error) error {
 	errCh := make(chan error)
 	go func() {
 		runtime.LockOSThread()

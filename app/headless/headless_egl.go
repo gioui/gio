@@ -8,6 +8,6 @@ import (
 	"gioui.org/app/internal/egl"
 )
 
-func newContext() (context, error) {
+func newGLContext() (glContext, error) {
 	return egl.NewContext(egl.EGL_DEFAULT_DISPLAY)
 }
