@@ -65,14 +65,11 @@ func loadDLLs() error {
 }
 
 func loadDLL(dll *syscall.LazyDLL, name string) error {
-	loadErr := dll.Load()
-	if loadErr == nil {
-		return nil
+	err := dll.Load()
+	if err != nil {
+		return fmt.Errorf("egl: failed to load %s: %v", name, err)
 	}
-	pmsg := syscall.StringToUTF16Ptr("Failed to load " + name + ". Gio requires the ANGLE OpenGL ES driver to run. A prebuilt version can be downloaded from https://gioui.org/doc/install.")
-	ptitle := syscall.StringToUTF16Ptr("Error")
-	syscall.MessageBox(0 /* HWND */, pmsg, ptitle, syscall.MB_ICONERROR|syscall.MB_SYSTEMMODAL)
-	return fmt.Errorf("egl: failed to load %s", name)
+	return nil
 }
 
 func eglChooseConfig(disp _EGLDisplay, attribs []_EGLint) (_EGLConfig, bool) {
