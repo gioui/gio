@@ -16,7 +16,7 @@ type context struct {
 	ctx     js.Value
 	cnv     js.Value
 	f       *glimpl.Functions
-	srgbFBO *srgb.SRGBFBO
+	srgbFBO *srgb.FBO
 }
 
 func newContext(w *window) (*context, error) {
@@ -78,7 +78,7 @@ func (c *context) Unlock() {}
 func (c *context) MakeCurrent() error {
 	if c.srgbFBO == nil {
 		var err error
-		c.srgbFBO, err = srgb.NewSRGBFBO(c.f)
+		c.srgbFBO, err = srgb.New(c.f)
 		if err != nil {
 			c.Release()
 			c.srgbFBO = nil

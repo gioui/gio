@@ -12,10 +12,10 @@ import (
 	"gioui.org/internal/unsafe"
 )
 
-// SRGBFBO implements an intermediate sRGB FBO
+// FBO implements an intermediate sRGB FBO
 // for gamma-correct rendering on platforms without
 // sRGB enabled native framebuffers.
-type SRGBFBO struct {
+type FBO struct {
 	c             *glimpl.Functions
 	width, height int
 	frameBuffer   gl.Framebuffer
@@ -27,7 +27,7 @@ type SRGBFBO struct {
 	es3           bool
 }
 
-func NewSRGBFBO(f *glimpl.Functions) (*SRGBFBO, error) {
+func New(f *glimpl.Functions) (*FBO, error) {
 	var es3 bool
 	glVer := f.GetString(gl.VERSION)
 	ver, err := gl.ParseGLVersion(glVer)
@@ -42,7 +42,7 @@ func NewSRGBFBO(f *glimpl.Functions) (*SRGBFBO, error) {
 			return nil, fmt.Errorf("no support for OpenGL ES 3 nor EXT_sRGB")
 		}
 	}
-	s := &SRGBFBO{
+	s := &FBO{
 		c:           f,
 		es3:         es3,
 		frameBuffer: f.CreateFramebuffer(),
@@ -57,7 +57,7 @@ func NewSRGBFBO(f *glimpl.Functions) (*SRGBFBO, error) {
 	return s, nil
 }
 
-func (s *SRGBFBO) Blit() {
+func (s *FBO) Blit() {
 	if !s.blitted {
 		prog, err := gl.CreateProgram(s.c, blitVSrc, blitFSrc, []string{"pos", "uv"})
 		if err != nil {
@@ -98,11 +98,11 @@ func (s *SRGBFBO) Blit() {
 	s.c.BindFramebuffer(gl.FRAMEBUFFER, gl.Framebuffer{})
 }
 
-func (s *SRGBFBO) AfterPresent() {
+func (s *FBO) AfterPresent() {
 	s.c.BindFramebuffer(gl.FRAMEBUFFER, s.frameBuffer)
 }
 
-func (s *SRGBFBO) Refresh(w, h int) error {
+func (s *FBO) Refresh(w, h int) error {
 	s.width, s.height = w, h
 	if w == 0 || h == 0 {
 		return nil
@@ -143,7 +143,7 @@ func (s *SRGBFBO) Refresh(w, h int) error {
 	return nil
 }
 
-func (s *SRGBFBO) Release() {
+func (s *FBO) Release() {
 	s.c.DeleteFramebuffer(s.frameBuffer)
 	s.c.DeleteTexture(s.colorTex)
 	s.c.DeleteRenderbuffer(s.depthBuffer)

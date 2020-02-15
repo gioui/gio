@@ -22,7 +22,7 @@ type glContext interface {
 
 type glBackend struct {
 	glContext
-	srgb *srgb.SRGBFBO
+	srgb *srgb.FBO
 }
 
 func newContext(width, height int) (backend, error) {
@@ -39,7 +39,7 @@ func newContext(width, height int) (backend, error) {
 		return nil, err
 	}
 	defer glctx.ReleaseCurrent()
-	fbo, err := srgb.NewSRGBFBO(glctx.Functions())
+	fbo, err := srgb.New(glctx.Functions())
 	if err != nil {
 		glctx.Release()
 		return nil, err

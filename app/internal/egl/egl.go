@@ -24,7 +24,7 @@ type Context struct {
 	width, height int
 	refreshFBO    bool
 	// For sRGB emulation.
-	srgbFBO *srgb.SRGBFBO
+	srgbFBO *srgb.FBO
 }
 
 type eglContext struct {
@@ -167,7 +167,7 @@ func (c *Context) MakeCurrent() error {
 	}
 	if c.srgbFBO == nil {
 		var err error
-		c.srgbFBO, err = srgb.NewSRGBFBO(c.c)
+		c.srgbFBO, err = srgb.New(c.c)
 		if err != nil {
 			return err
 		}
