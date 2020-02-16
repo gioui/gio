@@ -22,7 +22,7 @@ type Backend interface {
 	DefaultFramebuffer() Framebuffer
 	NilTexture() Texture
 	NewFramebuffer() Framebuffer
-	NewBuffer(typ BufferType) Buffer
+	NewBuffer(typ BufferType, data []byte) Buffer
 	NewProgram(vertexShader, fragmentShader string, attribMap []string) (Program, error)
 	SetupVertexArray(slot int, size int, dataType DataType, stride, offset int)
 
@@ -49,7 +49,6 @@ type TextureFilter uint8
 type TextureFormat uint8
 
 type BufferType uint8
-type BufferUsage uint8
 
 type DataType uint8
 
@@ -76,7 +75,6 @@ type Uniform interface{}
 
 type Buffer interface {
 	Bind()
-	Upload(usage BufferUsage, data []byte)
 	Release()
 }
 
@@ -114,10 +112,6 @@ const (
 const (
 	DataTypeFloat DataType = iota
 	DataTypeShort
-)
-
-const (
-	BufferUsageStaticDraw BufferUsage = iota
 )
 
 const (

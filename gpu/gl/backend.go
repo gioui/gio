@@ -148,7 +148,7 @@ func (b *Backend) NewTexture(minFilter, magFilter gpu.TextureFilter) gpu.Texture
 	return tex
 }
 
-func (b *Backend) NewBuffer(typ gpu.BufferType) gpu.Buffer {
+func (b *Backend) NewBuffer(typ gpu.BufferType, data []byte) gpu.Buffer {
 	obj := b.funcs.CreateBuffer()
 	var gltyp Enum
 	switch typ {
@@ -159,7 +159,10 @@ func (b *Backend) NewBuffer(typ gpu.BufferType) gpu.Buffer {
 	default:
 		panic("unsupported buffer type")
 	}
-	return &gpuBuffer{funcs: b.funcs, obj: obj, typ: gltyp}
+	buf := &gpuBuffer{funcs: b.funcs, obj: obj, typ: gltyp}
+	buf.Bind()
+	b.funcs.BufferData(gltyp, data, STATIC_DRAW)
+	return buf
 }
 
 func (b *Backend) bindTexture(unit int, t *gpuTexture) {
@@ -342,18 +345,6 @@ func (b *gpuBuffer) Release() {
 
 func (b *gpuBuffer) Bind() {
 	b.funcs.BindBuffer(b.typ, b.obj)
-}
-
-func (b *gpuBuffer) Upload(usage gpu.BufferUsage, data []byte) {
-	b.Bind()
-	var glusage Enum
-	switch usage {
-	case gpu.BufferUsageStaticDraw:
-		glusage = STATIC_DRAW
-	default:
-		panic("unsupported buffer usage")
-	}
-	b.funcs.BufferData(b.typ, data, glusage)
 }
 
 func (f *gpuFramebuffer) IsComplete() error {

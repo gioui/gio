@@ -143,8 +143,7 @@ func newStenciler(ctx Backend) *stenciler {
 		indices[i*6+4] = i*4 + 1
 		indices[i*6+5] = i*4 + 3
 	}
-	indexBuf := ctx.NewBuffer(BufferTypeIndices)
-	indexBuf.Upload(BufferUsageStaticDraw, gunsafe.BytesView(indices))
+	indexBuf := ctx.NewBuffer(BufferTypeIndices, gunsafe.BytesView(indices))
 	return &stenciler{
 		ctx:                ctx,
 		defFBO:             defFBO,
@@ -218,8 +217,7 @@ func (c *coverer) release() {
 }
 
 func buildPath(ctx Backend, p []byte) *pathData {
-	buf := ctx.NewBuffer(BufferTypeData)
-	buf.Upload(BufferUsageStaticDraw, p)
+	buf := ctx.NewBuffer(BufferTypeData, p)
 	return &pathData{
 		ncurves: len(p) / path.VertStride,
 		data:    buf,

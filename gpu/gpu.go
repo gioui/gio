@@ -380,14 +380,14 @@ func newBlitter(ctx Backend) *blitter {
 	if err != nil {
 		panic(err)
 	}
-	quadVerts := ctx.NewBuffer(BufferTypeData)
-	quadVerts.Upload(BufferUsageStaticDraw,
+	quadVerts := ctx.NewBuffer(BufferTypeData,
 		gunsafe.BytesView([]float32{
 			-1, +1, 0, 0,
 			+1, +1, 1, 0,
 			-1, -1, 0, 1,
 			+1, -1, 1, 1,
-		}))
+		}),
+	)
 	b := &blitter{
 		ctx:       ctx,
 		prog:      prog,
