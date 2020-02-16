@@ -13,7 +13,6 @@ import (
 	"image"
 	"image/color"
 	"math"
-	"strings"
 	"time"
 	"unsafe"
 
@@ -376,7 +375,7 @@ func (r *renderer) release() {
 }
 
 func newBlitter(ctx Backend) *blitter {
-	prog, err := createColorPrograms(ctx, blitVSrc, blitFSrc)
+	prog, err := createColorPrograms(ctx, shader_blit_vert, shader_blit_frag)
 	if err != nil {
 		panic(err)
 	}
@@ -398,14 +397,14 @@ func newBlitter(ctx Backend) *blitter {
 		case materialTexture:
 			uTex := prog.UniformFor("tex")
 			prog.Uniform1i(uTex, 0)
-			b.vars[i].uUVScale = prog.UniformFor("uvScale")
-			b.vars[i].uUVOffset = prog.UniformFor("uvOffset")
+			b.vars[i].uUVScale = prog.UniformFor("uniforms.uvScale")
+			b.vars[i].uUVOffset = prog.UniformFor("uniforms.uvOffset")
 		case materialColor:
-			b.vars[i].uColor = prog.UniformFor("color")
+			b.vars[i].uColor = prog.UniformFor("color.color")
 		}
-		b.vars[i].z = prog.UniformFor("z")
-		b.vars[i].uScale = prog.UniformFor("scale")
-		b.vars[i].uOffset = prog.UniformFor("offset")
+		b.vars[i].z = prog.UniformFor("uniforms.z")
+		b.vars[i].uScale = prog.UniformFor("uniforms.scale")
+		b.vars[i].uOffset = prog.UniformFor("uniforms.offset")
 	}
 	return b
 }
@@ -417,28 +416,14 @@ func (b *blitter) release() {
 	}
 }
 
-func createColorPrograms(ctx Backend, vsSrc, fsSrc string) ([2]Program, error) {
+func createColorPrograms(ctx Backend, vsSrc ShaderSources, fsSrc [2]ShaderSources) ([2]Program, error) {
 	var prog [2]Program
-	frep := strings.NewReplacer(
-		"HEADER", `
-uniform sampler2D tex;
-`,
-		"GET_COLOR", `texture2D(tex, vUV)`,
-	)
-	fsSrcTex := frep.Replace(fsSrc)
 	var err error
-	prog[materialTexture], err = ctx.NewProgram(vsSrc, fsSrcTex, blitAttribs)
+	prog[materialTexture], err = ctx.NewProgram(vsSrc, fsSrc[materialTexture], blitAttribs)
 	if err != nil {
 		return prog, err
 	}
-	frep = strings.NewReplacer(
-		"HEADER", `
-uniform vec4 color;
-`,
-		"GET_COLOR", `color`,
-	)
-	fsSrcCol := frep.Replace(fsSrc)
-	prog[materialColor], err = ctx.NewProgram(vsSrc, fsSrcCol, blitAttribs)
+	prog[materialColor], err = ctx.NewProgram(vsSrc, fsSrc[materialColor], blitAttribs)
 	if err != nil {
 		prog[materialTexture].Release()
 		return prog, err
@@ -949,43 +934,3 @@ func fillContourMaxY(maxy float32, verts []byte) {
 		bo.PutUint32(verts[i+off:], math.Float32bits(maxy))
 	}
 }
-
-const blitVSrc = `
-#version 100
-
-precision highp float;
-
-uniform float z;
-uniform vec2 scale;
-uniform vec2 offset;
-
-attribute vec2 pos;
-
-attribute vec2 uv;
-uniform vec2 uvScale;
-uniform vec2 uvOffset;
-
-varying vec2 vUV;
-
-void main() {
-	vec2 p = pos;
-	p *= scale;
-	p += offset;
-	gl_Position = vec4(p, z, 1);
-	vUV = uv*uvScale + uvOffset;
-}
-`
-
-const blitFSrc = `
-#version 100
-
-precision mediump float;
-
-varying vec2 vUV;
-
-HEADER
-
-void main() {
-	gl_FragColor = GET_COLOR;
-}
-`

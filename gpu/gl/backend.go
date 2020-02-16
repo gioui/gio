@@ -284,8 +284,8 @@ func (b *Backend) DepthFunc(f gpu.DepthFunc) {
 	b.funcs.DepthFunc(glfunc)
 }
 
-func (b *Backend) NewProgram(vssrc, fssrc string, attr []string) (gpu.Program, error) {
-	p, err := CreateProgram(b.funcs, vssrc, fssrc, attr)
+func (b *Backend) NewProgram(vssrc, fssrc gpu.ShaderSources, attr []string) (gpu.Program, error) {
+	p, err := CreateProgram(b.funcs, vssrc.GLES2, fssrc.GLES2, attr)
 	if err != nil {
 		return nil, err
 	}
