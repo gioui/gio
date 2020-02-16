@@ -38,7 +38,6 @@ type coverer struct {
 type stenciler struct {
 	ctx                Backend
 	defFBO             Framebuffer
-	indexBufQuads      int
 	prog               Program
 	iprog              Program
 	fbos               fboSet
@@ -68,6 +67,11 @@ type pathData struct {
 var (
 	pathAttribs      = []string{"corner", "maxy", "from", "ctrl", "to"}
 	intersectAttribs = []string{"pos", "uv"}
+)
+
+const (
+	// Number of path quads per draw batch.
+	pathBatchSize = 10000
 )
 
 const (
@@ -128,6 +132,19 @@ func newStenciler(ctx Backend) *stenciler {
 	}
 	coverLoc := iprog.UniformFor("cover")
 	iprog.Uniform1i(coverLoc, 0)
+	// Allocate a suitably large index buffer for drawing paths.
+	indices := make([]uint16, pathBatchSize*6)
+	for i := 0; i < pathBatchSize; i++ {
+		i := uint16(i)
+		indices[i*6+0] = i*4 + 0
+		indices[i*6+1] = i*4 + 1
+		indices[i*6+2] = i*4 + 2
+		indices[i*6+3] = i*4 + 2
+		indices[i*6+4] = i*4 + 1
+		indices[i*6+5] = i*4 + 3
+	}
+	indexBuf := ctx.NewBuffer(BufferTypeIndices)
+	indexBuf.Upload(BufferUsageStaticDraw, gunsafe.BytesView(indices))
 	return &stenciler{
 		ctx:                ctx,
 		defFBO:             defFBO,
@@ -138,7 +155,7 @@ func newStenciler(ctx Backend) *stenciler {
 		uPathOffset:        prog.UniformFor("pathOffset"),
 		uIntersectUVScale:  iprog.UniformFor("uvScale"),
 		uIntersectUVOffset: iprog.UniformFor("uvOffset"),
-		indexBuf:           ctx.NewBuffer(BufferTypeIndices),
+		indexBuf:           indexBuf,
 	}
 }
 
@@ -274,23 +291,8 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 	nquads := data.ncurves / 4
 	for start < nquads {
 		batch := nquads - start
-		if max := int(^uint16(0)) / 6; batch > max {
+		if max := pathBatchSize; batch > max {
 			batch = max
-		}
-		// Enlarge VBO if necessary.
-		if batch > s.indexBufQuads {
-			indices := make([]uint16, batch*6)
-			for i := 0; i < batch; i++ {
-				i := uint16(i)
-				indices[i*6+0] = i*4 + 0
-				indices[i*6+1] = i*4 + 1
-				indices[i*6+2] = i*4 + 2
-				indices[i*6+3] = i*4 + 2
-				indices[i*6+4] = i*4 + 1
-				indices[i*6+5] = i*4 + 3
-			}
-			s.indexBuf.Upload(BufferUsageStaticDraw, gunsafe.BytesView(indices))
-			s.indexBufQuads = batch
 		}
 		off := path.VertStride * start * 4
 		s.ctx.SetupVertexArray(attribPathCorner, 2, DataTypeShort, path.VertStride, off+int(unsafe.Offsetof((*(*path.Vertex)(nil)).CornerX)))
