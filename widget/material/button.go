@@ -25,6 +25,7 @@ type Button struct {
 	TextSize     unit.Value
 	Background   color.RGBA
 	CornerRadius unit.Value
+	Inset        layout.Inset
 	shaper       text.Shaper
 }
 
@@ -34,6 +35,7 @@ type IconButton struct {
 	Icon       *Icon
 	Size       unit.Value
 	Padding    unit.Value
+	Inset      layout.Inset
 }
 
 func (t *Theme) Button(txt string) Button {
@@ -42,7 +44,11 @@ func (t *Theme) Button(txt string) Button {
 		Color:      rgb(0xffffff),
 		Background: t.Color.Primary,
 		TextSize:   t.TextSize.Scale(14.0 / 16.0),
-		shaper:     t.Shaper,
+		Inset: layout.Inset{
+			Top: unit.Dp(10), Bottom: unit.Dp(10),
+			Left: unit.Dp(12), Right: unit.Dp(12),
+		},
+		shaper: t.Shaper,
 	}
 }
 
@@ -80,7 +86,7 @@ func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 			gtx.Constraints.Width.Min = hmin
 			gtx.Constraints.Height.Min = vmin
 			layout.Center.Layout(gtx, func() {
-				layout.Inset{Top: unit.Dp(10), Bottom: unit.Dp(10), Left: unit.Dp(12), Right: unit.Dp(12)}.Layout(gtx, func() {
+				b.Inset.Layout(gtx, func() {
 					paint.ColorOp{Color: col}.Add(gtx.Ops)
 					widget.Label{}.Layout(gtx, b.shaper, b.Font, b.TextSize, b.Text)
 				})
