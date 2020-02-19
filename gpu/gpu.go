@@ -376,7 +376,7 @@ func newBlitter(ctx Backend) *blitter {
 	if err != nil {
 		panic(err)
 	}
-	quadVerts := ctx.NewBuffer(BufferTypeVertices,
+	quadVerts := ctx.NewImmutableBuffer(BufferTypeVertices,
 		gunsafe.BytesView([]float32{
 			-1, +1, 0, 0,
 			+1, +1, 1, 0,

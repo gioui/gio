@@ -162,7 +162,7 @@ func (b *Backend) NewTexture(minFilter, magFilter gpu.TextureFilter) gpu.Texture
 	return tex
 }
 
-func (b *Backend) NewBuffer(typ gpu.BufferType, data []byte) gpu.Buffer {
+func (b *Backend) NewImmutableBuffer(typ gpu.BufferType, data []byte) gpu.Buffer {
 	obj := b.funcs.CreateBuffer()
 	var gltyp Enum
 	switch typ {

@@ -22,7 +22,7 @@ type Backend interface {
 	DefaultFramebuffer() Framebuffer
 	NilTexture() Texture
 	NewFramebuffer() Framebuffer
-	NewBuffer(typ BufferType, data []byte) Buffer
+	NewImmutableBuffer(typ BufferType, data []byte) Buffer
 	NewProgram(vertexShader, fragmentShader ShaderSources) (Program, error)
 	NewInputLayout(vertexShader ShaderSources, layout []InputDesc) (InputLayout, error)
 

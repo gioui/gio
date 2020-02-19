@@ -142,7 +142,7 @@ func newStenciler(ctx Backend) *stenciler {
 		indices[i*6+4] = i*4 + 1
 		indices[i*6+5] = i*4 + 3
 	}
-	indexBuf := ctx.NewBuffer(BufferTypeIndices, gunsafe.BytesView(indices))
+	indexBuf := ctx.NewImmutableBuffer(BufferTypeIndices, gunsafe.BytesView(indices))
 	progLayout, err := ctx.NewInputLayout(shader_stencil_vert, []InputDesc{
 		{Type: DataTypeShort, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).CornerX))},
 		{Type: DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).MaxY))},
@@ -239,7 +239,7 @@ func (c *coverer) release() {
 }
 
 func buildPath(ctx Backend, p []byte) *pathData {
-	buf := ctx.NewBuffer(BufferTypeVertices, p)
+	buf := ctx.NewImmutableBuffer(BufferTypeVertices, p)
 	return &pathData{
 		ncurves: len(p) / path.VertStride,
 		data:    buf,
