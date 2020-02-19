@@ -23,6 +23,7 @@ type Backend interface {
 	NilTexture() Texture
 	NewFramebuffer() Framebuffer
 	NewImmutableBuffer(typ BufferType, data []byte) Buffer
+	NewBuffer(typ BufferType, size int) Buffer
 	NewProgram(vertexShader, fragmentShader ShaderSources) (Program, error)
 	NewInputLayout(vertexShader ShaderSources, layout []InputDesc) (InputLayout, error)
 
@@ -118,6 +119,7 @@ type Buffer interface {
 	BindVertex(stride, offset int)
 	BindIndex()
 	Release()
+	Upload(data []byte)
 }
 
 type Framebuffer interface {

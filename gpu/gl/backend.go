@@ -60,9 +60,11 @@ type gpuFramebuffer struct {
 }
 
 type gpuBuffer struct {
-	backend *Backend
-	obj     Buffer
-	typ     Enum
+	backend   *Backend
+	obj       Buffer
+	typ       Enum
+	size      int
+	immutable bool
 }
 
 type gpuProgram struct {
@@ -162,20 +164,18 @@ func (b *Backend) NewTexture(minFilter, magFilter gpu.TextureFilter) gpu.Texture
 	return tex
 }
 
+func (b *Backend) NewBuffer(typ gpu.BufferType, size int) gpu.Buffer {
+	obj := b.funcs.CreateBuffer()
+	gltyp := toBufferType(typ)
+	return &gpuBuffer{backend: b, obj: obj, typ: gltyp, size: size}
+}
+
 func (b *Backend) NewImmutableBuffer(typ gpu.BufferType, data []byte) gpu.Buffer {
 	obj := b.funcs.CreateBuffer()
-	var gltyp Enum
-	switch typ {
-	case gpu.BufferTypeVertices:
-		gltyp = ARRAY_BUFFER
-	case gpu.BufferTypeIndices:
-		gltyp = ELEMENT_ARRAY_BUFFER
-	default:
-		panic("unsupported buffer type")
-	}
-	buf := &gpuBuffer{backend: b, obj: obj, typ: gltyp}
-	b.funcs.BindBuffer(gltyp, obj)
-	b.funcs.BufferData(gltyp, data, STATIC_DRAW)
+	gltyp := toBufferType(typ)
+	buf := &gpuBuffer{backend: b, obj: obj, typ: gltyp, size: len(data)}
+	buf.Upload(data)
+	buf.immutable = true
 	return buf
 }
 
@@ -360,6 +360,17 @@ func (p *gpuProgram) UniformFor(uniform string) gpu.Uniform {
 
 func (p *gpuProgram) Release() {
 	p.backend.funcs.DeleteProgram(p.obj)
+}
+
+func (b *gpuBuffer) Upload(data []byte) {
+	if b.immutable {
+		panic("immutable buffer")
+	}
+	if len(data) > b.size {
+		panic("buffer size overflow")
+	}
+	b.backend.funcs.BindBuffer(b.typ, b.obj)
+	b.backend.funcs.BufferData(b.typ, data, STATIC_DRAW)
 }
 
 func (b *gpuBuffer) Release() {
@@ -566,4 +577,15 @@ func hasExtension(exts []string, ext string) bool {
 		}
 	}
 	return false
+}
+
+func toBufferType(typ gpu.BufferType) Enum {
+	switch typ {
+	case gpu.BufferTypeVertices:
+		return ARRAY_BUFFER
+	case gpu.BufferTypeIndices:
+		return ELEMENT_ARRAY_BUFFER
+	default:
+		panic("unsupported buffer type")
+	}
 }
