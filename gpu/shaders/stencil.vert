@@ -8,7 +8,7 @@ layout(binding = 0) uniform Block {
 	vec2 scale;
 	vec2 offset;
 	vec2 pathOffset;
-} uniforms;
+};
 
 layout(location=0) in vec2 corner;
 layout(location=1) in float maxy;
@@ -24,10 +24,10 @@ void main() {
 	// Add a one pixel overlap so curve quads cover their
 	// entire curves. Could use conservative rasterization
 	// if available.
-	vec2 from = from + uniforms.pathOffset;
-	vec2 ctrl = ctrl + uniforms.pathOffset;
-	vec2 to = to + uniforms.pathOffset;
-	float maxy = maxy + uniforms.pathOffset.y;
+	vec2 from = from + pathOffset;
+	vec2 ctrl = ctrl + pathOffset;
+	vec2 to = to + pathOffset;
+	float maxy = maxy + pathOffset.y;
 	vec2 pos;
 	if (corner.x > 0.0) {
 		// East.
@@ -46,8 +46,8 @@ void main() {
 	vFrom = from-pos;
 	vCtrl = ctrl-pos;
 	vTo = to-pos;
-    pos *= uniforms.scale;
-    pos += uniforms.offset;
+    pos *= scale;
+    pos += offset;
     gl_Position = vec4(pos, 1, 1);
 }
 

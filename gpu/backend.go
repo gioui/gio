@@ -41,10 +41,11 @@ type Backend interface {
 }
 
 type ShaderSources struct {
-	GLES2    string
-	HLSL     []byte
-	Uniforms []UniformLocation
-	Inputs   []InputLocation
+	GLES2       string
+	HLSL        []byte
+	Uniforms    []UniformLocation
+	UniformSize int
+	Inputs      []InputLocation
 }
 
 type UniformLocation struct {
@@ -106,11 +107,10 @@ type Caps struct {
 type Program interface {
 	Bind()
 	Release()
+	SetVertexUniforms(buf Buffer)
+	SetFragmentUniforms(buf Buffer)
 	UniformFor(uniform string) Uniform
 	Uniform1i(u Uniform, v int)
-	Uniform1f(u Uniform, v float32)
-	Uniform2f(u Uniform, v0, v1 float32)
-	Uniform4f(u Uniform, v0, v1, v2, v3 float32)
 }
 
 type Uniform interface{}
@@ -161,6 +161,7 @@ const (
 const (
 	BufferTypeIndices BufferType = iota
 	BufferTypeVertices
+	BufferTypeUniforms
 )
 
 const (

@@ -10,7 +10,7 @@ layout(location = 1) in vec2 uv;
 layout(binding = 0) uniform Block {
 	vec2 scale;
 	vec2 offset;
-} uvparams;
+};
 
 layout(location = 0) out vec2 vUV;
 
@@ -18,5 +18,5 @@ void main() {
   vec2 p = pos;
   p.y = -p.y;
   gl_Position = vec4(p, 0, 1);
-  vUV = uv*uvparams.scale + uvparams.offset;
+  vUV = uv*scale + offset;
 }

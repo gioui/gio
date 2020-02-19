@@ -6,13 +6,14 @@ var (
 	shader_blit_frag = [...]ShaderSources{
 		ShaderSources{
 			Uniforms: []UniformLocation{
-				{Name: "_12.color", Type: 0, Size: 4, Offset: 0},
+				{Name: "_12._color", Type: 0, Size: 4, Offset: 0},
 			},
-			GLES2: "#version 100\nprecision mediump float;\nprecision highp int;\n\nstruct Color\n{\n    vec4 color;\n};\n\nuniform Color color;\n\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = color.color;\n}\n\n",
+			UniformSize: 16,
+			GLES2:       "#version 100\nprecision mediump float;\nprecision highp int;\n\nstruct Color\n{\n    vec4 _color;\n};\n\nuniform Color _12;\n\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = _12._color;\n}\n\n",
 			/*
 			   cbuffer Color : register(b0)
 			   {
-			       float4 color_color : packoffset(c0);
+			       float4 _12_color : packoffset(c0);
 			   };
 
 
@@ -31,7 +32,7 @@ var (
 
 			   void frag_main()
 			   {
-			       fragColor = color_color;
+			       fragColor = _12_color;
 			   }
 
 			   SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
@@ -95,15 +96,16 @@ var (
 			{Name: "_15.uvScale", Type: 0, Size: 2, Offset: 24},
 			{Name: "_15.uvOffset", Type: 0, Size: 2, Offset: 32},
 		},
-		GLES2: "#version 100\n\nstruct Block\n{\n    float z;\n    vec2 scale;\n    vec2 offset;\n    vec2 uvScale;\n    vec2 uvOffset;\n};\n\nuniform Block uniforms;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\n\nvoid main()\n{\n    vec2 p = pos;\n    p *= uniforms.scale;\n    p += uniforms.offset;\n    gl_Position = vec4(p, uniforms.z, 1.0);\n    vUV = (uv * uniforms.uvScale) + uniforms.uvOffset;\n}\n\n",
+		UniformSize: 40,
+		GLES2:       "#version 100\n\nstruct Block\n{\n    float z;\n    vec2 scale;\n    vec2 offset;\n    vec2 uvScale;\n    vec2 uvOffset;\n};\n\nuniform Block _15;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\n\nvoid main()\n{\n    vec2 p = pos;\n    p *= _15.scale;\n    p += _15.offset;\n    gl_Position = vec4(p, _15.z, 1.0);\n    vUV = (uv * _15.uvScale) + _15.uvOffset;\n}\n\n",
 		/*
 		   cbuffer Block : register(b0)
 		   {
-		       float uniforms_z : packoffset(c0);
-		       float2 uniforms_scale : packoffset(c0.z);
-		       float2 uniforms_offset : packoffset(c1);
-		       float2 uniforms_uvScale : packoffset(c1.z);
-		       float2 uniforms_uvOffset : packoffset(c2);
+		       float _15_z : packoffset(c0);
+		       float2 _15_scale : packoffset(c0.z);
+		       float2 _15_offset : packoffset(c1);
+		       float2 _15_uvScale : packoffset(c1.z);
+		       float2 _15_uvOffset : packoffset(c2);
 		   };
 
 
@@ -127,10 +129,10 @@ var (
 		   void vert_main()
 		   {
 		       float2 p = pos;
-		       p *= uniforms_scale;
-		       p += uniforms_offset;
-		       gl_Position = float4(p, uniforms_z, 1.0f);
-		       vUV = (uv * uniforms_uvScale) + uniforms_uvOffset;
+		       p *= _15_scale;
+		       p += _15_offset;
+		       gl_Position = float4(p, _15_z, 1.0f);
+		       vUV = (uv * _15_uvScale) + _15_uvOffset;
 		   }
 
 		   SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
@@ -150,13 +152,14 @@ var (
 	shader_cover_frag = [...]ShaderSources{
 		ShaderSources{
 			Uniforms: []UniformLocation{
-				{Name: "_12.color", Type: 0, Size: 4, Offset: 0},
+				{Name: "_12._color", Type: 0, Size: 4, Offset: 0},
 			},
-			GLES2: "#version 100\nprecision mediump float;\nprecision highp int;\n\nstruct Color\n{\n    vec4 color;\n};\n\nuniform Color color;\n\nuniform mediump sampler2D cover;\n\nvarying highp vec2 vCoverUV;\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = color.color;\n    float cover_1 = abs(texture2D(cover, vCoverUV).x);\n    gl_FragData[0] *= cover_1;\n}\n\n",
+			UniformSize: 16,
+			GLES2:       "#version 100\nprecision mediump float;\nprecision highp int;\n\nstruct Color\n{\n    vec4 _color;\n};\n\nuniform Color _12;\n\nuniform mediump sampler2D cover;\n\nvarying highp vec2 vCoverUV;\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = _12._color;\n    float cover_1 = abs(texture2D(cover, vCoverUV).x);\n    gl_FragData[0] *= cover_1;\n}\n\n",
 			/*
 			   cbuffer Color : register(b0)
 			   {
-			       float4 color_color : packoffset(c0);
+			       float4 _12_color : packoffset(c0);
 			   };
 
 			   Texture2D<float4> cover : register(t1);
@@ -179,7 +182,7 @@ var (
 
 			   void frag_main()
 			   {
-			       fragColor = color_color;
+			       fragColor = _12_color;
 			       float cover_1 = abs(cover.Sample(_cover_sampler, vCoverUV).x);
 			       fragColor *= cover_1;
 			   }
@@ -250,22 +253,23 @@ var (
 			{Name: "_19.z", Type: 0, Size: 1, Offset: 0},
 			{Name: "_19.scale", Type: 0, Size: 2, Offset: 8},
 			{Name: "_19.offset", Type: 0, Size: 2, Offset: 16},
-			{Name: "_19.uvScale", Type: 0, Size: 2, Offset: 24},
-			{Name: "_19.uvOffset", Type: 0, Size: 2, Offset: 32},
-			{Name: "_19.uvCoverScale", Type: 0, Size: 2, Offset: 40},
-			{Name: "_19.uvCoverOffset", Type: 0, Size: 2, Offset: 48},
+			{Name: "_19.uvCoverScale", Type: 0, Size: 2, Offset: 24},
+			{Name: "_19.uvCoverOffset", Type: 0, Size: 2, Offset: 32},
+			{Name: "_19.uvScale", Type: 0, Size: 2, Offset: 40},
+			{Name: "_19.uvOffset", Type: 0, Size: 2, Offset: 48},
 		},
-		GLES2: "#version 100\n\nstruct Block\n{\n    float z;\n    vec2 scale;\n    vec2 offset;\n    vec2 uvScale;\n    vec2 uvOffset;\n    vec2 uvCoverScale;\n    vec2 uvCoverOffset;\n};\n\nuniform Block uniforms;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\nvarying vec2 vCoverUV;\n\nvoid main()\n{\n    gl_Position = vec4((pos * uniforms.scale) + uniforms.offset, uniforms.z, 1.0);\n    vUV = (uv * uniforms.uvScale) + uniforms.uvOffset;\n    vCoverUV = (uv * uniforms.uvCoverScale) + uniforms.uvCoverOffset;\n}\n\n",
+		UniformSize: 56,
+		GLES2:       "#version 100\n\nstruct Block\n{\n    float z;\n    vec2 scale;\n    vec2 offset;\n    vec2 uvCoverScale;\n    vec2 uvCoverOffset;\n    vec2 uvScale;\n    vec2 uvOffset;\n};\n\nuniform Block _19;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\nvarying vec2 vCoverUV;\n\nvoid main()\n{\n    gl_Position = vec4((pos * _19.scale) + _19.offset, _19.z, 1.0);\n    vUV = (uv * _19.uvScale) + _19.uvOffset;\n    vCoverUV = (uv * _19.uvCoverScale) + _19.uvCoverOffset;\n}\n\n",
 		/*
 		   cbuffer Block : register(b0)
 		   {
-		       float uniforms_z : packoffset(c0);
-		       float2 uniforms_scale : packoffset(c0.z);
-		       float2 uniforms_offset : packoffset(c1);
-		       float2 uniforms_uvScale : packoffset(c1.z);
-		       float2 uniforms_uvOffset : packoffset(c2);
-		       float2 uniforms_uvCoverScale : packoffset(c2.z);
-		       float2 uniforms_uvCoverOffset : packoffset(c3);
+		       float _19_z : packoffset(c0);
+		       float2 _19_scale : packoffset(c0.z);
+		       float2 _19_offset : packoffset(c1);
+		       float2 _19_uvCoverScale : packoffset(c1.z);
+		       float2 _19_uvCoverOffset : packoffset(c2);
+		       float2 _19_uvScale : packoffset(c2.z);
+		       float2 _19_uvOffset : packoffset(c3);
 		   };
 
 
@@ -290,9 +294,9 @@ var (
 
 		   void vert_main()
 		   {
-		       gl_Position = float4((pos * uniforms_scale) + uniforms_offset, uniforms_z, 1.0f);
-		       vUV = (uv * uniforms_uvScale) + uniforms_uvOffset;
-		       vCoverUV = (uv * uniforms_uvCoverScale) + uniforms_uvCoverOffset;
+		       gl_Position = float4((pos * _19_scale) + _19_offset, _19_z, 1.0f);
+		       vUV = (uv * _19_uvScale) + _19_uvOffset;
+		       vCoverUV = (uv * _19_uvCoverScale) + _19_uvCoverOffset;
 		   }
 
 		   SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
@@ -356,12 +360,13 @@ var (
 			{Name: "_40.scale", Type: 0, Size: 2, Offset: 0},
 			{Name: "_40.offset", Type: 0, Size: 2, Offset: 8},
 		},
-		GLES2: "#version 100\n\nstruct Block\n{\n    vec2 scale;\n    vec2 offset;\n};\n\nuniform Block uvparams;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\n\nvoid main()\n{\n    vec2 p = pos;\n    p.y = -p.y;\n    gl_Position = vec4(p, 0.0, 1.0);\n    vUV = (uv * uvparams.scale) + uvparams.offset;\n}\n\n",
+		UniformSize: 16,
+		GLES2:       "#version 100\n\nstruct Block\n{\n    vec2 scale;\n    vec2 offset;\n};\n\nuniform Block _40;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\n\nvoid main()\n{\n    vec2 p = pos;\n    p.y = -p.y;\n    gl_Position = vec4(p, 0.0, 1.0);\n    vUV = (uv * _40.scale) + _40.offset;\n}\n\n",
 		/*
 		   cbuffer Block : register(b0)
 		   {
-		       float2 uvparams_scale : packoffset(c0);
-		       float2 uvparams_offset : packoffset(c0.z);
+		       float2 _40_scale : packoffset(c0);
+		       float2 _40_offset : packoffset(c0.z);
 		   };
 
 
@@ -387,7 +392,7 @@ var (
 		       float2 p = pos;
 		       p.y = -p.y;
 		       gl_Position = float4(p, 0.0f, 1.0f);
-		       vUV = (uv * uvparams_scale) + uvparams_offset;
+		       vUV = (uv * _40_scale) + _40_offset;
 		   }
 
 		   SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
@@ -484,13 +489,14 @@ var (
 			{Name: "_15.offset", Type: 0, Size: 2, Offset: 8},
 			{Name: "_15.pathOffset", Type: 0, Size: 2, Offset: 16},
 		},
-		GLES2: "#version 100\n\nstruct Block\n{\n    vec2 scale;\n    vec2 offset;\n    vec2 pathOffset;\n};\n\nuniform Block uniforms;\n\nattribute vec2 from;\nattribute vec2 ctrl;\nattribute vec2 to;\nattribute float maxy;\nattribute vec2 corner;\nvarying vec2 vFrom;\nvarying vec2 vCtrl;\nvarying vec2 vTo;\n\nvoid main()\n{\n    vec2 from_1 = from + uniforms.pathOffset;\n    vec2 ctrl_1 = ctrl + uniforms.pathOffset;\n    vec2 to_1 = to + uniforms.pathOffset;\n    float maxy_1 = maxy + uniforms.pathOffset.y;\n    vec2 pos;\n    if (corner.x > 0.0)\n    {\n        pos.x = max(max(from_1.x, ctrl_1.x), to_1.x) + 1.0;\n    }\n    else\n    {\n        pos.x = min(min(from_1.x, ctrl_1.x), to_1.x) - 1.0;\n    }\n    if (corner.y > 0.0)\n    {\n        pos.y = maxy_1 + 1.0;\n    }\n    else\n    {\n        pos.y = min(min(from_1.y, ctrl_1.y), to_1.y) - 1.0;\n    }\n    vFrom = from_1 - pos;\n    vCtrl = ctrl_1 - pos;\n    vTo = to_1 - pos;\n    pos *= uniforms.scale;\n    pos += uniforms.offset;\n    gl_Position = vec4(pos, 1.0, 1.0);\n}\n\n",
+		UniformSize: 24,
+		GLES2:       "#version 100\n\nstruct Block\n{\n    vec2 scale;\n    vec2 offset;\n    vec2 pathOffset;\n};\n\nuniform Block _15;\n\nattribute vec2 from;\nattribute vec2 ctrl;\nattribute vec2 to;\nattribute float maxy;\nattribute vec2 corner;\nvarying vec2 vFrom;\nvarying vec2 vCtrl;\nvarying vec2 vTo;\n\nvoid main()\n{\n    vec2 from_1 = from + _15.pathOffset;\n    vec2 ctrl_1 = ctrl + _15.pathOffset;\n    vec2 to_1 = to + _15.pathOffset;\n    float maxy_1 = maxy + _15.pathOffset.y;\n    vec2 pos;\n    if (corner.x > 0.0)\n    {\n        pos.x = max(max(from_1.x, ctrl_1.x), to_1.x) + 1.0;\n    }\n    else\n    {\n        pos.x = min(min(from_1.x, ctrl_1.x), to_1.x) - 1.0;\n    }\n    if (corner.y > 0.0)\n    {\n        pos.y = maxy_1 + 1.0;\n    }\n    else\n    {\n        pos.y = min(min(from_1.y, ctrl_1.y), to_1.y) - 1.0;\n    }\n    vFrom = from_1 - pos;\n    vCtrl = ctrl_1 - pos;\n    vTo = to_1 - pos;\n    pos *= _15.scale;\n    pos += _15.offset;\n    gl_Position = vec4(pos, 1.0, 1.0);\n}\n\n",
 		/*
 		   cbuffer Block : register(b0)
 		   {
-		       float2 uniforms_scale : packoffset(c0);
-		       float2 uniforms_offset : packoffset(c0.z);
-		       float2 uniforms_pathOffset : packoffset(c1);
+		       float2 _15_scale : packoffset(c0);
+		       float2 _15_offset : packoffset(c0.z);
+		       float2 _15_pathOffset : packoffset(c1);
 		   };
 
 
@@ -523,10 +529,10 @@ var (
 
 		   void vert_main()
 		   {
-		       float2 from_1 = from + uniforms_pathOffset;
-		       float2 ctrl_1 = ctrl + uniforms_pathOffset;
-		       float2 to_1 = to + uniforms_pathOffset;
-		       float maxy_1 = maxy + uniforms_pathOffset.y;
+		       float2 from_1 = from + _15_pathOffset;
+		       float2 ctrl_1 = ctrl + _15_pathOffset;
+		       float2 to_1 = to + _15_pathOffset;
+		       float maxy_1 = maxy + _15_pathOffset.y;
 		       float2 pos;
 		       if (corner.x > 0.0f)
 		       {
@@ -547,8 +553,8 @@ var (
 		       vFrom = from_1 - pos;
 		       vCtrl = ctrl_1 - pos;
 		       vTo = to_1 - pos;
-		       pos *= uniforms_scale;
-		       pos += uniforms_offset;
+		       pos *= _15_scale;
+		       pos += _15_offset;
 		       gl_Position = float4(pos, 1.0f, 1.0f);
 		   }
 

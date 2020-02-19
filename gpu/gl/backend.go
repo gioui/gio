@@ -8,6 +8,7 @@ import (
 	"image"
 	"strings"
 	"time"
+	"unsafe"
 
 	"gioui.org/gpu"
 )
@@ -65,12 +66,31 @@ type gpuBuffer struct {
 	typ       Enum
 	size      int
 	immutable bool
+	version   int
+	// For emulation of uniform buffers.
+	data []byte
 }
 
 type gpuProgram struct {
-	backend *Backend
-	obj     Program
-	nattr   int
+	backend      *Backend
+	obj          Program
+	nattr        int
+	vertUniforms uniformsTracker
+	fragUniforms uniformsTracker
+}
+
+type uniformsTracker struct {
+	locs    []uniformLocation
+	size    int
+	buf     *gpuBuffer
+	version int
+}
+
+type uniformLocation struct {
+	uniform Uniform
+	offset  int
+	typ     gpu.DataType
+	size    int
 }
 
 type gpuInputLayout struct {
@@ -165,9 +185,16 @@ func (b *Backend) NewTexture(minFilter, magFilter gpu.TextureFilter) gpu.Texture
 }
 
 func (b *Backend) NewBuffer(typ gpu.BufferType, size int) gpu.Buffer {
-	obj := b.funcs.CreateBuffer()
 	gltyp := toBufferType(typ)
-	return &gpuBuffer{backend: b, obj: obj, typ: gltyp, size: size}
+	buf := &gpuBuffer{backend: b, typ: gltyp, size: size}
+	switch typ {
+	case gpu.BufferTypeUniforms:
+		// GLES 2 doesn't support uniform buffers.
+		buf.data = make([]byte, size)
+	default:
+		buf.obj = b.funcs.CreateBuffer()
+	}
+	return buf
 }
 
 func (b *Backend) NewImmutableBuffer(typ gpu.BufferType, data []byte) gpu.Buffer {
@@ -246,13 +273,20 @@ func (b *Backend) SetBlend(enable bool) {
 }
 
 func (b *Backend) DrawElements(mode gpu.DrawMode, off, count int) {
-	b.setupVertexArrays()
+	b.prepareDraw()
 	b.funcs.DrawElements(toGLDrawMode(mode), count, UNSIGNED_SHORT, off)
 }
 
 func (b *Backend) DrawArrays(mode gpu.DrawMode, off, count int) {
-	b.setupVertexArrays()
+	b.prepareDraw()
 	b.funcs.DrawArrays(toGLDrawMode(mode), off, count)
+}
+
+func (b *Backend) prepareDraw() {
+	b.setupVertexArrays()
+	if p := b.state.prog; p != nil {
+		p.updateUniforms()
+	}
 }
 
 func toGLDrawMode(mode gpu.DrawMode) Enum {
@@ -325,27 +359,37 @@ func (b *Backend) NewProgram(vssrc, fssrc gpu.ShaderSources) (gpu.Program, error
 	if err != nil {
 		return nil, err
 	}
-	return &gpuProgram{backend: b, obj: p, nattr: len(attr)}, nil
+	gpuProg := &gpuProgram{
+		backend: b,
+		obj:     p,
+		nattr:   len(attr),
+	}
+	gpuProg.vertUniforms.setup(b.funcs, p, vssrc.UniformSize, vssrc.Uniforms)
+	gpuProg.fragUniforms.setup(b.funcs, p, fssrc.UniformSize, fssrc.Uniforms)
+	return gpuProg, nil
+}
+
+func lookupUniform(funcs Functions, p Program, loc gpu.UniformLocation) uniformLocation {
+	u := GetUniformLocation(funcs, p, loc.Name)
+	return uniformLocation{uniform: u, offset: loc.Offset, typ: loc.Type, size: loc.Size}
+}
+
+func (p *gpuProgram) SetVertexUniforms(buffer gpu.Buffer) {
+	p.vertUniforms.setBuffer(buffer)
+}
+
+func (p *gpuProgram) SetFragmentUniforms(buffer gpu.Buffer) {
+	p.fragUniforms.setBuffer(buffer)
+}
+
+func (p *gpuProgram) updateUniforms() {
+	p.vertUniforms.update(p.backend.funcs)
+	p.fragUniforms.update(p.backend.funcs)
 }
 
 func (p *gpuProgram) Uniform1i(u gpu.Uniform, v int) {
 	p.Bind()
 	p.backend.funcs.Uniform1i(u.(Uniform), v)
-}
-
-func (p *gpuProgram) Uniform1f(u gpu.Uniform, v0 float32) {
-	p.Bind()
-	p.backend.funcs.Uniform1f(u.(Uniform), v0)
-}
-
-func (p *gpuProgram) Uniform2f(u gpu.Uniform, v0, v1 float32) {
-	p.Bind()
-	p.backend.funcs.Uniform2f(u.(Uniform), v0, v1)
-}
-
-func (p *gpuProgram) Uniform4f(u gpu.Uniform, v0, v1, v2, v3 float32) {
-	p.Bind()
-	p.backend.funcs.Uniform4f(u.(Uniform), v0, v1, v2, v3)
 }
 
 func (p *gpuProgram) Bind() {
@@ -362,6 +406,59 @@ func (p *gpuProgram) Release() {
 	p.backend.funcs.DeleteProgram(p.obj)
 }
 
+func (u *uniformsTracker) setup(funcs Functions, p Program, uniformSize int, uniforms []gpu.UniformLocation) {
+	u.locs = make([]uniformLocation, len(uniforms))
+	for i, uniform := range uniforms {
+		u.locs[i] = lookupUniform(funcs, p, uniform)
+	}
+	u.size = uniformSize
+}
+
+func (u *uniformsTracker) setBuffer(buffer gpu.Buffer) {
+	buf := buffer.(*gpuBuffer)
+	if buf.typ != UNIFORM_BUFFER {
+		panic("not a uniform buffer")
+	}
+	if buf.size < u.size {
+		panic(fmt.Errorf("uniform buffer too small, got %d need %d", buf.size, u.size))
+	}
+	u.buf = buf
+	// Force update.
+	u.version = buf.version - 1
+}
+
+func (p *uniformsTracker) update(funcs Functions) {
+	b := p.buf
+	if b == nil || b.version == p.version {
+		return
+	}
+	p.version = b.version
+	data := b.data
+	for _, u := range p.locs {
+		data := data[u.offset:]
+		switch {
+		case u.typ == gpu.DataTypeFloat && u.size == 1:
+			data := data[:4]
+			v := *(*[1]float32)(unsafe.Pointer(&data[0]))
+			funcs.Uniform1f(u.uniform, v[0])
+		case u.typ == gpu.DataTypeFloat && u.size == 2:
+			data := data[:8]
+			v := *(*[2]float32)(unsafe.Pointer(&data[0]))
+			funcs.Uniform2f(u.uniform, v[0], v[1])
+		case u.typ == gpu.DataTypeFloat && u.size == 3:
+			data := data[:12]
+			v := *(*[3]float32)(unsafe.Pointer(&data[0]))
+			funcs.Uniform3f(u.uniform, v[0], v[1], v[2])
+		case u.typ == gpu.DataTypeFloat && u.size == 4:
+			data := data[:16]
+			v := *(*[4]float32)(unsafe.Pointer(&data[0]))
+			funcs.Uniform4f(u.uniform, v[0], v[1], v[2], v[3])
+		default:
+			panic("unsupported uniform data type or size")
+		}
+	}
+}
+
 func (b *gpuBuffer) Upload(data []byte) {
 	if b.immutable {
 		panic("immutable buffer")
@@ -369,12 +466,22 @@ func (b *gpuBuffer) Upload(data []byte) {
 	if len(data) > b.size {
 		panic("buffer size overflow")
 	}
-	b.backend.funcs.BindBuffer(b.typ, b.obj)
-	b.backend.funcs.BufferData(b.typ, data, STATIC_DRAW)
+	b.version++
+	switch b.typ {
+	case UNIFORM_BUFFER:
+		copy(b.data, data)
+	default:
+		b.backend.funcs.BindBuffer(b.typ, b.obj)
+		b.backend.funcs.BufferData(b.typ, data, STATIC_DRAW)
+	}
 }
 
 func (b *gpuBuffer) Release() {
-	b.backend.funcs.DeleteBuffer(b.obj)
+	switch b.typ {
+	case UNIFORM_BUFFER:
+	default:
+		b.backend.funcs.DeleteBuffer(b.obj)
+	}
 }
 
 func (b *gpuBuffer) BindVertex(stride, offset int) {
@@ -585,6 +692,8 @@ func toBufferType(typ gpu.BufferType) Enum {
 		return ARRAY_BUFFER
 	case gpu.BufferTypeIndices:
 		return ELEMENT_ARRAY_BUFFER
+	case gpu.BufferTypeUniforms:
+		return UNIFORM_BUFFER
 	default:
 		panic("unsupported buffer type")
 	}

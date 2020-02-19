@@ -13,6 +13,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"reflect"
 	"time"
 	"unsafe"
 
@@ -209,17 +210,50 @@ type texture struct {
 }
 
 type blitter struct {
-	ctx      Backend
-	viewport image.Point
-	prog     [2]Program
-	layout   InputLayout
-	vars     [2]struct {
-		z                   Uniform
-		uScale, uOffset     Uniform
-		uUVScale, uUVOffset Uniform
-		uColor              Uniform
+	ctx         Backend
+	viewport    image.Point
+	prog        [2]*program
+	layout      InputLayout
+	colUniforms struct {
+		vert struct {
+			blitUniforms
+			_ [8]byte // Padding to a multiple of 16.
+		}
+		frag struct {
+			colorUniforms
+		}
+	}
+	texUniforms struct {
+		vert struct {
+			blitUniforms
+			_ [8]byte // Padding to a multiple of 16.
+		}
 	}
 	quadVerts Buffer
+}
+
+type uniformBuffer struct {
+	buf Buffer
+	ptr []byte
+}
+
+type program struct {
+	prog         Program
+	vertUniforms *uniformBuffer
+	fragUniforms *uniformBuffer
+}
+
+type blitUniforms struct {
+	z        float32
+	_        float32 // Padding.
+	scale    [2]float32
+	offset   [2]float32
+	uvScale  [2]float32
+	uvOffset [2]float32
+}
+
+type colorUniforms struct {
+	color [4]float32
 }
 
 type materialType uint8
@@ -372,10 +406,6 @@ func (r *renderer) release() {
 }
 
 func newBlitter(ctx Backend) *blitter {
-	prog, layout, err := createColorPrograms(ctx, shader_blit_vert, shader_blit_frag)
-	if err != nil {
-		panic(err)
-	}
 	quadVerts := ctx.NewImmutableBuffer(BufferTypeVertices,
 		gunsafe.BytesView([]float32{
 			-1, +1, 0, 0,
@@ -386,24 +416,17 @@ func newBlitter(ctx Backend) *blitter {
 	)
 	b := &blitter{
 		ctx:       ctx,
-		prog:      prog,
-		layout:    layout,
 		quadVerts: quadVerts,
 	}
-	for i, prog := range prog {
-		switch materialType(i) {
-		case materialTexture:
-			uTex := prog.UniformFor("tex")
-			prog.Uniform1i(uTex, 0)
-			b.vars[i].uUVScale = prog.UniformFor("uniforms.uvScale")
-			b.vars[i].uUVOffset = prog.UniformFor("uniforms.uvOffset")
-		case materialColor:
-			b.vars[i].uColor = prog.UniformFor("color.color")
-		}
-		b.vars[i].z = prog.UniformFor("uniforms.z")
-		b.vars[i].uScale = prog.UniformFor("uniforms.scale")
-		b.vars[i].uOffset = prog.UniformFor("uniforms.offset")
+	prog, layout, err := createColorPrograms(ctx, shader_blit_vert, shader_blit_frag,
+		[2]interface{}{&b.colUniforms.vert, &b.texUniforms.vert}, [2]interface{}{&b.colUniforms.frag, nil})
+	if err != nil {
+		panic(err)
 	}
+	b.prog = prog
+	b.layout = layout
+	texProg := b.prog[materialTexture].prog
+	texProg.Uniform1i(texProg.UniformFor("tex"), 0)
 	return b
 }
 
@@ -415,28 +438,47 @@ func (b *blitter) release() {
 	b.layout.Release()
 }
 
-func createColorPrograms(ctx Backend, vsSrc ShaderSources, fsSrc [2]ShaderSources) ([2]Program, InputLayout, error) {
-	var prog [2]Program
-	var err error
-	prog[materialTexture], err = ctx.NewProgram(vsSrc, fsSrc[materialTexture])
+func createColorPrograms(b Backend, vsSrc ShaderSources, fsSrc [2]ShaderSources, vertUniforms, fragUniforms [2]interface{}) ([2]*program, InputLayout, error) {
+	var progs [2]*program
+	prog, err := b.NewProgram(vsSrc, fsSrc[materialTexture])
 	if err != nil {
-		return prog, nil, err
+		return progs, nil, err
 	}
-	prog[materialColor], err = ctx.NewProgram(vsSrc, fsSrc[materialColor])
+	var vertBuffer *uniformBuffer
+	if u := vertUniforms[materialTexture]; u != nil {
+		vertBuffer = newUniformBuffer(b, u)
+		prog.SetVertexUniforms(vertBuffer.buf)
+	}
+	var fragBuffer *uniformBuffer
+	if u := fragUniforms[materialTexture]; u != nil {
+		fragBuffer = newUniformBuffer(b, u)
+		prog.SetFragmentUniforms(fragBuffer.buf)
+	}
+	progs[materialTexture] = newProgram(prog, vertBuffer, fragBuffer)
+	prog, err = b.NewProgram(vsSrc, fsSrc[materialColor])
 	if err != nil {
-		prog[materialTexture].Release()
-		return prog, nil, err
+		progs[materialTexture].Release()
+		return progs, nil, err
 	}
-	layout, err := ctx.NewInputLayout(vsSrc, []InputDesc{
+	if u := vertUniforms[materialColor]; u != nil {
+		vertBuffer = newUniformBuffer(b, u)
+		prog.SetVertexUniforms(vertBuffer.buf)
+	}
+	if u := fragUniforms[materialColor]; u != nil {
+		fragBuffer = newUniformBuffer(b, u)
+		prog.SetFragmentUniforms(fragBuffer.buf)
+	}
+	progs[materialColor] = newProgram(prog, vertBuffer, fragBuffer)
+	layout, err := b.NewInputLayout(vsSrc, []InputDesc{
 		{Type: DataTypeFloat, Size: 2, Offset: 0},
 		{Type: DataTypeFloat, Size: 2, Offset: 4 * 2},
 	})
 	if err != nil {
-		prog[materialTexture].Release()
-		prog[materialColor].Release()
-		return prog, nil, err
+		progs[materialTexture].Release()
+		progs[materialColor].Release()
+		return progs, nil, err
 	}
-	return prog, layout, nil
+	return progs, layout, nil
 }
 
 func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
@@ -465,7 +507,7 @@ func (r *renderer) intersect(ops []imageOp) {
 	fbo := -1
 	r.pather.stenciler.beginIntersect(r.intersections.sizes)
 	r.blitter.quadVerts.BindVertex(4*4, 0)
-	r.pather.stenciler.iprogLayout.Bind()
+	r.pather.stenciler.iprog.layout.Bind()
 	for _, img := range ops {
 		if img.clipType != clipTypeIntersection {
 			continue
@@ -497,8 +539,9 @@ func (r *renderer) intersectPath(p *pathOp, clip image.Rectangle) {
 	fbo := r.pather.stenciler.cover(p.place.Idx)
 	fbo.tex.Bind(0)
 	coverScale, coverOff := texSpaceTransform(toRectF(uv), fbo.size)
-	r.pather.stenciler.iprog.Uniform2f(r.pather.stenciler.uIntersectUVScale, coverScale.X, coverScale.Y)
-	r.pather.stenciler.iprog.Uniform2f(r.pather.stenciler.uIntersectUVOffset, coverOff.X, coverOff.Y)
+	r.pather.stenciler.iprog.uniforms.vert.uvScale = [2]float32{coverScale.X, coverScale.Y}
+	r.pather.stenciler.iprog.uniforms.vert.uvOffset = [2]float32{coverOff.X, coverOff.Y}
+	r.pather.stenciler.iprog.prog.UploadUniforms()
 	r.ctx.DrawArrays(DrawModeTriangleStrip, 0, 4)
 }
 
@@ -846,18 +889,75 @@ func gamma(r, g, b, a uint32) [4]float32 {
 
 func (b *blitter) blit(z float32, mat materialType, col [4]float32, scale, off, uvScale, uvOff f32.Point) {
 	p := b.prog[mat]
-	p.Bind()
+	p.prog.Bind()
+	var uniforms *blitUniforms
 	switch mat {
 	case materialColor:
-		p.Uniform4f(b.vars[mat].uColor, col[0], col[1], col[2], col[3])
+		b.colUniforms.frag.color = col
+		uniforms = &b.colUniforms.vert.blitUniforms
 	case materialTexture:
-		p.Uniform2f(b.vars[mat].uUVScale, uvScale.X, uvScale.Y)
-		p.Uniform2f(b.vars[mat].uUVOffset, uvOff.X, uvOff.Y)
+		b.texUniforms.vert.uvScale = [2]float32{uvScale.X, uvScale.Y}
+		b.texUniforms.vert.uvOffset = [2]float32{uvOff.X, uvOff.Y}
+		uniforms = &b.texUniforms.vert.blitUniforms
 	}
-	p.Uniform1f(b.vars[mat].z, z)
-	p.Uniform2f(b.vars[mat].uScale, scale.X, scale.Y)
-	p.Uniform2f(b.vars[mat].uOffset, off.X, off.Y)
+	uniforms.z = z
+	uniforms.scale = [2]float32{scale.X, scale.Y}
+	uniforms.offset = [2]float32{off.X, off.Y}
+	p.UploadUniforms()
 	b.ctx.DrawArrays(DrawModeTriangleStrip, 0, 4)
+}
+
+// newUniformBuffer creates a new GPU uniform buffer backed by the
+// structure uniformBlock points to.
+func newUniformBuffer(b Backend, uniformBlock interface{}) *uniformBuffer {
+	ref := reflect.ValueOf(uniformBlock)
+	// Determine the size of the uniforms structure, *uniforms.
+	size := ref.Elem().Type().Size()
+	// Map the uniforms structure as a byte slice.
+	ptr := (*[1 << 30]byte)(unsafe.Pointer(ref.Pointer()))[:size:size]
+	ubuf := b.NewBuffer(BufferTypeUniforms, len(ptr))
+	return &uniformBuffer{buf: ubuf, ptr: ptr}
+}
+
+func (u *uniformBuffer) Upload() {
+	u.buf.Upload(u.ptr)
+}
+
+func (u *uniformBuffer) Release() {
+	u.buf.Release()
+	u.buf = nil
+}
+
+func newProgram(prog Program, vertUniforms, fragUniforms *uniformBuffer) *program {
+	if vertUniforms != nil {
+		prog.SetVertexUniforms(vertUniforms.buf)
+	}
+	if fragUniforms != nil {
+		prog.SetFragmentUniforms(fragUniforms.buf)
+	}
+	return &program{prog: prog, vertUniforms: vertUniforms, fragUniforms: fragUniforms}
+}
+
+func (p *program) UploadUniforms() {
+	if p.vertUniforms != nil {
+		p.vertUniforms.Upload()
+	}
+	if p.fragUniforms != nil {
+		p.fragUniforms.Upload()
+	}
+}
+
+func (p *program) Release() {
+	p.prog.Release()
+	p.prog = nil
+	if p.vertUniforms != nil {
+		p.vertUniforms.Release()
+		p.vertUniforms = nil
+	}
+	if p.fragUniforms != nil {
+		p.fragUniforms.Release()
+		p.fragUniforms = nil
+	}
 }
 
 // texSpaceTransform return the scale and offset that transforms the given subimage

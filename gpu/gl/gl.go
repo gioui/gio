@@ -71,6 +71,7 @@ const (
 	TRIANGLE_STRIP                        = 0x5
 	TRIANGLES                             = 0x4
 	TRUE                                  = 1
+	UNIFORM_BUFFER                        = 0x8A11
 	UNPACK_ALIGNMENT                      = 0xcf5
 	UNSIGNED_BYTE                         = 0x1401
 	UNSIGNED_SHORT                        = 0x1403

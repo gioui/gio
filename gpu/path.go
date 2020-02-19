@@ -24,32 +24,65 @@ type pather struct {
 }
 
 type coverer struct {
-	ctx    Backend
-	prog   [2]Program
-	layout InputLayout
-	vars   [2]struct {
-		z                             Uniform
-		uScale, uOffset               Uniform
-		uUVScale, uUVOffset           Uniform
-		uCoverUVScale, uCoverUVOffset Uniform
-		uColor                        Uniform
+	ctx         Backend
+	prog        [2]*program
+	texUniforms struct {
+		vert struct {
+			coverUniforms
+			_ [8]byte // Padding to multiple of 16.
+		}
 	}
+	colUniforms struct {
+		vert struct {
+			coverUniforms
+			_ [8]byte // Padding to multiple of 16.
+		}
+		frag struct {
+			colorUniforms
+		}
+	}
+	layout InputLayout
+}
+
+type coverUniforms struct {
+	z             float32
+	_             float32 // Padding.
+	scale         [2]float32
+	offset        [2]float32
+	uvCoverScale  [2]float32
+	uvCoverOffset [2]float32
+	uvScale       [2]float32
+	uvOffset      [2]float32
 }
 
 type stenciler struct {
-	ctx                Backend
-	defFBO             Framebuffer
-	prog               Program
-	progLayout         InputLayout
-	iprog              Program
-	iprogLayout        InputLayout
-	fbos               fboSet
-	intersections      fboSet
-	uScale, uOffset    Uniform
-	uPathOffset        Uniform
-	uIntersectUVOffset Uniform
-	uIntersectUVScale  Uniform
-	indexBuf           Buffer
+	ctx    Backend
+	defFBO Framebuffer
+	prog   struct {
+		prog     *program
+		uniforms struct {
+			vert struct {
+				scale      [2]float32
+				offset     [2]float32
+				pathOffset [2]float32
+				_          [8]byte // Padding to multiple of 16.
+			}
+		}
+		layout InputLayout
+	}
+	iprog struct {
+		prog     *program
+		uniforms struct {
+			vert struct {
+				uvScale  [2]float32
+				uvOffset [2]float32
+			}
+		}
+		layout InputLayout
+	}
+	fbos          fboSet
+	intersections fboSet
+	indexBuf      Buffer
 }
 
 type fboSet struct {
@@ -89,48 +122,28 @@ func newPather(ctx Backend) *pather {
 }
 
 func newCoverer(ctx Backend) *coverer {
-	prog, layout, err := createColorPrograms(ctx, shader_cover_vert, shader_cover_frag)
+	c := &coverer{
+		ctx: ctx,
+	}
+	prog, layout, err := createColorPrograms(ctx, shader_cover_vert, shader_cover_frag,
+		[2]interface{}{&c.colUniforms.vert, &c.texUniforms.vert},
+		[2]interface{}{&c.colUniforms.frag, nil},
+	)
 	if err != nil {
 		panic(err)
 	}
-	c := &coverer{
-		ctx:    ctx,
-		prog:   prog,
-		layout: layout,
-	}
-	for i, prog := range prog {
-		switch materialType(i) {
-		case materialTexture:
-			uTex := prog.UniformFor("tex")
-			prog.Uniform1i(uTex, 0)
-			c.vars[i].uUVScale = prog.UniformFor("uniforms.uvScale")
-			c.vars[i].uUVOffset = prog.UniformFor("uniforms.uvOffset")
-		case materialColor:
-			c.vars[i].uColor = prog.UniformFor("color.color")
-		}
-		uCover := prog.UniformFor("cover")
-		prog.Uniform1i(uCover, 1)
-		c.vars[i].z = prog.UniformFor("uniforms.z")
-		c.vars[i].uScale = prog.UniformFor("uniforms.scale")
-		c.vars[i].uOffset = prog.UniformFor("uniforms.offset")
-		c.vars[i].uCoverUVScale = prog.UniformFor("uniforms.uvCoverScale")
-		c.vars[i].uCoverUVOffset = prog.UniformFor("uniforms.uvCoverOffset")
+	c.prog = prog
+	c.layout = layout
+	texProg := prog[materialTexture].prog
+	texProg.Uniform1i(texProg.UniformFor("tex"), 0)
+	for _, p := range prog {
+		p.prog.Uniform1i(p.prog.UniformFor("cover"), 1)
 	}
 	return c
 }
 
 func newStenciler(ctx Backend) *stenciler {
 	defFBO := ctx.DefaultFramebuffer()
-	prog, err := ctx.NewProgram(shader_stencil_vert, shader_stencil_frag)
-	if err != nil {
-		panic(err)
-	}
-	iprog, err := ctx.NewProgram(shader_intersect_vert, shader_intersect_frag)
-	if err != nil {
-		panic(err)
-	}
-	coverLoc := iprog.UniformFor("cover")
-	iprog.Uniform1i(coverLoc, 0)
 	// Allocate a suitably large index buffer for drawing paths.
 	indices := make([]uint16, pathBatchSize*6)
 	for i := 0; i < pathBatchSize; i++ {
@@ -160,20 +173,28 @@ func newStenciler(ctx Backend) *stenciler {
 	if err != nil {
 		panic(err)
 	}
-	return &stenciler{
-		ctx:                ctx,
-		defFBO:             defFBO,
-		prog:               prog,
-		progLayout:         progLayout,
-		iprog:              iprog,
-		iprogLayout:        iprogLayout,
-		uScale:             prog.UniformFor("uniforms.scale"),
-		uOffset:            prog.UniformFor("uniforms.offset"),
-		uPathOffset:        prog.UniformFor("uniforms.pathOffset"),
-		uIntersectUVScale:  iprog.UniformFor("uvparams.scale"),
-		uIntersectUVOffset: iprog.UniformFor("uvparams.offset"),
-		indexBuf:           indexBuf,
+	st := &stenciler{
+		ctx:      ctx,
+		defFBO:   defFBO,
+		indexBuf: indexBuf,
 	}
+	prog, err := ctx.NewProgram(shader_stencil_vert, shader_stencil_frag)
+	if err != nil {
+		panic(err)
+	}
+	vertUniforms := newUniformBuffer(ctx, &st.prog.uniforms.vert)
+	st.prog.prog = newProgram(prog, vertUniforms, nil)
+	st.prog.layout = progLayout
+	iprog, err := ctx.NewProgram(shader_intersect_vert, shader_intersect_frag)
+	if err != nil {
+		panic(err)
+	}
+	vertUniforms = newUniformBuffer(ctx, &st.iprog.uniforms.vert)
+	coverLoc := iprog.UniformFor("cover")
+	iprog.Uniform1i(coverLoc, 0)
+	st.iprog.prog = newProgram(iprog, vertUniforms, nil)
+	st.iprog.layout = iprogLayout
+	return st
 }
 
 func (s *fboSet) resize(ctx Backend, sizes []image.Point) {
@@ -219,10 +240,10 @@ func (s *fboSet) delete(ctx Backend, idx int) {
 
 func (s *stenciler) release() {
 	s.fbos.delete(s.ctx, 0)
-	s.progLayout.Release()
-	s.prog.Release()
-	s.iprogLayout.Release()
-	s.iprog.Release()
+	s.prog.layout.Release()
+	s.prog.prog.Release()
+	s.iprog.layout.Release()
+	s.iprog.prog.Release()
 	s.indexBuf.Release()
 }
 
@@ -270,7 +291,7 @@ func (s *stenciler) beginIntersect(sizes []image.Point) {
 	// no floating point support is available.
 	s.intersections.resize(s.ctx, sizes)
 	s.ctx.ClearColor(1.0, 0.0, 0.0, 0.0)
-	s.iprog.Bind()
+	s.iprog.prog.prog.Bind()
 }
 
 func (s *stenciler) endIntersect() {
@@ -292,8 +313,8 @@ func (s *stenciler) begin(sizes []image.Point) {
 	s.ctx.BlendFunc(BlendFactorOne, BlendFactorOne)
 	s.fbos.resize(s.ctx, sizes)
 	s.ctx.ClearColor(0.0, 0.0, 0.0, 0.0)
-	s.prog.Bind()
-	s.progLayout.Bind()
+	s.prog.prog.prog.Bind()
+	s.prog.layout.Bind()
 	s.indexBuf.BindIndex()
 }
 
@@ -303,9 +324,10 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 	texSize := f32.Point{X: float32(bounds.Dx()), Y: float32(bounds.Dy())}
 	scale := f32.Point{X: 2 / texSize.X, Y: 2 / texSize.Y}
 	orig := f32.Point{X: -1 - float32(bounds.Min.X)*2/texSize.X, Y: -1 - float32(bounds.Min.Y)*2/texSize.Y}
-	s.prog.Uniform2f(s.uScale, scale.X, scale.Y)
-	s.prog.Uniform2f(s.uOffset, orig.X, orig.Y)
-	s.prog.Uniform2f(s.uPathOffset, offset.X, offset.Y)
+	s.prog.uniforms.vert.scale = [2]float32{scale.X, scale.Y}
+	s.prog.uniforms.vert.offset = [2]float32{orig.X, orig.Y}
+	s.prog.uniforms.vert.pathOffset = [2]float32{offset.X, offset.Y}
+	s.prog.prog.UploadUniforms()
 	// Draw in batches that fit in uint16 indices.
 	start := 0
 	nquads := data.ncurves / 4
@@ -331,18 +353,22 @@ func (p *pather) cover(z float32, mat materialType, col [4]float32, scale, off, 
 
 func (c *coverer) cover(z float32, mat materialType, col [4]float32, scale, off, uvScale, uvOff, coverScale, coverOff f32.Point) {
 	p := c.prog[mat]
-	p.Bind()
+	p.prog.Bind()
+	var uniforms *coverUniforms
 	switch mat {
 	case materialColor:
-		p.Uniform4f(c.vars[mat].uColor, col[0], col[1], col[2], col[3])
+		c.colUniforms.frag.color = col
+		uniforms = &c.colUniforms.vert.coverUniforms
 	case materialTexture:
-		p.Uniform2f(c.vars[mat].uUVScale, uvScale.X, uvScale.Y)
-		p.Uniform2f(c.vars[mat].uUVOffset, uvOff.X, uvOff.Y)
+		c.texUniforms.vert.uvScale = [2]float32{uvScale.X, uvScale.Y}
+		c.texUniforms.vert.uvOffset = [2]float32{uvOff.X, uvOff.Y}
+		uniforms = &c.texUniforms.vert.coverUniforms
 	}
-	p.Uniform1f(c.vars[mat].z, z)
-	p.Uniform2f(c.vars[mat].uScale, scale.X, scale.Y)
-	p.Uniform2f(c.vars[mat].uOffset, off.X, off.Y)
-	p.Uniform2f(c.vars[mat].uCoverUVScale, coverScale.X, coverScale.Y)
-	p.Uniform2f(c.vars[mat].uCoverUVOffset, coverOff.X, coverOff.Y)
+	uniforms.z = z
+	uniforms.scale = [2]float32{scale.X, scale.Y}
+	uniforms.offset = [2]float32{off.X, off.Y}
+	uniforms.uvCoverScale = [2]float32{coverScale.X, coverScale.Y}
+	uniforms.uvCoverOffset = [2]float32{coverOff.X, coverOff.Y}
+	p.UploadUniforms()
 	c.ctx.DrawArrays(DrawModeTriangleStrip, 0, 4)
 }
