@@ -212,6 +212,7 @@ type blitter struct {
 	ctx      Backend
 	viewport image.Point
 	prog     [2]Program
+	layout   InputLayout
 	vars     [2]struct {
 		z                   Uniform
 		uScale, uOffset     Uniform
@@ -232,10 +233,6 @@ const (
 const (
 	materialColor materialType = iota
 	materialTexture
-)
-
-var (
-	blitAttribs = []string{"pos", "uv"}
 )
 
 const (
@@ -375,7 +372,7 @@ func (r *renderer) release() {
 }
 
 func newBlitter(ctx Backend) *blitter {
-	prog, err := createColorPrograms(ctx, shader_blit_vert, shader_blit_frag)
+	prog, layout, err := createColorPrograms(ctx, shader_blit_vert, shader_blit_frag)
 	if err != nil {
 		panic(err)
 	}
@@ -390,6 +387,7 @@ func newBlitter(ctx Backend) *blitter {
 	b := &blitter{
 		ctx:       ctx,
 		prog:      prog,
+		layout:    layout,
 		quadVerts: quadVerts,
 	}
 	for i, prog := range prog {
@@ -414,21 +412,31 @@ func (b *blitter) release() {
 	for _, p := range b.prog {
 		p.Release()
 	}
+	b.layout.Release()
 }
 
-func createColorPrograms(ctx Backend, vsSrc ShaderSources, fsSrc [2]ShaderSources) ([2]Program, error) {
+func createColorPrograms(ctx Backend, vsSrc ShaderSources, fsSrc [2]ShaderSources) ([2]Program, InputLayout, error) {
 	var prog [2]Program
 	var err error
-	prog[materialTexture], err = ctx.NewProgram(vsSrc, fsSrc[materialTexture], blitAttribs)
+	prog[materialTexture], err = ctx.NewProgram(vsSrc, fsSrc[materialTexture])
 	if err != nil {
-		return prog, err
+		return prog, nil, err
 	}
-	prog[materialColor], err = ctx.NewProgram(vsSrc, fsSrc[materialColor], blitAttribs)
+	prog[materialColor], err = ctx.NewProgram(vsSrc, fsSrc[materialColor])
 	if err != nil {
 		prog[materialTexture].Release()
-		return prog, err
+		return prog, nil, err
 	}
-	return prog, nil
+	layout, err := ctx.NewInputLayout(vsSrc, []InputDesc{
+		{Type: DataTypeFloat, Size: 2, Offset: 0},
+		{Type: DataTypeFloat, Size: 2, Offset: 4 * 2},
+	})
+	if err != nil {
+		prog[materialTexture].Release()
+		prog[materialColor].Release()
+		return prog, nil, err
+	}
+	return prog, layout, nil
 }
 
 func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
@@ -456,9 +464,8 @@ func (r *renderer) intersect(ops []imageOp) {
 	}
 	fbo := -1
 	r.pather.stenciler.beginIntersect(r.intersections.sizes)
-	r.blitter.quadVerts.Bind()
-	r.ctx.SetupVertexArray(attribPos, 2, DataTypeFloat, 4*4, 0)
-	r.ctx.SetupVertexArray(attribUV, 2, DataTypeFloat, 4*4, 4*2)
+	r.blitter.quadVerts.BindVertex(4*4, 0)
+	r.pather.stenciler.iprogLayout.Bind()
 	for _, img := range ops {
 		if img.clipType != clipTypeIntersection {
 			continue
@@ -764,9 +771,8 @@ func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f3
 
 func (r *renderer) drawZOps(ops []imageOp) {
 	r.ctx.SetDepthTest(true)
-	r.blitter.quadVerts.Bind()
-	r.ctx.SetupVertexArray(attribPos, 2, DataTypeFloat, 4*4, 0)
-	r.ctx.SetupVertexArray(attribUV, 2, DataTypeFloat, 4*4, 4*2)
+	r.blitter.quadVerts.BindVertex(4*4, 0)
+	r.blitter.layout.Bind()
 	// Render front to back.
 	for i := len(ops) - 1; i >= 0; i-- {
 		img := ops[i]
@@ -786,9 +792,8 @@ func (r *renderer) drawOps(ops []imageOp) {
 	r.ctx.SetDepthTest(true)
 	r.ctx.DepthMask(false)
 	r.ctx.BlendFunc(BlendFactorOne, BlendFactorOneMinusSrcAlpha)
-	r.blitter.quadVerts.Bind()
-	r.ctx.SetupVertexArray(attribPos, 2, DataTypeFloat, 4*4, 0)
-	r.ctx.SetupVertexArray(attribUV, 2, DataTypeFloat, 4*4, 4*2)
+	r.blitter.quadVerts.BindVertex(4*4, 0)
+	r.pather.coverer.layout.Bind()
 	var coverTex Texture
 	for _, img := range ops {
 		m := img.material

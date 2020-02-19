@@ -34,6 +34,14 @@ type glstate struct {
 	nattr    int
 	prog     *gpuProgram
 	texUnits [2]*gpuTexture
+	layout   *gpuInputLayout
+	buffer   bufferBinding
+}
+
+type bufferBinding struct {
+	buf    *gpuBuffer
+	offset int
+	stride int
 }
 
 type gpuTimer struct {
@@ -52,15 +60,21 @@ type gpuFramebuffer struct {
 }
 
 type gpuBuffer struct {
-	funcs Functions
-	obj   Buffer
-	typ   Enum
+	backend *Backend
+	obj     Buffer
+	typ     Enum
 }
 
 type gpuProgram struct {
 	backend *Backend
 	obj     Program
 	nattr   int
+}
+
+type gpuInputLayout struct {
+	backend *Backend
+	inputs  []gpu.InputLocation
+	layout  []gpu.InputDesc
 }
 
 // textureTriple holds the type settings for
@@ -159,7 +173,7 @@ func (b *Backend) NewBuffer(typ gpu.BufferType, data []byte) gpu.Buffer {
 	default:
 		panic("unsupported buffer type")
 	}
-	buf := &gpuBuffer{funcs: b.funcs, obj: obj, typ: gltyp}
+	buf := &gpuBuffer{backend: b, obj: obj, typ: gltyp}
 	buf.Bind()
 	b.funcs.BufferData(gltyp, data, STATIC_DRAW)
 	return buf
@@ -232,10 +246,12 @@ func (b *Backend) SetBlend(enable bool) {
 }
 
 func (b *Backend) DrawElements(mode gpu.DrawMode, off, count int) {
+	b.setupVertexArrays()
 	b.funcs.DrawElements(toGLDrawMode(mode), count, UNSIGNED_SHORT, off)
 }
 
 func (b *Backend) DrawArrays(mode gpu.DrawMode, off, count int) {
+	b.setupVertexArrays()
 	b.funcs.DrawArrays(toGLDrawMode(mode), off, count)
 }
 
@@ -284,7 +300,27 @@ func (b *Backend) DepthFunc(f gpu.DepthFunc) {
 	b.funcs.DepthFunc(glfunc)
 }
 
-func (b *Backend) NewProgram(vssrc, fssrc gpu.ShaderSources, attr []string) (gpu.Program, error) {
+func (b *Backend) NewInputLayout(vs gpu.ShaderSources, layout []gpu.InputDesc) (gpu.InputLayout, error) {
+	if len(vs.Inputs) != len(layout) {
+		return nil, fmt.Errorf("NewInputLayout: got %d inputs, expected %d", len(layout), len(vs.Inputs))
+	}
+	for i, inp := range vs.Inputs {
+		if exp, got := inp.Size, layout[i].Size; exp != got {
+			return nil, fmt.Errorf("NewInputLayout: data size mismatch for %q: got %d expected %d", inp.Name, got, exp)
+		}
+	}
+	return &gpuInputLayout{
+		backend: b,
+		inputs:  vs.Inputs,
+		layout:  layout,
+	}, nil
+}
+
+func (b *Backend) NewProgram(vssrc, fssrc gpu.ShaderSources) (gpu.Program, error) {
+	attr := make([]string, len(vssrc.Inputs))
+	for _, inp := range vssrc.Inputs {
+		attr[inp.Location] = inp.Name
+	}
 	p, err := CreateProgram(b.funcs, vssrc.GLES2, fssrc.GLES2, attr)
 	if err != nil {
 		return nil, err
@@ -322,29 +358,45 @@ func (p *gpuProgram) UniformFor(uniform string) gpu.Uniform {
 	return GetUniformLocation(f, p.obj, uniform)
 }
 
-func (b *Backend) SetupVertexArray(slot int, size int, dataType gpu.DataType, stride, offset int) {
-	var gltyp Enum
-	switch dataType {
-	case gpu.DataTypeFloat:
-		gltyp = FLOAT
-	case gpu.DataTypeShort:
-		gltyp = SHORT
-	default:
-		panic("unsupported data type")
-	}
-	b.funcs.VertexAttribPointer(Attrib(slot), size, gltyp, false, stride, offset)
-}
-
 func (p *gpuProgram) Release() {
 	p.backend.funcs.DeleteProgram(p.obj)
 }
 
 func (b *gpuBuffer) Release() {
-	b.funcs.DeleteBuffer(b.obj)
+	b.backend.funcs.DeleteBuffer(b.obj)
+}
+
+func (b *gpuBuffer) BindVertex(stride, offset int) {
+	if b.typ != ARRAY_BUFFER {
+		panic("not a vertex buffer")
+	}
+	b.backend.state.buffer = bufferBinding{buf: b, stride: stride, offset: offset}
+}
+
+func (b *Backend) setupVertexArrays() {
+	layout := b.state.layout
+	if layout == nil {
+		panic("no input layout is current")
+	}
+	buf := b.state.buffer
+	b.funcs.BindBuffer(ARRAY_BUFFER, buf.buf.obj)
+	for i, inp := range layout.inputs {
+		l := layout.layout[i]
+		var gltyp Enum
+		switch l.Type {
+		case gpu.DataTypeFloat:
+			gltyp = FLOAT
+		case gpu.DataTypeShort:
+			gltyp = SHORT
+		default:
+			panic("unsupported data type")
+		}
+		b.funcs.VertexAttribPointer(Attrib(inp.Location), l.Size, gltyp, false, buf.stride, buf.offset+l.Offset)
+	}
 }
 
 func (b *gpuBuffer) Bind() {
-	b.funcs.BindBuffer(b.typ, b.obj)
+	b.backend.funcs.BindBuffer(b.typ, b.obj)
 }
 
 func (f *gpuFramebuffer) IsComplete() error {
@@ -436,6 +488,12 @@ func (t *gpuTimer) Duration() (time.Duration, bool) {
 	nanos := t.funcs.GetQueryObjectuiv(t.obj, QUERY_RESULT)
 	return time.Duration(nanos), true
 }
+
+func (l *gpuInputLayout) Bind() {
+	l.backend.state.layout = l
+}
+
+func (l *gpuInputLayout) Release() {}
 
 // floatTripleFor determines the best texture triple for floating point FBOs.
 func floatTripleFor(f Functions, ver [2]int, exts []string) (textureTriple, error) {

@@ -23,8 +23,8 @@ type Backend interface {
 	NilTexture() Texture
 	NewFramebuffer() Framebuffer
 	NewBuffer(typ BufferType, data []byte) Buffer
-	NewProgram(vertexShader, fragmentShader ShaderSources, attribMap []string) (Program, error)
-	SetupVertexArray(slot int, size int, dataType DataType, stride, offset int)
+	NewProgram(vertexShader, fragmentShader ShaderSources) (Program, error)
+	NewInputLayout(vertexShader ShaderSources, layout []InputDesc) (InputLayout, error)
 
 	DepthFunc(f DepthFunc)
 	ClearColor(r, g, b, a float32)
@@ -65,6 +65,21 @@ type InputLocation struct {
 	Size int
 }
 
+// InputDesc describes a vertex attribute as laid out in a Buffer.
+type InputDesc struct {
+	Type DataType
+	Size int
+
+	Offset int
+}
+
+// InputLayout is the backend specific representation of the mapping
+// between Buffers and shader attributes.
+type InputLayout interface {
+	Bind()
+	Release()
+}
+
 type BlendFactor uint8
 
 type DrawMode uint8
@@ -100,6 +115,7 @@ type Program interface {
 type Uniform interface{}
 
 type Buffer interface {
+	BindVertex(stride, offset int)
 	Bind()
 	Release()
 }

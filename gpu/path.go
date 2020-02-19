@@ -24,9 +24,10 @@ type pather struct {
 }
 
 type coverer struct {
-	ctx  Backend
-	prog [2]Program
-	vars [2]struct {
+	ctx    Backend
+	prog   [2]Program
+	layout InputLayout
+	vars   [2]struct {
 		z                             Uniform
 		uScale, uOffset               Uniform
 		uUVScale, uUVOffset           Uniform
@@ -39,7 +40,9 @@ type stenciler struct {
 	ctx                Backend
 	defFBO             Framebuffer
 	prog               Program
+	progLayout         InputLayout
 	iprog              Program
+	iprogLayout        InputLayout
 	fbos               fboSet
 	intersections      fboSet
 	uScale, uOffset    Uniform
@@ -64,11 +67,6 @@ type pathData struct {
 	data    Buffer
 }
 
-var (
-	pathAttribs      = []string{"corner", "maxy", "from", "ctrl", "to"}
-	intersectAttribs = []string{"pos", "uv"}
-)
-
 const (
 	// Number of path quads per draw batch.
 	pathBatchSize = 10000
@@ -91,13 +89,14 @@ func newPather(ctx Backend) *pather {
 }
 
 func newCoverer(ctx Backend) *coverer {
-	prog, err := createColorPrograms(ctx, shader_cover_vert, shader_cover_frag)
+	prog, layout, err := createColorPrograms(ctx, shader_cover_vert, shader_cover_frag)
 	if err != nil {
 		panic(err)
 	}
 	c := &coverer{
-		ctx:  ctx,
-		prog: prog,
+		ctx:    ctx,
+		prog:   prog,
+		layout: layout,
 	}
 	for i, prog := range prog {
 		switch materialType(i) {
@@ -122,11 +121,11 @@ func newCoverer(ctx Backend) *coverer {
 
 func newStenciler(ctx Backend) *stenciler {
 	defFBO := ctx.DefaultFramebuffer()
-	prog, err := ctx.NewProgram(shader_stencil_vert, shader_stencil_frag, pathAttribs)
+	prog, err := ctx.NewProgram(shader_stencil_vert, shader_stencil_frag)
 	if err != nil {
 		panic(err)
 	}
-	iprog, err := ctx.NewProgram(shader_intersect_vert, shader_intersect_frag, intersectAttribs)
+	iprog, err := ctx.NewProgram(shader_intersect_vert, shader_intersect_frag)
 	if err != nil {
 		panic(err)
 	}
@@ -144,11 +143,30 @@ func newStenciler(ctx Backend) *stenciler {
 		indices[i*6+5] = i*4 + 3
 	}
 	indexBuf := ctx.NewBuffer(BufferTypeIndices, gunsafe.BytesView(indices))
+	progLayout, err := ctx.NewInputLayout(shader_stencil_vert, []InputDesc{
+		{Type: DataTypeShort, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).CornerX))},
+		{Type: DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).MaxY))},
+		{Type: DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).FromX))},
+		{Type: DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).CtrlX))},
+		{Type: DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).ToX))},
+	})
+	if err != nil {
+		panic(err)
+	}
+	iprogLayout, err := ctx.NewInputLayout(shader_intersect_vert, []InputDesc{
+		{Type: DataTypeFloat, Size: 2, Offset: 0},
+		{Type: DataTypeFloat, Size: 2, Offset: 4 * 2},
+	})
+	if err != nil {
+		panic(err)
+	}
 	return &stenciler{
 		ctx:                ctx,
 		defFBO:             defFBO,
 		prog:               prog,
+		progLayout:         progLayout,
 		iprog:              iprog,
+		iprogLayout:        iprogLayout,
 		uScale:             prog.UniformFor("uniforms.scale"),
 		uOffset:            prog.UniformFor("uniforms.offset"),
 		uPathOffset:        prog.UniformFor("uniforms.pathOffset"),
@@ -201,7 +219,10 @@ func (s *fboSet) delete(ctx Backend, idx int) {
 
 func (s *stenciler) release() {
 	s.fbos.delete(s.ctx, 0)
+	s.progLayout.Release()
 	s.prog.Release()
+	s.iprogLayout.Release()
+	s.iprog.Release()
 	s.indexBuf.Release()
 }
 
@@ -214,6 +235,7 @@ func (c *coverer) release() {
 	for _, p := range c.prog {
 		p.Release()
 	}
+	c.layout.Release()
 }
 
 func buildPath(ctx Backend, p []byte) *pathData {
@@ -271,11 +293,11 @@ func (s *stenciler) begin(sizes []image.Point) {
 	s.fbos.resize(s.ctx, sizes)
 	s.ctx.ClearColor(0.0, 0.0, 0.0, 0.0)
 	s.prog.Bind()
+	s.progLayout.Bind()
 	s.indexBuf.Bind()
 }
 
 func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.Point, data *pathData) {
-	data.data.Bind()
 	s.ctx.Viewport(uv.X, uv.Y, bounds.Dx(), bounds.Dy())
 	// Transform UI coordinates to OpenGL coordinates.
 	texSize := f32.Point{X: float32(bounds.Dx()), Y: float32(bounds.Dy())}
@@ -293,11 +315,7 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 			batch = max
 		}
 		off := path.VertStride * start * 4
-		s.ctx.SetupVertexArray(attribPathCorner, 2, DataTypeShort, path.VertStride, off+int(unsafe.Offsetof((*(*path.Vertex)(nil)).CornerX)))
-		s.ctx.SetupVertexArray(attribPathMaxY, 1, DataTypeFloat, path.VertStride, off+int(unsafe.Offsetof((*(*path.Vertex)(nil)).MaxY)))
-		s.ctx.SetupVertexArray(attribPathFrom, 2, DataTypeFloat, path.VertStride, off+int(unsafe.Offsetof((*(*path.Vertex)(nil)).FromX)))
-		s.ctx.SetupVertexArray(attribPathCtrl, 2, DataTypeFloat, path.VertStride, off+int(unsafe.Offsetof((*(*path.Vertex)(nil)).CtrlX)))
-		s.ctx.SetupVertexArray(attribPathTo, 2, DataTypeFloat, path.VertStride, off+int(unsafe.Offsetof((*(*path.Vertex)(nil)).ToX)))
+		data.data.BindVertex(path.VertStride, off)
 		s.ctx.DrawElements(DrawModeTriangles, 0, batch*6)
 		start += batch
 	}
