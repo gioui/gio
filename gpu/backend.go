@@ -116,7 +116,7 @@ type Uniform interface{}
 
 type Buffer interface {
 	BindVertex(stride, offset int)
-	Bind()
+	BindIndex()
 	Release()
 }
 

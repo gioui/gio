@@ -174,7 +174,7 @@ func (b *Backend) NewBuffer(typ gpu.BufferType, data []byte) gpu.Buffer {
 		panic("unsupported buffer type")
 	}
 	buf := &gpuBuffer{backend: b, obj: obj, typ: gltyp}
-	buf.Bind()
+	b.funcs.BindBuffer(gltyp, obj)
 	b.funcs.BufferData(gltyp, data, STATIC_DRAW)
 	return buf
 }
@@ -395,8 +395,11 @@ func (b *Backend) setupVertexArrays() {
 	}
 }
 
-func (b *gpuBuffer) Bind() {
-	b.backend.funcs.BindBuffer(b.typ, b.obj)
+func (b *gpuBuffer) BindIndex() {
+	if b.typ != ELEMENT_ARRAY_BUFFER {
+		panic("not an index buffer")
+	}
+	b.backend.funcs.BindBuffer(ELEMENT_ARRAY_BUFFER, b.obj)
 }
 
 func (f *gpuFramebuffer) IsComplete() error {

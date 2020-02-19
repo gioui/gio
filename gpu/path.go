@@ -294,7 +294,7 @@ func (s *stenciler) begin(sizes []image.Point) {
 	s.ctx.ClearColor(0.0, 0.0, 0.0, 0.0)
 	s.prog.Bind()
 	s.progLayout.Bind()
-	s.indexBuf.Bind()
+	s.indexBuf.BindIndex()
 }
 
 func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.Point, data *pathData) {
