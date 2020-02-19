@@ -18,7 +18,7 @@ packages:
  - xvfb
  - xdotool
  - scrot
- # - sway TODO: uncomment once the wayland e2e test passes again
+ - sway
  - grim
 sources:
  - https://git.sr.ht/~eliasnaur/gio
