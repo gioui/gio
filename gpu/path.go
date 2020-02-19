@@ -239,7 +239,7 @@ func (c *coverer) release() {
 }
 
 func buildPath(ctx Backend, p []byte) *pathData {
-	buf := ctx.NewBuffer(BufferTypeData, p)
+	buf := ctx.NewBuffer(BufferTypeVertices, p)
 	return &pathData{
 		ncurves: len(p) / path.VertStride,
 		data:    buf,

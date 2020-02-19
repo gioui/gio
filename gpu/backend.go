@@ -158,7 +158,7 @@ const (
 
 const (
 	BufferTypeIndices BufferType = iota
-	BufferTypeData
+	BufferTypeVertices
 )
 
 const (

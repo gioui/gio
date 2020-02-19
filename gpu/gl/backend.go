@@ -166,7 +166,7 @@ func (b *Backend) NewBuffer(typ gpu.BufferType, data []byte) gpu.Buffer {
 	obj := b.funcs.CreateBuffer()
 	var gltyp Enum
 	switch typ {
-	case gpu.BufferTypeData:
+	case gpu.BufferTypeVertices:
 		gltyp = ARRAY_BUFFER
 	case gpu.BufferTypeIndices:
 		gltyp = ELEMENT_ARRAY_BUFFER
