@@ -8,8 +8,6 @@ layout(location=0) in vec2 vFrom;
 layout(location=1) in vec2 vCtrl;
 layout(location=2) in vec2 vTo;
 
-layout(binding=0) uniform sampler2D areaLUT;
-
 layout(location = 0) out vec4 fragCover;
 
 void main() {
