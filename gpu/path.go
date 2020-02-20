@@ -195,7 +195,6 @@ func (s *fboSet) resize(ctx Backend, sizes []image.Point) {
 	for i := len(s.fbos); i < len(sizes); i++ {
 		s.fbos = append(s.fbos, stencilFBO{
 			fbo: ctx.NewFramebuffer(),
-			tex: ctx.NewTexture(FilterNearest, FilterNearest),
 		})
 	}
 	// Resize fbos.
@@ -207,8 +206,11 @@ func (s *fboSet) resize(ctx Backend, sizes []image.Point) {
 		waste := float32(sz.X*sz.Y) / float32(f.size.X*f.size.Y)
 		resize = resize || waste > 1.2
 		if resize {
+			if f.tex != nil {
+				f.tex.Release()
+			}
 			f.size = sz
-			f.tex.Resize(TextureFormatFloat, sz.X, sz.Y)
+			f.tex = ctx.NewTexture(TextureFormatFloat, sz.X, sz.Y, FilterNearest, FilterNearest)
 			f.fbo.BindTexture(f.tex)
 		}
 	}

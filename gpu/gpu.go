@@ -378,7 +378,7 @@ func (r *renderer) texHandle(t *texture) Texture {
 	if t.tex != nil {
 		return t.tex
 	}
-	t.tex = r.ctx.NewTexture(FilterLinear, FilterLinear)
+	t.tex = r.ctx.NewTexture(TextureFormatSRGB, t.src.Bounds().Dx(), t.src.Bounds().Dy(), FilterLinear, FilterLinear)
 	t.tex.Upload(t.src)
 	return t.tex
 }

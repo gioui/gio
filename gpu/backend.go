@@ -18,7 +18,7 @@ type Backend interface {
 	// IsContinuousTime reports whether all timer measurements
 	// are valid at the point of call.
 	IsTimeContinuous() bool
-	NewTexture(minFilter, magFilter TextureFilter) Texture
+	NewTexture(format TextureFormat, width, height int, minFilter, magFilter TextureFilter) Texture
 	DefaultFramebuffer() Framebuffer
 	NilTexture() Texture
 	NewFramebuffer() Framebuffer
@@ -143,7 +143,6 @@ type Texture interface {
 	Upload(img *image.RGBA)
 	Release()
 	Bind(unit int)
-	Resize(format TextureFormat, width, height int)
 }
 
 const (

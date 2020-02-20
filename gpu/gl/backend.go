@@ -53,6 +53,7 @@ type gpuTimer struct {
 type gpuTexture struct {
 	backend *Backend
 	obj     Texture
+	triple  textureTriple
 }
 
 type gpuFramebuffer struct {
@@ -174,13 +175,22 @@ func (b *Backend) DefaultFramebuffer() gpu.Framebuffer {
 	return b.defFBO
 }
 
-func (b *Backend) NewTexture(minFilter, magFilter gpu.TextureFilter) gpu.Texture {
+func (b *Backend) NewTexture(format gpu.TextureFormat, width, height int, minFilter, magFilter gpu.TextureFilter) gpu.Texture {
 	tex := &gpuTexture{backend: b, obj: b.funcs.CreateTexture()}
+	switch format {
+	case gpu.TextureFormatFloat:
+		tex.triple = b.floatTriple
+	case gpu.TextureFormatSRGB:
+		tex.triple = b.srgbaTriple
+	default:
+		panic("unsupported texture format")
+	}
 	tex.Bind(0)
 	b.funcs.TexParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, toTexFilter(magFilter))
 	b.funcs.TexParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, toTexFilter(minFilter))
 	b.funcs.TexParameteri(TEXTURE_2D, TEXTURE_WRAP_S, CLAMP_TO_EDGE)
 	b.funcs.TexParameteri(TEXTURE_2D, TEXTURE_WRAP_T, CLAMP_TO_EDGE)
+	b.funcs.TexImage2D(TEXTURE_2D, 0, tex.triple.internalFormat, width, height, tex.triple.format, tex.triple.typ, nil)
 	return tex
 }
 
@@ -571,12 +581,6 @@ func (t *gpuTexture) Release() {
 	t.backend.funcs.DeleteTexture(t.obj)
 }
 
-func (t *gpuTexture) Resize(format gpu.TextureFormat, width, height int) {
-	t.Bind(0)
-	tt := t.backend.floatTriple
-	t.backend.funcs.TexImage2D(TEXTURE_2D, 0, tt.internalFormat, width, height, tt.format, tt.typ, nil)
-}
-
 func (t *gpuTexture) Upload(img *image.RGBA) {
 	t.Bind(0)
 	var pixels []byte
@@ -588,8 +592,7 @@ func (t *gpuTexture) Upload(img *image.RGBA) {
 	start := (b.Min.X + b.Min.Y*w) * 4
 	end := (b.Max.X + (b.Max.Y-1)*w) * 4
 	pixels = img.Pix[start:end]
-	tt := t.backend.srgbaTriple
-	t.backend.funcs.TexImage2D(TEXTURE_2D, 0, tt.internalFormat, w, h, tt.format, tt.typ, pixels)
+	t.backend.funcs.TexImage2D(TEXTURE_2D, 0, t.triple.internalFormat, w, h, t.triple.format, t.triple.typ, pixels)
 }
 
 func (t *gpuTimer) Begin() {
