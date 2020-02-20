@@ -171,7 +171,7 @@ func (b *Backend) DefaultFramebuffer() gpu.Framebuffer {
 	return b.defFBO
 }
 
-func (b *Backend) NewTexture(format gpu.TextureFormat, width, height int, minFilter, magFilter gpu.TextureFilter) gpu.Texture {
+func (b *Backend) NewTexture(format gpu.TextureFormat, width, height int, minFilter, magFilter gpu.TextureFilter, binding gpu.BufferBinding) gpu.Texture {
 	tex := &gpuTexture{backend: b, obj: b.funcs.CreateTexture()}
 	switch format {
 	case gpu.TextureFormatFloat:

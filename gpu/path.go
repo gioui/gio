@@ -210,7 +210,8 @@ func (s *fboSet) resize(ctx Backend, sizes []image.Point) {
 				f.tex.Release()
 			}
 			f.size = sz
-			f.tex = ctx.NewTexture(TextureFormatFloat, sz.X, sz.Y, FilterNearest, FilterNearest)
+			f.tex = ctx.NewTexture(TextureFormatFloat, sz.X, sz.Y, FilterNearest, FilterNearest,
+				BufferBindingTexture|BufferBindingFramebuffer)
 			f.fbo.BindTexture(f.tex)
 		}
 	}

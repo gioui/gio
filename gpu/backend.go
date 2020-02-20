@@ -18,7 +18,7 @@ type Backend interface {
 	// IsContinuousTime reports whether all timer measurements
 	// are valid at the point of call.
 	IsTimeContinuous() bool
-	NewTexture(format TextureFormat, width, height int, minFilter, magFilter TextureFilter) Texture
+	NewTexture(format TextureFormat, width, height int, minFilter, magFilter TextureFilter, bindings BufferBinding) Texture
 	DefaultFramebuffer() Framebuffer
 	NewFramebuffer() Framebuffer
 	NewImmutableBuffer(typ BufferBinding, data []byte) Buffer
@@ -162,6 +162,8 @@ const (
 	BufferBindingIndices BufferBinding = 1 << iota
 	BufferBindingVertices
 	BufferBindingUniforms
+	BufferBindingTexture
+	BufferBindingFramebuffer
 )
 
 const (
