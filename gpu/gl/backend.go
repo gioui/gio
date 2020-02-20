@@ -274,7 +274,9 @@ func (b *Backend) SetBlend(enable bool) {
 
 func (b *Backend) DrawElements(mode gpu.DrawMode, off, count int) {
 	b.prepareDraw()
-	b.funcs.DrawElements(toGLDrawMode(mode), count, UNSIGNED_SHORT, off)
+	// off is in 16-bit indices, but DrawElements take a byte offset.
+	byteOff := off * 2
+	b.funcs.DrawElements(toGLDrawMode(mode), count, UNSIGNED_SHORT, byteOff)
 }
 
 func (b *Backend) DrawArrays(mode gpu.DrawMode, off, count int) {
