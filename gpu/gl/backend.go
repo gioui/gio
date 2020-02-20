@@ -64,7 +64,7 @@ type gpuFramebuffer struct {
 type gpuBuffer struct {
 	backend   *Backend
 	obj       Buffer
-	typ       Enum
+	typ       gpu.BufferBinding
 	size      int
 	immutable bool
 	version   int
@@ -190,23 +190,24 @@ func (b *Backend) NewTexture(format gpu.TextureFormat, width, height int, minFil
 	return tex
 }
 
-func (b *Backend) NewBuffer(typ gpu.BufferType, size int) gpu.Buffer {
-	gltyp := toBufferType(typ)
-	buf := &gpuBuffer{backend: b, typ: gltyp, size: size}
-	switch typ {
-	case gpu.BufferTypeUniforms:
+func (b *Backend) NewBuffer(typ gpu.BufferBinding, size int) gpu.Buffer {
+	buf := &gpuBuffer{backend: b, typ: typ, size: size}
+	if typ&gpu.BufferBindingUniforms != 0 {
+		if typ != gpu.BufferBindingUniforms {
+			panic("uniforms buffers cannot be bound as anything else")
+		}
 		// GLES 2 doesn't support uniform buffers.
 		buf.data = make([]byte, size)
-	default:
+	}
+	if typ&^gpu.BufferBindingUniforms != 0 {
 		buf.obj = b.funcs.CreateBuffer()
 	}
 	return buf
 }
 
-func (b *Backend) NewImmutableBuffer(typ gpu.BufferType, data []byte) gpu.Buffer {
+func (b *Backend) NewImmutableBuffer(typ gpu.BufferBinding, data []byte) gpu.Buffer {
 	obj := b.funcs.CreateBuffer()
-	gltyp := toBufferType(typ)
-	buf := &gpuBuffer{backend: b, obj: obj, typ: gltyp, size: len(data)}
+	buf := &gpuBuffer{backend: b, obj: obj, typ: typ, size: len(data)}
 	buf.Upload(data)
 	buf.immutable = true
 	return buf
@@ -428,7 +429,7 @@ func (u *uniformsTracker) setup(funcs Functions, p Program, uniformSize int, uni
 
 func (u *uniformsTracker) setBuffer(buffer gpu.Buffer) {
 	buf := buffer.(*gpuBuffer)
-	if buf.typ != UNIFORM_BUFFER {
+	if buf.typ&gpu.BufferBindingUniforms == 0 {
 		panic("not a uniform buffer")
 	}
 	if buf.size < u.size {
@@ -479,25 +480,24 @@ func (b *gpuBuffer) Upload(data []byte) {
 		panic("buffer size overflow")
 	}
 	b.version++
-	switch b.typ {
-	case UNIFORM_BUFFER:
+	if b.typ&gpu.BufferBindingUniforms != 0 {
 		copy(b.data, data)
-	default:
-		b.backend.funcs.BindBuffer(b.typ, b.obj)
-		b.backend.funcs.BufferData(b.typ, data, STATIC_DRAW)
+	}
+	if b.typ&^gpu.BufferBindingUniforms != 0 {
+		firstBinding := firstBufferType(b.typ)
+		b.backend.funcs.BindBuffer(firstBinding, b.obj)
+		b.backend.funcs.BufferData(firstBinding, data, STATIC_DRAW)
 	}
 }
 
 func (b *gpuBuffer) Release() {
-	switch b.typ {
-	case UNIFORM_BUFFER:
-	default:
+	if b.typ&^gpu.BufferBindingUniforms != 0 {
 		b.backend.funcs.DeleteBuffer(b.obj)
 	}
 }
 
 func (b *gpuBuffer) BindVertex(stride, offset int) {
-	if b.typ != ARRAY_BUFFER {
+	if b.typ&gpu.BufferBindingVertices == 0 {
 		panic("not a vertex buffer")
 	}
 	b.backend.state.buffer = bufferBinding{buf: b, stride: stride, offset: offset}
@@ -526,7 +526,7 @@ func (b *Backend) setupVertexArrays() {
 }
 
 func (b *gpuBuffer) BindIndex() {
-	if b.typ != ELEMENT_ARRAY_BUFFER {
+	if b.typ&gpu.BufferBindingIndices == 0 {
 		panic("not an index buffer")
 	}
 	b.backend.funcs.BindBuffer(ELEMENT_ARRAY_BUFFER, b.obj)
@@ -691,13 +691,13 @@ func hasExtension(exts []string, ext string) bool {
 	return false
 }
 
-func toBufferType(typ gpu.BufferType) Enum {
-	switch typ {
-	case gpu.BufferTypeVertices:
-		return ARRAY_BUFFER
-	case gpu.BufferTypeIndices:
+func firstBufferType(typ gpu.BufferBinding) Enum {
+	switch {
+	case typ&gpu.BufferBindingIndices != 0:
 		return ELEMENT_ARRAY_BUFFER
-	case gpu.BufferTypeUniforms:
+	case typ&gpu.BufferBindingVertices != 0:
+		return ARRAY_BUFFER
+	case typ&gpu.BufferBindingUniforms != 0:
 		return UNIFORM_BUFFER
 	default:
 		panic("unsupported buffer type")

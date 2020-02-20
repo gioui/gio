@@ -21,8 +21,8 @@ type Backend interface {
 	NewTexture(format TextureFormat, width, height int, minFilter, magFilter TextureFilter) Texture
 	DefaultFramebuffer() Framebuffer
 	NewFramebuffer() Framebuffer
-	NewImmutableBuffer(typ BufferType, data []byte) Buffer
-	NewBuffer(typ BufferType, size int) Buffer
+	NewImmutableBuffer(typ BufferBinding, data []byte) Buffer
+	NewBuffer(typ BufferBinding, size int) Buffer
 	NewProgram(vertexShader, fragmentShader ShaderSources) (Program, error)
 	NewInputLayout(vertexShader ShaderSources, layout []InputDesc) (InputLayout, error)
 
@@ -96,7 +96,7 @@ type BufferAttachments uint
 type TextureFilter uint8
 type TextureFormat uint8
 
-type BufferType uint8
+type BufferBinding uint8
 
 type DataType uint8
 
@@ -159,9 +159,9 @@ const (
 )
 
 const (
-	BufferTypeIndices BufferType = iota
-	BufferTypeVertices
-	BufferTypeUniforms
+	BufferBindingIndices BufferBinding = 1 << iota
+	BufferBindingVertices
+	BufferBindingUniforms
 )
 
 const (

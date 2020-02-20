@@ -406,7 +406,7 @@ func (r *renderer) release() {
 }
 
 func newBlitter(ctx Backend) *blitter {
-	quadVerts := ctx.NewImmutableBuffer(BufferTypeVertices,
+	quadVerts := ctx.NewImmutableBuffer(BufferBindingVertices,
 		gunsafe.BytesView([]float32{
 			-1, +1, 0, 0,
 			+1, +1, 1, 0,
@@ -913,7 +913,7 @@ func newUniformBuffer(b Backend, uniformBlock interface{}) *uniformBuffer {
 	size := ref.Elem().Type().Size()
 	// Map the uniforms structure as a byte slice.
 	ptr := (*[1 << 30]byte)(unsafe.Pointer(ref.Pointer()))[:size:size]
-	ubuf := b.NewBuffer(BufferTypeUniforms, len(ptr))
+	ubuf := b.NewBuffer(BufferBindingUniforms, len(ptr))
 	return &uniformBuffer{buf: ubuf, ptr: ptr}
 }
 
