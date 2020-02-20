@@ -134,11 +134,6 @@ func newCoverer(ctx Backend) *coverer {
 	}
 	c.prog = prog
 	c.layout = layout
-	texProg := prog[materialTexture].prog
-	texProg.Uniform1i(texProg.UniformFor("tex"), 0)
-	for _, p := range prog {
-		p.prog.Uniform1i(p.prog.UniformFor("cover"), 1)
-	}
 	return c
 }
 
@@ -190,8 +185,6 @@ func newStenciler(ctx Backend) *stenciler {
 		panic(err)
 	}
 	vertUniforms = newUniformBuffer(ctx, &st.iprog.uniforms.vert)
-	coverLoc := iprog.UniformFor("cover")
-	iprog.Uniform1i(coverLoc, 0)
 	st.iprog.prog = newProgram(iprog, vertUniforms, nil)
 	st.iprog.layout = iprogLayout
 	return st

@@ -425,8 +425,6 @@ func newBlitter(ctx Backend) *blitter {
 	}
 	b.prog = prog
 	b.layout = layout
-	texProg := b.prog[materialTexture].prog
-	texProg.Uniform1i(texProg.UniformFor("tex"), 0)
 	return b
 }
 

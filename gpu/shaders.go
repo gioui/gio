@@ -48,6 +48,9 @@ var (
 			HLSL: []byte(nil),
 		},
 		ShaderSources{
+			Textures: []TextureBinding{
+				{Name: "tex", Binding: 0},
+			},
 			GLES2: "#version 100\nprecision mediump float;\nprecision highp int;\n\nuniform mediump sampler2D tex;\n\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = texture2D(tex, vUV);\n}\n\n",
 			/*
 			   Texture2D<float4> tex : register(t0);
@@ -155,7 +158,10 @@ var (
 				{Name: "_12._color", Type: 0, Size: 4, Offset: 0},
 			},
 			UniformSize: 16,
-			GLES2:       "#version 100\nprecision mediump float;\nprecision highp int;\n\nstruct Color\n{\n    vec4 _color;\n};\n\nuniform Color _12;\n\nuniform mediump sampler2D cover;\n\nvarying highp vec2 vCoverUV;\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = _12._color;\n    float cover_1 = abs(texture2D(cover, vCoverUV).x);\n    gl_FragData[0] *= cover_1;\n}\n\n",
+			Textures: []TextureBinding{
+				{Name: "cover", Binding: 1},
+			},
+			GLES2: "#version 100\nprecision mediump float;\nprecision highp int;\n\nstruct Color\n{\n    vec4 _color;\n};\n\nuniform Color _12;\n\nuniform mediump sampler2D cover;\n\nvarying highp vec2 vCoverUV;\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = _12._color;\n    float cover_1 = abs(texture2D(cover, vCoverUV).x);\n    gl_FragData[0] *= cover_1;\n}\n\n",
 			/*
 			   cbuffer Color : register(b0)
 			   {
@@ -201,6 +207,10 @@ var (
 			HLSL: []byte(nil),
 		},
 		ShaderSources{
+			Textures: []TextureBinding{
+				{Name: "tex", Binding: 0},
+				{Name: "cover", Binding: 1},
+			},
 			GLES2: "#version 100\nprecision mediump float;\nprecision highp int;\n\nuniform mediump sampler2D tex;\nuniform mediump sampler2D cover;\n\nvarying vec2 vUV;\nvarying highp vec2 vCoverUV;\n\nvoid main()\n{\n    gl_FragData[0] = texture2D(tex, vUV);\n    float cover_1 = abs(texture2D(cover, vCoverUV).x);\n    gl_FragData[0] *= cover_1;\n}\n\n",
 			/*
 			   Texture2D<float4> tex : register(t0);
@@ -315,6 +325,9 @@ var (
 		HLSL: []byte(nil),
 	}
 	shader_intersect_frag = ShaderSources{
+		Textures: []TextureBinding{
+			{Name: "cover", Binding: 0},
+		},
 		GLES2: "#version 100\nprecision mediump float;\nprecision highp int;\n\nuniform mediump sampler2D cover;\n\nvarying highp vec2 vUV;\n\nvoid main()\n{\n    float cover_1 = abs(texture2D(cover, vUV).x);\n    gl_FragData[0].x = cover_1;\n}\n\n",
 		/*
 		   Texture2D<float4> cover : register(t0);

@@ -46,6 +46,12 @@ type ShaderSources struct {
 	Uniforms    []UniformLocation
 	UniformSize int
 	Inputs      []InputLocation
+	Textures    []TextureBinding
+}
+
+type TextureBinding struct {
+	Name    string
+	Binding int
 }
 
 type UniformLocation struct {
@@ -109,11 +115,7 @@ type Program interface {
 	Release()
 	SetVertexUniforms(buf Buffer)
 	SetFragmentUniforms(buf Buffer)
-	UniformFor(uniform string) Uniform
-	Uniform1i(u Uniform, v int)
 }
-
-type Uniform interface{}
 
 type Buffer interface {
 	BindVertex(stride, offset int)

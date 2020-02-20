@@ -366,6 +366,20 @@ func (b *Backend) NewProgram(vssrc, fssrc gpu.ShaderSources) (gpu.Program, error
 		obj:     p,
 		nattr:   len(attr),
 	}
+	gpuProg.Bind()
+	// Bind texture uniforms.
+	for _, tex := range vssrc.Textures {
+		u := b.funcs.GetUniformLocation(p, tex.Name)
+		if u.valid() {
+			b.funcs.Uniform1i(u, tex.Binding)
+		}
+	}
+	for _, tex := range fssrc.Textures {
+		u := b.funcs.GetUniformLocation(p, tex.Name)
+		if u.valid() {
+			b.funcs.Uniform1i(u, tex.Binding)
+		}
+	}
 	gpuProg.vertUniforms.setup(b.funcs, p, vssrc.UniformSize, vssrc.Uniforms)
 	gpuProg.fragUniforms.setup(b.funcs, p, fssrc.UniformSize, fssrc.Uniforms)
 	return gpuProg, nil
@@ -389,19 +403,9 @@ func (p *gpuProgram) updateUniforms() {
 	p.fragUniforms.update(p.backend.funcs)
 }
 
-func (p *gpuProgram) Uniform1i(u gpu.Uniform, v int) {
-	p.Bind()
-	p.backend.funcs.Uniform1i(u.(Uniform), v)
-}
-
 func (p *gpuProgram) Bind() {
 	p.backend.useProgram(p)
 	p.backend.enableVertexArrays(p.nattr)
-}
-
-func (p *gpuProgram) UniformFor(uniform string) gpu.Uniform {
-	f := p.backend.funcs
-	return GetUniformLocation(f, p.obj, uniform)
 }
 
 func (p *gpuProgram) Release() {
