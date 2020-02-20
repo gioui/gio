@@ -20,7 +20,6 @@ type Backend interface {
 	IsTimeContinuous() bool
 	NewTexture(format TextureFormat, width, height int, minFilter, magFilter TextureFilter) Texture
 	DefaultFramebuffer() Framebuffer
-	NilTexture() Texture
 	NewFramebuffer() Framebuffer
 	NewImmutableBuffer(typ BufferType, data []byte) Buffer
 	NewBuffer(typ BufferType, size int) Buffer

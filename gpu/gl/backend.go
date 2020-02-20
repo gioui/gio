@@ -167,10 +167,6 @@ func (b *Backend) NewFramebuffer() gpu.Framebuffer {
 	return &gpuFramebuffer{funcs: b.funcs, obj: fb}
 }
 
-func (b *Backend) NilTexture() gpu.Texture {
-	return &gpuTexture{backend: b}
-}
-
 func (b *Backend) DefaultFramebuffer() gpu.Framebuffer {
 	return b.defFBO
 }

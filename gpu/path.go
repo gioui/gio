@@ -279,7 +279,6 @@ func (p *pather) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.
 }
 
 func (s *stenciler) beginIntersect(sizes []image.Point) {
-	s.ctx.NilTexture().Bind(1)
 	s.ctx.BlendFunc(BlendFactorDstColor, BlendFactorZero)
 	// 8 bit coverage is enough, but OpenGL ES only supports single channel
 	// floating point formats. Replace with GL_RGB+GL_UNSIGNED_BYTE if
@@ -304,7 +303,6 @@ func (s *stenciler) cover(idx int) stencilFBO {
 }
 
 func (s *stenciler) begin(sizes []image.Point) {
-	s.ctx.NilTexture().Bind(1)
 	s.ctx.BlendFunc(BlendFactorOne, BlendFactorOne)
 	s.fbos.resize(s.ctx, sizes)
 	s.ctx.ClearColor(0.0, 0.0, 0.0, 0.0)
