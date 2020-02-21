@@ -20,7 +20,7 @@ type Backend interface {
 	IsTimeContinuous() bool
 	NewTexture(format TextureFormat, width, height int, minFilter, magFilter TextureFilter, bindings BufferBinding) Texture
 	DefaultFramebuffer() Framebuffer
-	NewFramebuffer() Framebuffer
+	NewFramebuffer(tex Texture) Framebuffer
 	NewImmutableBuffer(typ BufferBinding, data []byte) Buffer
 	NewBuffer(typ BufferBinding, size int) Buffer
 	NewProgram(vertexShader, fragmentShader ShaderSources) (Program, error)
@@ -125,7 +125,6 @@ type Buffer interface {
 
 type Framebuffer interface {
 	Bind()
-	BindTexture(t Texture)
 	Invalidate()
 	Release()
 	IsComplete() error

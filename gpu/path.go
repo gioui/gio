@@ -193,9 +193,7 @@ func newStenciler(ctx Backend) *stenciler {
 func (s *fboSet) resize(ctx Backend, sizes []image.Point) {
 	// Add fbos.
 	for i := len(s.fbos); i < len(sizes); i++ {
-		s.fbos = append(s.fbos, stencilFBO{
-			fbo: ctx.NewFramebuffer(),
-		})
+		s.fbos = append(s.fbos, stencilFBO{})
 	}
 	// Resize fbos.
 	for i, sz := range sizes {
@@ -206,13 +204,14 @@ func (s *fboSet) resize(ctx Backend, sizes []image.Point) {
 		waste := float32(sz.X*sz.Y) / float32(f.size.X*f.size.Y)
 		resize = resize || waste > 1.2
 		if resize {
-			if f.tex != nil {
+			if f.fbo != nil {
+				f.fbo.Release()
 				f.tex.Release()
 			}
 			f.size = sz
 			f.tex = ctx.NewTexture(TextureFormatFloat, sz.X, sz.Y, FilterNearest, FilterNearest,
 				BufferBindingTexture|BufferBindingFramebuffer)
-			f.fbo.BindTexture(f.tex)
+			f.fbo = ctx.NewFramebuffer(f.tex)
 		}
 	}
 	// Delete extra fbos.

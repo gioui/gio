@@ -162,9 +162,13 @@ func (b *Backend) IsTimeContinuous() bool {
 	return b.funcs.GetInteger(GPU_DISJOINT_EXT) == FALSE
 }
 
-func (b *Backend) NewFramebuffer() gpu.Framebuffer {
+func (b *Backend) NewFramebuffer(tex gpu.Texture) gpu.Framebuffer {
+	gltex := tex.(*gpuTexture)
 	fb := b.funcs.CreateFramebuffer()
-	return &gpuFramebuffer{funcs: b.funcs, obj: fb}
+	fbo := &gpuFramebuffer{funcs: b.funcs, obj: fb}
+	fbo.Bind()
+	b.funcs.FramebufferTexture2D(FRAMEBUFFER, COLOR_ATTACHMENT0, TEXTURE_2D, gltex.obj, 0)
+	return fbo
 }
 
 func (b *Backend) DefaultFramebuffer() gpu.Framebuffer {
@@ -550,12 +554,6 @@ func (f *gpuFramebuffer) Invalidate() {
 
 func (f *gpuFramebuffer) Release() {
 	f.funcs.DeleteFramebuffer(f.obj)
-}
-
-func (f *gpuFramebuffer) BindTexture(t gpu.Texture) {
-	gltex := t.(*gpuTexture)
-	f.Bind()
-	f.funcs.FramebufferTexture2D(FRAMEBUFFER, COLOR_ATTACHMENT0, TEXTURE_2D, gltex.obj, 0)
 }
 
 func toTexFilter(f gpu.TextureFilter) int {
