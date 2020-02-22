@@ -139,6 +139,7 @@ type Functions interface {
 	GetUniformLocation(p Program, name string) Uniform
 	InvalidateFramebuffer(target, attachment Enum)
 	LinkProgram(p Program)
+	ReadPixels(x, y, width, height int, format, ty Enum, data []byte)
 	RenderbufferStorage(target, internalformat Enum, width, height int)
 	ShaderSource(s Shader, src string)
 	TexImage2D(target Enum, level int, internalFormat int, width, height int, format, ty Enum, data []byte)

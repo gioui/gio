@@ -589,6 +589,16 @@ func (b *gpuBuffer) BindIndex() {
 	b.backend.funcs.BindBuffer(ELEMENT_ARRAY_BUFFER, b.obj)
 }
 
+func (f *gpuFramebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
+	glErr(f.funcs)
+	f.Bind()
+	if len(pixels) < src.Dx()*src.Dy() {
+		return errors.New("unexpected RGBA size")
+	}
+	f.funcs.ReadPixels(src.Min.X, src.Min.Y, src.Dx(), src.Dy(), RGBA, UNSIGNED_BYTE, pixels)
+	return glErr(f.funcs)
+}
+
 func (f *gpuFramebuffer) Bind() {
 	f.funcs.BindFramebuffer(FRAMEBUFFER, f.obj)
 }

@@ -127,6 +127,7 @@ type Framebuffer interface {
 	Bind()
 	Invalidate()
 	Release()
+	ReadPixels(src image.Rectangle, pixels []byte) error
 }
 
 type Timer interface {
