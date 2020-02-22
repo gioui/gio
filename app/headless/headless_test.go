@@ -18,6 +18,7 @@ func TestHeadless(t *testing.T) {
 	if err != nil {
 		t.Skipf("headless windows not supported: %v", err)
 	}
+	defer w.Release()
 
 	col := color.RGBA{A: 0xff, R: 0xcc, G: 0xcc}
 	var ops op.Ops
