@@ -56,9 +56,8 @@ type coverUniforms struct {
 }
 
 type stenciler struct {
-	ctx    Backend
-	defFBO Framebuffer
-	prog   struct {
+	ctx  Backend
+	prog struct {
 		prog     *program
 		uniforms struct {
 			vert struct {
@@ -138,7 +137,6 @@ func newCoverer(ctx Backend) *coverer {
 }
 
 func newStenciler(ctx Backend) *stenciler {
-	defFBO := ctx.DefaultFramebuffer()
 	// Allocate a suitably large index buffer for drawing paths.
 	indices := make([]uint16, pathBatchSize*6)
 	for i := 0; i < pathBatchSize; i++ {
@@ -173,7 +171,6 @@ func newStenciler(ctx Backend) *stenciler {
 	}
 	st := &stenciler{
 		ctx:      ctx,
-		defFBO:   defFBO,
 		indexBuf: indexBuf,
 	}
 	prog, err := ctx.NewProgram(shader_stencil_vert, shader_stencil_frag)
@@ -281,10 +278,6 @@ func (p *pather) begin(sizes []image.Point) {
 	p.stenciler.begin(sizes)
 }
 
-func (p *pather) end() {
-	p.stenciler.end()
-}
-
 func (p *pather) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.Point, data *pathData) {
 	p.stenciler.stencilPath(bounds, offset, uv, data)
 }
@@ -299,14 +292,9 @@ func (s *stenciler) beginIntersect(sizes []image.Point) {
 	s.ctx.BindProgram(s.iprog.prog.prog)
 }
 
-func (s *stenciler) endIntersect() {
-	s.ctx.BindFramebuffer(s.defFBO)
-}
-
 func (s *stenciler) invalidateFBO() {
 	s.intersections.invalidate(s.ctx)
 	s.fbos.invalidate(s.ctx)
-	s.ctx.BindFramebuffer(s.defFBO)
 }
 
 func (s *stenciler) cover(idx int) stencilFBO {
@@ -345,10 +333,6 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 		s.ctx.DrawElements(DrawModeTriangles, 0, batch*6)
 		start += batch
 	}
-}
-
-func (s *stenciler) end() {
-	s.ctx.BindFramebuffer(s.defFBO)
 }
 
 func (p *pather) cover(z float32, mat materialType, col [4]float32, scale, off, uvScale, uvOff, coverScale, coverOff f32.Point) {

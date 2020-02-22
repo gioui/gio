@@ -30,6 +30,7 @@ type GPU struct {
 	pathCache *opCache
 	cache     *resourceCache
 
+	defFBO                                            Framebuffer
 	profile                                           string
 	timers                                            *timers
 	frameStart                                        time.Time
@@ -275,7 +276,9 @@ const (
 )
 
 func New(ctx Backend) (*GPU, error) {
+	defFBO := ctx.CurrentFramebuffer()
 	g := &GPU{
+		defFBO:    defFBO,
 		pathCache: newOpCache(),
 		cache:     newResourceCache(),
 	}
@@ -332,6 +335,7 @@ func (g *GPU) BeginFrame() {
 	if g.drawOps.profile {
 		g.zopsTimer.begin()
 	}
+	g.ctx.BindFramebuffer(g.defFBO)
 	g.ctx.DepthFunc(DepthFuncGreater)
 	g.ctx.ClearColor(g.drawOps.clearColor[0], g.drawOps.clearColor[1], g.drawOps.clearColor[2], 1.0)
 	g.ctx.ClearDepth(0.0)
@@ -347,6 +351,7 @@ func (g *GPU) BeginFrame() {
 	g.renderer.intersect(g.drawOps.imageOps)
 	g.stencilTimer.end()
 	g.coverTimer.begin()
+	g.ctx.BindFramebuffer(g.defFBO)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.renderer.drawOps(g.drawOps.imageOps)
 	g.ctx.SetBlend(false)
@@ -502,7 +507,6 @@ func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
 		data, _ := pathCache.get(p.pathKey)
 		r.pather.stencilPath(p.clip, p.off, p.place.Pos, data.(*pathData))
 	}
-	r.pather.end()
 }
 
 func (r *renderer) intersect(ops []imageOp) {
@@ -526,7 +530,6 @@ func (r *renderer) intersect(ops []imageOp) {
 		r.ctx.Viewport(img.place.Pos.X, img.place.Pos.Y, img.clip.Dx(), img.clip.Dy())
 		r.intersectPath(img.path, img.clip)
 	}
-	r.pather.stenciler.endIntersect()
 }
 
 func (r *renderer) intersectPath(p *pathOp, clip image.Rectangle) {

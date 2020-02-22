@@ -15,8 +15,7 @@ import (
 
 // Backend implements gpu.Backend.
 type Backend struct {
-	funcs  Functions
-	defFBO *gpuFramebuffer
+	funcs Functions
 
 	state glstate
 
@@ -59,10 +58,11 @@ type gpuTexture struct {
 }
 
 type gpuFramebuffer struct {
-	backend *Backend
+	backend  *Backend
 	obj      Framebuffer
 	hasDepth bool
 	depthBuf Renderbuffer
+	foreign  bool
 }
 
 type gpuBuffer struct {
@@ -127,14 +127,12 @@ func NewBackend(f Functions) (*Backend, error) {
 	if err != nil {
 		return nil, err
 	}
-	defFBO := Framebuffer(f.GetBinding(FRAMEBUFFER_BINDING))
 	b := &Backend{
 		funcs:       f,
 		floatTriple: floatTriple,
 		alphaTriple: alphaTripleFor(ver),
 		srgbaTriple: srgbaTriple,
 	}
-	b.defFBO = &gpuFramebuffer{backend: b, obj: defFBO}
 	if hasExtension(exts, "GL_EXT_disjoint_timer_query_webgl2") || hasExtension(exts, "GL_EXT_disjoint_timer_query") {
 		b.feats.Features |= gpu.FeatureTimers
 	}
@@ -202,8 +200,9 @@ func (b *Backend) NewFramebuffer(tex gpu.Texture, depthBits int) (gpu.Framebuffe
 	return fbo, nil
 }
 
-func (b *Backend) DefaultFramebuffer() gpu.Framebuffer {
-	return b.defFBO
+func (b *Backend) CurrentFramebuffer() gpu.Framebuffer {
+	fboID := Framebuffer(b.funcs.GetBinding(FRAMEBUFFER_BINDING))
+	return &gpuFramebuffer{backend: b, obj: fboID, foreign: true}
 }
 
 func (b *Backend) NewTexture(format gpu.TextureFormat, width, height int, minFilter, magFilter gpu.TextureFilter, binding gpu.BufferBinding) (gpu.Texture, error) {
@@ -612,6 +611,9 @@ func (f *gpuFramebuffer) Invalidate() {
 }
 
 func (f *gpuFramebuffer) Release() {
+	if f.foreign {
+		panic("cannot release framebuffer created by CurrentFramebuffer")
+	}
 	f.backend.funcs.DeleteFramebuffer(f.obj)
 	if f.hasDepth {
 		f.backend.funcs.DeleteRenderbuffer(f.depthBuf)
