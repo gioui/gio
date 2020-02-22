@@ -489,7 +489,7 @@ func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
 		if fbo != p.place.Idx {
 			fbo = p.place.Idx
 			f := r.pather.stenciler.cover(fbo)
-			bindFramebuffer(f.fbo)
+			f.fbo.Bind()
 			r.ctx.Clear(BufferAttachmentColor)
 		}
 		data, _ := pathCache.get(p.pathKey)
@@ -513,7 +513,7 @@ func (r *renderer) intersect(ops []imageOp) {
 		if fbo != img.place.Idx {
 			fbo = img.place.Idx
 			f := r.pather.stenciler.intersections.fbos[fbo]
-			bindFramebuffer(f.fbo)
+			f.fbo.Bind()
 			r.ctx.Clear(BufferAttachmentColor)
 		}
 		r.ctx.Viewport(img.place.Pos.X, img.place.Pos.Y, img.clip.Dx(), img.clip.Dy())
@@ -988,13 +988,6 @@ func clipSpaceTransform(r image.Rectangle, viewport image.Point) (f32.Point, f32
 	scale := f32.Point{X: w * .5, Y: h * .5}
 	offset := f32.Point{X: x + w*.5, Y: y - h*.5}
 	return scale, offset
-}
-
-func bindFramebuffer(fbo Framebuffer) {
-	fbo.Bind()
-	if err := fbo.IsComplete(); err != nil {
-		panic(fmt.Errorf("AA FBO not complete: %v", err))
-	}
 }
 
 // Fill in maximal Y coordinates of the NW and NE corners.

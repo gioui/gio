@@ -139,7 +139,7 @@ func NewBackend(f Functions) (*Backend, error) {
 }
 
 func (b *Backend) BeginFrame() {
-	// Assume GL state is reset.
+	// Assume GL state is reset between frames.
 	b.state = glstate{}
 }
 
@@ -162,13 +162,17 @@ func (b *Backend) IsTimeContinuous() bool {
 	return b.funcs.GetInteger(GPU_DISJOINT_EXT) == FALSE
 }
 
-func (b *Backend) NewFramebuffer(tex gpu.Texture) gpu.Framebuffer {
+func (b *Backend) NewFramebuffer(tex gpu.Texture) (gpu.Framebuffer, error) {
 	gltex := tex.(*gpuTexture)
 	fb := b.funcs.CreateFramebuffer()
 	fbo := &gpuFramebuffer{funcs: b.funcs, obj: fb}
 	fbo.Bind()
 	b.funcs.FramebufferTexture2D(FRAMEBUFFER, COLOR_ATTACHMENT0, TEXTURE_2D, gltex.obj, 0)
-	return fbo
+	if st := b.funcs.CheckFramebufferStatus(FRAMEBUFFER); st != FRAMEBUFFER_COMPLETE {
+		fbo.Release()
+		return nil, fmt.Errorf("incomplete framebuffer, status = 0x%x, err = %d", st, b.funcs.GetError())
+	}
+	return fbo, nil
 }
 
 func (b *Backend) DefaultFramebuffer() gpu.Framebuffer {
@@ -534,13 +538,6 @@ func (b *gpuBuffer) BindIndex() {
 		panic("not an index buffer")
 	}
 	b.backend.funcs.BindBuffer(ELEMENT_ARRAY_BUFFER, b.obj)
-}
-
-func (f *gpuFramebuffer) IsComplete() error {
-	if st := f.funcs.CheckFramebufferStatus(FRAMEBUFFER); st != FRAMEBUFFER_COMPLETE {
-		return fmt.Errorf("incomplete framebuffer, status = 0x%x, err = %d", st, f.funcs.GetError())
-	}
-	return nil
 }
 
 func (f *gpuFramebuffer) Bind() {

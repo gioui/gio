@@ -211,7 +211,11 @@ func (s *fboSet) resize(ctx Backend, sizes []image.Point) {
 			f.size = sz
 			f.tex = ctx.NewTexture(TextureFormatFloat, sz.X, sz.Y, FilterNearest, FilterNearest,
 				BufferBindingTexture|BufferBindingFramebuffer)
-			f.fbo = ctx.NewFramebuffer(f.tex)
+			fbo, err := ctx.NewFramebuffer(f.tex)
+			if err != nil {
+				panic(err)
+			}
+			f.fbo = fbo
 		}
 	}
 	// Delete extra fbos.
