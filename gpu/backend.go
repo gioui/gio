@@ -18,11 +18,11 @@ type Backend interface {
 	// IsContinuousTime reports whether all timer measurements
 	// are valid at the point of call.
 	IsTimeContinuous() bool
-	NewTexture(format TextureFormat, width, height int, minFilter, magFilter TextureFilter, bindings BufferBinding) Texture
+	NewTexture(format TextureFormat, width, height int, minFilter, magFilter TextureFilter, bindings BufferBinding) (Texture, error)
 	DefaultFramebuffer() Framebuffer
 	NewFramebuffer(tex Texture) (Framebuffer, error)
-	NewImmutableBuffer(typ BufferBinding, data []byte) Buffer
-	NewBuffer(typ BufferBinding, size int) Buffer
+	NewImmutableBuffer(typ BufferBinding, data []byte) (Buffer, error)
+	NewBuffer(typ BufferBinding, size int) (Buffer, error)
 	NewProgram(vertexShader, fragmentShader ShaderSources) (Program, error)
 	NewInputLayout(vertexShader ShaderSources, layout []InputDesc) (InputLayout, error)
 

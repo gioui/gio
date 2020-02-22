@@ -378,8 +378,12 @@ func (r *renderer) texHandle(t *texture) Texture {
 	if t.tex != nil {
 		return t.tex
 	}
-	t.tex = r.ctx.NewTexture(TextureFormatSRGB, t.src.Bounds().Dx(), t.src.Bounds().Dy(), FilterLinear, FilterLinear, BufferBindingTexture)
-	t.tex.Upload(t.src)
+	tex, err := r.ctx.NewTexture(TextureFormatSRGB, t.src.Bounds().Dx(), t.src.Bounds().Dy(), FilterLinear, FilterLinear, BufferBindingTexture)
+	if err != nil {
+		panic(err)
+	}
+	tex.Upload(t.src)
+	t.tex = tex
 	return t.tex
 }
 
@@ -406,7 +410,7 @@ func (r *renderer) release() {
 }
 
 func newBlitter(ctx Backend) *blitter {
-	quadVerts := ctx.NewImmutableBuffer(BufferBindingVertices,
+	quadVerts, err := ctx.NewImmutableBuffer(BufferBindingVertices,
 		gunsafe.BytesView([]float32{
 			-1, +1, 0, 0,
 			+1, +1, 1, 0,
@@ -414,6 +418,9 @@ func newBlitter(ctx Backend) *blitter {
 			+1, -1, 1, 1,
 		}),
 	)
+	if err != nil {
+		panic(err)
+	}
 	b := &blitter{
 		ctx:       ctx,
 		quadVerts: quadVerts,
@@ -913,7 +920,10 @@ func newUniformBuffer(b Backend, uniformBlock interface{}) *uniformBuffer {
 	size := ref.Elem().Type().Size()
 	// Map the uniforms structure as a byte slice.
 	ptr := (*[1 << 30]byte)(unsafe.Pointer(ref.Pointer()))[:size:size]
-	ubuf := b.NewBuffer(BufferBindingUniforms, len(ptr))
+	ubuf, err := b.NewBuffer(BufferBindingUniforms, len(ptr))
+	if err != nil {
+		panic(err)
+	}
 	return &uniformBuffer{buf: ubuf, ptr: ptr}
 }
 

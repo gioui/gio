@@ -150,7 +150,10 @@ func newStenciler(ctx Backend) *stenciler {
 		indices[i*6+4] = i*4 + 1
 		indices[i*6+5] = i*4 + 3
 	}
-	indexBuf := ctx.NewImmutableBuffer(BufferBindingIndices, gunsafe.BytesView(indices))
+	indexBuf, err := ctx.NewImmutableBuffer(BufferBindingIndices, gunsafe.BytesView(indices))
+	if err != nil {
+		panic(err)
+	}
 	progLayout, err := ctx.NewInputLayout(shader_stencil_vert, []InputDesc{
 		{Type: DataTypeShort, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).CornerX))},
 		{Type: DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).MaxY))},
@@ -208,13 +211,14 @@ func (s *fboSet) resize(ctx Backend, sizes []image.Point) {
 				f.fbo.Release()
 				f.tex.Release()
 			}
-			f.size = sz
-			f.tex = ctx.NewTexture(TextureFormatFloat, sz.X, sz.Y, FilterNearest, FilterNearest,
+			tex, err := ctx.NewTexture(TextureFormatFloat, sz.X, sz.Y, FilterNearest, FilterNearest,
 				BufferBindingTexture|BufferBindingFramebuffer)
-			fbo, err := ctx.NewFramebuffer(f.tex)
+			fbo, err := ctx.NewFramebuffer(tex)
 			if err != nil {
 				panic(err)
 			}
+			f.size = sz
+			f.tex = tex
 			f.fbo = fbo
 		}
 	}
@@ -259,7 +263,10 @@ func (c *coverer) release() {
 }
 
 func buildPath(ctx Backend, p []byte) *pathData {
-	buf := ctx.NewImmutableBuffer(BufferBindingVertices, p)
+	buf, err := ctx.NewImmutableBuffer(BufferBindingVertices, p)
+	if err != nil {
+		panic(err)
+	}
 	return &pathData{
 		ncurves: len(p) / path.VertStride,
 		data:    buf,

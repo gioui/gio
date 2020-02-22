@@ -163,10 +163,15 @@ func (b *Backend) IsTimeContinuous() bool {
 }
 
 func (b *Backend) NewFramebuffer(tex gpu.Texture) (gpu.Framebuffer, error) {
+	glErr(b.funcs)
 	gltex := tex.(*gpuTexture)
 	fb := b.funcs.CreateFramebuffer()
 	fbo := &gpuFramebuffer{funcs: b.funcs, obj: fb}
 	fbo.Bind()
+	if err := glErr(b.funcs); err != nil {
+		fbo.Release()
+		return nil, err
+	}
 	b.funcs.FramebufferTexture2D(FRAMEBUFFER, COLOR_ATTACHMENT0, TEXTURE_2D, gltex.obj, 0)
 	if st := b.funcs.CheckFramebufferStatus(FRAMEBUFFER); st != FRAMEBUFFER_COMPLETE {
 		fbo.Release()
@@ -179,7 +184,8 @@ func (b *Backend) DefaultFramebuffer() gpu.Framebuffer {
 	return b.defFBO
 }
 
-func (b *Backend) NewTexture(format gpu.TextureFormat, width, height int, minFilter, magFilter gpu.TextureFilter, binding gpu.BufferBinding) gpu.Texture {
+func (b *Backend) NewTexture(format gpu.TextureFormat, width, height int, minFilter, magFilter gpu.TextureFilter, binding gpu.BufferBinding) (gpu.Texture, error) {
+	glErr(b.funcs)
 	tex := &gpuTexture{backend: b, obj: b.funcs.CreateTexture()}
 	switch format {
 	case gpu.TextureFormatFloat:
@@ -187,7 +193,7 @@ func (b *Backend) NewTexture(format gpu.TextureFormat, width, height int, minFil
 	case gpu.TextureFormatSRGB:
 		tex.triple = b.srgbaTriple
 	default:
-		panic("unsupported texture format")
+		return nil, errors.New("unsupported texture format")
 	}
 	tex.Bind(0)
 	b.funcs.TexParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, toTexFilter(magFilter))
@@ -195,30 +201,51 @@ func (b *Backend) NewTexture(format gpu.TextureFormat, width, height int, minFil
 	b.funcs.TexParameteri(TEXTURE_2D, TEXTURE_WRAP_S, CLAMP_TO_EDGE)
 	b.funcs.TexParameteri(TEXTURE_2D, TEXTURE_WRAP_T, CLAMP_TO_EDGE)
 	b.funcs.TexImage2D(TEXTURE_2D, 0, tex.triple.internalFormat, width, height, tex.triple.format, tex.triple.typ, nil)
-	return tex
+	if err := glErr(b.funcs); err != nil {
+		tex.Release()
+		return nil, err
+	}
+	return tex, nil
 }
 
-func (b *Backend) NewBuffer(typ gpu.BufferBinding, size int) gpu.Buffer {
+func (b *Backend) NewBuffer(typ gpu.BufferBinding, size int) (gpu.Buffer, error) {
+	glErr(b.funcs)
 	buf := &gpuBuffer{backend: b, typ: typ, size: size}
 	if typ&gpu.BufferBindingUniforms != 0 {
 		if typ != gpu.BufferBindingUniforms {
-			panic("uniforms buffers cannot be bound as anything else")
+			return nil, errors.New("uniforms buffers cannot be bound as anything else")
 		}
 		// GLES 2 doesn't support uniform buffers.
 		buf.data = make([]byte, size)
 	}
 	if typ&^gpu.BufferBindingUniforms != 0 {
 		buf.obj = b.funcs.CreateBuffer()
+		if err := glErr(b.funcs); err != nil {
+			buf.Release()
+			return nil, err
+		}
 	}
-	return buf
+	return buf, nil
 }
 
-func (b *Backend) NewImmutableBuffer(typ gpu.BufferBinding, data []byte) gpu.Buffer {
+func (b *Backend) NewImmutableBuffer(typ gpu.BufferBinding, data []byte) (gpu.Buffer, error) {
+	glErr(b.funcs)
 	obj := b.funcs.CreateBuffer()
 	buf := &gpuBuffer{backend: b, obj: obj, typ: typ, size: len(data)}
 	buf.Upload(data)
 	buf.immutable = true
-	return buf
+	if err := glErr(b.funcs); err != nil {
+		buf.Release()
+		return nil, err
+	}
+	return buf, nil
+}
+
+func glErr(f Functions) error {
+	if st := f.GetError(); st != NO_ERROR {
+		return fmt.Errorf("glGetError: %#x", st)
+	}
+	return nil
 }
 
 func (b *Backend) bindTexture(unit int, t *gpuTexture) {
