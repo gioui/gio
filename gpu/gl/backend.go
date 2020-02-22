@@ -59,7 +59,7 @@ type gpuTexture struct {
 }
 
 type gpuFramebuffer struct {
-	funcs    Functions
+	backend *Backend
 	obj      Framebuffer
 	hasDepth bool
 	depthBuf Renderbuffer
@@ -129,12 +129,12 @@ func NewBackend(f Functions) (*Backend, error) {
 	}
 	defFBO := Framebuffer(f.GetBinding(FRAMEBUFFER_BINDING))
 	b := &Backend{
-		defFBO:      &gpuFramebuffer{funcs: f, obj: defFBO},
 		funcs:       f,
 		floatTriple: floatTriple,
 		alphaTriple: alphaTripleFor(ver),
 		srgbaTriple: srgbaTriple,
 	}
+	b.defFBO = &gpuFramebuffer{backend: b, obj: defFBO}
 	if hasExtension(exts, "GL_EXT_disjoint_timer_query_webgl2") || hasExtension(exts, "GL_EXT_disjoint_timer_query") {
 		b.feats.Features |= gpu.FeatureTimers
 	}
@@ -170,8 +170,8 @@ func (b *Backend) NewFramebuffer(tex gpu.Texture, depthBits int) (gpu.Framebuffe
 	glErr(b.funcs)
 	gltex := tex.(*gpuTexture)
 	fb := b.funcs.CreateFramebuffer()
-	fbo := &gpuFramebuffer{funcs: b.funcs, obj: fb}
-	fbo.Bind()
+	fbo := &gpuFramebuffer{backend: b, obj: fb}
+	b.BindFramebuffer(fbo)
 	if err := glErr(b.funcs); err != nil {
 		fbo.Release()
 		return nil, err
@@ -217,7 +217,7 @@ func (b *Backend) NewTexture(format gpu.TextureFormat, width, height int, minFil
 	default:
 		return nil, errors.New("unsupported texture format")
 	}
-	tex.Bind(0)
+	b.BindTexture(0, tex)
 	b.funcs.TexParameteri(TEXTURE_2D, TEXTURE_MAG_FILTER, toTexFilter(magFilter))
 	b.funcs.TexParameteri(TEXTURE_2D, TEXTURE_MIN_FILTER, toTexFilter(minFilter))
 	b.funcs.TexParameteri(TEXTURE_2D, TEXTURE_WRAP_S, CLAMP_TO_EDGE)
@@ -430,7 +430,7 @@ func (b *Backend) NewProgram(vssrc, fssrc gpu.ShaderSources) (gpu.Program, error
 		obj:     p,
 		nattr:   len(attr),
 	}
-	gpuProg.Bind()
+	b.BindProgram(gpuProg)
 	// Bind texture uniforms.
 	for _, tex := range vssrc.Textures {
 		u := b.funcs.GetUniformLocation(p, tex.Name)
@@ -467,9 +467,10 @@ func (p *gpuProgram) updateUniforms() {
 	p.fragUniforms.update(p.backend.funcs)
 }
 
-func (p *gpuProgram) Bind() {
-	p.backend.useProgram(p)
-	p.backend.enableVertexArrays(p.nattr)
+func (b *Backend) BindProgram(prog gpu.Program) {
+	p := prog.(*gpuProgram)
+	b.useProgram(p)
+	b.enableVertexArrays(p.nattr)
 }
 
 func (p *gpuProgram) Release() {
@@ -553,11 +554,12 @@ func (b *gpuBuffer) Release() {
 	}
 }
 
-func (b *gpuBuffer) BindVertex(stride, offset int) {
-	if b.typ&gpu.BufferBindingVertices == 0 {
+func (b *Backend) BindVertexBuffer(buf gpu.Buffer, stride, offset int) {
+	gbuf := buf.(*gpuBuffer)
+	if gbuf.typ&gpu.BufferBindingVertices == 0 {
 		panic("not a vertex buffer")
 	}
-	b.backend.state.buffer = bufferBinding{buf: b, stride: stride, offset: offset}
+	b.state.buffer = bufferBinding{buf: gbuf, stride: stride, offset: offset}
 }
 
 func (b *Backend) setupVertexArrays() {
@@ -582,36 +584,37 @@ func (b *Backend) setupVertexArrays() {
 	}
 }
 
-func (b *gpuBuffer) BindIndex() {
-	if b.typ&gpu.BufferBindingIndices == 0 {
+func (b *Backend) BindIndexBuffer(buf gpu.Buffer) {
+	gbuf := buf.(*gpuBuffer)
+	if gbuf.typ&gpu.BufferBindingIndices == 0 {
 		panic("not an index buffer")
 	}
-	b.backend.funcs.BindBuffer(ELEMENT_ARRAY_BUFFER, b.obj)
+	b.funcs.BindBuffer(ELEMENT_ARRAY_BUFFER, gbuf.obj)
 }
 
 func (f *gpuFramebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
-	glErr(f.funcs)
-	f.Bind()
+	glErr(f.backend.funcs)
+	f.backend.BindFramebuffer(f)
 	if len(pixels) < src.Dx()*src.Dy() {
 		return errors.New("unexpected RGBA size")
 	}
-	f.funcs.ReadPixels(src.Min.X, src.Min.Y, src.Dx(), src.Dy(), RGBA, UNSIGNED_BYTE, pixels)
-	return glErr(f.funcs)
+	f.backend.funcs.ReadPixels(src.Min.X, src.Min.Y, src.Dx(), src.Dy(), RGBA, UNSIGNED_BYTE, pixels)
+	return glErr(f.backend.funcs)
 }
 
-func (f *gpuFramebuffer) Bind() {
-	f.funcs.BindFramebuffer(FRAMEBUFFER, f.obj)
+func (b *Backend) BindFramebuffer(fbo gpu.Framebuffer) {
+	b.funcs.BindFramebuffer(FRAMEBUFFER, fbo.(*gpuFramebuffer).obj)
 }
 
 func (f *gpuFramebuffer) Invalidate() {
-	f.Bind()
-	f.funcs.InvalidateFramebuffer(FRAMEBUFFER, COLOR_ATTACHMENT0)
+	f.backend.BindFramebuffer(f)
+	f.backend.funcs.InvalidateFramebuffer(FRAMEBUFFER, COLOR_ATTACHMENT0)
 }
 
 func (f *gpuFramebuffer) Release() {
-	f.funcs.DeleteFramebuffer(f.obj)
+	f.backend.funcs.DeleteFramebuffer(f.obj)
 	if f.hasDepth {
-		f.funcs.DeleteRenderbuffer(f.depthBuf)
+		f.backend.funcs.DeleteRenderbuffer(f.depthBuf)
 	}
 }
 
@@ -626,8 +629,8 @@ func toTexFilter(f gpu.TextureFilter) int {
 	}
 }
 
-func (t *gpuTexture) Bind(unit int) {
-	t.backend.bindTexture(unit, t)
+func (b *Backend) BindTexture(unit int, t gpu.Texture) {
+	b.bindTexture(unit, t.(*gpuTexture))
 }
 
 func (t *gpuTexture) Release() {
@@ -635,7 +638,7 @@ func (t *gpuTexture) Release() {
 }
 
 func (t *gpuTexture) Upload(img *image.RGBA) {
-	t.Bind(0)
+	t.backend.BindTexture(0, t)
 	var pixels []byte
 	b := img.Bounds()
 	w, h := b.Dx(), b.Dy()
@@ -672,8 +675,8 @@ func (t *gpuTimer) Duration() (time.Duration, bool) {
 	return time.Duration(nanos), true
 }
 
-func (l *gpuInputLayout) Bind() {
-	l.backend.state.layout = l
+func (b *Backend) BindInputLayout(l gpu.InputLayout) {
+	b.state.layout = l.(*gpuInputLayout)
 }
 
 func (l *gpuInputLayout) Release() {}

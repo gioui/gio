@@ -59,7 +59,7 @@ func NewWindow(width, height int) (*Window, error) {
 			fboTex.Release()
 			return err
 		}
-		fbo.Bind()
+		backend.BindFramebuffer(fbo)
 		gp, err := gpu.New(backend)
 		if err != nil {
 			fbo.Release()

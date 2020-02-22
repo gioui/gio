@@ -296,17 +296,17 @@ func (s *stenciler) beginIntersect(sizes []image.Point) {
 	// no floating point support is available.
 	s.intersections.resize(s.ctx, sizes)
 	s.ctx.ClearColor(1.0, 0.0, 0.0, 0.0)
-	s.iprog.prog.prog.Bind()
+	s.ctx.BindProgram(s.iprog.prog.prog)
 }
 
 func (s *stenciler) endIntersect() {
-	s.defFBO.Bind()
+	s.ctx.BindFramebuffer(s.defFBO)
 }
 
 func (s *stenciler) invalidateFBO() {
 	s.intersections.invalidate(s.ctx)
 	s.fbos.invalidate(s.ctx)
-	s.defFBO.Bind()
+	s.ctx.BindFramebuffer(s.defFBO)
 }
 
 func (s *stenciler) cover(idx int) stencilFBO {
@@ -317,9 +317,9 @@ func (s *stenciler) begin(sizes []image.Point) {
 	s.ctx.BlendFunc(BlendFactorOne, BlendFactorOne)
 	s.fbos.resize(s.ctx, sizes)
 	s.ctx.ClearColor(0.0, 0.0, 0.0, 0.0)
-	s.prog.prog.prog.Bind()
-	s.prog.layout.Bind()
-	s.indexBuf.BindIndex()
+	s.ctx.BindProgram(s.prog.prog.prog)
+	s.ctx.BindInputLayout(s.prog.layout)
+	s.ctx.BindIndexBuffer(s.indexBuf)
 }
 
 func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.Point, data *pathData) {
@@ -341,14 +341,14 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 			batch = max
 		}
 		off := path.VertStride * start * 4
-		data.data.BindVertex(path.VertStride, off)
+		s.ctx.BindVertexBuffer(data.data, path.VertStride, off)
 		s.ctx.DrawElements(DrawModeTriangles, 0, batch*6)
 		start += batch
 	}
 }
 
 func (s *stenciler) end() {
-	s.defFBO.Bind()
+	s.ctx.BindFramebuffer(s.defFBO)
 }
 
 func (p *pather) cover(z float32, mat materialType, col [4]float32, scale, off, uvScale, uvOff, coverScale, coverOff f32.Point) {
@@ -357,7 +357,7 @@ func (p *pather) cover(z float32, mat materialType, col [4]float32, scale, off, 
 
 func (c *coverer) cover(z float32, mat materialType, col [4]float32, scale, off, uvScale, uvOff, coverScale, coverOff f32.Point) {
 	p := c.prog[mat]
-	p.prog.Bind()
+	c.ctx.BindProgram(p.prog)
 	var uniforms *coverUniforms
 	switch mat {
 	case materialColor:

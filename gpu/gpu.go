@@ -496,7 +496,7 @@ func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
 		if fbo != p.place.Idx {
 			fbo = p.place.Idx
 			f := r.pather.stenciler.cover(fbo)
-			f.fbo.Bind()
+			r.ctx.BindFramebuffer(f.fbo)
 			r.ctx.Clear(BufferAttachmentColor)
 		}
 		data, _ := pathCache.get(p.pathKey)
@@ -511,8 +511,8 @@ func (r *renderer) intersect(ops []imageOp) {
 	}
 	fbo := -1
 	r.pather.stenciler.beginIntersect(r.intersections.sizes)
-	r.blitter.quadVerts.BindVertex(4*4, 0)
-	r.pather.stenciler.iprog.layout.Bind()
+	r.ctx.BindVertexBuffer(r.blitter.quadVerts, 4*4, 0)
+	r.ctx.BindInputLayout(r.pather.stenciler.iprog.layout)
 	for _, img := range ops {
 		if img.clipType != clipTypeIntersection {
 			continue
@@ -520,7 +520,7 @@ func (r *renderer) intersect(ops []imageOp) {
 		if fbo != img.place.Idx {
 			fbo = img.place.Idx
 			f := r.pather.stenciler.intersections.fbos[fbo]
-			f.fbo.Bind()
+			r.ctx.BindFramebuffer(f.fbo)
 			r.ctx.Clear(BufferAttachmentColor)
 		}
 		r.ctx.Viewport(img.place.Pos.X, img.place.Pos.Y, img.clip.Dx(), img.clip.Dy())
@@ -542,7 +542,7 @@ func (r *renderer) intersectPath(p *pathOp, clip image.Rectangle) {
 		Max: o.Add(clip.Size()),
 	}
 	fbo := r.pather.stenciler.cover(p.place.Idx)
-	fbo.tex.Bind(0)
+	r.ctx.BindTexture(0, fbo.tex)
 	coverScale, coverOff := texSpaceTransform(toRectF(uv), fbo.size)
 	r.pather.stenciler.iprog.uniforms.vert.uvScale = [2]float32{coverScale.X, coverScale.Y}
 	r.pather.stenciler.iprog.uniforms.vert.uvOffset = [2]float32{coverOff.X, coverOff.Y}
@@ -819,15 +819,15 @@ func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f3
 
 func (r *renderer) drawZOps(ops []imageOp) {
 	r.ctx.SetDepthTest(true)
-	r.blitter.quadVerts.BindVertex(4*4, 0)
-	r.blitter.layout.Bind()
+	r.ctx.BindVertexBuffer(r.blitter.quadVerts, 4*4, 0)
+	r.ctx.BindInputLayout(r.blitter.layout)
 	// Render front to back.
 	for i := len(ops) - 1; i >= 0; i-- {
 		img := ops[i]
 		m := img.material
 		switch m.material {
 		case materialTexture:
-			r.texHandle(m.texture).Bind(0)
+			r.ctx.BindTexture(0, r.texHandle(m.texture))
 		}
 		drc := img.clip
 		scale, off := clipSpaceTransform(drc, r.blitter.viewport)
@@ -840,14 +840,14 @@ func (r *renderer) drawOps(ops []imageOp) {
 	r.ctx.SetDepthTest(true)
 	r.ctx.DepthMask(false)
 	r.ctx.BlendFunc(BlendFactorOne, BlendFactorOneMinusSrcAlpha)
-	r.blitter.quadVerts.BindVertex(4*4, 0)
-	r.pather.coverer.layout.Bind()
+	r.ctx.BindVertexBuffer(r.blitter.quadVerts, 4*4, 0)
+	r.ctx.BindInputLayout(r.pather.coverer.layout)
 	var coverTex Texture
 	for _, img := range ops {
 		m := img.material
 		switch m.material {
 		case materialTexture:
-			r.texHandle(m.texture).Bind(0)
+			r.ctx.BindTexture(0, r.texHandle(m.texture))
 		}
 		drc := img.clip
 		scale, off := clipSpaceTransform(drc, r.blitter.viewport)
@@ -863,7 +863,7 @@ func (r *renderer) drawOps(ops []imageOp) {
 		}
 		if coverTex != fbo.tex {
 			coverTex = fbo.tex
-			coverTex.Bind(1)
+			r.ctx.BindTexture(1, coverTex)
 		}
 		uv := image.Rectangle{
 			Min: img.place.Pos,
@@ -894,7 +894,7 @@ func gamma(r, g, b, a uint32) [4]float32 {
 
 func (b *blitter) blit(z float32, mat materialType, col [4]float32, scale, off, uvScale, uvOff f32.Point) {
 	p := b.prog[mat]
-	p.prog.Bind()
+	b.ctx.BindProgram(p.prog)
 	var uniforms *blitUniforms
 	switch mat {
 	case materialColor:

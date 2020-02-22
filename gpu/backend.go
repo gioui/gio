@@ -37,6 +37,13 @@ type Backend interface {
 	SetDepthTest(enable bool)
 	DepthMask(mask bool)
 	BlendFunc(sfactor, dfactor BlendFactor)
+
+	BindInputLayout(i InputLayout)
+	BindProgram(p Program)
+	BindFramebuffer(f Framebuffer)
+	BindTexture(unit int, t Texture)
+	BindVertexBuffer(b Buffer, stride, offset int)
+	BindIndexBuffer(b Buffer)
 }
 
 type ShaderSources struct {
@@ -83,7 +90,6 @@ type InputDesc struct {
 // InputLayout is the backend specific representation of the mapping
 // between Buffers and shader attributes.
 type InputLayout interface {
-	Bind()
 	Release()
 }
 
@@ -110,21 +116,17 @@ type Caps struct {
 }
 
 type Program interface {
-	Bind()
 	Release()
 	SetVertexUniforms(buf Buffer)
 	SetFragmentUniforms(buf Buffer)
 }
 
 type Buffer interface {
-	BindVertex(stride, offset int)
-	BindIndex()
 	Release()
 	Upload(data []byte)
 }
 
 type Framebuffer interface {
-	Bind()
 	Invalidate()
 	Release()
 	ReadPixels(src image.Rectangle, pixels []byte) error
@@ -140,7 +142,6 @@ type Timer interface {
 type Texture interface {
 	Upload(img *image.RGBA)
 	Release()
-	Bind(unit int)
 }
 
 const (
