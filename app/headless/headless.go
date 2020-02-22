@@ -14,13 +14,15 @@ import (
 
 // Window is a headless window.
 type Window struct {
-	size image.Point
-	ctx  backend
-	gpu  *gpu.GPU
+	size    image.Point
+	ctx     backend
+	backend gpu.Backend
+	gpu     *gpu.GPU
+	fboTex  gpu.Texture
+	fbo     gpu.Framebuffer
 }
 
 type backend interface {
-	Screenshot(width, height int, pixels []byte) error
 	Backend() (gpu.Backend, error)
 	MakeCurrent() error
 	ReleaseCurrent()
@@ -40,18 +42,38 @@ func NewWindow(width, height int) (*Window, error) {
 	err = contextDo(ctx, func() error {
 		backend, err := ctx.Backend()
 		if err != nil {
-			ctx.Release()
 			return err
 		}
-		gpu, err := gpu.New(backend)
+		fboTex, err := backend.NewTexture(
+			gpu.TextureFormatSRGB,
+			width, height,
+			gpu.FilterNearest, gpu.FilterNearest,
+			gpu.BufferBindingFramebuffer,
+		)
 		if err != nil {
-			ctx.Release()
+			return nil
+		}
+		const depthBits = 16
+		fbo, err := backend.NewFramebuffer(fboTex, depthBits)
+		if err != nil {
+			fboTex.Release()
 			return err
 		}
-		w.gpu = gpu
+		fbo.Bind()
+		gp, err := gpu.New(backend)
+		if err != nil {
+			fbo.Release()
+			fboTex.Release()
+			return err
+		}
+		w.fboTex = fboTex
+		w.fbo = fbo
+		w.gpu = gp
+		w.backend = backend
 		return err
 	})
 	if err != nil {
+		ctx.Release()
 		return nil, err
 	}
 	return w, nil
@@ -60,6 +82,14 @@ func NewWindow(width, height int) (*Window, error) {
 // Release resources associated with the window.
 func (w *Window) Release() {
 	contextDo(w.ctx, func() error {
+		if w.fbo != nil {
+			w.fbo.Release()
+			w.fbo = nil
+		}
+		if w.fboTex != nil {
+			w.fboTex.Release()
+			w.fboTex = nil
+		}
 		if w.gpu != nil {
 			w.gpu.Release()
 			w.gpu = nil
@@ -87,7 +117,10 @@ func (w *Window) Frame(frame *op.Ops) {
 func (w *Window) Screenshot() (*image.RGBA, error) {
 	img := image.NewRGBA(image.Rectangle{Max: w.size})
 	contextDo(w.ctx, func() error {
-		return w.ctx.Screenshot(w.size.X, w.size.Y, img.Pix)
+		return w.fbo.ReadPixels(
+			image.Rectangle{
+				Max: image.Point{X: w.size.X, Y: w.size.Y},
+			}, img.Pix)
 	})
 	// Flip image in y-direction. OpenGL's origin is in the lower
 	// left corner.
