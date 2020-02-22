@@ -54,11 +54,15 @@ type gpuTexture struct {
 	backend *Backend
 	obj     Texture
 	triple  textureTriple
+	width   int
+	height  int
 }
 
 type gpuFramebuffer struct {
-	funcs Functions
-	obj   Framebuffer
+	funcs    Functions
+	obj      Framebuffer
+	hasDepth bool
+	depthBuf Renderbuffer
 }
 
 type gpuBuffer struct {
@@ -162,7 +166,7 @@ func (b *Backend) IsTimeContinuous() bool {
 	return b.funcs.GetInteger(GPU_DISJOINT_EXT) == FALSE
 }
 
-func (b *Backend) NewFramebuffer(tex gpu.Texture) (gpu.Framebuffer, error) {
+func (b *Backend) NewFramebuffer(tex gpu.Texture, depthBits int) (gpu.Framebuffer, error) {
 	glErr(b.funcs)
 	gltex := tex.(*gpuTexture)
 	fb := b.funcs.CreateFramebuffer()
@@ -173,6 +177,24 @@ func (b *Backend) NewFramebuffer(tex gpu.Texture) (gpu.Framebuffer, error) {
 		return nil, err
 	}
 	b.funcs.FramebufferTexture2D(FRAMEBUFFER, COLOR_ATTACHMENT0, TEXTURE_2D, gltex.obj, 0)
+	if depthBits > 0 {
+		size := Enum(DEPTH_COMPONENT16)
+		switch {
+		case depthBits > 24:
+			size = DEPTH_COMPONENT32F
+		case depthBits > 16:
+			size = DEPTH_COMPONENT24
+		}
+		depthBuf := b.funcs.CreateRenderbuffer()
+		b.funcs.BindRenderbuffer(RENDERBUFFER, depthBuf)
+		b.funcs.RenderbufferStorage(RENDERBUFFER, size, gltex.width, gltex.height)
+		fbo.depthBuf = depthBuf
+		fbo.hasDepth = true
+		if err := glErr(b.funcs); err != nil {
+			fbo.Release()
+			return nil, err
+		}
+	}
 	if st := b.funcs.CheckFramebufferStatus(FRAMEBUFFER); st != FRAMEBUFFER_COMPLETE {
 		fbo.Release()
 		return nil, fmt.Errorf("incomplete framebuffer, status = 0x%x, err = %d", st, b.funcs.GetError())
@@ -186,7 +208,7 @@ func (b *Backend) DefaultFramebuffer() gpu.Framebuffer {
 
 func (b *Backend) NewTexture(format gpu.TextureFormat, width, height int, minFilter, magFilter gpu.TextureFilter, binding gpu.BufferBinding) (gpu.Texture, error) {
 	glErr(b.funcs)
-	tex := &gpuTexture{backend: b, obj: b.funcs.CreateTexture()}
+	tex := &gpuTexture{backend: b, obj: b.funcs.CreateTexture(), width: width, height: height}
 	switch format {
 	case gpu.TextureFormatFloat:
 		tex.triple = b.floatTriple
@@ -578,6 +600,9 @@ func (f *gpuFramebuffer) Invalidate() {
 
 func (f *gpuFramebuffer) Release() {
 	f.funcs.DeleteFramebuffer(f.obj)
+	if f.hasDepth {
+		f.funcs.DeleteRenderbuffer(f.depthBuf)
+	}
 }
 
 func toTexFilter(f gpu.TextureFilter) int {

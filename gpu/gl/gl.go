@@ -17,6 +17,8 @@ const (
 	DEPTH_BUFFER_BIT                      = 0x100
 	DEPTH_ATTACHMENT                      = 0x8d00
 	DEPTH_COMPONENT16                     = 0x81a5
+	DEPTH_COMPONENT24                     = 0x81A6
+	DEPTH_COMPONENT32F                    = 0x8CAC
 	DEPTH_TEST                            = 0xb71
 	DST_COLOR                             = 0x306
 	ELEMENT_ARRAY_BUFFER                  = 0x8893
@@ -91,6 +93,7 @@ type Functions interface {
 	BindAttribLocation(p Program, a Attrib, name string)
 	BindBuffer(target Enum, b Buffer)
 	BindFramebuffer(target Enum, fb Framebuffer)
+	BindRenderbuffer(target Enum, fb Renderbuffer)
 	BindTexture(target Enum, t Texture)
 	BlendEquation(mode Enum)
 	BlendFunc(sfactor, dfactor Enum)
@@ -104,12 +107,14 @@ type Functions interface {
 	CreateFramebuffer() Framebuffer
 	CreateProgram() Program
 	CreateQuery() Query
+	CreateRenderbuffer() Renderbuffer
 	CreateShader(ty Enum) Shader
 	CreateTexture() Texture
 	DeleteBuffer(v Buffer)
 	DeleteFramebuffer(v Framebuffer)
 	DeleteProgram(p Program)
 	DeleteQuery(query Query)
+	DeleteRenderbuffer(r Renderbuffer)
 	DeleteShader(s Shader)
 	DeleteTexture(v Texture)
 	DepthFunc(f Enum)
@@ -134,6 +139,7 @@ type Functions interface {
 	GetUniformLocation(p Program, name string) Uniform
 	InvalidateFramebuffer(target, attachment Enum)
 	LinkProgram(p Program)
+	RenderbufferStorage(target, internalformat Enum, width, height int)
 	ShaderSource(s Shader, src string)
 	TexImage2D(target Enum, level int, internalFormat int, width, height int, format, ty Enum, data []byte)
 	TexParameteri(target, pname Enum, param int)
