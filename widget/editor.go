@@ -155,6 +155,9 @@ func (e *Editor) processPointer(gtx *layout.Context) {
 }
 
 func (e *Editor) processKey(gtx *layout.Context) {
+	if e.rr.Changed() {
+		e.events = append(e.events, ChangeEvent{})
+	}
 	for _, ke := range gtx.Events(&e.eventKey) {
 		e.blinkStart = gtx.Now()
 		switch ke := ke.(type) {
