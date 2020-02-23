@@ -2,6 +2,6 @@
 
 package headless
 
-func newContext(width, height int) (backend, error) {
+func newContext() (backend, error) {
 	return newGLContext()
 }

@@ -31,7 +31,7 @@ type backend interface {
 
 // NewWindow creates a new headless window.
 func NewWindow(width, height int) (*Window, error) {
-	ctx, err := newContext(width, height)
+	ctx, err := newContext()
 	if err != nil {
 		return nil, err
 	}
