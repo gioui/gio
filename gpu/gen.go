@@ -2,4 +2,4 @@
 
 package gpu
 
-//go:generate go run build.go
+//go:generate go run ../internal/cmd/convertshaders -package gpu
