@@ -348,7 +348,11 @@ func (b *Backend) DrawArrays(mode backend.DrawMode, off, count int) {
 }
 
 func (b *Backend) prepareDraw() {
-	b.setupVertexArrays()
+	nattr := b.state.prog.nattr
+	b.enableVertexArrays(nattr)
+	if nattr > 0 {
+		b.setupVertexArrays()
+	}
 	if p := b.state.prog; p != nil {
 		p.updateUniforms()
 	}
@@ -469,7 +473,6 @@ func (p *gpuProgram) updateUniforms() {
 func (b *Backend) BindProgram(prog backend.Program) {
 	p := prog.(*gpuProgram)
 	b.useProgram(p)
-	b.enableVertexArrays(p.nattr)
 }
 
 func (p *gpuProgram) Release() {
