@@ -127,18 +127,23 @@ func (w *Window) Screenshot() (*image.RGBA, error) {
 	if err != nil {
 		return nil, err
 	}
+	flipImageY(img)
+	return img, nil
+}
+
+func flipImageY(img *image.RGBA) {
 	// Flip image in y-direction. OpenGL's origin is in the lower
 	// left corner.
 	row := make([]uint8, img.Stride)
-	for y := 0; y < w.size.Y/2; y++ {
-		y1 := w.size.Y - y - 1
+	sy := img.Bounds().Dy()
+	for y := 0; y < sy/2; y++ {
+		y1 := sy - y - 1
 		dest := img.PixOffset(0, y1)
 		src := img.PixOffset(0, y)
 		copy(row, img.Pix[dest:])
 		copy(img.Pix[dest:], img.Pix[src:src+len(row)])
 		copy(img.Pix[src:], row)
 	}
-	return img, nil
 }
 
 func contextDo(ctx context, f func() error) error {

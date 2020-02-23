@@ -13,14 +13,11 @@ import (
 )
 
 func TestHeadless(t *testing.T) {
-	sz := image.Point{X: 800, Y: 600}
-	w, err := NewWindow(sz.X, sz.Y)
-	if err != nil {
-		t.Skipf("headless windows not supported: %v", err)
-	}
-	defer w.Release()
+	w, release := newTestWindow(t)
+	defer release()
 
-	col := color.RGBA{A: 0xff, R: 0xcc, G: 0xcc}
+	sz := w.size
+	col := color.RGBA{A: 0xff, R: 0xca, G: 0xfe}
 	var ops op.Ops
 	paint.ColorOp{Color: col}.Add(&ops)
 	// Paint only part of the screen to avoid the glClear optimization.
@@ -39,5 +36,17 @@ func TestHeadless(t *testing.T) {
 	}
 	if got := img.RGBAAt(0, 0); got != col {
 		t.Errorf("got color %v, expected %v", got, col)
+	}
+}
+
+func newTestWindow(t *testing.T) (*Window, func()) {
+	t.Helper()
+	sz := image.Point{X: 800, Y: 600}
+	w, err := NewWindow(sz.X, sz.Y)
+	if err != nil {
+		t.Skipf("headless windows not supported: %v", err)
+	}
+	return w, func() {
+		w.Release()
 	}
 }
