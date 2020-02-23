@@ -216,22 +216,26 @@ type blitter struct {
 	viewport    image.Point
 	prog        [2]*program
 	layout      backend.InputLayout
-	colUniforms struct {
-		vert struct {
-			blitUniforms
-			_ [8]byte // Padding to a multiple of 16.
-		}
-		frag struct {
-			colorUniforms
-		}
+	colUniforms *blitColUniforms
+	texUniforms *blitTexUniforms
+	quadVerts   backend.Buffer
+}
+
+type blitColUniforms struct {
+	vert struct {
+		blitUniforms
+		_ [8]byte // Padding to a multiple of 16.
 	}
-	texUniforms struct {
-		vert struct {
-			blitUniforms
-			_ [8]byte // Padding to a multiple of 16.
-		}
+	frag struct {
+		colorUniforms
 	}
-	quadVerts backend.Buffer
+}
+
+type blitTexUniforms struct {
+	vert struct {
+		blitUniforms
+		_ [8]byte // Padding to a multiple of 16.
+	}
 }
 
 type uniformBuffer struct {
@@ -431,6 +435,8 @@ func newBlitter(ctx backend.Device) *blitter {
 		ctx:       ctx,
 		quadVerts: quadVerts,
 	}
+	b.colUniforms = new(blitColUniforms)
+	b.texUniforms = new(blitTexUniforms)
 	prog, layout, err := createColorPrograms(ctx, shader_blit_vert, shader_blit_frag,
 		[2]interface{}{&b.colUniforms.vert, &b.texUniforms.vert}, [2]interface{}{&b.colUniforms.frag, nil})
 	if err != nil {

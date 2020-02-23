@@ -27,22 +27,26 @@ type pather struct {
 type coverer struct {
 	ctx         backend.Device
 	prog        [2]*program
-	texUniforms struct {
-		vert struct {
-			coverUniforms
-			_ [8]byte // Padding to multiple of 16.
-		}
+	texUniforms *coverTexUniforms
+	colUniforms *coverColUniforms
+	layout      backend.InputLayout
+}
+
+type coverTexUniforms struct {
+	vert struct {
+		coverUniforms
+		_ [8]byte // Padding to multiple of 16.
 	}
-	colUniforms struct {
-		vert struct {
-			coverUniforms
-			_ [8]byte // Padding to multiple of 16.
-		}
-		frag struct {
-			colorUniforms
-		}
+}
+
+type coverColUniforms struct {
+	vert struct {
+		coverUniforms
+		_ [8]byte // Padding to multiple of 16.
 	}
-	layout backend.InputLayout
+	frag struct {
+		colorUniforms
+	}
 }
 
 type coverUniforms struct {
@@ -60,29 +64,33 @@ type stenciler struct {
 	ctx  backend.Device
 	prog struct {
 		prog     *program
-		uniforms struct {
-			vert struct {
-				scale      [2]float32
-				offset     [2]float32
-				pathOffset [2]float32
-				_          [8]byte // Padding to multiple of 16.
-			}
-		}
-		layout backend.InputLayout
+		uniforms *stencilUniforms
+		layout   backend.InputLayout
 	}
 	iprog struct {
 		prog     *program
-		uniforms struct {
-			vert struct {
-				uvScale  [2]float32
-				uvOffset [2]float32
-			}
-		}
-		layout backend.InputLayout
+		uniforms *intersectUniforms
+		layout   backend.InputLayout
 	}
 	fbos          fboSet
 	intersections fboSet
 	indexBuf      backend.Buffer
+}
+
+type stencilUniforms struct {
+	vert struct {
+		scale      [2]float32
+		offset     [2]float32
+		pathOffset [2]float32
+		_          [8]byte // Padding to multiple of 16.
+	}
+}
+
+type intersectUniforms struct {
+	vert struct {
+		uvScale  [2]float32
+		uvOffset [2]float32
+	}
 }
 
 type fboSet struct {
@@ -125,6 +133,8 @@ func newCoverer(ctx backend.Device) *coverer {
 	c := &coverer{
 		ctx: ctx,
 	}
+	c.colUniforms = new(coverColUniforms)
+	c.texUniforms = new(coverTexUniforms)
 	prog, layout, err := createColorPrograms(ctx, shader_cover_vert, shader_cover_frag,
 		[2]interface{}{&c.colUniforms.vert, &c.texUniforms.vert},
 		[2]interface{}{&c.colUniforms.frag, nil},
@@ -178,6 +188,7 @@ func newStenciler(ctx backend.Device) *stenciler {
 	if err != nil {
 		panic(err)
 	}
+	st.prog.uniforms = new(stencilUniforms)
 	vertUniforms := newUniformBuffer(ctx, &st.prog.uniforms.vert)
 	st.prog.prog = newProgram(prog, vertUniforms, nil)
 	st.prog.layout = progLayout
@@ -185,6 +196,7 @@ func newStenciler(ctx backend.Device) *stenciler {
 	if err != nil {
 		panic(err)
 	}
+	st.iprog.uniforms = new(intersectUniforms)
 	vertUniforms = newUniformBuffer(ctx, &st.iprog.uniforms.vert)
 	st.iprog.prog = newProgram(iprog, vertUniforms, nil)
 	st.iprog.layout = iprogLayout
