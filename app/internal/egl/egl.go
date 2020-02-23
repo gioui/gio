@@ -12,7 +12,7 @@ import (
 
 	"gioui.org/app/internal/glimpl"
 	"gioui.org/app/internal/srgb"
-	"gioui.org/gpu"
+	"gioui.org/gpu/backend"
 	"gioui.org/gpu/gl"
 )
 
@@ -121,7 +121,7 @@ func (c *Context) Functions() *glimpl.Functions {
 	return c.c
 }
 
-func (c *Context) Backend() (gpu.Backend, error) {
+func (c *Context) Backend() (backend.Device, error) {
 	return gl.NewBackend(c.c)
 }
 

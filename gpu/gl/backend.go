@@ -10,16 +10,16 @@ import (
 	"time"
 	"unsafe"
 
-	"gioui.org/gpu"
+	"gioui.org/gpu/backend"
 )
 
-// Backend implements gpu.Backend.
+// Backend implements backend.Device.
 type Backend struct {
 	funcs Functions
 
 	state glstate
 
-	feats gpu.Caps
+	feats backend.Caps
 	// floatTriple holds the settings for floating point
 	// textures.
 	floatTriple textureTriple
@@ -68,7 +68,7 @@ type gpuFramebuffer struct {
 type gpuBuffer struct {
 	backend   *Backend
 	obj       Buffer
-	typ       gpu.BufferBinding
+	typ       backend.BufferBinding
 	size      int
 	immutable bool
 	version   int
@@ -94,14 +94,14 @@ type uniformsTracker struct {
 type uniformLocation struct {
 	uniform Uniform
 	offset  int
-	typ     gpu.DataType
+	typ     backend.DataType
 	size    int
 }
 
 type gpuInputLayout struct {
 	backend *Backend
-	inputs  []gpu.InputLocation
-	layout  []gpu.InputDesc
+	inputs  []backend.InputLocation
+	layout  []backend.InputDesc
 }
 
 // textureTriple holds the type settings for
@@ -134,7 +134,7 @@ func NewBackend(f Functions) (*Backend, error) {
 		srgbaTriple: srgbaTriple,
 	}
 	if hasExtension(exts, "GL_EXT_disjoint_timer_query_webgl2") || hasExtension(exts, "GL_EXT_disjoint_timer_query") {
-		b.feats.Features |= gpu.FeatureTimers
+		b.feats.Features |= backend.FeatureTimers
 	}
 	b.feats.MaxTextureSize = f.GetInteger(MAX_TEXTURE_SIZE)
 	return b, nil
@@ -149,11 +149,11 @@ func (b *Backend) EndFrame() {
 	b.funcs.ActiveTexture(TEXTURE0)
 }
 
-func (b *Backend) Caps() gpu.Caps {
+func (b *Backend) Caps() backend.Caps {
 	return b.feats
 }
 
-func (b *Backend) NewTimer() gpu.Timer {
+func (b *Backend) NewTimer() backend.Timer {
 	return &gpuTimer{
 		funcs: b.funcs,
 		obj:   b.funcs.CreateQuery(),
@@ -164,7 +164,7 @@ func (b *Backend) IsTimeContinuous() bool {
 	return b.funcs.GetInteger(GPU_DISJOINT_EXT) == FALSE
 }
 
-func (b *Backend) NewFramebuffer(tex gpu.Texture, depthBits int) (gpu.Framebuffer, error) {
+func (b *Backend) NewFramebuffer(tex backend.Texture, depthBits int) (backend.Framebuffer, error) {
 	glErr(b.funcs)
 	gltex := tex.(*gpuTexture)
 	fb := b.funcs.CreateFramebuffer()
@@ -200,18 +200,18 @@ func (b *Backend) NewFramebuffer(tex gpu.Texture, depthBits int) (gpu.Framebuffe
 	return fbo, nil
 }
 
-func (b *Backend) CurrentFramebuffer() gpu.Framebuffer {
+func (b *Backend) CurrentFramebuffer() backend.Framebuffer {
 	fboID := Framebuffer(b.funcs.GetBinding(FRAMEBUFFER_BINDING))
 	return &gpuFramebuffer{backend: b, obj: fboID, foreign: true}
 }
 
-func (b *Backend) NewTexture(format gpu.TextureFormat, width, height int, minFilter, magFilter gpu.TextureFilter, binding gpu.BufferBinding) (gpu.Texture, error) {
+func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, minFilter, magFilter backend.TextureFilter, binding backend.BufferBinding) (backend.Texture, error) {
 	glErr(b.funcs)
 	tex := &gpuTexture{backend: b, obj: b.funcs.CreateTexture(), width: width, height: height}
 	switch format {
-	case gpu.TextureFormatFloat:
+	case backend.TextureFormatFloat:
 		tex.triple = b.floatTriple
-	case gpu.TextureFormatSRGB:
+	case backend.TextureFormatSRGB:
 		tex.triple = b.srgbaTriple
 	default:
 		return nil, errors.New("unsupported texture format")
@@ -229,17 +229,17 @@ func (b *Backend) NewTexture(format gpu.TextureFormat, width, height int, minFil
 	return tex, nil
 }
 
-func (b *Backend) NewBuffer(typ gpu.BufferBinding, size int) (gpu.Buffer, error) {
+func (b *Backend) NewBuffer(typ backend.BufferBinding, size int) (backend.Buffer, error) {
 	glErr(b.funcs)
 	buf := &gpuBuffer{backend: b, typ: typ, size: size}
-	if typ&gpu.BufferBindingUniforms != 0 {
-		if typ != gpu.BufferBindingUniforms {
+	if typ&backend.BufferBindingUniforms != 0 {
+		if typ != backend.BufferBindingUniforms {
 			return nil, errors.New("uniforms buffers cannot be bound as anything else")
 		}
 		// GLES 2 doesn't support uniform buffers.
 		buf.data = make([]byte, size)
 	}
-	if typ&^gpu.BufferBindingUniforms != 0 {
+	if typ&^backend.BufferBindingUniforms != 0 {
 		buf.obj = b.funcs.CreateBuffer()
 		if err := glErr(b.funcs); err != nil {
 			buf.Release()
@@ -249,7 +249,7 @@ func (b *Backend) NewBuffer(typ gpu.BufferBinding, size int) (gpu.Buffer, error)
 	return buf, nil
 }
 
-func (b *Backend) NewImmutableBuffer(typ gpu.BufferBinding, data []byte) (gpu.Buffer, error) {
+func (b *Backend) NewImmutableBuffer(typ backend.BufferBinding, data []byte) (backend.Buffer, error) {
 	glErr(b.funcs)
 	obj := b.funcs.CreateBuffer()
 	buf := &gpuBuffer{backend: b, obj: obj, typ: typ, size: len(data)}
@@ -304,19 +304,19 @@ func (b *Backend) SetDepthTest(enable bool) {
 	}
 }
 
-func (b *Backend) BlendFunc(sfactor, dfactor gpu.BlendFactor) {
+func (b *Backend) BlendFunc(sfactor, dfactor backend.BlendFactor) {
 	b.funcs.BlendFunc(toGLBlendFactor(sfactor), toGLBlendFactor(dfactor))
 }
 
-func toGLBlendFactor(f gpu.BlendFactor) Enum {
+func toGLBlendFactor(f backend.BlendFactor) Enum {
 	switch f {
-	case gpu.BlendFactorOne:
+	case backend.BlendFactorOne:
 		return ONE
-	case gpu.BlendFactorOneMinusSrcAlpha:
+	case backend.BlendFactorOneMinusSrcAlpha:
 		return ONE_MINUS_SRC_ALPHA
-	case gpu.BlendFactorZero:
+	case backend.BlendFactorZero:
 		return ZERO
-	case gpu.BlendFactorDstColor:
+	case backend.BlendFactorDstColor:
 		return DST_COLOR
 	default:
 		panic("unsupported blend factor")
@@ -335,14 +335,14 @@ func (b *Backend) SetBlend(enable bool) {
 	}
 }
 
-func (b *Backend) DrawElements(mode gpu.DrawMode, off, count int) {
+func (b *Backend) DrawElements(mode backend.DrawMode, off, count int) {
 	b.prepareDraw()
 	// off is in 16-bit indices, but DrawElements take a byte offset.
 	byteOff := off * 2
 	b.funcs.DrawElements(toGLDrawMode(mode), count, UNSIGNED_SHORT, byteOff)
 }
 
-func (b *Backend) DrawArrays(mode gpu.DrawMode, off, count int) {
+func (b *Backend) DrawArrays(mode backend.DrawMode, off, count int) {
 	b.prepareDraw()
 	b.funcs.DrawArrays(toGLDrawMode(mode), off, count)
 }
@@ -354,11 +354,11 @@ func (b *Backend) prepareDraw() {
 	}
 }
 
-func toGLDrawMode(mode gpu.DrawMode) Enum {
+func toGLDrawMode(mode backend.DrawMode) Enum {
 	switch mode {
-	case gpu.DrawModeTriangleStrip:
+	case backend.DrawModeTriangleStrip:
 		return TRIANGLE_STRIP
-	case gpu.DrawModeTriangles:
+	case backend.DrawModeTriangles:
 		return TRIANGLES
 	default:
 		panic("unsupported draw mode")
@@ -369,12 +369,12 @@ func (b *Backend) Viewport(x, y, width, height int) {
 	b.funcs.Viewport(x, y, width, height)
 }
 
-func (b *Backend) Clear(attachments gpu.BufferAttachments) {
+func (b *Backend) Clear(attachments backend.BufferAttachments) {
 	var mask Enum
-	if attachments&gpu.BufferAttachmentColor != 0 {
+	if attachments&backend.BufferAttachmentColor != 0 {
 		mask |= COLOR_BUFFER_BIT
 	}
-	if attachments&gpu.BufferAttachmentDepth != 0 {
+	if attachments&backend.BufferAttachmentDepth != 0 {
 		mask |= DEPTH_BUFFER_BIT
 	}
 	b.funcs.Clear(mask)
@@ -388,10 +388,10 @@ func (b *Backend) ClearColor(colR, colG, colB, colA float32) {
 	b.funcs.ClearColor(colR, colG, colB, colA)
 }
 
-func (b *Backend) DepthFunc(f gpu.DepthFunc) {
+func (b *Backend) DepthFunc(f backend.DepthFunc) {
 	var glfunc Enum
 	switch f {
-	case gpu.DepthFuncGreater:
+	case backend.DepthFuncGreater:
 		glfunc = GREATER
 	default:
 		panic("unsupported depth func")
@@ -399,7 +399,7 @@ func (b *Backend) DepthFunc(f gpu.DepthFunc) {
 	b.funcs.DepthFunc(glfunc)
 }
 
-func (b *Backend) NewInputLayout(vs gpu.ShaderSources, layout []gpu.InputDesc) (gpu.InputLayout, error) {
+func (b *Backend) NewInputLayout(vs backend.ShaderSources, layout []backend.InputDesc) (backend.InputLayout, error) {
 	if len(vs.Inputs) != len(layout) {
 		return nil, fmt.Errorf("NewInputLayout: got %d inputs, expected %d", len(layout), len(vs.Inputs))
 	}
@@ -415,7 +415,7 @@ func (b *Backend) NewInputLayout(vs gpu.ShaderSources, layout []gpu.InputDesc) (
 	}, nil
 }
 
-func (b *Backend) NewProgram(vssrc, fssrc gpu.ShaderSources) (gpu.Program, error) {
+func (b *Backend) NewProgram(vssrc, fssrc backend.ShaderSources) (backend.Program, error) {
 	attr := make([]string, len(vssrc.Inputs))
 	for _, inp := range vssrc.Inputs {
 		attr[inp.Location] = inp.Name
@@ -448,16 +448,16 @@ func (b *Backend) NewProgram(vssrc, fssrc gpu.ShaderSources) (gpu.Program, error
 	return gpuProg, nil
 }
 
-func lookupUniform(funcs Functions, p Program, loc gpu.UniformLocation) uniformLocation {
+func lookupUniform(funcs Functions, p Program, loc backend.UniformLocation) uniformLocation {
 	u := GetUniformLocation(funcs, p, loc.Name)
 	return uniformLocation{uniform: u, offset: loc.Offset, typ: loc.Type, size: loc.Size}
 }
 
-func (p *gpuProgram) SetVertexUniforms(buffer gpu.Buffer) {
+func (p *gpuProgram) SetVertexUniforms(buffer backend.Buffer) {
 	p.vertUniforms.setBuffer(buffer)
 }
 
-func (p *gpuProgram) SetFragmentUniforms(buffer gpu.Buffer) {
+func (p *gpuProgram) SetFragmentUniforms(buffer backend.Buffer) {
 	p.fragUniforms.setBuffer(buffer)
 }
 
@@ -466,7 +466,7 @@ func (p *gpuProgram) updateUniforms() {
 	p.fragUniforms.update(p.backend.funcs)
 }
 
-func (b *Backend) BindProgram(prog gpu.Program) {
+func (b *Backend) BindProgram(prog backend.Program) {
 	p := prog.(*gpuProgram)
 	b.useProgram(p)
 	b.enableVertexArrays(p.nattr)
@@ -476,7 +476,7 @@ func (p *gpuProgram) Release() {
 	p.backend.funcs.DeleteProgram(p.obj)
 }
 
-func (u *uniformsTracker) setup(funcs Functions, p Program, uniformSize int, uniforms []gpu.UniformLocation) {
+func (u *uniformsTracker) setup(funcs Functions, p Program, uniformSize int, uniforms []backend.UniformLocation) {
 	u.locs = make([]uniformLocation, len(uniforms))
 	for i, uniform := range uniforms {
 		u.locs[i] = lookupUniform(funcs, p, uniform)
@@ -484,9 +484,9 @@ func (u *uniformsTracker) setup(funcs Functions, p Program, uniformSize int, uni
 	u.size = uniformSize
 }
 
-func (u *uniformsTracker) setBuffer(buffer gpu.Buffer) {
+func (u *uniformsTracker) setBuffer(buffer backend.Buffer) {
 	buf := buffer.(*gpuBuffer)
-	if buf.typ&gpu.BufferBindingUniforms == 0 {
+	if buf.typ&backend.BufferBindingUniforms == 0 {
 		panic("not a uniform buffer")
 	}
 	if buf.size < u.size {
@@ -507,19 +507,19 @@ func (p *uniformsTracker) update(funcs Functions) {
 	for _, u := range p.locs {
 		data := data[u.offset:]
 		switch {
-		case u.typ == gpu.DataTypeFloat && u.size == 1:
+		case u.typ == backend.DataTypeFloat && u.size == 1:
 			data := data[:4]
 			v := *(*[1]float32)(unsafe.Pointer(&data[0]))
 			funcs.Uniform1f(u.uniform, v[0])
-		case u.typ == gpu.DataTypeFloat && u.size == 2:
+		case u.typ == backend.DataTypeFloat && u.size == 2:
 			data := data[:8]
 			v := *(*[2]float32)(unsafe.Pointer(&data[0]))
 			funcs.Uniform2f(u.uniform, v[0], v[1])
-		case u.typ == gpu.DataTypeFloat && u.size == 3:
+		case u.typ == backend.DataTypeFloat && u.size == 3:
 			data := data[:12]
 			v := *(*[3]float32)(unsafe.Pointer(&data[0]))
 			funcs.Uniform3f(u.uniform, v[0], v[1], v[2])
-		case u.typ == gpu.DataTypeFloat && u.size == 4:
+		case u.typ == backend.DataTypeFloat && u.size == 4:
 			data := data[:16]
 			v := *(*[4]float32)(unsafe.Pointer(&data[0]))
 			funcs.Uniform4f(u.uniform, v[0], v[1], v[2], v[3])
@@ -537,10 +537,10 @@ func (b *gpuBuffer) Upload(data []byte) {
 		panic("buffer size overflow")
 	}
 	b.version++
-	if b.typ&gpu.BufferBindingUniforms != 0 {
+	if b.typ&backend.BufferBindingUniforms != 0 {
 		copy(b.data, data)
 	}
-	if b.typ&^gpu.BufferBindingUniforms != 0 {
+	if b.typ&^backend.BufferBindingUniforms != 0 {
 		firstBinding := firstBufferType(b.typ)
 		b.backend.funcs.BindBuffer(firstBinding, b.obj)
 		b.backend.funcs.BufferData(firstBinding, data, STATIC_DRAW)
@@ -548,14 +548,14 @@ func (b *gpuBuffer) Upload(data []byte) {
 }
 
 func (b *gpuBuffer) Release() {
-	if b.typ&^gpu.BufferBindingUniforms != 0 {
+	if b.typ&^backend.BufferBindingUniforms != 0 {
 		b.backend.funcs.DeleteBuffer(b.obj)
 	}
 }
 
-func (b *Backend) BindVertexBuffer(buf gpu.Buffer, stride, offset int) {
+func (b *Backend) BindVertexBuffer(buf backend.Buffer, stride, offset int) {
 	gbuf := buf.(*gpuBuffer)
-	if gbuf.typ&gpu.BufferBindingVertices == 0 {
+	if gbuf.typ&backend.BufferBindingVertices == 0 {
 		panic("not a vertex buffer")
 	}
 	b.state.buffer = bufferBinding{buf: gbuf, stride: stride, offset: offset}
@@ -572,9 +572,9 @@ func (b *Backend) setupVertexArrays() {
 		l := layout.layout[i]
 		var gltyp Enum
 		switch l.Type {
-		case gpu.DataTypeFloat:
+		case backend.DataTypeFloat:
 			gltyp = FLOAT
-		case gpu.DataTypeShort:
+		case backend.DataTypeShort:
 			gltyp = SHORT
 		default:
 			panic("unsupported data type")
@@ -583,9 +583,9 @@ func (b *Backend) setupVertexArrays() {
 	}
 }
 
-func (b *Backend) BindIndexBuffer(buf gpu.Buffer) {
+func (b *Backend) BindIndexBuffer(buf backend.Buffer) {
 	gbuf := buf.(*gpuBuffer)
-	if gbuf.typ&gpu.BufferBindingIndices == 0 {
+	if gbuf.typ&backend.BufferBindingIndices == 0 {
 		panic("not an index buffer")
 	}
 	b.funcs.BindBuffer(ELEMENT_ARRAY_BUFFER, gbuf.obj)
@@ -601,7 +601,7 @@ func (f *gpuFramebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 	return glErr(f.backend.funcs)
 }
 
-func (b *Backend) BindFramebuffer(fbo gpu.Framebuffer) {
+func (b *Backend) BindFramebuffer(fbo backend.Framebuffer) {
 	b.funcs.BindFramebuffer(FRAMEBUFFER, fbo.(*gpuFramebuffer).obj)
 }
 
@@ -620,18 +620,18 @@ func (f *gpuFramebuffer) Release() {
 	}
 }
 
-func toTexFilter(f gpu.TextureFilter) int {
+func toTexFilter(f backend.TextureFilter) int {
 	switch f {
-	case gpu.FilterNearest:
+	case backend.FilterNearest:
 		return NEAREST
-	case gpu.FilterLinear:
+	case backend.FilterLinear:
 		return LINEAR
 	default:
 		panic("unsupported texture filter")
 	}
 }
 
-func (b *Backend) BindTexture(unit int, t gpu.Texture) {
+func (b *Backend) BindTexture(unit int, t backend.Texture) {
 	b.bindTexture(unit, t.(*gpuTexture))
 }
 
@@ -677,7 +677,7 @@ func (t *gpuTimer) Duration() (time.Duration, bool) {
 	return time.Duration(nanos), true
 }
 
-func (b *Backend) BindInputLayout(l gpu.InputLayout) {
+func (b *Backend) BindInputLayout(l backend.InputLayout) {
 	b.state.layout = l.(*gpuInputLayout)
 }
 
@@ -753,13 +753,13 @@ func hasExtension(exts []string, ext string) bool {
 	return false
 }
 
-func firstBufferType(typ gpu.BufferBinding) Enum {
+func firstBufferType(typ backend.BufferBinding) Enum {
 	switch {
-	case typ&gpu.BufferBindingIndices != 0:
+	case typ&backend.BufferBindingIndices != 0:
 		return ELEMENT_ARRAY_BUFFER
-	case typ&gpu.BufferBindingVertices != 0:
+	case typ&backend.BufferBindingVertices != 0:
 		return ARRAY_BUFFER
-	case typ&gpu.BufferBindingUniforms != 0:
+	case typ&backend.BufferBindingUniforms != 0:
 		return UNIFORM_BUFFER
 	default:
 		panic("unsupported buffer type")

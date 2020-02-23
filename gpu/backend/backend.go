@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package gpu
+package backend
 
 import (
 	"image"
 	"time"
 )
 
-// Backend represents the abstraction of underlying GPU
+// Device represents the abstraction of underlying GPU
 // APIs such as OpenGL, Direct3D useful for rendering Gio
 // operations.
-type Backend interface {
+type Device interface {
 	BeginFrame()
 	EndFrame()
 	Caps() Caps

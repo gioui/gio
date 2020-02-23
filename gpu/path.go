@@ -10,12 +10,13 @@ import (
 	"unsafe"
 
 	"gioui.org/f32"
+	"gioui.org/gpu/backend"
 	"gioui.org/internal/path"
 	gunsafe "gioui.org/internal/unsafe"
 )
 
 type pather struct {
-	ctx Backend
+	ctx backend.Device
 
 	viewport image.Point
 
@@ -24,7 +25,7 @@ type pather struct {
 }
 
 type coverer struct {
-	ctx         Backend
+	ctx         backend.Device
 	prog        [2]*program
 	texUniforms struct {
 		vert struct {
@@ -41,7 +42,7 @@ type coverer struct {
 			colorUniforms
 		}
 	}
-	layout InputLayout
+	layout backend.InputLayout
 }
 
 type coverUniforms struct {
@@ -56,7 +57,7 @@ type coverUniforms struct {
 }
 
 type stenciler struct {
-	ctx  Backend
+	ctx  backend.Device
 	prog struct {
 		prog     *program
 		uniforms struct {
@@ -67,7 +68,7 @@ type stenciler struct {
 				_          [8]byte // Padding to multiple of 16.
 			}
 		}
-		layout InputLayout
+		layout backend.InputLayout
 	}
 	iprog struct {
 		prog     *program
@@ -77,11 +78,11 @@ type stenciler struct {
 				uvOffset [2]float32
 			}
 		}
-		layout InputLayout
+		layout backend.InputLayout
 	}
 	fbos          fboSet
 	intersections fboSet
-	indexBuf      Buffer
+	indexBuf      backend.Buffer
 }
 
 type fboSet struct {
@@ -90,13 +91,13 @@ type fboSet struct {
 
 type stencilFBO struct {
 	size image.Point
-	fbo  Framebuffer
-	tex  Texture
+	fbo  backend.Framebuffer
+	tex  backend.Texture
 }
 
 type pathData struct {
 	ncurves int
-	data    Buffer
+	data    backend.Buffer
 }
 
 const (
@@ -112,7 +113,7 @@ const (
 	attribPathTo     = 4
 )
 
-func newPather(ctx Backend) *pather {
+func newPather(ctx backend.Device) *pather {
 	return &pather{
 		ctx:       ctx,
 		stenciler: newStenciler(ctx),
@@ -120,7 +121,7 @@ func newPather(ctx Backend) *pather {
 	}
 }
 
-func newCoverer(ctx Backend) *coverer {
+func newCoverer(ctx backend.Device) *coverer {
 	c := &coverer{
 		ctx: ctx,
 	}
@@ -136,7 +137,7 @@ func newCoverer(ctx Backend) *coverer {
 	return c
 }
 
-func newStenciler(ctx Backend) *stenciler {
+func newStenciler(ctx backend.Device) *stenciler {
 	// Allocate a suitably large index buffer for drawing paths.
 	indices := make([]uint16, pathBatchSize*6)
 	for i := 0; i < pathBatchSize; i++ {
@@ -148,23 +149,23 @@ func newStenciler(ctx Backend) *stenciler {
 		indices[i*6+4] = i*4 + 1
 		indices[i*6+5] = i*4 + 3
 	}
-	indexBuf, err := ctx.NewImmutableBuffer(BufferBindingIndices, gunsafe.BytesView(indices))
+	indexBuf, err := ctx.NewImmutableBuffer(backend.BufferBindingIndices, gunsafe.BytesView(indices))
 	if err != nil {
 		panic(err)
 	}
-	progLayout, err := ctx.NewInputLayout(shader_stencil_vert, []InputDesc{
-		{Type: DataTypeShort, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).CornerX))},
-		{Type: DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).MaxY))},
-		{Type: DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).FromX))},
-		{Type: DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).CtrlX))},
-		{Type: DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).ToX))},
+	progLayout, err := ctx.NewInputLayout(shader_stencil_vert, []backend.InputDesc{
+		{Type: backend.DataTypeShort, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).CornerX))},
+		{Type: backend.DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).MaxY))},
+		{Type: backend.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).FromX))},
+		{Type: backend.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).CtrlX))},
+		{Type: backend.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).ToX))},
 	})
 	if err != nil {
 		panic(err)
 	}
-	iprogLayout, err := ctx.NewInputLayout(shader_intersect_vert, []InputDesc{
-		{Type: DataTypeFloat, Size: 2, Offset: 0},
-		{Type: DataTypeFloat, Size: 2, Offset: 4 * 2},
+	iprogLayout, err := ctx.NewInputLayout(shader_intersect_vert, []backend.InputDesc{
+		{Type: backend.DataTypeFloat, Size: 2, Offset: 0},
+		{Type: backend.DataTypeFloat, Size: 2, Offset: 4 * 2},
 	})
 	if err != nil {
 		panic(err)
@@ -190,7 +191,7 @@ func newStenciler(ctx Backend) *stenciler {
 	return st
 }
 
-func (s *fboSet) resize(ctx Backend, sizes []image.Point) {
+func (s *fboSet) resize(ctx backend.Device, sizes []image.Point) {
 	// Add fbos.
 	for i := len(s.fbos); i < len(sizes); i++ {
 		s.fbos = append(s.fbos, stencilFBO{})
@@ -208,8 +209,8 @@ func (s *fboSet) resize(ctx Backend, sizes []image.Point) {
 				f.fbo.Release()
 				f.tex.Release()
 			}
-			tex, err := ctx.NewTexture(TextureFormatFloat, sz.X, sz.Y, FilterNearest, FilterNearest,
-				BufferBindingTexture|BufferBindingFramebuffer)
+			tex, err := ctx.NewTexture(backend.TextureFormatFloat, sz.X, sz.Y, backend.FilterNearest, backend.FilterNearest,
+				backend.BufferBindingTexture|backend.BufferBindingFramebuffer)
 			fbo, err := ctx.NewFramebuffer(tex, 0)
 			if err != nil {
 				panic(err)
@@ -223,13 +224,13 @@ func (s *fboSet) resize(ctx Backend, sizes []image.Point) {
 	s.delete(ctx, len(sizes))
 }
 
-func (s *fboSet) invalidate(ctx Backend) {
+func (s *fboSet) invalidate(ctx backend.Device) {
 	for _, f := range s.fbos {
 		f.fbo.Invalidate()
 	}
 }
 
-func (s *fboSet) delete(ctx Backend, idx int) {
+func (s *fboSet) delete(ctx backend.Device, idx int) {
 	for i := idx; i < len(s.fbos); i++ {
 		f := s.fbos[i]
 		f.fbo.Release()
@@ -259,8 +260,8 @@ func (c *coverer) release() {
 	c.layout.Release()
 }
 
-func buildPath(ctx Backend, p []byte) *pathData {
-	buf, err := ctx.NewImmutableBuffer(BufferBindingVertices, p)
+func buildPath(ctx backend.Device, p []byte) *pathData {
+	buf, err := ctx.NewImmutableBuffer(backend.BufferBindingVertices, p)
 	if err != nil {
 		panic(err)
 	}
@@ -283,7 +284,7 @@ func (p *pather) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.
 }
 
 func (s *stenciler) beginIntersect(sizes []image.Point) {
-	s.ctx.BlendFunc(BlendFactorDstColor, BlendFactorZero)
+	s.ctx.BlendFunc(backend.BlendFactorDstColor, backend.BlendFactorZero)
 	// 8 bit coverage is enough, but OpenGL ES only supports single channel
 	// floating point formats. Replace with GL_RGB+GL_UNSIGNED_BYTE if
 	// no floating point support is available.
@@ -302,7 +303,7 @@ func (s *stenciler) cover(idx int) stencilFBO {
 }
 
 func (s *stenciler) begin(sizes []image.Point) {
-	s.ctx.BlendFunc(BlendFactorOne, BlendFactorOne)
+	s.ctx.BlendFunc(backend.BlendFactorOne, backend.BlendFactorOne)
 	s.fbos.resize(s.ctx, sizes)
 	s.ctx.ClearColor(0.0, 0.0, 0.0, 0.0)
 	s.ctx.BindProgram(s.prog.prog.prog)
@@ -330,7 +331,7 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 		}
 		off := path.VertStride * start * 4
 		s.ctx.BindVertexBuffer(data.data, path.VertStride, off)
-		s.ctx.DrawElements(DrawModeTriangles, 0, batch*6)
+		s.ctx.DrawElements(backend.DrawModeTriangles, 0, batch*6)
 		start += batch
 	}
 }
@@ -358,5 +359,5 @@ func (c *coverer) cover(z float32, mat materialType, col [4]float32, scale, off,
 	uniforms.uvCoverScale = [2]float32{coverScale.X, coverScale.Y}
 	uniforms.uvCoverOffset = [2]float32{coverOff.X, coverOff.Y}
 	p.UploadUniforms()
-	c.ctx.DrawArrays(DrawModeTriangleStrip, 0, 4)
+	c.ctx.DrawArrays(backend.DrawModeTriangleStrip, 0, 4)
 }

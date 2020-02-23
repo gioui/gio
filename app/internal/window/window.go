@@ -9,7 +9,7 @@ import (
 	"math"
 	"time"
 
-	"gioui.org/gpu"
+	"gioui.org/gpu/backend"
 	"gioui.org/io/event"
 	"gioui.org/io/system"
 	"gioui.org/unit"
@@ -32,7 +32,7 @@ type Callbacks interface {
 }
 
 type Context interface {
-	Backend() (gpu.Backend, error)
+	Backend() (backend.Device, error)
 	Present() error
 	MakeCurrent() error
 	Release()

@@ -9,21 +9,22 @@ import (
 	"runtime"
 
 	"gioui.org/gpu"
+	"gioui.org/gpu/backend"
 	"gioui.org/op"
 )
 
 // Window is a headless window.
 type Window struct {
 	size    image.Point
-	ctx     backend
-	backend gpu.Backend
+	ctx     context
+	backend backend.Device
 	gpu     *gpu.GPU
-	fboTex  gpu.Texture
-	fbo     gpu.Framebuffer
+	fboTex  backend.Texture
+	fbo     backend.Framebuffer
 }
 
-type backend interface {
-	Backend() (gpu.Backend, error)
+type context interface {
+	Backend() (backend.Device, error)
 	MakeCurrent() error
 	ReleaseCurrent()
 	Release()
@@ -40,27 +41,27 @@ func NewWindow(width, height int) (*Window, error) {
 		ctx:  ctx,
 	}
 	err = contextDo(ctx, func() error {
-		backend, err := ctx.Backend()
+		dev, err := ctx.Backend()
 		if err != nil {
 			return err
 		}
-		fboTex, err := backend.NewTexture(
-			gpu.TextureFormatSRGB,
+		fboTex, err := dev.NewTexture(
+			backend.TextureFormatSRGB,
 			width, height,
-			gpu.FilterNearest, gpu.FilterNearest,
-			gpu.BufferBindingFramebuffer,
+			backend.FilterNearest, backend.FilterNearest,
+			backend.BufferBindingFramebuffer,
 		)
 		if err != nil {
 			return nil
 		}
 		const depthBits = 16
-		fbo, err := backend.NewFramebuffer(fboTex, depthBits)
+		fbo, err := dev.NewFramebuffer(fboTex, depthBits)
 		if err != nil {
 			fboTex.Release()
 			return err
 		}
-		backend.BindFramebuffer(fbo)
-		gp, err := gpu.New(backend)
+		dev.BindFramebuffer(fbo)
+		gp, err := gpu.New(dev)
 		if err != nil {
 			fbo.Release()
 			fboTex.Release()
@@ -69,7 +70,7 @@ func NewWindow(width, height int) (*Window, error) {
 		w.fboTex = fboTex
 		w.fbo = fbo
 		w.gpu = gp
-		w.backend = backend
+		w.backend = dev
 		return err
 	})
 	if err != nil {
@@ -139,7 +140,7 @@ func (w *Window) Screenshot() (*image.RGBA, error) {
 	return img, nil
 }
 
-func contextDo(ctx backend, f func() error) error {
+func contextDo(ctx context, f func() error) error {
 	errCh := make(chan error)
 	go func() {
 		runtime.LockOSThread()

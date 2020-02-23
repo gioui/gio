@@ -18,6 +18,7 @@ import (
 	"unsafe"
 
 	"gioui.org/f32"
+	"gioui.org/gpu/backend"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
 	"gioui.org/internal/path"
@@ -30,18 +31,18 @@ type GPU struct {
 	pathCache *opCache
 	cache     *resourceCache
 
-	defFBO                                            Framebuffer
+	defFBO                                            backend.Framebuffer
 	profile                                           string
 	timers                                            *timers
 	frameStart                                        time.Time
 	zopsTimer, stencilTimer, coverTimer, cleanupTimer *timer
 	drawOps                                           drawOps
-	ctx                                               Backend
+	ctx                                               backend.Device
 	renderer                                          *renderer
 }
 
 type renderer struct {
-	ctx           Backend
+	ctx           backend.Device
 	blitter       *blitter
 	pather        *pather
 	packer        packer
@@ -207,14 +208,14 @@ type resource interface {
 
 type texture struct {
 	src *image.RGBA
-	tex Texture
+	tex backend.Texture
 }
 
 type blitter struct {
-	ctx         Backend
+	ctx         backend.Device
 	viewport    image.Point
 	prog        [2]*program
-	layout      InputLayout
+	layout      backend.InputLayout
 	colUniforms struct {
 		vert struct {
 			blitUniforms
@@ -230,16 +231,16 @@ type blitter struct {
 			_ [8]byte // Padding to a multiple of 16.
 		}
 	}
-	quadVerts Buffer
+	quadVerts backend.Buffer
 }
 
 type uniformBuffer struct {
-	buf Buffer
+	buf backend.Buffer
 	ptr []byte
 }
 
 type program struct {
-	prog         Program
+	prog         backend.Program
 	vertUniforms *uniformBuffer
 	fragUniforms *uniformBuffer
 }
@@ -275,7 +276,7 @@ const (
 	attribUV  = 1
 )
 
-func New(ctx Backend) (*GPU, error) {
+func New(ctx backend.Device) (*GPU, error) {
 	defFBO := ctx.CurrentFramebuffer()
 	g := &GPU{
 		defFBO:    defFBO,
@@ -288,7 +289,7 @@ func New(ctx Backend) (*GPU, error) {
 	return g, nil
 }
 
-func (g *GPU) init(ctx Backend) error {
+func (g *GPU) init(ctx backend.Device) error {
 	g.ctx = ctx
 	g.renderer = newRenderer(ctx)
 	return nil
@@ -309,7 +310,7 @@ func (g *GPU) Collect(viewport image.Point, frameOps *op.Ops) {
 	g.drawOps.reset(g.cache, viewport)
 	g.drawOps.collect(g.cache, frameOps, viewport)
 	g.frameStart = time.Now()
-	if g.drawOps.profile && g.timers == nil && g.ctx.Caps().Features.Has(FeatureTimers) {
+	if g.drawOps.profile && g.timers == nil && g.ctx.Caps().Features.Has(backend.FeatureTimers) {
 		g.timers = newTimers(g.ctx)
 		g.zopsTimer = g.timers.newTimer()
 		g.stencilTimer = g.timers.newTimer()
@@ -336,10 +337,10 @@ func (g *GPU) BeginFrame() {
 		g.zopsTimer.begin()
 	}
 	g.ctx.BindFramebuffer(g.defFBO)
-	g.ctx.DepthFunc(DepthFuncGreater)
+	g.ctx.DepthFunc(backend.DepthFuncGreater)
 	g.ctx.ClearColor(g.drawOps.clearColor[0], g.drawOps.clearColor[1], g.drawOps.clearColor[2], 1.0)
 	g.ctx.ClearDepth(0.0)
-	g.ctx.Clear(BufferAttachmentColor | BufferAttachmentDepth)
+	g.ctx.Clear(backend.BufferAttachmentColor | backend.BufferAttachmentDepth)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.renderer.drawZOps(g.drawOps.zimageOps)
 	g.zopsTimer.end()
@@ -379,11 +380,11 @@ func (g *GPU) Profile() string {
 	return g.profile
 }
 
-func (r *renderer) texHandle(t *texture) Texture {
+func (r *renderer) texHandle(t *texture) backend.Texture {
 	if t.tex != nil {
 		return t.tex
 	}
-	tex, err := r.ctx.NewTexture(TextureFormatSRGB, t.src.Bounds().Dx(), t.src.Bounds().Dy(), FilterLinear, FilterLinear, BufferBindingTexture)
+	tex, err := r.ctx.NewTexture(backend.TextureFormatSRGB, t.src.Bounds().Dx(), t.src.Bounds().Dy(), backend.FilterLinear, backend.FilterLinear, backend.BufferBindingTexture)
 	if err != nil {
 		panic(err)
 	}
@@ -398,7 +399,7 @@ func (t *texture) release() {
 	}
 }
 
-func newRenderer(ctx Backend) *renderer {
+func newRenderer(ctx backend.Device) *renderer {
 	r := &renderer{
 		ctx:     ctx,
 		blitter: newBlitter(ctx),
@@ -414,8 +415,8 @@ func (r *renderer) release() {
 	r.blitter.release()
 }
 
-func newBlitter(ctx Backend) *blitter {
-	quadVerts, err := ctx.NewImmutableBuffer(BufferBindingVertices,
+func newBlitter(ctx backend.Device) *blitter {
+	quadVerts, err := ctx.NewImmutableBuffer(backend.BufferBindingVertices,
 		gunsafe.BytesView([]float32{
 			-1, +1, 0, 0,
 			+1, +1, 1, 0,
@@ -448,7 +449,7 @@ func (b *blitter) release() {
 	b.layout.Release()
 }
 
-func createColorPrograms(b Backend, vsSrc ShaderSources, fsSrc [2]ShaderSources, vertUniforms, fragUniforms [2]interface{}) ([2]*program, InputLayout, error) {
+func createColorPrograms(b backend.Device, vsSrc backend.ShaderSources, fsSrc [2]backend.ShaderSources, vertUniforms, fragUniforms [2]interface{}) ([2]*program, backend.InputLayout, error) {
 	var progs [2]*program
 	prog, err := b.NewProgram(vsSrc, fsSrc[materialTexture])
 	if err != nil {
@@ -479,9 +480,9 @@ func createColorPrograms(b Backend, vsSrc ShaderSources, fsSrc [2]ShaderSources,
 		prog.SetFragmentUniforms(fragBuffer.buf)
 	}
 	progs[materialColor] = newProgram(prog, vertBuffer, fragBuffer)
-	layout, err := b.NewInputLayout(vsSrc, []InputDesc{
-		{Type: DataTypeFloat, Size: 2, Offset: 0},
-		{Type: DataTypeFloat, Size: 2, Offset: 4 * 2},
+	layout, err := b.NewInputLayout(vsSrc, []backend.InputDesc{
+		{Type: backend.DataTypeFloat, Size: 2, Offset: 0},
+		{Type: backend.DataTypeFloat, Size: 2, Offset: 4 * 2},
 	})
 	if err != nil {
 		progs[materialTexture].Release()
@@ -502,7 +503,7 @@ func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
 			fbo = p.place.Idx
 			f := r.pather.stenciler.cover(fbo)
 			r.ctx.BindFramebuffer(f.fbo)
-			r.ctx.Clear(BufferAttachmentColor)
+			r.ctx.Clear(backend.BufferAttachmentColor)
 		}
 		data, _ := pathCache.get(p.pathKey)
 		r.pather.stencilPath(p.clip, p.off, p.place.Pos, data.(*pathData))
@@ -525,7 +526,7 @@ func (r *renderer) intersect(ops []imageOp) {
 			fbo = img.place.Idx
 			f := r.pather.stenciler.intersections.fbos[fbo]
 			r.ctx.BindFramebuffer(f.fbo)
-			r.ctx.Clear(BufferAttachmentColor)
+			r.ctx.Clear(backend.BufferAttachmentColor)
 		}
 		r.ctx.Viewport(img.place.Pos.X, img.place.Pos.Y, img.clip.Dx(), img.clip.Dy())
 		r.intersectPath(img.path, img.clip)
@@ -550,7 +551,7 @@ func (r *renderer) intersectPath(p *pathOp, clip image.Rectangle) {
 	r.pather.stenciler.iprog.uniforms.vert.uvScale = [2]float32{coverScale.X, coverScale.Y}
 	r.pather.stenciler.iprog.uniforms.vert.uvOffset = [2]float32{coverOff.X, coverOff.Y}
 	r.pather.stenciler.iprog.prog.UploadUniforms()
-	r.ctx.DrawArrays(DrawModeTriangleStrip, 0, 4)
+	r.ctx.DrawArrays(backend.DrawModeTriangleStrip, 0, 4)
 }
 
 func (r *renderer) packIntersections(ops []imageOp) {
@@ -842,10 +843,10 @@ func (r *renderer) drawZOps(ops []imageOp) {
 func (r *renderer) drawOps(ops []imageOp) {
 	r.ctx.SetDepthTest(true)
 	r.ctx.DepthMask(false)
-	r.ctx.BlendFunc(BlendFactorOne, BlendFactorOneMinusSrcAlpha)
+	r.ctx.BlendFunc(backend.BlendFactorOne, backend.BlendFactorOneMinusSrcAlpha)
 	r.ctx.BindVertexBuffer(r.blitter.quadVerts, 4*4, 0)
 	r.ctx.BindInputLayout(r.pather.coverer.layout)
-	var coverTex Texture
+	var coverTex backend.Texture
 	for _, img := range ops {
 		m := img.material
 		switch m.material {
@@ -912,18 +913,18 @@ func (b *blitter) blit(z float32, mat materialType, col [4]float32, scale, off, 
 	uniforms.scale = [2]float32{scale.X, scale.Y}
 	uniforms.offset = [2]float32{off.X, off.Y}
 	p.UploadUniforms()
-	b.ctx.DrawArrays(DrawModeTriangleStrip, 0, 4)
+	b.ctx.DrawArrays(backend.DrawModeTriangleStrip, 0, 4)
 }
 
 // newUniformBuffer creates a new GPU uniform buffer backed by the
 // structure uniformBlock points to.
-func newUniformBuffer(b Backend, uniformBlock interface{}) *uniformBuffer {
+func newUniformBuffer(b backend.Device, uniformBlock interface{}) *uniformBuffer {
 	ref := reflect.ValueOf(uniformBlock)
 	// Determine the size of the uniforms structure, *uniforms.
 	size := ref.Elem().Type().Size()
 	// Map the uniforms structure as a byte slice.
 	ptr := (*[1 << 30]byte)(unsafe.Pointer(ref.Pointer()))[:size:size]
-	ubuf, err := b.NewBuffer(BufferBindingUniforms, len(ptr))
+	ubuf, err := b.NewBuffer(backend.BufferBindingUniforms, len(ptr))
 	if err != nil {
 		panic(err)
 	}
@@ -939,7 +940,7 @@ func (u *uniformBuffer) Release() {
 	u.buf = nil
 }
 
-func newProgram(prog Program, vertUniforms, fragUniforms *uniformBuffer) *program {
+func newProgram(prog backend.Program, vertUniforms, fragUniforms *uniformBuffer) *program {
 	if vertUniforms != nil {
 		prog.SetVertexUniforms(vertUniforms.buf)
 	}

@@ -4,7 +4,7 @@ package headless
 
 import (
 	"gioui.org/app/internal/glimpl"
-	"gioui.org/gpu"
+	"gioui.org/gpu/backend"
 	"gioui.org/gpu/gl"
 )
 
@@ -22,7 +22,7 @@ type nsContext struct {
 	prepared bool
 }
 
-func newGLContext() (backend, error) {
+func newGLContext() (context, error) {
 	ctx := C.gio_headless_newContext()
 	return &nsContext{ctx: ctx, c: new(glimpl.Functions)}, nil
 }
@@ -40,7 +40,7 @@ func (c *nsContext) ReleaseCurrent() {
 	C.gio_headless_clearCurrentContext(c.ctx)
 }
 
-func (c *nsContext) Backend() (gpu.Backend, error) {
+func (c *nsContext) Backend() (backend.Device, error) {
 	return gl.NewBackend(c.c)
 }
 

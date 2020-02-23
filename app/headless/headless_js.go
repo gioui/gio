@@ -7,7 +7,7 @@ import (
 	"syscall/js"
 
 	"gioui.org/app/internal/glimpl"
-	"gioui.org/gpu"
+	"gioui.org/gpu/backend"
 	"gioui.org/gpu/gl"
 )
 
@@ -16,7 +16,7 @@ type jsContext struct {
 	f   *glimpl.Functions
 }
 
-func newGLContext() (backend, error) {
+func newGLContext() (context, error) {
 	version := 2
 	doc := js.Global().Get("document")
 	cnv := doc.Call("createElement", "canvas")
@@ -39,7 +39,7 @@ func newGLContext() (backend, error) {
 	return c, nil
 }
 
-func (c *jsContext) Backend() (gpu.Backend, error) {
+func (c *jsContext) Backend() (backend.Device, error) {
 	return gl.NewBackend(c.f)
 }
 

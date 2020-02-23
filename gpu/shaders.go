@@ -2,10 +2,12 @@
 
 package gpu
 
+import "gioui.org/gpu/backend"
+
 var (
-	shader_blit_frag = [...]ShaderSources{
-		ShaderSources{
-			Uniforms: []UniformLocation{
+	shader_blit_frag = [...]backend.ShaderSources{
+		backend.ShaderSources{
+			Uniforms: []backend.UniformLocation{
 				{Name: "_12._color", Type: 0, Size: 4, Offset: 0},
 			},
 			UniformSize: 16,
@@ -47,8 +49,8 @@ var (
 			*/
 			HLSL: []byte(nil),
 		},
-		ShaderSources{
-			Textures: []TextureBinding{
+		backend.ShaderSources{
+			Textures: []backend.TextureBinding{
 				{Name: "tex", Binding: 0},
 			},
 			GLES2: "#version 100\nprecision mediump float;\nprecision highp int;\n\nuniform mediump sampler2D tex;\n\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = texture2D(tex, vUV);\n}\n\n",
@@ -87,12 +89,12 @@ var (
 			HLSL: []byte(nil),
 		},
 	}
-	shader_blit_vert = ShaderSources{
-		Inputs: []InputLocation{
+	shader_blit_vert = backend.ShaderSources{
+		Inputs: []backend.InputLocation{
 			{Name: "pos", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0, Size: 2},
 			{Name: "uv", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0, Size: 2},
 		},
-		Uniforms: []UniformLocation{
+		Uniforms: []backend.UniformLocation{
 			{Name: "_15.z", Type: 0, Size: 1, Offset: 0},
 			{Name: "_15.scale", Type: 0, Size: 2, Offset: 8},
 			{Name: "_15.offset", Type: 0, Size: 2, Offset: 16},
@@ -152,13 +154,13 @@ var (
 		*/
 		HLSL: []byte(nil),
 	}
-	shader_cover_frag = [...]ShaderSources{
-		ShaderSources{
-			Uniforms: []UniformLocation{
+	shader_cover_frag = [...]backend.ShaderSources{
+		backend.ShaderSources{
+			Uniforms: []backend.UniformLocation{
 				{Name: "_12._color", Type: 0, Size: 4, Offset: 0},
 			},
 			UniformSize: 16,
-			Textures: []TextureBinding{
+			Textures: []backend.TextureBinding{
 				{Name: "cover", Binding: 1},
 			},
 			GLES2: "#version 100\nprecision mediump float;\nprecision highp int;\n\nstruct Color\n{\n    vec4 _color;\n};\n\nuniform Color _12;\n\nuniform mediump sampler2D cover;\n\nvarying highp vec2 vCoverUV;\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = _12._color;\n    float cover_1 = abs(texture2D(cover, vCoverUV).x);\n    gl_FragData[0] *= cover_1;\n}\n\n",
@@ -206,8 +208,8 @@ var (
 			*/
 			HLSL: []byte(nil),
 		},
-		ShaderSources{
-			Textures: []TextureBinding{
+		backend.ShaderSources{
+			Textures: []backend.TextureBinding{
 				{Name: "tex", Binding: 0},
 				{Name: "cover", Binding: 1},
 			},
@@ -254,12 +256,12 @@ var (
 			HLSL: []byte(nil),
 		},
 	}
-	shader_cover_vert = ShaderSources{
-		Inputs: []InputLocation{
+	shader_cover_vert = backend.ShaderSources{
+		Inputs: []backend.InputLocation{
 			{Name: "pos", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0, Size: 2},
 			{Name: "uv", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0, Size: 2},
 		},
-		Uniforms: []UniformLocation{
+		Uniforms: []backend.UniformLocation{
 			{Name: "_19.z", Type: 0, Size: 1, Offset: 0},
 			{Name: "_19.scale", Type: 0, Size: 2, Offset: 8},
 			{Name: "_19.offset", Type: 0, Size: 2, Offset: 16},
@@ -324,8 +326,8 @@ var (
 		*/
 		HLSL: []byte(nil),
 	}
-	shader_intersect_frag = ShaderSources{
-		Textures: []TextureBinding{
+	shader_intersect_frag = backend.ShaderSources{
+		Textures: []backend.TextureBinding{
 			{Name: "cover", Binding: 0},
 		},
 		GLES2: "#version 100\nprecision mediump float;\nprecision highp int;\n\nuniform mediump sampler2D cover;\n\nvarying highp vec2 vUV;\n\nvoid main()\n{\n    float cover_1 = abs(texture2D(cover, vUV).x);\n    gl_FragData[0].x = cover_1;\n}\n\n",
@@ -364,12 +366,12 @@ var (
 		*/
 		HLSL: []byte(nil),
 	}
-	shader_intersect_vert = ShaderSources{
-		Inputs: []InputLocation{
+	shader_intersect_vert = backend.ShaderSources{
+		Inputs: []backend.InputLocation{
 			{Name: "pos", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0, Size: 2},
 			{Name: "uv", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0, Size: 2},
 		},
-		Uniforms: []UniformLocation{
+		Uniforms: []backend.UniformLocation{
 			{Name: "_40.scale", Type: 0, Size: 2, Offset: 0},
 			{Name: "_40.offset", Type: 0, Size: 2, Offset: 8},
 		},
@@ -422,7 +424,7 @@ var (
 		*/
 		HLSL: []byte(nil),
 	}
-	shader_stencil_frag = ShaderSources{
+	shader_stencil_frag = backend.ShaderSources{
 		GLES2: "#version 100\nprecision mediump float;\nprecision highp int;\n\nvarying vec2 vTo;\nvarying vec2 vFrom;\nvarying vec2 vCtrl;\n\nvoid main()\n{\n    float dx = vTo.x - vFrom.x;\n    bool increasing = vTo.x >= vFrom.x;\n    bvec2 _35 = bvec2(increasing);\n    vec2 left = vec2(_35.x ? vFrom.x : vTo.x, _35.y ? vFrom.y : vTo.y);\n    bvec2 _41 = bvec2(increasing);\n    vec2 right = vec2(_41.x ? vTo.x : vFrom.x, _41.y ? vTo.y : vFrom.y);\n    vec2 extent = clamp(vec2(vFrom.x, vTo.x), vec2(-0.5), vec2(0.5));\n    float midx = mix(extent.x, extent.y, 0.5);\n    float x0 = midx - left.x;\n    vec2 p1 = vCtrl - left;\n    vec2 v = right - vCtrl;\n    float t = x0 / (p1.x + sqrt((p1.x * p1.x) + ((v.x - p1.x) * x0)));\n    float y = mix(mix(left.y, vCtrl.y, t), mix(vCtrl.y, right.y, t), t);\n    vec2 d_half = mix(p1, v, vec2(t));\n    float dy = d_half.y / d_half.x;\n    float width = extent.y - extent.x;\n    dy = abs(dy * width);\n    vec4 sides = vec4((dy * 0.5) + y, (dy * (-0.5)) + y, (0.5 - y) / dy, ((-0.5) - y) / dy);\n    sides = clamp(sides + vec4(0.5), vec4(0.0), vec4(1.0));\n    float area = 0.5 * ((((sides.z - (sides.z * sides.y)) + 1.0) - sides.x) + (sides.x * sides.w));\n    area *= width;\n    if (width == 0.0)\n    {\n        area = 0.0;\n    }\n    gl_FragData[0].x = area;\n}\n\n",
 		/*
 		   static float2 vTo;
@@ -486,15 +488,15 @@ var (
 		*/
 		HLSL: []byte(nil),
 	}
-	shader_stencil_vert = ShaderSources{
-		Inputs: []InputLocation{
+	shader_stencil_vert = backend.ShaderSources{
+		Inputs: []backend.InputLocation{
 			{Name: "corner", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0, Size: 2},
 			{Name: "maxy", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0, Size: 1},
 			{Name: "from", Location: 2, Semantic: "TEXCOORD", SemanticIndex: 0, Type: 0, Size: 2},
 			{Name: "ctrl", Location: 3, Semantic: "TEXCOORD", SemanticIndex: 1, Type: 0, Size: 2},
 			{Name: "to", Location: 4, Semantic: "TEXCOORD", SemanticIndex: 2, Type: 0, Size: 2},
 		},
-		Uniforms: []UniformLocation{
+		Uniforms: []backend.UniformLocation{
 			{Name: "_15.scale", Type: 0, Size: 2, Offset: 0},
 			{Name: "_15.offset", Type: 0, Size: 2, Offset: 8},
 			{Name: "_15.pathOffset", Type: 0, Size: 2, Offset: 16},

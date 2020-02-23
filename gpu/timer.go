@@ -4,17 +4,19 @@ package gpu
 
 import (
 	"time"
+
+	"gioui.org/gpu/backend"
 )
 
 type timers struct {
-	backend Backend
+	backend backend.Device
 	timers  []*timer
 }
 
 type timer struct {
 	Elapsed time.Duration
-	backend Backend
-	timer   Timer
+	backend backend.Device
+	timer   backend.Timer
 	state   timerState
 }
 
@@ -26,7 +28,7 @@ const (
 	timerWaiting
 )
 
-func newTimers(b Backend) *timers {
+func newTimers(b backend.Device) *timers {
 	return &timers{
 		backend: b,
 	}
