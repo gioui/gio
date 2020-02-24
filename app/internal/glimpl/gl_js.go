@@ -62,6 +62,9 @@ func (f *Functions) BindAttribLocation(p gl.Program, a gl.Attrib, name string) {
 func (f *Functions) BindBuffer(target gl.Enum, b gl.Buffer) {
 	f.Ctx.Call("bindBuffer", int(target), js.Value(b))
 }
+func (f *Functions) BindBufferBase(target gl.Enum, index int, b gl.Buffer) {
+	f.Ctx.Call("bindBufferBase", int(target), index, js.Value(b))
+}
 func (f *Functions) BindFramebuffer(target gl.Enum, fb gl.Framebuffer) {
 	f.Ctx.Call("bindFramebuffer", int(target), js.Value(fb))
 }
@@ -228,6 +231,9 @@ func (f *Functions) GetString(pname gl.Enum) string {
 		return f.Ctx.Call("getParameter", int(pname)).String()
 	}
 }
+func (f *Functions) GetUniformBlockIndex(p gl.Program, name string) uint {
+	return uint(paramVal(f.Ctx.Call("getUniformBlockIndex", js.Value(p), name)))
+}
 func (f *Functions) GetUniformLocation(p gl.Program, name string) gl.Uniform {
 	return gl.Uniform(f.Ctx.Call("getUniformLocation", js.Value(p), name))
 }
@@ -269,6 +275,9 @@ func (f *Functions) TexSubImage2D(target gl.Enum, level int, x, y, width, height
 }
 func (f *Functions) TexParameteri(target, pname gl.Enum, param int) {
 	f.Ctx.Call("texParameteri", int(target), int(pname), int(param))
+}
+func (f *Functions) UniformBlockBinding(p gl.Program, uniformBlockIndex uint, uniformBlockBinding uint) {
+	f.Ctx.Call("uniformBlockBinding", js.Value(p), int(uniformBlockIndex), int(uniformBlockBinding))
 }
 func (f *Functions) Uniform1f(dst gl.Uniform, v float32) {
 	f.Ctx.Call("uniform1f", js.Value(dst), v)

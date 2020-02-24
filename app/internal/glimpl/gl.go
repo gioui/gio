@@ -41,6 +41,9 @@ import (
 #include <GLES3/gl3.h>
 #endif
 
+static void (*_glBindBufferBase)(GLenum target, GLuint index, GLuint buffer);
+static GLuint (*_glGetUniformBlockIndex)(GLuint program, const GLchar *uniformBlockName);
+static void (*_glUniformBlockBinding)(GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding);
 static void (*_glInvalidateFramebuffer)(GLenum target, GLsizei numAttachments, const GLenum *attachments);
 
 static void (*_glBeginQuery)(GLenum target, GLuint id);
@@ -58,6 +61,18 @@ __attribute__ ((visibility ("hidden"))) void gio_glVertexAttribPointer(GLuint in
 // The pointer-free version of glDrawElements, to avoid the Cgo pointer checks.
 __attribute__ ((visibility ("hidden"))) void gio_glDrawElements(GLenum mode, GLsizei count, GLenum type, const uintptr_t offset) {
 	glDrawElements(mode, count, type, (const GLvoid *)offset);
+}
+
+__attribute__ ((visibility ("hidden"))) void gio_glBindBufferBase(GLenum target, GLuint index, GLuint buffer) {
+	_glBindBufferBase(target, index, buffer);
+}
+
+__attribute__ ((visibility ("hidden"))) void gio_glUniformBlockBinding(GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding) {
+	_glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
+}
+
+__attribute__ ((visibility ("hidden"))) GLuint gio_glGetUniformBlockIndex(GLuint program, const GLchar *uniformBlockName) {
+	return _glGetUniformBlockIndex(program, uniformBlockName);
 }
 
 __attribute__ ((visibility ("hidden"))) void gio_glInvalidateFramebuffer(GLenum target, GLenum attachment) {
@@ -104,10 +119,16 @@ __attribute__((constructor)) static void gio_loadGLFunctions() {
 	_glGenQueries = glGenQueries;
 	_glGetQueryObjectuiv = glGetQueryObjectuiv;
 	#endif
+	_glBindBufferBase = glBindBufferBase;
+	_glGetUniformBlockIndex = glGetUniformBlockIndex;
+	_glUniformBlockBinding = glUniformBlockBinding;
 	_glGetStringi = glGetStringi;
 #else
 	// Load libGLESv3 if available.
 	dlopen("libGLESv3.so", RTLD_NOW | RTLD_GLOBAL);
+	_glBindBufferBase = dlsym(RTLD_DEFAULT, "glBindBufferBase");
+	_glGetUniformBlockIndex = dlsym(RTLD_DEFAULT, "glGetUniformBlockIndex");
+	_glUniformBlockBinding = dlsym(RTLD_DEFAULT, "glUniformBlockBinding");
 	_glInvalidateFramebuffer = dlsym(RTLD_DEFAULT, "glInvalidateFramebuffer");
 	_glGetStringi = dlsym(RTLD_DEFAULT, "glGetStringi");
 	// Fall back to EXT_invalidate_framebuffer if available.
@@ -157,6 +178,10 @@ func (f *Functions) BindAttribLocation(p gl.Program, a gl.Attrib, name string) {
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
 	C.glBindAttribLocation(C.GLuint(p.V), C.GLuint(a), cname)
+}
+
+func (f *Functions) BindBufferBase(target gl.Enum, index int, b gl.Buffer) {
+	C.gio_glBindBufferBase(C.GLenum(target), C.GLuint(index), C.GLuint(b.V))
 }
 
 func (f *Functions) BindBuffer(target gl.Enum, b gl.Buffer) {
@@ -407,6 +432,12 @@ func (f *Functions) GetString(pname gl.Enum) string {
 	}
 }
 
+func (f *Functions) GetUniformBlockIndex(p gl.Program, name string) uint {
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+	return uint(C.gio_glGetUniformBlockIndex(C.GLuint(p.V), cname))
+}
+
 func (f *Functions) GetUniformLocation(p gl.Program, name string) gl.Uniform {
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
@@ -466,6 +497,10 @@ func (f *Functions) TexSubImage2D(target gl.Enum, level int, x int, y int, width
 
 func (f *Functions) TexParameteri(target, pname gl.Enum, param int) {
 	C.glTexParameteri(C.GLenum(target), C.GLenum(pname), C.GLint(param))
+}
+
+func (f *Functions) UniformBlockBinding(p gl.Program, uniformBlockIndex uint, uniformBlockBinding uint) {
+	C.gio_glUniformBlockBinding(C.GLuint(p.V), C.GLuint(uniformBlockIndex), C.GLuint(uniformBlockBinding))
 }
 
 func (f *Functions) Uniform1f(dst gl.Uniform, v float32) {

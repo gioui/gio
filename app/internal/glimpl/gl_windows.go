@@ -21,6 +21,7 @@ var (
 	_glBeginQuery                         = LibGLESv2.NewProc("glBeginQuery")
 	_glBindAttribLocation                 = LibGLESv2.NewProc("glBindAttribLocation")
 	_glBindBuffer                         = LibGLESv2.NewProc("glBindBuffer")
+	_glBindBufferBase                     = LibGLESv2.NewProc("glBindBufferBase")
 	_glBindFramebuffer                    = LibGLESv2.NewProc("glBindFramebuffer")
 	_glBindRenderbuffer                   = LibGLESv2.NewProc("glBindRenderbuffer")
 	_glBindTexture                        = LibGLESv2.NewProc("glBindTexture")
@@ -35,6 +36,7 @@ var (
 	_glCompileShader                      = LibGLESv2.NewProc("glCompileShader")
 	_glGenBuffers                         = LibGLESv2.NewProc("glGenBuffers")
 	_glGenFramebuffers                    = LibGLESv2.NewProc("glGenFramebuffers")
+	_glGetUniformBlockIndex               = LibGLESv2.NewProc("glGetUniformBlockIndex")
 	_glCreateProgram                      = LibGLESv2.NewProc("glCreateProgram")
 	_glGenRenderbuffers                   = LibGLESv2.NewProc("glGenRenderbuffers")
 	_glCreateShader                       = LibGLESv2.NewProc("glCreateShader")
@@ -79,6 +81,7 @@ var (
 	_glTexImage2D                         = LibGLESv2.NewProc("glTexImage2D")
 	_glTexSubImage2D                      = LibGLESv2.NewProc("glTexSubImage2D")
 	_glTexParameteri                      = LibGLESv2.NewProc("glTexParameteri")
+	_glUniformBlockBinding                = LibGLESv2.NewProc("glUniformBlockBinding")
 	_glUniform1f                          = LibGLESv2.NewProc("glUniform1f")
 	_glUniform1i                          = LibGLESv2.NewProc("glUniform1i")
 	_glUniform2f                          = LibGLESv2.NewProc("glUniform2f")
@@ -111,6 +114,9 @@ func (c *Functions) BindAttribLocation(p gl.Program, a gl.Attrib, name string) {
 }
 func (c *Functions) BindBuffer(target gl.Enum, b gl.Buffer) {
 	syscall.Syscall(_glBindBuffer.Addr(), 2, uintptr(target), uintptr(b.V), 0)
+}
+func (c *Functions) BindBufferBase(target gl.Enum, index int, b gl.Buffer) {
+	syscall.Syscall(_glBindBufferBase.Addr(), 3, uintptr(target), uintptr(index), uintptr(b.V))
 }
 func (c *Functions) BindFramebuffer(target gl.Enum, fb gl.Framebuffer) {
 	syscall.Syscall(_glBindFramebuffer.Addr(), 2, uintptr(target), uintptr(fb.V), 0)
@@ -246,6 +252,13 @@ func (c *Functions) FramebufferRenderbuffer(target, attachment, renderbuffertarg
 func (c *Functions) FramebufferTexture2D(target, attachment, texTarget gl.Enum, t gl.Texture, level int) {
 	syscall.Syscall6(_glFramebufferTexture2D.Addr(), 5, uintptr(target), uintptr(attachment), uintptr(texTarget), uintptr(t.V), uintptr(level), 0)
 }
+func (f *Functions) GetUniformBlockIndex(p gl.Program, name string) uint {
+	cname := cString(name)
+	c0 := &cname[0]
+	u, _, _ := syscall.Syscall(_glGetUniformBlockIndex.Addr(), 2, uintptr(p.V), uintptr(unsafe.Pointer(c0)), 0)
+	issue34474KeepAlive(c0)
+	return uint(u)
+}
 func (c *Functions) GetBinding(pname gl.Enum) gl.Object {
 	return gl.Object{uint(c.GetInteger(pname))}
 }
@@ -297,7 +310,7 @@ func (c *Functions) GetUniformLocation(p gl.Program, name string) gl.Uniform {
 	cname := cString(name)
 	c0 := &cname[0]
 	u, _, _ := syscall.Syscall(_glGetUniformLocation.Addr(), 2, uintptr(p.V), uintptr(unsafe.Pointer(c0)), 0)
-	issue34474KeepAlive(c)
+	issue34474KeepAlive(c0)
 	return gl.Uniform{int(u)}
 }
 func (c *Functions) InvalidateFramebuffer(target, attachment gl.Enum) {
@@ -347,6 +360,9 @@ func (c *Functions) TexSubImage2D(target gl.Enum, level int, x, y, width, height
 }
 func (c *Functions) TexParameteri(target, pname gl.Enum, param int) {
 	syscall.Syscall(_glTexParameteri.Addr(), 3, uintptr(target), uintptr(pname), uintptr(param))
+}
+func (f *Functions) UniformBlockBinding(p gl.Program, uniformBlockIndex uint, uniformBlockBinding uint) {
+	syscall.Syscall(_glUniformBlockBinding.Addr(), 3, uintptr(p.V), uintptr(uniformBlockIndex), uintptr(uniformBlockBinding))
 }
 func (c *Functions) Uniform1f(dst gl.Uniform, v float32) {
 	syscall.Syscall(_glUniform1f.Addr(), 2, uintptr(dst.V), uintptr(math.Float32bits(v)), 0)
