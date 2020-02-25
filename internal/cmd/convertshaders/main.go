@@ -64,13 +64,8 @@ func generate() error {
 	for _, shader := range shaders {
 		const nvariants = 2
 		var variants [nvariants]struct {
-			gles2       string
-			hlslSrc     string
-			hlsl        []byte
-			inputs      []backend.InputLocation
-			uniforms    []backend.UniformLocation
-			textures    []backend.TextureBinding
-			uniformSize int
+			backend.ShaderSources
+			hlslSrc string
 		}
 		args := [nvariants]shaderArgs{
 			{
@@ -83,13 +78,16 @@ func generate() error {
 			},
 		}
 		for i := range args {
-			gles2, reflect, err := convertShader(tmp, glslcc, shader, "gles", "100", &args[i], false)
+			glsl100, reflect, err := convertShader(tmp, glslcc, shader, "gles", "100", &args[i], false)
 			if err != nil {
 				return err
 			}
 			// Make the GL ES 2 source compatible with desktop GL 3.
-			gles2 = "#version 100\n" + gles2
-			inputs, uniforms, textures, uniformSize, err := parseReflection(reflect)
+			glsl100 = "#version 100\n" + glsl100
+			if err := parseReflection(reflect, &variants[i].ShaderSources); err != nil {
+				return err
+			}
+			glsl300, _, err := convertShader(tmp, glslcc, shader, "gles", "300", &args[i], false)
 			if err != nil {
 				return err
 			}
@@ -113,40 +111,39 @@ func generate() error {
 					return err
 				}
 			}
-			variants[i].gles2 = gles2
+			variants[i].GLSL100ES = glsl100
+			variants[i].GLSL300ES = glsl300
 			variants[i].hlslSrc = hlsl
-			variants[i].hlsl = hlslc
-			variants[i].inputs = inputs
-			variants[i].uniforms = uniforms
-			variants[i].textures = textures
-			variants[i].uniformSize = uniformSize
+			variants[i].HLSL = hlslc
 		}
 		name := filepath.Base(shader)
 		name = strings.ReplaceAll(name, ".", "_")
 		fmt.Fprintf(&out, "\tshader_%s = ", name)
 		// If the shader don't use the variant arguments, output
 		// only a single version.
-		multiVariant := variants[0].gles2 != variants[1].gles2
+		multiVariant := variants[0].GLSL100ES != variants[1].GLSL100ES
 		if multiVariant {
 			fmt.Fprintf(&out, "[...]backend.ShaderSources{\n")
 		}
 		for _, src := range variants {
 			fmt.Fprintf(&out, "backend.ShaderSources{\n")
-			if len(src.inputs) > 0 {
-				fmt.Fprintf(&out, "Inputs: %#v,\n", src.inputs)
+			if len(src.Inputs) > 0 {
+				fmt.Fprintf(&out, "Inputs: %#v,\n", src.Inputs)
 			}
-			if len(src.uniforms) > 0 {
-				fmt.Fprintf(&out, "Uniforms: %#v,\n", src.uniforms)
+			if u := src.Uniforms; len(u.Blocks) > 0 {
+				fmt.Fprintf(&out, "Uniforms: backend.UniformsReflection{\n")
+				fmt.Fprintf(&out, "Blocks: %#v,\n", u.Blocks)
+				fmt.Fprintf(&out, "Locations: %#v,\n", u.Locations)
+				fmt.Fprintf(&out, "Size: %d,\n", u.Size)
+				fmt.Fprintf(&out, "},\n")
 			}
-			if src.uniformSize != 0 {
-				fmt.Fprintf(&out, "UniformSize: %d,\n", src.uniformSize)
+			if len(src.Textures) > 0 {
+				fmt.Fprintf(&out, "Textures: %#v,\n", src.Textures)
 			}
-			if len(src.textures) > 0 {
-				fmt.Fprintf(&out, "Textures: %#v,\n", src.textures)
-			}
-			fmt.Fprintf(&out, "GLES2: %#v,\n", src.gles2)
+			fmt.Fprintf(&out, "GLSL100ES: %#v,\n", src.GLSL100ES)
+			fmt.Fprintf(&out, "GLSL300ES: %#v,\n", src.GLSL300ES)
 			fmt.Fprintf(&out, "/*\n%s\n*/\n", src.hlslSrc)
-			fmt.Fprintf(&out, "HLSL: %#v,\n", src.hlsl)
+			fmt.Fprintf(&out, "HLSL: %#v,\n", src.HLSL)
 			fmt.Fprintf(&out, "}")
 			if multiVariant {
 				fmt.Fprintf(&out, ",")
@@ -168,7 +165,7 @@ func generate() error {
 	return ioutil.WriteFile("shaders.go", gosrc, 0644)
 }
 
-func parseReflection(jsonData []byte) ([]backend.InputLocation, []backend.UniformLocation, []backend.TextureBinding, int, error) {
+func parseReflection(jsonData []byte, info *backend.ShaderSources) error {
 	type InputReflection struct {
 		ID            int    `json:"id"`
 		Name          string `json:"name"`
@@ -210,16 +207,15 @@ func parseReflection(jsonData []byte) ([]backend.InputLocation, []backend.Unifor
 	}
 	var reflect shaderMetadata
 	if err := json.Unmarshal(jsonData, &reflect); err != nil {
-		return nil, nil, nil, 0, fmt.Errorf("parseReflection: %v", err)
+		return fmt.Errorf("parseReflection: %v", err)
 	}
-	var inputs []backend.InputLocation
 	inputRef := reflect.VS.Inputs
 	for _, input := range inputRef {
 		dataType, dataSize, err := parseDataType(input.Type)
 		if err != nil {
-			return nil, nil, nil, 0, fmt.Errorf("parseReflection: %v", err)
+			return fmt.Errorf("parseReflection: %v", err)
 		}
-		inputs = append(inputs, backend.InputLocation{
+		info.Inputs = append(info.Inputs, backend.InputLocation{
 			Name:          input.Name,
 			Location:      input.Location,
 			Semantic:      input.Semantic,
@@ -228,22 +224,25 @@ func parseReflection(jsonData []byte) ([]backend.InputLocation, []backend.Unifor
 			Size:          dataSize,
 		})
 	}
-	sort.Slice(inputs, func(i, j int) bool {
-		return inputs[i].Location < inputs[j].Location
+	sort.Slice(info.Inputs, func(i, j int) bool {
+		return info.Inputs[i].Location < info.Inputs[j].Location
 	})
-	var ublocks []backend.UniformLocation
 	shaderBlocks := reflect.VS.UniformBuffers
 	if len(shaderBlocks) == 0 {
 		shaderBlocks = reflect.FS.UniformBuffers
 	}
 	blockOffset := 0
 	for _, block := range shaderBlocks {
+		info.Uniforms.Blocks = append(info.Uniforms.Blocks, backend.UniformBlock{
+			Name:    block.Name,
+			Binding: block.Binding,
+		})
 		for _, member := range block.Members {
 			dataType, size, err := parseDataType(member.Type)
 			if err != nil {
-				return nil, nil, nil, 0, fmt.Errorf("parseReflection: %v", err)
+				return fmt.Errorf("parseReflection: %v", err)
 			}
-			ublocks = append(ublocks, backend.UniformLocation{
+			info.Uniforms.Locations = append(info.Uniforms.Locations, backend.UniformLocation{
 				// Synthetic name generated by glslcc.
 				Name:   fmt.Sprintf("_%d.%s", block.ID, member.Name),
 				Type:   dataType,
@@ -253,18 +252,18 @@ func parseReflection(jsonData []byte) ([]backend.InputLocation, []backend.Unifor
 		}
 		blockOffset += block.Size
 	}
+	info.Uniforms.Size = blockOffset
 	textures := reflect.VS.Textures
 	if len(textures) == 0 {
 		textures = reflect.FS.Textures
 	}
-	var texBinds []backend.TextureBinding
 	for _, texture := range textures {
-		texBinds = append(texBinds, backend.TextureBinding{
+		info.Textures = append(info.Textures, backend.TextureBinding{
 			Name:    texture.Name,
 			Binding: texture.Binding,
 		})
 	}
-	return inputs, ublocks, texBinds, blockOffset, nil
+	return nil
 }
 
 func parseDataType(t string) (backend.DataType, int, error) {

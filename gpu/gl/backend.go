@@ -19,7 +19,8 @@ type Backend struct {
 
 	state glstate
 
-	feats backend.Caps
+	gles300 bool
+	feats   backend.Caps
 	// floatTriple holds the settings for floating point
 	// textures.
 	floatTriple textureTriple
@@ -67,6 +68,7 @@ type gpuFramebuffer struct {
 
 type gpuBuffer struct {
 	backend   *Backend
+	hasBuffer bool
 	obj       Buffer
 	typ       backend.BufferBinding
 	size      int
@@ -115,7 +117,7 @@ type textureTriple struct {
 func NewBackend(f Functions) (*Backend, error) {
 	exts := strings.Split(f.GetString(EXTENSIONS), " ")
 	glVer := f.GetString(VERSION)
-	ver, err := ParseGLVersion(glVer)
+	ver, gles, err := ParseGLVersion(glVer)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +129,9 @@ func NewBackend(f Functions) (*Backend, error) {
 	if err != nil {
 		return nil, err
 	}
+	gles300 := gles && ver[0] >= 3
 	b := &Backend{
+		gles300:     gles300,
 		funcs:       f,
 		floatTriple: floatTriple,
 		alphaTriple: alphaTripleFor(ver),
@@ -236,10 +240,13 @@ func (b *Backend) NewBuffer(typ backend.BufferBinding, size int) (backend.Buffer
 		if typ != backend.BufferBindingUniforms {
 			return nil, errors.New("uniforms buffers cannot be bound as anything else")
 		}
-		// GLES 2 doesn't support uniform buffers.
-		buf.data = make([]byte, size)
+		if !b.gles300 {
+			// GLES 2 doesn't support uniform buffers.
+			buf.data = make([]byte, size)
+		}
 	}
-	if typ&^backend.BufferBindingUniforms != 0 {
+	if typ&^backend.BufferBindingUniforms != 0 || b.gles300 {
+		buf.hasBuffer = true
 		buf.obj = b.funcs.CreateBuffer()
 		if err := glErr(b.funcs); err != nil {
 			buf.Release()
@@ -252,7 +259,7 @@ func (b *Backend) NewBuffer(typ backend.BufferBinding, size int) (backend.Buffer
 func (b *Backend) NewImmutableBuffer(typ backend.BufferBinding, data []byte) (backend.Buffer, error) {
 	glErr(b.funcs)
 	obj := b.funcs.CreateBuffer()
-	buf := &gpuBuffer{backend: b, obj: obj, typ: typ, size: len(data)}
+	buf := &gpuBuffer{backend: b, obj: obj, typ: typ, size: len(data), hasBuffer: true}
 	buf.Upload(data)
 	buf.immutable = true
 	if err := glErr(b.funcs); err != nil {
@@ -419,12 +426,16 @@ func (b *Backend) NewInputLayout(vs backend.ShaderSources, layout []backend.Inpu
 	}, nil
 }
 
-func (b *Backend) NewProgram(vssrc, fssrc backend.ShaderSources) (backend.Program, error) {
-	attr := make([]string, len(vssrc.Inputs))
-	for _, inp := range vssrc.Inputs {
+func (b *Backend) NewProgram(vertShader, fragShader backend.ShaderSources) (backend.Program, error) {
+	attr := make([]string, len(vertShader.Inputs))
+	for _, inp := range vertShader.Inputs {
 		attr[inp.Location] = inp.Name
 	}
-	p, err := CreateProgram(b.funcs, vssrc.GLES2, fssrc.GLES2, attr)
+	vsrc, fsrc := vertShader.GLSL100ES, fragShader.GLSL100ES
+	if b.gles300 {
+		vsrc, fsrc = vertShader.GLSL300ES, fragShader.GLSL300ES
+	}
+	p, err := CreateProgram(b.funcs, vsrc, fsrc, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -435,20 +446,39 @@ func (b *Backend) NewProgram(vssrc, fssrc backend.ShaderSources) (backend.Progra
 	}
 	b.BindProgram(gpuProg)
 	// Bind texture uniforms.
-	for _, tex := range vssrc.Textures {
+	for _, tex := range vertShader.Textures {
 		u := b.funcs.GetUniformLocation(p, tex.Name)
 		if u.valid() {
 			b.funcs.Uniform1i(u, tex.Binding)
 		}
 	}
-	for _, tex := range fssrc.Textures {
+	for _, tex := range fragShader.Textures {
 		u := b.funcs.GetUniformLocation(p, tex.Name)
 		if u.valid() {
 			b.funcs.Uniform1i(u, tex.Binding)
 		}
 	}
-	gpuProg.vertUniforms.setup(b.funcs, p, vssrc.UniformSize, vssrc.Uniforms)
-	gpuProg.fragUniforms.setup(b.funcs, p, fssrc.UniformSize, fssrc.Uniforms)
+	if b.gles300 {
+		for _, block := range vertShader.Uniforms.Blocks {
+			blockIdx := b.funcs.GetUniformBlockIndex(p, block.Name)
+			if blockIdx != INVALID_INDEX {
+				b.funcs.UniformBlockBinding(p, blockIdx, uint(block.Binding))
+			}
+		}
+		// To match Direct3D 11 with separate vertex and fragment
+		// shader uniform buffers, offset all fragment blocks to be
+		// located after the vertex blocks.
+		off := len(vertShader.Uniforms.Blocks)
+		for _, block := range fragShader.Uniforms.Blocks {
+			blockIdx := b.funcs.GetUniformBlockIndex(p, block.Name)
+			if blockIdx != INVALID_INDEX {
+				b.funcs.UniformBlockBinding(p, blockIdx, uint(block.Binding+off))
+			}
+		}
+	} else {
+		gpuProg.vertUniforms.setup(b.funcs, p, vertShader.Uniforms.Size, vertShader.Uniforms.Locations)
+		gpuProg.fragUniforms.setup(b.funcs, p, fragShader.Uniforms.Size, fragShader.Uniforms.Locations)
+	}
 	return gpuProg, nil
 }
 
@@ -466,8 +496,18 @@ func (p *gpuProgram) SetFragmentUniforms(buffer backend.Buffer) {
 }
 
 func (p *gpuProgram) updateUniforms() {
-	p.vertUniforms.update(p.backend.funcs)
-	p.fragUniforms.update(p.backend.funcs)
+	f := p.backend.funcs
+	if p.backend.gles300 {
+		if b := p.vertUniforms.buf; b != nil {
+			f.BindBufferBase(UNIFORM_BUFFER, 0, b.obj)
+		}
+		if b := p.fragUniforms.buf; b != nil {
+			f.BindBufferBase(UNIFORM_BUFFER, 1, b.obj)
+		}
+	} else {
+		p.vertUniforms.update(f)
+		p.fragUniforms.update(f)
+	}
 }
 
 func (b *Backend) BindProgram(prog backend.Program) {
@@ -540,10 +580,8 @@ func (b *gpuBuffer) Upload(data []byte) {
 		panic("buffer size overflow")
 	}
 	b.version++
-	if b.typ&backend.BufferBindingUniforms != 0 {
-		copy(b.data, data)
-	}
-	if b.typ&^backend.BufferBindingUniforms != 0 {
+	copy(b.data, data)
+	if b.hasBuffer {
 		firstBinding := firstBufferType(b.typ)
 		b.backend.funcs.BindBuffer(firstBinding, b.obj)
 		b.backend.funcs.BufferData(firstBinding, data, STATIC_DRAW)
@@ -551,8 +589,9 @@ func (b *gpuBuffer) Upload(data []byte) {
 }
 
 func (b *gpuBuffer) Release() {
-	if b.typ&^backend.BufferBindingUniforms != 0 {
+	if b.hasBuffer {
 		b.backend.funcs.DeleteBuffer(b.obj)
+		b.hasBuffer = false
 	}
 }
 

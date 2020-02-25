@@ -47,15 +47,26 @@ type Device interface {
 }
 
 type ShaderSources struct {
-	GLES2       string
-	HLSL        []byte
-	Uniforms    []UniformLocation
-	UniformSize int
-	Inputs      []InputLocation
-	Textures    []TextureBinding
+	GLSL100ES string
+	GLSL300ES string
+	HLSL      []byte
+	Uniforms  UniformsReflection
+	Inputs    []InputLocation
+	Textures  []TextureBinding
+}
+
+type UniformsReflection struct {
+	Blocks    []UniformBlock
+	Locations []UniformLocation
+	Size      int
 }
 
 type TextureBinding struct {
+	Name    string
+	Binding int
+}
+
+type UniformBlock struct {
 	Name    string
 	Binding int
 }

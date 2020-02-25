@@ -7,9 +7,13 @@ import "gioui.org/gpu/backend"
 var (
 	shader_blit_frag = [...]backend.ShaderSources{
 		backend.ShaderSources{
-			Uniforms:    []backend.UniformLocation{backend.UniformLocation{Name: "_12._color", Type: 0x0, Size: 4, Offset: 0}},
-			UniformSize: 16,
-			GLES2:       "#version 100\nprecision mediump float;\nprecision highp int;\n\nstruct Color\n{\n    vec4 _color;\n};\n\nuniform Color _12;\n\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = _12._color;\n}\n\n",
+			Uniforms: backend.UniformsReflection{
+				Blocks:    []backend.UniformBlock{backend.UniformBlock{Name: "Color", Binding: 0}},
+				Locations: []backend.UniformLocation{backend.UniformLocation{Name: "_12._color", Type: 0x0, Size: 4, Offset: 0}},
+				Size:      16,
+			},
+			GLSL100ES: "#version 100\nprecision mediump float;\nprecision highp int;\n\nstruct Color\n{\n    vec4 _color;\n};\n\nuniform Color _12;\n\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = _12._color;\n}\n\n",
+			GLSL300ES: "#version 300 es\nprecision mediump float;\nprecision highp int;\n\nlayout(std140) uniform Color\n{\n    vec4 _color;\n} _12;\n\nlayout(location = 0) out vec4 fragColor;\nin vec2 vUV;\n\nvoid main()\n{\n    fragColor = _12._color;\n}\n\n",
 			/*
 			   cbuffer Color : register(b0)
 			   {
@@ -48,8 +52,9 @@ var (
 			HLSL: []byte(nil),
 		},
 		backend.ShaderSources{
-			Textures: []backend.TextureBinding{backend.TextureBinding{Name: "tex", Binding: 0}},
-			GLES2:    "#version 100\nprecision mediump float;\nprecision highp int;\n\nuniform mediump sampler2D tex;\n\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = texture2D(tex, vUV);\n}\n\n",
+			Textures:  []backend.TextureBinding{backend.TextureBinding{Name: "tex", Binding: 0}},
+			GLSL100ES: "#version 100\nprecision mediump float;\nprecision highp int;\n\nuniform mediump sampler2D tex;\n\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = texture2D(tex, vUV);\n}\n\n",
+			GLSL300ES: "#version 300 es\nprecision mediump float;\nprecision highp int;\n\nuniform mediump sampler2D tex;\n\nlayout(location = 0) out vec4 fragColor;\nin vec2 vUV;\n\nvoid main()\n{\n    fragColor = texture(tex, vUV);\n}\n\n",
 			/*
 			   Texture2D<float4> tex : register(t0);
 			   SamplerState _tex_sampler : register(s0);
@@ -86,10 +91,14 @@ var (
 		},
 	}
 	shader_blit_vert = backend.ShaderSources{
-		Inputs:      []backend.InputLocation{backend.InputLocation{Name: "pos", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "uv", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0x0, Size: 2}},
-		Uniforms:    []backend.UniformLocation{backend.UniformLocation{Name: "_15.z", Type: 0x0, Size: 1, Offset: 0}, backend.UniformLocation{Name: "_15.scale", Type: 0x0, Size: 2, Offset: 8}, backend.UniformLocation{Name: "_15.offset", Type: 0x0, Size: 2, Offset: 16}, backend.UniformLocation{Name: "_15.uvScale", Type: 0x0, Size: 2, Offset: 24}, backend.UniformLocation{Name: "_15.uvOffset", Type: 0x0, Size: 2, Offset: 32}},
-		UniformSize: 40,
-		GLES2:       "#version 100\n\nstruct Block\n{\n    float z;\n    vec2 scale;\n    vec2 offset;\n    vec2 uvScale;\n    vec2 uvOffset;\n};\n\nuniform Block _15;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\n\nvoid main()\n{\n    vec2 p = pos;\n    p *= _15.scale;\n    p += _15.offset;\n    gl_Position = vec4(p, _15.z, 1.0);\n    vUV = (uv * _15.uvScale) + _15.uvOffset;\n}\n\n",
+		Inputs: []backend.InputLocation{backend.InputLocation{Name: "pos", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "uv", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0x0, Size: 2}},
+		Uniforms: backend.UniformsReflection{
+			Blocks:    []backend.UniformBlock{backend.UniformBlock{Name: "Block", Binding: 0}},
+			Locations: []backend.UniformLocation{backend.UniformLocation{Name: "_15.z", Type: 0x0, Size: 1, Offset: 0}, backend.UniformLocation{Name: "_15.scale", Type: 0x0, Size: 2, Offset: 8}, backend.UniformLocation{Name: "_15.offset", Type: 0x0, Size: 2, Offset: 16}, backend.UniformLocation{Name: "_15.uvScale", Type: 0x0, Size: 2, Offset: 24}, backend.UniformLocation{Name: "_15.uvOffset", Type: 0x0, Size: 2, Offset: 32}},
+			Size:      40,
+		},
+		GLSL100ES: "#version 100\n\nstruct Block\n{\n    float z;\n    vec2 scale;\n    vec2 offset;\n    vec2 uvScale;\n    vec2 uvOffset;\n};\n\nuniform Block _15;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\n\nvoid main()\n{\n    vec2 p = pos;\n    p *= _15.scale;\n    p += _15.offset;\n    gl_Position = vec4(p, _15.z, 1.0);\n    vUV = (uv * _15.uvScale) + _15.uvOffset;\n}\n\n",
+		GLSL300ES: "#version 300 es\n\nlayout(std140) uniform Block\n{\n    float z;\n    vec2 scale;\n    vec2 offset;\n    vec2 uvScale;\n    vec2 uvOffset;\n} _15;\n\nlayout(location = 0) in vec2 pos;\nout vec2 vUV;\nlayout(location = 1) in vec2 uv;\n\nvoid main()\n{\n    vec2 p = pos;\n    p *= _15.scale;\n    p += _15.offset;\n    gl_Position = vec4(p, _15.z, 1.0);\n    vUV = (uv * _15.uvScale) + _15.uvOffset;\n}\n\n",
 		/*
 		   cbuffer Block : register(b0)
 		   {
@@ -143,10 +152,14 @@ var (
 	}
 	shader_cover_frag = [...]backend.ShaderSources{
 		backend.ShaderSources{
-			Uniforms:    []backend.UniformLocation{backend.UniformLocation{Name: "_12._color", Type: 0x0, Size: 4, Offset: 0}},
-			UniformSize: 16,
-			Textures:    []backend.TextureBinding{backend.TextureBinding{Name: "cover", Binding: 1}},
-			GLES2:       "#version 100\nprecision mediump float;\nprecision highp int;\n\nstruct Color\n{\n    vec4 _color;\n};\n\nuniform Color _12;\n\nuniform mediump sampler2D cover;\n\nvarying highp vec2 vCoverUV;\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = _12._color;\n    float cover_1 = abs(texture2D(cover, vCoverUV).x);\n    gl_FragData[0] *= cover_1;\n}\n\n",
+			Uniforms: backend.UniformsReflection{
+				Blocks:    []backend.UniformBlock{backend.UniformBlock{Name: "Color", Binding: 0}},
+				Locations: []backend.UniformLocation{backend.UniformLocation{Name: "_12._color", Type: 0x0, Size: 4, Offset: 0}},
+				Size:      16,
+			},
+			Textures:  []backend.TextureBinding{backend.TextureBinding{Name: "cover", Binding: 1}},
+			GLSL100ES: "#version 100\nprecision mediump float;\nprecision highp int;\n\nstruct Color\n{\n    vec4 _color;\n};\n\nuniform Color _12;\n\nuniform mediump sampler2D cover;\n\nvarying highp vec2 vCoverUV;\nvarying vec2 vUV;\n\nvoid main()\n{\n    gl_FragData[0] = _12._color;\n    float cover_1 = abs(texture2D(cover, vCoverUV).x);\n    gl_FragData[0] *= cover_1;\n}\n\n",
+			GLSL300ES: "#version 300 es\nprecision mediump float;\nprecision highp int;\n\nlayout(std140) uniform Color\n{\n    vec4 _color;\n} _12;\n\nuniform mediump sampler2D cover;\n\nlayout(location = 0) out vec4 fragColor;\nin highp vec2 vCoverUV;\nin vec2 vUV;\n\nvoid main()\n{\n    fragColor = _12._color;\n    float cover_1 = abs(texture(cover, vCoverUV).x);\n    fragColor *= cover_1;\n}\n\n",
 			/*
 			   cbuffer Color : register(b0)
 			   {
@@ -192,8 +205,9 @@ var (
 			HLSL: []byte(nil),
 		},
 		backend.ShaderSources{
-			Textures: []backend.TextureBinding{backend.TextureBinding{Name: "tex", Binding: 0}, backend.TextureBinding{Name: "cover", Binding: 1}},
-			GLES2:    "#version 100\nprecision mediump float;\nprecision highp int;\n\nuniform mediump sampler2D tex;\nuniform mediump sampler2D cover;\n\nvarying vec2 vUV;\nvarying highp vec2 vCoverUV;\n\nvoid main()\n{\n    gl_FragData[0] = texture2D(tex, vUV);\n    float cover_1 = abs(texture2D(cover, vCoverUV).x);\n    gl_FragData[0] *= cover_1;\n}\n\n",
+			Textures:  []backend.TextureBinding{backend.TextureBinding{Name: "tex", Binding: 0}, backend.TextureBinding{Name: "cover", Binding: 1}},
+			GLSL100ES: "#version 100\nprecision mediump float;\nprecision highp int;\n\nuniform mediump sampler2D tex;\nuniform mediump sampler2D cover;\n\nvarying vec2 vUV;\nvarying highp vec2 vCoverUV;\n\nvoid main()\n{\n    gl_FragData[0] = texture2D(tex, vUV);\n    float cover_1 = abs(texture2D(cover, vCoverUV).x);\n    gl_FragData[0] *= cover_1;\n}\n\n",
+			GLSL300ES: "#version 300 es\nprecision mediump float;\nprecision highp int;\n\nuniform mediump sampler2D tex;\nuniform mediump sampler2D cover;\n\nlayout(location = 0) out vec4 fragColor;\nin vec2 vUV;\nin highp vec2 vCoverUV;\n\nvoid main()\n{\n    fragColor = texture(tex, vUV);\n    float cover_1 = abs(texture(cover, vCoverUV).x);\n    fragColor *= cover_1;\n}\n\n",
 			/*
 			   Texture2D<float4> tex : register(t0);
 			   SamplerState _tex_sampler : register(s0);
@@ -237,10 +251,14 @@ var (
 		},
 	}
 	shader_cover_vert = backend.ShaderSources{
-		Inputs:      []backend.InputLocation{backend.InputLocation{Name: "pos", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "uv", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0x0, Size: 2}},
-		Uniforms:    []backend.UniformLocation{backend.UniformLocation{Name: "_19.z", Type: 0x0, Size: 1, Offset: 0}, backend.UniformLocation{Name: "_19.scale", Type: 0x0, Size: 2, Offset: 8}, backend.UniformLocation{Name: "_19.offset", Type: 0x0, Size: 2, Offset: 16}, backend.UniformLocation{Name: "_19.uvCoverScale", Type: 0x0, Size: 2, Offset: 24}, backend.UniformLocation{Name: "_19.uvCoverOffset", Type: 0x0, Size: 2, Offset: 32}, backend.UniformLocation{Name: "_19.uvScale", Type: 0x0, Size: 2, Offset: 40}, backend.UniformLocation{Name: "_19.uvOffset", Type: 0x0, Size: 2, Offset: 48}},
-		UniformSize: 56,
-		GLES2:       "#version 100\n\nstruct Block\n{\n    float z;\n    vec2 scale;\n    vec2 offset;\n    vec2 uvCoverScale;\n    vec2 uvCoverOffset;\n    vec2 uvScale;\n    vec2 uvOffset;\n};\n\nuniform Block _19;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\nvarying vec2 vCoverUV;\n\nvoid main()\n{\n    gl_Position = vec4((pos * _19.scale) + _19.offset, _19.z, 1.0);\n    vUV = (uv * _19.uvScale) + _19.uvOffset;\n    vCoverUV = (uv * _19.uvCoverScale) + _19.uvCoverOffset;\n}\n\n",
+		Inputs: []backend.InputLocation{backend.InputLocation{Name: "pos", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "uv", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0x0, Size: 2}},
+		Uniforms: backend.UniformsReflection{
+			Blocks:    []backend.UniformBlock{backend.UniformBlock{Name: "Block", Binding: 0}},
+			Locations: []backend.UniformLocation{backend.UniformLocation{Name: "_19.z", Type: 0x0, Size: 1, Offset: 0}, backend.UniformLocation{Name: "_19.scale", Type: 0x0, Size: 2, Offset: 8}, backend.UniformLocation{Name: "_19.offset", Type: 0x0, Size: 2, Offset: 16}, backend.UniformLocation{Name: "_19.uvCoverScale", Type: 0x0, Size: 2, Offset: 24}, backend.UniformLocation{Name: "_19.uvCoverOffset", Type: 0x0, Size: 2, Offset: 32}, backend.UniformLocation{Name: "_19.uvScale", Type: 0x0, Size: 2, Offset: 40}, backend.UniformLocation{Name: "_19.uvOffset", Type: 0x0, Size: 2, Offset: 48}},
+			Size:      56,
+		},
+		GLSL100ES: "#version 100\n\nstruct Block\n{\n    float z;\n    vec2 scale;\n    vec2 offset;\n    vec2 uvCoverScale;\n    vec2 uvCoverOffset;\n    vec2 uvScale;\n    vec2 uvOffset;\n};\n\nuniform Block _19;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\nvarying vec2 vCoverUV;\n\nvoid main()\n{\n    gl_Position = vec4((pos * _19.scale) + _19.offset, _19.z, 1.0);\n    vUV = (uv * _19.uvScale) + _19.uvOffset;\n    vCoverUV = (uv * _19.uvCoverScale) + _19.uvCoverOffset;\n}\n\n",
+		GLSL300ES: "#version 300 es\n\nlayout(std140) uniform Block\n{\n    float z;\n    vec2 scale;\n    vec2 offset;\n    vec2 uvCoverScale;\n    vec2 uvCoverOffset;\n    vec2 uvScale;\n    vec2 uvOffset;\n} _19;\n\nlayout(location = 0) in vec2 pos;\nout vec2 vUV;\nlayout(location = 1) in vec2 uv;\nout vec2 vCoverUV;\n\nvoid main()\n{\n    gl_Position = vec4((pos * _19.scale) + _19.offset, _19.z, 1.0);\n    vUV = (uv * _19.uvScale) + _19.uvOffset;\n    vCoverUV = (uv * _19.uvCoverScale) + _19.uvCoverOffset;\n}\n\n",
 		/*
 		   cbuffer Block : register(b0)
 		   {
@@ -296,8 +314,9 @@ var (
 		HLSL: []byte(nil),
 	}
 	shader_intersect_frag = backend.ShaderSources{
-		Textures: []backend.TextureBinding{backend.TextureBinding{Name: "cover", Binding: 0}},
-		GLES2:    "#version 100\nprecision mediump float;\nprecision highp int;\n\nuniform mediump sampler2D cover;\n\nvarying highp vec2 vUV;\n\nvoid main()\n{\n    float cover_1 = abs(texture2D(cover, vUV).x);\n    gl_FragData[0].x = cover_1;\n}\n\n",
+		Textures:  []backend.TextureBinding{backend.TextureBinding{Name: "cover", Binding: 0}},
+		GLSL100ES: "#version 100\nprecision mediump float;\nprecision highp int;\n\nuniform mediump sampler2D cover;\n\nvarying highp vec2 vUV;\n\nvoid main()\n{\n    float cover_1 = abs(texture2D(cover, vUV).x);\n    gl_FragData[0].x = cover_1;\n}\n\n",
+		GLSL300ES: "#version 300 es\nprecision mediump float;\nprecision highp int;\n\nuniform mediump sampler2D cover;\n\nin highp vec2 vUV;\nlayout(location = 0) out vec4 fragColor;\n\nvoid main()\n{\n    float cover_1 = abs(texture(cover, vUV).x);\n    fragColor.x = cover_1;\n}\n\n",
 		/*
 		   Texture2D<float4> cover : register(t0);
 		   SamplerState _cover_sampler : register(s0);
@@ -334,10 +353,14 @@ var (
 		HLSL: []byte(nil),
 	}
 	shader_intersect_vert = backend.ShaderSources{
-		Inputs:      []backend.InputLocation{backend.InputLocation{Name: "pos", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "uv", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0x0, Size: 2}},
-		Uniforms:    []backend.UniformLocation{backend.UniformLocation{Name: "_40.scale", Type: 0x0, Size: 2, Offset: 0}, backend.UniformLocation{Name: "_40.offset", Type: 0x0, Size: 2, Offset: 8}},
-		UniformSize: 16,
-		GLES2:       "#version 100\n\nstruct Block\n{\n    vec2 scale;\n    vec2 offset;\n};\n\nuniform Block _40;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\n\nvoid main()\n{\n    vec2 p = pos;\n    p.y = -p.y;\n    gl_Position = vec4(p, 0.0, 1.0);\n    vUV = (uv * _40.scale) + _40.offset;\n}\n\n",
+		Inputs: []backend.InputLocation{backend.InputLocation{Name: "pos", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "uv", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0x0, Size: 2}},
+		Uniforms: backend.UniformsReflection{
+			Blocks:    []backend.UniformBlock{backend.UniformBlock{Name: "Block", Binding: 0}},
+			Locations: []backend.UniformLocation{backend.UniformLocation{Name: "_40.scale", Type: 0x0, Size: 2, Offset: 0}, backend.UniformLocation{Name: "_40.offset", Type: 0x0, Size: 2, Offset: 8}},
+			Size:      16,
+		},
+		GLSL100ES: "#version 100\n\nstruct Block\n{\n    vec2 scale;\n    vec2 offset;\n};\n\nuniform Block _40;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\n\nvoid main()\n{\n    vec2 p = pos;\n    p.y = -p.y;\n    gl_Position = vec4(p, 0.0, 1.0);\n    vUV = (uv * _40.scale) + _40.offset;\n}\n\n",
+		GLSL300ES: "#version 300 es\n\nlayout(std140) uniform Block\n{\n    vec2 scale;\n    vec2 offset;\n} _40;\n\nlayout(location = 0) in vec2 pos;\nout vec2 vUV;\nlayout(location = 1) in vec2 uv;\n\nvoid main()\n{\n    vec2 p = pos;\n    p.y = -p.y;\n    gl_Position = vec4(p, 0.0, 1.0);\n    vUV = (uv * _40.scale) + _40.offset;\n}\n\n",
 		/*
 		   cbuffer Block : register(b0)
 		   {
@@ -386,7 +409,8 @@ var (
 		HLSL: []byte(nil),
 	}
 	shader_stencil_frag = backend.ShaderSources{
-		GLES2: "#version 100\nprecision mediump float;\nprecision highp int;\n\nvarying vec2 vTo;\nvarying vec2 vFrom;\nvarying vec2 vCtrl;\n\nvoid main()\n{\n    float dx = vTo.x - vFrom.x;\n    bool increasing = vTo.x >= vFrom.x;\n    bvec2 _35 = bvec2(increasing);\n    vec2 left = vec2(_35.x ? vFrom.x : vTo.x, _35.y ? vFrom.y : vTo.y);\n    bvec2 _41 = bvec2(increasing);\n    vec2 right = vec2(_41.x ? vTo.x : vFrom.x, _41.y ? vTo.y : vFrom.y);\n    vec2 extent = clamp(vec2(vFrom.x, vTo.x), vec2(-0.5), vec2(0.5));\n    float midx = mix(extent.x, extent.y, 0.5);\n    float x0 = midx - left.x;\n    vec2 p1 = vCtrl - left;\n    vec2 v = right - vCtrl;\n    float t = x0 / (p1.x + sqrt((p1.x * p1.x) + ((v.x - p1.x) * x0)));\n    float y = mix(mix(left.y, vCtrl.y, t), mix(vCtrl.y, right.y, t), t);\n    vec2 d_half = mix(p1, v, vec2(t));\n    float dy = d_half.y / d_half.x;\n    float width = extent.y - extent.x;\n    dy = abs(dy * width);\n    vec4 sides = vec4((dy * 0.5) + y, (dy * (-0.5)) + y, (0.5 - y) / dy, ((-0.5) - y) / dy);\n    sides = clamp(sides + vec4(0.5), vec4(0.0), vec4(1.0));\n    float area = 0.5 * ((((sides.z - (sides.z * sides.y)) + 1.0) - sides.x) + (sides.x * sides.w));\n    area *= width;\n    if (width == 0.0)\n    {\n        area = 0.0;\n    }\n    gl_FragData[0].x = area;\n}\n\n",
+		GLSL100ES: "#version 100\nprecision mediump float;\nprecision highp int;\n\nvarying vec2 vTo;\nvarying vec2 vFrom;\nvarying vec2 vCtrl;\n\nvoid main()\n{\n    float dx = vTo.x - vFrom.x;\n    bool increasing = vTo.x >= vFrom.x;\n    bvec2 _35 = bvec2(increasing);\n    vec2 left = vec2(_35.x ? vFrom.x : vTo.x, _35.y ? vFrom.y : vTo.y);\n    bvec2 _41 = bvec2(increasing);\n    vec2 right = vec2(_41.x ? vTo.x : vFrom.x, _41.y ? vTo.y : vFrom.y);\n    vec2 extent = clamp(vec2(vFrom.x, vTo.x), vec2(-0.5), vec2(0.5));\n    float midx = mix(extent.x, extent.y, 0.5);\n    float x0 = midx - left.x;\n    vec2 p1 = vCtrl - left;\n    vec2 v = right - vCtrl;\n    float t = x0 / (p1.x + sqrt((p1.x * p1.x) + ((v.x - p1.x) * x0)));\n    float y = mix(mix(left.y, vCtrl.y, t), mix(vCtrl.y, right.y, t), t);\n    vec2 d_half = mix(p1, v, vec2(t));\n    float dy = d_half.y / d_half.x;\n    float width = extent.y - extent.x;\n    dy = abs(dy * width);\n    vec4 sides = vec4((dy * 0.5) + y, (dy * (-0.5)) + y, (0.5 - y) / dy, ((-0.5) - y) / dy);\n    sides = clamp(sides + vec4(0.5), vec4(0.0), vec4(1.0));\n    float area = 0.5 * ((((sides.z - (sides.z * sides.y)) + 1.0) - sides.x) + (sides.x * sides.w));\n    area *= width;\n    if (width == 0.0)\n    {\n        area = 0.0;\n    }\n    gl_FragData[0].x = area;\n}\n\n",
+		GLSL300ES: "#version 300 es\nprecision mediump float;\nprecision highp int;\n\nin vec2 vTo;\nin vec2 vFrom;\nin vec2 vCtrl;\nlayout(location = 0) out vec4 fragCover;\n\nvoid main()\n{\n    float dx = vTo.x - vFrom.x;\n    bool increasing = vTo.x >= vFrom.x;\n    bvec2 _35 = bvec2(increasing);\n    vec2 left = vec2(_35.x ? vFrom.x : vTo.x, _35.y ? vFrom.y : vTo.y);\n    bvec2 _41 = bvec2(increasing);\n    vec2 right = vec2(_41.x ? vTo.x : vFrom.x, _41.y ? vTo.y : vFrom.y);\n    vec2 extent = clamp(vec2(vFrom.x, vTo.x), vec2(-0.5), vec2(0.5));\n    float midx = mix(extent.x, extent.y, 0.5);\n    float x0 = midx - left.x;\n    vec2 p1 = vCtrl - left;\n    vec2 v = right - vCtrl;\n    float t = x0 / (p1.x + sqrt((p1.x * p1.x) + ((v.x - p1.x) * x0)));\n    float y = mix(mix(left.y, vCtrl.y, t), mix(vCtrl.y, right.y, t), t);\n    vec2 d_half = mix(p1, v, vec2(t));\n    float dy = d_half.y / d_half.x;\n    float width = extent.y - extent.x;\n    dy = abs(dy * width);\n    vec4 sides = vec4((dy * 0.5) + y, (dy * (-0.5)) + y, (0.5 - y) / dy, ((-0.5) - y) / dy);\n    sides = clamp(sides + vec4(0.5), vec4(0.0), vec4(1.0));\n    float area = 0.5 * ((((sides.z - (sides.z * sides.y)) + 1.0) - sides.x) + (sides.x * sides.w));\n    area *= width;\n    if (width == 0.0)\n    {\n        area = 0.0;\n    }\n    fragCover.x = area;\n}\n\n",
 		/*
 		   static float2 vTo;
 		   static float2 vFrom;
@@ -450,10 +474,14 @@ var (
 		HLSL: []byte(nil),
 	}
 	shader_stencil_vert = backend.ShaderSources{
-		Inputs:      []backend.InputLocation{backend.InputLocation{Name: "corner", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "maxy", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0x0, Size: 1}, backend.InputLocation{Name: "from", Location: 2, Semantic: "TEXCOORD", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "ctrl", Location: 3, Semantic: "TEXCOORD", SemanticIndex: 1, Type: 0x0, Size: 2}, backend.InputLocation{Name: "to", Location: 4, Semantic: "TEXCOORD", SemanticIndex: 2, Type: 0x0, Size: 2}},
-		Uniforms:    []backend.UniformLocation{backend.UniformLocation{Name: "_15.scale", Type: 0x0, Size: 2, Offset: 0}, backend.UniformLocation{Name: "_15.offset", Type: 0x0, Size: 2, Offset: 8}, backend.UniformLocation{Name: "_15.pathOffset", Type: 0x0, Size: 2, Offset: 16}},
-		UniformSize: 24,
-		GLES2:       "#version 100\n\nstruct Block\n{\n    vec2 scale;\n    vec2 offset;\n    vec2 pathOffset;\n};\n\nuniform Block _15;\n\nattribute vec2 from;\nattribute vec2 ctrl;\nattribute vec2 to;\nattribute float maxy;\nattribute vec2 corner;\nvarying vec2 vFrom;\nvarying vec2 vCtrl;\nvarying vec2 vTo;\n\nvoid main()\n{\n    vec2 from_1 = from + _15.pathOffset;\n    vec2 ctrl_1 = ctrl + _15.pathOffset;\n    vec2 to_1 = to + _15.pathOffset;\n    float maxy_1 = maxy + _15.pathOffset.y;\n    vec2 pos;\n    if (corner.x > 0.0)\n    {\n        pos.x = max(max(from_1.x, ctrl_1.x), to_1.x) + 1.0;\n    }\n    else\n    {\n        pos.x = min(min(from_1.x, ctrl_1.x), to_1.x) - 1.0;\n    }\n    if (corner.y > 0.0)\n    {\n        pos.y = maxy_1 + 1.0;\n    }\n    else\n    {\n        pos.y = min(min(from_1.y, ctrl_1.y), to_1.y) - 1.0;\n    }\n    vFrom = from_1 - pos;\n    vCtrl = ctrl_1 - pos;\n    vTo = to_1 - pos;\n    pos *= _15.scale;\n    pos += _15.offset;\n    gl_Position = vec4(pos, 1.0, 1.0);\n}\n\n",
+		Inputs: []backend.InputLocation{backend.InputLocation{Name: "corner", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "maxy", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0x0, Size: 1}, backend.InputLocation{Name: "from", Location: 2, Semantic: "TEXCOORD", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "ctrl", Location: 3, Semantic: "TEXCOORD", SemanticIndex: 1, Type: 0x0, Size: 2}, backend.InputLocation{Name: "to", Location: 4, Semantic: "TEXCOORD", SemanticIndex: 2, Type: 0x0, Size: 2}},
+		Uniforms: backend.UniformsReflection{
+			Blocks:    []backend.UniformBlock{backend.UniformBlock{Name: "Block", Binding: 0}},
+			Locations: []backend.UniformLocation{backend.UniformLocation{Name: "_15.scale", Type: 0x0, Size: 2, Offset: 0}, backend.UniformLocation{Name: "_15.offset", Type: 0x0, Size: 2, Offset: 8}, backend.UniformLocation{Name: "_15.pathOffset", Type: 0x0, Size: 2, Offset: 16}},
+			Size:      24,
+		},
+		GLSL100ES: "#version 100\n\nstruct Block\n{\n    vec2 scale;\n    vec2 offset;\n    vec2 pathOffset;\n};\n\nuniform Block _15;\n\nattribute vec2 from;\nattribute vec2 ctrl;\nattribute vec2 to;\nattribute float maxy;\nattribute vec2 corner;\nvarying vec2 vFrom;\nvarying vec2 vCtrl;\nvarying vec2 vTo;\n\nvoid main()\n{\n    vec2 from_1 = from + _15.pathOffset;\n    vec2 ctrl_1 = ctrl + _15.pathOffset;\n    vec2 to_1 = to + _15.pathOffset;\n    float maxy_1 = maxy + _15.pathOffset.y;\n    vec2 pos;\n    if (corner.x > 0.0)\n    {\n        pos.x = max(max(from_1.x, ctrl_1.x), to_1.x) + 1.0;\n    }\n    else\n    {\n        pos.x = min(min(from_1.x, ctrl_1.x), to_1.x) - 1.0;\n    }\n    if (corner.y > 0.0)\n    {\n        pos.y = maxy_1 + 1.0;\n    }\n    else\n    {\n        pos.y = min(min(from_1.y, ctrl_1.y), to_1.y) - 1.0;\n    }\n    vFrom = from_1 - pos;\n    vCtrl = ctrl_1 - pos;\n    vTo = to_1 - pos;\n    pos *= _15.scale;\n    pos += _15.offset;\n    gl_Position = vec4(pos, 1.0, 1.0);\n}\n\n",
+		GLSL300ES: "#version 300 es\n\nlayout(std140) uniform Block\n{\n    vec2 scale;\n    vec2 offset;\n    vec2 pathOffset;\n} _15;\n\nlayout(location = 2) in vec2 from;\nlayout(location = 3) in vec2 ctrl;\nlayout(location = 4) in vec2 to;\nlayout(location = 1) in float maxy;\nlayout(location = 0) in vec2 corner;\nout vec2 vFrom;\nout vec2 vCtrl;\nout vec2 vTo;\n\nvoid main()\n{\n    vec2 from_1 = from + _15.pathOffset;\n    vec2 ctrl_1 = ctrl + _15.pathOffset;\n    vec2 to_1 = to + _15.pathOffset;\n    float maxy_1 = maxy + _15.pathOffset.y;\n    vec2 pos;\n    if (corner.x > 0.0)\n    {\n        pos.x = max(max(from_1.x, ctrl_1.x), to_1.x) + 1.0;\n    }\n    else\n    {\n        pos.x = min(min(from_1.x, ctrl_1.x), to_1.x) - 1.0;\n    }\n    if (corner.y > 0.0)\n    {\n        pos.y = maxy_1 + 1.0;\n    }\n    else\n    {\n        pos.y = min(min(from_1.y, ctrl_1.y), to_1.y) - 1.0;\n    }\n    vFrom = from_1 - pos;\n    vCtrl = ctrl_1 - pos;\n    vTo = to_1 - pos;\n    pos *= _15.scale;\n    pos += _15.offset;\n    gl_Position = vec4(pos, 1.0, 1.0);\n}\n\n",
 		/*
 		   cbuffer Block : register(b0)
 		   {

@@ -24,18 +24,18 @@ type FBO struct {
 	blitted       bool
 	quad          gl.Buffer
 	prog          gl.Program
-	es3           bool
+	gl3           bool
 }
 
 func New(f *glimpl.Functions) (*FBO, error) {
-	var es3 bool
+	var gl3 bool
 	glVer := f.GetString(gl.VERSION)
-	ver, err := gl.ParseGLVersion(glVer)
+	ver, _, err := gl.ParseGLVersion(glVer)
 	if err != nil {
 		return nil, err
 	}
 	if ver[0] >= 3 {
-		es3 = true
+		gl3 = true
 	} else {
 		exts := f.GetString(gl.EXTENSIONS)
 		if !strings.Contains(exts, "EXT_sRGB") {
@@ -44,7 +44,7 @@ func New(f *glimpl.Functions) (*FBO, error) {
 	}
 	s := &FBO{
 		c:           f,
-		es3:         es3,
+		gl3:         gl3,
 		frameBuffer: f.CreateFramebuffer(),
 		colorTex:    f.CreateTexture(),
 		depthBuffer: f.CreateRenderbuffer(),
@@ -108,7 +108,7 @@ func (s *FBO) Refresh(w, h int) error {
 		return nil
 	}
 	s.c.BindTexture(gl.TEXTURE_2D, s.colorTex)
-	if s.es3 {
+	if s.gl3 {
 		s.c.TexImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, w, h, gl.RGBA, gl.UNSIGNED_BYTE, nil)
 	} else /* EXT_sRGB */ {
 		s.c.TexImage2D(gl.TEXTURE_2D, 0, gl.SRGB_ALPHA_EXT, w, h, gl.SRGB_ALPHA_EXT, gl.UNSIGNED_BYTE, nil)

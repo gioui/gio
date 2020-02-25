@@ -33,6 +33,7 @@ const (
 	HALF_FLOAT                            = 0x140b
 	HALF_FLOAT_OES                        = 0x8d61
 	INFO_LOG_LENGTH                       = 0x8B84
+	INVALID_INDEX                         = ^uint(0)
 	GREATER                               = 0x204
 	LINEAR                                = 0x2601
 	LINK_STATUS                           = 0x8b82
@@ -92,6 +93,7 @@ type Functions interface {
 	BeginQuery(target Enum, query Query)
 	BindAttribLocation(p Program, a Attrib, name string)
 	BindBuffer(target Enum, b Buffer)
+	BindBufferBase(target Enum, index int, buffer Buffer)
 	BindFramebuffer(target Enum, fb Framebuffer)
 	BindRenderbuffer(target Enum, fb Renderbuffer)
 	BindTexture(target Enum, t Texture)
@@ -136,6 +138,7 @@ type Functions interface {
 	GetShaderi(s Shader, pname Enum) int
 	GetShaderInfoLog(s Shader) string
 	GetString(pname Enum) string
+	GetUniformBlockIndex(p Program, name string) uint
 	GetUniformLocation(p Program, name string) Uniform
 	InvalidateFramebuffer(target, attachment Enum)
 	LinkProgram(p Program)
@@ -144,6 +147,7 @@ type Functions interface {
 	ShaderSource(s Shader, src string)
 	TexImage2D(target Enum, level int, internalFormat int, width, height int, format, ty Enum, data []byte)
 	TexParameteri(target, pname Enum, param int)
+	UniformBlockBinding(p Program, uniformBlockIndex uint, uniformBlockBinding uint)
 	Uniform1f(dst Uniform, v float32)
 	Uniform1i(dst Uniform, v int)
 	Uniform2f(dst Uniform, v0, v1 float32)
