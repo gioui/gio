@@ -185,6 +185,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			Type:     pointer.Move,
 			Source:   pointer.Mouse,
 			Position: p,
+			Buttons:  w.pointerBtns,
 			Time:     windows.GetMessageTime(),
 		})
 	case windows.WM_MOUSEWHEEL:
@@ -266,6 +267,7 @@ func (w *window) scrollEvent(wParam, lParam uintptr) {
 		Type:     pointer.Move,
 		Source:   pointer.Mouse,
 		Position: p,
+		Buttons:  w.pointerBtns,
 		Scroll:   f32.Point{Y: -dist},
 		Time:     windows.GetMessageTime(),
 	})
