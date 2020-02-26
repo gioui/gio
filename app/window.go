@@ -252,8 +252,7 @@ func (w *Window) run(opts *window.Options) {
 			case system.StageEvent:
 				if w.loop != nil {
 					if e2.Stage < system.StageRunning {
-						w.loop.Release()
-						w.loop = nil
+						w.destroyGPU()
 					} else {
 						w.loop.Refresh()
 					}
@@ -274,23 +273,9 @@ func (w *Window) run(opts *window.Options) {
 				w.hasNextFrame = false
 				e2.Frame = w.update
 				w.out <- e2.FrameEvent
-				var err error
 				if w.loop != nil {
 					if e2.Sync {
 						w.loop.Refresh()
-					}
-					if err = w.loop.Flush(); err != nil {
-						w.loop.Release()
-						w.loop = nil
-					}
-				} else {
-					var ctx window.Context
-					ctx, err = w.driver.NewContext()
-					if err == nil {
-						w.loop, err = newLoop(ctx)
-						if err != nil {
-							ctx.Release()
-						}
 					}
 				}
 				var frame *op.Ops
@@ -303,25 +288,46 @@ func (w *Window) run(opts *window.Options) {
 					gotFrame = true
 				case w.out <- ackEvent:
 				}
-				if err != nil {
-					if gotFrame {
-						w.frameAck <- struct{}{}
+				var err error
+				for {
+					if w.loop != nil {
+						if err = w.loop.Flush(); err != nil {
+							w.destroyGPU()
+							if err != window.ErrDeviceLost {
+								break
+							}
+						}
 					}
-					w.destroy(err)
-					return
+					if w.loop == nil {
+						var ctx window.Context
+						ctx, err = w.driver.NewContext()
+						if err != nil {
+							break
+						}
+						w.loop, err = newLoop(ctx)
+						if err != nil {
+							ctx.Release()
+							break
+						}
+					}
+					w.draw(frameStart, e2.Size, frame)
+					if e2.Sync {
+						if err = w.loop.Flush(); err != nil {
+							w.destroyGPU()
+						}
+					}
+					if err != window.ErrDeviceLost {
+						break
+					}
 				}
-				w.draw(frameStart, e2.Size, frame)
 				if gotFrame {
 					// We're done with frame, let the client continue.
 					w.frameAck <- struct{}{}
 				}
-				if e2.Sync {
-					if err := w.loop.Flush(); err != nil {
-						w.loop.Release()
-						w.loop = nil
-						w.destroy(err)
-						return
-					}
+				if err != nil {
+					w.destroyGPU()
+					w.destroy(err)
+					return
 				}
 			case *system.CommandEvent:
 				w.out <- e
