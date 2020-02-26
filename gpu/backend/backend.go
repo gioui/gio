@@ -166,6 +166,7 @@ const (
 
 const (
 	DataTypeFloat DataType = iota
+	DataTypeInt
 	DataTypeShort
 )
 

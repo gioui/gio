@@ -474,14 +474,14 @@ var (
 		HLSL: []byte(nil),
 	}
 	shader_stencil_vert = backend.ShaderSources{
-		Inputs: []backend.InputLocation{backend.InputLocation{Name: "corner", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "maxy", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0x0, Size: 1}, backend.InputLocation{Name: "from", Location: 2, Semantic: "TEXCOORD", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "ctrl", Location: 3, Semantic: "TEXCOORD", SemanticIndex: 1, Type: 0x0, Size: 2}, backend.InputLocation{Name: "to", Location: 4, Semantic: "TEXCOORD", SemanticIndex: 2, Type: 0x0, Size: 2}},
+		Inputs: []backend.InputLocation{backend.InputLocation{Name: "corner", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x1, Size: 2}, backend.InputLocation{Name: "maxy", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0x0, Size: 1}, backend.InputLocation{Name: "from", Location: 2, Semantic: "TEXCOORD", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "ctrl", Location: 3, Semantic: "TEXCOORD", SemanticIndex: 1, Type: 0x0, Size: 2}, backend.InputLocation{Name: "to", Location: 4, Semantic: "TEXCOORD", SemanticIndex: 2, Type: 0x0, Size: 2}},
 		Uniforms: backend.UniformsReflection{
 			Blocks:    []backend.UniformBlock{backend.UniformBlock{Name: "Block", Binding: 0}},
 			Locations: []backend.UniformLocation{backend.UniformLocation{Name: "_15.scale", Type: 0x0, Size: 2, Offset: 0}, backend.UniformLocation{Name: "_15.offset", Type: 0x0, Size: 2, Offset: 8}, backend.UniformLocation{Name: "_15.pathOffset", Type: 0x0, Size: 2, Offset: 16}},
 			Size:      24,
 		},
-		GLSL100ES: "#version 100\n\nstruct Block\n{\n    vec2 scale;\n    vec2 offset;\n    vec2 pathOffset;\n};\n\nuniform Block _15;\n\nattribute vec2 from;\nattribute vec2 ctrl;\nattribute vec2 to;\nattribute float maxy;\nattribute vec2 corner;\nvarying vec2 vFrom;\nvarying vec2 vCtrl;\nvarying vec2 vTo;\n\nvoid main()\n{\n    vec2 from_1 = from + _15.pathOffset;\n    vec2 ctrl_1 = ctrl + _15.pathOffset;\n    vec2 to_1 = to + _15.pathOffset;\n    float maxy_1 = maxy + _15.pathOffset.y;\n    vec2 pos;\n    if (corner.x > 0.0)\n    {\n        pos.x = max(max(from_1.x, ctrl_1.x), to_1.x) + 1.0;\n    }\n    else\n    {\n        pos.x = min(min(from_1.x, ctrl_1.x), to_1.x) - 1.0;\n    }\n    if (corner.y > 0.0)\n    {\n        pos.y = maxy_1 + 1.0;\n    }\n    else\n    {\n        pos.y = min(min(from_1.y, ctrl_1.y), to_1.y) - 1.0;\n    }\n    vFrom = from_1 - pos;\n    vCtrl = ctrl_1 - pos;\n    vTo = to_1 - pos;\n    pos *= _15.scale;\n    pos += _15.offset;\n    gl_Position = vec4(pos, 1.0, 1.0);\n}\n\n",
-		GLSL300ES: "#version 300 es\n\nlayout(std140) uniform Block\n{\n    vec2 scale;\n    vec2 offset;\n    vec2 pathOffset;\n} _15;\n\nlayout(location = 2) in vec2 from;\nlayout(location = 3) in vec2 ctrl;\nlayout(location = 4) in vec2 to;\nlayout(location = 1) in float maxy;\nlayout(location = 0) in vec2 corner;\nout vec2 vFrom;\nout vec2 vCtrl;\nout vec2 vTo;\n\nvoid main()\n{\n    vec2 from_1 = from + _15.pathOffset;\n    vec2 ctrl_1 = ctrl + _15.pathOffset;\n    vec2 to_1 = to + _15.pathOffset;\n    float maxy_1 = maxy + _15.pathOffset.y;\n    vec2 pos;\n    if (corner.x > 0.0)\n    {\n        pos.x = max(max(from_1.x, ctrl_1.x), to_1.x) + 1.0;\n    }\n    else\n    {\n        pos.x = min(min(from_1.x, ctrl_1.x), to_1.x) - 1.0;\n    }\n    if (corner.y > 0.0)\n    {\n        pos.y = maxy_1 + 1.0;\n    }\n    else\n    {\n        pos.y = min(min(from_1.y, ctrl_1.y), to_1.y) - 1.0;\n    }\n    vFrom = from_1 - pos;\n    vCtrl = ctrl_1 - pos;\n    vTo = to_1 - pos;\n    pos *= _15.scale;\n    pos += _15.offset;\n    gl_Position = vec4(pos, 1.0, 1.0);\n}\n\n",
+		GLSL100ES: "#version 100\n\nstruct Block\n{\n    vec2 scale;\n    vec2 offset;\n    vec2 pathOffset;\n};\n\nuniform Block _15;\n\nattribute vec2 from;\nattribute vec2 ctrl;\nattribute vec2 to;\nattribute float maxy;\nattribute ivec2 corner;\nvarying vec2 vFrom;\nvarying vec2 vCtrl;\nvarying vec2 vTo;\n\nvoid main()\n{\n    vec2 from_1 = from + _15.pathOffset;\n    vec2 ctrl_1 = ctrl + _15.pathOffset;\n    vec2 to_1 = to + _15.pathOffset;\n    float maxy_1 = maxy + _15.pathOffset.y;\n    vec2 pos;\n    if (corner.x > 0)\n    {\n        pos.x = max(max(from_1.x, ctrl_1.x), to_1.x) + 1.0;\n    }\n    else\n    {\n        pos.x = min(min(from_1.x, ctrl_1.x), to_1.x) - 1.0;\n    }\n    if (corner.y > 0)\n    {\n        pos.y = maxy_1 + 1.0;\n    }\n    else\n    {\n        pos.y = min(min(from_1.y, ctrl_1.y), to_1.y) - 1.0;\n    }\n    vFrom = from_1 - pos;\n    vCtrl = ctrl_1 - pos;\n    vTo = to_1 - pos;\n    pos *= _15.scale;\n    pos += _15.offset;\n    gl_Position = vec4(pos, 1.0, 1.0);\n}\n\n",
+		GLSL300ES: "#version 300 es\n\nlayout(std140) uniform Block\n{\n    vec2 scale;\n    vec2 offset;\n    vec2 pathOffset;\n} _15;\n\nlayout(location = 2) in vec2 from;\nlayout(location = 3) in vec2 ctrl;\nlayout(location = 4) in vec2 to;\nlayout(location = 1) in float maxy;\nlayout(location = 0) in ivec2 corner;\nout vec2 vFrom;\nout vec2 vCtrl;\nout vec2 vTo;\n\nvoid main()\n{\n    vec2 from_1 = from + _15.pathOffset;\n    vec2 ctrl_1 = ctrl + _15.pathOffset;\n    vec2 to_1 = to + _15.pathOffset;\n    float maxy_1 = maxy + _15.pathOffset.y;\n    vec2 pos;\n    if (corner.x > 0)\n    {\n        pos.x = max(max(from_1.x, ctrl_1.x), to_1.x) + 1.0;\n    }\n    else\n    {\n        pos.x = min(min(from_1.x, ctrl_1.x), to_1.x) - 1.0;\n    }\n    if (corner.y > 0)\n    {\n        pos.y = maxy_1 + 1.0;\n    }\n    else\n    {\n        pos.y = min(min(from_1.y, ctrl_1.y), to_1.y) - 1.0;\n    }\n    vFrom = from_1 - pos;\n    vCtrl = ctrl_1 - pos;\n    vTo = to_1 - pos;\n    pos *= _15.scale;\n    pos += _15.offset;\n    gl_Position = vec4(pos, 1.0, 1.0);\n}\n\n",
 		/*
 		   cbuffer Block : register(b0)
 		   {
@@ -496,14 +496,14 @@ var (
 		   static float2 ctrl;
 		   static float2 to;
 		   static float maxy;
-		   static float2 corner;
+		   static int2 corner;
 		   static float2 vFrom;
 		   static float2 vCtrl;
 		   static float2 vTo;
 
 		   struct SPIRV_Cross_Input
 		   {
-		       float2 corner : POSITION;
+		       int2 corner : POSITION;
 		       float maxy : NORMAL;
 		       float2 from : TEXCOORD0;
 		       float2 ctrl : TEXCOORD1;
@@ -525,7 +525,7 @@ var (
 		       float2 to_1 = to + _15_pathOffset;
 		       float maxy_1 = maxy + _15_pathOffset.y;
 		       float2 pos;
-		       if (corner.x > 0.0f)
+		       if (corner.x > 0)
 		       {
 		           pos.x = max(max(from_1.x, ctrl_1.x), to_1.x) + 1.0f;
 		       }
@@ -533,7 +533,7 @@ var (
 		       {
 		           pos.x = min(min(from_1.x, ctrl_1.x), to_1.x) - 1.0f;
 		       }
-		       if (corner.y > 0.0f)
+		       if (corner.y > 0)
 		       {
 		           pos.y = maxy_1 + 1.0f;
 		       }

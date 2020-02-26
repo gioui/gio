@@ -276,6 +276,14 @@ func parseDataType(t string) (backend.DataType, int, error) {
 		return backend.DataTypeFloat, 3, nil
 	case "float4":
 		return backend.DataTypeFloat, 4, nil
+	case "int":
+		return backend.DataTypeInt, 1, nil
+	case "int2":
+		return backend.DataTypeInt, 2, nil
+	case "int3":
+		return backend.DataTypeInt, 3, nil
+	case "int4":
+		return backend.DataTypeInt, 4, nil
 	default:
 		return 0, 0, fmt.Errorf("unsupported input data type: %s", t)
 	}

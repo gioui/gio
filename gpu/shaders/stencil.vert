@@ -10,7 +10,7 @@ layout(binding = 0) uniform Block {
 	vec2 pathOffset;
 };
 
-layout(location=0) in vec2 corner;
+layout(location=0) in ivec2 corner;
 layout(location=1) in float maxy;
 layout(location=2) in vec2 from;
 layout(location=3) in vec2 ctrl;
@@ -29,14 +29,14 @@ void main() {
 	vec2 to = to + pathOffset;
 	float maxy = maxy + pathOffset.y;
 	vec2 pos;
-	if (corner.x > 0.0) {
+	if (corner.x > 0) {
 		// East.
 		pos.x = max(max(from.x, ctrl.x), to.x)+1.0;
 	} else {
 		// West.
 		pos.x = min(min(from.x, ctrl.x), to.x)-1.0;
 	}
-	if (corner.y > 0.0) {
+	if (corner.y > 0) {
 		// North.
 		pos.y = maxy + 1.0;
 	} else {
