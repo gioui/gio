@@ -356,6 +356,9 @@ func convertShader(tmp, glslcc, path, lang, profile string, args *shaderArgs, fl
 		"--profile", profile,
 		progFlag, tmppath,
 	)
+	if lang == "hlsl" {
+		cmd.Args = append(cmd.Args, "--defines=HLSL")
+	}
 	if flattenUBOs {
 		cmd.Args = append(cmd.Args, "--flatten-ubos")
 	}
