@@ -23,7 +23,11 @@ import (
 // multiple GPU backends (OpenGL ES, Direct3D 11...)
 // from a single source.
 
-var packageName = flag.String("package", "", "specify Go package name")
+var (
+	packageName   = flag.String("package", "", "specify Go package name")
+	shadersDir    = flag.String("dir", "shaders", "specify shader directory")
+	absShadersDir string
+)
 
 type shaderArgs struct {
 	FetchColorExpr string
@@ -48,9 +52,13 @@ func generate() error {
 	if err != nil {
 		return err
 	}
+	absShadersDir, err = filepath.Abs(*shadersDir)
+	if err != nil {
+		return err
+	}
 	fxc, err := exec.LookPath("fxc")
 	fxcFound := err == nil
-	shaders, err := filepath.Glob("shaders/*")
+	shaders, err := filepath.Glob(filepath.Join(absShadersDir, "*"))
 	if err != nil {
 		return err
 	}
@@ -62,6 +70,9 @@ func generate() error {
 	out.WriteString("var (\n")
 
 	for _, shader := range shaders {
+		if ext := filepath.Ext(shader); ext != ".vert" && ext != ".frag" {
+			continue
+		}
 		const nvariants = 2
 		var variants [nvariants]struct {
 			backend.ShaderSources
@@ -338,6 +349,7 @@ func convertShader(tmp, glslcc, path, lang, profile string, args *shaderArgs, fl
 	cmd := exec.Command(glslcc,
 		"--silent",
 		"--optimize",
+		"--include-dirs", absShadersDir,
 		"--reflect",
 		"--output", filepath.Join(tmp, "shader"),
 		"--lang", lang,
