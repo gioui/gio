@@ -6,7 +6,7 @@ import "gioui.org/gpu/backend"
 
 var (
 	shader_input_vert = backend.ShaderSources{
-		Inputs:    []backend.InputLocation{backend.InputLocation{Name: "position", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x0, Size: 4}},
+		Inputs:    []backend.InputLocation{{Name: "position", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x0, Size: 4}},
 		GLSL100ES: "\nattribute vec4 position;\n\nvoid main()\n{\n    gl_Position = position;\n}\n\n",
 		GLSL300ES: "#version 300 es\n\nlayout(location = 0) in vec4 position;\n\nvoid main()\n{\n    gl_Position = position;\n}\n\n",
 		GLSL130:   "#version 130\n\nin vec4 position;\n\nvoid main()\n{\n    gl_Position = position;\n}\n\n",

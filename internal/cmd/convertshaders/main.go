@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"go/format"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -178,11 +177,13 @@ func generate() error {
 		}
 	}
 	out.WriteString(")")
-	gosrc, err := format.Source(out.Bytes())
-	if err != nil {
-		return fmt.Errorf("shader.go: %v", err)
+	if err := ioutil.WriteFile("shaders.go", out.Bytes(), 0644); err != nil {
+		return err
 	}
-	return ioutil.WriteFile("shaders.go", gosrc, 0644)
+	cmd := exec.Command("gofmt", "-s", "-w", "shaders.go")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func parseReflection(jsonData []byte, info *backend.ShaderSources) error {
