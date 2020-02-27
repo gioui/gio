@@ -10,6 +10,7 @@ var (
 		GLSL100ES: "\nattribute vec4 position;\n\nvoid main()\n{\n    gl_Position = position;\n}\n\n",
 		GLSL300ES: "#version 300 es\n\nlayout(location = 0) in vec4 position;\n\nvoid main()\n{\n    gl_Position = position;\n}\n\n",
 		GLSL130:   "#version 130\n\nin vec4 position;\n\nvoid main()\n{\n    gl_Position = position;\n}\n\n",
+		GLSL150:   "#version 150\n\nin vec4 position;\n\nvoid main()\n{\n    gl_Position = position;\n}\n\n",
 		/*
 		   static float4 gl_Position;
 		   static float4 position;
@@ -45,6 +46,7 @@ var (
 		GLSL100ES: "precision mediump float;\nprecision highp int;\n\nvoid main()\n{\n    gl_FragData[0] = vec4(0.25, 0.550000011920928955078125, 0.75, 1.0);\n}\n\n",
 		GLSL300ES: "#version 300 es\nprecision mediump float;\nprecision highp int;\n\nlayout(location = 0) out vec4 fragColor;\n\nvoid main()\n{\n    fragColor = vec4(0.25, 0.550000011920928955078125, 0.75, 1.0);\n}\n\n",
 		GLSL130:   "#version 130\n\nout vec4 fragColor;\n\nvoid main()\n{\n    fragColor = vec4(0.25, 0.550000011920928955078125, 0.75, 1.0);\n}\n\n",
+		GLSL150:   "#version 150\n\nout vec4 fragColor;\n\nvoid main()\n{\n    fragColor = vec4(0.25, 0.550000011920928955078125, 0.75, 1.0);\n}\n\n",
 		/*
 		   static float4 fragColor;
 
@@ -73,6 +75,7 @@ var (
 		GLSL100ES: "\nvoid main()\n{\n    float x;\n    float y;\n    if (gl_VertexID == 0)\n    {\n        x = 0.0;\n        y = 0.5;\n    }\n    else\n    {\n        if (gl_VertexID == 1)\n        {\n            x = 0.5;\n            y = -0.5;\n        }\n        else\n        {\n            x = -0.5;\n            y = -0.5;\n        }\n    }\n    gl_Position = vec4(x, y, 0.5, 1.0);\n}\n\n",
 		GLSL300ES: "#version 300 es\n\nvoid main()\n{\n    float x;\n    float y;\n    if (gl_VertexID == 0)\n    {\n        x = 0.0;\n        y = 0.5;\n    }\n    else\n    {\n        if (gl_VertexID == 1)\n        {\n            x = 0.5;\n            y = -0.5;\n        }\n        else\n        {\n            x = -0.5;\n            y = -0.5;\n        }\n    }\n    gl_Position = vec4(x, y, 0.5, 1.0);\n}\n\n",
 		GLSL130:   "#version 130\n\nvoid main()\n{\n    float x;\n    float y;\n    if (gl_VertexID == 0)\n    {\n        x = 0.0;\n        y = 0.5;\n    }\n    else\n    {\n        if (gl_VertexID == 1)\n        {\n            x = 0.5;\n            y = -0.5;\n        }\n        else\n        {\n            x = -0.5;\n            y = -0.5;\n        }\n    }\n    gl_Position = vec4(x, y, 0.5, 1.0);\n}\n\n",
+		GLSL150:   "#version 150\n\nvoid main()\n{\n    float x;\n    float y;\n    if (gl_VertexID == 0)\n    {\n        x = 0.0;\n        y = 0.5;\n    }\n    else\n    {\n        if (gl_VertexID == 1)\n        {\n            x = 0.5;\n            y = -0.5;\n        }\n        else\n        {\n            x = -0.5;\n            y = -0.5;\n        }\n    }\n    gl_Position = vec4(x, y, 0.5, 1.0);\n}\n\n",
 		/*
 		   static float4 gl_Position;
 		   static int gl_VertexIndex;

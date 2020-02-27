@@ -50,6 +50,7 @@ type ShaderSources struct {
 	GLSL100ES string
 	GLSL300ES string
 	GLSL130   string
+	GLSL150   string
 	HLSL      []byte
 	Uniforms  UniformsReflection
 	Inputs    []InputLocation

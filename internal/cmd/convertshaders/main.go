@@ -124,9 +124,13 @@ func generate() error {
 					return err
 				}
 			}
+			// OpenGL 3.2 Core only accepts GLSL version 1.50, but is
+			// otherwise compatible with version 1.30.
+			glsl150 := strings.Replace(glsl130, "#version 130", "#version 150", 1)
 			variants[i].GLSL100ES = glsl100es
 			variants[i].GLSL300ES = glsl300es
 			variants[i].GLSL130 = glsl130
+			variants[i].GLSL150 = glsl150
 			variants[i].hlslSrc = hlsl
 			variants[i].HLSL = hlslc
 		}
@@ -157,6 +161,7 @@ func generate() error {
 			fmt.Fprintf(&out, "GLSL100ES: %#v,\n", src.GLSL100ES)
 			fmt.Fprintf(&out, "GLSL300ES: %#v,\n", src.GLSL300ES)
 			fmt.Fprintf(&out, "GLSL130: %#v,\n", src.GLSL130)
+			fmt.Fprintf(&out, "GLSL150: %#v,\n", src.GLSL150)
 			fmt.Fprintf(&out, "/*\n%s\n*/\n", src.hlslSrc)
 			fmt.Fprintf(&out, "HLSL: %#v,\n", src.HLSL)
 			fmt.Fprintf(&out, "}")

@@ -19,7 +19,7 @@ type Backend struct {
 
 	state glstate
 
-	gl3   bool
+	glver [2]int
 	gles  bool
 	ubo   bool
 	feats backend.Caps
@@ -131,10 +131,9 @@ func NewBackend(f Functions) (*Backend, error) {
 	if err != nil {
 		return nil, err
 	}
-	gl3 := ver[0] >= 3
-	ubo := gl3 && gles
+	ubo := ver[0] >= 3 && gles
 	b := &Backend{
-		gl3:         gl3,
+		glver:       ver,
 		gles:        gles,
 		ubo:         ubo,
 		funcs:       f,
@@ -437,10 +436,15 @@ func (b *Backend) NewProgram(vertShader, fragShader backend.ShaderSources) (back
 		attr[inp.Location] = inp.Name
 	}
 	vsrc, fsrc := vertShader.GLSL100ES, fragShader.GLSL100ES
-	if b.gl3 {
-		if b.gles {
+	if b.glver[0] >= 3 {
+		// OpenGL (ES) 3.0.
+		switch {
+		case b.gles:
 			vsrc, fsrc = vertShader.GLSL300ES, fragShader.GLSL300ES
-		} else {
+		case b.glver[0] >= 4 || b.glver[1] >= 2:
+			// OpenGL 3.2 Core only accepts glsl 1.50 or newer.
+			vsrc, fsrc = vertShader.GLSL150, fragShader.GLSL150
+		default:
 			vsrc, fsrc = vertShader.GLSL130, fragShader.GLSL130
 		}
 	}
