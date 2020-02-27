@@ -23,10 +23,3 @@ See the [contribution guide](https://gioui.org/doc/contribute) for more details.
 
 An [unofficial GitHub mirror](https://github.com/theclapp/gio-mirror)
 is kindly maintained by Larry Clapp.
-
-## License
-
-This project is dual-licensed under the UNLICENSE (see the UNLICENSE file) or
-the MIT license (see the LICENSE-MIT file).
-
-You may use the project under the terms of either license.
