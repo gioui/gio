@@ -158,7 +158,7 @@ func newStenciler(ctx backend.Device) *stenciler {
 		panic(err)
 	}
 	progLayout, err := ctx.NewInputLayout(shader_stencil_vert, []backend.InputDesc{
-		{Type: backend.DataTypeShort, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).CornerX))},
+		{Type: backend.DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).Corner))},
 		{Type: backend.DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).MaxY))},
 		{Type: backend.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).FromX))},
 		{Type: backend.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*path.Vertex)(nil)).CtrlX))},

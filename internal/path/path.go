@@ -8,11 +8,12 @@ import (
 
 // The vertex data suitable for passing to vertex programs.
 type Vertex struct {
-	CornerX, CornerY int16
-	MaxY             float32
-	FromX, FromY     float32
-	CtrlX, CtrlY     float32
-	ToX, ToY         float32
+	// Corner encodes the corner: +0.5 for south, +.25 for east.
+	Corner       float32
+	MaxY         float32
+	FromX, FromY float32
+	CtrlX, CtrlY float32
+	ToX, ToY     float32
 }
 
 const VertStride = 7*4 + 2*2

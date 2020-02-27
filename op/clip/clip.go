@@ -236,22 +236,26 @@ func (p *Path) expand(b f32.Rectangle) {
 }
 
 func (p *Path) vertex(cornerx, cornery int16, ctrl, to f32.Point) {
+	var corner float32
+	// Encode corner.
+	if cornerx == 1 {
+		corner += .5
+	}
+	if cornery == 1 {
+		corner += .25
+	}
 	v := path.Vertex{
-		CornerX: cornerx,
-		CornerY: cornery,
-		FromX:   p.pen.X,
-		FromY:   p.pen.Y,
-		CtrlX:   ctrl.X,
-		CtrlY:   ctrl.Y,
-		ToX:     to.X,
-		ToY:     to.Y,
+		Corner: corner,
+		FromX:  p.pen.X,
+		FromY:  p.pen.Y,
+		CtrlX:  ctrl.X,
+		CtrlY:  ctrl.Y,
+		ToX:    to.X,
+		ToY:    to.Y,
 	}
 	data := p.ops.Write(path.VertStride)
 	bo := binary.LittleEndian
-	data[0] = byte(uint16(v.CornerX))
-	data[1] = byte(uint16(v.CornerX) >> 8)
-	data[2] = byte(uint16(v.CornerY))
-	data[3] = byte(uint16(v.CornerY) >> 8)
+	bo.PutUint32(data[0:], math.Float32bits(corner))
 	// Put the contour index in MaxY.
 	bo.PutUint32(data[4:], uint32(p.contour))
 	bo.PutUint32(data[8:], math.Float32bits(v.FromX))
