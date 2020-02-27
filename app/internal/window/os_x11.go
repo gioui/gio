@@ -203,11 +203,9 @@ func (w *x11Window) atom(name string, onlyIfExists bool) C.Atom {
 // in x11window.loop.
 //
 type x11EventHandler struct {
-	w      *x11Window
-	text   []byte
-	xev    *C.XEvent
-	status C.Status
-	keysym C.KeySym
+	w    *x11Window
+	text []byte
+	xev  *C.XEvent
 }
 
 // handleEvents returns true if the window needs to be redrawn.

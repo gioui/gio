@@ -1001,13 +1001,6 @@ func (w *window) isAnimating() bool {
 	return w.animating || w.fling.anim.Active()
 }
 
-func (w *window) kill(err error) {
-	if w.pendingErr == nil {
-		w.pendingErr = err
-	}
-	w.dead = true
-}
-
 func (w *window) draw(sync bool) {
 	w.flushScroll()
 	w.mu.Lock()

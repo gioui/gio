@@ -272,11 +272,6 @@ const (
 	materialTexture
 )
 
-const (
-	attribPos = 0
-	attribUV  = 1
-)
-
 func New(ctx backend.Device) (*GPU, error) {
 	defFBO := ctx.CurrentFramebuffer()
 	g := &GPU{

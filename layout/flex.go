@@ -36,8 +36,6 @@ type FlexChild struct {
 // Spacing determine the spacing mode for a Flex.
 type Spacing uint8
 
-type flexMode uint8
-
 const (
 	// SpaceEnd leaves space at the end.
 	SpaceEnd Spacing = iota

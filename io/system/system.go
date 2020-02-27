@@ -23,9 +23,6 @@ type FrameEvent struct {
 	// Frame replaces the window's frame with the new
 	// frame.
 	Frame func(frame *op.Ops)
-	// Whether this draw is system generated and needs a complete
-	// frame before proceeding.
-	sync bool
 }
 
 // Config defines the essential properties of
@@ -96,7 +93,7 @@ func (l Stage) String() string {
 	}
 }
 
-func (_ FrameEvent) ImplementsEvent()    {}
-func (_ StageEvent) ImplementsEvent()    {}
-func (_ *CommandEvent) ImplementsEvent() {}
-func (_ DestroyEvent) ImplementsEvent()  {}
+func (FrameEvent) ImplementsEvent()    {}
+func (StageEvent) ImplementsEvent()    {}
+func (*CommandEvent) ImplementsEvent() {}
+func (DestroyEvent) ImplementsEvent()  {}

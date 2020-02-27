@@ -36,12 +36,11 @@ type eglContext struct {
 }
 
 var (
-	nilEGLDisplay          _EGLDisplay
-	nilEGLSurface          _EGLSurface
-	nilEGLContext          _EGLContext
-	nilEGLConfig           _EGLConfig
-	nilEGLNativeWindowType NativeWindowType
-	EGL_DEFAULT_DISPLAY    NativeDisplayType
+	nilEGLDisplay       _EGLDisplay
+	nilEGLSurface       _EGLSurface
+	nilEGLContext       _EGLContext
+	nilEGLConfig        _EGLConfig
+	EGL_DEFAULT_DISPLAY NativeDisplayType
 )
 
 const (

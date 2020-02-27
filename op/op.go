@@ -95,11 +95,10 @@ type Ops struct {
 // StackOp saves and restores the operation state
 // in a stack-like manner.
 type StackOp struct {
-	stackDepth int
-	id         stackID
-	macroID    int
-	active     bool
-	ops        *Ops
+	id      stackID
+	macroID int
+	active  bool
+	ops     *Ops
 }
 
 // MacroOp records a list of operations for later use.

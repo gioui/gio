@@ -17,7 +17,6 @@ import (
 type Icon struct {
 	Color color.RGBA
 	src   []byte
-	size  unit.Value
 	// Cached values.
 	op       paint.ImageOp
 	imgSize  int

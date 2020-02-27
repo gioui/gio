@@ -132,13 +132,6 @@ func toPointF(p image.Point) f32.Point {
 	return f32.Point{X: float32(p.X), Y: float32(p.Y)}
 }
 
-func toRectF(r image.Rectangle) f32.Rectangle {
-	return f32.Rectangle{
-		Min: toPointF(r.Min),
-		Max: toPointF(r.Max),
-	}
-}
-
 func drawInk(gtx *layout.Context, c widget.Click) {
 	d := gtx.Now().Sub(c.Time)
 	t := float32(d.Seconds())

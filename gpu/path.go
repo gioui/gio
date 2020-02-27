@@ -107,14 +107,6 @@ const (
 	pathBatchSize = 10000
 )
 
-const (
-	attribPathCorner = 0
-	attribPathMaxY   = 1
-	attribPathFrom   = 2
-	attribPathCtrl   = 3
-	attribPathTo     = 4
-)
-
 func newPather(ctx backend.Device) *pather {
 	return &pather{
 		ctx:       ctx,
@@ -217,6 +209,9 @@ func (s *fboSet) resize(ctx backend.Device, sizes []image.Point) {
 			}
 			tex, err := ctx.NewTexture(backend.TextureFormatFloat, sz.X, sz.Y, backend.FilterNearest, backend.FilterNearest,
 				backend.BufferBindingTexture|backend.BufferBindingFramebuffer)
+			if err != nil {
+				panic(err)
+			}
 			fbo, err := ctx.NewFramebuffer(tex, 0)
 			if err != nil {
 				panic(err)
