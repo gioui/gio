@@ -89,16 +89,18 @@ func generate() error {
 			},
 		}
 		for i := range args {
-			glsl100, reflect, err := convertShader(tmp, glslcc, shader, "gles", "100", &args[i], false)
+			glsl100es, reflect, err := convertShader(tmp, glslcc, shader, "gles", "100", &args[i], false)
 			if err != nil {
 				return err
 			}
-			// Make the GL ES 2 source compatible with desktop GL 3.
-			glsl100 = "#version 100\n" + glsl100
 			if err := parseReflection(reflect, &variants[i].ShaderSources); err != nil {
 				return err
 			}
-			glsl300, _, err := convertShader(tmp, glslcc, shader, "gles", "300", &args[i], false)
+			glsl300es, _, err := convertShader(tmp, glslcc, shader, "gles", "300", &args[i], false)
+			if err != nil {
+				return err
+			}
+			glsl130, _, err := convertShader(tmp, glslcc, shader, "glsl", "130", &args[i], false)
 			if err != nil {
 				return err
 			}
@@ -122,8 +124,9 @@ func generate() error {
 					return err
 				}
 			}
-			variants[i].GLSL100ES = glsl100
-			variants[i].GLSL300ES = glsl300
+			variants[i].GLSL100ES = glsl100es
+			variants[i].GLSL300ES = glsl300es
+			variants[i].GLSL130 = glsl130
 			variants[i].hlslSrc = hlsl
 			variants[i].HLSL = hlslc
 		}
@@ -153,6 +156,7 @@ func generate() error {
 			}
 			fmt.Fprintf(&out, "GLSL100ES: %#v,\n", src.GLSL100ES)
 			fmt.Fprintf(&out, "GLSL300ES: %#v,\n", src.GLSL300ES)
+			fmt.Fprintf(&out, "GLSL130: %#v,\n", src.GLSL130)
 			fmt.Fprintf(&out, "/*\n%s\n*/\n", src.hlslSrc)
 			fmt.Fprintf(&out, "HLSL: %#v,\n", src.HLSL)
 			fmt.Fprintf(&out, "}")

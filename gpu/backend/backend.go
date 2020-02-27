@@ -49,6 +49,7 @@ type Device interface {
 type ShaderSources struct {
 	GLSL100ES string
 	GLSL300ES string
+	GLSL130   string
 	HLSL      []byte
 	Uniforms  UniformsReflection
 	Inputs    []InputLocation

@@ -19,8 +19,10 @@ type Backend struct {
 
 	state glstate
 
-	gles300 bool
-	feats   backend.Caps
+	gl3   bool
+	gles  bool
+	ubo   bool
+	feats backend.Caps
 	// floatTriple holds the settings for floating point
 	// textures.
 	floatTriple textureTriple
@@ -129,9 +131,12 @@ func NewBackend(f Functions) (*Backend, error) {
 	if err != nil {
 		return nil, err
 	}
-	gles300 := gles && ver[0] >= 3
+	gl3 := ver[0] >= 3
+	ubo := gl3 && gles
 	b := &Backend{
-		gles300:     gles300,
+		gl3:         gl3,
+		gles:        gles,
+		ubo:         ubo,
 		funcs:       f,
 		floatTriple: floatTriple,
 		alphaTriple: alphaTripleFor(ver),
@@ -240,12 +245,12 @@ func (b *Backend) NewBuffer(typ backend.BufferBinding, size int) (backend.Buffer
 		if typ != backend.BufferBindingUniforms {
 			return nil, errors.New("uniforms buffers cannot be bound as anything else")
 		}
-		if !b.gles300 {
+		if !b.ubo {
 			// GLES 2 doesn't support uniform buffers.
 			buf.data = make([]byte, size)
 		}
 	}
-	if typ&^backend.BufferBindingUniforms != 0 || b.gles300 {
+	if typ&^backend.BufferBindingUniforms != 0 || b.ubo {
 		buf.hasBuffer = true
 		buf.obj = b.funcs.CreateBuffer()
 		if err := glErr(b.funcs); err != nil {
@@ -432,8 +437,12 @@ func (b *Backend) NewProgram(vertShader, fragShader backend.ShaderSources) (back
 		attr[inp.Location] = inp.Name
 	}
 	vsrc, fsrc := vertShader.GLSL100ES, fragShader.GLSL100ES
-	if b.gles300 {
-		vsrc, fsrc = vertShader.GLSL300ES, fragShader.GLSL300ES
+	if b.gl3 {
+		if b.gles {
+			vsrc, fsrc = vertShader.GLSL300ES, fragShader.GLSL300ES
+		} else {
+			vsrc, fsrc = vertShader.GLSL130, fragShader.GLSL130
+		}
 	}
 	p, err := CreateProgram(b.funcs, vsrc, fsrc, attr)
 	if err != nil {
@@ -458,7 +467,7 @@ func (b *Backend) NewProgram(vertShader, fragShader backend.ShaderSources) (back
 			b.funcs.Uniform1i(u, tex.Binding)
 		}
 	}
-	if b.gles300 {
+	if b.ubo {
 		for _, block := range vertShader.Uniforms.Blocks {
 			blockIdx := b.funcs.GetUniformBlockIndex(p, block.Name)
 			if blockIdx != INVALID_INDEX {
@@ -497,7 +506,7 @@ func (p *gpuProgram) SetFragmentUniforms(buffer backend.Buffer) {
 
 func (p *gpuProgram) updateUniforms() {
 	f := p.backend.funcs
-	if p.backend.gles300 {
+	if p.backend.ubo {
 		if b := p.vertUniforms.buf; b != nil {
 			f.BindBufferBase(UNIFORM_BUFFER, 0, b.obj)
 		}

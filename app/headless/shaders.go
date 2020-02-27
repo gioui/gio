@@ -7,8 +7,9 @@ import "gioui.org/gpu/backend"
 var (
 	shader_input_vert = backend.ShaderSources{
 		Inputs:    []backend.InputLocation{backend.InputLocation{Name: "position", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x0, Size: 4}},
-		GLSL100ES: "#version 100\n\nattribute vec4 position;\n\nvoid main()\n{\n    gl_Position = position;\n}\n\n",
+		GLSL100ES: "\nattribute vec4 position;\n\nvoid main()\n{\n    gl_Position = position;\n}\n\n",
 		GLSL300ES: "#version 300 es\n\nlayout(location = 0) in vec4 position;\n\nvoid main()\n{\n    gl_Position = position;\n}\n\n",
+		GLSL130:   "#version 130\n\nin vec4 position;\n\nvoid main()\n{\n    gl_Position = position;\n}\n\n",
 		/*
 		   static float4 gl_Position;
 		   static float4 position;
@@ -41,8 +42,9 @@ var (
 		HLSL: []byte(nil),
 	}
 	shader_simple_frag = backend.ShaderSources{
-		GLSL100ES: "#version 100\nprecision mediump float;\nprecision highp int;\n\nvoid main()\n{\n    gl_FragData[0] = vec4(0.25, 0.5, 0.75, 1.0);\n}\n\n",
-		GLSL300ES: "#version 300 es\nprecision mediump float;\nprecision highp int;\n\nlayout(location = 0) out vec4 fragColor;\n\nvoid main()\n{\n    fragColor = vec4(0.25, 0.5, 0.75, 1.0);\n}\n\n",
+		GLSL100ES: "precision mediump float;\nprecision highp int;\n\nvoid main()\n{\n    gl_FragData[0] = vec4(0.25, 0.550000011920928955078125, 0.75, 1.0);\n}\n\n",
+		GLSL300ES: "#version 300 es\nprecision mediump float;\nprecision highp int;\n\nlayout(location = 0) out vec4 fragColor;\n\nvoid main()\n{\n    fragColor = vec4(0.25, 0.550000011920928955078125, 0.75, 1.0);\n}\n\n",
+		GLSL130:   "#version 130\n\nout vec4 fragColor;\n\nvoid main()\n{\n    fragColor = vec4(0.25, 0.550000011920928955078125, 0.75, 1.0);\n}\n\n",
 		/*
 		   static float4 fragColor;
 
@@ -53,7 +55,7 @@ var (
 
 		   void frag_main()
 		   {
-		       fragColor = float4(0.25f, 0.5f, 0.75f, 1.0f);
+		       fragColor = float4(0.25f, 0.550000011920928955078125f, 0.75f, 1.0f);
 		   }
 
 		   SPIRV_Cross_Output main()
@@ -68,8 +70,9 @@ var (
 		HLSL: []byte(nil),
 	}
 	shader_simple_vert = backend.ShaderSources{
-		GLSL100ES: "#version 100\n\nvoid main()\n{\n    float x;\n    float y;\n    if (gl_VertexID == 0)\n    {\n        x = 0.0;\n        y = 0.5;\n    }\n    else\n    {\n        if (gl_VertexID == 1)\n        {\n            x = 0.5;\n            y = -0.5;\n        }\n        else\n        {\n            x = -0.5;\n            y = -0.5;\n        }\n    }\n    gl_Position = vec4(x, y, 0.5, 1.0);\n}\n\n",
+		GLSL100ES: "\nvoid main()\n{\n    float x;\n    float y;\n    if (gl_VertexID == 0)\n    {\n        x = 0.0;\n        y = 0.5;\n    }\n    else\n    {\n        if (gl_VertexID == 1)\n        {\n            x = 0.5;\n            y = -0.5;\n        }\n        else\n        {\n            x = -0.5;\n            y = -0.5;\n        }\n    }\n    gl_Position = vec4(x, y, 0.5, 1.0);\n}\n\n",
 		GLSL300ES: "#version 300 es\n\nvoid main()\n{\n    float x;\n    float y;\n    if (gl_VertexID == 0)\n    {\n        x = 0.0;\n        y = 0.5;\n    }\n    else\n    {\n        if (gl_VertexID == 1)\n        {\n            x = 0.5;\n            y = -0.5;\n        }\n        else\n        {\n            x = -0.5;\n            y = -0.5;\n        }\n    }\n    gl_Position = vec4(x, y, 0.5, 1.0);\n}\n\n",
+		GLSL130:   "#version 130\n\nvoid main()\n{\n    float x;\n    float y;\n    if (gl_VertexID == 0)\n    {\n        x = 0.0;\n        y = 0.5;\n    }\n    else\n    {\n        if (gl_VertexID == 1)\n        {\n            x = 0.5;\n            y = -0.5;\n        }\n        else\n        {\n            x = -0.5;\n            y = -0.5;\n        }\n    }\n    gl_Position = vec4(x, y, 0.5, 1.0);\n}\n\n",
 		/*
 		   static float4 gl_Position;
 		   static int gl_VertexIndex;
