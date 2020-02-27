@@ -224,7 +224,7 @@ type blitter struct {
 type blitColUniforms struct {
 	vert struct {
 		blitUniforms
-		_ [8]byte // Padding to a multiple of 16.
+		_ [10]byte // Padding to a multiple of 16.
 	}
 	frag struct {
 		colorUniforms
@@ -234,7 +234,7 @@ type blitColUniforms struct {
 type blitTexUniforms struct {
 	vert struct {
 		blitUniforms
-		_ [8]byte // Padding to a multiple of 16.
+		_ [10]byte // Padding to a multiple of 16.
 	}
 }
 
@@ -250,12 +250,9 @@ type program struct {
 }
 
 type blitUniforms struct {
-	z        float32
-	_        float32 // Padding.
-	scale    [2]float32
-	offset   [2]float32
-	uvScale  [2]float32
-	uvOffset [2]float32
+	transform   [4]float32
+	uvTransform [4]float32
+	z           float32
 }
 
 type colorUniforms struct {
@@ -554,8 +551,7 @@ func (r *renderer) intersectPath(p *pathOp, clip image.Rectangle) {
 	fbo := r.pather.stenciler.cover(p.place.Idx)
 	r.ctx.BindTexture(0, fbo.tex)
 	coverScale, coverOff := texSpaceTransform(toRectF(uv), fbo.size)
-	r.pather.stenciler.iprog.uniforms.vert.uvScale = [2]float32{coverScale.X, coverScale.Y}
-	r.pather.stenciler.iprog.uniforms.vert.uvOffset = [2]float32{coverOff.X, coverOff.Y}
+	r.pather.stenciler.iprog.uniforms.vert.uvTransform = [4]float32{coverScale.X, coverScale.Y, coverOff.X, coverOff.Y}
 	r.pather.stenciler.iprog.prog.UploadUniforms()
 	r.ctx.DrawArrays(backend.DrawModeTriangleStrip, 0, 4)
 }
@@ -911,13 +907,11 @@ func (b *blitter) blit(z float32, mat materialType, col [4]float32, scale, off, 
 		b.colUniforms.frag.color = col
 		uniforms = &b.colUniforms.vert.blitUniforms
 	case materialTexture:
-		b.texUniforms.vert.uvScale = [2]float32{uvScale.X, uvScale.Y}
-		b.texUniforms.vert.uvOffset = [2]float32{uvOff.X, uvOff.Y}
+		b.texUniforms.vert.uvTransform = [4]float32{uvScale.X, uvScale.Y, uvOff.X, uvOff.Y}
 		uniforms = &b.texUniforms.vert.blitUniforms
 	}
 	uniforms.z = z
-	uniforms.scale = [2]float32{scale.X, scale.Y}
-	uniforms.offset = [2]float32{off.X, off.Y}
+	uniforms.transform = [4]float32{scale.X, scale.Y, off.X, off.Y}
 	p.UploadUniforms()
 	b.ctx.DrawArrays(backend.DrawModeTriangleStrip, 0, 4)
 }

@@ -5,8 +5,7 @@
 precision highp float;
 
 layout(binding = 0) uniform Block {
-	vec2 scale;
-	vec2 offset;
+	vec4 transform;
 	vec2 pathOffset;
 };
 
@@ -46,8 +45,7 @@ void main() {
 	vFrom = from-pos;
 	vCtrl = ctrl-pos;
 	vTo = to-pos;
-    pos *= scale;
-    pos += offset;
+	pos = pos*transform.xy + transform.zw;
     gl_Position = vec4(pos, 1, 1);
 }
 

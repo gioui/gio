@@ -35,14 +35,14 @@ type coverer struct {
 type coverTexUniforms struct {
 	vert struct {
 		coverUniforms
-		_ [8]byte // Padding to multiple of 16.
+		_ [12]byte // Padding to multiple of 16.
 	}
 }
 
 type coverColUniforms struct {
 	vert struct {
 		coverUniforms
-		_ [8]byte // Padding to multiple of 16.
+		_ [12]byte // Padding to multiple of 16.
 	}
 	frag struct {
 		colorUniforms
@@ -50,14 +50,10 @@ type coverColUniforms struct {
 }
 
 type coverUniforms struct {
-	z             float32
-	_             float32 // Padding.
-	scale         [2]float32
-	offset        [2]float32
-	uvCoverScale  [2]float32
-	uvCoverOffset [2]float32
-	uvScale       [2]float32
-	uvOffset      [2]float32
+	transform        [4]float32
+	uvCoverTransform [4]float32
+	uvTransform      [4]float32
+	z                float32
 }
 
 type stenciler struct {
@@ -79,8 +75,7 @@ type stenciler struct {
 
 type stencilUniforms struct {
 	vert struct {
-		scale      [2]float32
-		offset     [2]float32
+		transform  [4]float32
 		pathOffset [2]float32
 		_          [8]byte // Padding to multiple of 16.
 	}
@@ -88,8 +83,7 @@ type stencilUniforms struct {
 
 type intersectUniforms struct {
 	vert struct {
-		uvScale  [2]float32
-		uvOffset [2]float32
+		uvTransform [4]float32
 	}
 }
 
@@ -329,8 +323,7 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 	texSize := f32.Point{X: float32(bounds.Dx()), Y: float32(bounds.Dy())}
 	scale := f32.Point{X: 2 / texSize.X, Y: 2 / texSize.Y}
 	orig := f32.Point{X: -1 - float32(bounds.Min.X)*2/texSize.X, Y: -1 - float32(bounds.Min.Y)*2/texSize.Y}
-	s.prog.uniforms.vert.scale = [2]float32{scale.X, scale.Y}
-	s.prog.uniforms.vert.offset = [2]float32{orig.X, orig.Y}
+	s.prog.uniforms.vert.transform = [4]float32{scale.X, scale.Y, orig.X, orig.Y}
 	s.prog.uniforms.vert.pathOffset = [2]float32{offset.X, offset.Y}
 	s.prog.prog.UploadUniforms()
 	// Draw in batches that fit in uint16 indices.
@@ -361,15 +354,12 @@ func (c *coverer) cover(z float32, mat materialType, col [4]float32, scale, off,
 		c.colUniforms.frag.color = col
 		uniforms = &c.colUniforms.vert.coverUniforms
 	case materialTexture:
-		c.texUniforms.vert.uvScale = [2]float32{uvScale.X, uvScale.Y}
-		c.texUniforms.vert.uvOffset = [2]float32{uvOff.X, uvOff.Y}
+		c.texUniforms.vert.uvTransform = [4]float32{uvScale.X, uvScale.Y, uvOff.X, uvOff.Y}
 		uniforms = &c.texUniforms.vert.coverUniforms
 	}
 	uniforms.z = z
-	uniforms.scale = [2]float32{scale.X, scale.Y}
-	uniforms.offset = [2]float32{off.X, off.Y}
-	uniforms.uvCoverScale = [2]float32{coverScale.X, coverScale.Y}
-	uniforms.uvCoverOffset = [2]float32{coverOff.X, coverOff.Y}
+	uniforms.transform = [4]float32{scale.X, scale.Y, off.X, off.Y}
+	uniforms.uvCoverTransform = [4]float32{coverScale.X, coverScale.Y, coverOff.X, coverOff.Y}
 	p.UploadUniforms()
 	c.ctx.DrawArrays(backend.DrawModeTriangleStrip, 0, 4)
 }
