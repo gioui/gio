@@ -194,7 +194,6 @@ func screenshot(t *testing.T, fbo backend.Framebuffer, size image.Point) *image.
 	if err != nil {
 		t.Fatal(err)
 	}
-	flipImageY(img)
 	if *dumpImages {
 		if err := saveImage(t.Name()+".png", img); err != nil {
 			t.Error(err)
