@@ -4,6 +4,8 @@
 
 precision highp float;
 
+#include <common.inc>
+
 layout(binding = 0) uniform Block {
 	float z;
 	vec2 scale;
@@ -24,5 +26,7 @@ layout(location = 1) out vec2 vUV;
 void main() {
     gl_Position = vec4(pos*scale + offset, z, 1);
 	vUV = uv*uvScale + uvOffset;
-	vCoverUV = uv*uvCoverScale+uvCoverOffset;
+	vec3[2] fboTrans = fboTextureTransform();
+	vec3 uv3 = transform3x2(fboTrans, vec3(uv, 1.0));
+	vCoverUV = (uv3*vec3(uvCoverScale, 1.0)+vec3(uvCoverOffset, 0.0)).xy;
 }
