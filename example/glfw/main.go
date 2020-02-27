@@ -177,8 +177,16 @@ func (f *goglFunctions) BindBuffer(target giogl.Enum, b giogl.Buffer) {
 	gl.BindBuffer(uint32(target), uint32(b.V))
 }
 
+func (f *goglFunctions) BindBufferBase(target giogl.Enum, index int, b giogl.Buffer) {
+	gl.BindBufferBase(uint32(target), uint32(index), uint32(b.V))
+}
+
 func (f *goglFunctions) BindFramebuffer(target giogl.Enum, fb giogl.Framebuffer) {
 	gl.BindFramebuffer(uint32(target), uint32(fb.V))
+}
+
+func (f *goglFunctions) BindRenderbuffer(target giogl.Enum, rb giogl.Renderbuffer) {
+	gl.BindRenderbuffer(uint32(target), uint32(rb.V))
 }
 
 func (f *goglFunctions) BindTexture(target giogl.Enum, t giogl.Texture) {
@@ -239,6 +247,12 @@ func (f *goglFunctions) CreateQuery() giogl.Query {
 	return giogl.Query{uint(q)}
 }
 
+func (f *goglFunctions) CreateRenderbuffer() giogl.Renderbuffer {
+	var rb uint32
+	gl.GenRenderbuffers(1, &rb)
+	return giogl.Renderbuffer{uint(rb)}
+}
+
 func (f *goglFunctions) CreateShader(ty giogl.Enum) giogl.Shader {
 	return giogl.Shader{uint(gl.CreateShader(uint32(ty)))}
 }
@@ -266,6 +280,11 @@ func (f *goglFunctions) DeleteProgram(p giogl.Program) {
 func (f *goglFunctions) DeleteQuery(query giogl.Query) {
 	q := uint32(query.V)
 	gl.DeleteQueries(1, &q)
+}
+
+func (f *goglFunctions) DeleteRenderbuffer(rb giogl.Renderbuffer) {
+	r := uint32(rb.V)
+	gl.DeleteRenderbuffers(1, &r)
 }
 
 func (f *goglFunctions) DeleteShader(s giogl.Shader) {
@@ -384,6 +403,10 @@ func (f *goglFunctions) GetString(pname giogl.Enum) string {
 	}
 }
 
+func (f *goglFunctions) GetUniformBlockIndex(p giogl.Program, name string) uint {
+	return uint(gl.GetUniformBlockIndex(uint32(p.V), gl.Str(name+"\x00")))
+}
+
 func (f *goglFunctions) GetUniformLocation(p giogl.Program, name string) giogl.Uniform {
 	return giogl.Uniform{int(gl.GetUniformLocation(uint32(p.V), gl.Str(name+"\x00")))}
 }
@@ -394,6 +417,14 @@ func (f *goglFunctions) InvalidateFramebuffer(target, attachment giogl.Enum) {
 
 func (f *goglFunctions) LinkProgram(p giogl.Program) {
 	gl.LinkProgram(uint32(p.V))
+}
+
+func (f *goglFunctions) ReadPixels(x, y, width, height int, format, ty giogl.Enum, data []byte) {
+	gl.ReadPixels(int32(x), int32(y), int32(width), int32(height), uint32(format), uint32(ty), unsafe.Pointer(&data[0]))
+}
+
+func (f *goglFunctions) RenderbufferStorage(target, internalformat giogl.Enum, width, height int) {
+	gl.RenderbufferStorage(uint32(target), uint32(internalformat), int32(width), int32(height))
 }
 
 func (f *goglFunctions) ShaderSource(s giogl.Shader, src string) {
@@ -416,6 +447,10 @@ func (f *goglFunctions) TexParameteri(target, pname giogl.Enum, param int) {
 
 func (f *goglFunctions) Uniform1f(dst giogl.Uniform, v float32) {
 	gl.Uniform1f(int32(dst.V), v)
+}
+
+func (f *goglFunctions) UniformBlockBinding(p giogl.Program, uniformBlockIndex uint, uniformBlockBinding uint) {
+	gl.UniformBlockBinding(uint32(p.V), uint32(uniformBlockIndex), uint32(uniformBlockBinding))
 }
 
 func (f *goglFunctions) Uniform1i(dst giogl.Uniform, v int) {
