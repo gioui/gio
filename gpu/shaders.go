@@ -94,17 +94,17 @@ var (
 		Inputs: []backend.InputLocation{backend.InputLocation{Name: "pos", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "uv", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0x0, Size: 2}},
 		Uniforms: backend.UniformsReflection{
 			Blocks:    []backend.UniformBlock{backend.UniformBlock{Name: "Block", Binding: 0}},
-			Locations: []backend.UniformLocation{backend.UniformLocation{Name: "_16.transform", Type: 0x0, Size: 4, Offset: 0}, backend.UniformLocation{Name: "_16.uvTransform", Type: 0x0, Size: 4, Offset: 16}, backend.UniformLocation{Name: "_16.z", Type: 0x0, Size: 1, Offset: 32}},
+			Locations: []backend.UniformLocation{backend.UniformLocation{Name: "_24.transform", Type: 0x0, Size: 4, Offset: 0}, backend.UniformLocation{Name: "_24.uvTransform", Type: 0x0, Size: 4, Offset: 16}, backend.UniformLocation{Name: "_24.z", Type: 0x0, Size: 1, Offset: 32}},
 			Size:      36,
 		},
-		GLSL100ES: "#version 100\n\nstruct Block\n{\n    vec4 transform;\n    vec4 uvTransform;\n    float z;\n};\n\nuniform Block _16;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\n\nvoid main()\n{\n    vec2 p = (pos * _16.transform.xy) + _16.transform.zw;\n    gl_Position = vec4(p, _16.z, 1.0);\n    vUV = (uv * _16.uvTransform.xy) + _16.uvTransform.zw;\n}\n\n",
-		GLSL300ES: "#version 300 es\n\nlayout(std140) uniform Block\n{\n    vec4 transform;\n    vec4 uvTransform;\n    float z;\n} _16;\n\nlayout(location = 0) in vec2 pos;\nout vec2 vUV;\nlayout(location = 1) in vec2 uv;\n\nvoid main()\n{\n    vec2 p = (pos * _16.transform.xy) + _16.transform.zw;\n    gl_Position = vec4(p, _16.z, 1.0);\n    vUV = (uv * _16.uvTransform.xy) + _16.uvTransform.zw;\n}\n\n",
+		GLSL100ES: "#version 100\n\nstruct Block\n{\n    vec4 transform;\n    vec4 uvTransform;\n    float z;\n};\n\nuniform Block _24;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\n\nvec4 toClipSpace(vec4 pos_1)\n{\n    return pos_1;\n}\n\nvoid main()\n{\n    vec2 p = (pos * _24.transform.xy) + _24.transform.zw;\n    vec4 param = vec4(p, _24.z, 1.0);\n    gl_Position = toClipSpace(param);\n    vUV = (uv * _24.uvTransform.xy) + _24.uvTransform.zw;\n}\n\n",
+		GLSL300ES: "#version 300 es\n\nlayout(std140) uniform Block\n{\n    vec4 transform;\n    vec4 uvTransform;\n    float z;\n} _24;\n\nlayout(location = 0) in vec2 pos;\nout vec2 vUV;\nlayout(location = 1) in vec2 uv;\n\nvec4 toClipSpace(vec4 pos_1)\n{\n    return pos_1;\n}\n\nvoid main()\n{\n    vec2 p = (pos * _24.transform.xy) + _24.transform.zw;\n    vec4 param = vec4(p, _24.z, 1.0);\n    gl_Position = toClipSpace(param);\n    vUV = (uv * _24.uvTransform.xy) + _24.uvTransform.zw;\n}\n\n",
 		/*
 		   cbuffer Block : register(b0)
 		   {
-		       float4 _16_transform : packoffset(c0);
-		       float4 _16_uvTransform : packoffset(c1);
-		       float _16_z : packoffset(c2);
+		       float4 _24_transform : packoffset(c0);
+		       float4 _24_uvTransform : packoffset(c1);
+		       float _24_z : packoffset(c2);
 		   };
 
 
@@ -125,11 +125,17 @@ var (
 		       float4 gl_Position : SV_Position;
 		   };
 
+		   float4 toClipSpace(float4 pos_1)
+		   {
+		       return pos_1;
+		   }
+
 		   void vert_main()
 		   {
-		       float2 p = (pos * _16_transform.xy) + _16_transform.zw;
-		       gl_Position = float4(p, _16_z, 1.0f);
-		       vUV = (uv * _16_uvTransform.xy) + _16_uvTransform.zw;
+		       float2 p = (pos * _24_transform.xy) + _24_transform.zw;
+		       float4 param = float4(p, _24_z, 1.0f);
+		       gl_Position = toClipSpace(param);
+		       vUV = (uv * _24_uvTransform.xy) + _24_uvTransform.zw;
 		   }
 
 		   SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)
@@ -250,18 +256,18 @@ var (
 		Inputs: []backend.InputLocation{backend.InputLocation{Name: "pos", Location: 0, Semantic: "POSITION", SemanticIndex: 0, Type: 0x0, Size: 2}, backend.InputLocation{Name: "uv", Location: 1, Semantic: "NORMAL", SemanticIndex: 0, Type: 0x0, Size: 2}},
 		Uniforms: backend.UniformsReflection{
 			Blocks:    []backend.UniformBlock{backend.UniformBlock{Name: "Block", Binding: 0}},
-			Locations: []backend.UniformLocation{backend.UniformLocation{Name: "_58.transform", Type: 0x0, Size: 4, Offset: 0}, backend.UniformLocation{Name: "_58.uvCoverTransform", Type: 0x0, Size: 4, Offset: 16}, backend.UniformLocation{Name: "_58.uvTransform", Type: 0x0, Size: 4, Offset: 32}, backend.UniformLocation{Name: "_58.z", Type: 0x0, Size: 1, Offset: 48}},
+			Locations: []backend.UniformLocation{backend.UniformLocation{Name: "_66.transform", Type: 0x0, Size: 4, Offset: 0}, backend.UniformLocation{Name: "_66.uvCoverTransform", Type: 0x0, Size: 4, Offset: 16}, backend.UniformLocation{Name: "_66.uvTransform", Type: 0x0, Size: 4, Offset: 32}, backend.UniformLocation{Name: "_66.z", Type: 0x0, Size: 1, Offset: 48}},
 			Size:      52,
 		},
-		GLSL100ES: "#version 100\n\nstruct Block\n{\n    vec4 transform;\n    vec4 uvCoverTransform;\n    vec4 uvTransform;\n    float z;\n};\n\nuniform Block _58;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\nvarying vec2 vCoverUV;\n\nvec3[2] fboTextureTransform()\n{\n    vec3 t[2];\n    t[0] = vec3(1.0, 0.0, 0.0);\n    t[1] = vec3(0.0, 1.0, 0.0);\n    return t;\n}\n\nvec3 transform3x2(vec3 t[2], vec3 v)\n{\n    return vec3(dot(t[0], v), dot(t[1], v), dot(vec3(0.0, 0.0, 1.0), v));\n}\n\nvoid main()\n{\n    gl_Position = vec4((pos * _58.transform.xy) + _58.transform.zw, _58.z, 1.0);\n    vUV = (uv * _58.uvTransform.xy) + _58.uvTransform.zw;\n    vec3 fboTrans[2] = fboTextureTransform();\n    vec3 param[2] = fboTrans;\n    vec3 param_1 = vec3(uv, 1.0);\n    vec3 uv3 = transform3x2(param, param_1);\n    vCoverUV = ((uv3 * vec3(_58.uvCoverTransform.xy, 1.0)) + vec3(_58.uvCoverTransform.zw, 0.0)).xy;\n}\n\n",
-		GLSL300ES: "#version 300 es\n\nlayout(std140) uniform Block\n{\n    vec4 transform;\n    vec4 uvCoverTransform;\n    vec4 uvTransform;\n    float z;\n} _58;\n\nlayout(location = 0) in vec2 pos;\nout vec2 vUV;\nlayout(location = 1) in vec2 uv;\nout vec2 vCoverUV;\n\nvec3[2] fboTextureTransform()\n{\n    vec3 t[2];\n    t[0] = vec3(1.0, 0.0, 0.0);\n    t[1] = vec3(0.0, 1.0, 0.0);\n    return t;\n}\n\nvec3 transform3x2(vec3 t[2], vec3 v)\n{\n    return vec3(dot(t[0], v), dot(t[1], v), dot(vec3(0.0, 0.0, 1.0), v));\n}\n\nvoid main()\n{\n    gl_Position = vec4((pos * _58.transform.xy) + _58.transform.zw, _58.z, 1.0);\n    vUV = (uv * _58.uvTransform.xy) + _58.uvTransform.zw;\n    vec3 fboTrans[2] = fboTextureTransform();\n    vec3 param[2] = fboTrans;\n    vec3 param_1 = vec3(uv, 1.0);\n    vec3 uv3 = transform3x2(param, param_1);\n    vCoverUV = ((uv3 * vec3(_58.uvCoverTransform.xy, 1.0)) + vec3(_58.uvCoverTransform.zw, 0.0)).xy;\n}\n\n",
+		GLSL100ES: "#version 100\n\nstruct Block\n{\n    vec4 transform;\n    vec4 uvCoverTransform;\n    vec4 uvTransform;\n    float z;\n};\n\nuniform Block _66;\n\nattribute vec2 pos;\nvarying vec2 vUV;\nattribute vec2 uv;\nvarying vec2 vCoverUV;\n\nvec4 toClipSpace(vec4 pos_1)\n{\n    return pos_1;\n}\n\nvec3[2] fboTextureTransform()\n{\n    vec3 t[2];\n    t[0] = vec3(1.0, 0.0, 0.0);\n    t[1] = vec3(0.0, 1.0, 0.0);\n    return t;\n}\n\nvec3 transform3x2(vec3 t[2], vec3 v)\n{\n    return vec3(dot(t[0], v), dot(t[1], v), dot(vec3(0.0, 0.0, 1.0), v));\n}\n\nvoid main()\n{\n    vec4 param = vec4((pos * _66.transform.xy) + _66.transform.zw, _66.z, 1.0);\n    gl_Position = toClipSpace(param);\n    vUV = (uv * _66.uvTransform.xy) + _66.uvTransform.zw;\n    vec3 fboTrans[2] = fboTextureTransform();\n    vec3 param_1[2] = fboTrans;\n    vec3 param_2 = vec3(uv, 1.0);\n    vec3 uv3 = transform3x2(param_1, param_2);\n    vCoverUV = ((uv3 * vec3(_66.uvCoverTransform.xy, 1.0)) + vec3(_66.uvCoverTransform.zw, 0.0)).xy;\n}\n\n",
+		GLSL300ES: "#version 300 es\n\nlayout(std140) uniform Block\n{\n    vec4 transform;\n    vec4 uvCoverTransform;\n    vec4 uvTransform;\n    float z;\n} _66;\n\nlayout(location = 0) in vec2 pos;\nout vec2 vUV;\nlayout(location = 1) in vec2 uv;\nout vec2 vCoverUV;\n\nvec4 toClipSpace(vec4 pos_1)\n{\n    return pos_1;\n}\n\nvec3[2] fboTextureTransform()\n{\n    vec3 t[2];\n    t[0] = vec3(1.0, 0.0, 0.0);\n    t[1] = vec3(0.0, 1.0, 0.0);\n    return t;\n}\n\nvec3 transform3x2(vec3 t[2], vec3 v)\n{\n    return vec3(dot(t[0], v), dot(t[1], v), dot(vec3(0.0, 0.0, 1.0), v));\n}\n\nvoid main()\n{\n    vec4 param = vec4((pos * _66.transform.xy) + _66.transform.zw, _66.z, 1.0);\n    gl_Position = toClipSpace(param);\n    vUV = (uv * _66.uvTransform.xy) + _66.uvTransform.zw;\n    vec3 fboTrans[2] = fboTextureTransform();\n    vec3 param_1[2] = fboTrans;\n    vec3 param_2 = vec3(uv, 1.0);\n    vec3 uv3 = transform3x2(param_1, param_2);\n    vCoverUV = ((uv3 * vec3(_66.uvCoverTransform.xy, 1.0)) + vec3(_66.uvCoverTransform.zw, 0.0)).xy;\n}\n\n",
 		/*
 		   cbuffer Block : register(b0)
 		   {
-		       float4 _58_transform : packoffset(c0);
-		       float4 _58_uvCoverTransform : packoffset(c1);
-		       float4 _58_uvTransform : packoffset(c2);
-		       float _58_z : packoffset(c3);
+		       float4 _66_transform : packoffset(c0);
+		       float4 _66_uvCoverTransform : packoffset(c1);
+		       float4 _66_uvTransform : packoffset(c2);
+		       float _66_z : packoffset(c3);
 		   };
 
 
@@ -284,6 +290,11 @@ var (
 		       float4 gl_Position : SV_Position;
 		   };
 
+		   float4 toClipSpace(float4 pos_1)
+		   {
+		       return pos_1;
+		   }
+
 		   void fboTextureTransform(out float3 SPIRV_Cross_return_value[2])
 		   {
 		       float3 t[2];
@@ -299,15 +310,16 @@ var (
 
 		   void vert_main()
 		   {
-		       gl_Position = float4((pos * _58_transform.xy) + _58_transform.zw, _58_z, 1.0f);
-		       vUV = (uv * _58_uvTransform.xy) + _58_uvTransform.zw;
-		       float3 _91[2];
-		       fboTextureTransform(_91);
-		       float3 fboTrans[2] = _91;
-		       float3 param[2] = fboTrans;
-		       float3 param_1 = float3(uv, 1.0f);
-		       float3 uv3 = transform3x2(param, param_1);
-		       vCoverUV = ((uv3 * float3(_58_uvCoverTransform.xy, 1.0f)) + float3(_58_uvCoverTransform.zw, 0.0f)).xy;
+		       float4 param = float4((pos * _66_transform.xy) + _66_transform.zw, _66_z, 1.0f);
+		       gl_Position = toClipSpace(param);
+		       vUV = (uv * _66_uvTransform.xy) + _66_uvTransform.zw;
+		       float3 _101[2];
+		       fboTextureTransform(_101);
+		       float3 fboTrans[2] = _101;
+		       float3 param_1[2] = fboTrans;
+		       float3 param_2 = float3(uv, 1.0f);
+		       float3 uv3 = transform3x2(param_1, param_2);
+		       vCoverUV = ((uv3 * float3(_66_uvCoverTransform.xy, 1.0f)) + float3(_66_uvCoverTransform.zw, 0.0f)).xy;
 		   }
 
 		   SPIRV_Cross_Output main(SPIRV_Cross_Input stage_input)

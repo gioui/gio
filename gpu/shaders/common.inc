@@ -12,6 +12,12 @@ vec3[2] fboTextureTransform() {
 	return t;
 }
 
+// toClipSpace converts an OpenGL gl_Position value to a
+// native GPU position.
+vec4 toClipSpace(vec4 pos) {
+	return pos;
+}
+
 vec3 transform3x2(vec3[2] t, vec3 v) {
 	return vec3(dot(t[0], v), dot(t[1], v), dot(vec3(0.0, 0.0, 1.0), v));
 }
