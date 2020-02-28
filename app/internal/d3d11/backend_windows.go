@@ -500,7 +500,7 @@ func (b *Backend) Clear(buffers backend.BufferAttachments) {
 	if buffers&backend.BufferAttachmentColor != 0 {
 		b.dev.ctx.ClearRenderTargetView(b.fbo.renderTarget, &b.clearColor)
 	}
-	if buffers&backend.BufferAttachmentDepth != 0 {
+	if buffers&backend.BufferAttachmentDepth != 0 && b.fbo.depthView != nil {
 		b.dev.ctx.ClearDepthStencilView(b.fbo.depthView, _D3D11_CLEAR_DEPTH|_D3D11_CLEAR_STENCIL, b.clearDepth, 0)
 	}
 }
