@@ -55,8 +55,6 @@ func generate() error {
 	if err != nil {
 		return err
 	}
-	fxc, err := exec.LookPath("fxc")
-	fxcFound := err == nil
 	shaders, err := filepath.Glob(filepath.Join(absShadersDir, "*"))
 	if err != nil {
 		return err
@@ -117,11 +115,9 @@ func generate() error {
 				return fmt.Errorf("unrecognized shader type %s", shader)
 			}
 			var hlslc []byte
-			if fxcFound {
-				hlslc, err = compileHLSL(tmp, fxc, hlsl, "main", hlslProf+"_4_0")
-				if err != nil {
-					return err
-				}
+			hlslc, err = compileHLSL(hlsl, "main", hlslProf+"_4_0")
+			if err != nil {
+				return err
 			}
 			// OpenGL 3.2 Core only accepts GLSL version 1.50, but is
 			// otherwise compatible with version 1.30.
@@ -308,26 +304,6 @@ func parseDataType(t string) (backend.DataType, int, error) {
 	default:
 		return 0, 0, fmt.Errorf("unsupported input data type: %s", t)
 	}
-}
-
-func compileHLSL(tmp, fxc, src, entry, profile string) ([]byte, error) {
-	tmpfile := filepath.Join(tmp, "shader.hlsl")
-	if err := ioutil.WriteFile(tmpfile, []byte(src), 0644); err != nil {
-		return nil, err
-	}
-	outFile := filepath.Join(tmp, "shader.bin")
-	cmd := exec.Command(fxc,
-		"/T", profile,
-		"/E", entry,
-		"/nologo",
-		"/Fo", outFile,
-		tmpfile,
-	)
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return nil, err
-	}
-	return ioutil.ReadFile(outFile)
 }
 
 func convertShader(tmp, glslcc, path, lang, profile string, args *shaderArgs, flattenUBOs bool) (string, []byte, error) {

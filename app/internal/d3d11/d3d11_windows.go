@@ -9,8 +9,6 @@ import (
 
 	"syscall"
 
-	gunsafe "gioui.org/internal/unsafe"
-
 	"golang.org/x/sys/windows"
 )
 
@@ -360,14 +358,6 @@ type _ID3D11InputLayout struct {
 	}
 }
 
-type _ID3DBlob struct {
-	vtbl *struct {
-		_IUnknownVTbl
-		GetBufferPointer uintptr
-		GetBufferSize    uintptr
-	}
-}
-
 type _D3D11_DEPTH_STENCIL_DESC struct {
 	DepthEnable      uint32
 	DepthWriteMask   uint32
@@ -560,10 +550,6 @@ var (
 
 	__D3D11CreateDevice             = d3d11.NewProc("D3D11CreateDevice")
 	__D3D11CreateDeviceAndSwapChain = d3d11.NewProc("D3D11CreateDeviceAndSwapChain")
-
-	d3dcompiler_47 = windows.NewLazySystemDLL("d3dcompiler_47.dll")
-
-	__D3DCompile = d3dcompiler_47.NewProc("D3DCompile")
 )
 
 const (
@@ -697,41 +683,6 @@ func _D3D11CreateDeviceAndSwapChain(driverType uint32, flags uint32, swapDesc *_
 		return nil, nil, nil, 0, ErrorCode{Name: "D3D11CreateDeviceAndSwapChain", Code: uint32(r)}
 	}
 	return dev, ctx, swchain, featLvl, nil
-}
-
-func _D3DCompile(src []byte, entryPoint, target string) ([]byte, error) {
-	var (
-		code   *_ID3DBlob
-		errors *_ID3DBlob
-	)
-	entryPoint0 := []byte(entryPoint + "\x00")
-	target0 := []byte(target + "\x00")
-	r, _, _ := __D3DCompile.Call(
-		uintptr(unsafe.Pointer(&src[0])),
-		uintptr(len(src)),
-		0, // pSourceName
-		0, // pDefines
-		0, // pInclude
-		uintptr(unsafe.Pointer(&entryPoint0[0])),
-		uintptr(unsafe.Pointer(&target0[0])),
-		0, // Flags1
-		0, // Flags2
-		uintptr(unsafe.Pointer(&code)),
-		uintptr(unsafe.Pointer(&errors)),
-	)
-	var compileErr string
-	if errors != nil {
-		compileErr = string(errors.data())
-		_IUnknownRelease(unsafe.Pointer(errors), errors.vtbl.Release)
-	}
-	if r != 0 {
-		return nil, fmt.Errorf("D3D11Compile: %#x: %s", r, compileErr)
-	}
-	bytecode := code.data()
-	cp := make([]byte, len(bytecode))
-	copy(cp, bytecode)
-	_IUnknownRelease(unsafe.Pointer(code), code.vtbl.Release)
-	return cp, nil
 }
 
 func (d *_ID3D11Device) CreateBuffer(desc *_D3D11_BUFFER_DESC, data []byte) (*_ID3D11Buffer, error) {
@@ -1279,34 +1230,6 @@ func (c *_ID3D11DeviceContext) OMSetDepthStencilState(state *_ID3D11DepthStencil
 		uintptr(unsafe.Pointer(state)),
 		uintptr(stencilRef),
 	)
-}
-
-func (b *_ID3DBlob) GetBufferPointer() uintptr {
-	ptr, _, _ := syscall.Syscall(
-		b.vtbl.GetBufferPointer,
-		1,
-		uintptr(unsafe.Pointer(b)),
-		0,
-		0,
-	)
-	return ptr
-}
-
-func (b *_ID3DBlob) GetBufferSize() uintptr {
-	sz, _, _ := syscall.Syscall(
-		b.vtbl.GetBufferSize,
-		1,
-		uintptr(unsafe.Pointer(b)),
-		0,
-		0,
-	)
-	return sz
-}
-
-func (b *_ID3DBlob) data() []byte {
-	data := gunsafe.SliceOf(b.GetBufferPointer())
-	n := int(b.GetBufferSize())
-	return data[:n:n]
 }
 
 func (d *_IDXGIObject) GetParent(guid *_GUID) (*_IDXGIObject, error) {
