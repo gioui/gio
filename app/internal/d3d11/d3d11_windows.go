@@ -533,7 +533,7 @@ type _D3D11_MAPPED_SUBRESOURCE struct {
 
 type ErrorCode struct {
 	Name string
-	Code int
+	Code uint
 }
 
 type _D3D11_RASTERIZER_DESC struct {
@@ -969,7 +969,7 @@ func (s *_IDXGISwapChain) Present(SyncInterval int, Flags uint32) error {
 		uintptr(Flags),
 	)
 	if r != 0 {
-		return ErrorCode{Name: "IDXGISwapChainPresent", Code: int(r)}
+		return ErrorCode{Name: "IDXGISwapChainPresent", Code: uint(r)}
 	}
 	return nil
 }
