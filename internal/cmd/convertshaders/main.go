@@ -115,9 +115,15 @@ func generate() error {
 				return fmt.Errorf("unrecognized shader type %s", shader)
 			}
 			var hlslc []byte
-			hlslc, err = compileHLSL(hlsl, "main", hlslProf+"_4_0")
+			hlslc, err = compileHLSL(hlsl, "main", hlslProf+"_4_0_level_9_1")
 			if err != nil {
-				return err
+				// Attempt shader model 4.0. Only the app/headless
+				// test shaders use features not supported by level
+				// 9.1.
+				hlslc, err = compileHLSL(hlsl, "main", hlslProf+"_4_0")
+				if err != nil {
+					return err
+				}
 			}
 			// OpenGL 3.2 Core only accepts GLSL version 1.50, but is
 			// otherwise compatible with version 1.30.
