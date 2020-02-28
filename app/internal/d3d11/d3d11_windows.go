@@ -533,7 +533,7 @@ type _D3D11_MAPPED_SUBRESOURCE struct {
 
 type ErrorCode struct {
 	Name string
-	Code uint
+	Code uint32
 }
 
 type _D3D11_RASTERIZER_DESC struct {
@@ -667,7 +667,7 @@ func _D3D11CreateDevice(driverType uint32, flags uint32) (*_ID3D11Device, *_ID3D
 		uintptr(unsafe.Pointer(&ctx)),     // ppImmediateContext
 	)
 	if r != 0 {
-		return nil, nil, 0, fmt.Errorf("D3D11CreateDevice: %#x", r)
+		return nil, nil, 0, ErrorCode{Name: "D3D11CreateDevice", Code: uint32(r)}
 	}
 	return dev, ctx, featLvl, nil
 }
@@ -694,7 +694,7 @@ func _D3D11CreateDeviceAndSwapChain(driverType uint32, flags uint32, swapDesc *_
 		uintptr(unsafe.Pointer(&ctx)),     // ppImmediateContext
 	)
 	if r != 0 {
-		return nil, nil, nil, 0, fmt.Errorf("D3D11CreateDeviceAndSwapChain: %#x", r)
+		return nil, nil, nil, 0, ErrorCode{Name: "D3D11CreateDeviceAndSwapChain", Code: uint32(r)}
 	}
 	return dev, ctx, swchain, featLvl, nil
 }
@@ -752,7 +752,7 @@ func (d *_ID3D11Device) CreateBuffer(desc *_D3D11_BUFFER_DESC, data []byte) (*_I
 		0, 0,
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("ID3D11DeviceCreateBuffer: %#x", r)
+		return nil, ErrorCode{Name: "ID3D11DeviceCreateBuffer", Code: uint32(r)}
 	}
 	return buf, nil
 }
@@ -769,7 +769,7 @@ func (d *_ID3D11Device) CreateDepthStencilViewTEX2D(res *_ID3D11Resource, desc *
 		0, 0,
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("ID3D11DeviceCreateDepthStencilView: %#x", r)
+		return nil, ErrorCode{Name: "ID3D11DeviceCreateDepthStencilView", Code: uint32(r)}
 	}
 	return view, nil
 }
@@ -787,7 +787,7 @@ func (d *_ID3D11Device) CreatePixelShader(bytecode []byte) (*_ID3D11PixelShader,
 		0,
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("ID3D11DeviceCreatePixelShader; %#x", r)
+		return nil, ErrorCode{Name: "ID3D11DeviceCreatePixelShader", Code: uint32(r)}
 	}
 	return shader, nil
 }
@@ -805,7 +805,7 @@ func (d *_ID3D11Device) CreateVertexShader(bytecode []byte) (*_ID3D11VertexShade
 		0,
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("ID3D11DeviceCreateVertexShader; %#x", r)
+		return nil, ErrorCode{Name: "ID3D11DeviceCreateVertexShader", Code: uint32(r)}
 	}
 	return shader, nil
 }
@@ -822,7 +822,7 @@ func (d *_ID3D11Device) CreateShaderResourceViewTEX2D(res *_ID3D11Resource, desc
 		0, 0,
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("ID3D11DeviceCreateShaderResourceView: %#x", r)
+		return nil, ErrorCode{Name: "ID3D11DeviceCreateShaderResourceView", Code: uint32(r)}
 	}
 	return resView, nil
 }
@@ -837,7 +837,7 @@ func (d *_ID3D11Device) CreateRasterizerState(desc *_D3D11_RASTERIZER_DESC) (*_I
 		uintptr(unsafe.Pointer(&state)),
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("ID3D11DeviceCreateRasterizerState: %#x", r)
+		return nil, ErrorCode{Name: "ID3D11DeviceCreateRasterizerState", Code: uint32(r)}
 	}
 	return state, nil
 }
@@ -859,7 +859,7 @@ func (d *_ID3D11Device) CreateInputLayout(descs []_D3D11_INPUT_ELEMENT_DESC, byt
 		uintptr(unsafe.Pointer(&layout)),
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("ID3D11DeviceCreateInputLayout: %#x", r)
+		return nil, ErrorCode{Name: "ID3D11DeviceCreateInputLayout", Code: uint32(r)}
 	}
 	return layout, nil
 }
@@ -874,7 +874,7 @@ func (d *_ID3D11Device) CreateSamplerState(desc *_D3D11_SAMPLER_DESC) (*_ID3D11S
 		uintptr(unsafe.Pointer(&sampler)),
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("ID3D11DeviceCreateSamplerState: %#x", r)
+		return nil, ErrorCode{Name: "ID3D11DeviceCreateSamplerState", Code: uint32(r)}
 	}
 	return sampler, nil
 }
@@ -891,7 +891,7 @@ func (d *_ID3D11Device) CreateTexture2D(desc *_D3D11_TEXTURE2D_DESC) (*_ID3D11Te
 		0, 0,
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("ID3D11CreateTexture2D: %#x", r)
+		return nil, ErrorCode{Name: "ID3D11CreateTexture2D", Code: uint32(r)}
 	}
 	return tex, nil
 }
@@ -908,7 +908,7 @@ func (d *_ID3D11Device) CreateRenderTargetView(res *_ID3D11Resource) (*_ID3D11Re
 		0, 0,
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("ID3D11DeviceCreateRenderTargetView: %#x", r)
+		return nil, ErrorCode{Name: "ID3D11DeviceCreateRenderTargetView", Code: uint32(r)}
 	}
 	return target, nil
 }
@@ -923,7 +923,7 @@ func (d *_ID3D11Device) CreateBlendState(desc *_D3D11_BLEND_DESC) (*_ID3D11Blend
 		uintptr(unsafe.Pointer(&state)),
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("ID3D11DeviceCreateBlendState: %#x", r)
+		return nil, ErrorCode{Name: "ID3D11DeviceCreateBlendState", Code: uint32(r)}
 	}
 	return state, nil
 }
@@ -938,7 +938,7 @@ func (d *_ID3D11Device) CreateDepthStencilState(desc *_D3D11_DEPTH_STENCIL_DESC)
 		uintptr(unsafe.Pointer(&state)),
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("ID3D11DeviceCreateDepthStencilState: %#x", r)
+		return nil, ErrorCode{Name: "ID3D11DeviceCreateDepthStencilState", Code: uint32(r)}
 	}
 	return state, nil
 }
@@ -955,7 +955,7 @@ func (s *_IDXGISwapChain) ResizeBuffers(buffers, width, height, newFormat, flags
 		uintptr(flags),
 	)
 	if r != 0 {
-		return fmt.Errorf("IDXGISwapChainResizeBuffers: %#x", r)
+		return ErrorCode{Name: "IDXGISwapChainResizeBuffers", Code: uint32(r)}
 	}
 	return nil
 }
@@ -969,7 +969,7 @@ func (s *_IDXGISwapChain) Present(SyncInterval int, Flags uint32) error {
 		uintptr(Flags),
 	)
 	if r != 0 {
-		return ErrorCode{Name: "IDXGISwapChainPresent", Code: uint(r)}
+		return ErrorCode{Name: "IDXGISwapChainPresent", Code: uint32(r)}
 	}
 	return nil
 }
@@ -987,7 +987,7 @@ func (s *_IDXGISwapChain) GetBuffer(index int, riid *_GUID) (*_IUnknown, error) 
 		0,
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("IDXGISwapChainGetBuffer: %#x", r)
+		return nil, ErrorCode{Name: "IDXGISwapChainGetBuffer", Code: uint32(r)}
 	}
 	return buf, nil
 }
@@ -1015,7 +1015,7 @@ func (c *_ID3D11DeviceContext) Map(resource *_ID3D11Resource, subResource, mapTy
 		uintptr(unsafe.Pointer(&resMap)),
 	)
 	if r != 0 {
-		return resMap, fmt.Errorf("ID3D11DeviceContextMap: %#x", r)
+		return resMap, ErrorCode{Name: "ID3D11DeviceContextMap", Code: uint32(r)}
 	}
 	return resMap, nil
 }
@@ -1319,7 +1319,7 @@ func (d *_IDXGIObject) GetParent(guid *_GUID) (*_IDXGIObject, error) {
 		uintptr(unsafe.Pointer(&parent)),
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("IDXGIObjectGetParent: %#x", r)
+		return nil, ErrorCode{Name: "IDXGIObjectGetParent", Code: uint32(r)}
 	}
 	return parent, nil
 }
@@ -1336,7 +1336,7 @@ func (d *_IDXGIFactory) CreateSwapChain(device *_IUnknown, desc *_DXGI_SWAP_CHAI
 		0, 0,
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("IDXGIFactory: %#x", r)
+		return nil, ErrorCode{Name: "IDXGIFactory", Code: uint32(r)}
 	}
 	return swchain, nil
 }
@@ -1351,7 +1351,7 @@ func (d *_IDXGIDevice) GetAdapter() (*_IDXGIAdapter, error) {
 		0,
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("IDXGIDeviceGetAdapter: %#x", r)
+		return nil, ErrorCode{Name: "IDXGIDeviceGetAdapter", Code: uint32(r)}
 	}
 	return adapter, nil
 }
@@ -1366,7 +1366,7 @@ func _IUnknownQueryInterface(obj unsafe.Pointer, queryInterfaceMethod uintptr, g
 		uintptr(unsafe.Pointer(&ref)),
 	)
 	if r != 0 {
-		return nil, fmt.Errorf("IUnknownQueryInterface: %#x", r)
+		return nil, ErrorCode{Name: "IUnknownQueryInterface", Code: uint32(r)}
 	}
 	return ref, nil
 }
