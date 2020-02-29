@@ -120,21 +120,35 @@ func NewDevice() (*Device, error) {
 		_IUnknownRelease(unsafe.Pointer(d3dctx), d3dctx.vtbl.Release)
 		return nil, fmt.Errorf("d3d11: feature level too low: %d", featLvl)
 	}
-	format := uint32(_DXGI_FORMAT_R16_FLOAT)
-	need := uint32(_D3D11_FORMAT_SUPPORT_TEXTURE2D | _D3D11_FORMAT_SUPPORT_RENDER_TARGET)
-	if use, _ := d3ddev.CheckFormatSupport(format); use&need == 0 {
-		// Fall back to a d3d 9.2 format.
-		format = _DXGI_FORMAT_R32_FLOAT
-		if use, _ = d3ddev.CheckFormatSupport(format); use&need == 0 {
-			_IUnknownRelease(unsafe.Pointer(d3ddev), d3ddev.vtbl.Release)
-			_IUnknownRelease(unsafe.Pointer(d3dctx), d3dctx.vtbl.Release)
-			return nil, fmt.Errorf("d3d11: no available floating point formats")
-		}
+	floatFormat, ok := detectFloatFormat(d3ddev)
+	if !ok {
+		_IUnknownRelease(unsafe.Pointer(d3ddev), d3ddev.vtbl.Release)
+		_IUnknownRelease(unsafe.Pointer(d3dctx), d3dctx.vtbl.Release)
+		return nil, fmt.Errorf("d3d11: no available floating point formats")
 	}
-	dev.floatFormat = format
+	dev.floatFormat = floatFormat
 	dev.depthStates = make(map[depthState]*_ID3D11DepthStencilState)
 	dev.blendStates = make(map[blendState]*_ID3D11BlendState)
 	return dev, nil
+}
+
+func detectFloatFormat(dev *_ID3D11Device) (uint32, bool) {
+	formats := []uint32{
+		_DXGI_FORMAT_R16_FLOAT,
+		_DXGI_FORMAT_R32_FLOAT,
+		_DXGI_FORMAT_R16G16_FLOAT,
+		_DXGI_FORMAT_R32G32_FLOAT,
+		// These last two are really wasteful, but c'est la vie.
+		_DXGI_FORMAT_R16G16B16A16_FLOAT,
+		_DXGI_FORMAT_R32G32B32A32_FLOAT,
+	}
+	for _, format := range formats {
+		need := uint32(_D3D11_FORMAT_SUPPORT_TEXTURE2D | _D3D11_FORMAT_SUPPORT_RENDER_TARGET)
+		if support, _ := dev.CheckFormatSupport(format); support&need == need {
+			return format, true
+		}
+	}
+	return 0, false
 }
 
 func (d *Device) CreateSwapChain(hwnd windows.Handle) (*SwapChain, error) {
