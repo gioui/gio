@@ -565,6 +565,11 @@ const (
 	_DXGI_FORMAT_R8G8B8A8_UNORM_SRGB = 29
 	_DXGI_FORMAT_R16_SINT            = 59
 	_DXGI_FORMAT_R16G16_SINT         = 38
+	_DXGI_FORMAT_R16_UINT            = 57
+	_DXGI_FORMAT_D24_UNORM_S8_UINT   = 45
+
+	_D3D11_FORMAT_SUPPORT_TEXTURE2D     = 0x20
+	_D3D11_FORMAT_SUPPORT_RENDER_TARGET = 0x4000
 
 	_DXGI_USAGE_RENDER_TARGET_OUTPUT = 1 << (1 + 4)
 
@@ -573,8 +578,6 @@ const (
 	_D3D11_MAP_READ = 1
 
 	_DXGI_SWAP_EFFECT_DISCARD = 0
-
-	_DXGI_FORMAT_R16_UINT = 57
 
 	_D3D_FEATURE_LEVEL_9_1  = 0x9100
 	_D3D_FEATURE_LEVEL_9_3  = 0x9300
@@ -610,8 +613,6 @@ const (
 
 	_D3D11_CLEAR_DEPTH   = 0x1
 	_D3D11_CLEAR_STENCIL = 0x2
-
-	_DXGI_FORMAT_D24_UNORM_S8_UINT = 45
 
 	_D3D11_DSV_DIMENSION_TEXTURE2D = 3
 
@@ -683,6 +684,21 @@ func _D3D11CreateDeviceAndSwapChain(driverType uint32, flags uint32, swapDesc *_
 		return nil, nil, nil, 0, ErrorCode{Name: "D3D11CreateDeviceAndSwapChain", Code: uint32(r)}
 	}
 	return dev, ctx, swchain, featLvl, nil
+}
+
+func (d *_ID3D11Device) CheckFormatSupport(format uint32) (uint32, error) {
+	var support uint32
+	r, _, _ := syscall.Syscall(
+		d.vtbl.CheckFormatSupport,
+		3,
+		uintptr(unsafe.Pointer(d)),
+		uintptr(format),
+		uintptr(unsafe.Pointer(&support)),
+	)
+	if r != 0 {
+		return 0, ErrorCode{Name: "ID3D11DeviceCheckFormatSupport", Code: uint32(r)}
+	}
+	return support, nil
 }
 
 func (d *_ID3D11Device) CreateBuffer(desc *_D3D11_BUFFER_DESC, data []byte) (*_ID3D11Buffer, error) {
