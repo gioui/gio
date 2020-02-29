@@ -12,7 +12,44 @@ import (
 	"gioui.org/op"
 )
 
-func TestPointer(t *testing.T) {
+func TestPointerDrag(t *testing.T) {
+	handler := new(int)
+	var ops op.Ops
+	pointer.Rect(image.Rectangle{
+		Max: image.Point{
+			X: 100,
+			Y: 100,
+		},
+	}).Add(&ops)
+	pointer.InputOp{Key: handler}.Add(&ops)
+
+	var r Router
+	r.Frame(&ops)
+	r.Add(
+		// Press.
+		pointer.Event{
+			Type: pointer.Press,
+			Position: f32.Point{
+				X: 50,
+				Y: 50,
+			},
+		},
+		// Move outside the area.
+		pointer.Event{
+			Type: pointer.Move,
+			Position: f32.Point{
+				X: 150,
+				Y: 150,
+			},
+		},
+	)
+	ev := r.Events(handler)
+	if moves := countPointerEvents(pointer.Move, ev); moves != 1 {
+		t.Errorf("got %d move events, expected 1", moves)
+	}
+}
+
+func TestPointerMove(t *testing.T) {
 	handler1 := new(int)
 	handler2 := new(int)
 	var ops op.Ops
