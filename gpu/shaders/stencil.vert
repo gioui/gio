@@ -29,15 +29,15 @@ void main() {
 	float maxy = maxy + pathOffset.y;
 	vec2 pos;
 	float c = corner;
-	if (c >= 0.5) {
-		c -= 0.5;
+	if (c >= 0.375) {
 		// North.
+		c -= 0.5;
 		pos.y = maxy + 1.0;
 	} else {
 		// South.
 		pos.y = min(min(from.y, ctrl.y), to.y) - 1.0;
 	}
-	if (c >= 0.25) {
+	if (c >= 0.125) {
 		// East.
 		pos.x = max(max(from.x, ctrl.x), to.x)+1.0;
 	} else {
