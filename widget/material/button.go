@@ -98,12 +98,13 @@ func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 }
 
 func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
-	layout.Stack{}.Layout(gtx,
+	layout.Stack{Alignment: layout.Center}.Layout(gtx,
 		layout.Expanded(func() {
-			size := float32(gtx.Constraints.Width.Min)
-			rr := float32(size) * .5
+			size := gtx.Constraints.Width.Min
+			sizef := float32(size)
+			rr := sizef * .5
 			clip.Rect{
-				Rect: f32.Rectangle{Max: f32.Point{X: size, Y: size}},
+				Rect: f32.Rectangle{Max: f32.Point{X: sizef, Y: sizef}},
 				NE:   rr, NW: rr, SE: rr, SW: rr,
 			}.Op(gtx.Ops).Add(gtx.Ops)
 			fill(gtx, b.Background)

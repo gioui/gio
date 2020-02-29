@@ -69,7 +69,6 @@ func (s Stack) Layout(gtx *Context, children ...StackChild) {
 		children[i].macro = m
 		children[i].dims = dims
 	}
-	maxSZ = gtx.Constraints.Constrain(maxSZ)
 	// Then lay out Expanded children.
 	for i, w := range children {
 		if !w.expanded {
@@ -93,6 +92,7 @@ func (s Stack) Layout(gtx *Context, children ...StackChild) {
 		children[i].dims = dims
 	}
 
+	maxSZ = gtx.Constraints.Constrain(maxSZ)
 	var baseline int
 	for _, ch := range children {
 		sz := ch.dims.Size
