@@ -332,6 +332,9 @@ func (w *window) draw(sync bool) {
 	windows.GetClientRect(w.hwnd, &r)
 	w.width = int(r.Right - r.Left)
 	w.height = int(r.Bottom - r.Top)
+	if w.width == 0 || w.height == 0 {
+		return
+	}
 	cfg := configForDC()
 	cfg.now = time.Now()
 	w.w.Event(FrameEvent{
