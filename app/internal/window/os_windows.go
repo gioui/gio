@@ -4,9 +4,11 @@ package window
 
 import (
 	"errors"
+	"fmt"
 	"image"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 	"unicode"
@@ -359,18 +361,16 @@ func (w *window) NewContext() (Context, error) {
 	sort.Slice(backends, func(i, j int) bool {
 		return backends[i].priority < backends[j].priority
 	})
-	var cerr error
+	var errs []string
 	for _, b := range backends {
 		ctx, err := b.initializer(w)
 		if err == nil {
 			return ctx, nil
 		}
-		if cerr == nil {
-			cerr = err
-		}
+		errs = append(errs, err.Error())
 	}
-	if cerr != nil {
-		return nil, cerr
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("NewContext: failed to create a GPU device, tried: %s", strings.Join(errs, ", "))
 	}
 	return nil, errors.New("NewContext: no available backends")
 }
