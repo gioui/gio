@@ -1,8 +1,9 @@
 # Gio
 
-Immediate mode GUI programs in Go for Android, iOS, macOS, Linux, FreeBSD, OpenBSD,
-Windows, and WebAssembly (experimental). See [gioui.org](https://gioui.org) for
-details and documentation.
+Immediate mode GUI programs in Go for Android, iOS, macOS, Linux,
+FreeBSD, OpenBSD, Windows, and WebAssembly (experimental). See the
+project page [gioui.org](https://gioui.org) for documentation and more
+information.
 
 [![builds.sr.ht status](https://builds.sr.ht/~eliasnaur/gio.svg)](https://builds.sr.ht/~eliasnaur/gio)
 
@@ -19,6 +20,9 @@ Post discussion to the [mailing list](https://lists.sr.ht/~eliasnaur/gio) and pa
 account is required and you can post without being subscribed.
 
 See the [contribution guide](https://gioui.org/doc/contribute) for more details.
+
+An [unofficial GitHub mirror](https://github.com/theclapp/gio-mirror)
+is kindly maintained by Larry Clapp.
 
 ## License
 
