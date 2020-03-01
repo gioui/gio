@@ -1,4 +1,4 @@
-image: debian/unstable # TODO(mvdan): switch back to testing once sway hits that repo
+image: debian/testing
 packages:
  - curl
  - pkg-config

@@ -10,7 +10,6 @@ import (
 	"image"
 	"image/png"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -47,23 +46,14 @@ func (d *WaylandTestDriver) Start(path string, width, height int) {
 		env = append(env, "WLR_BACKENDS=headless")
 	}
 
-	for _, prog := range []string{
+	d.needPrograms(
 		"sway",    // to run a wayland compositor
 		"grim",    // to take screenshots
 		"swaymsg", // to send input
-	} {
-		if _, err := exec.LookPath(prog); err != nil {
-			d.Skipf("%s needed to run", prog)
-		}
-	}
+	)
 
 	// First, build the app.
-	dir, err := ioutil.TempDir("", "gio-endtoend-wayland")
-	if err != nil {
-		d.Fatal(err)
-	}
-	d.Cleanup(func() { os.RemoveAll(dir) })
-
+	dir := d.tempDir("gio-endtoend-wayland")
 	bin := filepath.Join(dir, "red")
 	flags := []string{"build", "-tags", "nox11", "-o=" + bin}
 	if raceEnabled {

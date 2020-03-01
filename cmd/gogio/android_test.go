@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"image"
 	"image/png"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,12 +54,7 @@ func (d *AndroidTestDriver) Start(path string, width, height int) {
 	}
 
 	// First, build the app.
-	dir, err := ioutil.TempDir("", "gio-endtoend-android")
-	if err != nil {
-		d.Fatal(err)
-	}
-	d.Cleanup(func() { os.RemoveAll(dir) })
-	apk := filepath.Join(dir, "e2e.apk")
+	apk := filepath.Join(d.tempDir("gio-endtoend-android"), "e2e.apk")
 
 	// TODO(mvdan): This is inefficient, as we link the gogio tool every time.
 	// Consider options in the future. On the plus side, this is simple.

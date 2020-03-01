@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"io/ioutil"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -45,6 +48,10 @@ type TestDriver interface {
 type driverBase struct {
 	*testing.T
 
+	// TODO(mvdan): Make this lower-level, so that each driver can simply
+	// send us each line of output from the app. That will let us
+	// deduplicate some code, and also show app output as test logs in a
+	// consistent way.
 	frameNotifs chan bool
 }
 
@@ -253,4 +260,23 @@ func (d *driverBase) waitForFrame() {
 	case <-time.After(5 * time.Second):
 		d.Fatalf("timed out waiting for a frame to be ready")
 	}
+}
+
+func (d *driverBase) needPrograms(names ...string) {
+	d.Helper()
+	for _, name := range names {
+		if _, err := exec.LookPath(name); err != nil {
+			d.Skipf("%s needed to run", name)
+		}
+	}
+}
+
+func (d *driverBase) tempDir(name string) string {
+	d.Helper()
+	dir, err := ioutil.TempDir("", name)
+	if err != nil {
+		d.Fatal(err)
+	}
+	d.Cleanup(func() { os.RemoveAll(dir) })
+	return dir
 }
