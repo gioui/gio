@@ -280,3 +280,16 @@ func (d *driverBase) tempDir(name string) string {
 	d.Cleanup(func() { os.RemoveAll(dir) })
 	return dir
 }
+
+func (d *driverBase) gogio(args ...string) {
+	d.Helper()
+	prog, err := os.Executable()
+	if err != nil {
+		d.Fatal(err)
+	}
+	cmd := exec.Command(prog, args...)
+	cmd.Env = append(os.Environ(), "RUN_GOGIO=1")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		d.Fatalf("gogio error: %s:\n%s", err, out)
+	}
+}

@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 )
 
 type AndroidTestDriver struct {
@@ -55,13 +54,7 @@ func (d *AndroidTestDriver) Start(path string, width, height int) {
 
 	// First, build the app.
 	apk := filepath.Join(d.tempDir("gio-endtoend-android"), "e2e.apk")
-
-	// TODO(mvdan): This is inefficient, as we link the gogio tool every time.
-	// Consider options in the future. On the plus side, this is simple.
-	cmd := exec.Command("go", "run", ".", "-target=android", "-appid="+appid, "-o="+apk, path)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		d.Fatalf("could not build app: %s:\n%s", err, out)
-	}
+	d.gogio("-target=android", "-appid="+appid, "-o="+apk, path)
 
 	// Make sure the app isn't installed already, and try to uninstall it
 	// when we finish. Previous failed test runs might have left the app.
@@ -109,13 +102,6 @@ func (d *AndroidTestDriver) Start(path string, width, height int) {
 
 	// Start the app.
 	d.adb("shell", "monkey", "-p", appid, "1")
-
-	// Unfortunately, it seems like waiting for the initial frame isn't
-	// enough. Most Android versions have animations when opening apps that
-	// run for hundreds of milliseconds, so that's probably the reason.
-	// TODO(mvdan): any way to wait for the screen to be ready without a
-	// static sleep?
-	time.Sleep(500 * time.Millisecond)
 
 	// Wait for the gio app to render.
 	d.waitForFrame()

@@ -33,12 +33,7 @@ func (d *JSTestDriver) Start(path string, width, height int) {
 
 	// First, build the app.
 	dir := d.tempDir("gio-endtoend-js")
-	// TODO(mvdan): This is inefficient, as we link the gogio tool every time.
-	// Consider options in the future. On the plus side, this is simple.
-	cmd := exec.Command("go", "run", ".", "-target=js", "-o="+dir, path)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		d.Fatalf("could not build app: %s:\n%s", err, out)
-	}
+	d.gogio("-target=js", "-o="+dir, path)
 
 	// Second, start Chrome.
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
