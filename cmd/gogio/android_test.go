@@ -25,7 +25,7 @@ type AndroidTestDriver struct {
 
 var rxAdbDevice = regexp.MustCompile(`(.*)\s+device$`)
 
-func (d *AndroidTestDriver) Start(path string, width, height int) {
+func (d *AndroidTestDriver) Start(path string) {
 	d.sdkDir = os.Getenv("ANDROID_HOME")
 	if d.sdkDir == "" {
 		d.Skipf("Android SDK is required; set $ANDROID_HOME")

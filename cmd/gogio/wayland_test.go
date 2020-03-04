@@ -37,7 +37,7 @@ default_border none
 
 var rxSwayReady = regexp.MustCompile(`Running compositor on wayland display '(.*)'`)
 
-func (d *WaylandTestDriver) Start(path string, width, height int) {
+func (d *WaylandTestDriver) Start(path string) {
 	// We want os.Environ, so that it can e.g. find $DISPLAY to run within
 	// X11. wlroots env vars are documented at:
 	// https://github.com/swaywm/wlroots/blob/master/docs/env_vars.md
@@ -72,7 +72,7 @@ func (d *WaylandTestDriver) Start(path string, width, height int) {
 	}
 	defer f.Close()
 	if err := tmplSwayConfig.Execute(f, struct{ Width, Height int }{
-		width, height,
+		d.width, d.height,
 	}); err != nil {
 		d.Fatal(err)
 	}

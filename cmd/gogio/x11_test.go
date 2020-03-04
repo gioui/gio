@@ -24,7 +24,7 @@ type X11TestDriver struct {
 	display string
 }
 
-func (d *X11TestDriver) Start(path string, width, height int) {
+func (d *X11TestDriver) Start(path string) {
 	// First, build the app.
 	bin := filepath.Join(d.tempDir("gio-endtoend-x11"), "red")
 	flags := []string{"build", "-tags", "nowayland", "-o=" + bin}
@@ -40,7 +40,7 @@ func (d *X11TestDriver) Start(path string, width, height int) {
 	var wg sync.WaitGroup
 	d.Cleanup(wg.Wait)
 
-	d.startServer(wg, width, height)
+	d.startServer(wg, d.width, d.height)
 
 	// Then, start our program on the X server above.
 	{
@@ -159,17 +159,20 @@ func (d *X11TestDriver) Screenshot() image.Image {
 	return img
 }
 
-func (d *X11TestDriver) xdotool(args ...interface{}) {
+func (d *X11TestDriver) xdotool(args ...interface{}) string {
+	d.Helper()
 	strs := make([]string, len(args))
 	for i, arg := range args {
 		strs[i] = fmt.Sprint(arg)
 	}
 	cmd := exec.Command("xdotool", strs...)
 	cmd.Env = []string{"DISPLAY=" + d.display}
-	if out, err := cmd.CombinedOutput(); err != nil {
+	out, err := cmd.CombinedOutput()
+	if err != nil {
 		d.Errorf("%s", out)
 		d.Fatal(err)
 	}
+	return string(bytes.TrimSpace(out))
 }
 
 func (d *X11TestDriver) Click(x, y int) {

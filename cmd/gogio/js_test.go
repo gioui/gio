@@ -26,7 +26,7 @@ type JSTestDriver struct {
 	ctx context.Context
 }
 
-func (d *JSTestDriver) Start(path string, width, height int) {
+func (d *JSTestDriver) Start(path string) {
 	if raceEnabled {
 		d.Skipf("js/wasm doesn't support -race; skipping")
 	}
@@ -104,7 +104,7 @@ func (d *JSTestDriver) Start(path string, width, height int) {
 	d.Cleanup(ts.Close)
 
 	if err := chromedp.Run(ctx,
-		chromedp.EmulateViewport(int64(width), int64(height)),
+		chromedp.EmulateViewport(int64(d.width), int64(d.height)),
 		chromedp.Navigate(ts.URL),
 	); err != nil {
 		d.Fatal(err)

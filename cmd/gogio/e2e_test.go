@@ -26,15 +26,15 @@ const appid = "localhost.gogio.endtoend"
 // tests on. None of its methods return any errors, as the errors are directly
 // reported to testing.T via methods like Fatal.
 type TestDriver interface {
-	initBase(*testing.T)
+	initBase(t *testing.T, width, height int)
 
 	// Start opens the Gio app found at path. The driver should attempt to
-	// run the app with the given width and height, and the platform's
-	// background should be white.
+	// run the app with the base driver's width and height, and the
+	// platform's background should be white.
 	//
 	// When the function returns, the gio app must be ready to use on the
 	// platform, with its initial frame fully drawn.
-	Start(path string, width, height int)
+	Start(path string)
 
 	// Screenshot takes a screenshot of the Gio app on the platform.
 	Screenshot() image.Image
@@ -48,6 +48,8 @@ type TestDriver interface {
 type driverBase struct {
 	*testing.T
 
+	width, height int
+
 	// TODO(mvdan): Make this lower-level, so that each driver can simply
 	// send us each line of output from the app. That will let us
 	// deduplicate some code, and also show app output as test logs in a
@@ -55,8 +57,9 @@ type driverBase struct {
 	frameNotifs chan bool
 }
 
-func (d *driverBase) initBase(t *testing.T) {
+func (d *driverBase) initBase(t *testing.T, width, height int) {
 	d.T = t
+	d.width, d.height = width, height
 	d.frameNotifs = make(chan bool, 1)
 }
 
@@ -76,6 +79,7 @@ func TestEndToEnd(t *testing.T) {
 		{"Wayland", &WaylandTestDriver{}},
 		{"JS", &JSTestDriver{}},
 		{"Android", &AndroidTestDriver{}},
+		{"Windows", &WineTestDriver{}},
 	}
 
 	for _, subtest := range subtests {
@@ -88,11 +92,11 @@ func TestEndToEnd(t *testing.T) {
 }
 
 func runEndToEndTest(t *testing.T, driver TestDriver) {
-	driver.initBase(t)
-
 	size := image.Point{X: 800, Y: 600}
+	driver.initBase(t, size.X, size.Y)
+
 	t.Log("starting driver and gio app")
-	driver.Start("testdata/red.go", size.X, size.Y)
+	driver.Start("testdata/red.go")
 
 	beef := color.RGBA{R: 0xde, G: 0xad, B: 0xbe}
 	white := color.RGBA{R: 0xff, G: 0xff, B: 0xff}
