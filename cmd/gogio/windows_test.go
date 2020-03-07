@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
@@ -39,6 +40,10 @@ func (d *WineTestDriver) Start(path string) {
 	bin := filepath.Join(d.tempDir("gio-endtoend-windows"), "red.exe")
 	flags := []string{"build", "-o=" + bin}
 	if raceEnabled {
+		if runtime.GOOS != "windows" {
+			// cross-compilation disables CGo, which breaks -race.
+			d.Skipf("can't cross-compile -race for Windows; skipping")
+		}
 		flags = append(flags, "-race")
 	}
 	flags = append(flags, path)

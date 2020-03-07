@@ -20,6 +20,7 @@ packages:
  - scrot
  - sway
  - grim
+ - wine
 sources:
  - https://git.sr.ht/~eliasnaur/gio
 environment:
