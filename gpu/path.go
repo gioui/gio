@@ -83,7 +83,8 @@ type stencilUniforms struct {
 
 type intersectUniforms struct {
 	vert struct {
-		uvTransform [4]float32
+		uvTransform    [4]float32
+		subUVTransform [4]float32
 	}
 }
 

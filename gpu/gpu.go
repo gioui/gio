@@ -538,15 +538,21 @@ func (r *renderer) intersectPath(p *pathOp, clip image.Rectangle) {
 	if !p.path {
 		return
 	}
-	o := p.place.Pos.Add(clip.Min).Sub(p.clip.Min)
 	uv := image.Rectangle{
+		Min: p.place.Pos,
+		Max: p.place.Pos.Add(p.clip.Size()),
+	}
+	o := clip.Min.Sub(p.clip.Min)
+	sub := image.Rectangle{
 		Min: o,
 		Max: o.Add(clip.Size()),
 	}
 	fbo := r.pather.stenciler.cover(p.place.Idx)
 	r.ctx.BindTexture(0, fbo.tex)
 	coverScale, coverOff := texSpaceTransform(toRectF(uv), fbo.size)
+	subScale, subOff := texSpaceTransform(toRectF(sub), p.clip.Size())
 	r.pather.stenciler.iprog.uniforms.vert.uvTransform = [4]float32{coverScale.X, coverScale.Y, coverOff.X, coverOff.Y}
+	r.pather.stenciler.iprog.uniforms.vert.subUVTransform = [4]float32{subScale.X, subScale.Y, subOff.X, subOff.Y}
 	r.pather.stenciler.iprog.prog.UploadUniforms()
 	r.ctx.DrawArrays(backend.DrawModeTriangleStrip, 0, 4)
 }

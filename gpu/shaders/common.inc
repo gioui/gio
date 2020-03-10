@@ -17,6 +17,23 @@ vec3[2] fboTextureTransform() {
 	return t;
 }
 
+// fboTransform returns a transformation
+// that cancels the implied transformation between
+// the clip space and the framebuffer.
+// Only two rows are returned. The last is implied
+// to be [0, 0, 1].
+vec3[2] fboTransform() {
+	vec3[2] t;
+#ifdef HLSL
+	t[0] = vec3(1.0, 0.0, 0.0);
+	t[1] = vec3(0.0, 1.0, 0.0);
+#else
+	t[0] = vec3(1.0, 0.0, 0.0);
+	t[1] = vec3(0.0, -1.0, 0.0);
+#endif
+	return t;
+}
+
 // toClipSpace converts an OpenGL gl_Position value to a
 // native GPU position.
 vec4 toClipSpace(vec4 pos) {

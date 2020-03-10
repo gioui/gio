@@ -9,6 +9,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 )
 
@@ -36,6 +37,64 @@ func TestHeadless(t *testing.T) {
 	}
 	if got := img.RGBAAt(0, 0); got != col {
 		t.Errorf("got color %v, expected %v", got, col)
+	}
+}
+
+func TestClipping(t *testing.T) {
+	w, release := newTestWindow(t)
+	defer release()
+
+	sz := w.size
+	col := color.RGBA{A: 0xff, R: 0xca, G: 0xfe}
+	col2 := color.RGBA{A: 0xff, R: 0x00, G: 0xfe}
+	var ops op.Ops
+	pop := paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{
+		X: float32(sz.X),
+		Y: float32(sz.Y),
+	}}}
+	paint.ColorOp{Color: col}.Add(&ops)
+	clip.Rect{
+		Rect: f32.Rectangle{
+			Min: f32.Point{X: 50, Y: 50},
+			Max: f32.Point{X: 250, Y: 250},
+		},
+		SE: 75,
+	}.Op(&ops).Add(&ops)
+	pop.Add(&ops)
+	paint.ColorOp{Color: col2}.Add(&ops)
+	clip.Rect{
+		Rect: f32.Rectangle{
+			Min: f32.Point{X: 100, Y: 100},
+			Max: f32.Point{X: 350, Y: 350},
+		},
+		NW: 75,
+	}.Op(&ops).Add(&ops)
+	pop.Add(&ops)
+	w.Frame(&ops)
+
+	img, err := w.Screenshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *dumpImages {
+		if err := saveImage("clip.png", img); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bg := color.RGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff}
+	tests := []struct {
+		x, y  int
+		color color.RGBA
+	}{
+		{120, 120, col},
+		{130, 130, col2},
+		{210, 210, col2},
+		{230, 230, bg},
+	}
+	for _, test := range tests {
+		if got := img.RGBAAt(test.x, test.y); got != test.color {
+			t.Errorf("(%d,%d): got color %v, expected %v", test.x, test.y, got, test.color)
+		}
 	}
 }
 
