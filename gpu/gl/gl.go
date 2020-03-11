@@ -129,6 +129,7 @@ type Functions interface {
 	EnableVertexAttribArray(a Attrib)
 	EndQuery(target Enum)
 	FramebufferTexture2D(target, attachment, texTarget Enum, t Texture, level int)
+	FramebufferRenderbuffer(target, attachment, renderbuffertarget Enum, renderbuffer Renderbuffer)
 	GetBinding(pname Enum) Object
 	GetError() Enum
 	GetInteger(pname Enum) int

@@ -98,6 +98,47 @@ func TestClipping(t *testing.T) {
 	}
 }
 
+func TestDepth(t *testing.T) {
+	w, release := newTestWindow(t)
+	defer release()
+	var ops op.Ops
+
+	blue := color.RGBA{B: 0xFF, A: 0xFF}
+	paint.ColorOp{Color: blue}.Add(&ops)
+	paint.PaintOp{Rect: f32.Rectangle{
+		Max: f32.Point{X: 50, Y: 100},
+	}}.Add(&ops)
+	red := color.RGBA{R: 0xFF, A: 0xFF}
+	paint.ColorOp{Color: red}.Add(&ops)
+	paint.PaintOp{Rect: f32.Rectangle{
+		Max: f32.Point{X: 100, Y: 50},
+	}}.Add(&ops)
+	w.Frame(&ops)
+
+	img, err := w.Screenshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *dumpImages {
+		if err := saveImage("depth.png", img); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tests := []struct {
+		x, y  int
+		color color.RGBA
+	}{
+		{25, 25, red},
+		{75, 25, red},
+		{25, 75, blue},
+	}
+	for _, test := range tests {
+		if got := img.RGBAAt(test.x, test.y); got != test.color {
+			t.Errorf("(%d,%d): got color %v, expected %v", test.x, test.y, got, test.color)
+		}
+	}
+}
+
 func newTestWindow(t *testing.T) (*Window, func()) {
 	t.Helper()
 	sz := image.Point{X: 800, Y: 600}

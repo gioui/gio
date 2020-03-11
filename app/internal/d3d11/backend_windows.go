@@ -193,6 +193,10 @@ func (s *SwapChain) Framebuffer(d *Device) (*Framebuffer, error) {
 	if s.fbo.renderTarget != nil {
 		return s.fbo, nil
 	}
+	desc, err := s.swchain.GetDesc()
+	if err != nil {
+		return nil, err
+	}
 	backBuffer, err := s.swchain.GetBuffer(0, &_IID_ID3D11Texture2D)
 	if err != nil {
 		return nil, err
@@ -203,7 +207,13 @@ func (s *SwapChain) Framebuffer(d *Device) (*Framebuffer, error) {
 	if err != nil {
 		return nil, err
 	}
+	depthView, err := createDepthView(d.dev, int(desc.BufferDesc.Width), int(desc.BufferDesc.Height), 24)
+	if err != nil {
+		_IUnknownRelease(unsafe.Pointer(renderTarget), renderTarget.vtbl.Release)
+		return nil, err
+	}
 	s.fbo.renderTarget = renderTarget
+	s.fbo.depthView = depthView
 	s.fbo.dev = d
 	return s.fbo, nil
 }
@@ -255,6 +265,8 @@ func NewBackend(d *Device) (*Backend, error) {
 		FillMode:        _D3D11_FILL_SOLID,
 		DepthClipEnable: 1,
 	})
+	// Enable depth mask to match OpenGL.
+	b.depthState.mask = true
 	if err != nil {
 		return nil, err
 	}
@@ -359,8 +371,10 @@ func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, mi
 
 func (b *Backend) CurrentFramebuffer() backend.Framebuffer {
 	renderTarget := b.dev.ctx.OMGetRenderTargets()
-	// Assume someone else is holding on to it.
-	_IUnknownRelease(unsafe.Pointer(renderTarget), renderTarget.vtbl.Release)
+	if renderTarget != nil {
+		// Assume someone else is holding on to it.
+		_IUnknownRelease(unsafe.Pointer(renderTarget), renderTarget.vtbl.Release)
+	}
 	if renderTarget == b.fbo.renderTarget {
 		return b.fbo
 	}
@@ -379,30 +393,7 @@ func (b *Backend) NewFramebuffer(tex backend.Texture, depthBits int) (backend.Fr
 	}
 	fbo := &Framebuffer{dev: b.dev, format: d3dtex.format, resource: resource, renderTarget: renderTarget}
 	if depthBits > 0 {
-		depthTex, err := b.dev.dev.CreateTexture2D(&_D3D11_TEXTURE2D_DESC{
-			Width:     uint32(d3dtex.width),
-			Height:    uint32(d3dtex.height),
-			MipLevels: 1,
-			ArraySize: 1,
-			Format:    _DXGI_FORMAT_D24_UNORM_S8_UINT,
-			SampleDesc: _DXGI_SAMPLE_DESC{
-				Count:   1,
-				Quality: 0,
-			},
-			BindFlags: _D3D11_BIND_DEPTH_STENCIL,
-		})
-		if err != nil {
-			_IUnknownRelease(unsafe.Pointer(renderTarget), renderTarget.vtbl.Release)
-			return nil, err
-		}
-		depthView, err := b.dev.dev.CreateDepthStencilViewTEX2D(
-			(*_ID3D11Resource)(unsafe.Pointer(depthTex)),
-			&_D3D11_DEPTH_STENCIL_VIEW_DESC_TEX2D{
-				Format:        _DXGI_FORMAT_D24_UNORM_S8_UINT,
-				ViewDimension: _D3D11_DSV_DIMENSION_TEXTURE2D,
-			},
-		)
-		_IUnknownRelease(unsafe.Pointer(depthTex), depthTex.vtbl.Release)
+		depthView, err := createDepthView(b.dev.dev, d3dtex.width, d3dtex.height, depthBits)
 		if err != nil {
 			_IUnknownRelease(unsafe.Pointer(renderTarget), renderTarget.vtbl.Release)
 			return nil, err
@@ -410,6 +401,33 @@ func (b *Backend) NewFramebuffer(tex backend.Texture, depthBits int) (backend.Fr
 		fbo.depthView = depthView
 	}
 	return fbo, nil
+}
+
+func createDepthView(d *_ID3D11Device, width, height, depthBits int) (*_ID3D11DepthStencilView, error) {
+	depthTex, err := d.CreateTexture2D(&_D3D11_TEXTURE2D_DESC{
+		Width:     uint32(width),
+		Height:    uint32(height),
+		MipLevels: 1,
+		ArraySize: 1,
+		Format:    _DXGI_FORMAT_D24_UNORM_S8_UINT,
+		SampleDesc: _DXGI_SAMPLE_DESC{
+			Count:   1,
+			Quality: 0,
+		},
+		BindFlags: _D3D11_BIND_DEPTH_STENCIL,
+	})
+	if err != nil {
+		return nil, err
+	}
+	depthView, err := d.CreateDepthStencilViewTEX2D(
+		(*_ID3D11Resource)(unsafe.Pointer(depthTex)),
+		&_D3D11_DEPTH_STENCIL_VIEW_DESC_TEX2D{
+			Format:        _DXGI_FORMAT_D24_UNORM_S8_UINT,
+			ViewDimension: _D3D11_DSV_DIMENSION_TEXTURE2D,
+		},
+	)
+	_IUnknownRelease(unsafe.Pointer(depthTex), depthTex.vtbl.Release)
+	return depthView, err
 }
 
 func (b *Backend) NewInputLayout(vertexShader backend.ShaderSources, layout []backend.InputDesc) (backend.InputLayout, error) {
@@ -583,7 +601,7 @@ func (b *Backend) prepareDraw(mode backend.DrawMode) {
 		if b.depthState.enable {
 			desc.DepthEnable = 1
 		}
-		if !b.depthState.mask {
+		if b.depthState.mask {
 			desc.DepthWriteMask = _D3D11_DEPTH_WRITE_MASK_ALL
 		}
 		switch b.depthState.fn {

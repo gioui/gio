@@ -194,6 +194,7 @@ func (b *Backend) NewFramebuffer(tex backend.Texture, depthBits int) (backend.Fr
 		depthBuf := b.funcs.CreateRenderbuffer()
 		b.funcs.BindRenderbuffer(RENDERBUFFER, depthBuf)
 		b.funcs.RenderbufferStorage(RENDERBUFFER, size, gltex.width, gltex.height)
+		b.funcs.FramebufferRenderbuffer(FRAMEBUFFER, DEPTH_ATTACHMENT, RENDERBUFFER, depthBuf)
 		fbo.depthBuf = depthBuf
 		fbo.hasDepth = true
 		if err := glErr(b.funcs); err != nil {

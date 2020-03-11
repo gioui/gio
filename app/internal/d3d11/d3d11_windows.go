@@ -912,6 +912,21 @@ func (d *_ID3D11Device) CreateDepthStencilState(desc *_D3D11_DEPTH_STENCIL_DESC)
 	return state, nil
 }
 
+func (s *_IDXGISwapChain) GetDesc() (_DXGI_SWAP_CHAIN_DESC, error) {
+	var desc _DXGI_SWAP_CHAIN_DESC
+	r, _, _ := syscall.Syscall(
+		s.vtbl.GetDesc,
+		2,
+		uintptr(unsafe.Pointer(s)),
+		uintptr(unsafe.Pointer(&desc)),
+		0,
+	)
+	if r != 0 {
+		return _DXGI_SWAP_CHAIN_DESC{}, ErrorCode{Name: "IDXGISwapChainGetDesc", Code: uint32(r)}
+	}
+	return desc, nil
+}
+
 func (s *_IDXGISwapChain) ResizeBuffers(buffers, width, height, newFormat, flags uint32) error {
 	r, _, _ := syscall.Syscall6(
 		s.vtbl.ResizeBuffers,
