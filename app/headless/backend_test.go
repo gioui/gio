@@ -9,11 +9,11 @@ import (
 	"image/color"
 	"image/png"
 	"io/ioutil"
-	"math"
 	"runtime"
 	"testing"
 
 	"gioui.org/gpu/backend"
+	"gioui.org/internal/f32color"
 	"gioui.org/internal/unsafe"
 )
 
@@ -48,8 +48,8 @@ func TestSimpleShader(t *testing.T) {
 	}
 	// Just off the center to catch inverted triangles.
 	cx, cy := 300, 400
-	shaderCol := [4]float32{.25, .55, .75, 1.0}
-	if got, exp := img.RGBAAt(cx, cy), tosRGB(shaderCol); got != exp {
+	shaderCol := f32color.RGBA{R: .25, G: .55, B: .75, A: 1.0}
+	if got, exp := img.RGBAAt(cx, cy), shaderCol.SRGB(); got != exp {
 		t.Errorf("got color %v, expected %v", got, exp)
 	}
 }
@@ -94,8 +94,8 @@ func TestInputShader(t *testing.T) {
 		t.Errorf("got color %v, expected %v", got, clearCol)
 	}
 	cx, cy := 300, 400
-	shaderCol := [4]float32{.25, .55, .75, 1.0}
-	if got, exp := img.RGBAAt(cx, cy), tosRGB(shaderCol); got != exp {
+	shaderCol := f32color.RGBA{R: .25, G: .55, B: .75, A: 1.0}
+	if got, exp := img.RGBAAt(cx, cy), shaderCol.SRGB(); got != exp {
 		t.Errorf("got color %v, expected %v", got, exp)
 	}
 }
@@ -109,11 +109,11 @@ func TestFramebuffers(t *testing.T) {
 		col1 = color.RGBA{R: 0xad, G: 0xbe, B: 0xef, A: 0xde}
 		col2 = color.RGBA{R: 0xfe, G: 0xba, B: 0xbe, A: 0xca}
 	)
-	fcol1, fcol2 := fromsRGB(col1), fromsRGB(col2)
-	b.ClearColor(fcol1[0], fcol1[1], fcol1[2], fcol1[3])
+	fcol1, fcol2 := f32color.RGBAFromSRGB(col1), f32color.RGBAFromSRGB(col2)
+	b.ClearColor(fcol1.Float32())
 	b.BindFramebuffer(fbo1)
 	b.Clear(backend.BufferAttachmentColor)
-	b.ClearColor(fcol2[0], fcol2[1], fcol2[2], fcol2[3])
+	b.ClearColor(fcol2.Float32())
 	b.BindFramebuffer(fbo2)
 	b.Clear(backend.BufferAttachmentColor)
 	img := screenshot(t, fbo1, sz)
@@ -174,8 +174,8 @@ func newBackend(t *testing.T) backend.Device {
 	b.BeginFrame()
 	// ClearColor accepts linear RGBA colors, while 8-bit colors
 	// are in the sRGB color space.
-	col := fromsRGB(clearCol)
-	b.ClearColor(col[0], col[1], col[2], col[3])
+	col := f32color.RGBAFromSRGB(clearCol)
+	b.ClearColor(col.Float32())
 	t.Cleanup(func() {
 		b.EndFrame()
 		ctx.ReleaseCurrent()
@@ -208,39 +208,4 @@ func saveImage(file string, img image.Image) error {
 		return err
 	}
 	return ioutil.WriteFile(file, buf.Bytes(), 0666)
-}
-
-func tosRGB(col [4]float32) color.RGBA {
-	for i := 0; i <= 2; i++ {
-		c := col[i]
-		// Use the formula from EXT_sRGB.
-		switch {
-		case c <= 0:
-			c = 0
-		case 0 < c && c < 0.0031308:
-			c = 12.92 * c
-		case 0.0031308 <= c && c < 1:
-			c = 1.055*float32(math.Pow(float64(c), 0.41666)) - 0.055
-		case c >= 1:
-			c = 1
-		}
-		col[i] = c
-	}
-	return color.RGBA{R: uint8(col[0]*255 + .5), G: uint8(col[1]*255 + .5), B: uint8(col[2]*255 + .5), A: uint8(col[3]*255 + .5)}
-}
-
-func fromsRGB(col color.Color) [4]float32 {
-	r, g, b, a := col.RGBA()
-	color := [4]float32{float32(r) / 0xffff, float32(g) / 0xffff, float32(b) / 0xffff, float32(a) / 0xffff}
-	for i := 0; i <= 2; i++ {
-		c := color[i]
-		// Use the formula from EXT_sRGB.
-		if c <= 0.04045 {
-			c = c / 12.92
-		} else {
-			c = float32(math.Pow(float64((c+0.055)/1.055), 2.4))
-		}
-		color[i] = c
-	}
-	return color
 }

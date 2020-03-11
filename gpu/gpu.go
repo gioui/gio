@@ -19,6 +19,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/gpu/backend"
+	"gioui.org/internal/f32color"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
 	"gioui.org/internal/path"
@@ -54,7 +55,7 @@ type drawOps struct {
 	reader     ops.Reader
 	cache      *resourceCache
 	viewport   image.Point
-	clearColor [3]float32
+	clearColor f32color.RGBA
 	imageOps   []imageOp
 	// zimageOps are the rectangle clipped opaque images
 	// that can use fast front-to-back rendering with z-test
@@ -104,7 +105,7 @@ type material struct {
 	material materialType
 	opaque   bool
 	// For materialTypeColor.
-	color [4]float32
+	color f32color.RGBA
 	// For materialTypeTexture.
 	texture  *texture
 	uvScale  f32.Point
@@ -256,7 +257,7 @@ type blitUniforms struct {
 }
 
 type colorUniforms struct {
-	color [4]float32
+	color f32color.RGBA
 }
 
 type materialType uint8
@@ -334,7 +335,7 @@ func (g *GPU) BeginFrame() {
 	}
 	g.ctx.BindFramebuffer(g.defFBO)
 	g.ctx.DepthFunc(backend.DepthFuncGreater)
-	g.ctx.ClearColor(g.drawOps.clearColor[0], g.drawOps.clearColor[1], g.drawOps.clearColor[2], 1.0)
+	g.ctx.ClearColor(g.drawOps.clearColor.Float32())
 	g.ctx.ClearDepth(0.0)
 	g.ctx.Clear(backend.BufferAttachmentColor | backend.BufferAttachmentDepth)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
@@ -650,7 +651,7 @@ func floor(v float32) int {
 
 func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
 	d.profile = false
-	d.clearColor = [3]float32{1.0, 1.0, 1.0}
+	d.clearColor = f32color.RGBA{R: 1.0, G: 1.0, B: 1.0, A: 1.0}
 	d.cache = cache
 	d.viewport = viewport
 	d.imageOps = d.imageOps[:0]
@@ -744,7 +745,7 @@ loop:
 				d.zimageOps = d.zimageOps[:0]
 				d.imageOps = d.imageOps[:0]
 				state.z = 0
-				copy(d.clearColor[:], mat.color[:3])
+				d.clearColor = mat.color.Opaque()
 				continue
 			}
 			state.z++
@@ -789,8 +790,8 @@ func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f3
 	switch d.matType {
 	case materialColor:
 		m.material = materialColor
-		m.color = gamma(d.color.RGBA())
-		m.opaque = m.color[3] == 1.0
+		m.color = f32color.RGBAFromSRGB(d.color)
+		m.opaque = m.color.A == 1.0
 	case materialTexture:
 		m.material = materialTexture
 		dr := boundRectF(rect.Add(off))
@@ -883,23 +884,7 @@ func (r *renderer) drawOps(ops []imageOp) {
 	r.ctx.SetDepthTest(false)
 }
 
-func gamma(r, g, b, a uint32) [4]float32 {
-	color := [4]float32{float32(r) / 0xffff, float32(g) / 0xffff, float32(b) / 0xffff, float32(a) / 0xffff}
-	// Assume that image.Uniform colors are in sRGB space. Linearize.
-	for i := 0; i <= 2; i++ {
-		c := color[i]
-		// Use the formula from EXT_sRGB.
-		if c <= 0.04045 {
-			c = c / 12.92
-		} else {
-			c = float32(math.Pow(float64((c+0.055)/1.055), 2.4))
-		}
-		color[i] = c
-	}
-	return color
-}
-
-func (b *blitter) blit(z float32, mat materialType, col [4]float32, scale, off, uvScale, uvOff f32.Point) {
+func (b *blitter) blit(z float32, mat materialType, col f32color.RGBA, scale, off, uvScale, uvOff f32.Point) {
 	p := b.prog[mat]
 	b.ctx.BindProgram(p.prog)
 	var uniforms *blitUniforms

@@ -11,6 +11,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/gpu/backend"
+	"gioui.org/internal/f32color"
 	"gioui.org/internal/path"
 	gunsafe "gioui.org/internal/unsafe"
 )
@@ -337,11 +338,11 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 	}
 }
 
-func (p *pather) cover(z float32, mat materialType, col [4]float32, scale, off, uvScale, uvOff, coverScale, coverOff f32.Point) {
+func (p *pather) cover(z float32, mat materialType, col f32color.RGBA, scale, off, uvScale, uvOff, coverScale, coverOff f32.Point) {
 	p.coverer.cover(z, mat, col, scale, off, uvScale, uvOff, coverScale, coverOff)
 }
 
-func (c *coverer) cover(z float32, mat materialType, col [4]float32, scale, off, uvScale, uvOff, coverScale, coverOff f32.Point) {
+func (c *coverer) cover(z float32, mat materialType, col f32color.RGBA, scale, off, uvScale, uvOff, coverScale, coverOff f32.Point) {
 	p := c.prog[mat]
 	c.ctx.BindProgram(p.prog)
 	var uniforms *coverUniforms

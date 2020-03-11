@@ -10,6 +10,7 @@ import (
 	"unsafe"
 
 	"gioui.org/gpu/backend"
+	"gioui.org/internal/f32color"
 	gunsafe "gioui.org/internal/unsafe"
 	"golang.org/x/sys/windows"
 )
@@ -26,7 +27,7 @@ type Device struct {
 }
 
 type Backend struct {
-	clearColor [4]float32
+	clearColor f32color.RGBA
 	clearDepth float32
 	viewport   _D3D11_VIEWPORT
 	depthState depthState
@@ -539,7 +540,7 @@ func (b *Backend) NewProgram(vertexShader, fragmentShader backend.ShaderSources)
 }
 
 func (b *Backend) ClearColor(colr, colg, colb, cola float32) {
-	b.clearColor = [...]float32{colr, colg, colb, cola}
+	b.clearColor = f32color.RGBA{R: colr, G: colg, B: colb, A: cola}
 }
 
 func (b *Backend) Clear(buffers backend.BufferAttachments) {

@@ -5,9 +5,10 @@ package d3d11
 import (
 	"fmt"
 	"math"
+	"syscall"
 	"unsafe"
 
-	"syscall"
+	"gioui.org/internal/f32color"
 
 	"golang.org/x/sys/windows"
 )
@@ -1033,7 +1034,7 @@ func (c *_ID3D11DeviceContext) ClearDepthStencilView(target *_ID3D11DepthStencil
 	)
 }
 
-func (c *_ID3D11DeviceContext) ClearRenderTargetView(target *_ID3D11RenderTargetView, color *[4]float32) {
+func (c *_ID3D11DeviceContext) ClearRenderTargetView(target *_ID3D11RenderTargetView, color *f32color.RGBA) {
 	syscall.Syscall(
 		c.vtbl.ClearRenderTargetView,
 		3,
@@ -1243,7 +1244,7 @@ func (c *_ID3D11DeviceContext) DrawIndexed(count, start uint32, base int32) {
 	)
 }
 
-func (c *_ID3D11DeviceContext) OMSetBlendState(state *_ID3D11BlendState, factor *[4]float32, sampleMask uint32) {
+func (c *_ID3D11DeviceContext) OMSetBlendState(state *_ID3D11BlendState, factor *f32color.RGBA, sampleMask uint32) {
 	syscall.Syscall6(
 		c.vtbl.OMSetBlendState,
 		4,
