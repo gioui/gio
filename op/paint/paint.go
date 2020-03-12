@@ -63,6 +63,7 @@ func NewImageOp(src image.Image) ImageOp {
 	})
 	draw.Draw(dst, dst.Bounds(), src, src.Bounds().Min, draw.Src)
 	return ImageOp{
+		Rect:   dst.Bounds(),
 		src:    dst,
 		handle: new(int),
 	}
