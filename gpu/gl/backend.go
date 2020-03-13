@@ -620,7 +620,7 @@ func (b *Backend) BindVertexBuffer(buf backend.Buffer, stride, offset int) {
 func (b *Backend) setupVertexArrays() {
 	layout := b.state.layout
 	if layout == nil {
-		panic("no input layout is current")
+		return
 	}
 	buf := b.state.buffer
 	b.funcs.BindBuffer(ARRAY_BUFFER, buf.buf.obj)
