@@ -23,6 +23,8 @@ packages:
  - wine
 sources:
  - https://git.sr.ht/~eliasnaur/gio
+secrets:
+ - 0dd5efdf-400e-4735-8320-98b44844dfd0
 environment:
  GOFLAGS: -mod=readonly
  PATH: /home/build/sdk/go/bin:/usr/bin
@@ -49,3 +51,8 @@ tasks:
  - check_gofmt: |
      cd gio
      test -z "$(gofmt -s -l .)"
+ - annotate: |
+     go get git.sr.ht/~sircmpwn/annotatego
+     cd gio
+     ~/go/bin/annotatego -v -T gioui.org... > annotations.json
+     ../upload-annotations annotations.json eliasnaur gio
