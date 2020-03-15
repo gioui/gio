@@ -245,7 +245,7 @@ func (s *SwapChain) Release() {
 }
 
 func (s *SwapChain) Present() error {
-	return s.swchain.Present(0, 0)
+	return s.swchain.Present(1, 0)
 }
 
 func NewBackend(d *Device) (*Backend, error) {
