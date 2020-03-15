@@ -1034,7 +1034,7 @@ func (c *_ID3D11DeviceContext) ClearDepthStencilView(target *_ID3D11DepthStencil
 	)
 }
 
-func (c *_ID3D11DeviceContext) ClearRenderTargetView(target *_ID3D11RenderTargetView, color *f32color.RGBA) {
+func (c *_ID3D11DeviceContext) ClearRenderTargetView(target *_ID3D11RenderTargetView, color *[4]float32) {
 	syscall.Syscall(
 		c.vtbl.ClearRenderTargetView,
 		3,

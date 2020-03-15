@@ -335,9 +335,8 @@ func (g *GPU) BeginFrame() {
 	}
 	g.ctx.BindFramebuffer(g.defFBO)
 	g.ctx.DepthFunc(backend.DepthFuncGreater)
-	g.ctx.ClearColor(g.drawOps.clearColor.Float32())
 	g.ctx.ClearDepth(0.0)
-	g.ctx.Clear(backend.BufferAttachmentColor | backend.BufferAttachmentDepth)
+	g.ctx.Clear(g.drawOps.clearColor.Float32())
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.renderer.drawZOps(g.drawOps.zimageOps)
 	g.zopsTimer.end()
@@ -502,7 +501,7 @@ func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
 			fbo = p.place.Idx
 			f := r.pather.stenciler.cover(fbo)
 			r.ctx.BindFramebuffer(f.fbo)
-			r.ctx.Clear(backend.BufferAttachmentColor)
+			r.ctx.Clear(0.0, 0.0, 0.0, 0.0)
 		}
 		data, _ := pathCache.get(p.pathKey)
 		r.pather.stencilPath(p.clip, p.off, p.place.Pos, data.(*pathData))
@@ -525,7 +524,7 @@ func (r *renderer) intersect(ops []imageOp) {
 			fbo = img.place.Idx
 			f := r.pather.stenciler.intersections.fbos[fbo]
 			r.ctx.BindFramebuffer(f.fbo)
-			r.ctx.Clear(backend.BufferAttachmentColor)
+			r.ctx.Clear(1.0, 0.0, 0.0, 0.0)
 		}
 		r.ctx.Viewport(img.place.Pos.X, img.place.Pos.Y, img.clip.Dx(), img.clip.Dy())
 		r.intersectPath(img.path, img.clip)

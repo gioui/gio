@@ -110,12 +110,10 @@ func TestFramebuffers(t *testing.T) {
 		col2 = color.RGBA{R: 0xfe, G: 0xba, B: 0xbe, A: 0xca}
 	)
 	fcol1, fcol2 := f32color.RGBAFromSRGB(col1), f32color.RGBAFromSRGB(col2)
-	b.ClearColor(fcol1.Float32())
 	b.BindFramebuffer(fbo1)
-	b.Clear(backend.BufferAttachmentColor)
-	b.ClearColor(fcol2.Float32())
+	b.Clear(fcol1.Float32())
 	b.BindFramebuffer(fbo2)
-	b.Clear(backend.BufferAttachmentColor)
+	b.Clear(fcol2.Float32())
 	img := screenshot(t, fbo1, sz)
 	if got := img.RGBAAt(0, 0); got != col1 {
 		t.Errorf("got color %v, expected %v", got, col1)
@@ -129,7 +127,11 @@ func TestFramebuffers(t *testing.T) {
 func setupFBO(t *testing.T, b backend.Device, size image.Point) backend.Framebuffer {
 	fbo := newFBO(t, b, size)
 	b.BindFramebuffer(fbo)
-	b.Clear(backend.BufferAttachmentColor | backend.BufferAttachmentDepth)
+	// ClearColor accepts linear RGBA colors, while 8-bit colors
+	// are in the sRGB color space.
+	col := f32color.RGBAFromSRGB(clearCol)
+	b.Clear(col.Float32())
+	b.ClearDepth(0.0)
 	b.Viewport(0, 0, size.X, size.Y)
 	return fbo
 }
@@ -172,10 +174,6 @@ func newBackend(t *testing.T) backend.Device {
 		t.Fatal(err)
 	}
 	b.BeginFrame()
-	// ClearColor accepts linear RGBA colors, while 8-bit colors
-	// are in the sRGB color space.
-	col := f32color.RGBAFromSRGB(clearCol)
-	b.ClearColor(col.Float32())
 	t.Cleanup(func() {
 		b.EndFrame()
 		ctx.ReleaseCurrent()

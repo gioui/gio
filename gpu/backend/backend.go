@@ -27,9 +27,8 @@ type Device interface {
 	NewInputLayout(vertexShader ShaderSources, layout []InputDesc) (InputLayout, error)
 
 	DepthFunc(f DepthFunc)
-	ClearColor(r, g, b, a float32)
 	ClearDepth(d float32)
-	Clear(buffers BufferAttachments)
+	Clear(r, g, b, a float32)
 	Viewport(x, y, width, height int)
 	DrawArrays(mode DrawMode, off, count int)
 	DrawElements(mode DrawMode, off, count int)
@@ -110,8 +109,6 @@ type BlendFactor uint8
 
 type DrawMode uint8
 
-type BufferAttachments uint
-
 type TextureFilter uint8
 type TextureFormat uint8
 
@@ -156,11 +153,6 @@ type Texture interface {
 	Upload(img *image.RGBA)
 	Release()
 }
-
-const (
-	BufferAttachmentColor BufferAttachments = 1 << iota
-	BufferAttachmentDepth
-)
 
 const (
 	DepthFuncGreater DepthFunc = iota

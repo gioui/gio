@@ -10,7 +10,6 @@ import (
 	"unsafe"
 
 	"gioui.org/gpu/backend"
-	"gioui.org/internal/f32color"
 	gunsafe "gioui.org/internal/unsafe"
 	"golang.org/x/sys/windows"
 )
@@ -27,8 +26,8 @@ type Device struct {
 }
 
 type Backend struct {
-	clearColor f32color.RGBA
-	clearDepth float32
+	// Temporary storage to avoid garbage.
+	clearColor [4]float32
 	viewport   _D3D11_VIEWPORT
 	depthState depthState
 	blendState blendState
@@ -539,16 +538,14 @@ func (b *Backend) NewProgram(vertexShader, fragmentShader backend.ShaderSources)
 	return p, nil
 }
 
-func (b *Backend) ClearColor(colr, colg, colb, cola float32) {
-	b.clearColor = f32color.RGBA{R: colr, G: colg, B: colb, A: cola}
+func (b *Backend) Clear(colr, colg, colb, cola float32) {
+	b.clearColor = [4]float32{colr, colg, colb, cola}
+	b.dev.ctx.ClearRenderTargetView(b.fbo.renderTarget, &b.clearColor)
 }
 
-func (b *Backend) Clear(buffers backend.BufferAttachments) {
-	if buffers&backend.BufferAttachmentColor != 0 {
-		b.dev.ctx.ClearRenderTargetView(b.fbo.renderTarget, &b.clearColor)
-	}
-	if buffers&backend.BufferAttachmentDepth != 0 && b.fbo.depthView != nil {
-		b.dev.ctx.ClearDepthStencilView(b.fbo.depthView, _D3D11_CLEAR_DEPTH|_D3D11_CLEAR_STENCIL, b.clearDepth, 0)
+func (b *Backend) ClearDepth(depth float32) {
+	if b.fbo.depthView != nil {
+		b.dev.ctx.ClearDepthStencilView(b.fbo.depthView, _D3D11_CLEAR_DEPTH|_D3D11_CLEAR_STENCIL, depth, 0)
 	}
 }
 
@@ -648,10 +645,6 @@ func (b *Backend) prepareDraw(mode backend.DrawMode) {
 
 func (b *Backend) DepthFunc(f backend.DepthFunc) {
 	b.depthState.fn = f
-}
-
-func (b *Backend) ClearDepth(d float32) {
-	b.clearDepth = d
 }
 
 func (b *Backend) SetBlend(enable bool) {

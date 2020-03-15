@@ -292,7 +292,6 @@ func (s *stenciler) beginIntersect(sizes []image.Point) {
 	// floating point formats. Replace with GL_RGB+GL_UNSIGNED_BYTE if
 	// no floating point support is available.
 	s.intersections.resize(s.ctx, sizes)
-	s.ctx.ClearColor(1.0, 0.0, 0.0, 0.0)
 	s.ctx.BindProgram(s.iprog.prog.prog)
 }
 
@@ -308,7 +307,6 @@ func (s *stenciler) cover(idx int) stencilFBO {
 func (s *stenciler) begin(sizes []image.Point) {
 	s.ctx.BlendFunc(backend.BlendFactorOne, backend.BlendFactorOne)
 	s.fbos.resize(s.ctx, sizes)
-	s.ctx.ClearColor(0.0, 0.0, 0.0, 0.0)
 	s.ctx.BindProgram(s.prog.prog.prog)
 	s.ctx.BindInputLayout(s.prog.layout)
 	s.ctx.BindIndexBuffer(s.indexBuf)

@@ -385,23 +385,14 @@ func (b *Backend) Viewport(x, y, width, height int) {
 	b.funcs.Viewport(x, y, width, height)
 }
 
-func (b *Backend) Clear(attachments backend.BufferAttachments) {
-	var mask Enum
-	if attachments&backend.BufferAttachmentColor != 0 {
-		mask |= COLOR_BUFFER_BIT
-	}
-	if attachments&backend.BufferAttachmentDepth != 0 {
-		mask |= DEPTH_BUFFER_BIT
-	}
-	b.funcs.Clear(mask)
+func (b *Backend) Clear(colR, colG, colB, colA float32) {
+	b.funcs.ClearColor(colR, colG, colB, colA)
+	b.funcs.Clear(COLOR_BUFFER_BIT)
 }
 
 func (b *Backend) ClearDepth(d float32) {
 	b.funcs.ClearDepthf(d)
-}
-
-func (b *Backend) ClearColor(colR, colG, colB, colA float32) {
-	b.funcs.ClearColor(colR, colG, colB, colA)
+	b.funcs.Clear(DEPTH_BUFFER_BIT)
 }
 
 func (b *Backend) DepthFunc(f backend.DepthFunc) {
