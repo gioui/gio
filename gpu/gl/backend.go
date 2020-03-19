@@ -103,9 +103,8 @@ type uniformLocation struct {
 }
 
 type gpuInputLayout struct {
-	backend *Backend
-	inputs  []backend.InputLocation
-	layout  []backend.InputDesc
+	inputs []backend.InputLocation
+	layout []backend.InputDesc
 }
 
 // textureTriple holds the type settings for
@@ -416,9 +415,8 @@ func (b *Backend) NewInputLayout(vs backend.ShaderSources, layout []backend.Inpu
 		}
 	}
 	return &gpuInputLayout{
-		backend: b,
-		inputs:  vs.Inputs,
-		layout:  layout,
+		inputs: vs.Inputs,
+		layout: layout,
 	}, nil
 }
 
