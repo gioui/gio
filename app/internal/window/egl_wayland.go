@@ -13,7 +13,7 @@ import (
 
 /*
 #cgo LDFLAGS: -lwayland-egl
-#cgo CFLAGS: -I/usr/include/wayland
+#cgo CFLAGS: -I/usr/include/wayland -DMESA_EGL_NO_X11_HEADERS
 
 #include <EGL/egl.h>
 #include <wayland-client.h>

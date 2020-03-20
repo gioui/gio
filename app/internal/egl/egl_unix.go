@@ -10,6 +10,7 @@ package egl
 #cgo freebsd LDFLAGS: -L/usr/local/lib
 #cgo openbsd CFLAGS: -I/usr/X11R6/include
 #cgo openbsd LDFLAGS: -L/usr/X11R6/lib
+#cgo CFLAGS: -DMESA_EGL_NO_X11_HEADERS
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
