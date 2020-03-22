@@ -29,6 +29,13 @@ type Button struct {
 	shaper       text.Shaper
 }
 
+type ButtonLayout struct {
+	Background   color.RGBA
+	Color        color.RGBA
+	CornerRadius unit.Value
+	Inset        layout.Inset
+}
+
 type IconButton struct {
 	Background color.RGBA
 	Color      color.RGBA
@@ -40,15 +47,25 @@ type IconButton struct {
 
 func (t *Theme) Button(txt string) Button {
 	return Button{
-		Text:       txt,
-		Color:      rgb(0xffffff),
-		Background: t.Color.Primary,
-		TextSize:   t.TextSize.Scale(14.0 / 16.0),
+		Text:         txt,
+		Color:        rgb(0xffffff),
+		CornerRadius: unit.Dp(4),
+		Background:   t.Color.Primary,
+		TextSize:     t.TextSize.Scale(14.0 / 16.0),
 		Inset: layout.Inset{
 			Top: unit.Dp(10), Bottom: unit.Dp(10),
 			Left: unit.Dp(12), Right: unit.Dp(12),
 		},
 		shaper: t.Shaper,
+	}
+}
+
+func (t *Theme) ButtonLayout() ButtonLayout {
+	return ButtonLayout{
+		Background:   t.Color.Primary,
+		Color:        t.Color.InvText,
+		CornerRadius: unit.Dp(4),
+		Inset:        layout.UniformInset(unit.Dp(12)),
 	}
 }
 
@@ -63,13 +80,20 @@ func (t *Theme) IconButton(icon *Icon) IconButton {
 }
 
 func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
-	col := b.Color
-	bgcol := b.Background
-	hmin := gtx.Constraints.Width.Min
-	vmin := gtx.Constraints.Height.Min
+	ButtonLayout{
+		Background:   b.Background,
+		CornerRadius: b.CornerRadius,
+		Color:        b.Color,
+		Inset:        b.Inset,
+	}.Layout(gtx, button, func() {
+		widget.Label{}.Layout(gtx, b.shaper, b.Font, b.TextSize, b.Text)
+	})
+}
+
+func (b ButtonLayout) Layout(gtx *layout.Context, button *widget.Button, w layout.Widget) {
 	layout.Stack{Alignment: layout.Center}.Layout(gtx,
 		layout.Expanded(func() {
-			rr := float32(gtx.Px(unit.Dp(4)))
+			rr := float32(gtx.Px(b.CornerRadius))
 			clip.Rect{
 				Rect: f32.Rectangle{Max: f32.Point{
 					X: float32(gtx.Constraints.Width.Min),
@@ -77,18 +101,16 @@ func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 				}},
 				NE: rr, NW: rr, SE: rr, SW: rr,
 			}.Op(gtx.Ops).Add(gtx.Ops)
-			fill(gtx, bgcol)
+			fill(gtx, b.Background)
 			for _, c := range button.History() {
 				drawInk(gtx, c)
 			}
 		}),
 		layout.Stacked(func() {
-			gtx.Constraints.Width.Min = hmin
-			gtx.Constraints.Height.Min = vmin
 			layout.Center.Layout(gtx, func() {
 				b.Inset.Layout(gtx, func() {
-					paint.ColorOp{Color: col}.Add(gtx.Ops)
-					widget.Label{}.Layout(gtx, b.shaper, b.Font, b.TextSize, b.Text)
+					paint.ColorOp{Color: b.Color}.Add(gtx.Ops)
+					w()
 				})
 			})
 			pointer.Rect(image.Rectangle{Max: gtx.Dimensions.Size}).Add(gtx.Ops)
