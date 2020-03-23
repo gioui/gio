@@ -19,9 +19,9 @@ import (
 )
 
 /*
-#cgo LDFLAGS: -lxkbcommon
+#cgo linux pkg-config: xkbcommon
 #cgo freebsd openbsd CFLAGS: -I/usr/local/include
-#cgo freebsd openbsd LDFLAGS: -L/usr/local/lib
+#cgo freebsd openbsd LDFLAGS: -L/usr/local/lib -lxkbcommon
 
 #include <stdlib.h>
 #include <xkbcommon/xkbcommon.h>

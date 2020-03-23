@@ -5,7 +5,8 @@
 package egl
 
 /*
-#cgo LDFLAGS: -lEGL
+#cgo linux pkg-config: egl
+#cgo freebsd openbsd LDFLAGS: -lEGL
 #cgo freebsd CFLAGS: -I/usr/local/include
 #cgo freebsd LDFLAGS: -L/usr/local/lib
 #cgo openbsd CFLAGS: -I/usr/X11R6/include
@@ -14,8 +15,6 @@ package egl
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-#include <GLES2/gl2.h>
-#include <GLES3/gl3.h>
 */
 import "C"
 

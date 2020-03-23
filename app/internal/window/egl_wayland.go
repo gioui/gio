@@ -12,8 +12,9 @@ import (
 )
 
 /*
-#cgo LDFLAGS: -lwayland-egl
-#cgo CFLAGS: -I/usr/include/wayland -DMESA_EGL_NO_X11_HEADERS
+#cgo linux pkg-config: egl wayland-egl
+#cgo freebsd openbsd LDFLAGS: -lwayland-egl
+#cgo CFLAGS: -DMESA_EGL_NO_X11_HEADERS
 
 #include <EGL/egl.h>
 #include <wayland-client.h>

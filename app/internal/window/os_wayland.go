@@ -40,7 +40,8 @@ import (
 //go:generate sed -i "1s;^;// +build linux,!android,!nowayland freebsd\\n\\n;" wayland_text_input.c
 
 /*
-#cgo LDFLAGS: -lwayland-client -lwayland-cursor
+#cgo linux pkg-config: wayland-client wayland-cursor
+#cgo freebsd openbsd LDFLAGS: -lwayland-client -lwayland-cursor
 #cgo freebsd CFLAGS: -I/usr/local/include
 #cgo freebsd LDFLAGS: -L/usr/local/lib
 

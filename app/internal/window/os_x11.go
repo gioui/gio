@@ -7,7 +7,9 @@ package window
 /*
 #cgo openbsd CFLAGS: -I/usr/X11R6/include -I/usr/local/include
 #cgo openbsd LDFLAGS: -L/usr/X11R6/lib -L/usr/local/lib
-#cgo LDFLAGS: -lX11 -lxkbcommon -lxkbcommon-x11 -lX11-xcb
+#cgo freebsd openbsd LDFLAGS: -lX11 -lxkbcommon -lxkbcommon-x11 -lX11-xcb
+#cgo linux pkg-config: x11 xkbcommon xkbcommon-x11 x11-xcb
+
 #include <stdlib.h>
 #include <locale.h>
 #include <X11/Xlib.h>
