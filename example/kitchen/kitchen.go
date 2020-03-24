@@ -19,6 +19,7 @@ import (
 
 	"gioui.org/app"
 	"gioui.org/app/headless"
+	"gioui.org/font/gofont"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/text"
@@ -27,14 +28,16 @@ import (
 	"gioui.org/widget/material"
 
 	"golang.org/x/exp/shiny/materialdesign/icons"
-
-	"gioui.org/font/gofont"
 )
 
 var screenshot = flag.String("screenshot", "", "save a screenshot to a file and exit")
 
 type scaledConfig struct {
 	Scale float32
+}
+
+type iconAndTextButton struct {
+	theme *material.Theme
 }
 
 func main() {
@@ -109,6 +112,7 @@ var (
 	}
 	button            = new(widget.Button)
 	greenButton       = new(widget.Button)
+	iconTextButton    = new(widget.Button)
 	iconButton        = new(widget.Button)
 	radioButtonsGroup = new(widget.Enum)
 	list              = &layout.List{
@@ -119,6 +123,33 @@ var (
 	icon     *material.Icon
 	checkbox = new(widget.CheckBox)
 )
+
+func (b iconAndTextButton) Layout(gtx *layout.Context, button *widget.Button, icon *material.Icon, word string) {
+	b.theme.ButtonLayout().Layout(gtx, iconTextButton, func() {
+		iconAndLabel := layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}
+		textIconSpacer := unit.Dp(5)
+
+		layIcon := layout.Rigid(func() {
+			layout.Inset{Right: textIconSpacer}.Layout(gtx, func() {
+				size := gtx.Px(unit.Dp(56)) - 2*gtx.Px(unit.Dp(16))
+				if icon != nil {
+					icon.Layout(gtx, unit.Px(float32(size)))
+					gtx.Dimensions = layout.Dimensions{
+						Size: image.Point{X: size, Y: size},
+					}
+				}
+			})
+		})
+
+		layLabel := layout.Rigid(func() {
+			layout.Inset{Left: textIconSpacer}.Layout(gtx, func() {
+				widget.Label{}.Layout(gtx, b.theme.Shaper, text.Font{}, b.theme.TextSize, word)
+			})
+		})
+
+		iconAndLabel.Layout(gtx, layIcon, layLabel)
+	})
+}
 
 func kitchen(gtx *layout.Context, th *material.Theme) {
 	widgets := []func(){
@@ -146,6 +177,11 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 				layout.Rigid(func() {
 					in.Layout(gtx, func() {
 						th.IconButton(icon).Layout(gtx, iconButton)
+					})
+				}),
+				layout.Rigid(func() {
+					in.Layout(gtx, func() {
+						iconAndTextButton{th}.Layout(gtx, iconTextButton, icon, "Horizontal button")
 					})
 				}),
 				layout.Rigid(func() {
