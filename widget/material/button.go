@@ -109,9 +109,9 @@ func (b ButtonLayout) Layout(gtx *layout.Context, button *widget.Button, w layou
 			}
 		}),
 		layout.Stacked(func() {
-			gtx.Constraints.Width.Min = hmin
-			gtx.Constraints.Height.Min = vmin
 			layout.Center.Layout(gtx, func() {
+				gtx.Constraints.Width.Min = hmin
+				gtx.Constraints.Height.Min = vmin
 				b.Inset.Layout(gtx, func() {
 					paint.ColorOp{Color: b.Color}.Add(gtx.Ops)
 					w()
