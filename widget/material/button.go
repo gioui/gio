@@ -91,6 +91,8 @@ func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 }
 
 func (b ButtonLayout) Layout(gtx *layout.Context, button *widget.Button, w layout.Widget) {
+	hmin := gtx.Constraints.Width.Min
+	vmin := gtx.Constraints.Height.Min
 	layout.Stack{Alignment: layout.Center}.Layout(gtx,
 		layout.Expanded(func() {
 			rr := float32(gtx.Px(b.CornerRadius))
@@ -107,6 +109,8 @@ func (b ButtonLayout) Layout(gtx *layout.Context, button *widget.Button, w layou
 			}
 		}),
 		layout.Stacked(func() {
+			gtx.Constraints.Width.Min = hmin
+			gtx.Constraints.Height.Min = vmin
 			layout.Center.Layout(gtx, func() {
 				b.Inset.Layout(gtx, func() {
 					paint.ColorOp{Color: b.Color}.Add(gtx.Ops)
