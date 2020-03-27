@@ -86,7 +86,7 @@ func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 		Color:        b.Color,
 		Inset:        b.Inset,
 	}.Layout(gtx, button, func() {
-		widget.Label{}.Layout(gtx, b.shaper, b.Font, b.TextSize, b.Text)
+		widget.Label{Alignment: text.Middle}.Layout(gtx, b.shaper, b.Font, b.TextSize, b.Text)
 	})
 }
 
