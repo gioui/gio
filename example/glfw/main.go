@@ -332,6 +332,10 @@ func (f *goglFunctions) EndQuery(target giogl.Enum) {
 	gl.EndQuery(uint32(target))
 }
 
+func (f *goglFunctions) FramebufferRenderbuffer(target, attachment, renderbuffertarget giogl.Enum, renderbuffer giogl.Renderbuffer) {
+	gl.FramebufferRenderbuffer(uint32(target), uint32(attachment), uint32(renderbuffertarget), uint32(renderbuffer.V))
+}
+
 func (f *goglFunctions) FramebufferTexture2D(target, attachment, texTarget giogl.Enum, t giogl.Texture, level int) {
 	gl.FramebufferTexture2D(uint32(target), uint32(attachment), uint32(texTarget), uint32(t.V), int32(level))
 }
