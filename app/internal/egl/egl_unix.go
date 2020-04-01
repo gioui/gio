@@ -5,8 +5,8 @@
 package egl
 
 /*
-#cgo linux pkg-config: egl
-#cgo freebsd openbsd LDFLAGS: -lEGL
+#cgo linux,!android  pkg-config: egl
+#cgo freebsd openbsd android LDFLAGS: -lEGL
 #cgo freebsd CFLAGS: -I/usr/local/include
 #cgo freebsd LDFLAGS: -L/usr/local/lib
 #cgo openbsd CFLAGS: -I/usr/X11R6/include

@@ -14,9 +14,9 @@ import (
 
 /*
 #cgo CFLAGS: -Werror
-#cgo linux pkg-config: glesv2
+#cgo linux,!android pkg-config: glesv2
 #cgo linux freebsd LDFLAGS: -ldl
-#cgo freebsd openbsd LDFLAGS: -lGLESv2
+#cgo freebsd openbsd android LDFLAGS: -lGLESv2
 #cgo freebsd CFLAGS: -I/usr/local/include
 #cgo freebsd LDFLAGS: -L/usr/local/lib
 #cgo openbsd CFLAGS: -I/usr/X11R6/include
