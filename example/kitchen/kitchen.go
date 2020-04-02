@@ -48,6 +48,7 @@ func main() {
 		log.Fatal(err)
 	}
 	icon = ic
+	progressIncrementer = make(chan int)
 	gofont.Register()
 	if *screenshot != "" {
 		if err := saveScreenshot(*screenshot); err != nil {
@@ -56,8 +57,16 @@ func main() {
 		}
 		os.Exit(0)
 	}
+
 	go func() {
-		w := app.NewWindow()
+		for {
+			time.Sleep(time.Second)
+			progressIncrementer <- 10
+		}
+	}()
+
+	go func() {
+		w := app.NewWindow(app.Size(unit.Dp(800), unit.Dp(650)))
 		if err := loop(w); err != nil {
 			log.Fatal(err)
 		}
@@ -91,15 +100,24 @@ func saveScreenshot(f string) error {
 func loop(w *app.Window) error {
 	th := material.NewTheme()
 	gtx := layout.NewContext(w.Queue())
+
 	for {
-		e := <-w.Events()
-		switch e := e.(type) {
-		case system.DestroyEvent:
-			return e.Err
-		case system.FrameEvent:
-			gtx.Reset(e.Config, e.Size)
-			kitchen(gtx, th)
-			e.Frame(gtx.Ops)
+		select {
+		case e := <-w.Events():
+			switch e := e.(type) {
+			case system.DestroyEvent:
+				return e.Err
+			case system.FrameEvent:
+				gtx.Reset(e.Config, e.Size)
+				kitchen(gtx, th)
+				e.Frame(gtx.Ops)
+			}
+		case p := <-progressIncrementer:
+			progress += p
+			if progress > 100 {
+				progress = 0
+			}
+			w.Invalidate()
 		}
 	}
 }
@@ -118,10 +136,12 @@ var (
 	list              = &layout.List{
 		Axis: layout.Vertical,
 	}
-	green    = true
-	topLabel = "Hello, Gio"
-	icon     *material.Icon
-	checkbox = new(widget.CheckBox)
+	progress            = 0
+	progressIncrementer chan int
+	green               = true
+	topLabel            = "Hello, Gio"
+	icon                *material.Icon
+	checkbox            = new(widget.CheckBox)
 )
 
 func (b iconAndTextButton) Layout(gtx *layout.Context, button *widget.Button, icon *material.Icon, word string) {
@@ -205,6 +225,9 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 			)
 		},
 		func() {
+			th.ProgressBar().Layout(gtx, progress)
+		},
+		func() {
 			th.CheckBox("Checkbox").Layout(gtx, checkbox)
 		},
 		func() {
@@ -221,6 +244,7 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 			)
 		},
 	}
+
 	list.Layout(gtx, len(widgets), func(i int) {
 		layout.UniformInset(unit.Dp(16)).Layout(gtx, widgets[i])
 	})
