@@ -18,7 +18,7 @@ type Button struct {
 	history []Click
 }
 
-// Click represents a historic click.
+// Click represents a past click.
 type Click struct {
 	Position f32.Point
 	Time     time.Time
