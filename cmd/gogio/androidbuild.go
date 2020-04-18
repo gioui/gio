@@ -52,6 +52,22 @@ type manifestData struct {
 	AppName     string
 }
 
+const (
+	themes = `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<style name="Theme.GioApp" parent="android:style/Theme.NoTitleBar">
+	</style>
+</resources>`
+	themesV21 = `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<style name="Theme.GioApp" parent="android:style/Theme.NoTitleBar">
+		<item name="android:windowDrawsSystemBarBackgrounds">true</item>
+		<item name="android:navigationBarColor">#40000000</item>
+		<item name="android:statusBarColor">#40000000</item>
+	</style>
+</resources>`
+)
+
 func init() {
 	if runtime.GOOS == "windows" {
 		exeSuffix = ".exe"
@@ -250,7 +266,10 @@ func archiveAndroid(tmpDir string, bi *buildInfo, perms []string) (err error) {
 	aarw := newZipWriter(aar)
 	defer aarw.Close()
 	aarw.Create("R.txt")
-	aarw.Create("res/")
+	themesXML := aarw.Create("res/values/themes.xml")
+	themesXML.Write([]byte(themes))
+	themesXML21 := aarw.Create("res/values-v21/themes.xml")
+	themesXML21.Write([]byte(themesV21))
 	permissions, features := getPermissions(perms)
 	manifest := aarw.Create("AndroidManifest.xml")
 	manifestSrc := manifestData{
@@ -341,23 +360,10 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, pe
 		}
 		iconSnip = `android:icon="@mipmap/ic_launcher"`
 	}
-	themes := `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-	<style name="Theme.GioApp" parent="android:style/Theme.NoTitleBar">
-	</style>
-</resources>`
 	err = ioutil.WriteFile(filepath.Join(valDir, "themes.xml"), []byte(themes), 0660)
 	if err != nil {
 		return err
 	}
-	themesV21 := `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-	<style name="Theme.GioApp" parent="android:style/Theme.NoTitleBar">
-		<item name="android:windowDrawsSystemBarBackgrounds">true</item>
-		<item name="android:navigationBarColor">#40000000</item>
-		<item name="android:statusBarColor">#40000000</item>
-	</style>
-</resources>`
 	err = ioutil.WriteFile(filepath.Join(v21Dir, "themes.xml"), []byte(themesV21), 0660)
 	if err != nil {
 		return err
