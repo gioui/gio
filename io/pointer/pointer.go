@@ -95,6 +95,10 @@ const (
 	Release
 	// Move of a pointer.
 	Move
+	// Pointer enters an area watching for pointer input
+	Enter
+	// Pointer leaves an area watching for pointer input
+	Leave
 )
 
 const (
@@ -176,6 +180,10 @@ func (t Type) String() string {
 		return "Cancel"
 	case Move:
 		return "Move"
+	case Enter:
+		return "Enter"
+	case Leave:
+		return "Leave"
 	default:
 		panic("unknown Type")
 	}
