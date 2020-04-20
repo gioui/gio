@@ -151,10 +151,6 @@ void gio_jni_CallVoidMethod(JNIEnv *env, jobject obj, jmethodID methodID) {
 	(*env)->CallVoidMethod(env, obj, methodID);
 }
 
-void gio_jni_CallVoidMethod_J(JNIEnv *env, jobject obj, jmethodID methodID, jlong a1) {
-	(*env)->CallVoidMethod(env, obj, methodID, a1);
-}
-
 jbyte *gio_jni_GetByteArrayElements(JNIEnv *env, jbyteArray arr) {
 	return (*env)->GetByteArrayElements(env, arr, NULL);
 }
