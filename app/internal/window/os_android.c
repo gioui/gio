@@ -147,8 +147,8 @@ jint gio_jni_CallIntMethod(JNIEnv *env, jobject obj, jmethodID methodID) {
 	return (*env)->CallIntMethod(env, obj, methodID);
 }
 
-void gio_jni_CallVoidMethod(JNIEnv *env, jobject obj, jmethodID methodID) {
-	(*env)->CallVoidMethod(env, obj, methodID);
+void gio_jni_CallVoidMethod(JNIEnv *env, jobject obj, jmethodID methodID, const jvalue *args) {
+	(*env)->CallVoidMethodA(env, obj, methodID, args);
 }
 
 jbyte *gio_jni_GetByteArrayElements(JNIEnv *env, jbyteArray arr) {
@@ -163,7 +163,6 @@ jsize gio_jni_GetArrayLength(JNIEnv *env, jbyteArray arr) {
 	return (*env)->GetArrayLength(env, arr);
 }
 
-void gio_jni_RegisterFragment(JNIEnv *env, jobject view, jmethodID mid, char* del) {
-	jstring jdel = (*env)->NewStringUTF(env, del);
-	(*env)->CallObjectMethod(env, view, mid, jdel);
+jstring gio_jni_NewString(JNIEnv *env, const jchar *unicodeChars, jsize len) {
+	return (*env)->NewString(env, unicodeChars, len);
 }

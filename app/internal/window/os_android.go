@@ -23,6 +23,7 @@ import (
 	"runtime/debug"
 	"sync"
 	"time"
+	"unicode/utf16"
 	"unsafe"
 
 	"gioui.org/f32"
@@ -56,6 +57,8 @@ type window struct {
 	mpostFrameCallbackOnMainThread C.jmethodID
 	mRegisterFragment              C.jmethodID
 }
+
+type jvalue uint64 // The largest JNI type fits in 64 bits.
 
 var dataDirChan = make(chan string, 1)
 
@@ -212,7 +215,7 @@ func onFrameCallback(env *C.JNIEnv, class C.jclass, view C.jlong, nanos C.jlong)
 	w.mu.Unlock()
 	if anim {
 		runInJVM(func(env *C.JNIEnv) {
-			C.gio_jni_CallVoidMethod(env, w.view, w.mpostFrameCallback)
+			callVoidMethod(env, w.view, w.mpostFrameCallback)
 		})
 		w.draw(false)
 	}
@@ -306,7 +309,7 @@ func (w *window) SetAnimating(anim bool) {
 	w.mu.Unlock()
 	if anim {
 		runInJVM(func(env *C.JNIEnv) {
-			C.gio_jni_CallVoidMethod(env, w.view, w.mpostFrameCallbackOnMainThread)
+			callVoidMethod(env, w.view, w.mpostFrameCallbackOnMainThread)
 		})
 	}
 }
@@ -448,19 +451,37 @@ func (w *window) ShowTextInput(show bool) {
 	}
 	runInJVM(func(env *C.JNIEnv) {
 		if show {
-			C.gio_jni_CallVoidMethod(env, w.view, w.mshowTextInput)
+			callVoidMethod(env, w.view, w.mshowTextInput)
 		} else {
-			C.gio_jni_CallVoidMethod(env, w.view, w.mhideTextInput)
+			callVoidMethod(env, w.view, w.mhideTextInput)
 		}
 	})
 }
 
+func javaString(env *C.JNIEnv, str string) C.jstring {
+	if str == "" {
+		return 0
+	}
+	utf16Chars := utf16.Encode([]rune(str))
+	return C.gio_jni_NewString(env, (*C.jchar)(unsafe.Pointer(&utf16Chars[0])), C.int(len(utf16Chars)))
+}
+
 func (w *window) RegisterFragment(del string) {
 	runInJVM(func(env *C.JNIEnv) {
-		cdel := C.CString(del)
-		defer C.free(unsafe.Pointer(cdel))
-		C.gio_jni_RegisterFragment(env, w.view, w.mRegisterFragment, cdel)
+		jstr := javaString(env, del)
+		callVoidMethod(env, w.view, w.mRegisterFragment, jvalue(jstr))
 	})
+}
+
+func varArgs(args []jvalue) *C.jvalue {
+	if len(args) == 0 {
+		return nil
+	}
+	return (*C.jvalue)(unsafe.Pointer(&args[0]))
+}
+
+func callVoidMethod(env *C.JNIEnv, obj C.jobject, method C.jmethodID, args ...jvalue) {
+	C.gio_jni_CallVoidMethod(env, obj, method, varArgs(args))
 }
 
 func Main() {
