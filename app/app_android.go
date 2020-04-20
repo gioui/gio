@@ -4,11 +4,15 @@ import (
 	"gioui.org/app/internal/window"
 )
 
-type Handle window.Handle
+// JavaVM returns the global JNI JavaVM.
+func JavaVM() uintptr {
+	return window.JavaVM()
+}
 
-// PlatformHandle returns the Android platform-specific Handle.
-func PlatformHandle() *Handle {
-	return (*Handle)(window.PlatformHandle)
+// AppContext returns the global Application context as a JNI
+// jobject.
+func AppContext() uintptr {
+	return window.AppContext()
 }
 
 // androidDriver is an interface that allows the Window's run method
