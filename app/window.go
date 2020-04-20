@@ -72,8 +72,6 @@ var ackEvent event.Event
 // options. The options are hints; the platform is free to
 // ignore or adjust them.
 //
-// If opts are nil, a set of sensible defaults are used.
-//
 // If the current program is running on iOS and Android,
 // NewWindow returns the window previously created by the
 // platform.
