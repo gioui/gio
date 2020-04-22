@@ -354,6 +354,7 @@ func (g *GPU) BeginFrame() {
 	g.ctx.SetBlend(false)
 	g.renderer.pather.stenciler.invalidateFBO()
 	g.coverTimer.end()
+	g.ctx.BindFramebuffer(g.defFBO)
 }
 
 func (g *GPU) EndFrame() {

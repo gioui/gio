@@ -50,6 +50,11 @@ func (c *context) Release() {
 	c.Lock()
 	defer c.Unlock()
 	C.gio_clearCurrentContext()
+	// We could release the context with [view clearGLContext]
+	// and rely on [view openGLContext] auto-creating a new context.
+	// However that second context is not properly set up by
+	// OpenGLContextView, so we'll stay on the safe side and keep
+	// the first context around.
 }
 
 func (c *context) Present() error {
