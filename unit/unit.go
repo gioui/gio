@@ -55,7 +55,7 @@ func Px(v float32) Value {
 	return Value{V: v, U: UnitPx}
 }
 
-// Px returns the Value for v device independent
+// Dp returns the Value for v device independent
 // pixels.
 func Dp(v float32) Value {
 	return Value{V: v, U: UnitDp}
