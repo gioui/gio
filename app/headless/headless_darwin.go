@@ -6,6 +6,8 @@ import (
 	"gioui.org/app/internal/glimpl"
 	"gioui.org/gpu/backend"
 	"gioui.org/gpu/gl"
+
+	_ "gioui.org/app/internal/cocoainit"
 )
 
 /*

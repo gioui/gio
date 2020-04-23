@@ -17,6 +17,8 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+
+	_ "gioui.org/app/internal/cocoainit"
 )
 
 /*
