@@ -56,11 +56,14 @@ const (
 	themes = `<?xml version="1.0" encoding="utf-8"?>
 <resources>
 	<style name="Theme.GioApp" parent="android:style/Theme.NoTitleBar">
+		<item name="android:windowBackground">@android:color/white</item>
 	</style>
 </resources>`
 	themesV21 = `<?xml version="1.0" encoding="utf-8"?>
 <resources>
 	<style name="Theme.GioApp" parent="android:style/Theme.NoTitleBar">
+		<item name="android:windowBackground">@android:color/white</item>
+
 		<item name="android:windowDrawsSystemBarBackgrounds">true</item>
 		<item name="android:navigationBarColor">#40000000</item>
 		<item name="android:statusBarColor">#40000000</item>
