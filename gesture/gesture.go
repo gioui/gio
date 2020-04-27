@@ -81,7 +81,7 @@ const (
 	// TypePress is reported for the first pointer
 	// press.
 	TypePress ClickType = iota
-	// TypeClick is reporoted when a click action
+	// TypeClick is reported when a click action
 	// is complete.
 	TypeClick
 )
