@@ -751,7 +751,11 @@ func floatTripleFor(f Functions, ver [2]int, exts []string) (textureTriple, erro
 	if ver[0] >= 3 {
 		triples = append(triples, textureTriple{R16F, Enum(RED), Enum(HALF_FLOAT)})
 	}
-	if hasExtension(exts, "GL_OES_texture_half_float") && hasExtension(exts, "GL_EXT_color_buffer_half_float") {
+	// According to the OES_texture_half_float specification, EXT_color_buffer_half_float is needed to
+	// render to FBOs. However, the Safari WebGL1 implementation does support half-float FBOs but does not
+	// report EXT_color_buffer_half_float support. The triples are verified below, so it doesn't matter if we're
+	// wrong.
+	if hasExtension(exts, "GL_OES_texture_half_float") || hasExtension(exts, "GL_EXT_color_buffer_half_float") {
 		// Try single channel.
 		triples = append(triples, textureTriple{LUMINANCE, Enum(LUMINANCE), Enum(HALF_FLOAT_OES)})
 		// Fallback to 4 channels.
