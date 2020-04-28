@@ -17,12 +17,10 @@ layout(binding = 0) uniform Block {
 layout(location = 0) out vec2 vUV;
 
 void main() {
-  vec3[2] fboTrans = fboTransform();
-  vec3 p = transform3x2(fboTrans, vec3(pos, 1.0));
+  vec3 p = transform3x2(fboTransform, vec3(pos, 1.0));
   gl_Position = vec4(p, 1);
-  vec3[2] fboTexTrans = fboTextureTransform();
-  vec3 uv3 = transform3x2(fboTexTrans, vec3(uv, 1.0));
+  vec3 uv3 = transform3x2(fboTextureTransform, vec3(uv, 1.0));
   vUV = uv3.xy*subUVTransform.xy + subUVTransform.zw;
-  vUV = transform3x2(fboTexTrans, vec3(vUV, 1.0)).xy;
+  vUV = transform3x2(fboTextureTransform, vec3(vUV, 1.0)).xy;
   vUV = vUV*uvTransform.xy + uvTransform.zw;
 }
