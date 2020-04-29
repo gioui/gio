@@ -22,11 +22,20 @@ import (
 	"gioui.org/unit"
 )
 
+// The duration is somewhat arbitrary.
+const doubleClickDuration = 200 * time.Millisecond
+
 // Click detects click gestures in the form
 // of ClickEvents.
 type Click struct {
 	// state tracks the gesture state.
 	state ClickState
+	// clickedAt is the timestamp at which
+	// the last click occurred.
+	clickedAt time.Duration
+	// clicks is incremented if successive clicks
+	// are performed within a fixed duration.
+	clicks int
 }
 
 type ClickState uint8
@@ -39,6 +48,9 @@ type ClickEvent struct {
 	Position  f32.Point
 	Source    pointer.Source
 	Modifiers key.Modifiers
+	// NumClicks records successive clicks occurring
+	// within a short duration of each other.
+	NumClicks int
 }
 
 type ClickType uint8
@@ -122,7 +134,13 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 			wasPressed := c.state == StatePressed
 			c.state = StateNormal
 			if wasPressed {
-				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers})
+				if e.Time-c.clickedAt < doubleClickDuration {
+					c.clicks++
+				} else {
+					c.clicks = 1
+				}
+				c.clickedAt = e.Time
+				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
 			}
 		case pointer.Cancel:
 			c.state = StateNormal
