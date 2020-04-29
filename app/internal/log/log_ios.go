@@ -21,7 +21,7 @@ import (
 )
 
 func init() {
-	// macOS Console already includes timstamps.
+	// macOS Console already includes timestamps.
 	log.SetFlags(log.Flags() &^ log.LstdFlags)
 	log.SetOutput(newNSLogWriter())
 }
