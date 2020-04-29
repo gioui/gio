@@ -107,8 +107,12 @@ func (w *Window) Events() <-chan event.Event {
 	return w.out
 }
 
-// Queue returns the Window's event queue. The queue contains
-// the events received since the last frame.
+// Queue returns the Window's event queue. The queue contains the events
+// received since the last frame.
+//
+// Note: the Queue may only be used after receiving a FrameEvent and before the
+// next event is received, or the FrameEvent.Frame method is called, whichever
+// comes first.
 func (w *Window) Queue() *Queue {
 	return &w.queue
 }
