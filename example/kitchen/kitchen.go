@@ -145,7 +145,7 @@ var (
 )
 
 func (b iconAndTextButton) Layout(gtx *layout.Context, button *widget.Button, icon *material.Icon, word string) {
-	b.theme.ButtonLayout().Layout(gtx, iconTextButton, func() {
+	b.theme.ButtonLayout().Layout(gtx, button, func() {
 		iconAndLabel := layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}
 		textIconSpacer := unit.Dp(5)
 
