@@ -40,6 +40,9 @@ func (ic *Icon) Layout(gtx *layout.Context, sz unit.Value) {
 			Max: toPointF(ico.Size()),
 		},
 	}.Add(gtx.Ops)
+	gtx.Dimensions = layout.Dimensions{
+		Size: ico.Size(),
+	}
 }
 
 func (ic *Icon) image(sz int) paint.ImageOp {
