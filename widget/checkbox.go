@@ -6,22 +6,19 @@ import (
 )
 
 type CheckBox struct {
-	click   gesture.Click
-	checked bool
+	Checked bool
+
+	click gesture.Click
 }
 
-func (c *CheckBox) SetChecked(value bool) {
-	c.checked = value
-}
-
-func (c *CheckBox) Checked(gtx *layout.Context) bool {
+// Update the checked state according to incoming events.
+func (c *CheckBox) Update(gtx *layout.Context) {
 	for _, e := range c.click.Events(gtx) {
 		switch e.Type {
 		case gesture.TypeClick:
-			c.checked = !c.checked
+			c.Checked = !c.Checked
 		}
 	}
-	return c.checked
 }
 
 func (c *CheckBox) Layout(gtx *layout.Context) {

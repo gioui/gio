@@ -27,7 +27,9 @@ func CheckBox(th *Theme, label string) CheckBoxStyle {
 	}
 }
 
+// Layout updates the checkBox and displays it.
 func (c CheckBoxStyle) Layout(gtx *layout.Context, checkBox *widget.CheckBox) {
-	c.layout(gtx, checkBox.Checked(gtx))
+	checkBox.Update(gtx)
+	c.layout(gtx, checkBox.Checked)
 	checkBox.Layout(gtx)
 }
