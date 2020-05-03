@@ -12,6 +12,7 @@ import (
 	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
+	"gioui.org/widget"
 	"golang.org/x/exp/shiny/materialdesign/icons"
 )
 
@@ -24,10 +25,10 @@ type Theme struct {
 		InvText color.RGBA
 	}
 	TextSize              unit.Value
-	checkBoxCheckedIcon   *Icon
-	checkBoxUncheckedIcon *Icon
-	radioCheckedIcon      *Icon
-	radioUncheckedIcon    *Icon
+	checkBoxCheckedIcon   *widget.Icon
+	checkBoxUncheckedIcon *widget.Icon
+	radioCheckedIcon      *widget.Icon
+	radioUncheckedIcon    *widget.Icon
 }
 
 func NewTheme() *Theme {
@@ -40,15 +41,15 @@ func NewTheme() *Theme {
 	t.Color.InvText = rgb(0xffffff)
 	t.TextSize = unit.Sp(16)
 
-	t.checkBoxCheckedIcon = mustIcon(NewIcon(icons.ToggleCheckBox))
-	t.checkBoxUncheckedIcon = mustIcon(NewIcon(icons.ToggleCheckBoxOutlineBlank))
-	t.radioCheckedIcon = mustIcon(NewIcon(icons.ToggleRadioButtonChecked))
-	t.radioUncheckedIcon = mustIcon(NewIcon(icons.ToggleRadioButtonUnchecked))
+	t.checkBoxCheckedIcon = mustIcon(widget.NewIcon(icons.ToggleCheckBox))
+	t.checkBoxUncheckedIcon = mustIcon(widget.NewIcon(icons.ToggleCheckBoxOutlineBlank))
+	t.radioCheckedIcon = mustIcon(widget.NewIcon(icons.ToggleRadioButtonChecked))
+	t.radioUncheckedIcon = mustIcon(widget.NewIcon(icons.ToggleRadioButtonUnchecked))
 
 	return t
 }
 
-func mustIcon(ic *Icon, err error) *Icon {
+func mustIcon(ic *widget.Icon, err error) *widget.Icon {
 	if err != nil {
 		panic(err)
 	}

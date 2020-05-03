@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package material
+package widget
 
 import (
 	"image"
@@ -29,7 +29,7 @@ func NewIcon(data []byte) (*Icon, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Icon{src: data, Color: rgb(0x000000)}, nil
+	return &Icon{src: data, Color: color.RGBA{A: 0xff}}, nil
 }
 
 func (ic *Icon) Layout(gtx *layout.Context, sz unit.Value) {

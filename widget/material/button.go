@@ -39,7 +39,7 @@ type ButtonLayout struct {
 type IconButton struct {
 	Background color.RGBA
 	Color      color.RGBA
-	Icon       *Icon
+	Icon       *widget.Icon
 	Size       unit.Value
 	Padding    unit.Value
 	Inset      layout.Inset
@@ -69,7 +69,7 @@ func (t *Theme) ButtonLayout() ButtonLayout {
 	}
 }
 
-func (t *Theme) IconButton(icon *Icon) IconButton {
+func (t *Theme) IconButton(icon *widget.Icon) IconButton {
 	return IconButton{
 		Background: t.Color.Primary,
 		Color:      t.Color.InvText,

@@ -22,13 +22,12 @@ type checkable struct {
 	IconColor          color.RGBA
 	Size               unit.Value
 	shaper             text.Shaper
-	checkedStateIcon   *Icon
-	uncheckedStateIcon *Icon
+	checkedStateIcon   *widget.Icon
+	uncheckedStateIcon *widget.Icon
 }
 
 func (c *checkable) layout(gtx *layout.Context, checked bool) {
-
-	var icon *Icon
+	var icon *widget.Icon
 	if checked {
 		icon = c.checkedStateIcon
 	} else {
