@@ -44,7 +44,7 @@ type Window struct {
 	nextFrame    time.Time
 	delayedDraw  *time.Timer
 
-	queue Queue
+	queue queue
 
 	callbacks callbacks
 }
@@ -53,9 +53,9 @@ type callbacks struct {
 	w *Window
 }
 
-// Queue is an event.Queue implementation that distributes system events
+// queue is an event.Queue implementation that distributes system events
 // to the input handlers declared in the most recent frame.
-type Queue struct {
+type queue struct {
 	q router.Router
 }
 
@@ -105,16 +105,6 @@ func NewWindow(options ...Option) *Window {
 // Events returns the channel where events are delivered.
 func (w *Window) Events() <-chan event.Event {
 	return w.out
-}
-
-// Queue returns the Window's event queue. The queue contains the events
-// received since the last frame.
-//
-// Note: the Queue may only be used after receiving a FrameEvent and before the
-// next event is received, or the FrameEvent.Frame method is called, whichever
-// comes first.
-func (w *Window) Queue() *Queue {
-	return &w.queue
 }
 
 // update updates the Window. Paint operations updates the
@@ -274,6 +264,7 @@ func (w *Window) run(opts *window.Options) {
 				frameStart := time.Now()
 				w.hasNextFrame = false
 				e2.Frame = w.update
+				e2.Queue = &w.queue
 				w.out <- e2.FrameEvent
 				if w.loop != nil {
 					if e2.Sync {
@@ -353,7 +344,7 @@ func (w *Window) run(opts *window.Options) {
 	}
 }
 
-func (q *Queue) Events(k event.Key) []event.Event {
+func (q *queue) Events(k event.Key) []event.Event {
 	return q.q.Events(k)
 }
 

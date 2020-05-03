@@ -8,11 +8,12 @@ import (
 	"image"
 	"time"
 
+	"gioui.org/io/event"
 	"gioui.org/op"
 	"gioui.org/unit"
 )
 
-// A FrameEvent asks for a new frame in the form of a list of
+// A FrameEvent requests a new frame in the form of a list of
 // operations.
 type FrameEvent struct {
 	Config Config
@@ -20,9 +21,11 @@ type FrameEvent struct {
 	Size image.Point
 	// Insets is the insets to apply.
 	Insets Insets
-	// Frame replaces the window's frame with the new
-	// frame.
+	// Frame is the callback to supply the list of
+	// operations to complete the FrameEvent.
 	Frame func(frame *op.Ops)
+	// Queue supplies the events for event handlers.
+	Queue event.Queue
 }
 
 // Config defines the essential properties of
