@@ -98,7 +98,7 @@ var button widget.Button
 
 func draw(gtx *layout.Context, th *material.Theme) {
 	layout.Center.Layout(gtx, func() {
-		th.Button("Button").Layout(gtx, &button)
+		material.Button(th, "Button").Layout(gtx, &button)
 	})
 }
 

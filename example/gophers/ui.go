@@ -35,7 +35,7 @@ import (
 
 type UI struct {
 	fab          *widget.Button
-	fabIcon      *material.Icon
+	fabIcon      *widget.Icon
 	usersList    *layout.List
 	users        []*user
 	userClicks   []gesture.Click
@@ -85,7 +85,7 @@ func newUI(fetchCommits func(string)) *UI {
 		SingleLine: true,
 	}
 	var err error
-	u.fabIcon, err = material.NewIcon(icons.ContentSend)
+	u.fabIcon, err = widget.NewIcon(icons.ContentSend)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func (u *UI) layoutTimings(gtx *layout.Context) {
 	layout.NE.Layout(gtx, func() {
 		layout.Inset{Top: unit.Dp(16)}.Layout(gtx, func() {
 			txt := fmt.Sprintf("m: %d %s", mallocs, u.profile.Timings)
-			lbl := theme.Caption(txt)
+			lbl := material.Caption(theme, txt)
 			lbl.Font.Variant = "Mono"
 			lbl.Layout(gtx)
 		})
@@ -169,7 +169,7 @@ func (up *userPage) Layout(gtx *layout.Context) {
 func (up *userPage) commit(gtx *layout.Context, index int) {
 	u := up.user
 	msg := up.commits[index].GetMessage()
-	label := theme.Caption(msg)
+	label := material.Caption(theme, msg)
 	in := layout.Inset{Top: unit.Dp(16), Right: unit.Dp(8), Left: unit.Dp(8)}
 	in.Layout(gtx, func() {
 		layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
@@ -201,14 +201,14 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 						sz := gtx.Px(unit.Dp(200))
 						cs := gtx.Constraints
 						gtx.Constraints = layout.RigidConstraints(cs.Constrain(image.Point{X: sz, Y: sz}))
-						theme.Editor("Hint").Layout(gtx, u.edit)
+						material.Editor(theme, "Hint").Layout(gtx, u.edit)
 					})
 				}),
 				layout.Rigid(func() {
 					gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
 					in := layout.Inset{Bottom: unit.Dp(16), Left: unit.Dp(16), Right: unit.Dp(16)}
 					in.Layout(gtx, func() {
-						e := theme.Editor("Hint")
+						e := material.Editor(theme, "Hint")
 						e.TextSize = unit.Sp(14)
 						e.Font.Style = text.Italic
 						e.Layout(gtx, u.edit2)
@@ -223,7 +223,7 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 						layout.Stacked(func() {
 							in := layout.Inset{Top: unit.Dp(16), Right: unit.Dp(8), Bottom: unit.Dp(8), Left: unit.Dp(8)}
 							in.Layout(gtx, func() {
-								lbl := theme.Caption("GOPHERS")
+								lbl := material.Caption(theme, "GOPHERS")
 								lbl.Color = rgb(0x888888)
 								lbl.Layout(gtx)
 							})
@@ -241,7 +241,7 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 			in.Layout(gtx, func() {
 				for u.fab.Clicked(gtx) {
 				}
-				theme.IconButton(u.fabIcon).Layout(gtx, u.fab)
+				material.IconButton(theme, u.fabIcon).Layout(gtx, u.fab)
 			})
 		}),
 	)
@@ -279,13 +279,13 @@ func (u *UI) user(gtx *layout.Context, index int) {
 					layout.Rigid(func() {
 						baseline().Layout(gtx,
 							layout.Rigid(func() {
-								theme.Body1(user.name).Layout(gtx)
+								material.Body1(theme, user.name).Layout(gtx)
 							}),
 							layout.Flexed(1, func() {
 								gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
 								layout.E.Layout(gtx, func() {
 									layout.Inset{Left: unit.Dp(2)}.Layout(gtx, func() {
-										theme.Caption("3 hours ago").Layout(gtx)
+										material.Caption(theme, "3 hours ago").Layout(gtx)
 									})
 								})
 							}),
@@ -294,7 +294,7 @@ func (u *UI) user(gtx *layout.Context, index int) {
 					layout.Rigid(func() {
 						in := layout.Inset{Top: unit.Dp(4)}
 						in.Layout(gtx, func() {
-							lbl := theme.Caption(user.company)
+							lbl := material.Caption(theme, user.company)
 							lbl.Color = rgb(0xbbbbbb)
 							lbl.Layout(gtx)
 						})
@@ -315,7 +315,7 @@ func (u *user) layoutAvatar(gtx *layout.Context) {
 		draw.ApproxBiLinear.Scale(img, img.Bounds(), u.avatar, u.avatar.Bounds(), draw.Src, nil)
 		u.avatarOp = paint.NewImageOp(img)
 	}
-	img := theme.Image(u.avatarOp)
+	img := widget.Image{Src: u.avatarOp}
 	img.Scale = float32(sz) / float32(gtx.Px(unit.Dp(float32(sz))))
 	img.Layout(gtx)
 }

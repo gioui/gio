@@ -79,7 +79,7 @@ func drawTabs(gtx *layout.Context, th *material.Theme) {
 				var tabWidth int
 				layout.Stack{Alignment: layout.S}.Layout(gtx,
 					layout.Stacked(func() {
-						tabBtn := th.Button(t.Title)
+						tabBtn := material.Button(th, t.Title)
 						tabBtn.Background = color.RGBA{}   // No background.
 						tabBtn.CornerRadius = unit.Value{} // No corners.
 						tabBtn.Color = color.RGBA{A: 0xff} // Black text.
@@ -108,7 +108,7 @@ func drawTabs(gtx *layout.Context, th *material.Theme) {
 		}),
 		layout.Flexed(1, func() {
 			layout.Center.Layout(gtx, func() {
-				th.H1(fmt.Sprintf("Tab content #%d", tabs.selected)).Layout(gtx)
+				material.H1(th, fmt.Sprintf("Tab content #%d", tabs.selected)).Layout(gtx)
 			})
 		}),
 	)

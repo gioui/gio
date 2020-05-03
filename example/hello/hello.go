@@ -38,7 +38,7 @@ func loop(w *app.Window) error {
 			return e.Err
 		case system.FrameEvent:
 			gtx.Reset(e.Config, e.Size)
-			l := th.H1("Hello, Gio")
+			l := material.H1(th, "Hello, Gio")
 			maroon := color.RGBA{127, 0, 0, 255}
 			l.Color = maroon
 			l.Alignment = text.Middle

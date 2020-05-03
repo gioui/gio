@@ -43,7 +43,7 @@ type iconAndTextButton struct {
 func main() {
 	flag.Parse()
 	editor.SetText(longText)
-	ic, err := material.NewIcon(icons.ContentAdd)
+	ic, err := widget.NewIcon(icons.ContentAdd)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -140,12 +140,12 @@ var (
 	progressIncrementer chan int
 	green               = true
 	topLabel            = "Hello, Gio"
-	icon                *material.Icon
+	icon                *widget.Icon
 	checkbox            = new(widget.CheckBox)
 )
 
-func (b iconAndTextButton) Layout(gtx *layout.Context, button *widget.Button, icon *material.Icon, word string) {
-	b.theme.ButtonLayout().Layout(gtx, button, func() {
+func (b iconAndTextButton) Layout(gtx *layout.Context, button *widget.Button, icon *widget.Icon, word string) {
+	material.ButtonLayout(b.theme).Layout(gtx, button, func() {
 		iconAndLabel := layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}
 		textIconSpacer := unit.Dp(5)
 
@@ -174,14 +174,14 @@ func (b iconAndTextButton) Layout(gtx *layout.Context, button *widget.Button, ic
 func kitchen(gtx *layout.Context, th *material.Theme) {
 	widgets := []func(){
 		func() {
-			th.H3(topLabel).Layout(gtx)
+			material.H3(th, topLabel).Layout(gtx)
 		},
 		func() {
 			gtx.Constraints.Height.Max = gtx.Px(unit.Dp(200))
-			th.Editor("Hint").Layout(gtx, editor)
+			material.Editor(th, "Hint").Layout(gtx, editor)
 		},
 		func() {
-			e := th.Editor("Hint")
+			e := material.Editor(th, "Hint")
 			e.Font.Style = text.Italic
 			e.Layout(gtx, lineEditor)
 			for _, e := range lineEditor.Events(gtx) {
@@ -196,7 +196,7 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 			layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 				layout.Rigid(func() {
 					in.Layout(gtx, func() {
-						th.IconButton(icon).Layout(gtx, iconButton)
+						material.IconButton(th, icon).Layout(gtx, iconButton)
 					})
 				}),
 				layout.Rigid(func() {
@@ -209,13 +209,12 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 						for button.Clicked(gtx) {
 							green = !green
 						}
-						th.Button("Click me!").Layout(gtx, button)
+						material.Button(th, "Click me!").Layout(gtx, button)
 					})
 				}),
 				layout.Rigid(func() {
 					in.Layout(gtx, func() {
-						var btn material.Button
-						btn = th.Button("Green button")
+						btn := material.Button(th, "Green button")
 						if green {
 							btn.Background = color.RGBA{A: 0xff, R: 0x9e, G: 0x9d, B: 0x24}
 						}
@@ -225,21 +224,21 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 			)
 		},
 		func() {
-			th.ProgressBar().Layout(gtx, progress)
+			material.ProgressBar(th).Layout(gtx, progress)
 		},
 		func() {
-			th.CheckBox("Checkbox").Layout(gtx, checkbox)
+			material.CheckBox(th, "Checkbox").Layout(gtx, checkbox)
 		},
 		func() {
 			layout.Flex{}.Layout(gtx,
 				layout.Rigid(func() {
-					th.RadioButton("r1", "RadioButton1").Layout(gtx, radioButtonsGroup)
+					material.RadioButton(th, "r1", "RadioButton1").Layout(gtx, radioButtonsGroup)
 				}),
 				layout.Rigid(func() {
-					th.RadioButton("r2", "RadioButton2").Layout(gtx, radioButtonsGroup)
+					material.RadioButton(th, "r2", "RadioButton2").Layout(gtx, radioButtonsGroup)
 				}),
 				layout.Rigid(func() {
-					th.RadioButton("r3", "RadioButton3").Layout(gtx, radioButtonsGroup)
+					material.RadioButton(th, "r3", "RadioButton3").Layout(gtx, radioButtonsGroup)
 				}),
 			)
 		},
