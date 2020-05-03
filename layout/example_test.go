@@ -10,7 +10,7 @@ import (
 
 func ExampleInset() {
 	gtx := new(layout.Context)
-	gtx.Reset(nil, image.Point{X: 100, Y: 100})
+	gtx.Reset(nil, nil, image.Point{X: 100, Y: 100})
 	// Loose constraints with no minimal size.
 	gtx.Constraints.Width.Min = 0
 	gtx.Constraints.Height.Min = 0
@@ -33,7 +33,7 @@ func ExampleInset() {
 func ExampleDirection() {
 	gtx := new(layout.Context)
 	// Rigid constraints with both minimum and maximum set.
-	gtx.Reset(nil, image.Point{X: 100, Y: 100})
+	gtx.Reset(nil, nil, image.Point{X: 100, Y: 100})
 
 	layout.Center.Layout(gtx, func() {
 		// Lay out a 50x50 sized widget.
@@ -50,7 +50,7 @@ func ExampleDirection() {
 
 func ExampleFlex() {
 	gtx := new(layout.Context)
-	gtx.Reset(nil, image.Point{X: 100, Y: 100})
+	gtx.Reset(nil, nil, image.Point{X: 100, Y: 100})
 
 	layout.Flex{}.Layout(gtx,
 		// Rigid 10x10 widget.
@@ -72,7 +72,7 @@ func ExampleFlex() {
 
 func ExampleStack() {
 	gtx := new(layout.Context)
-	gtx.Reset(nil, image.Point{X: 100, Y: 100})
+	gtx.Reset(nil, nil, image.Point{X: 100, Y: 100})
 	gtx.Constraints.Width.Min = 0
 	gtx.Constraints.Height.Min = 0
 
@@ -94,7 +94,7 @@ func ExampleStack() {
 
 func ExampleList() {
 	gtx := new(layout.Context)
-	gtx.Reset(nil, image.Point{X: 100, Y: 100})
+	gtx.Reset(nil, nil, image.Point{X: 100, Y: 100})
 
 	// The list is 1e6 elements, but only 5 fit the constraints.
 	const listLen = 1e6

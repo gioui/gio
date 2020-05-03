@@ -29,13 +29,6 @@ type Context struct {
 	*op.Ops
 }
 
-// NewContext returns a Context for an event queue.
-func NewContext(q event.Queue) *Context {
-	return &Context{
-		queue: q,
-	}
-}
-
 // layout a widget with a set of constraints and return its
 // dimensions. The widget dimensions are constrained and the previous
 // constraints are restored after layout.
@@ -51,10 +44,11 @@ func ctxLayout(gtx *Context, cs Constraints, w Widget) Dimensions {
 
 // Reset the context. The constraints' minimum and maximum values are
 // set to the size.
-func (c *Context) Reset(cfg system.Config, size image.Point) {
+func (c *Context) Reset(q event.Queue, cfg system.Config, size image.Point) {
 	c.Constraints = RigidConstraints(size)
 	c.Dimensions = Dimensions{}
 	c.cfg = cfg
+	c.queue = q
 	if c.Ops == nil {
 		c.Ops = new(op.Ops)
 	}
