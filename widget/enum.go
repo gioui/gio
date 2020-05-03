@@ -6,9 +6,10 @@ import (
 )
 
 type Enum struct {
+	Value string
+
 	clicks []gesture.Click
 	values []string
-	value  string
 }
 
 func index(vs []string, t string) int {
@@ -20,32 +21,26 @@ func index(vs []string, t string) int {
 	return -1
 }
 
-// Value processes events and returns the last selected value, or
-// the empty string.
-func (e *Enum) Value(gtx *layout.Context) string {
+// Update the Value according to incoming events.
+func (e *Enum) Update(gtx *layout.Context) {
 	for i := range e.clicks {
 		for _, ev := range e.clicks[i].Events(gtx) {
 			switch ev.Type {
 			case gesture.TypeClick:
-				e.value = e.values[i]
+				e.Value = e.values[i]
 			}
 		}
 	}
-	return e.value
 }
 
 // Layout adds the event handler for key.
-func (rg *Enum) Layout(gtx *layout.Context, key string) {
-	if index(rg.values, key) == -1 {
-		rg.values = append(rg.values, key)
-		rg.clicks = append(rg.clicks, gesture.Click{})
-		rg.clicks[len(rg.clicks)-1].Add(gtx.Ops)
+func (e *Enum) Layout(gtx *layout.Context, key string) {
+	if index(e.values, key) == -1 {
+		e.values = append(e.values, key)
+		e.clicks = append(e.clicks, gesture.Click{})
+		e.clicks[len(e.clicks)-1].Add(gtx.Ops)
 	} else {
-		idx := index(rg.values, key)
-		rg.clicks[idx].Add(gtx.Ops)
+		idx := index(e.values, key)
+		e.clicks[idx].Add(gtx.Ops)
 	}
-}
-
-func (rg *Enum) SetValue(value string) {
-	rg.value = value
 }

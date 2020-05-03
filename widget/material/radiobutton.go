@@ -32,7 +32,9 @@ func RadioButton(th *Theme, key, label string) RadioButtonStyle {
 	}
 }
 
+// Layout updates enum and displays the radio button.
 func (r RadioButtonStyle) Layout(gtx *layout.Context, enum *widget.Enum) {
-	r.layout(gtx, enum.Value(gtx) == r.Key)
+	enum.Update(gtx)
+	r.layout(gtx, enum.Value == r.Key)
 	enum.Layout(gtx, r.Key)
 }
