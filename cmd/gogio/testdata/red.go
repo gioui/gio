@@ -53,7 +53,7 @@ func loop(w *app.Window) error {
 		color: color.RGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x80},
 	}
 
-	gtx := layout.NewContext(w.Queue())
+	gtx := new(layout.Context)
 	for {
 		e := <-w.Events()
 		switch e := e.(type) {
@@ -61,7 +61,7 @@ func loop(w *app.Window) error {
 			return e.Err
 		case system.FrameEvent:
 
-			gtx.Reset(e.Config, e.Size)
+			gtx.Reset(e.Queue, e.Config, e.Size)
 			layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 				layout.Flexed(0.5, func() {
 					layout.Flex{Axis: layout.Horizontal}.Layout(gtx,

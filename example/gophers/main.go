@@ -77,7 +77,7 @@ func initProfiling() {
 
 func (a *App) run() error {
 	a.ui.profiling = *stats
-	gtx := layout.NewContext(a.w.Queue())
+	gtx := new(layout.Context)
 	for {
 		select {
 		case users := <-a.updateUsers:
@@ -125,7 +125,7 @@ func (a *App) run() error {
 					}
 				}
 			case system.FrameEvent:
-				gtx.Reset(e.Config, e.Size)
+				gtx.Reset(e.Queue, e.Config, e.Size)
 				a.ui.Layout(gtx)
 				e.Frame(gtx.Ops)
 			}

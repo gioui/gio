@@ -14,7 +14,7 @@ func BenchmarkUI(b *testing.B) {
 	u := newUI(fetch)
 	gtx := new(layout.Context)
 	for i := 0; i < b.N; i++ {
-		gtx.Reset(nil, image.Point{800, 600})
+		gtx.Reset(nil, nil, image.Point{800, 600})
 		u.Layout(gtx)
 	}
 }

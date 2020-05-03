@@ -30,14 +30,14 @@ func main() {
 func loop(w *app.Window) error {
 	gofont.Register()
 	th := material.NewTheme()
-	gtx := layout.NewContext(w.Queue())
+	gtx := new(layout.Context)
 	for {
 		e := <-w.Events()
 		switch e := e.(type) {
 		case system.DestroyEvent:
 			return e.Err
 		case system.FrameEvent:
-			gtx.Reset(e.Config, e.Size)
+			gtx.Reset(e.Queue, e.Config, e.Size)
 			l := material.H1(th, "Hello, Gio")
 			maroon := color.RGBA{127, 0, 0, 255}
 			l.Color = maroon

@@ -63,7 +63,7 @@ func main() {
 	gofont.Register()
 	f := new(goglFunctions)
 	var queue router.Router
-	gtx := layout.NewContext(&queue)
+	gtx := new(layout.Context)
 	th := material.NewTheme()
 	backend, err := giogl.NewBackend(f)
 	if err != nil {
@@ -84,7 +84,7 @@ func main() {
 		}
 		width, height := window.GetSize()
 		sz := image.Point{X: width, Y: height}
-		gtx.Reset(&glfwConfig{scale}, sz)
+		gtx.Reset(&queue, &glfwConfig{scale}, sz)
 		draw(gtx, th)
 		gpu.Collect(sz, gtx.Ops)
 		gpu.BeginFrame()

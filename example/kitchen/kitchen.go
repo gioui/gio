@@ -82,7 +82,7 @@ func saveScreenshot(f string) error {
 		return err
 	}
 	gtx := new(layout.Context)
-	gtx.Reset(&scaledConfig{scale}, sz)
+	gtx.Reset(nil, &scaledConfig{scale}, sz)
 	th := material.NewTheme()
 	kitchen(gtx, th)
 	w.Frame(gtx.Ops)
@@ -99,8 +99,8 @@ func saveScreenshot(f string) error {
 
 func loop(w *app.Window) error {
 	th := material.NewTheme()
-	gtx := layout.NewContext(w.Queue())
 
+	gtx := new(layout.Context)
 	for {
 		select {
 		case e := <-w.Events():
@@ -108,7 +108,7 @@ func loop(w *app.Window) error {
 			case system.DestroyEvent:
 				return e.Err
 			case system.FrameEvent:
-				gtx.Reset(e.Config, e.Size)
+				gtx.Reset(e.Queue, e.Config, e.Size)
 				kitchen(gtx, th)
 				e.Frame(gtx.Ops)
 			}
