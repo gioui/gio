@@ -37,7 +37,7 @@ func NewContext(q event.Queue) *Context {
 }
 
 // layout a widget with a set of constraints and return its
-// dimensions. The widget dimensions are constrained abd the previous
+// dimensions. The widget dimensions are constrained and the previous
 // constraints are restored after layout.
 func ctxLayout(gtx *Context, cs Constraints, w Widget) Dimensions {
 	saved := gtx.Constraints
