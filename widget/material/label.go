@@ -12,7 +12,7 @@ import (
 	"gioui.org/widget"
 )
 
-type Label struct {
+type LabelStyle struct {
 	// Face defines the text style.
 	Font text.Font
 	// Color is the text color.
@@ -27,52 +27,52 @@ type Label struct {
 	shaper text.Shaper
 }
 
-func (t *Theme) H1(txt string) Label {
-	return t.Label(t.TextSize.Scale(96.0/16.0), txt)
+func H1(th *Theme, txt string) LabelStyle {
+	return Label(th, th.TextSize.Scale(96.0/16.0), txt)
 }
 
-func (t *Theme) H2(txt string) Label {
-	return t.Label(t.TextSize.Scale(60.0/16.0), txt)
+func H2(th *Theme, txt string) LabelStyle {
+	return Label(th, th.TextSize.Scale(60.0/16.0), txt)
 }
 
-func (t *Theme) H3(txt string) Label {
-	return t.Label(t.TextSize.Scale(48.0/16.0), txt)
+func H3(th *Theme, txt string) LabelStyle {
+	return Label(th, th.TextSize.Scale(48.0/16.0), txt)
 }
 
-func (t *Theme) H4(txt string) Label {
-	return t.Label(t.TextSize.Scale(34.0/16.0), txt)
+func H4(th *Theme, txt string) LabelStyle {
+	return Label(th, th.TextSize.Scale(34.0/16.0), txt)
 }
 
-func (t *Theme) H5(txt string) Label {
-	return t.Label(t.TextSize.Scale(24.0/16.0), txt)
+func H5(th *Theme, txt string) LabelStyle {
+	return Label(th, th.TextSize.Scale(24.0/16.0), txt)
 }
 
-func (t *Theme) H6(txt string) Label {
-	return t.Label(t.TextSize.Scale(20.0/16.0), txt)
+func H6(th *Theme, txt string) LabelStyle {
+	return Label(th, th.TextSize.Scale(20.0/16.0), txt)
 }
 
-func (t *Theme) Body1(txt string) Label {
-	return t.Label(t.TextSize, txt)
+func Body1(th *Theme, txt string) LabelStyle {
+	return Label(th, th.TextSize, txt)
 }
 
-func (t *Theme) Body2(txt string) Label {
-	return t.Label(t.TextSize.Scale(14.0/16.0), txt)
+func Body2(th *Theme, txt string) LabelStyle {
+	return Label(th, th.TextSize.Scale(14.0/16.0), txt)
 }
 
-func (t *Theme) Caption(txt string) Label {
-	return t.Label(t.TextSize.Scale(12.0/16.0), txt)
+func Caption(th *Theme, txt string) LabelStyle {
+	return Label(th, th.TextSize.Scale(12.0/16.0), txt)
 }
 
-func (t *Theme) Label(size unit.Value, txt string) Label {
-	return Label{
+func Label(th *Theme, size unit.Value, txt string) LabelStyle {
+	return LabelStyle{
 		Text:     txt,
-		Color:    t.Color.Text,
+		Color:    th.Color.Text,
 		TextSize: size,
-		shaper:   t.Shaper,
+		shaper:   th.Shaper,
 	}
 }
 
-func (l Label) Layout(gtx *layout.Context) {
+func (l LabelStyle) Layout(gtx *layout.Context) {
 	paint.ColorOp{Color: l.Color}.Add(gtx.Ops)
 	tl := widget.Label{Alignment: l.Alignment, MaxLines: l.MaxLines}
 	tl.Layout(gtx, l.shaper, l.Font, l.TextSize, l.Text)

@@ -17,7 +17,7 @@ import (
 	"gioui.org/widget"
 )
 
-type Button struct {
+type ButtonStyle struct {
 	Text string
 	// Color is the text color.
 	Color        color.RGBA
@@ -29,14 +29,14 @@ type Button struct {
 	shaper       text.Shaper
 }
 
-type ButtonLayout struct {
+type ButtonLayoutStyle struct {
 	Background   color.RGBA
 	Color        color.RGBA
 	CornerRadius unit.Value
 	Inset        layout.Inset
 }
 
-type IconButton struct {
+type IconButtonStyle struct {
 	Background color.RGBA
 	Color      color.RGBA
 	Icon       *widget.Icon
@@ -45,42 +45,42 @@ type IconButton struct {
 	Inset      layout.Inset
 }
 
-func (t *Theme) Button(txt string) Button {
-	return Button{
+func Button(th *Theme, txt string) ButtonStyle {
+	return ButtonStyle{
 		Text:         txt,
 		Color:        rgb(0xffffff),
 		CornerRadius: unit.Dp(4),
-		Background:   t.Color.Primary,
-		TextSize:     t.TextSize.Scale(14.0 / 16.0),
+		Background:   th.Color.Primary,
+		TextSize:     th.TextSize.Scale(14.0 / 16.0),
 		Inset: layout.Inset{
 			Top: unit.Dp(10), Bottom: unit.Dp(10),
 			Left: unit.Dp(12), Right: unit.Dp(12),
 		},
-		shaper: t.Shaper,
+		shaper: th.Shaper,
 	}
 }
 
-func (t *Theme) ButtonLayout() ButtonLayout {
-	return ButtonLayout{
-		Background:   t.Color.Primary,
-		Color:        t.Color.InvText,
+func ButtonLayout(th *Theme) ButtonLayoutStyle {
+	return ButtonLayoutStyle{
+		Background:   th.Color.Primary,
+		Color:        th.Color.InvText,
 		CornerRadius: unit.Dp(4),
 		Inset:        layout.UniformInset(unit.Dp(12)),
 	}
 }
 
-func (t *Theme) IconButton(icon *widget.Icon) IconButton {
-	return IconButton{
-		Background: t.Color.Primary,
-		Color:      t.Color.InvText,
+func IconButton(th *Theme, icon *widget.Icon) IconButtonStyle {
+	return IconButtonStyle{
+		Background: th.Color.Primary,
+		Color:      th.Color.InvText,
 		Icon:       icon,
 		Size:       unit.Dp(56),
 		Padding:    unit.Dp(16),
 	}
 }
 
-func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
-	ButtonLayout{
+func (b ButtonStyle) Layout(gtx *layout.Context, button *widget.Button) {
+	ButtonLayoutStyle{
 		Background:   b.Background,
 		CornerRadius: b.CornerRadius,
 		Color:        b.Color,
@@ -90,7 +90,7 @@ func (b Button) Layout(gtx *layout.Context, button *widget.Button) {
 	})
 }
 
-func (b ButtonLayout) Layout(gtx *layout.Context, button *widget.Button, w layout.Widget) {
+func (b ButtonLayoutStyle) Layout(gtx *layout.Context, button *widget.Button, w layout.Widget) {
 	hmin := gtx.Constraints.Width.Min
 	vmin := gtx.Constraints.Height.Min
 	layout.Stack{Alignment: layout.Center}.Layout(gtx,
@@ -123,7 +123,7 @@ func (b ButtonLayout) Layout(gtx *layout.Context, button *widget.Button, w layou
 	)
 }
 
-func (b IconButton) Layout(gtx *layout.Context, button *widget.Button) {
+func (b IconButtonStyle) Layout(gtx *layout.Context, button *widget.Button) {
 	layout.Stack{Alignment: layout.Center}.Layout(gtx,
 		layout.Expanded(func() {
 			size := gtx.Constraints.Width.Min

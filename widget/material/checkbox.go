@@ -8,26 +8,26 @@ import (
 	"gioui.org/widget"
 )
 
-type CheckBox struct {
+type CheckBoxStyle struct {
 	checkable
 }
 
-func (t *Theme) CheckBox(label string) CheckBox {
-	return CheckBox{
+func CheckBox(th *Theme, label string) CheckBoxStyle {
+	return CheckBoxStyle{
 		checkable{
 			Label:              label,
-			Color:              t.Color.Text,
-			IconColor:          t.Color.Primary,
-			TextSize:           t.TextSize.Scale(14.0 / 16.0),
+			Color:              th.Color.Text,
+			IconColor:          th.Color.Primary,
+			TextSize:           th.TextSize.Scale(14.0 / 16.0),
 			Size:               unit.Dp(26),
-			shaper:             t.Shaper,
-			checkedStateIcon:   t.checkBoxCheckedIcon,
-			uncheckedStateIcon: t.checkBoxUncheckedIcon,
+			shaper:             th.Shaper,
+			checkedStateIcon:   th.checkBoxCheckedIcon,
+			uncheckedStateIcon: th.checkBoxUncheckedIcon,
 		},
 	}
 }
 
-func (c CheckBox) Layout(gtx *layout.Context, checkBox *widget.CheckBox) {
+func (c CheckBoxStyle) Layout(gtx *layout.Context, checkBox *widget.CheckBox) {
 	c.layout(gtx, checkBox.Checked(gtx))
 	checkBox.Layout(gtx)
 }

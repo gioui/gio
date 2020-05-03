@@ -13,17 +13,17 @@ import (
 	"gioui.org/unit"
 )
 
-type ProgressBar struct {
+type ProgressBarStyle struct {
 	Color color.RGBA
 }
 
-func (t *Theme) ProgressBar() ProgressBar {
-	return ProgressBar{
-		Color: t.Color.Primary,
+func ProgressBar(th *Theme) ProgressBarStyle {
+	return ProgressBarStyle{
+		Color: th.Color.Primary,
 	}
 }
 
-func (b ProgressBar) Layout(gtx *layout.Context, progress int) {
+func (b ProgressBarStyle) Layout(gtx *layout.Context, progress int) {
 	shader := func(width float32, color color.RGBA) {
 		maxHeight := unit.Dp(4)
 		rr := float32(gtx.Px(unit.Dp(2)))

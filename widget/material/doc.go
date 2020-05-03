@@ -22,12 +22,12 @@
 //
 //     theme := material.NewTheme(...)
 //
-//     th.Button("Click me!").Layout(gtx, button)
+//     material.Button(theme, "Click me!").Layout(gtx, button)
 //
 // Customization
 //
-// Quite often, a program needs to customize the theme provided defaults. Several
-// options are available, depending on the nature of the change:
+// Quite often, a program needs to customize the theme-provided defaults. Several
+// options are available, depending on the nature of the change.
 //
 // Mandatory parameters: Some parameters are not part of the widget state but
 // have no obvious default. In the program above, the button text is a
@@ -41,7 +41,7 @@
 // Widget-local parameters: For changing the look of a particular widget,
 // adjust the widget specific theme object:
 //
-//     btn := th.Button("Click me!")
+//     btn := material.Button(theme, "Click me!")
 //     btn.Font.Style = text.Italic
 //     btn.Layout(gtx)
 //
@@ -51,7 +51,7 @@
 //
 //     icon := material.NewIcon(...)
 //
-//     th.IconButton(icon).Layout(gtx, button)
+//     material.IconButton(theme, icon).Layout(gtx, button)
 //
 // Specialized widgets: Theme both define a generic Label method
 // that takes a text size, and specialized methods for standard text

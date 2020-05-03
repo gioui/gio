@@ -13,7 +13,7 @@ import (
 	"gioui.org/widget"
 )
 
-type Editor struct {
+type EditorStyle struct {
 	Font     text.Font
 	TextSize unit.Value
 	// Color is the text color.
@@ -26,17 +26,17 @@ type Editor struct {
 	shaper text.Shaper
 }
 
-func (t *Theme) Editor(hint string) Editor {
-	return Editor{
-		TextSize:  t.TextSize,
-		Color:     t.Color.Text,
-		shaper:    t.Shaper,
+func Editor(th *Theme, hint string) EditorStyle {
+	return EditorStyle{
+		TextSize:  th.TextSize,
+		Color:     th.Color.Text,
+		shaper:    th.Shaper,
 		Hint:      hint,
-		HintColor: t.Color.Hint,
+		HintColor: th.Color.Hint,
 	}
 }
 
-func (e Editor) Layout(gtx *layout.Context, editor *widget.Editor) {
+func (e EditorStyle) Layout(gtx *layout.Context, editor *widget.Editor) {
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
 	var macro op.MacroOp
