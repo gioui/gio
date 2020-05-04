@@ -141,7 +141,8 @@ var (
 	green               = true
 	topLabel            = "Hello, Gio"
 	icon                *widget.Icon
-	checkbox            = new(widget.CheckBox)
+	checkbox            = new(widget.Bool)
+	swtch               = new(widget.Bool)
 )
 
 func (b iconAndTextButton) Layout(gtx *layout.Context, button *widget.Button, icon *widget.Icon, word string) {
@@ -227,7 +228,16 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 			material.ProgressBar(th).Layout(gtx, progress)
 		},
 		func() {
-			material.CheckBox(th, "Checkbox").Layout(gtx, checkbox)
+			layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Rigid(func() {
+					material.CheckBox(th, "Checkbox").Layout(gtx, checkbox)
+				}),
+				layout.Rigid(func() {
+					layout.Inset{Left: unit.Dp(16)}.Layout(gtx, func() {
+						material.Switch(th).Layout(gtx, swtch)
+					})
+				}),
+			)
 		},
 		func() {
 			layout.Flex{}.Layout(gtx,
