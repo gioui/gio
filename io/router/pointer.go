@@ -131,7 +131,6 @@ func (q *pointerQueue) opHit(handlers *[]event.Key, pos f32.Point) {
 			if _, exists := q.handlers[n.key]; exists {
 				*handlers = append(*handlers, n.key)
 			}
-
 		}
 	}
 }
@@ -236,6 +235,11 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	if e.Type == pointer.Release {
 		q.pointers = append(q.pointers[:pidx], q.pointers[pidx+1:]...)
 	}
+
+	// Deliver enter and leave events for pointers that entered or left a hit area.
+	q.deliverEventsToMissingHandlers(q.scratch, p.handlers, pointer.Enter, e, events)
+	q.deliverEventsToMissingHandlers(p.handlers, q.scratch, pointer.Leave, e, events)
+
 	for _, k := range p.handlers {
 		h := q.handlers[k]
 		e := e
@@ -256,6 +260,30 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 			if grabs == 0 {
 				h.wantsGrab = false
 			}
+		}
+	}
+}
+
+// deliverEventsToMissingHandlers compares the a and b handler lists to find all
+// handlers in b that are missing from a. It then sends an event templated off of
+// evTemplate but with the type specified by evType.
+//
+// This is useful for delivering pointer.Enter and pointer.Leave events.
+func (q *pointerQueue) deliverEventsToMissingHandlers(a, b []event.Key, evType pointer.Type, evTemplate pointer.Event, events *handlerEvents) {
+	for _, newH := range b {
+		found := false
+		for _, oldH := range a {
+			if newH == oldH {
+				found = true
+			}
+		}
+		if !found {
+			h := q.handlers[newH]
+			ev := evTemplate
+			ev.Hit = q.hit(h.area, evTemplate.Position)
+			ev.Position = h.transform.Invert().Transform(evTemplate.Position)
+			ev.Type = evType
+			events.Add(newH, ev)
 		}
 	}
 }
