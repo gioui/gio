@@ -135,10 +135,6 @@ jmethodID gio_jni_GetStaticMethodID(JNIEnv *env, jclass clazz, const char *name,
 	return (*env)->GetStaticMethodID(env, clazz, name, sig);
 }
 
-jint gio_jni_CallStaticIntMethodII(JNIEnv *env, jclass clazz, jmethodID methodID, jint a1, jint a2) {
-	return (*env)->CallStaticIntMethod(env, clazz, methodID, a1, a2);
-}
-
 jfloat gio_jni_CallFloatMethod(JNIEnv *env, jobject obj, jmethodID methodID) {
 	return (*env)->CallFloatMethod(env, obj, methodID);
 }
