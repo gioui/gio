@@ -42,24 +42,6 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 	private final Handler handler;
 	private long nhandle;
 
-	private static synchronized void initialize(Context appCtx) {
-		synchronized (initLock) {
-			if (jniLoaded) {
-				return;
-			}
-			String dataDir = appCtx.getFilesDir().getAbsolutePath();
-			byte[] dataDirUTF8;
-			try {
-				dataDirUTF8 = dataDir.getBytes("UTF-8");
-			} catch (UnsupportedEncodingException e) {
-				throw new RuntimeException(e);
-			}
-			System.loadLibrary("gio");
-			runGoMain(dataDirUTF8, appCtx);
-			jniLoaded = true;
-		}
-	}
-
 	public GioView(Context context) {
 		this(context, null);
 	}
@@ -69,7 +51,7 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 
 		handler = new Handler();
 		// Late initialization of the Go runtime to wait for a valid context.
-		initialize(context.getApplicationContext());
+		Gio.init(context.getApplicationContext());
 
 		nhandle = onCreateView(this);
 		imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -260,7 +242,6 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 	static private native void onFrameCallback(long handle, long nanos);
 	static private native boolean onBack(long handle);
 	static private native void onFocusChange(long handle, boolean focus);
-	static private native void runGoMain(byte[] dataDir, Context context);
 
 	private static class InputConnection extends BaseInputConnection {
 		private final Editable editable;

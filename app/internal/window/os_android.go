@@ -86,8 +86,8 @@ func jniGetStaticMethodID(env *C.JNIEnv, class C.jclass, method, sig string) C.j
 	return C.gio_jni_GetStaticMethodID(env, class, m, s)
 }
 
-//export Java_org_gioui_GioView_runGoMain
-func Java_org_gioui_GioView_runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyteArray, context C.jobject) {
+//export Java_org_gioui_Gio_runGoMain
+func Java_org_gioui_Gio_runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyteArray, context C.jobject) {
 	if res := C.gio_jni_GetJavaVM(env, &theJVM); res != 0 {
 		panic("gio: GetJavaVM failed")
 	}
