@@ -98,6 +98,8 @@ func mainErr() error {
 	if bi.appID == "" {
 		bi.appID = appIDFromPackage(pkgPath)
 	}
+	// Pass appID along, to be used for logging on platforms like Android.
+	bi.ldflags = fmt.Sprintf("-X gioui.org/app/internal/log.appID=%s", bi.appID)
 
 	switch *target {
 	case "js":

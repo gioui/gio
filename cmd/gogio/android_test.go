@@ -76,9 +76,9 @@ func (d *AndroidTestDriver) Start(path string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cmd := exec.CommandContext(ctx, d.adbPath,
 			"logcat",
-			"-s",    // suppress other logs
-			"-T1",   // don't show prevoius log messages
-			"gio:*", // show all logs from gio
+			"-s",       // suppress other logs
+			"-T1",      // don't show prevoius log messages
+			appid+":*", // show all logs from our gio app ID
 		)
 		logcat, err := cmd.StdoutPipe()
 		if err != nil {

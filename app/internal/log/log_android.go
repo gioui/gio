@@ -22,7 +22,7 @@ import (
 // 1024 is the truncation limit from android/log.h, plus a \n.
 const logLineLimit = 1024
 
-var logTag = C.CString("gio")
+var logTag = C.CString(appID)
 
 func init() {
 	// Android's logcat already includes timestamps.
