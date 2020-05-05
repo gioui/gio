@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 #include <jni.h>
-#include <dlfcn.h>
-#include <android/log.h>
 #include "os_android.h"
 #include "_cgo_export.h"
 
