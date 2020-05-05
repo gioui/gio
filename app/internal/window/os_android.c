@@ -10,8 +10,6 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
 		return -1;
 	}
 
-	setJVM(vm);
-
 	jclass viewClass = (*env)->FindClass(env, "org/gioui/GioView");
 	if (viewClass == NULL) {
 		return -1;
@@ -103,6 +101,10 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
 
 jint gio_jni_GetEnv(JavaVM *vm, JNIEnv **env, jint version) {
 	return (*vm)->GetEnv(vm, (void **)env, version);
+}
+
+jint gio_jni_GetJavaVM(JNIEnv *env, JavaVM **jvm) {
+	return (*env)->GetJavaVM(env, jvm);
 }
 
 jint gio_jni_AttachCurrentThread(JavaVM *vm, JNIEnv **p_env, void *thr_args) {

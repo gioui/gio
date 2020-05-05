@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 __attribute__ ((visibility ("hidden"))) jint gio_jni_GetEnv(JavaVM *vm, JNIEnv **env, jint version);
+__attribute__ ((visibility ("hidden"))) jint gio_jni_GetJavaVM(JNIEnv *env, JavaVM **jvm);
 __attribute__ ((visibility ("hidden"))) jint gio_jni_AttachCurrentThread(JavaVM *vm, JNIEnv **p_env, void *thr_args);
 __attribute__ ((visibility ("hidden"))) jint gio_jni_DetachCurrentThread(JavaVM *vm);
 

@@ -88,6 +88,9 @@ func jniGetStaticMethodID(env *C.JNIEnv, class C.jclass, method, sig string) C.j
 
 //export runGoMain
 func runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyteArray, context C.jobject) {
+	if res := C.gio_jni_GetJavaVM(env, &theJVM); res != 0 {
+		panic("gio: GetJavaVM failed")
+	}
 	dirBytes := C.gio_jni_GetByteArrayElements(env, jdataDir)
 	if dirBytes == nil {
 		panic("runGoMain: GetByteArrayElements failed")
@@ -111,11 +114,6 @@ func AppContext() uintptr {
 
 func GetDataDir() string {
 	return <-dataDirChan
-}
-
-//export setJVM
-func setJVM(vm *C.JavaVM) {
-	theJVM = vm
 }
 
 //export onCreateView
