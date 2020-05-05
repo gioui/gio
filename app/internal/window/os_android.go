@@ -86,8 +86,8 @@ func jniGetStaticMethodID(env *C.JNIEnv, class C.jclass, method, sig string) C.j
 	return C.gio_jni_GetStaticMethodID(env, class, m, s)
 }
 
-//export runGoMain
-func runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyteArray, context C.jobject) {
+//export Java_org_gioui_GioView_runGoMain
+func Java_org_gioui_GioView_runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyteArray, context C.jobject) {
 	if res := C.gio_jni_GetJavaVM(env, &theJVM); res != 0 {
 		panic("gio: GetJavaVM failed")
 	}
@@ -116,8 +116,8 @@ func GetDataDir() string {
 	return <-dataDirChan
 }
 
-//export onCreateView
-func onCreateView(env *C.JNIEnv, class C.jclass, view C.jobject) C.jlong {
+//export Java_org_gioui_GioView_onCreateView
+func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.jobject) C.jlong {
 	view = C.gio_jni_NewGlobalRef(env, view)
 	w := &window{
 		view:                           view,
@@ -139,8 +139,8 @@ func onCreateView(env *C.JNIEnv, class C.jclass, view C.jobject) C.jlong {
 	return handle
 }
 
-//export onDestroyView
-func onDestroyView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
+//export Java_org_gioui_GioView_onDestroyView
+func Java_org_gioui_GioView_onDestroyView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := views[handle]
 	w.callbacks.SetDriver(nil)
 	delete(views, handle)
@@ -148,15 +148,15 @@ func onDestroyView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w.view = 0
 }
 
-//export onStopView
-func onStopView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
+//export Java_org_gioui_GioView_onStopView
+func Java_org_gioui_GioView_onStopView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := views[handle]
 	w.started = false
 	w.setStage(system.StagePaused)
 }
 
-//export onStartView
-func onStartView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
+//export Java_org_gioui_GioView_onStartView
+func Java_org_gioui_GioView_onStartView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := views[handle]
 	w.started = true
 	if w.aNativeWindow() != nil {
@@ -164,8 +164,8 @@ func onStartView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	}
 }
 
-//export onSurfaceDestroyed
-func onSurfaceDestroyed(env *C.JNIEnv, class C.jclass, handle C.jlong) {
+//export Java_org_gioui_GioView_onSurfaceDestroyed
+func Java_org_gioui_GioView_onSurfaceDestroyed(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := views[handle]
 	w.mu.Lock()
 	w.win = nil
@@ -173,8 +173,8 @@ func onSurfaceDestroyed(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w.setStage(system.StagePaused)
 }
 
-//export onSurfaceChanged
-func onSurfaceChanged(env *C.JNIEnv, class C.jclass, handle C.jlong, surf C.jobject) {
+//export Java_org_gioui_GioView_onSurfaceChanged
+func Java_org_gioui_GioView_onSurfaceChanged(env *C.JNIEnv, class C.jclass, handle C.jlong, surf C.jobject) {
 	w := views[handle]
 	w.mu.Lock()
 	w.win = C.ANativeWindow_fromSurface(env, surf)
@@ -184,14 +184,14 @@ func onSurfaceChanged(env *C.JNIEnv, class C.jclass, handle C.jlong, surf C.jobj
 	}
 }
 
-//export onLowMemory
-func onLowMemory() {
+//export Java_org_gioui_GioView_onLowMemory
+func Java_org_gioui_GioView_onLowMemory() {
 	runtime.GC()
 	debug.FreeOSMemory()
 }
 
-//export onConfigurationChanged
-func onConfigurationChanged(env *C.JNIEnv, class C.jclass, view C.jlong) {
+//export Java_org_gioui_GioView_onConfigurationChanged
+func Java_org_gioui_GioView_onConfigurationChanged(env *C.JNIEnv, class C.jclass, view C.jlong) {
 	w := views[view]
 	w.loadConfig(env, class)
 	if w.stage >= system.StageRunning {
@@ -199,8 +199,8 @@ func onConfigurationChanged(env *C.JNIEnv, class C.jclass, view C.jlong) {
 	}
 }
 
-//export onFrameCallback
-func onFrameCallback(env *C.JNIEnv, class C.jclass, view C.jlong, nanos C.jlong) {
+//export Java_org_gioui_GioView_onFrameCallback
+func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view C.jlong, nanos C.jlong) {
 	w, exist := views[view]
 	if !exist {
 		return
@@ -219,8 +219,8 @@ func onFrameCallback(env *C.JNIEnv, class C.jclass, view C.jlong, nanos C.jlong)
 	}
 }
 
-//export onBack
-func onBack(env *C.JNIEnv, class C.jclass, view C.jlong) C.jboolean {
+//export Java_org_gioui_GioView_onBack
+func Java_org_gioui_GioView_onBack(env *C.JNIEnv, class C.jclass, view C.jlong) C.jboolean {
 	w := views[view]
 	ev := &system.CommandEvent{Type: system.CommandBack}
 	w.callbacks.Event(ev)
@@ -230,14 +230,14 @@ func onBack(env *C.JNIEnv, class C.jclass, view C.jlong) C.jboolean {
 	return C.JNI_FALSE
 }
 
-//export onFocusChange
-func onFocusChange(env *C.JNIEnv, class C.jclass, view C.jlong, focus C.jboolean) {
+//export Java_org_gioui_GioView_onFocusChange
+func Java_org_gioui_GioView_onFocusChange(env *C.JNIEnv, class C.jclass, view C.jlong, focus C.jboolean) {
 	w := views[view]
 	w.callbacks.Event(key.FocusEvent{Focus: focus == C.JNI_TRUE})
 }
 
-//export onWindowInsets
-func onWindowInsets(env *C.JNIEnv, class C.jclass, view C.jlong, top, right, bottom, left C.jint) {
+//export Java_org_gioui_GioView_onWindowInsets
+func Java_org_gioui_GioView_onWindowInsets(env *C.JNIEnv, class C.jclass, view C.jlong, top, right, bottom, left C.jint) {
 	w := views[view]
 	w.insets = system.Insets{
 		Top:    unit.Px(float32(top)),
@@ -383,8 +383,8 @@ func convertKeyCode(code C.jint) (string, bool) {
 	return n, true
 }
 
-//export onKeyEvent
-func onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, keyCode, r C.jint, t C.jlong) {
+//export Java_org_gioui_GioView_onKeyEvent
+func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, keyCode, r C.jint, t C.jlong) {
 	w := views[handle]
 	if n, ok := convertKeyCode(keyCode); ok {
 		w.callbacks.Event(key.Event{Name: n})
@@ -394,8 +394,8 @@ func onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, keyCode, r C.jint
 	}
 }
 
-//export onTouchEvent
-func onTouchEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, action, pointerID, tool C.jint, x, y C.jfloat, jbtns C.jint, t C.jlong) {
+//export Java_org_gioui_GioView_onTouchEvent
+func Java_org_gioui_GioView_onTouchEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, action, pointerID, tool C.jint, x, y C.jfloat, jbtns C.jint, t C.jlong) {
 	w := views[handle]
 	var typ pointer.Type
 	switch action {
