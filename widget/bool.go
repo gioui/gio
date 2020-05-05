@@ -14,8 +14,10 @@ type Bool struct {
 	gesture gesture.Click
 }
 
-// Update the checked state according to incoming events.
-func (b *Bool) Update(gtx *layout.Context) {
+// Update the checked state according to incoming events,
+// and reports whether Value changed.
+func (b *Bool) Update(gtx *layout.Context) bool {
+	was := b.Value
 	for _, e := range b.gesture.Events(gtx) {
 		switch e.Type {
 		case gesture.TypeClick:
@@ -26,6 +28,7 @@ func (b *Bool) Update(gtx *layout.Context) {
 			b.Value = !b.Value
 		}
 	}
+	return b.Value != was
 }
 
 func (b *Bool) Layout(gtx *layout.Context) {

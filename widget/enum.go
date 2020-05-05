@@ -21,8 +21,10 @@ func index(vs []string, t string) int {
 	return -1
 }
 
-// Update the Value according to incoming events.
-func (e *Enum) Update(gtx *layout.Context) {
+// Update the Value according to incoming events, and
+// reports whether Value changed.
+func (e *Enum) Update(gtx *layout.Context) bool {
+	was := e.Value
 	for i := range e.clicks {
 		for _, ev := range e.clicks[i].Events(gtx) {
 			switch ev.Type {
@@ -31,6 +33,7 @@ func (e *Enum) Update(gtx *layout.Context) {
 			}
 		}
 	}
+	return e.Value != was
 }
 
 // Layout adds the event handler for key.
