@@ -3,6 +3,7 @@
 package router
 
 import (
+	"fmt"
 	"image"
 	"testing"
 
@@ -452,37 +453,43 @@ func BenchmarkRouterAdd(b *testing.B) {
 	// evaluate performance for. Typical values for the example applications
 	// are 1-3, though checking highers values helps evaluate performance for
 	// more complex applications.
-	const handlerCount = 3
-	handlers := make([]event.Key, handlerCount)
-	for i := 0; i < handlerCount; i++ {
-		h := new(int)
-		*h = i
-		handlers[i] = h
-	}
-	var ops op.Ops
+	const startingHandlerCount = 3
+	const maxHandlerCount = 100
+	for i := startingHandlerCount; i < maxHandlerCount; i *= 3 {
+		handlerCount := i
+		b.Run(fmt.Sprintf("%d-handlers", i), func(b *testing.B) {
+			handlers := make([]event.Key, handlerCount)
+			for i := 0; i < handlerCount; i++ {
+				h := new(int)
+				*h = i
+				handlers[i] = h
+			}
+			var ops op.Ops
 
-	for i := range handlers {
-		pointer.Rect(image.Rectangle{
-			Max: image.Point{
-				X: 100,
-				Y: 100,
-			},
-		}).Add(&ops)
-		pointer.InputOp{Key: handlers[i]}.Add(&ops)
-	}
-	var r Router
-	r.Frame(&ops)
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		r.Add(
-			pointer.Event{
-				Type: pointer.Move,
-				Position: f32.Point{
-					X: 50,
-					Y: 50,
-				},
-			},
-		)
+			for i := range handlers {
+				pointer.Rect(image.Rectangle{
+					Max: image.Point{
+						X: 100,
+						Y: 100,
+					},
+				}).Add(&ops)
+				pointer.InputOp{Key: handlers[i]}.Add(&ops)
+			}
+			var r Router
+			r.Frame(&ops)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				r.Add(
+					pointer.Event{
+						Type: pointer.Move,
+						Position: f32.Point{
+							X: 50,
+							Y: 50,
+						},
+					},
+				)
+			}
+		})
 	}
 }
