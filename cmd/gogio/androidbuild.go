@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -123,7 +122,7 @@ func buildAndroid(tmpDir string, bi *buildInfo) error {
 		if len(p.GoFiles) == 0 {
 			return nil
 		}
-		dir := path.Dir(p.GoFiles[0])
+		dir := filepath.Dir(p.GoFiles[0])
 		jars, err := filepath.Glob(filepath.Join(dir, "*.jar"))
 		if err != nil {
 			return err
