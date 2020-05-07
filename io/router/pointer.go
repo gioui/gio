@@ -21,6 +21,10 @@ type pointerQueue struct {
 	pointers []pointerInfo
 	reader   ops.Reader
 	scratch  []event.Key
+
+	// prev and curr are two additional scratch slices that track active
+	// pointer event handlers from the previous and current frame
+	prev, curr []event.Key
 }
 
 type hitNode struct {
@@ -135,6 +139,9 @@ func (q *pointerQueue) opHit(handlers *[]event.Key, pos f32.Point) {
 	}
 }
 
+// TODO(whereswaldon): This method fails to handle the case in which a child
+// hit area extends outside of the boundaries of its parent. Such child hit
+// areas will not recieve some events as a result.
 func (q *pointerQueue) hit(areaIdx int, p f32.Point) bool {
 	for areaIdx != -1 {
 		a := &q.areas[areaIdx]
@@ -237,8 +244,10 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	}
 
 	// Deliver enter and leave events for pointers that entered or left a hit area.
-	q.deliverEventsToMissingHandlers(q.scratch, p.handlers, pointer.Enter, e, events)
-	q.deliverEventsToMissingHandlers(p.handlers, q.scratch, pointer.Leave, e, events)
+	q.curr, q.prev = q.prev[:0], q.curr
+	q.opHit(&q.curr, e.Position)
+	q.deliverEventsToMissingHandlers(q.prev, q.curr, pointer.Enter, e, events)
+	q.deliverEventsToMissingHandlers(q.curr, q.prev, pointer.Leave, e, events)
 
 	for _, k := range p.handlers {
 		h := q.handlers[k]
@@ -278,7 +287,10 @@ func (q *pointerQueue) deliverEventsToMissingHandlers(a, b []event.Key, evType p
 			}
 		}
 		if !found {
-			h := q.handlers[newH]
+			h, ok := q.handlers[newH]
+			if !ok {
+				continue
+			}
 			ev := evTemplate
 			ev.Hit = q.hit(h.area, evTemplate.Position)
 			ev.Position = h.transform.Invert().Transform(evTemplate.Position)
