@@ -105,7 +105,6 @@ void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat heigh
 		[window setContentView:view];
 		[window makeFirstResponder:view];
 
-
 		[NSApp run];
 	}
 }
