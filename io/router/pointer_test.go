@@ -136,6 +136,8 @@ func TestPointerEnterLeave(t *testing.T) {
 	handler2 := new(int)
 	var ops op.Ops
 
+	var stack op.StackOp
+	stack.Push(&ops)
 	// Handler 1 area: (0, 0) - (100, 100)
 	pointer.Rect(image.Rectangle{
 		Max: image.Point{
@@ -144,7 +146,10 @@ func TestPointerEnterLeave(t *testing.T) {
 		},
 	}).Add(&ops)
 	pointer.InputOp{Key: handler1}.Add(&ops)
+	stack.Pop()
+
 	// Handler 2 area: (50, 50) - (100, 100) (areas intersect).
+	stack.Push(&ops)
 	pointer.Rect(image.Rectangle{
 		Min: image.Point{
 			X: 50,
@@ -156,6 +161,7 @@ func TestPointerEnterLeave(t *testing.T) {
 		},
 	}).Add(&ops)
 	pointer.InputOp{Key: handler2}.Add(&ops)
+	stack.Pop()
 
 	var r Router
 	r.Frame(&ops)
@@ -170,7 +176,9 @@ func TestPointerEnterLeave(t *testing.T) {
 		},
 	)
 	// First event for a handler is always a Cancel.
-	assertEventSequence(t, r.Events(handler1), pointer.Cancel, pointer.Enter, pointer.Move)
+	// Only handler2 should receive the enter/move events because it is on top
+	// and handler1 is not an ancestor in the hit tree.
+	assertEventSequence(t, r.Events(handler1), pointer.Cancel)
 	assertEventSequence(t, r.Events(handler2), pointer.Cancel, pointer.Enter, pointer.Move)
 
 	// Leave the second area by moving into the first.
@@ -183,7 +191,8 @@ func TestPointerEnterLeave(t *testing.T) {
 			},
 		},
 	)
-	assertEventSequence(t, r.Events(handler1), pointer.Move)
+	// The cursor leaves handler2 and enters handler1.
+	assertEventSequence(t, r.Events(handler1), pointer.Enter, pointer.Move)
 	assertEventSequence(t, r.Events(handler2), pointer.Leave)
 
 	// Move, but stay within the same hit area.
@@ -236,13 +245,192 @@ func TestPointerEnterLeave(t *testing.T) {
 			},
 		},
 	)
-	assertEventSequence(t, r.Events(handler1), pointer.Enter, pointer.Release)
+	assertEventSequence(t, r.Events(handler1), pointer.Enter)
+	// The second handler gets the release event because the press started inside it.
+	assertEventSequence(t, r.Events(handler2), pointer.Leave, pointer.Release)
+
+}
+
+func TestPointerEnterLeaveNested(t *testing.T) {
+	handler1 := new(int)
+	handler2 := new(int)
+	var ops op.Ops
+
+	// Handler 1 area: (0, 0) - (100, 100)
+	pointer.Rect(image.Rectangle{
+		Max: image.Point{
+			X: 100,
+			Y: 100,
+		},
+	}).Add(&ops)
+	pointer.InputOp{Key: handler1}.Add(&ops)
+
+	// Handler 2 area: (25, 25) - (75, 75) (nested within first).
+	pointer.Rect(image.Rectangle{
+		Min: image.Point{
+			X: 25,
+			Y: 25,
+		},
+		Max: image.Point{
+			X: 75,
+			Y: 75,
+		},
+	}).Add(&ops)
+	pointer.InputOp{Key: handler2}.Add(&ops)
+
+	var r Router
+	r.Frame(&ops)
+	// Hit both handlers.
+	r.Add(
+		pointer.Event{
+			Type: pointer.Move,
+			Position: f32.Point{
+				X: 50,
+				Y: 50,
+			},
+		},
+	)
+	// First event for a handler is always a Cancel.
+	// Both handlers should receive the Enter and Move events because handler2 is a child of handler1.
+	assertEventSequence(t, r.Events(handler1), pointer.Cancel, pointer.Enter, pointer.Move)
+	assertEventSequence(t, r.Events(handler2), pointer.Cancel, pointer.Enter, pointer.Move)
+
+	// Leave the second area by moving into the first.
+	r.Add(
+		pointer.Event{
+			Type: pointer.Move,
+			Position: f32.Point{
+				X: 20,
+				Y: 20,
+			},
+		},
+	)
+	assertEventSequence(t, r.Events(handler1), pointer.Move)
 	assertEventSequence(t, r.Events(handler2), pointer.Leave)
+
+	// Move, but stay within the same hit area.
+	r.Add(
+		pointer.Event{
+			Type: pointer.Move,
+			Position: f32.Point{
+				X: 10,
+				Y: 10,
+			},
+		},
+	)
+	assertEventSequence(t, r.Events(handler1), pointer.Move)
+	assertEventSequence(t, r.Events(handler2))
+
+	// Move outside of both inputs.
+	r.Add(
+		pointer.Event{
+			Type: pointer.Move,
+			Position: f32.Point{
+				X: 200,
+				Y: 200,
+			},
+		},
+	)
+	assertEventSequence(t, r.Events(handler1), pointer.Leave)
+	assertEventSequence(t, r.Events(handler2))
+
+	// Check that a Press event generates Enter Events.
+	r.Add(
+		pointer.Event{
+			Type: pointer.Press,
+			Position: f32.Point{
+				X: 50,
+				Y: 50,
+			},
+		},
+	)
+	assertEventSequence(t, r.Events(handler1), pointer.Enter, pointer.Press)
+	assertEventSequence(t, r.Events(handler2), pointer.Enter, pointer.Press)
+
+	// Check that a Release event generates Enter/Leave Events.
+	r.Add(
+		pointer.Event{
+			Type: pointer.Release,
+			Position: f32.Point{
+				// Move out of the second hit area and into the first.
+				X: 20,
+				Y: 20,
+			},
+		},
+	)
+	assertEventSequence(t, r.Events(handler1), pointer.Release)
+	assertEventSequence(t, r.Events(handler2), pointer.Leave, pointer.Release)
+}
+
+func TestPointerActiveInputDisappears(t *testing.T) {
+	handler1 := new(int)
+	// Save this logic so we can redo it later.
+	renderHandler1 := func(ops *op.Ops) {
+		var stack op.StackOp
+		stack.Push(ops)
+		// Handler 1 area: (0, 0) - (100, 100)
+		pointer.Rect(image.Rectangle{
+			Max: image.Point{
+				X: 100,
+				Y: 100,
+			},
+		}).Add(ops)
+		pointer.InputOp{Key: handler1}.Add(ops)
+		stack.Pop()
+	}
+
+	var ops op.Ops
+	var r Router
+
+	renderHandler1(&ops)
+
+	// Draw handler.
+	ops.Reset()
+	renderHandler1(&ops)
+	r.Frame(&ops)
+	r.Add(
+		pointer.Event{
+			Type: pointer.Move,
+			Position: f32.Point{
+				X: 25,
+				Y: 25,
+			},
+		},
+	)
+	assertEventSequence(t, r.Events(handler1), pointer.Cancel, pointer.Enter, pointer.Move)
+
+	// Re-render with handler missing.
+	ops.Reset()
+	r.Frame(&ops)
+	r.Add(
+		pointer.Event{
+			Type: pointer.Move,
+			Position: f32.Point{
+				X: 25,
+				Y: 25,
+			},
+		},
+	)
+	assertEventSequence(t, r.Events(handler1), pointer.Cancel)
+}
+
+// toTypes converts a sequence of event.Event to their pointer.Types. It assumes
+// that all input events are of underlying type pointer.Event, and thus will
+// panic if some are not.
+func toTypes(events []event.Event) []pointer.Type {
+	out := make([]pointer.Type, len(events))
+	for i, event := range events {
+		out[i] = event.(pointer.Event).Type
+	}
+	return out
 }
 
 // assertEventSequence ensures that the provided actualEvents match the expected event types
 // in the provided order
 func assertEventSequence(t *testing.T, actualEvents []event.Event, expected ...pointer.Type) {
+	if len(actualEvents) != len(expected) {
+		t.Errorf("expected %v events, got %v", expected, toTypes(actualEvents))
+	}
 	for i, event := range actualEvents {
 		pointerEvent, ok := event.(pointer.Event)
 		if !ok {
@@ -250,7 +438,6 @@ func assertEventSequence(t *testing.T, actualEvents []event.Event, expected ...p
 			continue
 		}
 		if len(expected) <= i {
-			t.Errorf("actualEvents is longer than expected, has len %d, expected len %d", len(actualEvents), len(expected))
 			continue
 		}
 		if pointerEvent.Type != expected[i] {
