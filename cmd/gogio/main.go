@@ -31,6 +31,7 @@ var (
 	version       = flag.Int("version", 1, "app version (for -buildmode=exe)")
 	printCommands = flag.Bool("x", false, "print the commands")
 	keepWorkdir   = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting.")
+	linkMode      = flag.String("linkmode", "", "set the -linkmode flag of the go tool")
 )
 
 type buildInfo struct {
@@ -117,6 +118,9 @@ func mainErr() error {
 	if appArgs := flag.Args()[1:]; len(appArgs) > 0 {
 		// Pass along arguments to the app.
 		ldflags = append(ldflags, fmt.Sprintf("-X gioui.org/app.extraArgs=%s", strings.Join(appArgs, "|")))
+	}
+	if m := *linkMode; m != "" {
+		ldflags = append(ldflags, "-linkmode="+m)
 	}
 	bi.ldflags = strings.Join(ldflags, " ")
 	if err := build(bi); err != nil {
