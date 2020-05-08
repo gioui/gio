@@ -98,8 +98,9 @@ func mainErr() error {
 	if bi.appID == "" {
 		bi.appID = appIDFromPackage(pkgPath)
 	}
+	var ldflags []string
 	// Pass appID along, to be used for logging on platforms like Android.
-	bi.ldflags = fmt.Sprintf("-X gioui.org/app/internal/log.appID=%s", bi.appID)
+	ldflags = append(ldflags, fmt.Sprintf("-X gioui.org/app/internal/log.appID=%s", bi.appID))
 
 	switch *target {
 	case "js":
@@ -115,8 +116,9 @@ func mainErr() error {
 	}
 	if appArgs := flag.Args()[1:]; len(appArgs) > 0 {
 		// Pass along arguments to the app.
-		bi.ldflags = fmt.Sprintf("-X gioui.org/app.extraArgs=%s", strings.Join(appArgs, "|"))
+		ldflags = append(ldflags, fmt.Sprintf("-X gioui.org/app.extraArgs=%s", strings.Join(appArgs, "|")))
 	}
+	bi.ldflags = strings.Join(ldflags, " ")
 	if err := build(bi); err != nil {
 		return err
 	}
