@@ -257,7 +257,7 @@ func (d *driverBase) waitForFrame() {
 	// We can't let selects block forever, since the default -test.timeout
 	// is ten minutes - far too long for tests that take seconds.
 	//
-	// For now, a static short timeout is better than nothing. 2s is plenty
+	// For now, a static short timeout is better than nothing. 5s is plenty
 	// for our simple test app to render on any device.
 	select {
 	case <-d.frameNotifs:

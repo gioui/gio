@@ -62,9 +62,39 @@ func (d *WineTestDriver) Start(path string) {
 
 	// Then, start our program via Wine on the X server above.
 	{
+		cacheDir, err := os.UserCacheDir()
+		if err != nil {
+			d.Fatal(err)
+		}
+		// Use a wine directory separate from the default ~/.wine, so
+		// that the user's winecfg doesn't affect our test. This will
+		// default to ~/.cache/gio-e2e-wine. We use the user's cache,
+		// to reuse a previously set up wineprefix.
+		wineprefix := filepath.Join(cacheDir, "gio-e2e-wine")
+
+		// First, run a headless winecfg to make sure the wineprefix is
+		// set up. If Wine encounters any issue setting up, we can also
+		// report it early. This can easily take 5s the first time. The
+		// "/?" parameter is just to not try to open the winecfg GUI.
+		// TODO(mvdan): Why does this take ~2s when run with a terminal
+		// (pty), but it takes ~6s when run here?
+		{
+			start := time.Now()
+			cmd := exec.Command("wine", "winecfg", "/?")
+			cmd.Env = []string{"WINEPREFIX=" + wineprefix}
+			if out, err := cmd.CombinedOutput(); err != nil {
+				d.Fatalf("%v: %s", err, out)
+			}
+			d.Logf("set up WINEPREFIX in %s", time.Since(start))
+		}
+
 		ctx, cancel := context.WithCancel(context.Background())
 		cmd := exec.CommandContext(ctx, "wine", bin)
-		cmd.Env = []string{"DISPLAY=" + d.display}
+		cmd.Env = []string{
+			"DISPLAY=" + d.display,
+			"WINEDEBUG=-all", // hide warnings and other noise
+			"WINEPREFIX=" + wineprefix,
+		}
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
 			d.Fatal(err)
