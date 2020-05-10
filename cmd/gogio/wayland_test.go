@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"image"
 	"image/png"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -137,12 +136,12 @@ func (d *WaylandTestDriver) Start(path string) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cmd := exec.CommandContext(ctx, bin)
 		cmd.Env = []string{"XDG_RUNTIME_DIR=" + d.runtimeDir, "WAYLAND_DISPLAY=" + d.display}
-		stdout, err := cmd.StdoutPipe()
+		output, err := cmd.StdoutPipe()
 		if err != nil {
 			d.Fatal(err)
 		}
-		stderr := &bytes.Buffer{}
-		cmd.Stderr = stderr
+		cmd.Stderr = cmd.Stdout
+		d.output = output
 		if err := cmd.Start(); err != nil {
 			d.Fatal(err)
 		}
@@ -150,20 +149,9 @@ func (d *WaylandTestDriver) Start(path string) {
 		wg.Add(1)
 		go func() {
 			if err := cmd.Wait(); err != nil && ctx.Err() == nil {
-				// Print stderr and error.
-				io.Copy(os.Stdout, stderr)
 				d.Error(err)
 			}
 			wg.Done()
-		}()
-		go func() {
-			scanner := bufio.NewScanner(stdout)
-			for scanner.Scan() {
-				line := scanner.Text()
-				if line == "frame ready" {
-					d.frameNotifs <- true
-				}
-			}
 		}()
 	}
 

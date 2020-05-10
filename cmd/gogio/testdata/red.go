@@ -89,7 +89,7 @@ func loop(w *app.Window) error {
 				w.Invalidate()
 			case notifyPrint:
 				notify = notifyNone
-				fmt.Println("frame ready")
+				fmt.Println("gio frame ready")
 			}
 		}
 	}

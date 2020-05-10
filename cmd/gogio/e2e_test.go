@@ -3,11 +3,13 @@
 package main_test
 
 import (
+	"bufio"
 	"errors"
 	"flag"
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -50,17 +52,13 @@ type driverBase struct {
 
 	width, height int
 
-	// TODO(mvdan): Make this lower-level, so that each driver can simply
-	// send us each line of output from the app. That will let us
-	// deduplicate some code, and also show app output as test logs in a
-	// consistent way.
+	output      io.Reader
 	frameNotifs chan bool
 }
 
 func (d *driverBase) initBase(t *testing.T, width, height int) {
 	d.T = t
 	d.width, d.height = width, height
-	d.frameNotifs = make(chan bool, 1)
 }
 
 func TestEndToEnd(t *testing.T) {
@@ -250,6 +248,32 @@ func checkImageCorners(img image.Image, topLeft, topRight, botLeft, botRight col
 
 func (d *driverBase) waitForFrame() {
 	d.Helper()
+
+	if d.frameNotifs == nil {
+		// Start the goroutine that reads output lines and notifies of
+		// new frames via frameNotifs. The test doesn't wait for this
+		// goroutine to finish; it will naturally end when the output
+		// reader reaches an error like EOF.
+		d.frameNotifs = make(chan bool, 1)
+		if d.output == nil {
+			d.Fatal("need an output reader to be notified of frames")
+		}
+		go func() {
+			scanner := bufio.NewScanner(d.output)
+			for scanner.Scan() {
+				line := scanner.Text()
+				if strings.Contains(line, "gio frame ready") {
+					d.frameNotifs <- true
+				}
+			}
+			// Since we're only interested in the output while the
+			// app runs, and we don't know when it finishes here,
+			// ignore "already closed" pipe errors.
+			if err := scanner.Err(); err != nil && !errors.Is(err, os.ErrClosed) {
+				d.Errorf("reading app output: %v", err)
+			}
+		}()
+	}
 
 	// Unfortunately, there isn't a way to select on a test failing, since
 	// testing.T doesn't have anything like a context or a "done" channel.

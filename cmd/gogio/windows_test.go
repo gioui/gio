@@ -3,11 +3,8 @@
 package main_test
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"image"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -95,13 +92,12 @@ func (d *WineTestDriver) Start(path string) {
 			"WINEDEBUG=-all", // hide warnings and other noise
 			"WINEPREFIX=" + wineprefix,
 		}
-		stdout, err := cmd.StdoutPipe()
+		output, err := cmd.StdoutPipe()
 		if err != nil {
 			d.Fatal(err)
 		}
-		stderr := &bytes.Buffer{}
-		cmd.Stderr = stderr
-
+		cmd.Stderr = cmd.Stdout
+		d.output = output
 		if err := cmd.Start(); err != nil {
 			d.Fatal(err)
 		}
@@ -109,22 +105,10 @@ func (d *WineTestDriver) Start(path string) {
 		wg.Add(1)
 		go func() {
 			if err := cmd.Wait(); err != nil && ctx.Err() == nil {
-				// Print stderr and error.
-				io.Copy(os.Stdout, stderr)
 				d.Error(err)
 			}
 			wg.Done()
 		}()
-		go func() {
-			scanner := bufio.NewScanner(stdout)
-			for scanner.Scan() {
-				line := scanner.Text()
-				if line == "frame ready" {
-					d.frameNotifs <- true
-				}
-			}
-		}()
-
 	}
 	// Wait for the gio app to render.
 	d.waitForFrame()

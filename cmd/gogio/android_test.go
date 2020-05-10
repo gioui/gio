@@ -3,7 +3,6 @@
 package main_test
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -13,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strings"
 )
 
 type AndroidTestDriver struct {
@@ -80,24 +78,16 @@ func (d *AndroidTestDriver) Start(path string) {
 			"-T1",      // don't show prevoius log messages
 			appid+":*", // show all logs from our gio app ID
 		)
-		logcat, err := cmd.StdoutPipe()
+		output, err := cmd.StdoutPipe()
 		if err != nil {
 			d.Fatal(err)
 		}
-		cmd.Stderr = os.Stderr
+		cmd.Stderr = cmd.Stdout
+		d.output = output
 		if err := cmd.Start(); err != nil {
 			d.Fatal(err)
 		}
 		d.Cleanup(cancel)
-		go func() {
-			scanner := bufio.NewScanner(logcat)
-			for scanner.Scan() {
-				line := scanner.Text()
-				if strings.HasSuffix(line, ": frame ready") {
-					d.frameNotifs <- true
-				}
-			}
-		}()
 	}
 
 	// Start the app.

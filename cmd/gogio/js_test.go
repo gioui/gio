@@ -8,10 +8,10 @@ import (
 	"errors"
 	"image"
 	"image/png"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
-	"strings"
 
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
@@ -73,27 +73,26 @@ func (d *JSTestDriver) Start(path string) {
 		}
 		d.Fatal(err)
 	}
+	pr, pw := io.Pipe()
+	d.Cleanup(func() { pw.Close() })
+	d.output = pr
 	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		switch ev := ev.(type) {
 		case *runtime.EventConsoleAPICalled:
-			if ev.Type == "log" && len(ev.Args) == 1 &&
-				// Note that the argument values are JSON.
-				string(ev.Args[0].Value) == `"frame ready"` {
-
-				d.frameNotifs <- true
-				// These logs are expected. Don't show them.
-				break
-			}
 			switch ev.Type {
 			case "log", "info", "warning", "error":
-				var args strings.Builder
+				var b bytes.Buffer
+				b.WriteString("console.")
+				b.WriteString(string(ev.Type))
+				b.WriteString("(")
 				for i, arg := range ev.Args {
 					if i > 0 {
-						args.WriteString(", ")
+						b.WriteString(", ")
 					}
-					args.Write(arg.Value)
+					b.Write(arg.Value)
 				}
-				d.Logf("console %s: %s", ev.Type, args.String())
+				b.WriteString(")\n")
+				pw.Write(b.Bytes())
 			}
 		}
 	})
