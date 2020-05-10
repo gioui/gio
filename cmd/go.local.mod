@@ -1,3 +1,9 @@
+// Keep in sync with go.mod; the only difference should be the gioui.org
+// replace. To use it:
+//
+//     cd gogio
+//     GOFLAGS=-modfile=../go.local.mod go test
+
 module gioui.org/cmd
 
 go 1.13
