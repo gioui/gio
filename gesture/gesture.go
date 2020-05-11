@@ -36,6 +36,8 @@ type Click struct {
 	// clicks is incremented if successive clicks
 	// are performed within a fixed duration.
 	clicks int
+	// pressRep tracks whether a TypePress has been reported.
+	pressRep bool
 }
 
 type ClickState uint8
@@ -140,6 +142,9 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 					c.clicks = 1
 				}
 				c.clickedAt = e.Time
+				if c.reportPress(pointer.Grabbed) {
+					events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers})
+				}
 				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
 			}
 		case pointer.Cancel:
@@ -152,7 +157,10 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 				break
 			}
 			c.state = StatePressed
-			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers})
+			c.pressRep = false
+			if c.reportPress(e.Priority) {
+				events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers})
+			}
 		case pointer.Leave:
 			if c.state == StatePressed {
 				c.state = StateNormal
@@ -164,6 +172,14 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 		}
 	}
 	return events
+}
+
+func (c *Click) reportPress(pri pointer.Priority) bool {
+	send := !c.pressRep && pri == pointer.Grabbed
+	if send {
+		c.pressRep = true
+	}
+	return send
 }
 
 // Add the handler to the operation list to receive scroll events.
