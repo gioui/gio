@@ -31,7 +31,6 @@ type ButtonStyle struct {
 
 type ButtonLayoutStyle struct {
 	Background   color.RGBA
-	Color        color.RGBA
 	CornerRadius unit.Value
 	Inset        layout.Inset
 }
@@ -63,7 +62,6 @@ func Button(th *Theme, txt string) ButtonStyle {
 func ButtonLayout(th *Theme) ButtonLayoutStyle {
 	return ButtonLayoutStyle{
 		Background:   th.Color.Primary,
-		Color:        th.Color.InvText,
 		CornerRadius: unit.Dp(4),
 		Inset:        layout.UniformInset(unit.Dp(12)),
 	}
@@ -83,9 +81,9 @@ func (b ButtonStyle) Layout(gtx *layout.Context, button *widget.Button) {
 	ButtonLayoutStyle{
 		Background:   b.Background,
 		CornerRadius: b.CornerRadius,
-		Color:        b.Color,
 		Inset:        b.Inset,
 	}.Layout(gtx, button, func() {
+		paint.ColorOp{Color: b.Color}.Add(gtx.Ops)
 		widget.Label{Alignment: text.Middle}.Layout(gtx, b.shaper, b.Font, b.TextSize, b.Text)
 	})
 }
@@ -113,7 +111,6 @@ func (b ButtonLayoutStyle) Layout(gtx *layout.Context, button *widget.Button, w 
 			gtx.Constraints.Height.Min = vmin
 			layout.Center.Layout(gtx, func() {
 				b.Inset.Layout(gtx, func() {
-					paint.ColorOp{Color: b.Color}.Add(gtx.Ops)
 					w()
 				})
 			})
