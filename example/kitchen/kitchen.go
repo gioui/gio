@@ -164,7 +164,9 @@ func (b iconAndTextButton) Layout(gtx *layout.Context, button *widget.Button, ic
 
 		layLabel := layout.Rigid(func() {
 			layout.Inset{Left: textIconSpacer}.Layout(gtx, func() {
-				widget.Label{}.Layout(gtx, b.theme.Shaper, text.Font{}, b.theme.TextSize, word)
+				l := material.Body1(b.theme, word)
+				l.Color = b.theme.Color.InvText
+				l.Layout(gtx)
 			})
 		})
 
