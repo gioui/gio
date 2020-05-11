@@ -153,10 +153,12 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 			}
 			c.state = StatePressed
 			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers})
-		case pointer.Move:
-			if c.state == StatePressed && !e.Hit {
+		case pointer.Leave:
+			if c.state == StatePressed {
 				c.state = StateNormal
-			} else if c.state < StateFocused {
+			}
+		case pointer.Enter:
+			if c.state < StateFocused {
 				c.state = StateFocused
 			}
 		}
