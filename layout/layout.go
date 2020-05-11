@@ -81,6 +81,11 @@ func (c Constraints) Constrain(size image.Point) image.Point {
 	return image.Point{X: c.Width.Constrain(size.X), Y: c.Height.Constrain(size.Y)}
 }
 
+// Min returns the smallest dimensions that satisfy the constraints.
+func (c Constraints) Min() image.Point {
+	return image.Point{X: c.Width.Min, Y: c.Height.Min}
+}
+
 // RigidConstraints returns the constraints that can only be
 // satisfied by the given dimensions.
 func RigidConstraints(size image.Point) Constraints {

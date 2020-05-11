@@ -114,7 +114,9 @@ func (b ButtonLayoutStyle) Layout(gtx *layout.Context, button *widget.Button, w 
 					w()
 				})
 			})
-			pointer.Rect(image.Rectangle{Max: gtx.Dimensions.Size}).Add(gtx.Ops)
+		}),
+		layout.Expanded(func() {
+			pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min()}).Add(gtx.Ops)
 			button.Layout(gtx)
 		}),
 	)
@@ -146,7 +148,9 @@ func (b IconButtonStyle) Layout(gtx *layout.Context, button *widget.Button) {
 					Size: image.Point{X: size, Y: size},
 				}
 			})
-			pointer.Ellipse(image.Rectangle{Max: gtx.Dimensions.Size}).Add(gtx.Ops)
+		}),
+		layout.Expanded(func() {
+			pointer.Ellipse(image.Rectangle{Max: gtx.Constraints.Min()}).Add(gtx.Ops)
 			button.Layout(gtx)
 		}),
 	)
