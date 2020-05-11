@@ -56,8 +56,8 @@ func (b *Button) Layout(gtx *layout.Context) {
 		if gtx.Now().Sub(c.Time) < 1*time.Second {
 			break
 		}
-		copy(b.history, b.history[1:])
-		b.history = b.history[:len(b.history)-1]
+		n := copy(b.history, b.history[1:])
+		b.history = b.history[:n]
 	}
 }
 
