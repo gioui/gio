@@ -335,11 +335,11 @@ func (op *areaOp) Hit(pos f32.Point) bool {
 	case areaEllipse:
 		rx := float32(size.X) / 2
 		ry := float32(size.Y) / 2
-		rx2 := rx * rx
-		ry2 := ry * ry
 		xh := pos.X - rx
 		yk := pos.Y - ry
-		return xh*xh*ry2+yk*yk*rx2 <= rx2*ry2
+		// The ellipse function works in all cases because
+		// 0/0 is not <= 1.
+		return (xh*xh)/(rx*rx)+(yk*yk)/(ry*ry) <= 1
 	default:
 		panic("invalid area kind")
 	}
