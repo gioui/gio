@@ -330,12 +330,8 @@ func (op *areaOp) Hit(pos f32.Point) bool {
 	size := op.rect.Size()
 	switch op.kind {
 	case areaRect:
-		if 0 <= pos.X && pos.X < float32(size.X) &&
-			0 <= pos.Y && pos.Y < float32(size.Y) {
-			return true
-		} else {
-			return false
-		}
+		return 0 <= pos.X && pos.X < float32(size.X) &&
+			0 <= pos.Y && pos.Y < float32(size.Y)
 	case areaEllipse:
 		rx := float32(size.X) / 2
 		ry := float32(size.Y) / 2
@@ -343,11 +339,7 @@ func (op *areaOp) Hit(pos f32.Point) bool {
 		ry2 := ry * ry
 		xh := pos.X - rx
 		yk := pos.Y - ry
-		if xh*xh*ry2+yk*yk*rx2 <= rx2*ry2 {
-			return true
-		} else {
-			return false
-		}
+		return xh*xh*ry2+yk*yk*rx2 <= rx2*ry2
 	default:
 		panic("invalid area kind")
 	}
