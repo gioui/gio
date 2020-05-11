@@ -3,10 +3,12 @@
 package widget
 
 import (
+	"image"
 	"time"
 
 	"gioui.org/f32"
 	"gioui.org/gesture"
+	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/op"
 )
@@ -44,7 +46,11 @@ func (b *Button) History() []Click {
 func (b *Button) Layout(gtx *layout.Context) {
 	// Flush clicks from before the previous frame.
 	b.processEvents(gtx)
+	var st op.StackOp
+	st.Push(gtx.Ops)
+	pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min()}).Add(gtx.Ops)
 	b.click.Add(gtx.Ops)
+	st.Pop()
 	for len(b.history) > 0 {
 		c := b.history[0]
 		if gtx.Now().Sub(c.Time) < 1*time.Second {

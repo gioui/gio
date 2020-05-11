@@ -116,7 +116,6 @@ func (b ButtonLayoutStyle) Layout(gtx *layout.Context, button *widget.Button, w 
 			})
 		}),
 		layout.Expanded(func() {
-			pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min()}).Add(gtx.Ops)
 			button.Layout(gtx)
 		}),
 	)
