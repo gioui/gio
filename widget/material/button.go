@@ -77,7 +77,29 @@ func IconButton(th *Theme, icon *widget.Icon) IconButtonStyle {
 	}
 }
 
-func (b ButtonStyle) Layout(gtx *layout.Context, button *widget.Button) {
+// Clickable lays out a rectangular clickable widget without further
+// decoration.
+func Clickable(gtx *layout.Context, button *widget.Clickable, w layout.Widget) {
+	layout.Stack{}.Layout(gtx,
+		layout.Expanded(func() {
+			button.Layout(gtx)
+		}),
+		layout.Expanded(func() {
+			clip.Rect{
+				Rect: f32.Rectangle{Max: f32.Point{
+					X: float32(gtx.Constraints.Width.Min),
+					Y: float32(gtx.Constraints.Height.Min),
+				}},
+			}.Op(gtx.Ops).Add(gtx.Ops)
+			for _, c := range button.History() {
+				drawInk(gtx, c)
+			}
+		}),
+		layout.Stacked(w),
+	)
+}
+
+func (b ButtonStyle) Layout(gtx *layout.Context, button *widget.Clickable) {
 	ButtonLayoutStyle{
 		Background:   b.Background,
 		CornerRadius: b.CornerRadius,
@@ -88,7 +110,7 @@ func (b ButtonStyle) Layout(gtx *layout.Context, button *widget.Button) {
 	})
 }
 
-func (b ButtonLayoutStyle) Layout(gtx *layout.Context, button *widget.Button, w layout.Widget) {
+func (b ButtonLayoutStyle) Layout(gtx *layout.Context, button *widget.Clickable, w layout.Widget) {
 	hmin := gtx.Constraints.Width.Min
 	vmin := gtx.Constraints.Height.Min
 	layout.Stack{Alignment: layout.Center}.Layout(gtx,
@@ -121,7 +143,7 @@ func (b ButtonLayoutStyle) Layout(gtx *layout.Context, button *widget.Button, w 
 	)
 }
 
-func (b IconButtonStyle) Layout(gtx *layout.Context, button *widget.Button) {
+func (b IconButtonStyle) Layout(gtx *layout.Context, button *widget.Clickable) {
 	layout.Stack{Alignment: layout.Center}.Layout(gtx,
 		layout.Expanded(func() {
 			size := gtx.Constraints.Width.Min

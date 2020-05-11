@@ -5,14 +5,14 @@
 // To maximize reusability and visual flexibility, user interface controls are
 // split into two parts: the stateful widget and the stateless drawing of it.
 //
-// For example, widget.Button encapsulates the state and event
-// handling of all buttons, while the Theme can draw a single Button
-// in various styles.
+// For example, widget.Clickable encapsulates the state and event
+// handling of all clickable areas, while the Theme is responsible to
+// draw a specific area, for example a button.
 //
 // This snippet defines a button that prints a message when clicked:
 //
 //     var gtx *layout.Context
-//     button := new(widget.Button)
+//     button := new(widget.Clickable)
 //
 //     for button.Clicked(gtx) {
 //         fmt.Println("Clicked!")
@@ -46,7 +46,7 @@
 //     btn.Layout(gtx)
 //
 // Widget variants: A widget can have several distinct representations even
-// though the underlying state is the same. A widget.Button can be drawn as a
+// though the underlying state is the same. A widget.Clickable can be drawn as a
 // round icon button:
 //
 //     icon := material.NewIcon(...)
