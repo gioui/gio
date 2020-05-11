@@ -128,10 +128,11 @@ var (
 		SingleLine: true,
 		Submit:     true,
 	}
-	button            = new(widget.Button)
-	greenButton       = new(widget.Button)
-	iconTextButton    = new(widget.Button)
-	iconButton        = new(widget.Button)
+	button            = new(widget.Clickable)
+	greenButton       = new(widget.Clickable)
+	iconTextButton    = new(widget.Clickable)
+	iconButton        = new(widget.Clickable)
+	flatBtn           = new(widget.Clickable)
 	radioButtonsGroup = new(widget.Enum)
 	list              = &layout.List{
 		Axis: layout.Vertical,
@@ -145,7 +146,7 @@ var (
 	swtch               = new(widget.Bool)
 )
 
-func (b iconAndTextButton) Layout(gtx *layout.Context, button *widget.Button, icon *widget.Icon, word string) {
+func (b iconAndTextButton) Layout(gtx *layout.Context, button *widget.Clickable, icon *widget.Icon, word string) {
 	material.ButtonLayout(b.theme).Layout(gtx, button, func() {
 		iconAndLabel := layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}
 		textIconSpacer := unit.Dp(5)
@@ -204,7 +205,7 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 				}),
 				layout.Rigid(func() {
 					in.Layout(gtx, func() {
-						iconAndTextButton{th}.Layout(gtx, iconTextButton, icon, "Horizontal button")
+						iconAndTextButton{th}.Layout(gtx, iconTextButton, icon, "Icon")
 					})
 				}),
 				layout.Rigid(func() {
@@ -217,11 +218,26 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 				}),
 				layout.Rigid(func() {
 					in.Layout(gtx, func() {
-						btn := material.Button(th, "Green button")
+						l := "Green"
+						if !green {
+							l = "Blue"
+						}
+						btn := material.Button(th, l)
 						if green {
 							btn.Background = color.RGBA{A: 0xff, R: 0x9e, G: 0x9d, B: 0x24}
 						}
 						btn.Layout(gtx, greenButton)
+					})
+				}),
+				layout.Rigid(func() {
+					in.Layout(gtx, func() {
+						material.Clickable(gtx, flatBtn, func() {
+							layout.UniformInset(unit.Dp(12)).Layout(gtx, func() {
+								layout.Center.Layout(gtx, func() {
+									material.Body1(th, "Flat").Layout(gtx)
+								})
+							})
+						})
 					})
 				}),
 			)

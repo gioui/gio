@@ -94,7 +94,7 @@ func main() {
 	}
 }
 
-var button widget.Button
+var button widget.Clickable
 
 func draw(gtx *layout.Context, th *material.Theme) {
 	layout.Center.Layout(gtx, func() {

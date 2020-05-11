@@ -34,7 +34,7 @@ import (
 )
 
 type UI struct {
-	fab          *widget.Button
+	fab          *widget.Clickable
 	fabIcon      *widget.Icon
 	usersList    *layout.List
 	users        []*user
@@ -79,7 +79,7 @@ func newUI(fetchCommits func(string)) *UI {
 	u.usersList = &layout.List{
 		Axis: layout.Vertical,
 	}
-	u.fab = new(widget.Button)
+	u.fab = new(widget.Clickable)
 	u.edit2 = &widget.Editor{
 		//Alignment: text.End,
 		SingleLine: true,

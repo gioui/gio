@@ -56,7 +56,7 @@ type Tabs struct {
 }
 
 type Tab struct {
-	btn   widget.Button
+	btn   widget.Clickable
 	Title string
 }
 
