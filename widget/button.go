@@ -13,6 +13,7 @@ import (
 	"gioui.org/op"
 )
 
+// Button represents a clickable area.
 type Button struct {
 	click gesture.Click
 	// clicks tracks the number of unreported clicks.
@@ -26,8 +27,11 @@ type Click struct {
 	Time     time.Time
 }
 
+// Clicked calls Update and reports whether the button was
+// clicked since the last call. Multiple clicks result in Clicked
+// returning true once per click.
 func (b *Button) Clicked(gtx *layout.Context) bool {
-	b.processEvents(gtx)
+	b.Update(gtx)
 	if b.clicks > 0 {
 		b.clicks--
 		if b.clicks > 0 {
@@ -39,13 +43,15 @@ func (b *Button) Clicked(gtx *layout.Context) bool {
 	return false
 }
 
+// History is the past clicks useful for drawing click markers.
+// Clicks are retained for a short duration (about a second).
 func (b *Button) History() []Click {
 	return b.history
 }
 
 func (b *Button) Layout(gtx *layout.Context) {
 	// Flush clicks from before the previous frame.
-	b.processEvents(gtx)
+	b.Update(gtx)
 	var st op.StackOp
 	st.Push(gtx.Ops)
 	pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min()}).Add(gtx.Ops)
@@ -61,8 +67,11 @@ func (b *Button) Layout(gtx *layout.Context) {
 	}
 }
 
-func (b *Button) processEvents(gtx *layout.Context) {
-	for _, e := range b.click.Events(gtx) {
+// Update the button state by processing events. The underlying
+// gesture events are returned for use beyond what Clicked offers.
+func (b *Button) Update(gtx *layout.Context) []gesture.ClickEvent {
+	evts := b.click.Events(gtx)
+	for _, e := range evts {
 		switch e.Type {
 		case gesture.TypeClick:
 			b.clicks++
@@ -73,4 +82,5 @@ func (b *Button) processEvents(gtx *layout.Context) {
 			})
 		}
 	}
+	return evts
 }
