@@ -33,6 +33,19 @@ func (r Rectangle) String() string {
 	return r.Min.String() + "-" + r.Max.String()
 }
 
+// Rect is a shorthand to Rectangle{Point{x0, y0}, Point{x1, y1}}.
+// The returned Rectangle has x0 and y0 swapped if necessary so that
+// it's correctly formed
+func Rect(x0, y0, x1, y1 float32) Rectangle {
+	if x0 > x1 {
+		x0, x1 = x1, x0
+	}
+	if y0 > y1 {
+		y0, y1 = y1, y0
+	}
+	return Rectangle{Point{x0, y0}, Point{x1, y1}}
+}
+
 // Add return the point p+p2.
 func (p Point) Add(p2 Point) Point {
 	return Point{X: p.X + p2.X, Y: p.Y + p2.Y}
