@@ -5,7 +5,6 @@ package main
 import (
 	"fmt"
 	"image"
-	"image/color"
 	"log"
 
 	"gioui.org/app"
@@ -79,12 +78,11 @@ func drawTabs(gtx *layout.Context, th *material.Theme) {
 				var tabWidth int
 				layout.Stack{Alignment: layout.S}.Layout(gtx,
 					layout.Stacked(func() {
-						tabBtn := material.Button(th, t.Title)
-						tabBtn.Background = color.RGBA{}   // No background.
-						tabBtn.CornerRadius = unit.Value{} // No corners.
-						tabBtn.Color = color.RGBA{A: 0xff} // Black text.
-						tabBtn.TextSize = unit.Sp(20)
-						tabBtn.Layout(gtx, &t.btn)
+						material.Clickable(gtx, &t.btn, func() {
+							layout.UniformInset(unit.Sp(12)).Layout(gtx, func() {
+								material.H6(th, t.Title).Layout(gtx)
+							})
+						})
 						tabWidth = gtx.Dimensions.Size.X
 					}),
 					layout.Stacked(func() {
