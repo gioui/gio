@@ -9,15 +9,28 @@ corner with the axes extending right and down.
 */
 package f32
 
+import "strconv"
+
 // A Point is a two dimensional point.
 type Point struct {
 	X, Y float32
+}
+
+// String return a string representation of p.
+func (p Point) String() string {
+	return "(" + strconv.FormatFloat(float64(p.X), 'f', -1, 32) +
+		"," + strconv.FormatFloat(float64(p.Y), 'f', -1, 32) + ")"
 }
 
 // A Rectangle contains the points (X, Y) where Min.X <= X < Max.X,
 // Min.Y <= Y < Max.Y.
 type Rectangle struct {
 	Min, Max Point
+}
+
+// String return a string representation of r.
+func (r Rectangle) String() string {
+	return r.Min.String() + "-" + r.Max.String()
 }
 
 // Add return the point p+p2.
