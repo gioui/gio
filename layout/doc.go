@@ -13,7 +13,7 @@ in an implicit Context to keep the Widget declaration short.
 
 For example, to add space above a widget:
 
-	gtx := layout.NewContext(...)
+	gtx := new(layout.Context)
 	gtx.Reset(...)
 
 	// Configure a top inset.

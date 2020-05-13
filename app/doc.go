@@ -22,7 +22,7 @@ For example:
 
 	w := app.NewWindow()
 	for e := range w.Events() {
-		if e, ok := e.(app.FrameEvent); ok {
+		if e, ok := e.(system.FrameEvent); ok {
 			ops.Reset()
 			// Add operations to ops.
 			...
