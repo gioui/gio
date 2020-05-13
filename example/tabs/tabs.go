@@ -5,7 +5,9 @@ package main
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"log"
+	"math"
 
 	"gioui.org/app"
 	"gioui.org/f32"
@@ -47,6 +49,7 @@ func loop(w *app.Window) error {
 }
 
 var tabs Tabs
+var slider Slider
 
 type Tabs struct {
 	list     layout.List
@@ -73,6 +76,11 @@ func drawTabs(gtx *layout.Context, th *material.Theme) {
 			tabs.list.Layout(gtx, len(tabs.tabs), func(tabIdx int) {
 				t := &tabs.tabs[tabIdx]
 				if t.btn.Clicked(gtx) {
+					if tabs.selected < tabIdx {
+						slider.PushLeft(gtx)
+					} else if tabs.selected > tabIdx {
+						slider.PushRight(gtx)
+					}
 					tabs.selected = tabIdx
 				}
 				var tabWidth int
@@ -105,9 +113,36 @@ func drawTabs(gtx *layout.Context, th *material.Theme) {
 			})
 		}),
 		layout.Flexed(1, func() {
-			layout.Center.Layout(gtx, func() {
-				material.H1(th, fmt.Sprintf("Tab content #%d", tabs.selected)).Layout(gtx)
+			slider.Layout(gtx, func() {
+				fill(gtx, dynamicColor(tabs.selected))
+				layout.Center.Layout(gtx, func() {
+					material.H1(th, fmt.Sprintf("Tab content #%d", tabs.selected+1)).Layout(gtx)
+				})
 			})
 		}),
 	)
+}
+
+func bounds(gtx *layout.Context) f32.Rectangle {
+	cs := gtx.Constraints
+	d := image.Point{X: cs.Width.Min, Y: cs.Height.Min}
+	return f32.Rectangle{
+		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
+	}
+}
+
+func fill(gtx *layout.Context, col color.RGBA) {
+	dr := bounds(gtx)
+	paint.ColorOp{Color: col}.Add(gtx.Ops)
+	paint.PaintOp{Rect: dr}.Add(gtx.Ops)
+}
+
+func dynamicColor(i int) color.RGBA {
+	sn, cs := math.Sincos(float64(i) * math.Phi)
+	return color.RGBA{
+		R: 0xA0 + byte(0x30*sn),
+		G: 0xA0 + byte(0x30*cs),
+		B: 0xD0,
+		A: 0xFF,
+	}
 }
