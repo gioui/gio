@@ -36,11 +36,11 @@ type ColorOp struct {
 	Color color.RGBA
 }
 
-// PaintOp draws the current brush, respecting the
-// clip path and transformation.
+// PaintOp fills an area with the current brush, respecting the
+// current clip path and transformation.
 type PaintOp struct {
-	// The destination rectangle to paint. If necessary, the brush is resized to
-	// cover it.
+	// Rect is the destination area to paint. If necessary, the brush is
+	// scaled to cover the rectangle area.
 	Rect f32.Rectangle
 }
 
