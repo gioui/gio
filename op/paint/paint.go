@@ -14,7 +14,7 @@ import (
 	"gioui.org/op"
 )
 
-// ImageOp sets the material to an image.
+// ImageOp sets the brush to an image.
 type ImageOp struct {
 	// Rect is the section if the backing image to use.
 	Rect image.Rectangle
@@ -28,15 +28,15 @@ type ImageOp struct {
 	handle interface{}
 }
 
-// ColorOp sets the material to a constant color.
+// ColorOp sets the brush to a constant color.
 type ColorOp struct {
 	Color color.RGBA
 }
 
-// PaintOp draws the current material, respecting the
+// PaintOp draws the current brush, respecting the
 // clip path and transformation.
 type PaintOp struct {
-	// The destination rectangle to paint. If necessary, the material is resized to
+	// The destination rectangle to paint. If necessary, the brush is resized to
 	// cover it.
 	Rect f32.Rectangle
 }
