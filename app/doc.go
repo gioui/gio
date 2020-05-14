@@ -59,8 +59,8 @@ For example, to display a blank but otherwise functional window:
 
 Event queue
 
-A Window's Queue method returns an event.Queue implementation that distributes
-incoming events to the event handlers declared in the latest frame.
+A FrameEvent's Queue method returns an event.Queue implementation that distributes
+incoming events to the event handlers declared in the last frame.
 See the gioui.org/io/event package for more information about event handlers.
 
 Permissions
