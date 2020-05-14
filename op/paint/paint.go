@@ -16,7 +16,9 @@ import (
 
 // ImageOp sets the material to an image.
 type ImageOp struct {
-	Rect    image.Rectangle
+	// Rect is the section if the backing image to use.
+	Rect image.Rectangle
+
 	uniform bool
 	color   color.RGBA
 	src     *image.RGBA
@@ -34,9 +36,19 @@ type ColorOp struct {
 // PaintOp draws the current material, respecting the
 // clip path and transformation.
 type PaintOp struct {
+	// The destination rectangle to paint. If necessary, the material is resized to
+	// cover it.
 	Rect f32.Rectangle
 }
 
+// NewImageOp creates an ImageOp backed by src. See
+// gioui.org/io/system.FrameEvent for a description of when data
+// referenced by operations is safe to re-use.
+//
+// NewImageOp assumes the backing image is immutable, and may cache a
+// copy of its contents in a GPU-friendly way. Create new ImageOps to
+// ensure that changes to an image is reflected in the display of
+// it.
 func NewImageOp(src image.Image) ImageOp {
 	switch src := src.(type) {
 	case *image.Uniform:
