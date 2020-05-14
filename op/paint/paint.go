@@ -15,6 +15,9 @@ import (
 )
 
 // ImageOp sets the brush to an image.
+//
+// Note: the ImageOp may keep a reference to the backing image.
+// See NewImageOp for details.
 type ImageOp struct {
 	// Rect is the section if the backing image to use.
 	Rect image.Rectangle
