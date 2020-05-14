@@ -60,22 +60,26 @@ type wlConn struct {
 	compositor *C.struct_wl_compositor
 	wm         *C.struct_xdg_wm_base
 	imm        *C.struct_zwp_text_input_manager_v3
-	im         *C.struct_zwp_text_input_v3
 	shm        *C.struct_wl_shm
 	cursor     struct {
 		theme  *C.struct_wl_cursor_theme
 		cursor *C.struct_wl_cursor
 		surf   *C.struct_wl_surface
 	}
-	decor    *C.struct_zxdg_decoration_manager_v1
+	decor *C.struct_zxdg_decoration_manager_v1
+	seat  *wlSeat
+	xkb   *xkb.Context
+
+	repeat repeatState
+}
+
+type wlSeat struct {
 	seat     *C.struct_wl_seat
-	seatName C.uint32_t
+	name     C.uint32_t
 	pointer  *C.struct_wl_pointer
 	touch    *C.struct_wl_touch
 	keyboard *C.struct_wl_keyboard
-	xkb      *xkb.Context
-
-	repeat repeatState
+	im       *C.struct_zwp_text_input_v3
 }
 
 type repeatState struct {
@@ -249,36 +253,60 @@ func createNativeWindow(opts *Options) (*window, error) {
 
 //export gio_onSeatCapabilities
 func gio_onSeatCapabilities(data unsafe.Pointer, seat *C.struct_wl_seat, caps C.uint32_t) {
-	if seat != conn.seat {
+	if seat != conn.seat.seat {
 		panic("unexpected seat")
 	}
-	if conn.im == nil && conn.imm != nil {
-		conn.im = C.zwp_text_input_manager_v3_get_text_input(conn.imm, conn.seat)
-		C.gio_zwp_text_input_v3_add_listener(conn.im)
+	conn.seat.updateCaps(caps)
+}
+
+func (s *wlSeat) destroy() {
+	if s.im != nil {
+		C.zwp_text_input_v3_destroy(s.im)
+		s.im = nil
+	}
+	if s.pointer != nil {
+		delete(winMap, s.pointer)
+		C.wl_pointer_release(s.pointer)
+	}
+	if s.touch != nil {
+		delete(winMap, s.touch)
+		C.wl_touch_release(s.touch)
+	}
+	if s.keyboard != nil {
+		delete(winMap, s.keyboard)
+		C.wl_keyboard_release(s.keyboard)
+	}
+	C.wl_seat_release(s.seat)
+}
+
+func (s *wlSeat) updateCaps(caps C.uint32_t) {
+	if s.im == nil && conn.imm != nil {
+		s.im = C.zwp_text_input_manager_v3_get_text_input(conn.imm, s.seat)
+		C.gio_zwp_text_input_v3_add_listener(s.im)
 	}
 	switch {
-	case conn.pointer == nil && caps&C.WL_SEAT_CAPABILITY_POINTER != 0:
-		conn.pointer = C.wl_seat_get_pointer(seat)
-		C.gio_wl_pointer_add_listener(conn.pointer)
-	case conn.pointer != nil && caps&C.WL_SEAT_CAPABILITY_POINTER == 0:
-		C.wl_pointer_release(conn.pointer)
-		conn.pointer = nil
+	case s.pointer == nil && caps&C.WL_SEAT_CAPABILITY_POINTER != 0:
+		s.pointer = C.wl_seat_get_pointer(s.seat)
+		C.gio_wl_pointer_add_listener(s.pointer)
+	case s.pointer != nil && caps&C.WL_SEAT_CAPABILITY_POINTER == 0:
+		C.wl_pointer_release(s.pointer)
+		s.pointer = nil
 	}
 	switch {
-	case conn.touch == nil && caps&C.WL_SEAT_CAPABILITY_TOUCH != 0:
-		conn.touch = C.wl_seat_get_touch(seat)
-		C.gio_wl_touch_add_listener(conn.touch)
-	case conn.touch != nil && caps&C.WL_SEAT_CAPABILITY_TOUCH == 0:
-		C.wl_touch_release(conn.touch)
-		conn.touch = nil
+	case s.touch == nil && caps&C.WL_SEAT_CAPABILITY_TOUCH != 0:
+		s.touch = C.wl_seat_get_touch(s.seat)
+		C.gio_wl_touch_add_listener(s.touch)
+	case s.touch != nil && caps&C.WL_SEAT_CAPABILITY_TOUCH == 0:
+		C.wl_touch_release(s.touch)
+		s.touch = nil
 	}
 	switch {
-	case conn.keyboard == nil && caps&C.WL_SEAT_CAPABILITY_KEYBOARD != 0:
-		conn.keyboard = C.wl_seat_get_keyboard(seat)
-		C.gio_wl_keyboard_add_listener(conn.keyboard)
-	case conn.keyboard != nil && caps&C.WL_SEAT_CAPABILITY_KEYBOARD == 0:
-		C.wl_keyboard_release(conn.keyboard)
-		conn.keyboard = nil
+	case s.keyboard == nil && caps&C.WL_SEAT_CAPABILITY_KEYBOARD != 0:
+		s.keyboard = C.wl_seat_get_keyboard(s.seat)
+		C.gio_wl_keyboard_add_listener(s.keyboard)
+	case s.keyboard != nil && caps&C.WL_SEAT_CAPABILITY_KEYBOARD == 0:
+		C.wl_keyboard_release(s.keyboard)
+		s.keyboard = nil
 	}
 }
 
@@ -389,9 +417,11 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 		outputConfig[output] = new(wlOutput)
 	case "wl_seat":
 		if conn.seat == nil {
-			conn.seatName = name
-			conn.seat = (*C.struct_wl_seat)(C.wl_registry_bind(reg, name, &C.wl_seat_interface, 5))
-			C.gio_wl_seat_add_listener(conn.seat)
+			conn.seat = &wlSeat{
+				name: name,
+				seat: (*C.struct_wl_seat)(C.wl_registry_bind(reg, name, &C.wl_seat_interface, 5)),
+			}
+			C.gio_wl_seat_add_listener(conn.seat.seat)
 		}
 	case "wl_shm":
 		conn.shm = (*C.struct_wl_shm)(C.wl_registry_bind(reg, name, &C.wl_shm_interface, 1))
@@ -407,21 +437,8 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 
 //export gio_onRegistryGlobalRemove
 func gio_onRegistryGlobalRemove(data unsafe.Pointer, reg *C.struct_wl_registry, name C.uint32_t) {
-	if conn.seat != nil && name == conn.seatName {
-		if conn.im != nil {
-			C.zwp_text_input_v3_destroy(conn.im)
-			conn.im = nil
-		}
-		if conn.pointer != nil {
-			delete(winMap, conn.pointer)
-		}
-		if conn.touch != nil {
-			delete(winMap, conn.touch)
-		}
-		if conn.keyboard != nil {
-			delete(winMap, conn.keyboard)
-		}
-		C.wl_seat_release(conn.seat)
+	if s := conn.seat; s != nil && name == s.name {
+		s.destroy()
 		conn.seat = nil
 	}
 	if output, exists := outputMap[name]; exists {
@@ -1149,23 +1166,12 @@ func (c *wlConn) destroy() {
 	if c.cursor.theme != nil {
 		C.wl_cursor_theme_destroy(c.cursor.theme)
 	}
-	if c.keyboard != nil {
-		C.wl_keyboard_release(c.keyboard)
-	}
-	if c.pointer != nil {
-		C.wl_pointer_release(c.pointer)
-	}
-	if c.touch != nil {
-		C.wl_touch_release(c.touch)
-	}
-	if c.im != nil {
-		C.zwp_text_input_v3_destroy(c.im)
+	if c.seat != nil {
+		c.seat.destroy()
+		c.seat = nil
 	}
 	if c.imm != nil {
 		C.zwp_text_input_manager_v3_destroy(c.imm)
-	}
-	if c.seat != nil {
-		C.wl_seat_release(c.seat)
 	}
 	if c.decor != nil {
 		C.zxdg_decoration_manager_v1_destroy(c.decor)
