@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// package glfw doesn't build on OpenBSD and FreeBSD.
+// GLFW doesn't build on OpenBSD and FreeBSD.
 // +build !openbsd,!freebsd,!windows,!android,!ios,!js
 
+// The glfw example demonstrates integration of Gio into a foreign
+// windowing and rendering library, in this case GLFW
+// (https://www.glfw.org).
+//
+// See the go-glfw package for installation of the native
+// dependencies:
+//
+// https://github.com/go-gl/glfw
 package main
 
 import (
