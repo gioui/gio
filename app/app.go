@@ -35,7 +35,7 @@ func DataDir() (string, error) {
 	return dataDir()
 }
 
-// Main must be called from the a program's main function. It
+// Main must be called from the program main function. It
 // blocks until there are no more windows active.
 //
 // Calling Main is necessary because some operating systems
