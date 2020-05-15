@@ -135,7 +135,6 @@ type window struct {
 
 	stage             system.Stage
 	dead              bool
-	pendingErr        error
 	lastFrameCallback *C.struct_wl_callback
 
 	mu        sync.Mutex
@@ -846,7 +845,7 @@ loop:
 			dispFd.Events |= syscall.POLLOUT
 		}
 		if w.dead {
-			w.w.Event(system.DestroyEvent{Err: w.pendingErr})
+			w.w.Event(system.DestroyEvent{})
 			break
 		}
 		// Clear poll events.
