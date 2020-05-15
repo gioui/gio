@@ -55,7 +55,7 @@ import (
 */
 import "C"
 
-type wlConn struct {
+type wlDisplay struct {
 	disp       *C.struct_wl_display
 	compositor *C.struct_wl_compositor
 	wm         *C.struct_xdg_wm_base
@@ -152,7 +152,7 @@ type wlOutput struct {
 }
 
 var connMu sync.Mutex
-var conn *wlConn
+var conn *wlDisplay
 
 var (
 	winMap       = make(map[interface{}]*window)
@@ -1092,7 +1092,7 @@ func detectUIScale() float32 {
 }
 
 func waylandConnect() error {
-	c := new(wlConn)
+	c := new(wlDisplay)
 	conn = c
 	xkb, err := xkb.New()
 	if err != nil {
@@ -1154,7 +1154,7 @@ func waylandConnect() error {
 	return nil
 }
 
-func (c *wlConn) destroy() {
+func (c *wlDisplay) destroy() {
 	c.repeat.Stop(0)
 	if c.xkb != nil {
 		c.xkb.Destroy()
