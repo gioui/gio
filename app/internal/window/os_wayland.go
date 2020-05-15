@@ -149,6 +149,12 @@ type window struct {
 	scale    int
 }
 
+type poller struct {
+	pollfds [2]syscall.PollFd
+	// buf is scratch space for draining the notification pipe.
+	buf [100]byte
+}
+
 type wlOutput struct {
 	width      int
 	height     int
@@ -188,7 +194,9 @@ func newWLWindow(window Callbacks, opts *Options) error {
 			windowCounter <- -1
 		}()
 		w.w.SetDriver(w)
-		w.loop()
+		if err := w.loop(); err != nil {
+			panic(err)
+		}
 		w.destroy()
 		d.destroy()
 	}()
@@ -816,62 +824,66 @@ func gio_onFrameDone(data unsafe.Pointer, callback *C.struct_wl_callback, t C.ui
 	}
 }
 
-func (w *window) loop() {
-	dispfd := C.wl_display_get_fd(w.disp.disp)
-	// Poll for events and notifications.
-	pollfds := []syscall.PollFd{
-		{Fd: int32(dispfd), Events: syscall.POLLIN | syscall.POLLERR},
-		{Fd: int32(w.disp.notify.read), Events: syscall.POLLIN | syscall.POLLERR},
-	}
-	dispFd := &pollfds[0]
-	// Plenty of room for a backlog of notifications.
-	var buf = make([]byte, 100)
-loop:
+func (w *window) loop() error {
+	var p poller
 	for {
-		dispFd.Events &^= syscall.POLLOUT
-		if _, err := C.wl_display_flush(w.disp.disp); err != nil {
-			if err != syscall.EAGAIN {
-				break
-			}
-			// EAGAIN means the output buffer was full. Poll for
-			// POLLOUT to know when we can write again.
-			dispFd.Events |= syscall.POLLOUT
+		notified, err := w.disp.dispatch(&p)
+		if err != nil {
+			return err
 		}
 		if w.dead {
 			w.w.Event(system.DestroyEvent{})
 			break
 		}
-		// Clear poll events.
-		dispFd.Revents = 0
-		if _, err := syscall.Poll(pollfds, -1); err != nil && err != syscall.EINTR {
-			panic(fmt.Errorf("poll failed: %v", err))
-		}
-		redraw := false
-		// Clear notifications.
-		for {
-			_, err := syscall.Read(w.disp.notify.read, buf)
-			if err == syscall.EAGAIN {
-				break
-			}
-			if err != nil {
-				panic(fmt.Errorf("read from notify pipe failed: %v", err))
-			}
-			redraw = true
-		}
-		// Handle events
-		switch {
-		case dispFd.Revents&syscall.POLLIN != 0:
-			if ret := C.wl_display_dispatch(w.disp.disp); ret < 0 {
-				break loop
-			}
-		case dispFd.Revents&(syscall.POLLERR|syscall.POLLHUP) != 0:
-			break loop
-		}
-		w.disp.repeat.Repeat(w.disp)
-		if redraw {
+		if notified {
 			w.draw(false)
 		}
 	}
+	return nil
+}
+
+func (d *wlDisplay) dispatch(p *poller) (bool, error) {
+	dispfd := C.wl_display_get_fd(d.disp)
+	// Poll for events and notifications.
+	pollfds := append(p.pollfds[:0],
+		syscall.PollFd{Fd: int32(dispfd), Events: syscall.POLLIN | syscall.POLLERR},
+		syscall.PollFd{Fd: int32(d.notify.read), Events: syscall.POLLIN | syscall.POLLERR},
+	)
+	dispFd := &pollfds[0]
+	if ret, err := C.wl_display_flush(d.disp); ret < 0 {
+		if err != syscall.EAGAIN {
+			return false, fmt.Errorf("wayland: wl_display_flush failed: %v", err)
+		}
+		// EAGAIN means the output buffer was full. Poll for
+		// POLLOUT to know when we can write again.
+		dispFd.Events |= syscall.POLLOUT
+	}
+	if _, err := syscall.Poll(pollfds, -1); err != nil && err != syscall.EINTR {
+		return false, fmt.Errorf("wayland: poll failed: %v", err)
+	}
+	notified := false
+	// Clear notifications.
+	for {
+		_, err := syscall.Read(d.notify.read, p.buf[:])
+		if err == syscall.EAGAIN {
+			break
+		}
+		if err != nil {
+			return false, fmt.Errorf("wayland: read from notify pipe failed: %v", err)
+		}
+		notified = true
+	}
+	// Handle events
+	switch {
+	case dispFd.Revents&syscall.POLLIN != 0:
+		if ret, err := C.wl_display_dispatch(d.disp); ret < 0 {
+			return false, fmt.Errorf("wayland: wl_display_dispatch failed: %v", err)
+		}
+	case dispFd.Revents&(syscall.POLLERR|syscall.POLLHUP) != 0:
+		return false, errors.New("wayland: display file descriptor gone")
+	}
+	d.repeat.Repeat(d)
+	return notified, nil
 }
 
 func (w *window) SetAnimating(anim bool) {
