@@ -73,6 +73,11 @@ type wlDisplay struct {
 	outputMap    map[C.uint32_t]*C.struct_wl_output
 	outputConfig map[*C.struct_wl_output]*wlOutput
 
+	// Notification pipe fds.
+	notify struct {
+		read, write int
+	}
+
 	repeat repeatState
 }
 
@@ -105,16 +110,12 @@ type repeatState struct {
 }
 
 type window struct {
-	w      Callbacks
-	disp   *wlDisplay
-	surf   *C.struct_wl_surface
-	wmSurf *C.struct_xdg_surface
-	topLvl *C.struct_xdg_toplevel
-	decor  *C.struct_zxdg_toplevel_decoration_v1
-	// Notification pipe fds.
-	notify struct {
-		read, write int
-	}
+	w          Callbacks
+	disp       *wlDisplay
+	surf       *C.struct_wl_surface
+	wmSurf     *C.struct_xdg_surface
+	topLvl     *C.struct_xdg_toplevel
+	decor      *C.struct_zxdg_toplevel_decoration_v1
 	ppdp, ppsp float32
 	scroll     struct {
 		time  time.Duration
@@ -195,11 +196,6 @@ func newWLWindow(window Callbacks, opts *Options) error {
 }
 
 func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
-	pipe := make([]int, 2)
-	if err := syscall.Pipe2(pipe, syscall.O_NONBLOCK|syscall.O_CLOEXEC); err != nil {
-		return nil, fmt.Errorf("createNativeWindow: failed to create pipe: %v", err)
-	}
-
 	var scale int
 	for _, conf := range d.outputConfig {
 		if s := conf.scale; s > scale {
@@ -215,8 +211,6 @@ func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
 		ppdp:     ppdp,
 		ppsp:     ppdp,
 	}
-	w.notify.read = pipe[0]
-	w.notify.write = pipe[1]
 	w.surf = C.wl_compositor_create_surface(d.compositor)
 	if w.surf == nil {
 		w.destroy()
@@ -652,7 +646,7 @@ func (w *window) flushFling() {
 	w.fling.dir.X = estx.Velocity * invDist
 	w.fling.dir.Y = esty.Velocity * invDist
 	// Wake up the window loop.
-	w.wakeup()
+	w.disp.wakeup()
 }
 
 //export gio_onPointerAxisSource
@@ -762,7 +756,7 @@ func (r *repeatState) Start(w *window, keyCode uint32, t time.Duration) {
 				return
 			}
 			r.Advance(delay)
-			w.wakeup()
+			w.disp.wakeup()
 			delay = time.Second / time.Duration(rate)
 			timer.Reset(delay)
 		}
@@ -827,7 +821,7 @@ func (w *window) loop() {
 	// Poll for events and notifications.
 	pollfds := []syscall.PollFd{
 		{Fd: int32(dispfd), Events: syscall.POLLIN | syscall.POLLERR},
-		{Fd: int32(w.notify.read), Events: syscall.POLLIN | syscall.POLLERR},
+		{Fd: int32(w.disp.notify.read), Events: syscall.POLLIN | syscall.POLLERR},
 	}
 	dispFd := &pollfds[0]
 	// Plenty of room for a backlog of notifications.
@@ -855,7 +849,7 @@ loop:
 		redraw := false
 		// Clear notifications.
 		for {
-			_, err := syscall.Read(w.notify.read, buf)
+			_, err := syscall.Read(w.disp.notify.read, buf)
 			if err == syscall.EAGAIN {
 				break
 			}
@@ -886,27 +880,19 @@ func (w *window) SetAnimating(anim bool) {
 	animating := w.isAnimating()
 	w.mu.Unlock()
 	if animating {
-		w.wakeup()
+		w.disp.wakeup()
 	}
 }
 
 // Wakeup wakes up the event loop through the notification pipe.
-func (w *window) wakeup() {
+func (d *wlDisplay) wakeup() {
 	oneByte := make([]byte, 1)
-	if _, err := syscall.Write(w.notify.write, oneByte); err != nil && err != syscall.EAGAIN {
+	if _, err := syscall.Write(d.notify.write, oneByte); err != nil && err != syscall.EAGAIN {
 		panic(fmt.Errorf("failed to write to pipe: %v", err))
 	}
 }
 
 func (w *window) destroy() {
-	if w.notify.write != 0 {
-		syscall.Close(w.notify.write)
-		w.notify.write = 0
-	}
-	if w.notify.read != 0 {
-		syscall.Close(w.notify.read)
-		w.notify.read = 0
-	}
 	if w.topLvl != nil {
 		C.xdg_toplevel_destroy(w.topLvl)
 	}
@@ -1140,6 +1126,12 @@ func newWLDisplay() (*wlDisplay, error) {
 		outputMap:    make(map[C.uint32_t]*C.struct_wl_output),
 		outputConfig: make(map[*C.struct_wl_output]*wlOutput),
 	}
+	pipe := make([]int, 2)
+	if err := syscall.Pipe2(pipe, syscall.O_NONBLOCK|syscall.O_CLOEXEC); err != nil {
+		return nil, fmt.Errorf("wayland: failed to create pipe: %v", err)
+	}
+	d.notify.read = pipe[0]
+	d.notify.write = pipe[1]
 	xkb, err := xkb.New()
 	if err != nil {
 		d.destroy()
@@ -1202,6 +1194,14 @@ func newWLDisplay() (*wlDisplay, error) {
 }
 
 func (d *wlDisplay) destroy() {
+	if d.notify.write != 0 {
+		syscall.Close(d.notify.write)
+		d.notify.write = 0
+	}
+	if d.notify.read != 0 {
+		syscall.Close(d.notify.read)
+		d.notify.read = 0
+	}
 	d.repeat.Stop(0)
 	if d.xkb != nil {
 		d.xkb.Destroy()
