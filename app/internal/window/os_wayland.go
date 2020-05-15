@@ -179,13 +179,18 @@ func newWLWindow(window Callbacks, opts *Options) error {
 		d.destroy()
 		return err
 	}
+	// Increment window counter.
+	windowCounter <- +1
 	w.w = window
 	go func() {
+		defer func() {
+			// Decrement window counter.
+			windowCounter <- -1
+		}()
 		w.w.SetDriver(w)
 		w.loop()
 		w.destroy()
 		d.destroy()
-		close(mainDone)
 	}()
 	return nil
 }

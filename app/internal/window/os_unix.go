@@ -8,10 +8,16 @@ import (
 	"errors"
 )
 
-var mainDone = make(chan struct{})
+// windowCounter keeps track of the number of windows.
+// A send of +1 or -1 represents a change in window count.
+var windowCounter = make(chan int)
 
 func Main() {
-	<-mainDone
+	// Wait for first window
+	count := <-windowCounter
+	for count > 0 {
+		count += <-windowCounter
+	}
 }
 
 // instead of creating files with build tags for each combination of wayland +/- x11
