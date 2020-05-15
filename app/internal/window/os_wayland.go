@@ -67,9 +67,11 @@ type wlDisplay struct {
 		cursor *C.struct_wl_cursor
 		surf   *C.struct_wl_surface
 	}
-	decor *C.struct_zxdg_decoration_manager_v1
-	seat  *wlSeat
-	xkb   *xkb.Context
+	decor        *C.struct_zxdg_decoration_manager_v1
+	seat         *wlSeat
+	xkb          *xkb.Context
+	outputMap    map[C.uint32_t]*C.struct_wl_output
+	outputConfig map[*C.struct_wl_output]*wlOutput
 
 	repeat repeatState
 }
@@ -162,9 +164,7 @@ var (
 	// references. It is necessary because the the Wayland client API
 	// forces the use of callbacks and storing pointers to Go values
 	// in C is forbidden.
-	callbackMap  = make(map[unsafe.Pointer]interface{})
-	outputMap    = make(map[C.uint32_t]*C.struct_wl_output)
-	outputConfig = make(map[*C.struct_wl_output]*wlOutput)
+	callbackMap = make(map[unsafe.Pointer]interface{})
 )
 
 func init() {
@@ -199,7 +199,7 @@ func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
 	}
 
 	var scale int
-	for _, conf := range outputConfig {
+	for _, conf := range d.outputConfig {
 		if s := conf.scale; s > scale {
 			scale = s
 		}
@@ -347,14 +347,16 @@ func gio_onOutputMode(data unsafe.Pointer, output *C.struct_wl_output, flags C.u
 	if flags&C.WL_OUTPUT_MODE_CURRENT == 0 {
 		return
 	}
-	c := outputConfig[output]
+	d := callbackMap[data].(*wlDisplay)
+	c := d.outputConfig[output]
 	c.width = int(width)
 	c.height = int(height)
 }
 
 //export gio_onOutputGeometry
 func gio_onOutputGeometry(data unsafe.Pointer, output *C.struct_wl_output, x, y, physWidth, physHeight, subpixel C.int32_t, make, model *C.char, transform C.int32_t) {
-	c := outputConfig[output]
+	d := callbackMap[data].(*wlDisplay)
+	c := d.outputConfig[output]
 	c.transform = transform
 	c.physWidth = int(physWidth)
 	c.physHeight = int(physHeight)
@@ -362,13 +364,15 @@ func gio_onOutputGeometry(data unsafe.Pointer, output *C.struct_wl_output, x, y,
 
 //export gio_onOutputScale
 func gio_onOutputScale(data unsafe.Pointer, output *C.struct_wl_output, scale C.int32_t) {
-	c := outputConfig[output]
+	d := callbackMap[data].(*wlDisplay)
+	c := d.outputConfig[output]
 	c.scale = int(scale)
 }
 
 //export gio_onOutputDone
 func gio_onOutputDone(data unsafe.Pointer, output *C.struct_wl_output) {
-	conf := outputConfig[output]
+	d := callbackMap[data].(*wlDisplay)
+	conf := d.outputConfig[output]
 	for _, w := range conf.windows {
 		w.draw(true)
 	}
@@ -377,7 +381,7 @@ func gio_onOutputDone(data unsafe.Pointer, output *C.struct_wl_output) {
 //export gio_onSurfaceEnter
 func gio_onSurfaceEnter(data unsafe.Pointer, surf *C.struct_wl_surface, output *C.struct_wl_output) {
 	w := callbackMap[data].(*window)
-	conf := outputConfig[output]
+	conf := w.disp.outputConfig[output]
 	var found bool
 	for _, w2 := range conf.windows {
 		if w2 == w {
@@ -394,7 +398,7 @@ func gio_onSurfaceEnter(data unsafe.Pointer, surf *C.struct_wl_surface, output *
 //export gio_onSurfaceLeave
 func gio_onSurfaceLeave(data unsafe.Pointer, surf *C.struct_wl_surface, output *C.struct_wl_output) {
 	w := callbackMap[data].(*window)
-	conf := outputConfig[output]
+	conf := w.disp.outputConfig[output]
 	for i, w2 := range conf.windows {
 		if w2 == w {
 			conf.windows = append(conf.windows[:i], conf.windows[i+1:]...)
@@ -413,8 +417,8 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 	case "wl_output":
 		output := (*C.struct_wl_output)(C.wl_registry_bind(reg, name, &C.wl_output_interface, 2))
 		C.gio_wl_output_add_listener(output, unsafe.Pointer(d.disp))
-		outputMap[name] = output
-		outputConfig[output] = new(wlOutput)
+		d.outputMap[name] = output
+		d.outputConfig[output] = new(wlOutput)
 	case "wl_seat":
 		if d.seat == nil {
 			s := (*C.struct_wl_seat)(C.wl_registry_bind(reg, name, &C.wl_seat_interface, 5))
@@ -445,10 +449,10 @@ func gio_onRegistryGlobalRemove(data unsafe.Pointer, reg *C.struct_wl_registry, 
 		s.destroy()
 		d.seat = nil
 	}
-	if output, exists := outputMap[name]; exists {
+	if output, exists := d.outputMap[name]; exists {
 		C.wl_output_destroy(output)
-		delete(outputMap, name)
-		delete(outputConfig, output)
+		delete(d.outputMap, name)
+		delete(d.outputConfig, output)
 	}
 }
 
@@ -1006,7 +1010,7 @@ func (w *window) updateOpaqueRegion() {
 func (w *window) updateOutputs() {
 	scale := 1
 	var found bool
-	for _, conf := range outputConfig {
+	for _, conf := range w.disp.outputConfig {
 		for _, w2 := range conf.windows {
 			if w2 == w {
 				found = true
@@ -1115,7 +1119,10 @@ func detectUIScale() float32 {
 }
 
 func newWLDisplay() (*wlDisplay, error) {
-	d := new(wlDisplay)
+	d := &wlDisplay{
+		outputMap:    make(map[C.uint32_t]*C.struct_wl_output),
+		outputConfig: make(map[*C.struct_wl_output]*wlOutput),
+	}
 	xkb, err := xkb.New()
 	if err != nil {
 		d.destroy()
@@ -1153,7 +1160,7 @@ func newWLDisplay() (*wlDisplay, error) {
 		d.destroy()
 		return nil, errors.New("wayland: no wl_shm available")
 	}
-	if len(outputMap) == 0 {
+	if len(d.outputMap) == 0 {
 		d.destroy()
 		return nil, errors.New("wayland: no outputs available")
 	}
@@ -1208,7 +1215,7 @@ func (d *wlDisplay) destroy() {
 	if d.wm != nil {
 		C.xdg_wm_base_destroy(d.wm)
 	}
-	for _, output := range outputMap {
+	for _, output := range d.outputMap {
 		C.wl_output_destroy(output)
 	}
 	if d.reg != nil {
