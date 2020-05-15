@@ -56,17 +56,12 @@ import (
 import "C"
 
 type wlDisplay struct {
-	disp       *C.struct_wl_display
-	reg        *C.struct_wl_registry
-	compositor *C.struct_wl_compositor
-	wm         *C.struct_xdg_wm_base
-	imm        *C.struct_zwp_text_input_manager_v3
-	shm        *C.struct_wl_shm
-	cursor     struct {
-		theme  *C.struct_wl_cursor_theme
-		cursor *C.struct_wl_cursor
-		surf   *C.struct_wl_surface
-	}
+	disp         *C.struct_wl_display
+	reg          *C.struct_wl_registry
+	compositor   *C.struct_wl_compositor
+	wm           *C.struct_xdg_wm_base
+	imm          *C.struct_zwp_text_input_manager_v3
+	shm          *C.struct_wl_shm
 	decor        *C.struct_zxdg_decoration_manager_v1
 	seat         *wlSeat
 	xkb          *xkb.Context
@@ -125,6 +120,12 @@ type window struct {
 	pointerBtns pointer.Buttons
 	lastPos     f32.Point
 	lastTouch   f32.Point
+
+	cursor struct {
+		theme  *C.struct_wl_cursor_theme
+		cursor *C.struct_wl_cursor
+		surf   *C.struct_wl_surface
+	}
 
 	fling struct {
 		yExtrapolation fling.Extrapolation
@@ -234,6 +235,23 @@ func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
 	if w.topLvl == nil {
 		w.destroy()
 		return nil, errors.New("wayland: xdg_surface_get_toplevel failed")
+	}
+	w.cursor.theme = C.wl_cursor_theme_load(nil, 32, d.shm)
+	if w.cursor.theme == nil {
+		w.destroy()
+		return nil, errors.New("wayland: wl_cursor_theme_load failed")
+	}
+	cname := C.CString("left_ptr")
+	defer C.free(unsafe.Pointer(cname))
+	w.cursor.cursor = C.wl_cursor_theme_get_cursor(w.cursor.theme, cname)
+	if w.cursor.cursor == nil {
+		w.destroy()
+		return nil, errors.New("wayland: wl_cursor_theme_get_cursor failed")
+	}
+	w.cursor.surf = C.wl_compositor_create_surface(d.compositor)
+	if w.cursor.surf == nil {
+		w.destroy()
+		return nil, errors.New("wayland: wl_compositor_create_surface failed")
 	}
 	C.gio_xdg_wm_base_add_listener(d.wm, unsafe.Pointer(w.surf))
 	C.gio_wl_surface_add_listener(w.surf, unsafe.Pointer(w.surf))
@@ -547,15 +565,15 @@ func gio_onPointerEnter(data unsafe.Pointer, pointer *C.struct_wl_pointer, seria
 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
 	s.pointerFocus = w
 	// Get images[0].
-	img := *s.disp.cursor.cursor.images
+	img := *w.cursor.cursor.images
 	buf := C.wl_cursor_image_get_buffer(img)
 	if buf == nil {
 		return
 	}
-	C.wl_pointer_set_cursor(pointer, serial, s.disp.cursor.surf, C.int32_t(img.hotspot_x), C.int32_t(img.hotspot_y))
-	C.wl_surface_attach(s.disp.cursor.surf, buf, 0, 0)
-	C.wl_surface_damage(s.disp.cursor.surf, 0, 0, C.int32_t(img.width), C.int32_t(img.height))
-	C.wl_surface_commit(s.disp.cursor.surf)
+	C.wl_pointer_set_cursor(pointer, serial, w.cursor.surf, C.int32_t(img.hotspot_x), C.int32_t(img.hotspot_y))
+	C.wl_surface_attach(w.cursor.surf, buf, 0, 0)
+	C.wl_surface_damage(w.cursor.surf, 0, 0, C.int32_t(img.width), C.int32_t(img.height))
+	C.wl_surface_commit(w.cursor.surf)
 	w.lastPos = f32.Point{X: fromFixed(x), Y: fromFixed(y)}
 }
 
@@ -905,6 +923,12 @@ func (d *wlDisplay) wakeup() {
 }
 
 func (w *window) destroy() {
+	if w.cursor.surf != nil {
+		C.wl_surface_destroy(w.cursor.surf)
+	}
+	if w.cursor.theme != nil {
+		C.wl_cursor_theme_destroy(w.cursor.theme)
+	}
 	if w.topLvl != nil {
 		C.xdg_toplevel_destroy(w.topLvl)
 	}
@@ -1185,23 +1209,6 @@ func newWLDisplay() (*wlDisplay, error) {
 		d.destroy()
 		return nil, errors.New("wayland: no outputs available")
 	}
-	d.cursor.theme = C.wl_cursor_theme_load(nil, 32, d.shm)
-	if d.cursor.theme == nil {
-		d.destroy()
-		return nil, errors.New("wayland: wl_cursor_theme_load failed")
-	}
-	cname := C.CString("left_ptr")
-	defer C.free(unsafe.Pointer(cname))
-	d.cursor.cursor = C.wl_cursor_theme_get_cursor(d.cursor.theme, cname)
-	if d.cursor.cursor == nil {
-		d.destroy()
-		return nil, errors.New("wayland: wl_cursor_theme_get_cursor failed")
-	}
-	d.cursor.surf = C.wl_compositor_create_surface(d.compositor)
-	if d.cursor.surf == nil {
-		d.destroy()
-		return nil, errors.New("wayland: wl_compositor_create_surface failed")
-	}
 	return d, nil
 }
 
@@ -1218,12 +1225,6 @@ func (d *wlDisplay) destroy() {
 	if d.xkb != nil {
 		d.xkb.Destroy()
 		d.xkb = nil
-	}
-	if d.cursor.surf != nil {
-		C.wl_surface_destroy(d.cursor.surf)
-	}
-	if d.cursor.theme != nil {
-		C.wl_cursor_theme_destroy(d.cursor.theme)
 	}
 	if d.seat != nil {
 		d.seat.destroy()
