@@ -834,7 +834,6 @@ func (w *window) loop() {
 	var buf = make([]byte, 100)
 loop:
 	for {
-		C.wl_display_dispatch_pending(w.disp.disp)
 		dispFd.Events &^= syscall.POLLOUT
 		if _, err := C.wl_display_flush(w.disp.disp); err != nil {
 			if err != syscall.EAGAIN {
