@@ -162,7 +162,7 @@ var (
 	// references. It is necessary because the the Wayland client API
 	// forces the use of callbacks and storing pointers to Go values
 	// in C is forbidden.
-	callbackMap  = make(map[interface{}]interface{})
+	callbackMap  = make(map[unsafe.Pointer]interface{})
 	outputMap    = make(map[C.uint32_t]*C.struct_wl_output)
 	outputConfig = make(map[*C.struct_wl_output]*wlOutput)
 )
@@ -220,6 +220,7 @@ func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
 		w.destroy()
 		return nil, errors.New("wayland: wl_compositor_create_surface failed")
 	}
+	callbackMap[unsafe.Pointer(w.surf)] = w
 	w.wmSurf = C.xdg_wm_base_get_xdg_surface(d.wm, w.surf)
 	if w.wmSurf == nil {
 		w.destroy()
@@ -230,10 +231,10 @@ func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
 		w.destroy()
 		return nil, errors.New("wayland: xdg_surface_get_toplevel failed")
 	}
-	C.gio_xdg_wm_base_add_listener(d.wm)
-	C.gio_wl_surface_add_listener(w.surf)
-	C.gio_xdg_surface_add_listener(w.wmSurf)
-	C.gio_xdg_toplevel_add_listener(w.topLvl)
+	C.gio_xdg_wm_base_add_listener(d.wm, unsafe.Pointer(w.surf))
+	C.gio_wl_surface_add_listener(w.surf, unsafe.Pointer(w.surf))
+	C.gio_xdg_surface_add_listener(w.wmSurf, unsafe.Pointer(w.surf))
+	C.gio_xdg_toplevel_add_listener(w.topLvl, unsafe.Pointer(w.surf))
 	title := C.CString(opts.Title)
 	C.xdg_toplevel_set_title(w.topLvl, title)
 	C.free(unsafe.Pointer(title))
@@ -248,15 +249,12 @@ func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
 	}
 	w.updateOpaqueRegion()
 	C.wl_surface_commit(w.surf)
-	callbackMap[w.topLvl] = w
-	callbackMap[w.surf] = w
-	callbackMap[w.wmSurf] = w
 	return w, nil
 }
 
 //export gio_onSeatCapabilities
 func gio_onSeatCapabilities(data unsafe.Pointer, seat *C.struct_wl_seat, caps C.uint32_t) {
-	s := callbackMap[seat].(*wlSeat)
+	s := callbackMap[data].(*wlSeat)
 	s.updateCaps(caps)
 }
 
@@ -266,52 +264,46 @@ func (s *wlSeat) destroy() {
 		s.im = nil
 	}
 	if s.pointer != nil {
-		delete(callbackMap, s.pointer)
 		C.wl_pointer_release(s.pointer)
 	}
 	if s.touch != nil {
-		delete(callbackMap, s.touch)
 		C.wl_touch_release(s.touch)
 	}
 	if s.keyboard != nil {
-		delete(callbackMap, s.keyboard)
 		C.wl_keyboard_release(s.keyboard)
 	}
-	C.wl_seat_release(s.seat)
+	if s.seat != nil {
+		delete(callbackMap, unsafe.Pointer(s.seat))
+		C.wl_seat_release(s.seat)
+	}
 }
 
 func (s *wlSeat) updateCaps(caps C.uint32_t) {
 	if s.im == nil && s.disp.imm != nil {
 		s.im = C.zwp_text_input_manager_v3_get_text_input(s.disp.imm, s.seat)
-		C.gio_zwp_text_input_v3_add_listener(s.im)
+		C.gio_zwp_text_input_v3_add_listener(s.im, unsafe.Pointer(s.seat))
 	}
 	switch {
 	case s.pointer == nil && caps&C.WL_SEAT_CAPABILITY_POINTER != 0:
 		s.pointer = C.wl_seat_get_pointer(s.seat)
-		callbackMap[s.pointer] = s
-		C.gio_wl_pointer_add_listener(s.pointer)
+		C.gio_wl_pointer_add_listener(s.pointer, unsafe.Pointer(s.seat))
 	case s.pointer != nil && caps&C.WL_SEAT_CAPABILITY_POINTER == 0:
-		delete(callbackMap, s.pointer)
 		C.wl_pointer_release(s.pointer)
 		s.pointer = nil
 	}
 	switch {
 	case s.touch == nil && caps&C.WL_SEAT_CAPABILITY_TOUCH != 0:
 		s.touch = C.wl_seat_get_touch(s.seat)
-		callbackMap[s.touch] = s
-		C.gio_wl_touch_add_listener(s.touch)
+		C.gio_wl_touch_add_listener(s.touch, unsafe.Pointer(s.seat))
 	case s.touch != nil && caps&C.WL_SEAT_CAPABILITY_TOUCH == 0:
-		delete(callbackMap, s.touch)
 		C.wl_touch_release(s.touch)
 		s.touch = nil
 	}
 	switch {
 	case s.keyboard == nil && caps&C.WL_SEAT_CAPABILITY_KEYBOARD != 0:
 		s.keyboard = C.wl_seat_get_keyboard(s.seat)
-		callbackMap[s.keyboard] = s
-		C.gio_wl_keyboard_add_listener(s.keyboard)
+		C.gio_wl_keyboard_add_listener(s.keyboard, unsafe.Pointer(s.seat))
 	case s.keyboard != nil && caps&C.WL_SEAT_CAPABILITY_KEYBOARD == 0:
-		delete(callbackMap, s.keyboard)
 		C.wl_keyboard_release(s.keyboard)
 		s.keyboard = nil
 	}
@@ -323,7 +315,7 @@ func gio_onSeatName(data unsafe.Pointer, seat *C.struct_wl_seat, name *C.char) {
 
 //export gio_onXdgSurfaceConfigure
 func gio_onXdgSurfaceConfigure(data unsafe.Pointer, wmSurf *C.struct_xdg_surface, serial C.uint32_t) {
-	w := callbackMap[wmSurf].(*window)
+	w := callbackMap[data].(*window)
 	w.mu.Lock()
 	w.serial = serial
 	w.needAck = true
@@ -334,13 +326,13 @@ func gio_onXdgSurfaceConfigure(data unsafe.Pointer, wmSurf *C.struct_xdg_surface
 
 //export gio_onToplevelClose
 func gio_onToplevelClose(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel) {
-	w := callbackMap[topLvl].(*window)
+	w := callbackMap[data].(*window)
 	w.dead = true
 }
 
 //export gio_onToplevelConfigure
 func gio_onToplevelConfigure(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel, width, height C.int32_t, states *C.struct_wl_array) {
-	w := callbackMap[topLvl].(*window)
+	w := callbackMap[data].(*window)
 	if width != 0 && height != 0 {
 		w.mu.Lock()
 		defer w.mu.Unlock()
@@ -384,7 +376,7 @@ func gio_onOutputDone(data unsafe.Pointer, output *C.struct_wl_output) {
 
 //export gio_onSurfaceEnter
 func gio_onSurfaceEnter(data unsafe.Pointer, surf *C.struct_wl_surface, output *C.struct_wl_output) {
-	w := callbackMap[surf].(*window)
+	w := callbackMap[data].(*window)
 	conf := outputConfig[output]
 	var found bool
 	for _, w2 := range conf.windows {
@@ -401,7 +393,7 @@ func gio_onSurfaceEnter(data unsafe.Pointer, surf *C.struct_wl_surface, output *
 
 //export gio_onSurfaceLeave
 func gio_onSurfaceLeave(data unsafe.Pointer, surf *C.struct_wl_surface, output *C.struct_wl_output) {
-	w := callbackMap[surf].(*window)
+	w := callbackMap[data].(*window)
 	conf := outputConfig[output]
 	for i, w2 := range conf.windows {
 		if w2 == w {
@@ -414,13 +406,13 @@ func gio_onSurfaceLeave(data unsafe.Pointer, surf *C.struct_wl_surface, output *
 
 //export gio_onRegistryGlobal
 func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C.uint32_t, cintf *C.char, version C.uint32_t) {
-	d := callbackMap[reg].(*wlDisplay)
+	d := callbackMap[data].(*wlDisplay)
 	switch C.GoString(cintf) {
 	case "wl_compositor":
 		d.compositor = (*C.struct_wl_compositor)(C.wl_registry_bind(reg, name, &C.wl_compositor_interface, 3))
 	case "wl_output":
 		output := (*C.struct_wl_output)(C.wl_registry_bind(reg, name, &C.wl_output_interface, 2))
-		C.gio_wl_output_add_listener(output)
+		C.gio_wl_output_add_listener(output, unsafe.Pointer(d.disp))
 		outputMap[name] = output
 		outputConfig[output] = new(wlOutput)
 	case "wl_seat":
@@ -431,8 +423,8 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 				name: name,
 				seat: s,
 			}
-			callbackMap[s] = d.seat
-			C.gio_wl_seat_add_listener(d.seat.seat)
+			callbackMap[unsafe.Pointer(s)] = d.seat
+			C.gio_wl_seat_add_listener(d.seat.seat, unsafe.Pointer(d.seat.seat))
 		}
 	case "wl_shm":
 		d.shm = (*C.struct_wl_shm)(C.wl_registry_bind(reg, name, &C.wl_shm_interface, 1))
@@ -448,7 +440,7 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 
 //export gio_onRegistryGlobalRemove
 func gio_onRegistryGlobalRemove(data unsafe.Pointer, reg *C.struct_wl_registry, name C.uint32_t) {
-	d := callbackMap[reg].(*wlDisplay)
+	d := callbackMap[data].(*wlDisplay)
 	if s := d.seat; s != nil && name == s.name {
 		s.destroy()
 		d.seat = nil
@@ -462,8 +454,9 @@ func gio_onRegistryGlobalRemove(data unsafe.Pointer, reg *C.struct_wl_registry, 
 
 //export gio_onTouchDown
 func gio_onTouchDown(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.uint32_t, surf *C.struct_wl_surface, id C.int32_t, x, y C.wl_fixed_t) {
-	w := callbackMap[surf].(*window)
-	w.disp.seat.touchFoci[id] = w
+	s := callbackMap[data].(*wlSeat)
+	w := callbackMap[unsafe.Pointer(surf)].(*window)
+	s.touchFoci[id] = w
 	w.lastTouch = f32.Point{
 		X: fromFixed(x) * float32(w.scale),
 		Y: fromFixed(y) * float32(w.scale),
@@ -479,7 +472,7 @@ func gio_onTouchDown(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.
 
 //export gio_onTouchUp
 func gio_onTouchUp(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.uint32_t, id C.int32_t) {
-	s := callbackMap[touch].(*wlSeat)
+	s := callbackMap[data].(*wlSeat)
 	w := s.touchFoci[id]
 	delete(s.touchFoci, id)
 	w.w.Event(pointer.Event{
@@ -493,7 +486,7 @@ func gio_onTouchUp(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.ui
 
 //export gio_onTouchMotion
 func gio_onTouchMotion(data unsafe.Pointer, touch *C.struct_wl_touch, t C.uint32_t, id C.int32_t, x, y C.wl_fixed_t) {
-	s := callbackMap[touch].(*wlSeat)
+	s := callbackMap[data].(*wlSeat)
 	w := s.touchFoci[id]
 	w.lastTouch = f32.Point{
 		X: fromFixed(x) * float32(w.scale),
@@ -514,7 +507,7 @@ func gio_onTouchFrame(data unsafe.Pointer, touch *C.struct_wl_touch) {
 
 //export gio_onTouchCancel
 func gio_onTouchCancel(data unsafe.Pointer, touch *C.struct_wl_touch) {
-	s := callbackMap[touch].(*wlSeat)
+	s := callbackMap[data].(*wlSeat)
 	for id, w := range s.touchFoci {
 		delete(s.touchFoci, id)
 		w.w.Event(pointer.Event{
@@ -526,19 +519,19 @@ func gio_onTouchCancel(data unsafe.Pointer, touch *C.struct_wl_touch) {
 
 //export gio_onPointerEnter
 func gio_onPointerEnter(data unsafe.Pointer, pointer *C.struct_wl_pointer, serial C.uint32_t, surf *C.struct_wl_surface, x, y C.wl_fixed_t) {
-	w := callbackMap[surf].(*window)
-	w.disp.seat.pointerFocus = w
-	d := w.disp
+	s := callbackMap[data].(*wlSeat)
+	w := callbackMap[unsafe.Pointer(surf)].(*window)
+	s.pointerFocus = w
 	// Get images[0].
-	img := *d.cursor.cursor.images
+	img := *s.disp.cursor.cursor.images
 	buf := C.wl_cursor_image_get_buffer(img)
 	if buf == nil {
 		return
 	}
-	C.wl_pointer_set_cursor(pointer, serial, d.cursor.surf, C.int32_t(img.hotspot_x), C.int32_t(img.hotspot_y))
-	C.wl_surface_attach(d.cursor.surf, buf, 0, 0)
-	C.wl_surface_damage(d.cursor.surf, 0, 0, C.int32_t(img.width), C.int32_t(img.height))
-	C.wl_surface_commit(d.cursor.surf)
+	C.wl_pointer_set_cursor(pointer, serial, s.disp.cursor.surf, C.int32_t(img.hotspot_x), C.int32_t(img.hotspot_y))
+	C.wl_surface_attach(s.disp.cursor.surf, buf, 0, 0)
+	C.wl_surface_damage(s.disp.cursor.surf, 0, 0, C.int32_t(img.width), C.int32_t(img.height))
+	C.wl_surface_commit(s.disp.cursor.surf)
 	w.lastPos = f32.Point{X: fromFixed(x), Y: fromFixed(y)}
 }
 
@@ -548,7 +541,7 @@ func gio_onPointerLeave(data unsafe.Pointer, p *C.struct_wl_pointer, serial C.ui
 
 //export gio_onPointerMotion
 func gio_onPointerMotion(data unsafe.Pointer, p *C.struct_wl_pointer, t C.uint32_t, x, y C.wl_fixed_t) {
-	s := callbackMap[p].(*wlSeat)
+	s := callbackMap[data].(*wlSeat)
 	w := s.pointerFocus
 	w.resetFling()
 	w.onPointerMotion(x, y, t)
@@ -556,7 +549,7 @@ func gio_onPointerMotion(data unsafe.Pointer, p *C.struct_wl_pointer, t C.uint32
 
 //export gio_onPointerButton
 func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t, wbtn, state C.uint32_t) {
-	s := callbackMap[p].(*wlSeat)
+	s := callbackMap[data].(*wlSeat)
 	w := s.pointerFocus
 	// From linux-event-codes.h.
 	const (
@@ -597,7 +590,7 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 
 //export gio_onPointerAxis
 func gio_onPointerAxis(data unsafe.Pointer, p *C.struct_wl_pointer, t, axis C.uint32_t, value C.wl_fixed_t) {
-	s := callbackMap[p].(*wlSeat)
+	s := callbackMap[data].(*wlSeat)
 	w := s.pointerFocus
 	v := fromFixed(value)
 	w.resetFling()
@@ -614,7 +607,7 @@ func gio_onPointerAxis(data unsafe.Pointer, p *C.struct_wl_pointer, t, axis C.ui
 
 //export gio_onPointerFrame
 func gio_onPointerFrame(data unsafe.Pointer, p *C.struct_wl_pointer) {
-	s := callbackMap[p].(*wlSeat)
+	s := callbackMap[data].(*wlSeat)
 	w := s.pointerFocus
 	w.flushScroll()
 	w.flushFling()
@@ -646,14 +639,14 @@ func gio_onPointerAxisSource(data unsafe.Pointer, pointer *C.struct_wl_pointer, 
 
 //export gio_onPointerAxisStop
 func gio_onPointerAxisStop(data unsafe.Pointer, p *C.struct_wl_pointer, t, axis C.uint32_t) {
-	s := callbackMap[p].(*wlSeat)
+	s := callbackMap[data].(*wlSeat)
 	w := s.pointerFocus
 	w.fling.start = true
 }
 
 //export gio_onPointerAxisDiscrete
 func gio_onPointerAxisDiscrete(data unsafe.Pointer, p *C.struct_wl_pointer, axis C.uint32_t, discrete C.int32_t) {
-	s := callbackMap[p].(*wlSeat)
+	s := callbackMap[data].(*wlSeat)
 	w := s.pointerFocus
 	w.resetFling()
 	switch axis {
@@ -672,14 +665,13 @@ func (w *window) resetFling() {
 //export gio_onKeyboardKeymap
 func gio_onKeyboardKeymap(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, format C.uint32_t, fd C.int32_t, size C.uint32_t) {
 	defer syscall.Close(int(fd))
-	s := callbackMap[keyboard].(*wlSeat)
-	d := s.disp
-	d.repeat.Stop(0)
-	d.xkb.DestroyKeymapState()
+	s := callbackMap[data].(*wlSeat)
+	s.disp.repeat.Stop(0)
+	s.disp.xkb.DestroyKeymapState()
 	if format != C.WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 {
 		return
 	}
-	if err := d.xkb.LoadKeymap(int(format), int(fd), int(size)); err != nil {
+	if err := s.disp.xkb.LoadKeymap(int(format), int(fd), int(size)); err != nil {
 		// TODO: Do better.
 		panic(err)
 	}
@@ -687,16 +679,16 @@ func gio_onKeyboardKeymap(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, f
 
 //export gio_onKeyboardEnter
 func gio_onKeyboardEnter(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial C.uint32_t, surf *C.struct_wl_surface, keys *C.struct_wl_array) {
-	w := callbackMap[surf].(*window)
-	w.disp.seat.keyboardFocus = w
-	d := w.disp
-	d.repeat.Stop(0)
+	s := callbackMap[data].(*wlSeat)
+	w := callbackMap[unsafe.Pointer(surf)].(*window)
+	s.keyboardFocus = w
+	s.disp.repeat.Stop(0)
 	w.w.Event(key.FocusEvent{Focus: true})
 }
 
 //export gio_onKeyboardLeave
 func gio_onKeyboardLeave(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial C.uint32_t, surf *C.struct_wl_surface) {
-	s := callbackMap[keyboard].(*wlSeat)
+	s := callbackMap[data].(*wlSeat)
 	s.disp.repeat.Stop(0)
 	w := s.keyboardFocus
 	w.w.Event(key.FocusEvent{Focus: false})
@@ -704,7 +696,7 @@ func gio_onKeyboardLeave(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, se
 
 //export gio_onKeyboardKey
 func gio_onKeyboardKey(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial, timestamp, keyCode, state C.uint32_t) {
-	s := callbackMap[keyboard].(*wlSeat)
+	s := callbackMap[data].(*wlSeat)
 	w := s.keyboardFocus
 	t := time.Duration(timestamp) * time.Millisecond
 	s.disp.repeat.Stop(t)
@@ -801,8 +793,7 @@ func (r *repeatState) Repeat(d *wlDisplay) {
 //export gio_onFrameDone
 func gio_onFrameDone(data unsafe.Pointer, callback *C.struct_wl_callback, t C.uint32_t) {
 	C.wl_callback_destroy(callback)
-	surf := (*C.struct_wl_surface)(data)
-	w := callbackMap[surf].(*window)
+	w := callbackMap[data].(*window)
 	if w.lastFrameCallback == callback {
 		w.lastFrameCallback = nil
 		w.draw(false)
@@ -896,25 +887,23 @@ func (w *window) destroy() {
 		w.notify.read = 0
 	}
 	if w.topLvl != nil {
-		delete(callbackMap, w.topLvl)
 		C.xdg_toplevel_destroy(w.topLvl)
 	}
 	if w.surf != nil {
-		delete(callbackMap, w.surf)
 		C.wl_surface_destroy(w.surf)
 	}
 	if w.wmSurf != nil {
-		delete(callbackMap, w.wmSurf)
 		C.xdg_surface_destroy(w.wmSurf)
 	}
 	if w.decor != nil {
 		C.zxdg_toplevel_decoration_v1_destroy(w.decor)
 	}
+	delete(callbackMap, unsafe.Pointer(w.surf))
 }
 
 //export gio_onKeyboardModifiers
 func gio_onKeyboardModifiers(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial, depressed, latched, locked, group C.uint32_t) {
-	s := callbackMap[keyboard].(*wlSeat)
+	s := callbackMap[data].(*wlSeat)
 	d := s.disp
 	d.repeat.Stop(0)
 	if d.xkb == nil {
@@ -925,7 +914,7 @@ func gio_onKeyboardModifiers(data unsafe.Pointer, keyboard *C.struct_wl_keyboard
 
 //export gio_onKeyboardRepeatInfo
 func gio_onKeyboardRepeatInfo(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, rate, delay C.int32_t) {
-	s := callbackMap[keyboard].(*wlSeat)
+	s := callbackMap[data].(*wlSeat)
 	d := s.disp
 	d.repeat.Stop(0)
 	d.repeat.rate = int(rate)
@@ -1138,13 +1127,13 @@ func newWLDisplay() (*wlDisplay, error) {
 		d.destroy()
 		return nil, fmt.Errorf("wayland: wl_display_connect failed: %v", err)
 	}
+	callbackMap[unsafe.Pointer(d.disp)] = d
 	d.reg = C.wl_display_get_registry(d.disp)
 	if d.reg == nil {
 		d.destroy()
 		return nil, errors.New("wayland: wl_display_get_registry failed")
 	}
-	callbackMap[d.reg] = d
-	C.gio_wl_registry_add_listener(d.reg)
+	C.gio_wl_registry_add_listener(d.reg, unsafe.Pointer(d.disp))
 	// Wait for the server to register all its globals to the
 	// registry listener (gio_onRegistryGlobal).
 	C.wl_display_roundtrip(d.disp)
@@ -1224,11 +1213,10 @@ func (d *wlDisplay) destroy() {
 	}
 	if d.reg != nil {
 		C.wl_registry_destroy(d.reg)
-		delete(callbackMap, d.reg)
 	}
 	if d.disp != nil {
 		C.wl_display_disconnect(d.disp)
-		delete(callbackMap, d.disp)
+		delete(callbackMap, unsafe.Pointer(d.disp))
 	}
 }
 
