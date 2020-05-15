@@ -205,6 +205,18 @@ func newWLWindow(window Callbacks, opts *Options) error {
 }
 
 func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
+	if d.compositor == nil {
+		return nil, errors.New("wayland: no compositor available")
+	}
+	if d.wm == nil {
+		return nil, errors.New("wayland: no xdg_wm_base available")
+	}
+	if d.shm == nil {
+		return nil, errors.New("wayland: no wl_shm available")
+	}
+	if len(d.outputMap) == 0 {
+		return nil, errors.New("wayland: no outputs available")
+	}
 	var scale int
 	for _, conf := range d.outputConfig {
 		if s := conf.scale; s > scale {
@@ -1193,22 +1205,6 @@ func newWLDisplay() (*wlDisplay, error) {
 	// We need another roundtrip to get the initial output configurations
 	// through the gio_onOutput* callbacks.
 	C.wl_display_roundtrip(d.disp)
-	if d.compositor == nil {
-		d.destroy()
-		return nil, errors.New("wayland: no compositor available")
-	}
-	if d.wm == nil {
-		d.destroy()
-		return nil, errors.New("wayland: no xdg_wm_base available")
-	}
-	if d.shm == nil {
-		d.destroy()
-		return nil, errors.New("wayland: no wl_shm available")
-	}
-	if len(d.outputMap) == 0 {
-		d.destroy()
-		return nil, errors.New("wayland: no outputs available")
-	}
 	return d, nil
 }
 
