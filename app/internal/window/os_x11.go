@@ -113,17 +113,15 @@ func (w *x11Window) loop() {
 
 loop:
 	for !w.dead {
-		var syn, redraw bool
+		var syn, anim bool
 		// Check for pending draw events before checking animation or blocking.
 		// This fixes an issue on Xephyr where on startup XPending() > 0 but
 		// poll will still block. This also prevents no-op calls to poll.
 		if syn = h.handleEvents(); !syn {
 			w.mu.Lock()
-			animating := w.animating
+			anim = w.animating
 			w.mu.Unlock()
-			if animating {
-				redraw = true
-			} else {
+			if !anim {
 				// Clear poll events.
 				*xEvents = 0
 				// Wait for X event or gio notification.
@@ -150,10 +148,9 @@ loop:
 			if err != nil {
 				panic(fmt.Errorf("x11 loop: read from notify pipe failed: %w", err))
 			}
-			redraw = true
 		}
 
-		if redraw || syn {
+		if anim || syn {
 			w.cfg.now = time.Now()
 			w.w.Event(FrameEvent{
 				FrameEvent: system.FrameEvent{
