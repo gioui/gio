@@ -233,8 +233,11 @@ func (c *callbacks) SetDriver(d window.Driver) {
 }
 
 func (c *callbacks) Event(e event.Event) {
-	c.w.in <- e
-	<-c.w.ack
+	select {
+	case c.w.in <- e:
+		<-c.w.ack
+	case <-c.w.dead:
+	}
 }
 
 func (w *Window) waitAck() {
