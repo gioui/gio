@@ -214,6 +214,21 @@ func (w *Window) destroyGPU() {
 	}
 }
 
+// waitFrame waits for the client to either call FrameEvent.Frame
+// or to continue event handling. It returns whether the client
+// called Frame or not.
+func (w *Window) waitFrame() (*op.Ops, bool) {
+	select {
+	case frame := <-w.frames:
+		// The client called FrameEvent.Frame.
+		return frame, true
+	case w.out <- ackEvent:
+		// The client ignored FrameEvent and continued processing
+		// events.
+		return nil, false
+	}
+}
+
 func (w *Window) run(opts *window.Options) {
 	defer close(w.in)
 	defer close(w.out)
@@ -271,16 +286,7 @@ func (w *Window) run(opts *window.Options) {
 						w.loop.Refresh()
 					}
 				}
-				var frame *op.Ops
-				// Wait for either a frame or an ack event to go
-				// through, which means that the client didn't give us
-				// a frame.
-				gotFrame := false
-				select {
-				case frame = <-w.frames:
-					gotFrame = true
-				case w.out <- ackEvent:
-				}
+				frame, gotFrame := w.waitFrame()
 				var err error
 				for {
 					if w.loop != nil {
