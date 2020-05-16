@@ -27,10 +27,8 @@ type androidDriver interface {
 // and registers it as a Fragment in the Context in which the View was
 // created.
 func (w *Window) RegisterFragment(del string) {
-	go func() {
-		w.driverFuncs <- func() {
-			d := w.driver.(androidDriver)
-			d.RegisterFragment(del)
-		}
-	}()
+	w.driverDo(func() {
+		d := w.driver.(androidDriver)
+		d.RegisterFragment(del)
+	})
 }

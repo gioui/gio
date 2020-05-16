@@ -37,6 +37,8 @@ type Window struct {
 	invalidates chan struct{}
 	frames      chan *op.Ops
 	frameAck    chan struct{}
+	// dead is closed when the window is destroyed.
+	dead chan struct{}
 
 	stage        system.Stage
 	animating    bool
@@ -96,6 +98,7 @@ func NewWindow(options ...Option) *Window {
 		frames:      make(chan *op.Ops),
 		frameAck:    make(chan struct{}),
 		driverFuncs: make(chan func()),
+		dead:        make(chan struct{}),
 	}
 	w.callbacks.w = w
 	go w.run(opts)
@@ -188,6 +191,17 @@ func (w *Window) Invalidate() {
 	}
 }
 
+// driverDo calls f as soon as the window has a valid driver attached,
+// or does nothing if the window is destroyed while waiting.
+func (w *Window) driverDo(f func()) {
+	go func() {
+		select {
+		case w.driverFuncs <- f:
+		case <-w.dead:
+		}
+	}()
+}
+
 func (w *Window) updateAnimation() {
 	animate := false
 	if w.delayedDraw != nil {
@@ -236,6 +250,7 @@ func (w *Window) destroy(err error) {
 	// Ack the current event.
 	w.ack <- struct{}{}
 	w.out <- system.DestroyEvent{Err: err}
+	close(w.dead)
 	for e := range w.in {
 		w.ack <- struct{}{}
 		if _, ok := e.(system.DestroyEvent); ok {
@@ -274,7 +289,7 @@ func (w *Window) run(opts *window.Options) {
 		return
 	}
 	for {
-		var driverFuncs chan func() = nil
+		var driverFuncs chan func()
 		if w.driver != nil {
 			driverFuncs = w.driverFuncs
 		}
