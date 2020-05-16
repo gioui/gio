@@ -47,12 +47,25 @@ type x11Window struct {
 	xkbEventBase C.int
 	xw           C.Window
 
-	evDelWindow C.Atom
-	stage       system.Stage
-	cfg         config
-	width       int
-	height      int
-	notify      struct {
+	atoms struct {
+		// "UTF8_STRING".
+		utf8string C.Atom
+		// "TARGETS"
+		targets C.Atom
+		// "CLIPBOARD".
+		clipboard C.Atom
+		// "CLIPBOARD_CONTENT", the clipboard destination property.
+		clipboardContent C.Atom
+		// "WM_DELETE_WINDOW"
+		evDelWindow C.Atom
+		// "ATOM"
+		atom C.Atom
+	}
+	stage  system.Stage
+	cfg    config
+	width  int
+	height int
+	notify struct {
 		read, write int
 	}
 	dead bool
@@ -61,6 +74,12 @@ type x11Window struct {
 	animating bool
 
 	pointerBtns pointer.Buttons
+
+	clipboard struct {
+		read    bool
+		write   *string
+		content []byte
+	}
 }
 
 func (w *x11Window) SetAnimating(anim bool) {
@@ -70,6 +89,20 @@ func (w *x11Window) SetAnimating(anim bool) {
 	if anim {
 		w.wakeup()
 	}
+}
+
+func (w *x11Window) ReadClipboard() {
+	w.mu.Lock()
+	w.clipboard.read = true
+	w.mu.Unlock()
+	w.wakeup()
+}
+
+func (w *x11Window) WriteClipboard(s string) {
+	w.mu.Lock()
+	w.clipboard.write = &s
+	w.mu.Unlock()
+	w.wakeup()
 }
 
 func (w *x11Window) ShowTextInput(show bool) {}
@@ -162,6 +195,20 @@ loop:
 				},
 				Sync: syn,
 			})
+		}
+		w.mu.Lock()
+		readClipboard := w.clipboard.read
+		writeClipboard := w.clipboard.write
+		w.clipboard.read = false
+		w.clipboard.write = nil
+		w.mu.Unlock()
+		if readClipboard {
+			C.XDeleteProperty(w.x, w.xw, w.atoms.clipboardContent)
+			C.XConvertSelection(w.x, w.atoms.clipboard, w.atoms.utf8string, w.atoms.clipboardContent, w.xw, C.CurrentTime)
+		}
+		if writeClipboard != nil {
+			w.clipboard.content = []byte(*writeClipboard)
+			C.XSetSelectionOwner(w.x, w.atoms.clipboard, w.xw, C.CurrentTime)
 		}
 	}
 	w.w.Event(system.DestroyEvent{Err: nil})
@@ -303,10 +350,67 @@ func (h *x11EventHandler) handleEvents() bool {
 			w.width = int(cevt.width)
 			w.height = int(cevt.height)
 			// redraw will be done by a later expose event
+		case C.SelectionNotify:
+			cevt := (*C.XSelectionEvent)(unsafe.Pointer(xev))
+			prop := w.atoms.clipboardContent
+			if cevt.property != prop {
+				break
+			}
+			if cevt.selection != w.atoms.clipboard {
+				break
+			}
+			var text C.XTextProperty
+			if st := C.XGetTextProperty(w.x, w.xw, &text, prop); st == 0 {
+				// Failed; ignore.
+				break
+			}
+			if text.format != 8 || text.encoding != w.atoms.utf8string {
+				// Ignore non-utf-8 encoded strings.
+				break
+			}
+			str := C.GoStringN((*C.char)(unsafe.Pointer(text.value)), C.int(text.nitems))
+			w.w.Event(system.ClipboardEvent{Text: str})
+		case C.SelectionRequest:
+			cevt := (*C.XSelectionRequestEvent)(unsafe.Pointer(xev))
+			if cevt.selection != w.atoms.clipboard || cevt.property == C.None {
+				// Unsupported clipboard or obsolete requestor.
+				break
+			}
+			notify := func() {
+				nev := C.XSelectionEvent{
+					_type:     C.SelectionNotify,
+					display:   cevt.display,
+					requestor: cevt.requestor,
+					selection: cevt.selection,
+					target:    cevt.target,
+					property:  cevt.property,
+					time:      cevt.time,
+				}
+				C.XSendEvent(w.x, cevt.requestor, 0, 0, (*C.XEvent)(unsafe.Pointer(&nev)))
+			}
+			switch cevt.target {
+			case w.atoms.targets:
+				// The requestor wants the supported clipboard
+				// formats. First write the formats...
+				formats := []uint32{uint32(w.atoms.utf8string)}
+				C.XChangeProperty(w.x, cevt.requestor, cevt.property, w.atoms.atom,
+					32 /* bitwidth of formats */, C.PropModeReplace,
+					(*C.uchar)(unsafe.Pointer(&formats[0])), C.int(len(formats)),
+				)
+				// ...then notify the requestor.
+				notify()
+			case w.atoms.utf8string:
+				content := w.clipboard.content
+				C.XChangeProperty(w.x, cevt.requestor, cevt.property, w.atoms.utf8string,
+					8 /* bitwidth */, C.PropModeReplace,
+					(*C.uchar)(unsafe.Pointer(&content[0])), C.int(len(content)),
+				)
+				notify()
+			}
 		case C.ClientMessage: // extensions
 			cevt := (*C.XClientMessageEvent)(unsafe.Pointer(xev))
 			switch *(*C.long)(unsafe.Pointer(&cevt.data)) {
-			case C.long(w.evDelWindow):
+			case C.long(w.atoms.evDelWindow):
 				w.dead = true
 				return false
 			}
@@ -398,6 +502,13 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	hints.flags = C.InputHint
 	C.XSetWMHints(dpy, win, &hints)
 
+	w.atoms.utf8string = w.atom("UTF8_STRING", false)
+	w.atoms.evDelWindow = w.atom("WM_DELETE_WINDOW", false)
+	w.atoms.clipboard = w.atom("CLIPBOARD", false)
+	w.atoms.clipboardContent = w.atom("CLIPBOARD_CONTENT", false)
+	w.atoms.atom = w.atom("ATOM", false)
+	w.atoms.targets = w.atom("TARGETS", false)
+
 	// set the name
 	ctitle := C.CString(opts.Title)
 	defer C.free(unsafe.Pointer(ctitle))
@@ -406,15 +517,14 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	C.XSetTextProperty(dpy, win,
 		&C.XTextProperty{
 			value:    (*C.uchar)(unsafe.Pointer(ctitle)),
-			encoding: w.atom("UTF8_STRING", false),
+			encoding: w.atoms.utf8string,
 			format:   8,
 			nitems:   C.ulong(len(opts.Title)),
 		},
 		w.atom("_NET_WM_NAME", false))
 
 	// extensions
-	w.evDelWindow = w.atom("WM_DELETE_WINDOW", false)
-	C.XSetWMProtocols(dpy, win, &w.evDelWindow, 1)
+	C.XSetWMProtocols(dpy, win, &w.atoms.evDelWindow, 1)
 
 	// make the window visible on the screen
 	C.XMapWindow(dpy, win)
