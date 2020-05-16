@@ -116,7 +116,44 @@ func (w *Window) update(frame *op.Ops) {
 	<-w.frameAck
 }
 
-func (w *Window) draw(frameStart time.Time, size image.Point, frame *op.Ops) {
+func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync bool, frame *op.Ops) error {
+	for {
+		if w.loop != nil {
+			if err := w.loop.Flush(); err != nil {
+				w.destroyGPU()
+				if err == window.ErrDeviceLost {
+					continue
+				}
+				return err
+			}
+		}
+		if w.loop == nil {
+			var ctx window.Context
+			ctx, err := w.driver.NewContext()
+			if err != nil {
+				return err
+			}
+			w.loop, err = newLoop(ctx)
+			if err != nil {
+				ctx.Release()
+				return err
+			}
+		}
+		w.processFrame(frameStart, size, frame)
+		if sync {
+			if err := w.loop.Flush(); err != nil {
+				w.destroyGPU()
+				if err == window.ErrDeviceLost {
+					continue
+				}
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func (w *Window) processFrame(frameStart time.Time, size image.Point, frame *op.Ops) {
 	sync := w.loop.Draw(size, frame)
 	w.queue.q.Frame(frame)
 	switch w.queue.q.TextInputState() {
@@ -287,38 +324,7 @@ func (w *Window) run(opts *window.Options) {
 					}
 				}
 				frame, gotFrame := w.waitFrame()
-				var err error
-				for {
-					if w.loop != nil {
-						if err = w.loop.Flush(); err != nil {
-							w.destroyGPU()
-							if err != window.ErrDeviceLost {
-								break
-							}
-						}
-					}
-					if w.loop == nil {
-						var ctx window.Context
-						ctx, err = w.driver.NewContext()
-						if err != nil {
-							break
-						}
-						w.loop, err = newLoop(ctx)
-						if err != nil {
-							ctx.Release()
-							break
-						}
-					}
-					w.draw(frameStart, e2.Size, frame)
-					if e2.Sync {
-						if err = w.loop.Flush(); err != nil {
-							w.destroyGPU()
-						}
-					}
-					if err != window.ErrDeviceLost {
-						break
-					}
-				}
+				err := w.validateAndProcess(frameStart, e2.Size, e2.Sync, frame)
 				if gotFrame {
 					// We're done with frame, let the client continue.
 					w.frameAck <- struct{}{}
