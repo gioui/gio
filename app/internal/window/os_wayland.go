@@ -857,22 +857,20 @@ func gio_onFrameDone(data unsafe.Pointer, callback *C.struct_wl_callback, t C.ui
 func (w *window) loop() error {
 	var p poller
 	for {
-		notified, err := w.disp.dispatch(&p)
-		if err != nil {
+		if err := w.disp.dispatch(&p); err != nil {
 			return err
 		}
 		if w.dead {
 			w.w.Event(system.DestroyEvent{})
 			break
 		}
-		if notified {
-			w.draw(false)
-		}
+		// pass false to skip unnecessary drawing.
+		w.draw(false)
 	}
 	return nil
 }
 
-func (d *wlDisplay) dispatch(p *poller) (bool, error) {
+func (d *wlDisplay) dispatch(p *poller) error {
 	dispfd := C.wl_display_get_fd(d.disp)
 	// Poll for events and notifications.
 	pollfds := append(p.pollfds[:0],
@@ -882,16 +880,15 @@ func (d *wlDisplay) dispatch(p *poller) (bool, error) {
 	dispFd := &pollfds[0]
 	if ret, err := C.wl_display_flush(d.disp); ret < 0 {
 		if err != syscall.EAGAIN {
-			return false, fmt.Errorf("wayland: wl_display_flush failed: %v", err)
+			return fmt.Errorf("wayland: wl_display_flush failed: %v", err)
 		}
 		// EAGAIN means the output buffer was full. Poll for
 		// POLLOUT to know when we can write again.
 		dispFd.Events |= syscall.POLLOUT
 	}
 	if _, err := syscall.Poll(pollfds, -1); err != nil && err != syscall.EINTR {
-		return false, fmt.Errorf("wayland: poll failed: %v", err)
+		return fmt.Errorf("wayland: poll failed: %v", err)
 	}
-	notified := false
 	// Clear notifications.
 	for {
 		_, err := syscall.Read(d.notify.read, p.buf[:])
@@ -899,31 +896,27 @@ func (d *wlDisplay) dispatch(p *poller) (bool, error) {
 			break
 		}
 		if err != nil {
-			return false, fmt.Errorf("wayland: read from notify pipe failed: %v", err)
+			return fmt.Errorf("wayland: read from notify pipe failed: %v", err)
 		}
-		notified = true
 	}
 	// Handle events
 	switch {
 	case dispFd.Revents&syscall.POLLIN != 0:
 		if ret, err := C.wl_display_dispatch(d.disp); ret < 0 {
-			return false, fmt.Errorf("wayland: wl_display_dispatch failed: %v", err)
+			return fmt.Errorf("wayland: wl_display_dispatch failed: %v", err)
 		}
 	case dispFd.Revents&(syscall.POLLERR|syscall.POLLHUP) != 0:
-		return false, errors.New("wayland: display file descriptor gone")
+		return errors.New("wayland: display file descriptor gone")
 	}
 	d.repeat.Repeat(d)
-	return notified, nil
+	return nil
 }
 
 func (w *window) SetAnimating(anim bool) {
 	w.mu.Lock()
 	w.animating = anim
-	animating := w.isAnimating()
 	w.mu.Unlock()
-	if animating {
-		w.disp.wakeup()
-	}
+	w.disp.wakeup()
 }
 
 // Wakeup wakes up the event loop through the notification pipe.
@@ -1093,24 +1086,20 @@ func (w *window) config() (int, int, config) {
 	}
 }
 
-func (w *window) isAnimating() bool {
-	return w.animating || w.fling.anim.Active()
-}
-
 func (w *window) draw(sync bool) {
 	w.flushScroll()
 	w.mu.Lock()
-	animating := w.isAnimating()
+	anim := w.animating || w.fling.anim.Active()
 	dead := w.dead
 	w.mu.Unlock()
-	if dead || (!animating && !sync) {
+	if dead || (!anim && !sync) {
 		return
 	}
 	width, height, cfg := w.config()
 	if cfg == (config{}) {
 		return
 	}
-	if animating && w.lastFrameCallback == nil {
+	if anim && w.lastFrameCallback == nil {
 		w.lastFrameCallback = C.wl_surface_frame(w.surf)
 		// Use the surface as listener data for gio_onFrameDone.
 		C.gio_wl_callback_add_listener(w.lastFrameCallback, unsafe.Pointer(w.surf))
