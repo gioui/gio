@@ -105,10 +105,18 @@ func loop(w *app.Window) error {
 		select {
 		case e := <-w.Events():
 			switch e := e.(type) {
+			case system.ClipboardEvent:
+				lineEditor.SetText(e.Text)
 			case system.DestroyEvent:
 				return e.Err
 			case system.FrameEvent:
 				gtx.Reset(e.Queue, e.Config, e.Size)
+				for iconButton.Clicked(gtx) {
+					w.WriteClipboard(lineEditor.Text())
+				}
+				for flatBtn.Clicked(gtx) {
+					w.ReadClipboard()
+				}
 				kitchen(gtx, th)
 				e.Frame(gtx.Ops)
 			}
