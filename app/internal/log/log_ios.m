@@ -4,7 +4,7 @@
 
 @import Foundation;
 
-#include "log_ios.h"
+#include "_cgo_export.h"
 
 void nslog(char *str) {
 	NSLog(@"%@", @(str));

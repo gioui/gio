@@ -7,7 +7,7 @@ package log
 /*
 #cgo CFLAGS: -Werror -fmodules -fobjc-arc -x objective-c
 
-#include "log_ios.h"
+__attribute__ ((visibility ("hidden"))) void nslog(char *str);
 */
 import "C"
 
