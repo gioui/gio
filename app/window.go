@@ -191,6 +191,22 @@ func (w *Window) Invalidate() {
 	}
 }
 
+// ReadClipboard initiates a read of the clipboard in the form
+// of a system.ClipboardEvent. Multiple reads may be coalescedd
+// to a single event.
+func (w *Window) ReadClipboard() {
+	w.driverDo(func() {
+		w.driver.ReadClipboard()
+	})
+}
+
+// WriteClipboard writes a string to the clipboard.
+func (w *Window) WriteClipboard(s string) {
+	w.driverDo(func() {
+		w.driver.WriteClipboard(s)
+	})
+}
+
 // driverDo calls f as soon as the window has a valid driver attached,
 // or does nothing if the window is destroyed while waiting.
 func (w *Window) driverDo(f func()) {

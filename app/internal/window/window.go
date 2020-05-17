@@ -54,6 +54,11 @@ type Driver interface {
 	// ShowTextInput updates the virtual keyboard state.
 	ShowTextInput(show bool)
 	NewContext() (Context, error)
+
+	// ReadClipboard requests the clipboard content.
+	ReadClipboard()
+	// WriteClipboard requests a clipboard write.
+	WriteClipboard(s string)
 }
 
 type windowRendezvous struct {
