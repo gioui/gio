@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"reflect"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf16"
 	"unsafe"
 
 	syscall "golang.org/x/sys/windows"
@@ -376,6 +378,84 @@ func (w *window) NewContext() (Context, error) {
 		return nil, fmt.Errorf("NewContext: failed to create a GPU device, tried: %s", strings.Join(errs, ", "))
 	}
 	return nil, errors.New("NewContext: no available backends")
+}
+
+func (w *window) ReadClipboard() {
+	w.readClipboard()
+}
+
+func (w *window) readClipboard() error {
+	if err := windows.OpenClipboard(w.hwnd); err != nil {
+		return err
+	}
+	defer windows.CloseClipboard()
+	mem, err := windows.GetClipboardData(windows.CF_UNICODETEXT)
+	if err != nil {
+		return err
+	}
+	ptr, err := windows.GlobalLock(mem)
+	if err != nil {
+		return err
+	}
+	defer windows.GlobalUnlock(mem)
+	// Look for terminating null character.
+	n := 0
+	for {
+		ch := *(*uint16)(unsafe.Pointer(ptr + uintptr(n)*2))
+		if ch == 0 {
+			break
+		}
+		n++
+	}
+	var u16 []uint16
+	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&u16))
+	hdr.Data = ptr
+	hdr.Cap = n
+	hdr.Len = n
+	content := string(utf16.Decode(u16))
+	go func() {
+		w.w.Event(system.ClipboardEvent{Text: content})
+	}()
+	return nil
+}
+
+func (w *window) WriteClipboard(s string) {
+	w.writeClipboard(s)
+}
+
+func (w *window) writeClipboard(s string) error {
+	u16 := utf16.Encode([]rune(s))
+	// Data must be null terminated.
+	u16 = append(u16, 0)
+	if err := windows.OpenClipboard(w.hwnd); err != nil {
+		return err
+	}
+	defer windows.CloseClipboard()
+	if err := windows.EmptyClipboard(); err != nil {
+		return err
+	}
+	n := len(u16) * int(unsafe.Sizeof(u16[0]))
+	mem, err := windows.GlobalAlloc(n)
+	if err != nil {
+		return err
+	}
+	ptr, err := windows.GlobalLock(mem)
+	if err != nil {
+		windows.GlobalFree(mem)
+		return err
+	}
+	var u16v []uint16
+	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&u16v))
+	hdr.Data = ptr
+	hdr.Cap = len(u16)
+	hdr.Len = len(u16)
+	copy(u16v, u16)
+	windows.GlobalUnlock(mem)
+	if err := windows.SetClipboardData(windows.CF_UNICODETEXT, mem); err != nil {
+		windows.GlobalFree(mem)
+		return err
+	}
+	return nil
 }
 
 func (w *window) ShowTextInput(show bool) {}
