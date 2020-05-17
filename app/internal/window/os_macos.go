@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf16"
 	"unsafe"
 
 	"gioui.org/f32"
@@ -24,7 +25,6 @@ import (
 /*
 #cgo CFLAGS: -DGL_SILENCE_DEPRECATION -Werror -Wno-deprecated-declarations -fmodules -fobjc-arc -x objective-c
 
-
 #include <AppKit/AppKit.h>
 
 #define GIO_MOUSE_MOVE 1
@@ -37,6 +37,8 @@ __attribute__ ((visibility ("hidden"))) CGFloat gio_viewHeight(CFTypeRef viewRef
 __attribute__ ((visibility ("hidden"))) void gio_setAnimating(CFTypeRef viewRef, BOOL anim);
 __attribute__ ((visibility ("hidden"))) void gio_updateDisplayLink(CFTypeRef viewRef, CGDirectDisplayID dispID);
 __attribute__ ((visibility ("hidden"))) CGFloat gio_getViewBackingScale(CFTypeRef viewRef);
+__attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
+__attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
 */
 import "C"
 
@@ -87,6 +89,24 @@ func insertView(view C.CFTypeRef, w *window) {
 
 func (w *window) contextView() C.CFTypeRef {
 	return w.view
+}
+
+func (w *window) ReadClipboard() {
+	runOnMain(func() {
+		content := nsstringToString(C.gio_readClipboard())
+		w.w.Event(system.ClipboardEvent{Text: content})
+	})
+}
+
+func (w *window) WriteClipboard(s string) {
+	u16 := utf16.Encode([]rune(s))
+	runOnMain(func() {
+		var chars *C.unichar
+		if len(u16) > 0 {
+			chars = (*C.unichar)(unsafe.Pointer(&u16[0]))
+		}
+		C.gio_writeClipboard(chars, C.NSUInteger(len(u16)))
+	})
 }
 
 func (w *window) ShowTextInput(show bool) {}

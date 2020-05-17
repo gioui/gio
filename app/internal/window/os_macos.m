@@ -46,6 +46,26 @@
 }
 @end
 
+void gio_writeClipboard(unichar *chars, NSUInteger length) {
+	@autoreleasepool {
+		NSString *s = [NSString string];
+		if (length > 0) {
+			s = [NSString stringWithCharacters:chars length:length];
+		}
+		NSPasteboard *p = NSPasteboard.generalPasteboard;
+		[p declareTypes:@[NSPasteboardTypeString] owner:nil];
+		[p setString:s forType:NSPasteboardTypeString];
+	}
+}
+
+CFTypeRef gio_readClipboard(void) {
+	@autoreleasepool {
+		NSPasteboard *p = NSPasteboard.generalPasteboard;
+		NSString *content = [p stringForType:NSPasteboardTypeString];
+		return (__bridge_retained CFTypeRef)content;
+	}
+}
+
 CGFloat gio_viewHeight(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
 	return [view bounds].size.height;
