@@ -75,16 +75,15 @@ type window struct {
 	animating bool
 
 	// Cached Java methods.
-	mgetDensity                    C.jmethodID
-	mgetFontScale                  C.jmethodID
-	mshowTextInput                 C.jmethodID
-	mhideTextInput                 C.jmethodID
-	mpostFrameCallback             C.jmethodID
-	mpostFrameCallbackOnMainThread C.jmethodID
-	mRegisterFragment              C.jmethodID
-	mwakeupMainThread              C.jmethodID
-	mwriteClipboard                C.jmethodID
-	mreadClipboard                 C.jmethodID
+	mgetDensity        C.jmethodID
+	mgetFontScale      C.jmethodID
+	mshowTextInput     C.jmethodID
+	mhideTextInput     C.jmethodID
+	mpostFrameCallback C.jmethodID
+	mRegisterFragment  C.jmethodID
+	mwakeupMainThread  C.jmethodID
+	mwriteClipboard    C.jmethodID
+	mreadClipboard     C.jmethodID
 }
 
 type jvalue uint64 // The largest JNI type fits in 64 bits.
@@ -181,17 +180,16 @@ func GetDataDir() string {
 func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.jobject) C.jlong {
 	view = C.gio_jni_NewGlobalRef(env, view)
 	w := &window{
-		view:                           view,
-		mgetDensity:                    getMethodID(env, class, "getDensity", "()I"),
-		mgetFontScale:                  getMethodID(env, class, "getFontScale", "()F"),
-		mshowTextInput:                 getMethodID(env, class, "showTextInput", "()V"),
-		mhideTextInput:                 getMethodID(env, class, "hideTextInput", "()V"),
-		mpostFrameCallback:             getMethodID(env, class, "postFrameCallback", "()V"),
-		mpostFrameCallbackOnMainThread: getMethodID(env, class, "postFrameCallbackOnMainThread", "()V"),
-		mRegisterFragment:              getMethodID(env, class, "registerFragment", "(Ljava/lang/String;)V"),
-		mwakeupMainThread:              getMethodID(env, class, "wakeupMainThread", "()V"),
-		mwriteClipboard:                getMethodID(env, class, "writeClipboard", "(Ljava/lang/String;)V"),
-		mreadClipboard:                 getMethodID(env, class, "readClipboard", "()Ljava/lang/String;"),
+		view:               view,
+		mgetDensity:        getMethodID(env, class, "getDensity", "()I"),
+		mgetFontScale:      getMethodID(env, class, "getFontScale", "()F"),
+		mshowTextInput:     getMethodID(env, class, "showTextInput", "()V"),
+		mhideTextInput:     getMethodID(env, class, "hideTextInput", "()V"),
+		mpostFrameCallback: getMethodID(env, class, "postFrameCallback", "()V"),
+		mRegisterFragment:  getMethodID(env, class, "registerFragment", "(Ljava/lang/String;)V"),
+		mwakeupMainThread:  getMethodID(env, class, "wakeupMainThread", "()V"),
+		mwriteClipboard:    getMethodID(env, class, "writeClipboard", "(Ljava/lang/String;)V"),
+		mreadClipboard:     getMethodID(env, class, "readClipboard", "()Ljava/lang/String;"),
 	}
 	wopts := <-mainWindow.out
 	w.callbacks = wopts.window
@@ -370,8 +368,8 @@ func (w *window) SetAnimating(anim bool) {
 	w.animating = anim
 	w.mu.Unlock()
 	if anim {
-		runInJVM(javaVM(), func(env *C.JNIEnv) {
-			callVoidMethod(env, w.view, w.mpostFrameCallbackOnMainThread)
+		w.runOnMain(func(env *C.JNIEnv) {
+			callVoidMethod(env, w.view, w.mpostFrameCallback)
 		})
 	}
 }
@@ -532,7 +530,7 @@ func javaString(env *C.JNIEnv, str string) C.jstring {
 }
 
 func (w *window) RegisterFragment(del string) {
-	runInJVM(javaVM(), func(env *C.JNIEnv) {
+	w.runOnMain(func(env *C.JNIEnv) {
 		jstr := javaString(env, del)
 		callVoidMethod(env, w.view, w.mRegisterFragment, jvalue(jstr))
 	})

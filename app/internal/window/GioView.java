@@ -145,14 +145,6 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		});
 	}
 
-	void postFrameCallbackOnMainThread() {
-		handler.post(new Runnable() {
-			@Override public void run() {
-				postFrameCallback();
-			}
-		});
-	}
-
 	@Override protected boolean fitSystemWindows(Rect insets) {
 		onWindowInsets(nhandle, insets.top, insets.right, insets.bottom, insets.left);
 		return true;
@@ -201,7 +193,7 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		return onBack(nhandle);
 	}
 
-	protected void wakeupMainThread() {
+	void wakeupMainThread() {
 		handler.post(new Runnable() {
 			@Override public void run() {
 				scheduleMainFuncs();
@@ -209,7 +201,7 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		});
 	}
 
-	protected void registerFragment(String del) {
+	void registerFragment(String del) {
 		final Class cls;
 		try {
 			cls = getContext().getClassLoader().loadClass(del);
@@ -217,33 +209,29 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 			throw new RuntimeException("RegisterFragment: fragment class not found: " + e.getMessage());
 		}
 
-		handler.post(new Runnable() {
-			public void run() {
-				final Fragment frag;
-				try {
-					frag = (Fragment)cls.newInstance();
-				} catch (IllegalAccessException | InstantiationException | ExceptionInInitializerError | SecurityException | ClassCastException e) {
-					throw new RuntimeException("RegisterFragment: error instantiating fragment: " + e.getMessage());
-				}
-				final FragmentManager fm;
-				try {
-					fm = ((Activity)getContext()).getFragmentManager();
-				} catch (ClassCastException e) {
-					throw new RuntimeException("RegisterFragment: cannot get fragment manager from View Context: " + e.getMessage());
-				}
-				FragmentTransaction ft = fm.beginTransaction();
-				ft.add(frag, del);
-				ft.commitNow();
-			}
-		});
+		final Fragment frag;
+		try {
+			frag = (Fragment)cls.newInstance();
+		} catch (IllegalAccessException | InstantiationException | ExceptionInInitializerError | SecurityException | ClassCastException e) {
+			throw new RuntimeException("RegisterFragment: error instantiating fragment: " + e.getMessage());
+		}
+		final FragmentManager fm;
+		try {
+			fm = ((Activity)getContext()).getFragmentManager();
+		} catch (ClassCastException e) {
+			throw new RuntimeException("RegisterFragment: cannot get fragment manager from View Context: " + e.getMessage());
+		}
+		FragmentTransaction ft = fm.beginTransaction();
+		ft.add(frag, del);
+		ft.commitNow();
 	}
 
-	protected void writeClipboard(String s) {
+	void writeClipboard(String s) {
 		ClipboardManager m = (ClipboardManager)getContext().getSystemService(Context.CLIPBOARD_SERVICE);
 		m.setPrimaryClip(ClipData.newPlainText(null, s));
 	}
 
-	protected String readClipboard() {
+	String readClipboard() {
 		ClipboardManager m = (ClipboardManager)getContext().getSystemService(Context.CLIPBOARD_SERVICE);
 		ClipData c = m.getPrimaryClip();
 		if (c == null || c.getItemCount() < 1) {
