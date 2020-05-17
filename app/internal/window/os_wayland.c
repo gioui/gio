@@ -139,3 +139,36 @@ void gio_zwp_text_input_v3_add_listener(struct zwp_text_input_v3 *im, void *data
 
 	zwp_text_input_v3_add_listener(im, &listener, data);
 }
+
+void gio_wl_data_device_add_listener(struct wl_data_device *dd, void *data) {
+	static const struct wl_data_device_listener listener = {
+		.data_offer = gio_onDataDeviceOffer,
+		.enter = gio_onDataDeviceEnter,
+		.leave = gio_onDataDeviceLeave,
+		.motion = gio_onDataDeviceMotion,
+		.drop = gio_onDataDeviceDrop,
+		.selection = gio_onDataDeviceSelection,
+	};
+	wl_data_device_add_listener(dd, &listener, data);
+}
+
+void gio_wl_data_offer_add_listener(struct wl_data_offer *offer, void *data) {
+	static const struct wl_data_offer_listener listener = {
+		.offer = (void (*)(void *, struct wl_data_offer *, const char *))gio_onDataOfferOffer,
+		.source_actions = gio_onDataOfferSourceActions,
+		.action = gio_onDataOfferAction,
+	};
+	wl_data_offer_add_listener(offer, &listener, data);
+}
+
+void gio_wl_data_source_add_listener(struct wl_data_source *source, void *data) {
+	static const struct wl_data_source_listener listener = {
+		.target = (void (*)(void *, struct wl_data_source *, const char *))gio_onDataSourceTarget,
+		.send = (void (*)(void *, struct wl_data_source *, const char *, int32_t))gio_onDataSourceSend,
+		.cancelled = gio_onDataSourceCancelled,
+		.dnd_drop_performed = gio_onDataSourceDNDDropPerformed,
+		.dnd_finished = gio_onDataSourceDNDFinished,
+		.action = gio_onDataSourceAction,
+	};
+	wl_data_source_add_listener(source, &listener, data);
+}

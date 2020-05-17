@@ -9,7 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"io"
+	"io/ioutil"
 	"math"
+	"os"
 	"os/exec"
 	"strconv"
 	"sync"
@@ -64,21 +67,25 @@ __attribute__ ((visibility ("hidden"))) void gio_wl_pointer_add_listener(struct 
 __attribute__ ((visibility ("hidden"))) void gio_wl_touch_add_listener(struct wl_touch *touch, void *data);
 __attribute__ ((visibility ("hidden"))) void gio_wl_keyboard_add_listener(struct wl_keyboard *keyboard, void *data);
 __attribute__ ((visibility ("hidden"))) void gio_zwp_text_input_v3_add_listener(struct zwp_text_input_v3 *im, void *data);
+__attribute__ ((visibility ("hidden"))) void gio_wl_data_device_add_listener(struct wl_data_device *dd, void *data);
+__attribute__ ((visibility ("hidden"))) void gio_wl_data_offer_add_listener(struct wl_data_offer *offer, void *data);
+__attribute__ ((visibility ("hidden"))) void gio_wl_data_source_add_listener(struct wl_data_source *source, void *data);
 */
 import "C"
 
 type wlDisplay struct {
-	disp         *C.struct_wl_display
-	reg          *C.struct_wl_registry
-	compositor   *C.struct_wl_compositor
-	wm           *C.struct_xdg_wm_base
-	imm          *C.struct_zwp_text_input_manager_v3
-	shm          *C.struct_wl_shm
-	decor        *C.struct_zxdg_decoration_manager_v1
-	seat         *wlSeat
-	xkb          *xkb.Context
-	outputMap    map[C.uint32_t]*C.struct_wl_output
-	outputConfig map[*C.struct_wl_output]*wlOutput
+	disp              *C.struct_wl_display
+	reg               *C.struct_wl_registry
+	compositor        *C.struct_wl_compositor
+	wm                *C.struct_xdg_wm_base
+	imm               *C.struct_zwp_text_input_manager_v3
+	shm               *C.struct_wl_shm
+	dataDeviceManager *C.struct_wl_data_device_manager
+	decor             *C.struct_zxdg_decoration_manager_v1
+	seat              *wlSeat
+	xkb               *xkb.Context
+	outputMap         map[C.uint32_t]*C.struct_wl_output
+	outputConfig      map[*C.struct_wl_output]*wlOutput
 
 	// Notification pipe fds.
 	notify struct {
@@ -97,9 +104,27 @@ type wlSeat struct {
 	keyboard *C.struct_wl_keyboard
 	im       *C.struct_zwp_text_input_v3
 
+	// The most recent input serial.
+	serial C.uint32_t
+
 	pointerFocus  *window
 	keyboardFocus *window
 	touchFoci     map[C.int32_t]*window
+
+	// Clipboard support.
+	dataDev *C.struct_wl_data_device
+	// offers is a map from active wl_data_offers to
+	// the list of mime types they support.
+	offers map[*C.struct_wl_data_offer][]string
+	// clipboard is the wl_data_offer for the clipboard.
+	clipboard *C.struct_wl_data_offer
+	// mimeType is the chosen mime type of clipboard.
+	mimeType string
+	// source represents the clipboard content of the most recent
+	// clipboard write, if any.
+	source *C.struct_wl_data_source
+	// content is the data belonging to source.
+	content []byte
 }
 
 type repeatState struct {
@@ -154,12 +179,16 @@ type window struct {
 	mu        sync.Mutex
 	animating bool
 	needAck   bool
-	// The last configure serial waiting to be ack'ed.
+	// The most recent configure serial waiting to be ack'ed.
 	serial   C.uint32_t
 	width    int
 	height   int
 	newScale bool
 	scale    int
+	// readClipboard tracks whether a ClipboardEvent is requested.
+	readClipboard bool
+	// writeClipboard is set whenever a clipboard write is requested.
+	writeClipboard *string
 }
 
 type poller struct {
@@ -183,6 +212,10 @@ type wlOutput struct {
 // forces the use of callbacks and storing pointers to Go values
 // in C is forbidden.
 var callbackMap sync.Map
+
+// clipboardMimeTypes is a list of supported clipboard mime types, in
+// order of preference.
+var clipboardMimeTypes = []string{"text/plain;charset=utf8", "UTF8_STRING", "text/plain", "TEXT", "STRING"}
 
 func init() {
 	wlDriver = newWLWindow
@@ -214,6 +247,48 @@ func newWLWindow(window Callbacks, opts *Options) error {
 		}
 	}()
 	return nil
+}
+
+func (d *wlDisplay) writeClipboard(content []byte) error {
+	s := d.seat
+	if s == nil {
+		return nil
+	}
+	// Clear old offer.
+	if s.source != nil {
+		C.wl_data_source_destroy(s.source)
+		s.source = nil
+		s.content = nil
+	}
+	if d.dataDeviceManager == nil || s.dataDev == nil {
+		return nil
+	}
+	s.content = content
+	s.source = C.wl_data_device_manager_create_data_source(d.dataDeviceManager)
+	C.gio_wl_data_source_add_listener(s.source, unsafe.Pointer(s.seat))
+	for _, mime := range clipboardMimeTypes {
+		C.wl_data_source_offer(s.source, C.CString(mime))
+	}
+	C.wl_data_device_set_selection(s.dataDev, s.source, s.serial)
+	return nil
+}
+
+func (d *wlDisplay) readClipboard() (io.ReadCloser, error) {
+	s := d.seat
+	if s == nil {
+		return nil, nil
+	}
+	if s.clipboard == nil {
+		return nil, nil
+	}
+	r, w, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	cmimeType := C.CString(s.mimeType)
+	defer C.free(unsafe.Pointer(cmimeType))
+	C.wl_data_offer_receive(s.clipboard, cmimeType, C.int(w.Fd()))
+	return r, nil
 }
 
 func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
@@ -320,7 +395,25 @@ func gio_onSeatCapabilities(data unsafe.Pointer, seat *C.struct_wl_seat, caps C.
 	s.updateCaps(caps)
 }
 
+// flushOffers remove all wl_data_offers that isn't the clipboard
+// content.
+func (s *wlSeat) flushOffers() {
+	for o := range s.offers {
+		if o == s.clipboard {
+			continue
+		}
+		// We're only interested in clipboard offers.
+		delete(s.offers, o)
+		callbackDelete(unsafe.Pointer(o))
+		C.wl_data_offer_destroy(o)
+	}
+}
+
 func (s *wlSeat) destroy() {
+	if s.source != nil {
+		C.wl_data_source_destroy(s.source)
+		s.source = nil
+	}
 	if s.im != nil {
 		C.zwp_text_input_v3_destroy(s.im)
 		s.im = nil
@@ -333,6 +426,11 @@ func (s *wlSeat) destroy() {
 	}
 	if s.keyboard != nil {
 		C.wl_keyboard_release(s.keyboard)
+	}
+	s.clipboard = nil
+	s.flushOffers()
+	if s.dataDev != nil {
+		C.wl_data_device_release(s.dataDev)
 	}
 	if s.seat != nil {
 		callbackDelete(unsafe.Pointer(s.seat))
@@ -482,16 +580,31 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 		d.outputMap[name] = output
 		d.outputConfig[output] = new(wlOutput)
 	case "wl_seat":
-		if d.seat == nil {
-			s := (*C.struct_wl_seat)(C.wl_registry_bind(reg, name, &C.wl_seat_interface, 5))
-			d.seat = &wlSeat{
-				disp: d,
-				name: name,
-				seat: s,
-			}
-			callbackStore(unsafe.Pointer(s), d.seat)
-			C.gio_wl_seat_add_listener(d.seat.seat, unsafe.Pointer(d.seat.seat))
+		if d.seat != nil {
+			break
 		}
+		s := (*C.struct_wl_seat)(C.wl_registry_bind(reg, name, &C.wl_seat_interface, 5))
+		if s == nil {
+			// No support for v5 protocol.
+			break
+		}
+		d.seat = &wlSeat{
+			disp:   d,
+			name:   name,
+			seat:   s,
+			offers: make(map[*C.struct_wl_data_offer][]string),
+		}
+		callbackStore(unsafe.Pointer(s), d.seat)
+		C.gio_wl_seat_add_listener(s, unsafe.Pointer(s))
+		if d.dataDeviceManager == nil {
+			break
+		}
+		d.seat.dataDev = C.wl_data_device_manager_get_data_device(d.dataDeviceManager, s)
+		if d.seat.dataDev == nil {
+			break
+		}
+		callbackStore(unsafe.Pointer(d.seat.dataDev), d.seat)
+		C.gio_wl_data_device_add_listener(d.seat.dataDev, unsafe.Pointer(d.seat.dataDev))
 	case "wl_shm":
 		d.shm = (*C.struct_wl_shm)(C.wl_registry_bind(reg, name, &C.wl_shm_interface, 1))
 	case "xdg_wm_base":
@@ -501,6 +614,67 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 		// TODO: Implement and test text-input support.
 		/*case "zwp_text_input_manager_v3":
 		d.imm = (*C.struct_zwp_text_input_manager_v3)(C.wl_registry_bind(reg, name, &C.zwp_text_input_manager_v3_interface, 1))*/
+	case "wl_data_device_manager":
+		d.dataDeviceManager = (*C.struct_wl_data_device_manager)(C.wl_registry_bind(reg, name, &C.wl_data_device_manager_interface, 3))
+	}
+}
+
+//export gio_onDataOfferOffer
+func gio_onDataOfferOffer(data unsafe.Pointer, offer *C.struct_wl_data_offer, mime *C.char) {
+	s := callbackLoad(data).(*wlSeat)
+	s.offers[offer] = append(s.offers[offer], C.GoString(mime))
+}
+
+//export gio_onDataOfferSourceActions
+func gio_onDataOfferSourceActions(data unsafe.Pointer, offer *C.struct_wl_data_offer, acts C.uint32_t) {
+}
+
+//export gio_onDataOfferAction
+func gio_onDataOfferAction(data unsafe.Pointer, offer *C.struct_wl_data_offer, act C.uint32_t) {
+}
+
+//export gio_onDataDeviceOffer
+func gio_onDataDeviceOffer(data unsafe.Pointer, dataDev *C.struct_wl_data_device, id *C.struct_wl_data_offer) {
+	s := callbackLoad(data).(*wlSeat)
+	callbackStore(unsafe.Pointer(id), s)
+	C.gio_wl_data_offer_add_listener(id, unsafe.Pointer(id))
+	s.offers[id] = nil
+}
+
+//export gio_onDataDeviceEnter
+func gio_onDataDeviceEnter(data unsafe.Pointer, dataDev *C.struct_wl_data_device, serial C.uint32_t, surf *C.struct_wl_surface, x, y C.wl_fixed_t, id *C.struct_wl_data_offer) {
+	s := callbackLoad(data).(*wlSeat)
+	s.serial = serial
+	s.flushOffers()
+}
+
+//export gio_onDataDeviceLeave
+func gio_onDataDeviceLeave(data unsafe.Pointer, dataDev *C.struct_wl_data_device) {
+}
+
+//export gio_onDataDeviceMotion
+func gio_onDataDeviceMotion(data unsafe.Pointer, dataDev *C.struct_wl_data_device, t C.uint32_t, x, y C.wl_fixed_t) {
+}
+
+//export gio_onDataDeviceDrop
+func gio_onDataDeviceDrop(data unsafe.Pointer, dataDev *C.struct_wl_data_device) {
+}
+
+//export gio_onDataDeviceSelection
+func gio_onDataDeviceSelection(data unsafe.Pointer, dataDev *C.struct_wl_data_device, id *C.struct_wl_data_offer) {
+	s := callbackLoad(data).(*wlSeat)
+	defer s.flushOffers()
+	s.clipboard = nil
+loop:
+	for _, want := range clipboardMimeTypes {
+		for _, got := range s.offers[id] {
+			if want != got {
+				continue
+			}
+			s.clipboard = id
+			s.mimeType = got
+			break loop
+		}
 	}
 }
 
@@ -521,6 +695,7 @@ func gio_onRegistryGlobalRemove(data unsafe.Pointer, reg *C.struct_wl_registry, 
 //export gio_onTouchDown
 func gio_onTouchDown(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.uint32_t, surf *C.struct_wl_surface, id C.int32_t, x, y C.wl_fixed_t) {
 	s := callbackLoad(data).(*wlSeat)
+	s.serial = serial
 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
 	s.touchFoci[id] = w
 	w.lastTouch = f32.Point{
@@ -539,6 +714,7 @@ func gio_onTouchDown(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.
 //export gio_onTouchUp
 func gio_onTouchUp(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.uint32_t, id C.int32_t) {
 	s := callbackLoad(data).(*wlSeat)
+	s.serial = serial
 	w := s.touchFoci[id]
 	delete(s.touchFoci, id)
 	w.w.Event(pointer.Event{
@@ -586,6 +762,7 @@ func gio_onTouchCancel(data unsafe.Pointer, touch *C.struct_wl_touch) {
 //export gio_onPointerEnter
 func gio_onPointerEnter(data unsafe.Pointer, pointer *C.struct_wl_pointer, serial C.uint32_t, surf *C.struct_wl_surface, x, y C.wl_fixed_t) {
 	s := callbackLoad(data).(*wlSeat)
+	s.serial = serial
 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
 	s.pointerFocus = w
 	// Get images[0].
@@ -603,6 +780,8 @@ func gio_onPointerEnter(data unsafe.Pointer, pointer *C.struct_wl_pointer, seria
 
 //export gio_onPointerLeave
 func gio_onPointerLeave(data unsafe.Pointer, p *C.struct_wl_pointer, serial C.uint32_t, surface *C.struct_wl_surface) {
+	s := callbackLoad(data).(*wlSeat)
+	s.serial = serial
 }
 
 //export gio_onPointerMotion
@@ -616,6 +795,7 @@ func gio_onPointerMotion(data unsafe.Pointer, p *C.struct_wl_pointer, t C.uint32
 //export gio_onPointerButton
 func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t, wbtn, state C.uint32_t) {
 	s := callbackLoad(data).(*wlSeat)
+	s.serial = serial
 	w := s.pointerFocus
 	// From linux-event-codes.h.
 	const (
@@ -723,6 +903,20 @@ func gio_onPointerAxisDiscrete(data unsafe.Pointer, p *C.struct_wl_pointer, axis
 	}
 }
 
+func (w *window) ReadClipboard() {
+	w.mu.Lock()
+	w.readClipboard = true
+	w.mu.Unlock()
+	w.disp.wakeup()
+}
+
+func (w *window) WriteClipboard(s string) {
+	w.mu.Lock()
+	w.writeClipboard = &s
+	w.mu.Unlock()
+	w.disp.wakeup()
+}
+
 func (w *window) resetFling() {
 	w.fling.start = false
 	w.fling.anim = fling.Animation{}
@@ -746,6 +940,7 @@ func gio_onKeyboardKeymap(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, f
 //export gio_onKeyboardEnter
 func gio_onKeyboardEnter(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial C.uint32_t, surf *C.struct_wl_surface, keys *C.struct_wl_array) {
 	s := callbackLoad(data).(*wlSeat)
+	s.serial = serial
 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
 	s.keyboardFocus = w
 	s.disp.repeat.Stop(0)
@@ -755,6 +950,7 @@ func gio_onKeyboardEnter(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, se
 //export gio_onKeyboardLeave
 func gio_onKeyboardLeave(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial C.uint32_t, surf *C.struct_wl_surface) {
 	s := callbackLoad(data).(*wlSeat)
+	s.serial = serial
 	s.disp.repeat.Stop(0)
 	w := s.keyboardFocus
 	w.w.Event(key.FocusEvent{Focus: false})
@@ -763,6 +959,7 @@ func gio_onKeyboardLeave(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, se
 //export gio_onKeyboardKey
 func gio_onKeyboardKey(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial, timestamp, keyCode, state C.uint32_t) {
 	s := callbackLoad(data).(*wlSeat)
+	s.serial = serial
 	w := s.keyboardFocus
 	t := time.Duration(timestamp) * time.Millisecond
 	s.disp.repeat.Stop(t)
@@ -876,10 +1073,37 @@ func (w *window) loop() error {
 			w.w.Event(system.DestroyEvent{})
 			break
 		}
-		// pass false to skip unnecessary drawing.
-		w.draw(false)
+		w.process()
 	}
 	return nil
+}
+
+func (w *window) process() {
+	w.mu.Lock()
+	readClipboard := w.readClipboard
+	writeClipboard := w.writeClipboard
+	w.readClipboard = false
+	w.writeClipboard = nil
+	w.mu.Unlock()
+	if readClipboard {
+		r, err := w.disp.readClipboard()
+		// Send empty responses on unavailable clipboards or errors.
+		if r == nil || err != nil {
+			w.w.Event(system.ClipboardEvent{})
+			return
+		}
+		// Don't let slow clipboard transfers block event loop.
+		go func() {
+			defer r.Close()
+			data, _ := ioutil.ReadAll(r)
+			w.w.Event(system.ClipboardEvent{Text: string(data)})
+		}()
+	}
+	if writeClipboard != nil {
+		w.disp.writeClipboard([]byte(*writeClipboard))
+	}
+	// pass false to skip unnecessary drawing.
+	w.draw(false)
 }
 
 func (d *wlDisplay) dispatch(p *poller) error {
@@ -964,6 +1188,7 @@ func (w *window) destroy() {
 //export gio_onKeyboardModifiers
 func gio_onKeyboardModifiers(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, serial, depressed, latched, locked, group C.uint32_t) {
 	s := callbackLoad(data).(*wlSeat)
+	s.serial = serial
 	d := s.disp
 	d.repeat.Stop(0)
 	if d.xkb == nil {
@@ -1003,6 +1228,44 @@ func gio_onTextInputDeleteSurroundingText(data unsafe.Pointer, im *C.struct_zwp_
 
 //export gio_onTextInputDone
 func gio_onTextInputDone(data unsafe.Pointer, im *C.struct_zwp_text_input_v3, serial C.uint32_t) {
+	s := callbackLoad(data).(*wlSeat)
+	s.serial = serial
+}
+
+//export gio_onDataSourceTarget
+func gio_onDataSourceTarget(data unsafe.Pointer, source *C.struct_wl_data_source, mime *C.char) {
+}
+
+//export gio_onDataSourceSend
+func gio_onDataSourceSend(data unsafe.Pointer, source *C.struct_wl_data_source, mime *C.char, fd C.int32_t) {
+	s := callbackLoad(data).(*wlSeat)
+	content := s.content
+	go func() {
+		defer syscall.Close(int(fd))
+		syscall.Write(int(fd), content)
+	}()
+}
+
+//export gio_onDataSourceCancelled
+func gio_onDataSourceCancelled(data unsafe.Pointer, source *C.struct_wl_data_source) {
+	s := callbackLoad(data).(*wlSeat)
+	if s.source == source {
+		s.content = nil
+		s.source = nil
+	}
+	C.wl_data_source_destroy(source)
+}
+
+//export gio_onDataSourceDNDDropPerformed
+func gio_onDataSourceDNDDropPerformed(data unsafe.Pointer, source *C.struct_wl_data_source) {
+}
+
+//export gio_onDataSourceDNDFinished
+func gio_onDataSourceDNDFinished(data unsafe.Pointer, source *C.struct_wl_data_source) {
+}
+
+//export gio_onDataSourceAction
+func gio_onDataSourceAction(data unsafe.Pointer, source *C.struct_wl_data_source, act C.uint32_t) {
 }
 
 func (w *window) flushScroll() {
