@@ -10,8 +10,13 @@ package window
 #include <CoreGraphics/CoreGraphics.h>
 #include <UIKit/UIKit.h>
 #include <stdint.h>
-#include "os_ios.h"
 
+__attribute__ ((visibility ("hidden"))) void gio_showTextInput(CFTypeRef viewRef);
+__attribute__ ((visibility ("hidden"))) void gio_hideTextInput(CFTypeRef viewRef);
+__attribute__ ((visibility ("hidden"))) void gio_addLayerToView(CFTypeRef viewRef, CFTypeRef layerRef);
+__attribute__ ((visibility ("hidden"))) void gio_updateView(CFTypeRef viewRef, CFTypeRef layerRef);
+__attribute__ ((visibility ("hidden"))) void gio_removeLayer(CFTypeRef layerRef);
+__attribute__ ((visibility ("hidden"))) void gio_setAnimating(CFTypeRef viewRef, int anim);
 */
 import "C"
 

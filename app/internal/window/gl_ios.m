@@ -5,7 +5,7 @@
 @import UIKit;
 @import OpenGLES;
 
-#include "gl_ios.h"
+#include "_cgo_export.h"
 
 int gio_renderbufferStorage(CFTypeRef ctxRef, CFTypeRef layerRef, GLenum buffer) {
 	EAGLContext *ctx = (__bridge EAGLContext *)ctxRef;

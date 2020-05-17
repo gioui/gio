@@ -6,7 +6,6 @@
 
 #include <stdint.h>
 #include "_cgo_export.h"
-#include "os_ios.h"
 #include "framework_ios.h"
 
 @interface GioView: UIView <UIKeyInput>
