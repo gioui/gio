@@ -13,8 +13,8 @@ import (
 type TextInputState uint8
 
 type keyQueue struct {
-	focus    event.Key
-	handlers map[event.Key]*keyHandler
+	focus    event.Tag
+	handlers map[event.Tag]*keyHandler
 	reader   ops.Reader
 	state    TextInputState
 }
@@ -46,7 +46,7 @@ func (q *keyQueue) InputState() TextInputState {
 
 func (q *keyQueue) Frame(root *op.Ops, events *handlerEvents) {
 	if q.handlers == nil {
-		q.handlers = make(map[event.Key]*keyHandler)
+		q.handlers = make(map[event.Tag]*keyHandler)
 	}
 	for _, h := range q.handlers {
 		h.active = false
@@ -89,8 +89,8 @@ func (q *keyQueue) Push(e event.Event, events *handlerEvents) {
 	}
 }
 
-func (q *keyQueue) resolveFocus(events *handlerEvents) (event.Key, listenerPriority, bool) {
-	var k event.Key
+func (q *keyQueue) resolveFocus(events *handlerEvents) (event.Tag, listenerPriority, bool) {
+	var k event.Tag
 	var pri listenerPriority
 	var hide bool
 loop:
@@ -102,21 +102,21 @@ loop:
 			switch {
 			case op.Focus:
 				newPri = priNewFocus
-			case op.Key == q.focus:
+			case op.Tag == q.focus:
 				newPri = priCurrentFocus
 			default:
 				newPri = priDefault
 			}
 			// Switch focus if higher priority or if focus requested.
 			if newPri.replaces(pri) {
-				k, pri = op.Key, newPri
+				k, pri = op.Tag, newPri
 			}
-			h, ok := q.handlers[op.Key]
+			h, ok := q.handlers[op.Tag]
 			if !ok {
 				h = new(keyHandler)
-				q.handlers[op.Key] = h
+				q.handlers[op.Tag] = h
 				// Reset the handler on (each) first appearance.
-				events.Set(op.Key, []event.Event{key.FocusEvent{Focus: false}})
+				events.Set(op.Tag, []event.Event{key.FocusEvent{Focus: false}})
 			}
 			h.active = true
 		case opconst.TypeHideInput:
@@ -144,7 +144,7 @@ func decodeKeyInputOp(d []byte, refs []interface{}) key.InputOp {
 		panic("invalid op")
 	}
 	return key.InputOp{
+		Tag:   refs[0].(event.Tag),
 		Focus: d[1] != 0,
-		Key:   refs[0].(event.Key),
 	}
 }

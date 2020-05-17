@@ -25,7 +25,7 @@ The following example declares a handler ready for key input:
 
 	ops := new(op.Ops)
 	var h *Handler = ...
-	key.InputOp{Key: h}.Add(ops)
+	key.InputOp{Tag: h}.Add(ops)
 
 */
 package event
@@ -33,14 +33,14 @@ package event
 // Queue maps an event handler key to the events
 // available to the handler.
 type Queue interface {
-	// Events returns the available events for a
-	// Key.
-	Events(k Key) []Event
+	// Events returns the available events for an
+	// event handler tag.
+	Events(t Tag) []Event
 }
 
-// Key is the stable identifier for an event handler.
-// For a handler h, the key is typically &h.
-type Key interface{}
+// Tag is the stable identifier for an event handler.
+// For a handler h, the tag is typically &h.
+type Tag interface{}
 
 // Event is the marker interface for events.
 type Event interface {

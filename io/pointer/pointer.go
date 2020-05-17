@@ -57,7 +57,7 @@ type AreaOp struct {
 // InputOp declares an input handler ready for pointer
 // events.
 type InputOp struct {
-	Key event.Key
+	Tag event.Tag
 	// Grab, if set, request that the handler get
 	// Grabbed priority.
 	Grab bool
@@ -155,7 +155,7 @@ func (op AreaOp) Add(o *op.Ops) {
 }
 
 func (h InputOp) Add(o *op.Ops) {
-	data := o.Write(opconst.TypePointerInputLen, h.Key)
+	data := o.Write(opconst.TypePointerInputLen, h.Tag)
 	data[0] = byte(opconst.TypePointerInput)
 	if h.Grab {
 		data[1] = 1

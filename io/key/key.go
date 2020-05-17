@@ -22,7 +22,7 @@ import (
 // focused key handler. Set the Focus flag to request
 // the focus.
 type InputOp struct {
-	Key   event.Key
+	Tag   event.Tag
 	Focus bool
 }
 
@@ -97,7 +97,7 @@ func (m Modifiers) Contain(m2 Modifiers) bool {
 }
 
 func (h InputOp) Add(o *op.Ops) {
-	data := o.Write(opconst.TypeKeyInputLen, h.Key)
+	data := o.Write(opconst.TypeKeyInputLen, h.Tag)
 	data[0] = byte(opconst.TypeKeyInput)
 	if h.Focus {
 		data[1] = 1

@@ -17,14 +17,14 @@ import (
 type pointerQueue struct {
 	hitTree  []hitNode
 	areas    []areaNode
-	handlers map[event.Key]*pointerHandler
+	handlers map[event.Tag]*pointerHandler
 	pointers []pointerInfo
 	reader   ops.Reader
-	scratch  []event.Key
+	scratch  []event.Tag
 
 	// prev and curr are two additional scratch slices that track active
 	// pointer event handlers from the previous and current frame
-	prev, curr []event.Key
+	prev, curr []event.Tag
 }
 
 type hitNode struct {
@@ -34,13 +34,13 @@ type hitNode struct {
 	pass bool
 
 	// For handler nodes.
-	key event.Key
+	key event.Tag
 }
 
 type pointerInfo struct {
 	id       pointer.ID
 	pressed  bool
-	handlers []event.Key
+	handlers []event.Tag
 }
 
 type pointerHandler struct {
@@ -98,14 +98,14 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t o
 				next: node,
 				area: area,
 				pass: pass,
-				key:  op.Key,
+				key:  op.Tag,
 			})
 			node = len(q.hitTree) - 1
-			h, ok := q.handlers[op.Key]
+			h, ok := q.handlers[op.Tag]
 			if !ok {
 				h = new(pointerHandler)
-				q.handlers[op.Key] = h
-				events.Set(op.Key, []event.Event{pointer.Event{Type: pointer.Cancel}})
+				q.handlers[op.Tag] = h
+				events.Set(op.Tag, []event.Event{pointer.Event{Type: pointer.Cancel}})
 			}
 			h.active = true
 			h.area = area
@@ -115,7 +115,7 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t o
 	}
 }
 
-func (q *pointerQueue) opHit(handlers *[]event.Key, pos f32.Point) {
+func (q *pointerQueue) opHit(handlers *[]event.Tag, pos f32.Point) {
 	// Track whether we're passing through hits.
 	pass := true
 	idx := len(q.hitTree) - 1
@@ -160,7 +160,7 @@ func (a *areaNode) hit(p f32.Point) bool {
 
 func (q *pointerQueue) init() {
 	if q.handlers == nil {
-		q.handlers = make(map[event.Key]*pointerHandler)
+		q.handlers = make(map[event.Tag]*pointerHandler)
 	}
 }
 
@@ -182,7 +182,7 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	}
 }
 
-func (q *pointerQueue) dropHandler(k event.Key, events *handlerEvents) {
+func (q *pointerQueue) dropHandler(k event.Tag, events *handlerEvents) {
 	events.Add(k, pointer.Event{Type: pointer.Cancel})
 	q.handlers[k].wantsGrab = false
 	for i := range q.pointers {
@@ -278,7 +278,7 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 // evTemplate but with the type specified by evType.
 //
 // This is useful for delivering pointer.Enter and pointer.Leave events.
-func (q *pointerQueue) deliverEventsToMissingHandlers(a, b []event.Key, evType pointer.Type, evTemplate pointer.Event, events *handlerEvents) {
+func (q *pointerQueue) deliverEventsToMissingHandlers(a, b []event.Tag, evType pointer.Type, evTemplate pointer.Event, events *handlerEvents) {
 	for _, newH := range b {
 		found := false
 		for _, oldH := range a {
@@ -350,8 +350,8 @@ func decodePointerInputOp(d []byte, refs []interface{}) pointer.InputOp {
 		panic("invalid op")
 	}
 	return pointer.InputOp{
+		Tag:  refs[0].(event.Tag),
 		Grab: d[1] != 0,
-		Key:  refs[0].(event.Key),
 	}
 }
 

@@ -390,7 +390,7 @@ func (w *Window) run(opts *window.Options) {
 	}
 }
 
-func (q *queue) Events(k event.Key) []event.Event {
+func (q *queue) Events(k event.Tag) []event.Event {
 	return q.q.Events(k)
 }
 

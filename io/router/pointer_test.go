@@ -22,7 +22,7 @@ func TestPointerDrag(t *testing.T) {
 			Y: 100,
 		},
 	}).Add(&ops)
-	pointer.InputOp{Key: handler}.Add(&ops)
+	pointer.InputOp{Tag: handler}.Add(&ops)
 
 	var r Router
 	r.Frame(&ops)
@@ -62,7 +62,7 @@ func TestPointerMove(t *testing.T) {
 			Y: 100,
 		},
 	}).Add(&ops)
-	pointer.InputOp{Key: handler1}.Add(&ops)
+	pointer.InputOp{Tag: handler1}.Add(&ops)
 	// Handler 2 area: (50, 50) - (100, 100) (areas intersect).
 	pointer.Rect(image.Rectangle{
 		Min: image.Point{
@@ -74,7 +74,7 @@ func TestPointerMove(t *testing.T) {
 			Y: 200,
 		},
 	}).Add(&ops)
-	pointer.InputOp{Key: handler2}.Add(&ops)
+	pointer.InputOp{Tag: handler2}.Add(&ops)
 
 	var r Router
 	r.Frame(&ops)
@@ -146,7 +146,7 @@ func TestPointerEnterLeave(t *testing.T) {
 			Y: 100,
 		},
 	}).Add(&ops)
-	pointer.InputOp{Key: handler1}.Add(&ops)
+	pointer.InputOp{Tag: handler1}.Add(&ops)
 	stack.Pop()
 
 	// Handler 2 area: (50, 50) - (100, 100) (areas intersect).
@@ -161,7 +161,7 @@ func TestPointerEnterLeave(t *testing.T) {
 			Y: 200,
 		},
 	}).Add(&ops)
-	pointer.InputOp{Key: handler2}.Add(&ops)
+	pointer.InputOp{Tag: handler2}.Add(&ops)
 	stack.Pop()
 
 	var r Router
@@ -264,7 +264,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 			Y: 100,
 		},
 	}).Add(&ops)
-	pointer.InputOp{Key: handler1}.Add(&ops)
+	pointer.InputOp{Tag: handler1}.Add(&ops)
 
 	// Handler 2 area: (25, 25) - (75, 75) (nested within first).
 	pointer.Rect(image.Rectangle{
@@ -277,7 +277,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 			Y: 75,
 		},
 	}).Add(&ops)
-	pointer.InputOp{Key: handler2}.Add(&ops)
+	pointer.InputOp{Tag: handler2}.Add(&ops)
 
 	var r Router
 	r.Frame(&ops)
@@ -376,7 +376,7 @@ func TestPointerActiveInputDisappears(t *testing.T) {
 				Y: 100,
 			},
 		}).Add(ops)
-		pointer.InputOp{Key: handler1}.Add(ops)
+		pointer.InputOp{Tag: handler1}.Add(ops)
 		stack.Pop()
 	}
 
@@ -458,7 +458,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 	for i := startingHandlerCount; i < maxHandlerCount; i *= 3 {
 		handlerCount := i
 		b.Run(fmt.Sprintf("%d-handlers", i), func(b *testing.B) {
-			handlers := make([]event.Key, handlerCount)
+			handlers := make([]event.Tag, handlerCount)
 			for i := 0; i < handlerCount; i++ {
 				h := new(int)
 				*h = i
@@ -473,7 +473,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 						Y: 100,
 					},
 				}).Add(&ops)
-				pointer.InputOp{Key: handlers[i]}.Add(&ops)
+				pointer.InputOp{Tag: handlers[i]}.Add(&ops)
 			}
 			var r Router
 			r.Frame(&ops)

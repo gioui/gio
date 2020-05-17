@@ -112,7 +112,7 @@ var touchSlop = unit.Dp(3)
 
 // Add the handler to the operation list to receive click events.
 func (c *Click) Add(ops *op.Ops) {
-	op := pointer.InputOp{Key: c}
+	op := pointer.InputOp{Tag: c}
 	op.Add(ops)
 }
 
@@ -168,7 +168,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 
 // Add the handler to the operation list to receive scroll events.
 func (s *Scroll) Add(ops *op.Ops) {
-	oph := pointer.InputOp{Key: s, Grab: s.grab}
+	oph := pointer.InputOp{Tag: s, Grab: s.grab}
 	oph.Add(ops)
 	if s.flinger.Active() {
 		op.InvalidateOp{}.Add(ops)

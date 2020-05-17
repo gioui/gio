@@ -74,7 +74,7 @@ func (c *Context) Px(v unit.Value) int {
 
 // Events returns the events available for the key. If no
 // queue is configured, Events returns nil.
-func (c *Context) Events(k event.Key) []event.Event {
+func (c *Context) Events(k event.Tag) []event.Event {
 	if c.queue == nil {
 		return nil
 	}

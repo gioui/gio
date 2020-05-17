@@ -39,17 +39,17 @@ type Router struct {
 
 	// ProfileOp summary.
 	profiling    bool
-	profHandlers map[event.Key]struct{}
+	profHandlers map[event.Tag]struct{}
 	profile      profile.Event
 }
 
 type handlerEvents struct {
-	handlers  map[event.Key][]event.Event
+	handlers  map[event.Tag][]event.Event
 	hadEvents bool
 }
 
 // Events returns the available events for the handler key.
-func (q *Router) Events(k event.Key) []event.Event {
+func (q *Router) Events(k event.Tag) []event.Event {
 	events := q.handlers.Events(k)
 	if _, isprof := q.profHandlers[k]; isprof {
 		delete(q.profHandlers, k)
@@ -111,10 +111,10 @@ func (q *Router) collect() {
 		case opconst.TypeProfile:
 			op := decodeProfileOp(encOp.Data, encOp.Refs)
 			if q.profHandlers == nil {
-				q.profHandlers = make(map[event.Key]struct{})
+				q.profHandlers = make(map[event.Tag]struct{})
 			}
 			q.profiling = true
-			q.profHandlers[op.Key] = struct{}{}
+			q.profHandlers[op.Tag] = struct{}{}
 		}
 	}
 }
@@ -133,17 +133,17 @@ func (q *Router) WakeupTime() (time.Time, bool) {
 
 func (h *handlerEvents) init() {
 	if h.handlers == nil {
-		h.handlers = make(map[event.Key][]event.Event)
+		h.handlers = make(map[event.Tag][]event.Event)
 	}
 }
 
-func (h *handlerEvents) Set(k event.Key, evts []event.Event) {
+func (h *handlerEvents) Set(k event.Tag, evts []event.Event) {
 	h.init()
 	h.handlers[k] = evts
 	h.hadEvents = true
 }
 
-func (h *handlerEvents) Add(k event.Key, e event.Event) {
+func (h *handlerEvents) Add(k event.Tag, e event.Event) {
 	h.init()
 	h.handlers[k] = append(h.handlers[k], e)
 	h.hadEvents = true
@@ -155,7 +155,7 @@ func (h *handlerEvents) HadEvents() bool {
 	return u
 }
 
-func (h *handlerEvents) Events(k event.Key) []event.Event {
+func (h *handlerEvents) Events(k event.Tag) []event.Event {
 	if events, ok := h.handlers[k]; ok {
 		h.handlers[k] = h.handlers[k][:0]
 		// Schedule another frame if we delivered events to the user
@@ -184,7 +184,7 @@ func decodeProfileOp(d []byte, refs []interface{}) profile.Op {
 		panic("invalid op")
 	}
 	return profile.Op{
-		Key: refs[0].(event.Key),
+		Tag: refs[0].(event.Tag),
 	}
 }
 

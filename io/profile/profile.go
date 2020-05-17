@@ -13,7 +13,7 @@ import (
 // Op registers a handler for receiving
 // Events.
 type Op struct {
-	Key event.Key
+	Tag event.Tag
 }
 
 // Event contains profile data from a single
@@ -24,7 +24,7 @@ type Event struct {
 }
 
 func (p Op) Add(o *op.Ops) {
-	data := o.Write(opconst.TypeProfileLen, p.Key)
+	data := o.Write(opconst.TypeProfileLen, p.Tag)
 	data[0] = byte(opconst.TypeProfile)
 }
 
