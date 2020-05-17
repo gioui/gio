@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 #include <jni.h>
-#include "os_android.h"
 #include "_cgo_export.h"
 
 jint gio_jni_GetEnv(JavaVM *vm, JNIEnv **env, jint version) {
