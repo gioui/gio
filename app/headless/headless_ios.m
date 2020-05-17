@@ -5,7 +5,7 @@
 @import OpenGLES;
 
 #include <CoreFoundation/CoreFoundation.h>
-#include "headless_darwin.h"
+#include "_cgo_export.h"
 
 void gio_headless_releaseContext(CFTypeRef ctxRef) {
 	CFBridgingRelease(ctxRef);
