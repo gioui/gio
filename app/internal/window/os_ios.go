@@ -200,14 +200,19 @@ func onTouch(last C.int, view, touchRef C.CFTypeRef, phase C.NSInteger, x, y C.C
 }
 
 func (w *window) SetAnimating(anim bool) {
-	if w.view == 0 {
+	v := w.view
+	if v == 0 {
 		return
 	}
 	var animi C.int
 	if anim {
 		animi = 1
 	}
-	C.gio_setAnimating(w.view, animi)
+	C.CFRetain(v)
+	runOnMain(func() {
+		defer C.CFRelease(v)
+		C.gio_setAnimating(v, animi)
+	})
 }
 
 func (w *window) onKeyCommand(name string) {
@@ -245,14 +250,19 @@ func (w *window) isVisible() bool {
 }
 
 func (w *window) ShowTextInput(show bool) {
-	if w.view == 0 {
+	v := w.view
+	if v == 0 {
 		return
 	}
-	if show {
-		C.gio_showTextInput(w.view)
-	} else {
-		C.gio_hideTextInput(w.view)
-	}
+	C.CFRetain(v)
+	runOnMain(func() {
+		defer C.CFRelease(v)
+		if show {
+			C.gio_showTextInput(w.view)
+		} else {
+			C.gio_hideTextInput(w.view)
+		}
+	})
 }
 
 func NewWindow(win Callbacks, opts *Options) error {

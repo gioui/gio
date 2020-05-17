@@ -281,23 +281,17 @@ NSArray<UIKeyCommand *> *_keyCommands;
 
 void gio_setAnimating(CFTypeRef viewRef, int anim) {
 	GioView *view = (__bridge GioView *)viewRef;
-	dispatch_async(dispatch_get_main_queue(), ^{
-		[view setAnimating:(anim ? YES : NO)];
-	});
+	[view setAnimating:(anim ? YES : NO)];
 }
 
 void gio_showTextInput(CFTypeRef viewRef) {
 	UIView *view = (__bridge UIView *)viewRef;
-	dispatch_async(dispatch_get_main_queue(), ^{
-		[view becomeFirstResponder];
-	});
+	[view becomeFirstResponder];
 }
 
 void gio_hideTextInput(CFTypeRef viewRef) {
 	UIView *view = (__bridge UIView *)viewRef;
-	dispatch_async(dispatch_get_main_queue(), ^{
-		[view resignFirstResponder];
-	});
+	[view resignFirstResponder];
 }
 
 void gio_addLayerToView(CFTypeRef viewRef, CFTypeRef layerRef) {
