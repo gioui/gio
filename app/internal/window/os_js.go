@@ -19,10 +19,12 @@ import (
 
 type window struct {
 	window                js.Value
+	clipboard             js.Value
 	cnv                   js.Value
 	tarea                 js.Value
 	w                     Callbacks
 	redraw                js.Func
+	clipboardCallback     js.Func
 	requestAnimationFrame js.Value
 	cleanfuncs            []func()
 	touches               []js.Value
@@ -43,13 +45,19 @@ func NewWindow(win Callbacks, opts *Options) error {
 	tarea := createTextArea(doc)
 	cont.Call("appendChild", tarea)
 	w := &window{
-		cnv:    cnv,
-		tarea:  tarea,
-		window: js.Global().Get("window"),
+		cnv:       cnv,
+		tarea:     tarea,
+		window:    js.Global().Get("window"),
+		clipboard: js.Global().Get("navigator").Get("clipboard"),
 	}
 	w.requestAnimationFrame = w.window.Get("requestAnimationFrame")
 	w.redraw = w.funcOf(func(this js.Value, args []js.Value) interface{} {
 		w.animCallback()
+		return nil
+	})
+	w.clipboardCallback = w.funcOf(func(this js.Value, args []js.Value) interface{} {
+		content := args[0].String()
+		win.Event(system.ClipboardEvent{Text: content})
 		return nil
 	})
 	w.addEventListeners()
@@ -341,6 +349,26 @@ func (w *window) SetAnimating(anim bool) {
 		w.requestAnimationFrame.Invoke(w.redraw)
 	}
 	w.animating = anim
+}
+
+func (w *window) ReadClipboard() {
+	if w.clipboard.IsUndefined() {
+		return
+	}
+	if w.clipboard.Get("readText").IsUndefined() {
+		return
+	}
+	w.clipboard.Call("readText", w.clipboard).Call("then", w.clipboardCallback)
+}
+
+func (w *window) WriteClipboard(s string) {
+	if w.clipboard.IsUndefined() {
+		return
+	}
+	if w.clipboard.Get("writeText").IsUndefined() {
+		return
+	}
+	w.clipboard.Call("writeText", s)
 }
 
 func (w *window) ShowTextInput(show bool) {
