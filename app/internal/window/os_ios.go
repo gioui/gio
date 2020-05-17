@@ -17,6 +17,8 @@ __attribute__ ((visibility ("hidden"))) void gio_addLayerToView(CFTypeRef viewRe
 __attribute__ ((visibility ("hidden"))) void gio_updateView(CFTypeRef viewRef, CFTypeRef layerRef);
 __attribute__ ((visibility ("hidden"))) void gio_removeLayer(CFTypeRef layerRef);
 __attribute__ ((visibility ("hidden"))) void gio_setAnimating(CFTypeRef viewRef, int anim);
+__attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
+__attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
 */
 import "C"
 
@@ -26,6 +28,8 @@ import (
 	"runtime/debug"
 	"sync/atomic"
 	"time"
+	"unicode/utf16"
+	"unsafe"
 
 	"gioui.org/f32"
 	"gioui.org/io/key"
@@ -196,6 +200,24 @@ func onTouch(last C.int, view, touchRef C.CFTypeRef, phase C.NSInteger, x, y C.C
 		PointerID: w.lookupTouch(last != 0, touchRef),
 		Position:  p,
 		Time:      t,
+	})
+}
+
+func (w *window) ReadClipboard() {
+	runOnMain(func() {
+		content := nsstringToString(C.gio_readClipboard())
+		w.w.Event(system.ClipboardEvent{Text: content})
+	})
+}
+
+func (w *window) WriteClipboard(s string) {
+	u16 := utf16.Encode([]rune(s))
+	runOnMain(func() {
+		var chars *C.unichar
+		if len(u16) > 0 {
+			chars = (*C.unichar)(unsafe.Pointer(&u16[0]))
+		}
+		C.gio_writeClipboard(chars, C.NSUInteger(len(u16)))
 	})
 }
 

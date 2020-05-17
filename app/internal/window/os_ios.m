@@ -279,6 +279,24 @@ NSArray<UIKeyCommand *> *_keyCommands;
 }
 @end
 
+void gio_writeClipboard(unichar *chars, NSUInteger length) {
+	@autoreleasepool {
+		NSString *s = [NSString string];
+		if (length > 0) {
+			s = [NSString stringWithCharacters:chars length:length];
+		}
+		UIPasteboard *p = UIPasteboard.generalPasteboard;
+		p.string = s;
+	}
+}
+
+CFTypeRef gio_readClipboard(void) {
+	@autoreleasepool {
+		UIPasteboard *p = UIPasteboard.generalPasteboard;
+		return (__bridge_retained CFTypeRef)p.string;
+	}
+}
+
 void gio_setAnimating(CFTypeRef viewRef, int anim) {
 	GioView *view = (__bridge GioView *)viewRef;
 	[view setAnimating:(anim ? YES : NO)];
