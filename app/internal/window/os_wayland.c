@@ -5,7 +5,6 @@
 #include <wayland-client.h>
 #include "wayland_xdg_shell.h"
 #include "wayland_text_input.h"
-#include "os_wayland.h"
 #include "_cgo_export.h"
 
 void gio_wl_registry_add_listener(struct wl_registry *reg, void *data) {
