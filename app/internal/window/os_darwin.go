@@ -3,7 +3,7 @@
 package window
 
 /*
-#include "os_darwin.h"
+__attribute__ ((visibility ("hidden"))) void gio_wakeupMainThread(void);
 */
 import "C"
 

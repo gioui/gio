@@ -2,7 +2,6 @@
 
 @import Dispatch;
 
-#include "os_darwin.h"
 #include "_cgo_export.h"
 
 void gio_wakeupMainThread(void) {

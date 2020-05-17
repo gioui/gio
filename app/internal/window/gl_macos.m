@@ -7,8 +7,6 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <OpenGL/OpenGL.h>
 #include <OpenGL/gl3.h>
-#include "os_macos.h"
-#include "gl_macos.h"
 #include "_cgo_export.h"
 
 static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFloat dy) {

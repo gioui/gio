@@ -4,7 +4,6 @@
 
 @import AppKit;
 
-#include "os_macos.h"
 #include "_cgo_export.h"
 
 @interface GioDelegate : NSObject<NSApplicationDelegate, NSWindowDelegate>
