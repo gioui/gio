@@ -115,7 +115,7 @@ func (u *UI) layoutTimings(gtx *layout.Context) {
 			u.profile = e
 		}
 	}
-	profile.Op{Key: u}.Add(gtx.Ops)
+	profile.Op{Tag: u}.Add(gtx.Ops)
 	var mstats runtime.MemStats
 	runtime.ReadMemStats(&mstats)
 	mallocs := mstats.Mallocs - u.lastMallocs

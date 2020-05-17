@@ -119,7 +119,7 @@ func (w *quarterWidget) Layout(gtx *layout.Context) {
 	pointer.Rect(image.Rectangle{
 		Max: image.Pt(gtx.Constraints.Width.Max, gtx.Constraints.Height.Max),
 	}).Add(gtx.Ops)
-	pointer.InputOp{Key: w}.Add(gtx.Ops)
+	pointer.InputOp{Tag: w}.Add(gtx.Ops)
 
 	for _, e := range gtx.Events(w) {
 		if e, ok := e.(pointer.Event); ok && e.Type == pointer.Press {
