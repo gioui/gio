@@ -86,7 +86,12 @@ func (w *window) SetAnimating(anim bool) {
 	if anim {
 		animb = 1
 	}
-	C.gio_setAnimating(w.view, animb)
+	v := w.view
+	C.CFRetain(v)
+	runOnMain(func() {
+		defer C.CFRelease(v)
+		C.gio_setAnimating(v, animb)
+	})
 }
 
 func (w *window) setStage(stage system.Stage) {

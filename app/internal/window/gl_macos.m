@@ -148,9 +148,7 @@ void gio_updateDisplayLink(CFTypeRef viewRef, CGDirectDisplayID dispID) {
 
 void gio_setAnimating(CFTypeRef viewRef, BOOL anim) {
 	GioView *view = (__bridge GioView *)viewRef;
-	dispatch_async(dispatch_get_main_queue(), ^{
-		[view setAnimating:anim];
-	});
+	[view setAnimating:anim];
 }
 
 CFTypeRef gio_contextForView(CFTypeRef viewRef) {
