@@ -42,42 +42,37 @@ type window struct {
 	scale float32
 }
 
-type viewCmd struct {
-	view C.CFTypeRef
-	f    viewFunc
-}
-
-type viewFunc func(views viewMap, view C.CFTypeRef)
-
-type viewMap map[C.CFTypeRef]*window
-
-var (
-	viewOnce sync.Once
-	viewCmds = make(chan viewCmd)
-	viewAcks = make(chan struct{})
-)
+// viewMap is the mapping from Cocoa NSViews to Go windows.
+var viewMap sync.Map
 
 var mainWindow = newWindowRendezvous()
 
 var viewFactory func() C.CFTypeRef
 
-func viewDo(view C.CFTypeRef, f viewFunc) {
-	viewOnce.Do(func() {
-		go runViewCmdLoop()
-	})
-	viewCmds <- viewCmd{view, f}
-	<-viewAcks
+// mustView is like lookoupView, except that it panics
+// if the view isn't mapped.
+func mustView(view C.CFTypeRef) *window {
+	w, ok := lookupView(view)
+	if !ok {
+		panic("no window view view")
+	}
+	return w
 }
 
-func runViewCmdLoop() {
-	views := make(viewMap)
-	for {
-		select {
-		case cmd := <-viewCmds:
-			cmd.f(views, cmd.view)
-			viewAcks <- struct{}{}
-		}
+func lookupView(view C.CFTypeRef) (*window, bool) {
+	w, exists := viewMap.Load(view)
+	if !exists {
+		return nil, false
 	}
+	return w.(*window), true
+}
+
+func deleteView(view C.CFTypeRef) {
+	viewMap.Delete(view)
+}
+
+func insertView(view C.CFTypeRef, w *window) {
+	viewMap.Store(view, w)
 }
 
 func (w *window) contextView() C.CFTypeRef {
@@ -102,46 +97,34 @@ func (w *window) setStage(stage system.Stage) {
 	w.w.Event(system.StageEvent{Stage: stage})
 }
 
-// Use a top level func for onFrameCallback to avoid
-// garbage from viewDo.
-func onFrameCmd(views viewMap, view C.CFTypeRef) {
-	// CVDisplayLink does not run on the main thread,
-	// so we have to ignore requests to windows being
-	// deleted.
-	if w, exists := views[view]; exists {
-		w.draw(false)
-	}
-}
-
 //export gio_onFrameCallback
 func gio_onFrameCallback(view C.CFTypeRef) {
-	viewDo(view, onFrameCmd)
+	w, exists := lookupView(view)
+	if exists {
+		w.draw(false)
+	}
 }
 
 //export gio_onKeys
 func gio_onKeys(view C.CFTypeRef, cstr *C.char, ti C.double, mods C.NSUInteger) {
 	str := C.GoString(cstr)
 	kmods := convertMods(mods)
-	viewDo(view, func(views viewMap, view C.CFTypeRef) {
-		w := views[view]
-		for _, k := range str {
-			if n, ok := convertKey(k); ok {
-				w.w.Event(key.Event{
-					Name:      n,
-					Modifiers: kmods,
-				})
-			}
+	w := mustView(view)
+	for _, k := range str {
+		if n, ok := convertKey(k); ok {
+			w.w.Event(key.Event{
+				Name:      n,
+				Modifiers: kmods,
+			})
 		}
-	})
+	}
 }
 
 //export gio_onText
 func gio_onText(view C.CFTypeRef, cstr *C.char) {
 	str := C.GoString(cstr)
-	viewDo(view, func(views viewMap, view C.CFTypeRef) {
-		w := views[view]
-		w.w.Event(key.EditEvent{Text: str})
-	})
+	w := mustView(view)
+	w.w.Event(key.EditEvent{Text: str})
 }
 
 //export gio_onMouse
@@ -168,36 +151,30 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy 
 		btns |= pointer.ButtonMiddle
 	}
 	t := time.Duration(float64(ti)*float64(time.Second) + .5)
-	viewDo(view, func(views viewMap, view C.CFTypeRef) {
-		w := views[view]
-		x, y := float32(x)*w.scale, float32(y)*w.scale
-		dx, dy := float32(dx)*w.scale, float32(dy)*w.scale
-		w.w.Event(pointer.Event{
-			Type:      typ,
-			Source:    pointer.Mouse,
-			Time:      t,
-			Buttons:   btns,
-			Position:  f32.Point{X: x, Y: y},
-			Scroll:    f32.Point{X: dx, Y: dy},
-			Modifiers: convertMods(mods),
-		})
+	w := mustView(view)
+	xf, yf := float32(x)*w.scale, float32(y)*w.scale
+	dxf, dyf := float32(dx)*w.scale, float32(dy)*w.scale
+	w.w.Event(pointer.Event{
+		Type:      typ,
+		Source:    pointer.Mouse,
+		Time:      t,
+		Buttons:   btns,
+		Position:  f32.Point{X: xf, Y: yf},
+		Scroll:    f32.Point{X: dxf, Y: dyf},
+		Modifiers: convertMods(mods),
 	})
 }
 
 //export gio_onDraw
 func gio_onDraw(view C.CFTypeRef) {
-	viewDo(view, func(views viewMap, view C.CFTypeRef) {
-		w := views[view]
-		w.draw(true)
-	})
+	w := mustView(view)
+	w.draw(true)
 }
 
 //export gio_onFocus
 func gio_onFocus(view C.CFTypeRef, focus C.BOOL) {
-	viewDo(view, func(views viewMap, view C.CFTypeRef) {
-		w := views[view]
-		w.w.Event(key.FocusEvent{Focus: focus == C.YES})
-	})
+	w := mustView(view)
+	w.w.Event(key.FocusEvent{Focus: focus == C.YES})
 }
 
 func (w *window) draw(sync bool) {
@@ -232,42 +209,34 @@ func configFor(scale float32) config {
 
 //export gio_onTerminate
 func gio_onTerminate(view C.CFTypeRef) {
-	viewDo(view, func(views viewMap, view C.CFTypeRef) {
-		w := views[view]
-		delete(views, view)
-		w.w.Event(system.DestroyEvent{})
-	})
+	w := mustView(view)
+	deleteView(view)
+	w.w.Event(system.DestroyEvent{})
 }
 
 //export gio_onHide
 func gio_onHide(view C.CFTypeRef) {
-	viewDo(view, func(views viewMap, view C.CFTypeRef) {
-		w := views[view]
-		w.setStage(system.StagePaused)
-	})
+	w := mustView(view)
+	w.setStage(system.StagePaused)
 }
 
 //export gio_onShow
 func gio_onShow(view C.CFTypeRef) {
-	viewDo(view, func(views viewMap, view C.CFTypeRef) {
-		w := views[view]
-		w.setStage(system.StageRunning)
-	})
+	w := mustView(view)
+	w.setStage(system.StageRunning)
 }
 
 //export gio_onCreate
 func gio_onCreate(view C.CFTypeRef) {
-	viewDo(view, func(views viewMap, view C.CFTypeRef) {
-		scale := float32(C.gio_getViewBackingScale(view))
-		w := &window{
-			view:  view,
-			scale: scale,
-		}
-		wopts := <-mainWindow.out
-		w.w = wopts.window
-		w.w.SetDriver(w)
-		views[view] = w
-	})
+	scale := float32(C.gio_getViewBackingScale(view))
+	w := &window{
+		view:  view,
+		scale: scale,
+	}
+	wopts := <-mainWindow.out
+	w.w = wopts.window
+	w.w.SetDriver(w)
+	insertView(view, w)
 }
 
 func NewWindow(win Callbacks, opts *Options) error {
