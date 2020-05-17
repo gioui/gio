@@ -10,7 +10,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 
-public class GioActivity extends Activity {
+public final class GioActivity extends Activity {
 	private GioView view;
 
 	@Override public void onCreate(Bundle state) {

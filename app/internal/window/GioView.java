@@ -11,6 +11,8 @@ import android.app.Activity;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
+import android.content.ClipboardManager;
+import android.content.ClipData;
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.Build;
@@ -33,7 +35,7 @@ import android.view.inputmethod.EditorInfo;
 
 import java.io.UnsupportedEncodingException;
 
-public class GioView extends SurfaceView implements Choreographer.FrameCallback {
+public final class GioView extends SurfaceView implements Choreographer.FrameCallback {
 	private final static Object initLock = new Object();
 	private static boolean jniLoaded;
 
@@ -199,7 +201,15 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 		return onBack(nhandle);
 	}
 
-	public void registerFragment(String del) {
+	protected void wakeupMainThread() {
+		handler.post(new Runnable() {
+			@Override public void run() {
+				scheduleMainFuncs();
+			}
+		});
+	}
+
+	protected void registerFragment(String del) {
 		final Class cls;
 		try {
 			cls = getContext().getClassLoader().loadClass(del);
@@ -228,6 +238,20 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 		});
 	}
 
+	protected void writeClipboard(String s) {
+		ClipboardManager m = (ClipboardManager)getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+		m.setPrimaryClip(ClipData.newPlainText(null, s));
+	}
+
+	protected String readClipboard() {
+		ClipboardManager m = (ClipboardManager)getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+		ClipData c = m.getPrimaryClip();
+		if (c == null || c.getItemCount() < 1) {
+			return null;
+		}
+		return c.getItemAt(0).coerceToText(getContext()).toString();
+	}
+
 	static private native long onCreateView(GioView view);
 	static private native void onDestroyView(long handle);
 	static private native void onStartView(long handle);
@@ -242,6 +266,7 @@ public class GioView extends SurfaceView implements Choreographer.FrameCallback 
 	static private native void onFrameCallback(long handle, long nanos);
 	static private native boolean onBack(long handle);
 	static private native void onFocusChange(long handle, boolean focus);
+	static private native void scheduleMainFuncs();
 
 	private static class InputConnection extends BaseInputConnection {
 		private final Editable editable;

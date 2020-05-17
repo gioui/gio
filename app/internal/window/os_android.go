@@ -74,6 +74,7 @@ type window struct {
 	win       *C.ANativeWindow
 	animating bool
 
+	// Cached Java methods.
 	mgetDensity                    C.jmethodID
 	mgetFontScale                  C.jmethodID
 	mshowTextInput                 C.jmethodID
@@ -81,6 +82,9 @@ type window struct {
 	mpostFrameCallback             C.jmethodID
 	mpostFrameCallbackOnMainThread C.jmethodID
 	mRegisterFragment              C.jmethodID
+	mwakeupMainThread              C.jmethodID
+	mwriteClipboard                C.jmethodID
+	mreadClipboard                 C.jmethodID
 }
 
 type jvalue uint64 // The largest JNI type fits in 64 bits.
@@ -96,17 +100,13 @@ var android struct {
 
 	// The global Android App context.
 	appCtx C.jobject
-	// The Gio class reference.
-	gioCls C.jclass
-
-	// Cached Java methods.
-	writeClipboard C.jmethodID
-	readClipboard  C.jmethodID
 }
 
 var views = make(map[C.jlong]*window)
 
 var mainWindow = newWindowRendezvous()
+
+var mainFuncs = make(chan func(env *C.JNIEnv), 1)
 
 func getMethodID(env *C.JNIEnv, class C.jclass, method, sig string) C.jmethodID {
 	m := C.CString(method)
@@ -153,10 +153,7 @@ func initJVM(env *C.JNIEnv, gio C.jclass, ctx C.jobject) {
 	if res := C.gio_jni_GetJavaVM(env, &android.jvm); res != 0 {
 		panic("gio: GetJavaVM failed")
 	}
-	android.writeClipboard = getStaticMethodID(env, gio, "writeClipboard", "(Landroid/content/Context;Ljava/lang/String;)V")
-	android.readClipboard = getStaticMethodID(env, gio, "readClipboard", "(Landroid/content/Context;)Ljava/lang/String;")
 	android.appCtx = C.gio_jni_NewGlobalRef(env, ctx)
-	android.gioCls = C.jclass(C.gio_jni_NewGlobalRef(env, C.jobject(gio)))
 }
 
 func JavaVM() uintptr {
@@ -192,6 +189,9 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		mpostFrameCallback:             getMethodID(env, class, "postFrameCallback", "()V"),
 		mpostFrameCallbackOnMainThread: getMethodID(env, class, "postFrameCallbackOnMainThread", "()V"),
 		mRegisterFragment:              getMethodID(env, class, "registerFragment", "(Ljava/lang/String;)V"),
+		mwakeupMainThread:              getMethodID(env, class, "wakeupMainThread", "()V"),
+		mwriteClipboard:                getMethodID(env, class, "writeClipboard", "(Ljava/lang/String;)V"),
+		mreadClipboard:                 getMethodID(env, class, "readClipboard", "()Ljava/lang/String;"),
 	}
 	wopts := <-mainWindow.out
 	w.callbacks = wopts.window
@@ -619,33 +619,40 @@ func NewWindow(window Callbacks, opts *Options) error {
 	return <-mainWindow.errs
 }
 
-func WriteClipboard(s string) error {
-	var jerr error
-	jvm := javaVM()
-	if jvm == nil {
-		return errors.New("clipboard: the JVM is not yet available")
-	}
-	runInJVM(jvm, func(env *C.JNIEnv) {
+func (w *window) WriteClipboard(s string) {
+	w.runOnMain(func(env *C.JNIEnv) {
 		jstr := javaString(env, s)
-		jerr = callStaticVoidMethod(env, android.gioCls, android.writeClipboard, jvalue(android.appCtx), jvalue(jstr))
+		callVoidMethod(env, w.view, w.mwriteClipboard, jvalue(jstr))
 	})
-	return jerr
 }
 
-func ReadClipboard() (string, error) {
-	var clipboard string
-	var jerr error
-	jvm := javaVM()
-	if jvm == nil {
-		return "", errors.New("clipboard: the JVM is not yet available")
-	}
-	runInJVM(jvm, func(env *C.JNIEnv) {
-		c, err := callStaticObjectMethod(env, android.gioCls, android.readClipboard, jvalue(android.appCtx))
+func (w *window) ReadClipboard() {
+	w.runOnMain(func(env *C.JNIEnv) {
+		c, err := callObjectMethod(env, w.view, w.mreadClipboard)
 		if err != nil {
-			jerr = err
 			return
 		}
-		clipboard = goString(env, C.jstring(c))
+		content := goString(env, C.jstring(c))
+		w.callbacks.Event(system.ClipboardEvent{Text: content})
 	})
-	return clipboard, jerr
+}
+
+// runOnMain runs a function on the Java main thread.
+func (w *window) runOnMain(f func(env *C.JNIEnv)) {
+	mainFuncs <- f
+	runInJVM(javaVM(), func(env *C.JNIEnv) {
+		callVoidMethod(env, w.view, w.mwakeupMainThread)
+	})
+}
+
+//export Java_org_gioui_GioView_scheduleMainFuncs
+func Java_org_gioui_GioView_scheduleMainFuncs(env *C.JNIEnv, this C.jobject) {
+	for {
+		select {
+		case f := <-mainFuncs:
+			f(env)
+		default:
+			return
+		}
+	}
 }

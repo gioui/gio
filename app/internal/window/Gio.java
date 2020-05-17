@@ -2,8 +2,6 @@
 
 package org.gioui;
 
-import android.content.ClipboardManager;
-import android.content.ClipData;
 import android.content.Context;
 
 import java.io.UnsupportedEncodingException;
@@ -35,20 +33,6 @@ public final class Gio {
 			runGoMain(dataDirUTF8, appCtx);
 			jniLoaded = true;
 		}
-	}
-
-	private static void writeClipboard(Context ctx, String s) {
-		ClipboardManager m = (ClipboardManager)ctx.getSystemService(Context.CLIPBOARD_SERVICE);
-		m.setPrimaryClip(ClipData.newPlainText(null, s));
-	}
-
-	private static String readClipboard(Context ctx) {
-		ClipboardManager m = (ClipboardManager)ctx.getSystemService(Context.CLIPBOARD_SERVICE);
-		ClipData c = m.getPrimaryClip();
-		if (c == null || c.getItemCount() < 1) {
-			return null;
-		}
-		return c.getItemAt(0).coerceToText(ctx).toString();
 	}
 
 	static private native void runGoMain(byte[] dataDir, Context context);
