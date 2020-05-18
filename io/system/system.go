@@ -14,7 +14,8 @@ import (
 )
 
 // A FrameEvent requests a new frame in the form of a list of
-// operations.
+// operations that describes what to display and how to handle
+// input.
 type FrameEvent struct {
 	Config Config
 	// Size is the dimensions of the window.
@@ -33,14 +34,14 @@ type FrameEvent struct {
 	//
 	// Example:
 	//
-	//	var w *app.Window
-	//	var frame *op.Ops
-	// 	for e := range w.Events() {
-	//  	if e, ok := e.(system.FrameEvent); ok {
-	//			// Call frame.Reset and manipulate images for ImageOps
-	//			// here.
-	//			e.Frame(frame)
-	//  	}
+	//  var w *app.Window
+	//  var frame *op.Ops
+	//  for e := range w.Events() {
+	//      if e, ok := e.(system.FrameEvent); ok {
+	//          // Call frame.Reset and manipulate images for ImageOps
+	//          // here.
+	//          e.Frame(frame)
+	//      }
 	//  }
 	Frame func(frame *op.Ops)
 	// Queue supplies the events for event handlers.
