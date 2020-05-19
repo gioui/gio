@@ -55,14 +55,24 @@ func (b ProgressBarStyle) Layout(gtx *layout.Context, progress int) {
 	layout.Stack{Alignment: layout.W}.Layout(gtx,
 		layout.Stacked(func() {
 			// Use a transparent equivalent of progress color.
-			backgroundColor := b.Color
-			backgroundColor.A = 100
+			bgCol := mulAlpha(b.Color, 150)
 
-			shader(progressBarWidth, backgroundColor)
+			shader(progressBarWidth, bgCol)
 		}),
 		layout.Stacked(func() {
 			fillWidth := (progressBarWidth / 100) * float32(progress)
 			shader(fillWidth, b.Color)
 		}),
 	)
+}
+
+// mulAlpha scales all color components by alpha/255.
+func mulAlpha(c color.RGBA, alpha uint8) color.RGBA {
+	a := uint16(alpha)
+	return color.RGBA{
+		A: uint8(uint16(c.A) * a / 255),
+		R: uint8(uint16(c.R) * a / 255),
+		G: uint8(uint16(c.G) * a / 255),
+		B: uint8(uint16(c.B) * a / 255),
+	}
 }
