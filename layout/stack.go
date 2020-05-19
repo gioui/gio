@@ -26,16 +26,17 @@ type StackChild struct {
 	dims  Dimensions
 }
 
-// Stacked returns a Stack child that laid out with the same maximum
-// constraints as the Stack.
+// Stacked returns a Stack child that is laid out with no minimum
+// constraints and the maximum constraints passed to Stack.Layout.
 func Stacked(w Widget) StackChild {
 	return StackChild{
 		widget: w,
 	}
 }
 
-// Expanded returns a Stack child that is forced to take up at least
-// the space as the largest Stacked.
+// Expanded returns a Stack child with the minimum constraints set
+// to the largest Stacked child. The maximum constraints are set to
+// the same as passed to Stack.Layout.
 func Expanded(w Widget) StackChild {
 	return StackChild{
 		expanded: true,
