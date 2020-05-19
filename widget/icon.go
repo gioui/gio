@@ -37,7 +37,7 @@ func (ic *Icon) Layout(gtx *layout.Context, sz unit.Value) {
 	ico.Add(gtx.Ops)
 	paint.PaintOp{
 		Rect: f32.Rectangle{
-			Max: toPointF(ico.Size()),
+			Max: layout.FPt(ico.Size()),
 		},
 	}.Add(gtx.Ops)
 	gtx.Dimensions = layout.Dimensions{

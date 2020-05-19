@@ -310,7 +310,7 @@ func (rr Rect) Op(ops *op.Ops) Op {
 			Max: image.Point{X: int(r.Max.X), Y: int(r.Max.Y)},
 		}
 		// Optimize pixel-aligned rectangles to just its bounds.
-		if r == toRectF(ri) {
+		if r == fRect(ri) {
 			return Op{bounds: r}
 		}
 	}
@@ -338,9 +338,16 @@ func roundRect(ops *op.Ops, r f32.Rectangle, se, sw, nw, ne float32) Op {
 	return p.End()
 }
 
-func toRectF(r image.Rectangle) f32.Rectangle {
+// fRect converts a rectangle to a f32.Rectangle.
+func fRect(r image.Rectangle) f32.Rectangle {
 	return f32.Rectangle{
-		Min: f32.Point{X: float32(r.Min.X), Y: float32(r.Min.Y)},
-		Max: f32.Point{X: float32(r.Max.X), Y: float32(r.Max.Y)},
+		Min: fPt(r.Min), Max: fPt(r.Max),
+	}
+}
+
+// fPt converts an point to a f32.Point.
+func fPt(p image.Point) f32.Point {
+	return f32.Point{
+		X: float32(p.X), Y: float32(p.Y),
 	}
 }

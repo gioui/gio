@@ -332,7 +332,7 @@ func (e *Editor) PaintText(gtx *layout.Context) {
 		stack.Push(gtx.Ops)
 		op.TransformOp{}.Offset(shape.offset).Add(gtx.Ops)
 		shape.clip.Add(gtx.Ops)
-		paint.PaintOp{Rect: toRectF(clip).Sub(shape.offset)}.Add(gtx.Ops)
+		paint.PaintOp{Rect: layout.FRect(clip).Sub(shape.offset)}.Add(gtx.Ops)
 		stack.Pop()
 	}
 }
@@ -368,7 +368,7 @@ func (e *Editor) PaintCaret(gtx *layout.Context) {
 	clip.Max = clip.Max.Add(e.viewSize)
 	carRect = clip.Intersect(carRect)
 	if !carRect.Empty() {
-		paint.PaintOp{Rect: toRectF(carRect)}.Add(gtx.Ops)
+		paint.PaintOp{Rect: layout.FRect(carRect)}.Add(gtx.Ops)
 	}
 	stack.Pop()
 }

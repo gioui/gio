@@ -175,10 +175,6 @@ func (b IconButtonStyle) Layout(gtx *layout.Context, button *widget.Clickable) {
 	)
 }
 
-func toPointF(p image.Point) f32.Point {
-	return f32.Point{X: float32(p.X), Y: float32(p.Y)}
-}
-
 func drawInk(gtx *layout.Context, c widget.Click) {
 	d := gtx.Now().Sub(c.Time)
 	t := float32(d.Seconds())

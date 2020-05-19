@@ -24,6 +24,7 @@ import (
 	"gioui.org/internal/ops"
 	"gioui.org/internal/path"
 	gunsafe "gioui.org/internal/unsafe"
+	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/paint"
 )
@@ -796,7 +797,7 @@ func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f3
 		m.material = materialTexture
 		dr := boundRectF(rect.Add(off))
 		sz := d.image.src.Bounds().Size()
-		sr := toRectF(d.image.rect)
+		sr := layout.FRect(d.image.rect)
 		if dx := float32(dr.Dx()); dx != 0 {
 			// Don't clip 1 px width sources.
 			if sdx := sr.Dx(); sdx > 1 {

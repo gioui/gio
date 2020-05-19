@@ -130,7 +130,7 @@ func (in Inset) Layout(gtx *Context, w Widget) {
 	}
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
-	op.TransformOp{}.Offset(toPointF(image.Point{X: left, Y: top})).Add(gtx.Ops)
+	op.TransformOp{}.Offset(FPt(image.Point{X: left, Y: top})).Add(gtx.Ops)
 	dims := ctxLayout(gtx, mcs, w)
 	stack.Pop()
 	gtx.Dimensions = Dimensions{
@@ -176,7 +176,7 @@ func (a Direction) Layout(gtx *Context, w Widget) {
 	}
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
-	op.TransformOp{}.Offset(toPointF(p)).Add(gtx.Ops)
+	op.TransformOp{}.Offset(FPt(p)).Add(gtx.Ops)
 	macro.Add()
 	stack.Pop()
 	gtx.Dimensions = Dimensions{

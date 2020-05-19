@@ -5,7 +5,6 @@ package layout
 import (
 	"image"
 
-	"gioui.org/f32"
 	"gioui.org/gesture"
 	"gioui.org/io/pointer"
 	"gioui.org/op"
@@ -261,8 +260,8 @@ func (l *List) layout() Dimensions {
 		}
 		var stack op.StackOp
 		stack.Push(ops)
-		clip.Rect{Rect: toRectF(r)}.Op(ops).Add(ops)
-		op.TransformOp{}.Offset(toPointF(axisPoint(l.Axis, pos, cross))).Add(ops)
+		clip.Rect{Rect: FRect(r)}.Op(ops).Add(ops)
+		op.TransformOp{}.Offset(FPt(axisPoint(l.Axis, pos, cross))).Add(ops)
 		child.macro.Add()
 		stack.Pop()
 		pos += childSize
@@ -285,11 +284,4 @@ func (l *List) layout() Dimensions {
 	l.scroll.Add(ops)
 	l.macro.Add()
 	return Dimensions{Size: dims}
-}
-
-func toRectF(r image.Rectangle) f32.Rectangle {
-	return f32.Rectangle{
-		Min: f32.Point{X: float32(r.Min.X), Y: float32(r.Min.Y)},
-		Max: f32.Point{X: float32(r.Max.X), Y: float32(r.Max.Y)},
-	}
 }

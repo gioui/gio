@@ -102,27 +102,20 @@ func (l Label) Layout(gtx *layout.Context, s text.Shaper, font text.Font, size u
 		Width:     dims.Size.X,
 	}
 	for {
-		start, end, layout, off, ok := it.Next()
+		start, end, l, off, ok := it.Next()
 		if !ok {
 			break
 		}
-		lclip := toRectF(clip).Sub(off)
+		lclip := layout.FRect(clip).Sub(off)
 		var stack op.StackOp
 		stack.Push(gtx.Ops)
 		op.TransformOp{}.Offset(off).Add(gtx.Ops)
 		str := txt[start:end]
-		s.ShapeString(font, textSize, str, layout).Add(gtx.Ops)
+		s.ShapeString(font, textSize, str, l).Add(gtx.Ops)
 		paint.PaintOp{Rect: lclip}.Add(gtx.Ops)
 		stack.Pop()
 	}
 	gtx.Dimensions = dims
-}
-
-func toRectF(r image.Rectangle) f32.Rectangle {
-	return f32.Rectangle{
-		Min: f32.Point{X: float32(r.Min.X), Y: float32(r.Min.Y)},
-		Max: f32.Point{X: float32(r.Max.X), Y: float32(r.Max.Y)},
-	}
 }
 
 func textPadding(lines []text.Line) (padding image.Rectangle) {

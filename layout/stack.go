@@ -110,7 +110,7 @@ func (s Stack) Layout(gtx *Context, children ...StackChild) {
 		}
 		var stack op.StackOp
 		stack.Push(gtx.Ops)
-		op.TransformOp{}.Offset(toPointF(p)).Add(gtx.Ops)
+		op.TransformOp{}.Offset(FPt(p)).Add(gtx.Ops)
 		ch.macro.Add()
 		stack.Pop()
 		if baseline == 0 {

@@ -5,7 +5,6 @@ package layout
 import (
 	"image"
 
-	"gioui.org/f32"
 	"gioui.org/op"
 )
 
@@ -175,7 +174,7 @@ func (f Flex) Layout(gtx *Context, children ...FlexChild) {
 		}
 		var stack op.StackOp
 		stack.Push(gtx.Ops)
-		op.TransformOp{}.Offset(toPointF(axisPoint(f.Axis, mainSize, cross))).Add(gtx.Ops)
+		op.TransformOp{}.Offset(FPt(axisPoint(f.Axis, mainSize, cross))).Add(gtx.Ops)
 		child.macro.Add()
 		stack.Pop()
 		mainSize += axisMain(f.Axis, dims.Size)
@@ -250,10 +249,6 @@ func axisConstraints(a Axis, mainMin, mainMax, crossMin, crossMax int) Constrain
 	} else {
 		return Constraints{Min: image.Pt(crossMin, mainMin), Max: image.Pt(crossMax, mainMax)}
 	}
-}
-
-func toPointF(p image.Point) f32.Point {
-	return f32.Point{X: float32(p.X), Y: float32(p.Y)}
 }
 
 func (s Spacing) String() string {
