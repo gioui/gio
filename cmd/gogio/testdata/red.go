@@ -112,12 +112,12 @@ func (w *quarterWidget) Layout(gtx *layout.Context) {
 		paint.ColorOp{Color: w.color}.Add(gtx.Ops)
 	}
 	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{
-		X: float32(gtx.Constraints.Width.Max),
-		Y: float32(gtx.Constraints.Height.Max),
+		X: float32(gtx.Constraints.Max.X),
+		Y: float32(gtx.Constraints.Max.Y),
 	}}}.Add(gtx.Ops)
 
 	pointer.Rect(image.Rectangle{
-		Max: image.Pt(gtx.Constraints.Width.Max, gtx.Constraints.Height.Max),
+		Max: image.Pt(gtx.Constraints.Max.X, gtx.Constraints.Max.Y),
 	}).Add(gtx.Ops)
 	pointer.InputOp{Tag: w}.Add(gtx.Ops)
 

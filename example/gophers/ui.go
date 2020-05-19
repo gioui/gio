@@ -177,12 +177,12 @@ func (up *userPage) commit(gtx *layout.Context, index int) {
 				sz := gtx.Px(unit.Dp(48))
 				cc := clipCircle{}
 				cc.Layout(gtx, func() {
-					gtx.Constraints = layout.RigidConstraints(gtx.Constraints.Constrain(image.Point{X: sz, Y: sz}))
+					gtx.Constraints = layout.Exact(gtx.Constraints.Constrain(image.Point{X: sz, Y: sz}))
 					u.layoutAvatar(gtx)
 				})
 			}),
 			layout.Flexed(1, func() {
-				gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
+				gtx.Constraints.Min.X = gtx.Constraints.Max.X
 				layout.Inset{Left: unit.Dp(8)}.Layout(gtx, func() {
 					label.Layout(gtx)
 				})
@@ -196,16 +196,16 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 		layout.Expanded(func() {
 			layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 				layout.Rigid(func() {
-					gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
+					gtx.Constraints.Min.X = gtx.Constraints.Max.X
 					layout.UniformInset(unit.Dp(16)).Layout(gtx, func() {
 						sz := gtx.Px(unit.Dp(200))
 						cs := gtx.Constraints
-						gtx.Constraints = layout.RigidConstraints(cs.Constrain(image.Point{X: sz, Y: sz}))
+						gtx.Constraints = layout.Exact(cs.Constrain(image.Point{X: sz, Y: sz}))
 						material.Editor(theme, "Hint").Layout(gtx, u.edit)
 					})
 				}),
 				layout.Rigid(func() {
-					gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
+					gtx.Constraints.Min.X = gtx.Constraints.Max.X
 					in := layout.Inset{Bottom: unit.Dp(16), Left: unit.Dp(16), Right: unit.Dp(16)}
 					in.Layout(gtx, func() {
 						e := material.Editor(theme, "Hint")
@@ -217,7 +217,7 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 				layout.Rigid(func() {
 					layout.Stack{}.Layout(gtx,
 						layout.Expanded(func() {
-							gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
+							gtx.Constraints.Min.X = gtx.Constraints.Max.X
 							fill{rgb(0xf2f2f2)}.Layout(gtx)
 						}),
 						layout.Stacked(func() {
@@ -231,7 +231,7 @@ func (u *UI) layoutUsers(gtx *layout.Context) {
 					)
 				}),
 				layout.Flexed(1, func() {
-					gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
+					gtx.Constraints.Min.X = gtx.Constraints.Max.X
 					u.layoutContributors(gtx)
 				}),
 			)
@@ -269,7 +269,7 @@ func (u *UI) user(gtx *layout.Context, index int) {
 					cc.Layout(gtx, func() {
 						dim := gtx.Px(unit.Dp(48))
 						sz := image.Point{X: dim, Y: dim}
-						gtx.Constraints = layout.RigidConstraints(gtx.Constraints.Constrain(sz))
+						gtx.Constraints = layout.Exact(gtx.Constraints.Constrain(sz))
 						user.layoutAvatar(gtx)
 					})
 				})
@@ -282,7 +282,7 @@ func (u *UI) user(gtx *layout.Context, index int) {
 								material.Body1(theme, user.name).Layout(gtx)
 							}),
 							layout.Flexed(1, func() {
-								gtx.Constraints.Width.Min = gtx.Constraints.Width.Max
+								gtx.Constraints.Min.X = gtx.Constraints.Max.X
 								layout.E.Layout(gtx, func() {
 									layout.Inset{Left: unit.Dp(2)}.Layout(gtx, func() {
 										material.Caption(theme, "3 hours ago").Layout(gtx)
@@ -309,7 +309,7 @@ func (u *UI) user(gtx *layout.Context, index int) {
 }
 
 func (u *user) layoutAvatar(gtx *layout.Context) {
-	sz := gtx.Constraints.Width.Min
+	sz := gtx.Constraints.Min.X
 	if u.avatarOp.Size().X != sz {
 		img := image.NewRGBA(image.Rectangle{Max: image.Point{X: sz, Y: sz}})
 		draw.ApproxBiLinear.Scale(img, img.Bounds(), u.avatar, u.avatar.Bounds(), draw.Src, nil)
@@ -326,7 +326,7 @@ type fill struct {
 
 func (f fill) Layout(gtx *layout.Context) {
 	cs := gtx.Constraints
-	d := image.Point{X: cs.Width.Min, Y: cs.Height.Min}
+	d := cs.Min
 	dr := f32.Rectangle{
 		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
 	}

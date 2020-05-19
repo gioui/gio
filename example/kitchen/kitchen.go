@@ -189,7 +189,7 @@ func kitchen(gtx *layout.Context, th *material.Theme) {
 			material.H3(th, topLabel).Layout(gtx)
 		},
 		func() {
-			gtx.Constraints.Height.Max = gtx.Px(unit.Dp(200))
+			gtx.Constraints.Max.Y = gtx.Px(unit.Dp(200))
 			material.Editor(th, "Hint").Layout(gtx, editor)
 		},
 		func() {

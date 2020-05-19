@@ -125,7 +125,7 @@ func drawTabs(gtx *layout.Context, th *material.Theme) {
 
 func bounds(gtx *layout.Context) f32.Rectangle {
 	cs := gtx.Constraints
-	d := image.Point{X: cs.Width.Min, Y: cs.Height.Min}
+	d := cs.Min
 	return f32.Rectangle{
 		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
 	}
