@@ -5,6 +5,7 @@ package layout
 import (
 	"image"
 
+	"gioui.org/f32"
 	"gioui.org/op"
 	"gioui.org/unit"
 )
@@ -63,6 +64,20 @@ const (
 func Exact(size image.Point) Constraints {
 	return Constraints{
 		Min: size, Max: size,
+	}
+}
+
+// FPt converts an point to a f32.Point.
+func FPt(p image.Point) f32.Point {
+	return f32.Point{
+		X: float32(p.X), Y: float32(p.Y),
+	}
+}
+
+// FRect converts a rectangle to a f32.Rectangle.
+func FRect(r image.Rectangle) f32.Rectangle {
+	return f32.Rectangle{
+		Min: FPt(r.Min), Max: FPt(r.Max),
 	}
 }
 
