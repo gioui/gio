@@ -11,6 +11,13 @@ import (
 )
 
 // Constraints represent the minimum and maximum size of a widget.
+//
+// A widget does not have to treat its constraints as "hard". For
+// example, if it's passed a constraint with a minimum size that's
+// smaller than its actual minimum size, it should return its minimum
+// size dimensions instead. Parent widgets should deal appropriately
+// with child widgets that return dimensions that do not fit their
+// constraints (for example, by clipping).
 type Constraints struct {
 	Min, Max image.Point
 }
