@@ -244,7 +244,7 @@ func (e *Editor) Layout(gtx *layout.Context, sh text.Shaper, font text.Font, siz
 		e.font = font
 		e.textSize = textSize
 	}
-	maxWidth := gtx.Constraints.Width.Max
+	maxWidth := gtx.Constraints.Max.X
 	if e.SingleLine {
 		maxWidth = inf
 	}

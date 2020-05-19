@@ -9,17 +9,9 @@ import (
 	"gioui.org/unit"
 )
 
-// Constraints represent a set of acceptable ranges for
-// a widget's width and height.
+// Constraints represent the minimum and maximum size of a widget.
 type Constraints struct {
-	Width  Constraint
-	Height Constraint
-}
-
-// Constraint is a range of acceptable sizes in a single
-// dimension.
-type Constraint struct {
-	Min, Max int
+	Min, Max image.Point
 }
 
 // Dimensions are the resolved size and baseline for a widget.
@@ -66,33 +58,21 @@ const (
 	Vertical
 )
 
-// Constrain a value to the range [Min; Max].
-func (c Constraint) Constrain(v int) int {
-	if v < c.Min {
-		return c.Min
-	} else if v > c.Max {
-		return c.Max
-	}
-	return v
-}
-
-// Constrain a size to the Width and Height ranges.
+// Constrain a size so each dimension is in the range [min;max].
 func (c Constraints) Constrain(size image.Point) image.Point {
-	return image.Point{X: c.Width.Constrain(size.X), Y: c.Height.Constrain(size.Y)}
-}
-
-// Min returns the smallest dimensions that satisfy the constraints.
-func (c Constraints) Min() image.Point {
-	return image.Point{X: c.Width.Min, Y: c.Height.Min}
-}
-
-// RigidConstraints returns the constraints that can only be
-// satisfied by the given dimensions.
-func RigidConstraints(size image.Point) Constraints {
-	return Constraints{
-		Width:  Constraint{Min: size.X, Max: size.X},
-		Height: Constraint{Min: size.Y, Max: size.Y},
+	if min := c.Min.X; size.X < min {
+		size.X = min
 	}
+	if min := c.Min.Y; size.Y < min {
+		size.Y = min
+	}
+	if max := c.Max.X; size.X > max {
+		size.X = max
+	}
+	if max := c.Max.Y; size.Y > max {
+		size.Y = max
+	}
+	return size
 }
 
 // Inset adds space around a widget.
@@ -107,23 +87,23 @@ func (in Inset) Layout(gtx *Context, w Widget) {
 	bottom := gtx.Px(in.Bottom)
 	left := gtx.Px(in.Left)
 	mcs := gtx.Constraints
-	mcs.Width.Max -= left + right
-	if mcs.Width.Max < 0 {
+	mcs.Max.X -= left + right
+	if mcs.Max.X < 0 {
 		left = 0
 		right = 0
-		mcs.Width.Max = 0
+		mcs.Max.X = 0
 	}
-	if mcs.Width.Min > mcs.Width.Max {
-		mcs.Width.Min = mcs.Width.Max
+	if mcs.Min.X > mcs.Max.X {
+		mcs.Min.X = mcs.Max.X
 	}
-	mcs.Height.Max -= top + bottom
-	if mcs.Height.Max < 0 {
+	mcs.Max.Y -= top + bottom
+	if mcs.Max.Y < 0 {
 		bottom = 0
 		top = 0
-		mcs.Height.Max = 0
+		mcs.Max.Y = 0
 	}
-	if mcs.Height.Min > mcs.Height.Max {
-		mcs.Height.Min = mcs.Height.Max
+	if mcs.Min.Y > mcs.Max.Y {
+		mcs.Min.Y = mcs.Max.Y
 	}
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
@@ -148,16 +128,15 @@ func (a Direction) Layout(gtx *Context, w Widget) {
 	macro.Record(gtx.Ops)
 	cs := gtx.Constraints
 	mcs := cs
-	mcs.Width.Min = 0
-	mcs.Height.Min = 0
+	mcs.Min = image.Point{}
 	dims := ctxLayout(gtx, mcs, w)
 	macro.Stop()
 	sz := dims.Size
-	if sz.X < cs.Width.Min {
-		sz.X = cs.Width.Min
+	if sz.X < cs.Min.X {
+		sz.X = cs.Min.X
 	}
-	if sz.Y < cs.Height.Min {
-		sz.Y = cs.Height.Min
+	if sz.Y < cs.Min.Y {
+		sz.Y = cs.Min.Y
 	}
 	var p image.Point
 	switch Direction(a) {

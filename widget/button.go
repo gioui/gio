@@ -54,7 +54,7 @@ func (b *Clickable) Layout(gtx *layout.Context) {
 	b.Update(gtx)
 	var st op.StackOp
 	st.Push(gtx.Ops)
-	pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min()}).Add(gtx.Ops)
+	pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min}).Add(gtx.Ops)
 	b.click.Add(gtx.Ops)
 	st.Pop()
 	for len(b.history) > 0 {

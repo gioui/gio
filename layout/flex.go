@@ -83,12 +83,13 @@ func (f Flex) Layout(gtx *Context, children ...FlexChild) {
 			continue
 		}
 		cs := gtx.Constraints
-		mainc := axisMainConstraint(f.Axis, cs)
-		mainMax := mainc.Max - size
+		_, mainMax := axisMainConstraint(f.Axis, cs)
+		mainMax -= size
 		if mainMax < 0 {
 			mainMax = 0
 		}
-		cs = axisConstraints(f.Axis, Constraint{Max: mainMax}, axisCrossConstraint(f.Axis, cs))
+		crossMin, crossMax := axisCrossConstraint(f.Axis, cs)
+		cs = axisConstraints(f.Axis, 0, mainMax, crossMin, crossMax)
 		var m op.MacroOp
 		m.Record(gtx.Ops)
 		dims := ctxLayout(gtx, cs, child.widget)
@@ -107,21 +108,21 @@ func (f Flex) Layout(gtx *Context, children ...FlexChild) {
 			continue
 		}
 		cs := gtx.Constraints
-		mainc := axisMainConstraint(f.Axis, cs)
+		_, mainMax := axisMainConstraint(f.Axis, cs)
 		var flexSize int
-		if mainc.Max > size {
-			flexSize = mainc.Max - rigidSize
+		if mainMax > size {
+			flexSize = mainMax - rigidSize
 			// Apply weight and add any leftover fraction from a
 			// previous Flexed.
 			childSize := float32(flexSize)*child.weight + fraction
 			flexSize = int(childSize + .5)
 			fraction = childSize - float32(flexSize)
-			if max := mainc.Max - size; flexSize > max {
+			if max := mainMax - size; flexSize > max {
 				flexSize = max
 			}
 		}
-		submainc := Constraint{Min: flexSize, Max: flexSize}
-		cs = axisConstraints(f.Axis, submainc, axisCrossConstraint(f.Axis, cs))
+		crossMin, crossMax := axisCrossConstraint(f.Axis, cs)
+		cs = axisConstraints(f.Axis, flexSize, flexSize, crossMin, crossMax)
 		var m op.MacroOp
 		m.Record(gtx.Ops)
 		dims := ctxLayout(gtx, cs, child.widget)
@@ -142,10 +143,10 @@ func (f Flex) Layout(gtx *Context, children ...FlexChild) {
 		}
 	}
 	cs := gtx.Constraints
-	mainc := axisMainConstraint(f.Axis, cs)
+	mainMin, _ := axisMainConstraint(f.Axis, cs)
 	var space int
-	if mainc.Min > size {
-		space = mainc.Min - size
+	if mainMin > size {
+		space = mainMin - size
 	}
 	var mainSize int
 	switch f.Spacing {
@@ -227,27 +228,27 @@ func axisCross(a Axis, sz image.Point) int {
 	}
 }
 
-func axisMainConstraint(a Axis, cs Constraints) Constraint {
+func axisMainConstraint(a Axis, cs Constraints) (int, int) {
 	if a == Horizontal {
-		return cs.Width
+		return cs.Min.X, cs.Max.X
 	} else {
-		return cs.Height
+		return cs.Min.Y, cs.Max.Y
 	}
 }
 
-func axisCrossConstraint(a Axis, cs Constraints) Constraint {
+func axisCrossConstraint(a Axis, cs Constraints) (int, int) {
 	if a == Horizontal {
-		return cs.Height
+		return cs.Min.Y, cs.Max.Y
 	} else {
-		return cs.Width
+		return cs.Min.X, cs.Max.X
 	}
 }
 
-func axisConstraints(a Axis, mainc, crossc Constraint) Constraints {
+func axisConstraints(a Axis, mainMin, mainMax, crossMin, crossMax int) Constraints {
 	if a == Horizontal {
-		return Constraints{Width: mainc, Height: crossc}
+		return Constraints{Min: image.Pt(mainMin, crossMin), Max: image.Pt(mainMax, crossMax)}
 	} else {
-		return Constraints{Width: crossc, Height: mainc}
+		return Constraints{Min: image.Pt(crossMin, mainMin), Max: image.Pt(crossMax, mainMax)}
 	}
 }
 

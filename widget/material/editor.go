@@ -45,11 +45,11 @@ func (e EditorStyle) Layout(gtx *layout.Context, editor *widget.Editor) {
 	tl := widget.Label{Alignment: editor.Alignment}
 	tl.Layout(gtx, e.shaper, e.Font, e.TextSize, e.Hint)
 	macro.Stop()
-	if w := gtx.Dimensions.Size.X; gtx.Constraints.Width.Min < w {
-		gtx.Constraints.Width.Min = w
+	if w := gtx.Dimensions.Size.X; gtx.Constraints.Min.X < w {
+		gtx.Constraints.Min.X = w
 	}
-	if h := gtx.Dimensions.Size.Y; gtx.Constraints.Height.Min < h {
-		gtx.Constraints.Height.Min = h
+	if h := gtx.Dimensions.Size.Y; gtx.Constraints.Min.Y < h {
+		gtx.Constraints.Min.Y = h
 	}
 	editor.Layout(gtx, e.shaper, e.Font, e.TextSize)
 	if editor.Len() > 0 {

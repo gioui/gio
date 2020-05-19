@@ -45,7 +45,7 @@ func ctxLayout(gtx *Context, cs Constraints, w Widget) Dimensions {
 // Reset the context. The constraints' minimum and maximum values are
 // set to the size.
 func (c *Context) Reset(q event.Queue, cfg system.Config, size image.Point) {
-	c.Constraints = RigidConstraints(size)
+	c.Constraints = Constraints{Min: size, Max: size}
 	c.Dimensions = Dimensions{}
 	c.cfg = cfg
 	c.queue = q

@@ -87,8 +87,8 @@ func Clickable(gtx *layout.Context, button *widget.Clickable, w layout.Widget) {
 		layout.Expanded(func() {
 			clip.Rect{
 				Rect: f32.Rectangle{Max: f32.Point{
-					X: float32(gtx.Constraints.Width.Min),
-					Y: float32(gtx.Constraints.Height.Min),
+					X: float32(gtx.Constraints.Min.X),
+					Y: float32(gtx.Constraints.Min.Y),
 				}},
 			}.Op(gtx.Ops).Add(gtx.Ops)
 			for _, c := range button.History() {
@@ -111,15 +111,14 @@ func (b ButtonStyle) Layout(gtx *layout.Context, button *widget.Clickable) {
 }
 
 func (b ButtonLayoutStyle) Layout(gtx *layout.Context, button *widget.Clickable, w layout.Widget) {
-	hmin := gtx.Constraints.Width.Min
-	vmin := gtx.Constraints.Height.Min
+	min := gtx.Constraints.Min
 	layout.Stack{Alignment: layout.Center}.Layout(gtx,
 		layout.Expanded(func() {
 			rr := float32(gtx.Px(b.CornerRadius))
 			clip.Rect{
 				Rect: f32.Rectangle{Max: f32.Point{
-					X: float32(gtx.Constraints.Width.Min),
-					Y: float32(gtx.Constraints.Height.Min),
+					X: float32(gtx.Constraints.Min.X),
+					Y: float32(gtx.Constraints.Min.Y),
 				}},
 				NE: rr, NW: rr, SE: rr, SW: rr,
 			}.Op(gtx.Ops).Add(gtx.Ops)
@@ -129,8 +128,7 @@ func (b ButtonLayoutStyle) Layout(gtx *layout.Context, button *widget.Clickable,
 			}
 		}),
 		layout.Stacked(func() {
-			gtx.Constraints.Width.Min = hmin
-			gtx.Constraints.Height.Min = vmin
+			gtx.Constraints.Min = min
 			layout.Center.Layout(gtx, func() {
 				b.Inset.Layout(gtx, func() {
 					w()
@@ -146,7 +144,7 @@ func (b ButtonLayoutStyle) Layout(gtx *layout.Context, button *widget.Clickable,
 func (b IconButtonStyle) Layout(gtx *layout.Context, button *widget.Clickable) {
 	layout.Stack{Alignment: layout.Center}.Layout(gtx,
 		layout.Expanded(func() {
-			size := gtx.Constraints.Width.Min
+			size := gtx.Constraints.Min.X
 			sizef := float32(size)
 			rr := sizef * .5
 			clip.Rect{
@@ -171,7 +169,7 @@ func (b IconButtonStyle) Layout(gtx *layout.Context, button *widget.Clickable) {
 			})
 		}),
 		layout.Expanded(func() {
-			pointer.Ellipse(image.Rectangle{Max: gtx.Constraints.Min()}).Add(gtx.Ops)
+			pointer.Ellipse(image.Rectangle{Max: gtx.Constraints.Min}).Add(gtx.Ops)
 			button.Layout(gtx)
 		}),
 	)

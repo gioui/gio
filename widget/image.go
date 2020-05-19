@@ -32,7 +32,7 @@ func (im Image) Layout(gtx *layout.Context) {
 	wf, hf := float32(size.X), float32(size.Y)
 	w, h := gtx.Px(unit.Dp(wf*scale)), gtx.Px(unit.Dp(hf*scale))
 	cs := gtx.Constraints
-	d := image.Point{X: cs.Width.Constrain(w), Y: cs.Height.Constrain(h)}
+	d := cs.Constrain(image.Pt(w, h))
 	var s op.StackOp
 	s.Push(gtx.Ops)
 	clip.Rect{Rect: f32.Rectangle{Max: toPointF(d)}}.Op(gtx.Ops).Add(gtx.Ops)

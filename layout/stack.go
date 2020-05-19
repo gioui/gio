@@ -54,8 +54,7 @@ func (s Stack) Layout(gtx *Context, children ...StackChild) {
 			continue
 		}
 		cs := gtx.Constraints
-		cs.Width.Min = 0
-		cs.Height.Min = 0
+		cs.Min = image.Pt(0, 0)
 		var m op.MacroOp
 		m.Record(gtx.Ops)
 		dims := ctxLayout(gtx, cs, w.widget)
@@ -77,8 +76,7 @@ func (s Stack) Layout(gtx *Context, children ...StackChild) {
 		var m op.MacroOp
 		m.Record(gtx.Ops)
 		cs := Constraints{
-			Width:  Constraint{Min: maxSZ.X, Max: gtx.Constraints.Width.Max},
-			Height: Constraint{Min: maxSZ.Y, Max: gtx.Constraints.Height.Max},
+			Min: maxSZ, Max: gtx.Constraints.Max,
 		}
 		dims := ctxLayout(gtx, cs, w.widget)
 		m.Stop()

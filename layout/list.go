@@ -103,7 +103,8 @@ func (l *List) init(gtx *Context, len int) {
 // Layout the List.
 func (l *List) Layout(gtx *Context, len int, w ListElement) {
 	for l.init(gtx, len); l.more(); l.next() {
-		cs := axisConstraints(l.Axis, Constraint{Max: inf}, axisCrossConstraint(l.Axis, l.ctx.Constraints))
+		crossMin, crossMax := axisCrossConstraint(l.Axis, l.ctx.Constraints)
+		cs := axisConstraints(l.Axis, 0, inf, crossMin, crossMax)
 		i := l.index()
 		l.end(ctxLayout(gtx, cs, func() {
 			w(i)
@@ -160,7 +161,7 @@ func (l *List) more() bool {
 }
 
 func (l *List) nextDir() iterationDir {
-	vsize := axisMainConstraint(l.Axis, l.ctx.Constraints).Max
+	_, vsize := axisMainConstraint(l.Axis, l.ctx.Constraints)
 	last := l.Position.First + len(l.children)
 	// Clamp offset.
 	if l.maxSize-l.Position.Offset < vsize && last == l.len {
@@ -204,7 +205,7 @@ func (l *List) layout() Dimensions {
 	if l.more() {
 		panic("unfinished child")
 	}
-	mainc := axisMainConstraint(l.Axis, l.ctx.Constraints)
+	mainMin, mainMax := axisMainConstraint(l.Axis, l.ctx.Constraints)
 	children := l.children
 	// Skip invisible children
 	for len(children) > 0 {
@@ -225,7 +226,7 @@ func (l *List) layout() Dimensions {
 			maxCross = c
 		}
 		size += axisMain(l.Axis, sz)
-		if size >= mainc.Max {
+		if size >= mainMax {
 			children = children[:i+1]
 			break
 		}
@@ -233,7 +234,7 @@ func (l *List) layout() Dimensions {
 	ops := l.ctx.Ops
 	pos := -l.Position.Offset
 	// ScrollToEnd lists are end aligned.
-	if space := mainc.Max - size; l.ScrollToEnd && space > 0 {
+	if space := mainMax - size; l.ScrollToEnd && space > 0 {
 		pos += space
 	}
 	for _, child := range children {
@@ -247,8 +248,8 @@ func (l *List) layout() Dimensions {
 		}
 		childSize := axisMain(l.Axis, sz)
 		max := childSize + pos
-		if max > mainc.Max {
-			max = mainc.Max
+		if max > mainMax {
+			max = mainMax
 		}
 		min := pos
 		if min < 0 {
@@ -267,12 +268,18 @@ func (l *List) layout() Dimensions {
 		pos += childSize
 	}
 	atStart := l.Position.First == 0 && l.Position.Offset <= 0
-	atEnd := l.Position.First+len(children) == l.len && mainc.Max >= pos
+	atEnd := l.Position.First+len(children) == l.len && mainMax >= pos
 	if atStart && l.scrollDelta < 0 || atEnd && l.scrollDelta > 0 {
 		l.scroll.Stop()
 	}
 	l.Position.BeforeEnd = !atEnd
-	dims := axisPoint(l.Axis, mainc.Constrain(pos), maxCross)
+	if pos < mainMin {
+		pos = mainMin
+	}
+	if pos > mainMax {
+		pos = mainMax
+	}
+	dims := axisPoint(l.Axis, pos, maxCross)
 	l.macro.Stop()
 	pointer.Rect(image.Rectangle{Max: dims}).Add(ops)
 	l.scroll.Add(ops)

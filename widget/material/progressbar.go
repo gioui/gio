@@ -50,7 +50,7 @@ func (b ProgressBarStyle) Layout(gtx *layout.Context, progress int) {
 		progress = 0
 	}
 
-	progressBarWidth := float32(gtx.Constraints.Width.Max)
+	progressBarWidth := float32(gtx.Constraints.Max.X)
 
 	layout.Stack{Alignment: layout.W}.Layout(gtx,
 		layout.Stacked(func() {

@@ -12,8 +12,7 @@ func ExampleInset() {
 	gtx := new(layout.Context)
 	gtx.Reset(nil, nil, image.Point{X: 100, Y: 100})
 	// Loose constraints with no minimal size.
-	gtx.Constraints.Width.Min = 0
-	gtx.Constraints.Height.Min = 0
+	gtx.Constraints.Min = image.Point{}
 
 	// Inset all edges by 10.
 	inset := layout.UniformInset(unit.Dp(10))
@@ -55,26 +54,25 @@ func ExampleFlex() {
 	layout.Flex{}.Layout(gtx,
 		// Rigid 10x10 widget.
 		layout.Rigid(func() {
-			fmt.Printf("Rigid: %v\n", gtx.Constraints.Width)
+			fmt.Printf("Rigid: %v\n", gtx.Constraints)
 			layoutWidget(gtx, 10, 10)
 		}),
 		// Child with 50% space allowance.
 		layout.Flexed(0.5, func() {
-			fmt.Printf("50%%: %v\n", gtx.Constraints.Width)
+			fmt.Printf("50%%: %v\n", gtx.Constraints)
 			layoutWidget(gtx, 10, 10)
 		}),
 	)
 
 	// Output:
-	// Rigid: {0 100}
-	// 50%: {45 45}
+	// Rigid: {(0,100) (100,100)}
+	// 50%: {(45,100) (45,100)}
 }
 
 func ExampleStack() {
 	gtx := new(layout.Context)
 	gtx.Reset(nil, nil, image.Point{X: 100, Y: 100})
-	gtx.Constraints.Width.Min = 0
-	gtx.Constraints.Height.Min = 0
+	gtx.Constraints.Min = image.Point{}
 
 	layout.Stack{}.Layout(gtx,
 		// Force widget to the same size as the second.
@@ -89,7 +87,7 @@ func ExampleStack() {
 	)
 
 	// Output:
-	// Expand: {{50 100} {50 100}}
+	// Expand: {(50,50) (100,100)}
 }
 
 func ExampleList() {

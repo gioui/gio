@@ -87,7 +87,7 @@ func (l *lineIterator) Next() (int, int, []text.Glyph, f32.Point, bool) {
 func (l Label) Layout(gtx *layout.Context, s text.Shaper, font text.Font, size unit.Value, txt string) {
 	cs := gtx.Constraints
 	textSize := fixed.I(gtx.Px(size))
-	lines := s.LayoutString(font, textSize, cs.Width.Max, txt)
+	lines := s.LayoutString(font, textSize, cs.Max.X, txt)
 	if max := l.MaxLines; max > 0 && len(lines) > max {
 		lines = lines[:max]
 	}
