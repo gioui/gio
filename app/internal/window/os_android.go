@@ -637,10 +637,12 @@ func (w *window) ReadClipboard() {
 
 // runOnMain runs a function on the Java main thread.
 func (w *window) runOnMain(f func(env *C.JNIEnv)) {
-	mainFuncs <- f
-	runInJVM(javaVM(), func(env *C.JNIEnv) {
-		callVoidMethod(env, w.view, w.mwakeupMainThread)
-	})
+	go func() {
+		mainFuncs <- f
+		runInJVM(javaVM(), func(env *C.JNIEnv) {
+			callVoidMethod(env, w.view, w.mwakeupMainThread)
+		})
+	}()
 }
 
 //export Java_org_gioui_GioView_scheduleMainFuncs
