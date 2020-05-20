@@ -317,6 +317,11 @@ func (rr Rect) Op(ops *op.Ops) Op {
 	return roundRect(ops, r, rr.SE, rr.SW, rr.NW, rr.NE)
 }
 
+// Add is a shorthand for Op(ops).Add(ops).
+func (rr Rect) Add(ops *op.Ops) {
+	rr.Op(ops).Add(ops)
+}
+
 // roundRect returns the clip area of a rectangle with rounded
 // corners defined by their radii.
 func roundRect(ops *op.Ops, r f32.Rectangle, se, sw, nw, ne float32) Op {
