@@ -401,9 +401,13 @@ func (h *x11EventHandler) handleEvents() bool {
 				notify()
 			case w.atoms.utf8string:
 				content := w.clipboard.content
+				var ptr *C.uchar
+				if len(content) > 0 {
+					ptr = (*C.uchar)(unsafe.Pointer(&content[0]))
+				}
 				C.XChangeProperty(w.x, cevt.requestor, cevt.property, w.atoms.utf8string,
 					8 /* bitwidth */, C.PropModeReplace,
-					(*C.uchar)(unsafe.Pointer(&content[0])), C.int(len(content)),
+					ptr, C.int(len(content)),
 				)
 				notify()
 			}
