@@ -51,12 +51,11 @@ func buildJS(bi *buildInfo) error {
 
 			const go = new Go();
 
-			// Pick up argv from location hash (#args).
-			var hash = location.hash;
-			if (hash.length > 0 && hash[0] == '#') {
-				hash = decodeURIComponent(hash.substr(1));
-				go.argv = hash.split(" ");
-				go.argv.unshift("gio"); // os.Args(0)
+			// Pick up argv from the argv query argument (if set).
+			const params = new URLSearchParams(location.search);
+			const argv = params.get("argv");
+			if (argv) {
+				go.argv = go.argv.concat(argv.split(" "));
 			}
 
 			WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((result) => {
