@@ -23,8 +23,8 @@ func ProgressBar(th *Theme) ProgressBarStyle {
 	}
 }
 
-func (b ProgressBarStyle) Layout(gtx *layout.Context, progress int) {
-	shader := func(width float32, color color.RGBA) {
+func (p ProgressBarStyle) Layout(gtx layout.Context, progress int) layout.Dimensions {
+	shader := func(width float32, color color.RGBA) layout.Dimensions {
 		maxHeight := unit.Dp(4)
 		rr := float32(gtx.Px(unit.Dp(2)))
 
@@ -41,7 +41,7 @@ func (b ProgressBarStyle) Layout(gtx *layout.Context, progress int) {
 		paint.ColorOp{Color: color}.Add(gtx.Ops)
 		paint.PaintOp{Rect: dr}.Add(gtx.Ops)
 
-		gtx.Dimensions = layout.Dimensions{Size: d}
+		return layout.Dimensions{Size: d}
 	}
 
 	if progress > 100 {
@@ -52,16 +52,16 @@ func (b ProgressBarStyle) Layout(gtx *layout.Context, progress int) {
 
 	progressBarWidth := float32(gtx.Constraints.Max.X)
 
-	layout.Stack{Alignment: layout.W}.Layout(gtx,
-		layout.Stacked(func() {
+	return layout.Stack{Alignment: layout.W}.Layout(gtx,
+		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			// Use a transparent equivalent of progress color.
-			bgCol := mulAlpha(b.Color, 150)
+			bgCol := mulAlpha(p.Color, 150)
 
-			shader(progressBarWidth, bgCol)
+			return shader(progressBarWidth, bgCol)
 		}),
-		layout.Stacked(func() {
+		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			fillWidth := (progressBarWidth / 100) * float32(progress)
-			shader(fillWidth, b.Color)
+			return shader(fillWidth, p.Color)
 		}),
 	)
 }

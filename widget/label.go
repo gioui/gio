@@ -84,7 +84,7 @@ func (l *lineIterator) Next() (int, int, []text.Glyph, f32.Point, bool) {
 	return 0, 0, nil, f32.Point{}, false
 }
 
-func (l Label) Layout(gtx *layout.Context, s text.Shaper, font text.Font, size unit.Value, txt string) {
+func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size unit.Value, txt string) layout.Dimensions {
 	cs := gtx.Constraints
 	textSize := fixed.I(gtx.Px(size))
 	lines := s.LayoutString(font, textSize, cs.Max.X, txt)
@@ -115,7 +115,7 @@ func (l Label) Layout(gtx *layout.Context, s text.Shaper, font text.Font, size u
 		paint.PaintOp{Rect: lclip}.Add(gtx.Ops)
 		stack.Pop()
 	}
-	gtx.Dimensions = dims
+	return dims
 }
 
 func textPadding(lines []text.Line) (padding image.Rectangle) {

@@ -74,7 +74,7 @@ func Flexed(weight float32, widget Widget) FlexChild {
 // Layout a list of children. The position of the children are
 // determined by the specified order, but Rigid children are laid out
 // before Flexed children.
-func (f Flex) Layout(gtx *Context, children ...FlexChild) {
+func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 	size := 0
 	// Lay out Rigid children.
 	for i, child := range children {
@@ -91,7 +91,9 @@ func (f Flex) Layout(gtx *Context, children ...FlexChild) {
 		cs = axisConstraints(f.Axis, 0, mainMax, crossMin, crossMax)
 		var m op.MacroOp
 		m.Record(gtx.Ops)
-		dims := ctxLayout(gtx, cs, child.widget)
+		gtx := gtx
+		gtx.Constraints = cs
+		dims := child.widget(gtx)
 		m.Stop()
 		sz := axisMain(f.Axis, dims.Size)
 		size += sz
@@ -124,7 +126,9 @@ func (f Flex) Layout(gtx *Context, children ...FlexChild) {
 		cs = axisConstraints(f.Axis, flexSize, flexSize, crossMin, crossMax)
 		var m op.MacroOp
 		m.Record(gtx.Ops)
-		dims := ctxLayout(gtx, cs, child.widget)
+		gtx := gtx
+		gtx.Constraints = cs
+		dims := child.widget(gtx)
 		m.Stop()
 		sz := axisMain(f.Axis, dims.Size)
 		size += sz
@@ -200,7 +204,7 @@ func (f Flex) Layout(gtx *Context, children ...FlexChild) {
 		mainSize += space / (len(children) * 2)
 	}
 	sz := axisPoint(f.Axis, mainSize, maxCross)
-	gtx.Dimensions = Dimensions{Size: sz, Baseline: sz.Y - maxBaseline}
+	return Dimensions{Size: sz, Baseline: sz.Y - maxBaseline}
 }
 
 func axisPoint(a Axis, main, cross int) image.Point {

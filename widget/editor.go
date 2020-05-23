@@ -89,7 +89,7 @@ const (
 )
 
 // Events returns available editor events.
-func (e *Editor) Events(gtx *layout.Context) []EditorEvent {
+func (e *Editor) Events(gtx layout.Context) []EditorEvent {
 	e.processEvents(gtx)
 	events := e.events
 	e.events = nil
@@ -97,7 +97,7 @@ func (e *Editor) Events(gtx *layout.Context) []EditorEvent {
 	return events
 }
 
-func (e *Editor) processEvents(gtx *layout.Context) {
+func (e *Editor) processEvents(gtx layout.Context) {
 	if e.shaper == nil {
 		// Can't process events without a shaper.
 		return
@@ -114,7 +114,7 @@ func (e *Editor) makeValid() {
 	}
 }
 
-func (e *Editor) processPointer(gtx *layout.Context) {
+func (e *Editor) processPointer(gtx layout.Context) {
 	sbounds := e.scrollBounds()
 	var smin, smax int
 	var axis gesture.Axis
@@ -154,7 +154,7 @@ func (e *Editor) processPointer(gtx *layout.Context) {
 	}
 }
 
-func (e *Editor) processKey(gtx *layout.Context) {
+func (e *Editor) processKey(gtx layout.Context) {
 	if e.rr.Changed() {
 		e.events = append(e.events, ChangeEvent{})
 	}
@@ -233,7 +233,7 @@ func (e *Editor) Focused() bool {
 }
 
 // Layout lays out the editor.
-func (e *Editor) Layout(gtx *layout.Context, sh text.Shaper, font text.Font, size unit.Value) {
+func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size unit.Value) layout.Dimensions {
 	// Flush events from before the previous frame.
 	copy(e.events, e.events[e.prevEvents:])
 	e.events = e.events[:len(e.events)-e.prevEvents]
@@ -258,10 +258,10 @@ func (e *Editor) Layout(gtx *layout.Context, sh text.Shaper, font text.Font, siz
 	}
 
 	e.processEvents(gtx)
-	e.layout(gtx)
+	return e.layout(gtx)
 }
 
-func (e *Editor) layout(gtx *layout.Context) {
+func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 	e.makeValid()
 
 	e.viewSize = gtx.Constraints.Constrain(e.dims.Size)
@@ -321,10 +321,10 @@ func (e *Editor) layout(gtx *layout.Context) {
 		e.caretOn = e.focused && (!blinking || dt%timePerBlink < timePerBlink/2)
 	}
 
-	gtx.Dimensions = layout.Dimensions{Size: e.viewSize, Baseline: e.dims.Baseline}
+	return layout.Dimensions{Size: e.viewSize, Baseline: e.dims.Baseline}
 }
 
-func (e *Editor) PaintText(gtx *layout.Context) {
+func (e *Editor) PaintText(gtx layout.Context) {
 	clip := textPadding(e.lines)
 	clip.Max = clip.Max.Add(e.viewSize)
 	for _, shape := range e.shapes {
@@ -337,7 +337,7 @@ func (e *Editor) PaintText(gtx *layout.Context) {
 	}
 }
 
-func (e *Editor) PaintCaret(gtx *layout.Context) {
+func (e *Editor) PaintCaret(gtx layout.Context) {
 	if !e.caretOn {
 		return
 	}

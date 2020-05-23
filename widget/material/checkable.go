@@ -26,7 +26,7 @@ type checkable struct {
 	uncheckedStateIcon *widget.Icon
 }
 
-func (c *checkable) layout(gtx *layout.Context, checked bool) {
+func (c *checkable) layout(gtx layout.Context, checked bool) layout.Dimensions {
 	var icon *widget.Icon
 	if checked {
 		icon = c.checkedStateIcon
@@ -35,29 +35,30 @@ func (c *checkable) layout(gtx *layout.Context, checked bool) {
 	}
 
 	min := gtx.Constraints.Min
-	layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-		layout.Rigid(func() {
-			layout.Center.Layout(gtx, func() {
-				layout.UniformInset(unit.Dp(2)).Layout(gtx, func() {
+	dims := layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return layout.UniformInset(unit.Dp(2)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 					size := gtx.Px(c.Size)
 					icon.Color = c.IconColor
 					icon.Layout(gtx, unit.Px(float32(size)))
-					gtx.Dimensions = layout.Dimensions{
+					return layout.Dimensions{
 						Size: image.Point{X: size, Y: size},
 					}
 				})
 			})
 		}),
 
-		layout.Rigid(func() {
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			gtx.Constraints.Min = min
-			layout.W.Layout(gtx, func() {
-				layout.UniformInset(unit.Dp(2)).Layout(gtx, func() {
+			return layout.W.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return layout.UniformInset(unit.Dp(2)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 					paint.ColorOp{Color: c.Color}.Add(gtx.Ops)
-					widget.Label{}.Layout(gtx, c.shaper, c.Font, c.TextSize, c.Label)
+					return widget.Label{}.Layout(gtx, c.shaper, c.Font, c.TextSize, c.Label)
 				})
 			})
 		}),
 	)
-	pointer.Rect(image.Rectangle{Max: gtx.Dimensions.Size}).Add(gtx.Ops)
+	pointer.Rect(image.Rectangle{Max: dims.Size}).Add(gtx.Ops)
+	return dims
 }

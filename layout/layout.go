@@ -40,7 +40,7 @@ type Direction uint8
 
 // Widget is a function scope for drawing, processing events and
 // computing dimensions for a user interface element.
-type Widget func()
+type Widget func(gtx Context) Dimensions
 
 const (
 	Start Alignment = iota
@@ -111,7 +111,7 @@ type Inset struct {
 }
 
 // Layout a widget.
-func (in Inset) Layout(gtx *Context, w Widget) {
+func (in Inset) Layout(gtx Context, w Widget) Dimensions {
 	top := gtx.Px(in.Top)
 	right := gtx.Px(in.Right)
 	bottom := gtx.Px(in.Bottom)
@@ -138,9 +138,10 @@ func (in Inset) Layout(gtx *Context, w Widget) {
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
 	op.TransformOp{}.Offset(FPt(image.Point{X: left, Y: top})).Add(gtx.Ops)
-	dims := ctxLayout(gtx, mcs, w)
+	gtx.Constraints = mcs
+	dims := w(gtx)
 	stack.Pop()
-	gtx.Dimensions = Dimensions{
+	return Dimensions{
 		Size:     dims.Size.Add(image.Point{X: right + left, Y: top + bottom}),
 		Baseline: dims.Baseline + bottom,
 	}
@@ -153,13 +154,12 @@ func UniformInset(v unit.Value) Inset {
 }
 
 // Layout a widget according to the direction.
-func (a Direction) Layout(gtx *Context, w Widget) {
+func (a Direction) Layout(gtx Context, w Widget) Dimensions {
 	var macro op.MacroOp
 	macro.Record(gtx.Ops)
 	cs := gtx.Constraints
-	mcs := cs
-	mcs.Min = image.Point{}
-	dims := ctxLayout(gtx, mcs, w)
+	gtx.Constraints.Min = image.Point{}
+	dims := w(gtx)
 	macro.Stop()
 	sz := dims.Size
 	if sz.X < cs.Min.X {
@@ -186,7 +186,7 @@ func (a Direction) Layout(gtx *Context, w Widget) {
 	op.TransformOp{}.Offset(FPt(p)).Add(gtx.Ops)
 	macro.Add()
 	stack.Pop()
-	gtx.Dimensions = Dimensions{
+	return Dimensions{
 		Size:     sz,
 		Baseline: dims.Baseline + sz.Y - dims.Size.Y - p.Y,
 	}

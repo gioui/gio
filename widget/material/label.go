@@ -72,8 +72,8 @@ func Label(th *Theme, size unit.Value, txt string) LabelStyle {
 	}
 }
 
-func (l LabelStyle) Layout(gtx *layout.Context) {
+func (l LabelStyle) Layout(gtx layout.Context) layout.Dimensions {
 	paint.ColorOp{Color: l.Color}.Add(gtx.Ops)
 	tl := widget.Label{Alignment: l.Alignment, MaxLines: l.MaxLines}
-	tl.Layout(gtx, l.shaper, l.Font, l.TextSize, l.Text)
+	return tl.Layout(gtx, l.shaper, l.Font, l.TextSize, l.Text)
 }

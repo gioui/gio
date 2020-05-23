@@ -32,7 +32,7 @@ func NewIcon(data []byte) (*Icon, error) {
 	return &Icon{src: data, Color: color.RGBA{A: 0xff}}, nil
 }
 
-func (ic *Icon) Layout(gtx *layout.Context, sz unit.Value) {
+func (ic *Icon) Layout(gtx layout.Context, sz unit.Value) layout.Dimensions {
 	ico := ic.image(gtx.Px(sz))
 	ico.Add(gtx.Ops)
 	paint.PaintOp{
@@ -40,7 +40,7 @@ func (ic *Icon) Layout(gtx *layout.Context, sz unit.Value) {
 			Max: layout.FPt(ico.Size()),
 		},
 	}.Add(gtx.Ops)
-	gtx.Dimensions = layout.Dimensions{
+	return layout.Dimensions{
 		Size: ico.Size(),
 	}
 }

@@ -63,7 +63,7 @@ func argb(c uint32) color.RGBA {
 	return color.RGBA{A: uint8(c >> 24), R: uint8(c >> 16), G: uint8(c >> 8), B: uint8(c)}
 }
 
-func fill(gtx *layout.Context, col color.RGBA) {
+func fill(gtx layout.Context, col color.RGBA) layout.Dimensions {
 	cs := gtx.Constraints
 	d := cs.Min
 	dr := f32.Rectangle{
@@ -71,5 +71,5 @@ func fill(gtx *layout.Context, col color.RGBA) {
 	}
 	paint.ColorOp{Color: col}.Add(gtx.Ops)
 	paint.PaintOp{Rect: dr}.Add(gtx.Ops)
-	gtx.Dimensions = layout.Dimensions{Size: d}
+	return layout.Dimensions{Size: d}
 }

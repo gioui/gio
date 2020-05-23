@@ -36,22 +36,22 @@ func Editor(th *Theme, hint string) EditorStyle {
 	}
 }
 
-func (e EditorStyle) Layout(gtx *layout.Context, editor *widget.Editor) {
+func (e EditorStyle) Layout(gtx layout.Context, editor *widget.Editor) layout.Dimensions {
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
 	var macro op.MacroOp
 	macro.Record(gtx.Ops)
 	paint.ColorOp{Color: e.HintColor}.Add(gtx.Ops)
 	tl := widget.Label{Alignment: editor.Alignment}
-	tl.Layout(gtx, e.shaper, e.Font, e.TextSize, e.Hint)
+	dims := tl.Layout(gtx, e.shaper, e.Font, e.TextSize, e.Hint)
 	macro.Stop()
-	if w := gtx.Dimensions.Size.X; gtx.Constraints.Min.X < w {
+	if w := dims.Size.X; gtx.Constraints.Min.X < w {
 		gtx.Constraints.Min.X = w
 	}
-	if h := gtx.Dimensions.Size.Y; gtx.Constraints.Min.Y < h {
+	if h := dims.Size.Y; gtx.Constraints.Min.Y < h {
 		gtx.Constraints.Min.Y = h
 	}
-	editor.Layout(gtx, e.shaper, e.Font, e.TextSize)
+	dims = editor.Layout(gtx, e.shaper, e.Font, e.TextSize)
 	if editor.Len() > 0 {
 		paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
 		editor.PaintText(gtx)
@@ -61,4 +61,5 @@ func (e EditorStyle) Layout(gtx *layout.Context, editor *widget.Editor) {
 	paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
 	editor.PaintCaret(gtx)
 	stack.Pop()
+	return dims
 }

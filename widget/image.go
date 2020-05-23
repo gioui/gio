@@ -23,7 +23,7 @@ type Image struct {
 	Scale float32
 }
 
-func (im Image) Layout(gtx *layout.Context) {
+func (im Image) Layout(gtx layout.Context) layout.Dimensions {
 	scale := im.Scale
 	if scale == 0 {
 		scale = 160.0 / 72.0
@@ -39,5 +39,5 @@ func (im Image) Layout(gtx *layout.Context) {
 	im.Src.Add(gtx.Ops)
 	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(w), Y: float32(h)}}}.Add(gtx.Ops)
 	s.Pop()
-	gtx.Dimensions = layout.Dimensions{Size: d}
+	return layout.Dimensions{Size: d}
 }

@@ -11,7 +11,7 @@
 //
 // This snippet defines a button that prints a message when clicked:
 //
-//     var gtx *layout.Context
+//     var gtx layout.Context
 //     button := new(widget.Clickable)
 //
 //     for button.Clicked(gtx) {
@@ -43,7 +43,7 @@
 //
 //     btn := material.Button(theme, "Click me!")
 //     btn.Font.Style = text.Italic
-//     btn.Layout(gtx)
+//     btn.Layout(gtx, button)
 //
 // Widget variants: A widget can have several distinct representations even
 // though the underlying state is the same. A widget.Clickable can be drawn as a

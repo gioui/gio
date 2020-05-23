@@ -30,7 +30,7 @@ type Click struct {
 // Clicked calls Update and reports whether the button was
 // clicked since the last call. Multiple clicks result in Clicked
 // returning true once per click.
-func (b *Clickable) Clicked(gtx *layout.Context) bool {
+func (b *Clickable) Clicked(gtx layout.Context) bool {
 	b.Update(gtx)
 	if b.clicks > 0 {
 		b.clicks--
@@ -49,7 +49,7 @@ func (b *Clickable) History() []Click {
 	return b.history
 }
 
-func (b *Clickable) Layout(gtx *layout.Context) {
+func (b *Clickable) Layout(gtx layout.Context) layout.Dimensions {
 	// Flush clicks from before the previous frame.
 	b.Update(gtx)
 	var st op.StackOp
@@ -65,11 +65,12 @@ func (b *Clickable) Layout(gtx *layout.Context) {
 		n := copy(b.history, b.history[1:])
 		b.history = b.history[:n]
 	}
+	return layout.Dimensions{Size: gtx.Constraints.Min}
 }
 
 // Update the button state by processing events. The underlying
 // gesture events are returned for use beyond what Clicked offers.
-func (b *Clickable) Update(gtx *layout.Context) []gesture.ClickEvent {
+func (b *Clickable) Update(gtx layout.Context) []gesture.ClickEvent {
 	evts := b.click.Events(gtx)
 	for _, e := range evts {
 		switch e.Type {

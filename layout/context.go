@@ -20,63 +20,54 @@ type Context struct {
 	// Constraints track the constraints for the active widget or
 	// layout.
 	Constraints Constraints
-	// Dimensions track the result of the most recent layout
-	// operation.
-	Dimensions Dimensions
 
-	cfg   system.Config
-	queue event.Queue
+	Config system.Config
+	Queue  event.Queue
 	*op.Ops
 }
 
-// layout a widget with a set of constraints and return its
-// dimensions. The widget dimensions are constrained and the previous
-// constraints are restored after layout.
-func ctxLayout(gtx *Context, cs Constraints, w Widget) Dimensions {
-	saved := gtx.Constraints
-	gtx.Constraints = cs
-	gtx.Dimensions = Dimensions{}
-	w()
-	gtx.Dimensions.Size = cs.Constrain(gtx.Dimensions.Size)
-	gtx.Constraints = saved
-	return gtx.Dimensions
-}
-
-// Reset the context. The constraints' minimum and maximum values are
-// set to the size.
-func (c *Context) Reset(q event.Queue, cfg system.Config, size image.Point) {
-	c.Constraints = Constraints{Min: size, Max: size}
-	c.Dimensions = Dimensions{}
-	c.cfg = cfg
-	c.queue = q
-	if c.Ops == nil {
-		c.Ops = new(op.Ops)
+// NewContext is a shorthand for
+//
+//   Context{
+//     Ops: ops,
+//     Queue: q,
+//     Config: cfg,
+//     Constraints: Exact(size),
+//   }
+//
+// NewContext calls ops.Reset.
+func NewContext(ops *op.Ops, q event.Queue, cfg system.Config, size image.Point) Context {
+	ops.Reset()
+	return Context{
+		Ops:         ops,
+		Queue:       q,
+		Config:      cfg,
+		Constraints: Exact(size),
 	}
-	c.Ops.Reset()
 }
 
 // Now returns the configuration time or the zero time.
-func (c *Context) Now() time.Time {
-	if c.cfg == nil {
+func (c Context) Now() time.Time {
+	if c.Config == nil {
 		return time.Time{}
 	}
-	return c.cfg.Now()
+	return c.Config.Now()
 }
 
 // Px maps the value to pixels. If no configuration is set,
 // Px returns the rounded value of v.
-func (c *Context) Px(v unit.Value) int {
-	if c.cfg == nil {
+func (c Context) Px(v unit.Value) int {
+	if c.Config == nil {
 		return int(math.Round(float64(v.V)))
 	}
-	return c.cfg.Px(v)
+	return c.Config.Px(v)
 }
 
 // Events returns the events available for the key. If no
 // queue is configured, Events returns nil.
-func (c *Context) Events(k event.Tag) []event.Event {
-	if c.queue == nil {
+func (c Context) Events(k event.Tag) []event.Event {
+	if c.Queue == nil {
 		return nil
 	}
-	return c.queue.Events(k)
+	return c.Queue.Events(k)
 }

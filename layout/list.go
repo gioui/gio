@@ -29,7 +29,7 @@ type List struct {
 	// Alignment is the cross axis alignment of list elements.
 	Alignment Alignment
 
-	ctx         *Context
+	ctx         Context
 	macro       op.MacroOp
 	child       op.MacroOp
 	scroll      gesture.Scroll
@@ -51,7 +51,7 @@ type List struct {
 
 // ListElement is a function that computes the dimensions of
 // a list element.
-type ListElement func(index int)
+type ListElement func(gtx Context, index int) Dimensions
 
 type iterationDir uint8
 
@@ -82,7 +82,7 @@ const (
 const inf = 1e6
 
 // init prepares the list for iterating through its children with next.
-func (l *List) init(gtx *Context, len int) {
+func (l *List) init(gtx Context, len int) {
 	if l.more() {
 		panic("unfinished child")
 	}
@@ -100,16 +100,15 @@ func (l *List) init(gtx *Context, len int) {
 }
 
 // Layout the List.
-func (l *List) Layout(gtx *Context, len int, w ListElement) {
+func (l *List) Layout(gtx Context, len int, w ListElement) Dimensions {
 	for l.init(gtx, len); l.more(); l.next() {
 		crossMin, crossMax := axisCrossConstraint(l.Axis, l.ctx.Constraints)
 		cs := axisConstraints(l.Axis, 0, inf, crossMin, crossMax)
 		i := l.index()
-		l.end(ctxLayout(gtx, cs, func() {
-			w(i)
-		}))
+		gtx.Constraints = cs
+		l.end(w(gtx, i))
 	}
-	gtx.Dimensions = l.layout()
+	return l.layout()
 }
 
 func (l *List) scrollToEnd() bool {

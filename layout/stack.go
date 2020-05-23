@@ -47,18 +47,18 @@ func Expanded(w Widget) StackChild {
 // Layout a stack of children. The position of the children are
 // determined by the specified order, but Stacked children are laid out
 // before Expanded children.
-func (s Stack) Layout(gtx *Context, children ...StackChild) {
+func (s Stack) Layout(gtx Context, children ...StackChild) Dimensions {
 	var maxSZ image.Point
 	// First lay out Stacked children.
 	for i, w := range children {
 		if w.expanded {
 			continue
 		}
-		cs := gtx.Constraints
-		cs.Min = image.Pt(0, 0)
 		var m op.MacroOp
 		m.Record(gtx.Ops)
-		dims := ctxLayout(gtx, cs, w.widget)
+		gtx := gtx
+		gtx.Constraints.Min = image.Pt(0, 0)
+		dims := w.widget(gtx)
 		m.Stop()
 		if w := dims.Size.X; w > maxSZ.X {
 			maxSZ.X = w
@@ -76,10 +76,11 @@ func (s Stack) Layout(gtx *Context, children ...StackChild) {
 		}
 		var m op.MacroOp
 		m.Record(gtx.Ops)
-		cs := Constraints{
+		gtx := gtx
+		gtx.Constraints = Constraints{
 			Min: maxSZ, Max: gtx.Constraints.Max,
 		}
-		dims := ctxLayout(gtx, cs, w.widget)
+		dims := w.widget(gtx)
 		m.Stop()
 		if w := dims.Size.X; w > maxSZ.X {
 			maxSZ.X = w
@@ -119,7 +120,7 @@ func (s Stack) Layout(gtx *Context, children ...StackChild) {
 			}
 		}
 	}
-	gtx.Dimensions = Dimensions{
+	return Dimensions{
 		Size:     maxSZ,
 		Baseline: baseline,
 	}
