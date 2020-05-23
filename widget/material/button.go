@@ -37,11 +37,12 @@ type ButtonLayoutStyle struct {
 
 type IconButtonStyle struct {
 	Background color.RGBA
-	Color      color.RGBA
-	Icon       *widget.Icon
-	Size       unit.Value
-	Padding    unit.Value
-	Inset      layout.Inset
+	// Color is the icon color.
+	Color color.RGBA
+	Icon  *widget.Icon
+	// Size is the icon size.
+	Size  unit.Value
+	Inset layout.Inset
 }
 
 func Button(th *Theme, txt string) ButtonStyle {
@@ -72,8 +73,8 @@ func IconButton(th *Theme, icon *widget.Icon) IconButtonStyle {
 		Background: th.Color.Primary,
 		Color:      th.Color.InvText,
 		Icon:       icon,
-		Size:       unit.Dp(56),
-		Padding:    unit.Dp(16),
+		Size:       unit.Dp(24),
+		Inset:      layout.UniformInset(unit.Dp(12)),
 	}
 }
 
@@ -157,8 +158,8 @@ func (b IconButtonStyle) Layout(gtx *layout.Context, button *widget.Clickable) {
 			}
 		}),
 		layout.Stacked(func() {
-			layout.UniformInset(b.Padding).Layout(gtx, func() {
-				size := gtx.Px(b.Size) - 2*gtx.Px(b.Padding)
+			b.Inset.Layout(gtx, func() {
+				size := gtx.Px(b.Size)
 				if b.Icon != nil {
 					b.Icon.Color = b.Color
 					b.Icon.Layout(gtx, unit.Px(float32(size)))
