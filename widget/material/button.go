@@ -26,6 +26,7 @@ type ButtonStyle struct {
 	Background   color.RGBA
 	CornerRadius unit.Value
 	Inset        layout.Inset
+	Button       *widget.Clickable
 	shaper       text.Shaper
 }
 
@@ -33,6 +34,7 @@ type ButtonLayoutStyle struct {
 	Background   color.RGBA
 	CornerRadius unit.Value
 	Inset        layout.Inset
+	Button       *widget.Clickable
 }
 
 type IconButtonStyle struct {
@@ -41,11 +43,12 @@ type IconButtonStyle struct {
 	Color color.RGBA
 	Icon  *widget.Icon
 	// Size is the icon size.
-	Size  unit.Value
-	Inset layout.Inset
+	Size   unit.Value
+	Inset  layout.Inset
+	Button *widget.Clickable
 }
 
-func Button(th *Theme, txt string) ButtonStyle {
+func Button(th *Theme, button *widget.Clickable, txt string) ButtonStyle {
 	return ButtonStyle{
 		Text:         txt,
 		Color:        rgb(0xffffff),
@@ -56,25 +59,28 @@ func Button(th *Theme, txt string) ButtonStyle {
 			Top: unit.Dp(10), Bottom: unit.Dp(10),
 			Left: unit.Dp(12), Right: unit.Dp(12),
 		},
+		Button: button,
 		shaper: th.Shaper,
 	}
 }
 
-func ButtonLayout(th *Theme) ButtonLayoutStyle {
+func ButtonLayout(th *Theme, button *widget.Clickable) ButtonLayoutStyle {
 	return ButtonLayoutStyle{
+		Button:       button,
 		Background:   th.Color.Primary,
 		CornerRadius: unit.Dp(4),
 		Inset:        layout.UniformInset(unit.Dp(12)),
 	}
 }
 
-func IconButton(th *Theme, icon *widget.Icon) IconButtonStyle {
+func IconButton(th *Theme, button *widget.Clickable, icon *widget.Icon) IconButtonStyle {
 	return IconButtonStyle{
 		Background: th.Color.Primary,
 		Color:      th.Color.InvText,
 		Icon:       icon,
 		Size:       unit.Dp(24),
 		Inset:      layout.UniformInset(unit.Dp(12)),
+		Button:     button,
 	}
 }
 
@@ -99,18 +105,19 @@ func Clickable(gtx layout.Context, button *widget.Clickable, w layout.Widget) la
 	)
 }
 
-func (b ButtonStyle) Layout(gtx layout.Context, button *widget.Clickable) layout.Dimensions {
+func (b ButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 	return ButtonLayoutStyle{
 		Background:   b.Background,
 		CornerRadius: b.CornerRadius,
 		Inset:        b.Inset,
-	}.Layout(gtx, button, func(gtx layout.Context) layout.Dimensions {
+		Button:       b.Button,
+	}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		paint.ColorOp{Color: b.Color}.Add(gtx.Ops)
 		return widget.Label{Alignment: text.Middle}.Layout(gtx, b.shaper, b.Font, b.TextSize, b.Text)
 	})
 }
 
-func (b ButtonLayoutStyle) Layout(gtx layout.Context, button *widget.Clickable, w layout.Widget) layout.Dimensions {
+func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 	min := gtx.Constraints.Min
 	return layout.Stack{Alignment: layout.Center}.Layout(gtx,
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
@@ -123,7 +130,7 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, button *widget.Clickable, 
 				NE: rr, NW: rr, SE: rr, SW: rr,
 			}.Op(gtx.Ops).Add(gtx.Ops)
 			dims := fill(gtx, b.Background)
-			for _, c := range button.History() {
+			for _, c := range b.Button.History() {
 				drawInk(gtx, c)
 			}
 			return dims
@@ -134,11 +141,11 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, button *widget.Clickable, 
 				return b.Inset.Layout(gtx, w)
 			})
 		}),
-		layout.Expanded(button.Layout),
+		layout.Expanded(b.Button.Layout),
 	)
 }
 
-func (b IconButtonStyle) Layout(gtx layout.Context, button *widget.Clickable) layout.Dimensions {
+func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 	return layout.Stack{Alignment: layout.Center}.Layout(gtx,
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
 			size := gtx.Constraints.Min.X
@@ -149,7 +156,7 @@ func (b IconButtonStyle) Layout(gtx layout.Context, button *widget.Clickable) la
 				NE:   rr, NW: rr, SE: rr, SW: rr,
 			}.Op(gtx.Ops).Add(gtx.Ops)
 			dims := fill(gtx, b.Background)
-			for _, c := range button.History() {
+			for _, c := range b.Button.History() {
 				drawInk(gtx, c)
 			}
 			return dims
@@ -168,7 +175,7 @@ func (b IconButtonStyle) Layout(gtx layout.Context, button *widget.Clickable) la
 		}),
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
 			pointer.Ellipse(image.Rectangle{Max: gtx.Constraints.Min}).Add(gtx.Ops)
-			return button.Layout(gtx)
+			return b.Button.Layout(gtx)
 		}),
 	)
 }

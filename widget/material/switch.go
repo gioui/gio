@@ -17,18 +17,20 @@ import (
 )
 
 type SwitchStyle struct {
-	Color color.RGBA
+	Color  color.RGBA
+	Switch *widget.Bool
 }
 
-func Switch(th *Theme) SwitchStyle {
+func Switch(th *Theme, swtch *widget.Bool) SwitchStyle {
 	return SwitchStyle{
-		Color: th.Color.Primary,
+		Switch: swtch,
+		Color:  th.Color.Primary,
 	}
 }
 
 // Layout updates the checkBox and displays it.
-func (s SwitchStyle) Layout(gtx layout.Context, swtch *widget.Bool) layout.Dimensions {
-	swtch.Update(gtx)
+func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
+	s.Switch.Update(gtx)
 
 	trackWidth := gtx.Px(unit.Dp(36))
 	trackHeight := gtx.Px(unit.Dp(16))
@@ -55,7 +57,7 @@ func (s SwitchStyle) Layout(gtx layout.Context, swtch *widget.Bool) layout.Dimen
 	// Compute thumb offset and color.
 	stack.Push(gtx.Ops)
 	col := rgb(0xffffff)
-	if swtch.Value {
+	if s.Switch.Value {
 		off := trackWidth - thumbSize
 		op.TransformOp{}.Offset(f32.Point{X: float32(off)}).Add(gtx.Ops)
 		col = s.Color
@@ -93,7 +95,7 @@ func (s SwitchStyle) Layout(gtx layout.Context, swtch *widget.Bool) layout.Dimen
 		},
 		NE: rr, NW: rr, SE: rr, SW: rr,
 	}.Op(gtx.Ops).Add(gtx.Ops)
-	drawInk(gtx, swtch.Last)
+	drawInk(gtx, s.Switch.Last)
 	stack.Pop()
 
 	// Set up click area.
@@ -109,7 +111,7 @@ func (s SwitchStyle) Layout(gtx layout.Context, swtch *widget.Bool) layout.Dimen
 			X: clickSize, Y: clickSize,
 		},
 	}).Add(gtx.Ops)
-	swtch.Layout(gtx)
+	s.Switch.Layout(gtx)
 	stack.Pop()
 
 	return layout.Dimensions{

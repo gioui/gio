@@ -10,11 +10,13 @@ import (
 
 type CheckBoxStyle struct {
 	checkable
+	CheckBox *widget.Bool
 }
 
-func CheckBox(th *Theme, label string) CheckBoxStyle {
+func CheckBox(th *Theme, checkBox *widget.Bool, label string) CheckBoxStyle {
 	return CheckBoxStyle{
-		checkable{
+		CheckBox: checkBox,
+		checkable: checkable{
 			Label:              label,
 			Color:              th.Color.Text,
 			IconColor:          th.Color.Primary,
@@ -28,9 +30,9 @@ func CheckBox(th *Theme, label string) CheckBoxStyle {
 }
 
 // Layout updates the checkBox and displays it.
-func (c CheckBoxStyle) Layout(gtx layout.Context, checkBox *widget.Bool) layout.Dimensions {
-	checkBox.Update(gtx)
-	dims := c.layout(gtx, checkBox.Value)
-	checkBox.Layout(gtx)
+func (c CheckBoxStyle) Layout(gtx layout.Context) layout.Dimensions {
+	c.CheckBox.Update(gtx)
+	dims := c.layout(gtx, c.CheckBox.Value)
+	c.CheckBox.Layout(gtx)
 	return dims
 }

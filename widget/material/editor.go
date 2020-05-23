@@ -22,12 +22,14 @@ type EditorStyle struct {
 	Hint string
 	// HintColor is the color of hint text.
 	HintColor color.RGBA
+	Editor    *widget.Editor
 
 	shaper text.Shaper
 }
 
-func Editor(th *Theme, hint string) EditorStyle {
+func Editor(th *Theme, editor *widget.Editor, hint string) EditorStyle {
 	return EditorStyle{
+		Editor:    editor,
 		TextSize:  th.TextSize,
 		Color:     th.Color.Text,
 		shaper:    th.Shaper,
@@ -36,13 +38,13 @@ func Editor(th *Theme, hint string) EditorStyle {
 	}
 }
 
-func (e EditorStyle) Layout(gtx layout.Context, editor *widget.Editor) layout.Dimensions {
+func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 	var stack op.StackOp
 	stack.Push(gtx.Ops)
 	var macro op.MacroOp
 	macro.Record(gtx.Ops)
 	paint.ColorOp{Color: e.HintColor}.Add(gtx.Ops)
-	tl := widget.Label{Alignment: editor.Alignment}
+	tl := widget.Label{Alignment: e.Editor.Alignment}
 	dims := tl.Layout(gtx, e.shaper, e.Font, e.TextSize, e.Hint)
 	macro.Stop()
 	if w := dims.Size.X; gtx.Constraints.Min.X < w {
@@ -51,15 +53,15 @@ func (e EditorStyle) Layout(gtx layout.Context, editor *widget.Editor) layout.Di
 	if h := dims.Size.Y; gtx.Constraints.Min.Y < h {
 		gtx.Constraints.Min.Y = h
 	}
-	dims = editor.Layout(gtx, e.shaper, e.Font, e.TextSize)
-	if editor.Len() > 0 {
+	dims = e.Editor.Layout(gtx, e.shaper, e.Font, e.TextSize)
+	if e.Editor.Len() > 0 {
 		paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
-		editor.PaintText(gtx)
+		e.Editor.PaintText(gtx)
 	} else {
 		macro.Add()
 	}
 	paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
-	editor.PaintCaret(gtx)
+	e.Editor.PaintCaret(gtx)
 	stack.Pop()
 	return dims
 }

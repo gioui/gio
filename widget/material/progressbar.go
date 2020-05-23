@@ -14,16 +14,18 @@ import (
 )
 
 type ProgressBarStyle struct {
-	Color color.RGBA
+	Color    color.RGBA
+	Progress int
 }
 
-func ProgressBar(th *Theme) ProgressBarStyle {
+func ProgressBar(th *Theme, progress int) ProgressBarStyle {
 	return ProgressBarStyle{
-		Color: th.Color.Primary,
+		Progress: progress,
+		Color:    th.Color.Primary,
 	}
 }
 
-func (p ProgressBarStyle) Layout(gtx layout.Context, progress int) layout.Dimensions {
+func (p ProgressBarStyle) Layout(gtx layout.Context) layout.Dimensions {
 	shader := func(width float32, color color.RGBA) layout.Dimensions {
 		maxHeight := unit.Dp(4)
 		rr := float32(gtx.Px(unit.Dp(2)))
@@ -44,6 +46,7 @@ func (p ProgressBarStyle) Layout(gtx layout.Context, progress int) layout.Dimens
 		return layout.Dimensions{Size: d}
 	}
 
+	progress := p.Progress
 	if progress > 100 {
 		progress = 100
 	} else if progress < 0 {
