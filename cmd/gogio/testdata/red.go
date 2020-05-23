@@ -14,6 +14,7 @@ import (
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/op/paint"
 )
 
@@ -39,6 +40,11 @@ const (
 // when a frame is ready. Initially we want to notify about the first frame.
 var notify = notifyInvalidate
 
+type (
+	C = layout.Context
+	D = layout.Dimensions
+)
+
 func loop(w *app.Window) error {
 	topLeft := quarterWidget{
 		color: color.RGBA{R: 0xde, G: 0xad, B: 0xbe, A: 0xff},
@@ -53,30 +59,29 @@ func loop(w *app.Window) error {
 		color: color.RGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x80},
 	}
 
-	gtx := new(layout.Context)
+	var ops op.Ops
 	for {
 		e := <-w.Events()
 		switch e := e.(type) {
 		case system.DestroyEvent:
 			return e.Err
 		case system.FrameEvent:
-
-			gtx.Reset(e.Queue, e.Config, e.Size)
+			gtx := layout.NewContext(&ops, e.Queue, e.Config, e.Size)
 			layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				layout.Flexed(0.5, func() {
-					layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
+				layout.Flexed(0.5, func(gtx C) D {
+					return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
 						// r1c1
-						layout.Flexed(0.5, func() { topLeft.Layout(gtx) }),
+						layout.Flexed(0.5, func(gtx C) D { return topLeft.Layout(gtx) }),
 						// r1c2
-						layout.Flexed(0.5, func() { topRight.Layout(gtx) }),
+						layout.Flexed(0.5, func(gtx C) D { return topRight.Layout(gtx) }),
 					)
 				}),
-				layout.Flexed(0.5, func() {
-					layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
+				layout.Flexed(0.5, func(gtx C) D {
+					return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
 						// r2c1
-						layout.Flexed(0.5, func() { botLeft.Layout(gtx) }),
+						layout.Flexed(0.5, func(gtx C) D { return botLeft.Layout(gtx) }),
 						// r2c2
-						layout.Flexed(0.5, func() { botRight.Layout(gtx) }),
+						layout.Flexed(0.5, func(gtx C) D { return botRight.Layout(gtx) }),
 					)
 				}),
 			)
@@ -105,7 +110,7 @@ type quarterWidget struct {
 
 var red = color.RGBA{R: 0xff, G: 0x00, B: 0x00, A: 0xff}
 
-func (w *quarterWidget) Layout(gtx *layout.Context) {
+func (w *quarterWidget) Layout(gtx layout.Context) layout.Dimensions {
 	if w.clicked {
 		paint.ColorOp{Color: red}.Add(gtx.Ops)
 	} else {
@@ -128,4 +133,5 @@ func (w *quarterWidget) Layout(gtx *layout.Context) {
 			notify = notifyInvalidate
 		}
 	}
+	return layout.Dimensions{Size: gtx.Constraints.Max}
 }

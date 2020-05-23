@@ -11,6 +11,7 @@ import (
 	"gioui.org/app"
 	"gioui.org/io/system"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/text"
 	"gioui.org/widget/material"
 
@@ -30,14 +31,14 @@ func main() {
 func loop(w *app.Window) error {
 	gofont.Register()
 	th := material.NewTheme()
-	gtx := new(layout.Context)
+	var ops op.Ops
 	for {
 		e := <-w.Events()
 		switch e := e.(type) {
 		case system.DestroyEvent:
 			return e.Err
 		case system.FrameEvent:
-			gtx.Reset(e.Queue, e.Config, e.Size)
+			gtx := layout.NewContext(&ops, e.Queue, e.Config, e.Size)
 			l := material.H1(th, "Hello, Gio")
 			maroon := color.RGBA{127, 0, 0, 255}
 			l.Color = maroon

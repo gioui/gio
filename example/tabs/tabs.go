@@ -13,6 +13,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/io/system"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
 	"gioui.org/widget"
@@ -34,14 +35,14 @@ func main() {
 func loop(w *app.Window) error {
 	gofont.Register()
 	th := material.NewTheme()
-	gtx := new(layout.Context)
+	var ops op.Ops
 	for {
 		e := <-w.Events()
 		switch e := e.(type) {
 		case system.DestroyEvent:
 			return e.Err
 		case system.FrameEvent:
-			gtx.Reset(e.Queue, e.Config, e.Size)
+			gtx := layout.NewContext(&ops, e.Queue, e.Config, e.Size)
 			drawTabs(gtx, th)
 			e.Frame(gtx.Ops)
 		}
@@ -70,32 +71,38 @@ func init() {
 	}
 }
 
-func drawTabs(gtx *layout.Context, th *material.Theme) {
-	layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-		layout.Rigid(func() {
-			tabs.list.Layout(gtx, len(tabs.tabs), func(tabIdx int) {
+type (
+	C = layout.Context
+	D = layout.Dimensions
+)
+
+func drawTabs(gtx layout.Context, th *material.Theme) layout.Dimensions {
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Rigid(func(gtx C) D {
+			return tabs.list.Layout(gtx, len(tabs.tabs), func(gtx C, tabIdx int) D {
 				t := &tabs.tabs[tabIdx]
 				if t.btn.Clicked(gtx) {
 					if tabs.selected < tabIdx {
-						slider.PushLeft(gtx)
+						slider.PushLeft()
 					} else if tabs.selected > tabIdx {
-						slider.PushRight(gtx)
+						slider.PushRight()
 					}
 					tabs.selected = tabIdx
 				}
 				var tabWidth int
-				layout.Stack{Alignment: layout.S}.Layout(gtx,
-					layout.Stacked(func() {
-						material.Clickable(gtx, &t.btn, func() {
-							layout.UniformInset(unit.Sp(12)).Layout(gtx, func() {
-								material.H6(th, t.Title).Layout(gtx)
-							})
+				return layout.Stack{Alignment: layout.S}.Layout(gtx,
+					layout.Stacked(func(gtx C) D {
+						dims := material.Clickable(gtx, &t.btn, func(gtx C) D {
+							return layout.UniformInset(unit.Sp(12)).Layout(gtx,
+								material.H6(th, t.Title).Layout,
+							)
 						})
-						tabWidth = gtx.Dimensions.Size.X
+						tabWidth = dims.Size.X
+						return dims
 					}),
-					layout.Stacked(func() {
+					layout.Stacked(func(gtx C) D {
 						if tabs.selected != tabIdx {
-							return
+							return layout.Dimensions{}
 						}
 						paint.ColorOp{Color: th.Color.Primary}.Add(gtx.Ops)
 						tabHeight := gtx.Px(unit.Dp(4))
@@ -105,25 +112,25 @@ func drawTabs(gtx *layout.Context, th *material.Theme) {
 								Y: float32(tabHeight),
 							},
 						}}.Add(gtx.Ops)
-						gtx.Dimensions = layout.Dimensions{
+						return layout.Dimensions{
 							Size: image.Point{X: tabWidth, Y: tabHeight},
 						}
 					}),
 				)
 			})
 		}),
-		layout.Flexed(1, func() {
-			slider.Layout(gtx, func() {
+		layout.Flexed(1, func(gtx C) D {
+			return slider.Layout(gtx, func(gtx C) D {
 				fill(gtx, dynamicColor(tabs.selected))
-				layout.Center.Layout(gtx, func() {
-					material.H1(th, fmt.Sprintf("Tab content #%d", tabs.selected+1)).Layout(gtx)
-				})
+				return layout.Center.Layout(gtx,
+					material.H1(th, fmt.Sprintf("Tab content #%d", tabs.selected+1)).Layout,
+				)
 			})
 		}),
 	)
 }
 
-func bounds(gtx *layout.Context) f32.Rectangle {
+func bounds(gtx layout.Context) f32.Rectangle {
 	cs := gtx.Constraints
 	d := cs.Min
 	return f32.Rectangle{
@@ -131,7 +138,7 @@ func bounds(gtx *layout.Context) f32.Rectangle {
 	}
 }
 
-func fill(gtx *layout.Context, col color.RGBA) {
+func fill(gtx layout.Context, col color.RGBA) {
 	dr := bounds(gtx)
 	paint.ColorOp{Color: col}.Add(gtx.Ops)
 	paint.PaintOp{Rect: dr}.Add(gtx.Ops)

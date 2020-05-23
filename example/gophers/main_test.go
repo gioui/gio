@@ -7,14 +7,18 @@ import (
 	"testing"
 
 	"gioui.org/layout"
+	"gioui.org/op"
 )
 
 func BenchmarkUI(b *testing.B) {
 	fetch := func(_ string) {}
 	u := newUI(fetch)
-	gtx := new(layout.Context)
+	var ops op.Ops
 	for i := 0; i < b.N; i++ {
-		gtx.Reset(nil, nil, image.Point{800, 600})
+		gtx := layout.Context{
+			Ops:         &ops,
+			Constraints: layout.Exact(image.Pt(800, 600)),
+		}
 		u.Layout(gtx)
 	}
 }

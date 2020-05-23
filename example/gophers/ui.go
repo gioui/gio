@@ -65,6 +65,11 @@ type user struct {
 
 var theme *material.Theme
 
+type (
+	C = layout.Context
+	D = layout.Dimensions
+)
+
 func init() {
 	gofont.Register()
 	theme = material.NewTheme()
@@ -106,7 +111,7 @@ func argb(c uint32) color.RGBA {
 	return color.RGBA{A: uint8(c >> 24), R: uint8(c >> 16), G: uint8(c >> 8), B: uint8(c)}
 }
 
-func (u *UI) layoutTimings(gtx *layout.Context) {
+func (u *UI) layoutTimings(gtx layout.Context) {
 	if !u.profiling {
 		return
 	}
@@ -120,17 +125,17 @@ func (u *UI) layoutTimings(gtx *layout.Context) {
 	runtime.ReadMemStats(&mstats)
 	mallocs := mstats.Mallocs - u.lastMallocs
 	u.lastMallocs = mstats.Mallocs
-	layout.NE.Layout(gtx, func() {
-		layout.Inset{Top: unit.Dp(16)}.Layout(gtx, func() {
+	layout.NE.Layout(gtx, func(gtx C) D {
+		return layout.Inset{Top: unit.Dp(16)}.Layout(gtx, func(gtx C) D {
 			txt := fmt.Sprintf("m: %d %s", mallocs, u.profile.Timings)
 			lbl := material.Caption(theme, txt)
 			lbl.Font.Variant = "Mono"
-			lbl.Layout(gtx)
+			return lbl.Layout(gtx)
 		})
 	})
 }
 
-func (u *UI) Layout(gtx *layout.Context) {
+func (u *UI) Layout(gtx layout.Context) {
 	for i := range u.userClicks {
 		click := &u.userClicks[i]
 		for _, e := range click.Events(gtx) {
@@ -156,159 +161,155 @@ func (u *UI) newUserPage(user *user) *userPage {
 	return up
 }
 
-func (up *userPage) Layout(gtx *layout.Context) {
+func (up *userPage) Layout(gtx layout.Context) {
 	l := up.commitsList
 	if l.Dragging() {
 		key.HideInputOp{}.Add(gtx.Ops)
 	}
-	l.Layout(gtx, len(up.commits), func(i int) {
-		up.commit(gtx, i)
+	l.Layout(gtx, len(up.commits), func(gtx C, i int) D {
+		return up.commit(gtx, i)
 	})
 }
 
-func (up *userPage) commit(gtx *layout.Context, index int) {
+func (up *userPage) commit(gtx layout.Context, index int) layout.Dimensions {
 	u := up.user
 	msg := up.commits[index].GetMessage()
 	label := material.Caption(theme, msg)
 	in := layout.Inset{Top: unit.Dp(16), Right: unit.Dp(8), Left: unit.Dp(8)}
-	in.Layout(gtx, func() {
-		layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-			layout.Rigid(func() {
+	return in.Layout(gtx, func(gtx C) D {
+		return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
+			layout.Rigid(func(gtx C) D {
 				sz := gtx.Px(unit.Dp(48))
 				cc := clipCircle{}
-				cc.Layout(gtx, func() {
+				return cc.Layout(gtx, func(gtx C) D {
 					gtx.Constraints = layout.Exact(gtx.Constraints.Constrain(image.Point{X: sz, Y: sz}))
-					u.layoutAvatar(gtx)
+					return u.layoutAvatar(gtx)
 				})
 			}),
-			layout.Flexed(1, func() {
+			layout.Flexed(1, func(gtx C) D {
 				gtx.Constraints.Min.X = gtx.Constraints.Max.X
-				layout.Inset{Left: unit.Dp(8)}.Layout(gtx, func() {
-					label.Layout(gtx)
-				})
+				return layout.Inset{Left: unit.Dp(8)}.Layout(gtx, label.Layout)
 			}),
 		)
 	})
 }
 
-func (u *UI) layoutUsers(gtx *layout.Context) {
+func (u *UI) layoutUsers(gtx layout.Context) {
 	layout.Stack{Alignment: layout.SE}.Layout(gtx,
-		layout.Expanded(func() {
-			layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				layout.Rigid(func() {
+		layout.Expanded(func(gtx C) D {
+			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+				layout.Rigid(func(gtx C) D {
 					gtx.Constraints.Min.X = gtx.Constraints.Max.X
-					layout.UniformInset(unit.Dp(16)).Layout(gtx, func() {
+					return layout.UniformInset(unit.Dp(16)).Layout(gtx, func(gtx C) D {
 						sz := gtx.Px(unit.Dp(200))
 						cs := gtx.Constraints
 						gtx.Constraints = layout.Exact(cs.Constrain(image.Point{X: sz, Y: sz}))
-						material.Editor(theme, "Hint").Layout(gtx, u.edit)
+						return material.Editor(theme, u.edit, "Hint").Layout(gtx)
 					})
 				}),
-				layout.Rigid(func() {
+				layout.Rigid(func(gtx C) D {
 					gtx.Constraints.Min.X = gtx.Constraints.Max.X
 					in := layout.Inset{Bottom: unit.Dp(16), Left: unit.Dp(16), Right: unit.Dp(16)}
-					in.Layout(gtx, func() {
-						e := material.Editor(theme, "Hint")
+					return in.Layout(gtx, func(gtx C) D {
+						e := material.Editor(theme, u.edit2, "Hint")
 						e.TextSize = unit.Sp(14)
 						e.Font.Style = text.Italic
-						e.Layout(gtx, u.edit2)
+						return e.Layout(gtx)
 					})
 				}),
-				layout.Rigid(func() {
-					layout.Stack{}.Layout(gtx,
-						layout.Expanded(func() {
+				layout.Rigid(func(gtx C) D {
+					return layout.Stack{}.Layout(gtx,
+						layout.Expanded(func(gtx C) D {
 							gtx.Constraints.Min.X = gtx.Constraints.Max.X
-							fill{rgb(0xf2f2f2)}.Layout(gtx)
+							return fill{rgb(0xf2f2f2)}.Layout(gtx)
 						}),
-						layout.Stacked(func() {
+						layout.Stacked(func(gtx C) D {
 							in := layout.Inset{Top: unit.Dp(16), Right: unit.Dp(8), Bottom: unit.Dp(8), Left: unit.Dp(8)}
-							in.Layout(gtx, func() {
+							return in.Layout(gtx, func(gtx C) D {
 								lbl := material.Caption(theme, "GOPHERS")
 								lbl.Color = rgb(0x888888)
-								lbl.Layout(gtx)
+								return lbl.Layout(gtx)
 							})
 						}),
 					)
 				}),
-				layout.Flexed(1, func() {
+				layout.Flexed(1, func(gtx C) D {
 					gtx.Constraints.Min.X = gtx.Constraints.Max.X
-					u.layoutContributors(gtx)
+					return u.layoutContributors(gtx)
 				}),
 			)
 		}),
-		layout.Stacked(func() {
+		layout.Stacked(func(gtx C) D {
 			in := layout.UniformInset(unit.Dp(16))
-			in.Layout(gtx, func() {
+			return in.Layout(gtx, func(gtx C) D {
 				for u.fab.Clicked(gtx) {
 				}
-				material.IconButton(theme, u.fabIcon).Layout(gtx, u.fab)
+				return material.IconButton(theme, u.fab, u.fabIcon).Layout(gtx)
 			})
 		}),
 	)
 }
 
-func (u *UI) layoutContributors(gtx *layout.Context) {
+func (u *UI) layoutContributors(gtx layout.Context) layout.Dimensions {
 	l := u.usersList
 	if l.Dragging() {
 		key.HideInputOp{}.Add(gtx.Ops)
 	}
-	l.Layout(gtx, len(u.users), func(i int) {
-		u.user(gtx, i)
+	return l.Layout(gtx, len(u.users), func(gtx C, i int) D {
+		return u.user(gtx, i)
 	})
 }
 
-func (u *UI) user(gtx *layout.Context, index int) {
+func (u *UI) user(gtx layout.Context, index int) layout.Dimensions {
 	user := u.users[index]
 	in := layout.UniformInset(unit.Dp(8))
-	in.Layout(gtx, func() {
-		centerRowOpts().Layout(gtx,
-			layout.Rigid(func() {
+	dims := in.Layout(gtx, func(gtx C) D {
+		return centerRowOpts().Layout(gtx,
+			layout.Rigid(func(gtx C) D {
 				in := layout.Inset{Right: unit.Dp(8)}
 				cc := clipCircle{}
-				in.Layout(gtx, func() {
-					cc.Layout(gtx, func() {
+				return in.Layout(gtx, func(gtx C) D {
+					return cc.Layout(gtx, func(gtx C) D {
 						dim := gtx.Px(unit.Dp(48))
 						sz := image.Point{X: dim, Y: dim}
 						gtx.Constraints = layout.Exact(gtx.Constraints.Constrain(sz))
-						user.layoutAvatar(gtx)
+						return user.layoutAvatar(gtx)
 					})
 				})
 			}),
-			layout.Rigid(func() {
-				column().Layout(gtx,
-					layout.Rigid(func() {
-						baseline().Layout(gtx,
-							layout.Rigid(func() {
-								material.Body1(theme, user.name).Layout(gtx)
-							}),
-							layout.Flexed(1, func() {
+			layout.Rigid(func(gtx C) D {
+				return column().Layout(gtx,
+					layout.Rigid(func(gtx C) D {
+						return baseline().Layout(gtx,
+							layout.Rigid(material.Body1(theme, user.name).Layout),
+							layout.Flexed(1, func(gtx C) D {
 								gtx.Constraints.Min.X = gtx.Constraints.Max.X
-								layout.E.Layout(gtx, func() {
-									layout.Inset{Left: unit.Dp(2)}.Layout(gtx, func() {
-										material.Caption(theme, "3 hours ago").Layout(gtx)
-									})
+								return layout.E.Layout(gtx, func(gtx C) D {
+									return layout.Inset{Left: unit.Dp(2)}.Layout(gtx,
+										material.Caption(theme, "3 hours ago").Layout)
 								})
 							}),
 						)
 					}),
-					layout.Rigid(func() {
+					layout.Rigid(func(gtx C) D {
 						in := layout.Inset{Top: unit.Dp(4)}
-						in.Layout(gtx, func() {
+						return in.Layout(gtx, func(gtx C) D {
 							lbl := material.Caption(theme, user.company)
 							lbl.Color = rgb(0xbbbbbb)
-							lbl.Layout(gtx)
+							return lbl.Layout(gtx)
 						})
 					}),
 				)
 			}),
 		)
 	})
-	pointer.Rect(image.Rectangle{Max: gtx.Dimensions.Size}).Add(gtx.Ops)
+	pointer.Rect(image.Rectangle{Max: dims.Size}).Add(gtx.Ops)
 	click := &u.userClicks[index]
 	click.Add(gtx.Ops)
+	return dims
 }
 
-func (u *user) layoutAvatar(gtx *layout.Context) {
+func (u *user) layoutAvatar(gtx layout.Context) layout.Dimensions {
 	sz := gtx.Constraints.Min.X
 	if u.avatarOp.Size().X != sz {
 		img := image.NewRGBA(image.Rectangle{Max: image.Point{X: sz, Y: sz}})
@@ -317,14 +318,14 @@ func (u *user) layoutAvatar(gtx *layout.Context) {
 	}
 	img := widget.Image{Src: u.avatarOp}
 	img.Scale = float32(sz) / float32(gtx.Px(unit.Dp(float32(sz))))
-	img.Layout(gtx)
+	return img.Layout(gtx)
 }
 
 type fill struct {
 	col color.RGBA
 }
 
-func (f fill) Layout(gtx *layout.Context) {
+func (f fill) Layout(gtx layout.Context) layout.Dimensions {
 	cs := gtx.Constraints
 	d := cs.Min
 	dr := f32.Rectangle{
@@ -332,7 +333,7 @@ func (f fill) Layout(gtx *layout.Context) {
 	}
 	paint.ColorOp{Color: f.col}.Add(gtx.Ops)
 	paint.PaintOp{Rect: dr}.Add(gtx.Ops)
-	gtx.Dimensions = layout.Dimensions{Size: d}
+	return layout.Dimensions{Size: d}
 }
 
 func column() layout.Flex {
@@ -350,12 +351,11 @@ func baseline() layout.Flex {
 type clipCircle struct {
 }
 
-func (c *clipCircle) Layout(gtx *layout.Context, w layout.Widget) {
+func (c *clipCircle) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 	var m op.MacroOp
 	m.Record(gtx.Ops)
-	w()
+	dims := w(gtx)
 	m.Stop()
-	dims := gtx.Dimensions
 	max := dims.Size.X
 	if dy := dims.Size.Y; dy > max {
 		max = dy
@@ -370,6 +370,7 @@ func (c *clipCircle) Layout(gtx *layout.Context, w layout.Widget) {
 	}.Op(gtx.Ops).Add(gtx.Ops)
 	m.Add()
 	stack.Pop()
+	return dims
 }
 
 const longTextSample = `1. I learned from my grandfather, Verus, to use good manners, and to

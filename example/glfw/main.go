@@ -29,6 +29,7 @@ import (
 	"gioui.org/io/pointer"
 	"gioui.org/io/router"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
@@ -71,7 +72,7 @@ func main() {
 	gofont.Register()
 	f := new(goglFunctions)
 	var queue router.Router
-	gtx := new(layout.Context)
+	var ops op.Ops
 	th := material.NewTheme()
 	backend, err := giogl.NewBackend(f)
 	if err != nil {
@@ -92,7 +93,7 @@ func main() {
 		}
 		width, height := window.GetSize()
 		sz := image.Point{X: width, Y: height}
-		gtx.Reset(&queue, &glfwConfig{scale}, sz)
+		gtx := layout.NewContext(&ops, &queue, &glfwConfig{scale}, sz)
 		draw(gtx, th)
 		gpu.Collect(sz, gtx.Ops)
 		gpu.BeginFrame()
@@ -104,10 +105,10 @@ func main() {
 
 var button widget.Clickable
 
-func draw(gtx *layout.Context, th *material.Theme) {
-	layout.Center.Layout(gtx, func() {
-		material.Button(th, "Button").Layout(gtx, &button)
-	})
+func draw(gtx layout.Context, th *material.Theme) layout.Dimensions {
+	return layout.Center.Layout(gtx,
+		material.Button(th, &button, "Button").Layout,
+	)
 }
 
 func registerCallbacks(window *glfw.Window, q *router.Router) {

@@ -20,6 +20,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/system"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/unit"
 
 	"github.com/google/go-github/v24/github"
@@ -77,7 +78,7 @@ func initProfiling() {
 
 func (a *App) run() error {
 	a.ui.profiling = *stats
-	gtx := new(layout.Context)
+	var ops op.Ops
 	for {
 		select {
 		case users := <-a.updateUsers:
@@ -125,7 +126,7 @@ func (a *App) run() error {
 					}
 				}
 			case system.FrameEvent:
-				gtx.Reset(e.Queue, e.Config, e.Size)
+				gtx := layout.NewContext(&ops, e.Queue, e.Config, e.Size)
 				a.ui.Layout(gtx)
 				e.Frame(gtx.Ops)
 			}

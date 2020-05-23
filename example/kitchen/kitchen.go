@@ -22,6 +22,7 @@ import (
 	"gioui.org/font/gofont"
 	"gioui.org/io/system"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
@@ -37,7 +38,10 @@ type scaledConfig struct {
 }
 
 type iconAndTextButton struct {
-	theme *material.Theme
+	theme  *material.Theme
+	button *widget.Clickable
+	icon   *widget.Icon
+	word   string
 }
 
 func main() {
@@ -81,8 +85,11 @@ func saveScreenshot(f string) error {
 	if err != nil {
 		return err
 	}
-	gtx := new(layout.Context)
-	gtx.Reset(nil, &scaledConfig{scale}, sz)
+	gtx := layout.Context{
+		Ops:         new(op.Ops),
+		Config:      &scaledConfig{scale},
+		Constraints: layout.Exact(sz),
+	}
 	th := material.NewTheme()
 	kitchen(gtx, th)
 	w.Frame(gtx.Ops)
@@ -100,7 +107,7 @@ func saveScreenshot(f string) error {
 func loop(w *app.Window) error {
 	th := material.NewTheme()
 
-	gtx := new(layout.Context)
+	var ops op.Ops
 	for {
 		select {
 		case e := <-w.Events():
@@ -110,7 +117,7 @@ func loop(w *app.Window) error {
 			case system.DestroyEvent:
 				return e.Err
 			case system.FrameEvent:
-				gtx.Reset(e.Queue, e.Config, e.Size)
+				gtx := layout.NewContext(&ops, e.Queue, e.Config, e.Size)
 				for iconButton.Clicked(gtx) {
 					w.WriteClipboard(lineEditor.Text())
 				}
@@ -154,134 +161,125 @@ var (
 	swtch               = new(widget.Bool)
 )
 
-func (b iconAndTextButton) Layout(gtx *layout.Context, button *widget.Clickable, icon *widget.Icon, word string) {
-	material.ButtonLayout(b.theme).Layout(gtx, button, func() {
+type (
+	D = layout.Dimensions
+	C = layout.Context
+)
+
+func (b iconAndTextButton) Layout(gtx layout.Context) layout.Dimensions {
+	return material.ButtonLayout(b.theme, b.button).Layout(gtx, func(gtx C) D {
 		iconAndLabel := layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}
 		textIconSpacer := unit.Dp(5)
 
-		layIcon := layout.Rigid(func() {
-			layout.Inset{Right: textIconSpacer}.Layout(gtx, func() {
-				size := gtx.Px(unit.Dp(56)) - 2*gtx.Px(unit.Dp(16))
+		layIcon := layout.Rigid(func(gtx C) D {
+			return layout.Inset{Right: textIconSpacer}.Layout(gtx, func(gtx C) D {
+				var d D
 				if icon != nil {
-					icon.Layout(gtx, unit.Px(float32(size)))
-					gtx.Dimensions = layout.Dimensions{
+					size := gtx.Px(unit.Dp(56)) - 2*gtx.Px(unit.Dp(16))
+					b.icon.Layout(gtx, unit.Px(float32(size)))
+					d = layout.Dimensions{
 						Size: image.Point{X: size, Y: size},
 					}
 				}
+				return d
 			})
 		})
 
-		layLabel := layout.Rigid(func() {
-			layout.Inset{Left: textIconSpacer}.Layout(gtx, func() {
-				l := material.Body1(b.theme, word)
+		layLabel := layout.Rigid(func(gtx C) D {
+			return layout.Inset{Left: textIconSpacer}.Layout(gtx, func(gtx C) D {
+				l := material.Body1(b.theme, b.word)
 				l.Color = b.theme.Color.InvText
-				l.Layout(gtx)
+				return l.Layout(gtx)
 			})
 		})
 
-		iconAndLabel.Layout(gtx, layIcon, layLabel)
+		return iconAndLabel.Layout(gtx, layIcon, layLabel)
 	})
 }
 
-func kitchen(gtx *layout.Context, th *material.Theme) {
-	widgets := []func(){
-		func() {
-			material.H3(th, topLabel).Layout(gtx)
-		},
-		func() {
+func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
+	widgets := []layout.Widget{
+		material.H3(th, topLabel).Layout,
+		func(gtx C) D {
 			gtx.Constraints.Max.Y = gtx.Px(unit.Dp(200))
-			material.Editor(th, "Hint").Layout(gtx, editor)
+			return material.Editor(th, editor, "Hint").Layout(gtx)
 		},
-		func() {
-			e := material.Editor(th, "Hint")
-			e.Font.Style = text.Italic
-			e.Layout(gtx, lineEditor)
+		func(gtx C) D {
 			for _, e := range lineEditor.Events(gtx) {
 				if e, ok := e.(widget.SubmitEvent); ok {
 					topLabel = e.Text
 					lineEditor.SetText("")
 				}
 			}
+			e := material.Editor(th, lineEditor, "Hint")
+			e.Font.Style = text.Italic
+			return e.Layout(gtx)
 		},
-		func() {
+		func(gtx C) D {
 			in := layout.UniformInset(unit.Dp(8))
-			layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-				layout.Rigid(func() {
-					in.Layout(gtx, func() {
-						material.IconButton(th, icon).Layout(gtx, iconButton)
-					})
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Rigid(func(gtx C) D {
+					return in.Layout(gtx, material.IconButton(th, iconButton, icon).Layout)
 				}),
-				layout.Rigid(func() {
-					in.Layout(gtx, func() {
-						iconAndTextButton{th}.Layout(gtx, iconTextButton, icon, "Icon")
-					})
+				layout.Rigid(func(gtx C) D {
+					return in.Layout(gtx, iconAndTextButton{theme: th, icon: icon, word: "Icon", button: iconTextButton}.Layout)
 				}),
-				layout.Rigid(func() {
-					in.Layout(gtx, func() {
+				layout.Rigid(func(gtx C) D {
+					return in.Layout(gtx, func(gtx C) D {
 						for button.Clicked(gtx) {
 							green = !green
 						}
-						material.Button(th, "Click me!").Layout(gtx, button)
+						return material.Button(th, button, "Click me!").Layout(gtx)
 					})
 				}),
-				layout.Rigid(func() {
-					in.Layout(gtx, func() {
+				layout.Rigid(func(gtx C) D {
+					return in.Layout(gtx, func(gtx C) D {
 						l := "Green"
 						if !green {
 							l = "Blue"
 						}
-						btn := material.Button(th, l)
+						btn := material.Button(th, greenButton, l)
 						if green {
 							btn.Background = color.RGBA{A: 0xff, R: 0x9e, G: 0x9d, B: 0x24}
 						}
-						btn.Layout(gtx, greenButton)
+						return btn.Layout(gtx)
 					})
 				}),
-				layout.Rigid(func() {
-					in.Layout(gtx, func() {
-						material.Clickable(gtx, flatBtn, func() {
-							layout.UniformInset(unit.Dp(12)).Layout(gtx, func() {
-								layout.Center.Layout(gtx, func() {
-									material.Body1(th, "Flat").Layout(gtx)
-								})
+				layout.Rigid(func(gtx C) D {
+					return in.Layout(gtx, func(gtx C) D {
+						return material.Clickable(gtx, flatBtn, func(gtx C) D {
+							return layout.UniformInset(unit.Dp(12)).Layout(gtx, func(gtx C) D {
+								return layout.Center.Layout(gtx, material.Body1(th, "Flat").Layout)
 							})
 						})
 					})
 				}),
 			)
 		},
-		func() {
-			material.ProgressBar(th).Layout(gtx, progress)
-		},
-		func() {
-			layout.Flex{Alignment: layout.Middle}.Layout(gtx,
-				layout.Rigid(func() {
-					material.CheckBox(th, "Checkbox").Layout(gtx, checkbox)
-				}),
-				layout.Rigid(func() {
-					layout.Inset{Left: unit.Dp(16)}.Layout(gtx, func() {
-						material.Switch(th).Layout(gtx, swtch)
-					})
+		material.ProgressBar(th, progress).Layout,
+		func(gtx C) D {
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Rigid(
+					material.CheckBox(th, checkbox, "Checkbox").Layout,
+				),
+				layout.Rigid(func(gtx C) D {
+					return layout.Inset{Left: unit.Dp(16)}.Layout(gtx,
+						material.Switch(th, swtch).Layout,
+					)
 				}),
 			)
 		},
-		func() {
-			layout.Flex{}.Layout(gtx,
-				layout.Rigid(func() {
-					material.RadioButton(th, "r1", "RadioButton1").Layout(gtx, radioButtonsGroup)
-				}),
-				layout.Rigid(func() {
-					material.RadioButton(th, "r2", "RadioButton2").Layout(gtx, radioButtonsGroup)
-				}),
-				layout.Rigid(func() {
-					material.RadioButton(th, "r3", "RadioButton3").Layout(gtx, radioButtonsGroup)
-				}),
+		func(gtx C) D {
+			return layout.Flex{}.Layout(gtx,
+				layout.Rigid(material.RadioButton(th, radioButtonsGroup, "r1", "RadioButton1").Layout),
+				layout.Rigid(material.RadioButton(th, radioButtonsGroup, "r2", "RadioButton2").Layout),
+				layout.Rigid(material.RadioButton(th, radioButtonsGroup, "r3", "RadioButton3").Layout),
 			)
 		},
 	}
 
-	list.Layout(gtx, len(widgets), func(i int) {
-		layout.UniformInset(unit.Dp(16)).Layout(gtx, widgets[i])
+	return list.Layout(gtx, len(widgets), func(gtx C, i int) D {
+		return layout.UniformInset(unit.Dp(16)).Layout(gtx, widgets[i])
 	})
 }
 

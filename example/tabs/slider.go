@@ -26,13 +26,13 @@ type Slider struct {
 }
 
 // PushLeft pushes the existing widget to the left.
-func (s *Slider) PushLeft(gtx *layout.Context) { s.push = 1 }
+func (s *Slider) PushLeft() { s.push = 1 }
 
 // PushRight pushes the existing widget to the right.
-func (s *Slider) PushRight(gtx *layout.Context) { s.push = -1 }
+func (s *Slider) PushRight() { s.push = -1 }
 
 // Layout lays out widget that can be pushed.
-func (s *Slider) Layout(gtx *layout.Context, w layout.Widget) {
+func (s *Slider) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 	if s.push != 0 {
 		s.last, s.next = s.next, new(op.Ops)
 		s.offset = float32(s.push)
@@ -68,20 +68,20 @@ func (s *Slider) Layout(gtx *layout.Context, w layout.Widget) {
 		op.InvalidateOp{}.Add(gtx.Ops)
 	}
 
+	var dims layout.Dimensions
 	{
-		prev := gtx.Ops
 		if s.next == nil {
 			s.next = new(op.Ops)
 		}
 		s.next.Reset()
+		gtx := gtx
 		gtx.Ops = s.next
-		w()
-		gtx.Ops = prev
+		dims = w(gtx)
 	}
 
 	if s.offset == 0 {
 		op.CallOp{Ops: s.next}.Add(gtx.Ops)
-		return
+		return dims
 	}
 
 	var stack op.StackOp
@@ -92,25 +92,26 @@ func (s *Slider) Layout(gtx *layout.Context, w layout.Widget) {
 
 	if s.offset > 0 {
 		op.TransformOp{}.Offset(f32.Point{
-			X: float32(gtx.Dimensions.Size.X) * (offset - 1),
+			X: float32(dims.Size.X) * (offset - 1),
 		}).Add(gtx.Ops)
 		op.CallOp{Ops: s.last}.Add(gtx.Ops)
 
 		op.TransformOp{}.Offset(f32.Point{
-			X: float32(gtx.Dimensions.Size.X),
+			X: float32(dims.Size.X),
 		}).Add(gtx.Ops)
 		op.CallOp{Ops: s.next}.Add(gtx.Ops)
 	} else {
 		op.TransformOp{}.Offset(f32.Point{
-			X: float32(gtx.Dimensions.Size.X) * (offset + 1),
+			X: float32(dims.Size.X) * (offset + 1),
 		}).Add(gtx.Ops)
 		op.CallOp{Ops: s.last}.Add(gtx.Ops)
 
 		op.TransformOp{}.Offset(f32.Point{
-			X: float32(-gtx.Dimensions.Size.X),
+			X: float32(-dims.Size.X),
 		}).Add(gtx.Ops)
 		op.CallOp{Ops: s.next}.Add(gtx.Ops)
 	}
+	return dims
 }
 
 // smooth handles -1 to 1 with ease-in-out cubic easing func.
