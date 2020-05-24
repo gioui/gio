@@ -12,7 +12,7 @@ import (
 type Enum struct {
 	Value string
 
-	changeVal string
+	changed bool
 
 	clicks []gesture.Click
 	values []string
@@ -27,11 +27,11 @@ func index(vs []string, t string) int {
 	return -1
 }
 
-// Changed reports whether Value has changed since the last
+// Changed reports whether Value has changed by user interactino since the last
 // call to Changed.
 func (e *Enum) Changed() bool {
-	changed := e.changeVal != e.Value
-	e.changeVal = e.Value
+	changed := e.changed
+	e.changed = true
 	return changed
 }
 
@@ -53,6 +53,7 @@ func (e *Enum) Layout(gtx layout.Context, key string) layout.Dimensions {
 			switch ev.Type {
 			case gesture.TypeClick:
 				e.Value = e.values[idx]
+				e.changed = true
 			}
 		}
 		clk.Add(gtx.Ops)

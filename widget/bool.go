@@ -14,8 +14,7 @@ type Bool struct {
 	// Last is the last registered click.
 	Last Press
 
-	// changeVal tracks Value from the most recent call to Changed.
-	changeVal bool
+	changed bool
 
 	gesture gesture.Click
 }
@@ -23,8 +22,8 @@ type Bool struct {
 // Changed reports whether Value has changed since the last
 // call to Changed.
 func (b *Bool) Changed() bool {
-	changed := b.Value != b.changeVal
-	b.changeVal = b.Value
+	changed := b.changed
+	b.changed = false
 	return changed
 }
 
@@ -37,6 +36,7 @@ func (b *Bool) Layout(gtx layout.Context) layout.Dimensions {
 				Position: e.Position,
 			}
 			b.Value = !b.Value
+			b.changed = true
 		}
 	}
 	var st op.StackOp
