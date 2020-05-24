@@ -1,8 +1,12 @@
 package widget
 
 import (
+	"image"
+
 	"gioui.org/gesture"
+	"gioui.org/io/pointer"
 	"gioui.org/layout"
+	"gioui.org/op"
 )
 
 type Enum struct {
@@ -32,7 +36,12 @@ func (e *Enum) Changed() bool {
 }
 
 // Layout adds the event handler for key.
-func (e *Enum) Layout(gtx layout.Context, key string) {
+func (e *Enum) Layout(gtx layout.Context, key string) layout.Dimensions {
+	var st op.StackOp
+	st.Push(gtx.Ops)
+	defer st.Pop()
+	pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min}).Add(gtx.Ops)
+
 	if index(e.values, key) == -1 {
 		e.values = append(e.values, key)
 		e.clicks = append(e.clicks, gesture.Click{})
@@ -48,4 +57,6 @@ func (e *Enum) Layout(gtx layout.Context, key string) {
 		}
 		clk.Add(gtx.Ops)
 	}
+
+	return layout.Dimensions{Size: gtx.Constraints.Min}
 }
