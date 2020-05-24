@@ -180,7 +180,7 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 	)
 }
 
-func drawInk(gtx layout.Context, c widget.Click) {
+func drawInk(gtx layout.Context, c widget.Press) {
 	d := gtx.Now().Sub(c.Time)
 	t := float32(d.Seconds())
 	const duration = 0.5

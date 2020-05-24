@@ -8,7 +8,7 @@ import (
 type Bool struct {
 	Value bool
 	// Last is the last registered click.
-	Last Click
+	Last Press
 
 	// changeVal tracks Value from the most recent call to Changed.
 	changeVal bool
@@ -28,7 +28,7 @@ func (b *Bool) Layout(gtx layout.Context) {
 	for _, e := range b.gesture.Events(gtx) {
 		switch e.Type {
 		case gesture.TypeClick:
-			b.Last = Click{
+			b.Last = Press{
 				Time:     gtx.Now(),
 				Position: e.Position,
 			}

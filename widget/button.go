@@ -18,11 +18,11 @@ type Clickable struct {
 	click gesture.Click
 	// clicks tracks the number of unreported clicks.
 	clicks  int
-	history []Click
+	history []Press
 }
 
-// Click represents a past click.
-type Click struct {
+// Press represents a past pointer press.
+type Press struct {
 	Position f32.Point
 	Time     time.Time
 }
@@ -39,7 +39,7 @@ func (b *Clickable) Clicked() bool {
 
 // History is the past pointer presses useful for drawing markers.
 // History is retained for a short duration (about a second).
-func (b *Clickable) History() []Click {
+func (b *Clickable) History() []Press {
 	return b.history
 }
 
@@ -68,7 +68,7 @@ func (b *Clickable) update(gtx layout.Context) {
 		case gesture.TypeClick:
 			b.clicks++
 		case gesture.TypePress:
-			b.history = append(b.history, Click{
+			b.history = append(b.history, Press{
 				Position: e.Position,
 				Time:     gtx.Now(),
 			})
