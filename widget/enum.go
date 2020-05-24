@@ -8,6 +8,8 @@ import (
 type Enum struct {
 	Value string
 
+	changeVal string
+
 	clicks []gesture.Click
 	values []string
 }
@@ -21,19 +23,12 @@ func index(vs []string, t string) int {
 	return -1
 }
 
-// Update the Value according to incoming events, and
-// reports whether Value changed.
-func (e *Enum) Update(gtx layout.Context) bool {
-	was := e.Value
-	for i := range e.clicks {
-		for _, ev := range e.clicks[i].Events(gtx) {
-			switch ev.Type {
-			case gesture.TypeClick:
-				e.Value = e.values[i]
-			}
-		}
-	}
-	return e.Value != was
+// Changed reports whether Value has changed since the last
+// call to Changed.
+func (e *Enum) Changed() bool {
+	changed := e.changeVal != e.Value
+	e.changeVal = e.Value
+	return changed
 }
 
 // Layout adds the event handler for key.
@@ -44,6 +39,13 @@ func (e *Enum) Layout(gtx layout.Context, key string) {
 		e.clicks[len(e.clicks)-1].Add(gtx.Ops)
 	} else {
 		idx := index(e.values, key)
-		e.clicks[idx].Add(gtx.Ops)
+		clk := &e.clicks[idx]
+		for _, ev := range clk.Events(gtx) {
+			switch ev.Type {
+			case gesture.TypeClick:
+				e.Value = e.values[idx]
+			}
+		}
+		clk.Add(gtx.Ops)
 	}
 }

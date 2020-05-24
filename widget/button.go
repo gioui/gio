@@ -27,31 +27,24 @@ type Click struct {
 	Time     time.Time
 }
 
-// Clicked calls Update and reports whether the button was
-// clicked since the last call. Multiple clicks result in Clicked
-// returning true once per click.
-func (b *Clickable) Clicked(gtx layout.Context) bool {
-	b.Update(gtx)
+// Clicked and reports whether the button was clicked since the last
+// call to Clicked. Clicked returns true once per click.
+func (b *Clickable) Clicked() bool {
 	if b.clicks > 0 {
 		b.clicks--
-		if b.clicks > 0 {
-			// Ensure timely delivery of remaining clicks.
-			op.InvalidateOp{}.Add(gtx.Ops)
-		}
 		return true
 	}
 	return false
 }
 
-// History is the past clicks useful for drawing click markers.
-// Clicks are retained for a short duration (about a second).
+// History is the past pointer presses useful for drawing markers.
+// History is retained for a short duration (about a second).
 func (b *Clickable) History() []Click {
 	return b.history
 }
 
 func (b *Clickable) Layout(gtx layout.Context) layout.Dimensions {
-	// Flush clicks from before the previous frame.
-	b.Update(gtx)
+	b.update(gtx)
 	var st op.StackOp
 	st.Push(gtx.Ops)
 	pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min}).Add(gtx.Ops)
@@ -68,11 +61,9 @@ func (b *Clickable) Layout(gtx layout.Context) layout.Dimensions {
 	return layout.Dimensions{Size: gtx.Constraints.Min}
 }
 
-// Update the button state by processing events. The underlying
-// gesture events are returned for use beyond what Clicked offers.
-func (b *Clickable) Update(gtx layout.Context) []gesture.ClickEvent {
-	evts := b.click.Events(gtx)
-	for _, e := range evts {
+// update the button state by processing events.
+func (b *Clickable) update(gtx layout.Context) {
+	for _, e := range b.click.Events(gtx) {
 		switch e.Type {
 		case gesture.TypeClick:
 			b.clicks++
@@ -83,5 +74,4 @@ func (b *Clickable) Update(gtx layout.Context) []gesture.ClickEvent {
 			})
 		}
 	}
-	return evts
 }

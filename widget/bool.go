@@ -7,17 +7,24 @@ import (
 
 type Bool struct {
 	Value bool
-
 	// Last is the last registered click.
 	Last Click
+
+	// changeVal tracks Value from the most recent call to Changed.
+	changeVal bool
 
 	gesture gesture.Click
 }
 
-// Update the checked state according to incoming events,
-// and reports whether Value changed.
-func (b *Bool) Update(gtx layout.Context) bool {
-	was := b.Value
+// Changed reports whether Value has changed since the last
+// call to Changed.
+func (b *Bool) Changed() bool {
+	changed := b.Value != b.changeVal
+	b.changeVal = b.Value
+	return changed
+}
+
+func (b *Bool) Layout(gtx layout.Context) {
 	for _, e := range b.gesture.Events(gtx) {
 		switch e.Type {
 		case gesture.TypeClick:
@@ -28,9 +35,5 @@ func (b *Bool) Update(gtx layout.Context) bool {
 			b.Value = !b.Value
 		}
 	}
-	return b.Value != was
-}
-
-func (b *Bool) Layout(gtx layout.Context) {
 	b.gesture.Add(gtx.Ops)
 }

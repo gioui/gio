@@ -30,8 +30,6 @@ func Switch(th *Theme, swtch *widget.Bool) SwitchStyle {
 
 // Layout updates the checkBox and displays it.
 func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
-	s.Switch.Update(gtx)
-
 	trackWidth := gtx.Px(unit.Dp(36))
 	trackHeight := gtx.Px(unit.Dp(16))
 	thumbSize := gtx.Px(unit.Dp(20))

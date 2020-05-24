@@ -89,8 +89,7 @@ const (
 )
 
 // Events returns available editor events.
-func (e *Editor) Events(gtx layout.Context) []EditorEvent {
-	e.processEvents(gtx)
+func (e *Editor) Events() []EditorEvent {
 	events := e.events
 	e.events = nil
 	e.prevEvents = 0
