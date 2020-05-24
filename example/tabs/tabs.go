@@ -81,7 +81,7 @@ func drawTabs(gtx layout.Context, th *material.Theme) layout.Dimensions {
 		layout.Rigid(func(gtx C) D {
 			return tabs.list.Layout(gtx, len(tabs.tabs), func(gtx C, tabIdx int) D {
 				t := &tabs.tabs[tabIdx]
-				if t.btn.Clicked(gtx) {
+				if t.btn.Clicked() {
 					if tabs.selected < tabIdx {
 						slider.PushLeft()
 					} else if tabs.selected > tabIdx {

@@ -242,7 +242,7 @@ func (u *UI) layoutUsers(gtx layout.Context) {
 		layout.Stacked(func(gtx C) D {
 			in := layout.UniformInset(unit.Dp(16))
 			return in.Layout(gtx, func(gtx C) D {
-				for u.fab.Clicked(gtx) {
+				for u.fab.Clicked() {
 				}
 				return material.IconButton(theme, u.fab, u.fabIcon).Layout(gtx)
 			})

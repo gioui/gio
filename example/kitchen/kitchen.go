@@ -118,10 +118,10 @@ func loop(w *app.Window) error {
 				return e.Err
 			case system.FrameEvent:
 				gtx := layout.NewContext(&ops, e.Queue, e.Config, e.Size)
-				for iconButton.Clicked(gtx) {
+				for iconButton.Clicked() {
 					w.WriteClipboard(lineEditor.Text())
 				}
-				for flatBtn.Clicked(gtx) {
+				for flatBtn.Clicked() {
 					w.ReadClipboard()
 				}
 				kitchen(gtx, th)
@@ -198,6 +198,12 @@ func (b iconAndTextButton) Layout(gtx layout.Context) layout.Dimensions {
 }
 
 func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
+	for _, e := range lineEditor.Events() {
+		if e, ok := e.(widget.SubmitEvent); ok {
+			topLabel = e.Text
+			lineEditor.SetText("")
+		}
+	}
 	widgets := []layout.Widget{
 		material.H3(th, topLabel).Layout,
 		func(gtx C) D {
@@ -205,12 +211,6 @@ func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 			return material.Editor(th, editor, "Hint").Layout(gtx)
 		},
 		func(gtx C) D {
-			for _, e := range lineEditor.Events(gtx) {
-				if e, ok := e.(widget.SubmitEvent); ok {
-					topLabel = e.Text
-					lineEditor.SetText("")
-				}
-			}
 			e := material.Editor(th, lineEditor, "Hint")
 			e.Font.Style = text.Italic
 			return e.Layout(gtx)
@@ -226,7 +226,7 @@ func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 				}),
 				layout.Rigid(func(gtx C) D {
 					return in.Layout(gtx, func(gtx C) D {
-						for button.Clicked(gtx) {
+						for button.Clicked() {
 							green = !green
 						}
 						return material.Button(th, button, "Click me!").Layout(gtx)
