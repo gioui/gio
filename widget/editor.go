@@ -98,6 +98,11 @@ func (e *Editor) Events(gtx layout.Context) []EditorEvent {
 }
 
 func (e *Editor) processEvents(gtx layout.Context) {
+	// Flush events from before the previous Layout.
+	n := copy(e.events, e.events[e.prevEvents:])
+	e.events = e.events[:n]
+	e.prevEvents = n
+
 	if e.shaper == nil {
 		// Can't process events without a shaper.
 		return
@@ -234,10 +239,6 @@ func (e *Editor) Focused() bool {
 
 // Layout lays out the editor.
 func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size unit.Value) layout.Dimensions {
-	// Flush events from before the previous frame.
-	copy(e.events, e.events[e.prevEvents:])
-	e.events = e.events[:len(e.events)-e.prevEvents]
-	e.prevEvents = len(e.events)
 	textSize := fixed.I(gtx.Px(size))
 	if e.font != font || e.textSize != textSize {
 		e.invalidate()
