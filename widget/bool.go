@@ -1,8 +1,12 @@
 package widget
 
 import (
+	"image"
+
 	"gioui.org/gesture"
+	"gioui.org/io/pointer"
 	"gioui.org/layout"
+	"gioui.org/op"
 )
 
 type Bool struct {
@@ -24,7 +28,7 @@ func (b *Bool) Changed() bool {
 	return changed
 }
 
-func (b *Bool) Layout(gtx layout.Context) {
+func (b *Bool) Layout(gtx layout.Context) layout.Dimensions {
 	for _, e := range b.gesture.Events(gtx) {
 		switch e.Type {
 		case gesture.TypeClick:
@@ -35,5 +39,10 @@ func (b *Bool) Layout(gtx layout.Context) {
 			b.Value = !b.Value
 		}
 	}
+	var st op.StackOp
+	st.Push(gtx.Ops)
+	defer st.Pop()
+	pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min}).Add(gtx.Ops)
 	b.gesture.Add(gtx.Ops)
+	return layout.Dimensions{Size: gtx.Constraints.Min}
 }

@@ -104,17 +104,13 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 		Y: (float32(trackHeight)-float32(clickSize))*.5 + trackOff,
 	}
 	op.TransformOp{}.Offset(clickOff).Add(gtx.Ops)
-	pointer.Ellipse(image.Rectangle{
-		Max: image.Point{
-			X: clickSize, Y: clickSize,
-		},
-	}).Add(gtx.Ops)
+	sz := image.Pt(clickSize, clickSize)
+	pointer.Ellipse(image.Rectangle{Max: sz}).Add(gtx.Ops)
+	gtx.Constraints.Min = sz
 	s.Switch.Layout(gtx)
 	stack.Pop()
 
-	return layout.Dimensions{
-		Size: image.Point{X: trackWidth, Y: trackHeight},
-	}
+	return layout.Dimensions{Size: image.Point{X: trackWidth, Y: thumbSize}}
 }
 
 func drawDisc(ops *op.Ops, sz float32, col color.RGBA) {
