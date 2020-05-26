@@ -28,6 +28,7 @@ type Clickable struct {
 // Click represents a click.
 type Click struct {
 	Modifiers key.Modifiers
+	NumClicks int
 }
 
 // Press represents a past pointer press.
@@ -94,6 +95,7 @@ func (b *Clickable) update(gtx layout.Context) {
 		case gesture.TypeClick:
 			b.clicks = append(b.clicks, Click{
 				Modifiers: e.Modifiers,
+				NumClicks: e.NumClicks,
 			})
 		case gesture.TypePress:
 			b.history = append(b.history, Press{
