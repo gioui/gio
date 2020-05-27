@@ -133,6 +133,23 @@ func (x *Context) LoadKeymap(format int, fd int, size int) error {
 	return nil
 }
 
+func (x *Context) Modifiers() key.Modifiers {
+	var mods key.Modifiers
+	if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_CTRL[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
+		mods |= key.ModCtrl
+	}
+	if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_SHIFT[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
+		mods |= key.ModShift
+	}
+	if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_ALT[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
+		mods |= key.ModAlt
+	}
+	if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_LOGO[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
+		mods |= key.ModSuper
+	}
+	return mods
+}
+
 func (x *Context) DispatchKey(keyCode uint32) (events []event.Event) {
 	if x.state == nil {
 		return
@@ -143,23 +160,14 @@ func (x *Context) DispatchKey(keyCode uint32) (events []event.Event) {
 	}
 	sym := C.xkb_state_key_get_one_sym(x.state, kc)
 	if name, ok := convertKeysym(sym); ok {
-		cmd := key.Event{Name: name}
+		cmd := key.Event{
+			Name:      name,
+			Modifiers: x.Modifiers(),
+		}
 		// Ensure that a physical backtab key is translated to
 		// Shift-Tab.
 		if sym == C.XKB_KEY_ISO_Left_Tab {
 			cmd.Modifiers |= key.ModShift
-		}
-		if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_CTRL[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
-			cmd.Modifiers |= key.ModCtrl
-		}
-		if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_SHIFT[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
-			cmd.Modifiers |= key.ModShift
-		}
-		if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_ALT[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
-			cmd.Modifiers |= key.ModAlt
-		}
-		if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_LOGO[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
-			cmd.Modifiers |= key.ModSuper
 		}
 		events = append(events, cmd)
 	}

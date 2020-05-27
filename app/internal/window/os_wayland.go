@@ -708,6 +708,7 @@ func gio_onTouchDown(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.
 		Position:  w.lastTouch,
 		PointerID: pointer.ID(id),
 		Time:      time.Duration(t) * time.Millisecond,
+		Modifiers: w.disp.xkb.Modifiers(),
 	})
 }
 
@@ -723,6 +724,7 @@ func gio_onTouchUp(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.ui
 		Position:  w.lastTouch,
 		PointerID: pointer.ID(id),
 		Time:      time.Duration(t) * time.Millisecond,
+		Modifiers: w.disp.xkb.Modifiers(),
 	})
 }
 
@@ -740,6 +742,7 @@ func gio_onTouchMotion(data unsafe.Pointer, touch *C.struct_wl_touch, t C.uint32
 		Source:    pointer.Touch,
 		PointerID: pointer.ID(id),
 		Time:      time.Duration(t) * time.Millisecond,
+		Modifiers: w.disp.xkb.Modifiers(),
 	})
 }
 
@@ -826,11 +829,12 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 	w.flushScroll()
 	w.resetFling()
 	w.w.Event(pointer.Event{
-		Type:     typ,
-		Source:   pointer.Mouse,
-		Buttons:  w.pointerBtns,
-		Position: w.lastPos,
-		Time:     time.Duration(t) * time.Millisecond,
+		Type:      typ,
+		Source:    pointer.Mouse,
+		Buttons:   w.pointerBtns,
+		Position:  w.lastPos,
+		Time:      time.Duration(t) * time.Millisecond,
+		Modifiers: w.disp.xkb.Modifiers(),
 	})
 }
 
@@ -1289,12 +1293,13 @@ func (w *window) flushScroll() {
 		return
 	}
 	w.w.Event(pointer.Event{
-		Type:     pointer.Move,
-		Source:   pointer.Mouse,
-		Buttons:  w.pointerBtns,
-		Position: w.lastPos,
-		Scroll:   total,
-		Time:     w.scroll.time,
+		Type:      pointer.Move,
+		Source:    pointer.Mouse,
+		Buttons:   w.pointerBtns,
+		Position:  w.lastPos,
+		Scroll:    total,
+		Time:      w.scroll.time,
+		Modifiers: w.disp.xkb.Modifiers(),
 	})
 	if w.scroll.steps == (image.Point{}) {
 		w.fling.xExtrapolation.SampleDelta(w.scroll.time, -w.scroll.dist.X)
@@ -1311,11 +1316,12 @@ func (w *window) onPointerMotion(x, y C.wl_fixed_t, t C.uint32_t) {
 		Y: fromFixed(y) * float32(w.scale),
 	}
 	w.w.Event(pointer.Event{
-		Type:     pointer.Move,
-		Position: w.lastPos,
-		Buttons:  w.pointerBtns,
-		Source:   pointer.Mouse,
-		Time:     time.Duration(t) * time.Millisecond,
+		Type:      pointer.Move,
+		Position:  w.lastPos,
+		Buttons:   w.pointerBtns,
+		Source:    pointer.Mouse,
+		Time:      time.Duration(t) * time.Millisecond,
+		Modifiers: w.disp.xkb.Modifiers(),
 	})
 }
 
