@@ -48,10 +48,11 @@ func init() {
 }
 
 type window struct {
-	view  C.CFTypeRef
-	w     Callbacks
-	stage system.Stage
-	scale float32
+	view          C.CFTypeRef
+	w             Callbacks
+	stage         system.Stage
+	scale         float32
+	width, height float32
 }
 
 // viewMap is the mapping from Cocoa NSViews to Go windows.
@@ -203,6 +204,8 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy 
 //export gio_onDraw
 func gio_onDraw(view C.CFTypeRef) {
 	w := mustView(view)
+	w.scale = float32(C.gio_getViewBackingScale(w.view))
+	w.width, w.height = float32(C.gio_viewWidth(w.view)), float32(C.gio_viewHeight(w.view))
 	w.draw(true)
 }
 
@@ -213,8 +216,7 @@ func gio_onFocus(view C.CFTypeRef, focus C.BOOL) {
 }
 
 func (w *window) draw(sync bool) {
-	w.scale = float32(C.gio_getViewBackingScale(w.view))
-	wf, hf := float32(C.gio_viewWidth(w.view)), float32(C.gio_viewHeight(w.view))
+	wf, hf := w.width, w.height
 	if wf == 0 || hf == 0 {
 		return
 	}
