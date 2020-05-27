@@ -48,9 +48,12 @@ func init() {
 }
 
 type window struct {
-	view          C.CFTypeRef
-	w             Callbacks
-	stage         system.Stage
+	view  C.CFTypeRef
+	w     Callbacks
+	stage system.Stage
+
+	// mu protect the following fields
+	mu            sync.Mutex
 	scale         float32
 	width, height float32
 }
@@ -204,8 +207,12 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy 
 //export gio_onDraw
 func gio_onDraw(view C.CFTypeRef) {
 	w := mustView(view)
-	w.scale = float32(C.gio_getViewBackingScale(w.view))
-	w.width, w.height = float32(C.gio_viewWidth(w.view)), float32(C.gio_viewHeight(w.view))
+	scale := float32(C.gio_getViewBackingScale(w.view))
+	width, height := float32(C.gio_viewWidth(w.view)), float32(C.gio_viewHeight(w.view))
+	w.mu.Lock()
+	w.scale = scale
+	w.width, w.height = width, height
+	w.mu.Unlock()
 	w.draw(true)
 }
 
@@ -216,13 +223,15 @@ func gio_onFocus(view C.CFTypeRef, focus C.BOOL) {
 }
 
 func (w *window) draw(sync bool) {
-	wf, hf := w.width, w.height
+	w.mu.Lock()
+	wf, hf, scale := w.width, w.height, w.scale
+	w.mu.Unlock()
 	if wf == 0 || hf == 0 {
 		return
 	}
-	width := int(wf*w.scale + .5)
-	height := int(hf*w.scale + .5)
-	cfg := configFor(w.scale)
+	width := int(wf*scale + .5)
+	height := int(hf*scale + .5)
+	cfg := configFor(scale)
 	cfg.now = time.Now()
 	w.setStage(system.StageRunning)
 	w.w.Event(FrameEvent{
