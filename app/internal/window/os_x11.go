@@ -293,7 +293,8 @@ func (h *x11EventHandler) handleEvents() bool {
 					X: float32(bevt.x),
 					Y: float32(bevt.y),
 				},
-				Time: time.Duration(bevt.time) * time.Millisecond,
+				Time:      time.Duration(bevt.time) * time.Millisecond,
+				Modifiers: w.xkb.Modifiers(),
 			}
 			if bevt._type == C.ButtonRelease {
 				ev.Type = pointer.Release
@@ -336,7 +337,8 @@ func (h *x11EventHandler) handleEvents() bool {
 					X: float32(mevt.x),
 					Y: float32(mevt.y),
 				},
-				Time: time.Duration(mevt.time) * time.Millisecond,
+				Time:      time.Duration(mevt.time) * time.Millisecond,
+				Modifiers: w.xkb.Modifiers(),
 			})
 		case C.Expose: // update
 			// redraw only on the last expose event
