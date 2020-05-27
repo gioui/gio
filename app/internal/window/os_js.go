@@ -220,18 +220,28 @@ func (w *window) focus() {
 func (w *window) keyEvent(e js.Value) {
 	k := e.Get("key").String()
 	if n, ok := translateKey(k); ok {
-		cmd := key.Event{Name: n}
-		if e.Call("getModifierState", "Alt").Bool() {
-			cmd.Modifiers |= key.ModAlt
-		}
-		if e.Call("getModifierState", "Control").Bool() {
-			cmd.Modifiers |= key.ModCtrl
-		}
-		if e.Call("getModifierState", "Shift").Bool() {
-			cmd.Modifiers |= key.ModShift
+		cmd := key.Event{
+			Name:      n,
+			Modifiers: modifiersFor(e),
 		}
 		w.w.Event(cmd)
 	}
+}
+
+// modifiersFor returns the modifier set for a DOM MouseEvent or
+// KeyEvent.
+func modifiersFor(e js.Value) key.Modifiers {
+	var mods key.Modifiers
+	if e.Call("getModifierState", "Alt").Bool() {
+		mods |= key.ModAlt
+	}
+	if e.Call("getModifierState", "Control").Bool() {
+		mods |= key.ModCtrl
+	}
+	if e.Call("getModifierState", "Shift").Bool() {
+		mods |= key.ModShift
+	}
+	return mods
 }
 
 func (w *window) touchEvent(typ pointer.Type, e js.Value) {
@@ -243,6 +253,16 @@ func (w *window) touchEvent(typ pointer.Type, e js.Value) {
 	w.mu.Lock()
 	scale := w.scale
 	w.mu.Unlock()
+	var mods key.Modifiers
+	if e.Get("shiftKey").Bool() {
+		mods |= key.ModShift
+	}
+	if e.Get("altKey").Bool() {
+		mods |= key.ModAlt
+	}
+	if e.Get("ctrlKey").Bool() {
+		mods |= key.ModCtrl
+	}
 	for i := 0; i < n; i++ {
 		touch := changedTouches.Index(i)
 		pid := w.touchIDFor(touch)
@@ -259,6 +279,7 @@ func (w *window) touchEvent(typ pointer.Type, e js.Value) {
 			Position:  pos,
 			PointerID: pid,
 			Time:      t,
+			Modifiers: modifiersFor(e),
 		})
 	}
 }
@@ -305,12 +326,13 @@ func (w *window) pointerEvent(typ pointer.Type, dx, dy float32, e js.Value) {
 		btns |= pointer.ButtonMiddle
 	}
 	w.w.Event(pointer.Event{
-		Type:     typ,
-		Source:   pointer.Mouse,
-		Buttons:  btns,
-		Position: pos,
-		Scroll:   scroll,
-		Time:     t,
+		Type:      typ,
+		Source:    pointer.Mouse,
+		Buttons:   btns,
+		Position:  pos,
+		Scroll:    scroll,
+		Time:      t,
+		Modifiers: modifiersFor(e),
 	})
 }
 
