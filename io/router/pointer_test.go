@@ -311,7 +311,6 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 
 func TestPointerActiveInputDisappears(t *testing.T) {
 	handler1 := new(int)
-	// Save this logic so we can redo it later.
 	var ops op.Ops
 	var r Router
 
@@ -386,9 +385,7 @@ func TestMultitouch(t *testing.T) {
 // addPointerHandler adds a pointer.InputOp for the tag in a
 // rectangular area.
 func addPointerHandler(ops *op.Ops, tag event.Tag, area image.Rectangle) {
-	var stack op.StackOp
-	stack.Push(ops)
-	defer stack.Pop()
+	defer op.Push(ops).Pop()
 	pointer.Rect(area).Add(ops)
 	pointer.InputOp{Tag: tag}.Add(ops)
 }

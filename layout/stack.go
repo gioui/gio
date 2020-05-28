@@ -54,19 +54,18 @@ func (s Stack) Layout(gtx Context, children ...StackChild) Dimensions {
 		if w.expanded {
 			continue
 		}
-		var m op.MacroOp
-		m.Record(gtx.Ops)
+		macro := op.Record(gtx.Ops)
 		gtx := gtx
 		gtx.Constraints.Min = image.Pt(0, 0)
 		dims := w.widget(gtx)
-		m.Stop()
+		macro.Stop()
 		if w := dims.Size.X; w > maxSZ.X {
 			maxSZ.X = w
 		}
 		if h := dims.Size.Y; h > maxSZ.Y {
 			maxSZ.Y = h
 		}
-		children[i].macro = m
+		children[i].macro = macro
 		children[i].dims = dims
 	}
 	// Then lay out Expanded children.
@@ -74,21 +73,20 @@ func (s Stack) Layout(gtx Context, children ...StackChild) Dimensions {
 		if !w.expanded {
 			continue
 		}
-		var m op.MacroOp
-		m.Record(gtx.Ops)
+		macro := op.Record(gtx.Ops)
 		gtx := gtx
 		gtx.Constraints = Constraints{
 			Min: maxSZ, Max: gtx.Constraints.Max,
 		}
 		dims := w.widget(gtx)
-		m.Stop()
+		macro.Stop()
 		if w := dims.Size.X; w > maxSZ.X {
 			maxSZ.X = w
 		}
 		if h := dims.Size.Y; h > maxSZ.Y {
 			maxSZ.Y = h
 		}
-		children[i].macro = m
+		children[i].macro = macro
 		children[i].dims = dims
 	}
 
@@ -109,8 +107,7 @@ func (s Stack) Layout(gtx Context, children ...StackChild) Dimensions {
 		case SW, S, SE:
 			p.Y = maxSZ.Y - sz.Y
 		}
-		var stack op.StackOp
-		stack.Push(gtx.Ops)
+		stack := op.Push(gtx.Ops)
 		op.TransformOp{}.Offset(FPt(p)).Add(gtx.Ops)
 		ch.macro.Add()
 		stack.Pop()

@@ -188,8 +188,7 @@ func drawInk(gtx layout.Context, c widget.Press) {
 		return
 	}
 	t = t / duration
-	var stack op.StackOp
-	stack.Push(gtx.Ops)
+	stack := op.Push(gtx.Ops)
 	size := float32(gtx.Px(unit.Dp(700))) * t
 	rr := size * .5
 	col := byte(0xaa * (1 - t*t))

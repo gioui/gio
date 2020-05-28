@@ -36,14 +36,18 @@ mutable state stack and execution flow can be controlled with macros.
 The StackOp saves the current state to the state stack and restores it later:
 
 	ops := new(op.Ops)
-	var stack op.StackOp
 	// Save the current state, in particular the transform.
-	stack.Push(ops)
+	stack := op.Push(ops)
 	// Apply a transform to subsequent operations.
 	op.TransformOp{}.Offset(...).Add(ops)
 	...
 	// Restore the previous transform.
 	stack.Pop()
+
+You can also use this one-line to save the current state and restore it at the
+end of a function :
+
+  defer op.Push(ops).Pop()
 
 The CallOp invokes another operation list:
 
@@ -54,8 +58,7 @@ The CallOp invokes another operation list:
 The MacroOp records a list of operations to be executed later:
 
 	ops := new(op.Ops)
-	var macro op.MacroOp
-	macro.Record(ops)
+	macro := op.Record(ops)
 	// Record operations by adding them.
 	op.InvalidateOp{}.Add(ops)
 	...
@@ -155,7 +158,13 @@ func (c CallOp) Add(o *Ops) {
 }
 
 // Push (save) the current operations state.
-func (s *StackOp) Push(o *Ops) {
+func Push(o *Ops) *StackOp {
+	var s StackOp
+	s.push(o)
+	return &s
+}
+
+func (s *StackOp) push(o *Ops) {
 	if s.active {
 		panic("unbalanced push")
 	}
@@ -221,7 +230,13 @@ func (o *Ops) pc() pc {
 }
 
 // Record a macro of operations.
-func (m *MacroOp) Record(o *Ops) {
+func Record(o *Ops) MacroOp {
+	var m MacroOp
+	m.record(o)
+	return m
+}
+
+func (m *MacroOp) record(o *Ops) {
 	if m.recording {
 		panic("already recording")
 	}

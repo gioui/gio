@@ -39,9 +39,7 @@ func (b *Bool) Layout(gtx layout.Context) layout.Dimensions {
 			b.changed = true
 		}
 	}
-	var st op.StackOp
-	st.Push(gtx.Ops)
-	defer st.Pop()
+	defer op.Push(gtx.Ops).Pop()
 	pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min}).Add(gtx.Ops)
 	b.gesture.Add(gtx.Ops)
 	return layout.Dimensions{Size: gtx.Constraints.Min}

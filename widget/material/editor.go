@@ -39,10 +39,8 @@ func Editor(th *Theme, editor *widget.Editor, hint string) EditorStyle {
 }
 
 func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
-	var stack op.StackOp
-	stack.Push(gtx.Ops)
-	var macro op.MacroOp
-	macro.Record(gtx.Ops)
+	defer op.Push(gtx.Ops).Pop()
+	macro := op.Record(gtx.Ops)
 	paint.ColorOp{Color: e.HintColor}.Add(gtx.Ops)
 	tl := widget.Label{Alignment: e.Editor.Alignment}
 	dims := tl.Layout(gtx, e.shaper, e.Font, e.TextSize, e.Hint)
@@ -62,6 +60,5 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}
 	paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
 	e.Editor.PaintCaret(gtx)
-	stack.Pop()
 	return dims
 }

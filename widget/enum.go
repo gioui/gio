@@ -37,9 +37,7 @@ func (e *Enum) Changed() bool {
 
 // Layout adds the event handler for key.
 func (e *Enum) Layout(gtx layout.Context, key string) layout.Dimensions {
-	var st op.StackOp
-	st.Push(gtx.Ops)
-	defer st.Pop()
+	defer op.Push(gtx.Ops).Pop()
 	pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min}).Add(gtx.Ops)
 
 	if index(e.values, key) == -1 {

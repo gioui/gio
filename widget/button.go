@@ -67,11 +67,10 @@ func (b *Clickable) History() []Press {
 
 func (b *Clickable) Layout(gtx layout.Context) layout.Dimensions {
 	b.update(gtx)
-	var st op.StackOp
-	st.Push(gtx.Ops)
+	stack := op.Push(gtx.Ops)
 	pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min}).Add(gtx.Ops)
 	b.click.Add(gtx.Ops)
-	st.Pop()
+	stack.Pop()
 	for len(b.history) > 0 {
 		c := b.history[0]
 		if gtx.Now().Sub(c.Time) < 1*time.Second {

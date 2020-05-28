@@ -135,8 +135,7 @@ func (in Inset) Layout(gtx Context, w Widget) Dimensions {
 	if mcs.Min.Y > mcs.Max.Y {
 		mcs.Min.Y = mcs.Max.Y
 	}
-	var stack op.StackOp
-	stack.Push(gtx.Ops)
+	stack := op.Push(gtx.Ops)
 	op.TransformOp{}.Offset(FPt(image.Point{X: left, Y: top})).Add(gtx.Ops)
 	gtx.Constraints = mcs
 	dims := w(gtx)
@@ -155,8 +154,7 @@ func UniformInset(v unit.Value) Inset {
 
 // Layout a widget according to the direction.
 func (a Direction) Layout(gtx Context, w Widget) Dimensions {
-	var macro op.MacroOp
-	macro.Record(gtx.Ops)
+	macro := op.Record(gtx.Ops)
 	cs := gtx.Constraints
 	gtx.Constraints.Min = image.Point{}
 	dims := w(gtx)
@@ -181,8 +179,7 @@ func (a Direction) Layout(gtx Context, w Widget) Dimensions {
 	case SW, S, SE:
 		p.Y = sz.Y - dims.Size.Y
 	}
-	var stack op.StackOp
-	stack.Push(gtx.Ops)
+	stack := op.Push(gtx.Ops)
 	op.TransformOp{}.Offset(FPt(p)).Add(gtx.Ops)
 	macro.Add()
 	stack.Pop()

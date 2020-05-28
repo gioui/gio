@@ -89,15 +89,14 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 		}
 		crossMin, crossMax := axisCrossConstraint(f.Axis, cs)
 		cs = axisConstraints(f.Axis, 0, mainMax, crossMin, crossMax)
-		var m op.MacroOp
-		m.Record(gtx.Ops)
+		macro := op.Record(gtx.Ops)
 		gtx := gtx
 		gtx.Constraints = cs
 		dims := child.widget(gtx)
-		m.Stop()
+		macro.Stop()
 		sz := axisMain(f.Axis, dims.Size)
 		size += sz
-		children[i].macro = m
+		children[i].macro = macro
 		children[i].dims = dims
 	}
 	rigidSize := size
@@ -124,15 +123,14 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 		}
 		crossMin, crossMax := axisCrossConstraint(f.Axis, cs)
 		cs = axisConstraints(f.Axis, flexSize, flexSize, crossMin, crossMax)
-		var m op.MacroOp
-		m.Record(gtx.Ops)
+		macro := op.Record(gtx.Ops)
 		gtx := gtx
 		gtx.Constraints = cs
 		dims := child.widget(gtx)
-		m.Stop()
+		macro.Stop()
 		sz := axisMain(f.Axis, dims.Size)
 		size += sz
-		children[i].macro = m
+		children[i].macro = macro
 		children[i].dims = dims
 	}
 	var maxCross int
@@ -176,8 +174,7 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 				cross = maxBaseline - b
 			}
 		}
-		var stack op.StackOp
-		stack.Push(gtx.Ops)
+		stack := op.Push(gtx.Ops)
 		op.TransformOp{}.Offset(FPt(axisPoint(f.Axis, mainSize, cross))).Add(gtx.Ops)
 		child.macro.Add()
 		stack.Pop()

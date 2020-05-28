@@ -328,8 +328,7 @@ func (e *Editor) PaintText(gtx layout.Context) {
 	clip := textPadding(e.lines)
 	clip.Max = clip.Max.Add(e.viewSize)
 	for _, shape := range e.shapes {
-		var stack op.StackOp
-		stack.Push(gtx.Ops)
+		stack := op.Push(gtx.Ops)
 		op.TransformOp{}.Offset(shape.offset).Add(gtx.Ops)
 		shape.clip.Add(gtx.Ops)
 		paint.PaintOp{Rect: layout.FRect(clip).Sub(shape.offset)}.Add(gtx.Ops)
@@ -344,8 +343,7 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 	carWidth := fixed.I(gtx.Px(unit.Dp(1)))
 	carLine, _, carX, carY := e.layoutCaret()
 
-	var stack op.StackOp
-	stack.Push(gtx.Ops)
+	stack := op.Push(gtx.Ops)
 	carX -= carWidth / 2
 	carAsc, carDesc := -e.lines[carLine].Bounds.Min.Y, e.lines[carLine].Bounds.Max.Y
 	carRect := image.Rectangle{

@@ -95,7 +95,7 @@ func (l *List) init(gtx Context, len int) {
 		l.Position.Offset = 0
 		l.Position.First = len
 	}
-	l.macro.Record(gtx.Ops)
+	l.macro = op.Record(gtx.Ops)
 	l.next()
 }
 
@@ -137,7 +137,7 @@ func (l *List) next() {
 		l.dir = l.nextDir()
 	}
 	if l.more() {
-		l.child.Record(l.ctx.Ops)
+		l.child = op.Record(l.ctx.Ops)
 	}
 }
 
@@ -257,8 +257,7 @@ func (l *List) layout() Dimensions {
 			Min: axisPoint(l.Axis, min, -inf),
 			Max: axisPoint(l.Axis, max, inf),
 		}
-		var stack op.StackOp
-		stack.Push(ops)
+		stack := op.Push(ops)
 		clip.Rect{Rect: FRect(r)}.Op(ops).Add(ops)
 		op.TransformOp{}.Offset(FPt(axisPoint(l.Axis, pos, cross))).Add(ops)
 		child.macro.Add()
@@ -279,9 +278,7 @@ func (l *List) layout() Dimensions {
 	}
 	dims := axisPoint(l.Axis, pos, maxCross)
 	l.macro.Stop()
-	var st op.StackOp
-	st.Push(l.ctx.Ops)
-	defer st.Pop()
+	defer op.Push(l.ctx.Ops).Pop()
 	pointer.Rect(image.Rectangle{Max: dims}).Add(ops)
 	l.scroll.Add(ops)
 	l.macro.Add()

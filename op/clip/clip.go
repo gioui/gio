@@ -53,7 +53,7 @@ func (p Op) Add(o *op.Ops) {
 // Begin the path, storing the path data and final Op into ops.
 func (p *Path) Begin(ops *op.Ops) {
 	p.ops = ops
-	p.macro.Record(ops)
+	p.macro = op.Record(ops)
 	// Write the TypeAux opcode and a byte for marking whether the
 	// path has had its MaxY filled out. If not, the gpu will fill it
 	// before using it.

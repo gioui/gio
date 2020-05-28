@@ -36,8 +36,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	trackOff := float32(thumbSize-trackHeight) * .5
 
 	// Draw track.
-	var stack op.StackOp
-	stack.Push(gtx.Ops)
+	stack := op.Push(gtx.Ops)
 	trackCorner := float32(trackHeight) / 2
 	trackRect := f32.Rectangle{Max: f32.Point{
 		X: float32(trackWidth),
@@ -53,7 +52,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	stack.Pop()
 
 	// Compute thumb offset and color.
-	stack.Push(gtx.Ops)
+	stack = op.Push(gtx.Ops)
 	col := rgb(0xffffff)
 	if s.Switch.Value {
 		off := trackWidth - thumbSize
@@ -63,8 +62,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 	// Draw thumb shadow, a translucent disc slightly larger than the
 	// thumb itself.
-	var shadowStack op.StackOp
-	shadowStack.Push(gtx.Ops)
+	shadowStack := op.Push(gtx.Ops)
 	shadowSize := float32(2)
 	// Center shadow horizontally and slightly adjust its Y.
 	op.TransformOp{}.Offset(f32.Point{X: -shadowSize / 2, Y: -.75}).Add(gtx.Ops)
@@ -76,7 +74,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	stack.Pop()
 
 	// Draw thumb ink.
-	stack.Push(gtx.Ops)
+	stack = op.Push(gtx.Ops)
 	inkSize := float32(gtx.Px(unit.Dp(44)))
 	rr := inkSize * .5
 	inkOff := f32.Point{
@@ -97,7 +95,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	stack.Pop()
 
 	// Set up click area.
-	stack.Push(gtx.Ops)
+	stack = op.Push(gtx.Ops)
 	clickSize := gtx.Px(unit.Dp(40))
 	clickOff := f32.Point{
 		X: (float32(trackWidth) - float32(clickSize)) * .5,
@@ -114,8 +112,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 }
 
 func drawDisc(ops *op.Ops, sz float32, col color.RGBA) {
-	var stack op.StackOp
-	stack.Push(ops)
+	defer op.Push(ops).Pop()
 	rr := sz / 2
 	r := f32.Rectangle{Max: f32.Point{X: sz, Y: sz}}
 	clip.Rect{
@@ -124,5 +121,4 @@ func drawDisc(ops *op.Ops, sz float32, col color.RGBA) {
 	}.Op(ops).Add(ops)
 	paint.ColorOp{Color: col}.Add(ops)
 	paint.PaintOp{Rect: r}.Add(ops)
-	stack.Pop()
 }
