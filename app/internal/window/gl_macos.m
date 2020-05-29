@@ -19,39 +19,14 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 	gio_onMouse((__bridge CFTypeRef)view, typ, [NSEvent pressedMouseButtons], p.x, p.y, dx, dy, [event timestamp], [event modifierFlags]);
 }
 
-static CVReturn displayLinkCallback(CVDisplayLinkRef displayLink, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext) {
-	CFTypeRef view = (CFTypeRef *)displayLinkContext;
-	gio_onFrameCallback(view);
-	return kCVReturnSuccess;
-}
-
 @interface GioView : NSOpenGLView 
 @end
 
 @implementation GioView {
-CVDisplayLinkRef displayLink;
 }
 - (instancetype)initWithFrame:(NSRect)frameRect
 				  pixelFormat:(NSOpenGLPixelFormat *)format {
-	self = [super initWithFrame:frameRect pixelFormat:format];
-	if (self) {
-		CVDisplayLinkCreateWithActiveCGDisplays(&displayLink);
-		CVDisplayLinkSetOutputCallback(displayLink, displayLinkCallback, (__bridge void*)self);
-	}
-	return self;
-}
-- (void)dealloc {
-	CVDisplayLinkRelease(displayLink);
-}
-- (void)setAnimating:(BOOL)anim {
-	if (anim) {
-		CVDisplayLinkStart(displayLink);
-	} else {
-		CVDisplayLinkStop(displayLink);
-	}
-}
-- (void)updateDisplay:(CGDirectDisplayID)dispID {
-	CVDisplayLinkSetCurrentCGDisplay(displayLink, dispID);
+	return [super initWithFrame:frameRect pixelFormat:format];
 }
 - (void)prepareOpenGL {
 	[super prepareOpenGL];
@@ -137,16 +112,6 @@ CFTypeRef gio_createGLView(void) {
 
 		return CFBridgingRetain(view);
 	}
-}
-
-void gio_updateDisplayLink(CFTypeRef viewRef, CGDirectDisplayID dispID) {
-	GioView *view = (__bridge GioView *)viewRef;
-	[view updateDisplay:dispID];
-}
-
-void gio_setAnimating(CFTypeRef viewRef, BOOL anim) {
-	GioView *view = (__bridge GioView *)viewRef;
-	[view setAnimating:anim];
 }
 
 CFTypeRef gio_contextForView(CFTypeRef viewRef) {

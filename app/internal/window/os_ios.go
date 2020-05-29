@@ -22,7 +22,6 @@ __attribute__ ((visibility ("hidden"))) void gio_hideTextInput(CFTypeRef viewRef
 __attribute__ ((visibility ("hidden"))) void gio_addLayerToView(CFTypeRef viewRef, CFTypeRef layerRef);
 __attribute__ ((visibility ("hidden"))) void gio_updateView(CFTypeRef viewRef, CFTypeRef layerRef);
 __attribute__ ((visibility ("hidden"))) void gio_removeLayer(CFTypeRef layerRef);
-__attribute__ ((visibility ("hidden"))) void gio_setAnimating(CFTypeRef viewRef, int anim);
 __attribute__ ((visibility ("hidden"))) struct drawParams gio_viewDrawParams(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
 __attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
@@ -46,8 +45,9 @@ import (
 )
 
 type window struct {
-	view C.CFTypeRef
-	w    Callbacks
+	view        C.CFTypeRef
+	w           Callbacks
+	displayLink *displayLink
 
 	layer   C.CFTypeRef
 	visible atomic.Value
@@ -71,6 +71,13 @@ func onCreate(view C.CFTypeRef) {
 	w := &window{
 		view: view,
 	}
+	dl, err := NewDisplayLink(func() {
+		w.draw(false)
+	})
+	if err != nil {
+		panic(err)
+	}
+	w.displayLink = dl
 	wopts := <-mainWindow.out
 	w.w = wopts.window
 	w.w.SetDriver(w)
@@ -79,12 +86,6 @@ func onCreate(view C.CFTypeRef) {
 	C.gio_addLayerToView(view, w.layer)
 	views[view] = w
 	w.w.Event(system.StageEvent{Stage: system.StagePaused})
-}
-
-//export gio_onFrameCallback
-func gio_onFrameCallback(view C.CFTypeRef) {
-	w := views[view]
-	w.draw(false)
 }
 
 //export gio_onDraw
@@ -139,6 +140,7 @@ func onDestroy(view C.CFTypeRef) {
 	w := views[view]
 	delete(views, view)
 	w.w.Event(system.DestroyEvent{})
+	w.displayLink.Close()
 	C.gio_removeLayer(w.layer)
 	C.CFRelease(w.layer)
 	w.layer = 0
@@ -240,15 +242,11 @@ func (w *window) SetAnimating(anim bool) {
 	if v == 0 {
 		return
 	}
-	var animi C.int
 	if anim {
-		animi = 1
+		w.displayLink.Start()
+	} else {
+		w.displayLink.Stop()
 	}
-	C.CFRetain(v)
-	runOnMain(func() {
-		defer C.CFRelease(v)
-		C.gio_setAnimating(v, animi)
-	})
 }
 
 func (w *window) onKeyCommand(name string) {

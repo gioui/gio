@@ -9,7 +9,6 @@
 #include "framework_ios.h"
 
 @interface GioView: UIView <UIKeyInput>
-- (void)setAnimating:(BOOL)anim;
 @end
 
 @interface GioViewController : UIViewController
@@ -134,20 +133,9 @@ static void handleTouches(int last, UIView *view, NSSet<UITouch *> *touches, UIE
 }
 
 @implementation GioView
-CADisplayLink *displayLink;
 NSArray<UIKeyCommand *> *_keyCommands;
-
-- (void)onFrameCallback:(CADisplayLink *)link {
-	gio_onFrameCallback((__bridge CFTypeRef)self);
-}
-
-- (instancetype)initWithFrame:(CGRect)frame {
-	self = [super initWithFrame:frame];
-	if (self) {
-		__weak id weakSelf = self;
-		displayLink = [CADisplayLink displayLinkWithTarget:weakSelf selector:@selector(onFrameCallback:)];
-	}
-	return self;
++ (void)onFrameCallback:(CADisplayLink *)link {
+	gio_onFrameCallback((__bridge CFTypeRef)link);
 }
 
 - (void)willMoveToWindow:(UIWindow *)newWindow {
@@ -182,16 +170,6 @@ NSArray<UIKeyCommand *> *_keyCommands;
 }
 
 - (void)dealloc {
-	[displayLink invalidate];
-}
-
-- (void)setAnimating:(BOOL)anim {
-	NSRunLoop *runLoop = [NSRunLoop currentRunLoop];
-	if (anim) {
-		[displayLink addToRunLoop:runLoop forMode:[runLoop currentMode]];
-	} else {
-		[displayLink removeFromRunLoop:runLoop forMode:[runLoop currentMode]];
-	}
 }
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
@@ -281,11 +259,6 @@ CFTypeRef gio_readClipboard(void) {
 	}
 }
 
-void gio_setAnimating(CFTypeRef viewRef, int anim) {
-	GioView *view = (__bridge GioView *)viewRef;
-	[view setAnimating:(anim ? YES : NO)];
-}
-
 void gio_showTextInput(CFTypeRef viewRef) {
 	UIView *view = (__bridge UIView *)viewRef;
 	[view becomeFirstResponder];
@@ -334,4 +307,34 @@ struct drawParams gio_viewDrawParams(CFTypeRef viewRef) {
 	params.bottom = insets.bottom*scale;
 	params.left = insets.left*scale;
 	return params;
+}
+
+CFTypeRef gio_createDisplayLink(void) {
+	CADisplayLink *dl = [CADisplayLink displayLinkWithTarget:[GioView class] selector:@selector(onFrameCallback:)];
+	dl.paused = YES;
+	NSRunLoop *runLoop = [NSRunLoop mainRunLoop];
+	[dl addToRunLoop:runLoop forMode:[runLoop currentMode]];
+	return (__bridge_retained CFTypeRef)dl;
+}
+
+int gio_startDisplayLink(CFTypeRef dlref) {
+	CADisplayLink *dl = (__bridge CADisplayLink *)dlref;
+	dl.paused = NO;
+	return 0;
+}
+
+int gio_stopDisplayLink(CFTypeRef dlref) {
+	CADisplayLink *dl = (__bridge CADisplayLink *)dlref;
+	dl.paused = YES;
+	return 0;
+}
+
+void gio_releaseDisplayLink(CFTypeRef dlref) {
+	CADisplayLink *dl = (__bridge CADisplayLink *)dlref;
+	[dl invalidate];
+	CFRelease(dlref);
+}
+
+void gio_setDisplayLinkDisplay(CFTypeRef dl, uint64_t did) {
+	// Nothing to do on iOS.
 }

@@ -31,7 +31,7 @@
 - (void)windowDidChangeScreen:(NSNotification *)notification {
 	CGDirectDisplayID dispID = [[[self.window screen] deviceDescription][@"NSScreenNumber"] unsignedIntValue];
 	CFTypeRef view = (__bridge CFTypeRef)self.window.contentView;
-	gio_updateDisplayLink(view, dispID);
+	gio_onChangeScreen(view, dispID);
 }
 - (void)windowDidBecomeKey:(NSNotification *)notification {
 	gio_onFocus((__bridge CFTypeRef)self.window.contentView, YES);
@@ -79,6 +79,34 @@ CGFloat gio_viewWidth(CFTypeRef viewRef) {
 CGFloat gio_getViewBackingScale(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
 	return [view.window backingScaleFactor];
+}
+
+static CVReturn displayLinkCallback(CVDisplayLinkRef dl, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext) {
+	gio_onFrameCallback(dl);
+	return kCVReturnSuccess;
+}
+
+CFTypeRef gio_createDisplayLink(void) {
+	CVDisplayLinkRef dl;
+	CVDisplayLinkCreateWithActiveCGDisplays(&dl);
+	CVDisplayLinkSetOutputCallback(dl, displayLinkCallback, nil);
+	return dl;
+}
+
+int gio_startDisplayLink(CFTypeRef dl) {
+	return CVDisplayLinkStart((CVDisplayLinkRef)dl);
+}
+
+int gio_stopDisplayLink(CFTypeRef dl) {
+	return CVDisplayLinkStop((CVDisplayLinkRef)dl);
+}
+
+void gio_releaseDisplayLink(CFTypeRef dl) {
+	CVDisplayLinkRelease((CVDisplayLinkRef)dl);
+}
+
+void gio_setDisplayLinkDisplay(CFTypeRef dl, uint64_t did) {
+	CVDisplayLinkSetCurrentCGDisplay((CVDisplayLinkRef)dl, (CGDirectDisplayID)did);
 }
 
 void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height) {

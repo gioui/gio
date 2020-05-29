@@ -34,8 +34,6 @@ import (
 __attribute__ ((visibility ("hidden"))) void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height);
 __attribute__ ((visibility ("hidden"))) CGFloat gio_viewWidth(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) CGFloat gio_viewHeight(CFTypeRef viewRef);
-__attribute__ ((visibility ("hidden"))) void gio_setAnimating(CFTypeRef viewRef, BOOL anim);
-__attribute__ ((visibility ("hidden"))) void gio_updateDisplayLink(CFTypeRef viewRef, CGDirectDisplayID dispID);
 __attribute__ ((visibility ("hidden"))) CGFloat gio_getViewBackingScale(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
 __attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
@@ -48,9 +46,10 @@ func init() {
 }
 
 type window struct {
-	view  C.CFTypeRef
-	w     Callbacks
-	stage system.Stage
+	view        C.CFTypeRef
+	w           Callbacks
+	stage       system.Stage
+	displayLink *displayLink
 
 	// mu protect the following fields
 	mu            sync.Mutex
@@ -116,16 +115,11 @@ func (w *window) WriteClipboard(s string) {
 func (w *window) ShowTextInput(show bool) {}
 
 func (w *window) SetAnimating(anim bool) {
-	var animb C.BOOL
 	if anim {
-		animb = 1
+		w.displayLink.Start()
+	} else {
+		w.displayLink.Stop()
 	}
-	v := w.view
-	C.CFRetain(v)
-	runOnMain(func() {
-		defer C.CFRelease(v)
-		C.gio_setAnimating(v, animb)
-	})
 }
 
 func (w *window) setStage(stage system.Stage) {
@@ -134,14 +128,6 @@ func (w *window) setStage(stage system.Stage) {
 	}
 	w.stage = stage
 	w.w.Event(system.StageEvent{Stage: stage})
-}
-
-//export gio_onFrameCallback
-func gio_onFrameCallback(view C.CFTypeRef) {
-	w, exists := lookupView(view)
-	if exists {
-		w.draw(false)
-	}
 }
 
 //export gio_onKeys
@@ -222,6 +208,12 @@ func gio_onFocus(view C.CFTypeRef, focus C.BOOL) {
 	w.w.Event(key.FocusEvent{Focus: focus == C.YES})
 }
 
+//export gio_onChangeScreen
+func gio_onChangeScreen(view C.CFTypeRef, did uint64) {
+	w := mustView(view)
+	w.displayLink.SetDisplayID(did)
+}
+
 func (w *window) draw(sync bool) {
 	w.mu.Lock()
 	wf, hf, scale := w.width, w.height, w.scale
@@ -256,6 +248,7 @@ func configFor(scale float32) config {
 //export gio_onTerminate
 func gio_onTerminate(view C.CFTypeRef) {
 	w := mustView(view)
+	w.displayLink.Close()
 	deleteView(view)
 	w.w.Event(system.DestroyEvent{})
 }
@@ -279,6 +272,13 @@ func gio_onCreate(view C.CFTypeRef) {
 		view:  view,
 		scale: scale,
 	}
+	dl, err := NewDisplayLink(func() {
+		w.draw(false)
+	})
+	if err != nil {
+		panic(err)
+	}
+	w.displayLink = dl
 	wopts := <-mainWindow.out
 	w.w = wopts.window
 	w.w.SetDriver(w)
