@@ -11,12 +11,19 @@ package window
 #include <UIKit/UIKit.h>
 #include <stdint.h>
 
+struct drawParams {
+	CGFloat dpi, sdpi;
+	CGFloat width, height;
+	CGFloat top, right, bottom, left;
+};
+
 __attribute__ ((visibility ("hidden"))) void gio_showTextInput(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) void gio_hideTextInput(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) void gio_addLayerToView(CFTypeRef viewRef, CFTypeRef layerRef);
 __attribute__ ((visibility ("hidden"))) void gio_updateView(CFTypeRef viewRef, CFTypeRef layerRef);
 __attribute__ ((visibility ("hidden"))) void gio_removeLayer(CFTypeRef layerRef);
 __attribute__ ((visibility ("hidden"))) void gio_setAnimating(CFTypeRef viewRef, int anim);
+__attribute__ ((visibility ("hidden"))) struct drawParams gio_viewDrawParams(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
 __attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
 */
@@ -74,42 +81,49 @@ func onCreate(view C.CFTypeRef) {
 	w.w.Event(system.StageEvent{Stage: system.StagePaused})
 }
 
-//export onDraw
-func onDraw(view C.CFTypeRef, dpi, sdpi, width, height C.CGFloat, sync C.int, top, right, bottom, left C.CGFloat) {
-	if width == 0 || height == 0 {
+//export gio_onFrameCallback
+func gio_onFrameCallback(view C.CFTypeRef) {
+	w := views[view]
+	w.draw(false)
+}
+
+//export gio_onDraw
+func gio_onDraw(view C.CFTypeRef) {
+	w := views[view]
+	w.draw(true)
+}
+
+func (w *window) draw(sync bool) {
+	params := C.gio_viewDrawParams(w.view)
+	if params.width == 0 || params.height == 0 {
 		return
 	}
-	w := views[view]
 	wasVisible := w.isVisible()
 	w.visible.Store(true)
-	C.gio_updateView(view, w.layer)
+	C.gio_updateView(w.view, w.layer)
 	if !wasVisible {
 		w.w.Event(system.StageEvent{Stage: system.StageRunning})
-	}
-	isSync := false
-	if sync != 0 {
-		isSync = true
 	}
 	const inchPrDp = 1.0 / 163
 	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
 			Size: image.Point{
-				X: int(width + .5),
-				Y: int(height + .5),
+				X: int(params.width + .5),
+				Y: int(params.height + .5),
 			},
 			Insets: system.Insets{
-				Top:    unit.Px(float32(top)),
-				Right:  unit.Px(float32(right)),
-				Bottom: unit.Px(float32(bottom)),
-				Left:   unit.Px(float32(left)),
+				Top:    unit.Px(float32(params.top)),
+				Right:  unit.Px(float32(params.right)),
+				Bottom: unit.Px(float32(params.bottom)),
+				Left:   unit.Px(float32(params.left)),
 			},
 			Config: &config{
-				pxPerDp: float32(dpi) * inchPrDp,
-				pxPerSp: float32(sdpi) * inchPrDp,
+				pxPerDp: float32(params.dpi) * inchPrDp,
+				pxPerSp: float32(params.sdpi) * inchPrDp,
 				now:     time.Now(),
 			},
 		},
-		Sync: isSync,
+		Sync: sync,
 	})
 }
 

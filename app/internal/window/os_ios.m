@@ -16,22 +16,6 @@
 @property(weak) UIScreen *screen;
 @end
 
-static void redraw(CFTypeRef viewRef, BOOL sync) {
-	UIView *v = (__bridge UIView *)viewRef;
-	CGFloat scale = v.layer.contentsScale;
-	// Use 163 as the standard ppi on iOS.
-	CGFloat dpi = 163*scale;
-	CGFloat sdpi = dpi;
-	UIEdgeInsets insets = v.layoutMargins;
-	if (@available(iOS 11.0, tvOS 11.0, *)) {
-		UIFontMetrics *metrics = [UIFontMetrics defaultMetrics];
-		sdpi = [metrics scaledValueForValue:sdpi];
-		insets = v.safeAreaInsets;
-	}
-	onDraw(viewRef, dpi, sdpi, v.bounds.size.width*scale, v.bounds.size.height*scale, sync,
-			insets.top*scale, insets.right*scale, insets.bottom*scale, insets.left*scale);
-}
-
 @implementation GioAppDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 	gio_runMain();
@@ -60,7 +44,7 @@ static void redraw(CFTypeRef viewRef, BOOL sync) {
 	UIView *drawView = c.view.subviews[0];
 	if (drawView != nil) {
 		CFTypeRef viewRef = (__bridge CFTypeRef)drawView;
-		redraw(viewRef, YES);
+		gio_onDraw(viewRef);
 	}
 }
 @end
@@ -108,7 +92,7 @@ CGFloat _keyboardHeight;
 	// Adjust view bounds to make room for the keyboard.
 	frame.size.height -= _keyboardHeight;
 	view.frame = frame;
-	redraw((__bridge CFTypeRef)view, YES);
+	gio_onDraw((__bridge CFTypeRef)view);
 }
 
 - (void)didReceiveMemoryWarning {
@@ -154,7 +138,7 @@ CADisplayLink *displayLink;
 NSArray<UIKeyCommand *> *_keyCommands;
 
 - (void)onFrameCallback:(CADisplayLink *)link {
-	redraw((__bridge CFTypeRef)self, NO);
+	gio_onFrameCallback((__bridge CFTypeRef)self);
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -328,4 +312,26 @@ void gio_updateView(CFTypeRef viewRef, CFTypeRef layerRef) {
 void gio_removeLayer(CFTypeRef layerRef) {
 	CALayer *layer = (__bridge CALayer *)layerRef;
 	[layer removeFromSuperlayer];
+}
+
+struct drawParams gio_viewDrawParams(CFTypeRef viewRef) {
+	UIView *v = (__bridge UIView *)viewRef;
+	struct drawParams params;
+	CGFloat scale = v.layer.contentsScale;
+	// Use 163 as the standard ppi on iOS.
+	params.dpi = 163*scale;
+	params.sdpi = params.dpi;
+	UIEdgeInsets insets = v.layoutMargins;
+	if (@available(iOS 11.0, tvOS 11.0, *)) {
+		UIFontMetrics *metrics = [UIFontMetrics defaultMetrics];
+		params.sdpi = [metrics scaledValueForValue:params.sdpi];
+		insets = v.safeAreaInsets;
+	}
+	params.width = v.bounds.size.width*scale;
+	params.height = v.bounds.size.height*scale;
+	params.top = insets.top*scale;
+	params.right = insets.right*scale;
+	params.bottom = insets.bottom*scale;
+	params.left = insets.left*scale;
+	return params;
 }
