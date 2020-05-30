@@ -36,7 +36,7 @@ func eglChooseConfig(disp _EGLDisplay, attribs []_EGLint) (_EGLConfig, bool) {
 	var cfg C.EGLConfig
 	var ncfg C.EGLint
 	if C.eglChooseConfig(disp, &attribs[0], &cfg, 1, &ncfg) != C.EGL_TRUE {
-		return nil, false
+		return nilEGLConfig, false
 	}
 	return _EGLConfig(cfg), true
 }
