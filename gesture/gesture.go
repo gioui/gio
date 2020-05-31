@@ -145,7 +145,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 		case pointer.Cancel:
 			c.state = StateNormal
 		case pointer.Press:
-			if c.state == StatePressed || !e.Hit {
+			if c.state == StatePressed {
 				break
 			}
 			if e.Source == pointer.Mouse && e.Buttons != pointer.ButtonLeft {

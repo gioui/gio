@@ -20,11 +20,6 @@ type pointerQueue struct {
 	handlers map[event.Tag]*pointerHandler
 	pointers []pointerInfo
 	reader   ops.Reader
-	scratch  []event.Tag
-
-	// prev and curr are two additional scratch slices that track active
-	// pointer event handlers from the previous and current frame
-	prev, curr []event.Tag
 }
 
 type hitNode struct {
@@ -34,13 +29,16 @@ type hitNode struct {
 	pass bool
 
 	// For handler nodes.
-	key event.Tag
+	tag event.Tag
 }
 
 type pointerInfo struct {
 	id       pointer.ID
 	pressed  bool
 	handlers []event.Tag
+
+	// entered tracks the tags that contain the pointer.
+	entered []event.Tag
 }
 
 type pointerHandler struct {
@@ -98,7 +96,7 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t o
 				next: node,
 				area: area,
 				pass: pass,
-				key:  op.Tag,
+				tag:  op.Tag,
 			})
 			node = len(q.hitTree) - 1
 			h, ok := q.handlers[op.Tag]
@@ -110,7 +108,7 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t o
 			h.active = true
 			h.area = area
 			h.transform = t
-			h.wantsGrab = h.wantsGrab || op.Grab
+			h.wantsGrab = op.Grab
 		}
 	}
 }
@@ -131,17 +129,14 @@ func (q *pointerQueue) opHit(handlers *[]event.Tag, pos f32.Point) {
 		} else {
 			idx = n.next
 		}
-		if n.key != nil {
-			if _, exists := q.handlers[n.key]; exists {
-				*handlers = append(*handlers, n.key)
+		if n.tag != nil {
+			if _, exists := q.handlers[n.tag]; exists {
+				*handlers = append(*handlers, n.tag)
 			}
 		}
 	}
 }
 
-// TODO(whereswaldon): This method fails to handle the case in which a child
-// hit area extends outside of the boundaries of its parent. Such child hit
-// areas will not recieve some events as a result.
 func (q *pointerQueue) hit(areaIdx int, p f32.Point) bool {
 	for areaIdx != -1 {
 		a := &q.areas[areaIdx]
@@ -176,20 +171,41 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	q.collectHandlers(&q.reader, events, op.TransformOp{}, -1, -1, false)
 	for k, h := range q.handlers {
 		if !h.active {
-			q.dropHandler(k, events)
+			q.dropHandlers(events, k)
 			delete(q.handlers, k)
+		}
+		if h.wantsGrab {
+			for _, p := range q.pointers {
+				if !p.pressed {
+					continue
+				}
+				for i, k2 := range p.handlers {
+					if k2 == k {
+						// Drop other handlers that lost their grab.
+						q.dropHandlers(events, p.handlers[i+1:]...)
+						q.dropHandlers(events, p.handlers[:i]...)
+						break
+					}
+				}
+			}
 		}
 	}
 }
 
-func (q *pointerQueue) dropHandler(k event.Tag, events *handlerEvents) {
-	events.Add(k, pointer.Event{Type: pointer.Cancel})
-	q.handlers[k].wantsGrab = false
-	for i := range q.pointers {
-		p := &q.pointers[i]
-		for i := len(p.handlers) - 1; i >= 0; i-- {
-			if p.handlers[i] == k {
-				p.handlers = append(p.handlers[:i], p.handlers[i+1:]...)
+func (q *pointerQueue) dropHandlers(events *handlerEvents, tags ...event.Tag) {
+	for _, k := range tags {
+		events.Add(k, pointer.Event{Type: pointer.Cancel})
+		for i := range q.pointers {
+			p := &q.pointers[i]
+			for i := len(p.handlers) - 1; i >= 0; i-- {
+				if p.handlers[i] == k {
+					p.handlers = append(p.handlers[:i], p.handlers[i+1:]...)
+				}
+			}
+			for i := len(p.entered) - 1; i >= 0; i-- {
+				if p.entered[i] == k {
+					p.entered = append(p.entered[:i], p.entered[i+1:]...)
+				}
 			}
 		}
 	}
@@ -200,7 +216,7 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	if e.Type == pointer.Cancel {
 		q.pointers = q.pointers[:0]
 		for k := range q.handlers {
-			q.dropHandler(k, events)
+			q.dropHandlers(events, k)
 		}
 		return
 	}
@@ -216,86 +232,72 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 		pidx = len(q.pointers) - 1
 	}
 	p := &q.pointers[pidx]
-	if !p.pressed && (e.Type == pointer.Move || e.Type == pointer.Press) {
-		p.handlers, q.scratch = q.scratch[:0], p.handlers
-		q.opHit(&p.handlers, e.Position)
+
+	q.deliverEnterLeaveEvents(p, events, e)
+	if e.Type == pointer.Release {
+		q.deliverEvent(p, events, e)
+		p.pressed = false
+	}
+	if !p.pressed {
 		if e.Type == pointer.Press {
 			p.pressed = true
 		}
+		p.handlers = p.handlers[:0]
+		q.opHit(&p.handlers, e.Position)
+		q.deliverEnterLeaveEvents(p, events, e)
 	}
-	if p.pressed {
-		// Resolve grabs.
-		q.scratch = q.scratch[:0]
-		for i, k := range p.handlers {
-			h := q.handlers[k]
-			if h.wantsGrab {
-				q.scratch = append(q.scratch, p.handlers[:i]...)
-				q.scratch = append(q.scratch, p.handlers[i+1:]...)
-				break
-			}
-		}
-		// Drop handlers that lost their grab.
-		for _, k := range q.scratch {
-			q.dropHandler(k, events)
-		}
+	if e.Type != pointer.Release {
+		q.deliverEvent(p, events, e)
 	}
-	if e.Type == pointer.Release {
+	if !p.pressed && len(p.entered) == 0 {
+		// No longer need to track pointer.
 		q.pointers = append(q.pointers[:pidx], q.pointers[pidx+1:]...)
 	}
+}
 
-	// Deliver enter and leave events for pointers that entered or left a hit area.
-	q.curr, q.prev = q.prev[:0], q.curr
-	q.opHit(&q.curr, e.Position)
-	q.deliverEventsToMissingHandlers(q.prev, q.curr, pointer.Enter, e, events)
-	q.deliverEventsToMissingHandlers(q.curr, q.prev, pointer.Leave, e, events)
-
+func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e pointer.Event) {
 	for _, k := range p.handlers {
 		h := q.handlers[k]
 		e := e
 		if p.pressed && len(p.handlers) == 1 {
 			e.Priority = pointer.Grabbed
 		}
-		e.Hit = q.hit(h.area, e.Position)
 		e.Position = h.transform.Invert().Transform(e.Position)
+
 		events.Add(k, e)
-		if e.Type == pointer.Release {
-			// Release grab when the number of grabs reaches zero.
-			grabs := 0
-			for _, p := range q.pointers {
-				if p.pressed && len(p.handlers) == 1 && p.handlers[0] == k {
-					grabs++
-				}
-			}
-			if grabs == 0 {
-				h.wantsGrab = false
-			}
-		}
 	}
 }
 
-// deliverEventsToMissingHandlers compares the a and b handler lists to find all
-// handlers in b that are missing from a. It then sends an event templated off of
-// evTemplate but with the type specified by evType.
-//
-// This is useful for delivering pointer.Enter and pointer.Leave events.
-func (q *pointerQueue) deliverEventsToMissingHandlers(a, b []event.Tag, evType pointer.Type, evTemplate pointer.Event, events *handlerEvents) {
-	for _, newH := range b {
-		found := false
-		for _, oldH := range a {
-			if newH == oldH {
-				found = true
+func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEvents, e pointer.Event) {
+	for _, k := range p.handlers {
+		h := q.handlers[k]
+		e := e
+		if p.pressed && len(p.handlers) == 1 {
+			e.Priority = pointer.Grabbed
+		}
+
+		// Hit-test to deliver Enter/Leave events. Consider non-mouse
+		// events leaving when they're Released.
+		hit := (e.Source == pointer.Mouse || p.pressed) && q.hit(h.area, e.Position)
+		entered := -1
+		for i, k2 := range p.entered {
+			if k2 == k {
+				entered = i
+				break
 			}
 		}
-		if !found {
-			h, ok := q.handlers[newH]
-			if !ok {
-				continue
-			}
-			ev := evTemplate
-			ev.Hit = q.hit(h.area, evTemplate.Position)
-			ev.Position = h.transform.Invert().Transform(evTemplate.Position)
-			ev.Type = evType
-			events.Add(newH, ev)
+
+		e.Position = h.transform.Invert().Transform(e.Position)
+
+		switch {
+		case !hit && entered != -1:
+			p.entered = append(p.entered[:entered], p.entered[entered+1:]...)
+			e.Type = pointer.Leave
+			events.Add(k, e)
+		case hit && entered == -1:
+			p.entered = append(p.entered, k)
+			e.Type = pointer.Enter
+			events.Add(k, e)
 		}
 	}
 }

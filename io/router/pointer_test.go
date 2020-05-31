@@ -5,6 +5,7 @@ package router
 import (
 	"fmt"
 	"image"
+	"reflect"
 	"testing"
 
 	"gioui.org/f32"
@@ -344,6 +345,44 @@ func TestPointerActiveInputDisappears(t *testing.T) {
 	assertEventSequence(t, r.Events(handler1), pointer.Cancel)
 }
 
+func TestMultitouch(t *testing.T) {
+	var ops op.Ops
+
+	// Add two separate handlers.
+	h1, h2 := new(int), new(int)
+	addPointerHandler(&ops, h1, image.Rect(0, 0, 100, 100))
+	addPointerHandler(&ops, h2, image.Rect(0, 100, 100, 200))
+
+	h1pt, h2pt := f32.Pt(0, 0), f32.Pt(0, 100)
+	var p1, p2 pointer.ID = 0, 1
+
+	var r Router
+	r.Frame(&ops)
+	r.Add(
+		pointer.Event{
+			Type:      pointer.Press,
+			Position:  h1pt,
+			PointerID: p1,
+		},
+	)
+	r.Add(
+		pointer.Event{
+			Type:      pointer.Press,
+			Position:  h2pt,
+			PointerID: p2,
+		},
+	)
+	r.Add(
+		pointer.Event{
+			Type:      pointer.Release,
+			Position:  h2pt,
+			PointerID: p2,
+		},
+	)
+	assertEventSequence(t, r.Events(h1), pointer.Cancel, pointer.Enter, pointer.Press)
+	assertEventSequence(t, r.Events(h2), pointer.Cancel, pointer.Enter, pointer.Press, pointer.Release)
+}
+
 // addPointerHandler adds a pointer.InputOp for the tag in a
 // rectangular area.
 func addPointerHandler(ops *op.Ops, tag event.Tag, area image.Rectangle) {
@@ -354,36 +393,26 @@ func addPointerHandler(ops *op.Ops, tag event.Tag, area image.Rectangle) {
 	pointer.InputOp{Tag: tag}.Add(ops)
 }
 
-// toTypes converts a sequence of event.Event to their pointer.Types. It assumes
+// pointerTypes converts a sequence of event.Event to their pointer.Types. It assumes
 // that all input events are of underlying type pointer.Event, and thus will
 // panic if some are not.
-func toTypes(events []event.Event) []pointer.Type {
-	out := make([]pointer.Type, len(events))
-	for i, event := range events {
-		out[i] = event.(pointer.Event).Type
+func pointerTypes(events []event.Event) []pointer.Type {
+	var types []pointer.Type
+	for _, e := range events {
+		if e, ok := e.(pointer.Event); ok {
+			types = append(types, e.Type)
+		}
 	}
-	return out
+	return types
 }
 
 // assertEventSequence ensures that the provided actualEvents match the expected event types
-// in the provided order
-func assertEventSequence(t *testing.T, actualEvents []event.Event, expected ...pointer.Type) {
-	if len(actualEvents) != len(expected) {
-		t.Errorf("expected %v events, got %v", expected, toTypes(actualEvents))
-	}
-	for i, event := range actualEvents {
-		pointerEvent, ok := event.(pointer.Event)
-		if !ok {
-			t.Errorf("actualEvents[%d] is not a pointer event, type %T", i, event)
-			continue
-		}
-		if len(expected) <= i {
-			continue
-		}
-		if pointerEvent.Type != expected[i] {
-			t.Errorf("actualEvents[%d] has type %s, expected %s", i, pointerEvent.Type.String(), expected[i].String())
-			continue
-		}
+// in the provided order.
+func assertEventSequence(t *testing.T, events []event.Event, expected ...pointer.Type) {
+	t.Helper()
+	got := pointerTypes(events)
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("expected %v events, got %v", expected, got)
 	}
 }
 

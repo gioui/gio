@@ -31,11 +31,6 @@ type Event struct {
 	Time time.Duration
 	// Buttons are the set of pressed mouse buttons for this event.
 	Buttons Buttons
-	// Hit is set when the event was within the registered
-	// area for the handler. Hit can be false when a pointer
-	// was pressed within the hit area, and then dragged
-	// outside it.
-	Hit bool
 	// Position is the position of the event, relative to
 	// the current transformation, as set by op.TransformOp.
 	Position f32.Point
