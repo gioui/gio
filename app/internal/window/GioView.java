@@ -113,7 +113,7 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 			}
 			onTouchEvent(
 					nhandle,
-					act,
+					pact,
 					event.getPointerId(i),
 					event.getToolType(i),
 					event.getX(i),
