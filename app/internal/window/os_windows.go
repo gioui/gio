@@ -470,7 +470,7 @@ func (w *window) HWND() (syscall.Handle, int, int) {
 
 func convertKeyCode(code uintptr) (string, bool) {
 	if '0' <= code && code <= '9' || 'A' <= code && code <= 'Z' {
-		return string(code), true
+		return string(rune(code)), true
 	}
 	var r string
 	switch code {

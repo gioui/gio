@@ -228,10 +228,10 @@ func (x *Context) UpdateMask(depressed, latched, locked, depressedGroup, latched
 
 func convertKeysym(s C.xkb_keysym_t) (string, bool) {
 	if 'a' <= s && s <= 'z' {
-		return string(s - 'a' + 'A'), true
+		return string(rune(s - 'a' + 'A')), true
 	}
 	if ' ' <= s && s <= '~' {
-		return string(s), true
+		return string(rune(s)), true
 	}
 	var n string
 	switch s {
