@@ -16,13 +16,7 @@ import (
 func TestPointerDrag(t *testing.T) {
 	handler := new(int)
 	var ops op.Ops
-	pointer.Rect(image.Rectangle{
-		Max: image.Point{
-			X: 100,
-			Y: 100,
-		},
-	}).Add(&ops)
-	pointer.InputOp{Tag: handler}.Add(&ops)
+	addPointerHandler(&ops, handler, image.Rect(0, 0, 100, 100))
 
 	var r Router
 	r.Frame(&ops)
@@ -56,24 +50,10 @@ func TestPointerMove(t *testing.T) {
 	var ops op.Ops
 
 	// Handler 1 area: (0, 0) - (100, 100)
-	pointer.Rect(image.Rectangle{
-		Max: image.Point{
-			X: 100,
-			Y: 100,
-		},
-	}).Add(&ops)
+	pointer.Rect(image.Rect(0, 0, 100, 100)).Add(&ops)
 	pointer.InputOp{Tag: handler1}.Add(&ops)
 	// Handler 2 area: (50, 50) - (100, 100) (areas intersect).
-	pointer.Rect(image.Rectangle{
-		Min: image.Point{
-			X: 50,
-			Y: 50,
-		},
-		Max: image.Point{
-			X: 200,
-			Y: 200,
-		},
-	}).Add(&ops)
+	pointer.Rect(image.Rect(50, 50, 200, 200)).Add(&ops)
 	pointer.InputOp{Tag: handler2}.Add(&ops)
 
 	var r Router
@@ -137,32 +117,11 @@ func TestPointerEnterLeave(t *testing.T) {
 	handler2 := new(int)
 	var ops op.Ops
 
-	var stack op.StackOp
-	stack.Push(&ops)
 	// Handler 1 area: (0, 0) - (100, 100)
-	pointer.Rect(image.Rectangle{
-		Max: image.Point{
-			X: 100,
-			Y: 100,
-		},
-	}).Add(&ops)
-	pointer.InputOp{Tag: handler1}.Add(&ops)
-	stack.Pop()
+	addPointerHandler(&ops, handler1, image.Rect(0, 0, 100, 100))
 
-	// Handler 2 area: (50, 50) - (100, 100) (areas intersect).
-	stack.Push(&ops)
-	pointer.Rect(image.Rectangle{
-		Min: image.Point{
-			X: 50,
-			Y: 50,
-		},
-		Max: image.Point{
-			X: 200,
-			Y: 200,
-		},
-	}).Add(&ops)
-	pointer.InputOp{Tag: handler2}.Add(&ops)
-	stack.Pop()
+	// Handler 2 area: (50, 50) - (100, 100) (areas overlap).
+	addPointerHandler(&ops, handler2, image.Rect(50, 50, 200, 200))
 
 	var r Router
 	r.Frame(&ops)
@@ -258,25 +217,11 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	var ops op.Ops
 
 	// Handler 1 area: (0, 0) - (100, 100)
-	pointer.Rect(image.Rectangle{
-		Max: image.Point{
-			X: 100,
-			Y: 100,
-		},
-	}).Add(&ops)
+	pointer.Rect(image.Rect(0, 0, 100, 100)).Add(&ops)
 	pointer.InputOp{Tag: handler1}.Add(&ops)
 
 	// Handler 2 area: (25, 25) - (75, 75) (nested within first).
-	pointer.Rect(image.Rectangle{
-		Min: image.Point{
-			X: 25,
-			Y: 25,
-		},
-		Max: image.Point{
-			X: 75,
-			Y: 75,
-		},
-	}).Add(&ops)
+	pointer.Rect(image.Rect(25, 25, 75, 75)).Add(&ops)
 	pointer.InputOp{Tag: handler2}.Add(&ops)
 
 	var r Router
@@ -366,28 +311,12 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 func TestPointerActiveInputDisappears(t *testing.T) {
 	handler1 := new(int)
 	// Save this logic so we can redo it later.
-	renderHandler1 := func(ops *op.Ops) {
-		var stack op.StackOp
-		stack.Push(ops)
-		// Handler 1 area: (0, 0) - (100, 100)
-		pointer.Rect(image.Rectangle{
-			Max: image.Point{
-				X: 100,
-				Y: 100,
-			},
-		}).Add(ops)
-		pointer.InputOp{Tag: handler1}.Add(ops)
-		stack.Pop()
-	}
-
 	var ops op.Ops
 	var r Router
 
-	renderHandler1(&ops)
-
 	// Draw handler.
 	ops.Reset()
-	renderHandler1(&ops)
+	addPointerHandler(&ops, handler1, image.Rect(0, 0, 100, 100))
 	r.Frame(&ops)
 	r.Add(
 		pointer.Event{
@@ -413,6 +342,16 @@ func TestPointerActiveInputDisappears(t *testing.T) {
 		},
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Cancel)
+}
+
+// addPointerHandler adds a pointer.InputOp for the tag in a
+// rectangular area.
+func addPointerHandler(ops *op.Ops, tag event.Tag, area image.Rectangle) {
+	var stack op.StackOp
+	stack.Push(ops)
+	defer stack.Pop()
+	pointer.Rect(area).Add(ops)
+	pointer.InputOp{Tag: tag}.Add(ops)
 }
 
 // toTypes converts a sequence of event.Event to their pointer.Types. It assumes
