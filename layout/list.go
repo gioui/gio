@@ -279,6 +279,9 @@ func (l *List) layout() Dimensions {
 	}
 	dims := axisPoint(l.Axis, pos, maxCross)
 	l.macro.Stop()
+	var st op.StackOp
+	st.Push(l.ctx.Ops)
+	defer st.Pop()
 	pointer.Rect(image.Rectangle{Max: dims}).Add(ops)
 	l.scroll.Add(ops)
 	l.macro.Add()
