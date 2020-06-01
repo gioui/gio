@@ -55,21 +55,21 @@ import (
 #include "wayland_xdg_shell.h"
 #include "wayland_xdg_decoration.h"
 
-__attribute__ ((visibility ("hidden"))) void gio_wl_registry_add_listener(struct wl_registry *reg, void *data);
-__attribute__ ((visibility ("hidden"))) void gio_wl_surface_add_listener(struct wl_surface *surface, void *data);
-__attribute__ ((visibility ("hidden"))) void gio_xdg_surface_add_listener(struct xdg_surface *surface, void *data);
-__attribute__ ((visibility ("hidden"))) void gio_xdg_toplevel_add_listener(struct xdg_toplevel *toplevel, void *data);
-__attribute__ ((visibility ("hidden"))) void gio_xdg_wm_base_add_listener(struct xdg_wm_base *wm, void *data);
-__attribute__ ((visibility ("hidden"))) void gio_wl_callback_add_listener(struct wl_callback *callback, void *data);
-__attribute__ ((visibility ("hidden"))) void gio_wl_output_add_listener(struct wl_output *output, void *data);
-__attribute__ ((visibility ("hidden"))) void gio_wl_seat_add_listener(struct wl_seat *seat, void *data);
-__attribute__ ((visibility ("hidden"))) void gio_wl_pointer_add_listener(struct wl_pointer *pointer, void *data);
-__attribute__ ((visibility ("hidden"))) void gio_wl_touch_add_listener(struct wl_touch *touch, void *data);
-__attribute__ ((visibility ("hidden"))) void gio_wl_keyboard_add_listener(struct wl_keyboard *keyboard, void *data);
-__attribute__ ((visibility ("hidden"))) void gio_zwp_text_input_v3_add_listener(struct zwp_text_input_v3 *im, void *data);
-__attribute__ ((visibility ("hidden"))) void gio_wl_data_device_add_listener(struct wl_data_device *dd, void *data);
-__attribute__ ((visibility ("hidden"))) void gio_wl_data_offer_add_listener(struct wl_data_offer *offer, void *data);
-__attribute__ ((visibility ("hidden"))) void gio_wl_data_source_add_listener(struct wl_data_source *source, void *data);
+extern const struct wl_registry_listener gio_registry_listener;
+extern const struct wl_surface_listener gio_surface_listener;
+extern const struct xdg_surface_listener gio_xdg_surface_listener;
+extern const struct xdg_toplevel_listener gio_xdg_toplevel_listener;
+extern const struct xdg_wm_base_listener gio_xdg_wm_base_listener;
+extern const struct wl_callback_listener gio_callback_listener;
+extern const struct wl_output_listener gio_output_listener;
+extern const struct wl_seat_listener gio_seat_listener;
+extern const struct wl_pointer_listener gio_pointer_listener;
+extern const struct wl_touch_listener gio_touch_listener;
+extern const struct wl_keyboard_listener gio_keyboard_listener;
+extern const struct zwp_text_input_v3_listener gio_zwp_text_input_v3_listener;
+extern const struct wl_data_device_listener gio_data_device_listener;
+extern const struct wl_data_offer_listener gio_data_offer_listener;
+extern const struct wl_data_source_listener gio_data_source_listener;
 */
 import "C"
 
@@ -265,7 +265,7 @@ func (d *wlDisplay) writeClipboard(content []byte) error {
 	}
 	s.content = content
 	s.source = C.wl_data_device_manager_create_data_source(d.dataDeviceManager)
-	C.gio_wl_data_source_add_listener(s.source, unsafe.Pointer(s.seat))
+	C.wl_data_source_add_listener(s.source, &C.gio_data_source_listener, unsafe.Pointer(s.seat))
 	for _, mime := range clipboardMimeTypes {
 		C.wl_data_source_offer(s.source, C.CString(mime))
 	}
@@ -352,10 +352,10 @@ func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
 		w.destroy()
 		return nil, errors.New("wayland: wl_compositor_create_surface failed")
 	}
-	C.gio_xdg_wm_base_add_listener(d.wm, unsafe.Pointer(w.surf))
-	C.gio_wl_surface_add_listener(w.surf, unsafe.Pointer(w.surf))
-	C.gio_xdg_surface_add_listener(w.wmSurf, unsafe.Pointer(w.surf))
-	C.gio_xdg_toplevel_add_listener(w.topLvl, unsafe.Pointer(w.surf))
+	C.xdg_wm_base_add_listener(d.wm, &C.gio_xdg_wm_base_listener, unsafe.Pointer(w.surf))
+	C.wl_surface_add_listener(w.surf, &C.gio_surface_listener, unsafe.Pointer(w.surf))
+	C.xdg_surface_add_listener(w.wmSurf, &C.gio_xdg_surface_listener, unsafe.Pointer(w.surf))
+	C.xdg_toplevel_add_listener(w.topLvl, &C.gio_xdg_toplevel_listener, unsafe.Pointer(w.surf))
 	title := C.CString(opts.Title)
 	C.xdg_toplevel_set_title(w.topLvl, title)
 	C.free(unsafe.Pointer(title))
@@ -441,12 +441,12 @@ func (s *wlSeat) destroy() {
 func (s *wlSeat) updateCaps(caps C.uint32_t) {
 	if s.im == nil && s.disp.imm != nil {
 		s.im = C.zwp_text_input_manager_v3_get_text_input(s.disp.imm, s.seat)
-		C.gio_zwp_text_input_v3_add_listener(s.im, unsafe.Pointer(s.seat))
+		C.zwp_text_input_v3_add_listener(s.im, &C.gio_zwp_text_input_v3_listener, unsafe.Pointer(s.seat))
 	}
 	switch {
 	case s.pointer == nil && caps&C.WL_SEAT_CAPABILITY_POINTER != 0:
 		s.pointer = C.wl_seat_get_pointer(s.seat)
-		C.gio_wl_pointer_add_listener(s.pointer, unsafe.Pointer(s.seat))
+		C.wl_pointer_add_listener(s.pointer, &C.gio_pointer_listener, unsafe.Pointer(s.seat))
 	case s.pointer != nil && caps&C.WL_SEAT_CAPABILITY_POINTER == 0:
 		C.wl_pointer_release(s.pointer)
 		s.pointer = nil
@@ -454,7 +454,7 @@ func (s *wlSeat) updateCaps(caps C.uint32_t) {
 	switch {
 	case s.touch == nil && caps&C.WL_SEAT_CAPABILITY_TOUCH != 0:
 		s.touch = C.wl_seat_get_touch(s.seat)
-		C.gio_wl_touch_add_listener(s.touch, unsafe.Pointer(s.seat))
+		C.wl_touch_add_listener(s.touch, &C.gio_touch_listener, unsafe.Pointer(s.seat))
 	case s.touch != nil && caps&C.WL_SEAT_CAPABILITY_TOUCH == 0:
 		C.wl_touch_release(s.touch)
 		s.touch = nil
@@ -462,7 +462,7 @@ func (s *wlSeat) updateCaps(caps C.uint32_t) {
 	switch {
 	case s.keyboard == nil && caps&C.WL_SEAT_CAPABILITY_KEYBOARD != 0:
 		s.keyboard = C.wl_seat_get_keyboard(s.seat)
-		C.gio_wl_keyboard_add_listener(s.keyboard, unsafe.Pointer(s.seat))
+		C.wl_keyboard_add_listener(s.keyboard, &C.gio_keyboard_listener, unsafe.Pointer(s.seat))
 	case s.keyboard != nil && caps&C.WL_SEAT_CAPABILITY_KEYBOARD == 0:
 		C.wl_keyboard_release(s.keyboard)
 		s.keyboard = nil
@@ -576,7 +576,7 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 		d.compositor = (*C.struct_wl_compositor)(C.wl_registry_bind(reg, name, &C.wl_compositor_interface, 3))
 	case "wl_output":
 		output := (*C.struct_wl_output)(C.wl_registry_bind(reg, name, &C.wl_output_interface, 2))
-		C.gio_wl_output_add_listener(output, unsafe.Pointer(d.disp))
+		C.wl_output_add_listener(output, &C.gio_output_listener, unsafe.Pointer(d.disp))
 		d.outputMap[name] = output
 		d.outputConfig[output] = new(wlOutput)
 	case "wl_seat":
@@ -595,7 +595,7 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 			offers: make(map[*C.struct_wl_data_offer][]string),
 		}
 		callbackStore(unsafe.Pointer(s), d.seat)
-		C.gio_wl_seat_add_listener(s, unsafe.Pointer(s))
+		C.wl_seat_add_listener(s, &C.gio_seat_listener, unsafe.Pointer(s))
 		if d.dataDeviceManager == nil {
 			break
 		}
@@ -604,7 +604,7 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 			break
 		}
 		callbackStore(unsafe.Pointer(d.seat.dataDev), d.seat)
-		C.gio_wl_data_device_add_listener(d.seat.dataDev, unsafe.Pointer(d.seat.dataDev))
+		C.wl_data_device_add_listener(d.seat.dataDev, &C.gio_data_device_listener, unsafe.Pointer(d.seat.dataDev))
 	case "wl_shm":
 		d.shm = (*C.struct_wl_shm)(C.wl_registry_bind(reg, name, &C.wl_shm_interface, 1))
 	case "xdg_wm_base":
@@ -637,7 +637,7 @@ func gio_onDataOfferAction(data unsafe.Pointer, offer *C.struct_wl_data_offer, a
 func gio_onDataDeviceOffer(data unsafe.Pointer, dataDev *C.struct_wl_data_device, id *C.struct_wl_data_offer) {
 	s := callbackLoad(data).(*wlSeat)
 	callbackStore(unsafe.Pointer(id), s)
-	C.gio_wl_data_offer_add_listener(id, unsafe.Pointer(id))
+	C.wl_data_offer_add_listener(id, &C.gio_data_offer_listener, unsafe.Pointer(id))
 	s.offers[id] = nil
 }
 
@@ -1383,7 +1383,7 @@ func (w *window) draw(sync bool) {
 	if anim && w.lastFrameCallback == nil {
 		w.lastFrameCallback = C.wl_surface_frame(w.surf)
 		// Use the surface as listener data for gio_onFrameDone.
-		C.gio_wl_callback_add_listener(w.lastFrameCallback, unsafe.Pointer(w.surf))
+		C.wl_callback_add_listener(w.lastFrameCallback, &C.gio_callback_listener, unsafe.Pointer(w.surf))
 	}
 	cfg.now = time.Now()
 	w.w.Event(FrameEvent{
@@ -1467,7 +1467,7 @@ func newWLDisplay() (*wlDisplay, error) {
 		d.destroy()
 		return nil, errors.New("wayland: wl_display_get_registry failed")
 	}
-	C.gio_wl_registry_add_listener(d.reg, unsafe.Pointer(d.disp))
+	C.wl_registry_add_listener(d.reg, &C.gio_registry_listener, unsafe.Pointer(d.disp))
 	// Wait for the server to register all its globals to the
 	// registry listener (gio_onRegistryGlobal).
 	C.wl_display_roundtrip(d.disp)

@@ -7,168 +7,111 @@
 #include "wayland_text_input.h"
 #include "_cgo_export.h"
 
-void gio_wl_registry_add_listener(struct wl_registry *reg, void *data) {
-	static const struct wl_registry_listener listener = {
-		// Cast away const parameter.
-		.global = (void (*)(void *, struct wl_registry *, uint32_t,  const char *, uint32_t))gio_onRegistryGlobal,
-		.global_remove = gio_onRegistryGlobalRemove
-	};
+const struct wl_registry_listener gio_registry_listener = {
+	// Cast away const parameter.
+	.global = (void (*)(void *, struct wl_registry *, uint32_t,  const char *, uint32_t))gio_onRegistryGlobal,
+	.global_remove = gio_onRegistryGlobalRemove
+};
 
-	wl_registry_add_listener(reg, &listener, data);
-}
+const struct wl_surface_listener gio_surface_listener = {
+	.enter = gio_onSurfaceEnter,
+	.leave = gio_onSurfaceLeave,
+};
 
-void gio_wl_surface_add_listener(struct wl_surface *surface, void *data) {
-	static struct wl_surface_listener listener = {
-		.enter = gio_onSurfaceEnter,
-		.leave = gio_onSurfaceLeave,
-	};
+const struct xdg_surface_listener gio_xdg_surface_listener = {
+	.configure = gio_onXdgSurfaceConfigure,
+};
 
-	wl_surface_add_listener(surface, &listener, data);
-}
-
-void gio_xdg_surface_add_listener(struct xdg_surface *surface, void *data) {
-	static const struct xdg_surface_listener listener = {
-		.configure = gio_onXdgSurfaceConfigure,
-	};
-
-	xdg_surface_add_listener(surface, &listener, data);
-}
-
-void gio_xdg_toplevel_add_listener(struct xdg_toplevel *toplevel, void *data) {
-	static const struct xdg_toplevel_listener listener = {
-		.configure = gio_onToplevelConfigure,
-		.close = gio_onToplevelClose,
-	};
-
-	xdg_toplevel_add_listener(toplevel, &listener, data);
-}
+const struct xdg_toplevel_listener gio_xdg_toplevel_listener = {
+	.configure = gio_onToplevelConfigure,
+	.close = gio_onToplevelClose,
+};
 
 static void xdg_wm_base_handle_ping(void *data, struct xdg_wm_base *wm, uint32_t serial) {
 	xdg_wm_base_pong(wm, serial);
 }
 
-void gio_xdg_wm_base_add_listener(struct xdg_wm_base *wm, void *data) {
-	static const struct xdg_wm_base_listener listener = {
-		.ping = xdg_wm_base_handle_ping,
-	};
+const struct xdg_wm_base_listener gio_xdg_wm_base_listener = {
+	.ping = xdg_wm_base_handle_ping,
+};
 
-	xdg_wm_base_add_listener(wm, &listener, data);
-}
+const struct wl_callback_listener gio_callback_listener = {
+	.done = gio_onFrameDone,
+};
 
-void gio_wl_callback_add_listener(struct wl_callback *callback, void *data) {
-	static const struct wl_callback_listener listener = {
-		.done = gio_onFrameDone,
-	};
+const struct wl_output_listener gio_output_listener = {
+	// Cast away const parameter.
+	.geometry = (void (*)(void *, struct wl_output *, int32_t,  int32_t,  int32_t,  int32_t,  int32_t,  const char *, const char *, int32_t))gio_onOutputGeometry,
+	.mode = gio_onOutputMode,
+	.done = gio_onOutputDone,
+	.scale = gio_onOutputScale,
+};
 
-	wl_callback_add_listener(callback, &listener, data);
-}
+const struct wl_seat_listener gio_seat_listener = {
+	.capabilities = gio_onSeatCapabilities,
+	// Cast away const parameter.
+	.name = (void (*)(void *, struct wl_seat *, const char *))gio_onSeatName,
+};
 
-void gio_wl_output_add_listener(struct wl_output *output, void *data) {
-	static const struct wl_output_listener listener = {
-		// Cast away const parameter.
-		.geometry = (void (*)(void *, struct wl_output *, int32_t,  int32_t,  int32_t,  int32_t,  int32_t,  const char *, const char *, int32_t))gio_onOutputGeometry,
-		.mode = gio_onOutputMode,
-		.done = gio_onOutputDone,
-		.scale = gio_onOutputScale,
-	};
+const struct wl_pointer_listener gio_pointer_listener = {
+	.enter = gio_onPointerEnter,
+	.leave = gio_onPointerLeave,
+	.motion = gio_onPointerMotion,
+	.button = gio_onPointerButton,
+	.axis = gio_onPointerAxis,
+	.frame = gio_onPointerFrame,
+	.axis_source = gio_onPointerAxisSource,
+	.axis_stop = gio_onPointerAxisStop,
+	.axis_discrete = gio_onPointerAxisDiscrete,
+};
 
-	wl_output_add_listener(output, &listener, data);
-}
+const struct wl_touch_listener gio_touch_listener = {
+	.down = gio_onTouchDown,
+	.up = gio_onTouchUp,
+	.motion = gio_onTouchMotion,
+	.frame = gio_onTouchFrame,
+	.cancel = gio_onTouchCancel,
+};
 
-void gio_wl_seat_add_listener(struct wl_seat *seat, void *data) {
-	static const struct wl_seat_listener listener = {
-		.capabilities = gio_onSeatCapabilities,
-		// Cast away const parameter.
-		.name = (void (*)(void *, struct wl_seat *, const char *))gio_onSeatName,
-	};
+const struct wl_keyboard_listener gio_keyboard_listener = {
+	.keymap = gio_onKeyboardKeymap,
+	.enter = gio_onKeyboardEnter,
+	.leave = gio_onKeyboardLeave,
+	.key = gio_onKeyboardKey,
+	.modifiers = gio_onKeyboardModifiers,
+	.repeat_info = gio_onKeyboardRepeatInfo
+};
 
-	wl_seat_add_listener(seat, &listener, data);
-}
+const struct zwp_text_input_v3_listener gio_zwp_text_input_v3_listener = {
+	.enter = gio_onTextInputEnter,
+	.leave = gio_onTextInputLeave,
+	// Cast away const parameter.
+	.preedit_string = (void (*)(void *, struct zwp_text_input_v3 *, const char *, int32_t,  int32_t))gio_onTextInputPreeditString,
+	.commit_string = (void (*)(void *, struct zwp_text_input_v3 *, const char *))gio_onTextInputCommitString,
+	.delete_surrounding_text = gio_onTextInputDeleteSurroundingText,
+	.done = gio_onTextInputDone
+};
 
-void gio_wl_pointer_add_listener(struct wl_pointer *pointer, void *data) {
-	static const struct wl_pointer_listener listener = {
-		.enter = gio_onPointerEnter,
-		.leave = gio_onPointerLeave,
-		.motion = gio_onPointerMotion,
-		.button = gio_onPointerButton,
-		.axis = gio_onPointerAxis,
-		.frame = gio_onPointerFrame,
-		.axis_source = gio_onPointerAxisSource,
-		.axis_stop = gio_onPointerAxisStop,
-		.axis_discrete = gio_onPointerAxisDiscrete,
-	};
+const struct wl_data_device_listener gio_data_device_listener = {
+	.data_offer = gio_onDataDeviceOffer,
+	.enter = gio_onDataDeviceEnter,
+	.leave = gio_onDataDeviceLeave,
+	.motion = gio_onDataDeviceMotion,
+	.drop = gio_onDataDeviceDrop,
+	.selection = gio_onDataDeviceSelection,
+};
 
-	wl_pointer_add_listener(pointer, &listener, data);
-}
+const struct wl_data_offer_listener gio_data_offer_listener = {
+	.offer = (void (*)(void *, struct wl_data_offer *, const char *))gio_onDataOfferOffer,
+	.source_actions = gio_onDataOfferSourceActions,
+	.action = gio_onDataOfferAction,
+};
 
-void gio_wl_touch_add_listener(struct wl_touch *touch, void *data) {
-	static const struct wl_touch_listener listener = {
-		.down = gio_onTouchDown,
-		.up = gio_onTouchUp,
-		.motion = gio_onTouchMotion,
-		.frame = gio_onTouchFrame,
-		.cancel = gio_onTouchCancel,
-	};
-
-	wl_touch_add_listener(touch, &listener, data);
-}
-
-void gio_wl_keyboard_add_listener(struct wl_keyboard *keyboard, void *data) {
-	static const struct wl_keyboard_listener listener = {
-		.keymap = gio_onKeyboardKeymap,
-		.enter = gio_onKeyboardEnter,
-		.leave = gio_onKeyboardLeave,
-		.key = gio_onKeyboardKey,
-		.modifiers = gio_onKeyboardModifiers,
-		.repeat_info = gio_onKeyboardRepeatInfo
-	};
-
-	wl_keyboard_add_listener(keyboard, &listener, data);
-}
-
-void gio_zwp_text_input_v3_add_listener(struct zwp_text_input_v3 *im, void *data) {
-	static const struct zwp_text_input_v3_listener listener = {
-		.enter = gio_onTextInputEnter,
-		.leave = gio_onTextInputLeave,
-		// Cast away const parameter.
-		.preedit_string = (void (*)(void *, struct zwp_text_input_v3 *, const char *, int32_t,  int32_t))gio_onTextInputPreeditString,
-		.commit_string = (void (*)(void *, struct zwp_text_input_v3 *, const char *))gio_onTextInputCommitString,
-		.delete_surrounding_text = gio_onTextInputDeleteSurroundingText,
-		.done = gio_onTextInputDone
-	};
-
-	zwp_text_input_v3_add_listener(im, &listener, data);
-}
-
-void gio_wl_data_device_add_listener(struct wl_data_device *dd, void *data) {
-	static const struct wl_data_device_listener listener = {
-		.data_offer = gio_onDataDeviceOffer,
-		.enter = gio_onDataDeviceEnter,
-		.leave = gio_onDataDeviceLeave,
-		.motion = gio_onDataDeviceMotion,
-		.drop = gio_onDataDeviceDrop,
-		.selection = gio_onDataDeviceSelection,
-	};
-	wl_data_device_add_listener(dd, &listener, data);
-}
-
-void gio_wl_data_offer_add_listener(struct wl_data_offer *offer, void *data) {
-	static const struct wl_data_offer_listener listener = {
-		.offer = (void (*)(void *, struct wl_data_offer *, const char *))gio_onDataOfferOffer,
-		.source_actions = gio_onDataOfferSourceActions,
-		.action = gio_onDataOfferAction,
-	};
-	wl_data_offer_add_listener(offer, &listener, data);
-}
-
-void gio_wl_data_source_add_listener(struct wl_data_source *source, void *data) {
-	static const struct wl_data_source_listener listener = {
-		.target = (void (*)(void *, struct wl_data_source *, const char *))gio_onDataSourceTarget,
-		.send = (void (*)(void *, struct wl_data_source *, const char *, int32_t))gio_onDataSourceSend,
-		.cancelled = gio_onDataSourceCancelled,
-		.dnd_drop_performed = gio_onDataSourceDNDDropPerformed,
-		.dnd_finished = gio_onDataSourceDNDFinished,
-		.action = gio_onDataSourceAction,
-	};
-	wl_data_source_add_listener(source, &listener, data);
-}
+const struct wl_data_source_listener gio_data_source_listener = {
+	.target = (void (*)(void *, struct wl_data_source *, const char *))gio_onDataSourceTarget,
+	.send = (void (*)(void *, struct wl_data_source *, const char *, int32_t))gio_onDataSourceSend,
+	.cancelled = gio_onDataSourceCancelled,
+	.dnd_drop_performed = gio_onDataSourceDNDDropPerformed,
+	.dnd_finished = gio_onDataSourceDNDFinished,
+	.action = gio_onDataSourceAction,
+};
