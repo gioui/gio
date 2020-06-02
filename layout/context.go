@@ -22,7 +22,9 @@ type Context struct {
 	Constraints Constraints
 
 	Config system.Config
-	Queue  event.Queue
+	// By convention, a nil Queue is a signal to widgets to draw themselves
+	// in a disabled state.
+	Queue event.Queue
 	*op.Ops
 }
 
@@ -70,4 +72,14 @@ func (c Context) Events(k event.Tag) []event.Event {
 		return nil
 	}
 	return c.Queue.Events(k)
+}
+
+// Disabled returns a copy of this context with a nil Queue,
+// blocking events to widgets using it.
+//
+// By convention, a nil Queue is a signal to widgets to draw themselves
+// in a disabled state.
+func (c Context) Disabled() Context {
+	c.Queue = nil
+	return c
 }
