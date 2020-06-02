@@ -114,6 +114,11 @@ CFTypeRef gio_createGLView(void) {
 	}
 }
 
+void gio_setNeedsDisplay(CFTypeRef viewRef) {
+	NSOpenGLView *view = (__bridge NSOpenGLView *)viewRef;
+	[view setNeedsDisplay:YES];
+}
+
 CFTypeRef gio_contextForView(CFTypeRef viewRef) {
 	NSOpenGLView *view = (__bridge NSOpenGLView *)viewRef;
 	return (__bridge CFTypeRef)view.openGLContext;

@@ -37,6 +37,7 @@ __attribute__ ((visibility ("hidden"))) CGFloat gio_viewHeight(CFTypeRef viewRef
 __attribute__ ((visibility ("hidden"))) CGFloat gio_getViewBackingScale(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
 __attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
+__attribute__ ((visibility ("hidden"))) void gio_setNeedsDisplay(CFTypeRef viewRef);
 */
 import "C"
 
@@ -51,10 +52,7 @@ type window struct {
 	stage       system.Stage
 	displayLink *displayLink
 
-	// mu protect the following fields
-	mu            sync.Mutex
-	scale         float32
-	width, height float32
+	scale float32
 }
 
 // viewMap is the mapping from Cocoa NSViews to Go windows.
@@ -193,13 +191,7 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy 
 //export gio_onDraw
 func gio_onDraw(view C.CFTypeRef) {
 	w := mustView(view)
-	scale := float32(C.gio_getViewBackingScale(w.view))
-	width, height := float32(C.gio_viewWidth(w.view)), float32(C.gio_viewHeight(w.view))
-	w.mu.Lock()
-	w.scale = scale
-	w.width, w.height = width, height
-	w.mu.Unlock()
-	w.draw(true)
+	w.draw()
 }
 
 //export gio_onFocus
@@ -214,16 +206,15 @@ func gio_onChangeScreen(view C.CFTypeRef, did uint64) {
 	w.displayLink.SetDisplayID(did)
 }
 
-func (w *window) draw(sync bool) {
-	w.mu.Lock()
-	wf, hf, scale := w.width, w.height, w.scale
-	w.mu.Unlock()
+func (w *window) draw() {
+	w.scale = float32(C.gio_getViewBackingScale(w.view))
+	wf, hf := float32(C.gio_viewWidth(w.view)), float32(C.gio_viewHeight(w.view))
 	if wf == 0 || hf == 0 {
 		return
 	}
-	width := int(wf*scale + .5)
-	height := int(hf*scale + .5)
-	cfg := configFor(scale)
+	width := int(wf*w.scale + .5)
+	height := int(hf*w.scale + .5)
+	cfg := configFor(w.scale)
 	cfg.now = time.Now()
 	w.setStage(system.StageRunning)
 	w.w.Event(FrameEvent{
@@ -234,7 +225,7 @@ func (w *window) draw(sync bool) {
 			},
 			Config: &cfg,
 		},
-		Sync: sync,
+		Sync: true,
 	})
 }
 
@@ -273,7 +264,11 @@ func gio_onCreate(view C.CFTypeRef) {
 		scale: scale,
 	}
 	dl, err := NewDisplayLink(func() {
-		w.draw(false)
+		C.CFRetain(view)
+		runOnMain(func() {
+			defer C.CFRelease(view)
+			C.gio_setNeedsDisplay(view)
+		})
 	})
 	if err != nil {
 		panic(err)
