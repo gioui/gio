@@ -51,7 +51,7 @@ func (b *Clickable) Clicked() bool {
 }
 
 // Clicks returns and clear the clicks since the last call to Clicks.
-func (b Clickable) Clicks() []Click {
+func (b *Clickable) Clicks() []Click {
 	clicks := b.clicks
 	b.clicks = nil
 	b.prevClicks = 0
