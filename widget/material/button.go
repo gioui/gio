@@ -129,7 +129,11 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 				}},
 				NE: rr, NW: rr, SE: rr, SW: rr,
 			}.Op(gtx.Ops).Add(gtx.Ops)
-			dims := fill(gtx, b.Background)
+			background := b.Background
+			if gtx.Queue == nil {
+				background = mulAlpha(b.Background, 150)
+			}
+			dims := fill(gtx, background)
 			for _, c := range b.Button.History() {
 				drawInk(gtx, c)
 			}
@@ -155,7 +159,11 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 				Rect: f32.Rectangle{Max: f32.Point{X: sizef, Y: sizef}},
 				NE:   rr, NW: rr, SE: rr, SW: rr,
 			}.Op(gtx.Ops).Add(gtx.Ops)
-			dims := fill(gtx, b.Background)
+			background := b.Background
+			if gtx.Queue == nil {
+				background = mulAlpha(b.Background, 150)
+			}
+			dims := fill(gtx, background)
 			for _, c := range b.Button.History() {
 				drawInk(gtx, c)
 			}
