@@ -100,7 +100,6 @@ type Ops struct {
 type StackOp struct {
 	id      stackID
 	macroID int
-	active  bool
 	ops     *Ops
 }
 
@@ -158,34 +157,23 @@ func (c CallOp) Add(o *Ops) {
 }
 
 // Push (save) the current operations state.
-func Push(o *Ops) *StackOp {
-	var s StackOp
-	s.push(o)
-	return &s
-}
-
-func (s *StackOp) push(o *Ops) {
-	if s.active {
-		panic("unbalanced push")
+func Push(o *Ops) StackOp {
+	s := StackOp{
+		ops:     o,
+		id:      o.stackStack.push(),
+		macroID: o.macroStack.currentID,
 	}
-	s.active = true
-	s.ops = o
-	s.id = o.stackStack.push()
-	s.macroID = o.macroStack.currentID
 	data := o.Write(opconst.TypePushLen)
 	data[0] = byte(opconst.TypePush)
+	return s
 }
 
 // Pop (restore) a previously Pushed operations state.
-func (s *StackOp) Pop() {
-	if !s.active {
-		panic("unbalanced pop")
-	}
+func (s StackOp) Pop() {
 	if s.ops.macroStack.currentID != s.macroID {
 		panic("pop in a different macro than push")
 	}
 	s.ops.stackStack.pop(s.id)
-	s.active = false
 	data := s.ops.Write(opconst.TypePopLen)
 	data[0] = byte(opconst.TypePop)
 }
