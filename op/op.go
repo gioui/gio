@@ -105,10 +105,9 @@ type StackOp struct {
 
 // MacroOp records a list of operations for later use.
 type MacroOp struct {
-	recording bool
-	ops       *Ops
-	id        stackID
-	pc        pc
+	ops *Ops
+	id  stackID
+	pc  pc
 }
 
 // CallOp invokes all the operations from a separate
@@ -219,35 +218,24 @@ func (o *Ops) pc() pc {
 
 // Record a macro of operations.
 func Record(o *Ops) MacroOp {
-	var m MacroOp
-	m.record(o)
-	return m
-}
-
-func (m *MacroOp) record(o *Ops) {
-	if m.recording {
-		panic("already recording")
+	m := MacroOp{
+		ops: o,
+		id:  o.macroStack.push(),
+		pc:  o.pc(),
 	}
-	m.recording = true
-	m.ops = o
-	m.id = m.ops.macroStack.push()
-	m.pc = o.pc()
 	// Reserve room for a macro definition. Updated in Stop.
 	m.ops.Write(opconst.TypeMacroDefLen)
 	m.fill()
+	return m
 }
 
 // Stop ends a previously started recording.
-func (m *MacroOp) Stop() {
-	if !m.recording {
-		panic("not recording")
-	}
+func (m MacroOp) Stop() {
 	m.ops.macroStack.pop(m.id)
-	m.recording = false
 	m.fill()
 }
 
-func (m *MacroOp) fill() {
+func (m MacroOp) fill() {
 	pc := m.ops.pc()
 	// Fill out the macro definition reserved in Record.
 	data := m.ops.data[m.pc.data:]
@@ -259,10 +247,7 @@ func (m *MacroOp) fill() {
 }
 
 // Add the recorded list of operations.
-func (m *MacroOp) Add() {
-	if m.recording {
-		panic("a recording is in progress")
-	}
+func (m MacroOp) Add() {
 	if m.ops == nil {
 		return
 	}
