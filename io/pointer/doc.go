@@ -20,7 +20,7 @@ For example, to set up a rectangular hit area:
 
 	r := image.Rectangle{...}
 	pointer.Rect(r).Add(ops)
-	pointer.InputOp{Key: h}.Add(ops)
+	pointer.InputOp{Tag: h}.Add(ops)
 
 Note that areas compound: the effective area of multiple area
 operations is the intersection of the areas.
@@ -37,12 +37,12 @@ For example:
 	var stack op.StackOp
 	var h1, h2 *Handler
 
-	stack.Push(ops)
-	pointer.InputOp{Key: h1}.Add(Ops)
+	stack := op.Push(ops)
+	pointer.InputOp{Tag: h1}.Add(Ops)
 	stack.Pop()
 
-	stack.Push(ops)
-	pointer.InputOp{Key: h2}.Add(ops)
+	stack = op.Push(ops)
+	pointer.InputOp{Tag: h2}.Add(ops)
 	stack.Pop()
 
 implies a tree of two inner nodes, each with one pointer handler.
