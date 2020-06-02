@@ -185,6 +185,7 @@ func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str []text.Glyp
 	var lastPos f32.Point
 	var builder clip.Path
 	ops := new(op.Ops)
+	m := op.Record(ops)
 	var x fixed.Int26_6
 	builder.Begin(ops)
 	for _, g := range str {
@@ -238,7 +239,7 @@ func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, f *opentype, str []text.Glyp
 		x += g.Advance
 	}
 	builder.End().Add(ops)
-	return op.CallOp{Ops: ops}
+	return m.Stop()
 }
 
 func readGlyphs(r io.Reader) ([]text.Glyph, error) {

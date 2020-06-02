@@ -44,7 +44,7 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 	paint.ColorOp{Color: e.HintColor}.Add(gtx.Ops)
 	tl := widget.Label{Alignment: e.Editor.Alignment}
 	dims := tl.Layout(gtx, e.shaper, e.Font, e.TextSize, e.Hint)
-	macro.Stop()
+	call := macro.Stop()
 	if w := dims.Size.X; gtx.Constraints.Min.X < w {
 		gtx.Constraints.Min.X = w
 	}
@@ -56,7 +56,7 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 		paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
 		e.Editor.PaintText(gtx)
 	} else {
-		macro.Add()
+		call.Add(gtx.Ops)
 	}
 	paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
 	e.Editor.PaintCaret(gtx)

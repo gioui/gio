@@ -35,12 +35,12 @@ type Path struct {
 // If you need to reset the clip to its previous values after
 // applying a Op, use op.StackOp.
 type Op struct {
-	macro  op.MacroOp
+	call   op.CallOp
 	bounds f32.Rectangle
 }
 
 func (p Op) Add(o *op.Ops) {
-	p.macro.Add()
+	p.call.Add(o)
 	data := o.Write(opconst.TypeClipLen)
 	data[0] = byte(opconst.TypeClip)
 	bo := binary.LittleEndian
@@ -281,9 +281,9 @@ func (p *Path) simpleQuadTo(ctrl, to f32.Point) {
 // End the path and return a clip operation that represents it.
 func (p *Path) End() Op {
 	p.end()
-	p.macro.Stop()
+	c := p.macro.Stop()
 	return Op{
-		macro:  p.macro,
+		call:   c,
 		bounds: p.bounds,
 	}
 }

@@ -33,12 +33,8 @@ type Key struct {
 
 // Shadow of op.MacroOp.
 type macroOp struct {
-	pc pc
-}
-
-// Shadow of op.CallOp.
-type callOp struct {
 	ops *op.Ops
+	pc  pc
 }
 
 type pc struct {
@@ -98,32 +94,14 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 			n += block.endPC.data - r.pc.data - opconst.TypeAuxLen
 			data = data[:n]
 		case opconst.TypeCall:
-			var op callOp
-			op.decode(data, refs)
-			endPC := pc{
-				data: len(op.ops.Data()),
-				refs: len(op.ops.Refs()),
-			}
-			retPC := r.pc
-			retPC.data += n
-			retPC.refs += nrefs
-			r.stack = append(r.stack, macro{
-				ops:   r.ops,
-				retPC: retPC,
-				endPC: endPC,
-			})
-			r.pc = pc{}
-			r.ops = op.ops
-			continue
-		case opconst.TypeMacro:
 			var op macroOp
-			op.decode(data)
-			macroData := r.ops.Data()[op.pc.data:]
-			if opconst.OpType(macroData[0]) != opconst.TypeMacroDef {
+			op.decode(data, refs)
+			macroData := op.ops.Data()[op.pc.data:]
+			if opconst.OpType(macroData[0]) != opconst.TypeMacro {
 				panic("invalid macro reference")
 			}
 			var opDef opMacroDef
-			opDef.decode(macroData[:opconst.TypeMacroDef.Size()])
+			opDef.decode(macroData[:opconst.TypeMacro.Size()])
 			retPC := r.pc
 			retPC.data += n
 			retPC.refs += nrefs
@@ -132,11 +110,12 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 				retPC: retPC,
 				endPC: opDef.endpc,
 			})
+			r.ops = op.ops
 			r.pc = op.pc
-			r.pc.data += opconst.TypeMacroDef.Size()
-			r.pc.refs += opconst.TypeMacroDef.NumRefs()
+			r.pc.data += opconst.TypeMacro.Size()
+			r.pc.refs += opconst.TypeMacro.NumRefs()
 			continue
-		case opconst.TypeMacroDef:
+		case opconst.TypeMacro:
 			var op opMacroDef
 			op.decode(data)
 			r.pc = op.endpc
@@ -149,7 +128,7 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 }
 
 func (op *opMacroDef) decode(data []byte) {
-	if opconst.OpType(data[0]) != opconst.TypeMacroDef {
+	if opconst.OpType(data[0]) != opconst.TypeMacro {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
@@ -163,23 +142,15 @@ func (op *opMacroDef) decode(data []byte) {
 	}
 }
 
-func (m *callOp) decode(data []byte, refs []interface{}) {
+func (m *macroOp) decode(data []byte, refs []interface{}) {
 	if opconst.OpType(data[0]) != opconst.TypeCall {
-		panic("invalid op")
-	}
-	*m = callOp{
-		ops: refs[0].(*op.Ops),
-	}
-}
-
-func (m *macroOp) decode(data []byte) {
-	if opconst.OpType(data[0]) != opconst.TypeMacro {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
 	dataIdx := int(int32(bo.Uint32(data[1:])))
 	refsIdx := int(int32(bo.Uint32(data[5:])))
 	*m = macroOp{
+		ops: refs[0].(*op.Ops),
 		pc: pc{
 			data: dataIdx,
 			refs: refsIdx,

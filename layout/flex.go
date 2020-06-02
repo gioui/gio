@@ -28,8 +28,8 @@ type FlexChild struct {
 	widget Widget
 
 	// Scratch space.
-	macro op.MacroOp
-	dims  Dimensions
+	call op.CallOp
+	dims Dimensions
 }
 
 // Spacing determine the spacing mode for a Flex.
@@ -93,10 +93,10 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 		gtx := gtx
 		gtx.Constraints = cs
 		dims := child.widget(gtx)
-		macro.Stop()
+		c := macro.Stop()
 		sz := axisMain(f.Axis, dims.Size)
 		size += sz
-		children[i].macro = macro
+		children[i].call = c
 		children[i].dims = dims
 	}
 	rigidSize := size
@@ -127,10 +127,10 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 		gtx := gtx
 		gtx.Constraints = cs
 		dims := child.widget(gtx)
-		macro.Stop()
+		c := macro.Stop()
 		sz := axisMain(f.Axis, dims.Size)
 		size += sz
-		children[i].macro = macro
+		children[i].call = c
 		children[i].dims = dims
 	}
 	var maxCross int
@@ -176,7 +176,7 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 		}
 		stack := op.Push(gtx.Ops)
 		op.TransformOp{}.Offset(FPt(axisPoint(f.Axis, mainSize, cross))).Add(gtx.Ops)
-		child.macro.Add()
+		child.call.Add(gtx.Ops)
 		stack.Pop()
 		mainSize += axisMain(f.Axis, dims.Size)
 		if i < len(children)-1 {

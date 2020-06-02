@@ -22,8 +22,8 @@ type StackChild struct {
 	widget   Widget
 
 	// Scratch space.
-	macro op.MacroOp
-	dims  Dimensions
+	call op.CallOp
+	dims Dimensions
 }
 
 // Stacked returns a Stack child that is laid out with no minimum
@@ -58,14 +58,14 @@ func (s Stack) Layout(gtx Context, children ...StackChild) Dimensions {
 		gtx := gtx
 		gtx.Constraints.Min = image.Pt(0, 0)
 		dims := w.widget(gtx)
-		macro.Stop()
+		call := macro.Stop()
 		if w := dims.Size.X; w > maxSZ.X {
 			maxSZ.X = w
 		}
 		if h := dims.Size.Y; h > maxSZ.Y {
 			maxSZ.Y = h
 		}
-		children[i].macro = macro
+		children[i].call = call
 		children[i].dims = dims
 	}
 	// Then lay out Expanded children.
@@ -79,14 +79,14 @@ func (s Stack) Layout(gtx Context, children ...StackChild) Dimensions {
 			Min: maxSZ, Max: gtx.Constraints.Max,
 		}
 		dims := w.widget(gtx)
-		macro.Stop()
+		call := macro.Stop()
 		if w := dims.Size.X; w > maxSZ.X {
 			maxSZ.X = w
 		}
 		if h := dims.Size.Y; h > maxSZ.Y {
 			maxSZ.Y = h
 		}
-		children[i].macro = macro
+		children[i].call = call
 		children[i].dims = dims
 	}
 
@@ -109,7 +109,7 @@ func (s Stack) Layout(gtx Context, children ...StackChild) Dimensions {
 		}
 		stack := op.Push(gtx.Ops)
 		op.TransformOp{}.Offset(FPt(p)).Add(gtx.Ops)
-		ch.macro.Add()
+		ch.call.Add(gtx.Ops)
 		stack.Pop()
 		if baseline == 0 {
 			if b := ch.dims.Baseline; b != 0 {

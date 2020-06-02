@@ -12,8 +12,8 @@ import (
 )
 
 type scrollChild struct {
-	size  image.Point
-	macro op.MacroOp
+	size image.Point
+	call op.CallOp
 }
 
 // List displays a subsection of a potentially infinitely
@@ -181,8 +181,8 @@ func (l *List) nextDir() iterationDir {
 
 // End the current child by specifying its dimensions.
 func (l *List) end(dims Dimensions) {
-	l.child.Stop()
-	child := scrollChild{dims.Size, l.child}
+	call := l.child.Stop()
+	child := scrollChild{dims.Size, call}
 	mainSize := axisMain(l.Axis, child.size)
 	l.maxSize += mainSize
 	switch l.dir {
@@ -260,7 +260,7 @@ func (l *List) layout() Dimensions {
 		stack := op.Push(ops)
 		clip.Rect{Rect: FRect(r)}.Op(ops).Add(ops)
 		op.TransformOp{}.Offset(FPt(axisPoint(l.Axis, pos, cross))).Add(ops)
-		child.macro.Add()
+		child.call.Add(ops)
 		stack.Pop()
 		pos += childSize
 	}
@@ -277,10 +277,10 @@ func (l *List) layout() Dimensions {
 		pos = mainMax
 	}
 	dims := axisPoint(l.Axis, pos, maxCross)
-	l.macro.Stop()
+	call := l.macro.Stop()
 	defer op.Push(l.ctx.Ops).Pop()
 	pointer.Rect(image.Rectangle{Max: dims}).Add(ops)
 	l.scroll.Add(ops)
-	l.macro.Add()
+	call.Add(ops)
 	return Dimensions{Size: dims}
 }

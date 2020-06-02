@@ -49,12 +49,6 @@ end of a function :
 
   defer op.Push(ops).Pop()
 
-The CallOp invokes another operation list:
-
-	ops := new(op.Ops)
-	ops2 := new(op.Ops)
-	op.CallOp{Ops: ops2}.Add(ops)
-
 The MacroOp records a list of operations to be executed later:
 
 	ops := new(op.Ops)
@@ -63,10 +57,10 @@ The MacroOp records a list of operations to be executed later:
 	op.InvalidateOp{}.Add(ops)
 	...
 	// End recording.
-	macro.Stop()
+	call := macro.Stop()
 
-	// replay the recorded operations by calling Add:
-	macro.Add()
+	// replay the recorded operations:
+	call.Add(ops)
 
 */
 package op
@@ -110,11 +104,11 @@ type MacroOp struct {
 	pc  pc
 }
 
-// CallOp invokes all the operations from a separate
-// operations list.
+// CallOp invokes the operations recorded by Record.
 type CallOp struct {
 	// Ops is the list of operations to invoke.
-	Ops *Ops
+	ops *Ops
+	pc  pc
 }
 
 // InvalidateOp requests a redraw at the given time. Use
@@ -144,15 +138,6 @@ type stackID struct {
 type pc struct {
 	data int
 	refs int
-}
-
-// Add the call to the operation list.
-func (c CallOp) Add(o *Ops) {
-	if c.Ops == nil {
-		return
-	}
-	data := o.Write(opconst.TypeCallLen, c.Ops)
-	data[0] = byte(opconst.TypeCall)
 }
 
 // Push (save) the current operations state.
@@ -224,38 +209,43 @@ func Record(o *Ops) MacroOp {
 		pc:  o.pc(),
 	}
 	// Reserve room for a macro definition. Updated in Stop.
-	m.ops.Write(opconst.TypeMacroDefLen)
+	m.ops.Write(opconst.TypeMacroLen)
 	m.fill()
 	return m
 }
 
-// Stop ends a previously started recording.
-func (m MacroOp) Stop() {
+// Stop ends a previously started recording and returns an
+// operation for replaying it.
+func (m MacroOp) Stop() CallOp {
 	m.ops.macroStack.pop(m.id)
 	m.fill()
+	return CallOp{
+		ops: m.ops,
+		pc:  m.pc,
+	}
 }
 
 func (m MacroOp) fill() {
 	pc := m.ops.pc()
 	// Fill out the macro definition reserved in Record.
 	data := m.ops.data[m.pc.data:]
-	data = data[:opconst.TypeMacroDefLen]
-	data[0] = byte(opconst.TypeMacroDef)
+	data = data[:opconst.TypeMacroLen]
+	data[0] = byte(opconst.TypeMacro)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(pc.data))
 	bo.PutUint32(data[5:], uint32(pc.refs))
 }
 
 // Add the recorded list of operations.
-func (m MacroOp) Add() {
-	if m.ops == nil {
+func (c CallOp) Add(o *Ops) {
+	if c.ops == nil {
 		return
 	}
-	data := m.ops.Write(opconst.TypeMacroLen)
-	data[0] = byte(opconst.TypeMacro)
+	data := o.Write(opconst.TypeCallLen, c.ops)
+	data[0] = byte(opconst.TypeCall)
 	bo := binary.LittleEndian
-	bo.PutUint32(data[1:], uint32(m.pc.data))
-	bo.PutUint32(data[5:], uint32(m.pc.refs))
+	bo.PutUint32(data[1:], uint32(c.pc.data))
+	bo.PutUint32(data[5:], uint32(c.pc.refs))
 }
 
 func (r InvalidateOp) Add(o *Ops) {

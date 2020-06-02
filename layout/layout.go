@@ -158,7 +158,7 @@ func (a Direction) Layout(gtx Context, w Widget) Dimensions {
 	cs := gtx.Constraints
 	gtx.Constraints.Min = image.Point{}
 	dims := w(gtx)
-	macro.Stop()
+	call := macro.Stop()
 	sz := dims.Size
 	if sz.X < cs.Min.X {
 		sz.X = cs.Min.X
@@ -181,7 +181,7 @@ func (a Direction) Layout(gtx Context, w Widget) Dimensions {
 	}
 	stack := op.Push(gtx.Ops)
 	op.TransformOp{}.Offset(FPt(p)).Add(gtx.Ops)
-	macro.Add()
+	call.Add(gtx.Ops)
 	stack.Pop()
 	return Dimensions{
 		Size:     sz,
