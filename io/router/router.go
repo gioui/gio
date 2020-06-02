@@ -159,7 +159,7 @@ func (h *handlerEvents) Events(k event.Tag) []event.Event {
 	if events, ok := h.handlers[k]; ok {
 		h.handlers[k] = h.handlers[k][:0]
 		// Schedule another frame if we delivered events to the user
-		// to flush half-updated state. This is important when a an
+		// to flush half-updated state. This is important when an
 		// event changes UI state that has already been laid out. In
 		// the worst case, we waste a frame, increasing power usage.
 		//
