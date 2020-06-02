@@ -3,7 +3,7 @@ module gioui.org/cmd
 go 1.13
 
 require (
-	gioui.org v0.0.0-20200607143106-f710bdf8e8f1
+	gioui.org v0.0.0-20200608081650-cc5f8fcffe5e
 	github.com/chromedp/cdproto v0.0.0-20191114225735-6626966fbae4
 	github.com/chromedp/chromedp v0.5.2
 	golang.org/x/image v0.0.0-20190802002840-cff245a6509b

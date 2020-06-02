@@ -147,6 +147,7 @@ var (
 	iconTextButton    = new(widget.Clickable)
 	iconButton        = new(widget.Clickable)
 	flatBtn           = new(widget.Clickable)
+	disableBtn        = new(widget.Clickable)
 	radioButtonsGroup = new(widget.Enum)
 	list              = &layout.List{
 		Axis: layout.Vertical,
@@ -265,6 +266,17 @@ func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 					return layout.Inset{Left: unit.Dp(16)}.Layout(gtx,
 						material.Switch(th, swtch).Layout,
 					)
+				}),
+				layout.Rigid(func(gtx C) D {
+					return layout.Inset{Left: unit.Dp(16)}.Layout(gtx, func(gtx C) D {
+						text := "enabled"
+						if !swtch.Value {
+							text = "disabled"
+							gtx = gtx.Disabled()
+						}
+						btn := material.Button(th, disableBtn, text)
+						return btn.Layout(gtx)
+					})
 				}),
 			)
 		},
