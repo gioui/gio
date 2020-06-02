@@ -146,7 +146,7 @@ func (w *window) addEventListeners() {
 			dx *= 120
 			dy *= 120
 		}
-		w.pointerEvent(pointer.Move, float32(dx), float32(dy), e)
+		w.pointerEvent(pointer.Scroll, float32(dx), float32(dy), e)
 		return nil
 	})
 	w.addEventListener(w.cnv, "touchstart", func(this js.Value, args []js.Value) interface{} {

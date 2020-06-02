@@ -217,8 +217,7 @@ func (s *Scroll) Scroll(cfg unit.Converter, q event.Queue, t time.Time, axis Axi
 		case pointer.Cancel:
 			s.dragging = false
 			s.grab = false
-		case pointer.Move:
-			// Scroll
+		case pointer.Scroll:
 			switch s.axis {
 			case Horizontal:
 				s.scroll += e.Scroll.X
@@ -228,10 +227,10 @@ func (s *Scroll) Scroll(cfg unit.Converter, q event.Queue, t time.Time, axis Axi
 			iscroll := int(s.scroll)
 			s.scroll -= float32(iscroll)
 			total += iscroll
+		case pointer.Move:
 			if !s.dragging || s.pid != e.PointerID {
 				continue
 			}
-			// Drag
 			val := s.val(e.Position)
 			s.estimator.Sample(e.Time, val)
 			v := int(math.Round(float64(val)))

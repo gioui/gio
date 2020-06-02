@@ -1293,7 +1293,7 @@ func (w *window) flushScroll() {
 		return
 	}
 	w.w.Event(pointer.Event{
-		Type:      pointer.Move,
+		Type:      pointer.Scroll,
 		Source:    pointer.Mouse,
 		Buttons:   w.pointerBtns,
 		Position:  w.lastPos,

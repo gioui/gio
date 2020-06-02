@@ -73,7 +73,7 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 - (void)scrollWheel:(NSEvent *)event {
 	CGFloat dx = -event.scrollingDeltaX;
 	CGFloat dy = -event.scrollingDeltaY;
-	handleMouse(self, event, GIO_MOUSE_MOVE, dx, dy);
+	handleMouse(self, event, GIO_MOUSE_SCROLL, dx, dy);
 }
 - (void)keyDown:(NSEvent *)event {
 	NSString *keys = [event charactersIgnoringModifiers];

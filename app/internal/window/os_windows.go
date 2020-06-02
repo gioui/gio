@@ -278,7 +278,7 @@ func (w *window) scrollEvent(wParam, lParam uintptr) {
 	p := f32.Point{X: float32(np.X), Y: float32(np.Y)}
 	dist := float32(int16(wParam >> 16))
 	w.w.Event(pointer.Event{
-		Type:     pointer.Move,
+		Type:     pointer.Scroll,
 		Source:   pointer.Mouse,
 		Position: p,
 		Buttons:  w.pointerBtns,

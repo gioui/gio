@@ -94,6 +94,8 @@ const (
 	Enter
 	// Pointer leaves an area watching for pointer input
 	Leave
+	// Scroll of a pointer.
+	Scroll
 )
 
 const (
@@ -179,6 +181,8 @@ func (t Type) String() string {
 		return "Enter"
 	case Leave:
 		return "Leave"
+	case Scroll:
+		return "Scroll"
 	default:
 		panic("unknown Type")
 	}

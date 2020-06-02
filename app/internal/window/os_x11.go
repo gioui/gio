@@ -310,11 +310,11 @@ func (h *x11EventHandler) handleEvents() bool {
 				btn = pointer.ButtonRight
 			case C.Button4:
 				// scroll up
-				ev.Type = pointer.Move
+				ev.Type = pointer.Scroll
 				ev.Scroll.Y = -scrollScale
 			case C.Button5:
 				// scroll down
-				ev.Type = pointer.Move
+				ev.Type = pointer.Scroll
 				ev.Scroll.Y = +scrollScale
 			default:
 				continue

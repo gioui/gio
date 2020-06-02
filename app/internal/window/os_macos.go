@@ -30,6 +30,7 @@ import (
 #define GIO_MOUSE_MOVE 1
 #define GIO_MOUSE_UP 2
 #define GIO_MOUSE_DOWN 3
+#define GIO_MOUSE_SCROLL 4
 
 __attribute__ ((visibility ("hidden"))) void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height);
 __attribute__ ((visibility ("hidden"))) CGFloat gio_viewWidth(CFTypeRef viewRef);
@@ -160,6 +161,8 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy 
 		typ = pointer.Release
 	case C.GIO_MOUSE_DOWN:
 		typ = pointer.Press
+	case C.GIO_MOUSE_SCROLL:
+		typ = pointer.Scroll
 	default:
 		panic("invalid direction")
 	}
