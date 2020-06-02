@@ -352,24 +352,21 @@ type clipCircle struct {
 }
 
 func (c *clipCircle) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
-	var m op.MacroOp
-	m.Record(gtx.Ops)
+	m := op.Record(gtx.Ops)
 	dims := w(gtx)
-	m.Stop()
+	call := m.Stop()
 	max := dims.Size.X
 	if dy := dims.Size.Y; dy > max {
 		max = dy
 	}
 	szf := float32(max)
 	rr := szf * .5
-	var stack op.StackOp
-	stack.Push(gtx.Ops)
+	defer op.Push(gtx.Ops).Pop()
 	clip.Rect{
 		Rect: f32.Rectangle{Max: f32.Point{X: szf, Y: szf}},
 		NE:   rr, NW: rr, SE: rr, SW: rr,
 	}.Op(gtx.Ops).Add(gtx.Ops)
-	m.Add()
-	stack.Pop()
+	call.Add(gtx.Ops)
 	return dims
 }
 

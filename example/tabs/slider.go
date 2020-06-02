@@ -18,8 +18,10 @@ type Slider struct {
 
 	push int
 
-	last *op.Ops
 	next *op.Ops
+
+	nextCall op.CallOp
+	lastCall op.CallOp
 
 	t0     time.Time
 	offset float32
@@ -34,7 +36,8 @@ func (s *Slider) PushRight() { s.push = -1 }
 // Layout lays out widget that can be pushed.
 func (s *Slider) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 	if s.push != 0 {
-		s.last, s.next = s.next, new(op.Ops)
+		s.next = nil
+		s.lastCall = s.nextCall
 		s.offset = float32(s.push)
 		s.t0 = gtx.Now()
 		s.push = 0
@@ -73,20 +76,20 @@ func (s *Slider) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 		if s.next == nil {
 			s.next = new(op.Ops)
 		}
-		s.next.Reset()
 		gtx := gtx
 		gtx.Ops = s.next
+		gtx.Ops.Reset()
+		m := op.Record(gtx.Ops)
 		dims = w(gtx)
+		s.nextCall = m.Stop()
 	}
 
 	if s.offset == 0 {
-		op.CallOp{Ops: s.next}.Add(gtx.Ops)
+		s.nextCall.Add(gtx.Ops)
 		return dims
 	}
 
-	var stack op.StackOp
-	stack.Push(gtx.Ops)
-	defer stack.Pop()
+	defer op.Push(gtx.Ops).Pop()
 
 	offset := smooth(s.offset)
 
@@ -94,22 +97,22 @@ func (s *Slider) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 		op.TransformOp{}.Offset(f32.Point{
 			X: float32(dims.Size.X) * (offset - 1),
 		}).Add(gtx.Ops)
-		op.CallOp{Ops: s.last}.Add(gtx.Ops)
+		s.lastCall.Add(gtx.Ops)
 
 		op.TransformOp{}.Offset(f32.Point{
 			X: float32(dims.Size.X),
 		}).Add(gtx.Ops)
-		op.CallOp{Ops: s.next}.Add(gtx.Ops)
+		s.nextCall.Add(gtx.Ops)
 	} else {
 		op.TransformOp{}.Offset(f32.Point{
 			X: float32(dims.Size.X) * (offset + 1),
 		}).Add(gtx.Ops)
-		op.CallOp{Ops: s.last}.Add(gtx.Ops)
+		s.lastCall.Add(gtx.Ops)
 
 		op.TransformOp{}.Offset(f32.Point{
 			X: float32(-dims.Size.X),
 		}).Add(gtx.Ops)
-		op.CallOp{Ops: s.next}.Add(gtx.Ops)
+		s.nextCall.Add(gtx.Ops)
 	}
 	return dims
 }
