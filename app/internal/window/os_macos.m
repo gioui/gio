@@ -141,7 +141,6 @@ void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat heigh
 														 backing:NSBackingStoreBuffered
 														   defer:NO];
 		window.title = [NSString stringWithUTF8String: title];
-		[window cascadeTopLeftFromPoint:NSMakePoint(20,20)];
 		[window setAcceptsMouseMovedEvents:YES];
 
 		gio_onCreate((__bridge CFTypeRef)view);
