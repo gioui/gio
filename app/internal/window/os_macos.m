@@ -6,15 +6,16 @@
 
 #include "_cgo_export.h"
 
-@interface GioDelegate : NSObject<NSApplicationDelegate, NSWindowDelegate>
+@interface GioAppDelegate : NSObject<NSApplicationDelegate>
 @property (strong,nonatomic) NSWindow *window;
 @end
 
-@implementation GioDelegate
+@interface GioWindowDelegate : NSObject<NSWindowDelegate>
+@end
+
+@implementation GioAppDelegate
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
 	[[NSRunningApplication currentApplication] activateWithOptions:(NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps)];
-	[self.window makeKeyAndOrderFront:self];
-	gio_onShow((__bridge CFTypeRef)self.window.contentView);
 }
 - (void)applicationDidHide:(NSNotification *)aNotification {
 	gio_onHide((__bridge CFTypeRef)self.window.contentView);
@@ -22,29 +23,43 @@
 - (void)applicationWillUnhide:(NSNotification *)notification {
 	gio_onShow((__bridge CFTypeRef)self.window.contentView);
 }
+@end
+
+@implementation GioWindowDelegate
 - (void)windowWillMiniaturize:(NSNotification *)notification {
-	gio_onHide((__bridge CFTypeRef)self.window.contentView);
+	NSWindow *window = (NSWindow *)[notification object];
+	gio_onHide((__bridge CFTypeRef)window.contentView);
 }
 - (void)windowDidDeminiaturize:(NSNotification *)notification {
-	gio_onShow((__bridge CFTypeRef)self.window.contentView);
+	NSWindow *window = (NSWindow *)[notification object];
+	gio_onShow((__bridge CFTypeRef)window.contentView);
 }
 - (void)windowDidChangeScreen:(NSNotification *)notification {
-	CGDirectDisplayID dispID = [[[self.window screen] deviceDescription][@"NSScreenNumber"] unsignedIntValue];
-	CFTypeRef view = (__bridge CFTypeRef)self.window.contentView;
+	NSWindow *window = (NSWindow *)[notification object];
+	CGDirectDisplayID dispID = [[[window screen] deviceDescription][@"NSScreenNumber"] unsignedIntValue];
+	CFTypeRef view = (__bridge CFTypeRef)window.contentView;
 	gio_onChangeScreen(view, dispID);
 }
 - (void)windowDidBecomeKey:(NSNotification *)notification {
-	gio_onFocus((__bridge CFTypeRef)self.window.contentView, YES);
+	NSWindow *window = (NSWindow *)[notification object];
+	gio_onFocus((__bridge CFTypeRef)window.contentView, YES);
 }
 - (void)windowDidResignKey:(NSNotification *)notification {
-	gio_onFocus((__bridge CFTypeRef)self.window.contentView, NO);
+	NSWindow *window = (NSWindow *)[notification object];
+	gio_onFocus((__bridge CFTypeRef)window.contentView, NO);
 }
 - (void)windowWillClose:(NSNotification *)notification {
-	gio_onTerminate((__bridge CFTypeRef)self.window.contentView);
-	self.window.delegate = nil;
+	NSWindow *window = (NSWindow *)[notification object];
+	window.delegate = nil;
+	gio_onTerminate((__bridge CFTypeRef)window.contentView);
 	[NSApp terminate:nil];
 }
 @end
+
+// Delegates are weakly referenced from their peers. Nothing
+// else holds a strong reference to our window delegate, so
+// keep a single global reference instead.
+static GioWindowDelegate *globalWindowDel;
 
 void gio_writeClipboard(unichar *chars, NSUInteger length) {
 	@autoreleasepool {
@@ -126,9 +141,15 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, 
 		NSView *view = (NSView *)CFBridgingRelease(viewRef);
 		[window setContentView:view];
 		[window makeFirstResponder:view];
+		window.delegate = globalWindowDel;
 		gio_onCreate((__bridge CFTypeRef)view);
 		return (__bridge_retained CFTypeRef)window;
 	}
+}
+
+void gio_makeKeyAndOrderFront(CFTypeRef viewRef) {
+	NSView *view = (__bridge NSView *)viewRef;
+	[view.window makeKeyAndOrderFront:nil];
 }
 
 void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height) {
@@ -152,11 +173,13 @@ void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat heigh
 		[menuBar addItem:mainMenu];
 		[NSApp setMainMenu:menuBar];
 
+		GioAppDelegate *del = [[GioAppDelegate alloc] init];
+
+		globalWindowDel = [[GioWindowDelegate alloc] init];
 		NSWindow *window = (__bridge NSWindow *)gio_createWindow(viewRef, title, width, height);
 
-		GioDelegate *del = [[GioDelegate alloc] init];
 		del.window = window;
-		[window setDelegate:del];
+
 		[NSApp setDelegate:del];
 
 		[NSApp run];

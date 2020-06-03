@@ -38,6 +38,7 @@ __attribute__ ((visibility ("hidden"))) CGFloat gio_getViewBackingScale(CFTypeRe
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
 __attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
 __attribute__ ((visibility ("hidden"))) void gio_setNeedsDisplay(CFTypeRef viewRef);
+__attribute__ ((visibility ("hidden"))) void gio_makeKeyAndOrderFront(CFTypeRef viewRef);
 */
 import "C"
 
@@ -278,6 +279,13 @@ func gio_onCreate(view C.CFTypeRef) {
 	w.w = wopts.window
 	w.w.SetDriver(w)
 	insertView(view, w)
+	if len(viewMap) == 1 {
+		C.CFRetain(view)
+		runOnMain(func() {
+			defer C.CFRelease(view)
+			C.gio_makeKeyAndOrderFront(view)
+		})
+	}
 }
 
 func NewWindow(win Callbacks, opts *Options) error {
