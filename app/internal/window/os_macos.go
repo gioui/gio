@@ -266,10 +266,8 @@ func gio_onCreate(view C.CFTypeRef) {
 		scale: scale,
 	}
 	dl, err := NewDisplayLink(func() {
-		C.CFRetain(view)
 		runOnMain(func() {
-			defer C.CFRelease(view)
-			C.gio_setNeedsDisplay(view)
+			C.gio_setNeedsDisplay(w.view)
 		})
 	})
 	if err != nil {
