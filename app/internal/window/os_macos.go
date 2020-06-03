@@ -31,15 +31,15 @@ import (
 #define GIO_MOUSE_DOWN 3
 #define GIO_MOUSE_SCROLL 4
 
-__attribute__ ((visibility ("hidden"))) void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height);
+__attribute__ ((visibility ("hidden"))) void gio_main(void);
 __attribute__ ((visibility ("hidden"))) CGFloat gio_viewWidth(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) CGFloat gio_viewHeight(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) CGFloat gio_getViewBackingScale(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
 __attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
 __attribute__ ((visibility ("hidden"))) void gio_setNeedsDisplay(CFTypeRef viewRef);
-__attribute__ ((visibility ("hidden"))) void gio_makeKeyAndOrderFront(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) void gio_appTerminate(void);
+__attribute__ ((visibility ("hidden"))) void gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height);
 */
 import "C"
 
@@ -60,16 +60,17 @@ type window struct {
 // viewMap is the mapping from Cocoa NSViews to Go windows.
 var viewMap = make(map[C.CFTypeRef]*window)
 
-var mainWindow = newWindowRendezvous()
-
 var viewFactory func() C.CFTypeRef
+
+// launched is closed when applicationDidFinishLaunching is called.
+var launched = make(chan struct{})
 
 // mustView is like lookoupView, except that it panics
 // if the view isn't mapped.
 func mustView(view C.CFTypeRef) *window {
 	w, ok := lookupView(view)
 	if !ok {
-		panic("no window view view")
+		panic("no window for view")
 	}
 	return w
 }
@@ -246,6 +247,8 @@ func gio_onClose(view C.CFTypeRef) {
 	w.displayLink.Close()
 	deleteView(view)
 	w.w.Event(system.DestroyEvent{})
+	w.view = 0
+	C.CFRelease(view)
 	if len(viewMap) == 0 {
 		C.gio_appTerminate()
 	}
@@ -277,8 +280,34 @@ func gio_onAppShow() {
 	}
 }
 
-//export gio_onCreate
-func gio_onCreate(view C.CFTypeRef) {
+//export gio_onFinishLaunching
+func gio_onFinishLaunching() {
+	close(launched)
+}
+
+func NewWindow(win Callbacks, opts *Options) error {
+	<-launched
+	errch := make(chan error)
+	var window *window
+	runOnMain(func() {
+		w, err := newWindow(win, opts)
+		window = w
+		errch <- err
+	})
+	if err := <-errch; err != nil {
+		return err
+	}
+	go func() {
+		win.SetDriver(window)
+	}()
+	return nil
+}
+
+func newWindow(win Callbacks, opts *Options) (*window, error) {
+	view := viewFactory()
+	if view == 0 {
+		return nil, errors.New("CreateWindow: failed to create view")
+	}
 	scale := float32(C.gio_getViewBackingScale(view))
 	w := &window{
 		view:  view,
@@ -286,48 +315,30 @@ func gio_onCreate(view C.CFTypeRef) {
 	}
 	dl, err := NewDisplayLink(func() {
 		runOnMain(func() {
-			C.gio_setNeedsDisplay(w.view)
+			if w.view != 0 {
+				C.gio_setNeedsDisplay(w.view)
+			}
 		})
 	})
-	if err != nil {
-		panic(err)
-	}
 	w.displayLink = dl
-	wopts := <-mainWindow.out
-	w.w = wopts.window
-	w.w.SetDriver(w)
-	insertView(view, w)
-	if len(viewMap) == 1 {
-		C.CFRetain(view)
-		runOnMain(func() {
-			defer C.CFRelease(view)
-			C.gio_makeKeyAndOrderFront(view)
-		})
-	}
-}
-
-func NewWindow(win Callbacks, opts *Options) error {
-	mainWindow.in <- windowAndOptions{win, opts}
-	return <-mainWindow.errs
-}
-
-func Main() {
-	wopts := <-mainWindow.out
-	view := viewFactory()
-	if view == 0 {
-		// TODO: return this error from CreateWindow.
-		panic(errors.New("CreateWindow: failed to create view"))
+	if err != nil {
+		C.CFRelease(view)
+		return nil, err
 	}
 	// Window sizes is in unscaled screen coordinates, not device pixels.
 	cfg := configFor(1.0)
-	opts := wopts.opts
-	w := cfg.Px(opts.Width)
-	h := cfg.Px(opts.Height)
-	w = int(float32(w))
-	h = int(float32(h))
+	width := cfg.Px(opts.Width)
+	height := cfg.Px(opts.Height)
 	title := C.CString(opts.Title)
 	defer C.free(unsafe.Pointer(title))
-	C.gio_main(view, title, C.CGFloat(w), C.CGFloat(h))
+	C.gio_createWindow(view, title, C.CGFloat(width), C.CGFloat(height))
+	w.w = win
+	insertView(view, w)
+	return w, nil
+}
+
+func Main() {
+	C.gio_main()
 }
 
 func convertKey(k rune) (string, bool) {

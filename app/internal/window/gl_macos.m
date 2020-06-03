@@ -22,8 +22,7 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 @interface GioView : NSOpenGLView 
 @end
 
-@implementation GioView {
-}
+@implementation GioView
 - (instancetype)initWithFrame:(NSRect)frameRect
 				  pixelFormat:(NSOpenGLPixelFormat *)format {
 	return [super initWithFrame:frameRect pixelFormat:format];

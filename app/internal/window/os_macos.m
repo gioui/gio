@@ -12,18 +12,6 @@
 @interface GioWindowDelegate : NSObject<NSWindowDelegate>
 @end
 
-@implementation GioAppDelegate
-- (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
-	[[NSRunningApplication currentApplication] activateWithOptions:(NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps)];
-}
-- (void)applicationDidHide:(NSNotification *)aNotification {
-	gio_onAppHide();
-}
-- (void)applicationWillUnhide:(NSNotification *)notification {
-	gio_onAppShow();
-}
-@end
-
 @implementation GioWindowDelegate
 - (void)windowWillMiniaturize:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
@@ -122,7 +110,7 @@ void gio_setDisplayLinkDisplay(CFTypeRef dl, uint64_t did) {
 	CVDisplayLinkSetCurrentCGDisplay((CVDisplayLinkRef)dl, (CGDirectDisplayID)did);
 }
 
-CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height) {
+void gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height) {
 	@autoreleasepool {
 		NSRect rect = NSMakeRect(0, 0, width, height);
 		NSUInteger styleMask = NSTitledWindowMask |
@@ -136,18 +124,13 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, 
 														   defer:NO];
 		[window setAcceptsMouseMovedEvents:YES];
 		window.title = [NSString stringWithUTF8String: title];
-		NSView *view = (NSView *)CFBridgingRelease(viewRef);
+		NSView *view = (__bridge NSView *)viewRef;
 		[window setContentView:view];
 		[window makeFirstResponder:view];
+		window.releasedWhenClosed = NO;
 		window.delegate = globalWindowDel;
-		gio_onCreate((__bridge CFTypeRef)view);
-		return (__bridge_retained CFTypeRef)window;
+		[window makeKeyAndOrderFront:nil];
 	}
-}
-
-void gio_makeKeyAndOrderFront(CFTypeRef viewRef) {
-	NSView *view = (__bridge NSView *)viewRef;
-	[view.window makeKeyAndOrderFront:nil];
 }
 
 void gio_appTerminate(void) {
@@ -156,9 +139,24 @@ void gio_appTerminate(void) {
 	}
 }
 
-void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height) {
+@implementation GioAppDelegate
+- (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
+	[[NSRunningApplication currentApplication] activateWithOptions:(NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps)];
+	gio_onFinishLaunching();
+}
+- (void)applicationDidHide:(NSNotification *)aNotification {
+	gio_onAppHide();
+}
+- (void)applicationWillUnhide:(NSNotification *)notification {
+	gio_onAppShow();
+}
+@end
+
+void gio_main() {
 	@autoreleasepool {
 		[NSApplication sharedApplication];
+		GioAppDelegate *del = [[GioAppDelegate alloc] init];
+		[NSApp setDelegate:del];
 		[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 
 		NSMenuItem *mainMenu = [NSMenuItem new];
@@ -177,12 +175,7 @@ void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat heigh
 		[menuBar addItem:mainMenu];
 		[NSApp setMainMenu:menuBar];
 
-		GioAppDelegate *del = [[GioAppDelegate alloc] init];
-
 		globalWindowDel = [[GioWindowDelegate alloc] init];
-		NSWindow *window = (__bridge NSWindow *)gio_createWindow(viewRef, title, width, height);
-
-		[NSApp setDelegate:del];
 
 		[NSApp run];
 	}
