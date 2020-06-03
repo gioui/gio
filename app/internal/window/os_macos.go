@@ -39,6 +39,7 @@ __attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
 __attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
 __attribute__ ((visibility ("hidden"))) void gio_setNeedsDisplay(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) void gio_makeKeyAndOrderFront(CFTypeRef viewRef);
+__attribute__ ((visibility ("hidden"))) void gio_appTerminate(void);
 */
 import "C"
 
@@ -239,12 +240,15 @@ func configFor(scale float32) config {
 	}
 }
 
-//export gio_onTerminate
-func gio_onTerminate(view C.CFTypeRef) {
+//export gio_onClose
+func gio_onClose(view C.CFTypeRef) {
 	w := mustView(view)
 	w.displayLink.Close()
 	deleteView(view)
 	w.w.Event(system.DestroyEvent{})
+	if len(viewMap) == 0 {
+		C.gio_appTerminate()
+	}
 }
 
 //export gio_onHide

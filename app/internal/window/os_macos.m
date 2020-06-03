@@ -50,8 +50,7 @@
 - (void)windowWillClose:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
 	window.delegate = nil;
-	gio_onTerminate((__bridge CFTypeRef)window.contentView);
-	[NSApp terminate:nil];
+	gio_onClose((__bridge CFTypeRef)window.contentView);
 }
 @end
 
@@ -149,6 +148,12 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, 
 void gio_makeKeyAndOrderFront(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
 	[view.window makeKeyAndOrderFront:nil];
+}
+
+void gio_appTerminate(void) {
+	@autoreleasepool {
+		[NSApp terminate:nil];
+	}
 }
 
 void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height) {
