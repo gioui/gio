@@ -109,9 +109,30 @@ void gio_setDisplayLinkDisplay(CFTypeRef dl, uint64_t did) {
 	CVDisplayLinkSetCurrentCGDisplay((CVDisplayLinkRef)dl, (CGDirectDisplayID)did);
 }
 
+CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height) {
+	@autoreleasepool {
+		NSRect rect = NSMakeRect(0, 0, width, height);
+		NSUInteger styleMask = NSTitledWindowMask |
+			NSResizableWindowMask |
+			NSMiniaturizableWindowMask |
+			NSClosableWindowMask;
+
+		NSWindow* window = [[NSWindow alloc] initWithContentRect:rect
+													   styleMask:styleMask
+														 backing:NSBackingStoreBuffered
+														   defer:NO];
+		[window setAcceptsMouseMovedEvents:YES];
+		window.title = [NSString stringWithUTF8String: title];
+		NSView *view = (NSView *)CFBridgingRelease(viewRef);
+		[window setContentView:view];
+		[window makeFirstResponder:view];
+		gio_onCreate((__bridge CFTypeRef)view);
+		return (__bridge_retained CFTypeRef)window;
+	}
+}
+
 void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height) {
 	@autoreleasepool {
-		NSView *view = (NSView *)CFBridgingRelease(viewRef);
 		[NSApplication sharedApplication];
 		[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 
@@ -131,25 +152,12 @@ void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat heigh
 		[menuBar addItem:mainMenu];
 		[NSApp setMainMenu:menuBar];
 
-		NSRect rect = NSMakeRect(0, 0, width, height);
-		NSUInteger styleMask = NSTitledWindowMask |
-			NSResizableWindowMask |
-			NSMiniaturizableWindowMask |
-			NSClosableWindowMask;
-		NSWindow* window = [[NSWindow alloc] initWithContentRect:rect
-													   styleMask:styleMask
-														 backing:NSBackingStoreBuffered
-														   defer:NO];
-		window.title = [NSString stringWithUTF8String: title];
-		[window setAcceptsMouseMovedEvents:YES];
+		NSWindow *window = (__bridge NSWindow *)gio_createWindow(viewRef, title, width, height);
 
-		gio_onCreate((__bridge CFTypeRef)view);
 		GioDelegate *del = [[GioDelegate alloc] init];
 		del.window = window;
 		[window setDelegate:del];
 		[NSApp setDelegate:del];
-		[window setContentView:view];
-		[window makeFirstResponder:view];
 
 		[NSApp run];
 	}
