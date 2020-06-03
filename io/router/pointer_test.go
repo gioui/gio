@@ -39,10 +39,7 @@ func TestPointerDrag(t *testing.T) {
 			},
 		},
 	)
-	ev := r.Events(handler)
-	if moves := countPointerEvents(pointer.Move, ev); moves != 1 {
-		t.Errorf("got %d move events, expected 1", moves)
-	}
+	assertEventSequence(t, r.Events(handler), pointer.Cancel, pointer.Enter, pointer.Press, pointer.Leave, pointer.Move)
 }
 
 func TestPointerMove(t *testing.T) {
@@ -85,32 +82,8 @@ func TestPointerMove(t *testing.T) {
 			},
 		},
 	)
-	ev1 := r.Events(handler1)
-	if cancels := countPointerEvents(pointer.Cancel, ev1); cancels != 1 {
-		t.Errorf("got %d cancel events, expected 1", cancels)
-	}
-	ev2 := r.Events(handler2)
-	if cancels := countPointerEvents(pointer.Cancel, ev2); cancels != 1 {
-		t.Errorf("got %d cancel events, expected 1", cancels)
-	}
-	if moves := countPointerEvents(pointer.Move, ev1); moves != 2 {
-		t.Errorf("got %d move events, expected 2", moves)
-	}
-	if moves := countPointerEvents(pointer.Move, ev2); moves != 1 {
-		t.Errorf("got %d move events, expected 1", moves)
-	}
-}
-
-func countPointerEvents(typ pointer.Type, events []event.Event) int {
-	c := 0
-	for _, e := range events {
-		if e, ok := e.(pointer.Event); ok {
-			if e.Type == typ {
-				c++
-			}
-		}
-	}
-	return c
+	assertEventSequence(t, r.Events(handler1), pointer.Cancel, pointer.Enter, pointer.Move, pointer.Move, pointer.Leave)
+	assertEventSequence(t, r.Events(handler2), pointer.Cancel, pointer.Enter, pointer.Move, pointer.Leave)
 }
 
 func TestPointerEnterLeave(t *testing.T) {
