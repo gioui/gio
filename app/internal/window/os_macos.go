@@ -8,7 +8,6 @@ import (
 	"errors"
 	"image"
 	"runtime"
-	"sync"
 	"time"
 	"unicode"
 	"unicode/utf16"
@@ -57,7 +56,7 @@ type window struct {
 }
 
 // viewMap is the mapping from Cocoa NSViews to Go windows.
-var viewMap sync.Map
+var viewMap = make(map[C.CFTypeRef]*window)
 
 var mainWindow = newWindowRendezvous()
 
@@ -74,19 +73,19 @@ func mustView(view C.CFTypeRef) *window {
 }
 
 func lookupView(view C.CFTypeRef) (*window, bool) {
-	w, exists := viewMap.Load(view)
+	w, exists := viewMap[view]
 	if !exists {
 		return nil, false
 	}
-	return w.(*window), true
+	return w, true
 }
 
 func deleteView(view C.CFTypeRef) {
-	viewMap.Delete(view)
+	delete(viewMap, view)
 }
 
 func insertView(view C.CFTypeRef, w *window) {
-	viewMap.Store(view, w)
+	viewMap[view] = w
 }
 
 func (w *window) contextView() C.CFTypeRef {
