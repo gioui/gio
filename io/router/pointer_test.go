@@ -125,6 +125,49 @@ func TestPointerTypes(t *testing.T) {
 	assertEventSequence(t, r.Events(handler), pointer.Cancel, pointer.Press, pointer.Release)
 }
 
+func TestPointerScroll(t *testing.T) {
+	handler1 := new(int)
+	handler2 := new(int)
+	var ops op.Ops
+
+	pointer.Rect(image.Rect(0, 0, 100, 100)).Add(&ops)
+	pointer.InputOp{Tag: handler1, Types: pointer.Scroll}.Add(&ops)
+
+	pointer.Rect(image.Rect(0, 0, 100, 50)).Add(&ops)
+	pointer.InputOp{Tag: handler2, Types: pointer.Scroll}.Add(&ops)
+
+	var r Router
+	r.Frame(&ops)
+	r.Add(
+		// Hit handler 2.
+		pointer.Event{
+			Type: pointer.Scroll,
+			Position: f32.Point{
+				X: 50,
+				Y: 25,
+			},
+		},
+		// Hit handler 1.
+		pointer.Event{
+			Type: pointer.Scroll,
+			Position: f32.Point{
+				X: 50,
+				Y: 75,
+			},
+		},
+		// Hit no handlers.
+		pointer.Event{
+			Type: pointer.Scroll,
+			Position: f32.Point{
+				X: 50,
+				Y: 125,
+			},
+		},
+	)
+	assertEventSequence(t, r.Events(handler1), pointer.Cancel, pointer.Scroll)
+	assertEventSequence(t, r.Events(handler2), pointer.Cancel, pointer.Scroll)
+}
+
 func TestPointerEnterLeave(t *testing.T) {
 	handler1 := new(int)
 	handler2 := new(int)

@@ -267,6 +267,11 @@ func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e poi
 		e.Position = h.transform.Invert().Transform(e.Position)
 
 		addPointerEvent(events, k, e, h.types)
+
+		// Only deliver scroll events to the foremost handler.
+		if e.Type == pointer.Scroll && e.Type&h.types != 0 {
+			return
+		}
 	}
 }
 
