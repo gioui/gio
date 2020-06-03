@@ -235,6 +235,10 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	}
 	p := &q.pointers[pidx]
 
+	if e.Type == pointer.Move && p.pressed {
+		e.Type = pointer.Drag
+	}
+
 	q.deliverEnterLeaveEvents(p, events, e)
 	if e.Type == pointer.Release {
 		q.deliverEvent(p, events, e)

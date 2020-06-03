@@ -174,7 +174,7 @@ func (s *Scroll) Add(ops *op.Ops) {
 	oph := pointer.InputOp{
 		Tag:   s,
 		Grab:  s.grab,
-		Types: pointer.Press | pointer.Move | pointer.Release | pointer.Scroll,
+		Types: pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll,
 	}
 	oph.Add(ops)
 	if s.flinger.Active() {
@@ -234,7 +234,7 @@ func (s *Scroll) Scroll(cfg unit.Converter, q event.Queue, t time.Time, axis Axi
 			iscroll := int(s.scroll)
 			s.scroll -= float32(iscroll)
 			total += iscroll
-		case pointer.Move:
+		case pointer.Drag:
 			if !s.dragging || s.pid != e.PointerID {
 				continue
 			}

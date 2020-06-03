@@ -12,7 +12,7 @@ Types
 
 Only events that match a specified list of types are delivered to a handler.
 
-For example, to receive Press, Move, and Release events (but not Enter,
+For example, to receive Press, Drag, and Release events (but not Move, Enter,
 Leave, or Scroll):
 
 	var ops op.Ops
@@ -20,7 +20,7 @@ Leave, or Scroll):
 
 	pointer.InputOp{
 		Tag:   h,
-		Types: pointer.Press | pointer.Move | pointer.Release,
+		Types: pointer.Press | pointer.Drag | pointer.Release,
 	}.Add(ops)
 
 Scroll events are only delivered to the foremost scroll handler.

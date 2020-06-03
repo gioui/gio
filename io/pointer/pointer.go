@@ -92,6 +92,8 @@ const (
 	Release
 	// Move of a pointer.
 	Move
+	// Drag of a pointer.
+	Drag
 	// Pointer enters an area watching for pointer input
 	Enter
 	// Pointer leaves an area watching for pointer input
@@ -180,6 +182,8 @@ func (t Type) String() string {
 		return "Cancel"
 	case Move:
 		return "Move"
+	case Drag:
+		return "Drag"
 	case Enter:
 		return "Enter"
 	case Leave:

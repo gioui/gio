@@ -39,7 +39,7 @@ func TestPointerDrag(t *testing.T) {
 			},
 		},
 	)
-	assertEventSequence(t, r.Events(handler), pointer.Cancel, pointer.Enter, pointer.Press, pointer.Leave, pointer.Move)
+	assertEventSequence(t, r.Events(handler), pointer.Cancel, pointer.Enter, pointer.Press, pointer.Leave, pointer.Drag)
 }
 
 func TestPointerMove(t *testing.T) {
@@ -446,7 +446,7 @@ func addPointerHandler(ops *op.Ops, tag event.Tag, area image.Rectangle) {
 	pointer.Rect(area).Add(ops)
 	pointer.InputOp{
 		Tag:   tag,
-		Types: pointer.Press | pointer.Move | pointer.Release | pointer.Enter | pointer.Leave,
+		Types: pointer.Press | pointer.Release | pointer.Move | pointer.Drag | pointer.Enter | pointer.Leave,
 	}.Add(ops)
 }
 
