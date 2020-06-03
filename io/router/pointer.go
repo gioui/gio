@@ -46,6 +46,7 @@ type pointerHandler struct {
 	active    bool
 	transform op.TransformOp
 	wantsGrab bool
+	types     pointer.Type
 }
 
 type areaOp struct {
@@ -109,6 +110,7 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t o
 			h.area = area
 			h.transform = t
 			h.wantsGrab = op.Grab
+			h.types = op.Types
 		}
 	}
 }
@@ -264,7 +266,7 @@ func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e poi
 		}
 		e.Position = h.transform.Invert().Transform(e.Position)
 
-		events.Add(k, e)
+		addPointerEvent(events, k, e, h.types)
 	}
 }
 
@@ -293,12 +295,18 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 		case !hit && entered != -1:
 			p.entered = append(p.entered[:entered], p.entered[entered+1:]...)
 			e.Type = pointer.Leave
-			events.Add(k, e)
+			addPointerEvent(events, k, e, h.types)
 		case hit && entered == -1:
 			p.entered = append(p.entered, k)
 			e.Type = pointer.Enter
-			events.Add(k, e)
+			addPointerEvent(events, k, e, h.types)
 		}
+	}
+}
+
+func addPointerEvent(events *handlerEvents, k event.Tag, e pointer.Event, types pointer.Type) {
+	if e.Type&types == e.Type {
+		events.Add(k, e)
 	}
 }
 
@@ -352,8 +360,9 @@ func decodePointerInputOp(d []byte, refs []interface{}) pointer.InputOp {
 		panic("invalid op")
 	}
 	return pointer.InputOp{
-		Tag:  refs[0].(event.Tag),
-		Grab: d[1] != 0,
+		Tag:   refs[0].(event.Tag),
+		Grab:  d[1] != 0,
+		Types: pointer.Type(d[2]),
 	}
 }
 

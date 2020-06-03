@@ -38,7 +38,7 @@ const (
 	TypePaintLen        = 1 + 4*4
 	TypeColorLen        = 1 + 4
 	TypeAreaLen         = 1 + 1 + 4*4
-	TypePointerInputLen = 1 + 1
+	TypePointerInputLen = 1 + 1 + 1
 	TypePassLen         = 1 + 1
 	TypeKeyInputLen     = 1 + 1
 	TypeHideInputLen    = 1

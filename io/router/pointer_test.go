@@ -47,12 +47,14 @@ func TestPointerMove(t *testing.T) {
 	handler2 := new(int)
 	var ops op.Ops
 
+	types := pointer.Move | pointer.Enter | pointer.Leave
+
 	// Handler 1 area: (0, 0) - (100, 100)
 	pointer.Rect(image.Rect(0, 0, 100, 100)).Add(&ops)
-	pointer.InputOp{Tag: handler1}.Add(&ops)
+	pointer.InputOp{Tag: handler1, Types: types}.Add(&ops)
 	// Handler 2 area: (50, 50) - (100, 100) (areas intersect).
 	pointer.Rect(image.Rect(50, 50, 200, 200)).Add(&ops)
-	pointer.InputOp{Tag: handler2}.Add(&ops)
+	pointer.InputOp{Tag: handler2, Types: types}.Add(&ops)
 
 	var r Router
 	r.Frame(&ops)
@@ -84,6 +86,43 @@ func TestPointerMove(t *testing.T) {
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Cancel, pointer.Enter, pointer.Move, pointer.Move, pointer.Leave)
 	assertEventSequence(t, r.Events(handler2), pointer.Cancel, pointer.Enter, pointer.Move, pointer.Leave)
+}
+
+func TestPointerTypes(t *testing.T) {
+	handler := new(int)
+	var ops op.Ops
+	pointer.Rect(image.Rect(0, 0, 100, 100)).Add(&ops)
+	pointer.InputOp{
+		Tag:   handler,
+		Types: pointer.Press | pointer.Release,
+	}.Add(&ops)
+
+	var r Router
+	r.Frame(&ops)
+	r.Add(
+		pointer.Event{
+			Type: pointer.Press,
+			Position: f32.Point{
+				X: 50,
+				Y: 50,
+			},
+		},
+		pointer.Event{
+			Type: pointer.Move,
+			Position: f32.Point{
+				X: 150,
+				Y: 150,
+			},
+		},
+		pointer.Event{
+			Type: pointer.Release,
+			Position: f32.Point{
+				X: 150,
+				Y: 150,
+			},
+		},
+	)
+	assertEventSequence(t, r.Events(handler), pointer.Cancel, pointer.Press, pointer.Release)
 }
 
 func TestPointerEnterLeave(t *testing.T) {
@@ -190,13 +229,15 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	handler2 := new(int)
 	var ops op.Ops
 
+	types := pointer.Press | pointer.Move | pointer.Release | pointer.Enter | pointer.Leave
+
 	// Handler 1 area: (0, 0) - (100, 100)
 	pointer.Rect(image.Rect(0, 0, 100, 100)).Add(&ops)
-	pointer.InputOp{Tag: handler1}.Add(&ops)
+	pointer.InputOp{Tag: handler1, Types: types}.Add(&ops)
 
 	// Handler 2 area: (25, 25) - (75, 75) (nested within first).
 	pointer.Rect(image.Rect(25, 25, 75, 75)).Add(&ops)
-	pointer.InputOp{Tag: handler2}.Add(&ops)
+	pointer.InputOp{Tag: handler2, Types: types}.Add(&ops)
 
 	var r Router
 	r.Frame(&ops)
@@ -360,7 +401,10 @@ func TestMultitouch(t *testing.T) {
 func addPointerHandler(ops *op.Ops, tag event.Tag, area image.Rectangle) {
 	defer op.Push(ops).Pop()
 	pointer.Rect(area).Add(ops)
-	pointer.InputOp{Tag: tag}.Add(ops)
+	pointer.InputOp{
+		Tag:   tag,
+		Types: pointer.Press | pointer.Move | pointer.Release | pointer.Enter | pointer.Leave,
+	}.Add(ops)
 }
 
 // pointerTypes converts a sequence of event.Event to their pointer.Types. It assumes
@@ -411,7 +455,10 @@ func BenchmarkRouterAdd(b *testing.B) {
 						Y: 100,
 					},
 				}).Add(&ops)
-				pointer.InputOp{Tag: handlers[i]}.Add(&ops)
+				pointer.InputOp{
+					Tag:   handlers[i],
+					Types: pointer.Move,
+				}.Add(&ops)
 			}
 			var r Router
 			r.Frame(&ops)

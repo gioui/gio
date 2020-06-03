@@ -8,15 +8,29 @@ object such as a finger.
 The InputOp operation is used to declare a handler ready for pointer
 events. Use an event.Queue to receive events.
 
+Types
+
+Only events that match a specified list of types are delivered to a handler.
+
+For example, to receive Press, Move, and Release events (but not Enter,
+Leave, or Scroll):
+
+	var ops op.Ops
+	var h *Handler = ...
+
+	pointer.InputOp{
+		Tag:   h,
+		Types: pointer.Press | pointer.Move | pointer.Release,
+	}.Add(ops)
+
+Cancel events are always delivered.
+
 Areas
 
 The area operations are used for specifying the area where
 subsequent InputOp are active.
 
 For example, to set up a rectangular hit area:
-
-	var ops op.Ops
-	var h *Handler = ...
 
 	r := image.Rectangle{...}
 	pointer.Rect(r).Add(ops)

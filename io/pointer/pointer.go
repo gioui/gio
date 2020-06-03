@@ -56,6 +56,8 @@ type InputOp struct {
 	// Grab, if set, request that the handler get
 	// Grabbed priority.
 	Grab bool
+	// Types is a bitwise-or of event types to receive.
+	Types Type
 }
 
 // PassOp sets the pass-through mode.
@@ -83,7 +85,7 @@ type areaKind uint8
 const (
 	// A Cancel event is generated when the current gesture is
 	// interrupted by other handlers or the system.
-	Cancel Type = iota
+	Cancel Type = (1 << iota) >> 1
 	// Press of a pointer.
 	Press
 	// Release of a pointer.
@@ -157,6 +159,7 @@ func (h InputOp) Add(o *op.Ops) {
 	if h.Grab {
 		data[1] = 1
 	}
+	data[2] = byte(h.Types)
 }
 
 func (op PassOp) Add(o *op.Ops) {
