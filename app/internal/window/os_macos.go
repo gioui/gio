@@ -259,6 +259,20 @@ func gio_onShow(view C.CFTypeRef) {
 	w.setStage(system.StageRunning)
 }
 
+//export gio_onAppHide
+func gio_onAppHide() {
+	for _, w := range viewMap {
+		w.setStage(system.StagePaused)
+	}
+}
+
+//export gio_onAppShow
+func gio_onAppShow() {
+	for _, w := range viewMap {
+		w.setStage(system.StageRunning)
+	}
+}
+
 //export gio_onCreate
 func gio_onCreate(view C.CFTypeRef) {
 	scale := float32(C.gio_getViewBackingScale(view))

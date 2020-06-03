@@ -7,7 +7,6 @@
 #include "_cgo_export.h"
 
 @interface GioAppDelegate : NSObject<NSApplicationDelegate>
-@property (strong,nonatomic) NSWindow *window;
 @end
 
 @interface GioWindowDelegate : NSObject<NSWindowDelegate>
@@ -18,10 +17,10 @@
 	[[NSRunningApplication currentApplication] activateWithOptions:(NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps)];
 }
 - (void)applicationDidHide:(NSNotification *)aNotification {
-	gio_onHide((__bridge CFTypeRef)self.window.contentView);
+	gio_onAppHide();
 }
 - (void)applicationWillUnhide:(NSNotification *)notification {
-	gio_onShow((__bridge CFTypeRef)self.window.contentView);
+	gio_onAppShow();
 }
 @end
 
@@ -177,8 +176,6 @@ void gio_main(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat heigh
 
 		globalWindowDel = [[GioWindowDelegate alloc] init];
 		NSWindow *window = (__bridge NSWindow *)gio_createWindow(viewRef, title, width, height);
-
-		del.window = window;
 
 		[NSApp setDelegate:del];
 
