@@ -23,8 +23,6 @@ Leave, or Scroll):
 		Types: pointer.Press | pointer.Drag | pointer.Release,
 	}.Add(ops)
 
-Scroll events are only delivered to the foremost scroll handler.
-
 Cancel events are always delivered.
 
 Areas
