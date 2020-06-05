@@ -113,6 +113,9 @@ const (
 	// Shared priority is for handlers that
 	// are part of a matching set larger than 1.
 	Shared Priority = iota
+	// Foremost priority is like Shared, but the
+	// handler is the foremost of the matching set.
+	Foremost
 	// Grabbed is used for matching sets of size 1.
 	Grabbed
 )
@@ -199,6 +202,8 @@ func (p Priority) String() string {
 	switch p {
 	case Shared:
 		return "Shared"
+	case Foremost:
+		return "Foremost"
 	case Grabbed:
 		return "Grabbed"
 	default:

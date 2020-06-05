@@ -225,6 +225,9 @@ func (s *Scroll) Scroll(cfg unit.Converter, q event.Queue, t time.Time, axis Axi
 			s.dragging = false
 			s.grab = false
 		case pointer.Scroll:
+			if e.Priority < pointer.Foremost {
+				continue
+			}
 			switch s.axis {
 			case Horizontal:
 				s.scroll += e.Scroll.X

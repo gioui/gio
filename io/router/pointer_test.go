@@ -125,7 +125,7 @@ func TestPointerTypes(t *testing.T) {
 	assertEventSequence(t, r.Events(handler), pointer.Cancel, pointer.Press, pointer.Release)
 }
 
-func TestPointerScroll(t *testing.T) {
+func TestPointerPriority(t *testing.T) {
 	handler1 := new(int)
 	handler2 := new(int)
 	var ops op.Ops
@@ -139,7 +139,7 @@ func TestPointerScroll(t *testing.T) {
 	var r Router
 	r.Frame(&ops)
 	r.Add(
-		// Hit handler 2.
+		// Hit both handlers.
 		pointer.Event{
 			Type: pointer.Scroll,
 			Position: f32.Point{
@@ -164,8 +164,12 @@ func TestPointerScroll(t *testing.T) {
 			},
 		},
 	)
-	assertEventSequence(t, r.Events(handler1), pointer.Cancel, pointer.Scroll)
-	assertEventSequence(t, r.Events(handler2), pointer.Cancel, pointer.Scroll)
+	hev1 := r.Events(handler1)
+	hev2 := r.Events(handler2)
+	assertEventSequence(t, hev1, pointer.Cancel, pointer.Scroll, pointer.Scroll)
+	assertEventSequence(t, hev2, pointer.Cancel, pointer.Scroll)
+	assertEventPriorities(t, hev1, pointer.Shared, pointer.Shared, pointer.Foremost)
+	assertEventPriorities(t, hev2, pointer.Shared, pointer.Foremost)
 }
 
 func TestPointerEnterLeave(t *testing.T) {
@@ -463,13 +467,27 @@ func pointerTypes(events []event.Event) []pointer.Type {
 	return types
 }
 
-// assertEventSequence ensures that the provided actualEvents match the expected event types
+// assertEventSequence checks that the provided events match the expected pointer event types
 // in the provided order.
 func assertEventSequence(t *testing.T, events []event.Event, expected ...pointer.Type) {
 	t.Helper()
 	got := pointerTypes(events)
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("expected %v events, got %v", expected, got)
+	}
+}
+
+// assertEventPriorities checks that the pointer.Event priorities of events match prios.
+func assertEventPriorities(t *testing.T, events []event.Event, prios ...pointer.Priority) {
+	t.Helper()
+	var got []pointer.Priority
+	for _, e := range events {
+		if e, ok := e.(pointer.Event); ok {
+			got = append(got, e.Priority)
+		}
+	}
+	if !reflect.DeepEqual(got, prios) {
+		t.Errorf("expected priorities %v, got %v", prios, got)
 	}
 }
 

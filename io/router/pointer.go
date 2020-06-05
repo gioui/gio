@@ -262,29 +262,34 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 }
 
 func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e pointer.Event) {
+	foremost := true
 	for _, k := range p.handlers {
 		h := q.handlers[k]
 		e := e
 		if p.pressed && len(p.handlers) == 1 {
 			e.Priority = pointer.Grabbed
+		} else if foremost {
+			e.Priority = pointer.Foremost
 		}
+
 		e.Position = h.transform.Invert().Transform(e.Position)
 
-		addPointerEvent(events, k, e, h.types)
-
-		// Only deliver scroll events to the foremost handler.
-		if e.Type == pointer.Scroll && e.Type&h.types != 0 {
-			return
+		if e.Type&h.types == e.Type {
+			foremost = false
+			events.Add(k, e)
 		}
 	}
 }
 
 func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEvents, e pointer.Event) {
+	foremost := true
 	for _, k := range p.handlers {
 		h := q.handlers[k]
 		e := e
 		if p.pressed && len(p.handlers) == 1 {
 			e.Priority = pointer.Grabbed
+		} else if foremost {
+			e.Priority = pointer.Foremost
 		}
 
 		// Hit-test to deliver Enter/Leave events. Consider non-mouse
@@ -304,18 +309,16 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 		case !hit && entered != -1:
 			p.entered = append(p.entered[:entered], p.entered[entered+1:]...)
 			e.Type = pointer.Leave
-			addPointerEvent(events, k, e, h.types)
 		case hit && entered == -1:
 			p.entered = append(p.entered, k)
 			e.Type = pointer.Enter
-			addPointerEvent(events, k, e, h.types)
+		default:
+			continue
 		}
-	}
-}
-
-func addPointerEvent(events *handlerEvents, k event.Tag, e pointer.Event, types pointer.Type) {
-	if e.Type&types == e.Type {
-		events.Add(k, e)
+		if e.Type&h.types == e.Type {
+			foremost = false
+			events.Add(k, e)
+		}
 	}
 }
 
