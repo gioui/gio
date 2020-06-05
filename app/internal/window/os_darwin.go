@@ -73,6 +73,9 @@ func gio_dispatchMainFuncs() {
 func nsstringToString(str C.CFTypeRef) string {
 	defer C.CFRelease(str)
 	n := C.gio_nsstringLength(str)
+	if n == 0 {
+		return ""
+	}
 	chars := make([]uint16, n)
 	C.gio_nsstringGetCharacters(str, (*C.unichar)(unsafe.Pointer(&chars[0])), 0, n)
 	utf8 := utf16.Decode(chars)
