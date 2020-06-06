@@ -39,7 +39,7 @@ __attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
 __attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
 __attribute__ ((visibility ("hidden"))) void gio_setNeedsDisplay(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) void gio_appTerminate(void);
-__attribute__ ((visibility ("hidden"))) void gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height);
+__attribute__ ((visibility ("hidden"))) NSPoint gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height, NSPoint topLeft);
 */
 import "C"
 
@@ -64,6 +64,10 @@ var viewFactory func() C.CFTypeRef
 
 // launched is closed when applicationDidFinishLaunching is called.
 var launched = make(chan struct{})
+
+// nextTopLeft is the offset to use for the next window's call to
+// cascadeTopLeftFromPoint.
+var nextTopLeft C.NSPoint
 
 // mustView is like lookoupView, except that it panics
 // if the view isn't mapped.
@@ -331,7 +335,7 @@ func newWindow(win Callbacks, opts *Options) (*window, error) {
 	height := cfg.Px(opts.Height)
 	title := C.CString(opts.Title)
 	defer C.free(unsafe.Pointer(title))
-	C.gio_createWindow(view, title, C.CGFloat(width), C.CGFloat(height))
+	nextTopLeft = C.gio_createWindow(view, title, C.CGFloat(width), C.CGFloat(height), nextTopLeft)
 	w.w = win
 	insertView(view, w)
 	return w, nil
