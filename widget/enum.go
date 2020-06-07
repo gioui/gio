@@ -31,7 +31,7 @@ func index(vs []string, t string) int {
 // call to Changed.
 func (e *Enum) Changed() bool {
 	changed := e.changed
-	e.changed = true
+	e.changed = false
 	return changed
 }
 
