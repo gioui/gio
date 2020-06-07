@@ -26,8 +26,6 @@ import (
 	"gioui.org/io/system"
 )
 
-var winMap = make(map[syscall.Handle]*window)
-
 type window struct {
 	hwnd        syscall.Handle
 	hdc         syscall.Handle
@@ -44,16 +42,34 @@ type window struct {
 
 const _WM_REDRAW = windows.WM_USER + 0
 
-var onceMu sync.Mutex
 var mainDone = make(chan struct{})
+
+type gpuAPI struct {
+	priority    int
+	initializer func(w *window) (Context, error)
+}
 
 // backends is the list of potential Context
 // implementations.
 var backends []gpuAPI
 
-type gpuAPI struct {
-	priority    int
-	initializer func(w *window) (Context, error)
+var winMap struct {
+	mu      sync.Mutex
+	windows map[syscall.Handle]*window
+}
+
+var resources struct {
+	once sync.Once
+	// handle is the module handle from GetModuleHandle.
+	handle syscall.Handle
+	// class is the Gio window class from RegisterClassEx.
+	class uint16
+	// cursor is the arrow cursor resource
+	cursor syscall.Handle
+}
+
+func init() {
+	winMap.windows = make(map[syscall.Handle]*window)
 }
 
 func Main() {
@@ -61,11 +77,6 @@ func Main() {
 }
 
 func NewWindow(window Callbacks, opts *Options) error {
-	onceMu.Lock()
-	defer onceMu.Unlock()
-	if len(winMap) > 0 {
-		return errors.New("multiple windows are not supported")
-	}
 	cerr := make(chan error)
 	go func() {
 		// Call win32 API from a single OS thread.
@@ -77,8 +88,20 @@ func NewWindow(window Callbacks, opts *Options) error {
 		}
 		defer w.destroy()
 		cerr <- nil
-		winMap[w.hwnd] = w
-		defer delete(winMap, w.hwnd)
+		winMap.mu.Lock()
+		winMap.windows[w.hwnd] = w
+		winMap.mu.Unlock()
+		defer func() {
+			winMap.mu.Lock()
+			defer winMap.mu.Unlock()
+			delete(winMap.windows, w.hwnd)
+			if len(winMap.windows) == 0 {
+				select {
+				case mainDone <- struct{}{}:
+				default:
+				}
+			}
+		}()
 		w.w = window
 		w.w.SetDriver(w)
 		defer w.w.Event(system.DestroyEvent{})
@@ -88,22 +111,23 @@ func NewWindow(window Callbacks, opts *Options) error {
 		if err := w.loop(); err != nil {
 			panic(err)
 		}
-		close(mainDone)
 	}()
 	return <-cerr
 }
 
-func createNativeWindow(opts *Options) (*window, error) {
+// initResources initializes the resources global.
+func initResources() error {
 	windows.SetProcessDPIAware()
-	cfg := configForDC()
 	hInst, err := windows.GetModuleHandle()
 	if err != nil {
-		return nil, err
+		return err
 	}
+	resources.handle = hInst
 	curs, err := windows.LoadCursor(windows.IDC_ARROW)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	resources.cursor = curs
 	wcls := windows.WndClassEx{
 		CbSize:        uint32(unsafe.Sizeof(windows.WndClassEx{})),
 		Style:         windows.CS_HREDRAW | windows.CS_VREDRAW | windows.CS_OWNDC,
@@ -114,8 +138,21 @@ func createNativeWindow(opts *Options) (*window, error) {
 	}
 	cls, err := windows.RegisterClassEx(&wcls)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	resources.class = cls
+	return nil
+}
+
+func createNativeWindow(opts *Options) (*window, error) {
+	var resErr error
+	resources.once.Do(func() {
+		resErr = initResources()
+	})
+	if resErr != nil {
+		return nil, resErr
+	}
+	cfg := configForDC()
 	wr := windows.Rect{
 		Right:  int32(cfg.Px(opts.Width)),
 		Bottom: int32(cfg.Px(opts.Height)),
@@ -124,7 +161,7 @@ func createNativeWindow(opts *Options) (*window, error) {
 	dwExStyle := uint32(windows.WS_EX_APPWINDOW | windows.WS_EX_WINDOWEDGE)
 	windows.AdjustWindowRectEx(&wr, dwStyle, 0, dwExStyle)
 	hwnd, err := windows.CreateWindowEx(dwExStyle,
-		cls,
+		resources.class,
 		opts.Title,
 		dwStyle|windows.WS_CLIPSIBLINGS|windows.WS_CLIPCHILDREN,
 		windows.CW_USEDEFAULT, windows.CW_USEDEFAULT,
@@ -132,7 +169,7 @@ func createNativeWindow(opts *Options) (*window, error) {
 		wr.Bottom-wr.Top,
 		0,
 		0,
-		hInst,
+		resources.handle,
 		0)
 	if err != nil {
 		return nil, err
@@ -148,7 +185,9 @@ func createNativeWindow(opts *Options) (*window, error) {
 }
 
 func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr {
-	w := winMap[hwnd]
+	winMap.mu.Lock()
+	w := winMap.windows[hwnd]
+	winMap.mu.Unlock()
 	switch msg {
 	case windows.WM_UNICHAR:
 		if wParam == windows.UNICODE_NOCHAR {
