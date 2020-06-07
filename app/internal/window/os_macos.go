@@ -292,26 +292,23 @@ func gio_onFinishLaunching() {
 func NewWindow(win Callbacks, opts *Options) error {
 	<-launched
 	errch := make(chan error)
-	var window *window
 	runOnMain(func() {
 		w, err := newWindow(win, opts)
-		window = w
-		errch <- err
-	})
-	if err := <-errch; err != nil {
-		return err
-	}
-	runOnMain(func() {
+		if err != nil {
+			errch <- err
+			return
+		}
 		// Window sizes is in unscaled screen coordinates, not device pixels.
 		cfg := configFor(1.0)
 		width := cfg.Px(opts.Width)
 		height := cfg.Px(opts.Height)
 		title := C.CString(opts.Title)
 		defer C.free(unsafe.Pointer(title))
-		nextTopLeft = C.gio_createWindow(window.view, title, C.CGFloat(width), C.CGFloat(height), nextTopLeft)
-		win.SetDriver(window)
+		errch <- nil
+		nextTopLeft = C.gio_createWindow(w.view, title, C.CGFloat(width), C.CGFloat(height), nextTopLeft)
+		win.SetDriver(w)
 	})
-	return nil
+	return <-errch
 }
 
 func newWindow(win Callbacks, opts *Options) (*window, error) {
