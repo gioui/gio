@@ -116,7 +116,7 @@ loop:
 				h = new(keyHandler)
 				q.handlers[op.Tag] = h
 				// Reset the handler on (each) first appearance.
-				events.Set(op.Tag, []event.Event{key.FocusEvent{Focus: false}})
+				events.Add(op.Tag, key.FocusEvent{Focus: false})
 			}
 			h.active = true
 		case opconst.TypeHideInput:

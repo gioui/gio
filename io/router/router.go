@@ -137,12 +137,6 @@ func (h *handlerEvents) init() {
 	}
 }
 
-func (h *handlerEvents) Set(k event.Tag, evts []event.Event) {
-	h.init()
-	h.handlers[k] = evts
-	h.hadEvents = true
-}
-
 func (h *handlerEvents) Add(k event.Tag, e event.Event) {
 	h.init()
 	h.handlers[k] = append(h.handlers[k], e)

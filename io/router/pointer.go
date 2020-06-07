@@ -104,7 +104,7 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t o
 			if !ok {
 				h = new(pointerHandler)
 				q.handlers[op.Tag] = h
-				events.Set(op.Tag, []event.Event{pointer.Event{Type: pointer.Cancel}})
+				events.Add(op.Tag, pointer.Event{Type: pointer.Cancel})
 			}
 			h.active = true
 			h.area = area
