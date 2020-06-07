@@ -28,94 +28,118 @@ type Shaper interface {
 	Metrics(font Font, size fixed.Int26_6) font.Metrics
 }
 
-// FontRegistry implements layout and shaping of text from a set of
+// Collection maps Fonts to Faces.
+type Collection struct {
+	def   Typeface
+	faces map[Font]Face
+}
+
+// Cache implements cached layout and shaping of text from a set of
 // registered fonts.
 //
-// If a font matches no registered shape, FontRegistry falls back to the
+// If a font matches no registered shape, Cache falls back to the
 // first registered face.
 //
 // The LayoutString and ShapeString results are cached and re-used if
 // possible.
-type FontRegistry struct {
-	def   Typeface
-	faces map[Font]*face
+type Cache struct {
+	col   *Collection
+	faces map[Font]*faceCache
 }
 
-type face struct {
-	face        Face
+type faceCache struct {
 	layoutCache layoutCache
 	pathCache   pathCache
 }
 
-func (s *FontRegistry) Register(font Font, tf Face) {
-	if s.faces == nil {
-		s.def = font.Typeface
-		s.faces = make(map[Font]*face)
+func (c *Collection) Register(font Font, tf Face) {
+	if c.faces == nil {
+		c.def = font.Typeface
+		c.faces = make(map[Font]Face)
 	}
 	if font.Weight == 0 {
 		font.Weight = Normal
 	}
-	s.faces[font] = &face{
-		face: tf,
+	c.faces[font] = tf
+}
+
+// Lookup a font and return the effective font and its
+// font face.
+func (c *Collection) Lookup(font Font) (Font, Face) {
+	var f Face
+	font, f = c.faceForStyle(font)
+	if f == nil {
+		font.Typeface = c.def
+		font, f = c.faceForStyle(font)
 	}
+	return font, f
 }
 
-func (s *FontRegistry) Layout(font Font, size fixed.Int26_6, maxWidth int, txt io.Reader) ([]Line, error) {
-	tf := s.faceForFont(font)
-	return tf.face.Layout(size, maxWidth, txt)
-}
-
-func (s *FontRegistry) Shape(font Font, size fixed.Int26_6, layout []Glyph) op.CallOp {
-	tf := s.faceForFont(font)
-	return tf.face.Shape(size, layout)
-}
-
-func (s *FontRegistry) LayoutString(font Font, size fixed.Int26_6, maxWidth int, str string) []Line {
-	tf := s.faceForFont(font)
-	return tf.layout(size, maxWidth, str)
-}
-
-func (s *FontRegistry) ShapeString(font Font, size fixed.Int26_6, str string, layout []Glyph) op.CallOp {
-	tf := s.faceForFont(font)
-	return tf.shape(size, str, layout)
-}
-
-func (s *FontRegistry) Metrics(font Font, size fixed.Int26_6) font.Metrics {
-	tf := s.faceForFont(font)
-	return tf.metrics(size)
-}
-
-func (s *FontRegistry) faceForStyle(font Font) *face {
-	tf := s.faces[font]
+func (c *Collection) faceForStyle(font Font) (Font, Face) {
+	tf := c.faces[font]
 	if tf == nil {
 		font := font
 		font.Weight = Normal
-		tf = s.faces[font]
+		tf = c.faces[font]
 	}
 	if tf == nil {
 		font := font
 		font.Style = Regular
-		tf = s.faces[font]
+		tf = c.faces[font]
 	}
 	if tf == nil {
 		font := font
 		font.Style = Regular
 		font.Weight = Normal
-		tf = s.faces[font]
+		tf = c.faces[font]
 	}
-	return tf
+	return font, tf
 }
 
-func (s *FontRegistry) faceForFont(font Font) *face {
-	tf := s.faceForStyle(font)
-	if tf == nil {
-		font.Typeface = s.def
-		tf = s.faceForStyle(font)
+func NewCache(fonts *Collection) *Cache {
+	return &Cache{
+		col:   fonts,
+		faces: make(map[Font]*faceCache),
 	}
-	return tf
 }
 
-func (t *face) layout(ppem fixed.Int26_6, maxWidth int, str string) []Line {
+func (s *Cache) Layout(font Font, size fixed.Int26_6, maxWidth int, txt io.Reader) ([]Line, error) {
+	_, face := s.faceForFont(font)
+	return face.Layout(size, maxWidth, txt)
+}
+
+func (s *Cache) Shape(font Font, size fixed.Int26_6, layout []Glyph) op.CallOp {
+	_, face := s.faceForFont(font)
+	return face.Shape(size, layout)
+}
+
+func (s *Cache) LayoutString(font Font, size fixed.Int26_6, maxWidth int, str string) []Line {
+	cache, face := s.faceForFont(font)
+	return cache.layout(face, size, maxWidth, str)
+}
+
+func (s *Cache) ShapeString(font Font, size fixed.Int26_6, str string, layout []Glyph) op.CallOp {
+	cache, face := s.faceForFont(font)
+	return cache.shape(face, size, str, layout)
+}
+
+func (s *Cache) Metrics(font Font, size fixed.Int26_6) font.Metrics {
+	cache, face := s.faceForFont(font)
+	return cache.metrics(face, size)
+}
+
+func (s *Cache) faceForFont(font Font) (*faceCache, Face) {
+	var f Face
+	font, f = s.col.Lookup(font)
+	cache, exists := s.faces[font]
+	if !exists {
+		cache = new(faceCache)
+		s.faces[font] = cache
+	}
+	return cache, f
+}
+
+func (t *faceCache) layout(face Face, ppem fixed.Int26_6, maxWidth int, str string) []Line {
 	if t == nil {
 		return nil
 	}
@@ -127,12 +151,12 @@ func (t *face) layout(ppem fixed.Int26_6, maxWidth int, str string) []Line {
 	if l, ok := t.layoutCache.Get(lk); ok {
 		return l
 	}
-	l, _ := t.face.Layout(ppem, maxWidth, strings.NewReader(str))
+	l, _ := face.Layout(ppem, maxWidth, strings.NewReader(str))
 	t.layoutCache.Put(lk, l)
 	return l
 }
 
-func (t *face) shape(ppem fixed.Int26_6, str string, layout []Glyph) op.CallOp {
+func (t *faceCache) shape(face Face, ppem fixed.Int26_6, str string, layout []Glyph) op.CallOp {
 	if t == nil {
 		return op.CallOp{}
 	}
@@ -143,11 +167,11 @@ func (t *face) shape(ppem fixed.Int26_6, str string, layout []Glyph) op.CallOp {
 	if clip, ok := t.pathCache.Get(pk); ok {
 		return clip
 	}
-	clip := t.face.Shape(ppem, layout)
+	clip := face.Shape(ppem, layout)
 	t.pathCache.Put(pk, clip)
 	return clip
 }
 
-func (t *face) metrics(ppem fixed.Int26_6) font.Metrics {
-	return t.face.Metrics(ppem)
+func (t *faceCache) metrics(face Face, ppem fixed.Int26_6) font.Metrics {
+	return face.Metrics(ppem)
 }

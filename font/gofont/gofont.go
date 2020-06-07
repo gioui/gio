@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// Package gofont registers the Go fonts in the font registry.
+// Package gofont exports the Go fonts as a text.Collection.
 //
 // See https://blog.golang.org/go-fonts for a description of the
 // fonts, and the golang.org/x/image/font/gofont packages for the
@@ -9,8 +9,8 @@ package gofont
 
 import (
 	"fmt"
+	"sync"
 
-	"gioui.org/font"
 	"gioui.org/font/opentype"
 	"gioui.org/text"
 	"golang.org/x/image/font/gofont/gobold"
@@ -27,27 +27,37 @@ import (
 	"golang.org/x/image/font/gofont/gosmallcapsitalic"
 )
 
-func Register() {
-	register(text.Font{}, goregular.TTF)
-	register(text.Font{Style: text.Italic}, goitalic.TTF)
-	register(text.Font{Weight: text.Bold}, gobold.TTF)
-	register(text.Font{Style: text.Italic, Weight: text.Bold}, gobolditalic.TTF)
-	register(text.Font{Weight: text.Medium}, gomedium.TTF)
-	register(text.Font{Weight: text.Medium, Style: text.Italic}, gomediumitalic.TTF)
-	register(text.Font{Variant: "Mono"}, gomono.TTF)
-	register(text.Font{Variant: "Mono", Weight: text.Bold}, gomonobold.TTF)
-	register(text.Font{Variant: "Mono", Weight: text.Bold, Style: text.Italic}, gomonobolditalic.TTF)
-	register(text.Font{Variant: "Mono", Style: text.Italic}, gomonoitalic.TTF)
-	register(text.Font{Variant: "Mono", Style: text.Italic}, gomonoitalic.TTF)
-	register(text.Font{Variant: "Smallcaps"}, gosmallcaps.TTF)
-	register(text.Font{Variant: "Smallcaps", Style: text.Italic}, gosmallcapsitalic.TTF)
+var (
+	once       sync.Once
+	collection *text.Collection
+)
+
+func Collection() *text.Collection {
+	once.Do(func() {
+		c := new(text.Collection)
+		register(c, text.Font{}, goregular.TTF)
+		register(c, text.Font{Style: text.Italic}, goitalic.TTF)
+		register(c, text.Font{Weight: text.Bold}, gobold.TTF)
+		register(c, text.Font{Style: text.Italic, Weight: text.Bold}, gobolditalic.TTF)
+		register(c, text.Font{Weight: text.Medium}, gomedium.TTF)
+		register(c, text.Font{Weight: text.Medium, Style: text.Italic}, gomediumitalic.TTF)
+		register(c, text.Font{Variant: "Mono"}, gomono.TTF)
+		register(c, text.Font{Variant: "Mono", Weight: text.Bold}, gomonobold.TTF)
+		register(c, text.Font{Variant: "Mono", Weight: text.Bold, Style: text.Italic}, gomonobolditalic.TTF)
+		register(c, text.Font{Variant: "Mono", Style: text.Italic}, gomonoitalic.TTF)
+		register(c, text.Font{Variant: "Mono", Style: text.Italic}, gomonoitalic.TTF)
+		register(c, text.Font{Variant: "Smallcaps"}, gosmallcaps.TTF)
+		register(c, text.Font{Variant: "Smallcaps", Style: text.Italic}, gosmallcapsitalic.TTF)
+		collection = c
+	})
+	return collection
 }
 
-func register(fnt text.Font, ttf []byte) {
+func register(c *text.Collection, fnt text.Font, ttf []byte) {
 	face, err := opentype.Parse(ttf)
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse font: %v", err))
 	}
 	fnt.Typeface = "Go"
-	font.Register(fnt, face)
+	c.Register(fnt, face)
 }

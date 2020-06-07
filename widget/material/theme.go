@@ -6,7 +6,6 @@ import (
 	"image/color"
 
 	"gioui.org/f32"
-	"gioui.org/font"
 	"gioui.org/layout"
 	"gioui.org/op/paint"
 	"gioui.org/text"
@@ -30,9 +29,9 @@ type Theme struct {
 	radioUncheckedIcon    *widget.Icon
 }
 
-func NewTheme() *Theme {
+func NewTheme(col *text.Collection) *Theme {
 	t := &Theme{
-		Shaper: font.Default(),
+		Shaper: text.NewCache(col),
 	}
 	t.Color.Primary = rgb(0x3f51b5)
 	t.Color.Text = rgb(0x000000)
