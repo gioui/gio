@@ -35,6 +35,7 @@ __attribute__ ((visibility ("hidden"))) void gio_main(void);
 __attribute__ ((visibility ("hidden"))) CGFloat gio_viewWidth(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) CGFloat gio_viewHeight(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) CGFloat gio_getViewBackingScale(CFTypeRef viewRef);
+__attribute__ ((visibility ("hidden"))) CGFloat gio_getScreenBackingScale(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
 __attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
 __attribute__ ((visibility ("hidden"))) void gio_setNeedsDisplay(CFTypeRef viewRef);
@@ -298,10 +299,13 @@ func NewWindow(win Callbacks, opts *Options) error {
 			errch <- err
 			return
 		}
-		// Window sizes is in unscaled screen coordinates, not device pixels.
-		cfg := configFor(1.0)
+		screenScale := float32(C.gio_getScreenBackingScale())
+		cfg := configFor(screenScale)
 		width := cfg.Px(opts.Width)
 		height := cfg.Px(opts.Height)
+		// Window sizes is in unscaled screen coordinates, not device pixels.
+		width = int(float32(width) / screenScale)
+		height = int(float32(height) / screenScale)
 		title := C.CString(opts.Title)
 		defer C.free(unsafe.Pointer(title))
 		errch <- nil

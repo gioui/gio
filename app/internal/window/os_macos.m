@@ -77,6 +77,10 @@ CGFloat gio_viewWidth(CFTypeRef viewRef) {
 	return [view bounds].size.width;
 }
 
+CGFloat gio_getScreenBackingScale(void) {
+	return [NSScreen.mainScreen backingScaleFactor];
+}
+
 CGFloat gio_getViewBackingScale(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
 	return [view.window backingScaleFactor];
