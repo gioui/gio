@@ -69,11 +69,10 @@ func main() {
 	// Enable sRGB.
 	gl.Enable(gl.FRAMEBUFFER_SRGB)
 
-	gofont.Register()
 	f := new(goglFunctions)
 	var queue router.Router
 	var ops op.Ops
-	th := material.NewTheme()
+	th := material.NewTheme(gofont.Collection())
 	backend, err := giogl.NewBackend(f)
 	if err != nil {
 		log.Fatal(err)

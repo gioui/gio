@@ -33,8 +33,7 @@ func main() {
 }
 
 func loop(w *app.Window) error {
-	gofont.Register()
-	th := material.NewTheme()
+	th := material.NewTheme(gofont.Collection())
 	var ops op.Ops
 	for {
 		e := <-w.Events()

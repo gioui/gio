@@ -71,8 +71,7 @@ type (
 )
 
 func init() {
-	gofont.Register()
-	theme = material.NewTheme()
+	theme = material.NewTheme(gofont.Collection())
 	theme.Color.Text = rgb(0x333333)
 	theme.Color.Hint = rgb(0xbbbbbb)
 }

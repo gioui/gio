@@ -53,7 +53,6 @@ func main() {
 	}
 	icon = ic
 	progressIncrementer = make(chan int)
-	gofont.Register()
 	if *screenshot != "" {
 		if err := saveScreenshot(*screenshot); err != nil {
 			fmt.Fprintf(os.Stderr, "failed to save screenshot: %v\n", err)
@@ -90,7 +89,7 @@ func saveScreenshot(f string) error {
 		Config:      &scaledConfig{scale},
 		Constraints: layout.Exact(sz),
 	}
-	th := material.NewTheme()
+	th := material.NewTheme(gofont.Collection())
 	kitchen(gtx, th)
 	w.Frame(gtx.Ops)
 	img, err := w.Screenshot()
@@ -105,7 +104,7 @@ func saveScreenshot(f string) error {
 }
 
 func loop(w *app.Window) error {
-	th := material.NewTheme()
+	th := material.NewTheme(gofont.Collection())
 
 	var ops op.Ops
 	for {
