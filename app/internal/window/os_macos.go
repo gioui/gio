@@ -301,9 +301,16 @@ func NewWindow(win Callbacks, opts *Options) error {
 	if err := <-errch; err != nil {
 		return err
 	}
-	go func() {
+	runOnMain(func() {
+		// Window sizes is in unscaled screen coordinates, not device pixels.
+		cfg := configFor(1.0)
+		width := cfg.Px(opts.Width)
+		height := cfg.Px(opts.Height)
+		title := C.CString(opts.Title)
+		defer C.free(unsafe.Pointer(title))
+		nextTopLeft = C.gio_createWindow(window.view, title, C.CGFloat(width), C.CGFloat(height), nextTopLeft)
 		win.SetDriver(window)
-	}()
+	})
 	return nil
 }
 
@@ -316,6 +323,7 @@ func newWindow(win Callbacks, opts *Options) (*window, error) {
 	w := &window{
 		view:  view,
 		scale: scale,
+		w:     win,
 	}
 	dl, err := NewDisplayLink(func() {
 		runOnMain(func() {
@@ -329,14 +337,6 @@ func newWindow(win Callbacks, opts *Options) (*window, error) {
 		C.CFRelease(view)
 		return nil, err
 	}
-	// Window sizes is in unscaled screen coordinates, not device pixels.
-	cfg := configFor(1.0)
-	width := cfg.Px(opts.Width)
-	height := cfg.Px(opts.Height)
-	title := C.CString(opts.Title)
-	defer C.free(unsafe.Pointer(title))
-	nextTopLeft = C.gio_createWindow(view, title, C.CGFloat(width), C.CGFloat(height), nextTopLeft)
-	w.w = win
 	insertView(view, w)
 	return w, nil
 }
