@@ -78,7 +78,8 @@ var ackEvent event.Event
 // NewWindow returns the window previously created by the
 // platform.
 //
-// BUG: Calling NewWindow more than once is not yet supported.
+// Calling NewWindow more than once is not supported on
+// iOS, Android, WebAssembly.
 func NewWindow(options ...Option) *Window {
 	opts := &window.Options{
 		Width:  unit.Dp(800),
