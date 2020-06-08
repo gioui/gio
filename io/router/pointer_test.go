@@ -24,19 +24,13 @@ func TestPointerDrag(t *testing.T) {
 	r.Add(
 		// Press.
 		pointer.Event{
-			Type: pointer.Press,
-			Position: f32.Point{
-				X: 50,
-				Y: 50,
-			},
+			Type:     pointer.Press,
+			Position: f32.Pt(50, 50),
 		},
 		// Move outside the area.
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 150,
-				Y: 150,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(150, 150),
 		},
 	)
 	assertEventSequence(t, r.Events(handler), pointer.Cancel, pointer.Enter, pointer.Press, pointer.Leave, pointer.Drag)
@@ -61,27 +55,18 @@ func TestPointerMove(t *testing.T) {
 	r.Add(
 		// Hit both handlers.
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 50,
-				Y: 50,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(50, 50),
 		},
 		// Hit handler 1.
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 49,
-				Y: 50,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(49, 50),
 		},
 		// Hit no handlers.
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 100,
-				Y: 50,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(100, 50),
 		},
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Cancel, pointer.Enter, pointer.Move, pointer.Move, pointer.Leave)
@@ -101,25 +86,16 @@ func TestPointerTypes(t *testing.T) {
 	r.Frame(&ops)
 	r.Add(
 		pointer.Event{
-			Type: pointer.Press,
-			Position: f32.Point{
-				X: 50,
-				Y: 50,
-			},
+			Type:     pointer.Press,
+			Position: f32.Pt(50, 50),
 		},
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 150,
-				Y: 150,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(150, 150),
 		},
 		pointer.Event{
-			Type: pointer.Release,
-			Position: f32.Point{
-				X: 150,
-				Y: 150,
-			},
+			Type:     pointer.Release,
+			Position: f32.Pt(150, 150),
 		},
 	)
 	assertEventSequence(t, r.Events(handler), pointer.Cancel, pointer.Press, pointer.Release)
@@ -141,27 +117,18 @@ func TestPointerPriority(t *testing.T) {
 	r.Add(
 		// Hit both handlers.
 		pointer.Event{
-			Type: pointer.Scroll,
-			Position: f32.Point{
-				X: 50,
-				Y: 25,
-			},
+			Type:     pointer.Scroll,
+			Position: f32.Pt(50, 25),
 		},
 		// Hit handler 1.
 		pointer.Event{
-			Type: pointer.Scroll,
-			Position: f32.Point{
-				X: 50,
-				Y: 75,
-			},
+			Type:     pointer.Scroll,
+			Position: f32.Pt(50, 75),
 		},
 		// Hit no handlers.
 		pointer.Event{
-			Type: pointer.Scroll,
-			Position: f32.Point{
-				X: 50,
-				Y: 125,
-			},
+			Type:     pointer.Scroll,
+			Position: f32.Pt(50, 125),
 		},
 	)
 	hev1 := r.Events(handler1)
@@ -180,7 +147,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	// Handler 1 area: (0, 0) - (100, 100)
 	addPointerHandler(&ops, handler1, image.Rect(0, 0, 100, 100))
 
-	// Handler 2 area: (50, 50) - (100, 100) (areas overlap).
+	// Handler 2 area: (50, 50) - (200, 200) (areas overlap).
 	addPointerHandler(&ops, handler2, image.Rect(50, 50, 200, 200))
 
 	var r Router
@@ -188,11 +155,8 @@ func TestPointerEnterLeave(t *testing.T) {
 	// Hit both handlers.
 	r.Add(
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 50,
-				Y: 50,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(50, 50),
 		},
 	)
 	// First event for a handler is always a Cancel.
@@ -204,11 +168,8 @@ func TestPointerEnterLeave(t *testing.T) {
 	// Leave the second area by moving into the first.
 	r.Add(
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 45,
-				Y: 45,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(45, 45),
 		},
 	)
 	// The cursor leaves handler2 and enters handler1.
@@ -218,11 +179,8 @@ func TestPointerEnterLeave(t *testing.T) {
 	// Move, but stay within the same hit area.
 	r.Add(
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 40,
-				Y: 40,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(40, 40),
 		},
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Move)
@@ -231,11 +189,8 @@ func TestPointerEnterLeave(t *testing.T) {
 	// Move outside of both inputs.
 	r.Add(
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 300,
-				Y: 300,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(300, 300),
 		},
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Leave)
@@ -244,11 +199,8 @@ func TestPointerEnterLeave(t *testing.T) {
 	// Check that a Press event generates Enter Events.
 	r.Add(
 		pointer.Event{
-			Type: pointer.Press,
-			Position: f32.Point{
-				X: 125,
-				Y: 125,
-			},
+			Type:     pointer.Press,
+			Position: f32.Pt(125, 125),
 		},
 	)
 	assertEventSequence(t, r.Events(handler1))
@@ -258,11 +210,8 @@ func TestPointerEnterLeave(t *testing.T) {
 	r.Add(
 		pointer.Event{
 			Type: pointer.Release,
-			Position: f32.Point{
-				// Move out of the second hit area and into the first.
-				X: 25,
-				Y: 25,
-			},
+			Position: f32.Pt(25,
+				25),
 		},
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Enter)
@@ -291,11 +240,8 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	// Hit both handlers.
 	r.Add(
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 50,
-				Y: 50,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(50, 50),
 		},
 	)
 	// First event for a handler is always a Cancel.
@@ -306,11 +252,8 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	// Leave the second area by moving into the first.
 	r.Add(
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 20,
-				Y: 20,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(20, 20),
 		},
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Move)
@@ -319,11 +262,8 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	// Move, but stay within the same hit area.
 	r.Add(
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 10,
-				Y: 10,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(10, 10),
 		},
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Move)
@@ -332,11 +272,8 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	// Move outside of both inputs.
 	r.Add(
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 200,
-				Y: 200,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(200, 200),
 		},
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Leave)
@@ -345,11 +282,8 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	// Check that a Press event generates Enter Events.
 	r.Add(
 		pointer.Event{
-			Type: pointer.Press,
-			Position: f32.Point{
-				X: 50,
-				Y: 50,
-			},
+			Type:     pointer.Press,
+			Position: f32.Pt(50, 50),
 		},
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Enter, pointer.Press)
@@ -358,12 +292,8 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	// Check that a Release event generates Enter/Leave Events.
 	r.Add(
 		pointer.Event{
-			Type: pointer.Release,
-			Position: f32.Point{
-				// Move out of the second hit area and into the first.
-				X: 20,
-				Y: 20,
-			},
+			Type:     pointer.Release,
+			Position: f32.Pt(20, 20),
 		},
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Release)
@@ -381,11 +311,8 @@ func TestPointerActiveInputDisappears(t *testing.T) {
 	r.Frame(&ops)
 	r.Add(
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 25,
-				Y: 25,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(25, 25),
 		},
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Cancel, pointer.Enter, pointer.Move)
@@ -395,11 +322,8 @@ func TestPointerActiveInputDisappears(t *testing.T) {
 	r.Frame(&ops)
 	r.Add(
 		pointer.Event{
-			Type: pointer.Move,
-			Position: f32.Point{
-				X: 25,
-				Y: 25,
-			},
+			Type:     pointer.Move,
+			Position: f32.Pt(25, 25),
 		},
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Cancel)
@@ -528,11 +452,8 @@ func BenchmarkRouterAdd(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				r.Add(
 					pointer.Event{
-						Type: pointer.Move,
-						Position: f32.Point{
-							X: 50,
-							Y: 50,
-						},
+						Type:     pointer.Move,
+						Position: f32.Pt(50, 50),
 					},
 				)
 			}
