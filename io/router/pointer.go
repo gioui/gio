@@ -44,7 +44,6 @@ type pointerInfo struct {
 type pointerHandler struct {
 	area      int
 	active    bool
-	transform op.TransformOp
 	wantsGrab bool
 	types     pointer.Type
 }
@@ -108,7 +107,6 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t o
 			}
 			h.active = true
 			h.area = area
-			h.transform = t
 			h.wantsGrab = op.Grab
 			h.types = op.Types
 		}
@@ -139,20 +137,23 @@ func (q *pointerQueue) opHit(handlers *[]event.Tag, pos f32.Point) {
 	}
 }
 
+func (q *pointerQueue) invTransform(areaIdx int, p f32.Point) f32.Point {
+	if areaIdx == -1 {
+		return p
+	}
+	return q.areas[areaIdx].trans.Invert().Transform(p)
+}
+
 func (q *pointerQueue) hit(areaIdx int, p f32.Point) bool {
 	for areaIdx != -1 {
 		a := &q.areas[areaIdx]
-		if !a.hit(p) {
+		p := a.trans.Invert().Transform(p)
+		if !a.area.Hit(p) {
 			return false
 		}
 		areaIdx = a.next
 	}
 	return true
-}
-
-func (a *areaNode) hit(p f32.Point) bool {
-	p = a.trans.Invert().Transform(p)
-	return a.area.Hit(p)
 }
 
 func (q *pointerQueue) init() {
@@ -272,7 +273,7 @@ func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e poi
 			e.Priority = pointer.Foremost
 		}
 
-		e.Position = h.transform.Invert().Transform(e.Position)
+		e.Position = q.invTransform(h.area, e.Position)
 
 		if e.Type&h.types == e.Type {
 			foremost = false
@@ -303,7 +304,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 			}
 		}
 
-		e.Position = h.transform.Invert().Transform(e.Position)
+		e.Position = q.invTransform(h.area, e.Position)
 
 		switch {
 		case !hit && entered != -1:
