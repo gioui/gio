@@ -206,6 +206,22 @@ func TestPointerEnterLeave(t *testing.T) {
 	assertEventSequence(t, r.Events(handler1))
 	assertEventSequence(t, r.Events(handler2), pointer.Enter, pointer.Press)
 
+	// Check that a drag only affects the participating handlers.
+	r.Add(
+		// Leave
+		pointer.Event{
+			Type:     pointer.Move,
+			Position: f32.Pt(25, 25),
+		},
+		// Enter
+		pointer.Event{
+			Type:     pointer.Move,
+			Position: f32.Pt(50, 50),
+		},
+	)
+	assertEventSequence(t, r.Events(handler1))
+	assertEventSequence(t, r.Events(handler2), pointer.Leave, pointer.Drag, pointer.Enter, pointer.Drag)
+
 	// Check that a Release event generates Enter/Leave Events.
 	r.Add(
 		pointer.Event{
@@ -218,6 +234,34 @@ func TestPointerEnterLeave(t *testing.T) {
 	// The second handler gets the release event because the press started inside it.
 	assertEventSequence(t, r.Events(handler2), pointer.Leave, pointer.Release)
 
+}
+
+func TestMultipleAreas(t *testing.T) {
+	handler := new(int)
+
+	var ops op.Ops
+
+	addPointerHandler(&ops, handler, image.Rect(0, 0, 100, 100))
+	addPointerHandler(&ops, handler, image.Rect(50, 50, 200, 200))
+
+	var r Router
+	r.Frame(&ops)
+	// Hit first area, then second area, then both.
+	r.Add(
+		pointer.Event{
+			Type:     pointer.Move,
+			Position: f32.Pt(25, 25),
+		},
+		pointer.Event{
+			Type:     pointer.Move,
+			Position: f32.Pt(150, 150),
+		},
+		pointer.Event{
+			Type:     pointer.Move,
+			Position: f32.Pt(50, 50),
+		},
+	)
+	assertEventSequence(t, r.Events(handler), pointer.Cancel, pointer.Enter, pointer.Move, pointer.Move, pointer.Move)
 }
 
 func TestPointerEnterLeaveNested(t *testing.T) {

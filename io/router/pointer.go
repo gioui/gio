@@ -20,6 +20,8 @@ type pointerQueue struct {
 	handlers map[event.Tag]*pointerHandler
 	pointers []pointerInfo
 	reader   ops.Reader
+
+	scratch []event.Tag
 }
 
 type hitNode struct {
@@ -240,18 +242,29 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 		e.Type = pointer.Drag
 	}
 
-	q.deliverEnterLeaveEvents(p, events, e)
 	if e.Type == pointer.Release {
-		q.deliverEvent(p, events, e)
 		p.pressed = false
 	}
-	if !p.pressed {
-		if e.Type == pointer.Press {
-			p.pressed = true
+	q.scratch = q.scratch[:0]
+	q.opHit(&q.scratch, e.Position)
+	if p.pressed {
+		// Filter out non-participating handlers.
+		for i := len(q.scratch) - 1; i >= 0; i-- {
+			if _, found := searchTag(p.handlers, q.scratch[i]); !found {
+				q.scratch = append(q.scratch[:i], q.scratch[i+1:]...)
+			}
 		}
-		p.handlers = p.handlers[:0]
-		q.opHit(&p.handlers, e.Position)
-		q.deliverEnterLeaveEvents(p, events, e)
+	}
+	q.deliverEnterLeaveEvents(p, q.scratch, events, e)
+
+	if e.Type == pointer.Release {
+		q.deliverEvent(p, events, e)
+	}
+	if !p.pressed {
+		p.handlers = append(p.handlers[:0], q.scratch...)
+	}
+	if e.Type == pointer.Press {
+		p.pressed = true
 	}
 	if e.Type != pointer.Release {
 		q.deliverEvent(p, events, e)
@@ -282,45 +295,47 @@ func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e poi
 	}
 }
 
-func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEvents, e pointer.Event) {
-	foremost := true
-	for _, k := range p.handlers {
-		h := q.handlers[k]
-		e := e
-		if p.pressed && len(p.handlers) == 1 {
-			e.Priority = pointer.Grabbed
-		} else if foremost {
-			e.Priority = pointer.Foremost
-		}
-
-		// Hit-test to deliver Enter/Leave events. Consider non-mouse
-		// events leaving when they're Released.
-		hit := (e.Source == pointer.Mouse || p.pressed) && q.hit(h.area, e.Position)
-		entered := -1
-		for i, k2 := range p.entered {
-			if k2 == k {
-				entered = i
-				break
-			}
-		}
-
-		e.Position = q.invTransform(h.area, e.Position)
-
-		switch {
-		case !hit && entered != -1:
-			p.entered = append(p.entered[:entered], p.entered[entered+1:]...)
-			e.Type = pointer.Leave
-		case hit && entered == -1:
-			p.entered = append(p.entered, k)
-			e.Type = pointer.Enter
-		default:
+func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, hits []event.Tag, events *handlerEvents, e pointer.Event) {
+	if e.Source != pointer.Mouse && !p.pressed {
+		// Consider non-mouse pointers leaving when they're released.
+		hits = nil
+	}
+	// Deliver Leave events.
+	for _, k := range p.entered {
+		if _, found := searchTag(hits, k); found {
 			continue
 		}
+		h := q.handlers[k]
+		e.Type = pointer.Leave
+		e.Position = q.invTransform(h.area, e.Position)
+
 		if e.Type&h.types == e.Type {
-			foremost = false
 			events.Add(k, e)
 		}
 	}
+	// Deliver Enter events.
+	for _, k := range hits {
+		if _, found := searchTag(p.entered, k); found {
+			continue
+		}
+		h := q.handlers[k]
+		e.Type = pointer.Enter
+		e.Position = q.invTransform(h.area, e.Position)
+
+		if e.Type&h.types == e.Type {
+			events.Add(k, e)
+		}
+	}
+	p.entered = append(p.entered[:0], hits...)
+}
+
+func searchTag(tags []event.Tag, tag event.Tag) (int, bool) {
+	for i, t := range tags {
+		if t == tag {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 func (op *areaOp) Decode(d []byte) {
