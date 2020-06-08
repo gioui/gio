@@ -750,6 +750,10 @@ loop:
 				continue
 			}
 			state.z++
+			if state.z != int(uint16(state.z)) {
+				// TODO(eliasnaur) gioui.org/issue/127.
+				panic("more than 65k paint objects not supported")
+			}
 			// Assume 16-bit depth buffer.
 			const zdepth = 1 << 16
 			// Convert z to window-space, assuming depth range [0;1].
