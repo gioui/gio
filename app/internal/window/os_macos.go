@@ -294,7 +294,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 	<-launched
 	errch := make(chan error)
 	runOnMain(func() {
-		w, err := newWindow(win, opts)
+		w, err := newWindow(opts)
 		if err != nil {
 			errch <- err
 			return
@@ -309,13 +309,14 @@ func NewWindow(win Callbacks, opts *Options) error {
 		title := C.CString(opts.Title)
 		defer C.free(unsafe.Pointer(title))
 		errch <- nil
-		nextTopLeft = C.gio_createWindow(w.view, title, C.CGFloat(width), C.CGFloat(height), nextTopLeft)
 		win.SetDriver(w)
+		w.w = win
+		nextTopLeft = C.gio_createWindow(w.view, title, C.CGFloat(width), C.CGFloat(height), nextTopLeft)
 	})
 	return <-errch
 }
 
-func newWindow(win Callbacks, opts *Options) (*window, error) {
+func newWindow(opts *Options) (*window, error) {
 	view := viewFactory()
 	if view == 0 {
 		return nil, errors.New("CreateWindow: failed to create view")
@@ -324,7 +325,6 @@ func newWindow(win Callbacks, opts *Options) (*window, error) {
 	w := &window{
 		view:  view,
 		scale: scale,
-		w:     win,
 	}
 	dl, err := NewDisplayLink(func() {
 		runOnMain(func() {
