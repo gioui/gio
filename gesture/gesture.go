@@ -96,6 +96,9 @@ const (
 	// TypeClick is reported when a click action
 	// is complete.
 	TypeClick
+	// TypeCancel is reported when the gesture is
+	// cancelled.
+	TypeCancel
 )
 
 const (
@@ -146,7 +149,11 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
 			}
 		case pointer.Cancel:
+			wasPressed := c.state == StatePressed
 			c.state = StateNormal
+			if wasPressed {
+				events = append(events, ClickEvent{Type: TypeCancel})
+			}
 		case pointer.Press:
 			if c.state == StatePressed {
 				break

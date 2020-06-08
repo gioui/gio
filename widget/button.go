@@ -91,6 +91,8 @@ func (b *Clickable) update(gtx layout.Context) {
 
 	for _, e := range b.click.Events(gtx) {
 		switch e.Type {
+		case gesture.TypeCancel:
+			b.history = nil
 		case gesture.TypeClick:
 			b.clicks = append(b.clicks, Click{
 				Modifiers: e.Modifiers,
