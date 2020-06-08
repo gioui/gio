@@ -36,6 +36,12 @@ type Click struct {
 	// clicks is incremented if successive clicks
 	// are performed within a fixed duration.
 	clicks int
+	// pressed tracks whether the pointer is pressed.
+	pressed bool
+	// entered tracks whether the pointer is inside the gesture.
+	entered bool
+	// pid is the pointer.ID.
+	pid pointer.ID
 }
 
 type ClickState uint8
@@ -80,16 +86,6 @@ const (
 )
 
 const (
-	// StateNormal is the default click state.
-	StateNormal ClickState = iota
-	// StateFocused is reported when a pointer
-	// is hovering over the handler.
-	StateFocused
-	// StatePressed is then a pointer is pressed.
-	StatePressed
-)
-
-const (
 	// TypePress is reported for the first pointer
 	// press.
 	TypePress ClickType = iota
@@ -122,11 +118,6 @@ func (c *Click) Add(ops *op.Ops) {
 	op.Add(ops)
 }
 
-// State reports the click state.
-func (c *Click) State() ClickState {
-	return c.state
-}
-
 // Events returns the next click event, if any.
 func (c *Click) Events(q event.Queue) []ClickEvent {
 	var events []ClickEvent
@@ -137,9 +128,11 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 		}
 		switch e.Type {
 		case pointer.Release:
-			wasPressed := c.state == StatePressed
-			c.state = StateNormal
-			if wasPressed {
+			if !c.pressed || c.pid != e.PointerID {
+				break
+			}
+			c.pressed = false
+			if c.entered {
 				if e.Time-c.clickedAt < doubleClickDuration {
 					c.clicks++
 				} else {
@@ -151,27 +144,40 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 				events = append(events, ClickEvent{Type: TypeCancel})
 			}
 		case pointer.Cancel:
-			wasPressed := c.state == StatePressed
-			c.state = StateNormal
+			wasPressed := c.pressed
+			c.pressed = false
+			c.entered = false
 			if wasPressed {
 				events = append(events, ClickEvent{Type: TypeCancel})
 			}
 		case pointer.Press:
-			if c.state == StatePressed {
+			if c.pressed {
 				break
 			}
 			if e.Source == pointer.Mouse && e.Buttons != pointer.ButtonLeft {
 				break
 			}
-			c.state = StatePressed
+			if !c.entered {
+				c.pid = e.PointerID
+			}
+			if c.pid != e.PointerID {
+				break
+			}
+			c.pressed = true
 			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers})
 		case pointer.Leave:
-			if c.state == StatePressed {
-				c.state = StateNormal
+			if !c.pressed {
+				c.pid = e.PointerID
+			}
+			if c.pid == e.PointerID {
+				c.entered = false
 			}
 		case pointer.Enter:
-			if c.state < StateFocused {
-				c.state = StateFocused
+			if !c.pressed {
+				c.pid = e.PointerID
+			}
+			if c.pid == e.PointerID {
+				c.entered = true
 			}
 		}
 	}
@@ -310,19 +316,6 @@ func (ct ClickType) String() string {
 		return "TypeCancel"
 	default:
 		panic("invalid ClickType")
-	}
-}
-
-func (cs ClickState) String() string {
-	switch cs {
-	case StateNormal:
-		return "StateNormal"
-	case StateFocused:
-		return "StateFocused"
-	case StatePressed:
-		return "StatePressed"
-	default:
-		panic("invalid ClickState")
 	}
 }
 
