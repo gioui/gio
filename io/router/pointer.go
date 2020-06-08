@@ -296,7 +296,7 @@ func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e poi
 }
 
 func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, hits []event.Tag, events *handlerEvents, e pointer.Event) {
-	if e.Source != pointer.Mouse && !p.pressed {
+	if e.Source != pointer.Mouse && !p.pressed && e.Type != pointer.Press {
 		// Consider non-mouse pointers leaving when they're released.
 		hits = nil
 	}
