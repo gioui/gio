@@ -232,7 +232,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Enter)
 	// The second handler gets the release event because the press started inside it.
-	assertEventSequence(t, r.Events(handler2), pointer.Leave, pointer.Release)
+	assertEventSequence(t, r.Events(handler2), pointer.Release, pointer.Leave)
 
 }
 
@@ -346,7 +346,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 		},
 	)
 	assertEventSequence(t, r.Events(handler1), pointer.Release)
-	assertEventSequence(t, r.Events(handler2), pointer.Leave, pointer.Release)
+	assertEventSequence(t, r.Events(handler2), pointer.Release, pointer.Leave)
 }
 
 func TestPointerActiveInputDisappears(t *testing.T) {

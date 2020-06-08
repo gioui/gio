@@ -245,6 +245,7 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	}
 
 	if e.Type == pointer.Release {
+		q.deliverEvent(p, events, e)
 		p.pressed = false
 	}
 	q.scratch = q.scratch[:0]
@@ -259,9 +260,6 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	}
 	q.deliverEnterLeaveEvents(p, q.scratch, events, e)
 
-	if e.Type == pointer.Release {
-		q.deliverEvent(p, events, e)
-	}
 	if !p.pressed {
 		p.handlers = append(p.handlers[:0], q.scratch...)
 	}
