@@ -42,7 +42,9 @@ type window struct {
 
 const _WM_REDRAW = windows.WM_USER + 0
 
-var mainDone = make(chan struct{})
+// windowCounter keeps track of the number of windows.
+// A send of +1 or -1 represents a change in window count.
+var windowCounter = make(chan int)
 
 type gpuAPI struct {
 	priority    int
@@ -53,10 +55,8 @@ type gpuAPI struct {
 // implementations.
 var backends []gpuAPI
 
-var winMap struct {
-	mu      sync.Mutex
-	windows map[syscall.Handle]*window
-}
+// winMap maps win32 HWNDs to *windows.
+var winMap sync.Map
 
 var resources struct {
 	once sync.Once
@@ -68,12 +68,12 @@ var resources struct {
 	cursor syscall.Handle
 }
 
-func init() {
-	winMap.windows = make(map[syscall.Handle]*window)
-}
-
 func Main() {
-	<-mainDone
+	// Wait for first window
+	count := <-windowCounter
+	for count > 0 {
+		count += <-windowCounter
+	}
 }
 
 func NewWindow(window Callbacks, opts *Options) error {
@@ -88,19 +88,11 @@ func NewWindow(window Callbacks, opts *Options) error {
 		}
 		defer w.destroy()
 		cerr <- nil
-		winMap.mu.Lock()
-		winMap.windows[w.hwnd] = w
-		winMap.mu.Unlock()
+		winMap.Store(w.hwnd, w)
+		windowCounter <- +1
 		defer func() {
-			winMap.mu.Lock()
-			defer winMap.mu.Unlock()
-			delete(winMap.windows, w.hwnd)
-			if len(winMap.windows) == 0 {
-				select {
-				case mainDone <- struct{}{}:
-				default:
-				}
-			}
+			winMap.Delete(w.hwnd)
+			windowCounter <- -1
 		}()
 		w.w = window
 		w.w.SetDriver(w)
@@ -185,9 +177,10 @@ func createNativeWindow(opts *Options) (*window, error) {
 }
 
 func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr {
-	winMap.mu.Lock()
-	w := winMap.windows[hwnd]
-	winMap.mu.Unlock()
+	var w *window
+	if win, exists := winMap.Load(hwnd); exists {
+		w = win.(*window)
+	}
 	switch msg {
 	case windows.WM_UNICHAR:
 		if wParam == windows.UNICODE_NOCHAR {
