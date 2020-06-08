@@ -33,8 +33,13 @@ type Click struct {
 
 // Press represents a past pointer press.
 type Press struct {
+	// Position of the press.
 	Position f32.Point
-	Time     time.Time
+	// Start is when the press began.
+	Start time.Time
+	// End is when the press was ended by a release or cancel.
+	// A zero End means it hasn't ended yet.
+	End time.Time
 }
 
 // Clicked reports whether there are pending clicks as would be
@@ -73,7 +78,7 @@ func (b *Clickable) Layout(gtx layout.Context) layout.Dimensions {
 	stack.Pop()
 	for len(b.history) > 0 {
 		c := b.history[0]
-		if gtx.Now().Sub(c.Time) < 1*time.Second {
+		if c.End.IsZero() || gtx.Now().Sub(c.Start) < 1*time.Second {
 			break
 		}
 		n := copy(b.history, b.history[1:])
@@ -91,17 +96,22 @@ func (b *Clickable) update(gtx layout.Context) {
 
 	for _, e := range b.click.Events(gtx) {
 		switch e.Type {
-		case gesture.TypeCancel:
-			b.history = nil
 		case gesture.TypeClick:
 			b.clicks = append(b.clicks, Click{
 				Modifiers: e.Modifiers,
 				NumClicks: e.NumClicks,
 			})
+			fallthrough
+		case gesture.TypeCancel:
+			for i := range b.history {
+				if b.history[i].End.IsZero() {
+					b.history[i].End = gtx.Now()
+				}
+			}
 		case gesture.TypePress:
 			b.history = append(b.history, Press{
 				Position: e.Position,
-				Time:     gtx.Now(),
+				Start:    gtx.Now(),
 			})
 		}
 	}

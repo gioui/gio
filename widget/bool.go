@@ -2,6 +2,7 @@ package widget
 
 import (
 	"image"
+	"time"
 
 	"gioui.org/gesture"
 	"gioui.org/io/pointer"
@@ -31,8 +32,10 @@ func (b *Bool) Layout(gtx layout.Context) layout.Dimensions {
 	for _, e := range b.gesture.Events(gtx) {
 		switch e.Type {
 		case gesture.TypeClick:
+			now := gtx.Now()
 			b.Last = Press{
-				Time:     gtx.Now(),
+				Start:    now,
+				End:      now.Add(time.Second),
 				Position: e.Position,
 			}
 			b.Value = !b.Value

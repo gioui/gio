@@ -147,6 +147,8 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 				}
 				c.clickedAt = e.Time
 				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
+			} else {
+				events = append(events, ClickEvent{Type: TypeCancel})
 			}
 		case pointer.Cancel:
 			wasPressed := c.state == StatePressed
@@ -304,6 +306,8 @@ func (ct ClickType) String() string {
 		return "TypePress"
 	case TypeClick:
 		return "TypeClick"
+	case TypeCancel:
+		return "TypeCancel"
 	default:
 		panic("invalid ClickType")
 	}

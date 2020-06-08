@@ -91,6 +91,8 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 		},
 		NE: rr, NW: rr, SE: rr, SW: rr,
 	}.Op(gtx.Ops).Add(gtx.Ops)
+	dims := image.Point{X: trackWidth, Y: thumbSize}
+	gtx.Constraints.Min = dims
 	drawInk(gtx, s.Switch.Last)
 	stack.Pop()
 
@@ -108,7 +110,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	s.Switch.Layout(gtx)
 	stack.Pop()
 
-	return layout.Dimensions{Size: image.Point{X: trackWidth, Y: thumbSize}}
+	return layout.Dimensions{Size: dims}
 }
 
 func drawDisc(ops *op.Ops, sz float32, col color.RGBA) {

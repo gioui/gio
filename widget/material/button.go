@@ -5,6 +5,7 @@ package material
 import (
 	"image"
 	"image/color"
+	"math"
 
 	"gioui.org/f32"
 	"gioui.org/io/pointer"
@@ -190,20 +191,37 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 func drawInk(gtx layout.Context, c widget.Press) {
 	now := gtx.Now()
-	age := now.Sub(c.Time)
+	age := now.Sub(c.Start)
 	t := float32(age.Seconds())
-	const duration = 0.5
-	if t > duration {
-		// Too old.
-		return
-	}
+	const duration = 0.4
 	t = t / duration
+	if t > 1.0 {
+		if c.Start.IsZero() || !c.End.IsZero() {
+			// Too old.
+			return
+		}
+		t = 1.0
+	}
 	defer op.Push(gtx.Ops).Pop()
-	size := float32(gtx.Px(unit.Dp(700))) * t
-	rr := size * .5
-	col := byte(0xcc * t * t)
-	ink := paint.ColorOp{Color: color.RGBA{A: col, R: col, G: col, B: col}}
+	t2 := t
+	if t2 > 1.0 {
+		t2 = 2.0 - t2
+	}
+	bezierBlend := t2 * t2 * (3.0 - 2.0*t2)
+	size := float32(gtx.Constraints.Min.X)
+	if h := float32(gtx.Constraints.Min.Y); h > size {
+		size = h
+	}
+	// Cover the entire constraints min rectangle.
+	size *= 2 * float32(math.Sqrt(2))
+	// Animate.
+	size *= bezierBlend
+	alpha := 0.7 * bezierBlend
+	const col = 0.8
+	ba, bc := byte(alpha*0xff), byte(alpha*col*0xff)
+	ink := paint.ColorOp{Color: color.RGBA{A: ba, R: bc, G: bc, B: bc}}
 	ink.Add(gtx.Ops)
+	rr := size * .5
 	op.TransformOp{}.Offset(c.Position).Offset(f32.Point{
 		X: -rr,
 		Y: -rr,
