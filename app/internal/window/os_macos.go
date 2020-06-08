@@ -40,7 +40,9 @@ __attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
 __attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
 __attribute__ ((visibility ("hidden"))) void gio_setNeedsDisplay(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) void gio_appTerminate(void);
-__attribute__ ((visibility ("hidden"))) NSPoint gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height, NSPoint topLeft);
+__attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height);
+__attribute__ ((visibility ("hidden"))) void gio_makeKeyAndOrderFront(CFTypeRef windowRef);
+__attribute__ ((visibility ("hidden"))) NSPoint gio_cascadeTopLeftFromPoint(CFTypeRef windowRef, NSPoint topLeft);
 */
 import "C"
 
@@ -51,6 +53,7 @@ func init() {
 
 type window struct {
 	view        C.CFTypeRef
+	window      C.CFTypeRef
 	w           Callbacks
 	stage       system.Stage
 	displayLink *displayLink
@@ -252,8 +255,10 @@ func gio_onClose(view C.CFTypeRef) {
 	w.displayLink.Close()
 	deleteView(view)
 	w.w.Event(system.DestroyEvent{})
+	C.CFRelease(w.view)
 	w.view = 0
-	C.CFRelease(view)
+	C.CFRelease(w.window)
+	w.window = 0
 	if len(viewMap) == 0 {
 		C.gio_appTerminate()
 	}
@@ -311,7 +316,14 @@ func NewWindow(win Callbacks, opts *Options) error {
 		errch <- nil
 		win.SetDriver(w)
 		w.w = win
-		nextTopLeft = C.gio_createWindow(w.view, title, C.CGFloat(width), C.CGFloat(height), nextTopLeft)
+		w.window = C.gio_createWindow(w.view, title, C.CGFloat(width), C.CGFloat(height))
+		if nextTopLeft.x == 0 && nextTopLeft.y == 0 {
+			// cascadeTopLeftFromPoint treats (0, 0) as a no-op,
+			// and just returns the offset we need for the first window.
+			nextTopLeft = C.gio_cascadeTopLeftFromPoint(w.window, nextTopLeft)
+		}
+		nextTopLeft = C.gio_cascadeTopLeftFromPoint(w.window, nextTopLeft)
+		C.gio_makeKeyAndOrderFront(w.window)
 	})
 	return <-errch
 }

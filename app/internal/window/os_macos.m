@@ -114,7 +114,17 @@ void gio_setDisplayLinkDisplay(CFTypeRef dl, uint64_t did) {
 	CVDisplayLinkSetCurrentCGDisplay((CVDisplayLinkRef)dl, (CGDirectDisplayID)did);
 }
 
-NSPoint gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height, NSPoint topLeft) {
+NSPoint gio_cascadeTopLeftFromPoint(CFTypeRef windowRef, NSPoint topLeft) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	return [window cascadeTopLeftFromPoint:topLeft];
+}
+
+void gio_makeKeyAndOrderFront(CFTypeRef windowRef) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	[window makeKeyAndOrderFront:nil];
+}
+
+CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height) {
 	@autoreleasepool {
 		NSRect rect = NSMakeRect(0, 0, width, height);
 		NSUInteger styleMask = NSTitledWindowMask |
@@ -131,16 +141,9 @@ NSPoint gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CG
 		NSView *view = (__bridge NSView *)viewRef;
 		[window setContentView:view];
 		[window makeFirstResponder:view];
-		if (topLeft.x == 0 && topLeft.y == 0) {
-			// cascadeTopLeftFromPoint treats (0, 0) as a no-op,
-			// and just returns the offset we need for the first window.
-			topLeft = [window cascadeTopLeftFromPoint:topLeft];
-		}
-		topLeft = [window cascadeTopLeftFromPoint:topLeft];
 		window.releasedWhenClosed = NO;
 		window.delegate = globalWindowDel;
-		[window makeKeyAndOrderFront:nil];
-		return topLeft;
+		return (__bridge_retained CFTypeRef)window;
 	}
 }
 
