@@ -189,17 +189,19 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 }
 
 func drawInk(gtx layout.Context, c widget.Press) {
-	d := gtx.Now().Sub(c.Time)
-	t := float32(d.Seconds())
+	now := gtx.Now()
+	age := now.Sub(c.Time)
+	t := float32(age.Seconds())
 	const duration = 0.5
 	if t > duration {
+		// Too old.
 		return
 	}
 	t = t / duration
-	stack := op.Push(gtx.Ops)
+	defer op.Push(gtx.Ops).Pop()
 	size := float32(gtx.Px(unit.Dp(700))) * t
 	rr := size * .5
-	col := byte(0xaa * (1 - t*t))
+	col := byte(0xcc * t * t)
 	ink := paint.ColorOp{Color: color.RGBA{A: col, R: col, G: col, B: col}}
 	ink.Add(gtx.Ops)
 	op.TransformOp{}.Offset(c.Position).Offset(f32.Point{
@@ -214,6 +216,5 @@ func drawInk(gtx layout.Context, c widget.Press) {
 		NE: rr, NW: rr, SE: rr, SW: rr,
 	}.Op(gtx.Ops).Add(gtx.Ops)
 	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(size), Y: float32(size)}}}.Add(gtx.Ops)
-	stack.Pop()
 	op.InvalidateOp{}.Add(gtx.Ops)
 }
