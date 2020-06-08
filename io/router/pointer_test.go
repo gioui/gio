@@ -242,7 +242,12 @@ func TestMultipleAreas(t *testing.T) {
 	var ops op.Ops
 
 	addPointerHandler(&ops, handler, image.Rect(0, 0, 100, 100))
-	addPointerHandler(&ops, handler, image.Rect(50, 50, 200, 200))
+	st := op.Push(&ops)
+	pointer.Rect(image.Rect(50, 50, 200, 200)).Add(&ops)
+	// Second area has no Types set, yet should receive events because
+	// Types for the same handles are or-ed together.
+	pointer.InputOp{Tag: handler}.Add(&ops)
+	st.Pop()
 
 	var r Router
 	r.Frame(&ops)

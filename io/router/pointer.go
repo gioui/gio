@@ -109,8 +109,8 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t o
 			}
 			h.active = true
 			h.area = area
-			h.wantsGrab = op.Grab
-			h.types = op.Types
+			h.wantsGrab = h.wantsGrab || op.Grab
+			h.types = h.types | op.Types
 		}
 	}
 }
@@ -169,6 +169,8 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	for _, h := range q.handlers {
 		// Reset handler.
 		h.active = false
+		h.wantsGrab = false
+		h.types = 0
 	}
 	q.hitTree = q.hitTree[:0]
 	q.areas = q.areas[:0]
