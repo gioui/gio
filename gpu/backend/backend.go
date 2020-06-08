@@ -156,6 +156,7 @@ type Texture interface {
 
 const (
 	DepthFuncGreater DepthFunc = iota
+	DepthFuncGreaterEqual
 )
 
 const (

@@ -399,6 +399,8 @@ func (b *Backend) DepthFunc(f backend.DepthFunc) {
 	switch f {
 	case backend.DepthFuncGreater:
 		glfunc = GREATER
+	case backend.DepthFuncGreaterEqual:
+		glfunc = GEQUAL
 	default:
 		panic("unsupported depth func")
 	}

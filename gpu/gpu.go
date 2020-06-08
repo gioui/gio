@@ -71,7 +71,7 @@ type drawState struct {
 	t     op.TransformOp
 	cpath *pathOp
 	rect  bool
-	z     int
+	z     uint16
 
 	matType materialType
 	// Current paint.ImageOp
@@ -335,7 +335,8 @@ func (g *GPU) BeginFrame() {
 		g.zopsTimer.begin()
 	}
 	g.ctx.BindFramebuffer(g.defFBO)
-	g.ctx.DepthFunc(backend.DepthFuncGreater)
+	// Equal because of depth saturation.
+	g.ctx.DepthFunc(backend.DepthFuncGreaterEqual)
 	g.ctx.ClearDepth(0.0)
 	g.ctx.Clear(g.drawOps.clearColor.Float32())
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
@@ -680,7 +681,7 @@ func (d *drawOps) newPathOp() *pathOp {
 	return &d.pathOpCache[len(d.pathOpCache)-1]
 }
 
-func (d *drawOps) collectOps(r *ops.Reader, state drawState) int {
+func (d *drawOps) collectOps(r *ops.Reader, state drawState) uint16 {
 	var aux []byte
 	var auxKey ops.Key
 loop:
@@ -749,10 +750,10 @@ loop:
 				d.clearColor = mat.color.Opaque()
 				continue
 			}
-			state.z++
-			if state.z != int(uint16(state.z)) {
-				// TODO(eliasnaur) gioui.org/issue/127.
-				panic("more than 65k paint objects not supported")
+			// It's ok to saturate the depth value because we're using
+			// the >= depth comparison function.
+			if state.z < 0xffff {
+				state.z++
 			}
 			// Assume 16-bit depth buffer.
 			const zdepth = 1 << 16

@@ -605,6 +605,8 @@ func (b *Backend) prepareDraw(mode backend.DrawMode) {
 		switch b.depthState.fn {
 		case backend.DepthFuncGreater:
 			desc.DepthFunc = _D3D11_COMPARISON_GREATER
+		case backend.DepthFuncGreaterEqual:
+			desc.DepthFunc = _D3D11_COMPARISON_GREATER_EQUAL
 		default:
 			panic("unsupported depth func")
 		}

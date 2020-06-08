@@ -35,6 +35,7 @@ const (
 	INFO_LOG_LENGTH                       = 0x8B84
 	INVALID_INDEX                         = ^uint(0)
 	GREATER                               = 0x204
+	GEQUAL                                = 0x206
 	LINEAR                                = 0x2601
 	LINK_STATUS                           = 0x8b82
 	LUMINANCE                             = 0x1909
