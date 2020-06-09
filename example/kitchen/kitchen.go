@@ -294,10 +294,6 @@ func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 	})
 }
 
-func (s *scaledConfig) Now() time.Time {
-	return time.Now()
-}
-
 func (s *scaledConfig) Px(v unit.Value) int {
 	scale := s.Scale
 	if v.U == unit.UnitPx {

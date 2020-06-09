@@ -39,13 +39,13 @@ func (s *Slider) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 		s.next = nil
 		s.lastCall = s.nextCall
 		s.offset = float32(s.push)
-		s.t0 = gtx.Now()
+		s.t0 = gtx.Now
 		s.push = 0
 	}
 
 	var delta time.Duration
 	if !s.t0.IsZero() {
-		now := gtx.Now()
+		now := gtx.Now
 		delta = now.Sub(s.t0)
 		s.t0 = now
 	}

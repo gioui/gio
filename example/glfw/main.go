@@ -95,6 +95,7 @@ func main() {
 		ops.Reset()
 		gtx := layout.Context{
 			Ops:         &ops,
+			Now:         time.Now(),
 			Queue:       &queue,
 			Config:      &glfwConfig{scale},
 			Constraints: layout.Exact(sz),
@@ -157,10 +158,6 @@ func registerCallbacks(window *glfw.Window, q *router.Router) {
 			Buttons:  btns,
 		})
 	})
-}
-
-func (s *glfwConfig) Now() time.Time {
-	return time.Now()
 }
 
 func (s *glfwConfig) Px(v unit.Value) int {
