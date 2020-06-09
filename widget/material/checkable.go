@@ -41,6 +41,9 @@ func (c *checkable) layout(gtx layout.Context, checked bool) layout.Dimensions {
 				return layout.UniformInset(unit.Dp(2)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 					size := gtx.Px(c.Size)
 					icon.Color = c.IconColor
+					if gtx.Queue == nil {
+						icon.Color = mulAlpha(icon.Color, 150)
+					}
 					icon.Layout(gtx, unit.Px(float32(size)))
 					return layout.Dimensions{
 						Size: image.Point{X: size, Y: size},

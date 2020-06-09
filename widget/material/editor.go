@@ -52,13 +52,20 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 		gtx.Constraints.Min.Y = h
 	}
 	dims = e.Editor.Layout(gtx, e.shaper, e.Font, e.TextSize)
+	disabled := gtx.Queue == nil
 	if e.Editor.Len() > 0 {
-		paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
+		textColor := e.Color
+		if disabled {
+			textColor = mulAlpha(textColor, 150)
+		}
+		paint.ColorOp{Color: textColor}.Add(gtx.Ops)
 		e.Editor.PaintText(gtx)
 	} else {
 		call.Add(gtx.Ops)
 	}
-	paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
-	e.Editor.PaintCaret(gtx)
+	if !disabled {
+		paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
+		e.Editor.PaintCaret(gtx)
+	}
 	return dims
 }

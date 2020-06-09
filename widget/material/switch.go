@@ -47,12 +47,20 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 		X: float32(trackWidth),
 		Y: float32(trackHeight),
 	}}
+	col := s.Color.Disabled
+	if s.Switch.Value {
+		col = s.Color.Enabled
+	}
+	if gtx.Queue == nil {
+		col = mulAlpha(col, 150)
+	}
+	trackColor := mulAlpha(col, 150)
 	op.TransformOp{}.Offset(f32.Point{Y: trackOff}).Add(gtx.Ops)
 	clip.Rect{
 		Rect: trackRect,
 		NE:   trackCorner, NW: trackCorner, SE: trackCorner, SW: trackCorner,
 	}.Op(gtx.Ops).Add(gtx.Ops)
-	paint.ColorOp{Color: rgb(0x9b9b9b)}.Add(gtx.Ops)
+	paint.ColorOp{Color: trackColor}.Add(gtx.Ops)
 	paint.PaintOp{Rect: trackRect}.Add(gtx.Ops)
 	stack.Pop()
 
@@ -79,11 +87,9 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 	// Compute thumb offset and color.
 	stack = op.Push(gtx.Ops)
-	col := s.Color.Disabled
 	if s.Switch.Value {
 		off := trackWidth - thumbSize
 		op.TransformOp{}.Offset(f32.Point{X: float32(off)}).Add(gtx.Ops)
-		col = s.Color.Enabled
 	}
 
 	// Draw thumb shadow, a translucent disc slightly larger than the
