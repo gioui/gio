@@ -198,7 +198,7 @@ func drawInk(gtx layout.Context, c widget.Press) {
 		fadeDuration   = float32(0.9)
 	)
 
-	now := gtx.Now()
+	now := gtx.Now
 
 	t := float32(now.Sub(c.Start).Seconds())
 

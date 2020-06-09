@@ -18,6 +18,9 @@ import (
 // input.
 type FrameEvent struct {
 	Config Config
+	// Now is the current animation. Use Now instead of time.Now to
+	// synchronize animation and to avoid the time.Now call overhead.
+	Now time.Time
 	// Size is the dimensions of the window.
 	Size image.Point
 	// Insets is the insets to apply.
@@ -51,9 +54,6 @@ type FrameEvent struct {
 // Config defines the essential properties of
 // the environment.
 type Config interface {
-	// Now returns the current animation time.
-	Now() time.Time
-
 	unit.Converter
 }
 

@@ -228,10 +228,10 @@ func (w *window) draw() {
 	width := int(wf*w.scale + .5)
 	height := int(hf*w.scale + .5)
 	cfg := configFor(w.scale)
-	cfg.now = time.Now()
 	w.setStage(system.StageRunning)
 	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
+			Now: time.Now(),
 			Size: image.Point{
 				X: width,
 				Y: height,

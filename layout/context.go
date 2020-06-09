@@ -24,6 +24,9 @@ type Context struct {
 	// By convention, a nil Queue is a signal to widgets to draw themselves
 	// in a disabled state.
 	Queue event.Queue
+	// Now is the animation time.
+	Now time.Time
+
 	*op.Ops
 }
 
@@ -31,6 +34,7 @@ type Context struct {
 //
 //   Context{
 //     Ops: ops,
+//     Now: e.Now,
 //     Queue: e.Queue,
 //     Config: e.Config,
 //     Constraints: Exact(e.Size),
@@ -41,18 +45,11 @@ func NewContext(ops *op.Ops, e system.FrameEvent) Context {
 	ops.Reset()
 	return Context{
 		Ops:         ops,
+		Now:         e.Now,
 		Queue:       e.Queue,
 		Config:      e.Config,
 		Constraints: Exact(e.Size),
 	}
-}
-
-// Now returns the configuration time or the zero time.
-func (c Context) Now() time.Time {
-	if c.Config == nil {
-		return time.Time{}
-	}
-	return c.Config.Now()
 }
 
 // Px maps the value to pixels. If no configuration is set,

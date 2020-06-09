@@ -80,7 +80,7 @@ func (b *Clickable) Layout(gtx layout.Context) layout.Dimensions {
 	stack.Pop()
 	for len(b.history) > 0 {
 		c := b.history[0]
-		if c.End.IsZero() || gtx.Now().Sub(c.End) < 1*time.Second {
+		if c.End.IsZero() || gtx.Now.Sub(c.End) < 1*time.Second {
 			break
 		}
 		n := copy(b.history, b.history[1:])
@@ -104,19 +104,19 @@ func (b *Clickable) update(gtx layout.Context) {
 				NumClicks: e.NumClicks,
 			})
 			if l := len(b.history); l > 0 {
-				b.history[l-1].End = gtx.Now()
+				b.history[l-1].End = gtx.Now
 			}
 		case gesture.TypeCancel:
 			for i := range b.history {
 				b.history[i].Cancelled = true
 				if b.history[i].End.IsZero() {
-					b.history[i].End = gtx.Now()
+					b.history[i].End = gtx.Now
 				}
 			}
 		case gesture.TypePress:
 			b.history = append(b.history, Press{
 				Position: e.Position,
-				Start:    gtx.Now(),
+				Start:    gtx.Now,
 			})
 		}
 	}

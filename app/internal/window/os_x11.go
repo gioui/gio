@@ -184,9 +184,9 @@ loop:
 		}
 
 		if anim || syn {
-			w.cfg.now = time.Now()
 			w.w.Event(FrameEvent{
 				FrameEvent: system.FrameEvent{
+					Now: time.Now(),
 					Size: image.Point{
 						X: w.width,
 						Y: w.height,

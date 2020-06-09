@@ -108,6 +108,7 @@ func (w *window) draw(sync bool) {
 	const inchPrDp = 1.0 / 163
 	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
+			Now: time.Now(),
 			Size: image.Point{
 				X: int(params.width + .5),
 				Y: int(params.height + .5),
@@ -121,7 +122,6 @@ func (w *window) draw(sync bool) {
 			Config: &config{
 				pxPerDp: float32(params.dpi) * inchPrDp,
 				pxPerSp: float32(params.sdpi) * inchPrDp,
-				now:     time.Now(),
 			},
 		},
 		Sync: sync,

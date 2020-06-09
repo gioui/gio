@@ -413,9 +413,9 @@ func (w *window) draw(sync bool) {
 	w.mu.Lock()
 	w.scale = float32(scale)
 	w.mu.Unlock()
-	cfg.now = time.Now()
 	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
+			Now: time.Now(),
 			Size: image.Point{
 				X: width,
 				Y: height,

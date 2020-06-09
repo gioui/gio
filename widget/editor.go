@@ -129,7 +129,7 @@ func (e *Editor) processPointer(gtx layout.Context) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Scroll(gtx, gtx, gtx.Now(), axis)
+	sdist := e.scroller.Scroll(gtx, gtx, gtx.Now, axis)
 	var soff int
 	if e.SingleLine {
 		e.scrollRel(sdist, 0)
@@ -142,7 +142,7 @@ func (e *Editor) processPointer(gtx layout.Context) {
 		switch {
 		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
 			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
-			e.blinkStart = gtx.Now()
+			e.blinkStart = gtx.Now
 			e.moveCoord(gtx, image.Point{
 				X: int(math.Round(float64(evt.Position.X))),
 				Y: int(math.Round(float64(evt.Position.Y))),
@@ -163,7 +163,7 @@ func (e *Editor) processKey(gtx layout.Context) {
 		e.events = append(e.events, ChangeEvent{})
 	}
 	for _, ke := range gtx.Events(&e.eventKey) {
-		e.blinkStart = gtx.Now()
+		e.blinkStart = gtx.Now
 		switch ke := ke.(type) {
 		case key.FocusEvent:
 			e.focused = ke.Focus
@@ -309,7 +309,7 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 	e.clicker.Add(gtx.Ops)
 	e.caretOn = false
 	if e.focused {
-		now := gtx.Now()
+		now := gtx.Now
 		dt := now.Sub(e.blinkStart)
 		blinking := dt < maxBlinkDuration
 		const timePerBlink = time.Second / blinksPerSecond

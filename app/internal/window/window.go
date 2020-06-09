@@ -7,7 +7,6 @@ package window
 import (
 	"errors"
 	"math"
-	"time"
 
 	"gioui.org/gpu/backend"
 	"gioui.org/io/event"
@@ -78,11 +77,6 @@ type config struct {
 	pxPerDp float32
 	// Device pixels per sp.
 	pxPerSp float32
-	now     time.Time
-}
-
-func (c *config) Now() time.Time {
-	return c.now
 }
 
 func (c *config) Px(v unit.Value) int {

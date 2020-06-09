@@ -384,6 +384,7 @@ func (w *window) draw(sync bool) {
 	ppdp := float32(w.dpi) * inchPrDp
 	w.callbacks.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
+			Now: time.Now(),
 			Size: image.Point{
 				X: int(width),
 				Y: int(height),
@@ -392,7 +393,6 @@ func (w *window) draw(sync bool) {
 			Config: &config{
 				pxPerDp: ppdp,
 				pxPerSp: w.fontScale * ppdp,
-				now:     time.Now(),
 			},
 		},
 		Sync: sync,
