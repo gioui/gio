@@ -193,12 +193,14 @@ func drawInk(gtx layout.Context, c widget.Press) {
 	// duration is the number of seconds for the
 	// completed animation: expand while fading in, then
 	// out.
-	const duration = float32(0.5)
+	const (
+		expandDuration = float32(0.5)
+		fadeDuration   = float32(0.9)
+	)
 
 	now := gtx.Now()
 
 	t := float32(now.Sub(c.Start).Seconds())
-	t /= duration
 
 	end := c.End
 	if end.IsZero() {
@@ -207,7 +209,6 @@ func drawInk(gtx layout.Context, c widget.Press) {
 	}
 
 	endt := float32(end.Sub(c.Start).Seconds())
-	endt /= duration
 
 	// Compute the fade-in/out position in [0;1].
 	var alphat float32
@@ -217,19 +218,19 @@ func drawInk(gtx layout.Context, c widget.Press) {
 			// If the press was cancelled before the inkwell
 			// was fully faded in, fast forward the animation
 			// to match the fade-out.
-			if h := 0.5 - endt; h > 0 {
+			if h := 0.5 - endt/fadeDuration; h > 0 {
 				haste = h
 			}
 		}
 		// Fade in.
-		half1 := t + haste
+		half1 := t/fadeDuration + haste
 		if half1 > 0.5 {
 			half1 = 0.5
 		}
 
 		// Fade out.
 		half2 := float32(now.Sub(end).Seconds())
-		half2 /= duration
+		half2 /= fadeDuration
 		half2 += haste
 		if half2 > 0.5 {
 			// Too old.
@@ -245,6 +246,7 @@ func drawInk(gtx layout.Context, c widget.Press) {
 		// Freeze expansion of cancelled presses.
 		sizet = endt
 	}
+	sizet /= expandDuration
 
 	// Animate only ended presses, and presses that are fading in.
 	if !c.End.IsZero() || sizet <= 1.0 {
