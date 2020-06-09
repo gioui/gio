@@ -190,35 +190,92 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 }
 
 func drawInk(gtx layout.Context, c widget.Press) {
+	// duration is the number of seconds for the
+	// completed animation: expand while fading in, then
+	// out.
+	const duration = float32(0.5)
+
 	now := gtx.Now()
-	age := now.Sub(c.Start)
-	t := float32(age.Seconds())
-	const duration = 0.4
-	t = t / duration
-	if t > 1.0 {
-		if c.Start.IsZero() || !c.End.IsZero() {
+
+	t := float32(now.Sub(c.Start).Seconds())
+	t /= duration
+
+	end := c.End
+	if end.IsZero() {
+		// If the press hasn't ended, don't fade-out.
+		end = now
+	}
+
+	endt := float32(end.Sub(c.Start).Seconds())
+	endt /= duration
+
+	// Compute the fade-in/out position in [0;1].
+	var alphat float32
+	{
+		var haste float32
+		if c.Cancelled {
+			// If the press was cancelled before the inkwell
+			// was fully faded in, fast forward the animation
+			// to match the fade-out.
+			if h := 0.5 - endt; h > 0 {
+				haste = h
+			}
+		}
+		// Fade in.
+		half1 := t + haste
+		if half1 > 0.5 {
+			half1 = 0.5
+		}
+
+		// Fade out.
+		half2 := float32(now.Sub(end).Seconds())
+		half2 /= duration
+		half2 += haste
+		if half2 > 0.5 {
 			// Too old.
 			return
 		}
-		t = 1.0
+
+		alphat = half1 + half2
 	}
-	defer op.Push(gtx.Ops).Pop()
-	t2 := t
-	if t2 > 1.0 {
-		t2 = 2.0 - t2
+
+	// Compute the expand position in [0;1].
+	sizet := t
+	if c.Cancelled {
+		// Freeze expansion of cancelled presses.
+		sizet = endt
 	}
-	bezierBlend := t2 * t2 * (3.0 - 2.0*t2)
+
+	// Animate only ended presses, and presses that are fading in.
+	if !c.End.IsZero() || sizet <= 1.0 {
+		op.InvalidateOp{}.Add(gtx.Ops)
+	}
+
+	if sizet > 1.0 {
+		sizet = 1.0
+	}
+
+	if alphat > .5 {
+		// Start fadeout after half the animation.
+		alphat = 1.0 - alphat
+	}
+	// Twice the speed to attain fully faded in at 0.5.
+	t2 := alphat * 2
+	// Beziér ease-in curve.
+	alphaBezier := t2 * t2 * (3.0 - 2.0*t2)
+	sizeBezier := sizet * sizet * (3.0 - 2.0*sizet)
 	size := float32(gtx.Constraints.Min.X)
 	if h := float32(gtx.Constraints.Min.Y); h > size {
 		size = h
 	}
 	// Cover the entire constraints min rectangle.
 	size *= 2 * float32(math.Sqrt(2))
-	// Animate.
-	size *= bezierBlend
-	alpha := 0.7 * bezierBlend
+	// Apply curve values to size and color.
+	size *= sizeBezier
+	alpha := 0.7 * alphaBezier
 	const col = 0.8
 	ba, bc := byte(alpha*0xff), byte(alpha*col*0xff)
+	defer op.Push(gtx.Ops).Pop()
 	ink := paint.ColorOp{Color: color.RGBA{A: ba, R: bc, G: bc, B: bc}}
 	ink.Add(gtx.Ops)
 	rr := size * .5
@@ -234,5 +291,4 @@ func drawInk(gtx layout.Context, c widget.Press) {
 		NE: rr, NW: rr, SE: rr, SW: rr,
 	}.Op(gtx.Ops).Add(gtx.Ops)
 	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(size), Y: float32(size)}}}.Add(gtx.Ops)
-	op.InvalidateOp{}.Add(gtx.Ops)
 }

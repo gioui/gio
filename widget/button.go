@@ -40,6 +40,8 @@ type Press struct {
 	// End is when the press was ended by a release or cancel.
 	// A zero End means it hasn't ended yet.
 	End time.Time
+	// Cancelled is true for cancelled presses.
+	Cancelled bool
 }
 
 // Clicked reports whether there are pending clicks as would be
@@ -78,7 +80,7 @@ func (b *Clickable) Layout(gtx layout.Context) layout.Dimensions {
 	stack.Pop()
 	for len(b.history) > 0 {
 		c := b.history[0]
-		if c.End.IsZero() || gtx.Now().Sub(c.Start) < 1*time.Second {
+		if c.End.IsZero() || gtx.Now().Sub(c.End) < 1*time.Second {
 			break
 		}
 		n := copy(b.history, b.history[1:])
@@ -101,9 +103,12 @@ func (b *Clickable) update(gtx layout.Context) {
 				Modifiers: e.Modifiers,
 				NumClicks: e.NumClicks,
 			})
-			fallthrough
+			if l := len(b.history); l > 0 {
+				b.history[l-1].End = gtx.Now()
+			}
 		case gesture.TypeCancel:
 			for i := range b.history {
+				b.history[i].Cancelled = true
 				if b.history[i].End.IsZero() {
 					b.history[i].End = gtx.Now()
 				}
