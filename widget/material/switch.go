@@ -51,6 +51,27 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	paint.PaintOp{Rect: trackRect}.Add(gtx.Ops)
 	stack.Pop()
 
+	// Draw thumb ink.
+	stack = op.Push(gtx.Ops)
+	inkSize := gtx.Px(unit.Dp(44))
+	rr := float32(inkSize) * .5
+	inkOff := f32.Point{
+		X: float32(trackWidth)*.5 - rr,
+		Y: -rr + float32(trackHeight)*.5 + trackOff,
+	}
+	op.TransformOp{}.Offset(inkOff).Add(gtx.Ops)
+	gtx.Constraints.Min = image.Pt(inkSize, inkSize)
+	clip.Rect{
+		Rect: f32.Rectangle{
+			Max: layout.FPt(gtx.Constraints.Min),
+		},
+		NE: rr, NW: rr, SE: rr, SW: rr,
+	}.Op(gtx.Ops).Add(gtx.Ops)
+	for _, p := range s.Switch.History() {
+		drawInk(gtx, p)
+	}
+	stack.Pop()
+
 	// Compute thumb offset and color.
 	stack = op.Push(gtx.Ops)
 	col := rgb(0xffffff)
@@ -73,29 +94,6 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	drawDisc(gtx.Ops, float32(thumbSize), col)
 	stack.Pop()
 
-	// Draw thumb ink.
-	stack = op.Push(gtx.Ops)
-	inkSize := float32(gtx.Px(unit.Dp(44)))
-	rr := inkSize * .5
-	inkOff := f32.Point{
-		X: float32(trackWidth)*.5 - rr,
-		Y: -rr + float32(trackHeight)*.5 + trackOff,
-	}
-	op.TransformOp{}.Offset(inkOff).Add(gtx.Ops)
-	clip.Rect{
-		Rect: f32.Rectangle{
-			Max: f32.Point{
-				X: inkSize,
-				Y: inkSize,
-			},
-		},
-		NE: rr, NW: rr, SE: rr, SW: rr,
-	}.Op(gtx.Ops).Add(gtx.Ops)
-	dims := image.Point{X: trackWidth, Y: thumbSize}
-	gtx.Constraints.Min = dims
-	drawInk(gtx, s.Switch.Last)
-	stack.Pop()
-
 	// Set up click area.
 	stack = op.Push(gtx.Ops)
 	clickSize := gtx.Px(unit.Dp(40))
@@ -110,6 +108,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	s.Switch.Layout(gtx)
 	stack.Pop()
 
+	dims := image.Point{X: trackWidth, Y: thumbSize}
 	return layout.Dimensions{Size: dims}
 }
 
