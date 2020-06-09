@@ -116,7 +116,7 @@ func loop(w *app.Window) error {
 			case system.DestroyEvent:
 				return e.Err
 			case system.FrameEvent:
-				gtx := layout.NewContext(&ops, e.Queue, e.Config, e.Size)
+				gtx := layout.NewContext(&ops, e)
 				for iconButton.Clicked() {
 					w.WriteClipboard(lineEditor.Text())
 				}

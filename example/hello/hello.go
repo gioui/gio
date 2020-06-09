@@ -37,7 +37,7 @@ func loop(w *app.Window) error {
 		case system.DestroyEvent:
 			return e.Err
 		case system.FrameEvent:
-			gtx := layout.NewContext(&ops, e.Queue, e.Config, e.Size)
+			gtx := layout.NewContext(&ops, e)
 			l := material.H1(th, "Hello, Gio")
 			maroon := color.RGBA{127, 0, 0, 255}
 			l.Color = maroon

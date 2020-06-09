@@ -66,7 +66,7 @@ func loop(w *app.Window) error {
 		case system.DestroyEvent:
 			return e.Err
 		case system.FrameEvent:
-			gtx := layout.NewContext(&ops, e.Queue, e.Config, e.Size)
+			gtx := layout.NewContext(&ops, e)
 			layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 				layout.Flexed(0.5, func(gtx C) D {
 					return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,

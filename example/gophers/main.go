@@ -126,7 +126,7 @@ func (a *App) run() error {
 					}
 				}
 			case system.FrameEvent:
-				gtx := layout.NewContext(&ops, e.Queue, e.Config, e.Size)
+				gtx := layout.NewContext(&ops, e)
 				a.ui.Layout(gtx)
 				e.Frame(gtx.Ops)
 			}

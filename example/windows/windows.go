@@ -49,7 +49,7 @@ func (w *window) loop(events <-chan event.Event) error {
 			for w.btn.Clicked() {
 				newWindow()
 			}
-			gtx := layout.NewContext(&ops, e.Queue, e.Config, e.Size)
+			gtx := layout.NewContext(&ops, e)
 			layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 				return material.Button(th, &w.btn, "More!").Layout(gtx)
 			})

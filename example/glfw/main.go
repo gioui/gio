@@ -92,7 +92,13 @@ func main() {
 		}
 		width, height := window.GetSize()
 		sz := image.Point{X: width, Y: height}
-		gtx := layout.NewContext(&ops, &queue, &glfwConfig{scale}, sz)
+		ops.Reset()
+		gtx := layout.Context{
+			Ops:         &ops,
+			Queue:       &queue,
+			Config:      &glfwConfig{scale},
+			Constraints: layout.Exact(sz),
+		}
 		draw(gtx, th)
 		gpu.Collect(sz, gtx.Ops)
 		gpu.BeginFrame()

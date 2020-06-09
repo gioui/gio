@@ -41,7 +41,7 @@ func loop(w *app.Window) error {
 		case system.DestroyEvent:
 			return e.Err
 		case system.FrameEvent:
-			gtx := layout.NewContext(&ops, e.Queue, e.Config, e.Size)
+			gtx := layout.NewContext(&ops, e)
 			drawTabs(gtx, th)
 			e.Frame(gtx.Ops)
 		}
