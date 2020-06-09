@@ -3,7 +3,6 @@
 package layout
 
 import (
-	"image"
 	"math"
 	"time"
 
@@ -32,19 +31,19 @@ type Context struct {
 //
 //   Context{
 //     Ops: ops,
-//     Queue: q,
-//     Config: cfg,
-//     Constraints: Exact(size),
+//     Queue: e.Queue,
+//     Config: e.Config,
+//     Constraints: Exact(e.Size),
 //   }
 //
 // NewContext calls ops.Reset.
-func NewContext(ops *op.Ops, q event.Queue, cfg system.Config, size image.Point) Context {
+func NewContext(ops *op.Ops, e system.FrameEvent) Context {
 	ops.Reset()
 	return Context{
 		Ops:         ops,
-		Queue:       q,
-		Config:      cfg,
-		Constraints: Exact(size),
+		Queue:       e.Queue,
+		Config:      e.Config,
+		Constraints: Exact(e.Size),
 	}
 }
 
