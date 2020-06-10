@@ -68,20 +68,20 @@ func loop(w *app.Window) error {
 		case system.FrameEvent:
 			gtx := layout.NewContext(&ops, e)
 			layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				layout.Flexed(0.5, func(gtx C) D {
+				layout.Flexed(1, func(gtx C) D {
 					return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
 						// r1c1
-						layout.Flexed(0.5, func(gtx C) D { return topLeft.Layout(gtx) }),
+						layout.Flexed(1, func(gtx C) D { return topLeft.Layout(gtx) }),
 						// r1c2
-						layout.Flexed(0.5, func(gtx C) D { return topRight.Layout(gtx) }),
+						layout.Flexed(1, func(gtx C) D { return topRight.Layout(gtx) }),
 					)
 				}),
-				layout.Flexed(0.5, func(gtx C) D {
+				layout.Flexed(1, func(gtx C) D {
 					return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
 						// r2c1
-						layout.Flexed(0.5, func(gtx C) D { return botLeft.Layout(gtx) }),
+						layout.Flexed(1, func(gtx C) D { return botLeft.Layout(gtx) }),
 						// r2c2
-						layout.Flexed(0.5, func(gtx C) D { return botRight.Layout(gtx) }),
+						layout.Flexed(1, func(gtx C) D { return botRight.Layout(gtx) }),
 					)
 				}),
 			)
