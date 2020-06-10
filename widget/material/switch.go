@@ -17,15 +17,20 @@ import (
 )
 
 type SwitchStyle struct {
-	Color  color.RGBA
+	Color struct {
+		Enabled  color.RGBA
+		Disabled color.RGBA
+	}
 	Switch *widget.Bool
 }
 
 func Switch(th *Theme, swtch *widget.Bool) SwitchStyle {
-	return SwitchStyle{
+	sw := SwitchStyle{
 		Switch: swtch,
-		Color:  th.Color.Primary,
 	}
+	sw.Color.Enabled = th.Color.Primary
+	sw.Color.Disabled = rgb(0xffffff)
+	return sw
 }
 
 // Layout updates the checkBox and displays it.
@@ -74,11 +79,11 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 	// Compute thumb offset and color.
 	stack = op.Push(gtx.Ops)
-	col := rgb(0xffffff)
+	col := s.Color.Disabled
 	if s.Switch.Value {
 		off := trackWidth - thumbSize
 		op.TransformOp{}.Offset(f32.Point{X: float32(off)}).Add(gtx.Ops)
-		col = s.Color
+		col = s.Color.Enabled
 	}
 
 	// Draw thumb shadow, a translucent disc slightly larger than the
