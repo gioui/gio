@@ -61,8 +61,9 @@ func Rigid(widget Widget) FlexChild {
 	}
 }
 
-// Flexed returns a Flex child forced to take up a fraction of
-// the remaining space.
+// Flexed returns a Flex child forced to take up w fraction of the
+// of the space left over from Rigid children. The fraction is weight
+// divided by the weight sum of all Flexed children.
 func Flexed(weight float32, widget Widget) FlexChild {
 	return FlexChild{
 		flex:   true,
@@ -76,60 +77,61 @@ func Flexed(weight float32, widget Widget) FlexChild {
 // before Flexed children.
 func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 	size := 0
+	cs := gtx.Constraints
+	mainMin, mainMax := axisMainConstraint(f.Axis, cs)
+	crossMin, crossMax := axisCrossConstraint(f.Axis, cs)
+	remaining := mainMax
+	var totalWeight float32
 	// Lay out Rigid children.
 	for i, child := range children {
 		if child.flex {
+			totalWeight += child.weight
 			continue
 		}
-		cs := gtx.Constraints
-		_, mainMax := axisMainConstraint(f.Axis, cs)
-		mainMax -= size
-		if mainMax < 0 {
-			mainMax = 0
-		}
-		crossMin, crossMax := axisCrossConstraint(f.Axis, cs)
-		cs = axisConstraints(f.Axis, 0, mainMax, crossMin, crossMax)
 		macro := op.Record(gtx.Ops)
 		gtx := gtx
-		gtx.Constraints = cs
+		gtx.Constraints = axisConstraints(f.Axis, 0, remaining, crossMin, crossMax)
 		dims := child.widget(gtx)
 		c := macro.Stop()
 		sz := axisMain(f.Axis, dims.Size)
 		size += sz
+		remaining -= sz
+		if remaining < 0 {
+			remaining = 0
+		}
 		children[i].call = c
 		children[i].dims = dims
 	}
-	rigidSize := size
 	// fraction is the rounding error from a Flex weighting.
 	var fraction float32
+	flexTotal := remaining
 	// Lay out Flexed children.
 	for i, child := range children {
 		if !child.flex {
 			continue
 		}
-		cs := gtx.Constraints
-		_, mainMax := axisMainConstraint(f.Axis, cs)
 		var flexSize int
-		if mainMax > size {
-			flexSize = mainMax - rigidSize
+		if remaining > 0 && totalWeight > 0 {
 			// Apply weight and add any leftover fraction from a
 			// previous Flexed.
-			childSize := float32(flexSize)*child.weight + fraction
-			flexSize = int(childSize + .5)
+			childSize := float32(flexTotal) * child.weight / totalWeight
+			flexSize = int(childSize + fraction + .5)
 			fraction = childSize - float32(flexSize)
-			if max := mainMax - size; flexSize > max {
-				flexSize = max
+			if flexSize > remaining {
+				flexSize = remaining
 			}
 		}
-		crossMin, crossMax := axisCrossConstraint(f.Axis, cs)
-		cs = axisConstraints(f.Axis, flexSize, flexSize, crossMin, crossMax)
 		macro := op.Record(gtx.Ops)
 		gtx := gtx
-		gtx.Constraints = cs
+		gtx.Constraints = axisConstraints(f.Axis, flexSize, flexSize, crossMin, crossMax)
 		dims := child.widget(gtx)
 		c := macro.Stop()
 		sz := axisMain(f.Axis, dims.Size)
 		size += sz
+		remaining -= sz
+		if remaining < 0 {
+			remaining = 0
+		}
 		children[i].call = c
 		children[i].dims = dims
 	}
@@ -143,8 +145,6 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 			maxBaseline = b
 		}
 	}
-	cs := gtx.Constraints
-	mainMin, _ := axisMainConstraint(f.Axis, cs)
 	var space int
 	if mainMin > size {
 		space = mainMin - size

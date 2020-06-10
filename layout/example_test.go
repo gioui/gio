@@ -69,9 +69,12 @@ func ExampleFlex() {
 			return layoutWidget(gtx, 10, 10)
 		}),
 		// Child with 50% space allowance.
-		layout.Flexed(0.5, func(gtx layout.Context) layout.Dimensions {
+		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 			fmt.Printf("50%%: %v\n", gtx.Constraints)
 			return layoutWidget(gtx, 10, 10)
+		}),
+		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+			return layout.Dimensions{}
 		}),
 	)
 
