@@ -483,7 +483,7 @@ loop:
 		l := e.lines[carLine]
 		y += (prevDesc + l.Ascent).Ceil()
 		prevDesc = l.Descent
-		if carLine == len(e.lines)-1 || idx+len(l.Layout) > e.rr.caret {
+		if carLine == len(e.lines)-1 || idx+l.Len > e.rr.caret {
 			for _, g := range l.Layout {
 				if idx == e.rr.caret {
 					break loop
