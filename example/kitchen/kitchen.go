@@ -20,6 +20,7 @@ import (
 	"gioui.org/app"
 	"gioui.org/app/headless"
 	"gioui.org/font/gofont"
+	"gioui.org/io/router"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -88,6 +89,7 @@ func saveScreenshot(f string) error {
 		Ops:         new(op.Ops),
 		Config:      &scaledConfig{scale},
 		Constraints: layout.Exact(sz),
+		Queue:       new(router.Router),
 	}
 	th := material.NewTheme(gofont.Collection())
 	kitchen(gtx, th)
