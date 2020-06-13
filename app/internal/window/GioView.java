@@ -191,31 +191,6 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		return onBack(nhandle);
 	}
 
-	void registerFragment(String del) {
-		final Class cls;
-		try {
-			cls = getContext().getClassLoader().loadClass(del);
-		} catch (ClassNotFoundException e) {
-			throw new RuntimeException("RegisterFragment: fragment class not found: " + e.getMessage());
-		}
-
-		final Fragment frag;
-		try {
-			frag = (Fragment)cls.newInstance();
-		} catch (IllegalAccessException | InstantiationException | ExceptionInInitializerError | SecurityException | ClassCastException e) {
-			throw new RuntimeException("RegisterFragment: error instantiating fragment: " + e.getMessage());
-		}
-		final FragmentManager fm;
-		try {
-			fm = ((Activity)getContext()).getFragmentManager();
-		} catch (ClassCastException e) {
-			throw new RuntimeException("RegisterFragment: cannot get fragment manager from View Context: " + e.getMessage());
-		}
-		FragmentTransaction ft = fm.beginTransaction();
-		ft.add(frag, del);
-		ft.commitNow();
-	}
-
 	static private native long onCreateView(GioView view);
 	static private native void onDestroyView(long handle);
 	static private native void onStartView(long handle);

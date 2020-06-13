@@ -80,7 +80,6 @@ type window struct {
 	mshowTextInput     C.jmethodID
 	mhideTextInput     C.jmethodID
 	mpostFrameCallback C.jmethodID
-	mRegisterFragment  C.jmethodID
 }
 
 type jvalue uint64 // The largest JNI type fits in 64 bits.
@@ -193,7 +192,6 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		mshowTextInput:     getMethodID(env, class, "showTextInput", "()V"),
 		mhideTextInput:     getMethodID(env, class, "hideTextInput", "()V"),
 		mpostFrameCallback: getMethodID(env, class, "postFrameCallback", "()V"),
-		mRegisterFragment:  getMethodID(env, class, "registerFragment", "(Ljava/lang/String;)V"),
 	}
 	wopts := <-mainWindow.out
 	w.callbacks = wopts.window
@@ -416,7 +414,6 @@ func runInJVM(jvm *C.JavaVM, f func(env *C.JNIEnv)) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	var env *C.JNIEnv
-	var detach bool
 	if res := C.gio_jni_GetEnv(jvm, &env, C.JNI_VERSION_1_6); res != C.JNI_OK {
 		if res != C.JNI_EDETACHED {
 			panic(fmt.Errorf("JNI GetEnv failed with error %d", res))
@@ -424,14 +421,9 @@ func runInJVM(jvm *C.JavaVM, f func(env *C.JNIEnv)) {
 		if C.gio_jni_AttachCurrentThread(jvm, &env, nil) != C.JNI_OK {
 			panic(errors.New("runInJVM: AttachCurrentThread failed"))
 		}
-		detach = true
+		defer C.gio_jni_DetachCurrentThread(jvm)
 	}
 
-	if detach {
-		defer func() {
-			C.gio_jni_DetachCurrentThread(jvm)
-		}()
-	}
 	f(env)
 }
 
@@ -537,11 +529,21 @@ func javaString(env *C.JNIEnv, str string) C.jstring {
 	return C.gio_jni_NewString(env, (*C.jchar)(unsafe.Pointer(&utf16Chars[0])), C.int(len(utf16Chars)))
 }
 
-func (w *window) RegisterFragment(del string) {
-	w.runOnMain(func(env *C.JNIEnv) {
-		jstr := javaString(env, del)
-		callVoidMethod(env, w.view, w.mRegisterFragment, jvalue(jstr))
+// Do invokes the function with a global JNI handle to the view. If
+// the view is destroyed, Do returns false and does not invoke the
+// function.
+//
+// NOTE: Do must be invoked on the Android main thread.
+func (w *window) Do(f func(view uintptr)) bool {
+	if w.view == 0 {
+		return false
+	}
+	runInJVM(javaVM(), func(env *C.JNIEnv) {
+		view := C.gio_jni_NewGlobalRef(env, w.view)
+		defer C.gio_jni_DeleteGlobalRef(env, view)
+		f(uintptr(view))
 	})
+	return true
 }
 
 func varArgs(args []jvalue) *C.jvalue {
@@ -642,6 +644,14 @@ func (w *window) ReadClipboard() {
 		}
 		content := goString(env, C.jstring(c))
 		w.callbacks.Event(system.ClipboardEvent{Text: content})
+	})
+}
+
+// RunOnMain is the exported version of runOnMain without a JNI
+// environement.
+func RunOnMain(f func()) {
+	runOnMain(func(_ *C.JNIEnv) {
+		f()
 	})
 }
 
