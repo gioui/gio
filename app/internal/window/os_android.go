@@ -369,6 +369,10 @@ func (w *window) SetAnimating(anim bool) {
 	w.mu.Unlock()
 	if anim {
 		w.runOnMain(func(env *C.JNIEnv) {
+			if w.view == 0 {
+				// View was destroyed while switching to main thread.
+				return
+			}
 			callVoidMethod(env, w.view, w.mpostFrameCallback)
 		})
 	}
