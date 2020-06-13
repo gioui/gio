@@ -81,7 +81,6 @@ type window struct {
 	mhideTextInput     C.jmethodID
 	mpostFrameCallback C.jmethodID
 	mRegisterFragment  C.jmethodID
-	mwakeupMainThread  C.jmethodID
 }
 
 type jvalue uint64 // The largest JNI type fits in 64 bits.
@@ -100,8 +99,9 @@ var android struct {
 	// gioCls is the class of the Gio class.
 	gioCls C.jclass
 
-	mwriteClipboard C.jmethodID
-	mreadClipboard  C.jmethodID
+	mwriteClipboard   C.jmethodID
+	mreadClipboard    C.jmethodID
+	mwakeupMainThread C.jmethodID
 }
 
 var views = make(map[C.jlong]*window)
@@ -159,6 +159,7 @@ func initJVM(env *C.JNIEnv, gio C.jclass, ctx C.jobject) {
 	android.gioCls = C.jclass(C.gio_jni_NewGlobalRef(env, C.jobject(gio)))
 	android.mwriteClipboard = getStaticMethodID(env, gio, "writeClipboard", "(Landroid/content/Context;Ljava/lang/String;)V")
 	android.mreadClipboard = getStaticMethodID(env, gio, "readClipboard", "(Landroid/content/Context;)Ljava/lang/String;")
+	android.mwakeupMainThread = getStaticMethodID(env, gio, "wakeupMainThread", "()V")
 }
 
 func JavaVM() uintptr {
@@ -193,7 +194,6 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		mhideTextInput:     getMethodID(env, class, "hideTextInput", "()V"),
 		mpostFrameCallback: getMethodID(env, class, "postFrameCallback", "()V"),
 		mRegisterFragment:  getMethodID(env, class, "registerFragment", "(Ljava/lang/String;)V"),
-		mwakeupMainThread:  getMethodID(env, class, "wakeupMainThread", "()V"),
 	}
 	wopts := <-mainWindow.out
 	w.callbacks = wopts.window
@@ -372,7 +372,7 @@ func (w *window) SetAnimating(anim bool) {
 	w.animating = anim
 	w.mu.Unlock()
 	if anim {
-		w.runOnMain(func(env *C.JNIEnv) {
+		runOnMain(func(env *C.JNIEnv) {
 			if w.view == 0 {
 				// View was destroyed while switching to main thread.
 				return
@@ -626,7 +626,7 @@ func NewWindow(window Callbacks, opts *Options) error {
 }
 
 func (w *window) WriteClipboard(s string) {
-	w.runOnMain(func(env *C.JNIEnv) {
+	runOnMain(func(env *C.JNIEnv) {
 		jstr := javaString(env, s)
 		callStaticVoidMethod(env, android.gioCls, android.mwriteClipboard,
 			jvalue(android.appCtx), jvalue(jstr))
@@ -634,7 +634,7 @@ func (w *window) WriteClipboard(s string) {
 }
 
 func (w *window) ReadClipboard() {
-	w.runOnMain(func(env *C.JNIEnv) {
+	runOnMain(func(env *C.JNIEnv) {
 		c, err := callStaticObjectMethod(env, android.gioCls, android.mreadClipboard,
 			jvalue(android.appCtx))
 		if err != nil {
@@ -646,17 +646,17 @@ func (w *window) ReadClipboard() {
 }
 
 // runOnMain runs a function on the Java main thread.
-func (w *window) runOnMain(f func(env *C.JNIEnv)) {
+func runOnMain(f func(env *C.JNIEnv)) {
 	go func() {
 		mainFuncs <- f
 		runInJVM(javaVM(), func(env *C.JNIEnv) {
-			callVoidMethod(env, w.view, w.mwakeupMainThread)
+			callStaticVoidMethod(env, android.gioCls, android.mwakeupMainThread)
 		})
 	}()
 }
 
-//export Java_org_gioui_GioView_scheduleMainFuncs
-func Java_org_gioui_GioView_scheduleMainFuncs(env *C.JNIEnv, this C.jobject) {
+//export Java_org_gioui_Gio_scheduleMainFuncs
+func Java_org_gioui_Gio_scheduleMainFuncs(env *C.JNIEnv, cls C.jclass) {
 	for {
 		select {
 		case f := <-mainFuncs:

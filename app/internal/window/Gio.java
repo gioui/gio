@@ -5,12 +5,15 @@ package org.gioui;
 import android.content.ClipboardManager;
 import android.content.ClipData;
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 
 import java.io.UnsupportedEncodingException;
 
 public final class Gio {
-	private final static Object initLock = new Object();
+	private static final Object initLock = new Object();
 	private static boolean jniLoaded;
+	private static final Handler handler = new Handler(Looper.getMainLooper());
 
 	/**
 	 * init loads and initializes the Go native library and runs
@@ -53,4 +56,13 @@ public final class Gio {
 		return c.getItemAt(0).coerceToText(ctx).toString();
 	}
 
+	static void wakeupMainThread() {
+		handler.post(new Runnable() {
+			@Override public void run() {
+				scheduleMainFuncs();
+			}
+		});
+	}
+
+	static private native void scheduleMainFuncs();
 }

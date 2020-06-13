@@ -14,7 +14,6 @@ import android.app.FragmentTransaction;
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.Build;
-import android.os.Handler;
 import android.text.Editable;
 import android.util.AttributeSet;
 import android.view.Choreographer;
@@ -40,7 +39,6 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	private final SurfaceHolder.Callback surfCallbacks;
 	private final View.OnFocusChangeListener focusCallback;
 	private final InputMethodManager imm;
-	private final Handler handler;
 	private long nhandle;
 
 	public GioView(Context context) {
@@ -50,7 +48,6 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	public GioView(Context context, AttributeSet attrs) {
 		super(context, attrs);
 
-		handler = new Handler();
 		// Late initialization of the Go runtime to wait for a valid context.
 		Gio.init(context.getApplicationContext());
 
@@ -194,14 +191,6 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		return onBack(nhandle);
 	}
 
-	void wakeupMainThread() {
-		handler.post(new Runnable() {
-			@Override public void run() {
-				scheduleMainFuncs();
-			}
-		});
-	}
-
 	void registerFragment(String del) {
 		final Class cls;
 		try {
@@ -241,7 +230,6 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	static private native void onFrameCallback(long handle, long nanos);
 	static private native boolean onBack(long handle);
 	static private native void onFocusChange(long handle, boolean focus);
-	static private native void scheduleMainFuncs();
 
 	private static class InputConnection extends BaseInputConnection {
 		private final Editable editable;
