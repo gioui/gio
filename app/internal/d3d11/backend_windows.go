@@ -777,13 +777,15 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 		return fmt.Errorf("ReadPixels: %v", err)
 	}
 	defer f.dev.ctx.Unmap(res, 0)
-	pitch := w * 4
-	if int(resMap.RowPitch) != pitch {
-		return fmt.Errorf("ReadPixels: got row pitch %d, expected %d", resMap.RowPitch, pitch)
+	srcPitch := w * 4
+	dstPitch := int(resMap.RowPitch)
+	mapSize := dstPitch * h
+	data := gunsafe.SliceOf(resMap.pData)[:mapSize:mapSize]
+	width := w * 4
+	for r := 0; r < h; r++ {
+		pixels := pixels[r*srcPitch:]
+		copy(pixels[:width], data[r*dstPitch:])
 	}
-	n := pitch * h
-	data := gunsafe.SliceOf(resMap.pData)[:n:n]
-	copy(pixels, data)
 	return nil
 }
 
