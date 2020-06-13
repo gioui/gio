@@ -413,7 +413,7 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, pe
 		<activity android:name="org.gioui.GioActivity"
 			android:label="{{.AppName}}"
 			android:theme="@style/Theme.GioApp"
-			android:configChanges="orientation|keyboardHidden"
+			android:configChanges="screenSize|screenLayout|smallestScreenSize|orientation|keyboardHidden"
 			android:windowSoftInputMode="adjustResize">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
