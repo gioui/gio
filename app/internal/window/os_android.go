@@ -82,8 +82,6 @@ type window struct {
 	mpostFrameCallback C.jmethodID
 	mRegisterFragment  C.jmethodID
 	mwakeupMainThread  C.jmethodID
-	mwriteClipboard    C.jmethodID
-	mreadClipboard     C.jmethodID
 }
 
 type jvalue uint64 // The largest JNI type fits in 64 bits.
@@ -97,8 +95,13 @@ var android struct {
 	mu  sync.Mutex
 	jvm *C.JavaVM
 
-	// The global Android App context.
+	// appCtx is the global Android App context.
 	appCtx C.jobject
+	// gioCls is the class of the Gio class.
+	gioCls C.jclass
+
+	mwriteClipboard C.jmethodID
+	mreadClipboard  C.jmethodID
 }
 
 var views = make(map[C.jlong]*window)
@@ -153,6 +156,9 @@ func initJVM(env *C.JNIEnv, gio C.jclass, ctx C.jobject) {
 		panic("gio: GetJavaVM failed")
 	}
 	android.appCtx = C.gio_jni_NewGlobalRef(env, ctx)
+	android.gioCls = C.jclass(C.gio_jni_NewGlobalRef(env, C.jobject(gio)))
+	android.mwriteClipboard = getStaticMethodID(env, gio, "writeClipboard", "(Landroid/content/Context;Ljava/lang/String;)V")
+	android.mreadClipboard = getStaticMethodID(env, gio, "readClipboard", "(Landroid/content/Context;)Ljava/lang/String;")
 }
 
 func JavaVM() uintptr {
@@ -188,8 +194,6 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		mpostFrameCallback: getMethodID(env, class, "postFrameCallback", "()V"),
 		mRegisterFragment:  getMethodID(env, class, "registerFragment", "(Ljava/lang/String;)V"),
 		mwakeupMainThread:  getMethodID(env, class, "wakeupMainThread", "()V"),
-		mwriteClipboard:    getMethodID(env, class, "writeClipboard", "(Ljava/lang/String;)V"),
-		mreadClipboard:     getMethodID(env, class, "readClipboard", "()Ljava/lang/String;"),
 	}
 	wopts := <-mainWindow.out
 	w.callbacks = wopts.window
@@ -624,13 +628,15 @@ func NewWindow(window Callbacks, opts *Options) error {
 func (w *window) WriteClipboard(s string) {
 	w.runOnMain(func(env *C.JNIEnv) {
 		jstr := javaString(env, s)
-		callVoidMethod(env, w.view, w.mwriteClipboard, jvalue(jstr))
+		callStaticVoidMethod(env, android.gioCls, android.mwriteClipboard,
+			jvalue(android.appCtx), jvalue(jstr))
 	})
 }
 
 func (w *window) ReadClipboard() {
 	w.runOnMain(func(env *C.JNIEnv) {
-		c, err := callObjectMethod(env, w.view, w.mreadClipboard)
+		c, err := callStaticObjectMethod(env, android.gioCls, android.mreadClipboard,
+			jvalue(android.appCtx))
 		if err != nil {
 			return
 		}

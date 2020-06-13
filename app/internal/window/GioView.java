@@ -11,8 +11,6 @@ import android.app.Activity;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
-import android.content.ClipboardManager;
-import android.content.ClipData;
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.Build;
@@ -227,20 +225,6 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		FragmentTransaction ft = fm.beginTransaction();
 		ft.add(frag, del);
 		ft.commitNow();
-	}
-
-	void writeClipboard(String s) {
-		ClipboardManager m = (ClipboardManager)getContext().getSystemService(Context.CLIPBOARD_SERVICE);
-		m.setPrimaryClip(ClipData.newPlainText(null, s));
-	}
-
-	String readClipboard() {
-		ClipboardManager m = (ClipboardManager)getContext().getSystemService(Context.CLIPBOARD_SERVICE);
-		ClipData c = m.getPrimaryClip();
-		if (c == null || c.getItemCount() < 1) {
-			return null;
-		}
-		return c.getItemAt(0).coerceToText(getContext()).toString();
 	}
 
 	static private native long onCreateView(GioView view);
