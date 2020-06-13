@@ -21,6 +21,7 @@ import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.WindowInsets;
 import android.view.Surface;
 import android.view.SurfaceView;
@@ -39,6 +40,9 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	private final SurfaceHolder.Callback surfCallbacks;
 	private final View.OnFocusChangeListener focusCallback;
 	private final InputMethodManager imm;
+	private final float scrollXScale;
+	private final float scrollYScale;
+
 	private long nhandle;
 
 	public GioView(Context context) {
@@ -50,6 +54,10 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 
 		// Late initialization of the Go runtime to wait for a valid context.
 		Gio.init(context.getApplicationContext());
+
+		ViewConfiguration conf = ViewConfiguration.get(context);
+		scrollXScale = conf.getScaledHorizontalScrollFactor();
+		scrollYScale = conf.getScaledVerticalScrollFactor();
 
 		nhandle = onCreateView(this);
 		imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -80,6 +88,11 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		return false;
 	}
 
+	@Override public boolean onGenericMotionEvent(MotionEvent event) {
+		dispatchMotionEvent(event);
+		return true;
+	}
+
 	@Override public boolean onTouchEvent(MotionEvent event) {
 		// Ask for unbuffered events. Flutter and Chrome does it
 		// so I assume its good for us as well.
@@ -87,6 +100,11 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 			requestUnbufferedDispatch(event);
 		}
 
+		dispatchMotionEvent(event);
+		return true;
+	}
+
+	private void dispatchMotionEvent(MotionEvent event) {
 		for (int j = 0; j < event.getHistorySize(); j++) {
 			long time = event.getHistoricalEventTime(j);
 			for (int i = 0; i < event.getPointerCount(); i++) {
@@ -97,6 +115,8 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 						event.getToolType(i),
 						event.getHistoricalX(i, j),
 						event.getHistoricalY(i, j),
+						scrollXScale*event.getHistoricalAxisValue(MotionEvent.AXIS_HSCROLL, i, j),
+						scrollYScale*event.getHistoricalAxisValue(MotionEvent.AXIS_VSCROLL, i, j),
 						event.getButtonState(),
 						time);
 			}
@@ -113,12 +133,12 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 					pact,
 					event.getPointerId(i),
 					event.getToolType(i),
-					event.getX(i),
-					event.getY(i),
+					event.getX(i), event.getY(i),
+					scrollXScale*event.getAxisValue(MotionEvent.AXIS_HSCROLL, i),
+					scrollYScale*event.getAxisValue(MotionEvent.AXIS_VSCROLL, i),
 					event.getButtonState(),
 					event.getEventTime());
 		}
-		return true;
 	}
 
 	@Override public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
@@ -200,7 +220,7 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	static private native void onConfigurationChanged(long handle);
 	static private native void onWindowInsets(long handle, int top, int right, int bottom, int left);
 	static private native void onLowMemory();
-	static private native void onTouchEvent(long handle, int action, int pointerID, int tool, float x, float y, int buttons, long time);
+	static private native void onTouchEvent(long handle, int action, int pointerID, int tool, float x, float y, float scrollX, float scrollY, int buttons, long time);
 	static private native void onKeyEvent(long handle, int code, int character, long time);
 	static private native void onFrameCallback(long handle, long nanos);
 	static private native boolean onBack(long handle);
