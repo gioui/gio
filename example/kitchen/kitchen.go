@@ -33,6 +33,7 @@ import (
 )
 
 var screenshot = flag.String("screenshot", "", "save a screenshot to a file and exit")
+var disable = flag.Bool("disable", false, "disable all widgets")
 
 type scaledConfig struct {
 	Scale float32
@@ -124,6 +125,9 @@ func loop(w *app.Window) error {
 				}
 				for flatBtn.Clicked() {
 					w.ReadClipboard()
+				}
+				if *disable {
+					gtx = gtx.Disabled()
 				}
 				kitchen(gtx, th)
 				e.Frame(gtx.Ops)
@@ -251,7 +255,11 @@ func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 					return in.Layout(gtx, func(gtx C) D {
 						return material.Clickable(gtx, flatBtn, func(gtx C) D {
 							return layout.UniformInset(unit.Dp(12)).Layout(gtx, func(gtx C) D {
-								return layout.Center.Layout(gtx, material.Body1(th, "Flat").Layout)
+								flatBtnText := material.Body1(th, "Flat")
+								if gtx.Queue == nil {
+									flatBtnText.Color.A = 150
+								}
+								return layout.Center.Layout(gtx, flatBtnText.Layout)
 							})
 						})
 					})
