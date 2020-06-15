@@ -212,9 +212,11 @@ func createContext(disp _EGLDisplay) (*eglContext, error) {
 		_EGL_CONFIG_CAVEAT, _EGL_NONE,
 	}
 	if srgb {
-		if runtime.GOOS == "linux" {
+		if runtime.GOOS == "linux" || runtime.GOOS == "android" {
 			// Some Mesa drivers crash if an sRGB framebuffer is requested without alpha.
 			// https://bugs.freedesktop.org/show_bug.cgi?id=107782.
+			//
+			// Also, some Android devices (Samsung S9) needs alpha for sRGB to work.
 			attribs = append(attribs, _EGL_ALPHA_SIZE, 1)
 		}
 		// Only request a depth buffer if we're going to render directly to the framebuffer.
