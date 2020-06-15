@@ -16,6 +16,7 @@ import android.graphics.Rect;
 import android.os.Build;
 import android.text.Editable;
 import android.util.AttributeSet;
+import android.util.TypedValue;
 import android.view.Choreographer;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
@@ -56,8 +57,19 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		Gio.init(context.getApplicationContext());
 
 		ViewConfiguration conf = ViewConfiguration.get(context);
-		scrollXScale = conf.getScaledHorizontalScrollFactor();
-		scrollYScale = conf.getScaledVerticalScrollFactor();
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			scrollXScale = conf.getScaledHorizontalScrollFactor();
+			scrollYScale = conf.getScaledVerticalScrollFactor();
+		} else {
+			float listItemHeight = 48; // dp
+			float px = TypedValue.applyDimension(
+				TypedValue.COMPLEX_UNIT_DIP,
+				listItemHeight,
+				getResources().getDisplayMetrics()
+			);
+			scrollXScale = px;
+			scrollYScale = px;
+		}
 
 		nhandle = onCreateView(this);
 		imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
