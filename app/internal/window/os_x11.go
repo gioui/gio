@@ -26,6 +26,8 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -507,6 +509,11 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	hints.input = C.True
 	hints.flags = C.InputHint
 	C.XSetWMHints(dpy, win, &hints)
+
+	name := C.CString(filepath.Base(os.Args[0]))
+	defer C.free(unsafe.Pointer(name))
+	wmhints := C.XClassHint{name, name}
+	C.XSetClassHint(dpy, win, &wmhints)
 
 	w.atoms.utf8string = w.atom("UTF8_STRING", false)
 	w.atoms.evDelWindow = w.atom("WM_DELETE_WINDOW", false)
