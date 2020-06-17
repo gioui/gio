@@ -129,7 +129,7 @@ func (e *Editor) processPointer(gtx layout.Context) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Scroll(gtx, gtx, gtx.Now, axis)
+	sdist := e.scroller.Scroll(gtx.Metric, gtx, gtx.Now, axis)
 	var soff int
 	if e.SingleLine {
 		e.scrollRel(sdist, 0)
@@ -143,7 +143,7 @@ func (e *Editor) processPointer(gtx layout.Context) {
 		case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
 			evt.Type == gesture.TypeClick && evt.Source == pointer.Touch:
 			e.blinkStart = gtx.Now
-			e.moveCoord(gtx, image.Point{
+			e.moveCoord(gtx.Metric, image.Point{
 				X: int(math.Round(float64(evt.Position.X))),
 				Y: int(math.Round(float64(evt.Position.Y))),
 			})
@@ -426,7 +426,7 @@ func (e *Editor) scrollAbs(x, y int) {
 	}
 }
 
-func (e *Editor) moveCoord(c unit.Converter, pos image.Point) {
+func (e *Editor) moveCoord(c unit.Metric, pos image.Point) {
 	var (
 		prevDesc fixed.Int26_6
 		carLine  int

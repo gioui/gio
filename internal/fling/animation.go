@@ -31,7 +31,7 @@ const (
 
 // Start a fling given a starting velocity. Returns whether a
 // fling was started.
-func (f *Animation) Start(c unit.Converter, now time.Time, velocity float32) bool {
+func (f *Animation) Start(c unit.Metric, now time.Time, velocity float32) bool {
 	min := float32(c.Px(minFlingVelocity))
 	v := velocity
 	if -min <= v && v <= min {

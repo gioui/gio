@@ -15,6 +15,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/unit"
 )
 
 type window struct {
@@ -407,7 +408,7 @@ func (w *window) ShowTextInput(show bool) {
 
 func (w *window) draw(sync bool) {
 	width, height, scale, cfg := w.config()
-	if cfg == (config{}) || width == 0 || height == 0 {
+	if cfg == (unit.Metric{}) || width == 0 || height == 0 {
 		return
 	}
 	w.mu.Lock()
@@ -420,13 +421,13 @@ func (w *window) draw(sync bool) {
 				X: width,
 				Y: height,
 			},
-			Config: &cfg,
+			Metric: cfg,
 		},
 		Sync: sync,
 	})
 }
 
-func (w *window) config() (int, int, float32, config) {
+func (w *window) config() (int, int, float32, unit.Metric) {
 	rect := w.cnv.Call("getBoundingClientRect")
 	width, height := rect.Get("width").Float(), rect.Get("height").Float()
 	scale := w.window.Get("devicePixelRatio").Float()
@@ -438,9 +439,9 @@ func (w *window) config() (int, int, float32, config) {
 		w.cnv.Set("width", iw)
 		w.cnv.Set("height", ih)
 	}
-	return iw, ih, float32(scale), config{
-		pxPerDp: float32(scale),
-		pxPerSp: float32(scale),
+	return iw, ih, float32(scale), unit.Metric{
+		PxPerDp: float32(scale),
+		PxPerSp: float32(scale),
 	}
 }
 

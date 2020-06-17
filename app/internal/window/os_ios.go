@@ -119,9 +119,9 @@ func (w *window) draw(sync bool) {
 				Bottom: unit.Px(float32(params.bottom)),
 				Left:   unit.Px(float32(params.left)),
 			},
-			Config: &config{
-				pxPerDp: float32(params.dpi) * inchPrDp,
-				pxPerSp: float32(params.sdpi) * inchPrDp,
+			Metric: unit.Metric{
+				PxPerDp: float32(params.dpi) * inchPrDp,
+				PxPerSp: float32(params.sdpi) * inchPrDp,
 			},
 		},
 		Sync: sync,

@@ -17,6 +17,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/unit"
 
 	_ "gioui.org/app/internal/cocoainit"
 )
@@ -236,16 +237,16 @@ func (w *window) draw() {
 				X: width,
 				Y: height,
 			},
-			Config: &cfg,
+			Metric: cfg,
 		},
 		Sync: true,
 	})
 }
 
-func configFor(scale float32) config {
-	return config{
-		pxPerDp: scale,
-		pxPerSp: scale,
+func configFor(scale float32) unit.Metric {
+	return unit.Metric{
+		PxPerDp: scale,
+		PxPerSp: scale,
 	}
 }
 

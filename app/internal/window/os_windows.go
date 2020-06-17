@@ -19,6 +19,7 @@ import (
 	syscall "golang.org/x/sys/windows"
 
 	"gioui.org/app/internal/windows"
+	"gioui.org/unit"
 
 	"gioui.org/f32"
 	"gioui.org/io/key"
@@ -377,7 +378,7 @@ func (w *window) draw(sync bool) {
 				X: w.width,
 				Y: w.height,
 			},
-			Config: &cfg,
+			Metric: cfg,
 		},
 		Sync: sync,
 	})
@@ -586,12 +587,12 @@ func convertKeyCode(code uintptr) (string, bool) {
 	return r, true
 }
 
-func configForDC() config {
+func configForDC() unit.Metric {
 	dpi := windows.GetSystemDPI()
 	const inchPrDp = 1.0 / 96.0
 	ppdp := float32(dpi) * inchPrDp
-	return config{
-		pxPerDp: ppdp,
-		pxPerSp: ppdp,
+	return unit.Metric{
+		PxPerDp: ppdp,
+		PxPerSp: ppdp,
 	}
 }

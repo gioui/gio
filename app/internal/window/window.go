@@ -6,7 +6,6 @@ package window
 
 import (
 	"errors"
-	"math"
 
 	"gioui.org/gpu/backend"
 	"gioui.org/io/event"
@@ -69,29 +68,6 @@ type windowRendezvous struct {
 type windowAndOptions struct {
 	window Callbacks
 	opts   *Options
-}
-
-// config implements the system.Config interface.
-type config struct {
-	// Device pixels per dp.
-	pxPerDp float32
-	// Device pixels per sp.
-	pxPerSp float32
-}
-
-func (c *config) Px(v unit.Value) int {
-	var r float32
-	switch v.U {
-	case unit.UnitPx:
-		r = v.V
-	case unit.UnitDp:
-		r = c.pxPerDp * v.V
-	case unit.UnitSp:
-		r = c.pxPerSp * v.V
-	default:
-		panic("unknown unit")
-	}
-	return int(math.Round(float64(r)))
 }
 
 func newWindowRendezvous() *windowRendezvous {

@@ -22,7 +22,10 @@ values.
 */
 package unit
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // Value is a value with a unit.
 type Value struct {
@@ -33,9 +36,13 @@ type Value struct {
 // Unit represents a unit for a Value.
 type Unit uint8
 
-// Converter converts Values to pixels.
-type Converter interface {
-	Px(v Value) int
+// Metric converts Values to device-dependent pixels, px. The zero
+// value represents a 1-to-1 scale from dp, sp to pixels.
+type Metric struct {
+	// PxPerDp is the device-dependent pixels per dp.
+	PxPerDp float32
+	// PxPerSp is the device-dependent pixels per sp.
+	PxPerSp float32
 }
 
 const (
@@ -90,7 +97,7 @@ func (u Unit) String() string {
 }
 
 // Add a list of Values.
-func Add(c Converter, values ...Value) Value {
+func Add(c Metric, values ...Value) Value {
 	var sum Value
 	for _, v := range values {
 		sum, v = compatible(c, sum, v)
@@ -100,7 +107,7 @@ func Add(c Converter, values ...Value) Value {
 }
 
 // Max returns the maximum of a list of Values.
-func Max(c Converter, values ...Value) Value {
+func Max(c Metric, values ...Value) Value {
 	var max Value
 	for _, v := range values {
 		max, v = compatible(c, max, v)
@@ -111,7 +118,30 @@ func Max(c Converter, values ...Value) Value {
 	return max
 }
 
-func compatible(c Converter, v1, v2 Value) (Value, Value) {
+func (c Metric) Px(v Value) int {
+	var r float32
+	switch v.U {
+	case UnitPx:
+		r = v.V
+	case UnitDp:
+		s := c.PxPerDp
+		if s == 0 {
+			s = 1
+		}
+		r = s * v.V
+	case UnitSp:
+		s := c.PxPerSp
+		if s == 0 {
+			s = 1
+		}
+		r = s * v.V
+	default:
+		panic("unknown unit")
+	}
+	return int(math.Round(float64(r)))
+}
+
+func compatible(c Metric, v1, v2 Value) (Value, Value) {
 	if v1.U == v2.U {
 		return v1, v2
 	}

@@ -37,6 +37,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/unit"
 
 	"gioui.org/app/internal/xkb"
 	syscall "golang.org/x/sys/unix"
@@ -64,7 +65,7 @@ type x11Window struct {
 		atom C.Atom
 	}
 	stage  system.Stage
-	cfg    config
+	cfg    unit.Metric
 	width  int
 	height int
 	notify struct {
@@ -193,7 +194,7 @@ loop:
 						X: w.width,
 						Y: w.height,
 					},
-					Config: &w.cfg,
+					Metric: w.cfg,
 				},
 				Sync: syn,
 			})
@@ -474,7 +475,7 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	}
 
 	ppsp := x11DetectUIScale(dpy)
-	cfg := config{pxPerDp: ppsp, pxPerSp: ppsp}
+	cfg := unit.Metric{PxPerDp: ppsp, PxPerSp: ppsp}
 	swa := C.XSetWindowAttributes{
 		event_mask: C.ExposureMask | C.FocusChangeMask | // update
 			C.KeyPressMask | C.KeyReleaseMask | // keyboard

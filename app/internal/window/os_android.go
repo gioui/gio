@@ -396,9 +396,9 @@ func (w *window) draw(sync bool) {
 				Y: int(height),
 			},
 			Insets: w.insets,
-			Config: &config{
-				pxPerDp: ppdp,
-				pxPerSp: w.fontScale * ppdp,
+			Metric: unit.Metric{
+				PxPerDp: ppdp,
+				PxPerSp: w.fontScale * ppdp,
 			},
 		},
 		Sync: sync,

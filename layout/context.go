@@ -3,7 +3,6 @@
 package layout
 
 import (
-	"math"
 	"time"
 
 	"gioui.org/io/event"
@@ -20,7 +19,7 @@ type Context struct {
 	// layout.
 	Constraints Constraints
 
-	Config system.Config
+	Metric unit.Metric
 	// By convention, a nil Queue is a signal to widgets to draw themselves
 	// in a disabled state.
 	Queue event.Queue
@@ -47,18 +46,14 @@ func NewContext(ops *op.Ops, e system.FrameEvent) Context {
 		Ops:         ops,
 		Now:         e.Now,
 		Queue:       e.Queue,
-		Config:      e.Config,
+		Metric:      e.Metric,
 		Constraints: Exact(e.Size),
 	}
 }
 
-// Px maps the value to pixels. If no configuration is set,
-// Px returns the rounded value of v.
+// Px maps the value to pixels.
 func (c Context) Px(v unit.Value) int {
-	if c.Config == nil {
-		return int(math.Round(float64(v.V)))
-	}
-	return c.Config.Px(v)
+	return c.Metric.Px(v)
 }
 
 // Events returns the events available for the key. If no

@@ -17,10 +17,11 @@ import (
 // operations that describes what to display and how to handle
 // input.
 type FrameEvent struct {
-	Config Config
 	// Now is the current animation. Use Now instead of time.Now to
 	// synchronize animation and to avoid the time.Now call overhead.
 	Now time.Time
+	// Metric converts device independent dp and sp to device pixels.
+	Metric unit.Metric
 	// Size is the dimensions of the window.
 	Size image.Point
 	// Insets is the insets to apply.
@@ -49,12 +50,6 @@ type FrameEvent struct {
 	Frame func(frame *op.Ops)
 	// Queue supplies the events for event handlers.
 	Queue event.Queue
-}
-
-// Config defines the essential properties of
-// the environment.
-type Config interface {
-	unit.Converter
 }
 
 // DestroyEvent is the last event sent through

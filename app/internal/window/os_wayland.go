@@ -25,6 +25,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/unit"
 	syscall "golang.org/x/sys/unix"
 )
 
@@ -873,7 +874,7 @@ func (w *window) flushFling() {
 	w.fling.yExtrapolation = fling.Extrapolation{}
 	vel := float32(math.Sqrt(float64(estx.Velocity*estx.Velocity + esty.Velocity*esty.Velocity)))
 	_, _, c := w.config()
-	if !w.fling.anim.Start(&c, time.Now(), vel) {
+	if !w.fling.anim.Start(c, time.Now(), vel) {
 		return
 	}
 	invDist := 1 / vel
@@ -1359,11 +1360,11 @@ func (w *window) updateOutputs() {
 	}
 }
 
-func (w *window) config() (int, int, config) {
+func (w *window) config() (int, int, unit.Metric) {
 	width, height := w.width*w.scale, w.height*w.scale
-	return width, height, config{
-		pxPerDp: w.ppdp * float32(w.scale),
-		pxPerSp: w.ppsp * float32(w.scale),
+	return width, height, unit.Metric{
+		PxPerDp: w.ppdp * float32(w.scale),
+		PxPerSp: w.ppsp * float32(w.scale),
 	}
 }
 
@@ -1377,7 +1378,7 @@ func (w *window) draw(sync bool) {
 		return
 	}
 	width, height, cfg := w.config()
-	if cfg == (config{}) {
+	if cfg == (unit.Metric{}) {
 		return
 	}
 	if anim && w.lastFrameCallback == nil {
@@ -1392,7 +1393,7 @@ func (w *window) draw(sync bool) {
 				X: width,
 				Y: height,
 			},
-			Config: &cfg,
+			Metric: cfg,
 		},
 		Sync: sync,
 	})
