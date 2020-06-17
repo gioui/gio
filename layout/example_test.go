@@ -62,7 +62,7 @@ func ExampleFlex() {
 		Constraints: layout.Exact(image.Point{X: 100, Y: 100}),
 	}
 
-	layout.Flex{}.Layout(gtx,
+	layout.Flex{WeightSum: 2}.Layout(gtx,
 		// Rigid 10x10 widget.
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			fmt.Printf("Rigid: %v\n", gtx.Constraints)
@@ -72,9 +72,6 @@ func ExampleFlex() {
 		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 			fmt.Printf("50%%: %v\n", gtx.Constraints)
 			return layoutWidget(gtx, 10, 10)
-		}),
-		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-			return layout.Dimensions{}
 		}),
 	)
 

@@ -18,6 +18,10 @@ type Flex struct {
 	Spacing Spacing
 	// Alignment is the alignment in the cross axis.
 	Alignment Alignment
+	// WeightSum is the sum of weights used for the weighted
+	// size of Flexed children. If WeightSum is zero, the sum
+	// of all Flexed weights is used.
+	WeightSum float32
 }
 
 // FlexChild is the descriptor for a Flex child.
@@ -101,6 +105,9 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 		}
 		children[i].call = c
 		children[i].dims = dims
+	}
+	if w := f.WeightSum; w != 0 {
+		totalWeight = w
 	}
 	// fraction is the rounding error from a Flex weighting.
 	var fraction float32
