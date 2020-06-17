@@ -299,6 +299,9 @@ func (w *window) ShowTextInput(show bool) {
 	})
 }
 
+// Close the window. Not implemented for iOS.
+func (w *window) Close() {}
+
 func NewWindow(win Callbacks, opts *Options) error {
 	mainWindow.in <- windowAndOptions{win, opts}
 	return <-mainWindow.errs

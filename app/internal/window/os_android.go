@@ -650,6 +650,9 @@ func (w *window) ReadClipboard() {
 	})
 }
 
+// Close the window. Not implemented for Android.
+func (w *window) Close() {}
+
 // RunOnMain is the exported version of runOnMain without a JNI
 // environement.
 func RunOnMain(f func()) {

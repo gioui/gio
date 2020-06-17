@@ -57,6 +57,9 @@ type Driver interface {
 	ReadClipboard()
 	// WriteClipboard requests a clipboard write.
 	WriteClipboard(s string)
+
+	// Close the window.
+	Close()
 }
 
 type windowRendezvous struct {

@@ -110,6 +110,9 @@ func (w *x11Window) WriteClipboard(s string) {
 
 func (w *x11Window) ShowTextInput(show bool) {}
 
+// Close the window. Not implemented for X11.
+func (w *x11Window) Close() {}
+
 var x11OneByte = make([]byte, 1)
 
 func (w *x11Window) wakeup() {

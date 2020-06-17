@@ -1426,6 +1426,9 @@ func (w *window) surface() (*C.struct_wl_surface, int, int) {
 
 func (w *window) ShowTextInput(show bool) {}
 
+// Close the window. Not implemented for Wayland.
+func (w *window) Close() {}
+
 // detectUIScale reports the system UI scale, or 1.0 if it fails.
 func detectUIScale() float32 {
 	// TODO: What about other window environments?

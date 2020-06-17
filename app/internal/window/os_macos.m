@@ -153,6 +153,11 @@ void gio_appTerminate(void) {
 	}
 }
 
+void gio_close(CFTypeRef windowRef) {
+  NSWindow* window = (__bridge NSWindow *)windowRef;
+  [window performClose:nil];
+}
+
 @implementation GioAppDelegate
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
 	[[NSRunningApplication currentApplication] activateWithOptions:(NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps)];

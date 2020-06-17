@@ -501,6 +501,9 @@ func (w *window) HWND() (syscall.Handle, int, int) {
 	return w.hwnd, w.width, w.height
 }
 
+// Close the window. Not implemented for Windows.
+func (w *window) Close() {}
+
 func convertKeyCode(code uintptr) (string, bool) {
 	if '0' <= code && code <= '9' || 'A' <= code && code <= 'Z' {
 		return string(rune(code)), true

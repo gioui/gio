@@ -44,6 +44,7 @@ __attribute__ ((visibility ("hidden"))) void gio_appTerminate(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height);
 __attribute__ ((visibility ("hidden"))) void gio_makeKeyAndOrderFront(CFTypeRef windowRef);
 __attribute__ ((visibility ("hidden"))) NSPoint gio_cascadeTopLeftFromPoint(CFTypeRef windowRef, NSPoint topLeft);
+__attribute__ ((visibility ("hidden"))) void gio_close(CFTypeRef windowRef);
 */
 import "C"
 
@@ -130,6 +131,17 @@ func (w *window) SetAnimating(anim bool) {
 	} else {
 		w.displayLink.Stop()
 	}
+}
+
+// Close the window. Only implemented for macOS.
+func (w *window) Close() {
+	runOnMain(func() {
+		// Make sure the view is still valid. The window might've been closed
+		// during the switch to the main thread.
+		if w.view != 0 {
+			C.gio_close(w.window)
+		}
+	})
 }
 
 func (w *window) setStage(stage system.Stage) {

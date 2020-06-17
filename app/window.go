@@ -208,6 +208,17 @@ func (w *Window) WriteClipboard(s string) {
 	})
 }
 
+// Close the window. The window's event loop should exit when it receives
+// system.DestroyEvent.
+//
+// Currently, only the macOS driver implements this functionality, all others
+// are stubbed.
+func (w *Window) Close() {
+	w.driverDo(func() {
+		w.driver.Close()
+	})
+}
+
 // driverDo calls f as soon as the window has a valid driver attached,
 // or does nothing if the window is destroyed while waiting.
 func (w *Window) driverDo(f func()) {

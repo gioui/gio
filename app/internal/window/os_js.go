@@ -406,6 +406,9 @@ func (w *window) ShowTextInput(show bool) {
 	}()
 }
 
+// Close the window. Not implemented for js.
+func (w *window) Close() {}
+
 func (w *window) draw(sync bool) {
 	width, height, scale, cfg := w.config()
 	if cfg == (unit.Metric{}) || width == 0 || height == 0 {
