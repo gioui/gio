@@ -62,6 +62,14 @@ type ClickEvent struct {
 
 type ClickType uint8
 
+// Drag detects drag gestures in the form of pointer.Drag events.
+type Drag struct {
+	dragging bool
+	pid      pointer.ID
+	start    f32.Point
+	grab     bool
+}
+
 // Scroll detects scroll gestures and reduces them to
 // scroll distances. Scroll recognizes mouse wheel
 // movements as well as drag and fling touch gestures.
@@ -299,6 +307,67 @@ func (s *Scroll) State() ScrollState {
 	default:
 		return StateIdle
 	}
+}
+
+// Add the handler to the operation list to receive drag events.
+func (d *Drag) Add(ops *op.Ops) {
+	op := pointer.InputOp{
+		Tag:   d,
+		Grab:  d.grab,
+		Types: pointer.Press | pointer.Drag | pointer.Release,
+	}
+	op.Add(ops)
+}
+
+// Events returns the next drag events, if any.
+func (d *Drag) Events(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event {
+	var events []pointer.Event
+	for _, e := range q.Events(d) {
+		e, ok := e.(pointer.Event)
+		if !ok {
+			continue
+		}
+
+		switch e.Type {
+		case pointer.Press:
+			if !(e.Buttons == pointer.ButtonLeft || e.Source == pointer.Touch) {
+				continue
+			}
+			if d.dragging {
+				continue
+			}
+			d.dragging = true
+			d.pid = e.PointerID
+			d.start = e.Position
+		case pointer.Drag:
+			if !d.dragging || e.PointerID != d.pid {
+				continue
+			}
+			switch axis {
+			case Horizontal:
+				e.Position.Y = d.start.Y
+			case Vertical:
+				e.Position.X = d.start.X
+			}
+			if e.Priority < pointer.Grabbed {
+				diff := e.Position.Sub(d.start)
+				slop := cfg.Px(touchSlop)
+				if diff.X*diff.X+diff.Y*diff.Y > float32(slop*slop) {
+					d.grab = true
+				}
+			}
+		case pointer.Release, pointer.Cancel:
+			if !d.dragging || e.PointerID != d.pid {
+				continue
+			}
+			d.dragging = false
+			d.grab = false
+		}
+
+		events = append(events, e)
+	}
+
+	return events
 }
 
 func (a Axis) String() string {
