@@ -13,7 +13,6 @@ import (
 	"image/png"
 	"io/ioutil"
 	"log"
-	"math"
 	"os"
 	"time"
 
@@ -34,10 +33,6 @@ import (
 
 var screenshot = flag.String("screenshot", "", "save a screenshot to a file and exit")
 var disable = flag.Bool("disable", false, "disable all widgets")
-
-type scaledConfig struct {
-	Scale float32
-}
 
 type iconAndTextButton struct {
 	theme  *material.Theme
@@ -87,8 +82,11 @@ func saveScreenshot(f string) error {
 		return err
 	}
 	gtx := layout.Context{
-		Ops:         new(op.Ops),
-		Config:      &scaledConfig{scale},
+		Ops: new(op.Ops),
+		Metric: unit.Metric{
+			PxPerDp: scale,
+			PxPerSp: scale,
+		},
 		Constraints: layout.Exact(sz),
 		Queue:       new(router.Router),
 	}
@@ -302,14 +300,6 @@ func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 	return list.Layout(gtx, len(widgets), func(gtx C, i int) D {
 		return layout.UniformInset(unit.Dp(16)).Layout(gtx, widgets[i])
 	})
-}
-
-func (s *scaledConfig) Px(v unit.Value) int {
-	scale := s.Scale
-	if v.U == unit.UnitPx {
-		scale = 1
-	}
-	return int(math.Round(float64(scale * v.V)))
 }
 
 const longText = `1. I learned from my grandfather, Verus, to use good manners, and to

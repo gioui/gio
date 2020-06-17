@@ -94,10 +94,13 @@ func main() {
 		sz := image.Point{X: width, Y: height}
 		ops.Reset()
 		gtx := layout.Context{
-			Ops:         &ops,
-			Now:         time.Now(),
-			Queue:       &queue,
-			Config:      &glfwConfig{scale},
+			Ops:   &ops,
+			Now:   time.Now(),
+			Queue: &queue,
+			Metric: unit.Metric{
+				PxPerDp: scale,
+				PxPerSp: scale,
+			},
 			Constraints: layout.Exact(sz),
 		}
 		draw(gtx, th)
