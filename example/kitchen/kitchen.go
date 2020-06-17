@@ -13,6 +13,7 @@ import (
 	"image/png"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
 	"time"
 
@@ -67,7 +68,7 @@ func main() {
 	}()
 
 	go func() {
-		w := app.NewWindow(app.Size(unit.Dp(800), unit.Dp(650)))
+		w := app.NewWindow(app.Size(unit.Dp(800), unit.Dp(700)))
 		if err := loop(w); err != nil {
 			log.Fatal(err)
 		}
@@ -197,6 +198,7 @@ var (
 	checkbox            = new(widget.Bool)
 	swtch               = new(widget.Bool)
 	transformTime       time.Time
+	float               = new(widget.Float)
 )
 
 type (
@@ -327,6 +329,16 @@ func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 				layout.Rigid(material.RadioButton(th, radioButtonsGroup, "r1", "RadioButton1").Layout),
 				layout.Rigid(material.RadioButton(th, radioButtonsGroup, "r2", "RadioButton2").Layout),
 				layout.Rigid(material.RadioButton(th, radioButtonsGroup, "r3", "RadioButton3").Layout),
+			)
+		},
+		func(gtx C) D {
+			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+				layout.Flexed(1, material.Slider(th, float, 0, 2*math.Pi).Layout),
+				layout.Rigid(func(gtx C) D {
+					return layout.UniformInset(unit.Dp(8)).Layout(gtx,
+						material.Body1(th, fmt.Sprintf("%.2f", float.Value)).Layout,
+					)
+				}),
 			)
 		},
 	}
