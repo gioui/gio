@@ -162,7 +162,8 @@ func (s StackOp) Pop() {
 	data[0] = byte(opconst.TypePop)
 }
 
-// Reset the Ops, preparing it for re-use.
+// Reset the Ops, preparing it for re-use. Reset invalidates
+// any recorded macros.
 func (o *Ops) Reset() {
 	o.stackStack = stack{}
 	o.macroStack = stack{}
@@ -236,7 +237,9 @@ func (m MacroOp) fill() {
 	bo.PutUint32(data[5:], uint32(pc.refs))
 }
 
-// Add the recorded list of operations.
+// Add the recorded list of operations. Add
+// panics if the Ops containing the recording
+// has been reset.
 func (c CallOp) Add(o *Ops) {
 	if c.ops == nil {
 		return
