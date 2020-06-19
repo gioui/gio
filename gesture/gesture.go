@@ -11,6 +11,7 @@ package gesture
 
 import (
 	"math"
+	"runtime"
 	"time"
 
 	"gioui.org/f32"
@@ -217,7 +218,12 @@ func (s *Scroll) Scroll(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) 
 		}
 		switch e.Type {
 		case pointer.Press:
-			if s.dragging || e.Source != pointer.Touch {
+			if s.dragging {
+				break
+			}
+			// Only scroll on touch drags, or on Android where mice
+			// drags also scroll by convention.
+			if e.Source != pointer.Touch && runtime.GOOS != "android" {
 				break
 			}
 			s.Stop()
