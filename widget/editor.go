@@ -47,12 +47,15 @@ type Editor struct {
 	shapes       []line
 	dims         layout.Dimensions
 	requestFocus bool
-	caretOn      bool
-	caretScroll  bool
 
-	// carXOff is the offset to the current caret
-	// position when moving between lines.
-	carXOff fixed.Int26_6
+	caret struct {
+		on     bool
+		scroll bool
+
+		// xoff is the offset to the current caret
+		// position when moving between lines.
+		xoff fixed.Int26_6
+	}
 
 	scroller  gesture.Scroll
 	scrollOff image.Point
@@ -149,7 +152,7 @@ func (e *Editor) processPointer(gtx layout.Context) {
 			})
 			e.requestFocus = true
 			if e.scroller.State() != gesture.StateFlinging {
-				e.caretScroll = true
+				e.caret.scroll = true
 			}
 		}
 	}
@@ -180,11 +183,11 @@ func (e *Editor) processKey(gtx layout.Context) {
 				}
 			}
 			if e.command(ke) {
-				e.caretScroll = true
+				e.caret.scroll = true
 				e.scroller.Stop()
 			}
 		case key.EditEvent:
-			e.caretScroll = true
+			e.caret.scroll = true
 			e.scroller.Stop()
 			e.append(ke.Text)
 		}
@@ -204,10 +207,10 @@ func (e *Editor) command(k key.Event) bool {
 		e.Delete(1)
 	case key.NameUpArrow:
 		line, _, carX, _ := e.layoutCaret()
-		e.carXOff = e.moveToLine(carX+e.carXOff, line-1)
+		e.caret.xoff = e.moveToLine(carX+e.caret.xoff, line-1)
 	case key.NameDownArrow:
 		line, _, carX, _ := e.layoutCaret()
-		e.carXOff = e.moveToLine(carX+e.carXOff, line+1)
+		e.caret.xoff = e.moveToLine(carX+e.caret.xoff, line+1)
 	case key.NameLeftArrow:
 		e.Move(-1)
 	case key.NameRightArrow:
@@ -268,8 +271,8 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 	// Adjust scrolling for new viewport and layout.
 	e.scrollRel(0, 0)
 
-	if e.caretScroll {
-		e.caretScroll = false
+	if e.caret.scroll {
+		e.caret.scroll = false
 		e.scrollToCaret()
 	}
 
@@ -307,7 +310,7 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 	pointer.Rect(r).Add(gtx.Ops)
 	e.scroller.Add(gtx.Ops)
 	e.clicker.Add(gtx.Ops)
-	e.caretOn = false
+	e.caret.on = false
 	if e.focused {
 		now := gtx.Now
 		dt := now.Sub(e.blinkStart)
@@ -318,7 +321,7 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 			redraw := op.InvalidateOp{At: nextBlink}
 			redraw.Add(gtx.Ops)
 		}
-		e.caretOn = e.focused && (!blinking || dt%timePerBlink < timePerBlink/2)
+		e.caret.on = e.focused && (!blinking || dt%timePerBlink < timePerBlink/2)
 	}
 
 	return layout.Dimensions{Size: e.viewSize, Baseline: e.dims.Baseline}
@@ -337,7 +340,7 @@ func (e *Editor) PaintText(gtx layout.Context) {
 }
 
 func (e *Editor) PaintCaret(gtx layout.Context) {
-	if !e.caretOn {
+	if !e.caret.on {
 		return
 	}
 	carWidth := fixed.I(gtx.Px(unit.Dp(1)))
@@ -384,7 +387,7 @@ func (e *Editor) Text() string {
 // SetText replaces the contents of the editor.
 func (e *Editor) SetText(s string) {
 	e.rr = editBuffer{}
-	e.carXOff = 0
+	e.caret.xoff = 0
 	e.prepend(s)
 }
 
@@ -509,14 +512,14 @@ func (e *Editor) invalidate() {
 // direction to delete: positive is forward, negative is backward.
 func (e *Editor) Delete(runes int) {
 	e.rr.deleteRunes(runes)
-	e.carXOff = 0
+	e.caret.xoff = 0
 	e.invalidate()
 }
 
 // Insert inserts text at the caret, moving the caret forward.
 func (e *Editor) Insert(s string) {
 	e.append(s)
-	e.caretScroll = true
+	e.caret.scroll = true
 	e.invalidate()
 }
 
@@ -530,7 +533,7 @@ func (e *Editor) append(s string) {
 
 func (e *Editor) prepend(s string) {
 	e.rr.prepend(s)
-	e.carXOff = 0
+	e.caret.xoff = 0
 	e.invalidate()
 }
 
@@ -555,7 +558,7 @@ func (e *Editor) movePages(pages int) {
 		y2 += h
 		carLine2++
 	}
-	e.carXOff = e.moveToLine(carX+e.carXOff, carLine2)
+	e.caret.xoff = e.moveToLine(carX+e.caret.xoff, carLine2)
 }
 
 func (e *Editor) moveToLine(carX fixed.Int26_6, carLine2 int) fixed.Int26_6 {
@@ -610,7 +613,7 @@ func (e *Editor) moveToLine(carX fixed.Int26_6, carLine2 int) fixed.Int26_6 {
 // backward.
 func (e *Editor) Move(distance int) {
 	e.rr.move(distance)
-	e.carXOff = 0
+	e.caret.xoff = 0
 }
 
 func (e *Editor) moveStart() {
@@ -621,7 +624,7 @@ func (e *Editor) moveStart() {
 		e.rr.caret -= s
 		x -= layout[i].Advance
 	}
-	e.carXOff = -x
+	e.caret.xoff = -x
 }
 
 func (e *Editor) moveEnd() {
@@ -640,7 +643,7 @@ func (e *Editor) moveEnd() {
 		x += adv
 	}
 	a := align(e.Alignment, l.Width, e.viewSize.X)
-	e.carXOff = l.Width + a - x
+	e.caret.xoff = l.Width + a - x
 }
 
 func (e *Editor) scrollToCaret() {
