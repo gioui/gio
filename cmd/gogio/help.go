@@ -18,6 +18,9 @@ package. Any run arguments are appended to os.Args at runtime.
 If the package contains an appicon.png file, it is used as the app icon on
 supported platforms.
 
+Compiled Java class files from jar files in the package directory are
+included in Android builds.
+
 The mandatory -target flag selects the target platform: ios or android for the
 mobile platforms, tvos for Apple's tvOS, js for WebAssembly/WebGL.
 
