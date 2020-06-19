@@ -178,10 +178,13 @@ func createNativeWindow(opts *Options) (*window, error) {
 }
 
 func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr {
-	var w *window
-	if win, exists := winMap.Load(hwnd); exists {
-		w = win.(*window)
+	win, exists := winMap.Load(hwnd)
+	if !exists {
+		return windows.DefWindowProc(hwnd, msg, wParam, lParam)
 	}
+
+	w := win.(*window)
+
 	switch msg {
 	case windows.WM_UNICHAR:
 		if wParam == windows.UNICODE_NOCHAR {
@@ -249,6 +252,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			w.setStage(system.StageRunning)
 		}
 	}
+
 	return windows.DefWindowProc(hwnd, msg, wParam, lParam)
 }
 
@@ -501,8 +505,9 @@ func (w *window) HWND() (syscall.Handle, int, int) {
 	return w.hwnd, w.width, w.height
 }
 
-// Close the window. Not implemented for Windows.
-func (w *window) Close() {}
+func (w *window) Close() {
+	windows.PostMessage(w.hwnd, windows.WM_CLOSE, 0, 0)
+}
 
 func convertKeyCode(code uintptr) (string, bool) {
 	if '0' <= code && code <= '9' || 'A' <= code && code <= 'Z' {

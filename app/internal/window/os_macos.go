@@ -133,7 +133,6 @@ func (w *window) SetAnimating(anim bool) {
 	}
 }
 
-// Close the window. Only implemented for macOS.
 func (w *window) Close() {
 	runOnMain(func() {
 		// Make sure the view is still valid. The window might've been closed
