@@ -152,18 +152,6 @@ func (e *editBuffer) dump() {
 	}
 }
 
-func (e *editBuffer) move(runes int) {
-	for ; runes < 0 && e.caret > 0; runes++ {
-		_, s := e.runeBefore(e.caret)
-		e.caret -= s
-	}
-	for ; runes > 0 && e.caret < e.len(); runes-- {
-		_, s := e.runeAt(e.caret)
-		e.caret += s
-	}
-	e.dump()
-}
-
 func (e *editBuffer) runeBefore(idx int) (rune, int) {
 	if idx > e.gapstart {
 		idx += e.gapLen()
