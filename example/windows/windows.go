@@ -12,6 +12,7 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
@@ -19,7 +20,10 @@ import (
 )
 
 type window struct {
-	btn widget.Clickable
+	*app.Window
+
+	more  widget.Clickable
+	close widget.Clickable
 }
 
 func main() {
@@ -30,8 +34,8 @@ func main() {
 func newWindow() {
 	go func() {
 		w := new(window)
-		evts := app.NewWindow().Events()
-		if err := w.loop(evts); err != nil {
+		w.Window = app.NewWindow()
+		if err := w.loop(w.Events()); err != nil {
 			log.Fatal(err)
 		}
 	}()
@@ -46,14 +50,29 @@ func (w *window) loop(events <-chan event.Event) error {
 		case system.DestroyEvent:
 			return e.Err
 		case system.FrameEvent:
-			for w.btn.Clicked() {
+			for w.more.Clicked() {
 				newWindow()
 			}
+			for w.close.Clicked() {
+				w.Close()
+			}
 			gtx := layout.NewContext(&ops, e)
+
 			layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				return material.Button(th, &w.btn, "More!").Layout(gtx)
+				return layout.Flex{
+					Alignment: layout.Middle,
+				}.Layout(gtx,
+					RigidInset(material.Button(th, &w.more, "More!").Layout),
+					RigidInset(material.Button(th, &w.close, "Close").Layout),
+				)
 			})
 			e.Frame(gtx.Ops)
 		}
 	}
+}
+
+func RigidInset(w layout.Widget) layout.FlexChild {
+	return layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+		return layout.UniformInset(unit.Sp(5)).Layout(gtx, w)
+	})
 }
