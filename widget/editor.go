@@ -468,11 +468,11 @@ func (e *Editor) CaretPos() (line, col int) {
 	return
 }
 
-// CaretCoords returns the x & y coordinates of the caret, relative to the
+// CaretCoords returns the coordinates of the caret, relative to the
 // editor itself.
-func (e *Editor) CaretCoords() (x fixed.Int26_6, y int) {
-	_, _, x, y = e.layoutCaret()
-	return
+func (e *Editor) CaretCoords() f32.Point {
+	_, _, x, y := e.layoutCaret()
+	return f32.Pt(float32(x)/64, float32(y))
 }
 
 func (e *Editor) layoutCaret() (carLine, carCol int, x fixed.Int26_6, y int) {
