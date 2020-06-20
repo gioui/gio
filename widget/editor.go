@@ -7,7 +7,6 @@ import (
 	"math"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"gioui.org/f32"
 	"gioui.org/gesture"
@@ -210,7 +209,7 @@ func (e *Editor) processKey(gtx layout.Context) {
 }
 
 func (e *Editor) moveLines(distance int) {
-	e.caret.xoff = e.moveToLine(e.caret.x+e.caret.xoff, e.caret.line+distance)
+	e.moveToLine(e.caret.x+e.caret.xoff, e.caret.line+distance)
 }
 
 func (e *Editor) command(k key.Event) bool {
@@ -465,8 +464,8 @@ func (e *Editor) moveCoord(pos image.Point) {
 		carLine++
 	}
 	x := fixed.I(pos.X + e.scrollOff.X)
-	e.caret.xoff = 0
 	e.moveToLine(x, carLine)
+	e.caret.xoff = 0
 }
 
 func (e *Editor) layoutText(s text.Shaper) ([]text.Line, layout.Dimensions) {
@@ -504,22 +503,25 @@ func (e *Editor) layoutCaret() (line, col int, x fixed.Int26_6, y int) {
 	var idx int
 	var prevDesc fixed.Int26_6
 loop:
-	for line = 0; line < len(e.lines); line++ {
+	for {
+		x = 0
+		col = 0
 		l := e.lines[line]
 		y += (prevDesc + l.Ascent).Ceil()
 		prevDesc = l.Descent
-		if line == len(e.lines)-1 || idx+l.Len > e.rr.caret {
-			for _, g := range l.Layout {
-				if idx == e.rr.caret {
-					break loop
-				}
-				x += g.Advance
-				idx += utf8.RuneLen(g.Rune)
-				col++
+		for _, g := range l.Layout {
+			if idx == e.rr.caret {
+				break loop
 			}
+			x += g.Advance
+			_, s := e.rr.runeAt(idx)
+			idx += s
+			col++
+		}
+		if line == len(e.lines)-1 || idx > e.rr.caret {
 			break
 		}
-		idx += l.Len
+		line++
 	}
 	x += align(e.Alignment, e.lines[line].Width, e.viewSize.X)
 	return
@@ -579,10 +581,10 @@ func (e *Editor) movePages(pages int) {
 		y2 += h
 		carLine2++
 	}
-	e.caret.xoff = e.moveToLine(e.caret.x+e.caret.xoff, carLine2)
+	e.moveToLine(e.caret.x+e.caret.xoff, carLine2)
 }
 
-func (e *Editor) moveToLine(x fixed.Int26_6, line int) fixed.Int26_6 {
+func (e *Editor) moveToLine(x fixed.Int26_6, line int) {
 	e.makeValid()
 	if line < 0 {
 		line = 0
@@ -590,31 +592,31 @@ func (e *Editor) moveToLine(x fixed.Int26_6, line int) fixed.Int26_6 {
 	if line >= len(e.lines) {
 		line = len(e.lines) - 1
 	}
-	// Move to start of line.
-	for i := e.caret.col - 1; i >= 0; i-- {
+
+	prevDesc := e.lines[line].Descent
+	for e.caret.line < line {
+		e.moveEnd()
+		l := e.lines[e.caret.line]
+		_, s := e.rr.runeAt(e.rr.caret)
+		e.rr.caret += s
+		e.caret.y += (prevDesc + l.Ascent).Ceil()
+		e.caret.col = 0
+		prevDesc = l.Descent
+		e.caret.line++
+	}
+	for e.caret.line > line {
+		e.moveStart()
+		l := e.lines[e.caret.line]
 		_, s := e.rr.runeBefore(e.rr.caret)
 		e.rr.caret -= s
+		e.caret.y -= (prevDesc + l.Ascent).Ceil()
+		prevDesc = l.Descent
+		e.caret.line--
+		l = e.lines[e.caret.line]
+		e.caret.col = len(l.Layout) - 1
 	}
-	e.caret.col = 0
-	if line != e.caret.line {
-		prevDesc := e.lines[line].Descent
-		if line > e.caret.line {
-			for i := e.caret.line; i < line; i++ {
-				l := e.lines[i]
-				e.rr.caret += l.Len
-				e.caret.y += (prevDesc + l.Ascent).Ceil()
-				prevDesc = l.Descent
-			}
-		} else {
-			for i := e.caret.line - 1; i >= line; i-- {
-				l := e.lines[i]
-				e.rr.caret -= l.Len
-				e.caret.y -= (prevDesc + l.Ascent).Ceil()
-				prevDesc = l.Descent
-			}
-		}
-		e.caret.line = line
-	}
+
+	e.moveStart()
 	l := e.lines[line]
 	e.caret.x = align(e.Alignment, l.Width, e.viewSize.X)
 	// Only move past the end of the last line
@@ -636,7 +638,7 @@ func (e *Editor) moveToLine(x fixed.Int26_6, line int) fixed.Int26_6 {
 		e.rr.caret += s
 		e.caret.col++
 	}
-	return x - e.caret.x
+	e.caret.xoff = x - e.caret.x
 }
 
 // Move the caret: positive distance moves forward, negative distance moves
