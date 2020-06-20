@@ -157,7 +157,7 @@ func (e *editBuffer) move(runes int) {
 		_, s := e.runeBefore(e.caret)
 		e.caret -= s
 	}
-	for ; runes > 0 && e.caret < len(e.text); runes-- {
+	for ; runes > 0 && e.caret < e.len(); runes-- {
 		_, s := e.runeAt(e.caret)
 		e.caret += s
 	}
