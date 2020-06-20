@@ -9,7 +9,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
-	"gioui.org/internal/path"
+	"gioui.org/internal/ops"
 	"gioui.org/op"
 )
 
@@ -21,12 +21,11 @@ import (
 // Path generates no garbage and can be used for dynamic paths; path
 // data is stored directly in the Ops list supplied to Begin.
 type Path struct {
-	ops       *op.Ops
-	contour   int
-	pen       f32.Point
-	bounds    f32.Rectangle
-	hasBounds bool
-	macro     op.MacroOp
+	ops     *op.Ops
+	contour int
+	pen     f32.Point
+	macro   op.MacroOp
+	start   f32.Point
 }
 
 // Op sets the current clip to the intersection of
@@ -54,22 +53,24 @@ func (p Op) Add(o *op.Ops) {
 func (p *Path) Begin(ops *op.Ops) {
 	p.ops = ops
 	p.macro = op.Record(ops)
-	// Write the TypeAux opcode and a byte for marking whether the
-	// path has had its MaxY filled out. If not, the gpu will fill it
-	// before using it.
-	data := ops.Write(2)
+	// Write the TypeAux opcode
+	data := ops.Write(opconst.TypeAuxLen)
 	data[0] = byte(opconst.TypeAux)
 }
 
 // MoveTo moves the pen to the given position.
 func (p *Path) Move(to f32.Point) {
-	p.end()
 	to = to.Add(p.pen)
+	p.end()
 	p.pen = to
+	p.start = to
 }
 
 // end completes the current contour.
 func (p *Path) end() {
+	if p.pen != p.start {
+		p.lineTo(p.start)
+	}
 	p.contour++
 }
 
@@ -93,56 +94,15 @@ func (p *Path) Quad(ctrl, to f32.Point) {
 }
 
 func (p *Path) quadTo(ctrl, to f32.Point) {
-	// Zero width curves don't contribute to stenciling.
-	if p.pen.X == to.X && p.pen.X == ctrl.X {
-		p.pen = to
-		return
-	}
-
-	bounds := f32.Rectangle{
-		Min: p.pen,
-		Max: to,
-	}.Canon()
-
-	// If the curve contain areas where a vertical line
-	// intersects it twice, split the curve in two x monotone
-	// lower and upper curves. The stencil fragment program
-	// expects only one intersection per curve.
-
-	// Find the t where the derivative in x is 0.
-	v0 := ctrl.Sub(p.pen)
-	v1 := to.Sub(ctrl)
-	d := v0.X - v1.X
-	// t = v0 / d. Split if t is in ]0;1[.
-	if v0.X > 0 && d > v0.X || v0.X < 0 && d < v0.X {
-		t := v0.X / d
-		ctrl0 := p.pen.Mul(1 - t).Add(ctrl.Mul(t))
-		ctrl1 := ctrl.Mul(1 - t).Add(to.Mul(t))
-		mid := ctrl0.Mul(1 - t).Add(ctrl1.Mul(t))
-		p.simpleQuadTo(ctrl0, mid)
-		p.simpleQuadTo(ctrl1, to)
-		if mid.X > bounds.Max.X {
-			bounds.Max.X = mid.X
-		}
-		if mid.X < bounds.Min.X {
-			bounds.Min.X = mid.X
-		}
-	} else {
-		p.simpleQuadTo(ctrl, to)
-	}
-	// Find the y extremum, if any.
-	d = v0.Y - v1.Y
-	if v0.Y > 0 && d > v0.Y || v0.Y < 0 && d < v0.Y {
-		t := v0.Y / d
-		y := (1-t)*(1-t)*p.pen.Y + 2*(1-t)*t*ctrl.Y + t*t*to.Y
-		if y > bounds.Max.Y {
-			bounds.Max.Y = y
-		}
-		if y < bounds.Min.Y {
-			bounds.Min.Y = y
-		}
-	}
-	p.expand(bounds)
+	data := p.ops.Write(ops.QuadSize + 4)
+	bo := binary.LittleEndian
+	bo.PutUint32(data[0:], uint32(p.contour))
+	ops.EncodeQuad(data[4:], ops.Quad{
+		From: p.pen,
+		Ctrl: ctrl,
+		To:   to,
+	})
+	p.pen = to
 }
 
 // Cube records a cubic Bézier from the pen through
@@ -223,68 +183,12 @@ func (p *Path) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to f32.Po
 	return splits
 }
 
-func (p *Path) expand(b f32.Rectangle) {
-	if !p.hasBounds {
-		p.hasBounds = true
-		inf := float32(math.Inf(+1))
-		p.bounds = f32.Rectangle{
-			Min: f32.Point{X: inf, Y: inf},
-			Max: f32.Point{X: -inf, Y: -inf},
-		}
-	}
-	p.bounds = p.bounds.Union(b)
-}
-
-func (p *Path) vertex(cornerx, cornery int16, ctrl, to f32.Point) {
-	var corner float32
-	// Encode corner.
-	if cornerx == 1 {
-		corner += .5
-	}
-	if cornery == 1 {
-		corner += .25
-	}
-	v := path.Vertex{
-		Corner: corner,
-		FromX:  p.pen.X,
-		FromY:  p.pen.Y,
-		CtrlX:  ctrl.X,
-		CtrlY:  ctrl.Y,
-		ToX:    to.X,
-		ToY:    to.Y,
-	}
-	data := p.ops.Write(path.VertStride)
-	bo := binary.LittleEndian
-	bo.PutUint32(data[0:], math.Float32bits(corner))
-	// Put the contour index in MaxY.
-	bo.PutUint32(data[4:], uint32(p.contour))
-	bo.PutUint32(data[8:], math.Float32bits(v.FromX))
-	bo.PutUint32(data[12:], math.Float32bits(v.FromY))
-	bo.PutUint32(data[16:], math.Float32bits(v.CtrlX))
-	bo.PutUint32(data[20:], math.Float32bits(v.CtrlY))
-	bo.PutUint32(data[24:], math.Float32bits(v.ToX))
-	bo.PutUint32(data[28:], math.Float32bits(v.ToY))
-}
-
-func (p *Path) simpleQuadTo(ctrl, to f32.Point) {
-	// NW.
-	p.vertex(-1, 1, ctrl, to)
-	// NE.
-	p.vertex(1, 1, ctrl, to)
-	// SW.
-	p.vertex(-1, -1, ctrl, to)
-	// SE.
-	p.vertex(1, -1, ctrl, to)
-	p.pen = to
-}
-
 // End the path and return a clip operation that represents it.
 func (p *Path) End() Op {
 	p.end()
 	c := p.macro.Stop()
 	return Op{
-		call:   c,
-		bounds: p.bounds,
+		call: c,
 	}
 }
 
@@ -332,6 +236,7 @@ func roundRect(ops *op.Ops, r f32.Rectangle, se, sw, nw, ne float32) Op {
 	var p Path
 	p.Begin(ops)
 	p.Move(r.Min)
+
 	p.Move(f32.Point{X: w, Y: h - se})
 	p.Cube(f32.Point{X: 0, Y: se * c}, f32.Point{X: -se + se*c, Y: se}, f32.Point{X: -se, Y: se}) // SE
 	p.Line(f32.Point{X: sw - w + se, Y: 0})

@@ -22,7 +22,6 @@ import (
 	"gioui.org/internal/f32color"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
-	"gioui.org/internal/path"
 	gunsafe "gioui.org/internal/unsafe"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -55,6 +54,7 @@ type drawOps struct {
 	profile    bool
 	reader     ops.Reader
 	cache      *resourceCache
+	vertCache  []byte
 	viewport   image.Point
 	clearColor f32color.RGBA
 	imageOps   []imageOp
@@ -64,6 +64,7 @@ type drawOps struct {
 	zimageOps   []imageOp
 	pathOps     []*pathOp
 	pathOpCache []pathOp
+	qs          quadSplitter
 }
 
 type drawState struct {
@@ -659,6 +660,7 @@ func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
 	d.zimageOps = d.zimageOps[:0]
 	d.pathOps = d.pathOps[:0]
 	d.pathOpCache = d.pathOpCache[:0]
+	d.vertCache = d.vertCache[:0]
 }
 
 func (d *drawOps) collect(cache *resourceCache, root *op.Ops, viewport image.Point) {
@@ -693,29 +695,29 @@ loop:
 			state.t = state.t.Multiply(op.TransformOp(dop))
 		case opconst.TypeAux:
 			aux = encOp.Data[opconst.TypeAuxLen:]
-			// The first data byte stores whether the MaxY
-			// fields have been initialized.
-			maxyFilled := aux[0] == 1
-			aux[0] = 1
-			aux = aux[1:]
-			if !maxyFilled {
-				fillMaxY(aux)
-			}
 			auxKey = encOp.Key
 		case opconst.TypeClip:
 			var op clipOp
 			op.decode(encOp.Data)
 			off := state.t.Transform(f32.Point{})
-			state.clip = state.clip.Intersect(op.bounds.Add(off))
+
+			bounds := op.bounds
+			if len(aux) > 0 {
+				// there is a clipping path, bounds is not filled before for performance
+				aux, bounds = d.buildVerts(aux)
+			}
+			state.clip = state.clip.Intersect(bounds.Add(off))
 			if state.clip.Empty() {
 				continue
 			}
+
 			npath := d.newPathOp()
 			*npath = pathOp{
 				parent: state.cpath,
 				off:    off,
 			}
 			state.cpath = npath
+
 			if len(aux) > 0 {
 				state.rect = false
 				state.cpath.pathKey = auxKey
@@ -1002,17 +1004,17 @@ func fillMaxY(verts []byte) {
 	for len(verts) > 0 {
 		maxy := float32(math.Inf(-1))
 		i := 0
-		for ; i+path.VertStride*4 <= len(verts); i += path.VertStride * 4 {
-			vert := verts[i : i+path.VertStride]
+		for ; i+vertStride*4 <= len(verts); i += vertStride * 4 {
+			vert := verts[i : i+vertStride]
 			// MaxY contains the integer contour index.
-			pathContour := int(bo.Uint32(vert[int(unsafe.Offsetof(((*path.Vertex)(nil)).MaxY)):]))
+			pathContour := int(bo.Uint32(vert[int(unsafe.Offsetof(((*vertex)(nil)).MaxY)):]))
 			if contour != pathContour {
 				contour = pathContour
 				break
 			}
-			fromy := math.Float32frombits(bo.Uint32(vert[int(unsafe.Offsetof(((*path.Vertex)(nil)).FromY)):]))
-			ctrly := math.Float32frombits(bo.Uint32(vert[int(unsafe.Offsetof(((*path.Vertex)(nil)).CtrlY)):]))
-			toy := math.Float32frombits(bo.Uint32(vert[int(unsafe.Offsetof(((*path.Vertex)(nil)).ToY)):]))
+			fromy := math.Float32frombits(bo.Uint32(vert[int(unsafe.Offsetof(((*vertex)(nil)).FromY)):]))
+			ctrly := math.Float32frombits(bo.Uint32(vert[int(unsafe.Offsetof(((*vertex)(nil)).CtrlY)):]))
+			toy := math.Float32frombits(bo.Uint32(vert[int(unsafe.Offsetof(((*vertex)(nil)).ToY)):]))
 			if fromy > maxy {
 				maxy = fromy
 			}
@@ -1030,8 +1032,37 @@ func fillMaxY(verts []byte) {
 
 func fillContourMaxY(maxy float32, verts []byte) {
 	bo := binary.LittleEndian
-	for i := 0; i < len(verts); i += path.VertStride {
-		off := int(unsafe.Offsetof(((*path.Vertex)(nil)).MaxY))
+	for i := 0; i < len(verts); i += vertStride {
+		off := int(unsafe.Offsetof(((*vertex)(nil)).MaxY))
 		bo.PutUint32(verts[i+off:], math.Float32bits(maxy))
 	}
+}
+
+func (d *drawOps) writeVertCache(n int) []byte {
+	d.vertCache = append(d.vertCache, make([]byte, n)...)
+	return d.vertCache[len(d.vertCache)-n:]
+}
+
+func (d *drawOps) buildVerts(aux []byte) (verts []byte, bounds f32.Rectangle) {
+	// split paths as needed, calculate maxY, bounds and create
+	// vertices that will be sent to GPU.
+	inf := float32(math.Inf(+1))
+	d.qs.bounds = f32.Rectangle{
+		Min: f32.Point{X: inf, Y: inf},
+		Max: f32.Point{X: -inf, Y: -inf},
+	}
+	d.qs.d = d
+	bo := binary.LittleEndian
+	startLength := len(d.vertCache)
+	for qi := 0; len(aux) >= (ops.QuadSize + 4); qi++ {
+		d.qs.contour = bo.Uint32(aux)
+		quad := ops.DecodeQuad(aux[4:])
+
+		d.qs.splitAndEncode(quad)
+
+		aux = aux[ops.QuadSize+4:]
+	}
+
+	fillMaxY(d.vertCache[startLength:])
+	return d.vertCache[startLength:], d.qs.bounds
 }
