@@ -209,6 +209,10 @@ func (e *Editor) processKey(gtx layout.Context) {
 	}
 }
 
+func (e *Editor) moveLines(distance int) {
+	e.caret.xoff = e.moveToLine(e.caret.x+e.caret.xoff, e.caret.line+distance)
+}
+
 func (e *Editor) command(k key.Event) bool {
 	switch k.Name {
 	case key.NameReturn, key.NameEnter:
@@ -218,9 +222,9 @@ func (e *Editor) command(k key.Event) bool {
 	case key.NameDeleteForward:
 		e.Delete(1)
 	case key.NameUpArrow:
-		e.caret.xoff = e.moveToLine(e.caret.x+e.caret.xoff, e.caret.line-1)
+		e.moveLines(-1)
 	case key.NameDownArrow:
-		e.caret.xoff = e.moveToLine(e.caret.x+e.caret.xoff, e.caret.line+1)
+		e.moveLines(+1)
 	case key.NameLeftArrow:
 		e.Move(-1)
 	case key.NameRightArrow:
