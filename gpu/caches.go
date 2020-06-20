@@ -14,15 +14,22 @@ type resourceCache struct {
 	newRes map[interface{}]resource
 }
 
-// opCache is like a resourceCache but using concrete types.
+// opCache is like a resourceCache but using concrete types and a
+// freelist instead of two maps to avoid runtime.mapaccess2 calls
+// since benchmarking showed them as a bottleneck.
 type opCache struct {
-	res    map[ops.Key]opCacheValue
-	newRes map[ops.Key]opCacheValue
+	// store the index + 1 in cache this key is stored in
+	index map[ops.Key]int
+	// list of indexes in cache that are free and can be used
+	freelist []int
+	cache    []opCacheValue
 }
 
 type opCacheValue struct {
 	data   *pathData
 	bounds f32.Rectangle
+	key    ops.Key
+	keep   bool
 }
 
 func newResourceCache() *resourceCache {
@@ -71,41 +78,63 @@ func (r *resourceCache) release() {
 
 func newOpCache() *opCache {
 	return &opCache{
-		res:    make(map[ops.Key]opCacheValue),
-		newRes: make(map[ops.Key]opCacheValue),
+		index:    make(map[ops.Key]int),
+		freelist: make([]int, 0),
+		cache:    make([]opCacheValue, 0),
 	}
 }
 
-func (r *opCache) get(key ops.Key) (opCacheValue, bool) {
-	v, exists := r.res[key]
-	if exists {
-		r.newRes[key] = v
+func (r *opCache) get(key ops.Key) (o opCacheValue, exist bool) {
+	v := r.index[key]
+	if v == 0 {
+		return
 	}
-	return v, exists
+	r.cache[v-1].keep = true
+	return r.cache[v-1], true
 }
 
 func (r *opCache) put(key ops.Key, val opCacheValue) {
-	r.res[key] = val
-	r.newRes[key] = val
+	v := r.index[key]
+	val.keep = true
+	val.key = key
+	if v == 0 {
+		// not in cache
+		i := len(r.cache)
+		if len(r.freelist) > 0 {
+			i = r.freelist[len(r.freelist)-1]
+			r.freelist = r.freelist[:len(r.freelist)-1]
+			r.cache[i] = val
+		} else {
+			r.cache = append(r.cache, val)
+		}
+		r.index[key] = i + 1
+	} else {
+		r.cache[v-1] = val
+	}
 }
 
 func (r *opCache) frame() {
-	for k, v := range r.res {
-		if _, exists := r.newRes[k]; !exists {
-			delete(r.res, k)
-			v.data.release()
+	r.freelist = r.freelist[:0]
+	for i, v := range r.cache {
+		r.cache[i].keep = false
+		if v.keep {
+			continue
 		}
-	}
-	for k, v := range r.newRes {
-		delete(r.newRes, k)
-		r.res[k] = v
+		if v.data != nil {
+			v.data.release()
+			r.cache[i].data = nil
+		}
+		delete(r.index, v.key)
+		r.freelist = append(r.freelist, i)
 	}
 }
 
 func (r *opCache) release() {
-	for _, v := range r.newRes {
-		v.data.release()
+	for i := range r.cache {
+		r.cache[i].keep = false
 	}
-	r.newRes = nil
-	r.res = nil
+	r.frame()
+	r.index = nil
+	r.freelist = nil
+	r.cache = nil
 }
