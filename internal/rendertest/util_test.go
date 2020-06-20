@@ -38,33 +38,40 @@ func init() {
 	squares = paint.NewImageOp(im)
 }
 
-func drawImage(size int, draw func(o *op.Ops)) (im *image.RGBA, err error) {
+func drawImage(size int, ops *op.Ops, draw func(o *op.Ops)) (im *image.RGBA, err error) {
 	sz := image.Point{X: size, Y: size}
 	w, err := headless.NewWindow(sz.X, sz.Y)
 	if err != nil {
 		return im, err
 	}
-	ops := new(op.Ops)
 	draw(ops)
 	w.Frame(ops)
 	return w.Screenshot()
 }
 
-func run(t *testing.T, f func(o *op.Ops)) result {
-	img, err := drawImage(128, f)
-	if err != nil {
-		t.Error("error rendering:", err)
+func run(t *testing.T, f func(o *op.Ops), c func(r result)) {
+	// draw a few times and check that it is correct each time, to
+	// ensure any caching effects still generate the correct images.
+	ok := true
+	var img *image.RGBA
+	var err error
+	ops := new(op.Ops)
+	for i := 0; i < 3; i++ {
+		ops.Reset()
+		img, err = drawImage(128, ops, f)
+		if err != nil {
+			t.Error("error rendering:", err)
+		}
+		// check for a reference image and make sure we are identical.
+		ok = ok && verifyRef(t, img)
+		c(result{t: t, img: img})
 	}
-
-	// check for a reference image and make sure we are identical.
-	ok := verifyRef(t, img)
 
 	if *dumpImages || !ok {
 		if err := saveImage(t.Name()+".png", img); err != nil {
 			t.Error(err)
 		}
 	}
-	return result{t: t, img: img}
 }
 
 func verifyRef(t *testing.T, img *image.RGBA) (ok bool) {

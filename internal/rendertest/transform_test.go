@@ -1,0 +1,201 @@
+package rendertest
+
+import (
+	"math"
+	"testing"
+
+	"gioui.org/f32"
+	"gioui.org/op"
+	"gioui.org/op/clip"
+	"gioui.org/op/paint"
+	"golang.org/x/image/colornames"
+)
+
+func TestPaintOffset(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		op.Offset(f32.Pt(10, 20)).Add(o)
+		paint.ColorOp{Color: colornames.Red}.Add(o)
+		paint.PaintOp{Rect: f32.Rect(0, 0, 50, 50)}.Add(o)
+	}, func(r result) {
+		r.expect(0, 0, colornames.White)
+		r.expect(59, 30, colornames.Red)
+		r.expect(60, 30, colornames.White)
+		r.expect(10, 70, colornames.White)
+	})
+}
+
+func TestPaintRotate(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		a := f32.Affine2D{}.Rotate(f32.Pt(40, 40), -math.Pi/8)
+		op.Affine(a).Add(o)
+		paint.ColorOp{Color: colornames.Red}.Add(o)
+		paint.PaintOp{Rect: f32.Rect(20, 20, 60, 60)}.Add(o)
+	}, func(r result) {
+		r.expect(40, 40, colornames.Red)
+		r.expect(50, 19, colornames.Red)
+		r.expect(59, 19, colornames.White)
+		r.expect(21, 21, colornames.White)
+	})
+}
+
+func TestPaintShear(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		a := f32.Affine2D{}.Shear(f32.Point{}, math.Pi/4, 0)
+		op.Affine(a).Add(o)
+		paint.ColorOp{Color: colornames.Red}.Add(o)
+		paint.PaintOp{Rect: f32.Rect(0, 0, 40, 40)}.Add(o)
+	}, func(r result) {
+		r.expect(10, 30, colornames.White)
+	})
+}
+
+func TestClipPaintOffset(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		paint.ColorOp{Color: colornames.Red}.Add(o)
+		clip.Rect{Rect: f32.Rect(10, 10, 30, 30)}.Add(o)
+		op.Offset(f32.Pt(20, 20)).Add(o)
+		paint.PaintOp{Rect: f32.Rect(0, 0, 100, 100)}.Add(o)
+	}, func(r result) {
+		r.expect(0, 0, colornames.White)
+		r.expect(19, 19, colornames.White)
+		r.expect(20, 20, colornames.Red)
+		r.expect(30, 30, colornames.White)
+	})
+}
+
+func TestClipOffset(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		paint.ColorOp{Color: colornames.Red}.Add(o)
+		op.Offset(f32.Pt(20, 20)).Add(o)
+		clip.Rect{Rect: f32.Rect(10, 10, 30, 30)}.Add(o)
+		paint.PaintOp{Rect: f32.Rect(0, 0, 100, 100)}.Add(o)
+	}, func(r result) {
+		r.expect(0, 0, colornames.White)
+		r.expect(29, 29, colornames.White)
+		r.expect(30, 30, colornames.Red)
+		r.expect(49, 49, colornames.Red)
+		r.expect(50, 50, colornames.White)
+	})
+}
+
+func TestClipScale(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		paint.ColorOp{Color: colornames.Red}.Add(o)
+		a := f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(2, 2)).Offset(f32.Pt(10, 10))
+		op.Affine(a).Add(o)
+		clip.Rect{Rect: f32.Rect(10, 10, 20, 20)}.Add(o)
+		paint.PaintOp{Rect: f32.Rect(0, 0, 1000, 1000)}.Add(o)
+	}, func(r result) {
+		r.expect(19+10, 19+10, colornames.White)
+		r.expect(20+10, 20+10, colornames.Red)
+		r.expect(39+10, 39+10, colornames.Red)
+		r.expect(40+10, 40+10, colornames.White)
+	})
+}
+
+func TestClipRotate(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		paint.ColorOp{Color: colornames.Red}.Add(o)
+		op.Affine(f32.Affine2D{}.Rotate(f32.Pt(40, 40), -math.Pi/4)).Add(o)
+		clip.Rect{Rect: f32.Rect(30, 30, 50, 50)}.Add(o)
+		paint.PaintOp{Rect: f32.Rect(0, 40, 100, 100)}.Add(o)
+	}, func(r result) {
+		r.expect(39, 39, colornames.White)
+		r.expect(41, 41, colornames.Red)
+		r.expect(50, 50, colornames.White)
+	})
+}
+
+func TestOffsetTexture(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		op.Offset(f32.Pt(15, 15)).Add(o)
+		squares.Add(o)
+		paint.PaintOp{Rect: f32.Rect(0, 0, 50, 50)}.Add(o)
+	}, func(r result) {
+		r.expect(14, 20, colornames.White)
+		r.expect(66, 20, colornames.White)
+		r.expect(16, 64, colornames.Green)
+		r.expect(64, 16, colornames.Green)
+	})
+}
+
+func TestOffsetScaleTexture(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		op.Offset(f32.Pt(15, 15)).Add(o)
+		squares.Add(o)
+		op.Affine(f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(2, 1))).Add(o)
+		paint.PaintOp{Rect: f32.Rect(0, 0, 50, 50)}.Add(o)
+	}, func(r result) {
+		r.expect(114, 64, colornames.Blue)
+		r.expect(116, 64, colornames.White)
+	})
+}
+
+func TestRotateTexture(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		squares.Add(o)
+		a := f32.Affine2D{}.Rotate(f32.Pt(40, 40), math.Pi/4)
+		op.Affine(a).Add(o)
+		paint.PaintOp{Rect: f32.Rect(30, 30, 50, 50)}.Add(o)
+	}, func(r result) {
+		r.expect(40, 40-12, colornames.Blue)
+		r.expect(40+12, 40, colornames.Green)
+	})
+}
+
+func TestRotateClipTexture(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		squares.Add(o)
+		a := f32.Affine2D{}.Rotate(f32.Pt(40, 40), math.Pi/8)
+		op.Affine(a).Add(o)
+		clip.Rect{Rect: f32.Rect(30, 30, 50, 50)}.Add(o)
+		paint.PaintOp{Rect: f32.Rect(10, 10, 70, 70)}.Add(o)
+	}, func(r result) {
+		r.expect(0, 0, colornames.White)
+		r.expect(37, 39, colornames.Green)
+		r.expect(36, 39, colornames.Green)
+		r.expect(35, 39, colornames.Green)
+		r.expect(34, 39, colornames.Green)
+		r.expect(33, 39, colornames.Green)
+	})
+}
+
+func TestComplicatedTransform(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		squares.Add(o)
+
+		clip.Rect{Rect: f32.Rect(0, 0, 100, 100), SE: 50, SW: 50, NW: 50, NE: 50}.Add(o)
+
+		a := f32.Affine2D{}.Shear(f32.Point{}, math.Pi/4, 0)
+		op.Affine(a).Add(o)
+		clip.Rect{Rect: f32.Rect(0, 0, 50, 40)}.Add(o)
+
+		op.Offset(f32.Pt(-100, -100)).Add(o)
+		paint.PaintOp{Rect: f32.Rect(100, 100, 150, 150)}.Add(o)
+	}, func(r result) {
+		r.expect(20, 5, colornames.White)
+	})
+}
+
+func TestTransformOrder(t *testing.T) {
+	// check the ordering of operations bot in affine and in gpu stack.
+	run(t, func(o *op.Ops) {
+		paint.ColorOp{Color: colornames.Red}.Add(o)
+
+		a := f32.Affine2D{}.Offset(f32.Pt(64, 64))
+		op.Affine(a).Add(o)
+
+		b := f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(8, 8))
+		op.Affine(b).Add(o)
+
+		c := f32.Affine2D{}.Offset(f32.Pt(-10, -10)).Scale(f32.Point{}, f32.Pt(0.5, 0.5))
+		op.Affine(c).Add(o)
+		paint.PaintOp{Rect: f32.Rect(0, 0, 20, 20)}.Add(o)
+	}, func(r result) {
+		// centered and with radius 40
+		r.expect(64-41, 64, colornames.White)
+		r.expect(64-39, 64, colornames.Red)
+		r.expect(64+39, 64, colornames.Red)
+		r.expect(64+41, 64, colornames.White)
+	})
+}

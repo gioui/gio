@@ -97,6 +97,29 @@ func BenchmarkDrawUI(b *testing.B) {
 	finishBenchmark(b, w)
 }
 
+func BenchmarkDrawUITransformed(b *testing.B) {
+	// Like BenchmarkDraw UI but transformed at every frame
+	gtx, w, th := setupBenchmark(b)
+	drawCore(gtx, th)
+	w.Frame(gtx.Ops)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		resetOps(gtx)
+
+		p := op.Push(gtx.Ops)
+		angle := float32(math.Mod(float64(i)/1000, 0.05))
+		a := f32.Affine2D{}.Shear(f32.Point{}, angle, angle).Rotate(f32.Point{}, angle)
+		op.Affine(a).Add(gtx.Ops)
+
+		drawCore(gtx, th)
+
+		p.Pop()
+		w.Frame(gtx.Ops)
+	}
+	finishBenchmark(b, w)
+}
+
 func Benchmark1000Circles(b *testing.B) {
 	// Benchmark1000Shapes draws 1000 individual shapes such that no caching between
 	// shapes will be possible and resets buffers on each operation to prevent caching
