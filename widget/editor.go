@@ -441,6 +441,7 @@ func (e *Editor) moveCoord(pos image.Point) {
 		carLine++
 	}
 	x := fixed.I(pos.X + e.scrollOff.X)
+	e.carXOff = 0
 	e.moveToLine(x, carLine)
 }
 
