@@ -38,8 +38,8 @@ func (col RGBA) Opaque() RGBA {
 	return col
 }
 
-// RGBAFromSRGB converts color.Color to RGBA.
-func RGBAFromSRGB(col color.Color) RGBA {
+// RGBAFromSRGB converts from SRGBA to RGBA.
+func RGBAFromSRGB(col color.RGBA) RGBA {
 	r, g, b, a := col.RGBA()
 	return RGBA{
 		R: sRGBToLinear(float32(r) / 0xffff),
