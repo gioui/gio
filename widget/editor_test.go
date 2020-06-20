@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"testing"
 	"testing/quick"
+	"unicode"
 
 	"gioui.org/f32"
 	"gioui.org/font/gofont"
@@ -43,6 +44,28 @@ func TestEditor(t *testing.T) {
 	assertCaret(t, e, 1, 4, len("æbc\naøå•"))
 	e.Move(+1)
 	assertCaret(t, e, 1, 4, len("æbc\naøå•"))
+
+	// Ensure that password masking does not affect caret behavior
+	e.Move(-3)
+	assertCaret(t, e, 1, 1, len("æbc\na"))
+	e.Mask = '*'
+	e.Layout(gtx, cache, font, fontSize)
+	assertCaret(t, e, 1, 1, len("æbc\na"))
+	e.Move(-3)
+	assertCaret(t, e, 0, 2, len("æb"))
+	e.Mask = '\U0001F92B'
+	e.Layout(gtx, cache, font, fontSize)
+	e.moveEnd()
+	assertCaret(t, e, 0, 3, len("æbc"))
+
+	// When a password mask is applied, it should replace all visible glyphs
+	for i, line := range e.lines {
+		for j, glyph := range line.Layout {
+			if glyph.Rune != e.Mask && !unicode.IsSpace(glyph.Rune) {
+				t.Errorf("glyph at (%d, %d) is unmasked rune %d", i, j, glyph.Rune)
+			}
+		}
+	}
 }
 
 // assertCaret asserts that the editor caret is at a particular line

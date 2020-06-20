@@ -4,9 +4,11 @@ package widget
 
 import (
 	"image"
+	"io"
 	"math"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"gioui.org/f32"
 	"gioui.org/gesture"
@@ -31,6 +33,10 @@ type Editor struct {
 	// Submit enabled translation of carriage return keys to SubmitEvents.
 	// If not enabled, carriage returns are inserted as newlines in the text.
 	Submit bool
+	// Mask replaces the visual display of each rune in the contents with the given rune.
+	// Newline characters are not masked. When non-zero, the unmasked contents
+	// are accessed by Len, Text, and SetText.
+	Mask rune
 
 	eventKey     int
 	font         text.Font
@@ -39,6 +45,8 @@ type Editor struct {
 	blinkStart   time.Time
 	focused      bool
 	rr           editBuffer
+	maskReader   maskReader
+	lastMask     rune
 	maxWidth     int
 	viewSize     image.Point
 	valid        bool
@@ -73,6 +81,49 @@ type Editor struct {
 	events []EditorEvent
 	// prevEvents is the number of events from the previous frame.
 	prevEvents int
+}
+
+type maskReader struct {
+	// rr is the underlying reader.
+	rr      io.RuneReader
+	maskBuf [utf8.UTFMax]byte
+	// mask is the utf-8 encoded mask rune.
+	mask []byte
+	// overflow contains excess mask bytes left over after the last Read call.
+	overflow []byte
+}
+
+func (m *maskReader) Reset(r io.RuneReader, mr rune) {
+	m.rr = r
+	n := utf8.EncodeRune(m.maskBuf[:], mr)
+	m.mask = m.maskBuf[:n]
+}
+
+// Read reads from the underlying reader and replaces every
+// rune with the mask rune.
+func (m *maskReader) Read(b []byte) (n int, err error) {
+	for len(b) > 0 {
+		var replacement []byte
+		if len(m.overflow) > 0 {
+			replacement = m.overflow
+		} else {
+			var r rune
+			r, _, err = m.rr.ReadRune()
+			if err != nil {
+				break
+			}
+			if r == '\n' {
+				replacement = []byte{'\n'}
+			} else {
+				replacement = m.mask
+			}
+		}
+		nn := copy(b, replacement)
+		m.overflow = replacement[nn:]
+		n += nn
+		b = b[nn:]
+	}
+	return n, err
 }
 
 type EditorEvent interface {
@@ -270,6 +321,10 @@ func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size
 	}
 	if sh != e.shaper {
 		e.shaper = sh
+		e.invalidate()
+	}
+	if e.Mask != e.lastMask {
+		e.lastMask = e.Mask
 		e.invalidate()
 	}
 
@@ -470,7 +525,12 @@ func (e *Editor) moveCoord(pos image.Point) {
 
 func (e *Editor) layoutText(s text.Shaper) ([]text.Line, layout.Dimensions) {
 	e.rr.Reset()
-	lines, _ := s.Layout(e.font, e.textSize, e.maxWidth, &e.rr)
+	var r io.Reader = &e.rr
+	if e.Mask != 0 {
+		e.maskReader.Reset(&e.rr, e.Mask)
+		r = &e.maskReader
+	}
+	lines, _ := s.Layout(e.font, e.textSize, e.maxWidth, r)
 	dims := linesDimens(lines)
 	for i := 0; i < len(lines)-1; i++ {
 		// To avoid layout flickering while editing, assume a soft newline takes
