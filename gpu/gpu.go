@@ -60,12 +60,11 @@ type drawOps struct {
 	// zimageOps are the rectangle clipped opaque images
 	// that can use fast front-to-back rendering with z-test
 	// and no blending.
-	zimageOps        []imageOp
-	pathOps          []*pathOp
-	pathOpCache      []pathOp
-	qs               quadSplitter
-	pathCache        *opCache
-	uniqueKeyCounter int
+	zimageOps   []imageOp
+	pathOps     []*pathOp
+	pathOpCache []pathOp
+	qs          quadSplitter
+	pathCache   *opCache
 }
 
 type drawState struct {
@@ -704,13 +703,6 @@ func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key, boun
 	}
 }
 
-// noCacheKey creates a new key for caches, but one that is unique and
-// thus will never lead to re-use.
-func (d *drawOps) noCacheKey() ops.Key {
-	d.uniqueKeyCounter--
-	return d.reader.NewKey(d.uniqueKeyCounter)
-}
-
 // split a transform into two parts, one which is pur offset and the
 // other representing the scaling, shearing and rotation part
 func splitTransform(t f32.Affine2D) (srs f32.Affine2D, offset f32.Point) {
@@ -756,7 +748,8 @@ loop:
 				}
 			} else {
 				aux, op.bounds, _ = d.boundsForTransformedRect(bounds, trans)
-				auxKey = d.noCacheKey()
+				auxKey = encOp.Key
+				auxKey.SetTransform(trans)
 			}
 			state.clip = state.clip.Intersect(op.bounds.Add(off))
 			if state.clip.Empty() {
@@ -787,7 +780,8 @@ loop:
 			if clipData != nil {
 				// The paint operation is sheared or rotated, add a clip path representing
 				// this transformed rectangle.
-				d.addClipPath(&state, clipData, d.noCacheKey(), bnd, off)
+				encOp.Key.SetTransform(trans)
+				d.addClipPath(&state, clipData, encOp.Key, bnd, off)
 			}
 
 			bounds := boundRectF(clip)

@@ -54,10 +54,6 @@ type opMacroDef struct {
 	endpc pc
 }
 
-func (r *Reader) NewKey(pc int) Key {
-	return Key{ops: r.ops, pc: pc, version: r.ops.Version()}
-}
-
 // Reset start reading from the op list.
 func (r *Reader) Reset(ops *op.Ops) {
 	r.stack = r.stack[:0]
