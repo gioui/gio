@@ -18,6 +18,7 @@ import (
 
 	"gioui.org/app"
 	"gioui.org/app/headless"
+	"gioui.org/f32"
 	"gioui.org/font/gofont"
 	"gioui.org/io/router"
 	"gioui.org/io/system"
@@ -127,7 +128,15 @@ func loop(w *app.Window) error {
 				if *disable {
 					gtx = gtx.Disabled()
 				}
-				kitchen(gtx, th)
+				if checkbox.Changed() {
+					if checkbox.Value {
+						transformTime = e.Now
+					} else {
+						transformTime = time.Time{}
+					}
+				}
+
+				transformedKitchen(gtx, th)
 				e.Frame(gtx.Ops)
 			}
 		case p := <-progressIncrementer:
@@ -138,6 +147,30 @@ func loop(w *app.Window) error {
 			w.Invalidate()
 		}
 	}
+}
+
+func transformedKitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
+	if !transformTime.IsZero() {
+		dt := float32(gtx.Now.Sub(transformTime).Seconds())
+		angle := dt * .1
+		op.InvalidateOp{}.Add(gtx.Ops)
+		defer op.Push(gtx.Ops).Pop()
+		tr := f32.Affine2D{}
+		tr = tr.Rotate(f32.Pt(300, 20), -angle)
+		scale := 1.0 - dt*.5
+		if scale < 0.5 {
+			scale = 0.5
+		}
+		tr = tr.Scale(f32.Pt(300, 20), f32.Pt(scale, scale))
+		offset := dt * 50
+		if offset > 200 {
+			offset = 200
+		}
+		tr = tr.Offset(f32.Pt(0, offset))
+		op.Affine(tr).Add(gtx.Ops)
+	}
+
+	return kitchen(gtx, th)
 }
 
 var (
@@ -163,6 +196,7 @@ var (
 	icon                *widget.Icon
 	checkbox            = new(widget.Bool)
 	swtch               = new(widget.Bool)
+	transformTime       time.Time
 )
 
 type (
@@ -268,7 +302,7 @@ func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 		func(gtx C) D {
 			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 				layout.Rigid(
-					material.CheckBox(th, checkbox, "Checkbox").Layout,
+					material.CheckBox(th, checkbox, "Transform").Layout,
 				),
 				layout.Rigid(func(gtx C) D {
 					return layout.Inset{Left: unit.Dp(16)}.Layout(gtx,
