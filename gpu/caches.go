@@ -28,8 +28,9 @@ type opCache struct {
 type opCacheValue struct {
 	data   pathData
 	bounds f32.Rectangle
-	key    ops.Key
-	keep   bool
+	// the fields below are handled by opCache
+	key  ops.Key
+	keep bool
 }
 
 func newResourceCache() *resourceCache {

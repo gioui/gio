@@ -706,9 +706,9 @@ func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key, boun
 // split a transform into two parts, one which is pur offset and the
 // other representing the scaling, shearing and rotation part
 func splitTransform(t f32.Affine2D) (srs f32.Affine2D, offset f32.Point) {
-	sx, hx, ox, sy, hy, oy := t.Elems()
+	sx, hx, ox, hy, sy, oy := t.Elems()
 	offset = f32.Point{X: ox, Y: oy}
-	srs = f32.NewAffine2D(sx, hx, 0, sy, hy, 0)
+	srs = f32.NewAffine2D(sx, hx, 0, hy, sy, 0)
 	return
 }
 
@@ -752,9 +752,6 @@ loop:
 				auxKey.SetTransform(trans)
 			}
 			state.clip = state.clip.Intersect(op.bounds.Add(off))
-			if state.clip.Empty() {
-				continue
-			}
 			d.addClipPath(&state, aux, auxKey, op.bounds, off)
 			aux = nil
 			auxKey = ops.Key{}

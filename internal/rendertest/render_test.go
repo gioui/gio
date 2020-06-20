@@ -15,7 +15,7 @@ func TestTransformMacro(t *testing.T) {
 	// testcase resulting from original bug when rendering layout.Stacked
 
 	// pre-build the text
-	c := createText()
+	c := constSqPath()
 
 	run(t, func(o *op.Ops) {
 
@@ -101,7 +101,7 @@ func TestNoClipFromPaint(t *testing.T) {
 	})
 }
 
-func createText() op.CallOp {
+func constSqPath() op.CallOp {
 	innerOps := new(op.Ops)
 	m := op.Record(innerOps)
 	builder := clip.Path{}
@@ -115,6 +115,14 @@ func createText() op.CallOp {
 	return m.Stop()
 }
 
+func constSqCirc() op.CallOp {
+	innerOps := new(op.Ops)
+	m := op.Record(innerOps)
+	clip.Rect{Rect: f32.Rect(0, 0, 40, 40),
+		NW: 20, NE: 20, SW: 20, SE: 20}.Add(innerOps)
+	return m.Stop()
+}
+
 func drawChild(ops *op.Ops, text op.CallOp) op.CallOp {
 	r1 := op.Record(ops)
 	text.Add(ops)
@@ -123,7 +131,7 @@ func drawChild(ops *op.Ops, text op.CallOp) op.CallOp {
 }
 
 func TestReuseStencil(t *testing.T) {
-	txt := createText()
+	txt := constSqPath()
 	run(t, func(ops *op.Ops) {
 		c1 := drawChild(ops, txt)
 		c2 := drawChild(ops, txt)
@@ -141,4 +149,36 @@ func TestReuseStencil(t *testing.T) {
 		r.expect(5, 5, colornames.Black)
 		r.expect(5, 55, colornames.Black)
 	})
+}
+
+func TestBuildOffscreen(t *testing.T) {
+	// Check that something we in one frame build outside the screen
+	// still is rendered correctly if moved into the screen in a later
+	// frame.
+
+	txt := constSqCirc()
+	draw := func(off float32, o *op.Ops) {
+		s := op.Push(o)
+		op.TransformOp{}.Offset(f32.Pt(0, off)).Add(o)
+		txt.Add(o)
+		paint.PaintOp{Rect: f32.Rect(0, 0, 40, 40)}.Add(o)
+		s.Pop()
+	}
+
+	multiRun(t,
+		frame(
+			func(ops *op.Ops) {
+				draw(-100, ops)
+			}, func(r result) {
+				r.expect(5, 5, colornames.White)
+				r.expect(20, 20, colornames.White)
+			}),
+		frame(
+			func(ops *op.Ops) {
+				draw(0, ops)
+			}, func(r result) {
+				r.expect(2, 2, colornames.White)
+				r.expect(20, 20, colornames.Black)
+				r.expect(38, 38, colornames.White)
+			}))
 }

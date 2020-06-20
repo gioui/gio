@@ -9,6 +9,7 @@ import (
 	"image/png"
 	"io/ioutil"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"gioui.org/app/headless"
@@ -61,9 +62,10 @@ func run(t *testing.T, f func(o *op.Ops), c func(r result)) {
 		img, err = drawImage(128, ops, f)
 		if err != nil {
 			t.Error("error rendering:", err)
+			return
 		}
 		// check for a reference image and make sure we are identical.
-		ok = ok && verifyRef(t, img)
+		ok = ok && verifyRef(t, img, 0)
 		c(result{t: t, img: img})
 	}
 
@@ -74,9 +76,62 @@ func run(t *testing.T, f func(o *op.Ops), c func(r result)) {
 	}
 }
 
-func verifyRef(t *testing.T, img *image.RGBA) (ok bool) {
+func frame(f func(o *op.Ops), c func(r result)) frameT {
+	return frameT{f: f, c: c}
+}
+
+type frameT struct {
+	f func(o *op.Ops)
+	c func(r result)
+}
+
+// multiRun is used to run test cases over multiple frames, typically
+// to test caching interactions.
+func multiRun(t *testing.T, frames ...frameT) {
+	// draw a few times and check that it is correct each time, to
+	// ensure any caching effects still generate the correct images.
+	var img *image.RGBA
+	var err error
+	sz := image.Point{X: 128, Y: 128}
+	w, err := headless.NewWindow(sz.X, sz.Y)
+	if err != nil {
+		t.Error("error creating window:", err)
+		t.FailNow()
+	}
+	ops := new(op.Ops)
+	for i := range frames {
+		ops.Reset()
+		frames[i].f(ops)
+		w.Frame(ops)
+		img, err = w.Screenshot()
+		if err != nil {
+			t.Error("error rendering:", err)
+			return
+		}
+		// check for a reference image and make sure we are identical.
+		ok := verifyRef(t, img, i)
+		if frames[i].c != nil {
+			frames[i].c(result{t: t, img: img})
+		}
+		if *dumpImages || !ok {
+			name := t.Name() + ".png"
+			if i != 0 {
+				name = t.Name() + "_" + strconv.Itoa(i) + ".png"
+			}
+			if err := saveImage(name, img); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+
+}
+
+func verifyRef(t *testing.T, img *image.RGBA, frame int) (ok bool) {
 	// ensure identical to ref data
 	path := filepath.Join("refs", t.Name()+".png")
+	if frame != 0 {
+		path = filepath.Join("refs", t.Name()+"_"+strconv.Itoa(frame)+".png")
+	}
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		t.Error("could not open ref:", err)
@@ -102,6 +157,7 @@ func verifyRef(t *testing.T, img *image.RGBA) (ok bool) {
 			c1, c2 := ref.RGBAAt(x, y), img.RGBAAt(x, y)
 			if !colorsClose(c1, c2) {
 				t.Error("not equal to ref at", x, y, " ", c1, c2)
+				return false
 			}
 		}
 	}

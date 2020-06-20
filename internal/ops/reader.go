@@ -62,11 +62,11 @@ func (r *Reader) Reset(ops *op.Ops) {
 }
 
 func (k Key) SetTransform(t f32.Affine2D) Key {
-	sx, hx, sy, hy, _, _ := t.Elems()
+	sx, hx, _, hy, sy, _ := t.Elems()
 	k.sx = sx
 	k.hx = hx
-	k.sy = sy
 	k.hy = hy
+	k.sy = sy
 	return k
 }
 
