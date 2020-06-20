@@ -83,6 +83,7 @@ type drawState struct {
 }
 
 type pathOp struct {
+	off f32.Point
 	// clip is the union of all
 	// later clip rectangles.
 	clip      image.Rectangle
@@ -97,6 +98,7 @@ type pathOp struct {
 type imageOp struct {
 	z        float32
 	path     *pathOp
+	off      f32.Point
 	clip     image.Rectangle
 	material material
 	clipType clipType
@@ -510,7 +512,7 @@ func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
 			r.ctx.Clear(0.0, 0.0, 0.0, 0.0)
 		}
 		v, _ := pathCache.get(p.pathKey)
-		r.pather.stencilPath(p.clip, p.place.Pos, v.data)
+		r.pather.stencilPath(p.clip, p.off, p.place.Pos, v.data)
 	}
 }
 
@@ -685,11 +687,12 @@ func (d *drawOps) newPathOp() *pathOp {
 	return &d.pathOpCache[len(d.pathOpCache)-1]
 }
 
-func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key, bounds f32.Rectangle) {
+func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key, bounds f32.Rectangle, off f32.Point) {
 	npath := d.newPathOp()
 	*npath = pathOp{
 		parent: state.cpath,
 		bounds: bounds,
+		off:    off,
 	}
 	state.cpath = npath
 	if len(aux) > 0 {
@@ -706,6 +709,15 @@ func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key, boun
 func (d *drawOps) noCacheKey() ops.Key {
 	d.uniqueKeyCounter--
 	return d.reader.NewKey(d.uniqueKeyCounter)
+}
+
+// split a transform into two parts, one which is pur offset and the
+// other representing the scaling, shearing and rotation part
+func splitTransform(t f32.Affine2D) (srs f32.Affine2D, offset f32.Point) {
+	sx, hx, ox, sy, hy, oy := t.Elems()
+	offset = f32.Point{X: ox, Y: oy}
+	srs = f32.NewAffine2D(sx, hx, 0, sy, hy, 0)
+	return
 }
 
 func (d *drawOps) collectOps(r *ops.Reader, state drawState) int {
@@ -726,27 +738,28 @@ loop:
 			var op clipOp
 			op.decode(encOp.Data)
 			bounds := op.bounds
+			trans, off := splitTransform(state.t)
 			if len(aux) > 0 {
 				// There is a clipping path, build the gpu data and update the
 				// cache key such that it will be equal only if the transform is the
 				// same also. Use cached data if we have it.
-				auxKey = auxKey.SetTransform(state.t)
+				auxKey = auxKey.SetTransform(trans)
 				if v, ok := d.pathCache.get(auxKey); ok {
 					// Since the GPU data exists in the cache aux will not be used.
 					op.bounds = v.bounds
 				} else {
-					aux, op.bounds = d.buildVerts(aux, state.t)
+					aux, op.bounds = d.buildVerts(aux, trans)
+					// this will be added to the cache when building the paths later
 				}
 			} else {
-				aux, op.bounds, _ = d.boundsForTransformedRect(bounds, state.t)
+				aux, op.bounds, _ = d.boundsForTransformedRect(bounds, trans)
 				auxKey = d.noCacheKey()
 			}
-			state.clip = state.clip.Intersect(op.bounds)
+			state.clip = state.clip.Intersect(op.bounds.Add(off))
 			if state.clip.Empty() {
 				continue
 			}
-
-			d.addClipPath(&state, aux, auxKey, op.bounds)
+			d.addClipPath(&state, aux, auxKey, op.bounds, off)
 			aux = nil
 			auxKey = ops.Key{}
 		case opconst.TypeColor:
@@ -760,8 +773,9 @@ loop:
 			// Transform (if needed) the painting rectangle and if so generate a clip path,
 			// for those cases also compute a partialTrans that maps texture coordinates between
 			// the new bounding rectangle and the transformed original paint rectangle.
-			clipData, bnd, partialTrans := d.boundsForTransformedRect(op.Rect, state.t)
-			clip := state.clip.Intersect(bnd).Canon()
+			trans, off := splitTransform(state.t)
+			clipData, bnd, partialTrans := d.boundsForTransformedRect(op.Rect, trans)
+			clip := state.clip.Intersect(bnd.Add(off)).Canon()
 			if clip.Empty() {
 				continue
 			}
@@ -770,11 +784,11 @@ loop:
 			if clipData != nil {
 				// The paint operation is sheared or rotated, add a clip path representing
 				// this transformed rectangle.
-				d.addClipPath(&state, clipData, d.noCacheKey(), bnd)
+				d.addClipPath(&state, clipData, d.noCacheKey(), bnd, off)
 			}
 
 			bounds := boundRectF(clip)
-			mat := state.materialFor(d.cache, bnd, partialTrans, bounds)
+			mat := state.materialFor(d.cache, bnd, off, partialTrans, bounds)
 
 			if bounds.Min == (image.Point{}) && bounds.Max == d.viewport && state.rect && mat.opaque && mat.material == materialColor {
 				// The image is a uniform opaque color and takes up the whole screen.
@@ -797,6 +811,7 @@ loop:
 			img := imageOp{
 				z:        zf,
 				path:     state.cpath,
+				off:      off,
 				clip:     bounds,
 				material: mat,
 			}
@@ -831,7 +846,7 @@ func expandPathOp(p *pathOp, clip image.Rectangle) {
 	}
 }
 
-func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, trans f32.Affine2D, clip image.Rectangle) material {
+func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f32.Point, trans f32.Affine2D, clip image.Rectangle) material {
 	var m material
 	switch d.matType {
 	case materialColor:
@@ -840,7 +855,7 @@ func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, trans 
 		m.opaque = m.color.A == 1.0
 	case materialTexture:
 		m.material = materialTexture
-		dr := boundRectF(rect)
+		dr := boundRectF(rect.Add(off))
 		sz := d.image.src.Bounds().Size()
 		sr := layout.FRect(d.image.rect)
 		if dx := float32(dr.Dx()); dx != 0 {
