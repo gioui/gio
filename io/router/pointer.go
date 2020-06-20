@@ -56,7 +56,7 @@ type areaOp struct {
 }
 
 type areaNode struct {
-	trans op.TransformOp
+	trans f32.Affine2D
 	next  int
 	area  areaOp
 }
@@ -68,7 +68,7 @@ const (
 	areaEllipse
 )
 
-func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t op.TransformOp, area, node int, pass bool) {
+func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t f32.Affine2D, area, node int, pass bool) {
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypePush:
@@ -90,8 +90,8 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t o
 			})
 			node = len(q.hitTree) - 1
 		case opconst.TypeTransform:
-			dop := ops.DecodeTransformOp(encOp.Data)
-			t = t.Multiply(op.TransformOp(dop))
+			dop := ops.DecodeTransform(encOp.Data)
+			t = t.Mul(dop)
 		case opconst.TypePointerInput:
 			op := decodePointerInputOp(encOp.Data, encOp.Refs)
 			q.hitTree = append(q.hitTree, hitNode{
@@ -175,7 +175,7 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	q.hitTree = q.hitTree[:0]
 	q.areas = q.areas[:0]
 	q.reader.Reset(root)
-	q.collectHandlers(&q.reader, events, op.TransformOp{}, -1, -1, false)
+	q.collectHandlers(&q.reader, events, f32.Affine2D{}, -1, -1, false)
 	for k, h := range q.handlers {
 		if !h.active {
 			q.dropHandlers(events, k)

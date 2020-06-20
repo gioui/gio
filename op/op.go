@@ -290,8 +290,13 @@ func (t TransformOp) Add(o *Ops) {
 	data := o.Write(opconst.TypeTransformLen)
 	data[0] = byte(opconst.TypeTransform)
 	bo := binary.LittleEndian
-	bo.PutUint32(data[1:], math.Float32bits(t.offset.X))
-	bo.PutUint32(data[5:], math.Float32bits(t.offset.Y))
+	// write it out as an affine matrix although we only support offset yet
+	bo.PutUint32(data[1:], math.Float32bits(1.0))
+	bo.PutUint32(data[1+4*1:], math.Float32bits(0))
+	bo.PutUint32(data[1+4*2:], math.Float32bits(t.offset.X))
+	bo.PutUint32(data[1+4*3:], math.Float32bits(0))
+	bo.PutUint32(data[1+4*4:], math.Float32bits(1))
+	bo.PutUint32(data[1+4*5:], math.Float32bits(t.offset.Y))
 }
 
 func (s *stack) push() stackID {

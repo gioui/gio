@@ -8,7 +8,6 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
-	"gioui.org/op"
 )
 
 const QuadSize = 4 * 2 * 3
@@ -38,13 +37,23 @@ func DecodeQuad(d []byte) (q Quad) {
 	return
 }
 
-func DecodeTransformOp(d []byte) op.TransformOp {
-	bo := binary.LittleEndian
+func DecodeTransform(d []byte) (t f32.Affine2D) {
 	if opconst.OpType(d[0]) != opconst.TypeTransform {
 		panic("invalid op")
 	}
-	return op.TransformOp{}.Offset(f32.Point{
-		X: math.Float32frombits(bo.Uint32(d[1:])),
-		Y: math.Float32frombits(bo.Uint32(d[5:])),
-	})
+	if len(d) < 1+6*4 {
+		panic("too short buffer")
+	}
+	return decodeAffine2D(d[1:])
+}
+
+func decodeAffine2D(data []byte) f32.Affine2D {
+	bo := binary.LittleEndian
+	a := math.Float32frombits(bo.Uint32(data))
+	b := math.Float32frombits(bo.Uint32(data[4*1:]))
+	c := math.Float32frombits(bo.Uint32(data[4*2:]))
+	d := math.Float32frombits(bo.Uint32(data[4*3:]))
+	e := math.Float32frombits(bo.Uint32(data[4*4:]))
+	f := math.Float32frombits(bo.Uint32(data[4*5:]))
+	return f32.NewAffine2D(a, b, c, d, e, f)
 }

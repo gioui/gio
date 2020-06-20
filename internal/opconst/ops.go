@@ -31,7 +31,7 @@ const (
 const (
 	TypeMacroLen        = 1 + 4 + 4
 	TypeCallLen         = 1 + 4 + 4
-	TypeTransformLen    = 1 + 4*2
+	TypeTransformLen    = 1 + 4*6
 	TypeLayerLen        = 1
 	TypeRedrawLen       = 1 + 8
 	TypeImageLen        = 1 + 4*4

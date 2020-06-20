@@ -69,7 +69,7 @@ type drawOps struct {
 
 type drawState struct {
 	clip  f32.Rectangle
-	t     op.TransformOp
+	t     f32.Affine2D
 	cpath *pathOp
 	rect  bool
 	z     int
@@ -691,8 +691,8 @@ loop:
 		case opconst.TypeProfile:
 			d.profile = true
 		case opconst.TypeTransform:
-			dop := ops.DecodeTransformOp(encOp.Data)
-			state.t = state.t.Multiply(op.TransformOp(dop))
+			dop := ops.DecodeTransform(encOp.Data)
+			state.t = state.t.Mul(dop)
 		case opconst.TypeAux:
 			aux = encOp.Data[opconst.TypeAuxLen:]
 			auxKey = encOp.Key
