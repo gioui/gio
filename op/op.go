@@ -117,10 +117,10 @@ type InvalidateOp struct {
 	At time.Time
 }
 
-// TransformOp applies a transform to the current transform.
+// TransformOp applies a transform to the current transform. The zero value
+// for TransformOp represents the identity transform.
 type TransformOp struct {
-	// TODO: general transformations.
-	offset f32.Point
+	t f32.Affine2D
 }
 
 // stack tracks the integer identities of StackOp and MacroOp
@@ -264,39 +264,33 @@ func (r InvalidateOp) Add(o *Ops) {
 	}
 }
 
-// Offset the transformation.
+// Offset creates a TransformOp with the offset o.
+func Offset(o f32.Point) TransformOp {
+	return TransformOp{t: f32.Affine2D{}.Offset(o)}
+}
+
+// Affine creates a TransformOp representing the transformation a.
+func Affine(a f32.Affine2D) TransformOp {
+	return TransformOp{t: a}
+}
+
+// Offset the transfomraiton.
 func (t TransformOp) Offset(o f32.Point) TransformOp {
-	return t.Multiply(TransformOp{o})
-}
-
-// Invert the transformation.
-func (t TransformOp) Invert() TransformOp {
-	return TransformOp{offset: t.offset.Mul(-1)}
-}
-
-// Transform a point.
-func (t TransformOp) Transform(p f32.Point) f32.Point {
-	return p.Add(t.offset)
-}
-
-// Multiply by a transformation.
-func (t TransformOp) Multiply(t2 TransformOp) TransformOp {
-	return TransformOp{
-		offset: t.offset.Add(t2.offset),
-	}
+	t.t = t.t.Offset(o)
+	return t
 }
 
 func (t TransformOp) Add(o *Ops) {
 	data := o.Write(opconst.TypeTransformLen)
 	data[0] = byte(opconst.TypeTransform)
 	bo := binary.LittleEndian
-	// write it out as an affine matrix although we only support offset yet
-	bo.PutUint32(data[1:], math.Float32bits(1.0))
-	bo.PutUint32(data[1+4*1:], math.Float32bits(0))
-	bo.PutUint32(data[1+4*2:], math.Float32bits(t.offset.X))
-	bo.PutUint32(data[1+4*3:], math.Float32bits(0))
-	bo.PutUint32(data[1+4*4:], math.Float32bits(1))
-	bo.PutUint32(data[1+4*5:], math.Float32bits(t.offset.Y))
+	a, b, c, d, e, f := t.t.Elems()
+	bo.PutUint32(data[1:], math.Float32bits(a))
+	bo.PutUint32(data[1+4*1:], math.Float32bits(b))
+	bo.PutUint32(data[1+4*2:], math.Float32bits(c))
+	bo.PutUint32(data[1+4*3:], math.Float32bits(d))
+	bo.PutUint32(data[1+4*4:], math.Float32bits(e))
+	bo.PutUint32(data[1+4*5:], math.Float32bits(f))
 }
 
 func (s *stack) push() stackID {

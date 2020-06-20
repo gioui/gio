@@ -54,7 +54,8 @@ type coverColUniforms struct {
 type coverUniforms struct {
 	transform        [4]float32
 	uvCoverTransform [4]float32
-	uvTransform      [4]float32
+	uvTransformR1    [4]float32
+	uvTransformR2    [4]float32
 	z                float32
 }
 
@@ -77,9 +78,7 @@ type stenciler struct {
 
 type stencilUniforms struct {
 	vert struct {
-		transform  [4]float32
-		pathOffset [2]float32
-		_          [8]byte // Padding to multiple of 16.
+		transform [4]float32
 	}
 }
 
@@ -307,8 +306,8 @@ func (p *pather) begin(sizes []image.Point) {
 	p.stenciler.begin(sizes)
 }
 
-func (p *pather) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.Point, data *pathData) {
-	p.stenciler.stencilPath(bounds, offset, uv, data)
+func (p *pather) stencilPath(bounds image.Rectangle, uv image.Point, data *pathData) {
+	p.stenciler.stencilPath(bounds, uv, data)
 }
 
 func (s *stenciler) beginIntersect(sizes []image.Point) {
@@ -337,14 +336,13 @@ func (s *stenciler) begin(sizes []image.Point) {
 	s.ctx.BindIndexBuffer(s.indexBuf)
 }
 
-func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.Point, data *pathData) {
+func (s *stenciler) stencilPath(bounds image.Rectangle, uv image.Point, data *pathData) {
 	s.ctx.Viewport(uv.X, uv.Y, bounds.Dx(), bounds.Dy())
 	// Transform UI coordinates to OpenGL coordinates.
 	texSize := f32.Point{X: float32(bounds.Dx()), Y: float32(bounds.Dy())}
 	scale := f32.Point{X: 2 / texSize.X, Y: 2 / texSize.Y}
 	orig := f32.Point{X: -1 - float32(bounds.Min.X)*2/texSize.X, Y: -1 - float32(bounds.Min.Y)*2/texSize.Y}
 	s.prog.uniforms.vert.transform = [4]float32{scale.X, scale.Y, orig.X, orig.Y}
-	s.prog.uniforms.vert.pathOffset = [2]float32{offset.X, offset.Y}
 	s.prog.prog.UploadUniforms()
 	// Draw in batches that fit in uint16 indices.
 	start := 0
@@ -361,11 +359,11 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 	}
 }
 
-func (p *pather) cover(z float32, mat materialType, col f32color.RGBA, scale, off, uvScale, uvOff, coverScale, coverOff f32.Point) {
-	p.coverer.cover(z, mat, col, scale, off, uvScale, uvOff, coverScale, coverOff)
+func (p *pather) cover(z float32, mat materialType, col f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
+	p.coverer.cover(z, mat, col, scale, off, uvTrans, coverScale, coverOff)
 }
 
-func (c *coverer) cover(z float32, mat materialType, col f32color.RGBA, scale, off, uvScale, uvOff, coverScale, coverOff f32.Point) {
+func (c *coverer) cover(z float32, mat materialType, col f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
 	p := c.prog[mat]
 	c.ctx.BindProgram(p.prog)
 	var uniforms *coverUniforms
@@ -374,7 +372,9 @@ func (c *coverer) cover(z float32, mat materialType, col f32color.RGBA, scale, o
 		c.colUniforms.frag.color = col
 		uniforms = &c.colUniforms.vert.coverUniforms
 	case materialTexture:
-		c.texUniforms.vert.uvTransform = [4]float32{uvScale.X, uvScale.Y, uvOff.X, uvOff.Y}
+		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
+		c.texUniforms.vert.uvTransformR1 = [4]float32{t1, t2, t3, 0}
+		c.texUniforms.vert.uvTransformR2 = [4]float32{t4, t5, t6, 0}
 		uniforms = &c.texUniforms.vert.coverUniforms
 	}
 	uniforms.z = z

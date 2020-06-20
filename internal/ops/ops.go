@@ -16,6 +16,13 @@ type Quad struct {
 	From, Ctrl, To f32.Point
 }
 
+func (q Quad) Transform(t f32.Affine2D) Quad {
+	q.From = t.Transform(q.From)
+	q.Ctrl = t.Transform(q.Ctrl)
+	q.To = t.Transform(q.To)
+	return q
+}
+
 func EncodeQuad(d []byte, q Quad) {
 	bo := binary.LittleEndian
 	bo.PutUint32(d[0:], math.Float32bits(q.From.X))
