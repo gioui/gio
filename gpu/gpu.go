@@ -319,7 +319,7 @@ func (g *GPU) Collect(viewport image.Point, frameOps *op.Ops) {
 		g.cleanupTimer = g.timers.newTimer()
 	}
 	for _, p := range g.drawOps.pathOps {
-		if _, exists := g.drawOps.pathCache.get(p.pathKey); !exists {
+		if v, exists := g.drawOps.pathCache.get(p.pathKey); !exists || v.data == nil {
 			data := buildPath(g.ctx, p.pathVerts)
 			g.drawOps.pathCache.put(p.pathKey, opCacheValue{
 				data:   data,
@@ -746,10 +746,13 @@ loop:
 				auxKey = auxKey.SetTransform(trans)
 				if v, ok := d.pathCache.get(auxKey); ok {
 					// Since the GPU data exists in the cache aux will not be used.
+					// Why is this not used for the offset shapes?
 					op.bounds = v.bounds
 				} else {
 					aux, op.bounds = d.buildVerts(aux, trans)
-					// this will be added to the cache when building the paths later
+					// add it to the cache, without GPU data, so the transform can be
+					// reused.
+					d.pathCache.put(auxKey, opCacheValue{bounds: op.bounds})
 				}
 			} else {
 				aux, op.bounds, _ = d.boundsForTransformedRect(bounds, trans)
