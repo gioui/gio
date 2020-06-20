@@ -29,8 +29,7 @@ import (
 )
 
 type GPU struct {
-	pathCache *opCache
-	cache     *resourceCache
+	cache *resourceCache
 
 	defFBO                                            backend.Framebuffer
 	profile                                           string
@@ -65,6 +64,7 @@ type drawOps struct {
 	pathOps          []*pathOp
 	pathOpCache      []pathOp
 	qs               quadSplitter
+	pathCache        *opCache
 	uniqueKeyCounter int
 }
 
@@ -86,6 +86,7 @@ type pathOp struct {
 	// clip is the union of all
 	// later clip rectangles.
 	clip      image.Rectangle
+	bounds    f32.Rectangle
 	pathKey   ops.Key
 	path      bool
 	pathVerts []byte
@@ -277,10 +278,10 @@ const (
 func New(ctx backend.Device) (*GPU, error) {
 	defFBO := ctx.CurrentFramebuffer()
 	g := &GPU{
-		defFBO:    defFBO,
-		pathCache: newOpCache(),
-		cache:     newResourceCache(),
+		defFBO: defFBO,
+		cache:  newResourceCache(),
 	}
+	g.drawOps.pathCache = newOpCache()
 	if err := g.init(ctx); err != nil {
 		return nil, err
 	}
@@ -295,7 +296,7 @@ func (g *GPU) init(ctx backend.Device) error {
 
 func (g *GPU) Release() {
 	g.renderer.release()
-	g.pathCache.release()
+	g.drawOps.pathCache.release()
 	g.cache.release()
 	if g.timers != nil {
 		g.timers.release()
@@ -316,9 +317,12 @@ func (g *GPU) Collect(viewport image.Point, frameOps *op.Ops) {
 		g.cleanupTimer = g.timers.newTimer()
 	}
 	for _, p := range g.drawOps.pathOps {
-		if _, exists := g.pathCache.get(p.pathKey); !exists {
+		if _, exists := g.drawOps.pathCache.get(p.pathKey); !exists {
 			data := buildPath(g.ctx, p.pathVerts)
-			g.pathCache.put(p.pathKey, data)
+			g.drawOps.pathCache.put(p.pathKey, opCacheValue{
+				data:   data,
+				bounds: p.bounds,
+			})
 		}
 		p.pathVerts = nil
 	}
@@ -344,7 +348,7 @@ func (g *GPU) BeginFrame() {
 	g.stencilTimer.begin()
 	g.ctx.SetBlend(true)
 	g.renderer.packStencils(&g.drawOps.pathOps)
-	g.renderer.stencilClips(g.pathCache, g.drawOps.pathOps)
+	g.renderer.stencilClips(g.drawOps.pathCache, g.drawOps.pathOps)
 	g.renderer.packIntersections(g.drawOps.imageOps)
 	g.renderer.intersect(g.drawOps.imageOps)
 	g.stencilTimer.end()
@@ -361,7 +365,7 @@ func (g *GPU) BeginFrame() {
 func (g *GPU) EndFrame() {
 	g.cleanupTimer.begin()
 	g.cache.frame()
-	g.pathCache.frame()
+	g.drawOps.pathCache.frame()
 	g.cleanupTimer.end()
 	if g.drawOps.profile && g.timers.ready() {
 		zt, st, covt, cleant := g.zopsTimer.Elapsed, g.stencilTimer.Elapsed, g.coverTimer.Elapsed, g.cleanupTimer.Elapsed
@@ -505,8 +509,8 @@ func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
 			r.ctx.BindFramebuffer(f.fbo)
 			r.ctx.Clear(0.0, 0.0, 0.0, 0.0)
 		}
-		data, _ := pathCache.get(p.pathKey)
-		r.pather.stencilPath(p.clip, p.place.Pos, data.(*pathData))
+		v, _ := pathCache.get(p.pathKey)
+		r.pather.stencilPath(p.clip, p.place.Pos, v.data)
 	}
 }
 
@@ -681,10 +685,11 @@ func (d *drawOps) newPathOp() *pathOp {
 	return &d.pathOpCache[len(d.pathOpCache)-1]
 }
 
-func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key) {
+func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key, bounds f32.Rectangle) {
 	npath := d.newPathOp()
 	*npath = pathOp{
 		parent: state.cpath,
+		bounds: bounds,
 	}
 	state.cpath = npath
 	if len(aux) > 0 {
@@ -724,9 +729,14 @@ loop:
 			if len(aux) > 0 {
 				// There is a clipping path, build the gpu data and update the
 				// cache key such that it will be equal only if the transform is the
-				// same also.
-				aux, op.bounds = d.buildVerts(aux, state.t)
+				// same also. Use cached data if we have it.
 				auxKey = auxKey.SetTransform(state.t)
+				if v, ok := d.pathCache.get(auxKey); ok {
+					// Since the GPU data exists in the cache aux will not be used.
+					op.bounds = v.bounds
+				} else {
+					aux, op.bounds = d.buildVerts(aux, state.t)
+				}
 			} else {
 				aux, op.bounds, _ = d.boundsForTransformedRect(bounds, state.t)
 				auxKey = d.noCacheKey()
@@ -736,7 +746,7 @@ loop:
 				continue
 			}
 
-			d.addClipPath(&state, aux, auxKey)
+			d.addClipPath(&state, aux, auxKey, op.bounds)
 			aux = nil
 			auxKey = ops.Key{}
 		case opconst.TypeColor:
@@ -760,7 +770,7 @@ loop:
 			if clipData != nil {
 				// The paint operation is sheared or rotated, add a clip path representing
 				// this transformed rectangle.
-				d.addClipPath(&state, clipData, d.noCacheKey())
+				d.addClipPath(&state, clipData, d.noCacheKey(), bnd)
 			}
 
 			bounds := boundRectF(clip)

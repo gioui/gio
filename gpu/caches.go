@@ -5,6 +5,7 @@ package gpu
 import (
 	"fmt"
 
+	"gioui.org/f32"
 	"gioui.org/internal/ops"
 )
 
@@ -13,11 +14,15 @@ type resourceCache struct {
 	newRes map[interface{}]resource
 }
 
-// opCache is like a resourceCache using the concrete Key
-// key type to avoid allocations.
+// opCache is like a resourceCache but using concrete types.
 type opCache struct {
-	res    map[ops.Key]resource
-	newRes map[ops.Key]resource
+	res    map[ops.Key]opCacheValue
+	newRes map[ops.Key]opCacheValue
+}
+
+type opCacheValue struct {
+	data   *pathData
+	bounds f32.Rectangle
 }
 
 func newResourceCache() *resourceCache {
@@ -66,12 +71,12 @@ func (r *resourceCache) release() {
 
 func newOpCache() *opCache {
 	return &opCache{
-		res:    make(map[ops.Key]resource),
-		newRes: make(map[ops.Key]resource),
+		res:    make(map[ops.Key]opCacheValue),
+		newRes: make(map[ops.Key]opCacheValue),
 	}
 }
 
-func (r *opCache) get(key ops.Key) (resource, bool) {
+func (r *opCache) get(key ops.Key) (opCacheValue, bool) {
 	v, exists := r.res[key]
 	if exists {
 		r.newRes[key] = v
@@ -79,7 +84,7 @@ func (r *opCache) get(key ops.Key) (resource, bool) {
 	return v, exists
 }
 
-func (r *opCache) put(key ops.Key, val resource) {
+func (r *opCache) put(key ops.Key, val opCacheValue) {
 	if _, exists := r.newRes[key]; exists {
 		panic(fmt.Errorf("key exists, %#v", key))
 	}
@@ -91,7 +96,7 @@ func (r *opCache) frame() {
 	for k, v := range r.res {
 		if _, exists := r.newRes[k]; !exists {
 			delete(r.res, k)
-			v.release()
+			v.data.release()
 		}
 	}
 	for k, v := range r.newRes {
@@ -102,7 +107,7 @@ func (r *opCache) frame() {
 
 func (r *opCache) release() {
 	for _, v := range r.newRes {
-		v.release()
+		v.data.release()
 	}
 	r.newRes = nil
 	r.res = nil
