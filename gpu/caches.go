@@ -26,7 +26,7 @@ type opCache struct {
 }
 
 type opCacheValue struct {
-	data   *pathData
+	data   pathData
 	bounds f32.Rectangle
 	key    ops.Key
 	keep   bool
@@ -120,9 +120,9 @@ func (r *opCache) frame() {
 		if v.keep {
 			continue
 		}
-		if v.data != nil {
+		if v.data.data != nil {
 			v.data.release()
-			r.cache[i].data = nil
+			r.cache[i].data.data = nil
 		}
 		delete(r.index, v.key)
 		r.freelist = append(r.freelist, i)

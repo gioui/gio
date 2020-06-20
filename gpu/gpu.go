@@ -318,7 +318,7 @@ func (g *GPU) Collect(viewport image.Point, frameOps *op.Ops) {
 		g.cleanupTimer = g.timers.newTimer()
 	}
 	for _, p := range g.drawOps.pathOps {
-		if v, exists := g.drawOps.pathCache.get(p.pathKey); !exists || v.data == nil {
+		if v, exists := g.drawOps.pathCache.get(p.pathKey); !exists || v.data.data == nil {
 			data := buildPath(g.ctx, p.pathVerts)
 			g.drawOps.pathCache.put(p.pathKey, opCacheValue{
 				data:   data,

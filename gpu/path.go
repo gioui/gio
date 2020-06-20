@@ -289,18 +289,18 @@ func (c *coverer) release() {
 	c.layout.Release()
 }
 
-func buildPath(ctx backend.Device, p []byte) *pathData {
+func buildPath(ctx backend.Device, p []byte) pathData {
 	buf, err := ctx.NewImmutableBuffer(backend.BufferBindingVertices, p)
 	if err != nil {
 		panic(err)
 	}
-	return &pathData{
+	return pathData{
 		ncurves: len(p) / vertStride,
 		data:    buf,
 	}
 }
 
-func (p *pathData) release() {
+func (p pathData) release() {
 	p.data.Release()
 }
 
@@ -308,7 +308,7 @@ func (p *pather) begin(sizes []image.Point) {
 	p.stenciler.begin(sizes)
 }
 
-func (p *pather) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.Point, data *pathData) {
+func (p *pather) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.Point, data pathData) {
 	p.stenciler.stencilPath(bounds, offset, uv, data)
 }
 
@@ -338,7 +338,7 @@ func (s *stenciler) begin(sizes []image.Point) {
 	s.ctx.BindIndexBuffer(s.indexBuf)
 }
 
-func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.Point, data *pathData) {
+func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.Point, data pathData) {
 	s.ctx.Viewport(uv.X, uv.Y, bounds.Dx(), bounds.Dy())
 	// Transform UI coordinates to OpenGL coordinates.
 	texSize := f32.Point{X: float32(bounds.Dx()), Y: float32(bounds.Dy())}
