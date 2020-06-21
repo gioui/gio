@@ -28,10 +28,10 @@ type Shaper interface {
 	Metrics(font Font, size fixed.Int26_6) font.Metrics
 }
 
-// Collection maps Fonts to Faces.
-type Collection struct {
-	def   Typeface
-	faces map[Font]Face
+// A FontFace is a Font and a matching Face.
+type FontFace struct {
+	Font Font
+	Face Face
 }
 
 // Cache implements cached layout and shaping of text from a set of
@@ -43,39 +43,27 @@ type Collection struct {
 // The LayoutString and ShapeString results are cached and re-used if
 // possible.
 type Cache struct {
-	col   *Collection
+	def   Typeface
 	faces map[Font]*faceCache
 }
 
 type faceCache struct {
+	face        Face
 	layoutCache layoutCache
 	pathCache   pathCache
 }
 
-func (c *Collection) Register(font Font, tf Face) {
-	if c.faces == nil {
-		c.def = font.Typeface
-		c.faces = make(map[Font]Face)
-	}
-	if font.Weight == 0 {
-		font.Weight = Normal
-	}
-	c.faces[font] = tf
-}
-
-// Lookup a font and return the effective font and its
-// font face.
-func (c *Collection) Lookup(font Font) (Font, Face) {
-	var f Face
-	font, f = c.faceForStyle(font)
+func (c *Cache) lookup(font Font) *faceCache {
+	var f *faceCache
+	f = c.faceForStyle(font)
 	if f == nil {
 		font.Typeface = c.def
-		font, f = c.faceForStyle(font)
+		f = c.faceForStyle(font)
 	}
-	return font, f
+	return f
 }
 
-func (c *Collection) faceForStyle(font Font) (Font, Face) {
+func (c *Cache) faceForStyle(font Font) *faceCache {
 	tf := c.faces[font]
 	if tf == nil {
 		font := font
@@ -93,54 +81,52 @@ func (c *Collection) faceForStyle(font Font) (Font, Face) {
 		font.Weight = Normal
 		tf = c.faces[font]
 	}
-	return font, tf
+	return tf
 }
 
-func NewCache(fonts *Collection) *Cache {
-	return &Cache{
-		col:   fonts,
+func NewCache(collection []FontFace) *Cache {
+	c := &Cache{
 		faces: make(map[Font]*faceCache),
 	}
+	for i, ff := range collection {
+		if ff.Font.Weight == 0 {
+			ff.Font.Weight = Normal
+		}
+		if i == 0 {
+			c.def = ff.Font.Typeface
+		}
+		c.faces[ff.Font] = &faceCache{face: ff.Face}
+	}
+	return c
 }
 
 func (s *Cache) Layout(font Font, size fixed.Int26_6, maxWidth int, txt io.Reader) ([]Line, error) {
-	_, face := s.faceForFont(font)
-	return face.Layout(size, maxWidth, txt)
+	cache := s.lookup(font)
+	return cache.face.Layout(size, maxWidth, txt)
 }
 
 func (s *Cache) Shape(font Font, size fixed.Int26_6, layout []Glyph) op.CallOp {
-	_, face := s.faceForFont(font)
-	return face.Shape(size, layout)
+	cache := s.lookup(font)
+	return cache.face.Shape(size, layout)
 }
 
 func (s *Cache) LayoutString(font Font, size fixed.Int26_6, maxWidth int, str string) []Line {
-	cache, face := s.faceForFont(font)
-	return cache.layout(face, size, maxWidth, str)
+	cache := s.lookup(font)
+	return cache.layout(size, maxWidth, str)
 }
 
 func (s *Cache) ShapeString(font Font, size fixed.Int26_6, str string, layout []Glyph) op.CallOp {
-	cache, face := s.faceForFont(font)
-	return cache.shape(face, size, str, layout)
+	cache := s.lookup(font)
+	return cache.shape(size, str, layout)
 }
 
 func (s *Cache) Metrics(font Font, size fixed.Int26_6) font.Metrics {
-	cache, face := s.faceForFont(font)
-	return cache.metrics(face, size)
+	cache := s.lookup(font)
+	return cache.metrics(size)
 }
 
-func (s *Cache) faceForFont(font Font) (*faceCache, Face) {
-	var f Face
-	font, f = s.col.Lookup(font)
-	cache, exists := s.faces[font]
-	if !exists {
-		cache = new(faceCache)
-		s.faces[font] = cache
-	}
-	return cache, f
-}
-
-func (t *faceCache) layout(face Face, ppem fixed.Int26_6, maxWidth int, str string) []Line {
-	if t == nil {
+func (f *faceCache) layout(ppem fixed.Int26_6, maxWidth int, str string) []Line {
+	if f == nil {
 		return nil
 	}
 	lk := layoutKey{
@@ -148,30 +134,30 @@ func (t *faceCache) layout(face Face, ppem fixed.Int26_6, maxWidth int, str stri
 		maxWidth: maxWidth,
 		str:      str,
 	}
-	if l, ok := t.layoutCache.Get(lk); ok {
+	if l, ok := f.layoutCache.Get(lk); ok {
 		return l
 	}
-	l, _ := face.Layout(ppem, maxWidth, strings.NewReader(str))
-	t.layoutCache.Put(lk, l)
+	l, _ := f.face.Layout(ppem, maxWidth, strings.NewReader(str))
+	f.layoutCache.Put(lk, l)
 	return l
 }
 
-func (t *faceCache) shape(face Face, ppem fixed.Int26_6, str string, layout []Glyph) op.CallOp {
-	if t == nil {
+func (f *faceCache) shape(ppem fixed.Int26_6, str string, layout []Glyph) op.CallOp {
+	if f == nil {
 		return op.CallOp{}
 	}
 	pk := pathKey{
 		ppem: ppem,
 		str:  str,
 	}
-	if clip, ok := t.pathCache.Get(pk); ok {
+	if clip, ok := f.pathCache.Get(pk); ok {
 		return clip
 	}
-	clip := face.Shape(ppem, layout)
-	t.pathCache.Put(pk, clip)
+	clip := f.face.Shape(ppem, layout)
+	f.pathCache.Put(pk, clip)
 	return clip
 }
 
-func (t *faceCache) metrics(face Face, ppem fixed.Int26_6) font.Metrics {
-	return face.Metrics(ppem)
+func (f *faceCache) metrics(ppem fixed.Int26_6) font.Metrics {
+	return f.face.Metrics(ppem)
 }

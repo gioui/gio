@@ -29,35 +29,36 @@ import (
 
 var (
 	once       sync.Once
-	collection *text.Collection
+	collection []text.FontFace
 )
 
-func Collection() *text.Collection {
+func Collection() []text.FontFace {
 	once.Do(func() {
-		c := new(text.Collection)
-		register(c, text.Font{}, goregular.TTF)
-		register(c, text.Font{Style: text.Italic}, goitalic.TTF)
-		register(c, text.Font{Weight: text.Bold}, gobold.TTF)
-		register(c, text.Font{Style: text.Italic, Weight: text.Bold}, gobolditalic.TTF)
-		register(c, text.Font{Weight: text.Medium}, gomedium.TTF)
-		register(c, text.Font{Weight: text.Medium, Style: text.Italic}, gomediumitalic.TTF)
-		register(c, text.Font{Variant: "Mono"}, gomono.TTF)
-		register(c, text.Font{Variant: "Mono", Weight: text.Bold}, gomonobold.TTF)
-		register(c, text.Font{Variant: "Mono", Weight: text.Bold, Style: text.Italic}, gomonobolditalic.TTF)
-		register(c, text.Font{Variant: "Mono", Style: text.Italic}, gomonoitalic.TTF)
-		register(c, text.Font{Variant: "Mono", Style: text.Italic}, gomonoitalic.TTF)
-		register(c, text.Font{Variant: "Smallcaps"}, gosmallcaps.TTF)
-		register(c, text.Font{Variant: "Smallcaps", Style: text.Italic}, gosmallcapsitalic.TTF)
-		collection = c
+		register(text.Font{}, goregular.TTF)
+		register(text.Font{Style: text.Italic}, goitalic.TTF)
+		register(text.Font{Weight: text.Bold}, gobold.TTF)
+		register(text.Font{Style: text.Italic, Weight: text.Bold}, gobolditalic.TTF)
+		register(text.Font{Weight: text.Medium}, gomedium.TTF)
+		register(text.Font{Weight: text.Medium, Style: text.Italic}, gomediumitalic.TTF)
+		register(text.Font{Variant: "Mono"}, gomono.TTF)
+		register(text.Font{Variant: "Mono", Weight: text.Bold}, gomonobold.TTF)
+		register(text.Font{Variant: "Mono", Weight: text.Bold, Style: text.Italic}, gomonobolditalic.TTF)
+		register(text.Font{Variant: "Mono", Style: text.Italic}, gomonoitalic.TTF)
+		register(text.Font{Variant: "Mono", Style: text.Italic}, gomonoitalic.TTF)
+		register(text.Font{Variant: "Smallcaps"}, gosmallcaps.TTF)
+		register(text.Font{Variant: "Smallcaps", Style: text.Italic}, gosmallcapsitalic.TTF)
+		// Ensure that any outside appends will not reuse the backing store.
+		n := len(collection)
+		collection = collection[:n:n]
 	})
 	return collection
 }
 
-func register(c *text.Collection, fnt text.Font, ttf []byte) {
+func register(fnt text.Font, ttf []byte) {
 	face, err := opentype.Parse(ttf)
 	if err != nil {
-		panic(fmt.Sprintf("failed to parse font: %v", err))
+		panic(fmt.Errorf("failed to parse font: %v", err))
 	}
 	fnt.Typeface = "Go"
-	c.Register(fnt, face)
+	collection = append(collection, text.FontFace{Font: fnt, Face: face})
 }

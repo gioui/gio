@@ -29,9 +29,9 @@ type Theme struct {
 	radioUncheckedIcon    *widget.Icon
 }
 
-func NewTheme(col *text.Collection) *Theme {
+func NewTheme(fontCollection []text.FontFace) *Theme {
 	t := &Theme{
-		Shaper: text.NewCache(col),
+		Shaper: text.NewCache(fontCollection),
 	}
 	t.Color.Primary = rgb(0x3f51b5)
 	t.Color.Text = rgb(0x000000)
