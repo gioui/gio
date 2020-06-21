@@ -19,7 +19,7 @@ type Shaper interface {
 	// Shape a line of text and return a clipping operation for its outline.
 	Shape(font Font, size fixed.Int26_6, layout []Glyph) op.CallOp
 
-	// LayoutString is like Layout, but for strings..
+	// LayoutString is like Layout, but for strings.
 	LayoutString(font Font, size fixed.Int26_6, maxWidth int, str string) []Line
 	// ShapeString is like Shape for lines previously laid out by LayoutString.
 	ShapeString(font Font, size fixed.Int26_6, str string, layout []Glyph) op.CallOp
