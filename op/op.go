@@ -39,7 +39,7 @@ The StackOp saves the current state to the state stack and restores it later:
 	// Save the current state, in particular the transform.
 	stack := op.Push(ops)
 	// Apply a transform to subsequent operations.
-	op.TransformOp{}.Offset(...).Add(ops)
+	op.Offset(...).Add(ops)
 	...
 	// Restore the previous transform.
 	stack.Pop()
@@ -272,12 +272,6 @@ func Offset(o f32.Point) TransformOp {
 // Affine creates a TransformOp representing the transformation a.
 func Affine(a f32.Affine2D) TransformOp {
 	return TransformOp{t: a}
-}
-
-// Offset the transfomraiton.
-func (t TransformOp) Offset(o f32.Point) TransformOp {
-	t.t = t.t.Offset(o)
-	return t
 }
 
 func (t TransformOp) Add(o *Ops) {

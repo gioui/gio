@@ -136,7 +136,7 @@ func (in Inset) Layout(gtx Context, w Widget) Dimensions {
 		mcs.Min.Y = mcs.Max.Y
 	}
 	stack := op.Push(gtx.Ops)
-	op.TransformOp{}.Offset(FPt(image.Point{X: left, Y: top})).Add(gtx.Ops)
+	op.Offset(FPt(image.Point{X: left, Y: top})).Add(gtx.Ops)
 	gtx.Constraints = mcs
 	dims := w(gtx)
 	stack.Pop()
@@ -180,7 +180,7 @@ func (a Direction) Layout(gtx Context, w Widget) Dimensions {
 		p.Y = sz.Y - dims.Size.Y
 	}
 	stack := op.Push(gtx.Ops)
-	op.TransformOp{}.Offset(FPt(p)).Add(gtx.Ops)
+	op.Offset(FPt(p)).Add(gtx.Ops)
 	call.Add(gtx.Ops)
 	stack.Pop()
 	return Dimensions{

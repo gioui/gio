@@ -405,7 +405,7 @@ func (e *Editor) PaintText(gtx layout.Context) {
 	clip.Max = clip.Max.Add(e.viewSize)
 	for _, shape := range e.shapes {
 		stack := op.Push(gtx.Ops)
-		op.TransformOp{}.Offset(shape.offset).Add(gtx.Ops)
+		op.Offset(shape.offset).Add(gtx.Ops)
 		shape.clip.Add(gtx.Ops)
 		paint.PaintOp{Rect: layout.FRect(clip).Sub(shape.offset)}.Add(gtx.Ops)
 		stack.Pop()

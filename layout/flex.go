@@ -182,7 +182,7 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 			}
 		}
 		stack := op.Push(gtx.Ops)
-		op.TransformOp{}.Offset(FPt(axisPoint(f.Axis, mainSize, cross))).Add(gtx.Ops)
+		op.Offset(FPt(axisPoint(f.Axis, mainSize, cross))).Add(gtx.Ops)
 		child.call.Add(gtx.Ops)
 		stack.Pop()
 		mainSize += axisMain(f.Axis, dims.Size)

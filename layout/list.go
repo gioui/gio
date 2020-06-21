@@ -259,7 +259,7 @@ func (l *List) layout() Dimensions {
 		}
 		stack := op.Push(ops)
 		clip.Rect{Rect: FRect(r)}.Op(ops).Add(ops)
-		op.TransformOp{}.Offset(FPt(axisPoint(l.Axis, pos, cross))).Add(ops)
+		op.Offset(FPt(axisPoint(l.Axis, pos, cross))).Add(ops)
 		child.call.Add(ops)
 		stack.Pop()
 		pos += childSize

@@ -31,7 +31,7 @@ func TestTransformMacro(t *testing.T) {
 		paint.ColorOp{Color: colornames.Red}.Add(o)
 		// Simulate a draw text call
 		stack := op.Push(o)
-		op.TransformOp{}.Offset(f32.Pt(0, 10)).Add(o)
+		op.Offset(f32.Pt(0, 10)).Add(o)
 
 		// Actually create the text clip-path
 		c.Add(o)
@@ -43,11 +43,11 @@ func TestTransformMacro(t *testing.T) {
 
 		// Call each of them in a transform
 		s1 := op.Push(o)
-		op.TransformOp{}.Offset(f32.Pt(0, 0)).Add(o)
+		op.Offset(f32.Pt(0, 0)).Add(o)
 		c1.Add(o)
 		s1.Pop()
 		s2 := op.Push(o)
-		op.TransformOp{}.Offset(f32.Pt(0, 0)).Add(o)
+		op.Offset(f32.Pt(0, 0)).Add(o)
 		c2.Add(o)
 		s2.Pop()
 	}, func(r result) {
@@ -142,7 +142,7 @@ func TestReuseStencil(t *testing.T) {
 		stack1.Pop()
 
 		stack2 := op.Push(ops)
-		op.TransformOp{}.Offset(f32.Pt(0, 50)).Add(ops)
+		op.Offset(f32.Pt(0, 50)).Add(ops)
 		c2.Add(ops)
 		stack2.Pop()
 	}, func(r result) {
@@ -159,7 +159,7 @@ func TestBuildOffscreen(t *testing.T) {
 	txt := constSqCirc()
 	draw := func(off float32, o *op.Ops) {
 		s := op.Push(o)
-		op.TransformOp{}.Offset(f32.Pt(0, off)).Add(o)
+		op.Offset(f32.Pt(0, off)).Add(o)
 		txt.Add(o)
 		paint.PaintOp{Rect: f32.Rect(0, 0, 40, 40)}.Add(o)
 		s.Pop()

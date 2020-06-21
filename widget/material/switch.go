@@ -55,7 +55,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 		col = mulAlpha(col, 150)
 	}
 	trackColor := mulAlpha(col, 150)
-	op.TransformOp{}.Offset(f32.Point{Y: trackOff}).Add(gtx.Ops)
+	op.Offset(f32.Point{Y: trackOff}).Add(gtx.Ops)
 	clip.Rect{
 		Rect: trackRect,
 		NE:   trackCorner, NW: trackCorner, SE: trackCorner, SW: trackCorner,
@@ -72,7 +72,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 		X: float32(trackWidth)*.5 - rr,
 		Y: -rr + float32(trackHeight)*.5 + trackOff,
 	}
-	op.TransformOp{}.Offset(inkOff).Add(gtx.Ops)
+	op.Offset(inkOff).Add(gtx.Ops)
 	gtx.Constraints.Min = image.Pt(inkSize, inkSize)
 	clip.Rect{
 		Rect: f32.Rectangle{
@@ -89,7 +89,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	stack = op.Push(gtx.Ops)
 	if s.Switch.Value {
 		off := trackWidth - thumbSize
-		op.TransformOp{}.Offset(f32.Point{X: float32(off)}).Add(gtx.Ops)
+		op.Offset(f32.Point{X: float32(off)}).Add(gtx.Ops)
 	}
 
 	// Draw thumb shadow, a translucent disc slightly larger than the
@@ -97,7 +97,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	shadowStack := op.Push(gtx.Ops)
 	shadowSize := float32(2)
 	// Center shadow horizontally and slightly adjust its Y.
-	op.TransformOp{}.Offset(f32.Point{X: -shadowSize / 2, Y: -.75}).Add(gtx.Ops)
+	op.Offset(f32.Point{X: -shadowSize / 2, Y: -.75}).Add(gtx.Ops)
 	drawDisc(gtx.Ops, float32(thumbSize)+shadowSize, argb(0x55000000))
 	shadowStack.Pop()
 
@@ -112,7 +112,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 		X: (float32(trackWidth) - float32(clickSize)) * .5,
 		Y: (float32(trackHeight)-float32(clickSize))*.5 + trackOff,
 	}
-	op.TransformOp{}.Offset(clickOff).Add(gtx.Ops)
+	op.Offset(clickOff).Add(gtx.Ops)
 	sz := image.Pt(clickSize, clickSize)
 	pointer.Ellipse(image.Rectangle{Max: sz}).Add(gtx.Ops)
 	gtx.Constraints.Min = sz
