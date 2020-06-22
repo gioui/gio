@@ -411,7 +411,7 @@ func archiveIOS(tmpDir, target, frameworkRoot string, bi *buildInfo) error {
 			"-ldflags=-s -w "+bi.ldflags,
 			"-buildmode=c-archive",
 			"-o", lib,
-			"-tags", "ios",
+			"-tags", "ios "+bi.tags,
 			bi.pkg,
 		)
 		lipo.Args = append(lipo.Args, lib)

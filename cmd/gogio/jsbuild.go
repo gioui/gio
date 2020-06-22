@@ -22,6 +22,7 @@ func buildJS(bi *buildInfo) error {
 		"go",
 		"build",
 		"-ldflags="+bi.ldflags,
+		"-tags="+bi.tags,
 		"-o", filepath.Join(out, "main.wasm"),
 		bi.pkg,
 	)

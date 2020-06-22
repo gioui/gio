@@ -203,6 +203,7 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 			"build",
 			"-ldflags=-w -s "+bi.ldflags,
 			"-buildmode=c-shared",
+			"-tags", bi.tags,
 			"-o", libFile,
 			bi.pkg,
 		)

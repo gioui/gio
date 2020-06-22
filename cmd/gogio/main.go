@@ -33,12 +33,14 @@ var (
 	keepWorkdir   = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting.")
 	linkMode      = flag.String("linkmode", "", "set the -linkmode flag of the go tool")
 	extraLdflags  = flag.String("ldflags", "", "extra flags to the Go linker")
+	extraTags     = flag.String("tags", "", "extra tags to the Go tool")
 )
 
 type buildInfo struct {
 	name    string
 	pkg     string
 	ldflags string
+	tags    string
 	target  string
 	appID   string
 	version int
@@ -96,6 +98,7 @@ func mainErr() error {
 		dir:     dir,
 		version: *version,
 		minsdk:  *minsdk,
+		tags:    *extraTags,
 	}
 	if bi.appID == "" {
 		bi.appID = appIDFromPackage(pkgPath)

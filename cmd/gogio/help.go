@@ -34,6 +34,8 @@ and archive. Buildmode exe outputs an .ipa file for iOS or tvOS, an .apk file
 for Android or a directory with the WebAssembly module and support files for
 a browser.
 
+The -ldflags and -tags flags pass extra linker flags and tags to the go tool.
+
 As a special case for iOS or tvOS, specifying a path that ends with ".app"
 will output an app directory suitable for a simulator.
 
