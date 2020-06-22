@@ -41,7 +41,7 @@ __attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
 __attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
 __attribute__ ((visibility ("hidden"))) void gio_setNeedsDisplay(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) void gio_appTerminate(void);
-__attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height);
+__attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight);
 __attribute__ ((visibility ("hidden"))) void gio_makeKeyAndOrderFront(CFTypeRef windowRef);
 __attribute__ ((visibility ("hidden"))) NSPoint gio_cascadeTopLeftFromPoint(CFTypeRef windowRef, NSPoint topLeft);
 __attribute__ ((visibility ("hidden"))) void gio_close(CFTypeRef windowRef);
@@ -323,12 +323,21 @@ func NewWindow(win Callbacks, opts *Options) error {
 		// Window sizes is in unscaled screen coordinates, not device pixels.
 		width = int(float32(width) / screenScale)
 		height = int(float32(height) / screenScale)
+		minWidth := cfg.Px(opts.MinWidth)
+		minHeight := cfg.Px(opts.MinHeight)
+		minWidth = int(float32(minWidth) / screenScale)
+		minHeight = int(float32(minHeight) / screenScale)
+		maxWidth := cfg.Px(opts.MaxWidth)
+		maxHeight := cfg.Px(opts.MaxHeight)
+		maxWidth = int(float32(maxWidth) / screenScale)
+		maxHeight = int(float32(maxHeight) / screenScale)
 		title := C.CString(opts.Title)
 		defer C.free(unsafe.Pointer(title))
 		errch <- nil
 		win.SetDriver(w)
 		w.w = win
-		w.window = C.gio_createWindow(w.view, title, C.CGFloat(width), C.CGFloat(height))
+		w.window = C.gio_createWindow(w.view, title, C.CGFloat(width), C.CGFloat(height),
+			C.CGFloat(minWidth), C.CGFloat(minHeight), C.CGFloat(maxWidth), C.CGFloat(maxHeight))
 		if nextTopLeft.x == 0 && nextTopLeft.y == 0 {
 			// cascadeTopLeftFromPoint treats (0, 0) as a no-op,
 			// and just returns the offset we need for the first window.

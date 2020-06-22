@@ -124,7 +124,7 @@ void gio_makeKeyAndOrderFront(CFTypeRef windowRef) {
 	[window makeKeyAndOrderFront:nil];
 }
 
-CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height) {
+CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight) {
 	@autoreleasepool {
 		NSRect rect = NSMakeRect(0, 0, width, height);
 		NSUInteger styleMask = NSTitledWindowMask |
@@ -136,6 +136,12 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, 
 													   styleMask:styleMask
 														 backing:NSBackingStoreBuffered
 														   defer:NO];
+		if (minWidth > 0 || minHeight > 0) {
+			window.contentMinSize = NSMakeSize(minWidth, minHeight);
+		}
+		if (maxWidth > 0 || maxHeight > 0) {
+			window.contentMaxSize = NSMakeSize(maxWidth, maxHeight);
+		}
 		[window setAcceptsMouseMovedEvents:YES];
 		window.title = [NSString stringWithUTF8String: title];
 		NSView *view = (__bridge NSView *)viewRef;

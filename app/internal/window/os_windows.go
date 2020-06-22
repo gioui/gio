@@ -27,6 +27,16 @@ import (
 	"gioui.org/io/system"
 )
 
+type winConstraints struct {
+	minWidth, minHeight int32
+	maxWidth, maxHeight int32
+}
+
+type winDeltas struct {
+	width  int32
+	height int32
+}
+
 type window struct {
 	hwnd        syscall.Handle
 	hdc         syscall.Handle
@@ -39,6 +49,10 @@ type window struct {
 
 	mu        sync.Mutex
 	animating bool
+
+	minmax winConstraints
+	deltas winDeltas
+	opts   *Options
 }
 
 const _WM_REDRAW = windows.WM_USER + 0
@@ -137,6 +151,15 @@ func initResources() error {
 	return nil
 }
 
+func getWindowConstraints(cfg unit.Metric, opts *Options, d winDeltas) winConstraints {
+	var minmax winConstraints
+	minmax.minWidth = int32(cfg.Px(opts.MinWidth)) + d.width
+	minmax.minHeight = int32(cfg.Px(opts.MinHeight)) + d.height
+	minmax.maxWidth = int32(cfg.Px(opts.MaxWidth)) + d.width
+	minmax.maxHeight = int32(cfg.Px(opts.MaxHeight)) + d.height
+	return minmax
+}
+
 func createNativeWindow(opts *Options) (*window, error) {
 	var resErr error
 	resources.once.Do(func() {
@@ -152,7 +175,14 @@ func createNativeWindow(opts *Options) (*window, error) {
 	}
 	dwStyle := uint32(windows.WS_OVERLAPPEDWINDOW)
 	dwExStyle := uint32(windows.WS_EX_APPWINDOW | windows.WS_EX_WINDOWEDGE)
+	deltas := winDeltas{
+		width:  wr.Right,
+		height: wr.Bottom,
+	}
 	windows.AdjustWindowRectEx(&wr, dwStyle, 0, dwExStyle)
+	deltas.width = wr.Right - wr.Left - deltas.width
+	deltas.height = wr.Bottom - wr.Top - deltas.height
+
 	hwnd, err := windows.CreateWindowEx(dwExStyle,
 		resources.class,
 		opts.Title,
@@ -168,7 +198,10 @@ func createNativeWindow(opts *Options) (*window, error) {
 		return nil, err
 	}
 	w := &window{
-		hwnd: hwnd,
+		hwnd:   hwnd,
+		minmax: getWindowConstraints(cfg, opts, deltas),
+		deltas: deltas,
+		opts:   opts,
 	}
 	w.hdc, err = windows.GetDC(hwnd)
 	if err != nil {
@@ -250,6 +283,20 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			w.setStage(system.StagePaused)
 		case windows.SIZE_MAXIMIZED, windows.SIZE_RESTORED:
 			w.setStage(system.StageRunning)
+		}
+	case windows.WM_GETMINMAXINFO:
+		mm := (*windows.MinMaxInfo)(unsafe.Pointer(uintptr(lParam)))
+		if w.minmax.minWidth > 0 || w.minmax.minHeight > 0 {
+			mm.PtMinTrackSize = windows.Point{
+				w.minmax.minWidth,
+				w.minmax.minHeight,
+			}
+		}
+		if w.minmax.maxWidth > 0 || w.minmax.maxHeight > 0 {
+			mm.PtMaxTrackSize = windows.Point{
+				w.minmax.maxWidth,
+				w.minmax.maxHeight,
+			}
 		}
 	}
 
@@ -375,6 +422,7 @@ func (w *window) draw(sync bool) {
 		return
 	}
 	cfg := configForDC()
+	w.minmax = getWindowConstraints(cfg, w.opts, w.deltas)
 	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
 			Now: time.Now(),

@@ -427,4 +427,32 @@ func Size(w, h unit.Value) Option {
 	}
 }
 
+// MaxSize sets the maximum size of the window.
+func MaxSize(w, h unit.Value) Option {
+	if w.V <= 0 {
+		panic("width must be larger than or equal to 0")
+	}
+	if h.V <= 0 {
+		panic("height must be larger than or equal to 0")
+	}
+	return func(opts *window.Options) {
+		opts.MaxWidth = w
+		opts.MaxHeight = h
+	}
+}
+
+// MinSize sets the minimum size of the window.
+func MinSize(w, h unit.Value) Option {
+	if w.V <= 0 {
+		panic("width must be larger than or equal to 0")
+	}
+	if h.V <= 0 {
+		panic("height must be larger than or equal to 0")
+	}
+	return func(opts *window.Options) {
+		opts.MinWidth = w
+		opts.MinHeight = h
+	}
+}
+
 func (driverEvent) ImplementsEvent() {}

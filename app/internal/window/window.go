@@ -14,8 +14,10 @@ import (
 )
 
 type Options struct {
-	Width, Height unit.Value
-	Title         string
+	Width, Height       unit.Value
+	MinWidth, MinHeight unit.Value
+	MaxWidth, MaxHeight unit.Value
+	Title               string
 }
 
 type FrameEvent struct {

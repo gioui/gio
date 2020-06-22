@@ -514,6 +514,21 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	hints.flags = C.InputHint
 	C.XSetWMHints(dpy, win, &hints)
 
+	var shints C.XSizeHints
+	if opts.MinWidth.V != 0 || opts.MinHeight.V != 0 {
+		shints.min_width = C.int(cfg.Px(opts.MinWidth))
+		shints.min_height = C.int(cfg.Px(opts.MinHeight))
+		shints.flags = C.PMinSize
+	}
+	if opts.MaxWidth.V != 0 || opts.MaxHeight.V != 0 {
+		shints.max_width = C.int(cfg.Px(opts.MaxWidth))
+		shints.max_height = C.int(cfg.Px(opts.MaxHeight))
+		shints.flags = shints.flags | C.PMaxSize
+	}
+	if shints.flags != 0 {
+		C.XSetWMNormalHints(dpy, win, &shints)
+	}
+
 	name := C.CString(filepath.Base(os.Args[0]))
 	defer C.free(unsafe.Pointer(name))
 	wmhints := C.XClassHint{name, name}
