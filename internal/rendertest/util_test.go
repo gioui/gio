@@ -39,12 +39,9 @@ func init() {
 	squares = paint.NewImageOp(im)
 }
 
-func drawImage(size int, ops *op.Ops, draw func(o *op.Ops)) (im *image.RGBA, err error) {
+func drawImage(t *testing.T, size int, ops *op.Ops, draw func(o *op.Ops)) (im *image.RGBA, err error) {
 	sz := image.Point{X: size, Y: size}
-	w, err := headless.NewWindow(sz.X, sz.Y)
-	if err != nil {
-		return im, err
-	}
+	w := newWindow(t, sz.X, sz.Y)
 	draw(ops)
 	w.Frame(ops)
 	return w.Screenshot()
@@ -59,7 +56,7 @@ func run(t *testing.T, f func(o *op.Ops), c func(r result)) {
 	ops := new(op.Ops)
 	for i := 0; i < 3; i++ {
 		ops.Reset()
-		img, err = drawImage(128, ops, f)
+		img, err = drawImage(t, 128, ops, f)
 		if err != nil {
 			t.Error("error rendering:", err)
 			return
@@ -93,11 +90,7 @@ func multiRun(t *testing.T, frames ...frameT) {
 	var img *image.RGBA
 	var err error
 	sz := image.Point{X: 128, Y: 128}
-	w, err := headless.NewWindow(sz.X, sz.Y)
-	if err != nil {
-		t.Error("error creating window:", err)
-		t.FailNow()
-	}
+	w := newWindow(t, sz.X, sz.Y)
 	ops := new(op.Ops)
 	for i := range frames {
 		ops.Reset()
@@ -197,4 +190,12 @@ func saveImage(file string, img image.Image) error {
 		return err
 	}
 	return ioutil.WriteFile(file, buf.Bytes(), 0666)
+}
+
+func newWindow(t testing.TB, width, height int) *headless.Window {
+	w, err := headless.NewWindow(width, height)
+	if err != nil {
+		t.Skipf("failed to create headless window, skipping: %v", err)
+	}
+	return w
 }

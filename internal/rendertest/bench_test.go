@@ -25,10 +25,7 @@ var (
 
 func setupBenchmark(b *testing.B) (layout.Context, *headless.Window, *material.Theme) {
 	sz := image.Point{X: 1024, Y: 1200}
-	w, err := headless.NewWindow(sz.X, sz.Y)
-	if err != nil {
-		b.Error(err)
-	}
+	w := newWindow(b, sz.X, sz.Y)
 	ops := new(op.Ops)
 	gtx := layout.Context{
 		Ops:         ops,
