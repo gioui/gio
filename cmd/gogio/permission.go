@@ -16,7 +16,7 @@ var AndroidPermissions = map[string][]string{
 }
 
 var AndroidFeatures = map[string][]string{
-	"default": {`glEsVersion="0x00030000"`},
+	"default": {`glEsVersion="0x00030000"`, `name="android.hardware.type.pc"`},
 	"bluetooth": {
 		`name="android.hardware.bluetooth"`,
 		`name="android.hardware.bluetooth_le"`,

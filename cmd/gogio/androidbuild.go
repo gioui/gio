@@ -274,7 +274,6 @@ func archiveAndroid(tmpDir string, bi *buildInfo, perms []string) (err error) {
 	themesXML21.Write([]byte(themesV21))
 	permissions, features := getPermissions(perms)
 	// Disable input emulation on ChromeOS.
-	features = append(features, "android.hardware.type.pc")
 	manifest := aarw.Create("AndroidManifest.xml")
 	manifestSrc := manifestData{
 		AppID:       bi.appID,
