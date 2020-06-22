@@ -591,7 +591,15 @@ func findNDK(androidHome string) (string, error) {
 	if _, err := os.Stat(ndkBundle); err == nil {
 		return ndkBundle, nil
 	}
-	return "", fmt.Errorf("no NDK found in $ANDROID_HOME (%s). Use `sdkmanager ndk-bundle` to install it", androidHome)
+	// Certain non-standard NDK isntallations set the $ANDROID_NDK_ROOT
+	// environment variable
+	if ndkBundle, ok := os.LookupEnv("ANDROID_NDK_ROOT"); ok {
+		if _, err := os.Stat(ndkBundle); err == nil {
+			return ndkBundle, nil
+		}
+	}
+
+	return "", fmt.Errorf("no NDK found in $ANDROID_HOME (%s). Set $ANDROID_NDK_ROOT or use `sdkmanager ndk-bundle` to install the NDK", androidHome)
 }
 
 func findKeytool() (string, error) {
