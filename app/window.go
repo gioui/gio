@@ -211,7 +211,7 @@ func (w *Window) WriteClipboard(s string) {
 // Close the window. The window's event loop should exit when it receives
 // system.DestroyEvent.
 //
-// Currently, only macOS and Windows driver implements this functionality,
+// Currently, only macOS, Windows and X11 drivers implement this functionality,
 // all others are stubbed.
 func (w *Window) Close() {
 	w.driverDo(func() {

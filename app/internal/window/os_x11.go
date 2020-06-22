@@ -110,8 +110,23 @@ func (w *x11Window) WriteClipboard(s string) {
 
 func (w *x11Window) ShowTextInput(show bool) {}
 
-// Close the window. Not implemented for X11.
-func (w *x11Window) Close() {}
+// Close the window.
+func (w *x11Window) Close() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	ev := C.XClientMessageEvent{
+		_type:        C.ClientMessage,
+		display:      w.x,
+		window:       w.xw,
+		message_type: w.atom("WM_PROTOCOLS", true),
+		format:       32,
+	}
+	arr := (*[5]C.long)(unsafe.Pointer(&ev.data))
+	arr[0] = C.long(w.atoms.evDelWindow)
+	arr[1] = C.CurrentTime
+	C.XSendEvent(w.x, w.xw, C.False, C.NoEventMask, (*C.XEvent)(unsafe.Pointer(&ev)))
+}
 
 var x11OneByte = make([]byte, 1)
 
