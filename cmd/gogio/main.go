@@ -32,6 +32,7 @@ var (
 	printCommands = flag.Bool("x", false, "print the commands")
 	keepWorkdir   = flag.Bool("work", false, "print the name of the temporary work directory and do not delete it when exiting.")
 	linkMode      = flag.String("linkmode", "", "set the -linkmode flag of the go tool")
+	extraLdflags  = flag.String("ldflags", "", "extra flags to the Go linker")
 )
 
 type buildInfo struct {
@@ -100,6 +101,9 @@ func mainErr() error {
 		bi.appID = appIDFromPackage(pkgPath)
 	}
 	var ldflags []string
+	if extra := *extraLdflags; extra != "" {
+		ldflags = append(ldflags, strings.Split(extra, " ")...)
+	}
 	// Pass appID along, to be used for logging on platforms like Android.
 	ldflags = append(ldflags, fmt.Sprintf("-X gioui.org/app/internal/log.appID=%s", bi.appID))
 
