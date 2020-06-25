@@ -182,3 +182,15 @@ func TestBuildOffscreen(t *testing.T) {
 				r.expect(38, 38, colornames.White)
 			}))
 }
+
+func TestNegativeOverlaps(t *testing.T) {
+	run(t, func(ops *op.Ops) {
+		clip.Rect{Rect: f32.Rect(50, 50, 100, 100)}.Add(ops)
+		paint.PaintOp{Rect: f32.Rect(0, 120, 100, 122)}.Add(ops)
+	}, func(r result) {
+		r.expect(60, 60, colornames.White)
+		r.expect(60, 110, colornames.White)
+		r.expect(60, 120, colornames.White)
+		r.expect(60, 122, colornames.White)
+	})
+}

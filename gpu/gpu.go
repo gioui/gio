@@ -768,7 +768,7 @@ loop:
 			// the new bounding rectangle and the transformed original paint rectangle.
 			trans, off := splitTransform(state.t)
 			clipData, bnd, partialTrans := d.boundsForTransformedRect(op.Rect, trans)
-			clip := state.clip.Intersect(bnd.Add(off)).Canon()
+			clip := state.clip.Intersect(bnd.Add(off))
 			if clip.Empty() {
 				continue
 			}
