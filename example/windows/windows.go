@@ -6,6 +6,8 @@ package main
 
 import (
 	"log"
+	"os"
+	"sync/atomic"
 
 	"gioui.org/app"
 	"gioui.org/io/event"
@@ -31,12 +33,18 @@ func main() {
 	app.Main()
 }
 
+var windowCount int32
+
 func newWindow() {
+	atomic.AddInt32(&windowCount, +1)
 	go func() {
 		w := new(window)
 		w.Window = app.NewWindow()
 		if err := w.loop(w.Events()); err != nil {
 			log.Fatal(err)
+		}
+		if c := atomic.AddInt32(&windowCount, -1); c == 0 {
+			os.Exit(0)
 		}
 	}()
 }

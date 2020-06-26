@@ -68,6 +68,7 @@ func main() {
 	}()
 
 	go func() {
+		defer os.Exit(0)
 		w := app.NewWindow(app.Size(unit.Dp(800), unit.Dp(700)))
 		if err := loop(w); err != nil {
 			log.Fatal(err)

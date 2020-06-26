@@ -8,6 +8,7 @@ import (
 	"image/color"
 	"log"
 	"math"
+	"os"
 
 	"gioui.org/app"
 	"gioui.org/f32"
@@ -24,6 +25,7 @@ import (
 
 func main() {
 	go func() {
+		defer os.Exit(0)
 		w := app.NewWindow()
 		if err := loop(w); err != nil {
 			log.Fatal(err)

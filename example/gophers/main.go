@@ -60,6 +60,7 @@ func main() {
 			app.Size(unit.Dp(400), unit.Dp(800)),
 			app.Title("Gophers"),
 		)
+		defer os.Exit(0)
 		if err := newApp(w).run(); err != nil {
 			log.Fatal(err)
 		}
