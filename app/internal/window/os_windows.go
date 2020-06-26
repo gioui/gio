@@ -153,10 +153,10 @@ func initResources() error {
 
 func getWindowConstraints(cfg unit.Metric, opts *Options, d winDeltas) winConstraints {
 	var minmax winConstraints
-	minmax.minWidth = int32(cfg.Px(opts.MinWidth)) + d.width
-	minmax.minHeight = int32(cfg.Px(opts.MinHeight)) + d.height
-	minmax.maxWidth = int32(cfg.Px(opts.MaxWidth)) + d.width
-	minmax.maxHeight = int32(cfg.Px(opts.MaxHeight)) + d.height
+	minmax.minWidth = int32(cfg.Px(opts.MinWidth))
+	minmax.minHeight = int32(cfg.Px(opts.MinHeight))
+	minmax.maxWidth = int32(cfg.Px(opts.MaxWidth))
+	minmax.maxHeight = int32(cfg.Px(opts.MaxHeight))
 	return minmax
 }
 
@@ -288,14 +288,14 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		mm := (*windows.MinMaxInfo)(unsafe.Pointer(uintptr(lParam)))
 		if w.minmax.minWidth > 0 || w.minmax.minHeight > 0 {
 			mm.PtMinTrackSize = windows.Point{
-				w.minmax.minWidth,
-				w.minmax.minHeight,
+				w.minmax.minWidth+w.deltas.width,
+				w.minmax.minHeight+w.deltas.height,
 			}
 		}
 		if w.minmax.maxWidth > 0 || w.minmax.maxHeight > 0 {
 			mm.PtMaxTrackSize = windows.Point{
-				w.minmax.maxWidth,
-				w.minmax.maxHeight,
+				w.minmax.maxWidth+w.deltas.width,
+				w.minmax.maxHeight+w.deltas.height,
 			}
 		}
 	}
