@@ -163,6 +163,20 @@ func exeIOS(tmpDir, target, app string, bi *buildInfo) error {
 	const mainmSrc = `@import UIKit;
 @import Gio;
 
+@interface GioAppDelegate : UIResponder <UIApplicationDelegate>
+@property (strong, nonatomic) UIWindow *window;
+@end
+
+@implementation GioAppDelegate
+- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+	self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
+	GioViewController *controller = [[GioViewController alloc] initWithNibName:nil bundle:nil];
+	self.window.rootViewController = controller;
+	[self.window makeKeyAndVisible];
+	return YES;
+}
+@end
+
 int main(int argc, char * argv[]) {
 	@autoreleasepool {
 		return UIApplicationMain(argc, argv, nil, NSStringFromClass([GioAppDelegate class]));

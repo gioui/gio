@@ -2,7 +2,5 @@
 
 #include <UIKit/UIKit.h>
 
-@interface GioAppDelegate : UIResponder <UIApplicationDelegate>
-@property (strong, nonatomic) UIWindow *window;
+@interface GioViewController : UIViewController
 @end
-

@@ -11,30 +11,9 @@
 @interface GioView: UIView <UIKeyInput>
 @end
 
-@interface GioViewController : UIViewController
-@property(weak) UIScreen *screen;
-
-+ (UIWindow *)createWindow;
-@end
-
-@implementation GioAppDelegate
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-	self.window = [GioViewController createWindow];
-	[self.window makeKeyAndVisible];
-	return YES;
-}
-@end
-
 @implementation GioViewController
-CGFloat _keyboardHeight;
 
-+ (UIWindow *)createWindow {
-	UIWindow *window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
-	GioViewController *controller = [[self alloc] initWithNibName:nil bundle:nil];
-	controller.screen = window.screen;
-	window.rootViewController = controller;
-	return window;
-}
+CGFloat _keyboardHeight;
 
 - (void)loadView {
 	gio_runMain();
@@ -47,7 +26,6 @@ CGFloat _keyboardHeight;
 #ifndef TARGET_OS_TV
 	drawView.multipleTouchEnabled = YES;
 #endif
-	drawView.contentScaleFactor = self.screen.nativeScale;
 	drawView.preservesSuperviewLayoutMargins = YES;
 	drawView.layoutMargins = UIEdgeInsetsMake(0, 0, 0, 0);
 	onCreate((__bridge CFTypeRef)drawView);
@@ -156,6 +134,7 @@ NSArray<UIKeyCommand *> *_keyCommands;
 														name:UIWindowDidResignKeyNotification
 													  object:self.window];
 	}
+	self.contentScaleFactor = newWindow.screen.nativeScale;
 	[[NSNotificationCenter defaultCenter] addObserver:self
 											 selector:@selector(onWindowDidBecomeKey:)
 												 name:UIWindowDidBecomeKeyNotification
