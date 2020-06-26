@@ -35,8 +35,10 @@ func DataDir() (string, error) {
 	return dataDir()
 }
 
-// Main must be called from the program main function. It
-// blocks until there are no more windows active.
+// Main must be called last from the program main function.
+// On most platforms Main blocks forever, for Android and
+// iOS it returns immediately to give control of the main
+// thread back to the system.
 //
 // Calling Main is necessary because some operating systems
 // require control of the main thread of the program for

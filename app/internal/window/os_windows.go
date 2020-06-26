@@ -57,10 +57,6 @@ type window struct {
 
 const _WM_REDRAW = windows.WM_USER + 0
 
-// windowCounter keeps track of the number of windows.
-// A send of +1 or -1 represents a change in window count.
-var windowCounter = make(chan int)
-
 type gpuAPI struct {
 	priority    int
 	initializer func(w *window) (Context, error)
@@ -84,11 +80,7 @@ var resources struct {
 }
 
 func Main() {
-	// Wait for first window
-	count := <-windowCounter
-	for count > 0 {
-		count += <-windowCounter
-	}
+	select {}
 }
 
 func NewWindow(window Callbacks, opts *Options) error {
@@ -104,11 +96,7 @@ func NewWindow(window Callbacks, opts *Options) error {
 		defer w.destroy()
 		cerr <- nil
 		winMap.Store(w.hwnd, w)
-		windowCounter <- +1
-		defer func() {
-			winMap.Delete(w.hwnd)
-			windowCounter <- -1
-		}()
+		defer winMap.Delete(w.hwnd)
 		w.w = window
 		w.w.SetDriver(w)
 		defer w.w.Event(system.DestroyEvent{})

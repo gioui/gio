@@ -36,8 +36,6 @@ type window struct {
 	animating bool
 }
 
-var mainDone = make(chan struct{})
-
 func NewWindow(win Callbacks, opts *Options) error {
 	doc := js.Global().Get("document")
 	cont := getContainer(doc)
@@ -70,7 +68,6 @@ func NewWindow(win Callbacks, opts *Options) error {
 		w.draw(true)
 		select {}
 		w.cleanup()
-		close(mainDone)
 	}()
 	return nil
 }
@@ -449,7 +446,7 @@ func (w *window) config() (int, int, float32, unit.Metric) {
 }
 
 func Main() {
-	<-mainDone
+	select {}
 }
 
 func translateKey(k string) (string, bool) {

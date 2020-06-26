@@ -576,12 +576,7 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	// make the window visible on the screen
 	C.XMapWindow(dpy, win)
 
-	// Increment window counter.
-	windowCounter <- +1
 	go func() {
-		defer func() {
-			windowCounter <- -1
-		}()
 		w.w.SetDriver(w)
 		w.setStage(system.StageRunning)
 		w.loop()

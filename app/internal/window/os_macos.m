@@ -153,12 +153,6 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, 
 	}
 }
 
-void gio_appTerminate(void) {
-	@autoreleasepool {
-		[NSApp terminate:nil];
-	}
-}
-
 void gio_close(CFTypeRef windowRef) {
   NSWindow* window = (__bridge NSWindow *)windowRef;
   [window performClose:nil];

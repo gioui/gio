@@ -40,7 +40,6 @@ __attribute__ ((visibility ("hidden"))) CGFloat gio_getScreenBackingScale(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
 __attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
 __attribute__ ((visibility ("hidden"))) void gio_setNeedsDisplay(CFTypeRef viewRef);
-__attribute__ ((visibility ("hidden"))) void gio_appTerminate(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight);
 __attribute__ ((visibility ("hidden"))) void gio_makeKeyAndOrderFront(CFTypeRef windowRef);
 __attribute__ ((visibility ("hidden"))) NSPoint gio_cascadeTopLeftFromPoint(CFTypeRef windowRef, NSPoint topLeft);
@@ -271,9 +270,6 @@ func gio_onClose(view C.CFTypeRef) {
 	w.view = 0
 	C.CFRelease(w.window)
 	w.window = 0
-	if len(viewMap) == 0 {
-		C.gio_appTerminate()
-	}
 }
 
 //export gio_onHide
