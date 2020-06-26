@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"gioui.org/op"
-	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -50,7 +49,6 @@ type Font struct {
 type Face interface {
 	Layout(ppem fixed.Int26_6, maxWidth int, txt io.Reader) ([]Line, error)
 	Shape(ppem fixed.Int26_6, str []Glyph) op.CallOp
-	Metrics(ppem fixed.Int26_6) font.Metrics
 }
 
 // Typeface identifies a particular typeface design. The empty

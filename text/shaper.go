@@ -6,8 +6,6 @@ import (
 	"io"
 	"strings"
 
-	"golang.org/x/image/font"
-
 	"gioui.org/op"
 	"golang.org/x/image/math/fixed"
 )
@@ -23,9 +21,6 @@ type Shaper interface {
 	LayoutString(font Font, size fixed.Int26_6, maxWidth int, str string) []Line
 	// ShapeString is like Shape for lines previously laid out by LayoutString.
 	ShapeString(font Font, size fixed.Int26_6, str string, layout []Glyph) op.CallOp
-
-	// Metrics returns the font metrics for font.
-	Metrics(font Font, size fixed.Int26_6) font.Metrics
 }
 
 // A FontFace is a Font and a matching Face.
@@ -120,11 +115,6 @@ func (s *Cache) ShapeString(font Font, size fixed.Int26_6, str string, layout []
 	return cache.shape(size, str, layout)
 }
 
-func (s *Cache) Metrics(font Font, size fixed.Int26_6) font.Metrics {
-	cache := s.lookup(font)
-	return cache.metrics(size)
-}
-
 func (f *faceCache) layout(ppem fixed.Int26_6, maxWidth int, str string) []Line {
 	if f == nil {
 		return nil
@@ -156,8 +146,4 @@ func (f *faceCache) shape(ppem fixed.Int26_6, str string, layout []Glyph) op.Cal
 	clip := f.face.Shape(ppem, layout)
 	f.pathCache.Put(pk, clip)
 	return clip
-}
-
-func (f *faceCache) metrics(ppem fixed.Int26_6) font.Metrics {
-	return f.face.Metrics(ppem)
 }
