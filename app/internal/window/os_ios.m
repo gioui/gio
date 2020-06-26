@@ -13,45 +13,32 @@
 
 @interface GioViewController : UIViewController
 @property(weak) UIScreen *screen;
+
++ (UIWindow *)createWindow;
 @end
 
 @implementation GioAppDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-	gio_runMain();
-
-	self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
-	GioViewController *controller = [[GioViewController alloc] initWithNibName:nil bundle:nil];
-	controller.screen = self.window.screen;
-    self.window.rootViewController = controller;
-    [self.window makeKeyAndVisible];
+	self.window = [GioViewController createWindow];
+	[self.window makeKeyAndVisible];
 	return YES;
-}
-
-- (void)applicationWillResignActive:(UIApplication *)application {
-}
-
-- (void)applicationDidEnterBackground:(UIApplication *)application {
-	GioViewController *vc = (GioViewController *)self.window.rootViewController;
-	UIView *drawView = vc.view.subviews[0];
-	if (drawView != nil) {
-		onStop((__bridge CFTypeRef)drawView);
-	}
-}
-
-- (void)applicationWillEnterForeground:(UIApplication *)application {
-	GioViewController *c = (GioViewController*)self.window.rootViewController;
-	UIView *drawView = c.view.subviews[0];
-	if (drawView != nil) {
-		CFTypeRef viewRef = (__bridge CFTypeRef)drawView;
-		gio_onDraw(viewRef);
-	}
 }
 @end
 
 @implementation GioViewController
 CGFloat _keyboardHeight;
 
++ (UIWindow *)createWindow {
+	UIWindow *window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
+	GioViewController *controller = [[self alloc] initWithNibName:nil bundle:nil];
+	controller.screen = window.screen;
+	window.rootViewController = controller;
+	return window;
+}
+
 - (void)loadView {
+	gio_runMain();
+
 	CGRect zeroFrame = CGRectMake(0, 0, 0, 0);
 	self.view = [[UIView alloc] initWithFrame:zeroFrame];
 	self.view.layoutMargins = UIEdgeInsetsMake(0, 0, 0, 0);
@@ -76,6 +63,28 @@ CGFloat _keyboardHeight;
 											 selector:@selector(keyboardWillHide:)
 												 name:UIKeyboardWillHideNotification
 											   object:nil];
+	[[NSNotificationCenter defaultCenter] addObserver: self
+											 selector: @selector(applicationDidEnterBackground:)
+												 name: UIApplicationDidEnterBackgroundNotification
+											   object: nil];
+	[[NSNotificationCenter defaultCenter] addObserver: self
+											 selector: @selector(applicationWillEnterForeground:)
+												 name: UIApplicationWillEnterForegroundNotification
+											   object: nil];
+}
+
+- (void)applicationWillEnterForeground:(UIApplication *)application {
+	UIView *drawView = self.view.subviews[0];
+	if (drawView != nil) {
+		gio_onDraw((__bridge CFTypeRef)drawView);
+	}
+}
+
+- (void)applicationDidEnterBackground:(UIApplication *)application {
+	UIView *drawView = self.view.subviews[0];
+	if (drawView != nil) {
+		onStop((__bridge CFTypeRef)drawView);
+	}
 }
 
 - (void)viewDidDisappear:(BOOL)animated {

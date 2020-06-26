@@ -309,3 +309,8 @@ func NewWindow(win Callbacks, opts *Options) error {
 
 func Main() {
 }
+
+//export gio_runMain
+func gio_runMain() {
+	runMain()
+}
