@@ -115,7 +115,9 @@ func (w *x11Window) Close() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	ev := C.XClientMessageEvent{
+	var xev C.XEvent
+	ev := (*C.XClientMessageEvent)(unsafe.Pointer(&xev))
+	*ev = C.XClientMessageEvent{
 		_type:        C.ClientMessage,
 		display:      w.x,
 		window:       w.xw,
@@ -125,7 +127,7 @@ func (w *x11Window) Close() {
 	arr := (*[5]C.long)(unsafe.Pointer(&ev.data))
 	arr[0] = C.long(w.atoms.evDelWindow)
 	arr[1] = C.CurrentTime
-	C.XSendEvent(w.x, w.xw, C.False, C.NoEventMask, (*C.XEvent)(unsafe.Pointer(&ev)))
+	C.XSendEvent(w.x, w.xw, C.False, C.NoEventMask, &xev)
 }
 
 var x11OneByte = make([]byte, 1)
@@ -400,7 +402,9 @@ func (h *x11EventHandler) handleEvents() bool {
 				break
 			}
 			notify := func() {
-				nev := C.XSelectionEvent{
+				var xev C.XEvent
+				ev := (*C.XSelectionEvent)(unsafe.Pointer(&xev))
+				*ev = C.XSelectionEvent{
 					_type:     C.SelectionNotify,
 					display:   cevt.display,
 					requestor: cevt.requestor,
@@ -409,7 +413,7 @@ func (h *x11EventHandler) handleEvents() bool {
 					property:  cevt.property,
 					time:      cevt.time,
 				}
-				C.XSendEvent(w.x, cevt.requestor, 0, 0, (*C.XEvent)(unsafe.Pointer(&nev)))
+				C.XSendEvent(w.x, cevt.requestor, 0, 0, &xev)
 			}
 			switch cevt.target {
 			case w.atoms.targets:
