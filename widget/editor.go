@@ -3,6 +3,7 @@
 package widget
 
 import (
+	"bufio"
 	"image"
 	"io"
 	"math"
@@ -172,15 +173,16 @@ func (e *Editor) processEvents(gtx layout.Context) {
 }
 
 func (e *Editor) makeValid() {
-	if !e.valid {
-		e.lines, e.dims = e.layoutText(e.shaper)
-		line, col, x, y := e.layoutCaret()
-		e.caret.line = line
-		e.caret.col = col
-		e.caret.x = x
-		e.caret.y = y
-		e.valid = true
+	if e.valid {
+		return
 	}
+	e.lines, e.dims = e.layoutText(e.shaper)
+	line, col, x, y := e.layoutCaret()
+	e.caret.line = line
+	e.caret.col = col
+	e.caret.x = x
+	e.caret.y = y
+	e.valid = true
 }
 
 func (e *Editor) processPointer(gtx layout.Context) {
@@ -530,7 +532,12 @@ func (e *Editor) layoutText(s text.Shaper) ([]text.Line, layout.Dimensions) {
 		e.maskReader.Reset(&e.rr, e.Mask)
 		r = &e.maskReader
 	}
-	lines, _ := s.Layout(e.font, e.textSize, e.maxWidth, r)
+	var lines []text.Line
+	if s != nil {
+		lines, _ = s.Layout(e.font, e.textSize, e.maxWidth, r)
+	} else {
+		lines, _ = nullLayout(r)
+	}
 	dims := linesDimens(lines)
 	for i := 0; i < len(lines)-1; i++ {
 		// To avoid layout flickering while editing, assume a soft newline takes
@@ -797,6 +804,28 @@ func (e *Editor) scrollToCaret() {
 func (e *Editor) NumLines() int {
 	e.makeValid()
 	return len(e.lines)
+}
+
+func nullLayout(r io.Reader) ([]text.Line, error) {
+	var layout []text.Glyph
+	rr := bufio.NewReader(r)
+	var rerr error
+	var n int
+	for {
+		r, s, err := rr.ReadRune()
+		n += s
+		layout = append(layout, text.Glyph{Rune: r})
+		if err != nil {
+			rerr = err
+			break
+		}
+	}
+	return []text.Line{
+		{
+			Layout: layout,
+			Len:    n,
+		},
+	}, rerr
 }
 
 func (s ChangeEvent) isEditorEvent() {}

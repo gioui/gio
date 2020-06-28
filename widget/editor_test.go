@@ -155,6 +155,12 @@ func TestEditorCaretConsistency(t *testing.T) {
 	}
 }
 
+func TestEditorNoLayout(t *testing.T) {
+	var e Editor
+	e.SetText("hi!\n")
+	e.Move(1)
+}
+
 // Generate generates a value of itself, for testing/quick.
 func (editMutation) Generate(rand *rand.Rand, size int) reflect.Value {
 	t := editMutation(rand.Intn(int(moveLast)))
