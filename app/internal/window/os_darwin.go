@@ -133,9 +133,7 @@ func (d *displayLink) run(dl C.CFTypeRef) {
 				atomic.StoreUint32(&d.running, 1)
 				if !started {
 					started = true
-					if res := C.gio_startDisplayLink(dl); res != 0 {
-						panic("failed to start display link")
-					}
+					C.gio_startDisplayLink(dl)
 				}
 			}
 		case did := <-d.dids:
