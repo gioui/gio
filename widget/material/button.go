@@ -34,7 +34,6 @@ type ButtonStyle struct {
 type ButtonLayoutStyle struct {
 	Background   color.RGBA
 	CornerRadius unit.Value
-	Inset        layout.Inset
 	Button       *widget.Clickable
 }
 
@@ -70,7 +69,6 @@ func ButtonLayout(th *Theme, button *widget.Clickable) ButtonLayoutStyle {
 		Button:       button,
 		Background:   th.Color.Primary,
 		CornerRadius: unit.Dp(4),
-		Inset:        layout.UniformInset(unit.Dp(12)),
 	}
 }
 
@@ -110,11 +108,12 @@ func (b ButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 	return ButtonLayoutStyle{
 		Background:   b.Background,
 		CornerRadius: b.CornerRadius,
-		Inset:        b.Inset,
 		Button:       b.Button,
 	}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		paint.ColorOp{Color: b.Color}.Add(gtx.Ops)
-		return widget.Label{Alignment: text.Middle}.Layout(gtx, b.shaper, b.Font, b.TextSize, b.Text)
+		return b.Inset.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			paint.ColorOp{Color: b.Color}.Add(gtx.Ops)
+			return widget.Label{Alignment: text.Middle}.Layout(gtx, b.shaper, b.Font, b.TextSize, b.Text)
+		})
 	})
 }
 
@@ -142,9 +141,7 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 		}),
 		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			gtx.Constraints.Min = min
-			return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				return b.Inset.Layout(gtx, w)
-			})
+			return layout.Center.Layout(gtx, w)
 		}),
 		layout.Expanded(b.Button.Layout),
 	)
