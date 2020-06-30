@@ -209,32 +209,34 @@ type (
 
 func (b iconAndTextButton) Layout(gtx layout.Context) layout.Dimensions {
 	return material.ButtonLayout(b.theme, b.button).Layout(gtx, func(gtx C) D {
-		iconAndLabel := layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}
-		textIconSpacer := unit.Dp(5)
+		return layout.UniformInset(unit.Dp(12)).Layout(gtx, func(gtx C) D {
+			iconAndLabel := layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}
+			textIconSpacer := unit.Dp(5)
 
-		layIcon := layout.Rigid(func(gtx C) D {
-			return layout.Inset{Right: textIconSpacer}.Layout(gtx, func(gtx C) D {
-				var d D
-				if icon != nil {
-					size := gtx.Px(unit.Dp(56)) - 2*gtx.Px(unit.Dp(16))
-					b.icon.Layout(gtx, unit.Px(float32(size)))
-					d = layout.Dimensions{
-						Size: image.Point{X: size, Y: size},
+			layIcon := layout.Rigid(func(gtx C) D {
+				return layout.Inset{Right: textIconSpacer}.Layout(gtx, func(gtx C) D {
+					var d D
+					if icon != nil {
+						size := gtx.Px(unit.Dp(56)) - 2*gtx.Px(unit.Dp(16))
+						b.icon.Layout(gtx, unit.Px(float32(size)))
+						d = layout.Dimensions{
+							Size: image.Point{X: size, Y: size},
+						}
 					}
-				}
-				return d
+					return d
+				})
 			})
-		})
 
-		layLabel := layout.Rigid(func(gtx C) D {
-			return layout.Inset{Left: textIconSpacer}.Layout(gtx, func(gtx C) D {
-				l := material.Body1(b.theme, b.word)
-				l.Color = b.theme.Color.InvText
-				return l.Layout(gtx)
+			layLabel := layout.Rigid(func(gtx C) D {
+				return layout.Inset{Left: textIconSpacer}.Layout(gtx, func(gtx C) D {
+					l := material.Body1(b.theme, b.word)
+					l.Color = b.theme.Color.InvText
+					return l.Layout(gtx)
+				})
 			})
-		})
 
-		return iconAndLabel.Layout(gtx, layIcon, layLabel)
+			return iconAndLabel.Layout(gtx, layIcon, layLabel)
+		})
 	})
 }
 
