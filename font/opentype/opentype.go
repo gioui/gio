@@ -19,10 +19,10 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-// Font implements text.Face.
+// Font implements text.Face. It's methods are safe to use
+// concurrently.
 type Font struct {
 	font *sfnt.Font
-	buf  sfnt.Buffer
 }
 
 // Collection is a collection of one or more fonts.
@@ -90,16 +90,19 @@ func (f *Font) Layout(ppem fixed.Int26_6, maxWidth int, txt io.Reader) ([]text.L
 	if err != nil {
 		return nil, err
 	}
-	return layoutText(&f.buf, ppem, maxWidth, &opentype{Font: f.font, Hinting: font.HintingFull}, glyphs)
+	var buf sfnt.Buffer
+	return layoutText(&buf, ppem, maxWidth, &opentype{Font: f.font, Hinting: font.HintingFull}, glyphs)
 }
 
 func (f *Font) Shape(ppem fixed.Int26_6, str []text.Glyph) op.CallOp {
-	return textPath(&f.buf, ppem, &opentype{Font: f.font, Hinting: font.HintingFull}, str)
+	var buf sfnt.Buffer
+	return textPath(&buf, ppem, &opentype{Font: f.font, Hinting: font.HintingFull}, str)
 }
 
 func (f *Font) Metrics(ppem fixed.Int26_6) font.Metrics {
 	o := &opentype{Font: f.font, Hinting: font.HintingFull}
-	return o.Metrics(&f.buf, ppem)
+	var buf sfnt.Buffer
+	return o.Metrics(&buf, ppem)
 }
 
 func layoutText(sbuf *sfnt.Buffer, ppem fixed.Int26_6, maxWidth int, f *opentype, glyphs []text.Glyph) ([]text.Line, error) {
