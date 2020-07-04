@@ -70,8 +70,6 @@ func (c *Context) Release() {
 	c.ReleaseSurface()
 	if c.eglCtx != nil {
 		eglDestroyContext(c.disp, c.eglCtx.ctx)
-		eglTerminate(c.disp)
-		eglReleaseThread()
 		c.eglCtx = nil
 	}
 	c.disp = nilEGLDisplay
