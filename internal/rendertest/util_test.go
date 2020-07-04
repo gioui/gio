@@ -197,5 +197,6 @@ func newWindow(t testing.TB, width, height int) *headless.Window {
 	if err != nil {
 		t.Skipf("failed to create headless window, skipping: %v", err)
 	}
+	t.Cleanup(w.Release)
 	return w
 }
