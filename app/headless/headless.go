@@ -96,12 +96,12 @@ func (w *Window) Release() {
 			w.gpu.Release()
 			w.gpu = nil
 		}
-		if w.ctx != nil {
-			w.ctx.Release()
-			w.ctx = nil
-		}
 		return nil
 	})
+	if w.ctx != nil {
+		w.ctx.Release()
+		w.ctx = nil
+	}
 }
 
 // Frame replace the window content and state with the
