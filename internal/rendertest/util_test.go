@@ -44,7 +44,9 @@ func drawImage(t *testing.T, size int, ops *op.Ops, draw func(o *op.Ops)) (im *i
 	sz := image.Point{X: size, Y: size}
 	w := newWindow(t, sz.X, sz.Y)
 	draw(ops)
-	w.Frame(ops)
+	if err := w.Frame(ops); err != nil {
+		return nil, err
+	}
 	return w.Screenshot()
 }
 
@@ -100,13 +102,16 @@ func multiRun(t *testing.T, frames ...frameT) {
 	for i := range frames {
 		ops.Reset()
 		frames[i].f(ops)
-		w.Frame(ops)
+		if err := w.Frame(ops); err != nil {
+			t.Errorf("rendering failed: %v", err)
+			continue
+		}
 		img, err = w.Screenshot()
 		if err != nil {
-			t.Error("error rendering:", err)
-			return
+			t.Errorf("screenshot failed: %v", err)
+			continue
 		}
-		// check for a reference image and make sure we are identical.
+		// Check for a reference image and make sure they are identical.
 		ok := verifyRef(t, img, i)
 		if frames[i].c != nil {
 			frames[i].c(result{t: t, img: img})

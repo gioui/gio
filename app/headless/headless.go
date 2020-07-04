@@ -106,8 +106,8 @@ func (w *Window) Release() {
 
 // Frame replace the window content and state with the
 // operation list.
-func (w *Window) Frame(frame *op.Ops) {
-	contextDo(w.ctx, func() error {
+func (w *Window) Frame(frame *op.Ops) error {
+	return contextDo(w.ctx, func() error {
 		w.gpu.Collect(w.size, frame)
 		w.gpu.BeginFrame()
 		w.gpu.EndFrame()

@@ -26,7 +26,9 @@ func TestHeadless(t *testing.T) {
 		X: float32(sz.X) - 100,
 		Y: float32(sz.Y) - 100,
 	}}}.Add(&ops)
-	w.Frame(&ops)
+	if err := w.Frame(&ops); err != nil {
+		t.Fatal(err)
+	}
 
 	img, err := w.Screenshot()
 	if err != nil {
@@ -70,7 +72,9 @@ func TestClipping(t *testing.T) {
 		NW: 75,
 	}.Op(&ops).Add(&ops)
 	pop.Add(&ops)
-	w.Frame(&ops)
+	if err := w.Frame(&ops); err != nil {
+		t.Fatal(err)
+	}
 
 	img, err := w.Screenshot()
 	if err != nil {
@@ -113,7 +117,9 @@ func TestDepth(t *testing.T) {
 	paint.PaintOp{Rect: f32.Rectangle{
 		Max: f32.Point{X: 100, Y: 50},
 	}}.Add(&ops)
-	w.Frame(&ops)
+	if err := w.Frame(&ops); err != nil {
+		t.Fatal(err)
+	}
 
 	img, err := w.Screenshot()
 	if err != nil {
