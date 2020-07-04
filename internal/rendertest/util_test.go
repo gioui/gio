@@ -3,6 +3,7 @@ package rendertest
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -50,7 +51,6 @@ func drawImage(t *testing.T, size int, ops *op.Ops, draw func(o *op.Ops)) (im *i
 func run(t *testing.T, f func(o *op.Ops), c func(r result)) {
 	// draw a few times and check that it is correct each time, to
 	// ensure any caching effects still generate the correct images.
-	ok := true
 	var img *image.RGBA
 	var err error
 	ops := new(op.Ops)
@@ -62,11 +62,16 @@ func run(t *testing.T, f func(o *op.Ops), c func(r result)) {
 			return
 		}
 		// check for a reference image and make sure we are identical.
-		ok = ok && verifyRef(t, img, 0)
+		if !verifyRef(t, img, 0) {
+			name := fmt.Sprintf("%s-%d-bad.png", t.Name(), i)
+			if err := saveImage(name, img); err != nil {
+				t.Error(err)
+			}
+		}
 		c(result{t: t, img: img})
 	}
 
-	if *dumpImages || !ok {
+	if *dumpImages {
 		if err := saveImage(t.Name()+".png", img); err != nil {
 			t.Error(err)
 		}
