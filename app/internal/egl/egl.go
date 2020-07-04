@@ -166,12 +166,16 @@ func (c *Context) MakeCurrent() error {
 		var err error
 		c.srgbFBO, err = srgb.New(c.c)
 		if err != nil {
+			c.ReleaseCurrent()
 			return err
 		}
 	}
 	if c.refreshFBO {
 		c.refreshFBO = false
-		return c.srgbFBO.Refresh(c.width, c.height)
+		if err := c.srgbFBO.Refresh(c.width, c.height); err != nil {
+			c.ReleaseCurrent()
+			return err
+		}
 	}
 	return nil
 }

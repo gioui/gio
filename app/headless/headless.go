@@ -139,8 +139,9 @@ func contextDo(ctx context, f func() error) error {
 			errCh <- err
 			return
 		}
-		defer ctx.ReleaseCurrent()
-		errCh <- f()
+		err := f()
+		ctx.ReleaseCurrent()
+		errCh <- err
 	}()
 	return <-errCh
 }
