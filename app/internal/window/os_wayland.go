@@ -584,10 +584,11 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 			break
 		}
 		d.seat = &wlSeat{
-			disp:   d,
-			name:   name,
-			seat:   s,
-			offers: make(map[*C.struct_wl_data_offer][]string),
+			disp:      d,
+			name:      name,
+			seat:      s,
+			offers:    make(map[*C.struct_wl_data_offer][]string),
+			touchFoci: make(map[C.int32_t]*window),
 		}
 		callbackStore(unsafe.Pointer(s), d.seat)
 		C.wl_seat_add_listener(s, &C.gio_seat_listener, unsafe.Pointer(s))
