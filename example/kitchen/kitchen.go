@@ -325,6 +325,14 @@ func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 						return btn.Layout(gtx)
 					})
 				}),
+				layout.Rigid(func(gtx C) D {
+					return layout.Inset{Left: unit.Dp(16)}.Layout(gtx, func(gtx C) D {
+						if !swtch.Value {
+							return D{}
+						}
+						return material.Loader(th).Layout(gtx)
+					})
+				}),
 			)
 		},
 		func(gtx C) D {
