@@ -21,11 +21,11 @@ import (
 
 func main() {
 	go func() {
-		defer os.Exit(0)
 		w := app.NewWindow()
 		if err := loop(w); err != nil {
 			log.Fatal(err)
 		}
+		os.Exit(0)
 	}()
 	app.Main()
 }
