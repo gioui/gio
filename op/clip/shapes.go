@@ -20,7 +20,11 @@ type RRect struct {
 
 // op returns the op for the rectangle.
 func (rr RRect) op(ops *op.Ops) Op {
-	return roundRect(ops, rr.Rect, rr.SE, rr.SW, rr.NW, rr.NE)
+	var p Path
+	p.Begin(ops)
+	p.Move(rr.Rect.Min)
+	roundRect(&p, rr.Rect.Size(), rr.SE, rr.SW, rr.NW, rr.NE)
+	return p.End()
 }
 
 // Add the rectangle clip.
@@ -28,17 +32,48 @@ func (rr RRect) Add(ops *op.Ops) {
 	rr.op(ops).Add(ops)
 }
 
-// roundRect returns the clip area of a rectangle with rounded
-// corners defined by their radii.
-func roundRect(ops *op.Ops, r f32.Rectangle, se, sw, nw, ne float32) Op {
-	size := r.Size()
-	// https://pomax.github.io/bezierinfo/#circles_cubic.
-	w, h := float32(size.X), float32(size.Y)
-	const c = 0.55228475 // 4*(sqrt(2)-1)/3
+// Border represents the clip area of a rectangular border.
+type Border struct {
+	// Rect is the bounds of the border.
+	Rect  f32.Rectangle
+	Width float32
+	// The corner radii.
+	SE, SW, NW, NE float32
+}
+
+func (b Border) op(ops *op.Ops) Op {
 	var p Path
 	p.Begin(ops)
-	p.Move(r.Min)
+	w := b.Width
 
+	// Outer outline.
+	r := b.Rect
+	p.Move(r.Min)
+	end := roundRect(&p, r.Size(), b.SE, b.SW, b.NW, b.NE)
+
+	// Inner outline
+	r = b.Rect
+	r.Min.X += w
+	r.Min.Y += w
+	r.Max.X -= w
+	r.Max.Y -= w
+	p.Move(r.Min.Sub(end))
+	roundRectRev(&p, r.Size(), b.SE-w, b.SW-w, b.NW-w, b.NE-w)
+
+	return p.End()
+}
+
+// Add the border clip.
+func (rr Border) Add(ops *op.Ops) {
+	rr.op(ops).Add(ops)
+}
+
+// roundRect adds the outline of a rectangle with rounded corners to a
+// path.
+func roundRect(p *Path, size f32.Point, se, sw, nw, ne float32) f32.Point {
+	// https://pomax.github.io/bezierinfo/#circles_cubic.
+	w, h := size.X, size.Y
+	const c = 0.55228475 // 4*(sqrt(2)-1)/3
 	p.Move(f32.Point{X: w, Y: h - se})
 	p.Cube(f32.Point{X: 0, Y: se * c}, f32.Point{X: -se + se*c, Y: se}, f32.Point{X: -se, Y: se}) // SE
 	p.Line(f32.Point{X: sw - w + se, Y: 0})
@@ -47,5 +82,19 @@ func roundRect(ops *op.Ops, r f32.Rectangle, se, sw, nw, ne float32) Op {
 	p.Cube(f32.Point{X: 0, Y: -nw * c}, f32.Point{X: nw - nw*c, Y: -nw}, f32.Point{X: nw, Y: -nw}) // NW
 	p.Line(f32.Point{X: w - ne - nw, Y: 0})
 	p.Cube(f32.Point{X: ne * c, Y: 0}, f32.Point{X: ne, Y: ne - ne*c}, f32.Point{X: ne, Y: ne}) // NE
-	return p.End()
+	return p.pen
+}
+
+// roundRectRev is like roundRect but counter-clockwise.
+func roundRectRev(p *Path, size f32.Point, se, sw, nw, ne float32) {
+	w, h := size.X, size.Y
+	const c = 0.55228475
+	p.Move(f32.Point{X: 0, Y: h - sw})
+	p.Cube(f32.Point{X: 0, Y: sw * c}, f32.Point{X: sw - sw*c, Y: sw}, f32.Point{X: sw, Y: sw}) // SW
+	p.Line(f32.Point{X: -se + w - sw, Y: 0})
+	p.Cube(f32.Point{X: se * c, Y: 0}, f32.Point{X: se, Y: -se + se*c}, f32.Point{X: se, Y: -se}) // SE
+	p.Line(f32.Point{X: 0, Y: ne - h + se})
+	p.Cube(f32.Point{X: 0, Y: -ne * c}, f32.Point{X: -ne + ne*c, Y: -ne}, f32.Point{X: -ne, Y: -ne}) // NE
+	p.Line(f32.Point{X: -w + ne + nw, Y: 0})
+	p.Cube(f32.Point{X: -nw * c, Y: 0}, f32.Point{X: -nw, Y: nw - nw*c}, f32.Point{X: -nw, Y: nw}) // NW
 }
