@@ -176,9 +176,10 @@ func layoutText(sbuf *sfnt.Buffer, ppem fixed.Int26_6, maxWidth int, fonts []*op
 	}
 	var prev, word state
 	endLine := func() {
-		if prev.f != nil {
-			updateBounds(prev.f)
+		if prev.f == nil && len(fonts) > 0 {
+			prev.f = fonts[0]
 		}
+		updateBounds(prev.f)
 		nextLine.Layout = glyphs[:prev.idx:prev.idx]
 		nextLine.Len = prev.len
 		nextLine.Width = prev.x + prev.adv

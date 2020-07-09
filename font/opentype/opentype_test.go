@@ -13,6 +13,9 @@ import (
 	"gioui.org/internal/ops"
 	"gioui.org/op"
 	"gioui.org/text"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/gofont/goregular"
+	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -84,6 +87,31 @@ func TestCollectionAsFace(t *testing.T) {
 	}
 	if !areShapesEqual(shapeCollInvalid, shapeInvalid1) {
 		t.Error("font collection did not render the invalid glyph using the replacement from font 1")
+	}
+}
+
+func TestEmptyString(t *testing.T) {
+	face, err := Parse(goregular.TTF)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ppem := fixed.I(200)
+
+	lines, err := face.Layout(ppem, 2000, strings.NewReader(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lines) == 0 {
+		t.Fatalf("Layout returned no lines for empty string; expected 1")
+	}
+	l := lines[0]
+	exp, err := face.font.Bounds(new(sfnt.Buffer), ppem, font.HintingFull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := l.Bounds; got != exp {
+		t.Errorf("got bounds %+v for empty string; expected %+v", got, exp)
 	}
 }
 
