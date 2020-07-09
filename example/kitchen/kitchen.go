@@ -256,7 +256,7 @@ func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 		func(gtx C) D {
 			e := material.Editor(th, lineEditor, "Hint")
 			e.Font.Style = text.Italic
-			border := widget.Border{Color: color.RGBA{A: 0xff}, CornerRadius: unit.Dp(10), Width: unit.Px(2)}
+			border := widget.Border{Color: color.RGBA{A: 0xff}, CornerRadius: unit.Dp(8), Width: unit.Px(2)}
 			return border.Layout(gtx, func(gtx C) D {
 				return layout.UniformInset(unit.Dp(8)).Layout(gtx, e.Layout)
 			})
