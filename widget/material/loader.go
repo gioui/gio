@@ -27,12 +27,12 @@ func Loader(th *Theme) LoaderStyle {
 }
 
 func (l LoaderStyle) Layout(gtx layout.Context) layout.Dimensions {
-	diam := gtx.Px(unit.Dp(24))
-	if minX := gtx.Constraints.Min.X; minX > diam {
-		diam = minX
-	}
+	diam := gtx.Constraints.Min.X
 	if minY := gtx.Constraints.Min.Y; minY > diam {
 		diam = minY
+	}
+	if diam == 0 {
+		diam = gtx.Px(unit.Dp(24))
 	}
 	sz := gtx.Constraints.Constrain(image.Pt(diam, diam))
 	radius := float64(sz.X) * .5
