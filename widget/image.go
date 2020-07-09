@@ -34,7 +34,7 @@ func (im Image) Layout(gtx layout.Context) layout.Dimensions {
 	cs := gtx.Constraints
 	d := cs.Constrain(image.Pt(w, h))
 	stack := op.Push(gtx.Ops)
-	clip.Rect{Rect: f32.Rectangle{Max: layout.FPt(d)}}.Op(gtx.Ops).Add(gtx.Ops)
+	clip.Rect{Rect: f32.Rectangle{Max: layout.FPt(d)}}.Add(gtx.Ops)
 	im.Src.Add(gtx.Ops)
 	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(w), Y: float32(h)}}}.Add(gtx.Ops)
 	stack.Pop()

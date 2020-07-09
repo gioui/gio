@@ -193,8 +193,8 @@ func (p *Path) End() Op {
 }
 
 // Rect represents the clip area of a rectangle with rounded
-// corners.The origin is in the upper left
-// corner.
+// corners.
+//
 // Specify a square with corner radii equal to half the square size to
 // construct a circular clip area.
 type Rect struct {
@@ -203,8 +203,8 @@ type Rect struct {
 	SE, SW, NW, NE float32
 }
 
-// Op returns the Op for the rectangle.
-func (rr Rect) Op(ops *op.Ops) Op {
+// op returns the op for the rectangle.
+func (rr Rect) op(ops *op.Ops) Op {
 	r := rr.Rect
 	// Optimize for the common pixel aligned rectangle with no
 	// corner rounding.
@@ -221,9 +221,9 @@ func (rr Rect) Op(ops *op.Ops) Op {
 	return roundRect(ops, r, rr.SE, rr.SW, rr.NW, rr.NE)
 }
 
-// Add is a shorthand for Op(ops).Add(ops).
+// Add the rectangle clip operation.
 func (rr Rect) Add(ops *op.Ops) {
-	rr.Op(ops).Add(ops)
+	rr.op(ops).Add(ops)
 }
 
 // roundRect returns the clip area of a rectangle with rounded

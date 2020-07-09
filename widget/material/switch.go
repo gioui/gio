@@ -59,7 +59,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	clip.Rect{
 		Rect: trackRect,
 		NE:   trackCorner, NW: trackCorner, SE: trackCorner, SW: trackCorner,
-	}.Op(gtx.Ops).Add(gtx.Ops)
+	}.Add(gtx.Ops)
 	paint.ColorOp{Color: trackColor}.Add(gtx.Ops)
 	paint.PaintOp{Rect: trackRect}.Add(gtx.Ops)
 	stack.Pop()
@@ -79,7 +79,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 			Max: layout.FPt(gtx.Constraints.Min),
 		},
 		NE: rr, NW: rr, SE: rr, SW: rr,
-	}.Op(gtx.Ops).Add(gtx.Ops)
+	}.Add(gtx.Ops)
 	for _, p := range s.Switch.History() {
 		drawInk(gtx, p)
 	}
@@ -130,7 +130,7 @@ func drawDisc(ops *op.Ops, sz float32, col color.RGBA) {
 	clip.Rect{
 		Rect: r,
 		NE:   rr, NW: rr, SE: rr, SW: rr,
-	}.Op(ops).Add(ops)
+	}.Add(ops)
 	paint.ColorOp{Color: col}.Add(ops)
 	paint.PaintOp{Rect: r}.Add(ops)
 }

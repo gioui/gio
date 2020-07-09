@@ -61,7 +61,7 @@ func TestClipping(t *testing.T) {
 			Max: f32.Point{X: 250, Y: 250},
 		},
 		SE: 75,
-	}.Op(&ops).Add(&ops)
+	}.Add(&ops)
 	pop.Add(&ops)
 	paint.ColorOp{Color: col2}.Add(&ops)
 	clip.Rect{
@@ -70,7 +70,7 @@ func TestClipping(t *testing.T) {
 			Max: f32.Point{X: 350, Y: 350},
 		},
 		NW: 75,
-	}.Op(&ops).Add(&ops)
+	}.Add(&ops)
 	pop.Add(&ops)
 	if err := w.Frame(&ops); err != nil {
 		t.Fatal(err)

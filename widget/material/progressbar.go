@@ -38,7 +38,7 @@ func (p ProgressBarStyle) Layout(gtx layout.Context) layout.Dimensions {
 		clip.Rect{
 			Rect: f32.Rectangle{Max: f32.Point{X: width, Y: float32(gtx.Px(maxHeight))}},
 			NE:   rr, NW: rr, SE: rr, SW: rr,
-		}.Op(gtx.Ops).Add(gtx.Ops)
+		}.Add(gtx.Ops)
 
 		paint.ColorOp{Color: color}.Add(gtx.Ops)
 		paint.PaintOp{Rect: dr}.Add(gtx.Ops)

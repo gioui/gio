@@ -364,7 +364,7 @@ func (c *clipCircle) Layout(gtx layout.Context, w layout.Widget) layout.Dimensio
 	clip.Rect{
 		Rect: f32.Rectangle{Max: f32.Point{X: szf, Y: szf}},
 		NE:   rr, NW: rr, SE: rr, SW: rr,
-	}.Op(gtx.Ops).Add(gtx.Ops)
+	}.Add(gtx.Ops)
 	call.Add(gtx.Ops)
 	return dims
 }

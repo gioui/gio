@@ -94,7 +94,7 @@ func Clickable(gtx layout.Context, button *widget.Clickable, w layout.Widget) la
 					X: float32(gtx.Constraints.Min.X),
 					Y: float32(gtx.Constraints.Min.Y),
 				}},
-			}.Op(gtx.Ops).Add(gtx.Ops)
+			}.Add(gtx.Ops)
 			for _, c := range button.History() {
 				drawInk(gtx, c)
 			}
@@ -128,7 +128,7 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 					Y: float32(gtx.Constraints.Min.Y),
 				}},
 				NE: rr, NW: rr, SE: rr, SW: rr,
-			}.Op(gtx.Ops).Add(gtx.Ops)
+			}.Add(gtx.Ops)
 			background := b.Background
 			if gtx.Queue == nil {
 				background = mulAlpha(b.Background, 150)
@@ -156,7 +156,7 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 			clip.Rect{
 				Rect: f32.Rectangle{Max: f32.Point{X: sizef, Y: sizef}},
 				NE:   rr, NW: rr, SE: rr, SW: rr,
-			}.Op(gtx.Ops).Add(gtx.Ops)
+			}.Add(gtx.Ops)
 			background := b.Background
 			if gtx.Queue == nil {
 				background = mulAlpha(b.Background, 150)
@@ -288,6 +288,6 @@ func drawInk(gtx layout.Context, c widget.Press) {
 			Y: float32(size),
 		}},
 		NE: rr, NW: rr, SE: rr, SW: rr,
-	}.Op(gtx.Ops).Add(gtx.Ops)
+	}.Add(gtx.Ops)
 	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(size), Y: float32(size)}}}.Add(gtx.Ops)
 }
