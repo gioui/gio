@@ -118,7 +118,7 @@ func constSqPath() op.CallOp {
 func constSqCirc() op.CallOp {
 	innerOps := new(op.Ops)
 	m := op.Record(innerOps)
-	clip.Rect{Rect: f32.Rect(0, 0, 40, 40),
+	clip.RRect{Rect: f32.Rect(0, 0, 40, 40),
 		NW: 20, NE: 20, SW: 20, SE: 20}.Add(innerOps)
 	return m.Stop()
 }
@@ -185,7 +185,7 @@ func TestBuildOffscreen(t *testing.T) {
 
 func TestNegativeOverlaps(t *testing.T) {
 	run(t, func(ops *op.Ops) {
-		clip.Rect{Rect: f32.Rect(50, 50, 100, 100)}.Add(ops)
+		clip.RRect{Rect: f32.Rect(50, 50, 100, 100)}.Add(ops)
 		paint.PaintOp{Rect: f32.Rect(0, 120, 100, 122)}.Add(ops)
 	}, func(r result) {
 		r.expect(60, 60, colornames.White)

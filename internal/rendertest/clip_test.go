@@ -25,7 +25,7 @@ func TestPaintRect(t *testing.T) {
 func TestPaintClippedRect(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		paint.ColorOp{Color: colornames.Red}.Add(o)
-		clip.Rect{Rect: f32.Rect(25, 25, 60, 60)}.Add(o)
+		clip.RRect{Rect: f32.Rect(25, 25, 60, 60)}.Add(o)
 		paint.PaintOp{Rect: f32.Rect(0, 0, 50, 50)}.Add(o)
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
@@ -40,7 +40,7 @@ func TestPaintClippedCirle(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		paint.ColorOp{Color: colornames.Red}.Add(o)
 		r := float32(10)
-		clip.Rect{Rect: f32.Rect(20, 20, 40, 40), SE: r, SW: r, NW: r, NE: r}.Add(o)
+		clip.RRect{Rect: f32.Rect(20, 20, 40, 40), SE: r, SW: r, NW: r, NE: r}.Add(o)
 		paint.PaintOp{Rect: f32.Rect(0, 0, 30, 50)}.Add(o)
 	}, func(r result) {
 		r.expect(21, 21, colornames.White)
@@ -64,7 +64,7 @@ func TestPaintTexture(t *testing.T) {
 func TestPaintClippedTexture(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		squares.Add(o)
-		clip.Rect{Rect: f32.Rect(0, 0, 40, 40)}.Add(o)
+		clip.RRect{Rect: f32.Rect(0, 0, 40, 40)}.Add(o)
 		paint.PaintOp{Rect: f32.Rect(0, 0, 80, 80)}.Add(o)
 	}, func(r result) {
 		r.expect(40, 40, colornames.White)

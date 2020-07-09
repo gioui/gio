@@ -89,7 +89,7 @@ func Clickable(gtx layout.Context, button *widget.Clickable, w layout.Widget) la
 	return layout.Stack{}.Layout(gtx,
 		layout.Expanded(button.Layout),
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
-			clip.Rect{
+			clip.RRect{
 				Rect: f32.Rectangle{Max: f32.Point{
 					X: float32(gtx.Constraints.Min.X),
 					Y: float32(gtx.Constraints.Min.Y),
@@ -122,7 +122,7 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 	return layout.Stack{Alignment: layout.Center}.Layout(gtx,
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
 			rr := float32(gtx.Px(b.CornerRadius))
-			clip.Rect{
+			clip.RRect{
 				Rect: f32.Rectangle{Max: f32.Point{
 					X: float32(gtx.Constraints.Min.X),
 					Y: float32(gtx.Constraints.Min.Y),
@@ -153,7 +153,7 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 			size := gtx.Constraints.Min.X
 			sizef := float32(size)
 			rr := sizef * .5
-			clip.Rect{
+			clip.RRect{
 				Rect: f32.Rectangle{Max: f32.Point{X: sizef, Y: sizef}},
 				NE:   rr, NW: rr, SE: rr, SW: rr,
 			}.Add(gtx.Ops)
@@ -282,7 +282,7 @@ func drawInk(gtx layout.Context, c widget.Press) {
 		X: -rr,
 		Y: -rr,
 	})).Add(gtx.Ops)
-	clip.Rect{
+	clip.RRect{
 		Rect: f32.Rectangle{Max: f32.Point{
 			X: float32(size),
 			Y: float32(size),

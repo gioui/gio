@@ -258,7 +258,7 @@ func (l *List) layout() Dimensions {
 			Max: axisPoint(l.Axis, max, inf),
 		}
 		stack := op.Push(ops)
-		clip.Rect{Rect: FRect(r)}.Add(ops)
+		clip.Rect(r).Add(ops)
 		op.Offset(FPt(axisPoint(l.Axis, pos, cross))).Add(ops)
 		child.call.Add(ops)
 		stack.Pop()

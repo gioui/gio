@@ -52,7 +52,7 @@ func TestPaintShear(t *testing.T) {
 func TestClipPaintOffset(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		paint.ColorOp{Color: colornames.Red}.Add(o)
-		clip.Rect{Rect: f32.Rect(10, 10, 30, 30)}.Add(o)
+		clip.RRect{Rect: f32.Rect(10, 10, 30, 30)}.Add(o)
 		op.Offset(f32.Pt(20, 20)).Add(o)
 		paint.PaintOp{Rect: f32.Rect(0, 0, 100, 100)}.Add(o)
 	}, func(r result) {
@@ -67,7 +67,7 @@ func TestClipOffset(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		paint.ColorOp{Color: colornames.Red}.Add(o)
 		op.Offset(f32.Pt(20, 20)).Add(o)
-		clip.Rect{Rect: f32.Rect(10, 10, 30, 30)}.Add(o)
+		clip.RRect{Rect: f32.Rect(10, 10, 30, 30)}.Add(o)
 		paint.PaintOp{Rect: f32.Rect(0, 0, 100, 100)}.Add(o)
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
@@ -83,7 +83,7 @@ func TestClipScale(t *testing.T) {
 		paint.ColorOp{Color: colornames.Red}.Add(o)
 		a := f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(2, 2)).Offset(f32.Pt(10, 10))
 		op.Affine(a).Add(o)
-		clip.Rect{Rect: f32.Rect(10, 10, 20, 20)}.Add(o)
+		clip.RRect{Rect: f32.Rect(10, 10, 20, 20)}.Add(o)
 		paint.PaintOp{Rect: f32.Rect(0, 0, 1000, 1000)}.Add(o)
 	}, func(r result) {
 		r.expect(19+10, 19+10, colornames.White)
@@ -97,7 +97,7 @@ func TestClipRotate(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		paint.ColorOp{Color: colornames.Red}.Add(o)
 		op.Affine(f32.Affine2D{}.Rotate(f32.Pt(40, 40), -math.Pi/4)).Add(o)
-		clip.Rect{Rect: f32.Rect(30, 30, 50, 50)}.Add(o)
+		clip.RRect{Rect: f32.Rect(30, 30, 50, 50)}.Add(o)
 		paint.PaintOp{Rect: f32.Rect(0, 40, 100, 100)}.Add(o)
 	}, func(r result) {
 		r.expect(39, 39, colornames.White)
@@ -148,7 +148,7 @@ func TestRotateClipTexture(t *testing.T) {
 		squares.Add(o)
 		a := f32.Affine2D{}.Rotate(f32.Pt(40, 40), math.Pi/8)
 		op.Affine(a).Add(o)
-		clip.Rect{Rect: f32.Rect(30, 30, 50, 50)}.Add(o)
+		clip.RRect{Rect: f32.Rect(30, 30, 50, 50)}.Add(o)
 		paint.PaintOp{Rect: f32.Rect(10, 10, 70, 70)}.Add(o)
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
@@ -164,11 +164,11 @@ func TestComplicatedTransform(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		squares.Add(o)
 
-		clip.Rect{Rect: f32.Rect(0, 0, 100, 100), SE: 50, SW: 50, NW: 50, NE: 50}.Add(o)
+		clip.RRect{Rect: f32.Rect(0, 0, 100, 100), SE: 50, SW: 50, NW: 50, NE: 50}.Add(o)
 
 		a := f32.Affine2D{}.Shear(f32.Point{}, math.Pi/4, 0)
 		op.Affine(a).Add(o)
-		clip.Rect{Rect: f32.Rect(0, 0, 50, 40)}.Add(o)
+		clip.RRect{Rect: f32.Rect(0, 0, 50, 40)}.Add(o)
 
 		op.Offset(f32.Pt(-100, -100)).Add(o)
 		paint.PaintOp{Rect: f32.Rect(100, 100, 150, 150)}.Add(o)

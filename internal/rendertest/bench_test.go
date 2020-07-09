@@ -158,7 +158,7 @@ func draw1000Circles(gtx layout.Context) {
 		for y := 0; y < 10; y++ {
 			pi := op.Push(ops)
 			paint.ColorOp{Color: color.RGBA{R: 100 + uint8(x), G: 100 + uint8(y), B: 100, A: 120}}.Add(ops)
-			clip.Rect{Rect: f32.Rect(0, 0, 10, 10), NE: 5, SE: 5, SW: 5, NW: 5}.Add(ops)
+			clip.RRect{Rect: f32.Rect(0, 0, 10, 10), NE: 5, SE: 5, SW: 5, NW: 5}.Add(ops)
 			paint.PaintOp{Rect: f32.Rect(0, 0, 10, 10)}.Add(ops)
 			pi.Pop()
 			op.Offset(f32.Pt(0, float32(100))).Add(ops)
@@ -171,7 +171,7 @@ func draw1000CirclesInstanced(gtx layout.Context) {
 	ops := gtx.Ops
 
 	r := op.Record(ops)
-	clip.Rect{Rect: f32.Rect(0, 0, 10, 10), NE: 5, SE: 5, SW: 5, NW: 5}.Add(ops)
+	clip.RRect{Rect: f32.Rect(0, 0, 10, 10), NE: 5, SE: 5, SW: 5, NW: 5}.Add(ops)
 	paint.PaintOp{Rect: f32.Rect(0, 0, 10, 10)}.Add(ops)
 	c := r.Stop()
 
@@ -210,7 +210,7 @@ func drawIndividualShapes(gtx layout.Context, th *material.Theme) chan op.CallOp
 			for y := 0; y < 9; y++ {
 				pi := op.Push(ops)
 				paint.ColorOp{Color: color.RGBA{R: 100 + uint8(x), G: 100 + uint8(y), B: 100, A: 120}}.Add(ops)
-				clip.Rect{Rect: f32.Rect(0, 0, 25, 25), NE: 10, SE: 10, SW: 10, NW: 10}.Add(ops)
+				clip.RRect{Rect: f32.Rect(0, 0, 25, 25), NE: 10, SE: 10, SW: 10, NW: 10}.Add(ops)
 				paint.PaintOp{Rect: f32.Rect(0, 0, 25, 25)}.Add(ops)
 				pi.Pop()
 				op.Offset(f32.Pt(0, float32(50))).Add(ops)
@@ -229,7 +229,7 @@ func drawShapeInstances(gtx layout.Context, th *material.Theme) chan op.CallOp {
 		co := op.Record(ops)
 
 		r := op.Record(ops)
-		clip.Rect{Rect: f32.Rect(0, 0, 25, 25), NE: 10, SE: 10, SW: 10, NW: 10}.Add(ops)
+		clip.RRect{Rect: f32.Rect(0, 0, 25, 25), NE: 10, SE: 10, SW: 10, NW: 10}.Add(ops)
 		paint.PaintOp{Rect: f32.Rect(0, 0, 25, 25)}.Add(ops)
 		c := r.Stop()
 

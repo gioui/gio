@@ -5,7 +5,6 @@ package clip
 import (
 	"encoding/binary"
 	"image"
-	"math"
 
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
@@ -35,7 +34,7 @@ type Path struct {
 // applying a Op, use op.StackOp.
 type Op struct {
 	call   op.CallOp
-	bounds f32.Rectangle
+	bounds image.Rectangle
 }
 
 func (p Op) Add(o *op.Ops) {
@@ -43,10 +42,10 @@ func (p Op) Add(o *op.Ops) {
 	data := o.Write(opconst.TypeClipLen)
 	data[0] = byte(opconst.TypeClip)
 	bo := binary.LittleEndian
-	bo.PutUint32(data[1:], math.Float32bits(p.bounds.Min.X))
-	bo.PutUint32(data[5:], math.Float32bits(p.bounds.Min.Y))
-	bo.PutUint32(data[9:], math.Float32bits(p.bounds.Max.X))
-	bo.PutUint32(data[13:], math.Float32bits(p.bounds.Max.Y))
+	bo.PutUint32(data[1:], uint32(p.bounds.Min.X))
+	bo.PutUint32(data[5:], uint32(p.bounds.Min.Y))
+	bo.PutUint32(data[9:], uint32(p.bounds.Max.X))
+	bo.PutUint32(data[13:], uint32(p.bounds.Max.Y))
 }
 
 // Begin the path, storing the path data and final Op into ops.
@@ -192,72 +191,10 @@ func (p *Path) End() Op {
 	}
 }
 
-// Rect represents the clip area of a rectangle with rounded
-// corners.
-//
-// Specify a square with corner radii equal to half the square size to
-// construct a circular clip area.
-type Rect struct {
-	Rect f32.Rectangle
-	// The corner radii.
-	SE, SW, NW, NE float32
-}
+// Rect represents the clip area of a pixel-aligned rectangle.
+type Rect image.Rectangle
 
-// op returns the op for the rectangle.
-func (rr Rect) op(ops *op.Ops) Op {
-	r := rr.Rect
-	// Optimize for the common pixel aligned rectangle with no
-	// corner rounding.
-	if rr.SE == 0 && rr.SW == 0 && rr.NW == 0 && rr.NE == 0 {
-		ri := image.Rectangle{
-			Min: image.Point{X: int(r.Min.X), Y: int(r.Min.Y)},
-			Max: image.Point{X: int(r.Max.X), Y: int(r.Max.Y)},
-		}
-		// Optimize pixel-aligned rectangles to just its bounds.
-		if r == fRect(ri) {
-			return Op{bounds: r}
-		}
-	}
-	return roundRect(ops, r, rr.SE, rr.SW, rr.NW, rr.NE)
-}
-
-// Add the rectangle clip operation.
-func (rr Rect) Add(ops *op.Ops) {
-	rr.op(ops).Add(ops)
-}
-
-// roundRect returns the clip area of a rectangle with rounded
-// corners defined by their radii.
-func roundRect(ops *op.Ops, r f32.Rectangle, se, sw, nw, ne float32) Op {
-	size := r.Size()
-	// https://pomax.github.io/bezierinfo/#circles_cubic.
-	w, h := float32(size.X), float32(size.Y)
-	const c = 0.55228475 // 4*(sqrt(2)-1)/3
-	var p Path
-	p.Begin(ops)
-	p.Move(r.Min)
-
-	p.Move(f32.Point{X: w, Y: h - se})
-	p.Cube(f32.Point{X: 0, Y: se * c}, f32.Point{X: -se + se*c, Y: se}, f32.Point{X: -se, Y: se}) // SE
-	p.Line(f32.Point{X: sw - w + se, Y: 0})
-	p.Cube(f32.Point{X: -sw * c, Y: 0}, f32.Point{X: -sw, Y: -sw + sw*c}, f32.Point{X: -sw, Y: -sw}) // SW
-	p.Line(f32.Point{X: 0, Y: nw - h + sw})
-	p.Cube(f32.Point{X: 0, Y: -nw * c}, f32.Point{X: nw - nw*c, Y: -nw}, f32.Point{X: nw, Y: -nw}) // NW
-	p.Line(f32.Point{X: w - ne - nw, Y: 0})
-	p.Cube(f32.Point{X: ne * c, Y: 0}, f32.Point{X: ne, Y: ne - ne*c}, f32.Point{X: ne, Y: ne}) // NE
-	return p.End()
-}
-
-// fRect converts a rectangle to a f32.Rectangle.
-func fRect(r image.Rectangle) f32.Rectangle {
-	return f32.Rectangle{
-		Min: fPt(r.Min), Max: fPt(r.Max),
-	}
-}
-
-// fPt converts an point to a f32.Point.
-func fPt(p image.Point) f32.Point {
-	return f32.Point{
-		X: float32(p.X), Y: float32(p.Y),
-	}
+// Add the clip operation.
+func (r Rect) Add(ops *op.Ops) {
+	Op{bounds: image.Rectangle(r)}.Add(ops)
 }

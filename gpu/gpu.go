@@ -116,6 +116,7 @@ type material struct {
 
 // clipOp is the shadow of clip.Op.
 type clipOp struct {
+	// TODO: Use image.Rectangle?
 	bounds f32.Rectangle
 }
 
@@ -131,18 +132,18 @@ func (op *clipOp) decode(data []byte) {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
-	r := f32.Rectangle{
-		Min: f32.Point{
-			X: math.Float32frombits(bo.Uint32(data[1:])),
-			Y: math.Float32frombits(bo.Uint32(data[5:])),
+	r := image.Rectangle{
+		Min: image.Point{
+			X: int(int32(bo.Uint32(data[1:]))),
+			Y: int(int32(bo.Uint32(data[5:]))),
 		},
-		Max: f32.Point{
-			X: math.Float32frombits(bo.Uint32(data[9:])),
-			Y: math.Float32frombits(bo.Uint32(data[13:])),
+		Max: image.Point{
+			X: int(int32(bo.Uint32(data[9:]))),
+			Y: int(int32(bo.Uint32(data[13:]))),
 		},
 	}
 	*op = clipOp{
-		bounds: r,
+		bounds: layout.FRect(r),
 	}
 }
 
@@ -158,12 +159,12 @@ func decodeImageOp(data []byte, refs []interface{}) imageOpData {
 	return imageOpData{
 		rect: image.Rectangle{
 			Min: image.Point{
-				X: int(bo.Uint32(data[1:])),
-				Y: int(bo.Uint32(data[5:])),
+				X: int(int32(bo.Uint32(data[1:]))),
+				Y: int(int32(bo.Uint32(data[5:]))),
 			},
 			Max: image.Point{
-				X: int(bo.Uint32(data[9:])),
-				Y: int(bo.Uint32(data[13:])),
+				X: int(int32(bo.Uint32(data[9:]))),
+				Y: int(int32(bo.Uint32(data[13:]))),
 			},
 		},
 		src:    refs[0].(*image.RGBA),

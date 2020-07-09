@@ -55,7 +55,7 @@ func TestClipping(t *testing.T) {
 		Y: float32(sz.Y),
 	}}}
 	paint.ColorOp{Color: col}.Add(&ops)
-	clip.Rect{
+	clip.RRect{
 		Rect: f32.Rectangle{
 			Min: f32.Point{X: 50, Y: 50},
 			Max: f32.Point{X: 250, Y: 250},
@@ -64,7 +64,7 @@ func TestClipping(t *testing.T) {
 	}.Add(&ops)
 	pop.Add(&ops)
 	paint.ColorOp{Color: col2}.Add(&ops)
-	clip.Rect{
+	clip.RRect{
 		Rect: f32.Rectangle{
 			Min: f32.Point{X: 100, Y: 100},
 			Max: f32.Point{X: 350, Y: 350},
