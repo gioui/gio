@@ -423,7 +423,7 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 	carX := e.caret.x
 	carY := e.caret.y
 
-	stack := op.Push(gtx.Ops)
+	defer op.Push(gtx.Ops).Pop()
 	carX -= carWidth / 2
 	carAsc, carDesc := -e.lines[e.caret.line].Bounds.Min.Y, e.lines[e.caret.line].Bounds.Max.Y
 	carRect := image.Rectangle{
@@ -448,7 +448,6 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 	if !carRect.Empty() {
 		paint.PaintOp{Rect: layout.FRect(carRect)}.Add(gtx.Ops)
 	}
-	stack.Pop()
 }
 
 // Len is the length of the editor contents.
