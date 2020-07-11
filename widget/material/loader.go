@@ -57,8 +57,8 @@ func (l LoaderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}
 }
 
-func clipLoader(ops *op.Ops, start, end, radius float64) {
-	const thickness = .2
+func clipLoader(ops *op.Ops, startAngle, endAngle, radius float64) {
+	const thickness = .25
 
 	outer := float32(radius)
 	inner := float32(radius) * (1. - thickness)
@@ -66,64 +66,68 @@ func clipLoader(ops *op.Ops, start, end, radius float64) {
 	var p clip.Path
 	p.Begin(ops)
 
-	sine, cose := math.Sincos(start)
+	vy, vx := math.Sincos(startAngle)
 
-	pen := f32.Pt(float32(cose), float32(sine)).Mul(outer)
-	p.Move(pen)
-	angle := start
-	// The clip path uses quadratic beziér curves to approximate
-	// a circle arc. Minimize the error by capping the length of
-	// each curve segment.
-	arcPrRadian := radius * math.Pi
-	const maxArcLen = 20.
-	anglePerSegment := maxArcLen / arcPrRadian
-	// Outer arc.
-	for angle < end {
-		angle += anglePerSegment
-		if angle > end {
-			angle = end
+	start := f32.Pt(float32(vx), float32(vy))
+
+	// Use quadratic beziér curves to approximate a circle arc and
+	// minimize the error by capping the length of each curve segment.
+
+	const maxSegments = 20.
+	nsegments := math.Round(20 * math.Pi / (endAngle - startAngle))
+
+	θ := (endAngle - startAngle) / nsegments
+
+	// To avoid a math.Sincos for every segment, compute a clockwise
+	// rotation matrix once and apply for each segment.
+	//
+	// [ cos θ -sin θ]
+	// [sin θ cos θ]
+	sinθ64, cosθ64 := math.Sincos(θ)
+	sinθ, cosθ := float32(sinθ64), float32(cosθ64)
+	rotate := func(clockwise float32, p f32.Point) f32.Point {
+		return f32.Point{
+			X: p.X*cosθ - p.Y*clockwise*sinθ,
+			Y: p.X*clockwise*sinθ + p.Y*cosθ,
 		}
-		sins, coss := sine, cose
-		sine, cose = math.Sincos(angle)
-
-		// https://pomax.github.io/bezierinfo/#circles
-		div := 1. / (coss*sine - cose*sins)
-		ctrl := f32.Point{
-			X: float32((sine - sins) * div),
-			Y: -float32((cose - coss) * div),
-		}.Mul(outer)
-
-		endPt := f32.Pt(float32(cose), float32(sine)).Mul(outer)
-
-		p.Quad(ctrl.Sub(pen), endPt.Sub(pen))
-		pen = endPt
 	}
 
+	// Compute control point C according to
+	// https://pomax.github.io/bezierinfo/#circles.
+	// If S is the starting point, S' is the orthogonal
+	// tangent, θ is clockwise:
+	//
+	// C = S + b*S', b = (cos θ - 1)/sin θ
+	//
+	b := (cosθ - 1.) / sinθ
+
+	control := func(clockwise float32, S f32.Point) f32.Point {
+		tangent := f32.Pt(-S.Y, S.X)
+		return S.Add(tangent.Mul(b * -clockwise))
+	}
+
+	pen := start.Mul(outer)
+	p.Move(pen)
+
+	end := start
+	arc := func(clockwise float32, radius float32) {
+		for i := 0; i < int(nsegments); i++ {
+			ctrl := control(clockwise, end)
+			end = rotate(clockwise, end)
+			p.Quad(ctrl.Mul(radius).Sub(pen), end.Mul(radius).Sub(pen))
+			pen = end.Mul(radius)
+		}
+	}
+	// Outer arc, clockwise.
+	arc(+1, outer)
+
 	// Arc cap.
-	cap := f32.Pt(float32(cose), float32(sine)).Mul(inner)
+	cap := end.Mul(inner)
 	p.Line(cap.Sub(pen))
 	pen = cap
 
-	// Inner arc.
-	for angle > start {
-		angle -= anglePerSegment
-		if angle < start {
-			angle = start
-		}
-		sins, coss := sine, cose
-		sine, cose = math.Sincos(angle)
-
-		div := 1. / (coss*sine - cose*sins)
-		ctrl := f32.Point{
-			X: float32((sine - sins) * div),
-			Y: -float32((cose - coss) * div),
-		}.Mul(inner)
-
-		endPt := f32.Pt(float32(cose), float32(sine)).Mul(inner)
-
-		p.Quad(ctrl.Sub(pen), endPt.Sub(pen))
-		pen = endPt
-	}
+	// Inner arc, counter-clockwise.
+	arc(-1, inner)
 
 	// Second arc cap automatically completed by End.
 	p.End().Add(ops)
