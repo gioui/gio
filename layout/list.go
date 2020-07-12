@@ -30,8 +30,6 @@ type List struct {
 	Alignment Alignment
 
 	ctx         Context
-	macro       op.MacroOp
-	child       op.MacroOp
 	scroll      gesture.Scroll
 	scrollDelta int
 
@@ -95,20 +93,21 @@ func (l *List) init(gtx Context, len int) {
 		l.Position.Offset = 0
 		l.Position.First = len
 	}
-	l.macro = op.Record(gtx.Ops)
-	l.next()
 }
 
 // Layout the List.
 func (l *List) Layout(gtx Context, len int, w ListElement) Dimensions {
-	for l.init(gtx, len); l.more(); l.next() {
-		crossMin, crossMax := axisCrossConstraint(l.Axis, l.ctx.Constraints)
-		cs := axisConstraints(l.Axis, 0, inf, crossMin, crossMax)
-		i := l.index()
-		gtx.Constraints = cs
-		l.end(w(gtx, i))
+	l.init(gtx, len)
+	crossMin, crossMax := axisCrossConstraint(l.Axis, gtx.Constraints)
+	gtx.Constraints = axisConstraints(l.Axis, 0, inf, crossMin, crossMax)
+	macro := op.Record(gtx.Ops)
+	for l.next(); l.more(); l.next() {
+		child := op.Record(gtx.Ops)
+		dims := w(gtx, l.index())
+		call := child.Stop()
+		l.end(dims, call)
 	}
-	return l.layout()
+	return l.layout(macro)
 }
 
 func (l *List) scrollToEnd() bool {
@@ -135,9 +134,6 @@ func (l *List) next() {
 		l.Position.BeforeEnd = true
 		l.Position.Offset += l.scrollDelta
 		l.dir = l.nextDir()
-	}
-	if l.more() {
-		l.child = op.Record(l.ctx.Ops)
 	}
 }
 
@@ -180,8 +176,7 @@ func (l *List) nextDir() iterationDir {
 }
 
 // End the current child by specifying its dimensions.
-func (l *List) end(dims Dimensions) {
-	call := l.child.Stop()
+func (l *List) end(dims Dimensions, call op.CallOp) {
 	child := scrollChild{dims.Size, call}
 	mainSize := axisMain(l.Axis, child.size)
 	l.maxSize += mainSize
@@ -199,7 +194,7 @@ func (l *List) end(dims Dimensions) {
 }
 
 // Layout the List and return its dimensions.
-func (l *List) layout() Dimensions {
+func (l *List) layout(macro op.MacroOp) Dimensions {
 	if l.more() {
 		panic("unfinished child")
 	}
@@ -277,7 +272,7 @@ func (l *List) layout() Dimensions {
 		pos = mainMax
 	}
 	dims := axisPoint(l.Axis, pos, maxCross)
-	call := l.macro.Stop()
+	call := macro.Stop()
 	defer op.Push(l.ctx.Ops).Pop()
 	pointer.Rect(image.Rectangle{Max: dims}).Add(ops)
 	l.scroll.Add(ops)
