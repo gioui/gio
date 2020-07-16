@@ -409,8 +409,16 @@ func newRenderer(ctx backend.Device) *renderer {
 		blitter: newBlitter(ctx),
 		pather:  newPather(ctx),
 	}
-	r.packer.maxDim = ctx.Caps().MaxTextureSize
-	r.intersections.maxDim = r.packer.maxDim
+
+	maxDim := ctx.Caps().MaxTextureSize
+	// Large atlas textures cause artifacts due to precision loss in
+	// shaders.
+	if cap := 8192; maxDim > cap {
+		maxDim = cap
+	}
+
+	r.packer.maxDim = maxDim
+	r.intersections.maxDim = maxDim
 	return r
 }
 
