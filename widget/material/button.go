@@ -150,11 +150,11 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 	return layout.Stack{Alignment: layout.Center}.Layout(gtx,
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
-			size := gtx.Constraints.Min.X
-			sizef := float32(size)
-			rr := sizef * .5
+			sizex, sizey := gtx.Constraints.Min.X, gtx.Constraints.Min.Y
+			sizexf, sizeyf := float32(sizex), float32(sizey)
+			rr := (sizexf + sizeyf) * .25
 			clip.RRect{
-				Rect: f32.Rectangle{Max: f32.Point{X: sizef, Y: sizef}},
+				Rect: f32.Rectangle{Max: f32.Point{X: sizexf, Y: sizeyf}},
 				NE:   rr, NW: rr, SE: rr, SW: rr,
 			}.Add(gtx.Ops)
 			background := b.Background
