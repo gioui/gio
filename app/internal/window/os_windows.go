@@ -156,7 +156,8 @@ func createNativeWindow(opts *Options) (*window, error) {
 	if resErr != nil {
 		return nil, resErr
 	}
-	cfg := configForDC()
+	dpi := windows.GetSystemDPI()
+	cfg := configForDPI(dpi)
 	wr := windows.Rect{
 		Right:  int32(cfg.Px(opts.Width)),
 		Bottom: int32(cfg.Px(opts.Height)),
@@ -276,14 +277,14 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		mm := (*windows.MinMaxInfo)(unsafe.Pointer(uintptr(lParam)))
 		if w.minmax.minWidth > 0 || w.minmax.minHeight > 0 {
 			mm.PtMinTrackSize = windows.Point{
-				w.minmax.minWidth+w.deltas.width,
-				w.minmax.minHeight+w.deltas.height,
+				w.minmax.minWidth + w.deltas.width,
+				w.minmax.minHeight + w.deltas.height,
 			}
 		}
 		if w.minmax.maxWidth > 0 || w.minmax.maxHeight > 0 {
 			mm.PtMaxTrackSize = windows.Point{
-				w.minmax.maxWidth+w.deltas.width,
-				w.minmax.maxHeight+w.deltas.height,
+				w.minmax.maxWidth + w.deltas.width,
+				w.minmax.maxHeight + w.deltas.height,
 			}
 		}
 	}
@@ -409,7 +410,8 @@ func (w *window) draw(sync bool) {
 	if w.width == 0 || w.height == 0 {
 		return
 	}
-	cfg := configForDC()
+	dpi := windows.GetWindowDPI(w.hwnd)
+	cfg := configForDPI(dpi)
 	w.minmax = getWindowConstraints(cfg, w.opts, w.deltas)
 	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
@@ -631,8 +633,7 @@ func convertKeyCode(code uintptr) (string, bool) {
 	return r, true
 }
 
-func configForDC() unit.Metric {
-	dpi := windows.GetSystemDPI()
+func configForDPI(dpi int) unit.Metric {
 	const inchPrDp = 1.0 / 96.0
 	ppdp := float32(dpi) * inchPrDp
 	return unit.Metric{

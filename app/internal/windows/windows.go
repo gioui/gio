@@ -207,6 +207,7 @@ var (
 	_GetClientRect               = user32.NewProc("GetClientRect")
 	_GetClipboardData            = user32.NewProc("GetClipboardData")
 	_GetDC                       = user32.NewProc("GetDC")
+	_GetDpiForWindow             = user32.NewProc("GetDpiForWindow")
 	_GetKeyState                 = user32.NewProc("GetKeyState")
 	_GetMessage                  = user32.NewProc("GetMessageW")
 	_GetMessageTime              = user32.NewProc("GetMessageTime")
@@ -343,7 +344,7 @@ func getDpiForMonitor(hmonitor syscall.Handle, dpiType uint32) int {
 
 // GetSystemDPI returns the effective DPI of the system.
 func GetSystemDPI() int {
-	// Check for getDpiForMonitor, introduced in Windows 8.1.
+	// Check for GetDpiForMonitor, introduced in Windows 8.1.
 	if _GetDpiForMonitor.Find() == nil {
 		hmon := monitorFromPoint(Point{}, MONITOR_DEFAULTTOPRIMARY)
 		return getDpiForMonitor(hmon, MDT_EFFECTIVE_DPI)
@@ -375,6 +376,17 @@ func GetMessage(m *Msg, hwnd syscall.Handle, wMsgFilterMin, wMsgFilterMax uint32
 func GetMessageTime() time.Duration {
 	r, _, _ := _GetMessageTime.Call()
 	return time.Duration(r) * time.Millisecond
+}
+
+// GetWindowDPI returns the effective DPI of the window.
+func GetWindowDPI(hwnd syscall.Handle) int {
+	// Check for GetDpiForWindow, introduced in Windows 10.
+	if _GetDpiForWindow.Find() == nil {
+		dpi, _, _ := _GetDpiForWindow.Call(uintptr(hwnd))
+		return int(dpi)
+	} else {
+		return GetSystemDPI()
+	}
 }
 
 func GlobalAlloc(size int) (syscall.Handle, error) {
