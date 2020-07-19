@@ -19,7 +19,7 @@ import (
 // use some global variables for benchmarking so as to not pollute
 // the reported allocs with allocations that we do not want to count.
 var (
-	c1, c2, c3    = make(chan op.CallOp, 0), make(chan op.CallOp, 0), make(chan op.CallOp, 0)
+	c1, c2, c3    = make(chan op.CallOp), make(chan op.CallOp), make(chan op.CallOp)
 	op1, op2, op3 op.Ops
 )
 

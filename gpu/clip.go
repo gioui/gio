@@ -6,7 +6,6 @@ import (
 )
 
 type quadSplitter struct {
-	verts   []byte
 	bounds  f32.Rectangle
 	contour uint32
 	d       *drawOps

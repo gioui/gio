@@ -29,8 +29,6 @@ const doubleClickDuration = 200 * time.Millisecond
 // Click detects click gestures in the form
 // of ClickEvents.
 type Click struct {
-	// state tracks the gesture state.
-	state ClickState
 	// clickedAt is the timestamp at which
 	// the last click occurred.
 	clickedAt time.Duration

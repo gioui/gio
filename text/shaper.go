@@ -49,8 +49,7 @@ type faceCache struct {
 }
 
 func (c *Cache) lookup(font Font) *faceCache {
-	var f *faceCache
-	f = c.faceForStyle(font)
+	f := c.faceForStyle(font)
 	if f == nil {
 		font.Typeface = c.def
 		f = c.faceForStyle(font)

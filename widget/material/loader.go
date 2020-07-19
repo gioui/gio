@@ -73,7 +73,6 @@ func clipLoader(ops *op.Ops, startAngle, endAngle, radius float64) {
 	// Use quadratic beziér curves to approximate a circle arc and
 	// minimize the error by capping the length of each curve segment.
 
-	const maxSegments = 20.
 	nsegments := math.Round(20 * math.Pi / (endAngle - startAngle))
 
 	θ := (endAngle - startAngle) / nsegments
