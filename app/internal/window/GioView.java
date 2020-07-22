@@ -12,6 +12,7 @@ import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.content.Context;
+import android.graphics.Color;
 import android.graphics.Rect;
 import android.os.Build;
 import android.text.Editable;
@@ -55,6 +56,10 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 
 		// Late initialization of the Go runtime to wait for a valid context.
 		Gio.init(context.getApplicationContext());
+
+		// Set background color to transparent to avoid a flickering
+		// issue on ChromeOS.
+		setBackgroundColor(Color.argb(0, 0, 0, 0));
 
 		ViewConfiguration conf = ViewConfiguration.get(context);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
