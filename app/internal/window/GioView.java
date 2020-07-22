@@ -109,8 +109,8 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	}
 
 	@Override public boolean onTouchEvent(MotionEvent event) {
-		// Ask for unbuffered events. Flutter and Chrome does it
-		// so I assume its good for us as well.
+		// Ask for unbuffered events. Flutter and Chrome do it
+		// so assume it's good for us as well.
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
 			requestUnbufferedDispatch(event);
 		}
