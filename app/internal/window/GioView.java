@@ -60,6 +60,9 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 			scrollXScale = conf.getScaledHorizontalScrollFactor();
 			scrollYScale = conf.getScaledVerticalScrollFactor();
+
+			// The platform focus highlight is not aware of Gio's widgets.
+			setDefaultFocusHighlightEnabled(false);
 		} else {
 			float listItemHeight = 48; // dp
 			float px = TypedValue.applyDimension(
