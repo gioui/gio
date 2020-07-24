@@ -193,17 +193,17 @@ func (w *Window) Invalidate() {
 }
 
 // ReadClipboard initiates a read of the clipboard in the form
-// of a system.ClipboardEvent. Multiple reads may be coalescedd
+// of a system.ClipboardEvent. Multiple reads may be coalesced
 // to a single event.
 func (w *Window) ReadClipboard() {
-	w.driverDo(func() {
+	go w.driverDo(func() {
 		w.driver.ReadClipboard()
 	})
 }
 
 // WriteClipboard writes a string to the clipboard.
 func (w *Window) WriteClipboard(s string) {
-	w.driverDo(func() {
+	go w.driverDo(func() {
 		w.driver.WriteClipboard(s)
 	})
 }
@@ -214,20 +214,20 @@ func (w *Window) WriteClipboard(s string) {
 // Currently, only macOS, Windows and X11 drivers implement this functionality,
 // all others are stubbed.
 func (w *Window) Close() {
-	w.driverDo(func() {
+	go w.driverDo(func() {
 		w.driver.Close()
 	})
 }
 
 // driverDo calls f as soon as the window has a valid driver attached,
-// or does nothing if the window is destroyed while waiting.
-func (w *Window) driverDo(f func()) {
-	go func() {
-		select {
-		case w.driverFuncs <- f:
-		case <-w.dead:
-		}
-	}()
+// or return false if the window was destroyed while waiting.
+func (w *Window) driverDo(f func()) bool {
+	select {
+	case w.driverFuncs <- f:
+		return true
+	case <-w.dead:
+		return false
+	}
 }
 
 func (w *Window) updateAnimation() {

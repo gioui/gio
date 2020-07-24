@@ -29,16 +29,25 @@ func (w *Window) Do(f func(view uintptr)) {
 	}
 	success := make(chan bool)
 	for {
-		driver := make(chan androidDriver, 1)
+		driver := make(chan androidDriver)
 		// two-stage process: first wait for a valid driver...
-		w.driverDo(func() {
-			driver <- w.driver.(androidDriver)
-		})
+		go func() {
+			alive := w.driverDo(func() {
+				driver <- w.driver.(androidDriver)
+			})
+			if !alive {
+				driver <- nil
+			}
+		}()
+		d := <-driver
+		if d == nil {
+			// Window is dead.
+			break
+		}
 		// .. then run the function on the main thread using the
 		// driver. The driver Do method returns false if the
 		// view was invalidated while switching to the main thread.
 		window.RunOnMain(func() {
-			d := <-driver
 			success <- d.Do(f)
 		})
 		if <-success {
