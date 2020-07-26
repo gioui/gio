@@ -277,7 +277,7 @@ func (w *window) touchEvent(typ pointer.Type, e js.Value) {
 			Position:  pos,
 			PointerID: pid,
 			Time:      t,
-			Modifiers: modifiersFor(e),
+			Modifiers: mods,
 		})
 	}
 }
