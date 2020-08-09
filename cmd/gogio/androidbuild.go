@@ -77,9 +77,9 @@ func init() {
 }
 
 func buildAndroid(tmpDir string, bi *buildInfo) error {
-	sdk := os.Getenv("ANDROID_HOME")
+	sdk := os.Getenv("ANDROID_SDK_ROOT")
 	if sdk == "" {
-		return errors.New("please set ANDROID_HOME to the Android SDK path")
+		return errors.New("please set ANDROID_SDK_ROOT to the Android SDK path")
 	}
 	if _, err := os.Stat(sdk); err != nil {
 		return err
@@ -164,9 +164,9 @@ func buildAndroid(tmpDir string, bi *buildInfo) error {
 }
 
 func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err error) {
-	androidHome := os.Getenv("ANDROID_HOME")
+	androidHome := os.Getenv("ANDROID_SDK_ROOT")
 	if androidHome == "" {
-		return errors.New("ANDROID_HOME is not set. Please point it to the root of the Android SDK")
+		return errors.New("ANDROID_SDK_ROOT is not set. Please point it to the root of the Android SDK")
 	}
 	javac, err := findJavaC()
 	if err != nil {
@@ -586,7 +586,7 @@ func findNDK(androidHome string) (string, error) {
 	if bestNDK, found := latestVersionPath(ndks); found {
 		return bestNDK, nil
 	}
-	// The old NDK path was $ANDROID_HOME/ndk-bundle.
+	// The old NDK path was $ANDROID_SDK_ROOT/ndk-bundle.
 	ndkBundle := filepath.Join(androidHome, "ndk-bundle")
 	if _, err := os.Stat(ndkBundle); err == nil {
 		return ndkBundle, nil
@@ -599,7 +599,7 @@ func findNDK(androidHome string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("no NDK found in $ANDROID_HOME (%s). Set $ANDROID_NDK_ROOT or use `sdkmanager ndk-bundle` to install the NDK", androidHome)
+	return "", fmt.Errorf("no NDK found in $ANDROID_SDK_ROOT (%s). Set $ANDROID_NDK_ROOT or use `sdkmanager ndk-bundle` to install the NDK", androidHome)
 }
 
 func findKeytool() (string, error) {

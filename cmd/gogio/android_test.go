@@ -24,9 +24,9 @@ type AndroidTestDriver struct {
 var rxAdbDevice = regexp.MustCompile(`(.*)\s+device$`)
 
 func (d *AndroidTestDriver) Start(path string) {
-	d.sdkDir = os.Getenv("ANDROID_HOME")
+	d.sdkDir = os.Getenv("ANDROID_SDK_ROOT")
 	if d.sdkDir == "" {
-		d.Skipf("Android SDK is required; set $ANDROID_HOME")
+		d.Skipf("Android SDK is required; set $ANDROID_SDK_ROOT")
 	}
 	d.adbPath = filepath.Join(d.sdkDir, "platform-tools", "adb")
 
