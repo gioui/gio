@@ -22,11 +22,13 @@ type Theme struct {
 		Hint    color.RGBA
 		InvText color.RGBA
 	}
-	TextSize              unit.Value
-	checkBoxCheckedIcon   *widget.Icon
-	checkBoxUncheckedIcon *widget.Icon
-	radioCheckedIcon      *widget.Icon
-	radioUncheckedIcon    *widget.Icon
+	TextSize unit.Value
+	Icon     struct {
+		CheckBoxChecked   *widget.Icon
+		CheckBoxUnchecked *widget.Icon
+		RadioChecked      *widget.Icon
+		RadioUnchecked    *widget.Icon
+	}
 }
 
 func NewTheme(fontCollection []text.FontFace) *Theme {
@@ -39,10 +41,10 @@ func NewTheme(fontCollection []text.FontFace) *Theme {
 	t.Color.InvText = rgb(0xffffff)
 	t.TextSize = unit.Sp(16)
 
-	t.checkBoxCheckedIcon = mustIcon(widget.NewIcon(icons.ToggleCheckBox))
-	t.checkBoxUncheckedIcon = mustIcon(widget.NewIcon(icons.ToggleCheckBoxOutlineBlank))
-	t.radioCheckedIcon = mustIcon(widget.NewIcon(icons.ToggleRadioButtonChecked))
-	t.radioUncheckedIcon = mustIcon(widget.NewIcon(icons.ToggleRadioButtonUnchecked))
+	t.Icon.CheckBoxChecked = mustIcon(widget.NewIcon(icons.ToggleCheckBox))
+	t.Icon.CheckBoxUnchecked = mustIcon(widget.NewIcon(icons.ToggleCheckBoxOutlineBlank))
+	t.Icon.RadioChecked = mustIcon(widget.NewIcon(icons.ToggleRadioButtonChecked))
+	t.Icon.RadioUnchecked = mustIcon(widget.NewIcon(icons.ToggleRadioButtonUnchecked))
 
 	return t
 }

@@ -27,8 +27,8 @@ func RadioButton(th *Theme, group *widget.Enum, key, label string) RadioButtonSt
 			TextSize:           th.TextSize.Scale(14.0 / 16.0),
 			Size:               unit.Dp(26),
 			shaper:             th.Shaper,
-			checkedStateIcon:   th.radioCheckedIcon,
-			uncheckedStateIcon: th.radioUncheckedIcon,
+			checkedStateIcon:   th.Icon.RadioChecked,
+			uncheckedStateIcon: th.Icon.RadioUnchecked,
 		},
 		Key: key,
 	}

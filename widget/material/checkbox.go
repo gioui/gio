@@ -23,8 +23,8 @@ func CheckBox(th *Theme, checkBox *widget.Bool, label string) CheckBoxStyle {
 			TextSize:           th.TextSize.Scale(14.0 / 16.0),
 			Size:               unit.Dp(26),
 			shaper:             th.Shaper,
-			checkedStateIcon:   th.checkBoxCheckedIcon,
-			uncheckedStateIcon: th.checkBoxUncheckedIcon,
+			checkedStateIcon:   th.Icon.CheckBoxChecked,
+			uncheckedStateIcon: th.Icon.CheckBoxUnchecked,
 		},
 	}
 }
