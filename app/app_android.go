@@ -6,6 +6,8 @@ import (
 	"gioui.org/app/internal/window"
 )
 
+type ViewEvent = window.ViewEvent
+
 // JavaVM returns the global JNI JavaVM.
 func JavaVM() uintptr {
 	return window.JavaVM()
@@ -15,43 +17,4 @@ func JavaVM() uintptr {
 // jobject.
 func AppContext() uintptr {
 	return window.AppContext()
-}
-
-// Do invokes the function with a JNI jobject handle to the underlying
-// Android View. The function is invoked on the main thread, and the
-// handle is invalidated after the function returns.
-//
-// Note: Do may deadlock if called from the same goroutine that receives from
-// Events.
-func (w *Window) Do(f func(view uintptr)) {
-	type androidDriver interface {
-		Do(f func(view uintptr)) bool
-	}
-	success := make(chan bool)
-	for {
-		driver := make(chan androidDriver)
-		// two-stage process: first wait for a valid driver...
-		go func() {
-			alive := w.driverDo(func() {
-				driver <- w.driver.(androidDriver)
-			})
-			if !alive {
-				driver <- nil
-			}
-		}()
-		d := <-driver
-		if d == nil {
-			// Window is dead.
-			break
-		}
-		// .. then run the function on the main thread using the
-		// driver. The driver Do method returns false if the
-		// view was invalidated while switching to the main thread.
-		window.RunOnMain(func() {
-			success <- d.Do(f)
-		})
-		if <-success {
-			break
-		}
-	}
 }

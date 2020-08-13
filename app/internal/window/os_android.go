@@ -82,6 +82,16 @@ type window struct {
 	mpostFrameCallback C.jmethodID
 }
 
+// ViewEvent is sent whenever the Window's underlying Android view
+// changes.
+type ViewEvent struct {
+	// View is a JNI global reference to the android.view.View
+	// instance backing the Window. The reference is valid until
+	// the next ViewEvent is received.
+	// A zero View means that there is currently no view attached.
+	View uintptr
+}
+
 type jvalue uint64 // The largest JNI type fits in 64 bits.
 
 var dataDirChan = make(chan string, 1)
@@ -200,12 +210,14 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 	views[handle] = w
 	w.loadConfig(env, class)
 	w.setStage(system.StagePaused)
+	w.callbacks.Event(ViewEvent{View: uintptr(view)})
 	return handle
 }
 
 //export Java_org_gioui_GioView_onDestroyView
 func Java_org_gioui_GioView_onDestroyView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := views[handle]
+	w.callbacks.Event(ViewEvent{View: 0})
 	w.callbacks.SetDriver(nil)
 	delete(views, handle)
 	C.gio_jni_DeleteGlobalRef(env, w.view)
@@ -532,23 +544,6 @@ func javaString(env *C.JNIEnv, str string) C.jstring {
 	return C.gio_jni_NewString(env, (*C.jchar)(unsafe.Pointer(&utf16Chars[0])), C.int(len(utf16Chars)))
 }
 
-// Do invokes the function with a global JNI handle to the view. If
-// the view is destroyed, Do returns false and does not invoke the
-// function.
-//
-// NOTE: Do must be invoked on the Android main thread.
-func (w *window) Do(f func(view uintptr)) bool {
-	if w.view == 0 {
-		return false
-	}
-	runInJVM(javaVM(), func(env *C.JNIEnv) {
-		view := C.gio_jni_NewGlobalRef(env, w.view)
-		defer C.gio_jni_DeleteGlobalRef(env, view)
-		f(uintptr(view))
-	})
-	return true
-}
-
 func varArgs(args []jvalue) *C.jvalue {
 	if len(args) == 0 {
 		return nil
@@ -653,14 +648,6 @@ func (w *window) ReadClipboard() {
 // Close the window. Not implemented for Android.
 func (w *window) Close() {}
 
-// RunOnMain is the exported version of runOnMain without a JNI
-// environement.
-func RunOnMain(f func()) {
-	runOnMain(func(_ *C.JNIEnv) {
-		f()
-	})
-}
-
 // runOnMain runs a function on the Java main thread.
 func runOnMain(f func(env *C.JNIEnv)) {
 	go func() {
@@ -682,3 +669,5 @@ func Java_org_gioui_Gio_scheduleMainFuncs(env *C.JNIEnv, cls C.jclass) {
 		}
 	}
 }
+
+func (_ ViewEvent) ImplementsEvent() {}
