@@ -350,7 +350,10 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, pe
 			return err
 		}
 	}
-	icon := filepath.Join(bi.dir, "appicon.png")
+	icon := *iconPath
+	if icon == "" {
+		icon = filepath.Join(bi.dir, "appicon.png")
+	}
 	iconSnip := ""
 	if _, err := os.Stat(icon); err == nil {
 		err := buildIcons(resDir, icon, []iconVariant{

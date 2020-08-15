@@ -15,9 +15,6 @@ programs for platforms where additional metadata or support files are required.
 The package argument specifies an import path or a single Go source file to
 package. Any run arguments are appended to os.Args at runtime.
 
-If the package contains an appicon.png file, it is used as the app icon on
-supported platforms.
-
 Compiled Java class files from jar files in the package directory are
 included in Android builds.
 
@@ -41,6 +38,10 @@ will output an app directory suitable for a simulator.
 
 The other buildmode is archive, which will output an .aar library for Android
 or a .framework for iOS and tvOS.
+
+The -icon flag specifies a path to a PNG image to use as app icon on iOS and Android.
+If left unspecified, the appicon.png file from the main package is used
+(if it exists).
 
 The -appid flag specifies the package name for Android or the bundle id for
 iOS and tvOS. A bundle id must be provisioned through Xcode before the gogio

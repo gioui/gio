@@ -34,6 +34,7 @@ var (
 	linkMode      = flag.String("linkmode", "", "set the -linkmode flag of the go tool")
 	extraLdflags  = flag.String("ldflags", "", "extra flags to the Go linker")
 	extraTags     = flag.String("tags", "", "extra tags to the Go tool")
+	iconPath      = flag.String("icon", "", "Specify an icon for iOS and Android")
 )
 
 type buildInfo struct {

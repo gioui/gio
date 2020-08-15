@@ -222,7 +222,10 @@ int main(int argc, char * argv[]) {
 	if err := ioutil.WriteFile(plistFile, []byte(infoPlist), 0660); err != nil {
 		return err
 	}
-	icon := filepath.Join(bi.dir, "appicon.png")
+	icon := *iconPath
+	if icon == "" {
+		icon = filepath.Join(bi.dir, "appicon.png")
+	}
 	if _, err := os.Stat(icon); err == nil {
 		assetPlist, err := iosIcons(bi, tmpDir, app, icon)
 		if err != nil {
