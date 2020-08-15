@@ -1,6 +1,6 @@
 module gioui.org
 
-go 1.13
+go 1.14
 
 require (
 	golang.org/x/exp v0.0.0-20191002040644-a1355ae1e2c3
