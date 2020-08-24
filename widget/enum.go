@@ -50,8 +50,10 @@ func (e *Enum) Layout(gtx layout.Context, key string) layout.Dimensions {
 		for _, ev := range clk.Events(gtx) {
 			switch ev.Type {
 			case gesture.TypeClick:
-				e.Value = e.values[idx]
-				e.changed = true
+				if new := e.values[idx]; new != e.Value {
+					e.Value = new
+					e.changed = true
+				}
 			}
 		}
 		clk.Add(gtx.Ops)
