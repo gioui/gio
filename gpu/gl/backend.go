@@ -488,7 +488,7 @@ func (b *Backend) NewProgram(vertShader, fragShader backend.ShaderSources) (back
 }
 
 func lookupUniform(funcs Functions, p Program, loc backend.UniformLocation) uniformLocation {
-	u := GetUniformLocation(funcs, p, loc.Name)
+	u := funcs.GetUniformLocation(p, loc.Name)
 	return uniformLocation{uniform: u, offset: loc.Offset, typ: loc.Type, size: loc.Size}
 }
 

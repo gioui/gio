@@ -37,14 +37,6 @@ func CreateProgram(ctx Functions, vsSrc, fsSrc string, attribs []string) (Progra
 	return prog, nil
 }
 
-func GetUniformLocation(ctx Functions, prog Program, name string) Uniform {
-	loc := ctx.GetUniformLocation(prog, name)
-	if !loc.valid() {
-		panic(fmt.Errorf("uniform %s not found", name))
-	}
-	return loc
-}
-
 func createShader(ctx Functions, typ Enum, src string) (Shader, error) {
 	sh := ctx.CreateShader(typ)
 	if !sh.valid() {

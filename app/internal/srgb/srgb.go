@@ -65,7 +65,7 @@ func (s *FBO) Blit() {
 		}
 		s.prog = prog
 		s.c.UseProgram(prog)
-		s.c.Uniform1i(gl.GetUniformLocation(s.c, prog, "tex"), 0)
+		s.c.Uniform1i(s.c.GetUniformLocation(prog, "tex"), 0)
 		s.quad = s.c.CreateBuffer()
 		s.c.BindBuffer(gl.ARRAY_BUFFER, s.quad)
 		s.c.BufferData(gl.ARRAY_BUFFER,
