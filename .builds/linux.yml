@@ -9,6 +9,7 @@ packages:
  - libxkbcommon-x11-dev
  - libgles2-mesa-dev
  - libegl1-mesa-dev
+ - libffi-dev
  - libxcursor-dev
  - libxrandr-dev
  - libxinerama-dev
