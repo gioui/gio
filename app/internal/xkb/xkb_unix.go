@@ -185,7 +185,10 @@ func (x *Context) DispatchKey(keyCode uint32) (events []event.Event) {
 		C.xkb_compose_state_reset(x.compState)
 		str = x.utf8Buf[:size]
 	case C.XKB_COMPOSE_NOTHING:
-		str = x.charsForKeycode(kc)
+		mod := x.Modifiers()
+		if mod&(key.ModCtrl|key.ModAlt|key.ModSuper) == 0 {
+			str = x.charsForKeycode(kc)
+		}
 	}
 	// Report only printable runes.
 	var n int
