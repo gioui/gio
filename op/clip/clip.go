@@ -28,6 +28,9 @@ type Path struct {
 	start   f32.Point
 }
 
+// Pos returns the current pen position.
+func (p *Path) Pos() f32.Point { return p.pen }
+
 // Op sets the current clip to the intersection of
 // the existing clip with this clip.
 //
