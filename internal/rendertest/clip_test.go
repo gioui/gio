@@ -1,6 +1,7 @@
 package rendertest
 
 import (
+	"math"
 	"testing"
 
 	"gioui.org/f32"
@@ -46,6 +47,35 @@ func TestPaintClippedCirle(t *testing.T) {
 		r.expect(21, 21, colornames.White)
 		r.expect(25, 30, colornames.Red)
 		r.expect(31, 30, colornames.White)
+	})
+}
+
+func TestPaintArc(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		p := new(clip.Path)
+		p.Begin(o)
+		p.Move(f32.Pt(0, 20))
+		p.Line(f32.Pt(10, 0))
+		p.Arc(f32.Pt(10, 0), f32.Pt(40, 0), math.Pi)
+		p.Line(f32.Pt(30, 0))
+		p.Line(f32.Pt(0, 25))
+		p.Arc(f32.Pt(-10, 5), f32.Pt(10, 15), -math.Pi)
+		p.Line(f32.Pt(0, 25))
+		p.Line(f32.Pt(-10, 0))
+		p.Arc(f32.Pt(-10, 0), f32.Pt(-40, 0), -math.Pi)
+		p.Line(f32.Pt(-10, 0))
+		p.Line(f32.Pt(0, -10))
+		p.Arc(f32.Pt(-10, -20), f32.Pt(10, -5), math.Pi)
+		p.Line(f32.Pt(0, -10))
+		p.Line(f32.Pt(-50, 0))
+		p.End().Add(o)
+
+		paint.ColorOp{Color: colornames.Red}.Add(o)
+		paint.PaintOp{Rect: f32.Rect(0, 0, 128, 128)}.Add(o)
+	}, func(r result) {
+		r.expect(0, 0, colornames.White)
+		r.expect(0, 25, colornames.Red)
+		r.expect(0, 15, colornames.White)
 	})
 }
 

@@ -5,6 +5,7 @@ package clip
 import (
 	"encoding/binary"
 	"image"
+	"math"
 
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
@@ -102,6 +103,153 @@ func (p *Path) quadTo(ctrl, to f32.Point) {
 		To:   to,
 	})
 	p.pen = to
+}
+
+// Arc adds an elliptical arc to the path. The implied ellipse is defined
+// by its focus points f1 and f2.
+// The arc starts in the current point and ends angle radians along the ellipse boundary.
+// The sign of angle determines the direction; positive being counter-clockwise,
+// negative clockwise.
+func (p *Path) Arc(f1, f2 f32.Point, angle float32) {
+	f1 = f1.Add(p.pen)
+	f2 = f2.Add(p.pen)
+	c, rx, ry, beg, alpha := arcFrom(f1, f2, p.pen)
+	p.arc(alpha, c, rx, ry, beg, float64(angle))
+}
+
+func dist(p1, p2 f32.Point) float64 {
+	var (
+		x1 = float64(p1.X)
+		y1 = float64(p1.Y)
+		x2 = float64(p2.X)
+		y2 = float64(p2.Y)
+		dx = x2 - x1
+		dy = y2 - y1
+	)
+	return math.Hypot(dx, dy)
+}
+
+func arcFrom(f1, f2, p f32.Point) (c f32.Point, rx, ry, start, alpha float64) {
+	c = f32.Point{
+		X: 0.5 * (f1.X + f2.X),
+		Y: 0.5 * (f1.Y + f2.Y),
+	}
+
+	// semi-major axis: 2a = |PF1| + |PF2|
+	a := 0.5 * (dist(f1, p) + dist(f2, p))
+
+	// semi-minor axis: c^2 = a^2+b^2 (c: focal distance)
+	f := dist(f1, c)
+	b := math.Sqrt(a*a - f*f)
+
+	switch {
+	case a > b:
+		rx = a
+		ry = b
+	default:
+		rx = b
+		ry = a
+	}
+
+	var x float64
+	switch {
+	case f1 == c || f2 == c:
+		// degenerate case of a circle.
+		alpha = 0
+	default:
+		switch {
+		case f1.X > c.X:
+			x = float64(f1.X - c.X)
+			alpha = math.Acos(x / f)
+		case f1.X < c.X:
+			x = float64(f2.X - c.X)
+			alpha = math.Acos(x / f)
+		case f1.X == c.X:
+			// special case of a "vertical" ellipse.
+			alpha = math.Pi / 2
+			if f1.Y < c.Y {
+				alpha = -alpha
+			}
+		}
+	}
+
+	start = math.Acos(float64(p.X-c.X) / dist(c, p))
+	if c.Y > p.Y {
+		start = -start
+	}
+	start -= alpha
+
+	return c, rx, ry, start, alpha
+}
+
+// arc records an elliptical arc centered at c, with radii rx and ry,
+// starting at angle beg and stopping at end, in radians.
+//
+// The math is extracted from the following paper:
+//  "Drawing an elliptical arc using polylines, quadratic or
+//   cubic Bezier curves", L. Maisonobe
+// An electronic version may be found at:
+//  http://spaceroots.org/documents/ellipse/elliptical-arc.pdf
+func (p *Path) arc(alpha float64, c f32.Point, rx, ry, beg, delta float64) {
+	var (
+		n = math.Round(20 * math.Pi / math.Abs(delta))
+		θ = delta / n
+
+		sinθ64, cosθ64 = math.Sincos(θ)
+		sinθ, cosθ     = float32(sinθ64), float32(cosθ64)
+		b              = (cosθ - 1) / sinθ
+	)
+
+	var (
+		ref f32.Affine2D // transform from absolute frame to ellipse-based one
+		rot f32.Affine2D // rotation matrix for each segment
+		inv f32.Affine2D // transform from ellipse-based frame to absolute one
+	)
+	ref = ref.Offset(f32.Point{}.Sub(c))
+	ref = ref.Rotate(f32.Point{}, float32(-alpha))
+	ref = ref.Scale(f32.Point{}, f32.Point{
+		X: float32(1 / rx),
+		Y: float32(1 / ry),
+	})
+	inv = ref.Invert()
+	rot = rot.Rotate(f32.Point{}, float32(θ))
+
+	// Instead of invoking math.Sincos for every segment, compute a rotation
+	// matrix once and apply for each segment.
+	// Before applying the rotation matrix rot, transform the coordinates
+	// to a frame centered to the ellipse (and warped into a unit circle), then rotate.
+	// Finally, transform back into the original frame.
+	//
+	// Also compute the control point C according to
+	// https://pomax.github.io/bezierinfo/#circles.
+	// If S is the starting point, S' is the orthogonal
+	// tangent, θ is clockwise:
+	//
+	// C = S + b*S', b = (cos θ - 1)/sin θ
+	//
+	// We apply the same original <-> ellipse frame transformation to the
+	// control point as well.
+	rotate := func(p f32.Point) (end, ctl f32.Point) {
+		q := ref.Transform(p)
+		t := f32.Pt(-q.Y, q.X)
+
+		end = rot.Transform(q)
+		ctl = q.Add(t.Mul(b))
+
+		end = inv.Transform(end)
+		ctl = inv.Transform(ctl)
+
+		return end, ctl
+	}
+
+	var (
+		ctl f32.Point
+		end = p.pen
+	)
+	for i := 0; i < int(n); i++ {
+		end, ctl = rotate(p.pen)
+		p.quadTo(ctl, end)
+	}
 }
 
 // Cube records a cubic Bézier from the pen through
