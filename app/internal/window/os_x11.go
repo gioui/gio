@@ -53,6 +53,8 @@ type x11Window struct {
 	atoms struct {
 		// "UTF8_STRING".
 		utf8string C.Atom
+		// "text/plain;charset=utf-8".
+		plaintext C.Atom
 		// "TARGETS"
 		targets C.Atom
 		// "CLIPBOARD".
@@ -63,6 +65,8 @@ type x11Window struct {
 		evDelWindow C.Atom
 		// "ATOM"
 		atom C.Atom
+		// "GTK_TEXT_BUFFER_CONTENTS"
+		gtk_text_buffer_contents C.Atom
 	}
 	stage  system.Stage
 	cfg    unit.Metric
@@ -418,21 +422,27 @@ func (h *x11EventHandler) handleEvents() bool {
 			switch cevt.target {
 			case w.atoms.targets:
 				// The requestor wants the supported clipboard
-				// formats. First write the formats...
-				formats := []uint32{uint32(w.atoms.utf8string)}
+				// formats. First write the targets...
+				formats := []C.long{
+					C.long(w.atoms.targets),
+					C.long(w.atoms.utf8string),
+					C.long(w.atoms.plaintext),
+					// GTK clients need this.
+					C.long(w.atoms.gtk_text_buffer_contents),
+				}
 				C.XChangeProperty(w.x, cevt.requestor, cevt.property, w.atoms.atom,
 					32 /* bitwidth of formats */, C.PropModeReplace,
 					(*C.uchar)(unsafe.Pointer(&formats[0])), C.int(len(formats)),
 				)
 				// ...then notify the requestor.
 				notify()
-			case w.atoms.utf8string:
+			case w.atoms.plaintext, w.atoms.utf8string, w.atoms.gtk_text_buffer_contents:
 				content := w.clipboard.content
 				var ptr *C.uchar
 				if len(content) > 0 {
 					ptr = (*C.uchar)(unsafe.Pointer(&content[0]))
 				}
-				C.XChangeProperty(w.x, cevt.requestor, cevt.property, w.atoms.utf8string,
+				C.XChangeProperty(w.x, cevt.requestor, cevt.property, cevt.target,
 					8 /* bitwidth */, C.PropModeReplace,
 					ptr, C.int(len(content)),
 				)
@@ -554,6 +564,8 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	C.XSetClassHint(dpy, win, &wmhints)
 
 	w.atoms.utf8string = w.atom("UTF8_STRING", false)
+	w.atoms.plaintext = w.atom("text/plain;charset=utf-8", false)
+	w.atoms.gtk_text_buffer_contents = w.atom("GTK_TEXT_BUFFER_CONTENTS", false)
 	w.atoms.evDelWindow = w.atom("WM_DELETE_WINDOW", false)
 	w.atoms.clipboard = w.atom("CLIPBOARD", false)
 	w.atoms.clipboardContent = w.atom("CLIPBOARD_CONTENT", false)
