@@ -61,6 +61,7 @@ func TestPaintArc(t *testing.T) {
 		p.Line(f32.Pt(0, 25))
 		p.Arc(f32.Pt(-10, 5), f32.Pt(10, 15), -math.Pi)
 		p.Line(f32.Pt(0, 25))
+		p.Arc(f32.Pt(10, 10), f32.Pt(10, 10), 2*math.Pi)
 		p.Line(f32.Pt(-10, 0))
 		p.Arc(f32.Pt(-10, 0), f32.Pt(-40, 0), -math.Pi)
 		p.Line(f32.Pt(-10, 0))

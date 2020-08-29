@@ -194,16 +194,9 @@ func arcFrom(f1, f2, p f32.Point) (c f32.Point, rx, ry, start, alpha float64) {
 // An electronic version may be found at:
 //  http://spaceroots.org/documents/ellipse/elliptical-arc.pdf
 func (p *Path) arc(alpha float64, c f32.Point, rx, ry, beg, delta float64) {
+	const n = 16
 	var (
-		n = math.Round(20 * math.Pi / math.Abs(delta))
-		θ = delta / n
-
-		sinθ64, cosθ64 = math.Sincos(θ)
-		sinθ, cosθ     = float32(sinθ64), float32(cosθ64)
-		b              = (cosθ - 1) / sinθ
-	)
-
-	var (
+		θ   = delta / n
 		ref f32.Affine2D // transform from absolute frame to ellipse-based one
 		rot f32.Affine2D // rotation matrix for each segment
 		inv f32.Affine2D // transform from ellipse-based frame to absolute one
@@ -215,43 +208,29 @@ func (p *Path) arc(alpha float64, c f32.Point, rx, ry, beg, delta float64) {
 		Y: float32(1 / ry),
 	})
 	inv = ref.Invert()
-	rot = rot.Rotate(f32.Point{}, float32(θ))
+	rot = rot.Rotate(f32.Point{}, float32(0.5*θ))
 
 	// Instead of invoking math.Sincos for every segment, compute a rotation
 	// matrix once and apply for each segment.
 	// Before applying the rotation matrix rot, transform the coordinates
 	// to a frame centered to the ellipse (and warped into a unit circle), then rotate.
 	// Finally, transform back into the original frame.
-	//
-	// Also compute the control point C according to
-	// https://pomax.github.io/bezierinfo/#circles.
-	// If S is the starting point, S' is the orthogonal
-	// tangent, θ is clockwise:
-	//
-	// C = S + b*S', b = (cos θ - 1)/sin θ
-	//
-	// We apply the same original <-> ellipse frame transformation to the
-	// control point as well.
-	rotate := func(p f32.Point) (end, ctl f32.Point) {
+	step := func(p f32.Point) f32.Point {
 		q := ref.Transform(p)
-		t := f32.Pt(-q.Y, q.X)
-
-		end = rot.Transform(q)
-		ctl = q.Add(t.Mul(b))
-
-		end = inv.Transform(end)
-		ctl = inv.Transform(ctl)
-
-		return end, ctl
+		q = rot.Transform(q)
+		q = inv.Transform(q)
+		return q
 	}
 
-	var (
-		ctl f32.Point
-		end = p.pen
-	)
-	for i := 0; i < int(n); i++ {
-		end, ctl = rotate(p.pen)
-		p.quadTo(ctl, end)
+	for i := 0; i < n; i++ {
+		p0 := p.pen
+		p1 := step(p0)
+		p2 := step(p1)
+		ctl := f32.Pt(
+			2*p1.X-0.5*(p0.X+p2.X),
+			2*p1.Y-0.5*(p0.Y+p2.Y),
+		)
+		p.quadTo(ctl, p2)
 	}
 }
 
