@@ -25,8 +25,6 @@ packages:
  - unzip
 sources:
  - https://git.sr.ht/~eliasnaur/gio
-secrets:
- - 0dd5efdf-400e-4735-8320-98b44844dfd0
 environment:
  GOFLAGS: -mod=readonly
  PATH: /home/build/sdk/go/bin:/usr/bin:/home/build/go/bin:/home/build/android/tools/bin
@@ -80,8 +78,3 @@ tasks:
  - test_android: |
      cd gio/example
      gogio -target android ./kitchen
- - annotate: |
-     go get git.sr.ht/~sircmpwn/annotatego
-     cd gio
-     ~/go/bin/annotatego -v -T gioui.org... > annotations.json
-     ../upload-annotations annotations.json eliasnaur gio
