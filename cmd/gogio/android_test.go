@@ -29,6 +29,9 @@ func (d *AndroidTestDriver) Start(path string) {
 		d.Skipf("Android SDK is required; set $ANDROID_SDK_ROOT")
 	}
 	d.adbPath = filepath.Join(d.sdkDir, "platform-tools", "adb")
+	if _, err := os.Stat(d.adbPath); os.IsNotExist(err) {
+		d.Skipf("adb not found")
+	}
 
 	devOut := bytes.TrimSpace(d.adb("devices"))
 	devices := rxAdbDevice.FindAllSubmatch(devOut, -1)
