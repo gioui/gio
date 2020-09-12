@@ -8,9 +8,8 @@ Usage:
 
 	gogio -target <target> [flags] <package> [run arguments]
 
-The go tool is sufficient to build, install and run Gio programs on platforms
-where a single executable is sufficient. The gogio tool can build and package Gio
-programs for platforms where additional metadata or support files are required.
+The gogio tool builds and packages Gio programs for platforms where additional
+metadata or support files are required.
 
 The package argument specifies an import path or a single Go source file to
 package. Any run arguments are appended to os.Args at runtime.
@@ -47,8 +46,11 @@ The -appid flag specifies the package name for Android or the bundle id for
 iOS and tvOS. A bundle id must be provisioned through Xcode before the gogio
 tool can use it.
 
-The -version flag specifies the integer version for Android and the last
+The -version flag specifies the integer version code for Android and the last
 component of the 1.0.X version for iOS and tvOS.
+
+For Android builds the -minsdk flag specify the minimum SDK level. For example,
+use -minsdk 22 to target Android 5.1 (Lollipop) and later.
 
 The -work flag prints the path to the working directory and suppress
 its deletion.
