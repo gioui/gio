@@ -276,9 +276,17 @@ func (e *Editor) command(k key.Event) bool {
 	case key.NameReturn, key.NameEnter:
 		e.append("\n")
 	case key.NameDeleteBackward:
-		e.Delete(-1)
+		if k.Modifiers == modSkip {
+			e.deleteWord(-1)
+		} else {
+			e.Delete(-1)
+		}
 	case key.NameDeleteForward:
-		e.Delete(1)
+		if k.Modifiers == modSkip {
+			e.deleteWord(1)
+		} else {
+			e.Delete(1)
+		}
 	case key.NameUpArrow:
 		e.moveLines(-1)
 	case key.NameDownArrow:
@@ -822,6 +830,53 @@ func (e *Editor) moveWord(distance int) {
 			e.Move(direction)
 		}
 	}
+}
+
+// deleteWord the next word(s) in the specified direction.
+// Unlike moveWord, deleteWord treats whitespace as a word itself.
+// Positive is forward, negative is backward.
+// Absolute values greater than one will delete that many words.
+func (e *Editor) deleteWord(distance int) {
+	e.makeValid()
+	// split the distance information into constituent parts to be
+	// used independently.
+	words, direction := distance, 1
+	if distance < 0 {
+		words, direction = distance*-1, -1
+	}
+	// atEnd if offset is at or beyond either side of the buffer.
+	atEnd := func(offset int) bool {
+		idx := e.rr.caret + offset*direction
+		return idx <= 0 || idx >= e.rr.len()
+	}
+	// next returns the appropriate rune given the direction and offset.
+	next := func(offset int) (r rune) {
+		idx := e.rr.caret + offset*direction
+		if idx < 0 {
+			idx = 0
+		} else if idx > e.rr.len() {
+			idx = e.rr.len()
+		}
+		if direction < 0 {
+			r, _ = e.rr.runeBefore(idx)
+		} else {
+			r, _ = e.rr.runeAt(idx)
+		}
+		return r
+	}
+	var runes = 1
+	for ii := 0; ii < words; ii++ {
+		if r := next(runes); unicode.IsSpace(r) {
+			for r := next(runes); unicode.IsSpace(r) && !atEnd(runes); r = next(runes) {
+				runes += 1
+			}
+		} else {
+			for r := next(runes); !unicode.IsSpace(r) && !atEnd(runes); r = next(runes) {
+				runes += 1
+			}
+		}
+	}
+	e.Delete(runes * direction)
 }
 
 func (e *Editor) scrollToCaret() {
