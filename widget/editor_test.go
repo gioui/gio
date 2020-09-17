@@ -91,6 +91,7 @@ const (
 	moveStart
 	moveEnd
 	moveCoord
+	moveWord
 	moveLast // Mark end; never generated.
 )
 
@@ -140,6 +141,8 @@ func TestEditorCaretConsistency(t *testing.T) {
 				e.moveEnd()
 			case moveCoord:
 				e.moveCoord(image.Pt(int(x), int(y)))
+			case moveWord:
+				e.moveWord(int(distance))
 			default:
 				return false
 			}
@@ -155,6 +158,51 @@ func TestEditorCaretConsistency(t *testing.T) {
 	}
 }
 
+func TestEditorMoveWord(t *testing.T) {
+	type Test struct {
+		Text  string
+		Start int
+		Skip  int
+		Want  int
+	}
+	tests := []Test{
+		{"", 0, 0, 0},
+		{"", 0, -1, 0},
+		{"", 0, 1, 0},
+		{"hello", 0, -1, 0},
+		{"hello", 0, 1, 5},
+		{"hello world", 3, 1, 5},
+		{"hello world", 3, -1, 0},
+		{"hello world", 8, -1, 6},
+		{"hello world", 8, 1, 11},
+		{"hello    world", 3, 1, 5},
+		{"hello    world", 3, 2, 14},
+		{"hello    world", 8, 1, 14},
+		{"hello    world", 8, -1, 0},
+		{"hello brave new world", 0, 3, 15},
+	}
+	setup := func(t string) *Editor {
+		e := new(Editor)
+		gtx := layout.Context{
+			Ops:         new(op.Ops),
+			Constraints: layout.Exact(image.Pt(100, 100)),
+		}
+		cache := text.NewCache(gofont.Collection())
+		fontSize := unit.Px(10)
+		font := text.Font{}
+		e.SetText(t)
+		e.Layout(gtx, cache, font, fontSize)
+		return e
+	}
+	for ii, tt := range tests {
+		e := setup(tt.Text)
+		e.Move(tt.Start)
+		e.moveWord(tt.Skip)
+		if e.rr.caret != tt.Want {
+			t.Fatalf("[%d] moveWord: bad caret position: got %d, want %d", ii, e.rr.caret, tt.Want)
+		}
+	}
+}
 func TestEditorNoLayout(t *testing.T) {
 	var e Editor
 	e.SetText("hi!\n")

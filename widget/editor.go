@@ -7,8 +7,10 @@ import (
 	"image"
 	"io"
 	"math"
+	"runtime"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"gioui.org/f32"
@@ -266,6 +268,10 @@ func (e *Editor) moveLines(distance int) {
 }
 
 func (e *Editor) command(k key.Event) bool {
+	modSkip := key.ModCtrl
+	if runtime.GOOS == "darwin" {
+		modSkip = key.ModAlt
+	}
 	switch k.Name {
 	case key.NameReturn, key.NameEnter:
 		e.append("\n")
@@ -278,9 +284,17 @@ func (e *Editor) command(k key.Event) bool {
 	case key.NameDownArrow:
 		e.moveLines(+1)
 	case key.NameLeftArrow:
-		e.Move(-1)
+		if k.Modifiers == modSkip {
+			e.moveWord(-1)
+		} else {
+			e.Move(-1)
+		}
 	case key.NameRightArrow:
-		e.Move(1)
+		if k.Modifiers == modSkip {
+			e.moveWord(1)
+		} else {
+			e.Move(1)
+		}
 	case key.NamePageUp:
 		e.movePages(-1)
 	case key.NamePageDown:
@@ -773,6 +787,41 @@ func (e *Editor) moveEnd() {
 	}
 	a := align(e.Alignment, l.Width, e.viewSize.X)
 	e.caret.xoff = l.Width + a - e.caret.x
+}
+
+// moveWord moves the caret to the next word in the specified direction.
+// Positive is forward, negative is backward.
+// Absolute values greater than one will skip that many words.
+func (e *Editor) moveWord(distance int) {
+	e.makeValid()
+	// split the distance information into constituent parts to be
+	// used independently.
+	words, direction := distance, 1
+	if distance < 0 {
+		words, direction = distance*-1, -1
+	}
+	// atEnd if caret is at either side of the buffer.
+	atEnd := func() bool {
+		return e.rr.caret == 0 || e.rr.caret == e.rr.len()
+	}
+	// next returns the appropriate rune given the direction.
+	next := func() (r rune) {
+		if direction < 0 {
+			r, _ = e.rr.runeBefore(e.rr.caret)
+		} else {
+			r, _ = e.rr.runeAt(e.rr.caret)
+		}
+		return r
+	}
+	for ii := 0; ii < words; ii++ {
+		for r := next(); unicode.IsSpace(r) && !atEnd(); r = next() {
+			e.Move(direction)
+		}
+		e.Move(direction)
+		for r := next(); !unicode.IsSpace(r) && !atEnd(); r = next() {
+			e.Move(direction)
+		}
+	}
 }
 
 func (e *Editor) scrollToCaret() {
