@@ -7,6 +7,7 @@ import (
 	"image/color"
 
 	"gioui.org/f32"
+	"gioui.org/internal/f32color"
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -52,9 +53,9 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 		col = s.Color.Enabled
 	}
 	if gtx.Queue == nil {
-		col = mulAlpha(col, 150)
+		col = f32color.MulAlpha(col, 150)
 	}
-	trackColor := mulAlpha(col, 150)
+	trackColor := f32color.MulAlpha(col, 150)
 	op.Offset(f32.Point{Y: trackOff}).Add(gtx.Ops)
 	clip.RRect{
 		Rect: trackRect,

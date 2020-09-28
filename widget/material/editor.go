@@ -5,6 +5,7 @@ package material
 import (
 	"image/color"
 
+	"gioui.org/internal/f32color"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/paint"
@@ -56,7 +57,7 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 	if e.Editor.Len() > 0 {
 		textColor := e.Color
 		if disabled {
-			textColor = mulAlpha(textColor, 150)
+			textColor = f32color.MulAlpha(textColor, 150)
 		}
 		paint.ColorOp{Color: textColor}.Add(gtx.Ops)
 		e.Editor.PaintText(gtx)

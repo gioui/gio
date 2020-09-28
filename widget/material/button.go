@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"gioui.org/f32"
+	"gioui.org/internal/f32color"
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -131,7 +132,7 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 			}.Add(gtx.Ops)
 			background := b.Background
 			if gtx.Queue == nil {
-				background = mulAlpha(b.Background, 150)
+				background = f32color.MulAlpha(b.Background, 150)
 			}
 			dims := fill(gtx, background)
 			for _, c := range b.Button.History() {
@@ -159,7 +160,7 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 			}.Add(gtx.Ops)
 			background := b.Background
 			if gtx.Queue == nil {
-				background = mulAlpha(b.Background, 150)
+				background = f32color.MulAlpha(b.Background, 150)
 			}
 			dims := fill(gtx, background)
 			for _, c := range b.Button.History() {
@@ -273,9 +274,10 @@ func drawInk(gtx layout.Context, c widget.Press) {
 	size *= sizeBezier
 	alpha := 0.7 * alphaBezier
 	const col = 0.8
-	ba, bc := byte(alpha*0xff), byte(alpha*col*0xff)
+	ba, bc := byte(alpha*0xff), byte(col*0xff)
 	defer op.Push(gtx.Ops).Pop()
-	ink := paint.ColorOp{Color: color.RGBA{A: ba, R: bc, G: bc, B: bc}}
+	rgba := f32color.MulAlpha(color.RGBA{A: 0xff, R: bc, G: bc, B: bc}, ba)
+	ink := paint.ColorOp{Color: rgba}
 	ink.Add(gtx.Ops)
 	rr := size * .5
 	op.Offset(c.Position.Add(f32.Point{

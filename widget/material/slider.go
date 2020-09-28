@@ -7,6 +7,7 @@ import (
 	"image/color"
 
 	"gioui.org/f32"
+	"gioui.org/internal/f32color"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -55,7 +56,7 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 	color := s.Color
 	if gtx.Queue == nil {
-		color = mulAlpha(color, 150)
+		color = f32color.MulAlpha(color, 150)
 	}
 
 	// Draw track before thumb.
@@ -80,7 +81,7 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	track.Min.X = thumbPos
 	track.Max.X = float32(size.X) - halfWidth
 	clip.RRect{Rect: track}.Add(gtx.Ops)
-	paint.ColorOp{Color: mulAlpha(color, 96)}.Add(gtx.Ops)
+	paint.ColorOp{Color: f32color.MulAlpha(color, 96)}.Add(gtx.Ops)
 	paint.PaintOp{Rect: track}.Add(gtx.Ops)
 	st.Pop()
 

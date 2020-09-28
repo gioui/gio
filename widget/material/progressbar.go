@@ -7,6 +7,7 @@ import (
 	"image/color"
 
 	"gioui.org/f32"
+	"gioui.org/internal/f32color"
 	"gioui.org/layout"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
@@ -58,7 +59,7 @@ func (p ProgressBarStyle) Layout(gtx layout.Context) layout.Dimensions {
 	return layout.Stack{Alignment: layout.W}.Layout(gtx,
 		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			// Use a transparent equivalent of progress color.
-			bgCol := mulAlpha(p.Color, 150)
+			bgCol := f32color.MulAlpha(p.Color, 150)
 
 			return shader(progressBarWidth, bgCol)
 		}),
@@ -66,20 +67,9 @@ func (p ProgressBarStyle) Layout(gtx layout.Context) layout.Dimensions {
 			fillWidth := (progressBarWidth / 100) * float32(progress)
 			fillColor := p.Color
 			if gtx.Queue == nil {
-				fillColor = mulAlpha(fillColor, 200)
+				fillColor = f32color.MulAlpha(fillColor, 200)
 			}
 			return shader(fillWidth, fillColor)
 		}),
 	)
-}
-
-// mulAlpha scales all color components by alpha/255.
-func mulAlpha(c color.RGBA, alpha uint8) color.RGBA {
-	a := uint16(alpha)
-	return color.RGBA{
-		A: uint8(uint16(c.A) * a / 255),
-		R: uint8(uint16(c.R) * a / 255),
-		G: uint8(uint16(c.G) * a / 255),
-		B: uint8(uint16(c.B) * a / 255),
-	}
 }

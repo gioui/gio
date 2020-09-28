@@ -73,3 +73,15 @@ func sRGBToLinear(c float32) float32 {
 		return float32(math.Pow(float64((c+0.055)/1.055), 2.4))
 	}
 }
+
+// MulAlpha scales all color components by alpha/255.
+func MulAlpha(c color.RGBA, alpha uint8) color.RGBA {
+	// TODO: Optimize. This is pretty slow.
+	a := float32(alpha) / 255.
+	rgba := RGBAFromSRGB(c)
+	rgba.A *= a
+	rgba.R *= a
+	rgba.G *= a
+	rgba.B *= a
+	return rgba.SRGB()
+}
