@@ -13,6 +13,8 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/font/gofont"
+	"gioui.org/io/event"
+	"gioui.org/io/key"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/text"
@@ -66,6 +68,35 @@ func TestEditor(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestEditorDimensions(t *testing.T) {
+	e := new(Editor)
+	tq := &testQueue{
+		events: []event.Event{
+			key.EditEvent{Text: "A"},
+		},
+	}
+	gtx := layout.Context{
+		Ops:         new(op.Ops),
+		Constraints: layout.Constraints{Max: image.Pt(100, 100)},
+		Queue:       tq,
+	}
+	cache := text.NewCache(gofont.Collection())
+	fontSize := unit.Px(10)
+	font := text.Font{}
+	dims := e.Layout(gtx, cache, font, fontSize)
+	if dims.Size.X == 0 {
+		t.Errorf("EditEvent was not reflected in Editor width")
+	}
+}
+
+type testQueue struct {
+	events []event.Event
+}
+
+func (q *testQueue) Events(_ event.Tag) []event.Event {
+	return q.events
 }
 
 // assertCaret asserts that the editor caret is at a particular line

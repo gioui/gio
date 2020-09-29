@@ -354,6 +354,7 @@ func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size
 
 	e.makeValid()
 	e.processEvents(gtx)
+	e.makeValid()
 
 	if viewSize := gtx.Constraints.Constrain(e.dims.Size); viewSize != e.viewSize {
 		e.viewSize = viewSize
