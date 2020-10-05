@@ -79,10 +79,11 @@ type StageEvent struct {
 	Stage Stage
 }
 
-// CommandEvent is a system event.
+// CommandEvent is a system event. Unlike most other events, CommandEvent is
+// delivered as a pointer to allow Cancel to suppress it.
 type CommandEvent struct {
 	Type CommandType
-	// Suppress the default action of the command.
+	// Cancel suppress the default action of the command.
 	Cancel bool
 }
 
