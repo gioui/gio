@@ -23,6 +23,10 @@ type Constraints struct {
 }
 
 // Dimensions are the resolved size and baseline for a widget.
+//
+// Baseline is the distance from the bottom of a widget to the baseline of
+// any text it contains (or 0). The purpose is to be able to align text
+// that span multiple widgets.
 type Dimensions struct {
 	Size     image.Point
 	Baseline int
@@ -153,7 +157,8 @@ func UniformInset(v unit.Value) Inset {
 }
 
 // Layout a widget according to the direction.
-func (a Direction) Layout(gtx Context, w Widget) Dimensions {
+// The widget is called with the context constraints minimum cleared.
+func (d Direction) Layout(gtx Context, w Widget) Dimensions {
 	macro := op.Record(gtx.Ops)
 	cs := gtx.Constraints
 	gtx.Constraints.Min = image.Point{}
@@ -167,13 +172,13 @@ func (a Direction) Layout(gtx Context, w Widget) Dimensions {
 		sz.Y = cs.Min.Y
 	}
 	var p image.Point
-	switch Direction(a) {
+	switch d {
 	case N, S, Center:
 		p.X = (sz.X - dims.Size.X) / 2
 	case NE, SE, E:
 		p.X = sz.X - dims.Size.X
 	}
-	switch Direction(a) {
+	switch d {
 	case W, Center, E:
 		p.Y = (sz.Y - dims.Size.Y) / 2
 	case SW, S, SE:
