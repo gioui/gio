@@ -2,7 +2,7 @@ image: debian/testing
 packages:
  - clang
  - cmake
- - python
+ - curl
  - autoconf
  - libxml2-dev
  - libssl-dev
