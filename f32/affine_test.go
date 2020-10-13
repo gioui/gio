@@ -13,6 +13,16 @@ func eq(p1, p2 Point) bool {
 	return math.Abs(math.Sqrt(float64(dx*dx+dy*dy))) < tol
 }
 
+func eqaff(x, y Affine2D) bool {
+	tol := 1e-5
+	return math.Abs(float64(x.a-y.a)) < tol &&
+		math.Abs(float64(x.b-y.b)) < tol &&
+		math.Abs(float64(x.c-y.c)) < tol &&
+		math.Abs(float64(x.d-y.d)) < tol &&
+		math.Abs(float64(x.e-y.e)) < tol &&
+		math.Abs(float64(x.f-y.f)) < tol
+}
+
 func TestTransformOffset(t *testing.T) {
 	p := Point{X: 1, Y: 2}
 	o := Point{X: 2, Y: -3}
@@ -84,6 +94,49 @@ func TestTransformMultiply(t *testing.T) {
 	}
 }
 
+func TestPrimes(t *testing.T) {
+	xa := NewAffine2D(9, 11, 13, 17, 19, 23)
+	xb := NewAffine2D(29, 31, 37, 43, 47, 53)
+
+	pa := Point{X: 2, Y: 3}
+	pb := Point{X: 5, Y: 7}
+
+	for _, test := range []struct {
+		x   Affine2D
+		p   Point
+		exp Point
+	}{
+		{x: xa, p: pa, exp: Pt(64, 114)},
+		{x: xa, p: pb, exp: Pt(135, 241)},
+		{x: xb, p: pa, exp: Pt(188, 280)},
+		{x: xb, p: pb, exp: Pt(399, 597)},
+	} {
+		got := test.x.Transform(test.p)
+		if !eq(got, test.exp) {
+			t.Errorf("%v.Transform(%v): have %v, want %v", test.x, test.p, got, test.exp)
+		}
+	}
+
+	for _, test := range []struct {
+		x   Affine2D
+		exp Affine2D
+	}{
+		{x: xa, exp: NewAffine2D(-1.1875, 0.6875, -0.375, 1.0625, -0.5625, -0.875)},
+		{x: xb, exp: NewAffine2D(1.5666667, -1.0333333, -3.2000008, -1.4333333, 1-0.03333336, 1.7999992)},
+	} {
+		got := test.x.Invert()
+		if !eqaff(got, test.exp) {
+			t.Errorf("%v.Invert(): have %v, want %v", test.x, got, test.exp)
+		}
+	}
+
+	got := xa.Mul(xb)
+	exp := NewAffine2D(734, 796, 929, 1310, 1420, 1659)
+	if !eqaff(got, exp) {
+		t.Errorf("%v.Mul(%v): have %v, want %v", xa, xb, got, exp)
+	}
+}
+
 func TestTransformScaleAround(t *testing.T) {
 	p := Pt(-1, -1)
 	target := Pt(-6, -13)
@@ -117,5 +170,63 @@ func TestMulOrder(t *testing.T) {
 		t.Log(T1)
 		t.Log(T2)
 		t.Error("multiplication / transform order not as expected")
+	}
+}
+
+func BenchmarkTransformOffset(b *testing.B) {
+	p := Point{X: 1, Y: 2}
+	o := Point{X: 0.5, Y: 0.5}
+	aff := Affine2D{}.Offset(o)
+
+	for i := 0; i < b.N; i++ {
+		p = aff.Transform(p)
+	}
+	_ = p
+}
+
+func BenchmarkTransformScale(b *testing.B) {
+	p := Point{X: 1, Y: 2}
+	s := Point{X: 0.5, Y: 0.5}
+	aff := Affine2D{}.Scale(Point{}, s)
+	for i := 0; i < b.N; i++ {
+		p = aff.Transform(p)
+	}
+	_ = p
+}
+
+func BenchmarkTransformRotate(b *testing.B) {
+	p := Point{X: 1, Y: 2}
+	a := float32(math.Pi / 2)
+	aff := Affine2D{}.Rotate(Point{}, a)
+	for i := 0; i < b.N; i++ {
+		p = aff.Transform(p)
+	}
+	_ = p
+}
+
+func BenchmarkTransformTranslateMultiply(b *testing.B) {
+	a := Affine2D{}.Offset(Point{X: 1, Y: 1}).Rotate(Point{}, math.Pi/3)
+	t := Affine2D{}.Offset(Point{X: 0.5, Y: 0.5})
+
+	for i := 0; i < b.N; i++ {
+		a = a.Mul(t)
+	}
+}
+
+func BenchmarkTransformScaleMultiply(b *testing.B) {
+	a := Affine2D{}.Offset(Point{X: 1, Y: 1}).Rotate(Point{}, math.Pi/3)
+	t := Affine2D{}.Offset(Point{X: 0.5, Y: 0.5}).Scale(Point{}, Point{X: 0.4, Y: -0.5})
+
+	for i := 0; i < b.N; i++ {
+		a = a.Mul(t)
+	}
+}
+
+func BenchmarkTransformMultiply(b *testing.B) {
+	a := Affine2D{}.Offset(Point{X: 1, Y: 1}).Rotate(Point{}, math.Pi/3)
+	t := Affine2D{}.Offset(Point{X: 0.5, Y: 0.5}).Rotate(Point{}, math.Pi/7)
+
+	for i := 0; i < b.N; i++ {
+		a = a.Mul(t)
 	}
 }
