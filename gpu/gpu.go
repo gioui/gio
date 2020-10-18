@@ -677,7 +677,6 @@ func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
 }
 
 func (d *drawOps) collect(cache *resourceCache, root *op.Ops, viewport image.Point) {
-	d.reset(cache, viewport)
 	clip := f32.Rectangle{
 		Max: f32.Point{X: float32(viewport.X), Y: float32(viewport.Y)},
 	}
