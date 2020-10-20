@@ -416,6 +416,17 @@ func archiveIOS(tmpDir, target, frameworkRoot string, bi *buildInfo) error {
 	exe := filepath.Join(frameworkDir, framework)
 	lipo := exec.Command("xcrun", "lipo", "-o", exe, "-create")
 	var builds errgroup.Group
+	tags := bi.tags
+	goos := "ios"
+	supportsIOS, err := supportsGOOS("ios")
+	if err != nil {
+		return err
+	}
+	if !supportsIOS {
+		// Go 1.15 and earlier target iOS with GOOS=darwin, tags=ios.
+		goos = "darwin"
+		tags = "ios " + tags
+	}
 	for _, a := range bi.archs {
 		clang, cflags, err := iosCompilerFor(target, a)
 		if err != nil {
@@ -428,14 +439,14 @@ func archiveIOS(tmpDir, target, frameworkRoot string, bi *buildInfo) error {
 			"-ldflags=-s -w "+bi.ldflags,
 			"-buildmode=c-archive",
 			"-o", lib,
-			"-tags", "ios "+bi.tags,
+			"-tags", tags,
 			bi.pkg,
 		)
 		lipo.Args = append(lipo.Args, lib)
 		cflagsLine := strings.Join(cflags, " ")
 		cmd.Env = append(
 			os.Environ(),
-			"GOOS=darwin",
+			"GOOS="+goos,
 			"GOARCH="+a,
 			"CGO_ENABLED=1",
 			"CC="+clang,
@@ -469,6 +480,24 @@ func archiveIOS(tmpDir, target, frameworkRoot string, bi *buildInfo) error {
 }`, framework)
 	moduleFile := filepath.Join(frameworkDir, "Modules", "module.modulemap")
 	return ioutil.WriteFile(moduleFile, []byte(module), 0644)
+}
+
+func supportsGOOS(wantGoos string) (bool, error) {
+	geese, err := runCmd(exec.Command("go", "tool", "dist", "list"))
+	if err != nil {
+		return false, err
+	}
+	for _, pair := range strings.Split(geese, "\n") {
+		s := strings.SplitN(pair, "/", 2)
+		if len(s) != 2 {
+			return false, fmt.Errorf("go tool dist list: invalid GOOS/GOARCH pair: %s", pair)
+		}
+		goos := s[0]
+		if goos == wantGoos {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func iosCompilerFor(target, arch string) (string, []string, error) {
