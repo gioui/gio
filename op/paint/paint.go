@@ -12,6 +12,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 )
 
 // ImageOp sets the brush to an image.
@@ -124,4 +125,28 @@ func (d PaintOp) Add(o *op.Ops) {
 	bo.PutUint32(data[5:], math.Float32bits(d.Rect.Min.Y))
 	bo.PutUint32(data[9:], math.Float32bits(d.Rect.Max.X))
 	bo.PutUint32(data[13:], math.Float32bits(d.Rect.Max.Y))
+}
+
+// FillShape fills the area described by the provided clip.Op with the
+// provided color.
+func FillShape(ops *op.Ops, shape clip.Op, c color.RGBA) {
+	defer op.Push(ops).Pop()
+	shape.Add(ops)
+	Fill(ops, c)
+}
+
+// Fill paints an infinitely large plane with the provided color. It
+// is intended to be used with a clip.Op already in place to limit
+// the painted area. Use FillShape unless you need to paint several
+// times within the same clip.Op.
+func Fill(ops *op.Ops, c color.RGBA) {
+	defer op.Push(ops).Pop()
+	ColorOp{Color: c}.Add(ops)
+	inf := float32(math.Inf(+1))
+	PaintOp{
+		Rect: f32.Rectangle{
+			Min: f32.Pt(-inf, -inf),
+			Max: f32.Pt(+inf, +inf),
+		},
+	}.Add(ops)
 }
