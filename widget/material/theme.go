@@ -5,9 +5,6 @@ package material
 import (
 	"image/color"
 
-	"gioui.org/f32"
-	"gioui.org/layout"
-	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
@@ -62,15 +59,4 @@ func rgb(c uint32) color.RGBA {
 
 func argb(c uint32) color.RGBA {
 	return color.RGBA{A: uint8(c >> 24), R: uint8(c >> 16), G: uint8(c >> 8), B: uint8(c)}
-}
-
-func fill(gtx layout.Context, col color.RGBA) layout.Dimensions {
-	cs := gtx.Constraints
-	d := cs.Min
-	dr := f32.Rectangle{
-		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
-	}
-	paint.ColorOp{Color: col}.Add(gtx.Ops)
-	paint.PaintOp{Rect: dr}.Add(gtx.Ops)
-	return layout.Dimensions{Size: d}
 }
