@@ -18,8 +18,8 @@ type RRect struct {
 	SE, SW, NW, NE float32
 }
 
-// op returns the op for the rectangle.
-func (rr RRect) op(ops *op.Ops) Op {
+// Op returns the op for the rounded rectangle.
+func (rr RRect) Op(ops *op.Ops) Op {
 	var p Path
 	p.Begin(ops)
 	p.Move(rr.Rect.Min)
@@ -29,7 +29,7 @@ func (rr RRect) op(ops *op.Ops) Op {
 
 // Add the rectangle clip.
 func (rr RRect) Add(ops *op.Ops) {
-	rr.op(ops).Add(ops)
+	rr.Op(ops).Add(ops)
 }
 
 // Border represents the clip area of a rectangular border.
@@ -41,7 +41,8 @@ type Border struct {
 	SE, SW, NW, NE float32
 }
 
-func (b Border) op(ops *op.Ops) Op {
+// Op returns the Op for the border.
+func (b Border) Op(ops *op.Ops) Op {
 	var p Path
 	p.Begin(ops)
 	w := b.Width
@@ -65,7 +66,7 @@ func (b Border) op(ops *op.Ops) Op {
 
 // Add the border clip.
 func (rr Border) Add(ops *op.Ops) {
-	rr.op(ops).Add(ops)
+	rr.Op(ops).Add(ops)
 }
 
 // roundRect adds the outline of a rectangle with rounded corners to a

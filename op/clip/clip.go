@@ -324,7 +324,12 @@ func (p *Path) End() Op {
 // Rect represents the clip area of a pixel-aligned rectangle.
 type Rect image.Rectangle
 
+// Op returns the op for the rectangle.
+func (r Rect) Op(ops *op.Ops) Op {
+	return Op{bounds: image.Rectangle(r)}
+}
+
 // Add the clip operation.
 func (r Rect) Add(ops *op.Ops) {
-	Op{bounds: image.Rectangle(r)}.Add(ops)
+	r.Op(ops).Add(ops)
 }
