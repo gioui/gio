@@ -123,22 +123,19 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 	return layout.Stack{Alignment: layout.Center}.Layout(gtx,
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
 			rr := float32(gtx.Px(b.CornerRadius))
-			clip.RRect{
-				Rect: f32.Rectangle{Max: f32.Point{
-					X: float32(gtx.Constraints.Min.X),
-					Y: float32(gtx.Constraints.Min.Y),
-				}},
-				NE: rr, NW: rr, SE: rr, SW: rr,
-			}.Add(gtx.Ops)
+			clip.UniformRRect(f32.Rectangle{Max: f32.Point{
+				X: float32(gtx.Constraints.Min.X),
+				Y: float32(gtx.Constraints.Min.Y),
+			}}, rr).Add(gtx.Ops)
 			background := b.Background
 			if gtx.Queue == nil {
 				background = f32color.MulAlpha(b.Background, 150)
 			}
-			dims := fill(gtx, background)
+			paint.Fill(gtx.Ops, background)
 			for _, c := range b.Button.History() {
 				drawInk(gtx, c)
 			}
-			return dims
+			return layout.Dimensions{Size: gtx.Constraints.Min}
 		}),
 		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			gtx.Constraints.Min = min
@@ -154,19 +151,18 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 			sizex, sizey := gtx.Constraints.Min.X, gtx.Constraints.Min.Y
 			sizexf, sizeyf := float32(sizex), float32(sizey)
 			rr := (sizexf + sizeyf) * .25
-			clip.RRect{
-				Rect: f32.Rectangle{Max: f32.Point{X: sizexf, Y: sizeyf}},
-				NE:   rr, NW: rr, SE: rr, SW: rr,
-			}.Add(gtx.Ops)
+			clip.UniformRRect(f32.Rectangle{
+				Max: f32.Point{X: sizexf, Y: sizeyf},
+			}, rr).Add(gtx.Ops)
 			background := b.Background
 			if gtx.Queue == nil {
 				background = f32color.MulAlpha(b.Background, 150)
 			}
-			dims := fill(gtx, background)
+			paint.Fill(gtx.Ops, background)
 			for _, c := range b.Button.History() {
 				drawInk(gtx, c)
 			}
-			return dims
+			return layout.Dimensions{Size: gtx.Constraints.Min}
 		}),
 		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			return b.Inset.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
