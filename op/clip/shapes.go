@@ -7,6 +7,18 @@ import (
 	"gioui.org/op"
 )
 
+// UniformRRect returns an RRect with all corner radii set to the
+// provided radius.
+func UniformRRect(rect f32.Rectangle, radius float32) RRect {
+	return RRect{
+		Rect: rect,
+		SE:   radius,
+		SW:   radius,
+		NE:   radius,
+		NW:   radius,
+	}
+}
+
 // RRect represents the clip area of a rectangle with rounded
 // corners.
 //
