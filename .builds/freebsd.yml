@@ -1,4 +1,4 @@
-image: freebsd/latest
+image: freebsd/11.x
 packages:
  - libX11
  - libxkbcommon
