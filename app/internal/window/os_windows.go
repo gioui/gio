@@ -44,7 +44,6 @@ type window struct {
 	width       int
 	height      int
 	stage       system.Stage
-	dead        bool
 	pointerBtns pointer.Buttons
 
 	mu        sync.Mutex
@@ -86,7 +85,10 @@ func Main() {
 func NewWindow(window Callbacks, opts *Options) error {
 	cerr := make(chan error)
 	go func() {
-		// Call win32 API from a single OS thread.
+		// GetMessage and PeekMessage can filter on a window HWND, but
+		// then thread-specific messages such as WM_QUIT are ignored.
+		// Instead lock the thread so window messages arrive through
+		// unfiltered GetMessage calls.
 		runtime.LockOSThread()
 		w, err := createNativeWindow(opts)
 		if err != nil {
@@ -263,7 +265,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_MOUSEWHEEL:
 		w.scrollEvent(wParam, lParam)
 	case windows.WM_DESTROY:
-		w.dead = true
+		windows.PostQuitMessage(0)
 	case windows.WM_PAINT:
 		w.draw(true)
 	case windows.WM_SIZE:
@@ -363,18 +365,21 @@ func (w *window) scrollEvent(wParam, lParam uintptr) {
 // Adapted from https://blogs.msdn.microsoft.com/oldnewthing/20060126-00/?p=32513/
 func (w *window) loop() error {
 	msg := new(windows.Msg)
-	for !w.dead {
+loop:
+	for {
 		w.mu.Lock()
 		anim := w.animating
 		w.mu.Unlock()
-		if anim && !windows.PeekMessage(msg, w.hwnd, 0, 0, windows.PM_NOREMOVE) {
+		if anim && !windows.PeekMessage(msg, 0, 0, 0, windows.PM_NOREMOVE) {
 			w.draw(false)
 			continue
 		}
-		windows.GetMessage(msg, w.hwnd, 0, 0)
-		if msg.Message == windows.WM_QUIT {
-			windows.PostQuitMessage(msg.WParam)
-			break
+		switch ret := windows.GetMessage(msg, 0, 0, 0); ret {
+		case -1:
+			return errors.New("GetMessage failed")
+		case 0:
+			// WM_QUIT received.
+			break loop
 		}
 		windows.TranslateMessage(msg)
 		windows.DispatchMessage(msg)
