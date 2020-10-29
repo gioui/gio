@@ -180,7 +180,11 @@ func (w *window) addEventListeners() {
 		return nil
 	})
 	w.addEventListener(w.tarea, "keydown", func(this js.Value, args []js.Value) interface{} {
-		w.keyEvent(args[0])
+		w.keyEvent(args[0], key.Press)
+		return nil
+	})
+	w.addEventListener(w.tarea, "keyup", func(this js.Value, args []js.Value) interface{} {
+		w.keyEvent(args[0], key.Release)
 		return nil
 	})
 	w.addEventListener(w.tarea, "compositionstart", func(this js.Value, args []js.Value) interface{} {
@@ -215,12 +219,13 @@ func (w *window) focus() {
 	w.tarea.Call("focus")
 }
 
-func (w *window) keyEvent(e js.Value) {
+func (w *window) keyEvent(e js.Value, ks key.State) {
 	k := e.Get("key").String()
 	if n, ok := translateKey(k); ok {
 		cmd := key.Event{
 			Name:      n,
 			Modifiers: modifiersFor(e),
+			State:     ks,
 		}
 		w.w.Event(cmd)
 	}

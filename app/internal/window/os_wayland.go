@@ -964,12 +964,13 @@ func gio_onKeyboardKey(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, seri
 	t := time.Duration(timestamp) * time.Millisecond
 	s.disp.repeat.Stop(t)
 	w.resetFling()
+	kc := mapXKBKeycode(uint32(keyCode))
+	ks := mapXKBKeyState(uint32(state))
+	for _, e := range w.disp.xkb.DispatchKey(kc, ks) {
+		w.w.Event(e)
+	}
 	if state != C.WL_KEYBOARD_KEY_STATE_PRESSED {
 		return
-	}
-	kc := mapXKBKeycode(uint32(keyCode))
-	for _, e := range w.disp.xkb.DispatchKey(kc) {
-		w.w.Event(e)
 	}
 	if w.disp.xkb.IsRepeatKey(kc) {
 		w.disp.repeat.Start(w, kc, t)
@@ -979,6 +980,15 @@ func gio_onKeyboardKey(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, seri
 func mapXKBKeycode(keyCode uint32) uint32 {
 	// According to the xkb_v1 spec: "to determine the xkb keycode, clients must add 8 to the key event keycode."
 	return keyCode + 8
+}
+
+func mapXKBKeyState(state uint32) key.State {
+	switch state {
+	case C.WL_KEYBOARD_KEY_STATE_RELEASED:
+		return key.Release
+	default:
+		return key.Press
+	}
 }
 
 func (r *repeatState) Start(w *window, keyCode uint32, t time.Duration) {
@@ -1046,7 +1056,7 @@ func (r *repeatState) Repeat(d *wlDisplay) {
 		if r.last+delay > now {
 			break
 		}
-		for _, e := range d.xkb.DispatchKey(r.key) {
+		for _, e := range d.xkb.DispatchKey(r.key, key.Press) {
 			r.win.Event(e)
 		}
 		r.last += delay

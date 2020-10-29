@@ -228,9 +228,17 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_ERASEBKGND:
 		// Avoid flickering between GPU content and background color.
 		return 1
-	case windows.WM_KEYDOWN, windows.WM_SYSKEYDOWN:
+	case windows.WM_KEYDOWN, windows.WM_KEYUP, windows.WM_SYSKEYDOWN, windows.WM_SYSKEYUP:
 		if n, ok := convertKeyCode(wParam); ok {
-			w.w.Event(key.Event{Name: n, Modifiers: getModifiers()})
+			e := key.Event{
+				Name:      n,
+				Modifiers: getModifiers(),
+				State:     key.Press,
+			}
+			if msg == windows.WM_KEYUP || msg == windows.WM_SYSKEYUP {
+				e.State = key.Release
+			}
+			w.w.Event(e)
 		}
 	case windows.WM_LBUTTONDOWN:
 		w.pointerButton(pointer.ButtonLeft, true, lParam, getModifiers())

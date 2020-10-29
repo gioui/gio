@@ -46,12 +46,27 @@ type Event struct {
 	Name string
 	// Modifiers is the set of active modifiers when the key was pressed.
 	Modifiers Modifiers
+	// State is the state of the key when the event was fired.
+	State State
 }
 
 // An EditEvent is generated when text is input.
 type EditEvent struct {
 	Text string
 }
+
+// State is the state of a key during an event.
+type State uint8
+
+const (
+	// Press is the state of a pressed key.
+	Press State = iota
+	// Release is the state of a key that has been released.
+	//
+	// Note: release events are only implemented on the following platforms:
+	// Linux, Windows, WebAssembly.
+	Release
+)
 
 // Modifiers
 type Modifiers uint32

@@ -305,12 +305,15 @@ func (h *x11EventHandler) handleEvents() bool {
 				h.w.xkb.UpdateMask(uint32(state.base_mods), uint32(state.latched_mods), uint32(state.locked_mods),
 					uint32(state.base_group), uint32(state.latched_group), uint32(state.locked_group))
 			}
-		case C.KeyPress:
+		case C.KeyPress, C.KeyRelease:
+			ks := key.Press
+			if _type == C.KeyRelease {
+				ks = key.Release
+			}
 			kevt := (*C.XKeyPressedEvent)(unsafe.Pointer(xev))
-			for _, e := range h.w.xkb.DispatchKey(uint32(kevt.keycode)) {
+			for _, e := range h.w.xkb.DispatchKey(uint32(kevt.keycode), ks) {
 				w.w.Event(e)
 			}
-		case C.KeyRelease:
 		case C.ButtonPress, C.ButtonRelease:
 			bevt := (*C.XButtonEvent)(unsafe.Pointer(xev))
 			ev := pointer.Event{
