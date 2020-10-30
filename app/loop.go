@@ -77,7 +77,6 @@ func (l *renderLoop) renderLoop(ctx window.Context) error {
 			return
 		}
 		defer g.Release()
-		defer ctx.Release()
 		initErr <- nil
 	loop:
 		for {

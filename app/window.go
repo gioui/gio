@@ -25,6 +25,7 @@ type Option func(opts *window.Options)
 // Window represents an operating system window.
 type Window struct {
 	driver window.Driver
+	ctx    window.Context
 	loop   *renderLoop
 
 	// driverFuncs is a channel of functions to run when
@@ -132,14 +133,14 @@ func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync
 			}
 		}
 		if w.loop == nil {
-			var ctx window.Context
-			ctx, err := w.driver.NewContext()
+			var err error
+			w.ctx, err = w.driver.NewContext()
 			if err != nil {
 				return err
 			}
-			w.loop, err = newLoop(ctx)
+			w.loop, err = newLoop(w.ctx)
 			if err != nil {
-				ctx.Release()
+				w.ctx.Release()
 				return err
 			}
 		}
@@ -294,6 +295,10 @@ func (w *Window) destroyGPU() {
 	if w.loop != nil {
 		w.loop.Release()
 		w.loop = nil
+	}
+	if w.ctx != nil {
+		w.ctx.Release()
+		w.ctx = nil
 	}
 }
 
