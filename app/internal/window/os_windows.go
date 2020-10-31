@@ -287,14 +287,14 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		mm := (*windows.MinMaxInfo)(unsafe.Pointer(uintptr(lParam)))
 		if w.minmax.minWidth > 0 || w.minmax.minHeight > 0 {
 			mm.PtMinTrackSize = windows.Point{
-				w.minmax.minWidth + w.deltas.width,
-				w.minmax.minHeight + w.deltas.height,
+				X: w.minmax.minWidth + w.deltas.width,
+				Y: w.minmax.minHeight + w.deltas.height,
 			}
 		}
 		if w.minmax.maxWidth > 0 || w.minmax.maxHeight > 0 {
 			mm.PtMaxTrackSize = windows.Point{
-				w.minmax.maxWidth + w.deltas.width,
-				w.minmax.maxHeight + w.deltas.height,
+				X: w.minmax.maxWidth + w.deltas.width,
+				Y: w.minmax.maxHeight + w.deltas.height,
 			}
 		}
 	}
