@@ -1,10 +1,12 @@
 package rendertest
 
 import (
+	"image/color"
 	"math"
 	"testing"
 
 	"gioui.org/f32"
+	"gioui.org/internal/f32color"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
@@ -193,4 +195,96 @@ func TestNegativeOverlaps(t *testing.T) {
 		r.expect(60, 120, colornames.White)
 		r.expect(60, 122, colornames.White)
 	})
+}
+
+type Gradient struct {
+	From, To color.RGBA
+}
+
+var gradients = []Gradient{
+	{From: color.RGBA{R: 0x00, G: 0x00, B: 0x00, A: 0xFF}, To: color.RGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}},
+	{From: color.RGBA{R: 0x19, G: 0xFF, B: 0x19, A: 0xFF}, To: color.RGBA{R: 0xFF, G: 0x19, B: 0x19, A: 0xFF}},
+	{From: color.RGBA{R: 0xFF, G: 0x19, B: 0x19, A: 0xFF}, To: color.RGBA{R: 0x19, G: 0x19, B: 0xFF, A: 0xFF}},
+	{From: color.RGBA{R: 0x19, G: 0x19, B: 0xFF, A: 0xFF}, To: color.RGBA{R: 0x19, G: 0xFF, B: 0x19, A: 0xFF}},
+	{From: color.RGBA{R: 0x19, G: 0xFF, B: 0xFF, A: 0xFF}, To: color.RGBA{R: 0xFF, G: 0x19, B: 0x19, A: 0xFF}},
+	{From: color.RGBA{R: 0xFF, G: 0xFF, B: 0x19, A: 0xFF}, To: color.RGBA{R: 0x19, G: 0x19, B: 0xFF, A: 0xFF}},
+}
+
+func TestLinearGradient(t *testing.T) {
+	const gradienth = 8
+	// 0.5 offset from ends to ensure that the center of the pixel
+	// aligns with gradient from and to colors.
+	pixelAligned := f32.Rect(0.5, 0, 127.5, gradienth)
+	samples := []int{0, 12, 32, 64, 96, 115, 127}
+
+	run(t, func(ops *op.Ops) {
+		gr := pixelAligned
+		for _, g := range gradients {
+			paint.LinearGradientOp{
+				Stop1:  f32.Pt(gr.Min.X, gr.Min.Y),
+				Color1: g.From,
+				Stop2:  f32.Pt(gr.Max.X, gr.Min.Y),
+				Color2: g.To,
+			}.Add(ops)
+			paint.PaintOp{Rect: gr}.Add(ops)
+			gr = gr.Add(f32.Pt(0, gradienth))
+		}
+	}, func(r result) {
+		gr := pixelAligned
+		for _, g := range gradients {
+			from := f32color.RGBAFromSRGB(g.From)
+			to := f32color.RGBAFromSRGB(g.To)
+			for _, p := range samples {
+				exp := lerp(from, to, float32(p)/float32(r.img.Bounds().Dx()-1))
+				r.expect(p, int(gr.Min.Y+gradienth/2), exp.SRGB())
+			}
+			gr = gr.Add(f32.Pt(0, gradienth))
+		}
+	})
+}
+
+func TestLinearGradientAngled(t *testing.T) {
+	run(t, func(ops *op.Ops) {
+		paint.LinearGradientOp{
+			Stop1:  f32.Pt(64, 64),
+			Color1: colornames.Black,
+			Stop2:  f32.Pt(0, 0),
+			Color2: colornames.Red,
+		}.Add(ops)
+		paint.PaintOp{Rect: f32.Rect(0, 0, 64, 64)}.Add(ops)
+
+		paint.LinearGradientOp{
+			Stop1:  f32.Pt(64, 64),
+			Color1: colornames.White,
+			Stop2:  f32.Pt(128, 0),
+			Color2: colornames.Green,
+		}.Add(ops)
+		paint.PaintOp{Rect: f32.Rect(64, 0, 128, 64)}.Add(ops)
+
+		paint.LinearGradientOp{
+			Stop1:  f32.Pt(64, 64),
+			Color1: colornames.Black,
+			Stop2:  f32.Pt(128, 128),
+			Color2: colornames.Blue,
+		}.Add(ops)
+		paint.PaintOp{Rect: f32.Rect(64, 64, 128, 128)}.Add(ops)
+
+		paint.LinearGradientOp{
+			Stop1:  f32.Pt(64, 64),
+			Color1: colornames.White,
+			Stop2:  f32.Pt(0, 128),
+			Color2: colornames.Magenta,
+		}.Add(ops)
+		paint.PaintOp{Rect: f32.Rect(0, 64, 64, 128)}.Add(ops)
+	}, func(r result) {})
+}
+
+// lerp calculates linear interpolation with color b and p.
+func lerp(a, b f32color.RGBA, p float32) f32color.RGBA {
+	return f32color.RGBA{
+		R: a.R*(1-p) + b.R*p,
+		G: a.G*(1-p) + b.G*p,
+		B: a.B*(1-p) + b.B*p,
+		A: a.A*(1-p) + b.A*p,
+	}
 }

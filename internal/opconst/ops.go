@@ -16,6 +16,7 @@ const (
 	TypeImage
 	TypePaint
 	TypeColor
+	TypeLinearGradient
 	TypeArea
 	TypePointerInput
 	TypePass
@@ -29,24 +30,25 @@ const (
 )
 
 const (
-	TypeMacroLen        = 1 + 4 + 4
-	TypeCallLen         = 1 + 4 + 4
-	TypeTransformLen    = 1 + 4*6
-	TypeLayerLen        = 1
-	TypeRedrawLen       = 1 + 8
-	TypeImageLen        = 1 + 4*4
-	TypePaintLen        = 1 + 4*4
-	TypeColorLen        = 1 + 4
-	TypeAreaLen         = 1 + 1 + 4*4
-	TypePointerInputLen = 1 + 1 + 1
-	TypePassLen         = 1 + 1
-	TypeKeyInputLen     = 1 + 1
-	TypeHideInputLen    = 1
-	TypePushLen         = 1
-	TypePopLen          = 1
-	TypeAuxLen          = 1
-	TypeClipLen         = 1 + 4*4
-	TypeProfileLen      = 1
+	TypeMacroLen          = 1 + 4 + 4
+	TypeCallLen           = 1 + 4 + 4
+	TypeTransformLen      = 1 + 4*6
+	TypeLayerLen          = 1
+	TypeRedrawLen         = 1 + 8
+	TypeImageLen          = 1 + 4*4
+	TypePaintLen          = 1 + 4*4
+	TypeColorLen          = 1 + 4
+	TypeLinearGradientLen = 1 + 8*2 + 4*2
+	TypeAreaLen           = 1 + 1 + 4*4
+	TypePointerInputLen   = 1 + 1 + 1
+	TypePassLen           = 1 + 1
+	TypeKeyInputLen       = 1 + 1
+	TypeHideInputLen      = 1
+	TypePushLen           = 1
+	TypePopLen            = 1
+	TypeAuxLen            = 1
+	TypeClipLen           = 1 + 4*4
+	TypeProfileLen        = 1
 )
 
 func (t OpType) Size() int {
@@ -59,6 +61,7 @@ func (t OpType) Size() int {
 		TypeImageLen,
 		TypePaintLen,
 		TypeColorLen,
+		TypeLinearGradientLen,
 		TypeAreaLen,
 		TypePointerInputLen,
 		TypePassLen,

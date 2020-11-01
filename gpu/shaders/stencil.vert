@@ -48,6 +48,6 @@ void main() {
 	vCtrl = ctrl-pos;
 	vTo = to-pos;
 	pos = pos*transform.xy + transform.zw;
-    gl_Position = vec4(pos, 1, 1);
+	gl_Position = vec4(pos, 1, 1);
 }
 

@@ -37,6 +37,15 @@ type ColorOp struct {
 	Color color.RGBA
 }
 
+// LinearGradientOp sets the brush to a gradient starting at stop1 with color1 and
+// ending at stop2 with color2.
+type LinearGradientOp struct {
+	Stop1  f32.Point
+	Color1 color.RGBA
+	Stop2  f32.Point
+	Color2 color.RGBA
+}
+
 // PaintOp fills an area with the current brush, respecting the
 // current clip path and transformation.
 type PaintOp struct {
@@ -115,6 +124,26 @@ func (c ColorOp) Add(o *op.Ops) {
 	data[2] = c.Color.G
 	data[3] = c.Color.B
 	data[4] = c.Color.A
+}
+
+func (c LinearGradientOp) Add(o *op.Ops) {
+	data := o.Write(opconst.TypeLinearGradientLen)
+	data[0] = byte(opconst.TypeLinearGradient)
+
+	bo := binary.LittleEndian
+	bo.PutUint32(data[1:], math.Float32bits(c.Stop1.X))
+	bo.PutUint32(data[5:], math.Float32bits(c.Stop1.Y))
+	bo.PutUint32(data[9:], math.Float32bits(c.Stop2.X))
+	bo.PutUint32(data[13:], math.Float32bits(c.Stop2.Y))
+
+	data[17+0] = c.Color1.R
+	data[17+1] = c.Color1.G
+	data[17+2] = c.Color1.B
+	data[17+3] = c.Color1.A
+	data[21+0] = c.Color2.R
+	data[21+1] = c.Color2.G
+	data[21+2] = c.Color2.B
+	data[21+3] = c.Color2.A
 }
 
 func (d PaintOp) Add(o *op.Ops) {

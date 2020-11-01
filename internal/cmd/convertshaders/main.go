@@ -70,7 +70,7 @@ func generate() error {
 		if ext := filepath.Ext(shader); ext != ".vert" && ext != ".frag" {
 			continue
 		}
-		const nvariants = 2
+		const nvariants = 3
 		var variants [nvariants]struct {
 			backend.ShaderSources
 			hlslSrc string
@@ -79,6 +79,10 @@ func generate() error {
 			{
 				FetchColorExpr: `_color`,
 				Header:         `layout(binding=0) uniform Color { vec4 _color; };`,
+			},
+			{
+				FetchColorExpr: `mix(_color1, _color2, clamp(vUV.x, 0.0, 1.0))`,
+				Header:         `layout(binding=0) uniform Gradient { vec4 _color1; vec4 _color2; };`,
 			},
 			{
 				FetchColorExpr: `texture(tex, vUV)`,

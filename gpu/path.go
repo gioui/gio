@@ -27,11 +27,12 @@ type pather struct {
 }
 
 type coverer struct {
-	ctx         backend.Device
-	prog        [2]*program
-	texUniforms *coverTexUniforms
-	colUniforms *coverColUniforms
-	layout      backend.InputLayout
+	ctx                    backend.Device
+	prog                   [3]*program
+	texUniforms            *coverTexUniforms
+	colUniforms            *coverColUniforms
+	linearGradientUniforms *coverLinearGradientUniforms
+	layout                 backend.InputLayout
 }
 
 type coverTexUniforms struct {
@@ -48,6 +49,16 @@ type coverColUniforms struct {
 	}
 	frag struct {
 		colorUniforms
+	}
+}
+
+type coverLinearGradientUniforms struct {
+	vert struct {
+		coverUniforms
+		_ [12]byte // Padding to multiple of 16.
+	}
+	frag struct {
+		gradientUniforms
 	}
 }
 
@@ -149,9 +160,10 @@ func newCoverer(ctx backend.Device) *coverer {
 	}
 	c.colUniforms = new(coverColUniforms)
 	c.texUniforms = new(coverTexUniforms)
+	c.linearGradientUniforms = new(coverLinearGradientUniforms)
 	prog, layout, err := createColorPrograms(ctx, shader_cover_vert, shader_cover_frag,
-		[2]interface{}{&c.colUniforms.vert, &c.texUniforms.vert},
-		[2]interface{}{&c.colUniforms.frag, nil},
+		[3]interface{}{&c.colUniforms.vert, &c.linearGradientUniforms.vert, &c.texUniforms.vert},
+		[3]interface{}{&c.colUniforms.frag, &c.linearGradientUniforms.frag, nil},
 	)
 	if err != nil {
 		panic(err)
@@ -362,11 +374,11 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 	}
 }
 
-func (p *pather) cover(z float32, mat materialType, col f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
-	p.coverer.cover(z, mat, col, scale, off, uvTrans, coverScale, coverOff)
+func (p *pather) cover(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
+	p.coverer.cover(z, mat, col, col1, col2, scale, off, uvTrans, coverScale, coverOff)
 }
 
-func (c *coverer) cover(z float32, mat materialType, col f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
+func (c *coverer) cover(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
 	p := c.prog[mat]
 	c.ctx.BindProgram(p.prog)
 	var uniforms *coverUniforms
@@ -374,6 +386,14 @@ func (c *coverer) cover(z float32, mat materialType, col f32color.RGBA, scale, o
 	case materialColor:
 		c.colUniforms.frag.color = col
 		uniforms = &c.colUniforms.vert.coverUniforms
+	case materialLinearGradient:
+		c.linearGradientUniforms.frag.color1 = col1
+		c.linearGradientUniforms.frag.color2 = col2
+
+		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
+		c.linearGradientUniforms.vert.uvTransformR1 = [4]float32{t1, t2, t3, 0}
+		c.linearGradientUniforms.vert.uvTransformR2 = [4]float32{t4, t5, t6, 0}
+		uniforms = &c.linearGradientUniforms.vert.coverUniforms
 	case materialTexture:
 		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
 		c.texUniforms.vert.uvTransformR1 = [4]float32{t1, t2, t3, 0}
