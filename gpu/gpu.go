@@ -342,8 +342,10 @@ func (g *GPU) BeginFrame() {
 	}
 	g.ctx.BindFramebuffer(g.defFBO)
 	g.ctx.DepthFunc(backend.DepthFuncGreater)
-	g.ctx.ClearDepth(0.0)
+	// Note that Clear must be before ClearDepth if nothing else is rendered
+	// (len(zimageOps) == 0). If not, the Fairphone 2 will corrupt the depth buffer.
 	g.ctx.Clear(g.drawOps.clearColor.Float32())
+	g.ctx.ClearDepth(0.0)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.renderer.drawZOps(g.drawOps.zimageOps)
 	g.zopsTimer.end()
