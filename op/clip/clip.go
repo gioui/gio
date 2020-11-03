@@ -325,11 +325,11 @@ func (p *Path) End() Op {
 type Rect image.Rectangle
 
 // Op returns the op for the rectangle.
-func (r Rect) Op(ops *op.Ops) Op {
+func (r Rect) Op() Op {
 	return Op{bounds: image.Rectangle(r)}
 }
 
 // Add the clip operation.
 func (r Rect) Add(ops *op.Ops) {
-	r.Op(ops).Add(ops)
+	r.Op().Add(ops)
 }
