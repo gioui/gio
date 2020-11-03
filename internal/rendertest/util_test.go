@@ -176,7 +176,7 @@ func close(b1, b2 uint8) bool {
 		b1, b2 = b2, b1
 	}
 	diff := b2 - b1
-	return diff < 20
+	return diff < 10
 }
 
 func (r result) expect(x, y int, col color.RGBA) {
