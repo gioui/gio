@@ -28,7 +28,7 @@ func (im Image) Layout(gtx layout.Context) layout.Dimensions {
 	if scale == 0 {
 		scale = 160.0 / 72.0
 	}
-	size := im.Src.Rect.Size()
+	size := im.Src.Size()
 	wf, hf := float32(size.X), float32(size.Y)
 	w, h := gtx.Px(unit.Dp(wf*scale)), gtx.Px(unit.Dp(hf*scale))
 	cs := gtx.Constraints
