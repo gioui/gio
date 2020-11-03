@@ -156,9 +156,8 @@ func (d PaintOp) Add(o *op.Ops) {
 	bo.PutUint32(data[13:], math.Float32bits(d.Rect.Max.Y))
 }
 
-// FillShape fills the area described by the provided clip.Op with the
-// provided color.
-func FillShape(ops *op.Ops, shape clip.Op, c color.RGBA) {
+// FillShape fills the clip shape with a color.
+func FillShape(ops *op.Ops, c color.RGBA, shape clip.Op) {
 	defer op.Push(ops).Pop()
 	shape.Add(ops)
 	Fill(ops, c)
