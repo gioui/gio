@@ -25,6 +25,7 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
@@ -240,6 +241,14 @@ func (b iconAndTextButton) Layout(gtx layout.Context) layout.Dimensions {
 	})
 }
 
+func bounds(gtx layout.Context) f32.Rectangle {
+	cs := gtx.Constraints
+	d := cs.Min
+	return f32.Rectangle{
+		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
+	}
+}
+
 func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 	for _, e := range lineEditor.Events() {
 		if e, ok := e.(widget.SubmitEvent); ok {
@@ -260,6 +269,23 @@ func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 			return border.Layout(gtx, func(gtx C) D {
 				return layout.UniformInset(unit.Dp(8)).Layout(gtx, e.Layout)
 			})
+		},
+		func(gtx C) D {
+			gtx.Constraints.Min.Y = gtx.Px(unit.Dp(50))
+			gtx.Constraints.Max.Y = gtx.Constraints.Min.Y
+
+			dr := bounds(gtx)
+			paint.LinearGradientOp{
+				Stop1:  dr.Min,
+				Stop2:  dr.Max,
+				Color1: color.RGBA{0x10, 0xff, 0x10, 0xFF},
+				Color2: color.RGBA{0x10, 0x10, 0xff, 0xFF},
+			}.Add(gtx.Ops)
+
+			paint.PaintOp{Rect: dr}.Add(gtx.Ops)
+			return layout.Dimensions{
+				Size: gtx.Constraints.Max,
+			}
 		},
 		func(gtx C) D {
 			in := layout.UniformInset(unit.Dp(8))

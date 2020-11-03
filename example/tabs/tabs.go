@@ -122,7 +122,7 @@ func drawTabs(gtx layout.Context, th *material.Theme) layout.Dimensions {
 		}),
 		layout.Flexed(1, func(gtx C) D {
 			return slider.Layout(gtx, func(gtx C) D {
-				fill(gtx, dynamicColor(tabs.selected))
+				fill(gtx, dynamicColor(tabs.selected), dynamicColor(tabs.selected+1))
 				return layout.Center.Layout(gtx,
 					material.H1(th, fmt.Sprintf("Tab content #%d", tabs.selected+1)).Layout,
 				)
@@ -139,9 +139,22 @@ func bounds(gtx layout.Context) f32.Rectangle {
 	}
 }
 
-func fill(gtx layout.Context, col color.RGBA) {
+func fill(gtx layout.Context, col1, col2 color.RGBA) {
 	dr := bounds(gtx)
-	paint.ColorOp{Color: col}.Add(gtx.Ops)
+	paint.ColorOp{Color: color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xFF}}.Add(gtx.Ops)
+	paint.ColorOp{Color: color.RGBA{R: 0, G: 0, B: 0, A: 0xFF}}.Add(gtx.Ops)
+	paint.PaintOp{Rect: dr}.Add(gtx.Ops)
+
+	col2.R = byte(float32(col2.R))
+	col2.G = byte(float32(col2.G))
+	col2.B = byte(float32(col2.B))
+	col2.A = byte(float32(col2.A) * 0.2)
+	paint.LinearGradientOp{
+		Stop1:  f32.Pt(dr.Min.X, 0),
+		Stop2:  f32.Pt(dr.Max.X, 0),
+		Color1: col1,
+		Color2: col2,
+	}.Add(gtx.Ops)
 	paint.PaintOp{Rect: dr}.Add(gtx.Ops)
 }
 
