@@ -1,6 +1,7 @@
 package rendertest
 
 import (
+	"image"
 	"math"
 	"testing"
 
@@ -14,8 +15,7 @@ import (
 func TestPaintOffset(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		op.Offset(f32.Pt(10, 20)).Add(o)
-		paint.ColorOp{Color: colornames.Red}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 50, 50)}.Add(o)
+		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
 		r.expect(59, 30, colornames.Red)
@@ -28,8 +28,7 @@ func TestPaintRotate(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		a := f32.Affine2D{}.Rotate(f32.Pt(40, 40), -math.Pi/8)
 		op.Affine(a).Add(o)
-		paint.ColorOp{Color: colornames.Red}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(20, 20, 60, 60)}.Add(o)
+		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(20, 20, 60, 60)).Op())
 	}, func(r result) {
 		r.expect(40, 40, colornames.Red)
 		r.expect(50, 19, colornames.Red)
@@ -42,8 +41,7 @@ func TestPaintShear(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		a := f32.Affine2D{}.Shear(f32.Point{}, math.Pi/4, 0)
 		op.Affine(a).Add(o)
-		paint.ColorOp{Color: colornames.Red}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 40, 40)}.Add(o)
+		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(0, 0, 40, 40)).Op())
 	}, func(r result) {
 		r.expect(10, 30, colornames.White)
 	})
@@ -51,10 +49,9 @@ func TestPaintShear(t *testing.T) {
 
 func TestClipPaintOffset(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		paint.ColorOp{Color: colornames.Red}.Add(o)
 		clip.RRect{Rect: f32.Rect(10, 10, 30, 30)}.Add(o)
 		op.Offset(f32.Pt(20, 20)).Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 100, 100)}.Add(o)
+		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(0, 0, 100, 100)).Op())
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
 		r.expect(19, 19, colornames.White)
@@ -65,10 +62,9 @@ func TestClipPaintOffset(t *testing.T) {
 
 func TestClipOffset(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		paint.ColorOp{Color: colornames.Red}.Add(o)
 		op.Offset(f32.Pt(20, 20)).Add(o)
 		clip.RRect{Rect: f32.Rect(10, 10, 30, 30)}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 100, 100)}.Add(o)
+		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(0, 0, 100, 100)).Op())
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
 		r.expect(29, 29, colornames.White)
@@ -80,11 +76,10 @@ func TestClipOffset(t *testing.T) {
 
 func TestClipScale(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		paint.ColorOp{Color: colornames.Red}.Add(o)
 		a := f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(2, 2)).Offset(f32.Pt(10, 10))
 		op.Affine(a).Add(o)
 		clip.RRect{Rect: f32.Rect(10, 10, 20, 20)}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 1000, 1000)}.Add(o)
+		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(0, 0, 1000, 1000)).Op())
 	}, func(r result) {
 		r.expect(19+10, 19+10, colornames.White)
 		r.expect(20+10, 20+10, colornames.Red)
@@ -95,10 +90,9 @@ func TestClipScale(t *testing.T) {
 
 func TestClipRotate(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		paint.ColorOp{Color: colornames.Red}.Add(o)
 		op.Affine(f32.Affine2D{}.Rotate(f32.Pt(40, 40), -math.Pi/4)).Add(o)
 		clip.RRect{Rect: f32.Rect(30, 30, 50, 50)}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 40, 100, 100)}.Add(o)
+		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(0, 40, 100, 100)).Op())
 	}, func(r result) {
 		r.expect(39, 39, colornames.White)
 		r.expect(41, 41, colornames.Red)
@@ -180,8 +174,6 @@ func TestComplicatedTransform(t *testing.T) {
 func TestTransformOrder(t *testing.T) {
 	// check the ordering of operations bot in affine and in gpu stack.
 	run(t, func(o *op.Ops) {
-		paint.ColorOp{Color: colornames.Red}.Add(o)
-
 		a := f32.Affine2D{}.Offset(f32.Pt(64, 64))
 		op.Affine(a).Add(o)
 
@@ -190,7 +182,7 @@ func TestTransformOrder(t *testing.T) {
 
 		c := f32.Affine2D{}.Offset(f32.Pt(-10, -10)).Scale(f32.Point{}, f32.Pt(0.5, 0.5))
 		op.Affine(c).Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 20, 20)}.Add(o)
+		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(0, 0, 20, 20)).Op())
 	}, func(r result) {
 		// centered and with radius 40
 		r.expect(64-41, 64, colornames.White)

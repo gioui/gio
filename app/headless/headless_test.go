@@ -22,10 +22,7 @@ func TestHeadless(t *testing.T) {
 	var ops op.Ops
 	paint.ColorOp{Color: col}.Add(&ops)
 	// Paint only part of the screen to avoid the glClear optimization.
-	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{
-		X: float32(sz.X) - 100,
-		Y: float32(sz.Y) - 100,
-	}}}.Add(&ops)
+	paint.FillShape(&ops, col, clip.Rect(image.Rect(0, 0, sz.X-100, sz.Y-100)).Op())
 	if err := w.Frame(&ops); err != nil {
 		t.Fatal(err)
 	}
@@ -108,15 +105,9 @@ func TestDepth(t *testing.T) {
 	var ops op.Ops
 
 	blue := color.RGBA{B: 0xFF, A: 0xFF}
-	paint.ColorOp{Color: blue}.Add(&ops)
-	paint.PaintOp{Rect: f32.Rectangle{
-		Max: f32.Point{X: 50, Y: 100},
-	}}.Add(&ops)
+	paint.FillShape(&ops, blue, clip.Rect(image.Rect(0, 0, 50, 100)).Op())
 	red := color.RGBA{R: 0xFF, A: 0xFF}
-	paint.ColorOp{Color: red}.Add(&ops)
-	paint.PaintOp{Rect: f32.Rectangle{
-		Max: f32.Point{X: 100, Y: 50},
-	}}.Add(&ops)
+	paint.FillShape(&ops, red, clip.Rect(image.Rect(0, 0, 100, 50)).Op())
 	if err := w.Frame(&ops); err != nil {
 		t.Fatal(err)
 	}

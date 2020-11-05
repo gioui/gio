@@ -1,6 +1,7 @@
 package rendertest
 
 import (
+	"image"
 	"image/color"
 	"math"
 	"testing"
@@ -16,16 +17,15 @@ import (
 func TestTransformMacro(t *testing.T) {
 	// testcase resulting from original bug when rendering layout.Stacked
 
-	// pre-build the text
+	// Build clip-path.
 	c := constSqPath()
 
 	run(t, func(o *op.Ops) {
 
 		// render the first Stacked item
 		m1 := op.Record(o)
-		dr := f32.Rect(0, 0, 128, 50)
-		paint.ColorOp{Color: colornames.Black}.Add(o)
-		paint.PaintOp{Rect: dr}.Add(o)
+		dr := image.Rect(0, 0, 128, 50)
+		paint.FillShape(o, colornames.Black, clip.Rect(dr).Op())
 		c1 := m1.Stop()
 
 		// Render the second stacked item
@@ -62,8 +62,7 @@ func TestTransformMacro(t *testing.T) {
 func TestRepeatedPaintsZ(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		// Draw a rectangle
-		paint.ColorOp{Color: colornames.Black}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 128, 50)}.Add(o)
+		paint.FillShape(o, colornames.Black, clip.Rect(image.Rect(0, 0, 128, 50)).Op())
 
 		builder := clip.Path{}
 		builder.Begin(o)
@@ -73,8 +72,7 @@ func TestRepeatedPaintsZ(t *testing.T) {
 		builder.Line(f32.Pt(-10, 0))
 		builder.Line(f32.Pt(0, -10))
 		builder.End().Add(o)
-		paint.ColorOp{Color: colornames.Red}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 10, 10)}.Add(o)
+		paint.Fill(o, colornames.Red)
 	}, func(r result) {
 		r.expect(5, 5, colornames.Red)
 		r.expect(11, 15, colornames.Black)
@@ -84,17 +82,15 @@ func TestRepeatedPaintsZ(t *testing.T) {
 
 func TestNoClipFromPaint(t *testing.T) {
 	// ensure that a paint operation does not polute the state
-	// by leaving any clip paths i place.
+	// by leaving any clip paths in place.
 	run(t, func(o *op.Ops) {
 		a := f32.Affine2D{}.Rotate(f32.Pt(20, 20), math.Pi/4)
 		op.Affine(a).Add(o)
-		paint.ColorOp{Color: colornames.Red}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(10, 10, 30, 30)}.Add(o)
+		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(10, 10, 30, 30)).Op())
 		a = f32.Affine2D{}.Rotate(f32.Pt(20, 20), -math.Pi/4)
 		op.Affine(a).Add(o)
 
-		paint.ColorOp{Color: colornames.Black}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 50, 50)}.Add(o)
+		paint.FillShape(o, colornames.Black, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
 	}, func(r result) {
 		r.expect(1, 1, colornames.Black)
 		r.expect(20, 20, colornames.Black)

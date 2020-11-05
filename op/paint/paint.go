@@ -160,7 +160,7 @@ func FillShape(ops *op.Ops, c color.RGBA, shape clip.Op) {
 func Fill(ops *op.Ops, c color.RGBA) {
 	defer op.Push(ops).Pop()
 	ColorOp{Color: c}.Add(ops)
-	inf := float32(math.Inf(+1))
+	inf := float32(1e6)
 	PaintOp{
 		Rect: f32.Rectangle{
 			Min: f32.Pt(-inf, -inf),

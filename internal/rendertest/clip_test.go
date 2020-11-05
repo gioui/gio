@@ -1,6 +1,7 @@
 package rendertest
 
 import (
+	"image"
 	"math"
 	"testing"
 
@@ -13,8 +14,7 @@ import (
 
 func TestPaintRect(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		paint.ColorOp{Color: colornames.Red}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 50, 50)}.Add(o)
+		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
 	}, func(r result) {
 		r.expect(0, 0, colornames.Red)
 		r.expect(49, 0, colornames.Red)
@@ -25,9 +25,8 @@ func TestPaintRect(t *testing.T) {
 
 func TestPaintClippedRect(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		paint.ColorOp{Color: colornames.Red}.Add(o)
 		clip.RRect{Rect: f32.Rect(25, 25, 60, 60)}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 50, 50)}.Add(o)
+		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
 		r.expect(24, 35, colornames.White)
@@ -39,10 +38,10 @@ func TestPaintClippedRect(t *testing.T) {
 
 func TestPaintClippedCirle(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		paint.ColorOp{Color: colornames.Red}.Add(o)
 		r := float32(10)
 		clip.RRect{Rect: f32.Rect(20, 20, 40, 40), SE: r, SW: r, NW: r, NE: r}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 30, 50)}.Add(o)
+		clip.Rect(image.Rect(0, 0, 30, 50)).Add(o)
+		paint.Fill(o, colornames.Red)
 	}, func(r result) {
 		r.expect(21, 21, colornames.White)
 		r.expect(25, 30, colornames.Red)
@@ -71,8 +70,7 @@ func TestPaintArc(t *testing.T) {
 		p.Line(f32.Pt(-50, 0))
 		p.End().Add(o)
 
-		paint.ColorOp{Color: colornames.Red}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 128, 128)}.Add(o)
+		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(0, 0, 128, 128)).Op())
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
 		r.expect(0, 25, colornames.Red)
