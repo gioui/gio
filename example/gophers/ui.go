@@ -327,11 +327,10 @@ type fill struct {
 func (f fill) Layout(gtx layout.Context) layout.Dimensions {
 	cs := gtx.Constraints
 	d := cs.Min
-	dr := f32.Rectangle{
-		Max: f32.Point{X: float32(d.X), Y: float32(d.Y)},
+	dr := image.Rectangle{
+		Max: image.Point{X: d.X, Y: d.Y},
 	}
-	paint.ColorOp{Color: f.col}.Add(gtx.Ops)
-	paint.PaintOp{Rect: dr}.Add(gtx.Ops)
+	paint.FillShape(gtx.Ops, f.col, clip.Rect(dr).Op())
 	return layout.Dimensions{Size: d}
 }
 
