@@ -3,6 +3,7 @@
 package f32
 
 import (
+	"fmt"
 	"math"
 )
 
@@ -134,4 +135,9 @@ func (a Affine2D) shear(radiansX, radiansY float32) Affine2D {
 		(a.a + 1) + a.d*tx - 1, a.b + (a.e+1)*tx, a.c + a.f*tx,
 		(a.a+1)*ty + a.d, a.b*ty + (a.e + 1) - 1, a.f*ty + a.f,
 	}
+}
+
+func (a Affine2D) String() string {
+	sx, hx, ox, hy, sy, oy := a.Elems()
+	return fmt.Sprintf("[[%f %f %f] [%f %f %f]]", sx, hx, ox, hy, sy, oy)
 }
