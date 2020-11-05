@@ -62,7 +62,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 		NE:   trackCorner, NW: trackCorner, SE: trackCorner, SW: trackCorner,
 	}.Add(gtx.Ops)
 	paint.ColorOp{Color: trackColor}.Add(gtx.Ops)
-	paint.PaintOp{Rect: trackRect}.Add(gtx.Ops)
+	paint.PaintOp{}.Add(gtx.Ops)
 	stack.Pop()
 
 	// Draw thumb ink.
@@ -133,5 +133,5 @@ func drawDisc(ops *op.Ops, sz float32, col color.RGBA) {
 		NE:   rr, NW: rr, SE: rr, SW: rr,
 	}.Add(ops)
 	paint.ColorOp{Color: col}.Add(ops)
-	paint.PaintOp{Rect: r}.Add(ops)
+	paint.PaintOp{}.Add(ops)
 }

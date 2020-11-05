@@ -25,7 +25,6 @@ import (
 	gunsafe "gioui.org/internal/unsafe"
 	"gioui.org/layout"
 	"gioui.org/op"
-	"gioui.org/op/paint"
 )
 
 type GPU struct {
@@ -213,26 +212,6 @@ func decodeLinearGradientOp(data []byte) linearGradientOpData {
 			B: data[21+2],
 			A: data[21+3],
 		},
-	}
-}
-
-func decodePaintOp(data []byte) paint.PaintOp {
-	bo := binary.LittleEndian
-	if opconst.OpType(data[0]) != opconst.TypePaint {
-		panic("invalid op")
-	}
-	r := f32.Rectangle{
-		Min: f32.Point{
-			X: math.Float32frombits(bo.Uint32(data[1:])),
-			Y: math.Float32frombits(bo.Uint32(data[5:])),
-		},
-		Max: f32.Point{
-			X: math.Float32frombits(bo.Uint32(data[9:])),
-			Y: math.Float32frombits(bo.Uint32(data[13:])),
-		},
-	}
-	return paint.PaintOp{
-		Rect: r,
 	}
 }
 
@@ -854,12 +833,18 @@ loop:
 			state.matType = materialTexture
 			state.image = decodeImageOp(encOp.Data, encOp.Refs)
 		case opconst.TypePaint:
-			op := decodePaintOp(encOp.Data)
 			// Transform (if needed) the painting rectangle and if so generate a clip path,
 			// for those cases also compute a partialTrans that maps texture coordinates between
 			// the new bounding rectangle and the transformed original paint rectangle.
 			trans, off := splitTransform(state.t)
-			clipData, bnd, partialTrans := d.boundsForTransformedRect(op.Rect, trans)
+			// Fill the clip area, unless the material is a (bounded) image.
+			// TODO: Find a tighter bound.
+			inf := float32(1e6)
+			dst := f32.Rect(-inf, -inf, inf, inf)
+			if state.matType == materialTexture {
+				dst = layout.FRect(state.image.src.Rect)
+			}
+			clipData, bnd, partialTrans := d.boundsForTransformedRect(dst, trans)
 			clip := state.clip.Intersect(bnd.Add(off))
 			if clip.Empty() {
 				continue

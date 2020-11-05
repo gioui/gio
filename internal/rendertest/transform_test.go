@@ -104,7 +104,8 @@ func TestOffsetTexture(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		op.Offset(f32.Pt(15, 15)).Add(o)
 		squares.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 50, 50)}.Add(o)
+		scale(50.0/512, 50.0/512).Add(o)
+		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 		r.expect(14, 20, colornames.White)
 		r.expect(66, 20, colornames.White)
@@ -118,7 +119,8 @@ func TestOffsetScaleTexture(t *testing.T) {
 		op.Offset(f32.Pt(15, 15)).Add(o)
 		squares.Add(o)
 		op.Affine(f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(2, 1))).Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 50, 50)}.Add(o)
+		scale(50.0/512, 50.0/512).Add(o)
+		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 		r.expect(114, 64, colornames.Blue)
 		r.expect(116, 64, colornames.White)
@@ -127,10 +129,12 @@ func TestOffsetScaleTexture(t *testing.T) {
 
 func TestRotateTexture(t *testing.T) {
 	run(t, func(o *op.Ops) {
+		defer op.Push(o).Pop()
 		squares.Add(o)
-		a := f32.Affine2D{}.Rotate(f32.Pt(40, 40), math.Pi/4)
+		a := f32.Affine2D{}.Offset(f32.Pt(30, 30)).Rotate(f32.Pt(40, 40), math.Pi/4)
 		op.Affine(a).Add(o)
-		paint.PaintOp{Rect: f32.Rect(30, 30, 50, 50)}.Add(o)
+		scale(20.0/512, 20.0/512).Add(o)
+		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 		r.expect(40, 40-12, colornames.Blue)
 		r.expect(40+12, 40, colornames.Green)
@@ -143,7 +147,9 @@ func TestRotateClipTexture(t *testing.T) {
 		a := f32.Affine2D{}.Rotate(f32.Pt(40, 40), math.Pi/8)
 		op.Affine(a).Add(o)
 		clip.RRect{Rect: f32.Rect(30, 30, 50, 50)}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(10, 10, 70, 70)}.Add(o)
+		op.Affine(f32.Affine2D{}.Offset(f32.Pt(10, 10))).Add(o)
+		scale(60.0/512, 60.0/512).Add(o)
+		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
 		r.expect(37, 39, colornames.Green)
@@ -164,8 +170,8 @@ func TestComplicatedTransform(t *testing.T) {
 		op.Affine(a).Add(o)
 		clip.RRect{Rect: f32.Rect(0, 0, 50, 40)}.Add(o)
 
-		op.Offset(f32.Pt(-100, -100)).Add(o)
-		paint.PaintOp{Rect: f32.Rect(100, 100, 150, 150)}.Add(o)
+		scale(50.0/512, 50.0/512).Add(o)
+		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 		r.expect(20, 5, colornames.White)
 	})

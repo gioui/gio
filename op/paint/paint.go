@@ -43,12 +43,8 @@ type LinearGradientOp struct {
 	Color2 color.RGBA
 }
 
-// PaintOp fills an area with the current brush, respecting the
-// current clip path and transformation.
+// PaintOp fills fills the current clip area with the current brush.
 type PaintOp struct {
-	// Rect is the destination area to paint. If necessary, the brush is
-	// scaled to cover the rectangle area.
-	Rect f32.Rectangle
 }
 
 // NewImageOp creates an ImageOp backed by src. See
@@ -139,11 +135,6 @@ func (c LinearGradientOp) Add(o *op.Ops) {
 func (d PaintOp) Add(o *op.Ops) {
 	data := o.Write(opconst.TypePaintLen)
 	data[0] = byte(opconst.TypePaint)
-	bo := binary.LittleEndian
-	bo.PutUint32(data[1:], math.Float32bits(d.Rect.Min.X))
-	bo.PutUint32(data[5:], math.Float32bits(d.Rect.Min.Y))
-	bo.PutUint32(data[9:], math.Float32bits(d.Rect.Max.X))
-	bo.PutUint32(data[13:], math.Float32bits(d.Rect.Max.Y))
 }
 
 // FillShape fills the clip shape with a color.
@@ -160,11 +151,5 @@ func FillShape(ops *op.Ops, c color.RGBA, shape clip.Op) {
 func Fill(ops *op.Ops, c color.RGBA) {
 	defer op.Push(ops).Pop()
 	ColorOp{Color: c}.Add(ops)
-	inf := float32(1e6)
-	PaintOp{
-		Rect: f32.Rectangle{
-			Min: f32.Pt(-inf, -inf),
-			Max: f32.Pt(+inf, +inf),
-		},
-	}.Add(ops)
+	PaintOp{}.Add(ops)
 }

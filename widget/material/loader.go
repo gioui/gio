@@ -48,9 +48,7 @@ func (l LoaderStyle) Layout(gtx layout.Context) layout.Dimensions {
 		Color: l.Color,
 	}.Add(gtx.Ops)
 	op.Offset(f32.Pt(-float32(radius), -float32(radius))).Add(gtx.Ops)
-	paint.PaintOp{
-		Rect: f32.Rectangle{Max: layout.FPt(sz)},
-	}.Add(gtx.Ops)
+	paint.PaintOp{}.Add(gtx.Ops)
 	op.InvalidateOp{}.Add(gtx.Ops)
 	return layout.Dimensions{
 		Size: sz,

@@ -7,7 +7,6 @@ import (
 	"image/color"
 	"image/draw"
 
-	"gioui.org/f32"
 	"gioui.org/layout"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
@@ -35,11 +34,7 @@ func NewIcon(data []byte) (*Icon, error) {
 func (ic *Icon) Layout(gtx layout.Context, sz unit.Value) layout.Dimensions {
 	ico := ic.image(gtx.Px(sz))
 	ico.Add(gtx.Ops)
-	paint.PaintOp{
-		Rect: f32.Rectangle{
-			Max: layout.FPt(ico.Size()),
-		},
-	}.Add(gtx.Ops)
+	paint.PaintOp{}.Add(gtx.Ops)
 	return layout.Dimensions{
 		Size: ico.Size(),
 	}

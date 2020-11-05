@@ -73,7 +73,7 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}
 	clip.RRect{Rect: track}.Add(gtx.Ops)
 	paint.ColorOp{Color: color}.Add(gtx.Ops)
-	paint.PaintOp{Rect: track}.Add(gtx.Ops)
+	paint.PaintOp{}.Add(gtx.Ops)
 	st.Pop()
 
 	// Draw track after thumb.
@@ -82,7 +82,7 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	track.Max.X = float32(size.X) - halfWidth
 	clip.RRect{Rect: track}.Add(gtx.Ops)
 	paint.ColorOp{Color: f32color.MulAlpha(color, 96)}.Add(gtx.Ops)
-	paint.PaintOp{Rect: track}.Add(gtx.Ops)
+	paint.PaintOp{}.Add(gtx.Ops)
 	st.Pop()
 
 	// Draw thumb.
@@ -103,7 +103,7 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 		NE:   rr, NW: rr, SE: rr, SW: rr,
 	}.Add(gtx.Ops)
 	paint.ColorOp{Color: color}.Add(gtx.Ops)
-	paint.PaintOp{Rect: thumb}.Add(gtx.Ops)
+	paint.PaintOp{}.Add(gtx.Ops)
 	st.Pop()
 
 	return layout.Dimensions{Size: size}

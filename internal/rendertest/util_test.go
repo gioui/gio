@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"gioui.org/app/headless"
+	"gioui.org/f32"
 	"gioui.org/op"
 	"gioui.org/op/paint"
 	"golang.org/x/image/colornames"
@@ -209,4 +210,8 @@ func newWindow(t testing.TB, width, height int) *headless.Window {
 	}
 	t.Cleanup(w.Release)
 	return w
+}
+
+func scale(sx, sy float32) op.TransformOp {
+	return op.Affine(f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(sx, sy)))
 }

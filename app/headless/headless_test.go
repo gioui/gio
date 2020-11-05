@@ -43,14 +43,9 @@ func TestClipping(t *testing.T) {
 	w, release := newTestWindow(t)
 	defer release()
 
-	sz := w.size
 	col := color.RGBA{A: 0xff, R: 0xca, G: 0xfe}
 	col2 := color.RGBA{A: 0xff, R: 0x00, G: 0xfe}
 	var ops op.Ops
-	pop := paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{
-		X: float32(sz.X),
-		Y: float32(sz.Y),
-	}}}
 	paint.ColorOp{Color: col}.Add(&ops)
 	clip.RRect{
 		Rect: f32.Rectangle{
@@ -59,7 +54,7 @@ func TestClipping(t *testing.T) {
 		},
 		SE: 75,
 	}.Add(&ops)
-	pop.Add(&ops)
+	paint.PaintOp{}.Add(&ops)
 	paint.ColorOp{Color: col2}.Add(&ops)
 	clip.RRect{
 		Rect: f32.Rectangle{
@@ -68,7 +63,7 @@ func TestClipping(t *testing.T) {
 		},
 		NW: 75,
 	}.Add(&ops)
-	pop.Add(&ops)
+	paint.PaintOp{}.Add(&ops)
 	if err := w.Frame(&ops); err != nil {
 		t.Fatal(err)
 	}

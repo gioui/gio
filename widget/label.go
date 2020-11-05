@@ -106,12 +106,11 @@ func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size un
 		if !ok {
 			break
 		}
-		lclip := layout.FRect(clip).Sub(off)
 		stack := op.Push(gtx.Ops)
 		op.Offset(off).Add(gtx.Ops)
 		str := txt[start:end]
 		s.ShapeString(font, textSize, str, l).Add(gtx.Ops)
-		paint.PaintOp{Rect: lclip}.Add(gtx.Ops)
+		paint.PaintOp{}.Add(gtx.Ops)
 		stack.Pop()
 	}
 	return dims

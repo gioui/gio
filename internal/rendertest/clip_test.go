@@ -81,7 +81,8 @@ func TestPaintArc(t *testing.T) {
 func TestPaintTexture(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		squares.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 80, 80)}.Add(o)
+		scale(80.0/512, 80.0/512).Add(o)
+		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 		r.expect(0, 0, colornames.Blue)
 		r.expect(79, 10, colornames.Green)
@@ -94,7 +95,8 @@ func TestPaintClippedTexture(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		squares.Add(o)
 		clip.RRect{Rect: f32.Rect(0, 0, 40, 40)}.Add(o)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 80, 80)}.Add(o)
+		scale(80.0/512, 80.0/512).Add(o)
+		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 		r.expect(40, 40, colornames.White)
 		r.expect(25, 35, colornames.Blue)

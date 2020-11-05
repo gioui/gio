@@ -171,7 +171,7 @@ func draw1000CirclesInstanced(gtx layout.Context) {
 
 	r := op.Record(ops)
 	clip.RRect{Rect: f32.Rect(0, 0, 10, 10), NE: 5, SE: 5, SW: 5, NW: 5}.Add(ops)
-	paint.PaintOp{Rect: f32.Rect(0, 0, 10, 10)}.Add(ops)
+	paint.PaintOp{}.Add(ops)
 	c := r.Stop()
 
 	for x := 0; x < 100; x++ {
@@ -228,7 +228,7 @@ func drawShapeInstances(gtx layout.Context, th *material.Theme) chan op.CallOp {
 
 		r := op.Record(ops)
 		clip.RRect{Rect: f32.Rect(0, 0, 25, 25), NE: 10, SE: 10, SW: 10, NW: 10}.Add(ops)
-		paint.PaintOp{Rect: f32.Rect(0, 0, 25, 25)}.Add(ops)
+		paint.PaintOp{}.Add(ops)
 		c := r.Stop()
 
 		squares.Add(ops)

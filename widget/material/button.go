@@ -287,5 +287,5 @@ func drawInk(gtx layout.Context, c widget.Press) {
 		}},
 		NE: rr, NW: rr, SE: rr, SW: rr,
 	}.Add(gtx.Ops)
-	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(size), Y: float32(size)}}}.Add(gtx.Ops)
+	paint.PaintOp{}.Add(gtx.Ops)
 }

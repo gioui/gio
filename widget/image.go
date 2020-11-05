@@ -5,7 +5,6 @@ package widget
 import (
 	"image"
 
-	"gioui.org/f32"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -36,7 +35,7 @@ func (im Image) Layout(gtx layout.Context) layout.Dimensions {
 	stack := op.Push(gtx.Ops)
 	clip.Rect(image.Rectangle{Max: d}).Add(gtx.Ops)
 	im.Src.Add(gtx.Ops)
-	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{X: float32(w), Y: float32(h)}}}.Add(gtx.Ops)
+	paint.PaintOp{}.Add(gtx.Ops)
 	stack.Pop()
 	return layout.Dimensions{Size: d}
 }

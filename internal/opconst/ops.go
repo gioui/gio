@@ -36,7 +36,7 @@ const (
 	TypeLayerLen          = 1
 	TypeRedrawLen         = 1 + 8
 	TypeImageLen          = 1
-	TypePaintLen          = 1 + 4*4
+	TypePaintLen          = 1
 	TypeColorLen          = 1 + 4
 	TypeLinearGradientLen = 1 + 8*2 + 4*2
 	TypeAreaLen           = 1 + 1 + 4*4
