@@ -103,7 +103,6 @@ type pathOp struct {
 type imageOp struct {
 	z        float32
 	path     *pathOp
-	off      f32.Point
 	clip     image.Rectangle
 	material material
 	clipType clipType
@@ -910,7 +909,6 @@ loop:
 			img := imageOp{
 				z:        zf,
 				path:     state.cpath,
-				off:      off,
 				clip:     bounds,
 				material: mat,
 			}
