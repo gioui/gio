@@ -10,11 +10,11 @@ import (
 	"log"
 
 	"gioui.org/app"
-	"gioui.org/f32"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 )
 
@@ -111,15 +111,15 @@ type quarterWidget struct {
 var red = color.RGBA{R: 0xff, G: 0x00, B: 0x00, A: 0xff}
 
 func (w *quarterWidget) Layout(gtx layout.Context) layout.Dimensions {
+	var color color.RGBA
 	if w.clicked {
-		paint.ColorOp{Color: red}.Add(gtx.Ops)
+		color = red
 	} else {
-		paint.ColorOp{Color: w.color}.Add(gtx.Ops)
+		color = w.color
 	}
-	paint.PaintOp{Rect: f32.Rectangle{Max: f32.Point{
-		X: float32(gtx.Constraints.Max.X),
-		Y: float32(gtx.Constraints.Max.Y),
-	}}}.Add(gtx.Ops)
+
+	r := image.Rectangle{Max: gtx.Constraints.Max}
+	paint.FillShape(gtx.Ops, color, clip.Rect(r).Op())
 
 	pointer.Rect(image.Rectangle{
 		Max: image.Pt(gtx.Constraints.Max.X, gtx.Constraints.Max.Y),
