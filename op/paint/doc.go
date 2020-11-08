@@ -8,5 +8,7 @@ area, taking the current clip path and transformation into account.
 
 The current brush is set by either a ColorOp for a constant color, or
 ImageOp for an image.
+
+All color.RGBA values are in the sRGB color space.
 */
 package paint
