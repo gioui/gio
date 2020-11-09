@@ -303,7 +303,7 @@ func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, fonts []*opentype, str []tex
 		}
 		x += g.Advance
 	}
-	builder.End().Add(ops)
+	builder.Outline().Add(ops)
 	return m.Stop()
 }
 

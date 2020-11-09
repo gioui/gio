@@ -312,8 +312,8 @@ func (p *Path) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to f32.Po
 	return splits
 }
 
-// End the path and return a clip operation that represents it.
-func (p *Path) End() Op {
+// Outline closes the path and returns a clip operation that represents it.
+func (p *Path) Outline() Op {
 	p.end()
 	c := p.macro.Stop()
 	return Op{

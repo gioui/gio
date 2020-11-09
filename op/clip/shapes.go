@@ -36,7 +36,7 @@ func (rr RRect) Op(ops *op.Ops) Op {
 	p.Begin(ops)
 	p.Move(rr.Rect.Min)
 	roundRect(&p, rr.Rect.Size(), rr.SE, rr.SW, rr.NW, rr.NE)
-	return p.End()
+	return p.Outline()
 }
 
 // Add the rectangle clip.
@@ -73,7 +73,7 @@ func (b Border) Op(ops *op.Ops) Op {
 	p.Move(r.Min.Sub(end))
 	roundRectRev(&p, r.Size(), b.SE-w, b.SW-w, b.NW-w, b.NE-w)
 
-	return p.End()
+	return p.Outline()
 }
 
 // Add the border clip.

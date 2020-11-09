@@ -68,7 +68,7 @@ func TestPaintArc(t *testing.T) {
 		p.Arc(f32.Pt(-10, -20), f32.Pt(10, -5), math.Pi)
 		p.Line(f32.Pt(0, -10))
 		p.Line(f32.Pt(-50, 0))
-		p.End().Add(o)
+		p.Outline().Add(o)
 
 		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(0, 0, 128, 128)).Op())
 	}, func(r result) {

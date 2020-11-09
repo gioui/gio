@@ -71,7 +71,7 @@ func TestRepeatedPaintsZ(t *testing.T) {
 		builder.Line(f32.Pt(0, 10))
 		builder.Line(f32.Pt(-10, 0))
 		builder.Line(f32.Pt(0, -10))
-		builder.End().Add(o)
+		builder.Outline().Add(o)
 		paint.Fill(o, colornames.Red)
 	}, func(r result) {
 		r.expect(5, 5, colornames.Red)
@@ -109,7 +109,7 @@ func constSqPath() op.CallOp {
 	builder.Line(f32.Pt(0, 10))
 	builder.Line(f32.Pt(-10, 0))
 	builder.Line(f32.Pt(0, -10))
-	builder.End().Add(innerOps)
+	builder.Outline().Add(innerOps)
 	return m.Stop()
 }
 

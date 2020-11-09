@@ -85,6 +85,6 @@ func clipLoader(ops *op.Ops, startAngle, endAngle, radius float64) {
 	center = f32.Pt(0, 0).Sub(p.Pos())
 	p.Arc(center, center, -delta)
 
-	// Second arc cap automatically completed by End.
-	p.End().Add(ops)
+	// Second arc cap automatically completed by Outline.
+	p.Outline().Add(ops)
 }
