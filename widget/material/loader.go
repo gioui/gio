@@ -59,32 +59,23 @@ func clipLoader(ops *op.Ops, startAngle, endAngle, radius float64) {
 	const thickness = .25
 
 	var (
-		outer = float32(radius)
+		width = float32(radius * thickness)
 		delta = float32(endAngle - startAngle)
 
 		vy, vx = math.Sincos(startAngle)
 
-		pen    = f32.Pt(float32(vx), float32(vy)).Mul(outer)
+		pen    = f32.Pt(float32(vx), float32(vy)).Mul(float32(radius))
 		center = f32.Pt(0, 0).Sub(pen)
+
+		style = clip.StrokeStyle{
+			Cap: clip.FlatCap,
+		}
 
 		p clip.Path
 	)
 
 	p.Begin(ops)
 	p.Move(pen)
-
-	// Outer arc.
 	p.Arc(center, center, delta)
-
-	// Arc cap.
-	pen = p.Pos()
-	cap := pen.Mul(1 - thickness)
-	p.Line(cap.Sub(pen))
-
-	// Inner arc.
-	center = f32.Pt(0, 0).Sub(p.Pos())
-	p.Arc(center, center, -delta)
-
-	// Second arc cap automatically completed by Outline.
-	p.Outline().Add(ops)
+	p.Stroke(width, style).Add(ops)
 }
