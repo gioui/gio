@@ -25,6 +25,7 @@ import (
 	gunsafe "gioui.org/internal/unsafe"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 )
 
 type GPU struct {
@@ -125,6 +126,8 @@ type material struct {
 type clipOp struct {
 	// TODO: Use image.Rectangle?
 	bounds f32.Rectangle
+	width  float32
+	style  clip.StrokeStyle
 }
 
 // imageOpData is the shadow of paint.ImageOp.
@@ -157,6 +160,10 @@ func (op *clipOp) decode(data []byte) {
 	}
 	*op = clipOp{
 		bounds: layout.FRect(r),
+		width:  math.Float32frombits(bo.Uint32(data[17:])),
+		style: clip.StrokeStyle{
+			Cap: clip.StrokeCap(data[21]),
+		},
 	}
 }
 
@@ -805,7 +812,7 @@ loop:
 					// Why is this not used for the offset shapes?
 					op.bounds = v.bounds
 				} else {
-					aux, op.bounds = d.buildVerts(aux, trans)
+					aux, op.bounds = d.buildVerts(aux, trans, op.width, op.style)
 					// add it to the cache, without GPU data, so the transform can be
 					// reused.
 					d.pathCache.put(auxKey, opCacheValue{bounds: op.bounds})
@@ -1210,7 +1217,7 @@ func (d *drawOps) writeVertCache(n int) []byte {
 }
 
 // transform, split paths as needed, calculate maxY, bounds and create GPU vertices.
-func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D) (verts []byte, bounds f32.Rectangle) {
+func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D, width float32, sty clip.StrokeStyle) (verts []byte, bounds f32.Rectangle) {
 	inf := float32(math.Inf(+1))
 	d.qs.bounds = f32.Rectangle{
 		Min: f32.Point{X: inf, Y: inf},
@@ -1219,14 +1226,37 @@ func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D) (verts []byte, bounds 
 	d.qs.d = d
 	bo := binary.LittleEndian
 	startLength := len(d.vertCache)
-	for qi := 0; len(aux) >= (ops.QuadSize + 4); qi++ {
-		d.qs.contour = bo.Uint32(aux)
-		quad := ops.DecodeQuad(aux[4:])
-		quad = quad.Transform(tr)
 
-		d.qs.splitAndEncode(quad)
+	switch {
+	default:
+		// Outline path.
+		for qi := 0; len(aux) >= (ops.QuadSize + 4); qi++ {
+			d.qs.contour = bo.Uint32(aux)
+			quad := ops.DecodeQuad(aux[4:])
+			quad = quad.Transform(tr)
 
-		aux = aux[ops.QuadSize+4:]
+			d.qs.splitAndEncode(quad)
+
+			aux = aux[ops.QuadSize+4:]
+		}
+	case width > 0:
+		// Stroke path.
+		quads := make(strokeQuads, 0, 2*len(aux)/(ops.QuadSize+4))
+		for qi := 0; len(aux) >= (ops.QuadSize + 4); qi++ {
+			quad := strokeQuad{
+				contour: bo.Uint32(aux),
+				quad:    ops.DecodeQuad(aux[4:]),
+			}
+			quads = append(quads, quad)
+			aux = aux[ops.QuadSize+4:]
+		}
+		quads = quads.stroke(width, sty)
+		for _, quad := range quads {
+			d.qs.contour = quad.contour
+			quad.quad = quad.quad.Transform(tr)
+
+			d.qs.splitAndEncode(quad.quad)
+		}
 	}
 
 	fillMaxY(d.vertCache[startLength:])

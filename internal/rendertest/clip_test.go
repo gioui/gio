@@ -102,3 +102,87 @@ func TestPaintClippedTexture(t *testing.T) {
 		r.expect(25, 35, colornames.Blue)
 	})
 }
+
+func TestStrokedPathBevelFlat(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		const width = 2.5
+		sty := clip.StrokeStyle{
+			Cap: clip.FlatCap,
+		}
+
+		p := new(clip.Path)
+		p.Begin(o)
+		p.Move(f32.Pt(10, 50))
+		p.Line(f32.Pt(10, 0))
+		p.Arc(f32.Pt(10, 0), f32.Pt(20, 0), math.Pi)
+		p.Line(f32.Pt(10, 0))
+		p.Line(f32.Pt(10, 10))
+		p.Arc(f32.Pt(0, 30), f32.Pt(0, 30), 2*math.Pi)
+		p.Line(f32.Pt(-20, 0))
+		p.Quad(f32.Pt(-10, -10), f32.Pt(-30, 30))
+		p.Stroke(width, sty).Add(o)
+
+		paint.Fill(o, colornames.Red)
+	}, func(r result) {
+		r.expect(0, 0, colornames.White)
+		r.expect(10, 50, colornames.Red)
+	})
+}
+
+func TestStrokedPathBevelSquare(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		const width = 2.5
+		sty := clip.StrokeStyle{
+			Cap: clip.SquareCap,
+		}
+
+		p := new(clip.Path)
+		p.Begin(o)
+		p.Move(f32.Pt(10, 50))
+		p.Line(f32.Pt(10, 0))
+		p.Arc(f32.Pt(10, 0), f32.Pt(20, 0), math.Pi)
+		p.Line(f32.Pt(10, 0))
+		p.Line(f32.Pt(10, 10))
+		p.Arc(f32.Pt(0, 30), f32.Pt(0, 30), 2*math.Pi)
+		p.Line(f32.Pt(-20, 0))
+		p.Quad(f32.Pt(-10, -10), f32.Pt(-30, 30))
+		p.Stroke(width, sty).Add(o)
+
+		paint.Fill(o, colornames.Red)
+	}, func(r result) {
+		r.expect(0, 0, colornames.White)
+		r.expect(10, 50, colornames.Red)
+	})
+}
+
+func TestStrokedPathZeroWidth(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		const width = 2
+		var sty clip.StrokeStyle
+		{
+			p := new(clip.Path)
+			p.Begin(o)
+			p.Move(f32.Pt(10, 50))
+			p.Line(f32.Pt(50, 0))
+			p.Stroke(width, sty).Add(o)
+
+			paint.Fill(o, colornames.Black)
+		}
+
+		{
+			p := new(clip.Path)
+			p.Begin(o)
+			p.Move(f32.Pt(10, 50))
+			p.Line(f32.Pt(30, 0))
+			p.Stroke(0, sty).Add(o) // width=0, disable stroke
+
+			paint.Fill(o, colornames.Red)
+		}
+
+	}, func(r result) {
+		r.expect(0, 0, colornames.White)
+		r.expect(10, 50, colornames.Black)
+		r.expect(30, 50, colornames.Black)
+		r.expect(65, 50, colornames.White)
+	})
+}

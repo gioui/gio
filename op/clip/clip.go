@@ -39,6 +39,8 @@ func (p *Path) Pos() f32.Point { return p.pen }
 type Op struct {
 	call   op.CallOp
 	bounds image.Rectangle
+	width  float32     // Width of the stroked path, 0 for outline paths.
+	style  StrokeStyle // Style of the stroked path, 0 for outline paths.
 }
 
 func (p Op) Add(o *op.Ops) {
@@ -50,6 +52,8 @@ func (p Op) Add(o *op.Ops) {
 	bo.PutUint32(data[5:], uint32(p.bounds.Min.Y))
 	bo.PutUint32(data[9:], uint32(p.bounds.Max.X))
 	bo.PutUint32(data[13:], uint32(p.bounds.Max.Y))
+	bo.PutUint32(data[17:], math.Float32bits(p.width))
+	data[21] = uint8(p.style.Cap)
 }
 
 // Begin the path, storing the path data and final Op into ops.
@@ -318,6 +322,26 @@ func (p *Path) Outline() Op {
 	c := p.macro.Stop()
 	return Op{
 		call: c,
+	}
+}
+
+// Stroke returns a stroked path with the specified width
+// and configuration.
+// If the provided width is <= 0, the path won't be stroked.
+func (p *Path) Stroke(width float32, sty StrokeStyle) Op {
+	if width <= 0 {
+		// Explicitly discard the macro to ignore the path.
+		p.macro.Stop()
+		return Op{
+			call: op.Record(p.ops).Stop(),
+		}
+	}
+
+	c := p.macro.Stop()
+	return Op{
+		call:  c,
+		width: width,
+		style: sty,
 	}
 }
 
