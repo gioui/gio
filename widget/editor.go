@@ -238,7 +238,7 @@ func (e *Editor) processKey(gtx layout.Context) {
 		case key.FocusEvent:
 			e.focused = ke.Focus
 		case key.Event:
-			if !e.focused {
+			if !e.focused || ke.State != key.Press {
 				break
 			}
 			if e.Submit && (ke.Name == key.NameReturn || ke.Name == key.NameEnter) {
