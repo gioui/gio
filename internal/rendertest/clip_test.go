@@ -129,6 +129,32 @@ func TestStrokedPathBevelFlat(t *testing.T) {
 	})
 }
 
+func TestStrokedPathBevelRound(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		const width = 2.5
+		sty := clip.StrokeStyle{
+			Cap: clip.RoundCap,
+		}
+
+		p := new(clip.Path)
+		p.Begin(o)
+		p.Move(f32.Pt(10, 50))
+		p.Line(f32.Pt(10, 0))
+		p.Arc(f32.Pt(10, 0), f32.Pt(20, 0), math.Pi)
+		p.Line(f32.Pt(10, 0))
+		p.Line(f32.Pt(10, 10))
+		p.Arc(f32.Pt(0, 30), f32.Pt(0, 30), 2*math.Pi)
+		p.Line(f32.Pt(-20, 0))
+		p.Quad(f32.Pt(-10, -10), f32.Pt(-30, 30))
+		p.Stroke(width, sty).Add(o)
+
+		paint.Fill(o, colornames.Red)
+	}, func(r result) {
+		r.expect(0, 0, colornames.White)
+		r.expect(10, 50, colornames.Red)
+	})
+}
+
 func TestStrokedPathBevelSquare(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		const width = 2.5

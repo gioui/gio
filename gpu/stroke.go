@@ -28,6 +28,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/internal/ops"
+	"gioui.org/op"
 	"gioui.org/op/clip"
 )
 
@@ -45,6 +46,10 @@ type strokeState struct {
 
 type strokeQuads []strokeQuad
 
+func (qs *strokeQuads) pen() f32.Point {
+	return (*qs)[len(*qs)-1].quad.To
+}
+
 func (qs *strokeQuads) lineTo(pt f32.Point) {
 	end := (*qs)[len(*qs)-1].quad.To
 	*qs = append(*qs, strokeQuad{
@@ -54,6 +59,27 @@ func (qs *strokeQuads) lineTo(pt f32.Point) {
 			To:   pt,
 		},
 	})
+}
+
+func (qs *strokeQuads) arc(f1, f2 f32.Point, angle float32) {
+	var (
+		p clip.Path
+		o = new(op.Ops)
+	)
+	p.Begin(o)
+	p.Move(qs.pen())
+	beg := len(o.Data())
+	p.Arc(f1, f2, angle)
+	end := len(o.Data())
+	raw := o.Data()[beg:end]
+
+	for qi := 0; len(raw) >= (ops.QuadSize + 4); qi++ {
+		quad := ops.DecodeQuad(raw[4:])
+		raw = raw[ops.QuadSize+4:]
+		*qs = append(*qs, strokeQuad{
+			quad: quad,
+		})
+	}
 }
 
 // split splits a slice of quads into slices of quads grouped
@@ -409,6 +435,8 @@ func strokePathCap(sty clip.StrokeStyle, qs *strokeQuads, hw float32, pivot, n0 
 		strokePathFlatCap(qs, hw, pivot, n0)
 	case clip.SquareCap:
 		strokePathSquareCap(qs, hw, pivot, n0)
+	case clip.RoundCap:
+		strokePathRoundCap(qs, hw, pivot, n0)
 	default:
 		panic("impossible")
 	}
@@ -432,4 +460,10 @@ func strokePathSquareCap(qs *strokeQuads, hw float32, pivot, n0 f32.Point) {
 	qs.lineTo(corner1)
 	qs.lineTo(corner2)
 	qs.lineTo(end)
+}
+
+// strokePathRoundCap caps the start or end of a path with a round cap.
+func strokePathRoundCap(qs *strokeQuads, hw float32, pivot, n0 f32.Point) {
+	c := pivot.Sub(qs.pen())
+	qs.arc(c, c, math.Pi)
 }

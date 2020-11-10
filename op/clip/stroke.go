@@ -20,4 +20,9 @@ const (
 	// and left-hand sides of a stroked path with a half square of length
 	// the stroked path's width.
 	SquareCap
+
+	// RoundCap caps stroked paths with a round cap, joining the right-hand and
+	// left-hand sides of a stroked path with a half disc of diameter the
+	// stroked path's width.
+	RoundCap
 )
