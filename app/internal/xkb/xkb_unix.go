@@ -170,9 +170,7 @@ func (x *Context) DispatchKey(keyCode uint32, state key.State) (events []event.E
 		if sym == C.XKB_KEY_ISO_Left_Tab {
 			cmd.Modifiers |= key.ModShift
 		}
-		if state == key.Press {
-			events = append(events, cmd)
-		}
+		events = append(events, cmd)
 	}
 	C.xkb_compose_state_feed(x.compState, sym)
 	var str []byte
