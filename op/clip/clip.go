@@ -40,7 +40,7 @@ type Op struct {
 	call   op.CallOp
 	bounds image.Rectangle
 	width  float32     // Width of the stroked path, 0 for outline paths.
-	style  StrokeStyle // Style of the stroked path, 0 for outline paths.
+	style  StrokeStyle // Style of the stroked path, zero for outline paths.
 }
 
 func (p Op) Add(o *op.Ops) {

@@ -49,6 +49,7 @@ type Border struct {
 	// Rect is the bounds of the border.
 	Rect  f32.Rectangle
 	Width float32
+	Style StrokeStyle
 	// The corner radii.
 	SE, SW, NW, NE float32
 }
@@ -57,23 +58,11 @@ type Border struct {
 func (b Border) Op(ops *op.Ops) Op {
 	var p Path
 	p.Begin(ops)
-	w := b.Width
 
-	// Outer outline.
-	r := b.Rect
-	p.Move(r.Min)
-	end := roundRect(&p, r.Size(), b.SE, b.SW, b.NW, b.NE)
+	p.Move(b.Rect.Min)
+	roundRect(&p, b.Rect.Size(), b.SE, b.SW, b.NW, b.NE)
 
-	// Inner outline
-	r = b.Rect
-	r.Min.X += w
-	r.Min.Y += w
-	r.Max.X -= w
-	r.Max.Y -= w
-	p.Move(r.Min.Sub(end))
-	roundRectRev(&p, r.Size(), b.SE-w, b.SW-w, b.NW-w, b.NE-w)
-
-	return p.Outline()
+	return p.Stroke(b.Width, b.Style)
 }
 
 // Add the border clip.
@@ -83,7 +72,7 @@ func (rr Border) Add(ops *op.Ops) {
 
 // roundRect adds the outline of a rectangle with rounded corners to a
 // path.
-func roundRect(p *Path, size f32.Point, se, sw, nw, ne float32) f32.Point {
+func roundRect(p *Path, size f32.Point, se, sw, nw, ne float32) {
 	// https://pomax.github.io/bezierinfo/#circles_cubic.
 	w, h := size.X, size.Y
 	const c = 0.55228475 // 4*(sqrt(2)-1)/3
@@ -95,19 +84,5 @@ func roundRect(p *Path, size f32.Point, se, sw, nw, ne float32) f32.Point {
 	p.Cube(f32.Point{X: 0, Y: -nw * c}, f32.Point{X: nw - nw*c, Y: -nw}, f32.Point{X: nw, Y: -nw}) // NW
 	p.Line(f32.Point{X: w - ne - nw, Y: 0})
 	p.Cube(f32.Point{X: ne * c, Y: 0}, f32.Point{X: ne, Y: ne - ne*c}, f32.Point{X: ne, Y: ne}) // NE
-	return p.pen
-}
-
-// roundRectRev is like roundRect but counter-clockwise.
-func roundRectRev(p *Path, size f32.Point, se, sw, nw, ne float32) {
-	w, h := size.X, size.Y
-	const c = 0.55228475
-	p.Move(f32.Point{X: 0, Y: h - sw})
-	p.Cube(f32.Point{X: 0, Y: sw * c}, f32.Point{X: sw - sw*c, Y: sw}, f32.Point{X: sw, Y: sw}) // SW
-	p.Line(f32.Point{X: -se + w - sw, Y: 0})
-	p.Cube(f32.Point{X: se * c, Y: 0}, f32.Point{X: se, Y: -se + se*c}, f32.Point{X: se, Y: -se}) // SE
-	p.Line(f32.Point{X: 0, Y: ne - h + se})
-	p.Cube(f32.Point{X: 0, Y: -ne * c}, f32.Point{X: -ne + ne*c, Y: -ne}, f32.Point{X: -ne, Y: -ne}) // NE
-	p.Line(f32.Point{X: -w + ne + nw, Y: 0})
-	p.Cube(f32.Point{X: -nw * c, Y: 0}, f32.Point{X: -nw, Y: nw - nw*c}, f32.Point{X: -nw, Y: nw}) // NW
+	p.Line(f32.Point{X: 0, Y: -(ne - h + se)})
 }
