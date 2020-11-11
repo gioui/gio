@@ -162,8 +162,9 @@ func (op *clipOp) decode(data []byte) {
 		bounds: layout.FRect(r),
 		width:  math.Float32frombits(bo.Uint32(data[17:])),
 		style: clip.StrokeStyle{
-			Cap:  clip.StrokeCap(data[21]),
-			Join: clip.StrokeJoin(data[22]),
+			Cap:   clip.StrokeCap(data[21]),
+			Join:  clip.StrokeJoin(data[22]),
+			Miter: math.Float32frombits(bo.Uint32(data[23:])),
 		},
 	}
 }

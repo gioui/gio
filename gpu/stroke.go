@@ -423,6 +423,10 @@ func quadBezierSplit(p0, p1, p2 f32.Point, t float32) (f32.Point, f32.Point, f32
 // strokePathJoin joins the two paths rhs and lhs, according to the provided
 // stroke style sty.
 func strokePathJoin(sty clip.StrokeStyle, rhs, lhs *strokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
+	if sty.Miter > 0 {
+		strokePathMiterJoin(sty, rhs, lhs, hw, pivot, n0, n1, r0, r1)
+		return
+	}
 	switch sty.Join {
 	case clip.BevelJoin:
 		strokePathBevelJoin(rhs, lhs, hw, pivot, n0, n1, r0, r1)
@@ -462,6 +466,47 @@ func strokePathRoundJoin(rhs, lhs *strokeQuads, hw float32, pivot, n0, n1 f32.Po
 		rhs.lineTo(rp) // Add a line to accomodate for rounding errors.
 		lhs.lineTo(lp)
 	}
+}
+
+func strokePathMiterJoin(sty clip.StrokeStyle, rhs, lhs *strokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
+	if n0 == n1.Mul(-1) {
+		strokePathBevelJoin(rhs, lhs, hw, pivot, n0, n1, r0, r1)
+		return
+	}
+
+	// This is to handle nearly linear joints that would be clipped otherwise.
+	limit := math.Max(float64(sty.Miter), 1.001)
+
+	cw := dotPt(rot90CW(n0), n1) >= 0.0
+	if cw {
+		// hw is used to calculate |R|.
+		// When running CW, n0 and n1 point the other way,
+		// so the sign of r0 and r1 is negated.
+		hw = -hw
+	}
+	hw64 := float64(hw)
+
+	cos := math.Sqrt(0.5 * (1 + float64(cosPt(n0, n1))))
+	d := hw64 / cos
+	if math.Abs(limit*hw64) < math.Abs(d) {
+		sty.Miter = 0 // Set miter to zero to disable the miter joint.
+		strokePathJoin(sty, rhs, lhs, hw, pivot, n0, n1, r0, r1)
+		return
+	}
+	mid := pivot.Add(normPt(n0.Add(n1), float32(d)))
+
+	rp := pivot.Add(n1)
+	lp := pivot.Sub(n1)
+	switch {
+	case cw:
+		// Path bends to the right, ie. CW.
+		lhs.lineTo(mid)
+	default:
+		// Path bends to the left, ie. CCW.
+		rhs.lineTo(mid)
+	}
+	rhs.lineTo(rp)
+	lhs.lineTo(lp)
 }
 
 // strokePathCap caps the provided path qs, according to the provided stroke style sty.

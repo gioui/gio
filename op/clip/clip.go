@@ -55,6 +55,7 @@ func (p Op) Add(o *op.Ops) {
 	bo.PutUint32(data[17:], math.Float32bits(p.width))
 	data[21] = uint8(p.style.Cap)
 	data[22] = uint8(p.style.Join)
+	bo.PutUint32(data[23:], math.Float32bits(p.style.Miter))
 }
 
 // Begin the path, storing the path data and final Op into ops.

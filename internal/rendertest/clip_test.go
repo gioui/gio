@@ -211,6 +211,96 @@ func TestStrokedPathRoundRound(t *testing.T) {
 	})
 }
 
+func TestStrokedPathFlatMiter(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		const width = 10
+		sty := clip.StrokeStyle{
+			Cap:   clip.FlatCap,
+			Join:  clip.BevelJoin,
+			Miter: 5,
+		}
+
+		beg := f32.Pt(40, 10)
+		{
+			p := new(clip.Path)
+			p.Begin(o)
+			p.Move(beg)
+			p.Line(f32.Pt(50, 0))
+			p.Line(f32.Pt(-50, 50))
+			p.Line(f32.Pt(50, 0))
+			p.Quad(f32.Pt(-50, 20), f32.Pt(-50, 50))
+			p.Line(f32.Pt(50, 0))
+
+			p.Stroke(width, sty).Add(o)
+			paint.Fill(o, colornames.Red)
+		}
+
+		{
+			p := new(clip.Path)
+			p.Begin(o)
+			p.Move(beg)
+			p.Line(f32.Pt(50, 0))
+			p.Line(f32.Pt(-50, 50))
+			p.Line(f32.Pt(50, 0))
+			p.Quad(f32.Pt(-50, 20), f32.Pt(-50, 50))
+			p.Line(f32.Pt(50, 0))
+
+			p.Stroke(2, clip.StrokeStyle{}).Add(o)
+			paint.Fill(o, colornames.Black)
+		}
+
+	}, func(r result) {
+		r.expect(0, 0, colornames.White)
+		r.expect(40, 10, colornames.Black)
+		r.expect(40, 12, colornames.Red)
+	})
+}
+
+func TestStrokedPathFlatMiterInf(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		const width = 10
+		sty := clip.StrokeStyle{
+			Cap:   clip.FlatCap,
+			Join:  clip.BevelJoin,
+			Miter: float32(math.Inf(+1)),
+		}
+
+		beg := f32.Pt(40, 10)
+		{
+			p := new(clip.Path)
+			p.Begin(o)
+			p.Move(beg)
+			p.Line(f32.Pt(50, 0))
+			p.Line(f32.Pt(-50, 50))
+			p.Line(f32.Pt(50, 0))
+			p.Quad(f32.Pt(-50, 20), f32.Pt(-50, 50))
+			p.Line(f32.Pt(50, 0))
+
+			p.Stroke(width, sty).Add(o)
+			paint.Fill(o, colornames.Red)
+		}
+
+		{
+			p := new(clip.Path)
+			p.Begin(o)
+			p.Move(beg)
+			p.Line(f32.Pt(50, 0))
+			p.Line(f32.Pt(-50, 50))
+			p.Line(f32.Pt(50, 0))
+			p.Quad(f32.Pt(-50, 20), f32.Pt(-50, 50))
+			p.Line(f32.Pt(50, 0))
+
+			p.Stroke(2, clip.StrokeStyle{}).Add(o)
+			paint.Fill(o, colornames.Black)
+		}
+
+	}, func(r result) {
+		r.expect(0, 0, colornames.White)
+		r.expect(40, 10, colornames.Black)
+		r.expect(40, 12, colornames.Red)
+	})
+}
+
 func TestStrokedPathZeroWidth(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		const width = 2

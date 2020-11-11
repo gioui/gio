@@ -8,6 +8,11 @@ package clip
 type StrokeStyle struct {
 	Cap  StrokeCap
 	Join StrokeJoin
+
+	// Miter is the limit to apply to a miter joint.
+	// The zero Miter disables the miter joint; setting Miter to +∞
+	// unconditionally enables the miter joint.
+	Miter float32
 }
 
 // StrokeCap describes the head or tail of a stroked path.
