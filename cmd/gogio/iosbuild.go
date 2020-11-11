@@ -224,7 +224,7 @@ int main(int argc, char * argv[]) {
 	}
 	icon := *iconPath
 	if icon == "" {
-		icon = filepath.Join(bi.dir, "appicon.png")
+		icon = filepath.Join(bi.pkgDir, "appicon.png")
 	}
 	if _, err := os.Stat(icon); err == nil {
 		assetPlist, err := iosIcons(bi, tmpDir, app, icon)
@@ -440,7 +440,7 @@ func archiveIOS(tmpDir, target, frameworkRoot string, bi *buildInfo) error {
 			"-buildmode=c-archive",
 			"-o", lib,
 			"-tags", tags,
-			bi.pkg,
+			bi.pkgPath,
 		)
 		lipo.Args = append(lipo.Args, lib)
 		cflagsLine := strings.Join(cflags, " ")

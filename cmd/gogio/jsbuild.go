@@ -24,7 +24,7 @@ func buildJS(bi *buildInfo) error {
 		"-ldflags="+bi.ldflags,
 		"-tags="+bi.tags,
 		"-o", filepath.Join(out, "main.wasm"),
-		bi.pkg,
+		bi.pkgPath,
 	)
 	cmd.Env = append(
 		os.Environ(),

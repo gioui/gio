@@ -37,35 +37,34 @@ var (
 	iconPath      = flag.String("icon", "", "Specify an icon for iOS and Android")
 )
 
-type buildInfo struct {
-	name    string
-	pkg     string
-	ldflags string
-	tags    string
-	target  string
-	appID   string
-	version int
-	dir     string
-	archs   []string
-	minsdk  int
-}
-
 func main() {
 	flag.Usage = func() {
 		fmt.Fprint(os.Stderr, mainUsage)
 	}
 	flag.Parse()
-	if err := mainErr(); err != nil {
+	if err := flagValidate(); err != nil {
+		fmt.Fprintf(os.Stderr, "gogio: %v\n", err)
+		os.Exit(1)
+	}
+	buildInfo, err := newBuildInfo(getPkgAbsPath())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "gogio: %v\n", err)
+		os.Exit(1)
+	}
+	if err := build(buildInfo); err != nil {
 		fmt.Fprintf(os.Stderr, "gogio: %v\n", err)
 		os.Exit(1)
 	}
 	os.Exit(0)
 }
 
-func mainErr() error {
-	pkg := flag.Arg(0)
-	if pkg == "" {
+func flagValidate() error {
+	pkgPathArg := flag.Arg(0)
+	if pkgPathArg == "" {
 		return errors.New("specify a package")
+	}
+	if _, err := filepath.Abs(pkgPathArg); err != nil {
+		return err
 	}
 	if *target == "" {
 		return errors.New("please specify -target")
@@ -80,93 +79,7 @@ func mainErr() error {
 	default:
 		return fmt.Errorf("invalid -buildmode %s", *buildMode)
 	}
-	// Find package name.
-	pkgPath, err := runCmd(exec.Command("go", "list", "-f", "{{.ImportPath}}", pkg))
-	if err != nil {
-		return err
-	}
-	dir, err := runCmd(exec.Command("go", "list", "-f", "{{.Dir}}", pkg))
-	if err != nil {
-		return err
-	}
-	elems := strings.Split(pkgPath, "/")
-	name := elems[len(elems)-1]
-	bi := &buildInfo{
-		name:    name,
-		pkg:     pkg,
-		target:  *target,
-		appID:   *appID,
-		dir:     dir,
-		version: *version,
-		minsdk:  *minsdk,
-		tags:    *extraTags,
-	}
-	if bi.appID == "" {
-		bi.appID = appIDFromPackage(pkgPath)
-	}
-	var ldflags []string
-	if extra := *extraLdflags; extra != "" {
-		ldflags = append(ldflags, strings.Split(extra, " ")...)
-	}
-	// Pass appID along, to be used for logging on platforms like Android.
-	ldflags = append(ldflags, fmt.Sprintf("-X gioui.org/app/internal/log.appID=%s", bi.appID))
-
-	switch *target {
-	case "js":
-		bi.archs = []string{"wasm"}
-	case "ios", "tvos":
-		// Only 64-bit support.
-		bi.archs = []string{"arm64", "amd64"}
-	case "android":
-		bi.archs = []string{"arm", "arm64", "386", "amd64"}
-	}
-	if *archNames != "" {
-		bi.archs = strings.Split(*archNames, ",")
-	}
-	if appArgs := flag.Args()[1:]; len(appArgs) > 0 {
-		// Pass along arguments to the app.
-		ldflags = append(ldflags, fmt.Sprintf("-X gioui.org/app.extraArgs=%s", strings.Join(appArgs, "|")))
-	}
-	if m := *linkMode; m != "" {
-		ldflags = append(ldflags, "-linkmode="+m)
-	}
-	bi.ldflags = strings.Join(ldflags, " ")
-	if err := build(bi); err != nil {
-		return err
-	}
 	return nil
-}
-
-func appIDFromPackage(pkgPath string) string {
-	elems := strings.Split(pkgPath, "/")
-	domain := strings.Split(elems[0], ".")
-	name := ""
-	if len(elems) > 1 {
-		name = "." + elems[len(elems)-1]
-	}
-	if len(elems) < 2 && len(domain) < 2 {
-		name = "." + domain[0]
-		domain[0] = "localhost"
-	} else {
-		for i := 0; i < len(domain)/2; i++ {
-			opp := len(domain) - 1 - i
-			domain[i], domain[opp] = domain[opp], domain[i]
-		}
-	}
-
-	pkgDomain := strings.Join(domain, ".")
-	appid := []rune(pkgDomain + name)
-
-	// a Java-language-style package name may contain upper- and lower-case
-	// letters and underscores with individual parts separated by '.'.
-	// https://developer.android.com/guide/topics/manifest/manifest-element
-	for i, c := range appid {
-		if !('a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' ||
-			c == '_' || c == '.') {
-			appid[i] = '_'
-		}
-	}
-	return string(appid)
 }
 
 func build(bi *buildInfo) error {
