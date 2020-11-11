@@ -12,7 +12,7 @@ packages:
  - libplist-utils # for gogio
  - golang
 sources:
- - git@git.sr.ht:~eliasnaur/applesdks
+ - https://git.sr.ht/~eliasnaur/applesdks
  - https://git.sr.ht/~eliasnaur/gio
  - https://git.sr.ht/~eliasnaur/giouiorg
  - https://github.com/tpoechtrager/cctools-port.git
@@ -21,8 +21,6 @@ sources:
 environment:
    APPLE_TOOLCHAIN_ROOT: /home/build/appletools
    PATH: /home/build/go/bin:/usr/bin
-secrets:
- - 6363dfe0-15d9-4bd2-88a5-ae53243568c9
 tasks:
  - prepare_toolchain: |
      mkdir -p $APPLE_TOOLCHAIN_ROOT
