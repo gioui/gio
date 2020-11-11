@@ -3,9 +3,11 @@
 package clip
 
 // StrokeStyle describes how a stroked path should be drawn.
-// StrokeStyle zero value draws a Bevel-joined and Flat-capped stroked path.
+// The zero value of StrokeStyle represents bevel-joined and flat-capped
+// strokes.
 type StrokeStyle struct {
-	Cap StrokeCap
+	Cap  StrokeCap
+	Join StrokeJoin
 }
 
 // StrokeCap describes the head or tail of a stroked path.
@@ -25,4 +27,15 @@ const (
 	// left-hand sides of a stroked path with a half disc of diameter the
 	// stroked path's width.
 	RoundCap
+)
+
+// StrokeJoin describes how stroked paths are collated.
+type StrokeJoin uint8
+
+const (
+	// BevelJoin joins path segments with sharp bevels.
+	BevelJoin StrokeJoin = iota
+
+	// RoundJoin joins path segments with a round segment.
+	RoundJoin
 )

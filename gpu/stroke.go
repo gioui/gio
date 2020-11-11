@@ -51,7 +51,7 @@ func (qs *strokeQuads) pen() f32.Point {
 }
 
 func (qs *strokeQuads) lineTo(pt f32.Point) {
-	end := (*qs)[len(*qs)-1].quad.To
+	end := qs.pen()
 	*qs = append(*qs, strokeQuad{
 		quad: ops.Quad{
 			From: end,
@@ -273,6 +273,13 @@ func strokePathNorm(p0, p1, p2 f32.Point, t, d float32) f32.Point {
 func rot90CW(p f32.Point) f32.Point  { return f32.Pt(+p.Y, -p.X) }
 func rot90CCW(p f32.Point) f32.Point { return f32.Pt(-p.Y, +p.X) }
 
+// cosPt returns the cosine of the opening angle between p and q.
+func cosPt(p, q f32.Point) float32 {
+	np := math.Hypot(float64(p.X), float64(p.Y))
+	nq := math.Hypot(float64(q.X), float64(q.Y))
+	return dotPt(p, q) / float32(np*nq)
+}
+
 func normPt(p f32.Point, l float32) f32.Point {
 	d := math.Hypot(float64(p.X), float64(p.Y))
 	l64 := float64(l)
@@ -416,7 +423,14 @@ func quadBezierSplit(p0, p1, p2 f32.Point, t float32) (f32.Point, f32.Point, f32
 // strokePathJoin joins the two paths rhs and lhs, according to the provided
 // stroke style sty.
 func strokePathJoin(sty clip.StrokeStyle, rhs, lhs *strokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
-	strokePathBevelJoin(rhs, lhs, hw, pivot, n0, n1, r0, r1)
+	switch sty.Join {
+	case clip.BevelJoin:
+		strokePathBevelJoin(rhs, lhs, hw, pivot, n0, n1, r0, r1)
+	case clip.RoundJoin:
+		strokePathRoundJoin(rhs, lhs, hw, pivot, n0, n1, r0, r1)
+	default:
+		panic("impossible")
+	}
 }
 
 func strokePathBevelJoin(rhs, lhs *strokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
@@ -426,6 +440,28 @@ func strokePathBevelJoin(rhs, lhs *strokeQuads, hw float32, pivot, n0, n1 f32.Po
 
 	rhs.lineTo(rp)
 	lhs.lineTo(lp)
+}
+
+func strokePathRoundJoin(rhs, lhs *strokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
+	rp := pivot.Add(n1)
+	lp := pivot.Sub(n1)
+	cw := dotPt(rot90CW(n0), n1) >= 0.0
+	switch {
+	case cw:
+		// Path bends to the right, ie. CW (or 180 degree turn).
+		c := pivot.Sub(lhs.pen())
+		angle := -math.Acos(float64(cosPt(n0, n1)))
+		lhs.arc(c, c, float32(angle))
+		lhs.lineTo(lp) // Add a line to accomodate for rounding errors.
+		rhs.lineTo(rp)
+	default:
+		// Path bends to the left, ie. CCW.
+		angle := math.Acos(float64(cosPt(n0, n1)))
+		c := pivot.Sub(rhs.pen())
+		rhs.arc(c, c, float32(angle))
+		rhs.lineTo(rp) // Add a line to accomodate for rounding errors.
+		lhs.lineTo(lp)
+	}
 }
 
 // strokePathCap caps the provided path qs, according to the provided stroke style sty.
