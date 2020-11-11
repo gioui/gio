@@ -949,20 +949,14 @@ func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f3
 				Y: float32(sz.Y),
 			},
 		}
-		if dx := float32(dr.Dx()); dx != 0 {
-			// Don't clip 1 px width sources.
-			if sdx := sr.Dx(); sdx > 1 {
-				sr.Min.X += (float32(clip.Min.X-dr.Min.X)*sdx + dx/2) / dx
-				sr.Max.X -= (float32(dr.Max.X-clip.Max.X)*sdx + dx/2) / dx
-			}
-		}
-		if dy := float32(dr.Dy()); dy != 0 {
-			// Don't clip 1 px height sources.
-			if sdy := sr.Dy(); sdy > 1 {
-				sr.Min.Y += (float32(clip.Min.Y-dr.Min.Y)*sdy + dy/2) / dy
-				sr.Max.Y -= (float32(dr.Max.Y-clip.Max.Y)*sdy + dy/2) / dy
-			}
-		}
+		dx := float32(dr.Dx())
+		sdx := sr.Dx()
+		sr.Min.X += float32(clip.Min.X-dr.Min.X) * sdx / dx
+		sr.Max.X -= float32(dr.Max.X-clip.Max.X) * sdx / dx
+		dy := float32(dr.Dy())
+		sdy := sr.Dy()
+		sr.Min.Y += float32(clip.Min.Y-dr.Min.Y) * sdy / dy
+		sr.Max.Y -= float32(dr.Max.Y-clip.Max.Y) * sdy / dy
 		tex, exists := cache.get(d.image.handle)
 		if !exists {
 			t := &texture{
