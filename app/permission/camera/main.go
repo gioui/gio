@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 /*
-Package camera implements permissions to access camera ardware.
+Package camera implements permissions to access camera hardware.
 
 Android
 
