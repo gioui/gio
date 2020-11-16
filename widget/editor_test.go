@@ -62,9 +62,9 @@ func TestEditor(t *testing.T) {
 
 	// When a password mask is applied, it should replace all visible glyphs
 	for i, line := range e.lines {
-		for j, glyph := range line.Layout {
-			if glyph.Rune != e.Mask && !unicode.IsSpace(glyph.Rune) {
-				t.Errorf("glyph at (%d, %d) is unmasked rune %d", i, j, glyph.Rune)
+		for j, r := range line.Layout.Text {
+			if r != e.Mask && !unicode.IsSpace(r) {
+				t.Errorf("glyph at (%d, %d) is unmasked rune %d", i, j, r)
 			}
 		}
 	}

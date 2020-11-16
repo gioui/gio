@@ -5,6 +5,7 @@
 package opentype
 
 import (
+	"bytes"
 	"io"
 	"unicode"
 	"unicode/utf8"
@@ -34,6 +35,13 @@ type Collection struct {
 type opentype struct {
 	Font    *sfnt.Font
 	Hinting font.Hinting
+}
+
+// a glyph represents a rune and its advance according to a Font.
+// TODO: remove this type and work on io.Readers directly.
+type glyph struct {
+	Rune    rune
+	Advance fixed.Int26_6
 }
 
 // NewFont parses an SFNT font, such as TTF or OTF data, from a []byte
@@ -110,7 +118,7 @@ func (f *Font) Layout(ppem fixed.Int26_6, maxWidth int, txt io.Reader) ([]text.L
 	return layoutText(&buf, ppem, maxWidth, fonts, glyphs)
 }
 
-func (f *Font) Shape(ppem fixed.Int26_6, str []text.Glyph) op.CallOp {
+func (f *Font) Shape(ppem fixed.Int26_6, str text.Layout) op.CallOp {
 	var buf sfnt.Buffer
 	return textPath(&buf, ppem, []*opentype{{Font: f.font, Hinting: font.HintingFull}}, str)
 }
@@ -130,7 +138,7 @@ func (c *Collection) Layout(ppem fixed.Int26_6, maxWidth int, txt io.Reader) ([]
 	return layoutText(&buf, ppem, maxWidth, c.fonts, glyphs)
 }
 
-func (c *Collection) Shape(ppem fixed.Int26_6, str []text.Glyph) op.CallOp {
+func (c *Collection) Shape(ppem fixed.Int26_6, str text.Layout) op.CallOp {
 	var buf sfnt.Buffer
 	return textPath(&buf, ppem, c.fonts, str)
 }
@@ -147,7 +155,7 @@ func fontForGlyph(buf *sfnt.Buffer, fonts []*opentype, r rune) *opentype {
 	return fonts[0] // Use replacement character from the first font if necessary
 }
 
-func layoutText(sbuf *sfnt.Buffer, ppem fixed.Int26_6, maxWidth int, fonts []*opentype, glyphs []text.Glyph) ([]text.Line, error) {
+func layoutText(sbuf *sfnt.Buffer, ppem fixed.Int26_6, maxWidth int, fonts []*opentype, glyphs []glyph) ([]text.Line, error) {
 	var lines []text.Line
 	var nextLine text.Line
 	updateBounds := func(f *opentype) {
@@ -180,8 +188,7 @@ func layoutText(sbuf *sfnt.Buffer, ppem fixed.Int26_6, maxWidth int, fonts []*op
 			prev.f = fonts[0]
 		}
 		updateBounds(prev.f)
-		nextLine.Layout = glyphs[:prev.idx:prev.idx]
-		nextLine.Len = prev.len
+		nextLine.Layout = toLayout(glyphs[:prev.idx:prev.idx])
 		nextLine.Width = prev.x + prev.adv
 		nextLine.Bounds.Max.X += prev.x
 		lines = append(lines, nextLine)
@@ -242,20 +249,32 @@ func layoutText(sbuf *sfnt.Buffer, ppem fixed.Int26_6, maxWidth int, fonts []*op
 	return lines, nil
 }
 
-func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, fonts []*opentype, str []text.Glyph) op.CallOp {
+// toLayout converts a slice of glyphs to a text.Layout.
+func toLayout(glyphs []glyph) text.Layout {
+	var buf bytes.Buffer
+	advs := make([]fixed.Int26_6, len(glyphs))
+	for i, g := range glyphs {
+		buf.WriteRune(g.Rune)
+		advs[i] = glyphs[i].Advance
+	}
+	return text.Layout{Text: buf.String(), Advances: advs}
+}
+
+func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, fonts []*opentype, str text.Layout) op.CallOp {
 	var lastPos f32.Point
 	var builder clip.Path
 	ops := new(op.Ops)
 	m := op.Record(ops)
 	var x fixed.Int26_6
 	builder.Begin(ops)
-	for _, g := range str {
-		if !unicode.IsSpace(g.Rune) {
-			f := fontForGlyph(buf, fonts, g.Rune)
+	rune := 0
+	for _, r := range str.Text {
+		if !unicode.IsSpace(r) {
+			f := fontForGlyph(buf, fonts, r)
 			if f == nil {
 				continue
 			}
-			segs, ok := f.LoadGlyph(buf, ppem, g.Rune)
+			segs, ok := f.LoadGlyph(buf, ppem, r)
 			if !ok {
 				continue
 			}
@@ -301,14 +320,15 @@ func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, fonts []*opentype, str []tex
 			}
 			lastPos = lastPos.Add(lastArg)
 		}
-		x += g.Advance
+		x += str.Advances[rune]
+		rune++
 	}
 	builder.Outline().Add(ops)
 	return m.Stop()
 }
 
-func readGlyphs(r io.Reader) ([]text.Glyph, error) {
-	var glyphs []text.Glyph
+func readGlyphs(r io.Reader) ([]glyph, error) {
+	var glyphs []glyph
 	buf := make([]byte, 0, 1024)
 	for {
 		n, err := r.Read(buf[len(buf):cap(buf)])
@@ -322,7 +342,7 @@ func readGlyphs(r io.Reader) ([]text.Glyph, error) {
 		for i < lim {
 			c, s := utf8.DecodeRune(buf[i:])
 			i += s
-			glyphs = append(glyphs, text.Glyph{Rune: c})
+			glyphs = append(glyphs, glyph{Rune: c})
 		}
 		n = copy(buf, buf[i:])
 		buf = buf[:n]

@@ -11,9 +11,7 @@ import (
 
 // A Line contains the measurements of a line of text.
 type Line struct {
-	Layout []Glyph
-	// Len is the length in UTF8 bytes of the line.
-	Len int
+	Layout Layout
 	// Width is the width of the line.
 	Width fixed.Int26_6
 	// Ascent is the height above the baseline.
@@ -25,9 +23,9 @@ type Line struct {
 	Bounds fixed.Rectangle26_6
 }
 
-type Glyph struct {
-	Rune    rune
-	Advance fixed.Int26_6
+type Layout struct {
+	Text     string
+	Advances []fixed.Int26_6
 }
 
 // Style is the font style.
@@ -50,7 +48,7 @@ type Font struct {
 // methods must be safe for concurrent use.
 type Face interface {
 	Layout(ppem fixed.Int26_6, maxWidth int, txt io.Reader) ([]Line, error)
-	Shape(ppem fixed.Int26_6, str []Glyph) op.CallOp
+	Shape(ppem fixed.Int26_6, str Layout) op.CallOp
 }
 
 // Typeface identifies a particular typeface design. The empty
