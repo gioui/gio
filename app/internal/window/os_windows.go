@@ -74,7 +74,7 @@ var resources struct {
 	handle syscall.Handle
 	// class is the Gio window class from RegisterClassEx.
 	class uint16
-	// cursor is the arrow cursor resource
+	// cursor is the arrow cursor resource.
 	cursor syscall.Handle
 }
 
