@@ -83,9 +83,6 @@ func NewCache(collection []FontFace) *Cache {
 		faces: make(map[Font]*faceCache),
 	}
 	for i, ff := range collection {
-		if ff.Font.Weight == 0 {
-			ff.Font.Weight = Normal
-		}
 		if i == 0 {
 			c.def = ff.Font.Typeface
 		}

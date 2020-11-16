@@ -33,7 +33,8 @@ type Glyph struct {
 // Style is the font style.
 type Style int
 
-// Weight is a font weight, in CSS units.
+// Weight is a font weight, in CSS units subtracted 400 so the zero value
+// is normal text weight.
 type Weight int
 
 // Font specify a particular typeface variant, style and weight.
@@ -73,9 +74,9 @@ const (
 )
 
 const (
-	Normal Weight = 400
-	Medium Weight = 500
-	Bold   Weight = 600
+	Normal Weight = 400 - 400
+	Medium Weight = 500 - 400
+	Bold   Weight = 600 - 400
 )
 
 func (a Alignment) String() string {
