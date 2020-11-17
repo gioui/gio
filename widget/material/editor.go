@@ -43,7 +43,11 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 	defer op.Push(gtx.Ops).Pop()
 	macro := op.Record(gtx.Ops)
 	paint.ColorOp{Color: e.HintColor}.Add(gtx.Ops)
-	tl := widget.Label{Alignment: e.Editor.Alignment}
+	var maxlines int
+	if e.Editor.SingleLine {
+		maxlines = 1
+	}
+	tl := widget.Label{Alignment: e.Editor.Alignment, MaxLines: maxlines}
 	dims := tl.Layout(gtx, e.shaper, e.Font, e.TextSize, e.Hint)
 	call := macro.Stop()
 	if w := dims.Size.X; gtx.Constraints.Min.X < w {
