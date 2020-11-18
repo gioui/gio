@@ -7,7 +7,7 @@ import (
 	"math"
 )
 
-// RGBA is a 32 bit floating point linear space color.
+// RGBA is a 32 bit floating point linear premultiplied color space.
 type RGBA struct {
 	R, G, B, A float32
 }
@@ -23,11 +23,14 @@ func (col RGBA) Float32() (r, g, b, a float32) {
 }
 
 // SRGBA converts from linear to sRGB color space.
-func (col RGBA) SRGB() color.RGBA {
-	return color.RGBA{
-		R: uint8(linearTosRGB(col.R)*255 + .5),
-		G: uint8(linearTosRGB(col.G)*255 + .5),
-		B: uint8(linearTosRGB(col.B)*255 + .5),
+func (col RGBA) SRGB() color.NRGBA {
+	if col.A == 0 {
+		return color.NRGBA{}
+	}
+	return color.NRGBA{
+		R: uint8(linearTosRGB(col.R/col.A)*255 + .5),
+		G: uint8(linearTosRGB(col.G/col.A)*255 + .5),
+		B: uint8(linearTosRGB(col.B/col.A)*255 + .5),
 		A: uint8(col.A*255 + .5),
 	}
 }
@@ -38,15 +41,48 @@ func (col RGBA) Opaque() RGBA {
 	return col
 }
 
-// RGBAFromSRGB converts from SRGBA to RGBA.
-func RGBAFromSRGB(col color.RGBA) RGBA {
-	r, g, b, a := col.RGBA()
+// LinearFromSRGB converts from SRGBA to RGBA.
+func LinearFromSRGB(col color.NRGBA) RGBA {
+	af := float32(col.A) / 0xFF
 	return RGBA{
-		R: sRGBToLinear(float32(r) / 0xffff),
-		G: sRGBToLinear(float32(g) / 0xffff),
-		B: sRGBToLinear(float32(b) / 0xffff),
-		A: float32(a) / 0xFFFF,
+		R: sRGBToLinear(float32(col.R)/0xff) * af,
+		G: sRGBToLinear(float32(col.G)/0xff) * af,
+		B: sRGBToLinear(float32(col.B)/0xff) * af,
+		A: af,
 	}
+}
+
+// NRGBAToRGBA converts from non-premultiplied sRGB color to premultiplied sRGB color.
+//
+// Each component in the result is `sRGBToLinear(c * alpha)`, where `c`
+// is the linear color.
+func NRGBAToRGBA(col color.NRGBA) color.RGBA {
+	if col.A == 0xFF {
+		return color.RGBA(col)
+	}
+	c := LinearFromSRGB(col)
+	return color.RGBA{
+		R: uint8(linearTosRGB(c.R)*255 + .5),
+		G: uint8(linearTosRGB(c.G)*255 + .5),
+		B: uint8(linearTosRGB(c.B)*255 + .5),
+		A: col.A,
+	}
+}
+
+// RGBAToNRGBA converts from premultiplied sRGB color to non-premultiplied sRGB color.
+func RGBAToNRGBA(col color.RGBA) color.NRGBA {
+	if col.A == 0xFF {
+		return color.NRGBA(col)
+	}
+
+	linear := RGBA{
+		R: sRGBToLinear(float32(col.R) / 0xff),
+		G: sRGBToLinear(float32(col.G) / 0xff),
+		B: sRGBToLinear(float32(col.B) / 0xff),
+		A: float32(col.A) / 0xff,
+	}
+
+	return linear.SRGB()
 }
 
 // linearTosRGB transforms color value from linear to sRGB.
@@ -74,14 +110,8 @@ func sRGBToLinear(c float32) float32 {
 	}
 }
 
-// MulAlpha scales all color components by alpha/255.
-func MulAlpha(c color.RGBA, alpha uint8) color.RGBA {
-	// TODO: Optimize. This is pretty slow.
-	a := float32(alpha) / 255.
-	rgba := RGBAFromSRGB(c)
-	rgba.A *= a
-	rgba.R *= a
-	rgba.G *= a
-	rgba.B *= a
-	return rgba.SRGB()
+// MulAlpha applies the alpha to the color.
+func MulAlpha(c color.NRGBA, alpha uint8) color.NRGBA {
+	c.A = uint8(uint32(c.A) * uint32(alpha) / 0xFF)
+	return c
 }

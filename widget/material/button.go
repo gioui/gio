@@ -22,10 +22,10 @@ import (
 type ButtonStyle struct {
 	Text string
 	// Color is the text color.
-	Color        color.RGBA
+	Color        color.NRGBA
 	Font         text.Font
 	TextSize     unit.Value
-	Background   color.RGBA
+	Background   color.NRGBA
 	CornerRadius unit.Value
 	Inset        layout.Inset
 	Button       *widget.Clickable
@@ -33,15 +33,15 @@ type ButtonStyle struct {
 }
 
 type ButtonLayoutStyle struct {
-	Background   color.RGBA
+	Background   color.NRGBA
 	CornerRadius unit.Value
 	Button       *widget.Clickable
 }
 
 type IconButtonStyle struct {
-	Background color.RGBA
+	Background color.NRGBA
 	// Color is the icon color.
-	Color color.RGBA
+	Color color.NRGBA
 	Icon  *widget.Icon
 	// Size is the icon size.
 	Size   unit.Value
@@ -272,7 +272,7 @@ func drawInk(gtx layout.Context, c widget.Press) {
 	const col = 0.8
 	ba, bc := byte(alpha*0xff), byte(col*0xff)
 	defer op.Push(gtx.Ops).Pop()
-	rgba := f32color.MulAlpha(color.RGBA{A: 0xff, R: bc, G: bc, B: bc}, ba)
+	rgba := f32color.MulAlpha(color.NRGBA{A: 0xff, R: bc, G: bc, B: bc}, ba)
 	ink := paint.ColorOp{Color: rgba}
 	ink.Add(gtx.Ops)
 	rr := size * .5

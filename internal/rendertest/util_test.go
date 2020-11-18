@@ -15,6 +15,7 @@ import (
 
 	"gioui.org/app/headless"
 	"gioui.org/f32"
+	"gioui.org/internal/f32color"
 	"gioui.org/op"
 	"gioui.org/op/paint"
 	"golang.org/x/image/colornames"
@@ -23,6 +24,15 @@ import (
 var (
 	dumpImages = flag.Bool("saveimages", false, "save test images")
 	squares    paint.ImageOp
+)
+
+var (
+	red     = f32color.RGBAToNRGBA(colornames.Red)
+	green   = f32color.RGBAToNRGBA(colornames.Green)
+	blue    = f32color.RGBAToNRGBA(colornames.Blue)
+	magenta = f32color.RGBAToNRGBA(colornames.Magenta)
+	black   = f32color.RGBAToNRGBA(colornames.Black)
+	white   = f32color.RGBAToNRGBA(colornames.White)
 )
 
 func init() {

@@ -25,12 +25,12 @@ func TestTransformMacro(t *testing.T) {
 		// render the first Stacked item
 		m1 := op.Record(o)
 		dr := image.Rect(0, 0, 128, 50)
-		paint.FillShape(o, colornames.Black, clip.Rect(dr).Op())
+		paint.FillShape(o, black, clip.Rect(dr).Op())
 		c1 := m1.Stop()
 
 		// Render the second stacked item
 		m2 := op.Record(o)
-		paint.ColorOp{Color: colornames.Red}.Add(o)
+		paint.ColorOp{Color: red}.Add(o)
 		// Simulate a draw text call
 		stack := op.Push(o)
 		op.Offset(f32.Pt(0, 10)).Add(o)
@@ -62,7 +62,7 @@ func TestTransformMacro(t *testing.T) {
 func TestRepeatedPaintsZ(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		// Draw a rectangle
-		paint.FillShape(o, colornames.Black, clip.Rect(image.Rect(0, 0, 128, 50)).Op())
+		paint.FillShape(o, black, clip.Rect(image.Rect(0, 0, 128, 50)).Op())
 
 		builder := clip.Path{}
 		builder.Begin(o)
@@ -72,7 +72,7 @@ func TestRepeatedPaintsZ(t *testing.T) {
 		builder.Line(f32.Pt(-10, 0))
 		builder.Line(f32.Pt(0, -10))
 		builder.Outline().Add(o)
-		paint.Fill(o, colornames.Red)
+		paint.Fill(o, red)
 	}, func(r result) {
 		r.expect(5, 5, colornames.Red)
 		r.expect(11, 15, colornames.Black)
@@ -86,11 +86,11 @@ func TestNoClipFromPaint(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		a := f32.Affine2D{}.Rotate(f32.Pt(20, 20), math.Pi/4)
 		op.Affine(a).Add(o)
-		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(10, 10, 30, 30)).Op())
+		paint.FillShape(o, red, clip.Rect(image.Rect(10, 10, 30, 30)).Op())
 		a = f32.Affine2D{}.Rotate(f32.Pt(20, 20), -math.Pi/4)
 		op.Affine(a).Add(o)
 
-		paint.FillShape(o, colornames.Black, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
+		paint.FillShape(o, black, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
 	}, func(r result) {
 		r.expect(1, 1, colornames.Black)
 		r.expect(20, 20, colornames.Black)
@@ -195,16 +195,16 @@ func TestNegativeOverlaps(t *testing.T) {
 }
 
 type Gradient struct {
-	From, To color.RGBA
+	From, To color.NRGBA
 }
 
 var gradients = []Gradient{
-	{From: color.RGBA{R: 0x00, G: 0x00, B: 0x00, A: 0xFF}, To: color.RGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}},
-	{From: color.RGBA{R: 0x19, G: 0xFF, B: 0x19, A: 0xFF}, To: color.RGBA{R: 0xFF, G: 0x19, B: 0x19, A: 0xFF}},
-	{From: color.RGBA{R: 0xFF, G: 0x19, B: 0x19, A: 0xFF}, To: color.RGBA{R: 0x19, G: 0x19, B: 0xFF, A: 0xFF}},
-	{From: color.RGBA{R: 0x19, G: 0x19, B: 0xFF, A: 0xFF}, To: color.RGBA{R: 0x19, G: 0xFF, B: 0x19, A: 0xFF}},
-	{From: color.RGBA{R: 0x19, G: 0xFF, B: 0xFF, A: 0xFF}, To: color.RGBA{R: 0xFF, G: 0x19, B: 0x19, A: 0xFF}},
-	{From: color.RGBA{R: 0xFF, G: 0xFF, B: 0x19, A: 0xFF}, To: color.RGBA{R: 0x19, G: 0x19, B: 0xFF, A: 0xFF}},
+	{From: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0xFF}, To: color.NRGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}},
+	{From: color.NRGBA{R: 0x19, G: 0xFF, B: 0x19, A: 0xFF}, To: color.NRGBA{R: 0xFF, G: 0x19, B: 0x19, A: 0xFF}},
+	{From: color.NRGBA{R: 0xFF, G: 0x19, B: 0x19, A: 0xFF}, To: color.NRGBA{R: 0x19, G: 0x19, B: 0xFF, A: 0xFF}},
+	{From: color.NRGBA{R: 0x19, G: 0x19, B: 0xFF, A: 0xFF}, To: color.NRGBA{R: 0x19, G: 0xFF, B: 0x19, A: 0xFF}},
+	{From: color.NRGBA{R: 0x19, G: 0xFF, B: 0xFF, A: 0xFF}, To: color.NRGBA{R: 0xFF, G: 0x19, B: 0x19, A: 0xFF}},
+	{From: color.NRGBA{R: 0xFF, G: 0xFF, B: 0x19, A: 0xFF}, To: color.NRGBA{R: 0x19, G: 0x19, B: 0xFF, A: 0xFF}},
 }
 
 func TestLinearGradient(t *testing.T) {
@@ -236,11 +236,11 @@ func TestLinearGradient(t *testing.T) {
 	}, func(r result) {
 		gr := pixelAligned
 		for _, g := range gradients {
-			from := f32color.RGBAFromSRGB(g.From)
-			to := f32color.RGBAFromSRGB(g.To)
+			from := f32color.LinearFromSRGB(g.From)
+			to := f32color.LinearFromSRGB(g.To)
 			for _, p := range samples {
 				exp := lerp(from, to, float32(p)/float32(r.img.Bounds().Dx()-1))
-				r.expect(p, int(gr.Min.Y+gradienth/2), exp.SRGB())
+				r.expect(p, int(gr.Min.Y+gradienth/2), f32color.NRGBAToRGBA(exp.SRGB()))
 			}
 			gr = gr.Add(f32.Pt(0, gradienth))
 		}
@@ -251,9 +251,9 @@ func TestLinearGradientAngled(t *testing.T) {
 	run(t, func(ops *op.Ops) {
 		paint.LinearGradientOp{
 			Stop1:  f32.Pt(64, 64),
-			Color1: colornames.Black,
+			Color1: black,
 			Stop2:  f32.Pt(0, 0),
-			Color2: colornames.Red,
+			Color2: red,
 		}.Add(ops)
 		st := op.Push(ops)
 		clip.Rect(image.Rect(0, 0, 64, 64)).Add(ops)
@@ -262,9 +262,9 @@ func TestLinearGradientAngled(t *testing.T) {
 
 		paint.LinearGradientOp{
 			Stop1:  f32.Pt(64, 64),
-			Color1: colornames.White,
+			Color1: white,
 			Stop2:  f32.Pt(128, 0),
-			Color2: colornames.Green,
+			Color2: green,
 		}.Add(ops)
 		st = op.Push(ops)
 		clip.Rect(image.Rect(64, 0, 128, 64)).Add(ops)
@@ -273,9 +273,9 @@ func TestLinearGradientAngled(t *testing.T) {
 
 		paint.LinearGradientOp{
 			Stop1:  f32.Pt(64, 64),
-			Color1: colornames.Black,
+			Color1: black,
 			Stop2:  f32.Pt(128, 128),
-			Color2: colornames.Blue,
+			Color2: blue,
 		}.Add(ops)
 		st = op.Push(ops)
 		clip.Rect(image.Rect(64, 64, 128, 128)).Add(ops)
@@ -284,9 +284,9 @@ func TestLinearGradientAngled(t *testing.T) {
 
 		paint.LinearGradientOp{
 			Stop1:  f32.Pt(64, 64),
-			Color1: colornames.White,
+			Color1: white,
 			Stop2:  f32.Pt(0, 128),
-			Color2: colornames.Magenta,
+			Color2: magenta,
 		}.Add(ops)
 		st = op.Push(ops)
 		clip.Rect(image.Rect(0, 64, 64, 128)).Add(ops)

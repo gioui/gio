@@ -21,7 +21,7 @@ import (
 // See NewImageOp for details.
 type ImageOp struct {
 	uniform bool
-	color   color.RGBA
+	color   color.NRGBA
 	src     *image.RGBA
 
 	// handle is a key to uniquely identify this ImageOp
@@ -31,16 +31,16 @@ type ImageOp struct {
 
 // ColorOp sets the brush to a constant color.
 type ColorOp struct {
-	Color color.RGBA
+	Color color.NRGBA
 }
 
 // LinearGradientOp sets the brush to a gradient starting at stop1 with color1 and
 // ending at stop2 with color2.
 type LinearGradientOp struct {
 	Stop1  f32.Point
-	Color1 color.RGBA
+	Color1 color.NRGBA
 	Stop2  f32.Point
-	Color2 color.RGBA
+	Color2 color.NRGBA
 }
 
 // PaintOp fills fills the current clip area with the current brush.
@@ -58,7 +58,7 @@ type PaintOp struct {
 func NewImageOp(src image.Image) ImageOp {
 	switch src := src.(type) {
 	case *image.Uniform:
-		col := color.RGBAModel.Convert(src.C).(color.RGBA)
+		col := color.NRGBAModel.Convert(src.C).(color.NRGBA)
 		return ImageOp{
 			uniform: true,
 			color:   col,
@@ -138,7 +138,7 @@ func (d PaintOp) Add(o *op.Ops) {
 }
 
 // FillShape fills the clip shape with a color.
-func FillShape(ops *op.Ops, c color.RGBA, shape clip.Op) {
+func FillShape(ops *op.Ops, c color.NRGBA, shape clip.Op) {
 	defer op.Push(ops).Pop()
 	shape.Add(ops)
 	Fill(ops, c)
@@ -148,7 +148,7 @@ func FillShape(ops *op.Ops, c color.RGBA, shape clip.Op) {
 // is intended to be used with a clip.Op already in place to limit
 // the painted area. Use FillShape unless you need to paint several
 // times within the same clip.Op.
-func Fill(ops *op.Ops, c color.RGBA) {
+func Fill(ops *op.Ops, c color.NRGBA) {
 	defer op.Push(ops).Pop()
 	ColorOp{Color: c}.Add(ops)
 	PaintOp{}.Add(ops)

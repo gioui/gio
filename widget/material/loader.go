@@ -17,7 +17,7 @@ import (
 )
 
 type LoaderStyle struct {
-	Color color.RGBA
+	Color color.NRGBA
 }
 
 func Loader(th *Theme) LoaderStyle {

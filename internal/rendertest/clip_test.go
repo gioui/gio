@@ -14,7 +14,7 @@ import (
 
 func TestPaintRect(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
+		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
 	}, func(r result) {
 		r.expect(0, 0, colornames.Red)
 		r.expect(49, 0, colornames.Red)
@@ -26,7 +26,7 @@ func TestPaintRect(t *testing.T) {
 func TestPaintClippedRect(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		clip.RRect{Rect: f32.Rect(25, 25, 60, 60)}.Add(o)
-		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
+		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
 		r.expect(24, 35, colornames.White)
@@ -41,7 +41,7 @@ func TestPaintClippedCirle(t *testing.T) {
 		r := float32(10)
 		clip.RRect{Rect: f32.Rect(20, 20, 40, 40), SE: r, SW: r, NW: r, NE: r}.Add(o)
 		clip.Rect(image.Rect(0, 0, 30, 50)).Add(o)
-		paint.Fill(o, colornames.Red)
+		paint.Fill(o, red)
 	}, func(r result) {
 		r.expect(21, 21, colornames.White)
 		r.expect(25, 30, colornames.Red)
@@ -70,7 +70,7 @@ func TestPaintArc(t *testing.T) {
 		p.Line(f32.Pt(-50, 0))
 		p.Outline().Add(o)
 
-		paint.FillShape(o, colornames.Red, clip.Rect(image.Rect(0, 0, 128, 128)).Op())
+		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 128, 128)).Op())
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
 		r.expect(0, 25, colornames.Red)
@@ -123,7 +123,7 @@ func TestStrokedPathBevelFlat(t *testing.T) {
 		p.Quad(f32.Pt(-10, -10), f32.Pt(-30, 30))
 		p.Stroke(width, sty).Add(o)
 
-		paint.Fill(o, colornames.Red)
+		paint.Fill(o, red)
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
 		r.expect(10, 50, colornames.Red)
@@ -150,7 +150,7 @@ func TestStrokedPathBevelRound(t *testing.T) {
 		p.Quad(f32.Pt(-10, -10), f32.Pt(-30, 30))
 		p.Stroke(width, sty).Add(o)
 
-		paint.Fill(o, colornames.Red)
+		paint.Fill(o, red)
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
 		r.expect(10, 50, colornames.Red)
@@ -177,7 +177,7 @@ func TestStrokedPathBevelSquare(t *testing.T) {
 		p.Quad(f32.Pt(-10, -10), f32.Pt(-30, 30))
 		p.Stroke(width, sty).Add(o)
 
-		paint.Fill(o, colornames.Red)
+		paint.Fill(o, red)
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
 		r.expect(10, 50, colornames.Red)
@@ -204,7 +204,7 @@ func TestStrokedPathRoundRound(t *testing.T) {
 		p.Quad(f32.Pt(-10, -10), f32.Pt(-30, 30))
 		p.Stroke(width, sty).Add(o)
 
-		paint.Fill(o, colornames.Red)
+		paint.Fill(o, red)
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
 		r.expect(10, 50, colornames.Red)
@@ -232,7 +232,7 @@ func TestStrokedPathFlatMiter(t *testing.T) {
 			p.Line(f32.Pt(50, 0))
 
 			p.Stroke(width, sty).Add(o)
-			paint.Fill(o, colornames.Red)
+			paint.Fill(o, red)
 		}
 
 		{
@@ -246,7 +246,7 @@ func TestStrokedPathFlatMiter(t *testing.T) {
 			p.Line(f32.Pt(50, 0))
 
 			p.Stroke(2, clip.StrokeStyle{}).Add(o)
-			paint.Fill(o, colornames.Black)
+			paint.Fill(o, black)
 		}
 
 	}, func(r result) {
@@ -277,7 +277,7 @@ func TestStrokedPathFlatMiterInf(t *testing.T) {
 			p.Line(f32.Pt(50, 0))
 
 			p.Stroke(width, sty).Add(o)
-			paint.Fill(o, colornames.Red)
+			paint.Fill(o, red)
 		}
 
 		{
@@ -291,7 +291,7 @@ func TestStrokedPathFlatMiterInf(t *testing.T) {
 			p.Line(f32.Pt(50, 0))
 
 			p.Stroke(2, clip.StrokeStyle{}).Add(o)
-			paint.Fill(o, colornames.Black)
+			paint.Fill(o, black)
 		}
 
 	}, func(r result) {
@@ -312,7 +312,7 @@ func TestStrokedPathZeroWidth(t *testing.T) {
 			p.Line(f32.Pt(50, 0))
 			p.Stroke(width, sty).Add(o)
 
-			paint.Fill(o, colornames.Black)
+			paint.Fill(o, black)
 		}
 
 		{
@@ -322,7 +322,7 @@ func TestStrokedPathZeroWidth(t *testing.T) {
 			p.Line(f32.Pt(30, 0))
 			p.Stroke(0, sty).Add(o) // width=0, disable stroke
 
-			paint.Fill(o, colornames.Red)
+			paint.Fill(o, red)
 		}
 
 	}, func(r result) {

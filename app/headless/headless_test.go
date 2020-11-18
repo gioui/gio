@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"gioui.org/f32"
+	"gioui.org/internal/f32color"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
@@ -18,7 +19,7 @@ func TestHeadless(t *testing.T) {
 	defer release()
 
 	sz := w.size
-	col := color.RGBA{A: 0xff, R: 0xca, G: 0xfe}
+	col := color.NRGBA{A: 0xff, R: 0xca, G: 0xfe}
 	var ops op.Ops
 	paint.ColorOp{Color: col}.Add(&ops)
 	// Paint only part of the screen to avoid the glClear optimization.
@@ -34,8 +35,8 @@ func TestHeadless(t *testing.T) {
 	if isz := img.Bounds().Size(); isz != sz {
 		t.Errorf("got %v screenshot, expected %v", isz, sz)
 	}
-	if got := img.RGBAAt(0, 0); got != col {
-		t.Errorf("got color %v, expected %v", got, col)
+	if got := img.RGBAAt(0, 0); got != f32color.NRGBAToRGBA(col) {
+		t.Errorf("got color %v, expected %v", got, f32color.NRGBAToRGBA(col))
 	}
 }
 
@@ -43,8 +44,8 @@ func TestClipping(t *testing.T) {
 	w, release := newTestWindow(t)
 	defer release()
 
-	col := color.RGBA{A: 0xff, R: 0xca, G: 0xfe}
-	col2 := color.RGBA{A: 0xff, R: 0x00, G: 0xfe}
+	col := color.NRGBA{A: 0xff, R: 0xca, G: 0xfe}
+	col2 := color.NRGBA{A: 0xff, R: 0x00, G: 0xfe}
 	var ops op.Ops
 	paint.ColorOp{Color: col}.Add(&ops)
 	clip.RRect{
@@ -77,10 +78,10 @@ func TestClipping(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	bg := color.RGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff}
+	bg := color.NRGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff}
 	tests := []struct {
 		x, y  int
-		color color.RGBA
+		color color.NRGBA
 	}{
 		{120, 120, col},
 		{130, 130, col2},
@@ -88,8 +89,8 @@ func TestClipping(t *testing.T) {
 		{230, 230, bg},
 	}
 	for _, test := range tests {
-		if got := img.RGBAAt(test.x, test.y); got != test.color {
-			t.Errorf("(%d,%d): got color %v, expected %v", test.x, test.y, got, test.color)
+		if got := img.RGBAAt(test.x, test.y); got != f32color.NRGBAToRGBA(test.color) {
+			t.Errorf("(%d,%d): got color %v, expected %v", test.x, test.y, got, f32color.NRGBAToRGBA(test.color))
 		}
 	}
 }
@@ -99,9 +100,9 @@ func TestDepth(t *testing.T) {
 	defer release()
 	var ops op.Ops
 
-	blue := color.RGBA{B: 0xFF, A: 0xFF}
+	blue := color.NRGBA{B: 0xFF, A: 0xFF}
 	paint.FillShape(&ops, blue, clip.Rect(image.Rect(0, 0, 50, 100)).Op())
-	red := color.RGBA{R: 0xFF, A: 0xFF}
+	red := color.NRGBA{R: 0xFF, A: 0xFF}
 	paint.FillShape(&ops, red, clip.Rect(image.Rect(0, 0, 100, 50)).Op())
 	if err := w.Frame(&ops); err != nil {
 		t.Fatal(err)
@@ -118,15 +119,15 @@ func TestDepth(t *testing.T) {
 	}
 	tests := []struct {
 		x, y  int
-		color color.RGBA
+		color color.NRGBA
 	}{
 		{25, 25, red},
 		{75, 25, red},
 		{25, 75, blue},
 	}
 	for _, test := range tests {
-		if got := img.RGBAAt(test.x, test.y); got != test.color {
-			t.Errorf("(%d,%d): got color %v, expected %v", test.x, test.y, got, test.color)
+		if got := img.RGBAAt(test.x, test.y); got != f32color.NRGBAToRGBA(test.color) {
+			t.Errorf("(%d,%d): got color %v, expected %v", test.x, test.y, got, f32color.NRGBAToRGBA(test.color))
 		}
 	}
 }

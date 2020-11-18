@@ -17,10 +17,10 @@ import (
 
 type checkable struct {
 	Label              string
-	Color              color.RGBA
+	Color              color.NRGBA
 	Font               text.Font
 	TextSize           unit.Value
-	IconColor          color.RGBA
+	IconColor          color.NRGBA
 	Size               unit.Value
 	shaper             text.Shaper
 	checkedStateIcon   *widget.Icon

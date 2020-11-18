@@ -14,10 +14,10 @@ import (
 type Theme struct {
 	Shaper text.Shaper
 	Color  struct {
-		Primary color.RGBA
-		Text    color.RGBA
-		Hint    color.RGBA
-		InvText color.RGBA
+		Primary color.NRGBA
+		Text    color.NRGBA
+		Hint    color.NRGBA
+		InvText color.NRGBA
 	}
 	TextSize unit.Value
 	Icon     struct {
@@ -53,10 +53,10 @@ func mustIcon(ic *widget.Icon, err error) *widget.Icon {
 	return ic
 }
 
-func rgb(c uint32) color.RGBA {
+func rgb(c uint32) color.NRGBA {
 	return argb(0xff000000 | c)
 }
 
-func argb(c uint32) color.RGBA {
-	return color.RGBA{A: uint8(c >> 24), R: uint8(c >> 16), G: uint8(c >> 8), B: uint8(c)}
+func argb(c uint32) color.NRGBA {
+	return color.NRGBA{A: uint8(c >> 24), R: uint8(c >> 16), G: uint8(c >> 8), B: uint8(c)}
 }

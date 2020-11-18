@@ -9,6 +9,6 @@ taking the current transformation into account.
 The current brush is set by either a ColorOp for a constant color, or
 ImageOp for an image, or LinearGradientOp for gradients.
 
-All color.RGBA values are in the sRGB color space.
+All color.NRGBA values are in the sRGB color space.
 */
 package paint

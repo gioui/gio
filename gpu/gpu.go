@@ -78,13 +78,13 @@ type drawState struct {
 	// Current paint.ImageOp
 	image imageOpData
 	// Current paint.ColorOp, if any.
-	color color.RGBA
+	color color.NRGBA
 
 	// Current paint.LinearGradientOp.
 	stop1  f32.Point
 	stop2  f32.Point
-	color1 color.RGBA
-	color2 color.RGBA
+	color1 color.NRGBA
+	color2 color.NRGBA
 }
 
 type pathOp struct {
@@ -138,9 +138,9 @@ type imageOpData struct {
 
 type linearGradientOpData struct {
 	stop1  f32.Point
-	color1 color.RGBA
+	color1 color.NRGBA
 	stop2  f32.Point
-	color2 color.RGBA
+	color2 color.NRGBA
 }
 
 func (op *clipOp) decode(data []byte) {
@@ -183,11 +183,11 @@ func decodeImageOp(data []byte, refs []interface{}) imageOpData {
 	}
 }
 
-func decodeColorOp(data []byte) color.RGBA {
+func decodeColorOp(data []byte) color.NRGBA {
 	if opconst.OpType(data[0]) != opconst.TypeColor {
 		panic("invalid op")
 	}
-	return color.RGBA{
+	return color.NRGBA{
 		R: data[1],
 		G: data[2],
 		B: data[3],
@@ -209,13 +209,13 @@ func decodeLinearGradientOp(data []byte) linearGradientOpData {
 			X: math.Float32frombits(bo.Uint32(data[9:])),
 			Y: math.Float32frombits(bo.Uint32(data[13:])),
 		},
-		color1: color.RGBA{
+		color1: color.NRGBA{
 			R: data[17+0],
 			G: data[17+1],
 			B: data[17+2],
 			A: data[17+3],
 		},
-		color2: color.RGBA{
+		color2: color.NRGBA{
 			R: data[21+0],
 			G: data[21+1],
 			B: data[21+2],
@@ -749,7 +749,7 @@ func (d *drawOps) collect(cache *resourceCache, root *op.Ops, viewport image.Poi
 	state := drawState{
 		clip:  clip,
 		rect:  true,
-		color: color.RGBA{A: 0xff},
+		color: color.NRGBA{A: 0xff},
 	}
 	d.collectOps(&d.reader, state)
 }
@@ -930,13 +930,13 @@ func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f3
 	switch d.matType {
 	case materialColor:
 		m.material = materialColor
-		m.color = f32color.RGBAFromSRGB(d.color)
+		m.color = f32color.LinearFromSRGB(d.color)
 		m.opaque = m.color.A == 1.0
 	case materialLinearGradient:
 		m.material = materialLinearGradient
 
-		m.color1 = f32color.RGBAFromSRGB(d.color1)
-		m.color2 = f32color.RGBAFromSRGB(d.color2)
+		m.color1 = f32color.LinearFromSRGB(d.color1)
+		m.color2 = f32color.LinearFromSRGB(d.color2)
 		m.opaque = m.color1.A == 1.0 && m.color2.A == 1.0
 
 		m.uvTrans = trans.Mul(gradientSpaceTransform(clip, off, d.stop1, d.stop2))

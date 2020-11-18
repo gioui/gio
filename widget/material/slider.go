@@ -28,7 +28,7 @@ func Slider(th *Theme, float *widget.Float, min, max float32) SliderStyle {
 
 type SliderStyle struct {
 	Min, Max float32
-	Color    color.RGBA
+	Color    color.NRGBA
 	Float    *widget.Float
 }
 

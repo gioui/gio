@@ -19,8 +19,8 @@ import (
 
 type SwitchStyle struct {
 	Color struct {
-		Enabled  color.RGBA
-		Disabled color.RGBA
+		Enabled  color.NRGBA
+		Disabled color.NRGBA
 	}
 	Switch *widget.Bool
 }
@@ -124,7 +124,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	return layout.Dimensions{Size: dims}
 }
 
-func drawDisc(ops *op.Ops, sz float32, col color.RGBA) {
+func drawDisc(ops *op.Ops, sz float32, col color.NRGBA) {
 	defer op.Push(ops).Pop()
 	rr := sz / 2
 	r := f32.Rectangle{Max: f32.Point{X: sz, Y: sz}}

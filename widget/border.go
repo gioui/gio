@@ -15,7 +15,7 @@ import (
 
 // Border lays out a widget and draws a border inside it.
 type Border struct {
-	Color        color.RGBA
+	Color        color.NRGBA
 	CornerRadius unit.Value
 	Width        unit.Value
 }
