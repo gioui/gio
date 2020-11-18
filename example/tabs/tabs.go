@@ -127,17 +127,16 @@ func drawTabs(gtx layout.Context, th *material.Theme) layout.Dimensions {
 	)
 }
 
-func fill(gtx layout.Context, col1, col2 color.RGBA) {
+func fill(gtx layout.Context, col1, col2 color.NRGBA) {
 	dr := image.Rectangle{Max: gtx.Constraints.Min}
 	paint.FillShape(gtx.Ops,
-		color.RGBA{R: 0, G: 0, B: 0, A: 0xFF},
+		color.NRGBA{R: 0, G: 0, B: 0, A: 0xFF},
 		clip.Rect(dr).Op(),
 	)
 
 	col2.R = byte(float32(col2.R))
 	col2.G = byte(float32(col2.G))
 	col2.B = byte(float32(col2.B))
-	col2.A = byte(float32(col2.A) * 0.2)
 	paint.LinearGradientOp{
 		Stop1:  f32.Pt(float32(dr.Min.X), 0),
 		Stop2:  f32.Pt(float32(dr.Max.X), 0),
@@ -149,9 +148,9 @@ func fill(gtx layout.Context, col1, col2 color.RGBA) {
 	paint.PaintOp{}.Add(gtx.Ops)
 }
 
-func dynamicColor(i int) color.RGBA {
+func dynamicColor(i int) color.NRGBA {
 	sn, cs := math.Sincos(float64(i) * math.Phi)
-	return color.RGBA{
+	return color.NRGBA{
 		R: 0xA0 + byte(0x30*sn),
 		G: 0xA0 + byte(0x30*cs),
 		B: 0xD0,

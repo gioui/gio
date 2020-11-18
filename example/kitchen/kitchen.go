@@ -258,7 +258,7 @@ func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 		func(gtx C) D {
 			e := material.Editor(th, lineEditor, "Hint")
 			e.Font.Style = text.Italic
-			border := widget.Border{Color: color.RGBA{A: 0xff}, CornerRadius: unit.Dp(8), Width: unit.Px(2)}
+			border := widget.Border{Color: color.NRGBA{A: 0xff}, CornerRadius: unit.Dp(8), Width: unit.Px(2)}
 			return border.Layout(gtx, func(gtx C) D {
 				return layout.UniformInset(unit.Dp(8)).Layout(gtx, e.Layout)
 			})
@@ -272,8 +272,8 @@ func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 			paint.LinearGradientOp{
 				Stop1:  layout.FPt(dr.Min),
 				Stop2:  layout.FPt(dr.Max),
-				Color1: color.RGBA{0x10, 0xff, 0x10, 0xFF},
-				Color2: color.RGBA{0x10, 0x10, 0xff, 0xFF},
+				Color1: color.NRGBA{R: 0x10, G: 0xff, B: 0x10, A: 0xFF},
+				Color2: color.NRGBA{R: 0x10, G: 0x10, B: 0xff, A: 0xFF},
 			}.Add(gtx.Ops)
 			clip.Rect(dr).Add(gtx.Ops)
 			paint.PaintOp{}.Add(gtx.Ops)
@@ -306,7 +306,7 @@ func kitchen(gtx layout.Context, th *material.Theme) layout.Dimensions {
 						}
 						btn := material.Button(th, greenButton, l)
 						if green {
-							btn.Background = color.RGBA{A: 0xff, R: 0x9e, G: 0x9d, B: 0x24}
+							btn.Background = color.NRGBA{A: 0xff, R: 0x9e, G: 0x9d, B: 0x24}
 						}
 						return btn.Layout(gtx)
 					})

@@ -47,16 +47,16 @@ type (
 
 func loop(w *app.Window) error {
 	topLeft := quarterWidget{
-		color: color.RGBA{R: 0xde, G: 0xad, B: 0xbe, A: 0xff},
+		color: color.NRGBA{R: 0xde, G: 0xad, B: 0xbe, A: 0xff},
 	}
 	topRight := quarterWidget{
-		color: color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff},
+		color: color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff},
 	}
 	botLeft := quarterWidget{
-		color: color.RGBA{R: 0x00, G: 0x00, B: 0x00, A: 0xff},
+		color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0xff},
 	}
 	botRight := quarterWidget{
-		color: color.RGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x80},
+		color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x80},
 	}
 
 	var ops op.Ops
@@ -103,15 +103,15 @@ func loop(w *app.Window) error {
 // quarterWidget paints a quarter of the screen with one color. When clicked, it
 // turns red, going back to its normal color when clicked again.
 type quarterWidget struct {
-	color color.RGBA
+	color color.NRGBA
 
 	clicked bool
 }
 
-var red = color.RGBA{R: 0xff, G: 0x00, B: 0x00, A: 0xff}
+var red = color.NRGBA{R: 0xff, G: 0x00, B: 0x00, A: 0xff}
 
 func (w *quarterWidget) Layout(gtx layout.Context) layout.Dimensions {
-	var color color.RGBA
+	var color color.NRGBA
 	if w.clicked {
 		color = red
 	} else {
