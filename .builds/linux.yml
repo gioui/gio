@@ -79,3 +79,13 @@ tasks:
  - check_gofmt: |
      cd gio
      test -z "$(gofmt -s -l .)"
+ - check_sign_off: |
+     set +x -e
+     cd gio
+     for hash in $(git log -n 20 --format="%H"); do
+        message=$(git log -1 --format=%B $hash)
+        if [[ ! "$message" =~ "Signed-off-by: " ]]; then
+            echo "unsigned commit $hash"
+            exit 1
+        fi
+     done
