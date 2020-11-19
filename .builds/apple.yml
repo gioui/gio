@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Unlicense OR MIT
 image: debian/testing
 packages:
  - clang
