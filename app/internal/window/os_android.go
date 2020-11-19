@@ -454,6 +454,10 @@ func convertKeyCode(code C.jint) (string, bool) {
 		n = key.NameDeleteForward
 	case C.AKEYCODE_DEL:
 		n = key.NameDeleteBackward
+	case C.AKEYCODE_NUMPAD_ENTER:
+		n = key.NameEnter
+	case C.AKEYCODE_ENTER:
+		n = key.NameEnter
 	default:
 		return "", false
 	}
