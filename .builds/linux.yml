@@ -54,9 +54,6 @@ tasks:
  - test_example: |
      cd gio/example
      go test -race ./...
- - check_gofmt: |
-     cd gio
-     test -z "$(gofmt -s -l .)"
  - install_jdk8: |
      curl -so jdk.deb "https://cdn.azul.com/zulu/bin/zulu8.42.0.21-ca-jdk8.0.232-linux_amd64.deb"
      sudo apt install -y -f ./jdk.deb
@@ -78,3 +75,6 @@ tasks:
  - test_android: |
      cd gio/example
      gogio -target android ./kitchen
+ - check_gofmt: |
+     cd gio
+     test -z "$(gofmt -s -l .)"
