@@ -67,9 +67,14 @@ func (p *Path) Begin(ops *op.Ops) {
 	data[0] = byte(opconst.TypeAux)
 }
 
-// MoveTo moves the pen to the given position.
-func (p *Path) Move(to f32.Point) {
-	to = to.Add(p.pen)
+// Move moves the pen by the amount specified by delta.
+func (p *Path) Move(delta f32.Point) {
+	to := delta.Add(p.pen)
+	p.MoveTo(to)
+}
+
+// MoveTo moves the pen to the specified absolute coordinate.
+func (p *Path) MoveTo(to f32.Point) {
 	p.end()
 	p.pen = to
 	p.start = to
@@ -78,7 +83,7 @@ func (p *Path) Move(to f32.Point) {
 // end completes the current contour.
 func (p *Path) end() {
 	if p.pen != p.start {
-		p.lineTo(p.start)
+		p.LineTo(p.start)
 	}
 	p.contour++
 }
@@ -86,12 +91,13 @@ func (p *Path) end() {
 // Line moves the pen by the amount specified by delta, recording a line.
 func (p *Path) Line(delta f32.Point) {
 	to := delta.Add(p.pen)
-	p.lineTo(to)
+	p.LineTo(to)
 }
 
-func (p *Path) lineTo(to f32.Point) {
+// LineTo moves the pen to the absolute point specified, recording a line.
+func (p *Path) LineTo(to f32.Point) {
 	// Model lines as degenerate quadratic Béziers.
-	p.quadTo(to.Add(p.pen).Mul(.5), to)
+	p.QuadTo(to.Add(p.pen).Mul(.5), to)
 }
 
 // Quad records a quadratic Bézier from the pen to end
@@ -99,10 +105,12 @@ func (p *Path) lineTo(to f32.Point) {
 func (p *Path) Quad(ctrl, to f32.Point) {
 	ctrl = ctrl.Add(p.pen)
 	to = to.Add(p.pen)
-	p.quadTo(ctrl, to)
+	p.QuadTo(ctrl, to)
 }
 
-func (p *Path) quadTo(ctrl, to f32.Point) {
+// QuadTo records a quadratic Bézier from the pen to end
+// with the control point ctrl, with absolute coordinates.
+func (p *Path) QuadTo(ctrl, to f32.Point) {
 	data := p.ops.Write(ops.QuadSize + 4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
@@ -236,7 +244,7 @@ func (p *Path) arc(alpha float64, c f32.Point, rx, ry, beg, delta float64) {
 			2*p1.X-0.5*(p0.X+p2.X),
 			2*p1.Y-0.5*(p0.Y+p2.Y),
 		)
-		p.quadTo(ctl, p2)
+		p.QuadTo(ctl, p2)
 	}
 }
 
@@ -289,7 +297,7 @@ func (p *Path) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to f32.Po
 	c := ctrl0.Mul(3).Sub(p.pen).Add(ctrl1.Mul(3)).Sub(to).Mul(1.0 / 4.0)
 	const maxSplits = 32
 	if splits >= maxSplits {
-		p.quadTo(c, to)
+		p.QuadTo(c, to)
 		return splits
 	}
 	// The maximum distance between the cubic P and its approximation Q given t
@@ -301,7 +309,7 @@ func (p *Path) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to f32.Po
 	v := to.Sub(ctrl1.Mul(3)).Add(ctrl0.Mul(3)).Sub(p.pen)
 	d2 := (v.X*v.X + v.Y*v.Y) * 3 / (36 * 36)
 	if d2 <= maxDist*maxDist {
-		p.quadTo(c, to)
+		p.QuadTo(c, to)
 		return splits
 	}
 	// De Casteljau split the curve and approximate the halves.

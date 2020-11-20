@@ -78,6 +78,26 @@ func TestPaintArc(t *testing.T) {
 	})
 }
 
+func TestPaintAbsolute(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		p := new(clip.Path)
+		p.Begin(o)
+		p.Move(f32.Pt(100, 100)) // offset the initial pen position to test "MoveTo"
+
+		p.MoveTo(f32.Pt(20, 20))
+		p.LineTo(f32.Pt(80, 20))
+		p.QuadTo(f32.Pt(80, 80), f32.Pt(20, 80))
+		p.Outline().Add(o)
+
+		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 128, 128)).Op())
+	}, func(r result) {
+		r.expect(0, 0, colornames.White)
+		r.expect(30, 30, colornames.Red)
+		r.expect(79, 79, colornames.White)
+		r.expect(90, 90, colornames.White)
+	})
+}
+
 func TestPaintTexture(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		squares.Add(o)
