@@ -120,6 +120,10 @@ func (w *window) addEventListeners() {
 		w.draw(true)
 		return nil
 	})
+	w.addEventListener(w.window, "contextmenu", func(this js.Value, args []js.Value) interface{} {
+		args[0].Call("preventDefault")
+		return nil
+	})
 	w.addEventListener(w.cnv, "mousemove", func(this js.Value, args []js.Value) interface{} {
 		w.pointerEvent(pointer.Move, 0, 0, args[0])
 		return nil
