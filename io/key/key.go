@@ -10,6 +10,7 @@ events.
 package key
 
 import (
+	"fmt"
 	"strings"
 
 	"gioui.org/internal/opconst"
@@ -64,7 +65,7 @@ const (
 	// Release is the state of a key that has been released.
 	//
 	// Note: release events are only implemented on the following platforms:
-	// Linux, Windows, WebAssembly.
+	// macOS, Linux, Windows, WebAssembly.
 	Release
 )
 
@@ -129,7 +130,7 @@ func (Event) ImplementsEvent()      {}
 func (FocusEvent) ImplementsEvent() {}
 
 func (e Event) String() string {
-	return "{" + string(e.Name) + " " + e.Modifiers.String() + "}"
+	return fmt.Sprintf("%v %v %v}", e.Name, e.Modifiers, e.State)
 }
 
 func (m Modifiers) String() string {
@@ -150,4 +151,15 @@ func (m Modifiers) String() string {
 		strs = append(strs, "ModSuper")
 	}
 	return strings.Join(strs, "|")
+}
+
+func (s State) String() string {
+	switch s {
+	case Press:
+		return "Press"
+	case Release:
+		return "Release"
+	default:
+		panic("invalid State")
+	}
 }

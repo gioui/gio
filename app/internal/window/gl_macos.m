@@ -76,8 +76,12 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 }
 - (void)keyDown:(NSEvent *)event {
 	NSString *keys = [event charactersIgnoringModifiers];
-	gio_onKeys((__bridge CFTypeRef)self, (char *)[keys UTF8String], [event timestamp], [event modifierFlags]);
+	gio_onKeys((__bridge CFTypeRef)self, (char *)[keys UTF8String], [event timestamp], [event modifierFlags], true);
 	[self interpretKeyEvents:[NSArray arrayWithObject:event]];
+}
+- (void)keyUp:(NSEvent *)event {
+	NSString *keys = [event charactersIgnoringModifiers];
+	gio_onKeys((__bridge CFTypeRef)self, (char *)[keys UTF8String], [event timestamp], [event modifierFlags], false);
 }
 - (void)insertText:(id)string {
 	const char *utf8 = [string UTF8String];

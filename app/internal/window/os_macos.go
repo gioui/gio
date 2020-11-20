@@ -151,15 +151,20 @@ func (w *window) setStage(stage system.Stage) {
 }
 
 //export gio_onKeys
-func gio_onKeys(view C.CFTypeRef, cstr *C.char, ti C.double, mods C.NSUInteger) {
+func gio_onKeys(view C.CFTypeRef, cstr *C.char, ti C.double, mods C.NSUInteger, keyDown C.bool) {
 	str := C.GoString(cstr)
 	kmods := convertMods(mods)
+	ks := key.Release
+	if keyDown {
+		ks = key.Press
+	}
 	w := mustView(view)
 	for _, k := range str {
 		if n, ok := convertKey(k); ok {
 			w.w.Event(key.Event{
 				Name:      n,
 				Modifiers: kmods,
+				State:     ks,
 			})
 		}
 	}
