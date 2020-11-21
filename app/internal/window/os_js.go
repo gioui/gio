@@ -27,6 +27,7 @@ type window struct {
 	redraw                js.Func
 	clipboardCallback     js.Func
 	requestAnimationFrame js.Value
+	browserHistory        js.Value
 	cleanfuncs            []func()
 	touches               []js.Value
 	composing             bool
@@ -51,6 +52,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 		clipboard: js.Global().Get("navigator").Get("clipboard"),
 	}
 	w.requestAnimationFrame = w.window.Get("requestAnimationFrame")
+	w.browserHistory = w.window.Get("history")
 	w.redraw = w.funcOf(func(this js.Value, args []js.Value) interface{} {
 		w.animCallback()
 		return nil
@@ -61,6 +63,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 		return nil
 	})
 	w.addEventListeners()
+	w.addHistory()
 	w.w = win
 	go func() {
 		w.w.SetDriver(w)
@@ -124,6 +127,15 @@ func (w *window) addEventListeners() {
 	w.addEventListener(w.window, "contextmenu", func(this js.Value, args []js.Value) interface{} {
 		args[0].Call("preventDefault")
 		return nil
+	})
+	w.addEventListener(w.window, "popstate", func(this js.Value, args []js.Value) interface{} {
+		ev := &system.CommandEvent{Type: system.CommandBack}
+		w.w.Event(ev)
+		if ev.Cancel {
+			return w.browserHistory.Call("forward")
+		}
+
+		return w.browserHistory.Call("back")
 	})
 	w.addEventListener(w.cnv, "mousemove", func(this js.Value, args []js.Value) interface{} {
 		w.pointerEvent(pointer.Move, 0, 0, args[0])
@@ -216,6 +228,10 @@ func (w *window) addEventListeners() {
 		w.flushInput()
 		return nil
 	})
+}
+
+func (w *window) addHistory() {
+	w.browserHistory.Call("pushState", nil, nil, w.window.Get("location").Get("href"))
 }
 
 func (w *window) flushInput() {
