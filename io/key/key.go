@@ -113,7 +113,7 @@ func (m Modifiers) Contain(m2 Modifiers) bool {
 }
 
 func (h InputOp) Add(o *op.Ops) {
-	data := o.Write(opconst.TypeKeyInputLen, h.Tag)
+	data := o.Write1(opconst.TypeKeyInputLen, h.Tag)
 	data[0] = byte(opconst.TypeKeyInput)
 	if h.Focus {
 		data[1] = 1

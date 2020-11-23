@@ -24,7 +24,7 @@ type Event struct {
 }
 
 func (p Op) Add(o *op.Ops) {
-	data := o.Write(opconst.TypeProfileLen, p.Tag)
+	data := o.Write1(opconst.TypeProfileLen, p.Tag)
 	data[0] = byte(opconst.TypeProfile)
 }
 

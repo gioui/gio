@@ -192,9 +192,22 @@ func (o *Ops) Version() int {
 }
 
 // Write is for internal use only.
-func (o *Ops) Write(n int, refs ...interface{}) []byte {
+func (o *Ops) Write(n int) []byte {
 	o.data = append(o.data, make([]byte, n)...)
-	o.refs = append(o.refs, refs...)
+	return o.data[len(o.data)-n:]
+}
+
+// Write1 is for internal use only.
+func (o *Ops) Write1(n int, ref1 interface{}) []byte {
+	o.data = append(o.data, make([]byte, n)...)
+	o.refs = append(o.refs, ref1)
+	return o.data[len(o.data)-n:]
+}
+
+// Write2 is for internal use only.
+func (o *Ops) Write2(n int, ref1, ref2 interface{}) []byte {
+	o.data = append(o.data, make([]byte, n)...)
+	o.refs = append(o.refs, ref1, ref2)
 	return o.data[len(o.data)-n:]
 }
 
@@ -244,7 +257,7 @@ func (c CallOp) Add(o *Ops) {
 	if c.ops == nil {
 		return
 	}
-	data := o.Write(opconst.TypeCallLen, c.ops)
+	data := o.Write1(opconst.TypeCallLen, c.ops)
 	data[0] = byte(opconst.TypeCall)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(c.pc.data))

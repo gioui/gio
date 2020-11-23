@@ -99,7 +99,7 @@ func (i ImageOp) Add(o *op.Ops) {
 		}.Add(o)
 		return
 	}
-	data := o.Write(opconst.TypeImageLen, i.src, i.handle)
+	data := o.Write2(opconst.TypeImageLen, i.src, i.handle)
 	data[0] = byte(opconst.TypeImage)
 }
 

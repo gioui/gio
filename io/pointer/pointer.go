@@ -159,7 +159,7 @@ func (op AreaOp) Add(o *op.Ops) {
 }
 
 func (h InputOp) Add(o *op.Ops) {
-	data := o.Write(opconst.TypePointerInputLen, h.Tag)
+	data := o.Write1(opconst.TypePointerInputLen, h.Tag)
 	data[0] = byte(opconst.TypePointerInput)
 	if h.Grab {
 		data[1] = 1
