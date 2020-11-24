@@ -66,6 +66,12 @@ func (p Point) Mul(s float32) Point {
 	return Point{X: p.X * s, Y: p.Y * s}
 }
 
+// In reports whether p is in r.
+func (p Point) In(r Rectangle) bool {
+	return r.Min.X <= p.X && p.X < r.Max.X &&
+		r.Min.Y <= p.Y && p.Y < r.Max.Y
+}
+
 // Size returns r's width and height.
 func (r Rectangle) Size() Point {
 	return Point{X: r.Dx(), Y: r.Dy()}
