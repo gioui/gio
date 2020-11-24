@@ -251,6 +251,9 @@ func (p *Path) arc(alpha float64, c f32.Point, rx, ry, beg, delta float64) {
 // Cube records a cubic Bézier from the pen through
 // two control points ending in to.
 func (p *Path) Cube(ctrl0, ctrl1, to f32.Point) {
+	if ctrl0 == (f32.Point{}) && ctrl1 == (f32.Point{}) && to == (f32.Point{}) {
+		return
+	}
 	ctrl0 = ctrl0.Add(p.pen)
 	ctrl1 = ctrl1.Add(p.pen)
 	to = to.Add(p.pen)
