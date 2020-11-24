@@ -143,6 +143,7 @@ func (op *opMacroDef) decode(data []byte) {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
+	data = data[:9]
 	dataIdx := int(int32(bo.Uint32(data[1:])))
 	refsIdx := int(int32(bo.Uint32(data[5:])))
 	*op = opMacroDef{
@@ -157,6 +158,7 @@ func (m *macroOp) decode(data []byte, refs []interface{}) {
 	if opconst.OpType(data[0]) != opconst.TypeCall {
 		panic("invalid op")
 	}
+	data = data[:9]
 	bo := binary.LittleEndian
 	dataIdx := int(int32(bo.Uint32(data[1:])))
 	refsIdx := int(int32(bo.Uint32(data[5:])))

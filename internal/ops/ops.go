@@ -24,6 +24,7 @@ func (q Quad) Transform(t f32.Affine2D) Quad {
 }
 
 func EncodeQuad(d []byte, q Quad) {
+	d = d[:24]
 	bo := binary.LittleEndian
 	bo.PutUint32(d[0:], math.Float32bits(q.From.X))
 	bo.PutUint32(d[4:], math.Float32bits(q.From.Y))
@@ -34,6 +35,7 @@ func EncodeQuad(d []byte, q Quad) {
 }
 
 func DecodeQuad(d []byte) (q Quad) {
+	d = d[:24]
 	bo := binary.LittleEndian
 	q.From.X = math.Float32frombits(bo.Uint32(d[0:]))
 	q.From.Y = math.Float32frombits(bo.Uint32(d[4:]))
@@ -44,17 +46,13 @@ func DecodeQuad(d []byte) (q Quad) {
 	return
 }
 
-func DecodeTransform(d []byte) (t f32.Affine2D) {
-	if opconst.OpType(d[0]) != opconst.TypeTransform {
+func DecodeTransform(data []byte) (t f32.Affine2D) {
+	if opconst.OpType(data[0]) != opconst.TypeTransform {
 		panic("invalid op")
 	}
-	if len(d) < 1+6*4 {
-		panic("too short buffer")
-	}
-	return decodeAffine2D(d[1:])
-}
+	data = data[1:]
+	data = data[:4*6]
 
-func decodeAffine2D(data []byte) f32.Affine2D {
 	bo := binary.LittleEndian
 	a := math.Float32frombits(bo.Uint32(data))
 	b := math.Float32frombits(bo.Uint32(data[4*1:]))
