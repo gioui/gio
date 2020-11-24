@@ -211,6 +211,7 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 			os.Environ(),
 			"GOOS=android",
 			"GOARCH="+a,
+			"GOARM=7", // Avoid softfloat.
 			"CGO_ENABLED=1",
 			"CC="+clang,
 		)
