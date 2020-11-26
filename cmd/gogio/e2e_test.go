@@ -68,33 +68,39 @@ func TestEndToEnd(t *testing.T) {
 
 	t.Parallel()
 
+	const (
+		testdataWithGoImportPkgPath = "gioui.org/cmd/gogio/testdata"
+		testdataWithRelativePkgPath = "testdata/testdata.go"
+	)
 	// Keep this list local, to not reuse TestDriver objects.
 	subtests := []struct {
-		name   string
-		driver TestDriver
+		name    string
+		driver  TestDriver
+		pkgPath string
 	}{
-		{"X11", &X11TestDriver{}},
-		{"Wayland", &WaylandTestDriver{}},
-		{"JS", &JSTestDriver{}},
-		{"Android", &AndroidTestDriver{}},
-		{"Windows", &WineTestDriver{}},
+		{"X11 using go import path", &X11TestDriver{}, testdataWithGoImportPkgPath},
+		{"X11", &X11TestDriver{}, testdataWithRelativePkgPath},
+		{"Wayland", &WaylandTestDriver{}, testdataWithRelativePkgPath},
+		{"JS", &JSTestDriver{}, testdataWithRelativePkgPath},
+		{"Android", &AndroidTestDriver{}, testdataWithRelativePkgPath},
+		{"Windows", &WineTestDriver{}, testdataWithRelativePkgPath},
 	}
 
 	for _, subtest := range subtests {
 		t.Run(subtest.name, func(t *testing.T) {
 			subtest := subtest // copy the changing loop variable
 			t.Parallel()
-			runEndToEndTest(t, subtest.driver)
+			runEndToEndTest(t, subtest.driver, subtest.pkgPath)
 		})
 	}
 }
 
-func runEndToEndTest(t *testing.T, driver TestDriver) {
+func runEndToEndTest(t *testing.T, driver TestDriver, pkgPath string) {
 	size := image.Point{X: 800, Y: 600}
 	driver.initBase(t, size.X, size.Y)
 
 	t.Log("starting driver and gio app")
-	driver.Start("testdata/red.go")
+	driver.Start(pkgPath)
 
 	beef := color.NRGBA{R: 0xde, G: 0xad, B: 0xbe, A: 0xff}
 	white := color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
