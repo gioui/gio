@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"strings"
 )
 
@@ -22,8 +21,8 @@ type buildInfo struct {
 	version int
 }
 
-func newBuildInfo(pkgAbsPath string) (*buildInfo, error) {
-	pkgMetadata, err := getPkgMetadata(pkgAbsPath)
+func newBuildInfo(pkgPath string) (*buildInfo, error) {
+	pkgMetadata, err := getPkgMetadata(pkgPath)
 	if err != nil {
 		return nil, err
 	}
@@ -35,17 +34,12 @@ func newBuildInfo(pkgAbsPath string) (*buildInfo, error) {
 		minsdk:  *minsdk,
 		name:    getPkgName(pkgMetadata),
 		pkgDir:  pkgMetadata.Dir,
-		pkgPath: pkgAbsPath,
+		pkgPath: pkgPath,
 		tags:    *extraTags,
 		target:  *target,
 		version: *version,
 	}
 	return bi, nil
-}
-
-func getPkgAbsPath() string {
-	absPath, _ := filepath.Abs(flag.Arg(0))
-	return absPath
 }
 
 func getArchs() []string {
@@ -88,12 +82,12 @@ type packageMetadata struct {
 	Dir     string
 }
 
-func getPkgMetadata(absPath string) (*packageMetadata, error) {
-	pkgImportPath, err := runCmd(exec.Command("go", "list", "-f", "{{.ImportPath}}", absPath))
+func getPkgMetadata(pkgPath string) (*packageMetadata, error) {
+	pkgImportPath, err := runCmd(exec.Command("go", "list", "-f", "{{.ImportPath}}", pkgPath))
 	if err != nil {
 		return nil, err
 	}
-	pkgDir, err := runCmd(exec.Command("go", "list", "-f", "{{.Dir}}", absPath))
+	pkgDir, err := runCmd(exec.Command("go", "list", "-f", "{{.Dir}}", pkgPath))
 	if err != nil {
 		return nil, err
 	}

@@ -46,7 +46,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "gogio: %v\n", err)
 		os.Exit(1)
 	}
-	buildInfo, err := newBuildInfo(getPkgAbsPath())
+	buildInfo, err := newBuildInfo(flag.Arg(0))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "gogio: %v\n", err)
 		os.Exit(1)
@@ -62,9 +62,6 @@ func flagValidate() error {
 	pkgPathArg := flag.Arg(0)
 	if pkgPathArg == "" {
 		return errors.New("specify a package")
-	}
-	if _, err := filepath.Abs(pkgPathArg); err != nil {
-		return err
 	}
 	if *target == "" {
 		return errors.New("please specify -target")
