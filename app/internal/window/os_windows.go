@@ -271,7 +271,9 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			Time:     windows.GetMessageTime(),
 		})
 	case windows.WM_MOUSEWHEEL:
-		w.scrollEvent(wParam, lParam)
+		w.scrollEvent(wParam, lParam, false)
+	case windows.WM_MOUSEHWHEEL:
+		w.scrollEvent(wParam, lParam, true)
 	case windows.WM_DESTROY:
 		windows.PostQuitMessage(0)
 	case windows.WM_PAINT:
@@ -352,7 +354,7 @@ func coordsFromlParam(lParam uintptr) (int, int) {
 	return x, y
 }
 
-func (w *window) scrollEvent(wParam, lParam uintptr) {
+func (w *window) scrollEvent(wParam, lParam uintptr, horizontal bool) {
 	x, y := coordsFromlParam(lParam)
 	// The WM_MOUSEWHEEL coordinates are in screen coordinates, in contrast
 	// to other mouse events.
@@ -360,12 +362,16 @@ func (w *window) scrollEvent(wParam, lParam uintptr) {
 	windows.ScreenToClient(w.hwnd, &np)
 	p := f32.Point{X: float32(np.X), Y: float32(np.Y)}
 	dist := float32(int16(wParam >> 16))
+	sp := f32.Point{Y: -dist}
+	if horizontal {
+		sp.X, sp.Y = sp.Y, sp.X
+	}
 	w.w.Event(pointer.Event{
 		Type:     pointer.Scroll,
 		Source:   pointer.Mouse,
 		Position: p,
 		Buttons:  w.pointerBtns,
-		Scroll:   f32.Point{Y: -dist},
+		Scroll:   sp,
 		Time:     windows.GetMessageTime(),
 	})
 }

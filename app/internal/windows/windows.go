@@ -142,6 +142,7 @@ const (
 	WM_MBUTTONUP     = 0x0208
 	WM_MOUSEMOVE     = 0x0200
 	WM_MOUSEWHEEL    = 0x020A
+	WM_MOUSEHWHEEL   = 0x020E
 	WM_PAINT         = 0x000F
 	WM_CLOSE         = 0x0010
 	WM_QUIT          = 0x0012

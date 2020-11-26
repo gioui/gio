@@ -346,6 +346,15 @@ func (h *x11EventHandler) handleEvents() bool {
 				// scroll down
 				ev.Type = pointer.Scroll
 				ev.Scroll.Y = +scrollScale
+			case 6:
+				// http://xahlee.info/linux/linux_x11_mouse_button_number.html
+				// scroll left
+				ev.Type = pointer.Scroll
+				ev.Scroll.X = -scrollScale * 2
+			case 7:
+				// scroll right
+				ev.Type = pointer.Scroll
+				ev.Scroll.X = +scrollScale * 2
 			default:
 				continue
 			}
