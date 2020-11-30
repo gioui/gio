@@ -20,16 +20,22 @@ import (
 
 // InputOp declares a handler ready for key events.
 // Key events are in general only delivered to the
-// focused key handler. Set the Focus flag to request
-// the focus.
+// focused key handler.
 type InputOp struct {
-	Tag   event.Tag
-	Focus bool
+	Tag event.Tag
 }
 
-// HideInputOp request that any on screen text input
-// be hidden.
-type HideInputOp struct{}
+// SoftKeyboardOp shows or hide the on-screen keyboard, if available.
+type SoftKeyboardOp struct {
+	Show bool
+}
+
+// FocusOp sets or clears the keyboard focus.
+type FocusOp struct {
+	// Focus, if set, moves the focus to the current InputOp. If Focus
+	// is false, the focus is cleared.
+	Focus bool
+}
 
 // A FocusEvent is generated when a handler gains or loses
 // focus.
@@ -115,14 +121,22 @@ func (m Modifiers) Contain(m2 Modifiers) bool {
 func (h InputOp) Add(o *op.Ops) {
 	data := o.Write1(opconst.TypeKeyInputLen, h.Tag)
 	data[0] = byte(opconst.TypeKeyInput)
-	if h.Focus {
+}
+
+func (h SoftKeyboardOp) Add(o *op.Ops) {
+	data := o.Write(opconst.TypeKeySoftKeyboardLen)
+	data[0] = byte(opconst.TypeKeySoftKeyboard)
+	if h.Show {
 		data[1] = 1
 	}
 }
 
-func (h HideInputOp) Add(o *op.Ops) {
-	data := o.Write(opconst.TypeHideInputLen)
-	data[0] = byte(opconst.TypeHideInput)
+func (h FocusOp) Add(o *op.Ops) {
+	data := o.Write(opconst.TypeKeyFocusLen)
+	data[0] = byte(opconst.TypeKeyFocus)
+	if h.Focus {
+		data[1] = 1
+	}
 }
 
 func (EditEvent) ImplementsEvent()  {}

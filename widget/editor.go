@@ -399,7 +399,11 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 		e.shapes = append(e.shapes, line{off, path})
 	}
 
-	key.InputOp{Tag: &e.eventKey, Focus: e.requestFocus}.Add(gtx.Ops)
+	key.InputOp{Tag: &e.eventKey}.Add(gtx.Ops)
+	if e.requestFocus {
+		key.FocusOp{Focus: true}.Add(gtx.Ops)
+		key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)
+	}
 	e.requestFocus = false
 	pointerPadding := gtx.Px(unit.Dp(4))
 	r := image.Rectangle{Max: e.viewSize}
