@@ -185,7 +185,8 @@ func (f *Functions) FramebufferTexture2D(target, attachment, texTarget gl.Enum, 
 	f.Ctx.Call("framebufferTexture2D", int(target), int(attachment), int(texTarget), js.Value(t), level)
 }
 func (f *Functions) GetError() gl.Enum {
-	return gl.Enum(f.Ctx.Call("getError").Int())
+	// Avoid slow getError calls. See gio#179.
+	return 0
 }
 func (f *Functions) GetRenderbufferParameteri(target, pname gl.Enum) int {
 	return paramVal(f.Ctx.Call("getRenderbufferParameteri", int(pname)))
