@@ -7,19 +7,21 @@ import (
 	"testing"
 	"time"
 
-	"gioui.org/layout"
-	"gioui.org/op"
 	"gioui.org/app/headless"
 	"gioui.org/f32"
 	"gioui.org/font/gofont"
+	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/widget/material"
 )
 
-func BenchmarkUI(b *testing.B) { benchmarkUI(b, transformation{}) }
+func BenchmarkUI(b *testing.B)        { benchmarkUI(b, transformation{}) }
 func BenchmarkUI_Offset(b *testing.B) { benchmarkUI(b, transformation{offset: true}) }
-func BenchmarkUI_Scale(b *testing.B) { benchmarkUI(b, transformation{scale: true}) }
+func BenchmarkUI_Scale(b *testing.B)  { benchmarkUI(b, transformation{scale: true}) }
 func BenchmarkUI_Rotate(b *testing.B) { benchmarkUI(b, transformation{rotate: true}) }
-func BenchmarkUI_All(b *testing.B) { benchmarkUI(b, transformation{offset: true, rotate: true, scale: true}) }
+func BenchmarkUI_All(b *testing.B) {
+	benchmarkUI(b, transformation{offset: true, rotate: true, scale: true})
+}
 
 func benchmarkUI(b *testing.B, transform transformation) {
 	th := material.NewTheme(gofont.Collection())
@@ -42,19 +44,19 @@ func benchmarkUI(b *testing.B, transform transformation) {
 			Constraints: layout.Exact(image.Pt(800, 600)),
 		}
 		addTransform(i, transform, gtx.Ops)
-		layoutTime += measure(func(){ kitchen(gtx, th) })
-		frameTime += measure(func(){ w.Frame(&ops) })
+		layoutTime += measure(func() { kitchen(gtx, th) })
+		frameTime += measure(func() { w.Frame(&ops) })
 	}
 	b.StopTimer()
 
-	b.ReportMetric(float64(layoutTime.Nanoseconds()) / float64(b.N), "ns/layout")
-	b.ReportMetric(float64(frameTime.Nanoseconds()) / float64(b.N), "ns/frame")
+	b.ReportMetric(float64(layoutTime.Nanoseconds())/float64(b.N), "ns/layout")
+	b.ReportMetric(float64(frameTime.Nanoseconds())/float64(b.N), "ns/frame")
 }
 
 type transformation struct {
 	offset bool
 	rotate bool
-	scale bool
+	scale  bool
 }
 
 func addTransform(i int, transform transformation, ops *op.Ops) {
