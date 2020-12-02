@@ -22,6 +22,7 @@ import android.view.Choreographer;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.PointerIcon;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowInsets;
@@ -36,7 +37,6 @@ import android.view.inputmethod.EditorInfo;
 import java.io.UnsupportedEncodingException;
 
 public final class GioView extends SurfaceView implements Choreographer.FrameCallback {
-	private final static Object initLock = new Object();
 	private static boolean jniLoaded;
 
 	private final SurfaceHolder.Callback surfCallbacks;
@@ -122,6 +122,11 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 
 		dispatchMotionEvent(event);
 		return true;
+	}
+
+	private void setCursor(Context ctx, int id) {
+		PointerIcon pointerIcon = PointerIcon.getSystemIcon(ctx, id);
+		GioView.this.setPointerIcon(pointerIcon);
 	}
 
 	private void dispatchMotionEvent(MotionEvent event) {

@@ -58,6 +58,7 @@ type window struct {
 	w           Callbacks
 	stage       system.Stage
 	displayLink *displayLink
+	cursor      pointer.CursorName
 
 	scale float32
 }
@@ -74,7 +75,7 @@ var launched = make(chan struct{})
 // cascadeTopLeftFromPoint.
 var nextTopLeft C.NSPoint
 
-// mustView is like lookoupView, except that it panics
+// mustView is like lookupView, except that it panics
 // if the view isn't mapped.
 func mustView(view C.CFTypeRef) *window {
 	w, ok := lookupView(view)
@@ -120,6 +121,10 @@ func (w *window) WriteClipboard(s string) {
 		}
 		C.gio_writeClipboard(chars, C.NSUInteger(len(u16)))
 	})
+}
+
+func (w *window) SetCursor(name pointer.CursorName) {
+	w.cursor = windowSetCursor(w.cursor, name)
 }
 
 func (w *window) ShowTextInput(show bool) {}
@@ -227,6 +232,7 @@ func gio_onDraw(view C.CFTypeRef) {
 func gio_onFocus(view C.CFTypeRef, focus C.BOOL) {
 	w := mustView(view)
 	w.w.Event(key.FocusEvent{Focus: focus == C.YES})
+	w.SetCursor(w.cursor)
 }
 
 //export gio_onChangeScreen

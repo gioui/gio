@@ -61,7 +61,12 @@ const (
 
 	CW_USEDEFAULT = -2147483648
 
-	IDC_ARROW = 32512
+	IDC_ARROW  = 32512
+	IDC_IBEAM  = 32513
+	IDC_HAND   = 32649
+	IDC_CROSS  = 32515
+	IDC_SIZENS = 32645
+	IDC_SIZEWE = 32644
 
 	INFINITE = 0xFFFFFFFF
 
@@ -146,6 +151,7 @@ const (
 	WM_PAINT         = 0x000F
 	WM_CLOSE         = 0x0010
 	WM_QUIT          = 0x0012
+	WM_SETCURSOR     = 0x0020
 	WM_SETFOCUS      = 0x0007
 	WM_KILLFOCUS     = 0x0008
 	WM_SHOWWINDOW    = 0x0018
@@ -227,6 +233,7 @@ var (
 	_ScreenToClient              = user32.NewProc("ScreenToClient")
 	_ShowWindow                  = user32.NewProc("ShowWindow")
 	_SetCapture                  = user32.NewProc("SetCapture")
+	_SetCursor                   = user32.NewProc("SetCursor")
 	_SetClipboardData            = user32.NewProc("SetClipboardData")
 	_SetForegroundWindow         = user32.NewProc("SetForegroundWindow")
 	_SetFocus                    = user32.NewProc("SetFocus")
@@ -512,6 +519,10 @@ func SetClipboardData(format uint32, mem syscall.Handle) error {
 		return fmt.Errorf("SetClipboardData: %v", err)
 	}
 	return nil
+}
+
+func SetCursor(h syscall.Handle) {
+	_SetCursor.Call(uintptr(h))
 }
 
 func SetTimer(hwnd syscall.Handle, nIDEvent uintptr, uElapse uint32, timerProc uintptr) error {

@@ -426,6 +426,11 @@ func (w *window) WriteClipboard(s string) {
 	w.clipboard.Call("writeText", s)
 }
 
+func (w *window) SetCursor(name pointer.CursorName) {
+	style := w.cnv.Get("style")
+	style.Set("cursor", string(name))
+}
+
 func (w *window) ShowTextInput(show bool) {
 	// Run in a goroutine to avoid a deadlock if the
 	// focus change result in an event.

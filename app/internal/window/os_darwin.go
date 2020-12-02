@@ -13,6 +13,9 @@ __attribute__ ((visibility ("hidden"))) void gio_releaseDisplayLink(CFTypeRef dl
 __attribute__ ((visibility ("hidden"))) int gio_startDisplayLink(CFTypeRef dl);
 __attribute__ ((visibility ("hidden"))) int gio_stopDisplayLink(CFTypeRef dl);
 __attribute__ ((visibility ("hidden"))) void gio_setDisplayLinkDisplay(CFTypeRef dl, uint64_t did);
+__attribute__ ((visibility ("hidden"))) void gio_hideCursor();
+__attribute__ ((visibility ("hidden"))) void gio_showCursor();
+__attribute__ ((visibility ("hidden"))) void gio_setCursor(NSUInteger curID);
 */
 import "C"
 import (
@@ -22,6 +25,8 @@ import (
 	"time"
 	"unicode/utf16"
 	"unsafe"
+
+	"gioui.org/io/pointer"
 )
 
 // displayLink is the state for a display link (CVDisplayLinkRef on macOS,
@@ -168,4 +173,42 @@ func gio_onFrameCallback(dl C.CFTypeRef) {
 			d.callback()
 		}
 	}
+}
+
+// windowSetCursor updates the cursor from the current one to a new one
+// and returns the new one.
+func windowSetCursor(from, to pointer.CursorName) pointer.CursorName {
+	if from == to {
+		return to
+	}
+	var curID int
+	switch to {
+	default:
+		to = pointer.CursorDefault
+		fallthrough
+	case pointer.CursorDefault:
+		curID = 1
+	case pointer.CursorText:
+		curID = 2
+	case pointer.CursorPointer:
+		curID = 3
+	case pointer.CursorCrossHair:
+		curID = 4
+	case pointer.CursorColResize:
+		curID = 5
+	case pointer.CursorRowResize:
+		curID = 6
+	case pointer.CursorNone:
+		runOnMain(func() {
+			C.gio_hideCursor()
+		})
+		return to
+	}
+	runOnMain(func() {
+		if from == pointer.CursorNone {
+			C.gio_showCursor()
+		}
+		C.gio_setCursor(C.NSUInteger(curID))
+	})
+	return to
 }

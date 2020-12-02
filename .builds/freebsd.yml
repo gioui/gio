@@ -3,6 +3,8 @@ image: freebsd/11.x
 packages:
  - libX11
  - libxkbcommon
+ - libXcursor
+ - libXfixes
  - wayland
  - mesa-libs
  - xorg-vfbserver

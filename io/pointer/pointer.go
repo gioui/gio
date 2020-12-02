@@ -79,8 +79,28 @@ type Source uint8
 // Buttons is a set of mouse buttons
 type Buttons uint8
 
+// CursorName is the name of a cursor.
+type CursorName string
+
 // Must match app/internal/input.areaKind
 type areaKind uint8
+
+const (
+	// CursorDefault is the default cursor.
+	CursorDefault CursorName = ""
+	// CursorText is the cursor for text.
+	CursorText CursorName = "text"
+	// CursorPointer is the cursor for a link.
+	CursorPointer CursorName = "pointer"
+	// CursorCrossHair is the cursor for precise location.
+	CursorCrossHair CursorName = "crosshair"
+	// CursorColResize is the cursor for vertical resize.
+	CursorColResize CursorName = "col-resize"
+	// CursorRowResize is the cursor for horizontal resize.
+	CursorRowResize CursorName = "row-resize"
+	// CursorNone hides the cursor. To show it again, use any other cursor.
+	CursorNone CursorName = "none"
+)
 
 const (
 	// A Cancel event is generated when the current gesture is
@@ -240,6 +260,13 @@ func (b Buttons) String() string {
 		strs = append(strs, "ButtonMiddle")
 	}
 	return strings.Join(strs, "|")
+}
+
+func (c CursorName) String() string {
+	if c == CursorDefault {
+		return "default"
+	}
+	return string(c)
 }
 
 func (Event) ImplementsEvent() {}

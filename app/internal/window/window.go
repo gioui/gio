@@ -9,6 +9,7 @@ import (
 
 	"gioui.org/gpu/backend"
 	"gioui.org/io/event"
+	"gioui.org/io/pointer"
 	"gioui.org/io/system"
 	"gioui.org/unit"
 )
@@ -59,6 +60,9 @@ type Driver interface {
 	ReadClipboard()
 	// WriteClipboard requests a clipboard write.
 	WriteClipboard(s string)
+
+	// SetCursor updates the current cursor to name.
+	SetCursor(name pointer.CursorName)
 
 	// Close the window.
 	Close()

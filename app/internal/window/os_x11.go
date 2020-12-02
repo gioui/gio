@@ -7,8 +7,8 @@ package window
 /*
 #cgo openbsd CFLAGS: -I/usr/X11R6/include -I/usr/local/include
 #cgo openbsd LDFLAGS: -L/usr/X11R6/lib -L/usr/local/lib
-#cgo freebsd openbsd LDFLAGS: -lX11 -lxkbcommon -lxkbcommon-x11 -lX11-xcb
-#cgo linux pkg-config: x11 xkbcommon xkbcommon-x11 x11-xcb
+#cgo freebsd openbsd LDFLAGS: -lX11 -lxkbcommon -lxkbcommon-x11 -lX11-xcb -lXcursor -lXfixes
+#cgo linux pkg-config: x11 xkbcommon xkbcommon-x11 x11-xcb xcursor xfixes
 
 #include <stdlib.h>
 #include <locale.h>
@@ -18,6 +18,8 @@ package window
 #include <X11/Xresource.h>
 #include <X11/XKBlib.h>
 #include <X11/Xlib-xcb.h>
+#include <X11/extensions/Xfixes.h>
+#include <X11/Xcursor/Xcursor.h>
 #include <xkbcommon/xkbcommon-x11.h>
 
 */
@@ -87,6 +89,7 @@ type x11Window struct {
 		write   *string
 		content []byte
 	}
+	cursor pointer.CursorName
 }
 
 func (w *x11Window) SetAnimating(anim bool) {
@@ -110,6 +113,27 @@ func (w *x11Window) WriteClipboard(s string) {
 	w.clipboard.write = &s
 	w.mu.Unlock()
 	w.wakeup()
+}
+
+func (w *x11Window) SetCursor(name pointer.CursorName) {
+	if name == pointer.CursorNone {
+		w.cursor = name
+		C.XFixesHideCursor(w.x, w.xw)
+		return
+	}
+	if w.cursor == pointer.CursorNone {
+		C.XFixesShowCursor(w.x, w.xw)
+	}
+	cname := C.CString(string(name))
+	defer C.free(unsafe.Pointer(cname))
+	c := C.XcursorLibraryLoadCursor(w.x, cname)
+	if c == 0 {
+		name = pointer.CursorDefault
+	}
+	w.cursor = name
+	// If c if null (i.e. name was not found),
+	// XDefineCursor will use the default cursor.
+	C.XDefineCursor(w.x, w.xw, c)
 }
 
 func (w *x11Window) ShowTextInput(show bool) {}

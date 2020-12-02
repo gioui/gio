@@ -10,6 +10,7 @@ import (
 
 	"gioui.org/app/internal/window"
 	"gioui.org/io/event"
+	"gioui.org/io/pointer"
 	"gioui.org/io/profile"
 	"gioui.org/io/router"
 	"gioui.org/io/system"
@@ -206,6 +207,13 @@ func (w *Window) ReadClipboard() {
 func (w *Window) WriteClipboard(s string) {
 	go w.driverDo(func() {
 		w.driver.WriteClipboard(s)
+	})
+}
+
+// SetCursorName changes the current window cursor to name.
+func (w *Window) SetCursorName(name pointer.CursorName) {
+	go w.driverDo(func() {
+		w.driver.SetCursor(name)
 	})
 }
 

@@ -80,6 +80,7 @@ type window struct {
 	mshowTextInput     C.jmethodID
 	mhideTextInput     C.jmethodID
 	mpostFrameCallback C.jmethodID
+	msetCursor         C.jmethodID
 }
 
 // ViewEvent is sent whenever the Window's underlying Android view
@@ -202,6 +203,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		mshowTextInput:     getMethodID(env, class, "showTextInput", "()V"),
 		mhideTextInput:     getMethodID(env, class, "hideTextInput", "()V"),
 		mpostFrameCallback: getMethodID(env, class, "postFrameCallback", "()V"),
+		msetCursor:         getMethodID(env, class, "setCursor", "(Landroid/content/Context;I)V"),
 	}
 	wopts := <-mainWindow.out
 	w.callbacks = wopts.window
@@ -646,6 +648,32 @@ func (w *window) ReadClipboard() {
 		}
 		content := goString(env, C.jstring(c))
 		w.callbacks.Event(system.ClipboardEvent{Text: content})
+	})
+}
+
+func (w *window) SetCursor(name pointer.CursorName) {
+	var curID int
+	switch name {
+	default:
+		fallthrough
+	case pointer.CursorDefault:
+		curID = 1000 // TYPE_ARROW
+	case pointer.CursorText:
+		curID = 1008 // TYPE_TEXT
+	case pointer.CursorPointer:
+		curID = 1002 // TYPE_HAND
+	case pointer.CursorCrossHair:
+		curID = 1007 // TYPE_CROSSHAIR
+	case pointer.CursorColResize:
+		curID = 1014 // TYPE_HORIZONTAL_DOUBLE_ARROW
+	case pointer.CursorRowResize:
+		curID = 1015 // TYPE_VERTICAL_DOUBLE_ARROW
+	case pointer.CursorNone:
+		curID = 0 // TYPE_NULL
+	}
+	runOnMain(func(env *C.JNIEnv) {
+		callVoidMethod(env, w.view, w.msetCursor,
+			jvalue(android.appCtx), jvalue(curID))
 	})
 }
 

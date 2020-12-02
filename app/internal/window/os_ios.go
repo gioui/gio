@@ -51,6 +51,7 @@ type window struct {
 
 	layer   C.CFTypeRef
 	visible atomic.Value
+	cursor  pointer.CursorName
 
 	pointerMap []C.CFTypeRef
 }
@@ -247,6 +248,10 @@ func (w *window) SetAnimating(anim bool) {
 	} else {
 		w.displayLink.Stop()
 	}
+}
+
+func (w *window) SetCursor(name pointer.CursorName) {
+	w.cursor = windowSetCursor(w.cursor, name)
 }
 
 func (w *window) onKeyCommand(name string) {
