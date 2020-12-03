@@ -15,7 +15,7 @@ import (
 
 // Path constructs a Op clip path described by lines and
 // Bézier curves, where drawing outside the Path is discarded.
-// The inside-ness of a pixel is determines by the even-odd rule,
+// The inside-ness of a pixel is determines by the non-zero winding rule,
 // similar to the SVG rule of the same name.
 //
 // Path generates no garbage and can be used for dynamic paths; path
