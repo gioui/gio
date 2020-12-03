@@ -165,7 +165,9 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 	case SpaceEvenly:
 		mainSize += space / (1 + len(children))
 	case SpaceAround:
-		mainSize += space / (len(children) * 2)
+		if len(children) > 0 {
+			mainSize += space / (len(children) * 2)
+		}
 	}
 	for i, child := range children {
 		dims := child.dims
@@ -191,9 +193,13 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 			case SpaceEvenly:
 				mainSize += space / (1 + len(children))
 			case SpaceAround:
-				mainSize += space / len(children)
+				if len(children) > 0 {
+					mainSize += space / len(children)
+				}
 			case SpaceBetween:
-				mainSize += space / (len(children) - 1)
+				if len(children) > 1 {
+					mainSize += space / (len(children) - 1)
+				}
 			}
 		}
 	}
@@ -205,7 +211,9 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 	case SpaceEvenly:
 		mainSize += space / (1 + len(children))
 	case SpaceAround:
-		mainSize += space / (len(children) * 2)
+		if len(children) > 0 {
+			mainSize += space / (len(children) * 2)
+		}
 	}
 	sz := axisPoint(f.Axis, mainSize, maxCross)
 	return Dimensions{Size: sz, Baseline: sz.Y - maxBaseline}
