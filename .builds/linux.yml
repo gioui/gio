@@ -36,25 +36,25 @@ tasks:
  - install_go1_14: |
      mkdir -p /home/build/sdk
      curl https://dl.google.com/go/go1.14.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
- - install_chrome: |
-     curl -s https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-     sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
-     sudo apt update
-     sudo apt install -y google-chrome-stable
  - test_gio: |
      cd gio
      go test -race ./...
      GOOS=windows go test -exec=wine ./...
      GOOS=js GOARCH=wasm go build -o /dev/null ./...
+ - test_example: |
+     cd gio/example
+     go test -race ./...
+ - install_chrome: |
+     curl -s https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+     sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
+     sudo apt update
+     sudo apt install -y google-chrome-stable
  - test_cmd: |
      cd gio/cmd
      go test ./...
      go test -race ./...
      cd gogio # since we need -modfile to point at the parent directory
      GOFLAGS=-modfile=../go.local.mod go test
- - test_example: |
-     cd gio/example
-     go test -race ./...
  - install_jdk8: |
      curl -so jdk.deb "https://cdn.azul.com/zulu/bin/zulu8.42.0.21-ca-jdk8.0.232-linux_amd64.deb"
      sudo apt install -y -f ./jdk.deb
