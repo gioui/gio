@@ -125,6 +125,9 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	}
 
 	private void setCursor(Context ctx, int id) {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+			return;
+		}
 		PointerIcon pointerIcon = PointerIcon.getSystemIcon(ctx, id);
 		GioView.this.setPointerIcon(pointerIcon);
 	}
