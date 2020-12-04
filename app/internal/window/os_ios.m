@@ -326,3 +326,15 @@ void gio_releaseDisplayLink(CFTypeRef dlref) {
 void gio_setDisplayLinkDisplay(CFTypeRef dl, uint64_t did) {
 	// Nothing to do on iOS.
 }
+
+void gio_hideCursor() {
+	// Not supported.
+}
+
+void gio_showCursor() {
+	// Not supported.
+}
+
+void gio_setCursor(NSUInteger curID) {
+	// Not supported.
+}

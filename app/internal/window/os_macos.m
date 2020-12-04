@@ -86,6 +86,46 @@ CGFloat gio_getViewBackingScale(CFTypeRef viewRef) {
 	return [view.window backingScaleFactor];
 }
 
+void gio_hideCursor() {
+	@autoreleasepool {
+		[NSCursor hide];
+	}
+}
+
+void gio_showCursor() {
+	@autoreleasepool {
+		[NSCursor unhide];
+	}
+}
+
+void gio_setCursor(NSUInteger curID) {
+	@autoreleasepool {
+		switch (curID) {
+			case 1:
+				[NSCursor.arrowCursor set];
+				break;
+			case 2:
+				[NSCursor.IBeamCursor set];
+				break;
+			case 3:
+				[NSCursor.pointingHandCursor set];
+				break;
+			case 4:
+				[NSCursor.crosshairCursor set];
+				break;
+			case 5:
+				[NSCursor.resizeLeftRightCursor set];
+				break;
+			case 6:
+				[NSCursor.resizeUpDownCursor set];
+				break;
+			default:
+				[NSCursor.arrowCursor set];
+				break;
+		}
+	}
+}
+
 static CVReturn displayLinkCallback(CVDisplayLinkRef dl, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext) {
 	gio_onFrameCallback(dl);
 	return kCVReturnSuccess;
