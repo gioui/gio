@@ -124,7 +124,7 @@ func initResources() error {
 		return err
 	}
 	resources.handle = hInst
-	c, err := loadCursor(pointer.CursorDefault)
+	c, err := windows.LoadCursor(windows.IDC_ARROW)
 	if err != nil {
 		return err
 	}
