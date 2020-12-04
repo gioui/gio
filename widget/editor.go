@@ -247,7 +247,7 @@ func (e *Editor) processKey(gtx layout.Context) {
 					e.events = append(e.events, SubmitEvent{
 						Text: e.Text(),
 					})
-					return
+					continue
 				}
 			}
 			if e.command(ke) {
