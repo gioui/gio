@@ -459,7 +459,7 @@ func (h *x11EventHandler) handleEvents() bool {
 			case w.atoms.targets:
 				// The requestor wants the supported clipboard
 				// formats. First write the targets...
-				formats := []C.long{
+				formats := [...]C.long{
 					C.long(w.atoms.targets),
 					C.long(w.atoms.utf8string),
 					C.long(w.atoms.plaintext),
@@ -468,7 +468,7 @@ func (h *x11EventHandler) handleEvents() bool {
 				}
 				C.XChangeProperty(w.x, cevt.requestor, cevt.property, w.atoms.atom,
 					32 /* bitwidth of formats */, C.PropModeReplace,
-					(*C.uchar)(unsafe.Pointer(&formats[0])), C.int(len(formats)),
+					(*C.uchar)(unsafe.Pointer(&formats)), C.int(len(formats)),
 				)
 				// ...then notify the requestor.
 				notify()
