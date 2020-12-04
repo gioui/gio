@@ -22,6 +22,7 @@ import (
 	"gioui.org/app/internal/xkb"
 	"gioui.org/f32"
 	"gioui.org/internal/fling"
+	"gioui.org/io/clipboard"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
@@ -1134,14 +1135,14 @@ func (w *window) process() {
 		r, err := w.disp.readClipboard()
 		// Send empty responses on unavailable clipboards or errors.
 		if r == nil || err != nil {
-			w.w.Event(system.ClipboardEvent{})
+			w.w.Event(clipboard.Event{})
 			return
 		}
 		// Don't let slow clipboard transfers block event loop.
 		go func() {
 			defer r.Close()
 			data, _ := ioutil.ReadAll(r)
-			w.w.Event(system.ClipboardEvent{Text: string(data)})
+			w.w.Event(clipboard.Event{Text: string(data)})
 		}()
 	}
 	if writeClipboard != nil {

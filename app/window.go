@@ -195,7 +195,7 @@ func (w *Window) Invalidate() {
 }
 
 // ReadClipboard initiates a read of the clipboard in the form
-// of a system.ClipboardEvent. Multiple reads may be coalesced
+// of a clipboard.Event. Multiple reads may be coalesced
 // to a single event.
 func (w *Window) ReadClipboard() {
 	go w.driverDo(func() {

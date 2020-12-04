@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"gioui.org/f32"
+	"gioui.org/io/clipboard"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
@@ -59,7 +60,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 	})
 	w.clipboardCallback = w.funcOf(func(this js.Value, args []js.Value) interface{} {
 		content := args[0].String()
-		win.Event(system.ClipboardEvent{Text: content})
+		win.Event(clipboard.Event{Text: content})
 		return nil
 	})
 	w.addEventListeners()

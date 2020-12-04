@@ -52,6 +52,7 @@ import (
 	"unsafe"
 
 	"gioui.org/f32"
+	"gioui.org/io/clipboard"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
@@ -647,7 +648,7 @@ func (w *window) ReadClipboard() {
 			return
 		}
 		content := goString(env, C.jstring(c))
-		w.callbacks.Event(system.ClipboardEvent{Text: content})
+		w.callbacks.Event(clipboard.Event{Text: content})
 	})
 }
 

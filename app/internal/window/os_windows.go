@@ -22,6 +22,7 @@ import (
 	"gioui.org/unit"
 
 	"gioui.org/f32"
+	"gioui.org/io/clipboard"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
@@ -513,7 +514,7 @@ func (w *window) readClipboard() error {
 	hdr.Len = n
 	content := string(utf16.Decode(u16))
 	go func() {
-		w.w.Event(system.ClipboardEvent{Text: content})
+		w.w.Event(clipboard.Event{Text: content})
 	}()
 	return nil
 }

@@ -14,6 +14,7 @@ import (
 	"unsafe"
 
 	"gioui.org/f32"
+	"gioui.org/io/clipboard"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
@@ -108,7 +109,7 @@ func (w *window) contextView() C.CFTypeRef {
 func (w *window) ReadClipboard() {
 	runOnMain(func() {
 		content := nsstringToString(C.gio_readClipboard())
-		w.w.Event(system.ClipboardEvent{Text: content})
+		w.w.Event(clipboard.Event{Text: content})
 	})
 }
 

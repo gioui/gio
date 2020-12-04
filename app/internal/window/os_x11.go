@@ -36,6 +36,7 @@ import (
 	"unsafe"
 
 	"gioui.org/f32"
+	"gioui.org/io/clipboard"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
@@ -434,7 +435,7 @@ func (h *x11EventHandler) handleEvents() bool {
 				break
 			}
 			str := C.GoStringN((*C.char)(unsafe.Pointer(text.value)), C.int(text.nitems))
-			w.w.Event(system.ClipboardEvent{Text: str})
+			w.w.Event(clipboard.Event{Text: str})
 		case C.SelectionRequest:
 			cevt := (*C.XSelectionRequestEvent)(unsafe.Pointer(xev))
 			if cevt.selection != w.atoms.clipboard || cevt.property == C.None {
