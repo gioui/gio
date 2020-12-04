@@ -5,9 +5,9 @@
 package window
 
 import (
-	"gioui.org/app/internal/glimpl"
 	"gioui.org/gpu/backend"
 	"gioui.org/gpu/gl"
+	"gioui.org/internal/glimpl"
 )
 
 /*
@@ -43,14 +43,13 @@ func newContext(w *window) (*context, error) {
 	ctx := C.gio_contextForView(view)
 	c := &context{
 		ctx:  ctx,
-		c:    new(glimpl.Functions),
 		view: view,
 	}
 	return c, nil
 }
 
 func (c *context) Backend() (backend.Device, error) {
-	return gl.NewBackend(c.c)
+	return gl.NewBackend(nil)
 }
 
 func (c *context) Release() {

@@ -3,7 +3,6 @@
 package headless
 
 import (
-	"gioui.org/app/internal/glimpl"
 	"gioui.org/gpu/backend"
 	"gioui.org/gpu/gl"
 
@@ -24,14 +23,13 @@ __attribute__ ((visibility ("hidden"))) void gio_headless_prepareContext(CFTypeR
 import "C"
 
 type nsContext struct {
-	c        *glimpl.Functions
 	ctx      C.CFTypeRef
 	prepared bool
 }
 
 func newGLContext() (context, error) {
 	ctx := C.gio_headless_newContext()
-	return &nsContext{ctx: ctx, c: new(glimpl.Functions)}, nil
+	return &nsContext{ctx: ctx}, nil
 }
 
 func (c *nsContext) MakeCurrent() error {
@@ -48,11 +46,7 @@ func (c *nsContext) ReleaseCurrent() {
 }
 
 func (c *nsContext) Backend() (backend.Device, error) {
-	return gl.NewBackend(c.c)
-}
-
-func (c *nsContext) Functions() *glimpl.Functions {
-	return c.c
+	return gl.NewBackend(nil)
 }
 
 func (d *nsContext) Release() {

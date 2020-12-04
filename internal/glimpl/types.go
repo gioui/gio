@@ -1,6 +1,6 @@
 // +build !js
 
-package gl
+package glimpl
 
 type (
 	Buffer       struct{ V uint }
@@ -14,14 +14,14 @@ type (
 	Object       struct{ V uint }
 )
 
-func (u Uniform) valid() bool {
+func (u Uniform) Valid() bool {
 	return u.V != -1
 }
 
-func (p Program) valid() bool {
+func (p Program) Valid() bool {
 	return p.V != 0
 }
 
-func (s Shader) valid() bool {
+func (s Shader) Valid() bool {
 	return s.V != 0
 }

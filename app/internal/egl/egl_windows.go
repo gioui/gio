@@ -10,7 +10,7 @@ import (
 
 	syscall "golang.org/x/sys/windows"
 
-	"gioui.org/app/internal/glimpl"
+	"gioui.org/internal/glimpl"
 	gunsafe "gioui.org/internal/unsafe"
 )
 

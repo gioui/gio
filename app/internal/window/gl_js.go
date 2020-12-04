@@ -6,16 +6,15 @@ import (
 	"errors"
 	"syscall/js"
 
-	"gioui.org/app/internal/glimpl"
 	"gioui.org/app/internal/srgb"
 	"gioui.org/gpu/backend"
 	"gioui.org/gpu/gl"
+	"gioui.org/internal/glimpl"
 )
 
 type context struct {
 	ctx     js.Value
 	cnv     js.Value
-	f       *glimpl.Functions
 	srgbFBO *srgb.FBO
 }
 
@@ -33,20 +32,15 @@ func newContext(w *window) (*context, error) {
 	if ctx.IsNull() {
 		return nil, errors.New("app: webgl is not supported")
 	}
-	f := &glimpl.Functions{Ctx: ctx}
-	if err := f.Init(); err != nil {
-		return nil, err
-	}
 	c := &context{
 		ctx: ctx,
 		cnv: w.cnv,
-		f:   f,
 	}
 	return c, nil
 }
 
 func (c *context) Backend() (backend.Device, error) {
-	return gl.NewBackend(c.f)
+	return gl.NewBackend(glimpl.Context(c.ctx))
 }
 
 func (c *context) Release() {
@@ -76,7 +70,7 @@ func (c *context) Unlock() {}
 func (c *context) MakeCurrent() error {
 	if c.srgbFBO == nil {
 		var err error
-		c.srgbFBO, err = srgb.New(c.f)
+		c.srgbFBO, err = srgb.New(glimpl.Context(c.ctx))
 		if err != nil {
 			c.Release()
 			c.srgbFBO = nil

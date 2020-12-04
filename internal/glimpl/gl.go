@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package gl
+package glimpl
 
 type (
 	Attrib uint
@@ -88,7 +88,7 @@ const (
 	GPU_DISJOINT_EXT = 0x8FBB
 )
 
-type Functions interface {
+var _ interface {
 	ActiveTexture(texture Enum)
 	AttachShader(p Program, s Shader)
 	BeginQuery(target Enum, query Query)
@@ -158,4 +158,4 @@ type Functions interface {
 	UseProgram(p Program)
 	VertexAttribPointer(dst Attrib, size int, ty Enum, normalized bool, stride, offset int)
 	Viewport(x, y, width, height int)
-}
+} = (*Functions)(nil)

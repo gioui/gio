@@ -10,10 +10,10 @@ import (
 	"runtime"
 	"strings"
 
-	"gioui.org/app/internal/glimpl"
 	"gioui.org/app/internal/srgb"
 	"gioui.org/gpu/backend"
 	"gioui.org/gpu/gl"
+	"gioui.org/internal/glimpl"
 )
 
 type Context struct {
@@ -106,20 +106,20 @@ func NewContext(disp NativeDisplayType) (*Context, error) {
 	if err != nil {
 		return nil, err
 	}
+	f, err := glimpl.NewFunctions(nil)
+	if err != nil {
+		return nil, err
+	}
 	c := &Context{
 		disp:   eglDisp,
 		eglCtx: eglCtx,
-		c:      new(glimpl.Functions),
+		c:      f,
 	}
 	return c, nil
 }
 
-func (c *Context) Functions() *glimpl.Functions {
-	return c.c
-}
-
 func (c *Context) Backend() (backend.Device, error) {
-	return gl.NewBackend(c.c)
+	return gl.NewBackend(nil)
 }
 
 func (c *Context) ReleaseSurface() {
@@ -164,7 +164,7 @@ func (c *Context) MakeCurrent() error {
 	}
 	if c.srgbFBO == nil {
 		var err error
-		c.srgbFBO, err = srgb.New(c.c)
+		c.srgbFBO, err = srgb.New(nil)
 		if err != nil {
 			c.ReleaseCurrent()
 			return err

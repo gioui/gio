@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package gl
+package glimpl
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func CreateProgram(ctx Functions, vsSrc, fsSrc string, attribs []string) (Program, error) {
+func CreateProgram(ctx *Functions, vsSrc, fsSrc string, attribs []string) (Program, error) {
 	vs, err := createShader(ctx, VERTEX_SHADER, vsSrc)
 	if err != nil {
 		return Program{}, err
@@ -20,7 +20,7 @@ func CreateProgram(ctx Functions, vsSrc, fsSrc string, attribs []string) (Progra
 	}
 	defer ctx.DeleteShader(fs)
 	prog := ctx.CreateProgram()
-	if !prog.valid() {
+	if !prog.Valid() {
 		return Program{}, errors.New("glCreateProgram failed")
 	}
 	ctx.AttachShader(prog, vs)
@@ -37,9 +37,9 @@ func CreateProgram(ctx Functions, vsSrc, fsSrc string, attribs []string) (Progra
 	return prog, nil
 }
 
-func createShader(ctx Functions, typ Enum, src string) (Shader, error) {
+func createShader(ctx *Functions, typ Enum, src string) (Shader, error) {
 	sh := ctx.CreateShader(typ)
-	if !sh.valid() {
+	if !sh.Valid() {
 		return Shader{}, errors.New("glCreateShader failed")
 	}
 	ctx.ShaderSource(sh, src)

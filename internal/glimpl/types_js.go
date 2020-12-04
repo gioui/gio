@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package gl
+package glimpl
 
 import "syscall/js"
 
@@ -16,14 +16,14 @@ type (
 	Object       js.Value
 )
 
-func (p Program) valid() bool {
+func (p Program) Valid() bool {
 	return !js.Value(p).IsUndefined() && !js.Value(p).IsNull()
 }
 
-func (s Shader) valid() bool {
+func (s Shader) Valid() bool {
 	return !js.Value(s).IsUndefined() && !js.Value(s).IsNull()
 }
 
-func (u Uniform) valid() bool {
+func (u Uniform) Valid() bool {
 	return !js.Value(u).IsUndefined() && !js.Value(u).IsNull()
 }

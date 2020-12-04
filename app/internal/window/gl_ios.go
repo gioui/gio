@@ -21,9 +21,9 @@ import (
 	"errors"
 	"fmt"
 
-	"gioui.org/app/internal/glimpl"
 	"gioui.org/gpu/backend"
 	"gioui.org/gpu/gl"
+	"gioui.org/internal/glimpl"
 )
 
 type context struct {
@@ -32,8 +32,8 @@ type context struct {
 	ctx                      C.CFTypeRef
 	layer                    C.CFTypeRef
 	init                     bool
-	frameBuffer              gl.Framebuffer
-	colorBuffer, depthBuffer gl.Renderbuffer
+	frameBuffer              glimpl.Framebuffer
+	colorBuffer, depthBuffer glimpl.Renderbuffer
 }
 
 func init() {
@@ -64,7 +64,7 @@ func (c *context) Release() {
 	if c.ctx == 0 {
 		return
 	}
-	C.gio_renderbufferStorage(c.ctx, 0, C.GLenum(gl.RENDERBUFFER))
+	C.gio_renderbufferStorage(c.ctx, 0, C.GLenum(glimpl.RENDERBUFFER))
 	c.c.DeleteFramebuffer(c.frameBuffer)
 	c.c.DeleteRenderbuffer(c.colorBuffer)
 	c.c.DeleteRenderbuffer(c.depthBuffer)
@@ -79,10 +79,10 @@ func (c *context) Present() error {
 	}
 	// Discard depth buffer as recommended in
 	// https://developer.apple.com/library/archive/documentation/3DDrawing/Conceptual/OpenGLES_ProgrammingGuide/WorkingwithEAGLContexts/WorkingwithEAGLContexts.html
-	c.c.BindFramebuffer(gl.FRAMEBUFFER, c.frameBuffer)
-	c.c.InvalidateFramebuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT)
-	c.c.BindRenderbuffer(gl.RENDERBUFFER, c.colorBuffer)
-	if C.gio_presentRenderbuffer(c.ctx, C.GLenum(gl.RENDERBUFFER)) == 0 {
+	c.c.BindFramebuffer(glimpl.FRAMEBUFFER, c.frameBuffer)
+	c.c.InvalidateFramebuffer(glimpl.FRAMEBUFFER, glimpl.DEPTH_ATTACHMENT)
+	c.c.BindRenderbuffer(glimpl.RENDERBUFFER, c.colorBuffer)
+	if C.gio_presentRenderbuffer(c.ctx, C.GLenum(glimpl.RENDERBUFFER)) == 0 {
 		return errors.New("presentRenderBuffer failed")
 	}
 	return nil
@@ -109,20 +109,20 @@ func (c *context) MakeCurrent() error {
 		c.c.Finish()
 		return nil
 	}
-	currentRB := gl.Renderbuffer{uint(c.c.GetInteger(gl.RENDERBUFFER_BINDING))}
-	c.c.BindRenderbuffer(gl.RENDERBUFFER, c.colorBuffer)
-	if C.gio_renderbufferStorage(c.ctx, c.layer, C.GLenum(gl.RENDERBUFFER)) == 0 {
+	currentRB := glimpl.Renderbuffer{uint(c.c.GetInteger(glimpl.RENDERBUFFER_BINDING))}
+	c.c.BindRenderbuffer(glimpl.RENDERBUFFER, c.colorBuffer)
+	if C.gio_renderbufferStorage(c.ctx, c.layer, C.GLenum(glimpl.RENDERBUFFER)) == 0 {
 		return errors.New("renderbufferStorage failed")
 	}
-	w := c.c.GetRenderbufferParameteri(gl.RENDERBUFFER, gl.RENDERBUFFER_WIDTH)
-	h := c.c.GetRenderbufferParameteri(gl.RENDERBUFFER, gl.RENDERBUFFER_HEIGHT)
-	c.c.BindRenderbuffer(gl.RENDERBUFFER, c.depthBuffer)
-	c.c.RenderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, w, h)
-	c.c.BindRenderbuffer(gl.RENDERBUFFER, currentRB)
-	c.c.BindFramebuffer(gl.FRAMEBUFFER, c.frameBuffer)
-	c.c.FramebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, c.colorBuffer)
-	c.c.FramebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, c.depthBuffer)
-	if st := c.c.CheckFramebufferStatus(gl.FRAMEBUFFER); st != gl.FRAMEBUFFER_COMPLETE {
+	w := c.c.GetRenderbufferParameteri(glimpl.RENDERBUFFER, glimpl.RENDERBUFFER_WIDTH)
+	h := c.c.GetRenderbufferParameteri(glimpl.RENDERBUFFER, glimpl.RENDERBUFFER_HEIGHT)
+	c.c.BindRenderbuffer(glimpl.RENDERBUFFER, c.depthBuffer)
+	c.c.RenderbufferStorage(glimpl.RENDERBUFFER, glimpl.DEPTH_COMPONENT16, w, h)
+	c.c.BindRenderbuffer(glimpl.RENDERBUFFER, currentRB)
+	c.c.BindFramebuffer(glimpl.FRAMEBUFFER, c.frameBuffer)
+	c.c.FramebufferRenderbuffer(glimpl.FRAMEBUFFER, glimpl.COLOR_ATTACHMENT0, glimpl.RENDERBUFFER, c.colorBuffer)
+	c.c.FramebufferRenderbuffer(glimpl.FRAMEBUFFER, glimpl.DEPTH_ATTACHMENT, glimpl.RENDERBUFFER, c.depthBuffer)
+	if st := c.c.CheckFramebufferStatus(glimpl.FRAMEBUFFER); st != glimpl.FRAMEBUFFER_COMPLETE {
 		return fmt.Errorf("framebuffer incomplete, status: %#x\n", st)
 	}
 	return nil
