@@ -26,17 +26,15 @@ func newContext(w *window) (*context, error) {
 		"desynchronized":        true,
 		"preserveDrawingBuffer": true,
 	}
-	version := 2
 	ctx := w.cnv.Call("getContext", "webgl2", args)
 	if ctx.IsNull() {
-		version = 1
 		ctx = w.cnv.Call("getContext", "webgl", args)
 	}
 	if ctx.IsNull() {
 		return nil, errors.New("app: webgl is not supported")
 	}
 	f := &glimpl.Functions{Ctx: ctx}
-	if err := f.Init(version); err != nil {
+	if err := f.Init(); err != nil {
 		return nil, err
 	}
 	c := &context{

@@ -17,19 +17,17 @@ type jsContext struct {
 }
 
 func newGLContext() (context, error) {
-	version := 2
 	doc := js.Global().Get("document")
 	cnv := doc.Call("createElement", "canvas")
 	ctx := cnv.Call("getContext", "webgl2")
 	if ctx.IsNull() {
-		version = 1
 		ctx = cnv.Call("getContext", "webgl")
 	}
 	if ctx.IsNull() {
 		return nil, errors.New("headless: webgl is not supported")
 	}
 	f := &glimpl.Functions{Ctx: ctx}
-	if err := f.Init(version); err != nil {
+	if err := f.Init(); err != nil {
 		return nil, err
 	}
 	c := &jsContext{
