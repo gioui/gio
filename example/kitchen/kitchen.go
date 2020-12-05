@@ -21,6 +21,7 @@ import (
 	"gioui.org/app/headless"
 	"gioui.org/f32"
 	"gioui.org/font/gofont"
+	"gioui.org/io/clipboard"
 	"gioui.org/io/router"
 	"gioui.org/io/system"
 	"gioui.org/layout"
@@ -117,7 +118,7 @@ func loop(w *app.Window) error {
 		select {
 		case e := <-w.Events():
 			switch e := e.(type) {
-			case system.ClipboardEvent:
+			case clipboard.Event:
 				lineEditor.SetText(e.Text)
 			case system.DestroyEvent:
 				return e.Err
