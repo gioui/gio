@@ -21,6 +21,7 @@ import (
 
 type window struct {
 	window                js.Value
+	document              js.Value
 	clipboard             js.Value
 	cnv                   js.Value
 	tarea                 js.Value
@@ -48,6 +49,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 	cont.Call("appendChild", tarea)
 	w := &window{
 		cnv:       cnv,
+		document:  doc,
 		tarea:     tarea,
 		window:    js.Global().Get("window"),
 		clipboard: js.Global().Get("navigator").Get("clipboard"),
@@ -137,6 +139,17 @@ func (w *window) addEventListeners() {
 		}
 
 		return w.browserHistory.Call("back")
+	})
+	w.addEventListener(w.document, "visibilitychange", func(this js.Value, args []js.Value) interface{} {
+		ev := system.StageEvent{}
+		switch w.document.Get("visibilityState").String() {
+		case "hidden", "prerender", "unloaded":
+			ev.Stage = system.StagePaused
+		default:
+			ev.Stage = system.StageRunning
+		}
+		w.w.Event(ev)
+		return nil
 	})
 	w.addEventListener(w.cnv, "mousemove", func(this js.Value, args []js.Value) interface{} {
 		w.pointerEvent(pointer.Move, 0, 0, args[0])
