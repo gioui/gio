@@ -146,7 +146,7 @@ type SubmitEvent struct {
 }
 
 type line struct {
-	offset f32.Point
+	offset image.Point
 	clip   op.CallOp
 }
 
@@ -447,12 +447,13 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 }
 
 func (e *Editor) PaintText(gtx layout.Context) {
-	clip := textPadding(e.lines)
-	clip.Max = clip.Max.Add(e.viewSize)
+	cl := textPadding(e.lines)
+	cl.Max = cl.Max.Add(e.viewSize)
 	for _, shape := range e.shapes {
 		stack := op.Push(gtx.Ops)
-		op.Offset(shape.offset).Add(gtx.Ops)
+		op.Offset(layout.FPt(shape.offset)).Add(gtx.Ops)
 		shape.clip.Add(gtx.Ops)
+		clip.Rect(cl.Sub(shape.offset)).Add(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
 		stack.Pop()
 	}

@@ -7,9 +7,9 @@ import (
 	"image"
 	"unicode/utf8"
 
-	"gioui.org/f32"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
@@ -38,7 +38,7 @@ type lineIterator struct {
 
 const inf = 1e6
 
-func (l *lineIterator) Next() (text.Layout, f32.Point, bool) {
+func (l *lineIterator) Next() (text.Layout, image.Point, bool) {
 	for len(l.Lines) > 0 {
 		line := l.Lines[0]
 		l.Lines = l.Lines[1:]
@@ -82,10 +82,10 @@ func (l *lineIterator) Next() (text.Layout, f32.Point, bool) {
 			endx += layout.Advances[rune]
 			rune++
 		}
-		offf := f32.Point{X: float32(off.X) / 64, Y: float32(off.Y) / 64}
+		offf := image.Point{X: off.X.Floor(), Y: off.Y.Floor()}
 		return layout, offf, true
 	}
-	return text.Layout{}, f32.Point{}, false
+	return text.Layout{}, image.Point{}, false
 }
 
 func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size unit.Value, txt string) layout.Dimensions {
@@ -97,11 +97,11 @@ func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size un
 	}
 	dims := linesDimens(lines)
 	dims.Size = cs.Constrain(dims.Size)
-	clip := textPadding(lines)
-	clip.Max = clip.Max.Add(dims.Size)
+	cl := textPadding(lines)
+	cl.Max = cl.Max.Add(dims.Size)
 	it := lineIterator{
 		Lines:     lines,
-		Clip:      clip,
+		Clip:      cl,
 		Alignment: l.Alignment,
 		Width:     dims.Size.X,
 	}
@@ -111,8 +111,9 @@ func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size un
 			break
 		}
 		stack := op.Push(gtx.Ops)
-		op.Offset(off).Add(gtx.Ops)
+		op.Offset(layout.FPt(off)).Add(gtx.Ops)
 		s.Shape(font, textSize, l).Add(gtx.Ops)
+		clip.Rect(cl.Sub(off)).Add(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
 		stack.Pop()
 	}
