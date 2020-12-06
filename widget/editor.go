@@ -645,14 +645,14 @@ func (e *Editor) Insert(s string) {
 }
 
 func (e *Editor) append(s string) {
-	if e.SingleLine {
-		s = strings.ReplaceAll(s, "\n", "")
-	}
 	e.prepend(s)
 	e.rr.caret += len(s)
 }
 
 func (e *Editor) prepend(s string) {
+	if e.SingleLine {
+		s = strings.ReplaceAll(s, "\n", " ")
+	}
 	e.rr.prepend(s)
 	e.caret.xoff = 0
 	e.invalidate()
