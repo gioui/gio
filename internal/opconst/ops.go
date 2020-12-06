@@ -20,6 +20,8 @@ const (
 	TypeArea
 	TypePointerInput
 	TypePass
+	TypeClipboardRead
+	TypeClipboardWrite
 	TypeKeyInput
 	TypeKeyFocus
 	TypeKeySoftKeyboard
@@ -43,6 +45,8 @@ const (
 	TypeAreaLen            = 1 + 1 + 4*4
 	TypePointerInputLen    = 1 + 1 + 1
 	TypePassLen            = 1 + 1
+	TypeClipboardReadLen   = 1
+	TypeClipboardWriteLen  = 1
 	TypeKeyInputLen        = 1
 	TypeKeyFocusLen        = 1 + 1
 	TypeKeySoftKeyboardLen = 1 + 1
@@ -67,6 +71,8 @@ func (t OpType) Size() int {
 		TypeAreaLen,
 		TypePointerInputLen,
 		TypePassLen,
+		TypeClipboardReadLen,
+		TypeClipboardWriteLen,
 		TypeKeyInputLen,
 		TypeKeyFocusLen,
 		TypeKeySoftKeyboardLen,
@@ -80,7 +86,7 @@ func (t OpType) Size() int {
 
 func (t OpType) NumRefs() int {
 	switch t {
-	case TypeKeyInput, TypePointerInput, TypeProfile, TypeCall:
+	case TypeKeyInput, TypePointerInput, TypeProfile, TypeCall, TypeClipboardRead, TypeClipboardWrite:
 		return 1
 	case TypeImage:
 		return 2
