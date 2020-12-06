@@ -21,7 +21,6 @@ import (
 	"gioui.org/app/headless"
 	"gioui.org/f32"
 	"gioui.org/font/gofont"
-	"gioui.org/io/clipboard"
 	"gioui.org/io/router"
 	"gioui.org/io/system"
 	"gioui.org/layout"
@@ -118,18 +117,10 @@ func loop(w *app.Window) error {
 		select {
 		case e := <-w.Events():
 			switch e := e.(type) {
-			case clipboard.Event:
-				lineEditor.SetText(e.Text)
 			case system.DestroyEvent:
 				return e.Err
 			case system.FrameEvent:
 				gtx := layout.NewContext(&ops, e)
-				for iconButton.Clicked() {
-					w.WriteClipboard(lineEditor.Text())
-				}
-				for flatBtn.Clicked() {
-					w.ReadClipboard()
-				}
 				if *disable {
 					gtx = gtx.Disabled()
 				}
