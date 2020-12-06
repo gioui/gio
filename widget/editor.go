@@ -16,6 +16,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/gesture"
+	"gioui.org/io/clipboard"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
@@ -250,11 +251,15 @@ func (e *Editor) processKey(gtx layout.Context) {
 					continue
 				}
 			}
-			if e.command(ke) {
+			if e.command(gtx, ke) {
 				e.caret.scroll = true
 				e.scroller.Stop()
 			}
 		case key.EditEvent:
+			e.caret.scroll = true
+			e.scroller.Stop()
+			e.append(ke.Text)
+		case clipboard.Event:
 			e.caret.scroll = true
 			e.scroller.Stop()
 			e.append(ke.Text)
@@ -269,7 +274,7 @@ func (e *Editor) moveLines(distance int) {
 	e.moveToLine(e.caret.x+e.caret.xoff, e.caret.line+distance)
 }
 
-func (e *Editor) command(k key.Event) bool {
+func (e *Editor) command(gtx layout.Context, k key.Event) bool {
 	modSkip := key.ModCtrl
 	if runtime.GOOS == "darwin" {
 		modSkip = key.ModAlt
@@ -313,6 +318,16 @@ func (e *Editor) command(k key.Event) bool {
 		e.moveStart()
 	case key.NameEnd:
 		e.moveEnd()
+	case "V":
+		if k.Modifiers != key.ModShortcut {
+			return false
+		}
+		clipboard.ReadOp{Tag: &e.eventKey}.Add(gtx.Ops)
+	case "C":
+		if k.Modifiers != key.ModShortcut {
+			return false
+		}
+		clipboard.WriteOp{Text: e.Text()}.Add(gtx.Ops)
 	default:
 		return false
 	}
