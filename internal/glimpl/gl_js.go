@@ -30,7 +30,7 @@ func NewFunctions(ctx Context) (*Functions, error) {
 
 func (f *Functions) Init() error {
 	webgl2Class := js.Global().Get("WebGL2RenderingContext")
-	iswebgl2 := !webgl2Class.IsNull() && f.Ctx.InstanceOf(webgl2Class)
+	iswebgl2 := !webgl2Class.IsUndefined() && f.Ctx.InstanceOf(webgl2Class)
 	if !iswebgl2 {
 		f.EXT_disjoint_timer_query = f.getExtension("EXT_disjoint_timer_query")
 		if f.getExtension("OES_texture_half_float").IsNull() && f.getExtension("OES_texture_float").IsNull() {
