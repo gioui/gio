@@ -108,7 +108,7 @@ func drawTabs(gtx layout.Context, th *material.Theme) layout.Dimensions {
 						}
 						tabHeight := gtx.Px(unit.Dp(4))
 						tabRect := image.Rect(0, 0, tabWidth, tabHeight)
-						paint.FillShape(gtx.Ops, th.Color.Primary, clip.Rect(tabRect).Op())
+						paint.FillShape(gtx.Ops, th.Palette.ContrastBg, clip.Rect(tabRect).Op())
 						return layout.Dimensions{
 							Size: image.Point{X: tabWidth, Y: tabHeight},
 						}

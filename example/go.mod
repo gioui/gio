@@ -3,7 +3,7 @@ module gioui.org/example
 go 1.13
 
 require (
-	gioui.org v0.0.0-20201206215711-ede632b2650d
+	gioui.org v0.0.0-20201206220230-a87a520ae825
 	github.com/go-gl/gl v0.0.0-20190320180904-bf2b1f2f34d7
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20191125211704-12ad95a8df72
 	github.com/google/go-github/v24 v24.0.1

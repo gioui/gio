@@ -224,7 +224,7 @@ func (b iconAndTextButton) Layout(gtx layout.Context) layout.Dimensions {
 			layLabel := layout.Rigid(func(gtx C) D {
 				return layout.Inset{Left: textIconSpacer}.Layout(gtx, func(gtx C) D {
 					l := material.Body1(b.theme, b.word)
-					l.Color = b.theme.Color.InvText
+					l.Color = b.theme.Palette.ContrastFg
 					return l.Layout(gtx)
 				})
 			})
