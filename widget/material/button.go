@@ -52,9 +52,9 @@ type IconButtonStyle struct {
 func Button(th *Theme, button *widget.Clickable, txt string) ButtonStyle {
 	return ButtonStyle{
 		Text:         txt,
-		Color:        rgb(0xffffff),
+		Color:        th.Palette.ContrastFg,
 		CornerRadius: unit.Dp(4),
-		Background:   th.Color.Primary,
+		Background:   th.Palette.ContrastBg,
 		TextSize:     th.TextSize.Scale(14.0 / 16.0),
 		Inset: layout.Inset{
 			Top: unit.Dp(10), Bottom: unit.Dp(10),
@@ -68,15 +68,15 @@ func Button(th *Theme, button *widget.Clickable, txt string) ButtonStyle {
 func ButtonLayout(th *Theme, button *widget.Clickable) ButtonLayoutStyle {
 	return ButtonLayoutStyle{
 		Button:       button,
-		Background:   th.Color.Primary,
+		Background:   th.Palette.ContrastBg,
 		CornerRadius: unit.Dp(4),
 	}
 }
 
 func IconButton(th *Theme, button *widget.Clickable, icon *widget.Icon) IconButtonStyle {
 	return IconButtonStyle{
-		Background: th.Color.Primary,
-		Color:      th.Color.InvText,
+		Background: th.Palette.ContrastBg,
+		Color:      th.Palette.ContrastFg,
 		Icon:       icon,
 		Size:       unit.Dp(24),
 		Inset:      layout.UniformInset(unit.Dp(12)),

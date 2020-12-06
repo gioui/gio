@@ -32,10 +32,10 @@ func Editor(th *Theme, editor *widget.Editor, hint string) EditorStyle {
 	return EditorStyle{
 		Editor:    editor,
 		TextSize:  th.TextSize,
-		Color:     th.Color.Text,
+		Color:     th.Palette.Fg,
 		shaper:    th.Shaper,
 		Hint:      hint,
-		HintColor: th.Color.Hint,
+		HintColor: f32color.MulAlpha(th.Palette.Fg, 0xbb),
 	}
 }
 

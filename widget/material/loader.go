@@ -22,7 +22,7 @@ type LoaderStyle struct {
 
 func Loader(th *Theme) LoaderStyle {
 	return LoaderStyle{
-		Color: th.Color.Primary,
+		Color: th.Palette.ContrastBg,
 	}
 }
 

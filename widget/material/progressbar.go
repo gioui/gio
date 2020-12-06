@@ -15,14 +15,16 @@ import (
 )
 
 type ProgressBarStyle struct {
-	Color    color.NRGBA
-	Progress int
+	Color      color.NRGBA
+	TrackColor color.NRGBA
+	Progress   int
 }
 
 func ProgressBar(th *Theme, progress int) ProgressBarStyle {
 	return ProgressBarStyle{
-		Progress: progress,
-		Color:    th.Color.Primary,
+		Progress:   progress,
+		Color:      th.Palette.ContrastBg,
+		TrackColor: f32color.MulAlpha(th.Palette.Fg, 0x88),
 	}
 }
 
@@ -55,10 +57,7 @@ func (p ProgressBarStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 	return layout.Stack{Alignment: layout.W}.Layout(gtx,
 		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-			// Use a transparent equivalent of progress color.
-			bgCol := f32color.MulAlpha(p.Color, 150)
-
-			return shader(progressBarWidth, bgCol)
+			return shader(progressBarWidth, p.TrackColor)
 		}),
 		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			fillWidth := (progressBarWidth / 100) * float32(progress)

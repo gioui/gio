@@ -18,8 +18,8 @@ func CheckBox(th *Theme, checkBox *widget.Bool, label string) CheckBoxStyle {
 		CheckBox: checkBox,
 		checkable: checkable{
 			Label:              label,
-			Color:              th.Color.Text,
-			IconColor:          th.Color.Primary,
+			Color:              th.Palette.Fg,
+			IconColor:          th.Palette.ContrastBg,
 			TextSize:           th.TextSize.Scale(14.0 / 16.0),
 			Size:               unit.Dp(26),
 			shaper:             th.Shaper,

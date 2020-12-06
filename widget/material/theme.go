@@ -11,14 +11,28 @@ import (
 	"golang.org/x/exp/shiny/materialdesign/icons"
 )
 
+// Palette contains the minimal set of colors that a widget may need to
+// draw itself.
+type Palette struct {
+	// Bg is the background color atop which content is currently being
+	// drawn.
+	Bg color.NRGBA
+
+	// Fg is a color suitable for drawing on top of Bg.
+	Fg color.NRGBA
+
+	// ContrastBg is a color used to draw attention to active,
+	// important, interactive widgets such as buttons.
+	ContrastBg color.NRGBA
+
+	// ContrastFg is a color suitable for content drawn on top of
+	// ContrastBg.
+	ContrastFg color.NRGBA
+}
+
 type Theme struct {
 	Shaper text.Shaper
-	Color  struct {
-		Primary color.NRGBA
-		Text    color.NRGBA
-		Hint    color.NRGBA
-		InvText color.NRGBA
-	}
+	Palette
 	TextSize unit.Value
 	Icon     struct {
 		CheckBoxChecked   *widget.Icon
@@ -32,10 +46,12 @@ func NewTheme(fontCollection []text.FontFace) *Theme {
 	t := &Theme{
 		Shaper: text.NewCache(fontCollection),
 	}
-	t.Color.Primary = rgb(0x3f51b5)
-	t.Color.Text = rgb(0x000000)
-	t.Color.Hint = rgb(0xbbbbbb)
-	t.Color.InvText = rgb(0xffffff)
+	t.Palette = Palette{
+		Fg:         rgb(0x000000),
+		Bg:         rgb(0xffffff),
+		ContrastBg: rgb(0x3f51b5),
+		ContrastFg: rgb(0xffffff),
+	}
 	t.TextSize = unit.Sp(16)
 
 	t.Icon.CheckBoxChecked = mustIcon(widget.NewIcon(icons.ToggleCheckBox))
@@ -43,6 +59,11 @@ func NewTheme(fontCollection []text.FontFace) *Theme {
 	t.Icon.RadioChecked = mustIcon(widget.NewIcon(icons.ToggleRadioButtonChecked))
 	t.Icon.RadioUnchecked = mustIcon(widget.NewIcon(icons.ToggleRadioButtonUnchecked))
 
+	return t
+}
+
+func (t Theme) WithPalette(p Palette) Theme {
+	t.Palette = p
 	return t
 }
 

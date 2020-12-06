@@ -21,6 +21,7 @@ type SwitchStyle struct {
 	Color struct {
 		Enabled  color.NRGBA
 		Disabled color.NRGBA
+		Track    color.NRGBA
 	}
 	Switch *widget.Bool
 }
@@ -29,8 +30,9 @@ func Switch(th *Theme, swtch *widget.Bool) SwitchStyle {
 	sw := SwitchStyle{
 		Switch: swtch,
 	}
-	sw.Color.Enabled = th.Color.Primary
-	sw.Color.Disabled = rgb(0xffffff)
+	sw.Color.Enabled = th.Palette.ContrastBg
+	sw.Color.Disabled = th.Palette.Bg
+	sw.Color.Track = f32color.MulAlpha(th.Palette.Fg, 0x88)
 	return sw
 }
 
@@ -55,7 +57,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	if gtx.Queue == nil {
 		col = f32color.MulAlpha(col, 150)
 	}
-	trackColor := f32color.MulAlpha(col, 150)
+	trackColor := s.Color.Track
 	op.Offset(f32.Point{Y: trackOff}).Add(gtx.Ops)
 	clip.RRect{
 		Rect: trackRect,

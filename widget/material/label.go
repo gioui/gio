@@ -66,7 +66,7 @@ func Caption(th *Theme, txt string) LabelStyle {
 func Label(th *Theme, size unit.Value, txt string) LabelStyle {
 	return LabelStyle{
 		Text:     txt,
-		Color:    th.Color.Text,
+		Color:    th.Palette.Fg,
 		TextSize: size,
 		shaper:   th.Shaper,
 	}
