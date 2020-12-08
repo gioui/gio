@@ -31,6 +31,8 @@ const (
 	TypeClip
 	TypeProfile
 	TypeCursor
+	TypePath
+	TypeStroke
 )
 
 const (
@@ -54,9 +56,11 @@ const (
 	TypePushLen            = 1
 	TypePopLen             = 1
 	TypeAuxLen             = 1
-	TypeClipLen            = 1 + 4*4 + 4 + 2 + 4
+	TypeClipLen            = 1 + 4*4 + 1
 	TypeProfileLen         = 1
 	TypeCursorLen          = 1 + 1
+	TypePathLen            = 1 + 4
+	TypeStrokeLen          = 1 + 4 + 4 + 1 + 1
 )
 
 func (t OpType) Size() int {
@@ -84,6 +88,8 @@ func (t OpType) Size() int {
 		TypeClipLen,
 		TypeProfileLen,
 		TypeCursorLen,
+		TypePathLen,
+		TypeStrokeLen,
 	}[t-firstOpIndex]
 }
 

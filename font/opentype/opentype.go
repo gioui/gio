@@ -323,7 +323,9 @@ func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, fonts []*opentype, str text.
 		x += str.Advances[rune]
 		rune++
 	}
-	builder.Outline().Add(ops)
+	clip.Outline{
+		Path: builder.End(),
+	}.Op().Add(ops)
 	return m.Stop()
 }
 

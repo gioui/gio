@@ -13,6 +13,52 @@ import (
 	"gioui.org/op"
 )
 
+// Op represents a clip area. Op intersects the current clip area with
+// itself.
+type Op struct {
+	bounds image.Rectangle
+	path   PathSpec
+
+	outline bool
+	stroke  StrokeStyle
+}
+
+func (p Op) Add(o *op.Ops) {
+	if p.path.quads > 0 {
+		data := o.Write(opconst.TypePathLen)
+		data[0] = byte(opconst.TypePath)
+		bo := binary.LittleEndian
+		bo.PutUint32(data[1:], p.path.quads)
+		p.path.spec.Add(o)
+	}
+
+	if p.stroke.Width > 0 {
+		data := o.Write(opconst.TypeStrokeLen)
+		data[0] = byte(opconst.TypeStroke)
+		bo := binary.LittleEndian
+		bo.PutUint32(data[1:], math.Float32bits(p.stroke.Width))
+		bo.PutUint32(data[5:], math.Float32bits(p.stroke.Miter))
+		data[9] = uint8(p.stroke.Cap)
+		data[10] = uint8(p.stroke.Join)
+	}
+
+	data := o.Write(opconst.TypeClipLen)
+	data[0] = byte(opconst.TypeClip)
+	bo := binary.LittleEndian
+	bo.PutUint32(data[1:], uint32(p.bounds.Min.X))
+	bo.PutUint32(data[5:], uint32(p.bounds.Min.Y))
+	bo.PutUint32(data[9:], uint32(p.bounds.Max.X))
+	bo.PutUint32(data[13:], uint32(p.bounds.Max.Y))
+	if p.outline {
+		data[17] = byte(1)
+	}
+}
+
+type PathSpec struct {
+	spec  op.CallOp
+	quads uint32 // quads is the number Bézier segments in that path.
+}
+
 // Path constructs a Op clip path described by lines and
 // Bézier curves, where drawing outside the Path is discarded.
 // The inside-ness of a pixel is determines by the non-zero winding rule,
@@ -26,37 +72,11 @@ type Path struct {
 	pen     f32.Point
 	macro   op.MacroOp
 	start   f32.Point
+	quads   uint32
 }
 
 // Pos returns the current pen position.
 func (p *Path) Pos() f32.Point { return p.pen }
-
-// Op sets the current clip to the intersection of
-// the existing clip with this clip.
-//
-// If you need to reset the clip to its previous values after
-// applying a Op, use op.StackOp.
-type Op struct {
-	call   op.CallOp
-	bounds image.Rectangle
-	width  float32     // Width of the stroked path, 0 for outline paths.
-	style  StrokeStyle // Style of the stroked path, zero for outline paths.
-}
-
-func (p Op) Add(o *op.Ops) {
-	p.call.Add(o)
-	data := o.Write(opconst.TypeClipLen)
-	data[0] = byte(opconst.TypeClip)
-	bo := binary.LittleEndian
-	bo.PutUint32(data[1:], uint32(p.bounds.Min.X))
-	bo.PutUint32(data[5:], uint32(p.bounds.Min.Y))
-	bo.PutUint32(data[9:], uint32(p.bounds.Max.X))
-	bo.PutUint32(data[13:], uint32(p.bounds.Max.Y))
-	bo.PutUint32(data[17:], math.Float32bits(p.width))
-	data[21] = uint8(p.style.Cap)
-	data[22] = uint8(p.style.Join)
-	bo.PutUint32(data[23:], math.Float32bits(p.style.Miter))
-}
 
 // Begin the path, storing the path data and final Op into ops.
 func (p *Path) Begin(ops *op.Ops) {
@@ -65,6 +85,15 @@ func (p *Path) Begin(ops *op.Ops) {
 	// Write the TypeAux opcode
 	data := ops.Write(opconst.TypeAuxLen)
 	data[0] = byte(opconst.TypeAux)
+}
+
+// End returns a PathSpec ready to use in clipping operations.
+func (p *Path) End() PathSpec {
+	c := p.macro.Stop()
+	return PathSpec{
+		spec:  c,
+		quads: p.quads,
+	}
 }
 
 // Move moves the pen by the amount specified by delta.
@@ -120,6 +149,7 @@ func (p *Path) QuadTo(ctrl, to f32.Point) {
 		To:   to,
 	})
 	p.pen = to
+	p.quads++
 }
 
 // Arc adds an elliptical arc to the path. The implied ellipse is defined
@@ -329,32 +359,22 @@ func (p *Path) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to f32.Po
 	return splits
 }
 
-// Outline closes the path and returns a clip operation that represents it.
-func (p *Path) Outline() Op {
+// Close closes the path.
+func (p *Path) Close() {
 	p.end()
-	c := p.macro.Stop()
-	return Op{
-		call: c,
-	}
 }
 
-// Stroke returns a stroked path with the specified width
-// and configuration.
-// If the provided width is <= 0, the path won't be stroked.
-func (p *Path) Stroke(width float32, sty StrokeStyle) Op {
-	if width <= 0 {
-		// Explicitly discard the macro to ignore the path.
-		p.macro.Stop()
-		return Op{
-			call: op.Record(p.ops).Stop(),
-		}
-	}
+// Outline represents the area inside of a path, according to the
+// non-zero winding rule.
+type Outline struct {
+	Path PathSpec
+}
 
-	c := p.macro.Stop()
+// Op returns a clip operation representing the outline.
+func (o Outline) Op() Op {
 	return Op{
-		call:  c,
-		width: width,
-		style: sty,
+		path:    o.Path,
+		outline: true,
 	}
 }
 
@@ -363,7 +383,10 @@ type Rect image.Rectangle
 
 // Op returns the op for the rectangle.
 func (r Rect) Op() Op {
-	return Op{bounds: image.Rectangle(r)}
+	return Op{
+		bounds:  image.Rectangle(r),
+		outline: true,
+	}
 }
 
 // Add the clip operation.

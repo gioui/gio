@@ -2,17 +2,30 @@
 
 package clip
 
-// StrokeStyle describes how a stroked path should be drawn.
-// The zero value of StrokeStyle represents bevel-joined and flat-capped
-// strokes.
+// Stroke represents a stroked path.
+type Stroke struct {
+	Path  PathSpec
+	Style StrokeStyle
+}
+
+// Op returns a clip operation representing the stroke.
+func (s Stroke) Op() Op {
+	return Op{
+		path:   s.Path,
+		stroke: s.Style,
+	}
+}
+
+// StrokeStyle describes how a path should be stroked.
 type StrokeStyle struct {
-	Cap  StrokeCap
-	Join StrokeJoin
+	Width float32 // Width of the stroked path.
 
 	// Miter is the limit to apply to a miter joint.
 	// The zero Miter disables the miter joint; setting Miter to +∞
 	// unconditionally enables the miter joint.
 	Miter float32
+	Cap   StrokeCap  // Cap describes the head or tail of a stroked path.
+	Join  StrokeJoin // Join describes how stroked paths are collated.
 }
 
 // StrokeCap describes the head or tail of a stroked path.

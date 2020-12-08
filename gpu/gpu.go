@@ -109,6 +109,35 @@ type imageOp struct {
 	place    placement
 }
 
+func decodeStrokeOp(data []byte) clip.StrokeStyle {
+	_ = data[10]
+	if opconst.OpType(data[0]) != opconst.TypeStroke {
+		panic("invalid op")
+	}
+	bo := binary.LittleEndian
+	return clip.StrokeStyle{
+		Width: math.Float32frombits(bo.Uint32(data[1:])),
+		Miter: math.Float32frombits(bo.Uint32(data[5:])),
+		Cap:   clip.StrokeCap(data[9]),
+		Join:  clip.StrokeJoin(data[10]),
+	}
+}
+
+type quadsOp struct {
+	quads uint32
+	key   ops.Key
+	aux   []byte
+}
+
+func decodeQuadsOp(data []byte) uint32 {
+	_ = data[:1+4]
+	if opconst.OpType(data[0]) != opconst.TypePath {
+		panic("invalid op")
+	}
+	bo := binary.LittleEndian
+	return bo.Uint32(data[1:])
+}
+
 type material struct {
 	material materialType
 	opaque   bool
@@ -125,9 +154,8 @@ type material struct {
 // clipOp is the shadow of clip.Op.
 type clipOp struct {
 	// TODO: Use image.Rectangle?
-	bounds f32.Rectangle
-	width  float32
-	style  clip.StrokeStyle
+	bounds  f32.Rectangle
+	outline bool
 }
 
 // imageOpData is the shadow of paint.ImageOp.
@@ -159,13 +187,8 @@ func (op *clipOp) decode(data []byte) {
 		},
 	}
 	*op = clipOp{
-		bounds: layout.FRect(r),
-		width:  math.Float32frombits(bo.Uint32(data[17:])),
-		style: clip.StrokeStyle{
-			Cap:   clip.StrokeCap(data[21]),
-			Join:  clip.StrokeJoin(data[22]),
-			Miter: math.Float32frombits(bo.Uint32(data[23:])),
-		},
+		bounds:  layout.FRect(r),
+		outline: data[17] == 1,
 	}
 }
 
@@ -786,8 +809,10 @@ func splitTransform(t f32.Affine2D) (srs f32.Affine2D, offset f32.Point) {
 }
 
 func (d *drawOps) collectOps(r *ops.Reader, state drawState) int {
-	var aux []byte
-	var auxKey ops.Key
+	var (
+		quads  quadsOp
+		stroke clip.StrokeStyle
+	)
 loop:
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
@@ -796,38 +821,51 @@ loop:
 		case opconst.TypeTransform:
 			dop := ops.DecodeTransform(encOp.Data)
 			state.t = state.t.Mul(dop)
-		case opconst.TypeAux:
-			aux = encOp.Data[opconst.TypeAuxLen:]
-			auxKey = encOp.Key
+
+		case opconst.TypeStroke:
+			stroke = decodeStrokeOp(encOp.Data)
+
+		case opconst.TypePath:
+			quads.quads = decodeQuadsOp(encOp.Data)
+			if quads.quads > 0 {
+				encOp, ok = r.Decode()
+				if !ok {
+					break loop
+				}
+				quads.aux = encOp.Data[opconst.TypeAuxLen:]
+				quads.key = encOp.Key
+			}
+
 		case opconst.TypeClip:
 			var op clipOp
 			op.decode(encOp.Data)
 			bounds := op.bounds
 			trans, off := splitTransform(state.t)
-			if len(aux) > 0 {
+			if len(quads.aux) > 0 {
 				// There is a clipping path, build the gpu data and update the
 				// cache key such that it will be equal only if the transform is the
 				// same also. Use cached data if we have it.
-				auxKey = auxKey.SetTransform(trans)
-				if v, ok := d.pathCache.get(auxKey); ok {
+				quads.key = quads.key.SetTransform(trans)
+				if v, ok := d.pathCache.get(quads.key); ok {
 					// Since the GPU data exists in the cache aux will not be used.
 					// Why is this not used for the offset shapes?
 					op.bounds = v.bounds
 				} else {
-					aux, op.bounds = d.buildVerts(aux, trans, op.width, op.style)
+					quads.aux, op.bounds = d.buildVerts(quads.aux, trans, op.outline, stroke)
 					// add it to the cache, without GPU data, so the transform can be
 					// reused.
-					d.pathCache.put(auxKey, opCacheValue{bounds: op.bounds})
+					d.pathCache.put(quads.key, opCacheValue{bounds: op.bounds})
 				}
 			} else {
-				aux, op.bounds, _ = d.boundsForTransformedRect(bounds, trans)
-				auxKey = encOp.Key
-				auxKey.SetTransform(trans)
+				quads.aux, op.bounds, _ = d.boundsForTransformedRect(bounds, trans)
+				quads.key = encOp.Key
+				quads.key.SetTransform(trans)
 			}
 			state.clip = state.clip.Intersect(op.bounds.Add(off))
-			d.addClipPath(&state, aux, auxKey, op.bounds, off)
-			aux = nil
-			auxKey = ops.Key{}
+			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off)
+			quads = quadsOp{}
+			stroke = clip.StrokeStyle{}
+
 		case opconst.TypeColor:
 			state.matType = materialColor
 			state.color = decodeColorOp(encOp.Data)
@@ -1213,7 +1251,7 @@ func (d *drawOps) writeVertCache(n int) []byte {
 }
 
 // transform, split paths as needed, calculate maxY, bounds and create GPU vertices.
-func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D, width float32, sty clip.StrokeStyle) (verts []byte, bounds f32.Rectangle) {
+func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D, outline bool, stroke clip.StrokeStyle) (verts []byte, bounds f32.Rectangle) {
 	inf := float32(math.Inf(+1))
 	d.qs.bounds = f32.Rectangle{
 		Min: f32.Point{X: inf, Y: inf},
@@ -1224,18 +1262,7 @@ func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D, width float32, sty cli
 	startLength := len(d.vertCache)
 
 	switch {
-	default:
-		// Outline path.
-		for qi := 0; len(aux) >= (ops.QuadSize + 4); qi++ {
-			d.qs.contour = bo.Uint32(aux)
-			quad := ops.DecodeQuad(aux[4:])
-			quad = quad.Transform(tr)
-
-			d.qs.splitAndEncode(quad)
-
-			aux = aux[ops.QuadSize+4:]
-		}
-	case width > 0:
+	case stroke.Width > 0:
 		// Stroke path.
 		quads := make(strokeQuads, 0, 2*len(aux)/(ops.QuadSize+4))
 		for qi := 0; len(aux) >= (ops.QuadSize + 4); qi++ {
@@ -1246,12 +1273,24 @@ func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D, width float32, sty cli
 			quads = append(quads, quad)
 			aux = aux[ops.QuadSize+4:]
 		}
-		quads = quads.stroke(width, sty)
+		quads = quads.stroke(stroke)
 		for _, quad := range quads {
 			d.qs.contour = quad.contour
 			quad.quad = quad.quad.Transform(tr)
 
 			d.qs.splitAndEncode(quad.quad)
+		}
+
+	case outline:
+		// Outline path.
+		for qi := 0; len(aux) >= (ops.QuadSize + 4); qi++ {
+			d.qs.contour = bo.Uint32(aux)
+			quad := ops.DecodeQuad(aux[4:])
+			quad = quad.Transform(tr)
+
+			d.qs.splitAndEncode(quad)
+
+			aux = aux[ops.QuadSize+4:]
 		}
 	}
 
