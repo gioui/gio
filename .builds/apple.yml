@@ -37,9 +37,6 @@ tasks:
      cd ../tools
      ln -s appletoolchain clang-ios
      ln -s appletoolchain clang-macos
- - install_gogio: |
-     cd gio/cmd
-     go install ./gogio
  - install_appletoolchain: |
      cd giouiorg
      go build -o $APPLE_TOOLCHAIN_ROOT/tools ./cmd/appletoolchain
@@ -57,12 +54,19 @@ tasks:
      ./configure --prefix $APPLE_TOOLCHAIN_ROOT/toolchain --with-libtapi=$APPLE_TOOLCHAIN_ROOT/libtapi --target=x86_64-apple-darwin19
      make install
  - test_macos: |
-     cd gio/example
+     cd gio
      export PATH=/home/build/appletools/bin:$PATH
-     CC=$APPLE_TOOLCHAIN_ROOT/tools/clang-macos CGO_CFLAGS="--sysroot $APPLE_TOOLCHAIN_ROOT/MacOSX.sdk -arch x86_64" CGO_LDFLAGS="--sysroot $APPLE_TOOLCHAIN_ROOT/MacOSX.sdk -arch x86_64" GOOS=darwin CGO_ENABLED=1 go build -o /dev/null ./kitchen
+     CC=$APPLE_TOOLCHAIN_ROOT/tools/clang-macos CGO_CFLAGS="--sysroot $APPLE_TOOLCHAIN_ROOT/MacOSX.sdk -arch x86_64" CGO_LDFLAGS="--sysroot $APPLE_TOOLCHAIN_ROOT/MacOSX.sdk -arch x86_64" GOOS=darwin CGO_ENABLED=1 go build ./...
  - test_ios: |
      cd gio
      CC=$APPLE_TOOLCHAIN_ROOT/tools/clang-ios CGO_CFLAGS="--sysroot $APPLE_TOOLCHAIN_ROOT/iPhoneOS.sdk -arch arm64" CGO_LDFLAGS="--sysroot $APPLE_TOOLCHAIN_ROOT/iPhoneOS.sdk -arch arm64" GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build -tags ios ./...
+ - install_gogio: |
+     cd gio/cmd
+     go install ./gogio
+ - test_ios_gogio: |
+     mkdir tmp
+     cd tmp
+     go mod init example.com
+     go get -d gioui.org/example/kitchen
      export PATH=/home/build/appletools/bin:$PATH
-     cd example
-     gogio -target ios -o app.app ./kitchen
+     gogio -target ios -o app.app gioui.org/example/kitchen

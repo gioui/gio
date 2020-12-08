@@ -41,9 +41,6 @@ tasks:
      go test -race ./...
      GOOS=windows go test -exec=wine ./...
      GOOS=js GOARCH=wasm go build -o /dev/null ./...
- - test_example: |
-     cd gio/example
-     go test -race ./...
  - install_chrome: |
      curl -s https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
      sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
@@ -70,14 +67,18 @@ tasks:
      mv android-ndk-* ndk-bundle
      yes|sdkmanager --licenses
      sdkmanager "platforms;android-29" "build-tools;29.0.2"
- - install_gogio: |
-     cd gio/cmd
-     go install ./gogio
  - test_android: |
      cd gio
      CC=$ANDROID_SDK_ROOT/ndk-bundle/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang GOOS=android GOARCH=arm64 CGO_ENABLED=1 go build ./...
-     cd example
-     gogio -target android ./kitchen
+ - install_gogio: |
+     cd gio/cmd
+     go install ./gogio
+ - test_android_gogio: |
+     mkdir tmp
+     cd tmp
+     go mod init example.com
+     go get -d gioui.org/example/kitchen
+     gogio -target android gioui.org/example/kitchen
  - check_gofmt: |
      cd gio
      test -z "$(gofmt -s -l .)"
