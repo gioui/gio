@@ -17,6 +17,8 @@ import (
 type pointerQueue struct {
 	hitTree  []hitNode
 	areas    []areaNode
+	cursors  []cursorNode
+	cursor   pointer.CursorName
 	handlers map[event.Tag]*pointerHandler
 	pointers []pointerInfo
 	reader   ops.Reader
@@ -32,6 +34,11 @@ type hitNode struct {
 
 	// For handler nodes.
 	tag event.Tag
+}
+
+type cursorNode struct {
+	name pointer.CursorName
+	area int
 }
 
 type pointerInfo struct {
@@ -114,6 +121,11 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents, t f
 			h.area = area
 			h.wantsGrab = h.wantsGrab || op.Grab
 			h.types = h.types | op.Types
+		case opconst.TypeCursor:
+			q.cursors = append(q.cursors, cursorNode{
+				name: encOp.Refs[0].(pointer.CursorName),
+				area: len(q.areas) - 1,
+			})
 		}
 	}
 }
@@ -177,6 +189,7 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	}
 	q.hitTree = q.hitTree[:0]
 	q.areas = q.areas[:0]
+	q.cursors = q.cursors[:0]
 	q.reader.Reset(root)
 	q.collectHandlers(&q.reader, events, f32.Affine2D{}, -1, -1, false)
 	for k, h := range q.handlers {
@@ -314,6 +327,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, hits []event.Tag,
 
 		if e.Type&h.types == e.Type {
 			events.Add(k, e)
+			q.cursor = pointer.CursorDefault
 		}
 	}
 	// Deliver Enter events.
@@ -327,9 +341,23 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, hits []event.Tag,
 
 		if e.Type&h.types == e.Type {
 			events.Add(k, e)
+			q.hitCursor(h.area)
 		}
 	}
 	p.entered = append(p.entered[:0], hits...)
+}
+
+func (q *pointerQueue) hitCursor(want int) {
+	for _, c := range q.cursors {
+		idx := c.area
+		for idx != -1 {
+			if idx == want {
+				q.cursor = c.name
+				return
+			}
+			idx = q.areas[idx].next
+		}
+	}
 }
 
 func searchTag(tags []event.Tag, tag event.Tag) (int, bool) {

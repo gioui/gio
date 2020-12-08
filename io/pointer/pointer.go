@@ -49,6 +49,11 @@ type AreaOp struct {
 	rect image.Rectangle
 }
 
+// CursorNameOp sets the cursor for the current area.
+type CursorNameOp struct {
+	Name CursorName
+}
+
 // InputOp declares an input handler ready for pointer
 // events.
 type InputOp struct {
@@ -176,6 +181,11 @@ func (op AreaOp) Add(o *op.Ops) {
 	bo.PutUint32(data[6:], uint32(op.rect.Min.Y))
 	bo.PutUint32(data[10:], uint32(op.rect.Max.X))
 	bo.PutUint32(data[14:], uint32(op.rect.Max.Y))
+}
+
+func (op CursorNameOp) Add(o *op.Ops) {
+	data := o.Write1(opconst.TypeCursorLen, op.Name)
+	data[0] = byte(opconst.TypeCursor)
 }
 
 func (h InputOp) Add(o *op.Ops) {

@@ -115,6 +115,11 @@ func (q *Router) ReadClipboard() bool {
 	return q.cqueue.ReadClipboard()
 }
 
+// Cursor returns the last cursor set.
+func (q *Router) Cursor() pointer.CursorName {
+	return q.pqueue.cursor
+}
+
 func (q *Router) collect() {
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {

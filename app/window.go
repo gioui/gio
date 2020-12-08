@@ -48,7 +48,8 @@ type Window struct {
 	nextFrame    time.Time
 	delayedDraw  *time.Timer
 
-	queue queue
+	queue  queue
+	cursor pointer.CursorName
 
 	callbacks callbacks
 }
@@ -413,6 +414,10 @@ func (w *Window) run(opts *window.Options) {
 				if w.queue.q.Add(e2) {
 					w.setNextFrame(time.Time{})
 					w.updateAnimation()
+				}
+				if c := w.queue.q.Cursor(); c != w.cursor {
+					w.cursor = c
+					w.SetCursorName(c)
 				}
 				w.out <- e
 			}

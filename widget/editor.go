@@ -379,7 +379,10 @@ func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size
 	}
 	e.makeValid()
 
-	return e.layout(gtx)
+	dims := e.layout(gtx)
+	pointer.Rect(image.Rectangle{Max: dims.Size}).Add(gtx.Ops)
+	pointer.CursorNameOp{Name: pointer.CursorText}.Add(gtx.Ops)
+	return dims
 }
 
 func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
