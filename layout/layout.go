@@ -194,6 +194,20 @@ func (d Direction) Layout(gtx Context, w Widget) Dimensions {
 	}
 }
 
+// Spacer adds space between widgets.
+type Spacer struct {
+	Width, Height unit.Value
+}
+
+func (s Spacer) Layout(gtx Context) Dimensions {
+	return Dimensions{
+		Size: image.Point{
+			X: gtx.Px(s.Width),
+			Y: gtx.Px(s.Height),
+		},
+	}
+}
+
 func (a Alignment) String() string {
 	switch a {
 	case Start:
