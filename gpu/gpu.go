@@ -109,6 +109,23 @@ type imageOp struct {
 	place    placement
 }
 
+type dashOp struct {
+	phase  float32
+	dashes []float32
+}
+
+func decodeDashOp(data []byte) dashOp {
+	_ = data[5]
+	if opconst.OpType(data[0]) != opconst.TypeDash {
+		panic("invalid op")
+	}
+	bo := binary.LittleEndian
+	return dashOp{
+		phase:  math.Float32frombits(bo.Uint32(data[1:])),
+		dashes: make([]float32, data[5]),
+	}
+}
+
 func decodeStrokeOp(data []byte) clip.StrokeStyle {
 	_ = data[10]
 	if opconst.OpType(data[0]) != opconst.TypeStroke {
@@ -812,6 +829,7 @@ func (d *drawOps) collectOps(r *ops.Reader, state drawState) int {
 	var (
 		quads  quadsOp
 		stroke clip.StrokeStyle
+		dashes dashOp
 	)
 loop:
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
@@ -821,6 +839,22 @@ loop:
 		case opconst.TypeTransform:
 			dop := ops.DecodeTransform(encOp.Data)
 			state.t = state.t.Mul(dop)
+
+		case opconst.TypeDash:
+			dashes = decodeDashOp(encOp.Data)
+			if len(dashes.dashes) > 0 {
+				encOp, ok = r.Decode()
+				if !ok {
+					panic("gpu: could not decode dashes pattern")
+				}
+				data := encOp.Data[1:]
+				bo := binary.LittleEndian
+				for i := range dashes.dashes {
+					dashes.dashes[i] = math.Float32frombits(bo.Uint32(
+						data[i*4:],
+					))
+				}
+			}
 
 		case opconst.TypeStroke:
 			stroke = decodeStrokeOp(encOp.Data)
@@ -851,7 +885,9 @@ loop:
 					// Why is this not used for the offset shapes?
 					op.bounds = v.bounds
 				} else {
-					quads.aux, op.bounds = d.buildVerts(quads.aux, trans, op.outline, stroke)
+					quads.aux, op.bounds = d.buildVerts(
+						quads.aux, trans, op.outline, stroke, dashes,
+					)
 					// add it to the cache, without GPU data, so the transform can be
 					// reused.
 					d.pathCache.put(quads.key, opCacheValue{bounds: op.bounds})
@@ -865,6 +901,7 @@ loop:
 			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off)
 			quads = quadsOp{}
 			stroke = clip.StrokeStyle{}
+			dashes = dashOp{}
 
 		case opconst.TypeColor:
 			state.matType = materialColor
@@ -1251,7 +1288,7 @@ func (d *drawOps) writeVertCache(n int) []byte {
 }
 
 // transform, split paths as needed, calculate maxY, bounds and create GPU vertices.
-func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D, outline bool, stroke clip.StrokeStyle) (verts []byte, bounds f32.Rectangle) {
+func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D, outline bool, stroke clip.StrokeStyle, dashes dashOp) (verts []byte, bounds f32.Rectangle) {
 	inf := float32(math.Inf(+1))
 	d.qs.bounds = f32.Rectangle{
 		Min: f32.Point{X: inf, Y: inf},
@@ -1273,7 +1310,7 @@ func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D, outline bool, stroke c
 			quads = append(quads, quad)
 			aux = aux[ops.QuadSize+4:]
 		}
-		quads = quads.stroke(stroke)
+		quads = quads.stroke(stroke, dashes)
 		for _, quad := range quads {
 			d.qs.contour = quad.contour
 			quad.quad = quad.quad.Transform(tr)

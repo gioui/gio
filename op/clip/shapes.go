@@ -50,8 +50,9 @@ func (rr RRect) Add(ops *op.Ops) {
 // Border represents the clip area of a rectangular border.
 type Border struct {
 	// Rect is the bounds of the border.
-	Rect  f32.Rectangle
-	Width float32
+	Rect   f32.Rectangle
+	Width  float32
+	Dashes DashSpec
 	// The corner radii.
 	SE, SW, NW, NE float32
 }
@@ -68,6 +69,7 @@ func (b Border) Op(ops *op.Ops) Op {
 		Style: StrokeStyle{
 			Width: b.Width,
 		},
+		Dashes: b.Dashes,
 	}.Op()
 }
 

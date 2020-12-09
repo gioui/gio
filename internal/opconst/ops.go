@@ -33,6 +33,7 @@ const (
 	TypeCursor
 	TypePath
 	TypeStroke
+	TypeDash
 )
 
 const (
@@ -61,6 +62,7 @@ const (
 	TypeCursorLen          = 1 + 1
 	TypePathLen            = 1 + 4
 	TypeStrokeLen          = 1 + 4 + 4 + 1 + 1
+	TypeDashLen            = 1 + 4 + 1
 )
 
 func (t OpType) Size() int {
@@ -90,6 +92,7 @@ func (t OpType) Size() int {
 		TypeCursorLen,
 		TypePathLen,
 		TypeStrokeLen,
+		TypeDashLen,
 	}[t-firstOpIndex]
 }
 

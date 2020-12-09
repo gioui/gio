@@ -46,8 +46,20 @@ type strokeState struct {
 
 type strokeQuads []strokeQuad
 
+func (qs *strokeQuads) setContour(n uint32) {
+	for i := range *qs {
+		(*qs)[i].contour = n
+	}
+}
+
 func (qs *strokeQuads) pen() f32.Point {
 	return (*qs)[len(*qs)-1].quad.To
+}
+
+func (qs *strokeQuads) closed() bool {
+	beg := (*qs)[0].quad.From
+	end := (*qs)[len(*qs)-1].quad.To
+	return f32Eq(beg.X, end.X) && f32Eq(beg.Y, end.Y)
 }
 
 func (qs *strokeQuads) lineTo(pt f32.Point) {
@@ -106,7 +118,11 @@ func (qs strokeQuads) split() []strokeQuads {
 	return o
 }
 
-func (qs strokeQuads) stroke(stroke clip.StrokeStyle) strokeQuads {
+func (qs strokeQuads) stroke(stroke clip.StrokeStyle, dashes dashOp) strokeQuads {
+	if !isSolidLine(dashes) {
+		qs = qs.dash(dashes)
+	}
+
 	var (
 		o  strokeQuads
 		hw = 0.5 * stroke.Width
@@ -291,6 +307,10 @@ func normPt(p f32.Point, l float32) f32.Point {
 	return f32.Point{X: p.X * n, Y: p.Y * n}
 }
 
+func lenPt(p f32.Point) float32 {
+	return float32(math.Hypot(float64(p.X), float64(p.Y)))
+}
+
 func dotPt(p, q f32.Point) float32 {
 	return p.X*q.X + p.Y*q.Y
 }
@@ -347,6 +367,29 @@ func quadBezierD1(p0, p1, p2 f32.Point, t float32) f32.Point {
 func quadBezierD2(p0, p1, p2 f32.Point, t float32) f32.Point {
 	p := p2.Sub(p1.Mul(2)).Add(p0)
 	return p.Mul(2)
+}
+
+// quadBezierLen returns the length of the Bézier curve.
+// See:
+//  https://malczak.linuxpl.com/blog/quadratic-bezier-curve-length/
+func quadBezierLen(p0, p1, p2 f32.Point) float32 {
+	a := p0.Sub(p1.Mul(2)).Add(p2)
+	b := p1.Mul(2).Sub(p0.Mul(2))
+	A := float64(4 * dotPt(a, a))
+	B := float64(4 * dotPt(a, b))
+	C := float64(dotPt(b, b))
+	if f64Eq(A, 0.0) {
+		// p1 is in the middle between p0 and p2,
+		// so it is a straight line from p0 to p2.
+		return lenPt(p2.Sub(p0))
+	}
+
+	Sabc := 2 * math.Sqrt(A+B+C)
+	A2 := math.Sqrt(A)
+	A32 := 2 * A * A2
+	C2 := 2 * math.Sqrt(C)
+	BA := B / A2
+	return float32((A32*Sabc + A2*B*(Sabc-C2) + (4*C*A-B*B)*math.Log((2*A2+BA+Sabc)/(BA+C2))) / (4 * A32))
 }
 
 func strokeQuadBezier(state strokeState, d, flatness float32) strokeQuads {

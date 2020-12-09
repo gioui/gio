@@ -21,6 +21,7 @@ type Op struct {
 
 	outline bool
 	stroke  StrokeStyle
+	dashes  DashSpec
 }
 
 func (p Op) Add(o *op.Ops) {
@@ -40,6 +41,15 @@ func (p Op) Add(o *op.Ops) {
 		bo.PutUint32(data[5:], math.Float32bits(p.stroke.Miter))
 		data[9] = uint8(p.stroke.Cap)
 		data[10] = uint8(p.stroke.Join)
+	}
+
+	if p.dashes.phase != 0 || p.dashes.size > 0 {
+		data := o.Write(opconst.TypeDashLen)
+		data[0] = byte(opconst.TypeDash)
+		bo := binary.LittleEndian
+		bo.PutUint32(data[1:], math.Float32bits(p.dashes.phase))
+		data[5] = p.dashes.size // FIXME(sbinet) uint16? uint32?
+		p.dashes.spec.Add(o)
 	}
 
 	data := o.Write(opconst.TypeClipLen)
