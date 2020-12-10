@@ -97,7 +97,6 @@ func buildAndroid(tmpDir string, bi *buildInfo) error {
 		buildtools: buildtools,
 		androidjar: filepath.Join(platform, "android.jar"),
 	}
-
 	perms := []string{"default"}
 	const permPref = "gioui.org/app/permission/"
 	cfg := &packages.Config{
@@ -176,11 +175,15 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 	if err != nil {
 		return err
 	}
+	minSDK := 16
+	if bi.minsdk > minSDK {
+		minSDK = bi.minsdk
+	}
 	tcRoot := filepath.Join(ndkRoot, "toolchains", "llvm", "prebuilt", archNDK())
 	var builds errgroup.Group
 	for _, a := range bi.archs {
 		arch := allArchs[a]
-		clang, err := latestCompiler(tcRoot, a, bi.minsdk)
+		clang, err := latestCompiler(tcRoot, a, minSDK)
 		if err != nil {
 			return fmt.Errorf("%s. Please make sure you have NDK >= r19c installed. Use the command `sdkmanager ndk-bundle` to install it.", err)
 		}
@@ -351,13 +354,9 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, pe
 			return err
 		}
 	}
-	icon := *iconPath
-	if icon == "" {
-		icon = filepath.Join(bi.pkgDir, "appicon.png")
-	}
 	iconSnip := ""
-	if _, err := os.Stat(icon); err == nil {
-		err := buildIcons(resDir, icon, []iconVariant{
+	if _, err := os.Stat(bi.iconPath); err == nil {
+		err := buildIcons(resDir, bi.iconPath, []iconVariant{
 			{path: filepath.Join("mipmap-hdpi", "ic_launcher.png"), size: 72},
 			{path: filepath.Join("mipmap-xhdpi", "ic_launcher.png"), size: 96},
 			{path: filepath.Join("mipmap-xxhdpi", "ic_launcher.png"), size: 144},
@@ -394,12 +393,16 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, pe
 	if bi.minsdk > targetSDK {
 		targetSDK = bi.minsdk
 	}
+	minSDK := 16
+	if bi.minsdk > minSDK {
+		minSDK = bi.minsdk
+	}
 	permissions, features := getPermissions(perms)
 	appName := strings.Title(bi.name)
 	manifestSrc := manifestData{
 		AppID:       bi.appID,
 		Version:     bi.version,
-		MinSDK:      bi.minsdk,
+		MinSDK:      minSDK,
 		TargetSDK:   targetSDK,
 		Permissions: permissions,
 		Features:    features,

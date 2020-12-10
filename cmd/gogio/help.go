@@ -52,6 +52,9 @@ component of the 1.0.X version for iOS and tvOS.
 For Android builds the -minsdk flag specify the minimum SDK level. For example,
 use -minsdk 22 to target Android 5.1 (Lollipop) and later.
 
+For Windows builds the -minsdk flag specify the minimum OS version. For example,
+use -mindk 10 to target Windows 10 only, -minsdk 6 for Windows Vista and later.
+
 The -work flag prints the path to the working directory and suppress
 its deletion.
 
