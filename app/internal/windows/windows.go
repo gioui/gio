@@ -193,6 +193,19 @@ const (
 	GHND = 0x0042
 
 	CF_UNICODETEXT = 13
+	IMAGE_BITMAP   = 0
+	IMAGE_ICON     = 1
+	IMAGE_CURSOR   = 2
+
+	LR_CREATEDIBSECTION = 0x00002000
+	LR_DEFAULTCOLOR     = 0x00000000
+	LR_DEFAULTSIZE      = 0x00000040
+	LR_LOADFROMFILE     = 0x00000010
+	LR_LOADMAP3DCOLORS  = 0x00001000
+	LR_LOADTRANSPARENT  = 0x00000020
+	LR_MONOCHROME       = 0x00000001
+	LR_SHARED           = 0x00008000
+	LR_VGACOLOR         = 0x00000080
 )
 
 var (
@@ -221,6 +234,7 @@ var (
 	_GetMessageTime              = user32.NewProc("GetMessageTime")
 	_KillTimer                   = user32.NewProc("KillTimer")
 	_LoadCursor                  = user32.NewProc("LoadCursorW")
+	_LoadImage                   = user32.NewProc("LoadImageW")
 	_MonitorFromPoint            = user32.NewProc("MonitorFromPoint")
 	_MsgWaitForMultipleObjectsEx = user32.NewProc("MsgWaitForMultipleObjectsEx")
 	_OpenClipboard               = user32.NewProc("OpenClipboard")
@@ -434,6 +448,14 @@ func LoadCursor(curID uint16) (syscall.Handle, error) {
 	h, _, err := _LoadCursor.Call(0, uintptr(curID))
 	if h == 0 {
 		return 0, fmt.Errorf("LoadCursorW failed: %v", err)
+	}
+	return syscall.Handle(h), nil
+}
+
+func LoadImage(hInst syscall.Handle, res uint32, typ uint32, cx, cy int, fuload uint32) (syscall.Handle, error) {
+	h, _, err := _LoadImage.Call(uintptr(hInst), uintptr(res), uintptr(typ), uintptr(cx), uintptr(cy), uintptr(fuload))
+	if h == 0 {
+		return 0, fmt.Errorf("LoadImageW failed: %v", err)
 	}
 	return syscall.Handle(h), nil
 }

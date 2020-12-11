@@ -70,6 +70,9 @@ var backends []gpuAPI
 // winMap maps win32 HWNDs to *windows.
 var winMap sync.Map
 
+// iconID is the ID of the icon in the resource file.
+const iconID = 1
+
 var resources struct {
 	once sync.Once
 	// handle is the module handle from GetModuleHandle.
@@ -130,11 +133,13 @@ func initResources() error {
 		return err
 	}
 	resources.cursor = c
+	icon, _ := windows.LoadImage(hInst, iconID, windows.IMAGE_ICON, 0, 0, windows.LR_DEFAULTSIZE|windows.LR_SHARED)
 	wcls := windows.WndClassEx{
 		CbSize:        uint32(unsafe.Sizeof(windows.WndClassEx{})),
 		Style:         windows.CS_HREDRAW | windows.CS_VREDRAW | windows.CS_OWNDC,
 		LpfnWndProc:   syscall.NewCallback(windowProc),
 		HInstance:     hInst,
+		HIcon:         icon,
 		LpszClassName: syscall.StringToUTF16Ptr("GioWindow"),
 	}
 	cls, err := windows.RegisterClassEx(&wcls)
