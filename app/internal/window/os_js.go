@@ -70,7 +70,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 	w.w = win
 	go func() {
 		w.w.SetDriver(w)
-		w.focus()
+		w.blur()
 		w.w.Event(system.StageEvent{Stage: system.StageRunning})
 		w.draw(true)
 		select {}
@@ -185,7 +185,7 @@ func (w *window) addEventListeners() {
 	w.addEventListener(w.cnv, "touchstart", func(this js.Value, args []js.Value) interface{} {
 		w.touchEvent(pointer.Press, args[0])
 		if w.requestFocus {
-			w.focus()
+			w.focus() // iOS can only focus inside a Touch event.
 			w.requestFocus = false
 		}
 		return nil
@@ -216,6 +216,7 @@ func (w *window) addEventListeners() {
 	})
 	w.addEventListener(w.tarea, "blur", func(this js.Value, args []js.Value) interface{} {
 		w.w.Event(key.FocusEvent{Focus: false})
+		w.blur()
 		return nil
 	})
 	w.addEventListener(w.tarea, "keydown", func(this js.Value, args []js.Value) interface{} {
@@ -256,6 +257,7 @@ func (w *window) flushInput() {
 
 func (w *window) blur() {
 	w.tarea.Call("blur")
+	w.requestFocus = false
 }
 
 func (w *window) focus() {
