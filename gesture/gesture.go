@@ -368,6 +368,9 @@ func (d *Drag) Events(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event
 	return events
 }
 
+// Dragging reports whether it's currently in use.
+func (d *Drag) Dragging() bool { return d.dragging }
+
 func (a Axis) String() string {
 	switch a {
 	case Horizontal:

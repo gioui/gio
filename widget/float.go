@@ -21,6 +21,9 @@ type Float struct {
 	changed bool
 }
 
+// Dragging returns whether the value is being interacted with.
+func (f *Float) Dragging() bool { return f.drag.Dragging() }
+
 // Layout processes events.
 func (f *Float) Layout(gtx layout.Context, pointerMargin int, min, max float32) layout.Dimensions {
 	size := gtx.Constraints.Min
