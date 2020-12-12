@@ -40,6 +40,9 @@ type Theme struct {
 		RadioChecked      *widget.Icon
 		RadioUnchecked    *widget.Icon
 	}
+
+	// FingerSize is the minimum touch target size.
+	FingerSize unit.Value
 }
 
 func NewTheme(fontCollection []text.FontFace) *Theme {
@@ -58,6 +61,9 @@ func NewTheme(fontCollection []text.FontFace) *Theme {
 	t.Icon.CheckBoxUnchecked = mustIcon(widget.NewIcon(icons.ToggleCheckBoxOutlineBlank))
 	t.Icon.RadioChecked = mustIcon(widget.NewIcon(icons.ToggleRadioButtonChecked))
 	t.Icon.RadioUnchecked = mustIcon(widget.NewIcon(icons.ToggleRadioButtonUnchecked))
+
+	// 38dp is on the lower end of possible finger size.
+	t.FingerSize = unit.Dp(38)
 
 	return t
 }
