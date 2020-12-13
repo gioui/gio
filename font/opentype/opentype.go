@@ -19,7 +19,7 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-// Font implements text.Face. It's methods are safe to use
+// Font implements text.Face. Its methods are safe to use
 // concurrently.
 type Font struct {
 	font *sfnt.Font
