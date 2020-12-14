@@ -32,6 +32,9 @@ environment:
  ANDROID_SDK_ROOT: /home/build/android
  android_sdk_tools_zip: sdk-tools-linux-3859397.zip
  android_ndk_zip: android-ndk-r20-linux-x86_64.zip
+ github_mirror: git@github.com:gioui/gio
+secrets:
+ - 75d8a1eb-5fc5-4074-8a36-db6015d6ed5a
 tasks:
  - install_go1_14: |
      mkdir -p /home/build/sdk
@@ -92,3 +95,6 @@ tasks:
             exit 1
         fi
      done
+ - mirror: |
+     # mirror to github
+     ssh-keyscan github.com > "$HOME"/.ssh/known_hosts && cd gio && git push --mirror "$github_mirror" || echo "failed mirroring"
