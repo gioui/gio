@@ -135,7 +135,10 @@ const (
 	// jsSetGo sets the `window.go` variable.
 	jsSetGo = `(() => {
     window.go = {argv: [], env: {}, importObject: {go: {}}};
-	window.go["argv"] = (new URLSearchParams(location.search).get("argv") ?? "").split(" ");
+	const argv = new URLSearchParams(location.search).get("argv");
+	if (argv) {
+		window.go["argv"] = argv.split(" ");
+	}
 })();`
 	// jsStartGo initializes the main.wasm.
 	jsStartGo = `(() => {
