@@ -232,7 +232,7 @@ func gio_onDraw(view C.CFTypeRef) {
 //export gio_onFocus
 func gio_onFocus(view C.CFTypeRef, focus C.BOOL) {
 	w := mustView(view)
-	w.w.Event(key.FocusEvent{Focus: focus == C.YES})
+	w.w.Event(key.FocusEvent{Focus: focus == C.BOOL(C.YES)})
 	w.SetCursor(w.cursor)
 }
 
