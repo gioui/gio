@@ -21,5 +21,4 @@ account is required and you can post without being subscribed.
 
 See the [contribution guide](https://gioui.org/doc/contribute) for more details.
 
-An [unofficial GitHub mirror](https://github.com/theclapp/gio-mirror)
-is kindly maintained by Larry Clapp.
+An [official GitHub mirror](https://github.com/gioui/gio) is available.
