@@ -230,9 +230,9 @@ func gio_onDraw(view C.CFTypeRef) {
 }
 
 //export gio_onFocus
-func gio_onFocus(view C.CFTypeRef, focus C.BOOL) {
+func gio_onFocus(view C.CFTypeRef, focus C.int) {
 	w := mustView(view)
-	w.w.Event(key.FocusEvent{Focus: focus == C.YES})
+	w.w.Event(key.FocusEvent{Focus: focus == 1})
 	w.SetCursor(w.cursor)
 }
 

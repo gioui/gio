@@ -29,11 +29,11 @@
 }
 - (void)windowDidBecomeKey:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
-	gio_onFocus((__bridge CFTypeRef)window.contentView, YES);
+	gio_onFocus((__bridge CFTypeRef)window.contentView, 1);
 }
 - (void)windowDidResignKey:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
-	gio_onFocus((__bridge CFTypeRef)window.contentView, NO);
+	gio_onFocus((__bridge CFTypeRef)window.contentView, 0);
 }
 - (void)windowWillClose:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
