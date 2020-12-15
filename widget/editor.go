@@ -379,10 +379,7 @@ func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size
 	}
 	e.makeValid()
 
-	dims := e.layout(gtx)
-	pointer.Rect(image.Rectangle{Max: dims.Size}).Add(gtx.Ops)
-	pointer.CursorNameOp{Name: pointer.CursorText}.Add(gtx.Ops)
-	return dims
+	return e.layout(gtx)
 }
 
 func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
@@ -430,6 +427,7 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 	r.Max.X += pointerPadding
 	r.Max.X += pointerPadding
 	pointer.Rect(r).Add(gtx.Ops)
+	pointer.CursorNameOp{Name: pointer.CursorText}.Add(gtx.Ops)
 	e.scroller.Add(gtx.Ops)
 	e.clicker.Add(gtx.Ops)
 	e.caret.on = false

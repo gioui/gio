@@ -11,6 +11,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
+	"gioui.org/layout"
 	"gioui.org/op"
 )
 
@@ -414,6 +415,54 @@ func TestMultitouch(t *testing.T) {
 	)
 	assertEventSequence(t, r.Events(h1), pointer.Cancel, pointer.Enter, pointer.Press)
 	assertEventSequence(t, r.Events(h2), pointer.Cancel, pointer.Enter, pointer.Press, pointer.Release)
+}
+
+func TestCursorNameOp(t *testing.T) {
+	for _, tc := range []struct {
+		label string
+		pt    image.Point
+		want  pointer.CursorName
+	}{
+		{label: "inside", pt: image.Pt(50, 50), want: pointer.CursorPointer},
+		{label: "outside", pt: image.Pt(200, 200), want: pointer.CursorDefault},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			ops := new(op.Ops)
+			var r Router
+			var h int
+			widget := func() {
+				// This is the area where the cursor is changed to CursorPointer.
+				pointer.Rect(image.Rectangle{Max: image.Pt(100, 100)}).Add(ops)
+				// The cursor is checked and changed upon cursor movement.
+				pointer.InputOp{
+					Tag:   &h,
+					Types: pointer.Move,
+				}.Add(ops)
+				pointer.CursorNameOp{Name: pointer.CursorPointer}.Add(ops)
+			}
+			// Register the handlers.
+			widget()
+			// No cursor change as the mouse has not moved yet.
+			if got, want := r.Cursor(), pointer.CursorDefault; got != want {
+				t.Errorf("got %q; want %q", got, want)
+			}
+			// Add a mouse move event.
+			r.Frame(ops)
+			r.Add(
+				pointer.Event{
+					Source:   pointer.Mouse,
+					Type:     pointer.Move,
+					Position: layout.FPt(tc.pt),
+				},
+			)
+			// Make the widget process the new event.
+			widget()
+			// The cursor should now have been changed if the mouse moved over the declared area.
+			if got, want := r.Cursor(), tc.want; got != want {
+				t.Errorf("got %q; want %q", got, want)
+			}
+		})
+	}
 }
 
 // addPointerHandler adds a pointer.InputOp for the tag in a

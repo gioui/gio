@@ -177,6 +177,7 @@ func (q *pointerQueue) init() {
 	if q.handlers == nil {
 		q.handlers = make(map[event.Tag]*pointerHandler)
 	}
+	q.cursor = pointer.CursorDefault
 }
 
 func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
@@ -289,6 +290,11 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 		// No longer need to track pointer.
 		q.pointers = append(q.pointers[:pidx], q.pointers[pidx+1:]...)
 	}
+
+	for _, k := range p.entered {
+		h := q.handlers[k]
+		q.hitCursor(h.area)
+	}
 }
 
 func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e pointer.Event) {
@@ -327,7 +333,6 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, hits []event.Tag,
 
 		if e.Type&h.types == e.Type {
 			events.Add(k, e)
-			q.cursor = pointer.CursorDefault
 		}
 	}
 	// Deliver Enter events.
@@ -341,7 +346,6 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, hits []event.Tag,
 
 		if e.Type&h.types == e.Type {
 			events.Add(k, e)
-			q.hitCursor(h.area)
 		}
 	}
 	p.entered = append(p.entered[:0], hits...)
@@ -349,13 +353,9 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, hits []event.Tag,
 
 func (q *pointerQueue) hitCursor(want int) {
 	for _, c := range q.cursors {
-		idx := c.area
-		for idx != -1 {
-			if idx == want {
-				q.cursor = c.name
-				return
-			}
-			idx = q.areas[idx].next
+		if c.area == want {
+			q.cursor = c.name
+			return
 		}
 	}
 }
