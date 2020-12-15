@@ -4,13 +4,14 @@ package main
 
 import (
 	"fmt"
-	"golang.org/x/tools/go/packages"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 )
 
 func buildJS(bi *buildInfo) error {
