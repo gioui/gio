@@ -180,7 +180,7 @@ func (w *x11Window) setStage(s system.Stage) {
 		return
 	}
 	w.stage = s
-	w.w.Event(system.StageEvent{s})
+	w.w.Event(system.StageEvent{Stage: s})
 }
 
 func (w *x11Window) loop() {

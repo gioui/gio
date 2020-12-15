@@ -1445,7 +1445,7 @@ func (w *window) setStage(s system.Stage) {
 		return
 	}
 	w.stage = s
-	w.w.Event(system.StageEvent{s})
+	w.w.Event(system.StageEvent{Stage: s})
 }
 
 func (w *window) display() *C.struct_wl_display {
