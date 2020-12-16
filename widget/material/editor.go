@@ -61,7 +61,7 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 	if e.Editor.Len() > 0 {
 		textColor := e.Color
 		if disabled {
-			textColor = f32color.MulAlpha(textColor, 150)
+			textColor = f32color.Disabled(textColor)
 		}
 		paint.ColorOp{Color: textColor}.Add(gtx.Ops)
 		e.Editor.PaintText(gtx)

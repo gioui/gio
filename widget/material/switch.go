@@ -55,7 +55,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 		col = s.Color.Enabled
 	}
 	if gtx.Queue == nil {
-		col = f32color.MulAlpha(col, 150)
+		col = f32color.Disabled(col)
 	}
 	trackColor := s.Color.Track
 	op.Offset(f32.Point{Y: trackOff}).Add(gtx.Ops)

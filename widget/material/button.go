@@ -129,7 +129,7 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 			}}, rr).Add(gtx.Ops)
 			background := b.Background
 			if gtx.Queue == nil {
-				background = f32color.MulAlpha(b.Background, 150)
+				background = f32color.Disabled(b.Background)
 			}
 			paint.Fill(gtx.Ops, background)
 			for _, c := range b.Button.History() {
@@ -156,7 +156,7 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 			}, rr).Add(gtx.Ops)
 			background := b.Background
 			if gtx.Queue == nil {
-				background = f32color.MulAlpha(b.Background, 150)
+				background = f32color.Disabled(b.Background)
 			}
 			paint.Fill(gtx.Ops, background)
 			for _, c := range b.Button.History() {

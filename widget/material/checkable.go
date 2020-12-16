@@ -43,7 +43,7 @@ func (c *checkable) layout(gtx layout.Context, checked bool) layout.Dimensions {
 					size := gtx.Px(c.Size)
 					icon.Color = c.IconColor
 					if gtx.Queue == nil {
-						icon.Color = f32color.MulAlpha(icon.Color, 150)
+						icon.Color = f32color.Disabled(icon.Color)
 					}
 					icon.Layout(gtx, unit.Px(float32(size)))
 					return layout.Dimensions{

@@ -68,7 +68,7 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 	color := s.Color
 	if gtx.Queue == nil {
-		color = f32color.MulAlpha(color, 150)
+		color = f32color.Disabled(color)
 	}
 
 	// Draw track before thumb.
