@@ -12,7 +12,7 @@ import (
 type Affine2D struct {
 	// in order to make the zero value of Affine2D represent the identity
 	// transform we store it with the identity matrix subtracted, that is
-	// if the actual transformaiton matrix is:
+	// if the actual transformation matrix is:
 	// [sx, hx, ox]
 	// [hy, sy, oy]
 	// [ 0,  0,  1]

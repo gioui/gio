@@ -85,7 +85,7 @@ func TestRepeatedPaintsZ(t *testing.T) {
 }
 
 func TestNoClipFromPaint(t *testing.T) {
-	// ensure that a paint operation does not polute the state
+	// ensure that a paint operation does not pollute the state
 	// by leaving any clip paths in place.
 	run(t, func(o *op.Ops) {
 		a := f32.Affine2D{}.Rotate(f32.Pt(20, 20), math.Pi/4)

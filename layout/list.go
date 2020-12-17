@@ -35,7 +35,7 @@ type List struct {
 
 	// Position is updated during Layout. To save the list scroll position,
 	// just save Position after Layout finishes. To scroll the list
-	// programatically, update Position (e.g. restore it from a saved value)
+	// programmatically, update Position (e.g. restore it from a saved value)
 	// before calling Layout.
 	Position Position
 

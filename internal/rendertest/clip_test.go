@@ -59,7 +59,7 @@ func TestPaintClippedBorder(t *testing.T) {
 	})
 }
 
-func TestPaintClippedCirle(t *testing.T) {
+func TestPaintClippedCircle(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		r := float32(10)
 		clip.RRect{Rect: f32.Rect(20, 20, 40, 40), SE: r, SW: r, NW: r, NE: r}.Add(o)

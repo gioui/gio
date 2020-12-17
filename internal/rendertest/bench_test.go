@@ -57,7 +57,7 @@ func finishBenchmark(b *testing.B, w *headless.Window) {
 }
 
 func BenchmarkDrawUICached(b *testing.B) {
-	// As BecnhmarkDraw but the same op.Ops every time that is not reset - this
+	// As BenchmarkDraw but the same op.Ops every time that is not reset - this
 	// should thus allow for maximal cache usage.
 	gtx, w, th := setupBenchmark(b)
 	drawCore(gtx, th)

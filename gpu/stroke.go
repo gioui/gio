@@ -500,14 +500,14 @@ func strokePathRoundJoin(rhs, lhs *strokeQuads, hw float32, pivot, n0, n1 f32.Po
 		c := pivot.Sub(lhs.pen())
 		angle := -math.Acos(float64(cosPt(n0, n1)))
 		lhs.arc(c, c, float32(angle))
-		lhs.lineTo(lp) // Add a line to accomodate for rounding errors.
+		lhs.lineTo(lp) // Add a line to accommodate for rounding errors.
 		rhs.lineTo(rp)
 	default:
 		// Path bends to the left, ie. CCW.
 		angle := math.Acos(float64(cosPt(n0, n1)))
 		c := pivot.Sub(rhs.pen())
 		rhs.arc(c, c, float32(angle))
-		rhs.lineTo(rp) // Add a line to accomodate for rounding errors.
+		rhs.lineTo(rp) // Add a line to accommodate for rounding errors.
 		lhs.lineTo(lp)
 	}
 }

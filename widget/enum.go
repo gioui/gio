@@ -27,7 +27,7 @@ func index(vs []string, t string) int {
 	return -1
 }
 
-// Changed reports whether Value has changed by user interactino since the last
+// Changed reports whether Value has changed by user interaction since the last
 // call to Changed.
 func (e *Enum) Changed() bool {
 	changed := e.changed
