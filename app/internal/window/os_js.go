@@ -281,6 +281,10 @@ func (w *window) keyEvent(e js.Value, ks key.State) {
 // KeyEvent.
 func modifiersFor(e js.Value) key.Modifiers {
 	var mods key.Modifiers
+	if e.Get("getModifierState").IsUndefined() {
+		// Some browsers doesn't support getModifierState.
+		return mods
+	}
 	if e.Call("getModifierState", "Alt").Bool() {
 		mods |= key.ModAlt
 	}
