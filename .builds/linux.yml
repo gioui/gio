@@ -92,7 +92,7 @@ tasks:
      for hash in $(git log -n 20 --format="%H"); do
         message=$(git log -1 --format=%B $hash)
         if [[ ! "$message" =~ "Signed-off-by: " ]]; then
-            echo "unsigned commit $hash"
+            echo "Missing 'Signed-off-by' in commit $hash"
             exit 1
         fi
      done
