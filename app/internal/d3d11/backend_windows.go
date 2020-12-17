@@ -9,9 +9,10 @@ import (
 	"math"
 	"unsafe"
 
+	"golang.org/x/sys/windows"
+
 	"gioui.org/gpu/backend"
 	gunsafe "gioui.org/internal/unsafe"
-	"golang.org/x/sys/windows"
 )
 
 const debug = false

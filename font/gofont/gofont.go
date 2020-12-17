@@ -11,8 +11,6 @@ import (
 	"fmt"
 	"sync"
 
-	"gioui.org/font/opentype"
-	"gioui.org/text"
 	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/gofont/gobolditalic"
 	"golang.org/x/image/font/gofont/goitalic"
@@ -25,6 +23,9 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/gofont/gosmallcaps"
 	"golang.org/x/image/font/gofont/gosmallcapsitalic"
+
+	"gioui.org/font/opentype"
+	"gioui.org/text"
 )
 
 var (

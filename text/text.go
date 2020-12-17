@@ -5,8 +5,9 @@ package text
 import (
 	"io"
 
-	"gioui.org/op"
 	"golang.org/x/image/math/fixed"
+
+	"gioui.org/op"
 )
 
 // A Line contains the measurements of a line of text.

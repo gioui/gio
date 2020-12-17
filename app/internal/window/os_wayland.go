@@ -19,6 +19,8 @@ import (
 	"time"
 	"unsafe"
 
+	syscall "golang.org/x/sys/unix"
+
 	"gioui.org/app/internal/xkb"
 	"gioui.org/f32"
 	"gioui.org/internal/fling"
@@ -27,7 +29,6 @@ import (
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
 	"gioui.org/unit"
-	syscall "golang.org/x/sys/unix"
 )
 
 // Use wayland-scanner to generate glue code for the xdg-shell and xdg-decoration extensions.

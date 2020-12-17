@@ -7,11 +7,12 @@ import (
 	"image/color"
 	"image/draw"
 
+	"golang.org/x/exp/shiny/iconvg"
+
 	"gioui.org/internal/f32color"
 	"gioui.org/layout"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
-	"golang.org/x/exp/shiny/iconvg"
 )
 
 type Icon struct {

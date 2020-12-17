@@ -5,11 +5,12 @@ import (
 	"math"
 	"testing"
 
+	"golang.org/x/image/colornames"
+
 	"gioui.org/f32"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
-	"golang.org/x/image/colornames"
 )
 
 func TestPaintRect(t *testing.T) {

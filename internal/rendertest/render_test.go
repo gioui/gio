@@ -6,12 +6,13 @@ import (
 	"math"
 	"testing"
 
+	"golang.org/x/image/colornames"
+
 	"gioui.org/f32"
 	"gioui.org/internal/f32color"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
-	"golang.org/x/image/colornames"
 )
 
 func TestTransformMacro(t *testing.T) {

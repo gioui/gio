@@ -10,13 +10,14 @@ import (
 	"strings"
 	"testing"
 
-	"gioui.org/internal/ops"
-	"gioui.org/op"
-	"gioui.org/text"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
+
+	"gioui.org/internal/ops"
+	"gioui.org/op"
+	"gioui.org/text"
 )
 
 func TestCollectionAsFace(t *testing.T) {

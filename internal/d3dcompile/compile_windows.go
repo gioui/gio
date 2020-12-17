@@ -4,9 +4,8 @@ package d3dcompile
 
 import (
 	"fmt"
-	"unsafe"
-
 	"syscall"
+	"unsafe"
 
 	gunsafe "gioui.org/internal/unsafe"
 

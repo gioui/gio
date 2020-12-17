@@ -5,10 +5,11 @@ package material
 import (
 	"image/color"
 
+	"golang.org/x/exp/shiny/materialdesign/icons"
+
 	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
-	"golang.org/x/exp/shiny/materialdesign/icons"
 )
 
 // Palette contains the minimal set of colors that a widget may need to

@@ -3,8 +3,9 @@
 package text
 
 import (
-	"gioui.org/op"
 	"golang.org/x/image/math/fixed"
+
+	"gioui.org/op"
 )
 
 type layoutCache struct {

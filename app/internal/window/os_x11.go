@@ -42,8 +42,9 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/unit"
 
-	"gioui.org/app/internal/xkb"
 	syscall "golang.org/x/sys/unix"
+
+	"gioui.org/app/internal/xkb"
 )
 
 type x11Window struct {
