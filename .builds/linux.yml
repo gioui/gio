@@ -30,6 +30,7 @@ environment:
  GOFLAGS: -mod=readonly
  PATH: /home/build/sdk/go/bin:/usr/bin:/home/build/go/bin:/home/build/android/tools/bin
  ANDROID_SDK_ROOT: /home/build/android
+ EGL_PLATFORM: surfaceless # for headless tests
  android_sdk_tools_zip: sdk-tools-linux-3859397.zip
  android_ndk_zip: android-ndk-r20-linux-x86_64.zip
  github_mirror: git@github.com:gioui/gio
