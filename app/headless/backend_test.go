@@ -107,7 +107,7 @@ func TestFramebuffers(t *testing.T) {
 	fbo1 := newFBO(t, b, sz)
 	fbo2 := newFBO(t, b, sz)
 	var (
-		col1 = color.NRGBA{R: 0xad, G: 0xbe, B: 0xef, A: 0xde}
+		col1 = color.NRGBA{R: 0xac, G: 0xbe, B: 0xef, A: 0xde}
 		col2 = color.NRGBA{R: 0xfe, G: 0xba, B: 0xbe, A: 0xca}
 	)
 	fcol1, fcol2 := f32color.LinearFromSRGB(col1), f32color.LinearFromSRGB(col2)
