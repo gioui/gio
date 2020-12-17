@@ -230,11 +230,18 @@ func createContext(disp _EGLDisplay) (*eglContext, error) {
 		return nil, fmt.Errorf("eglChooseConfig failed: 0x%x", eglGetError())
 	}
 	if eglCfg == nilEGLConfig {
-		return nil, errors.New("eglChooseConfig returned 0 configs")
+		supportsNoCfg := hasExtension(exts, "EGL_KHR_no_config_context")
+		if !supportsNoCfg {
+			return nil, errors.New("eglChooseConfig returned no configs")
+		}
 	}
-	visID, ret := eglGetConfigAttrib(disp, eglCfg, _EGL_NATIVE_VISUAL_ID)
-	if !ret {
-		return nil, errors.New("newContext: eglGetConfigAttrib for _EGL_NATIVE_VISUAL_ID failed")
+	var visID _EGLint
+	if eglCfg != nilEGLConfig {
+		var ok bool
+		visID, ok = eglGetConfigAttrib(disp, eglCfg, _EGL_NATIVE_VISUAL_ID)
+		if !ok {
+			return nil, errors.New("newContext: eglGetConfigAttrib for _EGL_NATIVE_VISUAL_ID failed")
+		}
 	}
 	ctxAttribs := []_EGLint{
 		_EGL_CONTEXT_CLIENT_VERSION, 3,
