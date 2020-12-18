@@ -30,12 +30,15 @@ type window struct {
 	clipboardCallback     js.Func
 	requestAnimationFrame js.Value
 	browserHistory        js.Value
+	visualViewport        js.Value
 	cleanfuncs            []func()
 	touches               []js.Value
 	composing             bool
 	requestFocus          bool
 
 	mu        sync.Mutex
+	size      f32.Point
+	viewport  f32.Point
 	scale     float32
 	animating bool
 }
@@ -56,6 +59,10 @@ func NewWindow(win Callbacks, opts *Options) error {
 	}
 	w.requestAnimationFrame = w.window.Get("requestAnimationFrame")
 	w.browserHistory = w.window.Get("history")
+	w.visualViewport = w.window.Get("visualViewport")
+	if w.visualViewport.IsUndefined() {
+		w.visualViewport = w.window
+	}
 	w.redraw = w.funcOf(func(this js.Value, args []js.Value) interface{} {
 		w.animCallback()
 		return nil
@@ -73,6 +80,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 		w.w.SetDriver(w)
 		w.blur()
 		w.w.Event(system.StageEvent{Stage: system.StageRunning})
+		w.resize()
 		w.draw(true)
 		select {}
 	}()
@@ -123,7 +131,8 @@ func (w *window) cleanup() {
 }
 
 func (w *window) addEventListeners() {
-	w.addEventListener(w.window, "resize", func(this js.Value, args []js.Value) interface{} {
+	w.addEventListener(w.visualViewport, "resize", func(this js.Value, args []js.Value) interface{} {
+		w.resize()
 		w.draw(true)
 		return nil
 	})
@@ -466,14 +475,34 @@ func (w *window) ShowTextInput(show bool) {
 // Close the window. Not implemented for js.
 func (w *window) Close() {}
 
-func (w *window) draw(sync bool) {
-	width, height, scale, cfg := w.config()
-	if cfg == (unit.Metric{}) || width == 0 || height == 0 {
+func (w *window) resize() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.scale = float32(w.window.Get("devicePixelRatio").Float())
+
+	rect := w.cnv.Call("getBoundingClientRect")
+	w.size.X = float32(rect.Get("width").Float()) * w.scale
+	w.size.Y = float32(rect.Get("height").Float()) * w.scale
+
+	if vx, vy := w.visualViewport.Get("width"), w.visualViewport.Get("height"); !vx.IsUndefined() && !vy.IsUndefined() {
+		w.viewport.X, w.viewport.Y = float32(vx.Float())*w.scale, float32(vy.Float())*w.scale
+	}
+
+	if w.size.X == 0 || w.size.Y == 0 {
 		return
 	}
-	w.mu.Lock()
-	w.scale = float32(scale)
-	w.mu.Unlock()
+
+	w.cnv.Set("width", int(w.size.X+.5))
+	w.cnv.Set("height", int(w.size.Y+.5))
+}
+
+func (w *window) draw(sync bool) {
+	width, height, insets, metric := w.config()
+	if metric == (unit.Metric{}) || width == 0 || height == 0 {
+		return
+	}
+
 	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
 			Now: time.Now(),
@@ -481,28 +510,24 @@ func (w *window) draw(sync bool) {
 				X: width,
 				Y: height,
 			},
-			Metric: cfg,
+			Insets: insets,
+			Metric: metric,
 		},
 		Sync: sync,
 	})
 }
 
-func (w *window) config() (int, int, float32, unit.Metric) {
-	rect := w.cnv.Call("getBoundingClientRect")
-	width, height := rect.Get("width").Float(), rect.Get("height").Float()
-	scale := w.window.Get("devicePixelRatio").Float()
-	width *= scale
-	height *= scale
-	iw, ih := int(width+.5), int(height+.5)
-	// Adjust internal size of canvas if necessary.
-	if cw, ch := w.cnv.Get("width").Int(), w.cnv.Get("height").Int(); iw != cw || ih != ch {
-		w.cnv.Set("width", iw)
-		w.cnv.Set("height", ih)
-	}
-	return iw, ih, float32(scale), unit.Metric{
-		PxPerDp: float32(scale),
-		PxPerSp: float32(scale),
-	}
+func (w *window) config() (int, int, system.Insets, unit.Metric) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return int(w.size.X + .5), int(w.size.Y + .5), system.Insets{
+			Bottom: unit.Px(w.size.Y - w.viewport.Y),
+			Right:  unit.Px(w.size.X - w.viewport.X),
+		}, unit.Metric{
+			PxPerDp: w.scale,
+			PxPerSp: w.scale,
+		}
 }
 
 func Main() {
