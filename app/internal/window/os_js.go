@@ -69,12 +69,12 @@ func NewWindow(win Callbacks, opts *Options) error {
 	w.addHistory()
 	w.w = win
 	go func() {
+		defer w.cleanup()
 		w.w.SetDriver(w)
 		w.blur()
 		w.w.Event(system.StageEvent{Stage: system.StageRunning})
 		w.draw(true)
 		select {}
-		w.cleanup()
 	}()
 	return nil
 }
@@ -398,7 +398,7 @@ func (w *window) addEventListener(this js.Value, event string, f func(this js.Va
 }
 
 // funcOf is like js.FuncOf but adds the js.Func to a list of
-// functions to be released up.
+// functions to be released during cleanup.
 func (w *window) funcOf(f func(this js.Value, args []js.Value) interface{}) js.Func {
 	jsf := js.FuncOf(f)
 	w.cleanfuncs = append(w.cleanfuncs, jsf.Release)
