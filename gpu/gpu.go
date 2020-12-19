@@ -386,7 +386,7 @@ func (g *GPU) Collect(viewport image.Point, frameOps *op.Ops) {
 	g.renderer.blitter.viewport = viewport
 	g.renderer.pather.viewport = viewport
 	g.drawOps.reset(g.cache, viewport)
-	g.drawOps.collect(g.cache, frameOps, viewport)
+	g.drawOps.collect(g.ctx, g.cache, frameOps, viewport)
 	g.frameStart = time.Now()
 	if g.drawOps.profile && g.timers == nil && g.ctx.Caps().Features.Has(backend.FeatureTimers) {
 		g.timers = newTimers(g.ctx)
@@ -394,16 +394,6 @@ func (g *GPU) Collect(viewport image.Point, frameOps *op.Ops) {
 		g.stencilTimer = g.timers.newTimer()
 		g.coverTimer = g.timers.newTimer()
 		g.cleanupTimer = g.timers.newTimer()
-	}
-	for _, p := range g.drawOps.pathOps {
-		if v, exists := g.drawOps.pathCache.get(p.pathKey); !exists || v.data.data == nil {
-			data := buildPath(g.ctx, p.pathVerts)
-			g.drawOps.pathCache.put(p.pathKey, opCacheValue{
-				data:   data,
-				bounds: p.bounds,
-			})
-		}
-		p.pathVerts = nil
 	}
 }
 
@@ -781,7 +771,7 @@ func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
 	d.vertCache = d.vertCache[:0]
 }
 
-func (d *drawOps) collect(cache *resourceCache, root *op.Ops, viewport image.Point) {
+func (d *drawOps) collect(ctx backend.Device, cache *resourceCache, root *op.Ops, viewport image.Point) {
 	clip := f32.Rectangle{
 		Max: f32.Point{X: float32(viewport.X), Y: float32(viewport.Y)},
 	}
@@ -792,6 +782,16 @@ func (d *drawOps) collect(cache *resourceCache, root *op.Ops, viewport image.Poi
 		color: color.NRGBA{A: 0xff},
 	}
 	d.collectOps(&d.reader, state)
+	for _, p := range d.pathOps {
+		if v, exists := d.pathCache.get(p.pathKey); !exists || v.data.data == nil {
+			data := buildPath(ctx, p.pathVerts)
+			d.pathCache.put(p.pathKey, opCacheValue{
+				data:   data,
+				bounds: p.bounds,
+			})
+		}
+		p.pathVerts = nil
+	}
 }
 
 func (d *drawOps) newPathOp() *pathOp {
