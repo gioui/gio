@@ -109,7 +109,9 @@ func (c Constraints) Constrain(size image.Point) image.Point {
 	return size
 }
 
-// Inset adds space around a widget.
+// Inset adds space around a widget by decreasing its maximum
+// constraints. The minimum constraints will be adjusted to ensure
+// they do not exceed the maximum.
 type Inset struct {
 	Top, Right, Bottom, Left unit.Value
 }
