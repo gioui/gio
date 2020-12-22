@@ -26,6 +26,7 @@ type SwitchStyle struct {
 	Switch *widget.Bool
 }
 
+// Switch is for selecting a boolean value.
 func Switch(th *Theme, swtch *widget.Bool) SwitchStyle {
 	sw := SwitchStyle{
 		Switch: swtch,
@@ -36,7 +37,7 @@ func Switch(th *Theme, swtch *widget.Bool) SwitchStyle {
 	return sw
 }
 
-// Layout updates the checkBox and displays it.
+// Layout updates the switch and displays it.
 func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	trackWidth := gtx.Px(unit.Dp(36))
 	trackHeight := gtx.Px(unit.Dp(16))
