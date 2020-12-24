@@ -184,7 +184,9 @@ func (l *List) end(dims Dimensions, call op.CallOp) {
 	case iterateForward:
 		l.children = append(l.children, child)
 	case iterateBackward:
-		l.children = append([]scrollChild{child}, l.children...)
+		l.children = append(l.children, scrollChild{})
+		copy(l.children[1:], l.children)
+		l.children[0] = child
 		l.Position.First--
 		l.Position.Offset += mainSize
 	default:
