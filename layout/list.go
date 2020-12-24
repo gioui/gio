@@ -29,7 +29,7 @@ type List struct {
 	// Alignment is the cross axis alignment of list elements.
 	Alignment Alignment
 
-	ctx         Context
+	cs          Constraints
 	scroll      gesture.Scroll
 	scrollDelta int
 
@@ -84,11 +84,11 @@ func (l *List) init(gtx Context, len int) {
 	if l.more() {
 		panic("unfinished child")
 	}
-	l.ctx = gtx
+	l.cs = gtx.Constraints
 	l.maxSize = 0
 	l.children = l.children[:0]
 	l.len = len
-	l.update()
+	l.update(gtx)
 	if l.scrollToEnd() || l.Position.First > len {
 		l.Position.Offset = 0
 		l.Position.First = len
@@ -107,7 +107,7 @@ func (l *List) Layout(gtx Context, len int, w ListElement) Dimensions {
 		call := child.Stop()
 		l.end(dims, call)
 	}
-	return l.layout(macro)
+	return l.layout(gtx.Ops, macro)
 }
 
 func (l *List) scrollToEnd() bool {
@@ -119,8 +119,8 @@ func (l *List) Dragging() bool {
 	return l.scroll.State() == gesture.StateDragging
 }
 
-func (l *List) update() {
-	d := l.scroll.Scroll(l.ctx.Metric, l.ctx, l.ctx.Now, gesture.Axis(l.Axis))
+func (l *List) update(gtx Context) {
+	d := l.scroll.Scroll(gtx.Metric, gtx, gtx.Now, gesture.Axis(l.Axis))
 	l.scrollDelta = d
 	l.Position.Offset += d
 }
@@ -155,7 +155,7 @@ func (l *List) more() bool {
 }
 
 func (l *List) nextDir() iterationDir {
-	_, vsize := axisMainConstraint(l.Axis, l.ctx.Constraints)
+	_, vsize := axisMainConstraint(l.Axis, l.cs)
 	last := l.Position.First + len(l.children)
 	// Clamp offset.
 	if l.maxSize-l.Position.Offset < vsize && last == l.len {
@@ -196,11 +196,11 @@ func (l *List) end(dims Dimensions, call op.CallOp) {
 }
 
 // Layout the List and return its dimensions.
-func (l *List) layout(macro op.MacroOp) Dimensions {
+func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 	if l.more() {
 		panic("unfinished child")
 	}
-	mainMin, mainMax := axisMainConstraint(l.Axis, l.ctx.Constraints)
+	mainMin, mainMax := axisMainConstraint(l.Axis, l.cs)
 	children := l.children
 	// Skip invisible children
 	for len(children) > 0 {
@@ -226,7 +226,6 @@ func (l *List) layout(macro op.MacroOp) Dimensions {
 			break
 		}
 	}
-	ops := l.ctx.Ops
 	pos := -l.Position.Offset
 	// ScrollToEnd lists are end aligned.
 	if space := mainMax - size; l.ScrollToEnd && space > 0 {
@@ -275,7 +274,7 @@ func (l *List) layout(macro op.MacroOp) Dimensions {
 	}
 	dims := axisPoint(l.Axis, pos, maxCross)
 	call := macro.Stop()
-	defer op.Push(l.ctx.Ops).Pop()
+	defer op.Push(ops).Pop()
 	pointer.Rect(image.Rectangle{Max: dims}).Add(ops)
 	l.scroll.Add(ops)
 	call.Add(ops)
