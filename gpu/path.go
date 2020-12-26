@@ -143,7 +143,7 @@ const (
 	// Number of path quads per draw batch.
 	pathBatchSize = 10000
 	// Size of a vertex as sent to gpu
-	vertStride = 7*4 + 2*2
+	vertStride = 8 * 4
 )
 
 func newPather(ctx backend.Device) *pather {
