@@ -56,7 +56,10 @@ type drawOps struct {
 	vertCache  []byte
 	viewport   image.Point
 	clearColor f32color.RGBA
-	imageOps   []imageOp
+	// allImageOps is the combined list of imageOps and
+	// zimageOps, in drawing order.
+	allImageOps []imageOp
+	imageOps    []imageOp
 	// zimageOps are the rectangle clipped opaque images
 	// that can use fast front-to-back rendering with z-test
 	// and no blending.
@@ -65,6 +68,9 @@ type drawOps struct {
 	pathOpCache []pathOp
 	qs          quadSplitter
 	pathCache   *opCache
+	// hack for the compute renderer to access
+	// converted path data.
+	retainPathData bool
 }
 
 type drawState struct {
@@ -164,8 +170,11 @@ type material struct {
 	color1 f32color.RGBA
 	color2 f32color.RGBA
 	// For materialTypeTexture.
-	texture *texture
+	data    imageOpData
 	uvTrans f32.Affine2D
+
+	// For the compute backend.
+	trans f32.Affine2D
 }
 
 // clipOp is the shadow of clip.Op.
@@ -414,7 +423,7 @@ func (g *GPU) BeginFrame() {
 	g.ctx.Clear(g.drawOps.clearColor.Float32())
 	g.ctx.ClearDepth(0.0)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
-	g.renderer.drawZOps(g.drawOps.zimageOps)
+	g.renderer.drawZOps(g.cache, g.drawOps.zimageOps)
 	g.zopsTimer.end()
 	g.stencilTimer.begin()
 	g.ctx.SetBlend(true)
@@ -426,7 +435,7 @@ func (g *GPU) BeginFrame() {
 	g.coverTimer.begin()
 	g.ctx.BindFramebuffer(g.defFBO)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
-	g.renderer.drawOps(g.drawOps.imageOps)
+	g.renderer.drawOps(g.cache, g.drawOps.imageOps)
 	g.ctx.SetBlend(false)
 	g.renderer.pather.stenciler.invalidateFBO()
 	g.coverTimer.end()
@@ -453,17 +462,26 @@ func (g *GPU) Profile() string {
 	return g.profile
 }
 
-func (r *renderer) texHandle(t *texture) backend.Texture {
-	if t.tex != nil {
-		return t.tex
+func (r *renderer) texHandle(cache *resourceCache, data imageOpData) backend.Texture {
+	var tex *texture
+	t, exists := cache.get(data.handle)
+	if !exists {
+		t = &texture{
+			src: data.src,
+		}
+		cache.put(data.handle, t)
 	}
-	tex, err := r.ctx.NewTexture(backend.TextureFormatSRGB, t.src.Bounds().Dx(), t.src.Bounds().Dy(), backend.FilterLinear, backend.FilterLinear, backend.BufferBindingTexture)
+	tex = t.(*texture)
+	if tex.tex != nil {
+		return tex.tex
+	}
+	handle, err := r.ctx.NewTexture(backend.TextureFormatSRGB, data.src.Bounds().Dx(), data.src.Bounds().Dy(), backend.FilterLinear, backend.FilterLinear, backend.BufferBindingTexture)
 	if err != nil {
 		panic(err)
 	}
-	tex.Upload(t.src)
-	t.tex = tex
-	return t.tex
+	handle.Upload(data.src)
+	tex.tex = handle
+	return tex.tex
 }
 
 func (t *texture) release() {
@@ -765,6 +783,7 @@ func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
 	d.cache = cache
 	d.viewport = viewport
 	d.imageOps = d.imageOps[:0]
+	d.allImageOps = d.allImageOps[:0]
 	d.zimageOps = d.zimageOps[:0]
 	d.pathOps = d.pathOps[:0]
 	d.pathOpCache = d.pathOpCache[:0]
@@ -785,9 +804,15 @@ func (d *drawOps) collect(ctx backend.Device, cache *resourceCache, root *op.Ops
 	for _, p := range d.pathOps {
 		if v, exists := d.pathCache.get(p.pathKey); !exists || v.data.data == nil {
 			data := buildPath(ctx, p.pathVerts)
+			var pathVerts []byte
+			if d.retainPathData {
+				pathVerts = make([]byte, len(p.pathVerts))
+				copy(pathVerts, p.pathVerts)
+			}
 			d.pathCache.put(p.pathKey, opCacheValue{
-				data:   data,
-				bounds: p.bounds,
+				data:    data,
+				bounds:  p.bounds,
+				cpuData: pathVerts,
 			})
 		}
 		p.pathVerts = nil
@@ -943,11 +968,12 @@ loop:
 			}
 
 			bounds := boundRectF(clip)
-			mat := state.materialFor(d.cache, bnd, off, partialTrans, bounds)
+			mat := state.materialFor(bnd, off, partialTrans, bounds, state.t)
 
 			if bounds.Min == (image.Point{}) && bounds.Max == d.viewport && state.rect && mat.opaque && (mat.material == materialColor) {
 				// The image is a uniform opaque color and takes up the whole screen.
 				// Scrap images up to and including this image and set clear color.
+				d.allImageOps = d.allImageOps[:0]
 				d.zimageOps = d.zimageOps[:0]
 				d.imageOps = d.imageOps[:0]
 				state.z = 0
@@ -970,6 +996,7 @@ loop:
 				material: mat,
 			}
 
+			d.allImageOps = append(d.allImageOps, img)
 			if state.rect && img.material.opaque {
 				d.zimageOps = append(d.zimageOps, img)
 			} else {
@@ -1000,7 +1027,7 @@ func expandPathOp(p *pathOp, clip image.Rectangle) {
 	}
 }
 
-func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f32.Point, trans f32.Affine2D, clip image.Rectangle) material {
+func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32.Affine2D, clip image.Rectangle, trans f32.Affine2D) material {
 	var m material
 	switch d.matType {
 	case materialColor:
@@ -1014,7 +1041,7 @@ func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f3
 		m.color2 = f32color.LinearFromSRGB(d.color2)
 		m.opaque = m.color1.A == 1.0 && m.color2.A == 1.0
 
-		m.uvTrans = trans.Mul(gradientSpaceTransform(clip, off, d.stop1, d.stop2))
+		m.uvTrans = partTrans.Mul(gradientSpaceTransform(clip, off, d.stop1, d.stop2))
 	case materialTexture:
 		m.material = materialTexture
 		dr := boundRectF(rect.Add(off))
@@ -1033,22 +1060,15 @@ func (d *drawState) materialFor(cache *resourceCache, rect f32.Rectangle, off f3
 		sdy := sr.Dy()
 		sr.Min.Y += float32(clip.Min.Y-dr.Min.Y) * sdy / dy
 		sr.Max.Y -= float32(dr.Max.Y-clip.Max.Y) * sdy / dy
-		tex, exists := cache.get(d.image.handle)
-		if !exists {
-			t := &texture{
-				src: d.image.src,
-			}
-			cache.put(d.image.handle, t)
-			tex = t
-		}
-		m.texture = tex.(*texture)
 		uvScale, uvOffset := texSpaceTransform(sr, sz)
-		m.uvTrans = trans.Mul(f32.Affine2D{}.Scale(f32.Point{}, uvScale).Offset(uvOffset))
+		m.uvTrans = partTrans.Mul(f32.Affine2D{}.Scale(f32.Point{}, uvScale).Offset(uvOffset))
+		m.trans = trans
+		m.data = d.image
 	}
 	return m
 }
 
-func (r *renderer) drawZOps(ops []imageOp) {
+func (r *renderer) drawZOps(cache *resourceCache, ops []imageOp) {
 	r.ctx.SetDepthTest(true)
 	r.ctx.BindVertexBuffer(r.blitter.quadVerts, 4*4, 0)
 	r.ctx.BindInputLayout(r.blitter.layout)
@@ -1058,7 +1078,7 @@ func (r *renderer) drawZOps(ops []imageOp) {
 		m := img.material
 		switch m.material {
 		case materialTexture:
-			r.ctx.BindTexture(0, r.texHandle(m.texture))
+			r.ctx.BindTexture(0, r.texHandle(cache, m.data))
 		}
 		drc := img.clip
 		scale, off := clipSpaceTransform(drc, r.blitter.viewport)
@@ -1067,7 +1087,7 @@ func (r *renderer) drawZOps(ops []imageOp) {
 	r.ctx.SetDepthTest(false)
 }
 
-func (r *renderer) drawOps(ops []imageOp) {
+func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 	r.ctx.SetDepthTest(true)
 	r.ctx.DepthMask(false)
 	r.ctx.BlendFunc(backend.BlendFactorOne, backend.BlendFactorOneMinusSrcAlpha)
@@ -1078,7 +1098,7 @@ func (r *renderer) drawOps(ops []imageOp) {
 		m := img.material
 		switch m.material {
 		case materialTexture:
-			r.ctx.BindTexture(0, r.texHandle(m.texture))
+			r.ctx.BindTexture(0, r.texHandle(cache, m.data))
 		}
 		drc := img.clip
 
