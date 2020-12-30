@@ -1,0 +1,302 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT OR Unlicense
+
+// This is "kernel 4" in a 4-kernel pipeline. It renders the commands
+// in the per-tile command list to an image.
+
+// Right now, this kernel stores the image in a buffer, but a better
+// plan is to use a texture. This is because of limited support.
+
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+#ifdef VULKAN
+#extension GL_EXT_nonuniform_qualifier : enable
+#endif
+
+#include "mem.h"
+#include "setup.h"
+
+#define CHUNK 8
+#define CHUNK_DY (TILE_HEIGHT_PX / CHUNK)
+layout(local_size_x = TILE_WIDTH_PX, local_size_y = CHUNK_DY) in;
+
+layout(set = 0, binding = 1) readonly buffer ConfigBuf {
+    Config conf;
+};
+
+layout(rgba8, set = 0, binding = 2) uniform writeonly image2D image;
+
+#ifdef VULKAN
+layout(set = 0, binding = 3) uniform sampler2D textures[];
+#else
+layout(set = 0, binding = 3) uniform sampler2D atlas;
+#endif
+
+#include "ptcl.h"
+#include "tile.h"
+
+#define BLEND_STACK_SIZE 4
+
+// Layout of a clip scratch frame:
+// Each frame is WIDTH * HEIGHT 32-bit words, then a link reference.
+
+// Link offset and frame size in 32-bit words.
+#define CLIP_LINK_OFFSET (TILE_WIDTH_PX * TILE_HEIGHT_PX)
+#define CLIP_BUF_SIZE (CLIP_LINK_OFFSET + 1)
+
+shared MallocResult sh_clip_alloc;
+
+// Allocate a scratch buffer for clipping.
+MallocResult alloc_clip_buf(uint link) {
+    if (gl_LocalInvocationID.x == 0 && gl_LocalInvocationID.y == 0) {
+        MallocResult m = malloc(CLIP_BUF_SIZE * 4);
+        if (!m.failed) {
+            write_mem(m.alloc, (m.alloc.offset >> 2) + CLIP_LINK_OFFSET, link);
+        }
+        sh_clip_alloc = m;
+    }
+    barrier();
+    return sh_clip_alloc;
+}
+
+// Calculate coverage based on backdrop + coverage of each line segment
+float[CHUNK] computeArea(vec2 xy, int backdrop, uint tile_ref) {
+    // Probably better to store as float, but conversion is no doubt cheap.
+    float area[CHUNK];
+    for (uint k = 0; k < CHUNK; k++) area[k] = float(backdrop);
+    TileSegRef tile_seg_ref = TileSegRef(tile_ref);
+    do {
+        TileSeg seg = TileSeg_read(new_alloc(tile_seg_ref.offset, TileSeg_size), tile_seg_ref);
+        for (uint k = 0; k < CHUNK; k++) {
+            vec2 my_xy = vec2(xy.x, xy.y + float(k * CHUNK_DY));
+            vec2 start = seg.origin - my_xy;
+            vec2 end = start + seg.vector;
+            vec2 window = clamp(vec2(start.y, end.y), 0.0, 1.0);
+            if (window.x != window.y) {
+                vec2 t = (window - start.y) / seg.vector.y;
+                vec2 xs = vec2(mix(start.x, end.x, t.x), mix(start.x, end.x, t.y));
+                float xmin = min(min(xs.x, xs.y), 1.0) - 1e-6;
+                float xmax = max(xs.x, xs.y);
+                float b = min(xmax, 1.0);
+                float c = max(b, 0.0);
+                float d = max(xmin, 0.0);
+                float a = (b + 0.5 * (d * d - c * c) - xmin) / (xmax - xmin);
+                area[k] += a * (window.x - window.y);
+            }
+            area[k] += sign(seg.vector.x) * clamp(my_xy.y - seg.y_edge + 1.0, 0.0, 1.0);
+        }
+        tile_seg_ref = seg.next;
+    } while (tile_seg_ref.offset != 0);
+    for (uint k = 0; k < CHUNK; k++) {
+        area[k] = min(abs(area[k]), 1.0);
+    }
+    return area;
+}
+
+vec4[CHUNK] fillTexture(vec2 xy, CmdSolidTexture cmd_tex) {
+    vec2 uvmin = unpackUnorm2x16(cmd_tex.uv_bounds.x);
+    vec2 uvmax = unpackUnorm2x16(cmd_tex.uv_bounds.y);
+    vec4 rgba[CHUNK];
+    for (uint i = 0; i < CHUNK; i++) {
+        float dy = float(i * CHUNK_DY);
+        vec2 uv = vec2(xy.x, xy.y + dy) + vec2(0.5, 0.5);
+        uv = cmd_tex.mat.xy * uv.x + cmd_tex.mat.zw * uv.y + cmd_tex.translate;
+        uv = clamp(uv, uvmin, uvmax);
+#ifdef VULKAN
+        vec4 fg_rgba = textureGrad(textures[0], uv, cmd_tex.mat.xy, cmd_tex.mat.zw);
+#else
+        vec4 fg_rgba = textureGrad(atlas, uv, cmd_tex.mat.xy, cmd_tex.mat.zw);
+#endif
+        rgba[i] = fg_rgba;
+    }
+    return rgba;
+}
+
+vec3 tosRGB(vec3 rgb) {
+    bvec3 cutoff = greaterThanEqual(rgb, vec3(0.0031308));
+    vec3 below = vec3(12.92)*rgb;
+    vec3 above = vec3(1.055)*pow(rgb, vec3(0.41666)) - vec3(0.055);
+    return mix(below, above, cutoff);
+}
+
+// unpacksRGB unpacks a color in the sRGB color space to a vec4 in the linear color
+// space.
+vec4 unpacksRGB(uint srgba) {
+    vec4 color = unpackUnorm4x8(srgba).wzyx;
+    // Formula from EXT_sRGB.
+    vec3 rgb = color.rgb;
+    bvec3 cutoff = greaterThanEqual(rgb, vec3(0.04045));
+    vec3 below = rgb/vec3(12.92);
+    vec3 above = pow((rgb + vec3(0.055))/vec3(1.055), vec3(2.4));
+    rgb = mix(below, above, cutoff);
+    return vec4(rgb, color.a);
+}
+
+// packsRGB packs a color in the linear color space into its 8-bit sRGB equivalent.
+uint packsRGB(vec4 rgba) {
+    rgba = vec4(tosRGB(rgba.rgb), rgba.a);
+    return packUnorm4x8(rgba.wzyx);
+}
+
+void main() {
+    if (mem_error != NO_ERROR) {
+        return;
+    }
+
+    uint tile_ix = gl_WorkGroupID.y * conf.width_in_tiles + gl_WorkGroupID.x;
+    Alloc cmd_alloc = slice_mem(conf.ptcl_alloc, tile_ix * PTCL_INITIAL_ALLOC, PTCL_INITIAL_ALLOC);
+    CmdRef cmd_ref = CmdRef(cmd_alloc.offset);
+
+    uvec2 xy_uint = uvec2(gl_GlobalInvocationID.x, gl_LocalInvocationID.y + TILE_HEIGHT_PX * gl_WorkGroupID.y);
+    vec2 xy = vec2(xy_uint);
+    vec3 rgb[CHUNK];
+    float mask[CHUNK];
+    uint blend_stack[BLEND_STACK_SIZE][CHUNK];
+    uint blend_spill = 0;
+    uint blend_sp = 0;
+    Alloc clip_tos = new_alloc(0, 0);
+    for (uint i = 0; i < CHUNK; i++) {
+        rgb[i] = vec3(0.5);
+#ifdef VULKAN
+        if (xy_uint.x < 1024 && xy_uint.y < 1024) {
+            rgb[i] = texture(textures[gl_WorkGroupID.x / 64], vec2(xy_uint.x, xy_uint.y + CHUNK_DY * i) / 1024.0).rgb;
+        }
+#endif
+        mask[i] = 1.0;
+    }
+
+    while (true) {
+        uint tag = Cmd_tag(cmd_alloc, cmd_ref);
+        if (tag == Cmd_End) {
+            break;
+        }
+        switch (tag) {
+        case Cmd_Circle:
+            CmdCircle circle = Cmd_Circle_read(cmd_alloc, cmd_ref);
+            vec4 fg_rgba = unpacksRGB(circle.rgba_color);
+            for (uint i = 0; i < CHUNK; i++) {
+                float dy = float(i * CHUNK_DY);
+                float r = length(vec2(xy.x, xy.y + dy) + vec2(0.5, 0.5) - circle.center.xy);
+                float alpha = clamp(0.5 + circle.radius - r, 0.0, 1.0);
+                rgb[i] = mix(rgb[i], fg_rgba.rgb, mask[i] * alpha * fg_rgba.a);
+            }
+            break;
+        case Cmd_Stroke:
+            // Calculate distance field from all the line segments in this tile.
+            CmdStroke stroke = Cmd_Stroke_read(cmd_alloc, cmd_ref);
+            float df[CHUNK];
+            for (uint k = 0; k < CHUNK; k++) df[k] = 1e9;
+            TileSegRef tile_seg_ref = TileSegRef(stroke.tile_ref);
+            do {
+                TileSeg seg = TileSeg_read(new_alloc(tile_seg_ref.offset, TileSeg_size), tile_seg_ref);
+                vec2 line_vec = seg.vector;
+                for (uint k = 0; k < CHUNK; k++) {
+                    vec2 dpos = xy + vec2(0.5, 0.5) - seg.origin;
+                    dpos.y += float(k * CHUNK_DY);
+                    float t = clamp(dot(line_vec, dpos) / dot(line_vec, line_vec), 0.0, 1.0);
+                    df[k] = min(df[k], length(line_vec * t - dpos));
+                }
+                tile_seg_ref = seg.next;
+            } while (tile_seg_ref.offset != 0);
+            fg_rgba = unpacksRGB(stroke.rgba_color);
+            for (uint k = 0; k < CHUNK; k++) {
+                float alpha = clamp(stroke.half_width + 0.5 - df[k], 0.0, 1.0);
+                rgb[k] = mix(rgb[k], fg_rgba.rgb, mask[k] * alpha * fg_rgba.a);
+            }
+            break;
+        case Cmd_Fill:
+            CmdFill fill = Cmd_Fill_read(cmd_alloc, cmd_ref);
+            float area[CHUNK];
+            area = computeArea(xy, fill.backdrop, fill.tile_ref);
+            fg_rgba = unpacksRGB(fill.rgba_color);
+            for (uint k = 0; k < CHUNK; k++) {
+                rgb[k] = mix(rgb[k], fg_rgba.rgb, mask[k] * area[k] * fg_rgba.a);
+            }
+            break;
+        case Cmd_FillTexture:
+            CmdFillTexture fill_tex = Cmd_FillTexture_read(cmd_alloc, cmd_ref);
+            area = computeArea(xy, fill_tex.backdrop, fill_tex.tile_ref);
+            vec4 rgba[CHUNK] = fillTexture(xy, CmdSolidTexture(fill_tex.mat, fill_tex.translate, fill_tex.uv_bounds));
+            for (uint k = 0; k < CHUNK; k++) {
+                rgb[k] = mix(rgb[k], rgba[k].rgb, mask[k] * area[k] * rgba[k].a);
+            }
+            break;
+        case Cmd_BeginClip:
+        case Cmd_BeginSolidClip:
+            uint blend_slot = blend_sp % BLEND_STACK_SIZE;
+            if (blend_sp == blend_spill + BLEND_STACK_SIZE) {
+                // spill to scratch buffer
+                MallocResult m = alloc_clip_buf(clip_tos.offset);
+                if (m.failed) {
+                    return;
+                }
+                clip_tos = m.alloc;
+                uint base_ix = (clip_tos.offset >> 2) + gl_LocalInvocationID.x + TILE_WIDTH_PX * gl_LocalInvocationID.y;
+                for (uint k = 0; k < CHUNK; k++) {
+                    write_mem(clip_tos, base_ix + k * TILE_WIDTH_PX * CHUNK_DY, blend_stack[blend_slot][k]);
+                }
+                blend_spill++;
+            }
+            if (tag == Cmd_BeginClip) {
+                CmdBeginClip begin_clip = Cmd_BeginClip_read(cmd_alloc, cmd_ref);
+                area = computeArea(xy, begin_clip.backdrop, begin_clip.tile_ref);
+                for (uint k = 0; k < CHUNK; k++) {
+                    blend_stack[blend_slot][k] = packsRGB(vec4(rgb[k], clamp(abs(area[k]), 0.0, 1.0)));
+                }
+            } else {
+                CmdBeginSolidClip begin_solid_clip = Cmd_BeginSolidClip_read(cmd_alloc, cmd_ref);
+                float solid_alpha = begin_solid_clip.alpha;
+                for (uint k = 0; k < CHUNK; k++) {
+                    blend_stack[blend_slot][k] = packsRGB(vec4(rgb[k], solid_alpha));
+                }
+            }
+            blend_sp++;
+            break;
+        case Cmd_EndClip:
+            CmdEndClip end_clip = Cmd_EndClip_read(cmd_alloc, cmd_ref);
+            blend_slot = (blend_sp - 1) % BLEND_STACK_SIZE;
+            if (blend_sp == blend_spill) {
+                uint base_ix = (clip_tos.offset >> 2) + gl_LocalInvocationID.x + TILE_WIDTH_PX * gl_LocalInvocationID.y;
+                for (uint k = 0; k < CHUNK; k++) {
+                    blend_stack[blend_slot][k] = read_mem(clip_tos, base_ix + k * TILE_WIDTH_PX * CHUNK_DY);
+                }
+                clip_tos.offset = read_mem(clip_tos, (clip_tos.offset >> 2) + CLIP_LINK_OFFSET);
+                blend_spill--;
+            }
+            blend_sp--;
+            for (uint k = 0; k < CHUNK; k++) {
+                vec4 rgba = unpacksRGB(blend_stack[blend_slot][k]);
+                rgb[k] = mix(rgba.rgb, rgb[k], end_clip.alpha * rgba.a);
+            }
+            break;
+        case Cmd_Solid:
+            CmdSolid solid = Cmd_Solid_read(cmd_alloc, cmd_ref);
+            fg_rgba = unpacksRGB(solid.rgba_color);
+            for (uint k = 0; k < CHUNK; k++) {
+                rgb[k] = mix(rgb[k], fg_rgba.rgb, mask[k] * fg_rgba.a);
+            }
+            break;
+        case Cmd_SolidTexture:
+            CmdSolidTexture solid_tex = Cmd_SolidTexture_read(cmd_alloc, cmd_ref);
+            rgba = fillTexture(xy, solid_tex);
+            for (uint k = 0; k < CHUNK; k++) {
+                rgb[k] = mix(rgb[k], rgba[k].rgb, mask[k] * rgba[k].a);
+            }
+            break;
+        case Cmd_SolidMask:
+            CmdSolidMask solid_mask = Cmd_SolidMask_read(cmd_alloc, cmd_ref);
+            for (uint k = 0; k < CHUNK; k++) {
+                mask[k] = solid_mask.mask;
+            }
+            break;
+        case Cmd_Jump:
+            cmd_ref = CmdRef(Cmd_Jump_read(cmd_alloc, cmd_ref).new_ref);
+            cmd_alloc.offset = cmd_ref.offset;
+            continue;
+        }
+        cmd_ref.offset += Cmd_size;
+    }
+
+    for (uint i = 0; i < CHUNK; i++) {
+        imageStore(image, ivec2(xy_uint.x, xy_uint.y + CHUNK_DY * i), vec4(tosRGB(rgb[i]), 1.0));
+    }
+}
