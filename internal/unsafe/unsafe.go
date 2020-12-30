@@ -7,6 +7,18 @@ import (
 	"unsafe"
 )
 
+// StructView returns a byte slice view of a struct.
+func StructView(s interface{}) []byte {
+	v := reflect.ValueOf(s).Elem()
+	sz := int(v.Type().Size())
+	var res []byte
+	h := (*reflect.SliceHeader)(unsafe.Pointer(&res))
+	h.Data = uintptr(unsafe.Pointer(v.UnsafeAddr()))
+	h.Cap = sz
+	h.Len = sz
+	return res
+}
+
 // BytesView returns a byte slice view of a slice.
 func BytesView(s interface{}) []byte {
 	v := reflect.ValueOf(s)
