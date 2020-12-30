@@ -9,6 +9,7 @@ package gpu
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -28,7 +29,14 @@ import (
 	"gioui.org/op/clip"
 )
 
-type GPU struct {
+type GPU interface {
+	Release()
+	Collect(viewport image.Point, frameOps *op.Ops)
+	Frame() error
+	Profile() string
+}
+
+type gpu struct {
 	cache *resourceCache
 
 	defFBO                                            backend.Framebuffer
@@ -363,9 +371,19 @@ const (
 	materialTexture
 )
 
-func New(ctx backend.Device) (*GPU, error) {
+func New(ctx backend.Device) (GPU, error) {
+	feats := ctx.Caps().Features
+	switch {
+	case feats.Has(backend.FeatureFloatRenderTargets):
+		return newGPU(ctx)
+	default:
+		return nil, errors.New("gpu: no support for float render targets nor compute")
+	}
+}
+
+func newGPU(ctx backend.Device) (*gpu, error) {
 	defFBO := ctx.CurrentFramebuffer()
-	g := &GPU{
+	g := &gpu{
 		defFBO: defFBO,
 		cache:  newResourceCache(),
 	}
@@ -376,13 +394,13 @@ func New(ctx backend.Device) (*GPU, error) {
 	return g, nil
 }
 
-func (g *GPU) init(ctx backend.Device) error {
+func (g *gpu) init(ctx backend.Device) error {
 	g.ctx = ctx
 	g.renderer = newRenderer(ctx)
 	return nil
 }
 
-func (g *GPU) Release() {
+func (g *gpu) Release() {
 	g.renderer.release()
 	g.drawOps.pathCache.release()
 	g.cache.release()
@@ -391,7 +409,7 @@ func (g *GPU) Release() {
 	}
 }
 
-func (g *GPU) Collect(viewport image.Point, frameOps *op.Ops) {
+func (g *gpu) Collect(viewport image.Point, frameOps *op.Ops) {
 	g.renderer.blitter.viewport = viewport
 	g.renderer.pather.viewport = viewport
 	g.drawOps.reset(g.cache, viewport)
@@ -406,7 +424,7 @@ func (g *GPU) Collect(viewport image.Point, frameOps *op.Ops) {
 	}
 }
 
-func (g *GPU) BeginFrame() {
+func (g *gpu) Frame() error {
 	g.ctx.BeginFrame()
 	defer g.ctx.EndFrame()
 	viewport := g.renderer.blitter.viewport
@@ -440,9 +458,6 @@ func (g *GPU) BeginFrame() {
 	g.renderer.pather.stenciler.invalidateFBO()
 	g.coverTimer.end()
 	g.ctx.BindFramebuffer(g.defFBO)
-}
-
-func (g *GPU) EndFrame() {
 	g.cleanupTimer.begin()
 	g.cache.frame()
 	g.drawOps.pathCache.frame()
@@ -456,9 +471,10 @@ func (g *GPU) EndFrame() {
 		ft = ft.Round(q)
 		g.profile = fmt.Sprintf("draw:%7s gpu:%7s zt:%7s st:%7s cov:%7s", frameDur, ft, zt, st, covt)
 	}
+	return nil
 }
 
-func (g *GPU) Profile() string {
+func (g *gpu) Profile() string {
 	return g.profile
 }
 

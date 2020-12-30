@@ -18,7 +18,7 @@ type Window struct {
 	size    image.Point
 	ctx     context
 	backend backend.Device
-	gpu     *gpu.GPU
+	gpu     gpu.GPU
 	fboTex  backend.Texture
 	fbo     backend.Framebuffer
 }
@@ -109,9 +109,7 @@ func (w *Window) Release() {
 func (w *Window) Frame(frame *op.Ops) error {
 	return contextDo(w.ctx, func() error {
 		w.gpu.Collect(w.size, frame)
-		w.gpu.BeginFrame()
-		w.gpu.EndFrame()
-		return nil
+		return w.gpu.Frame()
 	})
 }
 
