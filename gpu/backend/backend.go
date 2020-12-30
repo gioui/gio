@@ -23,6 +23,7 @@ type Device interface {
 	NewFramebuffer(tex Texture, depthBits int) (Framebuffer, error)
 	NewImmutableBuffer(typ BufferBinding, data []byte) (Buffer, error)
 	NewBuffer(typ BufferBinding, size int) (Buffer, error)
+	NewComputeProgram(shader ShaderSources) (Program, error)
 	NewProgram(vertexShader, fragmentShader ShaderSources) (Program, error)
 	NewInputLayout(vertexShader ShaderSources, layout []InputDesc) (InputLayout, error)
 
@@ -43,17 +44,29 @@ type Device interface {
 	BindTexture(unit int, t Texture)
 	BindVertexBuffer(b Buffer, stride, offset int)
 	BindIndexBuffer(b Buffer)
+	BindImageTexture(unit int, texture Texture, access AccessBits, format TextureFormat)
+
+	MemoryBarrier()
+	DispatchCompute(x, y, z int)
 }
 
 type ShaderSources struct {
-	GLSL100ES string
-	GLSL300ES string
-	GLSL130   string
-	GLSL150   string
-	HLSL      []byte
-	Uniforms  UniformsReflection
-	Inputs    []InputLocation
-	Textures  []TextureBinding
+	Name           string
+	GLSL100ES      string
+	GLSL300ES      string
+	GLSL310ES      string
+	GLSL130        string
+	GLSL150        string
+	HLSL           []byte
+	Uniforms       UniformsReflection
+	Inputs         []InputLocation
+	Textures       []TextureBinding
+	StorageBuffers []StorageBufferBinding
+}
+
+type StorageBufferBinding struct {
+	Binding   int
+	BlockSize int
 }
 
 type UniformsReflection struct {
@@ -105,6 +118,8 @@ type InputLayout interface {
 	Release()
 }
 
+type AccessBits uint8
+
 type BlendFactor uint8
 
 type DrawMode uint8
@@ -127,6 +142,7 @@ type Caps struct {
 
 type Program interface {
 	Release()
+	SetStorageBuffer(binding int, buf Buffer)
 	SetVertexUniforms(buf Buffer)
 	SetFragmentUniforms(buf Buffer)
 }
@@ -134,6 +150,7 @@ type Program interface {
 type Buffer interface {
 	Release()
 	Upload(data []byte)
+	Download(data []byte) error
 }
 
 type Framebuffer interface {
@@ -150,7 +167,7 @@ type Timer interface {
 }
 
 type Texture interface {
-	Upload(img *image.RGBA)
+	Upload(offset, size image.Point, pixels []byte)
 	Release()
 }
 
@@ -171,11 +188,18 @@ const (
 	BufferBindingUniforms
 	BufferBindingTexture
 	BufferBindingFramebuffer
+	BufferBindingShaderStorage
 )
 
 const (
 	TextureFormatSRGB TextureFormat = iota
 	TextureFormatFloat
+	TextureFormatRGBA8
+)
+
+const (
+	AccessRead AccessBits = 1 + iota
+	AccessWrite
 )
 
 const (
@@ -184,7 +208,9 @@ const (
 )
 
 const (
-	FeatureTimers Features = iota
+	FeatureTimers Features = 1 << iota
+	FeatureFloatRenderTargets
+	FeatureCompute
 )
 
 const (
@@ -201,4 +227,16 @@ const (
 
 func (f Features) Has(feats Features) bool {
 	return f&feats == feats
+}
+
+func UploadImage(t Texture, offset image.Point, img *image.RGBA) {
+	var pixels []byte
+	size := img.Bounds().Size()
+	if img.Stride != size.X*4 {
+		panic("unsupported stride")
+	}
+	start := img.PixOffset(0, 0)
+	end := img.PixOffset(size.X, size.Y-1)
+	pixels = img.Pix[start:end]
+	t.Upload(offset, size, pixels)
 }

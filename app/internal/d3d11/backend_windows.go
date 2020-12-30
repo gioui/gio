@@ -121,12 +121,7 @@ func NewDevice() (*Device, error) {
 		_IUnknownRelease(unsafe.Pointer(d3dctx), d3dctx.vtbl.Release)
 		return nil, fmt.Errorf("d3d11: feature level too low: %d", featLvl)
 	}
-	floatFormat, ok := detectFloatFormat(d3ddev)
-	if !ok {
-		_IUnknownRelease(unsafe.Pointer(d3ddev), d3ddev.vtbl.Release)
-		_IUnknownRelease(unsafe.Pointer(d3dctx), d3dctx.vtbl.Release)
-		return nil, fmt.Errorf("d3d11: no available floating point formats")
-	}
+	floatFormat, _ := detectFloatFormat(d3ddev)
 	dev.floatFormat = floatFormat
 	dev.depthStates = make(map[depthState]*_ID3D11DepthStencilState)
 	dev.blendStates = make(map[blendState]*_ID3D11BlendState)
@@ -252,6 +247,9 @@ func (s *SwapChain) Present() error {
 func NewBackend(d *Device) (*Backend, error) {
 	caps := backend.Caps{
 		MaxTextureSize: 2048, // 9.1 maximum
+	}
+	if d.floatFormat != 0 {
+		caps.Features |= backend.FeatureFloatRenderTargets
 	}
 	switch {
 	case d.featLvl >= _D3D_FEATURE_LEVEL_11_0:
@@ -524,6 +522,10 @@ func (b *Backend) NewImmutableBuffer(typ backend.BufferBinding, data []byte) (ba
 	return &Buffer{backend: b, buf: buf, bind: bind, immutable: true}, nil
 }
 
+func (b *Backend) NewComputeProgram(shader backend.ShaderSources) (backend.Program, error) {
+	panic("not implemented")
+}
+
 func (b *Backend) NewProgram(vertexShader, fragmentShader backend.ShaderSources) (backend.Program, error) {
 	vs, err := b.dev.dev.CreateVertexShader(vertexShader.HLSL)
 	if err != nil {
@@ -667,17 +669,30 @@ func (b *Backend) BlendFunc(sfactor, dfactor backend.BlendFactor) {
 	b.blendState.dfactor = dfactor
 }
 
-func (t *Texture) Upload(img *image.RGBA) {
-	b := img.Bounds()
-	w := b.Dx()
-	if img.Stride != w*4 {
-		panic("unsupported stride")
+func (b *Backend) BindImageTexture(unit int, tex backend.Texture, access backend.AccessBits, f backend.TextureFormat) {
+	panic("not implemented")
+}
+
+func (b *Backend) MemoryBarrier() {
+	panic("not implemented")
+}
+
+func (b *Backend) DispatchCompute(x, y, z int) {
+	panic("not implemented")
+}
+
+func (t *Texture) Upload(offset, size image.Point, pixels []byte) {
+	stride := size.X * 4
+	dst := &_D3D11_BOX{
+		left:   uint32(offset.X),
+		top:    uint32(offset.Y),
+		right:  uint32(offset.X + size.X),
+		bottom: uint32(offset.Y + size.Y),
+		front:  0,
+		back:   1,
 	}
-	start := (b.Min.X + b.Min.Y*w) * 4
-	end := (b.Max.X + (b.Max.Y-1)*w) * 4
-	pixels := img.Pix[start:end]
 	res := (*_ID3D11Resource)(unsafe.Pointer(t.tex))
-	t.backend.dev.ctx.UpdateSubresource(res, uint32(img.Stride), uint32(len(pixels)), pixels)
+	t.backend.dev.ctx.UpdateSubresource(res, dst, uint32(stride), uint32(len(pixels)), pixels)
 }
 
 func (t *Texture) Release() {
@@ -710,6 +725,10 @@ func (p *Program) Release() {
 	p.frag.shader = nil
 }
 
+func (p *Program) SetStorageBuffer(binding int, buffer backend.Buffer) {
+	panic("not implemented")
+}
+
 func (p *Program) SetVertexUniforms(buf backend.Buffer) {
 	p.vert.uniforms = buf.(*Buffer)
 }
@@ -726,8 +745,12 @@ func (b *Backend) BindIndexBuffer(buf backend.Buffer) {
 	b.dev.ctx.IASetIndexBuffer(buf.(*Buffer).buf, _DXGI_FORMAT_R16_UINT, 0)
 }
 
+func (b *Buffer) Download(data []byte) error {
+	panic("not implemented")
+}
+
 func (b *Buffer) Upload(data []byte) {
-	b.backend.dev.ctx.UpdateSubresource((*_ID3D11Resource)(unsafe.Pointer(b.buf)), 0, 0, data)
+	b.backend.dev.ctx.UpdateSubresource((*_ID3D11Resource)(unsafe.Pointer(b.buf)), nil, 0, 0, data)
 }
 
 func (b *Buffer) Release() {

@@ -37,7 +37,7 @@ type glstate struct {
 	// nattr is the current number of enabled vertex arrays.
 	nattr    int
 	prog     *gpuProgram
-	texUnits [2]*gpuTexture
+	texUnits [4]*gpuTexture
 	layout   *gpuInputLayout
 	buffer   bufferBinding
 }
@@ -87,6 +87,7 @@ type gpuProgram struct {
 	nattr        int
 	vertUniforms uniformsTracker
 	fragUniforms uniformsTracker
+	storage      [storageBindings]*gpuBuffer
 }
 
 type uniformsTracker struct {
@@ -111,12 +112,16 @@ type gpuInputLayout struct {
 // textureTriple holds the type settings for
 // a TexImage2D call.
 type textureTriple struct {
-	internalFormat int
+	internalFormat glimpl.Enum
 	format         glimpl.Enum
 	typ            glimpl.Enum
 }
 
 type Context = glimpl.Context
+
+const (
+	storageBindings = 32
+)
 
 // NewBackend returns a new Backend.
 //
@@ -133,23 +138,27 @@ func NewBackend(ctx Context) (*Backend, error) {
 	if err != nil {
 		return nil, err
 	}
-	floatTriple, err := floatTripleFor(f, ver, exts)
-	if err != nil {
-		return nil, err
-	}
+	floatTriple, ffboErr := floatTripleFor(f, ver, exts)
 	srgbaTriple, err := srgbaTripleFor(ver, exts)
 	if err != nil {
 		return nil, err
 	}
-	ubo := ver[0] >= 3 && gles
+	gles30 := gles && ver[0] >= 3
+	gles31 := gles && (ver[0] > 3 || (ver[0] == 3 && ver[1] >= 1))
 	b := &Backend{
 		glver:       ver,
 		gles:        gles,
-		ubo:         ubo,
+		ubo:         gles30,
 		funcs:       f,
 		floatTriple: floatTriple,
 		alphaTriple: alphaTripleFor(ver),
 		srgbaTriple: srgbaTriple,
+	}
+	if ffboErr == nil {
+		b.feats.Features |= backend.FeatureFloatRenderTargets
+	}
+	if gles31 {
+		b.feats.Features |= backend.FeatureCompute
 	}
 	if hasExtension(exts, "GL_EXT_disjoint_timer_query_webgl2") || hasExtension(exts, "GL_EXT_disjoint_timer_query") {
 		b.feats.Features |= backend.FeatureTimers
@@ -232,6 +241,8 @@ func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, mi
 		tex.triple = b.floatTriple
 	case backend.TextureFormatSRGB:
 		tex.triple = b.srgbaTriple
+	case backend.TextureFormatRGBA8:
+		tex.triple = textureTriple{glimpl.RGBA8, glimpl.RGBA, glimpl.UNSIGNED_BYTE}
 	default:
 		return nil, errors.New("unsupported texture format")
 	}
@@ -240,7 +251,12 @@ func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, mi
 	b.funcs.TexParameteri(glimpl.TEXTURE_2D, glimpl.TEXTURE_MIN_FILTER, toTexFilter(minFilter))
 	b.funcs.TexParameteri(glimpl.TEXTURE_2D, glimpl.TEXTURE_WRAP_S, glimpl.CLAMP_TO_EDGE)
 	b.funcs.TexParameteri(glimpl.TEXTURE_2D, glimpl.TEXTURE_WRAP_T, glimpl.CLAMP_TO_EDGE)
-	b.funcs.TexImage2D(glimpl.TEXTURE_2D, 0, tex.triple.internalFormat, width, height, tex.triple.format, tex.triple.typ, nil)
+	if b.gles && b.glver[0] >= 3 {
+		// Immutable textures are required for BindImageTexture, and can't hurt otherwise.
+		b.funcs.TexStorage2D(glimpl.TEXTURE_2D, 1, tex.triple.internalFormat, width, height)
+	} else {
+		b.funcs.TexImage2D(glimpl.TEXTURE_2D, 0, tex.triple.internalFormat, width, height, tex.triple.format, tex.triple.typ)
+	}
 	if err := glErr(b.funcs); err != nil {
 		tex.Release()
 		return nil, err
@@ -267,6 +283,9 @@ func (b *Backend) NewBuffer(typ backend.BufferBinding, size int) (backend.Buffer
 			buf.Release()
 			return nil, err
 		}
+		firstBinding := firstBufferType(typ)
+		b.funcs.BindBuffer(firstBinding, buf.obj)
+		b.funcs.BufferData(firstBinding, size, glimpl.DYNAMIC_DRAW)
 	}
 	return buf, nil
 }
@@ -275,6 +294,9 @@ func (b *Backend) NewImmutableBuffer(typ backend.BufferBinding, data []byte) (ba
 	glErr(b.funcs)
 	obj := b.funcs.CreateBuffer()
 	buf := &gpuBuffer{backend: b, obj: obj, typ: typ, size: len(data), hasBuffer: true}
+	firstBinding := firstBufferType(typ)
+	b.funcs.BindBuffer(firstBinding, buf.obj)
+	b.funcs.BufferData(firstBinding, len(data), glimpl.STATIC_DRAW)
 	buf.Upload(data)
 	buf.immutable = true
 	if err := glErr(b.funcs); err != nil {
@@ -289,6 +311,40 @@ func glErr(f *glimpl.Functions) error {
 		return fmt.Errorf("glGetError: %#x", st)
 	}
 	return nil
+}
+
+func (b *Backend) MemoryBarrier() {
+	b.funcs.MemoryBarrier(glimpl.ALL_BARRIER_BITS)
+}
+
+func (b *Backend) DispatchCompute(x, y, z int) {
+	if p := b.state.prog; p != nil {
+		for binding, buf := range p.storage {
+			if buf != nil {
+				b.funcs.BindBufferBase(glimpl.SHADER_STORAGE_BUFFER, binding, buf.obj)
+			}
+		}
+	}
+	b.funcs.DispatchCompute(x, y, z)
+}
+
+func (b *Backend) BindImageTexture(unit int, tex backend.Texture, access backend.AccessBits, f backend.TextureFormat) {
+	t := tex.(*gpuTexture)
+	var acc glimpl.Enum
+	switch access {
+	case backend.AccessWrite:
+		acc = glimpl.WRITE_ONLY
+	default:
+		panic("unsupported access bits")
+	}
+	var format glimpl.Enum
+	switch f {
+	case backend.TextureFormatRGBA8:
+		format = glimpl.RGBA8
+	default:
+		panic("unsupported format")
+	}
+	b.funcs.BindImageTexture(unit, t.obj, 0, false, 0, acc, format)
 }
 
 func (b *Backend) bindTexture(unit int, t *gpuTexture) {
@@ -433,6 +489,18 @@ func (b *Backend) NewInputLayout(vs backend.ShaderSources, layout []backend.Inpu
 	}, nil
 }
 
+func (b *Backend) NewComputeProgram(src backend.ShaderSources) (backend.Program, error) {
+	p, err := glimpl.CreateComputeProgram(b.funcs, src.GLSL310ES)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %v", src.Name, err)
+	}
+	gpuProg := &gpuProgram{
+		backend: b,
+		obj:     p,
+	}
+	return gpuProg, nil
+}
+
 func (b *Backend) NewProgram(vertShader, fragShader backend.ShaderSources) (backend.Program, error) {
 	attr := make([]string, len(vertShader.Inputs))
 	for _, inp := range vertShader.Inputs {
@@ -501,6 +569,14 @@ func (b *Backend) NewProgram(vertShader, fragShader backend.ShaderSources) (back
 func lookupUniform(funcs *glimpl.Functions, p glimpl.Program, loc backend.UniformLocation) uniformLocation {
 	u := funcs.GetUniformLocation(p, loc.Name)
 	return uniformLocation{uniform: u, offset: loc.Offset, typ: loc.Type, size: loc.Size}
+}
+
+func (p *gpuProgram) SetStorageBuffer(binding int, buffer backend.Buffer) {
+	buf := buffer.(*gpuBuffer)
+	if buf.typ&backend.BufferBindingShaderStorage == 0 {
+		panic("not a shader storage buffer")
+	}
+	p.storage[binding] = buf
 }
 
 func (p *gpuProgram) SetVertexUniforms(buffer backend.Buffer) {
@@ -600,8 +676,29 @@ func (b *gpuBuffer) Upload(data []byte) {
 	if b.hasBuffer {
 		firstBinding := firstBufferType(b.typ)
 		b.backend.funcs.BindBuffer(firstBinding, b.obj)
-		b.backend.funcs.BufferData(firstBinding, data, glimpl.STATIC_DRAW)
+		b.backend.funcs.BufferSubData(firstBinding, 0, data)
 	}
+}
+
+func (b *gpuBuffer) Download(data []byte) error {
+	if len(data) > b.size {
+		panic("buffer size overflow")
+	}
+	if !b.hasBuffer {
+		copy(data, b.data)
+		return nil
+	}
+	firstBinding := firstBufferType(b.typ)
+	b.backend.funcs.BindBuffer(firstBinding, b.obj)
+	bufferMap := b.backend.funcs.MapBufferRange(firstBinding, 0, len(data), glimpl.MAP_READ_BIT)
+	if bufferMap == nil {
+		return fmt.Errorf("MapBufferRange: error %#x", b.backend.funcs.GetError())
+	}
+	copy(data, bufferMap)
+	if !b.backend.funcs.UnmapBuffer(firstBinding) {
+		return errors.New("buffer content lost")
+	}
+	return nil
 }
 
 func (b *gpuBuffer) Release() {
@@ -649,10 +746,20 @@ func (b *Backend) BindIndexBuffer(buf backend.Buffer) {
 	b.funcs.BindBuffer(glimpl.ELEMENT_ARRAY_BUFFER, gbuf.obj)
 }
 
+func (b *Backend) BlitFramebuffer(dst, src backend.Framebuffer, srect, drect image.Rectangle) {
+	b.funcs.BindFramebuffer(glimpl.DRAW_FRAMEBUFFER, dst.(*gpuFramebuffer).obj)
+	b.funcs.BindFramebuffer(glimpl.READ_FRAMEBUFFER, src.(*gpuFramebuffer).obj)
+	b.funcs.BlitFramebuffer(
+		srect.Min.X, srect.Min.Y, srect.Max.X, srect.Max.Y,
+		drect.Min.X, drect.Min.Y, drect.Max.X, drect.Max.Y,
+		glimpl.COLOR_BUFFER_BIT|glimpl.DEPTH_BUFFER_BIT|glimpl.STENCIL_BUFFER_BIT,
+		glimpl.NEAREST)
+}
+
 func (f *gpuFramebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 	glErr(f.backend.funcs)
 	f.backend.BindFramebuffer(f)
-	if len(pixels) < src.Dx()*src.Dy() {
+	if len(pixels) < src.Dx()*src.Dy()*4 {
 		return errors.New("unexpected RGBA size")
 	}
 	f.backend.funcs.ReadPixels(src.Min.X, src.Min.Y, src.Dx(), src.Dy(), glimpl.RGBA, glimpl.UNSIGNED_BYTE, pixels)
@@ -714,18 +821,12 @@ func (t *gpuTexture) Release() {
 	t.backend.funcs.DeleteTexture(t.obj)
 }
 
-func (t *gpuTexture) Upload(img *image.RGBA) {
-	t.backend.BindTexture(0, t)
-	var pixels []byte
-	b := img.Bounds()
-	w, h := b.Dx(), b.Dy()
-	if img.Stride != w*4 {
-		panic("unsupported stride")
+func (t *gpuTexture) Upload(offset, size image.Point, pixels []byte) {
+	if min := size.X * size.Y * 4; min > len(pixels) {
+		panic(fmt.Errorf("size %d larger than data %d", min, len(pixels)))
 	}
-	start := (b.Min.X + b.Min.Y*w) * 4
-	end := (b.Max.X + (b.Max.Y-1)*w) * 4
-	pixels = img.Pix[start:end]
-	t.backend.funcs.TexImage2D(glimpl.TEXTURE_2D, 0, t.triple.internalFormat, w, h, t.triple.format, t.triple.typ, pixels)
+	t.backend.BindTexture(0, t)
+	t.backend.funcs.TexSubImage2D(glimpl.TEXTURE_2D, 0, offset.X, offset.Y, size.X, size.Y, t.triple.format, t.triple.typ, pixels)
 }
 
 func (t *gpuTimer) Begin() {
@@ -792,7 +893,7 @@ func floatTripleFor(f *glimpl.Functions, ver [2]int, exts []string) (textureTrip
 	var attempts []string
 	for _, tt := range triples {
 		const size = 256
-		f.TexImage2D(glimpl.TEXTURE_2D, 0, tt.internalFormat, size, size, tt.format, tt.typ, nil)
+		f.TexImage2D(glimpl.TEXTURE_2D, 0, tt.internalFormat, size, size, tt.format, tt.typ)
 		f.FramebufferTexture2D(glimpl.FRAMEBUFFER, glimpl.COLOR_ATTACHMENT0, glimpl.TEXTURE_2D, tex, 0)
 		st := f.CheckFramebufferStatus(glimpl.FRAMEBUFFER)
 		if st == glimpl.FRAMEBUFFER_COMPLETE {
@@ -815,7 +916,7 @@ func srgbaTripleFor(ver [2]int, exts []string) (textureTriple, error) {
 }
 
 func alphaTripleFor(ver [2]int) textureTriple {
-	intf, f := glimpl.R8, glimpl.Enum(glimpl.RED)
+	intf, f := glimpl.Enum(glimpl.R8), glimpl.Enum(glimpl.RED)
 	if ver[0] < 3 {
 		// R8, RED not supported on OpenGL ES 2.0.
 		intf, f = glimpl.LUMINANCE, glimpl.Enum(glimpl.LUMINANCE)
@@ -840,6 +941,8 @@ func firstBufferType(typ backend.BufferBinding) glimpl.Enum {
 		return glimpl.ARRAY_BUFFER
 	case typ&backend.BufferBindingUniforms != 0:
 		return glimpl.UNIFORM_BUFFER
+	case typ&backend.BufferBindingShaderStorage != 0:
+		return glimpl.SHADER_STORAGE_BUFFER
 	default:
 		panic("unsupported buffer type")
 	}

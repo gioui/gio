@@ -94,8 +94,12 @@ func (c *d3d11Context) Release() {
 	if c.fbo != nil {
 		c.fbo.Release()
 	}
-	c.swchain.Release()
-	c.Device.Release()
+	if c.swchain != nil {
+		c.swchain.Release()
+	}
+	if c.Device != nil {
+		c.Device.Release()
+	}
 	c.fbo = nil
 	c.swchain = nil
 	c.Device = nil

@@ -479,7 +479,7 @@ func (r *renderer) texHandle(cache *resourceCache, data imageOpData) backend.Tex
 	if err != nil {
 		panic(err)
 	}
-	handle.Upload(data.src)
+	backend.UploadImage(handle, image.Pt(0, 0), data.src)
 	tex.tex = handle
 	return tex.tex
 }

@@ -51,6 +51,13 @@ static void (*_glEndQuery)(GLenum target);
 static void (*_glGenQueries)(GLsizei n, GLuint *ids);
 static void (*_glGetQueryObjectuiv)(GLuint id, GLenum pname, GLuint *params);
 static const GLubyte* (*_glGetStringi)(GLenum name, GLuint index);
+static void (*_glMemoryBarrier)(GLbitfield barriers);
+static void (*_glDispatchCompute)(GLuint x, GLuint y, GLuint z);
+static void* (*_glMapBufferRange)(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access);
+static GLboolean (*_glUnmapBuffer)(GLenum target);
+static void (*_glBindImageTexture)(GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format);
+static void (*_glTexStorage2D)(GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height);
+static void (*_glBlitFramebuffer)(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter);
 
 // The pointer-free version of glVertexAttribPointer, to avoid the Cgo pointer checks.
 __attribute__ ((visibility ("hidden"))) void gio_glVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, uintptr_t offset) {
@@ -108,6 +115,34 @@ __attribute__ ((visibility ("hidden"))) void gio_glGetQueryObjectuiv(GLuint id, 
 	_glGetQueryObjectuiv(id, pname, params);
 }
 
+__attribute__ ((visibility ("hidden"))) void gio_glMemoryBarrier(GLbitfield barriers) {
+	_glMemoryBarrier(barriers);
+}
+
+__attribute__ ((visibility ("hidden"))) void gio_glDispatchCompute(GLuint x, GLuint y, GLuint z) {
+	_glDispatchCompute(x, y, z);
+}
+
+__attribute__ ((visibility ("hidden"))) void *gio_glMapBufferRange(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access) {
+	return _glMapBufferRange(target, offset, length, access);
+}
+
+__attribute__ ((visibility ("hidden"))) GLboolean gio_glUnmapBuffer(GLenum target) {
+	return _glUnmapBuffer(target);
+}
+
+__attribute__ ((visibility ("hidden"))) void gio_glBindImageTexture(GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format) {
+	_glBindImageTexture(unit, texture, level, layered, layer, access, format);
+}
+
+__attribute__ ((visibility ("hidden"))) void gio_glTexStorage2D(GLenum target, GLsizei levels, GLenum internalFormat, GLsizei width, GLsizei height) {
+	_glTexStorage2D(target, levels, internalFormat, width, height);
+}
+
+__attribute__ ((visibility ("hidden"))) void gio_glBlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter) {
+	_glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+}
+
 __attribute__((constructor)) static void gio_loadGLFunctions() {
 #ifdef __APPLE__
 	#if TARGET_OS_IPHONE
@@ -122,6 +157,7 @@ __attribute__((constructor)) static void gio_loadGLFunctions() {
 	_glGetUniformBlockIndex = glGetUniformBlockIndex;
 	_glUniformBlockBinding = glUniformBlockBinding;
 	_glGetStringi = glGetStringi;
+	_glTexStorage2D = glTexStorage2D;
 #else
 	// Load libGLESv3 if available.
 	dlopen("libGLESv3.so", RTLD_NOW | RTLD_GLOBAL);
@@ -150,6 +186,14 @@ __attribute__((constructor)) static void gio_loadGLFunctions() {
 	_glGetQueryObjectuiv = dlsym(RTLD_DEFAULT, "glGetQueryObjectuiv");
 	if (_glGetQueryObjectuiv == NULL)
 		_glGetQueryObjectuiv = dlsym(RTLD_DEFAULT, "glGetQueryObjectuivEXT");
+
+	_glMemoryBarrier = dlsym(RTLD_DEFAULT, "glMemoryBarrier");
+	_glDispatchCompute = dlsym(RTLD_DEFAULT, "glDispatchCompute");
+	_glMapBufferRange = dlsym(RTLD_DEFAULT, "glMapBufferRange");
+	_glUnmapBuffer = dlsym(RTLD_DEFAULT, "glUnmapBuffer");
+	_glBindImageTexture = dlsym(RTLD_DEFAULT, "glBindImageTexture");
+	_glTexStorage2D = dlsym(RTLD_DEFAULT, "glTexStorage2D");
+	_glBlitFramebuffer = dlsym(RTLD_DEFAULT, "glBlitFramebuffer");
 #endif
 }
 */
@@ -204,6 +248,14 @@ func (f *Functions) BindRenderbuffer(target Enum, fb Renderbuffer) {
 	C.glBindRenderbuffer(C.GLenum(target), C.GLuint(fb.V))
 }
 
+func (f *Functions) BindImageTexture(unit int, t Texture, level int, layered bool, layer int, access, format Enum) {
+	l := C.GLboolean(C.GL_FALSE)
+	if layered {
+		l = C.GL_TRUE
+	}
+	C.gio_glBindImageTexture(C.GLuint(unit), C.GLuint(t.V), C.GLint(level), l, C.GLint(layer), C.GLenum(access), C.GLenum(format))
+}
+
 func (f *Functions) BindTexture(target Enum, t Texture) {
 	C.glBindTexture(C.GLenum(target), C.GLuint(t.V))
 }
@@ -216,12 +268,24 @@ func (f *Functions) BlendFunc(sfactor, dfactor Enum) {
 	C.glBlendFunc(C.GLenum(sfactor), C.GLenum(dfactor))
 }
 
-func (f *Functions) BufferData(target Enum, src []byte, usage Enum) {
+func (f *Functions) BlitFramebuffer(sx0, sy0, sx1, sy1, dx0, dy0, dx1, dy1 int, mask Enum, filter Enum) {
+	C.gio_glBlitFramebuffer(
+		C.GLint(sx0), C.GLint(sy0), C.GLint(sx1), C.GLint(sy1),
+		C.GLint(dx0), C.GLint(dy0), C.GLint(dx1), C.GLint(dy1),
+		C.GLenum(mask), C.GLenum(filter),
+	)
+}
+
+func (f *Functions) BufferData(target Enum, size int, usage Enum) {
+	C.glBufferData(C.GLenum(target), C.GLsizeiptr(size), nil, C.GLenum(usage))
+}
+
+func (f *Functions) BufferSubData(target Enum, offset int, src []byte) {
 	var p unsafe.Pointer
 	if len(src) > 0 {
 		p = unsafe.Pointer(&src[0])
 	}
-	C.glBufferData(C.GLenum(target), C.GLsizeiptr(len(src)), p, C.GLenum(usage))
+	C.glBufferSubData(C.GLenum(target), C.GLintptr(offset), C.GLsizeiptr(len(src)), p)
 }
 
 func (f *Functions) CheckFramebufferStatus(target Enum) Enum {
@@ -336,6 +400,10 @@ func (f *Functions) DrawArrays(mode Enum, first int, count int) {
 
 func (f *Functions) DrawElements(mode Enum, count int, ty Enum, offset int) {
 	C.gio_glDrawElements(C.GLenum(mode), C.GLsizei(count), C.GLenum(ty), C.uintptr_t(offset))
+}
+
+func (f *Functions) DispatchCompute(x, y, z int) {
+	C.gio_glDispatchCompute(C.GLuint(x), C.GLuint(y), C.GLuint(z))
 }
 
 func (f *Functions) Enable(cap Enum) {
@@ -464,6 +532,18 @@ func (f *Functions) PixelStorei(pname Enum, param int32) {
 	C.glPixelStorei(C.GLenum(pname), C.GLint(param))
 }
 
+func (f *Functions) MemoryBarrier(barriers Enum) {
+	C.gio_glMemoryBarrier(C.GLbitfield(barriers))
+}
+
+func (f *Functions) MapBufferRange(target Enum, offset, length int, access Enum) []byte {
+	p := C.gio_glMapBufferRange(C.GLenum(target), C.GLintptr(offset), C.GLsizeiptr(length), C.GLbitfield(access))
+	if p == nil {
+		return nil
+	}
+	return (*([1 << 30]byte))(p)[:length:length]
+}
+
 func (f *Functions) Scissor(x, y, width, height int32) {
 	C.glScissor(C.GLint(x), C.GLint(y), C.GLsizei(width), C.GLsizei(height))
 }
@@ -487,12 +567,12 @@ func (f *Functions) ShaderSource(s Shader, src string) {
 	C.glShaderSource(C.GLuint(s.V), 1, &csrc, &strlen)
 }
 
-func (f *Functions) TexImage2D(target Enum, level int, internalFormat int, width int, height int, format Enum, ty Enum, data []byte) {
-	var p unsafe.Pointer
-	if len(data) > 0 {
-		p = unsafe.Pointer(&data[0])
-	}
-	C.glTexImage2D(C.GLenum(target), C.GLint(level), C.GLint(internalFormat), C.GLsizei(width), C.GLsizei(height), 0, C.GLenum(format), C.GLenum(ty), p)
+func (f *Functions) TexImage2D(target Enum, level int, internalFormat Enum, width int, height int, format Enum, ty Enum) {
+	C.glTexImage2D(C.GLenum(target), C.GLint(level), C.GLint(internalFormat), C.GLsizei(width), C.GLsizei(height), 0, C.GLenum(format), C.GLenum(ty), nil)
+}
+
+func (f *Functions) TexStorage2D(target Enum, levels int, internalFormat Enum, width, height int) {
+	C.gio_glTexStorage2D(C.GLenum(target), C.GLsizei(levels), C.GLenum(internalFormat), C.GLsizei(width), C.GLsizei(height))
 }
 
 func (f *Functions) TexSubImage2D(target Enum, level int, x int, y int, width int, height int, format Enum, ty Enum, data []byte) {
@@ -533,6 +613,11 @@ func (f *Functions) Uniform4f(dst Uniform, v0 float32, v1 float32, v2 float32, v
 
 func (f *Functions) UseProgram(p Program) {
 	C.glUseProgram(C.GLuint(p.V))
+}
+
+func (f *Functions) UnmapBuffer(target Enum) bool {
+	r := C.gio_glUnmapBuffer(C.GLenum(target))
+	return r == C.GL_TRUE
 }
 
 func (f *Functions) VertexAttribPointer(dst Attrib, size int, ty Enum, normalized bool, stride int, offset int) {

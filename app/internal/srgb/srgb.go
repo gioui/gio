@@ -71,14 +71,14 @@ func (s *FBO) Blit() {
 		s.c.Uniform1i(s.c.GetUniformLocation(prog, "tex"), 0)
 		s.quad = s.c.CreateBuffer()
 		s.c.BindBuffer(glimpl.ARRAY_BUFFER, s.quad)
-		s.c.BufferData(glimpl.ARRAY_BUFFER,
-			unsafe.BytesView([]float32{
-				-1, +1, 0, 1,
-				+1, +1, 1, 1,
-				-1, -1, 0, 0,
-				+1, -1, 1, 0,
-			}),
-			glimpl.STATIC_DRAW)
+		coords := unsafe.BytesView([]float32{
+			-1, +1, 0, 1,
+			+1, +1, 1, 1,
+			-1, -1, 0, 0,
+			+1, -1, 1, 0,
+		})
+		s.c.BufferData(glimpl.ARRAY_BUFFER, len(coords), glimpl.STATIC_DRAW)
+		s.c.BufferSubData(glimpl.ARRAY_BUFFER, 0, coords)
 		s.blitted = true
 	}
 	s.c.BindFramebuffer(glimpl.FRAMEBUFFER, glimpl.Framebuffer{})
@@ -112,9 +112,9 @@ func (s *FBO) Refresh(w, h int) error {
 	}
 	s.c.BindTexture(glimpl.TEXTURE_2D, s.colorTex)
 	if s.gl3 {
-		s.c.TexImage2D(glimpl.TEXTURE_2D, 0, glimpl.SRGB8_ALPHA8, w, h, glimpl.RGBA, glimpl.UNSIGNED_BYTE, nil)
+		s.c.TexImage2D(glimpl.TEXTURE_2D, 0, glimpl.SRGB8_ALPHA8, w, h, glimpl.RGBA, glimpl.UNSIGNED_BYTE)
 	} else /* EXT_sRGB */ {
-		s.c.TexImage2D(glimpl.TEXTURE_2D, 0, glimpl.SRGB_ALPHA_EXT, w, h, glimpl.SRGB_ALPHA_EXT, glimpl.UNSIGNED_BYTE, nil)
+		s.c.TexImage2D(glimpl.TEXTURE_2D, 0, glimpl.SRGB_ALPHA_EXT, w, h, glimpl.SRGB_ALPHA_EXT, glimpl.UNSIGNED_BYTE)
 	}
 	currentRB := glimpl.Renderbuffer(s.c.GetBinding(glimpl.RENDERBUFFER_BINDING))
 	s.c.BindRenderbuffer(glimpl.RENDERBUFFER, s.depthBuffer)
@@ -136,7 +136,7 @@ func (s *FBO) Refresh(w, h int) error {
 		var pixel [4]byte
 		s.c.ReadPixels(0, 0, 1, 1, glimpl.RGBA, glimpl.UNSIGNED_BYTE, pixel[:])
 		if pixel[0] == 128 { // Correct sRGB color value is ~188
-			s.c.TexImage2D(glimpl.TEXTURE_2D, 0, glimpl.RGBA, w, h, glimpl.RGBA, glimpl.UNSIGNED_BYTE, nil)
+			s.c.TexImage2D(glimpl.TEXTURE_2D, 0, glimpl.RGBA, w, h, glimpl.RGBA, glimpl.UNSIGNED_BYTE)
 			if st := s.c.CheckFramebufferStatus(glimpl.FRAMEBUFFER); st != glimpl.FRAMEBUFFER_COMPLETE {
 				return fmt.Errorf("fallback RGBA framebuffer incomplete (%dx%d), status: %#x error: %x", s.width, s.height, st, s.c.GetError())
 			}

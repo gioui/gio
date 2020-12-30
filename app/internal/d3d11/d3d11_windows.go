@@ -1127,14 +1127,14 @@ func (c *_ID3D11DeviceContext) PSSetShader(s *_ID3D11PixelShader) {
 	)
 }
 
-func (c *_ID3D11DeviceContext) UpdateSubresource(res *_ID3D11Resource, rowPitch, depthPitch uint32, data []byte) {
+func (c *_ID3D11DeviceContext) UpdateSubresource(res *_ID3D11Resource, dstBox *_D3D11_BOX, rowPitch, depthPitch uint32, data []byte) {
 	syscall.Syscall9(
 		c.vtbl.UpdateSubresource,
 		7,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(res)),
 		0, // DstSubresource
-		0, // pDstBox
+		uintptr(unsafe.Pointer(dstBox)),
 		uintptr(unsafe.Pointer(&data[0])),
 		uintptr(rowPitch),
 		uintptr(depthPitch),

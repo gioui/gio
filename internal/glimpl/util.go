@@ -37,6 +37,26 @@ func CreateProgram(ctx *Functions, vsSrc, fsSrc string, attribs []string) (Progr
 	return prog, nil
 }
 
+func CreateComputeProgram(ctx *Functions, src string) (Program, error) {
+	cs, err := createShader(ctx, COMPUTE_SHADER, src)
+	if err != nil {
+		return Program{}, err
+	}
+	defer ctx.DeleteShader(cs)
+	prog := ctx.CreateProgram()
+	if !prog.Valid() {
+		return Program{}, errors.New("glCreateProgram failed")
+	}
+	ctx.AttachShader(prog, cs)
+	ctx.LinkProgram(prog)
+	if ctx.GetProgrami(prog, LINK_STATUS) == 0 {
+		log := ctx.GetProgramInfoLog(prog)
+		ctx.DeleteProgram(prog)
+		return Program{}, fmt.Errorf("program link failed: %s", strings.TrimSpace(log))
+	}
+	return prog, nil
+}
+
 func createShader(ctx *Functions, typ Enum, src string) (Shader, error) {
 	sh := ctx.CreateShader(typ)
 	if !sh.Valid() {
