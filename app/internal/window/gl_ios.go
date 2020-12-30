@@ -57,7 +57,7 @@ func newContext(w *window) (*context, error) {
 }
 
 func (c *context) Backend() (backend.Device, error) {
-	return gl.NewBackend(c.c)
+	return gl.NewBackend(nil)
 }
 
 func (c *context) Release() {
