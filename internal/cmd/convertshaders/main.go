@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -67,119 +68,17 @@ func generate() error {
 	out.WriteString("var (\n")
 
 	for _, shader := range shaders {
-		if ext := filepath.Ext(shader); ext != ".vert" && ext != ".frag" {
+		var err error
+		switch filepath.Ext(shader) {
+		case ".vert", ".frag":
+			err = generateShader(glslcc, tmp, &out, shader)
+		case ".comp":
+			err = generateComputeShader(tmp, &out, shader)
+		default:
 			continue
 		}
-		const nvariants = 3
-		var variants [nvariants]struct {
-			backend.ShaderSources
-			hlslSrc string
-		}
-		args := [nvariants]shaderArgs{
-			{
-				FetchColorExpr: `_color`,
-				Header:         `layout(binding=0) uniform Color { vec4 _color; };`,
-			},
-			{
-				FetchColorExpr: `mix(_color1, _color2, clamp(vUV.x, 0.0, 1.0))`,
-				Header:         `layout(binding=0) uniform Gradient { vec4 _color1; vec4 _color2; };`,
-			},
-			{
-				FetchColorExpr: `texture(tex, vUV)`,
-				Header:         `layout(binding=0) uniform sampler2D tex;`,
-			},
-		}
-		for i := range args {
-			glsl100es, reflect, err := convertShader(tmp, glslcc, shader, "gles", "100", &args[i], false)
-			if err != nil {
-				return err
-			}
-			if err := parseReflection(reflect, &variants[i].ShaderSources); err != nil {
-				return err
-			}
-			glsl300es, _, err := convertShader(tmp, glslcc, shader, "gles", "300", &args[i], false)
-			if err != nil {
-				return err
-			}
-			glsl130, _, err := convertShader(tmp, glslcc, shader, "glsl", "130", &args[i], false)
-			if err != nil {
-				return err
-			}
-			hlsl, _, err := convertShader(tmp, glslcc, shader, "hlsl", "40", &args[i], false)
-			if err != nil {
-				return err
-			}
-			var hlslProf string
-			switch filepath.Ext(shader) {
-			case ".frag":
-				hlslProf = "ps"
-			case ".vert":
-				hlslProf = "vs"
-			default:
-				return fmt.Errorf("unrecognized shader type %s", shader)
-			}
-			var hlslc []byte
-			hlslc, err = compileHLSL(hlsl, "main", hlslProf+"_4_0_level_9_1")
-			if err != nil {
-				// Attempt shader model 4.0. Only the app/headless
-				// test shaders use features not supported by level
-				// 9.1.
-				hlslc, err = compileHLSL(hlsl, "main", hlslProf+"_4_0")
-				if err != nil {
-					return err
-				}
-			}
-			// OpenGL 3.2 Core only accepts GLSL version 1.50, but is
-			// otherwise compatible with version 1.30.
-			glsl150 := strings.Replace(glsl130, "#version 130", "#version 150", 1)
-			variants[i].GLSL100ES = glsl100es
-			variants[i].GLSL300ES = glsl300es
-			variants[i].GLSL130 = glsl130
-			variants[i].GLSL150 = glsl150
-			variants[i].hlslSrc = hlsl
-			variants[i].HLSL = hlslc
-		}
-		name := filepath.Base(shader)
-		name = strings.ReplaceAll(name, ".", "_")
-		fmt.Fprintf(&out, "\tshader_%s = ", name)
-		// If the shader don't use the variant arguments, output
-		// only a single version.
-		multiVariant := variants[0].GLSL100ES != variants[1].GLSL100ES
-		if multiVariant {
-			fmt.Fprintf(&out, "[...]backend.ShaderSources{\n")
-		}
-		for _, src := range variants {
-			fmt.Fprintf(&out, "backend.ShaderSources{\n")
-			if len(src.Inputs) > 0 {
-				fmt.Fprintf(&out, "Inputs: %#v,\n", src.Inputs)
-			}
-			if u := src.Uniforms; len(u.Blocks) > 0 {
-				fmt.Fprintf(&out, "Uniforms: backend.UniformsReflection{\n")
-				fmt.Fprintf(&out, "Blocks: %#v,\n", u.Blocks)
-				fmt.Fprintf(&out, "Locations: %#v,\n", u.Locations)
-				fmt.Fprintf(&out, "Size: %d,\n", u.Size)
-				fmt.Fprintf(&out, "},\n")
-			}
-			if len(src.Textures) > 0 {
-				fmt.Fprintf(&out, "Textures: %#v,\n", src.Textures)
-			}
-			fmt.Fprintf(&out, "GLSL100ES: %#v,\n", src.GLSL100ES)
-			fmt.Fprintf(&out, "GLSL300ES: %#v,\n", src.GLSL300ES)
-			fmt.Fprintf(&out, "GLSL130: %#v,\n", src.GLSL130)
-			fmt.Fprintf(&out, "GLSL150: %#v,\n", src.GLSL150)
-			fmt.Fprintf(&out, "/*\n%s\n*/\n", src.hlslSrc)
-			fmt.Fprintf(&out, "HLSL: %#v,\n", src.HLSL)
-			fmt.Fprintf(&out, "}")
-			if multiVariant {
-				fmt.Fprintf(&out, ",")
-			}
-			fmt.Fprintf(&out, "\n")
-			if !multiVariant {
-				break
-			}
-		}
-		if multiVariant {
-			fmt.Fprintf(&out, "}\n")
+		if err != nil {
+			return err
 		}
 	}
 	out.WriteString(")")
@@ -190,6 +89,148 @@ func generate() error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+func generateComputeShader(tmp string, out io.Writer, shader string) error {
+	glslangValidator, err := exec.LookPath("glslangValidator")
+	if err != nil {
+		return err
+	}
+	spirv_cross, err := exec.LookPath("spirv-cross")
+	if err != nil {
+		return err
+	}
+	var src backend.ShaderSources
+	glsl310es, err := convertComputeShader(tmp, glslangValidator, spirv_cross, shader)
+	if err != nil {
+		return err
+	}
+	src.Name = filepath.Base(shader)
+	src.GLSL310ES = glsl310es
+	name := filepath.Base(shader)
+	name = strings.ReplaceAll(name, ".", "_")
+	fmt.Fprintf(out, "\tshader_%s = ", name)
+	fmt.Fprintf(out, "backend.ShaderSources{\n")
+	fmt.Fprintf(out, "Name: %#v,\n", src.Name)
+	fmt.Fprintf(out, "GLSL310ES: %#v,\n", src.GLSL310ES)
+	fmt.Fprintf(out, "}")
+	fmt.Fprintf(out, "\n")
+	return nil
+}
+
+func generateShader(glslcc, tmp string, out io.Writer, shader string) error {
+	const nvariants = 3
+	var variants [nvariants]struct {
+		backend.ShaderSources
+		hlslSrc string
+	}
+	args := [nvariants]shaderArgs{
+		{
+			FetchColorExpr: `_color`,
+			Header:         `layout(binding=0) uniform Color { vec4 _color; };`,
+		},
+		{
+			FetchColorExpr: `mix(_color1, _color2, clamp(vUV.x, 0.0, 1.0))`,
+			Header:         `layout(binding=0) uniform Gradient { vec4 _color1; vec4 _color2; };`,
+		},
+		{
+			FetchColorExpr: `texture(tex, vUV)`,
+			Header:         `layout(binding=0) uniform sampler2D tex;`,
+		},
+	}
+	for i := range args {
+		// Ignore error; some shaders are not meant to run in GLSL 1.00.
+		glsl100es, _, _ := convertShader(tmp, glslcc, shader, "gles", "100", &args[i], false)
+		glsl300es, reflect, err := convertShader(tmp, glslcc, shader, "gles", "300", &args[i], false)
+		if err != nil {
+			return err
+		}
+		glsl130, _, err := convertShader(tmp, glslcc, shader, "glsl", "130", &args[i], false)
+		if err != nil {
+			return err
+		}
+		hlsl, _, err := convertShader(tmp, glslcc, shader, "hlsl", "40", &args[i], false)
+		if err != nil {
+			return err
+		}
+		if err := parseReflection(reflect, &variants[i].ShaderSources); err != nil {
+			return err
+		}
+		var hlslProf string
+		switch filepath.Ext(shader) {
+		case ".frag":
+			hlslProf = "ps"
+		case ".vert":
+			hlslProf = "vs"
+		default:
+			return fmt.Errorf("unrecognized shader type %s", shader)
+		}
+		var hlslc []byte
+		hlslc, err = compileHLSL(hlsl, "main", hlslProf+"_4_0_level_9_1")
+		if err != nil {
+			// Attempt shader model 4.0. Only the app/headless
+			// test shaders use features not supported by level
+			// 9.1.
+			hlslc, err = compileHLSL(hlsl, "main", hlslProf+"_4_0")
+			if err != nil {
+				return err
+			}
+		}
+		// OpenGL 3.2 Core only accepts GLSL version 1.50, but is
+		// otherwise compatible with version 1.30.
+		glsl150 := strings.Replace(glsl130, "#version 130", "#version 150", 1)
+		variants[i].Name = filepath.Base(shader)
+		variants[i].GLSL100ES = glsl100es
+		variants[i].GLSL300ES = glsl300es
+		variants[i].GLSL130 = glsl130
+		variants[i].GLSL150 = glsl150
+		variants[i].hlslSrc = hlsl
+		variants[i].HLSL = hlslc
+	}
+	name := filepath.Base(shader)
+	name = strings.ReplaceAll(name, ".", "_")
+	fmt.Fprintf(out, "\tshader_%s = ", name)
+	// If the shader don't use the variant arguments, output
+	// only a single version.
+	multiVariant := variants[0].GLSL100ES != variants[1].GLSL100ES
+	if multiVariant {
+		fmt.Fprintf(out, "[...]backend.ShaderSources{\n")
+	}
+	for _, src := range variants {
+		fmt.Fprintf(out, "backend.ShaderSources{\n")
+		fmt.Fprintf(out, "Name: %#v,\n", src.Name)
+		if len(src.Inputs) > 0 {
+			fmt.Fprintf(out, "Inputs: %#v,\n", src.Inputs)
+		}
+		if u := src.Uniforms; len(u.Blocks) > 0 {
+			fmt.Fprintf(out, "Uniforms: backend.UniformsReflection{\n")
+			fmt.Fprintf(out, "Blocks: %#v,\n", u.Blocks)
+			fmt.Fprintf(out, "Locations: %#v,\n", u.Locations)
+			fmt.Fprintf(out, "Size: %d,\n", u.Size)
+			fmt.Fprintf(out, "},\n")
+		}
+		if len(src.Textures) > 0 {
+			fmt.Fprintf(out, "Textures: %#v,\n", src.Textures)
+		}
+		fmt.Fprintf(out, "GLSL100ES: %#v,\n", src.GLSL100ES)
+		fmt.Fprintf(out, "GLSL300ES: %#v,\n", src.GLSL300ES)
+		fmt.Fprintf(out, "GLSL130: %#v,\n", src.GLSL130)
+		fmt.Fprintf(out, "GLSL150: %#v,\n", src.GLSL150)
+		fmt.Fprintf(out, "/*\n%s\n*/\n", src.hlslSrc)
+		fmt.Fprintf(out, "HLSL: %#v,\n", src.HLSL)
+		fmt.Fprintf(out, "}")
+		if multiVariant {
+			fmt.Fprintf(out, ",")
+		}
+		fmt.Fprintf(out, "\n")
+		if !multiVariant {
+			break
+		}
+	}
+	if multiVariant {
+		fmt.Fprintf(out, "}\n")
+	}
+	return nil
 }
 
 func parseReflection(jsonData []byte, info *backend.ShaderSources) error {
@@ -223,14 +264,23 @@ func parseReflection(jsonData []byte, info *backend.ShaderSources) error {
 		Dimension string `json:"dimension"`
 		Format    string `json:"format"`
 	}
+	type StorageBufferReflection struct {
+		ID        int    `json:"id"`
+		Name      string `json:"name"`
+		Set       int    `json:"set"`
+		Binding   int    `json:"binding"`
+		BlockSize int    `json:"block_size"`
+	}
 	type shaderReflection struct {
 		Inputs         []InputReflection         `json:"inputs"`
 		UniformBuffers []UniformBufferReflection `json:"uniform_buffers"`
 		Textures       []TextureReflection       `json:"textures"`
+		StorageBuffers []StorageBufferReflection `json:"storage_buffers"`
 	}
 	type shaderMetadata struct {
 		VS shaderReflection `json:"vs"`
 		FS shaderReflection `json:"fs"`
+		CS shaderReflection `json:"cs"`
 	}
 	var reflect shaderMetadata
 	if err := json.Unmarshal(jsonData, &reflect); err != nil {
@@ -290,6 +340,12 @@ func parseReflection(jsonData []byte, info *backend.ShaderSources) error {
 			Binding: texture.Binding,
 		})
 	}
+	for _, sb := range reflect.CS.StorageBuffers {
+		info.StorageBuffers = append(info.StorageBuffers, backend.StorageBufferBinding{
+			Binding:   sb.Binding,
+			BlockSize: sb.BlockSize,
+		})
+	}
 	return nil
 }
 
@@ -339,6 +395,9 @@ func convertShader(tmp, glslcc, path, lang, profile string, args *shaderArgs, fl
 	case ".frag":
 		progFlag = "--frag"
 		progSuffix = "fs"
+	case ".comp":
+		progFlag = "--compute"
+		progSuffix = "cs"
 	default:
 		return "", nil, fmt.Errorf("unrecognized shader type: %s", path)
 	}
@@ -361,7 +420,7 @@ func convertShader(tmp, glslcc, path, lang, profile string, args *shaderArgs, fl
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return "", nil, fmt.Errorf("%s: %v", path, err)
+		return "", nil, fmt.Errorf("%s: %v", strings.Join(cmd.Args, " "), err)
 	}
 	f, err := os.Open(filepath.Join(tmp, "shader_"+progSuffix))
 	if err != nil {
@@ -378,4 +437,32 @@ func convertShader(tmp, glslcc, path, lang, profile string, args *shaderArgs, fl
 		return "", nil, err
 	}
 	return string(src), reflect, nil
+}
+
+func convertComputeShader(tmp, glslangValidator, spirv_cross, path string) (string, error) {
+	spvFile := filepath.Join(tmp, "shader.spv")
+	cmd := exec.Command(glslangValidator,
+		"-G100", // OpenGL ES 3.1.
+		"-w",    // Suppress warnings.
+		"-o", spvFile,
+		path,
+	)
+	defer os.Remove(spvFile)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("%s: %v", strings.Join(cmd.Args, " "), err)
+	}
+	cmd = exec.Command(spirv_cross,
+		"--es",
+		"--version", "310",
+		spvFile,
+	)
+	var shaderDump bytes.Buffer
+	cmd.Stdout = &shaderDump
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("%s: %v", strings.Join(cmd.Args, " "), err)
+	}
+	return shaderDump.String(), nil
 }
