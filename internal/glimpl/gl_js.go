@@ -90,14 +90,23 @@ func (f *Functions) BindRenderbuffer(target Enum, rb Renderbuffer) {
 func (f *Functions) BindTexture(target Enum, t Texture) {
 	f.Ctx.Call("bindTexture", int(target), js.Value(t))
 }
+func (f *Functions) BindImageTexture(unit int, t Texture, level int, layered bool, layer int, access, format Enum) {
+	panic("not implemented")
+}
 func (f *Functions) BlendEquation(mode Enum) {
 	f.Ctx.Call("blendEquation", int(mode))
 }
 func (f *Functions) BlendFunc(sfactor, dfactor Enum) {
 	f.Ctx.Call("blendFunc", int(sfactor), int(dfactor))
 }
-func (f *Functions) BufferData(target Enum, src []byte, usage Enum) {
-	f.Ctx.Call("bufferData", int(target), f.byteArrayOf(src), int(usage))
+func (f *Functions) BlitFramebuffer(sx0, sy0, sx1, sy1, dx0, dy0, dx1, dy1 int, mask Enum, filter Enum) {
+	panic("not implemented")
+}
+func (f *Functions) BufferData(target Enum, size int, usage Enum) {
+	f.Ctx.Call("bufferData", int(target), size, int(usage))
+}
+func (f *Functions) BufferSubData(target Enum, offset int, src []byte) {
+	f.Ctx.Call("bufferSubData", int(target), offset, f.byteArrayOf(src))
 }
 func (f *Functions) CheckFramebufferStatus(target Enum) Enum {
 	return Enum(f.Ctx.Call("checkFramebufferStatus", int(target)).Int())
@@ -177,6 +186,9 @@ func (f *Functions) DrawArrays(mode Enum, first, count int) {
 }
 func (f *Functions) DrawElements(mode Enum, count int, ty Enum, offset int) {
 	f.Ctx.Call("drawElements", int(mode), count, int(ty), offset)
+}
+func (f *Functions) DispatchCompute(x, y, z int) {
+	panic("not implemented")
 }
 func (f *Functions) Enable(cap Enum) {
 	f.Ctx.Call("enable", int(cap))
@@ -270,6 +282,12 @@ func (f *Functions) LinkProgram(p Program) {
 func (f *Functions) PixelStorei(pname Enum, param int32) {
 	f.Ctx.Call("pixelStorei", int(pname), param)
 }
+func (f *Functions) MemoryBarrier(barriers Enum) {
+	panic("not implemented")
+}
+func (f *Functions) MapBufferRange(target Enum, offset, length int, access Enum) []byte {
+	panic("not implemented")
+}
 func (f *Functions) RenderbufferStorage(target, internalformat Enum, width, height int) {
 	f.Ctx.Call("renderbufferStorage", int(target), int(internalformat), width, height)
 }
@@ -284,8 +302,11 @@ func (f *Functions) Scissor(x, y, width, height int32) {
 func (f *Functions) ShaderSource(s Shader, src string) {
 	f.Ctx.Call("shaderSource", js.Value(s), src)
 }
-func (f *Functions) TexImage2D(target Enum, level int, internalFormat int, width, height int, format, ty Enum, data []byte) {
-	f.Ctx.Call("texImage2D", int(target), int(level), int(internalFormat), int(width), int(height), 0, int(format), int(ty), f.byteArrayOf(data))
+func (f *Functions) TexImage2D(target Enum, level int, internalFormat Enum, width, height int, format, ty Enum) {
+	f.Ctx.Call("texImage2D", int(target), int(level), int(internalFormat), int(width), int(height), 0, int(format), int(ty), nil)
+}
+func (f *Functions) TexStorage2D(target Enum, levels int, internalFormat Enum, width, height int) {
+	f.Ctx.Call("texStorage2D", int(target), levels, int(internalFormat), width, height)
 }
 func (f *Functions) TexSubImage2D(target Enum, level int, x, y, width, height int, format, ty Enum, data []byte) {
 	f.Ctx.Call("texSubImage2D", int(target), level, x, y, width, height, int(format), int(ty), f.byteArrayOf(data))
@@ -313,6 +334,9 @@ func (f *Functions) Uniform4f(dst Uniform, v0, v1, v2, v3 float32) {
 }
 func (f *Functions) UseProgram(p Program) {
 	f.Ctx.Call("useProgram", js.Value(p))
+}
+func (f *Functions) UnmapBuffer(target Enum) bool {
+	panic("not implemented")
 }
 func (f *Functions) VertexAttribPointer(dst Attrib, size int, ty Enum, normalized bool, stride, offset int) {
 	f.Ctx.Call("vertexAttribPointer", int(dst), size, int(ty), normalized, stride, offset)
