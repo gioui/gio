@@ -14,6 +14,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"os"
 	"reflect"
 	"time"
 	"unsafe"
@@ -372,10 +373,13 @@ const (
 )
 
 func New(ctx backend.Device) (GPU, error) {
+	forceCompute := os.Getenv("GIORENDERER") == "forcecompute"
 	feats := ctx.Caps().Features
 	switch {
-	case feats.Has(backend.FeatureFloatRenderTargets):
+	case !forceCompute && feats.Has(backend.FeatureFloatRenderTargets):
 		return newGPU(ctx)
+	case feats.Has(backend.FeatureCompute):
+		return newCompute(ctx)
 	default:
 		return nil, errors.New("gpu: no support for float render targets nor compute")
 	}

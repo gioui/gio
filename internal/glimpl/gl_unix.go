@@ -157,7 +157,6 @@ __attribute__((constructor)) static void gio_loadGLFunctions() {
 	_glGetUniformBlockIndex = glGetUniformBlockIndex;
 	_glUniformBlockBinding = glUniformBlockBinding;
 	_glGetStringi = glGetStringi;
-	_glTexStorage2D = glTexStorage2D;
 #else
 	// Load libGLESv3 if available.
 	dlopen("libGLESv3.so", RTLD_NOW | RTLD_GLOBAL);
