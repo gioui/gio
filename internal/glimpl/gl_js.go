@@ -13,15 +13,21 @@ type Functions struct {
 	EXT_disjoint_timer_query        js.Value
 	EXT_disjoint_timer_query_webgl2 js.Value
 
+	// Cached reference to the Uint8Array JS type.
+	uint8Array js.Value
+
 	// Cached JS arrays.
-	byteBuf  js.Value
+	arrayBuf js.Value
 	int32Buf js.Value
 }
 
 type Context js.Value
 
 func NewFunctions(ctx Context) (*Functions, error) {
-	f := &Functions{Ctx: js.Value(ctx)}
+	f := &Functions{
+		Ctx:        js.Value(ctx),
+		uint8Array: js.Global().Get("Uint8Array"),
+	}
 	if err := f.Init(); err != nil {
 		return nil, err
 	}
@@ -268,9 +274,9 @@ func (f *Functions) RenderbufferStorage(target, internalformat Enum, width, heig
 	f.Ctx.Call("renderbufferStorage", int(target), int(internalformat), width, height)
 }
 func (f *Functions) ReadPixels(x, y, width, height int, format, ty Enum, data []byte) {
-	f.resizeByteBuffer(len(data))
-	f.Ctx.Call("readPixels", x, y, width, height, int(format), int(ty), f.byteBuf)
-	js.CopyBytesToGo(data, f.byteBuf)
+	ba := f.byteArrayOf(data)
+	f.Ctx.Call("readPixels", x, y, width, height, int(format), int(ty), ba)
+	js.CopyBytesToGo(data, ba)
 }
 func (f *Functions) Scissor(x, y, width, height int32) {
 	f.Ctx.Call("scissor", x, y, width, height)
@@ -320,18 +326,19 @@ func (f *Functions) byteArrayOf(data []byte) js.Value {
 		return js.Null()
 	}
 	f.resizeByteBuffer(len(data))
-	js.CopyBytesToJS(f.byteBuf, data)
-	return f.byteBuf
+	ba := f.uint8Array.New(f.arrayBuf, int(0), int(len(data)))
+	js.CopyBytesToJS(ba, data)
+	return ba
 }
 
 func (f *Functions) resizeByteBuffer(n int) {
 	if n == 0 {
 		return
 	}
-	if !f.byteBuf.IsUndefined() && f.byteBuf.Length() >= n {
+	if !f.arrayBuf.IsUndefined() && f.arrayBuf.Length() >= n {
 		return
 	}
-	f.byteBuf = js.Global().Get("Uint8Array").New(n)
+	f.arrayBuf = js.Global().Get("ArrayBuffer").New(n)
 }
 
 func paramVal(v js.Value) int {
