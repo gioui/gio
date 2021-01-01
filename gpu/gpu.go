@@ -1342,7 +1342,7 @@ func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D, outline bool, stroke c
 	case stroke.Width > 0:
 		// Stroke path.
 		quads := make(strokeQuads, 0, 2*len(aux)/(ops.QuadSize+4))
-		for qi := 0; len(aux) >= (ops.QuadSize + 4); qi++ {
+		for len(aux) >= ops.QuadSize+4 {
 			quad := strokeQuad{
 				contour: bo.Uint32(aux),
 				quad:    ops.DecodeQuad(aux[4:]),
@@ -1360,14 +1360,36 @@ func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D, outline bool, stroke c
 
 	case outline:
 		// Outline path.
-		for qi := 0; len(aux) >= (ops.QuadSize + 4); qi++ {
+		first := true
+		var firstPt, lastPt f32.Point
+		for len(aux) >= ops.QuadSize+4 {
 			d.qs.contour = bo.Uint32(aux)
 			quad := ops.DecodeQuad(aux[4:])
 			quad = quad.Transform(tr)
 
+			if first {
+				first = false
+				firstPt = quad.From
+				lastPt = quad.From
+			}
+			if quad.From != lastPt {
+				if lastPt != firstPt {
+					// Close outline before starting a new.
+					mid := firstPt.Add(lastPt).Mul(.5)
+					d.qs.splitAndEncode(ops.Quad{From: lastPt, To: firstPt, Ctrl: mid})
+				}
+				firstPt = quad.From
+			}
+			lastPt = quad.To
+
 			d.qs.splitAndEncode(quad)
 
 			aux = aux[ops.QuadSize+4:]
+		}
+		// Close last outline if necessary.
+		if !first && lastPt != firstPt {
+			mid := firstPt.Add(lastPt).Mul(.5)
+			d.qs.splitAndEncode(ops.Quad{From: lastPt, To: firstPt, Ctrl: mid})
 		}
 	}
 
