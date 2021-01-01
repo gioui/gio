@@ -32,6 +32,15 @@ import (
 	"gioui.org/op/clip"
 )
 
+// strokeTolerance is used to reconcile rounding errors arising
+// when splitting quads into smaller and smaller segments to approximate
+// them into straight lines, and when joining back segments.
+//
+// The magic value of 0.01 was found by striking a compromise between
+// aesthetic looking (curves did look like curves, even after linearization)
+// and speed.
+const strokeTolerance = 0.01
+
 type strokeQuad struct {
 	contour uint32
 	quad    ops.Quad
@@ -182,10 +191,9 @@ func (qs strokeQuads) offset(hw float32, stroke clip.StrokeStyle) (rhs, lhs stro
 		})
 	}
 
-	const tolerance = 0.01
 	for i, state := range states {
-		rhs = rhs.append(strokeQuadBezier(state, +hw, tolerance))
-		lhs = lhs.append(strokeQuadBezier(state, -hw, tolerance))
+		rhs = rhs.append(strokeQuadBezier(state, +hw, strokeTolerance))
+		lhs = lhs.append(strokeQuadBezier(state, -hw, strokeTolerance))
 
 		// join the current and next segments
 		if hasNext := i+1 < len(states); hasNext || closed {
@@ -262,6 +270,21 @@ func (qs strokeQuads) append(ps strokeQuads) strokeQuads {
 		return qs
 	case len(qs) == 0:
 		return ps
+	}
+
+	// Consolidate quads and smooth out rounding errors.
+	// We need to also check for the strokeTolerance to correctly handle
+	// join/cap points or on-purpose disjoint quads.
+	p0 := qs[len(qs)-1].quad.To
+	p1 := ps[0].quad.From
+	if p0 != p1 && lenPt(p0.Sub(p1)) < strokeTolerance {
+		qs = append(qs, strokeQuad{
+			quad: ops.Quad{
+				From: p0,
+				Ctrl: p0.Add(p1).Mul(0.5),
+				To:   p1,
+			},
+		})
 	}
 	return append(qs, ps...)
 }
@@ -402,7 +425,10 @@ func strokeQuadBezier(state strokeState, d, flatness float32) strokeQuads {
 // flattenQuadBezier splits a Bézier quadratic curve into linear sub-segments,
 // themselves also encoded as Bézier (degenerate, flat) quadratic curves.
 func flattenQuadBezier(qs strokeQuads, p0, p1, p2 f32.Point, d, flatness float32) strokeQuads {
-	var t float32
+	var (
+		t      float32
+		flat64 = float64(flatness)
+	)
 	for t < 1 {
 		s2 := float64((p2.X-p0.X)*(p1.Y-p0.Y) - (p2.Y-p0.Y)*(p1.X-p0.X))
 		den := math.Hypot(float64(p1.X-p0.X), float64(p1.Y-p0.Y))
@@ -411,7 +437,6 @@ func flattenQuadBezier(qs strokeQuads, p0, p1, p2 f32.Point, d, flatness float32
 		}
 
 		s2 /= den
-		flat64 := float64(flatness)
 		t = 2.0 * float32(math.Sqrt(flat64/3.0/math.Abs(s2)))
 		if t >= 1.0 {
 			break
@@ -425,7 +450,15 @@ func flattenQuadBezier(qs strokeQuads, p0, p1, p2 f32.Point, d, flatness float32
 }
 
 func (qs *strokeQuads) addLine(p0, ctrl, p1 f32.Point, t, d float32) {
-	p0 = p0.Add(strokePathNorm(p0, ctrl, p1, 0, d))
+
+	switch i := len(*qs); i {
+	case 0:
+		p0 = p0.Add(strokePathNorm(p0, ctrl, p1, 0, d))
+	default:
+		// Address possible rounding errors and use previous point.
+		p0 = (*qs)[i-1].quad.To
+	}
+
 	p1 = p1.Add(strokePathNorm(p0, ctrl, p1, 1, d))
 
 	*qs = append(*qs,
