@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Unlicense OR MIT
+
 package rendertest
 
 import (
@@ -180,15 +182,47 @@ func verifyRef(t *testing.T, img *image.RGBA, frame int) (ok bool) {
 }
 
 func colorsClose(c1, c2 color.RGBA) bool {
-	return close(c1.A, c2.A) && close(c1.R, c2.R) && close(c1.G, c2.G) && close(c1.B, c2.B)
+	const delta = 0.01 // magic value obtained from experimentation.
+	return yiqEqApprox(c1, c2, delta)
 }
 
-func close(b1, b2 uint8) bool {
-	if b1 > b2 {
-		b1, b2 = b2, b1
-	}
-	diff := b2 - b1
-	return diff < 16
+// yiqEqApprox compares the colors of 2 pixels, in the NTSC YIQ color space,
+// as described in:
+//
+//   Measuring perceived color difference using YIQ NTSC
+//   transmission color space in mobile applications.
+//   Yuriy Kotsarenko, Fernando Ramos.
+//
+// An electronic version is available at:
+//
+// - http://www.progmat.uaem.mx:8080/artVol2Num2/Articulo3Vol2Num2.pdf
+func yiqEqApprox(c1, c2 color.RGBA, d2 float64) bool {
+	const max = 35215.0 // difference between 2 maximally different pixels.
+
+	var (
+		r1 = float64(c1.R)
+		g1 = float64(c1.G)
+		b1 = float64(c1.B)
+
+		r2 = float64(c2.R)
+		g2 = float64(c2.G)
+		b2 = float64(c2.B)
+
+		y1 = r1*0.29889531 + g1*0.58662247 + b1*0.11448223
+		i1 = r1*0.59597799 - g1*0.27417610 - b1*0.32180189
+		q1 = r1*0.21147017 - g1*0.52261711 + b1*0.31114694
+
+		y2 = r2*0.29889531 + g2*0.58662247 + b2*0.11448223
+		i2 = r2*0.59597799 - g2*0.27417610 - b2*0.32180189
+		q2 = r2*0.21147017 - g2*0.52261711 + b2*0.31114694
+
+		y = y1 - y2
+		i = i1 - i2
+		q = q1 - q2
+
+		diff = 0.5053*y*y + 0.299*i*i + 0.1957*q*q
+	)
+	return diff <= max*d2
 }
 
 func (r result) expect(x, y int, col color.RGBA) {
