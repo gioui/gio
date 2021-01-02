@@ -267,6 +267,7 @@ func (g *compute) uploadImages(ops []imageOp) error {
 	a := &g.atlas
 	var uploads map[interface{}]*image.RGBA
 	resize := false
+	reclaimed := false
 restart:
 	for {
 		for _, op := range ops {
@@ -284,12 +285,19 @@ restart:
 					a.positions = nil
 					uploads = nil
 					a.packer = packer{
-						maxDim: maxDim + 256,
+						maxDim: maxDim,
 					}
-					if maxDim > g.maxTextureDim {
-						return errors.New("compute: no space left in atlas texture")
+					if !reclaimed {
+						// Some images may no longer be in use, try again
+						// after clearing existing maps.
+						reclaimed = true
+					} else {
+						a.packer.maxDim += 256
+						resize = true
+						if a.packer.maxDim > g.maxTextureDim {
+							return errors.New("compute: no space left in atlas texture")
+						}
 					}
-					resize = true
 					a.packer.newPage()
 					continue restart
 				}
