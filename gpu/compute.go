@@ -409,7 +409,9 @@ func (g *compute) encodeClipStack(clip, bounds f32.Rectangle, p *pathOp) int {
 	}
 	if p != nil && p.path {
 		pathData, _ := g.drawOps.pathCache.get(p.pathKey)
-		g.encodePath(p.off, pathData.cpuData)
+		g.enc.transform(f32.Affine2D{}.Offset(p.off))
+		g.enc.append(pathData.computePath)
+		g.enc.transform(f32.Affine2D{}.Offset(p.off.Mul(-1)))
 	} else {
 		g.enc.rect(bounds, false)
 	}
@@ -419,7 +421,8 @@ func (g *compute) encodeClipStack(clip, bounds f32.Rectangle, p *pathOp) int {
 // encodePath takes a Path encoded with quadSplitter and encode it for elements.comp.
 // This is certainly wasteful, but minimizes implementation differences to the old
 // renderer.
-func (g *compute) encodePath(off f32.Point, p []byte) {
+func encodePath(p []byte) encoder {
+	var enc encoder
 	for len(p) > 0 {
 		// p contains quadratic curves encoded in vertex structs.
 		vertex := p[:vertStride]
@@ -436,12 +439,13 @@ func (g *compute) encodePath(off f32.Point, p []byte) {
 			math.Float32frombits(bo.Uint32(vertex[24:])),
 			math.Float32frombits(bo.Uint32(vertex[28:])),
 		)
-		g.enc.quad(from.Add(off), ctrl.Add(off), to.Add(off), false)
+		enc.quad(from, ctrl, to, false)
 
 		// The vertex is duplicated 4 times, one for each corner of quads drawn
 		// by the old renderer.
 		p = p[vertStride*4:]
 	}
+	return enc
 }
 
 func (g *compute) render(tileDims image.Point) error {
@@ -694,6 +698,12 @@ func (e *encoder) reset() {
 
 func (e *encoder) numElements() int {
 	return len(e.scene) / sceneElemSize
+}
+
+func (e *encoder) append(e2 encoder) {
+	e.scene = append(e.scene, e2.scene...)
+	e.npath += e2.npath
+	e.npathseg += e2.npathseg
 }
 
 func (e *encoder) transform(m f32.Affine2D) {

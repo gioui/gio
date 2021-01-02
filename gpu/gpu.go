@@ -824,15 +824,14 @@ func (d *drawOps) collect(ctx backend.Device, cache *resourceCache, root *op.Ops
 	for _, p := range d.pathOps {
 		if v, exists := d.pathCache.get(p.pathKey); !exists || v.data.data == nil {
 			data := buildPath(ctx, p.pathVerts)
-			var pathVerts []byte
+			var computePath encoder
 			if d.retainPathData {
-				pathVerts = make([]byte, len(p.pathVerts))
-				copy(pathVerts, p.pathVerts)
+				computePath = encodePath(p.pathVerts)
 			}
 			d.pathCache.put(p.pathKey, opCacheValue{
-				data:    data,
-				bounds:  p.bounds,
-				cpuData: pathVerts,
+				data:        data,
+				bounds:      p.bounds,
+				computePath: computePath,
 			})
 		}
 		p.pathVerts = nil

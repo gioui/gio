@@ -27,9 +27,10 @@ type opCache struct {
 
 type opCacheValue struct {
 	data pathData
-	// cpuData is the retained data, if kept by the compute renderer.
-	cpuData []byte
-	bounds  f32.Rectangle
+	// computePath is the encoded path for compute.
+	computePath encoder
+
+	bounds f32.Rectangle
 	// the fields below are handled by opCache
 	key  ops.Key
 	keep bool
