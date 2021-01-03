@@ -29,7 +29,6 @@ type compute struct {
 
 	defFBO   backend.Framebuffer
 	programs struct {
-		init       backend.Program
 		elements   backend.Program
 		tileAlloc  backend.Program
 		pathCoarse backend.Program
@@ -616,7 +615,6 @@ func (g *compute) Release() {
 	g.drawOps.pathCache.release()
 	g.cache.release()
 	progs := []backend.Program{
-		g.programs.init,
 		g.programs.elements,
 		g.programs.tileAlloc,
 		g.programs.pathCoarse,
