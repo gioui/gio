@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"time"
 	"unsafe"
 
 	"gioui.org/f32"
@@ -55,6 +56,16 @@ type compute struct {
 		// positions maps imageOpData.handles to positions inside tex.
 		positions map[interface{}]image.Point
 		tex       backend.Texture
+	}
+	timers struct {
+		profile         string
+		t               *timers
+		elements        *timer
+		tileAlloc       *timer
+		pathCoarse      *timer
+		backdropBinning *timer
+		coarse          *timer
+		kernel4         *timer
 	}
 
 	// The following fields hold scratch space to avoid garbage.
@@ -207,6 +218,16 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	for _, img := range g.drawOps.allImageOps {
 		expandPathOp(img.path, img.clip)
 	}
+	if g.drawOps.profile && g.timers.t == nil && g.ctx.Caps().Features.Has(backend.FeatureTimers) {
+		t := &g.timers
+		t.t = newTimers(g.ctx)
+		t.elements = g.timers.t.newTimer()
+		t.tileAlloc = g.timers.t.newTimer()
+		t.pathCoarse = g.timers.t.newTimer()
+		t.backdropBinning = g.timers.t.newTimer()
+		t.coarse = g.timers.t.newTimer()
+		t.kernel4 = g.timers.t.newTimer()
+	}
 }
 
 func (g *compute) Frame() error {
@@ -229,11 +250,22 @@ func (g *compute) Frame() error {
 	g.blitOutput(viewport)
 	g.cache.frame()
 	g.drawOps.pathCache.frame()
+	t := &g.timers
+	if g.drawOps.profile && t.t.ready() {
+		et, tat, pct, bbt := t.elements.Elapsed, t.tileAlloc.Elapsed, t.pathCoarse.Elapsed, t.backdropBinning.Elapsed
+		ct, k4t := t.coarse.Elapsed, t.kernel4.Elapsed
+		ft := et + tat + pct + bbt + ct + k4t
+		q := 100 * time.Microsecond
+		ft = ft.Round(q)
+		et, tat, pct, bbt = et.Round(q), tat.Round(q), pct.Round(q), bbt.Round(q)
+		ct, k4t = ct.Round(q), k4t.Round(q)
+		t.profile = fmt.Sprintf("ft:%7s et:%7s tat:%7s pct:%7s bbt:%7s ct:%7s k4t:%7s", ft, et, tat, pct, bbt, ct, k4t)
+	}
 	return nil
 }
 
 func (g *compute) Profile() string {
-	return "N/A"
+	return g.timers.profile
 }
 
 // blitOutput copies the compute render output to the output FBO. We need to
@@ -543,28 +575,41 @@ func (g *compute) render(tileDims image.Point) error {
 			realloced = false
 			g.bindBuffers()
 		}
+		t := &g.timers
 		g.ctx.MemoryBarrier()
+		t.elements.begin()
 		g.ctx.BindProgram(g.programs.elements)
 		g.ctx.DispatchCompute(numPartitions, 1, 1)
 		g.ctx.MemoryBarrier()
+		t.elements.end()
+		t.tileAlloc.begin()
 		g.ctx.BindProgram(g.programs.tileAlloc)
 		g.ctx.DispatchCompute((g.enc.npath+wgSize-1)/wgSize, 1, 1)
 		g.ctx.MemoryBarrier()
+		t.tileAlloc.end()
+		t.pathCoarse.begin()
 		g.ctx.BindProgram(g.programs.pathCoarse)
 		g.ctx.DispatchCompute((g.enc.npathseg+31)/32, 1, 1)
 		g.ctx.MemoryBarrier()
+		t.pathCoarse.end()
+		t.backdropBinning.begin()
 		g.ctx.BindProgram(g.programs.backdrop)
 		g.ctx.DispatchCompute((g.enc.npath+wgSize-1)/wgSize, 1, 1)
 		// No barrier needed between backdrop and binning.
 		g.ctx.BindProgram(g.programs.binning)
 		g.ctx.DispatchCompute((g.enc.npath+wgSize-1)/wgSize, 1, 1)
 		g.ctx.MemoryBarrier()
+		t.backdropBinning.end()
+		t.coarse.begin()
 		g.ctx.BindProgram(g.programs.coarse)
 		g.ctx.DispatchCompute(widthInBins, heightInBins, 1)
 		g.ctx.MemoryBarrier()
+		t.coarse.end()
+		t.kernel4.begin()
 		g.ctx.BindProgram(g.programs.kernel4)
 		g.ctx.DispatchCompute(tileDims.X, tileDims.Y, 1)
 		g.ctx.MemoryBarrier()
+		t.kernel4.end()
 
 		if err := g.buffers.memory.buffer.Download(gunsafe.StructView(g.memHeader)); err != nil {
 			return err
@@ -643,6 +688,10 @@ func (g *compute) Release() {
 	if g.atlas.tex != nil {
 		g.atlas.tex.Release()
 	}
+	if g.timers.t != nil {
+		g.timers.t.release()
+	}
+
 	*g = compute{}
 }
 
