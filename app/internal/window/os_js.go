@@ -82,6 +82,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 		w.w.Event(system.StageEvent{Stage: system.StageRunning})
 		w.resize()
 		w.draw(true)
+		w.animCallback()
 		select {}
 	}()
 	return nil
@@ -417,22 +418,17 @@ func (w *window) funcOf(f func(this js.Value, args []js.Value) interface{}) js.F
 func (w *window) animCallback() {
 	w.mu.Lock()
 	anim := w.animating
-	if anim {
-		w.requestAnimationFrame.Invoke(w.redraw)
-	}
 	w.mu.Unlock()
 	if anim {
 		w.draw(false)
 	}
+	w.requestAnimationFrame.Invoke(w.redraw)
 }
 
 func (w *window) SetAnimating(anim bool) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
-	if anim && !w.animating {
-		w.requestAnimationFrame.Invoke(w.redraw)
-	}
 	w.animating = anim
+	w.mu.Unlock()
 }
 
 func (w *window) ReadClipboard() {
