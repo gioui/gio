@@ -232,6 +232,20 @@ func (qs strokeQuads) offset(hw float32, stroke clip.StrokeStyle) (rhs, lhs stro
 }
 
 func (qs *strokeQuads) close() {
+	p0 := (*qs)[len(*qs)-1].quad.To
+	p1 := (*qs)[0].quad.From
+
+	if p1 == p0 {
+		return
+	}
+
+	*qs = append(*qs, strokeQuad{
+		quad: ops.Quad{
+			From: p0,
+			Ctrl: p0.Add(p1).Mul(0.5),
+			To:   p1,
+		},
+	})
 }
 
 // ccw returns whether the path is counter-clockwise.
