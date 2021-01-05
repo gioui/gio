@@ -373,9 +373,11 @@ func (w *window) scrollEvent(wParam, lParam uintptr, horizontal bool) {
 	windows.ScreenToClient(w.hwnd, &np)
 	p := f32.Point{X: float32(np.X), Y: float32(np.Y)}
 	dist := float32(int16(wParam >> 16))
-	sp := f32.Point{Y: -dist}
+	var sp f32.Point
 	if horizontal {
-		sp.X, sp.Y = sp.Y, sp.X
+		sp.X = dist
+	} else {
+		sp.Y = -dist
 	}
 	w.w.Event(pointer.Event{
 		Type:     pointer.Scroll,
