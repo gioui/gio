@@ -38,7 +38,7 @@ type window struct {
 
 	mu        sync.Mutex
 	size      f32.Point
-	viewport  f32.Point
+	inset     f32.Point
 	scale     float32
 	animating bool
 }
@@ -486,7 +486,8 @@ func (w *window) resize() {
 	w.size.Y = float32(rect.Get("height").Float()) * w.scale
 
 	if vx, vy := w.visualViewport.Get("width"), w.visualViewport.Get("height"); !vx.IsUndefined() && !vy.IsUndefined() {
-		w.viewport.X, w.viewport.Y = float32(vx.Float())*w.scale, float32(vy.Float())*w.scale
+		w.inset.X = w.size.X - float32(vx.Float())*w.scale
+		w.inset.Y = w.size.Y - float32(vy.Float())*w.scale
 	}
 
 	if w.size.X == 0 || w.size.Y == 0 {
@@ -522,8 +523,8 @@ func (w *window) config() (int, int, system.Insets, unit.Metric) {
 	defer w.mu.Unlock()
 
 	return int(w.size.X + .5), int(w.size.Y + .5), system.Insets{
-			Bottom: unit.Px(w.size.Y - w.viewport.Y),
-			Right:  unit.Px(w.size.X - w.viewport.X),
+			Bottom: unit.Px(w.inset.Y),
+			Right:  unit.Px(w.inset.X),
 		}, unit.Metric{
 			PxPerDp: w.scale,
 			PxPerSp: w.scale,
