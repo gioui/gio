@@ -41,6 +41,9 @@ type window struct {
 	inset     f32.Point
 	scale     float32
 	animating bool
+	// animRequested tracks whether a requestAnimationFrame callback
+	// is pending.
+	animRequested bool
 }
 
 func NewWindow(win Callbacks, opts *Options) error {
@@ -417,6 +420,7 @@ func (w *window) funcOf(f func(this js.Value, args []js.Value) interface{}) js.F
 func (w *window) animCallback() {
 	w.mu.Lock()
 	anim := w.animating
+	w.animRequested = anim
 	if anim {
 		w.requestAnimationFrame.Invoke(w.redraw)
 	}
@@ -429,10 +433,11 @@ func (w *window) animCallback() {
 func (w *window) SetAnimating(anim bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if anim && !w.animating {
+	w.animating = anim
+	if anim && !w.animRequested {
+		w.animRequested = true
 		w.requestAnimationFrame.Invoke(w.redraw)
 	}
-	w.animating = anim
 }
 
 func (w *window) ReadClipboard() {
