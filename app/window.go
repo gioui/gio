@@ -185,14 +185,25 @@ func (w *Window) processFrame(frameStart time.Time, size image.Point, frame *op.
 	if t, ok := w.queue.q.WakeupTime(); ok {
 		w.setNextFrame(t)
 	}
+	// Opportunistically check whether Invalidate has been called, to avoid
+	// stopping and starting animation mode.
+	select {
+	case <-w.invalidates:
+		w.setNextFrame(time.Time{})
+	default:
+	}
 	w.updateAnimation()
 	// Wait for the GPU goroutine to finish processing frame.
 	<-sync
 }
 
-// Invalidate the window such that a FrameEvent will be generated
-// immediately. If the window is inactive, the event is sent when the
-// window becomes active.
+// Invalidate the window such that a FrameEvent will be generated immediately.
+// If the window is inactive, the event is sent when the window becomes active.
+//
+// Note that Invalidate is intended for externally triggered updates, such as a
+// response from a network request. InvalidateOp is more efficient for animation
+// and similar internal updates.
+//
 // Invalidate is safe for concurrent use.
 func (w *Window) Invalidate() {
 	select {
