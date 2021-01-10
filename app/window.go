@@ -246,14 +246,12 @@ func (w *Window) Close() {
 	})
 }
 
-// driverDo calls f as soon as the window has a valid driver attached,
-// or return false if the window was destroyed while waiting.
-func (w *Window) driverDo(f func()) bool {
+// driverDo waits for the window to have a valid driver attached and calls f.
+// It does nothing if the if the window was destroyed while waiting.
+func (w *Window) driverDo(f func()) {
 	select {
 	case w.driverFuncs <- f:
-		return true
 	case <-w.dead:
-		return false
 	}
 }
 
