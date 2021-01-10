@@ -71,9 +71,18 @@ type window struct {
 	stage   system.Stage
 	started bool
 
+	state, newState windowState
+
+	// mu protects the fields following it.
 	mu        sync.Mutex
 	win       *C.ANativeWindow
 	animating bool
+}
+
+// windowState tracks the View or Activity specific state lost when Android
+// re-creates our Activity.
+type windowState struct {
+	cursor *pointer.CursorName
 }
 
 // gioView hold cached JNI methods for GioView.
@@ -118,7 +127,11 @@ var android struct {
 	mwakeupMainThread C.jmethodID
 }
 
+// view maps from GioView JNI refenreces to windows.
 var views = make(map[C.jlong]*window)
+
+// windows maps from Callbacks to windows
+var windows = make(map[Callbacks]*window)
 
 var mainWindow = newWindowRendezvous()
 
@@ -209,15 +222,20 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.setCursor = getMethodID(env, class, "setCursor", "(I)V")
 	})
 	view = C.gio_jni_NewGlobalRef(env, view)
-	w := &window{
-		view: view,
-	}
 	wopts := <-mainWindow.out
-	w.callbacks = wopts.window
+	w, ok := windows[wopts.window]
+	if !ok {
+		w = &window{
+			callbacks: wopts.window,
+		}
+		windows[wopts.window] = w
+	}
 	w.callbacks.SetDriver(w)
+	w.view = view
 	handle := C.jlong(view)
 	views[handle] = w
 	w.loadConfig(env, class)
+	applyStateDiff(env, view, windowState{}, w.state)
 	w.setStage(system.StagePaused)
 	w.callbacks.Event(ViewEvent{View: uintptr(view)})
 	return handle
@@ -659,6 +677,33 @@ func (w *window) ReadClipboard() {
 }
 
 func (w *window) SetCursor(name pointer.CursorName) {
+	w.setState(func(state *windowState) {
+		state.cursor = &name
+	})
+}
+
+// setState adjust the window state on the main thread.
+func (w *window) setState(f func(state *windowState)) {
+	runOnMain(func(env *C.JNIEnv) {
+		f(&w.newState)
+		if w.view == 0 {
+			// No View attached. The state will be applied at next onCreateView.
+			return
+		}
+		old := w.state
+		state := w.newState
+		applyStateDiff(env, w.view, old, state)
+		w.state = state
+	})
+}
+
+func applyStateDiff(env *C.JNIEnv, view C.jobject, old, state windowState) {
+	if state.cursor != nil && old.cursor != state.cursor {
+		setCursor(env, view, *state.cursor)
+	}
+}
+
+func setCursor(env *C.JNIEnv, view C.jobject, name pointer.CursorName) {
 	var curID int
 	switch name {
 	default:
@@ -678,9 +723,7 @@ func (w *window) SetCursor(name pointer.CursorName) {
 	case pointer.CursorNone:
 		curID = 0 // TYPE_NULL
 	}
-	runOnMain(func(env *C.JNIEnv) {
-		callVoidMethod(env, w.view, gioView.setCursor, jvalue(curID))
-	})
+	callVoidMethod(env, view, gioView.setCursor, jvalue(curID))
 }
 
 // Close the window. Not implemented for Android.
