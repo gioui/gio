@@ -206,7 +206,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.showTextInput = getMethodID(env, class, "showTextInput", "()V")
 		m.hideTextInput = getMethodID(env, class, "hideTextInput", "()V")
 		m.postFrameCallback = getMethodID(env, class, "postFrameCallback", "()V")
-		m.setCursor = getMethodID(env, class, "setCursor", "(Landroid/content/Context;I)V")
+		m.setCursor = getMethodID(env, class, "setCursor", "(I)V")
 	})
 	view = C.gio_jni_NewGlobalRef(env, view)
 	w := &window{
@@ -679,8 +679,7 @@ func (w *window) SetCursor(name pointer.CursorName) {
 		curID = 0 // TYPE_NULL
 	}
 	runOnMain(func(env *C.JNIEnv) {
-		callVoidMethod(env, w.view, gioView.setCursor,
-			jvalue(android.appCtx), jvalue(curID))
+		callVoidMethod(env, w.view, gioView.setCursor, jvalue(curID))
 	})
 }
 
