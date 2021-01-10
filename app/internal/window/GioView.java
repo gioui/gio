@@ -174,20 +174,12 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	}
 
 	void showTextInput() {
-		post(new Runnable() {
-			@Override public void run() {
-				GioView.this.requestFocus();
-				imm.showSoftInput(GioView.this, 0);
-			}
-		});
+		GioView.this.requestFocus();
+		imm.showSoftInput(GioView.this, 0);
 	}
 
 	void hideTextInput() {
-		post(new Runnable() {
-			@Override public void run() {
-				imm.hideSoftInputFromWindow(getWindowToken(), 0);
-			}
-		});
+		imm.hideSoftInputFromWindow(getWindowToken(), 0);
 	}
 
 	@Override protected boolean fitSystemWindows(Rect insets) {

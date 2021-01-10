@@ -537,10 +537,10 @@ func Java_org_gioui_GioView_onTouchEvent(env *C.JNIEnv, class C.jclass, handle C
 }
 
 func (w *window) ShowTextInput(show bool) {
-	if w.view == 0 {
-		return
-	}
-	runInJVM(javaVM(), func(env *C.JNIEnv) {
+	runOnMain(func(env *C.JNIEnv) {
+		if w.view == 0 {
+			return
+		}
 		if show {
 			callVoidMethod(env, w.view, gioView.showTextInput)
 		} else {
