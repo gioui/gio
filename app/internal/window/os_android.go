@@ -74,14 +74,17 @@ type window struct {
 	mu        sync.Mutex
 	win       *C.ANativeWindow
 	animating bool
+}
 
-	// Cached Java methods.
-	mgetDensity        C.jmethodID
-	mgetFontScale      C.jmethodID
-	mshowTextInput     C.jmethodID
-	mhideTextInput     C.jmethodID
-	mpostFrameCallback C.jmethodID
-	msetCursor         C.jmethodID
+// gioView hold cached JNI methods for GioView.
+var gioView struct {
+	once              sync.Once
+	getDensity        C.jmethodID
+	getFontScale      C.jmethodID
+	showTextInput     C.jmethodID
+	hideTextInput     C.jmethodID
+	postFrameCallback C.jmethodID
+	setCursor         C.jmethodID
 }
 
 // ViewEvent is sent whenever the Window's underlying Android view
@@ -196,15 +199,18 @@ func GetDataDir() string {
 
 //export Java_org_gioui_GioView_onCreateView
 func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.jobject) C.jlong {
+	gioView.once.Do(func() {
+		m := &gioView
+		m.getDensity = getMethodID(env, class, "getDensity", "()I")
+		m.getFontScale = getMethodID(env, class, "getFontScale", "()F")
+		m.showTextInput = getMethodID(env, class, "showTextInput", "()V")
+		m.hideTextInput = getMethodID(env, class, "hideTextInput", "()V")
+		m.postFrameCallback = getMethodID(env, class, "postFrameCallback", "()V")
+		m.setCursor = getMethodID(env, class, "setCursor", "(Landroid/content/Context;I)V")
+	})
 	view = C.gio_jni_NewGlobalRef(env, view)
 	w := &window{
-		view:               view,
-		mgetDensity:        getMethodID(env, class, "getDensity", "()I"),
-		mgetFontScale:      getMethodID(env, class, "getFontScale", "()F"),
-		mshowTextInput:     getMethodID(env, class, "showTextInput", "()V"),
-		mhideTextInput:     getMethodID(env, class, "hideTextInput", "()V"),
-		mpostFrameCallback: getMethodID(env, class, "postFrameCallback", "()V"),
-		msetCursor:         getMethodID(env, class, "setCursor", "(Landroid/content/Context;I)V"),
+		view: view,
 	}
 	wopts := <-mainWindow.out
 	w.callbacks = wopts.window
@@ -292,7 +298,7 @@ func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view 
 	w.mu.Unlock()
 	if anim {
 		runInJVM(javaVM(), func(env *C.JNIEnv) {
-			callVoidMethod(env, w.view, w.mpostFrameCallback)
+			callVoidMethod(env, w.view, gioView.postFrameCallback)
 		})
 		w.draw(false)
 	}
@@ -367,8 +373,8 @@ func (w *window) aNativeWindow() *C.ANativeWindow {
 }
 
 func (w *window) loadConfig(env *C.JNIEnv, class C.jclass) {
-	dpi := int(C.gio_jni_CallIntMethod(env, w.view, w.mgetDensity))
-	w.fontScale = float32(C.gio_jni_CallFloatMethod(env, w.view, w.mgetFontScale))
+	dpi := int(C.gio_jni_CallIntMethod(env, w.view, gioView.getDensity))
+	w.fontScale = float32(C.gio_jni_CallFloatMethod(env, w.view, gioView.getFontScale))
 	switch dpi {
 	case C.ACONFIGURATION_DENSITY_NONE,
 		C.ACONFIGURATION_DENSITY_DEFAULT,
@@ -390,7 +396,7 @@ func (w *window) SetAnimating(anim bool) {
 				// View was destroyed while switching to main thread.
 				return
 			}
-			callVoidMethod(env, w.view, w.mpostFrameCallback)
+			callVoidMethod(env, w.view, gioView.postFrameCallback)
 		})
 	}
 }
@@ -536,9 +542,9 @@ func (w *window) ShowTextInput(show bool) {
 	}
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
 		if show {
-			callVoidMethod(env, w.view, w.mshowTextInput)
+			callVoidMethod(env, w.view, gioView.showTextInput)
 		} else {
-			callVoidMethod(env, w.view, w.mhideTextInput)
+			callVoidMethod(env, w.view, gioView.hideTextInput)
 		}
 	})
 }
@@ -673,7 +679,7 @@ func (w *window) SetCursor(name pointer.CursorName) {
 		curID = 0 // TYPE_NULL
 	}
 	runOnMain(func(env *C.JNIEnv) {
-		callVoidMethod(env, w.view, w.msetCursor,
+		callVoidMethod(env, w.view, gioView.setCursor,
 			jvalue(android.appCtx), jvalue(curID))
 	})
 }
