@@ -225,6 +225,57 @@ func (a Alignment) String() string {
 	}
 }
 
+// Main returns the main axis of p.
+// I.e. if a is Horizontal, then the returned value is p.X.
+func (a Axis) Main(p image.Point) int {
+	if a == Horizontal {
+		return p.X
+	}
+	return p.Y
+}
+
+// Cross returns the cross axis of p.
+// I.e. if a is Horizontal, then the returned value is p.Y.
+func (a Axis) Cross(p image.Point) int {
+	if a == Horizontal {
+		return p.Y
+	}
+	return p.X
+}
+
+// point returns the point having its values set based on the axis.
+// I.e. if a is Horizontal, then the returned value is image.Point{X: main, Y: cross}.
+func (a Axis) point(main, cross int) image.Point {
+	if a == Horizontal {
+		return image.Pt(main, cross)
+	}
+	return image.Pt(cross, main)
+}
+
+// mainConstraint returns the min and max main constraints for axis a.
+func (a Axis) mainConstraint(cs Constraints) (int, int) {
+	if a == Horizontal {
+		return cs.Min.X, cs.Max.X
+	}
+	return cs.Min.Y, cs.Max.Y
+}
+
+// crossConstraint returns the min and max cross constraints for axis a.
+func (a Axis) crossConstraint(cs Constraints) (int, int) {
+	if a == Horizontal {
+		return cs.Min.Y, cs.Max.Y
+	}
+	return cs.Min.X, cs.Max.X
+}
+
+// constraints returns the constraints for axis a.
+func (a Axis) constraints(mainMin, mainMax, crossMin, crossMax int) Constraints {
+	if a == Horizontal {
+		return Constraints{Min: image.Pt(mainMin, crossMin), Max: image.Pt(mainMax, crossMax)}
+	}
+	return Constraints{Min: image.Pt(crossMin, mainMin), Max: image.Pt(crossMax, mainMax)}
+}
+
 func (a Axis) String() string {
 	switch a {
 	case Horizontal:

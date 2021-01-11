@@ -3,8 +3,6 @@
 package layout
 
 import (
-	"image"
-
 	"gioui.org/op"
 )
 
@@ -83,8 +81,8 @@ func Flexed(weight float32, widget Widget) FlexChild {
 func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 	size := 0
 	cs := gtx.Constraints
-	mainMin, mainMax := axisMainConstraint(f.Axis, cs)
-	crossMin, crossMax := axisCrossConstraint(f.Axis, cs)
+	mainMin, mainMax := f.Axis.mainConstraint(cs)
+	crossMin, crossMax := f.Axis.crossConstraint(cs)
 	remaining := mainMax
 	var totalWeight float32
 	cgtx := gtx
@@ -95,10 +93,10 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 			continue
 		}
 		macro := op.Record(gtx.Ops)
-		cgtx.Constraints = axisConstraints(f.Axis, 0, remaining, crossMin, crossMax)
+		cgtx.Constraints = f.Axis.constraints(0, remaining, crossMin, crossMax)
 		dims := child.widget(cgtx)
 		c := macro.Stop()
-		sz := axisMain(f.Axis, dims.Size)
+		sz := f.Axis.Main(dims.Size)
 		size += sz
 		remaining -= sz
 		if remaining < 0 {
@@ -130,10 +128,10 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 			}
 		}
 		macro := op.Record(gtx.Ops)
-		cgtx.Constraints = axisConstraints(f.Axis, flexSize, flexSize, crossMin, crossMax)
+		cgtx.Constraints = f.Axis.constraints(flexSize, flexSize, crossMin, crossMax)
 		dims := child.widget(cgtx)
 		c := macro.Stop()
-		sz := axisMain(f.Axis, dims.Size)
+		sz := f.Axis.Main(dims.Size)
 		size += sz
 		remaining -= sz
 		if remaining < 0 {
@@ -145,7 +143,7 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 	var maxCross int
 	var maxBaseline int
 	for _, child := range children {
-		if c := axisCross(f.Axis, child.dims.Size); c > maxCross {
+		if c := f.Axis.Cross(child.dims.Size); c > maxCross {
 			maxCross = c
 		}
 		if b := child.dims.Size.Y - child.dims.Baseline; b > maxBaseline {
@@ -175,19 +173,19 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 		var cross int
 		switch f.Alignment {
 		case End:
-			cross = maxCross - axisCross(f.Axis, dims.Size)
+			cross = maxCross - f.Axis.Cross(dims.Size)
 		case Middle:
-			cross = (maxCross - axisCross(f.Axis, dims.Size)) / 2
+			cross = (maxCross - f.Axis.Cross(dims.Size)) / 2
 		case Baseline:
 			if f.Axis == Horizontal {
 				cross = maxBaseline - b
 			}
 		}
 		stack := op.Push(gtx.Ops)
-		op.Offset(FPt(axisPoint(f.Axis, mainSize, cross))).Add(gtx.Ops)
+		op.Offset(FPt(f.Axis.point(mainSize, cross))).Add(gtx.Ops)
 		child.call.Add(gtx.Ops)
 		stack.Pop()
-		mainSize += axisMain(f.Axis, dims.Size)
+		mainSize += f.Axis.Main(dims.Size)
 		if i < len(children)-1 {
 			switch f.Spacing {
 			case SpaceEvenly:
@@ -215,56 +213,8 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 			mainSize += space / (len(children) * 2)
 		}
 	}
-	sz := axisPoint(f.Axis, mainSize, maxCross)
+	sz := f.Axis.point(mainSize, maxCross)
 	return Dimensions{Size: sz, Baseline: sz.Y - maxBaseline}
-}
-
-func axisPoint(a Axis, main, cross int) image.Point {
-	if a == Horizontal {
-		return image.Point{main, cross}
-	} else {
-		return image.Point{cross, main}
-	}
-}
-
-func axisMain(a Axis, sz image.Point) int {
-	if a == Horizontal {
-		return sz.X
-	} else {
-		return sz.Y
-	}
-}
-
-func axisCross(a Axis, sz image.Point) int {
-	if a == Horizontal {
-		return sz.Y
-	} else {
-		return sz.X
-	}
-}
-
-func axisMainConstraint(a Axis, cs Constraints) (int, int) {
-	if a == Horizontal {
-		return cs.Min.X, cs.Max.X
-	} else {
-		return cs.Min.Y, cs.Max.Y
-	}
-}
-
-func axisCrossConstraint(a Axis, cs Constraints) (int, int) {
-	if a == Horizontal {
-		return cs.Min.Y, cs.Max.Y
-	} else {
-		return cs.Min.X, cs.Max.X
-	}
-}
-
-func axisConstraints(a Axis, mainMin, mainMax, crossMin, crossMax int) Constraints {
-	if a == Horizontal {
-		return Constraints{Min: image.Pt(mainMin, crossMin), Max: image.Pt(mainMax, crossMax)}
-	} else {
-		return Constraints{Min: image.Pt(crossMin, mainMin), Max: image.Pt(crossMax, mainMax)}
-	}
 }
 
 func (s Spacing) String() string {
