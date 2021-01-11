@@ -25,8 +25,8 @@ const (
 	TypeKeyInput
 	TypeKeyFocus
 	TypeKeySoftKeyboard
-	TypePush
-	TypePop
+	TypeSave
+	TypeLoad
 	TypeAux
 	TypeClip
 	TypeProfile
@@ -54,8 +54,8 @@ const (
 	TypeKeyInputLen        = 1
 	TypeKeyFocusLen        = 1 + 1
 	TypeKeySoftKeyboardLen = 1 + 1
-	TypePushLen            = 1
-	TypePopLen             = 1
+	TypeSaveLen            = 1 + 4
+	TypeLoadLen            = 1 + 4
 	TypeAuxLen             = 1
 	TypeClipLen            = 1 + 4*4 + 1
 	TypeProfileLen         = 1
@@ -84,8 +84,8 @@ func (t OpType) Size() int {
 		TypeKeyInputLen,
 		TypeKeyFocusLen,
 		TypeKeySoftKeyboardLen,
-		TypePushLen,
-		TypePopLen,
+		TypeSaveLen,
+		TypeLoadLen,
 		TypeAuxLen,
 		TypeClipLen,
 		TypeProfileLen,

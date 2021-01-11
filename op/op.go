@@ -82,8 +82,11 @@ type Ops struct {
 	version int
 	// data contains the serialized operations.
 	data []byte
-	// External references for operations.
+	// refs hold external references for operations.
 	refs []interface{}
+	// nextStateID is the id allocated for the next
+	// StackOp.
+	nextStateID int
 
 	stackStack stack
 	macroStack stack
@@ -92,7 +95,8 @@ type Ops struct {
 // StackOp saves and restores the operation state
 // in a stack-like manner.
 type StackOp struct {
-	id      stackID
+	id      int
+	stackID stackID
 	macroID int
 	ops     *Ops
 }
@@ -142,13 +146,17 @@ type pc struct {
 
 // Push (save) the current operations state.
 func Push(o *Ops) StackOp {
+	o.nextStateID++
 	s := StackOp{
 		ops:     o,
-		id:      o.stackStack.push(),
+		id:      o.nextStateID,
+		stackID: o.stackStack.push(),
 		macroID: o.macroStack.currentID,
 	}
-	data := o.Write(opconst.TypePushLen)
-	data[0] = byte(opconst.TypePush)
+	bo := binary.LittleEndian
+	data := o.Write(opconst.TypeSaveLen)
+	data[0] = byte(opconst.TypeSave)
+	bo.PutUint32(data[1:], uint32(s.id))
 	return s
 }
 
@@ -157,9 +165,11 @@ func (s StackOp) Pop() {
 	if s.ops.macroStack.currentID != s.macroID {
 		panic("pop in a different macro than push")
 	}
-	s.ops.stackStack.pop(s.id)
-	data := s.ops.Write(opconst.TypePopLen)
-	data[0] = byte(opconst.TypePop)
+	s.ops.stackStack.pop(s.stackID)
+	bo := binary.LittleEndian
+	data := s.ops.Write(opconst.TypeLoadLen)
+	data[0] = byte(opconst.TypeLoad)
+	bo.PutUint32(data[1:], uint32(s.id))
 }
 
 // Reset the Ops, preparing it for re-use. Reset invalidates
@@ -173,6 +183,7 @@ func (o *Ops) Reset() {
 	}
 	o.data = o.data[:0]
 	o.refs = o.refs[:0]
+	o.nextStateID = 0
 	o.version++
 }
 

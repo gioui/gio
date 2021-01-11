@@ -17,6 +17,14 @@ type keyQueue struct {
 	handlers map[event.Tag]*keyHandler
 	reader   ops.Reader
 	state    TextInputState
+	// states store states during resolveFocus
+	states []resolveState
+}
+
+type resolveState struct {
+	tag      event.Tag
+	pri      listenerPriority
+	keyboard TextInputState
 }
 
 type keyHandler struct {
@@ -56,9 +64,9 @@ func (q *keyQueue) Frame(root *op.Ops, events *handlerEvents) {
 	}
 	q.reader.Reset(root)
 
-	focus, pri, keyboard := q.resolveFocus(events)
-	if pri == priNone {
-		focus = nil
+	state := q.resolveFocus(events)
+	if state.pri == priNone {
+		state.tag = nil
 	}
 	for k, h := range q.handlers {
 		if !h.visible {
@@ -66,26 +74,26 @@ func (q *keyQueue) Frame(root *op.Ops, events *handlerEvents) {
 			if q.focus == k {
 				// Remove the focus from the handler that is no longer visible.
 				q.focus = nil
-				keyboard = TextInputClose
+				state.keyboard = TextInputClose
 			}
 		}
-		if h.new && k != focus {
+		if h.new && k != state.tag {
 			// Reset the handler on (each) first appearance.
 			events.Add(k, key.FocusEvent{Focus: false})
 		}
 	}
-	if focus != q.focus {
+	if state.tag != q.focus {
 		if q.focus != nil {
 			events.Add(q.focus, key.FocusEvent{Focus: false})
 		}
-		q.focus = focus
+		q.focus = state.tag
 		if q.focus != nil {
 			events.Add(q.focus, key.FocusEvent{Focus: true})
 		} else {
-			keyboard = TextInputClose
+			state.keyboard = TextInputClose
 		}
 	}
-	q.state = keyboard
+	q.state = state.keyboard
 }
 
 func (q *keyQueue) Push(e event.Event, events *handlerEvents) {
@@ -94,28 +102,28 @@ func (q *keyQueue) Push(e event.Event, events *handlerEvents) {
 	}
 }
 
-func (q *keyQueue) resolveFocus(events *handlerEvents) (tag event.Tag, pri listenerPriority, keyboard TextInputState) {
-loop:
+func (q *keyQueue) resolveFocus(events *handlerEvents) resolveState {
+	var state resolveState
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypeKeyFocus:
 			op := decodeFocusOp(encOp.Data, encOp.Refs)
 			if op.Focus {
-				pri = priNewFocus
+				state.pri = priNewFocus
 			} else {
-				pri, keyboard = priNone, TextInputClose
+				state.pri, state.keyboard = priNone, TextInputClose
 			}
 		case opconst.TypeKeySoftKeyboard:
 			op := decodeSoftKeyboardOp(encOp.Data, encOp.Refs)
 			if op.Show {
-				keyboard = TextInputOpen
+				state.keyboard = TextInputOpen
 			} else {
-				keyboard = TextInputClose
+				state.keyboard = TextInputClose
 			}
 		case opconst.TypeKeyInput:
 			op := decodeKeyInputOp(encOp.Data, encOp.Refs)
-			if op.Tag == q.focus && pri < priCurrentFocus {
-				pri = priCurrentFocus
+			if op.Tag == q.focus && state.pri < priCurrentFocus {
+				state.pri = priCurrentFocus
 			}
 			h, ok := q.handlers[op.Tag]
 			if !ok {
@@ -123,20 +131,27 @@ loop:
 				q.handlers[op.Tag] = h
 			}
 			h.visible = true
-			tag = op.Tag
-		case opconst.TypePush:
-			newK, newPri, newKeyboard := q.resolveFocus(events)
-			if newKeyboard > keyboard {
-				keyboard = newKeyboard
+			state.tag = op.Tag
+		case opconst.TypeSave:
+			id := ops.DecodeSave(encOp.Data)
+			if extra := id - len(q.states) + 1; extra > 0 {
+				q.states = append(q.states, make([]resolveState, extra)...)
 			}
-			if newPri.replaces(pri) {
-				tag, pri = newK, newPri
+			q.states[id] = state
+			state = resolveState{}
+		case opconst.TypeLoad:
+			id := ops.DecodeLoad(encOp.Data)
+			restored := q.states[id]
+			if state.keyboard > restored.keyboard {
+				restored.keyboard = state.keyboard
 			}
-		case opconst.TypePop:
-			break loop
+			if state.pri.replaces(restored.pri) {
+				restored.tag, restored.pri = state.tag, state.pri
+			}
+			state = restored
 		}
 	}
-	return tag, pri, keyboard
+	return state
 }
 
 func (p listenerPriority) replaces(p2 listenerPriority) bool {

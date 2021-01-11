@@ -61,6 +61,7 @@ type renderer struct {
 type drawOps struct {
 	profile    bool
 	reader     ops.Reader
+	states     []drawState
 	cache      *resourceCache
 	vertCache  []byte
 	viewport   image.Point
@@ -87,7 +88,6 @@ type drawState struct {
 	t     f32.Affine2D
 	cpath *pathOp
 	rect  bool
-	z     int
 
 	matType materialType
 	// Current paint.ImageOp
@@ -869,11 +869,12 @@ func splitTransform(t f32.Affine2D) (srs f32.Affine2D, offset f32.Point) {
 	return
 }
 
-func (d *drawOps) collectOps(r *ops.Reader, state drawState) int {
+func (d *drawOps) collectOps(r *ops.Reader, state drawState) {
 	var (
 		quads  quadsOp
 		stroke clip.StrokeStyle
 		dashes dashOp
+		z      int
 	)
 loop:
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
@@ -995,19 +996,19 @@ loop:
 				d.allImageOps = d.allImageOps[:0]
 				d.zimageOps = d.zimageOps[:0]
 				d.imageOps = d.imageOps[:0]
-				state.z = 0
+				z = 0
 				d.clearColor = mat.color.Opaque()
 				continue
 			}
-			state.z++
-			if state.z != int(uint16(state.z)) {
+			z++
+			if z != int(uint16(z)) {
 				// TODO(eliasnaur) gioui.org/issue/127.
 				panic("more than 65k paint objects not supported")
 			}
 			// Assume 16-bit depth buffer.
 			const zdepth = 1 << 16
 			// Convert z to window-space, assuming depth range [0;1].
-			zf := float32(state.z)*2/zdepth - 1.0
+			zf := float32(z)*2/zdepth - 1.0
 			img := imageOp{
 				z:        zf,
 				path:     state.cpath,
@@ -1026,13 +1027,17 @@ loop:
 				state.cpath = state.cpath.parent
 				state.rect = wasrect
 			}
-		case opconst.TypePush:
-			state.z = d.collectOps(r, state)
-		case opconst.TypePop:
-			break loop
+		case opconst.TypeSave:
+			id := ops.DecodeSave(encOp.Data)
+			if extra := id - len(d.states) + 1; extra > 0 {
+				d.states = append(d.states, make([]drawState, extra)...)
+			}
+			d.states[id] = state
+		case opconst.TypeLoad:
+			id := ops.DecodeLoad(encOp.Data)
+			state = d.states[id]
 		}
 	}
-	return state.z
 }
 
 func expandPathOp(p *pathOp, clip image.Rectangle) {
