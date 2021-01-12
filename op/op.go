@@ -88,7 +88,6 @@ type Ops struct {
 	// StackOp.
 	nextStateID int
 
-	stackStack stack
 	macroStack stack
 }
 
@@ -96,7 +95,6 @@ type Ops struct {
 // in a stack-like manner.
 type StackOp struct {
 	id      int
-	stackID stackID
 	macroID int
 	ops     *Ops
 }
@@ -150,7 +148,6 @@ func Push(o *Ops) StackOp {
 	s := StackOp{
 		ops:     o,
 		id:      o.nextStateID,
-		stackID: o.stackStack.push(),
 		macroID: o.macroStack.currentID,
 	}
 	bo := binary.LittleEndian
@@ -162,10 +159,12 @@ func Push(o *Ops) StackOp {
 
 // Pop (restore) a previously Pushed operations state.
 func (s StackOp) Pop() {
+	if s.id == 0 {
+		panic("zero-value op")
+	}
 	if s.ops.macroStack.currentID != s.macroID {
 		panic("pop in a different macro than push")
 	}
-	s.ops.stackStack.pop(s.stackID)
 	bo := binary.LittleEndian
 	data := s.ops.Write(opconst.TypeLoadLen)
 	data[0] = byte(opconst.TypeLoad)
@@ -175,7 +174,6 @@ func (s StackOp) Pop() {
 // Reset the Ops, preparing it for re-use. Reset invalidates
 // any recorded macros.
 func (o *Ops) Reset() {
-	o.stackStack = stack{}
 	o.macroStack = stack{}
 	// Leave references to the GC.
 	for i := range o.refs {
