@@ -24,7 +24,7 @@ func (b Border) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 	dims := w(gtx)
 	sz := dims.Size
 	rr := float32(gtx.Px(b.CornerRadius))
-	st := op.Push(gtx.Ops)
+	st := op.Save(gtx.Ops)
 	width := gtx.Px(b.Width)
 	clip.Border{
 		Rect: f32.Rectangle{
@@ -35,6 +35,6 @@ func (b Border) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 	}.Add(gtx.Ops)
 	paint.ColorOp{Color: b.Color}.Add(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
-	st.Pop()
+	st.Load()
 	return dims
 }

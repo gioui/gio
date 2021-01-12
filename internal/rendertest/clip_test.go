@@ -229,7 +229,7 @@ func TestStrokedPathRoundRound(t *testing.T) {
 func TestStrokedPathFlatMiter(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		{
-			stk := op.Push(o)
+			stk := op.Save(o)
 			p := newZigZagPath(o)
 			clip.Stroke{
 				Path: p,
@@ -241,10 +241,10 @@ func TestStrokedPathFlatMiter(t *testing.T) {
 				},
 			}.Op().Add(o)
 			paint.Fill(o, red)
-			stk.Pop()
+			stk.Load()
 		}
 		{
-			stk := op.Push(o)
+			stk := op.Save(o)
 			p := newZigZagPath(o)
 			clip.Stroke{
 				Path: p,
@@ -253,7 +253,7 @@ func TestStrokedPathFlatMiter(t *testing.T) {
 				},
 			}.Op().Add(o)
 			paint.Fill(o, black)
-			stk.Pop()
+			stk.Load()
 		}
 
 	}, func(r result) {
@@ -266,7 +266,7 @@ func TestStrokedPathFlatMiter(t *testing.T) {
 func TestStrokedPathFlatMiterInf(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		{
-			stk := op.Push(o)
+			stk := op.Save(o)
 			p := newZigZagPath(o)
 			clip.Stroke{
 				Path: p,
@@ -278,10 +278,10 @@ func TestStrokedPathFlatMiterInf(t *testing.T) {
 				},
 			}.Op().Add(o)
 			paint.Fill(o, red)
-			stk.Pop()
+			stk.Load()
 		}
 		{
-			stk := op.Push(o)
+			stk := op.Save(o)
 			p := newZigZagPath(o)
 			clip.Stroke{
 				Path: p,
@@ -290,7 +290,7 @@ func TestStrokedPathFlatMiterInf(t *testing.T) {
 				},
 			}.Op().Add(o)
 			paint.Fill(o, black)
-			stk.Pop()
+			stk.Load()
 		}
 
 	}, func(r result) {
@@ -303,7 +303,7 @@ func TestStrokedPathFlatMiterInf(t *testing.T) {
 func TestStrokedPathZeroWidth(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		{
-			stk := op.Push(o)
+			stk := op.Save(o)
 			p := new(clip.Path)
 			p.Begin(o)
 			p.Move(f32.Pt(10, 50))
@@ -316,11 +316,11 @@ func TestStrokedPathZeroWidth(t *testing.T) {
 			}.Op().Add(o)
 
 			paint.Fill(o, black)
-			stk.Pop()
+			stk.Load()
 		}
 
 		{
-			stk := op.Push(o)
+			stk := op.Save(o)
 			p := new(clip.Path)
 			p.Begin(o)
 			p.Move(f32.Pt(10, 50))
@@ -330,7 +330,7 @@ func TestStrokedPathZeroWidth(t *testing.T) {
 			}.Op().Add(o) // width=0, disable stroke
 
 			paint.Fill(o, red)
-			stk.Pop()
+			stk.Load()
 		}
 
 	}, func(r result) {
@@ -344,7 +344,7 @@ func TestStrokedPathZeroWidth(t *testing.T) {
 func TestDashedPathFlatCapEllipse(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		{
-			stk := op.Push(o)
+			stk := op.Save(o)
 			p := newEllipsePath(o)
 
 			var dash clip.Dash
@@ -367,10 +367,10 @@ func TestDashedPathFlatCapEllipse(t *testing.T) {
 				o,
 				red,
 			)
-			stk.Pop()
+			stk.Load()
 		}
 		{
-			stk := op.Push(o)
+			stk := op.Save(o)
 			p := newEllipsePath(o)
 			clip.Stroke{
 				Path: p,
@@ -383,7 +383,7 @@ func TestDashedPathFlatCapEllipse(t *testing.T) {
 				o,
 				black,
 			)
-			stk.Pop()
+			stk.Load()
 		}
 
 	}, func(r result) {
@@ -396,7 +396,7 @@ func TestDashedPathFlatCapEllipse(t *testing.T) {
 func TestDashedPathFlatCapZ(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		{
-			stk := op.Push(o)
+			stk := op.Save(o)
 			p := newZigZagPath(o)
 			var dash clip.Dash
 			dash.Begin(o)
@@ -414,18 +414,18 @@ func TestDashedPathFlatCapZ(t *testing.T) {
 				Dashes: dash.End(),
 			}.Op().Add(o)
 			paint.Fill(o, red)
-			stk.Pop()
+			stk.Load()
 		}
 
 		{
-			stk := op.Push(o)
+			stk := op.Save(o)
 			p := newZigZagPath(o)
 			clip.Stroke{
 				Path:  p,
 				Style: clip.StrokeStyle{Width: 2},
 			}.Op().Add(o)
 			paint.Fill(o, black)
-			stk.Pop()
+			stk.Load()
 		}
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
@@ -438,7 +438,7 @@ func TestDashedPathFlatCapZ(t *testing.T) {
 func TestDashedPathFlatCapZNoDash(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		{
-			stk := op.Push(o)
+			stk := op.Save(o)
 			p := newZigZagPath(o)
 			var dash clip.Dash
 			dash.Begin(o)
@@ -455,16 +455,16 @@ func TestDashedPathFlatCapZNoDash(t *testing.T) {
 				Dashes: dash.End(),
 			}.Op().Add(o)
 			paint.Fill(o, red)
-			stk.Pop()
+			stk.Load()
 		}
 		{
-			stk := op.Push(o)
+			stk := op.Save(o)
 			clip.Stroke{
 				Path:  newZigZagPath(o),
 				Style: clip.StrokeStyle{Width: 2},
 			}.Op().Add(o)
 			paint.Fill(o, black)
-			stk.Pop()
+			stk.Load()
 		}
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)
@@ -477,7 +477,7 @@ func TestDashedPathFlatCapZNoDash(t *testing.T) {
 func TestDashedPathFlatCapZNoPath(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		{
-			stk := op.Push(o)
+			stk := op.Save(o)
 			var dash clip.Dash
 			dash.Begin(o)
 			dash.Dash(0)
@@ -492,17 +492,17 @@ func TestDashedPathFlatCapZNoPath(t *testing.T) {
 				Dashes: dash.End(),
 			}.Op().Add(o)
 			paint.Fill(o, red)
-			stk.Pop()
+			stk.Load()
 		}
 		{
-			stk := op.Push(o)
+			stk := op.Save(o)
 			p := newZigZagPath(o)
 			clip.Stroke{
 				Path:  p,
 				Style: clip.StrokeStyle{Width: 2},
 			}.Op().Add(o)
 			paint.Fill(o, black)
-			stk.Pop()
+			stk.Load()
 		}
 	}, func(r result) {
 		r.expect(0, 0, colornames.White)

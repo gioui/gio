@@ -33,21 +33,21 @@ State
 An Ops list can be viewed as a very simple virtual machine: it has an implicit
 mutable state stack and execution flow can be controlled with macros.
 
-The StackOp saves the current state to the state stack and restores it later:
+The Save function saves the current state for later restoring:
 
 	ops := new(op.Ops)
 	// Save the current state, in particular the transform.
-	stack := op.Push(ops)
+	state := op.Save(ops)
 	// Apply a transform to subsequent operations.
 	op.Offset(...).Add(ops)
 	...
 	// Restore the previous transform.
-	stack.Pop()
+	state.Load()
 
 You can also use this one-line to save the current state and restore it at the
 end of a function :
 
-  defer op.Push(ops).Pop()
+  defer op.Save(ops).Load()
 
 The MacroOp records a list of operations to be executed later:
 
@@ -85,15 +85,15 @@ type Ops struct {
 	// refs hold external references for operations.
 	refs []interface{}
 	// nextStateID is the id allocated for the next
-	// StackOp.
+	// StateOp.
 	nextStateID int
 
 	macroStack stack
 }
 
-// StackOp saves and restores the operation state
-// in a stack-like manner.
-type StackOp struct {
+// StateOp represents a saved operation snapshop to be restored
+// later.
+type StateOp struct {
 	id      int
 	macroID int
 	ops     *Ops
@@ -125,8 +125,8 @@ type TransformOp struct {
 	t f32.Affine2D
 }
 
-// stack tracks the integer identities of StackOp and MacroOp
-// operations to ensure correct pairing of Push/Pop and Record/End.
+// stack tracks the integer identities of MacroOp
+// operations to ensure correct pairing of Record/End.
 type stack struct {
 	currentID int
 	nextID    int
@@ -142,10 +142,10 @@ type pc struct {
 	refs int
 }
 
-// Push (save) the current operations state.
-func Push(o *Ops) StackOp {
+// Save the current operations state.
+func Save(o *Ops) StateOp {
 	o.nextStateID++
-	s := StackOp{
+	s := StateOp{
 		ops:     o,
 		id:      o.nextStateID,
 		macroID: o.macroStack.currentID,
@@ -157,8 +157,8 @@ func Push(o *Ops) StackOp {
 	return s
 }
 
-// Pop (restore) a previously Pushed operations state.
-func (s StackOp) Pop() {
+// Load a previously saved operations state.
+func (s StateOp) Load() {
 	if s.id == 0 {
 		panic("zero-value op")
 	}

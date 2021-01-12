@@ -40,7 +40,7 @@ func Editor(th *Theme, editor *widget.Editor, hint string) EditorStyle {
 }
 
 func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
-	defer op.Push(gtx.Ops).Pop()
+	defer op.Save(gtx.Ops).Load()
 	macro := op.Record(gtx.Ops)
 	paint.ColorOp{Color: e.HintColor}.Add(gtx.Ops)
 	var maxlines int

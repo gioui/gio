@@ -38,30 +38,30 @@ func TestKeyStacked(t *testing.T) {
 	ops := new(op.Ops)
 	r := new(Router)
 
-	s := op.Push(ops)
+	s := op.Save(ops)
 	key.InputOp{Tag: &handlers[0]}.Add(ops)
 	// FocusOp must not overwrite the
 	// FocusOp{Focus: true}.
 	key.FocusOp{Focus: false}.Add(ops)
-	s.Pop()
-	s = op.Push(ops)
+	s.Load()
+	s = op.Save(ops)
 	key.SoftKeyboardOp{Show: false}.Add(ops)
 	key.InputOp{Tag: &handlers[1]}.Add(ops)
 	key.FocusOp{Focus: true}.Add(ops)
-	s.Pop()
-	s = op.Push(ops)
+	s.Load()
+	s = op.Save(ops)
 	key.InputOp{Tag: &handlers[2]}.Add(ops)
 	// SoftwareKeyboardOp will open the keyboard,
 	// overwriting `SoftKeyboardOp{Show: false}`.
 	key.SoftKeyboardOp{Show: true}.Add(ops)
-	s.Pop()
-	s = op.Push(ops)
+	s.Load()
+	s = op.Save(ops)
 	key.SoftKeyboardOp{Show: false}.Add(ops)
 	key.InputOp{Tag: &handlers[3]}.Add(ops)
 	// FocusOp must not overwrite the
 	// FocusOp{Focus: true}.
 	key.FocusOp{Focus: false}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	r.Frame(ops)
 
@@ -93,16 +93,16 @@ func TestKeyRemoveFocus(t *testing.T) {
 	r := new(Router)
 
 	// New InputOp with Focus and Keyboard:
-	s := op.Push(ops)
+	s := op.Save(ops)
 	key.InputOp{Tag: &handlers[0]}.Add(ops)
 	key.FocusOp{Focus: true}.Add(ops)
 	key.SoftKeyboardOp{Show: true}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	// New InputOp without any focus:
-	s = op.Push(ops)
+	s = op.Save(ops)
 	key.InputOp{Tag: &handlers[1]}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	r.Frame(ops)
 
@@ -118,19 +118,19 @@ func TestKeyRemoveFocus(t *testing.T) {
 	ops.Reset()
 
 	// Will get the focus removed:
-	s = op.Push(ops)
+	s = op.Save(ops)
 	key.InputOp{Tag: &handlers[0]}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	// Unchanged:
-	s = op.Push(ops)
+	s = op.Save(ops)
 	key.InputOp{Tag: &handlers[1]}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	// Removing any Focus:
-	s = op.Push(ops)
+	s = op.Save(ops)
 	key.FocusOp{Focus: false}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	r.Frame(ops)
 
@@ -141,18 +141,18 @@ func TestKeyRemoveFocus(t *testing.T) {
 
 	ops.Reset()
 
-	s = op.Push(ops)
+	s = op.Save(ops)
 	key.InputOp{Tag: &handlers[0]}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	// Setting Focus without InputOp:
-	s = op.Push(ops)
+	s = op.Save(ops)
 	key.FocusOp{Focus: true}.Add(ops)
-	s.Pop()
+	s.Load()
 
-	s = op.Push(ops)
+	s = op.Save(ops)
 	key.InputOp{Tag: &handlers[1]}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	r.Frame(ops)
 
@@ -165,18 +165,18 @@ func TestKeyRemoveFocus(t *testing.T) {
 
 	// Set focus to InputOp which already
 	// exists in the previous frame:
-	s = op.Push(ops)
+	s = op.Save(ops)
 	key.FocusOp{Focus: true}.Add(ops)
 	key.InputOp{Tag: &handlers[0]}.Add(ops)
 	key.SoftKeyboardOp{Show: true}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	// Tries to remove focus:
 	// It must not overwrite the previous `FocusOp`.
-	s = op.Push(ops)
+	s = op.Save(ops)
 	key.InputOp{Tag: &handlers[1]}.Add(ops)
 	key.FocusOp{Focus: false}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	r.Frame(ops)
 
@@ -192,16 +192,16 @@ func TestKeyFocusedInvisible(t *testing.T) {
 	r := new(Router)
 
 	// Set new InputOp with focus:
-	s := op.Push(ops)
+	s := op.Save(ops)
 	key.FocusOp{Focus: true}.Add(ops)
 	key.InputOp{Tag: &handlers[0]}.Add(ops)
 	key.SoftKeyboardOp{Show: true}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	// Set new InputOp without focus:
-	s = op.Push(ops)
+	s = op.Save(ops)
 	key.InputOp{Tag: &handlers[1]}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	r.Frame(ops)
 
@@ -217,9 +217,9 @@ func TestKeyFocusedInvisible(t *testing.T) {
 	//
 
 	// Unchanged:
-	s = op.Push(ops)
+	s = op.Save(ops)
 	key.InputOp{Tag: &handlers[1]}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	r.Frame(ops)
 
@@ -232,14 +232,14 @@ func TestKeyFocusedInvisible(t *testing.T) {
 
 	// Respawn the first element:
 	// It must receive one `Event{Focus: false}`.
-	s = op.Push(ops)
+	s = op.Save(ops)
 	key.InputOp{Tag: &handlers[0]}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	// Unchanged
-	s = op.Push(ops)
+	s = op.Save(ops)
 	key.InputOp{Tag: &handlers[1]}.Add(ops)
-	s.Pop()
+	s.Load()
 
 	r.Frame(ops)
 

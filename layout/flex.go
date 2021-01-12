@@ -181,10 +181,10 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 				cross = maxBaseline - b
 			}
 		}
-		stack := op.Push(gtx.Ops)
+		stack := op.Save(gtx.Ops)
 		op.Offset(FPt(f.Axis.point(mainSize, cross))).Add(gtx.Ops)
 		child.call.Add(gtx.Ops)
-		stack.Pop()
+		stack.Load()
 		mainSize += f.Axis.Main(dims.Size)
 		if i < len(children)-1 {
 			switch f.Spacing {

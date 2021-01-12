@@ -141,11 +141,11 @@ func (in Inset) Layout(gtx Context, w Widget) Dimensions {
 	if mcs.Min.Y > mcs.Max.Y {
 		mcs.Min.Y = mcs.Max.Y
 	}
-	stack := op.Push(gtx.Ops)
+	stack := op.Save(gtx.Ops)
 	op.Offset(FPt(image.Point{X: left, Y: top})).Add(gtx.Ops)
 	gtx.Constraints = mcs
 	dims := w(gtx)
-	stack.Pop()
+	stack.Load()
 	return Dimensions{
 		Size:     dims.Size.Add(image.Point{X: right + left, Y: top + bottom}),
 		Baseline: dims.Baseline + bottom,
@@ -186,10 +186,10 @@ func (d Direction) Layout(gtx Context, w Widget) Dimensions {
 	case SW, S, SE:
 		p.Y = sz.Y - dims.Size.Y
 	}
-	stack := op.Push(gtx.Ops)
+	stack := op.Save(gtx.Ops)
 	op.Offset(FPt(p)).Add(gtx.Ops)
 	call.Add(gtx.Ops)
-	stack.Pop()
+	stack.Load()
 	return Dimensions{
 		Size:     sz,
 		Baseline: dims.Baseline + sz.Y - dims.Size.Y - p.Y,

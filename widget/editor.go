@@ -451,12 +451,12 @@ func (e *Editor) PaintText(gtx layout.Context) {
 	cl := textPadding(e.lines)
 	cl.Max = cl.Max.Add(e.viewSize)
 	for _, shape := range e.shapes {
-		stack := op.Push(gtx.Ops)
+		stack := op.Save(gtx.Ops)
 		op.Offset(layout.FPt(shape.offset)).Add(gtx.Ops)
 		shape.clip.Add(gtx.Ops)
 		clip.Rect(cl.Sub(shape.offset)).Add(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
-		stack.Pop()
+		stack.Load()
 	}
 }
 
@@ -469,7 +469,7 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 	carX := e.caret.x
 	carY := e.caret.y
 
-	defer op.Push(gtx.Ops).Pop()
+	defer op.Save(gtx.Ops).Load()
 	carX -= carWidth / 2
 	carAsc, carDesc := -e.lines[e.caret.line].Bounds.Min.Y, e.lines[e.caret.line].Bounds.Max.Y
 	carRect := image.Rectangle{
@@ -492,10 +492,10 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 	cl.Max = cl.Max.Add(e.viewSize)
 	carRect = cl.Intersect(carRect)
 	if !carRect.Empty() {
-		st := op.Push(gtx.Ops)
+		st := op.Save(gtx.Ops)
 		clip.Rect(carRect).Add(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
-		st.Pop()
+		st.Load()
 	}
 }
 

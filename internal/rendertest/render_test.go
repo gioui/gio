@@ -33,26 +33,26 @@ func TestTransformMacro(t *testing.T) {
 		m2 := op.Record(o)
 		paint.ColorOp{Color: red}.Add(o)
 		// Simulate a draw text call
-		stack := op.Push(o)
+		stack := op.Save(o)
 		op.Offset(f32.Pt(0, 10)).Add(o)
 
 		// Apply the clip-path.
 		c.Add(o)
 
 		paint.PaintOp{}.Add(o)
-		stack.Pop()
+		stack.Load()
 
 		c2 := m2.Stop()
 
 		// Call each of them in a transform
-		s1 := op.Push(o)
+		s1 := op.Save(o)
 		op.Offset(f32.Pt(0, 0)).Add(o)
 		c1.Add(o)
-		s1.Pop()
-		s2 := op.Push(o)
+		s1.Load()
+		s2 := op.Save(o)
 		op.Offset(f32.Pt(0, 0)).Add(o)
 		c2.Add(o)
-		s2.Pop()
+		s2.Load()
 	}, func(r result) {
 		r.expect(5, 15, colornames.Red)
 		r.expect(15, 15, colornames.Black)
@@ -140,14 +140,14 @@ func TestReuseStencil(t *testing.T) {
 		c2 := drawChild(ops, txt)
 
 		// lay out the children
-		stack1 := op.Push(ops)
+		stack1 := op.Save(ops)
 		c1.Add(ops)
-		stack1.Pop()
+		stack1.Load()
 
-		stack2 := op.Push(ops)
+		stack2 := op.Save(ops)
 		op.Offset(f32.Pt(0, 50)).Add(ops)
 		c2.Add(ops)
-		stack2.Pop()
+		stack2.Load()
 	}, func(r result) {
 		r.expect(5, 5, colornames.Black)
 		r.expect(5, 55, colornames.Black)
@@ -161,11 +161,11 @@ func TestBuildOffscreen(t *testing.T) {
 
 	txt := constSqCirc()
 	draw := func(off float32, o *op.Ops) {
-		s := op.Push(o)
+		s := op.Save(o)
 		op.Offset(f32.Pt(0, off)).Add(o)
 		txt.Add(o)
 		paint.PaintOp{}.Add(o)
-		s.Pop()
+		s.Load()
 	}
 
 	multiRun(t,
@@ -230,12 +230,12 @@ func TestLinearGradient(t *testing.T) {
 				Stop2:  f32.Pt(gr.Max.X, gr.Min.Y),
 				Color2: g.To,
 			}.Add(ops)
-			st := op.Push(ops)
+			st := op.Save(ops)
 			clip.RRect{Rect: gr}.Add(ops)
 			op.Affine(f32.Affine2D{}.Offset(pixelAligned.Min)).Add(ops)
 			scale(pixelAligned.Dx()/128, 1).Add(ops)
 			paint.PaintOp{}.Add(ops)
-			st.Pop()
+			st.Load()
 			gr = gr.Add(f32.Pt(0, gradienth))
 		}
 	}, func(r result) {
@@ -260,10 +260,10 @@ func TestLinearGradientAngled(t *testing.T) {
 			Stop2:  f32.Pt(0, 0),
 			Color2: red,
 		}.Add(ops)
-		st := op.Push(ops)
+		st := op.Save(ops)
 		clip.Rect(image.Rect(0, 0, 64, 64)).Add(ops)
 		paint.PaintOp{}.Add(ops)
-		st.Pop()
+		st.Load()
 
 		paint.LinearGradientOp{
 			Stop1:  f32.Pt(64, 64),
@@ -271,10 +271,10 @@ func TestLinearGradientAngled(t *testing.T) {
 			Stop2:  f32.Pt(128, 0),
 			Color2: green,
 		}.Add(ops)
-		st = op.Push(ops)
+		st = op.Save(ops)
 		clip.Rect(image.Rect(64, 0, 128, 64)).Add(ops)
 		paint.PaintOp{}.Add(ops)
-		st.Pop()
+		st.Load()
 
 		paint.LinearGradientOp{
 			Stop1:  f32.Pt(64, 64),
@@ -282,10 +282,10 @@ func TestLinearGradientAngled(t *testing.T) {
 			Stop2:  f32.Pt(128, 128),
 			Color2: blue,
 		}.Add(ops)
-		st = op.Push(ops)
+		st = op.Save(ops)
 		clip.Rect(image.Rect(64, 64, 128, 128)).Add(ops)
 		paint.PaintOp{}.Add(ops)
-		st.Pop()
+		st.Load()
 
 		paint.LinearGradientOp{
 			Stop1:  f32.Pt(64, 64),
@@ -293,10 +293,10 @@ func TestLinearGradientAngled(t *testing.T) {
 			Stop2:  f32.Pt(0, 128),
 			Color2: magenta,
 		}.Add(ops)
-		st = op.Push(ops)
+		st = op.Save(ops)
 		clip.Rect(image.Rect(0, 64, 64, 128)).Add(ops)
 		paint.PaintOp{}.Add(ops)
-		st.Pop()
+		st.Load()
 	}, func(r result) {})
 }
 

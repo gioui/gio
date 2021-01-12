@@ -36,7 +36,7 @@ func (l LoaderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}
 	sz := gtx.Constraints.Constrain(image.Pt(diam, diam))
 	radius := float64(sz.X) * .5
-	defer op.Push(gtx.Ops).Pop()
+	defer op.Save(gtx.Ops).Load()
 	op.Offset(f32.Pt(float32(radius), float32(radius))).Add(gtx.Ops)
 
 	dt := (time.Duration(gtx.Now.UnixNano()) % (time.Second)).Seconds()

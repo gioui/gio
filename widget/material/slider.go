@@ -58,13 +58,13 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 		size.Y = 2 * (touchSizePx / 2)
 	}
 
-	st := op.Push(gtx.Ops)
+	st := op.Save(gtx.Ops)
 	op.Offset(f32.Pt(thumbRadius, 0)).Add(gtx.Ops)
 	gtx.Constraints.Min = image.Pt(size.X-2*thumbRadiusInt, size.Y)
 	s.Float.Layout(gtx, thumbRadiusInt, s.Min, s.Max)
 	gtx.Constraints.Min.Y = size.Y
 	thumbPos := thumbRadius + s.Float.Pos()
-	st.Pop()
+	st.Load()
 
 	color := s.Color
 	if gtx.Queue == nil {
@@ -72,7 +72,7 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}
 
 	// Draw track before thumb.
-	st = op.Push(gtx.Ops)
+	st = op.Save(gtx.Ops)
 	track := f32.Rectangle{
 		Min: f32.Point{
 			X: thumbRadius,
@@ -86,19 +86,19 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	clip.RRect{Rect: track}.Add(gtx.Ops)
 	paint.ColorOp{Color: color}.Add(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
-	st.Pop()
+	st.Load()
 
 	// Draw track after thumb.
-	st = op.Push(gtx.Ops)
+	st = op.Save(gtx.Ops)
 	track.Min.X = thumbPos
 	track.Max.X = float32(size.X) - thumbRadius
 	clip.RRect{Rect: track}.Add(gtx.Ops)
 	paint.ColorOp{Color: f32color.MulAlpha(color, 96)}.Add(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
-	st.Pop()
+	st.Load()
 
 	// Draw thumb.
-	st = op.Push(gtx.Ops)
+	st = op.Save(gtx.Ops)
 	thumb := f32.Rectangle{
 		Min: f32.Point{
 			X: thumbPos - thumbRadius,
@@ -116,7 +116,7 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}.Add(gtx.Ops)
 	paint.ColorOp{Color: color}.Add(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
-	st.Pop()
+	st.Load()
 
 	return layout.Dimensions{Size: size}
 }

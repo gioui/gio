@@ -51,13 +51,13 @@ For example:
 	var stack op.StackOp
 	var h1, h2 *Handler
 
-	stack := op.Push(ops)
+	state := op.Save(ops)
 	pointer.InputOp{Tag: h1}.Add(Ops)
-	stack.Pop()
+	state.Load()
 
-	stack = op.Push(ops)
+	state = op.Save(ops)
 	pointer.InputOp{Tag: h2}.Add(ops)
-	stack.Pop()
+	state.Load()
 
 implies a tree of two inner nodes, each with one pointer handler.
 

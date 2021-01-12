@@ -243,12 +243,12 @@ func TestMultipleAreas(t *testing.T) {
 	var ops op.Ops
 
 	addPointerHandler(&ops, handler, image.Rect(0, 0, 100, 100))
-	st := op.Push(&ops)
+	st := op.Save(&ops)
 	pointer.Rect(image.Rect(50, 50, 200, 200)).Add(&ops)
 	// Second area has no Types set, yet should receive events because
 	// Types for the same handles are or-ed together.
 	pointer.InputOp{Tag: handler}.Add(&ops)
-	st.Pop()
+	st.Load()
 
 	var r Router
 	r.Frame(&ops)
@@ -468,7 +468,7 @@ func TestCursorNameOp(t *testing.T) {
 // addPointerHandler adds a pointer.InputOp for the tag in a
 // rectangular area.
 func addPointerHandler(ops *op.Ops, tag event.Tag, area image.Rectangle) {
-	defer op.Push(ops).Pop()
+	defer op.Save(ops).Load()
 	pointer.Rect(area).Add(ops)
 	pointer.InputOp{
 		Tag:   tag,

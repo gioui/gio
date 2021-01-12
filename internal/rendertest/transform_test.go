@@ -130,7 +130,7 @@ func TestOffsetScaleTexture(t *testing.T) {
 
 func TestRotateTexture(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		defer op.Push(o).Pop()
+		defer op.Save(o).Load()
 		squares.Add(o)
 		a := f32.Affine2D{}.Offset(f32.Pt(30, 30)).Rotate(f32.Pt(40, 40), math.Pi/4)
 		op.Affine(a).Add(o)
