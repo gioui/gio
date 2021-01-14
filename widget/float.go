@@ -14,6 +14,7 @@ import (
 // Float is for selecting a value in a range.
 type Float struct {
 	Value float32
+	Axis  layout.Axis
 
 	drag    gesture.Drag
 	pos     float32 // position normalized to [0, 1]
@@ -24,13 +25,15 @@ type Float struct {
 // Dragging returns whether the value is being interacted with.
 func (f *Float) Dragging() bool { return f.drag.Dragging() }
 
-// Layout processes events.
+// Layout updates the value according to drag events along the f's main axis.
+//
+// The range of f is set by the minimum constraints main axis value.
 func (f *Float) Layout(gtx layout.Context, pointerMargin int, min, max float32) layout.Dimensions {
 	size := gtx.Constraints.Min
-	f.length = float32(size.X)
+	f.length = float32(f.Axis.Convert(size).X)
 
 	var de *pointer.Event
-	for _, e := range f.drag.Events(gtx.Metric, gtx, gesture.Horizontal) {
+	for _, e := range f.drag.Events(gtx.Metric, gtx, gesture.Axis(f.Axis)) {
 		if e.Type == pointer.Press || e.Type == pointer.Drag {
 			de = &e
 		}
@@ -38,7 +41,11 @@ func (f *Float) Layout(gtx layout.Context, pointerMargin int, min, max float32) 
 
 	value := f.Value
 	if de != nil {
-		f.pos = de.Position.X / f.length
+		xy := de.Position.X
+		if f.Axis == layout.Vertical {
+			xy = de.Position.Y
+		}
+		f.pos = xy / f.length
 		value = min + (max-min)*f.pos
 	} else if min != max {
 		f.pos = value/(max-min) - min
@@ -53,9 +60,11 @@ func (f *Float) Layout(gtx layout.Context, pointerMargin int, min, max float32) 
 	}
 
 	defer op.Save(gtx.Ops).Load()
-	rect := image.Rectangle{Max: size}
-	rect.Min.X -= pointerMargin
-	rect.Max.X += pointerMargin
+	margin := f.Axis.Convert(image.Pt(pointerMargin, 0))
+	rect := image.Rectangle{
+		Min: margin.Mul(-1),
+		Max: size.Add(margin),
+	}
 	pointer.Rect(rect).Add(gtx.Ops)
 	f.drag.Add(gtx.Ops)
 

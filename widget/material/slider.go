@@ -6,7 +6,6 @@ import (
 	"image"
 	"image/color"
 
-	"gioui.org/f32"
 	"gioui.org/internal/f32color"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -36,34 +35,26 @@ type SliderStyle struct {
 }
 
 func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
-	thumbRadiusInt := gtx.Px(unit.Dp(6))
-	trackWidth := float32(gtx.Px(unit.Dp(2)))
-	thumbRadius := float32(thumbRadiusInt)
+	thumbRadius := gtx.Px(unit.Dp(6))
+	trackWidth := gtx.Px(unit.Dp(2))
 
-	size := gtx.Constraints.Min
+	axis := s.Float.Axis
 	// Keep a minimum length so that the track is always visible.
-	minLength := thumbRadiusInt + 3*thumbRadiusInt + thumbRadiusInt
-	if size.X < minLength {
-		size.X = minLength
-	}
-	size.Y = 2 * thumbRadiusInt
-
+	minLength := thumbRadius + 3*thumbRadius + thumbRadius
 	// Try to expand to finger size, but only if the constraints
 	// allow for it.
-	touchSizePx := gtx.Px(s.FingerSize)
-	if touchSizePx > gtx.Constraints.Max.Y {
-		touchSizePx = gtx.Constraints.Max.Y
-	}
-	if size.Y < touchSizePx {
-		size.Y = 2 * (touchSizePx / 2)
-	}
+	touchSizePx := min(gtx.Px(s.FingerSize), axis.Convert(gtx.Constraints.Max).Y)
+	sizeMain := max(axis.Convert(gtx.Constraints.Min).X, minLength)
+	sizeCross := max(2*thumbRadius, touchSizePx)
+	size := axis.Convert(image.Pt(sizeMain, sizeCross))
 
 	st := op.Save(gtx.Ops)
-	op.Offset(f32.Pt(thumbRadius, 0)).Add(gtx.Ops)
-	gtx.Constraints.Min = image.Pt(size.X-2*thumbRadiusInt, size.Y)
-	s.Float.Layout(gtx, thumbRadiusInt, s.Min, s.Max)
-	gtx.Constraints.Min.Y = size.Y
-	thumbPos := thumbRadius + s.Float.Pos()
+	o := axis.Convert(image.Pt(thumbRadius, 0))
+	op.Offset(layout.FPt(o)).Add(gtx.Ops)
+	gtx.Constraints.Min = axis.Convert(image.Pt(sizeMain-2*thumbRadius, sizeCross))
+	s.Float.Layout(gtx, thumbRadius, s.Min, s.Max)
+	gtx.Constraints.Min = gtx.Constraints.Min.Add(axis.Convert(image.Pt(0, sizeCross)))
+	thumbPos := thumbRadius + int(s.Float.Pos())
 	st.Load()
 
 	color := s.Color
@@ -73,50 +64,49 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 	// Draw track before thumb.
 	st = op.Save(gtx.Ops)
-	track := f32.Rectangle{
-		Min: f32.Point{
-			X: thumbRadius,
-			Y: float32(size.Y/2) - trackWidth/2,
-		},
-		Max: f32.Point{
-			X: thumbPos,
-			Y: float32(size.Y/2) + trackWidth/2,
-		},
+	track := image.Rectangle{
+		Min: axis.Convert(image.Pt(thumbRadius, sizeCross/2-trackWidth/2)),
+		Max: axis.Convert(image.Pt(thumbPos, sizeCross/2+trackWidth/2)),
 	}
-	clip.RRect{Rect: track}.Add(gtx.Ops)
-	paint.ColorOp{Color: color}.Add(gtx.Ops)
-	paint.PaintOp{}.Add(gtx.Ops)
+	clip.Rect(track).Add(gtx.Ops)
+	paint.Fill(gtx.Ops, color)
 	st.Load()
 
 	// Draw track after thumb.
 	st = op.Save(gtx.Ops)
-	track.Min.X = thumbPos
-	track.Max.X = float32(size.X) - thumbRadius
-	clip.RRect{Rect: track}.Add(gtx.Ops)
-	paint.ColorOp{Color: f32color.MulAlpha(color, 96)}.Add(gtx.Ops)
-	paint.PaintOp{}.Add(gtx.Ops)
+	track = image.Rectangle{
+		Min: axis.Convert(image.Pt(thumbPos, axis.Convert(track.Min).Y)),
+		Max: axis.Convert(image.Pt(sizeMain-thumbRadius, axis.Convert(track.Max).Y)),
+	}
+	clip.Rect(track).Add(gtx.Ops)
+	paint.Fill(gtx.Ops, f32color.MulAlpha(color, 96))
 	st.Load()
 
 	// Draw thumb.
 	st = op.Save(gtx.Ops)
-	thumb := f32.Rectangle{
-		Min: f32.Point{
-			X: thumbPos - thumbRadius,
-			Y: float32(size.Y/2) - thumbRadius,
-		},
-		Max: f32.Point{
-			X: thumbPos + thumbRadius,
-			Y: float32(size.Y/2) + thumbRadius,
-		},
+	pt := axis.Convert(image.Pt(thumbPos, sizeCross/2))
+	rpt := image.Pt(thumbRadius, thumbRadius)
+	thumb := image.Rectangle{
+		Min: pt.Sub(rpt),
+		Max: pt.Add(rpt),
 	}
-	rr := thumbRadius
-	clip.RRect{
-		Rect: thumb,
-		NE:   rr, NW: rr, SE: rr, SW: rr,
-	}.Add(gtx.Ops)
-	paint.ColorOp{Color: color}.Add(gtx.Ops)
-	paint.PaintOp{}.Add(gtx.Ops)
+	clip.UniformRRect(layout.FRect(thumb), float32(thumbRadius)).Add(gtx.Ops)
+	paint.Fill(gtx.Ops, color)
 	st.Load()
 
 	return layout.Dimensions{Size: size}
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
