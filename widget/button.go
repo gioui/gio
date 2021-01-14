@@ -58,6 +58,16 @@ func (b *Clickable) Clicked() bool {
 	return true
 }
 
+// Hovered returns whether pointer is over the element.
+func (b *Clickable) Hovered() bool {
+	return b.click.Hovered()
+}
+
+// Pressed returns whether pointer is pressing the element.
+func (b *Clickable) Pressed() bool {
+	return b.click.Pressed()
+}
+
 // Clicks returns and clear the clicks since the last call to Clicks.
 func (b *Clickable) Clicks() []Click {
 	clicks := b.clicks

@@ -125,6 +125,16 @@ func (c *Click) Add(ops *op.Ops) {
 	op.Add(ops)
 }
 
+// Hovered returns whether a pointer is inside the area.
+func (c *Click) Hovered() bool {
+	return c.entered
+}
+
+// Pressed returns whether a pointer is pressing.
+func (c *Click) Pressed() bool {
+	return c.pressed
+}
+
 // Events returns the next click event, if any.
 func (c *Click) Events(q event.Queue) []ClickEvent {
 	var events []ClickEvent
