@@ -10,6 +10,7 @@ const firstOpIndex = 200
 const (
 	TypeMacro OpType = iota + firstOpIndex
 	TypeCall
+	TypeDefer
 	TypeTransform
 	TypeLayer
 	TypeInvalidate
@@ -39,6 +40,7 @@ const (
 const (
 	TypeMacroLen           = 1 + 4 + 4
 	TypeCallLen            = 1 + 4 + 4
+	TypeDeferLen           = 1
 	TypeTransformLen       = 1 + 4*6
 	TypeLayerLen           = 1
 	TypeRedrawLen          = 1 + 8
@@ -69,6 +71,7 @@ func (t OpType) Size() int {
 	return [...]int{
 		TypeMacroLen,
 		TypeCallLen,
+		TypeDeferLen,
 		TypeTransformLen,
 		TypeLayerLen,
 		TypeRedrawLen,

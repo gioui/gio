@@ -103,6 +103,26 @@ func TestNoClipFromPaint(t *testing.T) {
 	})
 }
 
+func TestDeferredPaint(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		state := op.Save(o)
+		clip.Rect(image.Rect(0, 0, 80, 80)).Op().Add(o)
+		paint.ColorOp{Color: color.NRGBA{A: 0xff, R: 0xff}}.Add(o)
+		m := op.Record(o)
+		paint.PaintOp{}.Add(o)
+		paintMacro := m.Stop()
+		op.Defer(o, paintMacro)
+		paint.ColorOp{Color: color.NRGBA{A: 0xff, G: 0xff}}.Add(o)
+		paint.PaintOp{}.Add(o)
+		state.Load()
+		op.Affine(f32.Affine2D{}.Offset(f32.Pt(10, 10))).Add(o)
+		clip.Rect(image.Rect(0, 0, 80, 80)).Op().Add(o)
+		paint.ColorOp{Color: color.NRGBA{A: 0xff, B: 0xff}}.Add(o)
+		paint.PaintOp{}.Add(o)
+	}, func(r result) {
+	})
+}
+
 func constSqPath() op.CallOp {
 	innerOps := new(op.Ops)
 	m := op.Record(innerOps)

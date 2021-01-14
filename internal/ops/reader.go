@@ -12,9 +12,11 @@ import (
 
 // Reader parses an ops list.
 type Reader struct {
-	pc    pc
-	stack []macro
-	ops   *op.Ops
+	pc        pc
+	stack     []macro
+	ops       *op.Ops
+	deferOps  op.Ops
+	deferDone bool
 }
 
 // EncodedOp represents an encoded op returned by
@@ -57,6 +59,8 @@ type opMacroDef struct {
 // Reset start reading from the op list.
 func (r *Reader) Reset(ops *op.Ops) {
 	r.stack = r.stack[:0]
+	r.deferOps.Reset()
+	r.deferDone = false
 	r.pc = pc{}
 	r.ops = ops
 }
@@ -74,6 +78,7 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 	if r.ops == nil {
 		return EncodedOp{}, false
 	}
+	deferring := false
 	for {
 		if len(r.stack) > 0 {
 			b := r.stack[len(r.stack)-1]
@@ -86,18 +91,30 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 		}
 		data := r.ops.Data()
 		data = data[r.pc.data:]
+		refs := r.ops.Refs()
 		if len(data) == 0 {
-			return EncodedOp{}, false
+			if r.deferDone {
+				return EncodedOp{}, false
+			}
+			r.deferDone = true
+			// Execute deferred macros.
+			r.ops = &r.deferOps
+			r.pc = pc{}
+			continue
 		}
 		key := Key{ops: r.ops, pc: r.pc.data, version: r.ops.Version()}
 		t := opconst.OpType(data[0])
 		n := t.Size()
 		nrefs := t.NumRefs()
 		data = data[:n]
-		refs := r.ops.Refs()
 		refs = refs[r.pc.refs:]
 		refs = refs[:nrefs]
 		switch t {
+		case opconst.TypeDefer:
+			deferring = true
+			r.pc.data += n
+			r.pc.refs += nrefs
+			continue
 		case opconst.TypeAux:
 			// An Aux operations is always wrapped in a macro, and
 			// its length is the remaining space.
@@ -105,6 +122,16 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 			n += block.endPC.data - r.pc.data - opconst.TypeAuxLen
 			data = data[:n]
 		case opconst.TypeCall:
+			if deferring {
+				deferring = false
+				// Copy macro for deferred execution.
+				if t.NumRefs() != 1 {
+					panic("internal error: unexpected number of macro refs")
+				}
+				deferData := r.deferOps.Write1(t.Size(), refs[0])
+				copy(deferData, data)
+				continue
+			}
 			var op macroOp
 			op.decode(data, refs)
 			macroData := op.ops.Data()[op.pc.data:]

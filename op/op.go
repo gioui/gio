@@ -142,6 +142,31 @@ type pc struct {
 	refs int
 }
 
+// Defer executes c after all other operations have completed,
+// including previously deferred operations.
+// Defer saves the operation state, which is then loaded prior
+// to execution.
+//
+// Note that deferred operations are executed in first-in-first-out
+// order, unlike the Go facility of the same name.
+func Defer(o *Ops, c CallOp) {
+	if c.ops == nil {
+		return
+	}
+	state := Save(o)
+	// Wrap c in a macro that loads the saved state before execution.
+	m := Record(o)
+	//
+	state.load()
+	c.Add(o)
+	c = m.Stop()
+	// A Defer is recorded as a TypeDefer followed by the
+	// wrapped macro.
+	data := o.Write(opconst.TypeDeferLen)
+	data[0] = byte(opconst.TypeDefer)
+	c.Add(o)
+}
+
 // Save the current operations state.
 func Save(o *Ops) StateOp {
 	o.nextStateID++
@@ -159,11 +184,16 @@ func Save(o *Ops) StateOp {
 
 // Load a previously saved operations state.
 func (s StateOp) Load() {
+	if s.ops.macroStack.currentID != s.macroID {
+		panic("load in a different macro than save")
+	}
+	s.load()
+}
+
+// load is like Load without the same-macro check.
+func (s StateOp) load() {
 	if s.id == 0 {
 		panic("zero-value op")
-	}
-	if s.ops.macroStack.currentID != s.macroID {
-		panic("pop in a different macro than push")
 	}
 	bo := binary.LittleEndian
 	data := s.ops.Write(opconst.TypeLoadLen)
