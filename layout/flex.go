@@ -3,6 +3,8 @@
 package layout
 
 import (
+	"image"
+
 	"gioui.org/op"
 )
 
@@ -96,7 +98,7 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 		cgtx.Constraints = f.Axis.constraints(0, remaining, crossMin, crossMax)
 		dims := child.widget(cgtx)
 		c := macro.Stop()
-		sz := f.Axis.Main(dims.Size)
+		sz := f.Axis.Convert(dims.Size).X
 		size += sz
 		remaining -= sz
 		if remaining < 0 {
@@ -131,7 +133,7 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 		cgtx.Constraints = f.Axis.constraints(flexSize, flexSize, crossMin, crossMax)
 		dims := child.widget(cgtx)
 		c := macro.Stop()
-		sz := f.Axis.Main(dims.Size)
+		sz := f.Axis.Convert(dims.Size).X
 		size += sz
 		remaining -= sz
 		if remaining < 0 {
@@ -143,7 +145,7 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 	var maxCross int
 	var maxBaseline int
 	for _, child := range children {
-		if c := f.Axis.Cross(child.dims.Size); c > maxCross {
+		if c := f.Axis.Convert(child.dims.Size).Y; c > maxCross {
 			maxCross = c
 		}
 		if b := child.dims.Size.Y - child.dims.Baseline; b > maxBaseline {
@@ -173,19 +175,20 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 		var cross int
 		switch f.Alignment {
 		case End:
-			cross = maxCross - f.Axis.Cross(dims.Size)
+			cross = maxCross - f.Axis.Convert(dims.Size).Y
 		case Middle:
-			cross = (maxCross - f.Axis.Cross(dims.Size)) / 2
+			cross = (maxCross - f.Axis.Convert(dims.Size).Y) / 2
 		case Baseline:
 			if f.Axis == Horizontal {
 				cross = maxBaseline - b
 			}
 		}
 		stack := op.Save(gtx.Ops)
-		op.Offset(FPt(f.Axis.point(mainSize, cross))).Add(gtx.Ops)
+		pt := f.Axis.Convert(image.Pt(mainSize, cross))
+		op.Offset(FPt(pt)).Add(gtx.Ops)
 		child.call.Add(gtx.Ops)
 		stack.Load()
-		mainSize += f.Axis.Main(dims.Size)
+		mainSize += f.Axis.Convert(dims.Size).X
 		if i < len(children)-1 {
 			switch f.Spacing {
 			case SpaceEvenly:
@@ -213,7 +216,7 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 			mainSize += space / (len(children) * 2)
 		}
 	}
-	sz := f.Axis.point(mainSize, maxCross)
+	sz := f.Axis.Convert(image.Pt(mainSize, maxCross))
 	return Dimensions{Size: sz, Baseline: sz.Y - maxBaseline}
 }
 

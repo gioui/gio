@@ -225,31 +225,14 @@ func (a Alignment) String() string {
 	}
 }
 
-// Main returns the main axis of p.
-// I.e. if a is Horizontal, then the returned value is p.X.
-func (a Axis) Main(p image.Point) int {
+// Convert a point in (x, y) coordinates to (main, cross) coordinates,
+// or vice versa. Specifically, Convert((x, y)) returns (x, y) unchanged
+// for the horizontal axis, or (y, x) for the vertical axis.
+func (a Axis) Convert(pt image.Point) image.Point {
 	if a == Horizontal {
-		return p.X
+		return pt
 	}
-	return p.Y
-}
-
-// Cross returns the cross axis of p.
-// I.e. if a is Horizontal, then the returned value is p.Y.
-func (a Axis) Cross(p image.Point) int {
-	if a == Horizontal {
-		return p.Y
-	}
-	return p.X
-}
-
-// point returns the point having its values set based on the axis.
-// I.e. if a is Horizontal, then the returned value is image.Point{X: main, Y: cross}.
-func (a Axis) point(main, cross int) image.Point {
-	if a == Horizontal {
-		return image.Pt(main, cross)
-	}
-	return image.Pt(cross, main)
+	return image.Pt(pt.Y, pt.X)
 }
 
 // mainConstraint returns the min and max main constraints for axis a.

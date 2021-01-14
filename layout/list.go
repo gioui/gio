@@ -178,7 +178,7 @@ func (l *List) nextDir() iterationDir {
 // End the current child by specifying its dimensions.
 func (l *List) end(dims Dimensions, call op.CallOp) {
 	child := scrollChild{dims.Size, call}
-	mainSize := l.Axis.Main(child.size)
+	mainSize := l.Axis.Convert(child.size).X
 	l.maxSize += mainSize
 	switch l.dir {
 	case iterateForward:
@@ -205,7 +205,7 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 	// Skip invisible children
 	for len(children) > 0 {
 		sz := children[0].size
-		mainSize := l.Axis.Main(sz)
+		mainSize := l.Axis.Convert(sz).X
 		if l.Position.Offset <= mainSize {
 			break
 		}
@@ -216,11 +216,11 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 	size := -l.Position.Offset
 	var maxCross int
 	for i, child := range children {
-		sz := child.size
-		if c := l.Axis.Cross(sz); c > maxCross {
+		sz := l.Axis.Convert(child.size)
+		if c := sz.Y; c > maxCross {
 			maxCross = c
 		}
-		size += l.Axis.Main(sz)
+		size += sz.X
 		if size >= mainMax {
 			children = children[:i+1]
 			break
@@ -232,15 +232,15 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 		pos += space
 	}
 	for _, child := range children {
-		sz := child.size
+		sz := l.Axis.Convert(child.size)
 		var cross int
 		switch l.Alignment {
 		case End:
-			cross = maxCross - l.Axis.Cross(sz)
+			cross = maxCross - sz.Y
 		case Middle:
-			cross = (maxCross - l.Axis.Cross(sz)) / 2
+			cross = (maxCross - sz.Y) / 2
 		}
-		childSize := l.Axis.Main(sz)
+		childSize := sz.X
 		max := childSize + pos
 		if max > mainMax {
 			max = mainMax
@@ -250,12 +250,13 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 			min = 0
 		}
 		r := image.Rectangle{
-			Min: l.Axis.point(min, -inf),
-			Max: l.Axis.point(max, inf),
+			Min: l.Axis.Convert(image.Pt(min, -inf)),
+			Max: l.Axis.Convert(image.Pt(max, inf)),
 		}
 		stack := op.Save(ops)
 		clip.Rect(r).Add(ops)
-		op.Offset(FPt(l.Axis.point(pos, cross))).Add(ops)
+		pt := l.Axis.Convert(image.Pt(pos, cross))
+		op.Offset(FPt(pt)).Add(ops)
 		child.call.Add(ops)
 		stack.Load()
 		pos += childSize
@@ -272,7 +273,7 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 	if pos > mainMax {
 		pos = mainMax
 	}
-	dims := l.Axis.point(pos, maxCross)
+	dims := l.Axis.Convert(image.Pt(pos, maxCross))
 	call := macro.Stop()
 	defer op.Save(ops).Load()
 	pointer.Rect(image.Rectangle{Max: dims}).Add(ops)
