@@ -36,3 +36,18 @@ func TestNRGBAToLinearRGBA_Boundary(t *testing.T) {
 		}
 	}
 }
+
+func TestLinearToRGBARoundtrip(t *testing.T) {
+	for col := 0; col <= 0xFF; col++ {
+		for alpha := 0; alpha <= 0xFF; alpha++ {
+			want := color.NRGBA{R: uint8(col), A: uint8(alpha)}
+			if alpha == 0 {
+				want.R = 0
+			}
+			got := LinearFromSRGB(want).SRGB()
+			if want != got {
+				t.Errorf("got %v expected %v", got, want)
+			}
+		}
+	}
+}
