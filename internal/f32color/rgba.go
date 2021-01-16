@@ -28,9 +28,9 @@ func (col RGBA) SRGB() color.NRGBA {
 		return color.NRGBA{}
 	}
 	return color.NRGBA{
-		R: uint8(linearTosRGB(col.R)/col.A*255 + .5),
-		G: uint8(linearTosRGB(col.G)/col.A*255 + .5),
-		B: uint8(linearTosRGB(col.B)/col.A*255 + .5),
+		R: uint8(linearTosRGB(col.R/col.A)*255 + .5),
+		G: uint8(linearTosRGB(col.G/col.A)*255 + .5),
+		B: uint8(linearTosRGB(col.B/col.A)*255 + .5),
 		A: uint8(col.A*255 + .5),
 	}
 }
@@ -53,9 +53,9 @@ func (col RGBA) Opaque() RGBA {
 func LinearFromSRGB(col color.NRGBA) RGBA {
 	af := float32(col.A) / 0xFF
 	return RGBA{
-		R: sRGBToLinear(float32(col.R) / 0xff * af),
-		G: sRGBToLinear(float32(col.G) / 0xff * af),
-		B: sRGBToLinear(float32(col.B) / 0xff * af),
+		R: sRGBToLinear(float32(col.R)/0xff) * af,
+		G: sRGBToLinear(float32(col.G)/0xff) * af,
+		B: sRGBToLinear(float32(col.B)/0xff) * af,
 		A: af,
 	}
 }
