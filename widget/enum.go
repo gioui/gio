@@ -10,7 +10,8 @@ import (
 )
 
 type Enum struct {
-	Value string
+	Value   string
+	Hovered string
 
 	changed bool
 
@@ -55,6 +56,12 @@ func (e *Enum) Layout(gtx layout.Context, key string) layout.Dimensions {
 					e.changed = true
 				}
 			}
+		}
+		if e.Hovered == key {
+			e.Hovered = ""
+		}
+		if clk.Hovered() {
+			e.Hovered = key
 		}
 		clk.Add(gtx.Ops)
 	}
