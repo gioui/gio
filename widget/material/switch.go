@@ -96,6 +96,18 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 		op.Offset(f32.Point{X: float32(off)}).Add(gtx.Ops)
 	}
 
+	// Draw hover.
+	if s.Switch.Hovered() {
+		var p clip.Path
+		r := 1.7 * float32(thumbSize) / 2
+		p.Begin(gtx.Ops)
+		//p.Move(f32.Pt(-float32(thumbSize)/2, -float32(thumbSize)/2))
+		p.Move(f32.Pt(-r+float32(thumbSize)/2, -r+float32(thumbSize)/2))
+		addCircle(&p, r)
+		background := f32color.MulAlpha(s.Color.Enabled, 70)
+		paint.FillShape(gtx.Ops, background, clip.Outline{Path: p.End()}.Op())
+	}
+
 	// Draw thumb shadow, a translucent disc slightly larger than the
 	// thumb itself.
 	shadowStack := op.Save(gtx.Ops)
