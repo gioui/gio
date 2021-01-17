@@ -172,6 +172,17 @@ func Disabled(c color.NRGBA) (d color.NRGBA) {
 	}
 }
 
+// Hovered blends color towards a brighter color.
+func Hovered(c color.NRGBA) (d color.NRGBA) {
+	const r = 0x20 // lighten ratio
+	return color.NRGBA{
+		R: byte(255 - int(255-c.R)*(255-r)/256),
+		G: byte(255 - int(255-c.G)*(255-r)/256),
+		B: byte(255 - int(255-c.B)*(255-r)/256),
+		A: c.A,
+	}
+}
+
 // approxLuminance is a fast approximate version of RGBA.Luminance.
 func approxLuminance(c color.NRGBA) byte {
 	const (

@@ -128,8 +128,11 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 				Y: float32(gtx.Constraints.Min.Y),
 			}}, rr).Add(gtx.Ops)
 			background := b.Background
-			if gtx.Queue == nil {
+			switch {
+			case gtx.Queue == nil:
 				background = f32color.Disabled(b.Background)
+			case b.Button.Hovered():
+				background = f32color.Hovered(b.Background)
 			}
 			paint.Fill(gtx.Ops, background)
 			for _, c := range b.Button.History() {
@@ -155,8 +158,11 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 				Max: f32.Point{X: sizexf, Y: sizeyf},
 			}, rr).Add(gtx.Ops)
 			background := b.Background
-			if gtx.Queue == nil {
+			switch {
+			case gtx.Queue == nil:
 				background = f32color.Disabled(b.Background)
+			case b.Button.Hovered():
+				background = f32color.Hovered(b.Background)
 			}
 			paint.Fill(gtx.Ops, background)
 			for _, c := range b.Button.History() {
