@@ -36,7 +36,7 @@ func RadioButton(th *Theme, group *widget.Enum, key, label string) RadioButtonSt
 
 // Layout updates enum and displays the radio button.
 func (r RadioButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
-	dims := r.layout(gtx, r.Group.Value == r.Key)
+	dims := r.layout(gtx, r.Group.Value == r.Key, false)
 	gtx.Constraints.Min = dims.Size
 	r.Group.Layout(gtx, r.Key)
 	return dims
