@@ -2,28 +2,26 @@
 
 package glimpl
 
-import "syscall/js"
-
 type (
-	Buffer       js.Value
-	Framebuffer  js.Value
-	Program      js.Value
-	Renderbuffer js.Value
-	Shader       js.Value
-	Texture      js.Value
-	Query        js.Value
-	Uniform      js.Value
-	Object       js.Value
+	Buffer       value
+	Framebuffer  value
+	Program      value
+	Renderbuffer value
+	Shader       value
+	Texture      value
+	Query        value
+	Uniform      value
+	Object       value
 )
 
-func (p Program) Valid() bool {
-	return !js.Value(p).IsUndefined() && !js.Value(p).IsNull()
+func (p *Program) Valid() bool {
+	return p.ref != 0
 }
 
-func (s Shader) Valid() bool {
-	return !js.Value(s).IsUndefined() && !js.Value(s).IsNull()
+func (s *Shader) Valid() bool {
+	return s.ref != 0
 }
 
-func (u Uniform) Valid() bool {
-	return !js.Value(u).IsUndefined() && !js.Value(u).IsNull()
+func (u *Uniform) Valid() bool {
+	return u.ref != 0
 }
