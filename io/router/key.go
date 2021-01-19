@@ -140,7 +140,7 @@ func (q *keyQueue) resolveFocus(events *handlerEvents) resolveState {
 			q.states[id] = state
 			state = resolveState{}
 		case opconst.TypeLoad:
-			id := ops.DecodeLoad(encOp.Data)
+			id, mask := ops.DecodeLoad(encOp.Data)
 			restored := q.states[id]
 			if state.keyboard > restored.keyboard {
 				restored.keyboard = state.keyboard
@@ -148,7 +148,9 @@ func (q *keyQueue) resolveFocus(events *handlerEvents) resolveState {
 			if state.pri.replaces(restored.pri) {
 				restored.tag, restored.pri = state.tag, state.pri
 			}
-			state = restored
+			if mask != 0 {
+				state = restored
+			}
 		}
 	}
 	return state

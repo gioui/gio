@@ -57,7 +57,7 @@ const (
 	TypeKeyFocusLen        = 1 + 1
 	TypeKeySoftKeyboardLen = 1 + 1
 	TypeSaveLen            = 1 + 4
-	TypeLoadLen            = 1 + 4
+	TypeLoadLen            = 1 + 1 + 4
 	TypeAuxLen             = 1
 	TypeClipLen            = 1 + 4*4 + 1
 	TypeProfileLen         = 1
@@ -66,6 +66,20 @@ const (
 	TypeStrokeLen          = 1 + 4 + 4 + 1 + 1
 	TypeDashLen            = 1 + 4 + 1
 )
+
+// StateMask is a bitmask of state types a load operation
+// should restore.
+type StateMask uint8
+
+const (
+	TransformState StateMask = 1 << iota
+
+	AllState = ^StateMask(0)
+)
+
+// InitialStateID is the ID for saving and loading
+// the initial operation state.
+const InitialStateID = 0
 
 func (t OpType) Size() int {
 	return [...]int{

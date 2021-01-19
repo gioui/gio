@@ -72,11 +72,11 @@ func DecodeSave(data []byte) int {
 	return int(bo.Uint32(data[1:]))
 }
 
-// DecodeLoad decodes the state id of a restore op.
-func DecodeLoad(data []byte) int {
+// DecodeLoad decodes the state id and mask of a load op.
+func DecodeLoad(data []byte) (int, opconst.StateMask) {
 	if opconst.OpType(data[0]) != opconst.TypeLoad {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
-	return int(bo.Uint32(data[1:]))
+	return int(bo.Uint32(data[2:])), opconst.StateMask(data[1])
 }

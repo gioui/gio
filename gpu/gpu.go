@@ -869,6 +869,13 @@ func splitTransform(t f32.Affine2D) (srs f32.Affine2D, offset f32.Point) {
 	return
 }
 
+func (d *drawOps) save(id int, state drawState) {
+	if extra := id - len(d.states) + 1; extra > 0 {
+		d.states = append(d.states, make([]drawState, extra)...)
+	}
+	d.states[id] = state
+}
+
 func (d *drawOps) collectOps(r *ops.Reader, state drawState) {
 	var (
 		quads  quadsOp
@@ -876,6 +883,7 @@ func (d *drawOps) collectOps(r *ops.Reader, state drawState) {
 		dashes dashOp
 		z      int
 	)
+	d.save(opconst.InitialStateID, state)
 loop:
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
@@ -1029,13 +1037,16 @@ loop:
 			}
 		case opconst.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
-			if extra := id - len(d.states) + 1; extra > 0 {
-				d.states = append(d.states, make([]drawState, extra)...)
-			}
-			d.states[id] = state
+			d.save(id, state)
 		case opconst.TypeLoad:
-			id := ops.DecodeLoad(encOp.Data)
-			state = d.states[id]
+			id, mask := ops.DecodeLoad(encOp.Data)
+			s := d.states[id]
+			if mask&opconst.TransformState != 0 {
+				state.t = s.t
+			}
+			if mask&^opconst.TransformState != 0 {
+				state = s
+			}
 		}
 	}
 }

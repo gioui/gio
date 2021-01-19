@@ -144,8 +144,8 @@ type pc struct {
 
 // Defer executes c after all other operations have completed,
 // including previously deferred operations.
-// Defer saves the operation state, which is then loaded prior
-// to execution.
+// Defer saves the current transformation and restores it prior
+// to execution. All other operation state is reset.
 //
 // Note that deferred operations are executed in first-in-first-out
 // order, unlike the Go facility of the same name.
@@ -156,8 +156,8 @@ func Defer(o *Ops, c CallOp) {
 	state := Save(o)
 	// Wrap c in a macro that loads the saved state before execution.
 	m := Record(o)
-	//
-	state.load()
+	load(o, opconst.InitialStateID, opconst.AllState)
+	load(o, state.id, opconst.TransformState)
 	c.Add(o)
 	c = m.Stop()
 	// A Defer is recorded as a TypeDefer followed by the
@@ -175,11 +175,17 @@ func Save(o *Ops) StateOp {
 		id:      o.nextStateID,
 		macroID: o.macroStack.currentID,
 	}
+	save(o, s.id)
+	return s
+}
+
+// save records a save of the operations state to
+// id.
+func save(o *Ops, id int) {
 	bo := binary.LittleEndian
 	data := o.Write(opconst.TypeSaveLen)
 	data[0] = byte(opconst.TypeSave)
-	bo.PutUint32(data[1:], uint32(s.id))
-	return s
+	bo.PutUint32(data[1:], uint32(id))
 }
 
 // Load a previously saved operations state.
@@ -187,18 +193,20 @@ func (s StateOp) Load() {
 	if s.ops.macroStack.currentID != s.macroID {
 		panic("load in a different macro than save")
 	}
-	s.load()
-}
-
-// load is like Load without the same-macro check.
-func (s StateOp) load() {
 	if s.id == 0 {
 		panic("zero-value op")
 	}
+	load(s.ops, s.id, opconst.AllState)
+}
+
+// load a previously saved operations state given
+// its ID. Only state included in mask is affected.
+func load(o *Ops, id int, m opconst.StateMask) {
 	bo := binary.LittleEndian
-	data := s.ops.Write(opconst.TypeLoadLen)
+	data := o.Write(opconst.TypeLoadLen)
 	data[0] = byte(opconst.TypeLoad)
-	bo.PutUint32(data[1:], uint32(s.id))
+	data[1] = byte(m)
+	bo.PutUint32(data[2:], uint32(id))
 }
 
 // Reset the Ops, preparing it for re-use. Reset invalidates

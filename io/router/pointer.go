@@ -85,22 +85,33 @@ const (
 	areaEllipse
 )
 
+func (q *pointerQueue) save(id int, state collectState) {
+	if extra := id - len(q.states) + 1; extra > 0 {
+		q.states = append(q.states, make([]collectState, extra)...)
+	}
+	q.states[id] = state
+}
+
 func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 	state := collectState{
 		area: -1,
 		node: -1,
 	}
+	q.save(opconst.InitialStateID, state)
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
-			if extra := id - len(q.states) + 1; extra > 0 {
-				q.states = append(q.states, make([]collectState, extra)...)
-			}
-			q.states[id] = state
+			q.save(id, state)
 		case opconst.TypeLoad:
-			id := ops.DecodeLoad(encOp.Data)
-			state = q.states[id]
+			id, mask := ops.DecodeLoad(encOp.Data)
+			s := q.states[id]
+			if mask&opconst.TransformState != 0 {
+				state.t = s.t
+			}
+			if mask&^opconst.TransformState != 0 {
+				state = s
+			}
 		case opconst.TypePass:
 			state.pass = encOp.Data[1] != 0
 		case opconst.TypeArea:
