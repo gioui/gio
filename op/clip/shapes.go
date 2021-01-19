@@ -3,9 +3,27 @@
 package clip
 
 import (
+	"image"
+
 	"gioui.org/f32"
 	"gioui.org/op"
 )
+
+// Rect represents the clip area of a pixel-aligned rectangle.
+type Rect image.Rectangle
+
+// Op returns the op for the rectangle.
+func (r Rect) Op() Op {
+	return Op{
+		bounds:  image.Rectangle(r),
+		outline: true,
+	}
+}
+
+// Add the clip operation.
+func (r Rect) Add(ops *op.Ops) {
+	r.Op().Add(ops)
+}
 
 // UniformRRect returns an RRect with all corner radii set to the
 // provided radius.
