@@ -69,6 +69,8 @@ type Position struct {
 	// Offset is the distance in pixels from the top edge to the child at index
 	// First.
 	Offset int
+	// Count is the number of visible children.
+	Count int
 }
 
 const (
@@ -206,7 +208,8 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 	for len(children) > 0 {
 		sz := children[0].size
 		mainSize := l.Axis.Convert(sz).X
-		if l.Position.Offset <= mainSize {
+		if l.Position.Offset < mainSize {
+			// First child is partially visible.
 			break
 		}
 		l.Position.First++
@@ -226,6 +229,7 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 			break
 		}
 	}
+	l.Position.Count = len(children)
 	pos := -l.Position.Offset
 	// ScrollToEnd lists are end aligned.
 	if space := mainMax - size; l.ScrollToEnd && space > 0 {
