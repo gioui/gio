@@ -29,61 +29,129 @@ type Label struct {
 // not pixels): Y = line number, X = rune column.
 type screenPos image.Point
 
-type lineIterator struct {
+type segmentIterator struct {
 	Lines     []text.Line
 	Clip      image.Rectangle
 	Alignment text.Alignment
 	Width     int
 	Offset    image.Point
+	startSel  screenPos
+	endSel    screenPos
 
+	pos    screenPos   // current position
+	line   text.Line   // current line
+	layout text.Layout // current line's Layout
+
+	// pixel positions
+	off         fixed.Point26_6
 	y, prevDesc fixed.Int26_6
 }
 
 const inf = 1e6
 
-func (l *lineIterator) Next() (text.Layout, image.Point, bool) {
-	for len(l.Lines) > 0 {
-		line := l.Lines[0]
-		l.Lines = l.Lines[1:]
-		x := align(l.Alignment, line.Width, l.Width) + fixed.I(l.Offset.X)
-		l.y += l.prevDesc + line.Ascent
-		l.prevDesc = line.Descent
-		// Align baseline and line start to the pixel grid.
-		off := fixed.Point26_6{X: fixed.I(x.Floor()), Y: fixed.I(l.y.Ceil())}
-		l.y = off.Y
-		off.Y += fixed.I(l.Offset.Y)
-		if (off.Y + line.Bounds.Min.Y).Floor() > l.Clip.Max.Y {
-			break
-		}
-		layout := line.Layout
-		if (off.Y + line.Bounds.Max.Y).Ceil() < l.Clip.Min.Y {
-			continue
-		}
-		for len(layout.Advances) > 0 {
-			_, n := utf8.DecodeRuneInString(layout.Text)
-			adv := layout.Advances[0]
-			if (off.X + adv + line.Bounds.Max.X - line.Width).Ceil() >= l.Clip.Min.X {
+func (l *segmentIterator) Next() (text.Layout, image.Point, bool, int, image.Point, bool) {
+	for l.pos.Y < len(l.Lines) {
+		if l.pos.X == 0 {
+			l.line = l.Lines[l.pos.Y]
+
+			// Calculate X & Y pixel coordinates of left edge of line. We need y
+			// for the next line, so it's in l, but we only need x here, so it's
+			// not.
+			x := align(l.Alignment, l.line.Width, l.Width) + fixed.I(l.Offset.X)
+			l.y += l.prevDesc + l.line.Ascent
+			l.prevDesc = l.line.Descent
+			// Align baseline and line start to the pixel grid.
+			l.off = fixed.Point26_6{X: fixed.I(x.Floor()), Y: fixed.I(l.y.Ceil())}
+			l.y = l.off.Y
+			l.off.Y += fixed.I(l.Offset.Y)
+			if (l.off.Y + l.line.Bounds.Min.Y).Floor() > l.Clip.Max.Y {
 				break
 			}
-			off.X += adv
-			layout.Text = layout.Text[n:]
-			layout.Advances = layout.Advances[1:]
+
+			if (l.off.Y + l.line.Bounds.Max.Y).Ceil() < l.Clip.Min.Y {
+				// This line is outside/before the clip area; go on to the next line.
+				l.pos.Y++
+				continue
+			}
+
+			// Copy the line's Layout, since we slice it up later.
+			l.layout = l.line.Layout
+
+			// Find the left edge of the text visible in the l.Clip clipping
+			// area.
+			for len(l.layout.Advances) > 0 {
+				_, n := utf8.DecodeRuneInString(l.layout.Text)
+				adv := l.layout.Advances[0]
+				if (l.off.X + adv + l.line.Bounds.Max.X - l.line.Width).Ceil() >= l.Clip.Min.X {
+					break
+				}
+				l.off.X += adv
+				l.layout.Text = l.layout.Text[n:]
+				l.layout.Advances = l.layout.Advances[1:]
+				l.pos.X++
+			}
 		}
-		endx := off.X
+
+		selected := l.inSelection()
+		endx := l.off.X
 		rune := 0
-		for n := range layout.Text {
-			if (endx + line.Bounds.Min.X).Floor() > l.Clip.Max.X {
-				layout.Advances = layout.Advances[:rune]
-				layout.Text = layout.Text[:n]
+		nextLine := true
+		retLayout := l.layout
+		for n := range l.layout.Text {
+			selChanged := selected != l.inSelection()
+			beyondClipEdge := (endx + l.line.Bounds.Min.X).Floor() > l.Clip.Max.X
+			if selChanged || beyondClipEdge {
+				retLayout.Advances = l.layout.Advances[:rune]
+				retLayout.Text = l.layout.Text[:n]
+				if selChanged {
+					// Save the rest of the line
+					l.layout.Advances = l.layout.Advances[rune:]
+					l.layout.Text = l.layout.Text[n:]
+					nextLine = false
+				}
 				break
 			}
-			endx += layout.Advances[rune]
+			endx += l.layout.Advances[rune]
 			rune++
+			l.pos.X++
 		}
-		offf := image.Point{X: off.X.Floor(), Y: off.Y.Floor()}
-		return layout, offf, true
+		offFloor := image.Point{X: l.off.X.Floor(), Y: l.off.Y.Floor()}
+
+		// Calculate the width & height if the returned text.
+		//
+		// If there's a better way to do this, I'm all ears.
+		var d fixed.Int26_6
+		for _, adv := range retLayout.Advances {
+			d += adv
+		}
+		size := image.Point{
+			X: d.Ceil(),
+			Y: (l.line.Ascent + l.line.Descent).Ceil(),
+		}
+
+		if nextLine {
+			l.pos.Y++
+			l.pos.X = 0
+		} else {
+			l.off.X = endx
+		}
+
+		return retLayout, offFloor, selected, l.prevDesc.Ceil() - size.Y, size, true
 	}
-	return text.Layout{}, image.Point{}, false
+	return text.Layout{}, image.Point{}, false, 0, image.Point{}, false
+}
+
+func (l *segmentIterator) inSelection() bool {
+	return l.startSel.LessOrEqual(l.pos) &&
+		l.pos.Less(l.endSel)
+}
+
+func (p1 screenPos) LessOrEqual(p2 screenPos) bool {
+	return p1.Y < p2.Y || (p1.Y == p2.Y && p1.X <= p2.X)
+}
+
+func (p1 screenPos) Less(p2 screenPos) bool {
+	return p1.Y < p2.Y || (p1.Y == p2.Y && p1.X < p2.X)
 }
 
 func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size unit.Value, txt string) layout.Dimensions {
@@ -97,14 +165,14 @@ func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size un
 	dims.Size = cs.Constrain(dims.Size)
 	cl := textPadding(lines)
 	cl.Max = cl.Max.Add(dims.Size)
-	it := lineIterator{
+	it := segmentIterator{
 		Lines:     lines,
 		Clip:      cl,
 		Alignment: l.Alignment,
 		Width:     dims.Size.X,
 	}
 	for {
-		l, off, ok := it.Next()
+		l, off, _, _, _, ok := it.Next()
 		if !ok {
 			break
 		}
