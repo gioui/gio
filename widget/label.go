@@ -25,6 +25,10 @@ type Label struct {
 	MaxLines int
 }
 
+// screenPos describes a character position (in text line and column numbers,
+// not pixels): Y = line number, X = rune column.
+type screenPos image.Point
+
 type lineIterator struct {
 	Lines     []text.Line
 	Clip      image.Rectangle
@@ -33,7 +37,6 @@ type lineIterator struct {
 	Offset    image.Point
 
 	y, prevDesc fixed.Int26_6
-	txtOff      int
 }
 
 const inf = 1e6
@@ -53,8 +56,6 @@ func (l *lineIterator) Next() (text.Layout, image.Point, bool) {
 			break
 		}
 		layout := line.Layout
-		start := l.txtOff
-		l.txtOff += len(line.Layout.Text)
 		if (off.Y + line.Bounds.Max.Y).Ceil() < l.Clip.Min.Y {
 			continue
 		}
@@ -67,18 +68,15 @@ func (l *lineIterator) Next() (text.Layout, image.Point, bool) {
 			off.X += adv
 			layout.Text = layout.Text[n:]
 			layout.Advances = layout.Advances[1:]
-			start += n
 		}
-		end := start
 		endx := off.X
 		rune := 0
-		for n, r := range layout.Text {
+		for n := range layout.Text {
 			if (endx + line.Bounds.Min.X).Floor() > l.Clip.Max.X {
 				layout.Advances = layout.Advances[:rune]
 				layout.Text = layout.Text[:n]
 				break
 			}
-			end += utf8.RuneLen(r)
 			endx += layout.Advances[rune]
 			rune++
 		}
