@@ -60,10 +60,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}
 	trackColor := s.Color.Track
 	op.Offset(f32.Point{Y: trackOff}).Add(gtx.Ops)
-	clip.RRect{
-		Rect: trackRect,
-		NE:   trackCorner, NW: trackCorner, SE: trackCorner, SW: trackCorner,
-	}.Add(gtx.Ops)
+	clip.UniformRRect(trackRect, trackCorner).Add(gtx.Ops)
 	paint.ColorOp{Color: trackColor}.Add(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
 	stack.Load()
@@ -78,12 +75,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}
 	op.Offset(inkOff).Add(gtx.Ops)
 	gtx.Constraints.Min = image.Pt(inkSize, inkSize)
-	clip.RRect{
-		Rect: f32.Rectangle{
-			Max: layout.FPt(gtx.Constraints.Min),
-		},
-		NE: rr, NW: rr, SE: rr, SW: rr,
-	}.Add(gtx.Ops)
+	clip.UniformRRect(f32.Rectangle{Max: layout.FPt(gtx.Constraints.Min)}, rr).Add(gtx.Ops)
 	for _, p := range s.Switch.History() {
 		drawInk(gtx, p)
 	}
@@ -142,11 +134,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 func drawDisc(ops *op.Ops, sz float32, col color.NRGBA) {
 	defer op.Save(ops).Load()
 	rr := sz / 2
-	r := f32.Rectangle{Max: f32.Point{X: sz, Y: sz}}
-	clip.RRect{
-		Rect: r,
-		NE:   rr, NW: rr, SE: rr, SW: rr,
-	}.Add(ops)
+	clip.UniformRRect(f32.Rectangle{Max: f32.Pt(sz, sz)}, rr).Add(ops)
 	paint.ColorOp{Color: col}.Add(ops)
 	paint.PaintOp{}.Add(ops)
 }

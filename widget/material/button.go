@@ -91,10 +91,7 @@ func Clickable(gtx layout.Context, button *widget.Clickable, w layout.Widget) la
 		layout.Expanded(button.Layout),
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
 			clip.RRect{
-				Rect: f32.Rectangle{Max: f32.Point{
-					X: float32(gtx.Constraints.Min.X),
-					Y: float32(gtx.Constraints.Min.Y),
-				}},
+				Rect: f32.Rectangle{Max: layout.FPt(gtx.Constraints.Min)},
 			}.Add(gtx.Ops)
 			for _, c := range button.History() {
 				drawInk(gtx, c)
@@ -286,12 +283,6 @@ func drawInk(gtx layout.Context, c widget.Press) {
 		X: -rr,
 		Y: -rr,
 	})).Add(gtx.Ops)
-	clip.RRect{
-		Rect: f32.Rectangle{Max: f32.Point{
-			X: float32(size),
-			Y: float32(size),
-		}},
-		NE: rr, NW: rr, SE: rr, SW: rr,
-	}.Add(gtx.Ops)
+	clip.UniformRRect(f32.Rectangle{Max: f32.Pt(size, size)}, rr).Add(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
 }
