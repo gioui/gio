@@ -36,24 +36,31 @@ func TestEditor(t *testing.T) {
 	assertCaret(t, e, 0, 0, 0)
 	e.moveEnd()
 	assertCaret(t, e, 0, 3, len("æbc"))
-	e.Move(+1)
+	e.MoveCaret(+1)
 	assertCaret(t, e, 1, 0, len("æbc\n"))
-	e.Move(-1)
+	e.MoveCaret(-1)
 	assertCaret(t, e, 0, 3, len("æbc"))
 	e.moveLines(+1)
 	assertCaret(t, e, 1, 3, len("æbc\naøå"))
 	e.moveEnd()
 	assertCaret(t, e, 1, 4, len("æbc\naøå•"))
-	e.Move(+1)
+	e.MoveCaret(+1)
+	assertCaret(t, e, 1, 4, len("æbc\naøå•"))
+
+	e.SetCaret(0)
+	assertCaret(t, e, 0, 0, 0)
+	e.SetCaret(len("æ"))
+	assertCaret(t, e, 0, 1, 2)
+	e.SetCaret(len("æbc\naøå•"))
 	assertCaret(t, e, 1, 4, len("æbc\naøå•"))
 
 	// Ensure that password masking does not affect caret behavior
-	e.Move(-3)
+	e.MoveCaret(-3)
 	assertCaret(t, e, 1, 1, len("æbc\na"))
 	e.Mask = '*'
 	e.Layout(gtx, cache, font, fontSize)
 	assertCaret(t, e, 1, 1, len("æbc\na"))
-	e.Move(-3)
+	e.MoveCaret(-3)
 	assertCaret(t, e, 0, 2, len("æb"))
 	e.Mask = '\U0001F92B'
 	e.Layout(gtx, cache, font, fontSize)
@@ -91,14 +98,6 @@ func TestEditorDimensions(t *testing.T) {
 	}
 }
 
-type testQueue struct {
-	events []event.Event
-}
-
-func (q *testQueue) Events(_ event.Tag) []event.Event {
-	return q.events
-}
-
 // assertCaret asserts that the editor caret is at a particular line
 // and column, and that the byte position matches as well.
 func assertCaret(t *testing.T, e *Editor, line, col, bytes int) {
@@ -107,8 +106,8 @@ func assertCaret(t *testing.T, e *Editor, line, col, bytes int) {
 	if gotLine != line || gotCol != col {
 		t.Errorf("caret at (%d, %d), expected (%d, %d)", gotLine, gotCol, line, col)
 	}
-	if bytes != e.rr.caret {
-		t.Errorf("caret at buffer position %d, expected %d", e.rr.caret, bytes)
+	if bytes != e.caret.pos.ofs {
+		t.Errorf("caret at buffer position %d, expected %d", e.caret.pos.ofs, bytes)
 	}
 }
 
@@ -145,12 +144,13 @@ func TestEditorCaretConsistency(t *testing.T) {
 			t.Helper()
 			gotLine, gotCol := e.CaretPos()
 			gotCoords := e.CaretCoords()
-			wantLine, wantCol, wantX, wantY := e.layoutCaret()
-			wantCoords := f32.Pt(float32(wantX)/64, float32(wantY))
-			if wantLine == gotLine && wantCol == gotCol && gotCoords == wantCoords {
+			want, _ := e.offsetToScreenPos(e.caret.pos.ofs)
+			wantCoords := f32.Pt(float32(want.x)/64, float32(want.y))
+			if want.lineCol.Y == gotLine && want.lineCol.X == gotCol && gotCoords == wantCoords {
 				return nil
 			}
-			return fmt.Errorf("caret (%d,%d) pos %s, want (%d,%d) pos %s", gotLine, gotCol, gotCoords, wantLine, wantCol, wantCoords)
+			return fmt.Errorf("caret (%d,%d) pos %s, want (%d,%d) pos %s",
+				gotLine, gotCol, gotCoords, want.lineCol.Y, want.lineCol.X, wantCoords)
 		}
 		if err := consistent(); err != nil {
 			t.Errorf("initial editor inconsistency (alignment %s): %v", a, err)
@@ -162,7 +162,7 @@ func TestEditorCaretConsistency(t *testing.T) {
 				e.SetText(str)
 				e.Layout(gtx, cache, font, fontSize)
 			case moveRune:
-				e.Move(int(distance))
+				e.MoveCaret(int(distance))
 			case moveLine:
 				e.moveLines(int(distance))
 			case movePage:
@@ -230,10 +230,10 @@ func TestEditorMoveWord(t *testing.T) {
 	}
 	for ii, tt := range tests {
 		e := setup(tt.Text)
-		e.Move(tt.Start)
+		e.MoveCaret(tt.Start)
 		e.moveWord(tt.Skip)
-		if e.rr.caret != tt.Want {
-			t.Fatalf("[%d] moveWord: bad caret position: got %d, want %d", ii, e.rr.caret, tt.Want)
+		if e.caret.pos.ofs != tt.Want {
+			t.Fatalf("[%d] moveWord: bad caret position: got %d, want %d", ii, e.caret.pos.ofs, tt.Want)
 		}
 	}
 }
@@ -278,10 +278,10 @@ func TestEditorDeleteWord(t *testing.T) {
 	}
 	for ii, tt := range tests {
 		e := setup(tt.Text)
-		e.Move(tt.Start)
+		e.MoveCaret(tt.Start)
 		e.deleteWord(tt.Delete)
-		if e.rr.caret != tt.Want {
-			t.Fatalf("[%d] deleteWord: bad caret position: got %d, want %d", ii, e.rr.caret, tt.Want)
+		if e.caret.pos.ofs != tt.Want {
+			t.Fatalf("[%d] deleteWord: bad caret position: got %d, want %d", ii, e.caret.pos.ofs, tt.Want)
 		}
 		if e.Text() != tt.Result {
 			t.Fatalf("[%d] deleteWord: invalid result: got %q, want %q", ii, e.Text(), tt.Result)
@@ -292,11 +292,19 @@ func TestEditorDeleteWord(t *testing.T) {
 func TestEditorNoLayout(t *testing.T) {
 	var e Editor
 	e.SetText("hi!\n")
-	e.Move(1)
+	e.MoveCaret(1)
 }
 
 // Generate generates a value of itself, for testing/quick.
 func (editMutation) Generate(rand *rand.Rand, size int) reflect.Value {
 	t := editMutation(rand.Intn(int(moveLast)))
 	return reflect.ValueOf(t)
+}
+
+type testQueue struct {
+	events []event.Event
+}
+
+func (q *testQueue) Events(_ event.Tag) []event.Event {
+	return q.events
 }
