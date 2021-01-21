@@ -32,12 +32,14 @@ func TestListPosition(t *testing.T) {
 		scroll []event.Event
 		first  int
 		count  int
+		offset int
+		last   int
 	}{
-		{label: "no item"},
-		{label: "1 visible 0 hidden", num: 1, count: 1},
+		{label: "no item", last: 20},
+		{label: "1 visible 0 hidden", num: 1, count: 1, last: 10},
 		{label: "2 visible 0 hidden", num: 2, count: 2},
 		{label: "2 visible 1 hidden", num: 3, count: 2},
-		{label: "3 visible 0 hidden small scroll", num: 3, count: 3,
+		{label: "3 visible 0 hidden small scroll", num: 3, count: 3, offset: 5, last: -5,
 			scroll: _s(
 				pointer.Event{
 					Source:   pointer.Mouse,
@@ -49,6 +51,26 @@ func TestListPosition(t *testing.T) {
 					Source: pointer.Mouse,
 					Type:   pointer.Scroll,
 					Scroll: f32.Pt(5, 0),
+				},
+				pointer.Event{
+					Source:   pointer.Mouse,
+					Buttons:  pointer.ButtonLeft,
+					Type:     pointer.Release,
+					Position: f32.Pt(5, 0),
+				},
+			)},
+		{label: "3 visible 0 hidden small scroll 2", num: 3, count: 3, offset: 3, last: -7,
+			scroll: _s(
+				pointer.Event{
+					Source:   pointer.Mouse,
+					Buttons:  pointer.ButtonLeft,
+					Type:     pointer.Press,
+					Position: f32.Pt(0, 0),
+				},
+				pointer.Event{
+					Source: pointer.Mouse,
+					Type:   pointer.Scroll,
+					Scroll: f32.Pt(3, 0),
 				},
 				pointer.Event{
 					Source:   pointer.Mouse,
@@ -96,6 +118,12 @@ func TestListPosition(t *testing.T) {
 			}
 			if got, want := pos.Count, tc.count; got != want {
 				t.Errorf("List: invalid number of visible children: got %v; want %v", got, want)
+			}
+			if got, want := pos.Offset, tc.offset; got != want {
+				t.Errorf("List: invalid first visible offset: got %v; want %v", got, want)
+			}
+			if got, want := pos.OffsetLast, tc.last; got != want {
+				t.Errorf("List: invalid last visible offset: got %v; want %v", got, want)
 			}
 		})
 	}

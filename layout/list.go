@@ -69,6 +69,9 @@ type Position struct {
 	// Offset is the distance in pixels from the top edge to the child at index
 	// First.
 	Offset int
+	// OffsetLast is the signed distance in pixels from the bottom edge to the
+	// bottom edge of the child at index First+Count.
+	OffsetLast int
 	// Count is the number of visible children.
 	Count int
 }
@@ -230,9 +233,10 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 		}
 	}
 	l.Position.Count = len(children)
+	l.Position.OffsetLast = mainMax - size
 	pos := -l.Position.Offset
 	// ScrollToEnd lists are end aligned.
-	if space := mainMax - size; l.ScrollToEnd && space > 0 {
+	if space := l.Position.OffsetLast; l.ScrollToEnd && space > 0 {
 		pos += space
 	}
 	for _, child := range children {
