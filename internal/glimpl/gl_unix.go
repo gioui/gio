@@ -152,6 +152,7 @@ __attribute__((constructor)) static void gio_loadGLFunctions() {
 	_glEndQuery = glEndQuery;
 	_glGenQueries = glGenQueries;
 	_glGetQueryObjectuiv = glGetQueryObjectuiv;
+	_glTexStorage2D = glTexStorage2D;
 	#endif
 	_glBindBufferBase = glBindBufferBase;
 	_glGetUniformBlockIndex = glGetUniformBlockIndex;
