@@ -23,19 +23,22 @@ type EditorStyle struct {
 	Hint string
 	// HintColor is the color of hint text.
 	HintColor color.NRGBA
-	Editor    *widget.Editor
+	// SelectionColor is the color of the background for selected text.
+	SelectionColor color.NRGBA
+	Editor         *widget.Editor
 
 	shaper text.Shaper
 }
 
 func Editor(th *Theme, editor *widget.Editor, hint string) EditorStyle {
 	return EditorStyle{
-		Editor:    editor,
-		TextSize:  th.TextSize,
-		Color:     th.Palette.Fg,
-		shaper:    th.Shaper,
-		Hint:      hint,
-		HintColor: f32color.MulAlpha(th.Palette.Fg, 0xbb),
+		Editor:         editor,
+		TextSize:       th.TextSize,
+		Color:          th.Palette.Fg,
+		shaper:         th.Shaper,
+		Hint:           hint,
+		HintColor:      f32color.MulAlpha(th.Palette.Fg, 0xbb),
+		SelectionColor: th.Palette.ContrastBg,
 	}
 }
 
@@ -59,11 +62,9 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 	dims = e.Editor.Layout(gtx, e.shaper, e.Font, e.TextSize)
 	disabled := gtx.Queue == nil
 	if e.Editor.Len() > 0 {
-		textColor := e.Color
-		if disabled {
-			textColor = f32color.Disabled(textColor)
-		}
-		paint.ColorOp{Color: textColor}.Add(gtx.Ops)
+		paint.ColorOp{Color: blendDisabledColor(disabled, e.SelectionColor)}.Add(gtx.Ops)
+		e.Editor.PaintSelection(gtx)
+		paint.ColorOp{Color: blendDisabledColor(disabled, e.Color)}.Add(gtx.Ops)
 		e.Editor.PaintText(gtx)
 	} else {
 		call.Add(gtx.Ops)
@@ -73,4 +74,11 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 		e.Editor.PaintCaret(gtx)
 	}
 	return dims
+}
+
+func blendDisabledColor(disabled bool, c color.NRGBA) color.NRGBA {
+	if disabled {
+		return f32color.Disabled(c)
+	}
+	return c
 }
