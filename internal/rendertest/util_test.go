@@ -161,7 +161,7 @@ func verifyRef(t *testing.T, img *image.RGBA, frame int) (ok bool) {
 	}
 	ref, ok := r.(*image.RGBA)
 	if !ok {
-		t.Error("ref image note RGBA")
+		t.Errorf("image is a %T, expected *image.RGBA", r)
 		return
 	}
 	if len(ref.Pix) != len(img.Pix) {

@@ -31,9 +31,17 @@ import (
 )
 
 type GPU interface {
+	// Release non-Go resources. The GPU is no longer valid after Release.
 	Release()
-	Collect(viewport image.Point, frameOps *op.Ops)
+	// Clear sets the clear color for the next Frame.
+	Clear(color color.NRGBA)
+	// Collect the graphics operations from frame, given the viewport.
+	Collect(viewport image.Point, frame *op.Ops)
+	// Frame clears the color buffer and draws the collected operations.
 	Frame() error
+	// Profile returns the last available profiling information. Profiling
+	// information is requested when Collect sees a ProfileOp, and the result
+	// is available through Profile at some later time.
 	Profile() string
 }
 
@@ -65,6 +73,7 @@ type drawOps struct {
 	cache      *resourceCache
 	vertCache  []byte
 	viewport   image.Point
+	clear      bool
 	clearColor f32color.RGBA
 	// allImageOps is the combined list of imageOps and
 	// zimageOps, in drawing order.
@@ -404,6 +413,11 @@ func (g *gpu) init(ctx backend.Device) error {
 	return nil
 }
 
+func (g *gpu) Clear(col color.NRGBA) {
+	g.drawOps.clear = true
+	g.drawOps.clearColor = f32color.LinearFromSRGB(col)
+}
+
 func (g *gpu) Release() {
 	g.renderer.release()
 	g.drawOps.pathCache.release()
@@ -442,7 +456,10 @@ func (g *gpu) Frame() error {
 	g.ctx.DepthFunc(backend.DepthFuncGreater)
 	// Note that Clear must be before ClearDepth if nothing else is rendered
 	// (len(zimageOps) == 0). If not, the Fairphone 2 will corrupt the depth buffer.
-	g.ctx.Clear(g.drawOps.clearColor.Float32())
+	if g.drawOps.clear {
+		g.drawOps.clear = false
+		g.ctx.Clear(g.drawOps.clearColor.Float32())
+	}
 	g.ctx.ClearDepth(0.0)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.renderer.drawZOps(g.cache, g.drawOps.zimageOps)
@@ -799,7 +816,6 @@ func floor(v float32) int {
 
 func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
 	d.profile = false
-	d.clearColor = f32color.RGBA{R: 1.0, G: 1.0, B: 1.0, A: 1.0}
 	d.cache = cache
 	d.viewport = viewport
 	d.imageOps = d.imageOps[:0]
@@ -1006,6 +1022,7 @@ loop:
 				d.imageOps = d.imageOps[:0]
 				z = 0
 				d.clearColor = mat.color.Opaque()
+				d.clear = true
 				continue
 			}
 			z++

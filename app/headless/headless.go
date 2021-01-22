@@ -6,6 +6,7 @@ package headless
 
 import (
 	"image"
+	"image/color"
 	"runtime"
 
 	"gioui.org/gpu"
@@ -108,6 +109,7 @@ func (w *Window) Release() {
 // operation list.
 func (w *Window) Frame(frame *op.Ops) error {
 	return contextDo(w.ctx, func() error {
+		w.gpu.Clear(color.NRGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff})
 		w.gpu.Collect(w.size, frame)
 		return w.gpu.Frame()
 	})

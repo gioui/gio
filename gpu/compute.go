@@ -230,6 +230,11 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	}
 }
 
+func (g *compute) Clear(col color.NRGBA) {
+	g.drawOps.clear = true
+	g.drawOps.clearColor = f32color.LinearFromSRGB(col)
+}
+
 func (g *compute) Frame() error {
 	viewport := g.drawOps.viewport
 	tileDims := image.Point{
@@ -285,8 +290,11 @@ func (g *compute) encode(viewport image.Point) {
 	// Flip Y-axis.
 	flipY := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(1, -1)).Offset(f32.Pt(0, float32(viewport.Y)))
 	g.enc.transform(flipY)
-	g.enc.rect(f32.Rectangle{Max: layout.FPt(viewport)}, false)
-	g.enc.fill(f32color.NRGBAToRGBA(g.drawOps.clearColor.SRGB()))
+	if g.drawOps.clear {
+		g.drawOps.clear = false
+		g.enc.rect(f32.Rectangle{Max: layout.FPt(viewport)}, false)
+		g.enc.fill(f32color.NRGBAToRGBA(g.drawOps.clearColor.SRGB()))
+	}
 	g.encodeOps(flipY, viewport, g.drawOps.allImageOps)
 }
 

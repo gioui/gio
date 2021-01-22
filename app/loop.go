@@ -4,6 +4,7 @@ package app
 
 import (
 	"image"
+	"image/color"
 	"runtime"
 
 	"gioui.org/app/internal/window"
@@ -85,6 +86,7 @@ func (l *renderLoop) renderLoop(ctx window.Context) error {
 				l.refreshErr <- ctx.MakeCurrent()
 			case frame := <-l.frames:
 				ctx.Lock()
+				g.Clear(color.NRGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff})
 				g.Collect(frame.viewport, frame.ops)
 				// Signal that we're done with the frame ops.
 				l.ack <- struct{}{}
