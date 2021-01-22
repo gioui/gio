@@ -54,7 +54,7 @@ const (
 	TypeClipboardReadLen   = 1
 	TypeClipboardWriteLen  = 1
 	TypeKeyInputLen        = 1
-	TypeKeyFocusLen        = 1 + 1
+	TypeKeyFocusLen        = 1
 	TypeKeySoftKeyboardLen = 1 + 1
 	TypeSaveLen            = 1 + 4
 	TypeLoadLen            = 1 + 1 + 4
@@ -115,7 +115,7 @@ func (t OpType) Size() int {
 
 func (t OpType) NumRefs() int {
 	switch t {
-	case TypeKeyInput, TypePointerInput, TypeProfile, TypeCall, TypeClipboardRead, TypeClipboardWrite, TypeCursor:
+	case TypeKeyInput, TypeKeyFocus, TypePointerInput, TypeProfile, TypeCall, TypeClipboardRead, TypeClipboardWrite, TypeCursor:
 		return 1
 	case TypeImage:
 		return 2

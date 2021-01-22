@@ -26,15 +26,17 @@ type InputOp struct {
 }
 
 // SoftKeyboardOp shows or hide the on-screen keyboard, if available.
+// It replaces any previous SoftKeyboardOp.
 type SoftKeyboardOp struct {
 	Show bool
 }
 
-// FocusOp sets or clears the keyboard focus.
+// FocusOp sets or clears the keyboard focus. It replaces any previous
+// FocusOp in the same frame.
 type FocusOp struct {
-	// Focus, if set, moves the focus to the current InputOp. If Focus
-	// is false, the focus is cleared.
-	Focus bool
+	// Tag is the new focus. The focus is cleared if Tag is nil, or if Tag
+	// has no InputOp in the same frame.
+	Tag event.Tag
 }
 
 // A FocusEvent is generated when a handler gains or loses
@@ -132,11 +134,8 @@ func (h SoftKeyboardOp) Add(o *op.Ops) {
 }
 
 func (h FocusOp) Add(o *op.Ops) {
-	data := o.Write(opconst.TypeKeyFocusLen)
+	data := o.Write1(opconst.TypeKeyFocusLen, h.Tag)
 	data[0] = byte(opconst.TypeKeyFocus)
-	if h.Focus {
-		data[1] = 1
-	}
 }
 
 func (EditEvent) ImplementsEvent()  {}

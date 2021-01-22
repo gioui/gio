@@ -416,7 +416,7 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 
 	key.InputOp{Tag: &e.eventKey}.Add(gtx.Ops)
 	if e.requestFocus {
-		key.FocusOp{Focus: true}.Add(gtx.Ops)
+		key.FocusOp{Tag: &e.eventKey}.Add(gtx.Ops)
 		key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)
 	}
 	e.requestFocus = false
