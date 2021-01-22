@@ -189,6 +189,9 @@ func (op CursorNameOp) Add(o *op.Ops) {
 }
 
 func (h InputOp) Add(o *op.Ops) {
+	if h.Tag == nil {
+		panic("Tag must be non-nil")
+	}
 	data := o.Write1(opconst.TypePointerInputLen, h.Tag)
 	data[0] = byte(opconst.TypePointerInput)
 	if h.Grab {

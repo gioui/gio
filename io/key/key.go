@@ -121,6 +121,9 @@ func (m Modifiers) Contain(m2 Modifiers) bool {
 }
 
 func (h InputOp) Add(o *op.Ops) {
+	if h.Tag == nil {
+		panic("Tag must be non-nil")
+	}
 	data := o.Write1(opconst.TypeKeyInputLen, h.Tag)
 	data[0] = byte(opconst.TypeKeyInput)
 }
