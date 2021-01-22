@@ -17,7 +17,7 @@ func TestClipboardDuplicateEvent(t *testing.T) {
 
 	router.Frame(ops)
 	event := clipboard.Event{Text: "Test"}
-	router.Add(event)
+	router.Queue(event)
 	assertClipboardReadOp(t, router, 0)
 	assertClipboardEvent(t, router.Events(&handler[0]), true)
 	assertClipboardEvent(t, router.Events(&handler[1]), true)
@@ -64,7 +64,7 @@ func TestQueueProcessReadClipboard(t *testing.T) {
 	router.Frame(ops)
 	// Send the clipboard event
 	event := clipboard.Event{Text: "Text 2"}
-	router.Add(event)
+	router.Queue(event)
 	assertClipboardReadOp(t, router, 0)
 	assertClipboardEvent(t, router.Events(&handler[0]), true)
 	ops.Reset()

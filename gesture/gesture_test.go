@@ -43,7 +43,7 @@ func TestMouseClicks(t *testing.T) {
 
 			var r router.Router
 			r.Frame(&ops)
-			r.Add(tc.events...)
+			r.Queue(tc.events...)
 
 			events := click.Events(&r)
 			clicks := filterMouseClicks(events)

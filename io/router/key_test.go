@@ -122,7 +122,7 @@ func TestKeyRemoveFocus(t *testing.T) {
 
 	// Add some key events:
 	event := event.Event(key.Event{Name: key.NameTab, Modifiers: key.ModShortcut, State: key.Press})
-	r.Add(event)
+	r.Queue(event)
 
 	assertKeyEvent(t, r.Events(&handlers[0]), true, event)
 	assertKeyEvent(t, r.Events(&handlers[1]), false)

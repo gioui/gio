@@ -108,7 +108,7 @@ func TestListPosition(t *testing.T) {
 			list.Layout(gtx, tc.num, el)
 			// Generate the scroll events.
 			r.Frame(gtx.Ops)
-			r.Add(tc.scroll...)
+			r.Queue(tc.scroll...)
 			// Let the list process the events.
 			list.Layout(gtx, tc.num, el)
 

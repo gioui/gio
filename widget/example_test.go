@@ -41,7 +41,7 @@ func ExampleClickable_passthrough() {
 	widget()
 	r.Frame(gtx.Ops)
 	// Simulate one click on the buttons by sending a Press and Release event.
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Source:   pointer.Mouse,
 			Buttons:  pointer.ButtonLeft,

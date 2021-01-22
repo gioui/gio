@@ -79,8 +79,8 @@ func (q *Router) Frame(ops *op.Ops) {
 	}
 }
 
-// Add an event and report whether at least one handler had an event queued.
-func (q *Router) Add(events ...event.Event) bool {
+// Queue an event and report whether at least one handler had an event queued.
+func (q *Router) Queue(events ...event.Event) bool {
 	for _, e := range events {
 		switch e := e.(type) {
 		case profile.Event:

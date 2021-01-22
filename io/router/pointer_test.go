@@ -42,7 +42,7 @@ func TestPointerDrag(t *testing.T) {
 
 	var r Router
 	r.Frame(&ops)
-	r.Add(
+	r.Queue(
 		// Press.
 		pointer.Event{
 			Type:     pointer.Press,
@@ -73,7 +73,7 @@ func TestPointerMove(t *testing.T) {
 
 	var r Router
 	r.Frame(&ops)
-	r.Add(
+	r.Queue(
 		// Hit both handlers.
 		pointer.Event{
 			Type:     pointer.Move,
@@ -105,7 +105,7 @@ func TestPointerTypes(t *testing.T) {
 
 	var r Router
 	r.Frame(&ops)
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Press,
 			Position: f32.Pt(50, 50),
@@ -135,7 +135,7 @@ func TestPointerPriority(t *testing.T) {
 
 	var r Router
 	r.Frame(&ops)
-	r.Add(
+	r.Queue(
 		// Hit both handlers.
 		pointer.Event{
 			Type:     pointer.Scroll,
@@ -174,7 +174,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	var r Router
 	r.Frame(&ops)
 	// Hit both handlers.
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Move,
 			Position: f32.Pt(50, 50),
@@ -187,7 +187,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	assertEventSequence(t, r.Events(handler2), pointer.Cancel, pointer.Enter, pointer.Move)
 
 	// Leave the second area by moving into the first.
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Move,
 			Position: f32.Pt(45, 45),
@@ -198,7 +198,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	assertEventSequence(t, r.Events(handler2), pointer.Leave)
 
 	// Move, but stay within the same hit area.
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Move,
 			Position: f32.Pt(40, 40),
@@ -208,7 +208,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	assertEventSequence(t, r.Events(handler2))
 
 	// Move outside of both inputs.
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Move,
 			Position: f32.Pt(300, 300),
@@ -218,7 +218,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	assertEventSequence(t, r.Events(handler2))
 
 	// Check that a Press event generates Enter Events.
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Press,
 			Position: f32.Pt(125, 125),
@@ -228,7 +228,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	assertEventSequence(t, r.Events(handler2), pointer.Enter, pointer.Press)
 
 	// Check that a drag only affects the participating handlers.
-	r.Add(
+	r.Queue(
 		// Leave
 		pointer.Event{
 			Type:     pointer.Move,
@@ -244,7 +244,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	assertEventSequence(t, r.Events(handler2), pointer.Leave, pointer.Drag, pointer.Enter, pointer.Drag)
 
 	// Check that a Release event generates Enter/Leave Events.
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type: pointer.Release,
 			Position: f32.Pt(25,
@@ -273,7 +273,7 @@ func TestMultipleAreas(t *testing.T) {
 	var r Router
 	r.Frame(&ops)
 	// Hit first area, then second area, then both.
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Move,
 			Position: f32.Pt(25, 25),
@@ -308,7 +308,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	var r Router
 	r.Frame(&ops)
 	// Hit both handlers.
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Move,
 			Position: f32.Pt(50, 50),
@@ -320,7 +320,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	assertEventSequence(t, r.Events(handler2), pointer.Cancel, pointer.Enter, pointer.Move)
 
 	// Leave the second area by moving into the first.
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Move,
 			Position: f32.Pt(20, 20),
@@ -330,7 +330,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	assertEventSequence(t, r.Events(handler2), pointer.Leave)
 
 	// Move, but stay within the same hit area.
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Move,
 			Position: f32.Pt(10, 10),
@@ -340,7 +340,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	assertEventSequence(t, r.Events(handler2))
 
 	// Move outside of both inputs.
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Move,
 			Position: f32.Pt(200, 200),
@@ -350,7 +350,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	assertEventSequence(t, r.Events(handler2))
 
 	// Check that a Press event generates Enter Events.
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Press,
 			Position: f32.Pt(50, 50),
@@ -360,7 +360,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	assertEventSequence(t, r.Events(handler2), pointer.Enter, pointer.Press)
 
 	// Check that a Release event generates Enter/Leave Events.
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Release,
 			Position: f32.Pt(20, 20),
@@ -379,7 +379,7 @@ func TestPointerActiveInputDisappears(t *testing.T) {
 	ops.Reset()
 	addPointerHandler(&ops, handler1, image.Rect(0, 0, 100, 100))
 	r.Frame(&ops)
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Move,
 			Position: f32.Pt(25, 25),
@@ -390,7 +390,7 @@ func TestPointerActiveInputDisappears(t *testing.T) {
 	// Re-render with handler missing.
 	ops.Reset()
 	r.Frame(&ops)
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:     pointer.Move,
 			Position: f32.Pt(25, 25),
@@ -412,21 +412,21 @@ func TestMultitouch(t *testing.T) {
 
 	var r Router
 	r.Frame(&ops)
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:      pointer.Press,
 			Position:  h1pt,
 			PointerID: p1,
 		},
 	)
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:      pointer.Press,
 			Position:  h2pt,
 			PointerID: p2,
 		},
 	)
-	r.Add(
+	r.Queue(
 		pointer.Event{
 			Type:      pointer.Release,
 			Position:  h2pt,
@@ -468,7 +468,7 @@ func TestCursorNameOp(t *testing.T) {
 			}
 			// Add a mouse move event.
 			r.Frame(ops)
-			r.Add(
+			r.Queue(
 				pointer.Event{
 					Source:   pointer.Mouse,
 					Type:     pointer.Move,
@@ -568,7 +568,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				r.Add(
+				r.Queue(
 					pointer.Event{
 						Type:     pointer.Move,
 						Position: f32.Pt(50, 50),
