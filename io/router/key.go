@@ -58,7 +58,7 @@ func (q *keyQueue) Frame(root *op.Ops, events *handlerEvents) {
 			}
 		} else if h.new && k != focus {
 			// Reset the handler on (each) first appearance, but don't trigger redraw.
-			events.Add(k, key.FocusEvent{Focus: false})
+			events.AddNoRedraw(k, key.FocusEvent{Focus: false})
 		}
 	}
 	if changed && focus != nil {

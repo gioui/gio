@@ -145,7 +145,9 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 			if !ok {
 				h = new(pointerHandler)
 				q.handlers[op.Tag] = h
-				events.Add(op.Tag, pointer.Event{Type: pointer.Cancel})
+				// Cancel handlers on (each) first appearance, but don't
+				// trigger redraw.
+				events.AddNoRedraw(op.Tag, pointer.Event{Type: pointer.Cancel})
 			}
 			h.active = true
 			h.area = state.area

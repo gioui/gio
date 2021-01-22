@@ -79,6 +79,7 @@ func (q *Router) Frame(ops *op.Ops) {
 	}
 }
 
+// Add an event and report whether at least one handler had an event queued.
 func (q *Router) Add(events ...event.Event) bool {
 	for _, e := range events {
 		switch e := e.(type) {
@@ -159,9 +160,13 @@ func (h *handlerEvents) init() {
 	}
 }
 
-func (h *handlerEvents) Add(k event.Tag, e event.Event) {
+func (h *handlerEvents) AddNoRedraw(k event.Tag, e event.Event) {
 	h.init()
 	h.handlers[k] = append(h.handlers[k], e)
+}
+
+func (h *handlerEvents) Add(k event.Tag, e event.Event) {
+	h.AddNoRedraw(k, e)
 	h.hadEvents = true
 }
 

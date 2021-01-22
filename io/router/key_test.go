@@ -11,6 +11,28 @@ import (
 	"gioui.org/op"
 )
 
+func TestKeyWakeup(t *testing.T) {
+	handler := new(int)
+	var ops op.Ops
+	key.InputOp{Tag: handler}.Add(&ops)
+
+	var r Router
+	// Test that merely adding a handler doesn't trigger redraw.
+	r.Frame(&ops)
+	if _, wake := r.WakeupTime(); wake {
+		t.Errorf("adding key.InputOp triggered a redraw")
+	}
+	// However, adding a handler queues a Focus(false) event.
+	if evts := r.Events(handler); len(evts) != 1 {
+		t.Errorf("no Focus event for newly registered key.InputOp")
+	}
+	// Verify that r.Events does trigger a redraw.
+	r.Frame(&ops)
+	if _, wake := r.WakeupTime(); !wake {
+		t.Errorf("key.FocusEvent event didn't trigger a redraw")
+	}
+}
+
 func TestKeyMultiples(t *testing.T) {
 	handlers := make([]int, 3)
 	ops := new(op.Ops)

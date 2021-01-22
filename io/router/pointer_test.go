@@ -15,6 +15,26 @@ import (
 	"gioui.org/op"
 )
 
+func TestPointerWakeup(t *testing.T) {
+	handler := new(int)
+	var ops op.Ops
+	addPointerHandler(&ops, handler, image.Rect(0, 0, 100, 100))
+
+	var r Router
+	// Test that merely adding a handler doesn't trigger redraw.
+	r.Frame(&ops)
+	if _, wake := r.WakeupTime(); wake {
+		t.Errorf("adding pointer.InputOp triggered a redraw")
+	}
+	// However, adding a handler queues a Cancel event.
+	assertEventSequence(t, r.Events(handler), pointer.Cancel)
+	// Verify that r.Events does trigger a redraw.
+	r.Frame(&ops)
+	if _, wake := r.WakeupTime(); !wake {
+		t.Errorf("pointer.Cancel event didn't trigger a redraw")
+	}
+}
+
 func TestPointerDrag(t *testing.T) {
 	handler := new(int)
 	var ops op.Ops
