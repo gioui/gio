@@ -40,7 +40,6 @@ type Router struct {
 	wakeupTime time.Time
 
 	// ProfileOp summary.
-	profiling    bool
 	profHandlers map[event.Tag]struct{}
 	profile      profile.Event
 }
@@ -66,7 +65,6 @@ func (q *Router) Events(k event.Tag) []event.Event {
 func (q *Router) Frame(ops *op.Ops) {
 	q.handlers.Clear()
 	q.wakeup = false
-	q.profiling = false
 	for k := range q.profHandlers {
 		delete(q.profHandlers, k)
 	}
@@ -134,7 +132,6 @@ func (q *Router) collect() {
 			if q.profHandlers == nil {
 				q.profHandlers = make(map[event.Tag]struct{})
 			}
-			q.profiling = true
 			q.profHandlers[op.Tag] = struct{}{}
 		case opconst.TypeClipboardRead:
 			q.cqueue.ProcessReadClipboard(encOp.Data, encOp.Refs)
@@ -147,7 +144,7 @@ func (q *Router) collect() {
 // Profiling reports whether there was profile handlers in the
 // most recent Frame call.
 func (q *Router) Profiling() bool {
-	return q.profiling
+	return len(q.profHandlers) > 0
 }
 
 // WakeupTime returns the most recent time for doing another frame,
