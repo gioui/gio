@@ -89,9 +89,12 @@ func TestPointerMove(t *testing.T) {
 			Type:     pointer.Move,
 			Position: f32.Pt(100, 50),
 		},
+		pointer.Event{
+			Type: pointer.Cancel,
+		},
 	)
-	assertEventSequence(t, r.Events(handler1), pointer.Cancel, pointer.Enter, pointer.Move, pointer.Move, pointer.Leave)
-	assertEventSequence(t, r.Events(handler2), pointer.Cancel, pointer.Enter, pointer.Move, pointer.Leave)
+	assertEventSequence(t, r.Events(handler1), pointer.Cancel, pointer.Enter, pointer.Move, pointer.Move, pointer.Leave, pointer.Cancel)
+	assertEventSequence(t, r.Events(handler2), pointer.Cancel, pointer.Enter, pointer.Move, pointer.Leave, pointer.Cancel)
 }
 
 func TestPointerTypes(t *testing.T) {
@@ -396,7 +399,7 @@ func TestPointerActiveInputDisappears(t *testing.T) {
 			Position: f32.Pt(25, 25),
 		},
 	)
-	assertEventSequence(t, r.Events(handler1), pointer.Cancel)
+	assertEventSequence(t, r.Events(handler1))
 }
 
 func TestMultitouch(t *testing.T) {

@@ -205,7 +205,7 @@ func (q *pointerQueue) hit(areaIdx int, p f32.Point) bool {
 	return true
 }
 
-func (q *pointerQueue) init() {
+func (q *pointerQueue) reset() {
 	if q.handlers == nil {
 		q.handlers = make(map[event.Tag]*pointerHandler)
 	}
@@ -213,7 +213,7 @@ func (q *pointerQueue) init() {
 }
 
 func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
-	q.init()
+	q.reset()
 	for _, h := range q.handlers {
 		// Reset handler.
 		h.active = false
@@ -238,6 +238,8 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 				for i, k2 := range p.handlers {
 					if k2 == k {
 						// Drop other handlers that lost their grab.
+						cancelHandlers(events, p.handlers[i+1:]...)
+						cancelHandlers(events, p.handlers[:i]...)
 						q.dropHandlers(events, p.handlers[i+1:]...)
 						q.dropHandlers(events, p.handlers[:i]...)
 						break
@@ -248,9 +250,14 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	}
 }
 
-func (q *pointerQueue) dropHandlers(events *handlerEvents, tags ...event.Tag) {
+func cancelHandlers(events *handlerEvents, tags ...event.Tag) {
 	for _, k := range tags {
 		events.Add(k, pointer.Event{Type: pointer.Cancel})
+	}
+}
+
+func (q *pointerQueue) dropHandlers(events *handlerEvents, tags ...event.Tag) {
+	for _, k := range tags {
 		for i := range q.pointers {
 			p := &q.pointers[i]
 			for i := len(p.handlers) - 1; i >= 0; i-- {
@@ -268,10 +275,11 @@ func (q *pointerQueue) dropHandlers(events *handlerEvents, tags ...event.Tag) {
 }
 
 func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
-	q.init()
+	q.reset()
 	if e.Type == pointer.Cancel {
 		q.pointers = q.pointers[:0]
 		for k := range q.handlers {
+			cancelHandlers(events, k)
 			q.dropHandlers(events, k)
 		}
 		return
