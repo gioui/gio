@@ -398,12 +398,18 @@ func (e *Editor) command(gtx layout.Context, k key.Event) bool {
 		if moveByWord {
 			e.moveWord(-1, selAct)
 		} else {
+			if selAct == selectionClear {
+				e.ClearSelection()
+			}
 			e.MoveCaret(-1, -1*int(selAct))
 		}
 	case key.NameRightArrow:
 		if moveByWord {
 			e.moveWord(1, selAct)
 		} else {
+			if selAct == selectionClear {
+				e.ClearSelection()
+			}
 			e.MoveCaret(1, int(selAct))
 		}
 	case key.NamePageUp:

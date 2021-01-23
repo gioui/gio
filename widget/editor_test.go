@@ -438,6 +438,42 @@ g123456789g
 	}
 }
 
+// Verify that an existing selection is dismissed when you press arrow keys.
+func TestSelectMove(t *testing.T) {
+	e := new(Editor)
+	e.SetText(`0123456789`)
+
+	gtx := layout.Context{Ops: new(op.Ops)}
+	cache := text.NewCache(gofont.Collection())
+	font := text.Font{}
+	fontSize := unit.Px(10)
+
+	// Layout once to populate e.lines and get focus.
+	gtx.Queue = newQueue(key.FocusEvent{Focus: true})
+	e.Layout(gtx, cache, font, fontSize)
+
+	testKey := func(keyName string) {
+		// Select 345
+		e.SetCaret(3, 6)
+		if expected, got := "345", e.SelectedText(); expected != got {
+			t.Errorf("KeyName %s, expected %q, got %q", keyName, expected, got)
+		}
+
+		// Press the key
+		gtx.Queue = newQueue(key.Event{State: key.Press, Name: keyName})
+		e.Layout(gtx, cache, font, fontSize)
+
+		if expected, got := "", e.SelectedText(); expected != got {
+			t.Errorf("KeyName %s, expected %q, got %q", keyName, expected, got)
+		}
+	}
+
+	testKey(key.NameLeftArrow)
+	testKey(key.NameRightArrow)
+	testKey(key.NameUpArrow)
+	testKey(key.NameDownArrow)
+}
+
 func textWidth(e *Editor, lineNum, colStart, colEnd int) float32 {
 	var w fixed.Int26_6
 	advances := e.lines[lineNum].Layout.Advances
@@ -460,6 +496,10 @@ func textHeight(e *Editor, lineNum int) float32 {
 
 type testQueue struct {
 	events []event.Event
+}
+
+func newQueue(e ...event.Event) *testQueue {
+	return &testQueue{events: e}
 }
 
 func (q *testQueue) Events(_ event.Tag) []event.Event {
