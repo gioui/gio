@@ -34,6 +34,8 @@ func TestEditor(t *testing.T) {
 	fontSize := unit.Px(10)
 	font := text.Font{}
 
+	e.SetCaret(0, 0) // shouldn't panic
+	assertCaret(t, e, 0, 0, 0)
 	e.SetText("æbc\naøå•")
 	e.Layout(gtx, cache, font, fontSize)
 	assertCaret(t, e, 0, 0, 0)

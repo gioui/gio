@@ -1186,6 +1186,7 @@ func (e *Editor) Selection() (start, end int) {
 // and end are in bytes, and represent offsets into the editor text. start and
 // end must be at a rune boundary.
 func (e *Editor) SetCaret(start, end int) {
+	e.makeValid()
 	// Constrain start and end to [0, e.Len()].
 	l := e.Len()
 	start = max(min(start, l), 0)
