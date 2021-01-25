@@ -209,7 +209,6 @@ func (q *pointerQueue) reset() {
 	if q.handlers == nil {
 		q.handlers = make(map[event.Tag]*pointerHandler)
 	}
-	q.cursor = pointer.CursorDefault
 }
 
 func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
@@ -331,6 +330,7 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 		q.pointers = append(q.pointers[:pidx], q.pointers[pidx+1:]...)
 	}
 
+	q.cursor = pointer.CursorDefault
 	for _, k := range p.entered {
 		h := q.handlers[k]
 		q.hitCursor(h.area)
@@ -395,7 +395,6 @@ func (q *pointerQueue) hitCursor(want int) {
 	for _, c := range q.cursors {
 		if c.area == want {
 			q.cursor = c.name
-			return
 		}
 	}
 }

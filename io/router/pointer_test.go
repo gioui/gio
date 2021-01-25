@@ -10,8 +10,8 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/io/event"
+	"gioui.org/io/key"
 	"gioui.org/io/pointer"
-	"gioui.org/layout"
 	"gioui.org/op"
 )
 
@@ -441,45 +441,86 @@ func TestMultitouch(t *testing.T) {
 }
 
 func TestCursorNameOp(t *testing.T) {
+	ops := new(op.Ops)
+	var r Router
+	var h int
+	var widget2 func()
+	widget := func() {
+		// This is the area where the cursor is changed to CursorPointer.
+		pointer.Rect(image.Rectangle{Max: image.Pt(100, 100)}).Add(ops)
+		// The cursor is checked and changed upon cursor movement.
+		pointer.InputOp{Tag: &h}.Add(ops)
+		pointer.CursorNameOp{Name: pointer.CursorPointer}.Add(ops)
+		if widget2 != nil {
+			widget2()
+		}
+	}
+	// Register the handlers.
+	widget()
+	// No cursor change as the mouse has not moved yet.
+	if got, want := r.Cursor(), pointer.CursorDefault; got != want {
+		t.Errorf("got %q; want %q", got, want)
+	}
+
+	_at := func(x, y float32) pointer.Event {
+		return pointer.Event{
+			Type:     pointer.Move,
+			Source:   pointer.Mouse,
+			Buttons:  pointer.ButtonLeft,
+			Position: f32.Pt(x, y),
+		}
+	}
 	for _, tc := range []struct {
 		label string
-		pt    image.Point
+		event interface{}
 		want  pointer.CursorName
 	}{
-		{label: "inside", pt: image.Pt(50, 50), want: pointer.CursorPointer},
-		{label: "outside", pt: image.Pt(200, 200), want: pointer.CursorDefault},
+		{label: "move inside",
+			event: _at(50, 50),
+			want:  pointer.CursorPointer,
+		},
+		{label: "move outside",
+			event: _at(200, 200),
+			want:  pointer.CursorDefault,
+		},
+		{label: "move back inside",
+			event: _at(50, 50),
+			want:  pointer.CursorPointer,
+		},
+		{label: "send key events while inside",
+			event: []event.Event{
+				key.Event{Name: "A", State: key.Press},
+				key.Event{Name: "A", State: key.Release},
+			},
+			want: pointer.CursorPointer,
+		},
+		{label: "send key events while outside",
+			event: []event.Event{
+				_at(200, 200),
+				key.Event{Name: "A", State: key.Press},
+				key.Event{Name: "A", State: key.Release},
+			},
+			want: pointer.CursorDefault,
+		},
 	} {
 		t.Run(tc.label, func(t *testing.T) {
-			ops := new(op.Ops)
-			var r Router
-			var h int
-			widget := func() {
-				// This is the area where the cursor is changed to CursorPointer.
-				pointer.Rect(image.Rectangle{Max: image.Pt(100, 100)}).Add(ops)
-				// The cursor is checked and changed upon cursor movement.
-				pointer.InputOp{
-					Tag:   &h,
-					Types: pointer.Move,
-				}.Add(ops)
-				pointer.CursorNameOp{Name: pointer.CursorPointer}.Add(ops)
-			}
-			// Register the handlers.
+			ops.Reset()
 			widget()
-			// No cursor change as the mouse has not moved yet.
-			if got, want := r.Cursor(), pointer.CursorDefault; got != want {
-				t.Errorf("got %q; want %q", got, want)
-			}
-			// Add a mouse move event.
 			r.Frame(ops)
-			r.Queue(
-				pointer.Event{
-					Source:   pointer.Mouse,
-					Type:     pointer.Move,
-					Position: layout.FPt(tc.pt),
-				},
-			)
-			// Make the widget process the new event.
+			switch ev := tc.event.(type) {
+			case event.Event:
+				r.Queue(ev)
+			case []event.Event:
+				r.Queue(ev...)
+			case func() event.Event:
+				r.Queue(ev())
+			case func() []event.Event:
+				r.Queue(ev()...)
+			default:
+				panic(fmt.Sprintf("unkown event %T", ev))
+			}
 			widget()
+			r.Frame(ops)
 			// The cursor should now have been changed if the mouse moved over the declared area.
 			if got, want := r.Cursor(), tc.want; got != want {
 				t.Errorf("got %q; want %q", got, want)
