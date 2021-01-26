@@ -41,6 +41,7 @@ func SliceOf(s uintptr) []byte {
 	h := (*reflect.SliceHeader)(unsafe.Pointer(&res))
 	h.Data = s
 	h.Cap = 1 << 30
+	h.Len = 1 << 30
 	return res
 }
 
