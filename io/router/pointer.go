@@ -340,9 +340,8 @@ func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e poi
 			e.Priority = pointer.Foremost
 		}
 
-		e.Position = q.invTransform(h.area, e.Position)
-
-		if e.Type&h.types == e.Type {
+		if e.Type&h.types != 0 {
+			e.Position = q.invTransform(h.area, e.Position)
 			foremost = false
 			events.Add(k, e)
 		}
@@ -372,9 +371,9 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 		}
 		h := q.handlers[k]
 		e.Type = pointer.Leave
-		e.Position = q.invTransform(h.area, e.Position)
 
-		if e.Type&h.types == e.Type {
+		if e.Type&h.types != 0 {
+			e.Position = q.invTransform(h.area, e.Position)
 			events.Add(k, e)
 		}
 	}
@@ -392,9 +391,9 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 			continue
 		}
 		e.Type = pointer.Enter
-		e.Position = q.invTransform(h.area, e.Position)
 
-		if e.Type&h.types == e.Type {
+		if e.Type&h.types != 0 {
+			e.Position = q.invTransform(h.area, e.Position)
 			events.Add(k, e)
 		}
 	}
