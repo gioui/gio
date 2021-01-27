@@ -304,17 +304,7 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 		q.deliverEvent(p, events, e)
 		p.pressed = false
 	}
-	q.scratch = q.scratch[:0]
-	q.opHit(&q.scratch, e.Position)
-	if p.pressed {
-		// Filter out non-participating handlers.
-		for i := len(q.scratch) - 1; i >= 0; i-- {
-			if _, found := searchTag(p.handlers, q.scratch[i]); !found {
-				q.scratch = append(q.scratch[:i], q.scratch[i+1:]...)
-			}
-		}
-	}
-	q.deliverEnterLeaveEvents(p, q.scratch, events, e)
+	q.deliverEnterLeaveEvents(p, events, e)
 
 	if !p.pressed {
 		p.handlers = append(p.handlers[:0], q.scratch...)
@@ -328,12 +318,6 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	if !p.pressed && len(p.entered) == 0 {
 		// No longer need to track pointer.
 		q.pointers = append(q.pointers[:pidx], q.pointers[pidx+1:]...)
-	}
-
-	q.cursor = pointer.CursorDefault
-	for _, k := range p.entered {
-		h := q.handlers[k]
-		q.hitCursor(h.area)
 	}
 }
 
@@ -357,7 +341,18 @@ func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e poi
 	}
 }
 
-func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, hits []event.Tag, events *handlerEvents, e pointer.Event) {
+func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEvents, e pointer.Event) {
+	q.scratch = q.scratch[:0]
+	q.opHit(&q.scratch, e.Position)
+	if p.pressed {
+		// Filter out non-participating handlers.
+		for i := len(q.scratch) - 1; i >= 0; i-- {
+			if _, found := searchTag(p.handlers, q.scratch[i]); !found {
+				q.scratch = append(q.scratch[:i], q.scratch[i+1:]...)
+			}
+		}
+	}
+	hits := q.scratch
 	if e.Source != pointer.Mouse && !p.pressed && e.Type != pointer.Press {
 		// Consider non-mouse pointers leaving when they're released.
 		hits = nil
@@ -375,12 +370,19 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, hits []event.Tag,
 			events.Add(k, e)
 		}
 	}
-	// Deliver Enter events.
+	// Deliver Enter events and update cursor.
+	q.cursor = pointer.CursorDefault
 	for _, k := range hits {
+		h := q.handlers[k]
+		for i := len(q.cursors) - 1; i >= 0; i-- {
+			if c := q.cursors[i]; c.area == h.area {
+				q.cursor = c.name
+				break
+			}
+		}
 		if _, found := searchTag(p.entered, k); found {
 			continue
 		}
-		h := q.handlers[k]
 		e.Type = pointer.Enter
 		e.Position = q.invTransform(h.area, e.Position)
 
@@ -389,14 +391,6 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, hits []event.Tag,
 		}
 	}
 	p.entered = append(p.entered[:0], hits...)
-}
-
-func (q *pointerQueue) hitCursor(want int) {
-	for _, c := range q.cursors {
-		if c.area == want {
-			q.cursor = c.name
-		}
-	}
 }
 
 func searchTag(tags []event.Tag, tag event.Tag) (int, bool) {
