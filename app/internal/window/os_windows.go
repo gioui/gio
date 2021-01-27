@@ -229,7 +229,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_UNICHAR:
 		if wParam == windows.UNICODE_NOCHAR {
 			// Tell the system that we accept WM_UNICHAR messages.
-			return 1
+			return windows.TRUE
 		}
 		fallthrough
 	case windows.WM_CHAR:
@@ -237,13 +237,13 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			w.w.Event(key.EditEvent{Text: string(r)})
 		}
 		// The message is processed.
-		return 1
+		return windows.TRUE
 	case windows.WM_DPICHANGED:
 		// Let Windows know we're prepared for runtime DPI changes.
-		return 1
+		return windows.TRUE
 	case windows.WM_ERASEBKGND:
 		// Avoid flickering between GPU content and background color.
-		return 1
+		return windows.TRUE
 	case windows.WM_KEYDOWN, windows.WM_KEYUP, windows.WM_SYSKEYDOWN, windows.WM_SYSKEYUP:
 		if n, ok := convertKeyCode(wParam); ok {
 			e := key.Event{
@@ -321,7 +321,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case _WM_CURSOR:
 		if w.cursorIn {
 			windows.SetCursor(w.cursor)
-			return 1
+			return windows.TRUE
 		}
 	}
 

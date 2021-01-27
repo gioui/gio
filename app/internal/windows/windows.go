@@ -55,6 +55,8 @@ type MinMaxInfo struct {
 }
 
 const (
+	TRUE = 1
+
 	CS_HREDRAW = 0x0002
 	CS_VREDRAW = 0x0001
 	CS_OWNDC   = 0x0020
