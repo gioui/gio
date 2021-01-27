@@ -409,6 +409,7 @@ func (w *Window) run(opts *window.Options) {
 					w.destroy(err)
 					return
 				}
+				w.updateCursor()
 			case *system.CommandEvent:
 				w.out <- e
 				w.waitAck()
@@ -424,14 +425,18 @@ func (w *Window) run(opts *window.Options) {
 					w.setNextFrame(time.Time{})
 					w.updateAnimation()
 				}
-				if c := w.queue.q.Cursor(); c != w.cursor {
-					w.cursor = c
-					w.SetCursorName(c)
-				}
+				w.updateCursor()
 				w.out <- e
 			}
 			w.ack <- struct{}{}
 		}
+	}
+}
+
+func (w *Window) updateCursor() {
+	if c := w.queue.q.Cursor(); c != w.cursor {
+		w.cursor = c
+		w.SetCursorName(c)
 	}
 }
 

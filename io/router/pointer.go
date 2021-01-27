@@ -47,6 +47,9 @@ type pointerInfo struct {
 	id       pointer.ID
 	pressed  bool
 	handlers []event.Tag
+	// last tracks the last pointer event received,
+	// used while processing frame events.
+	last pointer.Event
 
 	// entered tracks the tags that contain the pointer.
 	entered []event.Tag
@@ -247,6 +250,10 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 			}
 		}
 	}
+	for i := range q.pointers {
+		p := &q.pointers[i]
+		q.deliverEnterLeaveEvents(p, events, p.last)
+	}
 }
 
 func cancelHandlers(events *handlerEvents, tags ...event.Tag) {
@@ -295,6 +302,7 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 		pidx = len(q.pointers) - 1
 	}
 	p := &q.pointers[pidx]
+	p.last = e
 
 	if e.Type == pointer.Move && p.pressed {
 		e.Type = pointer.Drag

@@ -443,7 +443,7 @@ func TestMultitouch(t *testing.T) {
 func TestCursorNameOp(t *testing.T) {
 	ops := new(op.Ops)
 	var r Router
-	var h int
+	var h, h2 int
 	var widget2 func()
 	widget := func() {
 		// This is the area where the cursor is changed to CursorPointer.
@@ -501,6 +501,35 @@ func TestCursorNameOp(t *testing.T) {
 				key.Event{Name: "A", State: key.Release},
 			},
 			want: pointer.CursorDefault,
+		},
+		{label: "add new input on top while inside",
+			event: func() []event.Event {
+				widget2 = func() {
+					pointer.InputOp{Tag: &h2}.Add(ops)
+					pointer.CursorNameOp{Name: pointer.CursorCrossHair}.Add(ops)
+				}
+				return []event.Event{
+					_at(50, 50),
+					key.Event{
+						Name:  "A",
+						State: key.Press,
+					},
+				}
+			},
+			want: pointer.CursorCrossHair,
+		},
+		{label: "remove input on top while inside",
+			event: func() []event.Event {
+				widget2 = nil
+				return []event.Event{
+					_at(50, 50),
+					key.Event{
+						Name:  "A",
+						State: key.Press,
+					},
+				}
+			},
+			want: pointer.CursorPointer,
 		},
 	} {
 		t.Run(tc.label, func(t *testing.T) {
