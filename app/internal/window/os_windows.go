@@ -46,7 +46,11 @@ type window struct {
 	height      int
 	stage       system.Stage
 	pointerBtns pointer.Buttons
-	cursor      syscall.Handle
+
+	// cursorIn tracks whether the cursor was inside the window according
+	// to the most recent WM_SETCURSOR.
+	cursorIn bool
+	cursor   syscall.Handle
 
 	mu        sync.Mutex
 	animating bool
@@ -56,7 +60,10 @@ type window struct {
 	opts   *Options
 }
 
-const _WM_REDRAW = windows.WM_USER + 0
+const (
+	_WM_REDRAW = windows.WM_USER + iota
+	_WM_CURSOR
+)
 
 type gpuAPI struct {
 	priority    int
@@ -309,7 +316,13 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			}
 		}
 	case windows.WM_SETCURSOR:
-		windows.SetCursor(w.cursor)
+		w.cursorIn = (lParam & 0xffff) == windows.HTCLIENT
+		fallthrough
+	case _WM_CURSOR:
+		if w.cursorIn {
+			windows.SetCursor(w.cursor)
+			return 1
+		}
 	}
 
 	return windows.DefWindowProc(hwnd, msg, wParam, lParam)
@@ -571,6 +584,9 @@ func (w *window) SetCursor(name pointer.CursorName) {
 		c = resources.cursor
 	}
 	w.cursor = c
+	if err := windows.PostMessage(w.hwnd, _WM_CURSOR, 0, 0); err != nil {
+		panic(err)
+	}
 }
 
 func loadCursor(name pointer.CursorName) (syscall.Handle, error) {
