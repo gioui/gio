@@ -14,13 +14,12 @@ import (
 	"gioui.org/unit"
 )
 
-type Options struct {
-	Width, Height       unit.Value
-	MinWidth, MinHeight unit.Value
-	MaxWidth, MaxHeight unit.Value
-	Title               string
+type Option struct {
+	Width, Height       *unit.Value
+	MinWidth, MinHeight *unit.Value
+	MaxWidth, MaxHeight *unit.Value
+	Title               *string
 }
-
 type FrameEvent struct {
 	system.FrameEvent
 
@@ -64,6 +63,9 @@ type Driver interface {
 	// SetCursor updates the current cursor to name.
 	SetCursor(name pointer.CursorName)
 
+	// SetOption updates the current window Option.
+	SetOption(option Option)
+
 	// Close the window.
 	Close()
 }
@@ -76,7 +78,7 @@ type windowRendezvous struct {
 
 type windowAndOptions struct {
 	window Callbacks
-	opts   *Options
+	opts   *Option
 }
 
 func newWindowRendezvous() *windowRendezvous {

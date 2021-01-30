@@ -53,6 +53,7 @@ type x11Window struct {
 	xkb          *xkb.Context
 	xkbEventBase C.int
 	xw           C.Window
+	opts         Option
 
 	atoms struct {
 		// "UTF8_STRING".
@@ -136,6 +137,45 @@ func (w *x11Window) SetCursor(name pointer.CursorName) {
 	// If c if null (i.e. name was not found),
 	// XDefineCursor will use the default cursor.
 	C.XDefineCursor(w.x, w.xw, c)
+}
+
+func (w *x11Window) SetOption(option Option) {
+	if option.Title != nil {
+		w.opts.Title = option.Title
+
+		ctitle := C.CString(*w.opts.Title)
+		defer C.free(unsafe.Pointer(ctitle))
+		C.XStoreName(w.x, w.xw, ctitle)
+		C.XSetTextProperty(w.x, w.xw,
+			&C.XTextProperty{
+				value:    (*C.uchar)(unsafe.Pointer(ctitle)),
+				encoding: w.atoms.utf8string,
+				format:   8,
+				nitems:   C.ulong(len(*w.opts.Title)),
+			},
+			w.atom("_NET_WM_NAME", false),
+		)
+	}
+	if min, max := option.MinHeight != nil && option.MinWidth != nil, option.MaxHeight != nil && option.MaxWidth != nil; min || max {
+		if min {
+			w.opts.MinHeight, w.opts.MinWidth = option.MinHeight, option.MinWidth
+		}
+		if max {
+			w.opts.MaxHeight, w.opts.MaxWidth = option.MaxHeight, option.MaxWidth
+		}
+		var shints C.XSizeHints
+		if w.opts.MinWidth != nil && w.opts.MinHeight != nil {
+			shints.min_width = C.int(w.cfg.Px(*w.opts.MinWidth))
+			shints.min_height = C.int(w.cfg.Px(*w.opts.MinHeight))
+			shints.flags |= C.PMinSize
+		}
+		if w.opts.MaxWidth != nil || w.opts.MaxHeight != nil {
+			shints.max_width = C.int(w.cfg.Px(*w.opts.MaxWidth))
+			shints.max_height = C.int(w.cfg.Px(*w.opts.MaxHeight))
+			shints.flags |= C.PMaxSize
+		}
+		C.XSetWMNormalHints(w.x, w.xw, &shints)
+	}
 }
 
 func (w *x11Window) ShowTextInput(show bool) {}
@@ -506,7 +546,7 @@ func init() {
 	x11Driver = newX11Window
 }
 
-func newX11Window(gioWin Callbacks, opts *Options) error {
+func newX11Window(gioWin Callbacks, opts *Option) error {
 	var err error
 
 	pipe := make([]int, 2)
@@ -556,14 +596,14 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 		override_redirect: C.False,
 	}
 	win := C.XCreateWindow(dpy, C.XDefaultRootWindow(dpy),
-		0, 0, C.uint(cfg.Px(opts.Width)), C.uint(cfg.Px(opts.Height)),
+		0, 0, C.uint(cfg.Px(*opts.Width)), C.uint(cfg.Px(*opts.Height)),
 		0, C.CopyFromParent, C.InputOutput, nil,
 		C.CWEventMask|C.CWBackPixmap|C.CWOverrideRedirect, &swa)
 
 	w := &x11Window{
 		w: gioWin, x: dpy, xw: win,
-		width:        cfg.Px(opts.Width),
-		height:       cfg.Px(opts.Height),
+		width:        cfg.Px(*opts.Width),
+		height:       cfg.Px(*opts.Height),
 		cfg:          cfg,
 		xkb:          xkb,
 		xkbEventBase: xkbEventBase,
@@ -581,21 +621,6 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	hints.flags = C.InputHint
 	C.XSetWMHints(dpy, win, &hints)
 
-	var shints C.XSizeHints
-	if opts.MinWidth.V != 0 || opts.MinHeight.V != 0 {
-		shints.min_width = C.int(cfg.Px(opts.MinWidth))
-		shints.min_height = C.int(cfg.Px(opts.MinHeight))
-		shints.flags = C.PMinSize
-	}
-	if opts.MaxWidth.V != 0 || opts.MaxHeight.V != 0 {
-		shints.max_width = C.int(cfg.Px(opts.MaxWidth))
-		shints.max_height = C.int(cfg.Px(opts.MaxHeight))
-		shints.flags = shints.flags | C.PMaxSize
-	}
-	if shints.flags != 0 {
-		C.XSetWMNormalHints(dpy, win, &shints)
-	}
-
 	name := C.CString(filepath.Base(os.Args[0]))
 	defer C.free(unsafe.Pointer(name))
 	wmhints := C.XClassHint{name, name}
@@ -610,19 +635,7 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	w.atoms.atom = w.atom("ATOM", false)
 	w.atoms.targets = w.atom("TARGETS", false)
 
-	// set the name
-	ctitle := C.CString(opts.Title)
-	defer C.free(unsafe.Pointer(ctitle))
-	C.XStoreName(dpy, win, ctitle)
-	// set _NET_WM_NAME as well for UTF-8 support in window title.
-	C.XSetTextProperty(dpy, win,
-		&C.XTextProperty{
-			value:    (*C.uchar)(unsafe.Pointer(ctitle)),
-			encoding: w.atoms.utf8string,
-			format:   8,
-			nitems:   C.ulong(len(opts.Title)),
-		},
-		w.atom("_NET_WM_NAME", false))
+	w.SetOption(*opts)
 
 	// extensions
 	C.XSetWMProtocols(dpy, win, &w.atoms.evDelWindow, 1)

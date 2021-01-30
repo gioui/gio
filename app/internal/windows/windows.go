@@ -210,6 +210,22 @@ const (
 	LR_MONOCHROME       = 0x00000001
 	LR_SHARED           = 0x00008000
 	LR_VGACOLOR         = 0x00000080
+
+	SWP_ASYNCWINDOWPOS = 0x4000
+	SWP_DEFERERASE     = 0x2000
+	SWP_DRAWFRAME      = 0x0020
+	SWP_FRAMECHANGED   = 0x0020
+	SWP_HIDEWINDOW     = 0x0080
+	SWP_NOACTIVATE     = 0x0010
+	SWP_NOCOPYBITS     = 0x0100
+	SWP_NOMOVE         = 0x0002
+	SWP_NOOWNERZORDER  = 0x0200
+	SWP_NOREDRAW       = 0x0008
+	SWP_NOREPOSITION   = 0x0200
+	SWP_NOSENDCHANGING = 0x0400
+	SWP_NOSIZE         = 0x0001
+	SWP_NOZORDER       = 0x0004
+	SWP_SHOWWINDOW     = 0x0040
 )
 
 var (
@@ -257,6 +273,8 @@ var (
 	_SetFocus                    = user32.NewProc("SetFocus")
 	_SetProcessDPIAware          = user32.NewProc("SetProcessDPIAware")
 	_SetTimer                    = user32.NewProc("SetTimer")
+	_SetWindowPos                = user32.NewProc("SetWindowPos")
+	_SetWindowText               = user32.NewProc("SetWindowTextW")
 	_TranslateMessage            = user32.NewProc("TranslateMessage")
 	_UnregisterClass             = user32.NewProc("UnregisterClassW")
 	_UpdateWindow                = user32.NewProc("UpdateWindow")
@@ -557,6 +575,16 @@ func SetTimer(hwnd syscall.Handle, nIDEvent uintptr, uElapse uint32, timerProc u
 		return fmt.Errorf("SetTimer failed: %v", err)
 	}
 	return nil
+}
+
+func SetWindowPos(hwnd syscall.Handle, hwndafter syscall.Handle, x, y int32, cx, cy int32, flags uint32) error {
+	_, _, err := _SetWindowPos.Call(uintptr(hwnd), uintptr(hwndafter), uintptr(x), uintptr(y), uintptr(cx), uintptr(cy), uintptr(flags))
+	return err
+}
+
+func SetWindowText(hwnd syscall.Handle, title string) {
+	text := syscall.StringToUTF16Ptr(title)
+	_SetWindowText.Call(uintptr(hwnd), uintptr(unsafe.Pointer(text)))
 }
 
 func ScreenToClient(hwnd syscall.Handle, p *Point) {

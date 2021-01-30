@@ -255,6 +255,10 @@ func (w *window) SetCursor(name pointer.CursorName) {
 	w.cursor = windowSetCursor(w.cursor, name)
 }
 
+func (w *window) SetOption(option Option) {
+	// Not implemented for iOS
+}
+
 func (w *window) onKeyCommand(name string) {
 	w.w.Event(key.Event{
 		Name: name,
@@ -308,7 +312,7 @@ func (w *window) ShowTextInput(show bool) {
 // Close the window. Not implemented for iOS.
 func (w *window) Close() {}
 
-func NewWindow(win Callbacks, opts *Options) error {
+func NewWindow(win Callbacks, opts *Option) error {
 	mainWindow.in <- windowAndOptions{win, opts}
 	return <-mainWindow.errs
 }

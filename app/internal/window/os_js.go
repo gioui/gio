@@ -46,7 +46,7 @@ type window struct {
 	animRequested bool
 }
 
-func NewWindow(win Callbacks, opts *Options) error {
+func NewWindow(win Callbacks, opts *Option) error {
 	doc := js.Global().Get("document")
 	cont := getContainer(doc)
 	cnv := createCanvas(doc)
@@ -463,6 +463,10 @@ func (w *window) WriteClipboard(s string) {
 func (w *window) SetCursor(name pointer.CursorName) {
 	style := w.cnv.Get("style")
 	style.Set("cursor", string(name))
+}
+
+func (w *window) SetOption(option Option) {
+	// Not supported on JS.
 }
 
 func (w *window) ShowTextInput(show bool) {

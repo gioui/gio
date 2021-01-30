@@ -21,7 +21,7 @@ import (
 )
 
 // WindowOption configures a Window.
-type Option func(opts *window.Options)
+type Option func(opts *window.Option)
 
 // Window represents an operating system window.
 type Window struct {
@@ -84,13 +84,8 @@ var ackEvent event.Event
 // Calling NewWindow more than once is not supported on
 // iOS, Android, WebAssembly.
 func NewWindow(options ...Option) *Window {
-	opts := &window.Options{
-		Width:  unit.Dp(800),
-		Height: unit.Dp(600),
-		Title:  "Gio",
-	}
-
-	for _, o := range options {
+	opts := new(window.Option)
+	for _, o := range append([]Option{Title("Gio"), Size(unit.Dp(800), unit.Dp(600))}, options...) {
 		o(opts)
 	}
 
@@ -235,6 +230,17 @@ func (w *Window) SetCursorName(name pointer.CursorName) {
 	})
 }
 
+func (w *Window) Options(option ...Option) {
+	var opts window.Option
+	for _, o := range option {
+		o(&opts)
+	}
+
+	go w.driverDo(func() {
+		w.driver.SetOption(opts)
+	})
+}
+
 // Close the window. The window's event loop should exit when it receives
 // system.DestroyEvent.
 //
@@ -341,7 +347,7 @@ func (w *Window) waitFrame() (*op.Ops, bool) {
 	}
 }
 
-func (w *Window) run(opts *window.Options) {
+func (w *Window) run(opts *window.Option) {
 	defer close(w.in)
 	defer close(w.out)
 	if err := window.NewWindow(&w.callbacks, opts); err != nil {
@@ -446,8 +452,8 @@ func (q *queue) Events(k event.Tag) []event.Event {
 
 // Title sets the title of the window.
 func Title(t string) Option {
-	return func(opts *window.Options) {
-		opts.Title = t
+	return func(opts *window.Option) {
+		opts.Title = &t
 	}
 }
 
@@ -459,9 +465,9 @@ func Size(w, h unit.Value) Option {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
-	return func(opts *window.Options) {
-		opts.Width = w
-		opts.Height = h
+	return func(opts *window.Option) {
+		opts.Width = &w
+		opts.Height = &h
 	}
 }
 
@@ -473,9 +479,9 @@ func MaxSize(w, h unit.Value) Option {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
-	return func(opts *window.Options) {
-		opts.MaxWidth = w
-		opts.MaxHeight = h
+	return func(opts *window.Option) {
+		opts.MaxWidth = &w
+		opts.MaxHeight = &h
 	}
 }
 
@@ -487,9 +493,9 @@ func MinSize(w, h unit.Value) Option {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
-	return func(opts *window.Options) {
-		opts.MinWidth = w
-		opts.MinHeight = h
+	return func(opts *window.Option) {
+		opts.MinWidth = &w
+		opts.MinHeight = &h
 	}
 }
 

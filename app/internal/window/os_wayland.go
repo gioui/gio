@@ -224,7 +224,7 @@ func init() {
 	wlDriver = newWLWindow
 }
 
-func newWLWindow(window Callbacks, opts *Options) error {
+func newWLWindow(window Callbacks, opts *Option) error {
 	d, err := newWLDisplay()
 	if err != nil {
 		return err
@@ -288,7 +288,7 @@ func (d *wlDisplay) readClipboard() (io.ReadCloser, error) {
 	return r, nil
 }
 
-func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
+func (d *wlDisplay) createNativeWindow(opts *Option) (*window, error) {
 	if d.compositor == nil {
 		return nil, errors.New("wayland: no compositor available")
 	}
@@ -353,13 +353,13 @@ func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
 	C.wl_surface_add_listener(w.surf, &C.gio_surface_listener, unsafe.Pointer(w.surf))
 	C.xdg_surface_add_listener(w.wmSurf, &C.gio_xdg_surface_listener, unsafe.Pointer(w.surf))
 	C.xdg_toplevel_add_listener(w.topLvl, &C.gio_xdg_toplevel_listener, unsafe.Pointer(w.surf))
-	title := C.CString(opts.Title)
+	title := C.CString(*opts.Title)
 	C.xdg_toplevel_set_title(w.topLvl, title)
 	C.free(unsafe.Pointer(title))
 
 	_, _, cfg := w.config()
-	w.width = cfg.Px(opts.Width)
-	w.height = cfg.Px(opts.Height)
+	w.width = cfg.Px(*opts.Width)
+	w.height = cfg.Px(*opts.Height)
 	if d.decor != nil {
 		// Request server side decorations.
 		w.decor = C.zxdg_decoration_manager_v1_get_toplevel_decoration(d.decor, w.topLvl)
@@ -952,6 +952,10 @@ func (w *window) setCursor(pointer *C.struct_wl_pointer, serial C.uint32_t) {
 	C.wl_surface_attach(w.cursor.surf, buf, 0, 0)
 	C.wl_surface_damage(w.cursor.surf, 0, 0, C.int32_t(img.width), C.int32_t(img.height))
 	C.wl_surface_commit(w.cursor.surf)
+}
+
+func (w *window) SetOption(option Option) {
+	// Not supported on Wayland.
 }
 
 func (w *window) resetFling() {

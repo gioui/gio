@@ -12,13 +12,13 @@ func Main() {
 	select {}
 }
 
-type windowDriver func(Callbacks, *Options) error
+type windowDriver func(Callbacks, *Option) error
 
 // Instead of creating files with build tags for each combination of wayland +/- x11
 // let each driver initialize these variables with their own version of createWindow.
 var wlDriver, x11Driver windowDriver
 
-func NewWindow(window Callbacks, opts *Options) error {
+func NewWindow(window Callbacks, opts *Option) error {
 	var errFirst error
 	for _, d := range []windowDriver{x11Driver, wlDriver} {
 		if d == nil {

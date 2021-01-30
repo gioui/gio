@@ -128,6 +128,10 @@ func (w *window) SetCursor(name pointer.CursorName) {
 	w.cursor = windowSetCursor(w.cursor, name)
 }
 
+func (w *window) SetOption(option Option) {
+	// Not supported on MacOS.
+}
+
 func (w *window) ShowTextInput(show bool) {}
 
 func (w *window) SetAnimating(anim bool) {
@@ -315,7 +319,7 @@ func gio_onFinishLaunching() {
 	close(launched)
 }
 
-func NewWindow(win Callbacks, opts *Options) error {
+func NewWindow(win Callbacks, opts *Option) error {
 	<-launched
 	errch := make(chan error)
 	runOnMain(func() {
@@ -326,20 +330,26 @@ func NewWindow(win Callbacks, opts *Options) error {
 		}
 		screenScale := float32(C.gio_getScreenBackingScale())
 		cfg := configFor(screenScale)
-		width := cfg.Px(opts.Width)
-		height := cfg.Px(opts.Height)
+		width := cfg.Px(*opts.Width)
+		height := cfg.Px(*opts.Height)
 		// Window sizes is in unscaled screen coordinates, not device pixels.
 		width = int(float32(width) / screenScale)
 		height = int(float32(height) / screenScale)
-		minWidth := cfg.Px(opts.MinWidth)
-		minHeight := cfg.Px(opts.MinHeight)
+		var minWidth, minHeight int
+		if opts.MinWidth != nil && opts.MinHeight != nil {
+			minWidth = cfg.Px(*opts.MinWidth)
+			minHeight = cfg.Px(*opts.MinHeight)
+		}
 		minWidth = int(float32(minWidth) / screenScale)
 		minHeight = int(float32(minHeight) / screenScale)
-		maxWidth := cfg.Px(opts.MaxWidth)
-		maxHeight := cfg.Px(opts.MaxHeight)
+		var maxWidth, maxHeight int
+		if opts.MinWidth != nil && opts.MinHeight != nil {
+			maxWidth = cfg.Px(*opts.MaxWidth)
+			maxHeight = cfg.Px(*opts.MaxHeight)
+		}
 		maxWidth = int(float32(maxWidth) / screenScale)
 		maxHeight = int(float32(maxHeight) / screenScale)
-		title := C.CString(opts.Title)
+		title := C.CString(*opts.Title)
 		defer C.free(unsafe.Pointer(title))
 		errch <- nil
 		win.SetDriver(w)
@@ -357,7 +367,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 	return <-errch
 }
 
-func newWindow(opts *Options) (*window, error) {
+func newWindow(opts *Option) (*window, error) {
 	view := viewFactory()
 	if view == 0 {
 		return nil, errors.New("CreateWindow: failed to create view")

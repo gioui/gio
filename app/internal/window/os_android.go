@@ -651,7 +651,7 @@ func goString(env *C.JNIEnv, str C.jstring) string {
 func Main() {
 }
 
-func NewWindow(window Callbacks, opts *Options) error {
+func NewWindow(window Callbacks, opts *Option) error {
 	mainWindow.in <- windowAndOptions{window, opts}
 	return <-mainWindow.errs
 }
@@ -680,6 +680,10 @@ func (w *window) SetCursor(name pointer.CursorName) {
 	w.setState(func(state *windowState) {
 		state.cursor = &name
 	})
+}
+
+func (w *window) SetOption(option Option) {
+	// Not supported on Android.
 }
 
 // setState adjust the window state on the main thread.

@@ -55,9 +55,10 @@ type window struct {
 	mu        sync.Mutex
 	animating bool
 
+	cfg    unit.Metric
 	minmax winConstraints
 	deltas winDeltas
-	opts   *Options
+	opts   *Option
 }
 
 const (
@@ -94,7 +95,7 @@ func Main() {
 	select {}
 }
 
-func NewWindow(window Callbacks, opts *Options) error {
+func NewWindow(window Callbacks, opts *Option) error {
 	cerr := make(chan error)
 	go func() {
 		// GetMessage and PeekMessage can filter on a window HWND, but
@@ -157,16 +158,24 @@ func initResources() error {
 	return nil
 }
 
-func getWindowConstraints(cfg unit.Metric, opts *Options, d winDeltas) winConstraints {
+func getWindowConstraints(cfg unit.Metric, opts *Option, d winDeltas) winConstraints {
 	var minmax winConstraints
-	minmax.minWidth = int32(cfg.Px(opts.MinWidth))
-	minmax.minHeight = int32(cfg.Px(opts.MinHeight))
-	minmax.maxWidth = int32(cfg.Px(opts.MaxWidth))
-	minmax.maxHeight = int32(cfg.Px(opts.MaxHeight))
+	if opts.MinWidth != nil {
+		minmax.minWidth = int32(cfg.Px(*opts.MinWidth))
+	}
+	if opts.MinHeight != nil {
+		minmax.minHeight = int32(cfg.Px(*opts.MinHeight))
+	}
+	if opts.MaxWidth != nil {
+		minmax.maxWidth = int32(cfg.Px(*opts.MaxWidth))
+	}
+	if opts.MaxHeight != nil {
+		minmax.maxHeight = int32(cfg.Px(*opts.MaxHeight))
+	}
 	return minmax
 }
 
-func createNativeWindow(opts *Options) (*window, error) {
+func createNativeWindow(opts *Option) (*window, error) {
 	var resErr error
 	resources.once.Do(func() {
 		resErr = initResources()
@@ -177,8 +186,8 @@ func createNativeWindow(opts *Options) (*window, error) {
 	dpi := windows.GetSystemDPI()
 	cfg := configForDPI(dpi)
 	wr := windows.Rect{
-		Right:  int32(cfg.Px(opts.Width)),
-		Bottom: int32(cfg.Px(opts.Height)),
+		Right:  int32(cfg.Px(*opts.Width)),
+		Bottom: int32(cfg.Px(*opts.Height)),
 	}
 	dwStyle := uint32(windows.WS_OVERLAPPEDWINDOW)
 	dwExStyle := uint32(windows.WS_EX_APPWINDOW | windows.WS_EX_WINDOWEDGE)
@@ -192,7 +201,7 @@ func createNativeWindow(opts *Options) (*window, error) {
 
 	hwnd, err := windows.CreateWindowEx(dwExStyle,
 		resources.class,
-		opts.Title,
+		*opts.Title,
 		dwStyle|windows.WS_CLIPSIBLINGS|windows.WS_CLIPCHILDREN,
 		windows.CW_USEDEFAULT, windows.CW_USEDEFAULT,
 		wr.Right-wr.Left,
@@ -207,6 +216,7 @@ func createNativeWindow(opts *Options) (*window, error) {
 	w := &window{
 		hwnd:   hwnd,
 		minmax: getWindowConstraints(cfg, opts, deltas),
+		cfg:    cfg,
 		deltas: deltas,
 		opts:   opts,
 	}
@@ -576,6 +586,48 @@ func (w *window) writeClipboard(s string) error {
 		return err
 	}
 	return nil
+}
+
+func (w *window) SetOption(option Option) {
+	if option.Title != nil {
+		windows.SetWindowText(w.hwnd, *option.Title)
+		w.opts.Title = option.Title
+	}
+	if option.Height != nil && option.Width != nil {
+		w.opts.Width, w.opts.Height = option.Width, option.Height
+
+		windows.SetWindowPos(w.hwnd, w.hwnd, 0, 0, int32(w.cfg.Px(*option.Width)), int32(w.cfg.Px(*option.Height)), windows.SWP_ASYNCWINDOWPOS|windows.SWP_NOMOVE|windows.SWP_NOZORDER)
+	}
+	if option.MinWidth != nil && option.MinHeight != nil {
+		w.opts.MinWidth, w.opts.MinHeight = option.MinWidth, option.MinHeight
+		w.minmax.minWidth, w.minmax.minHeight = int32(w.cfg.Px(*w.opts.MinHeight)), int32(w.cfg.Px(*w.opts.MinWidth))
+
+		cw, ch := w.width, w.height
+		if mw := w.cfg.Px(*option.MinWidth); cw < mw {
+			cw = mw
+		}
+		if mh := w.cfg.Px(*option.MinHeight); ch < mh {
+			ch = mh
+		}
+		if cw != w.width || ch != w.height {
+			windows.SetWindowPos(w.hwnd, w.hwnd, 0, 0, int32(cw), int32(ch), windows.SWP_ASYNCWINDOWPOS|windows.SWP_NOMOVE|windows.SWP_NOZORDER)
+		}
+	}
+	if option.MaxWidth != nil && option.MaxHeight != nil {
+		w.opts.MaxWidth, w.opts.MaxHeight = option.MaxWidth, option.MaxHeight
+		w.minmax.maxWidth, w.minmax.maxHeight = int32(w.cfg.Px(*w.opts.MaxHeight)), int32(w.cfg.Px(*w.opts.MaxWidth))
+
+		cw, ch := w.width, w.height
+		if mw := w.cfg.Px(*option.MaxWidth); cw > mw {
+			cw = mw
+		}
+		if mh := w.cfg.Px(*option.MaxHeight); ch > mh {
+			ch = mh
+		}
+		if cw != w.width || ch != w.height {
+			windows.SetWindowPos(w.hwnd, w.hwnd, 0, 0, int32(cw), int32(ch), windows.SWP_ASYNCWINDOWPOS|windows.SWP_NOMOVE|windows.SWP_NOZORDER)
+		}
+	}
 }
 
 func (w *window) SetCursor(name pointer.CursorName) {
