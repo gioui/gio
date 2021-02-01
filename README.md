@@ -1,9 +1,11 @@
-# Gio
+# Gio - https://gioui.org
 
 Immediate mode GUI programs in Go for Android, iOS, macOS, Linux,
-FreeBSD, OpenBSD, Windows, and WebAssembly (experimental). See the
-project page [gioui.org](https://gioui.org) for documentation and more
-information.
+FreeBSD, OpenBSD, Windows, and WebAssembly (experimental).
+
+# Installation, examples, documentation
+
+Go to [gioui.org](https://gioui.org).
 
 [![builds.sr.ht status](https://builds.sr.ht/~eliasnaur/gio.svg)](https://builds.sr.ht/~eliasnaur/gio)
 
