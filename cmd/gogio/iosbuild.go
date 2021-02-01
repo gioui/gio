@@ -4,7 +4,8 @@ package main
 
 import (
 	"archive/zip"
-	"crypto/x509"
+	"crypto/sha1"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -130,10 +131,6 @@ func signIOS(bi *buildInfo, tmpDir, app string) error {
 		}
 		// Omit trailing newline.
 		certDER = certDER[:len(certDER)-1]
-		cert, err := x509.ParseCertificate(certDER)
-		if err != nil {
-			return fmt.Errorf("sign: failed to parse developer certificate from %q: %v", prov, err)
-		}
 		entitlements, err := runCmd(exec.Command("/usr/libexec/PlistBuddy", "-x", "-c", "Print:Entitlements", provInfo))
 		if err != nil {
 			return err
@@ -142,8 +139,9 @@ func signIOS(bi *buildInfo, tmpDir, app string) error {
 		if err := ioutil.WriteFile(entFile, []byte(entitlements), 0660); err != nil {
 			return err
 		}
-		signIdentity := cert.Subject.CommonName
-		_, err = runCmd(exec.Command("codesign", "-s", signIdentity, "--entitlements", entFile, app))
+		identity := sha1.Sum(certDER)
+		idHex := hex.EncodeToString(identity[:])
+		_, err = runCmd(exec.Command("codesign", "-s", idHex, "-v", "--entitlements", entFile, app))
 		return err
 	}
 	return fmt.Errorf("sign: no valid provisioning profile found for bundle id %q among %v", bi.appID, avail)
