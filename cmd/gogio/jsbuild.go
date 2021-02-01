@@ -144,7 +144,7 @@ const (
 	// jsStartGo initializes the main.wasm.
 	jsStartGo = `(() => {
 	defaultGo = new Go();
-	Object.assign(defaultGo["argv"], go["argv"]);
+	Object.assign(defaultGo["argv"], defaultGo["argv"].concat(go["argv"]));
 	Object.assign(defaultGo["env"], go["env"]);
 	for (let key in go["importObject"]) {
 		if (typeof defaultGo["importObject"][key] === "undefined") {
