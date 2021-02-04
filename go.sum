@@ -1,4 +1,8 @@
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
+git.sr.ht/~eliasnaur/compute v0.0.0-20210204153415-491ceaa9edaf h1:xCg8bcHYre0OhrGaNXeMmazc+HHmLWO55AHJsffdGkc=
+git.sr.ht/~eliasnaur/compute v0.0.0-20210204153415-491ceaa9edaf/go.mod h1:dfiJadl+qynx/jrSXFXXie+jglpBmN6ZTUg6gIu7eQs=
+git.sr.ht/~eliasnaur/compute v0.0.0-20210310211145-f20c77eb5f6b h1:ui0/u5439TRE+R8n2DsU18WjKoBd/quw893ojG/+W6M=
+git.sr.ht/~eliasnaur/compute v0.0.0-20210310211145-f20c77eb5f6b/go.mod h1:dfiJadl+qynx/jrSXFXXie+jglpBmN6ZTUg6gIu7eQs=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=

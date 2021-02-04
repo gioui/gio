@@ -359,7 +359,7 @@ func New(api API) (GPU, error) {
 	switch {
 	case !forceCompute && feats.Has(driver.FeatureFloatRenderTargets):
 		return newGPU(d)
-	case feats.Has(driver.FeatureCompute):
+	case feats.Has(driver.FeatureCompute) || supportsCPUCompute:
 		return newCompute(d)
 	default:
 		return nil, errors.New("gpu: no support for float render targets nor compute")
