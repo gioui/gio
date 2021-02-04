@@ -9,7 +9,6 @@ package gpu
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -364,11 +363,8 @@ func New(api API) (GPU, error) {
 	switch {
 	case !forceCompute && feats.Has(driver.FeatureFloatRenderTargets):
 		return newGPU(d)
-	case feats.Has(driver.FeatureCompute):
-		return newCompute(d)
-	default:
-		return nil, errors.New("gpu: no support for float render targets nor compute")
 	}
+	return newCompute(d)
 }
 
 func newGPU(ctx driver.Device) (*gpu, error) {

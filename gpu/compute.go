@@ -14,6 +14,7 @@ import (
 	"io/ioutil"
 	"math"
 	"math/bits"
+	"runtime"
 	"sort"
 	"time"
 	"unsafe"
@@ -28,6 +29,9 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
+
+	"gioui.org/cpu"
+	"gioui.org/cpu/piet"
 )
 
 type compute struct {
@@ -40,16 +44,16 @@ type compute struct {
 	maxTextureDim int
 
 	programs struct {
-		elements   driver.Program
-		tileAlloc  driver.Program
-		pathCoarse driver.Program
-		backdrop   driver.Program
-		binning    driver.Program
-		coarse     driver.Program
-		kernel4    driver.Program
+		elements   computeProgram
+		tileAlloc  computeProgram
+		pathCoarse computeProgram
+		backdrop   computeProgram
+		binning    computeProgram
+		coarse     computeProgram
+		kernel4    computeProgram
 	}
 	buffers struct {
-		config driver.Buffer
+		config sizedBuffer
 		scene  sizedBuffer
 		state  sizedBuffer
 		memory sizedBuffer
@@ -66,6 +70,8 @@ type compute struct {
 		layerVertices []layerVertex
 		layerAtlases  []*layerAtlas
 		packer        packer
+
+		descriptors *piet.Kernel4DescriptorSetLayout
 	}
 	// images contains ImageOp images packed into a texture atlas.
 	images struct {
@@ -94,6 +100,12 @@ type compute struct {
 
 		uniforms *materialUniforms
 		uniBuf   driver.Buffer
+
+		// CPU fields
+		cpuTex cpu.ImageDescriptor
+		// regions track new materials in tex, so they can be transferred to cpuTex.
+		regions []image.Rectangle
+		scratch []byte
 	}
 	timers struct {
 		profile string
@@ -102,6 +114,10 @@ type compute struct {
 		render  *timer
 		blit    *timer
 	}
+
+	// CPU fallback fields.
+	useCPU     bool
+	dispatcher *dispatcher
 
 	// The following fields hold scratch space to avoid garbage.
 	zeroSlice []byte
@@ -124,10 +140,11 @@ type layerPlace struct {
 type layerAtlas struct {
 	// image is the layer atlas texture. Note that it is in RGBA format,
 	// but contains data in sRGB. See blitLayers for more detail.
-	image  driver.Texture
-	fbo    driver.Framebuffer
-	size   image.Point
-	layers int
+	image    driver.Texture
+	fbo      driver.Framebuffer
+	cpuImage cpu.ImageDescriptor
+	size     image.Point
+	layers   int
 }
 
 type copyUniforms struct {
@@ -274,9 +291,22 @@ type encodeState struct {
 	clip  f32.Rectangle
 }
 
+// sizedBuffer holds a GPU buffer, or its equivalent CPU memory.
 type sizedBuffer struct {
 	size   int
 	buffer driver.Buffer
+	// cpuBuf is initialized when useCPU is true.
+	cpuBuf cpu.BufferDescriptor
+}
+
+// computeProgram holds a compute program, or its equivalent CPU implementation.
+type computeProgram struct {
+	prog driver.Program
+
+	// CPU fields.
+	progInfo    *cpu.ProgramInfo
+	descriptors unsafe.Pointer
+	buffers     []*cpu.BufferDescriptor
 }
 
 // config matches Config in setup.h
@@ -332,7 +362,8 @@ const (
 )
 
 func newCompute(ctx driver.Device) (*compute, error) {
-	maxDim := ctx.Caps().MaxTextureSize
+	caps := ctx.Caps()
+	maxDim := caps.MaxTextureSize
 	// Large atlas textures cause artifacts due to precision loss in
 	// shaders.
 	if cap := 8192; maxDim > cap {
@@ -343,6 +374,35 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		maxTextureDim: maxDim,
 		conf:          new(config),
 		memHeader:     new(memoryHeader),
+	}
+	shaders := []struct {
+		prog *computeProgram
+		src  driver.ShaderSources
+		info *cpu.ProgramInfo
+		hash string
+	}{
+		{&g.programs.elements, shader_elements_comp, piet.ElementsProgramInfo, piet.ElementsHash},
+		{&g.programs.tileAlloc, shader_tile_alloc_comp, piet.Tile_allocProgramInfo, piet.Tile_allocHash},
+		{&g.programs.pathCoarse, shader_path_coarse_comp, piet.Path_coarseProgramInfo, piet.Path_coarseHash},
+		{&g.programs.backdrop, shader_backdrop_comp, piet.BackdropProgramInfo, piet.BackdropHash},
+		{&g.programs.binning, shader_binning_comp, piet.BinningProgramInfo, piet.BinningHash},
+		{&g.programs.coarse, shader_coarse_comp, piet.CoarseProgramInfo, piet.CoarseHash},
+		{&g.programs.kernel4, shader_kernel4_comp, piet.Kernel4ProgramInfo, piet.Kernel4Hash},
+	}
+	if !caps.Features.Has(driver.FeatureCompute) {
+		g.useCPU = supportsCPUCompute
+		for _, s := range shaders {
+			if s.src.Hash != s.hash {
+				g.useCPU = false
+				break
+			}
+		}
+		if !g.useCPU {
+			return nil, errors.New("gpu: missing support for compute programs")
+		}
+	}
+	if g.useCPU {
+		g.dispatcher = newDispatcher(runtime.NumCPU())
 	}
 
 	// Large enough for reasonable fill sizes, yet still spannable by the compute programs.
@@ -397,32 +457,55 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	g.materials.uniBuf = buf
 	g.materials.prog.SetVertexUniforms(buf)
 
-	buf, err = ctx.NewBuffer(driver.BufferBindingShaderStorage, int(unsafe.Sizeof(config{})))
-	if err != nil {
-		g.Release()
-		return nil, err
-	}
-	g.buffers.config = buf
-
-	shaders := []struct {
-		prog *driver.Program
-		src  driver.ShaderSources
-	}{
-		{&g.programs.elements, shader_elements_comp},
-		{&g.programs.tileAlloc, shader_tile_alloc_comp},
-		{&g.programs.pathCoarse, shader_path_coarse_comp},
-		{&g.programs.backdrop, shader_backdrop_comp},
-		{&g.programs.binning, shader_binning_comp},
-		{&g.programs.coarse, shader_coarse_comp},
-		{&g.programs.kernel4, shader_kernel4_comp},
-	}
 	for _, shader := range shaders {
-		p, err := ctx.NewComputeProgram(shader.src)
-		if err != nil {
-			g.Release()
-			return nil, err
+		if !g.useCPU {
+			p, err := ctx.NewComputeProgram(shader.src)
+			if err != nil {
+				g.Release()
+				return nil, err
+			}
+			shader.prog.prog = p
+		} else {
+			shader.prog.progInfo = shader.info
 		}
-		*shader.prog = p
+	}
+	if g.useCPU {
+		{
+			desc := new(piet.ElementsDescriptorSetLayout)
+			g.programs.elements.descriptors = unsafe.Pointer(desc)
+			g.programs.elements.buffers = []*cpu.BufferDescriptor{desc.Binding0(), desc.Binding1(), desc.Binding2(), desc.Binding3()}
+		}
+		{
+			desc := new(piet.Tile_allocDescriptorSetLayout)
+			g.programs.tileAlloc.descriptors = unsafe.Pointer(desc)
+			g.programs.tileAlloc.buffers = []*cpu.BufferDescriptor{desc.Binding0(), desc.Binding1()}
+		}
+		{
+			desc := new(piet.Path_coarseDescriptorSetLayout)
+			g.programs.pathCoarse.descriptors = unsafe.Pointer(desc)
+			g.programs.pathCoarse.buffers = []*cpu.BufferDescriptor{desc.Binding0(), desc.Binding1()}
+		}
+		{
+			desc := new(piet.BackdropDescriptorSetLayout)
+			g.programs.backdrop.descriptors = unsafe.Pointer(desc)
+			g.programs.backdrop.buffers = []*cpu.BufferDescriptor{desc.Binding0(), desc.Binding1()}
+		}
+		{
+			desc := new(piet.BinningDescriptorSetLayout)
+			g.programs.binning.descriptors = unsafe.Pointer(desc)
+			g.programs.binning.buffers = []*cpu.BufferDescriptor{desc.Binding0(), desc.Binding1()}
+		}
+		{
+			desc := new(piet.CoarseDescriptorSetLayout)
+			g.programs.coarse.descriptors = unsafe.Pointer(desc)
+			g.programs.coarse.buffers = []*cpu.BufferDescriptor{desc.Binding0(), desc.Binding1()}
+		}
+		{
+			desc := new(piet.Kernel4DescriptorSetLayout)
+			g.programs.kernel4.descriptors = unsafe.Pointer(desc)
+			g.programs.kernel4.buffers = []*cpu.BufferDescriptor{desc.Binding0(), desc.Binding1()}
+			g.output.descriptors = desc
+		}
 	}
 	return g, nil
 }
@@ -553,7 +636,7 @@ func (g *compute) compactLayers() error {
 			continue
 		}
 		outputSize := g.output.packer.sizes[0]
-		atlas.ensureSize(g.ctx, outputSize)
+		atlas.ensureSize(g.useCPU, g.ctx, outputSize)
 		for i, l := range layers[:end] {
 			if l.newPlace == l.place {
 				continue
@@ -629,10 +712,10 @@ func (g *compute) renderLayers(viewport image.Point) error {
 			Y: (outputSize.Y + tileHeightPx - 1) / tileHeightPx,
 		}
 		w, h := tileDims.X*tileWidthPx, tileDims.Y*tileHeightPx
-		if err := atlas.ensureSize(g.ctx, image.Pt(w, h)); err != nil {
+		if err := atlas.ensureSize(g.useCPU, g.ctx, image.Pt(w, h)); err != nil {
 			return err
 		}
-		if err := g.render(atlas.image, tileDims); err != nil {
+		if err := g.render(atlas.image, atlas.cpuImage, tileDims, atlas.size.X*4); err != nil {
 			return err
 		}
 	}
@@ -694,7 +777,7 @@ func (g *compute) blitLayers(viewport image.Point) {
 		g.output.uniforms.uvScale = [2]float32{1 / float32(atlas.size.X), 1 / float32(atlas.size.Y)}
 		g.output.uniBuf.Upload(byteslice.Struct(g.output.uniforms))
 		vertexData := byteslice.Slice(g.output.layerVertices)
-		g.output.buffer.ensureCapacity(g.ctx, driver.BufferBindingVertices, len(vertexData))
+		g.output.buffer.ensureCapacity(false, g.ctx, driver.BufferBindingVertices, len(vertexData))
 		g.output.buffer.buffer.Upload(vertexData)
 		g.ctx.BindVertexBuffer(g.output.buffer.buffer, int(unsafe.Sizeof(g.output.layerVertices[0])), 0)
 		g.ctx.BindTexture(0, atlas.image)
@@ -705,6 +788,7 @@ func (g *compute) blitLayers(viewport image.Point) {
 func (g *compute) renderMaterials() error {
 	m := &g.materials
 	m.quads = m.quads[:0]
+	m.regions = m.regions[:0]
 	resize := false
 	reclaimed := false
 restart:
@@ -752,6 +836,10 @@ restart:
 			}
 			m.offsets[op.key] = offset
 			g.enc.setFillImageOffset(op.sceneIdx, offset.Sub(op.off))
+			m.regions = append(m.regions, image.Rectangle{
+				Min: place.Pos,
+				Max: place.Pos.Add(size),
+			})
 		}
 		break
 	}
@@ -768,6 +856,7 @@ restart:
 			m.tex.Release()
 			m.tex = nil
 		}
+		m.cpuTex.Free()
 		handle, err := g.ctx.NewTexture(driver.TextureFormatRGBA8, texSize, texSize,
 			driver.FilterNearest, driver.FilterNearest,
 			driver.BufferBindingShaderStorage|driver.BufferBindingFramebuffer)
@@ -781,6 +870,9 @@ restart:
 		}
 		m.tex = handle
 		m.fbo = fbo
+		if g.useCPU {
+			m.cpuTex = cpu.NewImageRGBA(texSize, texSize)
+		}
 	}
 	// Transform to clip space: [-1, -1] - [1, 1].
 	g.materials.uniforms.scale = [2]float32{2 / float32(texSize), 2 / float32(texSize)}
@@ -788,7 +880,7 @@ restart:
 	g.materials.uniBuf.Upload(byteslice.Struct(g.materials.uniforms))
 	vertexData := byteslice.Slice(m.quads)
 	n := pow2Ceil(len(vertexData))
-	m.buffer.ensureCapacity(g.ctx, driver.BufferBindingVertices, n)
+	m.buffer.ensureCapacity(false, g.ctx, driver.BufferBindingVertices, n)
 	m.buffer.buffer.Upload(vertexData)
 	g.ctx.BindTexture(0, g.images.tex)
 	g.ctx.BindFramebuffer(m.fbo)
@@ -962,7 +1054,7 @@ func (enc *encoder) encodePath(verts []byte) {
 	}
 }
 
-func (g *compute) render(dst driver.Texture, tileDims image.Point) error {
+func (g *compute) render(dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDims image.Point, stride int) error {
 	const (
 		// wgSize is the largest and most common workgroup size.
 		wgSize = 128
@@ -985,16 +1077,11 @@ func (g *compute) render(dst driver.Texture, tileDims image.Point) error {
 	if s := len(scene); s > g.buffers.scene.size {
 		realloced = true
 		paddedCap := s * 11 / 10
-		if err := g.buffers.scene.ensureCapacity(g.ctx, driver.BufferBindingShaderStorage, paddedCap); err != nil {
+		if err := g.buffers.scene.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorage, paddedCap); err != nil {
 			return err
 		}
 	}
-	g.buffers.scene.buffer.Upload(scene)
-
-	g.ctx.BindImageTexture(kernel4OutputUnit, dst, driver.AccessWrite, driver.TextureFormatRGBA8)
-	if t := g.materials.tex; t != nil {
-		g.ctx.BindImageTexture(kernel4AtlasUnit, t, driver.AccessRead, driver.TextureFormatRGBA8)
-	}
+	g.buffers.scene.upload(scene)
 
 	// alloc is the number of allocated bytes for static buffers.
 	var alloc uint32
@@ -1027,12 +1114,14 @@ func (g *compute) render(dst driver.Texture, tileDims image.Point) error {
 	if clearSize > g.buffers.state.size {
 		realloced = true
 		paddedCap := clearSize * 11 / 10
-		if err := g.buffers.state.ensureCapacity(g.ctx, driver.BufferBindingShaderStorage, paddedCap); err != nil {
+		if err := g.buffers.state.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorage, paddedCap); err != nil {
 			return err
 		}
 	}
 
-	g.buffers.config.Upload(byteslice.Struct(g.conf))
+	confData := byteslice.Struct(g.conf)
+	g.buffers.config.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorage, len(confData))
+	g.buffers.config.upload(confData)
 
 	minSize := int(unsafe.Sizeof(memoryHeader{})) + int(alloc)
 	if minSize > g.buffers.memory.size {
@@ -1040,45 +1129,53 @@ func (g *compute) render(dst driver.Texture, tileDims image.Point) error {
 		// Add space for dynamic GPU allocations.
 		const sizeBump = 4 * 1024 * 1024
 		minSize += sizeBump
-		if err := g.buffers.memory.ensureCapacity(g.ctx, driver.BufferBindingShaderStorage, minSize); err != nil {
+		if err := g.buffers.memory.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorage, minSize); err != nil {
 			return err
 		}
 	}
+
+	if !g.useCPU {
+		g.ctx.BindImageTexture(kernel4OutputUnit, dst, driver.AccessWrite, driver.TextureFormatRGBA8)
+		if t := g.materials.tex; t != nil {
+			g.ctx.BindImageTexture(kernel4AtlasUnit, t, driver.AccessRead, driver.TextureFormatRGBA8)
+		}
+	} else {
+		*g.output.descriptors.Binding2() = cpuDst
+		*g.output.descriptors.Binding3() = g.materials.cpuTex
+	}
+
 	for {
 		*g.memHeader = memoryHeader{
 			mem_offset: alloc,
 		}
-		g.buffers.memory.buffer.Upload(byteslice.Struct(g.memHeader))
-		g.buffers.state.buffer.Upload(g.zeros(clearSize))
+		g.buffers.memory.upload(byteslice.Struct(g.memHeader))
+		g.buffers.state.upload(g.zeros(clearSize))
 
 		if realloced {
 			realloced = false
 			g.bindBuffers()
 		}
-		g.ctx.MemoryBarrier()
-		g.ctx.BindProgram(g.programs.elements)
-		g.ctx.DispatchCompute(numPartitions, 1, 1)
-		g.ctx.MemoryBarrier()
-		g.ctx.BindProgram(g.programs.tileAlloc)
-		g.ctx.DispatchCompute((enc.npath+wgSize-1)/wgSize, 1, 1)
-		g.ctx.MemoryBarrier()
-		g.ctx.BindProgram(g.programs.pathCoarse)
-		g.ctx.DispatchCompute((enc.npathseg+31)/32, 1, 1)
-		g.ctx.MemoryBarrier()
-		g.ctx.BindProgram(g.programs.backdrop)
-		g.ctx.DispatchCompute((enc.npath+wgSize-1)/wgSize, 1, 1)
+		g.memoryBarrier()
+		g.dispatch(g.programs.elements, numPartitions, 1, 1)
+		g.memoryBarrier()
+		g.dispatch(g.programs.tileAlloc, (enc.npath+wgSize-1)/wgSize, 1, 1)
+		g.memoryBarrier()
+		g.dispatch(g.programs.pathCoarse, (enc.npathseg+31)/32, 1, 1)
+		g.memoryBarrier()
+		g.dispatch(g.programs.backdrop, (enc.npath+wgSize-1)/wgSize, 1, 1)
 		// No barrier needed between backdrop and binning.
-		g.ctx.BindProgram(g.programs.binning)
-		g.ctx.DispatchCompute((enc.npath+wgSize-1)/wgSize, 1, 1)
-		g.ctx.MemoryBarrier()
-		g.ctx.BindProgram(g.programs.coarse)
-		g.ctx.DispatchCompute(widthInBins, heightInBins, 1)
-		g.ctx.MemoryBarrier()
-		g.ctx.BindProgram(g.programs.kernel4)
-		g.ctx.DispatchCompute(tileDims.X, tileDims.Y, 1)
-		g.ctx.MemoryBarrier()
+		g.dispatch(g.programs.binning, (enc.npath+wgSize-1)/wgSize, 1, 1)
+		g.memoryBarrier()
+		g.dispatch(g.programs.coarse, widthInBins, heightInBins, 1)
+		g.memoryBarrier()
+		g.downloadMaterials()
+		g.dispatch(g.programs.kernel4, tileDims.X, tileDims.Y, 1)
+		g.memoryBarrier()
+		if g.useCPU {
+			g.dispatcher.Sync()
+		}
 
-		if err := g.buffers.memory.buffer.Download(byteslice.Struct(g.memHeader)); err != nil {
+		if err := g.buffers.memory.download(byteslice.Struct(g.memHeader)); err != nil {
 			if err == driver.ErrContentLost {
 				continue
 			}
@@ -1086,18 +1183,64 @@ func (g *compute) render(dst driver.Texture, tileDims image.Point) error {
 		}
 		switch errCode := g.memHeader.mem_error; errCode {
 		case memNoError:
+			if g.useCPU {
+				w, h := tileDims.X*tileWidthPx, tileDims.Y*tileHeightPx
+				dst.Upload(image.Pt(0, 0), image.Pt(w, h), cpuDst.Data(), stride)
+			}
 			return nil
 		case memMallocFailed:
 			// Resize memory and try again.
 			realloced = true
 			sz := g.buffers.memory.size * 15 / 10
-			if err := g.buffers.memory.ensureCapacity(g.ctx, driver.BufferBindingShaderStorage, sz); err != nil {
+			if err := g.buffers.memory.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorage, sz); err != nil {
 				return err
 			}
 			continue
 		default:
 			return fmt.Errorf("compute: shader program failed with error %d", errCode)
 		}
+	}
+}
+
+func (g *compute) downloadMaterials() {
+	m := &g.materials
+	if !g.useCPU || len(m.regions) == 0 {
+		return
+	}
+	copyFBO := m.fbo
+	data := m.cpuTex.Data()
+	for _, r := range m.regions {
+		dims := r.Size()
+		if n := dims.X * dims.Y * 4; n > len(m.scratch) {
+			m.scratch = make([]byte, n)
+		}
+		copyFBO.ReadPixels(r, m.scratch)
+		stride := m.packer.maxDim * 4
+		col := r.Min.X * 4
+		row := stride * r.Min.Y
+		off := col + row
+		w := dims.X * 4
+		for y := 0; y < dims.Y; y++ {
+			copy(data[off:off+w], m.scratch[y*dims.X*4:])
+			off += stride
+		}
+	}
+}
+
+func (g *compute) memoryBarrier() {
+	if !g.useCPU {
+		g.ctx.MemoryBarrier()
+	} else {
+		g.dispatcher.Barrier()
+	}
+}
+
+func (g *compute) dispatch(p computeProgram, x, y, z int) {
+	if !g.useCPU {
+		g.ctx.BindProgram(p.prog)
+		g.ctx.DispatchCompute(x, y, z)
+	} else {
+		g.dispatcher.Dispatch(p.progInfo, p.descriptors, x, y, z)
 	}
 }
 
@@ -1109,7 +1252,7 @@ func (g *compute) zeros(size int) []byte {
 	return g.zeroSlice[:size]
 }
 
-func (a *layerAtlas) ensureSize(ctx driver.Device, size image.Point) error {
+func (a *layerAtlas) ensureSize(useCPU bool, ctx driver.Device, size image.Point) error {
 	if a.size.X >= size.X && a.size.Y >= size.Y {
 		return nil
 	}
@@ -1122,6 +1265,8 @@ func (a *layerAtlas) ensureSize(ctx driver.Device, size image.Point) error {
 		a.image.Release()
 		a.image = nil
 	}
+	a.cpuImage.Free()
+
 	img, err := ctx.NewTexture(driver.TextureFormatRGBA8, size.X, size.Y,
 		driver.FilterNearest,
 		driver.FilterNearest,
@@ -1136,29 +1281,35 @@ func (a *layerAtlas) ensureSize(ctx driver.Device, size image.Point) error {
 	}
 	a.fbo = fbo
 	a.image = img
+	if useCPU {
+		a.cpuImage = cpu.NewImageRGBA(size.X, size.Y)
+	}
 	a.size = size
 	return nil
 }
 
 func (g *compute) Release() {
+	if g.useCPU {
+		g.dispatcher.Stop()
+	}
 	type resource interface {
 		Release()
 	}
 	res := []resource{
-		g.programs.elements,
-		g.programs.tileAlloc,
-		g.programs.pathCoarse,
-		g.programs.backdrop,
-		g.programs.binning,
-		g.programs.coarse,
-		g.programs.kernel4,
+		&g.programs.elements,
+		&g.programs.tileAlloc,
+		&g.programs.pathCoarse,
+		&g.programs.backdrop,
+		&g.programs.binning,
+		&g.programs.coarse,
+		&g.programs.kernel4,
 		g.output.blitProg,
 		&g.output.buffer,
 		g.output.uniBuf,
 		&g.buffers.scene,
 		&g.buffers.state,
 		&g.buffers.memory,
-		g.buffers.config,
+		&g.buffers.config,
 		g.images.tex,
 		g.materials.layout,
 		g.materials.prog,
@@ -1168,6 +1319,7 @@ func (g *compute) Release() {
 		g.materials.uniBuf,
 		g.timers.t,
 	}
+	g.materials.cpuTex.Free()
 	for _, r := range res {
 		if r != nil {
 			r.Release()
@@ -1180,48 +1332,82 @@ func (g *compute) Release() {
 		if a.image != nil {
 			a.image.Release()
 		}
+		a.cpuImage.Free()
 	}
 
 	*g = compute{}
 }
 
 func (g *compute) bindBuffers() {
-	bindStorageBuffers(g.programs.elements, g.buffers.memory.buffer, g.buffers.config, g.buffers.scene.buffer, g.buffers.state.buffer)
-	bindStorageBuffers(g.programs.tileAlloc, g.buffers.memory.buffer, g.buffers.config)
-	bindStorageBuffers(g.programs.pathCoarse, g.buffers.memory.buffer, g.buffers.config)
-	bindStorageBuffers(g.programs.backdrop, g.buffers.memory.buffer, g.buffers.config)
-	bindStorageBuffers(g.programs.binning, g.buffers.memory.buffer, g.buffers.config)
-	bindStorageBuffers(g.programs.coarse, g.buffers.memory.buffer, g.buffers.config)
-	bindStorageBuffers(g.programs.kernel4, g.buffers.memory.buffer, g.buffers.config)
+	g.bindStorageBuffers(g.programs.elements, g.buffers.memory, g.buffers.config, g.buffers.scene, g.buffers.state)
+	g.bindStorageBuffers(g.programs.tileAlloc, g.buffers.memory, g.buffers.config)
+	g.bindStorageBuffers(g.programs.pathCoarse, g.buffers.memory, g.buffers.config)
+	g.bindStorageBuffers(g.programs.backdrop, g.buffers.memory, g.buffers.config)
+	g.bindStorageBuffers(g.programs.binning, g.buffers.memory, g.buffers.config)
+	g.bindStorageBuffers(g.programs.coarse, g.buffers.memory, g.buffers.config)
+	g.bindStorageBuffers(g.programs.kernel4, g.buffers.memory, g.buffers.config)
+}
+
+func (p *computeProgram) Release() {
+	if p.prog != nil {
+		p.prog.Release()
+	}
+	*p = computeProgram{}
 }
 
 func (b *sizedBuffer) Release() {
 	if b.buffer == nil {
 		return
 	}
-	b.buffer.Release()
+	b.cpuBuf.Free()
 	*b = sizedBuffer{}
 }
 
-func (b *sizedBuffer) ensureCapacity(ctx driver.Device, binding driver.BufferBinding, size int) error {
+func (b *sizedBuffer) ensureCapacity(useCPU bool, ctx driver.Device, binding driver.BufferBinding, size int) error {
 	if b.size >= size {
 		return nil
 	}
 	if b.buffer != nil {
 		b.Release()
 	}
-	buf, err := ctx.NewBuffer(binding, size)
-	if err != nil {
-		return err
+	b.cpuBuf.Free()
+	if !useCPU {
+		buf, err := ctx.NewBuffer(binding, size)
+		if err != nil {
+			return err
+		}
+		b.buffer = buf
+	} else {
+		b.cpuBuf = cpu.NewBuffer(size)
 	}
-	b.buffer = buf
 	b.size = size
 	return nil
 }
 
-func bindStorageBuffers(prog driver.Program, buffers ...driver.Buffer) {
+func (b *sizedBuffer) download(data []byte) error {
+	if b.buffer != nil {
+		return b.buffer.Download(data)
+	} else {
+		copy(data, b.cpuBuf.Data())
+		return nil
+	}
+}
+
+func (b *sizedBuffer) upload(data []byte) {
+	if b.buffer != nil {
+		b.buffer.Upload(data)
+	} else {
+		copy(b.cpuBuf.Data(), data)
+	}
+}
+
+func (g *compute) bindStorageBuffers(prog computeProgram, buffers ...sizedBuffer) {
 	for i, buf := range buffers {
-		prog.SetStorageBuffer(i, buf)
+		if !g.useCPU {
+			prog.prog.SetStorageBuffer(i, buf.buffer)
+		} else {
+			*prog.buffers[i] = buf.cpuBuf
+		}
 	}
 }
 
