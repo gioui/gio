@@ -44,6 +44,14 @@ type Press struct {
 	Cancelled bool
 }
 
+// Click executes a simple programmatic click
+func (b *Clickable) Click() {
+	b.clicks = append(b.clicks, Click{
+		Modifiers: 0,
+		NumClicks: 1,
+	})
+}
+
 // Clicked reports whether there are pending clicks as would be
 // reported by Clicks. If so, Clicked removes the earliest click.
 func (b *Clickable) Clicked() bool {
@@ -82,6 +90,7 @@ func (b *Clickable) History() []Press {
 	return b.history
 }
 
+// Layout and update the button state
 func (b *Clickable) Layout(gtx layout.Context) layout.Dimensions {
 	b.update(gtx)
 	stack := op.Save(gtx.Ops)
