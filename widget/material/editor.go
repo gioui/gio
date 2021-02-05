@@ -38,7 +38,7 @@ func Editor(th *Theme, editor *widget.Editor, hint string) EditorStyle {
 		shaper:         th.Shaper,
 		Hint:           hint,
 		HintColor:      f32color.MulAlpha(th.Palette.Fg, 0xbb),
-		SelectionColor: th.Palette.ContrastBg,
+		SelectionColor: f32color.MulAlpha(th.Palette.ContrastBg, 0x60),
 	}
 }
 
