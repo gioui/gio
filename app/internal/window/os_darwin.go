@@ -198,6 +198,8 @@ func windowSetCursor(from, to pointer.CursorName) pointer.CursorName {
 		curID = 5
 	case pointer.CursorRowResize:
 		curID = 6
+	case pointer.CursorGrab:
+		curID = 7
 	case pointer.CursorNone:
 		runOnMain(func() {
 			C.gio_hideCursor()

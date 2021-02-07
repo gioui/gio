@@ -118,10 +118,13 @@ func (w *x11Window) WriteClipboard(s string) {
 }
 
 func (w *x11Window) SetCursor(name pointer.CursorName) {
-	if name == pointer.CursorNone {
+	switch name {
+	case pointer.CursorNone:
 		w.cursor = name
 		C.XFixesHideCursor(w.x, w.xw)
 		return
+	case pointer.CursorGrab:
+		name = "hand1"
 	}
 	if w.cursor == pointer.CursorNone {
 		C.XFixesShowCursor(w.x, w.xw)

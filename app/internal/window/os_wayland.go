@@ -930,6 +930,8 @@ func (w *window) SetCursor(name pointer.CursorName) {
 		name = "top_side"
 	case pointer.CursorColResize:
 		name = "left_side"
+	case pointer.CursorGrab:
+		name = "hand1"
 	}
 	cname := C.CString(string(name))
 	defer C.free(unsafe.Pointer(cname))

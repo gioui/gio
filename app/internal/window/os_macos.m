@@ -119,6 +119,9 @@ void gio_setCursor(NSUInteger curID) {
 			case 6:
 				[NSCursor.resizeUpDownCursor set];
 				break;
+			case 7:
+                [NSCursor.openHandCursor set];
+                break;
 			default:
 				[NSCursor.arrowCursor set];
 				break;

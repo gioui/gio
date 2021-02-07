@@ -103,6 +103,8 @@ const (
 	CursorColResize CursorName = "col-resize"
 	// CursorRowResize is the cursor for horizontal resize.
 	CursorRowResize CursorName = "row-resize"
+	// CursorGrab is the cursor for moving object in any direction.
+	CursorGrab CursorName = "grab"
 	// CursorNone hides the cursor. To show it again, use any other cursor.
 	CursorNone CursorName = "none"
 )
