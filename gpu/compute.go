@@ -46,12 +46,13 @@ type compute struct {
 	}
 	output struct {
 		size image.Point
-		// image is the output texture. Note that it is RGBA format,
+		// image is the output texture. Note that it is in RGBA format,
 		// but contains data in sRGB. See blitOutput for more detail.
 		image    backend.Texture
 		blitProg backend.Program
 	}
-	atlas struct {
+	// images contains ImageOp images packed into a texture atlas.
+	images struct {
 		packer packer
 		// positions maps imageOpData.handles to positions inside tex.
 		positions map[interface{}]image.Point
@@ -303,7 +304,7 @@ func (g *compute) uploadImages(ops []imageOp) error {
 	// images, to avoid atlas filtering artifacts.
 	const padding = 1
 
-	a := &g.atlas
+	a := &g.images
 	var uploads map[interface{}]*image.RGBA
 	resize := false
 	reclaimed := false
@@ -320,12 +321,9 @@ restart:
 				size.Y += padding
 				place, fits := a.packer.tryAdd(size)
 				if !fits {
-					maxDim := a.packer.maxDim
 					a.positions = nil
 					uploads = nil
-					a.packer = packer{
-						maxDim: maxDim,
-					}
+					a.packer.clear()
 					if !reclaimed {
 						// Some images may no longer be in use, try again
 						// after clearing existing maps.
@@ -341,7 +339,7 @@ restart:
 					continue restart
 				}
 				if a.positions == nil {
-					g.atlas.positions = make(map[interface{}]image.Point)
+					g.images.positions = make(map[interface{}]image.Point)
 				}
 				a.positions[m.data.handle] = place.Pos
 				if uploads == nil {
@@ -393,7 +391,7 @@ func (g *compute) encodeOps(trans f32.Affine2D, viewport image.Point, ops []imag
 		switch m.material {
 		case materialTexture:
 			img := m.data
-			pos, ok := g.atlas.positions[img.handle]
+			pos, ok := g.images.positions[img.handle]
 			if !ok {
 				panic("compute: internal error: image not placed")
 			}
@@ -401,7 +399,7 @@ func (g *compute) encodeOps(trans f32.Affine2D, viewport image.Point, ops []imag
 				Min: pos,
 				Max: pos.Add(img.src.Bounds().Size()),
 			}
-			maxDim := g.atlas.packer.maxDim
+			maxDim := g.images.packer.maxDim
 			atlasSize := f32.Pt(float32(maxDim), float32(maxDim))
 			uvBounds := f32.Rectangle{
 				Min: f32.Point{
@@ -521,8 +519,8 @@ func (g *compute) render(tileDims image.Point) error {
 		}
 	}
 	g.ctx.BindImageTexture(kernel4OutputUnit, g.output.image, backend.AccessWrite, backend.TextureFormatRGBA8)
-	if g.atlas.tex != nil {
-		g.ctx.BindTexture(kernel4AtlasUnit, g.atlas.tex)
+	if g.images.tex != nil {
+		g.ctx.BindTexture(kernel4AtlasUnit, g.images.tex)
 	}
 
 	// alloc is the number of allocated bytes for static buffers.
@@ -693,8 +691,8 @@ func (g *compute) Release() {
 	if g.output.image != nil {
 		g.output.image.Release()
 	}
-	if g.atlas.tex != nil {
-		g.atlas.tex.Release()
+	if g.images.tex != nil {
+		g.images.tex.Release()
 	}
 	if g.timers.t != nil {
 		g.timers.t.release()
