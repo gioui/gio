@@ -129,7 +129,7 @@ State map_element(ElementRef ref) {
         c.pathseg_count = 1;
         break;
     case Element_Fill:
-    case Element_FillTexture:
+    case Element_FillImage:
     case Element_Stroke:
     case Element_BeginClip:
         c.flags = FLAG_RESET_BBOX;
@@ -411,15 +411,14 @@ void main() {
             out_ref = AnnotatedRef(conf.anno_alloc.offset + (st.path_count - 1) * Annotated_size);
             Annotated_Fill_write(conf.anno_alloc, out_ref, anno_fill);
             break;
-        case Element_FillTexture:
-            FillTexture fill_tex = Element_FillTexture_read(this_ref);
-            AnnoFillTexture anno_fill_tex;
-            anno_fill_tex.uv_bounds = fill_tex.uv_bounds;
-            anno_fill_tex.bbox = st.bbox;
-            anno_fill_tex.mat = st.mat;
-            anno_fill_tex.translate = st.translate;
+        case Element_FillImage:
+            FillImage fill_img = Element_FillImage_read(this_ref);
+            AnnoFillImage anno_fill_img;
+            anno_fill_img.index = fill_img.index;
+            anno_fill_img.offset = fill_img.offset;
+            anno_fill_img.bbox = st.bbox;
             out_ref = AnnotatedRef(conf.anno_alloc.offset + (st.path_count - 1) * Annotated_size);
-            Annotated_FillTexture_write(conf.anno_alloc, out_ref, anno_fill_tex);
+            Annotated_FillImage_write(conf.anno_alloc, out_ref, anno_fill_img);
             break;
         case Element_BeginClip:
             Clip begin_clip = Element_BeginClip_read(this_ref);

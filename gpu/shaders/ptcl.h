@@ -18,7 +18,7 @@ struct CmdFillRef {
     uint offset;
 };
 
-struct CmdFillTextureRef {
+struct CmdFillImageRef {
     uint offset;
 };
 
@@ -38,7 +38,7 @@ struct CmdSolidRef {
     uint offset;
 };
 
-struct CmdSolidTextureRef {
+struct CmdSolidImageRef {
     uint offset;
 };
 
@@ -101,18 +101,17 @@ CmdFillRef CmdFill_index(CmdFillRef ref, uint index) {
     return CmdFillRef(ref.offset + index * CmdFill_size);
 }
 
-struct CmdFillTexture {
+struct CmdFillImage {
     uint tile_ref;
     int backdrop;
-    vec4 mat;
-    vec2 translate;
-    uvec2 uv_bounds;
+    uint index;
+    ivec2 offset;
 };
 
-#define CmdFillTexture_size 40
+#define CmdFillImage_size 16
 
-CmdFillTextureRef CmdFillTexture_index(CmdFillTextureRef ref, uint index) {
-    return CmdFillTextureRef(ref.offset + index * CmdFillTexture_size);
+CmdFillImageRef CmdFillImage_index(CmdFillImageRef ref, uint index) {
+    return CmdFillImageRef(ref.offset + index * CmdFillImage_size);
 }
 
 struct CmdBeginClip {
@@ -156,16 +155,15 @@ CmdSolidRef CmdSolid_index(CmdSolidRef ref, uint index) {
     return CmdSolidRef(ref.offset + index * CmdSolid_size);
 }
 
-struct CmdSolidTexture {
-    vec4 mat;
-    vec2 translate;
-    uvec2 uv_bounds;
+struct CmdSolidImage {
+    uint index;
+    ivec2 offset;
 };
 
-#define CmdSolidTexture_size 32
+#define CmdSolidImage_size 8
 
-CmdSolidTextureRef CmdSolidTexture_index(CmdSolidTextureRef ref, uint index) {
-    return CmdSolidTextureRef(ref.offset + index * CmdSolidTexture_size);
+CmdSolidImageRef CmdSolidImage_index(CmdSolidImageRef ref, uint index) {
+    return CmdSolidImageRef(ref.offset + index * CmdSolidImage_size);
 }
 
 struct CmdSolidMask {
@@ -192,16 +190,16 @@ CmdJumpRef CmdJump_index(CmdJumpRef ref, uint index) {
 #define Cmd_Circle 1
 #define Cmd_Line 2
 #define Cmd_Fill 3
-#define Cmd_FillTexture 4
+#define Cmd_FillImage 4
 #define Cmd_BeginClip 5
 #define Cmd_BeginSolidClip 6
 #define Cmd_EndClip 7
 #define Cmd_Stroke 8
 #define Cmd_Solid 9
 #define Cmd_SolidMask 10
-#define Cmd_SolidTexture 11
+#define Cmd_SolidImage 11
 #define Cmd_Jump 12
-#define Cmd_size 44
+#define Cmd_size 20
 
 CmdRef Cmd_index(CmdRef ref, uint index) {
     return CmdRef(ref.offset + index * Cmd_size);
@@ -286,39 +284,26 @@ void CmdFill_write(Alloc a, CmdFillRef ref, CmdFill s) {
     write_mem(a, ix + 2, s.rgba_color);
 }
 
-CmdFillTexture CmdFillTexture_read(Alloc a, CmdFillTextureRef ref) {
+CmdFillImage CmdFillImage_read(Alloc a, CmdFillImageRef ref) {
     uint ix = ref.offset >> 2;
     uint raw0 = read_mem(a, ix + 0);
     uint raw1 = read_mem(a, ix + 1);
     uint raw2 = read_mem(a, ix + 2);
     uint raw3 = read_mem(a, ix + 3);
-    uint raw4 = read_mem(a, ix + 4);
-    uint raw5 = read_mem(a, ix + 5);
-    uint raw6 = read_mem(a, ix + 6);
-    uint raw7 = read_mem(a, ix + 7);
-    uint raw8 = read_mem(a, ix + 8);
-    uint raw9 = read_mem(a, ix + 9);
-    CmdFillTexture s;
+    CmdFillImage s;
     s.tile_ref = raw0;
     s.backdrop = int(raw1);
-    s.mat = vec4(uintBitsToFloat(raw2), uintBitsToFloat(raw3), uintBitsToFloat(raw4), uintBitsToFloat(raw5));
-    s.translate = vec2(uintBitsToFloat(raw6), uintBitsToFloat(raw7));
-    s.uv_bounds = uvec2(raw8, raw9);
+    s.index = raw2;
+    s.offset = ivec2(int(raw3 << 16) >> 16, int(raw3) >> 16);
     return s;
 }
 
-void CmdFillTexture_write(Alloc a, CmdFillTextureRef ref, CmdFillTexture s) {
+void CmdFillImage_write(Alloc a, CmdFillImageRef ref, CmdFillImage s) {
     uint ix = ref.offset >> 2;
     write_mem(a, ix + 0, s.tile_ref);
     write_mem(a, ix + 1, uint(s.backdrop));
-    write_mem(a, ix + 2, floatBitsToUint(s.mat.x));
-    write_mem(a, ix + 3, floatBitsToUint(s.mat.y));
-    write_mem(a, ix + 4, floatBitsToUint(s.mat.z));
-    write_mem(a, ix + 5, floatBitsToUint(s.mat.w));
-    write_mem(a, ix + 6, floatBitsToUint(s.translate.x));
-    write_mem(a, ix + 7, floatBitsToUint(s.translate.y));
-    write_mem(a, ix + 8, s.uv_bounds.x);
-    write_mem(a, ix + 9, s.uv_bounds.y);
+    write_mem(a, ix + 2, s.index);
+    write_mem(a, ix + 3, (uint(s.offset.x) & 0xffff) | (uint(s.offset.y) << 16));
 }
 
 CmdBeginClip CmdBeginClip_read(Alloc a, CmdBeginClipRef ref) {
@@ -376,33 +361,20 @@ void CmdSolid_write(Alloc a, CmdSolidRef ref, CmdSolid s) {
     write_mem(a, ix + 0, s.rgba_color);
 }
 
-CmdSolidTexture CmdSolidTexture_read(Alloc a, CmdSolidTextureRef ref) {
+CmdSolidImage CmdSolidImage_read(Alloc a, CmdSolidImageRef ref) {
     uint ix = ref.offset >> 2;
     uint raw0 = read_mem(a, ix + 0);
     uint raw1 = read_mem(a, ix + 1);
-    uint raw2 = read_mem(a, ix + 2);
-    uint raw3 = read_mem(a, ix + 3);
-    uint raw4 = read_mem(a, ix + 4);
-    uint raw5 = read_mem(a, ix + 5);
-    uint raw6 = read_mem(a, ix + 6);
-    uint raw7 = read_mem(a, ix + 7);
-    CmdSolidTexture s;
-    s.mat = vec4(uintBitsToFloat(raw0), uintBitsToFloat(raw1), uintBitsToFloat(raw2), uintBitsToFloat(raw3));
-    s.translate = vec2(uintBitsToFloat(raw4), uintBitsToFloat(raw5));
-    s.uv_bounds = uvec2(raw6, raw7);
+    CmdSolidImage s;
+    s.index = raw0;
+    s.offset = ivec2(int(raw1 << 16) >> 16, int(raw1) >> 16);
     return s;
 }
 
-void CmdSolidTexture_write(Alloc a, CmdSolidTextureRef ref, CmdSolidTexture s) {
+void CmdSolidImage_write(Alloc a, CmdSolidImageRef ref, CmdSolidImage s) {
     uint ix = ref.offset >> 2;
-    write_mem(a, ix + 0, floatBitsToUint(s.mat.x));
-    write_mem(a, ix + 1, floatBitsToUint(s.mat.y));
-    write_mem(a, ix + 2, floatBitsToUint(s.mat.z));
-    write_mem(a, ix + 3, floatBitsToUint(s.mat.w));
-    write_mem(a, ix + 4, floatBitsToUint(s.translate.x));
-    write_mem(a, ix + 5, floatBitsToUint(s.translate.y));
-    write_mem(a, ix + 6, s.uv_bounds.x);
-    write_mem(a, ix + 7, s.uv_bounds.y);
+    write_mem(a, ix + 0, s.index);
+    write_mem(a, ix + 1, (uint(s.offset.x) & 0xffff) | (uint(s.offset.y) << 16));
 }
 
 CmdSolidMask CmdSolidMask_read(Alloc a, CmdSolidMaskRef ref) {
@@ -447,8 +419,8 @@ CmdFill Cmd_Fill_read(Alloc a, CmdRef ref) {
     return CmdFill_read(a, CmdFillRef(ref.offset + 4));
 }
 
-CmdFillTexture Cmd_FillTexture_read(Alloc a, CmdRef ref) {
-    return CmdFillTexture_read(a, CmdFillTextureRef(ref.offset + 4));
+CmdFillImage Cmd_FillImage_read(Alloc a, CmdRef ref) {
+    return CmdFillImage_read(a, CmdFillImageRef(ref.offset + 4));
 }
 
 CmdBeginClip Cmd_BeginClip_read(Alloc a, CmdRef ref) {
@@ -475,8 +447,8 @@ CmdSolidMask Cmd_SolidMask_read(Alloc a, CmdRef ref) {
     return CmdSolidMask_read(a, CmdSolidMaskRef(ref.offset + 4));
 }
 
-CmdSolidTexture Cmd_SolidTexture_read(Alloc a, CmdRef ref) {
-    return CmdSolidTexture_read(a, CmdSolidTextureRef(ref.offset + 4));
+CmdSolidImage Cmd_SolidImage_read(Alloc a, CmdRef ref) {
+    return CmdSolidImage_read(a, CmdSolidImageRef(ref.offset + 4));
 }
 
 CmdJump Cmd_Jump_read(Alloc a, CmdRef ref) {
@@ -502,9 +474,9 @@ void Cmd_Fill_write(Alloc a, CmdRef ref, CmdFill s) {
     CmdFill_write(a, CmdFillRef(ref.offset + 4), s);
 }
 
-void Cmd_FillTexture_write(Alloc a, CmdRef ref, CmdFillTexture s) {
-    write_mem(a, ref.offset >> 2, Cmd_FillTexture);
-    CmdFillTexture_write(a, CmdFillTextureRef(ref.offset + 4), s);
+void Cmd_FillImage_write(Alloc a, CmdRef ref, CmdFillImage s) {
+    write_mem(a, ref.offset >> 2, Cmd_FillImage);
+    CmdFillImage_write(a, CmdFillImageRef(ref.offset + 4), s);
 }
 
 void Cmd_BeginClip_write(Alloc a, CmdRef ref, CmdBeginClip s) {
@@ -537,9 +509,9 @@ void Cmd_SolidMask_write(Alloc a, CmdRef ref, CmdSolidMask s) {
     CmdSolidMask_write(a, CmdSolidMaskRef(ref.offset + 4), s);
 }
 
-void Cmd_SolidTexture_write(Alloc a, CmdRef ref, CmdSolidTexture s) {
-    write_mem(a, ref.offset >> 2, Cmd_SolidTexture);
-    CmdSolidTexture_write(a, CmdSolidTextureRef(ref.offset + 4), s);
+void Cmd_SolidImage_write(Alloc a, CmdRef ref, CmdSolidImage s) {
+    write_mem(a, ref.offset >> 2, Cmd_SolidImage);
+    CmdSolidImage_write(a, CmdSolidImageRef(ref.offset + 4), s);
 }
 
 void Cmd_Jump_write(Alloc a, CmdRef ref, CmdJump s) {
