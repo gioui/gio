@@ -715,8 +715,8 @@ func (r *renderer) intersectPath(p *pathOp, clip image.Rectangle) {
 	}
 	fbo := r.pather.stenciler.cover(p.place.Idx)
 	r.ctx.BindTexture(0, fbo.tex)
-	coverScale, coverOff := texSpaceTransform(toRectF(uv), fbo.size)
-	subScale, subOff := texSpaceTransform(toRectF(sub), p.clip.Size())
+	coverScale, coverOff := texSpaceTransform(layout.FRect(uv), fbo.size)
+	subScale, subOff := texSpaceTransform(layout.FRect(sub), p.clip.Size())
 	r.pather.stenciler.iprog.uniforms.vert.uvTransform = [4]float32{coverScale.X, coverScale.Y, coverOff.X, coverOff.Y}
 	r.pather.stenciler.iprog.uniforms.vert.subUVTransform = [4]float32{subScale.X, subScale.Y, subOff.X, subOff.Y}
 	r.pather.stenciler.iprog.prog.UploadUniforms()
@@ -789,19 +789,6 @@ func boundRectF(r f32.Rectangle) image.Rectangle {
 		Max: image.Point{
 			X: int(ceil(r.Max.X)),
 			Y: int(ceil(r.Max.Y)),
-		},
-	}
-}
-
-func toRectF(r image.Rectangle) f32.Rectangle {
-	return f32.Rectangle{
-		Min: f32.Point{
-			X: float32(r.Min.X),
-			Y: float32(r.Min.Y),
-		},
-		Max: f32.Point{
-			X: float32(r.Max.X),
-			Y: float32(r.Max.Y),
 		},
 	}
 }
@@ -1173,7 +1160,7 @@ func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 			Min: img.place.Pos,
 			Max: img.place.Pos.Add(drc.Size()),
 		}
-		coverScale, coverOff := texSpaceTransform(toRectF(uv), fbo.size)
+		coverScale, coverOff := texSpaceTransform(layout.FRect(uv), fbo.size)
 		r.pather.cover(img.z, m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans, coverScale, coverOff)
 	}
 	r.ctx.DepthMask(true)
