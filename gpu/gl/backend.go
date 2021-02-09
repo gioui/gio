@@ -334,6 +334,8 @@ func (b *Backend) BindImageTexture(unit int, tex backend.Texture, access backend
 	switch access {
 	case backend.AccessWrite:
 		acc = glimpl.WRITE_ONLY
+	case backend.AccessRead:
+		acc = glimpl.READ_ONLY
 	default:
 		panic("unsupported access bits")
 	}
