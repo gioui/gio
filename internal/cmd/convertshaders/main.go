@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"text/template"
@@ -166,12 +167,12 @@ func generateShader(glslcc, tmp string, out io.Writer, shader string) error {
 			return fmt.Errorf("unrecognized shader type %s", shader)
 		}
 		var hlslc []byte
-		hlslc, err = compileHLSL(hlsl, "main", hlslProf+"_4_0_level_9_1")
+		hlslc, err = compileHLSL(tmp, shader, hlsl, "main", hlslProf+"_4_0_level_9_1")
 		if err != nil {
 			// Attempt shader model 4.0. Only the app/headless
 			// test shaders use features not supported by level
 			// 9.1.
-			hlslc, err = compileHLSL(hlsl, "main", hlslProf+"_4_0")
+			hlslc, err = compileHLSL(tmp, shader, hlsl, "main", hlslProf+"_4_0")
 			if err != nil {
 				return err
 			}
@@ -372,6 +373,59 @@ func parseDataType(t string) (backend.DataType, int, error) {
 	}
 }
 
+func compileHLSL(tmp, path, src, entry, profile string) ([]byte, error) {
+	base := filepath.Base(path)
+	tmppath := filepath.Join(tmp, base)
+	defer os.Remove(tmppath)
+	if err := ioutil.WriteFile(tmppath, []byte(src), 0644); err != nil {
+		return nil, err
+	}
+	outfile := filepath.Join(tmp, base+".obj")
+	defer os.Remove(outfile)
+	fxcInput := tmppath
+	fxcOutput := outfile
+	var fxc *exec.Cmd
+	if runtime.GOOS == "windows" {
+		fxc = exec.Command("fxc.exe")
+	} else {
+		// Convert paths to wine Windows format.
+		var err error
+		fxcInput, err = windowsPath(fxcInput)
+		if err != nil {
+			return nil, err
+		}
+		fxcOutput, err = windowsPath(fxcOutput)
+		if err != nil {
+			return nil, err
+		}
+		fxc = exec.Command("wine", "fxc.exe")
+	}
+	var stdout, stderr bytes.Buffer
+	fxc.Stderr = &stderr
+	fxc.Stdout = &stdout
+	fxc.Args = append(fxc.Args, "/Fo", fxcOutput, "/T", profile, "/E", entry, fxcInput)
+	if err := fxc.Run(); err != nil {
+		info := ""
+		if runtime.GOOS != "windows" {
+			info = "If the fxc tool cannot be found, set WINEPATH to the Windows path for the Windows SDK.\n"
+		}
+		return nil, fmt.Errorf("%s\n%s\n%s%s: %v", stderr.Bytes(), stdout.Bytes(), info, fxc, err)
+	}
+	return ioutil.ReadFile(outfile)
+}
+
+// windowsPath uses the winepath tool to convert a path to Windows format. The returned
+// path can be used as arguments for Windows command line tools.
+func windowsPath(path string) (string, error) {
+	var out bytes.Buffer
+	winepath := exec.Command("winepath", "--windows", path)
+	winepath.Stdout = &out
+	if err := winepath.Run(); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out.String()), nil
+}
+
 func convertShader(tmp, glslcc, path, lang, profile string, args *shaderArgs, flattenUBOs bool) (string, []byte, error) {
 	shaderTmpl, err := template.ParseFiles(path)
 	if err != nil {
@@ -382,10 +436,10 @@ func convertShader(tmp, glslcc, path, lang, profile string, args *shaderArgs, fl
 		return "", nil, err
 	}
 	tmppath := filepath.Join(tmp, filepath.Base(path))
+	defer os.Remove(tmppath)
 	if err := ioutil.WriteFile(tmppath, buf.Bytes(), 0644); err != nil {
 		return "", nil, err
 	}
-	defer os.Remove(tmppath)
 	var progFlag string
 	var progSuffix string
 	switch filepath.Ext(path) {
