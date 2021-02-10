@@ -48,7 +48,7 @@ func (f *Float) Layout(gtx layout.Context, pointerMargin int, min, max float32) 
 		f.pos = xy / f.length
 		value = min + (max-min)*f.pos
 	} else if min != max {
-		f.pos = value/(max-min) - min
+		f.pos = (value - min) / (max - min)
 	}
 	// Unconditionally call setValue in case min, max, or value changed.
 	f.setValue(value, min, max)
