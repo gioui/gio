@@ -39,7 +39,7 @@ struct MallocResult {
     bool failed;
 };
 
-// new_alloc synthesizes an Alloc when its offset and size is derived.
+// new_alloc synthesizes an Alloc when its offset and size are derived.
 Alloc new_alloc(uint offset, uint size) {
     Alloc a;
     a.offset = offset;
@@ -72,7 +72,7 @@ MallocResult malloc(uint size) {
 
 // touch_mem checks whether access to the memory word at offset is valid.
 // If MEM_DEBUG is defined, touch_mem returns false if offset is out of bounds.
-// Note that offset is in words.
+// Offset is in words.
 bool touch_mem(Alloc alloc, uint offset) {
 #ifdef MEM_DEBUG
     if (offset < alloc.offset/4 || offset >= (alloc.offset + alloc.size)/4) {
@@ -84,7 +84,7 @@ bool touch_mem(Alloc alloc, uint offset) {
 }
 
 // write_mem writes val to memory at offset.
-// Note that offset is in words.
+// Offset is in words.
 void write_mem(Alloc alloc, uint offset, uint val) {
     if (!touch_mem(alloc, offset)) {
         return;
@@ -93,7 +93,7 @@ void write_mem(Alloc alloc, uint offset, uint val) {
 }
 
 // read_mem reads the value from memory at offset.
-// Note that offset is in words.
+// Offset is in words.
 uint read_mem(Alloc alloc, uint offset) {
     if (!touch_mem(alloc, offset)) {
         return 0;
@@ -102,8 +102,8 @@ uint read_mem(Alloc alloc, uint offset) {
     return v;
 }
 
-// slice_mem returns a sub-allocation inside another. Note that offset and size
-// are in bytes, relative to a.offset.
+// slice_mem returns a sub-allocation inside another. Offset and size are in
+// bytes, relative to a.offset.
 Alloc slice_mem(Alloc a, uint offset, uint size) {
 #ifdef MEM_DEBUG
     if ((offset & 3) != 0 || (size & 3) != 0) {
