@@ -101,7 +101,7 @@ type materialVertex struct {
 }
 
 type encoder struct {
-	scene    []byte
+	scene    []sceneElem
 	npath    int
 	npathseg int
 }
@@ -128,6 +128,8 @@ type config struct {
 	pathseg_alloc   memAlloc
 	anno_alloc      memAlloc
 }
+
+type sceneElem [sceneElemSize / 4]uint32
 
 // memAlloc matches Alloc in mem.h
 type memAlloc struct {
@@ -684,18 +686,18 @@ func (g *compute) render(tileDims image.Point) error {
 	}
 
 	// Pad scene with zeroes to avoid reading garbage in elements.comp.
-	scenePadding := partitionSize*sceneElemSize - len(g.enc.scene)%(partitionSize*sceneElemSize)
-	g.enc.scene = append(g.enc.scene, make([]byte, scenePadding)...)
+	scenePadding := partitionSize - len(g.enc.scene)%partitionSize
+	g.enc.scene = append(g.enc.scene, make([]sceneElem, scenePadding)...)
 
 	realloced := false
-	if s := len(g.enc.scene); s > g.buffers.scene.size {
+	if s := len(g.enc.scene) * sceneElemSize; s > g.buffers.scene.size {
 		realloced = true
 		paddedCap := s * 11 / 10
 		if err := g.buffers.scene.ensureCapacity(g.ctx, paddedCap); err != nil {
 			return err
 		}
 	}
-	g.buffers.scene.buffer.Upload(g.enc.scene)
+	g.buffers.scene.buffer.Upload(gunsafe.BytesView(g.enc.scene))
 
 	w, h := tileDims.X*tileWidthPx, tileDims.Y*tileHeightPx
 	if g.output.size.X < w || g.output.size.Y < h {
@@ -954,7 +956,7 @@ func (e *encoder) reset() {
 }
 
 func (e *encoder) numElements() int {
-	return len(e.scene) / sceneElemSize
+	return len(e.scene)
 }
 
 func (e *encoder) append(e2 encoder) {
@@ -965,52 +967,51 @@ func (e *encoder) append(e2 encoder) {
 
 func (e *encoder) transform(m f32.Affine2D) {
 	sx, hx, ox, hy, sy, oy := m.Elems()
-	cmd := make([]byte, sceneElemSize)
-	bo.PutUint32(cmd[0:4], elemTransform)
-	bo.PutUint32(cmd[4:8], math.Float32bits(sx))
-	bo.PutUint32(cmd[8:12], math.Float32bits(hy))
-	bo.PutUint32(cmd[12:16], math.Float32bits(hx))
-	bo.PutUint32(cmd[16:20], math.Float32bits(sy))
-	bo.PutUint32(cmd[20:24], math.Float32bits(ox))
-	bo.PutUint32(cmd[24:28], math.Float32bits(oy))
-	e.cmd(cmd)
+	e.scene = append(e.scene, sceneElem{
+		0: elemTransform,
+		1: math.Float32bits(sx),
+		2: math.Float32bits(hy),
+		3: math.Float32bits(hx),
+		4: math.Float32bits(sy),
+		5: math.Float32bits(ox),
+		6: math.Float32bits(oy),
+	})
 }
 
 func (e *encoder) lineWidth(width float32) {
-	cmd := make([]byte, sceneElemSize)
-	bo.PutUint32(cmd, elemLineWidth)
-	bo.PutUint32(cmd[4:8], math.Float32bits(width))
-	e.cmd(cmd)
+	e.scene = append(e.scene, sceneElem{
+		0: elemLineWidth,
+		1: math.Float32bits(width),
+	})
 }
 
 func (e *encoder) stroke(col color.RGBA) {
-	cmd := make([]byte, sceneElemSize)
-	bo.PutUint32(cmd, elemStroke)
-	c := uint32(col.R)<<24 | uint32(col.G)<<16 | uint32(col.B)<<8 | uint32(col.A)
-	bo.PutUint32(cmd[4:8], c)
-	e.cmd(cmd)
+	e.scene = append(e.scene, sceneElem{
+		0: elemStroke,
+		1: uint32(col.R)<<24 | uint32(col.G)<<16 | uint32(col.B)<<8 | uint32(col.A),
+	})
 	e.npath++
 }
 
 func (e *encoder) beginClip(bbox f32.Rectangle) {
-	cmd := make([]byte, sceneElemSize)
-	bo.PutUint32(cmd, elemBeginClip)
-	bo.PutUint32(cmd[4:8], math.Float32bits(bbox.Min.X))
-	bo.PutUint32(cmd[8:12], math.Float32bits(bbox.Min.Y))
-	bo.PutUint32(cmd[12:16], math.Float32bits(bbox.Max.X))
-	bo.PutUint32(cmd[16:20], math.Float32bits(bbox.Max.Y))
-	e.cmd(cmd)
+	e.scene = append(e.scene, sceneElem{
+		0: elemBeginClip,
+		1: math.Float32bits(bbox.Min.X),
+		2: math.Float32bits(bbox.Min.Y),
+		3: math.Float32bits(bbox.Max.X),
+		4: math.Float32bits(bbox.Max.Y),
+	})
 	e.npath++
 }
 
 func (e *encoder) endClip(bbox f32.Rectangle) {
-	cmd := make([]byte, sceneElemSize)
-	bo.PutUint32(cmd, elemEndClip)
-	bo.PutUint32(cmd[4:8], math.Float32bits(bbox.Min.X))
-	bo.PutUint32(cmd[8:12], math.Float32bits(bbox.Min.Y))
-	bo.PutUint32(cmd[12:16], math.Float32bits(bbox.Max.X))
-	bo.PutUint32(cmd[16:20], math.Float32bits(bbox.Max.Y))
-	e.cmd(cmd)
+	e.scene = append(e.scene, sceneElem{
+		0: elemEndClip,
+		1: math.Float32bits(bbox.Min.X),
+		2: math.Float32bits(bbox.Min.Y),
+		3: math.Float32bits(bbox.Max.X),
+		4: math.Float32bits(bbox.Max.Y),
+	})
 	e.npath++
 }
 
@@ -1024,57 +1025,52 @@ func (e *encoder) rect(r f32.Rectangle, stroke bool) {
 }
 
 func (e *encoder) fill(col color.RGBA) {
-	cmd := make([]byte, sceneElemSize)
-	bo.PutUint32(cmd, elemFill)
-	c := uint32(col.R)<<24 | uint32(col.G)<<16 | uint32(col.B)<<8 | uint32(col.A)
-	bo.PutUint32(cmd[4:8], c)
-	e.cmd(cmd)
+	e.scene = append(e.scene, sceneElem{
+		0: elemFill,
+		1: uint32(col.R)<<24 | uint32(col.G)<<16 | uint32(col.B)<<8 | uint32(col.A),
+	})
 	e.npath++
 }
 
 func (e *encoder) fillImage(index int, offset image.Point) {
-	cmd := make([]byte, sceneElemSize)
-	bo.PutUint32(cmd, elemFillImage)
 	x := int16(offset.X)
 	y := int16(offset.Y)
-	bo.PutUint32(cmd[4:8], uint32(index))
-	bo.PutUint32(cmd[8:12], uint32(uint16(x))|uint32(uint16(y))<<16)
-	e.cmd(cmd)
+	e.scene = append(e.scene, sceneElem{
+		0: elemFillImage,
+		1: uint32(index),
+		2: uint32(uint16(x)) | uint32(uint16(y))<<16,
+	})
 	e.npath++
 }
 
 func (e *encoder) line(start, end f32.Point, stroke bool) {
-	cmd := make([]byte, sceneElemSize)
+	tag := uint32(elemFillLine)
 	if stroke {
-		bo.PutUint32(cmd, elemStrokeLine)
-	} else {
-		bo.PutUint32(cmd, elemFillLine)
+		tag = elemStrokeLine
 	}
-	bo.PutUint32(cmd[4:8], math.Float32bits(start.X))
-	bo.PutUint32(cmd[8:12], math.Float32bits(start.Y))
-	bo.PutUint32(cmd[12:16], math.Float32bits(end.X))
-	bo.PutUint32(cmd[16:20], math.Float32bits(end.Y))
-	e.cmd(cmd)
+	e.scene = append(e.scene, sceneElem{
+		0: tag,
+		1: math.Float32bits(start.X),
+		2: math.Float32bits(start.Y),
+		3: math.Float32bits(end.X),
+		4: math.Float32bits(end.Y),
+	})
 	e.npathseg++
 }
 
 func (e *encoder) quad(start, ctrl, end f32.Point, stroke bool) {
-	cmd := make([]byte, sceneElemSize)
+	tag := uint32(elemFillQuad)
 	if stroke {
-		bo.PutUint32(cmd, elemStrokeQuad)
-	} else {
-		bo.PutUint32(cmd, elemFillQuad)
+		tag = elemStrokeQuad
 	}
-	bo.PutUint32(cmd[4:8], math.Float32bits(start.X))
-	bo.PutUint32(cmd[8:12], math.Float32bits(start.Y))
-	bo.PutUint32(cmd[12:16], math.Float32bits(ctrl.X))
-	bo.PutUint32(cmd[16:20], math.Float32bits(ctrl.Y))
-	bo.PutUint32(cmd[20:24], math.Float32bits(end.X))
-	bo.PutUint32(cmd[24:28], math.Float32bits(end.Y))
-	e.cmd(cmd)
+	e.scene = append(e.scene, sceneElem{
+		0: tag,
+		1: math.Float32bits(start.X),
+		2: math.Float32bits(start.Y),
+		3: math.Float32bits(ctrl.X),
+		4: math.Float32bits(ctrl.Y),
+		5: math.Float32bits(end.X),
+		6: math.Float32bits(end.Y),
+	})
 	e.npathseg++
-}
-
-func (e *encoder) cmd(cmd []byte) {
-	e.scene = append(e.scene, cmd...)
 }
