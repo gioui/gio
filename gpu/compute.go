@@ -153,9 +153,9 @@ const (
 
 	pathSize      = 12
 	binSize       = 8
-	pathsegSize   = 48
+	pathsegSize   = 44
 	annoSize      = 28
-	stateSize     = 56
+	stateSize     = 60
 	stateStride   = 4 + 2*stateSize
 	sceneElemSize = 36
 )
@@ -176,6 +176,10 @@ const (
 	elemBeginClip
 	elemEndClip
 	elemFillImage
+)
+
+const (
+	flagEndPath = 16 // FLAG_END_PATH from elements.comp
 )
 
 // mem.h constants.
@@ -647,6 +651,10 @@ func (g *compute) encodeClipStack(clip, bounds f32.Rectangle, p *pathOp) int {
 // renderer.
 func encodePath(p []byte) encoder {
 	var enc encoder
+	var (
+		prevTo  f32.Point
+		hasPrev bool
+	)
 	for len(p) > 0 {
 		// p contains quadratic curves encoded in vertex structs.
 		vertex := p[:vertStride]
@@ -663,11 +671,19 @@ func encodePath(p []byte) encoder {
 			math.Float32frombits(bo.Uint32(vertex[24:])),
 			math.Float32frombits(bo.Uint32(vertex[28:])),
 		)
+		if hasPrev && from != prevTo {
+			enc.scene[len(enc.scene)-1][0] = (flagEndPath << 16) | enc.scene[len(enc.scene)-1][0]
+		}
+		hasPrev = true
+		prevTo = to
 		enc.quad(from, ctrl, to, false)
 
 		// The vertex is duplicated 4 times, one for each corner of quads drawn
 		// by the old renderer.
 		p = p[vertStride*4:]
+	}
+	if hasPrev {
+		enc.scene[len(enc.scene)-1][0] = (flagEndPath << 16) | enc.scene[len(enc.scene)-1][0]
 	}
 	return enc
 }
@@ -1018,10 +1034,10 @@ func (e *encoder) endClip(bbox f32.Rectangle) {
 func (e *encoder) rect(r f32.Rectangle, stroke bool) {
 	// Rectangle corners, clock-wise.
 	c0, c1, c2, c3 := r.Min, f32.Pt(r.Min.X, r.Max.Y), r.Max, f32.Pt(r.Max.X, r.Min.Y)
-	e.line(c0, c1, stroke)
-	e.line(c1, c2, stroke)
-	e.line(c2, c3, stroke)
-	e.line(c3, c0, stroke)
+	e.line(c0, c1, stroke, 0)
+	e.line(c1, c2, stroke, 0)
+	e.line(c2, c3, stroke, 0)
+	e.line(c3, c0, stroke, flagEndPath)
 }
 
 func (e *encoder) fill(col color.RGBA) {
@@ -1043,13 +1059,13 @@ func (e *encoder) fillImage(index int, offset image.Point) {
 	e.npath++
 }
 
-func (e *encoder) line(start, end f32.Point, stroke bool) {
+func (e *encoder) line(start, end f32.Point, stroke bool, flags uint32) {
 	tag := uint32(elemFillLine)
 	if stroke {
 		tag = elemStrokeLine
 	}
 	e.scene = append(e.scene, sceneElem{
-		0: tag,
+		0: flags<<16 | tag,
 		1: math.Float32bits(start.X),
 		2: math.Float32bits(start.Y),
 		3: math.Float32bits(end.X),
