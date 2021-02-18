@@ -67,6 +67,8 @@ func loop(w *app.Window) error {
 			return e.Err
 		case system.FrameEvent:
 			gtx := layout.NewContext(&ops, e)
+			// Clear background to white, even on embedded platforms such as webassembly.
+			paint.Fill(gtx.Ops, color.NRGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff})
 			layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 				layout.Flexed(1, func(gtx C) D {
 					return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
