@@ -30,7 +30,6 @@ environment:
  GOFLAGS: -mod=readonly
  PATH: /home/build/sdk/go/bin:/usr/bin:/home/build/go/bin:/home/build/android/tools/bin
  ANDROID_SDK_ROOT: /home/build/android
- EGL_PLATFORM: surfaceless # for headless tests
  android_sdk_tools_zip: sdk-tools-linux-3859397.zip
  android_ndk_zip: android-ndk-r20-linux-x86_64.zip
  github_mirror: git@github.com:gioui/gio
@@ -42,8 +41,9 @@ tasks:
      curl https://dl.google.com/go/go1.14.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
  - test_gio: |
      cd gio
-     go test -race ./...
-     GOOS=windows go test -exec=wine ./...
+     export EGL_PLATFORM=surfaceless # for headless tests
+     go test -race -v ./...
+     GOOS=windows go test -exec=wine -v ./...
      GOOS=js GOARCH=wasm go build -o /dev/null ./...
  - install_chrome: |
      curl -s https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
@@ -52,10 +52,10 @@ tasks:
      sudo apt install -y google-chrome-stable
  - test_cmd: |
      cd gio/cmd
-     go test ./...
-     go test -race ./...
+     go test -v ./...
+     go test -race -v ./...
      cd gogio # since we need -modfile to point at the parent directory
-     GOFLAGS=-modfile=../go.local.mod go test
+     GOFLAGS=-modfile=../go.local.mod go test -v
  - install_jdk8: |
      curl -so jdk.deb "https://cdn.azul.com/zulu/bin/zulu8.42.0.21-ca-jdk8.0.232-linux_amd64.deb"
      sudo apt install -y -f ./jdk.deb
