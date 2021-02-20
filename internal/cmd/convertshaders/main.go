@@ -27,6 +27,7 @@ import (
 var (
 	packageName   = flag.String("package", "", "specify Go package name")
 	shadersDir    = flag.String("dir", "shaders", "specify shader directory")
+	directCompute = flag.Bool("directcompute", false, "enable compiling DirectCompute shaders")
 	absShadersDir string
 )
 
@@ -101,19 +102,17 @@ func generateComputeShader(tmp string, out io.Writer, shader string) error {
 	if err != nil {
 		return err
 	}
-	var src backend.ShaderSources
-	glsl310es, err := convertComputeShader(tmp, glslangValidator, spirv_cross, shader)
+	shaders, err := convertComputeShader(tmp, glslangValidator, spirv_cross, shader)
 	if err != nil {
 		return err
 	}
-	src.Name = filepath.Base(shader)
-	src.GLSL310ES = glsl310es
-	name := filepath.Base(shader)
-	name = strings.ReplaceAll(name, ".", "_")
-	fmt.Fprintf(out, "\tshader_%s = ", name)
+	filename := filepath.Base(shader)
+	varname := strings.ReplaceAll(filename, ".", "_")
+	fmt.Fprintf(out, "\tshader_%s = ", varname)
 	fmt.Fprintf(out, "backend.ShaderSources{\n")
-	fmt.Fprintf(out, "Name: %#v,\n", src.Name)
-	fmt.Fprintf(out, "GLSL310ES: %#v,\n", src.GLSL310ES)
+	fmt.Fprintf(out, "Name: %#v,\n", filename)
+	fmt.Fprintf(out, "GLSL310ES: %#v,\n", shaders.glsl310es)
+	fmt.Fprintf(out, "HLSL: %#v,\n", shaders.hlsl)
 	fmt.Fprintf(out, "}")
 	fmt.Fprintf(out, "\n")
 	return nil
@@ -121,10 +120,7 @@ func generateComputeShader(tmp string, out io.Writer, shader string) error {
 
 func generateShader(glslcc, tmp string, out io.Writer, shader string) error {
 	const nvariants = 3
-	var variants [nvariants]struct {
-		backend.ShaderSources
-		hlslSrc string
-	}
+	var variants [nvariants]backend.ShaderSources
 	args := [nvariants]shaderArgs{
 		{
 			FetchColorExpr: `_color`,
@@ -154,7 +150,7 @@ func generateShader(glslcc, tmp string, out io.Writer, shader string) error {
 		if err != nil {
 			return err
 		}
-		if err := parseReflection(reflect, &variants[i].ShaderSources); err != nil {
+		if err := parseReflection(reflect, &variants[i]); err != nil {
 			return err
 		}
 		var hlslProf string
@@ -167,12 +163,12 @@ func generateShader(glslcc, tmp string, out io.Writer, shader string) error {
 			return fmt.Errorf("unrecognized shader type %s", shader)
 		}
 		var hlslc []byte
-		hlslc, err = compileHLSL(tmp, shader, hlsl, "main", hlslProf+"_4_0_level_9_1")
+		hlslc, err = compileHLSL_FXC(tmp, shader, hlsl, "main", hlslProf+"_4_0_level_9_1")
 		if err != nil {
 			// Attempt shader model 4.0. Only the app/headless
 			// test shaders use features not supported by level
 			// 9.1.
-			hlslc, err = compileHLSL(tmp, shader, hlsl, "main", hlslProf+"_4_0")
+			hlslc, err = compileHLSL_FXC(tmp, shader, hlsl, "main", hlslProf+"_4_0")
 			if err != nil {
 				return err
 			}
@@ -185,7 +181,6 @@ func generateShader(glslcc, tmp string, out io.Writer, shader string) error {
 		variants[i].GLSL300ES = glsl300es
 		variants[i].GLSL130 = glsl130
 		variants[i].GLSL150 = glsl150
-		variants[i].hlslSrc = hlsl
 		variants[i].HLSL = hlslc
 	}
 	name := filepath.Base(shader)
@@ -217,7 +212,6 @@ func generateShader(glslcc, tmp string, out io.Writer, shader string) error {
 		fmt.Fprintf(out, "GLSL300ES: %#v,\n", src.GLSL300ES)
 		fmt.Fprintf(out, "GLSL130: %#v,\n", src.GLSL130)
 		fmt.Fprintf(out, "GLSL150: %#v,\n", src.GLSL150)
-		fmt.Fprintf(out, "/*\n%s\n*/\n", src.hlslSrc)
 		fmt.Fprintf(out, "HLSL: %#v,\n", src.HLSL)
 		fmt.Fprintf(out, "}")
 		if multiVariant {
@@ -373,7 +367,7 @@ func parseDataType(t string) (backend.DataType, int, error) {
 	}
 }
 
-func compileHLSL(tmp, path, src, entry, profile string) ([]byte, error) {
+func compileHLSL_FXC(tmp, path, src, entry, profile string) ([]byte, error) {
 	base := filepath.Base(path)
 	tmppath := filepath.Join(tmp, base)
 	defer os.Remove(tmppath)
@@ -410,6 +404,47 @@ func compileHLSL(tmp, path, src, entry, profile string) ([]byte, error) {
 			info = "If the fxc tool cannot be found, set WINEPATH to the Windows path for the Windows SDK.\n"
 		}
 		return nil, fmt.Errorf("%s\n%s\n%s%s: %v", stderr.Bytes(), stdout.Bytes(), info, fxc, err)
+	}
+	return ioutil.ReadFile(outfile)
+}
+
+func compileHLSL_DXC(tmp, path, src, entry, profile string) ([]byte, error) {
+	base := filepath.Base(path)
+	tmppath := filepath.Join(tmp, base)
+	defer os.Remove(tmppath)
+	if err := ioutil.WriteFile(tmppath, []byte(src), 0644); err != nil {
+		return nil, err
+	}
+	outfile := filepath.Join(tmp, base+".obj")
+	defer os.Remove(outfile)
+	dxcInput := tmppath
+	dxcOutput := outfile
+	var dxc *exec.Cmd
+	if runtime.GOOS == "windows" {
+		dxc = exec.Command("dxc.exe")
+	} else {
+		// Convert paths to wine Windows format.
+		var err error
+		dxcInput, err = windowsPath(dxcInput)
+		if err != nil {
+			return nil, err
+		}
+		dxcOutput, err = windowsPath(dxcOutput)
+		if err != nil {
+			return nil, err
+		}
+		dxc = exec.Command("wine", "dxc.exe")
+	}
+	var stdout, stderr bytes.Buffer
+	dxc.Stderr = &stderr
+	dxc.Stdout = &stdout
+	dxc.Args = append(dxc.Args, "-Fo", dxcOutput, "-T", profile, "-Qstrip_reflect", "-E", entry, dxcInput)
+	if err := dxc.Run(); err != nil {
+		info := ""
+		if runtime.GOOS != "windows" {
+			info = "If the dxc tool cannot be found, set WINEPATH to the Windows path for the Windows SDK.\n"
+		}
+		return nil, fmt.Errorf("%s\n%s\n%s%s: %v", stderr.Bytes(), stdout.Bytes(), info, dxc, err)
 	}
 	return ioutil.ReadFile(outfile)
 }
@@ -493,7 +528,12 @@ func convertShader(tmp, glslcc, path, lang, profile string, args *shaderArgs, fl
 	return string(src), reflect, nil
 }
 
-func convertComputeShader(tmp, glslangValidator, spirv_cross, path string) (string, error) {
+type computeShaders struct {
+	glsl310es string
+	hlsl      []byte
+}
+
+func convertComputeShader(tmp, glslangValidator, spirv_cross, path string) (computeShaders, error) {
 	spvFile := filepath.Join(tmp, "shader.spv")
 	cmd := exec.Command(glslangValidator,
 		"-G100", // OpenGL ES 3.1.
@@ -505,18 +545,47 @@ func convertComputeShader(tmp, glslangValidator, spirv_cross, path string) (stri
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("%s: %v", strings.Join(cmd.Args, " "), err)
+		return computeShaders{}, fmt.Errorf("%s: %v", strings.Join(cmd.Args, " "), err)
 	}
-	cmd = exec.Command(spirv_cross,
-		"--es",
-		"--version", "310",
-		spvFile,
-	)
-	var shaderDump bytes.Buffer
-	cmd.Stdout = &shaderDump
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("%s: %v", strings.Join(cmd.Args, " "), err)
+
+	var output computeShaders
+	{
+		cmd = exec.Command(spirv_cross,
+			"--es",
+			"--version", "310",
+			spvFile,
+		)
+		var shaderDump bytes.Buffer
+		cmd.Stdout = &shaderDump
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return output, fmt.Errorf("%s: %v", strings.Join(cmd.Args, " "), err)
+		}
+		output.glsl310es = unixLineEnding(shaderDump.String())
 	}
-	return shaderDump.String(), nil
+	if *directCompute {
+		cmd = exec.Command(spirv_cross,
+			"--hlsl",
+			"--shader-model", "50",
+			spvFile,
+		)
+		var shaderDump bytes.Buffer
+		cmd.Stdout = &shaderDump
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return output, fmt.Errorf("%s: %v", strings.Join(cmd.Args, " "), err)
+		}
+		hlslSrc := shaderDump.String()
+
+		var err error
+		output.hlsl, err = compileHLSL_DXC(tmp, path, hlslSrc, "main", "cs_5_0")
+		if err != nil {
+			return output, err
+		}
+	}
+	return output, nil
+}
+
+func unixLineEnding(s string) string {
+	return strings.ReplaceAll(s, "\r\n", "\n")
 }
