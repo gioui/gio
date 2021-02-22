@@ -23,6 +23,8 @@ type buildInfo struct {
 	tags     string
 	target   string
 	version  int
+	key      string
+	password string
 }
 
 func newBuildInfo(pkgPath string) (*buildInfo, error) {
@@ -47,6 +49,8 @@ func newBuildInfo(pkgPath string) (*buildInfo, error) {
 		tags:     *extraTags,
 		target:   *target,
 		version:  *version,
+		key:      *signKey,
+		password: *signPass,
 	}
 	return bi, nil
 }

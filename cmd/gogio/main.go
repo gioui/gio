@@ -34,7 +34,9 @@ var (
 	linkMode      = flag.String("linkmode", "", "set the -linkmode flag of the go tool")
 	extraLdflags  = flag.String("ldflags", "", "extra flags to the Go linker")
 	extraTags     = flag.String("tags", "", "extra tags to the Go tool")
-	iconPath      = flag.String("icon", "", "Specify an icon for iOS and Android")
+	iconPath      = flag.String("icon", "", "specify an icon for iOS and Android")
+	signKey       = flag.String("signkey", "", "specify the path of the keystore to be used to sign Android apk files.")
+	signPass      = flag.String("signpass", "", "specify the password to decrypt the signkey.")
 )
 
 func main() {

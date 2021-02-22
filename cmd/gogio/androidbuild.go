@@ -548,43 +548,57 @@ func signAPK(tmpDir string, tools *androidTools, bi *buildInfo) error {
 	if err != nil {
 		return err
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	keystore := filepath.Join(home, ".android", "debug.keystore")
-	if _, err := os.Stat(keystore); err != nil {
-		keystore = filepath.Join(tmpDir, "sign.keystore")
-		keytool, err := findKeytool()
-		if err != nil {
-			return err
-		}
-		_, err = runCmd(exec.Command(
-			keytool,
-			"-genkey",
-			"-keystore", keystore,
-			"-storepass", "android",
-			"-alias", "android",
-			"-keyalg", "RSA", "-keysize", "2048",
-			"-validity", "10000",
-			"-noprompt",
-			"-dname", "CN=android",
-		))
-		if err != nil {
+
+	if bi.key == "" {
+		if err := defaultAndroidKeystore(tmpDir, bi); err != nil {
 			return err
 		}
 	}
+
 	_, err = runCmd(exec.Command(
 		filepath.Join(tools.buildtools, "apksigner"),
 		"sign",
-		"--ks-pass", "pass:android",
-		"--ks", keystore,
+		"--ks-pass", "pass:"+bi.password,
+		"--ks", bi.key,
 		apkFile,
 	))
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func defaultAndroidKeystore(tmpDir string, bi *buildInfo) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	// Use debug.keystore, if exists.
+	bi.key = filepath.Join(home, ".android", "debug.keystore")
+	bi.password = "android"
+	if _, err := os.Stat(bi.key); err == nil {
+		return nil
+	}
+
+	// Generate new key.
+	bi.key = filepath.Join(tmpDir, "sign.keystore")
+	keytool, err := findKeytool()
+	if err != nil {
+		return err
+	}
+	_, err = runCmd(exec.Command(
+		keytool,
+		"-genkey",
+		"-keystore", bi.key,
+		"-storepass", bi.password,
+		"-alias", "android",
+		"-keyalg", "RSA", "-keysize", "2048",
+		"-validity", "10000",
+		"-noprompt",
+		"-dname", "CN=android",
+	))
+	return err
 }
 
 func findNDK(androidHome string) (string, error) {
