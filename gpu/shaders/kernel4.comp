@@ -278,12 +278,6 @@ void main() {
                 rgb[k] = mix(rgb[k], rgba[k].rgb, mask[k] * rgba[k].a);
             }
             break;
-        case Cmd_SolidMask:
-            CmdSolidMask solid_mask = Cmd_SolidMask_read(cmd_alloc, cmd_ref);
-            for (uint k = 0; k < CHUNK; k++) {
-                mask[k] = solid_mask.mask;
-            }
-            break;
         case Cmd_Jump:
             cmd_ref = CmdRef(Cmd_Jump_read(cmd_alloc, cmd_ref).new_ref);
             cmd_alloc.offset = cmd_ref.offset;

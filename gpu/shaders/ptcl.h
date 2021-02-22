@@ -42,10 +42,6 @@ struct CmdSolidImageRef {
     uint offset;
 };
 
-struct CmdSolidMaskRef {
-    uint offset;
-};
-
 struct CmdJumpRef {
     uint offset;
 };
@@ -166,16 +162,6 @@ CmdSolidImageRef CmdSolidImage_index(CmdSolidImageRef ref, uint index) {
     return CmdSolidImageRef(ref.offset + index * CmdSolidImage_size);
 }
 
-struct CmdSolidMask {
-    float mask;
-};
-
-#define CmdSolidMask_size 4
-
-CmdSolidMaskRef CmdSolidMask_index(CmdSolidMaskRef ref, uint index) {
-    return CmdSolidMaskRef(ref.offset + index * CmdSolidMask_size);
-}
-
 struct CmdJump {
     uint new_ref;
 };
@@ -196,9 +182,8 @@ CmdJumpRef CmdJump_index(CmdJumpRef ref, uint index) {
 #define Cmd_EndClip 7
 #define Cmd_Stroke 8
 #define Cmd_Solid 9
-#define Cmd_SolidMask 10
-#define Cmd_SolidImage 11
-#define Cmd_Jump 12
+#define Cmd_SolidImage 10
+#define Cmd_Jump 11
 #define Cmd_size 20
 
 CmdRef Cmd_index(CmdRef ref, uint index) {
@@ -377,19 +362,6 @@ void CmdSolidImage_write(Alloc a, CmdSolidImageRef ref, CmdSolidImage s) {
     write_mem(a, ix + 1, (uint(s.offset.x) & 0xffff) | (uint(s.offset.y) << 16));
 }
 
-CmdSolidMask CmdSolidMask_read(Alloc a, CmdSolidMaskRef ref) {
-    uint ix = ref.offset >> 2;
-    uint raw0 = read_mem(a, ix + 0);
-    CmdSolidMask s;
-    s.mask = uintBitsToFloat(raw0);
-    return s;
-}
-
-void CmdSolidMask_write(Alloc a, CmdSolidMaskRef ref, CmdSolidMask s) {
-    uint ix = ref.offset >> 2;
-    write_mem(a, ix + 0, floatBitsToUint(s.mask));
-}
-
 CmdJump CmdJump_read(Alloc a, CmdJumpRef ref) {
     uint ix = ref.offset >> 2;
     uint raw0 = read_mem(a, ix + 0);
@@ -441,10 +413,6 @@ CmdStroke Cmd_Stroke_read(Alloc a, CmdRef ref) {
 
 CmdSolid Cmd_Solid_read(Alloc a, CmdRef ref) {
     return CmdSolid_read(a, CmdSolidRef(ref.offset + 4));
-}
-
-CmdSolidMask Cmd_SolidMask_read(Alloc a, CmdRef ref) {
-    return CmdSolidMask_read(a, CmdSolidMaskRef(ref.offset + 4));
 }
 
 CmdSolidImage Cmd_SolidImage_read(Alloc a, CmdRef ref) {
@@ -502,11 +470,6 @@ void Cmd_Stroke_write(Alloc a, CmdRef ref, CmdStroke s) {
 void Cmd_Solid_write(Alloc a, CmdRef ref, CmdSolid s) {
     write_mem(a, ref.offset >> 2, Cmd_Solid);
     CmdSolid_write(a, CmdSolidRef(ref.offset + 4), s);
-}
-
-void Cmd_SolidMask_write(Alloc a, CmdRef ref, CmdSolidMask s) {
-    write_mem(a, ref.offset >> 2, Cmd_SolidMask);
-    CmdSolidMask_write(a, CmdSolidMaskRef(ref.offset + 4), s);
 }
 
 void Cmd_SolidImage_write(Alloc a, CmdRef ref, CmdSolidImage s) {
