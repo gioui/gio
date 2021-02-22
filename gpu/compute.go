@@ -856,7 +856,7 @@ func (g *compute) resizeOutput(size image.Point) error {
 	img, err := g.ctx.NewTexture(backend.TextureFormatRGBA8, size.X, size.Y,
 		backend.FilterNearest,
 		backend.FilterNearest,
-		backend.BufferBindingShaderStorage|backend.BufferBindingFramebuffer)
+		backend.BufferBindingShaderStorage|backend.BufferBindingTexture)
 	if err != nil {
 		return err
 	}
