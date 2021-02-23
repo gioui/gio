@@ -12,7 +12,6 @@ const (
 	TypeCall
 	TypeDefer
 	TypeTransform
-	TypeLayer
 	TypeInvalidate
 	TypeImage
 	TypePaint
@@ -42,7 +41,6 @@ const (
 	TypeCallLen            = 1 + 4 + 4
 	TypeDeferLen           = 1
 	TypeTransformLen       = 1 + 4*6
-	TypeLayerLen           = 1
 	TypeRedrawLen          = 1 + 8
 	TypeImageLen           = 1
 	TypePaintLen           = 1
@@ -87,7 +85,6 @@ func (t OpType) Size() int {
 		TypeCallLen,
 		TypeDeferLen,
 		TypeTransformLen,
-		TypeLayerLen,
 		TypeRedrawLen,
 		TypeImageLen,
 		TypePaintLen,
