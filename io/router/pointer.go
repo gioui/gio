@@ -4,7 +4,6 @@ package router
 
 import (
 	"encoding/binary"
-	"image"
 
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
@@ -64,7 +63,7 @@ type pointerHandler struct {
 
 type areaOp struct {
 	kind areaKind
-	rect image.Rectangle
+	rect f32.Rectangle
 }
 
 type areaNode struct {
@@ -409,19 +408,22 @@ func searchTag(tags []event.Tag, tag event.Tag) (int, bool) {
 	return 0, false
 }
 
+func opDecodeFloat32(d []byte) float32 {
+	return float32(binary.LittleEndian.Uint32(d))
+}
+
 func (op *areaOp) Decode(d []byte) {
 	if opconst.OpType(d[0]) != opconst.TypeArea {
 		panic("invalid op")
 	}
-	bo := binary.LittleEndian
-	rect := image.Rectangle{
-		Min: image.Point{
-			X: int(int32(bo.Uint32(d[2:]))),
-			Y: int(int32(bo.Uint32(d[6:]))),
+	rect := f32.Rectangle{
+		Min: f32.Point{
+			X: opDecodeFloat32(d[2:]),
+			Y: opDecodeFloat32(d[6:]),
 		},
-		Max: image.Point{
-			X: int(int32(bo.Uint32(d[10:]))),
-			Y: int(int32(bo.Uint32(d[14:]))),
+		Max: f32.Point{
+			X: opDecodeFloat32(d[10:]),
+			Y: opDecodeFloat32(d[14:]),
 		},
 	}
 	*op = areaOp{
@@ -431,19 +433,15 @@ func (op *areaOp) Decode(d []byte) {
 }
 
 func (op *areaOp) Hit(pos f32.Point) bool {
-	min := f32.Point{
-		X: float32(op.rect.Min.X),
-		Y: float32(op.rect.Min.Y),
-	}
-	pos = pos.Sub(min)
+	pos = pos.Sub(op.rect.Min)
 	size := op.rect.Size()
 	switch op.kind {
 	case areaRect:
-		return 0 <= pos.X && pos.X < float32(size.X) &&
-			0 <= pos.Y && pos.Y < float32(size.Y)
+		return 0 <= pos.X && pos.X < size.X &&
+			0 <= pos.Y && pos.Y < size.Y
 	case areaEllipse:
-		rx := float32(size.X) / 2
-		ry := float32(size.Y) / 2
+		rx := size.X / 2
+		ry := size.Y / 2
 		xh := pos.X - rx
 		yk := pos.Y - ry
 		// The ellipse function works in all cases because

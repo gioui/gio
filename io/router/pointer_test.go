@@ -651,3 +651,22 @@ func BenchmarkRouterAdd(b *testing.B) {
 		})
 	}
 }
+
+var benchAreaOp areaOp
+
+func BenchmarkAreaOp_Decode(b *testing.B) {
+	ops := new(op.Ops)
+	pointer.Rect(image.Rectangle{Max: image.Pt(100, 100)}).Add(ops)
+	for i := 0; i < b.N; i++ {
+		benchAreaOp.Decode(ops.Data())
+	}
+}
+
+func BenchmarkAreaOp_Hit(b *testing.B) {
+	ops := new(op.Ops)
+	pointer.Rect(image.Rectangle{Max: image.Pt(100, 100)}).Add(ops)
+	benchAreaOp.Decode(ops.Data())
+	for i := 0; i < b.N; i++ {
+		benchAreaOp.Hit(f32.Pt(50, 50))
+	}
+}
