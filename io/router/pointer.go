@@ -333,18 +333,18 @@ func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e poi
 	foremost := true
 	for _, k := range p.handlers {
 		h := q.handlers[k]
+		if e.Type&h.types == 0 {
+			continue
+		}
 		e := e
 		if p.pressed && len(p.handlers) == 1 {
 			e.Priority = pointer.Grabbed
 		} else if foremost {
 			e.Priority = pointer.Foremost
 		}
-
-		if e.Type&h.types != 0 {
-			e.Position = q.invTransform(h.area, e.Position)
-			foremost = false
-			events.Add(k, e)
-		}
+		e.Position = q.invTransform(h.area, e.Position)
+		foremost = false
+		events.Add(k, e)
 	}
 }
 
