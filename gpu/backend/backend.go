@@ -3,6 +3,7 @@
 package backend
 
 import (
+	"errors"
 	"image"
 	"time"
 )
@@ -224,6 +225,8 @@ const (
 	BlendFactorZero
 	BlendFactorDstColor
 )
+
+var ErrContentLost = errors.New("buffer content lost")
 
 func (f Features) Has(feats Features) bool {
 	return f&feats == feats

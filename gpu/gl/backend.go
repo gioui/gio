@@ -704,7 +704,7 @@ func (b *gpuBuffer) Download(data []byte) error {
 	}
 	copy(data, bufferMap)
 	if !b.backend.funcs.UnmapBuffer(firstBinding) {
-		return errors.New("buffer content lost")
+		return backend.ErrContentLost
 	}
 	return nil
 }

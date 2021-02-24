@@ -821,6 +821,9 @@ func (g *compute) render(tileDims image.Point) error {
 		t.kernel4.end()
 
 		if err := g.buffers.memory.buffer.Download(gunsafe.StructView(g.memHeader)); err != nil {
+			if err == backend.ErrContentLost {
+				continue
+			}
 			return err
 		}
 		switch errCode := g.memHeader.mem_error; errCode {
