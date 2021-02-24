@@ -166,16 +166,6 @@ void main() {
             break;
         }
         switch (tag) {
-        case Cmd_Circle:
-            CmdCircle circle = Cmd_Circle_read(cmd_alloc, cmd_ref);
-            vec4 fg_rgba = unpacksRGB(circle.rgba_color);
-            for (uint i = 0; i < CHUNK; i++) {
-                float dy = float(i * CHUNK_DY);
-                float r = length(vec2(xy.x, xy.y + dy) + vec2(0.5, 0.5) - circle.center.xy);
-                float alpha = clamp(0.5 + circle.radius - r, 0.0, 1.0);
-                rgb[i] = mix(rgb[i], fg_rgba.rgb, mask[i] * alpha * fg_rgba.a);
-            }
-            break;
         case Cmd_Stroke:
             // Calculate distance field from all the line segments in this tile.
             CmdStroke stroke = Cmd_Stroke_read(cmd_alloc, cmd_ref);
@@ -193,7 +183,7 @@ void main() {
                 }
                 tile_seg_ref = seg.next;
             } while (tile_seg_ref.offset != 0);
-            fg_rgba = unpacksRGB(stroke.rgba_color);
+            vec4 fg_rgba = unpacksRGB(stroke.rgba_color);
             for (uint k = 0; k < CHUNK; k++) {
                 float alpha = clamp(stroke.half_width + 0.5 - df[k], 0.0, 1.0);
                 rgb[k] = mix(rgb[k], fg_rgba.rgb, mask[k] * alpha * fg_rgba.a);
