@@ -409,7 +409,7 @@ func searchTag(tags []event.Tag, tag event.Tag) (int, bool) {
 }
 
 func opDecodeFloat32(d []byte) float32 {
-	return float32(binary.LittleEndian.Uint32(d))
+	return float32(int32(binary.LittleEndian.Uint32(d)))
 }
 
 func (op *areaOp) Decode(d []byte) {

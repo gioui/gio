@@ -57,6 +57,28 @@ func TestPointerDrag(t *testing.T) {
 	assertEventSequence(t, r.Events(handler), pointer.Cancel, pointer.Enter, pointer.Press, pointer.Leave, pointer.Drag)
 }
 
+func TestPointerDragNegative(t *testing.T) {
+	handler := new(int)
+	var ops op.Ops
+	addPointerHandler(&ops, handler, image.Rect(-100, -100, 0, 0))
+
+	var r Router
+	r.Frame(&ops)
+	r.Queue(
+		// Press.
+		pointer.Event{
+			Type:     pointer.Press,
+			Position: f32.Pt(-50, -50),
+		},
+		// Move outside the area.
+		pointer.Event{
+			Type:     pointer.Move,
+			Position: f32.Pt(-150, -150),
+		},
+	)
+	assertEventSequence(t, r.Events(handler), pointer.Cancel, pointer.Enter, pointer.Press, pointer.Leave, pointer.Drag)
+}
+
 func TestPointerMove(t *testing.T) {
 	handler1 := new(int)
 	handler2 := new(int)
