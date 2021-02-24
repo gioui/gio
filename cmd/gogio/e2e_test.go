@@ -127,7 +127,7 @@ func runEndToEndTest(t *testing.T, driver TestDriver, pkgPath string) {
 	t.Log("clicking twice and taking another screenshot")
 	driver.Click(1*(size.X/4), 1*(size.Y/4))
 	driver.Click(3*(size.X/4), 3*(size.Y/4))
-	withRetries(t, 2*time.Second, func() error {
+	withRetries(t, 4*time.Second, func() error {
 		img := driver.Screenshot()
 		return checkImageCorners(img, red, white, black, red)
 	})
