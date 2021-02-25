@@ -386,9 +386,9 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, pe
 	}
 
 	// Link APK.
-	// Currently, new apps must have a target SDK version of at least 28.
+	// Currently, new apps must have a target SDK version of at least 30.
 	// https://developer.android.com/distribute/best-practices/develop/target-sdk
-	targetSDK := 28
+	targetSDK := 30
 	if bi.minsdk > targetSDK {
 		targetSDK = bi.minsdk
 	}
