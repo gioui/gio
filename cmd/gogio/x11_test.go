@@ -39,7 +39,7 @@ func (d *X11TestDriver) Start(path string) {
 	var wg sync.WaitGroup
 	d.Cleanup(wg.Wait)
 
-	d.startServer(wg, d.width, d.height)
+	d.startServer(&wg, d.width, d.height)
 
 	// Then, start our program on the X server above.
 	{
@@ -69,7 +69,7 @@ func (d *X11TestDriver) Start(path string) {
 	d.waitForFrame()
 }
 
-func (d *X11TestDriver) startServer(wg sync.WaitGroup, width, height int) {
+func (d *X11TestDriver) startServer(wg *sync.WaitGroup, width, height int) {
 	// Pick a random display number between 1 and 100,000. Most machines
 	// will only be using :0, so there's only a 0.001% chance of two
 	// concurrent test runs to run into a conflict.
