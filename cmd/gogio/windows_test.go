@@ -56,7 +56,7 @@ func (d *WineTestDriver) Start(path string) {
 	d.Cleanup(wg.Wait)
 
 	// Add 50x50px to the display dimensions, as discussed earlier.
-	d.startServer(wg, d.width+50, d.height+50)
+	d.startServer(&wg, d.width+50, d.height+50)
 
 	// Then, start our program via Wine on the X server above.
 	{
