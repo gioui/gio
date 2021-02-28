@@ -40,9 +40,9 @@ Certain permissions on Android are marked with a protection level of
 "dangerous". This means that, in addition to including the relevant
 Gio permission packages, your app will need to prompt the user
 specifically to request access. To access the Android Activity
-required for prompting, use the Do method on Window. Do exposes
-the underlying Android View, on which the getContext method returns
-the Activity.
+required for prompting, use app.ViewEvent (only available on Android).
+app.ViewEvent exposes the underlying Android View, on which the
+getContext method returns the Activity.
 
 For more information on dangerous permissions, see:
 https://developer.android.com/guide/topics/permissions/overview#dangerous_permissions
