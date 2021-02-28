@@ -5,6 +5,7 @@ package widget
 import (
 	"image"
 
+	"gioui.org/f32"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -22,10 +23,12 @@ type Image struct {
 	Scale float32
 }
 
+const defaultScale = float32(160.0 / 72.0)
+
 func (im Image) Layout(gtx layout.Context) layout.Dimensions {
 	scale := im.Scale
 	if scale == 0 {
-		scale = 160.0 / 72.0
+		scale = defaultScale
 	}
 	size := im.Src.Size()
 	wf, hf := float32(size.X), float32(size.Y)
@@ -33,6 +36,8 @@ func (im Image) Layout(gtx layout.Context) layout.Dimensions {
 	cs := gtx.Constraints
 	d := cs.Constrain(image.Pt(w, h))
 	stack := op.Save(gtx.Ops)
+	pixelScale := scale * gtx.Metric.PxPerDp
+	op.Affine(f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(pixelScale, pixelScale))).Add(gtx.Ops)
 	clip.Rect(image.Rectangle{Max: d}).Add(gtx.Ops)
 	im.Src.Add(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
