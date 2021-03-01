@@ -19,7 +19,12 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 	gio_onMouse((__bridge CFTypeRef)view, typ, [NSEvent pressedMouseButtons], p.x, p.y, dx, dy, [event timestamp], [event modifierFlags]);
 }
 
-@interface GioView : NSOpenGLView 
+static void handleGesture(NSView *view, NSEvent *event, int typ, CGFloat m, CGFloat r) {
+	NSPoint p = [view convertPoint:[event locationInWindow] fromView:nil];
+	gio_onGesture((__bridge CFTypeRef)view, typ, p.x, p.y, m, r, [event timestamp]);
+}
+
+@interface GioView : NSOpenGLView
 @end
 
 @implementation GioView
@@ -73,6 +78,12 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 	CGFloat dx = -event.scrollingDeltaX;
 	CGFloat dy = -event.scrollingDeltaY;
 	handleMouse(self, event, GIO_MOUSE_SCROLL, dx, dy);
+}
+- (void)magnifyWithEvent:(NSEvent *)event {
+    handleGesture(self, event, GIO_GESTURE_PINCH, [event magnification], 0);
+}
+- (void)rotateWithEvent:(NSEvent *)event {
+    handleGesture(self, event, GIO_GESTURE_ROTATE, 0, [event rotation]);
 }
 - (void)keyDown:(NSEvent *)event {
 	NSString *keys = [event charactersIgnoringModifiers];

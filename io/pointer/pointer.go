@@ -36,6 +36,10 @@ type Event struct {
 	Position f32.Point
 	// Scroll is the scroll amount, if any.
 	Scroll f32.Point
+	// Scale is the rate of a pinch gesture
+	Magnification float32
+	// Rotation is the rate of a rotate gesture
+	Rotation float32
 	// Modifiers is the set of active modifiers when
 	// the mouse button was pressed.
 	Modifiers key.Modifiers
@@ -73,7 +77,7 @@ type PassOp struct {
 type ID uint16
 
 // Type of an Event.
-type Type uint8
+type Type uint16
 
 // Priority of an Event.
 type Priority uint8
@@ -127,6 +131,10 @@ const (
 	Leave
 	// Scroll of a pointer.
 	Scroll
+	// Pinch gesture
+	Pinch
+	// Rotate gesture
+	Rotate
 )
 
 const (
@@ -228,6 +236,10 @@ func (t Type) String() string {
 		return "Leave"
 	case Scroll:
 		return "Scroll"
+	case Pinch:
+		return "Pinch"
+	case Rotate:
+		return "Rotate"
 	default:
 		panic("unknown Type")
 	}

@@ -32,6 +32,8 @@ import (
 #define GIO_MOUSE_UP 2
 #define GIO_MOUSE_DOWN 3
 #define GIO_MOUSE_SCROLL 4
+#define GIO_GESTURE_PINCH 5
+#define GIO_GESTURE_ROTATE 6
 
 __attribute__ ((visibility ("hidden"))) void gio_main(void);
 __attribute__ ((visibility ("hidden"))) CGFloat gio_viewWidth(CFTypeRef viewRef);
@@ -220,6 +222,31 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy 
 		Position:  f32.Point{X: xf, Y: yf},
 		Scroll:    f32.Point{X: dxf, Y: dyf},
 		Modifiers: convertMods(mods),
+	})
+}
+
+//export gio_onGesture
+func gio_onGesture(view C.CFTypeRef, cdir C.int, x, y, m, r C.CGFloat, ti C.double) {
+	var typ pointer.Type
+	switch cdir {
+	case C.GIO_GESTURE_PINCH:
+		typ = pointer.Pinch
+	case C.GIO_GESTURE_ROTATE:
+		typ = pointer.Rotate
+	default:
+		panic("invalid gesture")
+	}
+	t := time.Duration(float64(ti)*float64(time.Second) + .5)
+	w := mustView(view)
+	xf, yf := float32(x)*w.scale, float32(y)*w.scale
+	mf, rf := float32(m)*w.scale, float32(r)*w.scale
+	w.w.Event(pointer.Event{
+		Type:          typ,
+		Source:        pointer.Touch,
+		Time:          t,
+		Position:      f32.Point{X: xf, Y: yf},
+		Magnification: mf,
+		Rotation:      rf,
 	})
 }
 
