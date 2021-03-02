@@ -8,10 +8,10 @@ import (
 )
 
 type d3d11Context struct {
-	win     *window
-	swchain *d3d11.SwapChain
-	fbo     *d3d11.Framebuffer
-	*d3d11.Device
+	win           *window
+	swchain       *d3d11.SwapChain
+	fbo           *d3d11.Framebuffer
+	dev           *d3d11.Device
 	width, height int
 }
 
@@ -29,13 +29,13 @@ func init() {
 				dev.Release()
 				return nil, err
 			}
-			return &d3d11Context{win: w, Device: dev, swchain: swchain}, nil
+			return &d3d11Context{win: w, dev: dev, swchain: swchain}, nil
 		},
 	})
 }
 
 func (c *d3d11Context) Backend() (backend.Device, error) {
-	return d3d11.NewBackend(c.Device)
+	return d3d11.NewBackend(c.dev)
 }
 
 func (c *d3d11Context) Present() error {
@@ -58,7 +58,7 @@ func (c *d3d11Context) Present() error {
 func (c *d3d11Context) MakeCurrent() error {
 	_, width, height := c.win.HWND()
 	if c.fbo != nil && width == c.width && height == c.height {
-		c.BindFramebuffer(c.fbo)
+		c.dev.BindFramebuffer(c.fbo)
 		return nil
 	}
 	if c.fbo != nil {
@@ -70,12 +70,12 @@ func (c *d3d11Context) MakeCurrent() error {
 	}
 	c.width = width
 	c.height = height
-	fbo, err := c.swchain.Framebuffer(c.Device)
+	fbo, err := c.swchain.Framebuffer(c.dev)
 	if err != nil {
 		return err
 	}
 	c.fbo = fbo
-	c.BindFramebuffer(c.fbo)
+	c.dev.BindFramebuffer(c.fbo)
 	return nil
 }
 
@@ -90,10 +90,10 @@ func (c *d3d11Context) Release() {
 	if c.swchain != nil {
 		c.swchain.Release()
 	}
-	if c.Device != nil {
-		c.Device.Release()
+	if c.dev != nil {
+		c.dev.Release()
 	}
 	c.fbo = nil
 	c.swchain = nil
-	c.Device = nil
+	c.dev = nil
 }

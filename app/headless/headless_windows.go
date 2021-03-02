@@ -8,7 +8,7 @@ import (
 )
 
 type d3d11Context struct {
-	*d3d11.Device
+	dev *d3d11.Device
 }
 
 func newContext() (context, error) {
@@ -16,11 +16,11 @@ func newContext() (context, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &d3d11Context{Device: dev}, nil
+	return &d3d11Context{dev: dev}, nil
 }
 
 func (c *d3d11Context) Backend() (backend.Device, error) {
-	backend, err := d3d11.NewBackend(c.Device)
+	backend, err := d3d11.NewBackend(c.dev)
 	if err != nil {
 		return nil, err
 	}
@@ -35,6 +35,6 @@ func (c *d3d11Context) ReleaseCurrent() {
 }
 
 func (c *d3d11Context) Release() {
-	c.Device.Release()
-	c.Device = nil
+	c.dev.Release()
+	c.dev = nil
 }
