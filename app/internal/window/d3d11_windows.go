@@ -46,18 +46,20 @@ func (c *d3d11Context) Backend() (backend.Device, error) {
 }
 
 func (c *d3d11Context) Present() error {
-	if err := c.swchain.Present(); err != nil {
-		if err, ok := err.(d3d11.ErrorCode); ok {
-			switch err.Code {
-			case d3d11.DXGI_STATUS_OCCLUDED:
-				// Ignore
-				return nil
-			case d3d11.DXGI_ERROR_DEVICE_RESET, d3d11.DXGI_ERROR_DEVICE_REMOVED, d3d11.D3DDDIERR_DEVICEREMOVED:
-				return ErrDeviceLost
-			}
+	err := c.swchain.Present()
+	if err == nil {
+		return nil
+	}
+	if err, ok := err.(d3d11.ErrorCode); ok {
+		switch err.Code {
+		case d3d11.DXGI_STATUS_OCCLUDED:
+			// Ignore
+			return nil
+		case d3d11.DXGI_ERROR_DEVICE_RESET, d3d11.DXGI_ERROR_DEVICE_REMOVED, d3d11.D3DDDIERR_DEVICEREMOVED:
+			return ErrDeviceLost
 		}
 	}
-	return nil
+	return err
 }
 
 func (c *d3d11Context) MakeCurrent() error {

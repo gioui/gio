@@ -258,19 +258,19 @@ func NewBackend(d *Device) (*Backend, error) {
 		caps.MaxTextureSize = 4096
 	}
 	b := &Backend{dev: d, caps: caps}
+	// Enable depth mask to match OpenGL.
+	b.depthState.mask = true
 	// Disable backface culling to match OpenGL.
 	state, err := b.dev.dev.CreateRasterizerState(&_D3D11_RASTERIZER_DESC{
 		CullMode:        _D3D11_CULL_NONE,
 		FillMode:        _D3D11_FILL_SOLID,
 		DepthClipEnable: 1,
 	})
-	// Enable depth mask to match OpenGL.
-	b.depthState.mask = true
 	if err != nil {
 		return nil, err
 	}
+	defer _IUnknownRelease(unsafe.Pointer(state), state.vtbl.Release)
 	b.dev.ctx.RSSetState(state)
-	_IUnknownRelease(unsafe.Pointer(state), state.vtbl.Release)
 	return b, nil
 }
 
