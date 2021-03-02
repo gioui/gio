@@ -29,7 +29,6 @@ type compute struct {
 	cache         *resourceCache
 	maxTextureDim int
 
-	defFBO   backend.Framebuffer
 	programs struct {
 		elements   backend.Program
 		tileAlloc  backend.Program
@@ -197,7 +196,6 @@ func newCompute(ctx backend.Device) (*compute, error) {
 	}
 	g := &compute{
 		ctx:           ctx,
-		defFBO:        ctx.CurrentFramebuffer(),
 		cache:         newResourceCache(),
 		maxTextureDim: maxDim,
 		conf:          new(config),
@@ -290,7 +288,7 @@ func (g *compute) Frame() error {
 		Y: (viewport.Y + tileHeightPx - 1) / tileHeightPx,
 	}
 
-	g.ctx.BeginFrame()
+	defFBO := g.ctx.BeginFrame()
 	defer g.ctx.EndFrame()
 
 	if err := g.uploadImages(g.drawOps.allImageOps); err != nil {
@@ -305,6 +303,7 @@ func (g *compute) Frame() error {
 	if err := g.render(tileDims); err != nil {
 		return err
 	}
+	g.ctx.BindFramebuffer(defFBO)
 	g.blitOutput(viewport)
 	g.cache.frame()
 	g.drawOps.pathCache.frame()
@@ -331,7 +330,6 @@ func (g *compute) Profile() string {
 // shader can only write to RGBA textures, but since we actually render in sRGB
 // format we can't use glBlitFramebuffer, because it does sRGB conversion.
 func (g *compute) blitOutput(viewport image.Point) {
-	g.ctx.BindFramebuffer(g.defFBO)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.ctx.BindTexture(0, g.output.image)
 	g.ctx.BindProgram(g.output.blitProg)

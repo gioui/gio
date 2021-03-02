@@ -48,7 +48,6 @@ type GPU interface {
 type gpu struct {
 	cache *resourceCache
 
-	defFBO                                            backend.Framebuffer
 	profile                                           string
 	timers                                            *timers
 	frameStart                                        time.Time
@@ -395,10 +394,8 @@ func New(ctx backend.Device) (GPU, error) {
 }
 
 func newGPU(ctx backend.Device) (*gpu, error) {
-	defFBO := ctx.CurrentFramebuffer()
 	g := &gpu{
-		defFBO: defFBO,
-		cache:  newResourceCache(),
+		cache: newResourceCache(),
 	}
 	g.drawOps.pathCache = newOpCache()
 	if err := g.init(ctx); err != nil {
@@ -443,7 +440,7 @@ func (g *gpu) Collect(viewport image.Point, frameOps *op.Ops) {
 }
 
 func (g *gpu) Frame() error {
-	g.ctx.BeginFrame()
+	defFBO := g.ctx.BeginFrame()
 	defer g.ctx.EndFrame()
 	viewport := g.renderer.blitter.viewport
 	for _, img := range g.drawOps.imageOps {
@@ -452,7 +449,7 @@ func (g *gpu) Frame() error {
 	if g.drawOps.profile {
 		g.zopsTimer.begin()
 	}
-	g.ctx.BindFramebuffer(g.defFBO)
+	g.ctx.BindFramebuffer(defFBO)
 	g.ctx.DepthFunc(backend.DepthFuncGreater)
 	// Note that Clear must be before ClearDepth if nothing else is rendered
 	// (len(zimageOps) == 0). If not, the Fairphone 2 will corrupt the depth buffer.
@@ -472,13 +469,13 @@ func (g *gpu) Frame() error {
 	g.renderer.intersect(g.drawOps.imageOps)
 	g.stencilTimer.end()
 	g.coverTimer.begin()
-	g.ctx.BindFramebuffer(g.defFBO)
+	g.ctx.BindFramebuffer(defFBO)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.renderer.drawOps(g.cache, g.drawOps.imageOps)
 	g.ctx.SetBlend(false)
 	g.renderer.pather.stenciler.invalidateFBO()
 	g.coverTimer.end()
-	g.ctx.BindFramebuffer(g.defFBO)
+	g.ctx.BindFramebuffer(defFBO)
 	g.cleanupTimer.begin()
 	g.cache.frame()
 	g.drawOps.pathCache.frame()

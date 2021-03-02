@@ -12,7 +12,7 @@ import (
 // APIs such as OpenGL, Direct3D useful for rendering Gio
 // operations.
 type Device interface {
-	BeginFrame()
+	BeginFrame() Framebuffer
 	EndFrame()
 	Caps() Caps
 	NewTimer() Timer
@@ -20,7 +20,6 @@ type Device interface {
 	// are valid at the point of call.
 	IsTimeContinuous() bool
 	NewTexture(format TextureFormat, width, height int, minFilter, magFilter TextureFilter, bindings BufferBinding) (Texture, error)
-	CurrentFramebuffer() Framebuffer
 	NewFramebuffer(tex Texture, depthBits int) (Framebuffer, error)
 	NewImmutableBuffer(typ BufferBinding, data []byte) (Buffer, error)
 	NewBuffer(typ BufferBinding, size int) (Buffer, error)
