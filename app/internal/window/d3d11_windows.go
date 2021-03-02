@@ -11,7 +11,6 @@ type d3d11Context struct {
 	win     *window
 	swchain *d3d11.SwapChain
 	fbo     *d3d11.Framebuffer
-	backend backend.Device
 	*d3d11.Device
 	width, height int
 }
@@ -36,13 +35,7 @@ func init() {
 }
 
 func (c *d3d11Context) Backend() (backend.Device, error) {
-	backend, err := d3d11.NewBackend(c.Device)
-	if err != nil {
-		return nil, err
-	}
-	c.backend = backend
-	c.backend.BindFramebuffer(c.fbo)
-	return backend, nil
+	return d3d11.NewBackend(c.Device)
 }
 
 func (c *d3d11Context) Present() error {
@@ -65,7 +58,7 @@ func (c *d3d11Context) Present() error {
 func (c *d3d11Context) MakeCurrent() error {
 	_, width, height := c.win.HWND()
 	if c.fbo != nil && width == c.width && height == c.height {
-		c.backend.BindFramebuffer(c.fbo)
+		c.BindFramebuffer(c.fbo)
 		return nil
 	}
 	if c.fbo != nil {
@@ -82,9 +75,7 @@ func (c *d3d11Context) MakeCurrent() error {
 		return err
 	}
 	c.fbo = fbo
-	if c.backend != nil {
-		c.backend.BindFramebuffer(c.fbo)
-	}
+	c.BindFramebuffer(c.fbo)
 	return nil
 }
 

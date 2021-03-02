@@ -185,6 +185,10 @@ func (d *Device) CreateSwapChain(hwnd windows.Handle) (*SwapChain, error) {
 	return &SwapChain{swchain: d3dswchain, fbo: &Framebuffer{}}, nil
 }
 
+func (d *Device) BindFramebuffer(fbo *Framebuffer) {
+	d.ctx.OMSetRenderTargets(fbo.renderTarget, fbo.depthView)
+}
+
 func (s *SwapChain) Framebuffer(d *Device) (*Framebuffer, error) {
 	if s.fbo.renderTarget != nil {
 		return s.fbo, nil
@@ -816,7 +820,7 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 
 func (b *Backend) BindFramebuffer(fbo backend.Framebuffer) {
 	b.fbo = fbo.(*Framebuffer)
-	b.dev.ctx.OMSetRenderTargets(b.fbo.renderTarget, b.fbo.depthView)
+	b.dev.BindFramebuffer(b.fbo)
 }
 
 func (f *Framebuffer) Invalidate() {
