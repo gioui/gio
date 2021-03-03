@@ -10,8 +10,9 @@ import (
 )
 
 type Enum struct {
-	Value   string
-	Hovered string
+	Value    string
+	hovered  string
+	hovering bool
 
 	changed bool
 
@@ -36,6 +37,11 @@ func (e *Enum) Changed() bool {
 	return changed
 }
 
+// Hovered returns the key that is highlighted, or false if none are.
+func (e *Enum) Hovered() (string, bool) {
+	return e.hovered, e.hovering
+}
+
 // Layout adds the event handler for key.
 func (e *Enum) Layout(gtx layout.Context, key string) layout.Dimensions {
 	defer op.Save(gtx.Ops).Load()
@@ -57,11 +63,12 @@ func (e *Enum) Layout(gtx layout.Context, key string) layout.Dimensions {
 				}
 			}
 		}
-		if e.Hovered == key {
-			e.Hovered = ""
+		if e.hovering && e.hovered == key {
+			e.hovering = false
 		}
 		if clk.Hovered() {
-			e.Hovered = key
+			e.hovered = key
+			e.hovering = true
 		}
 		clk.Add(gtx.Ops)
 	}
