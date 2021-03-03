@@ -136,9 +136,9 @@ func (d *WineTestDriver) Start(path string) {
 	// We can't tell if the windowmove operation worked until we take a
 	// screenshot, because the getwindowgeometry op reports the 0x0
 	// coordinates even if the window wasn't moved properly.
-	// A sleep of ~20ms seems to be enough on an idle laptop. Use 10x that.
+	// A sleep of ~20ms seems to be enough on an idle laptop. Use 20x that.
 	// TODO(mvdan): revisit this, when you have a spare three hours.
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(400 * time.Millisecond)
 	id := d.xdotool("search", "--sync", "--onlyvisible", "--name", "Gio")
 	d.xdotool("windowmove", "--sync", id, 0, 0)
 }
