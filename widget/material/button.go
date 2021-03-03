@@ -90,9 +90,7 @@ func Clickable(gtx layout.Context, button *widget.Clickable, w layout.Widget) la
 	return layout.Stack{}.Layout(gtx,
 		layout.Expanded(button.Layout),
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
-			clip.RRect{
-				Rect: f32.Rectangle{Max: layout.FPt(gtx.Constraints.Min)},
-			}.Add(gtx.Ops)
+			clip.Rect{Max: gtx.Constraints.Min}.Add(gtx.Ops)
 			for _, c := range button.History() {
 				drawInk(gtx, c)
 			}
