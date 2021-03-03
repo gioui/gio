@@ -38,7 +38,6 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 		icon = c.uncheckedStateIcon
 	}
 
-	min := gtx.Constraints.Min
 	dims := layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return layout.Stack{Alignment: layout.Center}.Layout(gtx,
@@ -77,12 +76,9 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 		}),
 
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			gtx.Constraints.Min = min
-			return layout.W.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				return layout.UniformInset(unit.Dp(2)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-					paint.ColorOp{Color: c.Color}.Add(gtx.Ops)
-					return widget.Label{}.Layout(gtx, c.shaper, c.Font, c.TextSize, c.Label)
-				})
+			return layout.UniformInset(unit.Dp(2)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				paint.ColorOp{Color: c.Color}.Add(gtx.Ops)
+				return widget.Label{}.Layout(gtx, c.shaper, c.Font, c.TextSize, c.Label)
 			})
 		}),
 	)
