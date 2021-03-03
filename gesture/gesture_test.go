@@ -64,7 +64,7 @@ func mouseClickEvents(times ...time.Duration) []event.Event {
 	press := pointer.Event{
 		Type:    pointer.Press,
 		Source:  pointer.Mouse,
-		Buttons: pointer.ButtonLeft,
+		Buttons: pointer.ButtonPrimary,
 	}
 	events := make([]event.Event, 0, 2*len(times))
 	for _, t := range times {

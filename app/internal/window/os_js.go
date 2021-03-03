@@ -382,13 +382,13 @@ func (w *window) pointerEvent(typ pointer.Type, dx, dy float32, e js.Value) {
 	jbtns := e.Get("buttons").Int()
 	var btns pointer.Buttons
 	if jbtns&1 != 0 {
-		btns |= pointer.ButtonLeft
+		btns |= pointer.ButtonPrimary
 	}
 	if jbtns&2 != 0 {
-		btns |= pointer.ButtonRight
+		btns |= pointer.ButtonSecondary
 	}
 	if jbtns&4 != 0 {
-		btns |= pointer.ButtonMiddle
+		btns |= pointer.ButtonTertiary
 	}
 	w.w.Event(pointer.Event{
 		Type:      typ,

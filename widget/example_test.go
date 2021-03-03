@@ -44,13 +44,13 @@ func ExampleClickable_passthrough() {
 	r.Queue(
 		pointer.Event{
 			Source:   pointer.Mouse,
-			Buttons:  pointer.ButtonLeft,
+			Buttons:  pointer.ButtonPrimary,
 			Type:     pointer.Press,
 			Position: f32.Pt(50, 50),
 		},
 		pointer.Event{
 			Source:   pointer.Mouse,
-			Buttons:  pointer.ButtonLeft,
+			Buttons:  pointer.ButtonPrimary,
 			Type:     pointer.Release,
 			Position: f32.Pt(50, 50),
 		},

@@ -200,13 +200,13 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy 
 	}
 	var btns pointer.Buttons
 	if cbtns&(1<<0) != 0 {
-		btns |= pointer.ButtonLeft
+		btns |= pointer.ButtonPrimary
 	}
 	if cbtns&(1<<1) != 0 {
-		btns |= pointer.ButtonRight
+		btns |= pointer.ButtonSecondary
 	}
 	if cbtns&(1<<2) != 0 {
-		btns |= pointer.ButtonMiddle
+		btns |= pointer.ButtonTertiary
 	}
 	t := time.Duration(float64(ti)*float64(time.Second) + .5)
 	w := mustView(view)

@@ -523,13 +523,13 @@ func Java_org_gioui_GioView_onTouchEvent(env *C.JNIEnv, class C.jclass, handle C
 	var src pointer.Source
 	var btns pointer.Buttons
 	if jbtns&C.AMOTION_EVENT_BUTTON_PRIMARY != 0 {
-		btns |= pointer.ButtonLeft
+		btns |= pointer.ButtonPrimary
 	}
 	if jbtns&C.AMOTION_EVENT_BUTTON_SECONDARY != 0 {
-		btns |= pointer.ButtonRight
+		btns |= pointer.ButtonSecondary
 	}
 	if jbtns&C.AMOTION_EVENT_BUTTON_TERTIARY != 0 {
-		btns |= pointer.ButtonMiddle
+		btns |= pointer.ButtonTertiary
 	}
 	switch tool {
 	case C.AMOTION_EVENT_TOOL_TYPE_FINGER:

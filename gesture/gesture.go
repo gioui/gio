@@ -172,7 +172,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 			if c.pressed {
 				break
 			}
-			if e.Source == pointer.Mouse && e.Buttons != pointer.ButtonLeft {
+			if e.Source == pointer.Mouse && e.Buttons != pointer.ButtonPrimary {
 				break
 			}
 			if !c.entered {
@@ -341,7 +341,7 @@ func (d *Drag) Events(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event
 
 		switch e.Type {
 		case pointer.Press:
-			if !(e.Buttons == pointer.ButtonLeft || e.Source == pointer.Touch) {
+			if !(e.Buttons == pointer.ButtonPrimary || e.Source == pointer.Touch) {
 				continue
 			}
 			if d.dragging {

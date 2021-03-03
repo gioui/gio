@@ -257,17 +257,17 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			w.w.Event(e)
 		}
 	case windows.WM_LBUTTONDOWN:
-		w.pointerButton(pointer.ButtonLeft, true, lParam, getModifiers())
+		w.pointerButton(pointer.ButtonPrimary, true, lParam, getModifiers())
 	case windows.WM_LBUTTONUP:
-		w.pointerButton(pointer.ButtonLeft, false, lParam, getModifiers())
+		w.pointerButton(pointer.ButtonPrimary, false, lParam, getModifiers())
 	case windows.WM_RBUTTONDOWN:
-		w.pointerButton(pointer.ButtonRight, true, lParam, getModifiers())
+		w.pointerButton(pointer.ButtonSecondary, true, lParam, getModifiers())
 	case windows.WM_RBUTTONUP:
-		w.pointerButton(pointer.ButtonRight, false, lParam, getModifiers())
+		w.pointerButton(pointer.ButtonSecondary, false, lParam, getModifiers())
 	case windows.WM_MBUTTONDOWN:
-		w.pointerButton(pointer.ButtonMiddle, true, lParam, getModifiers())
+		w.pointerButton(pointer.ButtonTertiary, true, lParam, getModifiers())
 	case windows.WM_MBUTTONUP:
-		w.pointerButton(pointer.ButtonMiddle, false, lParam, getModifiers())
+		w.pointerButton(pointer.ButtonTertiary, false, lParam, getModifiers())
 	case windows.WM_CANCELMODE:
 		w.w.Event(pointer.Event{
 			Type: pointer.Cancel,

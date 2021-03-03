@@ -362,11 +362,11 @@ func (h *x11EventHandler) handleEvents() bool {
 			const scrollScale = 10
 			switch bevt.button {
 			case C.Button1:
-				btn = pointer.ButtonLeft
+				btn = pointer.ButtonPrimary
 			case C.Button2:
-				btn = pointer.ButtonMiddle
+				btn = pointer.ButtonTertiary
 			case C.Button3:
-				btn = pointer.ButtonRight
+				btn = pointer.ButtonSecondary
 			case C.Button4:
 				// scroll up
 				ev.Type = pointer.Scroll

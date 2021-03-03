@@ -373,7 +373,7 @@ g123456789g
 		tq := &testQueue{
 			events: []event.Event{
 				pointer.Event{
-					Buttons:  pointer.ButtonLeft,
+					Buttons:  pointer.ButtonPrimary,
 					Type:     pointer.Press,
 					Source:   pointer.Mouse,
 					Position: f32.Pt(textWidth(e, startPos.lineCol.Y, 0, startPos.lineCol.X), textHeight(e, startPos.lineCol.Y)),

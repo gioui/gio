@@ -801,11 +801,11 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 	var btn pointer.Buttons
 	switch wbtn {
 	case BTN_LEFT:
-		btn = pointer.ButtonLeft
+		btn = pointer.ButtonPrimary
 	case BTN_RIGHT:
-		btn = pointer.ButtonRight
+		btn = pointer.ButtonSecondary
 	case BTN_MIDDLE:
-		btn = pointer.ButtonMiddle
+		btn = pointer.ButtonTertiary
 	default:
 		return
 	}

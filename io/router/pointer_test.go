@@ -488,7 +488,7 @@ func TestCursorNameOp(t *testing.T) {
 		return pointer.Event{
 			Type:     pointer.Move,
 			Source:   pointer.Mouse,
-			Buttons:  pointer.ButtonLeft,
+			Buttons:  pointer.ButtonPrimary,
 			Position: f32.Pt(x, y),
 		}
 	}

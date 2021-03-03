@@ -148,9 +148,14 @@ const (
 )
 
 const (
-	ButtonLeft Buttons = 1 << iota
-	ButtonRight
-	ButtonMiddle
+	// ButtonPrimary is the primary button, usually the left button for a
+	// right-handed user.
+	ButtonPrimary Buttons = 1 << iota
+	// ButtonSecondary is the secondary button, usually the right button for a
+	// right-handed user.
+	ButtonSecondary
+	// ButtonTertiary is the tertiary button, usually the middle button.
+	ButtonTertiary
 )
 
 const (
@@ -265,14 +270,14 @@ func (b Buttons) Contain(buttons Buttons) bool {
 
 func (b Buttons) String() string {
 	var strs []string
-	if b.Contain(ButtonLeft) {
-		strs = append(strs, "ButtonLeft")
+	if b.Contain(ButtonPrimary) {
+		strs = append(strs, "ButtonPrimary")
 	}
-	if b.Contain(ButtonRight) {
-		strs = append(strs, "ButtonRight")
+	if b.Contain(ButtonSecondary) {
+		strs = append(strs, "ButtonSecondary")
 	}
-	if b.Contain(ButtonMiddle) {
-		strs = append(strs, "ButtonMiddle")
+	if b.Contain(ButtonTertiary) {
+		strs = append(strs, "ButtonTertiary")
 	}
 	return strings.Join(strs, "|")
 }

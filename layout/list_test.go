@@ -43,7 +43,7 @@ func TestListPosition(t *testing.T) {
 			scroll: _s(
 				pointer.Event{
 					Source:   pointer.Mouse,
-					Buttons:  pointer.ButtonLeft,
+					Buttons:  pointer.ButtonPrimary,
 					Type:     pointer.Press,
 					Position: f32.Pt(0, 0),
 				},
@@ -54,7 +54,7 @@ func TestListPosition(t *testing.T) {
 				},
 				pointer.Event{
 					Source:   pointer.Mouse,
-					Buttons:  pointer.ButtonLeft,
+					Buttons:  pointer.ButtonPrimary,
 					Type:     pointer.Release,
 					Position: f32.Pt(5, 0),
 				},
@@ -63,7 +63,7 @@ func TestListPosition(t *testing.T) {
 			scroll: _s(
 				pointer.Event{
 					Source:   pointer.Mouse,
-					Buttons:  pointer.ButtonLeft,
+					Buttons:  pointer.ButtonPrimary,
 					Type:     pointer.Press,
 					Position: f32.Pt(0, 0),
 				},
@@ -74,7 +74,7 @@ func TestListPosition(t *testing.T) {
 				},
 				pointer.Event{
 					Source:   pointer.Mouse,
-					Buttons:  pointer.ButtonLeft,
+					Buttons:  pointer.ButtonPrimary,
 					Type:     pointer.Release,
 					Position: f32.Pt(5, 0),
 				},
@@ -83,7 +83,7 @@ func TestListPosition(t *testing.T) {
 			scroll: _s(
 				pointer.Event{
 					Source:   pointer.Mouse,
-					Buttons:  pointer.ButtonLeft,
+					Buttons:  pointer.ButtonPrimary,
 					Type:     pointer.Press,
 					Position: f32.Pt(0, 0),
 				},
@@ -94,7 +94,7 @@ func TestListPosition(t *testing.T) {
 				},
 				pointer.Event{
 					Source:   pointer.Mouse,
-					Buttons:  pointer.ButtonLeft,
+					Buttons:  pointer.ButtonPrimary,
 					Type:     pointer.Release,
 					Position: f32.Pt(15, 0),
 				},
