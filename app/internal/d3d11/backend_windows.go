@@ -18,11 +18,12 @@ import (
 const debug = false
 
 type Device struct {
-	dev *_ID3D11Device
-	ctx *_ID3D11DeviceContext
+	Handle *_ID3D11Device
+	ctx    *_ID3D11DeviceContext
 }
 
 type Backend struct {
+	dev *_ID3D11Device
 	ctx *_ID3D11DeviceContext
 
 	// Temporary storage to avoid garbage.
@@ -34,7 +35,6 @@ type Backend struct {
 	// Current program.
 	prog *Program
 
-	dev  *Device
 	caps backend.Caps
 
 	// fbo is the currently bound fbo.
@@ -101,7 +101,6 @@ type Buffer struct {
 }
 
 type InputLayout struct {
-	dev    *Device
 	layout *_ID3D11InputLayout
 }
 
@@ -122,7 +121,7 @@ func NewDevice() (*Device, error) {
 	if err != nil {
 		return nil, fmt.Errorf("NewContext: %v", err)
 	}
-	dev := &Device{dev: d3ddev, ctx: d3dctx}
+	dev := &Device{Handle: d3ddev, ctx: d3dctx}
 	return dev, nil
 }
 
@@ -146,7 +145,7 @@ func detectFloatFormat(dev *_ID3D11Device) (uint32, bool) {
 }
 
 func (d *Device) CreateSwapChain(hwnd windows.Handle) (*SwapChain, error) {
-	dxgiDev, err := _IUnknownQueryInterface(unsafe.Pointer(d.dev), d.dev.vtbl.QueryInterface, &_IID_IDXGIDevice)
+	dxgiDev, err := _IUnknownQueryInterface(unsafe.Pointer(d.Handle), d.Handle.vtbl.QueryInterface, &_IID_IDXGIDevice)
 	if err != nil {
 		return nil, fmt.Errorf("NewContext: %v", err)
 	}
@@ -161,7 +160,7 @@ func (d *Device) CreateSwapChain(hwnd windows.Handle) (*SwapChain, error) {
 		return nil, fmt.Errorf("NewContext: %v", err)
 	}
 	d3dswchain, err := (*_IDXGIFactory)(unsafe.Pointer(dxgiFactory)).CreateSwapChain(
-		(*_IUnknown)(unsafe.Pointer(d.dev)),
+		(*_IUnknown)(unsafe.Pointer(d.Handle)),
 		&_DXGI_SWAP_CHAIN_DESC{
 			BufferDesc: _DXGI_MODE_DESC{
 				Format: _DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
@@ -200,26 +199,26 @@ func (s *SwapChain) Framebuffer(d *Device) (*Framebuffer, error) {
 		return nil, err
 	}
 	texture := (*_ID3D11Resource)(unsafe.Pointer(backBuffer))
-	renderTarget, err := d.dev.CreateRenderTargetView(texture)
+	renderTarget, err := d.Handle.CreateRenderTargetView(texture)
 	_IUnknownRelease(unsafe.Pointer(backBuffer), backBuffer.vtbl.Release)
 	if err != nil {
 		return nil, err
 	}
-	depthView, err := createDepthView(d.dev, int(desc.BufferDesc.Width), int(desc.BufferDesc.Height), 24)
+	depthView, err := createDepthView(d.Handle, int(desc.BufferDesc.Width), int(desc.BufferDesc.Height), 24)
 	if err != nil {
 		_IUnknownRelease(unsafe.Pointer(renderTarget), renderTarget.vtbl.Release)
 		return nil, err
 	}
 	s.fbo.renderTarget = renderTarget
 	s.fbo.depthView = depthView
-	s.fbo.dev = d.dev
+	s.fbo.dev = d.Handle
 	s.fbo.ctx = d.ctx
 	return s.fbo, nil
 }
 
 func (d *Device) Release() {
 	_IUnknownRelease(unsafe.Pointer(d.ctx), d.ctx.vtbl.Release)
-	_IUnknownRelease(unsafe.Pointer(d.dev), d.dev.vtbl.Release)
+	_IUnknownRelease(unsafe.Pointer(d.Handle), d.Handle.vtbl.Release)
 	*d = Device{}
 }
 
@@ -238,19 +237,19 @@ func (s *SwapChain) Present() error {
 	return s.swchain.Present(1, 0)
 }
 
-func NewBackend(d *Device) (*Backend, error) {
+func NewBackend(dev *_ID3D11Device) (*Backend, error) {
 	b := &Backend{
-		dev: d,
-		ctx: d.dev.GetImmediateContext(),
+		dev: dev,
+		ctx: dev.GetImmediateContext(),
 		caps: backend.Caps{
 			MaxTextureSize: 2048, // 9.1 maximum
 		},
 		depthStates: make(map[depthState]*_ID3D11DepthStencilState),
 		blendStates: make(map[blendState]*_ID3D11BlendState),
 	}
-	featLvl := d.dev.GetFeatureLevel()
+	featLvl := dev.GetFeatureLevel()
 	if featLvl < _D3D_FEATURE_LEVEL_9_1 {
-		_IUnknownRelease(unsafe.Pointer(d.dev), d.dev.vtbl.Release)
+		_IUnknownRelease(unsafe.Pointer(dev), dev.vtbl.Release)
 		_IUnknownRelease(unsafe.Pointer(b.ctx), b.ctx.vtbl.Release)
 		return nil, fmt.Errorf("d3d11: feature level too low: %d", featLvl)
 	}
@@ -260,14 +259,14 @@ func NewBackend(d *Device) (*Backend, error) {
 	case featLvl >= _D3D_FEATURE_LEVEL_9_3:
 		b.caps.MaxTextureSize = 4096
 	}
-	if fmt, ok := detectFloatFormat(d.dev); ok {
+	if fmt, ok := detectFloatFormat(dev); ok {
 		b.floatFormat = fmt
 		b.caps.Features |= backend.FeatureFloatRenderTargets
 	}
 	// Enable depth mask to match OpenGL.
 	b.depthState.mask = true
 	// Disable backface culling to match OpenGL.
-	state, err := b.dev.dev.CreateRasterizerState(&_D3D11_RASTERIZER_DESC{
+	state, err := dev.CreateRasterizerState(&_D3D11_RASTERIZER_DESC{
 		CullMode:        _D3D11_CULL_NONE,
 		FillMode:        _D3D11_FILL_SOLID,
 		DepthClipEnable: 1,
@@ -289,7 +288,7 @@ func (b *Backend) BeginFrame() backend.Framebuffer {
 	if depthView != nil {
 		_IUnknownRelease(unsafe.Pointer(depthView), depthView.vtbl.Release)
 	}
-	return &Framebuffer{ctx: b.ctx, dev: b.dev.dev, renderTarget: renderTarget, depthView: depthView, foreign: true}
+	return &Framebuffer{ctx: b.ctx, dev: b.dev, renderTarget: renderTarget, depthView: depthView, foreign: true}
 }
 
 func (b *Backend) EndFrame() {
@@ -328,7 +327,7 @@ func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, mi
 	default:
 		return nil, fmt.Errorf("unsupported texture format %d", format)
 	}
-	tex, err := b.dev.dev.CreateTexture2D(&_D3D11_TEXTURE2D_DESC{
+	tex, err := b.dev.CreateTexture2D(&_D3D11_TEXTURE2D_DESC{
 		Width:     uint32(width),
 		Height:    uint32(height),
 		MipLevels: 1,
@@ -359,7 +358,7 @@ func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, mi
 			return nil, fmt.Errorf("unsupported texture filter combination %d, %d", minFilter, magFilter)
 		}
 		var err error
-		sampler, err = b.dev.dev.CreateSamplerState(&_D3D11_SAMPLER_DESC{
+		sampler, err = b.dev.CreateSamplerState(&_D3D11_SAMPLER_DESC{
 			Filter:        filter,
 			AddressU:      _D3D11_TEXTURE_ADDRESS_CLAMP,
 			AddressV:      _D3D11_TEXTURE_ADDRESS_CLAMP,
@@ -372,7 +371,7 @@ func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, mi
 			_IUnknownRelease(unsafe.Pointer(tex), tex.vtbl.Release)
 			return nil, err
 		}
-		resView, err = b.dev.dev.CreateShaderResourceViewTEX2D(
+		resView, err = b.dev.CreateShaderResourceViewTEX2D(
 			(*_ID3D11Resource)(unsafe.Pointer(tex)),
 			&_D3D11_SHADER_RESOURCE_VIEW_DESC_TEX2D{
 				_D3D11_SHADER_RESOURCE_VIEW_DESC: _D3D11_SHADER_RESOURCE_VIEW_DESC{
@@ -400,13 +399,13 @@ func (b *Backend) NewFramebuffer(tex backend.Texture, depthBits int) (backend.Fr
 		return nil, errors.New("the texture was created without BufferBindingFramebuffer binding")
 	}
 	resource := (*_ID3D11Resource)(unsafe.Pointer(d3dtex.tex))
-	renderTarget, err := b.dev.dev.CreateRenderTargetView(resource)
+	renderTarget, err := b.dev.CreateRenderTargetView(resource)
 	if err != nil {
 		return nil, err
 	}
-	fbo := &Framebuffer{ctx: b.ctx, dev: b.dev.dev, format: d3dtex.format, resource: resource, renderTarget: renderTarget}
+	fbo := &Framebuffer{ctx: b.ctx, dev: b.dev, format: d3dtex.format, resource: resource, renderTarget: renderTarget}
 	if depthBits > 0 {
-		depthView, err := createDepthView(b.dev.dev, d3dtex.width, d3dtex.height, depthBits)
+		depthView, err := createDepthView(b.dev, d3dtex.width, d3dtex.height, depthBits)
 		if err != nil {
 			_IUnknownRelease(unsafe.Pointer(renderTarget), renderTarget.vtbl.Release)
 			return nil, err
@@ -488,11 +487,11 @@ func (b *Backend) NewInputLayout(vertexShader backend.ShaderSources, layout []ba
 			AlignedByteOffset: uint32(l.Offset),
 		}
 	}
-	l, err := b.dev.dev.CreateInputLayout(descs, vertexShader.HLSL)
+	l, err := b.dev.CreateInputLayout(descs, vertexShader.HLSL)
 	if err != nil {
 		return nil, err
 	}
-	return &InputLayout{dev: b.dev, layout: l}, nil
+	return &InputLayout{layout: l}, nil
 }
 
 func (b *Backend) NewBuffer(typ backend.BufferBinding, size int) (backend.Buffer, error) {
@@ -505,7 +504,7 @@ func (b *Backend) NewBuffer(typ backend.BufferBinding, size int) (backend.Buffer
 		}
 	}
 	bind := convBufferBinding(typ)
-	buf, err := b.dev.dev.CreateBuffer(&_D3D11_BUFFER_DESC{
+	buf, err := b.dev.CreateBuffer(&_D3D11_BUFFER_DESC{
 		ByteWidth: uint32(size),
 		BindFlags: bind,
 	}, nil)
@@ -525,7 +524,7 @@ func (b *Backend) NewImmutableBuffer(typ backend.BufferBinding, data []byte) (ba
 		}
 	}
 	bind := convBufferBinding(typ)
-	buf, err := b.dev.dev.CreateBuffer(&_D3D11_BUFFER_DESC{
+	buf, err := b.dev.CreateBuffer(&_D3D11_BUFFER_DESC{
 		ByteWidth: uint32(len(data)),
 		Usage:     _D3D11_USAGE_IMMUTABLE,
 		BindFlags: bind,
@@ -541,11 +540,11 @@ func (b *Backend) NewComputeProgram(shader backend.ShaderSources) (backend.Progr
 }
 
 func (b *Backend) NewProgram(vertexShader, fragmentShader backend.ShaderSources) (backend.Program, error) {
-	vs, err := b.dev.dev.CreateVertexShader(vertexShader.HLSL)
+	vs, err := b.dev.CreateVertexShader(vertexShader.HLSL)
 	if err != nil {
 		return nil, err
 	}
-	ps, err := b.dev.dev.CreatePixelShader(fragmentShader.HLSL)
+	ps, err := b.dev.CreatePixelShader(fragmentShader.HLSL)
 	if err != nil {
 		return nil, err
 	}
@@ -628,7 +627,7 @@ func (b *Backend) prepareDraw(mode backend.DrawMode) {
 			panic("unsupported depth func")
 		}
 		var err error
-		depthState, err = b.dev.dev.CreateDepthStencilState(&desc)
+		depthState, err = b.dev.CreateDepthStencilState(&desc)
 		if err != nil {
 			panic(err)
 		}
@@ -653,7 +652,7 @@ func (b *Backend) prepareDraw(mode backend.DrawMode) {
 		t0.DestBlend = dcol
 		t0.DestBlendAlpha = dalpha
 		var err error
-		blendState, err = b.dev.dev.CreateBlendState(&desc)
+		blendState, err = b.dev.CreateBlendState(&desc)
 		if err != nil {
 			panic(err)
 		}
@@ -829,7 +828,7 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 
 func (b *Backend) BindFramebuffer(fbo backend.Framebuffer) {
 	b.fbo = fbo.(*Framebuffer)
-	b.dev.BindFramebuffer(b.fbo)
+	b.ctx.OMSetRenderTargets(b.fbo.renderTarget, b.fbo.depthView)
 }
 
 func (f *Framebuffer) Invalidate() {

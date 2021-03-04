@@ -20,7 +20,7 @@ func newContext() (context, error) {
 }
 
 func (c *d3d11Context) Backend() (backend.Device, error) {
-	backend, err := d3d11.NewBackend(c.dev)
+	backend, err := d3d11.NewBackend(c.dev.Handle)
 	if err != nil {
 		return nil, err
 	}

@@ -35,7 +35,7 @@ func init() {
 }
 
 func (c *d3d11Context) Backend() (backend.Device, error) {
-	return d3d11.NewBackend(c.dev)
+	return d3d11.NewBackend(c.dev.Handle)
 }
 
 func (c *d3d11Context) Present() error {
