@@ -23,6 +23,8 @@ type Device struct {
 }
 
 type Backend struct {
+	ctx *_ID3D11DeviceContext
+
 	// Temporary storage to avoid garbage.
 	clearColor [4]float32
 	viewport   _D3D11_VIEWPORT
@@ -82,7 +84,8 @@ type Program struct {
 }
 
 type Framebuffer struct {
-	dev          *Device
+	dev          *_ID3D11Device
+	ctx          *_ID3D11DeviceContext
 	format       uint32
 	resource     *_ID3D11Resource
 	renderTarget *_ID3D11RenderTargetView
@@ -209,15 +212,15 @@ func (s *SwapChain) Framebuffer(d *Device) (*Framebuffer, error) {
 	}
 	s.fbo.renderTarget = renderTarget
 	s.fbo.depthView = depthView
-	s.fbo.dev = d
+	s.fbo.dev = d.dev
+	s.fbo.ctx = d.ctx
 	return s.fbo, nil
 }
 
 func (d *Device) Release() {
 	_IUnknownRelease(unsafe.Pointer(d.ctx), d.ctx.vtbl.Release)
 	_IUnknownRelease(unsafe.Pointer(d.dev), d.dev.vtbl.Release)
-	d.ctx = nil
-	d.dev = nil
+	*d = Device{}
 }
 
 func (s *SwapChain) Resize() error {
@@ -238,6 +241,7 @@ func (s *SwapChain) Present() error {
 func NewBackend(d *Device) (*Backend, error) {
 	b := &Backend{
 		dev: d,
+		ctx: d.dev.GetImmediateContext(),
 		caps: backend.Caps{
 			MaxTextureSize: 2048, // 9.1 maximum
 		},
@@ -247,7 +251,7 @@ func NewBackend(d *Device) (*Backend, error) {
 	featLvl := d.dev.GetFeatureLevel()
 	if featLvl < _D3D_FEATURE_LEVEL_9_1 {
 		_IUnknownRelease(unsafe.Pointer(d.dev), d.dev.vtbl.Release)
-		_IUnknownRelease(unsafe.Pointer(d.ctx), d.ctx.vtbl.Release)
+		_IUnknownRelease(unsafe.Pointer(b.ctx), b.ctx.vtbl.Release)
 		return nil, fmt.Errorf("d3d11: feature level too low: %d", featLvl)
 	}
 	switch {
@@ -272,12 +276,12 @@ func NewBackend(d *Device) (*Backend, error) {
 		return nil, err
 	}
 	defer _IUnknownRelease(unsafe.Pointer(state), state.vtbl.Release)
-	b.dev.ctx.RSSetState(state)
+	b.ctx.RSSetState(state)
 	return b, nil
 }
 
 func (b *Backend) BeginFrame() backend.Framebuffer {
-	renderTarget, depthView := b.dev.ctx.OMGetRenderTargets()
+	renderTarget, depthView := b.ctx.OMGetRenderTargets()
 	// Assume someone else is holding on to the render targets.
 	if renderTarget != nil {
 		_IUnknownRelease(unsafe.Pointer(renderTarget), renderTarget.vtbl.Release)
@@ -285,7 +289,7 @@ func (b *Backend) BeginFrame() backend.Framebuffer {
 	if depthView != nil {
 		_IUnknownRelease(unsafe.Pointer(depthView), depthView.vtbl.Release)
 	}
-	return &Framebuffer{dev: b.dev, renderTarget: renderTarget, depthView: depthView, foreign: true}
+	return &Framebuffer{ctx: b.ctx, dev: b.dev.dev, renderTarget: renderTarget, depthView: depthView, foreign: true}
 }
 
 func (b *Backend) EndFrame() {
@@ -310,6 +314,7 @@ func (b *Backend) Release() {
 	for _, state := range b.blendStates {
 		_IUnknownRelease(unsafe.Pointer(state), state.vtbl.Release)
 	}
+	_IUnknownRelease(unsafe.Pointer(b.ctx), b.ctx.vtbl.Release)
 	*b = Backend{}
 }
 
@@ -399,7 +404,7 @@ func (b *Backend) NewFramebuffer(tex backend.Texture, depthBits int) (backend.Fr
 	if err != nil {
 		return nil, err
 	}
-	fbo := &Framebuffer{dev: b.dev, format: d3dtex.format, resource: resource, renderTarget: renderTarget}
+	fbo := &Framebuffer{ctx: b.ctx, dev: b.dev.dev, format: d3dtex.format, resource: resource, renderTarget: renderTarget}
 	if depthBits > 0 {
 		depthView, err := createDepthView(b.dev.dev, d3dtex.width, d3dtex.height, depthBits)
 		if err != nil {
@@ -552,12 +557,12 @@ func (b *Backend) NewProgram(vertexShader, fragmentShader backend.ShaderSources)
 
 func (b *Backend) Clear(colr, colg, colb, cola float32) {
 	b.clearColor = [4]float32{colr, colg, colb, cola}
-	b.dev.ctx.ClearRenderTargetView(b.fbo.renderTarget, &b.clearColor)
+	b.ctx.ClearRenderTargetView(b.fbo.renderTarget, &b.clearColor)
 }
 
 func (b *Backend) ClearDepth(depth float32) {
 	if b.fbo.depthView != nil {
-		b.dev.ctx.ClearDepthStencilView(b.fbo.depthView, _D3D11_CLEAR_DEPTH|_D3D11_CLEAR_STENCIL, depth, 0)
+		b.ctx.ClearDepthStencilView(b.fbo.depthView, _D3D11_CLEAR_DEPTH|_D3D11_CLEAR_STENCIL, depth, 0)
 	}
 }
 
@@ -570,28 +575,28 @@ func (b *Backend) Viewport(x, y, width, height int) {
 		MinDepth: 0.0,
 		MaxDepth: 1.0,
 	}
-	b.dev.ctx.RSSetViewports(&b.viewport)
+	b.ctx.RSSetViewports(&b.viewport)
 }
 
 func (b *Backend) DrawArrays(mode backend.DrawMode, off, count int) {
 	b.prepareDraw(mode)
-	b.dev.ctx.Draw(uint32(count), uint32(off))
+	b.ctx.Draw(uint32(count), uint32(off))
 }
 
 func (b *Backend) DrawElements(mode backend.DrawMode, off, count int) {
 	b.prepareDraw(mode)
-	b.dev.ctx.DrawIndexed(uint32(count), uint32(off), 0)
+	b.ctx.DrawIndexed(uint32(count), uint32(off), 0)
 }
 
 func (b *Backend) prepareDraw(mode backend.DrawMode) {
 	if p := b.prog; p != nil {
-		b.dev.ctx.VSSetShader(p.vert.shader)
-		b.dev.ctx.PSSetShader(p.frag.shader)
+		b.ctx.VSSetShader(p.vert.shader)
+		b.ctx.PSSetShader(p.frag.shader)
 		if buf := p.vert.uniforms; buf != nil {
-			b.dev.ctx.VSSetConstantBuffers(buf.buf)
+			b.ctx.VSSetConstantBuffers(buf.buf)
 		}
 		if buf := p.frag.uniforms; buf != nil {
-			b.dev.ctx.PSSetConstantBuffers(buf.buf)
+			b.ctx.PSSetConstantBuffers(buf.buf)
 		}
 	}
 	var topology uint32
@@ -603,7 +608,7 @@ func (b *Backend) prepareDraw(mode backend.DrawMode) {
 	default:
 		panic("unsupported draw mode")
 	}
-	b.dev.ctx.IASetPrimitiveTopology(topology)
+	b.ctx.IASetPrimitiveTopology(topology)
 
 	depthState, ok := b.depthStates[b.depthState]
 	if !ok {
@@ -629,7 +634,7 @@ func (b *Backend) prepareDraw(mode backend.DrawMode) {
 		}
 		b.depthStates[b.depthState] = depthState
 	}
-	b.dev.ctx.OMSetDepthStencilState(depthState, 0)
+	b.ctx.OMSetDepthStencilState(depthState, 0)
 
 	blendState, ok := b.blendStates[b.blendState]
 	if !ok {
@@ -654,7 +659,7 @@ func (b *Backend) prepareDraw(mode backend.DrawMode) {
 		}
 		b.blendStates[b.blendState] = blendState
 	}
-	b.dev.ctx.OMSetBlendState(blendState, nil, 0xffffffff)
+	b.ctx.OMSetBlendState(blendState, nil, 0xffffffff)
 }
 
 func (b *Backend) DepthFunc(f backend.DepthFunc) {
@@ -701,7 +706,7 @@ func (t *Texture) Upload(offset, size image.Point, pixels []byte) {
 		back:   1,
 	}
 	res := (*_ID3D11Resource)(unsafe.Pointer(t.tex))
-	t.backend.dev.ctx.UpdateSubresource(res, dst, uint32(stride), uint32(len(pixels)), pixels)
+	t.backend.ctx.UpdateSubresource(res, dst, uint32(stride), uint32(len(pixels)), pixels)
 }
 
 func (t *Texture) Release() {
@@ -719,8 +724,8 @@ func (t *Texture) Release() {
 
 func (b *Backend) BindTexture(unit int, tex backend.Texture) {
 	t := tex.(*Texture)
-	b.dev.ctx.PSSetSamplers(uint32(unit), t.sampler)
-	b.dev.ctx.PSSetShaderResources(uint32(unit), t.resView)
+	b.ctx.PSSetSamplers(uint32(unit), t.sampler)
+	b.ctx.PSSetShaderResources(uint32(unit), t.resView)
 }
 
 func (b *Backend) BindProgram(prog backend.Program) {
@@ -747,11 +752,11 @@ func (p *Program) SetFragmentUniforms(buf backend.Buffer) {
 }
 
 func (b *Backend) BindVertexBuffer(buf backend.Buffer, stride, offset int) {
-	b.dev.ctx.IASetVertexBuffers(buf.(*Buffer).buf, uint32(stride), uint32(offset))
+	b.ctx.IASetVertexBuffers(buf.(*Buffer).buf, uint32(stride), uint32(offset))
 }
 
 func (b *Backend) BindIndexBuffer(buf backend.Buffer) {
-	b.dev.ctx.IASetIndexBuffer(buf.(*Buffer).buf, _DXGI_FORMAT_R16_UINT, 0)
+	b.ctx.IASetIndexBuffer(buf.(*Buffer).buf, _DXGI_FORMAT_R16_UINT, 0)
 }
 
 func (b *Buffer) Download(data []byte) error {
@@ -759,7 +764,7 @@ func (b *Buffer) Download(data []byte) error {
 }
 
 func (b *Buffer) Upload(data []byte) {
-	b.backend.dev.ctx.UpdateSubresource((*_ID3D11Resource)(unsafe.Pointer(b.buf)), nil, 0, 0, data)
+	b.backend.ctx.UpdateSubresource((*_ID3D11Resource)(unsafe.Pointer(b.buf)), nil, 0, 0, data)
 }
 
 func (b *Buffer) Release() {
@@ -772,7 +777,7 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 		return errors.New("framebuffer does not support ReadPixels")
 	}
 	w, h := src.Dx(), src.Dy()
-	tex, err := f.dev.dev.CreateTexture2D(&_D3D11_TEXTURE2D_DESC{
+	tex, err := f.dev.CreateTexture2D(&_D3D11_TEXTURE2D_DESC{
 		Width:     uint32(w),
 		Height:    uint32(h),
 		MipLevels: 1,
@@ -790,7 +795,7 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 	}
 	defer _IUnknownRelease(unsafe.Pointer(tex), tex.vtbl.Release)
 	res := (*_ID3D11Resource)(unsafe.Pointer(tex))
-	f.dev.ctx.CopySubresourceRegion(
+	f.ctx.CopySubresourceRegion(
 		res,
 		0,       // Destination subresource.
 		0, 0, 0, // Destination coordinates (x, y, z).
@@ -805,11 +810,11 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 			back:   1,
 		},
 	)
-	resMap, err := f.dev.ctx.Map(res, 0, _D3D11_MAP_READ, 0)
+	resMap, err := f.ctx.Map(res, 0, _D3D11_MAP_READ, 0)
 	if err != nil {
 		return fmt.Errorf("ReadPixels: %v", err)
 	}
-	defer f.dev.ctx.Unmap(res, 0)
+	defer f.ctx.Unmap(res, 0)
 	srcPitch := w * 4
 	dstPitch := int(resMap.RowPitch)
 	mapSize := dstPitch * h
@@ -845,7 +850,7 @@ func (f *Framebuffer) Release() {
 }
 
 func (b *Backend) BindInputLayout(layout backend.InputLayout) {
-	b.dev.ctx.IASetInputLayout(layout.(*InputLayout).layout)
+	b.ctx.IASetInputLayout(layout.(*InputLayout).layout)
 }
 
 func (l *InputLayout) Release() {

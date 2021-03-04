@@ -924,6 +924,18 @@ func (d *_ID3D11Device) GetFeatureLevel() int {
 	return int(lvl)
 }
 
+func (d *_ID3D11Device) GetImmediateContext() *_ID3D11DeviceContext {
+	var ctx *_ID3D11DeviceContext
+	syscall.Syscall(
+		d.vtbl.GetImmediateContext,
+		2,
+		uintptr(unsafe.Pointer(d)),
+		uintptr(unsafe.Pointer(&ctx)),
+		0,
+	)
+	return ctx
+}
+
 func (s *_IDXGISwapChain) GetDesc() (_DXGI_SWAP_CHAIN_DESC, error) {
 	var desc _DXGI_SWAP_CHAIN_DESC
 	r, _, _ := syscall.Syscall(
