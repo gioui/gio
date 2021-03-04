@@ -18,10 +18,8 @@ import (
 const debug = false
 
 type Device struct {
-	dev         *_ID3D11Device
-	ctx         *_ID3D11DeviceContext
-	featLvl     uint32
-	floatFormat uint32
+	dev *_ID3D11Device
+	ctx *_ID3D11DeviceContext
 }
 
 type Backend struct {
@@ -39,6 +37,8 @@ type Backend struct {
 
 	// fbo is the currently bound fbo.
 	fbo *Framebuffer
+
+	floatFormat uint32
 
 	// cached state objects.
 	depthStates map[depthState]*_ID3D11DepthStencilState
@@ -112,21 +112,14 @@ func NewDevice() (*Device, error) {
 	if debug {
 		flags |= _D3D11_CREATE_DEVICE_DEBUG
 	}
-	d3ddev, d3dctx, featLvl, err := _D3D11CreateDevice(
+	d3ddev, d3dctx, _, err := _D3D11CreateDevice(
 		_D3D_DRIVER_TYPE_HARDWARE,
 		flags,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("NewContext: %v", err)
 	}
-	dev := &Device{dev: d3ddev, ctx: d3dctx, featLvl: featLvl}
-	if featLvl < _D3D_FEATURE_LEVEL_9_1 {
-		_IUnknownRelease(unsafe.Pointer(d3ddev), d3ddev.vtbl.Release)
-		_IUnknownRelease(unsafe.Pointer(d3dctx), d3dctx.vtbl.Release)
-		return nil, fmt.Errorf("d3d11: feature level too low: %d", featLvl)
-	}
-	floatFormat, _ := detectFloatFormat(d3ddev)
-	dev.floatFormat = floatFormat
+	dev := &Device{dev: d3ddev, ctx: d3dctx}
 	return dev, nil
 }
 
@@ -243,22 +236,29 @@ func (s *SwapChain) Present() error {
 }
 
 func NewBackend(d *Device) (*Backend, error) {
-	caps := backend.Caps{
-		MaxTextureSize: 2048, // 9.1 maximum
-	}
-	if d.floatFormat != 0 {
-		caps.Features |= backend.FeatureFloatRenderTargets
-	}
-	switch {
-	case d.featLvl >= _D3D_FEATURE_LEVEL_11_0:
-		caps.MaxTextureSize = 16384
-	case d.featLvl >= _D3D_FEATURE_LEVEL_9_3:
-		caps.MaxTextureSize = 4096
-	}
 	b := &Backend{
-		dev: d, caps: caps,
+		dev: d,
+		caps: backend.Caps{
+			MaxTextureSize: 2048, // 9.1 maximum
+		},
 		depthStates: make(map[depthState]*_ID3D11DepthStencilState),
 		blendStates: make(map[blendState]*_ID3D11BlendState),
+	}
+	featLvl := d.dev.GetFeatureLevel()
+	if featLvl < _D3D_FEATURE_LEVEL_9_1 {
+		_IUnknownRelease(unsafe.Pointer(d.dev), d.dev.vtbl.Release)
+		_IUnknownRelease(unsafe.Pointer(d.ctx), d.ctx.vtbl.Release)
+		return nil, fmt.Errorf("d3d11: feature level too low: %d", featLvl)
+	}
+	switch {
+	case featLvl >= _D3D_FEATURE_LEVEL_11_0:
+		b.caps.MaxTextureSize = 16384
+	case featLvl >= _D3D_FEATURE_LEVEL_9_3:
+		b.caps.MaxTextureSize = 4096
+	}
+	if fmt, ok := detectFloatFormat(d.dev); ok {
+		b.floatFormat = fmt
+		b.caps.Features |= backend.FeatureFloatRenderTargets
 	}
 	// Enable depth mask to match OpenGL.
 	b.depthState.mask = true
@@ -317,7 +317,7 @@ func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, mi
 	var d3dfmt uint32
 	switch format {
 	case backend.TextureFormatFloat:
-		d3dfmt = b.dev.floatFormat
+		d3dfmt = b.floatFormat
 	case backend.TextureFormatSRGB:
 		d3dfmt = _DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
 	default:

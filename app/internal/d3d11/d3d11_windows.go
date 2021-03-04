@@ -914,6 +914,16 @@ func (d *_ID3D11Device) CreateDepthStencilState(desc *_D3D11_DEPTH_STENCIL_DESC)
 	return state, nil
 }
 
+func (d *_ID3D11Device) GetFeatureLevel() int {
+	lvl, _, _ := syscall.Syscall(
+		d.vtbl.GetFeatureLevel,
+		1,
+		uintptr(unsafe.Pointer(d)),
+		0, 0,
+	)
+	return int(lvl)
+}
+
 func (s *_IDXGISwapChain) GetDesc() (_DXGI_SWAP_CHAIN_DESC, error) {
 	var desc _DXGI_SWAP_CHAIN_DESC
 	r, _, _ := syscall.Syscall(
