@@ -422,6 +422,7 @@ func (g *gpu) Release() {
 	if g.timers != nil {
 		g.timers.release()
 	}
+	g.ctx.Release()
 }
 
 func (g *gpu) Collect(viewport image.Point, frameOps *op.Ops) {

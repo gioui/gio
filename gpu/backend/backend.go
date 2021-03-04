@@ -48,6 +48,8 @@ type Device interface {
 
 	MemoryBarrier()
 	DispatchCompute(x, y, z int)
+
+	Release()
 }
 
 type ShaderSources struct {

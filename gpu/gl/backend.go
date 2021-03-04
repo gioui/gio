@@ -310,6 +310,9 @@ func glErr(f *glimpl.Functions) error {
 	return nil
 }
 
+func (b *Backend) Release() {
+}
+
 func (b *Backend) MemoryBarrier() {
 	b.funcs.MemoryBarrier(glimpl.ALL_BARRIER_BITS)
 }

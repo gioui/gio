@@ -22,8 +22,6 @@ type Device struct {
 	ctx         *_ID3D11DeviceContext
 	featLvl     uint32
 	floatFormat uint32
-	depthStates map[depthState]*_ID3D11DepthStencilState
-	blendStates map[blendState]*_ID3D11BlendState
 }
 
 type Backend struct {
@@ -32,13 +30,19 @@ type Backend struct {
 	viewport   _D3D11_VIEWPORT
 	depthState depthState
 	blendState blendState
-	prog       *Program
+
+	// Current program.
+	prog *Program
 
 	dev  *Device
 	caps backend.Caps
 
 	// fbo is the currently bound fbo.
 	fbo *Framebuffer
+
+	// cached state objects.
+	depthStates map[depthState]*_ID3D11DepthStencilState
+	blendStates map[blendState]*_ID3D11BlendState
 }
 
 type blendState struct {
@@ -123,8 +127,6 @@ func NewDevice() (*Device, error) {
 	}
 	floatFormat, _ := detectFloatFormat(d3ddev)
 	dev.floatFormat = floatFormat
-	dev.depthStates = make(map[depthState]*_ID3D11DepthStencilState)
-	dev.blendStates = make(map[blendState]*_ID3D11BlendState)
 	return dev, nil
 }
 
@@ -223,14 +225,6 @@ func (d *Device) Release() {
 	_IUnknownRelease(unsafe.Pointer(d.dev), d.dev.vtbl.Release)
 	d.ctx = nil
 	d.dev = nil
-	for _, state := range d.depthStates {
-		_IUnknownRelease(unsafe.Pointer(state), state.vtbl.Release)
-	}
-	d.depthStates = nil
-	for _, state := range d.blendStates {
-		_IUnknownRelease(unsafe.Pointer(state), state.vtbl.Release)
-	}
-	d.blendStates = nil
 }
 
 func (s *SwapChain) Resize() error {
@@ -261,7 +255,11 @@ func NewBackend(d *Device) (*Backend, error) {
 	case d.featLvl >= _D3D_FEATURE_LEVEL_9_3:
 		caps.MaxTextureSize = 4096
 	}
-	b := &Backend{dev: d, caps: caps}
+	b := &Backend{
+		dev: d, caps: caps,
+		depthStates: make(map[depthState]*_ID3D11DepthStencilState),
+		blendStates: make(map[blendState]*_ID3D11BlendState),
+	}
 	// Enable depth mask to match OpenGL.
 	b.depthState.mask = true
 	// Disable backface culling to match OpenGL.
@@ -303,6 +301,16 @@ func (b *Backend) NewTimer() backend.Timer {
 
 func (b *Backend) IsTimeContinuous() bool {
 	panic("timers not supported")
+}
+
+func (b *Backend) Release() {
+	for _, state := range b.depthStates {
+		_IUnknownRelease(unsafe.Pointer(state), state.vtbl.Release)
+	}
+	for _, state := range b.blendStates {
+		_IUnknownRelease(unsafe.Pointer(state), state.vtbl.Release)
+	}
+	*b = Backend{}
 }
 
 func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, minFilter, magFilter backend.TextureFilter, bindings backend.BufferBinding) (backend.Texture, error) {
@@ -597,7 +605,7 @@ func (b *Backend) prepareDraw(mode backend.DrawMode) {
 	}
 	b.dev.ctx.IASetPrimitiveTopology(topology)
 
-	depthState, ok := b.dev.depthStates[b.depthState]
+	depthState, ok := b.depthStates[b.depthState]
 	if !ok {
 		var desc _D3D11_DEPTH_STENCIL_DESC
 		if b.depthState.enable {
@@ -619,11 +627,11 @@ func (b *Backend) prepareDraw(mode backend.DrawMode) {
 		if err != nil {
 			panic(err)
 		}
-		b.dev.depthStates[b.depthState] = depthState
+		b.depthStates[b.depthState] = depthState
 	}
 	b.dev.ctx.OMSetDepthStencilState(depthState, 0)
 
-	blendState, ok := b.dev.blendStates[b.blendState]
+	blendState, ok := b.blendStates[b.blendState]
 	if !ok {
 		var desc _D3D11_BLEND_DESC
 		t0 := &desc.RenderTarget[0]
@@ -644,7 +652,7 @@ func (b *Backend) prepareDraw(mode backend.DrawMode) {
 		if err != nil {
 			panic(err)
 		}
-		b.dev.blendStates[b.blendState] = blendState
+		b.blendStates[b.blendState] = blendState
 	}
 	b.dev.ctx.OMSetBlendState(blendState, nil, 0xffffffff)
 }
