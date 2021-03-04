@@ -62,7 +62,6 @@ func NewWindow(width, height int) (*Window, error) {
 			fboTex.Release()
 			return err
 		}
-		dev.BindFramebuffer(fbo)
 		gp, err := gpu.New(dev)
 		if err != nil {
 			fbo.Release()
@@ -109,6 +108,7 @@ func (w *Window) Release() {
 // operation list.
 func (w *Window) Frame(frame *op.Ops) error {
 	return contextDo(w.ctx, func() error {
+		w.backend.BindFramebuffer(w.fbo)
 		w.gpu.Clear(color.NRGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff})
 		w.gpu.Collect(w.size, frame)
 		return w.gpu.Frame()
