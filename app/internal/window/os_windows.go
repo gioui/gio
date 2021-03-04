@@ -13,13 +13,13 @@ import (
 	"sync"
 	"time"
 	"unicode"
-	"unicode/utf16"
 	"unsafe"
 
 	syscall "golang.org/x/sys/windows"
 
 	"gioui.org/app/internal/windows"
 	"gioui.org/unit"
+	gowindows "golang.org/x/sys/windows"
 
 	"gioui.org/f32"
 	"gioui.org/io/clipboard"
@@ -518,21 +518,7 @@ func (w *window) readClipboard() error {
 		return err
 	}
 	defer windows.GlobalUnlock(mem)
-	// Look for terminating null character.
-	n := 0
-	for {
-		ch := *(*uint16)(unsafe.Pointer(ptr + uintptr(n)*2))
-		if ch == 0 {
-			break
-		}
-		n++
-	}
-	var u16 []uint16
-	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&u16))
-	hdr.Data = ptr
-	hdr.Cap = n
-	hdr.Len = n
-	content := string(utf16.Decode(u16))
+	content := gowindows.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
 	go func() {
 		w.w.Event(clipboard.Event{Text: content})
 	}()
@@ -544,14 +530,15 @@ func (w *window) WriteClipboard(s string) {
 }
 
 func (w *window) writeClipboard(s string) error {
-	u16 := utf16.Encode([]rune(s))
-	// Data must be null terminated.
-	u16 = append(u16, 0)
 	if err := windows.OpenClipboard(w.hwnd); err != nil {
 		return err
 	}
 	defer windows.CloseClipboard()
 	if err := windows.EmptyClipboard(); err != nil {
+		return err
+	}
+	u16, err := gowindows.UTF16FromString(s)
+	if err != nil {
 		return err
 	}
 	n := len(u16) * int(unsafe.Sizeof(u16[0]))
