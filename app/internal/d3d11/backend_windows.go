@@ -279,7 +279,12 @@ func NewBackend(d *Device) (*Backend, error) {
 }
 
 func (b *Backend) BeginFrame() backend.Framebuffer {
-	return b.currentFramebuffer()
+	renderTarget := b.dev.ctx.OMGetRenderTargets()
+	if renderTarget != nil {
+		// Assume someone else is holding on to it.
+		_IUnknownRelease(unsafe.Pointer(renderTarget), renderTarget.vtbl.Release)
+	}
+	return &Framebuffer{dev: b.dev, renderTarget: renderTarget, foreign: true}
 }
 
 func (b *Backend) EndFrame() {
@@ -371,18 +376,6 @@ func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, mi
 		}
 	}
 	return &Texture{backend: b, format: d3dfmt, tex: tex, sampler: sampler, resView: resView, bindings: bindings, width: width, height: height}, nil
-}
-
-func (b *Backend) currentFramebuffer() backend.Framebuffer {
-	renderTarget := b.dev.ctx.OMGetRenderTargets()
-	if renderTarget != nil {
-		// Assume someone else is holding on to it.
-		_IUnknownRelease(unsafe.Pointer(renderTarget), renderTarget.vtbl.Release)
-	}
-	if b.fbo != nil && renderTarget == b.fbo.renderTarget {
-		return b.fbo
-	}
-	return &Framebuffer{dev: b.dev, renderTarget: renderTarget, foreign: true}
 }
 
 func (b *Backend) NewFramebuffer(tex backend.Texture, depthBits int) (backend.Framebuffer, error) {
@@ -828,7 +821,7 @@ func (f *Framebuffer) Invalidate() {
 
 func (f *Framebuffer) Release() {
 	if f.foreign {
-		panic("framebuffer not created by NewBuffer")
+		panic("framebuffer not created by NewFramebuffer")
 	}
 	if f.renderTarget != nil {
 		_IUnknownRelease(unsafe.Pointer(f.renderTarget), f.renderTarget.vtbl.Release)

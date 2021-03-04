@@ -170,7 +170,8 @@ func NewBackend(ctx Context) (*Backend, error) {
 func (b *Backend) BeginFrame() backend.Framebuffer {
 	// Assume GL state is reset between frames.
 	b.state = glstate{}
-	return b.currentFramebuffer()
+	fboID := glimpl.Framebuffer(b.funcs.GetBinding(glimpl.FRAMEBUFFER_BINDING))
+	return &gpuFramebuffer{backend: b, obj: fboID, foreign: true}
 }
 
 func (b *Backend) EndFrame() {
@@ -227,11 +228,6 @@ func (b *Backend) NewFramebuffer(tex backend.Texture, depthBits int) (backend.Fr
 		return nil, fmt.Errorf("incomplete framebuffer, status = 0x%x, err = %d", st, b.funcs.GetError())
 	}
 	return fbo, nil
-}
-
-func (b *Backend) currentFramebuffer() backend.Framebuffer {
-	fboID := glimpl.Framebuffer(b.funcs.GetBinding(glimpl.FRAMEBUFFER_BINDING))
-	return &gpuFramebuffer{backend: b, obj: fboID, foreign: true}
 }
 
 func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, minFilter, magFilter backend.TextureFilter, binding backend.BufferBinding) (backend.Texture, error) {
@@ -803,7 +799,7 @@ func (f *gpuFramebuffer) Invalidate() {
 
 func (f *gpuFramebuffer) Release() {
 	if f.foreign {
-		panic("framebuffer not created by NewBuffer")
+		panic("framebuffer not created by NewFramebuffer")
 	}
 	f.backend.funcs.DeleteFramebuffer(f.obj)
 	if f.hasDepth {
