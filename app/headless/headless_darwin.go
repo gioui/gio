@@ -3,9 +3,7 @@
 package headless
 
 import (
-	"gioui.org/gpu/backend"
-	"gioui.org/gpu/gl"
-
+	"gioui.org/gpu"
 	_ "gioui.org/app/internal/cocoainit"
 )
 
@@ -32,6 +30,10 @@ func newGLContext() (context, error) {
 	return &nsContext{ctx: ctx}, nil
 }
 
+func (c *nsContext) API() gpu.API {
+	return gpu.OpenGL{}
+}
+
 func (c *nsContext) MakeCurrent() error {
 	C.gio_headless_makeCurrentContext(c.ctx)
 	if !c.prepared {
@@ -43,10 +45,6 @@ func (c *nsContext) MakeCurrent() error {
 
 func (c *nsContext) ReleaseCurrent() {
 	C.gio_headless_clearCurrentContext(c.ctx)
-}
-
-func (c *nsContext) Backend() (backend.Device, error) {
-	return gl.NewBackend(nil)
 }
 
 func (d *nsContext) Release() {

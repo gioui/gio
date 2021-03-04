@@ -6,8 +6,7 @@ import (
 	"errors"
 	"syscall/js"
 
-	"gioui.org/gpu/backend"
-	"gioui.org/gpu/gl"
+	"gioui.org/gpu"
 	"gioui.org/internal/glimpl"
 )
 
@@ -31,8 +30,8 @@ func newGLContext() (context, error) {
 	return c, nil
 }
 
-func (c *jsContext) Backend() (backend.Device, error) {
-	return gl.NewBackend(glimpl.Context(c.ctx))
+func (c *jsContext) API() gpu.API {
+	return gpu.OpenGL{Context: glimpl.Context(c.ctx)}
 }
 
 func (c *jsContext) Release() {

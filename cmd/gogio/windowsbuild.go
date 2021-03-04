@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/akavel/rsrc/binutil"
-	"github.com/akavel/rsrc/coff"
-	"golang.org/x/text/encoding/unicode"
 	"image/png"
 	"io"
 	"math"
@@ -17,6 +14,10 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+
+	"github.com/akavel/rsrc/binutil"
+	"github.com/akavel/rsrc/coff"
+	"golang.org/x/text/encoding/unicode"
 )
 
 func buildWindows(tmpDir string, bi *buildInfo) error {

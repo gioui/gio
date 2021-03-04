@@ -11,8 +11,7 @@ import (
 	"strings"
 
 	"gioui.org/app/internal/srgb"
-	"gioui.org/gpu/backend"
-	"gioui.org/gpu/gl"
+	"gioui.org/gpu"
 	"gioui.org/internal/glimpl"
 )
 
@@ -118,8 +117,8 @@ func NewContext(disp NativeDisplayType) (*Context, error) {
 	return c, nil
 }
 
-func (c *Context) Backend() (backend.Device, error) {
-	return gl.NewBackend(nil)
+func (c *Context) API() gpu.API {
+	return gpu.OpenGL{}
 }
 
 func (c *Context) ReleaseSurface() {

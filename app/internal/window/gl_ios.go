@@ -21,8 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	"gioui.org/gpu/backend"
-	"gioui.org/gpu/gl"
+	"gioui.org/gpu"
 	"gioui.org/internal/glimpl"
 )
 
@@ -56,8 +55,8 @@ func newContext(w *window) (*context, error) {
 	return c, nil
 }
 
-func (c *context) Backend() (backend.Device, error) {
-	return gl.NewBackend(nil)
+func (c *context) API() gpu.API {
+	return gpu.OpenGL{}
 }
 
 func (c *context) Release() {

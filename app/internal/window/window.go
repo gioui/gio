@@ -7,7 +7,7 @@ package window
 import (
 	"errors"
 
-	"gioui.org/gpu/backend"
+	"gioui.org/gpu"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
@@ -33,7 +33,7 @@ type Callbacks interface {
 }
 
 type Context interface {
-	Backend() (backend.Device, error)
+	API() gpu.API
 	Present() error
 	MakeCurrent() error
 	Release()

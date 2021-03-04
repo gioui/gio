@@ -7,8 +7,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/tools/go/packages"
 	"io"
 	"io/ioutil"
 	"os"
@@ -18,6 +16,9 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/tools/go/packages"
 )
 
 type androidTools struct {

@@ -28,6 +28,9 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
+
+	// Register backend.
+	_ "gioui.org/gpu/gl"
 )
 
 type GPU interface {
@@ -380,14 +383,18 @@ const (
 	materialTexture
 )
 
-func New(ctx backend.Device) (GPU, error) {
+func New(api API) (GPU, error) {
+	d, err := backend.NewDevice(api)
+	if err != nil {
+		return nil, err
+	}
 	forceCompute := os.Getenv("GIORENDERER") == "forcecompute"
-	feats := ctx.Caps().Features
+	feats := d.Caps().Features
 	switch {
 	case !forceCompute && feats.Has(backend.FeatureFloatRenderTargets):
-		return newGPU(ctx)
+		return newGPU(d)
 	case feats.Has(backend.FeatureCompute):
-		return newCompute(ctx)
+		return newCompute(d)
 	default:
 		return nil, errors.New("gpu: no support for float render targets nor compute")
 	}

@@ -123,12 +123,12 @@ const (
 	storageBindings = 32
 )
 
-// NewBackend returns a new Backend.
-//
-// Pass a WebGL context if GOOS is "js", otherwise pass nil for the current
-// context.
-func NewBackend(ctx Context) (*Backend, error) {
-	f, err := glimpl.NewFunctions(ctx)
+func init() {
+	backend.NewOpenGLDevice = newOpenGLDevice
+}
+
+func newOpenGLDevice(api backend.OpenGL) (backend.Device, error) {
+	f, err := glimpl.NewFunctions(api.Context)
 	if err != nil {
 		return nil, err
 	}

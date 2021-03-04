@@ -3,8 +3,10 @@
 package headless
 
 import (
+	"unsafe"
+
+	"gioui.org/gpu"
 	"gioui.org/app/internal/d3d11"
-	"gioui.org/gpu/backend"
 )
 
 type d3d11Context struct {
@@ -19,12 +21,8 @@ func newContext() (context, error) {
 	return &d3d11Context{dev: dev}, nil
 }
 
-func (c *d3d11Context) Backend() (backend.Device, error) {
-	backend, err := d3d11.NewBackend(c.dev.Handle)
-	if err != nil {
-		return nil, err
-	}
-	return backend, nil
+func (c *d3d11Context) API() gpu.API {
+	return gpu.Direct3D11{Device: unsafe.Pointer(c.dev.Handle)}
 }
 
 func (c *d3d11Context) MakeCurrent() error {

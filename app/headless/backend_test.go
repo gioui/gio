@@ -170,7 +170,7 @@ func newBackend(t *testing.T) backend.Device {
 	if err := ctx.MakeCurrent(); err != nil {
 		t.Fatal(err)
 	}
-	b, err := ctx.Backend()
+	b, err := backend.NewDevice(ctx.API())
 	if err != nil {
 		t.Fatal(err)
 	}

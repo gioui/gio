@@ -25,7 +25,7 @@ type Window struct {
 }
 
 type context interface {
-	Backend() (backend.Device, error)
+	API() gpu.API
 	MakeCurrent() error
 	ReleaseCurrent()
 	Release()
@@ -42,7 +42,8 @@ func NewWindow(width, height int) (*Window, error) {
 		ctx:  ctx,
 	}
 	err = contextDo(ctx, func() error {
-		dev, err := ctx.Backend()
+		api := ctx.API()
+		dev, err := backend.NewDevice(api)
 		if err != nil {
 			return err
 		}
@@ -62,7 +63,7 @@ func NewWindow(width, height int) (*Window, error) {
 			fboTex.Release()
 			return err
 		}
-		gp, err := gpu.New(dev)
+		gp, err := gpu.New(api)
 		if err != nil {
 			fbo.Release()
 			fboTex.Release()

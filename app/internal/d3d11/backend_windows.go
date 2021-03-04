@@ -109,6 +109,10 @@ type SwapChain struct {
 	fbo     *Framebuffer
 }
 
+func init() {
+	backend.NewDirect3D11Device = newDirect3D11Device
+}
+
 func NewDevice() (*Device, error) {
 	var flags uint32
 	if debug {
@@ -237,7 +241,8 @@ func (s *SwapChain) Present() error {
 	return s.swchain.Present(1, 0)
 }
 
-func NewBackend(dev *_ID3D11Device) (*Backend, error) {
+func newDirect3D11Device(api backend.Direct3D11) (backend.Device, error) {
+	dev := (*_ID3D11Device)(api.Device)
 	b := &Backend{
 		dev: dev,
 		ctx: dev.GetImmediateContext(),

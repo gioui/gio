@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: Unlicense OR MIT
+
+package gpu
+
+import "gioui.org/gpu/backend"
+
+// An API carries the necessary GPU API specific resources to create a Device.
+// There is an API type for each supported GPU API such as OpenGL and Direct3D.
+type API = backend.API
+
+// OpenGL denotes the OpenGL or OpenGL ES API.
+type OpenGL = backend.OpenGL
+
+// Direct3D11 denotes the Direct3D API.
+type Direct3D11 = backend.Direct3D11

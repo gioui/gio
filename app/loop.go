@@ -67,12 +67,7 @@ func (l *renderLoop) renderLoop(ctx window.Context) error {
 			initErr <- err
 			return
 		}
-		b, err := ctx.Backend()
-		if err != nil {
-			initErr <- err
-			return
-		}
-		g, err := gpu.New(b)
+		g, err := gpu.New(ctx.API())
 		if err != nil {
 			initErr <- err
 			return
