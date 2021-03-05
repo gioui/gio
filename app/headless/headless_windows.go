@@ -7,8 +7,6 @@ import (
 
 	"gioui.org/gpu"
 	"gioui.org/internal/d3d11"
-
-	_ "gioui.org/app/internal/d3d11"
 )
 
 type d3d11Context struct {

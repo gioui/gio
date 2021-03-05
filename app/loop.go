@@ -10,8 +10,6 @@ import (
 	"gioui.org/app/internal/window"
 	"gioui.org/gpu"
 	"gioui.org/op"
-
-	_ "gioui.org/app/internal/d3d11"
 )
 
 type renderLoop struct {
