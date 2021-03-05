@@ -2,4 +2,4 @@
 
 package headless
 
-//go:generate go run ../../internal/cmd/convertshaders -package headless
+//go:generate go run ../internal/convertshaders -package headless
