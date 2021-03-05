@@ -6,9 +6,9 @@ import (
 	"math"
 	"testing"
 
-	"gioui.org/app/headless"
 	"gioui.org/f32"
 	"gioui.org/font/gofont"
+	"gioui.org/gpu/headless"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"

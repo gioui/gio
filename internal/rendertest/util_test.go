@@ -17,8 +17,8 @@ import (
 
 	"golang.org/x/image/colornames"
 
-	"gioui.org/app/headless"
 	"gioui.org/f32"
+	"gioui.org/gpu/headless"
 	"gioui.org/internal/f32color"
 	"gioui.org/op"
 	"gioui.org/op/paint"
