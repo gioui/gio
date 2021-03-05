@@ -13,9 +13,9 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-type _DXGI_SWAP_CHAIN_DESC struct {
-	BufferDesc   _DXGI_MODE_DESC
-	SampleDesc   _DXGI_SAMPLE_DESC
+type DXGI_SWAP_CHAIN_DESC struct {
+	BufferDesc   DXGI_MODE_DESC
+	SampleDesc   DXGI_SAMPLE_DESC
 	BufferUsage  uint32
 	BufferCount  uint32
 	OutputWindow windows.Handle
@@ -24,39 +24,39 @@ type _DXGI_SWAP_CHAIN_DESC struct {
 	Flags        uint32
 }
 
-type _DXGI_SAMPLE_DESC struct {
+type DXGI_SAMPLE_DESC struct {
 	Count   uint32
 	Quality uint32
 }
 
-type _DXGI_MODE_DESC struct {
+type DXGI_MODE_DESC struct {
 	Width            uint32
 	Height           uint32
-	RefreshRate      _DXGI_RATIONAL
+	RefreshRate      DXGI_RATIONAL
 	Format           uint32
 	ScanlineOrdering uint32
 	Scaling          uint32
 }
 
-type _DXGI_RATIONAL struct {
+type DXGI_RATIONAL struct {
 	Numerator   uint32
 	Denominator uint32
 }
 
-type _D3D11_TEXTURE2D_DESC struct {
+type TEXTURE2D_DESC struct {
 	Width          uint32
 	Height         uint32
 	MipLevels      uint32
 	ArraySize      uint32
 	Format         uint32
-	SampleDesc     _DXGI_SAMPLE_DESC
+	SampleDesc     DXGI_SAMPLE_DESC
 	Usage          uint32
 	BindFlags      uint32
 	CPUAccessFlags uint32
 	MiscFlags      uint32
 }
 
-type _D3D11_SAMPLER_DESC struct {
+type SAMPLER_DESC struct {
 	Filter         uint32
 	AddressU       uint32
 	AddressV       uint32
@@ -69,22 +69,22 @@ type _D3D11_SAMPLER_DESC struct {
 	MaxLOD         float32
 }
 
-type _D3D11_SHADER_RESOURCE_VIEW_DESC_TEX2D struct {
-	_D3D11_SHADER_RESOURCE_VIEW_DESC
-	Texture2D _D3D11_TEX2D_SRV
+type SHADER_RESOURCE_VIEW_DESC_TEX2D struct {
+	SHADER_RESOURCE_VIEW_DESC
+	Texture2D TEX2D_SRV
 }
 
-type _D3D11_SHADER_RESOURCE_VIEW_DESC struct {
+type SHADER_RESOURCE_VIEW_DESC struct {
 	Format        uint32
 	ViewDimension uint32
 }
 
-type _D3D11_TEX2D_SRV struct {
+type TEX2D_SRV struct {
 	MostDetailedMip uint32
 	MipLevels       uint32
 }
 
-type _D3D11_INPUT_ELEMENT_DESC struct {
+type INPUT_ELEMENT_DESC struct {
 	SemanticName         *byte
 	SemanticIndex        uint32
 	Format               uint32
@@ -94,8 +94,8 @@ type _D3D11_INPUT_ELEMENT_DESC struct {
 	InstanceDataStepRate uint32
 }
 
-type _IDXGISwapChain struct {
-	vtbl *struct {
+type IDXGISwapChain struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 		SetPrivateData          uintptr
 		SetPrivateDataInterface uintptr
@@ -115,8 +115,8 @@ type _IDXGISwapChain struct {
 	}
 }
 
-type _ID3D11Device struct {
-	vtbl *struct {
+type Device struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 		CreateBuffer                         uintptr
 		CreateTexture1D                      uintptr
@@ -161,8 +161,8 @@ type _ID3D11Device struct {
 	}
 }
 
-type _ID3D11DeviceContext struct {
-	vtbl *struct {
+type DeviceContext struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 		GetDevice                                 uintptr
 		GetPrivateData                            uintptr
@@ -279,122 +279,122 @@ type _ID3D11DeviceContext struct {
 	}
 }
 
-type _ID3D11RenderTargetView struct {
-	vtbl *struct {
+type RenderTargetView struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 	}
 }
 
-type _ID3D11Resource struct {
-	vtbl *struct {
+type Resource struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 	}
 }
 
-type _ID3D11Texture2D struct {
-	vtbl *struct {
+type Texture2D struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 	}
 }
 
-type _ID3D11Buffer struct {
-	vtbl *struct {
+type Buffer struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 	}
 }
 
-type _ID3D11SamplerState struct {
-	vtbl *struct {
+type SamplerState struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 	}
 }
 
-type _ID3D11PixelShader struct {
-	vtbl *struct {
+type PixelShader struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 	}
 }
 
-type _ID3D11ShaderResourceView struct {
-	vtbl *struct {
+type ShaderResourceView struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 	}
 }
 
-type _ID3D11DepthStencilView struct {
-	vtbl *struct {
+type DepthStencilView struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 	}
 }
 
-type _ID3D11BlendState struct {
-	vtbl *struct {
+type BlendState struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 	}
 }
 
-type _ID3D11DepthStencilState struct {
-	vtbl *struct {
+type DepthStencilState struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 	}
 }
 
-type _ID3D11VertexShader struct {
-	vtbl *struct {
+type VertexShader struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 	}
 }
 
-type _ID3D11RasterizerState struct {
-	vtbl *struct {
+type RasterizerState struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 	}
 }
 
-type _ID3D11InputLayout struct {
-	vtbl *struct {
+type InputLayout struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 		GetBufferPointer uintptr
 		GetBufferSize    uintptr
 	}
 }
 
-type _D3D11_DEPTH_STENCIL_DESC struct {
+type DEPTH_STENCIL_DESC struct {
 	DepthEnable      uint32
 	DepthWriteMask   uint32
 	DepthFunc        uint32
 	StencilEnable    uint32
 	StencilReadMask  uint8
 	StencilWriteMask uint8
-	FrontFace        _D3D11_DEPTH_STENCILOP_DESC
-	BackFace         _D3D11_DEPTH_STENCILOP_DESC
+	FrontFace        DEPTH_STENCILOP_DESC
+	BackFace         DEPTH_STENCILOP_DESC
 }
 
-type _D3D11_DEPTH_STENCILOP_DESC struct {
+type DEPTH_STENCILOP_DESC struct {
 	StencilFailOp      uint32
 	StencilDepthFailOp uint32
 	StencilPassOp      uint32
 	StencilFunc        uint32
 }
 
-type _D3D11_DEPTH_STENCIL_VIEW_DESC_TEX2D struct {
+type DEPTH_STENCIL_VIEW_DESC_TEX2D struct {
 	Format        uint32
 	ViewDimension uint32
 	Flags         uint32
-	Texture2D     _D3D11_TEX2D_DSV
+	Texture2D     TEX2D_DSV
 }
 
-type _D3D11_TEX2D_DSV struct {
+type TEX2D_DSV struct {
 	MipSlice uint32
 }
 
-type _D3D11_BLEND_DESC struct {
+type BLEND_DESC struct {
 	AlphaToCoverageEnable  uint32
 	IndependentBlendEnable uint32
-	RenderTarget           [8]_D3D11_RENDER_TARGET_BLEND_DESC
+	RenderTarget           [8]RENDER_TARGET_BLEND_DESC
 }
 
-type _D3D11_RENDER_TARGET_BLEND_DESC struct {
+type RENDER_TARGET_BLEND_DESC struct {
 	BlendEnable           uint32
 	SrcBlend              uint32
 	DestBlend             uint32
@@ -405,8 +405,8 @@ type _D3D11_RENDER_TARGET_BLEND_DESC struct {
 	RenderTargetWriteMask uint8
 }
 
-type _IDXGIObject struct {
-	vtbl *struct {
+type IDXGIObject struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 		SetPrivateData          uintptr
 		SetPrivateDataInterface uintptr
@@ -415,8 +415,8 @@ type _IDXGIObject struct {
 	}
 }
 
-type _IDXGIAdapter struct {
-	vtbl *struct {
+type IDXGIAdapter struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 		SetPrivateData          uintptr
 		SetPrivateDataInterface uintptr
@@ -429,8 +429,8 @@ type _IDXGIAdapter struct {
 	}
 }
 
-type _IDXGIFactory struct {
-	vtbl *struct {
+type IDXGIFactory struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 		SetPrivateData          uintptr
 		SetPrivateDataInterface uintptr
@@ -444,8 +444,8 @@ type _IDXGIFactory struct {
 	}
 }
 
-type _IDXGIDevice struct {
-	vtbl *struct {
+type IDXGIDevice struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 		SetPrivateData          uintptr
 		SetPrivateDataInterface uintptr
@@ -459,8 +459,8 @@ type _IDXGIDevice struct {
 	}
 }
 
-type _IUnknown struct {
-	vtbl *struct {
+type IUnknown struct {
+	Vtbl *struct {
 		_IUnknownVTbl
 	}
 }
@@ -471,7 +471,7 @@ type _IUnknownVTbl struct {
 	Release        uintptr
 }
 
-type _D3D11_BUFFER_DESC struct {
+type BUFFER_DESC struct {
 	ByteWidth           uint32
 	Usage               uint32
 	BindFlags           uint32
@@ -480,7 +480,7 @@ type _D3D11_BUFFER_DESC struct {
 	StructureByteStride uint32
 }
 
-type _GUID struct {
+type GUID struct {
 	Data1   uint32
 	Data2   uint16
 	Data3   uint16
@@ -494,7 +494,7 @@ type _GUID struct {
 	Data4_7 uint8
 }
 
-type _D3D11_VIEWPORT struct {
+type VIEWPORT struct {
 	TopLeftX float32
 	TopLeftY float32
 	Width    float32
@@ -503,21 +503,21 @@ type _D3D11_VIEWPORT struct {
 	MaxDepth float32
 }
 
-type _D3D11_SUBRESOURCE_DATA struct {
+type SUBRESOURCE_DATA struct {
 	pSysMem *byte
 }
 
-type _D3D11_BOX struct {
-	left   uint32
-	top    uint32
-	front  uint32
-	right  uint32
-	bottom uint32
-	back   uint32
+type BOX struct {
+	Left   uint32
+	Top    uint32
+	Front  uint32
+	Right  uint32
+	Bottom uint32
+	Back   uint32
 }
 
-type _D3D11_MAPPED_SUBRESOURCE struct {
-	pData      uintptr
+type MAPPED_SUBRESOURCE struct {
+	PData      uintptr
 	RowPitch   uint32
 	DepthPitch uint32
 }
@@ -527,7 +527,7 @@ type ErrorCode struct {
 	Code uint32
 }
 
-type _D3D11_RASTERIZER_DESC struct {
+type RASTERIZER_DESC struct {
 	FillMode              uint32
 	CullMode              uint32
 	FrontCounterClockwise uint32
@@ -541,97 +541,97 @@ type _D3D11_RASTERIZER_DESC struct {
 }
 
 var (
-	_IID_ID3D11Texture2D = _GUID{0x6f15aaf2, 0xd208, 0x4e89, 0x9a, 0xb4, 0x48, 0x95, 0x35, 0xd3, 0x4f, 0x9c}
-	_IID_IDXGIDevice     = _GUID{0x54ec77fa, 0x1377, 0x44e6, 0x8c, 0x32, 0x88, 0xfd, 0x5f, 0x44, 0xc8, 0x4c}
-	_IID_IDXGIFactory    = _GUID{0x7b7166ec, 0x21c7, 0x44ae, 0xb2, 0x1a, 0xc9, 0xae, 0x32, 0x1a, 0xe3, 0x69}
+	IID_Texture2D    = GUID{0x6f15aaf2, 0xd208, 0x4e89, 0x9a, 0xb4, 0x48, 0x95, 0x35, 0xd3, 0x4f, 0x9c}
+	IID_IDXGIDevice  = GUID{0x54ec77fa, 0x1377, 0x44e6, 0x8c, 0x32, 0x88, 0xfd, 0x5f, 0x44, 0xc8, 0x4c}
+	IID_IDXGIFactory = GUID{0x7b7166ec, 0x21c7, 0x44ae, 0xb2, 0x1a, 0xc9, 0xae, 0x32, 0x1a, 0xe3, 0x69}
 )
 
 var (
 	d3d11 = windows.NewLazySystemDLL("d3d11.dll")
 
-	__D3D11CreateDevice             = d3d11.NewProc("D3D11CreateDevice")
-	__D3D11CreateDeviceAndSwapChain = d3d11.NewProc("D3D11CreateDeviceAndSwapChain")
+	_D3D11CreateDevice             = d3d11.NewProc("D3D11CreateDevice")
+	_D3D11CreateDeviceAndSwapChain = d3d11.NewProc("D3D11CreateDeviceAndSwapChain")
 )
 
 const (
-	_D3D11_SDK_VERSION        = 7
-	_D3D_DRIVER_TYPE_HARDWARE = 1
+	SDK_VERSION          = 7
+	DRIVER_TYPE_HARDWARE = 1
 
-	_DXGI_FORMAT_UNKNOWN             = 0
-	_DXGI_FORMAT_R16_FLOAT           = 54
-	_DXGI_FORMAT_R32_FLOAT           = 41
-	_DXGI_FORMAT_R32G32_FLOAT        = 16
-	_DXGI_FORMAT_R32G32B32_FLOAT     = 6
-	_DXGI_FORMAT_R32G32B32A32_FLOAT  = 2
-	_DXGI_FORMAT_R8G8B8A8_UNORM_SRGB = 29
-	_DXGI_FORMAT_R16_SINT            = 59
-	_DXGI_FORMAT_R16G16_SINT         = 38
-	_DXGI_FORMAT_R16_UINT            = 57
-	_DXGI_FORMAT_D24_UNORM_S8_UINT   = 45
-	_DXGI_FORMAT_R16G16_FLOAT        = 34
-	_DXGI_FORMAT_R16G16B16A16_FLOAT  = 10
+	DXGI_FORMAT_UNKNOWN             = 0
+	DXGI_FORMAT_R16_FLOAT           = 54
+	DXGI_FORMAT_R32_FLOAT           = 41
+	DXGI_FORMAT_R32G32_FLOAT        = 16
+	DXGI_FORMAT_R32G32B32_FLOAT     = 6
+	DXGI_FORMAT_R32G32B32A32_FLOAT  = 2
+	DXGI_FORMAT_R8G8B8A8_UNORM_SRGB = 29
+	DXGI_FORMAT_R16_SINT            = 59
+	DXGI_FORMAT_R16G16_SINT         = 38
+	DXGI_FORMAT_R16_UINT            = 57
+	DXGI_FORMAT_D24_UNORM_S8_UINT   = 45
+	DXGI_FORMAT_R16G16_FLOAT        = 34
+	DXGI_FORMAT_R16G16B16A16_FLOAT  = 10
 
-	_D3D11_FORMAT_SUPPORT_TEXTURE2D     = 0x20
-	_D3D11_FORMAT_SUPPORT_RENDER_TARGET = 0x4000
+	FORMAT_SUPPORT_TEXTURE2D     = 0x20
+	FORMAT_SUPPORT_RENDER_TARGET = 0x4000
 
-	_DXGI_USAGE_RENDER_TARGET_OUTPUT = 1 << (1 + 4)
+	DXGI_USAGE_RENDER_TARGET_OUTPUT = 1 << (1 + 4)
 
-	_D3D11_CPU_ACCESS_READ = 0x20000
+	CPU_ACCESS_READ = 0x20000
 
-	_D3D11_MAP_READ = 1
+	MAP_READ = 1
 
-	_DXGI_SWAP_EFFECT_DISCARD = 0
+	DXGI_SWAP_EFFECT_DISCARD = 0
 
-	_D3D_FEATURE_LEVEL_9_1  = 0x9100
-	_D3D_FEATURE_LEVEL_9_3  = 0x9300
-	_D3D_FEATURE_LEVEL_11_0 = 0xb000
+	FEATURE_LEVEL_9_1  = 0x9100
+	FEATURE_LEVEL_9_3  = 0x9300
+	FEATURE_LEVEL_11_0 = 0xb000
 
-	_D3D11_USAGE_IMMUTABLE = 1
-	_D3D11_USAGE_STAGING   = 3
+	USAGE_IMMUTABLE = 1
+	USAGE_STAGING   = 3
 
-	_D3D11_BIND_VERTEX_BUFFER   = 0x1
-	_D3D11_BIND_INDEX_BUFFER    = 0x2
-	_D3D11_BIND_CONSTANT_BUFFER = 0x4
-	_D3D11_BIND_SHADER_RESOURCE = 0x8
-	_D3D11_BIND_RENDER_TARGET   = 0x20
-	_D3D11_BIND_DEPTH_STENCIL   = 0x40
+	BIND_VERTEX_BUFFER   = 0x1
+	BIND_INDEX_BUFFER    = 0x2
+	BIND_CONSTANT_BUFFER = 0x4
+	BIND_SHADER_RESOURCE = 0x8
+	BIND_RENDER_TARGET   = 0x20
+	BIND_DEPTH_STENCIL   = 0x40
 
-	_D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST  = 4
-	_D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP = 5
+	PRIMITIVE_TOPOLOGY_TRIANGLELIST  = 4
+	PRIMITIVE_TOPOLOGY_TRIANGLESTRIP = 5
 
-	_D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT = 0x14
-	_D3D11_FILTER_MIN_MAG_MIP_POINT        = 0
+	FILTER_MIN_MAG_LINEAR_MIP_POINT = 0x14
+	FILTER_MIN_MAG_MIP_POINT        = 0
 
-	_D3D11_TEXTURE_ADDRESS_MIRROR = 2
-	_D3D11_TEXTURE_ADDRESS_CLAMP  = 3
-	_D3D11_TEXTURE_ADDRESS_WRAP   = 1
+	TEXTURE_ADDRESS_MIRROR = 2
+	TEXTURE_ADDRESS_CLAMP  = 3
+	TEXTURE_ADDRESS_WRAP   = 1
 
-	_D3D11_SRV_DIMENSION_TEXTURE2D = 4
+	SRV_DIMENSION_TEXTURE2D = 4
 
-	_D3D11_CREATE_DEVICE_DEBUG = 0x2
+	CREATE_DEVICE_DEBUG = 0x2
 
-	_D3D11_FILL_SOLID = 3
+	FILL_SOLID = 3
 
-	_D3D11_CULL_NONE = 1
+	CULL_NONE = 1
 
-	_D3D11_CLEAR_DEPTH   = 0x1
-	_D3D11_CLEAR_STENCIL = 0x2
+	CLEAR_DEPTH   = 0x1
+	CLEAR_STENCIL = 0x2
 
-	_D3D11_DSV_DIMENSION_TEXTURE2D = 3
+	DSV_DIMENSION_TEXTURE2D = 3
 
-	_D3D11_DEPTH_WRITE_MASK_ALL = 1
+	DEPTH_WRITE_MASK_ALL = 1
 
-	_D3D11_COMPARISON_GREATER       = 5
-	_D3D11_COMPARISON_GREATER_EQUAL = 7
+	COMPARISON_GREATER       = 5
+	COMPARISON_GREATER_EQUAL = 7
 
-	_D3D11_BLEND_OP_ADD        = 1
-	_D3D11_BLEND_ONE           = 2
-	_D3D11_BLEND_INV_SRC_ALPHA = 6
-	_D3D11_BLEND_ZERO          = 1
-	_D3D11_BLEND_DEST_COLOR    = 9
-	_D3D11_BLEND_DEST_ALPHA    = 7
+	BLEND_OP_ADD        = 1
+	BLEND_ONE           = 2
+	BLEND_INV_SRC_ALPHA = 6
+	BLEND_ZERO          = 1
+	BLEND_DEST_COLOR    = 9
+	BLEND_DEST_ALPHA    = 7
 
-	_D3D11_COLOR_WRITE_ENABLE_ALL = 1 | 2 | 4 | 8
+	COLOR_WRITE_ENABLE_ALL = 1 | 2 | 4 | 8
 
 	DXGI_STATUS_OCCLUDED      = 0x087A0001
 	DXGI_ERROR_DEVICE_RESET   = 0x887A0007
@@ -639,20 +639,20 @@ const (
 	D3DDDIERR_DEVICEREMOVED   = 1<<31 | 0x876<<16 | 2160
 )
 
-func _D3D11CreateDevice(driverType uint32, flags uint32) (*_ID3D11Device, *_ID3D11DeviceContext, uint32, error) {
+func CreateDevice(driverType uint32, flags uint32) (*Device, *DeviceContext, uint32, error) {
 	var (
-		dev     *_ID3D11Device
-		ctx     *_ID3D11DeviceContext
+		dev     *Device
+		ctx     *DeviceContext
 		featLvl uint32
 	)
-	r, _, _ := __D3D11CreateDevice.Call(
+	r, _, _ := _D3D11CreateDevice.Call(
 		0,                                 // pAdapter
 		uintptr(driverType),               // driverType
 		0,                                 // Software
 		uintptr(flags),                    // Flags
 		0,                                 // pFeatureLevels
 		0,                                 // FeatureLevels
-		_D3D11_SDK_VERSION,                // SDKVersion
+		SDK_VERSION,                       // SDKVersion
 		uintptr(unsafe.Pointer(&dev)),     // ppDevice
 		uintptr(unsafe.Pointer(&featLvl)), // pFeatureLevel
 		uintptr(unsafe.Pointer(&ctx)),     // ppImmediateContext
@@ -663,21 +663,21 @@ func _D3D11CreateDevice(driverType uint32, flags uint32) (*_ID3D11Device, *_ID3D
 	return dev, ctx, featLvl, nil
 }
 
-func _D3D11CreateDeviceAndSwapChain(driverType uint32, flags uint32, swapDesc *_DXGI_SWAP_CHAIN_DESC) (*_ID3D11Device, *_ID3D11DeviceContext, *_IDXGISwapChain, uint32, error) {
+func CreateDeviceAndSwapChain(driverType uint32, flags uint32, swapDesc *DXGI_SWAP_CHAIN_DESC) (*Device, *DeviceContext, *IDXGISwapChain, uint32, error) {
 	var (
-		dev     *_ID3D11Device
-		ctx     *_ID3D11DeviceContext
-		swchain *_IDXGISwapChain
+		dev     *Device
+		ctx     *DeviceContext
+		swchain *IDXGISwapChain
 		featLvl uint32
 	)
-	r, _, _ := __D3D11CreateDeviceAndSwapChain.Call(
+	r, _, _ := _D3D11CreateDeviceAndSwapChain.Call(
 		0,                                 // pAdapter
 		uintptr(driverType),               // driverType
 		0,                                 // Software
 		uintptr(flags),                    // Flags
 		0,                                 // pFeatureLevels
 		0,                                 // FeatureLevels
-		_D3D11_SDK_VERSION,                // SDKVersion
+		SDK_VERSION,                       // SDKVersion
 		uintptr(unsafe.Pointer(swapDesc)), // pSwapChainDesc
 		uintptr(unsafe.Pointer(&swchain)), // ppSwapChain
 		uintptr(unsafe.Pointer(&dev)),     // ppDevice
@@ -690,31 +690,31 @@ func _D3D11CreateDeviceAndSwapChain(driverType uint32, flags uint32, swapDesc *_
 	return dev, ctx, swchain, featLvl, nil
 }
 
-func (d *_ID3D11Device) CheckFormatSupport(format uint32) (uint32, error) {
+func (d *Device) CheckFormatSupport(format uint32) (uint32, error) {
 	var support uint32
 	r, _, _ := syscall.Syscall(
-		d.vtbl.CheckFormatSupport,
+		d.Vtbl.CheckFormatSupport,
 		3,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(format),
 		uintptr(unsafe.Pointer(&support)),
 	)
 	if r != 0 {
-		return 0, ErrorCode{Name: "ID3D11DeviceCheckFormatSupport", Code: uint32(r)}
+		return 0, ErrorCode{Name: "DeviceCheckFormatSupport", Code: uint32(r)}
 	}
 	return support, nil
 }
 
-func (d *_ID3D11Device) CreateBuffer(desc *_D3D11_BUFFER_DESC, data []byte) (*_ID3D11Buffer, error) {
-	var dataDesc *_D3D11_SUBRESOURCE_DATA
+func (d *Device) CreateBuffer(desc *BUFFER_DESC, data []byte) (*Buffer, error) {
+	var dataDesc *SUBRESOURCE_DATA
 	if len(data) > 0 {
-		dataDesc = &_D3D11_SUBRESOURCE_DATA{
+		dataDesc = &SUBRESOURCE_DATA{
 			pSysMem: &data[0],
 		}
 	}
-	var buf *_ID3D11Buffer
+	var buf *Buffer
 	r, _, _ := syscall.Syscall6(
-		d.vtbl.CreateBuffer,
+		d.Vtbl.CreateBuffer,
 		4,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(desc)),
@@ -723,15 +723,15 @@ func (d *_ID3D11Device) CreateBuffer(desc *_D3D11_BUFFER_DESC, data []byte) (*_I
 		0, 0,
 	)
 	if r != 0 {
-		return nil, ErrorCode{Name: "ID3D11DeviceCreateBuffer", Code: uint32(r)}
+		return nil, ErrorCode{Name: "DeviceCreateBuffer", Code: uint32(r)}
 	}
 	return buf, nil
 }
 
-func (d *_ID3D11Device) CreateDepthStencilViewTEX2D(res *_ID3D11Resource, desc *_D3D11_DEPTH_STENCIL_VIEW_DESC_TEX2D) (*_ID3D11DepthStencilView, error) {
-	var view *_ID3D11DepthStencilView
+func (d *Device) CreateDepthStencilViewTEX2D(res *Resource, desc *DEPTH_STENCIL_VIEW_DESC_TEX2D) (*DepthStencilView, error) {
+	var view *DepthStencilView
 	r, _, _ := syscall.Syscall6(
-		d.vtbl.CreateDepthStencilView,
+		d.Vtbl.CreateDepthStencilView,
 		4,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(res)),
@@ -740,15 +740,15 @@ func (d *_ID3D11Device) CreateDepthStencilViewTEX2D(res *_ID3D11Resource, desc *
 		0, 0,
 	)
 	if r != 0 {
-		return nil, ErrorCode{Name: "ID3D11DeviceCreateDepthStencilView", Code: uint32(r)}
+		return nil, ErrorCode{Name: "DeviceCreateDepthStencilView", Code: uint32(r)}
 	}
 	return view, nil
 }
 
-func (d *_ID3D11Device) CreatePixelShader(bytecode []byte) (*_ID3D11PixelShader, error) {
-	var shader *_ID3D11PixelShader
+func (d *Device) CreatePixelShader(bytecode []byte) (*PixelShader, error) {
+	var shader *PixelShader
 	r, _, _ := syscall.Syscall6(
-		d.vtbl.CreatePixelShader,
+		d.Vtbl.CreatePixelShader,
 		5,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(&bytecode[0])),
@@ -758,15 +758,15 @@ func (d *_ID3D11Device) CreatePixelShader(bytecode []byte) (*_ID3D11PixelShader,
 		0,
 	)
 	if r != 0 {
-		return nil, ErrorCode{Name: "ID3D11DeviceCreatePixelShader", Code: uint32(r)}
+		return nil, ErrorCode{Name: "DeviceCreatePixelShader", Code: uint32(r)}
 	}
 	return shader, nil
 }
 
-func (d *_ID3D11Device) CreateVertexShader(bytecode []byte) (*_ID3D11VertexShader, error) {
-	var shader *_ID3D11VertexShader
+func (d *Device) CreateVertexShader(bytecode []byte) (*VertexShader, error) {
+	var shader *VertexShader
 	r, _, _ := syscall.Syscall6(
-		d.vtbl.CreateVertexShader,
+		d.Vtbl.CreateVertexShader,
 		5,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(&bytecode[0])),
@@ -776,15 +776,15 @@ func (d *_ID3D11Device) CreateVertexShader(bytecode []byte) (*_ID3D11VertexShade
 		0,
 	)
 	if r != 0 {
-		return nil, ErrorCode{Name: "ID3D11DeviceCreateVertexShader", Code: uint32(r)}
+		return nil, ErrorCode{Name: "DeviceCreateVertexShader", Code: uint32(r)}
 	}
 	return shader, nil
 }
 
-func (d *_ID3D11Device) CreateShaderResourceViewTEX2D(res *_ID3D11Resource, desc *_D3D11_SHADER_RESOURCE_VIEW_DESC_TEX2D) (*_ID3D11ShaderResourceView, error) {
-	var resView *_ID3D11ShaderResourceView
+func (d *Device) CreateShaderResourceViewTEX2D(res *Resource, desc *SHADER_RESOURCE_VIEW_DESC_TEX2D) (*ShaderResourceView, error) {
+	var resView *ShaderResourceView
 	r, _, _ := syscall.Syscall6(
-		d.vtbl.CreateShaderResourceView,
+		d.Vtbl.CreateShaderResourceView,
 		4,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(res)),
@@ -793,34 +793,34 @@ func (d *_ID3D11Device) CreateShaderResourceViewTEX2D(res *_ID3D11Resource, desc
 		0, 0,
 	)
 	if r != 0 {
-		return nil, ErrorCode{Name: "ID3D11DeviceCreateShaderResourceView", Code: uint32(r)}
+		return nil, ErrorCode{Name: "DeviceCreateShaderResourceView", Code: uint32(r)}
 	}
 	return resView, nil
 }
 
-func (d *_ID3D11Device) CreateRasterizerState(desc *_D3D11_RASTERIZER_DESC) (*_ID3D11RasterizerState, error) {
-	var state *_ID3D11RasterizerState
+func (d *Device) CreateRasterizerState(desc *RASTERIZER_DESC) (*RasterizerState, error) {
+	var state *RasterizerState
 	r, _, _ := syscall.Syscall(
-		d.vtbl.CreateRasterizerState,
+		d.Vtbl.CreateRasterizerState,
 		3,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(desc)),
 		uintptr(unsafe.Pointer(&state)),
 	)
 	if r != 0 {
-		return nil, ErrorCode{Name: "ID3D11DeviceCreateRasterizerState", Code: uint32(r)}
+		return nil, ErrorCode{Name: "DeviceCreateRasterizerState", Code: uint32(r)}
 	}
 	return state, nil
 }
 
-func (d *_ID3D11Device) CreateInputLayout(descs []_D3D11_INPUT_ELEMENT_DESC, bytecode []byte) (*_ID3D11InputLayout, error) {
-	var pdesc *_D3D11_INPUT_ELEMENT_DESC
+func (d *Device) CreateInputLayout(descs []INPUT_ELEMENT_DESC, bytecode []byte) (*InputLayout, error) {
+	var pdesc *INPUT_ELEMENT_DESC
 	if len(descs) > 0 {
 		pdesc = &descs[0]
 	}
-	var layout *_ID3D11InputLayout
+	var layout *InputLayout
 	r, _, _ := syscall.Syscall6(
-		d.vtbl.CreateInputLayout,
+		d.Vtbl.CreateInputLayout,
 		6,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(pdesc)),
@@ -830,30 +830,30 @@ func (d *_ID3D11Device) CreateInputLayout(descs []_D3D11_INPUT_ELEMENT_DESC, byt
 		uintptr(unsafe.Pointer(&layout)),
 	)
 	if r != 0 {
-		return nil, ErrorCode{Name: "ID3D11DeviceCreateInputLayout", Code: uint32(r)}
+		return nil, ErrorCode{Name: "DeviceCreateInputLayout", Code: uint32(r)}
 	}
 	return layout, nil
 }
 
-func (d *_ID3D11Device) CreateSamplerState(desc *_D3D11_SAMPLER_DESC) (*_ID3D11SamplerState, error) {
-	var sampler *_ID3D11SamplerState
+func (d *Device) CreateSamplerState(desc *SAMPLER_DESC) (*SamplerState, error) {
+	var sampler *SamplerState
 	r, _, _ := syscall.Syscall(
-		d.vtbl.CreateSamplerState,
+		d.Vtbl.CreateSamplerState,
 		3,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(desc)),
 		uintptr(unsafe.Pointer(&sampler)),
 	)
 	if r != 0 {
-		return nil, ErrorCode{Name: "ID3D11DeviceCreateSamplerState", Code: uint32(r)}
+		return nil, ErrorCode{Name: "DeviceCreateSamplerState", Code: uint32(r)}
 	}
 	return sampler, nil
 }
 
-func (d *_ID3D11Device) CreateTexture2D(desc *_D3D11_TEXTURE2D_DESC) (*_ID3D11Texture2D, error) {
-	var tex *_ID3D11Texture2D
+func (d *Device) CreateTexture2D(desc *TEXTURE2D_DESC) (*Texture2D, error) {
+	var tex *Texture2D
 	r, _, _ := syscall.Syscall6(
-		d.vtbl.CreateTexture2D,
+		d.Vtbl.CreateTexture2D,
 		4,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(desc)),
@@ -862,15 +862,15 @@ func (d *_ID3D11Device) CreateTexture2D(desc *_D3D11_TEXTURE2D_DESC) (*_ID3D11Te
 		0, 0,
 	)
 	if r != 0 {
-		return nil, ErrorCode{Name: "ID3D11CreateTexture2D", Code: uint32(r)}
+		return nil, ErrorCode{Name: "CreateTexture2D", Code: uint32(r)}
 	}
 	return tex, nil
 }
 
-func (d *_ID3D11Device) CreateRenderTargetView(res *_ID3D11Resource) (*_ID3D11RenderTargetView, error) {
-	var target *_ID3D11RenderTargetView
+func (d *Device) CreateRenderTargetView(res *Resource) (*RenderTargetView, error) {
+	var target *RenderTargetView
 	r, _, _ := syscall.Syscall6(
-		d.vtbl.CreateRenderTargetView,
+		d.Vtbl.CreateRenderTargetView,
 		4,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(res)),
@@ -879,44 +879,44 @@ func (d *_ID3D11Device) CreateRenderTargetView(res *_ID3D11Resource) (*_ID3D11Re
 		0, 0,
 	)
 	if r != 0 {
-		return nil, ErrorCode{Name: "ID3D11DeviceCreateRenderTargetView", Code: uint32(r)}
+		return nil, ErrorCode{Name: "DeviceCreateRenderTargetView", Code: uint32(r)}
 	}
 	return target, nil
 }
 
-func (d *_ID3D11Device) CreateBlendState(desc *_D3D11_BLEND_DESC) (*_ID3D11BlendState, error) {
-	var state *_ID3D11BlendState
+func (d *Device) CreateBlendState(desc *BLEND_DESC) (*BlendState, error) {
+	var state *BlendState
 	r, _, _ := syscall.Syscall(
-		d.vtbl.CreateBlendState,
+		d.Vtbl.CreateBlendState,
 		3,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(desc)),
 		uintptr(unsafe.Pointer(&state)),
 	)
 	if r != 0 {
-		return nil, ErrorCode{Name: "ID3D11DeviceCreateBlendState", Code: uint32(r)}
+		return nil, ErrorCode{Name: "DeviceCreateBlendState", Code: uint32(r)}
 	}
 	return state, nil
 }
 
-func (d *_ID3D11Device) CreateDepthStencilState(desc *_D3D11_DEPTH_STENCIL_DESC) (*_ID3D11DepthStencilState, error) {
-	var state *_ID3D11DepthStencilState
+func (d *Device) CreateDepthStencilState(desc *DEPTH_STENCIL_DESC) (*DepthStencilState, error) {
+	var state *DepthStencilState
 	r, _, _ := syscall.Syscall(
-		d.vtbl.CreateDepthStencilState,
+		d.Vtbl.CreateDepthStencilState,
 		3,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(desc)),
 		uintptr(unsafe.Pointer(&state)),
 	)
 	if r != 0 {
-		return nil, ErrorCode{Name: "ID3D11DeviceCreateDepthStencilState", Code: uint32(r)}
+		return nil, ErrorCode{Name: "DeviceCreateDepthStencilState", Code: uint32(r)}
 	}
 	return state, nil
 }
 
-func (d *_ID3D11Device) GetFeatureLevel() int {
+func (d *Device) GetFeatureLevel() int {
 	lvl, _, _ := syscall.Syscall(
-		d.vtbl.GetFeatureLevel,
+		d.Vtbl.GetFeatureLevel,
 		1,
 		uintptr(unsafe.Pointer(d)),
 		0, 0,
@@ -924,10 +924,10 @@ func (d *_ID3D11Device) GetFeatureLevel() int {
 	return int(lvl)
 }
 
-func (d *_ID3D11Device) GetImmediateContext() *_ID3D11DeviceContext {
-	var ctx *_ID3D11DeviceContext
+func (d *Device) GetImmediateContext() *DeviceContext {
+	var ctx *DeviceContext
 	syscall.Syscall(
-		d.vtbl.GetImmediateContext,
+		d.Vtbl.GetImmediateContext,
 		2,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(&ctx)),
@@ -936,24 +936,24 @@ func (d *_ID3D11Device) GetImmediateContext() *_ID3D11DeviceContext {
 	return ctx
 }
 
-func (s *_IDXGISwapChain) GetDesc() (_DXGI_SWAP_CHAIN_DESC, error) {
-	var desc _DXGI_SWAP_CHAIN_DESC
+func (s *IDXGISwapChain) GetDesc() (DXGI_SWAP_CHAIN_DESC, error) {
+	var desc DXGI_SWAP_CHAIN_DESC
 	r, _, _ := syscall.Syscall(
-		s.vtbl.GetDesc,
+		s.Vtbl.GetDesc,
 		2,
 		uintptr(unsafe.Pointer(s)),
 		uintptr(unsafe.Pointer(&desc)),
 		0,
 	)
 	if r != 0 {
-		return _DXGI_SWAP_CHAIN_DESC{}, ErrorCode{Name: "IDXGISwapChainGetDesc", Code: uint32(r)}
+		return DXGI_SWAP_CHAIN_DESC{}, ErrorCode{Name: "IDXGISwapChainGetDesc", Code: uint32(r)}
 	}
 	return desc, nil
 }
 
-func (s *_IDXGISwapChain) ResizeBuffers(buffers, width, height, newFormat, flags uint32) error {
+func (s *IDXGISwapChain) ResizeBuffers(buffers, width, height, newFormat, flags uint32) error {
 	r, _, _ := syscall.Syscall6(
-		s.vtbl.ResizeBuffers,
+		s.Vtbl.ResizeBuffers,
 		6,
 		uintptr(unsafe.Pointer(s)),
 		uintptr(buffers),
@@ -968,9 +968,9 @@ func (s *_IDXGISwapChain) ResizeBuffers(buffers, width, height, newFormat, flags
 	return nil
 }
 
-func (s *_IDXGISwapChain) Present(SyncInterval int, Flags uint32) error {
+func (s *IDXGISwapChain) Present(SyncInterval int, Flags uint32) error {
 	r, _, _ := syscall.Syscall(
-		s.vtbl.Present,
+		s.Vtbl.Present,
 		3,
 		uintptr(unsafe.Pointer(s)),
 		uintptr(SyncInterval),
@@ -982,10 +982,10 @@ func (s *_IDXGISwapChain) Present(SyncInterval int, Flags uint32) error {
 	return nil
 }
 
-func (s *_IDXGISwapChain) GetBuffer(index int, riid *_GUID) (*_IUnknown, error) {
-	var buf *_IUnknown
+func (s *IDXGISwapChain) GetBuffer(index int, riid *GUID) (*IUnknown, error) {
+	var buf *IUnknown
 	r, _, _ := syscall.Syscall6(
-		s.vtbl.GetBuffer,
+		s.Vtbl.GetBuffer,
 		4,
 		uintptr(unsafe.Pointer(s)),
 		uintptr(index),
@@ -1000,9 +1000,9 @@ func (s *_IDXGISwapChain) GetBuffer(index int, riid *_GUID) (*_IUnknown, error) 
 	return buf, nil
 }
 
-func (c *_ID3D11DeviceContext) Unmap(resource *_ID3D11Resource, subResource uint32) {
+func (c *DeviceContext) Unmap(resource *Resource, subResource uint32) {
 	syscall.Syscall(
-		c.vtbl.Unmap,
+		c.Vtbl.Unmap,
 		3,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(resource)),
@@ -1010,10 +1010,10 @@ func (c *_ID3D11DeviceContext) Unmap(resource *_ID3D11Resource, subResource uint
 	)
 }
 
-func (c *_ID3D11DeviceContext) Map(resource *_ID3D11Resource, subResource, mapType, mapFlags uint32) (_D3D11_MAPPED_SUBRESOURCE, error) {
-	var resMap _D3D11_MAPPED_SUBRESOURCE
+func (c *DeviceContext) Map(resource *Resource, subResource, mapType, mapFlags uint32) (MAPPED_SUBRESOURCE, error) {
+	var resMap MAPPED_SUBRESOURCE
 	r, _, _ := syscall.Syscall6(
-		c.vtbl.Map,
+		c.Vtbl.Map,
 		6,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(resource)),
@@ -1023,14 +1023,14 @@ func (c *_ID3D11DeviceContext) Map(resource *_ID3D11Resource, subResource, mapTy
 		uintptr(unsafe.Pointer(&resMap)),
 	)
 	if r != 0 {
-		return resMap, ErrorCode{Name: "ID3D11DeviceContextMap", Code: uint32(r)}
+		return resMap, ErrorCode{Name: "DeviceContextMap", Code: uint32(r)}
 	}
 	return resMap, nil
 }
 
-func (c *_ID3D11DeviceContext) CopySubresourceRegion(dst *_ID3D11Resource, dstSubresource, dstX, dstY, dstZ uint32, src *_ID3D11Resource, srcSubresource uint32, srcBox *_D3D11_BOX) {
+func (c *DeviceContext) CopySubresourceRegion(dst *Resource, dstSubresource, dstX, dstY, dstZ uint32, src *Resource, srcSubresource uint32, srcBox *BOX) {
 	syscall.Syscall9(
-		c.vtbl.CopySubresourceRegion,
+		c.Vtbl.CopySubresourceRegion,
 		9,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(dst)),
@@ -1044,9 +1044,9 @@ func (c *_ID3D11DeviceContext) CopySubresourceRegion(dst *_ID3D11Resource, dstSu
 	)
 }
 
-func (c *_ID3D11DeviceContext) ClearDepthStencilView(target *_ID3D11DepthStencilView, flags uint32, depth float32, stencil uint8) {
+func (c *DeviceContext) ClearDepthStencilView(target *DepthStencilView, flags uint32, depth float32, stencil uint8) {
 	syscall.Syscall6(
-		c.vtbl.ClearDepthStencilView,
+		c.Vtbl.ClearDepthStencilView,
 		5,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(target)),
@@ -1057,9 +1057,9 @@ func (c *_ID3D11DeviceContext) ClearDepthStencilView(target *_ID3D11DepthStencil
 	)
 }
 
-func (c *_ID3D11DeviceContext) ClearRenderTargetView(target *_ID3D11RenderTargetView, color *[4]float32) {
+func (c *DeviceContext) ClearRenderTargetView(target *RenderTargetView, color *[4]float32) {
 	syscall.Syscall(
-		c.vtbl.ClearRenderTargetView,
+		c.Vtbl.ClearRenderTargetView,
 		3,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(target)),
@@ -1067,9 +1067,9 @@ func (c *_ID3D11DeviceContext) ClearRenderTargetView(target *_ID3D11RenderTarget
 	)
 }
 
-func (c *_ID3D11DeviceContext) RSSetViewports(viewport *_D3D11_VIEWPORT) {
+func (c *DeviceContext) RSSetViewports(viewport *VIEWPORT) {
 	syscall.Syscall(
-		c.vtbl.RSSetViewports,
+		c.Vtbl.RSSetViewports,
 		3,
 		uintptr(unsafe.Pointer(c)),
 		1, // NumViewports
@@ -1077,9 +1077,9 @@ func (c *_ID3D11DeviceContext) RSSetViewports(viewport *_D3D11_VIEWPORT) {
 	)
 }
 
-func (c *_ID3D11DeviceContext) VSSetShader(s *_ID3D11VertexShader) {
+func (c *DeviceContext) VSSetShader(s *VertexShader) {
 	syscall.Syscall6(
-		c.vtbl.VSSetShader,
+		c.Vtbl.VSSetShader,
 		4,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(s)),
@@ -1089,9 +1089,9 @@ func (c *_ID3D11DeviceContext) VSSetShader(s *_ID3D11VertexShader) {
 	)
 }
 
-func (c *_ID3D11DeviceContext) VSSetConstantBuffers(b *_ID3D11Buffer) {
+func (c *DeviceContext) VSSetConstantBuffers(b *Buffer) {
 	syscall.Syscall6(
-		c.vtbl.VSSetConstantBuffers,
+		c.Vtbl.VSSetConstantBuffers,
 		4,
 		uintptr(unsafe.Pointer(c)),
 		0, // StartSlot
@@ -1101,9 +1101,9 @@ func (c *_ID3D11DeviceContext) VSSetConstantBuffers(b *_ID3D11Buffer) {
 	)
 }
 
-func (c *_ID3D11DeviceContext) PSSetConstantBuffers(b *_ID3D11Buffer) {
+func (c *DeviceContext) PSSetConstantBuffers(b *Buffer) {
 	syscall.Syscall6(
-		c.vtbl.PSSetConstantBuffers,
+		c.Vtbl.PSSetConstantBuffers,
 		4,
 		uintptr(unsafe.Pointer(c)),
 		0, // StartSlot
@@ -1113,9 +1113,9 @@ func (c *_ID3D11DeviceContext) PSSetConstantBuffers(b *_ID3D11Buffer) {
 	)
 }
 
-func (c *_ID3D11DeviceContext) PSSetShaderResources(startSlot uint32, s *_ID3D11ShaderResourceView) {
+func (c *DeviceContext) PSSetShaderResources(startSlot uint32, s *ShaderResourceView) {
 	syscall.Syscall6(
-		c.vtbl.PSSetShaderResources,
+		c.Vtbl.PSSetShaderResources,
 		4,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(startSlot),
@@ -1125,9 +1125,9 @@ func (c *_ID3D11DeviceContext) PSSetShaderResources(startSlot uint32, s *_ID3D11
 	)
 }
 
-func (c *_ID3D11DeviceContext) PSSetSamplers(startSlot uint32, s *_ID3D11SamplerState) {
+func (c *DeviceContext) PSSetSamplers(startSlot uint32, s *SamplerState) {
 	syscall.Syscall6(
-		c.vtbl.PSSetSamplers,
+		c.Vtbl.PSSetSamplers,
 		4,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(startSlot),
@@ -1137,9 +1137,9 @@ func (c *_ID3D11DeviceContext) PSSetSamplers(startSlot uint32, s *_ID3D11Sampler
 	)
 }
 
-func (c *_ID3D11DeviceContext) PSSetShader(s *_ID3D11PixelShader) {
+func (c *DeviceContext) PSSetShader(s *PixelShader) {
 	syscall.Syscall6(
-		c.vtbl.PSSetShader,
+		c.Vtbl.PSSetShader,
 		4,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(s)),
@@ -1149,9 +1149,9 @@ func (c *_ID3D11DeviceContext) PSSetShader(s *_ID3D11PixelShader) {
 	)
 }
 
-func (c *_ID3D11DeviceContext) UpdateSubresource(res *_ID3D11Resource, dstBox *_D3D11_BOX, rowPitch, depthPitch uint32, data []byte) {
+func (c *DeviceContext) UpdateSubresource(res *Resource, dstBox *BOX, rowPitch, depthPitch uint32, data []byte) {
 	syscall.Syscall9(
-		c.vtbl.UpdateSubresource,
+		c.Vtbl.UpdateSubresource,
 		7,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(res)),
@@ -1164,9 +1164,9 @@ func (c *_ID3D11DeviceContext) UpdateSubresource(res *_ID3D11Resource, dstBox *_
 	)
 }
 
-func (c *_ID3D11DeviceContext) RSSetState(state *_ID3D11RasterizerState) {
+func (c *DeviceContext) RSSetState(state *RasterizerState) {
 	syscall.Syscall(
-		c.vtbl.RSSetState,
+		c.Vtbl.RSSetState,
 		2,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(state)),
@@ -1174,9 +1174,9 @@ func (c *_ID3D11DeviceContext) RSSetState(state *_ID3D11RasterizerState) {
 	)
 }
 
-func (c *_ID3D11DeviceContext) IASetInputLayout(layout *_ID3D11InputLayout) {
+func (c *DeviceContext) IASetInputLayout(layout *InputLayout) {
 	syscall.Syscall(
-		c.vtbl.IASetInputLayout,
+		c.Vtbl.IASetInputLayout,
 		2,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(layout)),
@@ -1184,9 +1184,9 @@ func (c *_ID3D11DeviceContext) IASetInputLayout(layout *_ID3D11InputLayout) {
 	)
 }
 
-func (c *_ID3D11DeviceContext) IASetIndexBuffer(buf *_ID3D11Buffer, format, offset uint32) {
+func (c *DeviceContext) IASetIndexBuffer(buf *Buffer, format, offset uint32) {
 	syscall.Syscall6(
-		c.vtbl.IASetIndexBuffer,
+		c.Vtbl.IASetIndexBuffer,
 		4,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(buf)),
@@ -1196,9 +1196,9 @@ func (c *_ID3D11DeviceContext) IASetIndexBuffer(buf *_ID3D11Buffer, format, offs
 	)
 }
 
-func (c *_ID3D11DeviceContext) IASetVertexBuffers(buf *_ID3D11Buffer, stride, offset uint32) {
+func (c *DeviceContext) IASetVertexBuffers(buf *Buffer, stride, offset uint32) {
 	syscall.Syscall6(
-		c.vtbl.IASetVertexBuffers,
+		c.Vtbl.IASetVertexBuffers,
 		6,
 		uintptr(unsafe.Pointer(c)),
 		0, // StartSlot
@@ -1209,9 +1209,9 @@ func (c *_ID3D11DeviceContext) IASetVertexBuffers(buf *_ID3D11Buffer, stride, of
 	)
 }
 
-func (c *_ID3D11DeviceContext) IASetPrimitiveTopology(mode uint32) {
+func (c *DeviceContext) IASetPrimitiveTopology(mode uint32) {
 	syscall.Syscall(
-		c.vtbl.IASetPrimitiveTopology,
+		c.Vtbl.IASetPrimitiveTopology,
 		2,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(mode),
@@ -1219,13 +1219,13 @@ func (c *_ID3D11DeviceContext) IASetPrimitiveTopology(mode uint32) {
 	)
 }
 
-func (c *_ID3D11DeviceContext) OMGetRenderTargets() (*_ID3D11RenderTargetView, *_ID3D11DepthStencilView) {
+func (c *DeviceContext) OMGetRenderTargets() (*RenderTargetView, *DepthStencilView) {
 	var (
-		target           *_ID3D11RenderTargetView
-		depthStencilView *_ID3D11DepthStencilView
+		target           *RenderTargetView
+		depthStencilView *DepthStencilView
 	)
 	syscall.Syscall6(
-		c.vtbl.OMGetRenderTargets,
+		c.Vtbl.OMGetRenderTargets,
 		4,
 		uintptr(unsafe.Pointer(c)),
 		1, // NumViews
@@ -1236,9 +1236,9 @@ func (c *_ID3D11DeviceContext) OMGetRenderTargets() (*_ID3D11RenderTargetView, *
 	return target, depthStencilView
 }
 
-func (c *_ID3D11DeviceContext) OMSetRenderTargets(target *_ID3D11RenderTargetView, depthStencil *_ID3D11DepthStencilView) {
+func (c *DeviceContext) OMSetRenderTargets(target *RenderTargetView, depthStencil *DepthStencilView) {
 	syscall.Syscall6(
-		c.vtbl.OMSetRenderTargets,
+		c.Vtbl.OMSetRenderTargets,
 		4,
 		uintptr(unsafe.Pointer(c)),
 		1, // NumViews
@@ -1248,9 +1248,9 @@ func (c *_ID3D11DeviceContext) OMSetRenderTargets(target *_ID3D11RenderTargetVie
 	)
 }
 
-func (c *_ID3D11DeviceContext) Draw(count, start uint32) {
+func (c *DeviceContext) Draw(count, start uint32) {
 	syscall.Syscall(
-		c.vtbl.Draw,
+		c.Vtbl.Draw,
 		3,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(count),
@@ -1258,9 +1258,9 @@ func (c *_ID3D11DeviceContext) Draw(count, start uint32) {
 	)
 }
 
-func (c *_ID3D11DeviceContext) DrawIndexed(count, start uint32, base int32) {
+func (c *DeviceContext) DrawIndexed(count, start uint32, base int32) {
 	syscall.Syscall6(
-		c.vtbl.DrawIndexed,
+		c.Vtbl.DrawIndexed,
 		4,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(count),
@@ -1270,9 +1270,9 @@ func (c *_ID3D11DeviceContext) DrawIndexed(count, start uint32, base int32) {
 	)
 }
 
-func (c *_ID3D11DeviceContext) OMSetBlendState(state *_ID3D11BlendState, factor *f32color.RGBA, sampleMask uint32) {
+func (c *DeviceContext) OMSetBlendState(state *BlendState, factor *f32color.RGBA, sampleMask uint32) {
 	syscall.Syscall6(
-		c.vtbl.OMSetBlendState,
+		c.Vtbl.OMSetBlendState,
 		4,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(state)),
@@ -1282,9 +1282,9 @@ func (c *_ID3D11DeviceContext) OMSetBlendState(state *_ID3D11BlendState, factor 
 	)
 }
 
-func (c *_ID3D11DeviceContext) OMSetDepthStencilState(state *_ID3D11DepthStencilState, stencilRef uint32) {
+func (c *DeviceContext) OMSetDepthStencilState(state *DepthStencilState, stencilRef uint32) {
 	syscall.Syscall(
-		c.vtbl.OMSetDepthStencilState,
+		c.Vtbl.OMSetDepthStencilState,
 		3,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(state)),
@@ -1292,10 +1292,10 @@ func (c *_ID3D11DeviceContext) OMSetDepthStencilState(state *_ID3D11DepthStencil
 	)
 }
 
-func (d *_IDXGIObject) GetParent(guid *_GUID) (*_IDXGIObject, error) {
-	var parent *_IDXGIObject
+func (d *IDXGIObject) GetParent(guid *GUID) (*IDXGIObject, error) {
+	var parent *IDXGIObject
 	r, _, _ := syscall.Syscall(
-		d.vtbl.GetParent,
+		d.Vtbl.GetParent,
 		3,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(guid)),
@@ -1307,10 +1307,10 @@ func (d *_IDXGIObject) GetParent(guid *_GUID) (*_IDXGIObject, error) {
 	return parent, nil
 }
 
-func (d *_IDXGIFactory) CreateSwapChain(device *_IUnknown, desc *_DXGI_SWAP_CHAIN_DESC) (*_IDXGISwapChain, error) {
-	var swchain *_IDXGISwapChain
+func (d *IDXGIFactory) CreateSwapChain(device *IUnknown, desc *DXGI_SWAP_CHAIN_DESC) (*IDXGISwapChain, error) {
+	var swchain *IDXGISwapChain
 	r, _, _ := syscall.Syscall6(
-		d.vtbl.CreateSwapChain,
+		d.Vtbl.CreateSwapChain,
 		4,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(device)),
@@ -1324,10 +1324,10 @@ func (d *_IDXGIFactory) CreateSwapChain(device *_IUnknown, desc *_DXGI_SWAP_CHAI
 	return swchain, nil
 }
 
-func (d *_IDXGIDevice) GetAdapter() (*_IDXGIAdapter, error) {
-	var adapter *_IDXGIAdapter
+func (d *IDXGIDevice) GetAdapter() (*IDXGIAdapter, error) {
+	var adapter *IDXGIAdapter
 	r, _, _ := syscall.Syscall(
-		d.vtbl.GetAdapter,
+		d.Vtbl.GetAdapter,
 		2,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(&adapter)),
@@ -1339,8 +1339,8 @@ func (d *_IDXGIDevice) GetAdapter() (*_IDXGIAdapter, error) {
 	return adapter, nil
 }
 
-func _IUnknownQueryInterface(obj unsafe.Pointer, queryInterfaceMethod uintptr, guid *_GUID) (*_IUnknown, error) {
-	var ref *_IUnknown
+func IUnknownQueryInterface(obj unsafe.Pointer, queryInterfaceMethod uintptr, guid *GUID) (*IUnknown, error) {
+	var ref *IUnknown
 	r, _, _ := syscall.Syscall(
 		queryInterfaceMethod,
 		3,
@@ -1354,7 +1354,7 @@ func _IUnknownQueryInterface(obj unsafe.Pointer, queryInterfaceMethod uintptr, g
 	return ref, nil
 }
 
-func _IUnknownRelease(obj unsafe.Pointer, releaseMethod uintptr) {
+func IUnknownRelease(obj unsafe.Pointer, releaseMethod uintptr) {
 	syscall.Syscall(
 		releaseMethod,
 		1,
@@ -1366,4 +1366,69 @@ func _IUnknownRelease(obj unsafe.Pointer, releaseMethod uintptr) {
 
 func (e ErrorCode) Error() string {
 	return fmt.Sprintf("%s: %#x", e.Name, e.Code)
+}
+
+func CreateSwapChain(dev *Device, hwnd windows.Handle) (*IDXGISwapChain, error) {
+	dxgiDev, err := IUnknownQueryInterface(unsafe.Pointer(dev), dev.Vtbl.QueryInterface, &IID_IDXGIDevice)
+	if err != nil {
+		return nil, fmt.Errorf("NewContext: %v", err)
+	}
+	adapter, err := (*IDXGIDevice)(unsafe.Pointer(dxgiDev)).GetAdapter()
+	IUnknownRelease(unsafe.Pointer(dxgiDev), dxgiDev.Vtbl.Release)
+	if err != nil {
+		return nil, fmt.Errorf("NewContext: %v", err)
+	}
+	dxgiFactory, err := (*IDXGIObject)(unsafe.Pointer(adapter)).GetParent(&IID_IDXGIFactory)
+	IUnknownRelease(unsafe.Pointer(adapter), adapter.Vtbl.Release)
+	if err != nil {
+		return nil, fmt.Errorf("NewContext: %v", err)
+	}
+	swchain, err := (*IDXGIFactory)(unsafe.Pointer(dxgiFactory)).CreateSwapChain(
+		(*IUnknown)(unsafe.Pointer(dev)),
+		&DXGI_SWAP_CHAIN_DESC{
+			BufferDesc: DXGI_MODE_DESC{
+				Format: DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+			},
+			SampleDesc: DXGI_SAMPLE_DESC{
+				Count: 1,
+			},
+			BufferUsage:  DXGI_USAGE_RENDER_TARGET_OUTPUT,
+			BufferCount:  1,
+			OutputWindow: hwnd,
+			Windowed:     1,
+			SwapEffect:   DXGI_SWAP_EFFECT_DISCARD,
+		},
+	)
+	IUnknownRelease(unsafe.Pointer(dxgiFactory), dxgiFactory.Vtbl.Release)
+	if err != nil {
+		return nil, fmt.Errorf("NewContext: %v", err)
+	}
+	return swchain, nil
+}
+
+func CreateDepthView(d *Device, width, height, depthBits int) (*DepthStencilView, error) {
+	depthTex, err := d.CreateTexture2D(&TEXTURE2D_DESC{
+		Width:     uint32(width),
+		Height:    uint32(height),
+		MipLevels: 1,
+		ArraySize: 1,
+		Format:    DXGI_FORMAT_D24_UNORM_S8_UINT,
+		SampleDesc: DXGI_SAMPLE_DESC{
+			Count:   1,
+			Quality: 0,
+		},
+		BindFlags: BIND_DEPTH_STENCIL,
+	})
+	if err != nil {
+		return nil, err
+	}
+	depthView, err := d.CreateDepthStencilViewTEX2D(
+		(*Resource)(unsafe.Pointer(depthTex)),
+		&DEPTH_STENCIL_VIEW_DESC_TEX2D{
+			Format:        DXGI_FORMAT_D24_UNORM_S8_UINT,
+			ViewDimension: DSV_DIMENSION_TEXTURE2D,
+		},
+	)
+	IUnknownRelease(unsafe.Pointer(depthTex), depthTex.Vtbl.Release)
+	return depthView, err
 }
