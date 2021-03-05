@@ -173,27 +173,37 @@ func (d Direction) Layout(gtx Context, w Widget) Dimensions {
 	if sz.Y < cs.Min.Y {
 		sz.Y = cs.Min.Y
 	}
-	var p image.Point
-	switch d {
-	case N, S, Center:
-		p.X = (sz.X - dims.Size.X) / 2
-	case NE, SE, E:
-		p.X = sz.X - dims.Size.X
-	}
-	switch d {
-	case W, Center, E:
-		p.Y = (sz.Y - dims.Size.Y) / 2
-	case SW, S, SE:
-		p.Y = sz.Y - dims.Size.Y
-	}
-	stack := op.Save(gtx.Ops)
+
+	defer op.Save(gtx.Ops).Load()
+	p := d.Position(dims.Size, sz)
 	op.Offset(FPt(p)).Add(gtx.Ops)
 	call.Add(gtx.Ops)
-	stack.Load()
+
 	return Dimensions{
 		Size:     sz,
 		Baseline: dims.Baseline + sz.Y - dims.Size.Y - p.Y,
 	}
+}
+
+// Position calculates widget position according to the direction.
+func (d Direction) Position(widget, bounds image.Point) image.Point {
+	var p image.Point
+
+	switch d {
+	case N, S, Center:
+		p.X = (bounds.X - widget.X) / 2
+	case NE, SE, E:
+		p.X = bounds.X - widget.X
+	}
+
+	switch d {
+	case W, Center, E:
+		p.Y = (bounds.Y - widget.Y) / 2
+	case SW, S, SE:
+		p.Y = bounds.Y - widget.Y
+	}
+
+	return p
 }
 
 // Spacer adds space between widgets.
