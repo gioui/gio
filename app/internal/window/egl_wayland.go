@@ -8,7 +8,7 @@ import (
 	"errors"
 	"unsafe"
 
-	"gioui.org/app/internal/egl"
+	"gioui.org/internal/egl"
 )
 
 /*

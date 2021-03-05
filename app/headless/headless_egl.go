@@ -5,7 +5,7 @@
 package headless
 
 import (
-	"gioui.org/app/internal/egl"
+	"gioui.org/internal/egl"
 )
 
 func newGLContext() (context, error) {

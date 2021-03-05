@@ -7,7 +7,7 @@ package window
 import (
 	"unsafe"
 
-	"gioui.org/app/internal/egl"
+	"gioui.org/internal/egl"
 )
 
 type x11Context struct {
