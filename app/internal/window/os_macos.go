@@ -20,7 +20,7 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/unit"
 
-	_ "gioui.org/app/internal/cocoainit"
+	_ "gioui.org/internal/cocoainit"
 )
 
 /*
