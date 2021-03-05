@@ -10,9 +10,9 @@ import (
 	"runtime"
 	"strings"
 
-	"gioui.org/app/internal/srgb"
 	"gioui.org/gpu"
 	"gioui.org/internal/glimpl"
+	"gioui.org/internal/srgb"
 )
 
 type Context struct {

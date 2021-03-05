@@ -6,7 +6,7 @@ import (
 	"errors"
 	"syscall/js"
 
-	"gioui.org/app/internal/srgb"
+	"gioui.org/internal/srgb"
 	"gioui.org/gpu"
 	"gioui.org/internal/glimpl"
 )
