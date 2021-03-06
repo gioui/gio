@@ -4,6 +4,9 @@ var AndroidPermissions = map[string][]string{
 	"network": {
 		"android.permission.INTERNET",
 	},
+	"networkstate": {
+		"android.permission.ACCESS_NETWORK_STATE",
+	},
 	"bluetooth": {
 		"android.permission.BLUETOOTH",
 		"android.permission.BLUETOOTH_ADMIN",
