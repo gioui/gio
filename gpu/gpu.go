@@ -30,8 +30,8 @@ import (
 	"gioui.org/op/clip"
 
 	// Register backends.
-	_ "gioui.org/gpu/gl"
 	_ "gioui.org/gpu/internal/d3d11"
+	_ "gioui.org/gpu/internal/opengl"
 )
 
 type GPU interface {
