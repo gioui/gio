@@ -70,9 +70,8 @@ type gpuAPI struct {
 	initializer func(w *window) (Context, error)
 }
 
-// backends is the list of potential Context
-// implementations.
-var backends []gpuAPI
+// drivers is the list of potential Context implementations.
+var drivers []gpuAPI
 
 // winMap maps win32 HWNDs to *windows.
 var winMap sync.Map
@@ -483,11 +482,11 @@ func (w *window) destroy() {
 }
 
 func (w *window) NewContext() (Context, error) {
-	sort.Slice(backends, func(i, j int) bool {
-		return backends[i].priority < backends[j].priority
+	sort.Slice(drivers, func(i, j int) bool {
+		return drivers[i].priority < drivers[j].priority
 	})
 	var errs []string
-	for _, b := range backends {
+	for _, b := range drivers {
 		ctx, err := b.initializer(w)
 		if err == nil {
 			return ctx, nil
@@ -497,7 +496,7 @@ func (w *window) NewContext() (Context, error) {
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("NewContext: failed to create a GPU device, tried: %s", strings.Join(errs, ", "))
 	}
-	return nil, errors.New("NewContext: no available backends")
+	return nil, errors.New("NewContext: no available GPU drivers")
 }
 
 func (w *window) ReadClipboard() {

@@ -12,7 +12,7 @@ type glContext struct {
 }
 
 func init() {
-	backends = append(backends, gpuAPI{
+	drivers = append(drivers, gpuAPI{
 		priority: 2,
 		initializer: func(w *window) (Context, error) {
 			disp := egl.NativeDisplayType(w.HDC())

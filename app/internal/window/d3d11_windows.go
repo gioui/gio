@@ -24,7 +24,7 @@ type d3d11Context struct {
 const debug = false
 
 func init() {
-	backends = append(backends, gpuAPI{
+	drivers = append(drivers, gpuAPI{
 		priority: 1,
 		initializer: func(w *window) (Context, error) {
 			hwnd, _, _ := w.HWND()
