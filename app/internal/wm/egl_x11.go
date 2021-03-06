@@ -2,7 +2,7 @@
 
 // +build linux,!android,!nox11 freebsd openbsd
 
-package window
+package wm
 
 import (
 	"unsafe"

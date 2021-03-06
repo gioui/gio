@@ -7,7 +7,7 @@ import (
 	"image/color"
 	"runtime"
 
-	"gioui.org/app/internal/window"
+	"gioui.org/app/internal/wm"
 	"gioui.org/gpu"
 	"gioui.org/op"
 )
@@ -36,7 +36,7 @@ type frameResult struct {
 	err     error
 }
 
-func newLoop(ctx window.Context) (*renderLoop, error) {
+func newLoop(ctx wm.Context) (*renderLoop, error) {
 	l := &renderLoop{
 		frames:     make(chan frame),
 		results:    make(chan frameResult),
@@ -54,7 +54,7 @@ func newLoop(ctx window.Context) (*renderLoop, error) {
 	return l, nil
 }
 
-func (l *renderLoop) renderLoop(ctx window.Context) error {
+func (l *renderLoop) renderLoop(ctx wm.Context) error {
 	// GL Operations must happen on a single OS thread, so
 	// pass initialization result through a channel.
 	initErr := make(chan error)

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package window
+package wm
 
 /*
 #include <Foundation/Foundation.h>

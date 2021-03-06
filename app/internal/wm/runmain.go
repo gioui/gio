@@ -2,7 +2,7 @@
 
 // +build android darwin,ios
 
-package window
+package wm
 
 // Android only supports non-Java programs as c-shared libraries.
 // Unfortunately, Go does not run a program's main function in

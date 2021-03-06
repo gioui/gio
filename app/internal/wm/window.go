@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// Package window implements platform specific windows
+// package wm implements platform specific windows
 // and GPU contexts.
-package window
+package wm
 
 import (
 	"errors"

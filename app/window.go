@@ -8,7 +8,6 @@ import (
 	"image"
 	"time"
 
-	"gioui.org/app/internal/window"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/io/profile"
@@ -18,15 +17,16 @@ import (
 	"gioui.org/unit"
 
 	_ "gioui.org/app/internal/log"
+	"gioui.org/app/internal/wm"
 )
 
-// WindowOption configures a Window.
-type Option func(opts *window.Options)
+// WindowOption configures a wm.
+type Option func(opts *wm.Options)
 
-// Window represents an operating system window.
+// Window represents an operating system wm.
 type Window struct {
-	driver window.Driver
-	ctx    window.Context
+	driver wm.Driver
+	ctx    wm.Context
 	loop   *renderLoop
 
 	// driverFuncs is a channel of functions to run when
@@ -65,9 +65,9 @@ type queue struct {
 }
 
 // driverEvent is sent when a new native driver
-// is available for the Window.
+// is available for the wm.
 type driverEvent struct {
-	driver window.Driver
+	driver wm.Driver
 }
 
 // Pre-allocate the ack event to avoid garbage.
@@ -84,7 +84,7 @@ var ackEvent event.Event
 // Calling NewWindow more than once is not supported on
 // iOS, Android, WebAssembly.
 func NewWindow(options ...Option) *Window {
-	opts := &window.Options{
+	opts := &wm.Options{
 		Width:  unit.Dp(800),
 		Height: unit.Dp(600),
 		Title:  "Gio",
@@ -114,7 +114,7 @@ func (w *Window) Events() <-chan event.Event {
 	return w.out
 }
 
-// update updates the Window. Paint operations updates the
+// update updates the wm. Paint operations updates the
 // window contents, input operations declare input handlers,
 // and so on. The supplied operations list completely replaces
 // the window state from previous calls.
@@ -128,7 +128,7 @@ func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync
 		if w.loop != nil {
 			if err := w.loop.Flush(); err != nil {
 				w.destroyGPU()
-				if err == window.ErrDeviceLost {
+				if err == wm.ErrDeviceLost {
 					continue
 				}
 				return err
@@ -150,7 +150,7 @@ func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync
 		if sync {
 			if err := w.loop.Flush(); err != nil {
 				w.destroyGPU()
-				if err == window.ErrDeviceLost {
+				if err == wm.ErrDeviceLost {
 					continue
 				}
 				return err
@@ -235,7 +235,7 @@ func (w *Window) SetCursorName(name pointer.CursorName) {
 	})
 }
 
-// Close the window. The window's event loop should exit when it receives
+// Close the wm. The window's event loop should exit when it receives
 // system.DestroyEvent.
 //
 // Currently, only macOS, Windows and X11 drivers implement this functionality,
@@ -281,7 +281,7 @@ func (w *Window) setNextFrame(at time.Time) {
 	}
 }
 
-func (c *callbacks) SetDriver(d window.Driver) {
+func (c *callbacks) SetDriver(d wm.Driver) {
 	c.Event(driverEvent{d})
 }
 
@@ -341,10 +341,10 @@ func (w *Window) waitFrame() (*op.Ops, bool) {
 	}
 }
 
-func (w *Window) run(opts *window.Options) {
+func (w *Window) run(opts *wm.Options) {
 	defer close(w.in)
 	defer close(w.out)
-	if err := window.NewWindow(&w.callbacks, opts); err != nil {
+	if err := wm.NewWindow(&w.callbacks, opts); err != nil {
 		w.out <- system.DestroyEvent{Err: err}
 		return
 	}
@@ -380,7 +380,7 @@ func (w *Window) run(opts *window.Options) {
 				w.updateAnimation()
 				w.out <- e
 				w.waitAck()
-			case window.FrameEvent:
+			case wm.FrameEvent:
 				if e2.Size == (image.Point{}) {
 					panic(errors.New("internal error: zero-sized Draw"))
 				}
@@ -444,14 +444,14 @@ func (q *queue) Events(k event.Tag) []event.Event {
 	return q.q.Events(k)
 }
 
-// Title sets the title of the window.
+// Title sets the title of the wm.
 func Title(t string) Option {
-	return func(opts *window.Options) {
+	return func(opts *wm.Options) {
 		opts.Title = t
 	}
 }
 
-// Size sets the size of the window.
+// Size sets the size of the wm.
 func Size(w, h unit.Value) Option {
 	if w.V <= 0 {
 		panic("width must be larger than or equal to 0")
@@ -459,13 +459,13 @@ func Size(w, h unit.Value) Option {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
-	return func(opts *window.Options) {
+	return func(opts *wm.Options) {
 		opts.Width = w
 		opts.Height = h
 	}
 }
 
-// MaxSize sets the maximum size of the window.
+// MaxSize sets the maximum size of the wm.
 func MaxSize(w, h unit.Value) Option {
 	if w.V <= 0 {
 		panic("width must be larger than or equal to 0")
@@ -473,13 +473,13 @@ func MaxSize(w, h unit.Value) Option {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
-	return func(opts *window.Options) {
+	return func(opts *wm.Options) {
 		opts.MaxWidth = w
 		opts.MaxHeight = h
 	}
 }
 
-// MinSize sets the minimum size of the window.
+// MinSize sets the minimum size of the wm.
 func MinSize(w, h unit.Value) Option {
 	if w.V <= 0 {
 		panic("width must be larger than or equal to 0")
@@ -487,7 +487,7 @@ func MinSize(w, h unit.Value) Option {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
-	return func(opts *window.Options) {
+	return func(opts *wm.Options) {
 		opts.MinWidth = w
 		opts.MinHeight = h
 	}

@@ -2,7 +2,7 @@
 
 // +build linux,!android,!nox11 freebsd openbsd
 
-package window
+package wm
 
 /*
 #cgo openbsd CFLAGS: -I/usr/X11R6/include -I/usr/local/include

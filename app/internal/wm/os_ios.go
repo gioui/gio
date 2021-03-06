@@ -2,7 +2,7 @@
 
 // +build darwin,ios
 
-package window
+package wm
 
 /*
 #cgo CFLAGS: -DGLES_SILENCE_DEPRECATION -Werror -Wno-deprecated-declarations -fmodules -fobjc-arc -x objective-c

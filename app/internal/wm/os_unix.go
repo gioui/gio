@@ -2,7 +2,7 @@
 
 // +build linux,!android freebsd openbsd
 
-package window
+package wm
 
 import (
 	"errors"

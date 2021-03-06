@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"gioui.org/app/internal/window"
+	"gioui.org/app/internal/wm"
 )
 
 var (
@@ -21,7 +21,7 @@ var (
 
 func dataDir() (string, error) {
 	dataDirOnce.Do(func() {
-		dataPath = window.GetDataDir()
+		dataPath = wm.GetDataDir()
 		// Set XDG_CACHE_HOME to make os.UserCacheDir work.
 		if _, exists := os.LookupEnv("XDG_CACHE_HOME"); !exists {
 			cachePath := filepath.Join(dataPath, "cache")

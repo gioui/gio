@@ -3,18 +3,18 @@
 package app
 
 import (
-	"gioui.org/app/internal/window"
+	"gioui.org/app/internal/wm"
 )
 
-type ViewEvent = window.ViewEvent
+type ViewEvent = wm.ViewEvent
 
 // JavaVM returns the global JNI JavaVM.
 func JavaVM() uintptr {
-	return window.JavaVM()
+	return wm.JavaVM()
 }
 
 // AppContext returns the global Application context as a JNI
 // jobject.
 func AppContext() uintptr {
-	return window.AppContext()
+	return wm.AppContext()
 }

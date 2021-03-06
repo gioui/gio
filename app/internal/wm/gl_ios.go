@@ -2,7 +2,7 @@
 
 // +build darwin,ios
 
-package window
+package wm
 
 /*
 #include <CoreFoundation/CoreFoundation.h>

@@ -2,7 +2,7 @@
 
 // +build darwin,!ios
 
-package window
+package wm
 
 import (
 	"gioui.org/gpu"

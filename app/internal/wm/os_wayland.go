@@ -2,7 +2,7 @@
 
 // +build linux,!android,!nowayland freebsd
 
-package window
+package wm
 
 import (
 	"bytes"
