@@ -16,12 +16,12 @@ import (
 
 // Window is a headless window.
 type Window struct {
-	size    image.Point
-	ctx     context
-	backend driver.Device
-	gpu     gpu.GPU
-	fboTex  driver.Texture
-	fbo     driver.Framebuffer
+	size   image.Point
+	ctx    context
+	dev    driver.Device
+	gpu    gpu.GPU
+	fboTex driver.Texture
+	fbo    driver.Framebuffer
 }
 
 type context interface {
@@ -72,7 +72,7 @@ func NewWindow(width, height int) (*Window, error) {
 		w.fboTex = fboTex
 		w.fbo = fbo
 		w.gpu = gp
-		w.backend = dev
+		w.dev = dev
 		return err
 	})
 	if err != nil {
@@ -109,7 +109,7 @@ func (w *Window) Release() {
 // operation list.
 func (w *Window) Frame(frame *op.Ops) error {
 	return contextDo(w.ctx, func() error {
-		w.backend.BindFramebuffer(w.fbo)
+		w.dev.BindFramebuffer(w.fbo)
 		w.gpu.Clear(color.NRGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff})
 		w.gpu.Collect(w.size, frame)
 		return w.gpu.Frame()
