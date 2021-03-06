@@ -1,6 +1,6 @@
 // +build !js
 
-package glimpl
+package gl
 
 type (
 	Buffer       struct{ V uint }

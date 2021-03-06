@@ -11,12 +11,12 @@ import (
 	"strings"
 
 	"gioui.org/gpu"
-	"gioui.org/internal/glimpl"
+	"gioui.org/internal/gl"
 	"gioui.org/internal/srgb"
 )
 
 type Context struct {
-	c             *glimpl.Functions
+	c             *gl.Functions
 	disp          _EGLDisplay
 	eglCtx        *eglContext
 	eglSurf       _EGLSurface
@@ -105,7 +105,7 @@ func NewContext(disp NativeDisplayType) (*Context, error) {
 	if err != nil {
 		return nil, err
 	}
-	f, err := glimpl.NewFunctions(nil)
+	f, err := gl.NewFunctions(nil)
 	if err != nil {
 		return nil, err
 	}

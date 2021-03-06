@@ -114,7 +114,7 @@ type InputDesc struct {
 	Offset int
 }
 
-// InputLayout is the backend specific representation of the mapping
+// InputLayout is the driver specific representation of the mapping
 // between Buffers and shader attributes.
 type InputLayout interface {
 	Release()

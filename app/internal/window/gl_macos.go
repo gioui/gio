@@ -6,7 +6,7 @@ package window
 
 import (
 	"gioui.org/gpu"
-	"gioui.org/internal/glimpl"
+	"gioui.org/internal/gl"
 )
 
 /*
@@ -26,7 +26,7 @@ __attribute__ ((visibility ("hidden"))) void gio_unlockContext(CFTypeRef ctxRef)
 import "C"
 
 type context struct {
-	c    *glimpl.Functions
+	c    *gl.Functions
 	ctx  C.CFTypeRef
 	view C.CFTypeRef
 }

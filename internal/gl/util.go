@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package glimpl
+package gl
 
 import (
 	"errors"

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"unsafe"
 
-	"gioui.org/internal/glimpl"
+	"gioui.org/internal/gl"
 )
 
 // See gpu/api.go for documentation for the API types
@@ -19,7 +19,7 @@ type OpenGL struct {
 	// Context contains the WebGL context for WebAssembly platforms. It is
 	// empty for all other platforms; an OpenGL context is assumed current when
 	// calling NewDevice.
-	Context glimpl.Context
+	Context gl.Context
 }
 
 type Direct3D11 struct {

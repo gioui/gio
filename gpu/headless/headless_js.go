@@ -7,7 +7,7 @@ import (
 	"syscall/js"
 
 	"gioui.org/gpu"
-	"gioui.org/internal/glimpl"
+	"gioui.org/internal/gl"
 )
 
 type jsContext struct {
@@ -31,7 +31,7 @@ func newGLContext() (context, error) {
 }
 
 func (c *jsContext) API() gpu.API {
-	return gpu.OpenGL{Context: glimpl.Context(c.ctx)}
+	return gpu.OpenGL{Context: gl.Context(c.ctx)}
 }
 
 func (c *jsContext) Release() {

@@ -2,7 +2,7 @@
 
 // +build darwin linux freebsd openbsd
 
-package glimpl
+package gl
 
 import (
 	"runtime"

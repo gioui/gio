@@ -6,9 +6,9 @@ import (
 	"errors"
 	"syscall/js"
 
-	"gioui.org/internal/srgb"
 	"gioui.org/gpu"
-	"gioui.org/internal/glimpl"
+	"gioui.org/internal/gl"
+	"gioui.org/internal/srgb"
 )
 
 type context struct {
@@ -39,7 +39,7 @@ func newContext(w *window) (*context, error) {
 }
 
 func (c *context) API() gpu.API {
-	return gpu.OpenGL{Context: glimpl.Context(c.ctx)}
+	return gpu.OpenGL{Context: gl.Context(c.ctx)}
 }
 
 func (c *context) Release() {
@@ -69,7 +69,7 @@ func (c *context) Unlock() {}
 func (c *context) MakeCurrent() error {
 	if c.srgbFBO == nil {
 		var err error
-		c.srgbFBO, err = srgb.New(glimpl.Context(c.ctx))
+		c.srgbFBO, err = srgb.New(gl.Context(c.ctx))
 		if err != nil {
 			c.Release()
 			c.srgbFBO = nil
