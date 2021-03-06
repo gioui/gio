@@ -223,6 +223,22 @@ func TestNegativeOverlaps(t *testing.T) {
 	})
 }
 
+func TestDepthOverlap(t *testing.T) {
+	run(t, func(ops *op.Ops) {
+		stack := op.Save(ops)
+		paint.FillShape(ops, red, clip.Rect{Max: image.Pt(128, 64)}.Op())
+		stack.Load()
+
+		stack = op.Save(ops)
+		paint.FillShape(ops, green, clip.Rect{Max: image.Pt(64, 128)}.Op())
+		stack.Load()
+	}, func(r result) {
+		r.expect(96, 32, colornames.Red)
+		r.expect(32, 96, colornames.Green)
+		r.expect(32, 32, colornames.Green)
+	})
+}
+
 type Gradient struct {
 	From, To color.NRGBA
 }
