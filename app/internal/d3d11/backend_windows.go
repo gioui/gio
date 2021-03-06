@@ -279,12 +279,15 @@ func NewBackend(d *Device) (*Backend, error) {
 }
 
 func (b *Backend) BeginFrame() backend.Framebuffer {
-	renderTarget := b.dev.ctx.OMGetRenderTargets()
+	renderTarget, depthView := b.dev.ctx.OMGetRenderTargets()
+	// Assume someone else is holding on to the render targets.
 	if renderTarget != nil {
-		// Assume someone else is holding on to it.
 		_IUnknownRelease(unsafe.Pointer(renderTarget), renderTarget.vtbl.Release)
 	}
-	return &Framebuffer{dev: b.dev, renderTarget: renderTarget, foreign: true}
+	if depthView != nil {
+		_IUnknownRelease(unsafe.Pointer(depthView), depthView.vtbl.Release)
+	}
+	return &Framebuffer{dev: b.dev, renderTarget: renderTarget, depthView: depthView, foreign: true}
 }
 
 func (b *Backend) EndFrame() {

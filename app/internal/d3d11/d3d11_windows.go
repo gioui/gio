@@ -1197,18 +1197,21 @@ func (c *_ID3D11DeviceContext) IASetPrimitiveTopology(mode uint32) {
 	)
 }
 
-func (c *_ID3D11DeviceContext) OMGetRenderTargets() *_ID3D11RenderTargetView {
-	var target *_ID3D11RenderTargetView
+func (c *_ID3D11DeviceContext) OMGetRenderTargets() (*_ID3D11RenderTargetView, *_ID3D11DepthStencilView) {
+	var (
+		target           *_ID3D11RenderTargetView
+		depthStencilView *_ID3D11DepthStencilView
+	)
 	syscall.Syscall6(
 		c.vtbl.OMGetRenderTargets,
 		4,
 		uintptr(unsafe.Pointer(c)),
 		1, // NumViews
 		uintptr(unsafe.Pointer(&target)),
-		0, // pDepthStencilView
+		uintptr(unsafe.Pointer(&depthStencilView)),
 		0, 0,
 	)
-	return target
+	return target, depthStencilView
 }
 
 func (c *_ID3D11DeviceContext) OMSetRenderTargets(target *_ID3D11RenderTargetView, depthStencil *_ID3D11DepthStencilView) {
