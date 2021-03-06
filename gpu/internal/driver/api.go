@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package backend
+package driver
 
 import (
 	"fmt"
@@ -49,7 +49,7 @@ func NewDevice(api API) (Device, error) {
 			return NewDirect3D11Device(api)
 		}
 	}
-	return nil, fmt.Errorf("backend: no backend available for the API %T", api)
+	return nil, fmt.Errorf("driver: no driver available for the API %T", api)
 }
 
 func (OpenGL) implementsAPI()     {}

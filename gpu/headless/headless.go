@@ -10,7 +10,7 @@ import (
 	"runtime"
 
 	"gioui.org/gpu"
-	"gioui.org/gpu/backend"
+	"gioui.org/gpu/internal/driver"
 	"gioui.org/op"
 )
 
@@ -18,10 +18,10 @@ import (
 type Window struct {
 	size    image.Point
 	ctx     context
-	backend backend.Device
+	backend driver.Device
 	gpu     gpu.GPU
-	fboTex  backend.Texture
-	fbo     backend.Framebuffer
+	fboTex  driver.Texture
+	fbo     driver.Framebuffer
 }
 
 type context interface {
@@ -43,16 +43,16 @@ func NewWindow(width, height int) (*Window, error) {
 	}
 	err = contextDo(ctx, func() error {
 		api := ctx.API()
-		dev, err := backend.NewDevice(api)
+		dev, err := driver.NewDevice(api)
 		if err != nil {
 			return err
 		}
 		dev.Viewport(0, 0, width, height)
 		fboTex, err := dev.NewTexture(
-			backend.TextureFormatSRGB,
+			driver.TextureFormatSRGB,
 			width, height,
-			backend.FilterNearest, backend.FilterNearest,
-			backend.BufferBindingFramebuffer,
+			driver.FilterNearest, driver.FilterNearest,
+			driver.BufferBindingFramebuffer,
 		)
 		if err != nil {
 			return nil

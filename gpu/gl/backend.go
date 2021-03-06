@@ -10,11 +10,11 @@ import (
 	"time"
 	"unsafe"
 
-	"gioui.org/gpu/backend"
+	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/glimpl"
 )
 
-// Backend implements backend.Device.
+// Backend implements driver.Device.
 type Backend struct {
 	funcs *glimpl.Functions
 
@@ -23,7 +23,7 @@ type Backend struct {
 	glver [2]int
 	gles  bool
 	ubo   bool
-	feats backend.Caps
+	feats driver.Caps
 	// floatTriple holds the settings for floating point
 	// textures.
 	floatTriple textureTriple
@@ -73,7 +73,7 @@ type gpuBuffer struct {
 	backend   *Backend
 	hasBuffer bool
 	obj       glimpl.Buffer
-	typ       backend.BufferBinding
+	typ       driver.BufferBinding
 	size      int
 	immutable bool
 	version   int
@@ -100,13 +100,13 @@ type uniformsTracker struct {
 type uniformLocation struct {
 	uniform glimpl.Uniform
 	offset  int
-	typ     backend.DataType
+	typ     driver.DataType
 	size    int
 }
 
 type gpuInputLayout struct {
-	inputs []backend.InputLocation
-	layout []backend.InputDesc
+	inputs []driver.InputLocation
+	layout []driver.InputDesc
 }
 
 // textureTriple holds the type settings for
@@ -124,10 +124,10 @@ const (
 )
 
 func init() {
-	backend.NewOpenGLDevice = newOpenGLDevice
+	driver.NewOpenGLDevice = newOpenGLDevice
 }
 
-func newOpenGLDevice(api backend.OpenGL) (backend.Device, error) {
+func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 	f, err := glimpl.NewFunctions(api.Context)
 	if err != nil {
 		return nil, err
@@ -155,19 +155,19 @@ func newOpenGLDevice(api backend.OpenGL) (backend.Device, error) {
 		srgbaTriple: srgbaTriple,
 	}
 	if ffboErr == nil {
-		b.feats.Features |= backend.FeatureFloatRenderTargets
+		b.feats.Features |= driver.FeatureFloatRenderTargets
 	}
 	if gles31 {
-		b.feats.Features |= backend.FeatureCompute
+		b.feats.Features |= driver.FeatureCompute
 	}
 	if hasExtension(exts, "GL_EXT_disjoint_timer_query_webgl2") || hasExtension(exts, "GL_EXT_disjoint_timer_query") {
-		b.feats.Features |= backend.FeatureTimers
+		b.feats.Features |= driver.FeatureTimers
 	}
 	b.feats.MaxTextureSize = f.GetInteger(glimpl.MAX_TEXTURE_SIZE)
 	return b, nil
 }
 
-func (b *Backend) BeginFrame() backend.Framebuffer {
+func (b *Backend) BeginFrame() driver.Framebuffer {
 	// Assume GL state is reset between frames.
 	b.state = glstate{}
 	fboID := glimpl.Framebuffer(b.funcs.GetBinding(glimpl.FRAMEBUFFER_BINDING))
@@ -178,11 +178,11 @@ func (b *Backend) EndFrame() {
 	b.funcs.ActiveTexture(glimpl.TEXTURE0)
 }
 
-func (b *Backend) Caps() backend.Caps {
+func (b *Backend) Caps() driver.Caps {
 	return b.feats
 }
 
-func (b *Backend) NewTimer() backend.Timer {
+func (b *Backend) NewTimer() driver.Timer {
 	return &gpuTimer{
 		funcs: b.funcs,
 		obj:   b.funcs.CreateQuery(),
@@ -193,7 +193,7 @@ func (b *Backend) IsTimeContinuous() bool {
 	return b.funcs.GetInteger(glimpl.GPU_DISJOINT_EXT) == glimpl.FALSE
 }
 
-func (b *Backend) NewFramebuffer(tex backend.Texture, depthBits int) (backend.Framebuffer, error) {
+func (b *Backend) NewFramebuffer(tex driver.Texture, depthBits int) (driver.Framebuffer, error) {
 	glErr(b.funcs)
 	gltex := tex.(*gpuTexture)
 	fb := b.funcs.CreateFramebuffer()
@@ -230,15 +230,15 @@ func (b *Backend) NewFramebuffer(tex backend.Texture, depthBits int) (backend.Fr
 	return fbo, nil
 }
 
-func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, minFilter, magFilter backend.TextureFilter, binding backend.BufferBinding) (backend.Texture, error) {
+func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, minFilter, magFilter driver.TextureFilter, binding driver.BufferBinding) (driver.Texture, error) {
 	glErr(b.funcs)
 	tex := &gpuTexture{backend: b, obj: b.funcs.CreateTexture(), width: width, height: height}
 	switch format {
-	case backend.TextureFormatFloat:
+	case driver.TextureFormatFloat:
 		tex.triple = b.floatTriple
-	case backend.TextureFormatSRGB:
+	case driver.TextureFormatSRGB:
 		tex.triple = b.srgbaTriple
-	case backend.TextureFormatRGBA8:
+	case driver.TextureFormatRGBA8:
 		tex.triple = textureTriple{glimpl.RGBA8, glimpl.RGBA, glimpl.UNSIGNED_BYTE}
 	default:
 		return nil, errors.New("unsupported texture format")
@@ -261,11 +261,11 @@ func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, mi
 	return tex, nil
 }
 
-func (b *Backend) NewBuffer(typ backend.BufferBinding, size int) (backend.Buffer, error) {
+func (b *Backend) NewBuffer(typ driver.BufferBinding, size int) (driver.Buffer, error) {
 	glErr(b.funcs)
 	buf := &gpuBuffer{backend: b, typ: typ, size: size}
-	if typ&backend.BufferBindingUniforms != 0 {
-		if typ != backend.BufferBindingUniforms {
+	if typ&driver.BufferBindingUniforms != 0 {
+		if typ != driver.BufferBindingUniforms {
 			return nil, errors.New("uniforms buffers cannot be bound as anything else")
 		}
 		if !b.ubo {
@@ -273,7 +273,7 @@ func (b *Backend) NewBuffer(typ backend.BufferBinding, size int) (backend.Buffer
 			buf.data = make([]byte, size)
 		}
 	}
-	if typ&^backend.BufferBindingUniforms != 0 || b.ubo {
+	if typ&^driver.BufferBindingUniforms != 0 || b.ubo {
 		buf.hasBuffer = true
 		buf.obj = b.funcs.CreateBuffer()
 		if err := glErr(b.funcs); err != nil {
@@ -287,7 +287,7 @@ func (b *Backend) NewBuffer(typ backend.BufferBinding, size int) (backend.Buffer
 	return buf, nil
 }
 
-func (b *Backend) NewImmutableBuffer(typ backend.BufferBinding, data []byte) (backend.Buffer, error) {
+func (b *Backend) NewImmutableBuffer(typ driver.BufferBinding, data []byte) (driver.Buffer, error) {
 	glErr(b.funcs)
 	obj := b.funcs.CreateBuffer()
 	buf := &gpuBuffer{backend: b, obj: obj, typ: typ, size: len(data), hasBuffer: true}
@@ -328,20 +328,20 @@ func (b *Backend) DispatchCompute(x, y, z int) {
 	b.funcs.DispatchCompute(x, y, z)
 }
 
-func (b *Backend) BindImageTexture(unit int, tex backend.Texture, access backend.AccessBits, f backend.TextureFormat) {
+func (b *Backend) BindImageTexture(unit int, tex driver.Texture, access driver.AccessBits, f driver.TextureFormat) {
 	t := tex.(*gpuTexture)
 	var acc glimpl.Enum
 	switch access {
-	case backend.AccessWrite:
+	case driver.AccessWrite:
 		acc = glimpl.WRITE_ONLY
-	case backend.AccessRead:
+	case driver.AccessRead:
 		acc = glimpl.READ_ONLY
 	default:
 		panic("unsupported access bits")
 	}
 	var format glimpl.Enum
 	switch f {
-	case backend.TextureFormatRGBA8:
+	case driver.TextureFormatRGBA8:
 		format = glimpl.RGBA8
 	default:
 		panic("unsupported format")
@@ -384,19 +384,19 @@ func (b *Backend) SetDepthTest(enable bool) {
 	}
 }
 
-func (b *Backend) BlendFunc(sfactor, dfactor backend.BlendFactor) {
+func (b *Backend) BlendFunc(sfactor, dfactor driver.BlendFactor) {
 	b.funcs.BlendFunc(toGLBlendFactor(sfactor), toGLBlendFactor(dfactor))
 }
 
-func toGLBlendFactor(f backend.BlendFactor) glimpl.Enum {
+func toGLBlendFactor(f driver.BlendFactor) glimpl.Enum {
 	switch f {
-	case backend.BlendFactorOne:
+	case driver.BlendFactorOne:
 		return glimpl.ONE
-	case backend.BlendFactorOneMinusSrcAlpha:
+	case driver.BlendFactorOneMinusSrcAlpha:
 		return glimpl.ONE_MINUS_SRC_ALPHA
-	case backend.BlendFactorZero:
+	case driver.BlendFactorZero:
 		return glimpl.ZERO
-	case backend.BlendFactorDstColor:
+	case driver.BlendFactorDstColor:
 		return glimpl.DST_COLOR
 	default:
 		panic("unsupported blend factor")
@@ -415,14 +415,14 @@ func (b *Backend) SetBlend(enable bool) {
 	}
 }
 
-func (b *Backend) DrawElements(mode backend.DrawMode, off, count int) {
+func (b *Backend) DrawElements(mode driver.DrawMode, off, count int) {
 	b.prepareDraw()
 	// off is in 16-bit indices, but DrawElements take a byte offset.
 	byteOff := off * 2
 	b.funcs.DrawElements(toGLDrawMode(mode), count, glimpl.UNSIGNED_SHORT, byteOff)
 }
 
-func (b *Backend) DrawArrays(mode backend.DrawMode, off, count int) {
+func (b *Backend) DrawArrays(mode driver.DrawMode, off, count int) {
 	b.prepareDraw()
 	b.funcs.DrawArrays(toGLDrawMode(mode), off, count)
 }
@@ -438,11 +438,11 @@ func (b *Backend) prepareDraw() {
 	}
 }
 
-func toGLDrawMode(mode backend.DrawMode) glimpl.Enum {
+func toGLDrawMode(mode driver.DrawMode) glimpl.Enum {
 	switch mode {
-	case backend.DrawModeTriangleStrip:
+	case driver.DrawModeTriangleStrip:
 		return glimpl.TRIANGLE_STRIP
-	case backend.DrawModeTriangles:
+	case driver.DrawModeTriangles:
 		return glimpl.TRIANGLES
 	default:
 		panic("unsupported draw mode")
@@ -463,12 +463,12 @@ func (b *Backend) ClearDepth(d float32) {
 	b.funcs.Clear(glimpl.DEPTH_BUFFER_BIT)
 }
 
-func (b *Backend) DepthFunc(f backend.DepthFunc) {
+func (b *Backend) DepthFunc(f driver.DepthFunc) {
 	var glfunc glimpl.Enum
 	switch f {
-	case backend.DepthFuncGreater:
+	case driver.DepthFuncGreater:
 		glfunc = glimpl.GREATER
-	case backend.DepthFuncGreaterEqual:
+	case driver.DepthFuncGreaterEqual:
 		glfunc = glimpl.GEQUAL
 	default:
 		panic("unsupported depth func")
@@ -476,7 +476,7 @@ func (b *Backend) DepthFunc(f backend.DepthFunc) {
 	b.funcs.DepthFunc(glfunc)
 }
 
-func (b *Backend) NewInputLayout(vs backend.ShaderSources, layout []backend.InputDesc) (backend.InputLayout, error) {
+func (b *Backend) NewInputLayout(vs driver.ShaderSources, layout []driver.InputDesc) (driver.InputLayout, error) {
 	if len(vs.Inputs) != len(layout) {
 		return nil, fmt.Errorf("NewInputLayout: got %d inputs, expected %d", len(layout), len(vs.Inputs))
 	}
@@ -491,7 +491,7 @@ func (b *Backend) NewInputLayout(vs backend.ShaderSources, layout []backend.Inpu
 	}, nil
 }
 
-func (b *Backend) NewComputeProgram(src backend.ShaderSources) (backend.Program, error) {
+func (b *Backend) NewComputeProgram(src driver.ShaderSources) (driver.Program, error) {
 	p, err := glimpl.CreateComputeProgram(b.funcs, src.GLSL310ES)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", src.Name, err)
@@ -503,7 +503,7 @@ func (b *Backend) NewComputeProgram(src backend.ShaderSources) (backend.Program,
 	return gpuProg, nil
 }
 
-func (b *Backend) NewProgram(vertShader, fragShader backend.ShaderSources) (backend.Program, error) {
+func (b *Backend) NewProgram(vertShader, fragShader driver.ShaderSources) (driver.Program, error) {
 	attr := make([]string, len(vertShader.Inputs))
 	for _, inp := range vertShader.Inputs {
 		attr[inp.Location] = inp.Name
@@ -568,24 +568,24 @@ func (b *Backend) NewProgram(vertShader, fragShader backend.ShaderSources) (back
 	return gpuProg, nil
 }
 
-func lookupUniform(funcs *glimpl.Functions, p glimpl.Program, loc backend.UniformLocation) uniformLocation {
+func lookupUniform(funcs *glimpl.Functions, p glimpl.Program, loc driver.UniformLocation) uniformLocation {
 	u := funcs.GetUniformLocation(p, loc.Name)
 	return uniformLocation{uniform: u, offset: loc.Offset, typ: loc.Type, size: loc.Size}
 }
 
-func (p *gpuProgram) SetStorageBuffer(binding int, buffer backend.Buffer) {
+func (p *gpuProgram) SetStorageBuffer(binding int, buffer driver.Buffer) {
 	buf := buffer.(*gpuBuffer)
-	if buf.typ&backend.BufferBindingShaderStorage == 0 {
+	if buf.typ&driver.BufferBindingShaderStorage == 0 {
 		panic("not a shader storage buffer")
 	}
 	p.storage[binding] = buf
 }
 
-func (p *gpuProgram) SetVertexUniforms(buffer backend.Buffer) {
+func (p *gpuProgram) SetVertexUniforms(buffer driver.Buffer) {
 	p.vertUniforms.setBuffer(buffer)
 }
 
-func (p *gpuProgram) SetFragmentUniforms(buffer backend.Buffer) {
+func (p *gpuProgram) SetFragmentUniforms(buffer driver.Buffer) {
 	p.fragUniforms.setBuffer(buffer)
 }
 
@@ -604,7 +604,7 @@ func (p *gpuProgram) updateUniforms() {
 	}
 }
 
-func (b *Backend) BindProgram(prog backend.Program) {
+func (b *Backend) BindProgram(prog driver.Program) {
 	p := prog.(*gpuProgram)
 	b.useProgram(p)
 }
@@ -613,7 +613,7 @@ func (p *gpuProgram) Release() {
 	p.backend.funcs.DeleteProgram(p.obj)
 }
 
-func (u *uniformsTracker) setup(funcs *glimpl.Functions, p glimpl.Program, uniformSize int, uniforms []backend.UniformLocation) {
+func (u *uniformsTracker) setup(funcs *glimpl.Functions, p glimpl.Program, uniformSize int, uniforms []driver.UniformLocation) {
 	u.locs = make([]uniformLocation, len(uniforms))
 	for i, uniform := range uniforms {
 		u.locs[i] = lookupUniform(funcs, p, uniform)
@@ -621,9 +621,9 @@ func (u *uniformsTracker) setup(funcs *glimpl.Functions, p glimpl.Program, unifo
 	u.size = uniformSize
 }
 
-func (u *uniformsTracker) setBuffer(buffer backend.Buffer) {
+func (u *uniformsTracker) setBuffer(buffer driver.Buffer) {
 	buf := buffer.(*gpuBuffer)
-	if buf.typ&backend.BufferBindingUniforms == 0 {
+	if buf.typ&driver.BufferBindingUniforms == 0 {
 		panic("not a uniform buffer")
 	}
 	if buf.size < u.size {
@@ -644,19 +644,19 @@ func (p *uniformsTracker) update(funcs *glimpl.Functions) {
 	for _, u := range p.locs {
 		data := data[u.offset:]
 		switch {
-		case u.typ == backend.DataTypeFloat && u.size == 1:
+		case u.typ == driver.DataTypeFloat && u.size == 1:
 			data := data[:4]
 			v := *(*[1]float32)(unsafe.Pointer(&data[0]))
 			funcs.Uniform1f(u.uniform, v[0])
-		case u.typ == backend.DataTypeFloat && u.size == 2:
+		case u.typ == driver.DataTypeFloat && u.size == 2:
 			data := data[:8]
 			v := *(*[2]float32)(unsafe.Pointer(&data[0]))
 			funcs.Uniform2f(u.uniform, v[0], v[1])
-		case u.typ == backend.DataTypeFloat && u.size == 3:
+		case u.typ == driver.DataTypeFloat && u.size == 3:
 			data := data[:12]
 			v := *(*[3]float32)(unsafe.Pointer(&data[0]))
 			funcs.Uniform3f(u.uniform, v[0], v[1], v[2])
-		case u.typ == backend.DataTypeFloat && u.size == 4:
+		case u.typ == driver.DataTypeFloat && u.size == 4:
 			data := data[:16]
 			v := *(*[4]float32)(unsafe.Pointer(&data[0]))
 			funcs.Uniform4f(u.uniform, v[0], v[1], v[2], v[3])
@@ -704,7 +704,7 @@ func (b *gpuBuffer) Download(data []byte) error {
 	}
 	copy(data, bufferMap)
 	if !b.backend.funcs.UnmapBuffer(firstBinding) {
-		return backend.ErrContentLost
+		return driver.ErrContentLost
 	}
 	return nil
 }
@@ -716,9 +716,9 @@ func (b *gpuBuffer) Release() {
 	}
 }
 
-func (b *Backend) BindVertexBuffer(buf backend.Buffer, stride, offset int) {
+func (b *Backend) BindVertexBuffer(buf driver.Buffer, stride, offset int) {
 	gbuf := buf.(*gpuBuffer)
-	if gbuf.typ&backend.BufferBindingVertices == 0 {
+	if gbuf.typ&driver.BufferBindingVertices == 0 {
 		panic("not a vertex buffer")
 	}
 	b.state.buffer = bufferBinding{buf: gbuf, stride: stride, offset: offset}
@@ -735,9 +735,9 @@ func (b *Backend) setupVertexArrays() {
 		l := layout.layout[i]
 		var gltyp glimpl.Enum
 		switch l.Type {
-		case backend.DataTypeFloat:
+		case driver.DataTypeFloat:
 			gltyp = glimpl.FLOAT
-		case backend.DataTypeShort:
+		case driver.DataTypeShort:
 			gltyp = glimpl.SHORT
 		default:
 			panic("unsupported data type")
@@ -746,15 +746,15 @@ func (b *Backend) setupVertexArrays() {
 	}
 }
 
-func (b *Backend) BindIndexBuffer(buf backend.Buffer) {
+func (b *Backend) BindIndexBuffer(buf driver.Buffer) {
 	gbuf := buf.(*gpuBuffer)
-	if gbuf.typ&backend.BufferBindingIndices == 0 {
+	if gbuf.typ&driver.BufferBindingIndices == 0 {
 		panic("not an index buffer")
 	}
 	b.funcs.BindBuffer(glimpl.ELEMENT_ARRAY_BUFFER, gbuf.obj)
 }
 
-func (b *Backend) BlitFramebuffer(dst, src backend.Framebuffer, srect, drect image.Rectangle) {
+func (b *Backend) BlitFramebuffer(dst, src driver.Framebuffer, srect, drect image.Rectangle) {
 	b.funcs.BindFramebuffer(glimpl.DRAW_FRAMEBUFFER, dst.(*gpuFramebuffer).obj)
 	b.funcs.BindFramebuffer(glimpl.READ_FRAMEBUFFER, src.(*gpuFramebuffer).obj)
 	b.funcs.BlitFramebuffer(
@@ -791,7 +791,7 @@ func flipImageY(stride int, height int, pixels []byte) {
 	}
 }
 
-func (b *Backend) BindFramebuffer(fbo backend.Framebuffer) {
+func (b *Backend) BindFramebuffer(fbo driver.Framebuffer) {
 	b.funcs.BindFramebuffer(glimpl.FRAMEBUFFER, fbo.(*gpuFramebuffer).obj)
 }
 
@@ -810,18 +810,18 @@ func (f *gpuFramebuffer) Release() {
 	}
 }
 
-func toTexFilter(f backend.TextureFilter) int {
+func toTexFilter(f driver.TextureFilter) int {
 	switch f {
-	case backend.FilterNearest:
+	case driver.FilterNearest:
 		return glimpl.NEAREST
-	case backend.FilterLinear:
+	case driver.FilterLinear:
 		return glimpl.LINEAR
 	default:
 		panic("unsupported texture filter")
 	}
 }
 
-func (b *Backend) BindTexture(unit int, t backend.Texture) {
+func (b *Backend) BindTexture(unit int, t driver.Texture) {
 	b.bindTexture(unit, t.(*gpuTexture))
 }
 
@@ -861,7 +861,7 @@ func (t *gpuTimer) Duration() (time.Duration, bool) {
 	return time.Duration(nanos), true
 }
 
-func (b *Backend) BindInputLayout(l backend.InputLayout) {
+func (b *Backend) BindInputLayout(l driver.InputLayout) {
 	b.state.layout = l.(*gpuInputLayout)
 }
 
@@ -941,15 +941,15 @@ func hasExtension(exts []string, ext string) bool {
 	return false
 }
 
-func firstBufferType(typ backend.BufferBinding) glimpl.Enum {
+func firstBufferType(typ driver.BufferBinding) glimpl.Enum {
 	switch {
-	case typ&backend.BufferBindingIndices != 0:
+	case typ&driver.BufferBindingIndices != 0:
 		return glimpl.ELEMENT_ARRAY_BUFFER
-	case typ&backend.BufferBindingVertices != 0:
+	case typ&driver.BufferBindingVertices != 0:
 		return glimpl.ARRAY_BUFFER
-	case typ&backend.BufferBindingUniforms != 0:
+	case typ&driver.BufferBindingUniforms != 0:
 		return glimpl.UNIFORM_BUFFER
-	case typ&backend.BufferBindingShaderStorage != 0:
+	case typ&driver.BufferBindingShaderStorage != 0:
 		return glimpl.SHADER_STORAGE_BUFFER
 	default:
 		panic("unsupported buffer type")

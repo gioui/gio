@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"testing"
 
-	"gioui.org/gpu/backend"
+	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/f32color"
 	"gioui.org/internal/unsafe"
 )
@@ -42,7 +42,7 @@ func TestSimpleShader(t *testing.T) {
 	}
 	defer p.Release()
 	b.BindProgram(p)
-	b.DrawArrays(backend.DrawModeTriangles, 0, 3)
+	b.DrawArrays(driver.DrawModeTriangles, 0, 3)
 	img := screenshot(t, fbo, sz)
 	if got := img.RGBAAt(0, 0); got != clearColExpect {
 		t.Errorf("got color %v, expected %v", got, clearColExpect)
@@ -65,7 +65,7 @@ func TestInputShader(t *testing.T) {
 	}
 	defer p.Release()
 	b.BindProgram(p)
-	buf, err := b.NewImmutableBuffer(backend.BufferBindingVertices,
+	buf, err := b.NewImmutableBuffer(driver.BufferBindingVertices,
 		unsafe.BytesView([]float32{
 			0, .5, .5, 1,
 			-.5, -.5, .5, 1,
@@ -77,9 +77,9 @@ func TestInputShader(t *testing.T) {
 	}
 	defer buf.Release()
 	b.BindVertexBuffer(buf, 4*4, 0)
-	layout, err := b.NewInputLayout(shader_input_vert, []backend.InputDesc{
+	layout, err := b.NewInputLayout(shader_input_vert, []driver.InputDesc{
 		{
-			Type:   backend.DataTypeFloat,
+			Type:   driver.DataTypeFloat,
 			Size:   4,
 			Offset: 0,
 		},
@@ -89,7 +89,7 @@ func TestInputShader(t *testing.T) {
 	}
 	defer layout.Release()
 	b.BindInputLayout(layout)
-	b.DrawArrays(backend.DrawModeTriangles, 0, 3)
+	b.DrawArrays(driver.DrawModeTriangles, 0, 3)
 	img := screenshot(t, fbo, sz)
 	if got := img.RGBAAt(0, 0); got != clearColExpect {
 		t.Errorf("got color %v, expected %v", got, clearColExpect)
@@ -125,7 +125,7 @@ func TestFramebuffers(t *testing.T) {
 	}
 }
 
-func setupFBO(t *testing.T, b backend.Device, size image.Point) backend.Framebuffer {
+func setupFBO(t *testing.T, b driver.Device, size image.Point) driver.Framebuffer {
 	fbo := newFBO(t, b, size)
 	b.BindFramebuffer(fbo)
 	// ClearColor accepts linear RGBA colors, while 8-bit colors
@@ -137,12 +137,12 @@ func setupFBO(t *testing.T, b backend.Device, size image.Point) backend.Framebuf
 	return fbo
 }
 
-func newFBO(t *testing.T, b backend.Device, size image.Point) backend.Framebuffer {
+func newFBO(t *testing.T, b driver.Device, size image.Point) driver.Framebuffer {
 	fboTex, err := b.NewTexture(
-		backend.TextureFormatSRGB,
+		driver.TextureFormatSRGB,
 		size.X, size.Y,
-		backend.FilterNearest, backend.FilterNearest,
-		backend.BufferBindingFramebuffer,
+		driver.FilterNearest, driver.FilterNearest,
+		driver.BufferBindingFramebuffer,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -161,7 +161,7 @@ func newFBO(t *testing.T, b backend.Device, size image.Point) backend.Framebuffe
 	return fbo
 }
 
-func newBackend(t *testing.T) backend.Device {
+func newBackend(t *testing.T) driver.Device {
 	ctx, err := newContext()
 	if err != nil {
 		t.Skipf("no context available: %v", err)
@@ -170,7 +170,7 @@ func newBackend(t *testing.T) backend.Device {
 	if err := ctx.MakeCurrent(); err != nil {
 		t.Fatal(err)
 	}
-	b, err := backend.NewDevice(ctx.API())
+	b, err := driver.NewDevice(ctx.API())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func newBackend(t *testing.T) backend.Device {
 	return b
 }
 
-func screenshot(t *testing.T, fbo backend.Framebuffer, size image.Point) *image.RGBA {
+func screenshot(t *testing.T, fbo driver.Framebuffer, size image.Point) *image.RGBA {
 	img := image.NewRGBA(image.Rectangle{Max: size})
 	err := fbo.ReadPixels(
 		image.Rectangle{

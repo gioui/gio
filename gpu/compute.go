@@ -14,7 +14,7 @@ import (
 	"unsafe"
 
 	"gioui.org/f32"
-	"gioui.org/gpu/backend"
+	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/f32color"
 	gunsafe "gioui.org/internal/unsafe"
 	"gioui.org/layout"
@@ -22,7 +22,7 @@ import (
 )
 
 type compute struct {
-	ctx backend.Device
+	ctx driver.Device
 	enc encoder
 
 	drawOps       drawOps
@@ -30,16 +30,16 @@ type compute struct {
 	maxTextureDim int
 
 	programs struct {
-		elements   backend.Program
-		tileAlloc  backend.Program
-		pathCoarse backend.Program
-		backdrop   backend.Program
-		binning    backend.Program
-		coarse     backend.Program
-		kernel4    backend.Program
+		elements   driver.Program
+		tileAlloc  driver.Program
+		pathCoarse driver.Program
+		backdrop   driver.Program
+		binning    driver.Program
+		coarse     driver.Program
+		kernel4    driver.Program
 	}
 	buffers struct {
-		config backend.Buffer
+		config driver.Buffer
 		scene  sizedBuffer
 		state  sizedBuffer
 		memory sizedBuffer
@@ -48,32 +48,32 @@ type compute struct {
 		size image.Point
 		// image is the output texture. Note that it is in RGBA format,
 		// but contains data in sRGB. See blitOutput for more detail.
-		image    backend.Texture
-		blitProg backend.Program
+		image    driver.Texture
+		blitProg driver.Program
 	}
 	// images contains ImageOp images packed into a texture atlas.
 	images struct {
 		packer packer
 		// positions maps imageOpData.handles to positions inside tex.
 		positions map[interface{}]image.Point
-		tex       backend.Texture
+		tex       driver.Texture
 	}
 	// materials contains the pre-processed materials (transformed images for
 	// now, gradients etc. later) packed in a texture atlas. The atlas is used
 	// as source in kernel4.
 	materials struct {
-		prog   backend.Program
-		layout backend.InputLayout
+		prog   driver.Program
+		layout driver.InputLayout
 
 		packer packer
 
 		texSize image.Point
-		tex     backend.Texture
-		fbo     backend.Framebuffer
+		tex     driver.Texture
+		fbo     driver.Framebuffer
 		quads   []materialVertex
 
 		bufSize int
-		buffer  backend.Buffer
+		buffer  driver.Buffer
 	}
 	timers struct {
 		profile         string
@@ -112,7 +112,7 @@ type encodeState struct {
 
 type sizedBuffer struct {
 	size   int
-	buffer backend.Buffer
+	buffer driver.Buffer
 }
 
 // config matches Config in setup.h
@@ -187,7 +187,7 @@ const (
 	memMallocFailed = 1 // ERR_MALLOC_FAILED
 )
 
-func newCompute(ctx backend.Device) (*compute, error) {
+func newCompute(ctx driver.Device) (*compute, error) {
 	maxDim := ctx.Caps().MaxTextureSize
 	// Large atlas textures cause artifacts due to precision loss in
 	// shaders.
@@ -215,9 +215,9 @@ func newCompute(ctx backend.Device) (*compute, error) {
 		return nil, err
 	}
 	g.materials.prog = materialProg
-	progLayout, err := ctx.NewInputLayout(shader_material_vert, []backend.InputDesc{
-		{Type: backend.DataTypeFloat, Size: 2, Offset: 0},
-		{Type: backend.DataTypeFloat, Size: 2, Offset: 4 * 2},
+	progLayout, err := ctx.NewInputLayout(shader_material_vert, []driver.InputDesc{
+		{Type: driver.DataTypeFloat, Size: 2, Offset: 0},
+		{Type: driver.DataTypeFloat, Size: 2, Offset: 4 * 2},
 	})
 	if err != nil {
 		g.Release()
@@ -228,7 +228,7 @@ func newCompute(ctx backend.Device) (*compute, error) {
 	g.drawOps.pathCache = newOpCache()
 	g.drawOps.retainPathData = true
 
-	buf, err := ctx.NewBuffer(backend.BufferBindingShaderStorage, int(unsafe.Sizeof(config{})))
+	buf, err := ctx.NewBuffer(driver.BufferBindingShaderStorage, int(unsafe.Sizeof(config{})))
 	if err != nil {
 		g.Release()
 		return nil, err
@@ -236,8 +236,8 @@ func newCompute(ctx backend.Device) (*compute, error) {
 	g.buffers.config = buf
 
 	shaders := []struct {
-		prog *backend.Program
-		src  backend.ShaderSources
+		prog *driver.Program
+		src  driver.ShaderSources
 	}{
 		{&g.programs.elements, shader_elements_comp},
 		{&g.programs.tileAlloc, shader_tile_alloc_comp},
@@ -264,7 +264,7 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	for _, img := range g.drawOps.allImageOps {
 		expandPathOp(img.path, img.clip)
 	}
-	if g.drawOps.profile && g.timers.t == nil && g.ctx.Caps().Features.Has(backend.FeatureTimers) {
+	if g.drawOps.profile && g.timers.t == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
 		t := &g.timers
 		t.t = newTimers(g.ctx)
 		t.elements = g.timers.t.newTimer()
@@ -333,7 +333,7 @@ func (g *compute) blitOutput(viewport image.Point) {
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.ctx.BindTexture(0, g.output.image)
 	g.ctx.BindProgram(g.output.blitProg)
-	g.ctx.DrawArrays(backend.DrawModeTriangleStrip, 0, 4)
+	g.ctx.DrawArrays(driver.DrawModeTriangleStrip, 0, 4)
 }
 
 func (g *compute) encode(viewport image.Point) error {
@@ -414,7 +414,7 @@ restart:
 			a.tex = nil
 		}
 		sz := a.packer.maxDim
-		handle, err := g.ctx.NewTexture(backend.TextureFormatSRGB, sz, sz, backend.FilterLinear, backend.FilterLinear, backend.BufferBindingTexture)
+		handle, err := g.ctx.NewTexture(driver.TextureFormatSRGB, sz, sz, driver.FilterLinear, driver.FilterLinear, driver.BufferBindingTexture)
 		if err != nil {
 			return fmt.Errorf("compute: failed to create image atlas: %v", err)
 		}
@@ -426,7 +426,7 @@ restart:
 			panic("compute: internal error: image not placed")
 		}
 		size := img.Bounds().Size()
-		backend.UploadImage(a.tex, pos, img)
+		driver.UploadImage(a.tex, pos, img)
 		rightPadding := image.Pt(padding, size.Y)
 		a.tex.Upload(image.Pt(pos.X+size.X, pos.Y), rightPadding, g.zeros(rightPadding.X*rightPadding.Y*4))
 		bottomPadding := image.Pt(size.X, padding)
@@ -453,7 +453,7 @@ func (g *compute) renderMaterials() error {
 		// Round to nearest power of 2 while we're doing an expensive recreation anyway.
 		sz := image.Pt(pow2Ceil(outSize.X), pow2Ceil(outSize.Y))
 		m.texSize = sz
-		handle, err := g.ctx.NewTexture(backend.TextureFormatRGBA8, sz.X, sz.Y, backend.FilterNearest, backend.FilterNearest, backend.BufferBindingShaderStorage|backend.BufferBindingFramebuffer)
+		handle, err := g.ctx.NewTexture(driver.TextureFormatRGBA8, sz.X, sz.Y, driver.FilterNearest, driver.FilterNearest, driver.BufferBindingShaderStorage|driver.BufferBindingFramebuffer)
 		if err != nil {
 			return fmt.Errorf("compute: failed to create material atlas: %v", err)
 		}
@@ -480,7 +480,7 @@ func (g *compute) renderMaterials() error {
 		}
 		// Ditto.
 		n := pow2Ceil(len(vertexData))
-		buf, err := g.ctx.NewBuffer(backend.BufferBindingVertices, n)
+		buf, err := g.ctx.NewBuffer(driver.BufferBindingVertices, n)
 		if err != nil {
 			return err
 		}
@@ -495,7 +495,7 @@ func (g *compute) renderMaterials() error {
 	g.ctx.BindProgram(m.prog)
 	g.ctx.BindVertexBuffer(m.buffer, int(unsafe.Sizeof(m.quads[0])), 0)
 	g.ctx.BindInputLayout(m.layout)
-	g.ctx.DrawArrays(backend.DrawModeTriangles, 0, len(m.quads))
+	g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(m.quads))
 	return nil
 }
 
@@ -719,9 +719,9 @@ func (g *compute) render(tileDims image.Point) error {
 			return err
 		}
 	}
-	g.ctx.BindImageTexture(kernel4OutputUnit, g.output.image, backend.AccessWrite, backend.TextureFormatRGBA8)
+	g.ctx.BindImageTexture(kernel4OutputUnit, g.output.image, driver.AccessWrite, driver.TextureFormatRGBA8)
 	if t := g.materials.tex; t != nil {
-		g.ctx.BindImageTexture(kernel4AtlasUnit, t, backend.AccessRead, backend.TextureFormatRGBA8)
+		g.ctx.BindImageTexture(kernel4AtlasUnit, t, driver.AccessRead, driver.TextureFormatRGBA8)
 	}
 
 	// alloc is the number of allocated bytes for static buffers.
@@ -819,7 +819,7 @@ func (g *compute) render(tileDims image.Point) error {
 		t.kernel4.end()
 
 		if err := g.buffers.memory.buffer.Download(gunsafe.StructView(g.memHeader)); err != nil {
-			if err == backend.ErrContentLost {
+			if err == driver.ErrContentLost {
 				continue
 			}
 			return err
@@ -854,10 +854,10 @@ func (g *compute) resizeOutput(size image.Point) error {
 		g.output.image.Release()
 		g.output.image = nil
 	}
-	img, err := g.ctx.NewTexture(backend.TextureFormatRGBA8, size.X, size.Y,
-		backend.FilterNearest,
-		backend.FilterNearest,
-		backend.BufferBindingShaderStorage|backend.BufferBindingTexture)
+	img, err := g.ctx.NewTexture(driver.TextureFormatRGBA8, size.X, size.Y,
+		driver.FilterNearest,
+		driver.FilterNearest,
+		driver.BufferBindingShaderStorage|driver.BufferBindingTexture)
 	if err != nil {
 		return err
 	}
@@ -873,7 +873,7 @@ func (g *compute) Release() {
 	if g.cache != nil {
 		g.cache.release()
 	}
-	progs := []backend.Program{
+	progs := []driver.Program{
 		g.programs.elements,
 		g.programs.tileAlloc,
 		g.programs.pathCoarse,
@@ -942,14 +942,14 @@ func (b *sizedBuffer) release() {
 	*b = sizedBuffer{}
 }
 
-func (b *sizedBuffer) ensureCapacity(ctx backend.Device, size int) error {
+func (b *sizedBuffer) ensureCapacity(ctx driver.Device, size int) error {
 	if b.size >= size {
 		return nil
 	}
 	if b.buffer != nil {
 		b.release()
 	}
-	buf, err := ctx.NewBuffer(backend.BufferBindingShaderStorage, size)
+	buf, err := ctx.NewBuffer(driver.BufferBindingShaderStorage, size)
 	if err != nil {
 		return err
 	}
@@ -958,7 +958,7 @@ func (b *sizedBuffer) ensureCapacity(ctx backend.Device, size int) error {
 	return nil
 }
 
-func bindStorageBuffers(prog backend.Program, buffers ...backend.Buffer) {
+func bindStorageBuffers(prog driver.Program, buffers ...driver.Buffer) {
 	for i, buf := range buffers {
 		prog.SetStorageBuffer(i, buf)
 	}

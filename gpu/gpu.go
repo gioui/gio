@@ -20,7 +20,7 @@ import (
 	"unsafe"
 
 	"gioui.org/f32"
-	"gioui.org/gpu/backend"
+	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/f32color"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
@@ -57,12 +57,12 @@ type gpu struct {
 	frameStart                                        time.Time
 	zopsTimer, stencilTimer, coverTimer, cleanupTimer *timer
 	drawOps                                           drawOps
-	ctx                                               backend.Device
+	ctx                                               driver.Device
 	renderer                                          *renderer
 }
 
 type renderer struct {
-	ctx           backend.Device
+	ctx           driver.Device
 	blitter       *blitter
 	pather        *pather
 	packer        packer
@@ -302,18 +302,18 @@ type resource interface {
 
 type texture struct {
 	src *image.RGBA
-	tex backend.Texture
+	tex driver.Texture
 }
 
 type blitter struct {
-	ctx                    backend.Device
+	ctx                    driver.Device
 	viewport               image.Point
 	prog                   [3]*program
-	layout                 backend.InputLayout
+	layout                 driver.InputLayout
 	colUniforms            *blitColUniforms
 	texUniforms            *blitTexUniforms
 	linearGradientUniforms *blitLinearGradientUniforms
-	quadVerts              backend.Buffer
+	quadVerts              driver.Buffer
 }
 
 type blitColUniforms struct {
@@ -344,12 +344,12 @@ type blitLinearGradientUniforms struct {
 }
 
 type uniformBuffer struct {
-	buf backend.Buffer
+	buf driver.Buffer
 	ptr []byte
 }
 
 type program struct {
-	prog         backend.Program
+	prog         driver.Program
 	vertUniforms *uniformBuffer
 	fragUniforms *uniformBuffer
 }
@@ -385,23 +385,23 @@ const (
 )
 
 func New(api API) (GPU, error) {
-	d, err := backend.NewDevice(api)
+	d, err := driver.NewDevice(api)
 	if err != nil {
 		return nil, err
 	}
 	forceCompute := os.Getenv("GIORENDERER") == "forcecompute"
 	feats := d.Caps().Features
 	switch {
-	case !forceCompute && feats.Has(backend.FeatureFloatRenderTargets):
+	case !forceCompute && feats.Has(driver.FeatureFloatRenderTargets):
 		return newGPU(d)
-	case feats.Has(backend.FeatureCompute):
+	case feats.Has(driver.FeatureCompute):
 		return newCompute(d)
 	default:
 		return nil, errors.New("gpu: no support for float render targets nor compute")
 	}
 }
 
-func newGPU(ctx backend.Device) (*gpu, error) {
+func newGPU(ctx driver.Device) (*gpu, error) {
 	g := &gpu{
 		cache: newResourceCache(),
 	}
@@ -412,7 +412,7 @@ func newGPU(ctx backend.Device) (*gpu, error) {
 	return g, nil
 }
 
-func (g *gpu) init(ctx backend.Device) error {
+func (g *gpu) init(ctx driver.Device) error {
 	g.ctx = ctx
 	g.renderer = newRenderer(ctx)
 	return nil
@@ -439,7 +439,7 @@ func (g *gpu) Collect(viewport image.Point, frameOps *op.Ops) {
 	g.drawOps.reset(g.cache, viewport)
 	g.drawOps.collect(g.ctx, g.cache, frameOps, viewport)
 	g.frameStart = time.Now()
-	if g.drawOps.profile && g.timers == nil && g.ctx.Caps().Features.Has(backend.FeatureTimers) {
+	if g.drawOps.profile && g.timers == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
 		g.timers = newTimers(g.ctx)
 		g.zopsTimer = g.timers.newTimer()
 		g.stencilTimer = g.timers.newTimer()
@@ -459,7 +459,7 @@ func (g *gpu) Frame() error {
 		g.zopsTimer.begin()
 	}
 	g.ctx.BindFramebuffer(defFBO)
-	g.ctx.DepthFunc(backend.DepthFuncGreater)
+	g.ctx.DepthFunc(driver.DepthFuncGreater)
 	// Note that Clear must be before ClearDepth if nothing else is rendered
 	// (len(zimageOps) == 0). If not, the Fairphone 2 will corrupt the depth buffer.
 	if g.drawOps.clear {
@@ -505,7 +505,7 @@ func (g *gpu) Profile() string {
 	return g.profile
 }
 
-func (r *renderer) texHandle(cache *resourceCache, data imageOpData) backend.Texture {
+func (r *renderer) texHandle(cache *resourceCache, data imageOpData) driver.Texture {
 	var tex *texture
 	t, exists := cache.get(data.handle)
 	if !exists {
@@ -518,11 +518,11 @@ func (r *renderer) texHandle(cache *resourceCache, data imageOpData) backend.Tex
 	if tex.tex != nil {
 		return tex.tex
 	}
-	handle, err := r.ctx.NewTexture(backend.TextureFormatSRGB, data.src.Bounds().Dx(), data.src.Bounds().Dy(), backend.FilterLinear, backend.FilterLinear, backend.BufferBindingTexture)
+	handle, err := r.ctx.NewTexture(driver.TextureFormatSRGB, data.src.Bounds().Dx(), data.src.Bounds().Dy(), driver.FilterLinear, driver.FilterLinear, driver.BufferBindingTexture)
 	if err != nil {
 		panic(err)
 	}
-	backend.UploadImage(handle, image.Pt(0, 0), data.src)
+	driver.UploadImage(handle, image.Pt(0, 0), data.src)
 	tex.tex = handle
 	return tex.tex
 }
@@ -533,7 +533,7 @@ func (t *texture) release() {
 	}
 }
 
-func newRenderer(ctx backend.Device) *renderer {
+func newRenderer(ctx driver.Device) *renderer {
 	r := &renderer{
 		ctx:     ctx,
 		blitter: newBlitter(ctx),
@@ -557,8 +557,8 @@ func (r *renderer) release() {
 	r.blitter.release()
 }
 
-func newBlitter(ctx backend.Device) *blitter {
-	quadVerts, err := ctx.NewImmutableBuffer(backend.BufferBindingVertices,
+func newBlitter(ctx driver.Device) *blitter {
+	quadVerts, err := ctx.NewImmutableBuffer(driver.BufferBindingVertices,
 		gunsafe.BytesView([]float32{
 			-1, +1, 0, 0,
 			+1, +1, 1, 0,
@@ -596,7 +596,7 @@ func (b *blitter) release() {
 	b.layout.Release()
 }
 
-func createColorPrograms(b backend.Device, vsSrc backend.ShaderSources, fsSrc [3]backend.ShaderSources, vertUniforms, fragUniforms [3]interface{}) ([3]*program, backend.InputLayout, error) {
+func createColorPrograms(b driver.Device, vsSrc driver.ShaderSources, fsSrc [3]driver.ShaderSources, vertUniforms, fragUniforms [3]interface{}) ([3]*program, driver.InputLayout, error) {
 	var progs [3]*program
 	{
 		prog, err := b.NewProgram(vsSrc, fsSrc[materialTexture])
@@ -649,9 +649,9 @@ func createColorPrograms(b backend.Device, vsSrc backend.ShaderSources, fsSrc [3
 		}
 		progs[materialLinearGradient] = newProgram(prog, vertBuffer, fragBuffer)
 	}
-	layout, err := b.NewInputLayout(vsSrc, []backend.InputDesc{
-		{Type: backend.DataTypeFloat, Size: 2, Offset: 0},
-		{Type: backend.DataTypeFloat, Size: 2, Offset: 4 * 2},
+	layout, err := b.NewInputLayout(vsSrc, []driver.InputDesc{
+		{Type: driver.DataTypeFloat, Size: 2, Offset: 0},
+		{Type: driver.DataTypeFloat, Size: 2, Offset: 4 * 2},
 	})
 	if err != nil {
 		progs[materialTexture].Release()
@@ -726,7 +726,7 @@ func (r *renderer) intersectPath(p *pathOp, clip image.Rectangle) {
 	r.pather.stenciler.iprog.uniforms.vert.uvTransform = [4]float32{coverScale.X, coverScale.Y, coverOff.X, coverOff.Y}
 	r.pather.stenciler.iprog.uniforms.vert.subUVTransform = [4]float32{subScale.X, subScale.Y, subOff.X, subOff.Y}
 	r.pather.stenciler.iprog.prog.UploadUniforms()
-	r.ctx.DrawArrays(backend.DrawModeTriangleStrip, 0, 4)
+	r.ctx.DrawArrays(driver.DrawModeTriangleStrip, 0, 4)
 }
 
 func (r *renderer) packIntersections(ops []imageOp) {
@@ -819,7 +819,7 @@ func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
 	d.vertCache = d.vertCache[:0]
 }
 
-func (d *drawOps) collect(ctx backend.Device, cache *resourceCache, root *op.Ops, viewport image.Point) {
+func (d *drawOps) collect(ctx driver.Device, cache *resourceCache, root *op.Ops, viewport image.Point) {
 	clip := f32.Rectangle{
 		Max: f32.Point{X: float32(viewport.X), Y: float32(viewport.Y)},
 	}
@@ -1135,10 +1135,10 @@ func (r *renderer) drawZOps(cache *resourceCache, ops []imageOp) {
 func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 	r.ctx.SetDepthTest(true)
 	r.ctx.DepthMask(false)
-	r.ctx.BlendFunc(backend.BlendFactorOne, backend.BlendFactorOneMinusSrcAlpha)
+	r.ctx.BlendFunc(driver.BlendFactorOne, driver.BlendFactorOneMinusSrcAlpha)
 	r.ctx.BindVertexBuffer(r.blitter.quadVerts, 4*4, 0)
 	r.ctx.BindInputLayout(r.pather.coverer.layout)
-	var coverTex backend.Texture
+	var coverTex driver.Texture
 	for _, img := range ops {
 		m := img.material
 		switch m.material {
@@ -1198,18 +1198,18 @@ func (b *blitter) blit(z float32, mat materialType, col f32color.RGBA, col1, col
 	uniforms.z = z
 	uniforms.transform = [4]float32{scale.X, scale.Y, off.X, off.Y}
 	p.UploadUniforms()
-	b.ctx.DrawArrays(backend.DrawModeTriangleStrip, 0, 4)
+	b.ctx.DrawArrays(driver.DrawModeTriangleStrip, 0, 4)
 }
 
 // newUniformBuffer creates a new GPU uniform buffer backed by the
 // structure uniformBlock points to.
-func newUniformBuffer(b backend.Device, uniformBlock interface{}) *uniformBuffer {
+func newUniformBuffer(b driver.Device, uniformBlock interface{}) *uniformBuffer {
 	ref := reflect.ValueOf(uniformBlock)
 	// Determine the size of the uniforms structure, *uniforms.
 	size := ref.Elem().Type().Size()
 	// Map the uniforms structure as a byte slice.
 	ptr := (*[1 << 30]byte)(unsafe.Pointer(ref.Pointer()))[:size:size]
-	ubuf, err := b.NewBuffer(backend.BufferBindingUniforms, len(ptr))
+	ubuf, err := b.NewBuffer(driver.BufferBindingUniforms, len(ptr))
 	if err != nil {
 		panic(err)
 	}
@@ -1225,7 +1225,7 @@ func (u *uniformBuffer) Release() {
 	u.buf = nil
 }
 
-func newProgram(prog backend.Program, vertUniforms, fragUniforms *uniformBuffer) *program {
+func newProgram(prog driver.Program, vertUniforms, fragUniforms *uniformBuffer) *program {
 	if vertUniforms != nil {
 		prog.SetVertexUniforms(vertUniforms.buf)
 	}

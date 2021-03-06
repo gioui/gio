@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"gioui.org/gpu/backend"
+	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/d3d11"
 	gunsafe "gioui.org/internal/unsafe"
 )
@@ -29,7 +29,7 @@ type Backend struct {
 	// Current program.
 	prog *Program
 
-	caps backend.Caps
+	caps driver.Caps
 
 	// fbo is the currently bound fbo.
 	fbo *Framebuffer
@@ -43,20 +43,20 @@ type Backend struct {
 
 type blendState struct {
 	enable  bool
-	sfactor backend.BlendFactor
-	dfactor backend.BlendFactor
+	sfactor driver.BlendFactor
+	dfactor driver.BlendFactor
 }
 
 type depthState struct {
 	enable bool
 	mask   bool
-	fn     backend.DepthFunc
+	fn     driver.DepthFunc
 }
 
 type Texture struct {
 	backend  *Backend
 	format   uint32
-	bindings backend.BufferBinding
+	bindings driver.BufferBinding
 	tex      *d3d11.Texture2D
 	sampler  *d3d11.SamplerState
 	resView  *d3d11.ShaderResourceView
@@ -99,7 +99,7 @@ type InputLayout struct {
 }
 
 func init() {
-	backend.NewDirect3D11Device = newDirect3D11Device
+	driver.NewDirect3D11Device = newDirect3D11Device
 }
 
 func detectFloatFormat(dev *d3d11.Device) (uint32, bool) {
@@ -121,12 +121,12 @@ func detectFloatFormat(dev *d3d11.Device) (uint32, bool) {
 	return 0, false
 }
 
-func newDirect3D11Device(api backend.Direct3D11) (backend.Device, error) {
+func newDirect3D11Device(api driver.Direct3D11) (driver.Device, error) {
 	dev := (*d3d11.Device)(api.Device)
 	b := &Backend{
 		dev: dev,
 		ctx: dev.GetImmediateContext(),
-		caps: backend.Caps{
+		caps: driver.Caps{
 			MaxTextureSize: 2048, // 9.1 maximum
 		},
 		depthStates: make(map[depthState]*d3d11.DepthStencilState),
@@ -146,7 +146,7 @@ func newDirect3D11Device(api backend.Direct3D11) (backend.Device, error) {
 	}
 	if fmt, ok := detectFloatFormat(dev); ok {
 		b.floatFormat = fmt
-		b.caps.Features |= backend.FeatureFloatRenderTargets
+		b.caps.Features |= driver.FeatureFloatRenderTargets
 	}
 	// Enable depth mask to match OpenGL.
 	b.depthState.mask = true
@@ -164,7 +164,7 @@ func newDirect3D11Device(api backend.Direct3D11) (backend.Device, error) {
 	return b, nil
 }
 
-func (b *Backend) BeginFrame() backend.Framebuffer {
+func (b *Backend) BeginFrame() driver.Framebuffer {
 	renderTarget, depthView := b.ctx.OMGetRenderTargets()
 	// Assume someone else is holding on to the render targets.
 	if renderTarget != nil {
@@ -179,11 +179,11 @@ func (b *Backend) BeginFrame() backend.Framebuffer {
 func (b *Backend) EndFrame() {
 }
 
-func (b *Backend) Caps() backend.Caps {
+func (b *Backend) Caps() driver.Caps {
 	return b.caps
 }
 
-func (b *Backend) NewTimer() backend.Timer {
+func (b *Backend) NewTimer() driver.Timer {
 	panic("timers not supported")
 }
 
@@ -202,12 +202,12 @@ func (b *Backend) Release() {
 	*b = Backend{}
 }
 
-func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, minFilter, magFilter backend.TextureFilter, bindings backend.BufferBinding) (backend.Texture, error) {
+func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, minFilter, magFilter driver.TextureFilter, bindings driver.BufferBinding) (driver.Texture, error) {
 	var d3dfmt uint32
 	switch format {
-	case backend.TextureFormatFloat:
+	case driver.TextureFormatFloat:
 		d3dfmt = b.floatFormat
-	case backend.TextureFormatSRGB:
+	case driver.TextureFormatSRGB:
 		d3dfmt = d3d11.DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
 	default:
 		return nil, fmt.Errorf("unsupported texture format %d", format)
@@ -231,12 +231,12 @@ func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, mi
 		sampler *d3d11.SamplerState
 		resView *d3d11.ShaderResourceView
 	)
-	if bindings&backend.BufferBindingTexture != 0 {
+	if bindings&driver.BufferBindingTexture != 0 {
 		var filter uint32
 		switch {
-		case minFilter == backend.FilterNearest && magFilter == backend.FilterNearest:
+		case minFilter == driver.FilterNearest && magFilter == driver.FilterNearest:
 			filter = d3d11.FILTER_MIN_MAG_MIP_POINT
-		case minFilter == backend.FilterLinear && magFilter == backend.FilterLinear:
+		case minFilter == driver.FilterLinear && magFilter == driver.FilterLinear:
 			filter = d3d11.FILTER_MIN_MAG_LINEAR_MIP_POINT
 		default:
 			d3d11.IUnknownRelease(unsafe.Pointer(tex), tex.Vtbl.Release)
@@ -278,9 +278,9 @@ func (b *Backend) NewTexture(format backend.TextureFormat, width, height int, mi
 	return &Texture{backend: b, format: d3dfmt, tex: tex, sampler: sampler, resView: resView, bindings: bindings, width: width, height: height}, nil
 }
 
-func (b *Backend) NewFramebuffer(tex backend.Texture, depthBits int) (backend.Framebuffer, error) {
+func (b *Backend) NewFramebuffer(tex driver.Texture, depthBits int) (driver.Framebuffer, error) {
 	d3dtex := tex.(*Texture)
-	if d3dtex.bindings&backend.BufferBindingFramebuffer == 0 {
+	if d3dtex.bindings&driver.BufferBindingFramebuffer == 0 {
 		return nil, errors.New("the texture was created without BufferBindingFramebuffer binding")
 	}
 	resource := (*d3d11.Resource)(unsafe.Pointer(d3dtex.tex))
@@ -300,7 +300,7 @@ func (b *Backend) NewFramebuffer(tex backend.Texture, depthBits int) (backend.Fr
 	return fbo, nil
 }
 
-func (b *Backend) NewInputLayout(vertexShader backend.ShaderSources, layout []backend.InputDesc) (backend.InputLayout, error) {
+func (b *Backend) NewInputLayout(vertexShader driver.ShaderSources, layout []driver.InputDesc) (driver.InputLayout, error) {
 	if len(vertexShader.Inputs) != len(layout) {
 		return nil, fmt.Errorf("NewInputLayout: got %d inputs, expected %d", len(layout), len(vertexShader.Inputs))
 	}
@@ -313,7 +313,7 @@ func (b *Backend) NewInputLayout(vertexShader backend.ShaderSources, layout []ba
 		}
 		var format uint32
 		switch l.Type {
-		case backend.DataTypeFloat:
+		case driver.DataTypeFloat:
 			switch l.Size {
 			case 1:
 				format = d3d11.DXGI_FORMAT_R32_FLOAT
@@ -326,7 +326,7 @@ func (b *Backend) NewInputLayout(vertexShader backend.ShaderSources, layout []ba
 			default:
 				panic("unsupported float data size")
 			}
-		case backend.DataTypeShort:
+		case driver.DataTypeShort:
 			switch l.Size {
 			case 1:
 				format = d3d11.DXGI_FORMAT_R16_SINT
@@ -352,9 +352,9 @@ func (b *Backend) NewInputLayout(vertexShader backend.ShaderSources, layout []ba
 	return &InputLayout{layout: l}, nil
 }
 
-func (b *Backend) NewBuffer(typ backend.BufferBinding, size int) (backend.Buffer, error) {
-	if typ&backend.BufferBindingUniforms != 0 {
-		if typ != backend.BufferBindingUniforms {
+func (b *Backend) NewBuffer(typ driver.BufferBinding, size int) (driver.Buffer, error) {
+	if typ&driver.BufferBindingUniforms != 0 {
+		if typ != driver.BufferBindingUniforms {
 			return nil, errors.New("uniform buffers cannot have other bindings")
 		}
 		if size%16 != 0 {
@@ -372,9 +372,9 @@ func (b *Backend) NewBuffer(typ backend.BufferBinding, size int) (backend.Buffer
 	return &Buffer{backend: b, buf: buf, bind: bind}, nil
 }
 
-func (b *Backend) NewImmutableBuffer(typ backend.BufferBinding, data []byte) (backend.Buffer, error) {
-	if typ&backend.BufferBindingUniforms != 0 {
-		if typ != backend.BufferBindingUniforms {
+func (b *Backend) NewImmutableBuffer(typ driver.BufferBinding, data []byte) (driver.Buffer, error) {
+	if typ&driver.BufferBindingUniforms != 0 {
+		if typ != driver.BufferBindingUniforms {
 			return nil, errors.New("uniform buffers cannot have other bindings")
 		}
 		if len(data)%16 != 0 {
@@ -393,11 +393,11 @@ func (b *Backend) NewImmutableBuffer(typ backend.BufferBinding, data []byte) (ba
 	return &Buffer{backend: b, buf: buf, bind: bind, immutable: true}, nil
 }
 
-func (b *Backend) NewComputeProgram(shader backend.ShaderSources) (backend.Program, error) {
+func (b *Backend) NewComputeProgram(shader driver.ShaderSources) (driver.Program, error) {
 	panic("not implemented")
 }
 
-func (b *Backend) NewProgram(vertexShader, fragmentShader backend.ShaderSources) (backend.Program, error) {
+func (b *Backend) NewProgram(vertexShader, fragmentShader driver.ShaderSources) (driver.Program, error) {
 	vs, err := b.dev.CreateVertexShader(vertexShader.HLSL)
 	if err != nil {
 		return nil, err
@@ -435,17 +435,17 @@ func (b *Backend) Viewport(x, y, width, height int) {
 	b.ctx.RSSetViewports(&b.viewport)
 }
 
-func (b *Backend) DrawArrays(mode backend.DrawMode, off, count int) {
+func (b *Backend) DrawArrays(mode driver.DrawMode, off, count int) {
 	b.prepareDraw(mode)
 	b.ctx.Draw(uint32(count), uint32(off))
 }
 
-func (b *Backend) DrawElements(mode backend.DrawMode, off, count int) {
+func (b *Backend) DrawElements(mode driver.DrawMode, off, count int) {
 	b.prepareDraw(mode)
 	b.ctx.DrawIndexed(uint32(count), uint32(off), 0)
 }
 
-func (b *Backend) prepareDraw(mode backend.DrawMode) {
+func (b *Backend) prepareDraw(mode driver.DrawMode) {
 	if p := b.prog; p != nil {
 		b.ctx.VSSetShader(p.vert.shader)
 		b.ctx.PSSetShader(p.frag.shader)
@@ -458,9 +458,9 @@ func (b *Backend) prepareDraw(mode backend.DrawMode) {
 	}
 	var topology uint32
 	switch mode {
-	case backend.DrawModeTriangles:
+	case driver.DrawModeTriangles:
 		topology = d3d11.PRIMITIVE_TOPOLOGY_TRIANGLELIST
-	case backend.DrawModeTriangleStrip:
+	case driver.DrawModeTriangleStrip:
 		topology = d3d11.PRIMITIVE_TOPOLOGY_TRIANGLESTRIP
 	default:
 		panic("unsupported draw mode")
@@ -477,9 +477,9 @@ func (b *Backend) prepareDraw(mode backend.DrawMode) {
 			desc.DepthWriteMask = d3d11.DEPTH_WRITE_MASK_ALL
 		}
 		switch b.depthState.fn {
-		case backend.DepthFuncGreater:
+		case driver.DepthFuncGreater:
 			desc.DepthFunc = d3d11.COMPARISON_GREATER
-		case backend.DepthFuncGreaterEqual:
+		case driver.DepthFuncGreaterEqual:
 			desc.DepthFunc = d3d11.COMPARISON_GREATER_EQUAL
 		default:
 			panic("unsupported depth func")
@@ -519,7 +519,7 @@ func (b *Backend) prepareDraw(mode backend.DrawMode) {
 	b.ctx.OMSetBlendState(blendState, nil, 0xffffffff)
 }
 
-func (b *Backend) DepthFunc(f backend.DepthFunc) {
+func (b *Backend) DepthFunc(f driver.DepthFunc) {
 	b.depthState.fn = f
 }
 
@@ -535,12 +535,12 @@ func (b *Backend) DepthMask(mask bool) {
 	b.depthState.mask = mask
 }
 
-func (b *Backend) BlendFunc(sfactor, dfactor backend.BlendFactor) {
+func (b *Backend) BlendFunc(sfactor, dfactor driver.BlendFactor) {
 	b.blendState.sfactor = sfactor
 	b.blendState.dfactor = dfactor
 }
 
-func (b *Backend) BindImageTexture(unit int, tex backend.Texture, access backend.AccessBits, f backend.TextureFormat) {
+func (b *Backend) BindImageTexture(unit int, tex driver.Texture, access driver.AccessBits, f driver.TextureFormat) {
 	panic("not implemented")
 }
 
@@ -579,13 +579,13 @@ func (t *Texture) Release() {
 	}
 }
 
-func (b *Backend) BindTexture(unit int, tex backend.Texture) {
+func (b *Backend) BindTexture(unit int, tex driver.Texture) {
 	t := tex.(*Texture)
 	b.ctx.PSSetSamplers(uint32(unit), t.sampler)
 	b.ctx.PSSetShaderResources(uint32(unit), t.resView)
 }
 
-func (b *Backend) BindProgram(prog backend.Program) {
+func (b *Backend) BindProgram(prog driver.Program) {
 	b.prog = prog.(*Program)
 }
 
@@ -596,23 +596,23 @@ func (p *Program) Release() {
 	p.frag.shader = nil
 }
 
-func (p *Program) SetStorageBuffer(binding int, buffer backend.Buffer) {
+func (p *Program) SetStorageBuffer(binding int, buffer driver.Buffer) {
 	panic("not implemented")
 }
 
-func (p *Program) SetVertexUniforms(buf backend.Buffer) {
+func (p *Program) SetVertexUniforms(buf driver.Buffer) {
 	p.vert.uniforms = buf.(*Buffer)
 }
 
-func (p *Program) SetFragmentUniforms(buf backend.Buffer) {
+func (p *Program) SetFragmentUniforms(buf driver.Buffer) {
 	p.frag.uniforms = buf.(*Buffer)
 }
 
-func (b *Backend) BindVertexBuffer(buf backend.Buffer, stride, offset int) {
+func (b *Backend) BindVertexBuffer(buf driver.Buffer, stride, offset int) {
 	b.ctx.IASetVertexBuffers(buf.(*Buffer).buf, uint32(stride), uint32(offset))
 }
 
-func (b *Backend) BindIndexBuffer(buf backend.Buffer) {
+func (b *Backend) BindIndexBuffer(buf driver.Buffer) {
 	b.ctx.IASetIndexBuffer(buf.(*Buffer).buf, d3d11.DXGI_FORMAT_R16_UINT, 0)
 }
 
@@ -684,7 +684,7 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 	return nil
 }
 
-func (b *Backend) BindFramebuffer(fbo backend.Framebuffer) {
+func (b *Backend) BindFramebuffer(fbo driver.Framebuffer) {
 	b.fbo = fbo.(*Framebuffer)
 	b.ctx.OMSetRenderTargets(b.fbo.renderTarget, b.fbo.depthView)
 }
@@ -706,7 +706,7 @@ func (f *Framebuffer) Release() {
 	}
 }
 
-func (b *Backend) BindInputLayout(layout backend.InputLayout) {
+func (b *Backend) BindInputLayout(layout driver.InputLayout) {
 	b.ctx.IASetInputLayout(layout.(*InputLayout).layout)
 }
 
@@ -715,35 +715,35 @@ func (l *InputLayout) Release() {
 	l.layout = nil
 }
 
-func convBufferBinding(typ backend.BufferBinding) uint32 {
+func convBufferBinding(typ driver.BufferBinding) uint32 {
 	var bindings uint32
-	if typ&backend.BufferBindingVertices != 0 {
+	if typ&driver.BufferBindingVertices != 0 {
 		bindings |= d3d11.BIND_VERTEX_BUFFER
 	}
-	if typ&backend.BufferBindingIndices != 0 {
+	if typ&driver.BufferBindingIndices != 0 {
 		bindings |= d3d11.BIND_INDEX_BUFFER
 	}
-	if typ&backend.BufferBindingUniforms != 0 {
+	if typ&driver.BufferBindingUniforms != 0 {
 		bindings |= d3d11.BIND_CONSTANT_BUFFER
 	}
-	if typ&backend.BufferBindingTexture != 0 {
+	if typ&driver.BufferBindingTexture != 0 {
 		bindings |= d3d11.BIND_SHADER_RESOURCE
 	}
-	if typ&backend.BufferBindingFramebuffer != 0 {
+	if typ&driver.BufferBindingFramebuffer != 0 {
 		bindings |= d3d11.BIND_RENDER_TARGET
 	}
 	return bindings
 }
 
-func toBlendFactor(f backend.BlendFactor) (uint32, uint32) {
+func toBlendFactor(f driver.BlendFactor) (uint32, uint32) {
 	switch f {
-	case backend.BlendFactorOne:
+	case driver.BlendFactorOne:
 		return d3d11.BLEND_ONE, d3d11.BLEND_ONE
-	case backend.BlendFactorOneMinusSrcAlpha:
+	case driver.BlendFactorOneMinusSrcAlpha:
 		return d3d11.BLEND_INV_SRC_ALPHA, d3d11.BLEND_INV_SRC_ALPHA
-	case backend.BlendFactorZero:
+	case driver.BlendFactorZero:
 		return d3d11.BLEND_ZERO, d3d11.BLEND_ZERO
-	case backend.BlendFactorDstColor:
+	case driver.BlendFactorDstColor:
 		return d3d11.BLEND_DEST_COLOR, d3d11.BLEND_DEST_ALPHA
 	default:
 		panic("unsupported blend source factor")
