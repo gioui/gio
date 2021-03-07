@@ -28,7 +28,7 @@ type pather struct {
 
 type coverer struct {
 	ctx                    driver.Device
-	prog                   [3]*program
+	prog                   [materialCount]*program
 	texUniforms            *coverTexUniforms
 	colUniforms            *coverColUniforms
 	linearGradientUniforms *coverLinearGradientUniforms
@@ -162,8 +162,16 @@ func newCoverer(ctx driver.Device) *coverer {
 	c.texUniforms = new(coverTexUniforms)
 	c.linearGradientUniforms = new(coverLinearGradientUniforms)
 	prog, layout, err := createColorPrograms(ctx, shader_cover_vert, shader_cover_frag,
-		[3]interface{}{&c.colUniforms.vert, &c.linearGradientUniforms.vert, &c.texUniforms.vert},
-		[3]interface{}{&c.colUniforms.frag, &c.linearGradientUniforms.frag, nil},
+		[materialCount]interface{}{
+			materialColor:          &c.colUniforms.vert,
+			materialLinearGradient: &c.linearGradientUniforms.vert,
+			materialTexture:        &c.texUniforms.vert,
+		},
+		[materialCount]interface{}{
+			materialColor:          &c.colUniforms.frag,
+			materialLinearGradient: &c.linearGradientUniforms.frag,
+			materialTexture:        nil,
+		},
 	)
 	if err != nil {
 		panic(err)

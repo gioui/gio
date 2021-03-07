@@ -308,7 +308,7 @@ type texture struct {
 type blitter struct {
 	ctx                    driver.Device
 	viewport               image.Point
-	prog                   [3]*program
+	prog                   [materialCount]*program
 	layout                 driver.InputLayout
 	colUniforms            *blitColUniforms
 	texUniforms            *blitTexUniforms
@@ -382,6 +382,7 @@ const (
 	materialColor materialType = iota
 	materialLinearGradient
 	materialTexture
+	materialCount
 )
 
 func New(api API) (GPU, error) {
@@ -569,6 +570,7 @@ func newBlitter(ctx driver.Device) *blitter {
 	if err != nil {
 		panic(err)
 	}
+
 	b := &blitter{
 		ctx:       ctx,
 		quadVerts: quadVerts,
@@ -576,13 +578,23 @@ func newBlitter(ctx driver.Device) *blitter {
 	b.colUniforms = new(blitColUniforms)
 	b.texUniforms = new(blitTexUniforms)
 	b.linearGradientUniforms = new(blitLinearGradientUniforms)
+
 	prog, layout, err := createColorPrograms(ctx, shader_blit_vert, shader_blit_frag,
-		[3]interface{}{&b.colUniforms.vert, &b.linearGradientUniforms.vert, &b.texUniforms.vert},
-		[3]interface{}{&b.colUniforms.frag, &b.linearGradientUniforms.frag, nil},
+		[...]interface{}{
+			materialColor:          &b.colUniforms.vert,
+			materialLinearGradient: &b.linearGradientUniforms.vert,
+			materialTexture:        &b.texUniforms.vert,
+		},
+		[...]interface{}{
+			materialColor:          &b.colUniforms.frag,
+			materialLinearGradient: &b.linearGradientUniforms.frag,
+			materialTexture:        nil,
+		},
 	)
 	if err != nil {
 		panic(err)
 	}
+
 	b.prog = prog
 	b.layout = layout
 	return b
@@ -596,67 +608,40 @@ func (b *blitter) release() {
 	b.layout.Release()
 }
 
-func createColorPrograms(b driver.Device, vsSrc driver.ShaderSources, fsSrc [3]driver.ShaderSources, vertUniforms, fragUniforms [3]interface{}) ([3]*program, driver.InputLayout, error) {
-	var progs [3]*program
-	{
-		prog, err := b.NewProgram(vsSrc, fsSrc[materialTexture])
+func createColorPrograms(b driver.Device, vsSrc driver.ShaderSources, fsSrc [materialCount]driver.ShaderSources, vertUniforms, fragUniforms [materialCount]interface{}) (_ [materialCount]*program, _ driver.InputLayout, err error) {
+	var progs [materialCount]*program
+
+	release := func() {
+		for _, p := range progs {
+			if p != nil {
+				p.Release()
+			}
+		}
+	}
+
+	for variant := range progs {
+		prog, err := b.NewProgram(vsSrc, fsSrc[variant])
 		if err != nil {
+			release()
 			return progs, nil, err
 		}
 		var vertBuffer, fragBuffer *uniformBuffer
-		if u := vertUniforms[materialTexture]; u != nil {
+		if u := vertUniforms[variant]; u != nil {
 			vertBuffer = newUniformBuffer(b, u)
 			prog.SetVertexUniforms(vertBuffer.buf)
 		}
-		if u := fragUniforms[materialTexture]; u != nil {
+		if u := fragUniforms[variant]; u != nil {
 			fragBuffer = newUniformBuffer(b, u)
 			prog.SetFragmentUniforms(fragBuffer.buf)
 		}
-		progs[materialTexture] = newProgram(prog, vertBuffer, fragBuffer)
+		progs[variant] = newProgram(prog, vertBuffer, fragBuffer)
 	}
-	{
-		var vertBuffer, fragBuffer *uniformBuffer
-		prog, err := b.NewProgram(vsSrc, fsSrc[materialColor])
-		if err != nil {
-			progs[materialTexture].Release()
-			return progs, nil, err
-		}
-		if u := vertUniforms[materialColor]; u != nil {
-			vertBuffer = newUniformBuffer(b, u)
-			prog.SetVertexUniforms(vertBuffer.buf)
-		}
-		if u := fragUniforms[materialColor]; u != nil {
-			fragBuffer = newUniformBuffer(b, u)
-			prog.SetFragmentUniforms(fragBuffer.buf)
-		}
-		progs[materialColor] = newProgram(prog, vertBuffer, fragBuffer)
-	}
-	{
-		var vertBuffer, fragBuffer *uniformBuffer
-		prog, err := b.NewProgram(vsSrc, fsSrc[materialLinearGradient])
-		if err != nil {
-			progs[materialTexture].Release()
-			progs[materialColor].Release()
-			return progs, nil, err
-		}
-		if u := vertUniforms[materialLinearGradient]; u != nil {
-			vertBuffer = newUniformBuffer(b, u)
-			prog.SetVertexUniforms(vertBuffer.buf)
-		}
-		if u := fragUniforms[materialLinearGradient]; u != nil {
-			fragBuffer = newUniformBuffer(b, u)
-			prog.SetFragmentUniforms(fragBuffer.buf)
-		}
-		progs[materialLinearGradient] = newProgram(prog, vertBuffer, fragBuffer)
-	}
+
 	layout, err := b.NewInputLayout(vsSrc, []driver.InputDesc{
 		{Type: driver.DataTypeFloat, Size: 2, Offset: 0},
 		{Type: driver.DataTypeFloat, Size: 2, Offset: 4 * 2},
 	})
 	if err != nil {
-		progs[materialTexture].Release()
-		progs[materialColor].Release()
-		progs[materialLinearGradient].Release()
 		return progs, nil, err
 	}
 	return progs, layout, nil
