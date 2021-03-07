@@ -313,6 +313,7 @@ type blitter struct {
 	colUniforms            *blitColUniforms
 	texUniforms            *blitTexUniforms
 	linearGradientUniforms *blitLinearGradientUniforms
+	radialGradientUniforms *blitRadialGradientUniforms
 	quadVerts              driver.Buffer
 }
 
@@ -334,6 +335,16 @@ type blitTexUniforms struct {
 }
 
 type blitLinearGradientUniforms struct {
+	vert struct {
+		blitUniforms
+		_ [12]byte // Padding to a multiple of 16.
+	}
+	frag struct {
+		gradientUniforms
+	}
+}
+
+type blitRadialGradientUniforms struct {
 	vert struct {
 		blitUniforms
 		_ [12]byte // Padding to a multiple of 16.
@@ -381,6 +392,7 @@ const (
 const (
 	materialColor materialType = iota
 	materialLinearGradient
+	materialRadialGradient
 	materialTexture
 	materialCount
 )
@@ -578,16 +590,19 @@ func newBlitter(ctx driver.Device) *blitter {
 	b.colUniforms = new(blitColUniforms)
 	b.texUniforms = new(blitTexUniforms)
 	b.linearGradientUniforms = new(blitLinearGradientUniforms)
+	b.radialGradientUniforms = new(blitRadialGradientUniforms)
 
 	prog, layout, err := createColorPrograms(ctx, shader_blit_vert, shader_blit_frag,
 		[...]interface{}{
 			materialColor:          &b.colUniforms.vert,
 			materialLinearGradient: &b.linearGradientUniforms.vert,
+			materialRadialGradient: &b.radialGradientUniforms.vert,
 			materialTexture:        &b.texUniforms.vert,
 		},
 		[...]interface{}{
 			materialColor:          &b.colUniforms.frag,
 			materialLinearGradient: &b.linearGradientUniforms.frag,
+			materialRadialGradient: &b.radialGradientUniforms.frag,
 			materialTexture:        nil,
 		},
 	)
@@ -1072,6 +1087,14 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 		m.opaque = m.color1.A == 1.0 && m.color2.A == 1.0
 
 		m.uvTrans = partTrans.Mul(gradientSpaceTransform(clip, off, d.stop1, d.stop2))
+	case materialRadialGradient:
+		m.material = materialRadialGradient
+
+		m.color1 = f32color.LinearFromSRGB(d.color1)
+		m.color2 = f32color.LinearFromSRGB(d.color2)
+		m.opaque = m.color1.A == 1.0 && m.color2.A == 1.0
+
+		m.uvTrans = partTrans.Mul(gradientSpaceTransform(clip, off, d.stop1, d.stop2))
 	case materialTexture:
 		m.material = materialTexture
 		dr := boundRectF(rect.Add(off))
@@ -1166,11 +1189,13 @@ func (b *blitter) blit(z float32, mat materialType, col f32color.RGBA, col1, col
 	case materialColor:
 		b.colUniforms.frag.color = col
 		uniforms = &b.colUniforms.vert.blitUniforms
+
 	case materialTexture:
 		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
 		b.texUniforms.vert.blitUniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}
 		b.texUniforms.vert.blitUniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
 		uniforms = &b.texUniforms.vert.blitUniforms
+
 	case materialLinearGradient:
 		b.linearGradientUniforms.frag.color1 = col1
 		b.linearGradientUniforms.frag.color2 = col2
@@ -1179,6 +1204,15 @@ func (b *blitter) blit(z float32, mat materialType, col f32color.RGBA, col1, col
 		b.linearGradientUniforms.vert.blitUniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}
 		b.linearGradientUniforms.vert.blitUniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
 		uniforms = &b.linearGradientUniforms.vert.blitUniforms
+
+	case materialRadialGradient:
+		b.radialGradientUniforms.frag.color1 = col1
+		b.radialGradientUniforms.frag.color2 = col2
+
+		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
+		b.radialGradientUniforms.vert.blitUniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}
+		b.radialGradientUniforms.vert.blitUniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
+		uniforms = &b.radialGradientUniforms.vert.blitUniforms
 	}
 	uniforms.z = z
 	uniforms.transform = [4]float32{scale.X, scale.Y, off.X, off.Y}
