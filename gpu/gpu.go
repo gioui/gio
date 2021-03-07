@@ -107,11 +107,13 @@ type drawState struct {
 	// Current paint.ColorOp, if any.
 	color color.NRGBA
 
-	// Current paint.LinearGradientOp.
+	// Current paint.LinearGradientOp and paint.RadialGradientOp.
 	stop1  f32.Point
 	stop2  f32.Point
 	color1 color.NRGBA
 	color2 color.NRGBA
+	// Current paint.RadialGradientOp.
+	radiusy float32
 }
 
 type pathOp struct {
@@ -187,9 +189,11 @@ type material struct {
 	opaque   bool
 	// For materialTypeColor.
 	color f32color.RGBA
-	// For materialTypeLinearGradient.
+	// For materialTypeLinearGradient and materialTypeRadialGradient.
 	color1 f32color.RGBA
 	color2 f32color.RGBA
+	// For materialTypeRadialGradient.
+	radiusy float32
 	// For materialTypeTexture.
 	data    imageOpData
 	uvTrans f32.Affine2D
@@ -212,9 +216,20 @@ type imageOpData struct {
 }
 
 type linearGradientOpData struct {
-	stop1  f32.Point
+	stop1 f32.Point
+	stop2 f32.Point
+
 	color1 color.NRGBA
-	stop2  f32.Point
+	color2 color.NRGBA
+}
+
+type radialGradientOpData struct {
+	stop1 f32.Point
+	stop2 f32.Point
+
+	radiusy float32
+
+	color1 color.NRGBA
 	color2 color.NRGBA
 }
 
@@ -290,6 +305,36 @@ func decodeLinearGradientOp(data []byte) linearGradientOpData {
 			G: data[21+1],
 			B: data[21+2],
 			A: data[21+3],
+		},
+	}
+}
+
+func decodeRadialGradientOp(data []byte) radialGradientOpData {
+	if opconst.OpType(data[0]) != opconst.TypeRadialGradient {
+		panic("invalid op")
+	}
+	bo := binary.LittleEndian
+	return radialGradientOpData{
+		stop1: f32.Point{
+			X: math.Float32frombits(bo.Uint32(data[1:])),
+			Y: math.Float32frombits(bo.Uint32(data[5:])),
+		},
+		stop2: f32.Point{
+			X: math.Float32frombits(bo.Uint32(data[9:])),
+			Y: math.Float32frombits(bo.Uint32(data[13:])),
+		},
+		radiusy: math.Float32frombits(bo.Uint32(data[17:])),
+		color1: color.NRGBA{
+			R: data[21+0],
+			G: data[21+1],
+			B: data[21+2],
+			A: data[21+3],
+		},
+		color2: color.NRGBA{
+			R: data[25+0],
+			G: data[25+1],
+			B: data[25+2],
+			A: data[25+3],
 		},
 	}
 }
@@ -975,6 +1020,14 @@ loop:
 			state.stop2 = op.stop2
 			state.color1 = op.color1
 			state.color2 = op.color2
+		case opconst.TypeRadialGradient:
+			state.matType = materialRadialGradient
+			op := decodeRadialGradientOp(encOp.Data)
+			state.stop1 = op.stop1
+			state.stop2 = op.stop2
+			state.radiusy = op.radiusy
+			state.color1 = op.color1
+			state.color2 = op.color2
 		case opconst.TypeImage:
 			state.matType = materialTexture
 			state.image = decodeImageOp(encOp.Data, encOp.Refs)
@@ -1086,7 +1139,7 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 		m.color2 = f32color.LinearFromSRGB(d.color2)
 		m.opaque = m.color1.A == 1.0 && m.color2.A == 1.0
 
-		m.uvTrans = partTrans.Mul(gradientSpaceTransform(clip, off, d.stop1, d.stop2))
+		m.uvTrans = partTrans.Mul(gradientSpaceTransform(clip, off, d.stop1, d.stop2, -1))
 	case materialRadialGradient:
 		m.material = materialRadialGradient
 
@@ -1094,7 +1147,7 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 		m.color2 = f32color.LinearFromSRGB(d.color2)
 		m.opaque = m.color1.A == 1.0 && m.color2.A == 1.0
 
-		m.uvTrans = partTrans.Mul(gradientSpaceTransform(clip, off, d.stop1, d.stop2))
+		m.uvTrans = partTrans.Mul(gradientSpaceTransform(clip, off, d.stop1, d.stop2, d.radiusy))
 	case materialTexture:
 		m.material = materialTexture
 		dr := boundRectF(rect.Add(off))
@@ -1286,10 +1339,19 @@ func texSpaceTransform(r f32.Rectangle, bounds image.Point) (f32.Point, f32.Poin
 }
 
 // gradientSpaceTransform transforms stop1 and stop2 to [(0,0), (1,1)].
-func gradientSpaceTransform(clip image.Rectangle, off f32.Point, stop1, stop2 f32.Point) f32.Affine2D {
+func gradientSpaceTransform(clip image.Rectangle, off f32.Point, stop1, stop2 f32.Point, radiusy float32) f32.Affine2D {
 	d := stop2.Sub(stop1)
 	l := float32(math.Sqrt(float64(d.X*d.X + d.Y*d.Y)))
 	a := float32(math.Atan2(float64(-d.Y), float64(d.X)))
+
+	scalex := 1 / l
+
+	var scaley float32
+	if radiusy == -1 {
+		scaley = scalex
+	} else if radiusy != 0 {
+		scaley = 1 / radiusy
+	}
 
 	// TODO: optimize
 	zp := f32.Point{}
@@ -1298,7 +1360,7 @@ func gradientSpaceTransform(clip image.Rectangle, off f32.Point, stop1, stop2 f3
 		Offset(zp.Sub(off).Add(layout.FPt(clip.Min))). // offset to clip space
 		Offset(zp.Sub(stop1)).                         // offset to first stop point
 		Rotate(zp, a).                                 // rotate to align gradient
-		Scale(zp, f32.Pt(1/l, 1/l))                    // scale gradient to right size
+		Scale(zp, f32.Pt(scalex, scaley))              // scale gradient to right size
 }
 
 // clipSpaceTransform returns the scale and offset that transforms the given

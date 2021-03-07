@@ -36,11 +36,28 @@ type ColorOp struct {
 
 // LinearGradientOp sets the brush to a gradient starting at stop1 with color1 and
 // ending at stop2 with color2.
+//
+// Note: this gradient does not work together with non-offset transforms.
 type LinearGradientOp struct {
 	Stop1  f32.Point
 	Color1 color.NRGBA
 	Stop2  f32.Point
 	Color2 color.NRGBA
+}
+
+// RadialGradientOp sets the brush to a radial gradient center starting at stop1 with color1
+// and ellipse X axis ending at stop2 with color2.
+//
+// Note: this does not work together with non-offset transforms.
+type RadialGradientOp struct {
+	Stop1  f32.Point
+	Color1 color.NRGBA
+	Stop2  f32.Point
+	Color2 color.NRGBA
+
+	// RadiusY defines Y axis for the ellipse.
+	// RadiusY = 0 draws a circle.
+	RadiusY float32
 }
 
 // PaintOp fills fills the current clip area with the current brush.
@@ -130,6 +147,35 @@ func (c LinearGradientOp) Add(o *op.Ops) {
 	data[21+1] = c.Color2.G
 	data[21+2] = c.Color2.B
 	data[21+3] = c.Color2.A
+}
+
+func (c RadialGradientOp) Add(o *op.Ops) {
+	data := o.Write(opconst.TypeRadialGradientLen)
+	data[0] = byte(opconst.TypeRadialGradient)
+
+	bo := binary.LittleEndian
+	bo.PutUint32(data[1:], math.Float32bits(c.Stop1.X))
+	bo.PutUint32(data[5:], math.Float32bits(c.Stop1.Y))
+	bo.PutUint32(data[9:], math.Float32bits(c.Stop2.X))
+	bo.PutUint32(data[13:], math.Float32bits(c.Stop2.Y))
+
+	radiusY := c.RadiusY
+	if radiusY < 0 {
+		radiusY = 0
+	}
+	if radiusY == 0 {
+		radiusY = -1 // using -1 to avoid duplicate length calculation
+	}
+	bo.PutUint32(data[17:], math.Float32bits(radiusY))
+
+	data[21+0] = c.Color1.R
+	data[21+1] = c.Color1.G
+	data[21+2] = c.Color1.B
+	data[21+3] = c.Color1.A
+	data[25+0] = c.Color2.R
+	data[25+1] = c.Color2.G
+	data[25+2] = c.Color2.B
+	data[25+3] = c.Color2.A
 }
 
 func (d PaintOp) Add(o *op.Ops) {
