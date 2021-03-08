@@ -352,6 +352,19 @@ func TestRadialGradient(t *testing.T) {
 	}, func(r result) {})
 }
 
+func TestRadialGradientOffset(t *testing.T) {
+	run(t, func(ops *op.Ops) {
+		paint.RadialGradientOp{
+			Stop1:   f32.Pt(64, 64),
+			Color1:  blue,
+			Stop2:   f32.Pt(64, 0),
+			Color2:  black,
+			Offset1: 0.5,
+		}.Add(ops)
+		paint.PaintOp{}.Add(ops)
+	}, func(r result) {})
+}
+
 func TestEllipseGradient(t *testing.T) {
 	run(t, func(ops *op.Ops) {
 		paint.RadialGradientOp{

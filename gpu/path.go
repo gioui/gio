@@ -69,7 +69,8 @@ type coverRadialGradientUniforms struct {
 		_ [12]byte // Padding to multiple of 16.
 	}
 	frag struct {
-		gradientUniforms
+		radialGradientUniforms
+		_ [12]byte // Padding to multiple of 16.
 	}
 }
 
@@ -399,11 +400,11 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 	}
 }
 
-func (p *pather) cover(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
-	p.coverer.cover(z, mat, col, col1, col2, scale, off, uvTrans, coverScale, coverOff)
+func (p *pather) cover(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, col1off float32, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
+	p.coverer.cover(z, mat, col, col1, col2, col1off, scale, off, uvTrans, coverScale, coverOff)
 }
 
-func (c *coverer) cover(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
+func (c *coverer) cover(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, col1off float32, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
 	p := c.prog[mat]
 	c.ctx.BindProgram(p.prog)
 	var uniforms *coverUniforms
@@ -424,6 +425,7 @@ func (c *coverer) cover(z float32, mat materialType, col f32color.RGBA, col1, co
 	case materialRadialGradient:
 		c.radialGradientUniforms.frag.color1 = col1
 		c.radialGradientUniforms.frag.color2 = col2
+		c.radialGradientUniforms.frag.offset1 = col1off
 
 		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
 		c.radialGradientUniforms.vert.uvTransformR1 = [4]float32{t1, t2, t3, 0}

@@ -113,6 +113,7 @@ type drawState struct {
 	color1 color.NRGBA
 	color2 color.NRGBA
 	// Current paint.RadialGradientOp.
+	offset1 float32
 	radiusy float32
 }
 
@@ -193,6 +194,7 @@ type material struct {
 	color1 f32color.RGBA
 	color2 f32color.RGBA
 	// For materialTypeRadialGradient.
+	offset1 float32
 	radiusy float32
 	// For materialTypeTexture.
 	data    imageOpData
@@ -227,6 +229,7 @@ type radialGradientOpData struct {
 	stop1 f32.Point
 	stop2 f32.Point
 
+	offset1 float32
 	radiusy float32
 
 	color1 color.NRGBA
@@ -336,6 +339,7 @@ func decodeRadialGradientOp(data []byte) radialGradientOpData {
 			B: data[25+2],
 			A: data[25+3],
 		},
+		offset1: math.Float32frombits(bo.Uint32(data[29:])),
 	}
 }
 
@@ -395,7 +399,8 @@ type blitRadialGradientUniforms struct {
 		_ [12]byte // Padding to a multiple of 16.
 	}
 	frag struct {
-		gradientUniforms
+		radialGradientUniforms
+		_ [12]byte // Padding to multiple of 16.
 	}
 }
 
@@ -424,6 +429,12 @@ type colorUniforms struct {
 type gradientUniforms struct {
 	color1 f32color.RGBA
 	color2 f32color.RGBA
+}
+
+type radialGradientUniforms struct {
+	color1  f32color.RGBA
+	color2  f32color.RGBA
+	offset1 float32
 }
 
 type materialType uint8
@@ -1025,6 +1036,7 @@ loop:
 			op := decodeRadialGradientOp(encOp.Data)
 			state.stop1 = op.stop1
 			state.stop2 = op.stop2
+			state.offset1 = op.offset1
 			state.radiusy = op.radiusy
 			state.color1 = op.color1
 			state.color2 = op.color2
@@ -1145,6 +1157,7 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 
 		m.color1 = f32color.LinearFromSRGB(d.color1)
 		m.color2 = f32color.LinearFromSRGB(d.color2)
+		m.offset1 = d.offset1
 		m.opaque = m.color1.A == 1.0 && m.color2.A == 1.0
 
 		m.uvTrans = partTrans.Mul(gradientSpaceTransform(clip, off, d.stop1, d.stop2, d.radiusy))
@@ -1188,7 +1201,7 @@ func (r *renderer) drawZOps(cache *resourceCache, ops []imageOp) {
 		}
 		drc := img.clip
 		scale, off := clipSpaceTransform(drc, r.blitter.viewport)
-		r.blitter.blit(img.z, m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans)
+		r.blitter.blit(img.z, m.material, m.color, m.color1, m.color2, m.offset1, scale, off, m.uvTrans)
 	}
 	r.ctx.SetDepthTest(false)
 }
@@ -1212,7 +1225,7 @@ func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 		var fbo stencilFBO
 		switch img.clipType {
 		case clipTypeNone:
-			r.blitter.blit(img.z, m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans)
+			r.blitter.blit(img.z, m.material, m.color, m.color1, m.color2, m.offset1, scale, off, m.uvTrans)
 			continue
 		case clipTypePath:
 			fbo = r.pather.stenciler.cover(img.place.Idx)
@@ -1228,13 +1241,13 @@ func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 			Max: img.place.Pos.Add(drc.Size()),
 		}
 		coverScale, coverOff := texSpaceTransform(layout.FRect(uv), fbo.size)
-		r.pather.cover(img.z, m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans, coverScale, coverOff)
+		r.pather.cover(img.z, m.material, m.color, m.color1, m.color2, m.offset1, scale, off, m.uvTrans, coverScale, coverOff)
 	}
 	r.ctx.DepthMask(true)
 	r.ctx.SetDepthTest(false)
 }
 
-func (b *blitter) blit(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D) {
+func (b *blitter) blit(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, col1off float32, scale, off f32.Point, uvTrans f32.Affine2D) {
 	p := b.prog[mat]
 	b.ctx.BindProgram(p.prog)
 	var uniforms *blitUniforms
@@ -1261,6 +1274,7 @@ func (b *blitter) blit(z float32, mat materialType, col f32color.RGBA, col1, col
 	case materialRadialGradient:
 		b.radialGradientUniforms.frag.color1 = col1
 		b.radialGradientUniforms.frag.color2 = col2
+		b.radialGradientUniforms.frag.offset1 = col1off
 
 		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
 		b.radialGradientUniforms.vert.blitUniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}

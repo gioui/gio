@@ -55,6 +55,8 @@ type RadialGradientOp struct {
 	Stop2  f32.Point
 	Color2 color.NRGBA
 
+	// Offset1 defines ratio to offset Stop1 color.
+	Offset1 float32
 	// RadiusY defines Y axis for the ellipse.
 	// RadiusY = 0 draws a circle.
 	RadiusY float32
@@ -176,6 +178,8 @@ func (c RadialGradientOp) Add(o *op.Ops) {
 	data[25+1] = c.Color2.G
 	data[25+2] = c.Color2.B
 	data[25+3] = c.Color2.A
+
+	bo.PutUint32(data[29:], math.Float32bits(c.Offset1))
 }
 
 func (d PaintOp) Add(o *op.Ops) {
