@@ -507,9 +507,9 @@ func pow2Ceil(v int) int {
 	return 1 << exp
 }
 
-// addMaterialQuad appends a render of an image to materials and returns the pixel offset
-// that maps the material texture to the correct position in the rendered image.
-func (g *compute) addMaterialQuad(M f32.Affine2D, img imageOpData) (image.Point, error) {
+// materialQuad constructs a quad that represents the transformed image. It returns the quad
+// and its bounds.
+func (g *compute) materialQuad(M f32.Affine2D, img imageOpData) ([4]materialVertex, image.Rectangle) {
 	imgSize := layout.FPt(img.src.Bounds().Size())
 	sx, hx, ox, hy, sy, oy := M.Elems()
 	transOff := f32.Pt(ox, oy)
@@ -534,21 +534,6 @@ func (g *compute) addMaterialQuad(M f32.Affine2D, img imageOpData) (image.Point,
 	}
 
 	bounds := boundRectF(boundsf)
-	size := bounds.Size()
-	// A material is clipped to avoid drawing outside its bounds inside the atlas. However,
-	// imprecision in the clipping may cause a single pixel overflow. Be safe.
-	size = size.Add(image.Pt(1, 1))
-	place, fits := g.materials.packer.tryAdd(size)
-	if !fits {
-		return image.Point{}, errors.New("compute: no space left in image atlas")
-	}
-	// Position quad to match place.
-	offset := place.Pos.Sub(bounds.Min)
-	offsetf := layout.FPt(offset)
-	q0 = q0.Add(offsetf)
-	q1 = q1.Add(offsetf)
-	q2 = q2.Add(offsetf)
-	q3 = q3.Add(offsetf)
 	uvPos, ok := g.images.positions[img.handle]
 	if !ok {
 		panic("compute: internal error: image not placed")
@@ -565,9 +550,7 @@ func (g *compute) addMaterialQuad(M f32.Affine2D, img imageOpData) (image.Point,
 		{posX: q2.X, posY: q2.Y, u: uvBounds.Max.X, v: uvBounds.Max.Y},
 		{posX: q3.X, posY: q3.Y, u: uvBounds.Max.X, v: uvBounds.Min.Y},
 	}
-	// Draw quad as two triangles.
-	g.materials.quads = append(g.materials.quads, quad[0], quad[1], quad[3], quad[3], quad[1], quad[2])
-	return offset, nil
+	return quad, bounds
 }
 
 func max(p1, p2 f32.Point) f32.Point {
@@ -603,12 +586,26 @@ func (g *compute) encodeOps(trans f32.Affine2D, viewport image.Point, ops []imag
 		switch m.material {
 		case materialTexture:
 			t := trans.Mul(m.trans)
-			off, err := g.addMaterialQuad(t, m.data)
-			if err != nil {
-				return err
-			}
+			quad, bounds := g.materialQuad(t, m.data)
 
-			g.enc.fillImage(0, off)
+			// A material is clipped to avoid drawing outside its bounds inside the atlas. However,
+			// imprecision in the clipping may cause a single pixel overflow. Be safe.
+			size := bounds.Size().Add(image.Pt(1, 1))
+			place, fits := g.materials.packer.tryAdd(size)
+			if !fits {
+				return errors.New("compute: no space left in image atlas")
+			}
+			// Position quad to match place.
+			offset := place.Pos.Sub(bounds.Min)
+			offsetf := layout.FPt(offset)
+			for i := range quad {
+				quad[i].posX += offsetf.X
+				quad[i].posY += offsetf.Y
+			}
+			// Draw quad as two triangles.
+			g.materials.quads = append(g.materials.quads, quad[0], quad[1], quad[3], quad[3], quad[1], quad[2])
+
+			g.enc.fillImage(0, offset)
 		case materialColor:
 			g.enc.fill(f32color.NRGBAToRGBA(op.material.color.SRGB()))
 		case materialLinearGradient:
