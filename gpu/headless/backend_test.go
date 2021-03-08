@@ -26,7 +26,7 @@ func TestFramebufferClear(t *testing.T) {
 	b := newBackend(t)
 	sz := image.Point{X: 800, Y: 600}
 	fbo := setupFBO(t, b, sz)
-	img := screenshot(t, fbo, sz)
+	img := screenshot(t, b, fbo, sz)
 	if got := img.RGBAAt(0, 0); got != clearColExpect {
 		t.Errorf("got color %v, expected %v", got, clearColExpect)
 	}
@@ -43,7 +43,7 @@ func TestSimpleShader(t *testing.T) {
 	defer p.Release()
 	b.BindProgram(p)
 	b.DrawArrays(driver.DrawModeTriangles, 0, 3)
-	img := screenshot(t, fbo, sz)
+	img := screenshot(t, b, fbo, sz)
 	if got := img.RGBAAt(0, 0); got != clearColExpect {
 		t.Errorf("got color %v, expected %v", got, clearColExpect)
 	}
@@ -90,7 +90,7 @@ func TestInputShader(t *testing.T) {
 	defer layout.Release()
 	b.BindInputLayout(layout)
 	b.DrawArrays(driver.DrawModeTriangles, 0, 3)
-	img := screenshot(t, fbo, sz)
+	img := screenshot(t, b, fbo, sz)
 	if got := img.RGBAAt(0, 0); got != clearColExpect {
 		t.Errorf("got color %v, expected %v", got, clearColExpect)
 	}
@@ -115,11 +115,11 @@ func TestFramebuffers(t *testing.T) {
 	b.Clear(fcol1.Float32())
 	b.BindFramebuffer(fbo2)
 	b.Clear(fcol2.Float32())
-	img := screenshot(t, fbo1, sz)
+	img := screenshot(t, b, fbo1, sz)
 	if got := img.RGBAAt(0, 0); got != f32color.NRGBAToRGBA(col1) {
 		t.Errorf("got color %v, expected %v", got, f32color.NRGBAToRGBA(col1))
 	}
-	img = screenshot(t, fbo2, sz)
+	img = screenshot(t, b, fbo2, sz)
 	if got := img.RGBAAt(0, 0); got != f32color.NRGBAToRGBA(col2) {
 		t.Errorf("got color %v, expected %v", got, f32color.NRGBAToRGBA(col2))
 	}
@@ -184,12 +184,8 @@ func newBackend(t *testing.T) driver.Device {
 	return b
 }
 
-func screenshot(t *testing.T, fbo driver.Framebuffer, size image.Point) *image.RGBA {
-	img := image.NewRGBA(image.Rectangle{Max: size})
-	err := fbo.ReadPixels(
-		image.Rectangle{
-			Max: image.Point{X: size.X, Y: size.Y},
-		}, img.Pix)
+func screenshot(t *testing.T, d driver.Device, fbo driver.Framebuffer, size image.Point) *image.RGBA {
+	img, err := driver.DownloadImage(d, fbo, image.Rectangle{Max: size})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -118,12 +118,11 @@ func (w *Window) Frame(frame *op.Ops) error {
 
 // Screenshot returns an image with the content of the window.
 func (w *Window) Screenshot() (*image.RGBA, error) {
-	img := image.NewRGBA(image.Rectangle{Max: w.size})
+	var img *image.RGBA
 	err := contextDo(w.ctx, func() error {
-		return w.fbo.ReadPixels(
-			image.Rectangle{
-				Max: image.Point{X: w.size.X, Y: w.size.Y},
-			}, img.Pix)
+		var err error
+		img, err = driver.DownloadImage(w.dev, w.fbo, image.Rectangle{Max: w.size})
+		return err
 	})
 	if err != nil {
 		return nil, err

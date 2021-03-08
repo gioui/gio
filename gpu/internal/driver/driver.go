@@ -138,8 +138,11 @@ type DepthFunc uint8
 type Features uint
 
 type Caps struct {
-	Features       Features
-	MaxTextureSize int
+	// BottomLeftOrigin is true if the driver has the origin in the lower left
+	// corner. The OpenGL driver returns true.
+	BottomLeftOrigin bool
+	Features         Features
+	MaxTextureSize   int
 }
 
 type Program interface {
@@ -231,6 +234,33 @@ var ErrContentLost = errors.New("buffer content lost")
 
 func (f Features) Has(feats Features) bool {
 	return f&feats == feats
+}
+
+func DownloadImage(d Device, f Framebuffer, r image.Rectangle) (*image.RGBA, error) {
+	img := image.NewRGBA(r)
+	if err := f.ReadPixels(r, img.Pix); err != nil {
+		return nil, err
+	}
+	if d.Caps().BottomLeftOrigin {
+		// OpenGL origin is in the lower-left corner. Flip the image to
+		// match.
+		flipImageY(r.Dx()*4, r.Dy(), img.Pix)
+	}
+	return img, nil
+}
+
+func flipImageY(stride, height int, pixels []byte) {
+	// Flip image in y-direction. OpenGL's origin is in the lower
+	// left corner.
+	row := make([]uint8, stride)
+	for y := 0; y < height/2; y++ {
+		y1 := height - y - 1
+		dest := y1 * stride
+		src := y * stride
+		copy(row, pixels[dest:])
+		copy(pixels[dest:], pixels[src:src+len(row)])
+		copy(pixels[src:], row)
+	}
 }
 
 func UploadImage(t Texture, offset image.Point, img *image.RGBA) {

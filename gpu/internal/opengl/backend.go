@@ -154,6 +154,7 @@ func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 		alphaTriple: alphaTripleFor(ver),
 		srgbaTriple: srgbaTriple,
 	}
+	b.feats.BottomLeftOrigin = true
 	if ffboErr == nil {
 		b.feats.Features |= driver.FeatureFloatRenderTargets
 	}
@@ -771,24 +772,7 @@ func (f *gpuFramebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 		return errors.New("unexpected RGBA size")
 	}
 	f.backend.funcs.ReadPixels(src.Min.X, src.Min.Y, src.Dx(), src.Dy(), gl.RGBA, gl.UNSIGNED_BYTE, pixels)
-	// OpenGL origin is in the lower-left corner. Flip the image to
-	// match.
-	flipImageY(src.Dx()*4, src.Dy(), pixels)
 	return glErr(f.backend.funcs)
-}
-
-func flipImageY(stride int, height int, pixels []byte) {
-	// Flip image in y-direction. OpenGL's origin is in the lower
-	// left corner.
-	row := make([]uint8, stride)
-	for y := 0; y < height/2; y++ {
-		y1 := height - y - 1
-		dest := y1 * stride
-		src := y * stride
-		copy(row, pixels[dest:])
-		copy(pixels[dest:], pixels[src:src+len(row)])
-		copy(pixels[src:], row)
-	}
 }
 
 func (b *Backend) BindFramebuffer(fbo driver.Framebuffer) {
