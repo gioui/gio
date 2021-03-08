@@ -23,7 +23,7 @@ var clearCol = color.NRGBA{A: 0xff, R: 0xde, G: 0xad, B: 0xbe}
 var clearColExpect = f32color.NRGBAToRGBA(clearCol)
 
 func TestFramebufferClear(t *testing.T) {
-	b := newBackend(t)
+	b := newDriver(t)
 	sz := image.Point{X: 800, Y: 600}
 	fbo := setupFBO(t, b, sz)
 	img := screenshot(t, b, fbo, sz)
@@ -33,7 +33,7 @@ func TestFramebufferClear(t *testing.T) {
 }
 
 func TestSimpleShader(t *testing.T) {
-	b := newBackend(t)
+	b := newDriver(t)
 	sz := image.Point{X: 800, Y: 600}
 	fbo := setupFBO(t, b, sz)
 	p, err := b.NewProgram(shader_simple_vert, shader_simple_frag)
@@ -56,7 +56,7 @@ func TestSimpleShader(t *testing.T) {
 }
 
 func TestInputShader(t *testing.T) {
-	b := newBackend(t)
+	b := newDriver(t)
 	sz := image.Point{X: 800, Y: 600}
 	fbo := setupFBO(t, b, sz)
 	p, err := b.NewProgram(shader_input_vert, shader_simple_frag)
@@ -102,7 +102,7 @@ func TestInputShader(t *testing.T) {
 }
 
 func TestFramebuffers(t *testing.T) {
-	b := newBackend(t)
+	b := newDriver(t)
 	sz := image.Point{X: 800, Y: 600}
 	fbo1 := newFBO(t, b, sz)
 	fbo2 := newFBO(t, b, sz)
@@ -161,7 +161,7 @@ func newFBO(t *testing.T, b driver.Device, size image.Point) driver.Framebuffer 
 	return fbo
 }
 
-func newBackend(t *testing.T) driver.Device {
+func newDriver(t *testing.T) driver.Device {
 	ctx, err := newContext()
 	if err != nil {
 		t.Skipf("no context available: %v", err)
