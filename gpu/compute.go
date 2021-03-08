@@ -26,6 +26,7 @@ type compute struct {
 	enc encoder
 
 	drawOps       drawOps
+	texOps        []textureOp
 	cache         *resourceCache
 	maxTextureDim int
 
@@ -62,15 +63,17 @@ type compute struct {
 	// now, gradients etc. later) packed in a texture atlas. The atlas is used
 	// as source in kernel4.
 	materials struct {
+		// offsets maps texture ops to the offsets to put in their FillImage commands.
+		offsets map[textureKey]image.Point
+
 		prog   driver.Program
 		layout driver.InputLayout
 
 		packer packer
 
-		texSize image.Point
-		tex     driver.Texture
-		fbo     driver.Framebuffer
-		quads   []materialVertex
+		tex   driver.Texture
+		fbo   driver.Framebuffer
+		quads []materialVertex
 
 		bufSize int
 		buffer  driver.Buffer
@@ -97,6 +100,24 @@ type compute struct {
 type materialVertex struct {
 	posX, posY float32
 	u, v       float32
+}
+
+// textureKey identifies textureOp.
+type textureKey struct {
+	handle    interface{}
+	transform f32.Affine2D
+}
+
+// textureOp represents an imageOp that requires texture space.
+type textureOp struct {
+	// sceneIdx is the index in the scene that contains the fill image command
+	// that corresponds to the operation.
+	sceneIdx int
+	key      textureKey
+	img      imageOpData
+
+	// pos is the position of the untransformed image in the images texture.
+	pos image.Point
 }
 
 type encoder struct {
@@ -291,10 +312,10 @@ func (g *compute) Frame() error {
 	defFBO := g.ctx.BeginFrame()
 	defer g.ctx.EndFrame()
 
-	if err := g.uploadImages(g.drawOps.allImageOps); err != nil {
+	if err := g.encode(viewport); err != nil {
 		return err
 	}
-	if err := g.encode(viewport); err != nil {
+	if err := g.uploadImages(); err != nil {
 		return err
 	}
 	if err := g.renderMaterials(); err != nil {
@@ -337,10 +358,7 @@ func (g *compute) blitOutput(viewport image.Point) {
 }
 
 func (g *compute) encode(viewport image.Point) error {
-	g.materials.packer.maxDim = g.maxTextureDim
-	g.materials.packer.clear()
-	g.materials.packer.newPage()
-	g.materials.quads = g.materials.quads[:0]
+	g.texOps = g.texOps[:0]
 	g.enc.reset()
 
 	// Flip Y-axis.
@@ -354,7 +372,119 @@ func (g *compute) encode(viewport image.Point) error {
 	return g.encodeOps(flipY, viewport, g.drawOps.allImageOps)
 }
 
-func (g *compute) uploadImages(ops []imageOp) error {
+func (g *compute) renderMaterials() error {
+	m := &g.materials
+	m.quads = m.quads[:0]
+	resize := false
+	reclaimed := false
+restart:
+	for {
+		for _, op := range g.texOps {
+			if off, exists := m.offsets[op.key]; exists {
+				g.enc.setFillImageOffset(op.sceneIdx, off)
+				continue
+			}
+			quad, bounds := g.materialQuad(op.key.transform, op.img, op.pos)
+
+			// A material is clipped to avoid drawing outside its bounds inside the atlas. However,
+			// imprecision in the clipping may cause a single pixel overflow. Be safe.
+			size := bounds.Size().Add(image.Pt(1, 1))
+			place, fits := m.packer.tryAdd(size)
+			if !fits {
+				m.offsets = nil
+				m.quads = m.quads[:0]
+				m.packer.clear()
+				if !reclaimed {
+					// Some images may no longer be in use, try again
+					// after clearing existing maps.
+					reclaimed = true
+				} else {
+					m.packer.maxDim += 256
+					resize = true
+					if m.packer.maxDim > g.maxTextureDim {
+						return errors.New("compute: no space left in material atlas")
+					}
+				}
+				m.packer.newPage()
+				continue restart
+			}
+			// Position quad to match place.
+			offset := place.Pos.Sub(bounds.Min)
+			offsetf := layout.FPt(offset)
+			for i := range quad {
+				quad[i].posX += offsetf.X
+				quad[i].posY += offsetf.Y
+			}
+			// Draw quad as two triangles.
+			m.quads = append(m.quads, quad[0], quad[1], quad[3], quad[3], quad[1], quad[2])
+			if m.offsets == nil {
+				m.offsets = make(map[textureKey]image.Point)
+			}
+			m.offsets[op.key] = offset
+			g.enc.setFillImageOffset(op.sceneIdx, offset)
+		}
+		break
+	}
+	if len(m.quads) == 0 {
+		return nil
+	}
+	texSize := m.packer.maxDim
+	if resize {
+		if m.fbo != nil {
+			m.fbo.Release()
+			m.fbo = nil
+		}
+		if m.tex != nil {
+			m.tex.Release()
+			m.tex = nil
+		}
+		handle, err := g.ctx.NewTexture(driver.TextureFormatRGBA8, texSize, texSize,
+			driver.FilterNearest, driver.FilterNearest,
+			driver.BufferBindingShaderStorage|driver.BufferBindingFramebuffer)
+		if err != nil {
+			return fmt.Errorf("compute: failed to create material atlas: %v", err)
+		}
+		m.tex = handle
+		fbo, err := g.ctx.NewFramebuffer(handle, 0)
+		if err != nil {
+			return fmt.Errorf("compute: failed to create material framebuffer: %v", err)
+		}
+		m.fbo = fbo
+	}
+	// TODO: move to shaders.
+	// Transform to clip space: [-1, -1] - [1, 1].
+	clip := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(2/float32(texSize), 2/float32(texSize))).Offset(f32.Pt(-1, -1))
+	for i, v := range m.quads {
+		p := clip.Transform(f32.Pt(v.posX, v.posY))
+		m.quads[i].posX = p.X
+		m.quads[i].posY = p.Y
+	}
+	vertexData := gunsafe.BytesView(m.quads)
+	if len(vertexData) > m.bufSize {
+		if m.buffer != nil {
+			m.buffer.Release()
+			m.buffer = nil
+		}
+		n := pow2Ceil(len(vertexData))
+		buf, err := g.ctx.NewBuffer(driver.BufferBindingVertices, n)
+		if err != nil {
+			return err
+		}
+		m.bufSize = n
+		m.buffer = buf
+	}
+	m.buffer.Upload(vertexData)
+	g.ctx.BindTexture(0, g.images.tex)
+	g.ctx.BindFramebuffer(m.fbo)
+	g.ctx.Viewport(0, 0, texSize, texSize)
+	g.ctx.BindProgram(m.prog)
+	g.ctx.BindVertexBuffer(m.buffer, int(unsafe.Sizeof(m.quads[0])), 0)
+	g.ctx.BindInputLayout(m.layout)
+	g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(m.quads))
+	return nil
+}
+
+func (g *compute) uploadImages() error {
 	// padding is the number of pixels added to the right and below
 	// images, to avoid atlas filtering artifacts.
 	const padding = 1
@@ -365,43 +495,40 @@ func (g *compute) uploadImages(ops []imageOp) error {
 	reclaimed := false
 restart:
 	for {
-		for _, op := range ops {
-			switch m := op.material; m.material {
-			case materialTexture:
-				if _, exists := a.positions[m.data.handle]; exists {
-					continue
-				}
-				size := m.data.src.Bounds().Size()
-				size.X += padding
-				size.Y += padding
-				place, fits := a.packer.tryAdd(size)
-				if !fits {
-					a.positions = nil
-					uploads = nil
-					a.packer.clear()
-					if !reclaimed {
-						// Some images may no longer be in use, try again
-						// after clearing existing maps.
-						reclaimed = true
-					} else {
-						a.packer.maxDim += 256
-						resize = true
-						if a.packer.maxDim > g.maxTextureDim {
-							return errors.New("compute: no space left in image atlas")
-						}
-					}
-					a.packer.newPage()
-					continue restart
-				}
-				if a.positions == nil {
-					g.images.positions = make(map[interface{}]image.Point)
-				}
-				a.positions[m.data.handle] = place.Pos
-				if uploads == nil {
-					uploads = make(map[interface{}]*image.RGBA)
-				}
-				uploads[m.data.handle] = m.data.src
+		for i, op := range g.texOps {
+			if pos, exists := a.positions[op.img.handle]; exists {
+				g.texOps[i].pos = pos
+				continue
 			}
+			size := op.img.src.Bounds().Size().Add(image.Pt(padding, padding))
+			place, fits := a.packer.tryAdd(size)
+			if !fits {
+				a.positions = nil
+				uploads = nil
+				a.packer.clear()
+				if !reclaimed {
+					// Some images may no longer be in use, try again
+					// after clearing existing maps.
+					reclaimed = true
+				} else {
+					a.packer.maxDim += 256
+					resize = true
+					if a.packer.maxDim > g.maxTextureDim {
+						return errors.New("compute: no space left in image atlas")
+					}
+				}
+				a.packer.newPage()
+				continue restart
+			}
+			if a.positions == nil {
+				a.positions = make(map[interface{}]image.Point)
+			}
+			a.positions[op.img.handle] = place.Pos
+			g.texOps[i].pos = place.Pos
+			if uploads == nil {
+				uploads = make(map[interface{}]*image.RGBA)
+			}
+			uploads[op.img.handle] = op.img.src
 		}
 		break
 	}
@@ -435,70 +562,6 @@ restart:
 	return nil
 }
 
-func (g *compute) renderMaterials() error {
-	m := &g.materials
-	outSize := g.materials.packer.sizes[0]
-	if outSize == (image.Point{}) {
-		return nil
-	}
-	if outSize.X > m.texSize.X || outSize.Y > m.texSize.Y {
-		if m.fbo != nil {
-			m.fbo.Release()
-			m.fbo = nil
-		}
-		if m.tex != nil {
-			m.tex.Release()
-			m.tex = nil
-		}
-		// Round to nearest power of 2 while we're doing an expensive recreation anyway.
-		sz := image.Pt(pow2Ceil(outSize.X), pow2Ceil(outSize.Y))
-		m.texSize = sz
-		handle, err := g.ctx.NewTexture(driver.TextureFormatRGBA8, sz.X, sz.Y, driver.FilterNearest, driver.FilterNearest, driver.BufferBindingShaderStorage|driver.BufferBindingFramebuffer)
-		if err != nil {
-			return fmt.Errorf("compute: failed to create material atlas: %v", err)
-		}
-		m.tex = handle
-		fbo, err := g.ctx.NewFramebuffer(handle, 0)
-		if err != nil {
-			return fmt.Errorf("compute: failed to create material framebuffer: %v", err)
-		}
-		m.fbo = fbo
-	}
-	// TODO: move to shaders.
-	// Transform to clip space: [-1, -1] - [1, 1].
-	clip := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(2/float32(m.texSize.X), 2/float32(m.texSize.Y))).Offset(f32.Pt(-1, -1))
-	for i, v := range m.quads {
-		p := clip.Transform(f32.Pt(v.posX, v.posY))
-		m.quads[i].posX = p.X
-		m.quads[i].posY = p.Y
-	}
-	vertexData := gunsafe.BytesView(m.quads)
-	if len(vertexData) > m.bufSize {
-		if m.buffer != nil {
-			m.buffer.Release()
-			m.buffer = nil
-		}
-		// Ditto.
-		n := pow2Ceil(len(vertexData))
-		buf, err := g.ctx.NewBuffer(driver.BufferBindingVertices, n)
-		if err != nil {
-			return err
-		}
-		m.bufSize = n
-		m.buffer = buf
-	}
-	m.buffer.Upload(vertexData)
-	g.ctx.BindTexture(0, g.images.tex)
-	g.ctx.BindFramebuffer(m.fbo)
-	g.ctx.Viewport(0, 0, m.texSize.X, m.texSize.Y)
-	g.ctx.Clear(0, 0, 0, 0)
-	g.ctx.BindProgram(m.prog)
-	g.ctx.BindVertexBuffer(m.buffer, int(unsafe.Sizeof(m.quads[0])), 0)
-	g.ctx.BindInputLayout(m.layout)
-	g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(m.quads))
-	return nil
-}
-
 func pow2Ceil(v int) int {
 	exp := bits.Len(uint(v))
 	if bits.OnesCount(uint(v)) == 1 {
@@ -509,7 +572,7 @@ func pow2Ceil(v int) int {
 
 // materialQuad constructs a quad that represents the transformed image. It returns the quad
 // and its bounds.
-func (g *compute) materialQuad(M f32.Affine2D, img imageOpData) ([4]materialVertex, image.Rectangle) {
+func (g *compute) materialQuad(M f32.Affine2D, img imageOpData, uvPos image.Point) ([4]materialVertex, image.Rectangle) {
 	imgSize := layout.FPt(img.src.Bounds().Size())
 	sx, hx, ox, hy, sy, oy := M.Elems()
 	transOff := f32.Pt(ox, oy)
@@ -534,10 +597,6 @@ func (g *compute) materialQuad(M f32.Affine2D, img imageOpData) ([4]materialVert
 	}
 
 	bounds := boundRectF(boundsf)
-	uvPos, ok := g.images.positions[img.handle]
-	if !ok {
-		panic("compute: internal error: image not placed")
-	}
 	uvPosf := layout.FPt(uvPos)
 	atlasScale := 1 / float32(g.images.packer.maxDim)
 	uvBounds := f32.Rectangle{
@@ -586,26 +645,16 @@ func (g *compute) encodeOps(trans f32.Affine2D, viewport image.Point, ops []imag
 		switch m.material {
 		case materialTexture:
 			t := trans.Mul(m.trans)
-			quad, bounds := g.materialQuad(t, m.data)
-
-			// A material is clipped to avoid drawing outside its bounds inside the atlas. However,
-			// imprecision in the clipping may cause a single pixel overflow. Be safe.
-			size := bounds.Size().Add(image.Pt(1, 1))
-			place, fits := g.materials.packer.tryAdd(size)
-			if !fits {
-				return errors.New("compute: no space left in image atlas")
-			}
-			// Position quad to match place.
-			offset := place.Pos.Sub(bounds.Min)
-			offsetf := layout.FPt(offset)
-			for i := range quad {
-				quad[i].posX += offsetf.X
-				quad[i].posY += offsetf.Y
-			}
-			// Draw quad as two triangles.
-			g.materials.quads = append(g.materials.quads, quad[0], quad[1], quad[3], quad[3], quad[1], quad[2])
-
-			g.enc.fillImage(0, offset)
+			g.texOps = append(g.texOps, textureOp{
+				sceneIdx: len(g.enc.scene),
+				img:      m.data,
+				key: textureKey{
+					transform: t,
+					handle:    m.data.handle,
+				},
+			})
+			// Add fill command, its offset is resolved and filled in renderMaterials.
+			g.enc.fillImage(0)
 		case materialColor:
 			g.enc.fill(f32color.NRGBAToRGBA(op.material.color.SRGB()))
 		case materialLinearGradient:
@@ -1046,13 +1095,16 @@ func (e *encoder) fill(col color.RGBA) {
 	e.npath++
 }
 
-func (e *encoder) fillImage(index int, offset image.Point) {
+func (e *encoder) setFillImageOffset(index int, offset image.Point) {
 	x := int16(offset.X)
 	y := int16(offset.Y)
+	e.scene[index][2] = uint32(uint16(x)) | uint32(uint16(y))<<16
+}
+
+func (e *encoder) fillImage(index int) {
 	e.scene = append(e.scene, sceneElem{
 		0: elemFillImage,
 		1: uint32(index),
-		2: uint32(uint16(x)) | uint32(uint16(y))<<16,
 	})
 	e.npath++
 }
