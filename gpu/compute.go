@@ -760,7 +760,7 @@ func (g *compute) render(tileDims image.Point) error {
 	g.buffers.scene.buffer.Upload(gunsafe.BytesView(g.enc.scene))
 
 	w, h := tileDims.X*tileWidthPx, tileDims.Y*tileHeightPx
-	if g.output.size.X < w || g.output.size.Y < h {
+	if g.output.size.X != w || g.output.size.Y != h {
 		if err := g.resizeOutput(image.Pt(w, h)); err != nil {
 			return err
 		}
