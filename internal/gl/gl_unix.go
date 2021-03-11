@@ -541,7 +541,7 @@ func (f *Functions) MapBufferRange(target Enum, offset, length int, access Enum)
 	if p == nil {
 		return nil
 	}
-	return (*([1 << 30]byte))(p)[:length:length]
+	return (*[1 << 30]byte)(p)[:length:length]
 }
 
 func (f *Functions) Scissor(x, y, width, height int32) {
