@@ -56,6 +56,24 @@ func Line(start, end f32.Point, stroke bool, flags uint32) Command {
 	}
 }
 
+func Cubic(start, ctrl0, ctrl1, end f32.Point, stroke bool) Command {
+	tag := uint32(OpFillCubic)
+	if stroke {
+		tag = uint32(OpStrokeCubic)
+	}
+	return Command{
+		0: tag,
+		1: math.Float32bits(start.X),
+		2: math.Float32bits(start.Y),
+		3: math.Float32bits(ctrl0.X),
+		4: math.Float32bits(ctrl0.Y),
+		5: math.Float32bits(ctrl1.X),
+		6: math.Float32bits(ctrl1.Y),
+		7: math.Float32bits(end.X),
+		8: math.Float32bits(end.Y),
+	}
+}
+
 func Quad(start, ctrl, end f32.Point, stroke bool) Command {
 	tag := uint32(OpFillQuad)
 	if stroke {
@@ -149,5 +167,16 @@ func DecodeQuad(cmd Command) (from, ctrl, to f32.Point) {
 	from = f32.Pt(math.Float32frombits(cmd[1]), math.Float32frombits(cmd[2]))
 	ctrl = f32.Pt(math.Float32frombits(cmd[3]), math.Float32frombits(cmd[4]))
 	to = f32.Pt(math.Float32frombits(cmd[5]), math.Float32frombits(cmd[6]))
+	return
+}
+
+func DecodeCubic(cmd Command) (from, ctrl0, ctrl1, to f32.Point) {
+	if cmd[0] != uint32(OpFillCubic) {
+		panic("invalid command")
+	}
+	from = f32.Pt(math.Float32frombits(cmd[1]), math.Float32frombits(cmd[2]))
+	ctrl0 = f32.Pt(math.Float32frombits(cmd[3]), math.Float32frombits(cmd[4]))
+	ctrl1 = f32.Pt(math.Float32frombits(cmd[5]), math.Float32frombits(cmd[6]))
+	to = f32.Pt(math.Float32frombits(cmd[7]), math.Float32frombits(cmd[8]))
 	return
 }

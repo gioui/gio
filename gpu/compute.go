@@ -706,6 +706,13 @@ func encodePath(pathData []byte, stroke clip.StrokeStyle, dashes dashOp) encoder
 			}
 			hasPrev = true
 			prevTo = to
+		case scene.OpFillCubic:
+			from, _, _, to := scene.DecodeCubic(cmd)
+			if hasPrev && from != prevTo {
+				enc.scene[len(enc.scene)-1][0] |= (flagEndPath << 16)
+			}
+			hasPrev = true
+			prevTo = to
 		default:
 			panic("unsupported path scene command")
 		}

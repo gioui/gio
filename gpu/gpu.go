@@ -1404,6 +1404,11 @@ func decodeToOutlineQuads(qs *quadSplitter, tr f32.Affine2D, pathData []byte) {
 			q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
 			q = q.Transform(tr)
 			qs.splitAndEncode(q)
+		case scene.OpFillCubic:
+			for _, q := range splitCubic(scene.DecodeCubic(cmd)) {
+				q = q.Transform(tr)
+				qs.splitAndEncode(q)
+			}
 		default:
 			panic("unsupported scene command")
 		}
@@ -1436,6 +1441,14 @@ func decodeToStrokeQuads(pathData []byte) strokeQuads {
 				quad:    q,
 			}
 			quads = append(quads, quad)
+		case scene.OpFillCubic:
+			for _, q := range splitCubic(scene.DecodeCubic(cmd)) {
+				quad := strokeQuad{
+					contour: contour,
+					quad:    q,
+				}
+				quads = append(quads, quad)
+			}
 		default:
 			panic("unsupported scene command")
 		}
@@ -1535,4 +1548,79 @@ func decodeQuad(d []byte) (q quadSegment) {
 	cmd := ops.DecodeCommand(d)
 	q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
 	return
+}
+
+func splitCubic(from, ctrl0, ctrl1, to f32.Point) []quadSegment {
+	quads := make([]quadSegment, 0, 10)
+	// Set the maximum distance proportionally to the longest side
+	// of the bounding rectangle.
+	hull := f32.Rectangle{
+		Min: from,
+		Max: ctrl0,
+	}.Canon().Add(ctrl1).Add(to)
+	l := hull.Dx()
+	if h := hull.Dy(); h > l {
+		l = h
+	}
+	approxCubeTo(&quads, 0, l*0.001, from, ctrl0, ctrl1, to)
+	return quads
+}
+
+// approxCube approximates a cubic Bézier by a series of quadratic
+// curves.
+func approxCubeTo(quads *[]quadSegment, splits int, maxDist float32, from, ctrl0, ctrl1, to f32.Point) int {
+	// The idea is from
+	// https://caffeineowl.com/graphics/2d/vectorial/cubic2quad01.html
+	// where a quadratic approximates a cubic by eliminating its t³ term
+	// from its polynomial expression anchored at the starting point:
+	//
+	// P(t) = pen + 3t(ctrl0 - pen) + 3t²(ctrl1 - 2ctrl0 + pen) + t³(to - 3ctrl1 + 3ctrl0 - pen)
+	//
+	// The control point for the new quadratic Q1 that shares starting point, pen, with P is
+	//
+	// C1 = (3ctrl0 - pen)/2
+	//
+	// The reverse cubic anchored at the end point has the polynomial
+	//
+	// P'(t) = to + 3t(ctrl1 - to) + 3t²(ctrl0 - 2ctrl1 + to) + t³(pen - 3ctrl0 + 3ctrl1 - to)
+	//
+	// The corresponding quadratic Q2 that shares the end point, to, with P has control
+	// point
+	//
+	// C2 = (3ctrl1 - to)/2
+	//
+	// The combined quadratic Bézier, Q, shares both start and end points with its cubic
+	// and use the midpoint between the two curves Q1 and Q2 as control point:
+	//
+	// C = (3ctrl0 - pen + 3ctrl1 - to)/4
+	c := ctrl0.Mul(3).Sub(from).Add(ctrl1.Mul(3)).Sub(to).Mul(1.0 / 4.0)
+	const maxSplits = 32
+	if splits >= maxSplits {
+		*quads = append(*quads, quadSegment{From: from, Ctrl: c, To: to})
+		return splits
+	}
+	// The maximum distance between the cubic P and its approximation Q given t
+	// can be shown to be
+	//
+	// d = sqrt(3)/36*|to - 3ctrl1 + 3ctrl0 - pen|
+	//
+	// To save a square root, compare d² with the squared tolerance.
+	v := to.Sub(ctrl1.Mul(3)).Add(ctrl0.Mul(3)).Sub(from)
+	d2 := (v.X*v.X + v.Y*v.Y) * 3 / (36 * 36)
+	if d2 <= maxDist*maxDist {
+		*quads = append(*quads, quadSegment{From: from, Ctrl: c, To: to})
+		return splits
+	}
+	// De Casteljau split the curve and approximate the halves.
+	t := float32(0.5)
+	c0 := from.Add(ctrl0.Sub(from).Mul(t))
+	c1 := ctrl0.Add(ctrl1.Sub(ctrl0).Mul(t))
+	c2 := ctrl1.Add(to.Sub(ctrl1).Mul(t))
+	c01 := c0.Add(c1.Sub(c0).Mul(t))
+	c12 := c1.Add(c2.Sub(c1).Mul(t))
+	c0112 := c01.Add(c12.Sub(c01).Mul(t))
+	splits++
+	splits = approxCubeTo(quads, splits, maxDist, from, c0, c01, c0112)
+	splits = approxCubeTo(quads, splits, maxDist, c0112, c12, c2, to)
+	return splits
 }
