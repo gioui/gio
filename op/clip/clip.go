@@ -8,8 +8,10 @@ import (
 	"math"
 
 	"gioui.org/f32"
+	"gioui.org/internal/byteslice"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
+	"gioui.org/internal/scene"
 	"gioui.org/op"
 )
 
@@ -155,11 +157,7 @@ func (p *Path) QuadTo(ctrl, to f32.Point) {
 	data := p.ops.Write(ops.QuadSize + 4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
-	ops.EncodeQuad(data[4:], ops.Quad{
-		From: p.pen,
-		Ctrl: ctrl,
-		To:   to,
-	})
+	encodeCommand(data[4:], scene.Quad(p.pen, ctrl, to, false))
 	p.pen = to
 	p.hasSegments = true
 }
@@ -394,4 +392,8 @@ func (o Outline) Op() Op {
 		path:    o.Path,
 		outline: true,
 	}
+}
+
+func encodeCommand(out []byte, cmd scene.Command) {
+	copy(out, byteslice.Slice(cmd[:]))
 }

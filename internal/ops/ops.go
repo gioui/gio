@@ -5,12 +5,15 @@ package ops
 import (
 	"encoding/binary"
 	"math"
+	"unsafe"
 
 	"gioui.org/f32"
+	"gioui.org/internal/byteslice"
 	"gioui.org/internal/opconst"
+	"gioui.org/internal/scene"
 )
 
-const QuadSize = 4 * 2 * 3
+const QuadSize = int(unsafe.Sizeof(scene.Command{}))
 
 type Quad struct {
 	From, Ctrl, To f32.Point
@@ -23,26 +26,10 @@ func (q Quad) Transform(t f32.Affine2D) Quad {
 	return q
 }
 
-func EncodeQuad(d []byte, q Quad) {
-	d = d[:24]
-	bo := binary.LittleEndian
-	bo.PutUint32(d[0:], math.Float32bits(q.From.X))
-	bo.PutUint32(d[4:], math.Float32bits(q.From.Y))
-	bo.PutUint32(d[8:], math.Float32bits(q.Ctrl.X))
-	bo.PutUint32(d[12:], math.Float32bits(q.Ctrl.Y))
-	bo.PutUint32(d[16:], math.Float32bits(q.To.X))
-	bo.PutUint32(d[20:], math.Float32bits(q.To.Y))
-}
-
 func DecodeQuad(d []byte) (q Quad) {
-	d = d[:24]
-	bo := binary.LittleEndian
-	q.From.X = math.Float32frombits(bo.Uint32(d[0:]))
-	q.From.Y = math.Float32frombits(bo.Uint32(d[4:]))
-	q.Ctrl.X = math.Float32frombits(bo.Uint32(d[8:]))
-	q.Ctrl.Y = math.Float32frombits(bo.Uint32(d[12:]))
-	q.To.X = math.Float32frombits(bo.Uint32(d[16:]))
-	q.To.Y = math.Float32frombits(bo.Uint32(d[20:]))
+	var cmd scene.Command
+	copy(byteslice.Slice(cmd[:]), d)
+	q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
 	return
 }
 
