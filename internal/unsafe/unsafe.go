@@ -44,14 +44,3 @@ func SliceOf(s uintptr) []byte {
 	h.Len = 1 << 30
 	return res
 }
-
-// GoString convert a NUL-terminated C string
-// to a Go string.
-func GoString(s []byte) string {
-	for i, v := range s {
-		if v == 0 {
-			return string(s[:i])
-		}
-	}
-	return string(s)
-}

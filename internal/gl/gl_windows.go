@@ -9,8 +9,6 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
-
-	gunsafe "gioui.org/internal/unsafe"
 )
 
 var (
@@ -324,7 +322,7 @@ func (c *Functions) GetShaderInfoLog(s Shader) string {
 }
 func (c *Functions) GetString(pname Enum) string {
 	s, _, _ := syscall.Syscall(_glGetString.Addr(), 1, uintptr(pname), 0, 0)
-	return gunsafe.GoString(gunsafe.SliceOf(s))
+	return windows.BytePtrToString((*byte)(unsafe.Pointer(s)))
 }
 func (c *Functions) GetUniformLocation(p Program, name string) Uniform {
 	cname := cString(name)

@@ -11,7 +11,6 @@ import (
 	syscall "golang.org/x/sys/windows"
 
 	"gioui.org/internal/gl"
-	gunsafe "gioui.org/internal/unsafe"
 )
 
 type (
@@ -154,7 +153,7 @@ func eglTerminate(disp _EGLDisplay) bool {
 
 func eglQueryString(disp _EGLDisplay, name _EGLint) string {
 	r, _, _ := _eglQueryString.Call(uintptr(disp), uintptr(name))
-	return gunsafe.GoString(gunsafe.SliceOf(r))
+	return syscall.BytePtrToString((*byte)(unsafe.Pointer(r)))
 }
 
 // issue34474KeepAlive calls runtime.KeepAlive as a
