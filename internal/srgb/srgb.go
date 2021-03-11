@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"strings"
 
+	"gioui.org/internal/byteslice"
 	"gioui.org/internal/gl"
-	"gioui.org/internal/unsafe"
 )
 
 // FBO implements an intermediate sRGB FBO
@@ -71,7 +71,7 @@ func (s *FBO) Blit() {
 		s.c.Uniform1i(s.c.GetUniformLocation(prog, "tex"), 0)
 		s.quad = s.c.CreateBuffer()
 		s.c.BindBuffer(gl.ARRAY_BUFFER, s.quad)
-		coords := unsafe.BytesView([]float32{
+		coords := byteslice.Slice([]float32{
 			-1, +1, 0, 1,
 			+1, +1, 1, 1,
 			-1, -1, 0, 0,

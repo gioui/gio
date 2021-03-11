@@ -13,8 +13,8 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/gpu/internal/driver"
+	"gioui.org/internal/byteslice"
 	"gioui.org/internal/f32color"
-	gunsafe "gioui.org/internal/unsafe"
 )
 
 type pather struct {
@@ -185,7 +185,7 @@ func newStenciler(ctx driver.Device) *stenciler {
 		indices[i*6+4] = i*4 + 1
 		indices[i*6+5] = i*4 + 3
 	}
-	indexBuf, err := ctx.NewImmutableBuffer(driver.BufferBindingIndices, gunsafe.BytesView(indices))
+	indexBuf, err := ctx.NewImmutableBuffer(driver.BufferBindingIndices, byteslice.Slice(indices))
 	if err != nil {
 		panic(err)
 	}

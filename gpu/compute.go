@@ -15,8 +15,8 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/gpu/internal/driver"
+	"gioui.org/internal/byteslice"
 	"gioui.org/internal/f32color"
-	gunsafe "gioui.org/internal/unsafe"
 	"gioui.org/layout"
 	"gioui.org/op"
 )
@@ -459,7 +459,7 @@ restart:
 		m.quads[i].posX = p.X
 		m.quads[i].posY = p.Y
 	}
-	vertexData := gunsafe.BytesView(m.quads)
+	vertexData := byteslice.Slice(m.quads)
 	if len(vertexData) > m.bufSize {
 		if m.buffer != nil {
 			m.buffer.Release()
@@ -757,7 +757,7 @@ func (g *compute) render(tileDims image.Point) error {
 			return err
 		}
 	}
-	g.buffers.scene.buffer.Upload(gunsafe.BytesView(g.enc.scene))
+	g.buffers.scene.buffer.Upload(byteslice.Slice(g.enc.scene))
 
 	w, h := tileDims.X*tileWidthPx, tileDims.Y*tileHeightPx
 	if g.output.size.X != w || g.output.size.Y != h {
@@ -805,7 +805,7 @@ func (g *compute) render(tileDims image.Point) error {
 		}
 	}
 
-	g.buffers.config.Upload(gunsafe.StructView(g.conf))
+	g.buffers.config.Upload(byteslice.Struct(g.conf))
 
 	minSize := int(unsafe.Sizeof(memoryHeader{})) + int(alloc)
 	if minSize > g.buffers.memory.size {
@@ -821,7 +821,7 @@ func (g *compute) render(tileDims image.Point) error {
 		*g.memHeader = memoryHeader{
 			mem_offset: alloc,
 		}
-		g.buffers.memory.buffer.Upload(gunsafe.StructView(g.memHeader))
+		g.buffers.memory.buffer.Upload(byteslice.Struct(g.memHeader))
 		g.buffers.state.buffer.Upload(g.zeros(clearSize))
 
 		if realloced {
@@ -864,7 +864,7 @@ func (g *compute) render(tileDims image.Point) error {
 		g.ctx.MemoryBarrier()
 		t.kernel4.end()
 
-		if err := g.buffers.memory.buffer.Download(gunsafe.StructView(g.memHeader)); err != nil {
+		if err := g.buffers.memory.buffer.Download(byteslice.Struct(g.memHeader)); err != nil {
 			if err == driver.ErrContentLost {
 				continue
 			}

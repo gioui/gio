@@ -21,10 +21,10 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/gpu/internal/driver"
+	"gioui.org/internal/byteslice"
 	"gioui.org/internal/f32color"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
-	gunsafe "gioui.org/internal/unsafe"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -559,7 +559,7 @@ func (r *renderer) release() {
 
 func newBlitter(ctx driver.Device) *blitter {
 	quadVerts, err := ctx.NewImmutableBuffer(driver.BufferBindingVertices,
-		gunsafe.BytesView([]float32{
+		byteslice.Slice([]float32{
 			-1, +1, 0, 0,
 			+1, +1, 1, 0,
 			-1, -1, 0, 1,

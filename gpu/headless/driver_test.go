@@ -13,8 +13,8 @@ import (
 	"testing"
 
 	"gioui.org/gpu/internal/driver"
+	"gioui.org/internal/byteslice"
 	"gioui.org/internal/f32color"
-	"gioui.org/internal/unsafe"
 )
 
 var dumpImages = flag.Bool("saveimages", false, "save test images")
@@ -66,7 +66,7 @@ func TestInputShader(t *testing.T) {
 	defer p.Release()
 	b.BindProgram(p)
 	buf, err := b.NewImmutableBuffer(driver.BufferBindingVertices,
-		unsafe.BytesView([]float32{
+		byteslice.Slice([]float32{
 			0, .5, .5, 1,
 			-.5, -.5, .5, 1,
 			.5, -.5, .5, 1,

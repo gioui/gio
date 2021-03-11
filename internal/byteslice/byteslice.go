@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package unsafe
+// Package byteslice provides byte slice views of other Go values  such as
+// slices and structs.
+package byteslice
 
 import (
 	"reflect"
 	"unsafe"
 )
 
-// StructView returns a byte slice view of a struct.
-func StructView(s interface{}) []byte {
+// Struct returns a byte slice view of a struct.
+func Struct(s interface{}) []byte {
 	v := reflect.ValueOf(s).Elem()
 	sz := int(v.Type().Size())
 	var res []byte
@@ -19,8 +21,8 @@ func StructView(s interface{}) []byte {
 	return res
 }
 
-// BytesView returns a byte slice view of a slice.
-func BytesView(s interface{}) []byte {
+// Slice returns a byte slice view of a slice.
+func Slice(s interface{}) []byte {
 	v := reflect.ValueOf(s)
 	first := v.Index(0)
 	sz := int(first.Type().Size())
