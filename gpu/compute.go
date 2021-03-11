@@ -17,6 +17,7 @@ import (
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/byteslice"
 	"gioui.org/internal/f32color"
+	"gioui.org/internal/scene"
 	"gioui.org/layout"
 	"gioui.org/op"
 )
@@ -121,7 +122,7 @@ type textureOp struct {
 }
 
 type encoder struct {
-	scene    []sceneElem
+	scene    []scene.Command
 	npath    int
 	npathseg int
 }
@@ -149,8 +150,6 @@ type config struct {
 	anno_alloc      memAlloc
 }
 
-type sceneElem [sceneElemSize / 4]uint32
-
 // memAlloc matches Alloc in mem.h
 type memAlloc struct {
 	offset uint32
@@ -171,31 +170,12 @@ const (
 	kernel4OutputUnit = 2
 	kernel4AtlasUnit  = 3
 
-	pathSize      = 12
-	binSize       = 8
-	pathsegSize   = 44
-	annoSize      = 28
-	stateSize     = 60
-	stateStride   = 4 + 2*stateSize
-	sceneElemSize = 36
-)
-
-// GPU commands from scene.h
-const (
-	elemNop = iota
-	elemStrokeLine
-	elemFillLine
-	elemStrokeQuad
-	elemFillQuad
-	elemStrokeCubic
-	elemFillCubic
-	elemStroke
-	elemFill
-	elemLineWidth
-	elemTransform
-	elemBeginClip
-	elemEndClip
-	elemFillImage
+	pathSize    = 12
+	binSize     = 8
+	pathsegSize = 44
+	annoSize    = 28
+	stateSize   = 60
+	stateStride = 4 + 2*stateSize
 )
 
 const (
@@ -747,17 +727,18 @@ func (g *compute) render(tileDims image.Point) error {
 
 	// Pad scene with zeroes to avoid reading garbage in elements.comp.
 	scenePadding := partitionSize - len(g.enc.scene)%partitionSize
-	g.enc.scene = append(g.enc.scene, make([]sceneElem, scenePadding)...)
+	g.enc.scene = append(g.enc.scene, make([]scene.Command, scenePadding)...)
 
 	realloced := false
-	if s := len(g.enc.scene) * sceneElemSize; s > g.buffers.scene.size {
+	scene := byteslice.Slice(g.enc.scene)
+	if s := len(scene); s > g.buffers.scene.size {
 		realloced = true
 		paddedCap := s * 11 / 10
 		if err := g.buffers.scene.ensureCapacity(g.ctx, paddedCap); err != nil {
 			return err
 		}
 	}
-	g.buffers.scene.buffer.Upload(byteslice.Slice(g.enc.scene))
+	g.buffers.scene.buffer.Upload(scene)
 
 	w, h := tileDims.X*tileWidthPx, tileDims.Y*tileHeightPx
 	if g.output.size.X != w || g.output.size.Y != h {
@@ -1029,52 +1010,25 @@ func (e *encoder) append(e2 encoder) {
 }
 
 func (e *encoder) transform(m f32.Affine2D) {
-	sx, hx, ox, hy, sy, oy := m.Elems()
-	e.scene = append(e.scene, sceneElem{
-		0: elemTransform,
-		1: math.Float32bits(sx),
-		2: math.Float32bits(hy),
-		3: math.Float32bits(hx),
-		4: math.Float32bits(sy),
-		5: math.Float32bits(ox),
-		6: math.Float32bits(oy),
-	})
+	e.scene = append(e.scene, scene.Transform(m))
 }
 
 func (e *encoder) lineWidth(width float32) {
-	e.scene = append(e.scene, sceneElem{
-		0: elemLineWidth,
-		1: math.Float32bits(width),
-	})
+	e.scene = append(e.scene, scene.LineWidth(width))
 }
 
 func (e *encoder) stroke(col color.RGBA) {
-	e.scene = append(e.scene, sceneElem{
-		0: elemStroke,
-		1: uint32(col.R)<<24 | uint32(col.G)<<16 | uint32(col.B)<<8 | uint32(col.A),
-	})
+	e.scene = append(e.scene, scene.Stroke(col))
 	e.npath++
 }
 
 func (e *encoder) beginClip(bbox f32.Rectangle) {
-	e.scene = append(e.scene, sceneElem{
-		0: elemBeginClip,
-		1: math.Float32bits(bbox.Min.X),
-		2: math.Float32bits(bbox.Min.Y),
-		3: math.Float32bits(bbox.Max.X),
-		4: math.Float32bits(bbox.Max.Y),
-	})
+	e.scene = append(e.scene, scene.BeginClip(bbox))
 	e.npath++
 }
 
 func (e *encoder) endClip(bbox f32.Rectangle) {
-	e.scene = append(e.scene, sceneElem{
-		0: elemEndClip,
-		1: math.Float32bits(bbox.Min.X),
-		2: math.Float32bits(bbox.Min.Y),
-		3: math.Float32bits(bbox.Max.X),
-		4: math.Float32bits(bbox.Max.Y),
-	})
+	e.scene = append(e.scene, scene.EndClip(bbox))
 	e.npath++
 }
 
@@ -1088,10 +1042,7 @@ func (e *encoder) rect(r f32.Rectangle, stroke bool) {
 }
 
 func (e *encoder) fill(col color.RGBA) {
-	e.scene = append(e.scene, sceneElem{
-		0: elemFill,
-		1: uint32(col.R)<<24 | uint32(col.G)<<16 | uint32(col.B)<<8 | uint32(col.A),
-	})
+	e.scene = append(e.scene, scene.Fill(col))
 	e.npath++
 }
 
@@ -1102,41 +1053,16 @@ func (e *encoder) setFillImageOffset(index int, offset image.Point) {
 }
 
 func (e *encoder) fillImage(index int) {
-	e.scene = append(e.scene, sceneElem{
-		0: elemFillImage,
-		1: uint32(index),
-	})
+	e.scene = append(e.scene, scene.FillImage(index))
 	e.npath++
 }
 
 func (e *encoder) line(start, end f32.Point, stroke bool, flags uint32) {
-	tag := uint32(elemFillLine)
-	if stroke {
-		tag = elemStrokeLine
-	}
-	e.scene = append(e.scene, sceneElem{
-		0: flags<<16 | tag,
-		1: math.Float32bits(start.X),
-		2: math.Float32bits(start.Y),
-		3: math.Float32bits(end.X),
-		4: math.Float32bits(end.Y),
-	})
+	e.scene = append(e.scene, scene.Line(start, end, stroke, flags))
 	e.npathseg++
 }
 
 func (e *encoder) quad(start, ctrl, end f32.Point, stroke bool) {
-	tag := uint32(elemFillQuad)
-	if stroke {
-		tag = elemStrokeQuad
-	}
-	e.scene = append(e.scene, sceneElem{
-		0: tag,
-		1: math.Float32bits(start.X),
-		2: math.Float32bits(start.Y),
-		3: math.Float32bits(ctrl.X),
-		4: math.Float32bits(ctrl.Y),
-		5: math.Float32bits(end.X),
-		6: math.Float32bits(end.Y),
-	})
+	e.scene = append(e.scene, scene.Quad(start, ctrl, end, stroke))
 	e.npathseg++
 }
