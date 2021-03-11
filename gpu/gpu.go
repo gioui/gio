@@ -93,7 +93,7 @@ type drawOps struct {
 	pathCache   *opCache
 	// hack for the compute renderer to access
 	// converted path data.
-	retainPathData bool
+	compute bool
 }
 
 type drawState struct {
@@ -126,6 +126,11 @@ type pathOp struct {
 	pathVerts []byte
 	parent    *pathOp
 	place     placement
+
+	// For compute
+	trans  f32.Affine2D
+	stroke clip.StrokeStyle
+	dashes dashOp
 }
 
 type imageOp struct {
@@ -829,8 +834,8 @@ func (d *drawOps) collect(ctx driver.Device, cache *resourceCache, root *op.Ops,
 		if v, exists := d.pathCache.get(p.pathKey); !exists || v.data.data == nil {
 			data := buildPath(ctx, p.pathVerts)
 			var computePath encoder
-			if d.retainPathData {
-				computePath = encodePath(p.pathVerts)
+			if d.compute {
+				computePath = encodePath(p.pathVerts, p.stroke, p.dashes)
 			}
 			d.pathCache.put(p.pathKey, opCacheValue{
 				data:        data,
@@ -847,12 +852,15 @@ func (d *drawOps) newPathOp() *pathOp {
 	return &d.pathOpCache[len(d.pathOpCache)-1]
 }
 
-func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key, bounds f32.Rectangle, off f32.Point) {
+func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key, bounds f32.Rectangle, off f32.Point, tr f32.Affine2D, stroke clip.StrokeStyle, dashes dashOp) {
 	npath := d.newPathOp()
 	*npath = pathOp{
 		parent: state.cpath,
 		bounds: bounds,
 		off:    off,
+		trans:  tr,
+		stroke: stroke,
+		dashes: dashes,
 	}
 	state.cpath = npath
 	if len(aux) > 0 {
@@ -939,9 +947,13 @@ loop:
 					// Why is this not used for the offset shapes?
 					op.bounds = v.bounds
 				} else {
-					quads.aux, op.bounds = d.buildVerts(
+					pathData, bounds := d.buildVerts(
 						quads.aux, trans, op.outline, stroke, dashes,
 					)
+					op.bounds = bounds
+					if !d.compute {
+						quads.aux = pathData
+					}
 					// add it to the cache, without GPU data, so the transform can be
 					// reused.
 					d.pathCache.put(quads.key, opCacheValue{bounds: op.bounds})
@@ -952,7 +964,7 @@ loop:
 				quads.key.SetTransform(trans)
 			}
 			state.clip = state.clip.Intersect(op.bounds.Add(off))
-			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off)
+			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off, state.t, stroke, dashes)
 			quads = quadsOp{}
 			stroke = clip.StrokeStyle{}
 			dashes = dashOp{}
@@ -983,8 +995,8 @@ loop:
 				dst = layout.FRect(state.image.src.Rect)
 			}
 			clipData, bnd, partialTrans := d.boundsForTransformedRect(dst, trans)
-			clip := state.clip.Intersect(bnd.Add(off))
-			if clip.Empty() {
+			cl := state.clip.Intersect(bnd.Add(off))
+			if cl.Empty() {
 				continue
 			}
 
@@ -993,10 +1005,10 @@ loop:
 				// The paint operation is sheared or rotated, add a clip path representing
 				// this transformed rectangle.
 				encOp.Key.SetTransform(trans)
-				d.addClipPath(&state, clipData, encOp.Key, bnd, off)
+				d.addClipPath(&state, clipData, encOp.Key, bnd, off, state.t, clip.StrokeStyle{}, dashOp{})
 			}
 
-			bounds := boundRectF(clip)
+			bounds := boundRectF(cl)
 			mat := state.materialFor(bnd, off, partialTrans, bounds, state.t)
 
 			if bounds.Min == (image.Point{}) && bounds.Max == d.viewport && state.rect && mat.opaque && (mat.material == materialColor) {
@@ -1452,13 +1464,31 @@ func (d *drawOps) boundsForTransformedRect(r f32.Rectangle, tr f32.Affine2D) (au
 
 	// build the GPU vertices
 	l := len(d.vertCache)
-	d.vertCache = append(d.vertCache, make([]byte, vertStride*4*4)...)
-	aux = d.vertCache[l:]
-	encodeQuadTo(aux, 0, corners[0], corners[0].Add(corners[1]).Mul(0.5), corners[1])
-	encodeQuadTo(aux[vertStride*4:], 0, corners[1], corners[1].Add(corners[2]).Mul(0.5), corners[2])
-	encodeQuadTo(aux[vertStride*4*2:], 0, corners[2], corners[2].Add(corners[3]).Mul(0.5), corners[3])
-	encodeQuadTo(aux[vertStride*4*3:], 0, corners[3], corners[3].Add(corners[0]).Mul(0.5), corners[0])
-	fillMaxY(aux)
+	if !d.compute {
+		d.vertCache = append(d.vertCache, make([]byte, vertStride*4*4)...)
+		aux = d.vertCache[l:]
+		encodeQuadTo(aux, 0, corners[0], corners[0].Add(corners[1]).Mul(0.5), corners[1])
+		encodeQuadTo(aux[vertStride*4:], 0, corners[1], corners[1].Add(corners[2]).Mul(0.5), corners[2])
+		encodeQuadTo(aux[vertStride*4*2:], 0, corners[2], corners[2].Add(corners[3]).Mul(0.5), corners[3])
+		encodeQuadTo(aux[vertStride*4*3:], 0, corners[3], corners[3].Add(corners[0]).Mul(0.5), corners[0])
+		fillMaxY(aux)
+	} else {
+		d.vertCache = append(d.vertCache, make([]byte, (scene.CommandSize+4)*4)...)
+		aux = d.vertCache[l:]
+		buf := aux
+		bo := binary.LittleEndian
+		bo.PutUint32(buf, 0) // Contour
+		ops.EncodeCommand(buf[4:], scene.Line(r.Min, f32.Pt(r.Max.X, r.Min.Y), false, 0))
+		buf = buf[4+scene.CommandSize:]
+		bo.PutUint32(buf, 0)
+		ops.EncodeCommand(buf[4:], scene.Line(f32.Pt(r.Max.X, r.Min.Y), r.Max, false, 0))
+		buf = buf[4+scene.CommandSize:]
+		bo.PutUint32(buf, 0)
+		ops.EncodeCommand(buf[4:], scene.Line(r.Max, f32.Pt(r.Min.X, r.Max.Y), false, 0))
+		buf = buf[4+scene.CommandSize:]
+		bo.PutUint32(buf, 0)
+		ops.EncodeCommand(buf[4:], scene.Line(f32.Pt(r.Min.X, r.Max.Y), r.Min, false, 0))
+	}
 
 	// establish the transform mapping from bounds rectangle to transformed corners
 	var P1, P2, P3 f32.Point

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"math"
 	"math/bits"
 	"time"
 	"unsafe"
@@ -17,9 +16,11 @@ import (
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/byteslice"
 	"gioui.org/internal/f32color"
+	"gioui.org/internal/ops"
 	"gioui.org/internal/scene"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 )
 
 type compute struct {
@@ -227,7 +228,7 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	g.materials.layout = progLayout
 
 	g.drawOps.pathCache = newOpCache()
-	g.drawOps.retainPathData = true
+	g.drawOps.compute = true
 
 	buf, err := ctx.NewBuffer(driver.BufferBindingShaderStorage, int(unsafe.Sizeof(config{})))
 	if err != nil {
@@ -661,53 +662,59 @@ func (g *compute) encodeClipStack(clip, bounds f32.Rectangle, p *pathOp) int {
 	}
 	if p != nil && p.path {
 		pathData, _ := g.drawOps.pathCache.get(p.pathKey)
-		g.enc.transform(f32.Affine2D{}.Offset(p.off))
+		g.enc.transform(p.trans)
 		g.enc.append(pathData.computePath)
-		g.enc.transform(f32.Affine2D{}.Offset(p.off.Mul(-1)))
+		g.enc.transform(p.trans.Invert())
 	} else {
 		g.enc.rect(bounds, false)
 	}
 	return nclips
 }
 
-// encodePath takes a Path encoded with quadSplitter and encode it for elements.comp.
-// This is certainly wasteful, but minimizes implementation differences to the old
-// renderer.
-func encodePath(p []byte) encoder {
+func encodePath(pathData []byte, stroke clip.StrokeStyle, dashes dashOp) encoder {
 	var enc encoder
+	if stroke.Width > 0 {
+		quads := decodeToStrokeQuads(pathData)
+		quads = quads.stroke(stroke, dashes)
+		for _, quad := range quads {
+			q := quad.quad
+			enc.quad(q.From, q.Ctrl, q.To, false)
+		}
+		if len(quads) > 0 {
+			enc.scene[len(enc.scene)-1][0] |= (flagEndPath << 16)
+		}
+		return enc
+	}
 	var (
 		prevTo  f32.Point
 		hasPrev bool
 	)
-	for len(p) > 0 {
-		// p contains quadratic curves encoded in vertex structs.
-		vertex := p[:vertStride]
-		// We only need some of the values. This code undoes vertex.encode.
-		from := f32.Pt(
-			math.Float32frombits(bo.Uint32(vertex[8:])),
-			math.Float32frombits(bo.Uint32(vertex[12:])),
-		)
-		ctrl := f32.Pt(
-			math.Float32frombits(bo.Uint32(vertex[16:])),
-			math.Float32frombits(bo.Uint32(vertex[20:])),
-		)
-		to := f32.Pt(
-			math.Float32frombits(bo.Uint32(vertex[24:])),
-			math.Float32frombits(bo.Uint32(vertex[28:])),
-		)
-		if hasPrev && from != prevTo {
-			enc.scene[len(enc.scene)-1][0] = (flagEndPath << 16) | enc.scene[len(enc.scene)-1][0]
+	for len(pathData) >= scene.CommandSize+4 {
+		cmd := ops.DecodeCommand(pathData[4:])
+		switch cmd.Op() {
+		case scene.OpFillLine:
+			from, to := scene.DecodeLine(cmd)
+			if hasPrev && from != prevTo {
+				enc.scene[len(enc.scene)-1][0] |= (flagEndPath << 16)
+			}
+			hasPrev = true
+			prevTo = to
+		case scene.OpFillQuad:
+			from, _, to := scene.DecodeQuad(cmd)
+			if hasPrev && from != prevTo {
+				enc.scene[len(enc.scene)-1][0] |= (flagEndPath << 16)
+			}
+			hasPrev = true
+			prevTo = to
+		default:
+			panic("unsupported path scene command")
 		}
-		hasPrev = true
-		prevTo = to
-		enc.quad(from, ctrl, to, false)
-
-		// The vertex is duplicated 4 times, one for each corner of quads drawn
-		// by the old renderer.
-		p = p[vertStride*4:]
+		enc.scene = append(enc.scene, cmd)
+		enc.npathseg++
+		pathData = pathData[scene.CommandSize+4:]
 	}
 	if hasPrev {
-		enc.scene[len(enc.scene)-1][0] = (flagEndPath << 16) | enc.scene[len(enc.scene)-1][0]
+		enc.scene[len(enc.scene)-1][0] |= (flagEndPath << 16)
 	}
 	return enc
 }

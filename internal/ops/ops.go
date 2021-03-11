@@ -18,6 +18,10 @@ func DecodeCommand(d []byte) scene.Command {
 	return cmd
 }
 
+func EncodeCommand(out []byte, cmd scene.Command) {
+	copy(out, byteslice.Uint32(cmd[:]))
+}
+
 func DecodeTransform(data []byte) (t f32.Affine2D) {
 	if opconst.OpType(data[0]) != opconst.TypeTransform {
 		panic("invalid op")

@@ -133,6 +133,15 @@ func FillImage(index int) Command {
 	}
 }
 
+func DecodeLine(cmd Command) (from, to f32.Point) {
+	if cmd[0] != uint32(OpFillLine) {
+		panic("invalid command")
+	}
+	from = f32.Pt(math.Float32frombits(cmd[1]), math.Float32frombits(cmd[2]))
+	to = f32.Pt(math.Float32frombits(cmd[3]), math.Float32frombits(cmd[4]))
+	return
+}
+
 func DecodeQuad(cmd Command) (from, ctrl, to f32.Point) {
 	if cmd[0] != uint32(OpFillQuad) {
 		panic("invalid command")
