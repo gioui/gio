@@ -1385,36 +1385,14 @@ func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D, outline bool, stroke c
 
 	case outline:
 		// Outline path.
-		first := true
-		var firstPt, lastPt f32.Point
 		for len(aux) >= ops.QuadSize+4 {
 			d.qs.contour = bo.Uint32(aux)
 			quad := ops.DecodeQuad(aux[4:])
 			quad = quad.Transform(tr)
 
-			if first {
-				first = false
-				firstPt = quad.From
-				lastPt = quad.From
-			}
-			if quad.From != lastPt {
-				if lastPt != firstPt {
-					// Close outline before starting a new.
-					mid := firstPt.Add(lastPt).Mul(.5)
-					d.qs.splitAndEncode(ops.Quad{From: lastPt, To: firstPt, Ctrl: mid})
-				}
-				firstPt = quad.From
-			}
-			lastPt = quad.To
-
 			d.qs.splitAndEncode(quad)
 
 			aux = aux[ops.QuadSize+4:]
-		}
-		// Close last outline if necessary.
-		if !first && lastPt != firstPt {
-			mid := firstPt.Add(lastPt).Mul(.5)
-			d.qs.splitAndEncode(ops.Quad{From: lastPt, To: firstPt, Ctrl: mid})
 		}
 	}
 

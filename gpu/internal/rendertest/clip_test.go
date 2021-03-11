@@ -91,6 +91,7 @@ func TestPaintArc(t *testing.T) {
 		p.Arc(f32.Pt(-10, -20), f32.Pt(10, -5), math.Pi)
 		p.Line(f32.Pt(0, -10))
 		p.Line(f32.Pt(-50, 0))
+		p.Close()
 		clip.Outline{
 			Path: p.End(),
 		}.Op().Add(o)
@@ -112,6 +113,7 @@ func TestPaintAbsolute(t *testing.T) {
 		p.MoveTo(f32.Pt(20, 20))
 		p.LineTo(f32.Pt(80, 20))
 		p.QuadTo(f32.Pt(80, 80), f32.Pt(20, 80))
+		p.Close()
 		clip.Outline{
 			Path: p.End(),
 		}.Op().Add(o)

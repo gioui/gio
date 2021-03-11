@@ -65,8 +65,11 @@ func (p Op) Add(o *op.Ops) {
 }
 
 type PathSpec struct {
-	spec  op.CallOp
-	quads uint32 // quads is the number Bézier segments in that path.
+	spec op.CallOp
+	// open is true if any path contour is not closed. A closed contour starts
+	// and ends in the same point.
+	open  bool
+	quads uint32 // quads is the number Bézier segments in the path.
 }
 
 // Path constructs a Op clip path described by lines and
@@ -78,6 +81,7 @@ type PathSpec struct {
 // data is stored directly in the Ops list supplied to Begin.
 type Path struct {
 	ops     *op.Ops
+	open    bool
 	contour int
 	pen     f32.Point
 	macro   op.MacroOp
@@ -102,6 +106,7 @@ func (p *Path) End() PathSpec {
 	c := p.macro.Stop()
 	return PathSpec{
 		spec:  c,
+		open:  p.open || p.pen != p.start,
 		quads: p.quads,
 	}
 }
@@ -114,6 +119,7 @@ func (p *Path) Move(delta f32.Point) {
 
 // MoveTo moves the pen to the specified absolute coordinate.
 func (p *Path) MoveTo(to f32.Point) {
+	p.open = p.open || p.pen != p.start
 	p.end()
 	p.pen = to
 	p.start = to
@@ -121,9 +127,6 @@ func (p *Path) MoveTo(to f32.Point) {
 
 // end completes the current contour.
 func (p *Path) end() {
-	if p.pen != p.start {
-		p.LineTo(p.start)
-	}
 	p.contour++
 }
 
@@ -369,8 +372,11 @@ func (p *Path) approxCubeTo(splits int, maxDist float32, ctrl0, ctrl1, to f32.Po
 	return splits
 }
 
-// Close closes the path.
+// Close closes the path contour.
 func (p *Path) Close() {
+	if p.pen != p.start {
+		p.LineTo(p.start)
+	}
 	p.end()
 }
 
@@ -382,6 +388,9 @@ type Outline struct {
 
 // Op returns a clip operation representing the outline.
 func (o Outline) Op() Op {
+	if o.Path.open {
+		panic("not all path contours are closed")
+	}
 	return Op{
 		path:    o.Path,
 		outline: true,
