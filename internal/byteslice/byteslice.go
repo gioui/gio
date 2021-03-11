@@ -21,6 +21,16 @@ func Struct(s interface{}) []byte {
 	return res
 }
 
+// Uint32 returns a byte slice view of a uint32 slice.
+func Uint32(s []uint32) []byte {
+	n := len(s)
+	if n == 0 {
+		return nil
+	}
+	blen := n * int(unsafe.Sizeof(s[0]))
+	return (*[1 << 30]byte)(unsafe.Pointer(&s[0]))[:blen:blen]
+}
+
 // Slice returns a byte slice view of a slice.
 func Slice(s interface{}) []byte {
 	v := reflect.ValueOf(s)
