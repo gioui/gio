@@ -31,16 +31,3 @@ func BytesView(s interface{}) []byte {
 	h.Len = v.Len() * sz
 	return res
 }
-
-// SliceOf returns a slice from a (native) pointer.
-func SliceOf(s uintptr) []byte {
-	if s == 0 {
-		return nil
-	}
-	var res []byte
-	h := (*reflect.SliceHeader)(unsafe.Pointer(&res))
-	h.Data = s
-	h.Cap = 1 << 30
-	h.Len = 1 << 30
-	return res
-}

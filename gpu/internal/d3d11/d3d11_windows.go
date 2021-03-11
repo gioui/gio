@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"image"
 	"math"
+	"reflect"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
 
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/d3d11"
-	gunsafe "gioui.org/internal/unsafe"
 )
 
 type Backend struct {
@@ -675,7 +675,7 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 	srcPitch := w * 4
 	dstPitch := int(resMap.RowPitch)
 	mapSize := dstPitch * h
-	data := gunsafe.SliceOf(resMap.PData)[:mapSize:mapSize]
+	data := sliceOf(resMap.PData, mapSize)
 	width := w * 4
 	for r := 0; r < h; r++ {
 		pixels := pixels[r*srcPitch:]
@@ -748,4 +748,14 @@ func toBlendFactor(f driver.BlendFactor) (uint32, uint32) {
 	default:
 		panic("unsupported blend source factor")
 	}
+}
+
+// sliceOf returns a slice from a (native) pointer.
+func sliceOf(ptr uintptr, cap int) []byte {
+	var data []byte
+	h := (*reflect.SliceHeader)(unsafe.Pointer(&data))
+	h.Data = ptr
+	h.Cap = cap
+	h.Len = cap
+	return data
 }
