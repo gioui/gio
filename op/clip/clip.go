@@ -138,8 +138,12 @@ func (p *Path) Line(delta f32.Point) {
 
 // LineTo moves the pen to the absolute point specified, recording a line.
 func (p *Path) LineTo(to f32.Point) {
-	// Model lines as degenerate quadratic Béziers.
-	p.QuadTo(to.Add(p.pen).Mul(.5), to)
+	data := p.ops.Write(scene.CommandSize + 4)
+	bo := binary.LittleEndian
+	bo.PutUint32(data[0:], uint32(p.contour))
+	ops.EncodeCommand(data[4:], scene.Line(p.pen, to, false, 0))
+	p.pen = to
+	p.hasSegments = true
 }
 
 // Quad records a quadratic Bézier from the pen to end

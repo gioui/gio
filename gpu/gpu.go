@@ -1393,6 +1393,12 @@ func decodeToOutlineQuads(qs *quadSplitter, tr f32.Affine2D, pathData []byte) {
 		qs.contour = bo.Uint32(pathData)
 		cmd := ops.DecodeCommand(pathData[4:])
 		switch cmd.Op() {
+		case scene.OpFillLine:
+			var q quadSegment
+			q.From, q.To = scene.DecodeLine(cmd)
+			q.Ctrl = q.From.Add(q.To).Mul(.5)
+			q = q.Transform(tr)
+			qs.splitAndEncode(q)
 		case scene.OpFillQuad:
 			var q quadSegment
 			q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
@@ -1413,6 +1419,15 @@ func decodeToStrokeQuads(pathData []byte) strokeQuads {
 		contour := bo.Uint32(pathData)
 		cmd := ops.DecodeCommand(pathData[4:])
 		switch cmd.Op() {
+		case scene.OpFillLine:
+			var q quadSegment
+			q.From, q.To = scene.DecodeLine(cmd)
+			q.Ctrl = q.From.Add(q.To).Mul(.5)
+			quad := strokeQuad{
+				contour: contour,
+				quad:    q,
+			}
+			quads = append(quads, quad)
 		case scene.OpFillQuad:
 			var q quadSegment
 			q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
