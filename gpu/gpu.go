@@ -25,6 +25,7 @@ import (
 	"gioui.org/internal/f32color"
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
+	"gioui.org/internal/scene"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -139,6 +140,10 @@ type imageOp struct {
 type dashOp struct {
 	phase  float32
 	dashes []float32
+}
+
+type quadSegment struct {
+	From, Ctrl, To f32.Point
 }
 
 func decodeDashOp(data []byte) dashOp {
@@ -1340,28 +1345,19 @@ func (d *drawOps) writeVertCache(n int) []byte {
 }
 
 // transform, split paths as needed, calculate maxY, bounds and create GPU vertices.
-func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D, outline bool, stroke clip.StrokeStyle, dashes dashOp) (verts []byte, bounds f32.Rectangle) {
+func (d *drawOps) buildVerts(pathData []byte, tr f32.Affine2D, outline bool, stroke clip.StrokeStyle, dashes dashOp) (verts []byte, bounds f32.Rectangle) {
 	inf := float32(math.Inf(+1))
 	d.qs.bounds = f32.Rectangle{
 		Min: f32.Point{X: inf, Y: inf},
 		Max: f32.Point{X: -inf, Y: -inf},
 	}
 	d.qs.d = d
-	bo := binary.LittleEndian
 	startLength := len(d.vertCache)
 
 	switch {
 	case stroke.Width > 0:
 		// Stroke path.
-		quads := make(strokeQuads, 0, 2*len(aux)/(ops.QuadSize+4))
-		for len(aux) >= ops.QuadSize+4 {
-			quad := strokeQuad{
-				contour: bo.Uint32(aux),
-				quad:    ops.DecodeQuad(aux[4:]),
-			}
-			quads = append(quads, quad)
-			aux = aux[ops.QuadSize+4:]
-		}
+		quads := decodeToStrokeQuads(pathData)
 		quads = quads.stroke(stroke, dashes)
 		for _, quad := range quads {
 			d.qs.contour = quad.contour
@@ -1371,20 +1367,54 @@ func (d *drawOps) buildVerts(aux []byte, tr f32.Affine2D, outline bool, stroke c
 		}
 
 	case outline:
-		// Outline path.
-		for len(aux) >= ops.QuadSize+4 {
-			d.qs.contour = bo.Uint32(aux)
-			quad := ops.DecodeQuad(aux[4:])
-			quad = quad.Transform(tr)
-
-			d.qs.splitAndEncode(quad)
-
-			aux = aux[ops.QuadSize+4:]
-		}
+		decodeToOutlineQuads(&d.qs, tr, pathData)
 	}
 
 	fillMaxY(d.vertCache[startLength:])
 	return d.vertCache[startLength:], d.qs.bounds
+}
+
+// decodeOutlineQuads decodes scene commands, splits them into quadratic béziers
+// as needed and feeds them to the supplied splitter.
+func decodeToOutlineQuads(qs *quadSplitter, tr f32.Affine2D, pathData []byte) {
+	for len(pathData) >= scene.CommandSize+4 {
+		qs.contour = bo.Uint32(pathData)
+		cmd := ops.DecodeCommand(pathData[4:])
+		switch cmd.Op() {
+		case scene.OpFillQuad:
+			var q quadSegment
+			q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
+			q = q.Transform(tr)
+			qs.splitAndEncode(q)
+		default:
+			panic("unsupported scene command")
+		}
+		pathData = pathData[scene.CommandSize+4:]
+	}
+}
+
+// decodeToStrokeQuads is like decodeOutlineQuads, except it returns a list of stroke
+// quads ready to stroke.
+func decodeToStrokeQuads(pathData []byte) strokeQuads {
+	quads := make(strokeQuads, 0, 2*len(pathData)/(scene.CommandSize+4))
+	for len(pathData) >= scene.CommandSize+4 {
+		contour := bo.Uint32(pathData)
+		cmd := ops.DecodeCommand(pathData[4:])
+		switch cmd.Op() {
+		case scene.OpFillQuad:
+			var q quadSegment
+			q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
+			quad := strokeQuad{
+				contour: contour,
+				quad:    q,
+			}
+			quads = append(quads, quad)
+		default:
+			panic("unsupported scene command")
+		}
+		pathData = pathData[scene.CommandSize+4:]
+	}
+	return quads
 }
 
 // create GPU vertices for transformed r, find the bounds and establish texture transform.
@@ -1447,4 +1477,17 @@ func (d *drawOps) boundsForTransformedRect(r f32.Rectangle, tr f32.Affine2D) (au
 func isPureOffset(t f32.Affine2D) bool {
 	a, b, _, d, e, _ := t.Elems()
 	return a == 1 && b == 0 && d == 0 && e == 1
+}
+
+func (q quadSegment) Transform(t f32.Affine2D) quadSegment {
+	q.From = t.Transform(q.From)
+	q.Ctrl = t.Transform(q.Ctrl)
+	q.To = t.Transform(q.To)
+	return q
+}
+
+func decodeQuad(d []byte) (q quadSegment) {
+	cmd := ops.DecodeCommand(d)
+	q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
+	return
 }

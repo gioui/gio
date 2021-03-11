@@ -5,7 +5,6 @@ package ops
 import (
 	"encoding/binary"
 	"math"
-	"unsafe"
 
 	"gioui.org/f32"
 	"gioui.org/internal/byteslice"
@@ -13,24 +12,10 @@ import (
 	"gioui.org/internal/scene"
 )
 
-const QuadSize = int(unsafe.Sizeof(scene.Command{}))
-
-type Quad struct {
-	From, Ctrl, To f32.Point
-}
-
-func (q Quad) Transform(t f32.Affine2D) Quad {
-	q.From = t.Transform(q.From)
-	q.Ctrl = t.Transform(q.Ctrl)
-	q.To = t.Transform(q.To)
-	return q
-}
-
-func DecodeQuad(d []byte) (q Quad) {
+func DecodeCommand(d []byte) scene.Command {
 	var cmd scene.Command
-	copy(byteslice.Slice(cmd[:]), d)
-	q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
-	return
+	copy(byteslice.Uint32(cmd[:]), d)
+	return cmd
 }
 
 func DecodeTransform(data []byte) (t f32.Affine2D) {

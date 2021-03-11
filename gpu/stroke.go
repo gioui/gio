@@ -27,7 +27,7 @@ import (
 	"math"
 
 	"gioui.org/f32"
-	"gioui.org/internal/ops"
+	"gioui.org/internal/scene"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 )
@@ -43,7 +43,7 @@ const strokeTolerance = 0.01
 
 type strokeQuad struct {
 	contour uint32
-	quad    ops.Quad
+	quad    quadSegment
 }
 
 type strokeState struct {
@@ -74,7 +74,7 @@ func (qs *strokeQuads) closed() bool {
 func (qs *strokeQuads) lineTo(pt f32.Point) {
 	end := qs.pen()
 	*qs = append(*qs, strokeQuad{
-		quad: ops.Quad{
+		quad: quadSegment{
 			From: end,
 			Ctrl: end.Add(pt).Mul(0.5),
 			To:   pt,
@@ -94,9 +94,9 @@ func (qs *strokeQuads) arc(f1, f2 f32.Point, angle float32) {
 	end := len(o.Data())
 	raw := o.Data()[beg:end]
 
-	for qi := 0; len(raw) >= (ops.QuadSize + 4); qi++ {
-		quad := ops.DecodeQuad(raw[4:])
-		raw = raw[ops.QuadSize+4:]
+	for qi := 0; len(raw) >= (scene.CommandSize + 4); qi++ {
+		quad := decodeQuad(raw[4:])
+		raw = raw[scene.CommandSize+4:]
 		*qs = append(*qs, strokeQuad{
 			quad: quad,
 		})
@@ -240,7 +240,7 @@ func (qs *strokeQuads) close() {
 	}
 
 	*qs = append(*qs, strokeQuad{
-		quad: ops.Quad{
+		quad: quadSegment{
 			From: p0,
 			Ctrl: p0.Add(p1).Mul(0.5),
 			To:   p1,
@@ -293,7 +293,7 @@ func (qs strokeQuads) append(ps strokeQuads) strokeQuads {
 	p1 := ps[0].quad.From
 	if p0 != p1 && lenPt(p0.Sub(p1)) < strokeTolerance {
 		qs = append(qs, strokeQuad{
-			quad: ops.Quad{
+			quad: quadSegment{
 				From: p0,
 				Ctrl: p0.Add(p1).Mul(0.5),
 				To:   p1,
@@ -477,7 +477,7 @@ func (qs *strokeQuads) addLine(p0, ctrl, p1 f32.Point, t, d float32) {
 
 	*qs = append(*qs,
 		strokeQuad{
-			quad: ops.Quad{
+			quad: quadSegment{
 				From: p0,
 				Ctrl: p0.Add(p1).Mul(0.5),
 				To:   p1,

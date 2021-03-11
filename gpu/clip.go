@@ -2,7 +2,6 @@ package gpu
 
 import (
 	"gioui.org/f32"
-	"gioui.org/internal/ops"
 )
 
 type quadSplitter struct {
@@ -47,7 +46,7 @@ func (qs *quadSplitter) encodeQuadTo(from, ctrl, to f32.Point) {
 	encodeQuadTo(data, qs.contour, from, ctrl, to)
 }
 
-func (qs *quadSplitter) splitAndEncode(quad ops.Quad) {
+func (qs *quadSplitter) splitAndEncode(quad quadSegment) {
 	cbnd := f32.Rectangle{
 		Min: quad.From,
 		Max: quad.To,

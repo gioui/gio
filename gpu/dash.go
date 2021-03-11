@@ -11,7 +11,6 @@ import (
 	"sort"
 
 	"gioui.org/f32"
-	"gioui.org/internal/ops"
 )
 
 func isSolidLine(sty dashOp) bool {
@@ -238,7 +237,7 @@ func (qs strokeQuads) splitAt(contour *uint32, ts ...float64) []strokeQuads {
 
 				oi = append(oi, strokeQuad{
 					contour: *contour,
-					quad: ops.Quad{
+					quad: quadSegment{
 						From: from,
 						Ctrl: q1,
 						To:   r0,
@@ -256,7 +255,7 @@ func (qs strokeQuads) splitAt(contour *uint32, ts ...float64) []strokeQuads {
 				}
 				oi = append(oi, strokeQuad{
 					contour: *contour,
-					quad: ops.Quad{
+					quad: quadSegment{
 						From: r0,
 						Ctrl: r1,
 						To:   r2,

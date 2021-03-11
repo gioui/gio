@@ -7,9 +7,12 @@ package scene
 import (
 	"image/color"
 	"math"
+	"unsafe"
 
 	"gioui.org/f32"
 )
+
+type Op uint32
 
 type Command [sceneElemSize / 4]uint32
 
@@ -17,26 +20,32 @@ const sceneElemSize = 36
 
 // GPU commands from scene.h
 const (
-	elemNop = iota
-	elemStrokeLine
-	elemFillLine
-	elemStrokeQuad
-	elemFillQuad
-	elemStrokeCubic
-	elemFillCubic
-	elemStroke
-	elemFill
-	elemLineWidth
-	elemTransform
-	elemBeginClip
-	elemEndClip
-	elemFillImage
+	OpNop Op = iota
+	OpStrokeLine
+	OpFillLine
+	OpStrokeQuad
+	OpFillQuad
+	OpStrokeCubic
+	OpFillCubic
+	OpStroke
+	OpFill
+	OpLineWidth
+	OpTransform
+	OpBeginClip
+	OpEndClip
+	OpFillImage
 )
 
+const CommandSize = int(unsafe.Sizeof(Command{}))
+
+func (c Command) Op() Op {
+	return Op(c[0])
+}
+
 func Line(start, end f32.Point, stroke bool, flags uint32) Command {
-	tag := uint32(elemFillLine)
+	tag := uint32(OpFillLine)
 	if stroke {
-		tag = elemStrokeLine
+		tag = uint32(OpStrokeLine)
 	}
 	return Command{
 		0: flags<<16 | tag,
@@ -48,9 +57,9 @@ func Line(start, end f32.Point, stroke bool, flags uint32) Command {
 }
 
 func Quad(start, ctrl, end f32.Point, stroke bool) Command {
-	tag := uint32(elemFillQuad)
+	tag := uint32(OpFillQuad)
 	if stroke {
-		tag = elemStrokeQuad
+		tag = uint32(OpStrokeQuad)
 	}
 	return Command{
 		0: tag,
@@ -66,7 +75,7 @@ func Quad(start, ctrl, end f32.Point, stroke bool) Command {
 func Transform(m f32.Affine2D) Command {
 	sx, hx, ox, hy, sy, oy := m.Elems()
 	return Command{
-		0: elemTransform,
+		0: uint32(OpTransform),
 		1: math.Float32bits(sx),
 		2: math.Float32bits(hy),
 		3: math.Float32bits(hx),
@@ -78,21 +87,21 @@ func Transform(m f32.Affine2D) Command {
 
 func LineWidth(width float32) Command {
 	return Command{
-		0: elemLineWidth,
+		0: uint32(OpLineWidth),
 		1: math.Float32bits(width),
 	}
 }
 
 func Stroke(col color.RGBA) Command {
 	return Command{
-		0: elemStroke,
+		0: uint32(OpStroke),
 		1: uint32(col.R)<<24 | uint32(col.G)<<16 | uint32(col.B)<<8 | uint32(col.A),
 	}
 }
 
 func BeginClip(bbox f32.Rectangle) Command {
 	return Command{
-		0: elemBeginClip,
+		0: uint32(OpBeginClip),
 		1: math.Float32bits(bbox.Min.X),
 		2: math.Float32bits(bbox.Min.Y),
 		3: math.Float32bits(bbox.Max.X),
@@ -102,7 +111,7 @@ func BeginClip(bbox f32.Rectangle) Command {
 
 func EndClip(bbox f32.Rectangle) Command {
 	return Command{
-		0: elemEndClip,
+		0: uint32(OpEndClip),
 		1: math.Float32bits(bbox.Min.X),
 		2: math.Float32bits(bbox.Min.Y),
 		3: math.Float32bits(bbox.Max.X),
@@ -112,20 +121,20 @@ func EndClip(bbox f32.Rectangle) Command {
 
 func Fill(col color.RGBA) Command {
 	return Command{
-		0: elemFill,
+		0: uint32(OpFill),
 		1: uint32(col.R)<<24 | uint32(col.G)<<16 | uint32(col.B)<<8 | uint32(col.A),
 	}
 }
 
 func FillImage(index int) Command {
 	return Command{
-		0: elemFillImage,
+		0: uint32(OpFillImage),
 		1: uint32(index),
 	}
 }
 
 func DecodeQuad(cmd Command) (from, ctrl, to f32.Point) {
-	if cmd[0] != elemFillQuad {
+	if cmd[0] != uint32(OpFillQuad) {
 		panic("invalid command")
 	}
 	from = f32.Pt(math.Float32frombits(cmd[1]), math.Float32frombits(cmd[2]))
