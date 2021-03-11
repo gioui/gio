@@ -25,11 +25,9 @@ type Op struct {
 }
 
 func (p Op) Add(o *op.Ops) {
-	if p.path.quads > 0 {
+	if p.path.hasSegments {
 		data := o.Write(opconst.TypePathLen)
 		data[0] = byte(opconst.TypePath)
-		bo := binary.LittleEndian
-		bo.PutUint32(data[1:], p.path.quads)
 		p.path.spec.Add(o)
 	}
 
@@ -68,8 +66,9 @@ type PathSpec struct {
 	spec op.CallOp
 	// open is true if any path contour is not closed. A closed contour starts
 	// and ends in the same point.
-	open  bool
-	quads uint32 // quads is the number Bézier segments in the path.
+	open bool
+	// hasSegments tracks whether there is more than one path segment in the path.
+	hasSegments bool
 }
 
 // Path constructs a Op clip path described by lines and
@@ -80,13 +79,13 @@ type PathSpec struct {
 // Path generates no garbage and can be used for dynamic paths; path
 // data is stored directly in the Ops list supplied to Begin.
 type Path struct {
-	ops     *op.Ops
-	open    bool
-	contour int
-	pen     f32.Point
-	macro   op.MacroOp
-	start   f32.Point
-	quads   uint32
+	ops         *op.Ops
+	open        bool
+	contour     int
+	pen         f32.Point
+	macro       op.MacroOp
+	start       f32.Point
+	hasSegments bool
 }
 
 // Pos returns the current pen position.
@@ -105,9 +104,9 @@ func (p *Path) Begin(ops *op.Ops) {
 func (p *Path) End() PathSpec {
 	c := p.macro.Stop()
 	return PathSpec{
-		spec:  c,
-		open:  p.open || p.pen != p.start,
-		quads: p.quads,
+		spec:        c,
+		open:        p.open || p.pen != p.start,
+		hasSegments: p.hasSegments,
 	}
 }
 
@@ -162,7 +161,7 @@ func (p *Path) QuadTo(ctrl, to f32.Point) {
 		To:   to,
 	})
 	p.pen = to
-	p.quads++
+	p.hasSegments = true
 }
 
 // Arc adds an elliptical arc to the path. The implied ellipse is defined

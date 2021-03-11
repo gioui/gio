@@ -60,7 +60,7 @@ const (
 	TypeClipLen            = 1 + 4*4 + 1
 	TypeProfileLen         = 1
 	TypeCursorLen          = 1 + 1
-	TypePathLen            = 1 + 4
+	TypePathLen            = 1
 	TypeStrokeLen          = 1 + 4 + 4 + 1 + 1
 	TypeDashLen            = 1 + 4 + 1
 )

@@ -168,18 +168,8 @@ func decodeStrokeOp(data []byte) clip.StrokeStyle {
 }
 
 type quadsOp struct {
-	quads uint32
-	key   ops.Key
-	aux   []byte
-}
-
-func decodeQuadsOp(data []byte) uint32 {
-	_ = data[:1+4]
-	if opconst.OpType(data[0]) != opconst.TypePath {
-		panic("invalid op")
-	}
-	bo := binary.LittleEndian
-	return bo.Uint32(data[1:])
+	key ops.Key
+	aux []byte
 }
 
 type material struct {
@@ -922,15 +912,12 @@ loop:
 			stroke = decodeStrokeOp(encOp.Data)
 
 		case opconst.TypePath:
-			quads.quads = decodeQuadsOp(encOp.Data)
-			if quads.quads > 0 {
-				encOp, ok = r.Decode()
-				if !ok {
-					break loop
-				}
-				quads.aux = encOp.Data[opconst.TypeAuxLen:]
-				quads.key = encOp.Key
+			encOp, ok = r.Decode()
+			if !ok {
+				break loop
 			}
+			quads.aux = encOp.Data[opconst.TypeAuxLen:]
+			quads.key = encOp.Key
 
 		case opconst.TypeClip:
 			var op clipOp
