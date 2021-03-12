@@ -45,30 +45,30 @@ type StrokeStyle struct {
 type StrokeCap uint8
 
 const (
+	// RoundCap caps stroked paths with a round cap, joining the right-hand and
+	// left-hand sides of a stroked path with a half disc of diameter the
+	// stroked path's width.
+	RoundCap StrokeCap = iota
+
 	// FlatCap caps stroked paths with a flat cap, joining the right-hand
 	// and left-hand sides of a stroked path with a straight line.
-	FlatCap StrokeCap = iota
+	FlatCap
 
 	// SquareCap caps stroked paths with a square cap, joining the right-hand
 	// and left-hand sides of a stroked path with a half square of length
 	// the stroked path's width.
 	SquareCap
-
-	// RoundCap caps stroked paths with a round cap, joining the right-hand and
-	// left-hand sides of a stroked path with a half disc of diameter the
-	// stroked path's width.
-	RoundCap
 )
 
 // StrokeJoin describes how stroked paths are collated.
 type StrokeJoin uint8
 
 const (
-	// BevelJoin joins path segments with sharp bevels.
-	BevelJoin StrokeJoin = iota
-
 	// RoundJoin joins path segments with a round segment.
-	RoundJoin
+	RoundJoin StrokeJoin = iota
+
+	// BevelJoin joins path segments with sharp bevels.
+	BevelJoin
 )
 
 // Dash records dashes' lengths and phase for a stroked path.
