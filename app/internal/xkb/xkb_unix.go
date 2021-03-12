@@ -234,7 +234,7 @@ func convertKeysym(s C.xkb_keysym_t) (string, bool) {
 	if 'a' <= s && s <= 'z' {
 		return string(rune(s - 'a' + 'A')), true
 	}
-	if ' ' <= s && s <= '~' {
+	if ' ' < s && s <= '~' {
 		return string(rune(s)), true
 	}
 	var n string
@@ -292,7 +292,7 @@ func convertKeysym(s C.xkb_keysym_t) (string, bool) {
 	case C.XKB_KEY_Tab, C.XKB_KEY_KP_Tab, C.XKB_KEY_ISO_Left_Tab:
 		n = key.NameTab
 	case 0x20, C.XKB_KEY_KP_Space:
-		n = "Space"
+		n = key.NameSpace
 	default:
 		return "", false
 	}

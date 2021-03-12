@@ -443,7 +443,7 @@ func convertKey(k rune) (string, bool) {
 	case 0x09, 0x19:
 		n = key.NameTab
 	case 0x20:
-		n = "Space"
+		n = key.NameSpace
 	default:
 		k = unicode.ToUpper(k)
 		if !unicode.IsPrint(k) {

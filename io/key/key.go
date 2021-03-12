@@ -112,6 +112,7 @@ const (
 	NamePageUp         = "⇞"
 	NamePageDown       = "⇟"
 	NameTab            = "⇥"
+	NameSpace          = "Space"
 )
 
 // Contain reports whether m contains all modifiers

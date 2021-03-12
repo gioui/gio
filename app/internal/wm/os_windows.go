@@ -671,7 +671,7 @@ func convertKeyCode(code uintptr) (string, bool) {
 	case windows.VK_TAB:
 		r = key.NameTab
 	case windows.VK_SPACE:
-		r = "Space"
+		r = key.NameSpace
 	case windows.VK_OEM_1:
 		r = ";"
 	case windows.VK_OEM_PLUS:
