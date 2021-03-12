@@ -45,7 +45,6 @@ func Collection() []text.FontFace {
 		register(text.Font{Variant: "Mono", Weight: text.Bold}, gomonobold.TTF)
 		register(text.Font{Variant: "Mono", Weight: text.Bold, Style: text.Italic}, gomonobolditalic.TTF)
 		register(text.Font{Variant: "Mono", Style: text.Italic}, gomonoitalic.TTF)
-		register(text.Font{Variant: "Mono", Style: text.Italic}, gomonoitalic.TTF)
 		register(text.Font{Variant: "Smallcaps"}, gosmallcaps.TTF)
 		register(text.Font{Variant: "Smallcaps", Style: text.Italic}, gosmallcapsitalic.TTF)
 		// Ensure that any outside appends will not reuse the backing store.
