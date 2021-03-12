@@ -835,7 +835,7 @@ func (d *drawOps) collect(ctx driver.Device, cache *resourceCache, root *op.Ops,
 			data := buildPath(ctx, p.pathVerts)
 			var computePath encoder
 			if d.compute {
-				computePath = encodePath(p.pathVerts, p.stroke, p.dashes)
+				computePath = encodePath(p)
 			}
 			d.pathCache.put(p.pathKey, opCacheValue{
 				data:        data,

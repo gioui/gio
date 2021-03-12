@@ -623,7 +623,7 @@ func (g *compute) encodeOps(trans f32.Affine2D, viewport image.Point, ops []imag
 		// clip is the union of all drawing affected by the clipping
 		// operation. TODO: tighten.
 		clip := f32.Rect(0, 0, float32(viewport.X), float32(viewport.Y))
-		nclips := g.encodeClipStack(clip, bounds, op.path)
+		nclips := g.encodeClipStack(clip, bounds, op.path, false)
 		m := op.material
 		switch m.material {
 		case materialTexture:
@@ -646,6 +646,10 @@ func (g *compute) encodeOps(trans f32.Affine2D, viewport image.Point, ops []imag
 		default:
 			panic("not implemented")
 		}
+		if op.path != nil && op.path.path {
+			g.enc.fillMode(scene.FillModeNonzero)
+			g.enc.transform(op.path.trans.Invert())
+		}
 		// Pop the clip stack.
 		for i := 0; i < nclips; i++ {
 			g.enc.endClip(clip)
@@ -655,40 +659,61 @@ func (g *compute) encodeOps(trans f32.Affine2D, viewport image.Point, ops []imag
 }
 
 // encodeClips encodes a stack of clip paths and return the stack depth.
-func (g *compute) encodeClipStack(clip, bounds f32.Rectangle, p *pathOp) int {
+func (g *compute) encodeClipStack(clip, bounds f32.Rectangle, p *pathOp, begin bool) int {
 	nclips := 0
 	if p != nil && p.parent != nil {
-		nclips += g.encodeClipStack(clip, bounds, p.parent)
-		g.enc.beginClip(clip)
+		nclips += g.encodeClipStack(clip, bounds, p.parent, true)
 		nclips += 1
 	}
+	s := isStroke(p)
 	if p != nil && p.path {
+		if s {
+			g.enc.fillMode(scene.FillModeStroke)
+			g.enc.lineWidth(p.stroke.Width)
+		}
 		pathData, _ := g.drawOps.pathCache.get(p.pathKey)
 		g.enc.transform(p.trans)
 		g.enc.append(pathData.computePath)
-		g.enc.transform(p.trans.Invert())
 	} else {
 		g.enc.rect(bounds)
+	}
+	if begin {
+		g.enc.beginClip(clip)
+		if s {
+			g.enc.fillMode(scene.FillModeNonzero)
+		}
+		if p != nil && p.path {
+			g.enc.transform(p.trans.Invert())
+		}
 	}
 	return nclips
 }
 
-func encodePath(pathData []byte, stroke clip.StrokeStyle, dashes dashOp) encoder {
+func supportsStroke(p *pathOp) bool {
+	return isSolidLine(p.dashes) && p.stroke.Miter == 0 && p.stroke.Join == clip.RoundJoin && p.stroke.Cap == clip.RoundCap
+}
+
+func isStroke(p *pathOp) bool {
+	return p.stroke.Width > 0 && supportsStroke(p)
+}
+
+func encodePath(p *pathOp) encoder {
 	var enc encoder
-	if stroke.Width > 0 {
-		quads := decodeToStrokeQuads(pathData)
-		quads = quads.stroke(stroke, dashes)
+	verts := p.pathVerts
+	if p.stroke.Width > 0 && !supportsStroke(p) {
+		quads := decodeToStrokeQuads(verts)
+		quads = quads.stroke(p.stroke, p.dashes)
 		for _, quad := range quads {
 			q := quad.quad
 			enc.quad(q.From, q.Ctrl, q.To)
 		}
 		return enc
 	}
-	for len(pathData) >= scene.CommandSize+4 {
-		cmd := ops.DecodeCommand(pathData[4:])
+	for len(verts) >= scene.CommandSize+4 {
+		cmd := ops.DecodeCommand(verts[4:])
 		enc.scene = append(enc.scene, cmd)
 		enc.npathseg++
-		pathData = pathData[scene.CommandSize+4:]
+		verts = verts[scene.CommandSize+4:]
 	}
 	return enc
 }
