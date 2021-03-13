@@ -54,6 +54,7 @@ func (rr RRect) Op(ops *op.Ops) Op {
 	p.Begin(ops)
 	p.Move(rr.Rect.Min)
 	roundRect(&p, rr.Rect.Size(), rr.SE, rr.SW, rr.NW, rr.NE)
+	p.Close()
 
 	return Outline{
 		Path: p.End(),
@@ -84,6 +85,7 @@ func (b Border) Op(ops *op.Ops) Op {
 	p.Begin(ops)
 	p.Move(b.Rect.Min)
 	roundRect(&p, b.Rect.Size(), b.SE, b.SW, b.NW, b.NE)
+	p.Close()
 
 	return Stroke{
 		Path: p.End(),
