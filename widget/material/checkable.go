@@ -5,7 +5,6 @@ package material
 import (
 	"image"
 	"image/color"
-	"math"
 
 	"gioui.org/f32"
 	"gioui.org/internal/f32color"
@@ -52,10 +51,12 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 
 					background := f32color.MulAlpha(c.IconColor, 70)
 
-					var p clip.Path
-					p.Begin(gtx.Ops)
-					addCircle(&p, float32(size)/2)
-					paint.FillShape(gtx.Ops, background, clip.Outline{Path: p.End()}.Op())
+					radius := float32(size) / 2
+					paint.FillShape(gtx.Ops, background,
+						clip.Circle{
+							Center: f32.Point{X: radius, Y: radius},
+							Radius: radius,
+						}.Op(gtx.Ops))
 
 					return dims
 				}),
@@ -84,15 +85,4 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 	)
 	pointer.Rect(image.Rectangle{Max: dims.Size}).Add(gtx.Ops)
 	return dims
-}
-
-// addCircle adds the outline of a circle to a path.
-func addCircle(p *clip.Path, r float32) {
-	// https://pomax.github.io/bezierinfo/#circles_cubic.
-	const c = 4 * (math.Sqrt2 - 1) / 3 // 4*(sqrt(2)-1)/3
-	p.Move(f32.Point{X: 2 * r, Y: 2*r - r})
-	p.Cube(f32.Point{X: 0, Y: r * c}, f32.Point{X: -r + r*c, Y: r}, f32.Point{X: -r, Y: r})
-	p.Cube(f32.Point{X: -r * c, Y: 0}, f32.Point{X: -r, Y: -r + r*c}, f32.Point{X: -r, Y: -r})
-	p.Cube(f32.Point{X: 0, Y: -r * c}, f32.Point{X: r - r*c, Y: -r}, f32.Point{X: r, Y: -r})
-	p.Cube(f32.Point{X: r * c, Y: 0}, f32.Point{X: r, Y: r - r*c}, f32.Point{X: r, Y: r})
 }
