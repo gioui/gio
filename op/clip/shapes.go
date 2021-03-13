@@ -4,6 +4,7 @@ package clip
 
 import (
 	"image"
+	"math"
 
 	"gioui.org/f32"
 	"gioui.org/op"
@@ -99,6 +100,55 @@ func (b Border) Op(ops *op.Ops) Op {
 // Add the border clip.
 func (rr Border) Add(ops *op.Ops) {
 	rr.Op(ops).Add(ops)
+}
+
+// Circle represents the clip area of a circle.
+type Circle struct {
+	Center f32.Point
+	Radius float32
+}
+
+// Op returns the op for the circle.
+func (c Circle) Op(ops *op.Ops) Op {
+	return Outline{Path: c.path(ops)}.Op()
+}
+
+// path returns the path spec for the circle.
+func (c Circle) path(ops *op.Ops) PathSpec {
+	var p Path
+	p.Begin(ops)
+
+	center := c.Center
+	r := c.Radius
+
+	// https://pomax.github.io/bezierinfo/#circles_cubic.
+	const q = 4 * (math.Sqrt2 - 1) / 3 // 4*(sqrt(2)-1)/3
+
+	curve := r * q
+	top := f32.Point{X: center.X, Y: center.Y - r}
+
+	p.MoveTo(top)
+	p.CubeTo(
+		f32.Point{X: center.X + curve, Y: center.Y - r},
+		f32.Point{X: center.X + r, Y: center.Y - curve},
+		f32.Point{X: center.X + r, Y: center.Y},
+	)
+	p.CubeTo(
+		f32.Point{X: center.X + r, Y: center.Y + curve},
+		f32.Point{X: center.X + curve, Y: center.Y + r},
+		f32.Point{X: center.X, Y: center.Y + r},
+	)
+	p.CubeTo(
+		f32.Point{X: center.X - curve, Y: center.Y + r},
+		f32.Point{X: center.X - r, Y: center.Y + curve},
+		f32.Point{X: center.X - r, Y: center.Y},
+	)
+	p.CubeTo(
+		f32.Point{X: center.X - r, Y: center.Y - curve},
+		f32.Point{X: center.X - curve, Y: center.Y - r},
+		top,
+	)
+	return p.End()
 }
 
 // roundRect adds the outline of a rectangle with rounded corners to a
