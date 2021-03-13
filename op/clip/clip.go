@@ -141,7 +141,7 @@ func (p *Path) LineTo(to f32.Point) {
 	data := p.ops.Write(scene.CommandSize + 4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
-	ops.EncodeCommand(data[4:], scene.Line(p.pen, to, false, 0))
+	ops.EncodeCommand(data[4:], scene.Line(p.pen, to, false))
 	p.pen = to
 	p.hasSegments = true
 }

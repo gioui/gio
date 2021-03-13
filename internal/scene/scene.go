@@ -42,13 +42,13 @@ func (c Command) Op() Op {
 	return Op(c[0])
 }
 
-func Line(start, end f32.Point, stroke bool, flags uint32) Command {
+func Line(start, end f32.Point, stroke bool) Command {
 	tag := uint32(OpFillLine)
 	if stroke {
 		tag = uint32(OpStrokeLine)
 	}
 	return Command{
-		0: flags<<16 | tag,
+		0: tag,
 		1: math.Float32bits(start.X),
 		2: math.Float32bits(start.Y),
 		3: math.Float32bits(end.X),

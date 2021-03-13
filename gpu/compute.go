@@ -173,14 +173,10 @@ const (
 
 	pathSize    = 12
 	binSize     = 8
-	pathsegSize = 44
+	pathsegSize = 48
 	annoSize    = 28
-	stateSize   = 60
+	stateSize   = 56
 	stateStride = 4 + 2*stateSize
-)
-
-const (
-	flagEndPath = 16 // FLAG_END_PATH from elements.comp
 )
 
 // mem.h constants.
@@ -680,48 +676,13 @@ func encodePath(pathData []byte, stroke clip.StrokeStyle, dashes dashOp) encoder
 			q := quad.quad
 			enc.quad(q.From, q.Ctrl, q.To, false)
 		}
-		if len(quads) > 0 {
-			enc.scene[len(enc.scene)-1][0] |= (flagEndPath << 16)
-		}
 		return enc
 	}
-	var (
-		prevTo  f32.Point
-		hasPrev bool
-	)
 	for len(pathData) >= scene.CommandSize+4 {
 		cmd := ops.DecodeCommand(pathData[4:])
-		switch cmd.Op() {
-		case scene.OpFillLine:
-			from, to := scene.DecodeLine(cmd)
-			if hasPrev && from != prevTo {
-				enc.scene[len(enc.scene)-1][0] |= (flagEndPath << 16)
-			}
-			hasPrev = true
-			prevTo = to
-		case scene.OpFillQuad:
-			from, _, to := scene.DecodeQuad(cmd)
-			if hasPrev && from != prevTo {
-				enc.scene[len(enc.scene)-1][0] |= (flagEndPath << 16)
-			}
-			hasPrev = true
-			prevTo = to
-		case scene.OpFillCubic:
-			from, _, _, to := scene.DecodeCubic(cmd)
-			if hasPrev && from != prevTo {
-				enc.scene[len(enc.scene)-1][0] |= (flagEndPath << 16)
-			}
-			hasPrev = true
-			prevTo = to
-		default:
-			panic("unsupported path scene command")
-		}
 		enc.scene = append(enc.scene, cmd)
 		enc.npathseg++
 		pathData = pathData[scene.CommandSize+4:]
-	}
-	if hasPrev {
-		enc.scene[len(enc.scene)-1][0] |= (flagEndPath << 16)
 	}
 	return enc
 }
@@ -1049,10 +1010,10 @@ func (e *encoder) endClip(bbox f32.Rectangle) {
 func (e *encoder) rect(r f32.Rectangle, stroke bool) {
 	// Rectangle corners, clock-wise.
 	c0, c1, c2, c3 := r.Min, f32.Pt(r.Min.X, r.Max.Y), r.Max, f32.Pt(r.Max.X, r.Min.Y)
-	e.line(c0, c1, stroke, 0)
-	e.line(c1, c2, stroke, 0)
-	e.line(c2, c3, stroke, 0)
-	e.line(c3, c0, stroke, flagEndPath)
+	e.line(c0, c1, stroke)
+	e.line(c1, c2, stroke)
+	e.line(c2, c3, stroke)
+	e.line(c3, c0, stroke)
 }
 
 func (e *encoder) fill(col color.RGBA) {
@@ -1071,8 +1032,8 @@ func (e *encoder) fillImage(index int) {
 	e.npath++
 }
 
-func (e *encoder) line(start, end f32.Point, stroke bool, flags uint32) {
-	e.scene = append(e.scene, scene.Line(start, end, stroke, flags))
+func (e *encoder) line(start, end f32.Point, stroke bool) {
+	e.scene = append(e.scene, scene.Line(start, end, stroke))
 	e.npathseg++
 }
 

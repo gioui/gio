@@ -1506,16 +1506,16 @@ func (d *drawOps) boundsForTransformedRect(r f32.Rectangle, tr f32.Affine2D) (au
 		buf := aux
 		bo := binary.LittleEndian
 		bo.PutUint32(buf, 0) // Contour
-		ops.EncodeCommand(buf[4:], scene.Line(r.Min, f32.Pt(r.Max.X, r.Min.Y), false, 0))
+		ops.EncodeCommand(buf[4:], scene.Line(r.Min, f32.Pt(r.Max.X, r.Min.Y), false))
 		buf = buf[4+scene.CommandSize:]
 		bo.PutUint32(buf, 0)
-		ops.EncodeCommand(buf[4:], scene.Line(f32.Pt(r.Max.X, r.Min.Y), r.Max, false, 0))
+		ops.EncodeCommand(buf[4:], scene.Line(f32.Pt(r.Max.X, r.Min.Y), r.Max, false))
 		buf = buf[4+scene.CommandSize:]
 		bo.PutUint32(buf, 0)
-		ops.EncodeCommand(buf[4:], scene.Line(r.Max, f32.Pt(r.Min.X, r.Max.Y), false, 0))
+		ops.EncodeCommand(buf[4:], scene.Line(r.Max, f32.Pt(r.Min.X, r.Max.Y), false))
 		buf = buf[4+scene.CommandSize:]
 		bo.PutUint32(buf, 0)
-		ops.EncodeCommand(buf[4:], scene.Line(f32.Pt(r.Min.X, r.Max.Y), r.Min, false, 0))
+		ops.EncodeCommand(buf[4:], scene.Line(f32.Pt(r.Min.X, r.Max.Y), r.Min, false))
 	}
 
 	// establish the transform mapping from bounds rectangle to transformed corners
