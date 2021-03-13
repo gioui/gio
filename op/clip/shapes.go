@@ -51,15 +51,44 @@ type RRect struct {
 
 // Op returns the op for the rounded rectangle.
 func (rr RRect) Op(ops *op.Ops) Op {
+	return Outline{Path: rr.path(ops)}.Op()
+}
+
+// path returns the path spec for the rounded rectangle.
+func (rr RRect) path(ops *op.Ops) PathSpec {
 	var p Path
 	p.Begin(ops)
-	p.Move(rr.Rect.Min)
-	roundRect(&p, rr.Rect.Size(), rr.SE, rr.SW, rr.NW, rr.NE)
-	p.Close()
 
-	return Outline{
-		Path: p.End(),
-	}.Op()
+	// https://pomax.github.io/bezierinfo/#circles_cubic.
+	const q = 4 * (math.Sqrt2 - 1) / 3
+	const iq = 1 - q
+
+	se, sw, nw, ne := rr.SE, rr.SW, rr.NW, rr.NE
+	w, n, e, s := rr.Rect.Min.X, rr.Rect.Min.Y, rr.Rect.Max.X, rr.Rect.Max.Y
+
+	p.MoveTo(f32.Point{X: w + nw, Y: n})
+	p.LineTo(f32.Point{X: e - ne, Y: n}) // N
+	p.CubeTo(                            // NE
+		f32.Point{X: e - ne*iq, Y: n},
+		f32.Point{X: e, Y: n + ne*iq},
+		f32.Point{X: e, Y: n + ne})
+	p.LineTo(f32.Point{X: e, Y: s - se}) // E
+	p.CubeTo(                            // SE
+		f32.Point{X: e, Y: s - se*iq},
+		f32.Point{X: e - se*iq, Y: s},
+		f32.Point{X: e - se, Y: s})
+	p.LineTo(f32.Point{X: w + sw, Y: s}) // S
+	p.CubeTo(                            // SW
+		f32.Point{X: w + sw*iq, Y: s},
+		f32.Point{X: w, Y: s - sw*iq},
+		f32.Point{X: w, Y: s - sw})
+	p.LineTo(f32.Point{X: w, Y: n + nw}) // W
+	p.CubeTo(                            // NW
+		f32.Point{X: w, Y: n + nw*iq},
+		f32.Point{X: w + nw*iq, Y: n},
+		f32.Point{X: w + nw, Y: n})
+
+	return p.End()
 }
 
 // Add the rectangle clip.
@@ -82,14 +111,11 @@ type Border struct {
 // stroked line that traces the border rectangle, optionally with rounded
 // corners and dashes.
 func (b Border) Op(ops *op.Ops) Op {
-	var p Path
-	p.Begin(ops)
-	p.Move(b.Rect.Min)
-	roundRect(&p, b.Rect.Size(), b.SE, b.SW, b.NW, b.NE)
-	p.Close()
-
 	return Stroke{
-		Path: p.End(),
+		Path: RRect{
+			Rect: b.Rect,
+			SE:   b.SE, SW: b.SW, NW: b.NW, NE: b.NE,
+		}.path(ops),
 		Style: StrokeStyle{
 			Width: b.Width,
 		},
@@ -122,7 +148,7 @@ func (c Circle) path(ops *op.Ops) PathSpec {
 	r := c.Radius
 
 	// https://pomax.github.io/bezierinfo/#circles_cubic.
-	const q = 4 * (math.Sqrt2 - 1) / 3 // 4*(sqrt(2)-1)/3
+	const q = 4 * (math.Sqrt2 - 1) / 3
 
 	curve := r * q
 	top := f32.Point{X: center.X, Y: center.Y - r}
@@ -149,21 +175,4 @@ func (c Circle) path(ops *op.Ops) PathSpec {
 		top,
 	)
 	return p.End()
-}
-
-// roundRect adds the outline of a rectangle with rounded corners to a
-// path.
-func roundRect(p *Path, size f32.Point, se, sw, nw, ne float32) {
-	// https://pomax.github.io/bezierinfo/#circles_cubic.
-	w, h := size.X, size.Y
-	const c = 0.55228475 // 4*(sqrt(2)-1)/3
-	p.Move(f32.Point{X: w, Y: h - se})
-	p.Cube(f32.Point{X: 0, Y: se * c}, f32.Point{X: -se + se*c, Y: se}, f32.Point{X: -se, Y: se}) // SE
-	p.Line(f32.Point{X: sw - w + se, Y: 0})
-	p.Cube(f32.Point{X: -sw * c, Y: 0}, f32.Point{X: -sw, Y: -sw + sw*c}, f32.Point{X: -sw, Y: -sw}) // SW
-	p.Line(f32.Point{X: 0, Y: nw - h + sw})
-	p.Cube(f32.Point{X: 0, Y: -nw * c}, f32.Point{X: nw - nw*c, Y: -nw}, f32.Point{X: nw, Y: -nw}) // NW
-	p.Line(f32.Point{X: w - ne - nw, Y: 0})
-	p.Cube(f32.Point{X: ne * c, Y: 0}, f32.Point{X: ne, Y: ne - ne*c}, f32.Point{X: ne, Y: ne}) // NE
-	p.Line(f32.Point{X: 0, Y: -(ne - h + se)})
 }
