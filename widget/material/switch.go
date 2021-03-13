@@ -88,30 +88,34 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 		op.Offset(f32.Point{X: float32(off)}).Add(gtx.Ops)
 	}
 
+	thumbRadius := float32(thumbSize) / 2
+
 	// Draw hover.
 	if s.Switch.Hovered() {
-		var p clip.Path
-		r := 1.7 * float32(thumbSize) / 2
-		p.Begin(gtx.Ops)
-		//p.Move(f32.Pt(-float32(thumbSize)/2, -float32(thumbSize)/2))
-		p.Move(f32.Pt(-r+float32(thumbSize)/2, -r+float32(thumbSize)/2))
-		addCircle(&p, r)
+		r := 1.7 * thumbRadius
 		background := f32color.MulAlpha(s.Color.Enabled, 70)
-		paint.FillShape(gtx.Ops, background, clip.Outline{Path: p.End()}.Op())
+		paint.FillShape(gtx.Ops, background,
+			clip.Circle{
+				Center: f32.Point{X: thumbRadius, Y: thumbRadius},
+				Radius: r,
+			}.Op(gtx.Ops))
 	}
 
 	// Draw thumb shadow, a translucent disc slightly larger than the
 	// thumb itself.
-	shadowStack := op.Save(gtx.Ops)
-	shadowSize := float32(2)
 	// Center shadow horizontally and slightly adjust its Y.
-	op.Offset(f32.Point{X: -shadowSize / 2, Y: -.75}).Add(gtx.Ops)
-	drawDisc(gtx.Ops, float32(thumbSize)+shadowSize, argb(0x55000000))
-	shadowStack.Load()
+	paint.FillShape(gtx.Ops, argb(0x55000000),
+		clip.Circle{
+			Center: f32.Point{X: thumbRadius, Y: thumbRadius + .25},
+			Radius: thumbRadius + 1,
+		}.Op(gtx.Ops))
 
 	// Draw thumb.
-	drawDisc(gtx.Ops, float32(thumbSize), col)
-	stack.Load()
+	paint.FillShape(gtx.Ops, col,
+		clip.Circle{
+			Center: f32.Point{X: thumbRadius, Y: thumbRadius},
+			Radius: thumbRadius,
+		}.Op(gtx.Ops))
 
 	// Set up click area.
 	stack = op.Save(gtx.Ops)
@@ -129,12 +133,4 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 	dims := image.Point{X: trackWidth, Y: thumbSize}
 	return layout.Dimensions{Size: dims}
-}
-
-func drawDisc(ops *op.Ops, sz float32, col color.NRGBA) {
-	defer op.Save(ops).Load()
-	rr := sz / 2
-	clip.UniformRRect(f32.Rectangle{Max: f32.Pt(sz, sz)}, rr).Add(ops)
-	paint.ColorOp{Color: col}.Add(ops)
-	paint.PaintOp{}.Add(ops)
 }
