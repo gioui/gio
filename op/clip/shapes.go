@@ -96,38 +96,6 @@ func (rr RRect) Path(ops *op.Ops) PathSpec {
 	return p.End()
 }
 
-// Border represents a rectangular border.
-type Border struct {
-	// Rect is the bounds of the border.
-	Rect f32.Rectangle
-	// Width of the line tracing Rect.
-	Width  float32
-	Dashes DashSpec
-	// The corner radii.
-	SE, SW, NW, NE float32
-}
-
-// Op returns the clip operation for the border. Its area corresponds to a
-// stroked line that traces the border rectangle, optionally with rounded
-// corners and dashes.
-func (b Border) Op(ops *op.Ops) Op {
-	return Stroke{
-		Path: RRect{
-			Rect: b.Rect,
-			SE:   b.SE, SW: b.SW, NW: b.NW, NE: b.NE,
-		}.Path(ops),
-		Style: StrokeStyle{
-			Width: b.Width,
-		},
-		Dashes: b.Dashes,
-	}.Op()
-}
-
-// Add the border clip.
-func (rr Border) Add(ops *op.Ops) {
-	rr.Op(ops).Add(ops)
-}
-
 // Circle represents the clip area of a circle.
 type Circle struct {
 	Center f32.Point

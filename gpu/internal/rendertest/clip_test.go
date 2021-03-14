@@ -37,29 +37,6 @@ func TestPaintClippedRect(t *testing.T) {
 	})
 }
 
-func TestPaintClippedBorder(t *testing.T) {
-	t.Skipf("doesn't render round-capped, round-joined dashes correctly")
-	run(t, func(o *op.Ops) {
-		var dashes clip.Dash
-		dashes.Begin(o)
-		dashes.Phase(1)
-		dashes.Dash(2)
-		dashes.Dash(1)
-
-		clip.Border{
-			Rect:   f32.Rect(25, 25, 60, 60),
-			Width:  4,
-			Dashes: dashes.End(),
-		}.Add(o)
-		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
-	}, func(r result) {
-		r.expect(0, 0, colornames.White)
-		r.expect(25, 25, colornames.Red)
-		r.expect(50, 0, colornames.White)
-		r.expect(10, 50, colornames.White)
-	})
-}
-
 func TestPaintClippedCircle(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		r := float32(10)
