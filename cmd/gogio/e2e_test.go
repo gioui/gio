@@ -110,7 +110,7 @@ func runEndToEndTest(t *testing.T, driver TestDriver, pkgPath string) {
 
 	// These are the four colors at the beginning.
 	t.Log("taking initial screenshot")
-	withRetries(t, 2*time.Second, func() error {
+	withRetries(t, 4*time.Second, func() error {
 		img := driver.Screenshot()
 		size = img.Bounds().Size() // override the default size
 		return checkImageCorners(img, beef, white, black, gray)
