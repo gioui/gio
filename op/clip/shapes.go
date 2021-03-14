@@ -51,11 +51,16 @@ type RRect struct {
 
 // Op returns the op for the rounded rectangle.
 func (rr RRect) Op(ops *op.Ops) Op {
-	return Outline{Path: rr.path(ops)}.Op()
+	return Outline{Path: rr.Path(ops)}.Op()
 }
 
-// path returns the path spec for the rounded rectangle.
-func (rr RRect) path(ops *op.Ops) PathSpec {
+// Add the rectangle clip.
+func (rr RRect) Add(ops *op.Ops) {
+	rr.Op(ops).Add(ops)
+}
+
+// Path returns the PathSpec for the rounded rectangle.
+func (rr RRect) Path(ops *op.Ops) PathSpec {
 	var p Path
 	p.Begin(ops)
 
@@ -91,11 +96,6 @@ func (rr RRect) path(ops *op.Ops) PathSpec {
 	return p.End()
 }
 
-// Add the rectangle clip.
-func (rr RRect) Add(ops *op.Ops) {
-	rr.Op(ops).Add(ops)
-}
-
 // Border represents a rectangular border.
 type Border struct {
 	// Rect is the bounds of the border.
@@ -115,7 +115,7 @@ func (b Border) Op(ops *op.Ops) Op {
 		Path: RRect{
 			Rect: b.Rect,
 			SE:   b.SE, SW: b.SW, NW: b.NW, NE: b.NE,
-		}.path(ops),
+		}.Path(ops),
 		Style: StrokeStyle{
 			Width: b.Width,
 		},
@@ -136,11 +136,16 @@ type Circle struct {
 
 // Op returns the op for the circle.
 func (c Circle) Op(ops *op.Ops) Op {
-	return Outline{Path: c.path(ops)}.Op()
+	return Outline{Path: c.Path(ops)}.Op()
 }
 
-// path returns the path spec for the circle.
-func (c Circle) path(ops *op.Ops) PathSpec {
+// Add the circle clip.
+func (c Circle) Add(ops *op.Ops) {
+	c.Op(ops).Add(ops)
+}
+
+// Path returns the PathSpec for the circle.
+func (c Circle) Path(ops *op.Ops) PathSpec {
 	var p Path
 	p.Begin(ops)
 
