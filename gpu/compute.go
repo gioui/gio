@@ -126,6 +126,7 @@ type encoder struct {
 	scene    []scene.Command
 	npath    int
 	npathseg int
+	ntrans   int
 }
 
 type encodeState struct {
@@ -149,6 +150,7 @@ type config struct {
 	ptcl_alloc      memAlloc
 	pathseg_alloc   memAlloc
 	anno_alloc      memAlloc
+	trans_alloc     memAlloc
 }
 
 // memAlloc matches Alloc in mem.h
@@ -173,9 +175,10 @@ const (
 
 	pathSize    = 12
 	binSize     = 8
-	pathsegSize = 48
+	pathsegSize = 52
 	annoSize    = 28
-	stateSize   = 56
+	transSize   = 24
+	stateSize   = 60
 	stateStride = 4 + 2*stateSize
 )
 
@@ -748,6 +751,7 @@ func (g *compute) render(tileDims image.Point) error {
 		ptcl_alloc:      malloc(tileDims.X * tileDims.Y * ptclInitialAlloc),
 		pathseg_alloc:   malloc(g.enc.npathseg * pathsegSize),
 		anno_alloc:      malloc(g.enc.npath * annoSize),
+		trans_alloc:     malloc(g.enc.ntrans * transSize),
 	}
 
 	numPartitions := (g.enc.numElements() + 127) / 128
@@ -972,6 +976,7 @@ func (e *encoder) reset() {
 	e.scene = e.scene[:0]
 	e.npath = 0
 	e.npathseg = 0
+	e.ntrans = 0
 }
 
 func (e *encoder) numElements() int {
@@ -982,10 +987,12 @@ func (e *encoder) append(e2 encoder) {
 	e.scene = append(e.scene, e2.scene...)
 	e.npath += e2.npath
 	e.npathseg += e2.npathseg
+	e.ntrans += e2.ntrans
 }
 
 func (e *encoder) transform(m f32.Affine2D) {
 	e.scene = append(e.scene, scene.Transform(m))
+	e.ntrans++
 }
 
 func (e *encoder) lineWidth(width float32) {
