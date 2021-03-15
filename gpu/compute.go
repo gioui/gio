@@ -457,6 +457,9 @@ restart:
 	g.ctx.BindTexture(0, g.images.tex)
 	g.ctx.BindFramebuffer(m.fbo)
 	g.ctx.Viewport(0, 0, texSize, texSize)
+	if reclaimed {
+		g.ctx.Clear(0, 0, 0, 0)
+	}
 	g.ctx.BindProgram(m.prog)
 	g.ctx.BindVertexBuffer(m.buffer, int(unsafe.Sizeof(m.quads[0])), 0)
 	g.ctx.BindInputLayout(m.layout)
