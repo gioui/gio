@@ -25,6 +25,8 @@ import (
 #cgo darwin,ios LDFLAGS: -framework OpenGLES
 
 #include <stdlib.h>
+#define __USE_GNU
+#include <dlfcn.h>
 
 #ifdef __APPLE__
 	#include "TargetConditionals.h"
@@ -34,8 +36,6 @@ import (
 	#include <OpenGL/gl3.h>
 	#endif
 #else
-#define __USE_GNU
-#include <dlfcn.h>
 #include <GLES2/gl2.h>
 #include <GLES3/gl3.h>
 #endif
@@ -144,23 +144,9 @@ __attribute__ ((visibility ("hidden"))) void gio_glBlitFramebuffer(GLint srcX0, 
 }
 
 __attribute__((constructor)) static void gio_loadGLFunctions() {
-#ifdef __APPLE__
-	#if TARGET_OS_IPHONE
-	_glInvalidateFramebuffer = glInvalidateFramebuffer;
-	_glBeginQuery = glBeginQuery;
-	_glDeleteQueries = glDeleteQueries;
-	_glEndQuery = glEndQuery;
-	_glGenQueries = glGenQueries;
-	_glGetQueryObjectuiv = glGetQueryObjectuiv;
-	_glTexStorage2D = glTexStorage2D;
-	#endif
-	_glBindBufferBase = glBindBufferBase;
-	_glGetUniformBlockIndex = glGetUniformBlockIndex;
-	_glUniformBlockBinding = glUniformBlockBinding;
-	_glGetStringi = glGetStringi;
-#else
 	// Load libGLESv3 if available.
 	dlopen("libGLESv3.so", RTLD_NOW | RTLD_GLOBAL);
+
 	_glBindBufferBase = dlsym(RTLD_DEFAULT, "glBindBufferBase");
 	_glGetUniformBlockIndex = dlsym(RTLD_DEFAULT, "glGetUniformBlockIndex");
 	_glUniformBlockBinding = dlsym(RTLD_DEFAULT, "glUniformBlockBinding");
@@ -194,7 +180,6 @@ __attribute__((constructor)) static void gio_loadGLFunctions() {
 	_glBindImageTexture = dlsym(RTLD_DEFAULT, "glBindImageTexture");
 	_glTexStorage2D = dlsym(RTLD_DEFAULT, "glTexStorage2D");
 	_glBlitFramebuffer = dlsym(RTLD_DEFAULT, "glBlitFramebuffer");
-#endif
 }
 */
 import "C"
