@@ -51,6 +51,16 @@ type RRect struct {
 
 // Op returns the op for the rounded rectangle.
 func (rr RRect) Op(ops *op.Ops) Op {
+	if rr.SE == 0 && rr.SW == 0 && rr.NW == 0 && rr.NE == 0 {
+		r := image.Rectangle{
+			Min: image.Point{X: int(rr.Rect.Min.X), Y: int(rr.Rect.Min.Y)},
+			Max: image.Point{X: int(rr.Rect.Max.X), Y: int(rr.Rect.Max.Y)},
+		}
+		// Only use Rect if rr is pixel-aligned, as Rect is guaranteed to be.
+		if fPt(r.Min) == rr.Rect.Min && fPt(r.Max) == rr.Rect.Max {
+			return Rect(r).Op()
+		}
+	}
 	return Outline{Path: rr.Path(ops)}.Op()
 }
 
@@ -148,4 +158,10 @@ func (c Circle) Path(ops *op.Ops) PathSpec {
 		top,
 	)
 	return p.End()
+}
+
+func fPt(p image.Point) f32.Point {
+	return f32.Point{
+		X: float32(p.X), Y: float32(p.Y),
+	}
 }
