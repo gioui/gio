@@ -34,6 +34,7 @@ var (
 	green   = f32color.RGBAToNRGBA(colornames.Green)
 	blue    = f32color.RGBAToNRGBA(colornames.Blue)
 	magenta = f32color.RGBAToNRGBA(colornames.Magenta)
+	yellow  = f32color.RGBAToNRGBA(colornames.Yellow)
 	black   = f32color.RGBAToNRGBA(colornames.Black)
 	white   = f32color.RGBAToNRGBA(colornames.White)
 )
