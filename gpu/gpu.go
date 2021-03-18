@@ -108,11 +108,14 @@ type drawState struct {
 	// Current paint.ColorOp, if any.
 	color color.NRGBA
 
-	// Current paint.LinearGradientOp.
+	// Current paint.LinearGradientOp and paint.RadialGradientOp.
 	stop1  f32.Point
 	stop2  f32.Point
 	color1 color.NRGBA
 	color2 color.NRGBA
+	// Current paint.RadialGradientOp.
+	offset1 float32
+	radiusy float32
 }
 
 type pathOp struct {
@@ -187,9 +190,12 @@ type material struct {
 	opaque   bool
 	// For materialTypeColor.
 	color f32color.RGBA
-	// For materialTypeLinearGradient.
+	// For materialTypeLinearGradient and materialTypeRadialGradient.
 	color1 f32color.RGBA
 	color2 f32color.RGBA
+	// For materialTypeRadialGradient.
+	offset1 float32
+	radiusy float32
 	// For materialTypeTexture.
 	data    imageOpData
 	uvTrans f32.Affine2D
@@ -212,9 +218,21 @@ type imageOpData struct {
 }
 
 type linearGradientOpData struct {
-	stop1  f32.Point
+	stop1 f32.Point
+	stop2 f32.Point
+
 	color1 color.NRGBA
-	stop2  f32.Point
+	color2 color.NRGBA
+}
+
+type radialGradientOpData struct {
+	stop1 f32.Point
+	stop2 f32.Point
+
+	offset1 float32
+	radiusy float32
+
+	color1 color.NRGBA
 	color2 color.NRGBA
 }
 
@@ -294,6 +312,37 @@ func decodeLinearGradientOp(data []byte) linearGradientOpData {
 	}
 }
 
+func decodeRadialGradientOp(data []byte) radialGradientOpData {
+	if opconst.OpType(data[0]) != opconst.TypeRadialGradient {
+		panic("invalid op")
+	}
+	bo := binary.LittleEndian
+	return radialGradientOpData{
+		stop1: f32.Point{
+			X: math.Float32frombits(bo.Uint32(data[1:])),
+			Y: math.Float32frombits(bo.Uint32(data[5:])),
+		},
+		stop2: f32.Point{
+			X: math.Float32frombits(bo.Uint32(data[9:])),
+			Y: math.Float32frombits(bo.Uint32(data[13:])),
+		},
+		radiusy: math.Float32frombits(bo.Uint32(data[17:])),
+		color1: color.NRGBA{
+			R: data[21+0],
+			G: data[21+1],
+			B: data[21+2],
+			A: data[21+3],
+		},
+		color2: color.NRGBA{
+			R: data[25+0],
+			G: data[25+1],
+			B: data[25+2],
+			A: data[25+3],
+		},
+		offset1: math.Float32frombits(bo.Uint32(data[29:])),
+	}
+}
+
 type clipType uint8
 
 type resource interface {
@@ -308,11 +357,12 @@ type texture struct {
 type blitter struct {
 	ctx                    driver.Device
 	viewport               image.Point
-	prog                   [3]*program
+	prog                   [materialCount]*program
 	layout                 driver.InputLayout
 	colUniforms            *blitColUniforms
 	texUniforms            *blitTexUniforms
 	linearGradientUniforms *blitLinearGradientUniforms
+	radialGradientUniforms *blitRadialGradientUniforms
 	quadVerts              driver.Buffer
 }
 
@@ -343,6 +393,17 @@ type blitLinearGradientUniforms struct {
 	}
 }
 
+type blitRadialGradientUniforms struct {
+	vert struct {
+		blitUniforms
+		_ [12]byte // Padding to a multiple of 16.
+	}
+	frag struct {
+		radialGradientUniforms
+		_ [12]byte // Padding to multiple of 16.
+	}
+}
+
 type uniformBuffer struct {
 	buf driver.Buffer
 	ptr []byte
@@ -370,6 +431,12 @@ type gradientUniforms struct {
 	color2 f32color.RGBA
 }
 
+type radialGradientUniforms struct {
+	color1  f32color.RGBA
+	color2  f32color.RGBA
+	offset1 float32
+}
+
 type materialType uint8
 
 const (
@@ -381,7 +448,9 @@ const (
 const (
 	materialColor materialType = iota
 	materialLinearGradient
+	materialRadialGradient
 	materialTexture
+	materialCount
 )
 
 func New(api API) (GPU, error) {
@@ -569,6 +638,7 @@ func newBlitter(ctx driver.Device) *blitter {
 	if err != nil {
 		panic(err)
 	}
+
 	b := &blitter{
 		ctx:       ctx,
 		quadVerts: quadVerts,
@@ -576,13 +646,26 @@ func newBlitter(ctx driver.Device) *blitter {
 	b.colUniforms = new(blitColUniforms)
 	b.texUniforms = new(blitTexUniforms)
 	b.linearGradientUniforms = new(blitLinearGradientUniforms)
+	b.radialGradientUniforms = new(blitRadialGradientUniforms)
+
 	prog, layout, err := createColorPrograms(ctx, shader_blit_vert, shader_blit_frag,
-		[3]interface{}{&b.colUniforms.vert, &b.linearGradientUniforms.vert, &b.texUniforms.vert},
-		[3]interface{}{&b.colUniforms.frag, &b.linearGradientUniforms.frag, nil},
+		[...]interface{}{
+			materialColor:          &b.colUniforms.vert,
+			materialLinearGradient: &b.linearGradientUniforms.vert,
+			materialRadialGradient: &b.radialGradientUniforms.vert,
+			materialTexture:        &b.texUniforms.vert,
+		},
+		[...]interface{}{
+			materialColor:          &b.colUniforms.frag,
+			materialLinearGradient: &b.linearGradientUniforms.frag,
+			materialRadialGradient: &b.radialGradientUniforms.frag,
+			materialTexture:        nil,
+		},
 	)
 	if err != nil {
 		panic(err)
 	}
+
 	b.prog = prog
 	b.layout = layout
 	return b
@@ -596,67 +679,40 @@ func (b *blitter) release() {
 	b.layout.Release()
 }
 
-func createColorPrograms(b driver.Device, vsSrc driver.ShaderSources, fsSrc [3]driver.ShaderSources, vertUniforms, fragUniforms [3]interface{}) ([3]*program, driver.InputLayout, error) {
-	var progs [3]*program
-	{
-		prog, err := b.NewProgram(vsSrc, fsSrc[materialTexture])
+func createColorPrograms(b driver.Device, vsSrc driver.ShaderSources, fsSrc [materialCount]driver.ShaderSources, vertUniforms, fragUniforms [materialCount]interface{}) (_ [materialCount]*program, _ driver.InputLayout, err error) {
+	var progs [materialCount]*program
+
+	release := func() {
+		for _, p := range progs {
+			if p != nil {
+				p.Release()
+			}
+		}
+	}
+
+	for variant := range progs {
+		prog, err := b.NewProgram(vsSrc, fsSrc[variant])
 		if err != nil {
+			release()
 			return progs, nil, err
 		}
 		var vertBuffer, fragBuffer *uniformBuffer
-		if u := vertUniforms[materialTexture]; u != nil {
+		if u := vertUniforms[variant]; u != nil {
 			vertBuffer = newUniformBuffer(b, u)
 			prog.SetVertexUniforms(vertBuffer.buf)
 		}
-		if u := fragUniforms[materialTexture]; u != nil {
+		if u := fragUniforms[variant]; u != nil {
 			fragBuffer = newUniformBuffer(b, u)
 			prog.SetFragmentUniforms(fragBuffer.buf)
 		}
-		progs[materialTexture] = newProgram(prog, vertBuffer, fragBuffer)
+		progs[variant] = newProgram(prog, vertBuffer, fragBuffer)
 	}
-	{
-		var vertBuffer, fragBuffer *uniformBuffer
-		prog, err := b.NewProgram(vsSrc, fsSrc[materialColor])
-		if err != nil {
-			progs[materialTexture].Release()
-			return progs, nil, err
-		}
-		if u := vertUniforms[materialColor]; u != nil {
-			vertBuffer = newUniformBuffer(b, u)
-			prog.SetVertexUniforms(vertBuffer.buf)
-		}
-		if u := fragUniforms[materialColor]; u != nil {
-			fragBuffer = newUniformBuffer(b, u)
-			prog.SetFragmentUniforms(fragBuffer.buf)
-		}
-		progs[materialColor] = newProgram(prog, vertBuffer, fragBuffer)
-	}
-	{
-		var vertBuffer, fragBuffer *uniformBuffer
-		prog, err := b.NewProgram(vsSrc, fsSrc[materialLinearGradient])
-		if err != nil {
-			progs[materialTexture].Release()
-			progs[materialColor].Release()
-			return progs, nil, err
-		}
-		if u := vertUniforms[materialLinearGradient]; u != nil {
-			vertBuffer = newUniformBuffer(b, u)
-			prog.SetVertexUniforms(vertBuffer.buf)
-		}
-		if u := fragUniforms[materialLinearGradient]; u != nil {
-			fragBuffer = newUniformBuffer(b, u)
-			prog.SetFragmentUniforms(fragBuffer.buf)
-		}
-		progs[materialLinearGradient] = newProgram(prog, vertBuffer, fragBuffer)
-	}
+
 	layout, err := b.NewInputLayout(vsSrc, []driver.InputDesc{
 		{Type: driver.DataTypeFloat, Size: 2, Offset: 0},
 		{Type: driver.DataTypeFloat, Size: 2, Offset: 4 * 2},
 	})
 	if err != nil {
-		progs[materialTexture].Release()
-		progs[materialColor].Release()
-		progs[materialLinearGradient].Release()
 		return progs, nil, err
 	}
 	return progs, layout, nil
@@ -979,6 +1035,15 @@ loop:
 			state.stop2 = op.stop2
 			state.color1 = op.color1
 			state.color2 = op.color2
+		case opconst.TypeRadialGradient:
+			state.matType = materialRadialGradient
+			op := decodeRadialGradientOp(encOp.Data)
+			state.stop1 = op.stop1
+			state.stop2 = op.stop2
+			state.offset1 = op.offset1
+			state.radiusy = op.radiusy
+			state.color1 = op.color1
+			state.color2 = op.color2
 		case opconst.TypeImage:
 			state.matType = materialTexture
 			state.image = decodeImageOp(encOp.Data, encOp.Refs)
@@ -1090,7 +1155,16 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 		m.color2 = f32color.LinearFromSRGB(d.color2)
 		m.opaque = m.color1.A == 1.0 && m.color2.A == 1.0
 
-		m.uvTrans = partTrans.Mul(gradientSpaceTransform(clip, off, d.stop1, d.stop2))
+		m.uvTrans = partTrans.Mul(gradientSpaceTransform(clip, off, d.stop1, d.stop2, -1))
+	case materialRadialGradient:
+		m.material = materialRadialGradient
+
+		m.color1 = f32color.LinearFromSRGB(d.color1)
+		m.color2 = f32color.LinearFromSRGB(d.color2)
+		m.offset1 = d.offset1
+		m.opaque = m.color1.A == 1.0 && m.color2.A == 1.0
+
+		m.uvTrans = partTrans.Mul(gradientSpaceTransform(clip, off, d.stop1, d.stop2, d.radiusy))
 	case materialTexture:
 		m.material = materialTexture
 		dr := boundRectF(rect.Add(off))
@@ -1131,7 +1205,7 @@ func (r *renderer) drawZOps(cache *resourceCache, ops []imageOp) {
 		}
 		drc := img.clip
 		scale, off := clipSpaceTransform(drc, r.blitter.viewport)
-		r.blitter.blit(img.z, m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans)
+		r.blitter.blit(img.z, m.material, m.color, m.color1, m.color2, m.offset1, scale, off, m.uvTrans)
 	}
 	r.ctx.SetDepthTest(false)
 }
@@ -1155,7 +1229,7 @@ func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 		var fbo stencilFBO
 		switch img.clipType {
 		case clipTypeNone:
-			r.blitter.blit(img.z, m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans)
+			r.blitter.blit(img.z, m.material, m.color, m.color1, m.color2, m.offset1, scale, off, m.uvTrans)
 			continue
 		case clipTypePath:
 			fbo = r.pather.stenciler.cover(img.place.Idx)
@@ -1171,13 +1245,13 @@ func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 			Max: img.place.Pos.Add(drc.Size()),
 		}
 		coverScale, coverOff := texSpaceTransform(layout.FRect(uv), fbo.size)
-		r.pather.cover(img.z, m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans, coverScale, coverOff)
+		r.pather.cover(img.z, m.material, m.color, m.color1, m.color2, m.offset1, scale, off, m.uvTrans, coverScale, coverOff)
 	}
 	r.ctx.DepthMask(true)
 	r.ctx.SetDepthTest(false)
 }
 
-func (b *blitter) blit(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D) {
+func (b *blitter) blit(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, col1off float32, scale, off f32.Point, uvTrans f32.Affine2D) {
 	p := b.prog[mat]
 	b.ctx.BindProgram(p.prog)
 	var uniforms *blitUniforms
@@ -1185,11 +1259,13 @@ func (b *blitter) blit(z float32, mat materialType, col f32color.RGBA, col1, col
 	case materialColor:
 		b.colUniforms.frag.color = col
 		uniforms = &b.colUniforms.vert.blitUniforms
+
 	case materialTexture:
 		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
 		b.texUniforms.vert.blitUniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}
 		b.texUniforms.vert.blitUniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
 		uniforms = &b.texUniforms.vert.blitUniforms
+
 	case materialLinearGradient:
 		b.linearGradientUniforms.frag.color1 = col1
 		b.linearGradientUniforms.frag.color2 = col2
@@ -1198,6 +1274,16 @@ func (b *blitter) blit(z float32, mat materialType, col f32color.RGBA, col1, col
 		b.linearGradientUniforms.vert.blitUniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}
 		b.linearGradientUniforms.vert.blitUniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
 		uniforms = &b.linearGradientUniforms.vert.blitUniforms
+
+	case materialRadialGradient:
+		b.radialGradientUniforms.frag.color1 = col1
+		b.radialGradientUniforms.frag.color2 = col2
+		b.radialGradientUniforms.frag.offset1 = col1off
+
+		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
+		b.radialGradientUniforms.vert.blitUniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}
+		b.radialGradientUniforms.vert.blitUniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
+		uniforms = &b.radialGradientUniforms.vert.blitUniforms
 	}
 	uniforms.z = z
 	uniforms.transform = [4]float32{scale.X, scale.Y, off.X, off.Y}
@@ -1271,10 +1357,19 @@ func texSpaceTransform(r f32.Rectangle, bounds image.Point) (f32.Point, f32.Poin
 }
 
 // gradientSpaceTransform transforms stop1 and stop2 to [(0,0), (1,1)].
-func gradientSpaceTransform(clip image.Rectangle, off f32.Point, stop1, stop2 f32.Point) f32.Affine2D {
+func gradientSpaceTransform(clip image.Rectangle, off f32.Point, stop1, stop2 f32.Point, radiusy float32) f32.Affine2D {
 	d := stop2.Sub(stop1)
 	l := float32(math.Sqrt(float64(d.X*d.X + d.Y*d.Y)))
 	a := float32(math.Atan2(float64(-d.Y), float64(d.X)))
+
+	scalex := 1 / l
+
+	var scaley float32
+	if radiusy == -1 {
+		scaley = scalex
+	} else if radiusy != 0 {
+		scaley = 1 / radiusy
+	}
 
 	// TODO: optimize
 	zp := f32.Point{}
@@ -1283,7 +1378,7 @@ func gradientSpaceTransform(clip image.Rectangle, off f32.Point, stop1, stop2 f3
 		Offset(zp.Sub(off).Add(layout.FPt(clip.Min))). // offset to clip space
 		Offset(zp.Sub(stop1)).                         // offset to first stop point
 		Rotate(zp, a).                                 // rotate to align gradient
-		Scale(zp, f32.Pt(1/l, 1/l))                    // scale gradient to right size
+		Scale(zp, f32.Pt(scalex, scaley))              // scale gradient to right size
 }
 
 // clipSpaceTransform returns the scale and offset that transforms the given

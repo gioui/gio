@@ -340,6 +340,57 @@ func TestLinearGradientAngled(t *testing.T) {
 	}, func(r result) {})
 }
 
+func TestRadialGradient(t *testing.T) {
+	run(t, func(ops *op.Ops) {
+		paint.RadialGradientOp{
+			Stop1:  f32.Pt(64, 64),
+			Color1: red,
+			Stop2:  f32.Pt(64, 0),
+			Color2: black,
+		}.Add(ops)
+		paint.PaintOp{}.Add(ops)
+	}, func(r result) {})
+}
+
+func TestRadialGradientOffset(t *testing.T) {
+	run(t, func(ops *op.Ops) {
+		paint.RadialGradientOp{
+			Stop1:   f32.Pt(64, 64),
+			Color1:  blue,
+			Stop2:   f32.Pt(64, 0),
+			Color2:  black,
+			Offset1: 0.5,
+		}.Add(ops)
+		paint.PaintOp{}.Add(ops)
+	}, func(r result) {})
+}
+
+func TestEllipseGradient(t *testing.T) {
+	run(t, func(ops *op.Ops) {
+		paint.RadialGradientOp{
+			Stop1:   f32.Pt(64, 64),
+			Color1:  red,
+			Stop2:   f32.Pt(64, 0),
+			Color2:  black,
+			RadiusY: 32,
+		}.Add(ops)
+		paint.PaintOp{}.Add(ops)
+	}, func(r result) {})
+}
+
+func TestEllipseGradientAngled(t *testing.T) {
+	run(t, func(ops *op.Ops) {
+		paint.RadialGradientOp{
+			Stop1:   f32.Pt(64, 64),
+			Color1:  red,
+			Stop2:   f32.Pt(32, 96),
+			Color2:  black,
+			RadiusY: 32,
+		}.Add(ops)
+		paint.PaintOp{}.Add(ops)
+	}, func(r result) {})
+}
+
 // lerp calculates linear interpolation with color b and p.
 func lerp(a, b f32color.RGBA, p float32) f32color.RGBA {
 	return f32color.RGBA{

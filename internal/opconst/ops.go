@@ -17,6 +17,7 @@ const (
 	TypePaint
 	TypeColor
 	TypeLinearGradient
+	TypeRadialGradient
 	TypeArea
 	TypePointerInput
 	TypePass
@@ -46,6 +47,7 @@ const (
 	TypePaintLen           = 1
 	TypeColorLen           = 1 + 4
 	TypeLinearGradientLen  = 1 + 8*2 + 4*2
+	TypeRadialGradientLen  = 1 + 8*2 + 4 + 4*2 + 4
 	TypeAreaLen            = 1 + 1 + 4*4
 	TypePointerInputLen    = 1 + 1 + 1
 	TypePassLen            = 1 + 1
@@ -90,6 +92,7 @@ func (t OpType) Size() int {
 		TypePaintLen,
 		TypeColorLen,
 		TypeLinearGradientLen,
+		TypeRadialGradientLen,
 		TypeAreaLen,
 		TypePointerInputLen,
 		TypePassLen,

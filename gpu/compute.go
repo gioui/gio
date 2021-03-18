@@ -643,6 +643,9 @@ func (g *compute) encodeOps(trans f32.Affine2D, viewport image.Point, ops []imag
 		case materialLinearGradient:
 			// TODO: implement.
 			g.enc.fill(f32color.NRGBAToRGBA(op.material.color1.SRGB()))
+		case materialRadialGradient:
+			// TODO: implement.
+			g.enc.fill(f32color.NRGBAToRGBA(op.material.color1.SRGB()))
 		default:
 			panic("not implemented")
 		}

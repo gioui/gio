@@ -269,6 +269,10 @@ func (conv *Converter) Shader(shaderPath string) ([]driver.ShaderSources, error)
 			Header:         `layout(binding=0) uniform Gradient { vec4 _color1; vec4 _color2; };`,
 		},
 		{
+			FetchColorExpr: `mix(_color1, _color2, clamp((length(vUV) - _offset1) / (1.0 - _offset1), 0.0, 1.0))`,
+			Header:         `layout(binding=0) uniform Gradient { vec4 _color1; vec4 _color2; float _offset1; };`,
+		},
+		{
 			FetchColorExpr: `texture(tex, vUV)`,
 			Header:         `layout(binding=0) uniform sampler2D tex;`,
 		},

@@ -28,10 +28,11 @@ type pather struct {
 
 type coverer struct {
 	ctx                    driver.Device
-	prog                   [3]*program
+	prog                   [materialCount]*program
 	texUniforms            *coverTexUniforms
 	colUniforms            *coverColUniforms
 	linearGradientUniforms *coverLinearGradientUniforms
+	radialGradientUniforms *coverRadialGradientUniforms
 	layout                 driver.InputLayout
 }
 
@@ -59,6 +60,17 @@ type coverLinearGradientUniforms struct {
 	}
 	frag struct {
 		gradientUniforms
+	}
+}
+
+type coverRadialGradientUniforms struct {
+	vert struct {
+		coverUniforms
+		_ [12]byte // Padding to multiple of 16.
+	}
+	frag struct {
+		radialGradientUniforms
+		_ [12]byte // Padding to multiple of 16.
 	}
 }
 
@@ -158,16 +170,30 @@ func newCoverer(ctx driver.Device) *coverer {
 	c := &coverer{
 		ctx: ctx,
 	}
+
 	c.colUniforms = new(coverColUniforms)
 	c.texUniforms = new(coverTexUniforms)
 	c.linearGradientUniforms = new(coverLinearGradientUniforms)
+	c.radialGradientUniforms = new(coverRadialGradientUniforms)
+
 	prog, layout, err := createColorPrograms(ctx, shader_cover_vert, shader_cover_frag,
-		[3]interface{}{&c.colUniforms.vert, &c.linearGradientUniforms.vert, &c.texUniforms.vert},
-		[3]interface{}{&c.colUniforms.frag, &c.linearGradientUniforms.frag, nil},
+		[materialCount]interface{}{
+			materialColor:          &c.colUniforms.vert,
+			materialLinearGradient: &c.linearGradientUniforms.vert,
+			materialRadialGradient: &c.radialGradientUniforms.vert,
+			materialTexture:        &c.texUniforms.vert,
+		},
+		[materialCount]interface{}{
+			materialColor:          &c.colUniforms.frag,
+			materialLinearGradient: &c.linearGradientUniforms.frag,
+			materialRadialGradient: &c.radialGradientUniforms.frag,
+			materialTexture:        nil,
+		},
 	)
 	if err != nil {
 		panic(err)
 	}
+
 	c.prog = prog
 	c.layout = layout
 	return c
@@ -374,11 +400,11 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 	}
 }
 
-func (p *pather) cover(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
-	p.coverer.cover(z, mat, col, col1, col2, scale, off, uvTrans, coverScale, coverOff)
+func (p *pather) cover(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, col1off float32, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
+	p.coverer.cover(z, mat, col, col1, col2, col1off, scale, off, uvTrans, coverScale, coverOff)
 }
 
-func (c *coverer) cover(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
+func (c *coverer) cover(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, col1off float32, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
 	p := c.prog[mat]
 	c.ctx.BindProgram(p.prog)
 	var uniforms *coverUniforms
@@ -386,6 +412,7 @@ func (c *coverer) cover(z float32, mat materialType, col f32color.RGBA, col1, co
 	case materialColor:
 		c.colUniforms.frag.color = col
 		uniforms = &c.colUniforms.vert.coverUniforms
+
 	case materialLinearGradient:
 		c.linearGradientUniforms.frag.color1 = col1
 		c.linearGradientUniforms.frag.color2 = col2
@@ -394,6 +421,17 @@ func (c *coverer) cover(z float32, mat materialType, col f32color.RGBA, col1, co
 		c.linearGradientUniforms.vert.uvTransformR1 = [4]float32{t1, t2, t3, 0}
 		c.linearGradientUniforms.vert.uvTransformR2 = [4]float32{t4, t5, t6, 0}
 		uniforms = &c.linearGradientUniforms.vert.coverUniforms
+
+	case materialRadialGradient:
+		c.radialGradientUniforms.frag.color1 = col1
+		c.radialGradientUniforms.frag.color2 = col2
+		c.radialGradientUniforms.frag.offset1 = col1off
+
+		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
+		c.radialGradientUniforms.vert.uvTransformR1 = [4]float32{t1, t2, t3, 0}
+		c.radialGradientUniforms.vert.uvTransformR2 = [4]float32{t4, t5, t6, 0}
+		uniforms = &c.radialGradientUniforms.vert.coverUniforms
+
 	case materialTexture:
 		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
 		c.texUniforms.vert.uvTransformR1 = [4]float32{t1, t2, t3, 0}
