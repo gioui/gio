@@ -1393,18 +1393,18 @@ func decodeToOutlineQuads(qs *quadSplitter, tr f32.Affine2D, pathData []byte) {
 		qs.contour = bo.Uint32(pathData)
 		cmd := ops.DecodeCommand(pathData[4:])
 		switch cmd.Op() {
-		case scene.OpFillLine:
+		case scene.OpLine:
 			var q quadSegment
 			q.From, q.To = scene.DecodeLine(cmd)
 			q.Ctrl = q.From.Add(q.To).Mul(.5)
 			q = q.Transform(tr)
 			qs.splitAndEncode(q)
-		case scene.OpFillQuad:
+		case scene.OpQuad:
 			var q quadSegment
 			q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
 			q = q.Transform(tr)
 			qs.splitAndEncode(q)
-		case scene.OpFillCubic:
+		case scene.OpCubic:
 			for _, q := range splitCubic(scene.DecodeCubic(cmd)) {
 				q = q.Transform(tr)
 				qs.splitAndEncode(q)
@@ -1424,7 +1424,7 @@ func decodeToStrokeQuads(pathData []byte) strokeQuads {
 		contour := bo.Uint32(pathData)
 		cmd := ops.DecodeCommand(pathData[4:])
 		switch cmd.Op() {
-		case scene.OpFillLine:
+		case scene.OpLine:
 			var q quadSegment
 			q.From, q.To = scene.DecodeLine(cmd)
 			q.Ctrl = q.From.Add(q.To).Mul(.5)
@@ -1433,7 +1433,7 @@ func decodeToStrokeQuads(pathData []byte) strokeQuads {
 				quad:    q,
 			}
 			quads = append(quads, quad)
-		case scene.OpFillQuad:
+		case scene.OpQuad:
 			var q quadSegment
 			q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
 			quad := strokeQuad{
@@ -1441,7 +1441,7 @@ func decodeToStrokeQuads(pathData []byte) strokeQuads {
 				quad:    q,
 			}
 			quads = append(quads, quad)
-		case scene.OpFillCubic:
+		case scene.OpCubic:
 			for _, q := range splitCubic(scene.DecodeCubic(cmd)) {
 				quad := strokeQuad{
 					contour: contour,
@@ -1506,16 +1506,16 @@ func (d *drawOps) boundsForTransformedRect(r f32.Rectangle, tr f32.Affine2D) (au
 		buf := aux
 		bo := binary.LittleEndian
 		bo.PutUint32(buf, 0) // Contour
-		ops.EncodeCommand(buf[4:], scene.Line(r.Min, f32.Pt(r.Max.X, r.Min.Y), false))
+		ops.EncodeCommand(buf[4:], scene.Line(r.Min, f32.Pt(r.Max.X, r.Min.Y)))
 		buf = buf[4+scene.CommandSize:]
 		bo.PutUint32(buf, 0)
-		ops.EncodeCommand(buf[4:], scene.Line(f32.Pt(r.Max.X, r.Min.Y), r.Max, false))
+		ops.EncodeCommand(buf[4:], scene.Line(f32.Pt(r.Max.X, r.Min.Y), r.Max))
 		buf = buf[4+scene.CommandSize:]
 		bo.PutUint32(buf, 0)
-		ops.EncodeCommand(buf[4:], scene.Line(r.Max, f32.Pt(r.Min.X, r.Max.Y), false))
+		ops.EncodeCommand(buf[4:], scene.Line(r.Max, f32.Pt(r.Min.X, r.Max.Y)))
 		buf = buf[4+scene.CommandSize:]
 		bo.PutUint32(buf, 0)
-		ops.EncodeCommand(buf[4:], scene.Line(f32.Pt(r.Min.X, r.Max.Y), r.Min, false))
+		ops.EncodeCommand(buf[4:], scene.Line(f32.Pt(r.Min.X, r.Max.Y), r.Min))
 	}
 
 	// establish the transform mapping from bounds rectangle to transformed corners

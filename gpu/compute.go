@@ -176,7 +176,7 @@ const (
 	pathSize    = 12
 	binSize     = 8
 	pathsegSize = 52
-	annoSize    = 28
+	annoSize    = 32
 	transSize   = 24
 	stateSize   = 60
 	stateStride = 4 + 2*stateSize
@@ -346,8 +346,8 @@ func (g *compute) encode(viewport image.Point) error {
 	g.enc.transform(flipY)
 	if g.drawOps.clear {
 		g.drawOps.clear = false
-		g.enc.rect(f32.Rectangle{Max: layout.FPt(viewport)}, false)
-		g.enc.fill(f32color.NRGBAToRGBA(g.drawOps.clearColor.SRGB()))
+		g.enc.rect(f32.Rectangle{Max: layout.FPt(viewport)})
+		g.enc.fillColor(f32color.NRGBAToRGBA(g.drawOps.clearColor.SRGB()))
 	}
 	return g.encodeOps(flipY, viewport, g.drawOps.allImageOps)
 }
@@ -639,10 +639,10 @@ func (g *compute) encodeOps(trans f32.Affine2D, viewport image.Point, ops []imag
 			// Add fill command, its offset is resolved and filled in renderMaterials.
 			g.enc.fillImage(0)
 		case materialColor:
-			g.enc.fill(f32color.NRGBAToRGBA(op.material.color.SRGB()))
+			g.enc.fillColor(f32color.NRGBAToRGBA(op.material.color.SRGB()))
 		case materialLinearGradient:
 			// TODO: implement.
-			g.enc.fill(f32color.NRGBAToRGBA(op.material.color1.SRGB()))
+			g.enc.fillColor(f32color.NRGBAToRGBA(op.material.color1.SRGB()))
 		default:
 			panic("not implemented")
 		}
@@ -668,7 +668,7 @@ func (g *compute) encodeClipStack(clip, bounds f32.Rectangle, p *pathOp) int {
 		g.enc.append(pathData.computePath)
 		g.enc.transform(p.trans.Invert())
 	} else {
-		g.enc.rect(bounds, false)
+		g.enc.rect(bounds)
 	}
 	return nclips
 }
@@ -680,7 +680,7 @@ func encodePath(pathData []byte, stroke clip.StrokeStyle, dashes dashOp) encoder
 		quads = quads.stroke(stroke, dashes)
 		for _, quad := range quads {
 			q := quad.quad
-			enc.quad(q.From, q.Ctrl, q.To, false)
+			enc.quad(q.From, q.Ctrl, q.To)
 		}
 		return enc
 	}
@@ -999,12 +999,11 @@ func (e *encoder) transform(m f32.Affine2D) {
 }
 
 func (e *encoder) lineWidth(width float32) {
-	e.scene = append(e.scene, scene.LineWidth(width))
+	e.scene = append(e.scene, scene.SetLineWidth(width))
 }
 
-func (e *encoder) stroke(col color.RGBA) {
-	e.scene = append(e.scene, scene.Stroke(col))
-	e.npath++
+func (e *encoder) fillMode(mode scene.FillMode) {
+	e.scene = append(e.scene, scene.SetFillMode(mode))
 }
 
 func (e *encoder) beginClip(bbox f32.Rectangle) {
@@ -1017,17 +1016,17 @@ func (e *encoder) endClip(bbox f32.Rectangle) {
 	e.npath++
 }
 
-func (e *encoder) rect(r f32.Rectangle, stroke bool) {
+func (e *encoder) rect(r f32.Rectangle) {
 	// Rectangle corners, clock-wise.
 	c0, c1, c2, c3 := r.Min, f32.Pt(r.Min.X, r.Max.Y), r.Max, f32.Pt(r.Max.X, r.Min.Y)
-	e.line(c0, c1, stroke)
-	e.line(c1, c2, stroke)
-	e.line(c2, c3, stroke)
-	e.line(c3, c0, stroke)
+	e.line(c0, c1)
+	e.line(c1, c2)
+	e.line(c2, c3)
+	e.line(c3, c0)
 }
 
-func (e *encoder) fill(col color.RGBA) {
-	e.scene = append(e.scene, scene.Fill(col))
+func (e *encoder) fillColor(col color.RGBA) {
+	e.scene = append(e.scene, scene.FillColor(col))
 	e.npath++
 }
 
@@ -1042,12 +1041,12 @@ func (e *encoder) fillImage(index int) {
 	e.npath++
 }
 
-func (e *encoder) line(start, end f32.Point, stroke bool) {
-	e.scene = append(e.scene, scene.Line(start, end, stroke))
+func (e *encoder) line(start, end f32.Point) {
+	e.scene = append(e.scene, scene.Line(start, end))
 	e.npathseg++
 }
 
-func (e *encoder) quad(start, ctrl, end f32.Point, stroke bool) {
-	e.scene = append(e.scene, scene.Quad(start, ctrl, end, stroke))
+func (e *encoder) quad(start, ctrl, end f32.Point) {
+	e.scene = append(e.scene, scene.Quad(start, ctrl, end))
 	e.npathseg++
 }

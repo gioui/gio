@@ -16,39 +16,40 @@ type Op uint32
 
 type Command [sceneElemSize / 4]uint32
 
-const sceneElemSize = 36
-
 // GPU commands from scene.h
 const (
 	OpNop Op = iota
-	OpStrokeLine
-	OpFillLine
-	OpStrokeQuad
-	OpFillQuad
-	OpStrokeCubic
-	OpFillCubic
-	OpStroke
-	OpFill
+	OpLine
+	OpQuad
+	OpCubic
+	OpFillColor
 	OpLineWidth
 	OpTransform
 	OpBeginClip
 	OpEndClip
 	OpFillImage
+	OpSetFillMode
+)
+
+// FillModes, from setup.h.
+type FillMode uint32
+
+const (
+	FillModeNonzero = 0
+	FillModeStroke  = 1
 )
 
 const CommandSize = int(unsafe.Sizeof(Command{}))
+
+const sceneElemSize = 36
 
 func (c Command) Op() Op {
 	return Op(c[0])
 }
 
-func Line(start, end f32.Point, stroke bool) Command {
-	tag := uint32(OpFillLine)
-	if stroke {
-		tag = uint32(OpStrokeLine)
-	}
+func Line(start, end f32.Point) Command {
 	return Command{
-		0: tag,
+		0: uint32(OpLine),
 		1: math.Float32bits(start.X),
 		2: math.Float32bits(start.Y),
 		3: math.Float32bits(end.X),
@@ -56,13 +57,9 @@ func Line(start, end f32.Point, stroke bool) Command {
 	}
 }
 
-func Cubic(start, ctrl0, ctrl1, end f32.Point, stroke bool) Command {
-	tag := uint32(OpFillCubic)
-	if stroke {
-		tag = uint32(OpStrokeCubic)
-	}
+func Cubic(start, ctrl0, ctrl1, end f32.Point) Command {
 	return Command{
-		0: tag,
+		0: uint32(OpCubic),
 		1: math.Float32bits(start.X),
 		2: math.Float32bits(start.Y),
 		3: math.Float32bits(ctrl0.X),
@@ -74,13 +71,9 @@ func Cubic(start, ctrl0, ctrl1, end f32.Point, stroke bool) Command {
 	}
 }
 
-func Quad(start, ctrl, end f32.Point, stroke bool) Command {
-	tag := uint32(OpFillQuad)
-	if stroke {
-		tag = uint32(OpStrokeQuad)
-	}
+func Quad(start, ctrl, end f32.Point) Command {
 	return Command{
-		0: tag,
+		0: uint32(OpQuad),
 		1: math.Float32bits(start.X),
 		2: math.Float32bits(start.Y),
 		3: math.Float32bits(ctrl.X),
@@ -103,17 +96,10 @@ func Transform(m f32.Affine2D) Command {
 	}
 }
 
-func LineWidth(width float32) Command {
+func SetLineWidth(width float32) Command {
 	return Command{
 		0: uint32(OpLineWidth),
 		1: math.Float32bits(width),
-	}
-}
-
-func Stroke(col color.RGBA) Command {
-	return Command{
-		0: uint32(OpStroke),
-		1: uint32(col.R)<<24 | uint32(col.G)<<16 | uint32(col.B)<<8 | uint32(col.A),
 	}
 }
 
@@ -137,9 +123,9 @@ func EndClip(bbox f32.Rectangle) Command {
 	}
 }
 
-func Fill(col color.RGBA) Command {
+func FillColor(col color.RGBA) Command {
 	return Command{
-		0: uint32(OpFill),
+		0: uint32(OpFillColor),
 		1: uint32(col.R)<<24 | uint32(col.G)<<16 | uint32(col.B)<<8 | uint32(col.A),
 	}
 }
@@ -151,8 +137,15 @@ func FillImage(index int) Command {
 	}
 }
 
+func SetFillMode(mode FillMode) Command {
+	return Command{
+		0: uint32(OpSetFillMode),
+		1: uint32(mode),
+	}
+}
+
 func DecodeLine(cmd Command) (from, to f32.Point) {
-	if cmd[0] != uint32(OpFillLine) {
+	if cmd[0] != uint32(OpLine) {
 		panic("invalid command")
 	}
 	from = f32.Pt(math.Float32frombits(cmd[1]), math.Float32frombits(cmd[2]))
@@ -161,7 +154,7 @@ func DecodeLine(cmd Command) (from, to f32.Point) {
 }
 
 func DecodeQuad(cmd Command) (from, ctrl, to f32.Point) {
-	if cmd[0] != uint32(OpFillQuad) {
+	if cmd[0] != uint32(OpQuad) {
 		panic("invalid command")
 	}
 	from = f32.Pt(math.Float32frombits(cmd[1]), math.Float32frombits(cmd[2]))
@@ -171,7 +164,7 @@ func DecodeQuad(cmd Command) (from, ctrl, to f32.Point) {
 }
 
 func DecodeCubic(cmd Command) (from, ctrl0, ctrl1, to f32.Point) {
-	if cmd[0] != uint32(OpFillCubic) {
+	if cmd[0] != uint32(OpCubic) {
 		panic("invalid command")
 	}
 	from = f32.Pt(math.Float32frombits(cmd[1]), math.Float32frombits(cmd[2]))

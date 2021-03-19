@@ -63,6 +63,11 @@ uint state_flag_index(uint partition_ix) {
 #define FLAG_SET_LINEWIDTH 1
 #define FLAG_SET_BBOX 2
 #define FLAG_RESET_BBOX 4
+#define FLAG_SET_FILL_MODE 8
+// Fill modes take up the next bit. Non-zero fill is 0, stroke is 1.
+#define LG_FILL_MODE 4
+#define FILL_MODE_BITS 1
+#define FILL_MODE_MASK (FILL_MODE_BITS << LG_FILL_MODE)
 
 // This is almost like a monoid (the interaction between transformation and
 // bounding boxes is approximate)
@@ -88,8 +93,11 @@ State combine_state(State a, State b) {
     c.translate.x = a.mat.x * b.translate.x + a.mat.z * b.translate.y + a.translate.x;
     c.translate.y = a.mat.y * b.translate.x + a.mat.w * b.translate.y + a.translate.y;
     c.linewidth = (b.flags & FLAG_SET_LINEWIDTH) == 0 ? a.linewidth : b.linewidth;
-    c.flags = (a.flags & (FLAG_SET_LINEWIDTH | FLAG_SET_BBOX)) | b.flags;
+    c.flags = (a.flags & (FLAG_SET_LINEWIDTH | FLAG_SET_BBOX | FLAG_SET_FILL_MODE)) | b.flags;
     c.flags |= (a.flags & FLAG_RESET_BBOX) >> 1;
+    uint fill_mode = (b.flags & FLAG_SET_FILL_MODE) == 0 ? a.flags : b.flags;
+    fill_mode &= FILL_MODE_MASK;
+    c.flags = (c.flags & ~FILL_MODE_MASK) | fill_mode;
     c.path_count = a.path_count + b.path_count;
     c.pathseg_count = a.pathseg_count + b.pathseg_count;
     c.trans_count = a.trans_count + b.trans_count;
@@ -99,7 +107,7 @@ State combine_state(State a, State b) {
 State map_element(ElementRef ref) {
     // TODO: it would *probably* be more efficient to make the memory read patterns less
     // divergent, though it would be more wasted memory.
-    uint tag = Element_tag(ref);
+    uint tag = Element_tag(ref).tag;
     State c;
     c.bbox = vec4(0.0, 0.0, 0.0, 0.0);
     c.mat = vec4(1.0, 0.0, 0.0, 1.0);
@@ -110,30 +118,26 @@ State map_element(ElementRef ref) {
     c.pathseg_count = 0;
     c.trans_count = 0;
     switch (tag) {
-    case Element_FillLine:
-    case Element_StrokeLine:
-        LineSeg line = Element_FillLine_read(ref);
+    case Element_Line:
+        LineSeg line = Element_Line_read(ref);
         c.bbox.xy = min(line.p0, line.p1);
         c.bbox.zw = max(line.p0, line.p1);
         c.pathseg_count = 1;
         break;
-    case Element_FillQuad:
-    case Element_StrokeQuad:
-        QuadSeg quad = Element_FillQuad_read(ref);
+    case Element_Quad:
+        QuadSeg quad = Element_Quad_read(ref);
         c.bbox.xy = min(min(quad.p0, quad.p1), quad.p2);
         c.bbox.zw = max(max(quad.p0, quad.p1), quad.p2);
         c.pathseg_count = 1;
         break;
-    case Element_FillCubic:
-    case Element_StrokeCubic:
-        CubicSeg cubic = Element_FillCubic_read(ref);
+    case Element_Cubic:
+        CubicSeg cubic = Element_Cubic_read(ref);
         c.bbox.xy = min(min(cubic.p0, cubic.p1), min(cubic.p2, cubic.p3));
         c.bbox.zw = max(max(cubic.p0, cubic.p1), max(cubic.p2, cubic.p3));
         c.pathseg_count = 1;
         break;
-    case Element_Fill:
+    case Element_FillColor:
     case Element_FillImage:
-    case Element_Stroke:
     case Element_BeginClip:
         c.flags = FLAG_RESET_BBOX;
         c.path_count = 1;
@@ -151,6 +155,10 @@ State map_element(ElementRef ref) {
         c.mat = t.mat;
         c.translate = t.translate;
         c.trans_count = 1;
+        break;
+    case Element_SetFillMode:
+        SetFillMode fm = Element_SetFillMode_read(ref);
+        c.flags = FLAG_SET_FILL_MODE | (fm.fill_mode << LG_FILL_MODE);
         break;
     }
     return c;
@@ -291,111 +299,109 @@ void main() {
         // gains to be had from stashing in shared memory or possibly
         // registers (though register pressure is an issue).
         ElementRef this_ref = Element_index(ref, i);
-        uint tag = Element_tag(this_ref);
-        switch (tag) {
-        case Element_FillLine:
-        case Element_StrokeLine:
-            LineSeg line = Element_StrokeLine_read(this_ref);
-            PathStrokeCubic path_cubic;
+        ElementTag tag = Element_tag(this_ref);
+        uint fill_mode = fill_mode_from_flags(st.flags >> LG_FILL_MODE);
+        bool is_stroke = fill_mode == MODE_STROKE;
+        switch (tag.tag) {
+        case Element_Line:
+            LineSeg line = Element_Line_read(this_ref);
+            PathCubic path_cubic;
             path_cubic.p0 = line.p0;
             path_cubic.p1 = mix(line.p0, line.p1, 1.0 / 3.0);
             path_cubic.p2 = mix(line.p1, line.p0, 1.0 / 3.0);
             path_cubic.p3 = line.p1;
             path_cubic.path_ix = st.path_count;
             path_cubic.trans_ix = st.trans_count;
-            if (tag == Element_StrokeLine) {
+            if (is_stroke) {
                 path_cubic.stroke = get_linewidth(st);
             } else {
                 path_cubic.stroke = vec2(0.0);
             }
-            // We do encoding a bit by hand to minimize divergence. Another approach
-            // would be to have a fill/stroke bool.
             PathSegRef path_out_ref = PathSegRef(conf.pathseg_alloc.offset + (st.pathseg_count - 1) * PathSeg_size);
-            uint out_tag = tag == Element_FillLine ? PathSeg_FillCubic : PathSeg_StrokeCubic;
-            write_mem(conf.pathseg_alloc, path_out_ref.offset >> 2, out_tag);
-            PathStrokeCubic_write(conf.pathseg_alloc, PathStrokeCubicRef(path_out_ref.offset + 4), path_cubic);
+            PathSeg_Cubic_write(conf.pathseg_alloc, path_out_ref, fill_mode, path_cubic);
             break;
-        case Element_FillQuad:
-        case Element_StrokeQuad:
-            QuadSeg quad = Element_StrokeQuad_read(this_ref);
+        case Element_Quad:
+            QuadSeg quad = Element_Quad_read(this_ref);
             path_cubic.p0 = quad.p0;
             path_cubic.p1 = mix(quad.p1, quad.p0, 1.0 / 3.0);
             path_cubic.p2 = mix(quad.p1, quad.p2, 1.0 / 3.0);
             path_cubic.p3 = quad.p2;
             path_cubic.path_ix = st.path_count;
             path_cubic.trans_ix = st.trans_count;
-            if (tag == Element_StrokeQuad) {
+            if (is_stroke) {
                 path_cubic.stroke = get_linewidth(st);
             } else {
                 path_cubic.stroke = vec2(0.0);
             }
-            // We do encoding a bit by hand to minimize divergence. Another approach
-            // would be to have a fill/stroke bool.
             path_out_ref = PathSegRef(conf.pathseg_alloc.offset + (st.pathseg_count - 1) * PathSeg_size);
-            out_tag = tag == Element_FillQuad ? PathSeg_FillCubic : PathSeg_StrokeCubic;
-            write_mem(conf.pathseg_alloc, path_out_ref.offset >> 2, out_tag);
-            PathStrokeCubic_write(conf.pathseg_alloc, PathStrokeCubicRef(path_out_ref.offset + 4), path_cubic);
+            PathSeg_Cubic_write(conf.pathseg_alloc, path_out_ref, fill_mode, path_cubic);
             break;
-        case Element_FillCubic:
-        case Element_StrokeCubic:
-            CubicSeg cubic = Element_StrokeCubic_read(this_ref);
+        case Element_Cubic:
+            CubicSeg cubic = Element_Cubic_read(this_ref);
             path_cubic.p0 = cubic.p0;
             path_cubic.p1 = cubic.p1;
             path_cubic.p2 = cubic.p2;
             path_cubic.p3 = cubic.p3;
             path_cubic.path_ix = st.path_count;
             path_cubic.trans_ix = st.trans_count;
-            if (tag == Element_StrokeCubic) {
+            if (is_stroke) {
                 path_cubic.stroke = get_linewidth(st);
             } else {
                 path_cubic.stroke = vec2(0.0);
             }
-            // We do encoding a bit by hand to minimize divergence. Another approach
-            // would be to have a fill/stroke bool.
             path_out_ref = PathSegRef(conf.pathseg_alloc.offset + (st.pathseg_count - 1) * PathSeg_size);
-            out_tag = tag == Element_FillCubic ? PathSeg_FillCubic : PathSeg_StrokeCubic;
-            write_mem(conf.pathseg_alloc, path_out_ref.offset >> 2, out_tag);
-            PathStrokeCubic_write(conf.pathseg_alloc, PathStrokeCubicRef(path_out_ref.offset + 4), path_cubic);
+            PathSeg_Cubic_write(conf.pathseg_alloc, path_out_ref, fill_mode, path_cubic);
             break;
-        case Element_Stroke:
-            Stroke stroke = Element_Stroke_read(this_ref);
-            AnnoStroke anno_stroke;
-            anno_stroke.rgba_color = stroke.rgba_color;
-            vec2 lw = get_linewidth(st);
-            anno_stroke.bbox = st.bbox + vec4(-lw, lw);
-            anno_stroke.linewidth = st.linewidth * sqrt(abs(st.mat.x * st.mat.w - st.mat.y * st.mat.z));
-            AnnotatedRef out_ref = AnnotatedRef(conf.anno_alloc.offset + (st.path_count - 1) * Annotated_size);
-            Annotated_Stroke_write(conf.anno_alloc, out_ref, anno_stroke);
-            break;
-        case Element_Fill:
-            Fill fill = Element_Fill_read(this_ref);
-            AnnoFill anno_fill;
+        case Element_FillColor:
+            FillColor fill = Element_FillColor_read(this_ref);
+            AnnoColor anno_fill;
             anno_fill.rgba_color = fill.rgba_color;
-            anno_fill.bbox = st.bbox;
-            out_ref = AnnotatedRef(conf.anno_alloc.offset + (st.path_count - 1) * Annotated_size);
-            Annotated_Fill_write(conf.anno_alloc, out_ref, anno_fill);
+            if (is_stroke) {
+                vec2 lw = get_linewidth(st);
+                anno_fill.bbox = st.bbox + vec4(-lw, lw);
+                anno_fill.linewidth = st.linewidth * sqrt(abs(st.mat.x * st.mat.w - st.mat.y * st.mat.z));
+            } else {
+                anno_fill.bbox = st.bbox;
+                anno_fill.linewidth = 0.0;
+            }
+            AnnotatedRef out_ref = AnnotatedRef(conf.anno_alloc.offset + (st.path_count - 1) * Annotated_size);
+            Annotated_Color_write(conf.anno_alloc, out_ref, fill_mode, anno_fill);
             break;
         case Element_FillImage:
             FillImage fill_img = Element_FillImage_read(this_ref);
-            AnnoFillImage anno_fill_img;
-            anno_fill_img.index = fill_img.index;
-            anno_fill_img.offset = fill_img.offset;
-            anno_fill_img.bbox = st.bbox;
+            AnnoImage anno_img;
+            anno_img.index = fill_img.index;
+            anno_img.offset = fill_img.offset;
+            if (is_stroke) {
+                vec2 lw = get_linewidth(st);
+                anno_img.bbox = st.bbox + vec4(-lw, lw);
+                anno_img.linewidth = st.linewidth * sqrt(abs(st.mat.x * st.mat.w - st.mat.y * st.mat.z));
+            } else {
+                anno_img.bbox = st.bbox;
+                anno_img.linewidth = 0.0;
+            }
             out_ref = AnnotatedRef(conf.anno_alloc.offset + (st.path_count - 1) * Annotated_size);
-            Annotated_FillImage_write(conf.anno_alloc, out_ref, anno_fill_img);
+            Annotated_Image_write(conf.anno_alloc, out_ref, fill_mode, anno_img);
             break;
         case Element_BeginClip:
             Clip begin_clip = Element_BeginClip_read(this_ref);
-            AnnoClip anno_begin_clip = AnnoClip(begin_clip.bbox);
-            // This is the absolute bbox, it's been transformed during encoding.
-            anno_begin_clip.bbox = begin_clip.bbox;
+            AnnoBeginClip anno_begin_clip;
+            if (is_stroke) {
+                vec2 lw = get_linewidth(st);
+                // This is the absolute bbox, it's been transformed during encoding.
+                anno_begin_clip.bbox = begin_clip.bbox + vec4(-lw, lw);
+                anno_begin_clip.linewidth = st.linewidth * sqrt(abs(st.mat.x * st.mat.w - st.mat.y * st.mat.z));
+            } else {
+                anno_begin_clip.bbox = begin_clip.bbox;
+                anno_fill.linewidth = 0.0;
+            }
             out_ref = AnnotatedRef(conf.anno_alloc.offset + (st.path_count - 1) * Annotated_size);
-            Annotated_BeginClip_write(conf.anno_alloc, out_ref, anno_begin_clip);
+            Annotated_BeginClip_write(conf.anno_alloc, out_ref, fill_mode, anno_begin_clip);
             break;
         case Element_EndClip:
             Clip end_clip = Element_EndClip_read(this_ref);
             // This bbox is expected to be the same as the begin one.
-            AnnoClip anno_end_clip = AnnoClip(end_clip.bbox);
+            AnnoEndClip anno_end_clip = AnnoEndClip(end_clip.bbox);
             out_ref = AnnotatedRef(conf.anno_alloc.offset + (st.path_count - 1) * Annotated_size);
             Annotated_EndClip_write(conf.anno_alloc, out_ref, anno_end_clip);
             break;

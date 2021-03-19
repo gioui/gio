@@ -141,7 +141,7 @@ func (p *Path) LineTo(to f32.Point) {
 	data := p.ops.Write(scene.CommandSize + 4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
-	ops.EncodeCommand(data[4:], scene.Line(p.pen, to, false))
+	ops.EncodeCommand(data[4:], scene.Line(p.pen, to))
 	p.pen = to
 	p.hasSegments = true
 }
@@ -160,7 +160,7 @@ func (p *Path) QuadTo(ctrl, to f32.Point) {
 	data := p.ops.Write(scene.CommandSize + 4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
-	ops.EncodeCommand(data[4:], scene.Quad(p.pen, ctrl, to, false))
+	ops.EncodeCommand(data[4:], scene.Quad(p.pen, ctrl, to))
 	p.pen = to
 	p.hasSegments = true
 }
@@ -306,7 +306,7 @@ func (p *Path) CubeTo(ctrl0, ctrl1, to f32.Point) {
 	data := p.ops.Write(scene.CommandSize + 4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
-	ops.EncodeCommand(data[4:], scene.Cubic(p.pen, ctrl0, ctrl1, to, false))
+	ops.EncodeCommand(data[4:], scene.Cubic(p.pen, ctrl0, ctrl1, to))
 	p.pen = to
 	p.hasSegments = true
 }
