@@ -25,8 +25,9 @@ import (
 )
 
 var (
-	dumpImages = flag.Bool("saveimages", false, "save test images")
-	squares    paint.ImageOp
+	dumpImages   = flag.Bool("saveimages", false, "save test images")
+	squares      paint.ImageOp
+	smallSquares paint.ImageOp
 )
 
 var (
@@ -39,8 +40,11 @@ var (
 )
 
 func init() {
-	// build the texture we use for testing
-	size := 512
+	squares = buildSquares(512)
+	smallSquares = buildSquares(50)
+}
+
+func buildSquares(size int) paint.ImageOp {
 	sub := size / 4
 	im := image.NewNRGBA(image.Rect(0, 0, size, size))
 	c1, c2 := image.NewUniform(colornames.Green), image.NewUniform(colornames.Blue)
@@ -51,7 +55,7 @@ func init() {
 		}
 		c1, c2 = c2, c1
 	}
-	squares = paint.NewImageOp(im)
+	return paint.NewImageOp(im)
 }
 
 func drawImage(t *testing.T, size int, ops *op.Ops, draw func(o *op.Ops)) (im *image.RGBA, err error) {

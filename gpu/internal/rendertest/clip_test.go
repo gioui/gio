@@ -118,6 +118,39 @@ func TestPaintTexture(t *testing.T) {
 	})
 }
 
+func TestTexturedStrokeClipped(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		smallSquares.Add(o)
+		op.Offset(f32.Pt(50, 50)).Add(o)
+		clip.Stroke{
+			Path: clip.RRect{Rect: f32.Rect(0, 0, 30, 30)}.Path(o),
+			Style: clip.StrokeStyle{
+				Width: 10,
+			},
+		}.Op().Add(o)
+		clip.RRect{Rect: f32.Rect(-30, -30, 60, 60)}.Add(o)
+		op.Offset(f32.Pt(-10, -10)).Add(o)
+		paint.PaintOp{}.Add(o)
+	}, func(r result) {
+	})
+}
+
+func TestTexturedStroke(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		smallSquares.Add(o)
+		op.Offset(f32.Pt(50, 50)).Add(o)
+		clip.Stroke{
+			Path: clip.RRect{Rect: f32.Rect(0, 0, 30, 30)}.Path(o),
+			Style: clip.StrokeStyle{
+				Width: 10,
+			},
+		}.Op().Add(o)
+		op.Offset(f32.Pt(-10, -10)).Add(o)
+		paint.PaintOp{}.Add(o)
+	}, func(r result) {
+	})
+}
+
 func TestPaintClippedTexture(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		squares.Add(o)
