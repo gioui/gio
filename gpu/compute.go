@@ -319,6 +319,7 @@ func (g *compute) Frame() error {
 		ct, k4t = ct.Round(q), k4t.Round(q)
 		t.profile = fmt.Sprintf("ft:%7s et:%7s tat:%7s pct:%7s bbt:%7s ct:%7s k4t:%7s", ft, et, tat, pct, bbt, ct, k4t)
 	}
+	g.drawOps.clear = false
 	return nil
 }
 
@@ -331,6 +332,11 @@ func (g *compute) Profile() string {
 // shader can only write to RGBA textures, but since we actually render in sRGB
 // format we can't use glBlitFramebuffer, because it does sRGB conversion.
 func (g *compute) blitOutput(viewport image.Point) {
+	if !g.drawOps.clear {
+		g.ctx.BlendFunc(driver.BlendFactorOne, driver.BlendFactorOneMinusSrcAlpha)
+		g.ctx.SetBlend(true)
+		defer g.ctx.SetBlend(false)
+	}
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.ctx.BindTexture(0, g.output.image)
 	g.ctx.BindProgram(g.output.blitProg)
@@ -345,7 +351,6 @@ func (g *compute) encode(viewport image.Point) error {
 	flipY := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(1, -1)).Offset(f32.Pt(0, float32(viewport.Y)))
 	g.enc.transform(flipY)
 	if g.drawOps.clear {
-		g.drawOps.clear = false
 		g.enc.rect(f32.Rectangle{Max: layout.FPt(viewport)})
 		g.enc.fillColor(f32color.NRGBAToRGBA(g.drawOps.clearColor.SRGB()))
 	}
