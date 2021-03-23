@@ -26,6 +26,7 @@ import (
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
 	"gioui.org/internal/scene"
+	"gioui.org/internal/stroke"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -130,7 +131,7 @@ type pathOp struct {
 	// For compute
 	trans  f32.Affine2D
 	stroke clip.StrokeStyle
-	dashes dashOp
+	dashes stroke.DashOp
 }
 
 type imageOp struct {
@@ -142,24 +143,15 @@ type imageOp struct {
 	place    placement
 }
 
-type dashOp struct {
-	phase  float32
-	dashes []float32
-}
-
-type quadSegment struct {
-	From, Ctrl, To f32.Point
-}
-
-func decodeDashOp(data []byte) dashOp {
+func decodeDashOp(data []byte) stroke.DashOp {
 	_ = data[5]
 	if opconst.OpType(data[0]) != opconst.TypeDash {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
-	return dashOp{
-		phase:  math.Float32frombits(bo.Uint32(data[1:])),
-		dashes: make([]float32, data[5]),
+	return stroke.DashOp{
+		Phase:  math.Float32frombits(bo.Uint32(data[1:])),
+		Dashes: make([]float32, data[5]),
 	}
 }
 
@@ -852,7 +844,7 @@ func (d *drawOps) newPathOp() *pathOp {
 	return &d.pathOpCache[len(d.pathOpCache)-1]
 }
 
-func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key, bounds f32.Rectangle, off f32.Point, tr f32.Affine2D, stroke clip.StrokeStyle, dashes dashOp) {
+func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key, bounds f32.Rectangle, off f32.Point, tr f32.Affine2D, stroke clip.StrokeStyle, dashes stroke.DashOp) {
 	npath := d.newPathOp()
 	*npath = pathOp{
 		parent: state.cpath,
@@ -891,8 +883,8 @@ func (d *drawOps) save(id int, state drawState) {
 func (d *drawOps) collectOps(r *ops.Reader, state drawState) {
 	var (
 		quads  quadsOp
-		stroke clip.StrokeStyle
-		dashes dashOp
+		str    clip.StrokeStyle
+		dashes stroke.DashOp
 		z      int
 	)
 	d.save(opconst.InitialStateID, state)
@@ -907,22 +899,22 @@ loop:
 
 		case opconst.TypeDash:
 			dashes = decodeDashOp(encOp.Data)
-			if len(dashes.dashes) > 0 {
+			if len(dashes.Dashes) > 0 {
 				encOp, ok = r.Decode()
 				if !ok {
 					panic("gpu: could not decode dashes pattern")
 				}
 				data := encOp.Data[1:]
 				bo := binary.LittleEndian
-				for i := range dashes.dashes {
-					dashes.dashes[i] = math.Float32frombits(bo.Uint32(
+				for i := range dashes.Dashes {
+					dashes.Dashes[i] = math.Float32frombits(bo.Uint32(
 						data[i*4:],
 					))
 				}
 			}
 
 		case opconst.TypeStroke:
-			stroke = decodeStrokeOp(encOp.Data)
+			str = decodeStrokeOp(encOp.Data)
 
 		case opconst.TypePath:
 			encOp, ok = r.Decode()
@@ -948,7 +940,7 @@ loop:
 					op.bounds = v.bounds
 				} else {
 					pathData, bounds := d.buildVerts(
-						quads.aux, trans, op.outline, stroke, dashes,
+						quads.aux, trans, op.outline, str, dashes,
 					)
 					op.bounds = bounds
 					if !d.compute {
@@ -964,10 +956,10 @@ loop:
 				quads.key.SetTransform(trans)
 			}
 			state.clip = state.clip.Intersect(op.bounds.Add(off))
-			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off, state.t, stroke, dashes)
+			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off, state.t, str, dashes)
 			quads = quadsOp{}
-			stroke = clip.StrokeStyle{}
-			dashes = dashOp{}
+			str = clip.StrokeStyle{}
+			dashes = stroke.DashOp{}
 
 		case opconst.TypeColor:
 			state.matType = materialColor
@@ -1005,7 +997,7 @@ loop:
 				// The paint operation is sheared or rotated, add a clip path representing
 				// this transformed rectangle.
 				encOp.Key.SetTransform(trans)
-				d.addClipPath(&state, clipData, encOp.Key, bnd, off, state.t, clip.StrokeStyle{}, dashOp{})
+				d.addClipPath(&state, clipData, encOp.Key, bnd, off, state.t, clip.StrokeStyle{}, stroke.DashOp{})
 			}
 
 			bounds := boundRectF(cl)
@@ -1357,7 +1349,7 @@ func (d *drawOps) writeVertCache(n int) []byte {
 }
 
 // transform, split paths as needed, calculate maxY, bounds and create GPU vertices.
-func (d *drawOps) buildVerts(pathData []byte, tr f32.Affine2D, outline bool, stroke clip.StrokeStyle, dashes dashOp) (verts []byte, bounds f32.Rectangle) {
+func (d *drawOps) buildVerts(pathData []byte, tr f32.Affine2D, outline bool, stroke clip.StrokeStyle, dashes stroke.DashOp) (verts []byte, bounds f32.Rectangle) {
 	inf := float32(math.Inf(+1))
 	d.qs.bounds = f32.Rectangle{
 		Min: f32.Point{X: inf, Y: inf},
@@ -1370,12 +1362,12 @@ func (d *drawOps) buildVerts(pathData []byte, tr f32.Affine2D, outline bool, str
 	case stroke.Width > 0:
 		// Stroke path.
 		quads := decodeToStrokeQuads(pathData)
-		quads = quads.stroke(stroke, dashes)
+		quads = quads.Stroke(stroke, dashes)
 		for _, quad := range quads {
-			d.qs.contour = quad.contour
-			quad.quad = quad.quad.Transform(tr)
+			d.qs.contour = quad.Contour
+			quad.Quad = quad.Quad.Transform(tr)
 
-			d.qs.splitAndEncode(quad.quad)
+			d.qs.splitAndEncode(quad.Quad)
 		}
 
 	case outline:
@@ -1394,13 +1386,13 @@ func decodeToOutlineQuads(qs *quadSplitter, tr f32.Affine2D, pathData []byte) {
 		cmd := ops.DecodeCommand(pathData[4:])
 		switch cmd.Op() {
 		case scene.OpLine:
-			var q quadSegment
+			var q stroke.QuadSegment
 			q.From, q.To = scene.DecodeLine(cmd)
 			q.Ctrl = q.From.Add(q.To).Mul(.5)
 			q = q.Transform(tr)
 			qs.splitAndEncode(q)
 		case scene.OpQuad:
-			var q quadSegment
+			var q stroke.QuadSegment
 			q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
 			q = q.Transform(tr)
 			qs.splitAndEncode(q)
@@ -1418,34 +1410,34 @@ func decodeToOutlineQuads(qs *quadSplitter, tr f32.Affine2D, pathData []byte) {
 
 // decodeToStrokeQuads is like decodeOutlineQuads, except it returns a list of stroke
 // quads ready to stroke.
-func decodeToStrokeQuads(pathData []byte) strokeQuads {
-	quads := make(strokeQuads, 0, 2*len(pathData)/(scene.CommandSize+4))
+func decodeToStrokeQuads(pathData []byte) stroke.StrokeQuads {
+	quads := make(stroke.StrokeQuads, 0, 2*len(pathData)/(scene.CommandSize+4))
 	for len(pathData) >= scene.CommandSize+4 {
 		contour := bo.Uint32(pathData)
 		cmd := ops.DecodeCommand(pathData[4:])
 		switch cmd.Op() {
 		case scene.OpLine:
-			var q quadSegment
+			var q stroke.QuadSegment
 			q.From, q.To = scene.DecodeLine(cmd)
 			q.Ctrl = q.From.Add(q.To).Mul(.5)
-			quad := strokeQuad{
-				contour: contour,
-				quad:    q,
+			quad := stroke.StrokeQuad{
+				Contour: contour,
+				Quad:    q,
 			}
 			quads = append(quads, quad)
 		case scene.OpQuad:
-			var q quadSegment
+			var q stroke.QuadSegment
 			q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
-			quad := strokeQuad{
-				contour: contour,
-				quad:    q,
+			quad := stroke.StrokeQuad{
+				Contour: contour,
+				Quad:    q,
 			}
 			quads = append(quads, quad)
 		case scene.OpCubic:
 			for _, q := range splitCubic(scene.DecodeCubic(cmd)) {
-				quad := strokeQuad{
-					contour: contour,
-					quad:    q,
+				quad := stroke.StrokeQuad{
+					Contour: contour,
+					Quad:    q,
 				}
 				quads = append(quads, quad)
 			}
@@ -1537,21 +1529,8 @@ func isPureOffset(t f32.Affine2D) bool {
 	return a == 1 && b == 0 && d == 0 && e == 1
 }
 
-func (q quadSegment) Transform(t f32.Affine2D) quadSegment {
-	q.From = t.Transform(q.From)
-	q.Ctrl = t.Transform(q.Ctrl)
-	q.To = t.Transform(q.To)
-	return q
-}
-
-func decodeQuad(d []byte) (q quadSegment) {
-	cmd := ops.DecodeCommand(d)
-	q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
-	return
-}
-
-func splitCubic(from, ctrl0, ctrl1, to f32.Point) []quadSegment {
-	quads := make([]quadSegment, 0, 10)
+func splitCubic(from, ctrl0, ctrl1, to f32.Point) []stroke.QuadSegment {
+	quads := make([]stroke.QuadSegment, 0, 10)
 	// Set the maximum distance proportionally to the longest side
 	// of the bounding rectangle.
 	hull := f32.Rectangle{
@@ -1568,7 +1547,7 @@ func splitCubic(from, ctrl0, ctrl1, to f32.Point) []quadSegment {
 
 // approxCube approximates a cubic Bézier by a series of quadratic
 // curves.
-func approxCubeTo(quads *[]quadSegment, splits int, maxDist float32, from, ctrl0, ctrl1, to f32.Point) int {
+func approxCubeTo(quads *[]stroke.QuadSegment, splits int, maxDist float32, from, ctrl0, ctrl1, to f32.Point) int {
 	// The idea is from
 	// https://caffeineowl.com/graphics/2d/vectorial/cubic2quad01.html
 	// where a quadratic approximates a cubic by eliminating its t³ term
@@ -1596,7 +1575,7 @@ func approxCubeTo(quads *[]quadSegment, splits int, maxDist float32, from, ctrl0
 	c := ctrl0.Mul(3).Sub(from).Add(ctrl1.Mul(3)).Sub(to).Mul(1.0 / 4.0)
 	const maxSplits = 32
 	if splits >= maxSplits {
-		*quads = append(*quads, quadSegment{From: from, Ctrl: c, To: to})
+		*quads = append(*quads, stroke.QuadSegment{From: from, Ctrl: c, To: to})
 		return splits
 	}
 	// The maximum distance between the cubic P and its approximation Q given t
@@ -1608,7 +1587,7 @@ func approxCubeTo(quads *[]quadSegment, splits int, maxDist float32, from, ctrl0
 	v := to.Sub(ctrl1.Mul(3)).Add(ctrl0.Mul(3)).Sub(from)
 	d2 := (v.X*v.X + v.Y*v.Y) * 3 / (36 * 36)
 	if d2 <= maxDist*maxDist {
-		*quads = append(*quads, quadSegment{From: from, Ctrl: c, To: to})
+		*quads = append(*quads, stroke.QuadSegment{From: from, Ctrl: c, To: to})
 		return splits
 	}
 	// De Casteljau split the curve and approximate the halves.

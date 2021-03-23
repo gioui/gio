@@ -4,7 +4,7 @@
 // (and used as a reference implementation):
 //  - github.com/tdewolff/canvas (Licensed under MIT)
 
-package gpu
+package stroke
 
 import (
 	"math"
@@ -13,30 +13,35 @@ import (
 	"gioui.org/f32"
 )
 
-func isSolidLine(sty dashOp) bool {
-	return sty.phase == 0 && len(sty.dashes) == 0
+type DashOp struct {
+	Phase  float32
+	Dashes []float32
 }
 
-func (qs strokeQuads) dash(sty dashOp) strokeQuads {
+func IsSolidLine(sty DashOp) bool {
+	return sty.Phase == 0 && len(sty.Dashes) == 0
+}
+
+func (qs StrokeQuads) dash(sty DashOp) StrokeQuads {
 	sty = dashCanonical(sty)
 
 	switch {
-	case len(sty.dashes) == 0:
+	case len(sty.Dashes) == 0:
 		return qs
-	case len(sty.dashes) == 1 && sty.dashes[0] == 0.0:
-		return strokeQuads{}
+	case len(sty.Dashes) == 1 && sty.Dashes[0] == 0.0:
+		return StrokeQuads{}
 	}
 
-	if len(sty.dashes)%2 == 1 {
+	if len(sty.Dashes)%2 == 1 {
 		// If the dash pattern is of uneven length, dash and space lengths
 		// alternate. The following duplicates the pattern so that uneven
 		// indices are always spaces.
-		sty.dashes = append(sty.dashes, sty.dashes...)
+		sty.Dashes = append(sty.Dashes, sty.Dashes...)
 	}
 
 	var (
 		i0, pos0 = dashStart(sty)
-		out      strokeQuads
+		out      StrokeQuads
 
 		contour uint32 = 1
 	)
@@ -48,13 +53,13 @@ func (qs strokeQuads) dash(sty dashOp) strokeQuads {
 			t      []float64
 			length = ps.len()
 		)
-		for pos+sty.dashes[i] < length {
-			pos += sty.dashes[i]
+		for pos+sty.Dashes[i] < length {
+			pos += sty.Dashes[i]
 			if 0.0 < pos {
 				t = append(t, float64(pos))
 			}
 			i++
-			if i == len(sty.dashes) {
+			if i == len(sty.Dashes) {
 				i = 0
 			}
 		}
@@ -66,7 +71,7 @@ func (qs strokeQuads) dash(sty dashOp) strokeQuads {
 		}
 
 		var (
-			qd strokeQuads
+			qd StrokeQuads
 			pd = ps.splitAt(&contour, t...)
 		)
 		for j := j0; j < len(pd)-1; j += 2 {
@@ -85,13 +90,13 @@ func (qs strokeQuads) dash(sty dashOp) strokeQuads {
 	return out
 }
 
-func dashCanonical(sty dashOp) dashOp {
+func dashCanonical(sty DashOp) DashOp {
 	var (
 		o  = sty
-		ds = o.dashes
+		ds = o.Dashes
 	)
 
-	if len(sty.dashes) == 0 {
+	if len(sty.Dashes) == 0 {
 		return sty
 	}
 
@@ -107,12 +112,12 @@ func dashCanonical(sty dashOp) dashOp {
 	// Remove first zero, collapse with second and last.
 	if f32Eq(ds[0], 0.0) {
 		if len(ds) < 3 {
-			return dashOp{
-				phase:  0.0,
-				dashes: []float32{0.0},
+			return DashOp{
+				Phase:  0.0,
+				Dashes: []float32{0.0},
 			}
 		}
-		o.phase -= ds[1]
+		o.Phase -= ds[1]
 		ds[len(ds)-1] += ds[1]
 		ds = ds[2:]
 	}
@@ -120,9 +125,9 @@ func dashCanonical(sty dashOp) dashOp {
 	// Remove last zero, collapse with fist and second to last.
 	if f32Eq(ds[len(ds)-1], 0.0) {
 		if len(ds) < 3 {
-			return dashOp{}
+			return DashOp{}
 		}
-		o.phase += ds[len(ds)-2]
+		o.Phase += ds[len(ds)-2]
 		ds[0] += ds[len(ds)-2]
 		ds = ds[:len(ds)-2]
 	}
@@ -130,9 +135,9 @@ func dashCanonical(sty dashOp) dashOp {
 	// If there are zeros or negatives, don't draw dashes.
 	for i := 0; i < len(ds); i++ {
 		if ds[i] < 0.0 || f32Eq(ds[i], 0.0) {
-			return dashOp{
-				phase:  0.0,
-				dashes: []float32{0.0},
+			return DashOp{
+				Phase:  0.0,
+				Dashes: []float32{0.0},
 			}
 		}
 	}
@@ -151,31 +156,31 @@ loop:
 	return o
 }
 
-func dashStart(sty dashOp) (int, float32) {
+func dashStart(sty DashOp) (int, float32) {
 	i0 := 0 // i0 is the index into dashes.
-	for sty.dashes[i0] <= sty.phase {
-		sty.phase -= sty.dashes[i0]
+	for sty.Dashes[i0] <= sty.Phase {
+		sty.Phase -= sty.Dashes[i0]
 		i0++
-		if i0 == len(sty.dashes) {
+		if i0 == len(sty.Dashes) {
 			i0 = 0
 		}
 	}
 	// pos0 may be negative if the offset lands halfway into dash.
-	pos0 := -sty.phase
-	if sty.phase < 0.0 {
+	pos0 := -sty.Phase
+	if sty.Phase < 0.0 {
 		var sum float32
-		for _, d := range sty.dashes {
+		for _, d := range sty.Dashes {
 			sum += d
 		}
-		pos0 = -(sum + sty.phase) // handle negative offsets
+		pos0 = -(sum + sty.Phase) // handle negative offsets
 	}
 	return i0, pos0
 }
 
-func (qs strokeQuads) len() float32 {
+func (qs StrokeQuads) len() float32 {
 	var sum float32
 	for i := range qs {
-		q := qs[i].quad
+		q := qs[i].Quad
 		sum += quadBezierLen(q.From, q.Ctrl, q.To)
 	}
 	return sum
@@ -184,10 +189,10 @@ func (qs strokeQuads) len() float32 {
 // splitAt splits the path into separate paths at the specified intervals
 // along the path.
 // splitAt updates the provided contour counter as it splits the segments.
-func (qs strokeQuads) splitAt(contour *uint32, ts ...float64) []strokeQuads {
+func (qs StrokeQuads) splitAt(contour *uint32, ts ...float64) []StrokeQuads {
 	if len(ts) == 0 {
 		qs.setContour(*contour)
-		return []strokeQuads{qs}
+		return []StrokeQuads{qs}
 	}
 
 	sort.Float64s(ts)
@@ -200,8 +205,8 @@ func (qs strokeQuads) splitAt(contour *uint32, ts ...float64) []strokeQuads {
 		t float64 // current position along curve
 	)
 
-	var oo []strokeQuads
-	var oi strokeQuads
+	var oo []StrokeQuads
+	var oi StrokeQuads
 	push := func() {
 		oo = append(oo, oi)
 		oi = nil
@@ -214,15 +219,15 @@ func (qs strokeQuads) splitAt(contour *uint32, ts ...float64) []strokeQuads {
 				continue
 			}
 			speed := func(t float64) float64 {
-				return float64(lenPt(quadBezierD1(q.quad.From, q.quad.Ctrl, q.quad.To, float32(t))))
+				return float64(lenPt(quadBezierD1(q.Quad.From, q.Quad.Ctrl, q.Quad.To, float32(t))))
 			}
 			invL, dt := invSpeedPolynomialChebyshevApprox(20, gaussLegendre7, speed, 0, 1)
 
 			var (
 				t0 float64
-				r0 = q.quad.From
-				r1 = q.quad.Ctrl
-				r2 = q.quad.To
+				r0 = q.Quad.From
+				r1 = q.Quad.Ctrl
+				r2 = q.Quad.To
 
 				// from keeps track of the start of the 'running' segment.
 				from = r0
@@ -235,9 +240,9 @@ func (qs strokeQuads) splitAt(contour *uint32, ts ...float64) []strokeQuads {
 				var q1 f32.Point
 				_, q1, _, r0, r1, r2 = quadBezierSplit(r0, r1, r2, float32(tsub))
 
-				oi = append(oi, strokeQuad{
-					contour: *contour,
-					quad: quadSegment{
+				oi = append(oi, StrokeQuad{
+					Contour: *contour,
+					Quad: QuadSegment{
 						From: from,
 						Ctrl: q1,
 						To:   r0,
@@ -253,9 +258,9 @@ func (qs strokeQuads) splitAt(contour *uint32, ts ...float64) []strokeQuads {
 				if len(oi) > 0 {
 					r0 = oi.pen()
 				}
-				oi = append(oi, strokeQuad{
-					contour: *contour,
-					quad: quadSegment{
+				oi = append(oi, StrokeQuad{
+					Contour: *contour,
+					Quad: QuadSegment{
 						From: r0,
 						Ctrl: r1,
 						To:   r2,

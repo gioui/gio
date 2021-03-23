@@ -18,6 +18,7 @@ import (
 	"gioui.org/internal/f32color"
 	"gioui.org/internal/ops"
 	"gioui.org/internal/scene"
+	"gioui.org/internal/stroke"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -695,7 +696,7 @@ func (g *compute) encodeClipStack(clip, bounds f32.Rectangle, p *pathOp, begin b
 }
 
 func supportsStroke(p *pathOp) bool {
-	return isSolidLine(p.dashes) && p.stroke.Miter == 0 && p.stroke.Join == clip.RoundJoin && p.stroke.Cap == clip.RoundCap
+	return stroke.IsSolidLine(p.dashes) && p.stroke.Miter == 0 && p.stroke.Join == clip.RoundJoin && p.stroke.Cap == clip.RoundCap
 }
 
 func isStroke(p *pathOp) bool {
@@ -707,9 +708,9 @@ func encodePath(p *pathOp) encoder {
 	verts := p.pathVerts
 	if p.stroke.Width > 0 && !supportsStroke(p) {
 		quads := decodeToStrokeQuads(verts)
-		quads = quads.stroke(p.stroke, p.dashes)
+		quads = quads.Stroke(p.stroke, p.dashes)
 		for _, quad := range quads {
-			q := quad.quad
+			q := quad.Quad
 			enc.quad(q.From, q.Ctrl, q.To)
 		}
 		return enc

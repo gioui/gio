@@ -21,12 +21,15 @@
 //  - https://raphlinus.github.io/graphics/curves/2019/12/23/flatten-quadbez.html
 //    R. Levien
 
-package gpu
+// Package stroke implements conversion of strokes to filled outlines. It is used as a
+// fallback for stroke configurations not natively supported by the renderer.
+package stroke
 
 import (
 	"math"
 
 	"gioui.org/f32"
+	"gioui.org/internal/ops"
 	"gioui.org/internal/scene"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -41,9 +44,13 @@ import (
 // and speed.
 const strokeTolerance = 0.01
 
-type strokeQuad struct {
-	contour uint32
-	quad    quadSegment
+type QuadSegment struct {
+	From, Ctrl, To f32.Point
+}
+
+type StrokeQuad struct {
+	Contour uint32
+	Quad    QuadSegment
 }
 
 type strokeState struct {
@@ -53,28 +60,28 @@ type strokeState struct {
 	ctl    f32.Point // ctl is the control point of the quadratic Bézier segment.
 }
 
-type strokeQuads []strokeQuad
+type StrokeQuads []StrokeQuad
 
-func (qs *strokeQuads) setContour(n uint32) {
+func (qs *StrokeQuads) setContour(n uint32) {
 	for i := range *qs {
-		(*qs)[i].contour = n
+		(*qs)[i].Contour = n
 	}
 }
 
-func (qs *strokeQuads) pen() f32.Point {
-	return (*qs)[len(*qs)-1].quad.To
+func (qs *StrokeQuads) pen() f32.Point {
+	return (*qs)[len(*qs)-1].Quad.To
 }
 
-func (qs *strokeQuads) closed() bool {
-	beg := (*qs)[0].quad.From
-	end := (*qs)[len(*qs)-1].quad.To
+func (qs *StrokeQuads) closed() bool {
+	beg := (*qs)[0].Quad.From
+	end := (*qs)[len(*qs)-1].Quad.To
 	return f32Eq(beg.X, end.X) && f32Eq(beg.Y, end.Y)
 }
 
-func (qs *strokeQuads) lineTo(pt f32.Point) {
+func (qs *StrokeQuads) lineTo(pt f32.Point) {
 	end := qs.pen()
-	*qs = append(*qs, strokeQuad{
-		quad: quadSegment{
+	*qs = append(*qs, StrokeQuad{
+		Quad: QuadSegment{
 			From: end,
 			Ctrl: end.Add(pt).Mul(0.5),
 			To:   pt,
@@ -82,7 +89,7 @@ func (qs *strokeQuads) lineTo(pt f32.Point) {
 	})
 }
 
-func (qs *strokeQuads) arc(f1, f2 f32.Point, angle float32) {
+func (qs *StrokeQuads) arc(f1, f2 f32.Point, angle float32) {
 	var (
 		p clip.Path
 		o = new(op.Ops)
@@ -97,29 +104,29 @@ func (qs *strokeQuads) arc(f1, f2 f32.Point, angle float32) {
 	for qi := 0; len(raw) >= (scene.CommandSize + 4); qi++ {
 		quad := decodeQuad(raw[4:])
 		raw = raw[scene.CommandSize+4:]
-		*qs = append(*qs, strokeQuad{
-			quad: quad,
+		*qs = append(*qs, StrokeQuad{
+			Quad: quad,
 		})
 	}
 }
 
 // split splits a slice of quads into slices of quads grouped
 // by contours (ie: splitted at move-to boundaries).
-func (qs strokeQuads) split() []strokeQuads {
+func (qs StrokeQuads) split() []StrokeQuads {
 	if len(qs) == 0 {
 		return nil
 	}
 
 	var (
 		c uint32
-		o []strokeQuads
+		o []StrokeQuads
 		i = len(o)
 	)
 	for _, q := range qs {
-		if q.contour != c {
-			c = q.contour
+		if q.Contour != c {
+			c = q.Contour
 			i = len(o)
-			o = append(o, strokeQuads{})
+			o = append(o, StrokeQuads{})
 		}
 		o[i] = append(o[i], q)
 	}
@@ -127,13 +134,13 @@ func (qs strokeQuads) split() []strokeQuads {
 	return o
 }
 
-func (qs strokeQuads) stroke(stroke clip.StrokeStyle, dashes dashOp) strokeQuads {
-	if !isSolidLine(dashes) {
+func (qs StrokeQuads) Stroke(stroke clip.StrokeStyle, dashes DashOp) StrokeQuads {
+	if !IsSolidLine(dashes) {
 		qs = qs.dash(dashes)
 	}
 
 	var (
-		o  strokeQuads
+		o  StrokeQuads
 		hw = 0.5 * stroke.Width
 	)
 
@@ -164,15 +171,15 @@ func (qs strokeQuads) stroke(stroke clip.StrokeStyle, dashes dashOp) strokeQuads
 // offset returns the right-hand and left-hand sides of the path, offset by
 // the half-width hw.
 // The stroke handles how segments are joined and ends are capped.
-func (qs strokeQuads) offset(hw float32, stroke clip.StrokeStyle) (rhs, lhs strokeQuads) {
+func (qs StrokeQuads) offset(hw float32, stroke clip.StrokeStyle) (rhs, lhs StrokeQuads) {
 	var (
 		states []strokeState
-		beg    = qs[0].quad.From
-		end    = qs[len(qs)-1].quad.To
+		beg    = qs[0].Quad.From
+		end    = qs[len(qs)-1].Quad.To
 		closed = beg == end
 	)
 	for i := range qs {
-		q := qs[i].quad
+		q := qs[i].Quad
 
 		var (
 			n0 = strokePathNorm(q.From, q.Ctrl, q.To, 0, hw)
@@ -231,16 +238,16 @@ func (qs strokeQuads) offset(hw float32, stroke clip.StrokeStyle) (rhs, lhs stro
 	return rhs, nil
 }
 
-func (qs *strokeQuads) close() {
-	p0 := (*qs)[len(*qs)-1].quad.To
-	p1 := (*qs)[0].quad.From
+func (qs *StrokeQuads) close() {
+	p0 := (*qs)[len(*qs)-1].Quad.To
+	p1 := (*qs)[0].Quad.From
 
 	if p1 == p0 {
 		return
 	}
 
-	*qs = append(*qs, strokeQuad{
-		quad: quadSegment{
+	*qs = append(*qs, StrokeQuad{
+		Quad: QuadSegment{
 			From: p0,
 			Ctrl: p0.Add(p1).Mul(0.5),
 			To:   p1,
@@ -249,36 +256,36 @@ func (qs *strokeQuads) close() {
 }
 
 // ccw returns whether the path is counter-clockwise.
-func (qs strokeQuads) ccw() bool {
+func (qs StrokeQuads) ccw() bool {
 	// Use the Shoelace formula:
 	//  https://en.wikipedia.org/wiki/Shoelace_formula
 	var area float32
 	for _, ps := range qs.split() {
 		for i := 1; i < len(ps); i++ {
-			pi := ps[i].quad.To
-			pj := ps[i-1].quad.To
+			pi := ps[i].Quad.To
+			pj := ps[i-1].Quad.To
 			area += (pi.X - pj.X) * (pi.Y + pj.Y)
 		}
 	}
 	return area <= 0.0
 }
 
-func (qs strokeQuads) reverse() strokeQuads {
+func (qs StrokeQuads) reverse() StrokeQuads {
 	if len(qs) == 0 {
 		return nil
 	}
 
-	ps := make(strokeQuads, 0, len(qs))
+	ps := make(StrokeQuads, 0, len(qs))
 	for i := range qs {
 		q := qs[len(qs)-1-i]
-		q.quad.To, q.quad.From = q.quad.From, q.quad.To
+		q.Quad.To, q.Quad.From = q.Quad.From, q.Quad.To
 		ps = append(ps, q)
 	}
 
 	return ps
 }
 
-func (qs strokeQuads) append(ps strokeQuads) strokeQuads {
+func (qs StrokeQuads) append(ps StrokeQuads) StrokeQuads {
 	switch {
 	case len(ps) == 0:
 		return qs
@@ -289,11 +296,11 @@ func (qs strokeQuads) append(ps strokeQuads) strokeQuads {
 	// Consolidate quads and smooth out rounding errors.
 	// We need to also check for the strokeTolerance to correctly handle
 	// join/cap points or on-purpose disjoint quads.
-	p0 := qs[len(qs)-1].quad.To
-	p1 := ps[0].quad.From
+	p0 := qs[len(qs)-1].Quad.To
+	p1 := ps[0].Quad.From
 	if p0 != p1 && lenPt(p0.Sub(p1)) < strokeTolerance {
-		qs = append(qs, strokeQuad{
-			quad: quadSegment{
+		qs = append(qs, StrokeQuad{
+			Quad: QuadSegment{
 				From: p0,
 				Ctrl: p0.Add(p1).Mul(0.5),
 				To:   p1,
@@ -301,6 +308,19 @@ func (qs strokeQuads) append(ps strokeQuads) strokeQuads {
 		})
 	}
 	return append(qs, ps...)
+}
+
+func (q QuadSegment) Transform(t f32.Affine2D) QuadSegment {
+	q.From = t.Transform(q.From)
+	q.Ctrl = t.Transform(q.Ctrl)
+	q.To = t.Transform(q.To)
+	return q
+}
+
+func decodeQuad(d []byte) (q QuadSegment) {
+	cmd := ops.DecodeCommand(d)
+	q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
+	return
 }
 
 // strokePathNorm returns the normal vector at t.
@@ -429,16 +449,16 @@ func quadBezierLen(p0, p1, p2 f32.Point) float32 {
 	return float32((A32*Sabc + A2*B*(Sabc-C2) + (4*C*A-B*B)*math.Log((2*A2+BA+Sabc)/(BA+C2))) / (4 * A32))
 }
 
-func strokeQuadBezier(state strokeState, d, flatness float32) strokeQuads {
+func strokeQuadBezier(state strokeState, d, flatness float32) StrokeQuads {
 	// Gio strokes are only quadratic Bézier curves, w/o any inflection point.
 	// So we just have to flatten them.
-	var qs strokeQuads
+	var qs StrokeQuads
 	return flattenQuadBezier(qs, state.p0, state.ctl, state.p1, d, flatness)
 }
 
 // flattenQuadBezier splits a Bézier quadratic curve into linear sub-segments,
 // themselves also encoded as Bézier (degenerate, flat) quadratic curves.
-func flattenQuadBezier(qs strokeQuads, p0, p1, p2 f32.Point, d, flatness float32) strokeQuads {
+func flattenQuadBezier(qs StrokeQuads, p0, p1, p2 f32.Point, d, flatness float32) StrokeQuads {
 	var (
 		t      float32
 		flat64 = float64(flatness)
@@ -463,21 +483,21 @@ func flattenQuadBezier(qs strokeQuads, p0, p1, p2 f32.Point, d, flatness float32
 	return qs
 }
 
-func (qs *strokeQuads) addLine(p0, ctrl, p1 f32.Point, t, d float32) {
+func (qs *StrokeQuads) addLine(p0, ctrl, p1 f32.Point, t, d float32) {
 
 	switch i := len(*qs); i {
 	case 0:
 		p0 = p0.Add(strokePathNorm(p0, ctrl, p1, 0, d))
 	default:
 		// Address possible rounding errors and use previous point.
-		p0 = (*qs)[i-1].quad.To
+		p0 = (*qs)[i-1].Quad.To
 	}
 
 	p1 = p1.Add(strokePathNorm(p0, ctrl, p1, 1, d))
 
 	*qs = append(*qs,
-		strokeQuad{
-			quad: quadSegment{
+		StrokeQuad{
+			Quad: QuadSegment{
 				From: p0,
 				Ctrl: p0.Add(p1).Mul(0.5),
 				To:   p1,
@@ -513,7 +533,7 @@ func quadBezierSplit(p0, p1, p2 f32.Point, t float32) (f32.Point, f32.Point, f32
 
 // strokePathJoin joins the two paths rhs and lhs, according to the provided
 // stroke operation.
-func strokePathJoin(stroke clip.StrokeStyle, rhs, lhs *strokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
+func strokePathJoin(stroke clip.StrokeStyle, rhs, lhs *StrokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
 	if stroke.Miter > 0 {
 		strokePathMiterJoin(stroke, rhs, lhs, hw, pivot, n0, n1, r0, r1)
 		return
@@ -528,7 +548,7 @@ func strokePathJoin(stroke clip.StrokeStyle, rhs, lhs *strokeQuads, hw float32, 
 	}
 }
 
-func strokePathBevelJoin(rhs, lhs *strokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
+func strokePathBevelJoin(rhs, lhs *StrokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
 
 	rp := pivot.Add(n1)
 	lp := pivot.Sub(n1)
@@ -537,7 +557,7 @@ func strokePathBevelJoin(rhs, lhs *strokeQuads, hw float32, pivot, n0, n1 f32.Po
 	lhs.lineTo(lp)
 }
 
-func strokePathRoundJoin(rhs, lhs *strokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
+func strokePathRoundJoin(rhs, lhs *StrokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
 	rp := pivot.Add(n1)
 	lp := pivot.Sub(n1)
 	cw := dotPt(rot90CW(n0), n1) >= 0.0
@@ -559,7 +579,7 @@ func strokePathRoundJoin(rhs, lhs *strokeQuads, hw float32, pivot, n0, n1 f32.Po
 	}
 }
 
-func strokePathMiterJoin(stroke clip.StrokeStyle, rhs, lhs *strokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
+func strokePathMiterJoin(stroke clip.StrokeStyle, rhs, lhs *StrokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
 	if n0 == n1.Mul(-1) {
 		strokePathBevelJoin(rhs, lhs, hw, pivot, n0, n1, r0, r1)
 		return
@@ -601,7 +621,7 @@ func strokePathMiterJoin(stroke clip.StrokeStyle, rhs, lhs *strokeQuads, hw floa
 }
 
 // strokePathCap caps the provided path qs, according to the provided stroke operation.
-func strokePathCap(stroke clip.StrokeStyle, qs *strokeQuads, hw float32, pivot, n0 f32.Point) {
+func strokePathCap(stroke clip.StrokeStyle, qs *StrokeQuads, hw float32, pivot, n0 f32.Point) {
 	switch stroke.Cap {
 	case clip.FlatCap:
 		strokePathFlatCap(qs, hw, pivot, n0)
@@ -615,13 +635,13 @@ func strokePathCap(stroke clip.StrokeStyle, qs *strokeQuads, hw float32, pivot, 
 }
 
 // strokePathFlatCap caps the start or end of a path with a flat cap.
-func strokePathFlatCap(qs *strokeQuads, hw float32, pivot, n0 f32.Point) {
+func strokePathFlatCap(qs *StrokeQuads, hw float32, pivot, n0 f32.Point) {
 	end := pivot.Sub(n0)
 	qs.lineTo(end)
 }
 
 // strokePathSquareCap caps the start or end of a path with a square cap.
-func strokePathSquareCap(qs *strokeQuads, hw float32, pivot, n0 f32.Point) {
+func strokePathSquareCap(qs *StrokeQuads, hw float32, pivot, n0 f32.Point) {
 	var (
 		e       = pivot.Add(rot90CCW(n0))
 		corner1 = e.Add(n0)
@@ -635,7 +655,7 @@ func strokePathSquareCap(qs *strokeQuads, hw float32, pivot, n0 f32.Point) {
 }
 
 // strokePathRoundCap caps the start or end of a path with a round cap.
-func strokePathRoundCap(qs *strokeQuads, hw float32, pivot, n0 f32.Point) {
+func strokePathRoundCap(qs *StrokeQuads, hw float32, pivot, n0 f32.Point) {
 	c := pivot.Sub(qs.pen())
 	qs.arc(c, c, math.Pi)
 }
