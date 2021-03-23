@@ -11,6 +11,7 @@ import (
 	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
 	"gioui.org/internal/scene"
+	"gioui.org/internal/stroke"
 	"gioui.org/op"
 )
 
@@ -174,7 +175,7 @@ func (p *Path) Arc(f1, f2 f32.Point, angle float32) {
 	f1 = f1.Add(p.pen)
 	f2 = f2.Add(p.pen)
 	const segments = 16
-	m := arcTransform(p.pen, f1, f2, angle, segments)
+	m := stroke.ArcTransform(p.pen, f1, f2, angle, segments)
 
 	for i := 0; i < segments; i++ {
 		p0 := p.pen
@@ -183,100 +184,6 @@ func (p *Path) Arc(f1, f2 f32.Point, angle float32) {
 		ctl := p1.Mul(2).Sub(p0.Add(p2).Mul(.5))
 		p.QuadTo(ctl, p2)
 	}
-}
-
-func dist(p1, p2 f32.Point) float64 {
-	var (
-		x1 = float64(p1.X)
-		y1 = float64(p1.Y)
-		x2 = float64(p2.X)
-		y2 = float64(p2.Y)
-		dx = x2 - x1
-		dy = y2 - y1
-	)
-	return math.Hypot(dx, dy)
-}
-
-// arcTransform computes a transformation that can be used for generating quadratic bézier
-// curve approximations for an arc.
-//
-// The math is extracted from the following paper:
-//  "Drawing an elliptical arc using polylines, quadratic or
-//   cubic Bezier curves", L. Maisonobe
-// An electronic version may be found at:
-//  http://spaceroots.org/documents/ellipse/elliptical-arc.pdf
-func arcTransform(p, f1, f2 f32.Point, angle float32, segments int) f32.Affine2D {
-	c := f32.Point{
-		X: 0.5 * (f1.X + f2.X),
-		Y: 0.5 * (f1.Y + f2.Y),
-	}
-
-	// semi-major axis: 2a = |PF1| + |PF2|
-	a := 0.5 * (dist(f1, p) + dist(f2, p))
-
-	// semi-minor axis: c^2 = a^2+b^2 (c: focal distance)
-	f := dist(f1, c)
-	b := math.Sqrt(a*a - f*f)
-
-	var rx, ry, alpha, start float64
-	switch {
-	case a > b:
-		rx = a
-		ry = b
-	default:
-		rx = b
-		ry = a
-	}
-
-	var x float64
-	switch {
-	case f1 == c || f2 == c:
-		// degenerate case of a circle.
-		alpha = 0
-	default:
-		switch {
-		case f1.X > c.X:
-			x = float64(f1.X - c.X)
-			alpha = math.Acos(x / f)
-		case f1.X < c.X:
-			x = float64(f2.X - c.X)
-			alpha = math.Acos(x / f)
-		case f1.X == c.X:
-			// special case of a "vertical" ellipse.
-			alpha = math.Pi / 2
-			if f1.Y < c.Y {
-				alpha = -alpha
-			}
-		}
-	}
-
-	start = math.Acos(float64(p.X-c.X) / dist(c, p))
-	if c.Y > p.Y {
-		start = -start
-	}
-	start -= alpha
-
-	var (
-		θ   = angle / float32(segments)
-		ref f32.Affine2D // transform from absolute frame to ellipse-based one
-		rot f32.Affine2D // rotation matrix for each segment
-		inv f32.Affine2D // transform from ellipse-based frame to absolute one
-	)
-	ref = ref.Offset(f32.Point{}.Sub(c))
-	ref = ref.Rotate(f32.Point{}, float32(-alpha))
-	ref = ref.Scale(f32.Point{}, f32.Point{
-		X: float32(1 / rx),
-		Y: float32(1 / ry),
-	})
-	inv = ref.Invert()
-	rot = rot.Rotate(f32.Point{}, float32(0.5*θ))
-
-	// Instead of invoking math.Sincos for every segment, compute a rotation
-	// matrix once and apply for each segment.
-	// Before applying the rotation matrix rot, transform the coordinates
-	// to a frame centered to the ellipse (and warped into a unit circle), then rotate.
-	// Finally, transform back into the original frame.
-	return inv.Mul(rot).Mul(ref)
 }
 
 // Cube records a cubic Bézier from the pen through

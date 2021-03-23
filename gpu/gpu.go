@@ -1349,7 +1349,7 @@ func (d *drawOps) writeVertCache(n int) []byte {
 }
 
 // transform, split paths as needed, calculate maxY, bounds and create GPU vertices.
-func (d *drawOps) buildVerts(pathData []byte, tr f32.Affine2D, outline bool, stroke clip.StrokeStyle, dashes stroke.DashOp) (verts []byte, bounds f32.Rectangle) {
+func (d *drawOps) buildVerts(pathData []byte, tr f32.Affine2D, outline bool, str clip.StrokeStyle, dashes stroke.DashOp) (verts []byte, bounds f32.Rectangle) {
 	inf := float32(math.Inf(+1))
 	d.qs.bounds = f32.Rectangle{
 		Min: f32.Point{X: inf, Y: inf},
@@ -1359,10 +1359,16 @@ func (d *drawOps) buildVerts(pathData []byte, tr f32.Affine2D, outline bool, str
 	startLength := len(d.vertCache)
 
 	switch {
-	case stroke.Width > 0:
+	case str.Width > 0:
 		// Stroke path.
 		quads := decodeToStrokeQuads(pathData)
-		quads = quads.Stroke(stroke, dashes)
+		ss := stroke.StrokeStyle{
+			Width: str.Width,
+			Miter: str.Miter,
+			Cap:   stroke.StrokeCap(str.Cap),
+			Join:  stroke.StrokeJoin(str.Join),
+		}
+		quads = quads.Stroke(ss, dashes)
 		for _, quad := range quads {
 			d.qs.contour = quad.Contour
 			quad.Quad = quad.Quad.Transform(tr)
