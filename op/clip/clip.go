@@ -173,8 +173,16 @@ func (p *Path) QuadTo(ctrl, to f32.Point) {
 func (p *Path) Arc(f1, f2 f32.Point, angle float32) {
 	f1 = f1.Add(p.pen)
 	f2 = f2.Add(p.pen)
-	c, rx, ry, beg, alpha := arcFrom(f1, f2, p.pen)
-	p.arc(alpha, c, rx, ry, beg, float64(angle))
+	const segments = 16
+	m := arcTransform(p.pen, f1, f2, angle, segments)
+
+	for i := 0; i < segments; i++ {
+		p0 := p.pen
+		p1 := m.Transform(p0)
+		p2 := m.Transform(p1)
+		ctl := p1.Mul(2).Sub(p0.Add(p2).Mul(.5))
+		p.QuadTo(ctl, p2)
+	}
 }
 
 func dist(p1, p2 f32.Point) float64 {
@@ -189,8 +197,16 @@ func dist(p1, p2 f32.Point) float64 {
 	return math.Hypot(dx, dy)
 }
 
-func arcFrom(f1, f2, p f32.Point) (c f32.Point, rx, ry, start, alpha float64) {
-	c = f32.Point{
+// arcTransform computes a transformation that can be used for generating quadratic bézier
+// curve approximations for an arc.
+//
+// The math is extracted from the following paper:
+//  "Drawing an elliptical arc using polylines, quadratic or
+//   cubic Bezier curves", L. Maisonobe
+// An electronic version may be found at:
+//  http://spaceroots.org/documents/ellipse/elliptical-arc.pdf
+func arcTransform(p, f1, f2 f32.Point, angle float32, segments int) f32.Affine2D {
+	c := f32.Point{
 		X: 0.5 * (f1.X + f2.X),
 		Y: 0.5 * (f1.Y + f2.Y),
 	}
@@ -202,6 +218,7 @@ func arcFrom(f1, f2, p f32.Point) (c f32.Point, rx, ry, start, alpha float64) {
 	f := dist(f1, c)
 	b := math.Sqrt(a*a - f*f)
 
+	var rx, ry, alpha, start float64
 	switch {
 	case a > b:
 		rx = a
@@ -239,21 +256,8 @@ func arcFrom(f1, f2, p f32.Point) (c f32.Point, rx, ry, start, alpha float64) {
 	}
 	start -= alpha
 
-	return c, rx, ry, start, alpha
-}
-
-// arc records an elliptical arc centered at c, with radii rx and ry,
-// starting at angle beg and stopping at end, in radians.
-//
-// The math is extracted from the following paper:
-//  "Drawing an elliptical arc using polylines, quadratic or
-//   cubic Bezier curves", L. Maisonobe
-// An electronic version may be found at:
-//  http://spaceroots.org/documents/ellipse/elliptical-arc.pdf
-func (p *Path) arc(alpha float64, c f32.Point, rx, ry, beg, delta float64) {
-	const n = 16
 	var (
-		θ   = delta / n
+		θ   = angle / float32(segments)
 		ref f32.Affine2D // transform from absolute frame to ellipse-based one
 		rot f32.Affine2D // rotation matrix for each segment
 		inv f32.Affine2D // transform from ellipse-based frame to absolute one
@@ -272,23 +276,7 @@ func (p *Path) arc(alpha float64, c f32.Point, rx, ry, beg, delta float64) {
 	// Before applying the rotation matrix rot, transform the coordinates
 	// to a frame centered to the ellipse (and warped into a unit circle), then rotate.
 	// Finally, transform back into the original frame.
-	step := func(p f32.Point) f32.Point {
-		q := ref.Transform(p)
-		q = rot.Transform(q)
-		q = inv.Transform(q)
-		return q
-	}
-
-	for i := 0; i < n; i++ {
-		p0 := p.pen
-		p1 := step(p0)
-		p2 := step(p1)
-		ctl := f32.Pt(
-			2*p1.X-0.5*(p0.X+p2.X),
-			2*p1.Y-0.5*(p0.Y+p2.Y),
-		)
-		p.QuadTo(ctl, p2)
-	}
+	return inv.Mul(rot).Mul(ref)
 }
 
 // Cube records a cubic Bézier from the pen through
