@@ -707,14 +707,13 @@ func encodePath(p *pathOp) encoder {
 	var enc encoder
 	verts := p.pathVerts
 	if p.stroke.Width > 0 && !supportsStroke(p) {
-		quads := decodeToStrokeQuads(verts)
 		ss := stroke.StrokeStyle{
 			Width: p.stroke.Width,
 			Miter: p.stroke.Miter,
 			Cap:   stroke.StrokeCap(p.stroke.Cap),
 			Join:  stroke.StrokeJoin(p.stroke.Join),
 		}
-		quads = quads.Stroke(ss, p.dashes)
+		quads := stroke.StrokePathCommands(ss, p.dashes, verts)
 		for _, quad := range quads {
 			q := quad.Quad
 			enc.quad(q.From, q.Ctrl, q.To)

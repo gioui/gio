@@ -26,9 +26,12 @@
 package stroke
 
 import (
+	"encoding/binary"
 	"math"
 
 	"gioui.org/f32"
+	"gioui.org/internal/ops"
+	"gioui.org/internal/scene"
 )
 
 // The following are copies of types from op/clip to avoid a circular import of
@@ -152,7 +155,7 @@ func (qs StrokeQuads) split() []StrokeQuads {
 	return o
 }
 
-func (qs StrokeQuads) Stroke(stroke StrokeStyle, dashes DashOp) StrokeQuads {
+func (qs StrokeQuads) stroke(stroke StrokeStyle, dashes DashOp) StrokeQuads {
 	if !IsSolidLine(dashes) {
 		qs = qs.dash(dashes)
 	}
@@ -764,4 +767,124 @@ func dist(p1, p2 f32.Point) float64 {
 		dy = y2 - y1
 	)
 	return math.Hypot(dx, dy)
+}
+
+func StrokePathCommands(style StrokeStyle, dashes DashOp, scene []byte) StrokeQuads {
+	quads := decodeToStrokeQuads(scene)
+	return quads.stroke(style, dashes)
+}
+
+// decodeToStrokeQuads decodes scene commands to quads ready to stroke.
+func decodeToStrokeQuads(pathData []byte) StrokeQuads {
+	quads := make(StrokeQuads, 0, 2*len(pathData)/(scene.CommandSize+4))
+	for len(pathData) >= scene.CommandSize+4 {
+		contour := binary.LittleEndian.Uint32(pathData)
+		cmd := ops.DecodeCommand(pathData[4:])
+		switch cmd.Op() {
+		case scene.OpLine:
+			var q QuadSegment
+			q.From, q.To = scene.DecodeLine(cmd)
+			q.Ctrl = q.From.Add(q.To).Mul(.5)
+			quad := StrokeQuad{
+				Contour: contour,
+				Quad:    q,
+			}
+			quads = append(quads, quad)
+		case scene.OpQuad:
+			var q QuadSegment
+			q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)
+			quad := StrokeQuad{
+				Contour: contour,
+				Quad:    q,
+			}
+			quads = append(quads, quad)
+		case scene.OpCubic:
+			for _, q := range SplitCubic(scene.DecodeCubic(cmd)) {
+				quad := StrokeQuad{
+					Contour: contour,
+					Quad:    q,
+				}
+				quads = append(quads, quad)
+			}
+		default:
+			panic("unsupported scene command")
+		}
+		pathData = pathData[scene.CommandSize+4:]
+	}
+	return quads
+}
+
+func SplitCubic(from, ctrl0, ctrl1, to f32.Point) []QuadSegment {
+	quads := make([]QuadSegment, 0, 10)
+	// Set the maximum distance proportionally to the longest side
+	// of the bounding rectangle.
+	hull := f32.Rectangle{
+		Min: from,
+		Max: ctrl0,
+	}.Canon().Add(ctrl1).Add(to)
+	l := hull.Dx()
+	if h := hull.Dy(); h > l {
+		l = h
+	}
+	approxCubeTo(&quads, 0, l*0.001, from, ctrl0, ctrl1, to)
+	return quads
+}
+
+// approxCubeTo approximates a cubic Bézier by a series of quadratic
+// curves.
+func approxCubeTo(quads *[]QuadSegment, splits int, maxDist float32, from, ctrl0, ctrl1, to f32.Point) int {
+	// The idea is from
+	// https://caffeineowl.com/graphics/2d/vectorial/cubic2quad01.html
+	// where a quadratic approximates a cubic by eliminating its t³ term
+	// from its polynomial expression anchored at the starting point:
+	//
+	// P(t) = pen + 3t(ctrl0 - pen) + 3t²(ctrl1 - 2ctrl0 + pen) + t³(to - 3ctrl1 + 3ctrl0 - pen)
+	//
+	// The control point for the new quadratic Q1 that shares starting point, pen, with P is
+	//
+	// C1 = (3ctrl0 - pen)/2
+	//
+	// The reverse cubic anchored at the end point has the polynomial
+	//
+	// P'(t) = to + 3t(ctrl1 - to) + 3t²(ctrl0 - 2ctrl1 + to) + t³(pen - 3ctrl0 + 3ctrl1 - to)
+	//
+	// The corresponding quadratic Q2 that shares the end point, to, with P has control
+	// point
+	//
+	// C2 = (3ctrl1 - to)/2
+	//
+	// The combined quadratic Bézier, Q, shares both start and end points with its cubic
+	// and use the midpoint between the two curves Q1 and Q2 as control point:
+	//
+	// C = (3ctrl0 - pen + 3ctrl1 - to)/4
+	c := ctrl0.Mul(3).Sub(from).Add(ctrl1.Mul(3)).Sub(to).Mul(1.0 / 4.0)
+	const maxSplits = 32
+	if splits >= maxSplits {
+		*quads = append(*quads, QuadSegment{From: from, Ctrl: c, To: to})
+		return splits
+	}
+	// The maximum distance between the cubic P and its approximation Q given t
+	// can be shown to be
+	//
+	// d = sqrt(3)/36*|to - 3ctrl1 + 3ctrl0 - pen|
+	//
+	// To save a square root, compare d² with the squared tolerance.
+	v := to.Sub(ctrl1.Mul(3)).Add(ctrl0.Mul(3)).Sub(from)
+	d2 := (v.X*v.X + v.Y*v.Y) * 3 / (36 * 36)
+	if d2 <= maxDist*maxDist {
+		*quads = append(*quads, QuadSegment{From: from, Ctrl: c, To: to})
+		return splits
+	}
+	// De Casteljau split the curve and approximate the halves.
+	t := float32(0.5)
+	c0 := from.Add(ctrl0.Sub(from).Mul(t))
+	c1 := ctrl0.Add(ctrl1.Sub(ctrl0).Mul(t))
+	c2 := ctrl1.Add(to.Sub(ctrl1).Mul(t))
+	c01 := c0.Add(c1.Sub(c0).Mul(t))
+	c12 := c1.Add(c2.Sub(c1).Mul(t))
+	c0112 := c01.Add(c12.Sub(c01).Mul(t))
+	splits++
+	splits = approxCubeTo(quads, splits, maxDist, from, c0, c01, c0112)
+	splits = approxCubeTo(quads, splits, maxDist, c0112, c12, c2, to)
+	return splits
 }
