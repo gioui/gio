@@ -33,7 +33,6 @@ const (
 	TypeCursor
 	TypePath
 	TypeStroke
-	TypeDash
 )
 
 const (
@@ -61,8 +60,7 @@ const (
 	TypeProfileLen         = 1
 	TypeCursorLen          = 1 + 1
 	TypePathLen            = 1
-	TypeStrokeLen          = 1 + 4 + 4 + 1 + 1
-	TypeDashLen            = 1 + 4 + 1
+	TypeStrokeLen          = 1 + 4
 )
 
 // StateMask is a bitmask of state types a load operation
@@ -106,7 +104,6 @@ func (t OpType) Size() int {
 		TypeCursorLen,
 		TypePathLen,
 		TypeStrokeLen,
-		TypeDashLen,
 	}[t-firstOpIndex]
 }
 

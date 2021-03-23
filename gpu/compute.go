@@ -18,10 +18,8 @@ import (
 	"gioui.org/internal/f32color"
 	"gioui.org/internal/ops"
 	"gioui.org/internal/scene"
-	"gioui.org/internal/stroke"
 	"gioui.org/layout"
 	"gioui.org/op"
-	"gioui.org/op/clip"
 )
 
 type compute struct {
@@ -671,9 +669,9 @@ func (g *compute) encodeClipStack(clip, bounds f32.Rectangle, p *pathOp, begin b
 		nclips += g.encodeClipStack(clip, bounds, p.parent, true)
 		nclips += 1
 	}
-	s := isStroke(p)
+	isStroke := p.stroke.Width > 0
 	if p != nil && p.path {
-		if s {
+		if isStroke {
 			g.enc.fillMode(scene.FillModeStroke)
 			g.enc.lineWidth(p.stroke.Width)
 		}
@@ -685,7 +683,7 @@ func (g *compute) encodeClipStack(clip, bounds f32.Rectangle, p *pathOp, begin b
 	}
 	if begin {
 		g.enc.beginClip(clip)
-		if s {
+		if isStroke {
 			g.enc.fillMode(scene.FillModeNonzero)
 		}
 		if p != nil && p.path {
@@ -695,31 +693,8 @@ func (g *compute) encodeClipStack(clip, bounds f32.Rectangle, p *pathOp, begin b
 	return nclips
 }
 
-func supportsStroke(p *pathOp) bool {
-	return stroke.IsSolidLine(p.dashes) && p.stroke.Miter == 0 && p.stroke.Join == clip.RoundJoin && p.stroke.Cap == clip.RoundCap
-}
-
-func isStroke(p *pathOp) bool {
-	return p.stroke.Width > 0 && supportsStroke(p)
-}
-
-func encodePath(p *pathOp) encoder {
+func encodePath(verts []byte) encoder {
 	var enc encoder
-	verts := p.pathVerts
-	if p.stroke.Width > 0 && !supportsStroke(p) {
-		ss := stroke.StrokeStyle{
-			Width: p.stroke.Width,
-			Miter: p.stroke.Miter,
-			Cap:   stroke.StrokeCap(p.stroke.Cap),
-			Join:  stroke.StrokeJoin(p.stroke.Join),
-		}
-		quads := stroke.StrokePathCommands(ss, p.dashes, verts)
-		for _, quad := range quads {
-			q := quad.Quad
-			enc.quad(q.From, q.Ctrl, q.To)
-		}
-		return enc
-	}
 	for len(verts) >= scene.CommandSize+4 {
 		cmd := ops.DecodeCommand(verts[4:])
 		enc.scene = append(enc.scene, cmd)

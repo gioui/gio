@@ -131,7 +131,6 @@ type pathOp struct {
 	// For compute
 	trans  f32.Affine2D
 	stroke clip.StrokeStyle
-	dashes stroke.DashOp
 }
 
 type imageOp struct {
@@ -143,29 +142,14 @@ type imageOp struct {
 	place    placement
 }
 
-func decodeDashOp(data []byte) stroke.DashOp {
-	_ = data[5]
-	if opconst.OpType(data[0]) != opconst.TypeDash {
-		panic("invalid op")
-	}
-	bo := binary.LittleEndian
-	return stroke.DashOp{
-		Phase:  math.Float32frombits(bo.Uint32(data[1:])),
-		Dashes: make([]float32, data[5]),
-	}
-}
-
 func decodeStrokeOp(data []byte) clip.StrokeStyle {
-	_ = data[10]
+	_ = data[4]
 	if opconst.OpType(data[0]) != opconst.TypeStroke {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
 	return clip.StrokeStyle{
 		Width: math.Float32frombits(bo.Uint32(data[1:])),
-		Miter: math.Float32frombits(bo.Uint32(data[5:])),
-		Cap:   clip.StrokeCap(data[9]),
-		Join:  clip.StrokeJoin(data[10]),
 	}
 }
 
@@ -827,7 +811,7 @@ func (d *drawOps) collect(ctx driver.Device, cache *resourceCache, root *op.Ops,
 			data := buildPath(ctx, p.pathVerts)
 			var computePath encoder
 			if d.compute {
-				computePath = encodePath(p)
+				computePath = encodePath(p.pathVerts)
 			}
 			d.pathCache.put(p.pathKey, opCacheValue{
 				data:        data,
@@ -844,7 +828,7 @@ func (d *drawOps) newPathOp() *pathOp {
 	return &d.pathOpCache[len(d.pathOpCache)-1]
 }
 
-func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key, bounds f32.Rectangle, off f32.Point, tr f32.Affine2D, stroke clip.StrokeStyle, dashes stroke.DashOp) {
+func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key, bounds f32.Rectangle, off f32.Point, tr f32.Affine2D, stroke clip.StrokeStyle) {
 	npath := d.newPathOp()
 	*npath = pathOp{
 		parent: state.cpath,
@@ -852,7 +836,6 @@ func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key, boun
 		off:    off,
 		trans:  tr,
 		stroke: stroke,
-		dashes: dashes,
 	}
 	state.cpath = npath
 	if len(aux) > 0 {
@@ -882,10 +865,9 @@ func (d *drawOps) save(id int, state drawState) {
 
 func (d *drawOps) collectOps(r *ops.Reader, state drawState) {
 	var (
-		quads  quadsOp
-		str    clip.StrokeStyle
-		dashes stroke.DashOp
-		z      int
+		quads quadsOp
+		str   clip.StrokeStyle
+		z     int
 	)
 	d.save(opconst.InitialStateID, state)
 loop:
@@ -896,22 +878,6 @@ loop:
 		case opconst.TypeTransform:
 			dop := ops.DecodeTransform(encOp.Data)
 			state.t = state.t.Mul(dop)
-
-		case opconst.TypeDash:
-			dashes = decodeDashOp(encOp.Data)
-			if len(dashes.Dashes) > 0 {
-				encOp, ok = r.Decode()
-				if !ok {
-					panic("gpu: could not decode dashes pattern")
-				}
-				data := encOp.Data[1:]
-				bo := binary.LittleEndian
-				for i := range dashes.Dashes {
-					dashes.Dashes[i] = math.Float32frombits(bo.Uint32(
-						data[i*4:],
-					))
-				}
-			}
 
 		case opconst.TypeStroke:
 			str = decodeStrokeOp(encOp.Data)
@@ -940,7 +906,7 @@ loop:
 					op.bounds = v.bounds
 				} else {
 					pathData, bounds := d.buildVerts(
-						quads.aux, trans, op.outline, str, dashes,
+						quads.aux, trans, op.outline, str,
 					)
 					op.bounds = bounds
 					if !d.compute {
@@ -956,10 +922,9 @@ loop:
 				quads.key.SetTransform(trans)
 			}
 			state.clip = state.clip.Intersect(op.bounds.Add(off))
-			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off, state.t, str, dashes)
+			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off, state.t, str)
 			quads = quadsOp{}
 			str = clip.StrokeStyle{}
-			dashes = stroke.DashOp{}
 
 		case opconst.TypeColor:
 			state.matType = materialColor
@@ -997,7 +962,7 @@ loop:
 				// The paint operation is sheared or rotated, add a clip path representing
 				// this transformed rectangle.
 				encOp.Key.SetTransform(trans)
-				d.addClipPath(&state, clipData, encOp.Key, bnd, off, state.t, clip.StrokeStyle{}, stroke.DashOp{})
+				d.addClipPath(&state, clipData, encOp.Key, bnd, off, state.t, clip.StrokeStyle{})
 			}
 
 			bounds := boundRectF(cl)
@@ -1349,7 +1314,7 @@ func (d *drawOps) writeVertCache(n int) []byte {
 }
 
 // transform, split paths as needed, calculate maxY, bounds and create GPU vertices.
-func (d *drawOps) buildVerts(pathData []byte, tr f32.Affine2D, outline bool, str clip.StrokeStyle, dashes stroke.DashOp) (verts []byte, bounds f32.Rectangle) {
+func (d *drawOps) buildVerts(pathData []byte, tr f32.Affine2D, outline bool, str clip.StrokeStyle) (verts []byte, bounds f32.Rectangle) {
 	inf := float32(math.Inf(+1))
 	d.qs.bounds = f32.Rectangle{
 		Min: f32.Point{X: inf, Y: inf},
@@ -1367,7 +1332,7 @@ func (d *drawOps) buildVerts(pathData []byte, tr f32.Affine2D, outline bool, str
 			Cap:   stroke.StrokeCap(str.Cap),
 			Join:  stroke.StrokeJoin(str.Join),
 		}
-		quads := stroke.StrokePathCommands(ss, dashes, pathData)
+		quads := stroke.StrokePathCommands(ss, stroke.DashOp{}, pathData)
 		for _, quad := range quads {
 			d.qs.contour = quad.Contour
 			quad.Quad = quad.Quad.Transform(tr)

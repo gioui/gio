@@ -93,7 +93,7 @@ func (d *Dash) Phase(v float32) {
 
 func (d *Dash) Dash(length float32) {
 	if d.size == math.MaxUint8 {
-		panic("clip: too large dash pattern")
+		panic("clip: dash pattern too large")
 	}
 	data := d.ops.Write(4)
 	bo := binary.LittleEndian

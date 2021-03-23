@@ -27,29 +27,31 @@ type Op struct {
 }
 
 func (p Op) Add(o *op.Ops) {
-	if p.path.hasSegments {
-		data := o.Write(opconst.TypePathLen)
-		data[0] = byte(opconst.TypePath)
-		p.path.spec.Add(o)
+	str := p.stroke
+	dashes := p.dashes
+	path := p.path
+	outline := p.outline
+	approx := str.Width > 0 && !(dashes == DashSpec{} && str.Miter == 0 && str.Join == RoundJoin && str.Cap == RoundCap)
+	if approx {
+		// If the stroke is not natively supported by the compute renderer, construct a filled path
+		// that approximates it.
+		path = p.approximateStroke(o)
+		dashes = DashSpec{}
+		str = StrokeStyle{}
+		outline = true
 	}
 
-	if p.stroke.Width > 0 {
+	if path.hasSegments {
+		data := o.Write(opconst.TypePathLen)
+		data[0] = byte(opconst.TypePath)
+		path.spec.Add(o)
+	}
+
+	if str.Width > 0 {
 		data := o.Write(opconst.TypeStrokeLen)
 		data[0] = byte(opconst.TypeStroke)
 		bo := binary.LittleEndian
-		bo.PutUint32(data[1:], math.Float32bits(p.stroke.Width))
-		bo.PutUint32(data[5:], math.Float32bits(p.stroke.Miter))
-		data[9] = uint8(p.stroke.Cap)
-		data[10] = uint8(p.stroke.Join)
-	}
-
-	if p.dashes.phase != 0 || p.dashes.size > 0 {
-		data := o.Write(opconst.TypeDashLen)
-		data[0] = byte(opconst.TypeDash)
-		bo := binary.LittleEndian
-		bo.PutUint32(data[1:], math.Float32bits(p.dashes.phase))
-		data[5] = p.dashes.size // FIXME(sbinet) uint16? uint32?
-		p.dashes.spec.Add(o)
+		bo.PutUint32(data[1:], math.Float32bits(str.Width))
 	}
 
 	data := o.Write(opconst.TypeClipLen)
@@ -59,9 +61,69 @@ func (p Op) Add(o *op.Ops) {
 	bo.PutUint32(data[5:], uint32(p.bounds.Min.Y))
 	bo.PutUint32(data[9:], uint32(p.bounds.Max.X))
 	bo.PutUint32(data[13:], uint32(p.bounds.Max.Y))
-	if p.outline {
+	if outline {
 		data[17] = byte(1)
 	}
+}
+
+func (p Op) approximateStroke(o *op.Ops) PathSpec {
+	if !p.path.hasSegments {
+		return PathSpec{}
+	}
+
+	var r ops.Reader
+	// Add path op for us to decode. Use a macro to omit it from later decodes.
+	ignore := op.Record(o)
+	r.ResetAt(o, ops.NewPC(o))
+	p.path.spec.Add(o)
+	ignore.Stop()
+	encOp, ok := r.Decode()
+	if !ok || opconst.OpType(encOp.Data[0]) != opconst.TypeAux {
+		panic("corrupt path data")
+	}
+	pathData := encOp.Data[opconst.TypeAuxLen:]
+
+	// Decode dashes in a similar way.
+	var dashes stroke.DashOp
+	if p.dashes.phase != 0 || p.dashes.size > 0 {
+		ignore := op.Record(o)
+		r.ResetAt(o, ops.NewPC(o))
+		p.dashes.spec.Add(o)
+		ignore.Stop()
+		encOp, ok := r.Decode()
+		if !ok || opconst.OpType(encOp.Data[0]) != opconst.TypeAux {
+			panic("corrupt dash data")
+		}
+		dashes.Dashes = make([]float32, p.dashes.size)
+		dashData := encOp.Data[opconst.TypeAuxLen:]
+		bo := binary.LittleEndian
+		for i := range dashes.Dashes {
+			dashes.Dashes[i] = math.Float32frombits(bo.Uint32(dashData[i*4:]))
+		}
+		dashes.Phase = p.dashes.phase
+	}
+
+	// Approximate and output path data.
+	var outline Path
+	outline.Begin(o)
+	ss := stroke.StrokeStyle{
+		Width: p.stroke.Width,
+		Miter: p.stroke.Miter,
+		Cap:   stroke.StrokeCap(p.stroke.Cap),
+		Join:  stroke.StrokeJoin(p.stroke.Join),
+	}
+	quads := stroke.StrokePathCommands(ss, dashes, pathData)
+	pen := f32.Pt(0, 0)
+	for _, quad := range quads {
+		q := quad.Quad
+		if q.From != pen {
+			pen = q.From
+			outline.MoveTo(pen)
+		}
+		outline.contour = int(quad.Contour)
+		outline.QuadTo(q.Ctrl, q.To)
+	}
+	return outline.End()
 }
 
 type PathSpec struct {
@@ -69,7 +131,7 @@ type PathSpec struct {
 	// open is true if any path contour is not closed. A closed contour starts
 	// and ends in the same point.
 	open bool
-	// hasSegments tracks whether there is more than one path segment in the path.
+	// hasSegments tracks whether there are any segments in the path.
 	hasSegments bool
 }
 
