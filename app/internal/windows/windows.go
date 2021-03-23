@@ -54,6 +54,23 @@ type MinMaxInfo struct {
 	PtMaxTrackSize Point
 }
 
+type WindowPlacement struct {
+	length           uint32
+	flags            uint32
+	showCmd          uint32
+	ptMinPosition    Point
+	ptMaxPosition    Point
+	rcNormalPosition Rect
+	rcDevice         Rect
+}
+
+type MonitorInfo struct {
+	cbSize   uint32
+	Monitor  Rect
+	WorkArea Rect
+	Flags    uint32
+}
+
 const (
 	TRUE = 1
 
@@ -62,6 +79,9 @@ const (
 	CS_OWNDC   = 0x0020
 
 	CW_USEDEFAULT = -2147483648
+
+	GWL_STYLE    = ^(uint32(16) - 1) // -16
+	HWND_TOPMOST = ^(uint32(1) - 1)  // -1
 
 	HTCLIENT = 1
 
@@ -86,6 +106,12 @@ const (
 	SIZE_RESTORED  = 0
 
 	SW_SHOWDEFAULT = 10
+
+	SWP_FRAMECHANGED  = 0x0020
+	SWP_NOMOVE        = 0x0002
+	SWP_NOOWNERZORDER = 0x0200
+	SWP_NOSIZE        = 0x0001
+	SWP_NOZORDER      = 0x0004
 
 	USER_TIMER_MINIMUM = 0x0000000A
 
@@ -237,10 +263,14 @@ var (
 	_GetKeyState                 = user32.NewProc("GetKeyState")
 	_GetMessage                  = user32.NewProc("GetMessageW")
 	_GetMessageTime              = user32.NewProc("GetMessageTime")
+	_GetMonitorInfo              = user32.NewProc("GetMonitorInfoW")
+	_GetWindowLong               = user32.NewProc("GetWindowLongPtrW")
+	_GetWindowPlacement          = user32.NewProc("GetWindowPlacement")
 	_KillTimer                   = user32.NewProc("KillTimer")
 	_LoadCursor                  = user32.NewProc("LoadCursorW")
 	_LoadImage                   = user32.NewProc("LoadImageW")
 	_MonitorFromPoint            = user32.NewProc("MonitorFromPoint")
+	_MonitorFromWindow           = user32.NewProc("MonitorFromWindow")
 	_MsgWaitForMultipleObjectsEx = user32.NewProc("MsgWaitForMultipleObjectsEx")
 	_OpenClipboard               = user32.NewProc("OpenClipboard")
 	_PeekMessage                 = user32.NewProc("PeekMessageW")
@@ -258,6 +288,9 @@ var (
 	_SetFocus                    = user32.NewProc("SetFocus")
 	_SetProcessDPIAware          = user32.NewProc("SetProcessDPIAware")
 	_SetTimer                    = user32.NewProc("SetTimer")
+	_SetWindowLong               = user32.NewProc("SetWindowLongPtrW")
+	_SetWindowPos                = user32.NewProc("SetWindowPos")
+	_SetWindowPlacement          = user32.NewProc("SetWindowPlacement")
 	_TranslateMessage            = user32.NewProc("TranslateMessage")
 	_UnregisterClass             = user32.NewProc("UnregisterClassW")
 	_UpdateWindow                = user32.NewProc("UpdateWindow")
@@ -415,6 +448,42 @@ func GetWindowDPI(hwnd syscall.Handle) int {
 	} else {
 		return GetSystemDPI()
 	}
+}
+
+func GetWindowPlacement(hwnd syscall.Handle) *WindowPlacement {
+	var wp WindowPlacement
+	wp.length = uint32(unsafe.Sizeof(wp))
+	_GetWindowPlacement.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&wp)))
+	return &wp
+}
+
+func GetMonitorInfo(hwnd syscall.Handle) MonitorInfo {
+	var mi MonitorInfo
+	mi.cbSize = uint32(unsafe.Sizeof(mi))
+	v, _, _ := _MonitorFromWindow.Call(uintptr(hwnd), MONITOR_DEFAULTTOPRIMARY)
+	_GetMonitorInfo.Call(v, uintptr(unsafe.Pointer(&mi)))
+	return mi
+}
+
+func GetWindowLong(hwnd syscall.Handle) (style uintptr) {
+	style, _, _ = _GetWindowLong.Call(uintptr(hwnd), uintptr(GWL_STYLE))
+	return
+}
+
+func SetWindowLong(hwnd syscall.Handle, idx uint32, style uintptr) {
+	_SetWindowLong.Call(uintptr(hwnd), uintptr(idx), style)
+}
+
+func SetWindowPlacement(hwnd syscall.Handle, wp *WindowPlacement) {
+	_SetWindowPlacement.Call(uintptr(hwnd), uintptr(unsafe.Pointer(wp)))
+}
+
+func SetWindowPos(hwnd syscall.Handle, hwndInsertAfter uint32, x, y, dx, dy int32, style uintptr) {
+	_SetWindowPos.Call(uintptr(hwnd), uintptr(hwndInsertAfter),
+		uintptr(x), uintptr(y),
+		uintptr(dx), uintptr(dy),
+		style,
+	)
 }
 
 func GlobalAlloc(size int) (syscall.Handle, error) {

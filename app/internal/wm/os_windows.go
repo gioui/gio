@@ -52,6 +52,9 @@ type window struct {
 	cursorIn bool
 	cursor   syscall.Handle
 
+	// placement saves the previous window position when in full screen mode.
+	placement *windows.WindowPlacement
+
 	mu        sync.Mutex
 	animating bool
 
@@ -119,6 +122,7 @@ func NewWindow(window Callbacks, opts *Options) error {
 		// Since the window class for the cursor is null,
 		// set it here to show the cursor.
 		w.SetCursor(pointer.CursorDefault)
+		w.SetWindowMode(opts.WindowMode)
 		if err := w.loop(); err != nil {
 			panic(err)
 		}
@@ -522,6 +526,38 @@ func (w *window) readClipboard() error {
 		w.w.Event(clipboard.Event{Text: content})
 	}()
 	return nil
+}
+
+func (w *window) SetWindowMode(mode WindowMode) {
+	// https://devblogs.microsoft.com/oldnewthing/20100412-00/?p=14353
+	switch mode {
+	case Windowed:
+		if w.placement == nil {
+			return
+		}
+		windows.SetWindowPlacement(w.hwnd, w.placement)
+		w.placement = nil
+		style := windows.GetWindowLong(w.hwnd)
+		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW)
+		windows.SetWindowPos(w.hwnd, windows.HWND_TOPMOST,
+			0, 0, 0, 0,
+			windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED,
+		)
+	case Fullscreen:
+		if w.placement != nil {
+			return
+		}
+		w.placement = windows.GetWindowPlacement(w.hwnd)
+		style := windows.GetWindowLong(w.hwnd)
+		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style&^windows.WS_OVERLAPPEDWINDOW)
+		mi := windows.GetMonitorInfo(w.hwnd)
+		windows.SetWindowPos(w.hwnd, 0,
+			mi.Monitor.Left, mi.Monitor.Top,
+			mi.Monitor.Right-mi.Monitor.Left,
+			mi.Monitor.Bottom-mi.Monitor.Top,
+			windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED,
+		)
+	}
 }
 
 func (w *window) WriteClipboard(s string) {

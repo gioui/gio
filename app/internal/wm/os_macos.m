@@ -167,6 +167,11 @@ void gio_makeKeyAndOrderFront(CFTypeRef windowRef) {
 	[window makeKeyAndOrderFront:nil];
 }
 
+void gio_toggleFullScreen(CFTypeRef windowRef) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	[window toggleFullScreen:nil];
+}
+
 CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight) {
 	@autoreleasepool {
 		NSRect rect = NSMakeRect(0, 0, width, height);

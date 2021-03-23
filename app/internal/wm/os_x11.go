@@ -71,6 +71,12 @@ type x11Window struct {
 		atom C.Atom
 		// "GTK_TEXT_BUFFER_CONTENTS"
 		gtk_text_buffer_contents C.Atom
+		// "_NET_WM_NAME"
+		wmName C.Atom
+		// "_NET_WM_STATE"
+		wmState C.Atom
+		// _NET_WM_STATE_FULLSCREEN"
+		wmStateFullscreen C.Atom
 	}
 	stage  system.Stage
 	cfg    unit.Metric
@@ -139,6 +145,18 @@ func (w *x11Window) SetCursor(name pointer.CursorName) {
 	// If c if null (i.e. name was not found),
 	// XDefineCursor will use the default cursor.
 	C.XDefineCursor(w.x, w.xw, c)
+}
+
+func (w *x11Window) SetWindowMode(mode WindowMode) {
+	switch mode {
+	case Windowed:
+		C.XDeleteProperty(w.x, w.xw, w.atoms.wmStateFullscreen)
+	case Fullscreen:
+		C.XChangeProperty(w.x, w.xw, w.atoms.wmState, C.XA_ATOM,
+			32, C.PropModeReplace,
+			(*C.uchar)(unsafe.Pointer(&w.atoms.wmStateFullscreen)), 1,
+		)
+	}
 }
 
 func (w *x11Window) ShowTextInput(show bool) {}
@@ -612,6 +630,9 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	w.atoms.clipboardContent = w.atom("CLIPBOARD_CONTENT", false)
 	w.atoms.atom = w.atom("ATOM", false)
 	w.atoms.targets = w.atom("TARGETS", false)
+	w.atoms.wmName = w.atom("_NET_WM_NAME", false)
+	w.atoms.wmState = w.atom("_NET_WM_STATE", false)
+	w.atoms.wmStateFullscreen = w.atom("_NET_WM_STATE_FULLSCREEN", false)
 
 	// set the name
 	ctitle := C.CString(opts.Title)
@@ -625,10 +646,12 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 			format:   8,
 			nitems:   C.ulong(len(opts.Title)),
 		},
-		w.atom("_NET_WM_NAME", false))
+		w.atoms.wmName)
 
 	// extensions
 	C.XSetWMProtocols(dpy, win, &w.atoms.evDelWindow, 1)
+
+	w.SetWindowMode(opts.WindowMode)
 
 	// make the window visible on the screen
 	C.XMapWindow(dpy, win)

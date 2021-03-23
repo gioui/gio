@@ -19,7 +19,15 @@ type Options struct {
 	MinWidth, MinHeight unit.Value
 	MaxWidth, MaxHeight unit.Value
 	Title               string
+	WindowMode          WindowMode
 }
+
+type WindowMode uint8
+
+const (
+	Windowed WindowMode = iota
+	Fullscreen
+)
 
 type FrameEvent struct {
 	system.FrameEvent
