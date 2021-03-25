@@ -36,6 +36,9 @@ type window struct {
 	composing             bool
 	requestFocus          bool
 
+	chanAnimation chan struct{}
+	chanRedraw    chan struct{}
+
 	mu        sync.Mutex
 	size      f32.Point
 	inset     f32.Point
@@ -66,8 +69,10 @@ func NewWindow(win Callbacks, opts *Options) error {
 	if w.visualViewport.IsUndefined() {
 		w.visualViewport = w.window
 	}
+	w.chanAnimation = make(chan struct{}, 1)
+	w.chanRedraw = make(chan struct{}, 1)
 	w.redraw = w.funcOf(func(this js.Value, args []js.Value) interface{} {
-		w.animCallback()
+		w.chanAnimation <- struct{}{}
 		return nil
 	})
 	w.clipboardCallback = w.funcOf(func(this js.Value, args []js.Value) interface{} {
@@ -87,7 +92,14 @@ func NewWindow(win Callbacks, opts *Options) error {
 		w.w.Event(system.StageEvent{Stage: system.StageRunning})
 		w.resize()
 		w.draw(true)
-		select {}
+		for {
+			select {
+			case <-w.chanAnimation:
+				w.animCallback()
+			case <-w.chanRedraw:
+				w.draw(true)
+			}
+		}
 	}()
 	return nil
 }
@@ -138,7 +150,7 @@ func (w *window) cleanup() {
 func (w *window) addEventListeners() {
 	w.addEventListener(w.visualViewport, "resize", func(this js.Value, args []js.Value) interface{} {
 		w.resize()
-		w.draw(true)
+		w.chanRedraw <- struct{}{}
 		return nil
 	})
 	w.addEventListener(w.window, "contextmenu", func(this js.Value, args []js.Value) interface{} {
