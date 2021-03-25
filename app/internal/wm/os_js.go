@@ -77,7 +77,9 @@ func NewWindow(win Callbacks, opts *Options) error {
 	})
 	w.addEventListeners()
 	w.addHistory()
+	w.windowMode(opts.WindowMode)
 	w.w = win
+
 	go func() {
 		defer w.cleanup()
 		w.w.SetDriver(w)
@@ -534,6 +536,25 @@ func (w *window) config() (int, int, system.Insets, unit.Metric) {
 			PxPerDp: w.scale,
 			PxPerSp: w.scale,
 		}
+}
+
+func (w *window) windowMode(mode WindowMode) {
+	switch mode {
+	case Windowed:
+		if fs := w.document.Get("fullscreenElement"); !fs.Truthy() {
+			return // Browser is already Windowed.
+		}
+		if !w.document.Get("exitFullscreen").Truthy() {
+			return // Browser doesn't support such feature.
+		}
+		w.document.Call("exitFullscreen")
+	case Fullscreen:
+		elem := w.document.Get("documentElement")
+		if !elem.Get("requestFullscreen").Truthy() {
+			return // Browser doesn't support such feature.
+		}
+		elem.Call("requestFullscreen")
+	}
 }
 
 func Main() {
