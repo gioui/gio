@@ -115,13 +115,11 @@ func ExampleList() {
 	const listLen = 1e6
 
 	var list layout.List
-	count := 0
 	list.Layout(gtx, listLen, func(gtx layout.Context, i int) layout.Dimensions {
-		count++
 		return layoutWidget(gtx, 20, 20)
 	})
 
-	fmt.Println(count)
+	fmt.Println(list.Position.Count)
 
 	// Output:
 	// 5
