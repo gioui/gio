@@ -264,16 +264,6 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	for _, img := range g.drawOps.allImageOps {
 		expandPathOp(img.path, img.clip)
 	}
-	if g.drawOps.profile && g.timers.t == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
-		t := &g.timers
-		t.t = newTimers(g.ctx)
-		t.elements = g.timers.t.newTimer()
-		t.tileAlloc = g.timers.t.newTimer()
-		t.pathCoarse = g.timers.t.newTimer()
-		t.backdropBinning = g.timers.t.newTimer()
-		t.coarse = g.timers.t.newTimer()
-		t.kernel4 = g.timers.t.newTimer()
-	}
 }
 
 func (g *compute) Clear(col color.NRGBA) {
@@ -290,6 +280,17 @@ func (g *compute) Frame() error {
 
 	defFBO := g.ctx.BeginFrame()
 	defer g.ctx.EndFrame()
+
+	if g.drawOps.profile && g.timers.t == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
+		t := &g.timers
+		t.t = newTimers(g.ctx)
+		t.elements = g.timers.t.newTimer()
+		t.tileAlloc = g.timers.t.newTimer()
+		t.pathCoarse = g.timers.t.newTimer()
+		t.backdropBinning = g.timers.t.newTimer()
+		t.coarse = g.timers.t.newTimer()
+		t.kernel4 = g.timers.t.newTimer()
+	}
 
 	if err := g.encode(viewport); err != nil {
 		return err
