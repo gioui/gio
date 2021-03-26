@@ -760,8 +760,7 @@ func (r *renderer) packStencils(pops *[]*pathOp) {
 	*pops = ops
 }
 
-// intersects intersects clip and b where b is offset by off.
-// ceilRect returns a bounding image.Rectangle for a f32.Rectangle.
+// boundRectF returns a bounding image.Rectangle for a f32.Rectangle.
 func boundRectF(r f32.Rectangle) image.Rectangle {
 	return image.Rectangle{
 		Min: image.Point{
