@@ -16,8 +16,10 @@ type Rect image.Rectangle
 // Op returns the op for the rectangle.
 func (r Rect) Op() Op {
 	return Op{
-		bounds:  image.Rectangle(r),
 		outline: true,
+		path: PathSpec{
+			bounds: image.Rectangle(r),
+		},
 	}
 }
 

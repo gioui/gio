@@ -18,8 +18,7 @@ import (
 // Op represents a clip area. Op intersects the current clip area with
 // itself.
 type Op struct {
-	bounds image.Rectangle
-	path   PathSpec
+	path PathSpec
 
 	outline bool
 	stroke  StrokeStyle
@@ -47,7 +46,14 @@ func (p Op) Add(o *op.Ops) {
 		path.spec.Add(o)
 	}
 
+	bounds := path.bounds
 	if str.Width > 0 {
+		// Expand bounds to cover stroke.
+		half := int(str.Width*.5 + .5)
+		bounds.Min.X -= half
+		bounds.Min.Y -= half
+		bounds.Max.X += half
+		bounds.Max.Y += half
 		data := o.Write(opconst.TypeStrokeLen)
 		data[0] = byte(opconst.TypeStroke)
 		bo := binary.LittleEndian
@@ -57,10 +63,10 @@ func (p Op) Add(o *op.Ops) {
 	data := o.Write(opconst.TypeClipLen)
 	data[0] = byte(opconst.TypeClip)
 	bo := binary.LittleEndian
-	bo.PutUint32(data[1:], uint32(p.bounds.Min.X))
-	bo.PutUint32(data[5:], uint32(p.bounds.Min.Y))
-	bo.PutUint32(data[9:], uint32(p.bounds.Max.X))
-	bo.PutUint32(data[13:], uint32(p.bounds.Max.Y))
+	bo.PutUint32(data[1:], uint32(bounds.Min.X))
+	bo.PutUint32(data[5:], uint32(bounds.Min.Y))
+	bo.PutUint32(data[9:], uint32(bounds.Max.X))
+	bo.PutUint32(data[13:], uint32(bounds.Max.Y))
 	if outline {
 		data[17] = byte(1)
 	}
@@ -133,6 +139,7 @@ type PathSpec struct {
 	open bool
 	// hasSegments tracks whether there are any segments in the path.
 	hasSegments bool
+	bounds      image.Rectangle
 }
 
 // Path constructs a Op clip path described by lines and
@@ -150,6 +157,7 @@ type Path struct {
 	macro       op.MacroOp
 	start       f32.Point
 	hasSegments bool
+	bounds      f32.Rectangle
 }
 
 // Pos returns the current pen position.
@@ -171,6 +179,7 @@ func (p *Path) End() PathSpec {
 		spec:        c,
 		open:        p.open || p.pen != p.start,
 		hasSegments: p.hasSegments,
+		bounds:      boundRectF(p.bounds),
 	}
 }
 
@@ -206,7 +215,51 @@ func (p *Path) LineTo(to f32.Point) {
 	bo.PutUint32(data[0:], uint32(p.contour))
 	ops.EncodeCommand(data[4:], scene.Line(p.pen, to))
 	p.pen = to
-	p.hasSegments = true
+	p.expand(to)
+}
+
+func (p *Path) expand(pt f32.Point) {
+	if !p.hasSegments {
+		p.hasSegments = true
+		p.bounds = f32.Rectangle{Min: pt, Max: pt}
+	} else {
+		b := p.bounds
+		if pt.X < b.Min.X {
+			b.Min.X = pt.X
+		}
+		if pt.Y < b.Min.Y {
+			b.Min.Y = pt.Y
+		}
+		if pt.X > b.Max.X {
+			b.Max.X = pt.X
+		}
+		if pt.Y > b.Max.Y {
+			b.Max.Y = pt.Y
+		}
+		p.bounds = b
+	}
+}
+
+// boundRectF returns a bounding image.Rectangle for a f32.Rectangle.
+func boundRectF(r f32.Rectangle) image.Rectangle {
+	return image.Rectangle{
+		Min: image.Point{
+			X: int(floor(r.Min.X)),
+			Y: int(floor(r.Min.Y)),
+		},
+		Max: image.Point{
+			X: int(ceil(r.Max.X)),
+			Y: int(ceil(r.Max.Y)),
+		},
+	}
+}
+
+func ceil(v float32) int {
+	return int(math.Ceil(float64(v)))
+}
+
+func floor(v float32) int {
+	return int(math.Floor(float64(v)))
 }
 
 // Quad records a quadratic Bézier from the pen to end
@@ -225,7 +278,8 @@ func (p *Path) QuadTo(ctrl, to f32.Point) {
 	bo.PutUint32(data[0:], uint32(p.contour))
 	ops.EncodeCommand(data[4:], scene.Quad(p.pen, ctrl, to))
 	p.pen = to
-	p.hasSegments = true
+	p.expand(ctrl)
+	p.expand(to)
 }
 
 // Arc adds an elliptical arc to the path. The implied ellipse is defined
@@ -265,7 +319,9 @@ func (p *Path) CubeTo(ctrl0, ctrl1, to f32.Point) {
 	bo.PutUint32(data[0:], uint32(p.contour))
 	ops.EncodeCommand(data[4:], scene.Cubic(p.pen, ctrl0, ctrl1, to))
 	p.pen = to
-	p.hasSegments = true
+	p.expand(ctrl0)
+	p.expand(ctrl1)
+	p.expand(to)
 }
 
 // Close closes the path contour.
