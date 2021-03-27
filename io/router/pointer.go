@@ -239,10 +239,11 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 				for i, k2 := range p.handlers {
 					if k2 == k {
 						// Drop other handlers that lost their grab.
-						cancelHandlers(events, p.handlers[i+1:]...)
-						cancelHandlers(events, p.handlers[:i]...)
-						q.dropHandlers(events, p.handlers[i+1:]...)
-						q.dropHandlers(events, p.handlers[:i]...)
+						dropped := make([]event.Tag, 0, len(p.handlers)-1)
+						dropped = append(dropped, p.handlers[:i]...)
+						dropped = append(dropped, p.handlers[i+1:]...)
+						cancelHandlers(events, dropped...)
+						q.dropHandlers(events, dropped...)
 						break
 					}
 				}
