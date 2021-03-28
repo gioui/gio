@@ -268,6 +268,7 @@ func (d *driverBase) waitForFrame() {
 			scanner := bufio.NewScanner(d.output)
 			for scanner.Scan() {
 				line := scanner.Text()
+				d.Log(line)
 				if strings.Contains(line, "gio frame ready") {
 					d.frameNotifs <- true
 				}
