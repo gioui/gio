@@ -76,6 +76,9 @@ func gio_dispatchMainFuncs() {
 // nsstringToString converts a NSString to a Go string, and
 // releases the original string.
 func nsstringToString(str C.CFTypeRef) string {
+	if str == 0 {
+		return ""
+	}
 	defer C.CFRelease(str)
 	n := C.gio_nsstringLength(str)
 	if n == 0 {
