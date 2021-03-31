@@ -285,7 +285,25 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 	call := macro.Stop()
 	defer op.Save(ops).Load()
 	pointer.Rect(image.Rectangle{Max: dims}).Add(ops)
-	l.scroll.Add(ops)
+
+	var min, max int
+	if o := l.Position.Offset; o > 0 {
+		// Use the size of the invisible part as scroll boundary.
+		min = -o
+	} else if l.Position.First > 0 {
+		min = -inf
+	}
+	if o := l.Position.OffsetLast; o < 0 {
+		max = -o
+	} else if l.Position.First+l.Position.Count < l.len {
+		max = inf
+	}
+	scrollRange := image.Rectangle{
+		Min: l.Axis.Convert(image.Pt(min, 0)),
+		Max: l.Axis.Convert(image.Pt(max, 0)),
+	}
+	l.scroll.Add(ops, scrollRange)
+
 	call.Add(ops)
 	return Dimensions{Size: dims}
 }

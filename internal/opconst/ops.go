@@ -46,7 +46,7 @@ const (
 	TypeColorLen           = 1 + 4
 	TypeLinearGradientLen  = 1 + 8*2 + 4*2
 	TypeAreaLen            = 1 + 1 + 4*4
-	TypePointerInputLen    = 1 + 1 + 1
+	TypePointerInputLen    = 1 + 1 + 1 + 2*4 + 2*4
 	TypePassLen            = 1 + 1
 	TypeClipboardReadLen   = 1
 	TypeClipboardWriteLen  = 1

@@ -185,39 +185,73 @@ func TestPointerTypes(t *testing.T) {
 func TestPointerPriority(t *testing.T) {
 	handler1 := new(int)
 	handler2 := new(int)
+	handler3 := new(int)
 	var ops op.Ops
 
+	st := op.Save(&ops)
 	pointer.Rect(image.Rect(0, 0, 100, 100)).Add(&ops)
-	pointer.InputOp{Tag: handler1, Types: pointer.Scroll}.Add(&ops)
+	pointer.InputOp{
+		Tag:          handler1,
+		Types:        pointer.Scroll,
+		ScrollBounds: image.Rectangle{Max: image.Point{X: 100}},
+	}.Add(&ops)
 
 	pointer.Rect(image.Rect(0, 0, 100, 50)).Add(&ops)
-	pointer.InputOp{Tag: handler2, Types: pointer.Scroll}.Add(&ops)
+	pointer.InputOp{
+		Tag:          handler2,
+		Types:        pointer.Scroll,
+		ScrollBounds: image.Rectangle{Max: image.Point{X: 20}},
+	}.Add(&ops)
+	st.Load()
+
+	pointer.Rect(image.Rect(0, 100, 100, 200)).Add(&ops)
+	pointer.InputOp{
+		Tag:          handler3,
+		Types:        pointer.Scroll,
+		ScrollBounds: image.Rectangle{Min: image.Point{X: -20, Y: -40}},
+	}.Add(&ops)
 
 	var r Router
 	r.Frame(&ops)
 	r.Queue(
-		// Hit both handlers.
+		// Hit handler 1 and 2.
 		pointer.Event{
 			Type:     pointer.Scroll,
 			Position: f32.Pt(50, 25),
+			Scroll:   f32.Pt(50, 0),
 		},
 		// Hit handler 1.
 		pointer.Event{
 			Type:     pointer.Scroll,
 			Position: f32.Pt(50, 75),
+			Scroll:   f32.Pt(50, 50),
+		},
+		// Hit handler 3.
+		pointer.Event{
+			Type:     pointer.Scroll,
+			Position: f32.Pt(50, 150),
+			Scroll:   f32.Pt(-30, -30),
 		},
 		// Hit no handlers.
 		pointer.Event{
 			Type:     pointer.Scroll,
-			Position: f32.Pt(50, 125),
+			Position: f32.Pt(50, 225),
 		},
 	)
+
 	hev1 := r.Events(handler1)
 	hev2 := r.Events(handler2)
+	hev3 := r.Events(handler3)
 	assertEventSequence(t, hev1, pointer.Cancel, pointer.Scroll, pointer.Scroll)
 	assertEventSequence(t, hev2, pointer.Cancel, pointer.Scroll)
+	assertEventSequence(t, hev3, pointer.Cancel, pointer.Scroll)
 	assertEventPriorities(t, hev1, pointer.Shared, pointer.Shared, pointer.Foremost)
 	assertEventPriorities(t, hev2, pointer.Shared, pointer.Foremost)
+	assertEventPriorities(t, hev3, pointer.Shared, pointer.Foremost)
+	assertScrollEvent(t, hev1[1], f32.Pt(30, 0))
+	assertScrollEvent(t, hev2[1], f32.Pt(20, 0))
+	assertScrollEvent(t, hev1[2], f32.Pt(50, 0))
+	assertScrollEvent(t, hev3[1], f32.Pt(-20, -30))
 }
 
 func TestPointerEnterLeave(t *testing.T) {
@@ -660,6 +694,14 @@ func assertEventPriorities(t *testing.T, events []event.Event, prios ...pointer.
 	}
 	if !reflect.DeepEqual(got, prios) {
 		t.Errorf("expected priorities %v, got %v", prios, got)
+	}
+}
+
+// assertScrollEvent checks that the event scrolling amount matches the supplied value.
+func assertScrollEvent(t *testing.T, ev event.Event, scroll f32.Point) {
+	t.Helper()
+	if got, want := ev.(pointer.Event).Scroll, scroll; got != want {
+		t.Errorf("got %v; want %v", got, want)
 	}
 }
 

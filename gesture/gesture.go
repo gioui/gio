@@ -10,6 +10,7 @@ and scrolling.
 package gesture
 
 import (
+	"image"
 	"math"
 	"runtime"
 	"time"
@@ -205,11 +206,12 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 func (ClickEvent) ImplementsEvent() {}
 
 // Add the handler to the operation list to receive scroll events.
-func (s *Scroll) Add(ops *op.Ops) {
+func (s *Scroll) Add(ops *op.Ops, bounds image.Rectangle) {
 	oph := pointer.InputOp{
-		Tag:   s,
-		Grab:  s.grab,
-		Types: pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll,
+		Tag:          s,
+		Grab:         s.grab,
+		Types:        pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll,
+		ScrollBounds: bounds,
 	}
 	oph.Add(ops)
 	if s.flinger.Active() {
@@ -265,9 +267,6 @@ func (s *Scroll) Scroll(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) 
 			s.dragging = false
 			s.grab = false
 		case pointer.Scroll:
-			if e.Priority < pointer.Foremost {
-				continue
-			}
 			switch s.axis {
 			case Horizontal:
 				s.scroll += e.Scroll.X

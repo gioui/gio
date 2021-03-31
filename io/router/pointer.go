@@ -4,6 +4,7 @@ package router
 
 import (
 	"encoding/binary"
+	"image"
 
 	"gioui.org/f32"
 	"gioui.org/internal/opconst"
@@ -59,6 +60,8 @@ type pointerHandler struct {
 	active    bool
 	wantsGrab bool
 	types     pointer.Type
+	// min and max horizontal/vertical scroll
+	scrollRange image.Rectangle
 }
 
 type areaOp struct {
@@ -155,6 +158,17 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 			h.area = state.area
 			h.wantsGrab = h.wantsGrab || op.Grab
 			h.types = h.types | op.Types
+			bo := binary.LittleEndian.Uint32
+			h.scrollRange = image.Rectangle{
+				Min: image.Point{
+					X: int(int32(bo(encOp.Data[3:]))),
+					Y: int(int32(bo(encOp.Data[7:]))),
+				},
+				Max: image.Point{
+					X: int(int32(bo(encOp.Data[11:]))),
+					Y: int(int32(bo(encOp.Data[15:]))),
+				},
+			}
 		case opconst.TypeCursor:
 			q.cursors = append(q.cursors, cursorNode{
 				name: encOp.Refs[0].(pointer.CursorName),
@@ -320,7 +334,11 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	if e.Type == pointer.Press {
 		p.pressed = true
 	}
-	if e.Type != pointer.Release {
+	switch e.Type {
+	case pointer.Release:
+	case pointer.Scroll:
+		q.deliverScrollEvent(p, events, e)
+	default:
 		q.deliverEvent(p, events, e)
 	}
 	if !p.pressed && len(p.entered) == 0 {
@@ -340,6 +358,31 @@ func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e poi
 		if e.Type&h.types == 0 {
 			continue
 		}
+		e := e
+		if foremost {
+			foremost = false
+			e.Priority = pointer.Foremost
+		}
+		e.Position = q.invTransform(h.area, e.Position)
+		events.Add(k, e)
+	}
+}
+
+func (q *pointerQueue) deliverScrollEvent(p *pointerInfo, events *handlerEvents, e pointer.Event) {
+	foremost := true
+	if p.pressed && len(p.handlers) == 1 {
+		e.Priority = pointer.Grabbed
+		foremost = false
+	}
+	var sx, sy = e.Scroll.X, e.Scroll.Y
+	for _, k := range p.handlers {
+		if sx == 0 && sy == 0 {
+			return
+		}
+		h := q.handlers[k]
+		// Distribute the scroll to the handler based on its ScrollRange.
+		sx, e.Scroll.X = setScrollEvent(sx, h.scrollRange.Min.X, h.scrollRange.Max.X)
+		sy, e.Scroll.Y = setScrollEvent(sy, h.scrollRange.Min.Y, h.scrollRange.Max.Y)
 		e := e
 		if foremost {
 			foremost = false
@@ -453,4 +496,14 @@ func (op *areaOp) Hit(pos f32.Point) bool {
 	default:
 		panic("invalid area kind")
 	}
+}
+
+func setScrollEvent(scroll float32, min, max int) (left, scrolled float32) {
+	if v := float32(max); scroll > v {
+		return scroll - v, v
+	}
+	if v := float32(min); scroll < v {
+		return scroll - v, v
+	}
+	return 0, scroll
 }

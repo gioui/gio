@@ -547,7 +547,17 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 	r.Max.X += pointerPadding
 	pointer.Rect(r).Add(gtx.Ops)
 	pointer.CursorNameOp{Name: pointer.CursorText}.Add(gtx.Ops)
-	e.scroller.Add(gtx.Ops)
+
+	var scrollRange image.Rectangle
+	if e.SingleLine {
+		scrollRange.Min.X = -e.scrollOff.X
+		scrollRange.Max.X = max(0, e.dims.Size.X-(e.scrollOff.X+e.viewSize.X))
+	} else {
+		scrollRange.Min.Y = -e.scrollOff.Y
+		scrollRange.Max.Y = max(0, e.dims.Size.Y-(e.scrollOff.Y+e.viewSize.Y))
+	}
+	e.scroller.Add(gtx.Ops, scrollRange)
+
 	e.clicker.Add(gtx.Ops)
 	e.dragger.Add(gtx.Ops)
 	e.caret.on = false
