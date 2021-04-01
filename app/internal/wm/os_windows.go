@@ -160,7 +160,7 @@ func initResources() error {
 	return nil
 }
 
-func getWindowConstraints(cfg unit.Metric, opts *Options, d winDeltas) winConstraints {
+func getWindowConstraints(cfg unit.Metric, opts *Options) winConstraints {
 	var minmax winConstraints
 	minmax.minWidth = int32(cfg.Px(opts.MinWidth))
 	minmax.minHeight = int32(cfg.Px(opts.MinHeight))
@@ -209,7 +209,7 @@ func createNativeWindow(opts *Options) (*window, error) {
 	}
 	w := &window{
 		hwnd:   hwnd,
-		minmax: getWindowConstraints(cfg, opts, deltas),
+		minmax: getWindowConstraints(cfg, opts),
 		deltas: deltas,
 		opts:   opts,
 	}
@@ -460,7 +460,7 @@ func (w *window) draw(sync bool) {
 	}
 	dpi := windows.GetWindowDPI(w.hwnd)
 	cfg := configForDPI(dpi)
-	w.minmax = getWindowConstraints(cfg, w.opts, w.deltas)
+	w.minmax = getWindowConstraints(cfg, w.opts)
 	w.w.Event(FrameEvent{
 		FrameEvent: system.FrameEvent{
 			Now: time.Now(),
