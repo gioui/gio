@@ -123,6 +123,47 @@ func (w *x11Window) WriteClipboard(s string) {
 	w.wakeup()
 }
 
+func (w *x11Window) Option(opts *Options) {
+	dpy := w.x
+	win := w.xw
+	cfg := w.cfg
+	var shints C.XSizeHints
+	if o := opts.MinSize; o != nil {
+		shints.min_width = C.int(cfg.Px(o.Width))
+		shints.min_height = C.int(cfg.Px(o.Height))
+		shints.flags = C.PMinSize
+	}
+	if o := opts.MaxSize; o != nil {
+		shints.max_width = C.int(cfg.Px(o.Width))
+		shints.max_height = C.int(cfg.Px(o.Height))
+		shints.flags = shints.flags | C.PMaxSize
+	}
+	if shints.flags != 0 {
+		C.XSetWMNormalHints(dpy, win, &shints)
+	}
+
+	var title string
+	if o := opts.Title; o != nil {
+		title = *o
+	}
+	ctitle := C.CString(title)
+	defer C.free(unsafe.Pointer(ctitle))
+	C.XStoreName(dpy, win, ctitle)
+	// set _NET_WM_NAME as well for UTF-8 support in window title.
+	C.XSetTextProperty(dpy, win,
+		&C.XTextProperty{
+			value:    (*C.uchar)(unsafe.Pointer(ctitle)),
+			encoding: w.atoms.utf8string,
+			format:   8,
+			nitems:   C.ulong(len(title)),
+		},
+		w.atoms.wmName)
+
+	if o := opts.WindowMode; o != nil {
+		w.SetWindowMode(*o)
+	}
+}
+
 func (w *x11Window) SetCursor(name pointer.CursorName) {
 	switch name {
 	case pointer.CursorNone:
@@ -607,21 +648,6 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	hints.flags = C.InputHint
 	C.XSetWMHints(dpy, win, &hints)
 
-	var shints C.XSizeHints
-	if o := opts.MinSize; o != nil && (o.Width.V != 0 || o.Height.V != 0) {
-		shints.min_width = C.int(cfg.Px(o.Width))
-		shints.min_height = C.int(cfg.Px(o.Height))
-		shints.flags = C.PMinSize
-	}
-	if o := opts.MaxSize; o != nil && (o.Width.V != 0 || o.Height.V != 0) {
-		shints.max_width = C.int(cfg.Px(o.Width))
-		shints.max_height = C.int(cfg.Px(o.Height))
-		shints.flags = shints.flags | C.PMaxSize
-	}
-	if shints.flags != 0 {
-		C.XSetWMNormalHints(dpy, win, &shints)
-	}
-
 	name := C.CString(filepath.Base(os.Args[0]))
 	defer C.free(unsafe.Pointer(name))
 	wmhints := C.XClassHint{name, name}
@@ -639,30 +665,10 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	w.atoms.wmState = w.atom("_NET_WM_STATE", false)
 	w.atoms.wmStateFullscreen = w.atom("_NET_WM_STATE_FULLSCREEN", false)
 
-	// set the name
-	var title string
-	if o := opts.Title; o != nil {
-		title = *o
-	}
-	ctitle := C.CString(title)
-	defer C.free(unsafe.Pointer(ctitle))
-	C.XStoreName(dpy, win, ctitle)
-	// set _NET_WM_NAME as well for UTF-8 support in window title.
-	C.XSetTextProperty(dpy, win,
-		&C.XTextProperty{
-			value:    (*C.uchar)(unsafe.Pointer(ctitle)),
-			encoding: w.atoms.utf8string,
-			format:   8,
-			nitems:   C.ulong(len(title)),
-		},
-		w.atoms.wmName)
-
 	// extensions
 	C.XSetWMProtocols(dpy, win, &w.atoms.evDelWindow, 1)
 
-	if o := opts.WindowMode; o != nil {
-		w.SetWindowMode(*o)
-	}
+	w.Option(opts)
 
 	// make the window visible on the screen
 	C.XMapWindow(dpy, win)

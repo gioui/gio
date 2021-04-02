@@ -271,6 +271,7 @@ var (
 	_LoadImage                   = user32.NewProc("LoadImageW")
 	_MonitorFromPoint            = user32.NewProc("MonitorFromPoint")
 	_MonitorFromWindow           = user32.NewProc("MonitorFromWindow")
+	_MoveWindow                  = user32.NewProc("MoveWindow")
 	_MsgWaitForMultipleObjectsEx = user32.NewProc("MsgWaitForMultipleObjectsEx")
 	_OpenClipboard               = user32.NewProc("OpenClipboard")
 	_PeekMessage                 = user32.NewProc("PeekMessageW")
@@ -289,8 +290,9 @@ var (
 	_SetProcessDPIAware          = user32.NewProc("SetProcessDPIAware")
 	_SetTimer                    = user32.NewProc("SetTimer")
 	_SetWindowLong               = user32.NewProc("SetWindowLongPtrW")
-	_SetWindowPos                = user32.NewProc("SetWindowPos")
 	_SetWindowPlacement          = user32.NewProc("SetWindowPlacement")
+	_SetWindowPos                = user32.NewProc("SetWindowPos")
+	_SetWindowText               = user32.NewProc("SetWindowTextW")
 	_TranslateMessage            = user32.NewProc("TranslateMessage")
 	_UnregisterClass             = user32.NewProc("UnregisterClassW")
 	_UpdateWindow                = user32.NewProc("UpdateWindow")
@@ -486,6 +488,11 @@ func SetWindowPos(hwnd syscall.Handle, hwndInsertAfter uint32, x, y, dx, dy int3
 	)
 }
 
+func SetWindowText(hwnd syscall.Handle, title string) {
+	wname := syscall.StringToUTF16Ptr(title)
+	_SetWindowText.Call(uintptr(hwnd), uintptr(unsafe.Pointer(wname)))
+}
+
 func GlobalAlloc(size int) (syscall.Handle, error) {
 	r, _, err := _GlobalAlloc.Call(GHND, uintptr(size))
 	if r == 0 {
@@ -532,6 +539,14 @@ func LoadImage(hInst syscall.Handle, res uint32, typ uint32, cx, cy int, fuload 
 		return 0, fmt.Errorf("LoadImageW failed: %v", err)
 	}
 	return syscall.Handle(h), nil
+}
+
+func MoveWindow(hwnd syscall.Handle, x, y, width, height int32, repaint bool) {
+	var paint uintptr
+	if repaint {
+		paint = TRUE
+	}
+	_MoveWindow.Call(uintptr(hwnd), uintptr(x), uintptr(y), uintptr(width), uintptr(height), paint)
 }
 
 func monitorFromPoint(pt Point, flags uint32) syscall.Handle {

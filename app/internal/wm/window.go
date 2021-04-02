@@ -74,6 +74,9 @@ type Driver interface {
 	// WriteClipboard requests a clipboard write.
 	WriteClipboard(s string)
 
+	// Option processes option changes.
+	Option(opts *Options)
+
 	// SetCursor updates the current cursor to name.
 	SetCursor(name pointer.CursorName)
 

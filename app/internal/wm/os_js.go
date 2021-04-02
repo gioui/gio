@@ -82,9 +82,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 	})
 	w.addEventListeners()
 	w.addHistory()
-	if o := opts.WindowMode; o != nil {
-		w.windowMode(*o)
-	}
+	w.Option(opts)
 	w.w = win
 
 	go func() {
@@ -474,6 +472,12 @@ func (w *window) WriteClipboard(s string) {
 		return
 	}
 	w.clipboard.Call("writeText", s)
+}
+
+func (w *window) Option(opts *Options) {
+	if o := opts.WindowMode; o != nil {
+		w.windowMode(*o)
+	}
 }
 
 func (w *window) SetCursor(name pointer.CursorName) {

@@ -239,6 +239,8 @@ func (w *window) WriteClipboard(s string) {
 	})
 }
 
+func (w *window) Option(opts *Options) {}
+
 func (w *window) SetAnimating(anim bool) {
 	v := w.view
 	if v == 0 {

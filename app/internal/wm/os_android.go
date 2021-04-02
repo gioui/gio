@@ -676,6 +676,8 @@ func (w *window) ReadClipboard() {
 	})
 }
 
+func (w *window) Option(opts *Options) {}
+
 func (w *window) SetCursor(name pointer.CursorName) {
 	w.setState(func(state *windowState) {
 		state.cursor = &name

@@ -46,6 +46,10 @@ __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef vie
 __attribute__ ((visibility ("hidden"))) void gio_makeKeyAndOrderFront(CFTypeRef windowRef);
 __attribute__ ((visibility ("hidden"))) NSPoint gio_cascadeTopLeftFromPoint(CFTypeRef windowRef, NSPoint topLeft);
 __attribute__ ((visibility ("hidden"))) void gio_close(CFTypeRef windowRef);
+__attribute__ ((visibility ("hidden"))) void gio_setSize(CFTypeRef windowRef, CGFloat width, CGFloat height);
+__attribute__ ((visibility ("hidden"))) void gio_setMinSize(CFTypeRef windowRef, CGFloat width, CGFloat height);
+__attribute__ ((visibility ("hidden"))) void gio_setMaxSize(CFTypeRef windowRef, CGFloat width, CGFloat height);
+__attribute__ ((visibility ("hidden"))) void gio_setTitle(CFTypeRef windowRef, const char *title);
 */
 import "C"
 
@@ -126,6 +130,45 @@ func (w *window) WriteClipboard(s string) {
 	})
 }
 
+func (w *window) Option(opts *Options) {
+	w.runOnMain(func() {
+		screenScale := float32(C.gio_getScreenBackingScale())
+		cfg := configFor(screenScale)
+		val := func(v unit.Value) float32 {
+			return float32(cfg.Px(v)) / screenScale
+		}
+		if o := opts.Size; o != nil {
+			width := val(o.Width)
+			height := val(o.Height)
+			if width > 0 || height > 0 {
+				C.gio_setSize(w.window, C.CGFloat(width), C.CGFloat(height))
+			}
+		}
+		if o := opts.MinSize; o != nil {
+			width := val(o.Width)
+			height := val(o.Height)
+			if width > 0 || height > 0 {
+				C.gio_setMinSize(w.window, C.CGFloat(width), C.CGFloat(height))
+			}
+		}
+		if o := opts.MaxSize; o != nil {
+			width := val(o.Width)
+			height := val(o.Height)
+			if width > 0 || height > 0 {
+				C.gio_setMaxSize(w.window, C.CGFloat(width), C.CGFloat(height))
+			}
+		}
+		if o := opts.Title; o != nil {
+			title := C.CString(*o)
+			defer C.free(unsafe.Pointer(title))
+			C.gio_setTitle(w.window, title)
+		}
+		if o := opts.WindowMode; o != nil {
+			w.SetWindowMode(*o)
+		}
+	})
+}
+
 func (w *window) SetWindowMode(mode WindowMode) {
 	switch mode {
 	case w.mode:
@@ -150,13 +193,19 @@ func (w *window) SetAnimating(anim bool) {
 	}
 }
 
-func (w *window) Close() {
+func (w *window) runOnMain(f func()) {
 	runOnMain(func() {
 		// Make sure the view is still valid. The window might've been closed
 		// during the switch to the main thread.
 		if w.view != 0 {
-			C.gio_close(w.window)
+			f()
 		}
+	})
+}
+
+func (w *window) Close() {
+	w.runOnMain(func() {
+		C.gio_close(w.window)
 	})
 }
 
@@ -336,35 +385,11 @@ func NewWindow(win Callbacks, opts *Options) error {
 			errch <- err
 			return
 		}
-		screenScale := float32(C.gio_getScreenBackingScale())
-		cfg := configFor(screenScale)
-		// Window sizes is in unscaled screen coordinates, not device pixels.
-		var width, height int
-		if o := opts.Size; o != nil {
-			width = int(float32(cfg.Px(o.Width)) / screenScale)
-			height = int(float32(cfg.Px(o.Height)) / screenScale)
-		}
-		var minWidth, minHeight int
-		if o := opts.MinSize; o != nil {
-			minWidth = int(float32(cfg.Px(o.Width)) / screenScale)
-			minHeight = int(float32(cfg.Px(o.Height)) / screenScale)
-		}
-		var maxWidth, maxHeight int
-		if o := opts.MaxSize; o != nil {
-			maxWidth = int(float32(cfg.Px(o.Width)) / screenScale)
-			maxHeight = int(float32(cfg.Px(o.Height)) / screenScale)
-		}
-		var title string
-		if o := opts.Title; o != nil {
-			title = *o
-		}
-		ctitle := C.CString(title)
-		defer C.free(unsafe.Pointer(ctitle))
 		errch <- nil
 		win.SetDriver(w)
 		w.w = win
-		w.window = C.gio_createWindow(w.view, ctitle, C.CGFloat(width), C.CGFloat(height),
-			C.CGFloat(minWidth), C.CGFloat(minHeight), C.CGFloat(maxWidth), C.CGFloat(maxHeight))
+		w.window = C.gio_createWindow(w.view, nil, 0, 0, 0, 0, 0, 0)
+		w.Option(opts)
 		if nextTopLeft.x == 0 && nextTopLeft.y == 0 {
 			// cascadeTopLeftFromPoint treats (0, 0) as a no-op,
 			// and just returns the offset we need for the first window.
@@ -372,9 +397,6 @@ func NewWindow(win Callbacks, opts *Options) error {
 		}
 		nextTopLeft = C.gio_cascadeTopLeftFromPoint(w.window, nextTopLeft)
 		C.gio_makeKeyAndOrderFront(w.window)
-		if o := opts.WindowMode; o != nil {
-			w.SetWindowMode(*o)
-		}
 	})
 	return <-errch
 }
@@ -390,10 +412,8 @@ func newWindow(opts *Options) (*window, error) {
 		scale: scale,
 	}
 	dl, err := NewDisplayLink(func() {
-		runOnMain(func() {
-			if w.view != 0 {
-				C.gio_setNeedsDisplay(w.view)
-			}
+		w.runOnMain(func() {
+			C.gio_setNeedsDisplay(w.view)
 		})
 	})
 	w.displayLink = dl

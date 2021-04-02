@@ -191,7 +191,9 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, 
 			window.contentMaxSize = NSMakeSize(maxWidth, maxHeight);
 		}
 		[window setAcceptsMouseMovedEvents:YES];
-		window.title = [NSString stringWithUTF8String: title];
+		if (title != nil) {
+		    window.title = [NSString stringWithUTF8String: title];
+		}
 		NSView *view = (__bridge NSView *)viewRef;
 		[window setContentView:view];
 		[window makeFirstResponder:view];
@@ -204,6 +206,27 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, 
 void gio_close(CFTypeRef windowRef) {
   NSWindow* window = (__bridge NSWindow *)windowRef;
   [window performClose:nil];
+}
+
+void gio_setSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
+  NSWindow* window = (__bridge NSWindow *)windowRef;
+  NSSize size = NSMakeSize(width, height);
+  [window setContentSize:size];
+}
+
+void gio_setMinSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
+  NSWindow* window = (__bridge NSWindow *)windowRef;
+  window.contentMinSize = NSMakeSize(width, height);
+}
+
+void gio_setMaxSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
+  NSWindow* window = (__bridge NSWindow *)windowRef;
+  window.contentMaxSize = NSMakeSize(width, height);
+}
+
+void gio_setTitle(CFTypeRef windowRef, const char *title) {
+  NSWindow* window = (__bridge NSWindow *)windowRef;
+  window.title = [NSString stringWithUTF8String: title];
 }
 
 @implementation GioAppDelegate

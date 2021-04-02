@@ -357,17 +357,8 @@ func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
 	C.xdg_surface_add_listener(w.wmSurf, &C.gio_xdg_surface_listener, unsafe.Pointer(w.surf))
 	C.xdg_toplevel_add_listener(w.topLvl, &C.gio_xdg_toplevel_listener, unsafe.Pointer(w.surf))
 
-	if o := opts.Title; o != nil {
-		title := C.CString(*o)
-		C.xdg_toplevel_set_title(w.topLvl, title)
-		C.free(unsafe.Pointer(title))
-	}
+	w.Option(opts)
 
-	_, _, cfg := w.config()
-	if o := opts.Size; o != nil {
-		w.width = cfg.Px(o.Width)
-		w.height = cfg.Px(o.Height)
-	}
 	if d.decor != nil {
 		// Request server side decorations.
 		w.decor = C.zxdg_decoration_manager_v1_get_toplevel_decoration(d.decor, w.topLvl)
@@ -916,6 +907,19 @@ func (w *window) WriteClipboard(s string) {
 	w.writeClipboard = &s
 	w.mu.Unlock()
 	w.disp.wakeup()
+}
+
+func (w *window) Option(opts *Options) {
+	_, _, cfg := w.config()
+	if o := opts.Size; o != nil {
+		w.width = cfg.Px(o.Width)
+		w.height = cfg.Px(o.Height)
+	}
+	if o := opts.Title; o != nil {
+		title := C.CString(*o)
+		C.xdg_toplevel_set_title(w.topLvl, title)
+		C.free(unsafe.Pointer(title))
+	}
 }
 
 func (w *window) SetCursor(name pointer.CursorName) {

@@ -116,15 +116,13 @@ func NewWindow(window Callbacks, opts *Options) error {
 		w.w = window
 		w.w.SetDriver(w)
 		defer w.w.Event(system.DestroyEvent{})
+		w.Option(opts)
 		windows.ShowWindow(w.hwnd, windows.SW_SHOWDEFAULT)
 		windows.SetForegroundWindow(w.hwnd)
 		windows.SetFocus(w.hwnd)
 		// Since the window class for the cursor is null,
 		// set it here to show the cursor.
 		w.SetCursor(pointer.CursorDefault)
-		if o := opts.WindowMode; o != nil {
-			w.SetWindowMode(*o)
-		}
 		if err := w.loop(); err != nil {
 			panic(err)
 		}
@@ -185,33 +183,15 @@ func createNativeWindow(opts *Options) (*window, error) {
 	}
 	dpi := windows.GetSystemDPI()
 	cfg := configForDPI(dpi)
-	var wr windows.Rect
-	if o := opts.Size; o != nil {
-		wr.Right = int32(cfg.Px(o.Width))
-		wr.Bottom = int32(cfg.Px(o.Height))
-	}
 	dwStyle := uint32(windows.WS_OVERLAPPEDWINDOW)
 	dwExStyle := uint32(windows.WS_EX_APPWINDOW | windows.WS_EX_WINDOWEDGE)
-	deltas := winDeltas{
-		width:  wr.Right,
-		height: wr.Bottom,
-	}
-	windows.AdjustWindowRectEx(&wr, dwStyle, 0, dwExStyle)
-	deltas.width = wr.Right - wr.Left - deltas.width
-	deltas.height = wr.Bottom - wr.Top - deltas.height
-
-	var title string
-	if o := opts.Title; o != nil {
-		title = *o
-	}
 
 	hwnd, err := windows.CreateWindowEx(dwExStyle,
 		resources.class,
-		title,
+		"",
 		dwStyle|windows.WS_CLIPSIBLINGS|windows.WS_CLIPCHILDREN,
 		windows.CW_USEDEFAULT, windows.CW_USEDEFAULT,
-		wr.Right-wr.Left,
-		wr.Bottom-wr.Top,
+		windows.CW_USEDEFAULT, windows.CW_USEDEFAULT,
 		0,
 		0,
 		resources.handle,
@@ -222,7 +202,6 @@ func createNativeWindow(opts *Options) (*window, error) {
 	w := &window{
 		hwnd:   hwnd,
 		minmax: getWindowConstraints(cfg, opts),
-		deltas: deltas,
 		opts:   opts,
 	}
 	w.hdc, err = windows.GetDC(hwnd)
@@ -538,6 +517,45 @@ func (w *window) readClipboard() error {
 		w.w.Event(clipboard.Event{Text: content})
 	}()
 	return nil
+}
+
+func (w *window) Option(opts *Options) {
+	if o := opts.Size; o != nil {
+		dpi := windows.GetSystemDPI()
+		cfg := configForDPI(dpi)
+		width := int32(cfg.Px(o.Width))
+		height := int32(cfg.Px(o.Height))
+
+		// Include the window decorations.
+		wr := windows.Rect{
+			Right:  width,
+			Bottom: height,
+		}
+		dwStyle := uint32(windows.WS_OVERLAPPEDWINDOW)
+		dwExStyle := uint32(windows.WS_EX_APPWINDOW | windows.WS_EX_WINDOWEDGE)
+		windows.AdjustWindowRectEx(&wr, dwStyle, 0, dwExStyle)
+
+		dw, dh := width, height
+		width = wr.Right - wr.Left
+		height = wr.Bottom - wr.Top
+		w.deltas.width = width - dw
+		w.deltas.height = height - dh
+
+		w.opts.Size = o
+		windows.MoveWindow(w.hwnd, 0, 0, width, height, true)
+	}
+	if o := opts.MinSize; o != nil {
+		w.opts.MinSize = o
+	}
+	if o := opts.MaxSize; o != nil {
+		w.opts.MaxSize = o
+	}
+	if o := opts.Title; o != nil {
+		windows.SetWindowText(w.hwnd, *opts.Title)
+	}
+	if o := opts.WindowMode; o != nil {
+		w.SetWindowMode(*o)
+	}
 }
 
 func (w *window) SetWindowMode(mode WindowMode) {
