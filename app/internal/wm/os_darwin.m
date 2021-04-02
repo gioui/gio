@@ -11,6 +11,10 @@ void gio_wakeupMainThread(void) {
 	});
 }
 
+bool gio_isMainThread() {
+	return [NSThread isMainThread];
+}
+
 NSUInteger gio_nsstringLength(CFTypeRef cstr) {
 	NSString *str = (__bridge NSString *)cstr;
 	return [str length];

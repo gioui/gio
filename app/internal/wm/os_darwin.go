@@ -16,6 +16,7 @@ __attribute__ ((visibility ("hidden"))) void gio_setDisplayLinkDisplay(CFTypeRef
 __attribute__ ((visibility ("hidden"))) void gio_hideCursor();
 __attribute__ ((visibility ("hidden"))) void gio_showCursor();
 __attribute__ ((visibility ("hidden"))) void gio_setCursor(NSUInteger curID);
+__attribute__ ((visibility ("hidden"))) bool gio_isMainThread();
 */
 import "C"
 import (
@@ -55,6 +56,10 @@ var mainFuncs = make(chan func(), 1)
 
 // runOnMain runs the function on the main thread.
 func runOnMain(f func()) {
+	if C.gio_isMainThread() {
+		f()
+		return
+	}
 	go func() {
 		mainFuncs <- f
 		C.gio_wakeupMainThread()
