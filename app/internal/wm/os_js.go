@@ -82,7 +82,9 @@ func NewWindow(win Callbacks, opts *Options) error {
 	})
 	w.addEventListeners()
 	w.addHistory()
-	w.windowMode(opts.WindowMode)
+	if o := opts.WindowMode; o != nil {
+		w.windowMode(*o)
+	}
 	w.w = win
 
 	go func() {

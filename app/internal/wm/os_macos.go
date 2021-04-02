@@ -338,25 +338,32 @@ func NewWindow(win Callbacks, opts *Options) error {
 		}
 		screenScale := float32(C.gio_getScreenBackingScale())
 		cfg := configFor(screenScale)
-		width := cfg.Px(opts.Width)
-		height := cfg.Px(opts.Height)
 		// Window sizes is in unscaled screen coordinates, not device pixels.
-		width = int(float32(width) / screenScale)
-		height = int(float32(height) / screenScale)
-		minWidth := cfg.Px(opts.MinWidth)
-		minHeight := cfg.Px(opts.MinHeight)
-		minWidth = int(float32(minWidth) / screenScale)
-		minHeight = int(float32(minHeight) / screenScale)
-		maxWidth := cfg.Px(opts.MaxWidth)
-		maxHeight := cfg.Px(opts.MaxHeight)
-		maxWidth = int(float32(maxWidth) / screenScale)
-		maxHeight = int(float32(maxHeight) / screenScale)
-		title := C.CString(opts.Title)
-		defer C.free(unsafe.Pointer(title))
+		var width, height int
+		if o := opts.Size; o != nil {
+			width = int(float32(cfg.Px(o.Width)) / screenScale)
+			height = int(float32(cfg.Px(o.Height)) / screenScale)
+		}
+		var minWidth, minHeight int
+		if o := opts.MinSize; o != nil {
+			minWidth = int(float32(cfg.Px(o.Width)) / screenScale)
+			minHeight = int(float32(cfg.Px(o.Height)) / screenScale)
+		}
+		var maxWidth, maxHeight int
+		if o := opts.MaxSize; o != nil {
+			maxWidth = int(float32(cfg.Px(o.Width)) / screenScale)
+			maxHeight = int(float32(cfg.Px(o.Height)) / screenScale)
+		}
+		var title string
+		if o := opts.Title; o != nil {
+			title = *o
+		}
+		ctitle := C.CString(title)
+		defer C.free(unsafe.Pointer(ctitle))
 		errch <- nil
 		win.SetDriver(w)
 		w.w = win
-		w.window = C.gio_createWindow(w.view, title, C.CGFloat(width), C.CGFloat(height),
+		w.window = C.gio_createWindow(w.view, ctitle, C.CGFloat(width), C.CGFloat(height),
 			C.CGFloat(minWidth), C.CGFloat(minHeight), C.CGFloat(maxWidth), C.CGFloat(maxHeight))
 		if nextTopLeft.x == 0 && nextTopLeft.y == 0 {
 			// cascadeTopLeftFromPoint treats (0, 0) as a no-op,
@@ -365,7 +372,9 @@ func NewWindow(win Callbacks, opts *Options) error {
 		}
 		nextTopLeft = C.gio_cascadeTopLeftFromPoint(w.window, nextTopLeft)
 		C.gio_makeKeyAndOrderFront(w.window)
-		w.SetWindowMode(opts.WindowMode)
+		if o := opts.WindowMode; o != nil {
+			w.SetWindowMode(*o)
+		}
 	})
 	return <-errch
 }

@@ -356,13 +356,18 @@ func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
 	C.wl_surface_add_listener(w.surf, &C.gio_surface_listener, unsafe.Pointer(w.surf))
 	C.xdg_surface_add_listener(w.wmSurf, &C.gio_xdg_surface_listener, unsafe.Pointer(w.surf))
 	C.xdg_toplevel_add_listener(w.topLvl, &C.gio_xdg_toplevel_listener, unsafe.Pointer(w.surf))
-	title := C.CString(opts.Title)
-	C.xdg_toplevel_set_title(w.topLvl, title)
-	C.free(unsafe.Pointer(title))
+
+	if o := opts.Title; o != nil {
+		title := C.CString(*o)
+		C.xdg_toplevel_set_title(w.topLvl, title)
+		C.free(unsafe.Pointer(title))
+	}
 
 	_, _, cfg := w.config()
-	w.width = cfg.Px(opts.Width)
-	w.height = cfg.Px(opts.Height)
+	if o := opts.Size; o != nil {
+		w.width = cfg.Px(o.Width)
+		w.height = cfg.Px(o.Height)
+	}
 	if d.decor != nil {
 		// Request server side decorations.
 		w.decor = C.zxdg_decoration_manager_v1_get_toplevel_decoration(d.decor, w.topLvl)

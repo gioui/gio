@@ -576,15 +576,20 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 		background_pixmap: C.None,
 		override_redirect: C.False,
 	}
+	var width, height int
+	if o := opts.Size; o != nil {
+		width = cfg.Px(o.Width)
+		height = cfg.Px(o.Height)
+	}
 	win := C.XCreateWindow(dpy, C.XDefaultRootWindow(dpy),
-		0, 0, C.uint(cfg.Px(opts.Width)), C.uint(cfg.Px(opts.Height)),
+		0, 0, C.uint(width), C.uint(height),
 		0, C.CopyFromParent, C.InputOutput, nil,
 		C.CWEventMask|C.CWBackPixmap|C.CWOverrideRedirect, &swa)
 
 	w := &x11Window{
 		w: gioWin, x: dpy, xw: win,
-		width:        cfg.Px(opts.Width),
-		height:       cfg.Px(opts.Height),
+		width:        width,
+		height:       height,
 		cfg:          cfg,
 		xkb:          xkb,
 		xkbEventBase: xkbEventBase,
@@ -603,14 +608,14 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	C.XSetWMHints(dpy, win, &hints)
 
 	var shints C.XSizeHints
-	if opts.MinWidth.V != 0 || opts.MinHeight.V != 0 {
-		shints.min_width = C.int(cfg.Px(opts.MinWidth))
-		shints.min_height = C.int(cfg.Px(opts.MinHeight))
+	if o := opts.MinSize; o != nil && (o.Width.V != 0 || o.Height.V != 0) {
+		shints.min_width = C.int(cfg.Px(o.Width))
+		shints.min_height = C.int(cfg.Px(o.Height))
 		shints.flags = C.PMinSize
 	}
-	if opts.MaxWidth.V != 0 || opts.MaxHeight.V != 0 {
-		shints.max_width = C.int(cfg.Px(opts.MaxWidth))
-		shints.max_height = C.int(cfg.Px(opts.MaxHeight))
+	if o := opts.MaxSize; o != nil && (o.Width.V != 0 || o.Height.V != 0) {
+		shints.max_width = C.int(cfg.Px(o.Width))
+		shints.max_height = C.int(cfg.Px(o.Height))
 		shints.flags = shints.flags | C.PMaxSize
 	}
 	if shints.flags != 0 {
@@ -635,7 +640,11 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	w.atoms.wmStateFullscreen = w.atom("_NET_WM_STATE_FULLSCREEN", false)
 
 	// set the name
-	ctitle := C.CString(opts.Title)
+	var title string
+	if o := opts.Title; o != nil {
+		title = *o
+	}
+	ctitle := C.CString(title)
 	defer C.free(unsafe.Pointer(ctitle))
 	C.XStoreName(dpy, win, ctitle)
 	// set _NET_WM_NAME as well for UTF-8 support in window title.
@@ -644,14 +653,16 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 			value:    (*C.uchar)(unsafe.Pointer(ctitle)),
 			encoding: w.atoms.utf8string,
 			format:   8,
-			nitems:   C.ulong(len(opts.Title)),
+			nitems:   C.ulong(len(title)),
 		},
 		w.atoms.wmName)
 
 	// extensions
 	C.XSetWMProtocols(dpy, win, &w.atoms.evDelWindow, 1)
 
-	w.SetWindowMode(opts.WindowMode)
+	if o := opts.WindowMode; o != nil {
+		w.SetWindowMode(*o)
+	}
 
 	// make the window visible on the screen
 	C.XMapWindow(dpy, win)

@@ -14,12 +14,17 @@ import (
 	"gioui.org/unit"
 )
 
+type Size struct {
+	Width  unit.Value
+	Height unit.Value
+}
+
 type Options struct {
-	Width, Height       unit.Value
-	MinWidth, MinHeight unit.Value
-	MaxWidth, MaxHeight unit.Value
-	Title               string
-	WindowMode          WindowMode
+	Size       *Size
+	MinSize    *Size
+	MaxSize    *Size
+	Title      *string
+	WindowMode *WindowMode
 }
 
 type WindowMode uint8

@@ -84,11 +84,10 @@ var ackEvent event.Event
 // Calling NewWindow more than once is not supported on
 // iOS, Android, WebAssembly.
 func NewWindow(options ...Option) *Window {
-	opts := &wm.Options{
-		Width:  unit.Dp(800),
-		Height: unit.Dp(600),
-		Title:  "Gio",
-	}
+	opts := new(wm.Options)
+	// Default options.
+	Size(unit.Px(800), unit.Px(600))(opts)
+	Title("Gio")(opts)
 
 	for _, o := range options {
 		o(opts)
@@ -456,14 +455,14 @@ const (
 // Supported platforms are macOS, X11 and Windows.
 func WindowMode(mode wm.WindowMode) Option {
 	return func(opts *wm.Options) {
-		opts.WindowMode = mode
+		opts.WindowMode = &mode
 	}
 }
 
 // Title sets the title of the wm.
 func Title(t string) Option {
 	return func(opts *wm.Options) {
-		opts.Title = t
+		opts.Title = &t
 	}
 }
 
@@ -476,8 +475,10 @@ func Size(w, h unit.Value) Option {
 		panic("height must be larger than or equal to 0")
 	}
 	return func(opts *wm.Options) {
-		opts.Width = w
-		opts.Height = h
+		opts.Size = &wm.Size{
+			Width:  w,
+			Height: h,
+		}
 	}
 }
 
@@ -490,8 +491,10 @@ func MaxSize(w, h unit.Value) Option {
 		panic("height must be larger than or equal to 0")
 	}
 	return func(opts *wm.Options) {
-		opts.MaxWidth = w
-		opts.MaxHeight = h
+		opts.MaxSize = &wm.Size{
+			Width:  w,
+			Height: h,
+		}
 	}
 }
 
@@ -504,8 +507,10 @@ func MinSize(w, h unit.Value) Option {
 		panic("height must be larger than or equal to 0")
 	}
 	return func(opts *wm.Options) {
-		opts.MinWidth = w
-		opts.MinHeight = h
+		opts.MinSize = &wm.Size{
+			Width:  w,
+			Height: h,
+		}
 	}
 }
 

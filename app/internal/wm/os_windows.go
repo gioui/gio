@@ -122,7 +122,9 @@ func NewWindow(window Callbacks, opts *Options) error {
 		// Since the window class for the cursor is null,
 		// set it here to show the cursor.
 		w.SetCursor(pointer.CursorDefault)
-		w.SetWindowMode(opts.WindowMode)
+		if o := opts.WindowMode; o != nil {
+			w.SetWindowMode(*o)
+		}
 		if err := w.loop(); err != nil {
 			panic(err)
 		}
@@ -162,10 +164,14 @@ func initResources() error {
 
 func getWindowConstraints(cfg unit.Metric, opts *Options) winConstraints {
 	var minmax winConstraints
-	minmax.minWidth = int32(cfg.Px(opts.MinWidth))
-	minmax.minHeight = int32(cfg.Px(opts.MinHeight))
-	minmax.maxWidth = int32(cfg.Px(opts.MaxWidth))
-	minmax.maxHeight = int32(cfg.Px(opts.MaxHeight))
+	if o := opts.MinSize; o != nil {
+		minmax.minWidth = int32(cfg.Px(o.Width))
+		minmax.minHeight = int32(cfg.Px(o.Height))
+	}
+	if o := opts.MaxSize; o != nil {
+		minmax.maxWidth = int32(cfg.Px(o.Width))
+		minmax.maxHeight = int32(cfg.Px(o.Height))
+	}
 	return minmax
 }
 
@@ -179,9 +185,10 @@ func createNativeWindow(opts *Options) (*window, error) {
 	}
 	dpi := windows.GetSystemDPI()
 	cfg := configForDPI(dpi)
-	wr := windows.Rect{
-		Right:  int32(cfg.Px(opts.Width)),
-		Bottom: int32(cfg.Px(opts.Height)),
+	var wr windows.Rect
+	if o := opts.Size; o != nil {
+		wr.Right = int32(cfg.Px(o.Width))
+		wr.Bottom = int32(cfg.Px(o.Height))
 	}
 	dwStyle := uint32(windows.WS_OVERLAPPEDWINDOW)
 	dwExStyle := uint32(windows.WS_EX_APPWINDOW | windows.WS_EX_WINDOWEDGE)
@@ -193,9 +200,14 @@ func createNativeWindow(opts *Options) (*window, error) {
 	deltas.width = wr.Right - wr.Left - deltas.width
 	deltas.height = wr.Bottom - wr.Top - deltas.height
 
+	var title string
+	if o := opts.Title; o != nil {
+		title = *o
+	}
+
 	hwnd, err := windows.CreateWindowEx(dwExStyle,
 		resources.class,
-		opts.Title,
+		title,
 		dwStyle|windows.WS_CLIPSIBLINGS|windows.WS_CLIPCHILDREN,
 		windows.CW_USEDEFAULT, windows.CW_USEDEFAULT,
 		wr.Right-wr.Left,
