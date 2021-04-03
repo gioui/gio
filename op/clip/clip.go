@@ -40,13 +40,26 @@ func (p Op) Add(o *op.Ops) {
 		outline = true
 	}
 
-	if path.hasSegments {
-		data := o.Write(opconst.TypePathLen)
-		data[0] = byte(opconst.TypePath)
-		path.spec.Add(o)
-	}
-
 	bounds := path.bounds
+	rect := !path.hasSegments
+	if rect {
+		// Clip shape defined by path.bounds alone, which is faster for the
+		// old renderer. The new renderer doesn't care, so encode an equivalent
+		// clip path.
+		fb := frect(bounds)
+		var p Path
+		p.Begin(o)
+		p.MoveTo(fb.Min)
+		p.LineTo(f32.Pt(fb.Max.X, fb.Min.Y))
+		p.LineTo(f32.Pt(fb.Max.X, fb.Max.Y))
+		p.LineTo(f32.Pt(fb.Min.X, fb.Max.Y))
+		p.LineTo(fb.Min)
+		path = p.End()
+	}
+	data := o.Write(opconst.TypePathLen)
+	data[0] = byte(opconst.TypePath)
+	path.spec.Add(o)
+
 	if str.Width > 0 {
 		// Expand bounds to cover stroke.
 		half := int(str.Width*.5 + .5)
@@ -60,7 +73,7 @@ func (p Op) Add(o *op.Ops) {
 		bo.PutUint32(data[1:], math.Float32bits(str.Width))
 	}
 
-	data := o.Write(opconst.TypeClipLen)
+	data = o.Write(opconst.TypeClipLen)
 	data[0] = byte(opconst.TypeClip)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(bounds.Min.X))
@@ -68,7 +81,10 @@ func (p Op) Add(o *op.Ops) {
 	bo.PutUint32(data[9:], uint32(bounds.Max.X))
 	bo.PutUint32(data[13:], uint32(bounds.Max.Y))
 	if outline {
-		data[17] = byte(1)
+		data[17] = 1
+	}
+	if rect {
+		data[18] = 1
 	}
 }
 
@@ -346,5 +362,19 @@ func (o Outline) Op() Op {
 	return Op{
 		path:    o.Path,
 		outline: true,
+	}
+}
+
+// fRect converts a rectangle to a f32.Rectangle.
+func frect(r image.Rectangle) f32.Rectangle {
+	return f32.Rectangle{
+		Min: fpt(r.Min), Max: fpt(r.Max),
+	}
+}
+
+// fpt converts an point to a f32.Point.
+func fpt(p image.Point) f32.Point {
+	return f32.Point{
+		X: float32(p.X), Y: float32(p.Y),
 	}
 }

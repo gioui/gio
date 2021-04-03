@@ -179,6 +179,7 @@ type clipOp struct {
 	// TODO: Use image.Rectangle?
 	bounds  f32.Rectangle
 	outline bool
+	rect    bool
 }
 
 // imageOpData is the shadow of paint.ImageOp.
@@ -212,6 +213,7 @@ func (op *clipOp) decode(data []byte) {
 	*op = clipOp{
 		bounds:  layout.FRect(r),
 		outline: data[17] == 1,
+		rect:    data[18] == 1,
 	}
 }
 
@@ -894,7 +896,7 @@ loop:
 			op.decode(encOp.Data)
 			bounds := op.bounds
 			trans, off := splitTransform(state.t)
-			if len(quads.aux) > 0 {
+			if !op.rect {
 				// There is a clipping path, build the gpu data and update the
 				// cache key such that it will be equal only if the transform is the
 				// same also. Use cached data if we have it.
