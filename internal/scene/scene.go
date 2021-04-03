@@ -5,6 +5,7 @@
 package scene
 
 import (
+	"fmt"
 	"image/color"
 	"math"
 	"unsafe"
@@ -45,6 +46,54 @@ const sceneElemSize = 36
 
 func (c Command) Op() Op {
 	return Op(c[0])
+}
+
+func (c Command) String() string {
+	switch Op(c[0]) {
+	case OpNop:
+		return "nop"
+	case OpLine:
+		from, to := DecodeLine(c)
+		return fmt.Sprintf("line(%v, %v)", from, to)
+	case OpQuad:
+		from, ctrl, to := DecodeQuad(c)
+		return fmt.Sprintf("quad(%v, %v, %v)", from, ctrl, to)
+	case OpCubic:
+		from, ctrl0, ctrl1, to := DecodeCubic(c)
+		return fmt.Sprintf("cubic(%v, %v, %v, %v)", from, ctrl0, ctrl1, to)
+	case OpFillColor:
+		return "fillcolor"
+	case OpLineWidth:
+		return "linewidth"
+	case OpTransform:
+		t := f32.NewAffine2D(
+			math.Float32frombits(c[1]),
+			math.Float32frombits(c[3]),
+			math.Float32frombits(c[5]),
+			math.Float32frombits(c[2]),
+			math.Float32frombits(c[4]),
+			math.Float32frombits(c[6]),
+		)
+		return fmt.Sprintf("transform (%v)", t)
+	case OpBeginClip:
+		bounds := f32.Rectangle{
+			Min: f32.Pt(math.Float32frombits(c[1]), math.Float32frombits(c[2])),
+			Max: f32.Pt(math.Float32frombits(c[3]), math.Float32frombits(c[4])),
+		}
+		return fmt.Sprintf("beginclip (%v)", bounds)
+	case OpEndClip:
+		bounds := f32.Rectangle{
+			Min: f32.Pt(math.Float32frombits(c[1]), math.Float32frombits(c[2])),
+			Max: f32.Pt(math.Float32frombits(c[3]), math.Float32frombits(c[4])),
+		}
+		return fmt.Sprintf("endclip (%v)", bounds)
+	case OpFillImage:
+		return "fillimage"
+	case OpSetFillMode:
+		return "setfillmode"
+	default:
+		panic("unreachable")
+	}
 }
 
 func Line(start, end f32.Point) Command {
