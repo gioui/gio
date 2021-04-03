@@ -264,6 +264,7 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	for _, img := range g.drawOps.allImageOps {
 		expandPathOp(img.path, img.clip)
 	}
+	g.encode(viewport)
 }
 
 func (g *compute) Clear(col color.NRGBA) {
@@ -292,9 +293,6 @@ func (g *compute) Frame() error {
 		t.kernel4 = g.timers.t.newTimer()
 	}
 
-	if err := g.encode(viewport); err != nil {
-		return err
-	}
 	if err := g.uploadImages(); err != nil {
 		return err
 	}
@@ -343,7 +341,7 @@ func (g *compute) blitOutput(viewport image.Point) {
 	g.ctx.DrawArrays(driver.DrawModeTriangleStrip, 0, 4)
 }
 
-func (g *compute) encode(viewport image.Point) error {
+func (g *compute) encode(viewport image.Point) {
 	g.texOps = g.texOps[:0]
 	g.enc.reset()
 
@@ -354,7 +352,7 @@ func (g *compute) encode(viewport image.Point) error {
 		g.enc.rect(f32.Rectangle{Max: layout.FPt(viewport)})
 		g.enc.fillColor(f32color.NRGBAToRGBA(g.drawOps.clearColor.SRGB()))
 	}
-	return g.encodeOps(flipY, viewport, g.drawOps.allImageOps)
+	g.encodeOps(flipY, viewport, g.drawOps.allImageOps)
 }
 
 func (g *compute) renderMaterials() error {
@@ -622,7 +620,7 @@ func min(p1, p2 f32.Point) f32.Point {
 	return p
 }
 
-func (g *compute) encodeOps(trans f32.Affine2D, viewport image.Point, ops []imageOp) error {
+func (g *compute) encodeOps(trans f32.Affine2D, viewport image.Point, ops []imageOp) {
 	for _, op := range ops {
 		bounds := layout.FRect(op.clip)
 		// clip is the union of all drawing affected by the clipping
@@ -660,7 +658,6 @@ func (g *compute) encodeOps(trans f32.Affine2D, viewport image.Point, ops []imag
 			g.enc.endClip(clip)
 		}
 	}
-	return nil
 }
 
 // encodeClips encodes a stack of clip paths and return the stack depth.
