@@ -269,6 +269,14 @@ func (w *window) addEventListeners() {
 		w.flushInput()
 		return nil
 	})
+	w.addEventListener(w.tarea, "paste", func(this js.Value, args []js.Value) interface{} {
+		if w.clipboard.IsUndefined() {
+			return nil
+		}
+		// Prevents duplicated-paste, since "paste" is already handled through Clipboard API.
+		args[0].Call("preventDefault")
+		return nil
+	})
 }
 
 func (w *window) addHistory() {
