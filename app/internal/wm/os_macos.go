@@ -172,11 +172,10 @@ func (w *window) Option(opts *Options) {
 func (w *window) SetWindowMode(mode WindowMode) {
 	switch mode {
 	case w.mode:
-		return
-	case Fullscreen:
+	case Windowed, Fullscreen:
 		C.gio_toggleFullScreen(w.window)
+		w.mode = mode
 	}
-	w.mode = mode
 }
 
 func (w *window) SetCursor(name pointer.CursorName) {

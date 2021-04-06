@@ -181,6 +181,7 @@ type window struct {
 
 	mu        sync.Mutex
 	animating bool
+	opts      *Options
 	needAck   bool
 	// The most recent configure serial waiting to be ack'ed.
 	serial   C.uint32_t
@@ -357,7 +358,7 @@ func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
 	C.xdg_surface_add_listener(w.wmSurf, &C.gio_xdg_surface_listener, unsafe.Pointer(w.surf))
 	C.xdg_toplevel_add_listener(w.topLvl, &C.gio_xdg_toplevel_listener, unsafe.Pointer(w.surf))
 
-	w.Option(opts)
+	w.setOptions(opts)
 
 	if d.decor != nil {
 		// Request server side decorations.
@@ -910,6 +911,13 @@ func (w *window) WriteClipboard(s string) {
 }
 
 func (w *window) Option(opts *Options) {
+	w.mu.Lock()
+	w.opts = opts
+	w.mu.Unlock()
+	w.disp.wakeup()
+}
+
+func (w *window) setOptions(opts *Options) {
 	_, _, cfg := w.config()
 	if o := opts.Size; o != nil {
 		w.width = cfg.Px(o.Width)
@@ -1143,8 +1151,10 @@ func (w *window) process() {
 	w.mu.Lock()
 	readClipboard := w.readClipboard
 	writeClipboard := w.writeClipboard
+	opts := w.opts
 	w.readClipboard = false
 	w.writeClipboard = nil
+	w.opts = nil
 	w.mu.Unlock()
 	if readClipboard {
 		r, err := w.disp.readClipboard()
@@ -1162,6 +1172,9 @@ func (w *window) process() {
 	}
 	if writeClipboard != nil {
 		w.disp.writeClipboard([]byte(*writeClipboard))
+	}
+	if opts != nil {
+		w.setOptions(opts)
 	}
 	// pass false to skip unnecessary drawing.
 	w.draw(false)

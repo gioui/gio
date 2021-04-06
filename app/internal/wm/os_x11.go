@@ -89,6 +89,7 @@ type x11Window struct {
 
 	mu        sync.Mutex
 	animating bool
+	opts      *Options
 
 	pointerBtns pointer.Buttons
 
@@ -98,6 +99,7 @@ type x11Window struct {
 		content []byte
 	}
 	cursor pointer.CursorName
+	mode   WindowMode
 }
 
 func (w *x11Window) SetAnimating(anim bool) {
@@ -124,22 +126,33 @@ func (w *x11Window) WriteClipboard(s string) {
 }
 
 func (w *x11Window) Option(opts *Options) {
-	dpy := w.x
-	win := w.xw
-	cfg := w.cfg
+	w.mu.Lock()
+	w.opts = opts
+	w.mu.Unlock()
+	w.wakeup()
+}
+
+func (w *x11Window) setOptions() {
+	w.mu.Lock()
+	opts := w.opts
+	w.opts = nil
+	w.mu.Unlock()
+	if opts == nil {
+		return
+	}
 	var shints C.XSizeHints
 	if o := opts.MinSize; o != nil {
-		shints.min_width = C.int(cfg.Px(o.Width))
-		shints.min_height = C.int(cfg.Px(o.Height))
+		shints.min_width = C.int(w.cfg.Px(o.Width))
+		shints.min_height = C.int(w.cfg.Px(o.Height))
 		shints.flags = C.PMinSize
 	}
 	if o := opts.MaxSize; o != nil {
-		shints.max_width = C.int(cfg.Px(o.Width))
-		shints.max_height = C.int(cfg.Px(o.Height))
+		shints.max_width = C.int(w.cfg.Px(o.Width))
+		shints.max_height = C.int(w.cfg.Px(o.Height))
 		shints.flags = shints.flags | C.PMaxSize
 	}
 	if shints.flags != 0 {
-		C.XSetWMNormalHints(dpy, win, &shints)
+		C.XSetWMNormalHints(w.x, w.xw, &shints)
 	}
 
 	var title string
@@ -148,9 +161,9 @@ func (w *x11Window) Option(opts *Options) {
 	}
 	ctitle := C.CString(title)
 	defer C.free(unsafe.Pointer(ctitle))
-	C.XStoreName(dpy, win, ctitle)
+	C.XStoreName(w.x, w.xw, ctitle)
 	// set _NET_WM_NAME as well for UTF-8 support in window title.
-	C.XSetTextProperty(dpy, win,
+	C.XSetTextProperty(w.x, w.xw,
 		&C.XTextProperty{
 			value:    (*C.uchar)(unsafe.Pointer(ctitle)),
 			encoding: w.atoms.utf8string,
@@ -190,6 +203,8 @@ func (w *x11Window) SetCursor(name pointer.CursorName) {
 
 func (w *x11Window) SetWindowMode(mode WindowMode) {
 	switch mode {
+	case w.mode:
+		return
 	case Windowed:
 		C.XDeleteProperty(w.x, w.xw, w.atoms.wmStateFullscreen)
 	case Fullscreen:
@@ -197,7 +212,34 @@ func (w *x11Window) SetWindowMode(mode WindowMode) {
 			32, C.PropModeReplace,
 			(*C.uchar)(unsafe.Pointer(&w.atoms.wmStateFullscreen)), 1,
 		)
+	default:
+		return
 	}
+	w.mode = mode
+	// "A Client wishing to change the state of a window MUST send
+	//  a _NET_WM_STATE client message to the root window (see below)."
+	var xev C.XEvent
+	ev := (*C.XClientMessageEvent)(unsafe.Pointer(&xev))
+	*ev = C.XClientMessageEvent{
+		_type:        C.ClientMessage,
+		display:      w.x,
+		window:       w.xw,
+		message_type: w.atoms.wmState,
+		format:       32,
+	}
+	arr := (*[5]C.long)(unsafe.Pointer(&ev.data))
+	arr[0] = 2 // _NET_WM_STATE_TOGGLE
+	arr[1] = C.long(w.atoms.wmStateFullscreen)
+	arr[2] = 0
+	arr[3] = 1 // application
+	arr[4] = 0
+	C.XSendEvent(
+		w.x,
+		C.XDefaultRootWindow(w.x), // MUST be the root window
+		C.False,
+		C.SubstructureNotifyMask|C.SubstructureRedirectMask,
+		&xev,
+	)
 }
 
 func (w *x11Window) ShowTextInput(show bool) {}
@@ -287,6 +329,7 @@ loop:
 				}
 			}
 		}
+		w.setOptions()
 		// Clear notifications.
 		for {
 			_, err := syscall.Read(w.notify.read, buf)

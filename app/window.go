@@ -211,6 +211,17 @@ func (w *Window) Invalidate() {
 	}
 }
 
+// Option applies the options to the window.
+func (w *Window) Option(opts ...Option) {
+	go w.driverDo(func() {
+		o := new(wm.Options)
+		for _, opt := range opts {
+			opt(o)
+		}
+		w.driver.Option(o)
+	})
+}
+
 // ReadClipboard initiates a read of the clipboard in the form
 // of a clipboard.Event. Multiple reads may be coalesced
 // to a single event.
