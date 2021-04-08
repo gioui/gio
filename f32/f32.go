@@ -101,11 +101,20 @@ func (r Rectangle) Intersect(s Rectangle) Rectangle {
 	if r.Max.Y > s.Max.Y {
 		r.Max.Y = s.Max.Y
 	}
+	if r.Empty() {
+		return Rectangle{}
+	}
 	return r
 }
 
 // Union returns the union of r and s.
 func (r Rectangle) Union(s Rectangle) Rectangle {
+	if r.Empty() {
+		return s
+	}
+	if s.Empty() {
+		return r
+	}
 	if r.Min.X > s.Min.X {
 		r.Min.X = s.Min.X
 	}
