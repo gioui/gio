@@ -4210,16 +4210,15 @@ void main()
             {
                 ElementRef param_73 = this_ref;
                 Clip begin_clip = Element_BeginClip_read(param_73);
+                anno_begin_clip.bbox = begin_clip.bbox;
                 if (is_stroke)
                 {
                     State param_74 = st;
                     vec2 lw_2 = get_linewidth(param_74);
-                    anno_begin_clip.bbox = begin_clip.bbox + vec4(-lw_2, lw_2);
                     anno_begin_clip.linewidth = st.linewidth * sqrt(abs((st.mat.x * st.mat.w) - (st.mat.y * st.mat.z)));
                 }
                 else
                 {
-                    anno_begin_clip.bbox = begin_clip.bbox;
                     anno_fill.linewidth = 0.0;
                 }
                 out_ref = AnnotatedRef(_2435.conf.anno_alloc.offset + ((st.path_count - 1u) * 32u));
@@ -5121,7 +5120,7 @@ void main()
                 CmdRef param_45 = cmd_ref;
                 cmd_ref = CmdRef(Cmd_Jump_read(param_44, param_45).new_ref);
                 cmd_alloc.offset = cmd_ref.offset;
-                continue;
+                break;
             }
         }
     }
