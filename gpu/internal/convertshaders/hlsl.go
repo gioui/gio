@@ -117,12 +117,17 @@ func (dxc *DXC) Compile(path, variant string, input []byte, entryPoint string, p
 // winepath uses the winepath tool to convert a paths to Windows format.
 // The returned path can be used as arguments for Windows command line tools.
 func winepath(paths ...*string) error {
+	winepath := exec.Command("winepath", "--windows")
 	for _, path := range paths {
-		out, err := exec.Command("winepath", "--windows", *path).Output()
-		if err != nil {
-			return fmt.Errorf("unable to run `winepath --windows %q`: %w", *path, err)
-		}
-		*path = strings.TrimSpace(string(out))
+		winepath.Args = append(winepath.Args, *path)
+	}
+	out, err := winepath.Output()
+	if err != nil {
+		return fmt.Errorf("unable to run `winepath --windows`: %w", err)
+	}
+	winPaths := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for i, path := range paths {
+		*path = winPaths[i]
 	}
 	return nil
 }
