@@ -249,7 +249,14 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			if msg == windows.WM_KEYUP || msg == windows.WM_SYSKEYUP {
 				e.State = key.Release
 			}
+
 			w.w.Event(e)
+
+			if (wParam == windows.VK_F10) && (msg == windows.WM_SYSKEYDOWN || msg == windows.WM_SYSKEYUP) {
+				// Reserve F10 for ourselves, and don't let it open the system menu. Other Windows programs
+				// such as cmd.exe and graphical debuggers also reserve F10.
+				return 0
+			}
 		}
 	case windows.WM_LBUTTONDOWN:
 		w.pointerButton(pointer.ButtonPrimary, true, lParam, getModifiers())
