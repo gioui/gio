@@ -3,7 +3,9 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os/exec"
 	"path/filepath"
@@ -121,11 +123,20 @@ func winepath(paths ...*string) error {
 	for _, path := range paths {
 		winepath.Args = append(winepath.Args, *path)
 	}
-	out, err := winepath.Output()
+	// Use a pipe instead of Output, because winepath may have left wineserver
+	// running for several seconds as a grandchild.
+	out, err := winepath.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("unable to run `winepath --windows`: %w", err)
+		return fmt.Errorf("unable to start winepath: %w", err)
 	}
-	winPaths := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if err := winepath.Start(); err != nil {
+		return fmt.Errorf("unable to start winepath: %w", err)
+	}
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, out); err != nil {
+		return fmt.Errorf("unable to run winepath: %w", err)
+	}
+	winPaths := strings.Split(strings.TrimSpace(buf.String()), "\n")
 	for i, path := range paths {
 		*path = winPaths[i]
 	}
