@@ -78,7 +78,7 @@ type DXC struct {
 	WorkDir WorkDir
 }
 
-func NewDXC() *DXC { return &DXC{Bin: "dxc.exe"} }
+func NewDXC() *DXC { return &DXC{Bin: "dxc"} }
 
 // Compile compiles the input shader.
 func (dxc *DXC) Compile(path, variant string, input []byte, entryPoint string, profile string) (string, error) {
@@ -92,12 +92,6 @@ func (dxc *DXC) Compile(path, variant string, input []byte, entryPoint string, p
 	}
 
 	cmd := exec.Command(dxc.Bin)
-	if runtime.GOOS != "windows" {
-		cmd = exec.Command("wine", dxc.Bin)
-		if err := winepath(&pathin, &pathout); err != nil {
-			return "", err
-		}
-	}
 
 	cmd.Args = append(cmd.Args,
 		"-Fo", pathout,
@@ -109,11 +103,7 @@ func (dxc *DXC) Compile(path, variant string, input []byte, entryPoint string, p
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		info := ""
-		if runtime.GOOS != "windows" {
-			info = "If the dxc tool cannot be found, set WINEPATH to the Windows path for the Windows SDK.\n"
-		}
-		return "", fmt.Errorf("%s\n%sfailed to run %v: %w", output, info, cmd.Args, err)
+		return "", fmt.Errorf("%s\nfailed to run %v: %w", output, cmd.Args, err)
 	}
 
 	compiled, err := ioutil.ReadFile(result)
