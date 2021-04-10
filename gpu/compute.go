@@ -82,12 +82,14 @@ type compute struct {
 	timers struct {
 		profile         string
 		t               *timers
+		materials       *timer
 		elements        *timer
 		tileAlloc       *timer
 		pathCoarse      *timer
 		backdropBinning *timer
 		coarse          *timer
 		kernel4         *timer
+		blit            *timer
 	}
 
 	// The following fields hold scratch space to avoid garbage.
@@ -285,20 +287,25 @@ func (g *compute) Frame() error {
 	if g.drawOps.profile && g.timers.t == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
 		t := &g.timers
 		t.t = newTimers(g.ctx)
+		t.materials = g.timers.t.newTimer()
 		t.elements = g.timers.t.newTimer()
 		t.tileAlloc = g.timers.t.newTimer()
 		t.pathCoarse = g.timers.t.newTimer()
 		t.backdropBinning = g.timers.t.newTimer()
 		t.coarse = g.timers.t.newTimer()
 		t.kernel4 = g.timers.t.newTimer()
+		t.blit = g.timers.t.newTimer()
 	}
 
+	mat := g.timers.materials
+	mat.begin()
 	if err := g.uploadImages(); err != nil {
 		return err
 	}
 	if err := g.renderMaterials(); err != nil {
 		return err
 	}
+	mat.end()
 	if err := g.render(tileDims); err != nil {
 		return err
 	}
@@ -308,14 +315,18 @@ func (g *compute) Frame() error {
 	g.drawOps.pathCache.frame()
 	t := &g.timers
 	if g.drawOps.profile && t.t.ready() {
+		mat := t.materials.Elapsed
 		et, tat, pct, bbt := t.elements.Elapsed, t.tileAlloc.Elapsed, t.pathCoarse.Elapsed, t.backdropBinning.Elapsed
 		ct, k4t := t.coarse.Elapsed, t.kernel4.Elapsed
-		ft := et + tat + pct + bbt + ct + k4t
+		blit := t.blit.Elapsed
+		ft := mat + et + tat + pct + bbt + ct + k4t + blit
 		q := 100 * time.Microsecond
 		ft = ft.Round(q)
+		mat = mat.Round(q)
 		et, tat, pct, bbt = et.Round(q), tat.Round(q), pct.Round(q), bbt.Round(q)
 		ct, k4t = ct.Round(q), k4t.Round(q)
-		t.profile = fmt.Sprintf("ft:%7s et:%7s tat:%7s pct:%7s bbt:%7s ct:%7s k4t:%7s", ft, et, tat, pct, bbt, ct, k4t)
+		blit = blit.Round(q)
+		t.profile = fmt.Sprintf("ft:%7s mat: %7s et:%7s tat:%7s pct:%7s bbt:%7s ct:%7s k4t:%7s blit:%7s", ft, mat, et, tat, pct, bbt, ct, k4t, blit)
 	}
 	g.drawOps.clear = false
 	return nil
@@ -330,6 +341,8 @@ func (g *compute) Profile() string {
 // shader can only write to RGBA textures, but since we actually render in sRGB
 // format we can't use glBlitFramebuffer, because it does sRGB conversion.
 func (g *compute) blitOutput(viewport image.Point) {
+	t := g.timers.blit
+	t.begin()
 	if !g.drawOps.clear {
 		g.ctx.BlendFunc(driver.BlendFactorOne, driver.BlendFactorOneMinusSrcAlpha)
 		g.ctx.SetBlend(true)
@@ -339,6 +352,7 @@ func (g *compute) blitOutput(viewport image.Point) {
 	g.ctx.BindTexture(0, g.output.image)
 	g.ctx.BindProgram(g.output.blitProg)
 	g.ctx.DrawArrays(driver.DrawModeTriangleStrip, 0, 4)
+	t.end()
 }
 
 func (g *compute) encode(viewport image.Point) {
