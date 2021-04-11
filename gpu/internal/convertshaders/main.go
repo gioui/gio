@@ -81,7 +81,6 @@ type Converter struct {
 	glslvalidator *GLSLValidator
 	spirv         *SPIRVCross
 	fxc           *FXC
-	dxc           *DXC
 }
 
 func NewConverter(workDir WorkDir, packageName, shadersDir string, directCompute bool) *Converter {
@@ -99,18 +98,13 @@ func NewConverter(workDir WorkDir, packageName, shadersDir string, directCompute
 	conv.glslvalidator = NewGLSLValidator()
 	conv.spirv = NewSPIRVCross()
 	conv.fxc = NewFXC()
-	conv.dxc = NewDXC()
 
 	verifyBinaryPath(&conv.glslvalidator.Bin)
 	verifyBinaryPath(&conv.spirv.Bin)
-	if directCompute {
-		verifyBinaryPath(&conv.dxc.Bin)
-	}
 	// We cannot check fxc since it may depend on wine.
 
 	conv.glslvalidator.WorkDir = workDir.Dir("glslvalidator")
 	conv.fxc.WorkDir = workDir.Dir("fxc")
-	conv.dxc.WorkDir = workDir.Dir("dxc")
 	conv.spirv.WorkDir = workDir.Dir("spirv")
 
 	return conv
@@ -378,16 +372,17 @@ func (conv *Converter) ComputeShader(shaderPath string) ([]driver.ShaderSources,
 	}
 	sources.GLSL310ES = unixLineEnding(sources.GLSL310ES)
 
-	if conv.directCompute {
-		hlslSource, err := conv.spirv.Convert(shaderPath, "", spirv, "hlsl", "50")
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert hlsl compute shader %q: %w", shaderPath, err)
-		}
+	hlslSource, err := conv.spirv.Convert(shaderPath, "", spirv, "hlsl", "50")
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert hlsl compute shader %q: %w", shaderPath, err)
+	}
 
-		sources.HLSL, err = conv.dxc.Compile(shaderPath, "0", []byte(hlslSource), "main", "cs_5_0")
-		if err != nil {
-			return nil, fmt.Errorf("failed to compile hlsl compute shader %q: %w", shaderPath, err)
-		}
+	dxil, err := conv.fxc.Compile(shaderPath, "0", []byte(hlslSource), "main", "5_0")
+	if err != nil {
+		return nil, fmt.Errorf("failed to compile hlsl compute shader %q: %w", shaderPath, err)
+	}
+	if conv.directCompute {
+		sources.HLSL = dxil
 	}
 
 	return []driver.ShaderSources{sources}, nil

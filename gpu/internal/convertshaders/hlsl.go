@@ -46,6 +46,8 @@ func (fxc *FXC) Compile(path, variant string, input []byte, entryPoint string, p
 		profile = "ps_" + profileVersion
 	case ".vert":
 		profile = "vs_" + profileVersion
+	case ".comp":
+		profile = "cs_" + profileVersion
 	default:
 		return "", fmt.Errorf("unrecognized shader type %s", path)
 	}
