@@ -53,22 +53,16 @@ type Device interface {
 }
 
 type ShaderSources struct {
-	Name           string
-	GLSL100ES      string
-	GLSL300ES      string
-	GLSL310ES      string
-	GLSL130        string
-	GLSL150        string
-	HLSL           []byte
-	Uniforms       UniformsReflection
-	Inputs         []InputLocation
-	Textures       []TextureBinding
-	StorageBuffers []StorageBufferBinding
-}
-
-type StorageBufferBinding struct {
-	Binding   int
-	BlockSize int
+	Name      string
+	GLSL100ES string
+	GLSL300ES string
+	GLSL310ES string
+	GLSL130   string
+	GLSL150   string
+	HLSL      []byte
+	Uniforms  UniformsReflection
+	Inputs    []InputLocation
+	Textures  []TextureBinding
 }
 
 type UniformsReflection struct {

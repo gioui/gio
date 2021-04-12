@@ -78,7 +78,6 @@ type Converter struct {
 
 	packageName string
 
-	glslcc        *GLSLCC
 	glslvalidator *GLSLValidator
 	spirv         *SPIRVCross
 	fxc           *FXC
@@ -97,22 +96,19 @@ func NewConverter(workDir WorkDir, packageName, shadersDir string, directCompute
 
 	conv.packageName = packageName
 
-	conv.glslcc = NewGLSLCC()
 	conv.glslvalidator = NewGLSLValidator()
 	conv.spirv = NewSPIRVCross()
 	conv.fxc = NewFXC()
 	conv.dxc = NewDXC()
 
-	verifyBinaryPath(&conv.glslcc.Bin)
 	verifyBinaryPath(&conv.glslvalidator.Bin)
 	verifyBinaryPath(&conv.spirv.Bin)
 	// we cannot check fxc/dxc, since they may depend on wine
 
-	conv.glslcc.IncludeDir = shadersDir
-	conv.glslcc.WorkDir = workDir.Dir("glslcc")
 	conv.glslvalidator.WorkDir = workDir.Dir("glslvalidator")
 	conv.fxc.WorkDir = workDir.Dir("fxc")
 	conv.dxc.WorkDir = workDir.Dir("dxc")
+	conv.spirv.WorkDir = workDir.Dir("spirv")
 
 	return conv
 }
@@ -222,19 +218,19 @@ func (conv *Converter) Run(out io.Writer) error {
 				fmt.Fprintf(out, "Textures: %#v,\n", src.Textures)
 			}
 			if len(src.GLSL100ES) > 0 {
-				fmt.Fprintf(out, "GLSL100ES: %#v,\n", src.GLSL100ES)
+				fmt.Fprintf(out, "GLSL100ES: `%s`,\n", src.GLSL100ES)
 			}
 			if len(src.GLSL300ES) > 0 {
-				fmt.Fprintf(out, "GLSL300ES: %#v,\n", src.GLSL300ES)
+				fmt.Fprintf(out, "GLSL300ES: `%s`,\n", src.GLSL300ES)
 			}
 			if len(src.GLSL310ES) > 0 {
-				fmt.Fprintf(out, "GLSL310ES: %#v,\n", src.GLSL310ES)
+				fmt.Fprintf(out, "GLSL310ES: `%s`,\n", src.GLSL310ES)
 			}
 			if len(src.GLSL130) > 0 {
-				fmt.Fprintf(out, "GLSL130: %#v,\n", src.GLSL130)
+				fmt.Fprintf(out, "GLSL130: `%s`,\n", src.GLSL130)
 			}
 			if len(src.GLSL150) > 0 {
-				fmt.Fprintf(out, "GLSL150: %#v,\n", src.GLSL150)
+				fmt.Fprintf(out, "GLSL150: `%s`,\n", src.GLSL150)
 			}
 			if len(src.HLSL) > 0 {
 				fmt.Fprintf(out, "HLSL: %#v,\n", src.HLSL)
@@ -261,12 +257,12 @@ func (conv *Converter) Shader(shaderPath string) ([]driver.ShaderSources, error)
 	}
 	variantArgs := [...]Variant{
 		{
-			FetchColorExpr: `_color`,
-			Header:         `layout(binding=0) uniform Color { vec4 _color; };`,
+			FetchColorExpr: `_color.color`,
+			Header:         `layout(binding=0) uniform Color { vec4 color; } _color;`,
 		},
 		{
-			FetchColorExpr: `mix(_color1, _color2, clamp(vUV.x, 0.0, 1.0))`,
-			Header:         `layout(binding=0) uniform Gradient { vec4 _color1; vec4 _color2; };`,
+			FetchColorExpr: `mix(_gradient.color1, _gradient.color2, clamp(vUV.x, 0.0, 1.0))`,
+			Header:         `layout(binding=0) uniform Gradient { vec4 color1; vec4 color2; } _gradient;`,
 		},
 		{
 			FetchColorExpr: `texture(tex, vUV)`,
@@ -292,27 +288,26 @@ func (conv *Converter) Shader(shaderPath string) ([]driver.ShaderSources, error)
 		sources.Name = filepath.Base(shaderPath)
 
 		// Ignore error; some shaders are not meant to run in GLSL 1.00.
-		sources.GLSL100ES, _, _ = conv.glslcc.Convert(shaderPath, variantName, buf.Bytes(), "gles", "100")
+		sources.GLSL100ES, _, _ = conv.ShaderVariant(shaderPath, variantName, buf.Bytes(), "es", "100")
 
 		var metadata Metadata
-		sources.GLSL300ES, metadata, err = conv.glslcc.Convert(shaderPath, variantName, buf.Bytes(), "gles", "300")
+		sources.GLSL300ES, metadata, err = conv.ShaderVariant(shaderPath, variantName, buf.Bytes(), "es", "300")
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert GLSL300ES:\n%w", err)
 		}
 
-		sources.GLSL130, _, err = conv.glslcc.Convert(shaderPath, variantName, buf.Bytes(), "glsl", "130")
+		sources.GLSL130, _, err = conv.ShaderVariant(shaderPath, variantName, buf.Bytes(), "glsl", "130")
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert GLSL130:\n%w", err)
 		}
 
-		hlsl, _, err := conv.glslcc.Convert(shaderPath, variantName, buf.Bytes(), "hlsl", "40")
+		hlsl, _, err := conv.ShaderVariant(shaderPath, variantName, buf.Bytes(), "hlsl", "40")
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert HLSL:\n%w", err)
 		}
-
 		sources.HLSL, err = conv.fxc.Compile(shaderPath, variantName, []byte(hlsl), "main", "4_0_level_9_1")
 		if err != nil {
-			// Attempt shader model 4.0. Only the app/headless
+			// Attempt shader model 4.0. Only the gpu/headless
 			// test shaders use features not supported by level
 			// 9.1.
 			sources.HLSL, err = conv.fxc.Compile(shaderPath, variantName, []byte(hlsl), "main", "4_0")
@@ -321,14 +316,14 @@ func (conv *Converter) Shader(shaderPath string) ([]driver.ShaderSources, error)
 			}
 		}
 
-		// OpenGL 3.2 Core only accepts GLSL version 1.50, but is
-		// otherwise compatible with version 1.30.
-		sources.GLSL150 = strings.Replace(sources.GLSL130, "#version 130", "#version 150", 1)
+		sources.GLSL150, _, err = conv.ShaderVariant(shaderPath, variantName, buf.Bytes(), "glsl", "150")
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert GLSL150:\n%w", err)
+		}
 
 		sources.Uniforms = metadata.Uniforms
 		sources.Inputs = metadata.Inputs
 		sources.Textures = metadata.Textures
-		sources.StorageBuffers = metadata.StorageBuffers
 
 		variants = append(variants, sources)
 	}
@@ -341,13 +336,32 @@ func (conv *Converter) Shader(shaderPath string) ([]driver.ShaderSources, error)
 	return variants, nil
 }
 
+func (conv *Converter) ShaderVariant(shaderPath, variant string, src []byte, lang, profile string) (string, Metadata, error) {
+	spirv, err := conv.glslvalidator.Convert(shaderPath, variant, lang == "hlsl", src)
+	if err != nil {
+		return "", Metadata{}, fmt.Errorf("failed to generate SPIR-V for %q: %w", shaderPath, err)
+	}
+
+	dst, err := conv.spirv.Convert(shaderPath, variant, spirv, lang, profile)
+	if err != nil {
+		return "", Metadata{}, fmt.Errorf("failed to convert shader %q: %w", shaderPath, err)
+	}
+
+	meta, err := conv.spirv.Metadata(shaderPath, variant, spirv)
+	if err != nil {
+		return "", Metadata{}, fmt.Errorf("failed to extract metadata for shader %q: %w", shaderPath, err)
+	}
+
+	return dst, meta, nil
+}
+
 func (conv *Converter) ComputeShader(shaderPath string) ([]driver.ShaderSources, error) {
 	shader, err := ioutil.ReadFile(shaderPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load shader %q: %w", shaderPath, err)
 	}
 
-	spirv, err := conv.glslvalidator.ConvertCompute(shaderPath, shader)
+	spirv, err := conv.glslvalidator.Convert(shaderPath, "", false, shader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert compute shader %q: %w", shaderPath, err)
 	}
@@ -355,14 +369,14 @@ func (conv *Converter) ComputeShader(shaderPath string) ([]driver.ShaderSources,
 	var sources driver.ShaderSources
 	sources.Name = filepath.Base(shaderPath)
 
-	sources.GLSL310ES, err = conv.spirv.Convert(spirv, "es", "310")
+	sources.GLSL310ES, err = conv.spirv.Convert(shaderPath, "", spirv, "es", "310")
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert es compute shader %q: %w", shaderPath, err)
 	}
 	sources.GLSL310ES = unixLineEnding(sources.GLSL310ES)
 
 	if conv.directCompute {
-		hlslSource, err := conv.spirv.Convert(spirv, "hlsl", "50")
+		hlslSource, err := conv.spirv.Convert(shaderPath, "", spirv, "hlsl", "50")
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert hlsl compute shader %q: %w", shaderPath, err)
 		}

@@ -324,7 +324,7 @@ func (b *Backend) NewInputLayout(vertexShader driver.ShaderSources, layout []dri
 			case 4:
 				format = d3d11.DXGI_FORMAT_R32G32B32A32_FLOAT
 			default:
-				panic("unsupported float data size")
+				panic("unsupported data size")
 			}
 		case driver.DataTypeShort:
 			switch l.Size {
@@ -333,7 +333,7 @@ func (b *Backend) NewInputLayout(vertexShader driver.ShaderSources, layout []dri
 			case 2:
 				format = d3d11.DXGI_FORMAT_R16G16_SINT
 			default:
-				panic("unsupported float data size")
+				panic("unsupported data size")
 			}
 		default:
 			panic("unsupported data type")

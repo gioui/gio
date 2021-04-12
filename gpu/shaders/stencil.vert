@@ -7,7 +7,7 @@ precision highp float;
 layout(binding = 0) uniform Block {
 	vec4 transform;
 	vec2 pathOffset;
-};
+} _block;
 
 layout(location=0) in float corner;
 layout(location=1) in float maxy;
@@ -23,10 +23,10 @@ void main() {
 	// Add a one pixel overlap so curve quads cover their
 	// entire curves. Could use conservative rasterization
 	// if available.
-	vec2 from = from + pathOffset;
-	vec2 ctrl = ctrl + pathOffset;
-	vec2 to = to + pathOffset;
-	float maxy = maxy + pathOffset.y;
+	vec2 from = from + _block.pathOffset;
+	vec2 ctrl = ctrl + _block.pathOffset;
+	vec2 to = to + _block.pathOffset;
+	float maxy = maxy + _block.pathOffset.y;
 	vec2 pos;
 	float c = corner;
 	if (c >= 0.375) {
@@ -47,7 +47,7 @@ void main() {
 	vFrom = from-pos;
 	vCtrl = ctrl-pos;
 	vTo = to-pos;
-	pos = pos*transform.xy + transform.zw;
+	pos = pos*_block.transform.xy + _block.transform.zw;
 	gl_Position = vec4(pos, 1, 1);
 }
 
