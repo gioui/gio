@@ -233,7 +233,7 @@ func (conv *Converter) Run(out io.Writer) error {
 				fmt.Fprintf(out, "GLSL150: `%s`,\n", src.GLSL150)
 			}
 			if len(src.HLSL) > 0 {
-				fmt.Fprintf(out, "HLSL: %#v,\n", src.HLSL)
+				fmt.Fprintf(out, "HLSL: %q,\n", src.HLSL)
 			}
 			fmt.Fprintf(out, "}")
 			if multiVariant {

@@ -59,7 +59,7 @@ type ShaderSources struct {
 	GLSL310ES string
 	GLSL130   string
 	GLSL150   string
-	HLSL      []byte
+	HLSL      string
 	Uniforms  UniformsReflection
 	Inputs    []InputLocation
 	Textures  []TextureBinding
