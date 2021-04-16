@@ -56,7 +56,7 @@ func (spirv *SPIRVCross) Convert(path, variant string, shader []byte, target, ve
 	default:
 		return "", fmt.Errorf("unknown target %q", target)
 	}
-	cmd.Args = append(cmd.Args, base)
+	cmd.Args = append(cmd.Args, "--no-420pack-extension", base)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {

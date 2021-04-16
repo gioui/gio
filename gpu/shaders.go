@@ -617,9 +617,6 @@ void main()
 
 `,
 			GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 struct Color
 {
@@ -638,11 +635,8 @@ void main()
 
 `,
 			GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0, std140) uniform Color
+layout(std140) uniform Color
 {
     vec4 color;
 } _color;
@@ -706,9 +700,6 @@ void main()
 
 `,
 			GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 struct Gradient
 {
@@ -728,11 +719,8 @@ void main()
 
 `,
 			GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0, std140) uniform Gradient
+layout(std140) uniform Gradient
 {
     vec4 color1;
     vec4 color2;
@@ -783,11 +771,8 @@ void main()
 
 `,
 			GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0) uniform sampler2D tex;
+uniform sampler2D tex;
 
 out vec4 fragColor;
 in vec2 vUV;
@@ -799,11 +784,8 @@ void main()
 
 `,
 			GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0) uniform sampler2D tex;
+uniform sampler2D tex;
 
 out vec4 fragColor;
 in vec2 vUV;
@@ -910,9 +892,6 @@ void main()
 
 `,
 		GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 struct m3x2
 {
@@ -956,9 +935,6 @@ void main()
 
 `,
 		GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 struct m3x2
 {
@@ -966,7 +942,7 @@ struct m3x2
     vec3 r1;
 };
 
-layout(binding = 0, std140) uniform Block
+layout(std140) uniform Block
 {
     vec4 transform;
     vec4 uvTransformR1;
@@ -2217,11 +2193,8 @@ void main()
 
 `,
 		GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0) uniform sampler2D tex;
+uniform sampler2D tex;
 
 out vec4 fragColor;
 
@@ -2243,11 +2216,8 @@ void main()
 
 `,
 		GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0) uniform sampler2D tex;
+uniform sampler2D tex;
 
 out vec4 fragColor;
 
@@ -2333,9 +2303,6 @@ void main()
 
 `,
 		GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 void main()
 {
@@ -2366,9 +2333,6 @@ void main()
 
 `,
 		GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 void main()
 {
@@ -2458,9 +2422,6 @@ void main()
 
 `,
 			GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 struct Color
 {
@@ -2469,7 +2430,7 @@ struct Color
 
 uniform Color _color;
 
-layout(binding = 1) uniform sampler2D cover;
+uniform sampler2D cover;
 
 out vec4 fragColor;
 in vec2 vCoverUV;
@@ -2484,16 +2445,13 @@ void main()
 
 `,
 			GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0, std140) uniform Color
+layout(std140) uniform Color
 {
     vec4 color;
 } _color;
 
-layout(binding = 1) uniform sampler2D cover;
+uniform sampler2D cover;
 
 out vec4 fragColor;
 in vec2 vCoverUV;
@@ -2568,9 +2526,6 @@ void main()
 
 `,
 			GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 struct Gradient
 {
@@ -2580,7 +2535,7 @@ struct Gradient
 
 uniform Gradient _gradient;
 
-layout(binding = 1) uniform sampler2D cover;
+uniform sampler2D cover;
 
 out vec4 fragColor;
 in vec2 vUV;
@@ -2595,17 +2550,14 @@ void main()
 
 `,
 			GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0, std140) uniform Gradient
+layout(std140) uniform Gradient
 {
     vec4 color1;
     vec4 color2;
 } _gradient;
 
-layout(binding = 1) uniform sampler2D cover;
+uniform sampler2D cover;
 
 out vec4 fragColor;
 in vec2 vUV;
@@ -2663,12 +2615,9 @@ void main()
 
 `,
 			GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0) uniform sampler2D tex;
-layout(binding = 1) uniform sampler2D cover;
+uniform sampler2D tex;
+uniform sampler2D cover;
 
 out vec4 fragColor;
 in vec2 vUV;
@@ -2683,12 +2632,9 @@ void main()
 
 `,
 			GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0) uniform sampler2D tex;
-layout(binding = 1) uniform sampler2D cover;
+uniform sampler2D tex;
+uniform sampler2D cover;
 
 out vec4 fragColor;
 in vec2 vUV;
@@ -2808,9 +2754,6 @@ void main()
 
 `,
 		GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 struct m3x2
 {
@@ -2859,9 +2802,6 @@ void main()
 
 `,
 		GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 struct m3x2
 {
@@ -2869,7 +2809,7 @@ struct m3x2
     vec3 r1;
 };
 
-layout(binding = 0, std140) uniform Block
+layout(std140) uniform Block
 {
     vec4 transform;
     vec4 uvCoverTransform;
@@ -4293,11 +4233,8 @@ void main()
 
 `,
 		GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0) uniform sampler2D cover;
+uniform sampler2D cover;
 
 in vec2 vUV;
 out vec4 fragColor;
@@ -4310,11 +4247,8 @@ void main()
 
 `,
 		GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0) uniform sampler2D cover;
+uniform sampler2D cover;
 
 in vec2 vUV;
 out vec4 fragColor;
@@ -4419,9 +4353,6 @@ void main()
 
 `,
 		GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 struct m3x2
 {
@@ -4464,9 +4395,6 @@ void main()
 
 `,
 		GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 struct m3x2
 {
@@ -4474,7 +4402,7 @@ struct m3x2
     vec3 r1;
 };
 
-layout(binding = 0, std140) uniform Block
+layout(std140) uniform Block
 {
     vec4 uvTransform;
     vec4 subUVTransform;
@@ -5192,11 +5120,8 @@ void main()
 
 `,
 		GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0) uniform sampler2D tex;
+uniform sampler2D tex;
 
 in vec2 vUV;
 out vec4 fragColor;
@@ -5220,11 +5145,8 @@ void main()
 
 `,
 		GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0) uniform sampler2D tex;
+uniform sampler2D tex;
 
 in vec2 vUV;
 out vec4 fragColor;
@@ -5279,9 +5201,6 @@ void main()
 
 `,
 		GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 out vec2 vUV;
 in vec2 uv;
@@ -5295,9 +5214,6 @@ void main()
 
 `,
 		GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 out vec2 vUV;
 in vec2 uv;
@@ -6083,9 +5999,6 @@ void main()
 
 `,
 		GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 in vec2 vTo;
 in vec2 vFrom;
@@ -6124,9 +6037,6 @@ void main()
 
 `,
 		GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 in vec2 vTo;
 in vec2 vFrom;
@@ -6277,9 +6187,6 @@ void main()
 
 `,
 		GLSL130: `#version 130
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
 struct Block
 {
@@ -6332,11 +6239,8 @@ void main()
 
 `,
 		GLSL150: `#version 150
-#ifdef GL_ARB_shading_language_420pack
-#extension GL_ARB_shading_language_420pack : require
-#endif
 
-layout(binding = 0, std140) uniform Block
+layout(std140) uniform Block
 {
     vec4 transform;
     vec2 pathOffset;
