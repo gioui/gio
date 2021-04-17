@@ -145,10 +145,11 @@ func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 	}
 	gles30 := gles && ver[0] >= 3
 	gles31 := gles && (ver[0] > 3 || (ver[0] == 3 && ver[1] >= 1))
+	gl40 := !gles && ver[0] >= 4
 	b := &Backend{
 		glver:       ver,
 		gles:        gles,
-		ubo:         gles30,
+		ubo:         gles30 || gl40,
 		funcs:       f,
 		floatTriple: floatTriple,
 		alphaTriple: alphaTripleFor(ver),
@@ -571,6 +572,9 @@ func (b *Backend) NewProgram(vertShader, fragShader driver.ShaderSources) (drive
 
 func lookupUniform(funcs *gl.Functions, p gl.Program, loc driver.UniformLocation) uniformLocation {
 	u := funcs.GetUniformLocation(p, loc.Name)
+	if !u.Valid() {
+		panic(fmt.Errorf("uniform %q not found", loc.Name))
+	}
 	return uniformLocation{uniform: u, offset: loc.Offset, typ: loc.Type, size: loc.Size}
 }
 
