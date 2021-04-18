@@ -29,6 +29,8 @@ import android.view.WindowInsets;
 import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.SurfaceHolder;
+import android.view.Window;
+import android.view.WindowInsetsController;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
@@ -131,6 +133,70 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		PointerIcon pointerIcon = PointerIcon.getSystemIcon(getContext(), id);
 		setPointerIcon(pointerIcon);
 	}
+
+    private enum Bar {
+        NAVIGATION,
+        STATUS,
+    }
+
+    private void setBarColor(Bar t, int color, int luminance) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return;
+        }
+
+        Window window = ((Activity) this.getContext()).getWindow();
+
+        int insetsMask;
+        int viewMask;
+
+        switch (t) {
+        case STATUS:
+            insetsMask = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS;
+            viewMask = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            window.setStatusBarColor(color);
+            break;
+        case NAVIGATION:
+            insetsMask = WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+            viewMask = View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            window.setNavigationBarColor(color);
+            break;
+        default:
+            throw new RuntimeException("invalid bar type");
+        }
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            int flags = this.getSystemUiVisibility();
+            if (luminance > 128) {
+               flags |=  viewMask;
+            } else {
+               flags &= ~viewMask;
+            }
+            this.setSystemUiVisibility(flags);
+            return;
+        }
+
+        WindowInsetsController insetsController = window.getInsetsController();
+        if (insetsController == null) {
+            return;
+        }
+        if (luminance > 128) {
+            insetsController.setSystemBarsAppearance(insetsMask, insetsMask);
+        } else {
+            insetsController.setSystemBarsAppearance(0, insetsMask);
+        }
+    }
+
+    private void setStatusColor(int color, int luminance) {
+        this.setBarColor(Bar.STATUS, color, luminance);
+    }
+
+    private void setNavigationColor(int color, int luminance) {
+        this.setBarColor(Bar.NAVIGATION, color, luminance);
+    }
 
 	private void dispatchMotionEvent(MotionEvent event) {
 		for (int j = 0; j < event.getHistorySize(); j++) {

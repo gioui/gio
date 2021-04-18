@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
 	"time"
 
 	"gioui.org/io/event"
@@ -522,6 +523,20 @@ func MinSize(w, h unit.Value) Option {
 			Width:  w,
 			Height: h,
 		}
+	}
+}
+
+// StatusColor sets the color of the Android status bar.
+func StatusColor(color color.NRGBA) Option {
+	return func(opts *wm.Options) {
+		opts.StatusColor = &color
+	}
+}
+
+// NavigationColor sets the color of the navigation bar on Android, or the address bar in browsers.
+func NavigationColor(color color.NRGBA) Option {
+	return func(opts *wm.Options) {
+		opts.NavigationColor = &color
 	}
 }
 

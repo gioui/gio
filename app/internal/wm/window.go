@@ -6,6 +6,7 @@ package wm
 
 import (
 	"errors"
+	"image/color"
 
 	"gioui.org/gpu"
 	"gioui.org/io/event"
@@ -20,11 +21,13 @@ type Size struct {
 }
 
 type Options struct {
-	Size       *Size
-	MinSize    *Size
-	MaxSize    *Size
-	Title      *string
-	WindowMode *WindowMode
+	Size            *Size
+	MinSize         *Size
+	MaxSize         *Size
+	Title           *string
+	WindowMode      *WindowMode
+	StatusColor     *color.NRGBA
+	NavigationColor *color.NRGBA
 }
 
 type WindowMode uint8
