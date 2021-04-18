@@ -3,7 +3,10 @@
 package wm
 
 import (
+	"fmt"
+	"gioui.org/internal/f32color"
 	"image"
+	"image/color"
 	"strings"
 	"sync"
 	"syscall/js"
@@ -22,6 +25,7 @@ import (
 type window struct {
 	window                js.Value
 	document              js.Value
+	head                  js.Value
 	clipboard             js.Value
 	cnv                   js.Value
 	tarea                 js.Value
@@ -61,6 +65,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 		document:  doc,
 		tarea:     tarea,
 		window:    js.Global().Get("window"),
+		head:      doc.Get("head"),
 		clipboard: js.Global().Get("navigator").Get("clipboard"),
 	}
 	w.requestAnimationFrame = w.window.Get("requestAnimationFrame")
@@ -486,6 +491,9 @@ func (w *window) Option(opts *Options) {
 	if o := opts.WindowMode; o != nil {
 		w.windowMode(*o)
 	}
+	if o := opts.NavigationColor; o != nil {
+		w.navigationColor(*o)
+	}
 }
 
 func (w *window) SetCursor(name pointer.CursorName) {
@@ -567,7 +575,7 @@ func (w *window) config() (int, int, system.Insets, unit.Metric) {
 func (w *window) windowMode(mode WindowMode) {
 	switch mode {
 	case Windowed:
-		if fs := w.document.Get("fullscreenElement"); !fs.Truthy() {
+		if !w.document.Get("fullscreenElement").Truthy() {
 			return // Browser is already Windowed.
 		}
 		if !w.document.Get("exitFullscreen").Truthy() {
@@ -581,6 +589,17 @@ func (w *window) windowMode(mode WindowMode) {
 		}
 		elem.Call("requestFullscreen")
 	}
+}
+
+func (w *window) navigationColor(c color.NRGBA) {
+	theme := w.head.Call("querySelector", `meta[name="theme-color"]`)
+	if !theme.Truthy() {
+		theme = w.document.Call("createElement", "meta")
+		theme.Set("name", "theme-color")
+		w.head.Call("appendChild", theme)
+	}
+	rgba := f32color.NRGBAToRGBA(c)
+	theme.Set("content", fmt.Sprintf("#%06X", []uint8{rgba.R, rgba.G, rgba.B}))
 }
 
 func Main() {

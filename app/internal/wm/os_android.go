@@ -42,7 +42,9 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"gioui.org/internal/f32color"
 	"image"
+	"image/color"
 	"reflect"
 	"runtime"
 	"runtime/debug"
@@ -82,18 +84,22 @@ type window struct {
 // windowState tracks the View or Activity specific state lost when Android
 // re-creates our Activity.
 type windowState struct {
-	cursor *pointer.CursorName
+	cursor          *pointer.CursorName
+	navigationColor *color.NRGBA
+	statusColor     *color.NRGBA
 }
 
 // gioView hold cached JNI methods for GioView.
 var gioView struct {
-	once              sync.Once
-	getDensity        C.jmethodID
-	getFontScale      C.jmethodID
-	showTextInput     C.jmethodID
-	hideTextInput     C.jmethodID
-	postFrameCallback C.jmethodID
-	setCursor         C.jmethodID
+	once               sync.Once
+	getDensity         C.jmethodID
+	getFontScale       C.jmethodID
+	showTextInput      C.jmethodID
+	hideTextInput      C.jmethodID
+	postFrameCallback  C.jmethodID
+	setCursor          C.jmethodID
+	setNavigationColor C.jmethodID
+	setStatusColor     C.jmethodID
 }
 
 // ViewEvent is sent whenever the Window's underlying Android view
@@ -220,6 +226,8 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.hideTextInput = getMethodID(env, class, "hideTextInput", "()V")
 		m.postFrameCallback = getMethodID(env, class, "postFrameCallback", "()V")
 		m.setCursor = getMethodID(env, class, "setCursor", "(I)V")
+		m.setNavigationColor = getMethodID(env, class, "setNavigationColor", "(II)V")
+		m.setStatusColor = getMethodID(env, class, "setStatusColor", "(II)V")
 	})
 	view = C.gio_jni_NewGlobalRef(env, view)
 	wopts := <-mainWindow.out
@@ -235,6 +243,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 	handle := C.jlong(view)
 	views[handle] = w
 	w.loadConfig(env, class)
+	w.Option(wopts.opts)
 	applyStateDiff(env, view, windowState{}, w.state)
 	w.setStage(system.StagePaused)
 	w.callbacks.Event(ViewEvent{View: uintptr(view)})
@@ -676,7 +685,18 @@ func (w *window) ReadClipboard() {
 	})
 }
 
-func (w *window) Option(opts *Options) {}
+func (w *window) Option(opts *Options) {
+	if o := opts.NavigationColor; o != nil {
+		w.setState(func(state *windowState) {
+			state.navigationColor = o
+		})
+	}
+	if o := opts.StatusColor; o != nil {
+		w.setState(func(state *windowState) {
+			state.statusColor = o
+		})
+	}
+}
 
 func (w *window) SetCursor(name pointer.CursorName) {
 	w.setState(func(state *windowState) {
@@ -703,6 +723,12 @@ func applyStateDiff(env *C.JNIEnv, view C.jobject, old, state windowState) {
 	if state.cursor != nil && old.cursor != state.cursor {
 		setCursor(env, view, *state.cursor)
 	}
+	if state.navigationColor != nil && old.navigationColor != state.navigationColor {
+		setNavigationColor(env, view, *state.navigationColor)
+	}
+	if state.statusColor != nil && old.statusColor != state.statusColor {
+		setStatusColor(env, view, *state.statusColor)
+	}
 }
 
 func setCursor(env *C.JNIEnv, view C.jobject, name pointer.CursorName) {
@@ -726,6 +752,20 @@ func setCursor(env *C.JNIEnv, view C.jobject, name pointer.CursorName) {
 		curID = 0 // TYPE_NULL
 	}
 	callVoidMethod(env, view, gioView.setCursor, jvalue(curID))
+}
+
+func setStatusColor(env *C.JNIEnv, view C.jobject, color color.NRGBA) {
+	callVoidMethod(env, view, gioView.setStatusColor,
+		jvalue(uint32(color.A)<<24|uint32(color.R)<<16|uint32(color.G)<<8|uint32(color.B)),
+		jvalue(int(f32color.LinearFromSRGB(color).Luminance()*255)),
+	)
+}
+
+func setNavigationColor(env *C.JNIEnv, view C.jobject, color color.NRGBA) {
+	callVoidMethod(env, view, gioView.setNavigationColor,
+		jvalue(uint32(color.A)<<24|uint32(color.R)<<16|uint32(color.G)<<8|uint32(color.B)),
+		jvalue(int(f32color.LinearFromSRGB(color).Luminance()*255)),
+	)
 }
 
 // Close the window. Not implemented for Android.
