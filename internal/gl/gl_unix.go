@@ -49,6 +49,7 @@ static void (*_glBeginQuery)(GLenum target, GLuint id);
 static void (*_glDeleteQueries)(GLsizei n, const GLuint *ids);
 static void (*_glEndQuery)(GLenum target);
 static void (*_glGenQueries)(GLsizei n, GLuint *ids);
+static void (*_glGetProgramBinary)(GLuint program, GLsizei bufsize, GLsizei *length, GLenum *binaryFormat, void *binary);
 static void (*_glGetQueryObjectuiv)(GLuint id, GLenum pname, GLuint *params);
 static const GLubyte* (*_glGetStringi)(GLenum name, GLuint index);
 static void (*_glMemoryBarrier)(GLbitfield barriers);
@@ -109,6 +110,10 @@ __attribute__ ((visibility ("hidden"))) const GLubyte* gio_glGetStringi(GLenum n
 
 __attribute__ ((visibility ("hidden"))) void gio_glGenQueries(GLsizei n, GLuint *ids) {
 	_glGenQueries(n, ids);
+}
+
+__attribute__ ((visibility ("hidden"))) void gio_glGetProgramBinary(GLuint program, GLsizei bufsize, GLsizei *length, GLenum *binaryFormat, void *binary) {
+	_glGetProgramBinary(program, bufsize, length, binaryFormat, binary);
 }
 
 __attribute__ ((visibility ("hidden"))) void gio_glGetQueryObjectuiv(GLuint id, GLenum pname, GLuint *params) {
@@ -180,6 +185,7 @@ __attribute__((constructor)) static void gio_loadGLFunctions() {
 	_glBindImageTexture = dlsym(RTLD_DEFAULT, "glBindImageTexture");
 	_glTexStorage2D = dlsym(RTLD_DEFAULT, "glTexStorage2D");
 	_glBlitFramebuffer = dlsym(RTLD_DEFAULT, "glBlitFramebuffer");
+	_glGetProgramBinary = dlsym(RTLD_DEFAULT, "glGetProgramBinary");
 }
 */
 import "C"
@@ -441,6 +447,17 @@ func (f *Functions) GetInteger(pname Enum) int {
 func (f *Functions) GetProgrami(p Program, pname Enum) int {
 	C.glGetProgramiv(C.GLuint(p.V), C.GLenum(pname), &f.ints[0])
 	return int(f.ints[0])
+}
+
+func (f *Functions) GetProgramBinary(p Program) []byte {
+	sz := f.GetProgrami(p, PROGRAM_BINARY_LENGTH)
+	if sz == 0 {
+		return nil
+	}
+	buf := make([]byte, sz)
+	var format C.GLenum
+	C.gio_glGetProgramBinary(C.GLuint(p.V), C.GLsizei(sz), nil, &format, unsafe.Pointer(&buf[0]))
+	return buf
 }
 
 func (f *Functions) GetProgramInfoLog(p Program) string {
