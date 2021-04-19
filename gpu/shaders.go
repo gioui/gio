@@ -2184,19 +2184,19 @@ uniform mediump sampler2D tex;
 
 layout(location = 0) out highp vec4 fragColor;
 
-highp vec3 sRGBtoRGB(highp vec3 rgb)
+vec3 sRGBtoRGB(vec3 rgb)
 {
     bvec3 cutoff = greaterThanEqual(rgb, vec3(0.040449999272823333740234375));
-    highp vec3 below = rgb / vec3(12.9200000762939453125);
-    highp vec3 above = pow((rgb + vec3(0.054999999701976776123046875)) / vec3(1.05499994754791259765625), vec3(2.400000095367431640625));
+    vec3 below = rgb / vec3(12.9200000762939453125);
+    vec3 above = pow((rgb + vec3(0.054999999701976776123046875)) / vec3(1.05499994754791259765625), vec3(2.400000095367431640625));
     return vec3(cutoff.x ? above.x : below.x, cutoff.y ? above.y : below.y, cutoff.z ? above.z : below.z);
 }
 
 void main()
 {
-    highp vec4 texel = texelFetch(tex, ivec2(gl_FragCoord.xy), 0);
-    highp vec3 param = texel.xyz;
-    highp vec3 rgb = sRGBtoRGB(param);
+    vec4 texel = texelFetch(tex, ivec2(gl_FragCoord.xy), 0);
+    vec3 param = texel.xyz;
+    vec3 rgb = sRGBtoRGB(param);
     fragColor = vec4(rgb, texel.w);
 }
 
@@ -4559,13 +4559,13 @@ layout(binding = 0, std430) buffer Memory
     uint memory[];
 } _198;
 
-layout(binding = 1, std430) readonly buffer ConfigBuf
+layout(binding = 1, std430) restrict readonly buffer ConfigBuf
 {
     Config conf;
 } _686;
 
-layout(binding = 3, rgba8) uniform readonly highp image2D images[1];
-layout(binding = 2, rgba8) uniform writeonly highp image2D image;
+layout(binding = 3, rgba8) uniform restrict readonly highp image2D images[1];
+layout(binding = 2, rgba8) uniform restrict writeonly highp image2D image;
 
 Alloc slice_mem(Alloc a, uint offset, uint size)
 {
@@ -4727,18 +4727,18 @@ CmdColor Cmd_Color_read(Alloc a, CmdRef ref)
     return CmdColor_read(param, param_1);
 }
 
-vec3 fromsRGB(vec3 srgb)
+mediump vec3 fromsRGB(mediump vec3 srgb)
 {
     bvec3 cutoff = greaterThanEqual(srgb, vec3(0.040449999272823333740234375));
-    vec3 below = srgb / vec3(12.9200000762939453125);
-    vec3 above = pow((srgb + vec3(0.054999999701976776123046875)) / vec3(1.05499994754791259765625), vec3(2.400000095367431640625));
+    mediump vec3 below = srgb / vec3(12.9200000762939453125);
+    mediump vec3 above = pow((srgb + vec3(0.054999999701976776123046875)) / vec3(1.05499994754791259765625), vec3(2.400000095367431640625));
     return mix(below, above, cutoff);
 }
 
-vec4 unpacksRGB(uint srgba)
+mediump vec4 unpacksRGB(uint srgba)
 {
-    vec4 color = unpackUnorm4x8(srgba).wzyx;
-    vec3 param = color.xyz;
+    mediump vec4 color = unpackUnorm4x8(srgba).wzyx;
+    mediump vec3 param = color.xyz;
     return vec4(fromsRGB(param), color.w);
 }
 
@@ -4764,33 +4764,33 @@ CmdImage Cmd_Image_read(Alloc a, CmdRef ref)
     return CmdImage_read(param, param_1);
 }
 
-vec4[8] fillImage(uvec2 xy, CmdImage cmd_img)
+mediump vec4[8] fillImage(uvec2 xy, CmdImage cmd_img)
 {
-    vec4 rgba[8];
+    mediump vec4 rgba[8];
     for (uint i = 0u; i < 8u; i++)
     {
         uint param = i;
         ivec2 uv = ivec2(xy + chunk_offset(param)) + cmd_img.offset;
-        vec4 fg_rgba = imageLoad(images[0], uv);
-        vec3 param_1 = fg_rgba.xyz;
-        vec3 _662 = fromsRGB(param_1);
+        mediump vec4 fg_rgba = imageLoad(images[0], uv);
+        mediump vec3 param_1 = fg_rgba.xyz;
+        mediump vec3 _662 = fromsRGB(param_1);
         fg_rgba = vec4(_662.x, _662.y, _662.z, fg_rgba.w);
         rgba[i] = fg_rgba;
     }
     return rgba;
 }
 
-vec3 tosRGB(vec3 rgb)
+mediump vec3 tosRGB(mediump vec3 rgb)
 {
     bvec3 cutoff = greaterThanEqual(rgb, vec3(0.003130800090730190277099609375));
-    vec3 below = vec3(12.9200000762939453125) * rgb;
-    vec3 above = (vec3(1.05499994754791259765625) * pow(rgb, vec3(0.416660010814666748046875))) - vec3(0.054999999701976776123046875);
+    mediump vec3 below = vec3(12.9200000762939453125) * rgb;
+    mediump vec3 above = (vec3(1.05499994754791259765625) * pow(rgb, vec3(0.416660010814666748046875))) - vec3(0.054999999701976776123046875);
     return mix(below, above, cutoff);
 }
 
-uint packsRGB(inout vec4 rgba)
+uint packsRGB(inout mediump vec4 rgba)
 {
-    vec3 param = rgba.xyz;
+    mediump vec3 param = rgba.xyz;
     rgba = vec4(tosRGB(param), rgba.w);
     return packUnorm4x8(rgba.wzyx);
 }
@@ -4839,16 +4839,16 @@ void main()
     cmd_ref.offset += 8u;
     uvec2 xy_uint = uvec2(gl_LocalInvocationID.x + (32u * gl_WorkGroupID.x), gl_LocalInvocationID.y + (32u * gl_WorkGroupID.y));
     vec2 xy = vec2(xy_uint);
-    vec4 rgba[8];
+    mediump vec4 rgba[8];
     for (uint i = 0u; i < 8u; i++)
     {
         rgba[i] = vec4(0.0);
     }
     uint clip_depth = 0u;
     bool mem_ok = _198.mem_error == 0u;
-    float df[8];
+    mediump float df[8];
     TileSegRef tile_seg_ref;
-    float area[8];
+    mediump float area[8];
     uint base_ix;
     while (mem_ok)
     {
@@ -4972,10 +4972,10 @@ void main()
                 CmdRef param_26 = cmd_ref;
                 CmdColor color = Cmd_Color_read(param_25, param_26);
                 uint param_27 = color.rgba_color;
-                vec4 fg = unpacksRGB(param_27);
+                mediump vec4 fg = unpacksRGB(param_27);
                 for (uint k_8 = 0u; k_8 < 8u; k_8++)
                 {
-                    vec4 fg_k = fg * area[k_8];
+                    mediump vec4 fg_k = fg * area[k_8];
                     rgba[k_8] = (rgba[k_8] * (1.0 - fg_k.w)) + fg_k;
                 }
                 cmd_ref.offset += 8u;
@@ -4988,10 +4988,10 @@ void main()
                 CmdImage fill_img = Cmd_Image_read(param_28, param_29);
                 uvec2 param_30 = xy_uint;
                 CmdImage param_31 = fill_img;
-                vec4 img[8] = fillImage(param_30, param_31);
+                mediump vec4 img[8] = fillImage(param_30, param_31);
                 for (uint k_9 = 0u; k_9 < 8u; k_9++)
                 {
-                    vec4 fg_k_1 = img[k_9] * area[k_9];
+                    mediump vec4 fg_k_1 = img[k_9] * area[k_9];
                     rgba[k_9] = (rgba[k_9] * (1.0 - fg_k_1.w)) + fg_k_1;
                 }
                 cmd_ref.offset += 12u;
@@ -5004,10 +5004,10 @@ void main()
                 {
                     uint param_32 = k_10;
                     uvec2 offset = chunk_offset(param_32);
-                    vec4 param_33 = vec4(rgba[k_10]);
+                    mediump vec4 param_33 = vec4(rgba[k_10]);
                     uint _1288 = packsRGB(param_33);
                     uint srgb = _1288;
-                    float alpha_1 = clamp(abs(area[k_10]), 0.0, 1.0);
+                    mediump float alpha_1 = clamp(abs(area[k_10]), 0.0, 1.0);
                     Alloc param_34 = scratch_alloc;
                     uint param_35 = (base_ix + 0u) + (2u * (offset.x + (offset.y * 32u)));
                     uint param_36 = srgb;
@@ -5037,8 +5037,8 @@ void main()
                     uint param_44 = (base_ix + 1u) + (2u * (offset_1.x + (offset_1.y * 32u)));
                     uint alpha_2 = read_mem(param_43, param_44);
                     uint param_45 = srgb_1;
-                    vec4 bg = unpacksRGB(param_45);
-                    vec4 fg_1 = (rgba[k_11] * area[k_11]) * uintBitsToFloat(alpha_2);
+                    mediump vec4 bg = unpacksRGB(param_45);
+                    mediump vec4 fg_1 = (rgba[k_11] * area[k_11]) * uintBitsToFloat(alpha_2);
                     rgba[k_11] = (bg * (1.0 - fg_1.w)) + fg_1;
                 }
                 cmd_ref.offset += 4u;
@@ -5057,7 +5057,7 @@ void main()
     for (uint i_1 = 0u; i_1 < 8u; i_1++)
     {
         uint param_48 = i_1;
-        vec3 param_49 = rgba[i_1].xyz;
+        mediump vec3 param_49 = rgba[i_1].xyz;
         imageStore(image, ivec2(xy_uint + chunk_offset(param_48)), vec4(tosRGB(param_49), rgba[i_1].w));
     }
 }
