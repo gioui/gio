@@ -444,6 +444,9 @@ func (e *Editor) command(gtx layout.Context, k key.Event) bool {
 			return false
 		}
 		e.caret.end, e.caret.start = e.offsetToScreenPos2(0, e.Len())
+	// Pressing escape removes focus from the editor
+	case key.NameEscape:
+		key.FocusOp{}.Add(gtx.Ops)
 	default:
 		return false
 	}
