@@ -8,6 +8,8 @@ layout(location = 0) out vec4 fragColor;
 
 layout(binding = 0) uniform sampler2D tex;
 
+precision mediump float;
+
 vec3 sRGBtoRGB(vec3 rgb) {
 	bvec3 cutoff = greaterThanEqual(rgb, vec3(0.04045));
 	vec3 below = rgb/vec3(12.92);
