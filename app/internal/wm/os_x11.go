@@ -155,6 +155,10 @@ func (w *x11Window) setOptions() {
 		C.XSetWMNormalHints(w.x, w.xw, &shints)
 	}
 
+	if o := opts.Size; o != nil {
+		C.XResizeWindow(w.x, w.xw, C.uint(w.cfg.Px(o.Width)), C.uint(w.cfg.Px(o.Height)))
+	}
+
 	var title string
 	if o := opts.Title; o != nil {
 		title = *o
