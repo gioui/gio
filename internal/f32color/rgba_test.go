@@ -7,21 +7,6 @@ import (
 	"testing"
 )
 
-func TestNRGBAToRGBA_PostAlpha_Boundary(t *testing.T) {
-	for col := 0; col <= 0xFF; col++ {
-		for alpha := 0; alpha <= 0xFF; alpha++ {
-			in := color.NRGBA{R: uint8(col), A: uint8(alpha)}
-			premul := NRGBAToRGBA_PostAlpha(in)
-			if premul.A != uint8(alpha) {
-				t.Errorf("%v: got %v expected %v", in, premul.A, alpha)
-			}
-			if premul.R > premul.A {
-				t.Errorf("%v: R=%v > A=%v", in, premul.R, premul.A)
-			}
-		}
-	}
-}
-
 func TestNRGBAToLinearRGBA_Boundary(t *testing.T) {
 	for col := 0; col <= 0xFF; col++ {
 		for alpha := 0; alpha <= 0xFF; alpha++ {
