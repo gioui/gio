@@ -398,7 +398,7 @@ func (g *gpu) Release() {
 	g.drawOps.pathCache.release()
 	g.cache.release()
 	if g.timers != nil {
-		g.timers.release()
+		g.timers.Release()
 	}
 	g.ctx.Release()
 }

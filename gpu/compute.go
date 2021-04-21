@@ -873,7 +873,10 @@ func (g *compute) resizeOutput(size image.Point) error {
 }
 
 func (g *compute) Release() {
-	progs := []driver.Program{
+	type resource interface {
+		Release()
+	}
+	res := []resource{
 		g.programs.elements,
 		g.programs.tileAlloc,
 		g.programs.pathCoarse,
@@ -881,45 +884,25 @@ func (g *compute) Release() {
 		g.programs.binning,
 		g.programs.coarse,
 		g.programs.kernel4,
+		g.output.blitProg,
+		&g.buffers.scene,
+		&g.buffers.state,
+		&g.buffers.memory,
+		g.buffers.config,
+		g.output.image,
+		g.images.tex,
+		g.materials.layout,
+		g.materials.prog,
+		g.materials.fbo,
+		g.materials.tex,
+		&g.materials.buffer,
+		g.materials.uniBuf,
+		g.timers.t,
 	}
-	if p := g.output.blitProg; p != nil {
-		p.Release()
-	}
-	for _, p := range progs {
-		if p != nil {
-			p.Release()
+	for _, r := range res {
+		if r != nil {
+			r.Release()
 		}
-	}
-	g.buffers.scene.release()
-	g.buffers.state.release()
-	g.buffers.memory.release()
-	if b := g.buffers.config; b != nil {
-		b.Release()
-	}
-	if g.output.image != nil {
-		g.output.image.Release()
-	}
-	if g.images.tex != nil {
-		g.images.tex.Release()
-	}
-	if g.materials.layout != nil {
-		g.materials.layout.Release()
-	}
-	if g.materials.prog != nil {
-		g.materials.prog.Release()
-	}
-	if g.materials.fbo != nil {
-		g.materials.fbo.Release()
-	}
-	if g.materials.tex != nil {
-		g.materials.tex.Release()
-	}
-	g.materials.buffer.release()
-	if b := g.materials.uniBuf; b != nil {
-		b.Release()
-	}
-	if g.timers.t != nil {
-		g.timers.t.release()
 	}
 
 	*g = compute{}
@@ -935,7 +918,7 @@ func (g *compute) bindBuffers() {
 	bindStorageBuffers(g.programs.kernel4, g.buffers.memory.buffer, g.buffers.config)
 }
 
-func (b *sizedBuffer) release() {
+func (b *sizedBuffer) Release() {
 	if b.buffer == nil {
 		return
 	}
@@ -948,7 +931,7 @@ func (b *sizedBuffer) ensureCapacity(ctx driver.Device, binding driver.BufferBin
 		return nil
 	}
 	if b.buffer != nil {
-		b.release()
+		b.Release()
 	}
 	buf, err := ctx.NewBuffer(binding, size)
 	if err != nil {
