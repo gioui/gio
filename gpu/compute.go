@@ -3,13 +3,18 @@
 package gpu
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash/maphash"
 	"image"
 	"image/color"
+	"image/png"
+	"io/ioutil"
 	"math"
 	"math/bits"
+	"sort"
 	"time"
 	"unsafe"
 
@@ -50,11 +55,17 @@ type compute struct {
 		memory sizedBuffer
 	}
 	output struct {
-		size image.Point
-		// image is the output texture. Note that it is in RGBA format,
-		// but contains data in sRGB. See blitOutput for more detail.
-		image    driver.Texture
 		blitProg driver.Program
+		layout   driver.InputLayout
+
+		buffer sizedBuffer
+
+		uniforms *copyUniforms
+		uniBuf   driver.Buffer
+
+		layerVertices []layerVertex
+		layerAtlases  []*layerAtlas
+		packer        packer
 	}
 	// images contains ImageOp images packed into a texture atlas.
 	images struct {
@@ -85,16 +96,11 @@ type compute struct {
 		uniBuf   driver.Buffer
 	}
 	timers struct {
-		profile         string
-		t               *timers
-		materials       *timer
-		elements        *timer
-		tileAlloc       *timer
-		pathCoarse      *timer
-		backdropBinning *timer
-		coarse          *timer
-		kernel4         *timer
-		blit            *timer
+		profile string
+		t       *timers
+		compact *timer
+		render  *timer
+		blit    *timer
 	}
 
 	// The following fields hold scratch space to avoid garbage.
@@ -103,42 +109,102 @@ type compute struct {
 	conf      *config
 }
 
+type layer struct {
+	rect     image.Rectangle
+	place    layerPlace
+	newPlace layerPlace
+	ops      []paintOp
+}
+
+type layerPlace struct {
+	atlas *layerAtlas
+	pos   image.Point
+}
+
+type layerAtlas struct {
+	// image is the layer atlas texture. Note that it is in RGBA format,
+	// but contains data in sRGB. See blitLayers for more detail.
+	image  driver.Texture
+	fbo    driver.Framebuffer
+	size   image.Point
+	layers int
+}
+
+type copyUniforms struct {
+	scale   [2]float32
+	pos     [2]float32
+	uvScale [2]float32
+	_       [8]byte // Pad to 16 bytes.
+}
+
 type materialUniforms struct {
 	scale [2]float32
 	pos   [2]float32
 }
 
 type collector struct {
-	profile      bool
-	reader       ops.Reader
-	states       []encoderState
-	clear        bool
-	clearColor   f32color.RGBA
-	clipCache    []clipState
-	clipCmdCache []clipCmd
-	paintOps     []paintOp
+	hasher     maphash.Hash
+	profile    bool
+	reader     ops.Reader
+	states     []encoderState
+	clear      bool
+	clearColor f32color.RGBA
+	clipStates []clipState
+	order      []hashIndex
+	prevFrame  opsCollector
+	frame      opsCollector
+}
+
+type hashIndex struct {
+	index int
+	hash  uint64
+}
+
+type opsCollector struct {
+	paths    []byte
+	clipCmds []clipCmd
+	ops      []paintOp
+	layers   []layer
 }
 
 type paintOp struct {
 	clipStack []clipCmd
-	state     encoderState
+	state     paintKey
+	intersect f32.Rectangle
+	hash      uint64
+	layer     int
 }
 
 // clipCmd describes a clipping command ready to be used for the compute
 // pipeline.
 type clipCmd struct {
 	// union of the bounds of the operations that are clipped.
-	union    f32.Rectangle
-	state    *clipState
-	relTrans f32.Affine2D
+	union     f32.Rectangle
+	state     clipKey
+	pathVerts []byte
+	absBounds f32.Rectangle
 }
 
 type encoderState struct {
-	t         f32.Affine2D
 	relTrans  f32.Affine2D
 	clip      *clipState
 	intersect f32.Rectangle
 
+	paintKey
+}
+
+// clipKey completely describes a clip operation (along with its path) and is appropriate
+// for hashing and equality checks.
+type clipKey struct {
+	bounds   f32.Rectangle
+	stroke   clip.StrokeStyle
+	relTrans f32.Affine2D
+}
+
+// paintKey completely defines a paint operation. It is suitable for hashing and
+// equality checks.
+type paintKey struct {
+	t       f32.Affine2D
 	matType materialType
 	// Current paint.ImageOp
 	image imageOpData
@@ -153,12 +219,16 @@ type encoderState struct {
 }
 
 type clipState struct {
-	bounds    f32.Rectangle
 	absBounds f32.Rectangle
-	pathVerts []byte
 	parent    *clipState
-	relTrans  f32.Affine2D
-	stroke    clip.StrokeStyle
+	pathVerts []byte
+
+	clipKey
+}
+
+type layerVertex struct {
+	posX, posY float32
+	u, v       float32
 }
 
 // materialVertex describes a vertex of a quad used to render a transformed
@@ -271,12 +341,32 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		memHeader:     new(memoryHeader),
 	}
 
+	// Large enough for reasonable fill sizes, yet still spannable by the compute programs.
+	g.output.packer.maxDim = 4096
 	blitProg, err := ctx.NewProgram(shader_copy_vert, shader_copy_frag)
 	if err != nil {
 		g.Release()
 		return nil, err
 	}
 	g.output.blitProg = blitProg
+	progLayout, err := ctx.NewInputLayout(shader_copy_vert, []driver.InputDesc{
+		{Type: driver.DataTypeFloat, Size: 2, Offset: 0},
+		{Type: driver.DataTypeFloat, Size: 2, Offset: 4 * 2},
+	})
+	if err != nil {
+		g.Release()
+		return nil, err
+	}
+	g.output.layout = progLayout
+	g.output.uniforms = new(copyUniforms)
+
+	buf, err := ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(*g.output.uniforms)))
+	if err != nil {
+		g.Release()
+		return nil, err
+	}
+	g.output.uniBuf = buf
+	g.output.blitProg.SetVertexUniforms(buf)
 
 	materialProg, err := ctx.NewProgram(shader_material_vert, shader_material_frag)
 	if err != nil {
@@ -284,7 +374,7 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		return nil, err
 	}
 	g.materials.prog = materialProg
-	progLayout, err := ctx.NewInputLayout(shader_material_vert, []driver.InputDesc{
+	progLayout, err = ctx.NewInputLayout(shader_material_vert, []driver.InputDesc{
 		{Type: driver.DataTypeFloat, Size: 2, Offset: 0},
 		{Type: driver.DataTypeFloat, Size: 2, Offset: 4 * 2},
 	})
@@ -295,7 +385,7 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	g.materials.layout = progLayout
 	g.materials.uniforms = new(materialUniforms)
 
-	buf, err := ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(*g.materials.uniforms)))
+	buf, err = ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(*g.materials.uniforms)))
 	if err != nil {
 		g.Release()
 		return nil, err
@@ -336,13 +426,12 @@ func newCompute(ctx driver.Device) (*compute, error) {
 func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	g.viewport = viewport
 	g.collector.reset()
-	g.enc.reset()
-	g.texOps = g.texOps[:0]
+	for i := range g.output.layerAtlases {
+		g.output.layerAtlases[i].layers = 0
+	}
 
-	// Flip Y-axis.
-	flipY := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(1, -1)).Offset(f32.Pt(0, float32(viewport.Y)))
-	g.collector.collect(ops, flipY, viewport)
-	g.collector.encode(viewport, &g.enc, &g.texOps)
+	g.collector.collect(ops, viewport)
+	g.collector.layer(viewport)
 }
 
 func (g *compute) Clear(col color.NRGBA) {
@@ -352,83 +441,261 @@ func (g *compute) Clear(col color.NRGBA) {
 
 func (g *compute) Frame() error {
 	viewport := g.viewport
-	tileDims := image.Point{
-		X: (viewport.X + tileWidthPx - 1) / tileWidthPx,
-		Y: (viewport.Y + tileHeightPx - 1) / tileHeightPx,
-	}
-
 	defFBO := g.ctx.BeginFrame(g.collector.clear, viewport)
 	defer g.ctx.EndFrame()
 
-	if g.collector.profile && g.timers.t == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
-		t := &g.timers
+	t := &g.timers
+	if g.collector.profile && t.t == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
 		t.t = newTimers(g.ctx)
-		t.materials = g.timers.t.newTimer()
-		t.elements = g.timers.t.newTimer()
-		t.tileAlloc = g.timers.t.newTimer()
-		t.pathCoarse = g.timers.t.newTimer()
-		t.backdropBinning = g.timers.t.newTimer()
-		t.coarse = g.timers.t.newTimer()
-		t.kernel4 = g.timers.t.newTimer()
-		t.blit = g.timers.t.newTimer()
+		t.compact = t.t.newTimer()
+		t.render = t.t.newTimer()
+		t.blit = t.t.newTimer()
 	}
 
-	mat := g.timers.materials
-	mat.begin()
 	g.ctx.BindFramebuffer(defFBO)
 	if g.collector.clear {
 		g.collector.clear = false
 		g.ctx.Clear(g.collector.clearColor.Float32())
 	}
-	if err := g.uploadImages(); err != nil {
+
+	t.compact.begin()
+	if err := g.compactLayers(); err != nil {
 		return err
 	}
-	if err := g.renderMaterials(); err != nil {
+	t.compact.end()
+	t.render.begin()
+	if err := g.renderLayers(viewport); err != nil {
 		return err
 	}
-	mat.end()
-	if err := g.render(tileDims); err != nil {
-		return err
-	}
+	t.render.end()
 	g.ctx.BindFramebuffer(defFBO)
-	g.blitOutput(viewport)
-	t := &g.timers
+	t.blit.begin()
+	g.blitLayers(viewport)
+	t.blit.end()
 	if g.collector.profile && t.t.ready() {
-		mat := t.materials.Elapsed
-		et, tat, pct, bbt := t.elements.Elapsed, t.tileAlloc.Elapsed, t.pathCoarse.Elapsed, t.backdropBinning.Elapsed
-		ct, k4t := t.coarse.Elapsed, t.kernel4.Elapsed
-		blit := t.blit.Elapsed
-		ft := mat + et + tat + pct + bbt + ct + k4t + blit
+		com, ren, blit := t.compact.Elapsed, t.render.Elapsed, t.blit.Elapsed
+		ft := com + ren + blit
 		q := 100 * time.Microsecond
 		ft = ft.Round(q)
-		mat = mat.Round(q)
-		et, tat, pct, bbt = et.Round(q), tat.Round(q), pct.Round(q), bbt.Round(q)
-		ct, k4t = ct.Round(q), k4t.Round(q)
-		blit = blit.Round(q)
-		t.profile = fmt.Sprintf("ft:%7s mat: %7s et:%7s tat:%7s pct:%7s bbt:%7s ct:%7s k4t:%7s blit:%7s", ft, mat, et, tat, pct, bbt, ct, k4t, blit)
+		com, ren, blit = com.Round(q), ren.Round(q), blit.Round(q)
+		t.profile = fmt.Sprintf("ft:%7s com: %7s ren:%7s blit:%7s", ft, com, ren, blit)
 	}
 	return nil
+}
+
+func (g *compute) dumpAtlases() {
+	for i, a := range g.output.layerAtlases {
+		dump, err := driver.DownloadImage(g.ctx, a.fbo, image.Rectangle{Max: a.size})
+		if err != nil {
+			panic(err)
+		}
+		nrgba := image.NewNRGBA(dump.Bounds())
+		bnd := dump.Bounds()
+		for x := bnd.Min.X; x < bnd.Max.X; x++ {
+			for y := bnd.Min.Y; y < bnd.Max.Y; y++ {
+				nrgba.SetNRGBA(x, y, f32color.RGBAToNRGBA(dump.RGBAAt(x, y)))
+			}
+		}
+		var buf bytes.Buffer
+		if err := png.Encode(&buf, nrgba); err != nil {
+			panic(err)
+		}
+		if err := ioutil.WriteFile(fmt.Sprintf("dump-%d.png", i), buf.Bytes(), 0600); err != nil {
+			panic(err)
+		}
+	}
 }
 
 func (g *compute) Profile() string {
 	return g.timers.profile
 }
 
-// blitOutput copies the compute render output to the output FBO. We need to
-// copy because compute shaders can only write to textures, not FBOs. Compute
-// shader can only write to RGBA textures, but since we actually render in sRGB
-// format we can't use glBlitFramebuffer, because it does sRGB conversion.
-func (g *compute) blitOutput(viewport image.Point) {
-	t := g.timers.blit
-	t.begin()
+func (g *compute) compactLayers() error {
+	layers := g.collector.frame.layers
+	for len(layers) > 0 {
+		var atlas *layerAtlas
+		addedLayers := false
+		end := 0
+		for end < len(layers) {
+			l := &layers[end]
+			if l.place.atlas == nil {
+				end++
+				continue
+			}
+			l.newPlace = l.place
+			if atlas == nil {
+				atlas = g.newAtlas()
+				g.output.packer.clear()
+				g.output.packer.newPage()
+			}
+			size := l.rect.Size()
+			place, fits := g.output.packer.tryAdd(size.Add(image.Pt(1, 1)))
+			if !fits {
+				if !addedLayers {
+					panic(fmt.Errorf("compute: internal error: empty atlas no longer fits layer (layer: %v)", size))
+				}
+				break
+			}
+			addedLayers = true
+			l.newPlace = layerPlace{
+				atlas: atlas,
+				pos:   place.Pos,
+			}
+			atlas.layers++
+			end++
+		}
+		if !addedLayers {
+			layers = layers[end:]
+			continue
+		}
+		outputSize := g.output.packer.sizes[0]
+		atlas.ensureSize(g.ctx, outputSize)
+		for i, l := range layers[:end] {
+			if l.newPlace == l.place {
+				continue
+			}
+			src := l.place.atlas.fbo
+			dst := atlas.fbo
+			sz := l.rect.Size()
+			sr := image.Rectangle{Min: l.place.pos, Max: l.place.pos.Add(sz)}
+			dr := image.Rectangle{Min: l.newPlace.pos, Max: l.newPlace.pos.Add(sz)}
+			g.ctx.BlitFramebuffer(dst, src, sr, dr)
+			l.place.atlas.layers--
+			if l.place.atlas.layers == 0 {
+				l.place.atlas.fbo.Invalidate()
+			}
+			layers[i].place = l.newPlace
+		}
+		layers = layers[end:]
+	}
+	return nil
+}
+
+func (g *compute) renderLayers(viewport image.Point) error {
+	layers := g.collector.frame.layers
+	for len(layers) > 0 {
+		var atlas *layerAtlas
+		addedLayers := false
+		for len(layers) > 0 {
+			l := &layers[0]
+			if a := l.place.atlas; a != nil {
+				a.layers++
+				layers = layers[1:]
+				continue
+			}
+			if atlas == nil {
+				atlas = g.newAtlas()
+				g.output.packer.clear()
+				g.output.packer.newPage()
+				g.enc.reset()
+				g.texOps = g.texOps[:0]
+			}
+			// Position onto atlas; pad to avoid overlap.
+			size := l.rect.Size()
+			place, fits := g.output.packer.tryAdd(size.Add(image.Pt(1, 1)))
+			if !fits {
+				if !addedLayers {
+					// The maximum compute output is either smaller than the window, or an operation
+					// in the layer wasn't clipped to the window.
+					panic(fmt.Errorf("compute: internal error: layer larger than maximum compute output (viewport: %v, layer: %v)", viewport, size))
+				}
+				break
+			}
+			addedLayers = true
+			l.place = layerPlace{
+				atlas: atlas,
+				pos:   place.Pos,
+			}
+			atlas.layers++
+			encodeLayer(*l, place.Pos, viewport, &g.enc, &g.texOps)
+			layers = layers[1:]
+		}
+		if !addedLayers {
+			break
+		}
+		if err := g.uploadImages(); err != nil {
+			return err
+		}
+		if err := g.renderMaterials(); err != nil {
+			return err
+		}
+		outputSize := g.output.packer.sizes[0]
+		tileDims := image.Point{
+			X: (outputSize.X + tileWidthPx - 1) / tileWidthPx,
+			Y: (outputSize.Y + tileHeightPx - 1) / tileHeightPx,
+		}
+		w, h := tileDims.X*tileWidthPx, tileDims.Y*tileHeightPx
+		if err := atlas.ensureSize(g.ctx, image.Pt(w, h)); err != nil {
+			return err
+		}
+		if err := g.render(atlas.image, tileDims); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (g *compute) newAtlas() *layerAtlas {
+	// Look for empty atlas to re-use.
+	for _, a := range g.output.layerAtlases {
+		if a.layers == 0 {
+			return a
+		}
+	}
+	a := new(layerAtlas)
+	g.output.layerAtlases = append(g.output.layerAtlases, a)
+	return a
+}
+
+func (g *compute) blitLayers(viewport image.Point) {
+	if len(g.collector.frame.layers) == 0 {
+		return
+	}
+	layers := g.collector.frame.layers
 	g.ctx.BlendFunc(driver.BlendFactorOne, driver.BlendFactorOneMinusSrcAlpha)
 	g.ctx.SetBlend(true)
 	defer g.ctx.SetBlend(false)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
-	g.ctx.BindTexture(0, g.output.image)
 	g.ctx.BindProgram(g.output.blitProg)
-	g.ctx.DrawArrays(driver.DrawModeTriangleStrip, 0, 4)
-	t.end()
+	g.ctx.BindInputLayout(g.output.layout)
+	for len(layers) > 0 {
+		g.output.layerVertices = g.output.layerVertices[:0]
+		atlas := layers[0].place.atlas
+		for len(layers) > 0 {
+			l := layers[0]
+			if l.place.atlas != atlas {
+				break
+			}
+			placef := layout.FPt(l.place.pos)
+			sizef := layout.FPt(l.rect.Size())
+			quad := [4]layerVertex{
+				{posX: float32(l.rect.Min.X), posY: float32(l.rect.Min.Y), u: placef.X, v: placef.Y},
+				{posX: float32(l.rect.Max.X), posY: float32(l.rect.Min.Y), u: placef.X + sizef.X, v: placef.Y},
+				{posX: float32(l.rect.Max.X), posY: float32(l.rect.Max.Y), u: placef.X + sizef.X, v: placef.Y + sizef.Y},
+				{posX: float32(l.rect.Min.X), posY: float32(l.rect.Max.Y), u: placef.X, v: placef.Y + sizef.Y},
+			}
+			g.output.layerVertices = append(g.output.layerVertices, quad[0], quad[1], quad[3], quad[3], quad[2], quad[1])
+			layers = layers[1:]
+		}
+
+		// Transform positions to clip space: [-1, -1] - [1, 1], and texture
+		// coordinates to texture space: [0, 0] - [1, 1].
+		clip := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(2/float32(viewport.X), 2/float32(viewport.Y))).Offset(f32.Pt(-1, -1))
+		// Flip y-axis to match framebuffer output space.
+		flipY := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(1, -1)).Offset(f32.Pt(0, float32(viewport.Y)))
+		clip = clip.Mul(flipY)
+		sx, _, ox, _, sy, oy := clip.Elems()
+		g.output.uniforms.scale = [2]float32{sx, sy}
+		g.output.uniforms.pos = [2]float32{ox, oy}
+		g.output.uniforms.uvScale = [2]float32{1 / float32(atlas.size.X), 1 / float32(atlas.size.Y)}
+		g.output.uniBuf.Upload(byteslice.Struct(g.output.uniforms))
+		vertexData := byteslice.Slice(g.output.layerVertices)
+		g.output.buffer.ensureCapacity(g.ctx, driver.BufferBindingVertices, len(vertexData))
+		g.output.buffer.buffer.Upload(vertexData)
+		g.ctx.BindVertexBuffer(g.output.buffer.buffer, int(unsafe.Sizeof(g.output.layerVertices[0])), 0)
+		g.ctx.BindTexture(0, atlas.image)
+		g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(g.output.layerVertices))
+	}
 }
 
 func (g *compute) renderMaterials() error {
@@ -691,7 +958,7 @@ func (enc *encoder) encodePath(verts []byte) {
 	}
 }
 
-func (g *compute) render(tileDims image.Point) error {
+func (g *compute) render(dst driver.Texture, tileDims image.Point) error {
 	const (
 		// wgSize is the largest and most common workgroup size.
 		wgSize = 128
@@ -720,13 +987,7 @@ func (g *compute) render(tileDims image.Point) error {
 	}
 	g.buffers.scene.buffer.Upload(scene)
 
-	w, h := tileDims.X*tileWidthPx, tileDims.Y*tileHeightPx
-	if g.output.size.X != w || g.output.size.Y != h {
-		if err := g.resizeOutput(image.Pt(w, h)); err != nil {
-			return err
-		}
-	}
-	g.ctx.BindImageTexture(kernel4OutputUnit, g.output.image, driver.AccessWrite, driver.TextureFormatRGBA8)
+	g.ctx.BindImageTexture(kernel4OutputUnit, dst, driver.AccessWrite, driver.TextureFormatRGBA8)
 	if t := g.materials.tex; t != nil {
 		g.ctx.BindImageTexture(kernel4AtlasUnit, t, driver.AccessRead, driver.TextureFormatRGBA8)
 	}
@@ -790,41 +1051,28 @@ func (g *compute) render(tileDims image.Point) error {
 			realloced = false
 			g.bindBuffers()
 		}
-		t := &g.timers
 		g.ctx.MemoryBarrier()
-		t.elements.begin()
 		g.ctx.BindProgram(g.programs.elements)
 		g.ctx.DispatchCompute(numPartitions, 1, 1)
 		g.ctx.MemoryBarrier()
-		t.elements.end()
-		t.tileAlloc.begin()
 		g.ctx.BindProgram(g.programs.tileAlloc)
 		g.ctx.DispatchCompute((enc.npath+wgSize-1)/wgSize, 1, 1)
 		g.ctx.MemoryBarrier()
-		t.tileAlloc.end()
-		t.pathCoarse.begin()
 		g.ctx.BindProgram(g.programs.pathCoarse)
 		g.ctx.DispatchCompute((enc.npathseg+31)/32, 1, 1)
 		g.ctx.MemoryBarrier()
-		t.pathCoarse.end()
-		t.backdropBinning.begin()
 		g.ctx.BindProgram(g.programs.backdrop)
 		g.ctx.DispatchCompute((enc.npath+wgSize-1)/wgSize, 1, 1)
 		// No barrier needed between backdrop and binning.
 		g.ctx.BindProgram(g.programs.binning)
 		g.ctx.DispatchCompute((enc.npath+wgSize-1)/wgSize, 1, 1)
 		g.ctx.MemoryBarrier()
-		t.backdropBinning.end()
-		t.coarse.begin()
 		g.ctx.BindProgram(g.programs.coarse)
 		g.ctx.DispatchCompute(widthInBins, heightInBins, 1)
 		g.ctx.MemoryBarrier()
-		t.coarse.end()
-		t.kernel4.begin()
 		g.ctx.BindProgram(g.programs.kernel4)
 		g.ctx.DispatchCompute(tileDims.X, tileDims.Y, 1)
 		g.ctx.MemoryBarrier()
-		t.kernel4.end()
 
 		if err := g.buffers.memory.buffer.Download(byteslice.Struct(g.memHeader)); err != nil {
 			if err == driver.ErrContentLost {
@@ -857,20 +1105,34 @@ func (g *compute) zeros(size int) []byte {
 	return g.zeroSlice[:size]
 }
 
-func (g *compute) resizeOutput(size image.Point) error {
-	if g.output.image != nil {
-		g.output.image.Release()
-		g.output.image = nil
+func (a *layerAtlas) ensureSize(ctx driver.Device, size image.Point) error {
+	if a.size.X >= size.X && a.size.Y >= size.Y {
+		return nil
 	}
-	img, err := g.ctx.NewTexture(driver.TextureFormatRGBA8, size.X, size.Y,
+	size.X, size.Y = pow2Ceil(size.X), pow2Ceil(size.Y)
+	if a.fbo != nil {
+		a.fbo.Release()
+		a.fbo = nil
+	}
+	if a.image != nil {
+		a.image.Release()
+		a.image = nil
+	}
+	img, err := ctx.NewTexture(driver.TextureFormatRGBA8, size.X, size.Y,
 		driver.FilterNearest,
 		driver.FilterNearest,
-		driver.BufferBindingShaderStorage|driver.BufferBindingTexture)
+		driver.BufferBindingShaderStorage|driver.BufferBindingTexture|driver.BufferBindingFramebuffer)
 	if err != nil {
 		return err
 	}
-	g.output.image = img
-	g.output.size = size
+	fbo, err := ctx.NewFramebuffer(img, 0)
+	if err != nil {
+		img.Release()
+		return err
+	}
+	a.fbo = fbo
+	a.image = img
+	a.size = size
 	return nil
 }
 
@@ -887,11 +1149,12 @@ func (g *compute) Release() {
 		g.programs.coarse,
 		g.programs.kernel4,
 		g.output.blitProg,
+		&g.output.buffer,
+		g.output.uniBuf,
 		&g.buffers.scene,
 		&g.buffers.state,
 		&g.buffers.memory,
 		g.buffers.config,
-		g.output.image,
 		g.images.tex,
 		g.materials.layout,
 		g.materials.prog,
@@ -904,6 +1167,14 @@ func (g *compute) Release() {
 	for _, r := range res {
 		if r != nil {
 			r.Release()
+		}
+	}
+	for _, a := range g.output.layerAtlases {
+		if a.fbo != nil {
+			a.fbo.Release()
+		}
+		if a.image != nil {
+			a.image.Release()
 		}
 	}
 
@@ -1008,6 +1279,9 @@ func (e *encoder) fillColor(col color.RGBA) {
 }
 
 func (e *encoder) setFillImageOffset(index int, offset image.Point) {
+	if e.scene[index].Op() != scene.OpFillImage {
+		panic("invalid fill image command")
+	}
 	x := int16(offset.X)
 	y := int16(offset.Y)
 	e.scene[index][2] = uint32(uint16(x)) | uint32(uint16(y))<<16
@@ -1031,20 +1305,22 @@ func (e *encoder) quad(start, ctrl, end f32.Point) {
 }
 
 func (c *collector) reset() {
+	c.prevFrame, c.frame = c.frame, c.prevFrame
 	c.profile = false
-	c.clipCache = c.clipCache[:0]
-	c.clipCmdCache = c.clipCmdCache[:0]
-	c.paintOps = c.paintOps[:0]
+	c.clipStates = c.clipStates[:0]
+	c.frame.reset()
+}
+
+func (c *opsCollector) reset() {
+	c.paths = c.paths[:0]
+	c.clipCmds = c.clipCmds[:0]
+	c.ops = c.ops[:0]
+	c.layers = c.layers[:0]
 }
 
 func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle, path []byte, stroke clip.StrokeStyle) {
 	// Rectangle clip regions.
 	if len(path) == 0 {
-		transView := transformBounds(state.t.Invert(), viewport)
-		// If the rectangular clip contains the viewport it can be discarded.
-		if transView.In(bounds) {
-			return
-		}
 		// If the rectangular clip region contains a previous path it can be discarded.
 		p := state.clip
 		t := state.relTrans.Invert()
@@ -1060,27 +1336,29 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 	}
 
 	absBounds := transformBounds(state.t, bounds).Bounds()
-	c.clipCache = append(c.clipCache, clipState{
+	c.clipStates = append(c.clipStates, clipState{
 		parent:    state.clip,
-		bounds:    bounds,
 		absBounds: absBounds,
-		relTrans:  state.relTrans,
-		stroke:    stroke,
 		pathVerts: path,
+		clipKey: clipKey{
+			bounds:   bounds,
+			relTrans: state.relTrans,
+			stroke:   stroke,
+		},
 	})
 	state.intersect = state.intersect.Intersect(absBounds)
-	state.clip = &c.clipCache[len(c.clipCache)-1]
+	state.clip = &c.clipStates[len(c.clipStates)-1]
 	state.relTrans = f32.Affine2D{}
 }
 
-func (c *collector) collect(root *op.Ops, trans f32.Affine2D, viewport image.Point) {
+func (c *collector) collect(root *op.Ops, viewport image.Point) {
 	fview := f32.Rectangle{Max: layout.FPt(viewport)}
 	c.reader.Reset(root)
 	state := encoderState{
-		color:     color.NRGBA{A: 0xff},
 		intersect: fview,
-		t:         trans,
-		relTrans:  trans,
+		paintKey: paintKey{
+			color: color.NRGBA{A: 0xff},
+		},
 	}
 	r := &c.reader
 	var (
@@ -1088,6 +1366,7 @@ func (c *collector) collect(root *op.Ops, trans f32.Affine2D, viewport image.Poi
 		str      clip.StrokeStyle
 	)
 	c.save(opconst.InitialStateID, state)
+	c.addClip(&state, fview, fview, nil, clip.StrokeStyle{})
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypeProfile:
@@ -1141,21 +1420,30 @@ func (c *collector) collect(root *op.Ops, trans f32.Affine2D, viewport image.Poi
 			if paintState.clip == nil && paintState.matType == materialColor && paintState.color.A == 255 {
 				c.clearColor = f32color.LinearFromSRGB(paintState.color).Opaque()
 				c.clear = true
-				c.paintOps = c.paintOps[:0]
+				c.frame.reset()
 				break
 			}
 
 			// Flatten clip stack.
 			p := paintState.clip
-			startIdx := len(c.clipCmdCache)
+			startIdx := len(c.frame.clipCmds)
 			for p != nil {
-				c.clipCmdCache = append(c.clipCmdCache, clipCmd{state: p, relTrans: p.relTrans})
+				idx := len(c.frame.paths)
+				c.frame.paths = append(c.frame.paths, make([]byte, len(p.pathVerts))...)
+				path := c.frame.paths[idx:]
+				copy(path, p.pathVerts)
+				c.frame.clipCmds = append(c.frame.clipCmds, clipCmd{
+					state:     p.clipKey,
+					pathVerts: path,
+					absBounds: p.absBounds,
+				})
 				p = p.parent
 			}
-			clipStack := c.clipCmdCache[startIdx:]
-			c.paintOps = append(c.paintOps, paintOp{
+			clipStack := c.frame.clipCmds[startIdx:]
+			c.frame.ops = append(c.frame.ops, paintOp{
 				clipStack: clipStack,
-				state:     paintState,
+				state:     paintState.paintKey,
+				intersect: paintState.intersect,
 			})
 		case opconst.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
@@ -1171,101 +1459,259 @@ func (c *collector) collect(root *op.Ops, trans f32.Affine2D, viewport image.Poi
 			}
 		}
 	}
-	for i := range c.paintOps {
-		op := &c.paintOps[i]
+	for i := range c.frame.ops {
+		op := &c.frame.ops[i]
 		// For each clip, cull rectangular clip regions that contain its
 		// (transformed) bounds. addClip already handled the converse case.
 		// TODO: do better than O(n²) to efficiently deal with deep stacks.
 		for i := 0; i < len(op.clipStack)-1; i++ {
 			cl := op.clipStack[i]
 			p := cl.state
-			r := transformBounds(cl.relTrans, p.bounds)
+			r := transformBounds(p.relTrans, p.bounds)
 			for j := i + 1; j < len(op.clipStack); j++ {
 				cl2 := op.clipStack[j]
 				p2 := cl2.state
-				if len(p2.pathVerts) == 0 && r.In(p2.bounds) {
+				if len(cl2.pathVerts) == 0 && r.In(cl2.state.bounds) {
 					op.clipStack = append(op.clipStack[:j], op.clipStack[j+1:]...)
 					j--
-					op.clipStack[j].relTrans = cl2.relTrans.Mul(op.clipStack[j].relTrans)
+					op.clipStack[j].state.relTrans = p2.relTrans.Mul(op.clipStack[j].state.relTrans)
 				}
-				r = transformRect(cl2.relTrans, r)
+				r = transformRect(p2.relTrans, r)
 			}
 		}
+		op.hash = c.hashOp(*op)
 	}
 }
 
-func (c *collector) encode(viewport image.Point, enc *encoder, texOps *[]textureOp) {
-	fview := f32.Rectangle{Max: layout.FPt(viewport)}
+func (c *collector) hashOp(op paintOp) uint64 {
+	c.hasher.Reset()
+	for _, cl := range op.clipStack {
+		c.hasher.Write(cl.pathVerts)
+		k := cl.state
+		keyBytes := (*[unsafe.Sizeof(k)]byte)(unsafe.Pointer(unsafe.Pointer(&k)))
+		c.hasher.Write(keyBytes[:])
+	}
+	k := op.state
+	keyBytes := (*[unsafe.Sizeof(k)]byte)(unsafe.Pointer(unsafe.Pointer(&k)))
+	c.hasher.Write(keyBytes[:])
+	return c.hasher.Sum64()
+}
+
+func (c *collector) layer(viewport image.Point) {
+	// Sort ops from previous frames by hash.
+	prevOps := c.prevFrame.ops
+	c.order = c.order[:0]
+	for i, op := range prevOps {
+		c.order = append(c.order, hashIndex{
+			index: i,
+			hash:  op.hash,
+		})
+	}
+	sort.Slice(c.order, func(i, j int) bool {
+		return c.order[i].hash < c.order[j].hash
+	})
+	addLayer := func(l layer) {
+		for i, op := range l.ops {
+			l.rect = l.rect.Union(boundRectF(op.intersect))
+			l.ops[i].layer = len(c.frame.layers)
+		}
+		c.frame.layers = append(c.frame.layers, l)
+		if l.place.atlas != nil {
+			l.place.atlas.layers++
+		}
+	}
+	ops := c.frame.ops
+	idx := 0
+	for idx < len(ops) {
+		op := ops[idx]
+		// Search for longest matching op sequence.
+		// start is the earliest index of a match.
+		start := searchOp(c.order, op.hash)
+		layerOps, layerIdx := longestLayer(prevOps, c.order[start:], ops[idx:])
+		if len(layerOps) == 0 {
+			idx++
+			continue
+		}
+		if unmatched := ops[:idx]; len(unmatched) > 0 {
+			// Flush layer of unmatched ops.
+			addLayer(layer{ops: unmatched})
+			ops = ops[idx:]
+			idx = 0
+		}
+		l := c.prevFrame.layers[layerIdx]
+		var place layerPlace
+		if len(l.ops) == len(layerOps) {
+			place = l.place
+		}
+		addLayer(layer{ops: layerOps, place: place})
+		ops = ops[len(layerOps):]
+	}
+	if len(ops) > 0 {
+		addLayer(layer{ops: ops})
+	}
+}
+
+func longestLayer(prev []paintOp, order []hashIndex, ops []paintOp) ([]paintOp, int) {
+	longest := 0
+	longestIdx := -1
+outer:
+	for len(order) > 0 {
+		first := order[0]
+		order = order[1:]
+		match := prev[first.index:]
+		// Potential match found. Now find longest matching sequence.
+		end := 0
+		layer := -1
+		for end < len(match) && end < len(ops) {
+			m := match[end]
+			o := ops[end]
+			// End on layer boundaries.
+			if layer != -1 && m.layer != layer {
+				break
+			}
+			// End layer when the next op doesn't match.
+			if m.hash != o.hash {
+				if end == 0 {
+					// Hashes are sorted so if the first op doesn't match, no
+					// more matches are possible.
+					break outer
+				}
+				break
+			}
+			if !opEqual(m, o) {
+				break
+			}
+			layer = m.layer
+			end++
+		}
+		if end > longest {
+			longest = end
+			longestIdx = layer
+		}
+	}
+	return ops[:longest], longestIdx
+}
+
+func searchOp(order []hashIndex, hash uint64) int {
+	lo, hi := 0, len(order)
+	for lo < hi {
+		mid := (lo + hi) / 2
+		if order[mid].hash < hash {
+			lo = mid + 1
+		} else {
+			hi = mid
+		}
+	}
+	return lo
+}
+
+func opEqual(o1 paintOp, o2 paintOp) bool {
+	if len(o1.clipStack) != len(o2.clipStack) {
+		return false
+	}
+	if o1.state != o2.state {
+		return false
+	}
+	for i, cl1 := range o1.clipStack {
+		cl2 := o2.clipStack[i]
+		if len(cl1.pathVerts) != len(cl2.pathVerts) {
+			return false
+		}
+		if cl1.state != cl2.state {
+			return false
+		}
+		if !bytes.Equal(cl1.pathVerts, cl2.pathVerts) {
+			return false
+		}
+	}
+	return true
+}
+
+func encodeLayer(l layer, pos image.Point, viewport image.Point, enc *encoder, texOps *[]textureOp) {
+	off := pos.Sub(l.rect.Min)
+	offf := layout.FPt(off)
+
+	enc.transform(f32.Affine2D{}.Offset(offf))
+	for _, op := range l.ops {
+		encodeOp(viewport, offf, enc, texOps, op)
+	}
+	enc.transform(f32.Affine2D{}.Offset(offf.Mul(-1)))
+}
+
+func encodeOp(viewport image.Point, absOff f32.Point, enc *encoder, texOps *[]textureOp, op paintOp) {
+	// Fill in clip bounds, which the shaders expect to be the union
+	// of all affected bounds.
+	var union f32.Rectangle
+	for i, cl := range op.clipStack {
+		union = union.Union(cl.absBounds)
+		op.clipStack[i].union = union
+	}
+
 	fillMode := scene.FillModeNonzero
-	for _, op := range c.paintOps {
-		// Fill in clip bounds, which the shaders expect to be the union
-		// of all affected bounds.
-		var union f32.Rectangle
-		for i, cl := range op.clipStack {
-			union = union.Union(cl.state.absBounds)
-			op.clipStack[i].union = union
+	var inv f32.Affine2D
+	for i := len(op.clipStack) - 1; i >= 0; i-- {
+		cl := op.clipStack[i]
+		if str := cl.state.stroke; str.Width > 0 {
+			enc.fillMode(scene.FillModeStroke)
+			enc.lineWidth(str.Width)
+			fillMode = scene.FillModeStroke
+		} else if fillMode != scene.FillModeNonzero {
+			enc.fillMode(scene.FillModeNonzero)
+			fillMode = scene.FillModeNonzero
 		}
+		enc.transform(cl.state.relTrans)
+		inv = inv.Mul(cl.state.relTrans)
+		if len(cl.pathVerts) == 0 {
+			enc.rect(cl.state.bounds)
+		} else {
+			enc.encodePath(cl.pathVerts)
+		}
+		if i != 0 {
+			enc.beginClip(cl.union.Add(absOff))
+		}
+	}
+	if len(op.clipStack) == 0 {
+		// No clipping; fill the entire view.
+		enc.rect(f32.Rectangle{Max: layout.FPt(viewport)})
+	}
 
-		var inv f32.Affine2D
-		for i := len(op.clipStack) - 1; i >= 0; i-- {
-			cl := op.clipStack[i]
-			if str := cl.state.stroke; str.Width > 0 {
-				enc.fillMode(scene.FillModeStroke)
-				enc.lineWidth(str.Width)
-				fillMode = scene.FillModeStroke
-			} else if fillMode != scene.FillModeNonzero {
-				enc.fillMode(scene.FillModeNonzero)
-				fillMode = scene.FillModeNonzero
-			}
-			enc.transform(cl.relTrans)
-			inv = inv.Mul(cl.relTrans)
-			if len(cl.state.pathVerts) == 0 {
-				enc.rect(cl.state.bounds)
-			} else {
-				enc.encodePath(cl.state.pathVerts)
-			}
-			if i != 0 {
-				enc.beginClip(cl.union)
-			}
-		}
-		if op.state.clip == nil {
-			// No clipping; fill the entire view.
-			enc.rect(fview)
-		}
-
-		switch op.state.matType {
-		case materialTexture:
-			// Add fill command. Its offset is resolved and filled in renderMaterials.
-			idx := enc.fillImage(0)
-			sx, hx, ox, hy, sy, oy := op.state.t.Elems()
-			// Separate integer offset from transformation. TextureOps that have identical transforms
-			// except for their integer offsets can share a transformed image.
-			intx, fracx := math.Modf(float64(ox))
-			inty, fracy := math.Modf(float64(oy))
-			t := f32.NewAffine2D(sx, hx, float32(fracx), hy, sy, float32(fracy))
-			*texOps = append(*texOps, textureOp{
-				sceneIdx: idx,
-				img:      op.state.image,
-				off:      image.Pt(int(intx), int(inty)),
-				key: textureKey{
-					transform: t,
-					handle:    op.state.image.handle,
-				},
-			})
-		case materialColor:
-			enc.fillColor(f32color.NRGBAToRGBA(op.state.color))
-		case materialLinearGradient:
-			// TODO: implement.
-			enc.fillColor(f32color.NRGBAToRGBA(op.state.color1))
-		default:
-			panic("not implemented")
-		}
-		enc.transform(inv.Invert())
-		// Pop the clip stack, except the first entry used for fill.
-		for i := 1; i < len(op.clipStack); i++ {
-			cl := op.clipStack[i]
-			enc.endClip(cl.union)
-		}
+	switch op.state.matType {
+	case materialTexture:
+		// Add fill command. Its offset is resolved and filled in renderMaterials.
+		idx := enc.fillImage(0)
+		sx, hx, ox, hy, sy, oy := op.state.t.Elems()
+		ox += absOff.X
+		oy += absOff.Y
+		// Separate integer offset from transformation. TextureOps that have identical transforms
+		// except for their integer offsets can share a transformed image.
+		intx, fracx := math.Modf(float64(ox))
+		inty, fracy := math.Modf(float64(oy))
+		t := f32.NewAffine2D(sx, hx, float32(fracx), hy, sy, float32(fracy))
+		*texOps = append(*texOps, textureOp{
+			sceneIdx: idx,
+			img:      op.state.image,
+			off:      image.Pt(int(intx), int(inty)),
+			key: textureKey{
+				transform: t,
+				handle:    op.state.image.handle,
+			},
+		})
+	case materialColor:
+		enc.fillColor(f32color.NRGBAToRGBA(op.state.color))
+	case materialLinearGradient:
+		// TODO: implement.
+		enc.fillColor(f32color.NRGBAToRGBA(op.state.color1))
+	default:
+		panic("not implemented")
+	}
+	enc.transform(inv.Invert())
+	// Pop the clip stack, except the first entry used for fill.
+	for i := 1; i < len(op.clipStack); i++ {
+		cl := op.clipStack[i]
+		enc.endClip(cl.union.Add(absOff))
+	}
+	if fillMode != scene.FillModeNonzero {
+		enc.fillMode(scene.FillModeNonzero)
 	}
 }
 

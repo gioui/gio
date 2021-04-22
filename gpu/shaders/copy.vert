@@ -4,19 +4,18 @@
 
 precision highp float;
 
+layout(binding = 0) uniform Block {
+	vec2 scale;
+	vec2 pos;
+	vec2 uvScale;
+} _block;
+
+layout(location = 0) in vec2 pos;
+layout(location = 1) in vec2 uv;
+
+layout(location = 0) out vec2 vUV;
+
 void main() {
-	switch (gl_VertexIndex) {
-	case 0:
-		gl_Position = vec4(-1.0, +1.0, 0.0, 1.0);
-		break;
-	case 1:
-		gl_Position = vec4(+1.0, +1.0, 0.0, 1.0);
-		break;
-	case 2:
-		gl_Position = vec4(-1.0, -1.0, 0.0, 1.0);
-		break;
-	case 3:
-		gl_Position = vec4(+1.0, -1.0, 0.0, 1.0);
-		break;
-	}
+	vUV = uv*_block.uvScale;
+	gl_Position = vec4(pos*_block.scale + _block.pos, 0, 1);
 }
