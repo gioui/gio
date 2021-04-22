@@ -375,6 +375,11 @@ func (g *compute) Frame() error {
 
 	mat := g.timers.materials
 	mat.begin()
+	g.ctx.BindFramebuffer(defFBO)
+	if g.collector.clear {
+		g.collector.clear = false
+		g.ctx.Clear(g.collector.clearColor.Float32())
+	}
 	if err := g.uploadImages(); err != nil {
 		return err
 	}
@@ -402,7 +407,6 @@ func (g *compute) Frame() error {
 		blit = blit.Round(q)
 		t.profile = fmt.Sprintf("ft:%7s mat: %7s et:%7s tat:%7s pct:%7s bbt:%7s ct:%7s k4t:%7s blit:%7s", ft, mat, et, tat, pct, bbt, ct, k4t, blit)
 	}
-	g.collector.clear = false
 	return nil
 }
 
@@ -417,11 +421,9 @@ func (g *compute) Profile() string {
 func (g *compute) blitOutput(viewport image.Point) {
 	t := g.timers.blit
 	t.begin()
-	if !g.collector.clear {
-		g.ctx.BlendFunc(driver.BlendFactorOne, driver.BlendFactorOneMinusSrcAlpha)
-		g.ctx.SetBlend(true)
-		defer g.ctx.SetBlend(false)
-	}
+	g.ctx.BlendFunc(driver.BlendFactorOne, driver.BlendFactorOneMinusSrcAlpha)
+	g.ctx.SetBlend(true)
+	defer g.ctx.SetBlend(false)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.ctx.BindTexture(0, g.output.image)
 	g.ctx.BindProgram(g.output.blitProg)
@@ -1195,10 +1197,6 @@ func (c *collector) collect(root *op.Ops, trans f32.Affine2D, viewport image.Poi
 func (c *collector) encode(viewport image.Point, enc *encoder, texOps *[]textureOp) {
 	fview := f32.Rectangle{Max: layout.FPt(viewport)}
 	fillMode := scene.FillModeNonzero
-	if c.clear {
-		enc.rect(fview)
-		enc.fillColor(f32color.NRGBAToRGBA(c.clearColor.SRGB()))
-	}
 	for _, op := range c.paintOps {
 		// Fill in clip bounds, which the shaders expect to be the union
 		// of all affected bounds.
