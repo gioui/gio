@@ -54,6 +54,7 @@ type compute struct {
 		// image is the output texture. Note that it is in RGBA format,
 		// but contains data in sRGB. See blitOutput for more detail.
 		image    driver.Texture
+		fbo      driver.Framebuffer
 		blitProg driver.Program
 	}
 	// images contains ImageOp images packed into a texture atlas.
@@ -380,6 +381,14 @@ func (g *compute) Frame() error {
 		g.collector.clear = false
 		g.ctx.Clear(g.collector.clearColor.Float32())
 	}
+	w, h := tileDims.X*tileWidthPx, tileDims.Y*tileHeightPx
+	if g.output.size.X != w || g.output.size.Y != h {
+		if err := g.resizeOutput(image.Pt(w, h)); err != nil {
+			return err
+		}
+	}
+	g.ctx.BindFramebuffer(g.output.fbo)
+	g.ctx.Clear(0, 0, 0, 0)
 	if err := g.uploadImages(); err != nil {
 		return err
 	}
@@ -719,12 +728,6 @@ func (g *compute) render(tileDims image.Point) error {
 	}
 	g.buffers.scene.buffer.Upload(scene)
 
-	w, h := tileDims.X*tileWidthPx, tileDims.Y*tileHeightPx
-	if g.output.size.X != w || g.output.size.Y != h {
-		if err := g.resizeOutput(image.Pt(w, h)); err != nil {
-			return err
-		}
-	}
 	g.ctx.BindImageTexture(kernel4OutputUnit, g.output.image, driver.AccessWrite, driver.TextureFormatRGBA8)
 	if t := g.materials.tex; t != nil {
 		g.ctx.BindImageTexture(kernel4AtlasUnit, t, driver.AccessRead, driver.TextureFormatRGBA8)
@@ -857,6 +860,10 @@ func (g *compute) zeros(size int) []byte {
 }
 
 func (g *compute) resizeOutput(size image.Point) error {
+	if g.output.fbo != nil {
+		g.output.fbo.Release()
+		g.output.fbo = nil
+	}
 	if g.output.image != nil {
 		g.output.image.Release()
 		g.output.image = nil
@@ -864,10 +871,16 @@ func (g *compute) resizeOutput(size image.Point) error {
 	img, err := g.ctx.NewTexture(driver.TextureFormatRGBA8, size.X, size.Y,
 		driver.FilterNearest,
 		driver.FilterNearest,
-		driver.BufferBindingShaderStorage|driver.BufferBindingTexture)
+		driver.BufferBindingShaderStorage|driver.BufferBindingTexture|driver.BufferBindingFramebuffer)
 	if err != nil {
 		return err
 	}
+	fbo, err := g.ctx.NewFramebuffer(img, 0)
+	if err != nil {
+		img.Release()
+		return err
+	}
+	g.output.fbo = fbo
 	g.output.image = img
 	g.output.size = size
 	return nil
@@ -890,6 +903,7 @@ func (g *compute) Release() {
 		&g.buffers.state,
 		&g.buffers.memory,
 		g.buffers.config,
+		g.output.fbo,
 		g.output.image,
 		g.images.tex,
 		g.materials.layout,
