@@ -212,12 +212,14 @@ type config struct {
 	n_pathseg       uint32
 	width_in_tiles  uint32
 	height_in_tiles uint32
+	dispatch_alloc  memAlloc
 	tile_alloc      memAlloc
 	bin_alloc       memAlloc
 	ptcl_alloc      memAlloc
 	pathseg_alloc   memAlloc
 	anno_alloc      memAlloc
 	trans_alloc     memAlloc
+	cmdtile_alloc   memAlloc
 }
 
 // memAlloc matches Alloc in mem.h
@@ -232,11 +234,20 @@ type memoryHeader struct {
 	mem_error  uint32
 }
 
+type tileCmd struct {
+	tile_x, tile_y, offset uint32
+	ncmd                   uint32
+}
+
 // rect is a oriented rectangle.
 type rectangle [4]f32.Point
 
 // GPU structure sizes and constants.
 const (
+	// dispatchBufferSize is the size of an indirect compute dispatch command,
+	// containing the x, y, and z workgroup dimensions.
+	dispatchBufferSize = 3 * 4
+
 	tileWidthPx       = 32
 	tileHeightPx      = 32
 	ptclInitialAlloc  = 1024
@@ -250,6 +261,7 @@ const (
 	transSize   = 24
 	stateSize   = 60
 	stateStride = 4 + 2*stateSize
+	cmdTileSize = 12
 )
 
 // mem.h constants.
@@ -750,12 +762,14 @@ func (g *compute) render(tileDims image.Point) error {
 		n_pathseg:       uint32(enc.npathseg),
 		width_in_tiles:  uint32(tileDims.X),
 		height_in_tiles: uint32(tileDims.Y),
+		dispatch_alloc:  malloc(dispatchBufferSize),
 		tile_alloc:      malloc(enc.npath * pathSize),
 		bin_alloc:       malloc(round(enc.npath, wgSize) * binSize),
 		ptcl_alloc:      malloc(tileDims.X * tileDims.Y * ptclInitialAlloc),
 		pathseg_alloc:   malloc(enc.npathseg * pathsegSize),
 		anno_alloc:      malloc(enc.npath * annoSize),
 		trans_alloc:     malloc(enc.ntrans * transSize),
+		cmdtile_alloc:   malloc(tileDims.X * tileDims.Y * cmdTileSize),
 	}
 
 	numPartitions := (enc.numElements() + 127) / 128
@@ -771,7 +785,8 @@ func (g *compute) render(tileDims image.Point) error {
 
 	g.buffers.config.Upload(byteslice.Struct(g.conf))
 
-	minSize := int(unsafe.Sizeof(memoryHeader{})) + int(alloc)
+	const memHeaderSize = unsafe.Sizeof(memoryHeader{})
+	minSize := int(memHeaderSize) + int(alloc)
 	if minSize > g.buffers.memory.size {
 		realloced = true
 		// Add space for dynamic GPU allocations.
@@ -824,7 +839,8 @@ func (g *compute) render(tileDims image.Point) error {
 		t.coarse.end()
 		t.kernel4.begin()
 		g.ctx.BindProgram(g.programs.kernel4)
-		g.ctx.DispatchCompute(tileDims.X, tileDims.Y, 1)
+		dispatchOff := int(memHeaderSize) + int(g.conf.dispatch_alloc.offset)
+		g.ctx.DispatchComputeIndirect(g.buffers.memory.buffer, dispatchOff)
 		g.ctx.MemoryBarrier()
 		t.kernel4.end()
 

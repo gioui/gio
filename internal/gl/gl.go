@@ -34,6 +34,7 @@ const (
 	DEPTH_FUNC                            = 0x0B74
 	DEPTH_TEST                            = 0xb71
 	DEPTH_WRITEMASK                       = 0x0B72
+	DISPATCH_INDIRECT_BUFFER              = 0x90EE
 	DRAW_FRAMEBUFFER                      = 0x8CA9
 	DST_COLOR                             = 0x306
 	DYNAMIC_DRAW                          = 0x88E8

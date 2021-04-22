@@ -176,6 +176,14 @@ shared uint sh_part_ix;
 shared State sh_prefix;
 
 void main() {
+	if (gl_GlobalInvocationID == uvec3(0)) {
+		// Initialize kernel4 indirect workgroup sizes to (0, 1, 1).
+		// The x dimension is incremented for each output tile in coarse.comp.
+		write_mem(conf.dispatch_alloc, 0, 0);
+		write_mem(conf.dispatch_alloc, 1, 1);
+		write_mem(conf.dispatch_alloc, 2, 1);
+	}
+
     State th_state[N_ROWS];
     // Determine partition to process by atomic counter (described in Section
     // 4.4 of prefix sum paper).

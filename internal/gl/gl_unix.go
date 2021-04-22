@@ -122,6 +122,7 @@ typedef struct {
 	void (*glGetQueryObjectuiv)(GLuint id, GLenum pname, GLuint *params);
 	const GLubyte* (*glGetStringi)(GLenum name, GLuint index);
 	void (*glDispatchCompute)(GLuint x, GLuint y, GLuint z);
+	void (*glDispatchComputeIndirect)(GLintptr offset);
 	void (*glMemoryBarrier)(GLbitfield barriers);
 	void* (*glMapBufferRange)(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access);
 	GLboolean (*glUnmapBuffer)(GLenum target);
@@ -490,6 +491,10 @@ static void glDispatchCompute(glFunctions *f, GLuint x, GLuint y, GLuint z) {
 	f->glDispatchCompute(x, y, z);
 }
 
+static void glDispatchComputeIndirect(glFunctions *f, GLintptr offset) {
+	f->glDispatchComputeIndirect(offset);
+}
+
 static void *glMapBufferRange(glFunctions *f, GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access) {
 	return f->glMapBufferRange(target, offset, length, access);
 }
@@ -697,6 +702,7 @@ func (f *Functions) load(forceES bool) error {
 	f.f.glGenVertexArrays = load("glGenVertexArrays")
 	f.f.glMemoryBarrier = load("glMemoryBarrier")
 	f.f.glDispatchCompute = load("glDispatchCompute")
+	f.f.glDispatchComputeIndirect = load("glDispatchComputeIndirect")
 	f.f.glMapBufferRange = load("glMapBufferRange")
 	f.f.glUnmapBuffer = load("glUnmapBuffer")
 	f.f.glBindImageTexture = load("glBindImageTexture")
@@ -911,6 +917,10 @@ func (f *Functions) DrawElements(mode Enum, count int, ty Enum, offset int) {
 
 func (f *Functions) DispatchCompute(x, y, z int) {
 	C.glDispatchCompute(&f.f, C.GLuint(x), C.GLuint(y), C.GLuint(z))
+}
+
+func (f *Functions) DispatchComputeIndirect(offset int) {
+	C.glDispatchComputeIndirect(&f.f, C.GLintptr(offset))
 }
 
 func (f *Functions) Enable(cap Enum) {

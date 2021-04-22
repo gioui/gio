@@ -556,6 +556,10 @@ func (b *Backend) DispatchCompute(x, y, z int) {
 	panic("not implemented")
 }
 
+func (b *Backend) DispatchComputeIndirect(buffer driver.Buffer, offset int) {
+	panic("not implemented")
+}
+
 func (t *Texture) Upload(offset, size image.Point, pixels []byte) {
 	stride := size.X * 4
 	dst := &d3d11.BOX{

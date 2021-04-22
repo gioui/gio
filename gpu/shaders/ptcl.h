@@ -26,6 +26,10 @@ struct CmdJumpRef {
     uint offset;
 };
 
+struct CmdTileRef {
+    uint offset;
+};
+
 struct CmdRef {
     uint offset;
 };
@@ -91,6 +95,18 @@ struct CmdJump {
 
 CmdJumpRef CmdJump_index(CmdJumpRef ref, uint index) {
     return CmdJumpRef(ref.offset + index * CmdJump_size);
+}
+
+struct CmdTile {
+    uint tile_x;
+    uint tile_y;
+    uint offset;
+};
+
+#define CmdTile_size 12
+
+CmdTileRef CmdTile_index(CmdTileRef ref, uint index) {
+    return CmdTileRef(ref.offset + index * CmdTile_size);
 }
 
 #define Cmd_End 0
@@ -199,6 +215,25 @@ CmdJump CmdJump_read(Alloc a, CmdJumpRef ref) {
 void CmdJump_write(Alloc a, CmdJumpRef ref, CmdJump s) {
     uint ix = ref.offset >> 2;
     write_mem(a, ix + 0, s.new_ref);
+}
+
+CmdTile CmdTile_read(Alloc a, CmdTileRef ref) {
+    uint ix = ref.offset >> 2;
+    uint raw0 = read_mem(a, ix + 0);
+    uint raw1 = read_mem(a, ix + 1);
+    uint raw2 = read_mem(a, ix + 2);
+    CmdTile s;
+    s.tile_x = raw0;
+    s.tile_y = raw1;
+    s.offset = raw2;
+    return s;
+}
+
+void CmdTile_write(Alloc a, CmdTileRef ref, CmdTile s) {
+    uint ix = ref.offset >> 2;
+    write_mem(a, ix + 0, s.tile_x);
+    write_mem(a, ix + 1, s.tile_y);
+    write_mem(a, ix + 2, s.offset);
 }
 
 CmdTag Cmd_tag(Alloc a, CmdRef ref) {

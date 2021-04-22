@@ -49,6 +49,7 @@ type Device interface {
 
 	MemoryBarrier()
 	DispatchCompute(x, y, z int)
+	DispatchComputeIndirect(b Buffer, offset int)
 
 	Release()
 }

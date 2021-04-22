@@ -30,12 +30,14 @@ struct Config {
     uint n_pathseg;
     uint width_in_tiles;
     uint height_in_tiles;
+    Alloc dispatch_alloc;
     Alloc tile_alloc;
     Alloc bin_alloc;
     Alloc ptcl_alloc;
     Alloc pathseg_alloc;
     Alloc anno_alloc;
     Alloc trans_alloc;
+    Alloc cmdtile_alloc;
 };
 
 // Fill modes.

@@ -48,12 +48,14 @@ struct Config
     uint n_pathseg;
     uint width_in_tiles;
     uint height_in_tiles;
+    Alloc dispatch_alloc;
     Alloc tile_alloc;
     Alloc bin_alloc;
     Alloc ptcl_alloc;
     Alloc pathseg_alloc;
     Alloc anno_alloc;
     Alloc trans_alloc;
+    Alloc cmdtile_alloc;
 };
 
 layout(binding = 0, std430) buffer Memory
@@ -304,12 +306,14 @@ struct Config
     uint n_pathseg;
     uint width_in_tiles;
     uint height_in_tiles;
+    Alloc dispatch_alloc;
     Alloc tile_alloc;
     Alloc bin_alloc;
     Alloc ptcl_alloc;
     Alloc pathseg_alloc;
     Alloc anno_alloc;
     Alloc trans_alloc;
+    Alloc cmdtile_alloc;
 };
 
 layout(binding = 0, std430) buffer Memory
@@ -1134,6 +1138,18 @@ struct CmdJump
     uint new_ref;
 };
 
+struct CmdTileRef
+{
+    uint offset;
+};
+
+struct CmdTile
+{
+    uint tile_x;
+    uint tile_y;
+    uint offset;
+};
+
 struct CmdRef
 {
     uint offset;
@@ -1145,12 +1161,14 @@ struct Config
     uint n_pathseg;
     uint width_in_tiles;
     uint height_in_tiles;
+    Alloc dispatch_alloc;
     Alloc tile_alloc;
     Alloc bin_alloc;
     Alloc ptcl_alloc;
     Alloc pathseg_alloc;
     Alloc anno_alloc;
     Alloc trans_alloc;
+    Alloc cmdtile_alloc;
 };
 
 layout(binding = 0, std430) buffer Memory
@@ -1158,12 +1176,12 @@ layout(binding = 0, std430) buffer Memory
     uint mem_offset;
     uint mem_error;
     uint memory[];
-} _273;
+} _283;
 
 layout(binding = 1, std430) readonly buffer ConfigBuf
 {
     Config conf;
-} _1066;
+} _1107;
 
 shared uint sh_bitmaps[4][128];
 shared Alloc sh_part_elements[128];
@@ -1194,7 +1212,7 @@ uint read_mem(Alloc alloc, uint offset)
     {
         return 0u;
     }
-    uint v = _273.memory[offset];
+    uint v = _283.memory[offset];
     return v;
 }
 
@@ -1254,7 +1272,7 @@ void write_tile_alloc(uint el_ix, Alloc a)
 Alloc read_tile_alloc(uint el_ix, bool mem_ok)
 {
     uint param = 0u;
-    uint param_1 = uint(int(uint(_273.memory.length())) * 4);
+    uint param_1 = uint(int(uint(_283.memory.length())) * 4);
     bool param_2 = mem_ok;
     return new_alloc(param, param_1, param_2);
 }
@@ -1311,17 +1329,17 @@ AnnoColor Annotated_Color_read(Alloc a, AnnotatedRef ref)
 
 MallocResult malloc(uint size)
 {
-    uint _279 = atomicAdd(_273.mem_offset, size);
-    uint offset = _279;
+    uint _289 = atomicAdd(_283.mem_offset, size);
+    uint offset = _289;
     MallocResult r;
-    r.failed = (offset + size) > uint(int(uint(_273.memory.length())) * 4);
+    r.failed = (offset + size) > uint(int(uint(_283.memory.length())) * 4);
     uint param = offset;
     uint param_1 = size;
     bool param_2 = !r.failed;
     r.alloc = new_alloc(param, param_1, param_2);
     if (r.failed)
     {
-        uint _308 = atomicMax(_273.mem_error, 1u);
+        uint _318 = atomicMax(_283.mem_error, 1u);
         return r;
     }
     return r;
@@ -1335,7 +1353,7 @@ void write_mem(Alloc alloc, uint offset, uint val)
     {
         return;
     }
-    _273.memory[offset] = val;
+    _283.memory[offset] = val;
 }
 
 void CmdJump_write(Alloc a, CmdJumpRef ref, CmdJump s)
@@ -1366,8 +1384,8 @@ bool alloc_cmd(inout Alloc cmd_alloc, inout CmdRef cmd_ref, inout uint cmd_limit
         return true;
     }
     uint param = 1024u;
-    MallocResult _973 = malloc(param);
-    MallocResult new_cmd = _973;
+    MallocResult _1014 = malloc(param);
+    MallocResult new_cmd = _1014;
     if (new_cmd.failed)
     {
         return false;
@@ -1627,20 +1645,37 @@ void alloc_write(Alloc a, uint offset, Alloc alloc)
     write_mem(param, param_1, param_2);
 }
 
+void CmdTile_write(Alloc a, CmdTileRef ref, CmdTile s)
+{
+    uint ix = ref.offset >> uint(2);
+    Alloc param = a;
+    uint param_1 = ix + 0u;
+    uint param_2 = s.tile_x;
+    write_mem(param, param_1, param_2);
+    Alloc param_3 = a;
+    uint param_4 = ix + 1u;
+    uint param_5 = s.tile_y;
+    write_mem(param_3, param_4, param_5);
+    Alloc param_6 = a;
+    uint param_7 = ix + 2u;
+    uint param_8 = s.offset;
+    write_mem(param_6, param_7, param_8);
+}
+
 void main()
 {
-    uint width_in_bins = ((_1066.conf.width_in_tiles + 16u) - 1u) / 16u;
+    uint width_in_bins = ((_1107.conf.width_in_tiles + 16u) - 1u) / 16u;
     uint bin_ix = (width_in_bins * gl_WorkGroupID.y) + gl_WorkGroupID.x;
     uint partition_ix = 0u;
-    uint n_partitions = ((_1066.conf.n_elements + 128u) - 1u) / 128u;
+    uint n_partitions = ((_1107.conf.n_elements + 128u) - 1u) / 128u;
     uint th_ix = gl_LocalInvocationID.x;
     uint bin_tile_x = 16u * gl_WorkGroupID.x;
     uint bin_tile_y = 8u * gl_WorkGroupID.y;
     uint tile_x = gl_LocalInvocationID.x % 16u;
     uint tile_y = gl_LocalInvocationID.x / 16u;
-    uint this_tile_ix = (((bin_tile_y + tile_y) * _1066.conf.width_in_tiles) + bin_tile_x) + tile_x;
+    uint this_tile_ix = (((bin_tile_y + tile_y) * _1107.conf.width_in_tiles) + bin_tile_x) + tile_x;
     Alloc param;
-    param.offset = _1066.conf.ptcl_alloc.offset;
+    param.offset = _1107.conf.ptcl_alloc.offset;
     uint param_1 = this_tile_ix * 1024u;
     uint param_2 = 1024u;
     Alloc cmd_alloc = slice_mem(param, param_1, param_2);
@@ -1660,17 +1695,18 @@ void main()
     cmd_ref.offset += 8u;
     uint num_begin_slots = 0u;
     uint begin_slot = 0u;
-    bool mem_ok = _273.mem_error == 0u;
+    bool mem_ok = _283.mem_error == 0u;
+    bool need_raster = false;
     Alloc param_6;
     Alloc param_8;
-    uint _1362;
+    uint _1404;
     uint element_ix;
     AnnotatedRef ref;
     Alloc param_17;
     Alloc param_19;
     uint tile_count;
     Alloc param_26;
-    uint _1677;
+    uint _1721;
     Alloc param_32;
     Tile tile_1;
     Alloc param_38;
@@ -1682,30 +1718,30 @@ void main()
         {
             sh_bitmaps[i][th_ix] = 0u;
         }
-        bool _1414;
+        bool _1456;
         for (;;)
         {
             if ((ready_ix == wr_ix) && (partition_ix < n_partitions))
             {
                 part_start_ix = ready_ix;
                 uint count = 0u;
-                bool _1208 = th_ix < 128u;
-                bool _1216;
-                if (_1208)
+                bool _1250 = th_ix < 128u;
+                bool _1258;
+                if (_1250)
                 {
-                    _1216 = (partition_ix + th_ix) < n_partitions;
+                    _1258 = (partition_ix + th_ix) < n_partitions;
                 }
                 else
                 {
-                    _1216 = _1208;
+                    _1258 = _1250;
                 }
-                if (_1216)
+                if (_1258)
                 {
-                    uint in_ix = (_1066.conf.bin_alloc.offset >> uint(2)) + ((((partition_ix + th_ix) * 128u) + bin_ix) * 2u);
-                    param_6.offset = _1066.conf.bin_alloc.offset;
+                    uint in_ix = (_1107.conf.bin_alloc.offset >> uint(2)) + ((((partition_ix + th_ix) * 128u) + bin_ix) * 2u);
+                    param_6.offset = _1107.conf.bin_alloc.offset;
                     uint param_7 = in_ix;
                     count = read_mem(param_6, param_7);
-                    param_8.offset = _1066.conf.bin_alloc.offset;
+                    param_8.offset = _1107.conf.bin_alloc.offset;
                     uint param_9 = in_ix + 1u;
                     uint offset = read_mem(param_8, param_9);
                     uint param_10 = offset;
@@ -1751,13 +1787,13 @@ void main()
                 }
                 if (part_ix > 0u)
                 {
-                    _1362 = sh_part_count[part_ix - 1u];
+                    _1404 = sh_part_count[part_ix - 1u];
                 }
                 else
                 {
-                    _1362 = part_start_ix;
+                    _1404 = part_start_ix;
                 }
-                ix -= _1362;
+                ix -= _1404;
                 Alloc bin_alloc = sh_part_elements[part_ix];
                 BinInstanceRef inst_ref = BinInstanceRef(bin_alloc.offset);
                 BinInstanceRef param_13 = inst_ref;
@@ -1769,16 +1805,16 @@ void main()
             }
             barrier();
             wr_ix = min((rd_ix + 128u), ready_ix);
-            bool _1404 = (wr_ix - rd_ix) < 128u;
-            if (_1404)
+            bool _1446 = (wr_ix - rd_ix) < 128u;
+            if (_1446)
             {
-                _1414 = (wr_ix < ready_ix) || (partition_ix < n_partitions);
+                _1456 = (wr_ix < ready_ix) || (partition_ix < n_partitions);
             }
             else
             {
-                _1414 = _1404;
+                _1456 = _1446;
             }
-            if (_1414)
+            if (_1456)
             {
                 continue;
             }
@@ -1791,8 +1827,8 @@ void main()
         if ((th_ix + rd_ix) < wr_ix)
         {
             element_ix = sh_elements[th_ix];
-            ref = AnnotatedRef(_1066.conf.anno_alloc.offset + (element_ix * 32u));
-            param_17.offset = _1066.conf.anno_alloc.offset;
+            ref = AnnotatedRef(_1107.conf.anno_alloc.offset + (element_ix * 32u));
+            param_17.offset = _1107.conf.anno_alloc.offset;
             AnnotatedRef param_18 = ref;
             tag = Annotated_tag(param_17, param_18).tag;
         }
@@ -1804,8 +1840,8 @@ void main()
             case 4u:
             {
                 uint path_ix = element_ix;
-                param_19.offset = _1066.conf.tile_alloc.offset;
-                PathRef param_20 = PathRef(_1066.conf.tile_alloc.offset + (path_ix * 12u));
+                param_19.offset = _1107.conf.tile_alloc.offset;
+                PathRef param_20 = PathRef(_1107.conf.tile_alloc.offset + (path_ix * 12u));
                 Path path = Path_read(param_19, param_20);
                 uint stride = path.bbox.z - path.bbox.x;
                 sh_tile_stride[th_ix] = stride;
@@ -1860,19 +1896,19 @@ void main()
                     el_ix = probe_1;
                 }
             }
-            AnnotatedRef ref_1 = AnnotatedRef(_1066.conf.anno_alloc.offset + (sh_elements[el_ix] * 32u));
-            param_26.offset = _1066.conf.anno_alloc.offset;
+            AnnotatedRef ref_1 = AnnotatedRef(_1107.conf.anno_alloc.offset + (sh_elements[el_ix] * 32u));
+            param_26.offset = _1107.conf.anno_alloc.offset;
             AnnotatedRef param_27 = ref_1;
             uint tag_1 = Annotated_tag(param_26, param_27).tag;
             if (el_ix > 0u)
             {
-                _1677 = sh_tile_count[el_ix - 1u];
+                _1721 = sh_tile_count[el_ix - 1u];
             }
             else
             {
-                _1677 = 0u;
+                _1721 = 0u;
             }
-            uint seq_ix = ix_1 - _1677;
+            uint seq_ix = ix_1 - _1721;
             uint width = sh_tile_width[el_ix];
             uint x = sh_tile_x0[el_ix] + (seq_ix % width);
             uint y = sh_tile_y0[el_ix] + (seq_ix / width);
@@ -1890,24 +1926,24 @@ void main()
                     Alloc param_30 = read_tile_alloc(param_28, param_29);
                     TileRef param_31 = TileRef(sh_tile_base[el_ix] + (((sh_tile_stride[el_ix] * y) + x) * 8u));
                     Tile tile = Tile_read(param_30, param_31);
-                    bool _1743 = tile.tile.offset != 0u;
-                    bool _1750;
-                    if (!_1743)
+                    bool _1787 = tile.tile.offset != 0u;
+                    bool _1794;
+                    if (!_1787)
                     {
-                        _1750 = tile.backdrop != 0;
+                        _1794 = tile.backdrop != 0;
                     }
                     else
                     {
-                        _1750 = _1743;
+                        _1794 = _1787;
                     }
-                    include_tile = _1750;
+                    include_tile = _1794;
                 }
             }
             if (include_tile)
             {
                 uint el_slice = el_ix / 32u;
                 uint el_mask = uint(1 << int(el_ix & 31u));
-                uint _1770 = atomicOr(sh_bitmaps[el_slice][(y * 16u) + x], el_mask);
+                uint _1814 = atomicOr(sh_bitmaps[el_slice][(y * 16u) + x], el_mask);
             }
         }
         barrier();
@@ -1931,8 +1967,8 @@ void main()
             uint element_ref_ix = (slice_ix * 32u) + uint(findLSB(bitmap));
             uint element_ix_1 = sh_elements[element_ref_ix];
             bitmap &= (bitmap - 1u);
-            ref = AnnotatedRef(_1066.conf.anno_alloc.offset + (element_ix_1 * 32u));
-            param_32.offset = _1066.conf.anno_alloc.offset;
+            ref = AnnotatedRef(_1107.conf.anno_alloc.offset + (element_ix_1 * 32u));
+            param_32.offset = _1107.conf.anno_alloc.offset;
             AnnotatedRef param_33 = ref;
             AnnotatedTag tag_2 = Annotated_tag(param_32, param_33);
             if (clip_zero_depth == 0u)
@@ -1941,22 +1977,23 @@ void main()
                 {
                     case 1u:
                     {
+                        need_raster = true;
                         uint param_34 = element_ref_ix;
                         bool param_35 = mem_ok;
                         Alloc param_36 = read_tile_alloc(param_34, param_35);
                         TileRef param_37 = TileRef(sh_tile_base[element_ref_ix] + (((sh_tile_stride[element_ref_ix] * tile_y) + tile_x) * 8u));
                         tile_1 = Tile_read(param_36, param_37);
-                        param_38.offset = _1066.conf.anno_alloc.offset;
+                        param_38.offset = _1107.conf.anno_alloc.offset;
                         AnnotatedRef param_39 = ref;
                         AnnoColor fill = Annotated_Color_read(param_38, param_39);
                         Alloc param_40 = cmd_alloc;
                         CmdRef param_41 = cmd_ref;
                         uint param_42 = cmd_limit;
-                        bool _1883 = alloc_cmd(param_40, param_41, param_42);
+                        bool _1927 = alloc_cmd(param_40, param_41, param_42);
                         cmd_alloc = param_40;
                         cmd_ref = param_41;
                         cmd_limit = param_42;
-                        if (!_1883)
+                        if (!_1927)
                         {
                             break;
                         }
@@ -1976,22 +2013,23 @@ void main()
                     }
                     case 2u:
                     {
+                        need_raster = true;
                         uint param_51 = element_ref_ix;
                         bool param_52 = mem_ok;
                         Alloc param_53 = read_tile_alloc(param_51, param_52);
                         TileRef param_54 = TileRef(sh_tile_base[element_ref_ix] + (((sh_tile_stride[element_ref_ix] * tile_y) + tile_x) * 8u));
                         tile_1 = Tile_read(param_53, param_54);
-                        param_55.offset = _1066.conf.anno_alloc.offset;
+                        param_55.offset = _1107.conf.anno_alloc.offset;
                         AnnotatedRef param_56 = ref;
                         AnnoImage fill_img = Annotated_Image_read(param_55, param_56);
                         Alloc param_57 = cmd_alloc;
                         CmdRef param_58 = cmd_ref;
                         uint param_59 = cmd_limit;
-                        bool _1955 = alloc_cmd(param_57, param_58, param_59);
+                        bool _1999 = alloc_cmd(param_57, param_58, param_59);
                         cmd_alloc = param_57;
                         cmd_ref = param_58;
                         cmd_limit = param_59;
-                        if (!_1955)
+                        if (!_1999)
                         {
                             break;
                         }
@@ -2016,17 +2054,17 @@ void main()
                         Alloc param_70 = read_tile_alloc(param_68, param_69);
                         TileRef param_71 = TileRef(sh_tile_base[element_ref_ix] + (((sh_tile_stride[element_ref_ix] * tile_y) + tile_x) * 8u));
                         tile_1 = Tile_read(param_70, param_71);
-                        bool _2016 = tile_1.tile.offset == 0u;
-                        bool _2022;
-                        if (_2016)
+                        bool _2060 = tile_1.tile.offset == 0u;
+                        bool _2066;
+                        if (_2060)
                         {
-                            _2022 = tile_1.backdrop == 0;
+                            _2066 = tile_1.backdrop == 0;
                         }
                         else
                         {
-                            _2022 = _2016;
+                            _2066 = _2060;
                         }
-                        if (_2022)
+                        if (_2066)
                         {
                             clip_zero_depth = clip_depth + 1u;
                         }
@@ -2038,17 +2076,17 @@ void main()
                             }
                             else
                             {
-                                param_72.offset = _1066.conf.anno_alloc.offset;
+                                param_72.offset = _1107.conf.anno_alloc.offset;
                                 AnnotatedRef param_73 = ref;
                                 AnnoBeginClip begin_clip = Annotated_BeginClip_read(param_72, param_73);
                                 Alloc param_74 = cmd_alloc;
                                 CmdRef param_75 = cmd_ref;
                                 uint param_76 = cmd_limit;
-                                bool _2057 = alloc_cmd(param_74, param_75, param_76);
+                                bool _2101 = alloc_cmd(param_74, param_75, param_76);
                                 cmd_alloc = param_74;
                                 cmd_ref = param_75;
                                 cmd_limit = param_76;
-                                if (!_2057)
+                                if (!_2101)
                                 {
                                     break;
                                 }
@@ -2077,26 +2115,26 @@ void main()
                     case 4u:
                     {
                         clip_depth--;
-                        bool _2109 = clip_depth >= 32u;
-                        bool _2119;
-                        if (!_2109)
+                        bool _2153 = clip_depth >= 32u;
+                        bool _2163;
+                        if (!_2153)
                         {
-                            _2119 = (clip_one_mask & uint(1 << int(clip_depth))) == 0u;
+                            _2163 = (clip_one_mask & uint(1 << int(clip_depth))) == 0u;
                         }
                         else
                         {
-                            _2119 = _2109;
+                            _2163 = _2153;
                         }
-                        if (_2119)
+                        if (_2163)
                         {
                             Alloc param_84 = cmd_alloc;
                             CmdRef param_85 = cmd_ref;
                             uint param_86 = cmd_limit;
-                            bool _2128 = alloc_cmd(param_84, param_85, param_86);
+                            bool _2172 = alloc_cmd(param_84, param_85, param_86);
                             cmd_alloc = param_84;
                             cmd_ref = param_85;
                             cmd_limit = param_86;
-                            if (!_2128)
+                            if (!_2172)
                             {
                                 break;
                             }
@@ -2142,17 +2180,7 @@ void main()
             break;
         }
     }
-    bool _2193 = (bin_tile_x + tile_x) < _1066.conf.width_in_tiles;
-    bool _2202;
-    if (_2193)
-    {
-        _2202 = (bin_tile_y + tile_y) < _1066.conf.height_in_tiles;
-    }
-    else
-    {
-        _2202 = _2193;
-    }
-    if (_2202)
+    if (need_raster)
     {
         Alloc param_91 = cmd_alloc;
         CmdRef param_92 = cmd_ref;
@@ -2161,13 +2189,28 @@ void main()
         {
             uint scratch_size = (((num_begin_slots * 32u) * 32u) * 2u) * 4u;
             uint param_93 = scratch_size;
-            MallocResult _2223 = malloc(param_93);
-            MallocResult scratch = _2223;
+            MallocResult _2253 = malloc(param_93);
+            MallocResult scratch = _2253;
             Alloc param_94 = scratch_alloc;
             uint param_95 = scratch_alloc.offset;
             Alloc param_96 = scratch.alloc;
             alloc_write(param_94, param_95, param_96);
         }
+        Alloc param_97;
+        param_97.offset = _1107.conf.dispatch_alloc.offset;
+        uint param_98 = _1107.conf.dispatch_alloc.offset * 4u;
+        uint _2278 = atomicAdd(_283.memory[_1107.conf.dispatch_alloc.offset * 4u], 1u);
+        uint index = _2278;
+        CmdTile tile_2;
+        tile_2.tile_x = bin_tile_x + tile_x;
+        tile_2.tile_y = bin_tile_y + tile_y;
+        tile_2.offset = scratch_alloc.offset;
+        CmdTileRef ref_2 = CmdTileRef(_1107.conf.cmdtile_alloc.offset + (index * 12u));
+        Alloc param_99;
+        param_99.offset = _1107.conf.cmdtile_alloc.offset;
+        CmdTileRef param_100 = ref_2;
+        CmdTile param_101 = tile_2;
+        CmdTile_write(param_99, param_100, param_101);
     }
 }
 
@@ -3083,12 +3126,14 @@ struct Config
     uint n_pathseg;
     uint width_in_tiles;
     uint height_in_tiles;
+    Alloc dispatch_alloc;
     Alloc tile_alloc;
     Alloc bin_alloc;
     Alloc ptcl_alloc;
     Alloc pathseg_alloc;
     Alloc anno_alloc;
     Alloc trans_alloc;
+    Alloc cmdtile_alloc;
 };
 
 layout(binding = 0, std430) buffer Memory
@@ -3112,11 +3157,27 @@ layout(binding = 3, std430) coherent buffer StateBuf
 layout(binding = 1, std430) readonly buffer ConfigBuf
 {
     Config conf;
-} _2429;
+} _2065;
 
 shared uint sh_part_ix;
 shared State sh_state[32];
 shared State sh_prefix;
+
+bool touch_mem(Alloc alloc, uint offset)
+{
+    return true;
+}
+
+void write_mem(Alloc alloc, uint offset, uint val)
+{
+    Alloc param = alloc;
+    uint param_1 = offset;
+    if (!touch_mem(param, param_1))
+    {
+        return;
+    }
+    _294.memory[offset] = val;
+}
 
 ElementTag Element_tag(ElementRef ref)
 {
@@ -3515,22 +3576,6 @@ vec2 get_linewidth(State st)
     return vec2(length(st.mat.xz), length(st.mat.yw)) * (0.5 * st.linewidth);
 }
 
-bool touch_mem(Alloc alloc, uint offset)
-{
-    return true;
-}
-
-void write_mem(Alloc alloc, uint offset, uint val)
-{
-    Alloc param = alloc;
-    uint param_1 = offset;
-    if (!touch_mem(param, param_1))
-    {
-        return;
-    }
-    _294.memory[offset] = val;
-}
-
 void PathCubic_write(Alloc a, PathCubicRef ref, PathCubic s)
 {
     uint ix = ref.offset >> uint(2);
@@ -3839,26 +3884,44 @@ void TransformSeg_write(Alloc a, TransformSegRef ref, TransformSeg s)
 
 void main()
 {
+    if (all(equal(gl_GlobalInvocationID, uvec3(0u))))
+    {
+        Alloc param;
+        param.offset = _2065.conf.dispatch_alloc.offset;
+        uint param_1 = 0u;
+        uint param_2 = 0u;
+        write_mem(param, param_1, param_2);
+        Alloc param_3;
+        param_3.offset = _2065.conf.dispatch_alloc.offset;
+        uint param_4 = 1u;
+        uint param_5 = 1u;
+        write_mem(param_3, param_4, param_5);
+        Alloc param_6;
+        param_6.offset = _2065.conf.dispatch_alloc.offset;
+        uint param_7 = 2u;
+        uint param_8 = 1u;
+        write_mem(param_6, param_7, param_8);
+    }
     if (gl_LocalInvocationID.x == 0u)
     {
-        uint _2063 = atomicAdd(_779.part_counter, 1u);
-        sh_part_ix = _2063;
+        uint _2101 = atomicAdd(_779.part_counter, 1u);
+        sh_part_ix = _2101;
     }
     barrier();
     uint part_ix = sh_part_ix;
     uint ix = (part_ix * 128u) + (gl_LocalInvocationID.x * 4u);
     ElementRef ref = ElementRef(ix * 36u);
-    ElementRef param = ref;
+    ElementRef param_9 = ref;
     State th_state[4];
-    th_state[0] = map_element(param);
+    th_state[0] = map_element(param_9);
     for (uint i = 1u; i < 4u; i++)
     {
-        ElementRef param_1 = ref;
-        uint param_2 = i;
-        ElementRef param_3 = Element_index(param_1, param_2);
-        State param_4 = th_state[i - 1u];
-        State param_5 = map_element(param_3);
-        th_state[i] = combine_state(param_4, param_5);
+        ElementRef param_10 = ref;
+        uint param_11 = i;
+        ElementRef param_12 = Element_index(param_10, param_11);
+        State param_13 = th_state[i - 1u];
+        State param_14 = map_element(param_12);
+        th_state[i] = combine_state(param_13, param_14);
     }
     State agg = th_state[3];
     sh_state[gl_LocalInvocationID.x] = agg;
@@ -3868,9 +3931,9 @@ void main()
         if (gl_LocalInvocationID.x >= uint(1 << int(i_1)))
         {
             State other = sh_state[gl_LocalInvocationID.x - uint(1 << int(i_1))];
-            State param_6 = other;
-            State param_7 = agg;
-            agg = combine_state(param_6, param_7);
+            State param_15 = other;
+            State param_16 = agg;
+            agg = combine_state(param_15, param_16);
         }
         barrier();
         sh_state[gl_LocalInvocationID.x] = agg;
@@ -3886,22 +3949,22 @@ void main()
     exclusive.trans_count = 0u;
     if (gl_LocalInvocationID.x == 31u)
     {
-        uint param_8 = part_ix;
-        StateRef param_9 = state_aggregate_ref(param_8);
-        State param_10 = agg;
-        State_write(param_9, param_10);
+        uint param_17 = part_ix;
+        StateRef param_18 = state_aggregate_ref(param_17);
+        State param_19 = agg;
+        State_write(param_18, param_19);
         uint flag = 1u;
         memoryBarrierBuffer();
         if (part_ix == 0u)
         {
-            uint param_11 = part_ix;
-            StateRef param_12 = state_prefix_ref(param_11);
-            State param_13 = agg;
-            State_write(param_12, param_13);
+            uint param_20 = part_ix;
+            StateRef param_21 = state_prefix_ref(param_20);
+            State param_22 = agg;
+            State_write(param_21, param_22);
             flag = 2u;
         }
-        uint param_14 = part_ix;
-        _779.state[state_flag_index(param_14)] = flag;
+        uint param_23 = part_ix;
+        _779.state[state_flag_index(param_23)] = flag;
         if (part_ix != 0u)
         {
             uint look_back_ix = part_ix - 1u;
@@ -3909,52 +3972,52 @@ void main()
             State their_agg;
             while (true)
             {
-                uint param_15 = look_back_ix;
-                flag = _779.state[state_flag_index(param_15)];
+                uint param_24 = look_back_ix;
+                flag = _779.state[state_flag_index(param_24)];
                 if (flag == 2u)
                 {
-                    uint param_16 = look_back_ix;
-                    StateRef param_17 = state_prefix_ref(param_16);
-                    State their_prefix = State_read(param_17);
-                    State param_18 = their_prefix;
-                    State param_19 = exclusive;
-                    exclusive = combine_state(param_18, param_19);
+                    uint param_25 = look_back_ix;
+                    StateRef param_26 = state_prefix_ref(param_25);
+                    State their_prefix = State_read(param_26);
+                    State param_27 = their_prefix;
+                    State param_28 = exclusive;
+                    exclusive = combine_state(param_27, param_28);
                     break;
                 }
                 else
                 {
                     if (flag == 1u)
                     {
-                        uint param_20 = look_back_ix;
-                        StateRef param_21 = state_aggregate_ref(param_20);
-                        their_agg = State_read(param_21);
-                        State param_22 = their_agg;
-                        State param_23 = exclusive;
-                        exclusive = combine_state(param_22, param_23);
+                        uint param_29 = look_back_ix;
+                        StateRef param_30 = state_aggregate_ref(param_29);
+                        their_agg = State_read(param_30);
+                        State param_31 = their_agg;
+                        State param_32 = exclusive;
+                        exclusive = combine_state(param_31, param_32);
                         look_back_ix--;
                         their_ix = 0u;
                         continue;
                     }
                 }
                 ElementRef ref_1 = ElementRef(((look_back_ix * 128u) + their_ix) * 36u);
-                ElementRef param_24 = ref_1;
-                State s = map_element(param_24);
+                ElementRef param_33 = ref_1;
+                State s = map_element(param_33);
                 if (their_ix == 0u)
                 {
                     their_agg = s;
                 }
                 else
                 {
-                    State param_25 = their_agg;
-                    State param_26 = s;
-                    their_agg = combine_state(param_25, param_26);
+                    State param_34 = their_agg;
+                    State param_35 = s;
+                    their_agg = combine_state(param_34, param_35);
                 }
                 their_ix++;
                 if (their_ix == 128u)
                 {
-                    State param_27 = their_agg;
-                    State param_28 = exclusive;
-                    exclusive = combine_state(param_27, param_28);
+                    State param_36 = their_agg;
+                    State param_37 = exclusive;
+                    exclusive = combine_state(param_36, param_37);
                     if (look_back_ix == 0u)
                     {
                         break;
@@ -3963,18 +4026,18 @@ void main()
                     their_ix = 0u;
                 }
             }
-            State param_29 = exclusive;
-            State param_30 = agg;
-            State inclusive_prefix = combine_state(param_29, param_30);
+            State param_38 = exclusive;
+            State param_39 = agg;
+            State inclusive_prefix = combine_state(param_38, param_39);
             sh_prefix = exclusive;
-            uint param_31 = part_ix;
-            StateRef param_32 = state_prefix_ref(param_31);
-            State param_33 = inclusive_prefix;
-            State_write(param_32, param_33);
+            uint param_40 = part_ix;
+            StateRef param_41 = state_prefix_ref(param_40);
+            State param_42 = inclusive_prefix;
+            State_write(param_41, param_42);
             memoryBarrierBuffer();
             flag = 2u;
-            uint param_34 = part_ix;
-            _779.state[state_flag_index(param_34)] = flag;
+            uint param_43 = part_ix;
+            _779.state[state_flag_index(param_43)] = flag;
         }
     }
     barrier();
@@ -3986,43 +4049,43 @@ void main()
     if (gl_LocalInvocationID.x > 0u)
     {
         State other_1 = sh_state[gl_LocalInvocationID.x - 1u];
-        State param_35 = row;
-        State param_36 = other_1;
-        row = combine_state(param_35, param_36);
+        State param_44 = row;
+        State param_45 = other_1;
+        row = combine_state(param_44, param_45);
     }
     PathCubic path_cubic;
     PathSegRef path_out_ref;
-    Alloc param_45;
-    Alloc param_51;
-    Alloc param_57;
+    Alloc param_54;
+    Alloc param_60;
+    Alloc param_66;
     AnnoColor anno_fill;
     AnnotatedRef out_ref;
-    Alloc param_63;
+    Alloc param_72;
     AnnoImage anno_img;
-    Alloc param_69;
+    Alloc param_78;
     AnnoBeginClip anno_begin_clip;
-    Alloc param_75;
-    Alloc param_80;
-    Alloc param_83;
+    Alloc param_84;
+    Alloc param_89;
+    Alloc param_92;
     for (uint i_2 = 0u; i_2 < 4u; i_2++)
     {
-        State param_37 = row;
-        State param_38 = th_state[i_2];
-        State st = combine_state(param_37, param_38);
-        ElementRef param_39 = ref;
-        uint param_40 = i_2;
-        ElementRef this_ref = Element_index(param_39, param_40);
-        ElementRef param_41 = this_ref;
-        ElementTag tag = Element_tag(param_41);
-        uint param_42 = st.flags >> uint(4);
-        uint fill_mode = fill_mode_from_flags(param_42);
+        State param_46 = row;
+        State param_47 = th_state[i_2];
+        State st = combine_state(param_46, param_47);
+        ElementRef param_48 = ref;
+        uint param_49 = i_2;
+        ElementRef this_ref = Element_index(param_48, param_49);
+        ElementRef param_50 = this_ref;
+        ElementTag tag = Element_tag(param_50);
+        uint param_51 = st.flags >> uint(4);
+        uint fill_mode = fill_mode_from_flags(param_51);
         bool is_stroke = fill_mode == 1u;
         switch (tag.tag)
         {
             case 1u:
             {
-                ElementRef param_43 = this_ref;
-                LineSeg line = Element_Line_read(param_43);
+                ElementRef param_52 = this_ref;
+                LineSeg line = Element_Line_read(param_52);
                 path_cubic.p0 = line.p0;
                 path_cubic.p1 = mix(line.p0, line.p1, vec2(0.3333333432674407958984375));
                 path_cubic.p2 = mix(line.p1, line.p0, vec2(0.3333333432674407958984375));
@@ -4031,25 +4094,25 @@ void main()
                 path_cubic.trans_ix = st.trans_count;
                 if (is_stroke)
                 {
-                    State param_44 = st;
-                    path_cubic.stroke = get_linewidth(param_44);
+                    State param_53 = st;
+                    path_cubic.stroke = get_linewidth(param_53);
                 }
                 else
                 {
                     path_cubic.stroke = vec2(0.0);
                 }
-                path_out_ref = PathSegRef(_2429.conf.pathseg_alloc.offset + ((st.pathseg_count - 1u) * 52u));
-                param_45.offset = _2429.conf.pathseg_alloc.offset;
-                PathSegRef param_46 = path_out_ref;
-                uint param_47 = fill_mode;
-                PathCubic param_48 = path_cubic;
-                PathSeg_Cubic_write(param_45, param_46, param_47, param_48);
+                path_out_ref = PathSegRef(_2065.conf.pathseg_alloc.offset + ((st.pathseg_count - 1u) * 52u));
+                param_54.offset = _2065.conf.pathseg_alloc.offset;
+                PathSegRef param_55 = path_out_ref;
+                uint param_56 = fill_mode;
+                PathCubic param_57 = path_cubic;
+                PathSeg_Cubic_write(param_54, param_55, param_56, param_57);
                 break;
             }
             case 2u:
             {
-                ElementRef param_49 = this_ref;
-                QuadSeg quad = Element_Quad_read(param_49);
+                ElementRef param_58 = this_ref;
+                QuadSeg quad = Element_Quad_read(param_58);
                 path_cubic.p0 = quad.p0;
                 path_cubic.p1 = mix(quad.p1, quad.p0, vec2(0.3333333432674407958984375));
                 path_cubic.p2 = mix(quad.p1, quad.p2, vec2(0.3333333432674407958984375));
@@ -4058,25 +4121,25 @@ void main()
                 path_cubic.trans_ix = st.trans_count;
                 if (is_stroke)
                 {
-                    State param_50 = st;
-                    path_cubic.stroke = get_linewidth(param_50);
+                    State param_59 = st;
+                    path_cubic.stroke = get_linewidth(param_59);
                 }
                 else
                 {
                     path_cubic.stroke = vec2(0.0);
                 }
-                path_out_ref = PathSegRef(_2429.conf.pathseg_alloc.offset + ((st.pathseg_count - 1u) * 52u));
-                param_51.offset = _2429.conf.pathseg_alloc.offset;
-                PathSegRef param_52 = path_out_ref;
-                uint param_53 = fill_mode;
-                PathCubic param_54 = path_cubic;
-                PathSeg_Cubic_write(param_51, param_52, param_53, param_54);
+                path_out_ref = PathSegRef(_2065.conf.pathseg_alloc.offset + ((st.pathseg_count - 1u) * 52u));
+                param_60.offset = _2065.conf.pathseg_alloc.offset;
+                PathSegRef param_61 = path_out_ref;
+                uint param_62 = fill_mode;
+                PathCubic param_63 = path_cubic;
+                PathSeg_Cubic_write(param_60, param_61, param_62, param_63);
                 break;
             }
             case 3u:
             {
-                ElementRef param_55 = this_ref;
-                CubicSeg cubic = Element_Cubic_read(param_55);
+                ElementRef param_64 = this_ref;
+                CubicSeg cubic = Element_Cubic_read(param_64);
                 path_cubic.p0 = cubic.p0;
                 path_cubic.p1 = cubic.p1;
                 path_cubic.p2 = cubic.p2;
@@ -4085,30 +4148,30 @@ void main()
                 path_cubic.trans_ix = st.trans_count;
                 if (is_stroke)
                 {
-                    State param_56 = st;
-                    path_cubic.stroke = get_linewidth(param_56);
+                    State param_65 = st;
+                    path_cubic.stroke = get_linewidth(param_65);
                 }
                 else
                 {
                     path_cubic.stroke = vec2(0.0);
                 }
-                path_out_ref = PathSegRef(_2429.conf.pathseg_alloc.offset + ((st.pathseg_count - 1u) * 52u));
-                param_57.offset = _2429.conf.pathseg_alloc.offset;
-                PathSegRef param_58 = path_out_ref;
-                uint param_59 = fill_mode;
-                PathCubic param_60 = path_cubic;
-                PathSeg_Cubic_write(param_57, param_58, param_59, param_60);
+                path_out_ref = PathSegRef(_2065.conf.pathseg_alloc.offset + ((st.pathseg_count - 1u) * 52u));
+                param_66.offset = _2065.conf.pathseg_alloc.offset;
+                PathSegRef param_67 = path_out_ref;
+                uint param_68 = fill_mode;
+                PathCubic param_69 = path_cubic;
+                PathSeg_Cubic_write(param_66, param_67, param_68, param_69);
                 break;
             }
             case 4u:
             {
-                ElementRef param_61 = this_ref;
-                FillColor fill = Element_FillColor_read(param_61);
+                ElementRef param_70 = this_ref;
+                FillColor fill = Element_FillColor_read(param_70);
                 anno_fill.rgba_color = fill.rgba_color;
                 if (is_stroke)
                 {
-                    State param_62 = st;
-                    vec2 lw = get_linewidth(param_62);
+                    State param_71 = st;
+                    vec2 lw = get_linewidth(param_71);
                     anno_fill.bbox = st.bbox + vec4(-lw, lw);
                     anno_fill.linewidth = st.linewidth * sqrt(abs((st.mat.x * st.mat.w) - (st.mat.y * st.mat.z)));
                 }
@@ -4117,24 +4180,24 @@ void main()
                     anno_fill.bbox = st.bbox;
                     anno_fill.linewidth = 0.0;
                 }
-                out_ref = AnnotatedRef(_2429.conf.anno_alloc.offset + ((st.path_count - 1u) * 32u));
-                param_63.offset = _2429.conf.anno_alloc.offset;
-                AnnotatedRef param_64 = out_ref;
-                uint param_65 = fill_mode;
-                AnnoColor param_66 = anno_fill;
-                Annotated_Color_write(param_63, param_64, param_65, param_66);
+                out_ref = AnnotatedRef(_2065.conf.anno_alloc.offset + ((st.path_count - 1u) * 32u));
+                param_72.offset = _2065.conf.anno_alloc.offset;
+                AnnotatedRef param_73 = out_ref;
+                uint param_74 = fill_mode;
+                AnnoColor param_75 = anno_fill;
+                Annotated_Color_write(param_72, param_73, param_74, param_75);
                 break;
             }
             case 9u:
             {
-                ElementRef param_67 = this_ref;
-                FillImage fill_img = Element_FillImage_read(param_67);
+                ElementRef param_76 = this_ref;
+                FillImage fill_img = Element_FillImage_read(param_76);
                 anno_img.index = fill_img.index;
                 anno_img.offset = fill_img.offset;
                 if (is_stroke)
                 {
-                    State param_68 = st;
-                    vec2 lw_1 = get_linewidth(param_68);
+                    State param_77 = st;
+                    vec2 lw_1 = get_linewidth(param_77);
                     anno_img.bbox = st.bbox + vec4(-lw_1, lw_1);
                     anno_img.linewidth = st.linewidth * sqrt(abs((st.mat.x * st.mat.w) - (st.mat.y * st.mat.z)));
                 }
@@ -4143,57 +4206,57 @@ void main()
                     anno_img.bbox = st.bbox;
                     anno_img.linewidth = 0.0;
                 }
-                out_ref = AnnotatedRef(_2429.conf.anno_alloc.offset + ((st.path_count - 1u) * 32u));
-                param_69.offset = _2429.conf.anno_alloc.offset;
-                AnnotatedRef param_70 = out_ref;
-                uint param_71 = fill_mode;
-                AnnoImage param_72 = anno_img;
-                Annotated_Image_write(param_69, param_70, param_71, param_72);
+                out_ref = AnnotatedRef(_2065.conf.anno_alloc.offset + ((st.path_count - 1u) * 32u));
+                param_78.offset = _2065.conf.anno_alloc.offset;
+                AnnotatedRef param_79 = out_ref;
+                uint param_80 = fill_mode;
+                AnnoImage param_81 = anno_img;
+                Annotated_Image_write(param_78, param_79, param_80, param_81);
                 break;
             }
             case 7u:
             {
-                ElementRef param_73 = this_ref;
-                Clip begin_clip = Element_BeginClip_read(param_73);
+                ElementRef param_82 = this_ref;
+                Clip begin_clip = Element_BeginClip_read(param_82);
                 anno_begin_clip.bbox = begin_clip.bbox;
                 if (is_stroke)
                 {
-                    State param_74 = st;
-                    vec2 lw_2 = get_linewidth(param_74);
+                    State param_83 = st;
+                    vec2 lw_2 = get_linewidth(param_83);
                     anno_begin_clip.linewidth = st.linewidth * sqrt(abs((st.mat.x * st.mat.w) - (st.mat.y * st.mat.z)));
                 }
                 else
                 {
                     anno_fill.linewidth = 0.0;
                 }
-                out_ref = AnnotatedRef(_2429.conf.anno_alloc.offset + ((st.path_count - 1u) * 32u));
-                param_75.offset = _2429.conf.anno_alloc.offset;
-                AnnotatedRef param_76 = out_ref;
-                uint param_77 = fill_mode;
-                AnnoBeginClip param_78 = anno_begin_clip;
-                Annotated_BeginClip_write(param_75, param_76, param_77, param_78);
+                out_ref = AnnotatedRef(_2065.conf.anno_alloc.offset + ((st.path_count - 1u) * 32u));
+                param_84.offset = _2065.conf.anno_alloc.offset;
+                AnnotatedRef param_85 = out_ref;
+                uint param_86 = fill_mode;
+                AnnoBeginClip param_87 = anno_begin_clip;
+                Annotated_BeginClip_write(param_84, param_85, param_86, param_87);
                 break;
             }
             case 8u:
             {
-                ElementRef param_79 = this_ref;
-                Clip end_clip = Element_EndClip_read(param_79);
+                ElementRef param_88 = this_ref;
+                Clip end_clip = Element_EndClip_read(param_88);
                 AnnoEndClip anno_end_clip = AnnoEndClip(end_clip.bbox);
-                out_ref = AnnotatedRef(_2429.conf.anno_alloc.offset + ((st.path_count - 1u) * 32u));
-                param_80.offset = _2429.conf.anno_alloc.offset;
-                AnnotatedRef param_81 = out_ref;
-                AnnoEndClip param_82 = anno_end_clip;
-                Annotated_EndClip_write(param_80, param_81, param_82);
+                out_ref = AnnotatedRef(_2065.conf.anno_alloc.offset + ((st.path_count - 1u) * 32u));
+                param_89.offset = _2065.conf.anno_alloc.offset;
+                AnnotatedRef param_90 = out_ref;
+                AnnoEndClip param_91 = anno_end_clip;
+                Annotated_EndClip_write(param_89, param_90, param_91);
                 break;
             }
             case 6u:
             {
                 TransformSeg transform = TransformSeg(st.mat, st.translate);
-                TransformSegRef trans_ref = TransformSegRef(_2429.conf.trans_alloc.offset + ((st.trans_count - 1u) * 24u));
-                param_83.offset = _2429.conf.trans_alloc.offset;
-                TransformSegRef param_84 = trans_ref;
-                TransformSeg param_85 = transform;
-                TransformSeg_write(param_83, param_84, param_85);
+                TransformSegRef trans_ref = TransformSegRef(_2065.conf.trans_alloc.offset + ((st.trans_count - 1u) * 24u));
+                param_92.offset = _2065.conf.trans_alloc.offset;
+                TransformSegRef param_93 = trans_ref;
+                TransformSeg param_94 = transform;
+                TransformSeg_write(param_92, param_93, param_94);
                 break;
             }
         }
@@ -4514,6 +4577,18 @@ struct CmdJump
     uint new_ref;
 };
 
+struct CmdTileRef
+{
+    uint offset;
+};
+
+struct CmdTile
+{
+    uint tile_x;
+    uint tile_y;
+    uint offset;
+};
+
 struct CmdRef
 {
     uint offset;
@@ -4544,12 +4619,14 @@ struct Config
     uint n_pathseg;
     uint width_in_tiles;
     uint height_in_tiles;
+    Alloc dispatch_alloc;
     Alloc tile_alloc;
     Alloc bin_alloc;
     Alloc ptcl_alloc;
     Alloc pathseg_alloc;
     Alloc anno_alloc;
     Alloc trans_alloc;
+    Alloc cmdtile_alloc;
 };
 
 layout(binding = 0, std430) buffer Memory
@@ -4557,20 +4634,15 @@ layout(binding = 0, std430) buffer Memory
     uint mem_offset;
     uint mem_error;
     uint memory[];
-} _198;
+} _200;
 
 layout(binding = 1, std430) restrict readonly buffer ConfigBuf
 {
     Config conf;
-} _686;
+} _715;
 
 layout(binding = 3, rgba8) uniform restrict readonly highp image2D images[1];
 layout(binding = 2, rgba8) uniform restrict writeonly highp image2D image;
-
-Alloc slice_mem(Alloc a, uint offset, uint size)
-{
-    return Alloc(a.offset + offset);
-}
 
 bool touch_mem(Alloc alloc, uint offset)
 {
@@ -4585,8 +4657,34 @@ uint read_mem(Alloc alloc, uint offset)
     {
         return 0u;
     }
-    uint v = _198.memory[offset];
+    uint v = _200.memory[offset];
     return v;
+}
+
+CmdTile CmdTile_read(Alloc a, CmdTileRef ref)
+{
+    uint ix = ref.offset >> uint(2);
+    Alloc param = a;
+    uint param_1 = ix + 0u;
+    uint raw0 = read_mem(param, param_1);
+    Alloc param_2 = a;
+    uint param_3 = ix + 1u;
+    uint raw1 = read_mem(param_2, param_3);
+    Alloc param_4 = a;
+    uint param_5 = ix + 2u;
+    uint raw2 = read_mem(param_4, param_5);
+    CmdTile s;
+    s.tile_x = raw0;
+    s.tile_y = raw1;
+    s.offset = raw2;
+    return s;
+}
+
+Alloc new_alloc(uint offset, uint size, bool mem_ok)
+{
+    Alloc a;
+    a.offset = offset;
+    return a;
 }
 
 Alloc alloc_read(Alloc a, uint offset)
@@ -4626,13 +4724,6 @@ CmdStroke Cmd_Stroke_read(Alloc a, CmdRef ref)
     Alloc param = a;
     CmdStrokeRef param_1 = CmdStrokeRef(ref.offset + 4u);
     return CmdStroke_read(param, param_1);
-}
-
-Alloc new_alloc(uint offset, uint size, bool mem_ok)
-{
-    Alloc a;
-    a.offset = offset;
-    return a;
 }
 
 TileSeg TileSeg_read(Alloc a, TileSegRef ref)
@@ -4773,8 +4864,8 @@ mediump vec4[8] fillImage(uvec2 xy, CmdImage cmd_img)
         ivec2 uv = ivec2(xy + chunk_offset(param)) + cmd_img.offset;
         mediump vec4 fg_rgba = imageLoad(images[0], uv);
         mediump vec3 param_1 = fg_rgba.xyz;
-        mediump vec3 _662 = fromsRGB(param_1);
-        fg_rgba = vec4(_662.x, _662.y, _662.z, fg_rgba.w);
+        mediump vec3 _693 = fromsRGB(param_1);
+        fg_rgba = vec4(_693.x, _693.y, _693.z, fg_rgba.w);
         rgba[i] = fg_rgba;
     }
     return rgba;
@@ -4803,7 +4894,7 @@ void write_mem(Alloc alloc, uint offset, uint val)
     {
         return;
     }
-    _198.memory[offset] = val;
+    _200.memory[offset] = val;
 }
 
 CmdJump CmdJump_read(Alloc a, CmdJumpRef ref)
@@ -4826,18 +4917,21 @@ CmdJump Cmd_Jump_read(Alloc a, CmdRef ref)
 
 void main()
 {
-    uint tile_ix = (gl_WorkGroupID.y * _686.conf.width_in_tiles) + gl_WorkGroupID.x;
+    bool mem_ok = _200.mem_error == 0u;
     Alloc param;
-    param.offset = _686.conf.ptcl_alloc.offset;
-    uint param_1 = tile_ix * 1024u;
-    uint param_2 = 1024u;
-    Alloc cmd_alloc = slice_mem(param, param_1, param_2);
+    param.offset = _715.conf.cmdtile_alloc.offset;
+    CmdTileRef param_1 = CmdTileRef(_715.conf.cmdtile_alloc.offset + (gl_WorkGroupID.x * 12u));
+    CmdTile tile = CmdTile_read(param, param_1);
+    uint param_2 = tile.offset;
+    uint param_3 = 1024u;
+    bool param_4 = mem_ok;
+    Alloc cmd_alloc = new_alloc(param_2, param_3, param_4);
     CmdRef cmd_ref = CmdRef(cmd_alloc.offset);
-    Alloc param_3 = cmd_alloc;
-    uint param_4 = cmd_ref.offset;
-    Alloc scratch_alloc = alloc_read(param_3, param_4);
+    Alloc param_5 = cmd_alloc;
+    uint param_6 = cmd_ref.offset;
+    Alloc scratch_alloc = alloc_read(param_5, param_6);
     cmd_ref.offset += 8u;
-    uvec2 xy_uint = uvec2(gl_LocalInvocationID.x + (32u * gl_WorkGroupID.x), gl_LocalInvocationID.y + (32u * gl_WorkGroupID.y));
+    uvec2 xy_uint = uvec2(gl_LocalInvocationID.x + (32u * tile.tile_x), gl_LocalInvocationID.y + (32u * tile.tile_y));
     vec2 xy = vec2(xy_uint);
     mediump vec4 rgba[8];
     for (uint i = 0u; i < 8u; i++)
@@ -4845,16 +4939,15 @@ void main()
         rgba[i] = vec4(0.0);
     }
     uint clip_depth = 0u;
-    bool mem_ok = _198.mem_error == 0u;
     mediump float df[8];
     TileSegRef tile_seg_ref;
     mediump float area[8];
     uint base_ix;
     while (mem_ok)
     {
-        Alloc param_5 = cmd_alloc;
-        CmdRef param_6 = cmd_ref;
-        uint tag = Cmd_tag(param_5, param_6).tag;
+        Alloc param_7 = cmd_alloc;
+        CmdRef param_8 = cmd_ref;
+        uint tag = Cmd_tag(param_7, param_8).tag;
         if (tag == 0u)
         {
             break;
@@ -4863,9 +4956,9 @@ void main()
         {
             case 2u:
             {
-                Alloc param_7 = cmd_alloc;
-                CmdRef param_8 = cmd_ref;
-                CmdStroke stroke = Cmd_Stroke_read(param_7, param_8);
+                Alloc param_9 = cmd_alloc;
+                CmdRef param_10 = cmd_ref;
+                CmdStroke stroke = Cmd_Stroke_read(param_9, param_10);
                 for (uint k = 0u; k < 8u; k++)
                 {
                     df[k] = 1000000000.0;
@@ -4873,18 +4966,18 @@ void main()
                 tile_seg_ref = TileSegRef(stroke.tile_ref);
                 do
                 {
-                    uint param_9 = tile_seg_ref.offset;
-                    uint param_10 = 24u;
-                    bool param_11 = mem_ok;
-                    Alloc param_12 = new_alloc(param_9, param_10, param_11);
-                    TileSegRef param_13 = tile_seg_ref;
-                    TileSeg seg = TileSeg_read(param_12, param_13);
+                    uint param_11 = tile_seg_ref.offset;
+                    uint param_12 = 24u;
+                    bool param_13 = mem_ok;
+                    Alloc param_14 = new_alloc(param_11, param_12, param_13);
+                    TileSegRef param_15 = tile_seg_ref;
+                    TileSeg seg = TileSeg_read(param_14, param_15);
                     vec2 line_vec = seg.vector;
                     for (uint k_1 = 0u; k_1 < 8u; k_1++)
                     {
                         vec2 dpos = (xy + vec2(0.5)) - seg.origin;
-                        uint param_14 = k_1;
-                        dpos += vec2(chunk_offset(param_14));
+                        uint param_16 = k_1;
+                        dpos += vec2(chunk_offset(param_16));
                         float t = clamp(dot(line_vec, dpos) / dot(line_vec, line_vec), 0.0, 1.0);
                         df[k_1] = min(df[k_1], length((line_vec * t) - dpos));
                     }
@@ -4899,9 +4992,9 @@ void main()
             }
             case 1u:
             {
-                Alloc param_15 = cmd_alloc;
-                CmdRef param_16 = cmd_ref;
-                CmdFill fill = Cmd_Fill_read(param_15, param_16);
+                Alloc param_17 = cmd_alloc;
+                CmdRef param_18 = cmd_ref;
+                CmdFill fill = Cmd_Fill_read(param_17, param_18);
                 for (uint k_3 = 0u; k_3 < 8u; k_3++)
                 {
                     area[k_3] = float(fill.backdrop);
@@ -4909,16 +5002,16 @@ void main()
                 tile_seg_ref = TileSegRef(fill.tile_ref);
                 do
                 {
-                    uint param_17 = tile_seg_ref.offset;
-                    uint param_18 = 24u;
-                    bool param_19 = mem_ok;
-                    Alloc param_20 = new_alloc(param_17, param_18, param_19);
-                    TileSegRef param_21 = tile_seg_ref;
-                    TileSeg seg_1 = TileSeg_read(param_20, param_21);
+                    uint param_19 = tile_seg_ref.offset;
+                    uint param_20 = 24u;
+                    bool param_21 = mem_ok;
+                    Alloc param_22 = new_alloc(param_19, param_20, param_21);
+                    TileSegRef param_23 = tile_seg_ref;
+                    TileSeg seg_1 = TileSeg_read(param_22, param_23);
                     for (uint k_4 = 0u; k_4 < 8u; k_4++)
                     {
-                        uint param_22 = k_4;
-                        vec2 my_xy = xy + vec2(chunk_offset(param_22));
+                        uint param_24 = k_4;
+                        vec2 my_xy = xy + vec2(chunk_offset(param_24));
                         vec2 start = seg_1.origin - my_xy;
                         vec2 end = start + seg_1.vector;
                         vec2 window = clamp(vec2(start.y, end.y), vec2(0.0), vec2(1.0));
@@ -4956,9 +5049,9 @@ void main()
             }
             case 4u:
             {
-                Alloc param_23 = cmd_alloc;
-                CmdRef param_24 = cmd_ref;
-                CmdAlpha alpha = Cmd_Alpha_read(param_23, param_24);
+                Alloc param_25 = cmd_alloc;
+                CmdRef param_26 = cmd_ref;
+                CmdAlpha alpha = Cmd_Alpha_read(param_25, param_26);
                 for (uint k_7 = 0u; k_7 < 8u; k_7++)
                 {
                     area[k_7] = alpha.alpha;
@@ -4968,11 +5061,11 @@ void main()
             }
             case 5u:
             {
-                Alloc param_25 = cmd_alloc;
-                CmdRef param_26 = cmd_ref;
-                CmdColor color = Cmd_Color_read(param_25, param_26);
-                uint param_27 = color.rgba_color;
-                mediump vec4 fg = unpacksRGB(param_27);
+                Alloc param_27 = cmd_alloc;
+                CmdRef param_28 = cmd_ref;
+                CmdColor color = Cmd_Color_read(param_27, param_28);
+                uint param_29 = color.rgba_color;
+                mediump vec4 fg = unpacksRGB(param_29);
                 for (uint k_8 = 0u; k_8 < 8u; k_8++)
                 {
                     mediump vec4 fg_k = fg * area[k_8];
@@ -4983,12 +5076,12 @@ void main()
             }
             case 6u:
             {
-                Alloc param_28 = cmd_alloc;
-                CmdRef param_29 = cmd_ref;
-                CmdImage fill_img = Cmd_Image_read(param_28, param_29);
-                uvec2 param_30 = xy_uint;
-                CmdImage param_31 = fill_img;
-                mediump vec4 img[8] = fillImage(param_30, param_31);
+                Alloc param_30 = cmd_alloc;
+                CmdRef param_31 = cmd_ref;
+                CmdImage fill_img = Cmd_Image_read(param_30, param_31);
+                uvec2 param_32 = xy_uint;
+                CmdImage param_33 = fill_img;
+                mediump vec4 img[8] = fillImage(param_32, param_33);
                 for (uint k_9 = 0u; k_9 < 8u; k_9++)
                 {
                     mediump vec4 fg_k_1 = img[k_9] * area[k_9];
@@ -5002,20 +5095,20 @@ void main()
                 base_ix = (scratch_alloc.offset >> uint(2)) + (2u * ((((clip_depth * 32u) * 32u) + gl_LocalInvocationID.x) + (32u * gl_LocalInvocationID.y)));
                 for (uint k_10 = 0u; k_10 < 8u; k_10++)
                 {
-                    uint param_32 = k_10;
-                    uvec2 offset = chunk_offset(param_32);
-                    mediump vec4 param_33 = vec4(rgba[k_10]);
-                    uint _1288 = packsRGB(param_33);
-                    uint srgb = _1288;
+                    uint param_34 = k_10;
+                    uvec2 offset = chunk_offset(param_34);
+                    mediump vec4 param_35 = vec4(rgba[k_10]);
+                    uint _1322 = packsRGB(param_35);
+                    uint srgb = _1322;
                     mediump float alpha_1 = clamp(abs(area[k_10]), 0.0, 1.0);
-                    Alloc param_34 = scratch_alloc;
-                    uint param_35 = (base_ix + 0u) + (2u * (offset.x + (offset.y * 32u)));
-                    uint param_36 = srgb;
-                    write_mem(param_34, param_35, param_36);
-                    Alloc param_37 = scratch_alloc;
-                    uint param_38 = (base_ix + 1u) + (2u * (offset.x + (offset.y * 32u)));
-                    uint param_39 = floatBitsToUint(alpha_1);
-                    write_mem(param_37, param_38, param_39);
+                    Alloc param_36 = scratch_alloc;
+                    uint param_37 = (base_ix + 0u) + (2u * (offset.x + (offset.y * 32u)));
+                    uint param_38 = srgb;
+                    write_mem(param_36, param_37, param_38);
+                    Alloc param_39 = scratch_alloc;
+                    uint param_40 = (base_ix + 1u) + (2u * (offset.x + (offset.y * 32u)));
+                    uint param_41 = floatBitsToUint(alpha_1);
+                    write_mem(param_39, param_40, param_41);
                     rgba[k_10] = vec4(0.0);
                 }
                 clip_depth++;
@@ -5028,16 +5121,16 @@ void main()
                 base_ix = (scratch_alloc.offset >> uint(2)) + (2u * ((((clip_depth * 32u) * 32u) + gl_LocalInvocationID.x) + (32u * gl_LocalInvocationID.y)));
                 for (uint k_11 = 0u; k_11 < 8u; k_11++)
                 {
-                    uint param_40 = k_11;
-                    uvec2 offset_1 = chunk_offset(param_40);
-                    Alloc param_41 = scratch_alloc;
-                    uint param_42 = (base_ix + 0u) + (2u * (offset_1.x + (offset_1.y * 32u)));
-                    uint srgb_1 = read_mem(param_41, param_42);
+                    uint param_42 = k_11;
+                    uvec2 offset_1 = chunk_offset(param_42);
                     Alloc param_43 = scratch_alloc;
-                    uint param_44 = (base_ix + 1u) + (2u * (offset_1.x + (offset_1.y * 32u)));
-                    uint alpha_2 = read_mem(param_43, param_44);
-                    uint param_45 = srgb_1;
-                    mediump vec4 bg = unpacksRGB(param_45);
+                    uint param_44 = (base_ix + 0u) + (2u * (offset_1.x + (offset_1.y * 32u)));
+                    uint srgb_1 = read_mem(param_43, param_44);
+                    Alloc param_45 = scratch_alloc;
+                    uint param_46 = (base_ix + 1u) + (2u * (offset_1.x + (offset_1.y * 32u)));
+                    uint alpha_2 = read_mem(param_45, param_46);
+                    uint param_47 = srgb_1;
+                    mediump vec4 bg = unpacksRGB(param_47);
                     mediump vec4 fg_1 = (rgba[k_11] * area[k_11]) * uintBitsToFloat(alpha_2);
                     rgba[k_11] = (bg * (1.0 - fg_1.w)) + fg_1;
                 }
@@ -5046,9 +5139,9 @@ void main()
             }
             case 9u:
             {
-                Alloc param_46 = cmd_alloc;
-                CmdRef param_47 = cmd_ref;
-                cmd_ref = CmdRef(Cmd_Jump_read(param_46, param_47).new_ref);
+                Alloc param_48 = cmd_alloc;
+                CmdRef param_49 = cmd_ref;
+                cmd_ref = CmdRef(Cmd_Jump_read(param_48, param_49).new_ref);
                 cmd_alloc.offset = cmd_ref.offset;
                 break;
             }
@@ -5056,9 +5149,9 @@ void main()
     }
     for (uint i_1 = 0u; i_1 < 8u; i_1++)
     {
-        uint param_48 = i_1;
-        mediump vec3 param_49 = rgba[i_1].xyz;
-        imageStore(image, ivec2(xy_uint + chunk_offset(param_48)), vec4(tosRGB(param_49), rgba[i_1].w));
+        uint param_50 = i_1;
+        mediump vec3 param_51 = rgba[i_1].xyz;
+        imageStore(image, ivec2(xy_uint + chunk_offset(param_50)), vec4(tosRGB(param_51), rgba[i_1].w));
     }
 }
 
@@ -5359,12 +5452,14 @@ struct Config
     uint n_pathseg;
     uint width_in_tiles;
     uint height_in_tiles;
+    Alloc dispatch_alloc;
     Alloc tile_alloc;
     Alloc bin_alloc;
     Alloc ptcl_alloc;
     Alloc pathseg_alloc;
     Alloc anno_alloc;
     Alloc trans_alloc;
+    Alloc cmdtile_alloc;
 };
 
 layout(binding = 0, std430) buffer Memory
@@ -6382,12 +6477,14 @@ struct Config
     uint n_pathseg;
     uint width_in_tiles;
     uint height_in_tiles;
+    Alloc dispatch_alloc;
     Alloc tile_alloc;
     Alloc bin_alloc;
     Alloc ptcl_alloc;
     Alloc pathseg_alloc;
     Alloc anno_alloc;
     Alloc trans_alloc;
+    Alloc cmdtile_alloc;
 };
 
 layout(binding = 0, std430) buffer Memory
@@ -6577,36 +6674,36 @@ void main()
     if (th_ix == 127u)
     {
         uint param_4 = total_tile_count * 8u;
-        MallocResult _478 = malloc(param_4);
-        sh_tile_alloc = _478;
+        MallocResult _479 = malloc(param_4);
+        sh_tile_alloc = _479;
     }
     barrier();
     MallocResult alloc_start = sh_tile_alloc;
-    bool _489;
+    bool _490;
     if (!alloc_start.failed)
     {
-        _489 = _92.mem_error != 0u;
+        _490 = _92.mem_error != 0u;
     }
     else
     {
-        _489 = alloc_start.failed;
+        _490 = alloc_start.failed;
     }
-    if (_489)
+    if (_490)
     {
         return;
     }
     if (element_ix < _305.conf.n_elements)
     {
-        uint _502;
+        uint _503;
         if (th_ix > 0u)
         {
-            _502 = sh_tile_count[th_ix - 1u];
+            _503 = sh_tile_count[th_ix - 1u];
         }
         else
         {
-            _502 = 0u;
+            _503 = 0u;
         }
-        uint tile_subix = _502;
+        uint tile_subix = _503;
         Alloc param_5 = alloc_start.alloc;
         uint param_6 = 8u * tile_subix;
         uint param_7 = 8u * tile_count;

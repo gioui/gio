@@ -274,6 +274,9 @@ func (c *Functions) DrawElements(mode Enum, count int, ty Enum, offset int) {
 func (f *Functions) DispatchCompute(x, y, z int) {
 	panic("not implemented")
 }
+func (f *Functions) DispatchComputeIndirect(offset int) {
+	panic("not implemented")
+}
 func (c *Functions) Enable(cap Enum) {
 	syscall.Syscall(_glEnable.Addr(), 1, uintptr(cap), 0, 0)
 }

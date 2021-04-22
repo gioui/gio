@@ -155,6 +155,7 @@ void main() {
     uint num_begin_slots = 0;
     uint begin_slot = 0;
     bool mem_ok = mem_error == NO_ERROR;
+    bool need_raster = false;
     while (true) {
         for (uint i = 0; i < N_SLICE; i++) {
             sh_bitmaps[i][th_ix] = 0;
@@ -334,6 +335,7 @@ void main() {
             if (clip_zero_depth == 0) {
                 switch (tag.tag) {
                 case Annotated_Color:
+                    need_raster = true;
                     Tile tile = Tile_read(read_tile_alloc(element_ref_ix, mem_ok), TileRef(sh_tile_base[element_ref_ix]
                         + (sh_tile_stride[element_ref_ix] * tile_y + tile_x) * Tile_size));
                     AnnoColor fill = Annotated_Color_read(conf.anno_alloc, ref);
@@ -345,6 +347,7 @@ void main() {
                     cmd_ref.offset += 4 + CmdColor_size;
                     break;
                 case Annotated_Image:
+                    need_raster = true;
                     tile = Tile_read(read_tile_alloc(element_ref_ix, mem_ok), TileRef(sh_tile_base[element_ref_ix]
                         + (sh_tile_stride[element_ref_ix] * tile_y + tile_x) * Tile_size));
                     AnnoImage fill_img = Annotated_Image_read(conf.anno_alloc, ref);
@@ -412,7 +415,7 @@ void main() {
         rd_ix += N_TILE;
         if (rd_ix >= ready_ix && partition_ix >= n_partitions) break;
     }
-    if (bin_tile_x + tile_x < conf.width_in_tiles && bin_tile_y + tile_y < conf.height_in_tiles) {
+    if (need_raster) {
         Cmd_End_write(cmd_alloc, cmd_ref);
         if (num_begin_slots > 0) {
             // Write scratch allocation: one state per BeginClip per rasterizer chunk.
@@ -422,5 +425,14 @@ void main() {
             // checks for memory overflow before using it.
             alloc_write(scratch_alloc, scratch_alloc.offset, scratch.alloc);
         }
+        // Write tile header and increment kernel4 dispatch count.
+        touch_mem(conf.dispatch_alloc, conf.dispatch_alloc.offset*4);
+        uint index = atomicAdd(memory[conf.dispatch_alloc.offset*4], 1);
+        CmdTile tile;
+        tile.tile_x = bin_tile_x + tile_x;
+        tile.tile_y = bin_tile_y + tile_y;
+        tile.offset = scratch_alloc.offset;
+        CmdTileRef ref = CmdTileRef(conf.cmdtile_alloc.offset + index * CmdTile_size);
+        CmdTile_write(conf.cmdtile_alloc, ref, tile);
     }
 }

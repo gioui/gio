@@ -86,15 +86,17 @@ mediump vec4[CHUNK] fillImage(uvec2 xy, CmdImage cmd_img) {
 }
 
 void main() {
-    uint tile_ix = gl_WorkGroupID.y * conf.width_in_tiles + gl_WorkGroupID.x;
-    Alloc cmd_alloc = slice_mem(conf.ptcl_alloc, tile_ix * PTCL_INITIAL_ALLOC, PTCL_INITIAL_ALLOC);
+    bool mem_ok = mem_error == NO_ERROR;
+    CmdTile tile = CmdTile_read(conf.cmdtile_alloc, CmdTileRef(conf.cmdtile_alloc.offset + gl_WorkGroupID.x * CmdTile_size));
+
+    Alloc cmd_alloc = new_alloc(tile.offset, PTCL_INITIAL_ALLOC, mem_ok);
     CmdRef cmd_ref = CmdRef(cmd_alloc.offset);
 
     // Read scrach space allocation, written first in the command list.
     Alloc scratch_alloc = alloc_read(cmd_alloc, cmd_ref.offset);
     cmd_ref.offset += Alloc_size;
 
-    uvec2 xy_uint = uvec2(gl_LocalInvocationID.x + TILE_WIDTH_PX * gl_WorkGroupID.x, gl_LocalInvocationID.y + TILE_HEIGHT_PX * gl_WorkGroupID.y);
+    uvec2 xy_uint = uvec2(gl_LocalInvocationID.x + TILE_WIDTH_PX * tile.tile_x, gl_LocalInvocationID.y + TILE_HEIGHT_PX * tile.tile_y);
     vec2 xy = vec2(xy_uint);
     mediump vec4 rgba[CHUNK];
     for (uint i = 0; i < CHUNK; i++) {
@@ -115,7 +117,6 @@ void main() {
 
     mediump float area[CHUNK];
     uint clip_depth = 0;
-    bool mem_ok = mem_error == NO_ERROR;
     while (mem_ok) {
         uint tag = Cmd_tag(cmd_alloc, cmd_ref).tag;
         if (tag == Cmd_End) {

@@ -779,15 +779,27 @@ func (b *Backend) MemoryBarrier() {
 	b.funcs.MemoryBarrier(gl.ALL_BARRIER_BITS)
 }
 
+func (b *Backend) DispatchComputeIndirect(buf driver.Buffer, offset int) {
+	b.bindBufferStorage()
+	b.funcs.BindBuffer(gl.DISPATCH_INDIRECT_BUFFER, buf.(*gpuBuffer).obj)
+	b.funcs.DispatchComputeIndirect(offset)
+}
+
 func (b *Backend) DispatchCompute(x, y, z int) {
-	if p := b.state.prog; p != nil {
-		for binding, buf := range p.storage {
-			if buf != nil {
-				b.glstate.bindBufferBase(b.funcs, gl.SHADER_STORAGE_BUFFER, binding, buf.obj)
-			}
+	b.bindBufferStorage()
+	b.funcs.DispatchCompute(x, y, z)
+}
+
+func (b *Backend) bindBufferStorage() {
+	p := b.state.prog
+	if p == nil {
+		return
+	}
+	for binding, buf := range p.storage {
+		if buf != nil {
+			b.glstate.bindBufferBase(b.funcs, gl.SHADER_STORAGE_BUFFER, binding, buf.obj)
 		}
 	}
-	b.funcs.DispatchCompute(x, y, z)
 }
 
 func (b *Backend) BindImageTexture(unit int, tex driver.Texture, access driver.AccessBits, f driver.TextureFormat) {
