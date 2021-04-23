@@ -57,8 +57,20 @@ Alloc new_alloc(uint offset, uint size, bool mem_ok) {
     return a;
 }
 
+// mem_alloc_size returns a.size if MEM_DEBUG is enabled, 0 otherwise.
+uint mem_alloc_size(Alloc a) {
+#ifdef MEM_DEBUG
+    return a.size;
+#else
+    return 0;
+#endif
+}
+
 // malloc allocates size bytes of memory.
 MallocResult malloc(uint size) {
+    if (size == 0) {
+        return MallocResult(new_alloc(0, 0, true), false);
+    }
     MallocResult r;
     uint offset = atomicAdd(mem_offset, size);
     r.failed = offset + size > memory.length() * 4;

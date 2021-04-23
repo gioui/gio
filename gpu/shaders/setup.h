@@ -33,7 +33,6 @@ struct Config {
     Alloc dispatch_alloc;
     Alloc tile_alloc;
     Alloc bin_alloc;
-    Alloc ptcl_alloc;
     Alloc pathseg_alloc;
     Alloc anno_alloc;
     Alloc trans_alloc;

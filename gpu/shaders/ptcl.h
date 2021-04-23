@@ -100,10 +100,12 @@ CmdJumpRef CmdJump_index(CmdJumpRef ref, uint index) {
 struct CmdTile {
     uint tile_x;
     uint tile_y;
-    uint offset;
+    uint cmd_offset;
+    uint clip_offset;
+    uint clip_size;
 };
 
-#define CmdTile_size 12
+#define CmdTile_size 20
 
 CmdTileRef CmdTile_index(CmdTileRef ref, uint index) {
     return CmdTileRef(ref.offset + index * CmdTile_size);
@@ -222,10 +224,14 @@ CmdTile CmdTile_read(Alloc a, CmdTileRef ref) {
     uint raw0 = read_mem(a, ix + 0);
     uint raw1 = read_mem(a, ix + 1);
     uint raw2 = read_mem(a, ix + 2);
+    uint raw3 = read_mem(a, ix + 3);
+    uint raw4 = read_mem(a, ix + 4);
     CmdTile s;
     s.tile_x = raw0;
     s.tile_y = raw1;
-    s.offset = raw2;
+    s.cmd_offset = raw2;
+    s.clip_offset = raw3;
+    s.clip_size = raw4;
     return s;
 }
 
@@ -233,7 +239,9 @@ void CmdTile_write(Alloc a, CmdTileRef ref, CmdTile s) {
     uint ix = ref.offset >> 2;
     write_mem(a, ix + 0, s.tile_x);
     write_mem(a, ix + 1, s.tile_y);
-    write_mem(a, ix + 2, s.offset);
+    write_mem(a, ix + 2, s.cmd_offset);
+    write_mem(a, ix + 3, s.clip_offset);
+    write_mem(a, ix + 4, s.clip_size);
 }
 
 CmdTag Cmd_tag(Alloc a, CmdRef ref) {

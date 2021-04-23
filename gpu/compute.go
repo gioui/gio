@@ -215,7 +215,6 @@ type config struct {
 	dispatch_alloc  memAlloc
 	tile_alloc      memAlloc
 	bin_alloc       memAlloc
-	ptcl_alloc      memAlloc
 	pathseg_alloc   memAlloc
 	anno_alloc      memAlloc
 	trans_alloc     memAlloc
@@ -261,7 +260,7 @@ const (
 	transSize   = 24
 	stateSize   = 60
 	stateStride = 4 + 2*stateSize
-	cmdTileSize = 12
+	cmdTileSize = 20
 )
 
 // mem.h constants.
@@ -765,7 +764,6 @@ func (g *compute) render(tileDims image.Point) error {
 		dispatch_alloc:  malloc(dispatchBufferSize),
 		tile_alloc:      malloc(enc.npath * pathSize),
 		bin_alloc:       malloc(round(enc.npath, wgSize) * binSize),
-		ptcl_alloc:      malloc(tileDims.X * tileDims.Y * ptclInitialAlloc),
 		pathseg_alloc:   malloc(enc.npathseg * pathsegSize),
 		anno_alloc:      malloc(enc.npath * annoSize),
 		trans_alloc:     malloc(enc.ntrans * transSize),

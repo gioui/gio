@@ -89,12 +89,11 @@ void main() {
     bool mem_ok = mem_error == NO_ERROR;
     CmdTile tile = CmdTile_read(conf.cmdtile_alloc, CmdTileRef(conf.cmdtile_alloc.offset + gl_WorkGroupID.x * CmdTile_size));
 
-    Alloc cmd_alloc = new_alloc(tile.offset, PTCL_INITIAL_ALLOC, mem_ok);
+    Alloc cmd_alloc = new_alloc(tile.cmd_offset, PTCL_INITIAL_ALLOC, mem_ok);
     CmdRef cmd_ref = CmdRef(cmd_alloc.offset);
 
     // Read scrach space allocation, written first in the command list.
-    Alloc scratch_alloc = alloc_read(cmd_alloc, cmd_ref.offset);
-    cmd_ref.offset += Alloc_size;
+    Alloc scratch_alloc = new_alloc(tile.clip_offset, tile.clip_size, mem_ok);
 
     uvec2 xy_uint = uvec2(gl_LocalInvocationID.x + TILE_WIDTH_PX * tile.tile_x, gl_LocalInvocationID.y + TILE_HEIGHT_PX * tile.tile_y);
     vec2 xy = vec2(xy_uint);

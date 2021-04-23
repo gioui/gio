@@ -74,7 +74,7 @@ Alloc read_tile_alloc(uint el_ix, bool mem_ok) {
 #define ANNO_COMMANDS 2
 
 // Perhaps cmd_alloc should be a global? This is a style question.
-bool alloc_cmd(inout Alloc cmd_alloc, inout CmdRef cmd_ref, inout uint cmd_limit) {
+bool alloc_cmd(inout Alloc cmd_alloc, inout Alloc initial_alloc, inout CmdRef cmd_ref, inout uint cmd_limit) {
     if (cmd_ref.offset < cmd_limit) {
         return true;
     }
@@ -82,8 +82,12 @@ bool alloc_cmd(inout Alloc cmd_alloc, inout CmdRef cmd_ref, inout uint cmd_limit
     if (new_cmd.failed) {
         return false;
     }
-    CmdJump jump = CmdJump(new_cmd.alloc.offset);
-    Cmd_Jump_write(cmd_alloc, cmd_ref, jump);
+    if (initial_alloc.offset == 0) {
+        initial_alloc = new_cmd.alloc;
+    } else {
+        CmdJump jump = CmdJump(new_cmd.alloc.offset);
+        Cmd_Jump_write(cmd_alloc, cmd_ref, jump);
+    }
     cmd_alloc = new_cmd.alloc;
     cmd_ref = CmdRef(cmd_alloc.offset);
     // Reserve space for the maximum number of commands and a potential jump.
@@ -122,13 +126,14 @@ void main() {
     uint bin_tile_y = N_TILE_Y * gl_WorkGroupID.y;
 
     // Per-tile state
+    bool mem_ok = mem_error == NO_ERROR;
     uint tile_x = gl_LocalInvocationID.x % N_TILE_X;
     uint tile_y = gl_LocalInvocationID.x / N_TILE_X;
     uint this_tile_ix = (bin_tile_y + tile_y) * conf.width_in_tiles + bin_tile_x + tile_x;
-    Alloc cmd_alloc = slice_mem(conf.ptcl_alloc, this_tile_ix * PTCL_INITIAL_ALLOC, PTCL_INITIAL_ALLOC);
-    CmdRef cmd_ref = CmdRef(cmd_alloc.offset);
-    // Reserve space for the maximum number of commands and a potential jump.
-    uint cmd_limit = cmd_ref.offset + PTCL_INITIAL_ALLOC - (ANNO_COMMANDS + 1) * Cmd_size;
+    Alloc cmd_alloc = new_alloc(0, 0, mem_ok);
+    Alloc initial_alloc = new_alloc(0, 0, mem_ok);
+    uint cmd_limit = 0;
+    CmdRef cmd_ref = CmdRef(0);
     // The nesting depth of the clip stack
     uint clip_depth = 0;
     // State for the "clip zero" optimization. If it's nonzero, then we are
@@ -148,13 +153,8 @@ void main() {
     uint part_start_ix = 0;
     uint ready_ix = 0;
 
-    // Leave room for the fine rasterizer scratch allocation.
-    Alloc scratch_alloc = slice_mem(cmd_alloc, 0, Alloc_size);
-    cmd_ref.offset += Alloc_size;
-
     uint num_begin_slots = 0;
     uint begin_slot = 0;
-    bool mem_ok = mem_error == NO_ERROR;
     bool need_raster = false;
     while (true) {
         for (uint i = 0; i < N_SLICE; i++) {
@@ -339,7 +339,7 @@ void main() {
                     Tile tile = Tile_read(read_tile_alloc(element_ref_ix, mem_ok), TileRef(sh_tile_base[element_ref_ix]
                         + (sh_tile_stride[element_ref_ix] * tile_y + tile_x) * Tile_size));
                     AnnoColor fill = Annotated_Color_read(conf.anno_alloc, ref);
-                    if (!alloc_cmd(cmd_alloc, cmd_ref, cmd_limit)) {
+                    if (!alloc_cmd(cmd_alloc, initial_alloc, cmd_ref, cmd_limit)) {
                         break;
                     }
                     write_fill(cmd_alloc, cmd_ref, tag.flags, tile, fill.linewidth);
@@ -351,7 +351,7 @@ void main() {
                     tile = Tile_read(read_tile_alloc(element_ref_ix, mem_ok), TileRef(sh_tile_base[element_ref_ix]
                         + (sh_tile_stride[element_ref_ix] * tile_y + tile_x) * Tile_size));
                     AnnoImage fill_img = Annotated_Image_read(conf.anno_alloc, ref);
-                    if (!alloc_cmd(cmd_alloc, cmd_ref, cmd_limit)) {
+                    if (!alloc_cmd(cmd_alloc, initial_alloc, cmd_ref, cmd_limit)) {
                         break;
                     }
                     write_fill(cmd_alloc, cmd_ref, tag.flags, tile, fill_img.linewidth);
@@ -367,7 +367,7 @@ void main() {
                         clip_one_mask |= (1 << clip_depth);
                     } else {
                         AnnoBeginClip begin_clip = Annotated_BeginClip_read(conf.anno_alloc, ref);
-                        if (!alloc_cmd(cmd_alloc, cmd_ref, cmd_limit)) {
+                        if (!alloc_cmd(cmd_alloc, initial_alloc, cmd_ref, cmd_limit)) {
                             break;
                         }
                         write_fill(cmd_alloc, cmd_ref, tag.flags, tile, begin_clip.linewidth);
@@ -384,7 +384,7 @@ void main() {
                 case Annotated_EndClip:
                     clip_depth--;
                     if (clip_depth >= 32 || (clip_one_mask & (1 << clip_depth)) == 0) {
-                        if (!alloc_cmd(cmd_alloc, cmd_ref, cmd_limit)) {
+                        if (!alloc_cmd(cmd_alloc, initial_alloc, cmd_ref, cmd_limit)) {
                             break;
                         }
                         Cmd_Solid_write(cmd_alloc, cmd_ref);
@@ -417,21 +417,20 @@ void main() {
     }
     if (need_raster) {
         Cmd_End_write(cmd_alloc, cmd_ref);
-        if (num_begin_slots > 0) {
-            // Write scratch allocation: one state per BeginClip per rasterizer chunk.
-            uint scratch_size = num_begin_slots * TILE_WIDTH_PX * TILE_HEIGHT_PX * CLIP_STATE_SIZE * 4;
-            MallocResult scratch = malloc(scratch_size);
-            // Ignore scratch.failed; we don't use the allocation and kernel4
-            // checks for memory overflow before using it.
-            alloc_write(scratch_alloc, scratch_alloc.offset, scratch.alloc);
-        }
+        // Allocate clip scratch space, one state per BeginClip per rasterizer chunk.
+        uint scratch_size = num_begin_slots * TILE_WIDTH_PX * TILE_HEIGHT_PX * CLIP_STATE_SIZE * 4;
+        MallocResult scratch = malloc(scratch_size);
         // Write tile header and increment kernel4 dispatch count.
         touch_mem(conf.dispatch_alloc, conf.dispatch_alloc.offset*4);
         uint index = atomicAdd(memory[conf.dispatch_alloc.offset*4], 1);
         CmdTile tile;
         tile.tile_x = bin_tile_x + tile_x;
         tile.tile_y = bin_tile_y + tile_y;
-        tile.offset = scratch_alloc.offset;
+        tile.cmd_offset = initial_alloc.offset;
+        // Ignore scratch.failed; we don't use the allocation and kernel4
+        // checks for memory overflow before using it.
+        tile.clip_offset = scratch.alloc.offset;
+        tile.clip_size = mem_alloc_size(scratch.alloc);
         CmdTileRef ref = CmdTileRef(conf.cmdtile_alloc.offset + index * CmdTile_size);
         CmdTile_write(conf.cmdtile_alloc, ref, tile);
     }
