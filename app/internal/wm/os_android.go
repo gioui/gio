@@ -85,6 +85,7 @@ type window struct {
 // re-creates our Activity.
 type windowState struct {
 	cursor          *pointer.CursorName
+	orientation     *Orientation
 	navigationColor *color.NRGBA
 	statusColor     *color.NRGBA
 }
@@ -98,6 +99,7 @@ var gioView struct {
 	hideTextInput      C.jmethodID
 	postFrameCallback  C.jmethodID
 	setCursor          C.jmethodID
+	setOrientation     C.jmethodID
 	setNavigationColor C.jmethodID
 	setStatusColor     C.jmethodID
 }
@@ -226,6 +228,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.hideTextInput = getMethodID(env, class, "hideTextInput", "()V")
 		m.postFrameCallback = getMethodID(env, class, "postFrameCallback", "()V")
 		m.setCursor = getMethodID(env, class, "setCursor", "(I)V")
+		m.setOrientation = getMethodID(env, class, "setOrientation", "(II)V")
 		m.setNavigationColor = getMethodID(env, class, "setNavigationColor", "(II)V")
 		m.setStatusColor = getMethodID(env, class, "setStatusColor", "(II)V")
 	})
@@ -686,6 +689,11 @@ func (w *window) ReadClipboard() {
 }
 
 func (w *window) Option(opts *Options) {
+	if o := opts.Orientation; o != nil {
+		w.setState(func(state *windowState) {
+			state.orientation = o
+		})
+	}
 	if o := opts.NavigationColor; o != nil {
 		w.setState(func(state *windowState) {
 			state.navigationColor = o
@@ -723,6 +731,9 @@ func applyStateDiff(env *C.JNIEnv, view C.jobject, old, state windowState) {
 	if state.cursor != nil && old.cursor != state.cursor {
 		setCursor(env, view, *state.cursor)
 	}
+	if state.orientation != nil && old.orientation != state.orientation {
+		setOrientation(env, view, *state.orientation)
+	}
 	if state.navigationColor != nil && old.navigationColor != state.navigationColor {
 		setNavigationColor(env, view, *state.navigationColor)
 	}
@@ -752,6 +763,23 @@ func setCursor(env *C.JNIEnv, view C.jobject, name pointer.CursorName) {
 		curID = 0 // TYPE_NULL
 	}
 	callVoidMethod(env, view, gioView.setCursor, jvalue(curID))
+}
+
+func setOrientation(env *C.JNIEnv, view C.jobject, mode Orientation) {
+	var (
+		id         int
+		idFallback int // Used only for SDK 17 or older.
+	)
+	// Constants defined at https://developer.android.com/reference/android/content/pm/ActivityInfo.
+	switch mode {
+	case AnyOrientation:
+		id, idFallback = 2, 2 // SCREEN_ORIENTATION_USER
+	case LandscapeOrientation:
+		id, idFallback = 11, 0 // SCREEN_ORIENTATION_USER_LANDSCAPE (or SCREEN_ORIENTATION_LANDSCAPE)
+	case PortraitOrientation:
+		id, idFallback = 12, 1 // SCREEN_ORIENTATION_USER_PORTRAIT (or SCREEN_ORIENTATION_PORTRAIT)
+	}
+	callVoidMethod(env, view, gioView.setOrientation, jvalue(id), jvalue(idFallback))
 }
 
 func setStatusColor(env *C.JNIEnv, view C.jobject, color color.NRGBA) {

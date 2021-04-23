@@ -134,6 +134,13 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		setPointerIcon(pointerIcon);
 	}
 
+    private void setOrientation(int id, int fallback) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR2) {
+            id = fallback;
+        }
+        ((Activity) this.getContext()).setRequestedOrientation(id);
+    }
+
     private enum Bar {
         NAVIGATION,
         STATUS,
