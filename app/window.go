@@ -455,17 +455,17 @@ func (q *queue) Events(k event.Tag) []event.Event {
 	return q.q.Events(k)
 }
 
-const (
+var (
 	// Windowed is the normal window mode with OS specific window decorations.
-	Windowed = wm.Windowed
+	Windowed = windowMode(wm.Windowed)
 	// Fullscreen is the full screen window mode.
-	Fullscreen = wm.Fullscreen
+	Fullscreen = windowMode(wm.Fullscreen)
 )
 
-// WindowMode sets the window mode.
+// windowMode sets the window mode.
 //
 // Supported platforms are macOS, X11 and Windows.
-func WindowMode(mode wm.WindowMode) Option {
+func windowMode(mode wm.WindowMode) Option {
 	return func(opts *wm.Options) {
 		opts.WindowMode = &mode
 	}
