@@ -35,6 +35,7 @@ type window struct {
 	requestAnimationFrame js.Value
 	browserHistory        js.Value
 	visualViewport        js.Value
+	screenOrientation     js.Value
 	cleanfuncs            []func()
 	touches               []js.Value
 	composing             bool
@@ -73,6 +74,9 @@ func NewWindow(win Callbacks, opts *Options) error {
 	w.visualViewport = w.window.Get("visualViewport")
 	if w.visualViewport.IsUndefined() {
 		w.visualViewport = w.window
+	}
+	if screen := w.window.Get("screen"); screen.Truthy() {
+		w.screenOrientation = screen.Get("orientation")
 	}
 	w.chanAnimation = make(chan struct{}, 1)
 	w.chanRedraw = make(chan struct{}, 1)
@@ -494,6 +498,9 @@ func (w *window) Option(opts *Options) {
 	if o := opts.NavigationColor; o != nil {
 		w.navigationColor(*o)
 	}
+	if o := opts.Orientation; o != nil {
+		w.orientation(*o)
+	}
 }
 
 func (w *window) SetCursor(name pointer.CursorName) {
@@ -588,6 +595,21 @@ func (w *window) windowMode(mode WindowMode) {
 			return // Browser doesn't support such feature.
 		}
 		elem.Call("requestFullscreen")
+	}
+}
+
+func (w *window) orientation(mode Orientation) {
+	if j := w.screenOrientation; !j.Truthy() || !j.Get("unlock").Truthy() || !j.Get("lock").Truthy() {
+		return // Browser don't support Screen Orientation API.
+	}
+
+	switch mode {
+	case AnyOrientation:
+		w.screenOrientation.Call("unlock")
+	case LandscapeOrientation:
+		w.screenOrientation.Call("lock", "landscape").Call("then", w.redraw)
+	case PortraitOrientation:
+		w.screenOrientation.Call("lock", "portrait").Call("then", w.redraw)
 	}
 }
 
