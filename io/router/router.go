@@ -102,6 +102,11 @@ func (q *Router) TextInputState() TextInputState {
 	return q.kqueue.InputState()
 }
 
+// TextInputHint returns the input mode from the most recent key.InputOp.
+func (q *Router) TextInputHint() (key.InputHint, bool) {
+	return q.kqueue.InputHint()
+}
+
 // WriteClipboard returns the most recent text to be copied
 // to the clipboard, if any.
 func (q *Router) WriteClipboard() (string, bool) {

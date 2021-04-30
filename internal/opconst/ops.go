@@ -50,8 +50,8 @@ const (
 	TypePassLen            = 1 + 1
 	TypeClipboardReadLen   = 1
 	TypeClipboardWriteLen  = 1
-	TypeKeyInputLen        = 1
-	TypeKeyFocusLen        = 1
+	TypeKeyInputLen        = 1 + 1
+	TypeKeyFocusLen        = 1 + 1
 	TypeKeySoftKeyboardLen = 1 + 1
 	TypeSaveLen            = 1 + 4
 	TypeLoadLen            = 1 + 1 + 4

@@ -184,6 +184,9 @@ func (w *Window) processFrame(frameStart time.Time, size image.Point, frame *op.
 	case router.TextInputClose:
 		go w.driverRun(func(d wm.Driver) { d.ShowTextInput(false) })
 	}
+	if hint, ok := w.queue.q.TextInputHint(); ok {
+		go w.driverRun(func(d wm.Driver) { d.SetInputHint(hint) })
+	}
 	if txt, ok := w.queue.q.WriteClipboard(); ok {
 		go w.WriteClipboard(txt)
 	}

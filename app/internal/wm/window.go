@@ -6,6 +6,7 @@ package wm
 
 import (
 	"errors"
+	"gioui.org/io/key"
 	"image/color"
 
 	"gioui.org/gpu"
@@ -84,8 +85,12 @@ type Driver interface {
 	// SetAnimating sets the animation flag. When the window is animating,
 	// FrameEvents are delivered as fast as the display can handle them.
 	SetAnimating(anim bool)
+
 	// ShowTextInput updates the virtual keyboard state.
 	ShowTextInput(show bool)
+
+	SetInputHint(mode key.InputHint)
+
 	NewContext() (Context, error)
 
 	// ReadClipboard requests the clipboard content.

@@ -152,6 +152,7 @@ var gioView struct {
 	getFontScale       C.jmethodID
 	showTextInput      C.jmethodID
 	hideTextInput      C.jmethodID
+	setInputHint       C.jmethodID
 	postFrameCallback  C.jmethodID
 	setCursor          C.jmethodID
 	setOrientation     C.jmethodID
@@ -281,6 +282,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.getFontScale = getMethodID(env, class, "getFontScale", "()F")
 		m.showTextInput = getMethodID(env, class, "showTextInput", "()V")
 		m.hideTextInput = getMethodID(env, class, "hideTextInput", "()V")
+		m.setInputHint = getMethodID(env, class, "setInputHint", "(I)V")
 		m.postFrameCallback = getMethodID(env, class, "postFrameCallback", "()V")
 		m.setCursor = getMethodID(env, class, "setCursor", "(I)V")
 		m.setOrientation = getMethodID(env, class, "setOrientation", "(II)V")
@@ -606,6 +608,28 @@ func (w *window) ShowTextInput(show bool) {
 		} else {
 			callVoidMethod(env, w.view, gioView.hideTextInput)
 		}
+	})
+}
+
+func (w *window) SetInputHint(mode key.InputHint) {
+	// Constants defined at https://developer.android.com/reference/android/text/InputType.
+	const (
+		TYPE_NULL                = 0
+		TYPE_CLASS_NUMBER        = 2
+		TYPE_NUMBER_FLAG_DECIMAL = 8192
+		TYPE_NUMBER_FLAG_SIGNED  = 4096
+	)
+
+	runInJVM(javaVM(), func(env *C.JNIEnv) {
+		var m jvalue
+		switch mode {
+		case key.HintNumeric:
+			m = TYPE_CLASS_NUMBER | TYPE_NUMBER_FLAG_DECIMAL | TYPE_NUMBER_FLAG_SIGNED
+		default:
+			// TYPE_NULL, since TYPE_CLASS_TEXT isn't currently supported (gio#116), so TYPE_NULL is used instead.
+			m = TYPE_NULL
+		}
+		callVoidMethod(env, w.view, gioView.setInputHint, m)
 	})
 }
 

@@ -223,6 +223,8 @@ func (w *x11Window) SetWindowMode(mode WindowMode) {
 
 func (w *x11Window) ShowTextInput(show bool) {}
 
+func (w *x11Window) SetInputHint(_ key.InputHint) {}
+
 // Close the window.
 func (w *x11Window) Close() {
 	var xev C.XEvent
