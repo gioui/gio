@@ -297,6 +297,8 @@ func (w *window) ShowTextInput(show bool) {
 	}
 }
 
+func (w *window) SetInputHint(_ key.InputHint) {}
+
 // Close the window. Not implemented for iOS.
 func (w *window) Close() {}
 

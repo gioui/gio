@@ -665,6 +665,8 @@ func loadCursor(name pointer.CursorName) (syscall.Handle, error) {
 
 func (w *window) ShowTextInput(show bool) {}
 
+func (w *window) SetInputHint(_ key.InputHint) {}
+
 func (w *window) HDC() syscall.Handle {
 	return w.hdc
 }

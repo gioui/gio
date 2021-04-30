@@ -187,6 +187,8 @@ func (w *window) SetCursor(name pointer.CursorName) {
 
 func (w *window) ShowTextInput(show bool) {}
 
+func (w *window) SetInputHint(_ key.InputHint) {}
+
 func (w *window) SetAnimating(anim bool) {
 	if anim {
 		w.displayLink.Start()

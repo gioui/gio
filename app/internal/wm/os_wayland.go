@@ -1462,6 +1462,8 @@ func (w *window) surface() (*C.struct_wl_surface, int, int) {
 
 func (w *window) ShowTextInput(show bool) {}
 
+func (w *window) SetInputHint(_ key.InputHint) {}
+
 // Close the window. Not implemented for Wayland.
 func (w *window) Close() {}
 

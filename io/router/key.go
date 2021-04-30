@@ -17,6 +17,7 @@ type keyQueue struct {
 	handlers map[event.Tag]*keyHandler
 	reader   ops.Reader
 	state    TextInputState
+	hint     key.InputHint
 }
 
 type keyHandler struct {
@@ -24,6 +25,7 @@ type keyHandler struct {
 	// in the current frame.
 	visible bool
 	new     bool
+	hint    key.InputHint
 }
 
 const (
@@ -36,6 +38,20 @@ const (
 // determined in Frame.
 func (q *keyQueue) InputState() TextInputState {
 	return q.state
+}
+
+// InputHint returns the input mode from the most recent key.InputOp.
+func (q *keyQueue) InputHint() (key.InputHint, bool) {
+	if q.focus == nil {
+		return q.hint, false
+	}
+	focused, ok := q.handlers[q.focus]
+	if !ok {
+		return q.hint, false
+	}
+	old := q.hint
+	q.hint = focused.hint
+	return q.hint, old != q.hint
 }
 
 func (q *keyQueue) Frame(root *op.Ops, events *handlerEvents) {
@@ -108,6 +124,7 @@ func (q *keyQueue) resolveFocus(events *handlerEvents) (focus event.Tag, changed
 				q.handlers[op.Tag] = h
 			}
 			h.visible = true
+			h.hint = op.Hint
 		}
 	}
 	return
@@ -118,7 +135,8 @@ func decodeKeyInputOp(d []byte, refs []interface{}) key.InputOp {
 		panic("invalid op")
 	}
 	return key.InputOp{
-		Tag: refs[0].(event.Tag),
+		Tag:  refs[0].(event.Tag),
+		Hint: key.InputHint(d[1]),
 	}
 }
 

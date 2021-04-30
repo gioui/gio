@@ -22,7 +22,8 @@ import (
 // Key events are in general only delivered to the
 // focused key handler.
 type InputOp struct {
-	Tag event.Tag
+	Tag  event.Tag
+	Hint InputHint
 }
 
 // SoftKeyboardOp shows or hide the on-screen keyboard, if available.
@@ -63,6 +64,25 @@ type Event struct {
 type EditEvent struct {
 	Text string
 }
+
+// InputHint changes the on-screen-keyboard type. That hints the
+// type of data that might be entered by the user.
+type InputHint uint8
+
+const (
+	// HintAny hints that any input is expected.
+	HintAny InputHint = iota
+	// HintText hints that text input is expected. It may activate auto-correction and suggestions.
+	HintText
+	// HintNumeric hints that numeric input is expected. It may activate shortcuts for 0-9, "." and ",".
+	HintNumeric
+	// HintEmail hints that email input is expected. It may activate shortcuts for common email characters, such as "@" and ".com".
+	HintEmail
+	// HintURL hints that URL input is expected. It may activate shortcuts for common URL fragments such as "/" and ".com".
+	HintURL
+	// HintTelephone hints that telephone number input is expected. It may activate shortcuts for 0-9, "#" and "*".
+	HintTelephone
+)
 
 // State is the state of a key during an event.
 type State uint8
@@ -127,6 +147,7 @@ func (h InputOp) Add(o *op.Ops) {
 	}
 	data := o.Write1(opconst.TypeKeyInputLen, h.Tag)
 	data[0] = byte(opconst.TypeKeyInput)
+	data[1] = byte(h.Hint)
 }
 
 func (h SoftKeyboardOp) Add(o *op.Ops) {
