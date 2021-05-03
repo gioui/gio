@@ -19,8 +19,8 @@ func TestPaintRect(t *testing.T) {
 	}, func(r result) {
 		r.expect(0, 0, colornames.Red)
 		r.expect(49, 0, colornames.Red)
-		r.expect(50, 0, colornames.White)
-		r.expect(10, 50, colornames.White)
+		r.expect(50, 0, transparent)
+		r.expect(10, 50, transparent)
 	})
 }
 
@@ -29,11 +29,11 @@ func TestPaintClippedRect(t *testing.T) {
 		clip.RRect{Rect: f32.Rect(25, 25, 60, 60)}.Add(o)
 		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
 	}, func(r result) {
-		r.expect(0, 0, colornames.White)
-		r.expect(24, 35, colornames.White)
+		r.expect(0, 0, transparent)
+		r.expect(24, 35, transparent)
 		r.expect(25, 35, colornames.Red)
-		r.expect(50, 0, colornames.White)
-		r.expect(10, 50, colornames.White)
+		r.expect(50, 0, transparent)
+		r.expect(10, 50, transparent)
 	})
 }
 
@@ -44,9 +44,9 @@ func TestPaintClippedCircle(t *testing.T) {
 		clip.Rect(image.Rect(0, 0, 30, 50)).Add(o)
 		paint.Fill(o, red)
 	}, func(r result) {
-		r.expect(21, 21, colornames.White)
+		r.expect(21, 21, transparent)
 		r.expect(25, 30, colornames.Red)
-		r.expect(31, 30, colornames.White)
+		r.expect(31, 30, transparent)
 	})
 }
 
@@ -76,9 +76,9 @@ func TestPaintArc(t *testing.T) {
 
 		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 128, 128)).Op())
 	}, func(r result) {
-		r.expect(0, 0, colornames.White)
+		r.expect(0, 0, transparent)
 		r.expect(0, 25, colornames.Red)
-		r.expect(0, 15, colornames.White)
+		r.expect(0, 15, transparent)
 	})
 }
 
@@ -98,10 +98,10 @@ func TestPaintAbsolute(t *testing.T) {
 
 		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 128, 128)).Op())
 	}, func(r result) {
-		r.expect(0, 0, colornames.White)
+		r.expect(0, 0, transparent)
 		r.expect(30, 30, colornames.Red)
-		r.expect(79, 79, colornames.White)
-		r.expect(90, 90, colornames.White)
+		r.expect(79, 79, transparent)
+		r.expect(90, 90, transparent)
 	})
 }
 
@@ -113,8 +113,8 @@ func TestPaintTexture(t *testing.T) {
 	}, func(r result) {
 		r.expect(0, 0, colornames.Blue)
 		r.expect(79, 10, colornames.Green)
-		r.expect(80, 0, colornames.White)
-		r.expect(10, 80, colornames.White)
+		r.expect(80, 0, transparent)
+		r.expect(10, 80, transparent)
 	})
 }
 
@@ -158,7 +158,7 @@ func TestPaintClippedTexture(t *testing.T) {
 		scale(80.0/512, 80.0/512).Add(o)
 		paint.PaintOp{}.Add(o)
 	}, func(r result) {
-		r.expect(40, 40, colornames.White)
+		r.expect(40, 40, transparent)
 		r.expect(25, 35, colornames.Blue)
 	})
 }
@@ -177,7 +177,7 @@ func TestStrokedPathBevelFlat(t *testing.T) {
 
 		paint.Fill(o, red)
 	}, func(r result) {
-		r.expect(0, 0, colornames.White)
+		r.expect(0, 0, transparent)
 		r.expect(10, 50, colornames.Red)
 	})
 }
@@ -196,7 +196,7 @@ func TestStrokedPathBevelRound(t *testing.T) {
 
 		paint.Fill(o, red)
 	}, func(r result) {
-		r.expect(0, 0, colornames.White)
+		r.expect(0, 0, transparent)
 		r.expect(10, 50, colornames.Red)
 	})
 }
@@ -215,7 +215,7 @@ func TestStrokedPathBevelSquare(t *testing.T) {
 
 		paint.Fill(o, red)
 	}, func(r result) {
-		r.expect(0, 0, colornames.White)
+		r.expect(0, 0, transparent)
 		r.expect(10, 50, colornames.Red)
 	})
 }
@@ -234,7 +234,7 @@ func TestStrokedPathRoundRound(t *testing.T) {
 
 		paint.Fill(o, red)
 	}, func(r result) {
-		r.expect(0, 0, colornames.White)
+		r.expect(0, 0, transparent)
 		r.expect(10, 50, colornames.Red)
 	})
 }
@@ -272,7 +272,7 @@ func TestStrokedPathFlatMiter(t *testing.T) {
 		}
 
 	}, func(r result) {
-		r.expect(0, 0, colornames.White)
+		r.expect(0, 0, transparent)
 		r.expect(40, 10, colornames.Black)
 		r.expect(40, 12, colornames.Red)
 	})
@@ -311,7 +311,7 @@ func TestStrokedPathFlatMiterInf(t *testing.T) {
 		}
 
 	}, func(r result) {
-		r.expect(0, 0, colornames.White)
+		r.expect(0, 0, transparent)
 		r.expect(40, 10, colornames.Black)
 		r.expect(40, 12, colornames.Red)
 	})
@@ -353,10 +353,10 @@ func TestStrokedPathZeroWidth(t *testing.T) {
 		}
 
 	}, func(r result) {
-		r.expect(0, 0, colornames.White)
+		r.expect(0, 0, transparent)
 		r.expect(10, 50, colornames.Black)
 		r.expect(30, 50, colornames.Black)
-		r.expect(65, 50, colornames.White)
+		r.expect(65, 50, transparent)
 	})
 }
 
@@ -406,7 +406,7 @@ func TestDashedPathFlatCapEllipse(t *testing.T) {
 		}
 
 	}, func(r result) {
-		r.expect(0, 0, colornames.White)
+		r.expect(0, 0, transparent)
 		r.expect(0, 62, colornames.Red)
 		r.expect(0, 65, colornames.Black)
 	})
@@ -451,10 +451,10 @@ func TestDashedPathFlatCapZ(t *testing.T) {
 			stk.Load()
 		}
 	}, func(r result) {
-		r.expect(0, 0, colornames.White)
+		r.expect(0, 0, transparent)
 		r.expect(40, 10, colornames.Black)
 		r.expect(40, 12, colornames.Red)
-		r.expect(46, 12, colornames.White)
+		r.expect(46, 12, transparent)
 	})
 }
 
@@ -494,7 +494,7 @@ func TestDashedPathFlatCapZNoDash(t *testing.T) {
 			stk.Load()
 		}
 	}, func(r result) {
-		r.expect(0, 0, colornames.White)
+		r.expect(0, 0, transparent)
 		r.expect(40, 10, colornames.Black)
 		r.expect(40, 12, colornames.Red)
 		r.expect(46, 12, colornames.Red)
@@ -536,10 +536,10 @@ func TestDashedPathFlatCapZNoPath(t *testing.T) {
 			stk.Load()
 		}
 	}, func(r result) {
-		r.expect(0, 0, colornames.White)
+		r.expect(0, 0, transparent)
 		r.expect(40, 10, colornames.Black)
-		r.expect(40, 12, colornames.White)
-		r.expect(46, 12, colornames.White)
+		r.expect(40, 12, transparent)
+		r.expect(46, 12, transparent)
 	})
 }
 

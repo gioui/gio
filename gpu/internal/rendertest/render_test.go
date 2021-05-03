@@ -56,7 +56,7 @@ func TestTransformMacro(t *testing.T) {
 	}, func(r result) {
 		r.expect(5, 15, colornames.Red)
 		r.expect(15, 15, colornames.Black)
-		r.expect(11, 51, colornames.White)
+		r.expect(11, 51, transparent)
 	})
 }
 
@@ -80,7 +80,7 @@ func TestRepeatedPaintsZ(t *testing.T) {
 	}, func(r result) {
 		r.expect(5, 5, colornames.Red)
 		r.expect(11, 15, colornames.Black)
-		r.expect(11, 51, colornames.White)
+		r.expect(11, 51, transparent)
 	})
 }
 
@@ -99,7 +99,7 @@ func TestNoClipFromPaint(t *testing.T) {
 		r.expect(1, 1, colornames.Black)
 		r.expect(20, 20, colornames.Black)
 		r.expect(49, 49, colornames.Black)
-		r.expect(51, 51, colornames.White)
+		r.expect(51, 51, transparent)
 	})
 }
 
@@ -197,16 +197,16 @@ func TestBuildOffscreen(t *testing.T) {
 			func(ops *op.Ops) {
 				draw(-100, ops)
 			}, func(r result) {
-				r.expect(5, 5, colornames.White)
-				r.expect(20, 20, colornames.White)
+				r.expect(5, 5, transparent)
+				r.expect(20, 20, transparent)
 			}),
 		frame(
 			func(ops *op.Ops) {
 				draw(0, ops)
 			}, func(r result) {
-				r.expect(2, 2, colornames.White)
+				r.expect(2, 2, transparent)
 				r.expect(20, 20, colornames.Black)
-				r.expect(38, 38, colornames.White)
+				r.expect(38, 38, transparent)
 			}))
 }
 
@@ -216,10 +216,10 @@ func TestNegativeOverlaps(t *testing.T) {
 		clip.Rect(image.Rect(0, 120, 100, 122)).Add(ops)
 		paint.PaintOp{}.Add(ops)
 	}, func(r result) {
-		r.expect(60, 60, colornames.White)
-		r.expect(60, 110, colornames.White)
-		r.expect(60, 120, colornames.White)
-		r.expect(60, 122, colornames.White)
+		r.expect(60, 60, transparent)
+		r.expect(60, 110, transparent)
+		r.expect(60, 120, transparent)
+		r.expect(60, 122, transparent)
 	})
 }
 

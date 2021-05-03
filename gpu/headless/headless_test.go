@@ -78,7 +78,7 @@ func TestClipping(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	bg := color.NRGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff}
+	var bg color.NRGBA
 	tests := []struct {
 		x, y  int
 		color color.NRGBA

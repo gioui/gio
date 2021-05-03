@@ -110,7 +110,7 @@ func (w *Window) Release() {
 func (w *Window) Frame(frame *op.Ops) error {
 	return contextDo(w.ctx, func() error {
 		w.dev.BindFramebuffer(w.fbo)
-		w.gpu.Clear(color.NRGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff})
+		w.gpu.Clear(color.NRGBA{})
 		w.gpu.Collect(w.size, frame)
 		return w.gpu.Frame()
 	})

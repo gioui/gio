@@ -31,12 +31,13 @@ var (
 )
 
 var (
-	red     = f32color.RGBAToNRGBA(colornames.Red)
-	green   = f32color.RGBAToNRGBA(colornames.Green)
-	blue    = f32color.RGBAToNRGBA(colornames.Blue)
-	magenta = f32color.RGBAToNRGBA(colornames.Magenta)
-	black   = f32color.RGBAToNRGBA(colornames.Black)
-	white   = f32color.RGBAToNRGBA(colornames.White)
+	red         = f32color.RGBAToNRGBA(colornames.Red)
+	green       = f32color.RGBAToNRGBA(colornames.Green)
+	blue        = f32color.RGBAToNRGBA(colornames.Blue)
+	magenta     = f32color.RGBAToNRGBA(colornames.Magenta)
+	black       = f32color.RGBAToNRGBA(colornames.Black)
+	white       = f32color.RGBAToNRGBA(colornames.White)
+	transparent = color.RGBA{}
 )
 
 func init() {
@@ -163,21 +164,32 @@ func verifyRef(t *testing.T, img *image.RGBA, frame int) (ok bool) {
 		t.Error("could not decode ref:", err)
 		return
 	}
-	ref, ok := r.(*image.RGBA)
-	if !ok {
-		t.Errorf("image is a %T, expected *image.RGBA", r)
-		return
-	}
-	if len(ref.Pix) != len(img.Pix) {
-		t.Error("not equal to ref (len)")
+	if img.Bounds() != r.Bounds() {
+		t.Errorf("reference image is %v, expected %v", r.Bounds(), img.Bounds())
 		return false
+	}
+	var ref *image.RGBA
+	switch r := r.(type) {
+	case *image.RGBA:
+		ref = r
+	case *image.NRGBA:
+		ref = image.NewRGBA(r.Bounds())
+		bnd := r.Bounds()
+		for x := bnd.Min.X; x < bnd.Max.X; x++ {
+			for y := bnd.Min.Y; y < bnd.Max.Y; y++ {
+				ref.SetRGBA(x, y, f32color.NRGBAToRGBA(r.NRGBAAt(x, y)))
+			}
+		}
+	default:
+		t.Fatalf("reference image is a %T, expected *image.NRGBA or *image.RGBA", r)
 	}
 	bnd := img.Bounds()
 	for x := bnd.Min.X; x < bnd.Max.X; x++ {
 		for y := bnd.Min.Y; y < bnd.Max.Y; y++ {
-			c1, c2 := ref.RGBAAt(x, y), img.RGBAAt(x, y)
-			if !colorsClose(c1, c2) {
-				t.Error("not equal to ref at", x, y, " ", c1, c2)
+			exp := ref.RGBAAt(x, y)
+			got := img.RGBAAt(x, y)
+			if !colorsClose(exp, got) {
+				t.Error("not equal to ref at", x, y, " ", got, exp)
 				return false
 			}
 		}
@@ -230,6 +242,7 @@ func yiqEqApprox(c1, c2 color.RGBA, d2 float64) bool {
 }
 
 func (r result) expect(x, y int, col color.RGBA) {
+	r.t.Helper()
 	if r.img == nil {
 		return
 	}
@@ -244,9 +257,17 @@ type result struct {
 	img *image.RGBA
 }
 
-func saveImage(file string, img image.Image) error {
+func saveImage(file string, img *image.RGBA) error {
+	// Only NRGBA images are losslessly encoded by png.Encode.
+	nrgba := image.NewNRGBA(img.Bounds())
+	bnd := img.Bounds()
+	for x := bnd.Min.X; x < bnd.Max.X; x++ {
+		for y := bnd.Min.Y; y < bnd.Max.Y; y++ {
+			nrgba.SetNRGBA(x, y, f32color.RGBAToNRGBA(img.RGBAAt(x, y)))
+		}
+	}
 	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
+	if err := png.Encode(&buf, nrgba); err != nil {
 		return err
 	}
 	return ioutil.WriteFile(file, buf.Bytes(), 0666)
