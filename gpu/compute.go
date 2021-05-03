@@ -31,6 +31,7 @@ type compute struct {
 	collector     collector
 	enc           encoder
 	texOps        []textureOp
+	layerVertices []layerVertex
 	viewport      image.Point
 	maxTextureDim int
 
@@ -50,12 +51,19 @@ type compute struct {
 		memory sizedBuffer
 	}
 	output struct {
-		size image.Point
+		packer packer
+		size   image.Point
 		// image is the output texture. Note that it is in RGBA format,
 		// but contains data in sRGB. See blitOutput for more detail.
 		image    driver.Texture
 		fbo      driver.Framebuffer
 		blitProg driver.Program
+		layout   driver.InputLayout
+
+		buffer sizedBuffer
+
+		uniforms *copyUniforms
+		uniBuf   driver.Buffer
 	}
 	// images contains ImageOp images packed into a texture atlas.
 	images struct {
@@ -102,6 +110,13 @@ type compute struct {
 	zeroSlice []byte
 	memHeader *memoryHeader
 	conf      *config
+}
+
+type copyUniforms struct {
+	scale   [2]float32
+	pos     [2]float32
+	uvScale [2]float32
+	_       [8]byte // Pad to 16 bytes.
 }
 
 type materialUniforms struct {
@@ -160,6 +175,11 @@ type clipState struct {
 	parent    *clipState
 	relTrans  f32.Affine2D
 	stroke    clip.StrokeStyle
+}
+
+type layerVertex struct {
+	posX, posY float32
+	u, v       float32
 }
 
 // materialVertex describes a vertex of a quad used to render a transformed
@@ -283,12 +303,32 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		memHeader:     new(memoryHeader),
 	}
 
+	// Large enough for reasonable fill sizes, yet still spannable by the compute programs.
+	g.output.packer.maxDim = 4096
 	blitProg, err := ctx.NewProgram(shader_copy_vert, shader_copy_frag)
 	if err != nil {
 		g.Release()
 		return nil, err
 	}
 	g.output.blitProg = blitProg
+	progLayout, err := ctx.NewInputLayout(shader_copy_vert, []driver.InputDesc{
+		{Type: driver.DataTypeFloat, Size: 2, Offset: 0},
+		{Type: driver.DataTypeFloat, Size: 2, Offset: 4 * 2},
+	})
+	if err != nil {
+		g.Release()
+		return nil, err
+	}
+	g.output.layout = progLayout
+	g.output.uniforms = new(copyUniforms)
+
+	buf, err := ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(*g.output.uniforms)))
+	if err != nil {
+		g.Release()
+		return nil, err
+	}
+	g.output.uniBuf = buf
+	g.output.blitProg.SetVertexUniforms(buf)
 
 	materialProg, err := ctx.NewProgram(shader_material_vert, shader_material_frag)
 	if err != nil {
@@ -296,7 +336,7 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		return nil, err
 	}
 	g.materials.prog = materialProg
-	progLayout, err := ctx.NewInputLayout(shader_material_vert, []driver.InputDesc{
+	progLayout, err = ctx.NewInputLayout(shader_material_vert, []driver.InputDesc{
 		{Type: driver.DataTypeFloat, Size: 2, Offset: 0},
 		{Type: driver.DataTypeFloat, Size: 2, Offset: 4 * 2},
 	})
@@ -307,7 +347,7 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	g.materials.layout = progLayout
 	g.materials.uniforms = new(materialUniforms)
 
-	buf, err := ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(*g.materials.uniforms)))
+	buf, err = ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(*g.materials.uniforms)))
 	if err != nil {
 		g.Release()
 		return nil, err
@@ -348,13 +388,23 @@ func newCompute(ctx driver.Device) (*compute, error) {
 func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	g.viewport = viewport
 	g.collector.reset()
-	g.enc.reset()
-	g.texOps = g.texOps[:0]
 
-	// Flip Y-axis.
-	flipY := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(1, -1)).Offset(f32.Pt(0, float32(viewport.Y)))
-	g.collector.collect(ops, flipY, viewport)
-	g.collector.encode(viewport, &g.enc, &g.texOps)
+	g.collector.collect(ops, viewport)
+	reclaimed := false
+	for {
+		g.enc.reset()
+		g.texOps = g.texOps[:0]
+		g.layerVertices = g.layerVertices[:0]
+		if g.collector.encode(viewport, &g.enc, &g.texOps, &g.layerVertices, &g.output.packer) {
+			break
+		}
+		if reclaimed {
+			panic(fmt.Errorf("compute: k4 output atlas exhausted"))
+		}
+		g.output.packer.clear()
+		g.output.packer.newPage()
+		reclaimed = true
+	}
 }
 
 func (g *compute) Clear(col color.NRGBA) {
@@ -363,10 +413,14 @@ func (g *compute) Clear(col color.NRGBA) {
 }
 
 func (g *compute) Frame() error {
+	if len(g.output.packer.sizes) == 0 {
+		return nil
+	}
+	outputSize := g.output.packer.sizes[0]
 	viewport := g.viewport
 	tileDims := image.Point{
-		X: (viewport.X + tileWidthPx - 1) / tileWidthPx,
-		Y: (viewport.Y + tileHeightPx - 1) / tileHeightPx,
+		X: (outputSize.X + tileWidthPx - 1) / tileWidthPx,
+		Y: (outputSize.Y + tileHeightPx - 1) / tileHeightPx,
 	}
 
 	defFBO := g.ctx.BeginFrame(g.collector.clear, viewport)
@@ -393,7 +447,8 @@ func (g *compute) Frame() error {
 		g.ctx.Clear(g.collector.clearColor.Float32())
 	}
 	w, h := tileDims.X*tileWidthPx, tileDims.Y*tileHeightPx
-	if g.output.size.X != w || g.output.size.Y != h {
+	if g.output.size.X < w || g.output.size.Y < h {
+		w, h = pow2Ceil(w), pow2Ceil(h)
 		if err := g.resizeOutput(image.Pt(w, h)); err != nil {
 			return err
 		}
@@ -434,21 +489,37 @@ func (g *compute) Profile() string {
 	return g.timers.profile
 }
 
-// blitOutput copies the compute render output to the output FBO. We need to
-// copy because compute shaders can only write to textures, not FBOs. Compute
-// shader can only write to RGBA textures, but since we actually render in sRGB
-// format we can't use glBlitFramebuffer, because it does sRGB conversion.
 func (g *compute) blitOutput(viewport image.Point) {
 	t := g.timers.blit
 	t.begin()
+	defer t.end()
+	verts := g.layerVertices
+	if len(verts) == 0 {
+		return
+	}
+	// Transform positions to clip space: [-1, -1] - [1, 1], and texture
+	// coordinates to texture space: [0, 0] - [1, 1].
+	clip := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(2/float32(viewport.X), 2/float32(viewport.Y))).Offset(f32.Pt(-1, -1))
+	// Flip y-axis to match framebuffer output space.
+	flipY := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(1, -1)).Offset(f32.Pt(0, float32(viewport.Y)))
+	clip = clip.Mul(flipY)
+	sx, _, ox, _, sy, oy := clip.Elems()
+	g.output.uniforms.scale = [2]float32{sx, sy}
+	g.output.uniforms.pos = [2]float32{ox, oy}
+	g.output.uniforms.uvScale = [2]float32{1 / float32(g.output.size.X), 1 / float32(g.output.size.Y)}
+	g.output.uniBuf.Upload(byteslice.Struct(g.output.uniforms))
+	vertexData := byteslice.Slice(verts)
+	g.output.buffer.ensureCapacity(g.ctx, driver.BufferBindingVertices, len(vertexData))
+	g.output.buffer.buffer.Upload(vertexData)
 	g.ctx.BlendFunc(driver.BlendFactorOne, driver.BlendFactorOneMinusSrcAlpha)
 	g.ctx.SetBlend(true)
 	defer g.ctx.SetBlend(false)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.ctx.BindTexture(0, g.output.image)
 	g.ctx.BindProgram(g.output.blitProg)
-	g.ctx.DrawArrays(driver.DrawModeTriangleStrip, 0, 4)
-	t.end()
+	g.ctx.BindVertexBuffer(g.output.buffer.buffer, int(unsafe.Sizeof(verts[0])), 0)
+	g.ctx.BindInputLayout(g.output.layout)
+	g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(verts))
 }
 
 func (g *compute) renderMaterials() error {
@@ -913,6 +984,8 @@ func (g *compute) Release() {
 		g.programs.coarse,
 		g.programs.kernel4,
 		g.output.blitProg,
+		&g.output.buffer,
+		g.output.uniBuf,
 		&g.buffers.scene,
 		&g.buffers.state,
 		&g.buffers.memory,
@@ -1100,14 +1173,12 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 	state.relTrans = f32.Affine2D{}
 }
 
-func (c *collector) collect(root *op.Ops, trans f32.Affine2D, viewport image.Point) {
+func (c *collector) collect(root *op.Ops, viewport image.Point) {
 	fview := f32.Rectangle{Max: layout.FPt(viewport)}
 	c.reader.Reset(root)
 	state := encoderState{
 		color:     color.NRGBA{A: 0xff},
 		intersect: fview,
-		t:         trans,
-		relTrans:  trans,
 	}
 	r := &c.reader
 	var (
@@ -1221,19 +1292,41 @@ func (c *collector) collect(root *op.Ops, trans f32.Affine2D, viewport image.Poi
 	}
 }
 
-func (c *collector) encode(viewport image.Point, enc *encoder, texOps *[]textureOp) {
+func (c *collector) encode(viewport image.Point, enc *encoder, texOps *[]textureOp, layerVerts *[]layerVertex, pck *packer) bool {
 	fview := f32.Rectangle{Max: layout.FPt(viewport)}
 	fillMode := scene.FillModeNonzero
 	for _, op := range c.paintOps {
+		// Position onto output atlas.
+		atlasBounds := boundRectF(op.state.intersect)
+		size := atlasBounds.Size()
+		// Add padding to avoid overlap.
+		place, fits := pck.tryAdd(size.Add(image.Pt(1, 1)))
+		if !fits {
+			return false
+		}
+		off := place.Pos.Sub(atlasBounds.Min)
+
+		offf := layout.FPt(off)
+		placef := layout.FPt(place.Pos)
+		sizef := layout.FPt(size)
+		quad := [4]layerVertex{
+			{posX: float32(atlasBounds.Min.X), posY: float32(atlasBounds.Min.Y), u: placef.X, v: placef.Y},
+			{posX: float32(atlasBounds.Min.X + size.X), posY: float32(atlasBounds.Min.Y), u: placef.X + sizef.X, v: placef.Y},
+			{posX: float32(atlasBounds.Min.X + size.X), posY: float32(atlasBounds.Min.Y + size.Y), u: placef.X + sizef.X, v: placef.Y + sizef.Y},
+			{posX: float32(atlasBounds.Min.X), posY: float32(atlasBounds.Min.Y + size.Y), u: placef.X, v: placef.Y + sizef.Y},
+		}
+		*layerVerts = append(*layerVerts, quad[0], quad[1], quad[3], quad[3], quad[2], quad[1])
+
 		// Fill in clip bounds, which the shaders expect to be the union
 		// of all affected bounds.
 		var union f32.Rectangle
 		for i, cl := range op.clipStack {
-			union = union.Union(cl.state.absBounds)
+			union = union.Union(cl.state.absBounds.Add(offf))
 			op.clipStack[i].union = union
 		}
 
-		var inv f32.Affine2D
+		inv := f32.Affine2D{}.Offset(offf)
+		enc.transform(inv)
 		for i := len(op.clipStack) - 1; i >= 0; i-- {
 			cl := op.clipStack[i]
 			if str := cl.state.stroke; str.Width > 0 {
@@ -1273,7 +1366,7 @@ func (c *collector) encode(viewport image.Point, enc *encoder, texOps *[]texture
 			*texOps = append(*texOps, textureOp{
 				sceneIdx: idx,
 				img:      op.state.image,
-				off:      image.Pt(int(intx), int(inty)),
+				off:      image.Pt(int(intx), int(inty)).Add(off),
 				key: textureKey{
 					transform: t,
 					handle:    op.state.image.handle,
@@ -1294,6 +1387,7 @@ func (c *collector) encode(viewport image.Point, enc *encoder, texOps *[]texture
 			enc.endClip(cl.union)
 		}
 	}
+	return true
 }
 
 func (c *collector) save(id int, state encoderState) {
