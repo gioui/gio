@@ -29,6 +29,8 @@ type compute struct {
 	ctx driver.Device
 
 	collector     collector
+	enc           encoder
+	texOps        []textureOp
 	viewport      image.Point
 	maxTextureDim int
 
@@ -107,15 +109,19 @@ type materialUniforms struct {
 }
 
 type collector struct {
-	enc        encoder
-	profile    bool
-	reader     ops.Reader
-	states     []encoderState
-	clear      bool
-	clearColor f32color.RGBA
-	clipCache  []clipState
-	texOps     []textureOp
-	clipStack  []clipCmd
+	profile      bool
+	reader       ops.Reader
+	states       []encoderState
+	clear        bool
+	clearColor   f32color.RGBA
+	clipCache    []clipState
+	clipCmdCache []clipCmd
+	paintOps     []paintOp
+}
+
+type paintOp struct {
+	clipStack []clipCmd
+	state     encoderState
 }
 
 // clipCmd describes a clipping command ready to be used for the compute
@@ -330,10 +336,13 @@ func newCompute(ctx driver.Device) (*compute, error) {
 func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	g.viewport = viewport
 	g.collector.reset()
+	g.enc.reset()
+	g.texOps = g.texOps[:0]
 
 	// Flip Y-axis.
 	flipY := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(1, -1)).Offset(f32.Pt(0, float32(viewport.Y)))
 	g.collector.collect(ops, flipY, viewport)
+	g.collector.encode(viewport, &g.enc, &g.texOps)
 }
 
 func (g *compute) Clear(col color.NRGBA) {
@@ -427,9 +436,9 @@ func (g *compute) renderMaterials() error {
 	reclaimed := false
 restart:
 	for {
-		for _, op := range g.collector.texOps {
+		for _, op := range g.texOps {
 			if off, exists := m.offsets[op.key]; exists {
-				g.collector.enc.setFillImageOffset(op.sceneIdx, off.Sub(op.off))
+				g.enc.setFillImageOffset(op.sceneIdx, off.Sub(op.off))
 				continue
 			}
 			quad, bounds := g.materialQuad(op.key.transform, op.img, op.pos)
@@ -469,7 +478,7 @@ restart:
 				m.offsets = make(map[textureKey]image.Point)
 			}
 			m.offsets[op.key] = offset
-			g.collector.enc.setFillImageOffset(op.sceneIdx, offset.Sub(op.off))
+			g.enc.setFillImageOffset(op.sceneIdx, offset.Sub(op.off))
 		}
 		break
 	}
@@ -531,9 +540,9 @@ func (g *compute) uploadImages() error {
 	reclaimed := false
 restart:
 	for {
-		for i, op := range g.collector.texOps {
+		for i, op := range g.texOps {
 			if pos, exists := a.positions[op.img.handle]; exists {
-				g.collector.texOps[i].pos = pos
+				g.texOps[i].pos = pos
 				continue
 			}
 			size := op.img.src.Bounds().Size().Add(image.Pt(padding, padding))
@@ -560,7 +569,7 @@ restart:
 				a.positions = make(map[interface{}]image.Point)
 			}
 			a.positions[op.img.handle] = place.Pos
-			g.collector.texOps[i].pos = place.Pos
+			g.texOps[i].pos = place.Pos
 			if uploads == nil {
 				uploads = make(map[interface{}]*image.RGBA)
 			}
@@ -692,7 +701,7 @@ func (g *compute) render(tileDims image.Point) error {
 		return fmt.Errorf("gpu: output too large (%dx%d)", tileDims.X*tileWidthPx, tileDims.Y*tileHeightPx)
 	}
 
-	enc := &g.collector.enc
+	enc := &g.enc
 	// Pad scene with zeroes to avoid reading garbage in elements.comp.
 	scenePadding := partitionSize - len(enc.scene)%partitionSize
 	enc.scene = append(enc.scene, make([]scene.Command, scenePadding)...)
@@ -1036,10 +1045,10 @@ func (e *encoder) quad(start, ctrl, end f32.Point) {
 }
 
 func (c *collector) reset() {
-	c.enc.reset()
 	c.profile = false
 	c.clipCache = c.clipCache[:0]
-	c.texOps = c.texOps[:0]
+	c.clipCmdCache = c.clipCmdCache[:0]
+	c.paintOps = c.paintOps[:0]
 }
 
 func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle, path []byte, stroke clip.StrokeStyle) {
@@ -1080,10 +1089,6 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 
 func (c *collector) collect(root *op.Ops, trans f32.Affine2D, viewport image.Point) {
 	fview := f32.Rectangle{Max: layout.FPt(viewport)}
-	if c.clear {
-		c.enc.rect(fview)
-		c.enc.fillColor(f32color.NRGBAToRGBA(c.clearColor.SRGB()))
-	}
 	c.reader.Reset(root)
 	state := encoderState{
 		color:     color.NRGBA{A: 0xff},
@@ -1095,7 +1100,6 @@ func (c *collector) collect(root *op.Ops, trans f32.Affine2D, viewport image.Poi
 	var (
 		pathData []byte
 		str      clip.StrokeStyle
-		fillMode = scene.FillModeNonzero
 	)
 	c.save(opconst.InitialStateID, state)
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
@@ -1149,110 +1153,24 @@ func (c *collector) collect(root *op.Ops, trans f32.Affine2D, viewport image.Poi
 			// screen, it covers all previous paints and we can discard all
 			// rendering commands recorded so far.
 			if paintState.clip == nil && paintState.matType == materialColor && paintState.color.A == 255 {
-				c.enc.reset()
-				fillMode = scene.FillModeNonzero
 				c.clearColor = f32color.LinearFromSRGB(paintState.color).Opaque()
 				c.clear = true
-				c.texOps = c.texOps[:0]
-				c.enc.rect(fview)
-				c.enc.fillColor(f32color.NRGBAToRGBA(c.clearColor.SRGB()))
+				c.paintOps = c.paintOps[:0]
 				break
 			}
 
 			// Flatten clip stack.
-			c.clipStack = c.clipStack[:0]
 			p := paintState.clip
+			startIdx := len(c.clipCmdCache)
 			for p != nil {
-				c.clipStack = append(c.clipStack, clipCmd{state: p, relTrans: p.relTrans})
+				c.clipCmdCache = append(c.clipCmdCache, clipCmd{state: p, relTrans: p.relTrans})
 				p = p.parent
 			}
-			// For each clip, cull rectangular clip regions that contain its
-			// (transformed) bounds. addClip already handled the converse case.
-			// TODO: do better than O(n²) to efficiently deal with deep stacks.
-			for i := 0; i < len(c.clipStack)-1; i++ {
-				cl := c.clipStack[i]
-				p := cl.state
-				r := transformBounds(cl.relTrans, p.bounds)
-				for j := i + 1; j < len(c.clipStack); j++ {
-					cl2 := c.clipStack[j]
-					p2 := cl2.state
-					if len(p2.pathVerts) == 0 && r.In(p2.bounds) {
-						c.clipStack = append(c.clipStack[:j], c.clipStack[j+1:]...)
-						j--
-						c.clipStack[j].relTrans = cl2.relTrans.Mul(c.clipStack[j].relTrans)
-					}
-					r = transformRect(cl2.relTrans, r)
-				}
-			}
-
-			// Fill in clip bounds, which the shaders expect to be the union
-			// of all affected bounds.
-			var union f32.Rectangle
-			for i, cl := range c.clipStack {
-				union = union.Union(cl.state.absBounds)
-				c.clipStack[i].union = union
-			}
-
-			var inv f32.Affine2D
-			for i := len(c.clipStack) - 1; i >= 0; i-- {
-				cl := c.clipStack[i]
-				if str := cl.state.stroke; str.Width > 0 {
-					c.enc.fillMode(scene.FillModeStroke)
-					c.enc.lineWidth(str.Width)
-					fillMode = scene.FillModeStroke
-				} else if fillMode != scene.FillModeNonzero {
-					c.enc.fillMode(scene.FillModeNonzero)
-					fillMode = scene.FillModeNonzero
-				}
-				c.enc.transform(cl.relTrans)
-				inv = inv.Mul(cl.relTrans)
-				if len(cl.state.pathVerts) == 0 {
-					c.enc.rect(cl.state.bounds)
-				} else {
-					c.enc.encodePath(cl.state.pathVerts)
-				}
-				if i != 0 {
-					c.enc.beginClip(cl.union)
-				}
-			}
-			if paintState.clip == nil {
-				// No clipping; fill the entire view.
-				c.enc.rect(fview)
-			}
-
-			switch paintState.matType {
-			case materialTexture:
-				// Add fill command. Its offset is resolved and filled in renderMaterials.
-				idx := c.enc.fillImage(0)
-				sx, hx, ox, hy, sy, oy := paintState.t.Elems()
-				// Separate integer offset from transformation. TextureOps that have identical transforms
-				// except for their integer offsets can share a transformed image.
-				intx, fracx := math.Modf(float64(ox))
-				inty, fracy := math.Modf(float64(oy))
-				t := f32.NewAffine2D(sx, hx, float32(fracx), hy, sy, float32(fracy))
-				c.texOps = append(c.texOps, textureOp{
-					sceneIdx: idx,
-					img:      paintState.image,
-					off:      image.Pt(int(intx), int(inty)),
-					key: textureKey{
-						transform: t,
-						handle:    paintState.image.handle,
-					},
-				})
-			case materialColor:
-				c.enc.fillColor(f32color.NRGBAToRGBA(paintState.color))
-			case materialLinearGradient:
-				// TODO: implement.
-				c.enc.fillColor(f32color.NRGBAToRGBA(paintState.color1))
-			default:
-				panic("not implemented")
-			}
-			c.enc.transform(inv.Invert())
-			// Pop the clip stack, except the first entry used for fill.
-			for i := 1; i < len(c.clipStack); i++ {
-				cl := c.clipStack[i]
-				c.enc.endClip(cl.union)
-			}
+			clipStack := c.clipCmdCache[startIdx:]
+			c.paintOps = append(c.paintOps, paintOp{
+				clipStack: clipStack,
+				state:     paintState,
+			})
 		case opconst.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
 			c.save(id, state)
@@ -1265,6 +1183,106 @@ func (c *collector) collect(root *op.Ops, trans f32.Affine2D, viewport image.Poi
 			if mask&^opconst.TransformState != 0 {
 				state = s
 			}
+		}
+	}
+	for i := range c.paintOps {
+		op := &c.paintOps[i]
+		// For each clip, cull rectangular clip regions that contain its
+		// (transformed) bounds. addClip already handled the converse case.
+		// TODO: do better than O(n²) to efficiently deal with deep stacks.
+		for i := 0; i < len(op.clipStack)-1; i++ {
+			cl := op.clipStack[i]
+			p := cl.state
+			r := transformBounds(cl.relTrans, p.bounds)
+			for j := i + 1; j < len(op.clipStack); j++ {
+				cl2 := op.clipStack[j]
+				p2 := cl2.state
+				if len(p2.pathVerts) == 0 && r.In(p2.bounds) {
+					op.clipStack = append(op.clipStack[:j], op.clipStack[j+1:]...)
+					j--
+					op.clipStack[j].relTrans = cl2.relTrans.Mul(op.clipStack[j].relTrans)
+				}
+				r = transformRect(cl2.relTrans, r)
+			}
+		}
+	}
+}
+
+func (c *collector) encode(viewport image.Point, enc *encoder, texOps *[]textureOp) {
+	fview := f32.Rectangle{Max: layout.FPt(viewport)}
+	fillMode := scene.FillModeNonzero
+	if c.clear {
+		enc.rect(fview)
+		enc.fillColor(f32color.NRGBAToRGBA(c.clearColor.SRGB()))
+	}
+	for _, op := range c.paintOps {
+		// Fill in clip bounds, which the shaders expect to be the union
+		// of all affected bounds.
+		var union f32.Rectangle
+		for i, cl := range op.clipStack {
+			union = union.Union(cl.state.absBounds)
+			op.clipStack[i].union = union
+		}
+
+		var inv f32.Affine2D
+		for i := len(op.clipStack) - 1; i >= 0; i-- {
+			cl := op.clipStack[i]
+			if str := cl.state.stroke; str.Width > 0 {
+				enc.fillMode(scene.FillModeStroke)
+				enc.lineWidth(str.Width)
+				fillMode = scene.FillModeStroke
+			} else if fillMode != scene.FillModeNonzero {
+				enc.fillMode(scene.FillModeNonzero)
+				fillMode = scene.FillModeNonzero
+			}
+			enc.transform(cl.relTrans)
+			inv = inv.Mul(cl.relTrans)
+			if len(cl.state.pathVerts) == 0 {
+				enc.rect(cl.state.bounds)
+			} else {
+				enc.encodePath(cl.state.pathVerts)
+			}
+			if i != 0 {
+				enc.beginClip(cl.union)
+			}
+		}
+		if op.state.clip == nil {
+			// No clipping; fill the entire view.
+			enc.rect(fview)
+		}
+
+		switch op.state.matType {
+		case materialTexture:
+			// Add fill command. Its offset is resolved and filled in renderMaterials.
+			idx := enc.fillImage(0)
+			sx, hx, ox, hy, sy, oy := op.state.t.Elems()
+			// Separate integer offset from transformation. TextureOps that have identical transforms
+			// except for their integer offsets can share a transformed image.
+			intx, fracx := math.Modf(float64(ox))
+			inty, fracy := math.Modf(float64(oy))
+			t := f32.NewAffine2D(sx, hx, float32(fracx), hy, sy, float32(fracy))
+			*texOps = append(*texOps, textureOp{
+				sceneIdx: idx,
+				img:      op.state.image,
+				off:      image.Pt(int(intx), int(inty)),
+				key: textureKey{
+					transform: t,
+					handle:    op.state.image.handle,
+				},
+			})
+		case materialColor:
+			enc.fillColor(f32color.NRGBAToRGBA(op.state.color))
+		case materialLinearGradient:
+			// TODO: implement.
+			enc.fillColor(f32color.NRGBAToRGBA(op.state.color1))
+		default:
+			panic("not implemented")
+		}
+		enc.transform(inv.Invert())
+		// Pop the clip stack, except the first entry used for fill.
+		for i := 1; i < len(op.clipStack); i++ {
+			cl := op.clipStack[i]
+			enc.endClip(cl.union)
 		}
 	}
 }
