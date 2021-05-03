@@ -243,6 +243,8 @@ void main() {
     }
 
     for (uint i = 0; i < CHUNK; i++) {
-        imageStore(image, ivec2(xy_uint + chunk_offset(i)), vec4(tosRGB(rgba[i].rgb), rgba[i].a));
+        if (rgba[i].a != 0) {
+            imageStore(image, ivec2(xy_uint + chunk_offset(i)), vec4(tosRGB(rgba[i].rgb), rgba[i].a));
+        }
     }
 }

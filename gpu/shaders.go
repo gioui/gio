@@ -1699,12 +1699,12 @@ void main()
     uint param_1 = 0u;
     bool param_2 = mem_ok;
     Alloc cmd_alloc = new_alloc(param, param_1, param_2);
-    CmdRef cmd_ref = CmdRef(0u);
     uint param_3 = 0u;
     uint param_4 = 0u;
     bool param_5 = mem_ok;
     Alloc initial_alloc = new_alloc(param_3, param_4, param_5);
     uint cmd_limit = 0u;
+    CmdRef cmd_ref = CmdRef(0u);
     uint clip_depth = 0u;
     uint clip_zero_depth = 0u;
     uint clip_one_mask = 0u;
@@ -5170,9 +5170,12 @@ void main()
     }
     for (uint i_1 = 0u; i_1 < 8u; i_1++)
     {
-        uint param_51 = i_1;
-        mediump vec3 param_52 = rgba[i_1].xyz;
-        imageStore(image, ivec2(xy_uint + chunk_offset(param_51)), vec4(tosRGB(param_52), rgba[i_1].w));
+        if (!(rgba[i_1].w == 0.0))
+        {
+            uint param_51 = i_1;
+            mediump vec3 param_52 = rgba[i_1].xyz;
+            imageStore(image, ivec2(xy_uint + chunk_offset(param_51)), vec4(tosRGB(param_52), rgba[i_1].w));
+        }
     }
 }
 
