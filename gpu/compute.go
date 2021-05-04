@@ -32,6 +32,7 @@ type compute struct {
 	enc           encoder
 	texOps        []textureOp
 	layerVertices []layerVertex
+	layers        []layer
 	viewport      image.Point
 	maxTextureDim int
 
@@ -110,6 +111,11 @@ type compute struct {
 	zeroSlice []byte
 	memHeader *memoryHeader
 	conf      *config
+}
+
+type layer struct {
+	rect  image.Rectangle
+	place image.Point
 }
 
 type copyUniforms struct {
@@ -394,8 +400,8 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	for {
 		g.enc.reset()
 		g.texOps = g.texOps[:0]
-		g.layerVertices = g.layerVertices[:0]
-		if g.collector.encode(viewport, &g.enc, &g.texOps, &g.layerVertices, &g.output.packer) {
+		g.layers = g.layers[:0]
+		if g.collector.encode(viewport, &g.enc, &g.texOps, &g.layers, &g.output.packer) {
 			break
 		}
 		if reclaimed {
@@ -453,8 +459,7 @@ func (g *compute) Frame() error {
 			return err
 		}
 	}
-	g.ctx.BindFramebuffer(g.output.fbo)
-	g.ctx.Clear(0, 0, 0, 0)
+	g.clearLayers()
 	if err := g.uploadImages(); err != nil {
 		return err
 	}
@@ -489,14 +494,36 @@ func (g *compute) Profile() string {
 	return g.timers.profile
 }
 
+func (g *compute) clearLayers() {
+	g.ctx.BindFramebuffer(g.output.fbo)
+	for _, l := range g.layers {
+		g.ctx.ClearRect(image.Rectangle{
+			Min: l.place,
+			Max: l.place.Add(l.rect.Size()),
+		}, 0, 0, 0, 0)
+	}
+}
+
 func (g *compute) blitOutput(viewport image.Point) {
 	t := g.timers.blit
 	t.begin()
 	defer t.end()
-	verts := g.layerVertices
-	if len(verts) == 0 {
+	if len(g.layers) == 0 {
 		return
 	}
+	g.layerVertices = g.layerVertices[:0]
+	for _, l := range g.layers {
+		placef := layout.FPt(l.place)
+		sizef := layout.FPt(l.rect.Size())
+		quad := [4]layerVertex{
+			{posX: float32(l.rect.Min.X), posY: float32(l.rect.Min.Y), u: placef.X, v: placef.Y},
+			{posX: float32(l.rect.Max.X), posY: float32(l.rect.Min.Y), u: placef.X + sizef.X, v: placef.Y},
+			{posX: float32(l.rect.Max.X), posY: float32(l.rect.Max.Y), u: placef.X + sizef.X, v: placef.Y + sizef.Y},
+			{posX: float32(l.rect.Min.X), posY: float32(l.rect.Max.Y), u: placef.X, v: placef.Y + sizef.Y},
+		}
+		g.layerVertices = append(g.layerVertices, quad[0], quad[1], quad[3], quad[3], quad[2], quad[1])
+	}
+
 	// Transform positions to clip space: [-1, -1] - [1, 1], and texture
 	// coordinates to texture space: [0, 0] - [1, 1].
 	clip := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(2/float32(viewport.X), 2/float32(viewport.Y))).Offset(f32.Pt(-1, -1))
@@ -508,7 +535,7 @@ func (g *compute) blitOutput(viewport image.Point) {
 	g.output.uniforms.pos = [2]float32{ox, oy}
 	g.output.uniforms.uvScale = [2]float32{1 / float32(g.output.size.X), 1 / float32(g.output.size.Y)}
 	g.output.uniBuf.Upload(byteslice.Struct(g.output.uniforms))
-	vertexData := byteslice.Slice(verts)
+	vertexData := byteslice.Slice(g.layerVertices)
 	g.output.buffer.ensureCapacity(g.ctx, driver.BufferBindingVertices, len(vertexData))
 	g.output.buffer.buffer.Upload(vertexData)
 	g.ctx.BlendFunc(driver.BlendFactorOne, driver.BlendFactorOneMinusSrcAlpha)
@@ -517,9 +544,9 @@ func (g *compute) blitOutput(viewport image.Point) {
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.ctx.BindTexture(0, g.output.image)
 	g.ctx.BindProgram(g.output.blitProg)
-	g.ctx.BindVertexBuffer(g.output.buffer.buffer, int(unsafe.Sizeof(verts[0])), 0)
+	g.ctx.BindVertexBuffer(g.output.buffer.buffer, int(unsafe.Sizeof(g.layerVertices[0])), 0)
 	g.ctx.BindInputLayout(g.output.layout)
-	g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(verts))
+	g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(g.layerVertices))
 }
 
 func (g *compute) renderMaterials() error {
@@ -1292,7 +1319,7 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 	}
 }
 
-func (c *collector) encode(viewport image.Point, enc *encoder, texOps *[]textureOp, layerVerts *[]layerVertex, pck *packer) bool {
+func (c *collector) encode(viewport image.Point, enc *encoder, texOps *[]textureOp, layers *[]layer, pck *packer) bool {
 	fview := f32.Rectangle{Max: layout.FPt(viewport)}
 	fillMode := scene.FillModeNonzero
 	for _, op := range c.paintOps {
@@ -1306,17 +1333,12 @@ func (c *collector) encode(viewport image.Point, enc *encoder, texOps *[]texture
 		}
 		off := place.Pos.Sub(atlasBounds.Min)
 
-		offf := layout.FPt(off)
-		placef := layout.FPt(place.Pos)
-		sizef := layout.FPt(size)
-		quad := [4]layerVertex{
-			{posX: float32(atlasBounds.Min.X), posY: float32(atlasBounds.Min.Y), u: placef.X, v: placef.Y},
-			{posX: float32(atlasBounds.Min.X + size.X), posY: float32(atlasBounds.Min.Y), u: placef.X + sizef.X, v: placef.Y},
-			{posX: float32(atlasBounds.Min.X + size.X), posY: float32(atlasBounds.Min.Y + size.Y), u: placef.X + sizef.X, v: placef.Y + sizef.Y},
-			{posX: float32(atlasBounds.Min.X), posY: float32(atlasBounds.Min.Y + size.Y), u: placef.X, v: placef.Y + sizef.Y},
-		}
-		*layerVerts = append(*layerVerts, quad[0], quad[1], quad[3], quad[3], quad[2], quad[1])
+		*layers = append(*layers, layer{
+			rect:  atlasBounds,
+			place: place.Pos,
+		})
 
+		offf := layout.FPt(off)
 		// Fill in clip bounds, which the shaders expect to be the union
 		// of all affected bounds.
 		var union f32.Rectangle
