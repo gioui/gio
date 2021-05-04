@@ -76,8 +76,7 @@ type compute struct {
 		fbo   driver.Framebuffer
 		quads []materialVertex
 
-		bufSize int
-		buffer  driver.Buffer
+		buffer sizedBuffer
 	}
 	timers struct {
 		profile         string
@@ -457,20 +456,9 @@ restart:
 		m.quads[i].posY = p.Y
 	}
 	vertexData := byteslice.Slice(m.quads)
-	if len(vertexData) > m.bufSize {
-		if m.buffer != nil {
-			m.buffer.Release()
-			m.buffer = nil
-		}
-		n := pow2Ceil(len(vertexData))
-		buf, err := g.ctx.NewBuffer(driver.BufferBindingVertices, n)
-		if err != nil {
-			return err
-		}
-		m.bufSize = n
-		m.buffer = buf
-	}
-	m.buffer.Upload(vertexData)
+	n := pow2Ceil(len(vertexData))
+	m.buffer.ensureCapacity(g.ctx, driver.BufferBindingVertices, n)
+	m.buffer.buffer.Upload(vertexData)
 	g.ctx.BindTexture(0, g.images.tex)
 	g.ctx.BindFramebuffer(m.fbo)
 	g.ctx.Viewport(0, 0, texSize, texSize)
@@ -478,7 +466,7 @@ restart:
 		g.ctx.Clear(0, 0, 0, 0)
 	}
 	g.ctx.BindProgram(m.prog)
-	g.ctx.BindVertexBuffer(m.buffer, int(unsafe.Sizeof(m.quads[0])), 0)
+	g.ctx.BindVertexBuffer(m.buffer.buffer, int(unsafe.Sizeof(m.quads[0])), 0)
 	g.ctx.BindInputLayout(m.layout)
 	g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(m.quads))
 	return nil
@@ -738,7 +726,7 @@ func (g *compute) render(tileDims image.Point) error {
 	if s := len(scene); s > g.buffers.scene.size {
 		realloced = true
 		paddedCap := s * 11 / 10
-		if err := g.buffers.scene.ensureCapacity(g.ctx, paddedCap); err != nil {
+		if err := g.buffers.scene.ensureCapacity(g.ctx, driver.BufferBindingShaderStorage, paddedCap); err != nil {
 			return err
 		}
 	}
@@ -786,7 +774,7 @@ func (g *compute) render(tileDims image.Point) error {
 	if clearSize > g.buffers.state.size {
 		realloced = true
 		paddedCap := clearSize * 11 / 10
-		if err := g.buffers.state.ensureCapacity(g.ctx, paddedCap); err != nil {
+		if err := g.buffers.state.ensureCapacity(g.ctx, driver.BufferBindingShaderStorage, paddedCap); err != nil {
 			return err
 		}
 	}
@@ -799,7 +787,7 @@ func (g *compute) render(tileDims image.Point) error {
 		// Add space for dynamic GPU allocations.
 		const sizeBump = 4 * 1024 * 1024
 		minSize += sizeBump
-		if err := g.buffers.memory.ensureCapacity(g.ctx, minSize); err != nil {
+		if err := g.buffers.memory.ensureCapacity(g.ctx, driver.BufferBindingShaderStorage, minSize); err != nil {
 			return err
 		}
 	}
@@ -863,7 +851,7 @@ func (g *compute) render(tileDims image.Point) error {
 			// Resize memory and try again.
 			realloced = true
 			sz := g.buffers.memory.size * 15 / 10
-			if err := g.buffers.memory.ensureCapacity(g.ctx, sz); err != nil {
+			if err := g.buffers.memory.ensureCapacity(g.ctx, driver.BufferBindingShaderStorage, sz); err != nil {
 				return err
 			}
 			continue
@@ -946,9 +934,7 @@ func (g *compute) Release() {
 	if g.materials.tex != nil {
 		g.materials.tex.Release()
 	}
-	if g.materials.buffer != nil {
-		g.materials.buffer.Release()
-	}
+	g.materials.buffer.release()
 	if g.timers.t != nil {
 		g.timers.t.release()
 	}
@@ -974,14 +960,14 @@ func (b *sizedBuffer) release() {
 	*b = sizedBuffer{}
 }
 
-func (b *sizedBuffer) ensureCapacity(ctx driver.Device, size int) error {
+func (b *sizedBuffer) ensureCapacity(ctx driver.Device, binding driver.BufferBinding, size int) error {
 	if b.size >= size {
 		return nil
 	}
 	if b.buffer != nil {
 		b.release()
 	}
-	buf, err := ctx.NewBuffer(driver.BufferBindingShaderStorage, size)
+	buf, err := ctx.NewBuffer(binding, size)
 	if err != nil {
 		return err
 	}
