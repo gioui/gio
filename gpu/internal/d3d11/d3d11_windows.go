@@ -412,6 +412,10 @@ func (b *Backend) NewProgram(vertexShader, fragmentShader driver.ShaderSources) 
 	return p, nil
 }
 
+func (b *Backend) ClearRect(r image.Rectangle, colr, colg, colb, cola float32) {
+	panic("not implemented")
+}
+
 func (b *Backend) Clear(colr, colg, colb, cola float32) {
 	b.clearColor = [4]float32{colr, colg, colb, cola}
 	b.ctx.ClearRenderTargetView(b.fbo.renderTarget, &b.clearColor)

@@ -884,6 +884,15 @@ func (b *Backend) Viewport(x, y, width, height int) {
 	b.glstate.setViewport(b.funcs, x, y, width, height)
 }
 
+func (b *Backend) ClearRect(r image.Rectangle, colR, colG, colB, colA float32) {
+	b.funcs.Enable(gl.SCISSOR_TEST)
+	defer b.funcs.Disable(gl.SCISSOR_TEST)
+	sz := r.Size()
+	b.funcs.Scissor(r.Min.X, r.Min.Y, sz.X, sz.Y)
+	b.funcs.ClearColor(colR, colG, colB, colA)
+	b.funcs.Clear(gl.COLOR_BUFFER_BIT)
+}
+
 func (b *Backend) Clear(colR, colG, colB, colA float32) {
 	b.glstate.setClearColor(b.funcs, colR, colG, colB, colA)
 	b.funcs.Clear(gl.COLOR_BUFFER_BIT)

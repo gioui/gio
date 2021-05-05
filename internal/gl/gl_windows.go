@@ -426,7 +426,7 @@ func (f *Functions) ReadPixels(x, y, width, height int, format, ty Enum, data []
 func (c *Functions) RenderbufferStorage(target, internalformat Enum, width, height int) {
 	syscall.Syscall6(_glRenderbufferStorage.Addr(), 4, uintptr(target), uintptr(internalformat), uintptr(width), uintptr(height), 0, 0)
 }
-func (c *Functions) Scissor(x, y, width, height int32) {
+func (c *Functions) Scissor(x, y, width, height int) {
 	syscall.Syscall6(_glScissor.Addr(), 4, uintptr(x), uintptr(y), uintptr(width), uintptr(height), 0, 0)
 }
 func (c *Functions) ShaderSource(s Shader, src string) {

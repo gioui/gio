@@ -1116,7 +1116,7 @@ func (f *Functions) MapBufferRange(target Enum, offset, length int, access Enum)
 	return (*[1 << 30]byte)(p)[:length:length]
 }
 
-func (f *Functions) Scissor(x, y, width, height int32) {
+func (f *Functions) Scissor(x, y, width, height int) {
 	C.glScissor(&f.f, C.GLint(x), C.GLint(y), C.GLsizei(width), C.GLsizei(height))
 }
 

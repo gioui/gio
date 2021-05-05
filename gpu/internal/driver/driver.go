@@ -30,6 +30,7 @@ type Device interface {
 	DepthFunc(f DepthFunc)
 	ClearDepth(d float32)
 	Clear(r, g, b, a float32)
+	ClearRect(rect image.Rectangle, r, g, b, a float32)
 	Viewport(x, y, width, height int)
 	DrawArrays(mode DrawMode, off, count int)
 	DrawElements(mode DrawMode, off, count int)

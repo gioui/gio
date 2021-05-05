@@ -83,6 +83,7 @@ const (
 	RGB                                   = 0x1907
 	RGBA                                  = 0x1908
 	RGBA8                                 = 0x8058
+	SCISSOR_TEST                          = 0x0C11
 	SHADER_STORAGE_BUFFER                 = 0x90D2
 	SHADER_STORAGE_BUFFER_BINDING         = 0x90D3
 	SHORT                                 = 0x1402
