@@ -77,6 +77,9 @@ type compute struct {
 		quads []materialVertex
 
 		buffer sizedBuffer
+
+		uniforms *materialUniforms
+		uniBuf   driver.Buffer
 	}
 	timers struct {
 		profile         string
@@ -95,6 +98,11 @@ type compute struct {
 	zeroSlice []byte
 	memHeader *memoryHeader
 	conf      *config
+}
+
+type materialUniforms struct {
+	scale [2]float32
+	pos   [2]float32
 }
 
 // materialVertex describes a vertex of a quad used to render a transformed
@@ -225,11 +233,20 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		return nil, err
 	}
 	g.materials.layout = progLayout
+	g.materials.uniforms = new(materialUniforms)
+
+	buf, err := ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(*g.materials.uniforms)))
+	if err != nil {
+		g.Release()
+		return nil, err
+	}
+	g.materials.uniBuf = buf
+	g.materials.prog.SetVertexUniforms(buf)
 
 	g.drawOps.pathCache = newOpCache()
 	g.drawOps.compute = true
 
-	buf, err := ctx.NewBuffer(driver.BufferBindingShaderStorage, int(unsafe.Sizeof(config{})))
+	buf, err = ctx.NewBuffer(driver.BufferBindingShaderStorage, int(unsafe.Sizeof(config{})))
 	if err != nil {
 		g.Release()
 		return nil, err
@@ -447,14 +464,10 @@ restart:
 		}
 		m.fbo = fbo
 	}
-	// TODO: move to shaders.
 	// Transform to clip space: [-1, -1] - [1, 1].
-	clip := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(2/float32(texSize), 2/float32(texSize))).Offset(f32.Pt(-1, -1))
-	for i, v := range m.quads {
-		p := clip.Transform(f32.Pt(v.posX, v.posY))
-		m.quads[i].posX = p.X
-		m.quads[i].posY = p.Y
-	}
+	g.materials.uniforms.scale = [2]float32{2 / float32(texSize), 2 / float32(texSize)}
+	g.materials.uniforms.pos = [2]float32{-1, -1}
+	g.materials.uniBuf.Upload(byteslice.Struct(g.materials.uniforms))
 	vertexData := byteslice.Slice(m.quads)
 	n := pow2Ceil(len(vertexData))
 	m.buffer.ensureCapacity(g.ctx, driver.BufferBindingVertices, n)
@@ -935,6 +948,9 @@ func (g *compute) Release() {
 		g.materials.tex.Release()
 	}
 	g.materials.buffer.release()
+	if b := g.materials.uniBuf; b != nil {
+		b.Release()
+	}
 	if g.timers.t != nil {
 		g.timers.t.release()
 	}
