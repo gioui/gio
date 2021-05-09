@@ -470,6 +470,25 @@ func (g *compute) Frame() error {
 	if err := g.render(tileDims); err != nil {
 		return err
 	}
+	/*dump, err := driver.DownloadImage(g.ctx, g.output.fbo, image.Rectangle{Max: g.output.size})
+	if err != nil {
+		panic(err)
+	}
+	nrgba := image.NewNRGBA(dump.Bounds())
+	bnd := dump.Bounds()
+	for x := bnd.Min.X; x < bnd.Max.X; x++ {
+		for y := bnd.Min.Y; y < bnd.Max.Y; y++ {
+			nrgba.SetNRGBA(x, y, f32color.RGBAToNRGBA(dump.RGBAAt(x, y)))
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, nrgba); err != nil {
+		panic(err)
+	}
+	if err := os.WriteFile("dump.png", buf.Bytes(), 0600); err != nil {
+		panic(err)
+	}
+	os.Exit(1)*/
 	g.ctx.BindFramebuffer(defFBO)
 	g.blitOutput(viewport)
 	t := &g.timers
@@ -1167,11 +1186,11 @@ func (c *collector) reset() {
 func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle, path []byte, stroke clip.StrokeStyle) {
 	// Rectangle clip regions.
 	if len(path) == 0 {
-		transView := transformBounds(state.t.Invert(), viewport)
+		/*transView := transformBounds(state.t.Invert(), viewport)
 		// If the rectangular clip contains the viewport it can be discarded.
 		if transView.In(bounds) {
 			return
-		}
+		}*/
 		// If the rectangular clip region contains a previous path it can be discarded.
 		p := state.clip
 		t := state.relTrans.Invert()
@@ -1213,6 +1232,7 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 		str      clip.StrokeStyle
 	)
 	c.save(opconst.InitialStateID, state)
+	c.addClip(&state, fview, fview, nil, clip.StrokeStyle{})
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypeProfile:
