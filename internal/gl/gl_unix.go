@@ -61,90 +61,90 @@ static void (*_glTexStorage2D)(GLenum target, GLsizei levels, GLenum internalfor
 static void (*_glBlitFramebuffer)(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter);
 
 // The pointer-free version of glVertexAttribPointer, to avoid the Cgo pointer checks.
-__attribute__ ((visibility ("hidden"))) void gio_glVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, uintptr_t offset) {
+static void gio_glVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, uintptr_t offset) {
 	glVertexAttribPointer(index, size, type, normalized, stride, (const GLvoid *)offset);
 }
 
 // The pointer-free version of glDrawElements, to avoid the Cgo pointer checks.
-__attribute__ ((visibility ("hidden"))) void gio_glDrawElements(GLenum mode, GLsizei count, GLenum type, const uintptr_t offset) {
+static void gio_glDrawElements(GLenum mode, GLsizei count, GLenum type, const uintptr_t offset) {
 	glDrawElements(mode, count, type, (const GLvoid *)offset);
 }
 
-__attribute__ ((visibility ("hidden"))) void gio_glBindBufferBase(GLenum target, GLuint index, GLuint buffer) {
+static void gio_glBindBufferBase(GLenum target, GLuint index, GLuint buffer) {
 	_glBindBufferBase(target, index, buffer);
 }
 
-__attribute__ ((visibility ("hidden"))) void gio_glUniformBlockBinding(GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding) {
+static void gio_glUniformBlockBinding(GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding) {
 	_glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
 }
 
-__attribute__ ((visibility ("hidden"))) GLuint gio_glGetUniformBlockIndex(GLuint program, const GLchar *uniformBlockName) {
+static GLuint gio_glGetUniformBlockIndex(GLuint program, const GLchar *uniformBlockName) {
 	return _glGetUniformBlockIndex(program, uniformBlockName);
 }
 
-__attribute__ ((visibility ("hidden"))) void gio_glInvalidateFramebuffer(GLenum target, GLenum attachment) {
+static void gio_glInvalidateFramebuffer(GLenum target, GLenum attachment) {
 	// Framebuffer invalidation is just a hint and can safely be ignored.
 	if (_glInvalidateFramebuffer != NULL) {
 		_glInvalidateFramebuffer(target, 1, &attachment);
 	}
 }
 
-__attribute__ ((visibility ("hidden"))) void gio_glBeginQuery(GLenum target, GLenum attachment) {
+static void gio_glBeginQuery(GLenum target, GLenum attachment) {
 	_glBeginQuery(target, attachment);
 }
 
-__attribute__ ((visibility ("hidden"))) void gio_glDeleteQueries(GLsizei n, const GLuint *ids) {
+static void gio_glDeleteQueries(GLsizei n, const GLuint *ids) {
 	_glDeleteQueries(n, ids);
 }
 
-__attribute__ ((visibility ("hidden"))) void gio_glEndQuery(GLenum target) {
+static void gio_glEndQuery(GLenum target) {
 	_glEndQuery(target);
 }
 
-__attribute__ ((visibility ("hidden"))) const GLubyte* gio_glGetStringi(GLenum name, GLuint index) {
+static const GLubyte* gio_glGetStringi(GLenum name, GLuint index) {
 	if (_glGetStringi == NULL) {
 		return NULL;
 	}
 	return _glGetStringi(name, index);
 }
 
-__attribute__ ((visibility ("hidden"))) void gio_glGenQueries(GLsizei n, GLuint *ids) {
+static void gio_glGenQueries(GLsizei n, GLuint *ids) {
 	_glGenQueries(n, ids);
 }
 
-__attribute__ ((visibility ("hidden"))) void gio_glGetProgramBinary(GLuint program, GLsizei bufsize, GLsizei *length, GLenum *binaryFormat, void *binary) {
+static void gio_glGetProgramBinary(GLuint program, GLsizei bufsize, GLsizei *length, GLenum *binaryFormat, void *binary) {
 	_glGetProgramBinary(program, bufsize, length, binaryFormat, binary);
 }
 
-__attribute__ ((visibility ("hidden"))) void gio_glGetQueryObjectuiv(GLuint id, GLenum pname, GLuint *params) {
+static void gio_glGetQueryObjectuiv(GLuint id, GLenum pname, GLuint *params) {
 	_glGetQueryObjectuiv(id, pname, params);
 }
 
-__attribute__ ((visibility ("hidden"))) void gio_glMemoryBarrier(GLbitfield barriers) {
+static void gio_glMemoryBarrier(GLbitfield barriers) {
 	_glMemoryBarrier(barriers);
 }
 
-__attribute__ ((visibility ("hidden"))) void gio_glDispatchCompute(GLuint x, GLuint y, GLuint z) {
+static void gio_glDispatchCompute(GLuint x, GLuint y, GLuint z) {
 	_glDispatchCompute(x, y, z);
 }
 
-__attribute__ ((visibility ("hidden"))) void *gio_glMapBufferRange(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access) {
+static void *gio_glMapBufferRange(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access) {
 	return _glMapBufferRange(target, offset, length, access);
 }
 
-__attribute__ ((visibility ("hidden"))) GLboolean gio_glUnmapBuffer(GLenum target) {
+static GLboolean gio_glUnmapBuffer(GLenum target) {
 	return _glUnmapBuffer(target);
 }
 
-__attribute__ ((visibility ("hidden"))) void gio_glBindImageTexture(GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format) {
+static void gio_glBindImageTexture(GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format) {
 	_glBindImageTexture(unit, texture, level, layered, layer, access, format);
 }
 
-__attribute__ ((visibility ("hidden"))) void gio_glTexStorage2D(GLenum target, GLsizei levels, GLenum internalFormat, GLsizei width, GLsizei height) {
+static void gio_glTexStorage2D(GLenum target, GLsizei levels, GLenum internalFormat, GLsizei width, GLsizei height) {
 	_glTexStorage2D(target, levels, internalFormat, width, height);
 }
 
-__attribute__ ((visibility ("hidden"))) void gio_glBlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter) {
+static void gio_glBlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter) {
 	_glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
 }
 
