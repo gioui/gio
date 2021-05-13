@@ -102,9 +102,6 @@ static void gio_glEndQuery(GLenum target) {
 }
 
 static const GLubyte* gio_glGetStringi(GLenum name, GLuint index) {
-	if (_glGetStringi == NULL) {
-		return NULL;
-	}
 	return _glGetStringi(name, index);
 }
 
@@ -484,7 +481,7 @@ func (f *Functions) GetShaderInfoLog(s Shader) string {
 	return string(buf)
 }
 
-func (f *Functions) GetStringi(pname Enum, index int) string {
+func (f *Functions) getStringi(pname Enum, index int) string {
 	str := C.gio_glGetStringi(C.GLenum(pname), C.GLuint(index))
 	if str == nil {
 		return ""
@@ -500,7 +497,7 @@ func (f *Functions) GetString(pname Enum) string {
 		var exts []string
 		nexts := f.GetInteger(NUM_EXTENSIONS)
 		for i := 0; i < nexts; i++ {
-			ext := f.GetStringi(EXTENSIONS, i)
+			ext := f.getStringi(EXTENSIONS, i)
 			exts = append(exts, ext)
 		}
 		return strings.Join(exts, " ")
