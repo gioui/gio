@@ -93,8 +93,6 @@ func (c *context) Unlock() {}
 
 func (c *context) MakeCurrent() error {
 	if C.gio_makeCurrent(c.ctx) == 0 {
-		C.CFRelease(c.ctx)
-		c.ctx = 0
 		return errors.New("[EAGLContext setCurrentContext] failed")
 	}
 	if !c.init {
