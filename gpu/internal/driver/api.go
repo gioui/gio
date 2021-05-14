@@ -9,13 +9,16 @@ import (
 	"gioui.org/internal/gl"
 )
 
-// See gpu/api.go for documentation for the API types
+// See gpu/api.go for documentation for the API types.
 
 type API interface {
 	implementsAPI()
 }
 
 type OpenGL struct {
+	// ES forces the use of ANGLE OpenGL ES libraries on macOS. It is
+	// ignored on all other platforms.
+	ES bool
 	// Context contains the WebGL context for WebAssembly platforms. It is
 	// empty for all other platforms; an OpenGL context is assumed current when
 	// calling NewDevice.

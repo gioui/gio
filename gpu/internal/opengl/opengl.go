@@ -131,7 +131,7 @@ func init() {
 }
 
 func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
-	f, err := gl.NewFunctions(api.Context)
+	f, err := gl.NewFunctions(api.Context, api.ES)
 	if err != nil {
 		return nil, err
 	}

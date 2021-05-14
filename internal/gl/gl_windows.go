@@ -98,7 +98,7 @@ type Functions struct {
 
 type Context interface{}
 
-func NewFunctions(ctx Context) (*Functions, error) {
+func NewFunctions(ctx Context, forceES bool) (*Functions, error) {
 	if ctx != nil {
 		panic("non-nil context")
 	}

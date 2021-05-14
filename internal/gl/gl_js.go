@@ -23,7 +23,7 @@ type Functions struct {
 
 type Context js.Value
 
-func NewFunctions(ctx Context) (*Functions, error) {
+func NewFunctions(ctx Context, forceES bool) (*Functions, error) {
 	f := &Functions{
 		Ctx:        js.Value(ctx),
 		uint8Array: js.Global().Get("Uint8Array"),

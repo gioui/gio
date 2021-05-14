@@ -47,7 +47,7 @@ func newContext(w *window) (*context, error) {
 		return nil, fmt.Errorf("failed to create EAGLContext")
 	}
 	api := contextAPI()
-	f, err := gl.NewFunctions(api.Context)
+	f, err := gl.NewFunctions(api.Context, api.ES)
 	if err != nil {
 		return nil, err
 	}
