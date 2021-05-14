@@ -5,6 +5,8 @@
 package wm
 
 import (
+	"errors"
+
 	"gioui.org/gpu"
 	"gioui.org/internal/gl"
 )
@@ -15,8 +17,9 @@ import (
 #include <AppKit/AppKit.h>
 #include <OpenGL/gl3.h>
 
-__attribute__ ((visibility ("hidden"))) CFTypeRef gio_createGLView(void);
-__attribute__ ((visibility ("hidden"))) CFTypeRef gio_contextForView(CFTypeRef viewRef);
+__attribute__ ((visibility ("hidden"))) CFTypeRef gio_createGLContext(void);
+__attribute__ ((visibility ("hidden"))) void gio_prepareContext(void);
+__attribute__ ((visibility ("hidden"))) void gio_setContextView(CFTypeRef ctx, CFTypeRef view);
 __attribute__ ((visibility ("hidden"))) void gio_makeCurrentContext(CFTypeRef ctx);
 __attribute__ ((visibility ("hidden"))) void gio_flushContextBuffer(CFTypeRef ctx);
 __attribute__ ((visibility ("hidden"))) void gio_clearCurrentContext(void);
@@ -26,20 +29,23 @@ __attribute__ ((visibility ("hidden"))) void gio_unlockContext(CFTypeRef ctxRef)
 import "C"
 
 type context struct {
-	c    *gl.Functions
-	ctx  C.CFTypeRef
-	view C.CFTypeRef
-}
-
-func init() {
-	viewFactory = func() C.CFTypeRef {
-		return C.gio_createGLView()
-	}
+	c        *gl.Functions
+	ctx      C.CFTypeRef
+	view     C.CFTypeRef
+	prepared bool
 }
 
 func newContext(w *window) (*context, error) {
 	view := w.contextView()
-	ctx := C.gio_contextForView(view)
+	ctx := C.gio_createGLContext()
+	if ctx == 0 {
+		return nil, errors.New("gl: failed to create NSOpenGLContext")
+	}
+	// [NSOpenGLContext setView] must run on the main thread. Fortunately,
+	// newContext is only called during a [NSView draw] on the main thread.
+	w.w.Func(func() {
+		C.gio_setContextView(ctx, view)
+	})
 	c := &context{
 		ctx:  ctx,
 		view: view,
@@ -52,14 +58,9 @@ func (c *context) API() gpu.API {
 }
 
 func (c *context) Release() {
-	c.Lock()
-	defer c.Unlock()
 	C.gio_clearCurrentContext()
-	// We could release the context with [view clearGLContext]
-	// and rely on [view openGLContext] auto-creating a new context.
-	// However that second context is not properly set up by
-	// OpenGLContextView, so we'll stay on the safe side and keep
-	// the first context around.
+	C.CFRelease(c.ctx)
+	c.ctx = 0
 }
 
 func (c *context) Present() error {
@@ -80,6 +81,10 @@ func (c *context) MakeCurrent() error {
 	c.Lock()
 	defer c.Unlock()
 	C.gio_makeCurrentContext(c.ctx)
+	if !c.prepared {
+		c.prepared = true
+		C.gio_prepareContext()
+	}
 	return nil
 }
 

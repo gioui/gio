@@ -42,6 +42,73 @@
 }
 @end
 
+static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFloat dy) {
+	NSPoint p = [view convertPoint:[event locationInWindow] fromView:nil];
+	if (!event.hasPreciseScrollingDeltas) {
+		// dx and dy are in rows and columns.
+		dx *= 10;
+		dy *= 10;
+	}
+	gio_onMouse((__bridge CFTypeRef)view, typ, [NSEvent pressedMouseButtons], p.x, p.y, dx, dy, [event timestamp], [event modifierFlags]);
+}
+
+@interface GioView : NSView
+@end
+
+@implementation GioView
+- (BOOL)isFlipped {
+	return YES;
+}
+- (void)drawRect:(NSRect)r {
+	gio_onDraw((__bridge CFTypeRef)self);
+}
+- (void)mouseDown:(NSEvent *)event {
+	handleMouse(self, event, GIO_MOUSE_DOWN, 0, 0);
+}
+- (void)mouseUp:(NSEvent *)event {
+	handleMouse(self, event, GIO_MOUSE_UP, 0, 0);
+}
+- (void)middleMouseDown:(NSEvent *)event {
+	handleMouse(self, event, GIO_MOUSE_DOWN, 0, 0);
+}
+- (void)middletMouseUp:(NSEvent *)event {
+	handleMouse(self, event, GIO_MOUSE_UP, 0, 0);
+}
+- (void)rightMouseDown:(NSEvent *)event {
+	handleMouse(self, event, GIO_MOUSE_DOWN, 0, 0);
+}
+- (void)rightMouseUp:(NSEvent *)event {
+	handleMouse(self, event, GIO_MOUSE_UP, 0, 0);
+}
+- (void)mouseMoved:(NSEvent *)event {
+	handleMouse(self, event, GIO_MOUSE_MOVE, 0, 0);
+}
+- (void)mouseDragged:(NSEvent *)event {
+	handleMouse(self, event, GIO_MOUSE_MOVE, 0, 0);
+}
+- (void)scrollWheel:(NSEvent *)event {
+	CGFloat dx = -event.scrollingDeltaX;
+	CGFloat dy = -event.scrollingDeltaY;
+	handleMouse(self, event, GIO_MOUSE_SCROLL, dx, dy);
+}
+- (void)keyDown:(NSEvent *)event {
+	NSString *keys = [event charactersIgnoringModifiers];
+	gio_onKeys((__bridge CFTypeRef)self, (char *)[keys UTF8String], [event timestamp], [event modifierFlags], true);
+	[self interpretKeyEvents:[NSArray arrayWithObject:event]];
+}
+- (void)keyUp:(NSEvent *)event {
+	NSString *keys = [event charactersIgnoringModifiers];
+	gio_onKeys((__bridge CFTypeRef)self, (char *)[keys UTF8String], [event timestamp], [event modifierFlags], false);
+}
+- (void)insertText:(id)string {
+	const char *utf8 = [string UTF8String];
+	gio_onText((__bridge CFTypeRef)self, (char *)utf8);
+}
+- (void)doCommandBySelector:(SEL)sel {
+	// Don't pass commands up the responder chain.
+	// They will end up in a beep.
+}
+@end
 // Delegates are weakly referenced from their peers. Nothing
 // else holds a strong reference to our window delegate, so
 // keep a single global reference instead.
@@ -84,6 +151,11 @@ CGFloat gio_getScreenBackingScale(void) {
 CGFloat gio_getViewBackingScale(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
 	return [view.window backingScaleFactor];
+}
+
+void gio_setNeedsDisplay(CFTypeRef viewRef) {
+	NSView *view = (__bridge NSView *)viewRef;
+	[view setNeedsDisplay:YES];
 }
 
 void gio_hideCursor() {
@@ -227,6 +299,16 @@ void gio_setMaxSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
 void gio_setTitle(CFTypeRef windowRef, const char *title) {
   NSWindow* window = (__bridge NSWindow *)windowRef;
   window.title = [NSString stringWithUTF8String: title];
+}
+
+CFTypeRef gio_createView(void) {
+	@autoreleasepool {
+		NSRect frame = NSMakeRect(0, 0, 0, 0);
+		GioView* view = [[GioView alloc] initWithFrame:frame];
+		[view setWantsBestResolutionOpenGLSurface:YES];
+		[view setWantsLayer:YES]; // The default in Mojave.
+		return CFBridgingRetain(view);
+	}
 }
 
 @implementation GioAppDelegate

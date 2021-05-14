@@ -56,7 +56,8 @@ type Window struct {
 }
 
 type callbacks struct {
-	w *Window
+	w     *Window
+	funcs chan func()
 }
 
 // queue is an event.Queue implementation that distributes system events
@@ -104,6 +105,7 @@ func NewWindow(options ...Option) *Window {
 		driverFuncs: make(chan func()),
 		dead:        make(chan struct{}),
 	}
+	w.callbacks.funcs = make(chan func())
 	w.callbacks.w = w
 	go w.run(opts)
 	return w
@@ -299,9 +301,20 @@ func (c *callbacks) SetDriver(d wm.Driver) {
 func (c *callbacks) Event(e event.Event) {
 	select {
 	case c.w.in <- e:
-		<-c.w.ack
+		for {
+			select {
+			case <-c.w.ack:
+				return
+			case f := <-c.funcs:
+				f()
+			}
+		}
 	case <-c.w.dead:
 	}
+}
+
+func (c *callbacks) Func(f func()) {
+	c.funcs <- f
 }
 
 func (w *Window) waitAck() {

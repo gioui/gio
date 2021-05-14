@@ -42,6 +42,7 @@ __attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
 __attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
 __attribute__ ((visibility ("hidden"))) void gio_setNeedsDisplay(CFTypeRef viewRef);
 __attribute__ ((visibility ("hidden"))) void gio_toggleFullScreen(CFTypeRef windowRef);
+__attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight);
 __attribute__ ((visibility ("hidden"))) void gio_makeKeyAndOrderFront(CFTypeRef windowRef);
 __attribute__ ((visibility ("hidden"))) NSPoint gio_cascadeTopLeftFromPoint(CFTypeRef windowRef, NSPoint topLeft);
@@ -72,8 +73,6 @@ type window struct {
 
 // viewMap is the mapping from Cocoa NSViews to Go windows.
 var viewMap = make(map[C.CFTypeRef]*window)
-
-var viewFactory func() C.CFTypeRef
 
 // launched is closed when applicationDidFinishLaunching is called.
 var launched = make(chan struct{})
@@ -401,7 +400,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 }
 
 func newWindow(opts *Options) (*window, error) {
-	view := viewFactory()
+	view := C.gio_createView()
 	if view == 0 {
 		return nil, errors.New("CreateWindow: failed to create view")
 	}
