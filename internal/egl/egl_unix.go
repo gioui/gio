@@ -102,3 +102,7 @@ func eglCreateWindowSurface(disp _EGLDisplay, conf _EGLConfig, win NativeWindowT
 	eglSurf := C.eglCreateWindowSurface(disp, conf, win, &attribs[0])
 	return eglSurf
 }
+
+func eglWaitClient() bool {
+	return C.eglWaitClient() == C.EGL_TRUE
+}

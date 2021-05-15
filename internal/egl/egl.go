@@ -11,12 +11,10 @@ import (
 	"strings"
 
 	"gioui.org/gpu"
-	"gioui.org/internal/gl"
 	"gioui.org/internal/srgb"
 )
 
 type Context struct {
-	c             *gl.Functions
 	disp          _EGLDisplay
 	eglCtx        *eglContext
 	eglSurf       _EGLSurface
@@ -105,14 +103,9 @@ func NewContext(disp NativeDisplayType) (*Context, error) {
 	if err != nil {
 		return nil, err
 	}
-	f, err := gl.NewFunctions(nil)
-	if err != nil {
-		return nil, err
-	}
 	c := &Context{
 		disp:   eglDisp,
 		eglCtx: eglCtx,
-		c:      f,
 	}
 	return c, nil
 }
@@ -126,7 +119,7 @@ func (c *Context) ReleaseSurface() {
 		return
 	}
 	// Make sure any in-flight GL commands are complete.
-	c.c.Finish()
+	eglWaitClient()
 	c.ReleaseCurrent()
 	eglDestroySurface(c.disp, c.eglSurf)
 	c.eglSurf = nilEGLSurface

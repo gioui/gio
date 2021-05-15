@@ -40,6 +40,7 @@ var (
 	_eglSwapBuffers         = libEGL.NewProc("eglSwapBuffers")
 	_eglTerminate           = libEGL.NewProc("eglTerminate")
 	_eglQueryString         = libEGL.NewProc("eglQueryString")
+	_eglWaitClient          = libEGL.NewProc("eglWaitClient")
 )
 
 var loadOnce sync.Once
@@ -154,6 +155,11 @@ func eglTerminate(disp _EGLDisplay) bool {
 func eglQueryString(disp _EGLDisplay, name _EGLint) string {
 	r, _, _ := _eglQueryString.Call(uintptr(disp), uintptr(name))
 	return syscall.BytePtrToString((*byte)(unsafe.Pointer(r)))
+}
+
+func eglWaitClient() bool {
+	r, _, _ := _eglWaitClient.Call()
+	return r != 0
 }
 
 // issue34474KeepAlive calls runtime.KeepAlive as a
