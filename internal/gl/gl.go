@@ -10,6 +10,7 @@ type (
 const (
 	ALL_BARRIER_BITS                      = 0xffffffff
 	ARRAY_BUFFER                          = 0x8892
+	BACK                                  = 0x0405
 	BLEND                                 = 0xbe2
 	CLAMP_TO_EDGE                         = 0x812f
 	COLOR_ATTACHMENT0                     = 0x8ce0

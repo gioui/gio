@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"gioui.org/gpu"
-	"gioui.org/internal/srgb"
 )
 
 type Context struct {
@@ -20,8 +19,6 @@ type Context struct {
 	eglSurf       _EGLSurface
 	width, height int
 	refreshFBO    bool
-	// For sRGB emulation.
-	srgbFBO *srgb.FBO
 }
 
 type eglContext struct {
@@ -60,10 +57,6 @@ const (
 )
 
 func (c *Context) Release() {
-	if c.srgbFBO != nil {
-		c.srgbFBO.Release()
-		c.srgbFBO = nil
-	}
 	c.ReleaseSurface()
 	if c.eglCtx != nil {
 		eglDestroyContext(c.disp, c.eglCtx.ctx)
@@ -73,14 +66,8 @@ func (c *Context) Release() {
 }
 
 func (c *Context) Present() error {
-	if c.srgbFBO != nil {
-		c.srgbFBO.Blit()
-	}
 	if !eglSwapBuffers(c.disp, c.eglSurf) {
 		return fmt.Errorf("eglSwapBuffers failed (%x)", eglGetError())
-	}
-	if c.srgbFBO != nil {
-		c.srgbFBO.AfterPresent()
 	}
 	return nil
 }
@@ -150,24 +137,6 @@ func (c *Context) MakeCurrent() error {
 	}
 	if !eglMakeCurrent(c.disp, c.eglSurf, c.eglSurf, c.eglCtx.ctx) {
 		return fmt.Errorf("eglMakeCurrent error 0x%x", eglGetError())
-	}
-	if c.eglCtx.srgb || c.eglSurf == nilEGLSurface {
-		return nil
-	}
-	if c.srgbFBO == nil {
-		var err error
-		c.srgbFBO, err = srgb.New(nil)
-		if err != nil {
-			c.ReleaseCurrent()
-			return err
-		}
-	}
-	if c.refreshFBO {
-		c.refreshFBO = false
-		if err := c.srgbFBO.Refresh(c.width, c.height); err != nil {
-			c.ReleaseCurrent()
-			return err
-		}
 	}
 	return nil
 }
@@ -268,7 +237,7 @@ func createSurface(disp _EGLDisplay, eglCtx *eglContext, win NativeWindowType) (
 	surfAttribs = append(surfAttribs, _EGL_NONE)
 	eglSurf := eglCreateWindowSurface(disp, eglCtx.config, win, surfAttribs)
 	if eglSurf == nilEGLSurface && eglCtx.srgb {
-		// Try again without sRGB
+		// Try again without sRGB.
 		eglCtx.srgb = false
 		surfAttribs = []_EGLint{_EGL_NONE}
 		eglSurf = eglCreateWindowSurface(disp, eglCtx.config, win, surfAttribs)

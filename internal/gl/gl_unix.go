@@ -436,6 +436,15 @@ func (f *Functions) GetFramebufferAttachmentParameteri(target, attachment, pname
 	return int(f.ints[0])
 }
 
+func (f *Functions) GetInteger4(pname Enum) [4]int {
+	C.glGetIntegerv(C.GLenum(pname), &f.ints[0])
+	var r [4]int
+	for i := range r {
+		r[i] = int(f.ints[i])
+	}
+	return r
+}
+
 func (f *Functions) GetInteger(pname Enum) int {
 	C.glGetIntegerv(C.GLenum(pname), &f.ints[0])
 	return int(f.ints[0])

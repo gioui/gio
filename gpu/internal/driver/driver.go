@@ -12,7 +12,7 @@ import (
 // APIs such as OpenGL, Direct3D useful for rendering Gio
 // operations.
 type Device interface {
-	BeginFrame() Framebuffer
+	BeginFrame(viewport image.Point) Framebuffer
 	EndFrame()
 	Caps() Caps
 	NewTimer() Timer

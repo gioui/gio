@@ -164,7 +164,7 @@ func newDirect3D11Device(api driver.Direct3D11) (driver.Device, error) {
 	return b, nil
 }
 
-func (b *Backend) BeginFrame() driver.Framebuffer {
+func (b *Backend) BeginFrame(viewport image.Point) driver.Framebuffer {
 	renderTarget, depthView := b.ctx.OMGetRenderTargets()
 	// Assume someone else is holding on to the render targets.
 	if renderTarget != nil {

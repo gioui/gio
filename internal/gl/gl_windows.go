@@ -292,6 +292,14 @@ func (c *Functions) GetFramebufferAttachmentParameteri(target, attachment, pname
 	p, _, _ := syscall.Syscall(_glGetFramebufferAttachmentParameteri.Addr(), 3, uintptr(target), uintptr(attachment), uintptr(pname))
 	return int(p)
 }
+func (c *Functions) GetInteger4(pname Enum) [4]int {
+	syscall.Syscall(_glGetIntegerv.Addr(), 2, uintptr(pname), uintptr(unsafe.Pointer(&c.int32s[0])), 0)
+	var r [4]int
+	for i := range r {
+		r[i] = int(c.int32s[i])
+	}
+	return r
+}
 func (c *Functions) GetInteger(pname Enum) int {
 	syscall.Syscall(_glGetIntegerv.Addr(), 2, uintptr(pname), uintptr(unsafe.Pointer(&c.int32s[0])), 0)
 	return int(c.int32s[0])

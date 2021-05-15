@@ -425,9 +425,9 @@ func (g *gpu) Collect(viewport image.Point, frameOps *op.Ops) {
 }
 
 func (g *gpu) Frame() error {
-	defFBO := g.ctx.BeginFrame()
-	defer g.ctx.EndFrame()
 	viewport := g.renderer.blitter.viewport
+	defFBO := g.ctx.BeginFrame(viewport)
+	defer g.ctx.EndFrame()
 	for _, img := range g.drawOps.imageOps {
 		expandPathOp(img.path, img.clip)
 	}

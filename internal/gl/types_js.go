@@ -16,6 +16,10 @@ type (
 	Object       js.Value
 )
 
+func (f Framebuffer) Valid() bool {
+	return !js.Value(f).IsUndefined() && !js.Value(f).IsNull()
+}
+
 func (p Program) Valid() bool {
 	return !js.Value(p).IsUndefined() && !js.Value(p).IsNull()
 }

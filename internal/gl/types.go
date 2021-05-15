@@ -14,6 +14,10 @@ type (
 	Object       struct{ V uint }
 )
 
+func (u Framebuffer) Valid() bool {
+	return u.V != 0
+}
+
 func (u Uniform) Valid() bool {
 	return u.V != -1
 }

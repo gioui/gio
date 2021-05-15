@@ -12,6 +12,7 @@ import (
 
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/gl"
+	"gioui.org/internal/srgb"
 )
 
 // Backend implements driver.Device.
@@ -30,6 +31,9 @@ type Backend struct {
 	// Single channel alpha textures.
 	alphaTriple textureTriple
 	srgbaTriple textureTriple
+
+	sRGBFBO *srgb.FBO
+	defFBO  gl.Framebuffer
 }
 
 // State tracking.
@@ -169,15 +173,43 @@ func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 	return b, nil
 }
 
-func (b *Backend) BeginFrame() driver.Framebuffer {
+func (b *Backend) BeginFrame(viewport image.Point) driver.Framebuffer {
 	// Assume GL state is reset between frames.
 	b.state = glstate{}
-	fboID := gl.Framebuffer(b.funcs.GetBinding(gl.FRAMEBUFFER_BINDING))
-	return &gpuFramebuffer{backend: b, obj: fboID, foreign: true}
+	b.defFBO = gl.Framebuffer(b.funcs.GetBinding(gl.FRAMEBUFFER_BINDING))
+	// Determine color encoding of the output framebuffer.
+	var fbEncoding int
+	if !b.defFBO.Valid() {
+		fbEncoding = b.funcs.GetFramebufferAttachmentParameteri(gl.FRAMEBUFFER, gl.BACK, gl.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING)
+	} else {
+		fbEncoding = b.funcs.GetFramebufferAttachmentParameteri(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING)
+	}
+	renderFBO := b.defFBO
+	if fbEncoding == gl.LINEAR {
+		if b.sRGBFBO == nil {
+			// Framebuffer is not in sRGB format. Emulate it.
+			sfbo, err := srgb.New(b.funcs)
+			if err != nil {
+				panic(err)
+			}
+			b.sRGBFBO = sfbo
+		}
+		if err := b.sRGBFBO.Refresh(viewport); err != nil {
+			panic(err)
+		}
+		renderFBO = b.sRGBFBO.Framebuffer()
+	}
+	b.funcs.BindFramebuffer(gl.FRAMEBUFFER, renderFBO)
+	return &gpuFramebuffer{backend: b, obj: renderFBO, foreign: true}
 }
 
 func (b *Backend) EndFrame() {
 	b.funcs.ActiveTexture(gl.TEXTURE0)
+	if b.sRGBFBO != nil {
+		b.funcs.BindFramebuffer(gl.FRAMEBUFFER, b.defFBO)
+		b.sRGBFBO.Blit()
+	}
+	b.funcs.BindFramebuffer(gl.FRAMEBUFFER, b.defFBO)
 }
 
 func (b *Backend) Caps() driver.Caps {
@@ -313,6 +345,10 @@ func glErr(f *gl.Functions) error {
 }
 
 func (b *Backend) Release() {
+	if b.sRGBFBO != nil {
+		b.sRGBFBO.Release()
+	}
+	*b = Backend{}
 }
 
 func (b *Backend) MemoryBarrier() {
