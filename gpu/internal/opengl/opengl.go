@@ -121,8 +121,6 @@ type textureTriple struct {
 	typ            gl.Enum
 }
 
-type Context = gl.Context
-
 const (
 	storageBindings = 32
 )
