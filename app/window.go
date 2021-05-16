@@ -88,7 +88,7 @@ var ackEvent event.Event
 func NewWindow(options ...Option) *Window {
 	opts := new(wm.Options)
 	// Default options.
-	Size(unit.Px(800), unit.Px(600))(opts)
+	Size(unit.Dp(800), unit.Dp(600))(opts)
 	Title("Gio")(opts)
 
 	for _, o := range options {
