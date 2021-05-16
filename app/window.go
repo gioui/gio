@@ -53,6 +53,8 @@ type Window struct {
 	cursor pointer.CursorName
 
 	callbacks callbacks
+
+	nocontext bool
 }
 
 type callbacks struct {
@@ -104,6 +106,7 @@ func NewWindow(options ...Option) *Window {
 		frameAck:    make(chan struct{}),
 		driverFuncs: make(chan func()),
 		dead:        make(chan struct{}),
+		nocontext:   opts.CustomRenderer,
 	}
 	w.callbacks.funcs = make(chan func())
 	w.callbacks.w = w
@@ -136,7 +139,7 @@ func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync
 				return err
 			}
 		}
-		if w.loop == nil {
+		if w.loop == nil && !w.nocontext {
 			var err error
 			w.ctx, err = w.driver.NewContext()
 			if err != nil {
@@ -149,7 +152,7 @@ func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync
 			}
 		}
 		w.processFrame(frameStart, size, frame)
-		if sync {
+		if sync && w.loop != nil {
 			if err := w.loop.Flush(); err != nil {
 				w.destroyGPU()
 				if err == wm.ErrDeviceLost {
@@ -163,7 +166,14 @@ func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync
 }
 
 func (w *Window) processFrame(frameStart time.Time, size image.Point, frame *op.Ops) {
-	sync := w.loop.Draw(size, frame)
+	var sync <-chan struct{}
+	if w.loop != nil {
+		sync = w.loop.Draw(size, frame)
+	} else {
+		s := make(chan struct{}, 1)
+		s <- struct{}{}
+		sync = s
+	}
 	w.queue.q.Frame(frame)
 	switch w.queue.q.TextInputState() {
 	case router.TextInputOpen:
@@ -177,7 +187,7 @@ func (w *Window) processFrame(frameStart time.Time, size image.Point, frame *op.
 	if w.queue.q.ReadClipboard() {
 		go w.ReadClipboard()
 	}
-	if w.queue.q.Profiling() {
+	if w.queue.q.Profiling() && w.loop != nil {
 		frameDur := time.Since(frameStart)
 		frameDur = frameDur.Truncate(100 * time.Microsecond)
 		q := 100 * time.Microsecond
@@ -568,6 +578,14 @@ func StatusColor(color color.NRGBA) Option {
 func NavigationColor(color color.NRGBA) Option {
 	return func(opts *wm.Options) {
 		opts.NavigationColor = &color
+	}
+}
+
+// CustomRenderer controls whether the the window contents is
+// rendered by the client. If true, no GPU context is created.
+func CustomRenderer(custom bool) Option {
+	return func(opts *wm.Options) {
+		opts.CustomRenderer = custom
 	}
 }
 

@@ -29,6 +29,7 @@ type Options struct {
 	StatusColor     *color.NRGBA
 	NavigationColor *color.NRGBA
 	Orientation     *Orientation
+	CustomRenderer  bool
 }
 
 type WindowMode uint8
