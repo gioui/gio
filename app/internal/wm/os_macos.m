@@ -300,12 +300,16 @@ void gio_setTitle(CFTypeRef windowRef, const char *title) {
   window.title = [NSString stringWithUTF8String: title];
 }
 
+CFTypeRef gio_layerForView(CFTypeRef viewRef) {
+	NSView *view = (__bridge NSView *)viewRef;
+	return (__bridge CFTypeRef)view.layer;
+}
+
 CFTypeRef gio_createView(void) {
 	@autoreleasepool {
 		NSRect frame = NSMakeRect(0, 0, 0, 0);
 		GioView* view = [[GioView alloc] initWithFrame:frame];
-		[view setWantsBestResolutionOpenGLSurface:YES];
-		[view setWantsLayer:YES]; // The default in Mojave.
+		[view setWantsLayer:YES];
 		return CFBridgingRetain(view);
 	}
 }

@@ -6,8 +6,6 @@ import (
 	"gioui.org/app/internal/wm"
 )
 
-type ViewEvent = wm.ViewEvent
-
 // JavaVM returns the global JNI JavaVM.
 func JavaVM() uintptr {
 	return wm.JavaVM()

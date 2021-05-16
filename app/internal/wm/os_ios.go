@@ -45,6 +45,8 @@ import (
 	"gioui.org/unit"
 )
 
+type ViewEvent struct{}
+
 type window struct {
 	view        C.CFTypeRef
 	w           Callbacks
@@ -322,3 +324,5 @@ func Main() {
 func gio_runMain() {
 	runMain()
 }
+
+func (_ ViewEvent) ImplementsEvent() {}

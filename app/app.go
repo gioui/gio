@@ -9,6 +9,12 @@ import (
 	"gioui.org/app/internal/wm"
 )
 
+// ViewEvent carries the platform specific window handles for
+// a Window.
+//
+// ViewEvent is implemented on Android and macOS.
+type ViewEvent = wm.ViewEvent
+
 // extraArgs contains extra arguments to append to
 // os.Args. The arguments are separated with |.
 // Useful for running programs on mobiles where the

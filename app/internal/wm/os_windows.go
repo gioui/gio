@@ -28,6 +28,8 @@ import (
 	"gioui.org/io/system"
 )
 
+type ViewEvent struct{}
+
 type winConstraints struct {
 	minWidth, minHeight int32
 	maxWidth, maxHeight int32
@@ -790,3 +792,5 @@ func configForDPI(dpi int) unit.Metric {
 		PxPerSp: ppdp,
 	}
 }
+
+func (_ ViewEvent) ImplementsEvent() {}

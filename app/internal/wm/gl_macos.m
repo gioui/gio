@@ -45,6 +45,7 @@ CFTypeRef gio_createGLContext(void) {
 void gio_setContextView(CFTypeRef ctxRef, CFTypeRef viewRef) {
 	GioGLContext *ctx = (__bridge GioGLContext *)ctxRef;
 	NSView *view = (__bridge NSView *)viewRef;
+	[view setWantsBestResolutionOpenGLSurface:YES];
 	[ctx setView:view];
 	[[NSNotificationCenter defaultCenter] addObserver:ctx
 											 selector:@selector(notifyUpdate:)

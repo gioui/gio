@@ -51,12 +51,22 @@ __attribute__ ((visibility ("hidden"))) void gio_setSize(CFTypeRef windowRef, CG
 __attribute__ ((visibility ("hidden"))) void gio_setMinSize(CFTypeRef windowRef, CGFloat width, CGFloat height);
 __attribute__ ((visibility ("hidden"))) void gio_setMaxSize(CFTypeRef windowRef, CGFloat width, CGFloat height);
 __attribute__ ((visibility ("hidden"))) void gio_setTitle(CFTypeRef windowRef, const char *title);
+__attribute__ ((visibility ("hidden"))) CFTypeRef gio_layerForView(CFTypeRef viewRef);
 */
 import "C"
 
 func init() {
 	// Darwin requires that UI operations happen on the main thread only.
 	runtime.LockOSThread()
+}
+
+// ViewEvent notified the client of changes to the window AppKit handles.
+// The handles are retained until another ViewEvent is sent.
+type ViewEvent struct {
+	// View is a CFTypeRef for the NSView for the window.
+	View uintptr
+	// Layer is a CFTypeRef of the CALayer of View.
+	Layer uintptr
 }
 
 type window struct {
@@ -335,6 +345,7 @@ func configFor(scale float32) unit.Metric {
 func gio_onClose(view C.CFTypeRef) {
 	w := mustView(view)
 	w.displayLink.Close()
+	w.w.Event(ViewEvent{})
 	deleteView(view)
 	w.w.Event(system.DestroyEvent{})
 	C.CFRelease(w.view)
@@ -395,6 +406,8 @@ func NewWindow(win Callbacks, opts *Options) error {
 		}
 		nextTopLeft = C.gio_cascadeTopLeftFromPoint(w.window, nextTopLeft)
 		C.gio_makeKeyAndOrderFront(w.window)
+		layer := C.gio_layerForView(w.view)
+		w.w.Event(ViewEvent{View: uintptr(w.view), Layer: uintptr(layer)})
 	})
 	return <-errch
 }
@@ -510,3 +523,5 @@ func convertMods(mods C.NSUInteger) key.Modifiers {
 	}
 	return kmods
 }
+
+func (_ ViewEvent) ImplementsEvent() {}

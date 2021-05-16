@@ -8,6 +8,8 @@ import (
 	"errors"
 )
 
+type ViewEvent struct{}
+
 func Main() {
 	select {}
 }
@@ -37,3 +39,5 @@ func NewWindow(window Callbacks, opts *Options) error {
 	}
 	return errors.New("app: no window driver available")
 }
+
+func (_ ViewEvent) ImplementsEvent() {}

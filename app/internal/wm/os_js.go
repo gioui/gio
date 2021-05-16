@@ -4,7 +4,6 @@ package wm
 
 import (
 	"fmt"
-	"gioui.org/internal/f32color"
 	"image"
 	"image/color"
 	"strings"
@@ -14,6 +13,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"gioui.org/internal/f32color"
+
 	"gioui.org/f32"
 	"gioui.org/io/clipboard"
 	"gioui.org/io/key"
@@ -21,6 +22,8 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/unit"
 )
+
+type ViewEvent struct{}
 
 type window struct {
 	window                js.Value
@@ -671,3 +674,5 @@ func translateKey(k string) (string, bool) {
 	}
 	return n, true
 }
+
+func (_ ViewEvent) ImplementsEvent() {}
