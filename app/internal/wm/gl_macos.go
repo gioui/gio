@@ -58,9 +58,11 @@ func (c *context) API() gpu.API {
 }
 
 func (c *context) Release() {
-	C.gio_clearCurrentContext()
-	C.CFRelease(c.ctx)
-	c.ctx = 0
+	if c.ctx != 0 {
+		C.gio_clearCurrentContext()
+		C.CFRelease(c.ctx)
+		c.ctx = 0
+	}
 }
 
 func (c *context) Present() error {
