@@ -19,6 +19,7 @@ import (
 type Backend struct {
 	funcs *gl.Functions
 
+	clear bool
 	state glstate
 
 	glver [2]int
@@ -171,7 +172,8 @@ func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 	return b, nil
 }
 
-func (b *Backend) BeginFrame(viewport image.Point) driver.Framebuffer {
+func (b *Backend) BeginFrame(clear bool, viewport image.Point) driver.Framebuffer {
+	b.clear = clear
 	// Assume GL state is reset between frames.
 	b.state = glstate{}
 	b.defFBO = gl.Framebuffer(b.funcs.GetBinding(gl.FRAMEBUFFER_BINDING))
@@ -198,6 +200,9 @@ func (b *Backend) BeginFrame(viewport image.Point) driver.Framebuffer {
 		renderFBO = b.sRGBFBO.Framebuffer()
 	}
 	b.funcs.BindFramebuffer(gl.FRAMEBUFFER, renderFBO)
+	if b.sRGBFBO != nil && !clear {
+		b.Clear(0, 0, 0, 0)
+	}
 	return &gpuFramebuffer{backend: b, obj: renderFBO, foreign: true}
 }
 
@@ -205,8 +210,15 @@ func (b *Backend) EndFrame() {
 	b.funcs.ActiveTexture(gl.TEXTURE0)
 	if b.sRGBFBO != nil {
 		b.funcs.BindFramebuffer(gl.FRAMEBUFFER, b.defFBO)
+		if b.clear {
+			b.SetBlend(false)
+		} else {
+			b.BlendFunc(driver.BlendFactorOne, driver.BlendFactorOneMinusSrcAlpha)
+			b.SetBlend(true)
+		}
 		b.sRGBFBO.Blit()
 	}
+	b.SetBlend(false)
 	b.funcs.BindFramebuffer(gl.FRAMEBUFFER, b.defFBO)
 }
 

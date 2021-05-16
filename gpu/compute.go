@@ -280,7 +280,7 @@ func (g *compute) Frame() error {
 		Y: (viewport.Y + tileHeightPx - 1) / tileHeightPx,
 	}
 
-	defFBO := g.ctx.BeginFrame(viewport)
+	defFBO := g.ctx.BeginFrame(g.drawOps.clear, viewport)
 	defer g.ctx.EndFrame()
 
 	if g.drawOps.profile && g.timers.t == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
