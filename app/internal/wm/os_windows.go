@@ -28,7 +28,9 @@ import (
 	"gioui.org/io/system"
 )
 
-type ViewEvent struct{}
+type ViewEvent struct {
+	HWND uintptr
+}
 
 type winConstraints struct {
 	minWidth, minHeight int32
@@ -117,6 +119,7 @@ func NewWindow(window Callbacks, opts *Options) error {
 		defer winMap.Delete(w.hwnd)
 		w.w = window
 		w.w.SetDriver(w)
+		w.w.Event(ViewEvent{HWND: uintptr(w.hwnd)})
 		w.Option(opts)
 		windows.ShowWindow(w.hwnd, windows.SW_SHOWDEFAULT)
 		windows.SetForegroundWindow(w.hwnd)
@@ -293,6 +296,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_MOUSEHWHEEL:
 		w.scrollEvent(wParam, lParam, true)
 	case windows.WM_DESTROY:
+		w.w.Event(ViewEvent{})
 		w.w.Event(system.DestroyEvent{})
 		if w.hdc != 0 {
 			windows.ReleaseDC(w.hdc)
