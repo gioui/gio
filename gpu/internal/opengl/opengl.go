@@ -33,8 +33,9 @@ type Backend struct {
 	alphaTriple textureTriple
 	srgbaTriple textureTriple
 
-	sRGBFBO *srgb.FBO
-	defFBO  gl.Framebuffer
+	sRGBFBO     *srgb.FBO
+	enabledSRGB bool
+	defFBO      gl.Framebuffer
 }
 
 // State tracking.
@@ -177,27 +178,33 @@ func (b *Backend) BeginFrame(clear bool, viewport image.Point) driver.Framebuffe
 	// Assume GL state is reset between frames.
 	b.state = glstate{}
 	b.defFBO = gl.Framebuffer(b.funcs.GetBinding(gl.FRAMEBUFFER_BINDING))
-	// Determine color encoding of the output framebuffer.
-	var fbEncoding int
-	if !b.defFBO.Valid() {
-		fbEncoding = b.funcs.GetFramebufferAttachmentParameteri(gl.FRAMEBUFFER, gl.BACK, gl.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING)
-	} else {
-		fbEncoding = b.funcs.GetFramebufferAttachmentParameteri(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING)
-	}
 	renderFBO := b.defFBO
-	if fbEncoding == gl.LINEAR {
-		if b.sRGBFBO == nil {
-			// Framebuffer is not in sRGB format. Emulate it.
-			sfbo, err := srgb.New(b.funcs)
-			if err != nil {
+	if b.gles {
+		// If the output framebuffer is not in the sRGB colorspace already, emulate it.
+		var fbEncoding int
+		if !b.defFBO.Valid() {
+			fbEncoding = b.funcs.GetFramebufferAttachmentParameteri(gl.FRAMEBUFFER, gl.BACK, gl.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING)
+		} else {
+			fbEncoding = b.funcs.GetFramebufferAttachmentParameteri(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING)
+		}
+		if fbEncoding == gl.LINEAR {
+			if b.sRGBFBO == nil {
+				sfbo, err := srgb.New(b.funcs)
+				if err != nil {
+					panic(err)
+				}
+				b.sRGBFBO = sfbo
+			}
+			if err := b.sRGBFBO.Refresh(viewport); err != nil {
 				panic(err)
 			}
-			b.sRGBFBO = sfbo
+			renderFBO = b.sRGBFBO.Framebuffer()
 		}
-		if err := b.sRGBFBO.Refresh(viewport); err != nil {
-			panic(err)
+	} else {
+		b.enabledSRGB = !b.funcs.IsEnabled(gl.FRAMEBUFFER_SRGB)
+		if b.enabledSRGB {
+			b.funcs.Enable(gl.FRAMEBUFFER_SRGB)
 		}
-		renderFBO = b.sRGBFBO.Framebuffer()
 	}
 	b.funcs.BindFramebuffer(gl.FRAMEBUFFER, renderFBO)
 	if b.sRGBFBO != nil && !clear {
@@ -220,6 +227,9 @@ func (b *Backend) EndFrame() {
 	}
 	b.SetBlend(false)
 	b.funcs.BindFramebuffer(gl.FRAMEBUFFER, b.defFBO)
+	if b.enabledSRGB {
+		b.funcs.Disable(gl.FRAMEBUFFER_SRGB)
+	}
 }
 
 func (b *Backend) Caps() driver.Caps {

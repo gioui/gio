@@ -83,6 +83,7 @@ typedef struct {
 	void (*glGetShaderInfoLog)(GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
 	const GLubyte *(*glGetString)(GLenum name);
 	GLint (*glGetUniformLocation)(GLuint program, const GLchar *name);
+	GLboolean (*glIsEnabled)(GLenum cap);
 	void (*glLinkProgram)(GLuint program);
 	void (*glPixelStorei)(GLenum pname, GLint param);
 	void (*glReadPixels)(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void *pixels);
@@ -317,6 +318,10 @@ static const GLubyte *glGetString(glFunctions *f, GLenum name) {
 
 static GLint glGetUniformLocation(glFunctions *f, GLuint program, const GLchar *name) {
 	return f->glGetUniformLocation(program, name);
+}
+
+static GLboolean glIsEnabled(glFunctions *f, GLenum cap) {
+	return f->glIsEnabled(cap);
 }
 
 static void glLinkProgram(glFunctions *f, GLuint program) {
@@ -588,6 +593,7 @@ func (f *Functions) load(forceES bool) error {
 	f.f.glGetShaderInfoLog = must("glGetShaderInfoLog")
 	f.f.glGetString = must("glGetString")
 	f.f.glGetUniformLocation = must("glGetUniformLocation")
+	f.f.glIsEnabled = must("glIsEnabled")
 	f.f.glLinkProgram = must("glLinkProgram")
 	f.f.glPixelStorei = must("glPixelStorei")
 	f.f.glReadPixels = must("glReadPixels")
@@ -978,6 +984,10 @@ func (f *Functions) GetUniformLocation(p Program, name string) Uniform {
 
 func (f *Functions) InvalidateFramebuffer(target, attachment Enum) {
 	C.glInvalidateFramebuffer(&f.f, C.GLenum(target), C.GLenum(attachment))
+}
+
+func (f *Functions) IsEnabled(cap Enum) bool {
+	return C.glIsEnabled(&f.f, C.GLenum(cap)) == TRUE
 }
 
 func (f *Functions) LinkProgram(p Program) {

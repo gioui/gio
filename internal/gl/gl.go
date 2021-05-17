@@ -36,6 +36,7 @@ const (
 	FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING = 0x8210
 	FRAMEBUFFER_BINDING                   = 0x8ca6
 	FRAMEBUFFER_COMPLETE                  = 0x8cd5
+	FRAMEBUFFER_SRGB                      = 0x8db9
 	HALF_FLOAT                            = 0x140b
 	HALF_FLOAT_OES                        = 0x8d61
 	INFO_LOG_LENGTH                       = 0x8B84

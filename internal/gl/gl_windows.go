@@ -70,6 +70,7 @@ var (
 	_glGetString                          = LibGLESv2.NewProc("glGetString")
 	_glGetUniformLocation                 = LibGLESv2.NewProc("glGetUniformLocation")
 	_glInvalidateFramebuffer              = LibGLESv2.NewProc("glInvalidateFramebuffer")
+	_glIsEnabled                          = LibGLESv2.NewProc("glIsEnabled")
 	_glLinkProgram                        = LibGLESv2.NewProc("glLinkProgram")
 	_glPixelStorei                        = LibGLESv2.NewProc("glPixelStorei")
 	_glReadPixels                         = LibGLESv2.NewProc("glReadPixels")
@@ -346,6 +347,10 @@ func (c *Functions) InvalidateFramebuffer(target, attachment Enum) {
 		return
 	}
 	syscall.Syscall(addr, 3, uintptr(target), 1, uintptr(unsafe.Pointer(&attachment)))
+}
+func (f *Functions) IsEnabled(cap Enum) bool {
+	u, _, _ := syscall.Syscall(_glIsEnabled.Addr(), 1, uintptr(cap), 0, 0)
+	return u == TRUE
 }
 func (c *Functions) LinkProgram(p Program) {
 	syscall.Syscall(_glLinkProgram.Addr(), 1, uintptr(p.V), 0, 0)

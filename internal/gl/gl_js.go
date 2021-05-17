@@ -276,6 +276,9 @@ func (f *Functions) InvalidateFramebuffer(target, attachment Enum) {
 		f.Ctx.Call("invalidateFramebuffer", int(target), f.int32Buf)
 	}
 }
+func (f *Functions) IsEnabled(cap Enum) bool {
+	return f.Ctx.Call("isEnabled", int(cap)).Truthy()
+}
 func (f *Functions) LinkProgram(p Program) {
 	f.Ctx.Call("linkProgram", js.Value(p))
 }

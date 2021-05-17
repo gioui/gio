@@ -84,5 +84,4 @@ void gio_prepareContext(void) {
 	GLuint defVBA;
 	glGenVertexArrays(1, &defVBA);
 	glBindVertexArray(defVBA);
-	glEnable(GL_FRAMEBUFFER_SRGB);
 }
