@@ -49,16 +49,15 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 		dx *= 10;
 		dy *= 10;
 	}
-	gio_onMouse((__bridge CFTypeRef)view, typ, [NSEvent pressedMouseButtons], p.x, p.y, dx, dy, [event timestamp], [event modifierFlags]);
+	// Origin is in the lower left corner. Convert to upper left.
+	CGFloat height = view.bounds.size.height;
+	gio_onMouse((__bridge CFTypeRef)view, typ, [NSEvent pressedMouseButtons], p.x, height - p.y, dx, dy, [event timestamp], [event modifierFlags]);
 }
 
 @interface GioView : NSView
 @end
 
 @implementation GioView
-- (BOOL)isFlipped {
-	return YES;
-}
 - (void)drawRect:(NSRect)r {
 	gio_onDraw((__bridge CFTypeRef)self);
 }
