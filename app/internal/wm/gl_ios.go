@@ -46,17 +46,26 @@ func newContext(w *window) (*context, error) {
 	if ctx == 0 {
 		return nil, fmt.Errorf("failed to create EAGLContext")
 	}
+	api := contextAPI()
+	f, err := gl.NewFunctions(api.Context)
+	if err != nil {
+		return nil, err
+	}
 	c := &context{
 		ctx:   ctx,
 		owner: w,
 		layer: C.CFTypeRef(w.contextLayer()),
-		c:     new(gl.Functions),
+		c:     f,
 	}
 	return c, nil
 }
 
-func (c *context) API() gpu.API {
+func contextAPI() gpu.OpenGL {
 	return gpu.OpenGL{}
+}
+
+func (c *context) API() gpu.API {
+	return contextAPI()
 }
 
 func (c *context) Release() {
