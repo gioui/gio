@@ -110,13 +110,11 @@ func NewWindow(window Callbacks, opts *Options) error {
 			cerr <- err
 			return
 		}
-		defer w.destroy()
 		cerr <- nil
 		winMap.Store(w.hwnd, w)
 		defer winMap.Delete(w.hwnd)
 		w.w = window
 		w.w.SetDriver(w)
-		defer w.w.Event(system.DestroyEvent{})
 		w.Option(opts)
 		windows.ShowWindow(w.hwnd, windows.SW_SHOWDEFAULT)
 		windows.SetForegroundWindow(w.hwnd)
@@ -293,6 +291,13 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_MOUSEHWHEEL:
 		w.scrollEvent(wParam, lParam, true)
 	case windows.WM_DESTROY:
+		w.w.Event(system.DestroyEvent{})
+		if w.hdc != 0 {
+			windows.ReleaseDC(w.hdc)
+			w.hdc = 0
+		}
+		// The system destroys the HWND for us.
+		w.hwnd = 0
 		windows.PostQuitMessage(0)
 	case windows.WM_PAINT:
 		w.draw(true)
@@ -473,17 +478,6 @@ func (w *window) draw(sync bool) {
 		},
 		Sync: sync,
 	})
-}
-
-func (w *window) destroy() {
-	if w.hdc != 0 {
-		windows.ReleaseDC(w.hdc)
-		w.hdc = 0
-	}
-	if w.hwnd != 0 {
-		windows.DestroyWindow(w.hwnd)
-		w.hwnd = 0
-	}
 }
 
 func (w *window) NewContext() (Context, error) {
