@@ -222,3 +222,9 @@ func windowSetCursor(from, to pointer.CursorName) pointer.CursorName {
 	})
 	return to
 }
+
+func (w *window) Wakeup() {
+	runOnMain(func() {
+		w.w.Event(WakeupEvent{})
+	})
+}

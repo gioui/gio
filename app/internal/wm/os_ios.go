@@ -224,21 +224,17 @@ func onTouch(last C.int, view, touchRef C.CFTypeRef, phase C.NSInteger, x, y C.C
 }
 
 func (w *window) ReadClipboard() {
-	runOnMain(func() {
-		content := nsstringToString(C.gio_readClipboard())
-		w.w.Event(clipboard.Event{Text: content})
-	})
+	content := nsstringToString(C.gio_readClipboard())
+	go w.w.Event(clipboard.Event{Text: content})
 }
 
 func (w *window) WriteClipboard(s string) {
 	u16 := utf16.Encode([]rune(s))
-	runOnMain(func() {
-		var chars *C.unichar
-		if len(u16) > 0 {
-			chars = (*C.unichar)(unsafe.Pointer(&u16[0]))
-		}
-		C.gio_writeClipboard(chars, C.NSUInteger(len(u16)))
-	})
+	var chars *C.unichar
+	if len(u16) > 0 {
+		chars = (*C.unichar)(unsafe.Pointer(&u16[0]))
+	}
+	C.gio_writeClipboard(chars, C.NSUInteger(len(u16)))
 }
 
 func (w *window) Option(opts *Options) {}
@@ -294,19 +290,11 @@ func (w *window) isVisible() bool {
 }
 
 func (w *window) ShowTextInput(show bool) {
-	v := w.view
-	if v == 0 {
-		return
+	if show {
+		C.gio_showTextInput(w.view)
+	} else {
+		C.gio_hideTextInput(w.view)
 	}
-	C.CFRetain(v)
-	runOnMain(func() {
-		defer C.CFRelease(v)
-		if show {
-			C.gio_showTextInput(w.view)
-		} else {
-			C.gio_hideTextInput(w.view)
-		}
-	})
 }
 
 // Close the window. Not implemented for iOS.

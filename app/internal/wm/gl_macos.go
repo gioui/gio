@@ -43,7 +43,7 @@ func newContext(w *window) (*context, error) {
 	}
 	// [NSOpenGLContext setView] must run on the main thread. Fortunately,
 	// newContext is only called during a [NSView draw] on the main thread.
-	w.w.Func(func() {
+	w.w.Run(func() {
 		C.gio_setContextView(ctx, view)
 	})
 	c := &context{

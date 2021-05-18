@@ -59,7 +59,6 @@ type window struct {
 	// placement saves the previous window position when in full screen mode.
 	placement *windows.WindowPlacement
 
-	mu        sync.Mutex
 	animating bool
 
 	minmax winConstraints
@@ -67,11 +66,7 @@ type window struct {
 	opts   *Options
 }
 
-const (
-	_WM_REDRAW = windows.WM_USER + iota
-	_WM_CURSOR
-	_WM_OPTION
-)
+const _WM_WAKEUP = windows.WM_USER + iota
 
 type gpuAPI struct {
 	priority    int
@@ -330,14 +325,12 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		}
 	case windows.WM_SETCURSOR:
 		w.cursorIn = (lParam & 0xffff) == windows.HTCLIENT
-		fallthrough
-	case _WM_CURSOR:
 		if w.cursorIn {
 			windows.SetCursor(w.cursor)
 			return windows.TRUE
 		}
-	case _WM_OPTION:
-		w.setOptions()
+	case _WM_WAKEUP:
+		w.w.Event(WakeupEvent{})
 	}
 
 	return windows.DefWindowProc(hwnd, msg, wParam, lParam)
@@ -422,9 +415,7 @@ func (w *window) loop() error {
 	msg := new(windows.Msg)
 loop:
 	for {
-		w.mu.Lock()
 		anim := w.animating
-		w.mu.Unlock()
 		if anim && !windows.PeekMessage(msg, 0, 0, 0, windows.PM_NOREMOVE) {
 			w.draw(false)
 			continue
@@ -443,16 +434,11 @@ loop:
 }
 
 func (w *window) SetAnimating(anim bool) {
-	w.mu.Lock()
 	w.animating = anim
-	w.mu.Unlock()
-	if anim {
-		w.postRedraw()
-	}
 }
 
-func (w *window) postRedraw() {
-	if err := windows.PostMessage(w.hwnd, _WM_REDRAW, 0, 0); err != nil {
+func (w *window) Wakeup() {
+	if err := windows.PostMessage(w.hwnd, _WM_WAKEUP, 0, 0); err != nil {
 		panic(err)
 	}
 }
@@ -530,18 +516,7 @@ func (w *window) readClipboard() error {
 }
 
 func (w *window) Option(opts *Options) {
-	w.mu.Lock()
 	w.opts = opts
-	w.mu.Unlock()
-	if err := windows.PostMessage(w.hwnd, _WM_OPTION, 0, 0); err != nil {
-		panic(err)
-	}
-}
-
-func (w *window) setOptions() {
-	w.mu.Lock()
-	opts := w.opts
-	w.mu.Unlock()
 	if o := opts.Size; o != nil {
 		dpi := windows.GetSystemDPI()
 		cfg := configForDPI(dpi)
@@ -658,8 +633,8 @@ func (w *window) SetCursor(name pointer.CursorName) {
 		c = resources.cursor
 	}
 	w.cursor = c
-	if err := windows.PostMessage(w.hwnd, _WM_CURSOR, 0, 0); err != nil {
-		panic(err)
+	if w.cursorIn {
+		windows.SetCursor(w.cursor)
 	}
 }
 

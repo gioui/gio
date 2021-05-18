@@ -122,60 +122,54 @@ func (w *window) contextView() C.CFTypeRef {
 }
 
 func (w *window) ReadClipboard() {
-	runOnMain(func() {
-		content := nsstringToString(C.gio_readClipboard())
-		w.w.Event(clipboard.Event{Text: content})
-	})
+	content := nsstringToString(C.gio_readClipboard())
+	go w.w.Event(clipboard.Event{Text: content})
 }
 
 func (w *window) WriteClipboard(s string) {
 	u16 := utf16.Encode([]rune(s))
-	runOnMain(func() {
-		var chars *C.unichar
-		if len(u16) > 0 {
-			chars = (*C.unichar)(unsafe.Pointer(&u16[0]))
-		}
-		C.gio_writeClipboard(chars, C.NSUInteger(len(u16)))
-	})
+	var chars *C.unichar
+	if len(u16) > 0 {
+		chars = (*C.unichar)(unsafe.Pointer(&u16[0]))
+	}
+	C.gio_writeClipboard(chars, C.NSUInteger(len(u16)))
 }
 
 func (w *window) Option(opts *Options) {
-	w.runOnMain(func() {
-		screenScale := float32(C.gio_getScreenBackingScale())
-		cfg := configFor(screenScale)
-		val := func(v unit.Value) float32 {
-			return float32(cfg.Px(v)) / screenScale
+	screenScale := float32(C.gio_getScreenBackingScale())
+	cfg := configFor(screenScale)
+	val := func(v unit.Value) float32 {
+		return float32(cfg.Px(v)) / screenScale
+	}
+	if o := opts.Size; o != nil {
+		width := val(o.Width)
+		height := val(o.Height)
+		if width > 0 || height > 0 {
+			C.gio_setSize(w.window, C.CGFloat(width), C.CGFloat(height))
 		}
-		if o := opts.Size; o != nil {
-			width := val(o.Width)
-			height := val(o.Height)
-			if width > 0 || height > 0 {
-				C.gio_setSize(w.window, C.CGFloat(width), C.CGFloat(height))
-			}
+	}
+	if o := opts.MinSize; o != nil {
+		width := val(o.Width)
+		height := val(o.Height)
+		if width > 0 || height > 0 {
+			C.gio_setMinSize(w.window, C.CGFloat(width), C.CGFloat(height))
 		}
-		if o := opts.MinSize; o != nil {
-			width := val(o.Width)
-			height := val(o.Height)
-			if width > 0 || height > 0 {
-				C.gio_setMinSize(w.window, C.CGFloat(width), C.CGFloat(height))
-			}
+	}
+	if o := opts.MaxSize; o != nil {
+		width := val(o.Width)
+		height := val(o.Height)
+		if width > 0 || height > 0 {
+			C.gio_setMaxSize(w.window, C.CGFloat(width), C.CGFloat(height))
 		}
-		if o := opts.MaxSize; o != nil {
-			width := val(o.Width)
-			height := val(o.Height)
-			if width > 0 || height > 0 {
-				C.gio_setMaxSize(w.window, C.CGFloat(width), C.CGFloat(height))
-			}
-		}
-		if o := opts.Title; o != nil {
-			title := C.CString(*o)
-			defer C.free(unsafe.Pointer(title))
-			C.gio_setTitle(w.window, title)
-		}
-		if o := opts.WindowMode; o != nil {
-			w.SetWindowMode(*o)
-		}
-	})
+	}
+	if o := opts.Title; o != nil {
+		title := C.CString(*o)
+		defer C.free(unsafe.Pointer(title))
+		C.gio_setTitle(w.window, title)
+	}
+	if o := opts.WindowMode; o != nil {
+		w.SetWindowMode(*o)
+	}
 }
 
 func (w *window) SetWindowMode(mode WindowMode) {
@@ -212,9 +206,7 @@ func (w *window) runOnMain(f func()) {
 }
 
 func (w *window) Close() {
-	w.runOnMain(func() {
-		C.gio_close(w.window)
-	})
+	C.gio_close(w.window)
 }
 
 func (w *window) setStage(stage system.Stage) {

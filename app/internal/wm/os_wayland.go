@@ -179,9 +179,7 @@ type window struct {
 	dead              bool
 	lastFrameCallback *C.struct_wl_callback
 
-	mu        sync.Mutex
 	animating bool
-	opts      *Options
 	needAck   bool
 	// The most recent configure serial waiting to be ack'ed.
 	serial   C.uint32_t
@@ -189,10 +187,8 @@ type window struct {
 	height   int
 	newScale bool
 	scale    int
-	// readClipboard tracks whether a ClipboardEvent is requested.
-	readClipboard bool
-	// writeClipboard is set whenever a clipboard write is requested.
-	writeClipboard *string
+
+	wakeups chan struct{}
 }
 
 type poller struct {
@@ -319,6 +315,7 @@ func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
 		newScale: scale != 1,
 		ppdp:     ppdp,
 		ppsp:     ppdp,
+		wakeups:  make(chan struct{}, 1),
 	}
 	w.surf = C.wl_compositor_create_surface(d.compositor)
 	if w.surf == nil {
@@ -473,10 +470,8 @@ func gio_onSeatName(data unsafe.Pointer, seat *C.struct_wl_seat, name *C.char) {
 //export gio_onXdgSurfaceConfigure
 func gio_onXdgSurfaceConfigure(data unsafe.Pointer, wmSurf *C.struct_xdg_surface, serial C.uint32_t) {
 	w := callbackLoad(data).(*window)
-	w.mu.Lock()
 	w.serial = serial
 	w.needAck = true
-	w.mu.Unlock()
 	w.setStage(system.StageRunning)
 	w.draw(true)
 }
@@ -491,8 +486,6 @@ func gio_onToplevelClose(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel) {
 func gio_onToplevelConfigure(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel, width, height C.int32_t, states *C.struct_wl_array) {
 	w := callbackLoad(data).(*window)
 	if width != 0 && height != 0 {
-		w.mu.Lock()
-		defer w.mu.Unlock()
 		w.width = int(width)
 		w.height = int(height)
 		w.updateOpaqueRegion()
@@ -868,8 +861,6 @@ func (w *window) flushFling() {
 	invDist := 1 / vel
 	w.fling.dir.X = estx.Velocity * invDist
 	w.fling.dir.Y = esty.Velocity * invDist
-	// Wake up the window loop.
-	w.disp.wakeup()
 }
 
 //export gio_onPointerAxisSource
@@ -897,24 +888,26 @@ func gio_onPointerAxisDiscrete(data unsafe.Pointer, p *C.struct_wl_pointer, axis
 }
 
 func (w *window) ReadClipboard() {
-	w.mu.Lock()
-	w.readClipboard = true
-	w.mu.Unlock()
-	w.disp.wakeup()
+	r, err := w.disp.readClipboard()
+	// Send empty responses on unavailable clipboards or errors.
+	if r == nil || err != nil {
+		w.w.Event(clipboard.Event{})
+		return
+	}
+	// Don't let slow clipboard transfers block event loop.
+	go func() {
+		defer r.Close()
+		data, _ := ioutil.ReadAll(r)
+		w.w.Event(clipboard.Event{Text: string(data)})
+	}()
 }
 
 func (w *window) WriteClipboard(s string) {
-	w.mu.Lock()
-	w.writeClipboard = &s
-	w.mu.Unlock()
-	w.disp.wakeup()
+	w.disp.writeClipboard([]byte(s))
 }
 
 func (w *window) Option(opts *Options) {
-	w.mu.Lock()
-	w.opts = opts
-	w.mu.Unlock()
-	w.disp.wakeup()
+	w.setOptions(opts)
 }
 
 func (w *window) setOptions(opts *Options) {
@@ -1138,46 +1131,19 @@ func (w *window) loop() error {
 		if err := w.disp.dispatch(&p); err != nil {
 			return err
 		}
+		select {
+		case <-w.wakeups:
+			w.w.Event(WakeupEvent{})
+		default:
+		}
 		if w.dead {
 			w.w.Event(system.DestroyEvent{})
 			break
 		}
-		w.process()
+		// pass false to skip unnecessary drawing.
+		w.draw(false)
 	}
 	return nil
-}
-
-func (w *window) process() {
-	w.mu.Lock()
-	readClipboard := w.readClipboard
-	writeClipboard := w.writeClipboard
-	opts := w.opts
-	w.readClipboard = false
-	w.writeClipboard = nil
-	w.opts = nil
-	w.mu.Unlock()
-	if readClipboard {
-		r, err := w.disp.readClipboard()
-		// Send empty responses on unavailable clipboards or errors.
-		if r == nil || err != nil {
-			w.w.Event(clipboard.Event{})
-			return
-		}
-		// Don't let slow clipboard transfers block event loop.
-		go func() {
-			defer r.Close()
-			data, _ := ioutil.ReadAll(r)
-			w.w.Event(clipboard.Event{Text: string(data)})
-		}()
-	}
-	if writeClipboard != nil {
-		w.disp.writeClipboard([]byte(*writeClipboard))
-	}
-	if opts != nil {
-		w.setOptions(opts)
-	}
-	// pass false to skip unnecessary drawing.
-	w.draw(false)
 }
 
 func (d *wlDisplay) dispatch(p *poller) error {
@@ -1222,11 +1188,16 @@ func (d *wlDisplay) dispatch(p *poller) error {
 	return nil
 }
 
-func (w *window) SetAnimating(anim bool) {
-	w.mu.Lock()
-	w.animating = anim
-	w.mu.Unlock()
+func (w *window) Wakeup() {
+	select {
+	case w.wakeups <- struct{}{}:
+	default:
+	}
 	w.disp.wakeup()
+}
+
+func (w *window) SetAnimating(anim bool) {
+	w.animating = anim
 }
 
 // Wakeup wakes up the event loop through the notification pipe.
@@ -1415,12 +1386,10 @@ func (w *window) updateOutputs() {
 			}
 		}
 	}
-	w.mu.Lock()
 	if found && scale != w.scale {
 		w.scale = scale
 		w.newScale = true
 	}
-	w.mu.Unlock()
 	if !found {
 		w.setStage(system.StagePaused)
 	} else {
@@ -1439,10 +1408,8 @@ func (w *window) config() (int, int, unit.Metric) {
 
 func (w *window) draw(sync bool) {
 	w.flushScroll()
-	w.mu.Lock()
 	anim := w.animating || w.fling.anim.Active()
 	dead := w.dead
-	w.mu.Unlock()
 	if dead || (!anim && !sync) {
 		return
 	}

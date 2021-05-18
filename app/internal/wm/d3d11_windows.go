@@ -72,7 +72,10 @@ func (c *d3d11Context) Present() error {
 }
 
 func (c *d3d11Context) MakeCurrent() error {
-	_, width, height := c.win.HWND()
+	var width, height int
+	c.win.w.Run(func() {
+		_, width, height = c.win.HWND()
+	})
 	if c.renderTarget != nil && width == c.width && height == c.height {
 		c.ctx.OMSetRenderTargets(c.renderTarget, c.depthView)
 		return nil

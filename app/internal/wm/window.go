@@ -32,6 +32,8 @@ type Options struct {
 	CustomRenderer  bool
 }
 
+type WakeupEvent struct{}
+
 type WindowMode uint8
 
 const (
@@ -59,7 +61,7 @@ type Callbacks interface {
 	// Func runs a function during an Event. This is required for platforms
 	// that require coordination between the rendering goroutine and the system
 	// main thread.
-	Func(f func())
+	Run(f func())
 }
 
 type Context interface {
@@ -99,6 +101,8 @@ type Driver interface {
 
 	// Close the window.
 	Close()
+	// Wakeup wakes up the event loop and sends a WakeupEvent.
+	Wakeup()
 }
 
 type windowRendezvous struct {
@@ -137,3 +141,5 @@ func newWindowRendezvous() *windowRendezvous {
 	}()
 	return wr
 }
+
+func (_ WakeupEvent) ImplementsEvent() {}

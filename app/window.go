@@ -24,7 +24,7 @@ import (
 // WindowOption configures a wm.
 type Option func(opts *wm.Options)
 
-// Window represents an operating system wm.
+// Window represents an operating system window.
 type Window struct {
 	driver wm.Driver
 	ctx    wm.Context
@@ -33,6 +33,9 @@ type Window struct {
 	// driverFuncs is a channel of functions to run when
 	// the Window has a valid driver.
 	driverFuncs chan func()
+	// wakeups wakes up the native event loop to send a
+	// wm.WakeupEvent that flushes driverFuncs.
+	wakeups chan struct{}
 
 	out         chan event.Event
 	in          chan event.Event
@@ -41,7 +44,8 @@ type Window struct {
 	frames      chan *op.Ops
 	frameAck    chan struct{}
 	// dead is closed when the window is destroyed.
-	dead chan struct{}
+	dead          chan struct{}
+	notifyAnimate chan struct{}
 
 	stage        system.Stage
 	animating    bool
@@ -58,8 +62,7 @@ type Window struct {
 }
 
 type callbacks struct {
-	w     *Window
-	funcs chan func()
+	w *Window
 }
 
 // queue is an event.Queue implementation that distributes system events
@@ -98,17 +101,18 @@ func NewWindow(options ...Option) *Window {
 	}
 
 	w := &Window{
-		in:          make(chan event.Event),
-		out:         make(chan event.Event),
-		ack:         make(chan struct{}),
-		invalidates: make(chan struct{}, 1),
-		frames:      make(chan *op.Ops),
-		frameAck:    make(chan struct{}),
-		driverFuncs: make(chan func()),
-		dead:        make(chan struct{}),
-		nocontext:   opts.CustomRenderer,
+		in:            make(chan event.Event),
+		out:           make(chan event.Event),
+		ack:           make(chan struct{}),
+		invalidates:   make(chan struct{}, 1),
+		frames:        make(chan *op.Ops),
+		frameAck:      make(chan struct{}),
+		driverFuncs:   make(chan func(), 1),
+		wakeups:       make(chan struct{}, 1),
+		dead:          make(chan struct{}),
+		notifyAnimate: make(chan struct{}, 1),
+		nocontext:     opts.CustomRenderer,
 	}
-	w.callbacks.funcs = make(chan func())
 	w.callbacks.w = w
 	go w.run(opts)
 	return w
@@ -177,9 +181,9 @@ func (w *Window) processFrame(frameStart time.Time, size image.Point, frame *op.
 	w.queue.q.Frame(frame)
 	switch w.queue.q.TextInputState() {
 	case router.TextInputOpen:
-		w.driver.ShowTextInput(true)
+		go w.Run(func() { w.driver.ShowTextInput(true) })
 	case router.TextInputClose:
-		w.driver.ShowTextInput(false)
+		go w.Run(func() { w.driver.ShowTextInput(false) })
 	}
 	if txt, ok := w.queue.q.WriteClipboard(); ok {
 		go w.WriteClipboard(txt)
@@ -226,7 +230,7 @@ func (w *Window) Invalidate() {
 
 // Option applies the options to the window.
 func (w *Window) Option(opts ...Option) {
-	go w.driverDo(func() {
+	go w.Run(func() {
 		o := new(wm.Options)
 		for _, opt := range opts {
 			opt(o)
@@ -239,21 +243,21 @@ func (w *Window) Option(opts ...Option) {
 // of a clipboard.Event. Multiple reads may be coalesced
 // to a single event.
 func (w *Window) ReadClipboard() {
-	go w.driverDo(func() {
+	go w.Run(func() {
 		w.driver.ReadClipboard()
 	})
 }
 
 // WriteClipboard writes a string to the clipboard.
 func (w *Window) WriteClipboard(s string) {
-	go w.driverDo(func() {
+	go w.Run(func() {
 		w.driver.WriteClipboard(s)
 	})
 }
 
 // SetCursorName changes the current window cursor to name.
 func (w *Window) SetCursorName(name pointer.CursorName) {
-	go w.driverDo(func() {
+	go w.Run(func() {
 		w.driver.SetCursor(name)
 	})
 }
@@ -264,16 +268,32 @@ func (w *Window) SetCursorName(name pointer.CursorName) {
 // Currently, only macOS, Windows and X11 drivers implement this functionality,
 // all others are stubbed.
 func (w *Window) Close() {
-	go w.driverDo(func() {
+	go w.Run(func() {
 		w.driver.Close()
 	})
 }
 
-// driverDo waits for the window to have a valid driver attached and calls f.
-// It does nothing if the if the window was destroyed while waiting.
-func (w *Window) driverDo(f func()) {
+// Run f in the same thread as the native window event loop, and wait for f to
+// return or the window to close. Run is guaranteed not to deadlock if it is
+// invoked during the handling of a ViewEvent, system.FrameEvent,
+// system.StageEvent; call Run in a separate goroutine to avoid deadlock in all
+// other cases.
+//
+// Note that most programs should not call Run; configuring a Window with
+// CustomRenderer is a notable exception.
+func (w *Window) Run(f func()) {
+	done := make(chan struct{})
+	wrapper := func() {
+		f()
+		close(done)
+	}
 	select {
-	case w.driverFuncs <- f:
+	case w.driverFuncs <- wrapper:
+		w.wakeup()
+		select {
+		case <-done:
+		case <-w.dead:
+		}
 	case <-w.dead:
 	}
 }
@@ -293,7 +313,18 @@ func (w *Window) updateAnimation() {
 	}
 	if animate != w.animating {
 		w.animating = animate
-		w.driver.SetAnimating(animate)
+		select {
+		case w.notifyAnimate <- struct{}{}:
+			w.wakeup()
+		default:
+		}
+	}
+}
+
+func (w *Window) wakeup() {
+	select {
+	case w.wakeups <- struct{}{}:
+	default:
 	}
 }
 
@@ -311,20 +342,39 @@ func (c *callbacks) SetDriver(d wm.Driver) {
 func (c *callbacks) Event(e event.Event) {
 	select {
 	case c.w.in <- e:
-		for {
-			select {
-			case <-c.w.ack:
-				return
-			case f := <-c.funcs:
-				f()
-			}
-		}
+		c.w.runFuncs()
 	case <-c.w.dead:
 	}
 }
 
-func (c *callbacks) Func(f func()) {
-	c.funcs <- f
+func (w *Window) runFuncs() {
+	// Flush pending runnnables.
+loop:
+	for {
+		select {
+		case <-w.notifyAnimate:
+			w.driver.SetAnimating(w.animating)
+		case f := <-w.driverFuncs:
+			f()
+		default:
+			break loop
+		}
+	}
+	// Wait for ack while running incoming runnables.
+	for {
+		select {
+		case <-w.notifyAnimate:
+			w.driver.SetAnimating(w.animating)
+		case f := <-w.driverFuncs:
+			f()
+		case <-w.ack:
+			return
+		}
+	}
+}
+
+func (c *callbacks) Run(f func()) {
+	c.w.Run(f)
 }
 
 func (w *Window) waitAck() {
@@ -383,9 +433,9 @@ func (w *Window) run(opts *wm.Options) {
 		return
 	}
 	for {
-		var driverFuncs chan func()
+		var wakeups chan struct{}
 		if w.driver != nil {
-			driverFuncs = w.driverFuncs
+			wakeups = w.wakeups
 		}
 		var timer <-chan time.Time
 		if w.delayedDraw != nil {
@@ -398,8 +448,8 @@ func (w *Window) run(opts *wm.Options) {
 		case <-w.invalidates:
 			w.setNextFrame(time.Time{})
 			w.updateAnimation()
-		case f := <-driverFuncs:
-			f()
+		case <-wakeups:
+			w.driver.Wakeup()
 		case e := <-w.in:
 			switch e2 := e.(type) {
 			case system.StageEvent:
@@ -454,6 +504,10 @@ func (w *Window) run(opts *wm.Options) {
 				w.out <- e2
 				w.ack <- struct{}{}
 				return
+			case ViewEvent:
+				w.out <- e2
+				w.waitAck()
+			case wm.WakeupEvent:
 			case event.Event:
 				if w.queue.q.Queue(e2) {
 					w.setNextFrame(time.Time{})

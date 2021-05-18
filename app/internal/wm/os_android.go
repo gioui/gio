@@ -42,7 +42,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"gioui.org/internal/f32color"
 	"image"
 	"image/color"
 	"reflect"
@@ -52,6 +51,8 @@ import (
 	"time"
 	"unicode/utf16"
 	"unsafe"
+
+	"gioui.org/internal/f32color"
 
 	"gioui.org/f32"
 	"gioui.org/io/clipboard"
@@ -70,24 +71,11 @@ type window struct {
 	fontScale float32
 	insets    system.Insets
 
-	stage   system.Stage
-	started bool
-
-	state, newState windowState
-
-	// mu protects the fields following it.
-	mu        sync.Mutex
-	win       *C.ANativeWindow
+	stage     system.Stage
+	started   bool
 	animating bool
-}
 
-// windowState tracks the View or Activity specific state lost when Android
-// re-creates our Activity.
-type windowState struct {
-	cursor          *pointer.CursorName
-	orientation     *Orientation
-	navigationColor *color.NRGBA
-	statusColor     *color.NRGBA
+	win *C.ANativeWindow
 }
 
 // gioView hold cached JNI methods for GioView.
@@ -247,7 +235,6 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 	views[handle] = w
 	w.loadConfig(env, class)
 	w.Option(wopts.opts)
-	applyStateDiff(env, view, windowState{}, w.state)
 	w.setStage(system.StagePaused)
 	w.callbacks.Event(ViewEvent{View: uintptr(view)})
 	return handle
@@ -274,7 +261,7 @@ func Java_org_gioui_GioView_onStopView(env *C.JNIEnv, class C.jclass, handle C.j
 func Java_org_gioui_GioView_onStartView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := views[handle]
 	w.started = true
-	if w.aNativeWindow() != nil {
+	if w.win != nil {
 		w.setVisible()
 	}
 }
@@ -282,18 +269,14 @@ func Java_org_gioui_GioView_onStartView(env *C.JNIEnv, class C.jclass, handle C.
 //export Java_org_gioui_GioView_onSurfaceDestroyed
 func Java_org_gioui_GioView_onSurfaceDestroyed(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := views[handle]
-	w.mu.Lock()
 	w.win = nil
-	w.mu.Unlock()
 	w.setStage(system.StagePaused)
 }
 
 //export Java_org_gioui_GioView_onSurfaceChanged
 func Java_org_gioui_GioView_onSurfaceChanged(env *C.JNIEnv, class C.jclass, handle C.jlong, surf C.jobject) {
 	w := views[handle]
-	w.mu.Lock()
 	w.win = C.ANativeWindow_fromSurface(env, surf)
-	w.mu.Unlock()
 	if w.started {
 		w.setVisible()
 	}
@@ -323,9 +306,7 @@ func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view 
 	if w.stage < system.StageRunning {
 		return
 	}
-	w.mu.Lock()
 	anim := w.animating
-	w.mu.Unlock()
 	if anim {
 		runInJVM(javaVM(), func(env *C.JNIEnv) {
 			callVoidMethod(env, w.view, gioView.postFrameCallback)
@@ -348,7 +329,7 @@ func Java_org_gioui_GioView_onBack(env *C.JNIEnv, class C.jclass, view C.jlong) 
 //export Java_org_gioui_GioView_onFocusChange
 func Java_org_gioui_GioView_onFocusChange(env *C.JNIEnv, class C.jclass, view C.jlong, focus C.jboolean) {
 	w := views[view]
-	w.callbacks.Event(key.FocusEvent{Focus: focus == C.JNI_TRUE})
+	go w.callbacks.Event(key.FocusEvent{Focus: focus == C.JNI_TRUE})
 }
 
 //export Java_org_gioui_GioView_onWindowInsets
@@ -366,8 +347,7 @@ func Java_org_gioui_GioView_onWindowInsets(env *C.JNIEnv, class C.jclass, view C
 }
 
 func (w *window) setVisible() {
-	win := w.aNativeWindow()
-	width, height := C.ANativeWindow_getWidth(win), C.ANativeWindow_getHeight(win)
+	width, height := C.ANativeWindow_getWidth(w.win), C.ANativeWindow_getHeight(w.win)
 	if width == 0 || height == 0 {
 		return
 	}
@@ -384,22 +364,15 @@ func (w *window) setStage(stage system.Stage) {
 }
 
 func (w *window) nativeWindow(visID int) (*C.ANativeWindow, int, int) {
-	win := w.aNativeWindow()
 	var width, height int
-	if win != nil {
-		if C.ANativeWindow_setBuffersGeometry(win, 0, 0, C.int32_t(visID)) != 0 {
+	if w.win != nil {
+		if C.ANativeWindow_setBuffersGeometry(w.win, 0, 0, C.int32_t(visID)) != 0 {
 			panic(errors.New("ANativeWindow_setBuffersGeometry failed"))
 		}
-		w, h := C.ANativeWindow_getWidth(win), C.ANativeWindow_getHeight(win)
+		w, h := C.ANativeWindow_getWidth(w.win), C.ANativeWindow_getHeight(w.win)
 		width, height = int(w), int(h)
 	}
-	return win, width, height
-}
-
-func (w *window) aNativeWindow() *C.ANativeWindow {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.win
+	return w.win, width, height
 }
 
 func (w *window) loadConfig(env *C.JNIEnv, class C.jclass) {
@@ -417,23 +390,16 @@ func (w *window) loadConfig(env *C.JNIEnv, class C.jclass) {
 }
 
 func (w *window) SetAnimating(anim bool) {
-	w.mu.Lock()
 	w.animating = anim
-	w.mu.Unlock()
 	if anim {
-		runOnMain(func(env *C.JNIEnv) {
-			if w.view == 0 {
-				// View was destroyed while switching to main thread.
-				return
-			}
+		runInJVM(javaVM(), func(env *C.JNIEnv) {
 			callVoidMethod(env, w.view, gioView.postFrameCallback)
 		})
 	}
 }
 
 func (w *window) draw(sync bool) {
-	win := w.aNativeWindow()
-	width, height := C.ANativeWindow_getWidth(win), C.ANativeWindow_getHeight(win)
+	width, height := C.ANativeWindow_getWidth(w.win), C.ANativeWindow_getHeight(w.win)
 	if width == 0 || height == 0 {
 		return
 	}
@@ -567,10 +533,7 @@ func Java_org_gioui_GioView_onTouchEvent(env *C.JNIEnv, class C.jclass, handle C
 }
 
 func (w *window) ShowTextInput(show bool) {
-	runOnMain(func(env *C.JNIEnv) {
-		if w.view == 0 {
-			return
-		}
+	runInJVM(javaVM(), func(env *C.JNIEnv) {
 		if show {
 			callVoidMethod(env, w.view, gioView.showTextInput)
 		} else {
@@ -669,7 +632,7 @@ func NewWindow(window Callbacks, opts *Options) error {
 }
 
 func (w *window) WriteClipboard(s string) {
-	runOnMain(func(env *C.JNIEnv) {
+	runInJVM(javaVM(), func(env *C.JNIEnv) {
 		jstr := javaString(env, s)
 		callStaticVoidMethod(env, android.gioCls, android.mwriteClipboard,
 			jvalue(android.appCtx), jvalue(jstr))
@@ -677,69 +640,41 @@ func (w *window) WriteClipboard(s string) {
 }
 
 func (w *window) ReadClipboard() {
-	runOnMain(func(env *C.JNIEnv) {
+	runInJVM(javaVM(), func(env *C.JNIEnv) {
 		c, err := callStaticObjectMethod(env, android.gioCls, android.mreadClipboard,
 			jvalue(android.appCtx))
 		if err != nil {
 			return
 		}
 		content := goString(env, C.jstring(c))
-		w.callbacks.Event(clipboard.Event{Text: content})
+		go w.callbacks.Event(clipboard.Event{Text: content})
 	})
 }
 
 func (w *window) Option(opts *Options) {
-	if o := opts.Orientation; o != nil {
-		w.setState(func(state *windowState) {
-			state.orientation = o
-		})
-	}
-	if o := opts.NavigationColor; o != nil {
-		w.setState(func(state *windowState) {
-			state.navigationColor = o
-		})
-	}
-	if o := opts.StatusColor; o != nil {
-		w.setState(func(state *windowState) {
-			state.statusColor = o
-		})
-	}
+	runInJVM(javaVM(), func(env *C.JNIEnv) {
+		if o := opts.Orientation; o != nil {
+			setOrientation(env, w.view, *o)
+		}
+		if o := opts.NavigationColor; o != nil {
+			setNavigationColor(env, w.view, *o)
+		}
+		if o := opts.StatusColor; o != nil {
+			setStatusColor(env, w.view, *o)
+		}
+	})
 }
 
 func (w *window) SetCursor(name pointer.CursorName) {
-	w.setState(func(state *windowState) {
-		state.cursor = &name
+	runInJVM(javaVM(), func(env *C.JNIEnv) {
+		setCursor(env, w.view, name)
 	})
 }
 
-// setState adjust the window state on the main thread.
-func (w *window) setState(f func(state *windowState)) {
+func (w *window) Wakeup() {
 	runOnMain(func(env *C.JNIEnv) {
-		f(&w.newState)
-		if w.view == 0 {
-			// No View attached. The state will be applied at next onCreateView.
-			return
-		}
-		old := w.state
-		state := w.newState
-		applyStateDiff(env, w.view, old, state)
-		w.state = state
+		w.callbacks.Event(WakeupEvent{})
 	})
-}
-
-func applyStateDiff(env *C.JNIEnv, view C.jobject, old, state windowState) {
-	if state.cursor != nil && old.cursor != state.cursor {
-		setCursor(env, view, *state.cursor)
-	}
-	if state.orientation != nil && old.orientation != state.orientation {
-		setOrientation(env, view, *state.orientation)
-	}
-	if state.navigationColor != nil && old.navigationColor != state.navigationColor {
-		setNavigationColor(env, view, *state.navigationColor)
-	}
-	if state.statusColor != nil && old.statusColor != state.statusColor {
-		setStatusColor(env, view, *state.statusColor)
-	}
 }
 
 func setCursor(env *C.JNIEnv, view C.jobject, name pointer.CursorName) {

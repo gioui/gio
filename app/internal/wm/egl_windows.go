@@ -3,6 +3,8 @@
 package wm
 
 import (
+	"golang.org/x/sys/windows"
+
 	"gioui.org/internal/egl"
 )
 
@@ -34,7 +36,13 @@ func (c *glContext) Release() {
 
 func (c *glContext) MakeCurrent() error {
 	c.Context.ReleaseSurface()
-	win, width, height := c.win.HWND()
+	var (
+		win           windows.Handle
+		width, height int
+	)
+	c.win.w.Run(func() {
+		win, width, height = c.win.HWND()
+	})
 	eglSurf := egl.NativeWindowType(win)
 	if err := c.Context.CreateSurface(eglSurf, width, height); err != nil {
 		return err

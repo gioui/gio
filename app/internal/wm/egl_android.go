@@ -3,6 +3,7 @@
 package wm
 
 /*
+#include <android/native_window_jni.h>
 #include <EGL/egl.h>
 */
 import "C"
@@ -35,7 +36,15 @@ func (c *context) Release() {
 
 func (c *context) MakeCurrent() error {
 	c.Context.ReleaseSurface()
-	win, width, height := c.win.nativeWindow(c.Context.VisualID())
+	var (
+		win           *C.ANativeWindow
+		width, height int
+	)
+	// Run on main thread. Deadlock is avoided because MakeCurrent is only
+	// called during a FrameEvent.
+	c.win.callbacks.Run(func() {
+		win, width, height = c.win.nativeWindow(c.Context.VisualID())
+	})
 	if win == nil {
 		return nil
 	}

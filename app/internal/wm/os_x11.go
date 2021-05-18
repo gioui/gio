@@ -87,59 +87,34 @@ type x11Window struct {
 	}
 	dead bool
 
-	mu        sync.Mutex
 	animating bool
-	opts      *Options
 
 	pointerBtns pointer.Buttons
 
 	clipboard struct {
-		read    bool
-		write   *string
 		content []byte
 	}
 	cursor pointer.CursorName
 	mode   WindowMode
+
+	wakeups chan struct{}
 }
 
 func (w *x11Window) SetAnimating(anim bool) {
-	w.mu.Lock()
 	w.animating = anim
-	w.mu.Unlock()
-	if anim {
-		w.wakeup()
-	}
 }
 
 func (w *x11Window) ReadClipboard() {
-	w.mu.Lock()
-	w.clipboard.read = true
-	w.mu.Unlock()
-	w.wakeup()
+	C.XDeleteProperty(w.x, w.xw, w.atoms.clipboardContent)
+	C.XConvertSelection(w.x, w.atoms.clipboard, w.atoms.utf8string, w.atoms.clipboardContent, w.xw, C.CurrentTime)
 }
 
 func (w *x11Window) WriteClipboard(s string) {
-	w.mu.Lock()
-	w.clipboard.write = &s
-	w.mu.Unlock()
-	w.wakeup()
+	w.clipboard.content = []byte(s)
+	C.XSetSelectionOwner(w.x, w.atoms.clipboard, w.xw, C.CurrentTime)
 }
 
 func (w *x11Window) Option(opts *Options) {
-	w.mu.Lock()
-	w.opts = opts
-	w.mu.Unlock()
-	w.wakeup()
-}
-
-func (w *x11Window) setOptions() {
-	w.mu.Lock()
-	opts := w.opts
-	w.opts = nil
-	w.mu.Unlock()
-	if opts == nil {
-		return
-	}
 	var shints C.XSizeHints
 	if o := opts.MinSize; o != nil {
 		shints.min_width = C.int(w.cfg.Px(o.Width))
@@ -250,9 +225,6 @@ func (w *x11Window) ShowTextInput(show bool) {}
 
 // Close the window.
 func (w *x11Window) Close() {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
 	var xev C.XEvent
 	ev := (*C.XClientMessageEvent)(unsafe.Pointer(&xev))
 	*ev = C.XClientMessageEvent{
@@ -270,7 +242,11 @@ func (w *x11Window) Close() {
 
 var x11OneByte = make([]byte, 1)
 
-func (w *x11Window) wakeup() {
+func (w *x11Window) Wakeup() {
+	select {
+	case w.wakeups <- struct{}{}:
+	default:
+	}
 	if _, err := syscall.Write(w.notify.write, x11OneByte); err != nil && err != syscall.EAGAIN {
 		panic(fmt.Errorf("failed to write to pipe: %v", err))
 	}
@@ -312,9 +288,7 @@ loop:
 		// This fixes an issue on Xephyr where on startup XPending() > 0 but
 		// poll will still block. This also prevents no-op calls to poll.
 		if syn = h.handleEvents(); !syn {
-			w.mu.Lock()
 			anim = w.animating
-			w.mu.Unlock()
 			if !anim {
 				// Clear poll events.
 				*xEvents = 0
@@ -333,7 +307,6 @@ loop:
 				}
 			}
 		}
-		w.setOptions()
 		// Clear notifications.
 		for {
 			_, err := syscall.Read(w.notify.read, buf)
@@ -343,6 +316,11 @@ loop:
 			if err != nil {
 				panic(fmt.Errorf("x11 loop: read from notify pipe failed: %w", err))
 			}
+		}
+		select {
+		case <-w.wakeups:
+			w.w.Event(WakeupEvent{})
+		default:
 		}
 
 		if anim || syn {
@@ -357,20 +335,6 @@ loop:
 				},
 				Sync: syn,
 			})
-		}
-		w.mu.Lock()
-		readClipboard := w.clipboard.read
-		writeClipboard := w.clipboard.write
-		w.clipboard.read = false
-		w.clipboard.write = nil
-		w.mu.Unlock()
-		if readClipboard {
-			C.XDeleteProperty(w.x, w.xw, w.atoms.clipboardContent)
-			C.XConvertSelection(w.x, w.atoms.clipboard, w.atoms.utf8string, w.atoms.clipboardContent, w.xw, C.CurrentTime)
-		}
-		if writeClipboard != nil {
-			w.clipboard.content = []byte(*writeClipboard)
-			C.XSetSelectionOwner(w.x, w.atoms.clipboard, w.xw, C.CurrentTime)
 		}
 	}
 	w.w.Event(system.DestroyEvent{Err: nil})
@@ -681,6 +645,7 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 		cfg:          cfg,
 		xkb:          xkb,
 		xkbEventBase: xkbEventBase,
+		wakeups:      make(chan struct{}, 1),
 	}
 	w.notify.read = pipe[0]
 	w.notify.write = pipe[1]

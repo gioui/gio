@@ -7,7 +7,6 @@ import (
 	"image"
 	"image/color"
 	"strings"
-	"sync"
 	"syscall/js"
 	"time"
 	"unicode"
@@ -47,7 +46,6 @@ type window struct {
 	chanAnimation chan struct{}
 	chanRedraw    chan struct{}
 
-	mu        sync.Mutex
 	size      f32.Point
 	inset     f32.Point
 	scale     float32
@@ -55,6 +53,7 @@ type window struct {
 	// animRequested tracks whether a requestAnimationFrame callback
 	// is pending.
 	animRequested bool
+	wakeups       chan struct{}
 }
 
 func NewWindow(win Callbacks, opts *Options) error {
@@ -71,6 +70,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 		window:    js.Global().Get("window"),
 		head:      doc.Get("head"),
 		clipboard: js.Global().Get("navigator").Get("clipboard"),
+		wakeups:   make(chan struct{}, 1),
 	}
 	w.requestAnimationFrame = w.window.Get("requestAnimationFrame")
 	w.browserHistory = w.window.Get("history")
@@ -89,7 +89,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 	})
 	w.clipboardCallback = w.funcOf(func(this js.Value, args []js.Value) interface{} {
 		content := args[0].String()
-		win.Event(clipboard.Event{Text: content})
+		go win.Event(clipboard.Event{Text: content})
 		return nil
 	})
 	w.addEventListeners()
@@ -106,6 +106,8 @@ func NewWindow(win Callbacks, opts *Options) error {
 		w.draw(true)
 		for {
 			select {
+			case <-w.wakeups:
+				w.w.Event(WakeupEvent{})
 			case <-w.chanAnimation:
 				w.animCallback()
 			case <-w.chanRedraw:
@@ -349,9 +351,7 @@ func (w *window) touchEvent(typ pointer.Type, e js.Value) {
 	changedTouches := e.Get("changedTouches")
 	n := changedTouches.Length()
 	rect := w.cnv.Call("getBoundingClientRect")
-	w.mu.Lock()
 	scale := w.scale
-	w.mu.Unlock()
 	var mods key.Modifiers
 	if e.Get("shiftKey").Bool() {
 		mods |= key.ModShift
@@ -401,9 +401,7 @@ func (w *window) pointerEvent(typ pointer.Type, dx, dy float32, e js.Value) {
 	rect := w.cnv.Call("getBoundingClientRect")
 	x -= rect.Get("left").Float()
 	y -= rect.Get("top").Float()
-	w.mu.Lock()
 	scale := w.scale
-	w.mu.Unlock()
 	pos := f32.Point{
 		X: float32(x) * scale,
 		Y: float32(y) * scale,
@@ -452,21 +450,17 @@ func (w *window) funcOf(f func(this js.Value, args []js.Value) interface{}) js.F
 }
 
 func (w *window) animCallback() {
-	w.mu.Lock()
 	anim := w.animating
 	w.animRequested = anim
 	if anim {
 		w.requestAnimationFrame.Invoke(w.redraw)
 	}
-	w.mu.Unlock()
 	if anim {
 		w.draw(false)
 	}
 }
 
 func (w *window) SetAnimating(anim bool) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
 	w.animating = anim
 	if anim && !w.animRequested {
 		w.animRequested = true
@@ -511,6 +505,13 @@ func (w *window) SetCursor(name pointer.CursorName) {
 	style.Set("cursor", string(name))
 }
 
+func (w *window) Wakeup() {
+	select {
+	case w.wakeups <- struct{}{}:
+	default:
+	}
+}
+
 func (w *window) ShowTextInput(show bool) {
 	// Run in a goroutine to avoid a deadlock if the
 	// focus change result in an event.
@@ -527,9 +528,6 @@ func (w *window) ShowTextInput(show bool) {
 func (w *window) Close() {}
 
 func (w *window) resize() {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
 	w.scale = float32(w.window.Get("devicePixelRatio").Float())
 
 	rect := w.cnv.Call("getBoundingClientRect")
@@ -570,9 +568,6 @@ func (w *window) draw(sync bool) {
 }
 
 func (w *window) config() (int, int, system.Insets, unit.Metric) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
 	return int(w.size.X + .5), int(w.size.Y + .5), system.Insets{
 			Bottom: unit.Px(w.inset.Y),
 			Right:  unit.Px(w.inset.X),
