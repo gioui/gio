@@ -206,7 +206,13 @@ func (w *window) runOnMain(f func()) {
 }
 
 func (w *window) Close() {
-	C.gio_close(w.window)
+	// gio_close immediately calls gio_onClose which sends events
+	// causing a deadlock because Close is called during an event.
+	// Break the deadlock by deferring the close, making Close more
+	// akin to a message like the other platforms.
+	go runOnMain(func() {
+		C.gio_close(w.window)
+	})
 }
 
 func (w *window) setStage(stage system.Stage) {
