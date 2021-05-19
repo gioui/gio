@@ -426,7 +426,6 @@ func (w *Window) waitFrame() (*op.Ops, bool) {
 }
 
 func (w *Window) run(opts *wm.Options) {
-	defer close(w.in)
 	defer close(w.out)
 	if err := wm.NewWindow(&w.callbacks, opts); err != nil {
 		w.out <- system.DestroyEvent{Err: err}
