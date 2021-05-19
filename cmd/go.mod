@@ -3,7 +3,7 @@ module gioui.org/cmd
 go 1.13
 
 require (
-	gioui.org v0.0.0-20210306132744-26d9e7fe5f05
+	gioui.org v0.0.0-20210518185901-8611894b4bb3
 	github.com/akavel/rsrc v0.10.1
 	github.com/chromedp/cdproto v0.0.0-20191114225735-6626966fbae4
 	github.com/chromedp/chromedp v0.5.2
