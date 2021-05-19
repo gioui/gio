@@ -391,6 +391,7 @@ func (w *Window) destroy(err error) {
 	w.ack <- struct{}{}
 	w.out <- system.DestroyEvent{Err: err}
 	close(w.dead)
+	close(w.out)
 	for e := range w.in {
 		w.ack <- struct{}{}
 		if _, ok := e.(system.DestroyEvent); ok {
@@ -427,6 +428,7 @@ func (w *Window) waitFrame() (*op.Ops, bool) {
 
 func (w *Window) run(opts *wm.Options) {
 	defer close(w.out)
+	defer close(w.dead)
 	if err := wm.NewWindow(&w.callbacks, opts); err != nil {
 		w.out <- system.DestroyEvent{Err: err}
 		return
