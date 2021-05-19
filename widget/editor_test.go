@@ -3,8 +3,10 @@
 package widget
 
 import (
+	"bytes"
 	"fmt"
 	"image"
+	"io"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -474,6 +476,46 @@ func TestSelectMove(t *testing.T) {
 	testKey(key.NameRightArrow)
 	testKey(key.NameUpArrow)
 	testKey(key.NameDownArrow)
+}
+
+func TestEditor_Read(t *testing.T) {
+	s := "hello world"
+	buf := make([]byte, len(s))
+	e := new(Editor)
+	e.SetText(s)
+
+	_, err := e.Seek(0, io.SeekStart)
+	if err != nil {
+		t.Error(err)
+	}
+	n, err := io.ReadFull(e, buf)
+	if err != nil {
+		t.Error(err)
+	}
+	if got, want := n, len(s); got != want {
+		t.Errorf("got %d; want %d", got, want)
+	}
+	if got, want := string(buf), s; got != want {
+		t.Errorf("got %q; want %q", got, want)
+	}
+}
+
+func TestEditor_WriteTo(t *testing.T) {
+	s := "hello world"
+	var buf bytes.Buffer
+	e := new(Editor)
+	e.SetText(s)
+
+	n, err := io.Copy(&buf, e)
+	if err != nil {
+		t.Error(err)
+	}
+	if got, want := int(n), len(s); got != want {
+		t.Errorf("got %d; want %d", got, want)
+	}
+	if got, want := buf.String(), s; got != want {
+		t.Errorf("got %q; want %q", got, want)
+	}
 }
 
 func textWidth(e *Editor, lineNum, colStart, colEnd int) float32 {

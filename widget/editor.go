@@ -1250,6 +1250,21 @@ func (e *Editor) ClearSelection() {
 	e.caret.end = e.caret.start
 }
 
+// WriteTo implements io.WriterTo.
+func (e *Editor) WriteTo(w io.Writer) (int64, error) {
+	return e.rr.WriteTo(w)
+}
+
+// Seek implements io.Seeker.
+func (e *Editor) Seek(offset int64, whence int) (int64, error) {
+	return e.rr.Seek(0, io.SeekStart)
+}
+
+// Read implements io.Reader.
+func (e *Editor) Read(p []byte) (int, error) {
+	return e.rr.Read(p)
+}
+
 func max(a, b int) int {
 	if a > b {
 		return a

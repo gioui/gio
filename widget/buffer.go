@@ -142,6 +142,16 @@ func (e *editBuffer) ReadRune() (rune, int, error) {
 	return r, s, nil
 }
 
+// WriteTo implements io.WriterTo.
+func (e *editBuffer) WriteTo(w io.Writer) (int64, error) {
+	n1, err := w.Write(e.text[:e.gapstart])
+	if err != nil {
+		return int64(n1), err
+	}
+	n2, err := w.Write(e.text[e.gapend:])
+	return int64(n1 + n2), err
+}
+
 func (e *editBuffer) String() string {
 	var b strings.Builder
 	b.Grow(e.len())
