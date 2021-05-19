@@ -31,6 +31,7 @@ import android.view.SurfaceView;
 import android.view.SurfaceHolder;
 import android.view.Window;
 import android.view.WindowInsetsController;
+import android.view.WindowManager;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
@@ -55,6 +56,10 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 
 	public GioView(Context context, AttributeSet attrs) {
 		super(context, attrs);
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+			setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+		}
+		setLayoutParams(new WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT));
 
 		// Late initialization of the Go runtime to wait for a valid context.
 		Gio.init(context.getApplicationContext());
@@ -277,30 +282,26 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		return getResources().getConfiguration().fontScale;
 	}
 
-	void start() {
+	public void start() {
 		onStartView(nhandle);
 	}
 
-	void stop() {
+	public void stop() {
 		onStopView(nhandle);
 	}
 
-	void destroy() {
+	public void destroy() {
 		setOnFocusChangeListener(null);
 		getHolder().removeCallback(surfCallbacks);
 		onDestroyView(nhandle);
 		nhandle = 0;
 	}
 
-	void configurationChanged() {
+	public void configurationChanged() {
 		onConfigurationChanged(nhandle);
 	}
 
-	void lowMemory() {
-		onLowMemory();
-	}
-
-	boolean backPressed() {
+	public boolean backPressed() {
 		return onBack(nhandle);
 	}
 
@@ -312,7 +313,7 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	static private native void onSurfaceChanged(long handle, Surface surface);
 	static private native void onConfigurationChanged(long handle);
 	static private native void onWindowInsets(long handle, int top, int right, int bottom, int left);
-	static private native void onLowMemory();
+	static public native void onLowMemory();
 	static private native void onTouchEvent(long handle, int action, int pointerID, int tool, float x, float y, float scrollX, float scrollY, int buttons, long time);
 	static private native void onKeyEvent(long handle, int code, int character, long time);
 	static private native void onFrameCallback(long handle, long nanos);

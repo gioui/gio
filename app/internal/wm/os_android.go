@@ -283,7 +283,7 @@ func Java_org_gioui_GioView_onSurfaceChanged(env *C.JNIEnv, class C.jclass, hand
 }
 
 //export Java_org_gioui_GioView_onLowMemory
-func Java_org_gioui_GioView_onLowMemory() {
+func Java_org_gioui_GioView_onLowMemory(env *C.JNIEnv, class C.jclass) {
 	runtime.GC()
 	debug.FreeOSMemory()
 }
