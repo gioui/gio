@@ -35,11 +35,11 @@ func (l LoaderStyle) Layout(gtx layout.Context) layout.Dimensions {
 		diam = gtx.Px(unit.Dp(24))
 	}
 	sz := gtx.Constraints.Constrain(image.Pt(diam, diam))
-	radius := float64(sz.X) * .5
+	radius := float32(sz.X) * .5
 	defer op.Save(gtx.Ops).Load()
-	op.Offset(f32.Pt(float32(radius), float32(radius))).Add(gtx.Ops)
+	op.Offset(f32.Pt(radius, radius)).Add(gtx.Ops)
 
-	dt := (time.Duration(gtx.Now.UnixNano()) % (time.Second)).Seconds()
+	dt := float32((time.Duration(gtx.Now.UnixNano()) % (time.Second)).Seconds())
 	startAngle := dt * math.Pi * 2
 	endAngle := startAngle + math.Pi*1.5
 
@@ -47,7 +47,7 @@ func (l LoaderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	paint.ColorOp{
 		Color: l.Color,
 	}.Add(gtx.Ops)
-	op.Offset(f32.Pt(-float32(radius), -float32(radius))).Add(gtx.Ops)
+	op.Offset(f32.Pt(-radius, -radius)).Add(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
 	op.InvalidateOp{}.Add(gtx.Ops)
 	return layout.Dimensions{
@@ -55,16 +55,17 @@ func (l LoaderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}
 }
 
-func clipLoader(ops *op.Ops, startAngle, endAngle, radius float64) {
+func clipLoader(ops *op.Ops, startAngle, endAngle, radius float32) {
 	const thickness = .25
 
 	var (
-		width = float32(radius * thickness)
-		delta = float32(endAngle - startAngle)
+		width = radius * thickness
+		delta = endAngle - startAngle
 
-		vy, vx = math.Sincos(startAngle)
+		vy, vx = math.Sincos(float64(startAngle))
 
-		pen    = f32.Pt(float32(vx), float32(vy)).Mul(float32(radius))
+		inner  = radius * (1. - thickness*.5)
+		pen    = f32.Pt(float32(vx), float32(vy)).Mul(inner)
 		center = f32.Pt(0, 0).Sub(pen)
 
 		p clip.Path
