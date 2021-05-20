@@ -12,30 +12,97 @@ package wm
 #include <android/input.h>
 #include <stdlib.h>
 
-__attribute__ ((visibility ("hidden"))) jint gio_jni_GetEnv(JavaVM *vm, JNIEnv **env, jint version);
-__attribute__ ((visibility ("hidden"))) jint gio_jni_GetJavaVM(JNIEnv *env, JavaVM **jvm);
-__attribute__ ((visibility ("hidden"))) jint gio_jni_AttachCurrentThread(JavaVM *vm, JNIEnv **p_env, void *thr_args);
-__attribute__ ((visibility ("hidden"))) jint gio_jni_DetachCurrentThread(JavaVM *vm);
+static jint jni_GetEnv(JavaVM *vm, JNIEnv **env, jint version) {
+	return (*vm)->GetEnv(vm, (void **)env, version);
+}
 
-__attribute__ ((visibility ("hidden"))) jobject gio_jni_NewGlobalRef(JNIEnv *env, jobject obj);
-__attribute__ ((visibility ("hidden"))) void gio_jni_DeleteGlobalRef(JNIEnv *env, jobject obj);
-__attribute__ ((visibility ("hidden"))) jclass gio_jni_GetObjectClass(JNIEnv *env, jobject obj);
-__attribute__ ((visibility ("hidden"))) jmethodID gio_jni_GetStaticMethodID(JNIEnv *env, jclass clazz, const char *name, const char *sig);
-__attribute__ ((visibility ("hidden"))) jmethodID gio_jni_GetMethodID(JNIEnv *env, jclass clazz, const char *name, const char *sig);
-__attribute__ ((visibility ("hidden"))) jfloat gio_jni_CallFloatMethod(JNIEnv *env, jobject obj, jmethodID methodID);
-__attribute__ ((visibility ("hidden"))) jint gio_jni_CallIntMethod(JNIEnv *env, jobject obj, jmethodID methodID);
-__attribute__ ((visibility ("hidden"))) void gio_jni_CallStaticVoidMethodA(JNIEnv *env, jclass cls, jmethodID methodID, const jvalue *args);
-__attribute__ ((visibility ("hidden"))) void gio_jni_CallVoidMethodA(JNIEnv *env, jobject obj, jmethodID methodID, const jvalue *args);
-__attribute__ ((visibility ("hidden"))) jbyte *gio_jni_GetByteArrayElements(JNIEnv *env, jbyteArray arr);
-__attribute__ ((visibility ("hidden"))) void gio_jni_ReleaseByteArrayElements(JNIEnv *env, jbyteArray arr, jbyte *bytes);
-__attribute__ ((visibility ("hidden"))) jsize gio_jni_GetArrayLength(JNIEnv *env, jbyteArray arr);
-__attribute__ ((visibility ("hidden"))) jstring gio_jni_NewString(JNIEnv *env, const jchar *unicodeChars, jsize len);
-__attribute__ ((visibility ("hidden"))) jsize gio_jni_GetStringLength(JNIEnv *env, jstring str);
-__attribute__ ((visibility ("hidden"))) const jchar *gio_jni_GetStringChars(JNIEnv *env, jstring str);
-__attribute__ ((visibility ("hidden"))) jthrowable gio_jni_ExceptionOccurred(JNIEnv *env);
-__attribute__ ((visibility ("hidden"))) void gio_jni_ExceptionClear(JNIEnv *env);
-__attribute__ ((visibility ("hidden"))) jobject gio_jni_CallObjectMethodA(JNIEnv *env, jobject obj, jmethodID method, jvalue *args);
-__attribute__ ((visibility ("hidden"))) jobject gio_jni_CallStaticObjectMethodA(JNIEnv *env, jclass cls, jmethodID method, jvalue *args);
+static jint jni_GetJavaVM(JNIEnv *env, JavaVM **jvm) {
+	return (*env)->GetJavaVM(env, jvm);
+}
+
+static jint jni_AttachCurrentThread(JavaVM *vm, JNIEnv **p_env, void *thr_args) {
+	return (*vm)->AttachCurrentThread(vm, p_env, thr_args);
+}
+
+static jint jni_DetachCurrentThread(JavaVM *vm) {
+	return (*vm)->DetachCurrentThread(vm);
+}
+
+static jobject jni_NewGlobalRef(JNIEnv *env, jobject obj) {
+	return (*env)->NewGlobalRef(env, obj);
+}
+
+static void jni_DeleteGlobalRef(JNIEnv *env, jobject obj) {
+	(*env)->DeleteGlobalRef(env, obj);
+}
+
+static jclass jni_GetObjectClass(JNIEnv *env, jobject obj) {
+	return (*env)->GetObjectClass(env, obj);
+}
+
+static jmethodID jni_GetMethodID(JNIEnv *env, jclass clazz, const char *name, const char *sig) {
+	return (*env)->GetMethodID(env, clazz, name, sig);
+}
+
+static jmethodID jni_GetStaticMethodID(JNIEnv *env, jclass clazz, const char *name, const char *sig) {
+	return (*env)->GetStaticMethodID(env, clazz, name, sig);
+}
+
+static jfloat jni_CallFloatMethod(JNIEnv *env, jobject obj, jmethodID methodID) {
+	return (*env)->CallFloatMethod(env, obj, methodID);
+}
+
+static jint jni_CallIntMethod(JNIEnv *env, jobject obj, jmethodID methodID) {
+	return (*env)->CallIntMethod(env, obj, methodID);
+}
+
+static void jni_CallStaticVoidMethodA(JNIEnv *env, jclass cls, jmethodID methodID, const jvalue *args) {
+	(*env)->CallStaticVoidMethodA(env, cls, methodID, args);
+}
+
+static void jni_CallVoidMethodA(JNIEnv *env, jobject obj, jmethodID methodID, const jvalue *args) {
+	(*env)->CallVoidMethodA(env, obj, methodID, args);
+}
+
+static jbyte *jni_GetByteArrayElements(JNIEnv *env, jbyteArray arr) {
+	return (*env)->GetByteArrayElements(env, arr, NULL);
+}
+
+static void jni_ReleaseByteArrayElements(JNIEnv *env, jbyteArray arr, jbyte *bytes) {
+	(*env)->ReleaseByteArrayElements(env, arr, bytes, JNI_ABORT);
+}
+
+static jsize jni_GetArrayLength(JNIEnv *env, jbyteArray arr) {
+	return (*env)->GetArrayLength(env, arr);
+}
+
+static jstring jni_NewString(JNIEnv *env, const jchar *unicodeChars, jsize len) {
+	return (*env)->NewString(env, unicodeChars, len);
+}
+
+static jsize jni_GetStringLength(JNIEnv *env, jstring str) {
+	return (*env)->GetStringLength(env, str);
+}
+
+static const jchar *jni_GetStringChars(JNIEnv *env, jstring str) {
+	return (*env)->GetStringChars(env, str, NULL);
+}
+
+static jthrowable jni_ExceptionOccurred(JNIEnv *env) {
+	return (*env)->ExceptionOccurred(env);
+}
+
+static void jni_ExceptionClear(JNIEnv *env) {
+	(*env)->ExceptionClear(env);
+}
+
+static jobject jni_CallObjectMethodA(JNIEnv *env, jobject obj, jmethodID method, jvalue *args) {
+	return (*env)->CallObjectMethodA(env, obj, method, args);
+}
+
+static jobject jni_CallStaticObjectMethodA(JNIEnv *env, jclass cls, jmethodID method, jvalue *args) {
+	return (*env)->CallStaticObjectMethodA(env, cls, method, args);
+}
 */
 import "C"
 
@@ -138,7 +205,7 @@ func getMethodID(env *C.JNIEnv, class C.jclass, method, sig string) C.jmethodID 
 	defer C.free(unsafe.Pointer(m))
 	s := C.CString(sig)
 	defer C.free(unsafe.Pointer(s))
-	jm := C.gio_jni_GetMethodID(env, class, m, s)
+	jm := C.jni_GetMethodID(env, class, m, s)
 	if err := exception(env); err != nil {
 		panic(err)
 	}
@@ -150,7 +217,7 @@ func getStaticMethodID(env *C.JNIEnv, class C.jclass, method, sig string) C.jmet
 	defer C.free(unsafe.Pointer(m))
 	s := C.CString(sig)
 	defer C.free(unsafe.Pointer(s))
-	jm := C.gio_jni_GetStaticMethodID(env, class, m, s)
+	jm := C.jni_GetStaticMethodID(env, class, m, s)
 	if err := exception(env); err != nil {
 		panic(err)
 	}
@@ -160,14 +227,14 @@ func getStaticMethodID(env *C.JNIEnv, class C.jclass, method, sig string) C.jmet
 //export Java_org_gioui_Gio_runGoMain
 func Java_org_gioui_Gio_runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyteArray, context C.jobject) {
 	initJVM(env, class, context)
-	dirBytes := C.gio_jni_GetByteArrayElements(env, jdataDir)
+	dirBytes := C.jni_GetByteArrayElements(env, jdataDir)
 	if dirBytes == nil {
 		panic("runGoMain: GetByteArrayElements failed")
 	}
-	n := C.gio_jni_GetArrayLength(env, jdataDir)
+	n := C.jni_GetArrayLength(env, jdataDir)
 	dataDir := C.GoStringN((*C.char)(unsafe.Pointer(dirBytes)), n)
 	dataDirChan <- dataDir
-	C.gio_jni_ReleaseByteArrayElements(env, jdataDir, dirBytes)
+	C.jni_ReleaseByteArrayElements(env, jdataDir, dirBytes)
 
 	runMain()
 }
@@ -175,11 +242,11 @@ func Java_org_gioui_Gio_runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyt
 func initJVM(env *C.JNIEnv, gio C.jclass, ctx C.jobject) {
 	android.mu.Lock()
 	defer android.mu.Unlock()
-	if res := C.gio_jni_GetJavaVM(env, &android.jvm); res != 0 {
+	if res := C.jni_GetJavaVM(env, &android.jvm); res != 0 {
 		panic("gio: GetJavaVM failed")
 	}
-	android.appCtx = C.gio_jni_NewGlobalRef(env, ctx)
-	android.gioCls = C.jclass(C.gio_jni_NewGlobalRef(env, C.jobject(gio)))
+	android.appCtx = C.jni_NewGlobalRef(env, ctx)
+	android.gioCls = C.jclass(C.jni_NewGlobalRef(env, C.jobject(gio)))
 	android.mwriteClipboard = getStaticMethodID(env, gio, "writeClipboard", "(Landroid/content/Context;Ljava/lang/String;)V")
 	android.mreadClipboard = getStaticMethodID(env, gio, "readClipboard", "(Landroid/content/Context;)Ljava/lang/String;")
 	android.mwakeupMainThread = getStaticMethodID(env, gio, "wakeupMainThread", "()V")
@@ -220,7 +287,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.setNavigationColor = getMethodID(env, class, "setNavigationColor", "(II)V")
 		m.setStatusColor = getMethodID(env, class, "setStatusColor", "(II)V")
 	})
-	view = C.gio_jni_NewGlobalRef(env, view)
+	view = C.jni_NewGlobalRef(env, view)
 	wopts := <-mainWindow.out
 	w, ok := windows[wopts.window]
 	if !ok {
@@ -246,7 +313,7 @@ func Java_org_gioui_GioView_onDestroyView(env *C.JNIEnv, class C.jclass, handle 
 	w.callbacks.Event(ViewEvent{View: 0})
 	w.callbacks.SetDriver(nil)
 	delete(views, handle)
-	C.gio_jni_DeleteGlobalRef(env, w.view)
+	C.jni_DeleteGlobalRef(env, w.view)
 	w.view = 0
 }
 
@@ -376,8 +443,8 @@ func (w *window) nativeWindow(visID int) (*C.ANativeWindow, int, int) {
 }
 
 func (w *window) loadConfig(env *C.JNIEnv, class C.jclass) {
-	dpi := int(C.gio_jni_CallIntMethod(env, w.view, gioView.getDensity))
-	w.fontScale = float32(C.gio_jni_CallFloatMethod(env, w.view, gioView.getFontScale))
+	dpi := int(C.jni_CallIntMethod(env, w.view, gioView.getDensity))
+	w.fontScale = float32(C.jni_CallFloatMethod(env, w.view, gioView.getFontScale))
 	switch dpi {
 	case C.ACONFIGURATION_DENSITY_NONE,
 		C.ACONFIGURATION_DENSITY_DEFAULT,
@@ -431,14 +498,14 @@ func runInJVM(jvm *C.JavaVM, f func(env *C.JNIEnv)) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	var env *C.JNIEnv
-	if res := C.gio_jni_GetEnv(jvm, &env, C.JNI_VERSION_1_6); res != C.JNI_OK {
+	if res := C.jni_GetEnv(jvm, &env, C.JNI_VERSION_1_6); res != C.JNI_OK {
 		if res != C.JNI_EDETACHED {
 			panic(fmt.Errorf("JNI GetEnv failed with error %d", res))
 		}
-		if C.gio_jni_AttachCurrentThread(jvm, &env, nil) != C.JNI_OK {
+		if C.jni_AttachCurrentThread(jvm, &env, nil) != C.JNI_OK {
 			panic(errors.New("runInJVM: AttachCurrentThread failed"))
 		}
-		defer C.gio_jni_DetachCurrentThread(jvm)
+		defer C.jni_DetachCurrentThread(jvm)
 	}
 
 	f(env)
@@ -547,7 +614,7 @@ func javaString(env *C.JNIEnv, str string) C.jstring {
 		return 0
 	}
 	utf16Chars := utf16.Encode([]rune(str))
-	return C.gio_jni_NewString(env, (*C.jchar)(unsafe.Pointer(&utf16Chars[0])), C.int(len(utf16Chars)))
+	return C.jni_NewString(env, (*C.jchar)(unsafe.Pointer(&utf16Chars[0])), C.int(len(utf16Chars)))
 }
 
 func varArgs(args []jvalue) *C.jvalue {
@@ -558,22 +625,22 @@ func varArgs(args []jvalue) *C.jvalue {
 }
 
 func callStaticVoidMethod(env *C.JNIEnv, cls C.jclass, method C.jmethodID, args ...jvalue) error {
-	C.gio_jni_CallStaticVoidMethodA(env, cls, method, varArgs(args))
+	C.jni_CallStaticVoidMethodA(env, cls, method, varArgs(args))
 	return exception(env)
 }
 
 func callStaticObjectMethod(env *C.JNIEnv, cls C.jclass, method C.jmethodID, args ...jvalue) (C.jobject, error) {
-	res := C.gio_jni_CallStaticObjectMethodA(env, cls, method, varArgs(args))
+	res := C.jni_CallStaticObjectMethodA(env, cls, method, varArgs(args))
 	return res, exception(env)
 }
 
 func callVoidMethod(env *C.JNIEnv, obj C.jobject, method C.jmethodID, args ...jvalue) error {
-	C.gio_jni_CallVoidMethodA(env, obj, method, varArgs(args))
+	C.jni_CallVoidMethodA(env, obj, method, varArgs(args))
 	return exception(env)
 }
 
 func callObjectMethod(env *C.JNIEnv, obj C.jobject, method C.jmethodID, args ...jvalue) (C.jobject, error) {
-	res := C.gio_jni_CallObjectMethodA(env, obj, method, varArgs(args))
+	res := C.jni_CallObjectMethodA(env, obj, method, varArgs(args))
 	return res, exception(env)
 }
 
@@ -581,11 +648,11 @@ func callObjectMethod(env *C.JNIEnv, obj C.jobject, method C.jmethodID, args ...
 // exception, or nil if no exception is pending. The pending
 // exception is cleared.
 func exception(env *C.JNIEnv) error {
-	thr := C.gio_jni_ExceptionOccurred(env)
+	thr := C.jni_ExceptionOccurred(env)
 	if thr == 0 {
 		return nil
 	}
-	C.gio_jni_ExceptionClear(env)
+	C.jni_ExceptionClear(env)
 	cls := getObjectClass(env, C.jobject(thr))
 	toString := getMethodID(env, cls, "toString", "()Ljava/lang/String;")
 	msg, err := callObjectMethod(env, C.jobject(thr), toString)
@@ -599,7 +666,7 @@ func getObjectClass(env *C.JNIEnv, obj C.jobject) C.jclass {
 	if obj == 0 {
 		panic("null object")
 	}
-	cls := C.gio_jni_GetObjectClass(env, C.jobject(obj))
+	cls := C.jni_GetObjectClass(env, C.jobject(obj))
 	if err := exception(env); err != nil {
 		// GetObjectClass should never fail.
 		panic(err)
@@ -612,8 +679,8 @@ func goString(env *C.JNIEnv, str C.jstring) string {
 	if str == 0 {
 		return ""
 	}
-	strlen := C.gio_jni_GetStringLength(env, C.jstring(str))
-	chars := C.gio_jni_GetStringChars(env, C.jstring(str))
+	strlen := C.jni_GetStringLength(env, C.jstring(str))
+	chars := C.jni_GetStringChars(env, C.jstring(str))
 	var utf16Chars []uint16
 	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&utf16Chars))
 	hdr.Data = uintptr(unsafe.Pointer(chars))
