@@ -8,9 +8,9 @@ sources:
 environment:
  PATH: /home/build/sdk/go/bin:/bin:/usr/local/bin:/usr/bin
 tasks:
- - install_go1_14: |
+ - install_go: |
      mkdir -p /home/build/sdk
-     curl https://dl.google.com/go/go1.14.src.tar.gz | tar -C /home/build/sdk -xzf -
+     curl https://dl.google.com/go/go1.16.3.src.tar.gz | tar -C /home/build/sdk -xzf -
      cd /home/build/sdk/go/src
      ./make.bash
  - test_gio: |
