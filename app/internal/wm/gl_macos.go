@@ -15,10 +15,8 @@ import (
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
 #include <AppKit/AppKit.h>
-#include <OpenGL/gl3.h>
 
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createGLContext(void);
-__attribute__ ((visibility ("hidden"))) void gio_prepareContext(void);
 __attribute__ ((visibility ("hidden"))) void gio_setContextView(CFTypeRef ctx, CFTypeRef view);
 __attribute__ ((visibility ("hidden"))) void gio_makeCurrentContext(CFTypeRef ctx);
 __attribute__ ((visibility ("hidden"))) void gio_flushContextBuffer(CFTypeRef ctx);
@@ -29,10 +27,9 @@ __attribute__ ((visibility ("hidden"))) void gio_unlockContext(CFTypeRef ctxRef)
 import "C"
 
 type context struct {
-	c        *gl.Functions
-	ctx      C.CFTypeRef
-	view     C.CFTypeRef
-	prepared bool
+	c    *gl.Functions
+	ctx  C.CFTypeRef
+	view C.CFTypeRef
 }
 
 func newContext(w *window) (*context, error) {
@@ -66,8 +63,6 @@ func (c *context) Release() {
 }
 
 func (c *context) Present() error {
-	// Assume the caller already locked the context.
-	C.glFlush()
 	return nil
 }
 
@@ -83,10 +78,6 @@ func (c *context) MakeCurrent() error {
 	c.Lock()
 	defer c.Unlock()
 	C.gio_makeCurrentContext(c.ctx)
-	if !c.prepared {
-		c.prepared = true
-		C.gio_prepareContext()
-	}
 	return nil
 }
 

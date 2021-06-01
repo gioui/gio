@@ -93,6 +93,9 @@ func (f *Functions) BindTexture(target Enum, t Texture) {
 func (f *Functions) BindImageTexture(unit int, t Texture, level int, layered bool, layer int, access, format Enum) {
 	panic("not implemented")
 }
+func (f *Functions) BindVertexArray(a VertexArray) {
+	panic("not supported")
+}
 func (f *Functions) BlendEquation(mode Enum) {
 	f.Ctx.Call("blendEquation", int(mode))
 }
@@ -144,6 +147,9 @@ func (f *Functions) CreateShader(ty Enum) Shader {
 func (f *Functions) CreateTexture() Texture {
 	return Texture(f.Ctx.Call("createTexture"))
 }
+func (f *Functions) CreateVertexArray() VertexArray {
+	panic("not supported")
+}
 func (f *Functions) DeleteBuffer(v Buffer) {
 	f.Ctx.Call("deleteBuffer", js.Value(v))
 }
@@ -168,6 +174,9 @@ func (f *Functions) DeleteRenderbuffer(v Renderbuffer) {
 }
 func (f *Functions) DeleteTexture(v Texture) {
 	f.Ctx.Call("deleteTexture", js.Value(v))
+}
+func (f *Functions) DeleteVertexArray(a VertexArray) {
+	panic("not implemented")
 }
 func (f *Functions) DepthFunc(fn Enum) {
 	f.Ctx.Call("depthFunc", int(fn))
@@ -205,6 +214,9 @@ func (f *Functions) EndQuery(target Enum) {
 }
 func (f *Functions) Finish() {
 	f.Ctx.Call("finish")
+}
+func (f *Functions) Flush() {
+	f.Ctx.Call("flush")
 }
 func (f *Functions) FramebufferRenderbuffer(target, attachment, renderbuffertarget Enum, renderbuffer Renderbuffer) {
 	f.Ctx.Call("framebufferRenderbuffer", int(target), int(attachment), int(renderbuffertarget), js.Value(renderbuffer))

@@ -36,6 +36,10 @@ type Backend struct {
 	sRGBFBO     *srgb.FBO
 	enabledSRGB bool
 	defFBO      gl.Framebuffer
+
+	// defVertArray is bound during a frame. We don't need it, but
+	// core desktop OpenGL profile 3.3 requires some array bound.
+	defVertArray gl.VertexArray
 }
 
 // State tracking.
@@ -205,6 +209,10 @@ func (b *Backend) BeginFrame(clear bool, viewport image.Point) driver.Framebuffe
 		if b.enabledSRGB {
 			b.funcs.Enable(gl.FRAMEBUFFER_SRGB)
 		}
+		if !b.defVertArray.Valid() {
+			b.defVertArray = b.funcs.CreateVertexArray()
+		}
+		b.funcs.BindVertexArray(b.defVertArray)
 	}
 	b.funcs.BindFramebuffer(gl.FRAMEBUFFER, renderFBO)
 	if b.sRGBFBO != nil && !clear {
@@ -230,6 +238,8 @@ func (b *Backend) EndFrame() {
 	if b.enabledSRGB {
 		b.funcs.Disable(gl.FRAMEBUFFER_SRGB)
 	}
+	// For single-buffered framebuffers such as on macOS.
+	b.funcs.Flush()
 }
 
 func (b *Backend) Caps() driver.Caps {
@@ -367,6 +377,9 @@ func glErr(f *gl.Functions) error {
 func (b *Backend) Release() {
 	if b.sRGBFBO != nil {
 		b.sRGBFBO.Release()
+	}
+	if b.defVertArray.Valid() {
+		b.funcs.DeleteVertexArray(b.defVertArray)
 	}
 	*b = Backend{}
 }

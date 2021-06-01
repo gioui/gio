@@ -11,6 +11,7 @@ type (
 	Texture      struct{ V uint }
 	Query        struct{ V uint }
 	Uniform      struct{ V int }
+	VertexArray  struct{ V uint }
 	Object       struct{ V uint }
 )
 
@@ -28,4 +29,8 @@ func (p Program) Valid() bool {
 
 func (s Shader) Valid() bool {
 	return s.V != 0
+}
+
+func (a VertexArray) Valid() bool {
+	return a.V != 0
 }

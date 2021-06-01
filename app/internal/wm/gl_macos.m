@@ -6,7 +6,6 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <OpenGL/OpenGL.h>
-#include <OpenGL/gl3.h>
 #include "_cgo_export.h"
 
 @interface GioGLContext : NSOpenGLContext
@@ -78,11 +77,4 @@ void gio_unlockContext(CFTypeRef ctxRef) {
 		NSOpenGLContext *ctx = (__bridge NSOpenGLContext *)ctxRef;
 		CGLUnlockContext([ctx CGLContextObj]);
 	}
-}
-
-void gio_prepareContext(void) {
-	// Bind a default VBA to emulate OpenGL ES 2.
-	GLuint defVBA;
-	glGenVertexArrays(1, &defVBA);
-	glBindVertexArray(defVBA);
 }

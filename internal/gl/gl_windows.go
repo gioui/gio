@@ -22,6 +22,7 @@ var (
 	_glBindFramebuffer                     = LibGLESv2.NewProc("glBindFramebuffer")
 	_glBindRenderbuffer                    = LibGLESv2.NewProc("glBindRenderbuffer")
 	_glBindTexture                         = LibGLESv2.NewProc("glBindTexture")
+	_glBindVertexArray                     = LibGLESv2.NewProc("glBindVertexArray")
 	_glBlendEquation                       = LibGLESv2.NewProc("glBlendEquation")
 	_glBlendFunc                           = LibGLESv2.NewProc("glBlendFunc")
 	_glBufferData                          = LibGLESv2.NewProc("glBufferData")
@@ -31,9 +32,11 @@ var (
 	_glClearColor                          = LibGLESv2.NewProc("glClearColor")
 	_glClearDepthf                         = LibGLESv2.NewProc("glClearDepthf")
 	_glDeleteQueries                       = LibGLESv2.NewProc("glDeleteQueries")
+	_glDeleteVertexArrays                  = LibGLESv2.NewProc("glDeleteVertexArrays")
 	_glCompileShader                       = LibGLESv2.NewProc("glCompileShader")
 	_glGenBuffers                          = LibGLESv2.NewProc("glGenBuffers")
 	_glGenFramebuffers                     = LibGLESv2.NewProc("glGenFramebuffers")
+	_glGenVertexArrays                     = LibGLESv2.NewProc("glGenVertexArrays")
 	_glGetUniformBlockIndex                = LibGLESv2.NewProc("glGetUniformBlockIndex")
 	_glCreateProgram                       = LibGLESv2.NewProc("glCreateProgram")
 	_glGenRenderbuffers                    = LibGLESv2.NewProc("glGenRenderbuffers")
@@ -55,6 +58,7 @@ var (
 	_glEnableVertexAttribArray             = LibGLESv2.NewProc("glEnableVertexAttribArray")
 	_glEndQuery                            = LibGLESv2.NewProc("glEndQuery")
 	_glFinish                              = LibGLESv2.NewProc("glFinish")
+	_glFlush                               = LibGLESv2.NewProc("glFlush")
 	_glFramebufferRenderbuffer             = LibGLESv2.NewProc("glFramebufferRenderbuffer")
 	_glFramebufferTexture2D                = LibGLESv2.NewProc("glFramebufferTexture2D")
 	_glGenQueries                          = LibGLESv2.NewProc("glGenQueries")
@@ -139,6 +143,9 @@ func (f *Functions) BindImageTexture(unit int, t Texture, level int, layered boo
 func (c *Functions) BindTexture(target Enum, t Texture) {
 	syscall.Syscall(_glBindTexture.Addr(), 2, uintptr(target), uintptr(t.V), 0)
 }
+func (c *Functions) BindVertexArray(a VertexArray) {
+	syscall.Syscall(_glBindVertexArray.Addr(), 1, uintptr(a.V), 0, 0)
+}
 func (c *Functions) BlendEquation(mode Enum) {
 	syscall.Syscall(_glBlendEquation.Addr(), 1, uintptr(mode), 0, 0)
 }
@@ -207,6 +214,11 @@ func (c *Functions) CreateTexture() Texture {
 	syscall.Syscall(_glGenTextures.Addr(), 2, 1, uintptr(unsafe.Pointer(&t)), 0)
 	return Texture{uint(t)}
 }
+func (c *Functions) CreateVertexArray() VertexArray {
+	var t uintptr
+	syscall.Syscall(_glGenVertexArrays.Addr(), 2, 1, uintptr(unsafe.Pointer(&t)), 0)
+	return VertexArray{uint(t)}
+}
 func (c *Functions) DeleteBuffer(v Buffer) {
 	syscall.Syscall(_glDeleteBuffers.Addr(), 2, 1, uintptr(unsafe.Pointer(&v)), 0)
 }
@@ -227,6 +239,9 @@ func (c *Functions) DeleteRenderbuffer(v Renderbuffer) {
 }
 func (c *Functions) DeleteTexture(v Texture) {
 	syscall.Syscall(_glDeleteTextures.Addr(), 2, 1, uintptr(unsafe.Pointer(&v.V)), 0)
+}
+func (f *Functions) DeleteVertexArray(array VertexArray) {
+	syscall.Syscall(_glDeleteVertexArrays.Addr(), 2, 1, uintptr(unsafe.Pointer(&array.V)), 0)
 }
 func (c *Functions) DepthFunc(f Enum) {
 	syscall.Syscall(_glDepthFunc.Addr(), 1, uintptr(f), 0, 0)
@@ -264,6 +279,9 @@ func (f *Functions) EndQuery(target Enum) {
 }
 func (c *Functions) Finish() {
 	syscall.Syscall(_glFinish.Addr(), 0, 0, 0, 0)
+}
+func (c *Functions) Flush() {
+	syscall.Syscall(_glFlush.Addr(), 0, 0, 0, 0)
 }
 func (c *Functions) FramebufferRenderbuffer(target, attachment, renderbuffertarget Enum, renderbuffer Renderbuffer) {
 	syscall.Syscall6(_glFramebufferRenderbuffer.Addr(), 4, uintptr(target), uintptr(attachment), uintptr(renderbuffertarget), uintptr(renderbuffer.V), 0, 0)

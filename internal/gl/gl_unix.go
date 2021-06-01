@@ -67,6 +67,7 @@ typedef struct {
 	void (*glEnable)(GLenum cap);
 	void (*glEnableVertexAttribArray)(GLuint index);
 	void (*glFinish)(void);
+	void (*glFlush)(void);
 	void (*glFramebufferRenderbuffer)(GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer);
 	void (*glFramebufferTexture2D)(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
 	void (*glGenBuffers)(GLsizei n, GLuint *buffers);
@@ -102,15 +103,17 @@ typedef struct {
 	void (*glVertexAttribPointer)(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
 	void (*glViewport)(GLint x, GLint y, GLsizei width, GLsizei height);
 
+	void (*glBindVertexArray)(GLuint array);
 	void (*glBindBufferBase)(GLenum target, GLuint index, GLuint buffer);
 	GLuint (*glGetUniformBlockIndex)(GLuint program, const GLchar *uniformBlockName);
 	void (*glUniformBlockBinding)(GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding);
 	void (*glInvalidateFramebuffer)(GLenum target, GLsizei numAttachments, const GLenum *attachments);
-
 	void (*glBeginQuery)(GLenum target, GLuint id);
 	void (*glDeleteQueries)(GLsizei n, const GLuint *ids);
+	void (*glDeleteVertexArrays)(GLsizei n, const GLuint *ids);
 	void (*glEndQuery)(GLenum target);
 	void (*glGenQueries)(GLsizei n, GLuint *ids);
+	void (*glGenVertexArrays)(GLsizei n, GLuint *ids);
 	void (*glGetProgramBinary)(GLuint program, GLsizei bufsize, GLsizei *length, GLenum *binaryFormat, void *binary);
 	void (*glGetQueryObjectuiv)(GLuint id, GLenum pname, GLuint *params);
 	const GLubyte* (*glGetStringi)(GLenum name, GLuint index);
@@ -149,6 +152,10 @@ static void glBindRenderbuffer(glFunctions *f, GLenum target, GLuint renderbuffe
 
 static void glBindTexture(glFunctions *f, GLenum target, GLuint texture) {
 	f->glBindTexture(target, texture);
+}
+
+static void glBindVertexArray(glFunctions *f, GLuint array) {
+	f->glBindVertexArray(array);
 }
 
 static void glBlendEquation(glFunctions *f, GLenum mode) {
@@ -254,6 +261,10 @@ static void glEnableVertexAttribArray(glFunctions *f, GLuint index) {
 
 static void glFinish(glFunctions *f) {
 	f->glFinish();
+}
+
+static void glFlush(glFunctions *f) {
+	f->glFlush();
 }
 
 static void glFramebufferRenderbuffer(glFunctions *f, GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer) {
@@ -420,6 +431,10 @@ static void glDeleteQueries(glFunctions *f, GLsizei n, const GLuint *ids) {
 	f->glDeleteQueries(n, ids);
 }
 
+static void glDeleteVertexArrays(glFunctions *f, GLsizei n, const GLuint *ids) {
+	f->glDeleteVertexArrays(n, ids);
+}
+
 static void glEndQuery(glFunctions *f, GLenum target) {
 	f->glEndQuery(target);
 }
@@ -430,6 +445,10 @@ static const GLubyte* glGetStringi(glFunctions *f, GLenum name, GLuint index) {
 
 static void glGenQueries(glFunctions *f, GLsizei n, GLuint *ids) {
 	f->glGenQueries(n, ids);
+}
+
+static void glGenVertexArrays(glFunctions *f, GLsizei n, GLuint *ids) {
+	f->glGenVertexArrays(n, ids);
 }
 
 static void glGetProgramBinary(glFunctions *f, GLuint program, GLsizei bufsize, GLsizei *length, GLenum *binaryFormat, void *binary) {
@@ -577,6 +596,7 @@ func (f *Functions) load(forceES bool) error {
 	f.f.glEnable = must("glEnable")
 	f.f.glEnableVertexAttribArray = must("glEnableVertexAttribArray")
 	f.f.glFinish = must("glFinish")
+	f.f.glFlush = must("glFlush")
 	f.f.glFramebufferRenderbuffer = must("glFramebufferRenderbuffer")
 	f.f.glFramebufferTexture2D = must("glFramebufferTexture2D")
 	f.f.glGenBuffers = must("glGenBuffers")
@@ -614,6 +634,7 @@ func (f *Functions) load(forceES bool) error {
 
 	// Extensions and GL ES 3 functions.
 	f.f.glBindBufferBase = load("glBindBufferBase")
+	f.f.glBindVertexArray = must("glBindVertexArray")
 	f.f.glGetUniformBlockIndex = load("glGetUniformBlockIndex")
 	f.f.glUniformBlockBinding = load("glUniformBlockBinding")
 	f.f.glInvalidateFramebuffer = load("glInvalidateFramebuffer")
@@ -644,6 +665,8 @@ func (f *Functions) load(forceES bool) error {
 		f.f.glGetQueryObjectuiv = load("glGetQueryObjectuivEXT")
 	}
 
+	f.f.glDeleteVertexArrays = load("glDeleteVertexArrays")
+	f.f.glGenVertexArrays = load("glGenVertexArrays")
 	f.f.glMemoryBarrier = load("glMemoryBarrier")
 	f.f.glDispatchCompute = load("glDispatchCompute")
 	f.f.glMapBufferRange = load("glMapBufferRange")
@@ -700,6 +723,10 @@ func (f *Functions) BindImageTexture(unit int, t Texture, level int, layered boo
 
 func (f *Functions) BindTexture(target Enum, t Texture) {
 	C.glBindTexture(&f.f, C.GLenum(target), C.GLuint(t.V))
+}
+
+func (f *Functions) BindVertexArray(a VertexArray) {
+	C.glBindVertexArray(&f.f, C.GLuint(a.V))
 }
 
 func (f *Functions) BlendEquation(mode Enum) {
@@ -783,6 +810,11 @@ func (f *Functions) CreateTexture() Texture {
 	return Texture{uint(f.uints[0])}
 }
 
+func (f *Functions) CreateVertexArray() VertexArray {
+	C.glGenVertexArrays(&f.f, 1, &f.uints[0])
+	return VertexArray{uint(f.uints[0])}
+}
+
 func (f *Functions) DeleteBuffer(v Buffer) {
 	f.uints[0] = C.GLuint(v.V)
 	C.glDeleteBuffers(&f.f, 1, &f.uints[0])
@@ -800,6 +832,11 @@ func (f *Functions) DeleteProgram(p Program) {
 func (f *Functions) DeleteQuery(query Query) {
 	f.uints[0] = C.GLuint(query.V)
 	C.glDeleteQueries(&f.f, 1, &f.uints[0])
+}
+
+func (f *Functions) DeleteVertexArray(array VertexArray) {
+	f.uints[0] = C.GLuint(array.V)
+	C.glDeleteVertexArrays(&f.f, 1, &f.uints[0])
 }
 
 func (f *Functions) DeleteRenderbuffer(v Renderbuffer) {
@@ -862,6 +899,10 @@ func (f *Functions) EnableVertexAttribArray(a Attrib) {
 
 func (f *Functions) Finish() {
 	C.glFinish(&f.f)
+}
+
+func (f *Functions) Flush() {
+	C.glFlush(&f.f)
 }
 
 func (f *Functions) FramebufferRenderbuffer(target, attachment, renderbuffertarget Enum, renderbuffer Renderbuffer) {

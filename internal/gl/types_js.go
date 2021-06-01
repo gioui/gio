@@ -13,6 +13,7 @@ type (
 	Texture      js.Value
 	Query        js.Value
 	Uniform      js.Value
+	VertexArray  js.Value
 	Object       js.Value
 )
 
@@ -30,4 +31,8 @@ func (s Shader) Valid() bool {
 
 func (u Uniform) Valid() bool {
 	return !js.Value(u).IsUndefined() && !js.Value(u).IsNull()
+}
+
+func (a VertexArray) Valid() bool {
+	return !js.Value(a).IsUndefined() && !js.Value(a).IsNull()
 }
