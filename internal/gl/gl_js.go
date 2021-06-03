@@ -19,6 +19,8 @@ type Functions struct {
 	// Cached JS arrays.
 	arrayBuf js.Value
 	int32Buf js.Value
+
+	isWebGL2 bool
 }
 
 type Context js.Value
@@ -36,8 +38,8 @@ func NewFunctions(ctx Context, forceES bool) (*Functions, error) {
 
 func (f *Functions) Init() error {
 	webgl2Class := js.Global().Get("WebGL2RenderingContext")
-	iswebgl2 := !webgl2Class.IsUndefined() && f.Ctx.InstanceOf(webgl2Class)
-	if !iswebgl2 {
+	f.isWebGL2 = !webgl2Class.IsUndefined() && f.Ctx.InstanceOf(webgl2Class)
+	if !f.isWebGL2 {
 		f.EXT_disjoint_timer_query = f.getExtension("EXT_disjoint_timer_query")
 		if f.getExtension("OES_texture_half_float").IsNull() && f.getExtension("OES_texture_float").IsNull() {
 			return errors.New("gl: no support for neither OES_texture_half_float nor OES_texture_float")
@@ -232,6 +234,10 @@ func (f *Functions) GetRenderbufferParameteri(target, pname Enum) int {
 	return paramVal(f.Ctx.Call("getRenderbufferParameteri", int(pname)))
 }
 func (f *Functions) GetFramebufferAttachmentParameteri(target, attachment, pname Enum) int {
+	if !f.isWebGL2 && pname == FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING {
+		// FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING is only available on WebGL 2
+		return LINEAR
+	}
 	return paramVal(f.Ctx.Call("getFramebufferAttachmentParameter", int(target), int(attachment), int(pname)))
 }
 func (f *Functions) GetBinding(pname Enum) Object {
