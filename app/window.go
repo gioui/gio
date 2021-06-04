@@ -354,6 +354,11 @@ func (c *callbacks) Event(e event.Event) {
 }
 
 func (w *Window) runFuncs(d wm.Driver) {
+	// Don't run driver functions if there's no driver.
+	if d == nil {
+		<-w.ack
+		return
+	}
 	// Flush pending runnnables.
 loop:
 	for {
