@@ -26,13 +26,12 @@ type Option func(opts *wm.Options)
 
 // Window represents an operating system window.
 type Window struct {
-	driver wm.Driver
-	ctx    wm.Context
-	loop   *renderLoop
+	ctx  wm.Context
+	loop *renderLoop
 
 	// driverFuncs is a channel of functions to run when
 	// the Window has a valid driver.
-	driverFuncs chan func()
+	driverFuncs chan func(d wm.Driver)
 	// wakeups wakes up the native event loop to send a
 	// wm.WakeupEvent that flushes driverFuncs.
 	wakeups chan struct{}
@@ -63,6 +62,7 @@ type Window struct {
 
 type callbacks struct {
 	w *Window
+	d wm.Driver
 }
 
 // queue is an event.Queue implementation that distributes system events
@@ -71,8 +71,7 @@ type queue struct {
 	q router.Router
 }
 
-// driverEvent is sent when a new native driver
-// is available for the wm.
+// driverEvent is sent when the underlying driver changes.
 type driverEvent struct {
 	driver wm.Driver
 }
@@ -107,7 +106,7 @@ func NewWindow(options ...Option) *Window {
 		invalidates:   make(chan struct{}, 1),
 		frames:        make(chan *op.Ops),
 		frameAck:      make(chan struct{}),
-		driverFuncs:   make(chan func(), 1),
+		driverFuncs:   make(chan func(d wm.Driver), 1),
 		wakeups:       make(chan struct{}, 1),
 		dead:          make(chan struct{}),
 		notifyAnimate: make(chan struct{}, 1),
@@ -132,7 +131,7 @@ func (w *Window) update(frame *op.Ops) {
 	<-w.frameAck
 }
 
-func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync bool, frame *op.Ops) error {
+func (w *Window) validateAndProcess(driver wm.Driver, frameStart time.Time, size image.Point, sync bool, frame *op.Ops) error {
 	for {
 		if w.loop != nil {
 			if err := w.loop.Flush(); err != nil {
@@ -145,7 +144,7 @@ func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync
 		}
 		if w.loop == nil && !w.nocontext {
 			var err error
-			w.ctx, err = w.driver.NewContext()
+			w.ctx, err = driver.NewContext()
 			if err != nil {
 				return err
 			}
@@ -181,9 +180,9 @@ func (w *Window) processFrame(frameStart time.Time, size image.Point, frame *op.
 	w.queue.q.Frame(frame)
 	switch w.queue.q.TextInputState() {
 	case router.TextInputOpen:
-		go w.Run(func() { w.driver.ShowTextInput(true) })
+		go w.driverRun(func(d wm.Driver) { d.ShowTextInput(true) })
 	case router.TextInputClose:
-		go w.Run(func() { w.driver.ShowTextInput(false) })
+		go w.driverRun(func(d wm.Driver) { d.ShowTextInput(false) })
 	}
 	if txt, ok := w.queue.q.WriteClipboard(); ok {
 		go w.WriteClipboard(txt)
@@ -230,12 +229,12 @@ func (w *Window) Invalidate() {
 
 // Option applies the options to the window.
 func (w *Window) Option(opts ...Option) {
-	go w.Run(func() {
+	go w.driverRun(func(d wm.Driver) {
 		o := new(wm.Options)
 		for _, opt := range opts {
 			opt(o)
 		}
-		w.driver.Option(o)
+		d.Option(o)
 	})
 }
 
@@ -243,22 +242,22 @@ func (w *Window) Option(opts ...Option) {
 // of a clipboard.Event. Multiple reads may be coalesced
 // to a single event.
 func (w *Window) ReadClipboard() {
-	go w.Run(func() {
-		w.driver.ReadClipboard()
+	go w.driverRun(func(d wm.Driver) {
+		d.ReadClipboard()
 	})
 }
 
 // WriteClipboard writes a string to the clipboard.
 func (w *Window) WriteClipboard(s string) {
-	go w.Run(func() {
-		w.driver.WriteClipboard(s)
+	go w.driverRun(func(d wm.Driver) {
+		d.WriteClipboard(s)
 	})
 }
 
 // SetCursorName changes the current window cursor to name.
 func (w *Window) SetCursorName(name pointer.CursorName) {
-	go w.Run(func() {
-		w.driver.SetCursor(name)
+	go w.driverRun(func(d wm.Driver) {
+		d.SetCursor(name)
 	})
 }
 
@@ -268,8 +267,8 @@ func (w *Window) SetCursorName(name pointer.CursorName) {
 // Currently, only macOS, Windows and X11 drivers implement this functionality,
 // all others are stubbed.
 func (w *Window) Close() {
-	go w.Run(func() {
-		w.driver.Close()
+	go w.driverRun(func(d wm.Driver) {
+		d.Close()
 	})
 }
 
@@ -282,10 +281,16 @@ func (w *Window) Close() {
 // Note that most programs should not call Run; configuring a Window with
 // CustomRenderer is a notable exception.
 func (w *Window) Run(f func()) {
-	done := make(chan struct{})
-	wrapper := func() {
+	w.driverRun(func(_ wm.Driver) {
 		f()
-		close(done)
+	})
+}
+
+func (w *Window) driverRun(f func(d wm.Driver)) {
+	done := make(chan struct{})
+	wrapper := func(d wm.Driver) {
+		defer close(done)
+		f(d)
 	}
 	select {
 	case w.driverFuncs <- wrapper:
@@ -336,26 +341,27 @@ func (w *Window) setNextFrame(at time.Time) {
 }
 
 func (c *callbacks) SetDriver(d wm.Driver) {
+	c.d = d
 	c.Event(driverEvent{d})
 }
 
 func (c *callbacks) Event(e event.Event) {
 	select {
 	case c.w.in <- e:
-		c.w.runFuncs()
+		c.w.runFuncs(c.d)
 	case <-c.w.dead:
 	}
 }
 
-func (w *Window) runFuncs() {
+func (w *Window) runFuncs(d wm.Driver) {
 	// Flush pending runnnables.
 loop:
 	for {
 		select {
 		case <-w.notifyAnimate:
-			w.driver.SetAnimating(w.animating)
+			d.SetAnimating(w.animating)
 		case f := <-w.driverFuncs:
-			f()
+			f(d)
 		default:
 			break loop
 		}
@@ -364,9 +370,9 @@ loop:
 	for {
 		select {
 		case <-w.notifyAnimate:
-			w.driver.SetAnimating(w.animating)
+			d.SetAnimating(w.animating)
 		case f := <-w.driverFuncs:
-			f()
+			f(d)
 		case <-w.ack:
 			return
 		}
@@ -433,9 +439,10 @@ func (w *Window) run(opts *wm.Options) {
 		w.out <- system.DestroyEvent{Err: err}
 		return
 	}
+	var driver wm.Driver
 	for {
 		var wakeups chan struct{}
-		if w.driver != nil {
+		if driver != nil {
 			wakeups = w.wakeups
 		}
 		var timer <-chan time.Time
@@ -450,7 +457,7 @@ func (w *Window) run(opts *wm.Options) {
 			w.setNextFrame(time.Time{})
 			w.updateAnimation()
 		case <-wakeups:
-			w.driver.Wakeup()
+			driver.Wakeup()
 		case e := <-w.in:
 			switch e2 := e.(type) {
 			case system.StageEvent:
@@ -484,7 +491,7 @@ func (w *Window) run(opts *wm.Options) {
 					}
 				}
 				frame, gotFrame := w.waitFrame()
-				err := w.validateAndProcess(frameStart, e2.Size, e2.Sync, frame)
+				err := w.validateAndProcess(driver, frameStart, e2.Size, e2.Sync, frame)
 				if gotFrame {
 					// We're done with frame, let the client continue.
 					w.frameAck <- struct{}{}
@@ -499,7 +506,7 @@ func (w *Window) run(opts *wm.Options) {
 				w.out <- e
 				w.waitAck()
 			case driverEvent:
-				w.driver = e2.driver
+				driver = e2.driver
 			case system.DestroyEvent:
 				w.destroyGPU()
 				w.out <- e2
