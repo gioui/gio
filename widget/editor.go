@@ -45,6 +45,8 @@ type Editor struct {
 	// Newline characters are not masked. When non-zero, the unmasked contents
 	// are accessed by Len, Text, and SetText.
 	Mask rune
+	// InputHint specifies the type of on-screen keyboard to be displayed.
+	InputHint key.InputHint
 
 	eventKey     int
 	font         text.Font
@@ -67,7 +69,7 @@ type Editor struct {
 		on     bool
 		scroll bool
 		// start is the current caret position, and also the start position of
-		// selected text. end is the end positon of selected text. If start.ofs
+		// selected text. end is the end position of selected text. If start.ofs
 		// == end.ofs, then there's no selection. Note that it's possible (and
 		// common) that the caret (start) is after the end, e.g. after
 		// Shift-DownArrow.
@@ -533,7 +535,7 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 		e.shapes = append(e.shapes, line{off, path, selected, yOffs, size})
 	}
 
-	key.InputOp{Tag: &e.eventKey}.Add(gtx.Ops)
+	key.InputOp{Tag: &e.eventKey, Hint: e.InputHint}.Add(gtx.Ops)
 	if e.requestFocus {
 		key.FocusOp{Tag: &e.eventKey}.Add(gtx.Ops)
 		key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)
