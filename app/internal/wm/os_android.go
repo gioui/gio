@@ -298,8 +298,8 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		}
 		windows[wopts.window] = w
 	}
-	w.callbacks.SetDriver(w)
 	w.view = view
+	w.callbacks.SetDriver(w)
 	handle := C.jlong(view)
 	views[handle] = w
 	w.loadConfig(env, class)
