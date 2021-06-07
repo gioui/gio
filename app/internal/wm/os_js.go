@@ -510,6 +510,9 @@ func (w *window) WriteClipboard(s string) {
 }
 
 func (w *window) Option(opts *Options) {
+	if o := opts.Title; o != nil {
+		w.document.Set("title", *o)
+	}
 	if o := opts.WindowMode; o != nil {
 		w.windowMode(*o)
 	}
