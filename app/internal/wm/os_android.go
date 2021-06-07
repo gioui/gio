@@ -158,6 +158,7 @@ var gioView struct {
 	setOrientation     C.jmethodID
 	setNavigationColor C.jmethodID
 	setStatusColor     C.jmethodID
+	setFullscreen      C.jmethodID
 }
 
 // ViewEvent is sent whenever the Window's underlying Android view
@@ -288,6 +289,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.setOrientation = getMethodID(env, class, "setOrientation", "(II)V")
 		m.setNavigationColor = getMethodID(env, class, "setNavigationColor", "(II)V")
 		m.setStatusColor = getMethodID(env, class, "setStatusColor", "(II)V")
+		m.setFullscreen = getMethodID(env, class, "setFullscreen", "(Z)V")
 	})
 	view = C.jni_NewGlobalRef(env, view)
 	wopts := <-mainWindow.out
@@ -753,6 +755,9 @@ func (w *window) Option(opts *Options) {
 		if o := opts.StatusColor; o != nil {
 			setStatusColor(env, w.view, *o)
 		}
+		if o := opts.WindowMode; o != nil {
+			setWindowMode(env, w.view, *o)
+		}
 	})
 }
 
@@ -820,6 +825,15 @@ func setNavigationColor(env *C.JNIEnv, view C.jobject, color color.NRGBA) {
 		jvalue(uint32(color.A)<<24|uint32(color.R)<<16|uint32(color.G)<<8|uint32(color.B)),
 		jvalue(int(f32color.LinearFromSRGB(color).Luminance()*255)),
 	)
+}
+
+func setWindowMode(env *C.JNIEnv, view C.jobject, mode WindowMode) {
+	switch mode {
+	case Fullscreen:
+		callVoidMethod(env, view, gioView.setFullscreen, C.JNI_TRUE)
+	default:
+		callVoidMethod(env, view, gioView.setFullscreen, C.JNI_FALSE)
+	}
 }
 
 // Close the window. Not implemented for Android.
