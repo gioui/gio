@@ -696,7 +696,7 @@ func ArcTransform(p, f1, f2 f32.Point, angle float32, segments int) f32.Affine2D
 	f := dist(f1, c)
 	b := math.Sqrt(a*a - f*f)
 
-	var rx, ry, alpha, start float64
+	var rx, ry, alpha float64
 	switch {
 	case a > b:
 		rx = a
@@ -727,12 +727,6 @@ func ArcTransform(p, f1, f2 f32.Point, angle float32, segments int) f32.Affine2D
 			}
 		}
 	}
-
-	start = math.Acos(float64(p.X-c.X) / dist(c, p))
-	if c.Y > p.Y {
-		start = -start
-	}
-	start -= alpha
 
 	var (
 		θ   = angle / float32(segments)

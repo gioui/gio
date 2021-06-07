@@ -27,15 +27,13 @@ type Op struct {
 
 func (p Op) Add(o *op.Ops) {
 	str := p.stroke
-	dashes := p.dashes
 	path := p.path
 	outline := p.outline
-	approx := str.Width > 0 && !(dashes == DashSpec{} && str.Miter == 0 && str.Join == RoundJoin && str.Cap == RoundCap)
+	approx := str.Width > 0 && !(p.dashes == DashSpec{} && str.Miter == 0 && str.Join == RoundJoin && str.Cap == RoundCap)
 	if approx {
 		// If the stroke is not natively supported by the compute renderer, construct a filled path
 		// that approximates it.
 		path = p.approximateStroke(o)
-		dashes = DashSpec{}
 		str = StrokeStyle{}
 		outline = true
 	}
