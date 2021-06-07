@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -39,9 +41,40 @@ func buildJS(bi *buildInfo) error {
 	if err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(filepath.Join(out, "index.html"), []byte(jsIndex), 0600); err != nil {
+
+	var faviconPath string
+	if _, err := os.Stat(bi.iconPath); err == nil {
+		// Copy icon to the output folder
+		icon, err := ioutil.ReadFile(bi.iconPath)
+		if err != nil {
+			return err
+		}
+		if err := ioutil.WriteFile(filepath.Join(out, filepath.Base(bi.iconPath)), icon, 0600); err != nil {
+			return err
+		}
+		faviconPath = filepath.Base(bi.iconPath)
+	}
+
+	indexTemplate, err := template.New("").Parse(jsIndex)
+	if err != nil {
 		return err
 	}
+
+	var b bytes.Buffer
+	if err := indexTemplate.Execute(&b, struct {
+		Name string
+		Icon string
+	}{
+		Name: bi.name,
+		Icon: faviconPath,
+	}); err != nil {
+		return err
+	}
+
+	if err := ioutil.WriteFile(filepath.Join(out, "index.html"), b.Bytes(), 0600); err != nil {
+		return err
+	}
+
 	goroot, err := runCmd(exec.Command("go", "env", "GOROOT"))
 	if err != nil {
 		return err
@@ -125,6 +158,8 @@ const (
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no">
 		<meta name="mobile-web-app-capable" content="yes">
+		{{ if .Icon }}<link rel="icon" href="{{.Icon}}" type="image/x-icon" />{{ end }}
+		{{ if .Name }}<title>{{.Name}}</title>{{ end }}
 		<script src="wasm.js"></script>
 		<style>
 			body,pre { margin:0;padding:0; }
