@@ -148,6 +148,22 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
         ((Activity) this.getContext()).setRequestedOrientation(id);
     }
 
+    private void setFullscreen(boolean enabled) {
+        int flags = this.getSystemUiVisibility();
+        if (enabled) {
+           flags |= SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+           flags |= SYSTEM_UI_FLAG_HIDE_NAVIGATION;
+           flags |= SYSTEM_UI_FLAG_FULLSCREEN;
+           flags |= SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+        } else {
+           flags &= ~SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+           flags &= ~SYSTEM_UI_FLAG_HIDE_NAVIGATION;
+           flags &= ~SYSTEM_UI_FLAG_FULLSCREEN;
+           flags &= ~SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+        }
+        this.setSystemUiVisibility(flags);
+    }
+
     private enum Bar {
         NAVIGATION,
         STATUS,
