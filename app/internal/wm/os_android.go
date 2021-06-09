@@ -546,7 +546,7 @@ func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.j
 	if n, ok := convertKeyCode(keyCode); ok {
 		w.callbacks.Event(key.Event{Name: n})
 	}
-	if r != 0 {
+	if r != 0 && r != '\n' { // Checking for "\n" to prevent duplication with key.NameEnter (gio#224).
 		w.callbacks.Event(key.EditEvent{Text: string(rune(r))})
 	}
 }
