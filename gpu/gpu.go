@@ -365,6 +365,8 @@ func New(api API) (GPU, error) {
 	if err != nil {
 		return nil, err
 	}
+	d.BeginFrame(false, image.Point{})
+	defer d.EndFrame()
 	forceCompute := os.Getenv("GIORENDERER") == "forcecompute"
 	feats := d.Caps().Features
 	switch {

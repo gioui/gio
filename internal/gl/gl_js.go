@@ -101,8 +101,8 @@ func (f *Functions) BindVertexArray(a VertexArray) {
 func (f *Functions) BlendEquation(mode Enum) {
 	f.Ctx.Call("blendEquation", int(mode))
 }
-func (f *Functions) BlendFunc(sfactor, dfactor Enum) {
-	f.Ctx.Call("blendFunc", int(sfactor), int(dfactor))
+func (f *Functions) BlendFuncSeparate(srcRGB, dstRGB, srcA, dstA Enum) {
+	f.Ctx.Call("blendFunc", int(srcRGB), int(dstRGB), int(srcA), int(dstA))
 }
 func (f *Functions) BlitFramebuffer(sx0, sy0, sx1, sy1, dx0, dy0, dx1, dy1 int, mask Enum, filter Enum) {
 	panic("not implemented")
@@ -241,10 +241,40 @@ func (f *Functions) GetFramebufferAttachmentParameteri(target, attachment, pname
 	return paramVal(f.Ctx.Call("getFramebufferAttachmentParameter", int(target), int(attachment), int(pname)))
 }
 func (f *Functions) GetBinding(pname Enum) Object {
-	return Object(f.Ctx.Call("getParameter", int(pname)))
+	obj := f.Ctx.Call("getParameter", int(pname))
+	if !obj.Truthy() {
+		return Object{}
+	}
+	return Object(obj)
+}
+func (f *Functions) GetBindingi(pname Enum, idx int) Object {
+	obj := f.Ctx.Call("getIndexedParameter", int(pname), idx)
+	if !obj.Truthy() {
+		return Object{}
+	}
+	return Object(obj)
 }
 func (f *Functions) GetInteger(pname Enum) int {
 	return paramVal(f.Ctx.Call("getParameter", int(pname)))
+}
+func (f *Functions) GetFloat(pname Enum) float32 {
+	return float32(f.Ctx.Call("getParameter", int(pname)).Float())
+}
+func (f *Functions) GetInteger4(pname Enum) [4]int {
+	arr := f.Ctx.Call("getParameter", int(pname))
+	var res [4]int
+	for i := range res {
+		res[i] = arr.Index(i).Int()
+	}
+	return res
+}
+func (f *Functions) GetFloat4(pname Enum) [4]float32 {
+	arr := f.Ctx.Call("getParameter", int(pname))
+	var res [4]float32
+	for i := range res {
+		res[i] = float32(arr.Index(i).Float())
+	}
+	return res
 }
 func (f *Functions) GetProgrami(p Program, pname Enum) int {
 	return paramVal(f.Ctx.Call("getProgramParameter", js.Value(p), int(pname)))
@@ -283,6 +313,19 @@ func (f *Functions) GetUniformBlockIndex(p Program, name string) uint {
 }
 func (f *Functions) GetUniformLocation(p Program, name string) Uniform {
 	return Uniform(f.Ctx.Call("getUniformLocation", js.Value(p), name))
+}
+func (f *Functions) GetVertexAttrib(index int, pname Enum) int {
+	return paramVal(f.Ctx.Call("getVertexAttrib", index, int(pname)))
+}
+func (f *Functions) GetVertexAttribBinding(index int, pname Enum) Object {
+	obj := f.Ctx.Call("getVertexAttrib", index, int(pname))
+	if !obj.Truthy() {
+		return Object{}
+	}
+	return Object(obj)
+}
+func (f *Functions) GetVertexAttribPointer(index int, pname Enum) uintptr {
+	return uintptr(f.Ctx.Call("getVertexAttribOffset", index, int(pname)).Int())
 }
 func (f *Functions) InvalidateFramebuffer(target, attachment Enum) {
 	fn := f.Ctx.Get("invalidateFramebuffer")

@@ -42,7 +42,7 @@ typedef struct {
 	void (*glBindRenderbuffer)(GLenum target, GLuint renderbuffer);
 	void (*glBindTexture)(GLenum target, GLuint texture);
 	void (*glBlendEquation)(GLenum mode);
-	void (*glBlendFunc)(GLenum sfactor, GLenum dfactor);
+	void (*glBlendFuncSeparate)(GLenum srcRGB, GLenum dstRGB, GLenum srcA, GLenum dstA);
 	void (*glBufferData)(GLenum target, GLsizeiptr size, const void *data, GLenum usage);
 	void (*glBufferSubData)(GLenum target, GLintptr offset, GLsizeiptr size, const void *data);
 	GLenum (*glCheckFramebufferStatus)(GLenum target);
@@ -76,7 +76,9 @@ typedef struct {
 	void (*glGenTextures)(GLsizei n, GLuint *textures);
 	GLenum (*glGetError)(void);
 	void (*glGetFramebufferAttachmentParameteriv)(GLenum target, GLenum attachment, GLenum pname, GLint *params);
+	void (*glGetFloatv)(GLenum pname, GLfloat *data);
 	void (*glGetIntegerv)(GLenum pname, GLint *data);
+	void (*glGetIntegeri_v)(GLenum pname, GLuint idx, GLint *data);
 	void (*glGetProgramiv)(GLuint program, GLenum pname, GLint *params);
 	void (*glGetProgramInfoLog)(GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
 	void (*glGetRenderbufferParameteriv)(GLenum target, GLenum pname, GLint *params);
@@ -84,6 +86,8 @@ typedef struct {
 	void (*glGetShaderInfoLog)(GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
 	const GLubyte *(*glGetString)(GLenum name);
 	GLint (*glGetUniformLocation)(GLuint program, const GLchar *name);
+	void (*glGetVertexAttribiv)(GLuint index, GLenum pname, GLint *params);
+	void (*glGetVertexAttribPointerv)(GLuint index, GLenum pname, void **params);
 	GLboolean (*glIsEnabled)(GLenum cap);
 	void (*glLinkProgram)(GLuint program);
 	void (*glPixelStorei)(GLenum pname, GLint param);
@@ -162,8 +166,8 @@ static void glBlendEquation(glFunctions *f, GLenum mode) {
 	f->glBlendEquation(mode);
 }
 
-static void glBlendFunc(glFunctions *f, GLenum sfactor, GLenum dfactor) {
-	f->glBlendFunc(sfactor, dfactor);
+static void glBlendFuncSeparate(glFunctions *f, GLenum srcRGB, GLenum dstRGB, GLenum srcA, GLenum dstA) {
+	f->glBlendFuncSeparate(srcRGB, dstRGB, srcA, dstA);
 }
 
 static void glBufferData(glFunctions *f, GLenum target, GLsizeiptr size, const void *data, GLenum usage) {
@@ -303,6 +307,14 @@ static void glGetIntegerv(glFunctions *f, GLenum pname, GLint *data) {
 	f->glGetIntegerv(pname, data);
 }
 
+static void glGetFloatv(glFunctions *f, GLenum pname, GLfloat *data) {
+	f->glGetFloatv(pname, data);
+}
+
+static void glGetIntegeri_v(glFunctions *f, GLenum pname, GLuint idx, GLint *data) {
+	f->glGetIntegeri_v(pname, idx, data);
+}
+
 static void glGetProgramiv(glFunctions *f, GLuint program, GLenum pname, GLint *params) {
 	f->glGetProgramiv(program, pname, params);
 }
@@ -329,6 +341,17 @@ static const GLubyte *glGetString(glFunctions *f, GLenum name) {
 
 static GLint glGetUniformLocation(glFunctions *f, GLuint program, const GLchar *name) {
 	return f->glGetUniformLocation(program, name);
+}
+
+static void glGetVertexAttribiv(glFunctions *f, GLuint index, GLenum pname, GLint *data) {
+	f->glGetVertexAttribiv(index, pname, data);
+}
+
+// Return uintptr_t to avoid Cgo pointer check.
+static uintptr_t glGetVertexAttribPointerv(glFunctions *f, GLuint index, GLenum pname) {
+	void *ptrs;
+	f->glGetVertexAttribPointerv(index, pname, &ptrs);
+	return (uintptr_t)ptrs;
 }
 
 static GLboolean glIsEnabled(glFunctions *f, GLenum cap) {
@@ -493,8 +516,9 @@ type Context interface{}
 
 type Functions struct {
 	// Query caches.
-	uints [100]C.GLuint
-	ints  [100]C.GLint
+	uints  [100]C.GLuint
+	ints   [100]C.GLint
+	floats [100]C.GLfloat
 
 	f C.glFunctions
 }
@@ -571,7 +595,7 @@ func (f *Functions) load(forceES bool) error {
 	f.f.glBindRenderbuffer = must("glBindRenderbuffer")
 	f.f.glBindTexture = must("glBindTexture")
 	f.f.glBlendEquation = must("glBlendEquation")
-	f.f.glBlendFunc = must("glBlendFunc")
+	f.f.glBlendFuncSeparate = must("glBlendFuncSeparate")
 	f.f.glBufferData = must("glBufferData")
 	f.f.glBufferSubData = must("glBufferSubData")
 	f.f.glCheckFramebufferStatus = must("glCheckFramebufferStatus")
@@ -606,6 +630,7 @@ func (f *Functions) load(forceES bool) error {
 	f.f.glGetError = must("glGetError")
 	f.f.glGetFramebufferAttachmentParameteriv = must("glGetFramebufferAttachmentParameteriv")
 	f.f.glGetIntegerv = must("glGetIntegerv")
+	f.f.glGetFloatv = must("glGetFloatv")
 	f.f.glGetProgramiv = must("glGetProgramiv")
 	f.f.glGetProgramInfoLog = must("glGetProgramInfoLog")
 	f.f.glGetRenderbufferParameteriv = must("glGetRenderbufferParameteriv")
@@ -613,6 +638,8 @@ func (f *Functions) load(forceES bool) error {
 	f.f.glGetShaderInfoLog = must("glGetShaderInfoLog")
 	f.f.glGetString = must("glGetString")
 	f.f.glGetUniformLocation = must("glGetUniformLocation")
+	f.f.glGetVertexAttribiv = must("glGetVertexAttribiv")
+	f.f.glGetVertexAttribPointerv = must("glGetVertexAttribPointerv")
 	f.f.glIsEnabled = must("glIsEnabled")
 	f.f.glLinkProgram = must("glLinkProgram")
 	f.f.glPixelStorei = must("glPixelStorei")
@@ -634,7 +661,8 @@ func (f *Functions) load(forceES bool) error {
 
 	// Extensions and GL ES 3 functions.
 	f.f.glBindBufferBase = load("glBindBufferBase")
-	f.f.glBindVertexArray = must("glBindVertexArray")
+	f.f.glBindVertexArray = load("glBindVertexArray")
+	f.f.glGetIntegeri_v = load("glGetIntegeri_v")
 	f.f.glGetUniformBlockIndex = load("glGetUniformBlockIndex")
 	f.f.glUniformBlockBinding = load("glUniformBlockBinding")
 	f.f.glInvalidateFramebuffer = load("glInvalidateFramebuffer")
@@ -733,8 +761,8 @@ func (f *Functions) BlendEquation(mode Enum) {
 	C.glBlendEquation(&f.f, C.GLenum(mode))
 }
 
-func (f *Functions) BlendFunc(sfactor, dfactor Enum) {
-	C.glBlendFunc(&f.f, C.GLenum(sfactor), C.GLenum(dfactor))
+func (f *Functions) BlendFuncSeparate(srcRGB, dstRGB, srcA, dstA Enum) {
+	C.glBlendFuncSeparate(&f.f, C.GLenum(srcRGB), C.GLenum(dstRGB), C.GLenum(srcA), C.GLenum(dstA))
 }
 
 func (f *Functions) BlitFramebuffer(sx0, sy0, sx1, sy1, dx0, dy0, dx1, dy1 int, mask Enum, filter Enum) {
@@ -917,6 +945,10 @@ func (c *Functions) GetBinding(pname Enum) Object {
 	return Object{uint(c.GetInteger(pname))}
 }
 
+func (c *Functions) GetBindingi(pname Enum, idx int) Object {
+	return Object{uint(c.GetIntegeri(pname, idx))}
+}
+
 func (f *Functions) GetError() Enum {
 	return Enum(C.glGetError(&f.f))
 }
@@ -931,6 +963,20 @@ func (f *Functions) GetFramebufferAttachmentParameteri(target, attachment, pname
 	return int(f.ints[0])
 }
 
+func (f *Functions) GetFloat4(pname Enum) [4]float32 {
+	C.glGetFloatv(&f.f, C.GLenum(pname), &f.floats[0])
+	var r [4]float32
+	for i := range r {
+		r[i] = float32(f.floats[i])
+	}
+	return r
+}
+
+func (f *Functions) GetFloat(pname Enum) float32 {
+	C.glGetFloatv(&f.f, C.GLenum(pname), &f.floats[0])
+	return float32(f.floats[0])
+}
+
 func (f *Functions) GetInteger4(pname Enum) [4]int {
 	C.glGetIntegerv(&f.f, C.GLenum(pname), &f.ints[0])
 	var r [4]int
@@ -942,6 +988,11 @@ func (f *Functions) GetInteger4(pname Enum) [4]int {
 
 func (f *Functions) GetInteger(pname Enum) int {
 	C.glGetIntegerv(&f.f, C.GLenum(pname), &f.ints[0])
+	return int(f.ints[0])
+}
+
+func (f *Functions) GetIntegeri(pname Enum, idx int) int {
+	C.glGetIntegeri_v(&f.f, C.GLenum(pname), C.GLuint(idx), &f.ints[0])
 	return int(f.ints[0])
 }
 
@@ -1021,6 +1072,20 @@ func (f *Functions) GetUniformLocation(p Program, name string) Uniform {
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
 	return Uniform{int(C.glGetUniformLocation(&f.f, C.GLuint(p.V), cname))}
+}
+
+func (f *Functions) GetVertexAttrib(index int, pname Enum) int {
+	C.glGetVertexAttribiv(&f.f, C.GLuint(index), C.GLenum(pname), &f.ints[0])
+	return int(f.ints[0])
+}
+
+func (f *Functions) GetVertexAttribBinding(index int, pname Enum) Object {
+	return Object{uint(f.GetVertexAttrib(index, pname))}
+}
+
+func (f *Functions) GetVertexAttribPointer(index int, pname Enum) uintptr {
+	ptr := C.glGetVertexAttribPointerv(&f.f, C.GLuint(index), C.GLenum(pname))
+	return uintptr(ptr)
 }
 
 func (f *Functions) InvalidateFramebuffer(target, attachment Enum) {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package srgb
+package opengl
 
 import (
 	"errors"
@@ -13,11 +13,12 @@ import (
 	"gioui.org/internal/gl"
 )
 
-// FBO implements an intermediate sRGB FBO
+// SRGBFBO implements an intermediate sRGB FBO
 // for gamma-correct rendering on platforms without
 // sRGB enabled native framebuffers.
-type FBO struct {
+type SRGBFBO struct {
 	c           *gl.Functions
+	state       *glState
 	viewport    image.Point
 	srgbBuffer  gl.Framebuffer
 	depthBuffer gl.Renderbuffer
@@ -28,7 +29,7 @@ type FBO struct {
 	gl3         bool
 }
 
-func New(f *gl.Functions) (*FBO, error) {
+func NewSRGBFBO(f *gl.Functions, state *glState) (*SRGBFBO, error) {
 	var gl3 bool
 	glVer := f.GetString(gl.VERSION)
 	ver, _, err := gl.ParseGLVersion(glVer)
@@ -43,14 +44,15 @@ func New(f *gl.Functions) (*FBO, error) {
 			return nil, fmt.Errorf("no support for OpenGL ES 3 nor EXT_sRGB")
 		}
 	}
-	s := &FBO{
+	s := &SRGBFBO{
 		c:           f,
+		state:       state,
 		gl3:         gl3,
 		srgbBuffer:  f.CreateFramebuffer(),
 		colorTex:    f.CreateTexture(),
 		depthBuffer: f.CreateRenderbuffer(),
 	}
-	f.BindTexture(gl.TEXTURE_2D, s.colorTex)
+	state.bindTexture(f, 0, s.colorTex)
 	f.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 	f.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 	f.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
@@ -58,17 +60,17 @@ func New(f *gl.Functions) (*FBO, error) {
 	return s, nil
 }
 
-func (s *FBO) Blit() {
+func (s *SRGBFBO) Blit() {
 	if !s.blitted {
 		prog, err := gl.CreateProgram(s.c, blitVSrc, blitFSrc, []string{"pos", "uv"})
 		if err != nil {
 			panic(err)
 		}
 		s.prog = prog
-		s.c.UseProgram(prog)
+		s.state.useProgram(s.c, prog)
 		s.c.Uniform1i(s.c.GetUniformLocation(prog, "tex"), 0)
 		s.quad = s.c.CreateBuffer()
-		s.c.BindBuffer(gl.ARRAY_BUFFER, s.quad)
+		s.state.bindBuffer(s.c, gl.ARRAY_BUFFER, s.quad)
 		coords := byteslice.Slice([]float32{
 			-1, +1, 0, 1,
 			+1, +1, 1, 1,
@@ -79,27 +81,23 @@ func (s *FBO) Blit() {
 		s.c.BufferSubData(gl.ARRAY_BUFFER, 0, coords)
 		s.blitted = true
 	}
-	s.c.UseProgram(s.prog)
-	s.c.BindTexture(gl.TEXTURE_2D, s.colorTex)
-	s.c.BindBuffer(gl.ARRAY_BUFFER, s.quad)
-	s.c.VertexAttribPointer(0 /* pos */, 2, gl.FLOAT, false, 4*4, 0)
-	s.c.VertexAttribPointer(1 /* uv */, 2, gl.FLOAT, false, 4*4, 4*2)
-	s.c.EnableVertexAttribArray(0)
-	s.c.EnableVertexAttribArray(1)
+	s.state.useProgram(s.c, s.prog)
+	s.state.bindTexture(s.c, 0, s.colorTex)
+	s.state.vertexAttribPointer(s.c, s.quad, 0 /* pos */, 2, gl.FLOAT, false, 4*4, 0)
+	s.state.vertexAttribPointer(s.c, s.quad, 1 /* uv */, 2, gl.FLOAT, false, 4*4, 4*2)
+	s.state.setVertexAttribArray(s.c, 0, true)
+	s.state.setVertexAttribArray(s.c, 1, true)
 	s.c.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
-	s.c.BindTexture(gl.TEXTURE_2D, gl.Texture{})
-	s.c.DisableVertexAttribArray(0)
-	s.c.DisableVertexAttribArray(1)
-	s.c.BindFramebuffer(gl.FRAMEBUFFER, s.srgbBuffer)
+	s.state.bindFramebuffer(s.c, gl.FRAMEBUFFER, s.srgbBuffer)
 	s.c.InvalidateFramebuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0)
 	s.c.InvalidateFramebuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT)
 }
 
-func (s *FBO) Framebuffer() gl.Framebuffer {
+func (s *SRGBFBO) Framebuffer() gl.Framebuffer {
 	return s.srgbBuffer
 }
 
-func (s *FBO) Refresh(viewport image.Point) error {
+func (s *SRGBFBO) Refresh(viewport image.Point) error {
 	if viewport.X == 0 || viewport.Y == 0 {
 		return errors.New("srgb: zero-sized framebuffer")
 	}
@@ -107,17 +105,15 @@ func (s *FBO) Refresh(viewport image.Point) error {
 		return nil
 	}
 	s.viewport = viewport
-	s.c.BindTexture(gl.TEXTURE_2D, s.colorTex)
+	s.state.bindTexture(s.c, 0, s.colorTex)
 	if s.gl3 {
 		s.c.TexImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, viewport.X, viewport.Y, gl.RGBA, gl.UNSIGNED_BYTE)
 	} else /* EXT_sRGB */ {
 		s.c.TexImage2D(gl.TEXTURE_2D, 0, gl.SRGB_ALPHA_EXT, viewport.X, viewport.Y, gl.SRGB_ALPHA_EXT, gl.UNSIGNED_BYTE)
 	}
-	currentRB := gl.Renderbuffer(s.c.GetBinding(gl.RENDERBUFFER_BINDING))
-	s.c.BindRenderbuffer(gl.RENDERBUFFER, s.depthBuffer)
+	s.state.bindRenderbuffer(s.c, gl.RENDERBUFFER, s.depthBuffer)
 	s.c.RenderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, viewport.X, viewport.Y)
-	s.c.BindRenderbuffer(gl.RENDERBUFFER, currentRB)
-	s.c.BindFramebuffer(gl.FRAMEBUFFER, s.srgbBuffer)
+	s.state.bindFramebuffer(s.c, gl.FRAMEBUFFER, s.srgbBuffer)
 	s.c.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, s.colorTex, 0)
 	s.c.FramebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, s.depthBuffer)
 	if st := s.c.CheckFramebufferStatus(gl.FRAMEBUFFER); st != gl.FRAMEBUFFER_COMPLETE {
@@ -128,7 +124,7 @@ func (s *FBO) Refresh(viewport image.Point) error {
 		// With macOS Safari, rendering to and then reading from a SRGB8_ALPHA8
 		// texture result in twice gamma corrected colors. Using a plain RGBA
 		// texture seems to work.
-		s.c.ClearColor(.5, .5, .5, 1.0)
+		s.state.setClearColor(s.c, .5, .5, .5, 1.0)
 		s.c.Clear(gl.COLOR_BUFFER_BIT)
 		var pixel [4]byte
 		s.c.ReadPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel[:])
@@ -143,13 +139,13 @@ func (s *FBO) Refresh(viewport image.Point) error {
 	return nil
 }
 
-func (s *FBO) Release() {
-	s.c.DeleteFramebuffer(s.srgbBuffer)
-	s.c.DeleteTexture(s.colorTex)
-	s.c.DeleteRenderbuffer(s.depthBuffer)
+func (s *SRGBFBO) Release() {
+	s.state.deleteFramebuffer(s.c, s.srgbBuffer)
+	s.state.deleteTexture(s.c, s.colorTex)
+	s.state.deleteRenderbuffer(s.c, s.depthBuffer)
 	if s.blitted {
-		s.c.DeleteBuffer(s.quad)
-		s.c.DeleteProgram(s.prog)
+		s.state.deleteBuffer(s.c, s.quad)
+		s.state.deleteProgram(s.c, s.prog)
 	}
 	s.c = nil
 }

@@ -24,7 +24,7 @@ var (
 	_glBindTexture                         = LibGLESv2.NewProc("glBindTexture")
 	_glBindVertexArray                     = LibGLESv2.NewProc("glBindVertexArray")
 	_glBlendEquation                       = LibGLESv2.NewProc("glBlendEquation")
-	_glBlendFunc                           = LibGLESv2.NewProc("glBlendFunc")
+	_glBlendFuncSeparate                   = LibGLESv2.NewProc("glBlendFuncSeparate")
 	_glBufferData                          = LibGLESv2.NewProc("glBufferData")
 	_glBufferSubData                       = LibGLESv2.NewProc("glBufferSubData")
 	_glCheckFramebufferStatus              = LibGLESv2.NewProc("glCheckFramebufferStatus")
@@ -64,8 +64,10 @@ var (
 	_glGenQueries                          = LibGLESv2.NewProc("glGenQueries")
 	_glGetError                            = LibGLESv2.NewProc("glGetError")
 	_glGetRenderbufferParameteriv          = LibGLESv2.NewProc("glGetRenderbufferParameteriv")
+	_glGetFloatv                           = LibGLESv2.NewProc("glGetFloatv")
 	_glGetFramebufferAttachmentParameteriv = LibGLESv2.NewProc("glGetFramebufferAttachmentParameteriv")
 	_glGetIntegerv                         = LibGLESv2.NewProc("glGetIntegerv")
+	_glGetIntegeri_v                       = LibGLESv2.NewProc("glGetIntegeri_v")
 	_glGetProgramiv                        = LibGLESv2.NewProc("glGetProgramiv")
 	_glGetProgramInfoLog                   = LibGLESv2.NewProc("glGetProgramInfoLog")
 	_glGetQueryObjectuiv                   = LibGLESv2.NewProc("glGetQueryObjectuiv")
@@ -73,6 +75,8 @@ var (
 	_glGetShaderInfoLog                    = LibGLESv2.NewProc("glGetShaderInfoLog")
 	_glGetString                           = LibGLESv2.NewProc("glGetString")
 	_glGetUniformLocation                  = LibGLESv2.NewProc("glGetUniformLocation")
+	_glGetVertexAttribiv                   = LibGLESv2.NewProc("glGetVertexAttribiv")
+	_glGetVertexAttribPointerv             = LibGLESv2.NewProc("glGetVertexAttribPointerv")
 	_glInvalidateFramebuffer               = LibGLESv2.NewProc("glInvalidateFramebuffer")
 	_glIsEnabled                           = LibGLESv2.NewProc("glIsEnabled")
 	_glLinkProgram                         = LibGLESv2.NewProc("glLinkProgram")
@@ -98,7 +102,9 @@ var (
 
 type Functions struct {
 	// Query caches.
-	int32s [100]int32
+	int32s   [100]int32
+	float32s [100]float32
+	uintptrs [100]uintptr
 }
 
 type Context interface{}
@@ -149,8 +155,8 @@ func (c *Functions) BindVertexArray(a VertexArray) {
 func (c *Functions) BlendEquation(mode Enum) {
 	syscall.Syscall(_glBlendEquation.Addr(), 1, uintptr(mode), 0, 0)
 }
-func (c *Functions) BlendFunc(sfactor, dfactor Enum) {
-	syscall.Syscall(_glBlendFunc.Addr(), 2, uintptr(sfactor), uintptr(dfactor), 0)
+func (c *Functions) BlendFuncSeparate(srcRGB, dstRGB, srcA, dstA Enum) {
+	syscall.Syscall6(_glBlendFuncSeparate.Addr(), 4, uintptr(srcRGB), uintptr(dstRGB), uintptr(srcA), uintptr(dstA), 0, 0)
 }
 func (f *Functions) BlitFramebuffer(sx0, sy0, sx1, sy1, dx0, dy0, dx1, dy1 int, mask Enum, filter Enum) {
 	panic("not implemented")
@@ -299,6 +305,9 @@ func (f *Functions) GetUniformBlockIndex(p Program, name string) uint {
 func (c *Functions) GetBinding(pname Enum) Object {
 	return Object{uint(c.GetInteger(pname))}
 }
+func (c *Functions) GetBindingi(pname Enum, idx int) Object {
+	return Object{uint(c.GetIntegeri(pname, idx))}
+}
 func (c *Functions) GetError() Enum {
 	e, _, _ := syscall.Syscall(_glGetError.Addr(), 0, 0, 0, 0)
 	return Enum(e)
@@ -322,6 +331,20 @@ func (c *Functions) GetInteger4(pname Enum) [4]int {
 func (c *Functions) GetInteger(pname Enum) int {
 	syscall.Syscall(_glGetIntegerv.Addr(), 2, uintptr(pname), uintptr(unsafe.Pointer(&c.int32s[0])), 0)
 	return int(c.int32s[0])
+}
+func (c *Functions) GetIntegeri(pname Enum, idx int) int {
+	syscall.Syscall(_glGetIntegeri_v.Addr(), 3, uintptr(pname), uintptr(idx), uintptr(unsafe.Pointer(&c.int32s[0])))
+	return int(c.int32s[0])
+}
+func (c *Functions) GetFloat(pname Enum) float32 {
+	syscall.Syscall(_glGetFloatv.Addr(), 2, uintptr(pname), uintptr(unsafe.Pointer(&c.float32s[0])), 0)
+	return c.float32s[0]
+}
+func (c *Functions) GetFloat4(pname Enum) [4]float32 {
+	syscall.Syscall(_glGetFloatv.Addr(), 2, uintptr(pname), uintptr(unsafe.Pointer(&c.float32s[0])), 0)
+	var r [4]float32
+	copy(r[:], c.float32s[:])
+	return r
 }
 func (c *Functions) GetProgrami(p Program, pname Enum) int {
 	syscall.Syscall(_glGetProgramiv.Addr(), 3, uintptr(p.V), uintptr(pname), uintptr(unsafe.Pointer(&c.int32s[0])))
@@ -357,6 +380,19 @@ func (c *Functions) GetUniformLocation(p Program, name string) Uniform {
 	u, _, _ := syscall.Syscall(_glGetUniformLocation.Addr(), 2, uintptr(p.V), uintptr(unsafe.Pointer(c0)), 0)
 	issue34474KeepAlive(c0)
 	return Uniform{int(u)}
+}
+func (c *Functions) GetVertexAttrib(index int, pname Enum) int {
+	syscall.Syscall(_glGetVertexAttribiv.Addr(), 3, uintptr(index), uintptr(pname), uintptr(unsafe.Pointer(&c.int32s[0])))
+	return int(c.int32s[0])
+}
+
+func (c *Functions) GetVertexAttribBinding(index int, pname Enum) Object {
+	return Object{uint(c.GetVertexAttrib(index, pname))}
+}
+
+func (c *Functions) GetVertexAttribPointer(index int, pname Enum) uintptr {
+	syscall.Syscall(_glGetVertexAttribPointerv.Addr(), 3, uintptr(index), uintptr(pname), uintptr(unsafe.Pointer(&c.uintptrs[0])))
+	return c.uintptrs[0]
 }
 func (c *Functions) InvalidateFramebuffer(target, attachment Enum) {
 	addr := _glInvalidateFramebuffer.Addr()

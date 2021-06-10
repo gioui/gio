@@ -12,15 +12,16 @@ import (
 
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/gl"
-	"gioui.org/internal/srgb"
 )
 
 // Backend implements driver.Device.
 type Backend struct {
 	funcs *gl.Functions
 
-	clear bool
-	state glstate
+	clear      bool
+	glstate    glState
+	state      state
+	savedState glState
 
 	glver [2]int
 	gles  bool
@@ -33,27 +34,61 @@ type Backend struct {
 	alphaTriple textureTriple
 	srgbaTriple textureTriple
 
-	sRGBFBO     *srgb.FBO
-	enabledSRGB bool
-	defFBO      gl.Framebuffer
+	sRGBFBO *SRGBFBO
 
-	// defVertArray is bound during a frame. We don't need it, but
+	// vertArray is bound during a frame. We don't need it, but
 	// core desktop OpenGL profile 3.3 requires some array bound.
-	defVertArray gl.VertexArray
+	vertArray gl.VertexArray
 }
 
 // State tracking.
-type glstate struct {
-	// nattr is the current number of enabled vertex arrays.
-	nattr    int
-	prog     *gpuProgram
-	texUnits [4]*gpuTexture
-	layout   *gpuInputLayout
-	buffer   bufferBinding
+type glState struct {
+	drawFBO     gl.Framebuffer
+	readFBO     gl.Framebuffer
+	renderBuf   gl.Renderbuffer
+	vertAttribs [5]struct {
+		obj        gl.Buffer
+		enabled    bool
+		size       int
+		typ        gl.Enum
+		normalized bool
+		stride     int
+		offset     uintptr
+	}
+	prog     gl.Program
+	texUnits struct {
+		active gl.Enum
+		binds  [2]gl.Texture
+	}
+	arrayBuf  gl.Buffer
+	elemBuf   gl.Buffer
+	uniBuf    gl.Buffer
+	uniBufs   [2]gl.Buffer
+	storeBuf  gl.Buffer
+	storeBufs [4]gl.Buffer
+	vertArray gl.VertexArray
+	depthMask bool
+	depthFunc gl.Enum
+	srgb      bool
+	blend     struct {
+		enable         bool
+		srcRGB, dstRGB gl.Enum
+		srcA, dstA     gl.Enum
+	}
+	depthTest  bool
+	clearColor [4]float32
+	clearDepth float32
+	viewport   [4]int
+}
+
+type state struct {
+	prog   *gpuProgram
+	layout *gpuInputLayout
+	buffer bufferBinding
 }
 
 type bufferBinding struct {
-	buf    *gpuBuffer
+	obj    gl.Buffer
 	offset int
 	stride int
 }
@@ -94,7 +129,6 @@ type gpuBuffer struct {
 type gpuProgram struct {
 	backend      *Backend
 	obj          gl.Program
-	nattr        int
 	vertUniforms uniformsTracker
 	fragUniforms uniformsTracker
 	storage      [storageBindings]*gpuBuffer
@@ -179,21 +213,21 @@ func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 
 func (b *Backend) BeginFrame(clear bool, viewport image.Point) driver.Framebuffer {
 	b.clear = clear
-	// Assume GL state is reset between frames.
-	b.state = glstate{}
-	b.defFBO = gl.Framebuffer(b.funcs.GetBinding(gl.FRAMEBUFFER_BINDING))
-	renderFBO := b.defFBO
+	b.glstate = b.queryState()
+	b.savedState = b.glstate
+	b.state = state{}
+	renderFBO := b.glstate.drawFBO
 	if b.gles {
 		// If the output framebuffer is not in the sRGB colorspace already, emulate it.
 		var fbEncoding int
-		if !b.defFBO.Valid() {
+		if !renderFBO.Valid() {
 			fbEncoding = b.funcs.GetFramebufferAttachmentParameteri(gl.FRAMEBUFFER, gl.BACK, gl.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING)
 		} else {
 			fbEncoding = b.funcs.GetFramebufferAttachmentParameteri(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING)
 		}
-		if fbEncoding == gl.LINEAR {
+		if fbEncoding == gl.LINEAR && viewport != (image.Point{}) {
 			if b.sRGBFBO == nil {
-				sfbo, err := srgb.New(b.funcs)
+				sfbo, err := NewSRGBFBO(b.funcs, &b.glstate)
 				if err != nil {
 					panic(err)
 				}
@@ -205,16 +239,13 @@ func (b *Backend) BeginFrame(clear bool, viewport image.Point) driver.Framebuffe
 			renderFBO = b.sRGBFBO.Framebuffer()
 		}
 	} else {
-		b.enabledSRGB = !b.funcs.IsEnabled(gl.FRAMEBUFFER_SRGB)
-		if b.enabledSRGB {
-			b.funcs.Enable(gl.FRAMEBUFFER_SRGB)
+		b.glstate.set(b.funcs, gl.FRAMEBUFFER_SRGB, true)
+		if !b.vertArray.Valid() {
+			b.vertArray = b.funcs.CreateVertexArray()
 		}
-		if !b.defVertArray.Valid() {
-			b.defVertArray = b.funcs.CreateVertexArray()
-		}
-		b.funcs.BindVertexArray(b.defVertArray)
+		b.glstate.bindVertexArray(b.funcs, b.vertArray)
 	}
-	b.funcs.BindFramebuffer(gl.FRAMEBUFFER, renderFBO)
+	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, renderFBO)
 	if b.sRGBFBO != nil && !clear {
 		b.Clear(0, 0, 0, 0)
 	}
@@ -222,9 +253,8 @@ func (b *Backend) BeginFrame(clear bool, viewport image.Point) driver.Framebuffe
 }
 
 func (b *Backend) EndFrame() {
-	b.funcs.ActiveTexture(gl.TEXTURE0)
 	if b.sRGBFBO != nil {
-		b.funcs.BindFramebuffer(gl.FRAMEBUFFER, b.defFBO)
+		b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, b.savedState.drawFBO)
 		if b.clear {
 			b.SetBlend(false)
 		} else {
@@ -233,13 +263,374 @@ func (b *Backend) EndFrame() {
 		}
 		b.sRGBFBO.Blit()
 	}
-	b.SetBlend(false)
-	b.funcs.BindFramebuffer(gl.FRAMEBUFFER, b.defFBO)
-	if b.enabledSRGB {
-		b.funcs.Disable(gl.FRAMEBUFFER_SRGB)
-	}
+	b.restoreState(b.savedState)
 	// For single-buffered framebuffers such as on macOS.
 	b.funcs.Flush()
+}
+
+func (b *Backend) queryState() glState {
+	s := glState{
+		prog:       gl.Program(b.funcs.GetBinding(gl.CURRENT_PROGRAM)),
+		arrayBuf:   gl.Buffer(b.funcs.GetBinding(gl.ARRAY_BUFFER_BINDING)),
+		elemBuf:    gl.Buffer(b.funcs.GetBinding(gl.ELEMENT_ARRAY_BUFFER_BINDING)),
+		drawFBO:    gl.Framebuffer(b.funcs.GetBinding(gl.FRAMEBUFFER_BINDING)),
+		depthMask:  b.funcs.GetInteger(gl.DEPTH_WRITEMASK) != gl.FALSE,
+		depthTest:  b.funcs.IsEnabled(gl.DEPTH_TEST),
+		depthFunc:  gl.Enum(b.funcs.GetInteger(gl.DEPTH_FUNC)),
+		clearDepth: b.funcs.GetFloat(gl.DEPTH_CLEAR_VALUE),
+		clearColor: b.funcs.GetFloat4(gl.COLOR_CLEAR_VALUE),
+		viewport:   b.funcs.GetInteger4(gl.VIEWPORT),
+	}
+	s.blend.enable = b.funcs.IsEnabled(gl.BLEND)
+	s.blend.srcRGB = gl.Enum(b.funcs.GetInteger(gl.BLEND_SRC_RGB))
+	s.blend.dstRGB = gl.Enum(b.funcs.GetInteger(gl.BLEND_DST_RGB))
+	s.blend.srcA = gl.Enum(b.funcs.GetInteger(gl.BLEND_SRC_ALPHA))
+	s.blend.dstA = gl.Enum(b.funcs.GetInteger(gl.BLEND_DST_ALPHA))
+	s.texUnits.active = gl.Enum(b.funcs.GetInteger(gl.ACTIVE_TEXTURE))
+	if !b.gles {
+		s.srgb = b.funcs.IsEnabled(gl.FRAMEBUFFER_SRGB)
+	}
+	if !b.gles || b.glver[0] >= 3 {
+		s.vertArray = gl.VertexArray(b.funcs.GetBinding(gl.VERTEX_ARRAY_BINDING))
+		s.readFBO = gl.Framebuffer(b.funcs.GetBinding(gl.READ_FRAMEBUFFER_BINDING))
+		s.uniBuf = gl.Buffer(b.funcs.GetBinding(gl.UNIFORM_BUFFER_BINDING))
+		for i := range s.uniBufs {
+			s.uniBufs[i] = gl.Buffer(b.funcs.GetBindingi(gl.UNIFORM_BUFFER_BINDING, i))
+		}
+	}
+	if b.gles && (b.glver[0] > 3 || (b.glver[0] == 3 && b.glver[1] >= 1)) {
+		s.storeBuf = gl.Buffer(b.funcs.GetBinding(gl.SHADER_STORAGE_BUFFER_BINDING))
+		for i := range s.storeBufs {
+			s.storeBufs[i] = gl.Buffer(b.funcs.GetBindingi(gl.SHADER_STORAGE_BUFFER_BINDING, i))
+		}
+	}
+	for i := range s.texUnits.binds {
+		s.activeTexture(b.funcs, gl.TEXTURE0+gl.Enum(i))
+		s.texUnits.binds[i] = gl.Texture(b.funcs.GetBinding(gl.TEXTURE_BINDING_2D))
+	}
+	for i := range s.vertAttribs {
+		a := &s.vertAttribs[i]
+		a.enabled = b.funcs.GetVertexAttrib(i, gl.VERTEX_ATTRIB_ARRAY_ENABLED) != gl.FALSE
+		a.obj = gl.Buffer(b.funcs.GetVertexAttribBinding(i, gl.VERTEX_ATTRIB_ARRAY_ENABLED))
+		a.size = b.funcs.GetVertexAttrib(i, gl.VERTEX_ATTRIB_ARRAY_SIZE)
+		a.typ = gl.Enum(b.funcs.GetVertexAttrib(i, gl.VERTEX_ATTRIB_ARRAY_TYPE))
+		a.normalized = b.funcs.GetVertexAttrib(i, gl.VERTEX_ATTRIB_ARRAY_NORMALIZED) != gl.FALSE
+		a.stride = b.funcs.GetVertexAttrib(i, gl.VERTEX_ATTRIB_ARRAY_STRIDE)
+		a.offset = b.funcs.GetVertexAttribPointer(i, gl.VERTEX_ATTRIB_ARRAY_POINTER)
+	}
+	return s
+}
+
+func (b *Backend) restoreState(dst glState) {
+	src := b.glstate
+	f := b.funcs
+	for i, unit := range dst.texUnits.binds {
+		src.bindTexture(f, i, unit)
+	}
+	src.activeTexture(f, dst.texUnits.active)
+	src.bindFramebuffer(f, gl.FRAMEBUFFER, dst.drawFBO)
+	src.bindFramebuffer(f, gl.READ_FRAMEBUFFER, dst.readFBO)
+	src.set(f, gl.BLEND, dst.blend.enable)
+	bf := dst.blend
+	src.setBlendFuncSeparate(f, bf.srcRGB, bf.dstRGB, bf.srcA, bf.dstA)
+	src.set(f, gl.DEPTH_TEST, dst.depthTest)
+	src.setDepthFunc(f, dst.depthFunc)
+	src.set(f, gl.FRAMEBUFFER_SRGB, dst.srgb)
+	src.bindVertexArray(f, dst.vertArray)
+	src.useProgram(f, dst.prog)
+	src.bindBuffer(f, gl.ELEMENT_ARRAY_BUFFER, dst.elemBuf)
+	for i, b := range dst.uniBufs {
+		src.bindBufferBase(f, gl.UNIFORM_BUFFER, i, b)
+	}
+	src.bindBuffer(f, gl.UNIFORM_BUFFER, dst.uniBuf)
+	for i, b := range dst.storeBufs {
+		src.bindBufferBase(f, gl.SHADER_STORAGE_BUFFER, i, b)
+	}
+	src.bindBuffer(f, gl.SHADER_STORAGE_BUFFER, dst.storeBuf)
+	src.setDepthMask(f, dst.depthMask)
+	src.setClearDepth(f, dst.clearDepth)
+	col := dst.clearColor
+	src.setClearColor(f, col[0], col[1], col[2], col[3])
+	for i, attr := range dst.vertAttribs {
+		src.setVertexAttribArray(f, i, attr.enabled)
+		src.vertexAttribPointer(f, attr.obj, i, attr.size, attr.typ, attr.normalized, attr.stride, int(attr.offset))
+	}
+	src.bindBuffer(f, gl.ARRAY_BUFFER, dst.arrayBuf)
+	v := dst.viewport
+	src.setViewport(f, v[0], v[1], v[2], v[3])
+}
+
+func (s *glState) setVertexAttribArray(f *gl.Functions, idx int, enabled bool) {
+	a := &s.vertAttribs[idx]
+	if enabled != a.enabled {
+		if enabled {
+			f.EnableVertexAttribArray(gl.Attrib(idx))
+		} else {
+			f.DisableVertexAttribArray(gl.Attrib(idx))
+		}
+		a.enabled = enabled
+	}
+}
+
+func (s *glState) vertexAttribPointer(f *gl.Functions, buf gl.Buffer, idx, size int, typ gl.Enum, normalized bool, stride, offset int) {
+	s.bindBuffer(f, gl.ARRAY_BUFFER, buf)
+	a := &s.vertAttribs[idx]
+	a.obj = buf
+	a.size = size
+	a.typ = typ
+	a.normalized = normalized
+	a.stride = stride
+	a.offset = uintptr(offset)
+	f.VertexAttribPointer(gl.Attrib(idx), a.size, a.typ, a.normalized, a.stride, int(a.offset))
+}
+
+func (s *glState) activeTexture(f *gl.Functions, unit gl.Enum) {
+	if unit != s.texUnits.active {
+		f.ActiveTexture(unit)
+		s.texUnits.active = unit
+	}
+}
+
+func (s *glState) bindRenderbuffer(f *gl.Functions, target gl.Enum, r gl.Renderbuffer) {
+	if !r.Equal(s.renderBuf) {
+		f.BindRenderbuffer(gl.RENDERBUFFER, r)
+		s.renderBuf = r
+	}
+}
+
+func (s *glState) bindTexture(f *gl.Functions, unit int, t gl.Texture) {
+	s.activeTexture(f, gl.TEXTURE0+gl.Enum(unit))
+	if !t.Equal(s.texUnits.binds[unit]) {
+		f.BindTexture(gl.TEXTURE_2D, t)
+		s.texUnits.binds[unit] = t
+	}
+}
+
+func (s *glState) bindVertexArray(f *gl.Functions, a gl.VertexArray) {
+	if !a.Equal(s.vertArray) {
+		f.BindVertexArray(a)
+		s.vertArray = a
+	}
+}
+
+func (s *glState) deleteRenderbuffer(f *gl.Functions, r gl.Renderbuffer) {
+	f.DeleteRenderbuffer(r)
+	if r.Equal(s.renderBuf) {
+		s.renderBuf = gl.Renderbuffer{}
+	}
+}
+
+func (s *glState) deleteFramebuffer(f *gl.Functions, fbo gl.Framebuffer) {
+	f.DeleteFramebuffer(fbo)
+	if fbo.Equal(s.drawFBO) {
+		s.drawFBO = gl.Framebuffer{}
+	}
+	if fbo.Equal(s.readFBO) {
+		s.readFBO = gl.Framebuffer{}
+	}
+}
+
+func (s *glState) deleteBuffer(f *gl.Functions, b gl.Buffer) {
+	f.DeleteBuffer(b)
+	if b.Equal(s.arrayBuf) {
+		s.arrayBuf = gl.Buffer{}
+	}
+	if b.Equal(s.elemBuf) {
+		s.elemBuf = gl.Buffer{}
+	}
+	if b.Equal(s.uniBuf) {
+		s.uniBuf = gl.Buffer{}
+	}
+	if b.Equal(s.storeBuf) {
+		s.uniBuf = gl.Buffer{}
+	}
+	for i, b2 := range s.storeBufs {
+		if b.Equal(b2) {
+			s.storeBufs[i] = gl.Buffer{}
+		}
+	}
+	for i, b2 := range s.uniBufs {
+		if b.Equal(b2) {
+			s.uniBufs[i] = gl.Buffer{}
+		}
+	}
+}
+
+func (s *glState) deleteProgram(f *gl.Functions, p gl.Program) {
+	f.DeleteProgram(p)
+	if p.Equal(s.prog) {
+		s.prog = gl.Program{}
+	}
+}
+
+func (s *glState) deleteVertexArray(f *gl.Functions, a gl.VertexArray) {
+	f.DeleteVertexArray(a)
+	if a.Equal(s.vertArray) {
+		s.vertArray = gl.VertexArray{}
+	}
+}
+
+func (s *glState) deleteTexture(f *gl.Functions, t gl.Texture) {
+	f.DeleteTexture(t)
+	binds := &s.texUnits.binds
+	for i, obj := range binds {
+		if t.Equal(obj) {
+			binds[i] = gl.Texture{}
+		}
+	}
+}
+
+func (s *glState) useProgram(f *gl.Functions, p gl.Program) {
+	if !p.Equal(s.prog) {
+		f.UseProgram(p)
+		s.prog = p
+	}
+}
+
+func (s *glState) bindFramebuffer(f *gl.Functions, target gl.Enum, fbo gl.Framebuffer) {
+	switch target {
+	case gl.FRAMEBUFFER:
+		if fbo.Equal(s.drawFBO) && fbo.Equal(s.readFBO) {
+			return
+		}
+		s.drawFBO = fbo
+		s.readFBO = fbo
+	case gl.READ_FRAMEBUFFER:
+		if fbo.Equal(s.readFBO) {
+			return
+		}
+		s.readFBO = fbo
+	case gl.DRAW_FRAMEBUFFER:
+		if fbo.Equal(s.drawFBO) {
+			return
+		}
+		s.drawFBO = fbo
+	default:
+		panic("unknown target")
+	}
+	f.BindFramebuffer(target, fbo)
+}
+
+func (s *glState) bindBufferBase(f *gl.Functions, target gl.Enum, idx int, buf gl.Buffer) {
+	switch target {
+	case gl.UNIFORM_BUFFER:
+		if buf.Equal(s.uniBuf) && buf.Equal(s.uniBufs[idx]) {
+			return
+		}
+		s.uniBuf = buf
+		s.uniBufs[idx] = buf
+	case gl.SHADER_STORAGE_BUFFER:
+		if buf.Equal(s.storeBuf) && buf.Equal(s.storeBufs[idx]) {
+			return
+		}
+		s.storeBuf = buf
+		s.storeBufs[idx] = buf
+	default:
+		panic("unknown buffer target")
+	}
+	f.BindBufferBase(target, idx, buf)
+}
+
+func (s *glState) bindBuffer(f *gl.Functions, target gl.Enum, buf gl.Buffer) {
+	switch target {
+	case gl.ARRAY_BUFFER:
+		if buf.Equal(s.arrayBuf) {
+			return
+		}
+		s.arrayBuf = buf
+	case gl.ELEMENT_ARRAY_BUFFER:
+		if buf.Equal(s.elemBuf) {
+			return
+		}
+		s.elemBuf = buf
+	case gl.UNIFORM_BUFFER:
+		if buf.Equal(s.uniBuf) {
+			return
+		}
+		s.uniBuf = buf
+	case gl.SHADER_STORAGE_BUFFER:
+		if buf.Equal(s.storeBuf) {
+			return
+		}
+		s.storeBuf = buf
+	default:
+		panic("unknown buffer target")
+	}
+	f.BindBuffer(target, buf)
+}
+
+func (s *glState) setClearDepth(f *gl.Functions, d float32) {
+	if d != s.clearDepth {
+		f.ClearDepthf(d)
+		s.clearDepth = d
+	}
+}
+
+func (s *glState) setClearColor(f *gl.Functions, r, g, b, a float32) {
+	col := [4]float32{r, g, b, a}
+	if col != s.clearColor {
+		f.ClearColor(r, g, b, a)
+		s.clearColor = col
+	}
+}
+
+func (s *glState) setViewport(f *gl.Functions, x, y, width, height int) {
+	view := [4]int{x, y, width, height}
+	if view != s.viewport {
+		f.Viewport(x, y, width, height)
+		s.viewport = view
+	}
+}
+
+func (s *glState) setDepthFunc(f *gl.Functions, df gl.Enum) {
+	if df != s.depthFunc {
+		f.DepthFunc(df)
+		s.depthFunc = df
+	}
+}
+
+func (s *glState) setBlendFuncSeparate(f *gl.Functions, srcRGB, dstRGB, srcA, dstA gl.Enum) {
+	if srcRGB != s.blend.srcRGB || dstRGB != s.blend.dstRGB || srcA != s.blend.srcA || dstA != s.blend.dstA {
+		s.blend.srcRGB = srcRGB
+		s.blend.dstRGB = dstRGB
+		s.blend.srcA = srcA
+		s.blend.dstA = dstA
+		f.BlendFuncSeparate(srcA, dstA, srcA, dstA)
+	}
+}
+
+func (s *glState) setDepthMask(f *gl.Functions, enable bool) {
+	if enable != s.depthMask {
+		f.DepthMask(enable)
+		s.depthMask = enable
+	}
+}
+
+func (s *glState) set(f *gl.Functions, target gl.Enum, enable bool) {
+	switch target {
+	case gl.FRAMEBUFFER_SRGB:
+		if s.srgb == enable {
+			return
+		}
+		s.srgb = enable
+	case gl.BLEND:
+		if enable == s.blend.enable {
+			return
+		}
+		s.blend.enable = enable
+	case gl.DEPTH_TEST:
+		if enable == s.depthTest {
+			return
+		}
+		s.depthTest = enable
+	default:
+		panic("unknown enable")
+	}
+	if enable {
+		f.Enable(target)
+	} else {
+		f.Disable(target)
+	}
 }
 
 func (b *Backend) Caps() driver.Caps {
@@ -277,7 +668,7 @@ func (b *Backend) NewFramebuffer(tex driver.Texture, depthBits int) (driver.Fram
 			size = gl.DEPTH_COMPONENT24
 		}
 		depthBuf := b.funcs.CreateRenderbuffer()
-		b.funcs.BindRenderbuffer(gl.RENDERBUFFER, depthBuf)
+		b.glstate.bindRenderbuffer(b.funcs, gl.RENDERBUFFER, depthBuf)
 		b.funcs.RenderbufferStorage(gl.RENDERBUFFER, size, gltex.width, gltex.height)
 		b.funcs.FramebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuf)
 		fbo.depthBuf = depthBuf
@@ -345,7 +736,7 @@ func (b *Backend) NewBuffer(typ driver.BufferBinding, size int) (driver.Buffer, 
 			return nil, err
 		}
 		firstBinding := firstBufferType(typ)
-		b.funcs.BindBuffer(firstBinding, buf.obj)
+		b.glstate.bindBuffer(b.funcs, firstBinding, buf.obj)
 		b.funcs.BufferData(firstBinding, size, gl.DYNAMIC_DRAW)
 	}
 	return buf, nil
@@ -356,7 +747,7 @@ func (b *Backend) NewImmutableBuffer(typ driver.BufferBinding, data []byte) (dri
 	obj := b.funcs.CreateBuffer()
 	buf := &gpuBuffer{backend: b, obj: obj, typ: typ, size: len(data), hasBuffer: true}
 	firstBinding := firstBufferType(typ)
-	b.funcs.BindBuffer(firstBinding, buf.obj)
+	b.glstate.bindBuffer(b.funcs, firstBinding, buf.obj)
 	b.funcs.BufferData(firstBinding, len(data), gl.STATIC_DRAW)
 	buf.Upload(data)
 	buf.immutable = true
@@ -378,8 +769,8 @@ func (b *Backend) Release() {
 	if b.sRGBFBO != nil {
 		b.sRGBFBO.Release()
 	}
-	if b.defVertArray.Valid() {
-		b.funcs.DeleteVertexArray(b.defVertArray)
+	if b.vertArray.Valid() {
+		b.glstate.deleteVertexArray(b.funcs, b.vertArray)
 	}
 	*b = Backend{}
 }
@@ -392,7 +783,7 @@ func (b *Backend) DispatchCompute(x, y, z int) {
 	if p := b.state.prog; p != nil {
 		for binding, buf := range p.storage {
 			if buf != nil {
-				b.funcs.BindBufferBase(gl.SHADER_STORAGE_BUFFER, binding, buf.obj)
+				b.glstate.bindBufferBase(b.funcs, gl.SHADER_STORAGE_BUFFER, binding, buf.obj)
 			}
 		}
 	}
@@ -420,43 +811,18 @@ func (b *Backend) BindImageTexture(unit int, tex driver.Texture, access driver.A
 	b.funcs.BindImageTexture(unit, t.obj, 0, false, 0, acc, format)
 }
 
-func (b *Backend) bindTexture(unit int, t *gpuTexture) {
-	if b.state.texUnits[unit] != t {
-		b.funcs.ActiveTexture(gl.TEXTURE0 + gl.Enum(unit))
-		b.funcs.BindTexture(gl.TEXTURE_2D, t.obj)
-		b.state.texUnits[unit] = t
-	}
-}
-
 func (b *Backend) useProgram(p *gpuProgram) {
-	if b.state.prog != p {
-		p.backend.funcs.UseProgram(p.obj)
-		b.state.prog = p
-	}
-}
-
-func (b *Backend) enableVertexArrays(n int) {
-	// Enable needed arrays.
-	for i := b.state.nattr; i < n; i++ {
-		b.funcs.EnableVertexAttribArray(gl.Attrib(i))
-	}
-	// Disable extra arrays.
-	for i := n; i < b.state.nattr; i++ {
-		b.funcs.DisableVertexAttribArray(gl.Attrib(i))
-	}
-	b.state.nattr = n
+	b.glstate.useProgram(b.funcs, p.obj)
+	b.state.prog = p
 }
 
 func (b *Backend) SetDepthTest(enable bool) {
-	if enable {
-		b.funcs.Enable(gl.DEPTH_TEST)
-	} else {
-		b.funcs.Disable(gl.DEPTH_TEST)
-	}
+	b.glstate.set(b.funcs, gl.DEPTH_TEST, enable)
 }
 
 func (b *Backend) BlendFunc(sfactor, dfactor driver.BlendFactor) {
-	b.funcs.BlendFunc(toGLBlendFactor(sfactor), toGLBlendFactor(dfactor))
+	src, dst := toGLBlendFactor(sfactor), toGLBlendFactor(dfactor)
+	b.glstate.setBlendFuncSeparate(b.funcs, src, dst, src, dst)
 }
 
 func toGLBlendFactor(f driver.BlendFactor) gl.Enum {
@@ -475,15 +841,11 @@ func toGLBlendFactor(f driver.BlendFactor) gl.Enum {
 }
 
 func (b *Backend) DepthMask(mask bool) {
-	b.funcs.DepthMask(mask)
+	b.glstate.setDepthMask(b.funcs, mask)
 }
 
 func (b *Backend) SetBlend(enable bool) {
-	if enable {
-		b.funcs.Enable(gl.BLEND)
-	} else {
-		b.funcs.Disable(gl.BLEND)
-	}
+	b.glstate.set(b.funcs, gl.BLEND, enable)
 }
 
 func (b *Backend) DrawElements(mode driver.DrawMode, off, count int) {
@@ -499,14 +861,12 @@ func (b *Backend) DrawArrays(mode driver.DrawMode, off, count int) {
 }
 
 func (b *Backend) prepareDraw() {
-	nattr := b.state.prog.nattr
-	b.enableVertexArrays(nattr)
-	if nattr > 0 {
-		b.setupVertexArrays()
+	p := b.state.prog
+	if p == nil {
+		return
 	}
-	if p := b.state.prog; p != nil {
-		p.updateUniforms()
-	}
+	b.setupVertexArrays()
+	p.updateUniforms()
 }
 
 func toGLDrawMode(mode driver.DrawMode) gl.Enum {
@@ -521,16 +881,16 @@ func toGLDrawMode(mode driver.DrawMode) gl.Enum {
 }
 
 func (b *Backend) Viewport(x, y, width, height int) {
-	b.funcs.Viewport(x, y, width, height)
+	b.glstate.setViewport(b.funcs, x, y, width, height)
 }
 
 func (b *Backend) Clear(colR, colG, colB, colA float32) {
-	b.funcs.ClearColor(colR, colG, colB, colA)
+	b.glstate.setClearColor(b.funcs, colR, colG, colB, colA)
 	b.funcs.Clear(gl.COLOR_BUFFER_BIT)
 }
 
 func (b *Backend) ClearDepth(d float32) {
-	b.funcs.ClearDepthf(d)
+	b.glstate.setClearDepth(b.funcs, d)
 	b.funcs.Clear(gl.DEPTH_BUFFER_BIT)
 }
 
@@ -544,7 +904,7 @@ func (b *Backend) DepthFunc(f driver.DepthFunc) {
 	default:
 		panic("unsupported depth func")
 	}
-	b.funcs.DepthFunc(glfunc)
+	b.glstate.setDepthFunc(b.funcs, glfunc)
 }
 
 func (b *Backend) NewInputLayout(vs driver.ShaderSources, layout []driver.InputDesc) (driver.InputLayout, error) {
@@ -599,7 +959,6 @@ func (b *Backend) NewProgram(vertShader, fragShader driver.ShaderSources) (drive
 	gpuProg := &gpuProgram{
 		backend: b,
 		obj:     p,
-		nattr:   len(attr),
 	}
 	b.BindProgram(gpuProg)
 	// Bind texture uniforms.
@@ -667,10 +1026,10 @@ func (p *gpuProgram) updateUniforms() {
 	f := p.backend.funcs
 	if p.backend.ubo {
 		if b := p.vertUniforms.buf; b != nil {
-			f.BindBufferBase(gl.UNIFORM_BUFFER, 0, b.obj)
+			p.backend.glstate.bindBufferBase(f, gl.UNIFORM_BUFFER, 0, b.obj)
 		}
 		if b := p.fragUniforms.buf; b != nil {
-			f.BindBufferBase(gl.UNIFORM_BUFFER, 1, b.obj)
+			p.backend.glstate.bindBufferBase(f, gl.UNIFORM_BUFFER, 1, b.obj)
 		}
 	} else {
 		p.vertUniforms.update(f)
@@ -684,7 +1043,7 @@ func (b *Backend) BindProgram(prog driver.Program) {
 }
 
 func (p *gpuProgram) Release() {
-	p.backend.funcs.DeleteProgram(p.obj)
+	p.backend.glstate.deleteProgram(p.backend.funcs, p.obj)
 }
 
 func (u *uniformsTracker) setup(funcs *gl.Functions, p gl.Program, uniformSize int, uniforms []driver.UniformLocation) {
@@ -751,7 +1110,7 @@ func (b *gpuBuffer) Upload(data []byte) {
 	copy(b.data, data)
 	if b.hasBuffer {
 		firstBinding := firstBufferType(b.typ)
-		b.backend.funcs.BindBuffer(firstBinding, b.obj)
+		b.backend.glstate.bindBuffer(b.backend.funcs, firstBinding, b.obj)
 		if len(data) == b.size {
 			// the iOS GL implementation doesn't recognize when BufferSubData
 			// clears the entire buffer. Tell it and avoid GPU stalls.
@@ -771,7 +1130,7 @@ func (b *gpuBuffer) Download(data []byte) error {
 		return nil
 	}
 	firstBinding := firstBufferType(b.typ)
-	b.backend.funcs.BindBuffer(firstBinding, b.obj)
+	b.backend.glstate.bindBuffer(b.backend.funcs, firstBinding, b.obj)
 	bufferMap := b.backend.funcs.MapBufferRange(firstBinding, 0, len(data), gl.MAP_READ_BIT)
 	if bufferMap == nil {
 		return fmt.Errorf("MapBufferRange: error %#x", b.backend.funcs.GetError())
@@ -785,7 +1144,7 @@ func (b *gpuBuffer) Download(data []byte) error {
 
 func (b *gpuBuffer) Release() {
 	if b.hasBuffer {
-		b.backend.funcs.DeleteBuffer(b.obj)
+		b.backend.glstate.deleteBuffer(b.backend.funcs, b.obj)
 		b.hasBuffer = false
 	}
 }
@@ -795,7 +1154,7 @@ func (b *Backend) BindVertexBuffer(buf driver.Buffer, stride, offset int) {
 	if gbuf.typ&driver.BufferBindingVertices == 0 {
 		panic("not a vertex buffer")
 	}
-	b.state.buffer = bufferBinding{buf: gbuf, stride: stride, offset: offset}
+	b.state.buffer = bufferBinding{obj: gbuf.obj, stride: stride, offset: offset}
 }
 
 func (b *Backend) setupVertexArrays() {
@@ -803,8 +1162,9 @@ func (b *Backend) setupVertexArrays() {
 	if layout == nil {
 		return
 	}
+	const max = len(b.glstate.vertAttribs)
+	var enabled [max]bool
 	buf := b.state.buffer
-	b.funcs.BindBuffer(gl.ARRAY_BUFFER, buf.buf.obj)
 	for i, inp := range layout.inputs {
 		l := layout.layout[i]
 		var gltyp gl.Enum
@@ -816,7 +1176,11 @@ func (b *Backend) setupVertexArrays() {
 		default:
 			panic("unsupported data type")
 		}
-		b.funcs.VertexAttribPointer(gl.Attrib(inp.Location), l.Size, gltyp, false, buf.stride, buf.offset+l.Offset)
+		enabled[inp.Location] = true
+		b.glstate.vertexAttribPointer(b.funcs, buf.obj, inp.Location, l.Size, gltyp, false, buf.stride, buf.offset+l.Offset)
+	}
+	for i := 0; i < max; i++ {
+		b.glstate.setVertexAttribArray(b.funcs, i, enabled[i])
 	}
 }
 
@@ -825,12 +1189,12 @@ func (b *Backend) BindIndexBuffer(buf driver.Buffer) {
 	if gbuf.typ&driver.BufferBindingIndices == 0 {
 		panic("not an index buffer")
 	}
-	b.funcs.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, gbuf.obj)
+	b.glstate.bindBuffer(b.funcs, gl.ELEMENT_ARRAY_BUFFER, gbuf.obj)
 }
 
 func (b *Backend) BlitFramebuffer(dst, src driver.Framebuffer, srect, drect image.Rectangle) {
-	b.funcs.BindFramebuffer(gl.DRAW_FRAMEBUFFER, dst.(*gpuFramebuffer).obj)
-	b.funcs.BindFramebuffer(gl.READ_FRAMEBUFFER, src.(*gpuFramebuffer).obj)
+	b.glstate.bindFramebuffer(b.funcs, gl.DRAW_FRAMEBUFFER, dst.(*gpuFramebuffer).obj)
+	b.glstate.bindFramebuffer(b.funcs, gl.READ_FRAMEBUFFER, src.(*gpuFramebuffer).obj)
 	b.funcs.BlitFramebuffer(
 		srect.Min.X, srect.Min.Y, srect.Max.X, srect.Max.Y,
 		drect.Min.X, drect.Min.Y, drect.Max.X, drect.Max.Y,
@@ -849,7 +1213,7 @@ func (f *gpuFramebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 }
 
 func (b *Backend) BindFramebuffer(fbo driver.Framebuffer) {
-	b.funcs.BindFramebuffer(gl.FRAMEBUFFER, fbo.(*gpuFramebuffer).obj)
+	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, fbo.(*gpuFramebuffer).obj)
 }
 
 func (f *gpuFramebuffer) Invalidate() {
@@ -861,9 +1225,9 @@ func (f *gpuFramebuffer) Release() {
 	if f.foreign {
 		panic("framebuffer not created by NewFramebuffer")
 	}
-	f.backend.funcs.DeleteFramebuffer(f.obj)
+	f.backend.glstate.deleteFramebuffer(f.backend.funcs, f.obj)
 	if f.hasDepth {
-		f.backend.funcs.DeleteRenderbuffer(f.depthBuf)
+		f.backend.glstate.deleteRenderbuffer(f.backend.funcs, f.depthBuf)
 	}
 }
 
@@ -879,11 +1243,11 @@ func toTexFilter(f driver.TextureFilter) int {
 }
 
 func (b *Backend) BindTexture(unit int, t driver.Texture) {
-	b.bindTexture(unit, t.(*gpuTexture))
+	b.glstate.bindTexture(b.funcs, unit, t.(*gpuTexture).obj)
 }
 
 func (t *gpuTexture) Release() {
-	t.backend.funcs.DeleteTexture(t.obj)
+	t.backend.glstate.deleteTexture(t.backend.funcs, t.obj)
 }
 
 func (t *gpuTexture) Upload(offset, size image.Point, pixels []byte) {
@@ -945,6 +1309,8 @@ func floatTripleFor(f *gl.Functions, ver [2]int, exts []string) (textureTriple, 
 	}
 	tex := f.CreateTexture()
 	defer f.DeleteTexture(tex)
+	defTex := gl.Texture(f.GetBinding(gl.TEXTURE_BINDING_2D))
+	defer f.BindTexture(gl.TEXTURE_2D, defTex)
 	f.BindTexture(gl.TEXTURE_2D, tex)
 	f.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 	f.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
