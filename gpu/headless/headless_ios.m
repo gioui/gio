@@ -27,6 +27,3 @@ void gio_headless_makeCurrentContext(CFTypeRef ctxRef) {
 	EAGLContext *ctx = (__bridge EAGLContext *)ctxRef;
 	[EAGLContext setCurrentContext:ctx];
 }
-
-void gio_headless_prepareContext(CFTypeRef ctxRef) {
-}

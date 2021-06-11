@@ -43,11 +43,3 @@ void gio_headless_makeCurrentContext(CFTypeRef ctxRef) {
 	[ctx makeCurrentContext];
 	CGLLockContext([ctx CGLContextObj]);
 }
-
-void gio_headless_prepareContext(CFTypeRef ctxRef) {
-	// Bind a default VBA to emulate OpenGL ES 2.
-	GLuint defVBA;
-	glGenVertexArrays(1, &defVBA);
-	glBindVertexArray(defVBA);
-	glEnable(GL_FRAMEBUFFER_SRGB);
-}

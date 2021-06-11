@@ -16,13 +16,11 @@ __attribute__ ((visibility ("hidden"))) CFTypeRef gio_headless_newContext(void);
 __attribute__ ((visibility ("hidden"))) void gio_headless_releaseContext(CFTypeRef ctxRef);
 __attribute__ ((visibility ("hidden"))) void gio_headless_clearCurrentContext(CFTypeRef ctxRef);
 __attribute__ ((visibility ("hidden"))) void gio_headless_makeCurrentContext(CFTypeRef ctxRef);
-__attribute__ ((visibility ("hidden"))) void gio_headless_prepareContext(CFTypeRef ctxRef);
 */
 import "C"
 
 type nsContext struct {
-	ctx      C.CFTypeRef
-	prepared bool
+	ctx C.CFTypeRef
 }
 
 func newGLContext() (context, error) {
@@ -36,10 +34,6 @@ func (c *nsContext) API() gpu.API {
 
 func (c *nsContext) MakeCurrent() error {
 	C.gio_headless_makeCurrentContext(c.ctx)
-	if !c.prepared {
-		C.gio_headless_prepareContext(c.ctx)
-		c.prepared = true
-	}
 	return nil
 }
 
