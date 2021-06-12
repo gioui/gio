@@ -6,8 +6,9 @@ package wm
 
 import (
 	"errors"
-	"gioui.org/io/key"
 	"image/color"
+
+	"gioui.org/io/key"
 
 	"gioui.org/gpu"
 	"gioui.org/io/event"
@@ -69,6 +70,7 @@ type Context interface {
 	API() gpu.API
 	Present() error
 	MakeCurrent() error
+	Refresh() error
 	Release()
 	Lock()
 	Unlock()

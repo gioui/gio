@@ -34,6 +34,10 @@ func (c *glContext) Release() {
 	}
 }
 
+func (c *glContext) Refresh() error {
+	return nil
+}
+
 func (c *glContext) MakeCurrent() error {
 	c.Context.ReleaseSurface()
 	var (

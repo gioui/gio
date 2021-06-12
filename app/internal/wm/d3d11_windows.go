@@ -71,6 +71,10 @@ func (c *d3d11Context) Present() error {
 	return err
 }
 
+func (c *d3d11Context) Refresh() error {
+	return nil
+}
+
 func (c *d3d11Context) MakeCurrent() error {
 	var width, height int
 	c.win.w.Run(func() {

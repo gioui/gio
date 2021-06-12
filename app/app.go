@@ -12,7 +12,7 @@ import (
 // ViewEvent carries the platform specific window handles for
 // a Window.
 //
-// ViewEvent is implemented on Android and macOS.
+// ViewEvent is implemented for Android, macOS, Windows.
 type ViewEvent = wm.ViewEvent
 
 // extraArgs contains extra arguments to append to

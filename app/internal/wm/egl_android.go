@@ -34,6 +34,10 @@ func (c *context) Release() {
 	}
 }
 
+func (c *context) Refresh() error {
+	return nil
+}
+
 func (c *context) MakeCurrent() error {
 	c.Context.ReleaseSurface()
 	var (

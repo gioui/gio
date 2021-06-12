@@ -19,6 +19,7 @@ import (
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createGLContext(void);
 __attribute__ ((visibility ("hidden"))) void gio_setContextView(CFTypeRef ctx, CFTypeRef view);
 __attribute__ ((visibility ("hidden"))) void gio_makeCurrentContext(CFTypeRef ctx);
+__attribute__ ((visibility ("hidden"))) void gio_updateContext(CFTypeRef ctx);
 __attribute__ ((visibility ("hidden"))) void gio_flushContextBuffer(CFTypeRef ctx);
 __attribute__ ((visibility ("hidden"))) void gio_clearCurrentContext(void);
 __attribute__ ((visibility ("hidden"))) void gio_lockContext(CFTypeRef ctxRef);
@@ -72,6 +73,13 @@ func (c *context) Lock() {
 
 func (c *context) Unlock() {
 	C.gio_unlockContext(c.ctx)
+}
+
+func (c *context) Refresh() error {
+	c.Lock()
+	defer c.Unlock()
+	C.gio_updateContext(c.ctx)
+	return nil
 }
 
 func (c *context) MakeCurrent() error {
