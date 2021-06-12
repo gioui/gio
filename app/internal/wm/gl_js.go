@@ -54,6 +54,10 @@ func (c *context) Lock() {}
 
 func (c *context) Unlock() {}
 
+func (c *context) Refresh() error {
+	return nil
+}
+
 func (c *context) MakeCurrent() error {
 	return nil
 }

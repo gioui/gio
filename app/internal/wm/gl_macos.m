@@ -8,20 +8,6 @@
 #include <OpenGL/OpenGL.h>
 #include "_cgo_export.h"
 
-@interface GioGLContext : NSOpenGLContext
-@end
-
-@implementation GioGLContext
-- (void) notifyUpdate:(NSNotification*)notification {
-	CGLLockContext([self CGLContextObj]);
-	[self update];
-	CGLUnlockContext([self CGLContextObj]);
-}
-- (void)dealloc {
-	[[NSNotificationCenter defaultCenter] removeObserver:self];
-}
-@end
-
 CFTypeRef gio_createGLContext(void) {
 	@autoreleasepool {
 		NSOpenGLPixelFormatAttribute attr[] = {
@@ -36,25 +22,28 @@ CFTypeRef gio_createGLContext(void) {
 		};
 		NSOpenGLPixelFormat *pixFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attr];
 
-		GioGLContext *ctx = [[GioGLContext alloc] initWithFormat:pixFormat shareContext: nil];
+		NSOpenGLContext *ctx = [[NSOpenGLContext alloc] initWithFormat:pixFormat shareContext: nil];
 		return CFBridgingRetain(ctx);
 	}
 }
 
 void gio_setContextView(CFTypeRef ctxRef, CFTypeRef viewRef) {
-	GioGLContext *ctx = (__bridge GioGLContext *)ctxRef;
+	NSOpenGLContext *ctx = (__bridge NSOpenGLContext *)ctxRef;
 	NSView *view = (__bridge NSView *)viewRef;
 	[view setWantsBestResolutionOpenGLSurface:YES];
 	[ctx setView:view];
-	[[NSNotificationCenter defaultCenter] addObserver:ctx
-											 selector:@selector(notifyUpdate:)
-												 name:NSViewGlobalFrameDidChangeNotification
-											   object:view];
 }
 
 void gio_clearCurrentContext(void) {
 	@autoreleasepool {
 		[NSOpenGLContext clearCurrentContext];
+	}
+}
+
+void gio_updateContext(CFTypeRef ctxRef) {
+	@autoreleasepool {
+		NSOpenGLContext *ctx = (__bridge NSOpenGLContext *)ctxRef;
+		[ctx update];
 	}
 }
 

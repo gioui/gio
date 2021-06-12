@@ -414,6 +414,12 @@ func (w *Window) destroy(err error) {
 	}
 }
 
+func (w *Window) refresh() {
+	w.driverRun(func(_ wm.Driver) {
+		w.loop.Refresh()
+	})
+}
+
 func (w *Window) destroyGPU() {
 	if w.loop != nil {
 		w.loop.Release()
@@ -473,7 +479,7 @@ func (w *Window) run(opts *wm.Options) {
 					if e2.Stage < system.StageRunning {
 						w.destroyGPU()
 					} else {
-						w.loop.Refresh()
+						w.refresh()
 					}
 				}
 				w.stage = e2.Stage
@@ -495,7 +501,7 @@ func (w *Window) run(opts *wm.Options) {
 				w.out <- e2.FrameEvent
 				if w.loop != nil {
 					if e2.Sync {
-						w.loop.Refresh()
+						w.refresh()
 					}
 				}
 				frame, gotFrame := w.waitFrame()

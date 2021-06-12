@@ -31,6 +31,10 @@ func (c *x11Context) Release() {
 	}
 }
 
+func (c *x11Context) Refresh() error {
+	return nil
+}
+
 func (c *x11Context) MakeCurrent() error {
 	c.Context.ReleaseSurface()
 	win, width, height := c.win.window()
