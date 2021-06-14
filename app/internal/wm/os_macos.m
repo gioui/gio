@@ -316,7 +316,8 @@ CFTypeRef gio_createView(void) {
 
 @implementation GioAppDelegate
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
-	[[NSRunningApplication currentApplication] activateWithOptions:(NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps)];
+	[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+	[NSApp activateIgnoringOtherApps:YES];
 	gio_onFinishLaunching();
 }
 - (void)applicationDidHide:(NSNotification *)aNotification {
@@ -332,7 +333,6 @@ void gio_main() {
 		[NSApplication sharedApplication];
 		GioAppDelegate *del = [[GioAppDelegate alloc] init];
 		[NSApp setDelegate:del];
-		[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 
 		NSMenuItem *mainMenu = [NSMenuItem new];
 

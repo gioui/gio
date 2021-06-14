@@ -395,9 +395,9 @@ func NewWindow(win Callbacks, opts *Options) error {
 			return
 		}
 		errch <- nil
-		win.SetDriver(w)
 		w.w = win
 		w.window = C.gio_createWindow(w.view, nil, 0, 0, 0, 0, 0, 0)
+		win.SetDriver(w)
 		w.Option(opts)
 		if nextTopLeft.x == 0 && nextTopLeft.y == 0 {
 			// cascadeTopLeftFromPoint treats (0, 0) as a no-op,
