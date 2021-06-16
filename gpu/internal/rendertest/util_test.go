@@ -70,7 +70,7 @@ func drawImage(t *testing.T, size int, ops *op.Ops, draw func(o *op.Ops)) (im *i
 }
 
 func run(t *testing.T, f func(o *op.Ops), c func(r result)) {
-	// draw a few times and check that it is correct each time, to
+	// Draw a few times and check that it is correct each time, to
 	// ensure any caching effects still generate the correct images.
 	var img *image.RGBA
 	var err error
@@ -82,7 +82,7 @@ func run(t *testing.T, f func(o *op.Ops), c func(r result)) {
 			t.Error("error rendering:", err)
 			return
 		}
-		// check for a reference image and make sure we are identical.
+		// Check for a reference image and make sure it is identical.
 		if !verifyRef(t, img, 0) {
 			name := fmt.Sprintf("%s-%d-bad.png", t.Name(), i)
 			if err := saveImage(name, img); err != nil {

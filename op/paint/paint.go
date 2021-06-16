@@ -98,6 +98,8 @@ func (i ImageOp) Add(o *op.Ops) {
 			Color: i.color,
 		}.Add(o)
 		return
+	} else if i.src == nil || i.src.Bounds().Empty() {
+		return
 	}
 	data := o.Write2(opconst.TypeImageLen, i.src, i.handle)
 	data[0] = byte(opconst.TypeImage)

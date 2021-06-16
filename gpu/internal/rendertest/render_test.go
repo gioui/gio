@@ -340,6 +340,16 @@ func TestLinearGradientAngled(t *testing.T) {
 	}, func(r result) {})
 }
 
+func TestZeroImage(t *testing.T) {
+	ops := new(op.Ops)
+	w := newWindow(t, 10, 10)
+	paint.ImageOp{}.Add(ops)
+	paint.PaintOp{}.Add(ops)
+	if err := w.Frame(ops); err != nil {
+		t.Error(err)
+	}
+}
+
 // lerp calculates linear interpolation with color b and p.
 func lerp(a, b f32color.RGBA, p float32) f32color.RGBA {
 	return f32color.RGBA{
