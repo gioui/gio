@@ -325,7 +325,7 @@ loop:
 		default:
 		}
 
-		if anim || syn {
+		if (anim || syn) && w.width != 0 && w.height != 0 {
 			w.w.Event(FrameEvent{
 				FrameEvent: system.FrameEvent{
 					Now: time.Now(),
