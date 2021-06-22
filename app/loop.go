@@ -134,7 +134,6 @@ func (l *renderLoop) Summary() string {
 }
 
 func (l *renderLoop) Refresh() {
-	l.ctx.Refresh()
 	if l.err != nil {
 		return
 	}

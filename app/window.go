@@ -416,8 +416,9 @@ func (w *Window) destroy(err error) {
 
 func (w *Window) refresh() {
 	w.driverRun(func(_ wm.Driver) {
-		w.loop.Refresh()
+		w.ctx.Refresh()
 	})
+	w.loop.Refresh()
 }
 
 func (w *Window) destroyGPU() {
