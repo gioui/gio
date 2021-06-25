@@ -341,6 +341,7 @@ func buildInfoPlist(bi *buildInfo) string {
 	<key>UIDeviceFamily</key>
 	<array>
 		<integer>1</integer>
+		<integer>2</integer>
 	</array>
 	<key>CFBundleSupportedPlatforms</key>
 	<array>
