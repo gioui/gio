@@ -245,6 +245,16 @@ func (a Axis) Convert(pt image.Point) image.Point {
 	return image.Pt(pt.Y, pt.X)
 }
 
+// FConvert a point in (x, y) coordinates to (main, cross) coordinates,
+// or vice versa. Specifically, FConvert((x, y)) returns (x, y) unchanged
+// for the horizontal axis, or (y, x) for the vertical axis.
+func (a Axis) FConvert(pt f32.Point) f32.Point {
+	if a == Horizontal {
+		return pt
+	}
+	return f32.Pt(pt.Y, pt.X)
+}
+
 // mainConstraint returns the min and max main constraints for axis a.
 func (a Axis) mainConstraint(cs Constraints) (int, int) {
 	if a == Horizontal {
