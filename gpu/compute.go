@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"log"
 	"math"
 	"math/bits"
+	"sort"
 	"time"
 	"unsafe"
 
@@ -31,8 +33,6 @@ type compute struct {
 	collector     collector
 	enc           encoder
 	texOps        []textureOp
-	layerVertices []layerVertex
-	layers        []layer
 	viewport      image.Point
 	maxTextureDim int
 
@@ -65,6 +65,9 @@ type compute struct {
 
 		uniforms *copyUniforms
 		uniBuf   driver.Buffer
+
+		frame         []layer
+		layerVertices []layerVertex
 	}
 	// images contains ImageOp images packed into a texture atlas.
 	images struct {
@@ -114,8 +117,10 @@ type compute struct {
 }
 
 type layer struct {
-	rect  image.Rectangle
-	place image.Point
+	rect   image.Rectangle
+	place  image.Point
+	cmds   encoder
+	texOps []textureOp
 }
 
 type copyUniforms struct {
@@ -396,20 +401,15 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	g.collector.reset()
 
 	g.collector.collect(ops, viewport)
-	reclaimed := false
-	for {
-		g.enc.reset()
-		g.texOps = g.texOps[:0]
-		g.layers = g.layers[:0]
-		if g.collector.encode(viewport, &g.enc, &g.texOps, &g.layers, &g.output.packer) {
-			break
-		}
-		if reclaimed {
-			panic(fmt.Errorf("compute: k4 output atlas exhausted"))
-		}
-		g.output.packer.clear()
-		g.output.packer.newPage()
-		reclaimed = true
+	var frame []layer
+	g.collector.layer(viewport, g.output.frame, &frame)
+	g.output.frame = frame
+	g.output.packer.clear()
+	g.output.packer.newPage()
+	g.texOps = g.texOps[:0]
+	g.enc.reset()
+	if !g.collector.encodeLayers(frame, &g.enc, &g.texOps, &g.output.packer) {
+		panic(fmt.Errorf("compute: k4 output atlas exhausted"))
 	}
 }
 
@@ -515,7 +515,7 @@ func (g *compute) Profile() string {
 
 func (g *compute) clearLayers() {
 	g.ctx.BindFramebuffer(g.output.fbo)
-	for _, l := range g.layers {
+	for _, l := range g.output.frame {
 		g.ctx.ClearRect(image.Rectangle{
 			Min: l.place,
 			Max: l.place.Add(l.rect.Size()),
@@ -527,11 +527,11 @@ func (g *compute) blitOutput(viewport image.Point) {
 	t := g.timers.blit
 	t.begin()
 	defer t.end()
-	if len(g.layers) == 0 {
+	if len(g.output.frame) == 0 {
 		return
 	}
-	g.layerVertices = g.layerVertices[:0]
-	for _, l := range g.layers {
+	g.output.layerVertices = g.output.layerVertices[:0]
+	for _, l := range g.output.frame {
 		placef := layout.FPt(l.place)
 		sizef := layout.FPt(l.rect.Size())
 		quad := [4]layerVertex{
@@ -540,7 +540,7 @@ func (g *compute) blitOutput(viewport image.Point) {
 			{posX: float32(l.rect.Max.X), posY: float32(l.rect.Max.Y), u: placef.X + sizef.X, v: placef.Y + sizef.Y},
 			{posX: float32(l.rect.Min.X), posY: float32(l.rect.Max.Y), u: placef.X, v: placef.Y + sizef.Y},
 		}
-		g.layerVertices = append(g.layerVertices, quad[0], quad[1], quad[3], quad[3], quad[2], quad[1])
+		g.output.layerVertices = append(g.output.layerVertices, quad[0], quad[1], quad[3], quad[3], quad[2], quad[1])
 	}
 
 	// Transform positions to clip space: [-1, -1] - [1, 1], and texture
@@ -554,7 +554,7 @@ func (g *compute) blitOutput(viewport image.Point) {
 	g.output.uniforms.pos = [2]float32{ox, oy}
 	g.output.uniforms.uvScale = [2]float32{1 / float32(g.output.size.X), 1 / float32(g.output.size.Y)}
 	g.output.uniBuf.Upload(byteslice.Struct(g.output.uniforms))
-	vertexData := byteslice.Slice(g.layerVertices)
+	vertexData := byteslice.Slice(g.output.layerVertices)
 	g.output.buffer.ensureCapacity(g.ctx, driver.BufferBindingVertices, len(vertexData))
 	g.output.buffer.buffer.Upload(vertexData)
 	g.ctx.BlendFunc(driver.BlendFactorOne, driver.BlendFactorOneMinusSrcAlpha)
@@ -563,9 +563,9 @@ func (g *compute) blitOutput(viewport image.Point) {
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.ctx.BindTexture(0, g.output.image)
 	g.ctx.BindProgram(g.output.blitProg)
-	g.ctx.BindVertexBuffer(g.output.buffer.buffer, int(unsafe.Sizeof(g.layerVertices[0])), 0)
+	g.ctx.BindVertexBuffer(g.output.buffer.buffer, int(unsafe.Sizeof(g.output.layerVertices[0])), 0)
 	g.ctx.BindInputLayout(g.output.layout)
-	g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(g.layerVertices))
+	g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(g.output.layerVertices))
 }
 
 func (g *compute) renderMaterials() error {
@@ -1153,6 +1153,19 @@ func (e *encoder) fillColor(col color.RGBA) {
 	e.npath++
 }
 
+func (e *encoder) offsetClipBounds(index int, offset f32.Point) {
+	c := &e.scene[index]
+	bounds := f32.Rectangle{
+		Min: f32.Pt(math.Float32frombits(c[1]), math.Float32frombits(c[2])),
+		Max: f32.Pt(math.Float32frombits(c[3]), math.Float32frombits(c[4])),
+	}
+	bounds = bounds.Add(offset)
+	c[1] = math.Float32bits(bounds.Min.X)
+	c[2] = math.Float32bits(bounds.Min.Y)
+	c[3] = math.Float32bits(bounds.Max.X)
+	c[4] = math.Float32bits(bounds.Max.Y)
+}
+
 func (e *encoder) setFillImageOffset(index int, offset image.Point) {
 	x := int16(offset.X)
 	y := int16(offset.Y)
@@ -1186,11 +1199,6 @@ func (c *collector) reset() {
 func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle, path []byte, stroke clip.StrokeStyle) {
 	// Rectangle clip regions.
 	if len(path) == 0 {
-		/*transView := transformBounds(state.t.Invert(), viewport)
-		// If the rectangular clip contains the viewport it can be discarded.
-		if transView.In(bounds) {
-			return
-		}*/
 		// If the rectangular clip region contains a previous path it can be discarded.
 		p := state.clip
 		t := state.relTrans.Invert()
@@ -1339,97 +1347,183 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 	}
 }
 
-func (c *collector) encode(viewport image.Point, enc *encoder, texOps *[]textureOp, layers *[]layer, pck *packer) bool {
-	fview := f32.Rectangle{Max: layout.FPt(viewport)}
-	fillMode := scene.FillModeNonzero
+func (c *collector) layer(viewport image.Point, prevFrame []layer, frame *[]layer) {
+	sort.Slice(prevFrame, func(i, j int) bool {
+		s1 := prevFrame[i].cmds.scene
+		s2 := prevFrame[j].cmds.scene
+		for i, cmd := range s1 {
+			if i >= len(s2) {
+				return false
+			}
+			cmd2 := s2[i]
+			for j, e1 := range cmd {
+				e2 := cmd2[j]
+				switch {
+				case e1 > e2:
+					return false
+				case e1 < e2:
+					return true
+				}
+			}
+		}
+		return false
+	})
+	var l layer
+	var misses int
 	for _, op := range c.paintOps {
+		var (
+			cmds   encoder
+			texOps []textureOp
+		)
+		c.encodeOp(viewport, &cmds, &texOps, op)
+		if l, found := lookupLayer(prevFrame, cmds.scene, texOps); found {
+			*frame = append(*frame, l)
+			continue
+		}
+		l.rect = l.rect.Union(boundRectF(op.state.intersect))
+		l.cmds.append(cmds)
+		l.texOps = append(l.texOps, texOps...)
+		misses++
+		*frame = append(*frame, l)
+		l = layer{}
+	}
+	log.Println("misses", misses, "layers", len(*frame))
+}
+
+func lookupLayer(frame []layer, cmds []scene.Command, texOps []textureOp) (layer, bool) {
+loop:
+	for _, l := range frame {
+		if len(l.cmds.scene) != len(cmds) {
+			continue
+		}
+		if len(l.texOps) != len(texOps) {
+			continue
+		}
+		for i, t := range l.texOps {
+			if t != texOps[i] {
+				continue loop
+			}
+		}
+		for i, c := range l.cmds.scene {
+			if c != cmds[i] {
+				continue loop
+			}
+		}
+		return l, true
+	}
+	return layer{}, false
+}
+
+func (c *collector) encodeLayers(frame []layer, enc *encoder, texOps *[]textureOp, pck *packer) bool {
+	for i, l := range frame {
 		// Position onto output atlas.
-		atlasBounds := boundRectF(op.state.intersect)
-		size := atlasBounds.Size()
+		size := l.rect.Size()
 		// Add padding to avoid overlap.
 		place, fits := pck.tryAdd(size.Add(image.Pt(1, 1)))
 		if !fits {
 			return false
 		}
-		off := place.Pos.Sub(atlasBounds.Min)
-
-		*layers = append(*layers, layer{
-			rect:  atlasBounds,
-			place: place.Pos,
-		})
-
+		off := place.Pos.Sub(l.rect.Min)
+		frame[i].place = place.Pos
 		offf := layout.FPt(off)
-		// Fill in clip bounds, which the shaders expect to be the union
-		// of all affected bounds.
-		var union f32.Rectangle
-		for i, cl := range op.clipStack {
-			union = union.Union(cl.state.absBounds.Add(offf))
-			op.clipStack[i].union = union
+		enc.transform(f32.Affine2D{}.Offset(offf))
+
+		// Offset clip rects.
+		cmdStart := len(enc.scene)
+		enc.append(l.cmds)
+		for i := cmdStart; i < len(enc.scene); i++ {
+			switch enc.scene[i].Op() {
+			case scene.OpBeginClip, scene.OpEndClip:
+				enc.offsetClipBounds(i, offf)
+			}
 		}
 
-		inv := f32.Affine2D{}.Offset(offf)
-		enc.transform(inv)
-		for i := len(op.clipStack) - 1; i >= 0; i-- {
-			cl := op.clipStack[i]
-			if str := cl.state.stroke; str.Width > 0 {
-				enc.fillMode(scene.FillModeStroke)
-				enc.lineWidth(str.Width)
-				fillMode = scene.FillModeStroke
-			} else if fillMode != scene.FillModeNonzero {
-				enc.fillMode(scene.FillModeNonzero)
-				fillMode = scene.FillModeNonzero
-			}
-			enc.transform(cl.relTrans)
-			inv = inv.Mul(cl.relTrans)
-			if len(cl.state.pathVerts) == 0 {
-				enc.rect(cl.state.bounds)
-			} else {
-				enc.encodePath(cl.state.pathVerts)
-			}
-			if i != 0 {
-				enc.beginClip(cl.union)
-			}
+		// Offset texture ops.
+		topStart := len(*texOps)
+		*texOps = append(*texOps, l.texOps...)
+		for i := topStart; i < len(*texOps); i++ {
+			top := &(*texOps)[i]
+			top.sceneIdx += cmdStart
+			top.off = top.off.Add(off)
 		}
-		if op.state.clip == nil {
-			// No clipping; fill the entire view.
-			enc.rect(fview)
-		}
-
-		switch op.state.matType {
-		case materialTexture:
-			// Add fill command. Its offset is resolved and filled in renderMaterials.
-			idx := enc.fillImage(0)
-			sx, hx, ox, hy, sy, oy := op.state.t.Elems()
-			// Separate integer offset from transformation. TextureOps that have identical transforms
-			// except for their integer offsets can share a transformed image.
-			intx, fracx := math.Modf(float64(ox))
-			inty, fracy := math.Modf(float64(oy))
-			t := f32.NewAffine2D(sx, hx, float32(fracx), hy, sy, float32(fracy))
-			*texOps = append(*texOps, textureOp{
-				sceneIdx: idx,
-				img:      op.state.image,
-				off:      image.Pt(int(intx), int(inty)).Add(off),
-				key: textureKey{
-					transform: t,
-					handle:    op.state.image.handle,
-				},
-			})
-		case materialColor:
-			enc.fillColor(f32color.NRGBAToRGBA(op.state.color))
-		case materialLinearGradient:
-			// TODO: implement.
-			enc.fillColor(f32color.NRGBAToRGBA(op.state.color1))
-		default:
-			panic("not implemented")
-		}
-		enc.transform(inv.Invert())
-		// Pop the clip stack, except the first entry used for fill.
-		for i := 1; i < len(op.clipStack); i++ {
-			cl := op.clipStack[i]
-			enc.endClip(cl.union)
-		}
+		enc.transform(f32.Affine2D{}.Offset(offf.Mul(-1)))
 	}
 	return true
+}
+
+func (c *collector) encodeOp(viewport image.Point, enc *encoder, texOps *[]textureOp, op paintOp) {
+	// Fill in clip bounds, which the shaders expect to be the union
+	// of all affected bounds.
+	var union f32.Rectangle
+	for i, cl := range op.clipStack {
+		union = union.Union(cl.state.absBounds)
+		op.clipStack[i].union = union
+	}
+
+	fillMode := scene.FillModeNonzero
+	var inv f32.Affine2D
+	for i := len(op.clipStack) - 1; i >= 0; i-- {
+		cl := op.clipStack[i]
+		if str := cl.state.stroke; str.Width > 0 {
+			enc.fillMode(scene.FillModeStroke)
+			enc.lineWidth(str.Width)
+			fillMode = scene.FillModeStroke
+		} else if fillMode != scene.FillModeNonzero {
+			enc.fillMode(scene.FillModeNonzero)
+			fillMode = scene.FillModeNonzero
+		}
+		enc.transform(cl.relTrans)
+		inv = inv.Mul(cl.relTrans)
+		if len(cl.state.pathVerts) == 0 {
+			enc.rect(cl.state.bounds)
+		} else {
+			enc.encodePath(cl.state.pathVerts)
+		}
+		if i != 0 {
+			enc.beginClip(cl.union)
+		}
+	}
+	if op.state.clip == nil {
+		// No clipping; fill the entire view.
+		enc.rect(f32.Rectangle{Max: layout.FPt(viewport)})
+	}
+
+	switch op.state.matType {
+	case materialTexture:
+		// Add fill command. Its offset is resolved and filled in renderMaterials.
+		idx := enc.fillImage(0)
+		sx, hx, ox, hy, sy, oy := op.state.t.Elems()
+		// Separate integer offset from transformation. TextureOps that have identical transforms
+		// except for their integer offsets can share a transformed image.
+		intx, fracx := math.Modf(float64(ox))
+		inty, fracy := math.Modf(float64(oy))
+		t := f32.NewAffine2D(sx, hx, float32(fracx), hy, sy, float32(fracy))
+		*texOps = append(*texOps, textureOp{
+			sceneIdx: idx,
+			img:      op.state.image,
+			off:      image.Pt(int(intx), int(inty)),
+			key: textureKey{
+				transform: t,
+				handle:    op.state.image.handle,
+			},
+		})
+	case materialColor:
+		enc.fillColor(f32color.NRGBAToRGBA(op.state.color))
+	case materialLinearGradient:
+		// TODO: implement.
+		enc.fillColor(f32color.NRGBAToRGBA(op.state.color1))
+	default:
+		panic("not implemented")
+	}
+	enc.transform(inv.Invert())
+	// Pop the clip stack, except the first entry used for fill.
+	for i := 1; i < len(op.clipStack); i++ {
+		cl := op.clipStack[i]
+		enc.endClip(cl.union)
+	}
+	if fillMode != scene.FillModeNonzero {
+		enc.fillMode(scene.FillModeNonzero)
+	}
 }
 
 func (c *collector) save(id int, state encoderState) {
