@@ -1351,35 +1351,55 @@ func (c *collector) layer(viewport image.Point, prevFrame []layer, frame *[]laye
 	sort.Slice(prevFrame, func(i, j int) bool {
 		s1 := prevFrame[i].cmds.scene
 		s2 := prevFrame[j].cmds.scene
-		for i, cmd := range s1 {
-			if i >= len(s2) {
-				return false
-			}
-			cmd2 := s2[i]
-			for j, e1 := range cmd {
-				e2 := cmd2[j]
-				switch {
-				case e1 > e2:
-					return false
-				case e1 < e2:
-					return true
-				}
-			}
-		}
-		return false
+		return layerLess(s1, s2)
 	})
-	var l layer
+	var (
+		l layer
+	)
 	var misses int
+	// potentials track the slice of layers with prefixes matching l.
+	potentials := prevFrame
+	addLayer := func() {
+		*frame = append(*frame, l)
+		l = layer{}
+	}
 	for _, op := range c.paintOps {
 		var (
 			cmds   encoder
 			texOps []textureOp
 		)
 		c.encodeOp(viewport, &cmds, &texOps, op)
-		if l, found := lookupLayer(prevFrame, cmds.scene, texOps); found {
-			*frame = append(*frame, l)
-			continue
+		// Extend l if possible.
+		start := len(l.cmds.scene)
+		// matched tracks whether l is a prefix for one or more layers in prevFrame.
+		matched := len(potentials) > 0
+		if !matched {
+			// If l is a layer with no prefix, search for the first op that is a prefix.
+			start = 0
 		}
+		// Narrow potentials to layers prefixed with l and op.
+		newPotentials := potentials
+		closest := searchLayerLeftmost(start, newPotentials, cmds.scene)
+		newPotentials = newPotentials[closest:]
+		closest = searchLayerRightmost(start, newPotentials, cmds.scene)
+		newPotentials = newPotentials[:closest]
+
+		// If longest match was found, finalize layer and start a new.
+		if len(l.cmds.scene) > 0 {
+			// If l doesn't have a prefix in prevFrame, end it when op has a prefix.
+			longestUnmatched := !matched && len(newPotentials) > 0
+			// Otherwise, end l when the longest prefix has been found.
+			longestMatched := matched && len(newPotentials) == 0
+			if longestUnmatched || longestMatched {
+				// Longest match found; finalize layer and start a new with op.
+				addLayer()
+				if !matched || len(l.cmds.scene) < len(newPotentials[0].cmds.scene) {
+					misses++
+				}
+				newPotentials = prevFrame
+			}
+		}
+		potentials = newPotentials
 		l.rect = l.rect.Union(boundRectF(op.state.intersect))
 		sceneIdx := len(l.cmds.scene)
 		l.cmds.append(cmds)
@@ -1389,11 +1409,76 @@ func (c *collector) layer(viewport image.Point, prevFrame []layer, frame *[]laye
 		for i := texIdx; i < len(l.texOps); i++ {
 			l.texOps[i].sceneIdx += sceneIdx
 		}
-		misses++
-		*frame = append(*frame, l)
-		l = layer{}
+	}
+	if len(l.cmds.scene) > 0 {
+		addLayer()
 	}
 	log.Println("misses", misses, "layers", len(*frame))
+}
+
+func searchLayerRightmost(start int, frame []layer, cmds []scene.Command) int {
+	lo, hi := 0, len(frame)
+	for lo < hi {
+		mid := (lo + hi) / 2
+		cmds2 := frame[mid].cmds.scene[start:]
+		if !layerLess(cmds2, cmds) && !layerEqual(cmds2, cmds) {
+			hi = mid
+		} else {
+			lo = mid + 1
+		}
+	}
+	if hi == 0 {
+		return 0
+	}
+	return hi - 1
+}
+
+func searchLayerLeftmost(start int, frame []layer, cmds []scene.Command) int {
+	lo, hi := 0, len(frame)
+	for lo < hi {
+		mid := (lo + hi) / 2
+		if layerLess(frame[mid].cmds.scene[start:], cmds) {
+			lo = mid + 1
+		} else {
+			hi = mid
+		}
+	}
+	return lo
+}
+
+func layerEqual(s1, s2 []scene.Command) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+	for i, cmd := range s1 {
+		cmd2 := s2[i]
+		for j, e1 := range cmd {
+			e2 := cmd2[j]
+			if e1 != e2 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func layerLess(s1, s2 []scene.Command) bool {
+	for i, cmd := range s1 {
+		if i >= len(s2) {
+			return false
+		}
+		cmd2 := s2[i]
+		for j, e1 := range cmd {
+			e2 := cmd2[j]
+			switch {
+			case e1 > e2:
+				return false
+			case e1 < e2:
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func lookupLayer(frame []layer, cmds []scene.Command, texOps []textureOp) (layer, bool) {
