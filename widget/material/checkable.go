@@ -67,7 +67,8 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 						if gtx.Queue == nil {
 							icon.Color = f32color.Disabled(icon.Color)
 						}
-						icon.Layout(gtx, unit.Px(float32(size)))
+						gtx.Constraints.Min = image.Point{X: size}
+						icon.Layout(gtx)
 						return layout.Dimensions{
 							Size: image.Point{X: size, Y: size},
 						}

@@ -170,7 +170,8 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 				size := gtx.Px(b.Size)
 				if b.Icon != nil {
 					b.Icon.Color = b.Color
-					b.Icon.Layout(gtx, unit.Px(float32(size)))
+					gtx.Constraints.Min = image.Point{X: size}
+					b.Icon.Layout(gtx)
 				}
 				return layout.Dimensions{
 					Size: image.Point{X: size, Y: size},

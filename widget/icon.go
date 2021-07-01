@@ -7,12 +7,14 @@ import (
 	"image/color"
 	"image/draw"
 
-	"golang.org/x/exp/shiny/iconvg"
-
 	"gioui.org/internal/f32color"
 	"gioui.org/layout"
+	"gioui.org/op"
+	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
+
+	"golang.org/x/exp/shiny/iconvg"
 )
 
 type Icon struct {
@@ -24,6 +26,8 @@ type Icon struct {
 	imgColor color.NRGBA
 }
 
+var defaultIconSize = unit.Dp(24)
+
 // NewIcon returns a new Icon from IconVG data.
 func NewIcon(data []byte) (*Icon, error) {
 	_, err := iconvg.DecodeMetadata(data)
@@ -33,8 +37,17 @@ func NewIcon(data []byte) (*Icon, error) {
 	return &Icon{src: data, Color: color.NRGBA{A: 0xff}}, nil
 }
 
-func (ic *Icon) Layout(gtx layout.Context, sz unit.Value) layout.Dimensions {
-	ico := ic.image(gtx.Px(sz))
+// Layout displays the icon with its size set to the X minimum constraint.
+func (ic *Icon) Layout(gtx layout.Context) layout.Dimensions {
+	sz := gtx.Constraints.Min.X
+	if sz == 0 {
+		sz = gtx.Metric.Px(defaultIconSize)
+	}
+	size := gtx.Constraints.Constrain(image.Pt(sz, sz))
+	defer op.Save(gtx.Ops).Load()
+	clip.Rect{Max: size}.Add(gtx.Ops)
+
+	ico := ic.image(size.X)
 	ico.Add(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
 	return layout.Dimensions{
