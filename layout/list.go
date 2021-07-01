@@ -74,6 +74,8 @@ type Position struct {
 	OffsetLast int
 	// Count is the number of visible children.
 	Count int
+	// Length is the estimated total size of all children, measured in pixels.
+	Length int
 }
 
 const (
@@ -106,11 +108,22 @@ func (l *List) Layout(gtx Context, len int, w ListElement) Dimensions {
 	crossMin, crossMax := l.Axis.crossConstraint(gtx.Constraints)
 	gtx.Constraints = l.Axis.constraints(0, inf, crossMin, crossMax)
 	macro := op.Record(gtx.Ops)
+	laidOutTotalLength := 0
+	numLaidOut := 0
+
 	for l.next(); l.more(); l.next() {
 		child := op.Record(gtx.Ops)
 		dims := w(gtx, l.index())
 		call := child.Stop()
 		l.end(dims, call)
+		laidOutTotalLength += l.Axis.Convert(dims.Size).X
+		numLaidOut++
+	}
+
+	if numLaidOut > 0 {
+		l.Position.Length = laidOutTotalLength * len / numLaidOut
+	} else {
+		l.Position.Length = 0
 	}
 	return l.layout(gtx.Ops, macro)
 }
