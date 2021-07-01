@@ -1381,8 +1381,14 @@ func (c *collector) layer(viewport image.Point, prevFrame []layer, frame *[]laye
 			continue
 		}
 		l.rect = l.rect.Union(boundRectF(op.state.intersect))
+		sceneIdx := len(l.cmds.scene)
 		l.cmds.append(cmds)
+		texIdx := len(l.texOps)
 		l.texOps = append(l.texOps, texOps...)
+		// Offset scene indices.
+		for i := texIdx; i < len(l.texOps); i++ {
+			l.texOps[i].sceneIdx += sceneIdx
+		}
 		misses++
 		*frame = append(*frame, l)
 		l = layer{}
