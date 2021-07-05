@@ -123,6 +123,7 @@ type layer struct {
 	place  image.Point
 	cmds   encoder
 	texOps []textureOp
+	ops    []paintOp
 }
 
 type copyUniforms struct {
@@ -153,6 +154,7 @@ type paintOp struct {
 	clipStack []clipCmd
 	state     encoderState
 	hash      uint64
+	order     int
 }
 
 // clipCmd describes a clipping command ready to be used for the compute
@@ -406,7 +408,7 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 
 	g.collector.collect(ops, viewport)
 	var frame []layer
-	g.collector.layer(viewport, g.output.frame, &frame)
+	//g.collector.layer(viewport, g.output.frame, &frame)
 	g.collector.layer2(viewport, g.output.frame2, &frame)
 	g.output.frame2 = make([]paintOp, len(g.collector.paintOps))
 	copy(g.output.frame2, g.collector.paintOps)
@@ -1351,6 +1353,7 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 				r = transformRect(cl2.relTrans, r)
 			}
 		}
+		op.order = i
 		op.hash = c.hashOp(op)
 	}
 }
@@ -1414,18 +1417,88 @@ func (c *collector) hashOp(op *paintOp) uint64 {
 
 func (c *collector) layer2(viewport image.Point, prevFrames []paintOp, frame *[]layer) {
 	// Sort ops from previous frames by hash.
-	layerOrder := make([]int, len(prevFrames))
-	for i := range layerOrder {
-		layerOrder[i] = i
-	}
-	sort.Slice(layerOrder, func(i, j int) bool {
+	sorted := make([]paintOp, len(prevFrames))
+	copy(sorted, prevFrames)
+	sort.Slice(sorted, func(i, j int) bool {
 		return prevFrames[i].hash < prevFrames[j].hash
 	})
 	ops := c.paintOps
+	var unmatched []paintOp
+	misses := 0
 	for len(ops) > 0 {
 		op := ops[0]
-		start := searchOp(prevFrames, op.hash)
+		// Search for longest matching op sequence.
+		// start is the earliest index of a match
+		start := searchOp(sorted, op.hash)
+		layerOps := longestLayer(prevFrames, sorted[start:], ops)
+		if len(layerOps) == 0 {
+			ops = ops[1:]
+			unmatched = append(unmatched, op)
+			misses++
+			continue
+		}
+		if len(unmatched) > 0 {
+			// Flush longest layer of unmatched ops.
+			*frame = append(*frame, layer{ops: unmatched})
+			unmatched = unmatched[:0]
+		}
+		*frame = append(*frame, layer{ops: layerOps})
+		ops = ops[len(layerOps):]
 	}
+	if len(unmatched) > 0 {
+		// Flush longest layer of unmatched ops.
+		*frame = append(*frame, layer{ops: unmatched})
+	}
+	for i := range *frame {
+		l := &(*frame)[i]
+		for _, op := range l.ops {
+			var (
+				cmds   encoder
+				texOps []textureOp
+			)
+			fmt.Println("op", op.order)
+			c.encodeOp(viewport, &cmds, &texOps, op)
+			l.rect = l.rect.Union(boundRectF(op.state.intersect))
+			sceneIdx := len(l.cmds.scene)
+			l.cmds.append(cmds)
+			texIdx := len(l.texOps)
+			l.texOps = append(l.texOps, texOps...)
+			// Offset scene indices.
+			for i := texIdx; i < len(l.texOps); i++ {
+				l.texOps[i].sceneIdx += sceneIdx
+			}
+		}
+	}
+	log.Println("misses", misses, "ops", len(c.paintOps))
+}
+
+func longestLayer(prev, sorted, ops []paintOp) []paintOp {
+	var best []paintOp
+	for len(sorted) > 0 {
+		first := sorted[0]
+		sorted = sorted[1:]
+		if first.hash != ops[0].hash {
+			// No more matches possible.
+			break
+		}
+		if !opEqual(first, ops[0]) {
+			continue
+		}
+		// First op match found. Now find longest matching sequence.
+		match := prev[first.order:]
+		end := 1
+		for end < len(prev) && end < len(ops) {
+			if !opEqual(prev[end], ops[end]) {
+				break
+			}
+			end++
+		}
+		match = match[:end]
+		if len(match) > len(best) {
+			best = match
+		}
+	}
+	return best
 }
 
 func searchOp(ops []paintOp, hash uint64) int {
