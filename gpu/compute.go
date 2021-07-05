@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash/maphash"
 	"image"
 	"image/color"
 	"log"
@@ -136,6 +137,7 @@ type materialUniforms struct {
 }
 
 type collector struct {
+	hasher       maphash.Hash
 	profile      bool
 	reader       ops.Reader
 	states       []encoderState
@@ -149,6 +151,7 @@ type collector struct {
 type paintOp struct {
 	clipStack []clipCmd
 	state     encoderState
+	hash      uint64
 }
 
 // clipCmd describes a clipping command ready to be used for the compute
@@ -1344,10 +1347,46 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 				r = transformRect(cl2.relTrans, r)
 			}
 		}
+		op.hash = c.hashOp(op)
 	}
 }
 
+func (c *collector) hashOp(op *paintOp) uint64 {
+	c.hasher.Reset()
+	for _, cl := range op.clipStack {
+		c.hasher.Write(cl.state.pathVerts)
+		clipKey := struct {
+			bounds f32.Rectangle
+			stroke clip.StrokeStyle
+			trans  f32.Affine2D
+		}{
+			bounds: cl.state.bounds,
+			stroke: cl.state.stroke,
+			trans:  cl.state.relTrans,
+		}
+		keyBytes := (*[unsafe.Sizeof(clipKey)]byte)(unsafe.Pointer(unsafe.Pointer(&clipKey)))
+		c.hasher.Write(keyBytes[:])
+	}
+	paintKey := struct {
+		t f32.Affine2D
+
+		matType materialType
+		image   imageOpData
+		color   color.NRGBA
+
+		stop1  f32.Point
+		stop2  f32.Point
+		color1 color.NRGBA
+		color2 color.NRGBA
+	}{}
+	keyBytes := (*[unsafe.Sizeof(paintKey)]byte)(unsafe.Pointer(unsafe.Pointer(&paintKey)))
+	c.hasher.Write(keyBytes[:])
+	return c.hasher.Sum64()
+}
+
 func (c *collector) layer(viewport image.Point, prevFrame []layer, frame *[]layer) {
+	fmt.Println("****start layer")
+	defer fmt.Println("****end layer")
 	sort.Slice(prevFrame, func(i, j int) bool {
 		s1 := prevFrame[i].cmds.scene
 		s2 := prevFrame[j].cmds.scene
@@ -1393,9 +1432,6 @@ func (c *collector) layer(viewport image.Point, prevFrame []layer, frame *[]laye
 			if longestUnmatched || longestMatched {
 				// Longest match found; finalize layer and start a new with op.
 				addLayer()
-				if !matched || len(l.cmds.scene) < len(newPotentials[0].cmds.scene) {
-					misses++
-				}
 				newPotentials = prevFrame
 			}
 		}
