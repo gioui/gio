@@ -407,11 +407,9 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	g.collector.collect(ops, viewport)
 	var frame []layer
 	g.collector.layer(viewport, g.output.frame, &frame)
-	order := g.collector.layer2(viewport, g.output.frame2, &frame)
+	g.collector.layer2(viewport, g.output.frame2, &frame)
 	g.output.frame2 = make([]paintOp, len(g.collector.paintOps))
-	for i, j := range order {
-		g.output.frame2[i] = g.collector.paintOps[j]
-	}
+	copy(g.output.frame2, g.collector.paintOps)
 	g.output.frame = frame
 	g.output.packer.clear()
 	g.output.packer.newPage()
@@ -1357,49 +1355,106 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 	}
 }
 
+// clipKey completely describes a clip operation and is appropriate for hashing
+// and equality checks.
+type clipKey struct {
+	bounds f32.Rectangle
+	stroke clip.StrokeStyle
+	trans  f32.Affine2D
+}
+
+// paintKey is like clipKey for paintOps.
+type paintKey struct {
+	t f32.Affine2D
+
+	matType materialType
+	image   imageOpData
+	color   color.NRGBA
+
+	stop1  f32.Point
+	stop2  f32.Point
+	color1 color.NRGBA
+	color2 color.NRGBA
+}
+
+func paintKeyFor(st encoderState) paintKey {
+	return paintKey{
+		t:       st.t,
+		matType: st.matType,
+		image:   st.image,
+		color:   st.color,
+		stop1:   st.stop1,
+		stop2:   st.stop2,
+		color1:  st.color1,
+		color2:  st.color2,
+	}
+}
+
+func clipKeyFor(st clipState) clipKey {
+	return clipKey{
+		bounds: st.bounds,
+		stroke: st.stroke,
+		trans:  st.relTrans,
+	}
+}
+
 func (c *collector) hashOp(op *paintOp) uint64 {
 	c.hasher.Reset()
 	for _, cl := range op.clipStack {
 		c.hasher.Write(cl.state.pathVerts)
-		clipKey := struct {
-			bounds f32.Rectangle
-			stroke clip.StrokeStyle
-			trans  f32.Affine2D
-		}{
-			bounds: cl.state.bounds,
-			stroke: cl.state.stroke,
-			trans:  cl.state.relTrans,
-		}
-		keyBytes := (*[unsafe.Sizeof(clipKey)]byte)(unsafe.Pointer(unsafe.Pointer(&clipKey)))
+		k := clipKeyFor(*cl.state)
+		keyBytes := (*[unsafe.Sizeof(k)]byte)(unsafe.Pointer(unsafe.Pointer(&k)))
 		c.hasher.Write(keyBytes[:])
 	}
-	paintKey := struct {
-		t f32.Affine2D
-
-		matType materialType
-		image   imageOpData
-		color   color.NRGBA
-
-		stop1  f32.Point
-		stop2  f32.Point
-		color1 color.NRGBA
-		color2 color.NRGBA
-	}{}
-	keyBytes := (*[unsafe.Sizeof(paintKey)]byte)(unsafe.Pointer(unsafe.Pointer(&paintKey)))
+	k := paintKeyFor(op.state)
+	keyBytes := (*[unsafe.Sizeof(k)]byte)(unsafe.Pointer(unsafe.Pointer(&k)))
 	c.hasher.Write(keyBytes[:])
 	return c.hasher.Sum64()
 }
 
-func (c *collector) layer2(viewport image.Point, prevFrames []paintOp, frame *[]layer) []int {
-	// Sort ops; prevFrames is already sorted.
-	order := make([]int, len(c.paintOps))
-	for i := range order {
-		order[i] = i
+func (c *collector) layer2(viewport image.Point, prevFrames []paintOp, frame *[]layer) {
+	// Sort ops from previous frames by hash.
+	layerOrder := make([]int, len(prevFrames))
+	for i := range layerOrder {
+		layerOrder[i] = i
 	}
-	sort.Slice(order, func(i, j int) bool {
-		return c.paintOps[i].hash < c.paintOps[j].hash
+	sort.Slice(layerOrder, func(i, j int) bool {
+		return prevFrames[i].hash < prevFrames[j].hash
 	})
-	return order
+	ops := c.paintOps
+	for len(ops) > 0 {
+		op := ops[0]
+		start := searchOp(prevFrames, op.hash)
+	}
+}
+
+func searchOp(ops []paintOp, hash uint64) int {
+	lo, hi := 0, len(ops)
+	for lo < hi {
+		mid := (lo + hi) / 2
+		if ops[mid].hash < hash {
+			lo = mid + 1
+		} else {
+			hi = mid
+		}
+	}
+	return lo
+}
+
+func opEqual(o1, o2 paintOp) bool {
+	if len(o1.clipStack) != len(o2.clipStack) {
+		return false
+	}
+	if paintKeyFor(o1.state) != paintKeyFor(o2.state) {
+		return false
+	}
+	for i, cl1 := range o1.clipStack {
+		cl2 := o2.clipStack[i]
+		if clipKeyFor(*cl1.state) != clipKeyFor(*cl2.state) {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *collector) layer(viewport image.Point, prevFrame []layer, frame *[]layer) {
