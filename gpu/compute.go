@@ -407,9 +407,11 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	g.collector.collect(ops, viewport)
 	var frame []layer
 	g.collector.layer(viewport, g.output.frame, &frame)
-	g.collector.layer2(viewport, g.output.frame2, &frame)
+	order := g.collector.layer2(viewport, g.output.frame2, &frame)
 	g.output.frame2 = make([]paintOp, len(g.collector.paintOps))
-	copy(g.output.frame2, g.collector.paintOps)
+	for i, j := range order {
+		g.output.frame2[i] = g.collector.paintOps[j]
+	}
 	g.output.frame = frame
 	g.output.packer.clear()
 	g.output.packer.newPage()
@@ -1389,14 +1391,15 @@ func (c *collector) hashOp(op *paintOp) uint64 {
 }
 
 func (c *collector) layer2(viewport image.Point, prevFrames []paintOp, frame *[]layer) []int {
-	// Sort ops from previous frames by hash.
-	layerOrder := make([]int, len(prevFrames))
-	for i := range layerOrder {
-		layerOrder[i] = i
+	// Sort ops; prevFrames is already sorted.
+	order := make([]int, len(c.paintOps))
+	for i := range order {
+		order[i] = i
 	}
-	sort.Slice(layerOrder, func(i, j int) bool {
-		return prevFrames[i].hash < prevFrames[j].hash
+	sort.Slice(order, func(i, j int) bool {
+		return c.paintOps[i].hash < c.paintOps[j].hash
 	})
+	return order
 }
 
 func (c *collector) layer(viewport image.Point, prevFrame []layer, frame *[]layer) {
