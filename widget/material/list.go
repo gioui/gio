@@ -279,6 +279,11 @@ func (l ListStyle) Layout(gtx layout.Context, length int, w layout.ListElement) 
 		// with the scrollbar.
 		deltaPx := int(math.Round(float64(float32(l.state.Position.Length) * delta)))
 		l.state.List.Position.Offset += deltaPx
+
+		// Ensure that the list pays attention to the Offset field when the scrollbar drag
+		// is started while the bar is at the end of the list. Without this, the scrollbar
+		// cannot be dragged away from the end.
+		l.state.List.Position.BeforeEnd = true
 	}
 
 	return listDims
