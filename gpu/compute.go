@@ -3,6 +3,7 @@
 package gpu
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -408,10 +409,29 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 
 	g.collector.collect(ops, viewport)
 	var frame []layer
-	//g.collector.layer(viewport, g.output.frame, &frame)
 	g.collector.layer2(viewport, g.output.frame2, &frame)
 	g.output.frame2 = make([]paintOp, len(g.collector.paintOps))
 	copy(g.output.frame2, g.collector.paintOps)
+	for i := range g.output.frame2 {
+		op := &g.output.frame2[i]
+		stack := make([]clipCmd, len(op.clipStack))
+		copy(stack, op.clipStack)
+		op.clipStack = stack
+		for i := range op.clipStack {
+			n := new(clipState)
+			cl := &op.clipStack[i]
+			*n = *cl.state
+			n.parent = nil
+			v := make([]byte, len(n.pathVerts))
+			copy(v, n.pathVerts)
+			n.pathVerts = v
+			cl.state = n
+		}
+		op.state.clip = nil
+		if op.hash != g.collector.hashOp(op) {
+			panic("hey!")
+		}
+	}
 	g.output.frame = frame
 	g.output.packer.clear()
 	g.output.packer.newPage()
@@ -1416,8 +1436,6 @@ func (c *collector) hashOp(op *paintOp) uint64 {
 }
 
 func (c *collector) layer2(viewport image.Point, prevFrames []paintOp, frame *[]layer) {
-	fmt.Println("****start layer2")
-	defer fmt.Println("****end layer2")
 	// Sort ops from previous frames by hash.
 	sorted := make([]paintOp, len(prevFrames))
 	copy(sorted, prevFrames)
@@ -1432,7 +1450,6 @@ func (c *collector) layer2(viewport image.Point, prevFrames []paintOp, frame *[]
 		// Search for longest matching op sequence.
 		// start is the earliest index of a match
 		start := searchOp(sorted, op.hash)
-		fmt.Println("search", op.hash, "from", start, "(hash)")
 		layerOps := longestLayer(prevFrames, sorted[start:], ops)
 		if len(layerOps) == 0 {
 			ops = ops[1:]
@@ -1441,16 +1458,10 @@ func (c *collector) layer2(viewport image.Point, prevFrames []paintOp, frame *[]
 			continue
 		}
 		if len(unmatched) > 0 {
-			fmt.Println("flushing unmatched", len(unmatched))
 			// Flush longest layer of unmatched ops.
 			*frame = append(*frame, layer{ops: unmatched})
 			unmatched = nil
 		}
-		fmt.Println("matching ops", len(layerOps))
-		for _, op := range layerOps {
-			fmt.Println(op.order)
-		}
-		fmt.Println("end matching ops")
 		*frame = append(*frame, layer{ops: layerOps})
 		ops = ops[len(layerOps):]
 	}
@@ -1477,7 +1488,7 @@ func (c *collector) layer2(viewport image.Point, prevFrames []paintOp, frame *[]
 			}
 		}
 	}
-	log.Println("misses", misses, "ops", len(c.paintOps), "nlayers", len(*frame))
+	fmt.Println("misses", misses, "ops", len(c.paintOps), "nlayers", len(*frame))
 }
 
 func longestLayer(prev, sorted, ops []paintOp) []paintOp {
@@ -1485,20 +1496,20 @@ func longestLayer(prev, sorted, ops []paintOp) []paintOp {
 	for len(sorted) > 0 {
 		first := sorted[0]
 		sorted = sorted[1:]
-		fmt.Println("checking op", ops[0].hash, first.hash)
 		if first.hash != ops[0].hash {
 			// No more matches possible.
 			break
 		}
 		if !opEqual(first, ops[0]) {
-			fmt.Println("op !=", ops[0].hash, first.hash)
 			continue
 		}
 		// First op match found. Now find longest matching sequence.
 		match := prev[first.order:]
 		end := 1
 		for end < len(match) && end < len(ops) {
-			if !opEqual(match[end], ops[end]) {
+			m := match[end]
+			o := ops[end]
+			if m.hash != o.hash || !opEqual(m, o) {
 				break
 			}
 			end++
@@ -1533,7 +1544,13 @@ func opEqual(o1, o2 paintOp) bool {
 	}
 	for i, cl1 := range o1.clipStack {
 		cl2 := o2.clipStack[i]
+		if len(cl1.state.pathVerts) != len(cl2.state.pathVerts) {
+			return false
+		}
 		if clipKeyFor(*cl1.state) != clipKeyFor(*cl2.state) {
+			return false
+		}
+		if !bytes.Equal(cl1.state.pathVerts, cl2.state.pathVerts) {
 			return false
 		}
 	}
@@ -1766,7 +1783,7 @@ func (c *collector) encodeOp(viewport image.Point, enc *encoder, texOps *[]textu
 			enc.beginClip(cl.union)
 		}
 	}
-	if op.state.clip == nil {
+	if len(op.clipStack) == 0 {
 		// No clipping; fill the entire view.
 		enc.rect(f32.Rectangle{Max: layout.FPt(viewport)})
 	}
