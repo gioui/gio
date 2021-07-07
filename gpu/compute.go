@@ -1416,11 +1416,13 @@ func (c *collector) hashOp(op *paintOp) uint64 {
 }
 
 func (c *collector) layer2(viewport image.Point, prevFrames []paintOp, frame *[]layer) {
+	fmt.Println("****start layer2")
+	defer fmt.Println("****end layer2")
 	// Sort ops from previous frames by hash.
 	sorted := make([]paintOp, len(prevFrames))
 	copy(sorted, prevFrames)
 	sort.Slice(sorted, func(i, j int) bool {
-		return prevFrames[i].hash < prevFrames[j].hash
+		return sorted[i].hash < sorted[j].hash
 	})
 	ops := c.paintOps
 	var unmatched []paintOp
@@ -1430,6 +1432,7 @@ func (c *collector) layer2(viewport image.Point, prevFrames []paintOp, frame *[]
 		// Search for longest matching op sequence.
 		// start is the earliest index of a match
 		start := searchOp(sorted, op.hash)
+		fmt.Println("search", op.hash, "from", start, "(hash)")
 		layerOps := longestLayer(prevFrames, sorted[start:], ops)
 		if len(layerOps) == 0 {
 			ops = ops[1:]
@@ -1438,10 +1441,16 @@ func (c *collector) layer2(viewport image.Point, prevFrames []paintOp, frame *[]
 			continue
 		}
 		if len(unmatched) > 0 {
+			fmt.Println("flushing unmatched", len(unmatched))
 			// Flush longest layer of unmatched ops.
 			*frame = append(*frame, layer{ops: unmatched})
-			unmatched = unmatched[:0]
+			unmatched = nil
 		}
+		fmt.Println("matching ops", len(layerOps))
+		for _, op := range layerOps {
+			fmt.Println(op.order)
+		}
+		fmt.Println("end matching ops")
 		*frame = append(*frame, layer{ops: layerOps})
 		ops = ops[len(layerOps):]
 	}
@@ -1456,7 +1465,6 @@ func (c *collector) layer2(viewport image.Point, prevFrames []paintOp, frame *[]
 				cmds   encoder
 				texOps []textureOp
 			)
-			fmt.Println("op", op.order)
 			c.encodeOp(viewport, &cmds, &texOps, op)
 			l.rect = l.rect.Union(boundRectF(op.state.intersect))
 			sceneIdx := len(l.cmds.scene)
@@ -1469,7 +1477,7 @@ func (c *collector) layer2(viewport image.Point, prevFrames []paintOp, frame *[]
 			}
 		}
 	}
-	log.Println("misses", misses, "ops", len(c.paintOps))
+	log.Println("misses", misses, "ops", len(c.paintOps), "nlayers", len(*frame))
 }
 
 func longestLayer(prev, sorted, ops []paintOp) []paintOp {
@@ -1477,18 +1485,20 @@ func longestLayer(prev, sorted, ops []paintOp) []paintOp {
 	for len(sorted) > 0 {
 		first := sorted[0]
 		sorted = sorted[1:]
+		fmt.Println("checking op", ops[0].hash, first.hash)
 		if first.hash != ops[0].hash {
 			// No more matches possible.
 			break
 		}
 		if !opEqual(first, ops[0]) {
+			fmt.Println("op !=", ops[0].hash, first.hash)
 			continue
 		}
 		// First op match found. Now find longest matching sequence.
 		match := prev[first.order:]
 		end := 1
-		for end < len(prev) && end < len(ops) {
-			if !opEqual(prev[end], ops[end]) {
+		for end < len(match) && end < len(ops) {
+			if !opEqual(match[end], ops[end]) {
 				break
 			}
 			end++
