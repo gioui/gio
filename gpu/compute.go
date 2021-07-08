@@ -169,18 +169,20 @@ type encoderState struct {
 	clip      *clipState
 	intersect f32.Rectangle
 
-	paintState
+	paintKey
 }
 
-// clipKey completely describes a clip operation and is appropriate for hashing
-// and equality checks.
+// clipKey completely describes a clip operation (along with its path) and is appropriate
+// for hashing and equality checks.
 type clipKey struct {
-	bounds f32.Rectangle
-	stroke clip.StrokeStyle
-	trans  f32.Affine2D
+	bounds   f32.Rectangle
+	stroke   clip.StrokeStyle
+	relTrans f32.Affine2D
 }
 
-type paintState struct {
+// paintKey completely defines a paint operation. It is suitable for hashing and
+// equality checks.
+type paintKey struct {
 	t       f32.Affine2D
 	matType materialType
 	// Current paint.ImageOp
@@ -196,12 +198,11 @@ type paintState struct {
 }
 
 type clipState struct {
-	bounds    f32.Rectangle
 	absBounds f32.Rectangle
-	pathVerts []byte
 	parent    *clipState
-	relTrans  f32.Affine2D
-	stroke    clip.StrokeStyle
+	pathVerts []byte
+
+	clipKey
 }
 
 type layerVertex struct {
@@ -1244,11 +1245,13 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 	absBounds := transformBounds(state.t, bounds).Bounds()
 	c.clipCache = append(c.clipCache, clipState{
 		parent:    state.clip,
-		bounds:    bounds,
 		absBounds: absBounds,
-		relTrans:  state.relTrans,
-		stroke:    stroke,
 		pathVerts: path,
+		clipKey: clipKey{
+			bounds:   bounds,
+			relTrans: state.relTrans,
+			stroke:   stroke,
+		},
 	})
 	state.intersect = state.intersect.Intersect(absBounds)
 	state.clip = &c.clipCache[len(c.clipCache)-1]
@@ -1260,8 +1263,10 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 	c.reader.Reset(root)
 	state := encoderState{
 		intersect: fview,
+		paintKey: paintKey{
+			color: color.NRGBA{A: 0xff},
+		},
 	}
-	state.color = color.NRGBA{A: 0xff}
 	r := &c.reader
 	var (
 		pathData []byte
@@ -1377,23 +1382,15 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 	}
 }
 
-func clipKeyFor(st clipState) clipKey {
-	return clipKey{
-		bounds: st.bounds,
-		stroke: st.stroke,
-		trans:  st.relTrans,
-	}
-}
-
 func (c *collector) hashOp(op *paintOp) uint64 {
 	c.hasher.Reset()
 	for _, cl := range op.clipStack {
 		c.hasher.Write(cl.state.pathVerts)
-		k := clipKeyFor(*cl.state)
+		k := cl.state.clipKey
 		keyBytes := (*[unsafe.Sizeof(k)]byte)(unsafe.Pointer(unsafe.Pointer(&k)))
 		c.hasher.Write(keyBytes[:])
 	}
-	k := op.state.paintState
+	k := op.state.paintKey
 	keyBytes := (*[unsafe.Sizeof(k)]byte)(unsafe.Pointer(unsafe.Pointer(&k)))
 	c.hasher.Write(keyBytes[:])
 	return c.hasher.Sum64()
@@ -1491,7 +1488,7 @@ func opEqual(o1, o2 paintOp) bool {
 	if len(o1.clipStack) != len(o2.clipStack) {
 		return false
 	}
-	if o1.state.paintState != o2.state.paintState {
+	if o1.state.paintKey != o2.state.paintKey {
 		return false
 	}
 	for i, cl1 := range o1.clipStack {
@@ -1499,7 +1496,7 @@ func opEqual(o1, o2 paintOp) bool {
 		if len(cl1.state.pathVerts) != len(cl2.state.pathVerts) {
 			return false
 		}
-		if clipKeyFor(*cl1.state) != clipKeyFor(*cl2.state) {
+		if cl1.state.clipKey != cl2.state.clipKey {
 			return false
 		}
 		if !bytes.Equal(cl1.state.pathVerts, cl2.state.pathVerts) {
