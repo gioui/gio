@@ -165,11 +165,23 @@ type clipCmd struct {
 }
 
 type encoderState struct {
-	t         f32.Affine2D
 	relTrans  f32.Affine2D
 	clip      *clipState
 	intersect f32.Rectangle
 
+	paintState
+}
+
+// clipKey completely describes a clip operation and is appropriate for hashing
+// and equality checks.
+type clipKey struct {
+	bounds f32.Rectangle
+	stroke clip.StrokeStyle
+	trans  f32.Affine2D
+}
+
+type paintState struct {
+	t       f32.Affine2D
 	matType materialType
 	// Current paint.ImageOp
 	image imageOpData
@@ -1247,9 +1259,9 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 	fview := f32.Rectangle{Max: layout.FPt(viewport)}
 	c.reader.Reset(root)
 	state := encoderState{
-		color:     color.NRGBA{A: 0xff},
 		intersect: fview,
 	}
+	state.color = color.NRGBA{A: 0xff}
 	r := &c.reader
 	var (
 		pathData []byte
@@ -1365,41 +1377,6 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 	}
 }
 
-// clipKey completely describes a clip operation and is appropriate for hashing
-// and equality checks.
-type clipKey struct {
-	bounds f32.Rectangle
-	stroke clip.StrokeStyle
-	trans  f32.Affine2D
-}
-
-// paintKey is like clipKey for paintOps.
-type paintKey struct {
-	t f32.Affine2D
-
-	matType materialType
-	image   imageOpData
-	color   color.NRGBA
-
-	stop1  f32.Point
-	stop2  f32.Point
-	color1 color.NRGBA
-	color2 color.NRGBA
-}
-
-func paintKeyFor(st encoderState) paintKey {
-	return paintKey{
-		t:       st.t,
-		matType: st.matType,
-		image:   st.image,
-		color:   st.color,
-		stop1:   st.stop1,
-		stop2:   st.stop2,
-		color1:  st.color1,
-		color2:  st.color2,
-	}
-}
-
 func clipKeyFor(st clipState) clipKey {
 	return clipKey{
 		bounds: st.bounds,
@@ -1416,7 +1393,7 @@ func (c *collector) hashOp(op *paintOp) uint64 {
 		keyBytes := (*[unsafe.Sizeof(k)]byte)(unsafe.Pointer(unsafe.Pointer(&k)))
 		c.hasher.Write(keyBytes[:])
 	}
-	k := paintKeyFor(op.state)
+	k := op.state.paintState
 	keyBytes := (*[unsafe.Sizeof(k)]byte)(unsafe.Pointer(unsafe.Pointer(&k)))
 	c.hasher.Write(keyBytes[:])
 	return c.hasher.Sum64()
@@ -1514,7 +1491,7 @@ func opEqual(o1, o2 paintOp) bool {
 	if len(o1.clipStack) != len(o2.clipStack) {
 		return false
 	}
-	if paintKeyFor(o1.state) != paintKeyFor(o2.state) {
+	if o1.state.paintState != o2.state.paintState {
 		return false
 	}
 	for i, cl1 := range o1.clipStack {
