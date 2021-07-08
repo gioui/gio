@@ -150,7 +150,8 @@ type collector struct {
 
 type paintOp struct {
 	clipStack []clipCmd
-	state     encoderState
+	state     paintKey
+	intersect f32.Rectangle
 	hash      uint64
 	order     int
 }
@@ -436,10 +437,6 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 			copy(v, n.pathVerts)
 			n.pathVerts = v
 			cl.state = n
-		}
-		op.state.clip = nil
-		if op.hash != g.collector.hashOp(op) {
-			panic("hey!")
 		}
 	}
 	g.output.frame = frame
@@ -1341,7 +1338,8 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 			clipStack := c.clipCmdCache[startIdx:]
 			c.paintOps = append(c.paintOps, paintOp{
 				clipStack: clipStack,
-				state:     paintState,
+				state:     paintState.paintKey,
+				intersect: paintState.intersect,
 			})
 		case opconst.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
@@ -1390,7 +1388,7 @@ func (c *collector) hashOp(op *paintOp) uint64 {
 		keyBytes := (*[unsafe.Sizeof(k)]byte)(unsafe.Pointer(unsafe.Pointer(&k)))
 		c.hasher.Write(keyBytes[:])
 	}
-	k := op.state.paintKey
+	k := op.state
 	keyBytes := (*[unsafe.Sizeof(k)]byte)(unsafe.Pointer(unsafe.Pointer(&k)))
 	c.hasher.Write(keyBytes[:])
 	return c.hasher.Sum64()
@@ -1409,7 +1407,7 @@ func (c *collector) layer(viewport image.Point, prevFrames []paintOp, frame *[]l
 	addLayer := func(ops []paintOp) {
 		l := layer{ops: ops}
 		for _, op := range ops {
-			l.rect = l.rect.Union(boundRectF(op.state.intersect))
+			l.rect = l.rect.Union(boundRectF(op.intersect))
 		}
 		*frame = append(*frame, l)
 	}
@@ -1488,7 +1486,7 @@ func opEqual(o1, o2 paintOp) bool {
 	if len(o1.clipStack) != len(o2.clipStack) {
 		return false
 	}
-	if o1.state.paintKey != o2.state.paintKey {
+	if o1.state != o2.state {
 		return false
 	}
 	for i, cl1 := range o1.clipStack {
