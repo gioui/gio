@@ -160,9 +160,11 @@ type paintOp struct {
 // pipeline.
 type clipCmd struct {
 	// union of the bounds of the operations that are clipped.
-	union    f32.Rectangle
-	state    *clipState
-	relTrans f32.Affine2D
+	union     f32.Rectangle
+	state     clipKey
+	relTrans  f32.Affine2D
+	pathVerts []byte
+	absBounds f32.Rectangle
 }
 
 type encoderState struct {
@@ -429,14 +431,10 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 		copy(stack, op.clipStack)
 		op.clipStack = stack
 		for i := range op.clipStack {
-			n := new(clipState)
 			cl := &op.clipStack[i]
-			*n = *cl.state
-			n.parent = nil
-			v := make([]byte, len(n.pathVerts))
-			copy(v, n.pathVerts)
-			n.pathVerts = v
-			cl.state = n
+			v := make([]byte, len(cl.pathVerts))
+			copy(v, cl.pathVerts)
+			cl.pathVerts = v
 		}
 	}
 	g.output.frame = frame
@@ -1332,7 +1330,12 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 			p := paintState.clip
 			startIdx := len(c.clipCmdCache)
 			for p != nil {
-				c.clipCmdCache = append(c.clipCmdCache, clipCmd{state: p, relTrans: p.relTrans})
+				c.clipCmdCache = append(c.clipCmdCache, clipCmd{
+					state:     p.clipKey,
+					relTrans:  p.relTrans,
+					pathVerts: p.pathVerts,
+					absBounds: p.absBounds,
+				})
 				p = p.parent
 			}
 			clipStack := c.clipCmdCache[startIdx:]
@@ -1366,8 +1369,7 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 			r := transformBounds(cl.relTrans, p.bounds)
 			for j := i + 1; j < len(op.clipStack); j++ {
 				cl2 := op.clipStack[j]
-				p2 := cl2.state
-				if len(p2.pathVerts) == 0 && r.In(p2.bounds) {
+				if len(cl2.pathVerts) == 0 && r.In(cl2.state.bounds) {
 					op.clipStack = append(op.clipStack[:j], op.clipStack[j+1:]...)
 					j--
 					op.clipStack[j].relTrans = cl2.relTrans.Mul(op.clipStack[j].relTrans)
@@ -1383,8 +1385,8 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 func (c *collector) hashOp(op *paintOp) uint64 {
 	c.hasher.Reset()
 	for _, cl := range op.clipStack {
-		c.hasher.Write(cl.state.pathVerts)
-		k := cl.state.clipKey
+		c.hasher.Write(cl.pathVerts)
+		k := cl.state
 		keyBytes := (*[unsafe.Sizeof(k)]byte)(unsafe.Pointer(unsafe.Pointer(&k)))
 		c.hasher.Write(keyBytes[:])
 	}
@@ -1491,13 +1493,13 @@ func opEqual(o1, o2 paintOp) bool {
 	}
 	for i, cl1 := range o1.clipStack {
 		cl2 := o2.clipStack[i]
-		if len(cl1.state.pathVerts) != len(cl2.state.pathVerts) {
+		if len(cl1.pathVerts) != len(cl2.pathVerts) {
 			return false
 		}
-		if cl1.state.clipKey != cl2.state.clipKey {
+		if cl1.state != cl2.state {
 			return false
 		}
-		if !bytes.Equal(cl1.state.pathVerts, cl2.state.pathVerts) {
+		if !bytes.Equal(cl1.pathVerts, cl2.pathVerts) {
 			return false
 		}
 	}
@@ -1531,7 +1533,7 @@ func (c *collector) encodeOp(viewport image.Point, absOff f32.Point, enc *encode
 	// of all affected bounds.
 	var union f32.Rectangle
 	for i, cl := range op.clipStack {
-		union = union.Union(cl.state.absBounds)
+		union = union.Union(cl.absBounds)
 		op.clipStack[i].union = union
 	}
 
@@ -1549,10 +1551,10 @@ func (c *collector) encodeOp(viewport image.Point, absOff f32.Point, enc *encode
 		}
 		enc.transform(cl.relTrans)
 		inv = inv.Mul(cl.relTrans)
-		if len(cl.state.pathVerts) == 0 {
+		if len(cl.pathVerts) == 0 {
 			enc.rect(cl.state.bounds)
 		} else {
-			enc.encodePath(cl.state.pathVerts)
+			enc.encodePath(cl.pathVerts)
 		}
 		if i != 0 {
 			enc.beginClip(cl.union.Add(absOff))
