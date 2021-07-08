@@ -162,7 +162,6 @@ type clipCmd struct {
 	// union of the bounds of the operations that are clipped.
 	union     f32.Rectangle
 	state     clipKey
-	relTrans  f32.Affine2D
 	pathVerts []byte
 	absBounds f32.Rectangle
 }
@@ -1332,7 +1331,6 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 			for p != nil {
 				c.clipCmdCache = append(c.clipCmdCache, clipCmd{
 					state:     p.clipKey,
-					relTrans:  p.relTrans,
 					pathVerts: p.pathVerts,
 					absBounds: p.absBounds,
 				})
@@ -1366,15 +1364,16 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 		for i := 0; i < len(op.clipStack)-1; i++ {
 			cl := op.clipStack[i]
 			p := cl.state
-			r := transformBounds(cl.relTrans, p.bounds)
+			r := transformBounds(p.relTrans, p.bounds)
 			for j := i + 1; j < len(op.clipStack); j++ {
 				cl2 := op.clipStack[j]
+				p2 := cl2.state
 				if len(cl2.pathVerts) == 0 && r.In(cl2.state.bounds) {
 					op.clipStack = append(op.clipStack[:j], op.clipStack[j+1:]...)
 					j--
-					op.clipStack[j].relTrans = cl2.relTrans.Mul(op.clipStack[j].relTrans)
+					op.clipStack[j].state.relTrans = p2.relTrans.Mul(op.clipStack[j].state.relTrans)
 				}
-				r = transformRect(cl2.relTrans, r)
+				r = transformRect(p2.relTrans, r)
 			}
 		}
 		op.order = i
@@ -1549,8 +1548,8 @@ func (c *collector) encodeOp(viewport image.Point, absOff f32.Point, enc *encode
 			enc.fillMode(scene.FillModeNonzero)
 			fillMode = scene.FillModeNonzero
 		}
-		enc.transform(cl.relTrans)
-		inv = inv.Mul(cl.relTrans)
+		enc.transform(cl.state.relTrans)
+		inv = inv.Mul(cl.state.relTrans)
 		if len(cl.pathVerts) == 0 {
 			enc.rect(cl.state.bounds)
 		} else {
