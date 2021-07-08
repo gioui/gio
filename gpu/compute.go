@@ -119,11 +119,9 @@ type compute struct {
 }
 
 type layer struct {
-	rect   image.Rectangle
-	place  image.Point
-	cmds   encoder
-	texOps []textureOp
-	ops    []paintOp
+	rect  image.Rectangle
+	place image.Point
+	ops   []paintOp
 }
 
 type copyUniforms struct {
@@ -436,7 +434,7 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	g.output.packer.newPage()
 	g.texOps = g.texOps[:0]
 	g.enc.reset()
-	if !g.collector.encodeLayers(frame, &g.enc, &g.texOps, &g.output.packer) {
+	if !g.collector.encodeLayers(viewport, frame, &g.enc, &g.texOps, &g.output.packer) {
 		panic(fmt.Errorf("compute: k4 output atlas exhausted"))
 	}
 }
@@ -1181,20 +1179,10 @@ func (e *encoder) fillColor(col color.RGBA) {
 	e.npath++
 }
 
-func (e *encoder) offsetClipBounds(index int, offset f32.Point) {
-	c := &e.scene[index]
-	bounds := f32.Rectangle{
-		Min: f32.Pt(math.Float32frombits(c[1]), math.Float32frombits(c[2])),
-		Max: f32.Pt(math.Float32frombits(c[3]), math.Float32frombits(c[4])),
-	}
-	bounds = bounds.Add(offset)
-	c[1] = math.Float32bits(bounds.Min.X)
-	c[2] = math.Float32bits(bounds.Min.Y)
-	c[3] = math.Float32bits(bounds.Max.X)
-	c[4] = math.Float32bits(bounds.Max.Y)
-}
-
 func (e *encoder) setFillImageOffset(index int, offset image.Point) {
+	if e.scene[index].Op() != scene.OpFillImage {
+		panic("invalid fill image command")
+	}
 	x := int16(offset.X)
 	y := int16(offset.Y)
 	e.scene[index][2] = uint32(uint16(x)) | uint32(uint16(y))<<16
@@ -1444,6 +1432,13 @@ func (c *collector) layer(viewport image.Point, prevFrames []paintOp, frame *[]l
 	ops := c.paintOps
 	var unmatched []paintOp
 	misses := 0
+	addLayer := func(ops []paintOp) {
+		l := layer{ops: ops}
+		for _, op := range ops {
+			l.rect = l.rect.Union(boundRectF(op.state.intersect))
+		}
+		*frame = append(*frame, l)
+	}
 	for len(ops) > 0 {
 		op := ops[0]
 		// Search for longest matching op sequence.
@@ -1458,34 +1453,15 @@ func (c *collector) layer(viewport image.Point, prevFrames []paintOp, frame *[]l
 		}
 		if len(unmatched) > 0 {
 			// Flush longest layer of unmatched ops.
-			*frame = append(*frame, layer{ops: unmatched})
+			addLayer(unmatched)
 			unmatched = nil
 		}
-		*frame = append(*frame, layer{ops: layerOps})
+		addLayer(layerOps)
 		ops = ops[len(layerOps):]
 	}
 	if len(unmatched) > 0 {
 		// Flush longest layer of unmatched ops.
-		*frame = append(*frame, layer{ops: unmatched})
-	}
-	for i := range *frame {
-		l := &(*frame)[i]
-		for _, op := range l.ops {
-			var (
-				cmds   encoder
-				texOps []textureOp
-			)
-			c.encodeOp(viewport, &cmds, &texOps, op)
-			l.rect = l.rect.Union(boundRectF(op.state.intersect))
-			sceneIdx := len(l.cmds.scene)
-			l.cmds.append(cmds)
-			texIdx := len(l.texOps)
-			l.texOps = append(l.texOps, texOps...)
-			// Offset scene indices.
-			for i := texIdx; i < len(l.texOps); i++ {
-				l.texOps[i].sceneIdx += sceneIdx
-			}
-		}
+		addLayer(unmatched)
 	}
 	fmt.Println("misses", misses, "ops", len(c.paintOps), "nlayers", len(*frame))
 }
@@ -1556,7 +1532,7 @@ func opEqual(o1, o2 paintOp) bool {
 	return true
 }
 
-func (c *collector) encodeLayers(frame []layer, enc *encoder, texOps *[]textureOp, pck *packer) bool {
+func (c *collector) encodeLayers(viewport image.Point, frame []layer, enc *encoder, texOps *[]textureOp, pck *packer) bool {
 	for i, l := range frame {
 		// Position onto output atlas.
 		size := l.rect.Size()
@@ -1568,32 +1544,17 @@ func (c *collector) encodeLayers(frame []layer, enc *encoder, texOps *[]textureO
 		off := place.Pos.Sub(l.rect.Min)
 		frame[i].place = place.Pos
 		offf := layout.FPt(off)
+
 		enc.transform(f32.Affine2D{}.Offset(offf))
-
-		// Offset clip rects.
-		cmdStart := len(enc.scene)
-		enc.append(l.cmds)
-		for i := cmdStart; i < len(enc.scene); i++ {
-			switch enc.scene[i].Op() {
-			case scene.OpBeginClip, scene.OpEndClip:
-				enc.offsetClipBounds(i, offf)
-			}
-		}
-
-		// Offset texture ops.
-		topStart := len(*texOps)
-		*texOps = append(*texOps, l.texOps...)
-		for i := topStart; i < len(*texOps); i++ {
-			top := &(*texOps)[i]
-			top.sceneIdx += cmdStart
-			top.off = top.off.Add(off)
+		for _, op := range l.ops {
+			c.encodeOp(viewport, offf, enc, texOps, op)
 		}
 		enc.transform(f32.Affine2D{}.Offset(offf.Mul(-1)))
 	}
 	return true
 }
 
-func (c *collector) encodeOp(viewport image.Point, enc *encoder, texOps *[]textureOp, op paintOp) {
+func (c *collector) encodeOp(viewport image.Point, absOff f32.Point, enc *encoder, texOps *[]textureOp, op paintOp) {
 	// Fill in clip bounds, which the shaders expect to be the union
 	// of all affected bounds.
 	var union f32.Rectangle
@@ -1622,7 +1583,7 @@ func (c *collector) encodeOp(viewport image.Point, enc *encoder, texOps *[]textu
 			enc.encodePath(cl.state.pathVerts)
 		}
 		if i != 0 {
-			enc.beginClip(cl.union)
+			enc.beginClip(cl.union.Add(absOff))
 		}
 	}
 	if len(op.clipStack) == 0 {
@@ -1635,6 +1596,8 @@ func (c *collector) encodeOp(viewport image.Point, enc *encoder, texOps *[]textu
 		// Add fill command. Its offset is resolved and filled in renderMaterials.
 		idx := enc.fillImage(0)
 		sx, hx, ox, hy, sy, oy := op.state.t.Elems()
+		ox += absOff.X
+		oy += absOff.Y
 		// Separate integer offset from transformation. TextureOps that have identical transforms
 		// except for their integer offsets can share a transformed image.
 		intx, fracx := math.Modf(float64(ox))
@@ -1661,7 +1624,7 @@ func (c *collector) encodeOp(viewport image.Point, enc *encoder, texOps *[]textu
 	// Pop the clip stack, except the first entry used for fill.
 	for i := 1; i < len(op.clipStack); i++ {
 		cl := op.clipStack[i]
-		enc.endClip(cl.union)
+		enc.endClip(cl.union.Add(absOff))
 	}
 	if fillMode != scene.FillModeNonzero {
 		enc.fillMode(scene.FillModeNonzero)
