@@ -67,8 +67,6 @@ type compute struct {
 		uniforms *copyUniforms
 		uniBuf   driver.Buffer
 
-		frame         []layer
-		frame2        []paintOp
 		layerVertices []layerVertex
 	}
 	// images contains ImageOp images packed into a texture atlas.
@@ -137,15 +135,22 @@ type materialUniforms struct {
 }
 
 type collector struct {
-	hasher       maphash.Hash
-	profile      bool
-	reader       ops.Reader
-	states       []encoderState
-	clear        bool
-	clearColor   f32color.RGBA
-	clipCache    []clipState
-	clipCmdCache []clipCmd
-	paintOps     []paintOp
+	hasher     maphash.Hash
+	profile    bool
+	reader     ops.Reader
+	states     []encoderState
+	clear      bool
+	clearColor f32color.RGBA
+	clipStates []clipState
+	prevFrame  opsCollector
+	frame      opsCollector
+	layers     []layer
+}
+
+type opsCollector struct {
+	paths    []byte
+	clipCmds []clipCmd
+	ops      []paintOp
 }
 
 type paintOp struct {
@@ -419,27 +424,12 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	g.collector.reset()
 
 	g.collector.collect(ops, viewport)
-	var frame []layer
-	g.collector.layer(viewport, g.output.frame2, &frame)
-	g.output.frame2 = make([]paintOp, len(g.collector.paintOps))
-	for i, op := range g.collector.paintOps {
-		stack := make([]clipCmd, len(op.clipStack))
-		copy(stack, op.clipStack)
-		op.clipStack = stack
-		for i := range op.clipStack {
-			cl := &op.clipStack[i]
-			v := make([]byte, len(cl.pathVerts))
-			copy(v, cl.pathVerts)
-			cl.pathVerts = v
-		}
-		g.output.frame2[i] = op
-	}
-	g.output.frame = frame
+	g.collector.layer(viewport)
 	g.output.packer.clear()
 	g.output.packer.newPage()
 	g.texOps = g.texOps[:0]
 	g.enc.reset()
-	if !g.collector.encodeLayers(viewport, frame, &g.enc, &g.texOps, &g.output.packer) {
+	if !g.collector.encodeLayers(viewport, &g.enc, &g.texOps, &g.output.packer) {
 		panic(fmt.Errorf("compute: k4 output atlas exhausted"))
 	}
 }
@@ -546,7 +536,7 @@ func (g *compute) Profile() string {
 
 func (g *compute) clearLayers() {
 	g.ctx.BindFramebuffer(g.output.fbo)
-	for _, l := range g.output.frame {
+	for _, l := range g.collector.layers {
 		g.ctx.ClearRect(image.Rectangle{
 			Min: l.place,
 			Max: l.place.Add(l.rect.Size()),
@@ -558,11 +548,11 @@ func (g *compute) blitOutput(viewport image.Point) {
 	t := g.timers.blit
 	t.begin()
 	defer t.end()
-	if len(g.output.frame) == 0 {
+	if len(g.collector.layers) == 0 {
 		return
 	}
 	g.output.layerVertices = g.output.layerVertices[:0]
-	for _, l := range g.output.frame {
+	for _, l := range g.collector.layers {
 		placef := layout.FPt(l.place)
 		sizef := layout.FPt(l.rect.Size())
 		quad := [4]layerVertex{
@@ -1211,10 +1201,17 @@ func (e *encoder) quad(start, ctrl, end f32.Point) {
 }
 
 func (c *collector) reset() {
+	c.prevFrame, c.frame = c.frame, c.prevFrame
 	c.profile = false
-	c.clipCache = c.clipCache[:0]
-	c.clipCmdCache = c.clipCmdCache[:0]
-	c.paintOps = c.paintOps[:0]
+	c.clipStates = c.clipStates[:0]
+	c.layers = c.layers[:0]
+	c.frame.reset()
+}
+
+func (c *opsCollector) reset() {
+	c.paths = c.paths[:0]
+	c.clipCmds = c.clipCmds[:0]
+	c.ops = c.ops[:0]
 }
 
 func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle, path []byte, stroke clip.StrokeStyle) {
@@ -1235,7 +1232,7 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 	}
 
 	absBounds := transformBounds(state.t, bounds).Bounds()
-	c.clipCache = append(c.clipCache, clipState{
+	c.clipStates = append(c.clipStates, clipState{
 		parent:    state.clip,
 		absBounds: absBounds,
 		pathVerts: path,
@@ -1246,7 +1243,7 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 		},
 	})
 	state.intersect = state.intersect.Intersect(absBounds)
-	state.clip = &c.clipCache[len(c.clipCache)-1]
+	state.clip = &c.clipStates[len(c.clipStates)-1]
 	state.relTrans = f32.Affine2D{}
 }
 
@@ -1319,23 +1316,27 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 			if paintState.clip == nil && paintState.matType == materialColor && paintState.color.A == 255 {
 				c.clearColor = f32color.LinearFromSRGB(paintState.color).Opaque()
 				c.clear = true
-				c.paintOps = c.paintOps[:0]
+				c.frame.reset()
 				break
 			}
 
 			// Flatten clip stack.
 			p := paintState.clip
-			startIdx := len(c.clipCmdCache)
+			startIdx := len(c.frame.clipCmds)
 			for p != nil {
-				c.clipCmdCache = append(c.clipCmdCache, clipCmd{
+				idx := len(c.frame.paths)
+				c.frame.paths = append(c.frame.paths, make([]byte, len(p.pathVerts))...)
+				path := c.frame.paths[idx:]
+				copy(path, p.pathVerts)
+				c.frame.clipCmds = append(c.frame.clipCmds, clipCmd{
 					state:     p.clipKey,
-					pathVerts: p.pathVerts,
+					pathVerts: path,
 					absBounds: p.absBounds,
 				})
 				p = p.parent
 			}
-			clipStack := c.clipCmdCache[startIdx:]
-			c.paintOps = append(c.paintOps, paintOp{
+			clipStack := c.frame.clipCmds[startIdx:]
+			c.frame.ops = append(c.frame.ops, paintOp{
 				clipStack: clipStack,
 				state:     paintState.paintKey,
 				intersect: paintState.intersect,
@@ -1354,8 +1355,8 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 			}
 		}
 	}
-	for i := range c.paintOps {
-		op := &c.paintOps[i]
+	for i := range c.frame.ops {
+		op := &c.frame.ops[i]
 		// For each clip, cull rectangular clip regions that contain its
 		// (transformed) bounds. addClip already handled the converse case.
 		// TODO: do better than O(n²) to efficiently deal with deep stacks.
@@ -1392,16 +1393,17 @@ func (c *collector) hashOp(op paintOp) uint64 {
 	return c.hasher.Sum64()
 }
 
-func (c *collector) layer(viewport image.Point, prevFrames []paintOp, frame *[]layer) {
+func (c *collector) layer(viewport image.Point) {
 	// Sort ops from previous frames by hash.
-	order := make([]int, len(prevFrames))
-	for i := range prevFrames {
+	order := make([]int, len(c.prevFrame.ops))
+	for i := range c.prevFrame.ops {
 		order[i] = i
 	}
+	prevOps := c.prevFrame.ops
 	sort.Slice(order, func(i, j int) bool {
-		return prevFrames[order[i]].hash < prevFrames[order[j]].hash
+		return prevOps[order[i]].hash < prevOps[order[j]].hash
 	})
-	ops := c.paintOps
+	ops := c.frame.ops
 	var unmatched []paintOp
 	misses := 0
 	addLayer := func(ops []paintOp) {
@@ -1409,14 +1411,14 @@ func (c *collector) layer(viewport image.Point, prevFrames []paintOp, frame *[]l
 		for _, op := range ops {
 			l.rect = l.rect.Union(boundRectF(op.intersect))
 		}
-		*frame = append(*frame, l)
+		c.layers = append(c.layers, l)
 	}
 	for len(ops) > 0 {
 		op := ops[0]
 		// Search for longest matching op sequence.
 		// start is the earliest index of a match
-		start := searchOp(prevFrames, order, op.hash)
-		layerOps := longestLayer(prevFrames, order[start:], ops)
+		start := searchOp(prevOps, order, op.hash)
+		layerOps := longestLayer(prevOps, order[start:], ops)
 		if len(layerOps) == 0 {
 			ops = ops[1:]
 			unmatched = append(unmatched, op)
@@ -1435,7 +1437,7 @@ func (c *collector) layer(viewport image.Point, prevFrames []paintOp, frame *[]l
 		// Flush longest layer of unmatched ops.
 		addLayer(unmatched)
 	}
-	fmt.Println("misses", misses, "ops", len(c.paintOps), "nlayers", len(*frame))
+	fmt.Println("misses", misses, "ops", len(c.frame.ops), "nlayers", len(c.layers))
 }
 
 func longestLayer(prev []paintOp, order []int, ops []paintOp) []paintOp {
@@ -1500,8 +1502,8 @@ func opEqual(o1 paintOp, o2 paintOp) bool {
 	return true
 }
 
-func (c *collector) encodeLayers(viewport image.Point, frame []layer, enc *encoder, texOps *[]textureOp, pck *packer) bool {
-	for i, l := range frame {
+func (c *collector) encodeLayers(viewport image.Point, enc *encoder, texOps *[]textureOp, pck *packer) bool {
+	for i, l := range c.layers {
 		// Position onto output atlas.
 		size := l.rect.Size()
 		// Add padding to avoid overlap.
@@ -1510,7 +1512,7 @@ func (c *collector) encodeLayers(viewport image.Point, frame []layer, enc *encod
 			return false
 		}
 		off := place.Pos.Sub(l.rect.Min)
-		frame[i].place = place.Pos
+		c.layers[i].place = place.Pos
 		offf := layout.FPt(off)
 
 		enc.transform(f32.Affine2D{}.Offset(offf))
