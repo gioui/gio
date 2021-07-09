@@ -1448,12 +1448,9 @@ func longestLayer(prev, sorted, ops []paintOp) []paintOp {
 			// No more matches possible.
 			break
 		}
-		if !opEqual(first, ops[0]) {
-			continue
-		}
-		// First op match found. Now find longest matching sequence.
+		// First potential match found. Now find longest matching sequence.
 		match := prev[first.order:]
-		end := 1
+		end := 0
 		for end < len(match) && end < len(ops) {
 			m := match[end]
 			o := ops[end]
@@ -1462,9 +1459,8 @@ func longestLayer(prev, sorted, ops []paintOp) []paintOp {
 			}
 			end++
 		}
-		match = match[:end]
-		if len(match) > len(best) {
-			best = match
+		if end > len(best) {
+			best = ops[:end]
 		}
 	}
 	return best
