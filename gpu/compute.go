@@ -142,6 +142,7 @@ type collector struct {
 	clear      bool
 	clearColor f32color.RGBA
 	clipStates []clipState
+	order      []int
 	prevFrame  opsCollector
 	frame      opsCollector
 	layers     []layer
@@ -1395,13 +1396,13 @@ func (c *collector) hashOp(op paintOp) uint64 {
 
 func (c *collector) layer(viewport image.Point) {
 	// Sort ops from previous frames by hash.
-	order := make([]int, len(c.prevFrame.ops))
-	for i := range c.prevFrame.ops {
-		order[i] = i
+	c.order = append(c.order[:0], make([]int, len(c.prevFrame.ops))...)
+	for i := range c.order {
+		c.order[i] = i
 	}
 	prevOps := c.prevFrame.ops
-	sort.Slice(order, func(i, j int) bool {
-		return prevOps[order[i]].hash < prevOps[order[j]].hash
+	sort.Slice(c.order, func(i, j int) bool {
+		return prevOps[c.order[i]].hash < prevOps[c.order[j]].hash
 	})
 	ops := c.frame.ops
 	var unmatched []paintOp
@@ -1417,8 +1418,8 @@ func (c *collector) layer(viewport image.Point) {
 		op := ops[0]
 		// Search for longest matching op sequence.
 		// start is the earliest index of a match
-		start := searchOp(prevOps, order, op.hash)
-		layerOps := longestLayer(prevOps, order[start:], ops)
+		start := searchOp(prevOps, c.order, op.hash)
+		layerOps := longestLayer(prevOps, c.order[start:], ops)
 		if len(layerOps) == 0 {
 			ops = ops[1:]
 			unmatched = append(unmatched, op)
