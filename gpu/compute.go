@@ -68,7 +68,7 @@ type compute struct {
 		uniBuf   driver.Buffer
 
 		frame         []layer
-		frame2        []paintOp
+		frame2        []opKey
 		layerVertices []layerVertex
 	}
 	// images contains ImageOp images packed into a texture atlas.
@@ -148,12 +148,17 @@ type collector struct {
 	paintOps     []paintOp
 }
 
+type opKey struct {
+	clipStack []clipCmd
+	state     paintKey
+	hash      uint64
+}
+
 type paintOp struct {
 	clipStack []clipCmd
 	state     paintKey
 	intersect f32.Rectangle
 	hash      uint64
-	order     int
 }
 
 // clipCmd describes a clipping command ready to be used for the compute
@@ -422,9 +427,13 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 	g.collector.collect(ops, viewport)
 	var frame []layer
 	g.collector.layer(viewport, g.output.frame2, &frame)
-	g.output.frame2 = make([]paintOp, len(g.collector.paintOps))
-	copy(g.output.frame2, g.collector.paintOps)
-	for i := range g.output.frame2 {
+	g.output.frame2 = make([]opKey, len(g.collector.paintOps))
+	for i, op := range g.collector.paintOps {
+		k := opKey{
+			clipStack: op.clipStack,
+			state:     op.state,
+			hash:      g.collector.hashOp(op),
+		}
 		op := &g.output.frame2[i]
 		stack := make([]clipCmd, len(op.clipStack))
 		copy(stack, op.clipStack)
@@ -435,6 +444,7 @@ func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
 			copy(v, cl.pathVerts)
 			cl.pathVerts = v
 		}
+		g.output.frame2[i] = k
 	}
 	g.output.frame = frame
 	g.output.packer.clear()
@@ -1376,12 +1386,11 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 				r = transformRect(p2.relTrans, r)
 			}
 		}
-		op.order = i
-		op.hash = c.hashOp(op)
+		op.hash = c.hashOp(*op)
 	}
 }
 
-func (c *collector) hashOp(op *paintOp) uint64 {
+func (c *collector) hashOp(op paintOp) uint64 {
 	c.hasher.Reset()
 	for _, cl := range op.clipStack {
 		c.hasher.Write(cl.pathVerts)
@@ -1395,12 +1404,14 @@ func (c *collector) hashOp(op *paintOp) uint64 {
 	return c.hasher.Sum64()
 }
 
-func (c *collector) layer(viewport image.Point, prevFrames []paintOp, frame *[]layer) {
+func (c *collector) layer(viewport image.Point, prevFrames []opKey, frame *[]layer) {
 	// Sort ops from previous frames by hash.
-	sorted := make([]paintOp, len(prevFrames))
-	copy(sorted, prevFrames)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].hash < sorted[j].hash
+	order := make([]int, len(prevFrames))
+	for i := range prevFrames {
+		order[i] = i
+	}
+	sort.Slice(order, func(i, j int) bool {
+		return prevFrames[order[i]].hash < prevFrames[order[j]].hash
 	})
 	ops := c.paintOps
 	var unmatched []paintOp
@@ -1416,8 +1427,8 @@ func (c *collector) layer(viewport image.Point, prevFrames []paintOp, frame *[]l
 		op := ops[0]
 		// Search for longest matching op sequence.
 		// start is the earliest index of a match
-		start := searchOp(sorted, op.hash)
-		layerOps := longestLayer(prevFrames, sorted[start:], ops)
+		start := searchOp(prevFrames, order, op.hash)
+		layerOps := longestLayer(prevFrames, order[start:], ops)
 		if len(layerOps) == 0 {
 			ops = ops[1:]
 			unmatched = append(unmatched, op)
@@ -1439,17 +1450,17 @@ func (c *collector) layer(viewport image.Point, prevFrames []paintOp, frame *[]l
 	fmt.Println("misses", misses, "ops", len(c.paintOps), "nlayers", len(*frame))
 }
 
-func longestLayer(prev, sorted, ops []paintOp) []paintOp {
+func longestLayer(prev []opKey, order []int, ops []paintOp) []paintOp {
 	var best []paintOp
-	for len(sorted) > 0 {
-		first := sorted[0]
-		sorted = sorted[1:]
-		if first.hash != ops[0].hash {
+	for len(order) > 0 {
+		first := order[0]
+		order = order[1:]
+		match := prev[first:]
+		if match[0].hash != ops[0].hash {
 			// No more matches possible.
 			break
 		}
 		// First potential match found. Now find longest matching sequence.
-		match := prev[first.order:]
 		end := 0
 		for end < len(match) && end < len(ops) {
 			m := match[end]
@@ -1466,11 +1477,11 @@ func longestLayer(prev, sorted, ops []paintOp) []paintOp {
 	return best
 }
 
-func searchOp(ops []paintOp, hash uint64) int {
-	lo, hi := 0, len(ops)
+func searchOp(ops []opKey, order []int, hash uint64) int {
+	lo, hi := 0, len(order)
 	for lo < hi {
 		mid := (lo + hi) / 2
-		if ops[mid].hash < hash {
+		if ops[order[mid]].hash < hash {
 			lo = mid + 1
 		} else {
 			hi = mid
@@ -1479,7 +1490,7 @@ func searchOp(ops []paintOp, hash uint64) int {
 	return lo
 }
 
-func opEqual(o1, o2 paintOp) bool {
+func opEqual(o1 opKey, o2 paintOp) bool {
 	if len(o1.clipStack) != len(o2.clipStack) {
 		return false
 	}
