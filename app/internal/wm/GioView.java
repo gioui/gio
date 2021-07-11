@@ -266,9 +266,7 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	}
 
 	@Override public InputConnection onCreateInputConnection(EditorInfo editor) {
-		// The TYPE_TEXT_FLAG_NO_SUGGESTIONS and TYPE_TEXT_VARIATION_VISIBLE_PASSWORD are used to fix the
-		// Samsung keyboard compatibility, forcing to disable the suggests/auto-complete. gio#116.
-		editor.inputType = InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | this.keyboardHint;
+		editor.inputType = this.keyboardHint;
 		editor.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN | EditorInfo.IME_FLAG_NO_EXTRACT_UI;
 		return new InputConnection(this);
 	}
