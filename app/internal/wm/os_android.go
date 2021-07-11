@@ -616,10 +616,12 @@ func (w *window) ShowTextInput(show bool) {
 func (w *window) SetInputHint(mode key.InputHint) {
 	// Constants defined at https://developer.android.com/reference/android/text/InputType.
 	const (
-		TYPE_NULL                = 0
-		TYPE_CLASS_NUMBER        = 2
-		TYPE_NUMBER_FLAG_DECIMAL = 8192
-		TYPE_NUMBER_FLAG_SIGNED  = 4096
+		TYPE_NULL                            = 0
+		TYPE_CLASS_NUMBER                    = 2
+		TYPE_NUMBER_FLAG_DECIMAL             = 8192
+		TYPE_NUMBER_FLAG_SIGNED              = 4096
+		TYPE_TEXT_FLAG_NO_SUGGESTIONS        = 524288
+		TYPE_TEXT_VARIATION_VISIBLE_PASSWORD = 144
 	)
 
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
@@ -628,9 +630,14 @@ func (w *window) SetInputHint(mode key.InputHint) {
 		case key.HintNumeric:
 			m = TYPE_CLASS_NUMBER | TYPE_NUMBER_FLAG_DECIMAL | TYPE_NUMBER_FLAG_SIGNED
 		default:
-			// TYPE_NULL, since TYPE_CLASS_TEXT isn't currently supported (gio#116), so TYPE_NULL is used instead.
+			// TYPE_NULL, since TYPE_CLASS_TEXT isn't currently supported.
 			m = TYPE_NULL
 		}
+
+		// The TYPE_TEXT_FLAG_NO_SUGGESTIONS and TYPE_TEXT_VARIATION_VISIBLE_PASSWORD are used to fix the
+		// Samsung keyboard compatibility, forcing to disable the suggests/auto-complete. gio#116.
+		m = m | TYPE_TEXT_FLAG_NO_SUGGESTIONS | TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+
 		callVoidMethod(env, w.view, gioView.setInputHint, m)
 	})
 }
