@@ -271,6 +271,10 @@ func (l ListStyle) Layout(gtx layout.Context, length int, w layout.ListElement) 
 	majorAxisSize := l.state.Axis.Convert(listDims.Size).X
 	start, end := fromListPosition(l.state.Position, length, majorAxisSize)
 	anchoring.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		// layout.Dimension respects the minimum, so ensure that the
+		// scrollbar will be drawn on the correct edge even if the provided
+		// layout.Context had a zero minimum constraint.
+		gtx.Constraints.Min = gtx.Constraints.Max
 		return l.ScrollbarStyle.Layout(gtx, l.state.Axis, start, end)
 	})
 
