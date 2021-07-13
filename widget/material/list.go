@@ -247,9 +247,10 @@ func List(th *Theme, state *widget.List) ListStyle {
 func (l ListStyle) Layout(gtx layout.Context, length int, w layout.ListElement) layout.Dimensions {
 	originalConstraints := gtx.Constraints
 
+	// Determine how much space the scrollbar occupies.
+	barWidth := gtx.Px(l.Width(gtx.Metric))
+
 	if l.AnchorStrategy == Occupy {
-		// Determine how much space the scrollbar occupies.
-		barWidth := gtx.Px(l.Width(gtx.Metric))
 
 		// Reserve space for the scrollbar using the gtx constraints.
 		max := l.state.Axis.Convert(gtx.Constraints.Max)
@@ -288,6 +289,13 @@ func (l ListStyle) Layout(gtx layout.Context, length int, w layout.ListElement) 
 		// is started while the bar is at the end of the list. Without this, the scrollbar
 		// cannot be dragged away from the end.
 		l.state.List.Position.BeforeEnd = true
+	}
+
+	if l.AnchorStrategy == Occupy {
+		// Increase the width to account for the space occupied by the scrollbar.
+		cross := l.state.Axis.Convert(listDims.Size)
+		cross.Y += barWidth
+		listDims.Size = l.state.Axis.Convert(cross)
 	}
 
 	return listDims
