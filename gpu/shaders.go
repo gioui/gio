@@ -5929,6 +5929,10 @@ void main()
                             base += stride;
                             xray = next_xray;
                         }
+                        if (uint(n_out) == n)
+                        {
+                            break;
+                        }
                         n_out++;
                         target += v_step;
                         p0 = p1;
