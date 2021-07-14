@@ -68,6 +68,9 @@ func runOnMain(f func()) {
 
 //export gio_dispatchMainFuncs
 func gio_dispatchMainFuncs() {
+	if !C.gio_isMainThread() {
+		panic("not main thread!")
+	}
 	for {
 		select {
 		case f := <-mainFuncs:
