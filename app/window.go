@@ -144,9 +144,11 @@ func (w *Window) validateAndProcess(driver wm.Driver, frameStart time.Time, size
 		}
 		if w.loop == nil && !w.nocontext {
 			var err error
-			w.ctx, err = driver.NewContext()
-			if err != nil {
-				return err
+			if w.ctx == nil {
+				w.ctx, err = driver.NewContext()
+				if err != nil {
+					return err
+				}
 			}
 			w.loop, err = newLoop(w.ctx)
 			if err != nil {
@@ -478,7 +480,10 @@ func (w *Window) run(opts *wm.Options) {
 			case system.StageEvent:
 				if w.loop != nil {
 					if e2.Stage < system.StageRunning {
-						w.destroyGPU()
+						if w.loop != nil {
+							w.loop.Release()
+							w.loop = nil
+						}
 					} else {
 						w.refresh()
 					}
