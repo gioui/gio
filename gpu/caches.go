@@ -73,7 +73,8 @@ func (r *resourceCache) frame() {
 }
 
 func (r *resourceCache) release() {
-	for _, v := range r.newRes {
+	r.frame()
+	for _, v := range r.res {
 		v.release()
 	}
 	r.newRes = nil
