@@ -46,6 +46,7 @@ type Device interface {
 	BindIndexBuffer(b Buffer)
 	BindImageTexture(unit int, texture Texture, access AccessBits, format TextureFormat)
 
+	BlitFramebuffer(dst, src Framebuffer, srect, drect image.Rectangle)
 	MemoryBarrier()
 	DispatchCompute(x, y, z int)
 

@@ -176,6 +176,10 @@ func (b *Backend) BeginFrame(clear bool, viewport image.Point) driver.Framebuffe
 	return &Framebuffer{ctx: b.ctx, dev: b.dev, renderTarget: renderTarget, depthView: depthView, foreign: true}
 }
 
+func (b *Backend) BlitFramebuffer(dst, src driver.Framebuffer, srect, drect image.Rectangle) {
+	panic("not implemented")
+}
+
 func (b *Backend) EndFrame() {
 }
 
