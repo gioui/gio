@@ -133,6 +133,9 @@ func (c *d3d11Context) Release() {
 		d3d11.IUnknownRelease(unsafe.Pointer(c.dev), c.dev.Vtbl.Release)
 	}
 	*c = d3d11Context{}
+	if debug {
+		d3d11.ReportLiveObjects()
+	}
 }
 
 func (c *d3d11Context) releaseFBO() {

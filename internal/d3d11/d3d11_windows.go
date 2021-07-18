@@ -115,6 +115,21 @@ type IDXGISwapChain struct {
 	}
 }
 
+type Debug struct {
+	Vtbl *struct {
+		_IUnknownVTbl
+		SetFeatureMask             uintptr
+		GetFeatureMask             uintptr
+		SetPresentPerRenderOpDelay uintptr
+		GetPresentPerRenderOpDelay uintptr
+		SetSwapChain               uintptr
+		GetSwapChain               uintptr
+		ValidateContext            uintptr
+		ReportLiveDeviceObjects    uintptr
+		ValidateContextForDispatch uintptr
+	}
+}
+
 type Device struct {
 	Vtbl *struct {
 		_IUnknownVTbl
@@ -444,6 +459,13 @@ type IDXGIFactory struct {
 	}
 }
 
+type IDXGIDebug struct {
+	Vtbl *struct {
+		_IUnknownVTbl
+		ReportLiveObjects uintptr
+	}
+}
+
 type IDXGIDevice struct {
 	Vtbl *struct {
 		_IUnknownVTbl
@@ -542,8 +564,12 @@ type RASTERIZER_DESC struct {
 
 var (
 	IID_Texture2D    = GUID{0x6f15aaf2, 0xd208, 0x4e89, 0x9a, 0xb4, 0x48, 0x95, 0x35, 0xd3, 0x4f, 0x9c}
+	IID_IDXGIDebug   = GUID{0x119E7452, 0xDE9E, 0x40fe, 0x88, 0x06, 0x88, 0xF9, 0x0C, 0x12, 0xB4, 0x41}
 	IID_IDXGIDevice  = GUID{0x54ec77fa, 0x1377, 0x44e6, 0x8c, 0x32, 0x88, 0xfd, 0x5f, 0x44, 0xc8, 0x4c}
 	IID_IDXGIFactory = GUID{0x7b7166ec, 0x21c7, 0x44ae, 0xb2, 0x1a, 0xc9, 0xae, 0x32, 0x1a, 0xe3, 0x69}
+	IID_ID3D11Debug  = GUID{0x79cf2233, 0x7536, 0x4948, 0x9d, 0x36, 0x1e, 0x46, 0x92, 0xdc, 0x57, 0x60}
+
+	DXGI_DEBUG_ALL = GUID{0xe48ae283, 0xda80, 0x490b, 0x87, 0xe6, 0x43, 0xe9, 0xa9, 0xcf, 0xda, 0x8}
 )
 
 var (
@@ -551,6 +577,10 @@ var (
 
 	_D3D11CreateDevice             = d3d11.NewProc("D3D11CreateDevice")
 	_D3D11CreateDeviceAndSwapChain = d3d11.NewProc("D3D11CreateDeviceAndSwapChain")
+
+	dxgi = windows.NewLazySystemDLL("dxgi.dll")
+
+	_DXGIGetDebugInterface1 = dxgi.NewProc("DXGIGetDebugInterface1")
 )
 
 const (
@@ -570,6 +600,10 @@ const (
 	DXGI_FORMAT_D24_UNORM_S8_UINT   = 45
 	DXGI_FORMAT_R16G16_FLOAT        = 34
 	DXGI_FORMAT_R16G16B16A16_FLOAT  = 10
+
+	DXGI_DEBUG_RLO_SUMMARY         = 0x1
+	DXGI_DEBUG_RLO_DETAIL          = 0x2
+	DXGI_DEBUG_RLO_IGNORE_INTERNAL = 0x4
 
 	FORMAT_SUPPORT_TEXTURE2D     = 0x20
 	FORMAT_SUPPORT_RENDER_TARGET = 0x4000
@@ -637,6 +671,10 @@ const (
 	DXGI_ERROR_DEVICE_RESET   = 0x887A0007
 	DXGI_ERROR_DEVICE_REMOVED = 0x887A0005
 	D3DDDIERR_DEVICEREMOVED   = 1<<31 | 0x876<<16 | 2160
+
+	RLDO_SUMMARY         = 1
+	RLDO_DETAIL          = 2
+	RLDO_IGNORE_INTERNAL = 4
 )
 
 func CreateDevice(driverType uint32, flags uint32) (*Device, *DeviceContext, uint32, error) {
@@ -688,6 +726,42 @@ func CreateDeviceAndSwapChain(driverType uint32, flags uint32, swapDesc *DXGI_SW
 		return nil, nil, nil, 0, ErrorCode{Name: "D3D11CreateDeviceAndSwapChain", Code: uint32(r)}
 	}
 	return dev, ctx, swchain, featLvl, nil
+}
+
+func DXGIGetDebugInterface1() (*IDXGIDebug, error) {
+	var dbg *IDXGIDebug
+	r, _, _ := _DXGIGetDebugInterface1.Call(
+		0, // Flags
+		uintptr(unsafe.Pointer(&IID_IDXGIDebug)),
+		uintptr(unsafe.Pointer(&dbg)),
+	)
+	if r != 0 {
+		return nil, ErrorCode{Name: "DXGIGetDebugInterface1", Code: uint32(r)}
+	}
+	return dbg, nil
+}
+
+func ReportLiveObjects() error {
+	dxgi, err := DXGIGetDebugInterface1()
+	if err != nil {
+		return err
+	}
+	defer IUnknownRelease(unsafe.Pointer(dxgi), dxgi.Vtbl.Release)
+	dxgi.ReportLiveObjects(&DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_DETAIL|DXGI_DEBUG_RLO_IGNORE_INTERNAL)
+	return nil
+}
+
+func (d *IDXGIDebug) ReportLiveObjects(guid *GUID, flags uint32) {
+	syscall.Syscall6(
+		d.Vtbl.ReportLiveObjects,
+		3,
+		uintptr(unsafe.Pointer(d)),
+		uintptr(unsafe.Pointer(guid)),
+		uintptr(flags),
+		0,
+		0,
+		0,
+	)
 }
 
 func (d *Device) CheckFormatSupport(format uint32) (uint32, error) {
@@ -934,6 +1008,27 @@ func (d *Device) GetImmediateContext() *DeviceContext {
 		0,
 	)
 	return ctx
+}
+
+func (d *Device) ReportLiveDeviceObjects() error {
+	intf, err := IUnknownQueryInterface(unsafe.Pointer(d), d.Vtbl.QueryInterface, &IID_ID3D11Debug)
+	if err != nil {
+		return fmt.Errorf("ReportLiveObjects: failed to query ID3D11Debug interface: %v", err)
+	}
+	defer IUnknownRelease(unsafe.Pointer(intf), intf.Vtbl.Release)
+	dbg := (*Debug)(unsafe.Pointer(intf))
+	dbg.ReportLiveDeviceObjects(RLDO_DETAIL | RLDO_IGNORE_INTERNAL)
+	return nil
+}
+
+func (d *Debug) ReportLiveDeviceObjects(flags uint32) {
+	syscall.Syscall(
+		d.Vtbl.ReportLiveDeviceObjects,
+		2,
+		uintptr(unsafe.Pointer(d)),
+		uintptr(flags),
+		0,
+	)
 }
 
 func (s *IDXGISwapChain) GetDesc() (DXGI_SWAP_CHAIN_DESC, error) {
