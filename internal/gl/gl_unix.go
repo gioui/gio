@@ -1101,7 +1101,7 @@ func (f *Functions) LinkProgram(p Program) {
 	C.glLinkProgram(&f.f, C.GLuint(p.V))
 }
 
-func (f *Functions) PixelStorei(pname Enum, param int32) {
+func (f *Functions) PixelStorei(pname Enum, param int) {
 	C.glPixelStorei(&f.f, C.GLenum(pname), C.GLint(param))
 }
 

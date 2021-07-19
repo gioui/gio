@@ -409,7 +409,7 @@ func (f *Functions) IsEnabled(cap Enum) bool {
 func (c *Functions) LinkProgram(p Program) {
 	syscall.Syscall(_glLinkProgram.Addr(), 1, uintptr(p.V), 0, 0)
 }
-func (c *Functions) PixelStorei(pname Enum, param int32) {
+func (c *Functions) PixelStorei(pname Enum, param int) {
 	syscall.Syscall(_glPixelStorei.Addr(), 2, uintptr(pname), uintptr(param), 0)
 }
 func (f *Functions) MemoryBarrier(barriers Enum) {

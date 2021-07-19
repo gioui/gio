@@ -343,7 +343,7 @@ func (f *Functions) IsEnabled(cap Enum) bool {
 func (f *Functions) LinkProgram(p Program) {
 	f.Ctx.Call("linkProgram", js.Value(p))
 }
-func (f *Functions) PixelStorei(pname Enum, param int32) {
+func (f *Functions) PixelStorei(pname Enum, param int) {
 	f.Ctx.Call("pixelStorei", int(pname), param)
 }
 func (f *Functions) MemoryBarrier(barriers Enum) {

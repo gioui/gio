@@ -556,8 +556,10 @@ func (b *Backend) DispatchCompute(x, y, z int) {
 	panic("not implemented")
 }
 
-func (t *Texture) Upload(offset, size image.Point, pixels []byte) {
-	stride := size.X * 4
+func (t *Texture) Upload(offset, size image.Point, pixels []byte, stride int) {
+	if stride == 0 {
+		stride = size.X * 4
+	}
 	dst := &d3d11.BOX{
 		Left:   uint32(offset.X),
 		Top:    uint32(offset.Y),

@@ -75,10 +75,11 @@ type glState struct {
 		srcRGB, dstRGB gl.Enum
 		srcA, dstA     gl.Enum
 	}
-	depthTest  bool
-	clearColor [4]float32
-	clearDepth float32
-	viewport   [4]int
+	depthTest         bool
+	clearColor        [4]float32
+	clearDepth        float32
+	viewport          [4]int
+	unpack_row_length int
 }
 
 type state struct {
@@ -270,16 +271,17 @@ func (b *Backend) EndFrame() {
 
 func (b *Backend) queryState() glState {
 	s := glState{
-		prog:       gl.Program(b.funcs.GetBinding(gl.CURRENT_PROGRAM)),
-		arrayBuf:   gl.Buffer(b.funcs.GetBinding(gl.ARRAY_BUFFER_BINDING)),
-		elemBuf:    gl.Buffer(b.funcs.GetBinding(gl.ELEMENT_ARRAY_BUFFER_BINDING)),
-		drawFBO:    gl.Framebuffer(b.funcs.GetBinding(gl.FRAMEBUFFER_BINDING)),
-		depthMask:  b.funcs.GetInteger(gl.DEPTH_WRITEMASK) != gl.FALSE,
-		depthTest:  b.funcs.IsEnabled(gl.DEPTH_TEST),
-		depthFunc:  gl.Enum(b.funcs.GetInteger(gl.DEPTH_FUNC)),
-		clearDepth: b.funcs.GetFloat(gl.DEPTH_CLEAR_VALUE),
-		clearColor: b.funcs.GetFloat4(gl.COLOR_CLEAR_VALUE),
-		viewport:   b.funcs.GetInteger4(gl.VIEWPORT),
+		prog:              gl.Program(b.funcs.GetBinding(gl.CURRENT_PROGRAM)),
+		arrayBuf:          gl.Buffer(b.funcs.GetBinding(gl.ARRAY_BUFFER_BINDING)),
+		elemBuf:           gl.Buffer(b.funcs.GetBinding(gl.ELEMENT_ARRAY_BUFFER_BINDING)),
+		drawFBO:           gl.Framebuffer(b.funcs.GetBinding(gl.FRAMEBUFFER_BINDING)),
+		depthMask:         b.funcs.GetInteger(gl.DEPTH_WRITEMASK) != gl.FALSE,
+		depthTest:         b.funcs.IsEnabled(gl.DEPTH_TEST),
+		depthFunc:         gl.Enum(b.funcs.GetInteger(gl.DEPTH_FUNC)),
+		clearDepth:        b.funcs.GetFloat(gl.DEPTH_CLEAR_VALUE),
+		clearColor:        b.funcs.GetFloat4(gl.COLOR_CLEAR_VALUE),
+		viewport:          b.funcs.GetInteger4(gl.VIEWPORT),
+		unpack_row_length: b.funcs.GetInteger(gl.UNPACK_ROW_LENGTH),
 	}
 	s.blend.enable = b.funcs.IsEnabled(gl.BLEND)
 	s.blend.srcRGB = gl.Enum(b.funcs.GetInteger(gl.BLEND_SRC_RGB))
@@ -358,6 +360,7 @@ func (b *Backend) restoreState(dst glState) {
 	src.bindBuffer(f, gl.ARRAY_BUFFER, dst.arrayBuf)
 	v := dst.viewport
 	src.setViewport(f, v[0], v[1], v[2], v[3])
+	src.pixelStorei(f, gl.UNPACK_ROW_LENGTH, dst.unpack_row_length)
 }
 
 func (s *glState) setVertexAttribArray(f *gl.Functions, idx int, enabled bool) {
@@ -557,6 +560,16 @@ func (s *glState) bindBuffer(f *gl.Functions, target gl.Enum, buf gl.Buffer) {
 		panic("unknown buffer target")
 	}
 	f.BindBuffer(target, buf)
+}
+
+func (s *glState) pixelStorei(f *gl.Functions, pname gl.Enum, val int) {
+	if pname != gl.UNPACK_ROW_LENGTH {
+		panic("unsupported PixelStorei pname")
+	}
+	if val != s.unpack_row_length {
+		f.PixelStorei(pname, val)
+		s.unpack_row_length = val
+	}
 }
 
 func (s *glState) setClearDepth(f *gl.Functions, d float32) {
@@ -1250,11 +1263,12 @@ func (t *gpuTexture) Release() {
 	t.backend.glstate.deleteTexture(t.backend.funcs, t.obj)
 }
 
-func (t *gpuTexture) Upload(offset, size image.Point, pixels []byte) {
+func (t *gpuTexture) Upload(offset, size image.Point, pixels []byte, stride int) {
 	if min := size.X * size.Y * 4; min > len(pixels) {
 		panic(fmt.Errorf("size %d larger than data %d", min, len(pixels)))
 	}
 	t.backend.BindTexture(0, t)
+	t.backend.glstate.pixelStorei(t.backend.funcs, gl.UNPACK_ROW_LENGTH, stride/4)
 	t.backend.funcs.TexSubImage2D(gl.TEXTURE_2D, 0, offset.X, offset.Y, size.X, size.Y, t.triple.format, t.triple.typ, pixels)
 }
 

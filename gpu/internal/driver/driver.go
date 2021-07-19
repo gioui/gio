@@ -167,7 +167,7 @@ type Timer interface {
 }
 
 type Texture interface {
-	Upload(offset, size image.Point, pixels []byte)
+	Upload(offset, size image.Point, pixels []byte, stride int)
 	Release()
 }
 
@@ -261,11 +261,8 @@ func flipImageY(stride, height int, pixels []byte) {
 func UploadImage(t Texture, offset image.Point, img *image.RGBA) {
 	var pixels []byte
 	size := img.Bounds().Size()
-	if img.Stride != size.X*4 {
-		panic("unsupported stride")
-	}
 	start := img.PixOffset(0, 0)
 	end := img.PixOffset(size.X, size.Y-1)
 	pixels = img.Pix[start:end]
-	t.Upload(offset, size, pixels)
+	t.Upload(offset, size, pixels, img.Stride)
 }

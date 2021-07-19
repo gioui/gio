@@ -557,9 +557,9 @@ restart:
 		size := img.Bounds().Size()
 		driver.UploadImage(a.tex, pos, img)
 		rightPadding := image.Pt(padding, size.Y)
-		a.tex.Upload(image.Pt(pos.X+size.X, pos.Y), rightPadding, g.zeros(rightPadding.X*rightPadding.Y*4))
+		a.tex.Upload(image.Pt(pos.X+size.X, pos.Y), rightPadding, g.zeros(rightPadding.X*rightPadding.Y*4), 0)
 		bottomPadding := image.Pt(size.X, padding)
-		a.tex.Upload(image.Pt(pos.X, pos.Y+size.Y), bottomPadding, g.zeros(bottomPadding.X*bottomPadding.Y*4))
+		a.tex.Upload(image.Pt(pos.X, pos.Y+size.Y), bottomPadding, g.zeros(bottomPadding.X*bottomPadding.Y*4), 0)
 	}
 	return nil
 }
