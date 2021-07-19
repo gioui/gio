@@ -5672,9 +5672,11 @@ void main()
             vec2 err_v = (((cubic.p2 - cubic.p1) * 3.0) + cubic.p0) - cubic.p3;
             float err = (err_v.x * err_v.x) + (err_v.y * err_v.y);
             uint n_quads = max(uint(ceil(pow(err * 3.7037036418914794921875, 0.16666667163372039794921875))), 1u);
+            n_quads = min(n_quads, 16u);
             float val = 0.0;
             vec2 qp0 = cubic.p0;
             float _step = 1.0 / float(n_quads);
+            SubdivResult keep_params[16];
             for (uint i = 0u; i < n_quads; i++)
             {
                 float t = float(i + 1u) * _step;
@@ -5696,6 +5698,7 @@ void main()
                 vec2 param_18 = qp2;
                 float param_19 = 0.4743416607379913330078125;
                 SubdivResult params = estimate_subdiv(param_16, param_17, param_18, param_19);
+                keep_params[i] = params;
                 val += params.val;
                 qp0 = qp2;
             }
@@ -5718,7 +5721,7 @@ void main()
             int n_out = 1;
             float val_sum = 0.0;
             vec2 p1;
-            float _1314;
+            float _1318;
             TileSeg tile_seg;
             for (uint i_1 = 0u; i_1 < n_quads; i_1++)
             {
@@ -5736,30 +5739,26 @@ void main()
                 float param_35 = t_1 - (0.5 * _step);
                 vec2 qp1_1 = eval_cubic(param_31, param_32, param_33, param_34, param_35);
                 qp1_1 = (qp1_1 * 2.0) - ((qp0 + qp2_1) * 0.5);
-                vec2 param_36 = qp0;
-                vec2 param_37 = qp1_1;
-                vec2 param_38 = qp2_1;
-                float param_39 = 0.4743416607379913330078125;
-                SubdivResult params_1 = estimate_subdiv(param_36, param_37, param_38, param_39);
-                float param_40 = params_1.a0;
-                float u0 = approx_parabola_inv_integral(param_40);
-                float param_41 = params_1.a2;
-                float u2 = approx_parabola_inv_integral(param_41);
+                SubdivResult params_1 = keep_params[i_1];
+                float param_36 = params_1.a0;
+                float u0 = approx_parabola_inv_integral(param_36);
+                float param_37 = params_1.a2;
+                float u2 = approx_parabola_inv_integral(param_37);
                 float uscale = 1.0 / (u2 - u0);
                 float target = float(n_out) * v_step;
                 for (;;)
                 {
-                    bool _1207 = uint(n_out) == n;
-                    bool _1217;
-                    if (!_1207)
+                    bool _1211 = uint(n_out) == n;
+                    bool _1221;
+                    if (!_1211)
                     {
-                        _1217 = target < (val_sum + params_1.val);
+                        _1221 = target < (val_sum + params_1.val);
                     }
                     else
                     {
-                        _1217 = _1207;
+                        _1221 = _1211;
                     }
-                    if (_1217)
+                    if (_1221)
                     {
                         if (uint(n_out) == n)
                         {
@@ -5769,14 +5768,14 @@ void main()
                         {
                             float u = (target - val_sum) / params_1.val;
                             float a = mix(params_1.a0, params_1.a2, u);
-                            float param_42 = a;
-                            float au = approx_parabola_inv_integral(param_42);
+                            float param_38 = a;
+                            float au = approx_parabola_inv_integral(param_38);
                             float t_2 = (au - u0) * uscale;
-                            vec2 param_43 = qp0;
-                            vec2 param_44 = qp1_1;
-                            vec2 param_45 = qp2_1;
-                            float param_46 = t_2;
-                            p1 = eval_quad(param_43, param_44, param_45, param_46);
+                            vec2 param_39 = qp0;
+                            vec2 param_40 = qp1_1;
+                            vec2 param_41 = qp2_1;
+                            float param_42 = t_2;
+                            p1 = eval_quad(param_39, param_40, param_41, param_42);
                         }
                         float xmin = min(p0.x, p1.x) - cubic.stroke.x;
                         float xmax = max(p0.x, p1.x) + cubic.stroke.x;
@@ -5786,13 +5785,13 @@ void main()
                         float dy = p1.y - p0.y;
                         if (abs(dy) < 9.999999717180685365747194737196e-10)
                         {
-                            _1314 = 1000000000.0;
+                            _1318 = 1000000000.0;
                         }
                         else
                         {
-                            _1314 = dx / dy;
+                            _1318 = dx / dy;
                         }
-                        float invslope = _1314;
+                        float invslope = _1318;
                         float c = (cubic.stroke.x + (abs(invslope) * (16.0 + cubic.stroke.y))) * 0.03125;
                         float b = invslope;
                         float a_1 = (p0.x - ((p0.y - 16.0) * b)) * 0.03125;
@@ -5808,9 +5807,9 @@ void main()
                         int stride = bbox.z - bbox.x;
                         int base = ((y0 - bbox.y) * stride) - bbox.x;
                         uint n_tile_alloc = uint((x1 - x0) * (y1 - y0));
-                        uint param_47 = n_tile_alloc * 24u;
-                        MallocResult _1429 = malloc(param_47);
-                        MallocResult tile_alloc = _1429;
+                        uint param_43 = n_tile_alloc * 24u;
+                        MallocResult _1433 = malloc(param_43);
+                        MallocResult tile_alloc = _1433;
                         if (tile_alloc.failed || (!mem_ok))
                         {
                             return;
@@ -5828,37 +5827,37 @@ void main()
                         {
                             float tile_y0 = float(y * 32);
                             int xbackdrop = max((xray + 1), bbox.x);
-                            bool _1486 = !is_stroke;
-                            bool _1496;
-                            if (_1486)
+                            bool _1490 = !is_stroke;
+                            bool _1500;
+                            if (_1490)
                             {
-                                _1496 = min(p0.y, p1.y) < tile_y0;
+                                _1500 = min(p0.y, p1.y) < tile_y0;
                             }
                             else
                             {
-                                _1496 = _1486;
+                                _1500 = _1490;
                             }
-                            bool _1503;
-                            if (_1496)
+                            bool _1507;
+                            if (_1500)
                             {
-                                _1503 = xbackdrop < bbox.z;
+                                _1507 = xbackdrop < bbox.z;
                             }
                             else
                             {
-                                _1503 = _1496;
+                                _1507 = _1500;
                             }
-                            if (_1503)
+                            if (_1507)
                             {
                                 int backdrop = (p1.y < p0.y) ? 1 : (-1);
-                                TileRef param_48 = path.tiles;
-                                uint param_49 = uint(base + xbackdrop);
-                                TileRef tile_ref = Tile_index(param_48, param_49);
+                                TileRef param_44 = path.tiles;
+                                uint param_45 = uint(base + xbackdrop);
+                                TileRef tile_ref = Tile_index(param_44, param_45);
                                 uint tile_el = tile_ref.offset >> uint(2);
-                                Alloc param_50 = path_alloc;
-                                uint param_51 = tile_el + 1u;
-                                if (touch_mem(param_50, param_51))
+                                Alloc param_46 = path_alloc;
+                                uint param_47 = tile_el + 1u;
+                                if (touch_mem(param_46, param_47))
                                 {
-                                    uint _1541 = atomicAdd(_145.memory[tile_el + 1u], uint(backdrop));
+                                    uint _1545 = atomicAdd(_145.memory[tile_el + 1u], uint(backdrop));
                                 }
                             }
                             int next_xray = last_xray;
@@ -5877,17 +5876,17 @@ void main()
                             for (int x = xx0; x < xx1; x++)
                             {
                                 float tile_x0 = float(x * 32);
-                                TileRef param_52 = TileRef(path.tiles.offset);
-                                uint param_53 = uint(base + x);
-                                TileRef tile_ref_1 = Tile_index(param_52, param_53);
+                                TileRef param_48 = TileRef(path.tiles.offset);
+                                uint param_49 = uint(base + x);
+                                TileRef tile_ref_1 = Tile_index(param_48, param_49);
                                 uint tile_el_1 = tile_ref_1.offset >> uint(2);
                                 uint old = 0u;
-                                Alloc param_54 = path_alloc;
-                                uint param_55 = tile_el_1;
-                                if (touch_mem(param_54, param_55))
+                                Alloc param_50 = path_alloc;
+                                uint param_51 = tile_el_1;
+                                if (touch_mem(param_50, param_51))
                                 {
-                                    uint _1644 = atomicExchange(_145.memory[tile_el_1], tile_offset);
-                                    old = _1644;
+                                    uint _1648 = atomicExchange(_145.memory[tile_el_1], tile_offset);
+                                    old = _1648;
                                 }
                                 tile_seg.origin = p0;
                                 tile_seg.vector = p1 - p0;
@@ -5919,10 +5918,10 @@ void main()
                                 }
                                 tile_seg.y_edge = y_edge;
                                 tile_seg.next.offset = old;
-                                Alloc param_56 = tile_alloc.alloc;
-                                TileSegRef param_57 = TileSegRef(tile_offset);
-                                TileSeg param_58 = tile_seg;
-                                TileSeg_write(param_56, param_57, param_58);
+                                Alloc param_52 = tile_alloc.alloc;
+                                TileSegRef param_53 = TileSegRef(tile_offset);
+                                TileSeg param_54 = tile_seg;
+                                TileSeg_write(param_52, param_53, param_54);
                                 tile_offset += 24u;
                             }
                             xc += b;
