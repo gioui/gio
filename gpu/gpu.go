@@ -122,7 +122,7 @@ type pathOp struct {
 	// later clip rectangles.
 	clip      image.Rectangle
 	bounds    f32.Rectangle
-	pathKey   ops.Key
+	pathKey   opKey
 	path      bool
 	pathVerts []byte
 	parent    *pathOp
@@ -154,8 +154,13 @@ func decodeStrokeOp(data []byte) clip.StrokeStyle {
 }
 
 type quadsOp struct {
-	key ops.Key
+	key opKey
 	aux []byte
+}
+
+type opKey struct {
+	sx, hx, sy, hy float32
+	ops.Key
 }
 
 type material struct {
@@ -829,7 +834,7 @@ func (d *drawOps) newPathOp() *pathOp {
 	return &d.pathOpCache[len(d.pathOpCache)-1]
 }
 
-func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey ops.Key, bounds f32.Rectangle, off f32.Point, tr f32.Affine2D, stroke clip.StrokeStyle) {
+func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey opKey, bounds f32.Rectangle, off f32.Point, tr f32.Affine2D, stroke clip.StrokeStyle) {
 	npath := d.newPathOp()
 	*npath = pathOp{
 		parent: state.cpath,
@@ -864,6 +869,15 @@ func (d *drawOps) save(id int, state drawState) {
 	d.states[id] = state
 }
 
+func (k opKey) SetTransform(t f32.Affine2D) opKey {
+	sx, hx, _, hy, sy, _ := t.Elems()
+	k.sx = sx
+	k.hx = hx
+	k.hy = hy
+	k.sy = sy
+	return k
+}
+
 func (d *drawOps) collectOps(r *ops.Reader, state drawState) {
 	var (
 		quads quadsOp
@@ -889,7 +903,7 @@ loop:
 				break loop
 			}
 			quads.aux = encOp.Data[opconst.TypeAuxLen:]
-			quads.key = encOp.Key
+			quads.key = opKey{Key: encOp.Key}
 
 		case opconst.TypeClip:
 			var op clipOp
@@ -919,8 +933,8 @@ loop:
 				}
 			} else {
 				quads.aux, op.bounds, _ = d.boundsForTransformedRect(bounds, trans)
-				quads.key = encOp.Key
-				quads.key.SetTransform(trans)
+				quads.key = opKey{Key: encOp.Key}
+				quads.key.SetTransform(trans) // TODO: This call has no effect.
 			}
 			state.clip = state.clip.Intersect(op.bounds.Add(off))
 			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off, state.t, str)
@@ -962,8 +976,9 @@ loop:
 			if clipData != nil {
 				// The paint operation is sheared or rotated, add a clip path representing
 				// this transformed rectangle.
-				encOp.Key.SetTransform(trans)
-				d.addClipPath(&state, clipData, encOp.Key, bnd, off, state.t, clip.StrokeStyle{})
+				k := opKey{Key: encOp.Key}
+				k.SetTransform(trans) // TODO: This call has no effect.
+				d.addClipPath(&state, clipData, k, bnd, off, state.t, clip.StrokeStyle{})
 			}
 
 			bounds := boundRectF(cl)

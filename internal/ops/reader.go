@@ -5,7 +5,6 @@ package ops
 import (
 	"encoding/binary"
 
-	"gioui.org/f32"
 	"gioui.org/internal/opconst"
 	"gioui.org/op"
 )
@@ -29,10 +28,9 @@ type EncodedOp struct {
 
 // Key is a unique key for a given op.
 type Key struct {
-	ops            *op.Ops
-	pc             int
-	version        int
-	sx, hx, sy, hy float32
+	ops     *op.Ops
+	pc      int
+	version int
 }
 
 // Shadow of op.MacroOp.
@@ -78,15 +76,6 @@ func NewPC(ops *op.Ops) PC {
 		data: len(ops.Data()),
 		refs: len(ops.Refs()),
 	}
-}
-
-func (k Key) SetTransform(t f32.Affine2D) Key {
-	sx, hx, _, hy, sy, _ := t.Elems()
-	k.sx = sx
-	k.hx = hx
-	k.hy = hy
-	k.sy = sy
-	return k
 }
 
 func (r *Reader) Decode() (EncodedOp, bool) {

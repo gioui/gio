@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"gioui.org/f32"
-	"gioui.org/internal/ops"
 )
 
 type resourceCache struct {
@@ -19,7 +18,7 @@ type resourceCache struct {
 // since benchmarking showed them as a bottleneck.
 type opCache struct {
 	// store the index + 1 in cache this key is stored in
-	index map[ops.Key]int
+	index map[opKey]int
 	// list of indexes in cache that are free and can be used
 	freelist []int
 	cache    []opCacheValue
@@ -32,7 +31,7 @@ type opCacheValue struct {
 
 	bounds f32.Rectangle
 	// the fields below are handled by opCache
-	key  ops.Key
+	key  opKey
 	keep bool
 }
 
@@ -83,13 +82,13 @@ func (r *resourceCache) release() {
 
 func newOpCache() *opCache {
 	return &opCache{
-		index:    make(map[ops.Key]int),
+		index:    make(map[opKey]int),
 		freelist: make([]int, 0),
 		cache:    make([]opCacheValue, 0),
 	}
 }
 
-func (r *opCache) get(key ops.Key) (o opCacheValue, exist bool) {
+func (r *opCache) get(key opKey) (o opCacheValue, exist bool) {
 	v := r.index[key]
 	if v == 0 {
 		return
@@ -98,7 +97,7 @@ func (r *opCache) get(key ops.Key) (o opCacheValue, exist bool) {
 	return r.cache[v-1], true
 }
 
-func (r *opCache) put(key ops.Key, val opCacheValue) {
+func (r *opCache) put(key opKey, val opCacheValue) {
 	v := r.index[key]
 	val.keep = true
 	val.key = key
