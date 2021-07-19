@@ -1679,18 +1679,14 @@ func encodeOp(viewport image.Point, absOff f32.Point, enc *encoder, texOps *[]te
 	case materialTexture:
 		// Add fill command. Its offset is resolved and filled in renderMaterials.
 		idx := enc.fillImage(0)
-		sx, hx, ox, hy, sy, oy := op.state.t.Elems()
-		ox += absOff.X
-		oy += absOff.Y
 		// Separate integer offset from transformation. TextureOps that have identical transforms
 		// except for their integer offsets can share a transformed image.
-		intx, fracx := math.Modf(float64(ox))
-		inty, fracy := math.Modf(float64(oy))
-		t := f32.NewAffine2D(sx, hx, float32(fracx), hy, sy, float32(fracy))
+		t := op.state.t.Offset(absOff)
+		t, off := separateTransform(t)
 		*texOps = append(*texOps, textureOp{
 			sceneIdx: idx,
 			img:      op.state.image,
-			off:      image.Pt(int(intx), int(inty)),
+			off:      off,
 			key: textureKey{
 				transform: t,
 				handle:    op.state.image.handle,
@@ -1727,6 +1723,14 @@ func transformBounds(t f32.Affine2D, bounds f32.Rectangle) rectangle {
 		t.Transform(bounds.Min), t.Transform(f32.Pt(bounds.Max.X, bounds.Min.Y)),
 		t.Transform(bounds.Max), t.Transform(f32.Pt(bounds.Min.X, bounds.Max.Y)),
 	}
+}
+
+func separateTransform(t f32.Affine2D) (f32.Affine2D, image.Point) {
+	sx, hx, ox, hy, sy, oy := t.Elems()
+	intx, fracx := math.Modf(float64(ox))
+	inty, fracy := math.Modf(float64(oy))
+	t = f32.NewAffine2D(sx, hx, float32(fracx), hy, sy, float32(fracy))
+	return t, image.Pt(int(intx), int(inty))
 }
 
 func transformRect(t f32.Affine2D, r rectangle) rectangle {
