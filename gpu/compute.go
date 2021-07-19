@@ -169,6 +169,7 @@ type opsCollector struct {
 
 type paintOp struct {
 	clipStack []clipCmd
+	offset    image.Point
 	state     paintKey
 	intersect f32.Rectangle
 	hash      uint64
@@ -1383,7 +1384,6 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 				panic("unexpected end of path operation")
 			}
 			pathData = encOp.Data[opconst.TypeAuxLen:]
-
 		case opconst.TypeClip:
 			var op clipOp
 			op.decode(encOp.Data)
@@ -1464,20 +1464,30 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 		// For each clip, cull rectangular clip regions that contain its
 		// (transformed) bounds. addClip already handled the converse case.
 		// TODO: do better than O(n²) to efficiently deal with deep stacks.
-		for i := 0; i < len(op.clipStack)-1; i++ {
-			cl := op.clipStack[i]
+		for j := 0; j < len(op.clipStack)-1; j++ {
+			cl := op.clipStack[j]
 			p := cl.state
 			r := transformBounds(p.relTrans, p.bounds)
-			for j := i + 1; j < len(op.clipStack); j++ {
-				cl2 := op.clipStack[j]
+			for k := j + 1; k < len(op.clipStack); k++ {
+				cl2 := op.clipStack[k]
 				p2 := cl2.state
 				if len(cl2.pathVerts) == 0 && r.In(cl2.state.bounds) {
-					op.clipStack = append(op.clipStack[:j], op.clipStack[j+1:]...)
-					j--
-					op.clipStack[j].state.relTrans = p2.relTrans.Mul(op.clipStack[j].state.relTrans)
+					op.clipStack = append(op.clipStack[:k], op.clipStack[k+1:]...)
+					k--
+					op.clipStack[k].state.relTrans = p2.relTrans.Mul(op.clipStack[k].state.relTrans)
 				}
 				r = transformRect(p2.relTrans, r)
 			}
+		}
+		// Separate the integer offset from the first transform. Two ops that differ
+		// only in integer offsets may share backing storage.
+		if len(op.clipStack) > 0 {
+			c := &op.clipStack[len(op.clipStack)-1]
+			t := c.state.relTrans
+			t, off := separateTransform(t)
+			c.state.relTrans = t
+			op.offset = off
+			op.state.t = op.state.t.Offset(layout.FPt(off.Mul(-1)))
 		}
 		op.hash = c.hashOp(*op)
 	}
@@ -1561,12 +1571,13 @@ outer:
 		match := prev[first.index:]
 		// Potential match found. Now find longest matching sequence.
 		end := 0
-		layer := -1
+		layer := match[0].layer
+		off := match[0].offset.Sub(ops[0].offset)
 		for end < len(match) && end < len(ops) {
 			m := match[end]
 			o := ops[end]
 			// End on layer boundaries.
-			if layer != -1 && m.layer != layer {
+			if m.layer != layer {
 				break
 			}
 			// End layer when the next op doesn't match.
@@ -1578,10 +1589,9 @@ outer:
 				}
 				break
 			}
-			if !opEqual(m, o) {
+			if !opEqual(off, m, o) {
 				break
 			}
-			layer = m.layer
 			end++
 		}
 		if end > longest {
@@ -1605,11 +1615,14 @@ func searchOp(order []hashIndex, hash uint64) int {
 	return lo
 }
 
-func opEqual(o1 paintOp, o2 paintOp) bool {
+func opEqual(off image.Point, o1 paintOp, o2 paintOp) bool {
 	if len(o1.clipStack) != len(o2.clipStack) {
 		return false
 	}
 	if o1.state != o2.state {
+		return false
+	}
+	if o1.offset.Sub(o2.offset) != off {
 		return false
 	}
 	for i, cl1 := range o1.clipStack {
@@ -1648,7 +1661,9 @@ func encodeOp(viewport image.Point, absOff f32.Point, enc *encoder, texOps *[]te
 	}
 
 	fillMode := scene.FillModeNonzero
-	var inv f32.Affine2D
+	opOff := layout.FPt(op.offset)
+	inv := f32.Affine2D{}.Offset(opOff)
+	enc.transform(inv)
 	for i := len(op.clipStack) - 1; i >= 0; i-- {
 		cl := op.clipStack[i]
 		if str := cl.state.stroke; str.Width > 0 {
@@ -1681,7 +1696,7 @@ func encodeOp(viewport image.Point, absOff f32.Point, enc *encoder, texOps *[]te
 		idx := enc.fillImage(0)
 		// Separate integer offset from transformation. TextureOps that have identical transforms
 		// except for their integer offsets can share a transformed image.
-		t := op.state.t.Offset(absOff)
+		t := op.state.t.Offset(absOff.Add(opOff))
 		t, off := separateTransform(t)
 		*texOps = append(*texOps, textureOp{
 			sceneIdx: idx,
