@@ -182,7 +182,8 @@ type clipCmd struct {
 	// union of the bounds of the operations that are clipped.
 	union     f32.Rectangle
 	state     clipKey
-	pathVerts []byte
+	path      []byte
+	pathKey   ops.Key
 	absBounds f32.Rectangle
 }
 
@@ -222,7 +223,8 @@ type paintKey struct {
 type clipState struct {
 	absBounds f32.Rectangle
 	parent    *clipState
-	pathVerts []byte
+	path      []byte
+	pathKey   ops.Key
 
 	clipKey
 }
@@ -1319,7 +1321,7 @@ func (c *opsCollector) reset() {
 	c.layers = c.layers[:0]
 }
 
-func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle, path []byte, stroke clip.StrokeStyle) {
+func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle, path []byte, key ops.Key, stroke clip.StrokeStyle) {
 	// Rectangle clip regions.
 	if len(path) == 0 {
 		// If the rectangular clip region contains a previous path it can be discarded.
@@ -1340,7 +1342,8 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 	c.clipStates = append(c.clipStates, clipState{
 		parent:    state.clip,
 		absBounds: absBounds,
-		pathVerts: path,
+		path:      path,
+		pathKey:   key,
 		clipKey: clipKey{
 			bounds:   bounds,
 			relTrans: state.relTrans,
@@ -1363,11 +1366,14 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 	}
 	r := &c.reader
 	var (
-		pathData []byte
-		str      clip.StrokeStyle
+		pathData struct {
+			data []byte
+			key  ops.Key
+		}
+		str clip.StrokeStyle
 	)
 	c.save(opconst.InitialStateID, state)
-	c.addClip(&state, fview, fview, nil, clip.StrokeStyle{})
+	c.addClip(&state, fview, fview, nil, ops.Key{}, clip.StrokeStyle{})
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypeProfile:
@@ -1383,12 +1389,13 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 			if !ok {
 				panic("unexpected end of path operation")
 			}
-			pathData = encOp.Data[opconst.TypeAuxLen:]
+			pathData.data = encOp.Data[opconst.TypeAuxLen:]
+			pathData.key = encOp.Key
 		case opconst.TypeClip:
 			var op clipOp
 			op.decode(encOp.Data)
-			c.addClip(&state, fview, op.bounds, pathData, str)
-			pathData = nil
+			c.addClip(&state, fview, op.bounds, pathData.data, pathData.key, str)
+			pathData.data = nil
 			str = clip.StrokeStyle{}
 		case opconst.TypeColor:
 			state.matType = materialColor
@@ -1408,7 +1415,7 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 			if paintState.matType == materialTexture {
 				// Clip to the bounds of the image, to hide other images in the atlas.
 				bounds := paintState.image.src.Bounds()
-				c.addClip(&paintState, fview, layout.FRect(bounds), nil, clip.StrokeStyle{})
+				c.addClip(&paintState, fview, layout.FRect(bounds), nil, ops.Key{}, clip.StrokeStyle{})
 			}
 			if paintState.intersect.Empty() {
 				break
@@ -1429,12 +1436,13 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 			startIdx := len(c.frame.clipCmds)
 			for p != nil {
 				idx := len(c.frame.paths)
-				c.frame.paths = append(c.frame.paths, make([]byte, len(p.pathVerts))...)
+				c.frame.paths = append(c.frame.paths, make([]byte, len(p.path))...)
 				path := c.frame.paths[idx:]
-				copy(path, p.pathVerts)
+				copy(path, p.path)
 				c.frame.clipCmds = append(c.frame.clipCmds, clipCmd{
 					state:     p.clipKey,
-					pathVerts: path,
+					path:      path,
+					pathKey:   p.pathKey,
 					absBounds: p.absBounds,
 				})
 				p = p.parent
@@ -1471,7 +1479,7 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 			for k := j + 1; k < len(op.clipStack); k++ {
 				cl2 := op.clipStack[k]
 				p2 := cl2.state
-				if len(cl2.pathVerts) == 0 && r.In(cl2.state.bounds) {
+				if len(cl2.path) == 0 && r.In(cl2.state.bounds) {
 					op.clipStack = append(op.clipStack[:k], op.clipStack[k+1:]...)
 					k--
 					op.clipStack[k].state.relTrans = p2.relTrans.Mul(op.clipStack[k].state.relTrans)
@@ -1496,7 +1504,7 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 func (c *collector) hashOp(op paintOp) uint64 {
 	c.hasher.Reset()
 	for _, cl := range op.clipStack {
-		c.hasher.Write(cl.pathVerts)
+		c.hasher.Write(cl.path)
 		k := cl.state
 		keyBytes := (*[unsafe.Sizeof(k)]byte)(unsafe.Pointer(unsafe.Pointer(&k)))
 		c.hasher.Write(keyBytes[:])
@@ -1627,13 +1635,13 @@ func opEqual(off image.Point, o1 paintOp, o2 paintOp) bool {
 	}
 	for i, cl1 := range o1.clipStack {
 		cl2 := o2.clipStack[i]
-		if len(cl1.pathVerts) != len(cl2.pathVerts) {
+		if len(cl1.path) != len(cl2.path) {
 			return false
 		}
 		if cl1.state != cl2.state {
 			return false
 		}
-		if !bytes.Equal(cl1.pathVerts, cl2.pathVerts) {
+		if cl1.pathKey != cl2.pathKey && !bytes.Equal(cl1.path, cl2.path) {
 			return false
 		}
 	}
@@ -1676,10 +1684,10 @@ func encodeOp(viewport image.Point, absOff f32.Point, enc *encoder, texOps *[]te
 		}
 		enc.transform(cl.state.relTrans)
 		inv = inv.Mul(cl.state.relTrans)
-		if len(cl.pathVerts) == 0 {
+		if len(cl.path) == 0 {
 			enc.rect(cl.state.bounds)
 		} else {
-			enc.encodePath(cl.pathVerts)
+			enc.encodePath(cl.path)
 		}
 		if i != 0 {
 			enc.beginClip(cl.union.Add(absOff))
