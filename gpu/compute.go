@@ -201,6 +201,7 @@ type clipKey struct {
 	bounds   f32.Rectangle
 	stroke   clip.StrokeStyle
 	relTrans f32.Affine2D
+	pathHash uint64
 }
 
 // paintKey completely defines a paint operation. It is suitable for hashing and
@@ -1321,7 +1322,7 @@ func (c *opsCollector) reset() {
 	c.layers = c.layers[:0]
 }
 
-func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle, path []byte, key ops.Key, stroke clip.StrokeStyle) {
+func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle, path []byte, key ops.Key, hash uint64, stroke clip.StrokeStyle) {
 	// Rectangle clip regions.
 	if len(path) == 0 {
 		// If the rectangular clip region contains a previous path it can be discarded.
@@ -1348,6 +1349,7 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 			bounds:   bounds,
 			relTrans: state.relTrans,
 			stroke:   stroke,
+			pathHash: hash,
 		},
 	})
 	state.intersect = state.intersect.Intersect(absBounds)
@@ -1369,11 +1371,12 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 		pathData struct {
 			data []byte
 			key  ops.Key
+			hash uint64
 		}
 		str clip.StrokeStyle
 	)
 	c.save(opconst.InitialStateID, state)
-	c.addClip(&state, fview, fview, nil, ops.Key{}, clip.StrokeStyle{})
+	c.addClip(&state, fview, fview, nil, ops.Key{}, 0, clip.StrokeStyle{})
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypeProfile:
@@ -1385,16 +1388,18 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 		case opconst.TypeStroke:
 			str = decodeStrokeOp(encOp.Data)
 		case opconst.TypePath:
+			hash := bo.Uint64(encOp.Data[1:])
 			encOp, ok = r.Decode()
 			if !ok {
 				panic("unexpected end of path operation")
 			}
 			pathData.data = encOp.Data[opconst.TypeAuxLen:]
 			pathData.key = encOp.Key
+			pathData.hash = hash
 		case opconst.TypeClip:
 			var op clipOp
 			op.decode(encOp.Data)
-			c.addClip(&state, fview, op.bounds, pathData.data, pathData.key, str)
+			c.addClip(&state, fview, op.bounds, pathData.data, pathData.key, pathData.hash, str)
 			pathData.data = nil
 			str = clip.StrokeStyle{}
 		case opconst.TypeColor:
@@ -1415,7 +1420,7 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 			if paintState.matType == materialTexture {
 				// Clip to the bounds of the image, to hide other images in the atlas.
 				bounds := paintState.image.src.Bounds()
-				c.addClip(&paintState, fview, layout.FRect(bounds), nil, ops.Key{}, clip.StrokeStyle{})
+				c.addClip(&paintState, fview, layout.FRect(bounds), nil, ops.Key{}, 0, clip.StrokeStyle{})
 			}
 			if paintState.intersect.Empty() {
 				break
@@ -1504,7 +1509,6 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 func (c *collector) hashOp(op paintOp) uint64 {
 	c.hasher.Reset()
 	for _, cl := range op.clipStack {
-		c.hasher.Write(cl.path)
 		k := cl.state
 		keyBytes := (*[unsafe.Sizeof(k)]byte)(unsafe.Pointer(unsafe.Pointer(&k)))
 		c.hasher.Write(keyBytes[:])

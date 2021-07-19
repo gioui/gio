@@ -4,6 +4,7 @@ package clip
 
 import (
 	"encoding/binary"
+	"hash/maphash"
 	"image"
 	"math"
 
@@ -14,6 +15,12 @@ import (
 	"gioui.org/internal/stroke"
 	"gioui.org/op"
 )
+
+var pathSeed maphash.Seed
+
+func init() {
+	pathSeed = maphash.MakeSeed()
+}
 
 // Op represents a clip area. Op intersects the current clip area with
 // itself.
@@ -38,9 +45,11 @@ func (p Op) Add(o *op.Ops) {
 		outline = true
 	}
 
+	bo := binary.LittleEndian
 	if path.hasSegments {
 		data := o.Write(opconst.TypePathLen)
 		data[0] = byte(opconst.TypePath)
+		bo.PutUint64(data[1:], path.hash)
 		path.spec.Add(o)
 	}
 
@@ -60,7 +69,6 @@ func (p Op) Add(o *op.Ops) {
 
 	data := o.Write(opconst.TypeClipLen)
 	data[0] = byte(opconst.TypeClip)
-	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(bounds.Min.X))
 	bo.PutUint32(data[5:], uint32(bounds.Min.Y))
 	bo.PutUint32(data[9:], uint32(bounds.Max.X))
@@ -138,6 +146,7 @@ type PathSpec struct {
 	// hasSegments tracks whether there are any segments in the path.
 	hasSegments bool
 	bounds      image.Rectangle
+	hash        uint64
 }
 
 // Path constructs a Op clip path described by lines and
@@ -156,6 +165,7 @@ type Path struct {
 	start       f32.Point
 	hasSegments bool
 	bounds      f32.Rectangle
+	hash        maphash.Hash
 }
 
 // Pos returns the current pen position.
@@ -163,6 +173,7 @@ func (p *Path) Pos() f32.Point { return p.pen }
 
 // Begin the path, storing the path data and final Op into ops.
 func (p *Path) Begin(ops *op.Ops) {
+	p.hash.SetSeed(pathSeed)
 	p.ops = ops
 	p.macro = op.Record(ops)
 	// Write the TypeAux opcode
@@ -178,6 +189,7 @@ func (p *Path) End() PathSpec {
 		open:        p.open || p.pen != p.start,
 		hasSegments: p.hasSegments,
 		bounds:      boundRectF(p.bounds),
+		hash:        p.hash.Sum64(),
 	}
 }
 
@@ -211,9 +223,14 @@ func (p *Path) LineTo(to f32.Point) {
 	data := p.ops.Write(scene.CommandSize + 4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
-	ops.EncodeCommand(data[4:], scene.Line(p.pen, to))
+	p.cmd(data[4:], scene.Line(p.pen, to))
 	p.pen = to
 	p.expand(to)
+}
+
+func (p *Path) cmd(data []byte, c scene.Command) {
+	ops.EncodeCommand(data, c)
+	p.hash.Write(data)
 }
 
 func (p *Path) expand(pt f32.Point) {
@@ -274,7 +291,7 @@ func (p *Path) QuadTo(ctrl, to f32.Point) {
 	data := p.ops.Write(scene.CommandSize + 4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
-	ops.EncodeCommand(data[4:], scene.Quad(p.pen, ctrl, to))
+	p.cmd(data[4:], scene.Quad(p.pen, ctrl, to))
 	p.pen = to
 	p.expand(ctrl)
 	p.expand(to)
@@ -315,7 +332,7 @@ func (p *Path) CubeTo(ctrl0, ctrl1, to f32.Point) {
 	data := p.ops.Write(scene.CommandSize + 4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
-	ops.EncodeCommand(data[4:], scene.Cubic(p.pen, ctrl0, ctrl1, to))
+	p.cmd(data[4:], scene.Cubic(p.pen, ctrl0, ctrl1, to))
 	p.pen = to
 	p.expand(ctrl0)
 	p.expand(ctrl1)
