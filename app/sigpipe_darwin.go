@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
+//go:build !go1.14
 // +build !go1.14
 
 // Work around golang.org/issue/33384, fixed in CL 191785,

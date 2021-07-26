@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
+//go:build darwin || linux || freebsd || openbsd
 // +build darwin linux freebsd openbsd
 
 package gl

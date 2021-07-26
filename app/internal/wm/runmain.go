@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
+//go:build android || (darwin && ios)
 // +build android darwin,ios
 
 package wm

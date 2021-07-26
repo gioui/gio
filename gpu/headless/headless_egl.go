@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
+//go:build linux || freebsd || windows || openbsd
 // +build linux freebsd windows openbsd
 
 package headless
