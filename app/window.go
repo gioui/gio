@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"runtime"
 	"time"
 
 	"gioui.org/io/event"
@@ -144,6 +145,9 @@ func (w *Window) validateAndProcess(driver wm.Driver, frameStart time.Time, size
 		}
 		if w.loop == nil && !w.nocontext {
 			var err error
+			if runtime.GOOS == "android" {
+				w.ctx = nil
+			}
 			if w.ctx == nil {
 				w.ctx, err = driver.NewContext()
 				if err != nil {
@@ -480,9 +484,13 @@ func (w *Window) run(opts *wm.Options) {
 			case system.StageEvent:
 				if w.loop != nil {
 					if e2.Stage < system.StageRunning {
-						if w.loop != nil {
-							w.loop.Release()
-							w.loop = nil
+						if runtime.GOOS == "android" {
+							w.destroyGPU()
+						} else {
+							if w.loop != nil {
+								w.loop.Release()
+								w.loop = nil
+							}
 						}
 					} else {
 						w.refresh()
