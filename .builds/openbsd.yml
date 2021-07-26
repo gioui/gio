@@ -10,7 +10,7 @@ environment:
 tasks:
  - install_go: |
      mkdir -p /home/build/sdk
-     curl https://dl.google.com/go/go1.16.3.src.tar.gz | tar -C /home/build/sdk -xzf -
+     curl https://dl.google.com/go/go1.16.6.src.tar.gz | tar -C /home/build/sdk -xzf -
      cd /home/build/sdk/go/src
      ./make.bash
  - test_gio: |

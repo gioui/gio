@@ -36,9 +36,9 @@ environment:
 secrets:
  - 75d8a1eb-5fc5-4074-8a36-db6015d6ed5a
 tasks:
- - install_go1_14: |
+ - install_go: |
      mkdir -p /home/build/sdk
-     curl -s https://dl.google.com/go/go1.14.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
+     curl -s https://dl.google.com/go/go1.16.6.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
  - test_gio: |
      cd gio
      export EGL_PLATFORM=surfaceless # for headless tests

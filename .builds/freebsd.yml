@@ -13,9 +13,9 @@ sources:
 environment:
  PATH: /home/build/sdk/go/bin:/bin:/usr/local/bin:/usr/bin
 tasks:
- - install_go1_14: |
+ - install_go: |
      mkdir -p /home/build/sdk
-     curl https://dl.google.com/go/go1.14.freebsd-amd64.tar.gz | tar -C /home/build/sdk -xzf -
+     curl https://dl.google.com/go/go1.16.6.freebsd-amd64.tar.gz | tar -C /home/build/sdk -xzf -
  - test_gio: |
      export EGL_PLATFORM=surfaceless # for headless tests
      cd gio
