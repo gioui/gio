@@ -192,7 +192,7 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 	if err != nil {
 		return err
 	}
-	minSDK := 16
+	minSDK := 17
 	if bi.minsdk > minSDK {
 		minSDK = bi.minsdk
 	}
