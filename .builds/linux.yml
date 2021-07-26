@@ -54,8 +54,6 @@ tasks:
      cd gio/cmd
      go test ./...
      go test -race ./...
-     cd gogio # since we need -modfile to point at the parent directory
-     GOFLAGS=-modfile=../go.local.mod go test
  - install_jdk8: |
      curl -so jdk.deb "https://cdn.azul.com/zulu/bin/zulu8.42.0.21-ca-jdk8.0.232-linux_amd64.deb"
      sudo apt-get -qq install -y -f ./jdk.deb
