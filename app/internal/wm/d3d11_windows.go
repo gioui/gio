@@ -117,6 +117,8 @@ func (c *d3d11Context) MakeCurrent() error {
 	return nil
 }
 
+func (c *d3d11Context) ReleaseCurrent() {}
+
 func (c *d3d11Context) Lock() {}
 
 func (c *d3d11Context) Unlock() {}

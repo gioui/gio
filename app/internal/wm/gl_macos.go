@@ -90,6 +90,10 @@ func (c *context) MakeCurrent() error {
 	return nil
 }
 
+func (c *context) ReleaseCurrent() {
+	C.gio_clearCurrentContext()
+}
+
 func (w *window) NewContext() (Context, error) {
 	return newContext(w)
 }

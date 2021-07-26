@@ -62,6 +62,8 @@ func (c *context) MakeCurrent() error {
 	return nil
 }
 
+func (c *context) ReleaseCurrent() {}
+
 func (w *window) NewContext() (Context, error) {
 	return newContext(w)
 }

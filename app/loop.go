@@ -69,6 +69,7 @@ func (l *renderLoop) renderLoop(ctx wm.Context) error {
 			initErr <- err
 			return
 		}
+		defer ctx.ReleaseCurrent()
 		g, err := gpu.New(ctx.API())
 		if err != nil {
 			initErr <- err
