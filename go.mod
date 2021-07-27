@@ -1,9 +1,11 @@
 module gioui.org
 
-go 1.14
+go 1.16
 
 require (
-	golang.org/x/exp v0.0.0-20191002040644-a1355ae1e2c3
-	golang.org/x/image v0.0.0-20200618115811-c13761719519
-	golang.org/x/sys v0.0.0-20210304124612-50617c2ba197
+	golang.org/x/exp v0.0.0-20210722180016-6781d3edade3
+	golang.org/x/image v0.0.0-20210628002857-a66eb6448b8d
+	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
 )
+
+require golang.org/x/text v0.3.6 // indirect
