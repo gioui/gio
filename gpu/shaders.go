@@ -250,6 +250,7 @@ void main()
 }
 
 `,
+		Hash: "6862eaf623d89da635e9d5bc981c77aae4e39aa44047ab47c62d243cf5fe7e73",
 	}
 	shader_binning_comp = driver.ShaderSources{
 		Name: "binning.comp",
@@ -573,6 +574,7 @@ void main()
 }
 
 `,
+		Hash: "84177b6dfb90309a6c054ab9fea42293bd49033c221651c756eb40188f4d6ce8",
 	}
 	shader_blit_frag = [...]driver.ShaderSources{
 		{
@@ -2172,6 +2174,7 @@ void main()
 }
 
 `,
+		Hash: "e7ef250c08701490aed979a889cca73943b988bdb5e4ca4b02735aebcf5e5505",
 	}
 	shader_copy_frag = driver.ShaderSources{
 		Name:     "copy.frag",
@@ -4204,6 +4207,7 @@ void main()
 }
 
 `,
+		Hash: "0f18de15866045b36217068789c9c8715a63e0f9f120c53ea2d4d76f53e443c3",
 	}
 	shader_intersect_frag = driver.ShaderSources{
 		Name:     "intersect.frag",
@@ -5066,6 +5070,7 @@ void main()
 }
 
 `,
+		Hash: "e72e482d7f40b2949426017cb5aeb4d391fcfc0e9d42e73bffb5a1e5576e906d",
 	}
 	shader_material_frag = driver.ShaderSources{
 		Name:     "material.frag",
@@ -5950,6 +5955,7 @@ void main()
 }
 
 `,
+		Hash: "ed67e14c880cf92bdd7a9d520610e8c8b139907ff8b55df20464d353a7f58e79",
 	}
 	shader_stencil_frag = driver.ShaderSources{
 		Name:   "stencil.frag",
@@ -6632,5 +6638,6 @@ void main()
 }
 
 `,
+		Hash: "364b3cf559d02a86c751292bedc571d5ceef2df899de39ad483b4176294e9857",
 	}
 )

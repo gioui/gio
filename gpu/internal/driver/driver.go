@@ -64,6 +64,7 @@ type ShaderSources struct {
 	Uniforms  UniformsReflection
 	Inputs    []InputLocation
 	Textures  []TextureBinding
+	Hash      string
 }
 
 type UniformsReflection struct {

@@ -4,6 +4,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -232,6 +234,9 @@ func (conv *Converter) Run(out io.Writer) error {
 			if len(src.HLSL) > 0 {
 				fmt.Fprintf(out, "HLSL: %q,\n", src.HLSL)
 			}
+			if len(src.Hash) > 0 {
+				fmt.Fprintf(out, "Hash: %q,\n", src.Hash)
+			}
 			fmt.Fprintf(out, "}")
 			if multiVariant {
 				fmt.Fprintf(out, ",")
@@ -365,6 +370,9 @@ func (conv *Converter) ComputeShader(shaderPath string) ([]driver.ShaderSources,
 
 	var sources driver.ShaderSources
 	sources.Name = filepath.Base(shaderPath)
+
+	sum := sha256.Sum256(shader)
+	sources.Hash = hex.EncodeToString(sum[:])
 
 	sources.GLSL310ES, err = conv.spirv.Convert(shaderPath, "", spirv, "es", "310")
 	if err != nil {
