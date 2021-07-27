@@ -457,11 +457,12 @@ restart:
 		if err != nil {
 			return fmt.Errorf("compute: failed to create material atlas: %v", err)
 		}
-		m.tex = handle
 		fbo, err := g.ctx.NewFramebuffer(handle, 0)
 		if err != nil {
+			handle.Release()
 			return fmt.Errorf("compute: failed to create material framebuffer: %v", err)
 		}
+		m.tex = handle
 		m.fbo = fbo
 	}
 	// Transform to clip space: [-1, -1] - [1, 1].
