@@ -17,42 +17,38 @@ import (
 // for gamma-correct rendering on platforms without
 // sRGB enabled native framebuffers.
 type SRGBFBO struct {
-	c           *gl.Functions
-	state       *glState
-	viewport    image.Point
-	srgbBuffer  gl.Framebuffer
-	depthBuffer gl.Renderbuffer
-	colorTex    gl.Texture
-	blitted     bool
-	quad        gl.Buffer
-	prog        gl.Program
-	gl3         bool
+	c        *gl.Functions
+	state    *glState
+	viewport image.Point
+	fbo      gl.Framebuffer
+	tex      gl.Texture
+	depth    gl.Renderbuffer
+	blitted  bool
+	quad     gl.Buffer
+	prog     gl.Program
+	format   textureTriple
 }
 
 func NewSRGBFBO(f *gl.Functions, state *glState) (*SRGBFBO, error) {
-	var gl3 bool
 	glVer := f.GetString(gl.VERSION)
 	ver, _, err := gl.ParseGLVersion(glVer)
 	if err != nil {
 		return nil, err
 	}
-	if ver[0] >= 3 {
-		gl3 = true
-	} else {
-		exts := f.GetString(gl.EXTENSIONS)
-		if !strings.Contains(exts, "EXT_sRGB") {
-			return nil, fmt.Errorf("no support for OpenGL ES 3 nor EXT_sRGB")
-		}
+	exts := strings.Split(f.GetString(gl.EXTENSIONS), " ")
+	srgbTriple, err := srgbaTripleFor(ver, exts)
+	if err != nil {
+		return nil, fmt.Errorf("srgb: missing sRGB format support")
 	}
 	s := &SRGBFBO{
-		c:           f,
-		state:       state,
-		gl3:         gl3,
-		srgbBuffer:  f.CreateFramebuffer(),
-		colorTex:    f.CreateTexture(),
-		depthBuffer: f.CreateRenderbuffer(),
+		c:      f,
+		state:  state,
+		format: srgbTriple,
+		fbo:    f.CreateFramebuffer(),
+		tex:    f.CreateTexture(),
+		depth:  f.CreateRenderbuffer(),
 	}
-	state.bindTexture(f, 0, s.colorTex)
+	state.bindTexture(f, 0, s.tex)
 	f.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 	f.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 	f.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
@@ -82,19 +78,19 @@ func (s *SRGBFBO) Blit() {
 		s.blitted = true
 	}
 	s.state.useProgram(s.c, s.prog)
-	s.state.bindTexture(s.c, 0, s.colorTex)
+	s.state.bindTexture(s.c, 0, s.tex)
 	s.state.vertexAttribPointer(s.c, s.quad, 0 /* pos */, 2, gl.FLOAT, false, 4*4, 0)
 	s.state.vertexAttribPointer(s.c, s.quad, 1 /* uv */, 2, gl.FLOAT, false, 4*4, 4*2)
 	s.state.setVertexAttribArray(s.c, 0, true)
 	s.state.setVertexAttribArray(s.c, 1, true)
 	s.c.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
-	s.state.bindFramebuffer(s.c, gl.FRAMEBUFFER, s.srgbBuffer)
+	s.state.bindFramebuffer(s.c, gl.FRAMEBUFFER, s.fbo)
 	s.c.InvalidateFramebuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0)
 	s.c.InvalidateFramebuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT)
 }
 
 func (s *SRGBFBO) Framebuffer() gl.Framebuffer {
-	return s.srgbBuffer
+	return s.fbo
 }
 
 func (s *SRGBFBO) Refresh(viewport image.Point) error {
@@ -105,17 +101,13 @@ func (s *SRGBFBO) Refresh(viewport image.Point) error {
 		return nil
 	}
 	s.viewport = viewport
-	s.state.bindTexture(s.c, 0, s.colorTex)
-	if s.gl3 {
-		s.c.TexImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, viewport.X, viewport.Y, gl.RGBA, gl.UNSIGNED_BYTE)
-	} else /* EXT_sRGB */ {
-		s.c.TexImage2D(gl.TEXTURE_2D, 0, gl.SRGB_ALPHA_EXT, viewport.X, viewport.Y, gl.SRGB_ALPHA_EXT, gl.UNSIGNED_BYTE)
-	}
-	s.state.bindRenderbuffer(s.c, gl.RENDERBUFFER, s.depthBuffer)
+	s.state.bindTexture(s.c, 0, s.tex)
+	s.c.TexImage2D(gl.TEXTURE_2D, 0, s.format.internalFormat, viewport.X, viewport.Y, s.format.format, s.format.typ)
+	s.state.bindRenderbuffer(s.c, gl.RENDERBUFFER, s.depth)
 	s.c.RenderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, viewport.X, viewport.Y)
-	s.state.bindFramebuffer(s.c, gl.FRAMEBUFFER, s.srgbBuffer)
-	s.c.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, s.colorTex, 0)
-	s.c.FramebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, s.depthBuffer)
+	s.state.bindFramebuffer(s.c, gl.FRAMEBUFFER, s.fbo)
+	s.c.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, s.tex, 0)
+	s.c.FramebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, s.depth)
 	if st := s.c.CheckFramebufferStatus(gl.FRAMEBUFFER); st != gl.FRAMEBUFFER_COMPLETE {
 		return fmt.Errorf("sRGB framebuffer incomplete (%dx%d), status: %#x error: %x", viewport.X, viewport.Y, st, s.c.GetError())
 	}
@@ -140,9 +132,9 @@ func (s *SRGBFBO) Refresh(viewport image.Point) error {
 }
 
 func (s *SRGBFBO) Release() {
-	s.state.deleteFramebuffer(s.c, s.srgbBuffer)
-	s.state.deleteTexture(s.c, s.colorTex)
-	s.state.deleteRenderbuffer(s.c, s.depthBuffer)
+	s.state.deleteFramebuffer(s.c, s.fbo)
+	s.state.deleteTexture(s.c, s.tex)
+	s.state.deleteRenderbuffer(s.c, s.depth)
 	if s.blitted {
 		s.state.deleteBuffer(s.c, s.quad)
 		s.state.deleteProgram(s.c, s.prog)
