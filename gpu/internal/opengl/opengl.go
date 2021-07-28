@@ -182,10 +182,7 @@ func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 		return nil, err
 	}
 	floatTriple, ffboErr := floatTripleFor(f, ver, exts)
-	srgbaTriple, err := srgbaTripleFor(ver, exts)
-	if err != nil {
-		return nil, err
-	}
+	srgbaTriple, srgbErr := srgbaTripleFor(ver, exts)
 	gles30 := gles && ver[0] >= 3
 	gles31 := gles && (ver[0] > 3 || (ver[0] == 3 && ver[1] >= 1))
 	gl40 := !gles && ver[0] >= 4
@@ -199,6 +196,9 @@ func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 		srgbaTriple: srgbaTriple,
 	}
 	b.feats.BottomLeftOrigin = true
+	if srgbErr == nil {
+		b.feats.Features |= driver.FeatureSRGB
+	}
 	if ffboErr == nil {
 		b.feats.Features |= driver.FeatureFloatRenderTargets
 	}

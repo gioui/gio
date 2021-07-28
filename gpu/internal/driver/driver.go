@@ -212,6 +212,7 @@ const (
 	FeatureTimers Features = 1 << iota
 	FeatureFloatRenderTargets
 	FeatureCompute
+	FeatureSRGB
 )
 
 const (

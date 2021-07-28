@@ -128,6 +128,7 @@ func newDirect3D11Device(api driver.Direct3D11) (driver.Device, error) {
 		ctx: dev.GetImmediateContext(),
 		caps: driver.Caps{
 			MaxTextureSize: 2048, // 9.1 maximum
+			Features:       driver.FeatureSRGB,
 		},
 		depthStates: make(map[depthState]*d3d11.DepthStencilState),
 		blendStates: make(map[blendState]*d3d11.BlendState),
