@@ -49,7 +49,7 @@ func NewWindow(width, height int) (*Window, error) {
 		}
 		dev.Viewport(0, 0, width, height)
 		fboTex, err := dev.NewTexture(
-			driver.TextureFormatSRGB,
+			driver.TextureFormatSRGBA,
 			width, height,
 			driver.FilterNearest, driver.FilterNearest,
 			driver.BufferBindingFramebuffer,

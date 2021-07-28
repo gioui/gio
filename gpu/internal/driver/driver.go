@@ -193,7 +193,7 @@ const (
 )
 
 const (
-	TextureFormatSRGB TextureFormat = iota
+	TextureFormatSRGBA TextureFormat = iota
 	TextureFormatFloat
 	TextureFormatRGBA8
 )

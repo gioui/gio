@@ -704,7 +704,7 @@ func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, min
 	switch format {
 	case driver.TextureFormatFloat:
 		tex.triple = b.floatTriple
-	case driver.TextureFormatSRGB:
+	case driver.TextureFormatSRGBA:
 		tex.triple = b.srgbaTriple
 	case driver.TextureFormatRGBA8:
 		tex.triple = textureTriple{gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE}

@@ -952,7 +952,7 @@ restart:
 			a.tex = nil
 		}
 		sz := a.packer.maxDim
-		handle, err := g.ctx.NewTexture(driver.TextureFormatSRGB, sz, sz, driver.FilterLinear, driver.FilterLinear, driver.BufferBindingTexture)
+		handle, err := g.ctx.NewTexture(driver.TextureFormatSRGBA, sz, sz, driver.FilterLinear, driver.FilterLinear, driver.BufferBindingTexture)
 		if err != nil {
 			return fmt.Errorf("compute: failed to create image atlas: %v", err)
 		}

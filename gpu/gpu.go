@@ -484,7 +484,7 @@ func (r *renderer) texHandle(cache *resourceCache, data imageOpData) driver.Text
 	if tex.tex != nil {
 		return tex.tex
 	}
-	handle, err := r.ctx.NewTexture(driver.TextureFormatSRGB, data.src.Bounds().Dx(), data.src.Bounds().Dy(), driver.FilterLinear, driver.FilterLinear, driver.BufferBindingTexture)
+	handle, err := r.ctx.NewTexture(driver.TextureFormatSRGBA, data.src.Bounds().Dx(), data.src.Bounds().Dy(), driver.FilterLinear, driver.FilterLinear, driver.BufferBindingTexture)
 	if err != nil {
 		panic(err)
 	}

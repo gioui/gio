@@ -139,7 +139,7 @@ func setupFBO(t *testing.T, b driver.Device, size image.Point) driver.Framebuffe
 
 func newFBO(t *testing.T, b driver.Device, size image.Point) driver.Framebuffer {
 	fboTex, err := b.NewTexture(
-		driver.TextureFormatSRGB,
+		driver.TextureFormatSRGBA,
 		size.X, size.Y,
 		driver.FilterNearest, driver.FilterNearest,
 		driver.BufferBindingFramebuffer,
