@@ -38,7 +38,8 @@ func NewSRGBFBO(f *gl.Functions, state *glState) (*SRGBFBO, error) {
 	exts := strings.Split(f.GetString(gl.EXTENSIONS), " ")
 	srgbTriple, err := srgbaTripleFor(ver, exts)
 	if err != nil {
-		return nil, fmt.Errorf("srgb: missing sRGB format support")
+		// Fall back to the linear RGB colorspace, at the cost of color precision loss.
+		srgbTriple = textureTriple{gl.RGBA, gl.Enum(gl.RGBA), gl.Enum(gl.UNSIGNED_BYTE)}
 	}
 	s := &SRGBFBO{
 		c:      f,
