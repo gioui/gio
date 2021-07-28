@@ -19,14 +19,14 @@ func TestIcon_Alpha(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	icon.Color = color.NRGBA{B: 0xff, A: 0x40}
+	col := color.NRGBA{B: 0xff, A: 0x40}
 
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
 	}
 
-	_ = icon.Layout(gtx)
+	_ = icon.Layout(gtx, col)
 }
 
 // TestWidgetConstraints tests that widgets returns dimensions within their constraints.
@@ -41,7 +41,7 @@ func TestWidgetConstraints(t *testing.T) {
 			label: "Icon",
 			widget: func(gtx layout.Context) layout.Dimensions {
 				ic, _ := NewIcon(icons.ToggleCheckBox)
-				return ic.Layout(gtx)
+				return ic.Layout(gtx, color.NRGBA{A: 0xff})
 			},
 			constraints: _cs(
 				layout.Constraints{

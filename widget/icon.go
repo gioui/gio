@@ -18,8 +18,7 @@ import (
 )
 
 type Icon struct {
-	Color color.NRGBA
-	src   []byte
+	src []byte
 	// Cached values.
 	op       paint.ImageOp
 	imgSize  int
@@ -34,11 +33,11 @@ func NewIcon(data []byte) (*Icon, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Icon{src: data, Color: color.NRGBA{A: 0xff}}, nil
+	return &Icon{src: data}, nil
 }
 
 // Layout displays the icon with its size set to the X minimum constraint.
-func (ic *Icon) Layout(gtx layout.Context) layout.Dimensions {
+func (ic *Icon) Layout(gtx layout.Context, color color.NRGBA) layout.Dimensions {
 	sz := gtx.Constraints.Min.X
 	if sz == 0 {
 		sz = gtx.Metric.Px(defaultIconSize)
@@ -47,7 +46,7 @@ func (ic *Icon) Layout(gtx layout.Context) layout.Dimensions {
 	defer op.Save(gtx.Ops).Load()
 	clip.Rect{Max: size}.Add(gtx.Ops)
 
-	ico := ic.image(size.X)
+	ico := ic.image(size.X, color)
 	ico.Add(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
 	return layout.Dimensions{
@@ -55,8 +54,8 @@ func (ic *Icon) Layout(gtx layout.Context) layout.Dimensions {
 	}
 }
 
-func (ic *Icon) image(sz int) paint.ImageOp {
-	if sz == ic.imgSize && ic.Color == ic.imgColor {
+func (ic *Icon) image(sz int, color color.NRGBA) paint.ImageOp {
+	if sz == ic.imgSize && color == ic.imgColor {
 		return ic.op
 	}
 	m, _ := iconvg.DecodeMetadata(ic.src)
@@ -64,12 +63,12 @@ func (ic *Icon) image(sz int) paint.ImageOp {
 	img := image.NewRGBA(image.Rectangle{Max: image.Point{X: sz, Y: int(float32(sz) * dy / dx)}})
 	var ico iconvg.Rasterizer
 	ico.SetDstImage(img, img.Bounds(), draw.Src)
-	m.Palette[0] = f32color.NRGBAToLinearRGBA(ic.Color)
+	m.Palette[0] = f32color.NRGBAToLinearRGBA(color)
 	iconvg.Decode(&ico, ic.src, &iconvg.DecodeOptions{
 		Palette: &m.Palette,
 	})
 	ic.op = paint.NewImageOp(img)
 	ic.imgSize = sz
-	ic.imgColor = ic.Color
+	ic.imgColor = color
 	return ic.op
 }

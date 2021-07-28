@@ -169,9 +169,8 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 			return b.Inset.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 				size := gtx.Px(b.Size)
 				if b.Icon != nil {
-					b.Icon.Color = b.Color
 					gtx.Constraints.Min = image.Point{X: size}
-					b.Icon.Layout(gtx)
+					b.Icon.Layout(gtx, b.Color)
 				}
 				return layout.Dimensions{
 					Size: image.Point{X: size, Y: size},

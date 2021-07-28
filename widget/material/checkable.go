@@ -63,12 +63,12 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 				layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 					return layout.UniformInset(unit.Dp(2)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 						size := gtx.Px(c.Size)
-						icon.Color = c.IconColor
+						col := c.IconColor
 						if gtx.Queue == nil {
-							icon.Color = f32color.Disabled(icon.Color)
+							col = f32color.Disabled(col)
 						}
 						gtx.Constraints.Min = image.Point{X: size}
-						icon.Layout(gtx)
+						icon.Layout(gtx, col)
 						return layout.Dimensions{
 							Size: image.Point{X: size, Y: size},
 						}
