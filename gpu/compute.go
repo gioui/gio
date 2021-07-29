@@ -42,6 +42,7 @@ type compute struct {
 	texOps        []textureOp
 	viewport      image.Point
 	maxTextureDim int
+	srgb          bool
 
 	programs struct {
 		elements   computeProgram
@@ -98,8 +99,14 @@ type compute struct {
 
 		buffer sizedBuffer
 
-		uniforms *materialUniforms
-		uniBuf   driver.Buffer
+		vert struct {
+			uniforms *materialVertUniforms
+			buf      driver.Buffer
+		}
+
+		frag struct {
+			buf driver.Buffer
+		}
 
 		// CPU fields
 		cpuTex cpu.ImageDescriptor
@@ -154,9 +161,14 @@ type copyUniforms struct {
 	_       [8]byte // Pad to 16 bytes.
 }
 
-type materialUniforms struct {
+type materialVertUniforms struct {
 	scale [2]float32
 	pos   [2]float32
+}
+
+type materialFragUniforms struct {
+	emulateSRGB float32
+	_           [12]byte // Pad to 16 bytes
 }
 
 type collector struct {
@@ -372,6 +384,7 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	g := &compute{
 		ctx:           ctx,
 		maxTextureDim: maxDim,
+		srgb:          caps.Features.Has(driver.FeatureSRGB),
 		conf:          new(config),
 		memHeader:     new(memoryHeader),
 	}
@@ -447,15 +460,27 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		return nil, err
 	}
 	g.materials.layout = progLayout
-	g.materials.uniforms = new(materialUniforms)
+	g.materials.vert.uniforms = new(materialVertUniforms)
 
-	buf, err = ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(*g.materials.uniforms)))
+	buf, err = ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(*g.materials.vert.uniforms)))
 	if err != nil {
 		g.Release()
 		return nil, err
 	}
-	g.materials.uniBuf = buf
+	g.materials.vert.buf = buf
 	g.materials.prog.SetVertexUniforms(buf)
+	var emulateSRGB materialFragUniforms
+	if !g.srgb {
+		emulateSRGB.emulateSRGB = 1.0
+	}
+	buf, err = ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(emulateSRGB)))
+	if err != nil {
+		g.Release()
+		return nil, err
+	}
+	buf.Upload(byteslice.Struct(&emulateSRGB))
+	g.materials.frag.buf = buf
+	g.materials.prog.SetFragmentUniforms(buf)
 
 	for _, shader := range shaders {
 		if !g.useCPU {
@@ -875,9 +900,9 @@ restart:
 		}
 	}
 	// Transform to clip space: [-1, -1] - [1, 1].
-	g.materials.uniforms.scale = [2]float32{2 / float32(texSize), 2 / float32(texSize)}
-	g.materials.uniforms.pos = [2]float32{-1, -1}
-	g.materials.uniBuf.Upload(byteslice.Struct(g.materials.uniforms))
+	g.materials.vert.uniforms.scale = [2]float32{2 / float32(texSize), 2 / float32(texSize)}
+	g.materials.vert.uniforms.pos = [2]float32{-1, -1}
+	g.materials.vert.buf.Upload(byteslice.Struct(g.materials.vert.uniforms))
 	vertexData := byteslice.Slice(m.quads)
 	n := pow2Ceil(len(vertexData))
 	m.buffer.ensureCapacity(false, g.ctx, driver.BufferBindingVertices, n)
@@ -952,7 +977,11 @@ restart:
 			a.tex = nil
 		}
 		sz := a.packer.maxDim
-		handle, err := g.ctx.NewTexture(driver.TextureFormatSRGBA, sz, sz, driver.FilterLinear, driver.FilterLinear, driver.BufferBindingTexture)
+		format := driver.TextureFormatSRGBA
+		if !g.srgb {
+			format = driver.TextureFormatRGBA8
+		}
+		handle, err := g.ctx.NewTexture(format, sz, sz, driver.FilterLinear, driver.FilterLinear, driver.BufferBindingTexture)
 		if err != nil {
 			return fmt.Errorf("compute: failed to create image atlas: %v", err)
 		}
@@ -1316,7 +1345,8 @@ func (g *compute) Release() {
 		g.materials.fbo,
 		g.materials.tex,
 		&g.materials.buffer,
-		g.materials.uniBuf,
+		g.materials.vert.buf,
+		g.materials.frag.buf,
 		g.timers.t,
 	}
 	g.materials.cpuTex.Free()

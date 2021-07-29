@@ -9,7 +9,6 @@ package gpu
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -361,11 +360,8 @@ func New(api API) (GPU, error) {
 	defer d.EndFrame()
 	forceCompute := os.Getenv("GIORENDERER") == "forcecompute"
 	feats := d.Caps().Features
-	if !feats.Has(driver.FeatureSRGB) {
-		return nil, errors.New("gpu: no sRGB texture formats found")
-	}
 	switch {
-	case !forceCompute && feats.Has(driver.FeatureFloatRenderTargets):
+	case !forceCompute && feats.Has(driver.FeatureFloatRenderTargets) && feats.Has(driver.FeatureSRGB):
 		return newGPU(d)
 	}
 	return newCompute(d)

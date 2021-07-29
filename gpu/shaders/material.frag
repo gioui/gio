@@ -10,6 +10,12 @@ layout(location = 0) in vec2 vUV;
 
 layout(location = 0) out vec4 fragColor;
 
+layout(binding=0) uniform Color {
+	// If emulateSRGB is set (!= 0), the input texels are sRGB encoded. We save the
+	// conversion step below, at the cost of texture filtering in sRGB space.
+	float emulateSRGB;
+};
+
 vec3 RGBtosRGB(vec3 rgb) {
 	bvec3 cutoff = greaterThanEqual(rgb, vec3(0.0031308));
 	vec3 below = vec3(12.92)*rgb;
@@ -19,6 +25,8 @@ vec3 RGBtosRGB(vec3 rgb) {
 
 void main() {
 	vec4 texel = texture(tex, vUV);
-	texel.rgb = RGBtosRGB(texel.rgb);
+	if (emulateSRGB == 0.0) {
+		texel.rgb = RGBtosRGB(texel.rgb);
+	}
 	fragColor = texel;
 }
