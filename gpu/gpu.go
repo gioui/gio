@@ -9,12 +9,14 @@ package gpu
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
 	"math"
 	"os"
 	"reflect"
+	"runtime/debug"
 	"time"
 	"unsafe"
 
@@ -29,6 +31,8 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
+	"gioui.org/shader"
+	"gioui.org/shader/gio"
 
 	// Register backends.
 	_ "gioui.org/gpu/internal/d3d11"
@@ -128,6 +132,10 @@ type imageOp struct {
 	clipType clipType
 	place    placement
 }
+
+// shaderModuleVersion is the exact version of gioui.org/shader expected by
+// this package. Shader programs are not backwards or forwards compatible.
+const shaderModuleVersion = "v0.0.0-20210808092941-55e18336189e"
 
 func decodeStrokeOp(data []byte) clip.StrokeStyle {
 	_ = data[4]
@@ -350,6 +358,9 @@ const (
 )
 
 func New(api API) (GPU, error) {
+	if err := verifyShaderModule(); err != nil {
+		return nil, err
+	}
 	d, err := driver.NewDevice(api)
 	if err != nil {
 		return nil, err
@@ -374,6 +385,23 @@ func newGPU(ctx driver.Device) (*gpu, error) {
 		return nil, err
 	}
 	return g, nil
+}
+
+func verifyShaderModule() error {
+	mod, ok := debug.ReadBuildInfo()
+	if !ok {
+		// No module support; hopefully the version matches.
+		return nil
+	}
+	for _, m := range mod.Deps {
+		if m.Path == "gioui.org/shader" {
+			if got := m.Version; got != shaderModuleVersion {
+				return fmt.Errorf("gpu: module gioui.org/shader is version %q, expected %q", got, shaderModuleVersion)
+			}
+			return nil
+		}
+	}
+	return errors.New("gpu: module version for gioui.org/shader not found")
 }
 
 func (g *gpu) init(ctx driver.Device) error {
@@ -530,7 +558,7 @@ func newBlitter(ctx driver.Device) *blitter {
 	b.colUniforms = new(blitColUniforms)
 	b.texUniforms = new(blitTexUniforms)
 	b.linearGradientUniforms = new(blitLinearGradientUniforms)
-	prog, layout, err := createColorPrograms(ctx, shader_blit_vert, shader_blit_frag,
+	prog, layout, err := createColorPrograms(ctx, gio.Shader_blit_vert, gio.Shader_blit_frag,
 		[3]interface{}{&b.colUniforms.vert, &b.linearGradientUniforms.vert, &b.texUniforms.vert},
 		[3]interface{}{&b.colUniforms.frag, &b.linearGradientUniforms.frag, nil},
 	)
@@ -550,7 +578,7 @@ func (b *blitter) release() {
 	b.layout.Release()
 }
 
-func createColorPrograms(b driver.Device, vsSrc driver.ShaderSources, fsSrc [3]driver.ShaderSources, vertUniforms, fragUniforms [3]interface{}) ([3]*program, driver.InputLayout, error) {
+func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.Sources, vertUniforms, fragUniforms [3]interface{}) ([3]*program, driver.InputLayout, error) {
 	var progs [3]*program
 	{
 		prog, err := b.NewProgram(vsSrc, fsSrc[materialTexture])
@@ -603,9 +631,9 @@ func createColorPrograms(b driver.Device, vsSrc driver.ShaderSources, fsSrc [3]d
 		}
 		progs[materialLinearGradient] = newProgram(prog, vertBuffer, fragBuffer)
 	}
-	layout, err := b.NewInputLayout(vsSrc, []driver.InputDesc{
-		{Type: driver.DataTypeFloat, Size: 2, Offset: 0},
-		{Type: driver.DataTypeFloat, Size: 2, Offset: 4 * 2},
+	layout, err := b.NewInputLayout(vsSrc, []shader.InputDesc{
+		{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
+		{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
 	})
 	if err != nil {
 		progs[materialTexture].Release()

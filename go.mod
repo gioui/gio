@@ -8,4 +8,7 @@ require (
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
 )
 
-require gioui.org/cpu v0.0.0-20210727122813-41509bcd3462
+require (
+	gioui.org/cpu v0.0.0-20210808092351-bfe733dd3334
+	gioui.org/shader v0.0.0-20210808092941-55e18336189e
+)

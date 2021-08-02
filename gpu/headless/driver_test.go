@@ -15,6 +15,8 @@ import (
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/byteslice"
 	"gioui.org/internal/f32color"
+	"gioui.org/shader"
+	"gioui.org/shader/gio"
 )
 
 var dumpImages = flag.Bool("saveimages", false, "save test images")
@@ -36,7 +38,7 @@ func TestSimpleShader(t *testing.T) {
 	b := newDriver(t)
 	sz := image.Point{X: 800, Y: 600}
 	fbo := setupFBO(t, b, sz)
-	p, err := b.NewProgram(shader_simple_vert, shader_simple_frag)
+	p, err := b.NewProgram(gio.Shader_simple_vert, gio.Shader_simple_frag)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +61,7 @@ func TestInputShader(t *testing.T) {
 	b := newDriver(t)
 	sz := image.Point{X: 800, Y: 600}
 	fbo := setupFBO(t, b, sz)
-	p, err := b.NewProgram(shader_input_vert, shader_simple_frag)
+	p, err := b.NewProgram(gio.Shader_input_vert, gio.Shader_simple_frag)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,9 +79,9 @@ func TestInputShader(t *testing.T) {
 	}
 	defer buf.Release()
 	b.BindVertexBuffer(buf, 4*4, 0)
-	layout, err := b.NewInputLayout(shader_input_vert, []driver.InputDesc{
+	layout, err := b.NewInputLayout(gio.Shader_input_vert, []shader.InputDesc{
 		{
-			Type:   driver.DataTypeFloat,
+			Type:   shader.DataTypeFloat,
 			Size:   4,
 			Offset: 0,
 		},

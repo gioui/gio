@@ -19,6 +19,7 @@ import (
 	"time"
 	"unsafe"
 
+	"gioui.org/cpu"
 	"gioui.org/f32"
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/byteslice"
@@ -29,9 +30,9 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
-
-	"gioui.org/cpu"
-	"gioui.org/cpu/piet"
+	"gioui.org/shader"
+	"gioui.org/shader/gio"
+	"gioui.org/shader/piet"
 )
 
 type compute struct {
@@ -390,29 +391,22 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	}
 	shaders := []struct {
 		prog *computeProgram
-		src  driver.ShaderSources
+		src  shader.Sources
 		info *cpu.ProgramInfo
-		hash string
 	}{
-		{&g.programs.elements, shader_elements_comp, piet.ElementsProgramInfo, piet.ElementsHash},
-		{&g.programs.tileAlloc, shader_tile_alloc_comp, piet.Tile_allocProgramInfo, piet.Tile_allocHash},
-		{&g.programs.pathCoarse, shader_path_coarse_comp, piet.Path_coarseProgramInfo, piet.Path_coarseHash},
-		{&g.programs.backdrop, shader_backdrop_comp, piet.BackdropProgramInfo, piet.BackdropHash},
-		{&g.programs.binning, shader_binning_comp, piet.BinningProgramInfo, piet.BinningHash},
-		{&g.programs.coarse, shader_coarse_comp, piet.CoarseProgramInfo, piet.CoarseHash},
-		{&g.programs.kernel4, shader_kernel4_comp, piet.Kernel4ProgramInfo, piet.Kernel4Hash},
+		{&g.programs.elements, piet.Shader_elements_comp, piet.ElementsProgramInfo},
+		{&g.programs.tileAlloc, piet.Shader_tile_alloc_comp, piet.Tile_allocProgramInfo},
+		{&g.programs.pathCoarse, piet.Shader_path_coarse_comp, piet.Path_coarseProgramInfo},
+		{&g.programs.backdrop, piet.Shader_backdrop_comp, piet.BackdropProgramInfo},
+		{&g.programs.binning, piet.Shader_binning_comp, piet.BinningProgramInfo},
+		{&g.programs.coarse, piet.Shader_coarse_comp, piet.CoarseProgramInfo},
+		{&g.programs.kernel4, piet.Shader_kernel4_comp, piet.Kernel4ProgramInfo},
 	}
 	if !caps.Features.Has(driver.FeatureCompute) {
-		g.useCPU = supportsCPUCompute
-		for _, s := range shaders {
-			if s.src.Hash != s.hash {
-				g.useCPU = false
-				break
-			}
-		}
-		if !g.useCPU {
+		if !supportsCPUCompute {
 			return nil, errors.New("gpu: missing support for compute programs")
 		}
+		g.useCPU = true
 	}
 	if g.useCPU {
 		g.dispatcher = newDispatcher(runtime.NumCPU())
@@ -420,15 +414,15 @@ func newCompute(ctx driver.Device) (*compute, error) {
 
 	// Large enough for reasonable fill sizes, yet still spannable by the compute programs.
 	g.output.packer.maxDim = 4096
-	blitProg, err := ctx.NewProgram(shader_copy_vert, shader_copy_frag)
+	blitProg, err := ctx.NewProgram(gio.Shader_copy_vert, gio.Shader_copy_frag)
 	if err != nil {
 		g.Release()
 		return nil, err
 	}
 	g.output.blitProg = blitProg
-	progLayout, err := ctx.NewInputLayout(shader_copy_vert, []driver.InputDesc{
-		{Type: driver.DataTypeFloat, Size: 2, Offset: 0},
-		{Type: driver.DataTypeFloat, Size: 2, Offset: 4 * 2},
+	progLayout, err := ctx.NewInputLayout(gio.Shader_copy_vert, []shader.InputDesc{
+		{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
+		{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
 	})
 	if err != nil {
 		g.Release()
@@ -445,15 +439,15 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	g.output.uniBuf = buf
 	g.output.blitProg.SetVertexUniforms(buf)
 
-	materialProg, err := ctx.NewProgram(shader_material_vert, shader_material_frag)
+	materialProg, err := ctx.NewProgram(gio.Shader_material_vert, gio.Shader_material_frag)
 	if err != nil {
 		g.Release()
 		return nil, err
 	}
 	g.materials.prog = materialProg
-	progLayout, err = ctx.NewInputLayout(shader_material_vert, []driver.InputDesc{
-		{Type: driver.DataTypeFloat, Size: 2, Offset: 0},
-		{Type: driver.DataTypeFloat, Size: 2, Offset: 4 * 2},
+	progLayout, err = ctx.NewInputLayout(gio.Shader_material_vert, []shader.InputDesc{
+		{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
+		{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
 	})
 	if err != nil {
 		g.Release()

@@ -12,6 +12,7 @@ import (
 
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/gl"
+	"gioui.org/shader"
 )
 
 // Backend implements driver.Device.
@@ -139,13 +140,13 @@ type uniformsTracker struct {
 type uniformLocation struct {
 	uniform gl.Uniform
 	offset  int
-	typ     driver.DataType
+	typ     shader.DataType
 	size    int
 }
 
 type gpuInputLayout struct {
-	inputs []driver.InputLocation
-	layout []driver.InputDesc
+	inputs []shader.InputLocation
+	layout []shader.InputDesc
 }
 
 // textureTriple holds the type settings for
@@ -846,7 +847,7 @@ func (b *Backend) Clear(colR, colG, colB, colA float32) {
 	b.funcs.Clear(gl.COLOR_BUFFER_BIT)
 }
 
-func (b *Backend) NewInputLayout(vs driver.ShaderSources, layout []driver.InputDesc) (driver.InputLayout, error) {
+func (b *Backend) NewInputLayout(vs shader.Sources, layout []shader.InputDesc) (driver.InputLayout, error) {
 	if len(vs.Inputs) != len(layout) {
 		return nil, fmt.Errorf("NewInputLayout: got %d inputs, expected %d", len(layout), len(vs.Inputs))
 	}
@@ -861,7 +862,7 @@ func (b *Backend) NewInputLayout(vs driver.ShaderSources, layout []driver.InputD
 	}, nil
 }
 
-func (b *Backend) NewComputeProgram(src driver.ShaderSources) (driver.Program, error) {
+func (b *Backend) NewComputeProgram(src shader.Sources) (driver.Program, error) {
 	p, err := gl.CreateComputeProgram(b.funcs, src.GLSL310ES)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", src.Name, err)
@@ -873,7 +874,7 @@ func (b *Backend) NewComputeProgram(src driver.ShaderSources) (driver.Program, e
 	return gpuProg, nil
 }
 
-func (b *Backend) NewProgram(vertShader, fragShader driver.ShaderSources) (driver.Program, error) {
+func (b *Backend) NewProgram(vertShader, fragShader shader.Sources) (driver.Program, error) {
 	attr := make([]string, len(vertShader.Inputs))
 	for _, inp := range vertShader.Inputs {
 		attr[inp.Location] = inp.Name
@@ -937,7 +938,7 @@ func (b *Backend) NewProgram(vertShader, fragShader driver.ShaderSources) (drive
 	return gpuProg, nil
 }
 
-func lookupUniform(funcs *gl.Functions, p gl.Program, loc driver.UniformLocation) uniformLocation {
+func lookupUniform(funcs *gl.Functions, p gl.Program, loc shader.UniformLocation) uniformLocation {
 	u := funcs.GetUniformLocation(p, loc.Name)
 	if !u.Valid() {
 		panic(fmt.Errorf("uniform %q not found", loc.Name))
@@ -985,7 +986,7 @@ func (p *gpuProgram) Release() {
 	p.backend.glstate.deleteProgram(p.backend.funcs, p.obj)
 }
 
-func (u *uniformsTracker) setup(funcs *gl.Functions, p gl.Program, uniformSize int, uniforms []driver.UniformLocation) {
+func (u *uniformsTracker) setup(funcs *gl.Functions, p gl.Program, uniformSize int, uniforms []shader.UniformLocation) {
 	u.locs = make([]uniformLocation, len(uniforms))
 	for i, uniform := range uniforms {
 		u.locs[i] = lookupUniform(funcs, p, uniform)
@@ -1016,19 +1017,19 @@ func (p *uniformsTracker) update(funcs *gl.Functions) {
 	for _, u := range p.locs {
 		data := data[u.offset:]
 		switch {
-		case u.typ == driver.DataTypeFloat && u.size == 1:
+		case u.typ == shader.DataTypeFloat && u.size == 1:
 			data := data[:4]
 			v := *(*[1]float32)(unsafe.Pointer(&data[0]))
 			funcs.Uniform1f(u.uniform, v[0])
-		case u.typ == driver.DataTypeFloat && u.size == 2:
+		case u.typ == shader.DataTypeFloat && u.size == 2:
 			data := data[:8]
 			v := *(*[2]float32)(unsafe.Pointer(&data[0]))
 			funcs.Uniform2f(u.uniform, v[0], v[1])
-		case u.typ == driver.DataTypeFloat && u.size == 3:
+		case u.typ == shader.DataTypeFloat && u.size == 3:
 			data := data[:12]
 			v := *(*[3]float32)(unsafe.Pointer(&data[0]))
 			funcs.Uniform3f(u.uniform, v[0], v[1], v[2])
-		case u.typ == driver.DataTypeFloat && u.size == 4:
+		case u.typ == shader.DataTypeFloat && u.size == 4:
 			data := data[:16]
 			v := *(*[4]float32)(unsafe.Pointer(&data[0]))
 			funcs.Uniform4f(u.uniform, v[0], v[1], v[2], v[3])
@@ -1108,9 +1109,9 @@ func (b *Backend) setupVertexArrays() {
 		l := layout.layout[i]
 		var gltyp gl.Enum
 		switch l.Type {
-		case driver.DataTypeFloat:
+		case shader.DataTypeFloat:
 			gltyp = gl.FLOAT
-		case driver.DataTypeShort:
+		case shader.DataTypeShort:
 			gltyp = gl.SHORT
 		default:
 			panic("unsupported data type")

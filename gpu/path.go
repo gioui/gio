@@ -15,6 +15,8 @@ import (
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/byteslice"
 	"gioui.org/internal/f32color"
+	"gioui.org/shader"
+	"gioui.org/shader/gio"
 )
 
 type pather struct {
@@ -161,7 +163,7 @@ func newCoverer(ctx driver.Device) *coverer {
 	c.colUniforms = new(coverColUniforms)
 	c.texUniforms = new(coverTexUniforms)
 	c.linearGradientUniforms = new(coverLinearGradientUniforms)
-	prog, layout, err := createColorPrograms(ctx, shader_cover_vert, shader_cover_frag,
+	prog, layout, err := createColorPrograms(ctx, gio.Shader_cover_vert, gio.Shader_cover_frag,
 		[3]interface{}{&c.colUniforms.vert, &c.linearGradientUniforms.vert, &c.texUniforms.vert},
 		[3]interface{}{&c.colUniforms.frag, &c.linearGradientUniforms.frag, nil},
 	)
@@ -189,19 +191,19 @@ func newStenciler(ctx driver.Device) *stenciler {
 	if err != nil {
 		panic(err)
 	}
-	progLayout, err := ctx.NewInputLayout(shader_stencil_vert, []driver.InputDesc{
-		{Type: driver.DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).Corner))},
-		{Type: driver.DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).MaxY))},
-		{Type: driver.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).FromX))},
-		{Type: driver.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).CtrlX))},
-		{Type: driver.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).ToX))},
+	progLayout, err := ctx.NewInputLayout(gio.Shader_stencil_vert, []shader.InputDesc{
+		{Type: shader.DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).Corner))},
+		{Type: shader.DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).MaxY))},
+		{Type: shader.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).FromX))},
+		{Type: shader.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).CtrlX))},
+		{Type: shader.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).ToX))},
 	})
 	if err != nil {
 		panic(err)
 	}
-	iprogLayout, err := ctx.NewInputLayout(shader_intersect_vert, []driver.InputDesc{
-		{Type: driver.DataTypeFloat, Size: 2, Offset: 0},
-		{Type: driver.DataTypeFloat, Size: 2, Offset: 4 * 2},
+	iprogLayout, err := ctx.NewInputLayout(gio.Shader_intersect_vert, []shader.InputDesc{
+		{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
+		{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
 	})
 	if err != nil {
 		panic(err)
@@ -210,7 +212,7 @@ func newStenciler(ctx driver.Device) *stenciler {
 		ctx:      ctx,
 		indexBuf: indexBuf,
 	}
-	prog, err := ctx.NewProgram(shader_stencil_vert, shader_stencil_frag)
+	prog, err := ctx.NewProgram(gio.Shader_stencil_vert, gio.Shader_stencil_frag)
 	if err != nil {
 		panic(err)
 	}
@@ -218,7 +220,7 @@ func newStenciler(ctx driver.Device) *stenciler {
 	vertUniforms := newUniformBuffer(ctx, &st.prog.uniforms.vert)
 	st.prog.prog = newProgram(prog, vertUniforms, nil)
 	st.prog.layout = progLayout
-	iprog, err := ctx.NewProgram(shader_intersect_vert, shader_intersect_frag)
+	iprog, err := ctx.NewProgram(gio.Shader_intersect_vert, gio.Shader_intersect_frag)
 	if err != nil {
 		panic(err)
 	}

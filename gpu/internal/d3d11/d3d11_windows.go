@@ -14,6 +14,7 @@ import (
 
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/d3d11"
+	"gioui.org/shader"
 )
 
 type Backend struct {
@@ -287,7 +288,7 @@ func (b *Backend) NewFramebuffer(tex driver.Texture) (driver.Framebuffer, error)
 	return fbo, nil
 }
 
-func (b *Backend) NewInputLayout(vertexShader driver.ShaderSources, layout []driver.InputDesc) (driver.InputLayout, error) {
+func (b *Backend) NewInputLayout(vertexShader shader.Sources, layout []shader.InputDesc) (driver.InputLayout, error) {
 	if len(vertexShader.Inputs) != len(layout) {
 		return nil, fmt.Errorf("NewInputLayout: got %d inputs, expected %d", len(layout), len(vertexShader.Inputs))
 	}
@@ -300,7 +301,7 @@ func (b *Backend) NewInputLayout(vertexShader driver.ShaderSources, layout []dri
 		}
 		var format uint32
 		switch l.Type {
-		case driver.DataTypeFloat:
+		case shader.DataTypeFloat:
 			switch l.Size {
 			case 1:
 				format = d3d11.DXGI_FORMAT_R32_FLOAT
@@ -313,7 +314,7 @@ func (b *Backend) NewInputLayout(vertexShader driver.ShaderSources, layout []dri
 			default:
 				panic("unsupported data size")
 			}
-		case driver.DataTypeShort:
+		case shader.DataTypeShort:
 			switch l.Size {
 			case 1:
 				format = d3d11.DXGI_FORMAT_R16_SINT
@@ -332,7 +333,7 @@ func (b *Backend) NewInputLayout(vertexShader driver.ShaderSources, layout []dri
 			AlignedByteOffset: uint32(l.Offset),
 		}
 	}
-	l, err := b.dev.CreateInputLayout(descs, []byte(vertexShader.HLSL))
+	l, err := b.dev.CreateInputLayout(descs, []byte(vertexShader.DXBC))
 	if err != nil {
 		return nil, err
 	}
@@ -380,16 +381,16 @@ func (b *Backend) NewImmutableBuffer(typ driver.BufferBinding, data []byte) (dri
 	return &Buffer{backend: b, buf: buf, bind: bind, immutable: true}, nil
 }
 
-func (b *Backend) NewComputeProgram(shader driver.ShaderSources) (driver.Program, error) {
+func (b *Backend) NewComputeProgram(shader shader.Sources) (driver.Program, error) {
 	panic("not implemented")
 }
 
-func (b *Backend) NewProgram(vertexShader, fragmentShader driver.ShaderSources) (driver.Program, error) {
-	vs, err := b.dev.CreateVertexShader([]byte(vertexShader.HLSL))
+func (b *Backend) NewProgram(vertexShader, fragmentShader shader.Sources) (driver.Program, error) {
+	vs, err := b.dev.CreateVertexShader([]byte(vertexShader.DXBC))
 	if err != nil {
 		return nil, err
 	}
-	ps, err := b.dev.CreatePixelShader([]byte(fragmentShader.HLSL))
+	ps, err := b.dev.CreatePixelShader([]byte(fragmentShader.DXBC))
 	if err != nil {
 		return nil, err
 	}
