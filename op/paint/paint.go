@@ -43,7 +43,7 @@ type LinearGradientOp struct {
 	Color2 color.NRGBA
 }
 
-// PaintOp fills fills the current clip area with the current brush.
+// PaintOp fills the current clip area with the current brush.
 type PaintOp struct {
 }
 
