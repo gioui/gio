@@ -36,6 +36,7 @@ import (
 
 	// Register backends.
 	_ "gioui.org/gpu/internal/d3d11"
+	_ "gioui.org/gpu/internal/metal"
 	_ "gioui.org/gpu/internal/opengl"
 )
 
@@ -135,7 +136,7 @@ type imageOp struct {
 
 // shaderModuleVersion is the exact version of gioui.org/shader expected by
 // this package. Shader programs are not backwards or forwards compatible.
-const shaderModuleVersion = "v0.0.0-20210820085839-484f7c0305de"
+const shaderModuleVersion = "v0.0.0-20210821062758-133bba6632c7"
 
 func decodeStrokeOp(data []byte) clip.StrokeStyle {
 	_ = data[4]

@@ -26,6 +26,11 @@ type Direct3D11RenderTarget struct {
 	RenderTarget unsafe.Pointer
 }
 
+type MetalRenderTarget struct {
+	// Texture is a MTLTexture.
+	Texture unsafe.Pointer
+}
+
 type OpenGL struct {
 	// ES forces the use of ANGLE OpenGL ES libraries on macOS. It is
 	// ignored on all other platforms.
@@ -41,10 +46,20 @@ type Direct3D11 struct {
 	Device unsafe.Pointer
 }
 
+type Metal struct {
+	// Device is an MTLDevice.
+	Device unsafe.Pointer
+	// Queue is a MTLCommandQueue.
+	Queue unsafe.Pointer
+	// PixelFormat is the MTLPixelFormat of the default framebuffer.
+	PixelFormat int
+}
+
 // API specific device constructors.
 var (
 	NewOpenGLDevice     func(api OpenGL) (Device, error)
 	NewDirect3D11Device func(api Direct3D11) (Device, error)
+	NewMetalDevice      func(api Metal) (Device, error)
 )
 
 // NewDevice creates a new Device given the api.
@@ -62,11 +77,17 @@ func NewDevice(api API) (Device, error) {
 		if NewDirect3D11Device != nil {
 			return NewDirect3D11Device(api)
 		}
+	case Metal:
+		if NewMetalDevice != nil {
+			return NewMetalDevice(api)
+		}
 	}
 	return nil, fmt.Errorf("driver: no driver available for the API %T", api)
 }
 
 func (OpenGL) implementsAPI()                          {}
 func (Direct3D11) implementsAPI()                      {}
+func (Metal) implementsAPI()                           {}
 func (OpenGLRenderTarget) ImplementsRenderTarget()     {}
 func (Direct3D11RenderTarget) ImplementsRenderTarget() {}
+func (MetalRenderTarget) ImplementsRenderTarget()      {}

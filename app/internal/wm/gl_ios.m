@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build darwin,ios
+// +build darwin,ios,nometal
 
 @import UIKit;
 @import OpenGLES;
 
 #include "_cgo_export.h"
+
+Class gio_layerClass(void) {
+	return [CAEAGLLayer class];
+}
 
 int gio_renderbufferStorage(CFTypeRef ctxRef, CFTypeRef layerRef, GLenum buffer) {
 	EAGLContext *ctx = (__bridge EAGLContext *)ctxRef;

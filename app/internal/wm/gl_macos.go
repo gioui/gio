@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-//go:build darwin && !ios
-// +build darwin,!ios
+//go:build darwin && !ios && nometal
+// +build darwin,!ios,nometal
 
 package wm
 

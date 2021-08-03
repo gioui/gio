@@ -8,6 +8,8 @@
 #include "_cgo_export.h"
 #include "framework_ios.h"
 
+__attribute__ ((visibility ("hidden"))) Class gio_layerClass(void);
+
 @interface GioView: UIView <UIKeyInput>
 @end
 
@@ -125,6 +127,9 @@ NSArray<UIKeyCommand *> *_keyCommands;
 	gio_onFrameCallback((__bridge CFTypeRef)link);
 }
 
++ (Class)layerClass {
+    return gio_layerClass();
+}
 - (void)willMoveToWindow:(UIWindow *)newWindow {
 	if (self.window != nil) {
 		[[NSNotificationCenter defaultCenter] removeObserver:self
@@ -155,9 +160,6 @@ NSArray<UIKeyCommand *> *_keyCommands;
 	if (self.isFirstResponder) {
 		onFocus((__bridge CFTypeRef)self, NO);
 	}
-}
-
-- (void)dealloc {
 }
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {

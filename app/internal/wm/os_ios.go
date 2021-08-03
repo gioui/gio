@@ -46,24 +46,6 @@ static void hideTextInput(CFTypeRef viewRef) {
 	[view resignFirstResponder];
 }
 
-static void addLayerToView(CFTypeRef viewRef, CFTypeRef layerRef) {
-	UIView *view = (__bridge UIView *)viewRef;
-	CALayer *layer = (__bridge CALayer *)layerRef;
-	[view.layer addSublayer:layer];
-}
-
-static void updateView(CFTypeRef viewRef, CFTypeRef layerRef) {
-	UIView *view = (__bridge UIView *)viewRef;
-	CAEAGLLayer *layer = (__bridge CAEAGLLayer *)layerRef;
-	layer.contentsScale = view.contentScaleFactor;
-	layer.bounds = view.bounds;
-}
-
-static void removeLayer(CFTypeRef layerRef) {
-	CALayer *layer = (__bridge CALayer *)layerRef;
-	[layer removeFromSuperlayer];
-}
-
 static struct drawParams viewDrawParams(CFTypeRef viewRef) {
 	UIView *v = (__bridge UIView *)viewRef;
 	struct drawParams params;
@@ -92,7 +74,6 @@ import (
 	"image"
 	"runtime"
 	"runtime/debug"
-	"sync/atomic"
 	"time"
 	"unicode/utf16"
 	"unsafe"
@@ -112,16 +93,13 @@ type window struct {
 	w           Callbacks
 	displayLink *displayLink
 
-	layer   C.CFTypeRef
-	visible atomic.Value
+	visible bool
 	cursor  pointer.CursorName
 
 	pointerMap []C.CFTypeRef
 }
 
 var mainWindow = newWindowRendezvous()
-
-var layerFactory func() uintptr
 
 var views = make(map[C.CFTypeRef]*window)
 
@@ -145,9 +123,6 @@ func onCreate(view C.CFTypeRef) {
 	wopts := <-mainWindow.out
 	w.w = wopts.window
 	w.w.SetDriver(w)
-	w.visible.Store(false)
-	w.layer = C.CFTypeRef(layerFactory())
-	C.addLayerToView(view, w.layer)
 	views[view] = w
 	w.w.Event(system.StageEvent{Stage: system.StagePaused})
 }
@@ -163,9 +138,8 @@ func (w *window) draw(sync bool) {
 	if params.width == 0 || params.height == 0 {
 		return
 	}
-	wasVisible := w.isVisible()
-	w.visible.Store(true)
-	C.updateView(w.view, w.layer)
+	wasVisible := w.visible
+	w.visible = true
 	if !wasVisible {
 		w.w.Event(system.StageEvent{Stage: system.StageRunning})
 	}
@@ -195,7 +169,7 @@ func (w *window) draw(sync bool) {
 //export onStop
 func onStop(view C.CFTypeRef) {
 	w := views[view]
-	w.visible.Store(false)
+	w.visible = false
 	w.w.Event(system.StageEvent{Stage: system.StagePaused})
 }
 
@@ -205,9 +179,6 @@ func onDestroy(view C.CFTypeRef) {
 	delete(views, view)
 	w.w.Event(system.DestroyEvent{})
 	w.displayLink.Close()
-	C.removeLayer(w.layer)
-	C.CFRelease(w.layer)
-	w.layer = 0
 	w.view = 0
 }
 
@@ -341,12 +312,8 @@ func (w *window) lookupTouch(last bool, touch C.CFTypeRef) pointer.ID {
 	return pointer.ID(id)
 }
 
-func (w *window) contextLayer() uintptr {
-	return uintptr(w.layer)
-}
-
-func (w *window) isVisible() bool {
-	return w.visible.Load().(bool)
+func (w *window) contextView() C.CFTypeRef {
+	return w.view
 }
 
 func (w *window) ShowTextInput(show bool) {

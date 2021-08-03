@@ -3,46 +3,69 @@
 package headless
 
 import (
+	"errors"
+	"unsafe"
+
 	"gioui.org/gpu"
 	_ "gioui.org/internal/cocoainit"
 )
 
 /*
-#cgo CFLAGS: -DGL_SILENCE_DEPRECATION -Werror -Wno-deprecated-declarations -fmodules -fobjc-arc -x objective-c
+#cgo CFLAGS: -Werror -Wno-deprecated-declarations -fmodules -fobjc-arc -x objective-c
+#cgo LDFLAGS: -framework CoreGraphics
 
-#include <CoreFoundation/CoreFoundation.h>
+@import Metal;
 
-__attribute__ ((visibility ("hidden"))) CFTypeRef gio_headless_newContext(void);
-__attribute__ ((visibility ("hidden"))) void gio_headless_clearCurrentContext(CFTypeRef ctxRef);
-__attribute__ ((visibility ("hidden"))) void gio_headless_makeCurrentContext(CFTypeRef ctxRef);
+static CFTypeRef createDevice(void) {
+	@autoreleasepool {
+		id dev = MTLCreateSystemDefaultDevice();
+		return CFBridgingRetain(dev);
+	}
+}
+
+static CFTypeRef newCommandQueue(CFTypeRef devRef) {
+	@autoreleasepool {
+		id<MTLDevice> dev = (__bridge id<MTLDevice>)devRef;
+		return CFBridgingRetain([dev newCommandQueue]);
+	}
+}
 */
 import "C"
 
-type nsContext struct {
-	ctx C.CFTypeRef
+type mtlContext struct {
+	dev   C.CFTypeRef
+	queue C.CFTypeRef
 }
 
 func newContext() (context, error) {
-	ctx := C.gio_headless_newContext()
-	return &nsContext{ctx: ctx}, nil
+	dev := C.createDevice()
+	if dev == 0 {
+		return nil, errors.New("headless: failed to create Metal device")
+	}
+	queue := C.newCommandQueue(dev)
+	if queue == 0 {
+		C.CFRelease(dev)
+		return nil, errors.New("headless: failed to create MTLQueue")
+	}
+	return &mtlContext{dev: dev, queue: queue}, nil
 }
 
-func (c *nsContext) API() gpu.API {
-	return gpu.OpenGL{}
+func (c *mtlContext) API() gpu.API {
+	return gpu.Metal{
+		Device:      unsafe.Pointer(c.dev),
+		Queue:       unsafe.Pointer(c.queue),
+		PixelFormat: int(C.MTLPixelFormatRGBA8Unorm_sRGB),
+	}
 }
 
-func (c *nsContext) MakeCurrent() error {
-	C.gio_headless_makeCurrentContext(c.ctx)
+func (c *mtlContext) MakeCurrent() error {
 	return nil
 }
 
-func (c *nsContext) ReleaseCurrent() {
-	C.gio_headless_clearCurrentContext(c.ctx)
-}
+func (c *mtlContext) ReleaseCurrent() {}
 
-func (d *nsContext) Release() {
-	if d.ctx != 0 {
-		C.CFRelease(d.ctx)
-		d.ctx = 0
-	}
+func (d *mtlContext) Release() {
+	C.CFRelease(d.dev)
+	C.CFRelease(d.queue)
+	*d = mtlContext{}
 }

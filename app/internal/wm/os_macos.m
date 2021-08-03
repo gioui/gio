@@ -6,6 +6,8 @@
 
 #include "_cgo_export.h"
 
+__attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(void);
+
 @interface GioAppDelegate : NSObject<NSApplicationDelegate>
 @end
 
@@ -54,12 +56,23 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 	gio_onMouse((__bridge CFTypeRef)view, typ, [NSEvent pressedMouseButtons], p.x, height - p.y, dx, dy, [event timestamp], [event modifierFlags]);
 }
 
-@interface GioView : NSView
+@interface GioView : NSView <CALayerDelegate>
 @end
 
 @implementation GioView
+// drawRect is called when OpenGL is used, displayLayer otherwise.
+// Don't know why.
 - (void)drawRect:(NSRect)r {
 	gio_onDraw((__bridge CFTypeRef)self);
+}
+- (void)displayLayer:(CALayer *)layer {
+	layer.contentsScale = self.window.backingScaleFactor;
+	gio_onDraw((__bridge CFTypeRef)self);
+}
+- (CALayer *)makeBackingLayer {
+	CALayer *layer = gio_layerFactory();
+	layer.delegate = self;
+	return layer;
 }
 - (void)mouseDown:(NSEvent *)event {
 	handleMouse(self, event, MOUSE_DOWN, 0, 0);
@@ -221,6 +234,7 @@ CFTypeRef gio_createView(void) {
 		NSRect frame = NSMakeRect(0, 0, 0, 0);
 		GioView* view = [[GioView alloc] initWithFrame:frame];
 		[view setWantsLayer:YES];
+		view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
 		return CFBridgingRetain(view);
 	}
 }

@@ -423,11 +423,9 @@ func gio_onClose(view C.CFTypeRef) {
 	deleteView(view)
 	w.w.Event(system.DestroyEvent{})
 	w.displayLink.Close()
-	w.displayLink = nil
 	C.CFRelease(w.view)
-	w.view = 0
 	C.CFRelease(w.window)
-	w.window = 0
+	*w = window{}
 }
 
 //export gio_onHide

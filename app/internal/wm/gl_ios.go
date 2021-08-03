@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-//go:build darwin && ios
-// +build darwin,ios
+//go:build darwin && ios && nometal
+// +build darwin,ios,nometal
 
 package wm
 
 /*
+@import UIKit;
+
 #include <CoreFoundation/CoreFoundation.h>
 #include <OpenGLES/ES2/gl.h>
 #include <OpenGLES/ES2/glext.h>
@@ -15,6 +17,14 @@ __attribute__ ((visibility ("hidden"))) int gio_presentRenderbuffer(CFTypeRef ct
 __attribute__ ((visibility ("hidden"))) int gio_makeCurrent(CFTypeRef ctx);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createContext(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createGLLayer(void);
+
+static CFTypeRef getViewLayer(CFTypeRef viewRef) {
+	@autoreleasepool {
+		UIView *view = (__bridge UIView *)viewRef;
+		return CFBridgingRetain(view.layer);
+	}
+}
+
 */
 import "C"
 
@@ -36,12 +46,6 @@ type context struct {
 	colorBuffer gl.Renderbuffer
 }
 
-func init() {
-	layerFactory = func() uintptr {
-		return uintptr(C.gio_createGLLayer())
-	}
-}
-
 func newContext(w *window) (*context, error) {
 	ctx := C.gio_createContext()
 	if ctx == 0 {
@@ -55,7 +59,7 @@ func newContext(w *window) (*context, error) {
 	c := &context{
 		ctx:   ctx,
 		owner: w,
-		layer: C.CFTypeRef(w.contextLayer()),
+		layer: C.getViewLayer(w.contextView()),
 		c:     f,
 	}
 	return c, nil
@@ -116,7 +120,7 @@ func (c *context) Refresh() error {
 		c.frameBuffer = c.c.CreateFramebuffer()
 		c.colorBuffer = c.c.CreateRenderbuffer()
 	}
-	if !c.owner.isVisible() {
+	if !c.owner.visible {
 		// Make sure any in-flight GL commands are complete.
 		c.c.Finish()
 		return nil

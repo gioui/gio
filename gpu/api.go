@@ -17,8 +17,14 @@ type OpenGLRenderTarget = driver.OpenGLRenderTarget
 // Direct3D11RenderTarget is a render target suitable for the Direct3D 11 backend.
 type Direct3D11RenderTarget = driver.Direct3D11RenderTarget
 
+// MetalRenderTarget is a render target suitable for the Metal backend.
+type MetalRenderTarget = driver.MetalRenderTarget
+
 // OpenGL denotes the OpenGL or OpenGL ES API.
 type OpenGL = driver.OpenGL
 
 // Direct3D11 denotes the Direct3D API.
 type Direct3D11 = driver.Direct3D11
+
+// Metal denotes the Apple Metal API.
+type Metal = driver.Metal

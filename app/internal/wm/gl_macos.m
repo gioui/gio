@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build darwin,!ios
+// +build darwin,!ios,nometal
 
 @import AppKit;
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <OpenGL/OpenGL.h>
 #include "_cgo_export.h"
+
+CALayer *gio_layerFactory(void) {
+	@autoreleasepool {
+		return [CALayer layer];
+	}
+}
 
 CFTypeRef gio_createGLContext(void) {
 	@autoreleasepool {
