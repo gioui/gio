@@ -36,6 +36,10 @@ func newContext(w *window) (*context, error) {
 	return c, nil
 }
 
+func (c *context) RenderTarget() gpu.RenderTarget {
+	return gpu.OpenGLRenderTarget{}
+}
+
 func (c *context) API() gpu.API {
 	return gpu.OpenGL{Context: gl.Context(c.ctx)}
 }

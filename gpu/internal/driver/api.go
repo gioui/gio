@@ -15,6 +15,19 @@ type API interface {
 	implementsAPI()
 }
 
+type RenderTarget interface {
+	ImplementsRenderTarget()
+}
+
+type OpenGLRenderTarget gl.Framebuffer
+
+type Direct3D11RenderTarget struct {
+	// RenderTarget is a *ID3D11RenderTargetView.
+	RenderTarget unsafe.Pointer
+	// DepthStencilView is a *ID3D11DepthStencilView.
+	DepthStencilView unsafe.Pointer
+}
+
 type OpenGL struct {
 	// ES forces the use of ANGLE OpenGL ES libraries on macOS. It is
 	// ignored on all other platforms.
@@ -55,5 +68,7 @@ func NewDevice(api API) (Device, error) {
 	return nil, fmt.Errorf("driver: no driver available for the API %T", api)
 }
 
-func (OpenGL) implementsAPI()     {}
-func (Direct3D11) implementsAPI() {}
+func (OpenGL) implementsAPI()                          {}
+func (Direct3D11) implementsAPI()                      {}
+func (OpenGLRenderTarget) ImplementsRenderTarget()     {}
+func (Direct3D11RenderTarget) ImplementsRenderTarget() {}

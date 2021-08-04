@@ -68,6 +68,7 @@ type Callbacks interface {
 
 type Context interface {
 	API() gpu.API
+	RenderTarget() gpu.RenderTarget
 	Present() error
 	Refresh() error
 	Release()

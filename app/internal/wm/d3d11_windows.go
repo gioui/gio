@@ -54,6 +54,13 @@ func (c *d3d11Context) API() gpu.API {
 	return gpu.Direct3D11{Device: unsafe.Pointer(c.dev)}
 }
 
+func (c *d3d11Context) RenderTarget() gpu.RenderTarget {
+	return gpu.Direct3D11RenderTarget{
+		RenderTarget:     unsafe.Pointer(c.renderTarget),
+		DepthStencilView: unsafe.Pointer(c.depthView),
+	}
+}
+
 func (c *d3d11Context) Present() error {
 	err := c.swchain.Present(1, 0)
 	if err == nil {

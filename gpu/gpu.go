@@ -42,8 +42,8 @@ type GPU interface {
 	Clear(color color.NRGBA)
 	// Collect the graphics operations from frame, given the viewport.
 	Collect(viewport image.Point, frame *op.Ops)
-	// Frame clears the color buffer and draws the collected operations.
-	Frame() error
+	// Frame draws the collected operations to target.
+	Frame(target RenderTarget) error
 	// Profile returns the last available profiling information. Profiling
 	// information is requested when Collect sees a ProfileOp, and the result
 	// is available through Profile at some later time.
@@ -356,7 +356,7 @@ func New(api API) (GPU, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.BeginFrame(false, image.Point{})
+	d.BeginFrame(nil, false, image.Point{})
 	defer d.EndFrame()
 	forceCompute := os.Getenv("GIORENDERER") == "forcecompute"
 	feats := d.Caps().Features
@@ -414,9 +414,9 @@ func (g *gpu) Collect(viewport image.Point, frameOps *op.Ops) {
 	}
 }
 
-func (g *gpu) Frame() error {
+func (g *gpu) Frame(target RenderTarget) error {
 	viewport := g.renderer.blitter.viewport
-	defFBO := g.ctx.BeginFrame(g.drawOps.clear, viewport)
+	defFBO := g.ctx.BeginFrame(target, g.drawOps.clear, viewport)
 	defer g.ctx.EndFrame()
 	for _, img := range g.drawOps.imageOps {
 		expandPathOp(img.path, img.clip)

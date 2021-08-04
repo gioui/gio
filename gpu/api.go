@@ -8,6 +8,15 @@ import "gioui.org/gpu/internal/driver"
 // There is an API type for each supported GPU API such as OpenGL and Direct3D.
 type API = driver.API
 
+// A RenderTarget denotest the destination framebuffer for a frame.
+type RenderTarget = driver.RenderTarget
+
+// OpenGLRenderTarget is a render target suitable for the OpenGL backend.
+type OpenGLRenderTarget = driver.OpenGLRenderTarget
+
+// Direct3D11RenderTarget is a render target suitable for the Direct3D 11 backend.
+type Direct3D11RenderTarget = driver.Direct3D11RenderTarget
+
 // OpenGL denotes the OpenGL or OpenGL ES API.
 type OpenGL = driver.OpenGL
 

@@ -65,6 +65,10 @@ func contextAPI() gpu.OpenGL {
 	return gpu.OpenGL{}
 }
 
+func (c *context) RenderTarget() gpu.RenderTarget {
+	return gpu.OpenGLRenderTarget(c.frameBuffer)
+}
+
 func (c *context) API() gpu.API {
 	return contextAPI()
 }

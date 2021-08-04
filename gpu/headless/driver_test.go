@@ -174,7 +174,7 @@ func newDriver(t *testing.T) driver.Device {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b.BeginFrame(true, image.Pt(1, 1))
+	b.BeginFrame(nil, true, image.Pt(1, 1))
 	t.Cleanup(func() {
 		b.EndFrame()
 		ctx.ReleaseCurrent()

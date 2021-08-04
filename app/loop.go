@@ -100,7 +100,7 @@ func (l *renderLoop) renderLoop(ctx wm.Context) error {
 				g.Collect(frame.viewport, frame.ops)
 				// Signal that we're done with the frame ops.
 				l.ack <- struct{}{}
-				res.err = g.Frame()
+				res.err = g.Frame(ctx.RenderTarget())
 				if res.err == nil {
 					res.err = ctx.Present()
 				}

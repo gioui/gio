@@ -12,7 +12,7 @@ import (
 // APIs such as OpenGL, Direct3D useful for rendering Gio
 // operations.
 type Device interface {
-	BeginFrame(clear bool, viewport image.Point) Framebuffer
+	BeginFrame(target RenderTarget, clear bool, viewport image.Point) Framebuffer
 	EndFrame()
 	Caps() Caps
 	NewTimer() Timer
@@ -155,6 +155,7 @@ type Buffer interface {
 }
 
 type Framebuffer interface {
+	RenderTarget
 	Invalidate()
 	Release()
 	ReadPixels(src image.Rectangle, pixels []byte) error

@@ -165,15 +165,23 @@ func newDirect3D11Device(api driver.Direct3D11) (driver.Device, error) {
 	return b, nil
 }
 
-func (b *Backend) BeginFrame(clear bool, viewport image.Point) driver.Framebuffer {
-	renderTarget, depthView := b.ctx.OMGetRenderTargets()
-	// Assume someone else is holding on to the render targets.
-	if renderTarget != nil {
-		d3d11.IUnknownRelease(unsafe.Pointer(renderTarget), renderTarget.Vtbl.Release)
+func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport image.Point) driver.Framebuffer {
+	var (
+		renderTarget *d3d11.RenderTargetView
+		depthView    *d3d11.DepthStencilView
+	)
+	if target != nil {
+		switch t := target.(type) {
+		case driver.Direct3D11RenderTarget:
+			renderTarget = (*d3d11.RenderTargetView)(t.RenderTarget)
+			depthView = (*d3d11.DepthStencilView)(t.DepthStencilView)
+		case *Framebuffer:
+			renderTarget, depthView = t.renderTarget, t.depthView
+		default:
+			panic(fmt.Errorf("opengl: invalid render target type: %T", target))
+		}
 	}
-	if depthView != nil {
-		d3d11.IUnknownRelease(unsafe.Pointer(depthView), depthView.Vtbl.Release)
-	}
+	b.ctx.OMSetRenderTargets(renderTarget, depthView)
 	return &Framebuffer{ctx: b.ctx, dev: b.dev, renderTarget: renderTarget, depthView: depthView, foreign: true}
 }
 
@@ -712,6 +720,8 @@ func (f *Framebuffer) Release() {
 		f.depthView = nil
 	}
 }
+
+func (f *Framebuffer) ImplementsRenderTarget() {}
 
 func (b *Backend) BindInputLayout(layout driver.InputLayout) {
 	b.ctx.IASetInputLayout(layout.(*InputLayout).layout)

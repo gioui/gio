@@ -112,7 +112,7 @@ func (w *Window) Frame(frame *op.Ops) error {
 		w.dev.BindFramebuffer(w.fbo)
 		w.gpu.Clear(color.NRGBA{})
 		w.gpu.Collect(w.size, frame)
-		return w.gpu.Frame()
+		return w.gpu.Frame(driver.RenderTarget(w.fbo))
 	})
 }
 

@@ -551,9 +551,9 @@ func (g *compute) Clear(col color.NRGBA) {
 	g.collector.clearColor = f32color.LinearFromSRGB(col)
 }
 
-func (g *compute) Frame() error {
+func (g *compute) Frame(target RenderTarget) error {
 	viewport := g.viewport
-	defFBO := g.ctx.BeginFrame(g.collector.clear, viewport)
+	defFBO := g.ctx.BeginFrame(target, g.collector.clear, viewport)
 	defer g.ctx.EndFrame()
 
 	t := &g.timers

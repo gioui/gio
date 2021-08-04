@@ -212,12 +212,23 @@ func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 	return b, nil
 }
 
-func (b *Backend) BeginFrame(clear bool, viewport image.Point) driver.Framebuffer {
+func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport image.Point) driver.Framebuffer {
 	b.clear = clear
 	b.glstate = b.queryState()
 	b.savedState = b.glstate
 	b.state = state{}
-	renderFBO := b.glstate.drawFBO
+	var renderFBO gl.Framebuffer
+	if target != nil {
+		switch t := target.(type) {
+		case driver.OpenGLRenderTarget:
+			renderFBO = gl.Framebuffer(t)
+		case *gpuFramebuffer:
+			renderFBO = t.obj
+		default:
+			panic(fmt.Errorf("opengl: invalid render target type: %T", target))
+		}
+	}
+	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, renderFBO)
 	if b.gles {
 		// If the output framebuffer is not in the sRGB colorspace already, emulate it.
 		var fbEncoding int
@@ -1243,6 +1254,8 @@ func (f *gpuFramebuffer) Release() {
 		f.backend.glstate.deleteRenderbuffer(f.backend.funcs, f.depthBuf)
 	}
 }
+
+func (f *gpuFramebuffer) ImplementsRenderTarget() {}
 
 func toTexFilter(f driver.TextureFilter) int {
 	switch f {
