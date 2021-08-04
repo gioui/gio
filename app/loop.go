@@ -17,14 +17,12 @@ type renderLoop struct {
 	drawing bool
 	err     error
 
-	ctx        wm.Context
-	frames     chan frame
-	results    chan frameResult
-	refresh    chan struct{}
-	refreshErr chan error
-	ack        chan struct{}
-	stop       chan struct{}
-	stopped    chan struct{}
+	ctx     wm.Context
+	frames  chan frame
+	results chan frameResult
+	ack     chan struct{}
+	stop    chan struct{}
+	stopped chan struct{}
 }
 
 type frame struct {
@@ -39,11 +37,9 @@ type frameResult struct {
 
 func newLoop(ctx wm.Context) (*renderLoop, error) {
 	l := &renderLoop{
-		ctx:        ctx,
-		frames:     make(chan frame),
-		results:    make(chan frameResult),
-		refresh:    make(chan struct{}),
-		refreshErr: make(chan error),
+		ctx:     ctx,
+		frames:  make(chan frame),
+		results: make(chan frameResult),
 		// Ack is buffered so GPU commands can be issued after
 		// ack'ing the frame.
 		ack:     make(chan struct{}, 1),
@@ -65,25 +61,35 @@ func (l *renderLoop) renderLoop(ctx wm.Context) error {
 		runtime.LockOSThread()
 		// Don't UnlockOSThread to avoid reuse by the Go runtime.
 
-		if err := ctx.MakeCurrent(); err != nil {
+		if err := ctx.Lock(); err != nil {
 			initErr <- err
 			return
 		}
-		defer ctx.ReleaseCurrent()
 		g, err := gpu.New(ctx.API())
 		if err != nil {
+			ctx.Unlock()
 			initErr <- err
 			return
 		}
-		defer g.Release()
+		defer func() {
+			if err := ctx.Lock(); err != nil {
+				return
+			}
+			defer ctx.Unlock()
+			g.Release()
+		}()
+		ctx.Unlock()
 		initErr <- nil
 	loop:
 		for {
 			select {
-			case <-l.refresh:
-				l.refreshErr <- ctx.MakeCurrent()
 			case frame := <-l.frames:
-				ctx.Lock()
+				var res frameResult
+				res.err = ctx.Lock()
+				if res.err != nil {
+					l.results <- res
+					break
+				}
 				if runtime.GOOS == "js" {
 					// Use transparent black when Gio is embedded, to allow mixing of Gio and
 					// foreign content below.
@@ -94,7 +100,6 @@ func (l *renderLoop) renderLoop(ctx wm.Context) error {
 				g.Collect(frame.viewport, frame.ops)
 				// Signal that we're done with the frame ops.
 				l.ack <- struct{}{}
-				var res frameResult
 				res.err = g.Frame()
 				if res.err == nil {
 					res.err = ctx.Present()
@@ -132,16 +137,6 @@ func (l *renderLoop) Flush() error {
 
 func (l *renderLoop) Summary() string {
 	return l.summary
-}
-
-func (l *renderLoop) Refresh() {
-	if l.err != nil {
-		return
-	}
-	// Make sure any pending frame is complete.
-	l.Flush()
-	l.refresh <- struct{}{}
-	l.setErr(<-l.refreshErr)
 }
 
 // Draw initiates a draw of a frame. It returns a channel

@@ -72,16 +72,9 @@ func (c *d3d11Context) Present() error {
 }
 
 func (c *d3d11Context) Refresh() error {
-	return nil
-}
-
-func (c *d3d11Context) MakeCurrent() error {
 	var width, height int
-	c.win.w.Run(func() {
-		_, width, height = c.win.HWND()
-	})
+	_, width, height = c.win.HWND()
 	if c.renderTarget != nil && width == c.width && height == c.height {
-		c.ctx.OMSetRenderTargets(c.renderTarget, c.depthView)
 		return nil
 	}
 	c.releaseFBO()
@@ -112,14 +105,13 @@ func (c *d3d11Context) MakeCurrent() error {
 	}
 	c.renderTarget = renderTarget
 	c.depthView = depthView
-
-	c.ctx.OMSetRenderTargets(c.renderTarget, c.depthView)
 	return nil
 }
 
-func (c *d3d11Context) ReleaseCurrent() {}
-
-func (c *d3d11Context) Lock() {}
+func (c *d3d11Context) Lock() error {
+	c.ctx.OMSetRenderTargets(c.renderTarget, c.depthView)
+	return nil
+}
 
 func (c *d3d11Context) Unlock() {}
 

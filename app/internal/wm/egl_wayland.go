@@ -50,10 +50,6 @@ func (c *context) Release() {
 }
 
 func (c *context) Refresh() error {
-	return nil
-}
-
-func (c *context) MakeCurrent() error {
 	c.Context.ReleaseSurface()
 	if c.eglWin != nil {
 		C.wl_egl_window_destroy(c.eglWin)
@@ -69,12 +65,13 @@ func (c *context) MakeCurrent() error {
 	}
 	c.eglWin = eglWin
 	eglSurf := egl.NativeWindowType(uintptr(unsafe.Pointer(eglWin)))
-	if err := c.Context.CreateSurface(eglSurf, width, height); err != nil {
-		return err
-	}
+	return c.Context.CreateSurface(eglSurf, width, height)
+}
+
+func (c *context) Lock() error {
 	return c.Context.MakeCurrent()
 }
 
-func (c *context) Lock() {}
-
-func (c *context) Unlock() {}
+func (c *context) Unlock() {
+	c.Context.ReleaseCurrent()
+}

@@ -35,18 +35,12 @@ func (c *glContext) Release() {
 }
 
 func (c *glContext) Refresh() error {
-	return nil
-}
-
-func (c *glContext) MakeCurrent() error {
 	c.Context.ReleaseSurface()
 	var (
 		win           windows.Handle
 		width, height int
 	)
-	c.win.w.Run(func() {
-		win, width, height = c.win.HWND()
-	})
+	win, width, height = c.win.HWND()
 	eglSurf := egl.NativeWindowType(win)
 	if err := c.Context.CreateSurface(eglSurf, width, height); err != nil {
 		return err
@@ -55,9 +49,14 @@ func (c *glContext) MakeCurrent() error {
 		return err
 	}
 	c.Context.EnableVSync(true)
+	c.Context.ReleaseCurrent()
 	return nil
 }
 
-func (c *glContext) Lock() {}
+func (c *glContext) Lock() error {
+	return c.Context.MakeCurrent()
+}
 
-func (c *glContext) Unlock() {}
+func (c *glContext) Unlock() {
+	c.Context.ReleaseCurrent()
+}

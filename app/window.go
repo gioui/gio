@@ -149,12 +149,18 @@ func (w *Window) validateAndProcess(driver wm.Driver, frameStart time.Time, size
 				if err != nil {
 					return err
 				}
+				sync = true
 			}
 			w.loop, err = newLoop(w.ctx)
 			if err != nil {
 				w.ctx.Release()
 				return err
 			}
+		}
+		if sync && w.ctx != nil {
+			w.driverRun(func(_ wm.Driver) {
+				w.ctx.Refresh()
+			})
 		}
 		w.processFrame(frameStart, size, frame)
 		if sync && w.loop != nil {
@@ -416,13 +422,6 @@ func (w *Window) destroy(err error) {
 	}
 }
 
-func (w *Window) refresh() {
-	w.driverRun(func(_ wm.Driver) {
-		w.ctx.Refresh()
-	})
-	w.loop.Refresh()
-}
-
 func (w *Window) destroyGPU() {
 	if w.loop != nil {
 		w.loop.Release()
@@ -484,8 +483,6 @@ func (w *Window) run(opts *wm.Options) {
 							w.loop.Release()
 							w.loop = nil
 						}
-					} else {
-						w.refresh()
 					}
 				}
 				w.stage = e2.Stage
@@ -505,11 +502,6 @@ func (w *Window) run(opts *wm.Options) {
 				e2.Frame = w.update
 				e2.Queue = &w.queue
 				w.out <- e2.FrameEvent
-				if w.loop != nil {
-					if e2.Sync {
-						w.refresh()
-					}
-				}
 				frame, gotFrame := w.waitFrame()
 				err := w.validateAndProcess(driver, frameStart, e2.Size, e2.Sync, frame)
 				if gotFrame {

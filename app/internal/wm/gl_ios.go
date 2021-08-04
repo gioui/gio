@@ -97,15 +97,18 @@ func (c *context) Present() error {
 	return nil
 }
 
-func (c *context) Lock() {}
-
-func (c *context) Unlock() {}
-
-func (c *context) Refresh() error {
+func (c *context) Lock() error {
+	if C.gio_makeCurrent(c.ctx) == 0 {
+		return errors.New("[EAGLContext setCurrentContext] failed")
+	}
 	return nil
 }
 
-func (c *context) MakeCurrent() error {
+func (c *context) Unlock() {
+	C.gio_makeCurrent(0)
+}
+
+func (c *context) Refresh() error {
 	if C.gio_makeCurrent(c.ctx) == 0 {
 		return errors.New("[EAGLContext setCurrentContext] failed")
 	}
@@ -137,10 +140,6 @@ func (c *context) MakeCurrent() error {
 		return fmt.Errorf("framebuffer incomplete, status: %#x\n", st)
 	}
 	return nil
-}
-
-func (c *context) ReleaseCurrent() {
-	C.gio_makeCurrent(0)
 }
 
 func (w *window) NewContext() (Context, error) {

@@ -35,33 +35,23 @@ func (c *context) Release() {
 }
 
 func (c *context) Refresh() error {
-	return nil
-}
-
-func (c *context) MakeCurrent() error {
 	c.Context.ReleaseSurface()
 	var (
 		win           *C.ANativeWindow
 		width, height int
 	)
-	// Run on main thread. Deadlock is avoided because MakeCurrent is only
-	// called during a FrameEvent.
-	c.win.callbacks.Run(func() {
-		win, width, height = c.win.nativeWindow(c.Context.VisualID())
-	})
+	win, width, height = c.win.nativeWindow(c.Context.VisualID())
 	if win == nil {
 		return nil
 	}
 	eglSurf := egl.NativeWindowType(unsafe.Pointer(win))
-	if err := c.Context.CreateSurface(eglSurf, width, height); err != nil {
-		return err
-	}
-	if err := c.Context.MakeCurrent(); err != nil {
-		return err
-	}
-	return nil
+	return c.Context.CreateSurface(eglSurf, width, height)
 }
 
-func (c *context) Lock() {}
+func (c *context) Lock() error {
+	return c.Context.MakeCurrent()
+}
 
-func (c *context) Unlock() {}
+func (c *context) Unlock() {
+	c.Context.ReleaseCurrent()
+}

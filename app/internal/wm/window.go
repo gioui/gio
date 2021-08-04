@@ -69,11 +69,9 @@ type Callbacks interface {
 type Context interface {
 	API() gpu.API
 	Present() error
-	MakeCurrent() error
-	ReleaseCurrent()
 	Refresh() error
 	Release()
-	Lock()
+	Lock() error
 	Unlock()
 }
 
