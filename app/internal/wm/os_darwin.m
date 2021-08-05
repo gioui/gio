@@ -10,17 +10,3 @@ void gio_wakeupMainThread(void) {
 		gio_dispatchMainFuncs();
 	});
 }
-
-bool gio_isMainThread() {
-	return [NSThread isMainThread];
-}
-
-NSUInteger gio_nsstringLength(CFTypeRef cstr) {
-	NSString *str = (__bridge NSString *)cstr;
-	return [str length];
-}
-
-void gio_nsstringGetCharacters(CFTypeRef cstr, unichar *chars, NSUInteger loc, NSUInteger length) {
-	NSString *str = (__bridge NSString *)cstr;
-	[str getCharacters:chars range:NSMakeRange(loc, length)];
-}

@@ -6,8 +6,6 @@ package wm
 #include <Foundation/Foundation.h>
 
 __attribute__ ((visibility ("hidden"))) void gio_wakeupMainThread(void);
-__attribute__ ((visibility ("hidden"))) NSUInteger gio_nsstringLength(CFTypeRef str);
-__attribute__ ((visibility ("hidden"))) void gio_nsstringGetCharacters(CFTypeRef str, unichar *chars, NSUInteger loc, NSUInteger length);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createDisplayLink(void);
 __attribute__ ((visibility ("hidden"))) void gio_releaseDisplayLink(CFTypeRef dl);
 __attribute__ ((visibility ("hidden"))) int gio_startDisplayLink(CFTypeRef dl);
@@ -16,7 +14,20 @@ __attribute__ ((visibility ("hidden"))) void gio_setDisplayLinkDisplay(CFTypeRef
 __attribute__ ((visibility ("hidden"))) void gio_hideCursor();
 __attribute__ ((visibility ("hidden"))) void gio_showCursor();
 __attribute__ ((visibility ("hidden"))) void gio_setCursor(NSUInteger curID);
-__attribute__ ((visibility ("hidden"))) bool gio_isMainThread();
+
+static bool gio_isMainThread() {
+	return [NSThread isMainThread];
+}
+
+static NSUInteger gio_nsstringLength(CFTypeRef cstr) {
+	NSString *str = (__bridge NSString *)cstr;
+	return [str length];
+}
+
+static void gio_nsstringGetCharacters(CFTypeRef cstr, unichar *chars, NSUInteger loc, NSUInteger length) {
+	NSString *str = (__bridge NSString *)cstr;
+	[str getCharacters:chars range:NSMakeRange(loc, length)];
+}
 */
 import "C"
 import (

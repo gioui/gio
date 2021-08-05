@@ -10,10 +10,6 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include "_cgo_export.h"
 
-void gio_headless_releaseContext(CFTypeRef ctxRef) {
-	CFBridgingRelease(ctxRef);
-}
-
 CFTypeRef gio_headless_newContext(void) {
 	NSOpenGLPixelFormatAttribute attr[] = {
 		NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core,

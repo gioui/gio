@@ -108,53 +108,38 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 	// They will end up in a beep.
 }
 @end
+
 // Delegates are weakly referenced from their peers. Nothing
 // else holds a strong reference to our window delegate, so
 // keep a single global reference instead.
 static GioWindowDelegate *globalWindowDel;
 
-void gio_writeClipboard(unichar *chars, NSUInteger length) {
-	@autoreleasepool {
-		NSString *s = [NSString string];
-		if (length > 0) {
-			s = [NSString stringWithCharacters:chars length:length];
-		}
-		NSPasteboard *p = NSPasteboard.generalPasteboard;
-		[p declareTypes:@[NSPasteboardTypeString] owner:nil];
-		[p setString:s forType:NSPasteboardTypeString];
-	}
+static CVReturn displayLinkCallback(CVDisplayLinkRef dl, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext) {
+	gio_onFrameCallback(dl);
+	return kCVReturnSuccess;
 }
 
-CFTypeRef gio_readClipboard(void) {
-	@autoreleasepool {
-		NSPasteboard *p = NSPasteboard.generalPasteboard;
-		NSString *content = [p stringForType:NSPasteboardTypeString];
-		return (__bridge_retained CFTypeRef)content;
-	}
+CFTypeRef gio_createDisplayLink(void) {
+	CVDisplayLinkRef dl;
+	CVDisplayLinkCreateWithActiveCGDisplays(&dl);
+	CVDisplayLinkSetOutputCallback(dl, displayLinkCallback, nil);
+	return dl;
 }
 
-CGFloat gio_viewHeight(CFTypeRef viewRef) {
-	NSView *view = (__bridge NSView *)viewRef;
-	return [view bounds].size.height;
+int gio_startDisplayLink(CFTypeRef dl) {
+	return CVDisplayLinkStart((CVDisplayLinkRef)dl);
 }
 
-CGFloat gio_viewWidth(CFTypeRef viewRef) {
-	NSView *view = (__bridge NSView *)viewRef;
-	return [view bounds].size.width;
+int gio_stopDisplayLink(CFTypeRef dl) {
+	return CVDisplayLinkStop((CVDisplayLinkRef)dl);
 }
 
-CGFloat gio_getScreenBackingScale(void) {
-	return [NSScreen.mainScreen backingScaleFactor];
+void gio_releaseDisplayLink(CFTypeRef dl) {
+	CVDisplayLinkRelease((CVDisplayLinkRef)dl);
 }
 
-CGFloat gio_getViewBackingScale(CFTypeRef viewRef) {
-	NSView *view = (__bridge NSView *)viewRef;
-	return [view.window backingScaleFactor];
-}
-
-void gio_setNeedsDisplay(CFTypeRef viewRef) {
-	NSView *view = (__bridge NSView *)viewRef;
-	[view setNeedsDisplay:YES];
+void gio_setDisplayLinkDisplay(CFTypeRef dl, uint64_t did) {
+	CVDisplayLinkSetCurrentCGDisplay((CVDisplayLinkRef)dl, (CGDirectDisplayID)did);
 }
 
 void gio_hideCursor() {
@@ -200,49 +185,6 @@ void gio_setCursor(NSUInteger curID) {
 	}
 }
 
-static CVReturn displayLinkCallback(CVDisplayLinkRef dl, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext) {
-	gio_onFrameCallback(dl);
-	return kCVReturnSuccess;
-}
-
-CFTypeRef gio_createDisplayLink(void) {
-	CVDisplayLinkRef dl;
-	CVDisplayLinkCreateWithActiveCGDisplays(&dl);
-	CVDisplayLinkSetOutputCallback(dl, displayLinkCallback, nil);
-	return dl;
-}
-
-int gio_startDisplayLink(CFTypeRef dl) {
-	return CVDisplayLinkStart((CVDisplayLinkRef)dl);
-}
-
-int gio_stopDisplayLink(CFTypeRef dl) {
-	return CVDisplayLinkStop((CVDisplayLinkRef)dl);
-}
-
-void gio_releaseDisplayLink(CFTypeRef dl) {
-	CVDisplayLinkRelease((CVDisplayLinkRef)dl);
-}
-
-void gio_setDisplayLinkDisplay(CFTypeRef dl, uint64_t did) {
-	CVDisplayLinkSetCurrentCGDisplay((CVDisplayLinkRef)dl, (CGDirectDisplayID)did);
-}
-
-NSPoint gio_cascadeTopLeftFromPoint(CFTypeRef windowRef, NSPoint topLeft) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	return [window cascadeTopLeftFromPoint:topLeft];
-}
-
-void gio_makeKeyAndOrderFront(CFTypeRef windowRef) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	[window makeKeyAndOrderFront:nil];
-}
-
-void gio_toggleFullScreen(CFTypeRef windowRef) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	[window toggleFullScreen:nil];
-}
-
 CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight) {
 	@autoreleasepool {
 		NSRect rect = NSMakeRect(0, 0, width, height);
@@ -272,37 +214,6 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, 
 		window.delegate = globalWindowDel;
 		return (__bridge_retained CFTypeRef)window;
 	}
-}
-
-void gio_close(CFTypeRef windowRef) {
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	[window performClose:nil];
-}
-
-void gio_setSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	NSSize size = NSMakeSize(width, height);
-	[window setContentSize:size];
-}
-
-void gio_setMinSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	window.contentMinSize = NSMakeSize(width, height);
-}
-
-void gio_setMaxSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	window.contentMaxSize = NSMakeSize(width, height);
-}
-
-void gio_setTitle(CFTypeRef windowRef, const char *title) {
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	window.title = [NSString stringWithUTF8String: title];
-}
-
-CFTypeRef gio_layerForView(CFTypeRef viewRef) {
-	NSView *view = (__bridge NSView *)viewRef;
-	return (__bridge CFTypeRef)view.layer;
 }
 
 CFTypeRef gio_createView(void) {

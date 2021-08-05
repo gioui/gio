@@ -8,7 +8,11 @@ package log
 /*
 #cgo CFLAGS: -Werror -fmodules -fobjc-arc -x objective-c
 
-__attribute__ ((visibility ("hidden"))) void nslog(char *str);
+@import Foundation;
+
+static void nslog(char *str) {
+	NSLog(@"%@", @(str));
+}
 */
 import "C"
 

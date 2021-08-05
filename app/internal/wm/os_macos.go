@@ -35,24 +35,98 @@ import (
 #define GIO_MOUSE_SCROLL 4
 
 __attribute__ ((visibility ("hidden"))) void gio_main(void);
-__attribute__ ((visibility ("hidden"))) CGFloat gio_viewWidth(CFTypeRef viewRef);
-__attribute__ ((visibility ("hidden"))) CGFloat gio_viewHeight(CFTypeRef viewRef);
-__attribute__ ((visibility ("hidden"))) CGFloat gio_getViewBackingScale(CFTypeRef viewRef);
-__attribute__ ((visibility ("hidden"))) CGFloat gio_getScreenBackingScale(void);
-__attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
-__attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
-__attribute__ ((visibility ("hidden"))) void gio_setNeedsDisplay(CFTypeRef viewRef);
-__attribute__ ((visibility ("hidden"))) void gio_toggleFullScreen(CFTypeRef windowRef);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight);
-__attribute__ ((visibility ("hidden"))) void gio_makeKeyAndOrderFront(CFTypeRef windowRef);
-__attribute__ ((visibility ("hidden"))) NSPoint gio_cascadeTopLeftFromPoint(CFTypeRef windowRef, NSPoint topLeft);
-__attribute__ ((visibility ("hidden"))) void gio_close(CFTypeRef windowRef);
-__attribute__ ((visibility ("hidden"))) void gio_setSize(CFTypeRef windowRef, CGFloat width, CGFloat height);
-__attribute__ ((visibility ("hidden"))) void gio_setMinSize(CFTypeRef windowRef, CGFloat width, CGFloat height);
-__attribute__ ((visibility ("hidden"))) void gio_setMaxSize(CFTypeRef windowRef, CGFloat width, CGFloat height);
-__attribute__ ((visibility ("hidden"))) void gio_setTitle(CFTypeRef windowRef, const char *title);
-__attribute__ ((visibility ("hidden"))) CFTypeRef gio_layerForView(CFTypeRef viewRef);
+
+static void gio_writeClipboard(unichar *chars, NSUInteger length) {
+	@autoreleasepool {
+		NSString *s = [NSString string];
+		if (length > 0) {
+			s = [NSString stringWithCharacters:chars length:length];
+		}
+		NSPasteboard *p = NSPasteboard.generalPasteboard;
+		[p declareTypes:@[NSPasteboardTypeString] owner:nil];
+		[p setString:s forType:NSPasteboardTypeString];
+	}
+}
+
+static CFTypeRef gio_readClipboard(void) {
+	@autoreleasepool {
+		NSPasteboard *p = NSPasteboard.generalPasteboard;
+		NSString *content = [p stringForType:NSPasteboardTypeString];
+		return (__bridge_retained CFTypeRef)content;
+	}
+}
+
+static CGFloat gio_viewHeight(CFTypeRef viewRef) {
+	NSView *view = (__bridge NSView *)viewRef;
+	return [view bounds].size.height;
+}
+
+static CGFloat gio_viewWidth(CFTypeRef viewRef) {
+	NSView *view = (__bridge NSView *)viewRef;
+	return [view bounds].size.width;
+}
+
+static CGFloat gio_getScreenBackingScale(void) {
+	return [NSScreen.mainScreen backingScaleFactor];
+}
+
+static CGFloat gio_getViewBackingScale(CFTypeRef viewRef) {
+	NSView *view = (__bridge NSView *)viewRef;
+	return [view.window backingScaleFactor];
+}
+
+static void gio_setNeedsDisplay(CFTypeRef viewRef) {
+	NSView *view = (__bridge NSView *)viewRef;
+	[view setNeedsDisplay:YES];
+}
+
+static NSPoint gio_cascadeTopLeftFromPoint(CFTypeRef windowRef, NSPoint topLeft) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	return [window cascadeTopLeftFromPoint:topLeft];
+}
+
+static void gio_makeKeyAndOrderFront(CFTypeRef windowRef) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	[window makeKeyAndOrderFront:nil];
+}
+
+static void gio_toggleFullScreen(CFTypeRef windowRef) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	[window toggleFullScreen:nil];
+}
+
+static void gio_close(CFTypeRef windowRef) {
+	NSWindow* window = (__bridge NSWindow *)windowRef;
+	[window performClose:nil];
+}
+
+static void gio_setSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
+	NSWindow* window = (__bridge NSWindow *)windowRef;
+	NSSize size = NSMakeSize(width, height);
+	[window setContentSize:size];
+}
+
+static void gio_setMinSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
+	NSWindow* window = (__bridge NSWindow *)windowRef;
+	window.contentMinSize = NSMakeSize(width, height);
+}
+
+static void gio_setMaxSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
+	NSWindow* window = (__bridge NSWindow *)windowRef;
+	window.contentMaxSize = NSMakeSize(width, height);
+}
+
+static void gio_setTitle(CFTypeRef windowRef, const char *title) {
+	NSWindow* window = (__bridge NSWindow *)windowRef;
+	window.title = [NSString stringWithUTF8String: title];
+}
+
+static CFTypeRef gio_layerForView(CFTypeRef viewRef) {
+	NSView *view = (__bridge NSView *)viewRef;
+	return (__bridge CFTypeRef)view.layer;
+}
 */
 import "C"
 

@@ -13,7 +13,6 @@ import (
 #include <CoreFoundation/CoreFoundation.h>
 
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_headless_newContext(void);
-__attribute__ ((visibility ("hidden"))) void gio_headless_releaseContext(CFTypeRef ctxRef);
 __attribute__ ((visibility ("hidden"))) void gio_headless_clearCurrentContext(CFTypeRef ctxRef);
 __attribute__ ((visibility ("hidden"))) void gio_headless_makeCurrentContext(CFTypeRef ctxRef);
 */
@@ -43,7 +42,7 @@ func (c *nsContext) ReleaseCurrent() {
 
 func (d *nsContext) Release() {
 	if d.ctx != 0 {
-		C.gio_headless_releaseContext(d.ctx)
+		C.CFRelease(d.ctx)
 		d.ctx = 0
 	}
 }

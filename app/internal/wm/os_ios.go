@@ -18,14 +18,73 @@ struct drawParams {
 	CGFloat top, right, bottom, left;
 };
 
-__attribute__ ((visibility ("hidden"))) void gio_showTextInput(CFTypeRef viewRef);
-__attribute__ ((visibility ("hidden"))) void gio_hideTextInput(CFTypeRef viewRef);
-__attribute__ ((visibility ("hidden"))) void gio_addLayerToView(CFTypeRef viewRef, CFTypeRef layerRef);
-__attribute__ ((visibility ("hidden"))) void gio_updateView(CFTypeRef viewRef, CFTypeRef layerRef);
-__attribute__ ((visibility ("hidden"))) void gio_removeLayer(CFTypeRef layerRef);
-__attribute__ ((visibility ("hidden"))) struct drawParams gio_viewDrawParams(CFTypeRef viewRef);
-__attribute__ ((visibility ("hidden"))) CFTypeRef gio_readClipboard(void);
-__attribute__ ((visibility ("hidden"))) void gio_writeClipboard(unichar *chars, NSUInteger length);
+static void gio_writeClipboard(unichar *chars, NSUInteger length) {
+	@autoreleasepool {
+		NSString *s = [NSString string];
+		if (length > 0) {
+			s = [NSString stringWithCharacters:chars length:length];
+		}
+		UIPasteboard *p = UIPasteboard.generalPasteboard;
+		p.string = s;
+	}
+}
+
+static CFTypeRef gio_readClipboard(void) {
+	@autoreleasepool {
+		UIPasteboard *p = UIPasteboard.generalPasteboard;
+		return (__bridge_retained CFTypeRef)p.string;
+	}
+}
+
+static void gio_showTextInput(CFTypeRef viewRef) {
+	UIView *view = (__bridge UIView *)viewRef;
+	[view becomeFirstResponder];
+}
+
+static void gio_hideTextInput(CFTypeRef viewRef) {
+	UIView *view = (__bridge UIView *)viewRef;
+	[view resignFirstResponder];
+}
+
+static void gio_addLayerToView(CFTypeRef viewRef, CFTypeRef layerRef) {
+	UIView *view = (__bridge UIView *)viewRef;
+	CALayer *layer = (__bridge CALayer *)layerRef;
+	[view.layer addSublayer:layer];
+}
+
+static void gio_updateView(CFTypeRef viewRef, CFTypeRef layerRef) {
+	UIView *view = (__bridge UIView *)viewRef;
+	CAEAGLLayer *layer = (__bridge CAEAGLLayer *)layerRef;
+	layer.contentsScale = view.contentScaleFactor;
+	layer.bounds = view.bounds;
+}
+
+static void gio_removeLayer(CFTypeRef layerRef) {
+	CALayer *layer = (__bridge CALayer *)layerRef;
+	[layer removeFromSuperlayer];
+}
+
+static struct drawParams gio_viewDrawParams(CFTypeRef viewRef) {
+	UIView *v = (__bridge UIView *)viewRef;
+	struct drawParams params;
+	CGFloat scale = v.layer.contentsScale;
+	// Use 163 as the standard ppi on iOS.
+	params.dpi = 163*scale;
+	params.sdpi = params.dpi;
+	UIEdgeInsets insets = v.layoutMargins;
+	if (@available(iOS 11.0, tvOS 11.0, *)) {
+		UIFontMetrics *metrics = [UIFontMetrics defaultMetrics];
+		params.sdpi = [metrics scaledValueForValue:params.sdpi];
+		insets = v.safeAreaInsets;
+	}
+	params.width = v.bounds.size.width*scale;
+	params.height = v.bounds.size.height*scale;
+	params.top = insets.top*scale;
+	params.right = insets.right*scale;
+	params.bottom = insets.bottom*scale;
+	params.left = insets.left*scale;
+	return params;
+}
 */
 import "C"
 
