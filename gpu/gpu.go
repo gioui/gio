@@ -53,13 +53,13 @@ type GPU interface {
 type gpu struct {
 	cache *resourceCache
 
-	profile                                           string
-	timers                                            *timers
-	frameStart                                        time.Time
-	zopsTimer, stencilTimer, coverTimer, cleanupTimer *timer
-	drawOps                                           drawOps
-	ctx                                               driver.Device
-	renderer                                          *renderer
+	profile                                string
+	timers                                 *timers
+	frameStart                             time.Time
+	stencilTimer, coverTimer, cleanupTimer *timer
+	drawOps                                drawOps
+	ctx                                    driver.Device
+	renderer                               *renderer
 }
 
 type renderer struct {
@@ -83,7 +83,6 @@ type drawOps struct {
 	// zimageOps are the rectangle clipped opaque images
 	// that can use fast front-to-back rendering with z-test
 	// and no blending.
-	zimageOps   []imageOp
 	pathOps     []*pathOp
 	pathOpCache []pathOp
 	qs          quadSplitter
@@ -123,7 +122,6 @@ type pathOp struct {
 }
 
 type imageOp struct {
-	z        float32
 	path     *pathOp
 	clip     image.Rectangle
 	material material
@@ -407,7 +405,6 @@ func (g *gpu) Collect(viewport image.Point, frameOps *op.Ops) {
 	g.frameStart = time.Now()
 	if g.drawOps.profile && g.timers == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
 		g.timers = newTimers(g.ctx)
-		g.zopsTimer = g.timers.newTimer()
 		g.stencilTimer = g.timers.newTimer()
 		g.coverTimer = g.timers.newTimer()
 		g.cleanupTimer = g.timers.newTimer()
@@ -421,9 +418,6 @@ func (g *gpu) Frame(target RenderTarget) error {
 	for _, img := range g.drawOps.imageOps {
 		expandPathOp(img.path, img.clip)
 	}
-	if g.drawOps.profile {
-		g.zopsTimer.begin()
-	}
 	g.ctx.BindFramebuffer(defFBO)
 	g.ctx.DepthFunc(driver.DepthFuncGreater)
 	// Note that Clear must be before ClearDepth if nothing else is rendered
@@ -434,8 +428,6 @@ func (g *gpu) Frame(target RenderTarget) error {
 	}
 	g.ctx.ClearDepth(0.0)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
-	g.renderer.drawZOps(g.cache, g.drawOps.zimageOps)
-	g.zopsTimer.end()
 	g.stencilTimer.begin()
 	g.ctx.SetBlend(true)
 	g.renderer.packStencils(&g.drawOps.pathOps)
@@ -456,13 +448,13 @@ func (g *gpu) Frame(target RenderTarget) error {
 	g.drawOps.pathCache.frame()
 	g.cleanupTimer.end()
 	if g.drawOps.profile && g.timers.ready() {
-		zt, st, covt, cleant := g.zopsTimer.Elapsed, g.stencilTimer.Elapsed, g.coverTimer.Elapsed, g.cleanupTimer.Elapsed
-		ft := zt + st + covt + cleant
+		st, covt, cleant := g.stencilTimer.Elapsed, g.coverTimer.Elapsed, g.cleanupTimer.Elapsed
+		ft := st + covt + cleant
 		q := 100 * time.Microsecond
-		zt, st, covt = zt.Round(q), st.Round(q), covt.Round(q)
+		st, covt = st.Round(q), covt.Round(q)
 		frameDur := time.Since(g.frameStart).Round(q)
 		ft = ft.Round(q)
-		g.profile = fmt.Sprintf("draw:%7s gpu:%7s zt:%7s st:%7s cov:%7s", frameDur, ft, zt, st, covt)
+		g.profile = fmt.Sprintf("draw:%7s gpu:%7s st:%7s cov:%7s", frameDur, ft, st, covt)
 	}
 	return nil
 }
@@ -777,7 +769,6 @@ func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
 	d.cache = cache
 	d.viewport = viewport
 	d.imageOps = d.imageOps[:0]
-	d.zimageOps = d.zimageOps[:0]
 	d.pathOps = d.pathOps[:0]
 	d.pathOpCache = d.pathOpCache[:0]
 	d.vertCache = d.vertCache[:0]
@@ -857,7 +848,6 @@ func (d *drawOps) collectOps(r *ops.Reader, state drawState) {
 	var (
 		quads quadsOp
 		str   clip.StrokeStyle
-		z     int
 	)
 	d.save(opconst.InitialStateID, state)
 loop:
@@ -960,34 +950,18 @@ loop:
 			if bounds.Min == (image.Point{}) && bounds.Max == d.viewport && state.rect && mat.opaque && (mat.material == materialColor) {
 				// The image is a uniform opaque color and takes up the whole screen.
 				// Scrap images up to and including this image and set clear color.
-				d.zimageOps = d.zimageOps[:0]
 				d.imageOps = d.imageOps[:0]
-				z = 0
 				d.clearColor = mat.color.Opaque()
 				d.clear = true
 				continue
 			}
-			z++
-			if z != int(uint16(z)) {
-				// TODO(eliasnaur) gioui.org/issue/127.
-				panic("more than 65k paint objects not supported")
-			}
-			// Assume 16-bit depth buffer.
-			const zdepth = 1 << 16
-			// Convert z to window-space, assuming depth range [0;1].
-			zf := float32(z)*2/zdepth - 1.0
 			img := imageOp{
-				z:        zf,
 				path:     state.cpath,
 				clip:     bounds,
 				material: mat,
 			}
 
-			if state.rect && img.material.opaque {
-				d.zimageOps = append(d.zimageOps, img)
-			} else {
-				d.imageOps = append(d.imageOps, img)
-			}
+			d.imageOps = append(d.imageOps, img)
 			if clipData != nil {
 				// we added a clip path that should not remain
 				state.cpath = state.cpath.parent
@@ -1060,25 +1034,6 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 	return m
 }
 
-func (r *renderer) drawZOps(cache *resourceCache, ops []imageOp) {
-	r.ctx.SetDepthTest(true)
-	r.ctx.BindVertexBuffer(r.blitter.quadVerts, 4*4, 0)
-	r.ctx.BindInputLayout(r.blitter.layout)
-	// Render front to back.
-	for i := len(ops) - 1; i >= 0; i-- {
-		img := ops[i]
-		m := img.material
-		switch m.material {
-		case materialTexture:
-			r.ctx.BindTexture(0, r.texHandle(cache, m.data))
-		}
-		drc := img.clip
-		scale, off := clipSpaceTransform(drc, r.blitter.viewport)
-		r.blitter.blit(img.z, m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans)
-	}
-	r.ctx.SetDepthTest(false)
-}
-
 func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 	r.ctx.SetDepthTest(true)
 	r.ctx.DepthMask(false)
@@ -1098,7 +1053,7 @@ func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 		var fbo stencilFBO
 		switch img.clipType {
 		case clipTypeNone:
-			r.blitter.blit(img.z, m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans)
+			r.blitter.blit(m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans)
 			continue
 		case clipTypePath:
 			fbo = r.pather.stenciler.cover(img.place.Idx)
@@ -1114,13 +1069,13 @@ func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 			Max: img.place.Pos.Add(drc.Size()),
 		}
 		coverScale, coverOff := texSpaceTransform(layout.FRect(uv), fbo.size)
-		r.pather.cover(img.z, m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans, coverScale, coverOff)
+		r.pather.cover(m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans, coverScale, coverOff)
 	}
 	r.ctx.DepthMask(true)
 	r.ctx.SetDepthTest(false)
 }
 
-func (b *blitter) blit(z float32, mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D) {
+func (b *blitter) blit(mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D) {
 	p := b.prog[mat]
 	b.ctx.BindProgram(p.prog)
 	var uniforms *blitUniforms
@@ -1142,7 +1097,6 @@ func (b *blitter) blit(z float32, mat materialType, col f32color.RGBA, col1, col
 		b.linearGradientUniforms.vert.blitUniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
 		uniforms = &b.linearGradientUniforms.vert.blitUniforms
 	}
-	uniforms.z = z
 	uniforms.transform = [4]float32{scale.X, scale.Y, off.X, off.Y}
 	p.UploadUniforms()
 	b.ctx.DrawArrays(driver.DrawModeTriangleStrip, 0, 4)
