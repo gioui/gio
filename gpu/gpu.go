@@ -419,14 +419,10 @@ func (g *gpu) Frame(target RenderTarget) error {
 		expandPathOp(img.path, img.clip)
 	}
 	g.ctx.BindFramebuffer(defFBO)
-	g.ctx.DepthFunc(driver.DepthFuncGreater)
-	// Note that Clear must be before ClearDepth if nothing else is rendered
-	// (len(zimageOps) == 0). If not, the Fairphone 2 will corrupt the depth buffer.
 	if g.drawOps.clear {
 		g.drawOps.clear = false
 		g.ctx.Clear(g.drawOps.clearColor.Float32())
 	}
-	g.ctx.ClearDepth(0.0)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.stencilTimer.begin()
 	g.ctx.SetBlend(true)
@@ -1035,8 +1031,6 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 }
 
 func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
-	r.ctx.SetDepthTest(true)
-	r.ctx.DepthMask(false)
 	r.ctx.BlendFunc(driver.BlendFactorOne, driver.BlendFactorOneMinusSrcAlpha)
 	r.ctx.BindVertexBuffer(r.blitter.quadVerts, 4*4, 0)
 	r.ctx.BindInputLayout(r.pather.coverer.layout)
@@ -1071,8 +1065,6 @@ func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 		coverScale, coverOff := texSpaceTransform(layout.FRect(uv), fbo.size)
 		r.pather.cover(m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans, coverScale, coverOff)
 	}
-	r.ctx.DepthMask(true)
-	r.ctx.SetDepthTest(false)
 }
 
 func (b *blitter) blit(mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D) {

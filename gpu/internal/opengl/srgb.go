@@ -22,7 +22,6 @@ type SRGBFBO struct {
 	viewport image.Point
 	fbo      gl.Framebuffer
 	tex      gl.Texture
-	depth    gl.Renderbuffer
 	blitted  bool
 	quad     gl.Buffer
 	prog     gl.Program
@@ -47,7 +46,6 @@ func NewSRGBFBO(f *gl.Functions, state *glState) (*SRGBFBO, error) {
 		format: srgbTriple,
 		fbo:    f.CreateFramebuffer(),
 		tex:    f.CreateTexture(),
-		depth:  f.CreateRenderbuffer(),
 	}
 	state.bindTexture(f, 0, s.tex)
 	f.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
@@ -87,7 +85,6 @@ func (s *SRGBFBO) Blit() {
 	s.c.DrawArrays(gl.TRIANGLE_STRIP, 0, 4)
 	s.state.bindFramebuffer(s.c, gl.FRAMEBUFFER, s.fbo)
 	s.c.InvalidateFramebuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0)
-	s.c.InvalidateFramebuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT)
 }
 
 func (s *SRGBFBO) Framebuffer() gl.Framebuffer {
@@ -104,11 +101,8 @@ func (s *SRGBFBO) Refresh(viewport image.Point) error {
 	s.viewport = viewport
 	s.state.bindTexture(s.c, 0, s.tex)
 	s.c.TexImage2D(gl.TEXTURE_2D, 0, s.format.internalFormat, viewport.X, viewport.Y, s.format.format, s.format.typ)
-	s.state.bindRenderbuffer(s.c, gl.RENDERBUFFER, s.depth)
-	s.c.RenderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, viewport.X, viewport.Y)
 	s.state.bindFramebuffer(s.c, gl.FRAMEBUFFER, s.fbo)
 	s.c.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, s.tex, 0)
-	s.c.FramebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, s.depth)
 	if st := s.c.CheckFramebufferStatus(gl.FRAMEBUFFER); st != gl.FRAMEBUFFER_COMPLETE {
 		return fmt.Errorf("sRGB framebuffer incomplete (%dx%d), status: %#x error: %x", viewport.X, viewport.Y, st, s.c.GetError())
 	}
@@ -135,7 +129,6 @@ func (s *SRGBFBO) Refresh(viewport image.Point) error {
 func (s *SRGBFBO) Release() {
 	s.state.deleteFramebuffer(s.c, s.fbo)
 	s.state.deleteTexture(s.c, s.tex)
-	s.state.deleteRenderbuffer(s.c, s.depth)
 	if s.blitted {
 		s.state.deleteBuffer(s.c, s.quad)
 		s.state.deleteProgram(s.c, s.prog)

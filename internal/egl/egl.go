@@ -187,8 +187,6 @@ func createContext(disp _EGLDisplay) (*eglContext, error) {
 			// Also, some Android devices (Samsung S9) need alpha for sRGB to work.
 			attribs = append(attribs, _EGL_ALPHA_SIZE, 8)
 		}
-		// Only request a depth buffer if we're going to render directly to the framebuffer.
-		attribs = append(attribs, _EGL_DEPTH_SIZE, 16)
 	}
 	attribs = append(attribs, _EGL_NONE)
 	eglCfg, ret := eglChooseConfig(disp, attribs)

@@ -13,7 +13,6 @@ CFTypeRef gio_createGLContext(void) {
 		NSOpenGLPixelFormatAttribute attr[] = {
 			NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core,
 			NSOpenGLPFAColorSize,     24,
-			NSOpenGLPFADepthSize,     16,
 			NSOpenGLPFAAccelerated,
 			// Opt-in to automatic GPU switching. CGL-only property.
 			kCGLPFASupportsAutomaticGraphicsSwitching,

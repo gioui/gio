@@ -888,7 +888,7 @@ restart:
 		if err != nil {
 			return fmt.Errorf("compute: failed to create material atlas: %v", err)
 		}
-		fbo, err := g.ctx.NewFramebuffer(handle, 0)
+		fbo, err := g.ctx.NewFramebuffer(handle)
 		if err != nil {
 			handle.Release()
 			return fmt.Errorf("compute: failed to create material framebuffer: %v", err)
@@ -1303,7 +1303,7 @@ func (a *layerAtlas) ensureSize(useCPU bool, ctx driver.Device, size image.Point
 	if err != nil {
 		return err
 	}
-	fbo, err := ctx.NewFramebuffer(img, 0)
+	fbo, err := ctx.NewFramebuffer(img)
 	if err != nil {
 		img.Release()
 		return err

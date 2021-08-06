@@ -57,8 +57,7 @@ func NewWindow(width, height int) (*Window, error) {
 		if err != nil {
 			return nil
 		}
-		const depthBits = 16
-		fbo, err := dev.NewFramebuffer(fboTex, depthBits)
+		fbo, err := dev.NewFramebuffer(fboTex)
 		if err != nil {
 			fboTex.Release()
 			return err

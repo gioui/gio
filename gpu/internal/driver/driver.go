@@ -20,22 +20,18 @@ type Device interface {
 	// are valid at the point of call.
 	IsTimeContinuous() bool
 	NewTexture(format TextureFormat, width, height int, minFilter, magFilter TextureFilter, bindings BufferBinding) (Texture, error)
-	NewFramebuffer(tex Texture, depthBits int) (Framebuffer, error)
+	NewFramebuffer(tex Texture) (Framebuffer, error)
 	NewImmutableBuffer(typ BufferBinding, data []byte) (Buffer, error)
 	NewBuffer(typ BufferBinding, size int) (Buffer, error)
 	NewComputeProgram(shader ShaderSources) (Program, error)
 	NewProgram(vertexShader, fragmentShader ShaderSources) (Program, error)
 	NewInputLayout(vertexShader ShaderSources, layout []InputDesc) (InputLayout, error)
 
-	DepthFunc(f DepthFunc)
-	ClearDepth(d float32)
 	Clear(r, g, b, a float32)
 	Viewport(x, y, width, height int)
 	DrawArrays(mode DrawMode, off, count int)
 	DrawElements(mode DrawMode, off, count int)
 	SetBlend(enable bool)
-	SetDepthTest(enable bool)
-	DepthMask(mask bool)
 	BlendFunc(sfactor, dfactor BlendFactor)
 
 	BindInputLayout(i InputLayout)
@@ -129,8 +125,6 @@ type BufferBinding uint8
 
 type DataType uint8
 
-type DepthFunc uint8
-
 type Features uint
 
 type Caps struct {
@@ -172,11 +166,6 @@ type Texture interface {
 	Upload(offset, size image.Point, pixels []byte, stride int)
 	Release()
 }
-
-const (
-	DepthFuncGreater DepthFunc = iota
-	DepthFuncGreaterEqual
-)
 
 const (
 	DataTypeFloat DataType = iota

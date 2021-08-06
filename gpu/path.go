@@ -252,7 +252,7 @@ func (s *fboSet) resize(ctx driver.Device, sizes []image.Point) {
 			if err != nil {
 				panic(err)
 			}
-			fbo, err := ctx.NewFramebuffer(tex, 0)
+			fbo, err := ctx.NewFramebuffer(tex)
 			if err != nil {
 				panic(err)
 			}

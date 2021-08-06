@@ -132,7 +132,6 @@ func setupFBO(t *testing.T, b driver.Device, size image.Point) driver.Framebuffe
 	// are in the sRGB color space.
 	col := f32color.LinearFromSRGB(clearCol)
 	b.Clear(col.Float32())
-	b.ClearDepth(0.0)
 	b.Viewport(0, 0, size.X, size.Y)
 	return fbo
 }
@@ -150,8 +149,7 @@ func newFBO(t *testing.T, b driver.Device, size image.Point) driver.Framebuffer 
 	t.Cleanup(func() {
 		fboTex.Release()
 	})
-	const depthBits = 16
-	fbo, err := b.NewFramebuffer(fboTex, depthBits)
+	fbo, err := b.NewFramebuffer(fboTex)
 	if err != nil {
 		t.Fatal(err)
 	}

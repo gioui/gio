@@ -17,7 +17,6 @@ type d3d11Context struct {
 
 	swchain       *d3d11.IDXGISwapChain
 	renderTarget  *d3d11.RenderTargetView
-	depthView     *d3d11.DepthStencilView
 	width, height int
 }
 
@@ -56,8 +55,7 @@ func (c *d3d11Context) API() gpu.API {
 
 func (c *d3d11Context) RenderTarget() gpu.RenderTarget {
 	return gpu.Direct3D11RenderTarget{
-		RenderTarget:     unsafe.Pointer(c.renderTarget),
-		DepthStencilView: unsafe.Pointer(c.depthView),
+		RenderTarget: unsafe.Pointer(c.renderTarget),
 	}
 }
 
@@ -91,10 +89,6 @@ func (c *d3d11Context) Refresh() error {
 	c.width = width
 	c.height = height
 
-	desc, err := c.swchain.GetDesc()
-	if err != nil {
-		return err
-	}
 	backBuffer, err := c.swchain.GetBuffer(0, &d3d11.IID_Texture2D)
 	if err != nil {
 		return err
@@ -105,18 +99,12 @@ func (c *d3d11Context) Refresh() error {
 	if err != nil {
 		return err
 	}
-	depthView, err := d3d11.CreateDepthView(c.dev, int(desc.BufferDesc.Width), int(desc.BufferDesc.Height), 24)
-	if err != nil {
-		d3d11.IUnknownRelease(unsafe.Pointer(renderTarget), renderTarget.Vtbl.Release)
-		return err
-	}
 	c.renderTarget = renderTarget
-	c.depthView = depthView
 	return nil
 }
 
 func (c *d3d11Context) Lock() error {
-	c.ctx.OMSetRenderTargets(c.renderTarget, c.depthView)
+	c.ctx.OMSetRenderTargets(c.renderTarget, nil)
 	return nil
 }
 
@@ -140,10 +128,6 @@ func (c *d3d11Context) Release() {
 }
 
 func (c *d3d11Context) releaseFBO() {
-	if c.depthView != nil {
-		d3d11.IUnknownRelease(unsafe.Pointer(c.depthView), c.depthView.Vtbl.Release)
-		c.depthView = nil
-	}
 	if c.renderTarget != nil {
 		d3d11.IUnknownRelease(unsafe.Pointer(c.renderTarget), c.renderTarget.Vtbl.Release)
 		c.renderTarget = nil

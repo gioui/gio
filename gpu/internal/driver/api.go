@@ -24,8 +24,6 @@ type OpenGLRenderTarget gl.Framebuffer
 type Direct3D11RenderTarget struct {
 	// RenderTarget is a *ID3D11RenderTargetView.
 	RenderTarget unsafe.Pointer
-	// DepthStencilView is a *ID3D11DepthStencilView.
-	DepthStencilView unsafe.Pointer
 }
 
 type OpenGL struct {
