@@ -11,7 +11,6 @@ packages:
  - llvm-dev # for cctools
  - uuid-dev ## for cctools
  - libplist-utils # for gogio
- - golang
 sources:
  - https://git.sr.ht/~eliasnaur/applesdks
  - https://git.sr.ht/~eliasnaur/gio
@@ -21,8 +20,11 @@ sources:
  - https://github.com/mackyle/xar.git
 environment:
    APPLE_TOOLCHAIN_ROOT: /home/build/appletools
-   PATH: /home/build/go/bin:/usr/bin
+   PATH: /home/build/sdk/go/bin:/home/build/go/bin:/usr/bin
 tasks:
+ - install_go: |
+     mkdir -p /home/build/sdk
+     curl -s https://dl.google.com/go/go1.16.6.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
  - prepare_toolchain: |
      mkdir -p $APPLE_TOOLCHAIN_ROOT
      cd $APPLE_TOOLCHAIN_ROOT
