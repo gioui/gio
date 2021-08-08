@@ -29,16 +29,16 @@ import (
 
 #include <AppKit/AppKit.h>
 
-#define GIO_MOUSE_MOVE 1
-#define GIO_MOUSE_UP 2
-#define GIO_MOUSE_DOWN 3
-#define GIO_MOUSE_SCROLL 4
+#define MOUSE_MOVE 1
+#define MOUSE_UP 2
+#define MOUSE_DOWN 3
+#define MOUSE_SCROLL 4
 
 __attribute__ ((visibility ("hidden"))) void gio_main(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight);
 
-static void gio_writeClipboard(unichar *chars, NSUInteger length) {
+static void writeClipboard(unichar *chars, NSUInteger length) {
 	@autoreleasepool {
 		NSString *s = [NSString string];
 		if (length > 0) {
@@ -50,7 +50,7 @@ static void gio_writeClipboard(unichar *chars, NSUInteger length) {
 	}
 }
 
-static CFTypeRef gio_readClipboard(void) {
+static CFTypeRef readClipboard(void) {
 	@autoreleasepool {
 		NSPasteboard *p = NSPasteboard.generalPasteboard;
 		NSString *content = [p stringForType:NSPasteboardTypeString];
@@ -58,72 +58,72 @@ static CFTypeRef gio_readClipboard(void) {
 	}
 }
 
-static CGFloat gio_viewHeight(CFTypeRef viewRef) {
+static CGFloat viewHeight(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
 	return [view bounds].size.height;
 }
 
-static CGFloat gio_viewWidth(CFTypeRef viewRef) {
+static CGFloat viewWidth(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
 	return [view bounds].size.width;
 }
 
-static CGFloat gio_getScreenBackingScale(void) {
+static CGFloat getScreenBackingScale(void) {
 	return [NSScreen.mainScreen backingScaleFactor];
 }
 
-static CGFloat gio_getViewBackingScale(CFTypeRef viewRef) {
+static CGFloat getViewBackingScale(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
 	return [view.window backingScaleFactor];
 }
 
-static void gio_setNeedsDisplay(CFTypeRef viewRef) {
+static void setNeedsDisplay(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
 	[view setNeedsDisplay:YES];
 }
 
-static NSPoint gio_cascadeTopLeftFromPoint(CFTypeRef windowRef, NSPoint topLeft) {
+static NSPoint cascadeTopLeftFromPoint(CFTypeRef windowRef, NSPoint topLeft) {
 	NSWindow *window = (__bridge NSWindow *)windowRef;
 	return [window cascadeTopLeftFromPoint:topLeft];
 }
 
-static void gio_makeKeyAndOrderFront(CFTypeRef windowRef) {
+static void makeKeyAndOrderFront(CFTypeRef windowRef) {
 	NSWindow *window = (__bridge NSWindow *)windowRef;
 	[window makeKeyAndOrderFront:nil];
 }
 
-static void gio_toggleFullScreen(CFTypeRef windowRef) {
+static void toggleFullScreen(CFTypeRef windowRef) {
 	NSWindow *window = (__bridge NSWindow *)windowRef;
 	[window toggleFullScreen:nil];
 }
 
-static void gio_close(CFTypeRef windowRef) {
+static void closeWindow(CFTypeRef windowRef) {
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	[window performClose:nil];
 }
 
-static void gio_setSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
+static void setSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	NSSize size = NSMakeSize(width, height);
 	[window setContentSize:size];
 }
 
-static void gio_setMinSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
+static void setMinSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	window.contentMinSize = NSMakeSize(width, height);
 }
 
-static void gio_setMaxSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
+static void setMaxSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	window.contentMaxSize = NSMakeSize(width, height);
 }
 
-static void gio_setTitle(CFTypeRef windowRef, const char *title) {
+static void setTitle(CFTypeRef windowRef, const char *title) {
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	window.title = [NSString stringWithUTF8String: title];
 }
 
-static CFTypeRef gio_layerForView(CFTypeRef viewRef) {
+static CFTypeRef layerForView(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
 	return (__bridge CFTypeRef)view.layer;
 }
@@ -197,7 +197,7 @@ func (w *window) contextView() C.CFTypeRef {
 }
 
 func (w *window) ReadClipboard() {
-	content := nsstringToString(C.gio_readClipboard())
+	content := nsstringToString(C.readClipboard())
 	go w.w.Event(clipboard.Event{Text: content})
 }
 
@@ -207,11 +207,11 @@ func (w *window) WriteClipboard(s string) {
 	if len(u16) > 0 {
 		chars = (*C.unichar)(unsafe.Pointer(&u16[0]))
 	}
-	C.gio_writeClipboard(chars, C.NSUInteger(len(u16)))
+	C.writeClipboard(chars, C.NSUInteger(len(u16)))
 }
 
 func (w *window) Option(opts *Options) {
-	screenScale := float32(C.gio_getScreenBackingScale())
+	screenScale := float32(C.getScreenBackingScale())
 	cfg := configFor(screenScale)
 	val := func(v unit.Value) float32 {
 		return float32(cfg.Px(v)) / screenScale
@@ -220,27 +220,27 @@ func (w *window) Option(opts *Options) {
 		width := val(o.Width)
 		height := val(o.Height)
 		if width > 0 || height > 0 {
-			C.gio_setSize(w.window, C.CGFloat(width), C.CGFloat(height))
+			C.setSize(w.window, C.CGFloat(width), C.CGFloat(height))
 		}
 	}
 	if o := opts.MinSize; o != nil {
 		width := val(o.Width)
 		height := val(o.Height)
 		if width > 0 || height > 0 {
-			C.gio_setMinSize(w.window, C.CGFloat(width), C.CGFloat(height))
+			C.setMinSize(w.window, C.CGFloat(width), C.CGFloat(height))
 		}
 	}
 	if o := opts.MaxSize; o != nil {
 		width := val(o.Width)
 		height := val(o.Height)
 		if width > 0 || height > 0 {
-			C.gio_setMaxSize(w.window, C.CGFloat(width), C.CGFloat(height))
+			C.setMaxSize(w.window, C.CGFloat(width), C.CGFloat(height))
 		}
 	}
 	if o := opts.Title; o != nil {
 		title := C.CString(*o)
 		defer C.free(unsafe.Pointer(title))
-		C.gio_setTitle(w.window, title)
+		C.setTitle(w.window, title)
 	}
 	if o := opts.WindowMode; o != nil {
 		w.SetWindowMode(*o)
@@ -251,7 +251,7 @@ func (w *window) SetWindowMode(mode WindowMode) {
 	switch mode {
 	case w.mode:
 	case Windowed, Fullscreen:
-		C.gio_toggleFullScreen(w.window)
+		C.toggleFullScreen(w.window)
 		w.mode = mode
 	}
 }
@@ -283,12 +283,12 @@ func (w *window) runOnMain(f func()) {
 }
 
 func (w *window) Close() {
-	// gio_close immediately calls gio_onClose which sends events
+	// close immediately calls gio_onClose which sends events
 	// causing a deadlock because Close is called during an event.
 	// Break the deadlock by deferring the close, making Close more
 	// akin to a message like the other platforms.
 	go runOnMain(func() {
-		C.gio_close(w.window)
+		C.closeWindow(w.window)
 	})
 }
 
@@ -331,13 +331,13 @@ func gio_onText(view C.CFTypeRef, cstr *C.char) {
 func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy C.CGFloat, ti C.double, mods C.NSUInteger) {
 	var typ pointer.Type
 	switch cdir {
-	case C.GIO_MOUSE_MOVE:
+	case C.MOUSE_MOVE:
 		typ = pointer.Move
-	case C.GIO_MOUSE_UP:
+	case C.MOUSE_UP:
 		typ = pointer.Release
-	case C.GIO_MOUSE_DOWN:
+	case C.MOUSE_DOWN:
 		typ = pointer.Press
-	case C.GIO_MOUSE_SCROLL:
+	case C.MOUSE_SCROLL:
 		typ = pointer.Scroll
 	default:
 		panic("invalid direction")
@@ -387,8 +387,8 @@ func gio_onChangeScreen(view C.CFTypeRef, did uint64) {
 }
 
 func (w *window) draw() {
-	w.scale = float32(C.gio_getViewBackingScale(w.view))
-	wf, hf := float32(C.gio_viewWidth(w.view)), float32(C.gio_viewHeight(w.view))
+	w.scale = float32(C.getViewBackingScale(w.view))
+	wf, hf := float32(C.viewWidth(w.view)), float32(C.viewHeight(w.view))
 	if wf == 0 || hf == 0 {
 		return
 	}
@@ -478,11 +478,11 @@ func NewWindow(win Callbacks, opts *Options) error {
 		if nextTopLeft.x == 0 && nextTopLeft.y == 0 {
 			// cascadeTopLeftFromPoint treats (0, 0) as a no-op,
 			// and just returns the offset we need for the first window.
-			nextTopLeft = C.gio_cascadeTopLeftFromPoint(w.window, nextTopLeft)
+			nextTopLeft = C.cascadeTopLeftFromPoint(w.window, nextTopLeft)
 		}
-		nextTopLeft = C.gio_cascadeTopLeftFromPoint(w.window, nextTopLeft)
-		C.gio_makeKeyAndOrderFront(w.window)
-		layer := C.gio_layerForView(w.view)
+		nextTopLeft = C.cascadeTopLeftFromPoint(w.window, nextTopLeft)
+		C.makeKeyAndOrderFront(w.window)
+		layer := C.layerForView(w.view)
 		w.w.Event(ViewEvent{View: uintptr(w.view), Layer: uintptr(layer)})
 	})
 	return <-errch
@@ -493,14 +493,14 @@ func newWindow(opts *Options) (*window, error) {
 	if view == 0 {
 		return nil, errors.New("CreateWindow: failed to create view")
 	}
-	scale := float32(C.gio_getViewBackingScale(view))
+	scale := float32(C.getViewBackingScale(view))
 	w := &window{
 		view:  view,
 		scale: scale,
 	}
 	dl, err := NewDisplayLink(func() {
 		w.runOnMain(func() {
-			C.gio_setNeedsDisplay(w.view)
+			C.setNeedsDisplay(w.view)
 		})
 	})
 	w.displayLink = dl

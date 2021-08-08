@@ -18,7 +18,7 @@ struct drawParams {
 	CGFloat top, right, bottom, left;
 };
 
-static void gio_writeClipboard(unichar *chars, NSUInteger length) {
+static void writeClipboard(unichar *chars, NSUInteger length) {
 	@autoreleasepool {
 		NSString *s = [NSString string];
 		if (length > 0) {
@@ -29,42 +29,42 @@ static void gio_writeClipboard(unichar *chars, NSUInteger length) {
 	}
 }
 
-static CFTypeRef gio_readClipboard(void) {
+static CFTypeRef readClipboard(void) {
 	@autoreleasepool {
 		UIPasteboard *p = UIPasteboard.generalPasteboard;
 		return (__bridge_retained CFTypeRef)p.string;
 	}
 }
 
-static void gio_showTextInput(CFTypeRef viewRef) {
+static void showTextInput(CFTypeRef viewRef) {
 	UIView *view = (__bridge UIView *)viewRef;
 	[view becomeFirstResponder];
 }
 
-static void gio_hideTextInput(CFTypeRef viewRef) {
+static void hideTextInput(CFTypeRef viewRef) {
 	UIView *view = (__bridge UIView *)viewRef;
 	[view resignFirstResponder];
 }
 
-static void gio_addLayerToView(CFTypeRef viewRef, CFTypeRef layerRef) {
+static void addLayerToView(CFTypeRef viewRef, CFTypeRef layerRef) {
 	UIView *view = (__bridge UIView *)viewRef;
 	CALayer *layer = (__bridge CALayer *)layerRef;
 	[view.layer addSublayer:layer];
 }
 
-static void gio_updateView(CFTypeRef viewRef, CFTypeRef layerRef) {
+static void updateView(CFTypeRef viewRef, CFTypeRef layerRef) {
 	UIView *view = (__bridge UIView *)viewRef;
 	CAEAGLLayer *layer = (__bridge CAEAGLLayer *)layerRef;
 	layer.contentsScale = view.contentScaleFactor;
 	layer.bounds = view.bounds;
 }
 
-static void gio_removeLayer(CFTypeRef layerRef) {
+static void removeLayer(CFTypeRef layerRef) {
 	CALayer *layer = (__bridge CALayer *)layerRef;
 	[layer removeFromSuperlayer];
 }
 
-static struct drawParams gio_viewDrawParams(CFTypeRef viewRef) {
+static struct drawParams viewDrawParams(CFTypeRef viewRef) {
 	UIView *v = (__bridge UIView *)viewRef;
 	struct drawParams params;
 	CGFloat scale = v.layer.contentsScale;
@@ -147,7 +147,7 @@ func onCreate(view C.CFTypeRef) {
 	w.w.SetDriver(w)
 	w.visible.Store(false)
 	w.layer = C.CFTypeRef(layerFactory())
-	C.gio_addLayerToView(view, w.layer)
+	C.addLayerToView(view, w.layer)
 	views[view] = w
 	w.w.Event(system.StageEvent{Stage: system.StagePaused})
 }
@@ -159,13 +159,13 @@ func gio_onDraw(view C.CFTypeRef) {
 }
 
 func (w *window) draw(sync bool) {
-	params := C.gio_viewDrawParams(w.view)
+	params := C.viewDrawParams(w.view)
 	if params.width == 0 || params.height == 0 {
 		return
 	}
 	wasVisible := w.isVisible()
 	w.visible.Store(true)
-	C.gio_updateView(w.view, w.layer)
+	C.updateView(w.view, w.layer)
 	if !wasVisible {
 		w.w.Event(system.StageEvent{Stage: system.StageRunning})
 	}
@@ -205,7 +205,7 @@ func onDestroy(view C.CFTypeRef) {
 	delete(views, view)
 	w.w.Event(system.DestroyEvent{})
 	w.displayLink.Close()
-	C.gio_removeLayer(w.layer)
+	C.removeLayer(w.layer)
 	C.CFRelease(w.layer)
 	w.layer = 0
 	w.view = 0
@@ -284,7 +284,7 @@ func onTouch(last C.int, view, touchRef C.CFTypeRef, phase C.NSInteger, x, y C.C
 }
 
 func (w *window) ReadClipboard() {
-	content := nsstringToString(C.gio_readClipboard())
+	content := nsstringToString(C.readClipboard())
 	go w.w.Event(clipboard.Event{Text: content})
 }
 
@@ -294,7 +294,7 @@ func (w *window) WriteClipboard(s string) {
 	if len(u16) > 0 {
 		chars = (*C.unichar)(unsafe.Pointer(&u16[0]))
 	}
-	C.gio_writeClipboard(chars, C.NSUInteger(len(u16)))
+	C.writeClipboard(chars, C.NSUInteger(len(u16)))
 }
 
 func (w *window) Option(opts *Options) {}
@@ -351,9 +351,9 @@ func (w *window) isVisible() bool {
 
 func (w *window) ShowTextInput(show bool) {
 	if show {
-		C.gio_showTextInput(w.view)
+		C.showTextInput(w.view)
 	} else {
-		C.gio_hideTextInput(w.view)
+		C.hideTextInput(w.view)
 	}
 }
 

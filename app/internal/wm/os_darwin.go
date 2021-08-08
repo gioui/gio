@@ -15,16 +15,16 @@ __attribute__ ((visibility ("hidden"))) void gio_hideCursor();
 __attribute__ ((visibility ("hidden"))) void gio_showCursor();
 __attribute__ ((visibility ("hidden"))) void gio_setCursor(NSUInteger curID);
 
-static bool gio_isMainThread() {
+static bool isMainThread() {
 	return [NSThread isMainThread];
 }
 
-static NSUInteger gio_nsstringLength(CFTypeRef cstr) {
+static NSUInteger nsstringLength(CFTypeRef cstr) {
 	NSString *str = (__bridge NSString *)cstr;
 	return [str length];
 }
 
-static void gio_nsstringGetCharacters(CFTypeRef cstr, unichar *chars, NSUInteger loc, NSUInteger length) {
+static void nsstringGetCharacters(CFTypeRef cstr, unichar *chars, NSUInteger loc, NSUInteger length) {
 	NSString *str = (__bridge NSString *)cstr;
 	[str getCharacters:chars range:NSMakeRange(loc, length)];
 }
@@ -67,7 +67,7 @@ var mainFuncs = make(chan func(), 1)
 
 // runOnMain runs the function on the main thread.
 func runOnMain(f func()) {
-	if C.gio_isMainThread() {
+	if C.isMainThread() {
 		f()
 		return
 	}
@@ -96,12 +96,12 @@ func nsstringToString(str C.CFTypeRef) string {
 		return ""
 	}
 	defer C.CFRelease(str)
-	n := C.gio_nsstringLength(str)
+	n := C.nsstringLength(str)
 	if n == 0 {
 		return ""
 	}
 	chars := make([]uint16, n)
-	C.gio_nsstringGetCharacters(str, (*C.unichar)(unsafe.Pointer(&chars[0])), 0, n)
+	C.nsstringGetCharacters(str, (*C.unichar)(unsafe.Pointer(&chars[0])), 0, n)
 	utf8 := utf16.Decode(chars)
 	return string(utf8)
 }
