@@ -80,8 +80,8 @@ type glState struct {
 }
 
 type state struct {
-	prog   *gpuProgram
-	layout *gpuInputLayout
+	prog   *program
+	layout *inputLayout
 	buffer bufferBinding
 }
 
@@ -91,12 +91,12 @@ type bufferBinding struct {
 	stride int
 }
 
-type gpuTimer struct {
+type timer struct {
 	funcs *gl.Functions
 	obj   gl.Query
 }
 
-type gpuTexture struct {
+type texture struct {
 	backend *Backend
 	obj     gl.Texture
 	triple  textureTriple
@@ -104,13 +104,13 @@ type gpuTexture struct {
 	height  int
 }
 
-type gpuFramebuffer struct {
+type framebuffer struct {
 	backend *Backend
 	obj     gl.Framebuffer
 	foreign bool
 }
 
-type gpuBuffer struct {
+type buffer struct {
 	backend   *Backend
 	hasBuffer bool
 	obj       gl.Buffer
@@ -122,18 +122,18 @@ type gpuBuffer struct {
 	data []byte
 }
 
-type gpuProgram struct {
+type program struct {
 	backend      *Backend
 	obj          gl.Program
 	vertUniforms uniformsTracker
 	fragUniforms uniformsTracker
-	storage      [storageBindings]*gpuBuffer
+	storage      [storageBindings]*buffer
 }
 
 type uniformsTracker struct {
 	locs    []uniformLocation
 	size    int
-	buf     *gpuBuffer
+	buf     *buffer
 	version int
 }
 
@@ -144,7 +144,7 @@ type uniformLocation struct {
 	size    int
 }
 
-type gpuInputLayout struct {
+type inputLayout struct {
 	inputs []shader.InputLocation
 	layout []shader.InputDesc
 }
@@ -217,7 +217,7 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 		switch t := target.(type) {
 		case driver.OpenGLRenderTarget:
 			renderFBO = gl.Framebuffer(t)
-		case *gpuFramebuffer:
+		case *framebuffer:
 			renderFBO = t.obj
 		default:
 			panic(fmt.Errorf("opengl: invalid render target type: %T", target))
@@ -256,7 +256,7 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 	if b.sRGBFBO != nil && !clear {
 		b.Clear(0, 0, 0, 0)
 	}
-	return &gpuFramebuffer{backend: b, obj: renderFBO, foreign: true}
+	return &framebuffer{backend: b, obj: renderFBO, foreign: true}
 }
 
 func (b *Backend) EndFrame() {
@@ -623,7 +623,7 @@ func (b *Backend) Caps() driver.Caps {
 }
 
 func (b *Backend) NewTimer() driver.Timer {
-	return &gpuTimer{
+	return &timer{
 		funcs: b.funcs,
 		obj:   b.funcs.CreateQuery(),
 	}
@@ -635,9 +635,9 @@ func (b *Backend) IsTimeContinuous() bool {
 
 func (b *Backend) NewFramebuffer(tex driver.Texture) (driver.Framebuffer, error) {
 	glErr(b.funcs)
-	gltex := tex.(*gpuTexture)
+	gltex := tex.(*texture)
 	fb := b.funcs.CreateFramebuffer()
-	fbo := &gpuFramebuffer{backend: b, obj: fb}
+	fbo := &framebuffer{backend: b, obj: fb}
 	b.BindFramebuffer(fbo)
 	if err := glErr(b.funcs); err != nil {
 		fbo.Release()
@@ -653,7 +653,7 @@ func (b *Backend) NewFramebuffer(tex driver.Texture) (driver.Framebuffer, error)
 
 func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, minFilter, magFilter driver.TextureFilter, binding driver.BufferBinding) (driver.Texture, error) {
 	glErr(b.funcs)
-	tex := &gpuTexture{backend: b, obj: b.funcs.CreateTexture(), width: width, height: height}
+	tex := &texture{backend: b, obj: b.funcs.CreateTexture(), width: width, height: height}
 	switch format {
 	case driver.TextureFormatFloat:
 		tex.triple = b.floatTriple
@@ -684,7 +684,7 @@ func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, min
 
 func (b *Backend) NewBuffer(typ driver.BufferBinding, size int) (driver.Buffer, error) {
 	glErr(b.funcs)
-	buf := &gpuBuffer{backend: b, typ: typ, size: size}
+	buf := &buffer{backend: b, typ: typ, size: size}
 	if typ&driver.BufferBindingUniforms != 0 {
 		if typ != driver.BufferBindingUniforms {
 			return nil, errors.New("uniforms buffers cannot be bound as anything else")
@@ -711,7 +711,7 @@ func (b *Backend) NewBuffer(typ driver.BufferBinding, size int) (driver.Buffer, 
 func (b *Backend) NewImmutableBuffer(typ driver.BufferBinding, data []byte) (driver.Buffer, error) {
 	glErr(b.funcs)
 	obj := b.funcs.CreateBuffer()
-	buf := &gpuBuffer{backend: b, obj: obj, typ: typ, size: len(data), hasBuffer: true}
+	buf := &buffer{backend: b, obj: obj, typ: typ, size: len(data), hasBuffer: true}
 	firstBinding := firstBufferType(typ)
 	b.glstate.bindBuffer(b.funcs, firstBinding, buf.obj)
 	b.funcs.BufferData(firstBinding, len(data), gl.STATIC_DRAW)
@@ -757,7 +757,7 @@ func (b *Backend) DispatchCompute(x, y, z int) {
 }
 
 func (b *Backend) BindImageTexture(unit int, tex driver.Texture, access driver.AccessBits, f driver.TextureFormat) {
-	t := tex.(*gpuTexture)
+	t := tex.(*texture)
 	var acc gl.Enum
 	switch access {
 	case driver.AccessWrite:
@@ -777,7 +777,7 @@ func (b *Backend) BindImageTexture(unit int, tex driver.Texture, access driver.A
 	b.funcs.BindImageTexture(unit, t.obj, 0, false, 0, acc, format)
 }
 
-func (b *Backend) useProgram(p *gpuProgram) {
+func (b *Backend) useProgram(p *program) {
 	b.glstate.useProgram(b.funcs, p.obj)
 	b.state.prog = p
 }
@@ -856,7 +856,7 @@ func (b *Backend) NewInputLayout(vs shader.Sources, layout []shader.InputDesc) (
 			return nil, fmt.Errorf("NewInputLayout: data size mismatch for %q: got %d expected %d", inp.Name, got, exp)
 		}
 	}
-	return &gpuInputLayout{
+	return &inputLayout{
 		inputs: vs.Inputs,
 		layout: layout,
 	}, nil
@@ -867,11 +867,10 @@ func (b *Backend) NewComputeProgram(src shader.Sources) (driver.Program, error) 
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", src.Name, err)
 	}
-	gpuProg := &gpuProgram{
+	return &program{
 		backend: b,
 		obj:     p,
-	}
-	return gpuProg, nil
+	}, nil
 }
 
 func (b *Backend) NewProgram(vertShader, fragShader shader.Sources) (driver.Program, error) {
@@ -896,11 +895,11 @@ func (b *Backend) NewProgram(vertShader, fragShader shader.Sources) (driver.Prog
 	if err != nil {
 		return nil, err
 	}
-	gpuProg := &gpuProgram{
+	prog := &program{
 		backend: b,
 		obj:     p,
 	}
-	b.BindProgram(gpuProg)
+	b.BindProgram(prog)
 	// Bind texture uniforms.
 	for _, tex := range vertShader.Textures {
 		u := b.funcs.GetUniformLocation(p, tex.Name)
@@ -932,10 +931,10 @@ func (b *Backend) NewProgram(vertShader, fragShader shader.Sources) (driver.Prog
 			}
 		}
 	} else {
-		gpuProg.vertUniforms.setup(b.funcs, p, vertShader.Uniforms.Size, vertShader.Uniforms.Locations)
-		gpuProg.fragUniforms.setup(b.funcs, p, fragShader.Uniforms.Size, fragShader.Uniforms.Locations)
+		prog.vertUniforms.setup(b.funcs, p, vertShader.Uniforms.Size, vertShader.Uniforms.Locations)
+		prog.fragUniforms.setup(b.funcs, p, fragShader.Uniforms.Size, fragShader.Uniforms.Locations)
 	}
-	return gpuProg, nil
+	return prog, nil
 }
 
 func lookupUniform(funcs *gl.Functions, p gl.Program, loc shader.UniformLocation) uniformLocation {
@@ -946,23 +945,23 @@ func lookupUniform(funcs *gl.Functions, p gl.Program, loc shader.UniformLocation
 	return uniformLocation{uniform: u, offset: loc.Offset, typ: loc.Type, size: loc.Size}
 }
 
-func (p *gpuProgram) SetStorageBuffer(binding int, buffer driver.Buffer) {
-	buf := buffer.(*gpuBuffer)
-	if buf.typ&driver.BufferBindingShaderStorage == 0 {
+func (p *program) SetStorageBuffer(binding int, buf driver.Buffer) {
+	b := buf.(*buffer)
+	if b.typ&driver.BufferBindingShaderStorage == 0 {
 		panic("not a shader storage buffer")
 	}
-	p.storage[binding] = buf
+	p.storage[binding] = b
 }
 
-func (p *gpuProgram) SetVertexUniforms(buffer driver.Buffer) {
-	p.vertUniforms.setBuffer(buffer)
+func (p *program) SetVertexUniforms(buf driver.Buffer) {
+	p.vertUniforms.setBuffer(buf)
 }
 
-func (p *gpuProgram) SetFragmentUniforms(buffer driver.Buffer) {
-	p.fragUniforms.setBuffer(buffer)
+func (p *program) SetFragmentUniforms(buf driver.Buffer) {
+	p.fragUniforms.setBuffer(buf)
 }
 
-func (p *gpuProgram) updateUniforms() {
+func (p *program) updateUniforms() {
 	f := p.backend.funcs
 	if p.backend.ubo {
 		if b := p.vertUniforms.buf; b != nil {
@@ -978,11 +977,11 @@ func (p *gpuProgram) updateUniforms() {
 }
 
 func (b *Backend) BindProgram(prog driver.Program) {
-	p := prog.(*gpuProgram)
+	p := prog.(*program)
 	b.useProgram(p)
 }
 
-func (p *gpuProgram) Release() {
+func (p *program) Release() {
 	p.backend.glstate.deleteProgram(p.backend.funcs, p.obj)
 }
 
@@ -994,17 +993,17 @@ func (u *uniformsTracker) setup(funcs *gl.Functions, p gl.Program, uniformSize i
 	u.size = uniformSize
 }
 
-func (u *uniformsTracker) setBuffer(buffer driver.Buffer) {
-	buf := buffer.(*gpuBuffer)
-	if buf.typ&driver.BufferBindingUniforms == 0 {
+func (u *uniformsTracker) setBuffer(buf driver.Buffer) {
+	b := buf.(*buffer)
+	if b.typ&driver.BufferBindingUniforms == 0 {
 		panic("not a uniform buffer")
 	}
-	if buf.size < u.size {
-		panic(fmt.Errorf("uniform buffer too small, got %d need %d", buf.size, u.size))
+	if b.size < u.size {
+		panic(fmt.Errorf("uniform buffer too small, got %d need %d", b.size, u.size))
 	}
-	u.buf = buf
+	u.buf = b
 	// Force update.
-	u.version = buf.version - 1
+	u.version = b.version - 1
 }
 
 func (p *uniformsTracker) update(funcs *gl.Functions) {
@@ -1039,7 +1038,7 @@ func (p *uniformsTracker) update(funcs *gl.Functions) {
 	}
 }
 
-func (b *gpuBuffer) Upload(data []byte) {
+func (b *buffer) Upload(data []byte) {
 	if b.immutable {
 		panic("immutable buffer")
 	}
@@ -1061,7 +1060,7 @@ func (b *gpuBuffer) Upload(data []byte) {
 	}
 }
 
-func (b *gpuBuffer) Download(data []byte) error {
+func (b *buffer) Download(data []byte) error {
 	if len(data) > b.size {
 		panic("buffer size overflow")
 	}
@@ -1082,7 +1081,7 @@ func (b *gpuBuffer) Download(data []byte) error {
 	return nil
 }
 
-func (b *gpuBuffer) Release() {
+func (b *buffer) Release() {
 	if b.hasBuffer {
 		b.backend.glstate.deleteBuffer(b.backend.funcs, b.obj)
 		b.hasBuffer = false
@@ -1090,7 +1089,7 @@ func (b *gpuBuffer) Release() {
 }
 
 func (b *Backend) BindVertexBuffer(buf driver.Buffer, stride, offset int) {
-	gbuf := buf.(*gpuBuffer)
+	gbuf := buf.(*buffer)
 	if gbuf.typ&driver.BufferBindingVertices == 0 {
 		panic("not a vertex buffer")
 	}
@@ -1125,7 +1124,7 @@ func (b *Backend) setupVertexArrays() {
 }
 
 func (b *Backend) BindIndexBuffer(buf driver.Buffer) {
-	gbuf := buf.(*gpuBuffer)
+	gbuf := buf.(*buffer)
 	if gbuf.typ&driver.BufferBindingIndices == 0 {
 		panic("not an index buffer")
 	}
@@ -1133,8 +1132,8 @@ func (b *Backend) BindIndexBuffer(buf driver.Buffer) {
 }
 
 func (b *Backend) BlitFramebuffer(dst, src driver.Framebuffer, srect, drect image.Rectangle) {
-	b.glstate.bindFramebuffer(b.funcs, gl.DRAW_FRAMEBUFFER, dst.(*gpuFramebuffer).obj)
-	b.glstate.bindFramebuffer(b.funcs, gl.READ_FRAMEBUFFER, src.(*gpuFramebuffer).obj)
+	b.glstate.bindFramebuffer(b.funcs, gl.DRAW_FRAMEBUFFER, dst.(*framebuffer).obj)
+	b.glstate.bindFramebuffer(b.funcs, gl.READ_FRAMEBUFFER, src.(*framebuffer).obj)
 	b.funcs.BlitFramebuffer(
 		srect.Min.X, srect.Min.Y, srect.Max.X, srect.Max.Y,
 		drect.Min.X, drect.Min.Y, drect.Max.X, drect.Max.Y,
@@ -1142,7 +1141,7 @@ func (b *Backend) BlitFramebuffer(dst, src driver.Framebuffer, srect, drect imag
 		gl.NEAREST)
 }
 
-func (f *gpuFramebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
+func (f *framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 	glErr(f.backend.funcs)
 	f.backend.BindFramebuffer(f)
 	if len(pixels) < src.Dx()*src.Dy()*4 {
@@ -1153,22 +1152,22 @@ func (f *gpuFramebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 }
 
 func (b *Backend) BindFramebuffer(fbo driver.Framebuffer) {
-	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, fbo.(*gpuFramebuffer).obj)
+	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, fbo.(*framebuffer).obj)
 }
 
-func (f *gpuFramebuffer) Invalidate() {
+func (f *framebuffer) Invalidate() {
 	f.backend.BindFramebuffer(f)
 	f.backend.funcs.InvalidateFramebuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0)
 }
 
-func (f *gpuFramebuffer) Release() {
+func (f *framebuffer) Release() {
 	if f.foreign {
 		panic("framebuffer not created by NewFramebuffer")
 	}
 	f.backend.glstate.deleteFramebuffer(f.backend.funcs, f.obj)
 }
 
-func (f *gpuFramebuffer) ImplementsRenderTarget() {}
+func (f *framebuffer) ImplementsRenderTarget() {}
 
 func toTexFilter(f driver.TextureFilter) int {
 	switch f {
@@ -1182,14 +1181,14 @@ func toTexFilter(f driver.TextureFilter) int {
 }
 
 func (b *Backend) BindTexture(unit int, t driver.Texture) {
-	b.glstate.bindTexture(b.funcs, unit, t.(*gpuTexture).obj)
+	b.glstate.bindTexture(b.funcs, unit, t.(*texture).obj)
 }
 
-func (t *gpuTexture) Release() {
+func (t *texture) Release() {
 	t.backend.glstate.deleteTexture(t.backend.funcs, t.obj)
 }
 
-func (t *gpuTexture) Upload(offset, size image.Point, pixels []byte, stride int) {
+func (t *texture) Upload(offset, size image.Point, pixels []byte, stride int) {
 	if min := size.X * size.Y * 4; min > len(pixels) {
 		panic(fmt.Errorf("size %d larger than data %d", min, len(pixels)))
 	}
@@ -1198,23 +1197,23 @@ func (t *gpuTexture) Upload(offset, size image.Point, pixels []byte, stride int)
 	t.backend.funcs.TexSubImage2D(gl.TEXTURE_2D, 0, offset.X, offset.Y, size.X, size.Y, t.triple.format, t.triple.typ, pixels)
 }
 
-func (t *gpuTimer) Begin() {
+func (t *timer) Begin() {
 	t.funcs.BeginQuery(gl.TIME_ELAPSED_EXT, t.obj)
 }
 
-func (t *gpuTimer) End() {
+func (t *timer) End() {
 	t.funcs.EndQuery(gl.TIME_ELAPSED_EXT)
 }
 
-func (t *gpuTimer) ready() bool {
+func (t *timer) ready() bool {
 	return t.funcs.GetQueryObjectuiv(t.obj, gl.QUERY_RESULT_AVAILABLE) == gl.TRUE
 }
 
-func (t *gpuTimer) Release() {
+func (t *timer) Release() {
 	t.funcs.DeleteQuery(t.obj)
 }
 
-func (t *gpuTimer) Duration() (time.Duration, bool) {
+func (t *timer) Duration() (time.Duration, bool) {
 	if !t.ready() {
 		return 0, false
 	}
@@ -1223,10 +1222,10 @@ func (t *gpuTimer) Duration() (time.Duration, bool) {
 }
 
 func (b *Backend) BindInputLayout(l driver.InputLayout) {
-	b.state.layout = l.(*gpuInputLayout)
+	b.state.layout = l.(*inputLayout)
 }
 
-func (l *gpuInputLayout) Release() {}
+func (l *inputLayout) Release() {}
 
 // floatTripleFor determines the best texture triple for floating point FBOs.
 func floatTripleFor(f *gl.Functions, ver [2]int, exts []string) (textureTriple, error) {
