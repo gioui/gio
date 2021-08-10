@@ -26,23 +26,25 @@ type Device interface {
 	NewImmutableBuffer(typ BufferBinding, data []byte) (Buffer, error)
 	NewBuffer(typ BufferBinding, size int) (Buffer, error)
 	NewComputeProgram(shader shader.Sources) (Program, error)
-	NewProgram(vertexShader, fragmentShader shader.Sources) (Program, error)
-	NewInputLayout(vertexShader shader.Sources, layout []shader.InputDesc) (InputLayout, error)
+	NewVertexShader(src shader.Sources) (VertexShader, error)
+	NewFragmentShader(src shader.Sources) (FragmentShader, error)
+	NewPipeline(desc PipelineDesc) (Pipeline, error)
 
 	Clear(r, g, b, a float32)
 	Viewport(x, y, width, height int)
 	DrawArrays(mode DrawMode, off, count int)
 	DrawElements(mode DrawMode, off, count int)
-	SetBlend(enable bool)
-	BlendFunc(sfactor, dfactor BlendFactor)
 
-	BindInputLayout(i InputLayout)
 	BindProgram(p Program)
+	BindPipeline(p Pipeline)
 	BindFramebuffer(f Framebuffer)
 	BindTexture(unit int, t Texture)
 	BindVertexBuffer(b Buffer, stride, offset int)
 	BindIndexBuffer(b Buffer)
 	BindImageTexture(unit int, texture Texture, access AccessBits, format TextureFormat)
+	BindVertexUniforms(buf Buffer)
+	BindFragmentUniforms(buf Buffer)
+	BindStorageBuffer(binding int, buf Buffer)
 
 	BlitFramebuffer(dst, src Framebuffer, srect, drect image.Rectangle)
 	MemoryBarrier()
@@ -51,10 +53,21 @@ type Device interface {
 	Release()
 }
 
-// InputLayout is the driver specific representation of the mapping
-// between Buffers and shader attributes.
-type InputLayout interface {
+type Pipeline interface {
 	Release()
+}
+
+type PipelineDesc struct {
+	VertexShader   VertexShader
+	FragmentShader FragmentShader
+	VertexLayout   []shader.InputDesc
+	BlendDesc      BlendDesc
+	PixelFormat    TextureFormat
+}
+
+type BlendDesc struct {
+	Enable               bool
+	SrcFactor, DstFactor BlendFactor
 }
 
 type AccessBits uint8
@@ -78,11 +91,16 @@ type Caps struct {
 	MaxTextureSize   int
 }
 
+type VertexShader interface {
+	Release()
+}
+
+type FragmentShader interface {
+	Release()
+}
+
 type Program interface {
 	Release()
-	SetStorageBuffer(binding int, buf Buffer)
-	SetVertexUniforms(buf Buffer)
-	SetFragmentUniforms(buf Buffer)
 }
 
 type Buffer interface {
@@ -123,6 +141,8 @@ const (
 	TextureFormatSRGBA TextureFormat = iota
 	TextureFormatFloat
 	TextureFormatRGBA8
+	// TextureFormatOutput denotes the format used by the output framebuffer.
+	TextureFormatOutput
 )
 
 const (

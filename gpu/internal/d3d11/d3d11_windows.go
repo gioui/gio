@@ -24,10 +24,8 @@ type Backend struct {
 	// Temporary storage to avoid garbage.
 	clearColor [4]float32
 	viewport   d3d11.VIEWPORT
-	blendState blendState
 
-	// Current program.
-	prog *Program
+	pipeline *Pipeline
 
 	caps driver.Caps
 
@@ -35,15 +33,13 @@ type Backend struct {
 	fbo *Framebuffer
 
 	floatFormat uint32
-
-	// cached state objects.
-	blendStates map[blendState]*d3d11.BlendState
 }
 
-type blendState struct {
-	enable  bool
-	sfactor driver.BlendFactor
-	dfactor driver.BlendFactor
+type Pipeline struct {
+	vert   *d3d11.VertexShader
+	frag   *d3d11.PixelShader
+	layout *d3d11.InputLayout
+	blend  *d3d11.BlendState
 }
 
 type Texture struct {
@@ -57,17 +53,15 @@ type Texture struct {
 	height   int
 }
 
-type Program struct {
+type VertexShader struct {
 	backend *Backend
+	shader  *d3d11.VertexShader
+	src     shader.Sources
+}
 
-	vert struct {
-		shader   *d3d11.VertexShader
-		uniforms *Buffer
-	}
-	frag struct {
-		shader   *d3d11.PixelShader
-		uniforms *Buffer
-	}
+type FragmentShader struct {
+	backend *Backend
+	shader  *d3d11.PixelShader
 }
 
 type Framebuffer struct {
@@ -84,10 +78,6 @@ type Buffer struct {
 	bind      uint32
 	buf       *d3d11.Buffer
 	immutable bool
-}
-
-type InputLayout struct {
-	layout *d3d11.InputLayout
 }
 
 func init() {
@@ -122,7 +112,6 @@ func newDirect3D11Device(api driver.Direct3D11) (driver.Device, error) {
 			MaxTextureSize: 2048, // 9.1 maximum
 			Features:       driver.FeatureSRGB,
 		},
-		blendStates: make(map[blendState]*d3d11.BlendState),
 	}
 	featLvl := dev.GetFeatureLevel()
 	if featLvl < d3d11.FEATURE_LEVEL_9_1 {
@@ -191,9 +180,6 @@ func (b *Backend) IsTimeContinuous() bool {
 }
 
 func (b *Backend) Release() {
-	for _, state := range b.blendStates {
-		d3d11.IUnknownRelease(unsafe.Pointer(state), state.Vtbl.Release)
-	}
 	d3d11.IUnknownRelease(unsafe.Pointer(b.ctx), b.ctx.Vtbl.Release)
 	*b = Backend{}
 }
@@ -288,7 +274,7 @@ func (b *Backend) NewFramebuffer(tex driver.Texture) (driver.Framebuffer, error)
 	return fbo, nil
 }
 
-func (b *Backend) NewInputLayout(vertexShader shader.Sources, layout []shader.InputDesc) (driver.InputLayout, error) {
+func (b *Backend) newInputLayout(vertexShader shader.Sources, layout []shader.InputDesc) (*d3d11.InputLayout, error) {
 	if len(vertexShader.Inputs) != len(layout) {
 		return nil, fmt.Errorf("NewInputLayout: got %d inputs, expected %d", len(layout), len(vertexShader.Inputs))
 	}
@@ -333,11 +319,7 @@ func (b *Backend) NewInputLayout(vertexShader shader.Sources, layout []shader.In
 			AlignedByteOffset: uint32(l.Offset),
 		}
 	}
-	l, err := b.dev.CreateInputLayout(descs, []byte(vertexShader.DXBC))
-	if err != nil {
-		return nil, err
-	}
-	return &InputLayout{layout: l}, nil
+	return b.dev.CreateInputLayout(descs, []byte(vertexShader.DXBC))
 }
 
 func (b *Backend) NewBuffer(typ driver.BufferBinding, size int) (driver.Buffer, error) {
@@ -385,19 +367,69 @@ func (b *Backend) NewComputeProgram(shader shader.Sources) (driver.Program, erro
 	panic("not implemented")
 }
 
-func (b *Backend) NewProgram(vertexShader, fragmentShader shader.Sources) (driver.Program, error) {
-	vs, err := b.dev.CreateVertexShader([]byte(vertexShader.DXBC))
+func (b *Backend) NewPipeline(desc driver.PipelineDesc) (driver.Pipeline, error) {
+	vsh := desc.VertexShader.(*VertexShader)
+	fsh := desc.FragmentShader.(*FragmentShader)
+	blend, err := b.newBlendState(desc.BlendDesc)
 	if err != nil {
 		return nil, err
 	}
-	ps, err := b.dev.CreatePixelShader([]byte(fragmentShader.DXBC))
+	var layout *d3d11.InputLayout
+	if l := desc.VertexLayout; l != nil {
+		var err error
+		layout, err = b.newInputLayout(vsh.src, l)
+		if err != nil {
+			d3d11.IUnknownRelease(unsafe.Pointer(blend), blend.Vtbl.AddRef)
+			return nil, err
+		}
+	}
+
+	// Retain shaders.
+	vshRef := vsh.shader
+	fshRef := fsh.shader
+	d3d11.IUnknownAddRef(unsafe.Pointer(vshRef), vshRef.Vtbl.AddRef)
+	d3d11.IUnknownAddRef(unsafe.Pointer(fshRef), fshRef.Vtbl.AddRef)
+
+	return &Pipeline{
+		vert:   vshRef,
+		frag:   fshRef,
+		layout: layout,
+		blend:  blend,
+	}, nil
+}
+
+func (b *Backend) newBlendState(desc driver.BlendDesc) (*d3d11.BlendState, error) {
+	var d3ddesc d3d11.BLEND_DESC
+	t0 := &d3ddesc.RenderTarget[0]
+	t0.RenderTargetWriteMask = d3d11.COLOR_WRITE_ENABLE_ALL
+	t0.BlendOp = d3d11.BLEND_OP_ADD
+	t0.BlendOpAlpha = d3d11.BLEND_OP_ADD
+	if desc.Enable {
+		t0.BlendEnable = 1
+	}
+	scol, salpha := toBlendFactor(desc.SrcFactor)
+	dcol, dalpha := toBlendFactor(desc.DstFactor)
+	t0.SrcBlend = scol
+	t0.SrcBlendAlpha = salpha
+	t0.DestBlend = dcol
+	t0.DestBlendAlpha = dalpha
+	return b.dev.CreateBlendState(&d3ddesc)
+}
+
+func (b *Backend) NewVertexShader(src shader.Sources) (driver.VertexShader, error) {
+	vs, err := b.dev.CreateVertexShader([]byte(src.DXBC))
 	if err != nil {
 		return nil, err
 	}
-	p := &Program{backend: b}
-	p.vert.shader = vs
-	p.frag.shader = ps
-	return p, nil
+	return &VertexShader{b, vs, src}, nil
+}
+
+func (b *Backend) NewFragmentShader(src shader.Sources) (driver.FragmentShader, error) {
+	fs, err := b.dev.CreatePixelShader([]byte(src.DXBC))
+	if err != nil {
+		return nil, err
+	}
+	return &FragmentShader{b, fs}, nil
 }
 
 func (b *Backend) Clear(colr, colg, colb, cola float32) {
@@ -428,15 +460,11 @@ func (b *Backend) DrawElements(mode driver.DrawMode, off, count int) {
 }
 
 func (b *Backend) prepareDraw(mode driver.DrawMode) {
-	if p := b.prog; p != nil {
-		b.ctx.VSSetShader(p.vert.shader)
-		b.ctx.PSSetShader(p.frag.shader)
-		if buf := p.vert.uniforms; buf != nil {
-			b.ctx.VSSetConstantBuffers(buf.buf)
-		}
-		if buf := p.frag.uniforms; buf != nil {
-			b.ctx.PSSetConstantBuffers(buf.buf)
-		}
+	if p := b.pipeline; p != nil {
+		b.ctx.VSSetShader(p.vert)
+		b.ctx.PSSetShader(p.frag)
+		b.ctx.IASetInputLayout(p.layout)
+		b.ctx.OMSetBlendState(p.blend, nil, 0xffffffff)
 	}
 	var topology uint32
 	switch mode {
@@ -448,40 +476,6 @@ func (b *Backend) prepareDraw(mode driver.DrawMode) {
 		panic("unsupported draw mode")
 	}
 	b.ctx.IASetPrimitiveTopology(topology)
-
-	blendState, ok := b.blendStates[b.blendState]
-	if !ok {
-		var desc d3d11.BLEND_DESC
-		t0 := &desc.RenderTarget[0]
-		t0.RenderTargetWriteMask = d3d11.COLOR_WRITE_ENABLE_ALL
-		t0.BlendOp = d3d11.BLEND_OP_ADD
-		t0.BlendOpAlpha = d3d11.BLEND_OP_ADD
-		if b.blendState.enable {
-			t0.BlendEnable = 1
-		}
-		scol, salpha := toBlendFactor(b.blendState.sfactor)
-		dcol, dalpha := toBlendFactor(b.blendState.dfactor)
-		t0.SrcBlend = scol
-		t0.SrcBlendAlpha = salpha
-		t0.DestBlend = dcol
-		t0.DestBlendAlpha = dalpha
-		var err error
-		blendState, err = b.dev.CreateBlendState(&desc)
-		if err != nil {
-			panic(err)
-		}
-		b.blendStates[b.blendState] = blendState
-	}
-	b.ctx.OMSetBlendState(blendState, nil, 0xffffffff)
-}
-
-func (b *Backend) SetBlend(enable bool) {
-	b.blendState.enable = enable
-}
-
-func (b *Backend) BlendFunc(sfactor, dfactor driver.BlendFactor) {
-	b.blendState.sfactor = sfactor
-	b.blendState.dfactor = dfactor
 }
 
 func (b *Backend) BindImageTexture(unit int, tex driver.Texture, access driver.AccessBits, f driver.TextureFormat) {
@@ -531,27 +525,46 @@ func (b *Backend) BindTexture(unit int, tex driver.Texture) {
 	b.ctx.PSSetShaderResources(uint32(unit), t.resView)
 }
 
+func (b *Backend) BindPipeline(pipe driver.Pipeline) {
+	b.pipeline = pipe.(*Pipeline)
+}
+
 func (b *Backend) BindProgram(prog driver.Program) {
-	b.prog = prog.(*Program)
-}
-
-func (p *Program) Release() {
-	d3d11.IUnknownRelease(unsafe.Pointer(p.vert.shader), p.vert.shader.Vtbl.Release)
-	d3d11.IUnknownRelease(unsafe.Pointer(p.frag.shader), p.frag.shader.Vtbl.Release)
-	p.vert.shader = nil
-	p.frag.shader = nil
-}
-
-func (p *Program) SetStorageBuffer(binding int, buffer driver.Buffer) {
 	panic("not implemented")
 }
 
-func (p *Program) SetVertexUniforms(buf driver.Buffer) {
-	p.vert.uniforms = buf.(*Buffer)
+func (s *VertexShader) Release() {
+	d3d11.IUnknownRelease(unsafe.Pointer(s.shader), s.shader.Vtbl.Release)
+	*s = VertexShader{}
 }
 
-func (p *Program) SetFragmentUniforms(buf driver.Buffer) {
-	p.frag.uniforms = buf.(*Buffer)
+func (s *FragmentShader) Release() {
+	d3d11.IUnknownRelease(unsafe.Pointer(s.shader), s.shader.Vtbl.Release)
+	*s = FragmentShader{}
+}
+
+func (p *Pipeline) Release() {
+	d3d11.IUnknownRelease(unsafe.Pointer(p.vert), p.vert.Vtbl.Release)
+	d3d11.IUnknownRelease(unsafe.Pointer(p.frag), p.frag.Vtbl.Release)
+	d3d11.IUnknownRelease(unsafe.Pointer(p.blend), p.blend.Vtbl.Release)
+	if l := p.layout; l != nil {
+		d3d11.IUnknownRelease(unsafe.Pointer(l), l.Vtbl.Release)
+	}
+	*p = Pipeline{}
+}
+
+func (b *Backend) BindStorageBuffer(binding int, buffer driver.Buffer) {
+	panic("not implemented")
+}
+
+func (b *Backend) BindVertexUniforms(buffer driver.Buffer) {
+	buf := buffer.(*Buffer)
+	b.ctx.VSSetConstantBuffers(buf.buf)
+}
+
+func (b *Backend) BindFragmentUniforms(buffer driver.Buffer) {
+	buf := buffer.(*Buffer)
+	b.ctx.PSSetConstantBuffers(buf.buf)
 }
 
 func (b *Backend) BindVertexBuffer(buf driver.Buffer, stride, offset int) {
@@ -649,15 +662,6 @@ func (f *Framebuffer) Release() {
 }
 
 func (f *Framebuffer) ImplementsRenderTarget() {}
-
-func (b *Backend) BindInputLayout(layout driver.InputLayout) {
-	b.ctx.IASetInputLayout(layout.(*InputLayout).layout)
-}
-
-func (l *InputLayout) Release() {
-	d3d11.IUnknownRelease(unsafe.Pointer(l.layout), l.layout.Vtbl.Release)
-	l.layout = nil
-}
 
 func convBufferBinding(typ driver.BufferBinding) uint32 {
 	var bindings uint32

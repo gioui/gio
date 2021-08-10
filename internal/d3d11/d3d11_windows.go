@@ -1449,6 +1449,16 @@ func IUnknownQueryInterface(obj unsafe.Pointer, queryInterfaceMethod uintptr, gu
 	return ref, nil
 }
 
+func IUnknownAddRef(obj unsafe.Pointer, addRefMethod uintptr) {
+	syscall.Syscall(
+		addRefMethod,
+		1,
+		uintptr(obj),
+		0,
+		0,
+	)
+}
+
 func IUnknownRelease(obj unsafe.Pointer, releaseMethod uintptr) {
 	syscall.Syscall(
 		releaseMethod,

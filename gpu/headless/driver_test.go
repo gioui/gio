@@ -38,12 +38,22 @@ func TestSimpleShader(t *testing.T) {
 	b := newDriver(t)
 	sz := image.Point{X: 800, Y: 600}
 	fbo := setupFBO(t, b, sz)
-	p, err := b.NewProgram(gio.Shader_simple_vert, gio.Shader_simple_frag)
+	vsh, fsh, err := newShaders(b, gio.Shader_simple_vert, gio.Shader_simple_frag)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer vsh.Release()
+	defer fsh.Release()
+	p, err := b.NewPipeline(driver.PipelineDesc{
+		VertexShader:   vsh,
+		FragmentShader: fsh,
+		PixelFormat:    driver.TextureFormatSRGBA,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer p.Release()
-	b.BindProgram(p)
+	b.BindPipeline(p)
 	b.DrawArrays(driver.DrawModeTriangles, 0, 3)
 	img := screenshot(t, b, fbo, sz)
 	if got := img.RGBAAt(0, 0); got != clearColExpect {
@@ -61,12 +71,30 @@ func TestInputShader(t *testing.T) {
 	b := newDriver(t)
 	sz := image.Point{X: 800, Y: 600}
 	fbo := setupFBO(t, b, sz)
-	p, err := b.NewProgram(gio.Shader_input_vert, gio.Shader_simple_frag)
+	vsh, fsh, err := newShaders(b, gio.Shader_input_vert, gio.Shader_simple_frag)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer p.Release()
-	b.BindProgram(p)
+	defer vsh.Release()
+	defer fsh.Release()
+	layout := []shader.InputDesc{
+		{
+			Type:   shader.DataTypeFloat,
+			Size:   4,
+			Offset: 0,
+		},
+	}
+	pipe, err := b.NewPipeline(driver.PipelineDesc{
+		VertexShader:   vsh,
+		FragmentShader: fsh,
+		VertexLayout:   layout,
+		PixelFormat:    driver.TextureFormatSRGBA,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pipe.Release()
+	b.BindPipeline(pipe)
 	buf, err := b.NewImmutableBuffer(driver.BufferBindingVertices,
 		byteslice.Slice([]float32{
 			0, .5, .5, 1,
@@ -79,18 +107,6 @@ func TestInputShader(t *testing.T) {
 	}
 	defer buf.Release()
 	b.BindVertexBuffer(buf, 4*4, 0)
-	layout, err := b.NewInputLayout(gio.Shader_input_vert, []shader.InputDesc{
-		{
-			Type:   shader.DataTypeFloat,
-			Size:   4,
-			Offset: 0,
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer layout.Release()
-	b.BindInputLayout(layout)
 	b.DrawArrays(driver.DrawModeTriangles, 0, 3)
 	img := screenshot(t, b, fbo, sz)
 	if got := img.RGBAAt(0, 0); got != clearColExpect {
@@ -101,6 +117,18 @@ func TestInputShader(t *testing.T) {
 	if got, exp := img.RGBAAt(cx, cy), shaderCol.SRGB(); got != f32color.NRGBAToRGBA(exp) {
 		t.Errorf("got color %v, expected %v", got, f32color.NRGBAToRGBA(exp))
 	}
+}
+
+func newShaders(ctx driver.Device, vsrc, fsrc shader.Sources) (vert driver.VertexShader, frag driver.FragmentShader, err error) {
+	vert, err = ctx.NewVertexShader(vsrc)
+	if err != nil {
+		return
+	}
+	frag, err = ctx.NewFragmentShader(fsrc)
+	if err != nil {
+		vert.Release()
+	}
+	return
 }
 
 func TestFramebuffers(t *testing.T) {

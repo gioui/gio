@@ -61,8 +61,7 @@ type compute struct {
 		memory sizedBuffer
 	}
 	output struct {
-		blitProg driver.Program
-		layout   driver.InputLayout
+		blitPipeline driver.Pipeline
 
 		buffer sizedBuffer
 
@@ -89,8 +88,7 @@ type compute struct {
 		// offsets maps texture ops to the offsets to put in their FillImage commands.
 		offsets map[textureKey]image.Point
 
-		prog   driver.Program
-		layout driver.InputLayout
+		pipeline driver.Pipeline
 
 		packer packer
 
@@ -414,21 +412,32 @@ func newCompute(ctx driver.Device) (*compute, error) {
 
 	// Large enough for reasonable fill sizes, yet still spannable by the compute programs.
 	g.output.packer.maxDim = 4096
-	blitProg, err := ctx.NewProgram(gio.Shader_copy_vert, gio.Shader_copy_frag)
+	copyVert, copyFrag, err := newShaders(ctx, gio.Shader_copy_vert, gio.Shader_copy_frag)
 	if err != nil {
 		g.Release()
 		return nil, err
 	}
-	g.output.blitProg = blitProg
-	progLayout, err := ctx.NewInputLayout(gio.Shader_copy_vert, []shader.InputDesc{
-		{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
-		{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
+	defer copyVert.Release()
+	defer copyFrag.Release()
+	pipe, err := ctx.NewPipeline(driver.PipelineDesc{
+		VertexShader:   copyVert,
+		FragmentShader: copyFrag,
+		VertexLayout: []shader.InputDesc{
+			{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
+			{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
+		},
+		PixelFormat: driver.TextureFormatOutput,
+		BlendDesc: driver.BlendDesc{
+			Enable:    true,
+			SrcFactor: driver.BlendFactorOne,
+			DstFactor: driver.BlendFactorOneMinusSrcAlpha,
+		},
 	})
 	if err != nil {
 		g.Release()
 		return nil, err
 	}
-	g.output.layout = progLayout
+	g.output.blitPipeline = pipe
 	g.output.uniforms = new(copyUniforms)
 
 	buf, err := ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(*g.output.uniforms)))
@@ -437,23 +446,28 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		return nil, err
 	}
 	g.output.uniBuf = buf
-	g.output.blitProg.SetVertexUniforms(buf)
 
-	materialProg, err := ctx.NewProgram(gio.Shader_material_vert, gio.Shader_material_frag)
+	materialVert, materialFrag, err := newShaders(ctx, gio.Shader_material_vert, gio.Shader_material_frag)
 	if err != nil {
 		g.Release()
 		return nil, err
 	}
-	g.materials.prog = materialProg
-	progLayout, err = ctx.NewInputLayout(gio.Shader_material_vert, []shader.InputDesc{
-		{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
-		{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
+	defer materialVert.Release()
+	defer materialFrag.Release()
+	pipe, err = ctx.NewPipeline(driver.PipelineDesc{
+		VertexShader:   materialVert,
+		FragmentShader: materialFrag,
+		VertexLayout: []shader.InputDesc{
+			{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
+			{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
+		},
+		PixelFormat: driver.TextureFormatRGBA8,
 	})
 	if err != nil {
 		g.Release()
 		return nil, err
 	}
-	g.materials.layout = progLayout
+	g.materials.pipeline = pipe
 	g.materials.vert.uniforms = new(materialVertUniforms)
 
 	buf, err = ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(*g.materials.vert.uniforms)))
@@ -462,7 +476,6 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		return nil, err
 	}
 	g.materials.vert.buf = buf
-	g.materials.prog.SetVertexUniforms(buf)
 	var emulateSRGB materialFragUniforms
 	if !g.srgb {
 		emulateSRGB.emulateSRGB = 1.0
@@ -474,7 +487,6 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	}
 	buf.Upload(byteslice.Struct(&emulateSRGB))
 	g.materials.frag.buf = buf
-	g.materials.prog.SetFragmentUniforms(buf)
 
 	for _, shader := range shaders {
 		if !g.useCPU {
@@ -527,6 +539,18 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		}
 	}
 	return g, nil
+}
+
+func newShaders(ctx driver.Device, vsrc, fsrc shader.Sources) (vert driver.VertexShader, frag driver.FragmentShader, err error) {
+	vert, err = ctx.NewVertexShader(vsrc)
+	if err != nil {
+		return
+	}
+	frag, err = ctx.NewFragmentShader(fsrc)
+	if err != nil {
+		vert.Release()
+	}
+	return
 }
 
 func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
@@ -758,12 +782,9 @@ func (g *compute) blitLayers(viewport image.Point) {
 		return
 	}
 	layers := g.collector.frame.layers
-	g.ctx.BlendFunc(driver.BlendFactorOne, driver.BlendFactorOneMinusSrcAlpha)
-	g.ctx.SetBlend(true)
-	defer g.ctx.SetBlend(false)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
-	g.ctx.BindProgram(g.output.blitProg)
-	g.ctx.BindInputLayout(g.output.layout)
+	g.ctx.BindPipeline(g.output.blitPipeline)
+	g.ctx.BindVertexUniforms(g.output.uniBuf)
 	for len(layers) > 0 {
 		g.output.layerVertices = g.output.layerVertices[:0]
 		atlas := layers[0].place.atlas
@@ -898,6 +919,8 @@ restart:
 	g.materials.vert.uniforms.scale = [2]float32{2 / float32(texSize), -2 / float32(texSize)}
 	g.materials.vert.uniforms.pos = [2]float32{-1, +1}
 	g.materials.vert.buf.Upload(byteslice.Struct(g.materials.vert.uniforms))
+	g.ctx.BindVertexUniforms(g.materials.vert.buf)
+	g.ctx.BindFragmentUniforms(g.materials.frag.buf)
 	vertexData := byteslice.Slice(m.quads)
 	n := pow2Ceil(len(vertexData))
 	m.buffer.ensureCapacity(false, g.ctx, driver.BufferBindingVertices, n)
@@ -908,9 +931,8 @@ restart:
 	if reclaimed {
 		g.ctx.Clear(0, 0, 0, 0)
 	}
-	g.ctx.BindProgram(m.prog)
+	g.ctx.BindPipeline(m.pipeline)
 	g.ctx.BindVertexBuffer(m.buffer.buffer, int(unsafe.Sizeof(m.quads[0])), 0)
-	g.ctx.BindInputLayout(m.layout)
 	g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(m.quads))
 	return nil
 }
@@ -1096,10 +1118,8 @@ func (g *compute) render(dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDim
 	scenePadding := partitionSize - len(enc.scene)%partitionSize
 	enc.scene = append(enc.scene, make([]scene.Command, scenePadding)...)
 
-	realloced := false
 	scene := byteslice.Slice(enc.scene)
 	if s := len(scene); s > g.buffers.scene.size {
-		realloced = true
 		paddedCap := s * 11 / 10
 		if err := g.buffers.scene.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorage, paddedCap); err != nil {
 			return err
@@ -1136,7 +1156,6 @@ func (g *compute) render(dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDim
 	// clearSize is the atomic partition counter plus flag and 2 states per partition.
 	clearSize := 4 + numPartitions*stateStride
 	if clearSize > g.buffers.state.size {
-		realloced = true
 		paddedCap := clearSize * 11 / 10
 		if err := g.buffers.state.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorage, paddedCap); err != nil {
 			return err
@@ -1149,7 +1168,6 @@ func (g *compute) render(dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDim
 
 	minSize := int(unsafe.Sizeof(memoryHeader{})) + int(alloc)
 	if minSize > g.buffers.memory.size {
-		realloced = true
 		// Add space for dynamic GPU allocations.
 		const sizeBump = 4 * 1024 * 1024
 		minSize += sizeBump
@@ -1175,10 +1193,7 @@ func (g *compute) render(dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDim
 		g.buffers.memory.upload(byteslice.Struct(g.memHeader))
 		g.buffers.state.upload(g.zeros(clearSize))
 
-		if realloced {
-			realloced = false
-			g.bindBuffers()
-		}
+		g.bindBuffers()
 		g.memoryBarrier()
 		g.dispatch(g.programs.elements, numPartitions, 1, 1)
 		g.memoryBarrier()
@@ -1214,7 +1229,6 @@ func (g *compute) render(dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDim
 			return nil
 		case memMallocFailed:
 			// Resize memory and try again.
-			realloced = true
 			sz := g.buffers.memory.size * 15 / 10
 			if err := g.buffers.memory.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorage, sz); err != nil {
 				return err
@@ -1327,7 +1341,7 @@ func (g *compute) Release() {
 		&g.programs.binning,
 		&g.programs.coarse,
 		&g.programs.kernel4,
-		g.output.blitProg,
+		g.output.blitPipeline,
 		&g.output.buffer,
 		g.output.uniBuf,
 		&g.buffers.scene,
@@ -1335,8 +1349,7 @@ func (g *compute) Release() {
 		&g.buffers.memory,
 		&g.buffers.config,
 		g.images.tex,
-		g.materials.layout,
-		g.materials.prog,
+		g.materials.pipeline,
 		g.materials.fbo,
 		g.materials.tex,
 		&g.materials.buffer,
@@ -1429,7 +1442,7 @@ func (b *sizedBuffer) upload(data []byte) {
 func (g *compute) bindStorageBuffers(prog computeProgram, buffers ...sizedBuffer) {
 	for i, buf := range buffers {
 		if !g.useCPU {
-			prog.prog.SetStorageBuffer(i, buf.buffer)
+			g.ctx.BindStorageBuffer(i, buf.buffer)
 		} else {
 			*prog.buffers[i] = buf.cpuBuf
 		}
