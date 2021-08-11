@@ -153,7 +153,7 @@ func (w *Window) validateAndProcess(driver wm.Driver, frameStart time.Time, size
 			}
 			w.loop, err = newLoop(w.ctx)
 			if err != nil {
-				w.ctx.Release()
+				w.destroyGPU()
 				return err
 			}
 		}
