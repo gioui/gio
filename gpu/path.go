@@ -187,14 +187,14 @@ func newStenciler(ctx driver.Device) *stenciler {
 	if err != nil {
 		panic(err)
 	}
-	progLayout := []shader.InputDesc{
+	progLayout := []driver.InputDesc{
 		{Type: shader.DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).Corner))},
 		{Type: shader.DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).MaxY))},
 		{Type: shader.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).FromX))},
 		{Type: shader.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).CtrlX))},
 		{Type: shader.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).ToX))},
 	}
-	iprogLayout := []shader.InputDesc{
+	iprogLayout := []driver.InputDesc{
 		{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
 		{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
 	}

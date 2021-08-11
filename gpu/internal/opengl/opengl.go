@@ -115,7 +115,7 @@ type framebuffer struct {
 type pipeline struct {
 	prog   *program
 	inputs []shader.InputLocation
-	layout []shader.InputDesc
+	layout []driver.InputDesc
 	blend  driver.BlendDesc
 }
 
@@ -157,7 +157,7 @@ type uniformLocation struct {
 
 type inputLayout struct {
 	inputs []shader.InputLocation
-	layout []shader.InputDesc
+	layout []driver.InputDesc
 }
 
 // textureTriple holds the type settings for

@@ -274,7 +274,7 @@ func (b *Backend) NewFramebuffer(tex driver.Texture) (driver.Framebuffer, error)
 	return fbo, nil
 }
 
-func (b *Backend) newInputLayout(vertexShader shader.Sources, layout []shader.InputDesc) (*d3d11.InputLayout, error) {
+func (b *Backend) newInputLayout(vertexShader shader.Sources, layout []driver.InputDesc) (*d3d11.InputLayout, error) {
 	if len(vertexShader.Inputs) != len(layout) {
 		return nil, fmt.Errorf("NewInputLayout: got %d inputs, expected %d", len(layout), len(vertexShader.Inputs))
 	}

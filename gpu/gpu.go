@@ -580,7 +580,7 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 		SrcFactor: driver.BlendFactorOne,
 		DstFactor: driver.BlendFactorOneMinusSrcAlpha,
 	}
-	layout := []shader.InputDesc{
+	layout := []driver.InputDesc{
 		{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
 		{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
 	}

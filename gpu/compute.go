@@ -422,7 +422,7 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	pipe, err := ctx.NewPipeline(driver.PipelineDesc{
 		VertexShader:   copyVert,
 		FragmentShader: copyFrag,
-		VertexLayout: []shader.InputDesc{
+		VertexLayout: []driver.InputDesc{
 			{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
 			{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
 		},
@@ -457,7 +457,7 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	pipe, err = ctx.NewPipeline(driver.PipelineDesc{
 		VertexShader:   materialVert,
 		FragmentShader: materialFrag,
-		VertexLayout: []shader.InputDesc{
+		VertexLayout: []driver.InputDesc{
 			{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
 			{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
 		},

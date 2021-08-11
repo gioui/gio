@@ -77,7 +77,7 @@ func TestInputShader(t *testing.T) {
 	}
 	defer vsh.Release()
 	defer fsh.Release()
-	layout := []shader.InputDesc{
+	layout := []driver.InputDesc{
 		{
 			Type:   shader.DataTypeFloat,
 			Size:   4,

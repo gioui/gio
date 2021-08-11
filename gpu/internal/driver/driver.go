@@ -60,9 +60,17 @@ type Pipeline interface {
 type PipelineDesc struct {
 	VertexShader   VertexShader
 	FragmentShader FragmentShader
-	VertexLayout   []shader.InputDesc
+	VertexLayout   []InputDesc
 	BlendDesc      BlendDesc
 	PixelFormat    TextureFormat
+}
+
+// InputDesc describes a vertex attribute as laid out in a Buffer.
+type InputDesc struct {
+	Type shader.DataType
+	Size int
+
+	Offset int
 }
 
 type BlendDesc struct {
