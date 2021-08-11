@@ -422,9 +422,12 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	pipe, err := ctx.NewPipeline(driver.PipelineDesc{
 		VertexShader:   copyVert,
 		FragmentShader: copyFrag,
-		VertexLayout: []driver.InputDesc{
-			{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
-			{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
+		VertexLayout: driver.VertexLayout{
+			Inputs: []driver.InputDesc{
+				{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
+				{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
+			},
+			Stride: int(unsafe.Sizeof(g.output.layerVertices[0])),
 		},
 		PixelFormat: driver.TextureFormatOutput,
 		BlendDesc: driver.BlendDesc{
@@ -457,9 +460,12 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	pipe, err = ctx.NewPipeline(driver.PipelineDesc{
 		VertexShader:   materialVert,
 		FragmentShader: materialFrag,
-		VertexLayout: []driver.InputDesc{
-			{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
-			{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
+		VertexLayout: driver.VertexLayout{
+			Inputs: []driver.InputDesc{
+				{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
+				{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
+			},
+			Stride: int(unsafe.Sizeof(g.materials.quads[0])),
 		},
 		PixelFormat: driver.TextureFormatRGBA8,
 	})
@@ -817,7 +823,7 @@ func (g *compute) blitLayers(viewport image.Point) {
 		vertexData := byteslice.Slice(g.output.layerVertices)
 		g.output.buffer.ensureCapacity(false, g.ctx, driver.BufferBindingVertices, len(vertexData))
 		g.output.buffer.buffer.Upload(vertexData)
-		g.ctx.BindVertexBuffer(g.output.buffer.buffer, int(unsafe.Sizeof(g.output.layerVertices[0])), 0)
+		g.ctx.BindVertexBuffer(g.output.buffer.buffer, 0)
 		g.ctx.BindTexture(0, atlas.image)
 		g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(g.output.layerVertices))
 	}
@@ -931,7 +937,7 @@ restart:
 	g.ctx.BindFramebuffer(m.fbo, d)
 	g.ctx.Viewport(0, 0, texSize, texSize)
 	g.ctx.BindPipeline(m.pipeline)
-	g.ctx.BindVertexBuffer(m.buffer.buffer, int(unsafe.Sizeof(m.quads[0])), 0)
+	g.ctx.BindVertexBuffer(m.buffer.buffer, 0)
 	g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(m.quads))
 	return nil
 }

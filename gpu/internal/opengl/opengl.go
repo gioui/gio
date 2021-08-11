@@ -90,7 +90,6 @@ type state struct {
 type bufferBinding struct {
 	obj    gl.Buffer
 	offset int
-	stride int
 }
 
 type timer struct {
@@ -115,7 +114,7 @@ type framebuffer struct {
 type pipeline struct {
 	prog   *program
 	inputs []shader.InputLocation
-	layout []driver.InputDesc
+	layout driver.VertexLayout
 	blend  driver.BlendDesc
 }
 
@@ -900,11 +899,11 @@ func (b *Backend) NewPipeline(desc driver.PipelineDesc) (driver.Pipeline, error)
 	}
 	layout := desc.VertexLayout
 	vsrc := desc.VertexShader.(*glshader).src
-	if len(vsrc.Inputs) != len(layout) {
-		return nil, fmt.Errorf("opengl: got %d inputs, expected %d", len(layout), len(vsrc.Inputs))
+	if len(vsrc.Inputs) != len(layout.Inputs) {
+		return nil, fmt.Errorf("opengl: got %d inputs, expected %d", len(layout.Inputs), len(vsrc.Inputs))
 	}
 	for i, inp := range vsrc.Inputs {
-		if exp, got := inp.Size, layout[i].Size; exp != got {
+		if exp, got := inp.Size, layout.Inputs[i].Size; exp != got {
 			return nil, fmt.Errorf("opengl: data size mismatch for %q: got %d expected %d", inp.Name, got, exp)
 		}
 	}
@@ -1122,12 +1121,12 @@ func (b *buffer) Release() {
 	}
 }
 
-func (b *Backend) BindVertexBuffer(buf driver.Buffer, stride, offset int) {
+func (b *Backend) BindVertexBuffer(buf driver.Buffer, offset int) {
 	gbuf := buf.(*buffer)
 	if gbuf.typ&driver.BufferBindingVertices == 0 {
 		panic("not a vertex buffer")
 	}
-	b.state.buffer = bufferBinding{obj: gbuf.obj, stride: stride, offset: offset}
+	b.state.buffer = bufferBinding{obj: gbuf.obj, offset: offset}
 }
 
 func (b *Backend) setupVertexArrays() {
@@ -1141,7 +1140,7 @@ func (b *Backend) setupVertexArrays() {
 	var enabled [max]bool
 	buf := b.state.buffer
 	for i, inp := range inputs {
-		l := layout[i]
+		l := layout.Inputs[i]
 		var gltyp gl.Enum
 		switch l.Type {
 		case shader.DataTypeFloat:
@@ -1152,7 +1151,7 @@ func (b *Backend) setupVertexArrays() {
 			panic("unsupported data type")
 		}
 		enabled[inp.Location] = true
-		b.glstate.vertexAttribPointer(b.funcs, buf.obj, inp.Location, l.Size, gltyp, false, buf.stride, buf.offset+l.Offset)
+		b.glstate.vertexAttribPointer(b.funcs, buf.obj, inp.Location, l.Size, gltyp, false, p.layout.Stride, buf.offset+l.Offset)
 	}
 	for i := 0; i < max; i++ {
 		b.glstate.setVertexAttribArray(b.funcs, i, enabled[i])

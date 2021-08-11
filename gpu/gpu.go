@@ -580,9 +580,12 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 		SrcFactor: driver.BlendFactorOne,
 		DstFactor: driver.BlendFactorOneMinusSrcAlpha,
 	}
-	layout := []driver.InputDesc{
-		{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
-		{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
+	layout := driver.VertexLayout{
+		Inputs: []driver.InputDesc{
+			{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
+			{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
+		},
+		Stride: 4 * 4,
 	}
 	vsh, err := b.NewVertexShader(vsSrc)
 	if err != nil {
@@ -702,7 +705,7 @@ func (r *renderer) intersect(ops []imageOp) {
 	}
 	fbo := -1
 	r.pather.stenciler.beginIntersect(r.intersections.sizes)
-	r.ctx.BindVertexBuffer(r.blitter.quadVerts, 4*4, 0)
+	r.ctx.BindVertexBuffer(r.blitter.quadVerts, 0)
 	for _, img := range ops {
 		if img.clipType != clipTypeIntersection {
 			continue
@@ -1093,7 +1096,7 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 }
 
 func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
-	r.ctx.BindVertexBuffer(r.blitter.quadVerts, 4*4, 0)
+	r.ctx.BindVertexBuffer(r.blitter.quadVerts, 0)
 	var coverTex driver.Texture
 	for _, img := range ops {
 		m := img.material

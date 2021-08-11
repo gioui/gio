@@ -77,12 +77,15 @@ func TestInputShader(t *testing.T) {
 	}
 	defer vsh.Release()
 	defer fsh.Release()
-	layout := []driver.InputDesc{
-		{
-			Type:   shader.DataTypeFloat,
-			Size:   4,
-			Offset: 0,
+	layout := driver.VertexLayout{
+		Inputs: []driver.InputDesc{
+			{
+				Type:   shader.DataTypeFloat,
+				Size:   4,
+				Offset: 0,
+			},
 		},
+		Stride: 4 * 4,
 	}
 	pipe, err := b.NewPipeline(driver.PipelineDesc{
 		VertexShader:   vsh,
@@ -106,7 +109,7 @@ func TestInputShader(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer buf.Release()
-	b.BindVertexBuffer(buf, 4*4, 0)
+	b.BindVertexBuffer(buf, 0)
 	b.DrawArrays(driver.DrawModeTriangles, 0, 3)
 	img := screenshot(t, b, fbo, sz)
 	if got := img.RGBAAt(0, 0); got != clearColExpect {

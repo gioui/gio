@@ -38,7 +38,7 @@ type Device interface {
 	BindPipeline(p Pipeline)
 	BindFramebuffer(f Framebuffer, a LoadDesc)
 	BindTexture(unit int, t Texture)
-	BindVertexBuffer(b Buffer, stride, offset int)
+	BindVertexBuffer(b Buffer, offset int)
 	BindIndexBuffer(b Buffer)
 	BindImageTexture(unit int, texture Texture, access AccessBits, format TextureFormat)
 	BindVertexUniforms(buf Buffer)
@@ -69,9 +69,14 @@ type Pipeline interface {
 type PipelineDesc struct {
 	VertexShader   VertexShader
 	FragmentShader FragmentShader
-	VertexLayout   []InputDesc
+	VertexLayout   VertexLayout
 	BlendDesc      BlendDesc
 	PixelFormat    TextureFormat
+}
+
+type VertexLayout struct {
+	Inputs []InputDesc
+	Stride int
 }
 
 // InputDesc describes a vertex attribute as laid out in a Buffer.

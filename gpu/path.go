@@ -187,16 +187,22 @@ func newStenciler(ctx driver.Device) *stenciler {
 	if err != nil {
 		panic(err)
 	}
-	progLayout := []driver.InputDesc{
-		{Type: shader.DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).Corner))},
-		{Type: shader.DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).MaxY))},
-		{Type: shader.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).FromX))},
-		{Type: shader.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).CtrlX))},
-		{Type: shader.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).ToX))},
+	progLayout := driver.VertexLayout{
+		Inputs: []driver.InputDesc{
+			{Type: shader.DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).Corner))},
+			{Type: shader.DataTypeFloat, Size: 1, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).MaxY))},
+			{Type: shader.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).FromX))},
+			{Type: shader.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).CtrlX))},
+			{Type: shader.DataTypeFloat, Size: 2, Offset: int(unsafe.Offsetof((*(*vertex)(nil)).ToX))},
+		},
+		Stride: vertStride,
 	}
-	iprogLayout := []driver.InputDesc{
-		{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
-		{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
+	iprogLayout := driver.VertexLayout{
+		Inputs: []driver.InputDesc{
+			{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
+			{Type: shader.DataTypeFloat, Size: 2, Offset: 4 * 2},
+		},
+		Stride: 4 * 4,
 	}
 	st := &stenciler{
 		ctx:      ctx,
@@ -370,7 +376,7 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 			batch = max
 		}
 		off := vertStride * start * 4
-		s.ctx.BindVertexBuffer(data.data, vertStride, off)
+		s.ctx.BindVertexBuffer(data.data, off)
 		s.ctx.DrawElements(driver.DrawModeTriangles, 0, batch*6)
 		start += batch
 	}

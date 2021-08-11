@@ -26,6 +26,10 @@ type Backend struct {
 	viewport   d3d11.VIEWPORT
 
 	pipeline *Pipeline
+	vert     struct {
+		buffer *Buffer
+		offset int
+	}
 
 	caps driver.Caps
 
@@ -40,6 +44,7 @@ type Pipeline struct {
 	frag   *d3d11.PixelShader
 	layout *d3d11.InputLayout
 	blend  *d3d11.BlendState
+	stride int
 }
 
 type Texture struct {
@@ -375,9 +380,9 @@ func (b *Backend) NewPipeline(desc driver.PipelineDesc) (driver.Pipeline, error)
 		return nil, err
 	}
 	var layout *d3d11.InputLayout
-	if l := desc.VertexLayout; l != nil {
+	if l := desc.VertexLayout; l.Stride > 0 {
 		var err error
-		layout, err = b.newInputLayout(vsh.src, l)
+		layout, err = b.newInputLayout(vsh.src, l.Inputs)
 		if err != nil {
 			d3d11.IUnknownRelease(unsafe.Pointer(blend), blend.Vtbl.AddRef)
 			return nil, err
@@ -394,6 +399,7 @@ func (b *Backend) NewPipeline(desc driver.PipelineDesc) (driver.Pipeline, error)
 		vert:   vshRef,
 		frag:   fshRef,
 		layout: layout,
+		stride: desc.VertexLayout.Stride,
 		blend:  blend,
 	}, nil
 }
@@ -460,6 +466,9 @@ func (b *Backend) prepareDraw(mode driver.DrawMode) {
 		b.ctx.PSSetShader(p.frag)
 		b.ctx.IASetInputLayout(p.layout)
 		b.ctx.OMSetBlendState(p.blend, nil, 0xffffffff)
+		if b.vert.buffer != nil {
+			b.ctx.IASetVertexBuffers(b.vert.buffer.buf, uint32(p.stride), uint32(b.vert.offset))
+		}
 	}
 	var topology uint32
 	switch mode {
@@ -562,8 +571,9 @@ func (b *Backend) BindFragmentUniforms(buffer driver.Buffer) {
 	b.ctx.PSSetConstantBuffers(buf.buf)
 }
 
-func (b *Backend) BindVertexBuffer(buf driver.Buffer, stride, offset int) {
-	b.ctx.IASetVertexBuffers(buf.(*Buffer).buf, uint32(stride), uint32(offset))
+func (b *Backend) BindVertexBuffer(buf driver.Buffer, offset int) {
+	b.vert.buffer = buf.(*Buffer)
+	b.vert.offset = offset
 }
 
 func (b *Backend) BindIndexBuffer(buf driver.Buffer) {
