@@ -445,11 +445,6 @@ func (g *gpu) Frame(target RenderTarget) error {
 	for _, img := range g.drawOps.imageOps {
 		expandPathOp(img.path, img.clip)
 	}
-	g.ctx.BindFramebuffer(defFBO)
-	if g.drawOps.clear {
-		g.drawOps.clear = false
-		g.ctx.Clear(g.drawOps.clearColor.Float32())
-	}
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.stencilTimer.begin()
 	g.renderer.packStencils(&g.drawOps.pathOps)
@@ -458,12 +453,17 @@ func (g *gpu) Frame(target RenderTarget) error {
 	g.renderer.intersect(g.drawOps.imageOps)
 	g.stencilTimer.end()
 	g.coverTimer.begin()
-	g.ctx.BindFramebuffer(defFBO)
+	var d driver.LoadDesc
+	if g.drawOps.clear {
+		g.drawOps.clear = false
+		d.Action = driver.LoadActionClear
+		c := &d.ClearColor
+		c.R, c.G, c.B, c.A = g.drawOps.clearColor.Float32()
+	}
+	g.ctx.BindFramebuffer(defFBO, d)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.renderer.drawOps(g.cache, g.drawOps.imageOps)
-	g.renderer.pather.stenciler.invalidateFBO()
 	g.coverTimer.end()
-	g.ctx.BindFramebuffer(defFBO)
 	g.cleanupTimer.begin()
 	g.cache.frame()
 	g.drawOps.pathCache.frame()
@@ -689,8 +689,7 @@ func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
 		if fbo != p.place.Idx {
 			fbo = p.place.Idx
 			f := r.pather.stenciler.cover(fbo)
-			r.ctx.BindFramebuffer(f.fbo)
-			r.ctx.Clear(0.0, 0.0, 0.0, 0.0)
+			r.ctx.BindFramebuffer(f.fbo, driver.LoadDesc{Action: driver.LoadActionClear})
 		}
 		v, _ := pathCache.get(p.pathKey)
 		r.pather.stencilPath(p.clip, p.off, p.place.Pos, v.data)
@@ -711,8 +710,9 @@ func (r *renderer) intersect(ops []imageOp) {
 		if fbo != img.place.Idx {
 			fbo = img.place.Idx
 			f := r.pather.stenciler.intersections.fbos[fbo]
-			r.ctx.BindFramebuffer(f.fbo)
-			r.ctx.Clear(1.0, 0.0, 0.0, 0.0)
+			d := driver.LoadDesc{Action: driver.LoadActionClear}
+			d.ClearColor.R = 1.0
+			r.ctx.BindFramebuffer(f.fbo, d)
 		}
 		r.ctx.Viewport(img.place.Pos.X, img.place.Pos.Y, img.clip.Dx(), img.clip.Dy())
 		r.intersectPath(img.path, img.clip)

@@ -268,7 +268,7 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 	}
 	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, renderFBO)
 	if b.sRGBFBO != nil && !clear {
-		b.Clear(0, 0, 0, 0)
+		b.clearOutput(0, 0, 0, 0)
 	}
 	return &framebuffer{backend: b, obj: renderFBO, foreign: true}
 }
@@ -652,7 +652,7 @@ func (b *Backend) NewFramebuffer(tex driver.Texture) (driver.Framebuffer, error)
 	gltex := tex.(*texture)
 	fb := b.funcs.CreateFramebuffer()
 	fbo := &framebuffer{backend: b, obj: fb}
-	b.BindFramebuffer(fbo)
+	b.BindFramebuffer(fbo, driver.LoadDesc{})
 	if err := glErr(b.funcs); err != nil {
 		fbo.Release()
 		return nil, err
@@ -849,7 +849,7 @@ func (b *Backend) Viewport(x, y, width, height int) {
 	b.glstate.setViewport(b.funcs, x, y, width, height)
 }
 
-func (b *Backend) Clear(colR, colG, colB, colA float32) {
+func (b *Backend) clearOutput(colR, colG, colB, colA float32) {
 	b.glstate.setClearColor(b.funcs, colR, colG, colB, colA)
 	b.funcs.Clear(gl.COLOR_BUFFER_BIT)
 }
@@ -1179,7 +1179,7 @@ func (b *Backend) BlitFramebuffer(dst, src driver.Framebuffer, srect, drect imag
 
 func (f *framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 	glErr(f.backend.funcs)
-	f.backend.BindFramebuffer(f)
+	f.backend.BindFramebuffer(f, driver.LoadDesc{})
 	if len(pixels) < src.Dx()*src.Dy()*4 {
 		return errors.New("unexpected RGBA size")
 	}
@@ -1195,13 +1195,15 @@ func (b *Backend) BindPipeline(pl driver.Pipeline) {
 	b.BlendFunc(p.blend.SrcFactor, p.blend.DstFactor)
 }
 
-func (b *Backend) BindFramebuffer(fbo driver.Framebuffer) {
+func (b *Backend) BindFramebuffer(fbo driver.Framebuffer, desc driver.LoadDesc) {
 	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, fbo.(*framebuffer).obj)
-}
-
-func (f *framebuffer) Invalidate() {
-	f.backend.BindFramebuffer(f)
-	f.backend.funcs.InvalidateFramebuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0)
+	switch desc.Action {
+	case driver.LoadActionClear:
+		c := desc.ClearColor
+		b.clearOutput(c.R, c.G, c.B, c.A)
+	case driver.LoadActionInvalidate:
+		b.funcs.InvalidateFramebuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0)
+	}
 }
 
 func (f *framebuffer) Release() {

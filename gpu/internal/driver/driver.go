@@ -30,14 +30,13 @@ type Device interface {
 	NewFragmentShader(src shader.Sources) (FragmentShader, error)
 	NewPipeline(desc PipelineDesc) (Pipeline, error)
 
-	Clear(r, g, b, a float32)
 	Viewport(x, y, width, height int)
 	DrawArrays(mode DrawMode, off, count int)
 	DrawElements(mode DrawMode, off, count int)
 
 	BindProgram(p Program)
 	BindPipeline(p Pipeline)
-	BindFramebuffer(f Framebuffer)
+	BindFramebuffer(f Framebuffer, a LoadDesc)
 	BindTexture(unit int, t Texture)
 	BindVertexBuffer(b Buffer, stride, offset int)
 	BindIndexBuffer(b Buffer)
@@ -51,6 +50,16 @@ type Device interface {
 	DispatchCompute(x, y, z int)
 
 	Release()
+}
+
+type LoadDesc struct {
+	Action     LoadAction
+	ClearColor struct {
+		R float32
+		G float32
+		B float32
+		A float32
+	}
 }
 
 type Pipeline interface {
@@ -89,6 +98,8 @@ type TextureFormat uint8
 
 type BufferBinding uint8
 
+type LoadAction uint8
+
 type Features uint
 
 type Caps struct {
@@ -119,7 +130,6 @@ type Buffer interface {
 
 type Framebuffer interface {
 	RenderTarget
-	Invalidate()
 	Release()
 	ReadPixels(src image.Rectangle, pixels []byte) error
 }
@@ -180,6 +190,12 @@ const (
 	BlendFactorOneMinusSrcAlpha
 	BlendFactorZero
 	BlendFactorDstColor
+)
+
+const (
+	LoadActionKeep LoadAction = iota
+	LoadActionClear
+	LoadActionInvalidate
 )
 
 var ErrContentLost = errors.New("buffer content lost")

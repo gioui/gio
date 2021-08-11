@@ -284,12 +284,6 @@ func (s *fboSet) resize(ctx driver.Device, sizes []image.Point) {
 	s.delete(ctx, len(sizes))
 }
 
-func (s *fboSet) invalidate(ctx driver.Device) {
-	for _, f := range s.fbos {
-		f.fbo.Invalidate()
-	}
-}
-
 func (s *fboSet) delete(ctx driver.Device, idx int) {
 	for i := idx; i < len(s.fbos); i++ {
 		f := s.fbos[i]
@@ -346,11 +340,6 @@ func (s *stenciler) beginIntersect(sizes []image.Point) {
 	// no floating point support is available.
 	s.intersections.resize(s.ctx, sizes)
 	s.ctx.BindPipeline(s.ipipeline.pipeline.pipeline)
-}
-
-func (s *stenciler) invalidateFBO() {
-	s.intersections.invalidate(s.ctx)
-	s.fbos.invalidate(s.ctx)
 }
 
 func (s *stenciler) cover(idx int) stencilFBO {

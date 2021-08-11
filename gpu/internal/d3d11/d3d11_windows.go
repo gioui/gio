@@ -432,11 +432,6 @@ func (b *Backend) NewFragmentShader(src shader.Sources) (driver.FragmentShader, 
 	return &FragmentShader{b, fs}, nil
 }
 
-func (b *Backend) Clear(colr, colg, colb, cola float32) {
-	b.clearColor = [4]float32{colr, colg, colb, cola}
-	b.ctx.ClearRenderTargetView(b.fbo.renderTarget, &b.clearColor)
-}
-
 func (b *Backend) Viewport(x, y, width, height int) {
 	b.viewport = d3d11.VIEWPORT{
 		TopLeftX: float32(x),
@@ -643,9 +638,14 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 	return nil
 }
 
-func (b *Backend) BindFramebuffer(fbo driver.Framebuffer) {
+func (b *Backend) BindFramebuffer(fbo driver.Framebuffer, d driver.LoadDesc) {
 	b.fbo = fbo.(*Framebuffer)
 	b.ctx.OMSetRenderTargets(b.fbo.renderTarget, nil)
+	if d.Action == driver.LoadActionClear {
+		c := d.ClearColor
+		b.clearColor = [4]float32{c.R, c.G, c.B, c.A}
+		b.ctx.ClearRenderTargetView(b.fbo.renderTarget, &b.clearColor)
+	}
 }
 
 func (f *Framebuffer) Invalidate() {

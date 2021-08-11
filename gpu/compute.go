@@ -582,12 +582,6 @@ func (g *compute) Frame(target RenderTarget) error {
 		t.blit = t.t.newTimer()
 	}
 
-	g.ctx.BindFramebuffer(defFBO)
-	if g.collector.clear {
-		g.collector.clear = false
-		g.ctx.Clear(g.collector.clearColor.Float32())
-	}
-
 	t.compact.begin()
 	if err := g.compactLayers(); err != nil {
 		return err
@@ -598,7 +592,14 @@ func (g *compute) Frame(target RenderTarget) error {
 		return err
 	}
 	t.render.end()
-	g.ctx.BindFramebuffer(defFBO)
+	var d driver.LoadDesc
+	if g.collector.clear {
+		g.collector.clear = false
+		d.Action = driver.LoadActionClear
+		c := &d.ClearColor
+		c.R, c.G, c.B, c.A = g.collector.clearColor.Float32()
+	}
+	g.ctx.BindFramebuffer(defFBO, d)
 	t.blit.begin()
 	g.blitLayers(viewport)
 	t.blit.end()
@@ -691,9 +692,6 @@ func (g *compute) compactLayers() error {
 			dr := image.Rectangle{Min: l.newPlace.pos, Max: l.newPlace.pos.Add(sz)}
 			g.ctx.BlitFramebuffer(dst, src, sr, dr)
 			l.place.atlas.layers--
-			if l.place.atlas.layers == 0 {
-				l.place.atlas.fbo.Invalidate()
-			}
 			layers[i].place = l.newPlace
 		}
 		layers = layers[end:]
@@ -926,11 +924,12 @@ restart:
 	m.buffer.ensureCapacity(false, g.ctx, driver.BufferBindingVertices, n)
 	m.buffer.buffer.Upload(vertexData)
 	g.ctx.BindTexture(0, g.images.tex)
-	g.ctx.BindFramebuffer(m.fbo)
-	g.ctx.Viewport(0, 0, texSize, texSize)
+	var d driver.LoadDesc
 	if reclaimed {
-		g.ctx.Clear(0, 0, 0, 0)
+		d.Action = driver.LoadActionClear
 	}
+	g.ctx.BindFramebuffer(m.fbo, d)
+	g.ctx.Viewport(0, 0, texSize, texSize)
 	g.ctx.BindPipeline(m.pipeline)
 	g.ctx.BindVertexBuffer(m.buffer.buffer, int(unsafe.Sizeof(m.quads[0])), 0)
 	g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(m.quads))

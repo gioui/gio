@@ -141,10 +141,12 @@ func TestFramebuffers(t *testing.T) {
 		col2 = color.NRGBA{R: 0xfe, G: 0xba, B: 0xbe, A: 0xca}
 	)
 	fcol1, fcol2 := f32color.LinearFromSRGB(col1), f32color.LinearFromSRGB(col2)
-	b.BindFramebuffer(fbo1)
-	b.Clear(fcol1.Float32())
-	b.BindFramebuffer(fbo2)
-	b.Clear(fcol2.Float32())
+	d := driver.LoadDesc{Action: driver.LoadActionClear}
+	c := &d.ClearColor
+	c.R, c.G, c.B, c.A = fcol1.Float32()
+	b.BindFramebuffer(fbo1, d)
+	c.R, c.G, c.B, c.A = fcol2.Float32()
+	b.BindFramebuffer(fbo2, d)
 	img := screenshot(t, b, fbo1, sz)
 	if got := img.RGBAAt(0, 0); got != f32color.NRGBAToRGBA(col1) {
 		t.Errorf("got color %v, expected %v", got, f32color.NRGBAToRGBA(col1))
@@ -157,11 +159,13 @@ func TestFramebuffers(t *testing.T) {
 
 func setupFBO(t *testing.T, b driver.Device, size image.Point) driver.Framebuffer {
 	fbo := newFBO(t, b, size)
-	b.BindFramebuffer(fbo)
 	// ClearColor accepts linear RGBA colors, while 8-bit colors
 	// are in the sRGB color space.
 	col := f32color.LinearFromSRGB(clearCol)
-	b.Clear(col.Float32())
+	d := driver.LoadDesc{Action: driver.LoadActionClear}
+	c := &d.ClearColor
+	c.R, c.G, c.B, c.A = col.Float32()
+	b.BindFramebuffer(fbo, d)
 	b.Viewport(0, 0, size.X, size.Y)
 	return fbo
 }
