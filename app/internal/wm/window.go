@@ -60,10 +60,6 @@ type FrameEvent struct {
 type Callbacks interface {
 	SetDriver(d Driver)
 	Event(e event.Event)
-	// Func runs a function during an Event. This is required for platforms
-	// that require coordination between the rendering goroutine and the system
-	// main thread.
-	Run(f func())
 }
 
 type Context interface {

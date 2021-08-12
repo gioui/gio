@@ -145,7 +145,9 @@ func (w *Window) validateAndProcess(driver wm.Driver, frameStart time.Time, size
 		if w.loop == nil && !w.nocontext {
 			var err error
 			if w.ctx == nil {
-				w.ctx, err = driver.NewContext()
+				w.driverRun(func(_ wm.Driver) {
+					w.ctx, err = driver.NewContext()
+				})
 				if err != nil {
 					return err
 				}
@@ -393,10 +395,6 @@ loop:
 			return
 		}
 	}
-}
-
-func (c *callbacks) Run(f func()) {
-	c.w.Run(f)
 }
 
 func (w *Window) waitAck() {
