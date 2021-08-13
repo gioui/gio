@@ -49,7 +49,7 @@ type GPU interface {
 	// Frame draws the collected operations to target.
 	Frame(target RenderTarget) error
 	// Profile returns the last available profiling information. Profiling
-	// information is requested when Collect sees a ProfileOp, and the result
+	// information is requested when Collect sees an io/profile.Op, and the result
 	// is available through Profile at some later time.
 	Profile() string
 }
