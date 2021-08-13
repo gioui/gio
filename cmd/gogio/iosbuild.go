@@ -19,7 +19,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const minIOSVersion = "9.0"
+const (
+	minIOSVersion = "9.0"
+	// Metal is available from iOS 8 on devices, yet from version 13 on the
+	// simulator.
+	minSimulatorVersion = "13.0"
+)
 
 func buildIOS(tmpDir, target string, bi *buildInfo) error {
 	appName := bi.name
@@ -496,8 +501,11 @@ func supportsGOOS(wantGoos string) (bool, error) {
 }
 
 func iosCompilerFor(target, arch string) (string, []string, error) {
-	var platformSDK string
-	var platformOS string
+	var (
+		platformSDK string
+		platformOS  string
+		minVer      = minIOSVersion
+	)
 	switch target {
 	case "ios":
 		platformOS = "ios"
@@ -505,6 +513,7 @@ func iosCompilerFor(target, arch string) (string, []string, error) {
 	case "tvos":
 		platformOS = "tvos"
 		platformSDK = "appletv"
+
 	}
 	switch arch {
 	case "arm", "arm64":
@@ -512,6 +521,7 @@ func iosCompilerFor(target, arch string) (string, []string, error) {
 	case "386", "amd64":
 		platformOS += "-simulator"
 		platformSDK += "simulator"
+		minVer = minSimulatorVersion
 	default:
 		return "", nil, fmt.Errorf("unsupported -arch: %s", arch)
 	}
@@ -527,7 +537,7 @@ func iosCompilerFor(target, arch string) (string, []string, error) {
 		"-fembed-bitcode",
 		"-arch", allArchs[arch].iosArch,
 		"-isysroot", sdkPath,
-		"-m" + platformOS + "-version-min=" + minIOSVersion,
+		"-m" + platformOS + "-version-min=" + minVer,
 	}
 	return clang, cflags, nil
 }
