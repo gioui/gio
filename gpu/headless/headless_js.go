@@ -14,7 +14,7 @@ type jsContext struct {
 	ctx js.Value
 }
 
-func newGLContext() (context, error) {
+func newContext() (context, error) {
 	doc := js.Global().Get("document")
 	cnv := doc.Call("createElement", "canvas")
 	ctx := cnv.Call("getContext", "webgl2")

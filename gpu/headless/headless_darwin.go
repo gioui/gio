@@ -22,7 +22,7 @@ type nsContext struct {
 	ctx C.CFTypeRef
 }
 
-func newGLContext() (context, error) {
+func newContext() (context, error) {
 	ctx := C.gio_headless_newContext()
 	return &nsContext{ctx: ctx}, nil
 }
