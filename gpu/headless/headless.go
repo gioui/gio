@@ -108,7 +108,6 @@ func (w *Window) Release() {
 // operation list.
 func (w *Window) Frame(frame *op.Ops) error {
 	return contextDo(w.ctx, func() error {
-		w.dev.BindFramebuffer(w.fbo)
 		w.gpu.Clear(color.NRGBA{})
 		w.gpu.Collect(w.size, frame)
 		return w.gpu.Frame(driver.RenderTarget(w.fbo))
