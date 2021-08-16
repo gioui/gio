@@ -10,5 +10,5 @@ require (
 
 require (
 	gioui.org/cpu v0.0.0-20210808092351-bfe733dd3334
-	gioui.org/shader v0.0.0-20210808092941-55e18336189e
+	gioui.org/shader v0.0.0-20210816161847-c12352edbd45
 )
