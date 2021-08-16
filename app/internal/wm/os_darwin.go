@@ -220,17 +220,13 @@ func windowSetCursor(from, to pointer.CursorName) pointer.CursorName {
 	case pointer.CursorGrab:
 		curID = 7
 	case pointer.CursorNone:
-		runOnMain(func() {
-			C.gio_hideCursor()
-		})
+		C.gio_hideCursor()
 		return to
 	}
-	runOnMain(func() {
-		if from == pointer.CursorNone {
-			C.gio_showCursor()
-		}
-		C.gio_setCursor(C.NSUInteger(curID))
-	})
+	if from == pointer.CursorNone {
+		C.gio_showCursor()
+	}
+	C.gio_setCursor(C.NSUInteger(curID))
 	return to
 }
 
