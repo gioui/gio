@@ -3,13 +3,10 @@
 package gpu
 
 import (
-	"runtime"
 	"unsafe"
 
 	"gioui.org/cpu"
 )
-
-const supportsCPUCompute = runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64" || runtime.GOARCH == "arm"
 
 // This file contains code specific to running compute shaders on the CPU.
 

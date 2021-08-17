@@ -9,6 +9,6 @@ require (
 )
 
 require (
-	gioui.org/cpu v0.0.0-20210808092351-bfe733dd3334
+	gioui.org/cpu v0.0.0-20210817074228-f6e4eef8cf21
 	gioui.org/shader v0.0.0-20210816161847-c12352edbd45
 )

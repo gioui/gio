@@ -403,7 +403,7 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		{&g.programs.kernel4, piet.Shader_kernel4_comp, piet.Kernel4ProgramInfo},
 	}
 	if !caps.Features.Has(driver.FeatureCompute) {
-		if !supportsCPUCompute {
+		if !cpu.Supported {
 			return nil, errors.New("gpu: missing support for compute programs")
 		}
 		g.useCPU = true
