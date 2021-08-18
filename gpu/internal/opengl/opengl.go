@@ -1166,9 +1166,10 @@ func (b *Backend) BindIndexBuffer(buf driver.Buffer) {
 	b.glstate.bindBuffer(b.funcs, gl.ELEMENT_ARRAY_BUFFER, gbuf.obj)
 }
 
-func (b *Backend) BlitFramebuffer(dst, src driver.Framebuffer, srect, drect image.Rectangle) {
+func (b *Backend) BlitFramebuffer(dst, src driver.Framebuffer, srect image.Rectangle, dorig image.Point) {
 	b.glstate.bindFramebuffer(b.funcs, gl.DRAW_FRAMEBUFFER, dst.(*framebuffer).obj)
 	b.glstate.bindFramebuffer(b.funcs, gl.READ_FRAMEBUFFER, src.(*framebuffer).obj)
+	drect := image.Rectangle{Min: dorig, Max: dorig.Add(srect.Size())}
 	b.funcs.BlitFramebuffer(
 		srect.Min.X, srect.Min.Y, srect.Max.X, srect.Max.Y,
 		drect.Min.X, drect.Min.Y, drect.Max.X, drect.Max.Y,

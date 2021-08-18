@@ -165,7 +165,7 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 	return &Framebuffer{ctx: b.ctx, dev: b.dev, renderTarget: renderTarget, foreign: true}
 }
 
-func (b *Backend) BlitFramebuffer(dst, src driver.Framebuffer, srect, drect image.Rectangle) {
+func (b *Backend) BlitFramebuffer(dst, src driver.Framebuffer, srect image.Rectangle, dorigin image.Point) {
 	panic("not implemented")
 }
 

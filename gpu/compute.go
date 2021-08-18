@@ -695,8 +695,7 @@ func (g *compute) compactLayers() error {
 			dst := atlas.fbo
 			sz := l.rect.Size()
 			sr := image.Rectangle{Min: l.place.pos, Max: l.place.pos.Add(sz)}
-			dr := image.Rectangle{Min: l.newPlace.pos, Max: l.newPlace.pos.Add(sz)}
-			g.ctx.BlitFramebuffer(dst, src, sr, dr)
+			g.ctx.BlitFramebuffer(dst, src, sr, l.newPlace.pos)
 			l.place.atlas.layers--
 			layers[i].place = l.newPlace
 		}
