@@ -244,6 +244,9 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 				panic(err)
 			}
 			renderFBO = b.sRGBFBO.Framebuffer()
+		} else if b.sRGBFBO != nil {
+			b.sRGBFBO.Release()
+			b.sRGBFBO = nil
 		}
 	} else {
 		b.glstate.set(b.funcs, gl.FRAMEBUFFER_SRGB, true)
