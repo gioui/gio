@@ -690,8 +690,10 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 
 	go func() {
 		w.w.SetDriver(w)
+		w.w.Event(ViewEvent{Display: unsafe.Pointer(dpy), Window: uintptr(win)})
 		w.setStage(system.StageRunning)
 		w.loop()
+		w.w.Event(ViewEvent{})
 		w.destroy()
 	}()
 	return nil

@@ -7,9 +7,15 @@ package wm
 
 import (
 	"errors"
+	"unsafe"
 )
 
-type ViewEvent struct{}
+type ViewEvent struct {
+	// Display is a pointer to the X11 Display created by XOpenDisplay.
+	Display unsafe.Pointer
+	// Window is the X11 window ID as returned by XCreateWindow.
+	Window uintptr
+}
 
 func Main() {
 	select {}
