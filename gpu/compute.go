@@ -893,9 +893,10 @@ restart:
 			m.cpuTex = cpu.NewImageRGBA(texSize, texSize)
 		}
 	}
-	// Transform to clip space: [-1, -1] - [1, 1].
-	g.materials.vert.uniforms.scale = [2]float32{2 / float32(texSize), 2 / float32(texSize)}
-	g.materials.vert.uniforms.pos = [2]float32{-1, -1}
+	// Transform to clip space: [-1, -1] - [1, 1] and flip Y-axis to cancel the implied transformation
+	// between framebuffer and texture space.
+	g.materials.vert.uniforms.scale = [2]float32{2 / float32(texSize), -2 / float32(texSize)}
+	g.materials.vert.uniforms.pos = [2]float32{-1, +1}
 	g.materials.vert.buf.Upload(byteslice.Struct(g.materials.vert.uniforms))
 	vertexData := byteslice.Slice(m.quads)
 	n := pow2Ceil(len(vertexData))
