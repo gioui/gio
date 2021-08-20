@@ -984,7 +984,7 @@ func lookupUniform(funcs *gl.Functions, p gl.Program, loc shader.UniformLocation
 
 func (b *Backend) BindStorageBuffer(binding int, buf driver.Buffer) {
 	bf := buf.(*buffer)
-	if bf.typ&driver.BufferBindingShaderStorage == 0 {
+	if bf.typ&(driver.BufferBindingShaderStorageRead|driver.BufferBindingShaderStorageWrite) == 0 {
 		panic("not a shader storage buffer")
 	}
 	b.storage[binding] = bf
@@ -1356,7 +1356,7 @@ func firstBufferType(typ driver.BufferBinding) gl.Enum {
 		return gl.ARRAY_BUFFER
 	case typ&driver.BufferBindingUniforms != 0:
 		return gl.UNIFORM_BUFFER
-	case typ&driver.BufferBindingShaderStorage != 0:
+	case typ&(driver.BufferBindingShaderStorageRead|driver.BufferBindingShaderStorageWrite) != 0:
 		return gl.SHADER_STORAGE_BUFFER
 	default:
 		panic("unsupported buffer type")

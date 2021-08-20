@@ -157,7 +157,8 @@ const (
 	BufferBindingUniforms
 	BufferBindingTexture
 	BufferBindingFramebuffer
-	BufferBindingShaderStorage
+	BufferBindingShaderStorageRead
+	BufferBindingShaderStorageWrite
 )
 
 const (

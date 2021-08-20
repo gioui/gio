@@ -902,7 +902,7 @@ restart:
 		m.cpuTex.Free()
 		handle, err := g.ctx.NewTexture(driver.TextureFormatRGBA8, texSize, texSize,
 			driver.FilterNearest, driver.FilterNearest,
-			driver.BufferBindingShaderStorage|driver.BufferBindingFramebuffer)
+			driver.BufferBindingShaderStorageRead|driver.BufferBindingFramebuffer)
 		if err != nil {
 			return fmt.Errorf("compute: failed to create material atlas: %v", err)
 		}
@@ -919,11 +919,11 @@ restart:
 	}
 	// Transform to clip space: [-1, -1] - [1, 1] and flip Y-axis to cancel the implied transformation
 	// between framebuffer and texture space.
-	g.materials.vert.uniforms.scale = [2]float32{2 / float32(texSize), -2 / float32(texSize)}
-	g.materials.vert.uniforms.pos = [2]float32{-1, +1}
-	g.materials.vert.buf.Upload(byteslice.Struct(g.materials.vert.uniforms))
-	g.ctx.BindVertexUniforms(g.materials.vert.buf)
-	g.ctx.BindFragmentUniforms(g.materials.frag.buf)
+	m.vert.uniforms.scale = [2]float32{2 / float32(texSize), -2 / float32(texSize)}
+	m.vert.uniforms.pos = [2]float32{-1, +1}
+	m.vert.buf.Upload(byteslice.Struct(m.vert.uniforms))
+	g.ctx.BindVertexUniforms(m.vert.buf)
+	g.ctx.BindFragmentUniforms(m.frag.buf)
 	vertexData := byteslice.Slice(m.quads)
 	n := pow2Ceil(len(vertexData))
 	m.buffer.ensureCapacity(false, g.ctx, driver.BufferBindingVertices, n)
@@ -1125,7 +1125,7 @@ func (g *compute) render(dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDim
 	scene := byteslice.Slice(enc.scene)
 	if s := len(scene); s > g.buffers.scene.size {
 		paddedCap := s * 11 / 10
-		if err := g.buffers.scene.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorage, paddedCap); err != nil {
+		if err := g.buffers.scene.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorageRead, paddedCap); err != nil {
 			return err
 		}
 	}
@@ -1161,13 +1161,13 @@ func (g *compute) render(dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDim
 	clearSize := 4 + numPartitions*stateStride
 	if clearSize > g.buffers.state.size {
 		paddedCap := clearSize * 11 / 10
-		if err := g.buffers.state.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorage, paddedCap); err != nil {
+		if err := g.buffers.state.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorageRead|driver.BufferBindingShaderStorageWrite, paddedCap); err != nil {
 			return err
 		}
 	}
 
 	confData := byteslice.Struct(g.conf)
-	g.buffers.config.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorage, len(confData))
+	g.buffers.config.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorageRead, len(confData))
 	g.buffers.config.upload(confData)
 
 	minSize := int(unsafe.Sizeof(memoryHeader{})) + int(alloc)
@@ -1175,7 +1175,7 @@ func (g *compute) render(dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDim
 		// Add space for dynamic GPU allocations.
 		const sizeBump = 4 * 1024 * 1024
 		minSize += sizeBump
-		if err := g.buffers.memory.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorage, minSize); err != nil {
+		if err := g.buffers.memory.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorageRead|driver.BufferBindingShaderStorageWrite, minSize); err != nil {
 			return err
 		}
 	}
@@ -1234,7 +1234,7 @@ func (g *compute) render(dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDim
 		case memMallocFailed:
 			// Resize memory and try again.
 			sz := g.buffers.memory.size * 15 / 10
-			if err := g.buffers.memory.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorage, sz); err != nil {
+			if err := g.buffers.memory.ensureCapacity(g.useCPU, g.ctx, driver.BufferBindingShaderStorageRead|driver.BufferBindingShaderStorageWrite, sz); err != nil {
 				return err
 			}
 			continue
@@ -1312,7 +1312,7 @@ func (a *layerAtlas) ensureSize(useCPU bool, ctx driver.Device, size image.Point
 	img, err := ctx.NewTexture(driver.TextureFormatRGBA8, size.X, size.Y,
 		driver.FilterNearest,
 		driver.FilterNearest,
-		driver.BufferBindingShaderStorage|driver.BufferBindingTexture|driver.BufferBindingFramebuffer)
+		driver.BufferBindingShaderStorageWrite|driver.BufferBindingTexture|driver.BufferBindingFramebuffer)
 	if err != nil {
 		return err
 	}
