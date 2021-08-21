@@ -1298,7 +1298,6 @@ func (a *layerAtlas) ensureSize(useCPU bool, ctx driver.Device, size image.Point
 	if a.size.X >= size.X && a.size.Y >= size.Y {
 		return nil
 	}
-	size.X, size.Y = pow2Ceil(size.X), pow2Ceil(size.Y)
 	if a.fbo != nil {
 		a.fbo.Release()
 		a.fbo = nil
