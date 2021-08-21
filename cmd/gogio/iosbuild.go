@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	minIOSVersion = "9.0"
+	minIOSVersion = "10.0"
 	// Metal is available from iOS 8 on devices, yet from version 13 on the
 	// simulator.
 	minSimulatorVersion = "13.0"
