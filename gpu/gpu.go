@@ -136,7 +136,7 @@ type imageOp struct {
 
 // shaderModuleVersion is the exact version of gioui.org/shader expected by
 // this package. Shader programs are not backwards or forwards compatible.
-const shaderModuleVersion = "v0.0.0-20210821062758-133bba6632c7"
+const shaderModuleVersion = "v0.0.0-20210821080300-98542fa6d725"
 
 func decodeStrokeOp(data []byte) clip.StrokeStyle {
 	_ = data[4]
