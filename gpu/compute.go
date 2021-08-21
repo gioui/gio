@@ -692,10 +692,10 @@ func (g *compute) compactLayers() error {
 				continue
 			}
 			src := l.place.atlas.fbo
-			dst := atlas.fbo
+			dst := atlas.image
 			sz := l.rect.Size()
 			sr := image.Rectangle{Min: l.place.pos, Max: l.place.pos.Add(sz)}
-			g.ctx.BlitFramebuffer(dst, src, sr, l.newPlace.pos)
+			g.ctx.CopyTexture(dst, l.newPlace.pos, src, sr)
 			l.place.atlas.layers--
 			layers[i].place = l.newPlace
 		}

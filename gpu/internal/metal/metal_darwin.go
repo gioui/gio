@@ -524,9 +524,9 @@ func (b *Backend) startBlit() C.CFTypeRef {
 	return b.blitEnc
 }
 
-func (b *Backend) BlitFramebuffer(dst, src driver.Framebuffer, srect image.Rectangle, dorig image.Point) {
+func (b *Backend) CopyTexture(dst driver.Texture, dorig image.Point, src driver.Framebuffer, srect image.Rectangle) {
 	enc := b.startBlit()
-	dstTex := dst.(*Framebuffer).texture
+	dstTex := dst.(*Texture).texture
 	srcTex := src.(*Framebuffer).texture
 	ssz := srect.Size()
 	C.blitEncCopyFromTexture(

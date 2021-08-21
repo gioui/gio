@@ -104,9 +104,6 @@ func (f *Functions) BlendEquation(mode Enum) {
 func (f *Functions) BlendFuncSeparate(srcRGB, dstRGB, srcA, dstA Enum) {
 	f.Ctx.Call("blendFunc", int(srcRGB), int(dstRGB), int(srcA), int(dstA))
 }
-func (f *Functions) BlitFramebuffer(sx0, sy0, sx1, sy1, dx0, dy0, dx1, dy1 int, mask Enum, filter Enum) {
-	panic("not implemented")
-}
 func (f *Functions) BufferData(target Enum, size int, usage Enum) {
 	f.Ctx.Call("bufferData", int(target), size, int(usage))
 }
@@ -127,6 +124,9 @@ func (f *Functions) ClearDepthf(d float32) {
 }
 func (f *Functions) CompileShader(s Shader) {
 	f.Ctx.Call("compileShader", js.Value(s))
+}
+func (f *Functions) CopyTexSubImage2D(target Enum, level, xoffset, yoffset, x, y, width, height int) {
+	f.Ctx.Call("copyTexSubImage2D", int(target), level, xoffset, yoffset, x, y, width, height)
 }
 func (f *Functions) CreateBuffer() Buffer {
 	return Buffer(f.Ctx.Call("createBuffer"))

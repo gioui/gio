@@ -165,7 +165,7 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 	return &Framebuffer{ctx: b.ctx, dev: b.dev, renderTarget: renderTarget, foreign: true}
 }
 
-func (b *Backend) BlitFramebuffer(dst, src driver.Framebuffer, srect image.Rectangle, dorigin image.Point) {
+func (b *Backend) CopyTexture(dst driver.Texture, dstOrigin image.Point, src driver.Framebuffer, srcRect image.Rectangle) {
 	panic("not implemented")
 }
 

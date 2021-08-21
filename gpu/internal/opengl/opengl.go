@@ -1166,15 +1166,16 @@ func (b *Backend) BindIndexBuffer(buf driver.Buffer) {
 	b.glstate.bindBuffer(b.funcs, gl.ELEMENT_ARRAY_BUFFER, gbuf.obj)
 }
 
-func (b *Backend) BlitFramebuffer(dst, src driver.Framebuffer, srect image.Rectangle, dorig image.Point) {
-	b.glstate.bindFramebuffer(b.funcs, gl.DRAW_FRAMEBUFFER, dst.(*framebuffer).obj)
+func (b *Backend) CopyTexture(dst driver.Texture, dstOrigin image.Point, src driver.Framebuffer, srcRect image.Rectangle) {
+	const unit = 0
+	oldTex := b.glstate.texUnits.binds[unit]
+	defer func() {
+		b.glstate.bindTexture(b.funcs, unit, oldTex)
+	}()
+	b.glstate.bindTexture(b.funcs, unit, dst.(*texture).obj)
 	b.glstate.bindFramebuffer(b.funcs, gl.READ_FRAMEBUFFER, src.(*framebuffer).obj)
-	drect := image.Rectangle{Min: dorig, Max: dorig.Add(srect.Size())}
-	b.funcs.BlitFramebuffer(
-		srect.Min.X, srect.Min.Y, srect.Max.X, srect.Max.Y,
-		drect.Min.X, drect.Min.Y, drect.Max.X, drect.Max.Y,
-		gl.COLOR_BUFFER_BIT,
-		gl.NEAREST)
+	sz := srcRect.Size()
+	b.funcs.CopyTexSubImage2D(gl.TEXTURE_2D, 0, dstOrigin.X, dstOrigin.Y, srcRect.Min.X, srcRect.Min.Y, sz.X, sz.Y)
 }
 
 func (f *framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {

@@ -45,7 +45,7 @@ type Device interface {
 	BindFragmentUniforms(buf Buffer)
 	BindStorageBuffer(binding int, buf Buffer)
 
-	BlitFramebuffer(dst, src Framebuffer, srcRect image.Rectangle, dstOrigin image.Point)
+	CopyTexture(dst Texture, dstOrigin image.Point, src Framebuffer, srcRect image.Rectangle)
 	MemoryBarrier()
 	DispatchCompute(x, y, z int)
 
