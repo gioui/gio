@@ -686,7 +686,9 @@ func (g *compute) compactLayers() error {
 			continue
 		}
 		outputSize := g.output.packer.sizes[0]
-		atlas.ensureSize(g.useCPU, g.ctx, outputSize)
+		if err := atlas.ensureSize(g.useCPU, g.ctx, outputSize); err != nil {
+			return err
+		}
 		for i, l := range layers[:end] {
 			if l.newPlace == l.place {
 				continue
