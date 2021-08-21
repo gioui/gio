@@ -1008,16 +1008,19 @@ func (b *Backend) BindFragmentUniforms(buf driver.Buffer) {
 
 func (p *program) updateUniforms() {
 	f := p.backend.funcs
-	if p.backend.ubo {
-		if b := p.backend.vertUniforms; b != nil {
+	if b := p.backend.vertUniforms; b != nil {
+		if p.backend.ubo {
 			p.backend.glstate.bindBufferBase(f, gl.UNIFORM_BUFFER, 0, b.obj)
+		} else {
+			p.vertUniforms.update(f, b)
 		}
-		if b := p.backend.fragUniforms; b != nil {
+	}
+	if b := p.backend.fragUniforms; b != nil {
+		if p.backend.ubo {
 			p.backend.glstate.bindBufferBase(f, gl.UNIFORM_BUFFER, 1, b.obj)
+		} else {
+			p.fragUniforms.update(f, b)
 		}
-	} else {
-		p.vertUniforms.update(f, p.backend.vertUniforms)
-		p.fragUniforms.update(f, p.backend.fragUniforms)
 	}
 }
 
