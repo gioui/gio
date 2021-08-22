@@ -38,10 +38,6 @@ static void setupLayer(CFTypeRef layerRef, CFTypeRef devRef) {
 			// Never let nextDrawable time out and return nil.
 			layer.allowsNextDrawableTimeout = NO;
 		}
-		if (@available(iOS 11.2, *)) {
-			// Minimize latency from input to window and save a bit of memory.
-			layer.maximumDrawableCount = 2;
-		}
 	}
 }
 
