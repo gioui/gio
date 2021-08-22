@@ -906,7 +906,7 @@ func (b *Backend) stagingBuffer(size int) (C.CFTypeRef, int) {
 			C.CFRelease(b.stagingBuf)
 		}
 		cap := 2 * (b.stagingOff + size)
-		b.stagingBuf = C.newBuffer(b.dev, C.NSUInteger(cap), C.MTLResourceStorageModeShared)
+		b.stagingBuf = C.newBuffer(b.dev, C.NSUInteger(cap), C.MTLResourceStorageModeShared|C.MTLResourceCPUCacheModeWriteCombined)
 		if b.stagingBuf == 0 {
 			panic(fmt.Errorf("metal: failed to allocate %d bytes of staging buffer", cap))
 		}
