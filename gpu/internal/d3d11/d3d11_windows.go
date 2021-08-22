@@ -658,9 +658,6 @@ func (b *Backend) BindFramebuffer(fbo driver.Framebuffer, d driver.LoadDesc) {
 	}
 }
 
-func (f *Framebuffer) Invalidate() {
-}
-
 func (f *Framebuffer) Release() {
 	if f.foreign {
 		panic("framebuffer not created by NewFramebuffer")
