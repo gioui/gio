@@ -9,14 +9,12 @@ package gpu
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"image"
 	"image/color"
 	"math"
 	"os"
 	"reflect"
-	"runtime/debug"
 	"time"
 	"unsafe"
 
@@ -133,10 +131,6 @@ type imageOp struct {
 	clipType clipType
 	place    placement
 }
-
-// shaderModuleVersion is the exact version of gioui.org/shader expected by
-// this package. Shader programs are not backwards or forwards compatible.
-const shaderModuleVersion = "v0.0.0-20210821080300-98542fa6d725"
 
 func decodeStrokeOp(data []byte) clip.StrokeStyle {
 	_ = data[4]
@@ -358,9 +352,6 @@ const (
 )
 
 func New(api API) (GPU, error) {
-	if err := verifyShaderModule(); err != nil {
-		return nil, err
-	}
 	d, err := driver.NewDevice(api)
 	if err != nil {
 		return nil, err
@@ -385,23 +376,6 @@ func newGPU(ctx driver.Device) (*gpu, error) {
 		return nil, err
 	}
 	return g, nil
-}
-
-func verifyShaderModule() error {
-	mod, ok := debug.ReadBuildInfo()
-	if !ok {
-		// No module support; hopefully the version matches.
-		return nil
-	}
-	for _, m := range mod.Deps {
-		if m.Path == "gioui.org/shader" {
-			if got := m.Version; got != shaderModuleVersion {
-				return fmt.Errorf("gpu: module gioui.org/shader is version %q, expected %q", got, shaderModuleVersion)
-			}
-			return nil
-		}
-	}
-	return errors.New("gpu: module version for gioui.org/shader not found")
 }
 
 func (g *gpu) init(ctx driver.Device) error {
