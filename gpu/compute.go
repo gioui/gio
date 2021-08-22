@@ -44,6 +44,9 @@ type compute struct {
 	viewport      image.Point
 	maxTextureDim int
 	srgb          bool
+	atlases       []*textureAtlas
+	frameCount    uint
+	moves         []atlasMove
 
 	programs struct {
 		elements   computeProgram
@@ -69,48 +72,29 @@ type compute struct {
 		uniBuf   driver.Buffer
 
 		layerVertices []layerVertex
-		layerAtlases  []*layerAtlas
-		packer        packer
-
-		descriptors *piet.Kernel4DescriptorSetLayout
+		descriptors   *piet.Kernel4DescriptorSetLayout
 	}
-	// images contains ImageOp images packed into a texture atlas.
-	images struct {
-		packer packer
-		// positions maps imageOpData.handles to positions inside tex.
-		positions map[interface{}]image.Point
-		tex       driver.Texture
-	}
+	// imgAllocs maps imageOpData.handles to allocs.
+	imgAllocs map[interface{}]*atlasAlloc
 	// materials contains the pre-processed materials (transformed images for
 	// now, gradients etc. later) packed in a texture atlas. The atlas is used
 	// as source in kernel4.
 	materials struct {
-		// offsets maps texture ops to the offsets to put in their FillImage commands.
-		offsets map[textureKey]image.Point
+		// allocs maps texture ops the their atlases and FillImage offsets.
+		allocs map[textureKey]materialAlloc
+		// regions track new materials to be transferred to CPU images.
+		regions []image.Rectangle
 
 		pipeline driver.Pipeline
-
-		packer packer
-
-		tex   driver.Texture
-		fbo   driver.Framebuffer
-		quads []materialVertex
-
-		buffer sizedBuffer
-
-		vert struct {
+		buffer   sizedBuffer
+		quads    []materialVertex
+		vert     struct {
 			uniforms *materialVertUniforms
 			buf      driver.Buffer
 		}
-
 		frag struct {
 			buf driver.Buffer
 		}
-
-		// CPU fields
-		cpuTex cpu.ImageDescriptor
-		// regions track new materials in tex, so they can be transferred to cpuTex.
-		regions []image.Rectangle
 		scratch []byte
 	}
 	timers struct {
@@ -131,26 +115,55 @@ type compute struct {
 	conf      *config
 }
 
+type materialAlloc struct {
+	alloc  *atlasAlloc
+	offset image.Point
+}
+
 type layer struct {
-	rect     image.Rectangle
-	place    layerPlace
-	newPlace layerPlace
-	ops      []paintOp
+	rect      image.Rectangle
+	alloc     *atlasAlloc
+	ops       []paintOp
+	materials *textureAtlas
 }
 
-type layerPlace struct {
-	atlas *layerAtlas
-	pos   image.Point
+type allocQuery struct {
+	atlas     *textureAtlas
+	size      image.Point
+	empty     bool
+	format    driver.TextureFormat
+	bindings  driver.BufferBinding
+	nocompact bool
 }
 
-type layerAtlas struct {
-	// image is the layer atlas texture. Note that it is in RGBA format,
-	// but contains data in sRGB. See blitLayers for more detail.
-	image    driver.Texture
-	fbo      driver.Framebuffer
-	cpuImage cpu.ImageDescriptor
-	size     image.Point
-	layers   int
+type atlasAlloc struct {
+	atlas      *textureAtlas
+	rect       image.Rectangle
+	cpu        bool
+	dead       bool
+	frameCount uint
+}
+
+type atlasMove struct {
+	src     *textureAtlas
+	dstPos  image.Point
+	srcRect image.Rectangle
+	cpu     bool
+}
+
+type textureAtlas struct {
+	image     driver.Texture
+	fbo       driver.Framebuffer
+	format    driver.TextureFormat
+	bindings  driver.BufferBinding
+	hasCPU    bool
+	cpuImage  cpu.ImageDescriptor
+	size      image.Point
+	allocs    []*atlasAlloc
+	packer    packer
+	realized  bool
+	lastFrame uint
+	compact   bool
 }
 
 type copyUniforms struct {
@@ -202,6 +215,7 @@ type paintOp struct {
 	intersect f32.Rectangle
 	hash      uint64
 	layer     int
+	texOpIdx  int
 }
 
 // clipCmd describes a clipping command ready to be used for the compute
@@ -278,16 +292,14 @@ type textureKey struct {
 
 // textureOp represents an paintOp that requires texture space.
 type textureOp struct {
-	// sceneIdx is the index in the scene that contains the fill image command
-	// that corresponds to the operation.
-	sceneIdx int
-	img      imageOpData
-	key      textureKey
-	// offset is the integer offset, separated from key.transform to increase cache hit rate.
+	img imageOpData
+	key textureKey
+	// offset is the integer offset separated from key.transform to increase cache hit rate.
 	off image.Point
-
-	// pos is the position of the untransformed image in the images texture.
-	pos image.Point
+	// matAlloc is the atlas placement for material.
+	matAlloc materialAlloc
+	// imgAlloc is the atlas placement for the source image
+	imgAlloc *atlasAlloc
 }
 
 type encoder struct {
@@ -349,6 +361,13 @@ type memoryHeader struct {
 // rect is a oriented rectangle.
 type rectangle [4]f32.Point
 
+const (
+	layersBindings    = driver.BufferBindingShaderStorageWrite | driver.BufferBindingTexture | driver.BufferBindingFramebuffer
+	materialsBindings = driver.BufferBindingFramebuffer | driver.BufferBindingShaderStorageRead
+	// Materials and layers can share texture storage if their bindings match.
+	combinedBindings = layersBindings | materialsBindings
+)
+
 // GPU structure sizes and constants.
 const (
 	tileWidthPx       = 32
@@ -380,6 +399,11 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	if cap := 8192; maxDim > cap {
 		maxDim = cap
 	}
+	// The compute programs can only span 128x64 tiles. Limit to 64 for now, and leave the
+	// complexity of a rectangular limit for later.
+	if computeCap := 4096; maxDim > computeCap {
+		maxDim = computeCap
+	}
 	g := &compute{
 		ctx:           ctx,
 		maxTextureDim: maxDim,
@@ -410,8 +434,6 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		g.dispatcher = newDispatcher(runtime.NumCPU())
 	}
 
-	// Large enough for reasonable fill sizes, yet still spannable by the compute programs.
-	g.output.packer.maxDims = image.Pt(4096, 4096)
 	copyVert, copyFrag, err := newShaders(ctx, gio.Shader_copy_vert, gio.Shader_copy_frag)
 	if err != nil {
 		g.Release()
@@ -560,6 +582,7 @@ func newShaders(ctx driver.Device, vsrc, fsrc shader.Sources) (vert driver.Verte
 }
 
 func (g *compute) Frame(frameOps *op.Ops, target RenderTarget, viewport image.Point) error {
+	g.frameCount++
 	g.collect(viewport, frameOps)
 	return g.frame(target)
 }
@@ -567,12 +590,9 @@ func (g *compute) Frame(frameOps *op.Ops, target RenderTarget, viewport image.Po
 func (g *compute) collect(viewport image.Point, ops *op.Ops) {
 	g.viewport = viewport
 	g.collector.reset()
-	for i := range g.output.layerAtlases {
-		g.output.layerAtlases[i].layers = 0
-	}
 
-	g.collector.collect(ops, viewport)
-	g.collector.layer(viewport)
+	g.texOps = g.texOps[:0]
+	g.collector.collect(ops, viewport, &g.texOps)
 }
 
 func (g *compute) Clear(col color.NRGBA) {
@@ -593,11 +613,13 @@ func (g *compute) frame(target RenderTarget) error {
 		t.blit = t.t.newTimer()
 	}
 
-	t.compact.begin()
-	if err := g.compactLayers(); err != nil {
+	if err := g.uploadImages(); err != nil {
 		return err
 	}
-	t.compact.end()
+	if err := g.renderMaterials(); err != nil {
+		return err
+	}
+	g.layer(viewport, g.texOps)
 	t.render.begin()
 	if err := g.renderLayers(viewport); err != nil {
 		return err
@@ -614,6 +636,11 @@ func (g *compute) frame(target RenderTarget) error {
 	t.blit.begin()
 	g.blitLayers(viewport)
 	t.blit.end()
+	t.compact.begin()
+	if err := g.compactAllocs(); err != nil {
+		return err
+	}
+	t.compact.end()
 	if g.collector.profile && t.t.ready() {
 		com, ren, blit := t.compact.Elapsed, t.render.Elapsed, t.blit.Elapsed
 		ft := com + ren + blit
@@ -626,7 +653,7 @@ func (g *compute) frame(target RenderTarget) error {
 }
 
 func (g *compute) dumpAtlases() {
-	for i, a := range g.output.layerAtlases {
+	for i, a := range g.atlases {
 		dump, err := driver.DownloadImage(g.ctx, a.fbo, image.Rectangle{Max: a.size})
 		if err != nil {
 			panic(err)
@@ -652,139 +679,183 @@ func (g *compute) Profile() string {
 	return g.timers.profile
 }
 
-func (g *compute) compactLayers() error {
-	layers := g.collector.frame.layers
-	for len(layers) > 0 {
-		var atlas *layerAtlas
+func (g *compute) compactAllocs() error {
+	const (
+		maxAllocAge = 3
+		maxAtlasAge = 10
+	)
+	atlases := g.atlases
+	for _, a := range atlases {
+		if len(a.allocs) > 0 && g.frameCount-a.lastFrame > maxAtlasAge {
+			a.compact = true
+		}
+	}
+	for len(atlases) > 0 {
+		var (
+			dstAtlas *textureAtlas
+			format   driver.TextureFormat
+			bindings driver.BufferBinding
+		)
+		g.moves = g.moves[:0]
 		addedLayers := false
-		end := 0
-		for end < len(layers) {
-			l := &layers[end]
-			if l.place.atlas == nil {
-				end++
+		useCPU := false
+	fill:
+		for len(atlases) > 0 {
+			srcAtlas := atlases[0]
+			allocs := srcAtlas.allocs
+			if !srcAtlas.compact {
+				atlases = atlases[1:]
 				continue
 			}
-			l.newPlace = l.place
-			if atlas == nil {
-				atlas = g.newAtlas()
-				g.output.packer.clear()
-				g.output.packer.newPage()
-			}
-			size := l.rect.Size()
-			place, fits := g.output.packer.tryAdd(size.Add(image.Pt(1, 1)))
-			if !fits {
-				if !addedLayers {
-					panic(fmt.Errorf("compute: internal error: empty atlas no longer fits layer (layer: %v)", size))
-				}
+			if addedLayers && (format != srcAtlas.format || srcAtlas.bindings&bindings != srcAtlas.bindings) {
 				break
 			}
-			addedLayers = true
-			l.newPlace = layerPlace{
-				atlas: atlas,
-				pos:   place.Pos,
+			format = srcAtlas.format
+			bindings = srcAtlas.bindings
+			for len(srcAtlas.allocs) > 0 {
+				a := srcAtlas.allocs[0]
+				n := len(srcAtlas.allocs)
+				if g.frameCount-a.frameCount > maxAllocAge {
+					a.dead = true
+					srcAtlas.allocs[0] = srcAtlas.allocs[n-1]
+					srcAtlas.allocs = srcAtlas.allocs[:n-1]
+					continue
+				}
+				size := a.rect.Size()
+				alloc, fits := g.atlasAlloc(allocQuery{
+					atlas:     dstAtlas,
+					size:      size,
+					format:    format,
+					bindings:  bindings,
+					nocompact: true,
+				})
+				if !fits {
+					break fill
+				}
+				dstAtlas = alloc.atlas
+				allocs = append(allocs, a)
+				addedLayers = true
+				useCPU = useCPU || a.cpu
+				dstAtlas.allocs = append(dstAtlas.allocs, a)
+				pos := alloc.rect.Min
+				g.moves = append(g.moves, atlasMove{
+					src: srcAtlas, dstPos: pos, srcRect: a.rect, cpu: a.cpu,
+				})
+				a.atlas = dstAtlas
+				a.rect = image.Rectangle{Min: pos, Max: pos.Add(a.rect.Size())}
+				srcAtlas.allocs[0] = srcAtlas.allocs[n-1]
+				srcAtlas.allocs = srcAtlas.allocs[:n-1]
 			}
-			atlas.layers++
-			end++
+			srcAtlas.compact = false
+			srcAtlas.realized = false
+			srcAtlas.packer.clear()
+			srcAtlas.packer.newPage()
+			srcAtlas.packer.maxDims = image.Pt(g.maxTextureDim, g.maxTextureDim)
+			atlases = atlases[1:]
 		}
 		if !addedLayers {
-			layers = layers[end:]
-			continue
+			break
 		}
-		outputSize := g.output.packer.sizes[0]
-		if err := atlas.ensureSize(g.useCPU, g.ctx, outputSize); err != nil {
+		outputSize := dstAtlas.packer.sizes[0]
+		if err := g.realizeAtlas(dstAtlas, useCPU, outputSize); err != nil {
 			return err
 		}
-		for i, l := range layers[:end] {
-			if l.newPlace == l.place {
-				continue
+		for _, move := range g.moves {
+			if !move.cpu {
+				g.ctx.CopyTexture(dstAtlas.image, move.dstPos, move.src.fbo, move.srcRect)
+			} else {
+				src := move.src.cpuImage.Data()
+				dst := dstAtlas.cpuImage.Data()
+				sstride := move.src.size.X * 4
+				dstride := dstAtlas.size.X * 4
+				copyImage(dst, dstride, move.dstPos, src, sstride, move.srcRect)
 			}
-			src := l.place.atlas.fbo
-			dst := atlas.image
-			sz := l.rect.Size()
-			sr := image.Rectangle{Min: l.place.pos, Max: l.place.pos.Add(sz)}
-			g.ctx.CopyTexture(dst, l.newPlace.pos, src, sr)
-			l.place.atlas.layers--
-			layers[i].place = l.newPlace
 		}
-		layers = layers[end:]
+	}
+	for i := len(g.atlases) - 1; i >= 0; i-- {
+		a := g.atlases[i]
+		if len(a.allocs) == 0 && g.frameCount-a.lastFrame > maxAtlasAge {
+			a.Release()
+			n := len(g.atlases)
+			g.atlases[i] = g.atlases[n-1]
+			g.atlases = g.atlases[:n-1]
+		}
 	}
 	return nil
+}
+
+func copyImage(dst []byte, dstStride int, dstPos image.Point, src []byte, srcStride int, srcRect image.Rectangle) {
+	sz := srcRect.Size()
+	soff := srcRect.Min.Y*srcStride + srcRect.Min.X*4
+	doff := dstPos.Y*dstStride + dstPos.X*4
+	rowLen := sz.X * 4
+	for y := 0; y < sz.Y; y++ {
+		srow := src[soff : soff+rowLen]
+		drow := dst[doff : doff+rowLen]
+		copy(drow, srow)
+		soff += srcStride
+		doff += dstStride
+	}
 }
 
 func (g *compute) renderLayers(viewport image.Point) error {
 	layers := g.collector.frame.layers
 	for len(layers) > 0 {
-		var atlas *layerAtlas
+		var materials, dst *textureAtlas
 		addedLayers := false
+		g.enc.reset()
 		for len(layers) > 0 {
 			l := &layers[0]
-			if a := l.place.atlas; a != nil {
-				a.layers++
+			if l.alloc != nil {
 				layers = layers[1:]
 				continue
 			}
-			if atlas == nil {
-				atlas = g.newAtlas()
-				g.output.packer.clear()
-				g.output.packer.newPage()
-				g.enc.reset()
-				g.texOps = g.texOps[:0]
-			}
-			// Position onto atlas; pad to avoid overlap.
-			size := l.rect.Size()
-			place, fits := g.output.packer.tryAdd(size.Add(image.Pt(1, 1)))
-			if !fits {
-				if !addedLayers {
-					// The maximum compute output is either smaller than the window, or an operation
-					// in the layer wasn't clipped to the window.
-					panic(fmt.Errorf("compute: internal error: layer larger than maximum compute output (viewport: %v, layer: %v)", viewport, size))
+			if materials != nil {
+				if l.materials != nil && materials != l.materials {
+					// Only one materials texture per compute pass.
+					break
 				}
+			} else {
+				materials = l.materials
+			}
+			size := l.rect.Size()
+			alloc, fits := g.atlasAlloc(allocQuery{
+				atlas:    dst,
+				empty:    true,
+				format:   driver.TextureFormatRGBA8,
+				bindings: combinedBindings,
+				// Pad to avoid overlap.
+				size: size.Add(image.Pt(1, 1)),
+			})
+			if !fits {
+				// Only one output atlas per compute pass.
 				break
 			}
+			dst = alloc.atlas
+			dst.compact = true
 			addedLayers = true
-			l.place = layerPlace{
-				atlas: atlas,
-				pos:   place.Pos,
-			}
-			atlas.layers++
-			encodeLayer(*l, place.Pos, viewport, &g.enc, &g.texOps)
+			l.alloc = &alloc
+			dst.allocs = append(dst.allocs, l.alloc)
+			encodeLayer(*l, alloc.rect.Min, viewport, &g.enc, g.texOps)
 			layers = layers[1:]
 		}
 		if !addedLayers {
 			break
 		}
-		if err := g.uploadImages(); err != nil {
-			return err
-		}
-		if err := g.renderMaterials(); err != nil {
-			return err
-		}
-		outputSize := g.output.packer.sizes[0]
+		outputSize := dst.packer.sizes[0]
 		tileDims := image.Point{
 			X: (outputSize.X + tileWidthPx - 1) / tileWidthPx,
 			Y: (outputSize.Y + tileHeightPx - 1) / tileHeightPx,
 		}
 		w, h := tileDims.X*tileWidthPx, tileDims.Y*tileHeightPx
-		if err := atlas.ensureSize(g.useCPU, g.ctx, image.Pt(w, h)); err != nil {
+		if err := g.realizeAtlas(dst, g.useCPU, image.Pt(w, h)); err != nil {
 			return err
 		}
-		if err := g.render(atlas.image, atlas.cpuImage, tileDims, atlas.size.X*4); err != nil {
+		if err := g.render(materials, dst.image, dst.cpuImage, tileDims, dst.size.X*4); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-func (g *compute) newAtlas() *layerAtlas {
-	// Look for empty atlas to re-use.
-	for _, a := range g.output.layerAtlases {
-		if a.layers == 0 {
-			return a
-		}
-	}
-	a := new(layerAtlas)
-	g.output.layerAtlases = append(g.output.layerAtlases, a)
-	return a
 }
 
 func (g *compute) blitLayers(viewport image.Point) {
@@ -797,13 +868,13 @@ func (g *compute) blitLayers(viewport image.Point) {
 	g.ctx.BindVertexUniforms(g.output.uniBuf)
 	for len(layers) > 0 {
 		g.output.layerVertices = g.output.layerVertices[:0]
-		atlas := layers[0].place.atlas
+		atlas := layers[0].alloc.atlas
 		for len(layers) > 0 {
 			l := layers[0]
-			if l.place.atlas != atlas {
+			if l.alloc.atlas != atlas {
 				break
 			}
-			placef := layout.FPt(l.place.pos)
+			placef := layout.FPt(l.alloc.rect.Min)
 			sizef := layout.FPt(l.rect.Size())
 			quad := [4]layerVertex{
 				{posX: float32(l.rect.Min.X), posY: float32(l.rect.Min.Y), u: placef.X, v: placef.Y},
@@ -837,197 +908,187 @@ func (g *compute) blitLayers(viewport image.Point) {
 
 func (g *compute) renderMaterials() error {
 	m := &g.materials
-	m.quads = m.quads[:0]
-	m.regions = m.regions[:0]
-	resize := false
-	reclaimed := false
-restart:
-	for {
-		for _, op := range g.texOps {
-			if off, exists := m.offsets[op.key]; exists {
-				g.enc.setFillImageOffset(op.sceneIdx, off.Sub(op.off))
+	for k, place := range m.allocs {
+		if place.alloc.dead {
+			delete(m.allocs, k)
+		}
+	}
+	texOps := g.texOps
+	for len(texOps) > 0 {
+		m.quads = m.quads[:0]
+		m.regions = m.regions[:0]
+		var (
+			atlas    *textureAtlas
+			imgAtlas *textureAtlas
+		)
+		for len(texOps) > 0 {
+			op := &texOps[0]
+			if a, exists := m.allocs[op.key]; exists {
+				g.touchAlloc(a.alloc)
+				op.matAlloc = a
+				texOps = texOps[1:]
 				continue
 			}
-			quad, bounds := g.materialQuad(op.key.transform, op.img, op.pos)
 
-			// A material is clipped to avoid drawing outside its bounds inside the atlas. However,
-			// imprecision in the clipping may cause a single pixel overflow. Be safe.
-			size := bounds.Size().Add(image.Pt(1, 1))
-			place, fits := m.packer.tryAdd(size)
-			if !fits {
-				m.offsets = nil
-				m.quads = m.quads[:0]
-				m.packer.clear()
-				if !reclaimed {
-					// Some images may no longer be in use, try again
-					// after clearing existing maps.
-					reclaimed = true
-				} else {
-					m.packer.maxDims.X += 256
-					m.packer.maxDims.Y += 256
-					resize = true
-					if m.packer.maxDims.X > g.maxTextureDim {
-						return errors.New("compute: no space left in material atlas")
-					}
-				}
-				m.packer.newPage()
-				continue restart
+			if imgAtlas != nil && op.imgAlloc.atlas != imgAtlas {
+				// Only one image atlas per render pass.
+				break
 			}
+			imgAtlas = op.imgAlloc.atlas
+			quad, bounds := g.materialQuad(imgAtlas.size, op.key.transform, op.img, op.imgAlloc.rect.Min)
+			// A material is clipped to avoid drawing outside its atlas bounds.
+			// However, imprecision in the clipping may cause a single pixel
+			// overflow. Be safe.
+			size := bounds.Size().Add(image.Pt(1, 1))
+			alloc, fits := g.atlasAlloc(allocQuery{
+				atlas:    atlas,
+				size:     size,
+				format:   driver.TextureFormatRGBA8,
+				bindings: combinedBindings,
+			})
+			if !fits {
+				break
+			}
+			atlas = alloc.atlas
+			alloc.cpu = g.useCPU
 			// Position quad to match place.
-			offset := place.Pos.Sub(bounds.Min)
-			offsetf := layout.FPt(offset)
+			offsetf := layout.FPt(alloc.rect.Min.Sub(bounds.Min))
 			for i := range quad {
 				quad[i].posX += offsetf.X
 				quad[i].posY += offsetf.Y
 			}
 			// Draw quad as two triangles.
 			m.quads = append(m.quads, quad[0], quad[1], quad[3], quad[3], quad[1], quad[2])
-			if m.offsets == nil {
-				m.offsets = make(map[textureKey]image.Point)
+			if m.allocs == nil {
+				m.allocs = make(map[textureKey]materialAlloc)
 			}
-			m.offsets[op.key] = offset
-			g.enc.setFillImageOffset(op.sceneIdx, offset.Sub(op.off))
-			m.regions = append(m.regions, image.Rectangle{
-				Min: place.Pos,
-				Max: place.Pos.Add(size),
-			})
+			atlasAlloc := materialAlloc{
+				alloc:  &alloc,
+				offset: bounds.Min.Mul(-1),
+			}
+			atlas.allocs = append(atlas.allocs, atlasAlloc.alloc)
+			m.allocs[op.key] = atlasAlloc
+			op.matAlloc = atlasAlloc
+			m.regions = append(m.regions, alloc.rect)
+			texOps = texOps[1:]
 		}
-		break
+		if len(m.quads) == 0 {
+			break
+		}
+		realized := atlas.realized
+		if err := g.realizeAtlas(atlas, g.useCPU, atlas.packer.sizes[0]); err != nil {
+			return err
+		}
+		// Transform to clip space: [-1, -1] - [1, 1] and flip Y-axis to cancel the implied transformation
+		// between framebuffer and texture space.
+		m.vert.uniforms.scale = [2]float32{2 / float32(atlas.size.X), -2 / float32(atlas.size.Y)}
+		m.vert.uniforms.pos = [2]float32{-1, +1}
+		m.vert.buf.Upload(byteslice.Struct(m.vert.uniforms))
+		g.ctx.BindVertexUniforms(m.vert.buf)
+		g.ctx.BindFragmentUniforms(m.frag.buf)
+		vertexData := byteslice.Slice(m.quads)
+		n := pow2Ceil(len(vertexData))
+		m.buffer.ensureCapacity(false, g.ctx, driver.BufferBindingVertices, n)
+		m.buffer.buffer.Upload(vertexData)
+		g.ctx.BindTexture(0, imgAtlas.image)
+		var d driver.LoadDesc
+		if !realized {
+			d.Action = driver.LoadActionClear
+		}
+		g.ctx.BindFramebuffer(atlas.fbo, d)
+		g.ctx.Viewport(0, 0, atlas.size.X, atlas.size.Y)
+		g.ctx.BindPipeline(m.pipeline)
+		g.ctx.BindVertexBuffer(m.buffer.buffer, 0)
+		g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(m.quads))
+		if !g.useCPU {
+			continue
+		}
+		copyFBO := atlas.fbo
+		data := atlas.cpuImage.Data()
+		for _, r := range m.regions {
+			dims := r.Size()
+			if n := dims.X * dims.Y * 4; n > len(m.scratch) {
+				m.scratch = make([]byte, n)
+			}
+			copyFBO.ReadPixels(r, m.scratch)
+			stride := atlas.size.X * 4
+			col := r.Min.X * 4
+			row := stride * r.Min.Y
+			off := col + row
+			w := dims.X * 4
+			for y := 0; y < dims.Y; y++ {
+				copy(data[off:off+w], m.scratch[y*dims.X*4:])
+				off += stride
+			}
+		}
 	}
-	if len(m.quads) == 0 {
-		return nil
-	}
-	texSize := m.packer.maxDims
-	if resize {
-		if m.fbo != nil {
-			m.fbo.Release()
-			m.fbo = nil
-		}
-		if m.tex != nil {
-			m.tex.Release()
-			m.tex = nil
-		}
-		m.cpuTex.Free()
-		handle, err := g.ctx.NewTexture(driver.TextureFormatRGBA8, texSize.X, texSize.Y,
-			driver.FilterNearest, driver.FilterNearest,
-			driver.BufferBindingShaderStorageRead|driver.BufferBindingFramebuffer)
-		if err != nil {
-			return fmt.Errorf("compute: failed to create material atlas: %v", err)
-		}
-		fbo, err := g.ctx.NewFramebuffer(handle)
-		if err != nil {
-			handle.Release()
-			return fmt.Errorf("compute: failed to create material framebuffer: %v", err)
-		}
-		m.tex = handle
-		m.fbo = fbo
-		if g.useCPU {
-			m.cpuTex = cpu.NewImageRGBA(texSize.X, texSize.Y)
-		}
-	}
-	// Transform to clip space: [-1, -1] - [1, 1] and flip Y-axis to cancel the implied transformation
-	// between framebuffer and texture space.
-	m.vert.uniforms.scale = [2]float32{2 / float32(texSize.X), -2 / float32(texSize.Y)}
-	m.vert.uniforms.pos = [2]float32{-1, +1}
-	m.vert.buf.Upload(byteslice.Struct(m.vert.uniforms))
-	g.ctx.BindVertexUniforms(m.vert.buf)
-	g.ctx.BindFragmentUniforms(m.frag.buf)
-	vertexData := byteslice.Slice(m.quads)
-	n := pow2Ceil(len(vertexData))
-	m.buffer.ensureCapacity(false, g.ctx, driver.BufferBindingVertices, n)
-	m.buffer.buffer.Upload(vertexData)
-	g.ctx.BindTexture(0, g.images.tex)
-	var d driver.LoadDesc
-	if reclaimed {
-		d.Action = driver.LoadActionClear
-	}
-	g.ctx.BindFramebuffer(m.fbo, d)
-	g.ctx.Viewport(0, 0, texSize.X, texSize.Y)
-	g.ctx.BindPipeline(m.pipeline)
-	g.ctx.BindVertexBuffer(m.buffer.buffer, 0)
-	g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(m.quads))
 	return nil
 }
 
 func (g *compute) uploadImages() error {
+	for k, a := range g.imgAllocs {
+		if a.dead {
+			delete(g.imgAllocs, k)
+		}
+	}
+	type upload struct {
+		pos image.Point
+		img *image.RGBA
+	}
+	var uploads []upload
+	format := driver.TextureFormatSRGBA
+	if !g.srgb {
+		format = driver.TextureFormatRGBA8
+	}
 	// padding is the number of pixels added to the right and below
 	// images, to avoid atlas filtering artifacts.
 	const padding = 1
-
-	a := &g.images
-	var uploads map[interface{}]*image.RGBA
-	resize := false
-	reclaimed := false
-restart:
-	for {
-		for i, op := range g.texOps {
-			if pos, exists := a.positions[op.img.handle]; exists {
-				g.texOps[i].pos = pos
+	texOps := g.texOps
+	for len(texOps) > 0 {
+		uploads = uploads[:0]
+		var atlas *textureAtlas
+		for len(texOps) > 0 {
+			op := &texOps[0]
+			if a, exists := g.imgAllocs[op.img.handle]; exists {
+				g.touchAlloc(a)
+				op.imgAlloc = a
+				texOps = texOps[1:]
 				continue
 			}
 			size := op.img.src.Bounds().Size().Add(image.Pt(padding, padding))
-			place, fits := a.packer.tryAdd(size)
+			alloc, fits := g.atlasAlloc(allocQuery{
+				atlas:    atlas,
+				size:     size,
+				format:   format,
+				bindings: driver.BufferBindingTexture | driver.BufferBindingFramebuffer,
+			})
 			if !fits {
-				a.positions = nil
-				uploads = nil
-				a.packer.clear()
-				if !reclaimed {
-					// Some images may no longer be in use, try again
-					// after clearing existing maps.
-					reclaimed = true
-				} else {
-					a.packer.maxDims.X += 256
-					a.packer.maxDims.Y += 256
-					resize = true
-					if a.packer.maxDims.X > g.maxTextureDim {
-						return errors.New("compute: no space left in image atlas")
-					}
-				}
-				a.packer.newPage()
-				continue restart
+				break
 			}
-			if a.positions == nil {
-				a.positions = make(map[interface{}]image.Point)
+			atlas = alloc.atlas
+			if g.imgAllocs == nil {
+				g.imgAllocs = make(map[interface{}]*atlasAlloc)
 			}
-			a.positions[op.img.handle] = place.Pos
-			g.texOps[i].pos = place.Pos
-			if uploads == nil {
-				uploads = make(map[interface{}]*image.RGBA)
-			}
-			uploads[op.img.handle] = op.img.src
+			op.imgAlloc = &alloc
+			atlas.allocs = append(atlas.allocs, op.imgAlloc)
+			g.imgAllocs[op.img.handle] = op.imgAlloc
+			uploads = append(uploads, upload{pos: alloc.rect.Min, img: op.img.src})
+			texOps = texOps[1:]
 		}
-		break
-	}
-	if len(uploads) == 0 {
-		return nil
-	}
-	if resize {
-		if a.tex != nil {
-			a.tex.Release()
-			a.tex = nil
+		if len(uploads) == 0 {
+			break
 		}
-		sz := a.packer.maxDims
-		format := driver.TextureFormatSRGBA
-		if !g.srgb {
-			format = driver.TextureFormatRGBA8
+		if err := g.realizeAtlas(atlas, false, atlas.packer.sizes[0]); err != nil {
+			return err
 		}
-		handle, err := g.ctx.NewTexture(format, sz.X, sz.Y, driver.FilterLinear, driver.FilterLinear, driver.BufferBindingTexture)
-		if err != nil {
-			return fmt.Errorf("compute: failed to create image atlas: %v", err)
+		for _, u := range uploads {
+			size := u.img.Bounds().Size()
+			driver.UploadImage(atlas.image, u.pos, u.img)
+			rightPadding := image.Pt(padding, size.Y)
+			atlas.image.Upload(image.Pt(u.pos.X+size.X, u.pos.Y), rightPadding, g.zeros(rightPadding.X*rightPadding.Y*4), 0)
+			bottomPadding := image.Pt(size.X, padding)
+			atlas.image.Upload(image.Pt(u.pos.X, u.pos.Y+size.Y), bottomPadding, g.zeros(bottomPadding.X*bottomPadding.Y*4), 0)
 		}
-		a.tex = handle
-	}
-	for h, img := range uploads {
-		pos, ok := a.positions[h]
-		if !ok {
-			panic("compute: internal error: image not placed")
-		}
-		size := img.Bounds().Size()
-		driver.UploadImage(a.tex, pos, img)
-		rightPadding := image.Pt(padding, size.Y)
-		a.tex.Upload(image.Pt(pos.X+size.X, pos.Y), rightPadding, g.zeros(rightPadding.X*rightPadding.Y*4), 0)
-		bottomPadding := image.Pt(size.X, padding)
-		a.tex.Upload(image.Pt(pos.X, pos.Y+size.Y), bottomPadding, g.zeros(bottomPadding.X*bottomPadding.Y*4), 0)
 	}
 	return nil
 }
@@ -1042,7 +1103,7 @@ func pow2Ceil(v int) int {
 
 // materialQuad constructs a quad that represents the transformed image. It returns the quad
 // and its bounds.
-func (g *compute) materialQuad(M f32.Affine2D, img imageOpData, uvPos image.Point) ([4]materialVertex, image.Rectangle) {
+func (g *compute) materialQuad(imgAtlasSize image.Point, M f32.Affine2D, img imageOpData, uvPos image.Point) ([4]materialVertex, image.Rectangle) {
 	imgSize := layout.FPt(img.src.Bounds().Size())
 	sx, hx, ox, hy, sy, oy := M.Elems()
 	transOff := f32.Pt(ox, oy)
@@ -1068,11 +1129,15 @@ func (g *compute) materialQuad(M f32.Affine2D, img imageOpData, uvPos image.Poin
 
 	bounds := boundRectF(boundsf)
 	uvPosf := layout.FPt(uvPos)
-	atlasScale := 1 / float32(g.images.packer.maxDims.X)
+	atlasScale := f32.Pt(1/float32(imgAtlasSize.X), 1/float32(imgAtlasSize.Y))
 	uvBounds := f32.Rectangle{
-		Min: uvPosf.Mul(atlasScale),
-		Max: uvPosf.Add(imgSize).Mul(atlasScale),
+		Min: uvPosf,
+		Max: uvPosf.Add(imgSize),
 	}
+	uvBounds.Min.X *= atlasScale.X
+	uvBounds.Min.Y *= atlasScale.Y
+	uvBounds.Max.X *= atlasScale.X
+	uvBounds.Max.Y *= atlasScale.Y
 	quad := [4]materialVertex{
 		{posX: q0.X, posY: q0.Y, u: uvBounds.Min.X, v: uvBounds.Min.Y},
 		{posX: q1.X, posY: q1.Y, u: uvBounds.Min.X, v: uvBounds.Max.Y},
@@ -1113,7 +1178,7 @@ func (enc *encoder) encodePath(verts []byte) {
 	}
 }
 
-func (g *compute) render(dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDims image.Point, stride int) error {
+func (g *compute) render(images *textureAtlas, dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDims image.Point, stride int) error {
 	const (
 		// wgSize is the largest and most common workgroup size.
 		wgSize = 128
@@ -1191,12 +1256,14 @@ func (g *compute) render(dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDim
 
 	if !g.useCPU {
 		g.ctx.BindImageTexture(kernel4OutputUnit, dst, driver.AccessWrite, driver.TextureFormatRGBA8)
-		if t := g.materials.tex; t != nil {
-			g.ctx.BindImageTexture(kernel4AtlasUnit, t, driver.AccessRead, driver.TextureFormatRGBA8)
+		if images != nil {
+			g.ctx.BindImageTexture(kernel4AtlasUnit, images.image, driver.AccessRead, driver.TextureFormatRGBA8)
 		}
 	} else {
 		*g.output.descriptors.Binding2() = cpuDst
-		*g.output.descriptors.Binding3() = g.materials.cpuTex
+		if images != nil {
+			*g.output.descriptors.Binding3() = images.cpuImage
+		}
 	}
 
 	for {
@@ -1220,7 +1287,6 @@ func (g *compute) render(dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDim
 		g.memoryBarrier()
 		g.dispatch(g.programs.coarse, widthInBins, heightInBins, 1)
 		g.memoryBarrier()
-		g.downloadMaterials()
 		g.dispatch(g.programs.kernel4, tileDims.X, tileDims.Y, 1)
 		g.memoryBarrier()
 		if g.useCPU {
@@ -1253,31 +1319,6 @@ func (g *compute) render(dst driver.Texture, cpuDst cpu.ImageDescriptor, tileDim
 	}
 }
 
-func (g *compute) downloadMaterials() {
-	m := &g.materials
-	if !g.useCPU || len(m.regions) == 0 {
-		return
-	}
-	copyFBO := m.fbo
-	data := m.cpuTex.Data()
-	for _, r := range m.regions {
-		dims := r.Size()
-		if n := dims.X * dims.Y * 4; n > len(m.scratch) {
-			m.scratch = make([]byte, n)
-		}
-		copyFBO.ReadPixels(r, m.scratch)
-		stride := m.packer.maxDims.X * 4
-		col := r.Min.X * 4
-		row := stride * r.Min.Y
-		off := col + row
-		w := dims.X * 4
-		for y := 0; y < dims.Y; y++ {
-			copy(data[off:off+w], m.scratch[y*dims.X*4:])
-			off += stride
-		}
-	}
-}
-
 func (g *compute) memoryBarrier() {
 	if !g.useCPU {
 		g.ctx.MemoryBarrier()
@@ -1303,24 +1344,96 @@ func (g *compute) zeros(size int) []byte {
 	return g.zeroSlice[:size]
 }
 
-func (a *layerAtlas) ensureSize(useCPU bool, ctx driver.Device, size image.Point) error {
-	if a.size.X >= size.X && a.size.Y >= size.Y {
+func (g *compute) touchAlloc(a *atlasAlloc) {
+	if a.dead {
+		panic("re-use of dead allocation")
+	}
+	a.frameCount = g.frameCount
+	a.atlas.lastFrame = a.frameCount
+}
+
+func (g *compute) atlasAlloc(q allocQuery) (atlasAlloc, bool) {
+	var (
+		place placement
+		fits  bool
+		atlas = q.atlas
+	)
+	if atlas != nil {
+		place, fits = atlas.packer.tryAdd(q.size)
+		if !fits {
+			atlas.compact = true
+		}
+	}
+	if atlas == nil {
+		// Look for matching atlas to re-use.
+		for _, a := range g.atlases {
+			if q.empty && len(a.allocs) > 0 {
+				continue
+			}
+			if q.nocompact && a.compact {
+				continue
+			}
+			if a.format != q.format || a.bindings&q.bindings != q.bindings {
+				continue
+			}
+			place, fits = a.packer.tryAdd(q.size)
+			if !fits {
+				a.compact = true
+				continue
+			}
+			atlas = a
+			break
+		}
+	}
+	if atlas == nil {
+		atlas = &textureAtlas{
+			format:   q.format,
+			bindings: q.bindings,
+		}
+		atlas.packer.maxDims = image.Pt(g.maxTextureDim, g.maxTextureDim)
+		atlas.packer.newPage()
+		g.atlases = append(g.atlases, atlas)
+		place, fits = atlas.packer.tryAdd(q.size)
+		if !fits {
+			panic(fmt.Errorf("compute: atlas allocation too large (%v)", q.size))
+		}
+	}
+	if !fits {
+		return atlasAlloc{}, false
+	}
+	atlas.lastFrame = g.frameCount
+	return atlasAlloc{
+		frameCount: g.frameCount,
+		atlas:      atlas,
+		rect:       image.Rectangle{Min: place.Pos, Max: place.Pos.Add(q.size)},
+	}, true
+}
+
+func (g *compute) realizeAtlas(atlas *textureAtlas, useCPU bool, size image.Point) error {
+	defer func() {
+		atlas.packer.maxDims = atlas.size
+		atlas.realized = true
+		atlas.ensureCPUImage(useCPU)
+	}()
+	if atlas.size.X >= size.X && atlas.size.Y >= size.Y {
 		return nil
 	}
-	if a.fbo != nil {
-		a.fbo.Release()
-		a.fbo = nil
+	if atlas.realized {
+		panic("resizing a realized atlas")
 	}
-	if a.image != nil {
-		a.image.Release()
-		a.image = nil
+	if err := atlas.resize(g.ctx, size); err != nil {
+		return err
 	}
-	a.cpuImage.Free()
+	return nil
+}
 
-	img, err := ctx.NewTexture(driver.TextureFormatRGBA8, size.X, size.Y,
+func (a *textureAtlas) resize(ctx driver.Device, size image.Point) error {
+	a.Release()
+
+	img, err := ctx.NewTexture(a.format, size.X, size.Y,
 		driver.FilterNearest,
 		driver.FilterNearest,
-		driver.BufferBindingShaderStorageWrite|driver.BufferBindingTexture|driver.BufferBindingFramebuffer)
+		a.bindings)
 	if err != nil {
 		return err
 	}
@@ -1331,11 +1444,16 @@ func (a *layerAtlas) ensureSize(useCPU bool, ctx driver.Device, size image.Point
 	}
 	a.fbo = fbo
 	a.image = img
-	if useCPU {
-		a.cpuImage = cpu.NewImageRGBA(size.X, size.Y)
-	}
 	a.size = size
 	return nil
+}
+
+func (a *textureAtlas) ensureCPUImage(useCPU bool) {
+	if !useCPU || a.hasCPU {
+		return
+	}
+	a.hasCPU = true
+	a.cpuImage = cpu.NewImageRGBA(a.size.X, a.size.Y)
 }
 
 func (g *compute) Release() {
@@ -1360,32 +1478,34 @@ func (g *compute) Release() {
 		&g.buffers.state,
 		&g.buffers.memory,
 		&g.buffers.config,
-		g.images.tex,
 		g.materials.pipeline,
-		g.materials.fbo,
-		g.materials.tex,
 		&g.materials.buffer,
 		g.materials.vert.buf,
 		g.materials.frag.buf,
 		g.timers.t,
 	}
-	g.materials.cpuTex.Free()
 	for _, r := range res {
 		if r != nil {
 			r.Release()
 		}
 	}
-	for _, a := range g.output.layerAtlases {
-		if a.fbo != nil {
-			a.fbo.Release()
-		}
-		if a.image != nil {
-			a.image.Release()
-		}
-		a.cpuImage.Free()
+	for _, a := range g.atlases {
+		a.Release()
 	}
-
 	*g = compute{}
+}
+
+func (a *textureAtlas) Release() {
+	if a.fbo != nil {
+		a.fbo.Release()
+		a.fbo = nil
+	}
+	if a.image != nil {
+		a.image.Release()
+		a.image = nil
+	}
+	a.cpuImage.Free()
+	a.hasCPU = false
 }
 
 func (g *compute) bindBuffers() {
@@ -1518,20 +1638,9 @@ func (e *encoder) fillColor(col color.RGBA) {
 	e.npath++
 }
 
-func (e *encoder) setFillImageOffset(index int, offset image.Point) {
-	if e.scene[index].Op() != scene.OpFillImage {
-		panic("invalid fill image command")
-	}
-	x := int16(offset.X)
-	y := int16(offset.Y)
-	e.scene[index][2] = uint32(uint16(x)) | uint32(uint16(y))<<16
-}
-
-func (e *encoder) fillImage(index int) int {
-	idx := len(e.scene)
-	e.scene = append(e.scene, scene.FillImage(index))
+func (e *encoder) fillImage(index int, offset image.Point) {
+	e.scene = append(e.scene, scene.FillImage(index, offset))
 	e.npath++
-	return idx
 }
 
 func (e *encoder) line(start, end f32.Point) {
@@ -1593,7 +1702,7 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 	state.relTrans = f32.Affine2D{}
 }
 
-func (c *collector) collect(root *op.Ops, viewport image.Point) {
+func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textureOp) {
 	fview := f32.Rectangle{Max: layout.FPt(viewport)}
 	c.reader.Reset(root)
 	state := encoderState{
@@ -1739,6 +1848,23 @@ func (c *collector) collect(root *op.Ops, viewport image.Point) {
 			op.state.t = op.state.t.Offset(layout.FPt(off.Mul(-1)))
 		}
 		op.hash = c.hashOp(*op)
+		op.texOpIdx = -1
+		switch op.state.matType {
+		case materialTexture:
+			op.texOpIdx = len(*texOps)
+			// Separate integer offset from transformation. TextureOps that have identical transforms
+			// except for their integer offsets can share a transformed image.
+			t := op.state.t.Offset(layout.FPt(op.offset))
+			t, off := separateTransform(t)
+			*texOps = append(*texOps, textureOp{
+				img: op.state.image,
+				off: off,
+				key: textureKey{
+					transform: t,
+					handle:    op.state.image.handle,
+				},
+			})
+		}
 	}
 }
 
@@ -1755,8 +1881,9 @@ func (c *collector) hashOp(op paintOp) uint64 {
 	return c.hasher.Sum64()
 }
 
-func (c *collector) layer(viewport image.Point) {
+func (g *compute) layer(viewport image.Point, texOps []textureOp) {
 	// Sort ops from previous frames by hash.
+	c := &g.collector
 	prevOps := c.prevFrame.ops
 	c.order = c.order[:0]
 	for i, op := range prevOps {
@@ -1768,14 +1895,37 @@ func (c *collector) layer(viewport image.Point) {
 	sort.Slice(c.order, func(i, j int) bool {
 		return c.order[i].hash < c.order[j].hash
 	})
-	addLayer := func(l layer) {
-		for i, op := range l.ops {
-			l.rect = l.rect.Union(boundRectF(op.intersect))
-			l.ops[i].layer = len(c.frame.layers)
-		}
-		c.frame.layers = append(c.frame.layers, l)
-		if l.place.atlas != nil {
-			l.place.atlas.layers++
+	// Split layers with different materials atlas; the compute stage has only
+	// one materials slot.
+	splitLayer := func(ops []paintOp, prevLayerIdx int) {
+		for len(ops) > 0 {
+			var materials *textureAtlas
+			idx := 0
+			for idx < len(ops) {
+				if i := ops[idx].texOpIdx; i != -1 {
+					omats := texOps[i].matAlloc.alloc.atlas
+					if materials != nil && omats != nil && omats != materials {
+						break
+					}
+					materials = omats
+				}
+				idx++
+			}
+			l := layer{ops: ops[:idx], materials: materials}
+			if prevLayerIdx != -1 {
+				prev := c.prevFrame.layers[prevLayerIdx]
+				if !prev.alloc.dead && len(prev.ops) == len(l.ops) {
+					l.alloc = prev.alloc
+					l.materials = prev.materials
+					g.touchAlloc(l.alloc)
+				}
+			}
+			for i, op := range l.ops {
+				l.rect = l.rect.Union(boundRectF(op.intersect))
+				l.ops[i].layer = len(c.frame.layers)
+			}
+			c.frame.layers = append(c.frame.layers, l)
+			ops = ops[idx:]
 		}
 	}
 	ops := c.frame.ops
@@ -1785,27 +1935,22 @@ func (c *collector) layer(viewport image.Point) {
 		// Search for longest matching op sequence.
 		// start is the earliest index of a match.
 		start := searchOp(c.order, op.hash)
-		layerOps, layerIdx := longestLayer(prevOps, c.order[start:], ops[idx:])
+		layerOps, prevLayerIdx := longestLayer(prevOps, c.order[start:], ops[idx:])
 		if len(layerOps) == 0 {
 			idx++
 			continue
 		}
 		if unmatched := ops[:idx]; len(unmatched) > 0 {
 			// Flush layer of unmatched ops.
-			addLayer(layer{ops: unmatched})
+			splitLayer(unmatched, -1)
 			ops = ops[idx:]
 			idx = 0
 		}
-		l := c.prevFrame.layers[layerIdx]
-		var place layerPlace
-		if len(l.ops) == len(layerOps) {
-			place = l.place
-		}
-		addLayer(layer{ops: layerOps, place: place})
+		splitLayer(layerOps, prevLayerIdx)
 		ops = ops[len(layerOps):]
 	}
 	if len(ops) > 0 {
-		addLayer(layer{ops: ops})
+		splitLayer(ops, -1)
 	}
 }
 
@@ -1824,7 +1969,7 @@ outer:
 		for end < len(match) && end < len(ops) {
 			m := match[end]
 			o := ops[end]
-			// End on layer boundaries.
+			// End layers on previous match.
 			if m.layer != layer {
 				break
 			}
@@ -1845,6 +1990,7 @@ outer:
 		if end > longest {
 			longest = end
 			longestIdx = layer
+
 		}
 	}
 	return ops[:longest], longestIdx
@@ -1888,18 +2034,18 @@ func opEqual(off image.Point, o1 paintOp, o2 paintOp) bool {
 	return true
 }
 
-func encodeLayer(l layer, pos image.Point, viewport image.Point, enc *encoder, texOps *[]textureOp) {
+func encodeLayer(l layer, pos image.Point, viewport image.Point, enc *encoder, texOps []textureOp) {
 	off := pos.Sub(l.rect.Min)
 	offf := layout.FPt(off)
 
 	enc.transform(f32.Affine2D{}.Offset(offf))
 	for _, op := range l.ops {
-		encodeOp(viewport, offf, enc, texOps, op)
+		encodeOp(viewport, off, enc, texOps, op)
 	}
 	enc.transform(f32.Affine2D{}.Offset(offf.Mul(-1)))
 }
 
-func encodeOp(viewport image.Point, absOff f32.Point, enc *encoder, texOps *[]textureOp, op paintOp) {
+func encodeOp(viewport image.Point, absOff image.Point, enc *encoder, texOps []textureOp, op paintOp) {
 	// Fill in clip bounds, which the shaders expect to be the union
 	// of all affected bounds.
 	var union f32.Rectangle
@@ -1908,6 +2054,7 @@ func encodeOp(viewport image.Point, absOff f32.Point, enc *encoder, texOps *[]te
 		op.clipStack[i].union = union
 	}
 
+	absOfff := layout.FPt(absOff)
 	fillMode := scene.FillModeNonzero
 	opOff := layout.FPt(op.offset)
 	inv := f32.Affine2D{}.Offset(opOff)
@@ -1930,7 +2077,7 @@ func encodeOp(viewport image.Point, absOff f32.Point, enc *encoder, texOps *[]te
 			enc.encodePath(cl.path)
 		}
 		if i != 0 {
-			enc.beginClip(cl.union.Add(absOff))
+			enc.beginClip(cl.union.Add(absOfff))
 		}
 	}
 	if len(op.clipStack) == 0 {
@@ -1940,21 +2087,9 @@ func encodeOp(viewport image.Point, absOff f32.Point, enc *encoder, texOps *[]te
 
 	switch op.state.matType {
 	case materialTexture:
-		// Add fill command. Its offset is resolved and filled in renderMaterials.
-		idx := enc.fillImage(0)
-		// Separate integer offset from transformation. TextureOps that have identical transforms
-		// except for their integer offsets can share a transformed image.
-		t := op.state.t.Offset(absOff.Add(opOff))
-		t, off := separateTransform(t)
-		*texOps = append(*texOps, textureOp{
-			sceneIdx: idx,
-			img:      op.state.image,
-			off:      off,
-			key: textureKey{
-				transform: t,
-				handle:    op.state.image.handle,
-			},
-		})
+		texOp := texOps[op.texOpIdx]
+		off := texOp.matAlloc.alloc.rect.Min.Add(texOp.matAlloc.offset).Sub(texOp.off).Sub(absOff)
+		enc.fillImage(0, off)
 	case materialColor:
 		enc.fillColor(f32color.NRGBAToRGBA(op.state.color))
 	case materialLinearGradient:
@@ -1967,7 +2102,7 @@ func encodeOp(viewport image.Point, absOff f32.Point, enc *encoder, texOps *[]te
 	// Pop the clip stack, except the first entry used for fill.
 	for i := 1; i < len(op.clipStack); i++ {
 		cl := op.clipStack[i]
-		enc.endClip(cl.union.Add(absOff))
+		enc.endClip(cl.union.Add(absOfff))
 	}
 	if fillMode != scene.FillModeNonzero {
 		enc.fillMode(scene.FillModeNonzero)

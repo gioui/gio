@@ -6,6 +6,7 @@ package scene
 
 import (
 	"fmt"
+	"image"
 	"image/color"
 	"math"
 	"unsafe"
@@ -179,10 +180,13 @@ func FillColor(col color.RGBA) Command {
 	}
 }
 
-func FillImage(index int) Command {
+func FillImage(index int, offset image.Point) Command {
+	x := int16(offset.X)
+	y := int16(offset.Y)
 	return Command{
 		0: uint32(OpFillImage),
 		1: uint32(index),
+		2: uint32(uint16(x)) | uint32(uint16(y))<<16,
 	}
 }
 
