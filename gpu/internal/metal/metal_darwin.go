@@ -388,9 +388,8 @@ type Backend struct {
 	computeEnc    C.CFTypeRef
 	blitEnc       C.CFTypeRef
 
-	stagingBuf    C.CFTypeRef
-	stagingOff    int
-	oldStagingBuf C.CFTypeRef
+	stagingBuf C.CFTypeRef
+	stagingOff int
 
 	indexBuf *Buffer
 	state    state
@@ -491,7 +490,6 @@ func newMetalDevice(api driver.Metal) (driver.Device, error) {
 func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport image.Point) driver.Framebuffer {
 	if b.lastCmdBuffer != 0 {
 		C.cmdBufferWaitUntilCompleted(b.lastCmdBuffer)
-		b.oldStagingBuf, b.stagingBuf = b.stagingBuf, b.oldStagingBuf
 		b.stagingOff = 0
 	}
 	if target == nil {
@@ -593,9 +591,6 @@ func (b *Backend) Release() {
 	}
 	if b.stagingBuf != 0 {
 		C.CFRelease(b.stagingBuf)
-	}
-	if b.oldStagingBuf != 0 {
-		C.CFRelease(b.oldStagingBuf)
 	}
 	C.CFRelease(b.queue)
 	C.CFRelease(b.dev)
