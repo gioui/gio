@@ -21,6 +21,11 @@ import (
 #include <CoreFoundation/CoreFoundation.h>
 #include <Metal/Metal.h>
 
+typedef struct {
+	void *addr;
+	NSUInteger size;
+} slice;
+
 static CFTypeRef queueNewBuffer(CFTypeRef queueRef) {
 	@autoreleasepool {
 		id<MTLCommandQueue> queue = (__bridge id<MTLCommandQueue>)queueRef;
@@ -298,17 +303,11 @@ static CFTypeRef newBuffer(CFTypeRef devRef, NSUInteger size, MTLResourceOptions
 	}
 }
 
-static void *bufferAddress(CFTypeRef bufRef) {
+static slice bufferContents(CFTypeRef bufRef) {
 	@autoreleasepool {
 		id<MTLBuffer> buf = (__bridge id<MTLBuffer>)bufRef;
-		return [buf contents];
-	}
-}
-
-static NSUInteger bufferLength(CFTypeRef bufRef) {
-	@autoreleasepool {
-		id<MTLBuffer> buf = (__bridge id<MTLBuffer>)bufRef;
-		return [buf length];
+		slice s = {.addr = [buf contents], .size = [buf length]};
+		return s;
 	}
 }
 
@@ -1106,9 +1105,8 @@ func (b *Buffer) Upload(data []byte) {
 }
 
 func bufferStore(buf C.CFTypeRef) []byte {
-	addr := C.bufferAddress(buf)
-	n := C.bufferLength(buf)
-	return (*(*[1 << 30]byte)(addr))[:n:n]
+	contents := C.bufferContents(buf)
+	return (*(*[1 << 30]byte)(contents.addr))[:contents.size:contents.size]
 }
 
 func bufferSlice(buf C.CFTypeRef, off, len int) []byte {
