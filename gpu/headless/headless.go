@@ -109,8 +109,7 @@ func (w *Window) Release() {
 func (w *Window) Frame(frame *op.Ops) error {
 	return contextDo(w.ctx, func() error {
 		w.gpu.Clear(color.NRGBA{})
-		w.gpu.Collect(w.size, frame)
-		return w.gpu.Frame(driver.RenderTarget(w.fbo))
+		return w.gpu.Frame(frame, driver.RenderTarget(w.fbo), w.size)
 	})
 }
 

@@ -559,7 +559,12 @@ func newShaders(ctx driver.Device, vsrc, fsrc shader.Sources) (vert driver.Verte
 	return
 }
 
-func (g *compute) Collect(viewport image.Point, ops *op.Ops) {
+func (g *compute) Frame(frameOps *op.Ops, target RenderTarget, viewport image.Point) error {
+	g.collect(viewport, frameOps)
+	return g.frame(target)
+}
+
+func (g *compute) collect(viewport image.Point, ops *op.Ops) {
 	g.viewport = viewport
 	g.collector.reset()
 	for i := range g.output.layerAtlases {
@@ -575,7 +580,7 @@ func (g *compute) Clear(col color.NRGBA) {
 	g.collector.clearColor = f32color.LinearFromSRGB(col)
 }
 
-func (g *compute) Frame(target RenderTarget) error {
+func (g *compute) frame(target RenderTarget) error {
 	viewport := g.viewport
 	defFBO := g.ctx.BeginFrame(target, g.collector.clear, viewport)
 	defer g.ctx.EndFrame()

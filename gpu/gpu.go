@@ -43,12 +43,10 @@ type GPU interface {
 	Release()
 	// Clear sets the clear color for the next Frame.
 	Clear(color color.NRGBA)
-	// Collect the graphics operations from frame, given the viewport.
-	Collect(viewport image.Point, frame *op.Ops)
-	// Frame draws the collected operations to target.
-	Frame(target RenderTarget) error
+	// Frame draws the graphics operations from op into a viewport of target.
+	Frame(frame *op.Ops, target RenderTarget, viewport image.Point) error
 	// Profile returns the last available profiling information. Profiling
-	// information is requested when Collect sees an io/profile.Op, and the result
+	// information is requested when Frame sees an io/profile.Op, and the result
 	// is available through Profile at some later time.
 	Profile() string
 }
@@ -399,7 +397,12 @@ func (g *gpu) Release() {
 	g.ctx.Release()
 }
 
-func (g *gpu) Collect(viewport image.Point, frameOps *op.Ops) {
+func (g *gpu) Frame(frameOps *op.Ops, target RenderTarget, viewport image.Point) error {
+	g.collect(viewport, frameOps)
+	return g.frame(target)
+}
+
+func (g *gpu) collect(viewport image.Point, frameOps *op.Ops) {
 	g.renderer.blitter.viewport = viewport
 	g.renderer.pather.viewport = viewport
 	g.drawOps.reset(g.cache, viewport)
@@ -413,7 +416,7 @@ func (g *gpu) Collect(viewport image.Point, frameOps *op.Ops) {
 	}
 }
 
-func (g *gpu) Frame(target RenderTarget) error {
+func (g *gpu) frame(target RenderTarget) error {
 	viewport := g.renderer.blitter.viewport
 	defFBO := g.ctx.BeginFrame(target, g.drawOps.clear, viewport)
 	defer g.ctx.EndFrame()

@@ -16,9 +16,6 @@ import (
 )
 
 // ImageOp sets the brush to an image.
-//
-// Note: the ImageOp may keep a reference to the backing image.
-// See NewImageOp for details.
 type ImageOp struct {
 	uniform bool
 	color   color.NRGBA
@@ -47,9 +44,7 @@ type LinearGradientOp struct {
 type PaintOp struct {
 }
 
-// NewImageOp creates an ImageOp backed by src. See
-// gioui.org/io/system.FrameEvent for a description of when data
-// referenced by operations is safe to re-use.
+// NewImageOp creates an ImageOp backed by src.
 //
 // NewImageOp assumes the backing image is immutable, and may cache a
 // copy of its contents in a GPU-friendly way. Create new ImageOps to

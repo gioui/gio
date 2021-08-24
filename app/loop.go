@@ -97,10 +97,9 @@ func (l *renderLoop) renderLoop(ctx wm.Context) error {
 				} else {
 					g.Clear(color.NRGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff})
 				}
-				g.Collect(frame.viewport, frame.ops)
+				res.err = g.Frame(frame.ops, ctx.RenderTarget(), frame.viewport)
 				// Signal that we're done with the frame ops.
 				l.ack <- struct{}{}
-				res.err = g.Frame(ctx.RenderTarget())
 				if res.err == nil {
 					res.err = ctx.Present()
 				}
