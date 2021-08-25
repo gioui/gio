@@ -716,7 +716,7 @@ func (b *Backend) NewBuffer(typ driver.BufferBinding, size int) (driver.Buffer, 
 		}
 		firstBinding := firstBufferType(typ)
 		b.glstate.bindBuffer(b.funcs, firstBinding, buf.obj)
-		b.funcs.BufferData(firstBinding, size, gl.DYNAMIC_DRAW)
+		b.funcs.BufferData(firstBinding, size, gl.DYNAMIC_DRAW, nil)
 	}
 	return buf, nil
 }
@@ -727,8 +727,7 @@ func (b *Backend) NewImmutableBuffer(typ driver.BufferBinding, data []byte) (dri
 	buf := &buffer{backend: b, obj: obj, typ: typ, size: len(data), hasBuffer: true}
 	firstBinding := firstBufferType(typ)
 	b.glstate.bindBuffer(b.funcs, firstBinding, buf.obj)
-	b.funcs.BufferData(firstBinding, len(data), gl.STATIC_DRAW)
-	buf.Upload(data)
+	b.funcs.BufferData(firstBinding, len(data), gl.STATIC_DRAW, data)
 	buf.immutable = true
 	if err := glErr(b.funcs); err != nil {
 		buf.Release()
@@ -1090,9 +1089,10 @@ func (b *buffer) Upload(data []byte) {
 			// the iOS GL implementation doesn't recognize when BufferSubData
 			// clears the entire buffer. Tell it and avoid GPU stalls.
 			// See also https://github.com/godotengine/godot/issues/23956.
-			b.backend.funcs.BufferData(firstBinding, b.size, gl.DYNAMIC_DRAW)
+			b.backend.funcs.BufferData(firstBinding, b.size, gl.DYNAMIC_DRAW, data)
+		} else {
+			b.backend.funcs.BufferSubData(firstBinding, 0, data)
 		}
-		b.backend.funcs.BufferSubData(firstBinding, 0, data)
 	}
 }
 

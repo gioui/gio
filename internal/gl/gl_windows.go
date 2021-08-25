@@ -159,8 +159,12 @@ func (c *Functions) BlendEquation(mode Enum) {
 func (c *Functions) BlendFuncSeparate(srcRGB, dstRGB, srcA, dstA Enum) {
 	syscall.Syscall6(_glBlendFuncSeparate.Addr(), 4, uintptr(srcRGB), uintptr(dstRGB), uintptr(srcA), uintptr(dstA), 0, 0)
 }
-func (c *Functions) BufferData(target Enum, size int, usage Enum) {
-	syscall.Syscall6(_glBufferData.Addr(), 4, uintptr(target), uintptr(size), 0, uintptr(usage), 0, 0)
+func (c *Functions) BufferData(target Enum, size int, usage Enum, data []byte) {
+	var p unsafe.Pointer
+	if len(data) > 0 {
+		p = unsafe.Pointer(&data[0])
+	}
+	syscall.Syscall6(_glBufferData.Addr(), 4, uintptr(target), uintptr(size), uintptr(p), uintptr(usage), 0, 0)
 }
 func (f *Functions) BufferSubData(target Enum, offset int, src []byte) {
 	if n := len(src); n > 0 {

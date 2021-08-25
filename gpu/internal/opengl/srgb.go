@@ -72,8 +72,7 @@ func (s *SRGBFBO) Blit() {
 			-1, -1, 0, 0,
 			+1, -1, 1, 0,
 		})
-		s.c.BufferData(gl.ARRAY_BUFFER, len(coords), gl.STATIC_DRAW)
-		s.c.BufferSubData(gl.ARRAY_BUFFER, 0, coords)
+		s.c.BufferData(gl.ARRAY_BUFFER, len(coords), gl.STATIC_DRAW, coords)
 		s.blitted = true
 	}
 	s.state.useProgram(s.c, s.prog)

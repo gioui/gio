@@ -104,8 +104,15 @@ func (f *Functions) BlendEquation(mode Enum) {
 func (f *Functions) BlendFuncSeparate(srcRGB, dstRGB, srcA, dstA Enum) {
 	f.Ctx.Call("blendFunc", int(srcRGB), int(dstRGB), int(srcA), int(dstA))
 }
-func (f *Functions) BufferData(target Enum, size int, usage Enum) {
-	f.Ctx.Call("bufferData", int(target), size, int(usage))
+func (f *Functions) BufferData(target Enum, size int, usage Enum, data []byte) {
+	if data == nil {
+		f.Ctx.Call("bufferData", int(target), size, int(usage))
+	} else {
+		if len(data) != size {
+			panic("size mismatch")
+		}
+		f.Ctx.Call("bufferData", int(target), f.byteArrayOf(data), int(usage))
+	}
 }
 func (f *Functions) BufferSubData(target Enum, offset int, src []byte) {
 	f.Ctx.Call("bufferSubData", int(target), offset, f.byteArrayOf(src))

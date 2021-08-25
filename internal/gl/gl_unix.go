@@ -782,8 +782,12 @@ func (f *Functions) BlitFramebuffer(sx0, sy0, sx1, sy1, dx0, dy0, dx1, dy1 int, 
 	)
 }
 
-func (f *Functions) BufferData(target Enum, size int, usage Enum) {
-	C.glBufferData(&f.f, C.GLenum(target), C.GLsizeiptr(size), nil, C.GLenum(usage))
+func (f *Functions) BufferData(target Enum, size int, usage Enum, data []byte) {
+	var p unsafe.Pointer
+	if len(data) > 0 {
+		p = unsafe.Pointer(&data[0])
+	}
+	C.glBufferData(&f.f, C.GLenum(target), C.GLsizeiptr(size), p, C.GLenum(usage))
 }
 
 func (f *Functions) BufferSubData(target Enum, offset int, src []byte) {
