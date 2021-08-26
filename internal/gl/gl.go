@@ -65,6 +65,7 @@ const (
 	NUM_EXTENSIONS                        = 0x821D
 	ONE                                   = 0x1
 	ONE_MINUS_SRC_ALPHA                   = 0x303
+	PACK_ROW_LENGTH                       = 0x0D02
 	PROGRAM_BINARY_LENGTH                 = 0x8741
 	QUERY_RESULT                          = 0x8866
 	QUERY_RESULT_AVAILABLE                = 0x8867

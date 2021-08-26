@@ -95,7 +95,6 @@ type compute struct {
 		frag struct {
 			buf driver.Buffer
 		}
-		scratch []byte
 	}
 	timers struct {
 		profile string
@@ -1006,20 +1005,11 @@ func (g *compute) renderMaterials() error {
 		copyFBO := atlas.fbo
 		data := atlas.cpuImage.Data()
 		for _, r := range m.regions {
-			dims := r.Size()
-			if n := dims.X * dims.Y * 4; n > len(m.scratch) {
-				m.scratch = make([]byte, n)
-			}
-			copyFBO.ReadPixels(r, m.scratch)
 			stride := atlas.size.X * 4
 			col := r.Min.X * 4
 			row := stride * r.Min.Y
 			off := col + row
-			w := dims.X * 4
-			for y := 0; y < dims.Y; y++ {
-				copy(data[off:off+w], m.scratch[y*dims.X*4:])
-				off += stride
-			}
+			copyFBO.ReadPixels(r, data[off:], stride)
 		}
 	}
 	return nil

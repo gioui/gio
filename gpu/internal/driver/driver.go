@@ -136,7 +136,7 @@ type Buffer interface {
 type Framebuffer interface {
 	RenderTarget
 	Release()
-	ReadPixels(src image.Rectangle, pixels []byte) error
+	ReadPixels(src image.Rectangle, pixels []byte, stride int) error
 }
 
 type Timer interface {
@@ -212,7 +212,7 @@ func (f Features) Has(feats Features) bool {
 
 func DownloadImage(d Device, f Framebuffer, r image.Rectangle) (*image.RGBA, error) {
 	img := image.NewRGBA(r)
-	if err := f.ReadPixels(r, img.Pix); err != nil {
+	if err := f.ReadPixels(r, img.Pix, img.Stride); err != nil {
 		return nil, err
 	}
 	if d.Caps().BottomLeftOrigin {

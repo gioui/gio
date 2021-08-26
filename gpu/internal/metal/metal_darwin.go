@@ -1121,7 +1121,7 @@ func (b *Buffer) Release() {
 	*b = Buffer{}
 }
 
-func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
+func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int) error {
 	if len(pixels) == 0 {
 		return nil
 	}
@@ -1135,7 +1135,6 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 		height: C.NSUInteger(sz.Y),
 		depth:  1,
 	}
-	stride := 4 * sz.X
 	buf, off := f.backend.stagingBuffer(len(pixels))
 	enc := f.backend.startBlit()
 	C.blitEncCopyTextureToBuffer(enc, f.texture, buf, C.NSUInteger(off), C.NSUInteger(stride), C.NSUInteger(len(pixels)), msize, orig)

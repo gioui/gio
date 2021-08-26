@@ -80,6 +80,7 @@ type glState struct {
 	clearColor        [4]float32
 	viewport          [4]int
 	unpack_row_length int
+	pack_row_length   int
 }
 
 type state struct {
@@ -297,6 +298,7 @@ func (b *Backend) queryState() glState {
 		clearColor:        b.funcs.GetFloat4(gl.COLOR_CLEAR_VALUE),
 		viewport:          b.funcs.GetInteger4(gl.VIEWPORT),
 		unpack_row_length: b.funcs.GetInteger(gl.UNPACK_ROW_LENGTH),
+		pack_row_length:   b.funcs.GetInteger(gl.PACK_ROW_LENGTH),
 	}
 	s.blend.enable = b.funcs.IsEnabled(gl.BLEND)
 	s.blend.srcRGB = gl.Enum(b.funcs.GetInteger(gl.BLEND_SRC_RGB))
@@ -372,6 +374,7 @@ func (b *Backend) restoreState(dst glState) {
 	v := dst.viewport
 	src.setViewport(f, v[0], v[1], v[2], v[3])
 	src.pixelStorei(f, gl.UNPACK_ROW_LENGTH, dst.unpack_row_length)
+	src.pixelStorei(f, gl.PACK_ROW_LENGTH, dst.pack_row_length)
 }
 
 func (s *glState) setVertexAttribArray(f *gl.Functions, idx int, enabled bool) {
@@ -574,13 +577,21 @@ func (s *glState) bindBuffer(f *gl.Functions, target gl.Enum, buf gl.Buffer) {
 }
 
 func (s *glState) pixelStorei(f *gl.Functions, pname gl.Enum, val int) {
-	if pname != gl.UNPACK_ROW_LENGTH {
+	switch pname {
+	case gl.UNPACK_ROW_LENGTH:
+		if val == s.unpack_row_length {
+			return
+		}
+		s.unpack_row_length = val
+	case gl.PACK_ROW_LENGTH:
+		if val == s.pack_row_length {
+			return
+		}
+		s.pack_row_length = val
+	default:
 		panic("unsupported PixelStorei pname")
 	}
-	if val != s.unpack_row_length {
-		f.PixelStorei(pname, val)
-		s.unpack_row_length = val
-	}
+	f.PixelStorei(pname, val)
 }
 
 func (s *glState) setClearColor(f *gl.Functions, r, g, b, a float32) {
@@ -1181,12 +1192,13 @@ func (b *Backend) CopyTexture(dst driver.Texture, dstOrigin image.Point, src dri
 	b.funcs.CopyTexSubImage2D(gl.TEXTURE_2D, 0, dstOrigin.X, dstOrigin.Y, srcRect.Min.X, srcRect.Min.Y, sz.X, sz.Y)
 }
 
-func (f *framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
+func (f *framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int) error {
 	glErr(f.backend.funcs)
 	f.backend.BindFramebuffer(f, driver.LoadDesc{})
 	if len(pixels) < src.Dx()*src.Dy()*4 {
 		return errors.New("unexpected RGBA size")
 	}
+	f.backend.glstate.pixelStorei(f.backend.funcs, gl.PACK_ROW_LENGTH, stride/4)
 	f.backend.funcs.ReadPixels(src.Min.X, src.Min.Y, src.Dx(), src.Dy(), gl.RGBA, gl.UNSIGNED_BYTE, pixels)
 	return glErr(f.backend.funcs)
 }

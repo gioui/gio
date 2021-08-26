@@ -593,7 +593,7 @@ func (b *Buffer) Release() {
 	b.buf = nil
 }
 
-func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
+func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int) error {
 	if f.resource == nil {
 		return errors.New("framebuffer does not support ReadPixels")
 	}
@@ -636,7 +636,7 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte) error {
 		return fmt.Errorf("ReadPixels: %v", err)
 	}
 	defer f.ctx.Unmap(res, 0)
-	srcPitch := w * 4
+	srcPitch := stride
 	dstPitch := int(resMap.RowPitch)
 	mapSize := dstPitch * h
 	data := sliceOf(resMap.PData, mapSize)
