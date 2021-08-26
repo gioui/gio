@@ -9,8 +9,8 @@ import (
 // packer packs a set of many smaller rectangles into
 // much fewer larger atlases.
 type packer struct {
-	maxDim int
-	spaces []image.Rectangle
+	maxDims image.Point
+	spaces  []image.Rectangle
 
 	sizes []image.Point
 	pos   image.Point
@@ -49,7 +49,7 @@ func (p *packer) tryAdd(s image.Point) (placement, bool) {
 	var (
 		bestIdx   = -1
 		bestSpace image.Rectangle
-		bestSize  = image.Pt(p.maxDim, p.maxDim)
+		bestSize  = p.maxDims
 	)
 	// Go backwards to prioritize smaller spaces.
 	for i, space := range p.spaces {
@@ -61,13 +61,13 @@ func (p *packer) tryAdd(s image.Point) (placement, bool) {
 		idx := len(p.sizes) - 1
 		size := p.sizes[idx]
 		if x := space.Min.X + s.X; x > size.X {
-			if x > p.maxDim {
+			if x > p.maxDims.X {
 				continue
 			}
 			size.X = x
 		}
 		if y := space.Min.Y + s.Y; y > size.Y {
-			if y > p.maxDim {
+			if y > p.maxDims.Y {
 				continue
 			}
 			size.Y = y

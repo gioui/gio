@@ -505,8 +505,8 @@ func newRenderer(ctx driver.Device) *renderer {
 		maxDim = cap
 	}
 
-	r.packer.maxDim = maxDim
-	r.intersections.maxDim = maxDim
+	r.packer.maxDims = image.Pt(maxDim, maxDim)
+	r.intersections.maxDims = image.Pt(maxDim, maxDim)
 	return r
 }
 
@@ -774,7 +774,7 @@ func (r *renderer) packStencils(pops *[]*pathOp) {
 		if !ok {
 			// The clip area is at most the entire screen. Hopefully no
 			// screen is larger than GL_MAX_TEXTURE_SIZE.
-			panic(fmt.Errorf("clip area %v is larger than maximum texture size %dx%d", p.clip, r.packer.maxDim, r.packer.maxDim))
+			panic(fmt.Errorf("clip area %v is larger than maximum texture size %v", p.clip, r.packer.maxDims))
 		}
 		p.place = place
 		i++

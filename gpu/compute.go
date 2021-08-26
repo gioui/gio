@@ -411,7 +411,7 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	}
 
 	// Large enough for reasonable fill sizes, yet still spannable by the compute programs.
-	g.output.packer.maxDim = 4096
+	g.output.packer.maxDims = image.Pt(4096, 4096)
 	copyVert, copyFrag, err := newShaders(ctx, gio.Shader_copy_vert, gio.Shader_copy_frag)
 	if err != nil {
 		g.Release()
@@ -863,9 +863,10 @@ restart:
 					// after clearing existing maps.
 					reclaimed = true
 				} else {
-					m.packer.maxDim += 256
+					m.packer.maxDims.X += 256
+					m.packer.maxDims.Y += 256
 					resize = true
-					if m.packer.maxDim > g.maxTextureDim {
+					if m.packer.maxDims.X > g.maxTextureDim {
 						return errors.New("compute: no space left in material atlas")
 					}
 				}
@@ -896,7 +897,7 @@ restart:
 	if len(m.quads) == 0 {
 		return nil
 	}
-	texSize := m.packer.maxDim
+	texSize := m.packer.maxDims
 	if resize {
 		if m.fbo != nil {
 			m.fbo.Release()
@@ -907,7 +908,7 @@ restart:
 			m.tex = nil
 		}
 		m.cpuTex.Free()
-		handle, err := g.ctx.NewTexture(driver.TextureFormatRGBA8, texSize, texSize,
+		handle, err := g.ctx.NewTexture(driver.TextureFormatRGBA8, texSize.X, texSize.Y,
 			driver.FilterNearest, driver.FilterNearest,
 			driver.BufferBindingShaderStorageRead|driver.BufferBindingFramebuffer)
 		if err != nil {
@@ -921,12 +922,12 @@ restart:
 		m.tex = handle
 		m.fbo = fbo
 		if g.useCPU {
-			m.cpuTex = cpu.NewImageRGBA(texSize, texSize)
+			m.cpuTex = cpu.NewImageRGBA(texSize.X, texSize.Y)
 		}
 	}
 	// Transform to clip space: [-1, -1] - [1, 1] and flip Y-axis to cancel the implied transformation
 	// between framebuffer and texture space.
-	m.vert.uniforms.scale = [2]float32{2 / float32(texSize), -2 / float32(texSize)}
+	m.vert.uniforms.scale = [2]float32{2 / float32(texSize.X), -2 / float32(texSize.Y)}
 	m.vert.uniforms.pos = [2]float32{-1, +1}
 	m.vert.buf.Upload(byteslice.Struct(m.vert.uniforms))
 	g.ctx.BindVertexUniforms(m.vert.buf)
@@ -941,7 +942,7 @@ restart:
 		d.Action = driver.LoadActionClear
 	}
 	g.ctx.BindFramebuffer(m.fbo, d)
-	g.ctx.Viewport(0, 0, texSize, texSize)
+	g.ctx.Viewport(0, 0, texSize.X, texSize.Y)
 	g.ctx.BindPipeline(m.pipeline)
 	g.ctx.BindVertexBuffer(m.buffer.buffer, 0)
 	g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(m.quads))
@@ -975,9 +976,10 @@ restart:
 					// after clearing existing maps.
 					reclaimed = true
 				} else {
-					a.packer.maxDim += 256
+					a.packer.maxDims.X += 256
+					a.packer.maxDims.Y += 256
 					resize = true
-					if a.packer.maxDim > g.maxTextureDim {
+					if a.packer.maxDims.X > g.maxTextureDim {
 						return errors.New("compute: no space left in image atlas")
 					}
 				}
@@ -1004,12 +1006,12 @@ restart:
 			a.tex.Release()
 			a.tex = nil
 		}
-		sz := a.packer.maxDim
+		sz := a.packer.maxDims
 		format := driver.TextureFormatSRGBA
 		if !g.srgb {
 			format = driver.TextureFormatRGBA8
 		}
-		handle, err := g.ctx.NewTexture(format, sz, sz, driver.FilterLinear, driver.FilterLinear, driver.BufferBindingTexture)
+		handle, err := g.ctx.NewTexture(format, sz.X, sz.Y, driver.FilterLinear, driver.FilterLinear, driver.BufferBindingTexture)
 		if err != nil {
 			return fmt.Errorf("compute: failed to create image atlas: %v", err)
 		}
@@ -1066,7 +1068,7 @@ func (g *compute) materialQuad(M f32.Affine2D, img imageOpData, uvPos image.Poin
 
 	bounds := boundRectF(boundsf)
 	uvPosf := layout.FPt(uvPos)
-	atlasScale := 1 / float32(g.images.packer.maxDim)
+	atlasScale := 1 / float32(g.images.packer.maxDims.X)
 	uvBounds := f32.Rectangle{
 		Min: uvPosf.Mul(atlasScale),
 		Max: uvPosf.Add(imgSize).Mul(atlasScale),
@@ -1264,7 +1266,7 @@ func (g *compute) downloadMaterials() {
 			m.scratch = make([]byte, n)
 		}
 		copyFBO.ReadPixels(r, m.scratch)
-		stride := m.packer.maxDim * 4
+		stride := m.packer.maxDims.X * 4
 		col := r.Min.X * 4
 		row := stride * r.Min.Y
 		off := col + row
