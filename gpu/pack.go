@@ -41,7 +41,7 @@ func (p *packer) newPage() {
 	p.sizes = append(p.sizes, image.Point{})
 	p.spaces = p.spaces[:0]
 	p.spaces = append(p.spaces, image.Rectangle{
-		Max: image.Point{X: p.maxDim, Y: p.maxDim},
+		Max: image.Point{X: 1e6, Y: 1e6},
 	})
 }
 
@@ -61,9 +61,15 @@ func (p *packer) tryAdd(s image.Point) (placement, bool) {
 		idx := len(p.sizes) - 1
 		size := p.sizes[idx]
 		if x := space.Min.X + s.X; x > size.X {
+			if x > p.maxDim {
+				continue
+			}
 			size.X = x
 		}
 		if y := space.Min.Y + s.Y; y > size.Y {
+			if y > p.maxDim {
+				continue
+			}
 			size.Y = y
 		}
 		if size.X*size.Y < bestSize.X*bestSize.Y {
