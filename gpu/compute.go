@@ -82,8 +82,6 @@ type compute struct {
 	materials struct {
 		// allocs maps texture ops the their atlases and FillImage offsets.
 		allocs map[textureKey]materialAlloc
-		// regions track new materials to be transferred to CPU images.
-		regions []image.Rectangle
 
 		pipeline driver.Pipeline
 		buffer   sizedBuffer
@@ -915,11 +913,11 @@ func (g *compute) renderMaterials() error {
 	texOps := g.texOps
 	for len(texOps) > 0 {
 		m.quads = m.quads[:0]
-		m.regions = m.regions[:0]
 		var (
 			atlas    *textureAtlas
 			imgAtlas *textureAtlas
 		)
+		var allocStart int
 		for len(texOps) > 0 {
 			op := &texOps[0]
 			if a, exists := m.allocs[op.key]; exists {
@@ -948,6 +946,9 @@ func (g *compute) renderMaterials() error {
 			if !fits {
 				break
 			}
+			if atlas == nil {
+				allocStart = len(alloc.atlas.allocs)
+			}
 			atlas = alloc.atlas
 			alloc.cpu = g.useCPU
 			// Position quad to match place.
@@ -968,7 +969,6 @@ func (g *compute) renderMaterials() error {
 			atlas.allocs = append(atlas.allocs, atlasAlloc.alloc)
 			m.allocs[op.key] = atlasAlloc
 			op.matAlloc = atlasAlloc
-			m.regions = append(m.regions, alloc.rect)
 			texOps = texOps[1:]
 		}
 		if len(m.quads) == 0 {
@@ -1004,12 +1004,13 @@ func (g *compute) renderMaterials() error {
 		}
 		copyFBO := atlas.fbo
 		data := atlas.cpuImage.Data()
-		for _, r := range m.regions {
+		newAllocs := atlas.allocs[allocStart:]
+		for _, a := range newAllocs {
 			stride := atlas.size.X * 4
-			col := r.Min.X * 4
-			row := stride * r.Min.Y
+			col := a.rect.Min.X * 4
+			row := stride * a.rect.Min.Y
 			off := col + row
-			copyFBO.ReadPixels(r, data[off:], stride)
+			copyFBO.ReadPixels(a.rect, data[off:], stride)
 		}
 	}
 	return nil
