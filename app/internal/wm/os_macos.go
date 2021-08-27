@@ -287,7 +287,7 @@ func (w *window) Close() {
 	// causing a deadlock because Close is called during an event.
 	// Break the deadlock by deferring the close, making Close more
 	// akin to a message like the other platforms.
-	go runOnMain(func() {
+	go w.runOnMain(func() {
 		C.closeWindow(w.window)
 	})
 }
@@ -425,7 +425,9 @@ func gio_onClose(view C.CFTypeRef) {
 	w.displayLink.Close()
 	C.CFRelease(w.view)
 	C.CFRelease(w.window)
-	*w = window{}
+	w.view = 0
+	w.window = 0
+	w.displayLink = nil
 }
 
 //export gio_onHide
