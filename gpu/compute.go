@@ -917,6 +917,10 @@ func (g *compute) renderMaterials() error {
 			atlas    *textureAtlas
 			imgAtlas *textureAtlas
 		)
+		// A material is clipped to avoid drawing outside its atlas bounds.
+		// However, imprecision in the clipping may cause a single pixel
+		// overflow.
+		var padding = image.Pt(1, 1)
 		var allocStart int
 		for len(texOps) > 0 {
 			op := &texOps[0]
@@ -933,13 +937,10 @@ func (g *compute) renderMaterials() error {
 			}
 			imgAtlas = op.imgAlloc.atlas
 			quad, bounds := g.materialQuad(imgAtlas.size, op.key.transform, op.img, op.imgAlloc.rect.Min)
-			// A material is clipped to avoid drawing outside its atlas bounds.
-			// However, imprecision in the clipping may cause a single pixel
-			// overflow. Be safe.
-			size := bounds.Size().Add(image.Pt(1, 1))
+			size := bounds.Size()
 			alloc, fits := g.atlasAlloc(allocQuery{
 				atlas:    atlas,
-				size:     size,
+				size:     size.Add(padding),
 				format:   driver.TextureFormatRGBA8,
 				bindings: combinedBindings,
 			})
@@ -951,11 +952,15 @@ func (g *compute) renderMaterials() error {
 			}
 			atlas = alloc.atlas
 			alloc.cpu = g.useCPU
-			// Position quad to match place.
-			offsetf := layout.FPt(alloc.rect.Min.Sub(bounds.Min))
+			offsetf := layout.FPt(bounds.Min.Mul(-1))
+			scale := f32.Pt(float32(size.X), float32(size.Y))
 			for i := range quad {
+				// Position quad to match place.
 				quad[i].posX += offsetf.X
 				quad[i].posY += offsetf.Y
+				// Scale to match viewport [0, 1].
+				quad[i].posX /= scale.X
+				quad[i].posY /= scale.Y
 			}
 			// Draw quad as two triangles.
 			m.quads = append(m.quads, quad[0], quad[1], quad[3], quad[3], quad[1], quad[2])
@@ -980,7 +985,7 @@ func (g *compute) renderMaterials() error {
 		}
 		// Transform to clip space: [-1, -1] - [1, 1] and flip Y-axis to cancel the implied transformation
 		// between framebuffer and texture space.
-		m.vert.uniforms.scale = [2]float32{2 / float32(atlas.size.X), -2 / float32(atlas.size.Y)}
+		m.vert.uniforms.scale = [2]float32{2, -2}
 		m.vert.uniforms.pos = [2]float32{-1, +1}
 		m.vert.buf.Upload(byteslice.Struct(m.vert.uniforms))
 		g.ctx.BindVertexUniforms(m.vert.buf)
@@ -995,16 +1000,19 @@ func (g *compute) renderMaterials() error {
 			d.Action = driver.LoadActionClear
 		}
 		g.ctx.BindFramebuffer(atlas.fbo, d)
-		g.ctx.Viewport(0, 0, atlas.size.X, atlas.size.Y)
 		g.ctx.BindPipeline(m.pipeline)
 		g.ctx.BindVertexBuffer(m.buffer.buffer, 0)
-		g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(m.quads))
+		newAllocs := atlas.allocs[allocStart:]
+		for i, a := range newAllocs {
+			sz := a.rect.Size().Sub(padding)
+			g.ctx.Viewport(a.rect.Min.X, a.rect.Min.Y, sz.X, sz.Y)
+			g.ctx.DrawArrays(driver.DrawModeTriangles, i*6, 6)
+		}
 		if !g.useCPU {
 			continue
 		}
 		copyFBO := atlas.fbo
 		data := atlas.cpuImage.Data()
-		newAllocs := atlas.allocs[allocStart:]
 		for _, a := range newAllocs {
 			stride := atlas.size.X * 4
 			col := a.rect.Min.X * 4
