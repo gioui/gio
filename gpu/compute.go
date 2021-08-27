@@ -285,6 +285,7 @@ type materialVertex struct {
 type textureKey struct {
 	handle    interface{}
 	transform f32.Affine2D
+	bounds    image.Rectangle
 }
 
 // textureOp represents an paintOp that requires texture space.
@@ -936,7 +937,11 @@ func (g *compute) renderMaterials() error {
 				break
 			}
 			imgAtlas = op.imgAlloc.atlas
-			quad, bounds := g.materialQuad(imgAtlas.size, op.key.transform, op.img, op.imgAlloc.rect.Min)
+			quad := g.materialQuad(imgAtlas.size, op.key.transform, op.img, op.imgAlloc.rect.Min)
+			boundsf := quadBounds(quad)
+			bounds := boundRectF(boundsf)
+			bounds = bounds.Intersect(op.key.bounds)
+
 			size := bounds.Size()
 			alloc, fits := g.atlasAlloc(allocQuery{
 				atlas:    atlas,
@@ -1102,7 +1107,7 @@ func pow2Ceil(v int) int {
 
 // materialQuad constructs a quad that represents the transformed image. It returns the quad
 // and its bounds.
-func (g *compute) materialQuad(imgAtlasSize image.Point, M f32.Affine2D, img imageOpData, uvPos image.Point) ([4]materialVertex, image.Rectangle) {
+func (g *compute) materialQuad(imgAtlasSize image.Point, M f32.Affine2D, img imageOpData, uvPos image.Point) [4]materialVertex {
 	imgSize := layout.FPt(img.src.Bounds().Size())
 	sx, hx, ox, hy, sy, oy := M.Elems()
 	transOff := f32.Pt(ox, oy)
@@ -1121,12 +1126,6 @@ func (g *compute) materialQuad(imgAtlasSize image.Point, M f32.Affine2D, img ima
 	q2 = q2.Add(transOff)
 	q3 = q3.Add(transOff)
 
-	boundsf := f32.Rectangle{
-		Min: min(min(q0, q1), min(q2, q3)),
-		Max: max(max(q0, q1), max(q2, q3)),
-	}
-
-	bounds := boundRectF(boundsf)
 	uvPosf := layout.FPt(uvPos)
 	atlasScale := f32.Pt(1/float32(imgAtlasSize.X), 1/float32(imgAtlasSize.Y))
 	uvBounds := f32.Rectangle{
@@ -1143,7 +1142,18 @@ func (g *compute) materialQuad(imgAtlasSize image.Point, M f32.Affine2D, img ima
 		{posX: q2.X, posY: q2.Y, u: uvBounds.Max.X, v: uvBounds.Max.Y},
 		{posX: q3.X, posY: q3.Y, u: uvBounds.Max.X, v: uvBounds.Min.Y},
 	}
-	return quad, bounds
+	return quad
+}
+
+func quadBounds(q [4]materialVertex) f32.Rectangle {
+	q0 := f32.Pt(q[0].posX, q[0].posY)
+	q1 := f32.Pt(q[1].posX, q[1].posY)
+	q2 := f32.Pt(q[2].posX, q[2].posY)
+	q3 := f32.Pt(q[3].posX, q[3].posY)
+	return f32.Rectangle{
+		Min: min(min(q0, q1), min(q2, q3)),
+		Max: max(max(q0, q1), max(q2, q3)),
+	}
 }
 
 func max(p1, p2 f32.Point) f32.Point {
@@ -1855,10 +1865,12 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 			// except for their integer offsets can share a transformed image.
 			t := op.state.t.Offset(layout.FPt(op.offset))
 			t, off := separateTransform(t)
+			bounds := boundRectF(op.intersect).Sub(off)
 			*texOps = append(*texOps, textureOp{
 				img: op.state.image,
 				off: off,
 				key: textureKey{
+					bounds:    bounds,
 					transform: t,
 					handle:    op.state.image.handle,
 				},
