@@ -170,7 +170,7 @@ const (
 )
 
 const (
-	AccessRead AccessBits = 1 + iota
+	AccessRead AccessBits = 1 << iota
 	AccessWrite
 )
 

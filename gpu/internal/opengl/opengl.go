@@ -785,6 +785,8 @@ func (b *Backend) BindImageTexture(unit int, tex driver.Texture, access driver.A
 		acc = gl.WRITE_ONLY
 	case driver.AccessRead:
 		acc = gl.READ_ONLY
+	case driver.AccessRead | driver.AccessWrite:
+		acc = gl.READ_WRITE
 	default:
 		panic("unsupported access bits")
 	}
