@@ -31,6 +31,8 @@ type Backend struct {
 		offset int
 	}
 
+	program *Program
+
 	caps driver.Caps
 
 	// fbo is the currently bound fbo.
@@ -54,6 +56,7 @@ type Texture struct {
 	tex      *d3d11.Texture2D
 	sampler  *d3d11.SamplerState
 	resView  *d3d11.ShaderResourceView
+	uaView   *d3d11.UnorderedAccessView
 	width    int
 	height   int
 }
@@ -69,6 +72,11 @@ type FragmentShader struct {
 	shader  *d3d11.PixelShader
 }
 
+type Program struct {
+	backend *Backend
+	shader  *d3d11.ComputeShader
+}
+
 type Framebuffer struct {
 	dev          *d3d11.Device
 	ctx          *d3d11.DeviceContext
@@ -82,7 +90,9 @@ type Buffer struct {
 	backend   *Backend
 	bind      uint32
 	buf       *d3d11.Buffer
-	size int
+	resView   *d3d11.ShaderResourceView
+	uaView    *d3d11.UnorderedAccessView
+	size      int
 	immutable bool
 }
 
@@ -120,14 +130,14 @@ func newDirect3D11Device(api driver.Direct3D11) (driver.Device, error) {
 		},
 	}
 	featLvl := dev.GetFeatureLevel()
-	if featLvl < d3d11.FEATURE_LEVEL_9_1 {
+	switch {
+	case featLvl < d3d11.FEATURE_LEVEL_9_1:
 		d3d11.IUnknownRelease(unsafe.Pointer(dev), dev.Vtbl.Release)
 		d3d11.IUnknownRelease(unsafe.Pointer(b.ctx), b.ctx.Vtbl.Release)
 		return nil, fmt.Errorf("d3d11: feature level too low: %d", featLvl)
-	}
-	switch {
 	case featLvl >= d3d11.FEATURE_LEVEL_11_0:
 		b.caps.MaxTextureSize = 16384
+		b.caps.Features |= driver.FeatureCompute
 	case featLvl >= d3d11.FEATURE_LEVEL_9_3:
 		b.caps.MaxTextureSize = 4096
 	}
@@ -159,15 +169,31 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 		case *Framebuffer:
 			renderTarget = t.renderTarget
 		default:
-			panic(fmt.Errorf("opengl: invalid render target type: %T", target))
+			panic(fmt.Errorf("d3d11: invalid render target type: %T", target))
 		}
 	}
 	b.ctx.OMSetRenderTargets(renderTarget, nil)
 	return &Framebuffer{ctx: b.ctx, dev: b.dev, renderTarget: renderTarget, foreign: true}
 }
 
-func (b *Backend) CopyTexture(dst driver.Texture, dstOrigin image.Point, src driver.Framebuffer, srcRect image.Rectangle) {
-	panic("not implemented")
+func (b *Backend) CopyTexture(dstTex driver.Texture, dstOrigin image.Point, srcFBO driver.Framebuffer, srcRect image.Rectangle) {
+	dst := (*d3d11.Resource)(unsafe.Pointer(dstTex.(*Texture).tex))
+	src := srcFBO.(*Framebuffer).resource
+	b.ctx.CopySubresourceRegion(
+		dst,
+		0,                                           // Destination subresource.
+		uint32(dstOrigin.X), uint32(dstOrigin.Y), 0, // Destination coordinates (x, y, z).
+		src,
+		0, // Source subresource.
+		&d3d11.BOX{
+			Left:   uint32(srcRect.Min.X),
+			Top:    uint32(srcRect.Min.Y),
+			Right:  uint32(srcRect.Max.X),
+			Bottom: uint32(srcRect.Max.Y),
+			Front:  0,
+			Back:   1,
+		},
+	)
 }
 
 func (b *Backend) EndFrame() {
@@ -197,6 +223,8 @@ func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, min
 		d3dfmt = b.floatFormat
 	case driver.TextureFormatSRGBA:
 		d3dfmt = d3d11.DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
+	case driver.TextureFormatRGBA8:
+		d3dfmt = d3d11.DXGI_FORMAT_R8G8B8A8_UNORM
 	default:
 		return nil, fmt.Errorf("unsupported texture format %d", format)
 	}
@@ -218,6 +246,7 @@ func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, min
 	var (
 		sampler *d3d11.SamplerState
 		resView *d3d11.ShaderResourceView
+		uaView  *d3d11.UnorderedAccessView
 	)
 	if bindings&driver.BufferBindingTexture != 0 {
 		var filter uint32
@@ -244,9 +273,9 @@ func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, min
 			d3d11.IUnknownRelease(unsafe.Pointer(tex), tex.Vtbl.Release)
 			return nil, err
 		}
-		resView, err = b.dev.CreateShaderResourceViewTEX2D(
+		resView, err = b.dev.CreateShaderResourceView(
 			(*d3d11.Resource)(unsafe.Pointer(tex)),
-			&d3d11.SHADER_RESOURCE_VIEW_DESC_TEX2D{
+			unsafe.Pointer(&d3d11.SHADER_RESOURCE_VIEW_DESC_TEX2D{
 				SHADER_RESOURCE_VIEW_DESC: d3d11.SHADER_RESOURCE_VIEW_DESC{
 					Format:        d3dfmt,
 					ViewDimension: d3d11.SRV_DIMENSION_TEXTURE2D,
@@ -255,7 +284,7 @@ func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, min
 					MostDetailedMip: 0,
 					MipLevels:       ^uint32(0),
 				},
-			},
+			}),
 		)
 		if err != nil {
 			d3d11.IUnknownRelease(unsafe.Pointer(tex), tex.Vtbl.Release)
@@ -263,7 +292,31 @@ func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, min
 			return nil, err
 		}
 	}
-	return &Texture{backend: b, format: d3dfmt, tex: tex, sampler: sampler, resView: resView, bindings: bindings, width: width, height: height}, nil
+	if bindings&driver.BufferBindingShaderStorageWrite != 0 {
+		uaView, err = b.dev.CreateUnorderedAccessView(
+			(*d3d11.Resource)(unsafe.Pointer(tex)),
+			unsafe.Pointer(&d3d11.UNORDERED_ACCESS_VIEW_DESC_TEX2D{
+				UNORDERED_ACCESS_VIEW_DESC: d3d11.UNORDERED_ACCESS_VIEW_DESC{
+					Format:        d3dfmt,
+					ViewDimension: d3d11.UAV_DIMENSION_TEXTURE2D,
+				},
+				Texture2D: d3d11.TEX2D_UAV{
+					MipSlice: 0,
+				},
+			}),
+		)
+		if err != nil {
+			if sampler != nil {
+				d3d11.IUnknownRelease(unsafe.Pointer(sampler), sampler.Vtbl.Release)
+			}
+			if resView != nil {
+				d3d11.IUnknownRelease(unsafe.Pointer(resView), resView.Vtbl.Release)
+			}
+			d3d11.IUnknownRelease(unsafe.Pointer(tex), tex.Vtbl.Release)
+			return nil, err
+		}
+	}
+	return &Texture{backend: b, format: d3dfmt, tex: tex, sampler: sampler, resView: resView, uaView: uaView, bindings: bindings, width: width, height: height}, nil
 }
 
 func (b *Backend) NewFramebuffer(tex driver.Texture) (driver.Framebuffer, error) {
@@ -346,23 +399,78 @@ func (b *Backend) newBuffer(typ driver.BufferBinding, size int, data []byte, imm
 		}
 	}
 	bind := convBufferBinding(typ)
-	var usage uint32
+	var usage, miscFlags, cpuFlags uint32
 	if immutable {
 		usage = d3d11.USAGE_IMMUTABLE
 	}
+	if typ&driver.BufferBindingShaderStorageWrite != 0 {
+		cpuFlags = d3d11.CPU_ACCESS_READ
+	}
+	if typ&(driver.BufferBindingShaderStorageRead|driver.BufferBindingShaderStorageWrite) != 0 {
+		miscFlags |= d3d11.RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS
+	}
 	buf, err := b.dev.CreateBuffer(&d3d11.BUFFER_DESC{
-		ByteWidth: uint32(size),
-		Usage: usage,
-		BindFlags: bind,
+		ByteWidth:      uint32(size),
+		Usage:          usage,
+		BindFlags:      bind,
+		CPUAccessFlags: cpuFlags,
+		MiscFlags:      miscFlags,
 	}, data)
 	if err != nil {
 		return nil, err
 	}
-	return &Buffer{backend: b, buf: buf, bind: bind, size: size, immutable: immutable}, nil
+	var (
+		resView *d3d11.ShaderResourceView
+		uaView  *d3d11.UnorderedAccessView
+	)
+	if typ&driver.BufferBindingShaderStorageWrite != 0 {
+		uaView, err = b.dev.CreateUnorderedAccessView(
+			(*d3d11.Resource)(unsafe.Pointer(buf)),
+			unsafe.Pointer(&d3d11.UNORDERED_ACCESS_VIEW_DESC_BUFFER{
+				UNORDERED_ACCESS_VIEW_DESC: d3d11.UNORDERED_ACCESS_VIEW_DESC{
+					Format:        d3d11.DXGI_FORMAT_R32_TYPELESS,
+					ViewDimension: d3d11.UAV_DIMENSION_BUFFER,
+				},
+				Buffer: d3d11.BUFFER_UAV{
+					FirstElement: 0,
+					NumElements:  uint32(size / 4),
+					Flags:        d3d11.BUFFER_UAV_FLAG_RAW,
+				},
+			}),
+		)
+		if err != nil {
+			d3d11.IUnknownRelease(unsafe.Pointer(buf), buf.Vtbl.Release)
+			return nil, err
+		}
+	} else if typ&driver.BufferBindingShaderStorageRead != 0 {
+		resView, err = b.dev.CreateShaderResourceView(
+			(*d3d11.Resource)(unsafe.Pointer(buf)),
+			unsafe.Pointer(&d3d11.SHADER_RESOURCE_VIEW_DESC_BUFFEREX{
+				SHADER_RESOURCE_VIEW_DESC: d3d11.SHADER_RESOURCE_VIEW_DESC{
+					Format:        d3d11.DXGI_FORMAT_R32_TYPELESS,
+					ViewDimension: d3d11.SRV_DIMENSION_BUFFEREX,
+				},
+				Buffer: d3d11.BUFFEREX_SRV{
+					FirstElement: 0,
+					NumElements:  uint32(size / 4),
+					Flags:        d3d11.BUFFEREX_SRV_FLAG_RAW,
+				},
+			}),
+		)
+		if err != nil {
+			d3d11.IUnknownRelease(unsafe.Pointer(buf), buf.Vtbl.Release)
+			return nil, err
+		}
+	}
+	return &Buffer{backend: b, buf: buf, bind: bind, size: size, resView: resView, uaView: uaView, immutable: immutable}, nil
 }
 
 func (b *Backend) NewComputeProgram(shader shader.Sources) (driver.Program, error) {
-	panic("not implemented")
+	cs, err := b.dev.CreateComputeShader([]byte(shader.DXBC))
+	if err != nil {
+		return nil, err
+	}
+	return &Program{backend: b, shader: cs}, nil
 }
 
 func (b *Backend) NewPipeline(desc driver.PipelineDesc) (driver.Pipeline, error) {
@@ -476,15 +584,19 @@ func (b *Backend) prepareDraw(mode driver.DrawMode) {
 }
 
 func (b *Backend) BindImageTexture(unit int, tex driver.Texture, access driver.AccessBits, f driver.TextureFormat) {
-	panic("not implemented")
+	t := tex.(*Texture)
+	if access&driver.AccessWrite == 0 {
+		b.ctx.CSSetShaderResources(uint32(unit), t.resView)
+	} else {
+		b.ctx.CSSetUnorderedAccessViews(uint32(unit), t.uaView)
+	}
 }
 
-func (b *Backend) MemoryBarrier() {
-	panic("not implemented")
-}
+func (b *Backend) MemoryBarrier() {}
 
 func (b *Backend) DispatchCompute(x, y, z int) {
-	panic("not implemented")
+	b.ctx.CSSetShader(b.program.shader)
+	b.ctx.Dispatch(uint32(x), uint32(y), uint32(z))
 }
 
 func (t *Texture) Upload(offset, size image.Point, pixels []byte, stride int) {
@@ -504,16 +616,17 @@ func (t *Texture) Upload(offset, size image.Point, pixels []byte, stride int) {
 }
 
 func (t *Texture) Release() {
-	d3d11.IUnknownRelease(unsafe.Pointer(t.tex), t.tex.Vtbl.Release)
-	t.tex = nil
 	if t.sampler != nil {
 		d3d11.IUnknownRelease(unsafe.Pointer(t.sampler), t.sampler.Vtbl.Release)
-		t.sampler = nil
 	}
 	if t.resView != nil {
 		d3d11.IUnknownRelease(unsafe.Pointer(t.resView), t.resView.Vtbl.Release)
-		t.resView = nil
 	}
+	if t.uaView != nil {
+		d3d11.IUnknownRelease(unsafe.Pointer(t.uaView), t.uaView.Vtbl.Release)
+	}
+	d3d11.IUnknownRelease(unsafe.Pointer(t.tex), t.tex.Vtbl.Release)
+	*t = Texture{}
 }
 
 func (b *Backend) BindTexture(unit int, tex driver.Texture) {
@@ -527,7 +640,7 @@ func (b *Backend) BindPipeline(pipe driver.Pipeline) {
 }
 
 func (b *Backend) BindProgram(prog driver.Program) {
-	panic("not implemented")
+	b.program = prog.(*Program)
 }
 
 func (s *VertexShader) Release() {
@@ -538,6 +651,11 @@ func (s *VertexShader) Release() {
 func (s *FragmentShader) Release() {
 	d3d11.IUnknownRelease(unsafe.Pointer(s.shader), s.shader.Vtbl.Release)
 	*s = FragmentShader{}
+}
+
+func (s *Program) Release() {
+	d3d11.IUnknownRelease(unsafe.Pointer(s.shader), s.shader.Vtbl.Release)
+	*s = Program{}
 }
 
 func (p *Pipeline) Release() {
@@ -551,7 +669,12 @@ func (p *Pipeline) Release() {
 }
 
 func (b *Backend) BindStorageBuffer(binding int, buffer driver.Buffer) {
-	panic("not implemented")
+	buf := buffer.(*Buffer)
+	if buf.resView != nil {
+		b.ctx.CSSetShaderResources(uint32(binding), buf.resView)
+	} else {
+		b.ctx.CSSetUnorderedAccessViews(uint32(binding), buf.uaView)
+	}
 }
 
 func (b *Backend) BindVertexUniforms(buffer driver.Buffer) {
@@ -573,8 +696,16 @@ func (b *Backend) BindIndexBuffer(buf driver.Buffer) {
 	b.ctx.IASetIndexBuffer(buf.(*Buffer).buf, d3d11.DXGI_FORMAT_R16_UINT, 0)
 }
 
-func (b *Buffer) Download(data []byte) error {
-	panic("not implemented")
+func (b *Buffer) Download(dst []byte) error {
+	res := (*d3d11.Resource)(unsafe.Pointer(b.buf))
+	resMap, err := b.backend.ctx.Map(res, 0, d3d11.MAP_READ, 0)
+	if err != nil {
+		return fmt.Errorf("d3d11: %v", err)
+	}
+	defer b.backend.ctx.Unmap(res, 0)
+	data := sliceOf(resMap.PData, len(dst))
+	copy(dst, data)
+	return nil
 }
 
 func (b *Buffer) Upload(data []byte) {
@@ -593,8 +724,14 @@ func (b *Buffer) Upload(data []byte) {
 }
 
 func (b *Buffer) Release() {
+	if b.resView != nil {
+		d3d11.IUnknownRelease(unsafe.Pointer(b.resView), b.resView.Vtbl.Release)
+	}
+	if b.uaView != nil {
+		d3d11.IUnknownRelease(unsafe.Pointer(b.uaView), b.uaView.Vtbl.Release)
+	}
 	d3d11.IUnknownRelease(unsafe.Pointer(b.buf), b.buf.Vtbl.Release)
-	b.buf = nil
+	*b = Buffer{}
 }
 
 func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int) error {
@@ -690,6 +827,11 @@ func convBufferBinding(typ driver.BufferBinding) uint32 {
 	}
 	if typ&driver.BufferBindingFramebuffer != 0 {
 		bindings |= d3d11.BIND_RENDER_TARGET
+	}
+	if typ&driver.BufferBindingShaderStorageWrite != 0 {
+		bindings |= d3d11.BIND_UNORDERED_ACCESS
+	} else if typ&driver.BufferBindingShaderStorageRead != 0 {
+		bindings |= d3d11.BIND_SHADER_RESOURCE
 	}
 	return bindings
 }

@@ -74,7 +74,27 @@ type SHADER_RESOURCE_VIEW_DESC_TEX2D struct {
 	Texture2D TEX2D_SRV
 }
 
+type SHADER_RESOURCE_VIEW_DESC_BUFFEREX struct {
+	SHADER_RESOURCE_VIEW_DESC
+	Buffer BUFFEREX_SRV
+}
+
+type UNORDERED_ACCESS_VIEW_DESC_TEX2D struct {
+	UNORDERED_ACCESS_VIEW_DESC
+	Texture2D TEX2D_UAV
+}
+
+type UNORDERED_ACCESS_VIEW_DESC_BUFFER struct {
+	UNORDERED_ACCESS_VIEW_DESC
+	Buffer BUFFER_UAV
+}
+
 type SHADER_RESOURCE_VIEW_DESC struct {
+	Format        uint32
+	ViewDimension uint32
+}
+
+type UNORDERED_ACCESS_VIEW_DESC struct {
 	Format        uint32
 	ViewDimension uint32
 }
@@ -82,6 +102,22 @@ type SHADER_RESOURCE_VIEW_DESC struct {
 type TEX2D_SRV struct {
 	MostDetailedMip uint32
 	MipLevels       uint32
+}
+
+type BUFFEREX_SRV struct {
+	FirstElement uint32
+	NumElements  uint32
+	Flags        uint32
+}
+
+type TEX2D_UAV struct {
+	MipSlice uint32
+}
+
+type BUFFER_UAV struct {
+	FirstElement uint32
+	NumElements  uint32
+	Flags        uint32
 }
 
 type INPUT_ELEMENT_DESC struct {
@@ -336,6 +372,12 @@ type ShaderResourceView struct {
 	}
 }
 
+type UnorderedAccessView struct {
+	Vtbl *struct {
+		_IUnknownVTbl
+	}
+}
+
 type DepthStencilView struct {
 	Vtbl *struct {
 		_IUnknownVTbl
@@ -355,6 +397,12 @@ type DepthStencilState struct {
 }
 
 type VertexShader struct {
+	Vtbl *struct {
+		_IUnknownVTbl
+	}
+}
+
+type ComputeShader struct {
 	Vtbl *struct {
 		_IUnknownVTbl
 	}
@@ -590,9 +638,11 @@ const (
 	DXGI_FORMAT_UNKNOWN             = 0
 	DXGI_FORMAT_R16_FLOAT           = 54
 	DXGI_FORMAT_R32_FLOAT           = 41
+	DXGI_FORMAT_R32_TYPELESS        = 39
 	DXGI_FORMAT_R32G32_FLOAT        = 16
 	DXGI_FORMAT_R32G32B32_FLOAT     = 6
 	DXGI_FORMAT_R32G32B32A32_FLOAT  = 2
+	DXGI_FORMAT_R8G8B8A8_UNORM      = 28
 	DXGI_FORMAT_R8G8B8A8_UNORM_SRGB = 29
 	DXGI_FORMAT_R16_SINT            = 59
 	DXGI_FORMAT_R16G16_SINT         = 38
@@ -623,12 +673,13 @@ const (
 	USAGE_IMMUTABLE = 1
 	USAGE_STAGING   = 3
 
-	BIND_VERTEX_BUFFER   = 0x1
-	BIND_INDEX_BUFFER    = 0x2
-	BIND_CONSTANT_BUFFER = 0x4
-	BIND_SHADER_RESOURCE = 0x8
-	BIND_RENDER_TARGET   = 0x20
-	BIND_DEPTH_STENCIL   = 0x40
+	BIND_VERTEX_BUFFER    = 0x1
+	BIND_INDEX_BUFFER     = 0x2
+	BIND_CONSTANT_BUFFER  = 0x4
+	BIND_SHADER_RESOURCE  = 0x8
+	BIND_RENDER_TARGET    = 0x20
+	BIND_DEPTH_STENCIL    = 0x40
+	BIND_UNORDERED_ACCESS = 0x80
 
 	PRIMITIVE_TOPOLOGY_TRIANGLELIST  = 4
 	PRIMITIVE_TOPOLOGY_TRIANGLESTRIP = 5
@@ -640,7 +691,16 @@ const (
 	TEXTURE_ADDRESS_CLAMP  = 3
 	TEXTURE_ADDRESS_WRAP   = 1
 
+	SRV_DIMENSION_BUFFER    = 1
+	UAV_DIMENSION_BUFFER    = 1
+	SRV_DIMENSION_BUFFEREX  = 11
 	SRV_DIMENSION_TEXTURE2D = 4
+	UAV_DIMENSION_TEXTURE2D = 4
+
+	BUFFER_UAV_FLAG_RAW   = 0x1
+	BUFFEREX_SRV_FLAG_RAW = 0x1
+
+	RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS = 0x20
 
 	CREATE_DEVICE_DEBUG = 0x2
 
@@ -855,14 +915,32 @@ func (d *Device) CreateVertexShader(bytecode []byte) (*VertexShader, error) {
 	return shader, nil
 }
 
-func (d *Device) CreateShaderResourceViewTEX2D(res *Resource, desc *SHADER_RESOURCE_VIEW_DESC_TEX2D) (*ShaderResourceView, error) {
+func (d *Device) CreateComputeShader(bytecode []byte) (*ComputeShader, error) {
+	var shader *ComputeShader
+	r, _, _ := syscall.Syscall6(
+		d.Vtbl.CreateComputeShader,
+		5,
+		uintptr(unsafe.Pointer(d)),
+		uintptr(unsafe.Pointer(&bytecode[0])),
+		uintptr(len(bytecode)),
+		0, // pClassLinkage
+		uintptr(unsafe.Pointer(&shader)),
+		0,
+	)
+	if r != 0 {
+		return nil, ErrorCode{Name: "DeviceCreateComputeShader", Code: uint32(r)}
+	}
+	return shader, nil
+}
+
+func (d *Device) CreateShaderResourceView(res *Resource, desc unsafe.Pointer) (*ShaderResourceView, error) {
 	var resView *ShaderResourceView
 	r, _, _ := syscall.Syscall6(
 		d.Vtbl.CreateShaderResourceView,
 		4,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(res)),
-		uintptr(unsafe.Pointer(desc)),
+		uintptr(desc),
 		uintptr(unsafe.Pointer(&resView)),
 		0, 0,
 	)
@@ -870,6 +948,23 @@ func (d *Device) CreateShaderResourceViewTEX2D(res *Resource, desc *SHADER_RESOU
 		return nil, ErrorCode{Name: "DeviceCreateShaderResourceView", Code: uint32(r)}
 	}
 	return resView, nil
+}
+
+func (d *Device) CreateUnorderedAccessView(res *Resource, desc unsafe.Pointer) (*UnorderedAccessView, error) {
+	var uaView *UnorderedAccessView
+	r, _, _ := syscall.Syscall6(
+		d.Vtbl.CreateUnorderedAccessView,
+		4,
+		uintptr(unsafe.Pointer(d)),
+		uintptr(unsafe.Pointer(res)),
+		uintptr(desc),
+		uintptr(unsafe.Pointer(&uaView)),
+		0, 0,
+	)
+	if r != 0 {
+		return nil, ErrorCode{Name: "DeviceCreateUnorderedAccessView", Code: uint32(r)}
+	}
+	return uaView, nil
 }
 
 func (d *Device) CreateRasterizerState(desc *RASTERIZER_DESC) (*RasterizerState, error) {
@@ -1162,6 +1257,42 @@ func (c *DeviceContext) ClearRenderTargetView(target *RenderTargetView, color *[
 	)
 }
 
+func (c *DeviceContext) CSSetShaderResources(startSlot uint32, s *ShaderResourceView) {
+	syscall.Syscall6(
+		c.Vtbl.CSSetShaderResources,
+		4,
+		uintptr(unsafe.Pointer(c)),
+		uintptr(startSlot),
+		1, // NumViews
+		uintptr(unsafe.Pointer(&s)),
+		0, 0,
+	)
+}
+
+func (c *DeviceContext) CSSetUnorderedAccessViews(startSlot uint32, v *UnorderedAccessView) {
+	syscall.Syscall6(
+		c.Vtbl.CSSetUnorderedAccessViews,
+		4,
+		uintptr(unsafe.Pointer(c)),
+		uintptr(startSlot),
+		1, // NumViews
+		uintptr(unsafe.Pointer(&v)),
+		0, 0,
+	)
+}
+
+func (c *DeviceContext) CSSetShader(s *ComputeShader) {
+	syscall.Syscall6(
+		c.Vtbl.CSSetShader,
+		4,
+		uintptr(unsafe.Pointer(c)),
+		uintptr(unsafe.Pointer(s)),
+		0, // ppClassInstances
+		0, // NumClassInstances
+		0, 0,
+	)
+}
+
 func (c *DeviceContext) RSSetViewports(viewport *VIEWPORT) {
 	syscall.Syscall(
 		c.Vtbl.RSSetViewports,
@@ -1361,6 +1492,18 @@ func (c *DeviceContext) DrawIndexed(count, start uint32, base int32) {
 		uintptr(count),
 		uintptr(start),
 		uintptr(base),
+		0, 0,
+	)
+}
+
+func (c *DeviceContext) Dispatch(x, y, z uint32) {
+	syscall.Syscall6(
+		c.Vtbl.Dispatch,
+		4,
+		uintptr(unsafe.Pointer(c)),
+		uintptr(x),
+		uintptr(y),
+		uintptr(z),
 		0, 0,
 	)
 }
