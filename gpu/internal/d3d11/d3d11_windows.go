@@ -82,6 +82,7 @@ type Buffer struct {
 	backend   *Backend
 	bind      uint32
 	buf       *d3d11.Buffer
+	size int
 	immutable bool
 }
 
@@ -344,7 +345,7 @@ func (b *Backend) NewBuffer(typ driver.BufferBinding, size int) (driver.Buffer, 
 	if err != nil {
 		return nil, err
 	}
-	return &Buffer{backend: b, buf: buf, bind: bind}, nil
+	return &Buffer{backend: b, buf: buf, bind: bind, size: size}, nil
 }
 
 func (b *Backend) NewImmutableBuffer(typ driver.BufferBinding, data []byte) (driver.Buffer, error) {
@@ -365,7 +366,7 @@ func (b *Backend) NewImmutableBuffer(typ driver.BufferBinding, data []byte) (dri
 	if err != nil {
 		return nil, err
 	}
-	return &Buffer{backend: b, buf: buf, bind: bind, immutable: true}, nil
+	return &Buffer{backend: b, buf: buf, bind: bind, size: len(data), immutable: true}, nil
 }
 
 func (b *Backend) NewComputeProgram(shader shader.Sources) (driver.Program, error) {
@@ -585,7 +586,18 @@ func (b *Buffer) Download(data []byte) error {
 }
 
 func (b *Buffer) Upload(data []byte) {
-	b.backend.ctx.UpdateSubresource((*d3d11.Resource)(unsafe.Pointer(b.buf)), nil, 0, 0, data)
+	var dst *d3d11.BOX
+	if len(data) < b.size {
+		dst = &d3d11.BOX{
+			Left:   0,
+			Right:  uint32(len(data)),
+			Top:    0,
+			Bottom: 1,
+			Front:  0,
+			Back:   1,
+		}
+	}
+	b.backend.ctx.UpdateSubresource((*d3d11.Resource)(unsafe.Pointer(b.buf)), dst, 0, 0, data)
 }
 
 func (b *Buffer) Release() {
