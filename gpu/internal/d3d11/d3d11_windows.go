@@ -329,6 +329,14 @@ func (b *Backend) newInputLayout(vertexShader shader.Sources, layout []driver.In
 }
 
 func (b *Backend) NewBuffer(typ driver.BufferBinding, size int) (driver.Buffer, error) {
+	return b.newBuffer(typ, size, nil, false)
+}
+
+func (b *Backend) NewImmutableBuffer(typ driver.BufferBinding, data []byte) (driver.Buffer, error) {
+	return b.newBuffer(typ, len(data), data, true)
+}
+
+func (b *Backend) newBuffer(typ driver.BufferBinding, size int, data []byte, immutable bool) (*Buffer, error) {
 	if typ&driver.BufferBindingUniforms != 0 {
 		if typ != driver.BufferBindingUniforms {
 			return nil, errors.New("uniform buffers cannot have other bindings")
@@ -338,35 +346,19 @@ func (b *Backend) NewBuffer(typ driver.BufferBinding, size int) (driver.Buffer, 
 		}
 	}
 	bind := convBufferBinding(typ)
+	var usage uint32
+	if immutable {
+		usage = d3d11.USAGE_IMMUTABLE
+	}
 	buf, err := b.dev.CreateBuffer(&d3d11.BUFFER_DESC{
 		ByteWidth: uint32(size),
-		BindFlags: bind,
-	}, nil)
-	if err != nil {
-		return nil, err
-	}
-	return &Buffer{backend: b, buf: buf, bind: bind, size: size}, nil
-}
-
-func (b *Backend) NewImmutableBuffer(typ driver.BufferBinding, data []byte) (driver.Buffer, error) {
-	if typ&driver.BufferBindingUniforms != 0 {
-		if typ != driver.BufferBindingUniforms {
-			return nil, errors.New("uniform buffers cannot have other bindings")
-		}
-		if len(data)%16 != 0 {
-			return nil, fmt.Errorf("constant buffer size is %d, expected a multiple of 16", len(data))
-		}
-	}
-	bind := convBufferBinding(typ)
-	buf, err := b.dev.CreateBuffer(&d3d11.BUFFER_DESC{
-		ByteWidth: uint32(len(data)),
-		Usage:     d3d11.USAGE_IMMUTABLE,
+		Usage: usage,
 		BindFlags: bind,
 	}, data)
 	if err != nil {
 		return nil, err
 	}
-	return &Buffer{backend: b, buf: buf, bind: bind, size: len(data), immutable: true}, nil
+	return &Buffer{backend: b, buf: buf, bind: bind, size: size, immutable: immutable}, nil
 }
 
 func (b *Backend) NewComputeProgram(shader shader.Sources) (driver.Program, error) {
