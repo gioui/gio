@@ -552,9 +552,9 @@ func (q *queue) Events(k event.Tag) []event.Event {
 
 var (
 	// Windowed is the normal window mode with OS specific window decorations.
-	Windowed = windowMode(wm.Windowed)
+	Windowed Option = windowMode(wm.Windowed)
 	// Fullscreen is the full screen window mode.
-	Fullscreen = windowMode(wm.Fullscreen)
+	Fullscreen Option = windowMode(wm.Fullscreen)
 )
 
 // windowMode sets the window mode.
@@ -568,11 +568,11 @@ func windowMode(mode wm.WindowMode) Option {
 
 var (
 	// AnyOrientation allows the window to be freely orientated.
-	AnyOrientation = orientation(wm.AnyOrientation)
+	AnyOrientation Option = orientation(wm.AnyOrientation)
 	// LandscapeOrientation constrains the window to landscape orientations.
-	LandscapeOrientation = orientation(wm.LandscapeOrientation)
+	LandscapeOrientation Option = orientation(wm.LandscapeOrientation)
 	// PortraitOrientation constrains the window to portrait orientations.
-	PortraitOrientation = orientation(wm.PortraitOrientation)
+	PortraitOrientation Option = orientation(wm.PortraitOrientation)
 )
 
 // orientation sets the orientation of the app.
