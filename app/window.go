@@ -21,7 +21,7 @@ import (
 	"gioui.org/app/internal/wm"
 )
 
-// WindowOption configures a wm.
+// Option configures a window.
 type Option func(opts *wm.Options)
 
 // Window represents an operating system window.
@@ -584,14 +584,14 @@ func orientation(mode wm.Orientation) Option {
 	}
 }
 
-// Title sets the title of the wm.
+// Title sets the title of the window.
 func Title(t string) Option {
 	return func(opts *wm.Options) {
 		opts.Title = &t
 	}
 }
 
-// Size sets the size of the wm.
+// Size sets the size of the window.
 func Size(w, h unit.Value) Option {
 	if w.V <= 0 {
 		panic("width must be larger than or equal to 0")
@@ -607,7 +607,7 @@ func Size(w, h unit.Value) Option {
 	}
 }
 
-// MaxSize sets the maximum size of the wm.
+// MaxSize sets the maximum size of the window.
 func MaxSize(w, h unit.Value) Option {
 	if w.V <= 0 {
 		panic("width must be larger than or equal to 0")
@@ -623,7 +623,7 @@ func MaxSize(w, h unit.Value) Option {
 	}
 }
 
-// MinSize sets the minimum size of the wm.
+// MinSize sets the minimum size of the window.
 func MinSize(w, h unit.Value) Option {
 	if w.V <= 0 {
 		panic("width must be larger than or equal to 0")
