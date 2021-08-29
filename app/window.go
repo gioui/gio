@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"runtime"
 	"time"
 
+	"gioui.org/gpu"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/io/profile"
@@ -25,8 +27,8 @@ type Option func(cnf *config)
 
 // Window represents an operating system window.
 type Window struct {
-	ctx  context
-	loop *renderLoop
+	ctx context
+	gpu gpu.GPU
 
 	// driverFuncs is a channel of functions to run when
 	// the Window has a valid driver.
@@ -72,7 +74,7 @@ type queue struct {
 
 // driverEvent is sent when the underlying driver changes.
 type driverEvent struct {
-	driver driver
+	wakeup func()
 }
 
 // Pre-allocate the ack event to avoid garbage.
@@ -129,21 +131,12 @@ func (w *Window) update(frame *op.Ops) {
 	<-w.frameAck
 }
 
-func (w *Window) validateAndProcess(d driver, frameStart time.Time, size image.Point, sync bool, frame *op.Ops) error {
+func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync bool, frame *op.Ops) error {
 	for {
-		if w.loop != nil {
-			if err := w.loop.Flush(); err != nil {
-				w.destroyGPU()
-				if err == errDeviceLost {
-					continue
-				}
-				return err
-			}
-		}
-		if w.loop == nil && !w.nocontext {
+		if w.gpu == nil && !w.nocontext {
 			var err error
 			if w.ctx == nil {
-				w.driverRun(func(_ driver) {
+				w.driverRun(func(d driver) {
 					w.ctx, err = d.NewContext()
 				})
 				if err != nil {
@@ -151,20 +144,13 @@ func (w *Window) validateAndProcess(d driver, frameStart time.Time, size image.P
 				}
 				sync = true
 			}
-			w.loop, err = newLoop(w.ctx)
-			if err != nil {
-				w.destroyGPU()
-				return err
-			}
 		}
 		if sync && w.ctx != nil {
-			w.driverRun(func(_ driver) {
-				w.ctx.Refresh()
+			var err error
+			w.driverRun(func(d driver) {
+				err = w.ctx.Refresh()
 			})
-		}
-		w.processFrame(frameStart, size, frame)
-		if sync && w.loop != nil {
-			if err := w.loop.Flush(); err != nil {
+			if err != nil {
 				w.destroyGPU()
 				if err == errDeviceLost {
 					continue
@@ -172,40 +158,73 @@ func (w *Window) validateAndProcess(d driver, frameStart time.Time, size image.P
 				return err
 			}
 		}
+		if w.gpu == nil && !w.nocontext {
+			if err := w.ctx.Lock(); err != nil {
+				w.destroyGPU()
+				return err
+			}
+			gpu, err := gpu.New(w.ctx.API())
+			w.ctx.Unlock()
+			if err != nil {
+				w.destroyGPU()
+				return err
+			}
+			w.gpu = gpu
+		}
+		if w.gpu != nil {
+			if err := w.render(frame, size); err != nil {
+				w.destroyGPU()
+				if err == errDeviceLost {
+					continue
+				}
+				return err
+			}
+		}
+		w.processFrame(frameStart, frame)
 		return nil
 	}
 }
 
-func (w *Window) processFrame(frameStart time.Time, size image.Point, frame *op.Ops) {
-	var sync <-chan struct{}
-	if w.loop != nil {
-		sync = w.loop.Draw(size, frame)
-	} else {
-		s := make(chan struct{}, 1)
-		s <- struct{}{}
-		sync = s
+func (w *Window) render(frame *op.Ops, viewport image.Point) error {
+	if err := w.ctx.Lock(); err != nil {
+		return err
 	}
+	defer w.ctx.Unlock()
+	if runtime.GOOS == "js" {
+		// Use transparent black when Gio is embedded, to allow mixing of Gio and
+		// foreign content below.
+		w.gpu.Clear(color.NRGBA{A: 0x00, R: 0x00, G: 0x00, B: 0x00})
+	} else {
+		w.gpu.Clear(color.NRGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff})
+	}
+	if err := w.gpu.Frame(frame, w.ctx.RenderTarget(), viewport); err != nil {
+		return err
+	}
+	return w.ctx.Present()
+}
+
+func (w *Window) processFrame(frameStart time.Time, frame *op.Ops) {
 	w.queue.q.Frame(frame)
 	switch w.queue.q.TextInputState() {
 	case router.TextInputOpen:
-		go w.driverRun(func(d driver) { d.ShowTextInput(true) })
+		w.driverRun(func(d driver) { d.ShowTextInput(true) })
 	case router.TextInputClose:
-		go w.driverRun(func(d driver) { d.ShowTextInput(false) })
+		w.driverRun(func(d driver) { d.ShowTextInput(false) })
 	}
 	if hint, ok := w.queue.q.TextInputHint(); ok {
-		go w.driverRun(func(d driver) { d.SetInputHint(hint) })
+		w.driverRun(func(d driver) { d.SetInputHint(hint) })
 	}
 	if txt, ok := w.queue.q.WriteClipboard(); ok {
-		go w.WriteClipboard(txt)
+		w.WriteClipboard(txt)
 	}
 	if w.queue.q.ReadClipboard() {
-		go w.ReadClipboard()
+		w.ReadClipboard()
 	}
-	if w.queue.q.Profiling() && w.loop != nil {
+	if w.queue.q.Profiling() && w.gpu != nil {
 		frameDur := time.Since(frameStart)
 		frameDur = frameDur.Truncate(100 * time.Microsecond)
 		q := 100 * time.Microsecond
-		timings := fmt.Sprintf("tot:%7s %s", frameDur.Round(q), w.loop.Summary())
+		timings := fmt.Sprintf("tot:%7s %s", frameDur.Round(q), w.gpu.Profile())
 		w.queue.q.Queue(profile.Event{Timings: timings})
 	}
 	if t, ok := w.queue.q.WakeupTime(); ok {
@@ -219,8 +238,6 @@ func (w *Window) processFrame(frameStart time.Time, size image.Point, frame *op.
 	default:
 	}
 	w.updateAnimation()
-	// Wait for the GPU goroutine to finish processing frame.
-	<-sync
 }
 
 // Invalidate the window such that a FrameEvent will be generated immediately.
@@ -353,7 +370,11 @@ func (w *Window) setNextFrame(at time.Time) {
 
 func (c *callbacks) SetDriver(d driver) {
 	c.d = d
-	c.Event(driverEvent{d})
+	var wakeup func()
+	if d != nil {
+		wakeup = d.Wakeup
+	}
+	c.Event(driverEvent{wakeup})
 }
 
 func (c *callbacks) Event(e event.Event) {
@@ -419,9 +440,11 @@ func (w *Window) destroy(err error) {
 }
 
 func (w *Window) destroyGPU() {
-	if w.loop != nil {
-		w.loop.Release()
-		w.loop = nil
+	if w.gpu != nil {
+		w.ctx.Lock()
+		w.gpu.Release()
+		w.ctx.Unlock()
+		w.gpu = nil
 	}
 	if w.ctx != nil {
 		w.ctx.Release()
@@ -445,19 +468,26 @@ func (w *Window) waitFrame() (*op.Ops, bool) {
 }
 
 func (w *Window) run(cnf *config) {
+	// Some OpenGL drivers don't like being made current on many different
+	// OS threads. Force the Go runtime to map the event loop goroutine to
+	// only one thread.
+	runtime.LockOSThread()
+
 	defer close(w.out)
 	defer close(w.dead)
 	if err := newWindow(&w.callbacks, cnf); err != nil {
 		w.out <- system.DestroyEvent{Err: err}
 		return
 	}
-	var driver driver
+	var wakeup func()
 	for {
-		var wakeups chan struct{}
-		if driver != nil {
+		var (
+			wakeups <-chan struct{}
+			timer   <-chan time.Time
+		)
+		if wakeup != nil {
 			wakeups = w.wakeups
 		}
-		var timer <-chan time.Time
 		if w.delayedDraw != nil {
 			timer = w.delayedDraw.C
 		}
@@ -469,16 +499,16 @@ func (w *Window) run(cnf *config) {
 			w.setNextFrame(time.Time{})
 			w.updateAnimation()
 		case <-wakeups:
-			driver.Wakeup()
+			wakeup()
 		case e := <-w.in:
 			switch e2 := e.(type) {
 			case system.StageEvent:
-				if w.loop != nil {
-					if e2.Stage < system.StageRunning {
-						if w.loop != nil {
-							w.loop.Release()
-							w.loop = nil
-						}
+				if e2.Stage < system.StageRunning {
+					if w.gpu != nil {
+						w.ctx.Lock()
+						w.gpu.Release()
+						w.gpu = nil
+						w.ctx.Unlock()
 					}
 				}
 				w.stage = e2.Stage
@@ -499,7 +529,7 @@ func (w *Window) run(cnf *config) {
 				e2.Queue = &w.queue
 				w.out <- e2.FrameEvent
 				frame, gotFrame := w.waitFrame()
-				err := w.validateAndProcess(driver, frameStart, e2.Size, e2.Sync, frame)
+				err := w.validateAndProcess(frameStart, e2.Size, e2.Sync, frame)
 				if gotFrame {
 					// We're done with frame, let the client continue.
 					w.frameAck <- struct{}{}
@@ -514,7 +544,7 @@ func (w *Window) run(cnf *config) {
 				w.out <- e
 				w.waitAck()
 			case driverEvent:
-				driver = e2.driver
+				wakeup = e2.wakeup
 			case system.DestroyEvent:
 				w.destroyGPU()
 				w.out <- e2
