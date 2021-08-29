@@ -80,7 +80,8 @@ func TestEndToEnd(t *testing.T) {
 	}{
 		{"X11 using go import path", &X11TestDriver{}, testdataWithGoImportPkgPath},
 		{"X11", &X11TestDriver{}, testdataWithRelativePkgPath},
-		{"Wayland", &WaylandTestDriver{}, testdataWithRelativePkgPath},
+		// Doesn't work on the builders.
+		//{"Wayland", &WaylandTestDriver{}, testdataWithRelativePkgPath},
 		{"JS", &JSTestDriver{}, testdataWithRelativePkgPath},
 		{"Android", &AndroidTestDriver{}, testdataWithRelativePkgPath},
 		{"Windows", &WineTestDriver{}, testdataWithRelativePkgPath},
