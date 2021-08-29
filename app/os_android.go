@@ -155,7 +155,7 @@ var gioView struct {
 	showTextInput      C.jmethodID
 	hideTextInput      C.jmethodID
 	setInputHint       C.jmethodID
-	postFrameCallback  C.jmethodID
+	postInvalidate     C.jmethodID
 	setCursor          C.jmethodID
 	setOrientation     C.jmethodID
 	setNavigationColor C.jmethodID
@@ -309,7 +309,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.showTextInput = getMethodID(env, class, "showTextInput", "()V")
 		m.hideTextInput = getMethodID(env, class, "hideTextInput", "()V")
 		m.setInputHint = getMethodID(env, class, "setInputHint", "(I)V")
-		m.postFrameCallback = getMethodID(env, class, "postFrameCallback", "()V")
+		m.postInvalidate = getMethodID(env, class, "postInvalidate", "()V")
 		m.setCursor = getMethodID(env, class, "setCursor", "(I)V")
 		m.setOrientation = getMethodID(env, class, "setOrientation", "(II)V")
 		m.setNavigationColor = getMethodID(env, class, "setNavigationColor", "(II)V")
@@ -394,7 +394,7 @@ func Java_org_gioui_GioView_onConfigurationChanged(env *C.JNIEnv, class C.jclass
 }
 
 //export Java_org_gioui_GioView_onFrameCallback
-func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view C.jlong, nanos C.jlong) {
+func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view C.jlong) {
 	w, exist := views[view]
 	if !exist {
 		return
@@ -405,7 +405,7 @@ func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view 
 	anim := w.animating
 	if anim {
 		runInJVM(javaVM(), func(env *C.JNIEnv) {
-			callVoidMethod(env, w.view, gioView.postFrameCallback)
+			callVoidMethod(env, w.view, gioView.postInvalidate)
 		})
 		w.draw(false)
 	}
@@ -489,7 +489,7 @@ func (w *window) SetAnimating(anim bool) {
 	w.animating = anim
 	if anim {
 		runInJVM(javaVM(), func(env *C.JNIEnv) {
-			callVoidMethod(env, w.view, gioView.postFrameCallback)
+			callVoidMethod(env, w.view, gioView.postInvalidate)
 		})
 	}
 }

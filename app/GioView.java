@@ -12,13 +12,13 @@ import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.content.Context;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.os.Build;
 import android.text.Editable;
 import android.util.AttributeSet;
 import android.util.TypedValue;
-import android.view.Choreographer;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -40,7 +40,7 @@ import android.text.InputType;
 
 import java.io.UnsupportedEncodingException;
 
-public final class GioView extends SurfaceView implements Choreographer.FrameCallback {
+public final class GioView extends SurfaceView {
 	private static boolean jniLoaded;
 
 	private final SurfaceHolder.Callback surfCallbacks;
@@ -293,13 +293,8 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		return true;
 	}
 
-	void postFrameCallback() {
-		Choreographer.getInstance().removeFrameCallback(this);
-		Choreographer.getInstance().postFrameCallback(this);
-	}
-
-	@Override public void doFrame(long nanos) {
-		onFrameCallback(nhandle, nanos);
+	@Override protected void onDraw(Canvas canvas) {
+		onFrameCallback(nhandle);
 	}
 
 	int getDensity() {
@@ -344,7 +339,7 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	static public native void onLowMemory();
 	static private native void onTouchEvent(long handle, int action, int pointerID, int tool, float x, float y, float scrollX, float scrollY, int buttons, long time);
 	static private native void onKeyEvent(long handle, int code, int character, long time);
-	static private native void onFrameCallback(long handle, long nanos);
+	static private native void onFrameCallback(long handle);
 	static private native boolean onBack(long handle);
 	static private native void onFocusChange(long handle, boolean focus);
 
