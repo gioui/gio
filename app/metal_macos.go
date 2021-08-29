@@ -3,7 +3,7 @@
 //go:build darwin && !ios && !nometal
 // +build darwin,!ios,!nometal
 
-package wm
+package app
 
 /*
 #cgo CFLAGS: -Werror -xobjective-c -fmodules -fobjc-arc

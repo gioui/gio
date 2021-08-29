@@ -7,7 +7,6 @@ import (
 	"image/color"
 	"runtime"
 
-	"gioui.org/app/internal/wm"
 	"gioui.org/gpu"
 	"gioui.org/op"
 )
@@ -17,7 +16,7 @@ type renderLoop struct {
 	drawing bool
 	err     error
 
-	ctx     wm.Context
+	ctx     context
 	frames  chan frame
 	results chan frameResult
 	ack     chan struct{}
@@ -35,7 +34,7 @@ type frameResult struct {
 	err     error
 }
 
-func newLoop(ctx wm.Context) (*renderLoop, error) {
+func newLoop(ctx context) (*renderLoop, error) {
 	l := &renderLoop{
 		ctx:     ctx,
 		frames:  make(chan frame),
@@ -52,7 +51,7 @@ func newLoop(ctx wm.Context) (*renderLoop, error) {
 	return l, nil
 }
 
-func (l *renderLoop) renderLoop(ctx wm.Context) error {
+func (l *renderLoop) renderLoop(ctx context) error {
 	// GL Operations must happen on a single OS thread, so
 	// pass initialization result through a channel.
 	initErr := make(chan error)

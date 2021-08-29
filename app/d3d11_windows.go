@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package wm
+package app
 
 import (
 	"fmt"
@@ -25,7 +25,7 @@ const debug = false
 func init() {
 	drivers = append(drivers, gpuAPI{
 		priority: 1,
-		initializer: func(w *window) (Context, error) {
+		initializer: func(w *window) (context, error) {
 			hwnd, _, _ := w.HWND()
 			var flags uint32
 			if debug {
@@ -70,7 +70,7 @@ func (c *d3d11Context) Present() error {
 			// Ignore
 			return nil
 		case d3d11.DXGI_ERROR_DEVICE_RESET, d3d11.DXGI_ERROR_DEVICE_REMOVED, d3d11.D3DDDIERR_DEVICEREMOVED:
-			return ErrDeviceLost
+			return errDeviceLost
 		}
 	}
 	return err

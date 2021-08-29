@@ -3,7 +3,7 @@
 //go:build !nometal
 // +build !nometal
 
-package wm
+package app
 
 /*
 #cgo CFLAGS: -Werror -xobjective-c -fmodules -fobjc-arc

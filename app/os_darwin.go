@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package wm
+package app
 
 /*
 #include <Foundation/Foundation.h>
@@ -232,6 +232,6 @@ func windowSetCursor(from, to pointer.CursorName) pointer.CursorName {
 
 func (w *window) Wakeup() {
 	runOnMain(func() {
-		w.w.Event(WakeupEvent{})
+		w.w.Event(wakeupEvent{})
 	})
 }

@@ -3,7 +3,7 @@
 //go:build (linux && !android && !nox11) || freebsd || openbsd
 // +build linux,!android,!nox11 freebsd openbsd
 
-package wm
+package app
 
 import (
 	"unsafe"
@@ -16,7 +16,7 @@ type x11Context struct {
 	*egl.Context
 }
 
-func (w *x11Window) NewContext() (Context, error) {
+func (w *x11Window) NewContext() (context, error) {
 	disp := egl.NativeDisplayType(unsafe.Pointer(w.display()))
 	ctx, err := egl.NewContext(disp)
 	if err != nil {

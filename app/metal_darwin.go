@@ -3,7 +3,7 @@
 //go:build !nometal
 // +build !nometal
 
-package wm
+package app
 
 import (
 	"errors"
@@ -169,6 +169,6 @@ func (c *mtlContext) Refresh() error {
 	return nil
 }
 
-func (w *window) NewContext() (Context, error) {
+func (w *window) NewContext() (context, error) {
 	return newMtlContext(w)
 }

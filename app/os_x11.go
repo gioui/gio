@@ -3,7 +3,7 @@
 //go:build (linux && !android && !nox11) || freebsd || openbsd
 // +build linux,!android,!nox11 freebsd openbsd
 
-package wm
+package app
 
 /*
 #cgo openbsd CFLAGS: -I/usr/X11R6/include -I/usr/local/include
@@ -49,7 +49,7 @@ import (
 )
 
 type x11Window struct {
-	w            Callbacks
+	w            *callbacks
 	x            *C.Display
 	xkb          *xkb.Context
 	xkbEventBase C.int
@@ -96,7 +96,7 @@ type x11Window struct {
 		content []byte
 	}
 	cursor pointer.CursorName
-	mode   WindowMode
+	mode   windowMode
 
 	wakeups chan struct{}
 }
@@ -115,14 +115,14 @@ func (w *x11Window) WriteClipboard(s string) {
 	C.XSetSelectionOwner(w.x, w.atoms.clipboard, w.xw, C.CurrentTime)
 }
 
-func (w *x11Window) Option(opts *Options) {
+func (w *x11Window) Configure(cnf *config) {
 	var shints C.XSizeHints
-	if o := opts.MinSize; o != nil {
+	if o := cnf.MinSize; o != nil {
 		shints.min_width = C.int(w.cfg.Px(o.Width))
 		shints.min_height = C.int(w.cfg.Px(o.Height))
 		shints.flags = C.PMinSize
 	}
-	if o := opts.MaxSize; o != nil {
+	if o := cnf.MaxSize; o != nil {
 		shints.max_width = C.int(w.cfg.Px(o.Width))
 		shints.max_height = C.int(w.cfg.Px(o.Height))
 		shints.flags = shints.flags | C.PMaxSize
@@ -131,12 +131,12 @@ func (w *x11Window) Option(opts *Options) {
 		C.XSetWMNormalHints(w.x, w.xw, &shints)
 	}
 
-	if o := opts.Size; o != nil {
+	if o := cnf.Size; o != nil {
 		C.XResizeWindow(w.x, w.xw, C.uint(w.cfg.Px(o.Width)), C.uint(w.cfg.Px(o.Height)))
 	}
 
 	var title string
-	if o := opts.Title; o != nil {
+	if o := cnf.Title; o != nil {
 		title = *o
 	}
 	ctitle := C.CString(title)
@@ -152,7 +152,7 @@ func (w *x11Window) Option(opts *Options) {
 		},
 		w.atoms.wmName)
 
-	if o := opts.WindowMode; o != nil {
+	if o := cnf.WindowMode; o != nil {
 		w.SetWindowMode(*o)
 	}
 }
@@ -181,13 +181,13 @@ func (w *x11Window) SetCursor(name pointer.CursorName) {
 	C.XDefineCursor(w.x, w.xw, c)
 }
 
-func (w *x11Window) SetWindowMode(mode WindowMode) {
+func (w *x11Window) SetWindowMode(mode windowMode) {
 	switch mode {
 	case w.mode:
 		return
-	case Windowed:
+	case windowed:
 		C.XDeleteProperty(w.x, w.xw, w.atoms.wmStateFullscreen)
-	case Fullscreen:
+	case fullscreen:
 		C.XChangeProperty(w.x, w.xw, w.atoms.wmState, C.XA_ATOM,
 			32, C.PropModeReplace,
 			(*C.uchar)(unsafe.Pointer(&w.atoms.wmStateFullscreen)), 1,
@@ -322,12 +322,12 @@ loop:
 		}
 		select {
 		case <-w.wakeups:
-			w.w.Event(WakeupEvent{})
+			w.w.Event(wakeupEvent{})
 		default:
 		}
 
 		if (anim || syn) && w.width != 0 && w.height != 0 {
-			w.w.Event(FrameEvent{
+			w.w.Event(frameEvent{
 				FrameEvent: system.FrameEvent{
 					Now: time.Now(),
 					Size: image.Point{
@@ -582,7 +582,7 @@ func init() {
 	x11Driver = newX11Window
 }
 
-func newX11Window(gioWin Callbacks, opts *Options) error {
+func newX11Window(gioWin *callbacks, cnf *config) error {
 	var err error
 
 	pipe := make([]int, 2)
@@ -632,7 +632,7 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 		override_redirect: C.False,
 	}
 	var width, height int
-	if o := opts.Size; o != nil {
+	if o := cnf.Size; o != nil {
 		width = cfg.Px(o.Width)
 		height = cfg.Px(o.Height)
 	}
@@ -683,7 +683,7 @@ func newX11Window(gioWin Callbacks, opts *Options) error {
 	// extensions
 	C.XSetWMProtocols(dpy, win, &w.atoms.evDelWindow, 1)
 
-	w.Option(opts)
+	w.Configure(cnf)
 
 	// make the window visible on the screen
 	C.XMapWindow(dpy, win)

@@ -3,7 +3,7 @@
 //go:build darwin && !ios
 // +build darwin,!ios
 
-package wm
+package app
 
 import (
 	"errors"
@@ -147,13 +147,13 @@ type ViewEvent struct {
 type window struct {
 	view        C.CFTypeRef
 	window      C.CFTypeRef
-	w           Callbacks
+	w           *callbacks
 	stage       system.Stage
 	displayLink *displayLink
 	cursor      pointer.CursorName
 
 	scale float32
-	mode  WindowMode
+	mode  windowMode
 }
 
 // viewMap is the mapping from Cocoa NSViews to Go windows.
@@ -210,47 +210,47 @@ func (w *window) WriteClipboard(s string) {
 	C.writeClipboard(chars, C.NSUInteger(len(u16)))
 }
 
-func (w *window) Option(opts *Options) {
+func (w *window) Configure(cnf *config) {
 	screenScale := float32(C.getScreenBackingScale())
 	cfg := configFor(screenScale)
 	val := func(v unit.Value) float32 {
 		return float32(cfg.Px(v)) / screenScale
 	}
-	if o := opts.Size; o != nil {
+	if o := cnf.Size; o != nil {
 		width := val(o.Width)
 		height := val(o.Height)
 		if width > 0 || height > 0 {
 			C.setSize(w.window, C.CGFloat(width), C.CGFloat(height))
 		}
 	}
-	if o := opts.MinSize; o != nil {
+	if o := cnf.MinSize; o != nil {
 		width := val(o.Width)
 		height := val(o.Height)
 		if width > 0 || height > 0 {
 			C.setMinSize(w.window, C.CGFloat(width), C.CGFloat(height))
 		}
 	}
-	if o := opts.MaxSize; o != nil {
+	if o := cnf.MaxSize; o != nil {
 		width := val(o.Width)
 		height := val(o.Height)
 		if width > 0 || height > 0 {
 			C.setMaxSize(w.window, C.CGFloat(width), C.CGFloat(height))
 		}
 	}
-	if o := opts.Title; o != nil {
+	if o := cnf.Title; o != nil {
 		title := C.CString(*o)
 		defer C.free(unsafe.Pointer(title))
 		C.setTitle(w.window, title)
 	}
-	if o := opts.WindowMode; o != nil {
+	if o := cnf.WindowMode; o != nil {
 		w.SetWindowMode(*o)
 	}
 }
 
-func (w *window) SetWindowMode(mode WindowMode) {
+func (w *window) SetWindowMode(mode windowMode) {
 	switch mode {
 	case w.mode:
-	case Windowed, Fullscreen:
+	case windowed, fullscreen:
 		C.toggleFullScreen(w.window)
 		w.mode = mode
 	}
@@ -396,7 +396,7 @@ func (w *window) draw() {
 	height := int(hf*w.scale + .5)
 	cfg := configFor(w.scale)
 	w.setStage(system.StageRunning)
-	w.w.Event(FrameEvent{
+	w.w.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
 			Now: time.Now(),
 			Size: image.Point{
@@ -461,11 +461,11 @@ func gio_onFinishLaunching() {
 	close(launched)
 }
 
-func NewWindow(win Callbacks, opts *Options) error {
+func newWindow(win *callbacks, cnf *config) error {
 	<-launched
 	errch := make(chan error)
 	runOnMain(func() {
-		w, err := newWindow(opts)
+		w, err := newOSWindow()
 		if err != nil {
 			errch <- err
 			return
@@ -474,7 +474,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 		w.w = win
 		w.window = C.gio_createWindow(w.view, nil, 0, 0, 0, 0, 0, 0)
 		win.SetDriver(w)
-		w.Option(opts)
+		w.Configure(cnf)
 		if nextTopLeft.x == 0 && nextTopLeft.y == 0 {
 			// cascadeTopLeftFromPoint treats (0, 0) as a no-op,
 			// and just returns the offset we need for the first window.
@@ -488,7 +488,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 	return <-errch
 }
 
-func newWindow(opts *Options) (*window, error) {
+func newOSWindow() (*window, error) {
 	view := C.gio_createView()
 	if view == 0 {
 		return nil, errors.New("CreateWindow: failed to create view")
@@ -512,7 +512,7 @@ func newWindow(opts *Options) (*window, error) {
 	return w, nil
 }
 
-func Main() {
+func osMain() {
 	C.gio_main()
 }
 

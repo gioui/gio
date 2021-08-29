@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package wm
+package app
 
 /*
 #cgo CFLAGS: -Werror
@@ -111,6 +111,8 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"runtime/debug"
@@ -130,7 +132,7 @@ import (
 )
 
 type window struct {
-	callbacks Callbacks
+	callbacks *callbacks
 
 	view C.jobject
 
@@ -195,12 +197,37 @@ var android struct {
 // view maps from GioView JNI refenreces to windows.
 var views = make(map[C.jlong]*window)
 
-// windows maps from Callbacks to windows
-var windows = make(map[Callbacks]*window)
+var windows = make(map[*callbacks]*window)
 
 var mainWindow = newWindowRendezvous()
 
 var mainFuncs = make(chan func(env *C.JNIEnv), 1)
+
+var (
+	dataDirOnce sync.Once
+	dataPath    string
+)
+
+func dataDir() (string, error) {
+	dataDirOnce.Do(func() {
+		dataPath = <-dataDirChan
+		// Set XDG_CACHE_HOME to make os.UserCacheDir work.
+		if _, exists := os.LookupEnv("XDG_CACHE_HOME"); !exists {
+			cachePath := filepath.Join(dataPath, "cache")
+			os.Setenv("XDG_CACHE_HOME", cachePath)
+		}
+		// Set XDG_CONFIG_HOME to make os.UserConfigDir work.
+		if _, exists := os.LookupEnv("XDG_CONFIG_HOME"); !exists {
+			cfgPath := filepath.Join(dataPath, "config")
+			os.Setenv("XDG_CONFIG_HOME", cfgPath)
+		}
+		// Set HOME to make os.UserHomeDir work.
+		if _, exists := os.LookupEnv("HOME"); !exists {
+			os.Setenv("HOME", dataPath)
+		}
+	})
+	return dataPath, nil
+}
 
 func getMethodID(env *C.JNIEnv, class C.jclass, method, sig string) C.jmethodID {
 	m := C.CString(method)
@@ -254,6 +281,7 @@ func initJVM(env *C.JNIEnv, gio C.jclass, ctx C.jobject) {
 	android.mwakeupMainThread = getStaticMethodID(env, gio, "wakeupMainThread", "()V")
 }
 
+// JavaVM returns the global JNI JavaVM.
 func JavaVM() uintptr {
 	jvm := javaVM()
 	return uintptr(unsafe.Pointer(jvm))
@@ -265,14 +293,11 @@ func javaVM() *C.JavaVM {
 	return android.jvm
 }
 
+// AppContext returns the global Application context as a JNI jobject.
 func AppContext() uintptr {
 	android.mu.Lock()
 	defer android.mu.Unlock()
 	return uintptr(android.appCtx)
-}
-
-func GetDataDir() string {
-	return <-dataDirChan
 }
 
 //export Java_org_gioui_GioView_onCreateView
@@ -305,7 +330,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 	handle := C.jlong(view)
 	views[handle] = w
 	w.loadConfig(env, class)
-	w.Option(wopts.opts)
+	w.Configure(wopts.cnf)
 	w.setStage(system.StagePaused)
 	w.callbacks.Event(ViewEvent{View: uintptr(view)})
 	return handle
@@ -476,7 +501,7 @@ func (w *window) draw(sync bool) {
 	}
 	const inchPrDp = 1.0 / 160
 	ppdp := float32(w.dpi) * inchPrDp
-	w.callbacks.Event(FrameEvent{
+	w.callbacks.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
 			Now: time.Now(),
 			Size: image.Point{
@@ -723,11 +748,11 @@ func goString(env *C.JNIEnv, str C.jstring) string {
 	return string(utf8)
 }
 
-func Main() {
+func osMain() {
 }
 
-func NewWindow(window Callbacks, opts *Options) error {
-	mainWindow.in <- windowAndOptions{window, opts}
+func newWindow(window *callbacks, cnf *config) error {
+	mainWindow.in <- windowAndConfig{window, cnf}
 	return <-mainWindow.errs
 }
 
@@ -751,18 +776,18 @@ func (w *window) ReadClipboard() {
 	})
 }
 
-func (w *window) Option(opts *Options) {
+func (w *window) Configure(cnf *config) {
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
-		if o := opts.Orientation; o != nil {
+		if o := cnf.Orientation; o != nil {
 			setOrientation(env, w.view, *o)
 		}
-		if o := opts.NavigationColor; o != nil {
+		if o := cnf.NavigationColor; o != nil {
 			setNavigationColor(env, w.view, *o)
 		}
-		if o := opts.StatusColor; o != nil {
+		if o := cnf.StatusColor; o != nil {
 			setStatusColor(env, w.view, *o)
 		}
-		if o := opts.WindowMode; o != nil {
+		if o := cnf.WindowMode; o != nil {
 			setWindowMode(env, w.view, *o)
 		}
 	})
@@ -776,7 +801,7 @@ func (w *window) SetCursor(name pointer.CursorName) {
 
 func (w *window) Wakeup() {
 	runOnMain(func(env *C.JNIEnv) {
-		w.callbacks.Event(WakeupEvent{})
+		w.callbacks.Event(wakeupEvent{})
 	})
 }
 
@@ -803,18 +828,18 @@ func setCursor(env *C.JNIEnv, view C.jobject, name pointer.CursorName) {
 	callVoidMethod(env, view, gioView.setCursor, jvalue(curID))
 }
 
-func setOrientation(env *C.JNIEnv, view C.jobject, mode Orientation) {
+func setOrientation(env *C.JNIEnv, view C.jobject, mode orientation) {
 	var (
 		id         int
 		idFallback int // Used only for SDK 17 or older.
 	)
 	// Constants defined at https://developer.android.com/reference/android/content/pm/ActivityInfo.
 	switch mode {
-	case AnyOrientation:
+	case anyOrientation:
 		id, idFallback = 2, 2 // SCREEN_ORIENTATION_USER
-	case LandscapeOrientation:
+	case landscapeOrientation:
 		id, idFallback = 11, 0 // SCREEN_ORIENTATION_USER_LANDSCAPE (or SCREEN_ORIENTATION_LANDSCAPE)
-	case PortraitOrientation:
+	case portraitOrientation:
 		id, idFallback = 12, 1 // SCREEN_ORIENTATION_USER_PORTRAIT (or SCREEN_ORIENTATION_PORTRAIT)
 	}
 	callVoidMethod(env, view, gioView.setOrientation, jvalue(id), jvalue(idFallback))
@@ -834,9 +859,9 @@ func setNavigationColor(env *C.JNIEnv, view C.jobject, color color.NRGBA) {
 	)
 }
 
-func setWindowMode(env *C.JNIEnv, view C.jobject, mode WindowMode) {
+func setWindowMode(env *C.JNIEnv, view C.jobject, mode windowMode) {
 	switch mode {
-	case Fullscreen:
+	case fullscreen:
 		callVoidMethod(env, view, gioView.setFullscreen, C.JNI_TRUE)
 	default:
 		callVoidMethod(env, view, gioView.setFullscreen, C.JNI_FALSE)

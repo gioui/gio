@@ -3,7 +3,7 @@
 //go:build darwin && ios && nometal
 // +build darwin,ios,nometal
 
-package wm
+package app
 
 /*
 @import UIKit;

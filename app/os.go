@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// package wm implements platform specific windows
+// package app implements platform specific windows
 // and GPU contexts.
-package wm
+package app
 
 import (
 	"errors"
@@ -11,58 +11,52 @@ import (
 	"gioui.org/io/key"
 
 	"gioui.org/gpu"
-	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
 	"gioui.org/unit"
 )
 
-type Size struct {
+type size struct {
 	Width  unit.Value
 	Height unit.Value
 }
 
-type Options struct {
-	Size            *Size
-	MinSize         *Size
-	MaxSize         *Size
+type config struct {
+	Size            *size
+	MinSize         *size
+	MaxSize         *size
 	Title           *string
-	WindowMode      *WindowMode
+	WindowMode      *windowMode
 	StatusColor     *color.NRGBA
 	NavigationColor *color.NRGBA
-	Orientation     *Orientation
+	Orientation     *orientation
 	CustomRenderer  bool
 }
 
-type WakeupEvent struct{}
+type wakeupEvent struct{}
 
-type WindowMode uint8
-
-const (
-	Windowed WindowMode = iota
-	Fullscreen
-)
-
-type Orientation uint8
+type windowMode uint8
 
 const (
-	AnyOrientation Orientation = iota
-	LandscapeOrientation
-	PortraitOrientation
+	windowed windowMode = iota
+	fullscreen
 )
 
-type FrameEvent struct {
+type orientation uint8
+
+const (
+	anyOrientation orientation = iota
+	landscapeOrientation
+	portraitOrientation
+)
+
+type frameEvent struct {
 	system.FrameEvent
 
 	Sync bool
 }
 
-type Callbacks interface {
-	SetDriver(d Driver)
-	Event(e event.Event)
-}
-
-type Context interface {
+type context interface {
 	API() gpu.API
 	RenderTarget() gpu.RenderTarget
 	Present() error
@@ -72,14 +66,14 @@ type Context interface {
 	Unlock()
 }
 
-// ErrDeviceLost is returned from Context.Present when
+// errDeviceLost is returned from Context.Present when
 // the underlying GPU device is gone and should be
 // recreated.
-var ErrDeviceLost = errors.New("GPU device lost")
+var errDeviceLost = errors.New("GPU device lost")
 
 // Driver is the interface for the platform implementation
 // of a window.
-type Driver interface {
+type driver interface {
 	// SetAnimating sets the animation flag. When the window is animating,
 	// FrameEvents are delivered as fast as the display can handle them.
 	SetAnimating(anim bool)
@@ -89,15 +83,15 @@ type Driver interface {
 
 	SetInputHint(mode key.InputHint)
 
-	NewContext() (Context, error)
+	NewContext() (context, error)
 
 	// ReadClipboard requests the clipboard content.
 	ReadClipboard()
 	// WriteClipboard requests a clipboard write.
 	WriteClipboard(s string)
 
-	// Option processes option changes.
-	Option(opts *Options)
+	// Configure the window.
+	Configure(cnf *config)
 
 	// SetCursor updates the current cursor to name.
 	SetCursor(name pointer.CursorName)
@@ -109,25 +103,25 @@ type Driver interface {
 }
 
 type windowRendezvous struct {
-	in   chan windowAndOptions
-	out  chan windowAndOptions
+	in   chan windowAndConfig
+	out  chan windowAndConfig
 	errs chan error
 }
 
-type windowAndOptions struct {
-	window Callbacks
-	opts   *Options
+type windowAndConfig struct {
+	window *callbacks
+	cnf    *config
 }
 
 func newWindowRendezvous() *windowRendezvous {
 	wr := &windowRendezvous{
-		in:   make(chan windowAndOptions),
-		out:  make(chan windowAndOptions),
+		in:   make(chan windowAndConfig),
+		out:  make(chan windowAndConfig),
 		errs: make(chan error),
 	}
 	go func() {
-		var main windowAndOptions
-		var out chan windowAndOptions
+		var main windowAndConfig
+		var out chan windowAndConfig
 		for {
 			select {
 			case w := <-wr.in:
@@ -145,4 +139,4 @@ func newWindowRendezvous() *windowRendezvous {
 	return wr
 }
 
-func (_ WakeupEvent) ImplementsEvent() {}
+func (_ wakeupEvent) ImplementsEvent() {}

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package wm
+package app
 
 import (
 	"errors"
@@ -45,7 +45,7 @@ type winDeltas struct {
 type window struct {
 	hwnd        syscall.Handle
 	hdc         syscall.Handle
-	w           Callbacks
+	w           *callbacks
 	width       int
 	height      int
 	stage       system.Stage
@@ -63,14 +63,14 @@ type window struct {
 
 	minmax winConstraints
 	deltas winDeltas
-	opts   *Options
+	cnf    *config
 }
 
 const _WM_WAKEUP = windows.WM_USER + iota
 
 type gpuAPI struct {
 	priority    int
-	initializer func(w *window) (Context, error)
+	initializer func(w *window) (context, error)
 }
 
 // drivers is the list of potential Context implementations.
@@ -92,11 +92,11 @@ var resources struct {
 	cursor syscall.Handle
 }
 
-func Main() {
+func osMain() {
 	select {}
 }
 
-func NewWindow(window Callbacks, opts *Options) error {
+func newWindow(window *callbacks, cnf *config) error {
 	cerr := make(chan error)
 	go func() {
 		// GetMessage and PeekMessage can filter on a window HWND, but
@@ -104,7 +104,7 @@ func NewWindow(window Callbacks, opts *Options) error {
 		// Instead lock the thread so window messages arrive through
 		// unfiltered GetMessage calls.
 		runtime.LockOSThread()
-		w, err := createNativeWindow(opts)
+		w, err := createNativeWindow(cnf)
 		if err != nil {
 			cerr <- err
 			return
@@ -115,7 +115,7 @@ func NewWindow(window Callbacks, opts *Options) error {
 		w.w = window
 		w.w.SetDriver(w)
 		w.w.Event(ViewEvent{HWND: uintptr(w.hwnd)})
-		w.Option(opts)
+		w.Configure(cnf)
 		windows.ShowWindow(w.hwnd, windows.SW_SHOWDEFAULT)
 		windows.SetForegroundWindow(w.hwnd)
 		windows.SetFocus(w.hwnd)
@@ -159,20 +159,20 @@ func initResources() error {
 	return nil
 }
 
-func getWindowConstraints(cfg unit.Metric, opts *Options) winConstraints {
+func getWindowConstraints(cfg unit.Metric, cnf *config) winConstraints {
 	var minmax winConstraints
-	if o := opts.MinSize; o != nil {
+	if o := cnf.MinSize; o != nil {
 		minmax.minWidth = int32(cfg.Px(o.Width))
 		minmax.minHeight = int32(cfg.Px(o.Height))
 	}
-	if o := opts.MaxSize; o != nil {
+	if o := cnf.MaxSize; o != nil {
 		minmax.maxWidth = int32(cfg.Px(o.Width))
 		minmax.maxHeight = int32(cfg.Px(o.Height))
 	}
 	return minmax
 }
 
-func createNativeWindow(opts *Options) (*window, error) {
+func createNativeWindow(cnf *config) (*window, error) {
 	var resErr error
 	resources.once.Do(func() {
 		resErr = initResources()
@@ -200,8 +200,8 @@ func createNativeWindow(opts *Options) (*window, error) {
 	}
 	w := &window{
 		hwnd:   hwnd,
-		minmax: getWindowConstraints(cfg, opts),
-		opts:   opts,
+		minmax: getWindowConstraints(cfg, cnf),
+		cnf:    cnf,
 	}
 	w.hdc, err = windows.GetDC(hwnd)
 	if err != nil {
@@ -330,7 +330,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			return windows.TRUE
 		}
 	case _WM_WAKEUP:
-		w.w.Event(WakeupEvent{})
+		w.w.Event(wakeupEvent{})
 	}
 
 	return windows.DefWindowProc(hwnd, msg, wParam, lParam)
@@ -458,8 +458,8 @@ func (w *window) draw(sync bool) {
 	}
 	dpi := windows.GetWindowDPI(w.hwnd)
 	cfg := configForDPI(dpi)
-	w.minmax = getWindowConstraints(cfg, w.opts)
-	w.w.Event(FrameEvent{
+	w.minmax = getWindowConstraints(cfg, w.cnf)
+	w.w.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
 			Now: time.Now(),
 			Size: image.Point{
@@ -472,7 +472,7 @@ func (w *window) draw(sync bool) {
 	})
 }
 
-func (w *window) NewContext() (Context, error) {
+func (w *window) NewContext() (context, error) {
 	sort.Slice(drivers, func(i, j int) bool {
 		return drivers[i].priority < drivers[j].priority
 	})
@@ -515,9 +515,9 @@ func (w *window) readClipboard() error {
 	return nil
 }
 
-func (w *window) Option(opts *Options) {
-	w.opts = opts
-	if o := opts.Size; o != nil {
+func (w *window) Configure(cnf *config) {
+	w.cnf = cnf
+	if o := cnf.Size; o != nil {
 		dpi := windows.GetSystemDPI()
 		cfg := configForDPI(dpi)
 		width := int32(cfg.Px(o.Width))
@@ -538,27 +538,27 @@ func (w *window) Option(opts *Options) {
 		w.deltas.width = width - dw
 		w.deltas.height = height - dh
 
-		w.opts.Size = o
+		w.cnf.Size = o
 		windows.MoveWindow(w.hwnd, 0, 0, width, height, true)
 	}
-	if o := opts.MinSize; o != nil {
-		w.opts.MinSize = o
+	if o := cnf.MinSize; o != nil {
+		w.cnf.MinSize = o
 	}
-	if o := opts.MaxSize; o != nil {
-		w.opts.MaxSize = o
+	if o := cnf.MaxSize; o != nil {
+		w.cnf.MaxSize = o
 	}
-	if o := opts.Title; o != nil {
-		windows.SetWindowText(w.hwnd, *opts.Title)
+	if o := cnf.Title; o != nil {
+		windows.SetWindowText(w.hwnd, *cnf.Title)
 	}
-	if o := opts.WindowMode; o != nil {
+	if o := cnf.WindowMode; o != nil {
 		w.SetWindowMode(*o)
 	}
 }
 
-func (w *window) SetWindowMode(mode WindowMode) {
+func (w *window) SetWindowMode(mode windowMode) {
 	// https://devblogs.microsoft.com/oldnewthing/20100412-00/?p=14353
 	switch mode {
-	case Windowed:
+	case windowed:
 		if w.placement == nil {
 			return
 		}
@@ -570,7 +570,7 @@ func (w *window) SetWindowMode(mode WindowMode) {
 			0, 0, 0, 0,
 			windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED,
 		)
-	case Fullscreen:
+	case fullscreen:
 		if w.placement != nil {
 			return
 		}

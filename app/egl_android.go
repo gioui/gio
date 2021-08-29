@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package wm
+package app
 
 /*
 #include <android/native_window_jni.h>
@@ -14,27 +14,27 @@ import (
 	"gioui.org/internal/egl"
 )
 
-type context struct {
+type androidContext struct {
 	win *window
 	*egl.Context
 }
 
-func (w *window) NewContext() (Context, error) {
+func (w *window) NewContext() (context, error) {
 	ctx, err := egl.NewContext(nil)
 	if err != nil {
 		return nil, err
 	}
-	return &context{win: w, Context: ctx}, nil
+	return &androidContext{win: w, Context: ctx}, nil
 }
 
-func (c *context) Release() {
+func (c *androidContext) Release() {
 	if c.Context != nil {
 		c.Context.Release()
 		c.Context = nil
 	}
 }
 
-func (c *context) Refresh() error {
+func (c *androidContext) Refresh() error {
 	c.Context.ReleaseSurface()
 	var (
 		win           *C.ANativeWindow
@@ -48,10 +48,10 @@ func (c *context) Refresh() error {
 	return c.Context.CreateSurface(eglSurf, width, height)
 }
 
-func (c *context) Lock() error {
+func (c *androidContext) Lock() error {
 	return c.Context.MakeCurrent()
 }
 
-func (c *context) Unlock() {
+func (c *androidContext) Unlock() {
 	c.Context.ReleaseCurrent()
 }

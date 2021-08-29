@@ -3,7 +3,7 @@
 //go:build (linux && !android && !nowayland) || freebsd
 // +build linux,!android,!nowayland freebsd
 
-package wm
+package app
 
 import (
 	"bytes"
@@ -136,7 +136,7 @@ type repeatState struct {
 	delay time.Duration
 
 	key   uint32
-	win   Callbacks
+	win   *callbacks
 	stopC chan struct{}
 
 	start time.Duration
@@ -146,7 +146,7 @@ type repeatState struct {
 }
 
 type window struct {
-	w          Callbacks
+	w          *callbacks
 	disp       *wlDisplay
 	surf       *C.struct_wl_surface
 	wmSurf     *C.struct_xdg_surface
@@ -222,12 +222,12 @@ func init() {
 	wlDriver = newWLWindow
 }
 
-func newWLWindow(window Callbacks, opts *Options) error {
+func newWLWindow(window *callbacks, cnf *config) error {
 	d, err := newWLDisplay()
 	if err != nil {
 		return err
 	}
-	w, err := d.createNativeWindow(opts)
+	w, err := d.createNativeWindow(cnf)
 	if err != nil {
 		d.destroy()
 		return err
@@ -289,7 +289,7 @@ func (d *wlDisplay) readClipboard() (io.ReadCloser, error) {
 	return r, nil
 }
 
-func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
+func (d *wlDisplay) createNativeWindow(cnf *config) (*window, error) {
 	if d.compositor == nil {
 		return nil, errors.New("wayland: no compositor available")
 	}
@@ -356,7 +356,7 @@ func (d *wlDisplay) createNativeWindow(opts *Options) (*window, error) {
 	C.xdg_surface_add_listener(w.wmSurf, &C.gio_xdg_surface_listener, unsafe.Pointer(w.surf))
 	C.xdg_toplevel_add_listener(w.topLvl, &C.gio_xdg_toplevel_listener, unsafe.Pointer(w.surf))
 
-	w.setOptions(opts)
+	w.Configure(cnf)
 
 	if d.decor != nil {
 		// Request server side decorations.
@@ -907,17 +907,13 @@ func (w *window) WriteClipboard(s string) {
 	w.disp.writeClipboard([]byte(s))
 }
 
-func (w *window) Option(opts *Options) {
-	w.setOptions(opts)
-}
-
-func (w *window) setOptions(opts *Options) {
+func (w *window) Configure(cnf *config) {
 	_, _, cfg := w.config()
-	if o := opts.Size; o != nil {
+	if o := cnf.Size; o != nil {
 		w.width = cfg.Px(o.Width)
 		w.height = cfg.Px(o.Height)
 	}
-	if o := opts.Title; o != nil {
+	if o := cnf.Title; o != nil {
 		title := C.CString(*o)
 		C.xdg_toplevel_set_title(w.topLvl, title)
 		C.free(unsafe.Pointer(title))
@@ -1134,7 +1130,7 @@ func (w *window) loop() error {
 		}
 		select {
 		case <-w.wakeups:
-			w.w.Event(WakeupEvent{})
+			w.w.Event(wakeupEvent{})
 		default:
 		}
 		if w.dead {
@@ -1423,7 +1419,7 @@ func (w *window) draw(sync bool) {
 		// Use the surface as listener data for gio_onFrameDone.
 		C.wl_callback_add_listener(w.lastFrameCallback, &C.gio_callback_listener, unsafe.Pointer(w.surf))
 	}
-	w.w.Event(FrameEvent{
+	w.w.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
 			Now: time.Now(),
 			Size: image.Point{

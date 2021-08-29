@@ -3,7 +3,7 @@
 //go:build darwin && !ios && nometal
 // +build darwin,!ios,nometal
 
-package wm
+package app
 
 import (
 	"errors"
@@ -28,35 +28,35 @@ __attribute__ ((visibility ("hidden"))) void gio_unlockContext(CFTypeRef ctxRef)
 */
 import "C"
 
-type context struct {
+type glContext struct {
 	c    *gl.Functions
 	ctx  C.CFTypeRef
 	view C.CFTypeRef
 }
 
-func newContext(w *window) (*context, error) {
+func newContext(w *window) (*glContext, error) {
 	view := w.contextView()
 	ctx := C.gio_createGLContext()
 	if ctx == 0 {
 		return nil, errors.New("gl: failed to create NSOpenGLContext")
 	}
 	C.gio_setContextView(ctx, view)
-	c := &context{
+	c := &glContext{
 		ctx:  ctx,
 		view: view,
 	}
 	return c, nil
 }
 
-func (c *context) RenderTarget() gpu.RenderTarget {
+func (c *glContext) RenderTarget() gpu.RenderTarget {
 	return gpu.OpenGLRenderTarget{}
 }
 
-func (c *context) API() gpu.API {
+func (c *glContext) API() gpu.API {
 	return gpu.OpenGL{}
 }
 
-func (c *context) Release() {
+func (c *glContext) Release() {
 	if c.ctx != 0 {
 		C.gio_clearCurrentContext()
 		C.CFRelease(c.ctx)
@@ -64,28 +64,28 @@ func (c *context) Release() {
 	}
 }
 
-func (c *context) Present() error {
+func (c *glContext) Present() error {
 	return nil
 }
 
-func (c *context) Lock() error {
+func (c *glContext) Lock() error {
 	C.gio_lockContext(c.ctx)
 	C.gio_makeCurrentContext(c.ctx)
 	return nil
 }
 
-func (c *context) Unlock() {
+func (c *glContext) Unlock() {
 	C.gio_clearCurrentContext()
 	C.gio_unlockContext(c.ctx)
 }
 
-func (c *context) Refresh() error {
+func (c *glContext) Refresh() error {
 	c.Lock()
 	defer c.Unlock()
 	C.gio_updateContext(c.ctx)
 	return nil
 }
 
-func (w *window) NewContext() (Context, error) {
+func (w *window) NewContext() (context, error) {
 	return newContext(w)
 }

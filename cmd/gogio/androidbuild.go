@@ -240,7 +240,7 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 			return err
 		})
 	}
-	appDir, err := runCmd(exec.Command("go", "list", "-f", "{{.Dir}}", "gioui.org/app/internal/wm"))
+	appDir, err := runCmd(exec.Command("go", "list", "-f", "{{.Dir}}", "gioui.org/app/"))
 	if err != nil {
 		return err
 	}

@@ -3,7 +3,7 @@
 //go:build (linux && !android) || freebsd || openbsd
 // +build linux,!android freebsd openbsd
 
-package wm
+package app
 
 import (
 	"errors"
@@ -17,23 +17,23 @@ type ViewEvent struct {
 	Window uintptr
 }
 
-func Main() {
+func osMain() {
 	select {}
 }
 
-type windowDriver func(Callbacks, *Options) error
+type windowDriver func(*callbacks, *config) error
 
 // Instead of creating files with build tags for each combination of wayland +/- x11
 // let each driver initialize these variables with their own version of createWindow.
 var wlDriver, x11Driver windowDriver
 
-func NewWindow(window Callbacks, opts *Options) error {
+func newWindow(window *callbacks, cnf *config) error {
 	var errFirst error
 	for _, d := range []windowDriver{x11Driver, wlDriver} {
 		if d == nil {
 			continue
 		}
-		err := d(window, opts)
+		err := d(window, cnf)
 		if err == nil {
 			return nil
 		}

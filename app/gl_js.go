@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package wm
+package app
 
 import (
 	"errors"
@@ -10,12 +10,12 @@ import (
 	"gioui.org/internal/gl"
 )
 
-type context struct {
+type glContext struct {
 	ctx js.Value
 	cnv js.Value
 }
 
-func newContext(w *window) (*context, error) {
+func newContext(w *window) (*glContext, error) {
 	args := map[string]interface{}{
 		// Enable low latency rendering.
 		// See https://developers.google.com/web/updates/2019/05/desynchronized.
@@ -29,41 +29,41 @@ func newContext(w *window) (*context, error) {
 	if ctx.IsNull() {
 		return nil, errors.New("app: webgl is not supported")
 	}
-	c := &context{
+	c := &glContext{
 		ctx: ctx,
 		cnv: w.cnv,
 	}
 	return c, nil
 }
 
-func (c *context) RenderTarget() gpu.RenderTarget {
+func (c *glContext) RenderTarget() gpu.RenderTarget {
 	return gpu.OpenGLRenderTarget{}
 }
 
-func (c *context) API() gpu.API {
+func (c *glContext) API() gpu.API {
 	return gpu.OpenGL{Context: gl.Context(c.ctx)}
 }
 
-func (c *context) Release() {
+func (c *glContext) Release() {
 }
 
-func (c *context) Present() error {
+func (c *glContext) Present() error {
 	if c.ctx.Call("isContextLost").Bool() {
 		return errors.New("context lost")
 	}
 	return nil
 }
 
-func (c *context) Lock() error {
+func (c *glContext) Lock() error {
 	return nil
 }
 
-func (c *context) Unlock() {}
+func (c *glContext) Unlock() {}
 
-func (c *context) Refresh() error {
+func (c *glContext) Refresh() error {
 	return nil
 }
 
-func (w *window) NewContext() (Context, error) {
+func (w *window) NewContext() (context, error) {
 	return newContext(w)
 }

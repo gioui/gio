@@ -18,22 +18,21 @@ import (
 	"gioui.org/unit"
 
 	_ "gioui.org/app/internal/log"
-	"gioui.org/app/internal/wm"
 )
 
 // Option configures a window.
-type Option func(opts *wm.Options)
+type Option func(cnf *config)
 
 // Window represents an operating system window.
 type Window struct {
-	ctx  wm.Context
+	ctx  context
 	loop *renderLoop
 
 	// driverFuncs is a channel of functions to run when
 	// the Window has a valid driver.
-	driverFuncs chan func(d wm.Driver)
+	driverFuncs chan func(d driver)
 	// wakeups wakes up the native event loop to send a
-	// wm.WakeupEvent that flushes driverFuncs.
+	// WakeupEvent that flushes driverFuncs.
 	wakeups chan struct{}
 
 	out         chan event.Event
@@ -62,7 +61,7 @@ type Window struct {
 
 type callbacks struct {
 	w *Window
-	d wm.Driver
+	d driver
 }
 
 // queue is an event.Queue implementation that distributes system events
@@ -73,7 +72,7 @@ type queue struct {
 
 // driverEvent is sent when the underlying driver changes.
 type driverEvent struct {
-	driver wm.Driver
+	driver driver
 }
 
 // Pre-allocate the ack event to avoid garbage.
@@ -90,13 +89,13 @@ var ackEvent event.Event
 // Calling NewWindow more than once is not supported on
 // iOS, Android, WebAssembly.
 func NewWindow(options ...Option) *Window {
-	opts := new(wm.Options)
+	cnf := new(config)
 	// Default options.
-	Size(unit.Dp(800), unit.Dp(600))(opts)
-	Title("Gio")(opts)
+	Size(unit.Dp(800), unit.Dp(600))(cnf)
+	Title("Gio")(cnf)
 
 	for _, o := range options {
-		o(opts)
+		o(cnf)
 	}
 
 	w := &Window{
@@ -106,14 +105,14 @@ func NewWindow(options ...Option) *Window {
 		invalidates:   make(chan struct{}, 1),
 		frames:        make(chan *op.Ops),
 		frameAck:      make(chan struct{}),
-		driverFuncs:   make(chan func(d wm.Driver), 1),
+		driverFuncs:   make(chan func(d driver), 1),
 		wakeups:       make(chan struct{}, 1),
 		dead:          make(chan struct{}),
 		notifyAnimate: make(chan struct{}, 1),
-		nocontext:     opts.CustomRenderer,
+		nocontext:     cnf.CustomRenderer,
 	}
 	w.callbacks.w = w
-	go w.run(opts)
+	go w.run(cnf)
 	return w
 }
 
@@ -122,21 +121,20 @@ func (w *Window) Events() <-chan event.Event {
 	return w.out
 }
 
-// update updates the wm. Paint operations updates the
-// window contents, input operations declare input handlers,
-// and so on. The supplied operations list completely replaces
-// the window state from previous calls.
+// update updates the window contents, input operations declare input handlers,
+// and so on. The supplied operations list completely replaces the window state
+// from previous calls.
 func (w *Window) update(frame *op.Ops) {
 	w.frames <- frame
 	<-w.frameAck
 }
 
-func (w *Window) validateAndProcess(driver wm.Driver, frameStart time.Time, size image.Point, sync bool, frame *op.Ops) error {
+func (w *Window) validateAndProcess(d driver, frameStart time.Time, size image.Point, sync bool, frame *op.Ops) error {
 	for {
 		if w.loop != nil {
 			if err := w.loop.Flush(); err != nil {
 				w.destroyGPU()
-				if err == wm.ErrDeviceLost {
+				if err == errDeviceLost {
 					continue
 				}
 				return err
@@ -145,8 +143,8 @@ func (w *Window) validateAndProcess(driver wm.Driver, frameStart time.Time, size
 		if w.loop == nil && !w.nocontext {
 			var err error
 			if w.ctx == nil {
-				w.driverRun(func(_ wm.Driver) {
-					w.ctx, err = driver.NewContext()
+				w.driverRun(func(_ driver) {
+					w.ctx, err = d.NewContext()
 				})
 				if err != nil {
 					return err
@@ -160,7 +158,7 @@ func (w *Window) validateAndProcess(driver wm.Driver, frameStart time.Time, size
 			}
 		}
 		if sync && w.ctx != nil {
-			w.driverRun(func(_ wm.Driver) {
+			w.driverRun(func(_ driver) {
 				w.ctx.Refresh()
 			})
 		}
@@ -168,7 +166,7 @@ func (w *Window) validateAndProcess(driver wm.Driver, frameStart time.Time, size
 		if sync && w.loop != nil {
 			if err := w.loop.Flush(); err != nil {
 				w.destroyGPU()
-				if err == wm.ErrDeviceLost {
+				if err == errDeviceLost {
 					continue
 				}
 				return err
@@ -190,12 +188,12 @@ func (w *Window) processFrame(frameStart time.Time, size image.Point, frame *op.
 	w.queue.q.Frame(frame)
 	switch w.queue.q.TextInputState() {
 	case router.TextInputOpen:
-		go w.driverRun(func(d wm.Driver) { d.ShowTextInput(true) })
+		go w.driverRun(func(d driver) { d.ShowTextInput(true) })
 	case router.TextInputClose:
-		go w.driverRun(func(d wm.Driver) { d.ShowTextInput(false) })
+		go w.driverRun(func(d driver) { d.ShowTextInput(false) })
 	}
 	if hint, ok := w.queue.q.TextInputHint(); ok {
-		go w.driverRun(func(d wm.Driver) { d.SetInputHint(hint) })
+		go w.driverRun(func(d driver) { d.SetInputHint(hint) })
 	}
 	if txt, ok := w.queue.q.WriteClipboard(); ok {
 		go w.WriteClipboard(txt)
@@ -242,12 +240,12 @@ func (w *Window) Invalidate() {
 
 // Option applies the options to the window.
 func (w *Window) Option(opts ...Option) {
-	go w.driverRun(func(d wm.Driver) {
-		o := new(wm.Options)
+	go w.driverRun(func(d driver) {
+		c := new(config)
 		for _, opt := range opts {
-			opt(o)
+			opt(c)
 		}
-		d.Option(o)
+		d.Configure(c)
 	})
 }
 
@@ -255,32 +253,32 @@ func (w *Window) Option(opts ...Option) {
 // of a clipboard.Event. Multiple reads may be coalesced
 // to a single event.
 func (w *Window) ReadClipboard() {
-	go w.driverRun(func(d wm.Driver) {
+	go w.driverRun(func(d driver) {
 		d.ReadClipboard()
 	})
 }
 
 // WriteClipboard writes a string to the clipboard.
 func (w *Window) WriteClipboard(s string) {
-	go w.driverRun(func(d wm.Driver) {
+	go w.driverRun(func(d driver) {
 		d.WriteClipboard(s)
 	})
 }
 
 // SetCursorName changes the current window cursor to name.
 func (w *Window) SetCursorName(name pointer.CursorName) {
-	go w.driverRun(func(d wm.Driver) {
+	go w.driverRun(func(d driver) {
 		d.SetCursor(name)
 	})
 }
 
-// Close the wm. The window's event loop should exit when it receives
+// Close the window. The window's event loop should exit when it receives
 // system.DestroyEvent.
 //
 // Currently, only macOS, Windows and X11 drivers implement this functionality,
 // all others are stubbed.
 func (w *Window) Close() {
-	go w.driverRun(func(d wm.Driver) {
+	go w.driverRun(func(d driver) {
 		d.Close()
 	})
 }
@@ -294,14 +292,14 @@ func (w *Window) Close() {
 // Note that most programs should not call Run; configuring a Window with
 // CustomRenderer is a notable exception.
 func (w *Window) Run(f func()) {
-	w.driverRun(func(_ wm.Driver) {
+	w.driverRun(func(_ driver) {
 		f()
 	})
 }
 
-func (w *Window) driverRun(f func(d wm.Driver)) {
+func (w *Window) driverRun(f func(d driver)) {
 	done := make(chan struct{})
-	wrapper := func(d wm.Driver) {
+	wrapper := func(d driver) {
 		defer close(done)
 		f(d)
 	}
@@ -353,7 +351,7 @@ func (w *Window) setNextFrame(at time.Time) {
 	}
 }
 
-func (c *callbacks) SetDriver(d wm.Driver) {
+func (c *callbacks) SetDriver(d driver) {
 	c.d = d
 	c.Event(driverEvent{d})
 }
@@ -366,7 +364,7 @@ func (c *callbacks) Event(e event.Event) {
 	}
 }
 
-func (w *Window) runFuncs(d wm.Driver) {
+func (w *Window) runFuncs(d driver) {
 	// Don't run driver functions if there's no driver.
 	if d == nil {
 		<-w.ack
@@ -446,14 +444,14 @@ func (w *Window) waitFrame() (*op.Ops, bool) {
 	}
 }
 
-func (w *Window) run(opts *wm.Options) {
+func (w *Window) run(cnf *config) {
 	defer close(w.out)
 	defer close(w.dead)
-	if err := wm.NewWindow(&w.callbacks, opts); err != nil {
+	if err := newWindow(&w.callbacks, cnf); err != nil {
 		w.out <- system.DestroyEvent{Err: err}
 		return
 	}
-	var driver wm.Driver
+	var driver driver
 	for {
 		var wakeups chan struct{}
 		if driver != nil {
@@ -487,7 +485,7 @@ func (w *Window) run(opts *wm.Options) {
 				w.updateAnimation()
 				w.out <- e
 				w.waitAck()
-			case wm.FrameEvent:
+			case frameEvent:
 				if e2.Size == (image.Point{}) {
 					panic(errors.New("internal error: zero-sized Draw"))
 				}
@@ -525,7 +523,7 @@ func (w *Window) run(opts *wm.Options) {
 			case ViewEvent:
 				w.out <- e2
 				w.waitAck()
-			case wm.WakeupEvent:
+			case wakeupEvent:
 			case event.Event:
 				if w.queue.q.Queue(e2) {
 					w.setNextFrame(time.Time{})
@@ -552,42 +550,42 @@ func (q *queue) Events(k event.Tag) []event.Event {
 
 var (
 	// Windowed is the normal window mode with OS specific window decorations.
-	Windowed Option = windowMode(wm.Windowed)
+	Windowed Option = modeOption(windowed)
 	// Fullscreen is the full screen window mode.
-	Fullscreen Option = windowMode(wm.Fullscreen)
+	Fullscreen Option = modeOption(fullscreen)
 )
 
-// windowMode sets the window mode.
+// WindowMode sets the window mode.
 //
 // Supported platforms are macOS, X11, Windows and JS.
-func windowMode(mode wm.WindowMode) Option {
-	return func(opts *wm.Options) {
-		opts.WindowMode = &mode
+func modeOption(mode windowMode) Option {
+	return func(cnf *config) {
+		cnf.WindowMode = &mode
 	}
 }
 
 var (
 	// AnyOrientation allows the window to be freely orientated.
-	AnyOrientation Option = orientation(wm.AnyOrientation)
+	AnyOrientation Option = orientationOption(anyOrientation)
 	// LandscapeOrientation constrains the window to landscape orientations.
-	LandscapeOrientation Option = orientation(wm.LandscapeOrientation)
+	LandscapeOrientation Option = orientationOption(landscapeOrientation)
 	// PortraitOrientation constrains the window to portrait orientations.
-	PortraitOrientation Option = orientation(wm.PortraitOrientation)
+	PortraitOrientation Option = orientationOption(portraitOrientation)
 )
 
 // orientation sets the orientation of the app.
 //
 // Supported platforms are Android and JS.
-func orientation(mode wm.Orientation) Option {
-	return func(opts *wm.Options) {
-		opts.Orientation = &mode
+func orientationOption(mode orientation) Option {
+	return func(cnf *config) {
+		cnf.Orientation = &mode
 	}
 }
 
 // Title sets the title of the window.
 func Title(t string) Option {
-	return func(opts *wm.Options) {
-		opts.Title = &t
+	return func(cnf *config) {
+		cnf.Title = &t
 	}
 }
 
@@ -599,8 +597,8 @@ func Size(w, h unit.Value) Option {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
-	return func(opts *wm.Options) {
-		opts.Size = &wm.Size{
+	return func(cnf *config) {
+		cnf.Size = &size{
 			Width:  w,
 			Height: h,
 		}
@@ -615,8 +613,8 @@ func MaxSize(w, h unit.Value) Option {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
-	return func(opts *wm.Options) {
-		opts.MaxSize = &wm.Size{
+	return func(cnf *config) {
+		cnf.MaxSize = &size{
 			Width:  w,
 			Height: h,
 		}
@@ -631,8 +629,8 @@ func MinSize(w, h unit.Value) Option {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
-	return func(opts *wm.Options) {
-		opts.MinSize = &wm.Size{
+	return func(cnf *config) {
+		cnf.MinSize = &size{
 			Width:  w,
 			Height: h,
 		}
@@ -641,23 +639,23 @@ func MinSize(w, h unit.Value) Option {
 
 // StatusColor sets the color of the Android status bar.
 func StatusColor(color color.NRGBA) Option {
-	return func(opts *wm.Options) {
-		opts.StatusColor = &color
+	return func(cnf *config) {
+		cnf.StatusColor = &color
 	}
 }
 
 // NavigationColor sets the color of the navigation bar on Android, or the address bar in browsers.
 func NavigationColor(color color.NRGBA) Option {
-	return func(opts *wm.Options) {
-		opts.NavigationColor = &color
+	return func(cnf *config) {
+		cnf.NavigationColor = &color
 	}
 }
 
 // CustomRenderer controls whether the the window contents is
 // rendered by the client. If true, no GPU context is created.
 func CustomRenderer(custom bool) Option {
-	return func(opts *wm.Options) {
-		opts.CustomRenderer = custom
+	return func(cnf *config) {
+		cnf.CustomRenderer = custom
 	}
 }
 

@@ -3,7 +3,7 @@
 //go:build darwin && ios
 // +build darwin,ios
 
-package wm
+package app
 
 /*
 #cgo CFLAGS: -DGLES_SILENCE_DEPRECATION -Werror -Wno-deprecated-declarations -fmodules -fobjc-arc -x objective-c
@@ -90,7 +90,7 @@ type ViewEvent struct{}
 
 type window struct {
 	view        C.CFTypeRef
-	w           Callbacks
+	w           *callbacks
 	displayLink *displayLink
 
 	visible bool
@@ -144,7 +144,7 @@ func (w *window) draw(sync bool) {
 		w.w.Event(system.StageEvent{Stage: system.StageRunning})
 	}
 	const inchPrDp = 1.0 / 163
-	w.w.Event(FrameEvent{
+	w.w.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
 			Now: time.Now(),
 			Size: image.Point{
@@ -268,7 +268,7 @@ func (w *window) WriteClipboard(s string) {
 	C.writeClipboard(chars, C.NSUInteger(len(u16)))
 }
 
-func (w *window) Option(opts *Options) {}
+func (w *window) Configure(cnf *config) {}
 
 func (w *window) SetAnimating(anim bool) {
 	v := w.view
@@ -329,12 +329,12 @@ func (w *window) SetInputHint(_ key.InputHint) {}
 // Close the window. Not implemented for iOS.
 func (w *window) Close() {}
 
-func NewWindow(win Callbacks, opts *Options) error {
-	mainWindow.in <- windowAndOptions{win, opts}
+func newWindow(win *callbacks, cnf *config) error {
+	mainWindow.in <- windowAndConfig{win, cnf}
 	return <-mainWindow.errs
 }
 
-func Main() {
+func osMain() {
 }
 
 //export gio_runMain

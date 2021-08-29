@@ -5,15 +5,7 @@ package app
 import (
 	"os"
 	"strings"
-
-	"gioui.org/app/internal/wm"
 )
-
-// ViewEvent carries the platform specific window handles for
-// a Window.
-//
-// ViewEvent is implemented for Android, macOS, Windows.
-type ViewEvent = wm.ViewEvent
 
 // extraArgs contains extra arguments to append to
 // os.Args. The arguments are separated with |.
@@ -50,5 +42,5 @@ func DataDir() (string, error) {
 // require control of the main thread of the program for
 // running windows.
 func Main() {
-	wm.Main()
+	osMain()
 }

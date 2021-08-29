@@ -3,7 +3,7 @@
 //go:build (linux && !android && !nowayland) || freebsd
 // +build linux,!android,!nowayland freebsd
 
-package wm
+package app
 
 import (
 	"errors"
@@ -23,22 +23,22 @@ import (
 */
 import "C"
 
-type context struct {
+type wlContext struct {
 	win *window
 	*egl.Context
 	eglWin *C.struct_wl_egl_window
 }
 
-func (w *window) NewContext() (Context, error) {
+func (w *window) NewContext() (context, error) {
 	disp := egl.NativeDisplayType(unsafe.Pointer(w.display()))
 	ctx, err := egl.NewContext(disp)
 	if err != nil {
 		return nil, err
 	}
-	return &context{Context: ctx, win: w}, nil
+	return &wlContext{Context: ctx, win: w}, nil
 }
 
-func (c *context) Release() {
+func (c *wlContext) Release() {
 	if c.Context != nil {
 		c.Context.Release()
 		c.Context = nil
@@ -49,7 +49,7 @@ func (c *context) Release() {
 	}
 }
 
-func (c *context) Refresh() error {
+func (c *wlContext) Refresh() error {
 	c.Context.ReleaseSurface()
 	if c.eglWin != nil {
 		C.wl_egl_window_destroy(c.eglWin)
@@ -68,10 +68,10 @@ func (c *context) Refresh() error {
 	return c.Context.CreateSurface(eglSurf, width, height)
 }
 
-func (c *context) Lock() error {
+func (c *wlContext) Lock() error {
 	return c.Context.MakeCurrent()
 }
 
-func (c *context) Unlock() {
+func (c *wlContext) Unlock() {
 	c.Context.ReleaseCurrent()
 }

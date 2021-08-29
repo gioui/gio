@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package wm
+package app
 
 import (
 	"fmt"
@@ -31,7 +31,7 @@ type window struct {
 	clipboard             js.Value
 	cnv                   js.Value
 	tarea                 js.Value
-	w                     Callbacks
+	w                     *callbacks
 	redraw                js.Func
 	clipboardCallback     js.Func
 	requestAnimationFrame js.Value
@@ -56,7 +56,7 @@ type window struct {
 	wakeups       chan struct{}
 }
 
-func NewWindow(win Callbacks, opts *Options) error {
+func newWindow(win *callbacks, cnf *config) error {
 	doc := js.Global().Get("document")
 	cont := getContainer(doc)
 	cnv := createCanvas(doc)
@@ -94,7 +94,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 	})
 	w.addEventListeners()
 	w.addHistory()
-	w.Option(opts)
+	w.Configure(cnf)
 	w.w = win
 
 	go func() {
@@ -107,7 +107,7 @@ func NewWindow(win Callbacks, opts *Options) error {
 		for {
 			select {
 			case <-w.wakeups:
-				w.w.Event(WakeupEvent{})
+				w.w.Event(wakeupEvent{})
 			case <-w.chanAnimation:
 				w.animCallback()
 			case <-w.chanRedraw:
@@ -509,17 +509,17 @@ func (w *window) WriteClipboard(s string) {
 	w.clipboard.Call("writeText", s)
 }
 
-func (w *window) Option(opts *Options) {
-	if o := opts.Title; o != nil {
+func (w *window) Configure(cnf *config) {
+	if o := cnf.Title; o != nil {
 		w.document.Set("title", *o)
 	}
-	if o := opts.WindowMode; o != nil {
+	if o := cnf.WindowMode; o != nil {
 		w.windowMode(*o)
 	}
-	if o := opts.NavigationColor; o != nil {
+	if o := cnf.NavigationColor; o != nil {
 		w.navigationColor(*o)
 	}
-	if o := opts.Orientation; o != nil {
+	if o := cnf.Orientation; o != nil {
 		w.orientation(*o)
 	}
 }
@@ -581,7 +581,7 @@ func (w *window) draw(sync bool) {
 		return
 	}
 
-	w.w.Event(FrameEvent{
+	w.w.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
 			Now: time.Now(),
 			Size: image.Point{
@@ -605,9 +605,9 @@ func (w *window) config() (int, int, system.Insets, unit.Metric) {
 		}
 }
 
-func (w *window) windowMode(mode WindowMode) {
+func (w *window) windowMode(mode windowMode) {
 	switch mode {
-	case Windowed:
+	case windowed:
 		if !w.document.Get("fullscreenElement").Truthy() {
 			return // Browser is already Windowed.
 		}
@@ -615,7 +615,7 @@ func (w *window) windowMode(mode WindowMode) {
 			return // Browser doesn't support such feature.
 		}
 		w.document.Call("exitFullscreen")
-	case Fullscreen:
+	case fullscreen:
 		elem := w.document.Get("documentElement")
 		if !elem.Get("requestFullscreen").Truthy() {
 			return // Browser doesn't support such feature.
@@ -624,17 +624,17 @@ func (w *window) windowMode(mode WindowMode) {
 	}
 }
 
-func (w *window) orientation(mode Orientation) {
+func (w *window) orientation(mode orientation) {
 	if j := w.screenOrientation; !j.Truthy() || !j.Get("unlock").Truthy() || !j.Get("lock").Truthy() {
 		return // Browser don't support Screen Orientation API.
 	}
 
 	switch mode {
-	case AnyOrientation:
+	case anyOrientation:
 		w.screenOrientation.Call("unlock")
-	case LandscapeOrientation:
+	case landscapeOrientation:
 		w.screenOrientation.Call("lock", "landscape").Call("then", w.redraw)
-	case PortraitOrientation:
+	case portraitOrientation:
 		w.screenOrientation.Call("lock", "portrait").Call("then", w.redraw)
 	}
 }
@@ -650,7 +650,7 @@ func (w *window) navigationColor(c color.NRGBA) {
 	theme.Set("content", fmt.Sprintf("#%06X", []uint8{rgba.R, rgba.G, rgba.B}))
 }
 
-func Main() {
+func osMain() {
 	select {}
 }
 

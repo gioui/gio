@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package wm
+package app
 
 import (
 	"golang.org/x/sys/windows"
@@ -16,7 +16,7 @@ type glContext struct {
 func init() {
 	drivers = append(drivers, gpuAPI{
 		priority: 2,
-		initializer: func(w *window) (Context, error) {
+		initializer: func(w *window) (context, error) {
 			disp := egl.NativeDisplayType(w.HDC())
 			ctx, err := egl.NewContext(disp)
 			if err != nil {
