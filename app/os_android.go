@@ -161,6 +161,7 @@ var gioView struct {
 	setNavigationColor C.jmethodID
 	setStatusColor     C.jmethodID
 	setFullscreen      C.jmethodID
+	unregister         C.jmethodID
 }
 
 // ViewEvent is sent whenever the Window's underlying Android view
@@ -315,6 +316,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.setNavigationColor = getMethodID(env, class, "setNavigationColor", "(II)V")
 		m.setStatusColor = getMethodID(env, class, "setStatusColor", "(II)V")
 		m.setFullscreen = getMethodID(env, class, "setFullscreen", "(Z)V")
+		m.unregister = getMethodID(env, class, "unregister", "()V")
 	})
 	view = C.jni_NewGlobalRef(env, view)
 	wopts := <-mainWindow.out
@@ -324,6 +326,9 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 			callbacks: wopts.window,
 		}
 		windows[wopts.window] = w
+	}
+	if w.view != 0 {
+		w.detach(env)
 	}
 	w.view = view
 	w.callbacks.SetDriver(w)
@@ -339,11 +344,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 //export Java_org_gioui_GioView_onDestroyView
 func Java_org_gioui_GioView_onDestroyView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := views[handle]
-	w.callbacks.Event(ViewEvent{View: 0})
-	w.callbacks.SetDriver(nil)
-	delete(views, handle)
-	C.jni_DeleteGlobalRef(env, w.view)
-	w.view = 0
+	w.detach(env)
 }
 
 //export Java_org_gioui_GioView_onStopView
@@ -440,6 +441,15 @@ func Java_org_gioui_GioView_onWindowInsets(env *C.JNIEnv, class C.jclass, view C
 	if w.stage >= system.StageRunning {
 		w.draw(true)
 	}
+}
+
+func (w *window) detach(env *C.JNIEnv) {
+	callVoidMethod(env, w.view, gioView.unregister)
+	w.callbacks.Event(ViewEvent{})
+	w.callbacks.SetDriver(nil)
+	delete(views, C.jlong(w.view))
+	C.jni_DeleteGlobalRef(env, w.view)
+	w.view = 0
 }
 
 func (w *window) setVisible() {

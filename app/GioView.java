@@ -113,7 +113,9 @@ public final class GioView extends SurfaceView {
 	}
 
 	@Override public boolean onKeyDown(int keyCode, KeyEvent event) {
-		onKeyEvent(nhandle, keyCode, event.getUnicodeChar(), event.getEventTime());
+		if (nhandle != 0) {
+			onKeyEvent(nhandle, keyCode, event.getUnicodeChar(), event.getEventTime());
+		}
 		return false;
 	}
 
@@ -229,6 +231,9 @@ public final class GioView extends SurfaceView {
     }
 
 	private void dispatchMotionEvent(MotionEvent event) {
+		if (nhandle == 0) {
+			return;
+		}
 		for (int j = 0; j < event.getHistorySize(); j++) {
 			long time = event.getHistoricalEventTime(j);
 			for (int i = 0; i < event.getPointerCount(); i++) {
@@ -289,12 +294,16 @@ public final class GioView extends SurfaceView {
 	}
 
 	@Override protected boolean fitSystemWindows(Rect insets) {
-		onWindowInsets(nhandle, insets.top, insets.right, insets.bottom, insets.left);
+		if (nhandle != 0) {
+			onWindowInsets(nhandle, insets.top, insets.right, insets.bottom, insets.left);
+		}
 		return true;
 	}
 
 	@Override protected void onDraw(Canvas canvas) {
-		onFrameCallback(nhandle);
+		if (nhandle != 0) {
+			onFrameCallback(nhandle);
+		}
 	}
 
 	int getDensity() {
@@ -306,25 +315,39 @@ public final class GioView extends SurfaceView {
 	}
 
 	public void start() {
-		onStartView(nhandle);
+		if (nhandle != 0) {
+			onStartView(nhandle);
+		}
 	}
 
 	public void stop() {
-		onStopView(nhandle);
+		if (nhandle != 0) {
+			onStopView(nhandle);
+		}
 	}
 
 	public void destroy() {
+		if (nhandle != 0) {
+			onDestroyView(nhandle);
+		}
+	}
+
+	protected void unregister() {
 		setOnFocusChangeListener(null);
 		getHolder().removeCallback(surfCallbacks);
-		onDestroyView(nhandle);
 		nhandle = 0;
 	}
 
 	public void configurationChanged() {
-		onConfigurationChanged(nhandle);
+		if (nhandle != 0) {
+			onConfigurationChanged(nhandle);
+		}
 	}
 
 	public boolean backPressed() {
+		if (nhandle == 0) {
+			return false;
+		}
 		return onBack(nhandle);
 	}
 
