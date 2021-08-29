@@ -15,7 +15,9 @@ import (
 )
 
 type androidContext struct {
-	win *window
+	win           *window
+	eglSurf       egl.NativeWindowType
+	width, height int
 	*egl.Context
 }
 
@@ -36,19 +38,24 @@ func (c *androidContext) Release() {
 
 func (c *androidContext) Refresh() error {
 	c.Context.ReleaseSurface()
-	var (
-		win           *C.ANativeWindow
-		width, height int
-	)
-	win, width, height = c.win.nativeWindow(c.Context.VisualID())
+	win, width, height := c.win.nativeWindow(c.Context.VisualID())
 	if win == nil {
 		return nil
 	}
-	eglSurf := egl.NativeWindowType(unsafe.Pointer(win))
-	return c.Context.CreateSurface(eglSurf, width, height)
+	c.eglSurf = egl.NativeWindowType(unsafe.Pointer(win))
+	c.width, c.height = width, height
+	return nil
 }
 
 func (c *androidContext) Lock() error {
+	// The Android emulator creates a broken surface if it is not
+	// created on the same thread as the context is made current.
+	if c.eglSurf != nil {
+		if err := c.Context.CreateSurface(c.eglSurf, c.width, c.height); err != nil {
+			return err
+		}
+		c.eglSurf = nil
+	}
 	return c.Context.MakeCurrent()
 }
 
