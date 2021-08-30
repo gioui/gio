@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-//go:build (linux && !android && !nox11) || freebsd || openbsd
-// +build linux,!android,!nox11 freebsd openbsd
+//go:build ((linux && !android) || freebsd || openbsd) && !nox11
+// +build linux,!android freebsd openbsd
+// +build !nox11
 
 package app
 
