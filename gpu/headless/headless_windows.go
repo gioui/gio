@@ -13,17 +13,19 @@ type d3d11Context struct {
 	dev *d3d11.Device
 }
 
-func newContext() (context, error) {
-	dev, ctx, _, err := d3d11.CreateDevice(
-		d3d11.DRIVER_TYPE_HARDWARE,
-		0,
-	)
-	if err != nil {
-		return nil, err
+func init() {
+	newContextPrimary = func() (context, error) {
+		dev, ctx, _, err := d3d11.CreateDevice(
+			d3d11.DRIVER_TYPE_HARDWARE,
+			0,
+		)
+		if err != nil {
+			return nil, err
+		}
+		// Don't need it.
+		d3d11.IUnknownRelease(unsafe.Pointer(ctx), ctx.Vtbl.Release)
+		return &d3d11Context{dev: dev}, nil
 	}
-	// Don't need it.
-	d3d11.IUnknownRelease(unsafe.Pointer(ctx), ctx.Vtbl.Release)
-	return &d3d11Context{dev: dev}, nil
 }
 
 func (c *d3d11Context) API() gpu.API {

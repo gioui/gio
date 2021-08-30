@@ -5,6 +5,7 @@
 package headless
 
 import (
+	"errors"
 	"image"
 	"image/color"
 	"runtime"
@@ -28,6 +29,33 @@ type context interface {
 	MakeCurrent() error
 	ReleaseCurrent()
 	Release()
+}
+
+var (
+	newContextPrimary  func() (context, error)
+	newContextFallback func() (context, error)
+)
+
+func newContext() (context, error) {
+	funcs := []func() (context, error){newContextPrimary, newContextFallback}
+	var firstErr error
+	for _, f := range funcs {
+		if f == nil {
+			continue
+		}
+		c, err := f()
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		return c, nil
+	}
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return nil, errors.New("x11: no available GPU backends")
 }
 
 // NewWindow creates a new headless window.

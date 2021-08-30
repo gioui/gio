@@ -30,13 +30,15 @@ type wlContext struct {
 	eglWin *C.struct_wl_egl_window
 }
 
-func (w *window) NewContext() (context, error) {
-	disp := egl.NativeDisplayType(unsafe.Pointer(w.display()))
-	ctx, err := egl.NewContext(disp)
-	if err != nil {
-		return nil, err
+func init() {
+	newWaylandEGLContext = func(w *window) (context, error) {
+		disp := egl.NativeDisplayType(unsafe.Pointer(w.display()))
+		ctx, err := egl.NewContext(disp)
+		if err != nil {
+			return nil, err
+		}
+		return &wlContext{Context: ctx, win: w}, nil
 	}
-	return &wlContext{Context: ctx, win: w}, nil
 }
 
 func (c *wlContext) Release() {

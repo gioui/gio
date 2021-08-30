@@ -102,6 +102,33 @@ type x11Window struct {
 	wakeups chan struct{}
 }
 
+var (
+	newX11EGLContext    func(w *x11Window) (context, error)
+	newX11VulkanContext func(w *x11Window) (context, error)
+)
+
+func (w *x11Window) NewContext() (context, error) {
+	var firstErr error
+	if f := newX11VulkanContext; f != nil {
+		c, err := f(w)
+		if err == nil {
+			return c, nil
+		}
+		firstErr = err
+	}
+	if f := newX11EGLContext; f != nil {
+		c, err := f(w)
+		if err == nil {
+			return c, nil
+		}
+		firstErr = err
+	}
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return nil, errors.New("x11: no available GPU backends")
+}
+
 func (w *x11Window) SetAnimating(anim bool) {
 	w.animating = anim
 }

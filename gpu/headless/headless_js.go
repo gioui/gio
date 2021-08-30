@@ -14,20 +14,22 @@ type jsContext struct {
 	ctx js.Value
 }
 
-func newContext() (context, error) {
-	doc := js.Global().Get("document")
-	cnv := doc.Call("createElement", "canvas")
-	ctx := cnv.Call("getContext", "webgl2")
-	if ctx.IsNull() {
-		ctx = cnv.Call("getContext", "webgl")
+func init() {
+	newContextPrimary = func() (context, error) {
+		doc := js.Global().Get("document")
+		cnv := doc.Call("createElement", "canvas")
+		ctx := cnv.Call("getContext", "webgl2")
+		if ctx.IsNull() {
+			ctx = cnv.Call("getContext", "webgl")
+		}
+		if ctx.IsNull() {
+			return nil, errors.New("headless: webgl is not supported")
+		}
+		c := &jsContext{
+			ctx: ctx,
+		}
+		return c, nil
 	}
-	if ctx.IsNull() {
-		return nil, errors.New("headless: webgl is not supported")
-	}
-	c := &jsContext{
-		ctx: ctx,
-	}
-	return c, nil
 }
 
 func (c *jsContext) API() gpu.API {

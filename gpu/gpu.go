@@ -36,6 +36,7 @@ import (
 	_ "gioui.org/gpu/internal/d3d11"
 	_ "gioui.org/gpu/internal/metal"
 	_ "gioui.org/gpu/internal/opengl"
+	_ "gioui.org/gpu/internal/vulkan"
 )
 
 type GPU interface {

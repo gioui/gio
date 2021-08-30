@@ -986,7 +986,7 @@ func (b *Backend) BindStorageBuffer(binding int, buffer driver.Buffer) {
 	}
 }
 
-func (b *Backend) BindVertexUniforms(buf driver.Buffer) {
+func (b *Backend) BindUniforms(buf driver.Buffer) {
 	bf := buf.(*Buffer)
 	enc := b.renderEnc
 	if enc == 0 {

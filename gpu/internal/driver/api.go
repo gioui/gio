@@ -31,6 +31,17 @@ type MetalRenderTarget struct {
 	Texture unsafe.Pointer
 }
 
+type VulkanRenderTarget struct {
+	// WaitSem is a VkSemaphore that must signaled before accessing Framebuffer.
+	WaitSem uint64
+	// SignalSem is a VkSemaphore that signal access to Framebuffer is complete.
+	SignalSem uint64
+	// Image is the VkImage to render into.
+	Image uint64
+	// Framebuffer is a VkFramebuffer for Image.
+	Framebuffer uint64
+}
+
 type OpenGL struct {
 	// ES forces the use of ANGLE OpenGL ES libraries on macOS. It is
 	// ignored on all other platforms.
@@ -55,11 +66,25 @@ type Metal struct {
 	PixelFormat int
 }
 
+type Vulkan struct {
+	// PhysDevice is a VkPhysicalDevice.
+	PhysDevice unsafe.Pointer
+	// Device is a VkDevice.
+	Device unsafe.Pointer
+	// QueueFamily is the queue familily index of the queue.
+	QueueFamily int
+	// QueueIndex is the logical queue index of the queue.
+	QueueIndex int
+	// Format is a VkFormat that matches render targets.
+	Format int
+}
+
 // API specific device constructors.
 var (
 	NewOpenGLDevice     func(api OpenGL) (Device, error)
 	NewDirect3D11Device func(api Direct3D11) (Device, error)
 	NewMetalDevice      func(api Metal) (Device, error)
+	NewVulkanDevice     func(api Vulkan) (Device, error)
 )
 
 // NewDevice creates a new Device given the api.
@@ -81,6 +106,10 @@ func NewDevice(api API) (Device, error) {
 		if NewMetalDevice != nil {
 			return NewMetalDevice(api)
 		}
+	case Vulkan:
+		if NewVulkanDevice != nil {
+			return NewVulkanDevice(api)
+		}
 	}
 	return nil, fmt.Errorf("driver: no driver available for the API %T", api)
 }
@@ -88,6 +117,8 @@ func NewDevice(api API) (Device, error) {
 func (OpenGL) implementsAPI()                          {}
 func (Direct3D11) implementsAPI()                      {}
 func (Metal) implementsAPI()                           {}
+func (Vulkan) implementsAPI()                          {}
 func (OpenGLRenderTarget) ImplementsRenderTarget()     {}
 func (Direct3D11RenderTarget) ImplementsRenderTarget() {}
 func (MetalRenderTarget) ImplementsRenderTarget()      {}
+func (VulkanRenderTarget) ImplementsRenderTarget()     {}

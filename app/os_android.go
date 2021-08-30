@@ -211,6 +211,33 @@ var (
 	dataPath    string
 )
 
+var (
+	newAndroidVulkanContext func(w *window) (context, error)
+	newAndroidGLESContext   func(w *window) (context, error)
+)
+
+func (w *window) NewContext() (context, error) {
+	funcs := []func(w *window) (context, error){newAndroidVulkanContext, newAndroidGLESContext}
+	var firstErr error
+	for _, f := range funcs {
+		if f == nil {
+			continue
+		}
+		c, err := f(w)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		return c, nil
+	}
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return nil, errors.New("x11: no available GPU backends")
+}
+
 func dataDir() (string, error) {
 	dataDirOnce.Do(func() {
 		dataPath = <-dataDirChan
@@ -471,16 +498,16 @@ func (w *window) setStage(stage system.Stage) {
 	w.callbacks.Event(system.StageEvent{stage})
 }
 
-func (w *window) nativeWindow(visID int) (*C.ANativeWindow, int, int) {
-	var width, height int
-	if w.win != nil {
-		if C.ANativeWindow_setBuffersGeometry(w.win, 0, 0, C.int32_t(visID)) != 0 {
-			panic(errors.New("ANativeWindow_setBuffersGeometry failed"))
-		}
-		w, h := C.ANativeWindow_getWidth(w.win), C.ANativeWindow_getHeight(w.win)
-		width, height = int(w), int(h)
+func (w *window) setVisual(visID int) error {
+	if C.ANativeWindow_setBuffersGeometry(w.win, 0, 0, C.int32_t(visID)) != 0 {
+		return errors.New("ANativeWindow_setBuffersGeometry failed")
 	}
-	return w.win, width, height
+	return nil
+}
+
+func (w *window) nativeWindow() (*C.ANativeWindow, int, int) {
+	width, height := C.ANativeWindow_getWidth(w.win), C.ANativeWindow_getHeight(w.win)
+	return w.win, int(width), int(height)
 }
 
 func (w *window) loadConfig(env *C.JNIEnv, class C.jclass) {

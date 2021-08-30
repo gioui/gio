@@ -37,17 +37,19 @@ type mtlContext struct {
 	queue C.CFTypeRef
 }
 
-func newContext() (context, error) {
-	dev := C.createDevice()
-	if dev == 0 {
-		return nil, errors.New("headless: failed to create Metal device")
+func init() {
+	newContextPrimary = func() (context, error) {
+		dev := C.createDevice()
+		if dev == 0 {
+			return nil, errors.New("headless: failed to create Metal device")
+		}
+		queue := C.newCommandQueue(dev)
+		if queue == 0 {
+			C.CFRelease(dev)
+			return nil, errors.New("headless: failed to create MTLQueue")
+		}
+		return &mtlContext{dev: dev, queue: queue}, nil
 	}
-	queue := C.newCommandQueue(dev)
-	if queue == 0 {
-		C.CFRelease(dev)
-		return nil, errors.New("headless: failed to create MTLQueue")
-	}
-	return &mtlContext{dev: dev, queue: queue}, nil
 }
 
 func (c *mtlContext) API() gpu.API {

@@ -21,12 +21,14 @@ type androidContext struct {
 	*egl.Context
 }
 
-func (w *window) NewContext() (context, error) {
-	ctx, err := egl.NewContext(nil)
-	if err != nil {
-		return nil, err
+func init() {
+	newAndroidGLESContext = func(w *window) (context, error) {
+		ctx, err := egl.NewContext(nil)
+		if err != nil {
+			return nil, err
+		}
+		return &androidContext{win: w, Context: ctx}, nil
 	}
-	return &androidContext{win: w, Context: ctx}, nil
 }
 
 func (c *androidContext) Release() {
@@ -38,10 +40,10 @@ func (c *androidContext) Release() {
 
 func (c *androidContext) Refresh() error {
 	c.Context.ReleaseSurface()
-	win, width, height := c.win.nativeWindow(c.Context.VisualID())
-	if win == nil {
-		return nil
+	if err := c.win.setVisual(c.Context.VisualID()); err != nil {
+		return err
 	}
+	win, width, height := c.win.nativeWindow()
 	c.eglSurf = egl.NativeWindowType(unsafe.Pointer(win))
 	c.width, c.height = width, height
 	return nil

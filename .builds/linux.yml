@@ -11,6 +11,7 @@ packages:
  - libgles2-mesa-dev
  - libegl1-mesa-dev
  - libffi-dev
+ - libvulkan-dev
  - libxcursor-dev
  - libxrandr-dev
  - libxinerama-dev

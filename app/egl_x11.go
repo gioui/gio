@@ -17,13 +17,15 @@ type x11Context struct {
 	*egl.Context
 }
 
-func (w *x11Window) NewContext() (context, error) {
-	disp := egl.NativeDisplayType(unsafe.Pointer(w.display()))
-	ctx, err := egl.NewContext(disp)
-	if err != nil {
-		return nil, err
+func init() {
+	newX11EGLContext = func(w *x11Window) (context, error) {
+		disp := egl.NativeDisplayType(unsafe.Pointer(w.display()))
+		ctx, err := egl.NewContext(disp)
+		if err != nil {
+			return nil, err
+		}
+		return &x11Context{win: w, Context: ctx}, nil
 	}
-	return &x11Context{win: w, Context: ctx}, nil
 }
 
 func (c *x11Context) Release() {

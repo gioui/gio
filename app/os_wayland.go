@@ -220,6 +220,11 @@ var callbackMap sync.Map
 // order of preference.
 var clipboardMimeTypes = []string{"text/plain;charset=utf8", "UTF8_STRING", "text/plain", "TEXT", "STRING"}
 
+var (
+	newWaylandEGLContext    func(w *window) (context, error)
+	newWaylandVulkanContext func(w *window) (context, error)
+)
+
 func init() {
 	wlDriver = newWLWindow
 }
@@ -1475,6 +1480,28 @@ func (w *window) SetInputHint(_ key.InputHint) {}
 
 // Close the window. Not implemented for Wayland.
 func (w *window) Close() {}
+
+func (w *window) NewContext() (context, error) {
+	var firstErr error
+	if f := newWaylandVulkanContext; f != nil {
+		c, err := f(w)
+		if err == nil {
+			return c, nil
+		}
+		firstErr = err
+	}
+	if f := newWaylandEGLContext; f != nil {
+		c, err := f(w)
+		if err == nil {
+			return c, nil
+		}
+		firstErr = err
+	}
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return nil, errors.New("wayland: no available GPU backends")
+}
 
 // detectUIScale reports the system UI scale, or 1.0 if it fails.
 func detectUIScale() float32 {

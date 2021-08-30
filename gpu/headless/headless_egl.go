@@ -9,6 +9,8 @@ import (
 	"gioui.org/internal/egl"
 )
 
-func newContext() (context, error) {
-	return egl.NewContext(egl.EGL_DEFAULT_DISPLAY)
+func init() {
+	newContextFallback = func() (context, error) {
+		return egl.NewContext(egl.EGL_DEFAULT_DISPLAY)
+	}
 }
