@@ -90,21 +90,21 @@ func NewCache(collection []FontFace) *Cache {
 }
 
 // Layout implements the Shaper interface.
-func (s *Cache) Layout(font Font, size fixed.Int26_6, maxWidth int, txt io.Reader) ([]Line, error) {
-	cache := s.lookup(font)
+func (c *Cache) Layout(font Font, size fixed.Int26_6, maxWidth int, txt io.Reader) ([]Line, error) {
+	cache := c.lookup(font)
 	return cache.face.Layout(size, maxWidth, txt)
 }
 
 // LayoutString is a caching implementation of the Shaper interface.
-func (s *Cache) LayoutString(font Font, size fixed.Int26_6, maxWidth int, str string) []Line {
-	cache := s.lookup(font)
+func (c *Cache) LayoutString(font Font, size fixed.Int26_6, maxWidth int, str string) []Line {
+	cache := c.lookup(font)
 	return cache.layout(size, maxWidth, str)
 }
 
 // Shape is a caching implementation of the Shaper interface. Shape assumes that the layout
 // argument is unchanged from a call to Layout or LayoutString.
-func (s *Cache) Shape(font Font, size fixed.Int26_6, layout Layout) op.CallOp {
-	cache := s.lookup(font)
+func (c *Cache) Shape(font Font, size fixed.Int26_6, layout Layout) op.CallOp {
+	cache := c.lookup(font)
 	return cache.shape(size, layout)
 }
 
