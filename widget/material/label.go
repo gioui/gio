@@ -28,11 +28,15 @@ type LabelStyle struct {
 }
 
 func H1(th *Theme, txt string) LabelStyle {
-	return Label(th, th.TextSize.Scale(96.0/16.0), txt)
+	label := Label(th, th.TextSize.Scale(96.0/16.0), txt)
+	label.Font.Weight = text.Light
+	return label
 }
 
 func H2(th *Theme, txt string) LabelStyle {
-	return Label(th, th.TextSize.Scale(60.0/16.0), txt)
+	label := Label(th, th.TextSize.Scale(60.0/16.0), txt)
+	label.Font.Weight = text.Light
+	return label
 }
 
 func H3(th *Theme, txt string) LabelStyle {
@@ -48,7 +52,19 @@ func H5(th *Theme, txt string) LabelStyle {
 }
 
 func H6(th *Theme, txt string) LabelStyle {
-	return Label(th, th.TextSize.Scale(20.0/16.0), txt)
+	label := Label(th, th.TextSize.Scale(20.0/16.0), txt)
+	label.Font.Weight = text.Medium
+	return label
+}
+
+func Subtitle1(th *Theme, txt string) LabelStyle {
+	return Label(th, th.TextSize.Scale(16.0/16.0), txt)
+}
+
+func Subtitle2(th *Theme, txt string) LabelStyle {
+	label := Label(th, th.TextSize.Scale(14.0/16.0), txt)
+	label.Font.Weight = text.Medium
+	return label
 }
 
 func Body1(th *Theme, txt string) LabelStyle {
@@ -61,6 +77,10 @@ func Body2(th *Theme, txt string) LabelStyle {
 
 func Caption(th *Theme, txt string) LabelStyle {
 	return Label(th, th.TextSize.Scale(12.0/16.0), txt)
+}
+
+func Overline(th *Theme, txt string) LabelStyle {
+	return Label(th, th.TextSize.Scale(10.0/16.0), txt)
 }
 
 func Label(th *Theme, size unit.Value, txt string) LabelStyle {
