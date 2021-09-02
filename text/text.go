@@ -114,3 +114,15 @@ func (s Style) String() string {
 		panic("invalid Style")
 	}
 }
+
+// weightDistance returns the distance value between two font weights.
+func weightDistance(wa Weight, wb Weight) int {
+	// Avoid dealing with negative Weight values.
+	a := int(wa) + 400
+	b := int(wb) + 400
+	diff := a - b
+	if diff < 0 {
+		return -diff
+	}
+	return diff
+}
