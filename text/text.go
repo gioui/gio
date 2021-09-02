@@ -103,3 +103,14 @@ func (a Alignment) String() string {
 		panic("invalid Alignment")
 	}
 }
+
+func (s Style) String() string {
+	switch s {
+	case Regular:
+		return "Regular"
+	case Italic:
+		return "Italic"
+	default:
+		panic("invalid Style")
+	}
+}
