@@ -100,6 +100,6 @@ func (a Alignment) String() string {
 	case Middle:
 		return "Middle"
 	default:
-		panic("unreachable")
+		panic("invalid Alignment")
 	}
 }
