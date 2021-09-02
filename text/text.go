@@ -115,6 +115,33 @@ func (s Style) String() string {
 	}
 }
 
+func (w Weight) String() string {
+	switch w {
+	case Thin:
+		return "Thin"
+	case ExtraLight:
+		return "ExtraLight"
+	case Light:
+		return "Light"
+	case Normal:
+		return "Normal"
+	case Medium:
+		return "Medium"
+	case SemiBold:
+		return "SemiBold"
+	case Bold:
+		return "Bold"
+	case ExtraBold:
+		return "ExtraBold"
+	case Black:
+		return "Black"
+	case ExtraBlack:
+		return "ExtraBlack"
+	default:
+		panic("invalid Weight")
+	}
+}
+
 // weightDistance returns the distance value between two font weights.
 func weightDistance(wa Weight, wb Weight) int {
 	// Avoid dealing with negative Weight values.
