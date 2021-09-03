@@ -47,7 +47,6 @@ func NewWindow(width, height int) (*Window, error) {
 		if err != nil {
 			return err
 		}
-		dev.Viewport(0, 0, width, height)
 		fboTex, err := dev.NewTexture(
 			driver.TextureFormatSRGBA,
 			width, height,

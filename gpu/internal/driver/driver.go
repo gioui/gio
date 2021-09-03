@@ -7,6 +7,7 @@ import (
 	"image"
 	"time"
 
+	"gioui.org/internal/f32color"
 	"gioui.org/shader"
 )
 
@@ -34,9 +35,10 @@ type Device interface {
 	DrawArrays(mode DrawMode, off, count int)
 	DrawElements(mode DrawMode, off, count int)
 
+	BeginRenderPass(f Framebuffer, desc LoadDesc)
+	EndRenderPass()
 	BindProgram(p Program)
 	BindPipeline(p Pipeline)
-	BindFramebuffer(f Framebuffer, a LoadDesc)
 	BindTexture(unit int, t Texture)
 	BindVertexBuffer(b Buffer, offset int)
 	BindIndexBuffer(b Buffer)
@@ -45,6 +47,8 @@ type Device interface {
 	BindFragmentUniforms(buf Buffer)
 	BindStorageBuffer(binding int, buf Buffer)
 
+	BeginCompute()
+	EndCompute()
 	CopyTexture(dst Texture, dstOrigin image.Point, src Framebuffer, srcRect image.Rectangle)
 	MemoryBarrier()
 	DispatchCompute(x, y, z int)
@@ -54,12 +58,7 @@ type Device interface {
 
 type LoadDesc struct {
 	Action     LoadAction
-	ClearColor struct {
-		R float32
-		G float32
-		B float32
-		A float32
-	}
+	ClearColor f32color.RGBA
 }
 
 type Pipeline interface {

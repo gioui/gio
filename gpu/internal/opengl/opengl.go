@@ -660,7 +660,7 @@ func (b *Backend) NewFramebuffer(tex driver.Texture) (driver.Framebuffer, error)
 	gltex := tex.(*texture)
 	fb := b.funcs.CreateFramebuffer()
 	fbo := &framebuffer{backend: b, obj: fb}
-	b.BindFramebuffer(fbo, driver.LoadDesc{})
+	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, fbo.obj)
 	if err := glErr(b.funcs); err != nil {
 		fbo.Release()
 		return nil, err
@@ -1194,7 +1194,7 @@ func (b *Backend) CopyTexture(dst driver.Texture, dstOrigin image.Point, src dri
 
 func (f *framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int) error {
 	glErr(f.backend.funcs)
-	f.backend.BindFramebuffer(f, driver.LoadDesc{})
+	f.backend.glstate.bindFramebuffer(f.backend.funcs, gl.FRAMEBUFFER, f.obj)
 	if len(pixels) < src.Dx()*src.Dy()*4 {
 		return errors.New("unexpected RGBA size")
 	}
@@ -1217,7 +1217,13 @@ func (b *Backend) BindPipeline(pl driver.Pipeline) {
 	b.BlendFunc(p.blend.SrcFactor, p.blend.DstFactor)
 }
 
-func (b *Backend) BindFramebuffer(fbo driver.Framebuffer, desc driver.LoadDesc) {
+func (b *Backend) BeginCompute() {
+}
+
+func (b *Backend) EndCompute() {
+}
+
+func (b *Backend) BeginRenderPass(fbo driver.Framebuffer, desc driver.LoadDesc) {
 	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, fbo.(*framebuffer).obj)
 	switch desc.Action {
 	case driver.LoadActionClear:
@@ -1226,6 +1232,9 @@ func (b *Backend) BindFramebuffer(fbo driver.Framebuffer, desc driver.LoadDesc) 
 	case driver.LoadActionInvalidate:
 		b.funcs.InvalidateFramebuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0)
 	}
+}
+
+func (b *Backend) EndRenderPass() {
 }
 
 func (f *framebuffer) Release() {

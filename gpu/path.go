@@ -346,7 +346,6 @@ func (s *stenciler) beginIntersect(sizes []image.Point) {
 	// floating point formats. Replace with GL_RGB+GL_UNSIGNED_BYTE if
 	// no floating point support is available.
 	s.intersections.resize(s.ctx, sizes)
-	s.ctx.BindPipeline(s.ipipeline.pipeline.pipeline)
 }
 
 func (s *stenciler) cover(idx int) stencilFBO {
@@ -355,8 +354,6 @@ func (s *stenciler) cover(idx int) stencilFBO {
 
 func (s *stenciler) begin(sizes []image.Point) {
 	s.fbos.resize(s.ctx, sizes)
-	s.ctx.BindPipeline(s.pipeline.pipeline.pipeline)
-	s.ctx.BindIndexBuffer(s.indexBuf)
 }
 
 func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.Point, data pathData) {
@@ -388,8 +385,6 @@ func (p *pather) cover(mat materialType, col f32color.RGBA, col1, col2 f32color.
 }
 
 func (c *coverer) cover(mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
-	p := c.pipelines[mat]
-	c.ctx.BindPipeline(p.pipeline)
 	var uniforms *coverUniforms
 	switch mat {
 	case materialColor:
@@ -411,7 +406,7 @@ func (c *coverer) cover(mat materialType, col f32color.RGBA, col1, col2 f32color
 	}
 	uniforms.transform = [4]float32{scale.X, scale.Y, off.X, off.Y}
 	uniforms.uvCoverTransform = [4]float32{coverScale.X, coverScale.Y, coverOff.X, coverOff.Y}
-	p.UploadUniforms(c.ctx)
+	c.pipelines[mat].UploadUniforms(c.ctx)
 	c.ctx.DrawArrays(driver.DrawModeTriangleStrip, 0, 4)
 }
 

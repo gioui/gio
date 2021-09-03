@@ -387,36 +387,17 @@ type Backend struct {
 	computeEnc    C.CFTypeRef
 	blitEnc       C.CFTypeRef
 
+	prog *Program
+
 	stagingBuf C.CFTypeRef
 	stagingOff int
 
 	indexBuf *Buffer
-	state    state
-	newState state
 
 	// bufSizes is scratch space for filling out the spvBufferSizeConstants
 	// that spirv-cross generates for emulating buffer.length expressions in
 	// shaders.
 	bufSizes []uint32
-}
-
-type state struct {
-	renderPass struct {
-		framebuffer *Framebuffer
-		loadAction  driver.LoadAction
-		clearColor  [4]float32
-	}
-	pipeline *Pipeline
-	program  *Program
-	vertices struct {
-		buffer *Buffer
-		offset int
-	}
-	buffers      [bufferUnits]*Buffer
-	vertUniforms *Buffer
-	fragUniforms *Buffer
-	textures     [texUnits]*Texture
-	viewport     C.MTLViewport
 }
 
 type Texture struct {
@@ -517,7 +498,6 @@ func (b *Backend) startBlit() C.CFTypeRef {
 	if b.blitEnc == 0 {
 		panic("metal: [MTLCommandBuffer blitCommandEncoder:] failed")
 	}
-	b.state = state{}
 	return b.blitEnc
 }
 
@@ -805,24 +785,34 @@ func (b *Backend) newShader(src shader.Sources) (*Shader, error) {
 }
 
 func (b *Backend) Viewport(x, y, width, height int) {
-	b.newState.viewport = C.MTLViewport{
+	enc := b.renderEnc
+	if enc == 0 {
+		panic("no active render pass")
+	}
+	C.renderEncViewport(enc, C.MTLViewport{
 		originX: C.double(x),
 		originY: C.double(y),
 		width:   C.double(width),
 		height:  C.double(height),
 		znear:   0.0,
 		zfar:    1.0,
-	}
+	})
 }
 
 func (b *Backend) DrawArrays(mode driver.DrawMode, off, count int) {
-	enc := b.encodeState()
+	enc := b.renderEnc
+	if enc == 0 {
+		panic("no active render pass")
+	}
 	t := primitiveFor(mode)
 	C.renderEncDrawPrimitives(enc, t, C.NSUInteger(off), C.NSUInteger(count))
 }
 
 func (b *Backend) DrawElements(mode driver.DrawMode, off, count int) {
-	enc := b.encodeState()
+	enc := b.renderEnc
+	if enc == 0 {
+		panic("no active render pass")
+	}
 	t := primitiveFor(mode)
 	C.renderEncDrawIndexedPrimitives(enc, t, b.indexBuf.buffer, C.NSUInteger(off), C.NSUInteger(count))
 }
@@ -839,59 +829,46 @@ func primitiveFor(mode driver.DrawMode) C.MTLPrimitiveType {
 }
 
 func (b *Backend) BindImageTexture(unit int, tex driver.Texture, access driver.AccessBits, f driver.TextureFormat) {
-	b.newState.textures[unit] = tex.(*Texture)
+	b.BindTexture(unit, tex)
 }
 
 func (b *Backend) MemoryBarrier() {}
 
-func (b *Backend) startCompute() C.CFTypeRef {
-	if b.computeEnc != 0 {
-		return b.computeEnc
-	}
+func (b *Backend) BeginCompute() {
 	b.endEncoder()
 	b.ensureCmdBuffer()
+	for i := range b.bufSizes {
+		b.bufSizes[i] = 0
+	}
 	b.computeEnc = C.cmdBufferComputeEncoder(b.cmdBuffer)
 	if b.computeEnc == 0 {
 		panic("metal: [MTLCommandBuffer computeCommandEncoder:] failed")
 	}
-	b.state = state{}
-	return b.computeEnc
+}
+
+func (b *Backend) EndCompute() {
+	if b.computeEnc == 0 {
+		panic("no active compute pass")
+	}
+	C.computeEncEnd(b.computeEnc)
+	C.CFRelease(b.computeEnc)
+	b.computeEnc = 0
 }
 
 func (b *Backend) DispatchCompute(x, y, z int) {
-	enc := b.startCompute()
-	p := b.newState.program
-	if p != b.state.program {
-		C.computeEncSetPipeline(enc, p.pipeline)
+	enc := b.computeEnc
+	if enc == 0 {
+		panic("no active compute pass")
 	}
-	for i, t := range b.newState.textures {
-		current := b.state.textures[i]
-		if t != current {
-			C.computeEncSetTexture(enc, C.NSUInteger(i), t.texture)
-		}
-	}
-	for i, buf := range b.newState.buffers {
-		b.bufSizes[i] = uint32(buf.size)
-		current := b.state.buffers[i]
-		if buf.buffer != 0 {
-			if buf != current {
-				C.computeEncSetBuffer(enc, C.NSUInteger(i), buf.buffer)
-			}
-		} else if buf.size > 0 {
-			C.computeEncSetBytes(enc, unsafe.Pointer(&buf.store[0]), C.NSUInteger(buf.size), C.NSUInteger(i))
-		}
-	}
-	if n := len(b.newState.buffers); n > 0 {
-		C.computeEncSetBytes(enc, unsafe.Pointer(&b.bufSizes[0]), C.NSUInteger(n*4), spvBufferSizeConstantsBinding)
-	}
+	C.computeEncSetBytes(enc, unsafe.Pointer(&b.bufSizes[0]), C.NSUInteger(len(b.bufSizes)*4), spvBufferSizeConstantsBinding)
 	threadgroupsPerGrid := C.MTLSize{
 		width: C.NSUInteger(x), height: C.NSUInteger(y), depth: C.NSUInteger(z),
 	}
+	sz := b.prog.groupSize
 	threadsPerThreadgroup := C.MTLSize{
-		width: C.NSUInteger(p.groupSize[0]), height: C.NSUInteger(p.groupSize[1]), depth: C.NSUInteger(p.groupSize[2]),
+		width: C.NSUInteger(sz[0]), height: C.NSUInteger(sz[1]), depth: C.NSUInteger(sz[2]),
 	}
 	C.computeEncDispatch(enc, threadgroupsPerGrid, threadsPerThreadgroup)
-	b.state = b.newState
 }
 
 func (b *Backend) stagingBuffer(size int) (C.CFTypeRef, int) {
@@ -956,34 +933,14 @@ func (p *Pipeline) Release() {
 
 func (b *Backend) BindTexture(unit int, tex driver.Texture) {
 	t := tex.(*Texture)
-	b.newState.textures[unit] = t
-}
-
-func (b *Backend) beginPass() C.CFTypeRef {
-	r := b.newState.renderPass
-	if r == b.state.renderPass {
-		return b.renderEnc
+	if enc := b.renderEnc; enc != 0 {
+		C.renderEncSetFragmentTexture(enc, C.NSUInteger(unit), t.texture)
+		C.renderEncSetFragmentSamplerState(enc, C.NSUInteger(unit), t.sampler)
+	} else if enc := b.computeEnc; enc != 0 {
+		C.computeEncSetTexture(enc, C.NSUInteger(unit), t.texture)
+	} else {
+		panic("no active render nor compute pass")
 	}
-	b.endEncoder()
-	var act C.MTLLoadAction
-	switch r.loadAction {
-	case driver.LoadActionKeep:
-		act = C.MTLLoadActionLoad
-	case driver.LoadActionClear:
-		act = C.MTLLoadActionClear
-	case driver.LoadActionInvalidate:
-		act = C.MTLLoadActionDontCare
-	}
-	b.ensureCmdBuffer()
-	c := r.clearColor
-	b.renderEnc = C.cmdBufferRenderEncoder(b.cmdBuffer, r.framebuffer.texture, act, C.float(c[0]), C.float(c[1]), C.float(c[2]), C.float(c[3]))
-	if b.renderEnc == 0 {
-		panic("metal: [MTLCommandBuffer renderCommandEncoderWithDescriptor:] failed")
-	}
-	r.loadAction = driver.LoadActionKeep
-	b.newState.renderPass = r
-	b.state.renderPass = r
-	return b.renderEnc
 }
 
 func (b *Backend) ensureCmdBuffer() {
@@ -996,59 +953,23 @@ func (b *Backend) ensureCmdBuffer() {
 	}
 }
 
-func (b *Backend) encodeState() C.CFTypeRef {
-	enc := b.beginPass()
-	for i, t := range b.newState.textures {
-		current := b.state.textures[i]
-		if t != current {
-			C.renderEncSetFragmentTexture(enc, C.NSUInteger(i), t.texture)
-			C.renderEncSetFragmentSamplerState(enc, C.NSUInteger(i), t.sampler)
-		}
-	}
-	if p := b.newState.pipeline; p != b.state.pipeline {
-		C.renderEncSetRenderPipelineState(enc, p.pipeline)
-	}
-	if bf := b.newState.fragUniforms; bf != nil {
-		if bf.buffer != 0 {
-			if bf != b.state.fragUniforms {
-				C.renderEncSetFragmentBuffer(enc, bf.buffer, uniformBufferIndex, 0)
-			}
-		} else if bf.size > 0 {
-			C.renderEncSetFragmentBytes(enc, unsafe.Pointer(&bf.store[0]), C.NSUInteger(bf.size), uniformBufferIndex)
-		}
-	}
-	if bf := b.newState.vertUniforms; bf != nil {
-		if bf.buffer != 0 {
-			if bf != b.state.vertUniforms {
-				C.renderEncSetVertexBuffer(enc, bf.buffer, uniformBufferIndex, 0)
-			}
-		} else if bf.size > 0 {
-			C.renderEncSetVertexBytes(enc, unsafe.Pointer(&bf.store[0]), C.NSUInteger(bf.size), uniformBufferIndex)
-		}
-	}
-	if v := b.newState.vertices; v.buffer != nil {
-		if v.buffer.buffer != 0 {
-			if v != b.state.vertices {
-				C.renderEncSetVertexBuffer(enc, v.buffer.buffer, attributeBufferIndex, C.NSUInteger(v.offset))
-			}
-		} else if n := v.buffer.size - v.offset; n > 0 {
-			C.renderEncSetVertexBytes(enc, unsafe.Pointer(&v.buffer.store[v.offset]), C.NSUInteger(n), attributeBufferIndex)
-		}
-	}
-	if vp := b.newState.viewport; vp != b.state.viewport {
-		C.renderEncViewport(enc, vp)
-	}
-	b.state = b.newState
-	return enc
-}
-
 func (b *Backend) BindPipeline(pipe driver.Pipeline) {
 	p := pipe.(*Pipeline)
-	b.newState.pipeline = p
+	enc := b.renderEnc
+	if enc == 0 {
+		panic("no active render pass")
+	}
+	C.renderEncSetRenderPipelineState(enc, p.pipeline)
 }
 
 func (b *Backend) BindProgram(prog driver.Program) {
-	b.newState.program = prog.(*Program)
+	enc := b.computeEnc
+	if enc == 0 {
+		panic("no active compute pass")
+	}
+	p := prog.(*Program)
+	C.computeEncSetPipeline(enc, p.pipeline)
+	b.prog = p
 }
 
 func (s *Shader) Release() {
@@ -1062,23 +983,56 @@ func (p *Program) Release() {
 }
 
 func (b *Backend) BindStorageBuffer(binding int, buffer driver.Buffer) {
-	b.newState.buffers[binding] = buffer.(*Buffer)
+	buf := buffer.(*Buffer)
+	b.bufSizes[binding] = uint32(buf.size)
+	enc := b.computeEnc
+	if enc == 0 {
+		panic("no active compute pass")
+	}
+	if buf.buffer != 0 {
+		C.computeEncSetBuffer(enc, C.NSUInteger(binding), buf.buffer)
+	} else if buf.size > 0 {
+		C.computeEncSetBytes(enc, unsafe.Pointer(&buf.store[0]), C.NSUInteger(buf.size), C.NSUInteger(binding))
+	}
 }
 
 func (b *Backend) BindVertexUniforms(buf driver.Buffer) {
 	bf := buf.(*Buffer)
-	b.newState.vertUniforms = bf
+	enc := b.renderEnc
+	if enc == 0 {
+		panic("no active render pass")
+	}
+	if bf.buffer != 0 {
+		C.renderEncSetVertexBuffer(enc, bf.buffer, uniformBufferIndex, 0)
+	} else if bf.size > 0 {
+		C.renderEncSetVertexBytes(enc, unsafe.Pointer(&bf.store[0]), C.NSUInteger(bf.size), uniformBufferIndex)
+	}
 }
 
 func (b *Backend) BindFragmentUniforms(buf driver.Buffer) {
 	bf := buf.(*Buffer)
-	b.newState.fragUniforms = bf
+	enc := b.renderEnc
+	if enc == 0 {
+		panic("no active render pass")
+	}
+	if bf.buffer != 0 {
+		C.renderEncSetFragmentBuffer(enc, bf.buffer, uniformBufferIndex, 0)
+	} else if bf.size > 0 {
+		C.renderEncSetFragmentBytes(enc, unsafe.Pointer(&bf.store[0]), C.NSUInteger(bf.size), uniformBufferIndex)
+	}
 }
 
 func (b *Backend) BindVertexBuffer(buf driver.Buffer, offset int) {
 	bf := buf.(*Buffer)
-	b.newState.vertices.buffer = bf
-	b.newState.vertices.offset = offset
+	enc := b.renderEnc
+	if enc == 0 {
+		panic("no active render pass")
+	}
+	if bf.buffer != 0 {
+		C.renderEncSetVertexBuffer(enc, bf.buffer, attributeBufferIndex, C.NSUInteger(offset))
+	} else if n := bf.size - offset; n > 0 {
+		C.renderEncSetVertexBytes(enc, unsafe.Pointer(&bf.store[offset]), C.NSUInteger(n), attributeBufferIndex)
+	}
 }
 
 func (b *Backend) BindIndexBuffer(buf driver.Buffer) {
@@ -1162,32 +1116,46 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int)
 	return nil
 }
 
-func (b *Backend) BindFramebuffer(fbo driver.Framebuffer, desc driver.LoadDesc) {
-	b.newState.renderPass.framebuffer = fbo.(*Framebuffer)
-	b.newState.renderPass.loadAction = desc.Action
-	c := desc.ClearColor
-	b.newState.renderPass.clearColor = [4]float32{c.R, c.G, c.B, c.A}
-	b.beginPass()
+func (b *Backend) BeginRenderPass(fbo driver.Framebuffer, d driver.LoadDesc) {
+	b.endEncoder()
+	b.ensureCmdBuffer()
+	f := fbo.(*Framebuffer)
+	col := d.ClearColor
+	var act C.MTLLoadAction
+	switch d.Action {
+	case driver.LoadActionKeep:
+		act = C.MTLLoadActionLoad
+	case driver.LoadActionClear:
+		act = C.MTLLoadActionClear
+	case driver.LoadActionInvalidate:
+		act = C.MTLLoadActionDontCare
+	}
+	b.renderEnc = C.cmdBufferRenderEncoder(b.cmdBuffer, f.texture, act, C.float(col.R), C.float(col.G), C.float(col.B), C.float(col.A))
+	if b.renderEnc == 0 {
+		panic("metal: [MTLCommandBuffer renderCommandEncoderWithDescriptor:] failed")
+	}
+}
+
+func (b *Backend) EndRenderPass() {
+	if b.renderEnc == 0 {
+		panic("no active render pass")
+	}
+	C.renderEncEnd(b.renderEnc)
+	C.CFRelease(b.renderEnc)
+	b.renderEnc = 0
 }
 
 func (b *Backend) endEncoder() {
 	if b.renderEnc != 0 {
-		C.renderEncEnd(b.renderEnc)
-		C.CFRelease(b.renderEnc)
-		b.renderEnc = 0
-		b.state = state{}
+		panic("active render pass")
 	}
 	if b.computeEnc != 0 {
-		C.computeEncEnd(b.computeEnc)
-		C.CFRelease(b.computeEnc)
-		b.computeEnc = 0
-		b.state = state{}
+		panic("active compute pass")
 	}
 	if b.blitEnc != 0 {
 		C.blitEncEnd(b.blitEnc)
 		C.CFRelease(b.blitEnc)
 		b.blitEnc = 0
-		b.state = state{}
 	}
 }
 

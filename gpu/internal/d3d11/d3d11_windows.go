@@ -789,7 +789,13 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int)
 	return nil
 }
 
-func (b *Backend) BindFramebuffer(fbo driver.Framebuffer, d driver.LoadDesc) {
+func (b *Backend) BeginCompute() {
+}
+
+func (b *Backend) EndCompute() {
+}
+
+func (b *Backend) BeginRenderPass(fbo driver.Framebuffer, d driver.LoadDesc) {
 	b.fbo = fbo.(*Framebuffer)
 	b.ctx.OMSetRenderTargets(b.fbo.renderTarget, nil)
 	if d.Action == driver.LoadActionClear {
@@ -797,6 +803,9 @@ func (b *Backend) BindFramebuffer(fbo driver.Framebuffer, d driver.LoadDesc) {
 		b.clearColor = [4]float32{c.R, c.G, c.B, c.A}
 		b.ctx.ClearRenderTargetView(b.fbo.renderTarget, &b.clearColor)
 	}
+}
+
+func (b *Backend) EndRenderPass() {
 }
 
 func (f *Framebuffer) Release() {

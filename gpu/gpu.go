@@ -424,7 +424,6 @@ func (g *gpu) frame(target RenderTarget) error {
 	for _, img := range g.drawOps.imageOps {
 		expandPathOp(img.path, img.clip)
 	}
-	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.stencilTimer.begin()
 	g.renderer.packStencils(&g.drawOps.pathOps)
 	g.renderer.stencilClips(g.drawOps.pathCache, g.drawOps.pathOps)
@@ -432,17 +431,19 @@ func (g *gpu) frame(target RenderTarget) error {
 	g.renderer.intersect(g.drawOps.imageOps)
 	g.stencilTimer.end()
 	g.coverTimer.begin()
-	var d driver.LoadDesc
+	g.renderer.uploadImages(g.cache, g.drawOps.imageOps)
+	d := driver.LoadDesc{
+		ClearColor: g.drawOps.clearColor,
+	}
 	if g.drawOps.clear {
 		g.drawOps.clear = false
 		d.Action = driver.LoadActionClear
-		c := &d.ClearColor
-		c.R, c.G, c.B, c.A = g.drawOps.clearColor.Float32()
 	}
-	g.ctx.BindFramebuffer(defFBO, d)
+	g.ctx.BeginRenderPass(defFBO, d)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.renderer.drawOps(g.cache, g.drawOps.imageOps)
 	g.coverTimer.end()
+	g.ctx.EndRenderPass()
 	g.cleanupTimer.begin()
 	g.cache.frame()
 	g.drawOps.pathCache.frame()
@@ -669,12 +670,20 @@ func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
 	r.pather.begin(r.packer.sizes)
 	for _, p := range ops {
 		if fbo != p.place.Idx {
+			if fbo != -1 {
+				r.ctx.EndRenderPass()
+			}
 			fbo = p.place.Idx
 			f := r.pather.stenciler.cover(fbo)
-			r.ctx.BindFramebuffer(f.fbo, driver.LoadDesc{Action: driver.LoadActionClear})
+			r.ctx.BeginRenderPass(f.fbo, driver.LoadDesc{Action: driver.LoadActionClear})
+			r.ctx.BindPipeline(r.pather.stenciler.pipeline.pipeline.pipeline)
+			r.ctx.BindIndexBuffer(r.pather.stenciler.indexBuf)
 		}
 		v, _ := pathCache.get(p.pathKey)
 		r.pather.stencilPath(p.clip, p.off, p.place.Pos, v.data)
+	}
+	if fbo != -1 {
+		r.ctx.EndRenderPass()
 	}
 }
 
@@ -684,20 +693,27 @@ func (r *renderer) intersect(ops []imageOp) {
 	}
 	fbo := -1
 	r.pather.stenciler.beginIntersect(r.intersections.sizes)
-	r.ctx.BindVertexBuffer(r.blitter.quadVerts, 0)
 	for _, img := range ops {
 		if img.clipType != clipTypeIntersection {
 			continue
 		}
 		if fbo != img.place.Idx {
+			if fbo != -1 {
+				r.ctx.EndRenderPass()
+			}
 			fbo = img.place.Idx
 			f := r.pather.stenciler.intersections.fbos[fbo]
 			d := driver.LoadDesc{Action: driver.LoadActionClear}
 			d.ClearColor.R = 1.0
-			r.ctx.BindFramebuffer(f.fbo, d)
+			r.ctx.BeginRenderPass(f.fbo, d)
+			r.ctx.BindPipeline(r.pather.stenciler.ipipeline.pipeline.pipeline)
+			r.ctx.BindVertexBuffer(r.blitter.quadVerts, 0)
 		}
 		r.ctx.Viewport(img.place.Pos.X, img.place.Pos.Y, img.clip.Dx(), img.clip.Dy())
 		r.intersectPath(img.path, img.clip)
+	}
+	if fbo != -1 {
+		r.ctx.EndRenderPass()
 	}
 }
 
@@ -1077,8 +1093,16 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 	return m
 }
 
+func (r *renderer) uploadImages(cache *resourceCache, ops []imageOp) {
+	for _, img := range ops {
+		m := img.material
+		if m.material == materialTexture {
+			r.texHandle(cache, m.data)
+		}
+	}
+}
+
 func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
-	r.ctx.BindVertexBuffer(r.blitter.quadVerts, 0)
 	var coverTex driver.Texture
 	for _, img := range ops {
 		m := img.material
@@ -1092,6 +1116,9 @@ func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 		var fbo stencilFBO
 		switch img.clipType {
 		case clipTypeNone:
+			p := r.blitter.pipelines[m.material]
+			r.ctx.BindPipeline(p.pipeline)
+			r.ctx.BindVertexBuffer(r.blitter.quadVerts, 0)
 			r.blitter.blit(m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans)
 			continue
 		case clipTypePath:
@@ -1108,6 +1135,9 @@ func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 			Max: img.place.Pos.Add(drc.Size()),
 		}
 		coverScale, coverOff := texSpaceTransform(layout.FRect(uv), fbo.size)
+		p := r.pather.coverer.pipelines[m.material]
+		r.ctx.BindPipeline(p.pipeline)
+		r.ctx.BindVertexBuffer(r.blitter.quadVerts, 0)
 		r.pather.cover(m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans, coverScale, coverOff)
 	}
 }
@@ -1165,12 +1195,12 @@ func (u *uniformBuffer) Release() {
 
 func (p *pipeline) UploadUniforms(ctx driver.Device) {
 	if p.vertUniforms != nil {
-		ctx.BindVertexUniforms(p.vertUniforms.buf)
 		p.vertUniforms.Upload()
+		ctx.BindVertexUniforms(p.vertUniforms.buf)
 	}
 	if p.fragUniforms != nil {
-		ctx.BindFragmentUniforms(p.fragUniforms.buf)
 		p.fragUniforms.Upload()
+		ctx.BindFragmentUniforms(p.fragUniforms.buf)
 	}
 }
 

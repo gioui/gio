@@ -27,7 +27,15 @@ var clearColExpect = f32color.NRGBAToRGBA(clearCol)
 func TestFramebufferClear(t *testing.T) {
 	b := newDriver(t)
 	sz := image.Point{X: 800, Y: 600}
-	fbo := setupFBO(t, b, sz)
+	fbo := newFBO(t, b, sz)
+	d := driver.LoadDesc{
+		// ClearColor accepts linear RGBA colors, while 8-bit colors
+		// are in the sRGB color space.
+		ClearColor: f32color.LinearFromSRGB(clearCol),
+		Action:     driver.LoadActionClear,
+	}
+	b.BeginRenderPass(fbo, d)
+	b.EndRenderPass()
 	img := screenshot(t, b, fbo, sz)
 	if got := img.RGBAAt(0, 0); got != clearColExpect {
 		t.Errorf("got color %v, expected %v", got, clearColExpect)
@@ -37,13 +45,13 @@ func TestFramebufferClear(t *testing.T) {
 func TestSimpleShader(t *testing.T) {
 	b := newDriver(t)
 	sz := image.Point{X: 800, Y: 600}
-	fbo := setupFBO(t, b, sz)
 	vsh, fsh, err := newShaders(b, gio.Shader_simple_vert, gio.Shader_simple_frag)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer vsh.Release()
 	defer fsh.Release()
+	fbo := newFBO(t, b, sz)
 	p, err := b.NewPipeline(driver.PipelineDesc{
 		VertexShader:   vsh,
 		FragmentShader: fsh,
@@ -53,8 +61,15 @@ func TestSimpleShader(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer p.Release()
+	d := driver.LoadDesc{
+		ClearColor: f32color.LinearFromSRGB(clearCol),
+		Action:     driver.LoadActionClear,
+	}
+	b.BeginRenderPass(fbo, d)
+	b.Viewport(0, 0, sz.X, sz.Y)
 	b.BindPipeline(p)
 	b.DrawArrays(driver.DrawModeTriangles, 0, 3)
+	b.EndRenderPass()
 	img := screenshot(t, b, fbo, sz)
 	if got := img.RGBAAt(0, 0); got != clearColExpect {
 		t.Errorf("got color %v, expected %v", got, clearColExpect)
@@ -70,7 +85,6 @@ func TestSimpleShader(t *testing.T) {
 func TestInputShader(t *testing.T) {
 	b := newDriver(t)
 	sz := image.Point{X: 800, Y: 600}
-	fbo := setupFBO(t, b, sz)
 	vsh, fsh, err := newShaders(b, gio.Shader_input_vert, gio.Shader_simple_frag)
 	if err != nil {
 		t.Fatal(err)
@@ -87,6 +101,7 @@ func TestInputShader(t *testing.T) {
 		},
 		Stride: 4 * 4,
 	}
+	fbo := newFBO(t, b, sz)
 	pipe, err := b.NewPipeline(driver.PipelineDesc{
 		VertexShader:   vsh,
 		FragmentShader: fsh,
@@ -97,7 +112,6 @@ func TestInputShader(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer pipe.Release()
-	b.BindPipeline(pipe)
 	buf, err := b.NewImmutableBuffer(driver.BufferBindingVertices,
 		byteslice.Slice([]float32{
 			0, .5, .5, 1,
@@ -109,8 +123,16 @@ func TestInputShader(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer buf.Release()
+	d := driver.LoadDesc{
+		ClearColor: f32color.LinearFromSRGB(clearCol),
+		Action:     driver.LoadActionClear,
+	}
+	b.BeginRenderPass(fbo, d)
+	b.Viewport(0, 0, sz.X, sz.Y)
+	b.BindPipeline(pipe)
 	b.BindVertexBuffer(buf, 0)
 	b.DrawArrays(driver.DrawModeTriangles, 0, 3)
+	b.EndRenderPass()
 	img := screenshot(t, b, fbo, sz)
 	if got := img.RGBAAt(0, 0); got != clearColExpect {
 		t.Errorf("got color %v, expected %v", got, clearColExpect)
@@ -137,19 +159,20 @@ func newShaders(ctx driver.Device, vsrc, fsrc shader.Sources) (vert driver.Verte
 func TestFramebuffers(t *testing.T) {
 	b := newDriver(t)
 	sz := image.Point{X: 800, Y: 600}
-	fbo1 := newFBO(t, b, sz)
-	fbo2 := newFBO(t, b, sz)
 	var (
 		col1 = color.NRGBA{R: 0xac, G: 0xbd, B: 0xef, A: 0xde}
 		col2 = color.NRGBA{R: 0xfe, G: 0xba, B: 0xbe, A: 0xca}
 	)
+	fbo1 := newFBO(t, b, sz)
+	fbo2 := newFBO(t, b, sz)
 	fcol1, fcol2 := f32color.LinearFromSRGB(col1), f32color.LinearFromSRGB(col2)
 	d := driver.LoadDesc{Action: driver.LoadActionClear}
-	c := &d.ClearColor
-	c.R, c.G, c.B, c.A = fcol1.Float32()
-	b.BindFramebuffer(fbo1, d)
-	c.R, c.G, c.B, c.A = fcol2.Float32()
-	b.BindFramebuffer(fbo2, d)
+	d.ClearColor = fcol1
+	b.BeginRenderPass(fbo1, d)
+	b.EndRenderPass()
+	d.ClearColor = fcol2
+	b.BeginRenderPass(fbo2, d)
+	b.EndRenderPass()
 	img := screenshot(t, b, fbo1, sz)
 	if got := img.RGBAAt(0, 0); got != f32color.NRGBAToRGBA(col1) {
 		t.Errorf("got color %v, expected %v", got, f32color.NRGBAToRGBA(col1))
@@ -158,19 +181,6 @@ func TestFramebuffers(t *testing.T) {
 	if got := img.RGBAAt(0, 0); got != f32color.NRGBAToRGBA(col2) {
 		t.Errorf("got color %v, expected %v", got, f32color.NRGBAToRGBA(col2))
 	}
-}
-
-func setupFBO(t *testing.T, b driver.Device, size image.Point) driver.Framebuffer {
-	fbo := newFBO(t, b, size)
-	// ClearColor accepts linear RGBA colors, while 8-bit colors
-	// are in the sRGB color space.
-	col := f32color.LinearFromSRGB(clearCol)
-	d := driver.LoadDesc{Action: driver.LoadActionClear}
-	c := &d.ClearColor
-	c.R, c.G, c.B, c.A = col.Float32()
-	b.BindFramebuffer(fbo, d)
-	b.Viewport(0, 0, size.X, size.Y)
-	return fbo
 }
 
 func newFBO(t *testing.T, b driver.Device, size image.Point) driver.Framebuffer {

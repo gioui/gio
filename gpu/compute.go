@@ -623,17 +623,18 @@ func (g *compute) frame(target RenderTarget) error {
 		return err
 	}
 	t.render.end()
-	var d driver.LoadDesc
+	d := driver.LoadDesc{
+		ClearColor: g.collector.clearColor,
+	}
 	if g.collector.clear {
 		g.collector.clear = false
 		d.Action = driver.LoadActionClear
-		c := &d.ClearColor
-		c.R, c.G, c.B, c.A = g.collector.clearColor.Float32()
 	}
-	g.ctx.BindFramebuffer(defFBO, d)
+	g.ctx.BeginRenderPass(defFBO, d)
 	t.blit.begin()
 	g.blitLayers(viewport)
 	t.blit.end()
+	g.ctx.EndRenderPass()
 	t.compact.begin()
 	if err := g.compactAllocs(); err != nil {
 		return err
@@ -993,18 +994,18 @@ func (g *compute) renderMaterials() error {
 		m.vert.uniforms.scale = [2]float32{2, -2}
 		m.vert.uniforms.pos = [2]float32{-1, +1}
 		m.vert.buf.Upload(byteslice.Struct(m.vert.uniforms))
-		g.ctx.BindVertexUniforms(m.vert.buf)
-		g.ctx.BindFragmentUniforms(m.frag.buf)
 		vertexData := byteslice.Slice(m.quads)
 		n := pow2Ceil(len(vertexData))
 		m.buffer.ensureCapacity(false, g.ctx, driver.BufferBindingVertices, n)
 		m.buffer.buffer.Upload(vertexData)
-		g.ctx.BindTexture(0, imgAtlas.image)
 		var d driver.LoadDesc
 		if !realized {
 			d.Action = driver.LoadActionClear
 		}
-		g.ctx.BindFramebuffer(atlas.fbo, d)
+		g.ctx.BeginRenderPass(atlas.fbo, d)
+		g.ctx.BindVertexUniforms(m.vert.buf)
+		g.ctx.BindFragmentUniforms(m.frag.buf)
+		g.ctx.BindTexture(0, imgAtlas.image)
 		g.ctx.BindPipeline(m.pipeline)
 		g.ctx.BindVertexBuffer(m.buffer.buffer, 0)
 		newAllocs := atlas.allocs[allocStart:]
@@ -1013,6 +1014,7 @@ func (g *compute) renderMaterials() error {
 			g.ctx.Viewport(a.rect.Min.X, a.rect.Min.Y, sz.X, sz.Y)
 			g.ctx.DrawArrays(driver.DrawModeTriangles, i*6, 6)
 		}
+		g.ctx.EndRenderPass()
 		if !g.useCPU {
 			continue
 		}
@@ -1263,24 +1265,25 @@ func (g *compute) render(images *textureAtlas, dst driver.Texture, cpuDst cpu.Im
 		}
 	}
 
-	if !g.useCPU {
-		g.ctx.BindImageTexture(kernel4OutputUnit, dst, driver.AccessWrite, driver.TextureFormatRGBA8)
-		if images != nil {
-			g.ctx.BindImageTexture(kernel4AtlasUnit, images.image, driver.AccessRead, driver.TextureFormatRGBA8)
-		}
-	} else {
-		*g.output.descriptors.Binding2() = cpuDst
-		if images != nil {
-			*g.output.descriptors.Binding3() = images.cpuImage
-		}
-	}
-
 	for {
 		*g.memHeader = memoryHeader{
 			mem_offset: alloc,
 		}
 		g.buffers.memory.upload(byteslice.Struct(g.memHeader))
 		g.buffers.state.upload(g.zeros(clearSize))
+
+		if !g.useCPU {
+			g.ctx.BeginCompute()
+			g.ctx.BindImageTexture(kernel4OutputUnit, dst, driver.AccessWrite, driver.TextureFormatRGBA8)
+			if images != nil {
+				g.ctx.BindImageTexture(kernel4AtlasUnit, images.image, driver.AccessRead, driver.TextureFormatRGBA8)
+			}
+		} else {
+			*g.output.descriptors.Binding2() = cpuDst
+			if images != nil {
+				*g.output.descriptors.Binding3() = images.cpuImage
+			}
+		}
 
 		g.bindBuffers()
 		g.memoryBarrier()
@@ -1298,7 +1301,9 @@ func (g *compute) render(images *textureAtlas, dst driver.Texture, cpuDst cpu.Im
 		g.memoryBarrier()
 		g.dispatch(g.programs.kernel4, tileDims.X, tileDims.Y, 1)
 		g.memoryBarrier()
-		if g.useCPU {
+		if !g.useCPU {
+			g.ctx.EndCompute()
+		} else {
 			g.dispatcher.Sync()
 		}
 
