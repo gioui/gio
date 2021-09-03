@@ -155,7 +155,8 @@ var gioView struct {
 	showTextInput      C.jmethodID
 	hideTextInput      C.jmethodID
 	setInputHint       C.jmethodID
-	postInvalidate     C.jmethodID
+	postInvalidate     C.jmethodID // requests draw, called from non-UI thread
+	invalidate         C.jmethodID // requests draw, called from UI thread
 	setCursor          C.jmethodID
 	setOrientation     C.jmethodID
 	setNavigationColor C.jmethodID
@@ -311,6 +312,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.hideTextInput = getMethodID(env, class, "hideTextInput", "()V")
 		m.setInputHint = getMethodID(env, class, "setInputHint", "(I)V")
 		m.postInvalidate = getMethodID(env, class, "postInvalidate", "()V")
+		m.invalidate = getMethodID(env, class, "invalidate", "()V")
 		m.setCursor = getMethodID(env, class, "setCursor", "(I)V")
 		m.setOrientation = getMethodID(env, class, "setOrientation", "(II)V")
 		m.setNavigationColor = getMethodID(env, class, "setNavigationColor", "(II)V")
@@ -403,12 +405,11 @@ func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view 
 	if w.stage < system.StageRunning {
 		return
 	}
-	anim := w.animating
-	if anim {
-		runInJVM(javaVM(), func(env *C.JNIEnv) {
-			callVoidMethod(env, w.view, gioView.postInvalidate)
-		})
+	if w.animating {
 		w.draw(false)
+		// Schedule the next draw immediately after this one. Since onFrameCallback runs
+		// on the UI thread, View.invalidate can be used here instead of postInvalidate.
+		callVoidMethod(env, w.view, gioView.invalidate)
 	}
 }
 
