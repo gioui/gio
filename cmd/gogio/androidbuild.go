@@ -798,6 +798,14 @@ func archNDK() string {
 		arch = "x86"
 	case "amd64":
 		arch = "x86_64"
+	case "arm64":
+		if runtime.GOOS == "darwin" {
+			// Workaround for arm64 macOS. This will keep working until
+			// Apple deprecates Rosetta 2.
+			arch = "x86_64"
+		} else {
+			panic("unsupported GOARCH: " + runtime.GOARCH)
+		}
 	default:
 		panic("unsupported GOARCH: " + runtime.GOARCH)
 	}
