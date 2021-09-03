@@ -444,8 +444,10 @@ func (w *window) Wakeup() {
 }
 
 func (w *window) setStage(s system.Stage) {
-	w.stage = s
-	w.w.Event(system.StageEvent{Stage: s})
+	if s != w.stage {
+		w.stage = s
+		w.w.Event(system.StageEvent{Stage: s})
+	}
 }
 
 func (w *window) draw(sync bool) {
