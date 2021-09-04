@@ -47,8 +47,7 @@ type Window struct {
 	frames      chan *op.Ops
 	frameAck    chan struct{}
 	// dead is closed when the window is destroyed.
-	dead          chan struct{}
-	notifyAnimate chan struct{}
+	dead chan struct{}
 
 	stage        system.Stage
 	animating    bool
@@ -104,18 +103,17 @@ func NewWindow(options ...Option) *Window {
 	}
 
 	w := &Window{
-		in:            make(chan event.Event),
-		out:           make(chan event.Event),
-		ack:           make(chan struct{}),
-		invalidates:   make(chan struct{}, 1),
-		frames:        make(chan *op.Ops),
-		frameAck:      make(chan struct{}),
-		driverFuncs:   make(chan func(d driver), 1),
-		driverDefers:  make(chan func(d driver), 1),
-		wakeups:       make(chan struct{}, 1),
-		dead:          make(chan struct{}),
-		notifyAnimate: make(chan struct{}, 1),
-		nocontext:     cnf.CustomRenderer,
+		in:           make(chan event.Event),
+		out:          make(chan event.Event),
+		ack:          make(chan struct{}),
+		invalidates:  make(chan struct{}, 1),
+		frames:       make(chan *op.Ops),
+		frameAck:     make(chan struct{}),
+		driverFuncs:  make(chan func(d driver), 1),
+		driverDefers: make(chan func(d driver), 1),
+		wakeups:      make(chan struct{}, 1),
+		dead:         make(chan struct{}),
+		nocontext:    cnf.CustomRenderer,
 	}
 	w.callbacks.w = w
 	go w.run(cnf)
@@ -362,12 +360,20 @@ func (w *Window) updateAnimation() {
 	}
 	if animate != w.animating {
 		w.animating = animate
-		select {
-		case w.notifyAnimate <- struct{}{}:
-			w.wakeup()
-		default:
+		if animate {
+			w.driverDefer(enableAnim)
+		} else {
+			w.driverDefer(disableAnim)
 		}
 	}
+}
+
+func enableAnim(d driver) {
+	d.SetAnimating(true)
+}
+
+func disableAnim(d driver) {
+	d.SetAnimating(false)
 }
 
 func (w *Window) wakeup() {
@@ -421,8 +427,6 @@ func (w *Window) runFuncs(d driver) {
 	// Wait for ack while running incoming runnables.
 	for {
 		select {
-		case <-w.notifyAnimate:
-			d.SetAnimating(w.animating)
 		case f := <-w.driverFuncs:
 			f(d)
 		case f := <-w.driverDefers:
