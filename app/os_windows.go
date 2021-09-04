@@ -511,9 +511,7 @@ func (w *window) readClipboard() error {
 	}
 	defer windows.GlobalUnlock(mem)
 	content := gowindows.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
-	go func() {
-		w.w.Event(clipboard.Event{Text: content})
-	}()
+	w.w.Event(clipboard.Event{Text: content})
 	return nil
 }
 

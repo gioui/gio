@@ -261,7 +261,7 @@ func (w *Window) Invalidate() {
 
 // Option applies the options to the window.
 func (w *Window) Option(opts ...Option) {
-	go w.driverDefer(func(d driver) {
+	w.driverDefer(func(d driver) {
 		c := new(config)
 		for _, opt := range opts {
 			opt(c)
@@ -274,21 +274,21 @@ func (w *Window) Option(opts ...Option) {
 // of a clipboard.Event. Multiple reads may be coalesced
 // to a single event.
 func (w *Window) ReadClipboard() {
-	go w.driverDefer(func(d driver) {
+	w.driverDefer(func(d driver) {
 		d.ReadClipboard()
 	})
 }
 
 // WriteClipboard writes a string to the clipboard.
 func (w *Window) WriteClipboard(s string) {
-	go w.driverDefer(func(d driver) {
+	w.driverDefer(func(d driver) {
 		d.WriteClipboard(s)
 	})
 }
 
 // SetCursorName changes the current window cursor to name.
 func (w *Window) SetCursorName(name pointer.CursorName) {
-	go w.driverDefer(func(d driver) {
+	w.driverDefer(func(d driver) {
 		d.SetCursor(name)
 	})
 }
@@ -299,7 +299,7 @@ func (w *Window) SetCursorName(name pointer.CursorName) {
 // Currently, only macOS, Windows and X11 drivers implement this functionality,
 // all others are stubbed.
 func (w *Window) Close() {
-	go w.driverDefer(func(d driver) {
+	w.driverDefer(func(d driver) {
 		d.Close()
 	})
 }

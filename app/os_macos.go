@@ -198,7 +198,7 @@ func (w *window) contextView() C.CFTypeRef {
 
 func (w *window) ReadClipboard() {
 	content := nsstringToString(C.readClipboard())
-	go w.w.Event(clipboard.Event{Text: content})
+	w.w.Event(clipboard.Event{Text: content})
 }
 
 func (w *window) WriteClipboard(s string) {
@@ -283,13 +283,7 @@ func (w *window) runOnMain(f func()) {
 }
 
 func (w *window) Close() {
-	// close immediately calls gio_onClose which sends events
-	// causing a deadlock because Close is called during an event.
-	// Break the deadlock by deferring the close, making Close more
-	// akin to a message like the other platforms.
-	go w.runOnMain(func() {
-		C.closeWindow(w.window)
-	})
+	C.closeWindow(w.window)
 }
 
 func (w *window) setStage(stage system.Stage) {

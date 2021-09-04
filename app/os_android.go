@@ -427,7 +427,7 @@ func Java_org_gioui_GioView_onBack(env *C.JNIEnv, class C.jclass, view C.jlong) 
 //export Java_org_gioui_GioView_onFocusChange
 func Java_org_gioui_GioView_onFocusChange(env *C.JNIEnv, class C.jclass, view C.jlong, focus C.jboolean) {
 	w := views[view]
-	go w.callbacks.Event(key.FocusEvent{Focus: focus == C.JNI_TRUE})
+	w.callbacks.Event(key.FocusEvent{Focus: focus == C.JNI_TRUE})
 }
 
 //export Java_org_gioui_GioView_onWindowInsets
@@ -783,7 +783,7 @@ func (w *window) ReadClipboard() {
 			return
 		}
 		content := goString(env, C.jstring(c))
-		go w.callbacks.Event(clipboard.Event{Text: content})
+		w.callbacks.Event(clipboard.Event{Text: content})
 	})
 }
 

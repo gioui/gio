@@ -256,7 +256,7 @@ func onTouch(last C.int, view, touchRef C.CFTypeRef, phase C.NSInteger, x, y C.C
 
 func (w *window) ReadClipboard() {
 	content := nsstringToString(C.readClipboard())
-	go w.w.Event(clipboard.Event{Text: content})
+	w.w.Event(clipboard.Event{Text: content})
 }
 
 func (w *window) WriteClipboard(s string) {
