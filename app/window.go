@@ -33,6 +33,9 @@ type Window struct {
 	// driverFuncs is a channel of functions to run when
 	// the Window has a valid driver.
 	driverFuncs chan func(d driver)
+	// driverDefers is like driverFuncs for functions that may
+	// block and shouldn't be waited for.
+	driverDefers chan func(d driver)
 	// wakeups wakes up the native event loop to send a
 	// WakeupEvent that flushes driverFuncs.
 	wakeups chan struct{}
@@ -108,6 +111,7 @@ func NewWindow(options ...Option) *Window {
 		frames:        make(chan *op.Ops),
 		frameAck:      make(chan struct{}),
 		driverFuncs:   make(chan func(d driver), 1),
+		driverDefers:  make(chan func(d driver), 1),
 		wakeups:       make(chan struct{}, 1),
 		dead:          make(chan struct{}),
 		notifyAnimate: make(chan struct{}, 1),
@@ -207,12 +211,12 @@ func (w *Window) processFrame(frameStart time.Time, frame *op.Ops) {
 	w.queue.q.Frame(frame)
 	switch w.queue.q.TextInputState() {
 	case router.TextInputOpen:
-		w.driverRun(func(d driver) { d.ShowTextInput(true) })
+		w.driverDefer(func(d driver) { d.ShowTextInput(true) })
 	case router.TextInputClose:
-		w.driverRun(func(d driver) { d.ShowTextInput(false) })
+		w.driverDefer(func(d driver) { d.ShowTextInput(false) })
 	}
 	if hint, ok := w.queue.q.TextInputHint(); ok {
-		w.driverRun(func(d driver) { d.SetInputHint(hint) })
+		w.driverDefer(func(d driver) { d.SetInputHint(hint) })
 	}
 	if txt, ok := w.queue.q.WriteClipboard(); ok {
 		w.WriteClipboard(txt)
@@ -257,7 +261,7 @@ func (w *Window) Invalidate() {
 
 // Option applies the options to the window.
 func (w *Window) Option(opts ...Option) {
-	go w.driverRun(func(d driver) {
+	go w.driverDefer(func(d driver) {
 		c := new(config)
 		for _, opt := range opts {
 			opt(c)
@@ -270,21 +274,21 @@ func (w *Window) Option(opts ...Option) {
 // of a clipboard.Event. Multiple reads may be coalesced
 // to a single event.
 func (w *Window) ReadClipboard() {
-	go w.driverRun(func(d driver) {
+	go w.driverDefer(func(d driver) {
 		d.ReadClipboard()
 	})
 }
 
 // WriteClipboard writes a string to the clipboard.
 func (w *Window) WriteClipboard(s string) {
-	go w.driverRun(func(d driver) {
+	go w.driverDefer(func(d driver) {
 		d.WriteClipboard(s)
 	})
 }
 
 // SetCursorName changes the current window cursor to name.
 func (w *Window) SetCursorName(name pointer.CursorName) {
-	go w.driverRun(func(d driver) {
+	go w.driverDefer(func(d driver) {
 		d.SetCursor(name)
 	})
 }
@@ -295,7 +299,7 @@ func (w *Window) SetCursorName(name pointer.CursorName) {
 // Currently, only macOS, Windows and X11 drivers implement this functionality,
 // all others are stubbed.
 func (w *Window) Close() {
-	go w.driverRun(func(d driver) {
+	go w.driverDefer(func(d driver) {
 		d.Close()
 	})
 }
@@ -314,6 +318,9 @@ func (w *Window) Run(f func()) {
 	})
 }
 
+// driverRun runs f on the driver event goroutine and returns when f has
+// completed. It can only be called during the processing of an event from
+// w.in.
 func (w *Window) driverRun(f func(d driver)) {
 	done := make(chan struct{})
 	wrapper := func(d driver) {
@@ -322,11 +329,20 @@ func (w *Window) driverRun(f func(d driver)) {
 	}
 	select {
 	case w.driverFuncs <- wrapper:
-		w.wakeup()
 		select {
 		case <-done:
 		case <-w.dead:
 		}
+	case <-w.dead:
+	}
+}
+
+// driverDefer is like driverRun but can be run from any context. It doesn't wait
+// for f to return.
+func (w *Window) driverDefer(f func(d driver)) {
+	select {
+	case w.driverDefers <- f:
+		w.wakeup()
 	case <-w.dead:
 	}
 }
@@ -378,10 +394,20 @@ func (c *callbacks) SetDriver(d driver) {
 }
 
 func (c *callbacks) Event(e event.Event) {
-	select {
-	case c.w.in <- e:
-		c.w.runFuncs(c.d)
-	case <-c.w.dead:
+	deferChan := c.w.driverDefers
+	if c.d == nil {
+		deferChan = nil
+	}
+	for {
+		select {
+		case f := <-deferChan:
+			f(c.d)
+		case c.w.in <- e:
+			c.w.runFuncs(c.d)
+			return
+		case <-c.w.dead:
+			return
+		}
 	}
 }
 
@@ -391,18 +417,7 @@ func (w *Window) runFuncs(d driver) {
 		<-w.ack
 		return
 	}
-	// Flush pending runnnables.
-loop:
-	for {
-		select {
-		case <-w.notifyAnimate:
-			d.SetAnimating(w.animating)
-		case f := <-w.driverFuncs:
-			f(d)
-		default:
-			break loop
-		}
-	}
+	var defers []func(d driver)
 	// Wait for ack while running incoming runnables.
 	for {
 		select {
@@ -410,7 +425,12 @@ loop:
 			d.SetAnimating(w.animating)
 		case f := <-w.driverFuncs:
 			f(d)
+		case f := <-w.driverDefers:
+			defers = append(defers, f)
 		case <-w.ack:
+			for _, f := range defers {
+				f(d)
+			}
 			return
 		}
 	}
