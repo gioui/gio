@@ -1200,8 +1200,14 @@ func (f *framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int)
 	if len(pixels) < src.Dx()*src.Dy()*4 {
 		return errors.New("unexpected RGBA size")
 	}
-	f.backend.glstate.pixelStorei(f.backend.funcs, gl.PACK_ROW_LENGTH, stride/4)
-	f.backend.funcs.ReadPixels(src.Min.X, src.Min.Y, src.Dx(), src.Dy(), gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+	w, h := src.Dx(), src.Dy()
+	// WebGL 1 doesn't support PACK_ROW_LENGTH != 0. Avoid it if possible.
+	rowLen := 0
+	if n := stride / 4; n != w {
+		rowLen = n
+	}
+	f.backend.glstate.pixelStorei(f.backend.funcs, gl.PACK_ROW_LENGTH, rowLen)
+	f.backend.funcs.ReadPixels(src.Min.X, src.Min.Y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
 	return glErr(f.backend.funcs)
 }
 
@@ -1262,7 +1268,12 @@ func (t *texture) Upload(offset, size image.Point, pixels []byte, stride int) {
 		panic(fmt.Errorf("size %d larger than data %d", min, len(pixels)))
 	}
 	t.backend.BindTexture(0, t)
-	t.backend.glstate.pixelStorei(t.backend.funcs, gl.UNPACK_ROW_LENGTH, stride/4)
+	// WebGL 1 doesn't support UNPACK_ROW_LENGTH != 0. Avoid it if possible.
+	rowLen := 0
+	if n := stride / 4; n != size.X {
+		rowLen = n
+	}
+	t.backend.glstate.pixelStorei(t.backend.funcs, gl.UNPACK_ROW_LENGTH, rowLen)
 	t.backend.funcs.TexSubImage2D(gl.TEXTURE_2D, 0, offset.X, offset.Y, size.X, size.Y, t.triple.format, t.triple.typ, pixels)
 }
 
