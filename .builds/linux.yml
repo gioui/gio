@@ -39,6 +39,19 @@ tasks:
  - install_go: |
      mkdir -p /home/build/sdk
      curl -s https://dl.google.com/go/go1.16.6.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
+ - check_gofmt: |
+     cd gio
+     test -z "$(gofmt -s -l .)"
+ - check_sign_off: |
+     set +x -e
+     cd gio
+     for hash in $(git log -n 20 --format="%H"); do
+        message=$(git log -1 --format=%B $hash)
+        if [[ ! "$message" =~ "Signed-off-by: " ]]; then
+            echo "Missing 'Signed-off-by' in commit $hash"
+            exit 1
+        fi
+     done
  - test_gio: |
      cd gio
      export EGL_PLATFORM=surfaceless # for headless tests
@@ -81,19 +94,6 @@ tasks:
      go mod init example.com
      go get -d gioui.org/example/kitchen
      gogio -target android gioui.org/example/kitchen
- - check_gofmt: |
-     cd gio
-     test -z "$(gofmt -s -l .)"
- - check_sign_off: |
-     set +x -e
-     cd gio
-     for hash in $(git log -n 20 --format="%H"); do
-        message=$(git log -1 --format=%B $hash)
-        if [[ ! "$message" =~ "Signed-off-by: " ]]; then
-            echo "Missing 'Signed-off-by' in commit $hash"
-            exit 1
-        fi
-     done
  - mirror: |
      # mirror to github
      ssh-keyscan github.com > "$HOME"/.ssh/known_hosts && cd gio && git push --mirror "$github_mirror" || echo "failed mirroring"
