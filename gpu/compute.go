@@ -1535,8 +1535,8 @@ func (p *computeProgram) Release() {
 }
 
 func (b *sizedBuffer) Release() {
-	if b.buffer == nil {
-		return
+	if b.buffer != nil {
+		b.buffer.Release()
 	}
 	b.cpuBuf.Free()
 	*b = sizedBuffer{}
