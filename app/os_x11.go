@@ -81,9 +81,7 @@ type x11Window struct {
 		wmStateFullscreen C.Atom
 	}
 	stage  system.Stage
-	cfg    unit.Metric
-	width  int
-	height int
+	metric unit.Metric
 	notify struct {
 		read, write int
 	}
@@ -97,7 +95,7 @@ type x11Window struct {
 		content []byte
 	}
 	cursor pointer.CursorName
-	mode   windowMode
+	config Config
 
 	wakeups chan struct{}
 }
@@ -116,46 +114,55 @@ func (w *x11Window) WriteClipboard(s string) {
 	C.XSetSelectionOwner(w.x, w.atoms.clipboard, w.xw, C.CurrentTime)
 }
 
-func (w *x11Window) Configure(cnf *config) {
+func (w *x11Window) Configure(options []Option) {
 	var shints C.XSizeHints
-	if o := cnf.MinSize; o != nil {
-		shints.min_width = C.int(w.cfg.Px(o.Width))
-		shints.min_height = C.int(w.cfg.Px(o.Height))
+	prev := w.config
+	cnf := w.config
+	cnf.apply(w.metric, options)
+	if prev.MinSize != cnf.MinSize {
+		w.config.MinSize = cnf.MinSize
+		shints.min_width = C.int(cnf.MinSize.X)
+		shints.min_height = C.int(cnf.MinSize.Y)
 		shints.flags = C.PMinSize
 	}
-	if o := cnf.MaxSize; o != nil {
-		shints.max_width = C.int(w.cfg.Px(o.Width))
-		shints.max_height = C.int(w.cfg.Px(o.Height))
+	if prev.MaxSize != cnf.MaxSize {
+		w.config.MaxSize = cnf.MaxSize
+		shints.max_width = C.int(cnf.MaxSize.X)
+		shints.max_height = C.int(cnf.MaxSize.Y)
 		shints.flags = shints.flags | C.PMaxSize
 	}
 	if shints.flags != 0 {
 		C.XSetWMNormalHints(w.x, w.xw, &shints)
 	}
 
-	if o := cnf.Size; o != nil {
-		C.XResizeWindow(w.x, w.xw, C.uint(w.cfg.Px(o.Width)), C.uint(w.cfg.Px(o.Height)))
+	if prev.Size != cnf.Size {
+		w.config.Size = cnf.Size
+		C.XResizeWindow(w.x, w.xw, C.uint(cnf.Size.X), C.uint(cnf.Size.Y))
 	}
 
-	var title string
-	if o := cnf.Title; o != nil {
-		title = *o
+	if prev.Title != cnf.Title {
+		title := cnf.Title
+		ctitle := C.CString(title)
+		defer C.free(unsafe.Pointer(ctitle))
+		C.XStoreName(w.x, w.xw, ctitle)
+		// set _NET_WM_NAME as well for UTF-8 support in window title.
+		C.XSetTextProperty(w.x, w.xw,
+			&C.XTextProperty{
+				value:    (*C.uchar)(unsafe.Pointer(ctitle)),
+				encoding: w.atoms.utf8string,
+				format:   8,
+				nitems:   C.ulong(len(title)),
+			},
+			w.atoms.wmName)
 	}
-	ctitle := C.CString(title)
-	defer C.free(unsafe.Pointer(ctitle))
-	C.XStoreName(w.x, w.xw, ctitle)
-	// set _NET_WM_NAME as well for UTF-8 support in window title.
-	C.XSetTextProperty(w.x, w.xw,
-		&C.XTextProperty{
-			value:    (*C.uchar)(unsafe.Pointer(ctitle)),
-			encoding: w.atoms.utf8string,
-			format:   8,
-			nitems:   C.ulong(len(title)),
-		},
-		w.atoms.wmName)
 
-	if o := cnf.WindowMode; o != nil {
-		w.SetWindowMode(*o)
+	if prev.Mode != cnf.Mode {
+		w.SetWindowMode(cnf.Mode)
 	}
+}
+
+func (w *x11Window) Config() Config {
+	return w.config
 }
 
 func (w *x11Window) SetCursor(name pointer.CursorName) {
@@ -182,13 +189,11 @@ func (w *x11Window) SetCursor(name pointer.CursorName) {
 	C.XDefineCursor(w.x, w.xw, c)
 }
 
-func (w *x11Window) SetWindowMode(mode windowMode) {
+func (w *x11Window) SetWindowMode(mode WindowMode) {
 	switch mode {
-	case w.mode:
-		return
-	case windowed:
+	case Windowed:
 		C.XDeleteProperty(w.x, w.xw, w.atoms.wmStateFullscreen)
-	case fullscreen:
+	case Fullscreen:
 		C.XChangeProperty(w.x, w.xw, w.atoms.wmState, C.XA_ATOM,
 			32, C.PropModeReplace,
 			(*C.uchar)(unsafe.Pointer(&w.atoms.wmStateFullscreen)), 1,
@@ -196,7 +201,7 @@ func (w *x11Window) SetWindowMode(mode windowMode) {
 	default:
 		return
 	}
-	w.mode = mode
+	w.config.Mode = mode
 	// "A Client wishing to change the state of a window MUST send
 	//  a _NET_WM_STATE client message to the root window (see below)."
 	var xev C.XEvent
@@ -261,7 +266,7 @@ func (w *x11Window) display() *C.Display {
 }
 
 func (w *x11Window) window() (C.Window, int, int) {
-	return w.xw, w.width, w.height
+	return w.xw, w.config.Size.X, w.config.Size.Y
 }
 
 func (w *x11Window) setStage(s system.Stage) {
@@ -327,15 +332,15 @@ loop:
 		default:
 		}
 
-		if (anim || syn) && w.width != 0 && w.height != 0 {
+		if (anim || syn) && w.config.Size.X != 0 && w.config.Size.Y != 0 {
 			w.w.Event(frameEvent{
 				FrameEvent: system.FrameEvent{
 					Now: time.Now(),
 					Size: image.Point{
-						X: w.width,
-						Y: w.height,
+						X: w.config.Size.X,
+						Y: w.config.Size.Y,
 					},
-					Metric: w.cfg,
+					Metric: w.metric,
 				},
 				Sync: syn,
 			})
@@ -491,8 +496,7 @@ func (h *x11EventHandler) handleEvents() bool {
 			w.w.Event(key.FocusEvent{Focus: false})
 		case C.ConfigureNotify: // window configuration change
 			cevt := (*C.XConfigureEvent)(unsafe.Pointer(xev))
-			w.width = int(cevt.width)
-			w.height = int(cevt.height)
+			w.config.Size = image.Pt(int(cevt.width), int(cevt.height))
 			// redraw will be done by a later expose event
 		case C.SelectionNotify:
 			cevt := (*C.XSelectionEvent)(unsafe.Pointer(xev))
@@ -583,7 +587,7 @@ func init() {
 	x11Driver = newX11Window
 }
 
-func newX11Window(gioWin *callbacks, cnf *config) error {
+func newX11Window(gioWin *callbacks, options []Option) error {
 	var err error
 
 	pipe := make([]int, 2)
@@ -623,6 +627,9 @@ func newX11Window(gioWin *callbacks, cnf *config) error {
 
 	ppsp := x11DetectUIScale(dpy)
 	cfg := unit.Metric{PxPerDp: ppsp, PxPerSp: ppsp}
+	var cnf Config
+	cnf.apply(cfg, options)
+
 	swa := C.XSetWindowAttributes{
 		event_mask: C.ExposureMask | C.FocusChangeMask | // update
 			C.KeyPressMask | C.KeyReleaseMask | // keyboard
@@ -632,24 +639,18 @@ func newX11Window(gioWin *callbacks, cnf *config) error {
 		background_pixmap: C.None,
 		override_redirect: C.False,
 	}
-	var width, height int
-	if o := cnf.Size; o != nil {
-		width = cfg.Px(o.Width)
-		height = cfg.Px(o.Height)
-	}
 	win := C.XCreateWindow(dpy, C.XDefaultRootWindow(dpy),
-		0, 0, C.uint(width), C.uint(height),
+		0, 0, C.uint(cnf.Size.X), C.uint(cnf.Size.Y),
 		0, C.CopyFromParent, C.InputOutput, nil,
 		C.CWEventMask|C.CWBackPixmap|C.CWOverrideRedirect, &swa)
 
 	w := &x11Window{
 		w: gioWin, x: dpy, xw: win,
-		width:        width,
-		height:       height,
-		cfg:          cfg,
+		metric:       cfg,
 		xkb:          xkb,
 		xkbEventBase: xkbEventBase,
 		wakeups:      make(chan struct{}, 1),
+		config:       cnf,
 	}
 	w.notify.read = pipe[0]
 	w.notify.write = pipe[1]
@@ -684,7 +685,7 @@ func newX11Window(gioWin *callbacks, cnf *config) error {
 	// extensions
 	C.XSetWMProtocols(dpy, win, &w.atoms.evDelWindow, 1)
 
-	w.Configure(cnf)
+	w.Configure(options)
 
 	// make the window visible on the screen
 	C.XMapWindow(dpy, win)

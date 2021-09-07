@@ -185,10 +185,9 @@ type window struct {
 	needAck   bool
 	// The most recent configure serial waiting to be ack'ed.
 	serial   C.uint32_t
-	width    int
-	height   int
 	newScale bool
 	scale    int
+	config   Config
 
 	wakeups chan struct{}
 }
@@ -223,12 +222,12 @@ func init() {
 	wlDriver = newWLWindow
 }
 
-func newWLWindow(window *callbacks, cnf *config) error {
+func newWLWindow(window *callbacks, options []Option) error {
 	d, err := newWLDisplay()
 	if err != nil {
 		return err
 	}
-	w, err := d.createNativeWindow(cnf)
+	w, err := d.createNativeWindow(options)
 	if err != nil {
 		d.destroy()
 		return err
@@ -290,7 +289,7 @@ func (d *wlDisplay) readClipboard() (io.ReadCloser, error) {
 	return r, nil
 }
 
-func (d *wlDisplay) createNativeWindow(cnf *config) (*window, error) {
+func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 	if d.compositor == nil {
 		return nil, errors.New("wayland: no compositor available")
 	}
@@ -357,7 +356,7 @@ func (d *wlDisplay) createNativeWindow(cnf *config) (*window, error) {
 	C.xdg_surface_add_listener(w.wmSurf, &C.gio_xdg_surface_listener, unsafe.Pointer(w.surf))
 	C.xdg_toplevel_add_listener(w.topLvl, &C.gio_xdg_toplevel_listener, unsafe.Pointer(w.surf))
 
-	w.Configure(cnf)
+	w.Configure(options)
 
 	if d.decor != nil {
 		// Request server side decorations.
@@ -488,8 +487,8 @@ func gio_onToplevelClose(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel) {
 func gio_onToplevelConfigure(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel, width, height C.int32_t, states *C.struct_wl_array) {
 	w := callbackLoad(data).(*window)
 	if width != 0 && height != 0 {
-		w.width = int(width)
-		w.height = int(height)
+		w.config.Size.X = int(width)
+		w.config.Size.Y = int(height)
 		w.updateOpaqueRegion()
 	}
 }
@@ -856,7 +855,7 @@ func (w *window) flushFling() {
 	w.fling.xExtrapolation = fling.Extrapolation{}
 	w.fling.yExtrapolation = fling.Extrapolation{}
 	vel := float32(math.Sqrt(float64(estx.Velocity*estx.Velocity + esty.Velocity*esty.Velocity)))
-	_, _, c := w.config()
+	_, _, c := w.getConfig()
 	if !w.fling.anim.Start(c, time.Now(), vel) {
 		return
 	}
@@ -908,17 +907,24 @@ func (w *window) WriteClipboard(s string) {
 	w.disp.writeClipboard([]byte(s))
 }
 
-func (w *window) Configure(cnf *config) {
-	_, _, cfg := w.config()
-	if o := cnf.Size; o != nil {
-		w.width = cfg.Px(o.Width)
-		w.height = cfg.Px(o.Height)
+func (w *window) Configure(options []Option) {
+	_, _, cfg := w.getConfig()
+	prev := w.config
+	cnf := w.config
+	cnf.apply(cfg, options)
+	if prev.Size != cnf.Size {
+		w.config.Size = cnf.Size
 	}
-	if o := cnf.Title; o != nil {
-		title := C.CString(*o)
+	if prev.Title != cnf.Title {
+		w.config.Title = cnf.Title
+		title := C.CString(cnf.Title)
 		C.xdg_toplevel_set_title(w.topLvl, title)
 		C.free(unsafe.Pointer(title))
 	}
+}
+
+func (w *window) Config() Config {
+	return w.config
 }
 
 func (w *window) SetCursor(name pointer.CursorName) {
@@ -1366,7 +1372,7 @@ func (w *window) onPointerMotion(x, y C.wl_fixed_t, t C.uint32_t) {
 
 func (w *window) updateOpaqueRegion() {
 	reg := C.wl_compositor_create_region(w.disp.compositor)
-	C.wl_region_add(reg, 0, 0, C.int32_t(w.width), C.int32_t(w.height))
+	C.wl_region_add(reg, 0, 0, C.int32_t(w.config.Size.X), C.int32_t(w.config.Size.Y))
 	C.wl_surface_set_opaque_region(w.surf, reg)
 	C.wl_region_destroy(reg)
 }
@@ -1396,8 +1402,8 @@ func (w *window) updateOutputs() {
 	}
 }
 
-func (w *window) config() (int, int, unit.Metric) {
-	width, height := w.width*w.scale, w.height*w.scale
+func (w *window) getConfig() (int, int, unit.Metric) {
+	width, height := w.config.Size.X*w.scale, w.config.Size.Y*w.scale
 	return width, height, unit.Metric{
 		PxPerDp: w.ppdp * float32(w.scale),
 		PxPerSp: w.ppsp * float32(w.scale),
@@ -1411,7 +1417,7 @@ func (w *window) draw(sync bool) {
 	if dead || (!anim && !sync) {
 		return
 	}
-	width, height, cfg := w.config()
+	width, height, cfg := w.getConfig()
 	if cfg == (unit.Metric{}) {
 		return
 	}
@@ -1450,7 +1456,7 @@ func (w *window) surface() (*C.struct_wl_surface, int, int) {
 		C.xdg_surface_ack_configure(w.wmSurf, w.serial)
 		w.needAck = false
 	}
-	width, height, scale := w.width, w.height, w.scale
+	width, height, scale := w.config.Size.X, w.config.Size.Y, w.scale
 	if w.newScale {
 		C.wl_surface_set_buffer_scale(w.surf, C.int32_t(scale))
 		w.newScale = false

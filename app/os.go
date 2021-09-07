@@ -6,6 +6,7 @@ package app
 
 import (
 	"errors"
+	"image"
 	"image/color"
 
 	"gioui.org/io/key"
@@ -21,34 +22,75 @@ type size struct {
 	Height unit.Value
 }
 
-type config struct {
-	Size            *size
-	MinSize         *size
-	MaxSize         *size
-	Title           *string
-	WindowMode      *windowMode
-	StatusColor     *color.NRGBA
-	NavigationColor *color.NRGBA
-	Orientation     *orientation
-	CustomRenderer  bool
+// Config describes a Window configuration.
+type Config struct {
+	// Size is the window dimensions (Width, Height).
+	Size image.Point
+	// MaxSize is the window maximum allowed dimensions.
+	MaxSize image.Point
+	// MinSize is the window minimum allowed dimensions.
+	MinSize image.Point
+	// Title is the window title displayed in its decoration bar.
+	Title string
+	// WindowMode is the window mode.
+	Mode WindowMode
+	// StatusColor is the color of the Android status bar.
+	StatusColor color.NRGBA
+	// NavigationColor is the color of the navigation bar
+	// on Android, or the address bar in browsers.
+	NavigationColor color.NRGBA
+	// Orientation is the current window orientation.
+	Orientation Orientation
+	// CustomRenderer is true when the window content is rendered by the
+	// client.
+	CustomRenderer bool
+}
+
+func (c *Config) apply(m unit.Metric, options []Option) {
+	for _, o := range options {
+		o(m, c)
+	}
 }
 
 type wakeupEvent struct{}
 
-type windowMode uint8
+// WindowMode is the window mode (WindowMode.Option sets it).
+//
+// Supported platforms are macOS, X11, Windows, Android and JS.
+type WindowMode uint8
 
 const (
-	windowed windowMode = iota
-	fullscreen
+	// Windowed is the normal window mode with OS specific window decorations.
+	Windowed WindowMode = iota
+	// Fullscreen is the full screen window mode.
+	Fullscreen
 )
 
-type orientation uint8
+func (m WindowMode) Option() Option {
+	return func(_ unit.Metric, cnf *Config) {
+		cnf.Mode = m
+	}
+}
+
+// Orientation is the orientation of the app (Orientation.Option sets it).
+//
+// Supported platforms are Android and JS.
+type Orientation uint8
 
 const (
-	anyOrientation orientation = iota
-	landscapeOrientation
-	portraitOrientation
+	// AnyOrientation allows the window to be freely orientated.
+	AnyOrientation Orientation = iota
+	// LandscapeOrientation constrains the window to landscape orientations.
+	LandscapeOrientation
+	// PortraitOrientation constrains the window to portrait orientations.
+	PortraitOrientation
 )
+
+func (o Orientation) Option() Option {
+	return func(_ unit.Metric, cnf *Config) {
+		cnf.Orientation = o
+	}
+}
 
 type frameEvent struct {
 	system.FrameEvent
@@ -91,7 +133,10 @@ type driver interface {
 	WriteClipboard(s string)
 
 	// Configure the window.
-	Configure(cnf *config)
+	Configure([]Option)
+
+	// Config returns the current configuration.
+	Config() Config
 
 	// SetCursor updates the current cursor to name.
 	SetCursor(name pointer.CursorName)
@@ -109,8 +154,8 @@ type windowRendezvous struct {
 }
 
 type windowAndConfig struct {
-	window *callbacks
-	cnf    *config
+	window  *callbacks
+	options []Option
 }
 
 func newWindowRendezvous() *windowRendezvous {

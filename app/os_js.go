@@ -46,7 +46,7 @@ type window struct {
 	chanAnimation chan struct{}
 	chanRedraw    chan struct{}
 
-	size      f32.Point
+	config    Config
 	inset     f32.Point
 	scale     float32
 	animating bool
@@ -56,7 +56,7 @@ type window struct {
 	wakeups       chan struct{}
 }
 
-func newWindow(win *callbacks, cnf *config) error {
+func newWindow(win *callbacks, options []Option) error {
 	doc := js.Global().Get("document")
 	cont := getContainer(doc)
 	cnv := createCanvas(doc)
@@ -94,7 +94,7 @@ func newWindow(win *callbacks, cnf *config) error {
 	})
 	w.addEventListeners()
 	w.addHistory()
-	w.Configure(cnf)
+	w.Configure(options)
 	w.w = win
 
 	go func() {
@@ -509,19 +509,29 @@ func (w *window) WriteClipboard(s string) {
 	w.clipboard.Call("writeText", s)
 }
 
-func (w *window) Configure(cnf *config) {
-	if o := cnf.Title; o != nil {
-		w.document.Set("title", *o)
+func (w *window) Configure(options []Option) {
+	prev := w.config
+	cnf := w.config
+	cnf.apply(unit.Metric{}, options)
+	if prev.Title != cnf.Title {
+		w.config.Title = cnf.Title
+		w.document.Set("title", cnf.Title)
 	}
-	if o := cnf.WindowMode; o != nil {
-		w.windowMode(*o)
+	if prev.Mode != cnf.Mode {
+		w.windowMode(cnf.Mode)
 	}
-	if o := cnf.NavigationColor; o != nil {
-		w.navigationColor(*o)
+	if prev.NavigationColor != cnf.NavigationColor {
+		w.config.NavigationColor = cnf.NavigationColor
+		w.navigationColor(cnf.NavigationColor)
 	}
-	if o := cnf.Orientation; o != nil {
-		w.orientation(*o)
+	if prev.Orientation != cnf.Orientation {
+		w.config.Orientation = cnf.Orientation
+		w.orientation(cnf.Orientation)
 	}
+}
+
+func (w *window) Config() Config {
+	return w.config
 }
 
 func (w *window) SetCursor(name pointer.CursorName) {
@@ -559,24 +569,24 @@ func (w *window) resize() {
 	w.scale = float32(w.window.Get("devicePixelRatio").Float())
 
 	rect := w.cnv.Call("getBoundingClientRect")
-	w.size.X = float32(rect.Get("width").Float()) * w.scale
-	w.size.Y = float32(rect.Get("height").Float()) * w.scale
+	w.config.Size.X = int(rect.Get("width").Float()) * int(w.scale)
+	w.config.Size.Y = int(rect.Get("height").Float()) * int(w.scale)
 
 	if vx, vy := w.visualViewport.Get("width"), w.visualViewport.Get("height"); !vx.IsUndefined() && !vy.IsUndefined() {
-		w.inset.X = w.size.X - float32(vx.Float())*w.scale
-		w.inset.Y = w.size.Y - float32(vy.Float())*w.scale
+		w.inset.X = float32(w.config.Size.X) - float32(vx.Float())*w.scale
+		w.inset.Y = float32(w.config.Size.Y) - float32(vy.Float())*w.scale
 	}
 
-	if w.size.X == 0 || w.size.Y == 0 {
+	if w.config.Size.X == 0 || w.config.Size.Y == 0 {
 		return
 	}
 
-	w.cnv.Set("width", int(w.size.X+.5))
-	w.cnv.Set("height", int(w.size.Y+.5))
+	w.cnv.Set("width", w.config.Size.X)
+	w.cnv.Set("height", w.config.Size.Y)
 }
 
 func (w *window) draw(sync bool) {
-	width, height, insets, metric := w.config()
+	width, height, insets, metric := w.getConfig()
 	if metric == (unit.Metric{}) || width == 0 || height == 0 {
 		return
 	}
@@ -595,8 +605,8 @@ func (w *window) draw(sync bool) {
 	})
 }
 
-func (w *window) config() (int, int, system.Insets, unit.Metric) {
-	return int(w.size.X + .5), int(w.size.Y + .5), system.Insets{
+func (w *window) getConfig() (int, int, system.Insets, unit.Metric) {
+	return w.config.Size.X, w.config.Size.Y, system.Insets{
 			Bottom: unit.Px(w.inset.Y),
 			Right:  unit.Px(w.inset.X),
 		}, unit.Metric{
@@ -605,9 +615,9 @@ func (w *window) config() (int, int, system.Insets, unit.Metric) {
 		}
 }
 
-func (w *window) windowMode(mode windowMode) {
+func (w *window) windowMode(mode WindowMode) {
 	switch mode {
-	case windowed:
+	case Windowed:
 		if !w.document.Get("fullscreenElement").Truthy() {
 			return // Browser is already Windowed.
 		}
@@ -615,26 +625,28 @@ func (w *window) windowMode(mode windowMode) {
 			return // Browser doesn't support such feature.
 		}
 		w.document.Call("exitFullscreen")
-	case fullscreen:
+		w.config.Mode = Windowed
+	case Fullscreen:
 		elem := w.document.Get("documentElement")
 		if !elem.Get("requestFullscreen").Truthy() {
 			return // Browser doesn't support such feature.
 		}
 		elem.Call("requestFullscreen")
+		w.config.Mode = Fullscreen
 	}
 }
 
-func (w *window) orientation(mode orientation) {
+func (w *window) orientation(mode Orientation) {
 	if j := w.screenOrientation; !j.Truthy() || !j.Get("unlock").Truthy() || !j.Get("lock").Truthy() {
 		return // Browser don't support Screen Orientation API.
 	}
 
 	switch mode {
-	case anyOrientation:
+	case AnyOrientation:
 		w.screenOrientation.Call("unlock")
-	case landscapeOrientation:
+	case LandscapeOrientation:
 		w.screenOrientation.Call("lock", "landscape").Call("then", w.redraw)
-	case portraitOrientation:
+	case PortraitOrientation:
 		w.screenOrientation.Call("lock", "portrait").Call("then", w.redraw)
 	}
 }

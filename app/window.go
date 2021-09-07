@@ -23,7 +23,7 @@ import (
 )
 
 // Option configures a window.
-type Option func(cnf *config)
+type Option func(unit.Metric, *Config)
 
 // Window represents an operating system window.
 type Window struct {
@@ -93,14 +93,13 @@ var ackEvent event.Event
 // Calling NewWindow more than once is not supported on
 // iOS, Android, WebAssembly.
 func NewWindow(options ...Option) *Window {
-	cnf := new(config)
-	// Default options.
-	Size(unit.Dp(800), unit.Dp(600))(cnf)
-	Title("Gio")(cnf)
-
-	for _, o := range options {
-		o(cnf)
+	defaultOptions := []Option{
+		Size(unit.Dp(800), unit.Dp(600)),
+		Title("Gio"),
 	}
+	options = append(defaultOptions, options...)
+	var cnf Config
+	cnf.apply(unit.Metric{}, options)
 
 	w := &Window{
 		in:           make(chan event.Event),
@@ -116,7 +115,7 @@ func NewWindow(options ...Option) *Window {
 		nocontext:    cnf.CustomRenderer,
 	}
 	w.callbacks.w = w
-	go w.run(cnf)
+	go w.run(options)
 	return w
 }
 
@@ -260,12 +259,19 @@ func (w *Window) Invalidate() {
 // Option applies the options to the window.
 func (w *Window) Option(opts ...Option) {
 	w.driverDefer(func(d driver) {
-		c := new(config)
-		for _, opt := range opts {
-			opt(c)
-		}
-		d.Configure(c)
+		d.Configure(opts)
 	})
+}
+
+// Config returns the Window configuration.
+//
+// A FrameEvent will occur whenever the configuration changes.
+func (w *Window) Config() Config {
+	var cnf Config
+	w.driverRun(func(d driver) {
+		cnf = d.Config()
+	})
+	return cnf
 }
 
 // ReadClipboard initiates a read of the clipboard in the form
@@ -491,7 +497,7 @@ func (w *Window) waitFrame() (*op.Ops, bool) {
 	}
 }
 
-func (w *Window) run(cnf *config) {
+func (w *Window) run(options []Option) {
 	// Some OpenGL drivers don't like being made current on many different
 	// OS threads. Force the Go runtime to map the event loop goroutine to
 	// only one thread.
@@ -499,7 +505,7 @@ func (w *Window) run(cnf *config) {
 
 	defer close(w.out)
 	defer close(w.dead)
-	if err := newWindow(&w.callbacks, cnf); err != nil {
+	if err := newWindow(&w.callbacks, options); err != nil {
 		w.out <- system.DestroyEvent{Err: err}
 		return
 	}
@@ -602,44 +608,10 @@ func (q *queue) Events(k event.Tag) []event.Event {
 	return q.q.Events(k)
 }
 
-var (
-	// Windowed is the normal window mode with OS specific window decorations.
-	Windowed Option = modeOption(windowed)
-	// Fullscreen is the full screen window mode.
-	Fullscreen Option = modeOption(fullscreen)
-)
-
-// WindowMode sets the window mode.
-//
-// Supported platforms are macOS, X11, Windows and JS.
-func modeOption(mode windowMode) Option {
-	return func(cnf *config) {
-		cnf.WindowMode = &mode
-	}
-}
-
-var (
-	// AnyOrientation allows the window to be freely orientated.
-	AnyOrientation Option = orientationOption(anyOrientation)
-	// LandscapeOrientation constrains the window to landscape orientations.
-	LandscapeOrientation Option = orientationOption(landscapeOrientation)
-	// PortraitOrientation constrains the window to portrait orientations.
-	PortraitOrientation Option = orientationOption(portraitOrientation)
-)
-
-// orientation sets the orientation of the app.
-//
-// Supported platforms are Android and JS.
-func orientationOption(mode orientation) Option {
-	return func(cnf *config) {
-		cnf.Orientation = &mode
-	}
-}
-
 // Title sets the title of the window.
 func Title(t string) Option {
-	return func(cnf *config) {
-		cnf.Title = &t
+	return func(_ unit.Metric, cnf *Config) {
+		cnf.Title = t
 	}
 }
 
@@ -651,10 +623,10 @@ func Size(w, h unit.Value) Option {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
-	return func(cnf *config) {
-		cnf.Size = &size{
-			Width:  w,
-			Height: h,
+	return func(m unit.Metric, cnf *Config) {
+		cnf.Size = image.Point{
+			X: m.Px(w),
+			Y: m.Px(h),
 		}
 	}
 }
@@ -667,10 +639,10 @@ func MaxSize(w, h unit.Value) Option {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
-	return func(cnf *config) {
-		cnf.MaxSize = &size{
-			Width:  w,
-			Height: h,
+	return func(m unit.Metric, cnf *Config) {
+		cnf.MaxSize = image.Point{
+			X: m.Px(w),
+			Y: m.Px(h),
 		}
 	}
 }
@@ -683,32 +655,32 @@ func MinSize(w, h unit.Value) Option {
 	if h.V <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
-	return func(cnf *config) {
-		cnf.MinSize = &size{
-			Width:  w,
-			Height: h,
+	return func(m unit.Metric, cnf *Config) {
+		cnf.MinSize = image.Point{
+			X: m.Px(w),
+			Y: m.Px(h),
 		}
 	}
 }
 
 // StatusColor sets the color of the Android status bar.
 func StatusColor(color color.NRGBA) Option {
-	return func(cnf *config) {
-		cnf.StatusColor = &color
+	return func(_ unit.Metric, cnf *Config) {
+		cnf.StatusColor = color
 	}
 }
 
 // NavigationColor sets the color of the navigation bar on Android, or the address bar in browsers.
 func NavigationColor(color color.NRGBA) Option {
-	return func(cnf *config) {
-		cnf.NavigationColor = &color
+	return func(_ unit.Metric, cnf *Config) {
+		cnf.NavigationColor = color
 	}
 }
 
-// CustomRenderer controls whether the the window contents is
+// CustomRenderer controls whether the window contents is
 // rendered by the client. If true, no GPU context is created.
 func CustomRenderer(custom bool) Option {
-	return func(cnf *config) {
+	return func(_ unit.Metric, cnf *Config) {
 		cnf.CustomRenderer = custom
 	}
 }

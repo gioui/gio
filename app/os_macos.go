@@ -152,8 +152,8 @@ type window struct {
 	displayLink *displayLink
 	cursor      pointer.CursorName
 
-	scale float32
-	mode  windowMode
+	scale  float32
+	config Config
 }
 
 // viewMap is the mapping from Cocoa NSViews to Go windows.
@@ -210,50 +210,46 @@ func (w *window) WriteClipboard(s string) {
 	C.writeClipboard(chars, C.NSUInteger(len(u16)))
 }
 
-func (w *window) Configure(cnf *config) {
+func (w *window) Configure(options []Option) {
 	screenScale := float32(C.getScreenBackingScale())
 	cfg := configFor(screenScale)
-	val := func(v unit.Value) float32 {
-		return float32(cfg.Px(v)) / screenScale
+	prev := w.config
+	cnf := w.config
+	cnf.apply(cfg, options)
+	cnf.Size = cnf.Size.Div(int(screenScale))
+	cnf.MinSize = cnf.MinSize.Div(int(screenScale))
+	cnf.MaxSize = cnf.MaxSize.Div(int(screenScale))
+
+	if prev.Size != cnf.Size {
+		w.config.Size = cnf.Size
+		C.setSize(w.window, C.CGFloat(cnf.Size.X), C.CGFloat(cnf.Size.Y))
 	}
-	if o := cnf.Size; o != nil {
-		width := val(o.Width)
-		height := val(o.Height)
-		if width > 0 || height > 0 {
-			C.setSize(w.window, C.CGFloat(width), C.CGFloat(height))
-		}
+	if prev.MinSize != cnf.MinSize {
+		w.config.MinSize = cnf.MinSize
+		C.setMinSize(w.window, C.CGFloat(cnf.MinSize.X), C.CGFloat(cnf.MinSize.Y))
 	}
-	if o := cnf.MinSize; o != nil {
-		width := val(o.Width)
-		height := val(o.Height)
-		if width > 0 || height > 0 {
-			C.setMinSize(w.window, C.CGFloat(width), C.CGFloat(height))
-		}
+	if prev.MaxSize != cnf.MaxSize {
+		w.config.MaxSize = cnf.MaxSize
+		C.setMaxSize(w.window, C.CGFloat(cnf.MaxSize.X), C.CGFloat(cnf.MaxSize.Y))
 	}
-	if o := cnf.MaxSize; o != nil {
-		width := val(o.Width)
-		height := val(o.Height)
-		if width > 0 || height > 0 {
-			C.setMaxSize(w.window, C.CGFloat(width), C.CGFloat(height))
-		}
-	}
-	if o := cnf.Title; o != nil {
-		title := C.CString(*o)
+
+	if prev.Title != cnf.Title {
+		w.config.Title = cnf.Title
+		title := C.CString(cnf.Title)
 		defer C.free(unsafe.Pointer(title))
 		C.setTitle(w.window, title)
 	}
-	if o := cnf.WindowMode; o != nil {
-		w.SetWindowMode(*o)
+	if prev.Mode != cnf.Mode {
+		switch cnf.Mode {
+		case Windowed, Fullscreen:
+			w.config.Mode = cnf.Mode
+			C.toggleFullScreen(w.window)
+		}
 	}
 }
 
-func (w *window) SetWindowMode(mode windowMode) {
-	switch mode {
-	case w.mode:
-	case windowed, fullscreen:
-		C.toggleFullScreen(w.window)
-		w.mode = mode
-	}
+func (w *window) Config() Config {
+	return w.config
 }
 
 func (w *window) SetCursor(name pointer.CursorName) {
@@ -455,7 +451,7 @@ func gio_onFinishLaunching() {
 	close(launched)
 }
 
-func newWindow(win *callbacks, cnf *config) error {
+func newWindow(win *callbacks, options []Option) error {
 	<-launched
 	errch := make(chan error)
 	runOnMain(func() {
@@ -468,7 +464,7 @@ func newWindow(win *callbacks, cnf *config) error {
 		w.w = win
 		w.window = C.gio_createWindow(w.view, nil, 0, 0, 0, 0, 0, 0)
 		win.SetDriver(w)
-		w.Configure(cnf)
+		w.Configure(options)
 		if nextTopLeft.x == 0 && nextTopLeft.y == 0 {
 			// cascadeTopLeftFromPoint treats (0, 0) as a no-op,
 			// and just returns the offset we need for the first window.

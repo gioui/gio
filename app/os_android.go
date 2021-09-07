@@ -144,7 +144,8 @@ type window struct {
 	started   bool
 	animating bool
 
-	win *C.ANativeWindow
+	win    *C.ANativeWindow
+	config Config
 }
 
 // gioView hold cached JNI methods for GioView.
@@ -337,7 +338,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 	handle := C.jlong(view)
 	views[handle] = w
 	w.loadConfig(env, class)
-	w.Configure(wopts.cnf)
+	w.Configure(wopts.options)
 	w.setStage(system.StagePaused)
 	w.callbacks.Event(ViewEvent{View: uintptr(view)})
 	return handle
@@ -762,8 +763,8 @@ func goString(env *C.JNIEnv, str C.jstring) string {
 func osMain() {
 }
 
-func newWindow(window *callbacks, cnf *config) error {
-	mainWindow.in <- windowAndConfig{window, cnf}
+func newWindow(window *callbacks, options []Option) error {
+	mainWindow.in <- windowAndConfig{window, options}
 	return <-mainWindow.errs
 }
 
@@ -787,21 +788,38 @@ func (w *window) ReadClipboard() {
 	})
 }
 
-func (w *window) Configure(cnf *config) {
+func (w *window) Configure(options []Option) {
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
-		if o := cnf.Orientation; o != nil {
-			setOrientation(env, w.view, *o)
+		prev := w.config
+		cnf := w.config
+		cnf.apply(unit.Metric{}, options)
+		if prev.Orientation != cnf.Orientation {
+			w.config.Orientation = cnf.Orientation
+			setOrientation(env, w.view, cnf.Orientation)
 		}
-		if o := cnf.NavigationColor; o != nil {
-			setNavigationColor(env, w.view, *o)
+		if prev.NavigationColor != cnf.NavigationColor {
+			w.config.NavigationColor = cnf.NavigationColor
+			setNavigationColor(env, w.view, cnf.NavigationColor)
 		}
-		if o := cnf.StatusColor; o != nil {
-			setStatusColor(env, w.view, *o)
+		if prev.StatusColor != cnf.StatusColor {
+			w.config.StatusColor = cnf.StatusColor
+			setStatusColor(env, w.view, cnf.StatusColor)
 		}
-		if o := cnf.WindowMode; o != nil {
-			setWindowMode(env, w.view, *o)
+		if prev.Mode != cnf.Mode {
+			switch cnf.Mode {
+			case Fullscreen:
+				callVoidMethod(env, w.view, gioView.setFullscreen, C.JNI_TRUE)
+				w.config.Mode = Fullscreen
+			case Windowed:
+				callVoidMethod(env, w.view, gioView.setFullscreen, C.JNI_FALSE)
+				w.config.Mode = Windowed
+			}
 		}
 	})
+}
+
+func (w *window) Config() Config {
+	return w.config
 }
 
 func (w *window) SetCursor(name pointer.CursorName) {
@@ -839,18 +857,18 @@ func setCursor(env *C.JNIEnv, view C.jobject, name pointer.CursorName) {
 	callVoidMethod(env, view, gioView.setCursor, jvalue(curID))
 }
 
-func setOrientation(env *C.JNIEnv, view C.jobject, mode orientation) {
+func setOrientation(env *C.JNIEnv, view C.jobject, mode Orientation) {
 	var (
 		id         int
 		idFallback int // Used only for SDK 17 or older.
 	)
 	// Constants defined at https://developer.android.com/reference/android/content/pm/ActivityInfo.
 	switch mode {
-	case anyOrientation:
+	case AnyOrientation:
 		id, idFallback = 2, 2 // SCREEN_ORIENTATION_USER
-	case landscapeOrientation:
+	case LandscapeOrientation:
 		id, idFallback = 11, 0 // SCREEN_ORIENTATION_USER_LANDSCAPE (or SCREEN_ORIENTATION_LANDSCAPE)
-	case portraitOrientation:
+	case PortraitOrientation:
 		id, idFallback = 12, 1 // SCREEN_ORIENTATION_USER_PORTRAIT (or SCREEN_ORIENTATION_PORTRAIT)
 	}
 	callVoidMethod(env, view, gioView.setOrientation, jvalue(id), jvalue(idFallback))
@@ -868,15 +886,6 @@ func setNavigationColor(env *C.JNIEnv, view C.jobject, color color.NRGBA) {
 		jvalue(uint32(color.A)<<24|uint32(color.R)<<16|uint32(color.G)<<8|uint32(color.B)),
 		jvalue(int(f32color.LinearFromSRGB(color).Luminance()*255)),
 	)
-}
-
-func setWindowMode(env *C.JNIEnv, view C.jobject, mode windowMode) {
-	switch mode {
-	case fullscreen:
-		callVoidMethod(env, view, gioView.setFullscreen, C.JNI_TRUE)
-	default:
-		callVoidMethod(env, view, gioView.setFullscreen, C.JNI_FALSE)
-	}
 }
 
 // Close the window. Not implemented for Android.

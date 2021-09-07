@@ -21,19 +21,19 @@ func osMain() {
 	select {}
 }
 
-type windowDriver func(*callbacks, *config) error
+type windowDriver func(*callbacks, []Option) error
 
 // Instead of creating files with build tags for each combination of wayland +/- x11
 // let each driver initialize these variables with their own version of createWindow.
 var wlDriver, x11Driver windowDriver
 
-func newWindow(window *callbacks, cnf *config) error {
+func newWindow(window *callbacks, options []Option) error {
 	var errFirst error
 	for _, d := range []windowDriver{x11Driver, wlDriver} {
 		if d == nil {
 			continue
 		}
-		err := d(window, cnf)
+		err := d(window, options)
 		if err == nil {
 			return nil
 		}

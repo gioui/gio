@@ -95,6 +95,7 @@ type window struct {
 
 	visible bool
 	cursor  pointer.CursorName
+	config  Config
 
 	pointerMap []C.CFTypeRef
 }
@@ -268,7 +269,11 @@ func (w *window) WriteClipboard(s string) {
 	C.writeClipboard(chars, C.NSUInteger(len(u16)))
 }
 
-func (w *window) Configure(cnf *config) {}
+func (w *window) Configure([]Option) {}
+
+func (w *window) Config() Config {
+	return w.config
+}
 
 func (w *window) SetAnimating(anim bool) {
 	v := w.view
@@ -329,8 +334,8 @@ func (w *window) SetInputHint(_ key.InputHint) {}
 // Close the window. Not implemented for iOS.
 func (w *window) Close() {}
 
-func newWindow(win *callbacks, cnf *config) error {
-	mainWindow.in <- windowAndConfig{win, cnf}
+func newWindow(win *callbacks, options []Option) error {
+	mainWindow.in <- windowAndConfig{win, options}
 	return <-mainWindow.errs
 }
 
