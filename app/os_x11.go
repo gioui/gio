@@ -627,6 +627,7 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 
 	ppsp := x11DetectUIScale(dpy)
 	cfg := unit.Metric{PxPerDp: ppsp, PxPerSp: ppsp}
+	// Only use cnf for getting the window size.
 	var cnf Config
 	cnf.apply(cfg, options)
 
@@ -650,7 +651,7 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 		xkb:          xkb,
 		xkbEventBase: xkbEventBase,
 		wakeups:      make(chan struct{}, 1),
-		config:       cnf,
+		config:       Config{Size: cnf.Size},
 	}
 	w.notify.read = pipe[0]
 	w.notify.write = pipe[1]
