@@ -105,7 +105,7 @@ type frameEvent struct {
 
 type context interface {
 	API() gpu.API
-	RenderTarget() gpu.RenderTarget
+	RenderTarget() (gpu.RenderTarget, error)
 	Present() error
 	Refresh() error
 	Release()

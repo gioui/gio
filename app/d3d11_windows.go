@@ -53,10 +53,10 @@ func (c *d3d11Context) API() gpu.API {
 	return gpu.Direct3D11{Device: unsafe.Pointer(c.dev)}
 }
 
-func (c *d3d11Context) RenderTarget() gpu.RenderTarget {
+func (c *d3d11Context) RenderTarget() (gpu.RenderTarget, error) {
 	return gpu.Direct3D11RenderTarget{
 		RenderTarget: unsafe.Pointer(c.renderTarget),
-	}
+	}, nil
 }
 
 func (c *d3d11Context) Present() error {

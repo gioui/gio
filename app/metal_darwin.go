@@ -111,21 +111,21 @@ func newMtlContext(w *window) (*mtlContext, error) {
 	return c, nil
 }
 
-func (c *mtlContext) RenderTarget() gpu.RenderTarget {
+func (c *mtlContext) RenderTarget() (gpu.RenderTarget, error) {
 	if c.drawable != 0 || c.texture != 0 {
-		panic("a previous RenderTarget wasn't Presented")
+		return nil, errors.New("metal:a previous RenderTarget wasn't Presented")
 	}
 	c.drawable = C.nextDrawable(c.layer)
 	if c.drawable == 0 {
-		panic("metal: [CAMetalLayer nextDrawable] failed")
+		return nil, errors.New("metal: [CAMetalLayer nextDrawable] failed")
 	}
 	c.texture = C.drawableTexture(c.drawable)
 	if c.texture == 0 {
-		panic("metal: CADrawable.texture is nil")
+		return nil, errors.New("metal: CADrawable.texture is nil")
 	}
 	return gpu.MetalRenderTarget{
 		Texture: unsafe.Pointer(c.texture),
-	}
+	}, nil
 }
 
 func (c *mtlContext) API() gpu.API {

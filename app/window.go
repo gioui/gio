@@ -198,7 +198,11 @@ func (w *Window) render(frame *op.Ops, viewport image.Point) error {
 	} else {
 		w.gpu.Clear(color.NRGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff})
 	}
-	if err := w.gpu.Frame(frame, w.ctx.RenderTarget(), viewport); err != nil {
+	target, err := w.ctx.RenderTarget()
+	if err != nil {
+		return err
+	}
+	if err := w.gpu.Frame(frame, target, viewport); err != nil {
 		return err
 	}
 	return w.ctx.Present()

@@ -97,8 +97,8 @@ func NewContext(disp NativeDisplayType) (*Context, error) {
 	return c, nil
 }
 
-func (c *Context) RenderTarget() gpu.RenderTarget {
-	return gpu.OpenGLRenderTarget{}
+func (c *Context) RenderTarget() (gpu.RenderTarget, error) {
+	return gpu.OpenGLRenderTarget{}, nil
 }
 
 func (c *Context) API() gpu.API {
