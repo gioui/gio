@@ -42,11 +42,12 @@ type Backend struct {
 }
 
 type Pipeline struct {
-	vert   *d3d11.VertexShader
-	frag   *d3d11.PixelShader
-	layout *d3d11.InputLayout
-	blend  *d3d11.BlendState
-	stride int
+	vert     *d3d11.VertexShader
+	frag     *d3d11.PixelShader
+	layout   *d3d11.InputLayout
+	blend    *d3d11.BlendState
+	stride   int
+	topology driver.Topology
 }
 
 type Texture struct {
@@ -497,11 +498,12 @@ func (b *Backend) NewPipeline(desc driver.PipelineDesc) (driver.Pipeline, error)
 	d3d11.IUnknownAddRef(unsafe.Pointer(fshRef), fshRef.Vtbl.AddRef)
 
 	return &Pipeline{
-		vert:   vshRef,
-		frag:   fshRef,
-		layout: layout,
-		stride: desc.VertexLayout.Stride,
-		blend:  blend,
+		vert:     vshRef,
+		frag:     fshRef,
+		layout:   layout,
+		stride:   desc.VertexLayout.Stride,
+		blend:    blend,
+		topology: desc.Topology,
 	}, nil
 }
 
@@ -551,31 +553,33 @@ func (b *Backend) Viewport(x, y, width, height int) {
 	b.ctx.RSSetViewports(&b.viewport)
 }
 
-func (b *Backend) DrawArrays(mode driver.DrawMode, off, count int) {
-	b.prepareDraw(mode)
+func (b *Backend) DrawArrays(off, count int) {
+	b.prepareDraw()
 	b.ctx.Draw(uint32(count), uint32(off))
 }
 
-func (b *Backend) DrawElements(mode driver.DrawMode, off, count int) {
-	b.prepareDraw(mode)
+func (b *Backend) DrawElements(off, count int) {
+	b.prepareDraw()
 	b.ctx.DrawIndexed(uint32(count), uint32(off), 0)
 }
 
-func (b *Backend) prepareDraw(mode driver.DrawMode) {
-	if p := b.pipeline; p != nil {
-		b.ctx.VSSetShader(p.vert)
-		b.ctx.PSSetShader(p.frag)
-		b.ctx.IASetInputLayout(p.layout)
-		b.ctx.OMSetBlendState(p.blend, nil, 0xffffffff)
-		if b.vert.buffer != nil {
-			b.ctx.IASetVertexBuffers(b.vert.buffer.buf, uint32(p.stride), uint32(b.vert.offset))
-		}
+func (b *Backend) prepareDraw() {
+	p := b.pipeline
+	if p == nil {
+		return
+	}
+	b.ctx.VSSetShader(p.vert)
+	b.ctx.PSSetShader(p.frag)
+	b.ctx.IASetInputLayout(p.layout)
+	b.ctx.OMSetBlendState(p.blend, nil, 0xffffffff)
+	if b.vert.buffer != nil {
+		b.ctx.IASetVertexBuffers(b.vert.buffer.buf, uint32(p.stride), uint32(b.vert.offset))
 	}
 	var topology uint32
-	switch mode {
-	case driver.DrawModeTriangles:
+	switch p.topology {
+	case driver.TopologyTriangles:
 		topology = d3d11.PRIMITIVE_TOPOLOGY_TRIANGLELIST
-	case driver.DrawModeTriangleStrip:
+	case driver.TopologyTriangleStrip:
 		topology = d3d11.PRIMITIVE_TOPOLOGY_TRIANGLESTRIP
 	default:
 		panic("unsupported draw mode")

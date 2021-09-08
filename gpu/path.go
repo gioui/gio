@@ -226,6 +226,7 @@ func newStenciler(ctx driver.Device) *stenciler {
 			DstFactor: driver.BlendFactorOne,
 		},
 		PixelFormat: driver.TextureFormatFloat,
+		Topology:    driver.TopologyTriangles,
 	})
 	st.pipeline.pipeline = &pipeline{pipe, vertUniforms, nil}
 	if err != nil {
@@ -249,6 +250,7 @@ func newStenciler(ctx driver.Device) *stenciler {
 			DstFactor: driver.BlendFactorZero,
 		},
 		PixelFormat: driver.TextureFormatFloat,
+		Topology:    driver.TopologyTriangleStrip,
 	})
 	st.ipipeline.pipeline = &pipeline{ipipe, vertUniforms, nil}
 	return st
@@ -375,7 +377,7 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 		}
 		off := vertStride * start * 4
 		s.ctx.BindVertexBuffer(data.data, off)
-		s.ctx.DrawElements(driver.DrawModeTriangles, 0, batch*6)
+		s.ctx.DrawElements(0, batch*6)
 		start += batch
 	}
 }
@@ -407,7 +409,7 @@ func (c *coverer) cover(mat materialType, col f32color.RGBA, col1, col2 f32color
 	uniforms.transform = [4]float32{scale.X, scale.Y, off.X, off.Y}
 	uniforms.uvCoverTransform = [4]float32{coverScale.X, coverScale.Y, coverOff.X, coverOff.Y}
 	c.pipelines[mat].UploadUniforms(c.ctx)
-	c.ctx.DrawArrays(driver.DrawModeTriangleStrip, 0, 4)
+	c.ctx.DrawArrays(0, 4)
 }
 
 func init() {

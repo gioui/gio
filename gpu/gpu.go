@@ -584,6 +584,7 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 			BlendDesc:      blend,
 			VertexLayout:   layout,
 			PixelFormat:    driver.TextureFormatOutput,
+			Topology:       driver.TopologyTriangleStrip,
 		})
 		if err != nil {
 			return pipelines, err
@@ -611,6 +612,7 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 			BlendDesc:      blend,
 			VertexLayout:   layout,
 			PixelFormat:    driver.TextureFormatOutput,
+			Topology:       driver.TopologyTriangleStrip,
 		})
 		if err != nil {
 			pipelines[materialTexture].Release()
@@ -639,6 +641,7 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 			BlendDesc:      blend,
 			VertexLayout:   layout,
 			PixelFormat:    driver.TextureFormatOutput,
+			Topology:       driver.TopologyTriangleStrip,
 		})
 		if err != nil {
 			pipelines[materialTexture].Release()
@@ -740,7 +743,7 @@ func (r *renderer) intersectPath(p *pathOp, clip image.Rectangle) {
 	r.pather.stenciler.ipipeline.uniforms.vert.uvTransform = [4]float32{coverScale.X, coverScale.Y, coverOff.X, coverOff.Y}
 	r.pather.stenciler.ipipeline.uniforms.vert.subUVTransform = [4]float32{subScale.X, subScale.Y, subOff.X, subOff.Y}
 	r.pather.stenciler.ipipeline.pipeline.UploadUniforms(r.ctx)
-	r.ctx.DrawArrays(driver.DrawModeTriangleStrip, 0, 4)
+	r.ctx.DrawArrays(0, 4)
 }
 
 func (r *renderer) packIntersections(ops []imageOp) {
@@ -1166,7 +1169,7 @@ func (b *blitter) blit(mat materialType, col f32color.RGBA, col1, col2 f32color.
 	}
 	uniforms.transform = [4]float32{scale.X, scale.Y, off.X, off.Y}
 	p.UploadUniforms(b.ctx)
-	b.ctx.DrawArrays(driver.DrawModeTriangleStrip, 0, 4)
+	b.ctx.DrawArrays(0, 4)
 }
 
 // newUniformBuffer creates a new GPU uniform buffer backed by the

@@ -387,7 +387,8 @@ type Backend struct {
 	computeEnc    C.CFTypeRef
 	blitEnc       C.CFTypeRef
 
-	prog *Program
+	prog     *Program
+	topology C.MTLPrimitiveType
 
 	stagingBuf C.CFTypeRef
 	stagingOff int
@@ -420,6 +421,7 @@ type Program struct {
 
 type Pipeline struct {
 	pipeline C.CFTypeRef
+	topology C.MTLPrimitiveType
 }
 
 type Framebuffer struct {
@@ -659,7 +661,7 @@ func (b *Backend) NewPipeline(desc driver.PipelineDesc) (driver.Pipeline, error)
 	if pipe == 0 {
 		return nil, errors.New("metal: pipeline construction failed")
 	}
-	return &Pipeline{pipeline: pipe}, nil
+	return &Pipeline{pipeline: pipe, topology: primitiveFor(desc.Topology)}, nil
 }
 
 func dataTypeSize(d shader.DataType) int {
@@ -799,29 +801,27 @@ func (b *Backend) Viewport(x, y, width, height int) {
 	})
 }
 
-func (b *Backend) DrawArrays(mode driver.DrawMode, off, count int) {
+func (b *Backend) DrawArrays(off, count int) {
 	enc := b.renderEnc
 	if enc == 0 {
 		panic("no active render pass")
 	}
-	t := primitiveFor(mode)
-	C.renderEncDrawPrimitives(enc, t, C.NSUInteger(off), C.NSUInteger(count))
+	C.renderEncDrawPrimitives(enc, b.topology, C.NSUInteger(off), C.NSUInteger(count))
 }
 
-func (b *Backend) DrawElements(mode driver.DrawMode, off, count int) {
+func (b *Backend) DrawElements(off, count int) {
 	enc := b.renderEnc
 	if enc == 0 {
 		panic("no active render pass")
 	}
-	t := primitiveFor(mode)
-	C.renderEncDrawIndexedPrimitives(enc, t, b.indexBuf.buffer, C.NSUInteger(off), C.NSUInteger(count))
+	C.renderEncDrawIndexedPrimitives(enc, b.topology, b.indexBuf.buffer, C.NSUInteger(off), C.NSUInteger(count))
 }
 
-func primitiveFor(mode driver.DrawMode) C.MTLPrimitiveType {
+func primitiveFor(mode driver.Topology) C.MTLPrimitiveType {
 	switch mode {
-	case driver.DrawModeTriangles:
+	case driver.TopologyTriangles:
 		return C.MTLPrimitiveTypeTriangle
-	case driver.DrawModeTriangleStrip:
+	case driver.TopologyTriangleStrip:
 		return C.MTLPrimitiveTypeTriangleStrip
 	default:
 		panic("metal: unknown draw mode")
@@ -960,6 +960,7 @@ func (b *Backend) BindPipeline(pipe driver.Pipeline) {
 		panic("no active render pass")
 	}
 	C.renderEncSetRenderPipelineState(enc, p.pipeline)
+	b.topology = p.topology
 }
 
 func (b *Backend) BindProgram(prog driver.Program) {

@@ -463,6 +463,7 @@ func newCompute(ctx driver.Device) (*compute, error) {
 			SrcFactor: driver.BlendFactorOne,
 			DstFactor: driver.BlendFactorOneMinusSrcAlpha,
 		},
+		Topology: driver.TopologyTriangles,
 	})
 	if err != nil {
 		g.Release()
@@ -496,6 +497,7 @@ func newCompute(ctx driver.Device) (*compute, error) {
 			Stride: int(unsafe.Sizeof(g.materials.quads[0])),
 		},
 		PixelFormat: driver.TextureFormatRGBA8,
+		Topology:    driver.TopologyTriangles,
 	})
 	if err != nil {
 		g.Release()
@@ -909,7 +911,7 @@ func (g *compute) blitLayers(viewport image.Point) {
 		g.output.buffer.buffer.Upload(vertexData)
 		g.ctx.BindVertexBuffer(g.output.buffer.buffer, 0)
 		g.ctx.BindTexture(0, atlas.image)
-		g.ctx.DrawArrays(driver.DrawModeTriangles, 0, len(g.output.layerVertices))
+		g.ctx.DrawArrays(0, len(g.output.layerVertices))
 	}
 }
 
@@ -1020,7 +1022,7 @@ func (g *compute) renderMaterials() error {
 		for i, a := range newAllocs {
 			sz := a.rect.Size().Sub(padding)
 			g.ctx.Viewport(a.rect.Min.X, a.rect.Min.Y, sz.X, sz.Y)
-			g.ctx.DrawArrays(driver.DrawModeTriangles, i*6, 6)
+			g.ctx.DrawArrays(i*6, 6)
 		}
 		g.ctx.EndRenderPass()
 		if !g.useCPU {

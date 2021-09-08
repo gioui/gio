@@ -32,8 +32,8 @@ type Device interface {
 	NewPipeline(desc PipelineDesc) (Pipeline, error)
 
 	Viewport(x, y, width, height int)
-	DrawArrays(mode DrawMode, off, count int)
-	DrawElements(mode DrawMode, off, count int)
+	DrawArrays(off, count int)
+	DrawElements(off, count int)
 
 	BeginRenderPass(f Framebuffer, desc LoadDesc)
 	EndRenderPass()
@@ -71,6 +71,7 @@ type PipelineDesc struct {
 	VertexLayout   VertexLayout
 	BlendDesc      BlendDesc
 	PixelFormat    TextureFormat
+	Topology       Topology
 }
 
 type VertexLayout struct {
@@ -95,7 +96,7 @@ type AccessBits uint8
 
 type BlendFactor uint8
 
-type DrawMode uint8
+type Topology uint8
 
 type TextureFilter uint8
 type TextureFormat uint8
@@ -186,8 +187,8 @@ const (
 )
 
 const (
-	DrawModeTriangleStrip DrawMode = iota
-	DrawModeTriangles
+	TopologyTriangleStrip Topology = iota
+	TopologyTriangles
 )
 
 const (

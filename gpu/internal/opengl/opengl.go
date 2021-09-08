@@ -113,10 +113,11 @@ type framebuffer struct {
 }
 
 type pipeline struct {
-	prog   *program
-	inputs []shader.InputLocation
-	layout driver.VertexLayout
-	blend  driver.BlendDesc
+	prog     *program
+	inputs   []shader.InputLocation
+	layout   driver.VertexLayout
+	blend    driver.BlendDesc
+	topology driver.Topology
 }
 
 type buffer struct {
@@ -822,16 +823,16 @@ func (b *Backend) SetBlend(enable bool) {
 	b.glstate.set(b.funcs, gl.BLEND, enable)
 }
 
-func (b *Backend) DrawElements(mode driver.DrawMode, off, count int) {
+func (b *Backend) DrawElements(off, count int) {
 	b.prepareDraw()
 	// off is in 16-bit indices, but DrawElements take a byte offset.
 	byteOff := off * 2
-	b.funcs.DrawElements(toGLDrawMode(mode), count, gl.UNSIGNED_SHORT, byteOff)
+	b.funcs.DrawElements(toGLDrawMode(b.state.pipeline.topology), count, gl.UNSIGNED_SHORT, byteOff)
 }
 
-func (b *Backend) DrawArrays(mode driver.DrawMode, off, count int) {
+func (b *Backend) DrawArrays(off, count int) {
 	b.prepareDraw()
-	b.funcs.DrawArrays(toGLDrawMode(mode), off, count)
+	b.funcs.DrawArrays(toGLDrawMode(b.state.pipeline.topology), off, count)
 }
 
 func (b *Backend) prepareDraw() {
@@ -843,11 +844,11 @@ func (b *Backend) prepareDraw() {
 	p.prog.updateUniforms()
 }
 
-func toGLDrawMode(mode driver.DrawMode) gl.Enum {
+func toGLDrawMode(mode driver.Topology) gl.Enum {
 	switch mode {
-	case driver.DrawModeTriangleStrip:
+	case driver.TopologyTriangleStrip:
 		return gl.TRIANGLE_STRIP
-	case driver.DrawModeTriangles:
+	case driver.TopologyTriangles:
 		return gl.TRIANGLES
 	default:
 		panic("unsupported draw mode")
@@ -918,10 +919,11 @@ func (b *Backend) NewPipeline(desc driver.PipelineDesc) (driver.Pipeline, error)
 		}
 	}
 	return &pipeline{
-		prog:   p,
-		inputs: vsrc.Inputs,
-		layout: layout,
-		blend:  desc.BlendDesc,
+		prog:     p,
+		inputs:   vsrc.Inputs,
+		layout:   layout,
+		blend:    desc.BlendDesc,
+		topology: desc.Topology,
 	}, nil
 }
 

@@ -56,6 +56,7 @@ func TestSimpleShader(t *testing.T) {
 		VertexShader:   vsh,
 		FragmentShader: fsh,
 		PixelFormat:    driver.TextureFormatSRGBA,
+		Topology:       driver.TopologyTriangles,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -68,7 +69,7 @@ func TestSimpleShader(t *testing.T) {
 	b.BeginRenderPass(fbo, d)
 	b.Viewport(0, 0, sz.X, sz.Y)
 	b.BindPipeline(p)
-	b.DrawArrays(driver.DrawModeTriangles, 0, 3)
+	b.DrawArrays(0, 3)
 	b.EndRenderPass()
 	img := screenshot(t, b, fbo, sz)
 	if got := img.RGBAAt(0, 0); got != clearColExpect {
@@ -107,6 +108,7 @@ func TestInputShader(t *testing.T) {
 		FragmentShader: fsh,
 		VertexLayout:   layout,
 		PixelFormat:    driver.TextureFormatSRGBA,
+		Topology:       driver.TopologyTriangles,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -131,7 +133,7 @@ func TestInputShader(t *testing.T) {
 	b.Viewport(0, 0, sz.X, sz.Y)
 	b.BindPipeline(pipe)
 	b.BindVertexBuffer(buf, 0)
-	b.DrawArrays(driver.DrawModeTriangles, 0, 3)
+	b.DrawArrays(0, 3)
 	b.EndRenderPass()
 	img := screenshot(t, b, fbo, sz)
 	if got := img.RGBAAt(0, 0); got != clearColExpect {
