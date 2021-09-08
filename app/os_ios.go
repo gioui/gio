@@ -275,6 +275,8 @@ func (w *window) Config() Config {
 	return w.config
 }
 
+func (w *window) Raise() {}
+
 func (w *window) SetAnimating(anim bool) {
 	v := w.view
 	if v == 0 {

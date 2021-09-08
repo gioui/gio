@@ -534,6 +534,8 @@ func (w *window) Config() Config {
 	return w.config
 }
 
+func (w *window) Raise() {}
+
 func (w *window) SetCursor(name pointer.CursorName) {
 	style := w.cnv.Get("style")
 	style.Set("cursor", string(name))

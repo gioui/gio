@@ -604,6 +604,16 @@ func (w *Window) updateCursor() {
 	}
 }
 
+// Raise requests that the platform bring this window to the top of all open windows.
+// Some platforms do not allow this except under certain circumstances, such as when
+// a window from the same application already has focus. If the platform does not
+// support it, this method will do nothing.
+func (w *Window) Raise() {
+	w.driverDefer(func(d driver) {
+		d.Raise()
+	})
+}
+
 func (q *queue) Events(k event.Tag) []event.Event {
 	return q.q.Events(k)
 }

@@ -141,6 +141,9 @@ type driver interface {
 	// SetCursor updates the current cursor to name.
 	SetCursor(name pointer.CursorName)
 
+	// Raise the window at the top.
+	Raise()
+
 	// Close the window.
 	Close()
 	// Wakeup wakes up the event loop and sends a WakeupEvent.

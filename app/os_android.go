@@ -822,6 +822,8 @@ func (w *window) Config() Config {
 	return w.config
 }
 
+func (w *window) Raise() {}
+
 func (w *window) SetCursor(name pointer.CursorName) {
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
 		setCursor(env, w.view, name)

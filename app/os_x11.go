@@ -79,6 +79,8 @@ type x11Window struct {
 		wmState C.Atom
 		// "_NET_WM_STATE_FULLSCREEN"
 		wmStateFullscreen C.Atom
+		// "_NET_ACTIVE_WINDOW"
+		wmActiveWindow C.Atom
 	}
 	stage  system.Stage
 	metric unit.Metric
@@ -163,6 +165,26 @@ func (w *x11Window) Configure(options []Option) {
 
 func (w *x11Window) Config() Config {
 	return w.config
+}
+
+func (w *x11Window) Raise() {
+	var xev C.XEvent
+	ev := (*C.XClientMessageEvent)(unsafe.Pointer(&xev))
+	*ev = C.XClientMessageEvent{
+		_type:        C.ClientMessage,
+		display:      w.x,
+		window:       w.xw,
+		message_type: w.atoms.wmActiveWindow,
+		format:       32,
+	}
+	C.XSendEvent(
+		w.x,
+		C.XDefaultRootWindow(w.x), // MUST be the root window
+		C.False,
+		C.SubstructureNotifyMask|C.SubstructureRedirectMask,
+		&xev,
+	)
+	C.XMapRaised(w.display(), w.xw)
 }
 
 func (w *x11Window) SetCursor(name pointer.CursorName) {
@@ -680,6 +702,7 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 	w.atoms.wmName = w.atom("_NET_WM_NAME", false)
 	w.atoms.wmState = w.atom("_NET_WM_STATE", false)
 	w.atoms.wmStateFullscreen = w.atom("_NET_WM_STATE_FULLSCREEN", false)
+	w.atoms.wmActiveWindow = w.atom("_NET_ACTIVE_WINDOW", false)
 
 	// extensions
 	C.XSetWMProtocols(dpy, win, &w.atoms.evDelWindow, 1)

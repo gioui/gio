@@ -663,6 +663,12 @@ func (w *window) Close() {
 	windows.PostMessage(w.hwnd, windows.WM_CLOSE, 0, 0)
 }
 
+func (w *window) Raise() {
+	windows.SetForegroundWindow(w.hwnd)
+	windows.SetWindowPos(w.hwnd, windows.HWND_TOPMOST, 0, 0, 0, 0,
+		windows.SWP_NOMOVE|windows.SWP_NOSIZE|windows.SWP_SHOWWINDOW)
+}
+
 func convertKeyCode(code uintptr) (string, bool) {
 	if '0' <= code && code <= '9' || 'A' <= code && code <= 'Z' {
 		return string(rune(code)), true

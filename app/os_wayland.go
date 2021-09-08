@@ -927,6 +927,8 @@ func (w *window) Config() Config {
 	return w.config
 }
 
+func (w *window) Raise() {}
+
 func (w *window) SetCursor(name pointer.CursorName) {
 	if name == pointer.CursorNone {
 		C.wl_pointer_set_cursor(w.disp.seat.pointer, w.serial, nil, 0, 0)

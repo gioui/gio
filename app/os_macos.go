@@ -127,6 +127,12 @@ static CFTypeRef layerForView(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
 	return (__bridge CFTypeRef)view.layer;
 }
+
+static void raiseWindow(CFTypeRef windowRef) {
+	NSWindow* window = (__bridge NSWindow *)windowRef;
+	[window makeKeyAndOrderFront:nil];
+}
+
 */
 import "C"
 
@@ -266,6 +272,10 @@ func (w *window) SetAnimating(anim bool) {
 	} else {
 		w.displayLink.Stop()
 	}
+}
+
+func (w *window) Raise() {
+	C.raiseWindow(w.window)
 }
 
 func (w *window) runOnMain(f func()) {
