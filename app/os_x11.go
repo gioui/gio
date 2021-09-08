@@ -77,7 +77,7 @@ type x11Window struct {
 		wmName C.Atom
 		// "_NET_WM_STATE"
 		wmState C.Atom
-		// _NET_WM_STATE_FULLSCREEN"
+		// "_NET_WM_STATE_FULLSCREEN"
 		wmStateFullscreen C.Atom
 	}
 	stage  system.Stage
@@ -190,20 +190,18 @@ func (w *x11Window) SetCursor(name pointer.CursorName) {
 }
 
 func (w *x11Window) SetWindowMode(mode WindowMode) {
+	var action C.long
 	switch mode {
 	case Windowed:
-		C.XDeleteProperty(w.x, w.xw, w.atoms.wmStateFullscreen)
+		action = 0 // _NET_WM_STATE_REMOVE
 	case Fullscreen:
-		C.XChangeProperty(w.x, w.xw, w.atoms.wmState, C.XA_ATOM,
-			32, C.PropModeReplace,
-			(*C.uchar)(unsafe.Pointer(&w.atoms.wmStateFullscreen)), 1,
-		)
+		action = 1 // _NET_WM_STATE_ADD
 	default:
 		return
 	}
 	w.config.Mode = mode
 	// "A Client wishing to change the state of a window MUST send
-	//  a _NET_WM_STATE client message to the root window (see below)."
+	//  a _NET_WM_STATE client message to the root window."
 	var xev C.XEvent
 	ev := (*C.XClientMessageEvent)(unsafe.Pointer(&xev))
 	*ev = C.XClientMessageEvent{
@@ -214,7 +212,7 @@ func (w *x11Window) SetWindowMode(mode WindowMode) {
 		format:       32,
 	}
 	arr := (*[5]C.long)(unsafe.Pointer(&ev.data))
-	arr[0] = 2 // _NET_WM_STATE_TOGGLE
+	arr[0] = action
 	arr[1] = C.long(w.atoms.wmStateFullscreen)
 	arr[2] = 0
 	arr[3] = 1 // application
