@@ -1501,6 +1501,7 @@ func (g *compute) Release() {
 	for _, a := range g.atlases {
 		a.Release()
 	}
+	g.ctx.Release()
 	*g = compute{}
 }
 
