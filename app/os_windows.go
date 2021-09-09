@@ -496,7 +496,7 @@ func (w *window) Configure(options []Option) {
 	cnf := w.config
 	cnf.apply(cfg, options)
 
-	if prev.Size != cnf.Size {
+	if cnf.Mode != Fullscreen && prev.Size != cnf.Size {
 		width := int32(cnf.Size.X)
 		height := int32(cnf.Size.Y)
 		w.config.Size = cnf.Size

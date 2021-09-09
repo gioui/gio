@@ -226,7 +226,7 @@ func (w *window) Configure(options []Option) {
 	cnf.MinSize = cnf.MinSize.Div(int(screenScale))
 	cnf.MaxSize = cnf.MaxSize.Div(int(screenScale))
 
-	if prev.Size != cnf.Size {
+	if cnf.Mode != Fullscreen && prev.Size != cnf.Size {
 		w.config.Size = cnf.Size
 		C.setSize(w.window, C.CGFloat(cnf.Size.X), C.CGFloat(cnf.Size.Y))
 	}

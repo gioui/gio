@@ -137,7 +137,7 @@ func (w *x11Window) Configure(options []Option) {
 		C.XSetWMNormalHints(w.x, w.xw, &shints)
 	}
 
-	if prev.Size != cnf.Size {
+	if cnf.Mode != Fullscreen && prev.Size != cnf.Size {
 		w.config.Size = cnf.Size
 		C.XResizeWindow(w.x, w.xw, C.uint(cnf.Size.X), C.uint(cnf.Size.Y))
 	}

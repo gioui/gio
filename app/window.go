@@ -625,7 +625,8 @@ func Title(t string) Option {
 	}
 }
 
-// Size sets the size of the window.
+// Size sets the size of the window. The option is ignored
+// in Fullscreen mode.
 func Size(w, h unit.Value) Option {
 	if w.V <= 0 {
 		panic("width must be larger than or equal to 0")
