@@ -35,7 +35,7 @@ func fromListPosition(lp layout.Position, elements int, majorAxisSize int) (star
 	// Compute the location of the beginning of the viewport.
 	viewportStart := (float32(lp.First)*meanElementHeight + listOffsetF) / lengthPx
 
-	return viewportStart, viewportStart + visibleFraction
+	return viewportStart, clamp1(viewportStart + visibleFraction)
 }
 
 // rangeIsScrollable returns whether the viewport described by start and end
