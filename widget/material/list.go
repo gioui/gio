@@ -179,12 +179,15 @@ func (s ScrollbarStyle) layout(gtx layout.Context, axis layout.Axis, viewportSta
 
 				// Compute the pixel size and position of the scroll indicator within
 				// the track.
-				trackLen := float32(gtx.Constraints.Min.X)
-				viewStart := viewportStart * trackLen
-				viewEnd := viewportEnd * trackLen
-				indicatorLen := unit.Max(gtx.Metric, unit.Px(viewEnd-viewStart), s.Indicator.MajorMinLen)
+				trackLen := gtx.Constraints.Min.X
+				viewStart := int(math.Round(float64(viewportStart) * float64(trackLen)))
+				viewEnd := int(math.Round(float64(viewportEnd) * float64(trackLen)))
+				indicatorLen := max(viewEnd-viewStart, gtx.Px(s.Indicator.MajorMinLen))
+				if viewStart+indicatorLen > trackLen {
+					viewStart = trackLen - indicatorLen
+				}
 				indicatorDims := axis.Convert(image.Point{
-					X: gtx.Px(indicatorLen),
+					X: indicatorLen,
 					Y: gtx.Px(s.Indicator.MinorWidth),
 				})
 				indicatorDimsF := layout.FPt(indicatorDims)
@@ -192,7 +195,7 @@ func (s ScrollbarStyle) layout(gtx layout.Context, axis layout.Axis, viewportSta
 
 				// Lay out the indicator.
 				defer op.Save(gtx.Ops).Load()
-				offset := axis.Convert(image.Pt(int(viewStart), 0))
+				offset := axis.Convert(image.Pt(viewStart, 0))
 				op.Offset(layout.FPt(offset)).Add(gtx.Ops)
 				paint.FillShape(gtx.Ops, s.Indicator.Color, clip.RRect{
 					Rect: f32.Rectangle{
