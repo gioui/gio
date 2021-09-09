@@ -58,6 +58,7 @@ func BenchmarkDrawUICached(b *testing.B) {
 	// As BenchmarkDraw but the same op.Ops every time that is not reset - this
 	// should thus allow for maximal cache usage.
 	gtx, w, th := setupBenchmark(b)
+	defer w.Release()
 	drawCore(gtx, th)
 	w.Frame(gtx.Ops)
 	b.ResetTimer()
@@ -73,6 +74,7 @@ func BenchmarkDrawUI(b *testing.B) {
 	// resetting the ops and drawing, similar to how a typical UI would function.
 	// This will allow font caching across frames.
 	gtx, w, th := setupBenchmark(b)
+	defer w.Release()
 	drawCore(gtx, th)
 	w.Frame(gtx.Ops)
 	b.ReportAllocs()
@@ -95,6 +97,7 @@ func BenchmarkDrawUI(b *testing.B) {
 func BenchmarkDrawUITransformed(b *testing.B) {
 	// Like BenchmarkDraw UI but transformed at every frame
 	gtx, w, th := setupBenchmark(b)
+	defer w.Release()
 	drawCore(gtx, th)
 	w.Frame(gtx.Ops)
 	b.ReportAllocs()
@@ -120,6 +123,7 @@ func Benchmark1000Circles(b *testing.B) {
 	// shapes will be possible and resets buffers on each operation to prevent caching
 	// between frames.
 	gtx, w, _ := setupBenchmark(b)
+	defer w.Release()
 	draw1000Circles(gtx)
 	w.Frame(gtx.Ops)
 	b.ReportAllocs()
@@ -136,6 +140,7 @@ func Benchmark1000CirclesInstanced(b *testing.B) {
 	// Like Benchmark1000Circles but will record them and thus allow for caching between
 	// them.
 	gtx, w, _ := setupBenchmark(b)
+	defer w.Release()
 	draw1000CirclesInstanced(gtx)
 	w.Frame(gtx.Ops)
 	b.ReportAllocs()

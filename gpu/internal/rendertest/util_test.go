@@ -62,6 +62,7 @@ func buildSquares(size int) paint.ImageOp {
 func drawImage(t *testing.T, size int, ops *op.Ops, draw func(o *op.Ops)) (im *image.RGBA, err error) {
 	sz := image.Point{X: size, Y: size}
 	w := newWindow(t, sz.X, sz.Y)
+	defer w.Release()
 	draw(ops)
 	if err := w.Frame(ops); err != nil {
 		return nil, err
@@ -109,6 +110,7 @@ func multiRun(t *testing.T, frames ...frameT) {
 	var err error
 	sz := image.Point{X: 128, Y: 128}
 	w := newWindow(t, sz.X, sz.Y)
+	defer w.Release()
 	ops := new(op.Ops)
 	for i := range frames {
 		ops.Reset()
@@ -135,7 +137,6 @@ func multiRun(t *testing.T, frames ...frameT) {
 			saveImage(t, name, img)
 		}
 	}
-
 }
 
 func verifyRef(t *testing.T, img *image.RGBA, frame int) (ok bool) {
@@ -275,7 +276,6 @@ func newWindow(t testing.TB, width, height int) *headless.Window {
 	if err != nil {
 		t.Skipf("failed to create headless window, skipping: %v", err)
 	}
-	t.Cleanup(w.Release)
 	return w
 }
 
