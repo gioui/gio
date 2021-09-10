@@ -7,8 +7,8 @@
 package app
 
 /*
-#cgo openbsd CFLAGS: -I/usr/X11R6/include -I/usr/local/include
-#cgo openbsd LDFLAGS: -L/usr/X11R6/lib -L/usr/local/lib
+#cgo freebsd openbsd CFLAGS: -I/usr/X11R6/include -I/usr/local/include
+#cgo freebsd openbsd LDFLAGS: -L/usr/X11R6/lib -L/usr/local/lib
 #cgo freebsd openbsd LDFLAGS: -lX11 -lxkbcommon -lxkbcommon-x11 -lX11-xcb -lXcursor -lXfixes
 #cgo linux pkg-config: x11 xkbcommon xkbcommon-x11 x11-xcb xcursor xfixes
 
