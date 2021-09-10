@@ -623,11 +623,9 @@ func (g *compute) frame(target RenderTarget) error {
 		g.collector.clear = false
 		d.Action = driver.LoadActionClear
 	}
-	g.ctx.BeginRenderPass(defFBO, d)
 	t.blit.begin()
-	g.blitLayers(viewport)
+	g.blitLayers(d, defFBO, viewport)
 	t.blit.end()
-	g.ctx.EndRenderPass()
 	t.compact.begin()
 	if err := g.compactAllocs(); err != nil {
 		return err
@@ -850,31 +848,46 @@ func (g *compute) renderLayers(viewport image.Point) error {
 	return nil
 }
 
-func (g *compute) blitLayers(viewport image.Point) {
-	if len(g.collector.frame.layers) == 0 {
+func (g *compute) blitLayers(d driver.LoadDesc, fbo driver.Framebuffer, viewport image.Point) {
+	layers := g.collector.frame.layers
+	g.output.layerVertices = g.output.layerVertices[:0]
+	for _, l := range layers {
+		placef := layout.FPt(l.alloc.rect.Min)
+		sizef := layout.FPt(l.rect.Size())
+		r := layout.FRect(l.rect)
+		quad := [4]layerVertex{
+			{posX: float32(r.Min.X), posY: float32(r.Min.Y), u: placef.X, v: placef.Y},
+			{posX: float32(r.Max.X), posY: float32(r.Min.Y), u: placef.X + sizef.X, v: placef.Y},
+			{posX: float32(r.Max.X), posY: float32(r.Max.Y), u: placef.X + sizef.X, v: placef.Y + sizef.Y},
+			{posX: float32(r.Min.X), posY: float32(r.Max.Y), u: placef.X, v: placef.Y + sizef.Y},
+		}
+		g.output.layerVertices = append(g.output.layerVertices, quad[0], quad[1], quad[3], quad[3], quad[2], quad[1])
+	}
+	if len(g.output.layerVertices) > 0 {
+		vertexData := byteslice.Slice(g.output.layerVertices)
+		g.output.buffer.ensureCapacity(false, g.ctx, driver.BufferBindingVertices, len(vertexData))
+		g.output.buffer.buffer.Upload(vertexData)
+	}
+	g.ctx.BeginRenderPass(fbo, d)
+	defer g.ctx.EndRenderPass()
+	if len(layers) == 0 {
 		return
 	}
-	layers := g.collector.frame.layers
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.ctx.BindPipeline(g.output.blitPipeline)
+	g.ctx.BindVertexBuffer(g.output.buffer.buffer, 0)
+	start := 0
 	for len(layers) > 0 {
-		g.output.layerVertices = g.output.layerVertices[:0]
+		count := 0
 		atlas := layers[0].alloc.atlas
 		for len(layers) > 0 {
 			l := layers[0]
 			if l.alloc.atlas != atlas {
 				break
 			}
-			placef := layout.FPt(l.alloc.rect.Min)
-			sizef := layout.FPt(l.rect.Size())
-			quad := [4]layerVertex{
-				{posX: float32(l.rect.Min.X), posY: float32(l.rect.Min.Y), u: placef.X, v: placef.Y},
-				{posX: float32(l.rect.Max.X), posY: float32(l.rect.Min.Y), u: placef.X + sizef.X, v: placef.Y},
-				{posX: float32(l.rect.Max.X), posY: float32(l.rect.Max.Y), u: placef.X + sizef.X, v: placef.Y + sizef.Y},
-				{posX: float32(l.rect.Min.X), posY: float32(l.rect.Max.Y), u: placef.X, v: placef.Y + sizef.Y},
-			}
-			g.output.layerVertices = append(g.output.layerVertices, quad[0], quad[1], quad[3], quad[3], quad[2], quad[1])
 			layers = layers[1:]
+			const verticesPerQuad = 6
+			count += verticesPerQuad
 		}
 
 		// Transform positions to clip space: [-1, -1] - [1, 1], and texture
@@ -889,12 +902,9 @@ func (g *compute) blitLayers(viewport image.Point) {
 		g.output.uniforms.uvScale = [2]float32{1 / float32(atlas.size.X), 1 / float32(atlas.size.Y)}
 		g.output.uniBuf.Upload(byteslice.Struct(g.output.uniforms))
 		g.ctx.BindUniforms(g.output.uniBuf)
-		vertexData := byteslice.Slice(g.output.layerVertices)
-		g.output.buffer.ensureCapacity(false, g.ctx, driver.BufferBindingVertices, len(vertexData))
-		g.output.buffer.buffer.Upload(vertexData)
-		g.ctx.BindVertexBuffer(g.output.buffer.buffer, 0)
 		g.ctx.BindTexture(0, atlas.image)
-		g.ctx.DrawArrays(0, len(g.output.layerVertices))
+		g.ctx.DrawArrays(start, count)
+		start += count
 	}
 }
 
