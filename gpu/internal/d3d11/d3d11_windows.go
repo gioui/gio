@@ -681,13 +681,9 @@ func (b *Backend) BindStorageBuffer(binding int, buffer driver.Buffer) {
 	}
 }
 
-func (b *Backend) BindVertexUniforms(buffer driver.Buffer) {
+func (b *Backend) BindUniforms(buffer driver.Buffer) {
 	buf := buffer.(*Buffer)
 	b.ctx.VSSetConstantBuffers(buf.buf)
-}
-
-func (b *Backend) BindFragmentUniforms(buffer driver.Buffer) {
-	buf := buffer.(*Buffer)
 	b.ctx.PSSetConstantBuffers(buf.buf)
 }
 

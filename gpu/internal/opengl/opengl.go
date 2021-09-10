@@ -26,17 +26,14 @@ type Backend struct {
 
 	glver [2]int
 	gles  bool
-	ubo   bool
 	feats driver.Caps
 	// floatTriple holds the settings for floating point
 	// textures.
 	floatTriple textureTriple
 	// Single channel alpha textures.
-	alphaTriple  textureTriple
-	srgbaTriple  textureTriple
-	vertUniforms *buffer
-	fragUniforms *buffer
-	storage      [storageBindings]*buffer
+	alphaTriple textureTriple
+	srgbaTriple textureTriple
+	storage     [storageBindings]*buffer
 
 	sRGBFBO *SRGBFBO
 
@@ -190,13 +187,10 @@ func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 	}
 	floatTriple, ffboErr := floatTripleFor(f, ver, exts)
 	srgbaTriple, srgbErr := srgbaTripleFor(ver, exts)
-	gles30 := gles && ver[0] >= 3
 	gles31 := gles && (ver[0] > 3 || (ver[0] == 3 && ver[1] >= 1))
-	gl40 := !gles && ver[0] >= 4
 	b := &Backend{
 		glver:       ver,
 		gles:        gles,
-		ubo:         gles30 || gl40,
 		funcs:       f,
 		floatTriple: floatTriple,
 		alphaTriple: alphaTripleFor(ver),
@@ -712,12 +706,9 @@ func (b *Backend) NewBuffer(typ driver.BufferBinding, size int) (driver.Buffer, 
 		if typ != driver.BufferBindingUniforms {
 			return nil, errors.New("uniforms buffers cannot be bound as anything else")
 		}
-		if !b.ubo {
-			// GLES 2 doesn't support uniform buffers.
-			buf.data = make([]byte, size)
-		}
+		buf.data = make([]byte, size)
 	}
-	if typ&^driver.BufferBindingUniforms != 0 || b.ubo {
+	if typ&^driver.BufferBindingUniforms != 0 {
 		buf.hasBuffer = true
 		buf.obj = b.funcs.CreateBuffer()
 		if err := glErr(b.funcs); err != nil {
@@ -841,7 +832,6 @@ func (b *Backend) prepareDraw() {
 		return
 	}
 	b.setupVertexArrays()
-	p.prog.updateUniforms()
 }
 
 func toGLDrawMode(mode driver.Topology) gl.Enum {
@@ -954,27 +944,8 @@ func (b *Backend) newProgram(desc driver.PipelineDesc) (*program, error) {
 			b.funcs.Uniform1i(u, tex.Binding)
 		}
 	}
-	if b.ubo {
-		for _, block := range vsh.src.Uniforms.Blocks {
-			blockIdx := b.funcs.GetUniformBlockIndex(p, block.Name)
-			if blockIdx != gl.INVALID_INDEX {
-				b.funcs.UniformBlockBinding(p, blockIdx, uint(block.Binding))
-			}
-		}
-		// To match Direct3D 11 with separate vertex and fragment
-		// shader uniform buffers, offset all fragment blocks to be
-		// located after the vertex blocks.
-		off := len(vsh.src.Uniforms.Blocks)
-		for _, block := range fsh.src.Uniforms.Blocks {
-			blockIdx := b.funcs.GetUniformBlockIndex(p, block.Name)
-			if blockIdx != gl.INVALID_INDEX {
-				b.funcs.UniformBlockBinding(p, blockIdx, uint(block.Binding+off))
-			}
-		}
-	} else {
-		prog.vertUniforms.setup(b.funcs, p, vsh.src.Uniforms.Size, vsh.src.Uniforms.Locations)
-		prog.fragUniforms.setup(b.funcs, p, fsh.src.Uniforms.Size, fsh.src.Uniforms.Locations)
-	}
+	prog.vertUniforms.setup(b.funcs, p, vsh.src.Uniforms.Size, vsh.src.Uniforms.Locations)
+	prog.fragUniforms.setup(b.funcs, p, fsh.src.Uniforms.Size, fsh.src.Uniforms.Locations)
 	return prog, nil
 }
 
@@ -994,38 +965,13 @@ func (b *Backend) BindStorageBuffer(binding int, buf driver.Buffer) {
 	b.storage[binding] = bf
 }
 
-func (b *Backend) BindVertexUniforms(buf driver.Buffer) {
+func (b *Backend) BindUniforms(buf driver.Buffer) {
 	bf := buf.(*buffer)
 	if bf.typ&driver.BufferBindingUniforms == 0 {
 		panic("not a uniform buffer")
 	}
-	b.vertUniforms = bf
-}
-
-func (b *Backend) BindFragmentUniforms(buf driver.Buffer) {
-	bf := buf.(*buffer)
-	if bf.typ&driver.BufferBindingUniforms == 0 {
-		panic("not a uniform buffer")
-	}
-	b.fragUniforms = bf
-}
-
-func (p *program) updateUniforms() {
-	f := p.backend.funcs
-	if b := p.backend.vertUniforms; b != nil {
-		if p.backend.ubo {
-			p.backend.glstate.bindBufferBase(f, gl.UNIFORM_BUFFER, 0, b.obj)
-		} else {
-			p.vertUniforms.update(f, b)
-		}
-	}
-	if b := p.backend.fragUniforms; b != nil {
-		if p.backend.ubo {
-			p.backend.glstate.bindBufferBase(f, gl.UNIFORM_BUFFER, 1, b.obj)
-		} else {
-			p.fragUniforms.update(f, b)
-		}
-	}
+	b.state.pipeline.prog.vertUniforms.update(b.funcs, bf)
+	b.state.pipeline.prog.fragUniforms.update(b.funcs, bf)
 }
 
 func (b *Backend) BindProgram(prog driver.Program) {

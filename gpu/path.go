@@ -37,30 +37,20 @@ type coverer struct {
 }
 
 type coverTexUniforms struct {
-	vert struct {
-		coverUniforms
-		_ [12]byte // Padding to multiple of 16.
-	}
+	coverUniforms
+	_ [12]byte // Padding to multiple of 16.
 }
 
 type coverColUniforms struct {
-	vert struct {
-		coverUniforms
-		_ [12]byte // Padding to multiple of 16.
-	}
-	frag struct {
-		colorUniforms
-	}
+	coverUniforms
+	_ [128 - unsafe.Sizeof(coverUniforms{}) - unsafe.Sizeof(colorUniforms{})]byte // Padding to 128 bytes.
+	colorUniforms
 }
 
 type coverLinearGradientUniforms struct {
-	vert struct {
-		coverUniforms
-		_ [12]byte // Padding to multiple of 16.
-	}
-	frag struct {
-		gradientUniforms
-	}
+	coverUniforms
+	_ [128 - unsafe.Sizeof(coverUniforms{}) - unsafe.Sizeof(gradientUniforms{})]byte // Padding to 128.
+	gradientUniforms
 }
 
 type coverUniforms struct {
@@ -87,11 +77,9 @@ type stenciler struct {
 }
 
 type stencilUniforms struct {
-	vert struct {
-		transform  [4]float32
-		pathOffset [2]float32
-		_          [8]byte // Padding to multiple of 16.
-	}
+	transform  [4]float32
+	pathOffset [2]float32
+	_          [8]byte // Padding to multiple of 16.
 }
 
 type intersectUniforms struct {
@@ -161,8 +149,7 @@ func newCoverer(ctx driver.Device) *coverer {
 	c.texUniforms = new(coverTexUniforms)
 	c.linearGradientUniforms = new(coverLinearGradientUniforms)
 	pipelines, err := createColorPrograms(ctx, gio.Shader_cover_vert, gio.Shader_cover_frag,
-		[3]interface{}{&c.colUniforms.vert, &c.linearGradientUniforms.vert, &c.texUniforms.vert},
-		[3]interface{}{&c.colUniforms.frag, &c.linearGradientUniforms.frag, nil},
+		[3]interface{}{c.colUniforms, c.linearGradientUniforms, c.texUniforms},
 	)
 	if err != nil {
 		panic(err)
@@ -215,7 +202,7 @@ func newStenciler(ctx driver.Device) *stenciler {
 	defer vsh.Release()
 	defer fsh.Release()
 	st.pipeline.uniforms = new(stencilUniforms)
-	vertUniforms := newUniformBuffer(ctx, &st.pipeline.uniforms.vert)
+	vertUniforms := newUniformBuffer(ctx, st.pipeline.uniforms)
 	pipe, err := st.ctx.NewPipeline(driver.PipelineDesc{
 		VertexShader:   vsh,
 		FragmentShader: fsh,
@@ -228,7 +215,7 @@ func newStenciler(ctx driver.Device) *stenciler {
 		PixelFormat: driver.TextureFormatFloat,
 		Topology:    driver.TopologyTriangles,
 	})
-	st.pipeline.pipeline = &pipeline{pipe, vertUniforms, nil}
+	st.pipeline.pipeline = &pipeline{pipe, vertUniforms}
 	if err != nil {
 		panic(err)
 	}
@@ -252,7 +239,7 @@ func newStenciler(ctx driver.Device) *stenciler {
 		PixelFormat: driver.TextureFormatFloat,
 		Topology:    driver.TopologyTriangleStrip,
 	})
-	st.ipipeline.pipeline = &pipeline{ipipe, vertUniforms, nil}
+	st.ipipeline.pipeline = &pipeline{ipipe, vertUniforms}
 	return st
 }
 
@@ -364,8 +351,8 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 	texSize := f32.Point{X: float32(bounds.Dx()), Y: float32(bounds.Dy())}
 	scale := f32.Point{X: 2 / texSize.X, Y: 2 / texSize.Y}
 	orig := f32.Point{X: -1 - float32(bounds.Min.X)*2/texSize.X, Y: -1 - float32(bounds.Min.Y)*2/texSize.Y}
-	s.pipeline.uniforms.vert.transform = [4]float32{scale.X, scale.Y, orig.X, orig.Y}
-	s.pipeline.uniforms.vert.pathOffset = [2]float32{offset.X, offset.Y}
+	s.pipeline.uniforms.transform = [4]float32{scale.X, scale.Y, orig.X, orig.Y}
+	s.pipeline.uniforms.pathOffset = [2]float32{offset.X, offset.Y}
 	s.pipeline.pipeline.UploadUniforms(s.ctx)
 	// Draw in batches that fit in uint16 indices.
 	start := 0
@@ -390,21 +377,21 @@ func (c *coverer) cover(mat materialType, col f32color.RGBA, col1, col2 f32color
 	var uniforms *coverUniforms
 	switch mat {
 	case materialColor:
-		c.colUniforms.frag.color = col
-		uniforms = &c.colUniforms.vert.coverUniforms
+		c.colUniforms.color = col
+		uniforms = &c.colUniforms.coverUniforms
 	case materialLinearGradient:
-		c.linearGradientUniforms.frag.color1 = col1
-		c.linearGradientUniforms.frag.color2 = col2
+		c.linearGradientUniforms.color1 = col1
+		c.linearGradientUniforms.color2 = col2
 
 		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
-		c.linearGradientUniforms.vert.uvTransformR1 = [4]float32{t1, t2, t3, 0}
-		c.linearGradientUniforms.vert.uvTransformR2 = [4]float32{t4, t5, t6, 0}
-		uniforms = &c.linearGradientUniforms.vert.coverUniforms
+		c.linearGradientUniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}
+		c.linearGradientUniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
+		uniforms = &c.linearGradientUniforms.coverUniforms
 	case materialTexture:
 		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
-		c.texUniforms.vert.uvTransformR1 = [4]float32{t1, t2, t3, 0}
-		c.texUniforms.vert.uvTransformR2 = [4]float32{t4, t5, t6, 0}
-		uniforms = &c.texUniforms.vert.coverUniforms
+		c.texUniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}
+		c.texUniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
+		uniforms = &c.texUniforms.coverUniforms
 	}
 	uniforms.transform = [4]float32{scale.X, scale.Y, off.X, off.Y}
 	uniforms.uvCoverTransform = [4]float32{coverScale.X, coverScale.Y, coverOff.X, coverOff.Y}

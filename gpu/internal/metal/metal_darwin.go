@@ -1005,20 +1005,9 @@ func (b *Backend) BindVertexUniforms(buf driver.Buffer) {
 	}
 	if bf.buffer != 0 {
 		C.renderEncSetVertexBuffer(enc, bf.buffer, uniformBufferIndex, 0)
-	} else if bf.size > 0 {
-		C.renderEncSetVertexBytes(enc, unsafe.Pointer(&bf.store[0]), C.NSUInteger(bf.size), uniformBufferIndex)
-	}
-}
-
-func (b *Backend) BindFragmentUniforms(buf driver.Buffer) {
-	bf := buf.(*Buffer)
-	enc := b.renderEnc
-	if enc == 0 {
-		panic("no active render pass")
-	}
-	if bf.buffer != 0 {
 		C.renderEncSetFragmentBuffer(enc, bf.buffer, uniformBufferIndex, 0)
 	} else if bf.size > 0 {
+		C.renderEncSetVertexBytes(enc, unsafe.Pointer(&bf.store[0]), C.NSUInteger(bf.size), uniformBufferIndex)
 		C.renderEncSetFragmentBytes(enc, unsafe.Pointer(&bf.store[0]), C.NSUInteger(bf.size), uniformBufferIndex)
 	}
 }

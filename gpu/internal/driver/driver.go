@@ -43,8 +43,7 @@ type Device interface {
 	BindVertexBuffer(b Buffer, offset int)
 	BindIndexBuffer(b Buffer)
 	BindImageTexture(unit int, texture Texture, access AccessBits, format TextureFormat)
-	BindVertexUniforms(buf Buffer)
-	BindFragmentUniforms(buf Buffer)
+	BindUniforms(buf Buffer)
 	BindStorageBuffer(binding int, buf Buffer)
 
 	BeginCompute()

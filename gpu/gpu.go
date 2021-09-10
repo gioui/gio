@@ -282,30 +282,20 @@ type blitter struct {
 }
 
 type blitColUniforms struct {
-	vert struct {
-		blitUniforms
-		_ [12]byte // Padding to a multiple of 16.
-	}
-	frag struct {
-		colorUniforms
-	}
+	blitUniforms
+	_ [128 - unsafe.Sizeof(blitUniforms{}) - unsafe.Sizeof(colorUniforms{})]byte // Padding to 128 bytes.
+	colorUniforms
 }
 
 type blitTexUniforms struct {
-	vert struct {
-		blitUniforms
-		_ [12]byte // Padding to a multiple of 16.
-	}
+	blitUniforms
+	_ [12]byte // Padding to 16 bytes.
 }
 
 type blitLinearGradientUniforms struct {
-	vert struct {
-		blitUniforms
-		_ [12]byte // Padding to a multiple of 16.
-	}
-	frag struct {
-		gradientUniforms
-	}
+	blitUniforms
+	_ [128 - unsafe.Sizeof(blitUniforms{}) - unsafe.Sizeof(gradientUniforms{})]byte // Padding to 128 bytes.
+	gradientUniforms
 }
 
 type uniformBuffer struct {
@@ -314,9 +304,8 @@ type uniformBuffer struct {
 }
 
 type pipeline struct {
-	pipeline     driver.Pipeline
-	vertUniforms *uniformBuffer
-	fragUniforms *uniformBuffer
+	pipeline driver.Pipeline
+	uniforms *uniformBuffer
 }
 
 type blitUniforms struct {
@@ -536,8 +525,7 @@ func newBlitter(ctx driver.Device) *blitter {
 	b.texUniforms = new(blitTexUniforms)
 	b.linearGradientUniforms = new(blitLinearGradientUniforms)
 	pipelines, err := createColorPrograms(ctx, gio.Shader_blit_vert, gio.Shader_blit_frag,
-		[3]interface{}{&b.colUniforms.vert, &b.linearGradientUniforms.vert, &b.texUniforms.vert},
-		[3]interface{}{&b.colUniforms.frag, &b.linearGradientUniforms.frag, nil},
+		[3]interface{}{b.colUniforms, b.linearGradientUniforms, b.texUniforms},
 	)
 	if err != nil {
 		panic(err)
@@ -553,7 +541,7 @@ func (b *blitter) release() {
 	}
 }
 
-func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.Sources, vertUniforms, fragUniforms [3]interface{}) ([3]*pipeline, error) {
+func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.Sources, uniforms [3]interface{}) ([3]*pipeline, error) {
 	var pipelines [3]*pipeline
 	blend := driver.BlendDesc{
 		Enable:    true,
@@ -589,17 +577,14 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 		if err != nil {
 			return pipelines, err
 		}
-		var vertBuffer, fragBuffer *uniformBuffer
-		if u := vertUniforms[materialTexture]; u != nil {
+		var vertBuffer *uniformBuffer
+		if u := uniforms[materialTexture]; u != nil {
 			vertBuffer = newUniformBuffer(b, u)
 		}
-		if u := fragUniforms[materialTexture]; u != nil {
-			fragBuffer = newUniformBuffer(b, u)
-		}
-		pipelines[materialTexture] = &pipeline{pipe, vertBuffer, fragBuffer}
+		pipelines[materialTexture] = &pipeline{pipe, vertBuffer}
 	}
 	{
-		var vertBuffer, fragBuffer *uniformBuffer
+		var vertBuffer *uniformBuffer
 		fsh, err := b.NewFragmentShader(fsSrc[materialColor])
 		if err != nil {
 			pipelines[materialTexture].Release()
@@ -618,16 +603,13 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 			pipelines[materialTexture].Release()
 			return pipelines, err
 		}
-		if u := vertUniforms[materialColor]; u != nil {
+		if u := uniforms[materialColor]; u != nil {
 			vertBuffer = newUniformBuffer(b, u)
 		}
-		if u := fragUniforms[materialColor]; u != nil {
-			fragBuffer = newUniformBuffer(b, u)
-		}
-		pipelines[materialColor] = &pipeline{pipe, vertBuffer, fragBuffer}
+		pipelines[materialColor] = &pipeline{pipe, vertBuffer}
 	}
 	{
-		var vertBuffer, fragBuffer *uniformBuffer
+		var vertBuffer *uniformBuffer
 		fsh, err := b.NewFragmentShader(fsSrc[materialLinearGradient])
 		if err != nil {
 			pipelines[materialTexture].Release()
@@ -648,13 +630,10 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 			pipelines[materialColor].Release()
 			return pipelines, err
 		}
-		if u := vertUniforms[materialLinearGradient]; u != nil {
+		if u := uniforms[materialLinearGradient]; u != nil {
 			vertBuffer = newUniformBuffer(b, u)
 		}
-		if u := fragUniforms[materialLinearGradient]; u != nil {
-			fragBuffer = newUniformBuffer(b, u)
-		}
-		pipelines[materialLinearGradient] = &pipeline{pipe, vertBuffer, fragBuffer}
+		pipelines[materialLinearGradient] = &pipeline{pipe, vertBuffer}
 	}
 	if err != nil {
 		for _, p := range pipelines {
@@ -1151,21 +1130,21 @@ func (b *blitter) blit(mat materialType, col f32color.RGBA, col1, col2 f32color.
 	var uniforms *blitUniforms
 	switch mat {
 	case materialColor:
-		b.colUniforms.frag.color = col
-		uniforms = &b.colUniforms.vert.blitUniforms
+		b.colUniforms.color = col
+		uniforms = &b.colUniforms.blitUniforms
 	case materialTexture:
 		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
-		b.texUniforms.vert.blitUniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}
-		b.texUniforms.vert.blitUniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
-		uniforms = &b.texUniforms.vert.blitUniforms
+		b.texUniforms.blitUniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}
+		b.texUniforms.blitUniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
+		uniforms = &b.texUniforms.blitUniforms
 	case materialLinearGradient:
-		b.linearGradientUniforms.frag.color1 = col1
-		b.linearGradientUniforms.frag.color2 = col2
+		b.linearGradientUniforms.color1 = col1
+		b.linearGradientUniforms.color2 = col2
 
 		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
-		b.linearGradientUniforms.vert.blitUniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}
-		b.linearGradientUniforms.vert.blitUniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
-		uniforms = &b.linearGradientUniforms.vert.blitUniforms
+		b.linearGradientUniforms.blitUniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}
+		b.linearGradientUniforms.blitUniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
+		uniforms = &b.linearGradientUniforms.blitUniforms
 	}
 	uniforms.transform = [4]float32{scale.X, scale.Y, off.X, off.Y}
 	p.UploadUniforms(b.ctx)
@@ -1197,23 +1176,16 @@ func (u *uniformBuffer) Release() {
 }
 
 func (p *pipeline) UploadUniforms(ctx driver.Device) {
-	if p.vertUniforms != nil {
-		p.vertUniforms.Upload()
-		ctx.BindVertexUniforms(p.vertUniforms.buf)
-	}
-	if p.fragUniforms != nil {
-		p.fragUniforms.Upload()
-		ctx.BindFragmentUniforms(p.fragUniforms.buf)
+	if p.uniforms != nil {
+		p.uniforms.Upload()
+		ctx.BindUniforms(p.uniforms.buf)
 	}
 }
 
 func (p *pipeline) Release() {
 	p.pipeline.Release()
-	if p.vertUniforms != nil {
-		p.vertUniforms.Release()
-	}
-	if p.fragUniforms != nil {
-		p.fragUniforms.Release()
+	if p.uniforms != nil {
+		p.uniforms.Release()
 	}
 	*p = pipeline{}
 }

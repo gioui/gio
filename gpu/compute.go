@@ -88,11 +88,8 @@ type compute struct {
 		pipeline driver.Pipeline
 		buffer   sizedBuffer
 		quads    []materialVertex
-		vert     struct {
-			uniforms *materialVertUniforms
-			buf      driver.Buffer
-		}
-		frag struct {
+		uniforms struct {
+			u   *materialUniforms
 			buf driver.Buffer
 		}
 	}
@@ -172,13 +169,10 @@ type copyUniforms struct {
 	_       [8]byte // Pad to 16 bytes.
 }
 
-type materialVertUniforms struct {
-	scale [2]float32
-	pos   [2]float32
-}
-
-type materialFragUniforms struct {
-	emulateSRGB float32
+type materialUniforms struct {
+	scale       [2]float32
+	pos         [2]float32
+	emulatesRGB float32
 	_           [12]byte // Pad to 16 bytes
 }
 
@@ -504,25 +498,14 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		return nil, err
 	}
 	g.materials.pipeline = pipe
-	g.materials.vert.uniforms = new(materialVertUniforms)
+	g.materials.uniforms.u = new(materialUniforms)
 
-	buf, err = ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(*g.materials.vert.uniforms)))
+	buf, err = ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(*g.materials.uniforms.u)))
 	if err != nil {
 		g.Release()
 		return nil, err
 	}
-	g.materials.vert.buf = buf
-	var emulateSRGB materialFragUniforms
-	if !g.srgb {
-		emulateSRGB.emulateSRGB = 1.0
-	}
-	buf, err = ctx.NewBuffer(driver.BufferBindingUniforms, int(unsafe.Sizeof(emulateSRGB)))
-	if err != nil {
-		g.Release()
-		return nil, err
-	}
-	buf.Upload(byteslice.Struct(&emulateSRGB))
-	g.materials.frag.buf = buf
+	g.materials.uniforms.buf = buf
 
 	for _, shader := range shaders {
 		if !g.useCPU {
@@ -874,7 +857,6 @@ func (g *compute) blitLayers(viewport image.Point) {
 	layers := g.collector.frame.layers
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.ctx.BindPipeline(g.output.blitPipeline)
-	g.ctx.BindVertexUniforms(g.output.uniBuf)
 	for len(layers) > 0 {
 		g.output.layerVertices = g.output.layerVertices[:0]
 		atlas := layers[0].alloc.atlas
@@ -906,6 +888,7 @@ func (g *compute) blitLayers(viewport image.Point) {
 		g.output.uniforms.pos = [2]float32{ox, oy}
 		g.output.uniforms.uvScale = [2]float32{1 / float32(atlas.size.X), 1 / float32(atlas.size.Y)}
 		g.output.uniBuf.Upload(byteslice.Struct(g.output.uniforms))
+		g.ctx.BindUniforms(g.output.uniBuf)
 		vertexData := byteslice.Slice(g.output.layerVertices)
 		g.output.buffer.ensureCapacity(false, g.ctx, driver.BufferBindingVertices, len(vertexData))
 		g.output.buffer.buffer.Upload(vertexData)
@@ -1001,9 +984,14 @@ func (g *compute) renderMaterials() error {
 		}
 		// Transform to clip space: [-1, -1] - [1, 1] and flip Y-axis to cancel the implied transformation
 		// between framebuffer and texture space.
-		m.vert.uniforms.scale = [2]float32{2, -2}
-		m.vert.uniforms.pos = [2]float32{-1, +1}
-		m.vert.buf.Upload(byteslice.Struct(m.vert.uniforms))
+		*m.uniforms.u = materialUniforms{
+			scale: [2]float32{2, -2},
+			pos:   [2]float32{-1, +1},
+		}
+		if !g.srgb {
+			m.uniforms.u.emulatesRGB = 1.0
+		}
+		m.uniforms.buf.Upload(byteslice.Struct(m.uniforms.u))
 		vertexData := byteslice.Slice(m.quads)
 		n := pow2Ceil(len(vertexData))
 		m.buffer.ensureCapacity(false, g.ctx, driver.BufferBindingVertices, n)
@@ -1013,10 +1001,9 @@ func (g *compute) renderMaterials() error {
 			d.Action = driver.LoadActionClear
 		}
 		g.ctx.BeginRenderPass(atlas.fbo, d)
-		g.ctx.BindVertexUniforms(m.vert.buf)
-		g.ctx.BindFragmentUniforms(m.frag.buf)
 		g.ctx.BindTexture(0, imgAtlas.image)
 		g.ctx.BindPipeline(m.pipeline)
+		g.ctx.BindUniforms(m.uniforms.buf)
 		g.ctx.BindVertexBuffer(m.buffer.buffer, 0)
 		newAllocs := atlas.allocs[allocStart:]
 		for i, a := range newAllocs {
@@ -1507,8 +1494,7 @@ func (g *compute) Release() {
 		&g.buffers.config,
 		g.materials.pipeline,
 		&g.materials.buffer,
-		g.materials.vert.buf,
-		g.materials.frag.buf,
+		g.materials.uniforms.buf,
 		g.timers.t,
 	}
 	for _, r := range res {
