@@ -358,6 +358,10 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, pe
 		)
 		d8.Args = append(d8.Args, classFiles...)
 		if _, err := runCmd(d8); err != nil {
+			major, minor, ok := determineJDKVersion()
+			if ok && (major != 1 || minor < 7 || 8 < minor) {
+				return fmt.Errorf("unsupported JDK version %d.%d, expected 1.7 or 1.8\nd8 error: %v", major, minor, err)
+			}
 			return err
 		}
 	}
@@ -564,6 +568,17 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, pe
 	}
 
 	return unsignedAPKZip.Close()
+}
+
+func determineJDKVersion() (int, int, bool) {
+	java := exec.Command("java", "-version")
+	out, err := java.CombinedOutput()
+	if err != nil {
+		return 0, 0, false
+	}
+	var major, minor int
+	_, err = fmt.Sscanf(string(out), "java version \"%d.%d", &major, &minor)
+	return major, minor, err == nil
 }
 
 func signAPK(tmpDir string, apkFile string, tools *androidTools, bi *buildInfo) error {
