@@ -301,6 +301,7 @@ func (s *fboSet) delete(ctx driver.Device, idx int) {
 
 func (s *stenciler) release() {
 	s.fbos.delete(s.ctx, 0)
+	s.intersections.delete(s.ctx, 0)
 	s.pipeline.pipeline.Release()
 	s.ipipeline.pipeline.Release()
 	s.indexBuf.Release()
