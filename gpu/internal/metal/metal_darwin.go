@@ -918,9 +918,18 @@ func (t *Texture) Upload(offset, size image.Point, pixels []byte, stride int) {
 	if stride == 0 {
 		stride = size.X * 4
 	}
-	buf, off := t.backend.stagingBuffer(len(pixels))
-	store := bufferSlice(buf, off, len(pixels))
-	copy(store, pixels)
+	dstStride := size.X * 4
+	n := size.Y * dstStride
+	buf, off := t.backend.stagingBuffer(n)
+	store := bufferSlice(buf, off, n)
+	var srcOff, dstOff int
+	for y := 0; y < size.Y; y++ {
+		srcRow := pixels[srcOff : srcOff+dstStride]
+		dstRow := store[dstOff : dstOff+dstStride]
+		copy(dstRow, srcRow)
+		dstOff += dstStride
+		srcOff += stride
+	}
 	enc := t.backend.startBlit()
 	orig := C.MTLOrigin{
 		x: C.NSUInteger(offset.X),
@@ -931,7 +940,7 @@ func (t *Texture) Upload(offset, size image.Point, pixels []byte, stride int) {
 		height: C.NSUInteger(size.Y),
 		depth:  1,
 	}
-	C.blitEncCopyBufferToTexture(enc, buf, t.texture, C.NSUInteger(off), C.NSUInteger(stride), C.NSUInteger(len(store)), msize, orig)
+	C.blitEncCopyBufferToTexture(enc, buf, t.texture, C.NSUInteger(off), C.NSUInteger(dstStride), C.NSUInteger(len(store)), msize, orig)
 }
 
 func (t *Texture) Release() {
@@ -1135,12 +1144,21 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int)
 		height: C.NSUInteger(sz.Y),
 		depth:  1,
 	}
-	buf, off := f.backend.stagingBuffer(len(pixels))
+	stageStride := sz.X * 4
+	n := sz.Y * stageStride
+	buf, off := f.backend.stagingBuffer(n)
 	enc := f.backend.startBlit()
-	C.blitEncCopyTextureToBuffer(enc, f.texture, buf, C.NSUInteger(off), C.NSUInteger(stride), C.NSUInteger(len(pixels)), msize, orig)
+	C.blitEncCopyTextureToBuffer(enc, f.texture, buf, C.NSUInteger(off), C.NSUInteger(stageStride), C.NSUInteger(n), msize, orig)
 	f.backend.endCmdBuffer(true)
-	store := bufferSlice(buf, off, len(pixels))
-	copy(pixels, store)
+	store := bufferSlice(buf, off, n)
+	var srcOff, dstOff int
+	for y := 0; y < sz.Y; y++ {
+		dstRow := pixels[srcOff : srcOff+stageStride]
+		srcRow := store[dstOff : dstOff+stageStride]
+		copy(dstRow, srcRow)
+		dstOff += stageStride
+		srcOff += stride
+	}
 	return nil
 }
 
