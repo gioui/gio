@@ -550,7 +550,7 @@ func dlsym(handle unsafe.Pointer, s string) unsafe.Pointer {
 func dlopen(lib string) unsafe.Pointer {
 	clib := C.CString(lib)
 	defer C.free(unsafe.Pointer(clib))
-	return C.dlopen(clib, C.RTLD_NOW)
+	return C.dlopen(clib, C.RTLD_NOW|C.RTLD_LOCAL)
 }
 
 func (f *Functions) load(forceES bool) error {
