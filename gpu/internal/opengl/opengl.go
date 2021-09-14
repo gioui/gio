@@ -285,8 +285,6 @@ func (b *Backend) EndFrame() {
 		b.sRGBFBO.Blit()
 	}
 	b.restoreState(b.savedState)
-	// For single-buffered framebuffers such as on macOS.
-	b.funcs.Flush()
 }
 
 func (b *Backend) queryState() glState {

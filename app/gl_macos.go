@@ -16,6 +16,7 @@ import (
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
 #include <AppKit/AppKit.h>
+#include <dlfcn.h>
 
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createGLContext(void);
 __attribute__ ((visibility ("hidden"))) void gio_setContextView(CFTypeRef ctx, CFTypeRef view);
@@ -25,16 +26,38 @@ __attribute__ ((visibility ("hidden"))) void gio_flushContextBuffer(CFTypeRef ct
 __attribute__ ((visibility ("hidden"))) void gio_clearCurrentContext(void);
 __attribute__ ((visibility ("hidden"))) void gio_lockContext(CFTypeRef ctxRef);
 __attribute__ ((visibility ("hidden"))) void gio_unlockContext(CFTypeRef ctxRef);
+
+typedef void (*PFN_glFlush)(void);
+
+static void glFlush(PFN_glFlush f) {
+	f();
+}
 */
 import "C"
+
+import "unsafe"
 
 type glContext struct {
 	c    *gl.Functions
 	ctx  C.CFTypeRef
 	view C.CFTypeRef
+
+	glFlush C.PFN_glFlush
 }
 
 func newContext(w *window) (*glContext, error) {
+	clib := C.CString("/System/Library/Frameworks/OpenGL.framework/OpenGL")
+	defer C.free(unsafe.Pointer(clib))
+	lib, err := C.dlopen(clib, C.RTLD_NOW|C.RTLD_LOCAL)
+	if err != nil {
+		return nil, err
+	}
+	csym := C.CString("glFlush")
+	defer C.free(unsafe.Pointer(csym))
+	glFlush := C.PFN_glFlush(C.dlsym(lib, csym))
+	if glFlush == nil {
+		return nil, errors.New("gl: missing symbol glFlush in the OpenGL framework")
+	}
 	view := w.contextView()
 	ctx := C.gio_createGLContext()
 	if ctx == 0 {
@@ -42,8 +65,9 @@ func newContext(w *window) (*glContext, error) {
 	}
 	C.gio_setContextView(ctx, view)
 	c := &glContext{
-		ctx:  ctx,
-		view: view,
+		ctx:     ctx,
+		view:    view,
+		glFlush: glFlush,
 	}
 	return c, nil
 }
@@ -65,6 +89,8 @@ func (c *glContext) Release() {
 }
 
 func (c *glContext) Present() error {
+	// Assume the caller already locked the context.
+	C.glFlush(c.glFlush)
 	return nil
 }
 
