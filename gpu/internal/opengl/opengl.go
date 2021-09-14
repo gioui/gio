@@ -888,18 +888,10 @@ func (b *Backend) NewFragmentShader(src shader.Sources) (driver.FragmentShader, 
 }
 
 func (b *Backend) glslFor(src shader.Sources) string {
-	if b.glver[0] < 3 {
+	if b.gles {
 		return src.GLSL100ES
-	}
-	// OpenGL (ES) 3.0.
-	switch {
-	case b.gles:
-		return src.GLSL300ES
-	case b.glver[0] >= 4 || b.glver[1] >= 2:
-		// OpenGL 3.2 Core only accepts glsl 1.50 or newer.
+	} else {
 		return src.GLSL150
-	default:
-		return src.GLSL130
 	}
 }
 

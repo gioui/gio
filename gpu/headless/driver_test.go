@@ -42,47 +42,6 @@ func TestFramebufferClear(t *testing.T) {
 	}
 }
 
-func TestSimpleShader(t *testing.T) {
-	b := newDriver(t)
-	sz := image.Point{X: 800, Y: 600}
-	vsh, fsh, err := newShaders(b, gio.Shader_simple_vert, gio.Shader_simple_frag)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer vsh.Release()
-	defer fsh.Release()
-	fbo := newFBO(t, b, sz)
-	p, err := b.NewPipeline(driver.PipelineDesc{
-		VertexShader:   vsh,
-		FragmentShader: fsh,
-		PixelFormat:    driver.TextureFormatSRGBA,
-		Topology:       driver.TopologyTriangles,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer p.Release()
-	d := driver.LoadDesc{
-		ClearColor: f32color.LinearFromSRGB(clearCol),
-		Action:     driver.LoadActionClear,
-	}
-	b.BeginRenderPass(fbo, d)
-	b.Viewport(0, 0, sz.X, sz.Y)
-	b.BindPipeline(p)
-	b.DrawArrays(0, 3)
-	b.EndRenderPass()
-	img := screenshot(t, b, fbo, sz)
-	if got := img.RGBAAt(0, 0); got != clearColExpect {
-		t.Errorf("got color %v, expected %v", got, clearColExpect)
-	}
-	// Just off the center to catch inverted triangles.
-	cx, cy := 300, 400
-	shaderCol := f32color.RGBA{R: .25, G: .55, B: .75, A: 1.0}
-	if got, exp := img.RGBAAt(cx, cy), shaderCol.SRGB(); got != f32color.NRGBAToRGBA(exp) {
-		t.Errorf("got color %v, expected %v", got, f32color.NRGBAToRGBA(exp))
-	}
-}
-
 func TestInputShader(t *testing.T) {
 	b := newDriver(t)
 	sz := image.Point{X: 800, Y: 600}
