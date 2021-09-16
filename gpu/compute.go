@@ -73,6 +73,8 @@ type compute struct {
 
 		layerVertices []layerVertex
 		descriptors   *piet.Kernel4DescriptorSetLayout
+
+		nullMaterials driver.Texture
 	}
 	// imgAllocs maps imageOpData.handles to allocs.
 	imgAllocs map[interface{}]*atlasAlloc
@@ -409,6 +411,12 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		conf:          new(config),
 		memHeader:     new(memoryHeader),
 	}
+	null, err := ctx.NewTexture(driver.TextureFormatRGBA8, 1, 1, driver.FilterNearest, driver.FilterNearest, driver.BufferBindingShaderStorageRead)
+	if err != nil {
+		g.Release()
+		return nil, err
+	}
+	g.output.nullMaterials = null
 	shaders := []struct {
 		prog *computeProgram
 		src  shader.Sources
@@ -1275,9 +1283,11 @@ func (g *compute) render(images *textureAtlas, dst driver.Texture, cpuDst cpu.Im
 		if !g.useCPU {
 			g.ctx.BeginCompute()
 			g.ctx.BindImageTexture(kernel4OutputUnit, dst, driver.AccessWrite, driver.TextureFormatRGBA8)
+			img := g.output.nullMaterials
 			if images != nil {
-				g.ctx.BindImageTexture(kernel4AtlasUnit, images.image, driver.AccessRead, driver.TextureFormatRGBA8)
+				img = images.image
 			}
+			g.ctx.BindImageTexture(kernel4AtlasUnit, img, driver.AccessRead, driver.TextureFormatRGBA8)
 		} else {
 			*g.output.descriptors.Binding2() = cpuDst
 			if images != nil {
@@ -1478,6 +1488,7 @@ func (g *compute) Release() {
 		Release()
 	}
 	res := []resource{
+		g.output.nullMaterials,
 		&g.programs.elements,
 		&g.programs.tileAlloc,
 		&g.programs.pathCoarse,
