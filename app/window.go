@@ -517,6 +517,13 @@ func (w *Window) run(options []Option) {
 		)
 		if wakeup != nil {
 			wakeups = w.wakeups
+			// Make sure any pending deferred driver functions are processed before calling
+			// into driverFunc again; only one driver function can be queued at a time.
+			select {
+			case <-wakeups:
+				wakeup()
+			default:
+			}
 		}
 		if w.delayedDraw != nil {
 			timer = w.delayedDraw.C
