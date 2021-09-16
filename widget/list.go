@@ -24,6 +24,9 @@ type Scrollbar struct {
 	track, indicator gesture.Click
 	drag             gesture.Drag
 	delta            float32
+
+	dragging   bool
+	oldDragPos float32
 }
 
 // Layout updates the internal state of the scrollbar based on events
@@ -60,12 +63,25 @@ func (s *Scrollbar) Layout(gtx layout.Context, axis layout.Axis, viewportStart, 
 
 	// Offset to account for any drags.
 	for _, event := range s.drag.Events(gtx.Metric, gtx, gesture.Axis(axis)) {
-		if event.Type != pointer.Drag {
+		switch event.Type {
+		case pointer.Drag:
+		case pointer.Release:
+			s.dragging = false
+		case pointer.Cancel:
+			s.dragging = false
+			continue
+		default:
 			continue
 		}
 		dragOffset := axis.FConvert(event.Position).X
 		normalizedDragOffset := dragOffset / trackHeight
-		s.delta += normalizedDragOffset - viewportStart
+
+		if !s.dragging {
+			s.dragging = true
+			s.oldDragPos = normalizedDragOffset
+		}
+		s.delta += normalizedDragOffset - s.oldDragPos
+		s.oldDragPos = normalizedDragOffset
 	}
 
 	// Process events from the indicator so that hover is

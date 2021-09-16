@@ -285,8 +285,7 @@ func (l ListStyle) Layout(gtx layout.Context, length int, w layout.ListElement) 
 	if delta := l.state.ScrollDistance(); delta != 0 {
 		// Handle any changes to the list position as a result of user interaction
 		// with the scrollbar.
-		deltaPx := int(math.Round(float64(float32(l.state.Position.Length) * delta)))
-		l.state.List.Position.Offset += deltaPx
+		l.state.List.Position.Offset += int(math.Round(float64(float32(l.state.Position.Length) * delta)))
 
 		// Ensure that the list pays attention to the Offset field when the scrollbar drag
 		// is started while the bar is at the end of the list. Without this, the scrollbar
