@@ -633,6 +633,8 @@ func (t *Texture) Release() {
 	*t = Texture{}
 }
 
+func (b *Backend) PrepareTexture(tex driver.Texture) {}
+
 func (b *Backend) BindTexture(unit int, tex driver.Texture) {
 	t := tex.(*Texture)
 	b.ctx.PSSetSamplers(uint32(unit), t.sampler)

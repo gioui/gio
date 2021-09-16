@@ -75,9 +75,9 @@ func TestInputShader(t *testing.T) {
 	defer pipe.Release()
 	buf, err := b.NewImmutableBuffer(driver.BufferBindingVertices,
 		byteslice.Slice([]float32{
-			0, .5, .5, 1,
-			-.5, -.5, .5, 1,
-			.5, -.5, .5, 1,
+			0, -.5, .5, 1,
+			-.5, +.5, .5, 1,
+			.5, +.5, .5, 1,
 		}),
 	)
 	if err != nil {

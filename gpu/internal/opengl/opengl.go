@@ -1202,6 +1202,8 @@ func toTexFilter(f driver.TextureFilter) int {
 	}
 }
 
+func (b *Backend) PrepareTexture(tex driver.Texture) {}
+
 func (b *Backend) BindTexture(unit int, t driver.Texture) {
 	b.glstate.bindTexture(b.funcs, unit, t.(*texture).obj)
 }

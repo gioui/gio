@@ -931,6 +931,8 @@ func (p *Pipeline) Release() {
 	*p = Pipeline{}
 }
 
+func (b *Backend) PrepareTexture(tex driver.Texture) {}
+
 func (b *Backend) BindTexture(unit int, tex driver.Texture) {
 	t := tex.(*Texture)
 	if enc := b.renderEnc; enc != 0 {

@@ -862,6 +862,7 @@ func (g *compute) blitLayers(d driver.LoadDesc, fbo driver.Framebuffer, viewport
 			{posX: float32(r.Min.X), posY: float32(r.Max.Y), u: placef.X, v: placef.Y + sizef.Y},
 		}
 		g.output.layerVertices = append(g.output.layerVertices, quad[0], quad[1], quad[3], quad[3], quad[2], quad[1])
+		g.ctx.PrepareTexture(l.alloc.atlas.image)
 	}
 	if len(g.output.layerVertices) > 0 {
 		vertexData := byteslice.Slice(g.output.layerVertices)
@@ -893,9 +894,6 @@ func (g *compute) blitLayers(d driver.LoadDesc, fbo driver.Framebuffer, viewport
 		// Transform positions to clip space: [-1, -1] - [1, 1], and texture
 		// coordinates to texture space: [0, 0] - [1, 1].
 		clip := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(2/float32(viewport.X), 2/float32(viewport.Y))).Offset(f32.Pt(-1, -1))
-		// Flip y-axis to match framebuffer output space.
-		flipY := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(1, -1)).Offset(f32.Pt(0, float32(viewport.Y)))
-		clip = clip.Mul(flipY)
 		sx, _, ox, _, sy, oy := clip.Elems()
 		g.output.uniforms.scale = [2]float32{sx, sy}
 		g.output.uniforms.pos = [2]float32{ox, oy}
@@ -992,11 +990,10 @@ func (g *compute) renderMaterials() error {
 		if err := g.realizeAtlas(atlas, g.useCPU, atlas.packer.sizes[0]); err != nil {
 			return err
 		}
-		// Transform to clip space: [-1, -1] - [1, 1] and flip Y-axis to cancel the implied transformation
-		// between framebuffer and texture space.
+		// Transform to clip space: [-1, -1] - [1, 1].
 		*m.uniforms.u = materialUniforms{
-			scale: [2]float32{2, -2},
-			pos:   [2]float32{-1, +1},
+			scale: [2]float32{2, 2},
+			pos:   [2]float32{-1, -1},
 		}
 		if !g.srgb {
 			m.uniforms.u.emulatesRGB = 1.0
@@ -1010,6 +1007,7 @@ func (g *compute) renderMaterials() error {
 		if !realized {
 			d.Action = driver.LoadActionClear
 		}
+		g.ctx.PrepareTexture(imgAtlas.image)
 		g.ctx.BeginRenderPass(atlas.fbo, d)
 		g.ctx.BindTexture(0, imgAtlas.image)
 		g.ctx.BindPipeline(m.pipeline)

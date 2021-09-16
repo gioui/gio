@@ -289,7 +289,6 @@ type blitColUniforms struct {
 
 type blitTexUniforms struct {
 	blitUniforms
-	_ [12]byte // Padding to 16 bytes.
 }
 
 type blitLinearGradientUniforms struct {
@@ -312,7 +311,6 @@ type blitUniforms struct {
 	transform     [4]float32
 	uvTransformR1 [4]float32
 	uvTransformR2 [4]float32
-	z             float32
 }
 
 type colorUniforms struct {
@@ -417,10 +415,12 @@ func (g *gpu) frame(target RenderTarget) error {
 	g.renderer.packStencils(&g.drawOps.pathOps)
 	g.renderer.stencilClips(g.drawOps.pathCache, g.drawOps.pathOps)
 	g.renderer.packIntersections(g.drawOps.imageOps)
+	g.renderer.prepareIntersections(g.drawOps.imageOps)
 	g.renderer.intersect(g.drawOps.imageOps)
 	g.stencilTimer.end()
 	g.coverTimer.begin()
 	g.renderer.uploadImages(g.cache, g.drawOps.imageOps)
+	g.renderer.prepareDrawOps(g.cache, g.drawOps.imageOps)
 	d := driver.LoadDesc{
 		ClearColor: g.drawOps.clearColor,
 	}
@@ -508,10 +508,10 @@ func (r *renderer) release() {
 func newBlitter(ctx driver.Device) *blitter {
 	quadVerts, err := ctx.NewImmutableBuffer(driver.BufferBindingVertices,
 		byteslice.Slice([]float32{
-			-1, +1, 0, 0,
-			+1, +1, 1, 0,
-			-1, -1, 0, 1,
-			+1, -1, 1, 1,
+			-1, -1, 0, 0,
+			+1, -1, 1, 0,
+			-1, +1, 0, 1,
+			+1, +1, 1, 1,
 		}),
 	)
 	if err != nil {
@@ -666,6 +666,16 @@ func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
 	}
 	if fbo != -1 {
 		r.ctx.EndRenderPass()
+	}
+}
+
+func (r *renderer) prepareIntersections(ops []imageOp) {
+	for _, img := range ops {
+		if img.clipType != clipTypeIntersection {
+			continue
+		}
+		fbo := r.pather.stenciler.cover(img.path.place.Idx)
+		r.ctx.PrepareTexture(fbo.tex)
 	}
 }
 
@@ -1084,6 +1094,27 @@ func (r *renderer) uploadImages(cache *resourceCache, ops []imageOp) {
 	}
 }
 
+func (r *renderer) prepareDrawOps(cache *resourceCache, ops []imageOp) {
+	for _, img := range ops {
+		m := img.material
+		switch m.material {
+		case materialTexture:
+			r.ctx.PrepareTexture(r.texHandle(cache, m.data))
+		}
+
+		var fbo stencilFBO
+		switch img.clipType {
+		case clipTypeNone:
+			continue
+		case clipTypePath:
+			fbo = r.pather.stenciler.cover(img.place.Idx)
+		case clipTypeIntersection:
+			fbo = r.pather.stenciler.intersections.fbos[img.place.Idx]
+		}
+		r.ctx.PrepareTexture(fbo.tex)
+	}
+}
+
 func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 	var coverTex driver.Texture
 	for _, img := range ops {
@@ -1216,25 +1247,25 @@ func gradientSpaceTransform(clip image.Rectangle, off f32.Point, stop1, stop2 f3
 }
 
 // clipSpaceTransform returns the scale and offset that transforms the given
-// rectangle from a viewport into OpenGL clip space.
+// rectangle from a viewport into GPU driver device coordinates.
 func clipSpaceTransform(r image.Rectangle, viewport image.Point) (f32.Point, f32.Point) {
-	// First, transform UI coordinates to OpenGL coordinates:
+	// First, transform UI coordinates to device coordinates:
 	//
-	//	[(-1, +1) (+1, +1)]
 	//	[(-1, -1) (+1, -1)]
+	//	[(-1, +1) (+1, +1)]
 	//
 	x, y := float32(r.Min.X), float32(r.Min.Y)
 	w, h := float32(r.Dx()), float32(r.Dy())
 	vx, vy := 2/float32(viewport.X), 2/float32(viewport.Y)
 	x = x*vx - 1
-	y = 1 - y*vy
+	y = y*vy - 1
 	w *= vx
 	h *= vy
 
 	// Then, compute the transformation from the fullscreen quad to
 	// the rectangle at (x, y) and dimensions (w, h).
 	scale := f32.Point{X: w * .5, Y: h * .5}
-	offset := f32.Point{X: x + w*.5, Y: y - h*.5}
+	offset := f32.Point{X: x + w*.5, Y: y + h*.5}
 
 	return scale, offset
 }

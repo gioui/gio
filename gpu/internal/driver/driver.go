@@ -37,6 +37,7 @@ type Device interface {
 
 	BeginRenderPass(f Framebuffer, desc LoadDesc)
 	EndRenderPass()
+	PrepareTexture(t Texture)
 	BindProgram(p Program)
 	BindPipeline(p Pipeline)
 	BindTexture(unit int, t Texture)
