@@ -44,8 +44,6 @@ type Click struct {
 	pid pointer.ID
 }
 
-type ClickState uint8
-
 // ClickEvent represent a click action, either a
 // TypePress for the beginning of a click or a
 // TypeClick for a completed click.
@@ -109,7 +107,7 @@ const (
 const (
 	// StateIdle is the default scroll state.
 	StateIdle ScrollState = iota
-	// StateDrag is reported during drag gestures.
+	// StateDragging is reported during drag gestures.
 	StateDragging
 	// StateFlinging is reported when a fling is
 	// in progress.
@@ -120,11 +118,10 @@ var touchSlop = unit.Dp(3)
 
 // Add the handler to the operation list to receive click events.
 func (c *Click) Add(ops *op.Ops) {
-	op := pointer.InputOp{
+	pointer.InputOp{
 		Tag:   c,
 		Types: pointer.Press | pointer.Release | pointer.Enter | pointer.Leave,
-	}
-	op.Add(ops)
+	}.Add(ops)
 }
 
 // Hovered returns whether a pointer is inside the area.
@@ -137,7 +134,7 @@ func (c *Click) Pressed() bool {
 	return c.pressed
 }
 
-// Events returns the next click event, if any.
+// Events returns the next click events, if any.
 func (c *Click) Events(q event.Queue) []ClickEvent {
 	var events []ClickEvent
 	for _, evt := range q.Events(c) {
@@ -321,12 +318,11 @@ func (s *Scroll) State() ScrollState {
 
 // Add the handler to the operation list to receive drag events.
 func (d *Drag) Add(ops *op.Ops) {
-	op := pointer.InputOp{
+	pointer.InputOp{
 		Tag:   d,
 		Grab:  d.grab,
 		Types: pointer.Press | pointer.Drag | pointer.Release,
-	}
-	op.Add(ops)
+	}.Add(ops)
 }
 
 // Events returns the next drag events, if any.
@@ -382,7 +378,7 @@ func (d *Drag) Events(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event
 	return events
 }
 
-// Dragging reports whether it's currently in use.
+// Dragging reports whether it is currently in use.
 func (d *Drag) Dragging() bool { return d.dragging }
 
 func (a Axis) String() string {
