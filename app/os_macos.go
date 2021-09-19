@@ -252,10 +252,9 @@ func (w *window) Configure(options []Option) {
 			C.toggleFullScreen(w.window)
 		}
 	}
-}
-
-func (w *window) Config() Config {
-	return w.config
+	if w.config != prev {
+		w.w.Event(ConfigEvent{Config: w.config})
+	}
 }
 
 func (w *window) SetCursor(name pointer.CursorName) {
@@ -389,20 +388,23 @@ func gio_onChangeScreen(view C.CFTypeRef, did uint64) {
 func (w *window) draw() {
 	w.scale = float32(C.getViewBackingScale(w.view))
 	wf, hf := float32(C.viewWidth(w.view)), float32(C.viewHeight(w.view))
-	if wf == 0 || hf == 0 {
+	sz := image.Point{
+		X: int(wf*w.scale + .5),
+		Y: int(hf*w.scale + .5),
+	}
+	if sz != w.config.Size {
+		w.config.Size = sz
+		w.w.Event(ConfigEvent{Config: w.config})
+	}
+	if sz.X == 0 || sz.Y == 0 {
 		return
 	}
-	width := int(wf*w.scale + .5)
-	height := int(hf*w.scale + .5)
 	cfg := configFor(w.scale)
 	w.setStage(system.StageRunning)
 	w.w.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
-			Now: time.Now(),
-			Size: image.Point{
-				X: width,
-				Y: height,
-			},
+			Now:    time.Now(),
+			Size:   w.config.Size,
 			Metric: cfg,
 		},
 		Sync: true,

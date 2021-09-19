@@ -428,20 +428,23 @@ func (w *window) setStage(s system.Stage) {
 func (w *window) draw(sync bool) {
 	var r windows.Rect
 	windows.GetClientRect(w.hwnd, &r)
-	w.config.Size.X = int(r.Right - r.Left)
-	w.config.Size.Y = int(r.Bottom - r.Top)
+	size := image.Point{
+		X: int(r.Right - r.Left),
+		Y: int(r.Bottom - r.Top),
+	}
 	if w.config.Size.X == 0 || w.config.Size.Y == 0 {
 		return
+	}
+	if size != w.config.Size {
+		w.config.Size = size
+		w.w.Event(ConfigEvent{Config: w.config})
 	}
 	dpi := windows.GetWindowDPI(w.hwnd)
 	cfg := configForDPI(dpi)
 	w.w.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
-			Now: time.Now(),
-			Size: image.Point{
-				X: w.config.Size.X,
-				Y: w.config.Size.Y,
-			},
+			Now:    time.Now(),
+			Size:   w.config.Size,
 			Metric: cfg,
 		},
 		Sync: sync,
@@ -531,10 +534,9 @@ func (w *window) Configure(options []Option) {
 	if prev.Mode != cnf.Mode {
 		w.SetWindowMode(cnf.Mode)
 	}
-}
-
-func (w *window) Config() Config {
-	return w.config
+	if w.config != prev {
+		w.w.Event(ConfigEvent{Config: w.config})
+	}
 }
 
 func (w *window) SetWindowMode(mode WindowMode) {
