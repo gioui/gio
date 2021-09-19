@@ -162,16 +162,23 @@ func UniformInset(v unit.Value) Inset {
 // The widget is called with the context constraints minimum cleared.
 func (d Direction) Layout(gtx Context, w Widget) Dimensions {
 	macro := op.Record(gtx.Ops)
-	cs := gtx.Constraints
-	gtx.Constraints.Min = image.Point{}
+	csn := gtx.Constraints.Min
+	switch d {
+	case N, S:
+		gtx.Constraints.Min.Y = 0
+	case E, W:
+		gtx.Constraints.Min.X = 0
+	default:
+		gtx.Constraints.Min = image.Point{}
+	}
 	dims := w(gtx)
 	call := macro.Stop()
 	sz := dims.Size
-	if sz.X < cs.Min.X {
-		sz.X = cs.Min.X
+	if sz.X < csn.X {
+		sz.X = csn.X
 	}
-	if sz.Y < cs.Min.Y {
-		sz.Y = cs.Min.Y
+	if sz.Y < csn.Y {
+		sz.Y = csn.Y
 	}
 
 	defer op.Save(gtx.Ops).Load()
