@@ -94,12 +94,12 @@ func newWindow(win *callbacks, options []Option) error {
 	})
 	w.addEventListeners()
 	w.addHistory()
-	w.Configure(options)
 	w.w = win
 
 	go func() {
 		defer w.cleanup()
 		w.w.SetDriver(w)
+		w.Configure(options)
 		w.blur()
 		w.w.Event(system.StageEvent{Stage: system.StageRunning})
 		w.resize()
