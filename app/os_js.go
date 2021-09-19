@@ -528,10 +528,9 @@ func (w *window) Configure(options []Option) {
 		w.config.Orientation = cnf.Orientation
 		w.orientation(cnf.Orientation)
 	}
-}
-
-func (w *window) Config() Config {
-	return w.config
+	if w.config != prev {
+		w.w.Event(ConfigEvent{Config: w.config})
+	}
 }
 
 func (w *window) Raise() {}
@@ -588,18 +587,18 @@ func (w *window) resize() {
 }
 
 func (w *window) draw(sync bool) {
-	width, height, insets, metric := w.getConfig()
-	if metric == (unit.Metric{}) || width == 0 || height == 0 {
+	size, insets, metric := w.getConfig()
+	if size != w.config.Size {
+		w.config.Size = size
+		w.w.Event(ConfigEvent{Config: w.config})
+	}
+	if metric == (unit.Metric{}) || size.X == 0 || size.Y == 0 {
 		return
 	}
-
 	w.w.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
-			Now: time.Now(),
-			Size: image.Point{
-				X: width,
-				Y: height,
-			},
+			Now:    time.Now(),
+			Size:   w.config.Size,
 			Insets: insets,
 			Metric: metric,
 		},
@@ -607,8 +606,8 @@ func (w *window) draw(sync bool) {
 	})
 }
 
-func (w *window) getConfig() (int, int, system.Insets, unit.Metric) {
-	return w.config.Size.X, w.config.Size.Y, system.Insets{
+func (w *window) getConfig() (image.Point, system.Insets, unit.Metric) {
+	return image.Pt(w.config.Size.X, w.config.Size.Y), system.Insets{
 			Bottom: unit.Px(w.inset.Y),
 			Right:  unit.Px(w.inset.X),
 		}, unit.Metric{

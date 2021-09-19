@@ -46,6 +46,11 @@ type Config struct {
 	CustomRenderer bool
 }
 
+// ConfigEvent is sent whenever the configuration of a Window changes.
+type ConfigEvent struct {
+	Config Config
+}
+
 func (c *Config) apply(m unit.Metric, options []Option) {
 	for _, o := range options {
 		o(m, c)
@@ -135,9 +140,6 @@ type driver interface {
 	// Configure the window.
 	Configure([]Option)
 
-	// Config returns the current configuration.
-	Config() Config
-
 	// SetCursor updates the current cursor to name.
 	SetCursor(name pointer.CursorName)
 
@@ -187,4 +189,5 @@ func newWindowRendezvous() *windowRendezvous {
 	return wr
 }
 
-func (_ wakeupEvent) ImplementsEvent() {}
+func (wakeupEvent) ImplementsEvent() {}
+func (ConfigEvent) ImplementsEvent() {}

@@ -263,17 +263,6 @@ func (w *Window) Option(opts ...Option) {
 	})
 }
 
-// Config returns the Window configuration.
-//
-// A FrameEvent will occur whenever the configuration changes.
-func (w *Window) Config() Config {
-	var cnf Config
-	w.driverRun(func(d driver) {
-		cnf = d.Config()
-	})
-	return cnf
-}
-
 // ReadClipboard initiates a read of the clipboard in the form
 // of a clipboard.Event. Multiple reads may be coalesced
 // to a single event.
