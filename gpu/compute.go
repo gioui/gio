@@ -1278,12 +1278,12 @@ func (g *compute) render(images *textureAtlas, dst driver.Texture, cpuDst cpu.Im
 
 		if !g.useCPU {
 			g.ctx.BeginCompute()
-			g.ctx.BindImageTexture(kernel4OutputUnit, dst, driver.AccessWrite, driver.TextureFormatRGBA8)
+			g.ctx.BindImageTexture(kernel4OutputUnit, dst)
 			img := g.output.nullMaterials
 			if images != nil {
 				img = images.image
 			}
-			g.ctx.BindImageTexture(kernel4AtlasUnit, img, driver.AccessRead, driver.TextureFormatRGBA8)
+			g.ctx.BindImageTexture(kernel4AtlasUnit, img)
 		} else {
 			*g.output.descriptors.Binding2() = cpuDst
 			if images != nil {

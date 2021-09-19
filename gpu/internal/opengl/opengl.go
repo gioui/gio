@@ -96,14 +96,15 @@ type timer struct {
 }
 
 type texture struct {
-	backend *Backend
-	obj     gl.Texture
-	fbo     gl.Framebuffer
-	hasFBO  bool
-	triple  textureTriple
-	width   int
-	height  int
-	foreign bool
+	backend  *Backend
+	obj      gl.Texture
+	fbo      gl.Framebuffer
+	hasFBO   bool
+	triple   textureTriple
+	width    int
+	height   int
+	bindings driver.BufferBinding
+	foreign  bool
 }
 
 type pipeline struct {
@@ -675,7 +676,7 @@ func (t *texture) ensureFBO() gl.Framebuffer {
 
 func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, minFilter, magFilter driver.TextureFilter, binding driver.BufferBinding) (driver.Texture, error) {
 	glErr(b.funcs)
-	tex := &texture{backend: b, obj: b.funcs.CreateTexture(), width: width, height: height}
+	tex := &texture{backend: b, obj: b.funcs.CreateTexture(), width: width, height: height, bindings: binding}
 	switch format {
 	case driver.TextureFormatFloat:
 		tex.triple = b.floatTriple
@@ -772,27 +773,20 @@ func (b *Backend) DispatchCompute(x, y, z int) {
 	b.funcs.DispatchCompute(x, y, z)
 }
 
-func (b *Backend) BindImageTexture(unit int, tex driver.Texture, access driver.AccessBits, f driver.TextureFormat) {
+func (b *Backend) BindImageTexture(unit int, tex driver.Texture) {
 	t := tex.(*texture)
 	var acc gl.Enum
-	switch access {
-	case driver.AccessWrite:
-		acc = gl.WRITE_ONLY
-	case driver.AccessRead:
+	switch t.bindings & (driver.BufferBindingShaderStorageRead | driver.BufferBindingShaderStorageWrite) {
+	case driver.BufferBindingShaderStorageRead:
 		acc = gl.READ_ONLY
-	case driver.AccessRead | driver.AccessWrite:
+	case driver.BufferBindingShaderStorageWrite:
+		acc = gl.WRITE_ONLY
+	case driver.BufferBindingShaderStorageRead | driver.BufferBindingShaderStorageWrite:
 		acc = gl.READ_WRITE
 	default:
 		panic("unsupported access bits")
 	}
-	var format gl.Enum
-	switch f {
-	case driver.TextureFormatRGBA8:
-		format = gl.RGBA8
-	default:
-		panic("unsupported format")
-	}
-	b.funcs.BindImageTexture(unit, t.obj, 0, false, 0, acc, format)
+	b.funcs.BindImageTexture(unit, t.obj, 0, false, 0, acc, t.triple.internalFormat)
 }
 
 func (b *Backend) BlendFunc(sfactor, dfactor driver.BlendFactor) {

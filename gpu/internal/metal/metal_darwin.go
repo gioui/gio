@@ -814,7 +814,7 @@ func primitiveFor(mode driver.Topology) C.MTLPrimitiveType {
 	}
 }
 
-func (b *Backend) BindImageTexture(unit int, tex driver.Texture, access driver.AccessBits, f driver.TextureFormat) {
+func (b *Backend) BindImageTexture(unit int, tex driver.Texture) {
 	b.BindTexture(unit, tex)
 }
 

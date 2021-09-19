@@ -582,12 +582,12 @@ func (b *Backend) prepareDraw() {
 	b.ctx.IASetPrimitiveTopology(topology)
 }
 
-func (b *Backend) BindImageTexture(unit int, tex driver.Texture, access driver.AccessBits, f driver.TextureFormat) {
+func (b *Backend) BindImageTexture(unit int, tex driver.Texture) {
 	t := tex.(*Texture)
-	if access&driver.AccessWrite == 0 {
-		b.ctx.CSSetShaderResources(uint32(unit), t.resView)
-	} else {
+	if t.uaView != nil {
 		b.ctx.CSSetUnorderedAccessViews(uint32(unit), t.uaView)
+	} else {
+		b.ctx.CSSetShaderResources(uint32(unit), t.resView)
 	}
 }
 

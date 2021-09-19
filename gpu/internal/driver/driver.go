@@ -42,7 +42,7 @@ type Device interface {
 	BindTexture(unit int, t Texture)
 	BindVertexBuffer(b Buffer, offset int)
 	BindIndexBuffer(b Buffer)
-	BindImageTexture(unit int, texture Texture, access AccessBits, format TextureFormat)
+	BindImageTexture(unit int, texture Texture)
 	BindUniforms(buf Buffer)
 	BindStorageBuffer(binding int, buf Buffer)
 
@@ -90,8 +90,6 @@ type BlendDesc struct {
 	Enable               bool
 	SrcFactor, DstFactor BlendFactor
 }
-
-type AccessBits uint8
 
 type BlendFactor uint8
 
@@ -162,11 +160,6 @@ const (
 	TextureFormatRGBA8
 	// TextureFormatOutput denotes the format used by the output framebuffer.
 	TextureFormatOutput
-)
-
-const (
-	AccessRead AccessBits = 1 << iota
-	AccessWrite
 )
 
 const (
