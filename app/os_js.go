@@ -570,8 +570,8 @@ func (w *window) resize() {
 	w.scale = float32(w.window.Get("devicePixelRatio").Float())
 
 	rect := w.cnv.Call("getBoundingClientRect")
-	w.config.Size.X = int(rect.Get("width").Float()) * int(w.scale)
-	w.config.Size.Y = int(rect.Get("height").Float()) * int(w.scale)
+	w.config.Size.X = int(float32(rect.Get("width").Float()) * w.scale)
+	w.config.Size.Y = int(float32(rect.Get("height").Float()) * w.scale)
 
 	if vx, vy := w.visualViewport.Get("width"), w.visualViewport.Get("height"); !vx.IsUndefined() && !vy.IsUndefined() {
 		w.inset.X = float32(w.config.Size.X) - float32(vx.Float())*w.scale
@@ -598,7 +598,7 @@ func (w *window) draw(sync bool) {
 	w.w.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
 			Now:    time.Now(),
-			Size:   w.config.Size,
+			Size:   size,
 			Insets: insets,
 			Metric: metric,
 		},
