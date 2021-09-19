@@ -657,7 +657,7 @@ func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
 			}
 			fbo = p.place.Idx
 			f := r.pather.stenciler.cover(fbo)
-			r.ctx.BeginRenderPass(f.fbo, driver.LoadDesc{Action: driver.LoadActionClear})
+			r.ctx.BeginRenderPass(f.tex, driver.LoadDesc{Action: driver.LoadActionClear})
 			r.ctx.BindPipeline(r.pather.stenciler.pipeline.pipeline.pipeline)
 			r.ctx.BindIndexBuffer(r.pather.stenciler.indexBuf)
 		}
@@ -697,7 +697,7 @@ func (r *renderer) intersect(ops []imageOp) {
 			f := r.pather.stenciler.intersections.fbos[fbo]
 			d := driver.LoadDesc{Action: driver.LoadActionClear}
 			d.ClearColor.R = 1.0
-			r.ctx.BeginRenderPass(f.fbo, d)
+			r.ctx.BeginRenderPass(f.tex, d)
 			r.ctx.BindPipeline(r.pather.stenciler.ipipeline.pipeline.pipeline)
 			r.ctx.BindVertexBuffer(r.blitter.quadVerts, 0)
 		}

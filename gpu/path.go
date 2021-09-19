@@ -95,7 +95,6 @@ type fboSet struct {
 
 type stencilFBO struct {
 	size image.Point
-	fbo  driver.Framebuffer
 	tex  driver.Texture
 }
 
@@ -257,8 +256,7 @@ func (s *fboSet) resize(ctx driver.Device, sizes []image.Point) {
 		waste := float32(sz.X*sz.Y) / float32(f.size.X*f.size.Y)
 		resize = resize || waste > 1.2
 		if resize {
-			if f.fbo != nil {
-				f.fbo.Release()
+			if f.tex != nil {
 				f.tex.Release()
 			}
 			tex, err := ctx.NewTexture(driver.TextureFormatFloat, sz.X, sz.Y, driver.FilterNearest, driver.FilterNearest,
@@ -266,13 +264,8 @@ func (s *fboSet) resize(ctx driver.Device, sizes []image.Point) {
 			if err != nil {
 				panic(err)
 			}
-			fbo, err := ctx.NewFramebuffer(tex)
-			if err != nil {
-				panic(err)
-			}
 			f.size = sz
 			f.tex = tex
-			f.fbo = fbo
 		}
 	}
 	// Delete extra fbos.
@@ -282,7 +275,6 @@ func (s *fboSet) resize(ctx driver.Device, sizes []image.Point) {
 func (s *fboSet) delete(ctx driver.Device, idx int) {
 	for i := idx; i < len(s.fbos); i++ {
 		f := s.fbos[i]
-		f.fbo.Release()
 		f.tex.Release()
 	}
 	s.fbos = s.fbos[:idx]

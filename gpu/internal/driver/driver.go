@@ -15,7 +15,7 @@ import (
 // APIs such as OpenGL, Direct3D useful for rendering Gio
 // operations.
 type Device interface {
-	BeginFrame(target RenderTarget, clear bool, viewport image.Point) Framebuffer
+	BeginFrame(target RenderTarget, clear bool, viewport image.Point) Texture
 	EndFrame()
 	Caps() Caps
 	NewTimer() Timer
@@ -23,7 +23,6 @@ type Device interface {
 	// are valid at the point of call.
 	IsTimeContinuous() bool
 	NewTexture(format TextureFormat, width, height int, minFilter, magFilter TextureFilter, bindings BufferBinding) (Texture, error)
-	NewFramebuffer(tex Texture) (Framebuffer, error)
 	NewImmutableBuffer(typ BufferBinding, data []byte) (Buffer, error)
 	NewBuffer(typ BufferBinding, size int) (Buffer, error)
 	NewComputeProgram(shader shader.Sources) (Program, error)
@@ -35,7 +34,7 @@ type Device interface {
 	DrawArrays(off, count int)
 	DrawElements(off, count int)
 
-	BeginRenderPass(f Framebuffer, desc LoadDesc)
+	BeginRenderPass(t Texture, desc LoadDesc)
 	EndRenderPass()
 	PrepareTexture(t Texture)
 	BindProgram(p Program)
@@ -49,7 +48,7 @@ type Device interface {
 
 	BeginCompute()
 	EndCompute()
-	CopyTexture(dst Texture, dstOrigin image.Point, src Framebuffer, srcRect image.Rectangle)
+	CopyTexture(dst Texture, dstOrigin image.Point, src Texture, srcRect image.Rectangle)
 	MemoryBarrier()
 	DispatchCompute(x, y, z int)
 
@@ -133,12 +132,6 @@ type Buffer interface {
 	Download(data []byte) error
 }
 
-type Framebuffer interface {
-	RenderTarget
-	Release()
-	ReadPixels(src image.Rectangle, pixels []byte, stride int) error
-}
-
 type Timer interface {
 	Begin()
 	End()
@@ -147,7 +140,9 @@ type Timer interface {
 }
 
 type Texture interface {
+	RenderTarget
 	Upload(offset, size image.Point, pixels []byte, stride int)
+	ReadPixels(src image.Rectangle, pixels []byte, stride int) error
 	Release()
 }
 
@@ -210,9 +205,9 @@ func (f Features) Has(feats Features) bool {
 	return f&feats == feats
 }
 
-func DownloadImage(d Device, f Framebuffer, r image.Rectangle) (*image.RGBA, error) {
+func DownloadImage(d Device, t Texture, r image.Rectangle) (*image.RGBA, error) {
 	img := image.NewRGBA(r)
-	if err := f.ReadPixels(r, img.Pix, img.Stride); err != nil {
+	if err := t.ReadPixels(r, img.Pix, img.Stride); err != nil {
 		return nil, err
 	}
 	if d.Caps().BottomLeftOrigin {

@@ -21,7 +21,6 @@ type Window struct {
 	dev    driver.Device
 	gpu    gpu.GPU
 	fboTex driver.Texture
-	fbo    driver.Framebuffer
 }
 
 type context interface {
@@ -56,20 +55,13 @@ func NewWindow(width, height int) (*Window, error) {
 		if err != nil {
 			return nil
 		}
-		fbo, err := dev.NewFramebuffer(fboTex)
-		if err != nil {
-			fboTex.Release()
-			return err
-		}
 		gp, err := gpu.New(api)
 		if err != nil {
-			fbo.Release()
 			fboTex.Release()
 			dev.Release()
 			return err
 		}
 		w.fboTex = fboTex
-		w.fbo = fbo
 		w.gpu = gp
 		w.dev = dev
 		return err
@@ -84,10 +76,6 @@ func NewWindow(width, height int) (*Window, error) {
 // Release resources associated with the window.
 func (w *Window) Release() {
 	contextDo(w.ctx, func() error {
-		if w.fbo != nil {
-			w.fbo.Release()
-			w.fbo = nil
-		}
 		if w.fboTex != nil {
 			w.fboTex.Release()
 			w.fboTex = nil
@@ -113,7 +101,7 @@ func (w *Window) Release() {
 func (w *Window) Frame(frame *op.Ops) error {
 	return contextDo(w.ctx, func() error {
 		w.gpu.Clear(color.NRGBA{})
-		return w.gpu.Frame(frame, driver.RenderTarget(w.fbo), w.size)
+		return w.gpu.Frame(frame, w.fboTex, w.size)
 	})
 }
 
@@ -122,7 +110,7 @@ func (w *Window) Screenshot() (*image.RGBA, error) {
 	var img *image.RGBA
 	err := contextDo(w.ctx, func() error {
 		var err error
-		img, err = driver.DownloadImage(w.dev, w.fbo, image.Rectangle{Max: w.size})
+		img, err = driver.DownloadImage(w.dev, w.fboTex, image.Rectangle{Max: w.size})
 		return err
 	})
 	if err != nil {

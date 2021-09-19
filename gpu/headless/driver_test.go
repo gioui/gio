@@ -144,7 +144,7 @@ func TestFramebuffers(t *testing.T) {
 	}
 }
 
-func newFBO(t *testing.T, b driver.Device, size image.Point) driver.Framebuffer {
+func newFBO(t *testing.T, b driver.Device, size image.Point) driver.Texture {
 	fboTex, err := b.NewTexture(
 		driver.TextureFormatSRGBA,
 		size.X, size.Y,
@@ -157,14 +157,7 @@ func newFBO(t *testing.T, b driver.Device, size image.Point) driver.Framebuffer 
 	t.Cleanup(func() {
 		fboTex.Release()
 	})
-	fbo, err := b.NewFramebuffer(fboTex)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		fbo.Release()
-	})
-	return fbo
+	return fboTex
 }
 
 func newDriver(t *testing.T) driver.Device {
@@ -191,7 +184,7 @@ func newDriver(t *testing.T) driver.Device {
 	return b
 }
 
-func screenshot(t *testing.T, d driver.Device, fbo driver.Framebuffer, size image.Point) *image.RGBA {
+func screenshot(t *testing.T, d driver.Device, fbo driver.Texture, size image.Point) *image.RGBA {
 	img, err := driver.DownloadImage(d, fbo, image.Rectangle{Max: size})
 	if err != nil {
 		t.Fatal(err)

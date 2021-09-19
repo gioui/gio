@@ -149,7 +149,6 @@ type atlasMove struct {
 
 type textureAtlas struct {
 	image     driver.Texture
-	fbo       driver.Framebuffer
 	format    driver.TextureFormat
 	bindings  driver.BufferBinding
 	hasCPU    bool
@@ -356,7 +355,7 @@ type memoryHeader struct {
 type rectangle [4]f32.Point
 
 const (
-	layersBindings    = driver.BufferBindingShaderStorageWrite | driver.BufferBindingTexture | driver.BufferBindingFramebuffer
+	layersBindings    = driver.BufferBindingShaderStorageWrite | driver.BufferBindingTexture
 	materialsBindings = driver.BufferBindingFramebuffer | driver.BufferBindingShaderStorageRead
 	// Materials and layers can share texture storage if their bindings match.
 	combinedBindings = layersBindings | materialsBindings
@@ -644,7 +643,7 @@ func (g *compute) frame(target RenderTarget) error {
 
 func (g *compute) dumpAtlases() {
 	for i, a := range g.atlases {
-		dump, err := driver.DownloadImage(g.ctx, a.fbo, image.Rectangle{Max: a.size})
+		dump, err := driver.DownloadImage(g.ctx, a.image, image.Rectangle{Max: a.size})
 		if err != nil {
 			panic(err)
 		}
@@ -752,7 +751,7 @@ func (g *compute) compactAllocs() error {
 		}
 		for _, move := range g.moves {
 			if !move.cpu {
-				g.ctx.CopyTexture(dstAtlas.image, move.dstPos, move.src.fbo, move.srcRect)
+				g.ctx.CopyTexture(dstAtlas.image, move.dstPos, move.src.image, move.srcRect)
 			} else {
 				src := move.src.cpuImage.Data()
 				dst := dstAtlas.cpuImage.Data()
@@ -848,7 +847,7 @@ func (g *compute) renderLayers(viewport image.Point) error {
 	return nil
 }
 
-func (g *compute) blitLayers(d driver.LoadDesc, fbo driver.Framebuffer, viewport image.Point) {
+func (g *compute) blitLayers(d driver.LoadDesc, fbo driver.Texture, viewport image.Point) {
 	layers := g.collector.frame.layers
 	g.output.layerVertices = g.output.layerVertices[:0]
 	for _, l := range layers {
@@ -1008,7 +1007,7 @@ func (g *compute) renderMaterials() error {
 			d.Action = driver.LoadActionClear
 		}
 		g.ctx.PrepareTexture(imgAtlas.image)
-		g.ctx.BeginRenderPass(atlas.fbo, d)
+		g.ctx.BeginRenderPass(atlas.image, d)
 		g.ctx.BindTexture(0, imgAtlas.image)
 		g.ctx.BindPipeline(m.pipeline)
 		g.ctx.BindUniforms(m.uniforms.buf)
@@ -1023,14 +1022,14 @@ func (g *compute) renderMaterials() error {
 		if !g.useCPU {
 			continue
 		}
-		copyFBO := atlas.fbo
+		src := atlas.image
 		data := atlas.cpuImage.Data()
 		for _, a := range newAllocs {
 			stride := atlas.size.X * 4
 			col := a.rect.Min.X * 4
 			row := stride * a.rect.Min.Y
 			off := col + row
-			copyFBO.ReadPixels(a.rect, data[off:], stride)
+			src.ReadPixels(a.rect, data[off:], stride)
 		}
 	}
 	return nil
@@ -1458,12 +1457,6 @@ func (a *textureAtlas) resize(ctx driver.Device, size image.Point) error {
 	if err != nil {
 		return err
 	}
-	fbo, err := ctx.NewFramebuffer(img)
-	if err != nil {
-		img.Release()
-		return err
-	}
-	a.fbo = fbo
 	a.image = img
 	a.size = size
 	return nil
@@ -1518,10 +1511,6 @@ func (g *compute) Release() {
 }
 
 func (a *textureAtlas) Release() {
-	if a.fbo != nil {
-		a.fbo.Release()
-		a.fbo = nil
-	}
 	if a.image != nil {
 		a.image.Release()
 		a.image = nil

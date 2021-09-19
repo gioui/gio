@@ -98,14 +98,11 @@ type timer struct {
 type texture struct {
 	backend *Backend
 	obj     gl.Texture
+	fbo     gl.Framebuffer
+	hasFBO  bool
 	triple  textureTriple
 	width   int
 	height  int
-}
-
-type framebuffer struct {
-	backend *Backend
-	obj     gl.Framebuffer
 	foreign bool
 }
 
@@ -213,7 +210,7 @@ func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 	return b, nil
 }
 
-func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport image.Point) driver.Framebuffer {
+func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport image.Point) driver.Texture {
 	b.clear = clear
 	b.glstate = b.queryState()
 	b.savedState = b.glstate
@@ -223,8 +220,8 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 		switch t := target.(type) {
 		case driver.OpenGLRenderTarget:
 			renderFBO = gl.Framebuffer(t)
-		case *framebuffer:
-			renderFBO = t.obj
+		case *texture:
+			renderFBO = t.ensureFBO()
 		default:
 			panic(fmt.Errorf("opengl: invalid render target type: %T", target))
 		}
@@ -265,7 +262,7 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 	if b.sRGBFBO != nil && !clear {
 		b.clearOutput(0, 0, 0, 0)
 	}
-	return &framebuffer{backend: b, obj: renderFBO, foreign: true}
+	return &texture{backend: b, fbo: renderFBO, hasFBO: true, foreign: true}
 }
 
 func (b *Backend) EndFrame() {
@@ -650,22 +647,30 @@ func (b *Backend) IsTimeContinuous() bool {
 	return b.funcs.GetInteger(gl.GPU_DISJOINT_EXT) == gl.FALSE
 }
 
-func (b *Backend) NewFramebuffer(tex driver.Texture) (driver.Framebuffer, error) {
+func (t *texture) ensureFBO() gl.Framebuffer {
+	if t.hasFBO {
+		return t.fbo
+	}
+	b := t.backend
+	oldFBO := b.glstate.drawFBO
+	defer func() {
+		b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, oldFBO)
+	}()
 	glErr(b.funcs)
-	gltex := tex.(*texture)
 	fb := b.funcs.CreateFramebuffer()
-	fbo := &framebuffer{backend: b, obj: fb}
-	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, fbo.obj)
+	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, fb)
 	if err := glErr(b.funcs); err != nil {
-		fbo.Release()
-		return nil, err
+		b.funcs.DeleteFramebuffer(fb)
+		panic(err)
 	}
-	b.funcs.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, gltex.obj, 0)
+	b.funcs.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.obj, 0)
 	if st := b.funcs.CheckFramebufferStatus(gl.FRAMEBUFFER); st != gl.FRAMEBUFFER_COMPLETE {
-		fbo.Release()
-		return nil, fmt.Errorf("incomplete framebuffer, status = 0x%x, err = %d", st, b.funcs.GetError())
+		b.funcs.DeleteFramebuffer(fb)
+		panic(fmt.Errorf("incomplete framebuffer, status = 0x%x, err = %d", st, b.funcs.GetError()))
 	}
-	return fbo, nil
+	t.fbo = fb
+	t.hasFBO = true
+	return fb
 }
 
 func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, minFilter, magFilter driver.TextureFilter, binding driver.BufferBinding) (driver.Texture, error) {
@@ -1120,21 +1125,21 @@ func (b *Backend) BindIndexBuffer(buf driver.Buffer) {
 	b.glstate.bindBuffer(b.funcs, gl.ELEMENT_ARRAY_BUFFER, gbuf.obj)
 }
 
-func (b *Backend) CopyTexture(dst driver.Texture, dstOrigin image.Point, src driver.Framebuffer, srcRect image.Rectangle) {
+func (b *Backend) CopyTexture(dst driver.Texture, dstOrigin image.Point, src driver.Texture, srcRect image.Rectangle) {
 	const unit = 0
 	oldTex := b.glstate.texUnits.binds[unit]
 	defer func() {
 		b.glstate.bindTexture(b.funcs, unit, oldTex)
 	}()
 	b.glstate.bindTexture(b.funcs, unit, dst.(*texture).obj)
-	b.glstate.bindFramebuffer(b.funcs, gl.READ_FRAMEBUFFER, src.(*framebuffer).obj)
+	b.glstate.bindFramebuffer(b.funcs, gl.READ_FRAMEBUFFER, src.(*texture).ensureFBO())
 	sz := srcRect.Size()
 	b.funcs.CopyTexSubImage2D(gl.TEXTURE_2D, 0, dstOrigin.X, dstOrigin.Y, srcRect.Min.X, srcRect.Min.Y, sz.X, sz.Y)
 }
 
-func (f *framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int) error {
-	glErr(f.backend.funcs)
-	f.backend.glstate.bindFramebuffer(f.backend.funcs, gl.FRAMEBUFFER, f.obj)
+func (t *texture) ReadPixels(src image.Rectangle, pixels []byte, stride int) error {
+	glErr(t.backend.funcs)
+	t.backend.glstate.bindFramebuffer(t.backend.funcs, gl.FRAMEBUFFER, t.ensureFBO())
 	if len(pixels) < src.Dx()*src.Dy()*4 {
 		return errors.New("unexpected RGBA size")
 	}
@@ -1144,9 +1149,9 @@ func (f *framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int)
 	if n := stride / 4; n != w {
 		rowLen = n
 	}
-	f.backend.glstate.pixelStorei(f.backend.funcs, gl.PACK_ROW_LENGTH, rowLen)
-	f.backend.funcs.ReadPixels(src.Min.X, src.Min.Y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
-	return glErr(f.backend.funcs)
+	t.backend.glstate.pixelStorei(t.backend.funcs, gl.PACK_ROW_LENGTH, rowLen)
+	t.backend.funcs.ReadPixels(src.Min.X, src.Min.Y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+	return glErr(t.backend.funcs)
 }
 
 func (b *Backend) BindPipeline(pl driver.Pipeline) {
@@ -1163,8 +1168,9 @@ func (b *Backend) BeginCompute() {
 func (b *Backend) EndCompute() {
 }
 
-func (b *Backend) BeginRenderPass(fbo driver.Framebuffer, desc driver.LoadDesc) {
-	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, fbo.(*framebuffer).obj)
+func (b *Backend) BeginRenderPass(tex driver.Texture, desc driver.LoadDesc) {
+	fbo := tex.(*texture).ensureFBO()
+	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, fbo)
 	switch desc.Action {
 	case driver.LoadActionClear:
 		c := desc.ClearColor
@@ -1177,14 +1183,7 @@ func (b *Backend) BeginRenderPass(fbo driver.Framebuffer, desc driver.LoadDesc) 
 func (b *Backend) EndRenderPass() {
 }
 
-func (f *framebuffer) Release() {
-	if f.foreign {
-		panic("framebuffer not created by NewFramebuffer")
-	}
-	f.backend.glstate.deleteFramebuffer(f.backend.funcs, f.obj)
-}
-
-func (f *framebuffer) ImplementsRenderTarget() {}
+func (f *texture) ImplementsRenderTarget() {}
 
 func (p *pipeline) Release() {
 	p.prog.Release()
@@ -1209,6 +1208,12 @@ func (b *Backend) BindTexture(unit int, t driver.Texture) {
 }
 
 func (t *texture) Release() {
+	if t.foreign {
+		panic("texture not created by NewTexture")
+	}
+	if t.hasFBO {
+		t.backend.glstate.deleteFramebuffer(t.backend.funcs, t.fbo)
+	}
 	t.backend.glstate.deleteTexture(t.backend.funcs, t.obj)
 }
 

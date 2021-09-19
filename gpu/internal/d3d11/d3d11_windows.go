@@ -35,9 +35,6 @@ type Backend struct {
 
 	caps driver.Caps
 
-	// fbo is the currently bound fbo.
-	fbo *Framebuffer
-
 	floatFormat uint32
 }
 
@@ -51,15 +48,18 @@ type Pipeline struct {
 }
 
 type Texture struct {
-	backend  *Backend
-	format   uint32
-	bindings driver.BufferBinding
-	tex      *d3d11.Texture2D
-	sampler  *d3d11.SamplerState
-	resView  *d3d11.ShaderResourceView
-	uaView   *d3d11.UnorderedAccessView
-	width    int
-	height   int
+	backend      *Backend
+	format       uint32
+	bindings     driver.BufferBinding
+	tex          *d3d11.Texture2D
+	sampler      *d3d11.SamplerState
+	resView      *d3d11.ShaderResourceView
+	uaView       *d3d11.UnorderedAccessView
+	renderTarget *d3d11.RenderTargetView
+
+	width   int
+	height  int
+	foreign bool
 }
 
 type VertexShader struct {
@@ -76,15 +76,6 @@ type FragmentShader struct {
 type Program struct {
 	backend *Backend
 	shader  *d3d11.ComputeShader
-}
-
-type Framebuffer struct {
-	dev          *d3d11.Device
-	ctx          *d3d11.DeviceContext
-	format       uint32
-	resource     *d3d11.Resource
-	renderTarget *d3d11.RenderTargetView
-	foreign      bool
 }
 
 type Buffer struct {
@@ -159,7 +150,7 @@ func newDirect3D11Device(api driver.Direct3D11) (driver.Device, error) {
 	return b, nil
 }
 
-func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport image.Point) driver.Framebuffer {
+func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport image.Point) driver.Texture {
 	var (
 		renderTarget *d3d11.RenderTargetView
 	)
@@ -167,19 +158,19 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 		switch t := target.(type) {
 		case driver.Direct3D11RenderTarget:
 			renderTarget = (*d3d11.RenderTargetView)(t.RenderTarget)
-		case *Framebuffer:
+		case *Texture:
 			renderTarget = t.renderTarget
 		default:
 			panic(fmt.Errorf("d3d11: invalid render target type: %T", target))
 		}
 	}
 	b.ctx.OMSetRenderTargets(renderTarget, nil)
-	return &Framebuffer{ctx: b.ctx, dev: b.dev, renderTarget: renderTarget, foreign: true}
+	return &Texture{backend: b, renderTarget: renderTarget, foreign: true}
 }
 
-func (b *Backend) CopyTexture(dstTex driver.Texture, dstOrigin image.Point, srcFBO driver.Framebuffer, srcRect image.Rectangle) {
+func (b *Backend) CopyTexture(dstTex driver.Texture, dstOrigin image.Point, srcTex driver.Texture, srcRect image.Rectangle) {
 	dst := (*d3d11.Resource)(unsafe.Pointer(dstTex.(*Texture).tex))
-	src := srcFBO.(*Framebuffer).resource
+	src := (*d3d11.Resource)(srcTex.(*Texture).tex)
 	b.ctx.CopySubresourceRegion(
 		dst,
 		0,                                           // Destination subresource.
@@ -248,6 +239,7 @@ func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, min
 		sampler *d3d11.SamplerState
 		resView *d3d11.ShaderResourceView
 		uaView  *d3d11.UnorderedAccessView
+		fbo     *d3d11.RenderTargetView
 	)
 	if bindings&driver.BufferBindingTexture != 0 {
 		var filter uint32
@@ -317,21 +309,24 @@ func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, min
 			return nil, err
 		}
 	}
-	return &Texture{backend: b, format: d3dfmt, tex: tex, sampler: sampler, resView: resView, uaView: uaView, bindings: bindings, width: width, height: height}, nil
-}
-
-func (b *Backend) NewFramebuffer(tex driver.Texture) (driver.Framebuffer, error) {
-	d3dtex := tex.(*Texture)
-	if d3dtex.bindings&driver.BufferBindingFramebuffer == 0 {
-		return nil, errors.New("the texture was created without BufferBindingFramebuffer binding")
+	if bindings&driver.BufferBindingFramebuffer != 0 {
+		resource := (*d3d11.Resource)(unsafe.Pointer(tex))
+		fbo, err = b.dev.CreateRenderTargetView(resource)
+		if err != nil {
+			if uaView != nil {
+				d3d11.IUnknownRelease(unsafe.Pointer(uaView), uaView.Vtbl.Release)
+			}
+			if sampler != nil {
+				d3d11.IUnknownRelease(unsafe.Pointer(sampler), sampler.Vtbl.Release)
+			}
+			if resView != nil {
+				d3d11.IUnknownRelease(unsafe.Pointer(resView), resView.Vtbl.Release)
+			}
+			d3d11.IUnknownRelease(unsafe.Pointer(tex), tex.Vtbl.Release)
+			return nil, err
+		}
 	}
-	resource := (*d3d11.Resource)(unsafe.Pointer(d3dtex.tex))
-	renderTarget, err := b.dev.CreateRenderTargetView(resource)
-	if err != nil {
-		return nil, err
-	}
-	fbo := &Framebuffer{ctx: b.ctx, dev: b.dev, format: d3dtex.format, resource: resource, renderTarget: renderTarget}
-	return fbo, nil
+	return &Texture{backend: b, format: d3dfmt, tex: tex, sampler: sampler, resView: resView, uaView: uaView, renderTarget: fbo, bindings: bindings, width: width, height: height}, nil
 }
 
 func (b *Backend) newInputLayout(vertexShader shader.Sources, layout []driver.InputDesc) (*d3d11.InputLayout, error) {
@@ -620,6 +615,12 @@ func (t *Texture) Upload(offset, size image.Point, pixels []byte, stride int) {
 }
 
 func (t *Texture) Release() {
+	if t.foreign {
+		panic("texture not created by NewTexture")
+	}
+	if t.renderTarget != nil {
+		d3d11.IUnknownRelease(unsafe.Pointer(t.renderTarget), t.renderTarget.Vtbl.Release)
+	}
 	if t.sampler != nil {
 		d3d11.IUnknownRelease(unsafe.Pointer(t.sampler), t.sampler.Vtbl.Release)
 	}
@@ -736,17 +737,14 @@ func (b *Buffer) Release() {
 	*b = Buffer{}
 }
 
-func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int) error {
-	if f.resource == nil {
-		return errors.New("framebuffer does not support ReadPixels")
-	}
+func (t *Texture) ReadPixels(src image.Rectangle, pixels []byte, stride int) error {
 	w, h := src.Dx(), src.Dy()
-	tex, err := f.dev.CreateTexture2D(&d3d11.TEXTURE2D_DESC{
+	tex, err := t.backend.dev.CreateTexture2D(&d3d11.TEXTURE2D_DESC{
 		Width:     uint32(w),
 		Height:    uint32(h),
 		MipLevels: 1,
 		ArraySize: 1,
-		Format:    f.format,
+		Format:    t.format,
 		SampleDesc: d3d11.DXGI_SAMPLE_DESC{
 			Count:   1,
 			Quality: 0,
@@ -759,11 +757,11 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int)
 	}
 	defer d3d11.IUnknownRelease(unsafe.Pointer(tex), tex.Vtbl.Release)
 	res := (*d3d11.Resource)(unsafe.Pointer(tex))
-	f.ctx.CopySubresourceRegion(
+	t.backend.ctx.CopySubresourceRegion(
 		res,
 		0,       // Destination subresource.
 		0, 0, 0, // Destination coordinates (x, y, z).
-		f.resource,
+		(*d3d11.Resource)(t.tex),
 		0, // Source subresource.
 		&d3d11.BOX{
 			Left:   uint32(src.Min.X),
@@ -774,11 +772,11 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int)
 			Back:   1,
 		},
 	)
-	resMap, err := f.ctx.Map(res, 0, d3d11.MAP_READ, 0)
+	resMap, err := t.backend.ctx.Map(res, 0, d3d11.MAP_READ, 0)
 	if err != nil {
 		return fmt.Errorf("ReadPixels: %v", err)
 	}
-	defer f.ctx.Unmap(res, 0)
+	defer t.backend.ctx.Unmap(res, 0)
 	srcPitch := stride
 	dstPitch := int(resMap.RowPitch)
 	mapSize := dstPitch * h
@@ -797,30 +795,20 @@ func (b *Backend) BeginCompute() {
 func (b *Backend) EndCompute() {
 }
 
-func (b *Backend) BeginRenderPass(fbo driver.Framebuffer, d driver.LoadDesc) {
-	b.fbo = fbo.(*Framebuffer)
-	b.ctx.OMSetRenderTargets(b.fbo.renderTarget, nil)
+func (b *Backend) BeginRenderPass(tex driver.Texture, d driver.LoadDesc) {
+	t := tex.(*Texture)
+	b.ctx.OMSetRenderTargets(t.renderTarget, nil)
 	if d.Action == driver.LoadActionClear {
 		c := d.ClearColor
 		b.clearColor = [4]float32{c.R, c.G, c.B, c.A}
-		b.ctx.ClearRenderTargetView(b.fbo.renderTarget, &b.clearColor)
+		b.ctx.ClearRenderTargetView(t.renderTarget, &b.clearColor)
 	}
 }
 
 func (b *Backend) EndRenderPass() {
 }
 
-func (f *Framebuffer) Release() {
-	if f.foreign {
-		panic("framebuffer not created by NewFramebuffer")
-	}
-	if f.renderTarget != nil {
-		d3d11.IUnknownRelease(unsafe.Pointer(f.renderTarget), f.renderTarget.Vtbl.Release)
-		f.renderTarget = nil
-	}
-}
-
-func (f *Framebuffer) ImplementsRenderTarget() {}
+func (f *Texture) ImplementsRenderTarget() {}
 
 func convBufferBinding(typ driver.BufferBinding) uint32 {
 	var bindings uint32

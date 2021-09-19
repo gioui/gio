@@ -407,6 +407,7 @@ type Texture struct {
 	sampler C.CFTypeRef
 	width   int
 	height  int
+	foreign bool
 }
 
 type Shader struct {
@@ -422,12 +423,6 @@ type Program struct {
 type Pipeline struct {
 	pipeline C.CFTypeRef
 	topology C.MTLPrimitiveType
-}
-
-type Framebuffer struct {
-	backend *Backend
-	texture C.CFTypeRef
-	foreign bool
 }
 
 type Buffer struct {
@@ -469,7 +464,7 @@ func newMetalDevice(api driver.Metal) (driver.Device, error) {
 	return b, nil
 }
 
-func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport image.Point) driver.Framebuffer {
+func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport image.Point) driver.Texture {
 	if b.lastCmdBuffer != 0 {
 		C.cmdBufferWaitUntilCompleted(b.lastCmdBuffer)
 		b.stagingOff = 0
@@ -477,13 +472,11 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 	if target == nil {
 		return nil
 	}
-	var texture C.CFTypeRef
 	switch t := target.(type) {
 	case driver.MetalRenderTarget:
-		texture = C.CFTypeRef(t.Texture)
-		return &Framebuffer{texture: texture, foreign: true}
-	case *Framebuffer:
-		texture = C.CFTypeRef(t.texture)
+		texture := C.CFTypeRef(t.Texture)
+		return &Texture{texture: texture, foreign: true}
+	case *Texture:
 		return t
 	default:
 		panic(fmt.Sprintf("metal: unsupported render target type: %T", t))
@@ -503,10 +496,10 @@ func (b *Backend) startBlit() C.CFTypeRef {
 	return b.blitEnc
 }
 
-func (b *Backend) CopyTexture(dst driver.Texture, dorig image.Point, src driver.Framebuffer, srect image.Rectangle) {
+func (b *Backend) CopyTexture(dst driver.Texture, dorig image.Point, src driver.Texture, srect image.Rectangle) {
 	enc := b.startBlit()
 	dstTex := dst.(*Texture).texture
-	srcTex := src.(*Framebuffer).texture
+	srcTex := src.(*Texture).texture
 	ssz := srect.Size()
 	C.blitEncCopyFromTexture(
 		enc,
@@ -718,13 +711,6 @@ func pixelFormatFor(f driver.TextureFormat) C.MTLPixelFormat {
 	}
 }
 
-func (b *Backend) NewFramebuffer(tex driver.Texture) (driver.Framebuffer, error) {
-	t := tex.(*Texture)
-	C.CFRetain(t.texture)
-	fbo := &Framebuffer{backend: b, texture: t.texture}
-	return fbo, nil
-}
-
 func (b *Backend) NewBuffer(typ driver.BufferBinding, size int) (driver.Buffer, error) {
 	// Transfer buffer contents in command encoders on every use for
 	// smaller buffers. The advantage is that buffer re-use during a frame
@@ -921,6 +907,9 @@ func (t *Texture) Upload(offset, size image.Point, pixels []byte, stride int) {
 }
 
 func (t *Texture) Release() {
+	if t.foreign {
+		panic("metal: release of external texture")
+	}
 	C.CFRelease(t.texture)
 	C.CFRelease(t.sampler)
 	*t = Texture{}
@@ -1076,7 +1065,7 @@ func (b *Buffer) Release() {
 	*b = Buffer{}
 }
 
-func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int) error {
+func (t *Texture) ReadPixels(src image.Rectangle, pixels []byte, stride int) error {
 	if len(pixels) == 0 {
 		return nil
 	}
@@ -1092,10 +1081,10 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int)
 	}
 	stageStride := sz.X * 4
 	n := sz.Y * stageStride
-	buf, off := f.backend.stagingBuffer(n)
-	enc := f.backend.startBlit()
-	C.blitEncCopyTextureToBuffer(enc, f.texture, buf, C.NSUInteger(off), C.NSUInteger(stageStride), C.NSUInteger(n), msize, orig)
-	f.backend.endCmdBuffer(true)
+	buf, off := t.backend.stagingBuffer(n)
+	enc := t.backend.startBlit()
+	C.blitEncCopyTextureToBuffer(enc, t.texture, buf, C.NSUInteger(off), C.NSUInteger(stageStride), C.NSUInteger(n), msize, orig)
+	t.backend.endCmdBuffer(true)
 	store := bufferSlice(buf, off, n)
 	var srcOff, dstOff int
 	for y := 0; y < sz.Y; y++ {
@@ -1108,10 +1097,10 @@ func (f *Framebuffer) ReadPixels(src image.Rectangle, pixels []byte, stride int)
 	return nil
 }
 
-func (b *Backend) BeginRenderPass(fbo driver.Framebuffer, d driver.LoadDesc) {
+func (b *Backend) BeginRenderPass(tex driver.Texture, d driver.LoadDesc) {
 	b.endEncoder()
 	b.ensureCmdBuffer()
-	f := fbo.(*Framebuffer)
+	f := tex.(*Texture)
 	col := d.ClearColor
 	var act C.MTLLoadAction
 	switch d.Action {
@@ -1151,12 +1140,4 @@ func (b *Backend) endEncoder() {
 	}
 }
 
-func (f *Framebuffer) Release() {
-	if f.foreign {
-		panic("metal: invalid release of external framebuffer")
-	}
-	C.CFRelease(f.texture)
-	*f = Framebuffer{}
-}
-
-func (f *Framebuffer) ImplementsRenderTarget() {}
+func (f *Texture) ImplementsRenderTarget() {}
