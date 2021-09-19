@@ -60,6 +60,10 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 @end
 
 @implementation GioView
+- (void)setFrameSize:(NSSize)newSize {
+	[super setFrameSize:newSize];
+	[self setNeedsDisplay:YES];
+}
 // drawRect is called when OpenGL is used, displayLayer otherwise.
 // Don't know why.
 - (void)drawRect:(NSRect)r {
@@ -233,7 +237,7 @@ CFTypeRef gio_createView(void) {
 	@autoreleasepool {
 		NSRect frame = NSMakeRect(0, 0, 0, 0);
 		GioView* view = [[GioView alloc] initWithFrame:frame];
-		[view setWantsLayer:YES];
+		view.wantsLayer = YES;
 		view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
 		return CFBridgingRetain(view);
 	}
