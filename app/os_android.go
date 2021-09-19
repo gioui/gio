@@ -507,19 +507,20 @@ func (w *window) SetAnimating(anim bool) {
 }
 
 func (w *window) draw(sync bool) {
-	width, height := C.ANativeWindow_getWidth(w.win), C.ANativeWindow_getHeight(w.win)
-	if width == 0 || height == 0 {
+	size := image.Pt(int(C.ANativeWindow_getWidth(w.win)), int(C.ANativeWindow_getHeight(w.win)))
+	if size != w.config.Size {
+		w.config.Size = size
+		w.callbacks.Event(ConfigEvent{Config: w.config})
+	}
+	if size.X == 0 || size.Y == 0 {
 		return
 	}
 	const inchPrDp = 1.0 / 160
 	ppdp := float32(w.dpi) * inchPrDp
 	w.callbacks.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
-			Now: time.Now(),
-			Size: image.Point{
-				X: int(width),
-				Y: int(height),
-			},
+			Now:    time.Now(),
+			Size:   w.config.Size,
 			Insets: w.insets,
 			Metric: unit.Metric{
 				PxPerDp: ppdp,
@@ -815,11 +816,10 @@ func (w *window) Configure(options []Option) {
 				w.config.Mode = Windowed
 			}
 		}
+		if w.config != prev {
+			w.callbacks.Event(ConfigEvent{Config: w.config})
+		}
 	})
-}
-
-func (w *window) Config() Config {
-	return w.config
 }
 
 func (w *window) Raise() {}

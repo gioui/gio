@@ -161,10 +161,9 @@ func (w *x11Window) Configure(options []Option) {
 	if prev.Mode != cnf.Mode {
 		w.SetWindowMode(cnf.Mode)
 	}
-}
-
-func (w *x11Window) Config() Config {
-	return w.config
+	if w.config != prev {
+		w.w.Event(ConfigEvent{Config: w.config})
+	}
 }
 
 func (w *x11Window) Raise() {
@@ -355,11 +354,8 @@ loop:
 		if (anim || syn) && w.config.Size.X != 0 && w.config.Size.Y != 0 {
 			w.w.Event(frameEvent{
 				FrameEvent: system.FrameEvent{
-					Now: time.Now(),
-					Size: image.Point{
-						X: w.config.Size.X,
-						Y: w.config.Size.Y,
-					},
+					Now:    time.Now(),
+					Size:   w.config.Size,
 					Metric: w.metric,
 				},
 				Sync: syn,
@@ -516,7 +512,10 @@ func (h *x11EventHandler) handleEvents() bool {
 			w.w.Event(key.FocusEvent{Focus: false})
 		case C.ConfigureNotify: // window configuration change
 			cevt := (*C.XConfigureEvent)(unsafe.Pointer(xev))
-			w.config.Size = image.Pt(int(cevt.width), int(cevt.height))
+			if sz := image.Pt(int(cevt.width), int(cevt.height)); sz != w.config.Size {
+				w.config.Size = sz
+				w.w.Event(ConfigEvent{Config: w.config})
+			}
 			// redraw will be done by a later expose event
 		case C.SelectionNotify:
 			cevt := (*C.XSelectionEvent)(unsafe.Pointer(xev))

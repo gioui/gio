@@ -94,12 +94,12 @@ func newWindow(win *callbacks, options []Option) error {
 	})
 	w.addEventListeners()
 	w.addHistory()
-	w.Configure(options)
 	w.w = win
 
 	go func() {
 		defer w.cleanup()
 		w.w.SetDriver(w)
+		w.Configure(options)
 		w.blur()
 		w.w.Event(system.StageEvent{Stage: system.StageRunning})
 		w.resize()
@@ -528,10 +528,9 @@ func (w *window) Configure(options []Option) {
 		w.config.Orientation = cnf.Orientation
 		w.orientation(cnf.Orientation)
 	}
-}
-
-func (w *window) Config() Config {
-	return w.config
+	if w.config != prev {
+		w.w.Event(ConfigEvent{Config: w.config})
+	}
 }
 
 func (w *window) Raise() {}
@@ -571,8 +570,14 @@ func (w *window) resize() {
 	w.scale = float32(w.window.Get("devicePixelRatio").Float())
 
 	rect := w.cnv.Call("getBoundingClientRect")
-	w.config.Size.X = int(rect.Get("width").Float()) * int(w.scale)
-	w.config.Size.Y = int(rect.Get("height").Float()) * int(w.scale)
+	size := image.Point{
+		X: int(float32(rect.Get("width").Float()) * w.scale),
+		Y: int(float32(rect.Get("height").Float()) * w.scale),
+	}
+	if size != w.config.Size {
+		w.config.Size = size
+		w.w.Event(ConfigEvent{Config: w.config})
+	}
 
 	if vx, vy := w.visualViewport.Get("width"), w.visualViewport.Get("height"); !vx.IsUndefined() && !vy.IsUndefined() {
 		w.inset.X = float32(w.config.Size.X) - float32(vx.Float())*w.scale
@@ -588,18 +593,14 @@ func (w *window) resize() {
 }
 
 func (w *window) draw(sync bool) {
-	width, height, insets, metric := w.getConfig()
-	if metric == (unit.Metric{}) || width == 0 || height == 0 {
+	size, insets, metric := w.getConfig()
+	if metric == (unit.Metric{}) || size.X == 0 || size.Y == 0 {
 		return
 	}
-
 	w.w.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
-			Now: time.Now(),
-			Size: image.Point{
-				X: width,
-				Y: height,
-			},
+			Now:    time.Now(),
+			Size:   size,
 			Insets: insets,
 			Metric: metric,
 		},
@@ -607,8 +608,8 @@ func (w *window) draw(sync bool) {
 	})
 }
 
-func (w *window) getConfig() (int, int, system.Insets, unit.Metric) {
-	return w.config.Size.X, w.config.Size.Y, system.Insets{
+func (w *window) getConfig() (image.Point, system.Insets, unit.Metric) {
+	return image.Pt(w.config.Size.X, w.config.Size.Y), system.Insets{
 			Bottom: unit.Px(w.inset.Y),
 			Right:  unit.Px(w.inset.X),
 		}, unit.Metric{

@@ -95,7 +95,6 @@ type window struct {
 
 	visible bool
 	cursor  pointer.CursorName
-	config  Config
 
 	pointerMap []C.CFTypeRef
 }
@@ -270,10 +269,6 @@ func (w *window) WriteClipboard(s string) {
 }
 
 func (w *window) Configure([]Option) {}
-
-func (w *window) Config() Config {
-	return w.config
-}
 
 func (w *window) Raise() {}
 
