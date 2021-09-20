@@ -54,6 +54,8 @@ type Device interface {
 	Release()
 }
 
+var ErrDeviceLost = errors.New("GPU device lost")
+
 type LoadDesc struct {
 	Action     LoadAction
 	ClearColor f32color.RGBA

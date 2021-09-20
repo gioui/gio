@@ -28,3 +28,7 @@ type Direct3D11 = driver.Direct3D11
 
 // Metal denotes the Apple Metal API.
 type Metal = driver.Metal
+
+// ErrDeviceLost is returned from GPU operations when the underlying GPU device
+// is lost and should be recreated.
+var ErrDeviceLost = driver.ErrDeviceLost

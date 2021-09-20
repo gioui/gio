@@ -113,11 +113,6 @@ type context interface {
 	Unlock()
 }
 
-// errDeviceLost is returned from Context.Present when
-// the underlying GPU device is gone and should be
-// recreated.
-var errDeviceLost = errors.New("GPU device lost")
-
 // Driver is the interface for the platform implementation
 // of a window.
 type driver interface {

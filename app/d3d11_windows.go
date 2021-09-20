@@ -70,7 +70,7 @@ func (c *d3d11Context) Present() error {
 			// Ignore
 			return nil
 		case d3d11.DXGI_ERROR_DEVICE_RESET, d3d11.DXGI_ERROR_DEVICE_REMOVED, d3d11.D3DDDIERR_DEVICEREMOVED:
-			return errDeviceLost
+			return gpu.ErrDeviceLost
 		}
 	}
 	return err

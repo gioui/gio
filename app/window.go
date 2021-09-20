@@ -153,7 +153,7 @@ func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync
 			})
 			if err != nil {
 				w.destroyGPU()
-				if err == errDeviceLost {
+				if errors.Is(err, gpu.ErrDeviceLost) {
 					continue
 				}
 				return err
@@ -175,7 +175,7 @@ func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync
 		if w.gpu != nil {
 			if err := w.render(frame, size); err != nil {
 				w.destroyGPU()
-				if err == errDeviceLost {
+				if errors.Is(err, gpu.ErrDeviceLost) {
 					continue
 				}
 				return err
