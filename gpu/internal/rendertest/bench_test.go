@@ -50,9 +50,7 @@ func finishBenchmark(b *testing.B, w *headless.Window) {
 		if err != nil {
 			b.Error(err)
 		}
-		if err := saveImage(b.Name()+".png", img); err != nil {
-			b.Error(err)
-		}
+		saveImage(b, b.Name()+".png", img)
 	}
 }
 

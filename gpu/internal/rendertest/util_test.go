@@ -85,17 +85,9 @@ func run(t *testing.T, f func(o *op.Ops), c func(r result)) {
 		// Check for a reference image and make sure it is identical.
 		if !verifyRef(t, img, 0) {
 			name := fmt.Sprintf("%s-%d-bad.png", t.Name(), i)
-			if err := saveImage(name, img); err != nil {
-				t.Error(err)
-			}
+			saveImage(t, name, img)
 		}
 		c(result{t: t, img: img})
-	}
-
-	if *dumpImages {
-		if err := saveImage(t.Name()+".png", img); err != nil {
-			t.Error(err)
-		}
 	}
 }
 
@@ -135,14 +127,12 @@ func multiRun(t *testing.T, frames ...frameT) {
 		if frames[i].c != nil {
 			frames[i].c(result{t: t, img: img})
 		}
-		if *dumpImages || !ok {
+		if !ok {
 			name := t.Name() + ".png"
 			if i != 0 {
 				name = t.Name() + "_" + strconv.Itoa(i) + ".png"
 			}
-			if err := saveImage(name, img); err != nil {
-				t.Error(err)
-			}
+			saveImage(t, name, img)
 		}
 	}
 
@@ -257,7 +247,10 @@ type result struct {
 	img *image.RGBA
 }
 
-func saveImage(file string, img *image.RGBA) error {
+func saveImage(t testing.TB, file string, img *image.RGBA) {
+	if !*dumpImages {
+		return
+	}
 	// Only NRGBA images are losslessly encoded by png.Encode.
 	nrgba := image.NewNRGBA(img.Bounds())
 	bnd := img.Bounds()
@@ -268,9 +261,13 @@ func saveImage(file string, img *image.RGBA) error {
 	}
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, nrgba); err != nil {
-		return err
+		t.Error(err)
+		return
 	}
-	return ioutil.WriteFile(file, buf.Bytes(), 0666)
+	if err := ioutil.WriteFile(file, buf.Bytes(), 0666); err != nil {
+		t.Error(err)
+		return
+	}
 }
 
 func newWindow(t testing.TB, width, height int) *headless.Window {
