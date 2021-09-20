@@ -818,8 +818,6 @@ func (b *Backend) BindImageTexture(unit int, tex driver.Texture) {
 	b.BindTexture(unit, tex)
 }
 
-func (b *Backend) MemoryBarrier() {}
-
 func (b *Backend) BeginCompute() {
 	b.endEncoder()
 	b.ensureCmdBuffer()

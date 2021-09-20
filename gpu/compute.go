@@ -1340,9 +1340,7 @@ func (g *compute) render(images *textureAtlas, dst driver.Texture, cpuDst cpu.Im
 }
 
 func (g *compute) memoryBarrier() {
-	if !g.useCPU {
-		g.ctx.MemoryBarrier()
-	} else {
+	if g.useCPU {
 		g.dispatcher.Barrier()
 	}
 }

@@ -591,8 +591,6 @@ func (b *Backend) BindImageTexture(unit int, tex driver.Texture) {
 	}
 }
 
-func (b *Backend) MemoryBarrier() {}
-
 func (b *Backend) DispatchCompute(x, y, z int) {
 	b.ctx.CSSetShader(b.program.shader)
 	b.ctx.Dispatch(uint32(x), uint32(y), uint32(z))

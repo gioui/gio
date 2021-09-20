@@ -760,10 +760,6 @@ func (b *Backend) Release() {
 	*b = Backend{}
 }
 
-func (b *Backend) MemoryBarrier() {
-	b.funcs.MemoryBarrier(gl.ALL_BARRIER_BITS)
-}
-
 func (b *Backend) DispatchCompute(x, y, z int) {
 	for binding, buf := range b.storage {
 		if buf != nil {
@@ -771,6 +767,7 @@ func (b *Backend) DispatchCompute(x, y, z int) {
 		}
 	}
 	b.funcs.DispatchCompute(x, y, z)
+	b.funcs.MemoryBarrier(gl.ALL_BARRIER_BITS)
 }
 
 func (b *Backend) BindImageTexture(unit int, tex driver.Texture) {
@@ -1157,6 +1154,7 @@ func (b *Backend) BindPipeline(pl driver.Pipeline) {
 }
 
 func (b *Backend) BeginCompute() {
+	b.funcs.MemoryBarrier(gl.ALL_BARRIER_BITS)
 }
 
 func (b *Backend) EndCompute() {

@@ -49,7 +49,6 @@ type Device interface {
 	BeginCompute()
 	EndCompute()
 	CopyTexture(dst Texture, dstOrigin image.Point, src Texture, srcRect image.Rectangle)
-	MemoryBarrier()
 	DispatchCompute(x, y, z int)
 
 	Release()
