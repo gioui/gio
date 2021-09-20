@@ -212,6 +212,7 @@ func newDriver(t *testing.T) driver.Device {
 	b.BeginFrame(nil, true, image.Pt(1, 1))
 	t.Cleanup(func() {
 		b.EndFrame()
+		b.Release()
 		ctx.ReleaseCurrent()
 		runtime.UnlockOSThread()
 		ctx.Release()

@@ -66,6 +66,7 @@ func NewWindow(width, height int) (*Window, error) {
 		if err != nil {
 			fbo.Release()
 			fboTex.Release()
+			dev.Release()
 			return err
 		}
 		w.fboTex = fboTex
@@ -95,6 +96,10 @@ func (w *Window) Release() {
 		if w.gpu != nil {
 			w.gpu.Release()
 			w.gpu = nil
+		}
+		if w.dev != nil {
+			w.dev.Release()
+			w.dev = nil
 		}
 		return nil
 	})
