@@ -432,12 +432,12 @@ func (w *window) draw(sync bool) {
 		X: int(r.Right - r.Left),
 		Y: int(r.Bottom - r.Top),
 	}
-	if w.config.Size.X == 0 || w.config.Size.Y == 0 {
-		return
-	}
 	if size != w.config.Size {
 		w.config.Size = size
 		w.w.Event(ConfigEvent{Config: w.config})
+	}
+	if w.config.Size.X == 0 || w.config.Size.Y == 0 {
+		return
 	}
 	dpi := windows.GetWindowDPI(w.hwnd)
 	cfg := configForDPI(dpi)
