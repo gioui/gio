@@ -15,6 +15,7 @@ import (
 type wlVkContext struct {
 	win  *window
 	inst vk.Instance
+	surf vk.Surface
 	ctx  *vkContext
 }
 
@@ -39,6 +40,7 @@ func init() {
 		c := &wlVkContext{
 			win:  w,
 			inst: inst,
+			surf: surf,
 			ctx:  ctx,
 		}
 		return c, nil
@@ -55,6 +57,7 @@ func (c *wlVkContext) API() gpu.API {
 
 func (c *wlVkContext) Release() {
 	c.ctx.release()
+	vk.DestroySurface(c.inst, c.surf)
 	vk.DestroyInstance(c.inst)
 	*c = wlVkContext{}
 }
@@ -71,11 +74,13 @@ func (c *wlVkContext) Unlock() {}
 
 func (c *wlVkContext) Refresh() error {
 	win, w, h := c.win.nativeWindow()
-	c.ctx.destroySurface()
+	if c.surf != 0 {
+		c.ctx.destroySwapchain()
+		vk.DestroySurface(c.inst, c.surf)
+	}
 	surf, err := vk.CreateAndroidSurface(c.inst, unsafe.Pointer(win))
 	if err != nil {
 		return err
 	}
-	c.ctx.setSurface(surf)
-	return c.ctx.refresh(w, h)
+	return c.ctx.refresh(surf, w, h)
 }

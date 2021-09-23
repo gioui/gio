@@ -17,6 +17,7 @@ import (
 type x11VkContext struct {
 	win  *x11Window
 	inst vk.Instance
+	surf vk.Surface
 	ctx  *vkContext
 }
 
@@ -42,6 +43,7 @@ func init() {
 		c := &x11VkContext{
 			win:  w,
 			inst: inst,
+			surf: surf,
 			ctx:  ctx,
 		}
 		return c, nil
@@ -58,6 +60,7 @@ func (c *x11VkContext) API() gpu.API {
 
 func (c *x11VkContext) Release() {
 	c.ctx.release()
+	vk.DestroySurface(c.inst, c.surf)
 	vk.DestroyInstance(c.inst)
 	*c = x11VkContext{}
 }
@@ -74,5 +77,5 @@ func (c *x11VkContext) Unlock() {}
 
 func (c *x11VkContext) Refresh() error {
 	_, w, h := c.win.window()
-	return c.ctx.refresh(w, h)
+	return c.ctx.refresh(c.surf, w, h)
 }

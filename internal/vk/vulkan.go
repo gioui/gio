@@ -816,12 +816,12 @@ func CreateInstance(exts ...string) (Instance, error) {
 		return nil, err
 	}
 	inf := C.VkInstanceCreateInfo{
-		sType:                 C.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-		enabledExtensionCount: C.uint32_t(len(exts)),
+		sType: C.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 	}
 	if len(exts) > 0 {
 		cexts := mallocCStringArr(exts)
 		defer freeCStringArr(cexts)
+		inf.enabledExtensionCount = C.uint32_t(len(exts))
 		inf.ppEnabledExtensionNames = &cexts[0]
 	}
 	var inst Instance
@@ -861,17 +861,25 @@ func GetPhysicalDeviceQueueFamilyProperties(pd PhysicalDevice) []QueueFamilyProp
 	return queues
 }
 
-func ChoosePhysicalDevice(inst Instance, surf Surface) (PhysicalDevice, int, error) {
+func EnumeratePhysicalDevices(inst Instance) ([]PhysicalDevice, error) {
 	var count C.uint32_t
 	if err := vkErr(C.vkEnumeratePhysicalDevices(funcs.vkEnumeratePhysicalDevices, inst, &count, nil)); err != nil {
-		return nil, 0, fmt.Errorf("vulkan: vkEnumeratePhysicalDevices: %w", err)
+		return nil, fmt.Errorf("vulkan: vkEnumeratePhysicalDevices: %w", err)
 	}
 	if count == 0 {
-		return nil, 0, errors.New("vulkan: no devices available")
+		return nil, nil
 	}
 	devs := make([]C.VkPhysicalDevice, count)
 	if err := vkErr(C.vkEnumeratePhysicalDevices(funcs.vkEnumeratePhysicalDevices, inst, &count, &devs[0])); err != nil {
-		return nil, 0, fmt.Errorf("vulkan: vkEnumeratePhysicalDevices: %w", err)
+		return nil, fmt.Errorf("vulkan: vkEnumeratePhysicalDevices: %w", err)
+	}
+	return devs, nil
+}
+
+func ChoosePhysicalDevice(inst Instance, surf Surface) (PhysicalDevice, int, error) {
+	devs, err := EnumeratePhysicalDevices(inst)
+	if err != nil {
+		return nil, 0, err
 	}
 	for _, pd := range devs {
 		const caps = C.VK_QUEUE_GRAPHICS_BIT | C.VK_QUEUE_COMPUTE_BIT

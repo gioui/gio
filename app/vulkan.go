@@ -17,7 +17,6 @@ import (
 type vkContext struct {
 	physDev    vk.PhysicalDevice
 	inst       vk.Instance
-	surf       vk.Surface
 	dev        vk.Device
 	queueFam   int
 	queue      vk.Queue
@@ -35,36 +34,30 @@ type vkContext struct {
 func newVulkanContext(inst vk.Instance, surf vk.Surface) (*vkContext, error) {
 	physDev, qFam, err := vk.ChoosePhysicalDevice(inst, surf)
 	if err != nil {
-		vk.DestroySurface(inst, surf)
 		return nil, err
 	}
 	dev, err := vk.CreateDeviceAndQueue(physDev, qFam, "VK_KHR_swapchain")
 	if err != nil {
-		vk.DestroySurface(inst, surf)
 		return nil, err
 	}
 	if err != nil {
-		vk.DestroySurface(inst, surf)
 		vk.DestroyDevice(dev)
 		return nil, err
 	}
 	acquireSem, err := vk.CreateSemaphore(dev)
 	if err != nil {
-		vk.DestroySurface(inst, surf)
 		vk.DestroyDevice(dev)
 		return nil, err
 	}
 	presentSem, err := vk.CreateSemaphore(dev)
 	if err != nil {
 		vk.DestroySemaphore(dev, acquireSem)
-		vk.DestroySurface(inst, surf)
 		vk.DestroyDevice(dev)
 		return nil, err
 	}
 	c := &vkContext{
 		physDev:    physDev,
 		inst:       inst,
-		surf:       surf,
 		dev:        dev,
 		queueFam:   qFam,
 		queue:      vk.GetDeviceQueue(dev, qFam, 0),
@@ -120,7 +113,7 @@ func mapErr(err error) error {
 func (c *vkContext) release() {
 	vk.DeviceWaitIdle(c.dev)
 
-	c.destroySurface()
+	c.destroySwapchain()
 	vk.DestroySemaphore(c.dev, c.acquireSem)
 	vk.DestroySemaphore(c.dev, c.presentSem)
 	vk.DestroyDevice(c.dev)
@@ -142,7 +135,7 @@ func (c *vkContext) destroyImageViews() {
 	c.views = nil
 }
 
-func (c *vkContext) destroySurface() {
+func (c *vkContext) destroySwapchain() {
 	vk.DeviceWaitIdle(c.dev)
 
 	c.destroyImageViews()
@@ -150,24 +143,13 @@ func (c *vkContext) destroySurface() {
 		vk.DestroySwapchain(c.dev, c.swchain)
 		c.swchain = 0
 	}
-	if c.surf != 0 {
-		vk.DestroySurface(c.inst, c.surf)
-		c.surf = 0
-	}
 }
 
-func (c *vkContext) setSurface(surf vk.Surface) {
-	if c.surf != 0 {
-		panic("another surface is active")
-	}
-	c.surf = surf
-}
-
-func (c *vkContext) refresh(width, height int) error {
+func (c *vkContext) refresh(surf vk.Surface, width, height int) error {
 	vk.DeviceWaitIdle(c.dev)
 
 	c.destroyImageViews()
-	swchain, imgs, format, err := vk.CreateSwapchain(c.physDev, c.dev, c.surf, width, height, c.swchain)
+	swchain, imgs, format, err := vk.CreateSwapchain(c.physDev, c.dev, surf, width, height, c.swchain)
 	if c.swchain != 0 {
 		vk.DestroySwapchain(c.dev, c.swchain)
 		c.swchain = 0
