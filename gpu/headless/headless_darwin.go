@@ -4,7 +4,6 @@ package headless
 
 import (
 	"errors"
-	"unsafe"
 
 	"gioui.org/gpu"
 	_ "gioui.org/internal/cocoainit"
@@ -54,8 +53,8 @@ func init() {
 
 func (c *mtlContext) API() gpu.API {
 	return gpu.Metal{
-		Device:      unsafe.Pointer(c.dev),
-		Queue:       unsafe.Pointer(c.queue),
+		Device:      uintptr(c.dev),
+		Queue:       uintptr(c.queue),
 		PixelFormat: int(C.MTLPixelFormatRGBA8Unorm_sRGB),
 	}
 }

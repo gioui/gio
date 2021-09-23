@@ -7,7 +7,6 @@ package app
 
 import (
 	"errors"
-	"unsafe"
 
 	"gioui.org/gpu"
 )
@@ -123,14 +122,14 @@ func (c *mtlContext) RenderTarget() (gpu.RenderTarget, error) {
 		return nil, errors.New("metal: CADrawable.texture is nil")
 	}
 	return gpu.MetalRenderTarget{
-		Texture: unsafe.Pointer(c.texture),
+		Texture: uintptr(c.texture),
 	}, nil
 }
 
 func (c *mtlContext) API() gpu.API {
 	return gpu.Metal{
-		Device:      unsafe.Pointer(c.dev),
-		Queue:       unsafe.Pointer(c.queue),
+		Device:      uintptr(c.dev),
+		Queue:       uintptr(c.queue),
 		PixelFormat: int(C.MTLPixelFormatBGRA8Unorm_sRGB),
 	}
 }

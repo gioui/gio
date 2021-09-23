@@ -28,7 +28,7 @@ type Direct3D11RenderTarget struct {
 
 type MetalRenderTarget struct {
 	// Texture is a MTLTexture.
-	Texture unsafe.Pointer
+	Texture uintptr
 }
 
 type VulkanRenderTarget struct {
@@ -59,9 +59,9 @@ type Direct3D11 struct {
 
 type Metal struct {
 	// Device is an MTLDevice.
-	Device unsafe.Pointer
+	Device uintptr
 	// Queue is a MTLCommandQueue.
-	Queue unsafe.Pointer
+	Queue uintptr
 	// PixelFormat is the MTLPixelFormat of the default framebuffer.
 	PixelFormat int
 }
