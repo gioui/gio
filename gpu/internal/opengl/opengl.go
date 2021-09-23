@@ -1123,7 +1123,7 @@ func (b *Backend) CopyTexture(dst driver.Texture, dstOrigin image.Point, src dri
 		b.glstate.bindTexture(b.funcs, unit, oldTex)
 	}()
 	b.glstate.bindTexture(b.funcs, unit, dst.(*texture).obj)
-	b.glstate.bindFramebuffer(b.funcs, gl.READ_FRAMEBUFFER, src.(*texture).ensureFBO())
+	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, src.(*texture).ensureFBO())
 	sz := srcRect.Size()
 	b.funcs.CopyTexSubImage2D(gl.TEXTURE_2D, 0, dstOrigin.X, dstOrigin.Y, srcRect.Min.X, srcRect.Min.Y, sz.X, sz.Y)
 }
