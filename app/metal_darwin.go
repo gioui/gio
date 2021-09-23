@@ -62,7 +62,6 @@ static void presentDrawable(CFTypeRef queueRef, CFTypeRef drawableRef) {
 		id<MTLCommandBuffer> cmdBuffer = [queue commandBuffer];
 		[cmdBuffer presentDrawable:drawable];
 		[cmdBuffer commit];
-		[cmdBuffer waitUntilCompleted];
 	}
 }
 
