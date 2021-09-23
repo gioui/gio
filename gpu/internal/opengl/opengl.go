@@ -172,6 +172,13 @@ func init() {
 	driver.NewOpenGLDevice = newOpenGLDevice
 }
 
+// Supporting compute programs is theoretically possible with OpenGL ES 3.1. In
+// practice, there are too many driver issues, especially on Android (e.g.
+// Google Pixel, Samsung J2 are both broken i different ways). Disable support
+// and rely on Vulkan for devices that support it, and the CPU fallback for
+// devices that don't.
+const brokenGLES31 = true
+
 func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 	f, err := gl.NewFunctions(api.Context, api.ES)
 	if err != nil {
@@ -201,7 +208,7 @@ func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 	if ffboErr == nil {
 		b.feats.Features |= driver.FeatureFloatRenderTargets
 	}
-	if gles31 {
+	if gles31 && !brokenGLES31 {
 		b.feats.Features |= driver.FeatureCompute
 	}
 	if hasExtension(exts, "GL_EXT_disjoint_timer_query_webgl2") || hasExtension(exts, "GL_EXT_disjoint_timer_query") {
@@ -851,7 +858,9 @@ func (b *Backend) clearOutput(colR, colG, colB, colA float32) {
 }
 
 func (b *Backend) NewComputeProgram(src shader.Sources) (driver.Program, error) {
-	p, err := gl.CreateComputeProgram(b.funcs, src.GLSL310ES)
+	// We don't support ES 3.1 compute, see brokenGLES31 above.
+	const GLES31Source = ""
+	p, err := gl.CreateComputeProgram(b.funcs, GLES31Source)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", src.Name, err)
 	}
