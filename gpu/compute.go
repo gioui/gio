@@ -1818,11 +1818,19 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 		case opconst.TypeLoad:
 			id, mask := ops.DecodeLoad(encOp.Data)
 			s := c.states[id]
-			if mask&opconst.TransformState != 0 {
-				state.t = s.t
-			}
 			if mask&^opconst.TransformState != 0 {
 				state = s
+			} else if mask&opconst.TransformState != 0 {
+				state.t = s.t
+				state.relTrans = s.t
+				if cl := state.clip; cl != nil {
+					var relTrans f32.Affine2D
+					for cl != nil {
+						relTrans = cl.relTrans.Mul(relTrans)
+						cl = cl.parent
+					}
+					state.relTrans = relTrans.Invert().Mul(state.relTrans)
+				}
 			}
 		}
 	}
