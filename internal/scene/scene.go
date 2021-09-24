@@ -63,7 +63,7 @@ func (c Command) String() string {
 		from, ctrl0, ctrl1, to := DecodeCubic(c)
 		return fmt.Sprintf("cubic(%v, %v, %v, %v)", from, ctrl0, ctrl1, to)
 	case OpFillColor:
-		return "fillcolor"
+		return fmt.Sprintf("fillcolor %#.8x", c[1])
 	case OpLineWidth:
 		return "linewidth"
 	case OpTransform:
