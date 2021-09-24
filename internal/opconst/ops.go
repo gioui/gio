@@ -117,3 +117,60 @@ func (t OpType) NumRefs() int {
 		return 0
 	}
 }
+
+func (t OpType) String() string {
+	switch t {
+	case TypeMacro:
+		return "Macro"
+	case TypeCall:
+		return "Call"
+	case TypeDefer:
+		return "Defer"
+	case TypeTransform:
+		return "Transform"
+	case TypeInvalidate:
+		return "Invalidate"
+	case TypeImage:
+		return "Image"
+	case TypePaint:
+		return "Paint"
+	case TypeColor:
+		return "Color"
+	case TypeLinearGradient:
+		return "LinearGradient"
+	case TypeArea:
+		return "Area"
+	case TypePointerInput:
+		return "PointerInput"
+	case TypePass:
+		return "Pass"
+	case TypeClipboardRead:
+		return "ClipboardRead"
+	case TypeClipboardWrite:
+		return "ClipboardWrite"
+	case TypeKeyInput:
+		return "KeyInput"
+	case TypeKeyFocus:
+		return "KeyFocus"
+	case TypeKeySoftKeyboard:
+		return "KeySoftKeyboard"
+	case TypeSave:
+		return "Save"
+	case TypeLoad:
+		return "Load"
+	case TypeAux:
+		return "Aux"
+	case TypeClip:
+		return "Clip"
+	case TypeProfile:
+		return "Profile"
+	case TypeCursor:
+		return "Cursor"
+	case TypePath:
+		return "Path"
+	case TypeStroke:
+		return "Stroke"
+	default:
+		panic("unnkown OpType")
+	}
+}
