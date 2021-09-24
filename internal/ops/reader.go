@@ -134,6 +134,8 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 				}
 				deferData := r.deferOps.Write1(t.Size(), refs[0])
 				copy(deferData, data)
+				r.pc.data += n
+				r.pc.refs += nrefs
 				continue
 			}
 			var op macroOp

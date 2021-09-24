@@ -107,13 +107,13 @@ func TestDeferredPaint(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		state := op.Save(o)
 		clip.Rect(image.Rect(0, 0, 80, 80)).Op().Add(o)
-		paint.ColorOp{Color: color.NRGBA{A: 0xff, G: 0xff}}.Add(o)
+		paint.ColorOp{Color: color.NRGBA{A: 0x60, G: 0xff}}.Add(o)
 		paint.PaintOp{}.Add(o)
 
 		op.Affine(f32.Affine2D{}.Offset(f32.Pt(20, 20))).Add(o)
 		m := op.Record(o)
 		clip.Rect(image.Rect(0, 0, 80, 80)).Op().Add(o)
-		paint.ColorOp{Color: color.NRGBA{A: 0xff, R: 0xff, G: 0xff}}.Add(o)
+		paint.ColorOp{Color: color.NRGBA{A: 0x60, R: 0xff, G: 0xff}}.Add(o)
 		paint.PaintOp{}.Add(o)
 		paintMacro := m.Stop()
 		op.Defer(o, paintMacro)
@@ -121,7 +121,7 @@ func TestDeferredPaint(t *testing.T) {
 		state.Load()
 		op.Affine(f32.Affine2D{}.Offset(f32.Pt(10, 10))).Add(o)
 		clip.Rect(image.Rect(0, 0, 80, 80)).Op().Add(o)
-		paint.ColorOp{Color: color.NRGBA{A: 0xff, B: 0xff}}.Add(o)
+		paint.ColorOp{Color: color.NRGBA{A: 0x60, B: 0xff}}.Add(o)
 		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 	})
