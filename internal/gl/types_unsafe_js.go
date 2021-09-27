@@ -1,28 +1,30 @@
+//go:build unsafe
+// +build unsafe
+
 // SPDX-License-Identifier: Unlicense OR MIT
 
 package gl
 
-import "syscall/js"
-
 type (
-	Object       js.Value
+	Object struct {
+		ref int64
+	}
 	Buffer       Object
 	Framebuffer  Object
 	Program      Object
 	Renderbuffer Object
 	Shader       Object
 	Texture      Object
-	Query        Object
 	Uniform      Object
 	VertexArray  Object
 )
 
 func (o Object) valid() bool {
-	return js.Value(o).Truthy()
+	return o.ref != 0
 }
 
 func (o Object) equal(o2 Object) bool {
-	return js.Value(o).Equal(js.Value(o2))
+	return o.ref == o2.ref
 }
 
 func (b Buffer) Valid() bool {
