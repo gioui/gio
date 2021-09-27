@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"runtime"
 	"strings"
 	"time"
 	"unsafe"
@@ -78,6 +79,7 @@ type glState struct {
 	viewport          [4]int
 	unpack_row_length int
 	pack_row_length   int
+	isInitized        bool
 }
 
 type state struct {
@@ -288,24 +290,31 @@ func (b *Backend) EndFrame() {
 }
 
 func (b *Backend) queryState() glState {
-	s := glState{
-		prog:              gl.Program(b.funcs.GetBinding(gl.CURRENT_PROGRAM)),
-		arrayBuf:          gl.Buffer(b.funcs.GetBinding(gl.ARRAY_BUFFER_BINDING)),
-		elemBuf:           gl.Buffer(b.funcs.GetBinding(gl.ELEMENT_ARRAY_BUFFER_BINDING)),
-		drawFBO:           gl.Framebuffer(b.funcs.GetBinding(gl.FRAMEBUFFER_BINDING)),
-		clearColor:        b.funcs.GetFloat4(gl.COLOR_CLEAR_VALUE),
-		viewport:          b.funcs.GetInteger4(gl.VIEWPORT),
-		unpack_row_length: b.funcs.GetInteger(gl.UNPACK_ROW_LENGTH),
-		pack_row_length:   b.funcs.GetInteger(gl.PACK_ROW_LENGTH),
-	}
-	s.blend.enable = b.funcs.IsEnabled(gl.BLEND)
-	s.blend.srcRGB = gl.Enum(b.funcs.GetInteger(gl.BLEND_SRC_RGB))
-	s.blend.dstRGB = gl.Enum(b.funcs.GetInteger(gl.BLEND_DST_RGB))
-	s.blend.srcA = gl.Enum(b.funcs.GetInteger(gl.BLEND_SRC_ALPHA))
-	s.blend.dstA = gl.Enum(b.funcs.GetInteger(gl.BLEND_DST_ALPHA))
-	s.texUnits.active = gl.Enum(b.funcs.GetInteger(gl.ACTIVE_TEXTURE))
-	if !b.gles {
-		s.srgb = b.funcs.IsEnabled(gl.FRAMEBUFFER_SRGB)
+	var s glState
+	if runtime.GOOS == "js" && b.savedState.isInitized {
+		// Uses the cached value for WebAssembly, if available.
+		s = b.savedState
+	} else {
+		s = glState{
+			prog:              gl.Program(b.funcs.GetBinding(gl.CURRENT_PROGRAM)),
+			arrayBuf:          gl.Buffer(b.funcs.GetBinding(gl.ARRAY_BUFFER_BINDING)),
+			elemBuf:           gl.Buffer(b.funcs.GetBinding(gl.ELEMENT_ARRAY_BUFFER_BINDING)),
+			drawFBO:           gl.Framebuffer(b.funcs.GetBinding(gl.FRAMEBUFFER_BINDING)),
+			clearColor:        b.funcs.GetFloat4(gl.COLOR_CLEAR_VALUE),
+			viewport:          b.funcs.GetInteger4(gl.VIEWPORT),
+			unpack_row_length: b.funcs.GetInteger(gl.UNPACK_ROW_LENGTH),
+			pack_row_length:   b.funcs.GetInteger(gl.PACK_ROW_LENGTH),
+			isInitized:        true,
+		}
+		s.blend.enable = b.funcs.IsEnabled(gl.BLEND)
+		s.blend.srcRGB = gl.Enum(b.funcs.GetInteger(gl.BLEND_SRC_RGB))
+		s.blend.dstRGB = gl.Enum(b.funcs.GetInteger(gl.BLEND_DST_RGB))
+		s.blend.srcA = gl.Enum(b.funcs.GetInteger(gl.BLEND_SRC_ALPHA))
+		s.blend.dstA = gl.Enum(b.funcs.GetInteger(gl.BLEND_DST_ALPHA))
+		s.texUnits.active = gl.Enum(b.funcs.GetInteger(gl.ACTIVE_TEXTURE))
+		if !b.gles {
+			s.srgb = b.funcs.IsEnabled(gl.FRAMEBUFFER_SRGB)
+		}
 	}
 	if !b.gles || b.glver[0] >= 3 {
 		s.vertArray = gl.VertexArray(b.funcs.GetBinding(gl.VERTEX_ARRAY_BINDING))

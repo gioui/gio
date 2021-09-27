@@ -9,7 +9,7 @@ import (
 )
 
 type Functions struct {
-	Ctx                             js.Value
+	Ctx                             context
 	EXT_disjoint_timer_query        js.Value
 	EXT_disjoint_timer_query_webgl2 js.Value
 
@@ -25,9 +25,23 @@ type Functions struct {
 
 type Context js.Value
 
+type context struct {
+	js.Value
+	cache map[string]js.Value
+}
+
+func (ctx context) Call(m string, args ...interface{}) js.Value {
+	value, ok := ctx.cache[m]
+	if !ok {
+		value = ctx.Value.Get(m).Call("bind", ctx.Value)
+		ctx.cache[m] = value
+	}
+	return value.Invoke(args...)
+}
+
 func NewFunctions(ctx Context, forceES bool) (*Functions, error) {
 	f := &Functions{
-		Ctx:        js.Value(ctx),
+		Ctx:        context{Value: js.Value(ctx), cache: make(map[string]js.Value, 128)},
 		uint8Array: js.Global().Get("Uint8Array"),
 	}
 	if err := f.Init(); err != nil {
