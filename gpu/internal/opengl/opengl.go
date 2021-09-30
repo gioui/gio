@@ -954,14 +954,6 @@ func (b *Backend) newProgram(desc driver.PipelineDesc) (*program, error) {
 	return prog, nil
 }
 
-func lookupUniform(funcs *gl.Functions, p gl.Program, loc shader.UniformLocation) uniformLocation {
-	u := funcs.GetUniformLocation(p, loc.Name)
-	if !u.Valid() {
-		panic(fmt.Errorf("uniform %q not found", loc.Name))
-	}
-	return uniformLocation{uniform: u, offset: loc.Offset, typ: loc.Type, size: loc.Size}
-}
-
 func (b *Backend) BindStorageBuffer(binding int, buf driver.Buffer) {
 	bf := buf.(*buffer)
 	if bf.typ&(driver.BufferBindingShaderStorageRead|driver.BufferBindingShaderStorageWrite) == 0 {
@@ -995,7 +987,8 @@ func (p *program) Release() {
 func (u *uniforms) setup(funcs *gl.Functions, p gl.Program, uniformSize int, uniforms []shader.UniformLocation) {
 	u.locs = make([]uniformLocation, len(uniforms))
 	for i, uniform := range uniforms {
-		u.locs[i] = lookupUniform(funcs, p, uniform)
+		loc := funcs.GetUniformLocation(p, uniform.Name)
+		u.locs[i] = uniformLocation{uniform: loc, offset: uniform.Offset, typ: uniform.Type, size: uniform.Size}
 	}
 	u.size = uniformSize
 }
@@ -1006,6 +999,9 @@ func (p *uniforms) update(funcs *gl.Functions, buf *buffer) {
 	}
 	data := buf.data
 	for _, u := range p.locs {
+		if !u.uniform.Valid() {
+			continue
+		}
 		data := data[u.offset:]
 		switch {
 		case u.typ == shader.DataTypeFloat && u.size == 1:
