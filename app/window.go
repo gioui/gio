@@ -433,6 +433,13 @@ func (w *Window) runFuncs(d driver) {
 		return
 	}
 	var defers []func(d driver)
+	// Don't miss deferred functions when ack arrives immediately. There is one
+	// wakeup event per function, so one select is enough.
+	select {
+	case f := <-w.driverDefers:
+		defers = append(defers, f)
+	default:
+	}
 	// Wait for ack while running incoming runnables.
 	for {
 		select {
