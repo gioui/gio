@@ -1110,7 +1110,7 @@ func formatFor(format driver.TextureFormat) vk.Format {
 
 func mapErr(err error) error {
 	var vkErr vk.Error
-	if errors.As(err, &vkErr) && vkErr.IsDeviceLost() {
+	if errors.As(err, &vkErr) && vkErr == vk.ERROR_DEVICE_LOST {
 		return driver.ErrDeviceLost
 	}
 	return err

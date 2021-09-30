@@ -22,6 +22,10 @@ type size struct {
 	Height unit.Value
 }
 
+// errOutOfDate is reported when the GPU surface dimensions or properties no
+// longer match the window.
+var errOutOfDate = errors.New("app: GPU surface out of date")
+
 // Config describes a Window configuration.
 type Config struct {
 	// Size is the window dimensions (Width, Height).

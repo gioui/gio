@@ -57,7 +57,9 @@ func (c *wlVkContext) API() gpu.API {
 
 func (c *wlVkContext) Release() {
 	c.ctx.release()
-	vk.DestroySurface(c.inst, c.surf)
+	if c.surf != 0 {
+		vk.DestroySurface(c.inst, c.surf)
+	}
 	vk.DestroyInstance(c.inst)
 	*c = wlVkContext{}
 }

@@ -104,7 +104,13 @@ func mapErr(err error) error {
 		// swapchain (preTransform != currentTransform). However, we don't
 		// support transforming the output ourselves, so we'll live with it.
 		return nil
-	case vkErr.IsDeviceLost():
+	case vkErr == vk.ERROR_OUT_OF_DATE_KHR:
+		return errOutOfDate
+	case vkErr == vk.ERROR_SURFACE_LOST_KHR:
+		// Treating a lost surface as a lost device isn't accurate, but
+		// porbably not worth optimizing.
+		return gpu.ErrDeviceLost
+	case vkErr == vk.ERROR_DEVICE_LOST:
 		return gpu.ErrDeviceLost
 	}
 	return err
@@ -149,6 +155,16 @@ func (c *vkContext) refresh(surf vk.Surface, width, height int) error {
 	vk.DeviceWaitIdle(c.dev)
 
 	c.destroyImageViews()
+	// Check whether size is valid. That's needed on X11, where ConfigureNotify
+	// is not always synchronized with the window extent.
+	caps, err := vk.GetPhysicalDeviceSurfaceCapabilities(c.physDev, surf)
+	if err != nil {
+		return err
+	}
+	minExt, maxExt := caps.MinExtent(), caps.MaxExtent()
+	if width < minExt.X || maxExt.X < width || height < minExt.Y || maxExt.Y < height {
+		return errOutOfDate
+	}
 	swchain, imgs, format, err := vk.CreateSwapchain(c.physDev, c.dev, surf, width, height, c.swchain)
 	if c.swchain != 0 {
 		vk.DestroySwapchain(c.dev, c.swchain)

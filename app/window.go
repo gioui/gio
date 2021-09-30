@@ -152,6 +152,11 @@ func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync
 				err = w.ctx.Refresh()
 			})
 			if err != nil {
+				if errors.Is(err, errOutOfDate) {
+					// Surface couldn't be created for transient reasons. Skip
+					// this frame and wait for the next.
+					return nil
+				}
 				w.destroyGPU()
 				if errors.Is(err, gpu.ErrDeviceLost) {
 					continue
@@ -174,6 +179,11 @@ func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync
 		}
 		if w.gpu != nil {
 			if err := w.render(frame, size); err != nil {
+				if errors.Is(err, errOutOfDate) {
+					// GPU surface needs refreshing.
+					sync = true
+					continue
+				}
 				w.destroyGPU()
 				if errors.Is(err, gpu.ErrDeviceLost) {
 					continue

@@ -380,6 +380,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"image"
 	"math"
 	"reflect"
 	"runtime"
@@ -441,7 +442,8 @@ type (
 	Viewport              = C.VkViewport
 	WriteDescriptorSet    = C.VkWriteDescriptorSet
 
-	Surface = C.VkSurfaceKHR
+	Surface             = C.VkSurfaceKHR
+	SurfaceCapabilities = C.VkSurfaceCapabilitiesKHR
 
 	Swapchain = C.VkSwapchainKHR
 )
@@ -939,11 +941,19 @@ func GetDeviceQueue(d Device, queueFamily, queueIndex int) Queue {
 	return queue
 }
 
-func CreateSwapchain(pd PhysicalDevice, d Device, surf Surface, width, height int, old Swapchain) (Swapchain, []Image, Format, error) {
+func GetPhysicalDeviceSurfaceCapabilities(pd PhysicalDevice, surf Surface) (SurfaceCapabilities, error) {
 	var caps C.VkSurfaceCapabilitiesKHR
 	err := vkErr(C.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(funcs.vkGetPhysicalDeviceSurfaceCapabilitiesKHR, pd, surf, &caps))
 	if err != nil {
-		return nilSwapchain, nil, 0, fmt.Errorf("vulkan: vkGetPhysicalDeviceSurfaceCapabilitiesKHR: %w", err)
+		return SurfaceCapabilities{}, fmt.Errorf("vulkan: vkGetPhysicalDeviceSurfaceCapabilitiesKHR: %w", err)
+	}
+	return caps, nil
+}
+
+func CreateSwapchain(pd PhysicalDevice, d Device, surf Surface, width, height int, old Swapchain) (Swapchain, []Image, Format, error) {
+	caps, err := GetPhysicalDeviceSurfaceCapabilities(pd, surf)
+	if err != nil {
+		return nilSwapchain, nil, 0, err
 	}
 	mode, modeOK, err := choosePresentMode(pd, surf)
 	if err != nil {
@@ -1846,6 +1856,14 @@ func (p QueueFamilyProperties) Flags() QueueFlags {
 	return p.queueFlags
 }
 
+func (c SurfaceCapabilities) MinExtent() image.Point {
+	return image.Pt(int(c.minImageExtent.width), int(c.minImageExtent.height))
+}
+
+func (c SurfaceCapabilities) MaxExtent() image.Point {
+	return image.Pt(int(c.maxImageExtent.width), int(c.maxImageExtent.height))
+}
+
 func BuildViewport(x, y, width, height float32) Viewport {
 	return C.VkViewport{
 		x:        C.float(x),
@@ -2047,13 +2065,4 @@ func vkErr(res C.VkResult) error {
 
 func (e Error) Error() string {
 	return fmt.Sprintf("error %d", e)
-}
-
-func (e Error) IsDeviceLost() bool {
-	switch e {
-	case ERROR_OUT_OF_DATE_KHR, ERROR_SURFACE_LOST_KHR, ERROR_DEVICE_LOST:
-		return true
-	default:
-		return false
-	}
 }
