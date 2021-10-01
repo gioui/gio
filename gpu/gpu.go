@@ -73,18 +73,15 @@ type renderer struct {
 }
 
 type drawOps struct {
-	profile    bool
-	reader     ops.Reader
-	states     []drawState
-	cache      *resourceCache
-	vertCache  []byte
-	viewport   image.Point
-	clear      bool
-	clearColor f32color.RGBA
-	imageOps   []imageOp
-	// zimageOps are the rectangle clipped opaque images
-	// that can use fast front-to-back rendering with z-test
-	// and no blending.
+	profile     bool
+	reader      ops.Reader
+	states      []drawState
+	cache       *resourceCache
+	vertCache   []byte
+	viewport    image.Point
+	clear       bool
+	clearColor  f32color.RGBA
+	imageOps    []imageOp
 	pathOps     []*pathOp
 	pathOpCache []pathOp
 	qs          quadSplitter
@@ -95,7 +92,6 @@ type drawState struct {
 	clip  f32.Rectangle
 	t     f32.Affine2D
 	cpath *pathOp
-	rect  bool
 
 	matType materialType
 	// Current paint.ImageOp
@@ -112,6 +108,9 @@ type drawState struct {
 
 type pathOp struct {
 	off f32.Point
+	// rect tracks whether the clip stack can be represented by a
+	// pixel-aligned rectangle.
+	rect bool
 	// clip is the union of all
 	// later clip rectangles.
 	clip      image.Rectangle
@@ -830,7 +829,6 @@ func (d *drawOps) collect(root *op.Ops, viewport image.Point) {
 	d.reader.Reset(root)
 	state := drawState{
 		clip:  clip,
-		rect:  true,
 		color: color.NRGBA{A: 0xff},
 	}
 	d.collectOps(&d.reader, state)
@@ -860,15 +858,16 @@ func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey opKey, bounds
 		parent: state.cpath,
 		bounds: bounds,
 		off:    off,
+		rect:   npath.parent == nil || npath.parent.rect,
+	}
+	if len(aux) > 0 {
+		npath.rect = false
+		npath.pathKey = auxKey
+		npath.path = true
+		npath.pathVerts = aux
+		d.pathOps = append(d.pathOps, npath)
 	}
 	state.cpath = npath
-	if len(aux) > 0 {
-		state.rect = false
-		state.cpath.pathKey = auxKey
-		state.cpath.path = true
-		state.cpath.pathVerts = aux
-		d.pathOps = append(d.pathOps, state.cpath)
-	}
 }
 
 // split a transform into two parts, one which is pure offset and the
@@ -987,7 +986,6 @@ loop:
 				continue
 			}
 
-			wasrect := state.rect
 			if clipData != nil {
 				// The paint operation is sheared or rotated, add a clip path representing
 				// this transformed rectangle.
@@ -999,7 +997,8 @@ loop:
 			bounds := boundRectF(cl)
 			mat := state.materialFor(bnd, off, partialTrans, bounds)
 
-			if bounds.Min == (image.Point{}) && bounds.Max == d.viewport && state.rect && mat.opaque && (mat.material == materialColor) {
+			rect := state.cpath == nil || state.cpath.rect
+			if bounds.Min == (image.Point{}) && bounds.Max == d.viewport && rect && mat.opaque && (mat.material == materialColor) {
 				// The image is a uniform opaque color and takes up the whole screen.
 				// Scrap images up to and including this image and set clear color.
 				d.imageOps = d.imageOps[:0]
@@ -1017,7 +1016,6 @@ loop:
 			if clipData != nil {
 				// we added a clip path that should not remain
 				state.cpath = state.cpath.parent
-				state.rect = wasrect
 			}
 		case opconst.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
