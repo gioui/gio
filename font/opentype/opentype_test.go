@@ -189,8 +189,8 @@ func shapeRune(f text.Face, r rune) (clip.Op, error) {
 // areShapesEqual returns true iff both given text shapes are produced with identical operations.
 func areShapesEqual(shape1, shape2 clip.Op) bool {
 	var ops1, ops2 op.Ops
-	shape1.Add(&ops1)
-	shape2.Add(&ops2)
+	shape1.Push(&ops1).Pop()
+	shape2.Push(&ops2).Pop()
 	var r1, r2 ops.Reader
 	r1.Reset(&ops1)
 	r2.Reset(&ops2)

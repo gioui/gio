@@ -36,14 +36,13 @@ func (p ProgressCircleStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}
 	sz := gtx.Constraints.Constrain(image.Pt(diam, diam))
 	radius := float32(sz.X) * .5
-	defer op.Save(gtx.Ops).Load()
-	op.Offset(f32.Pt(radius, radius)).Add(gtx.Ops)
+	defer op.Offset(f32.Pt(radius, radius)).Push(gtx.Ops).Pop()
 
-	clipLoader(gtx.Ops, -math.Pi/2, -math.Pi/2+math.Pi*2*p.Progress, radius)
+	defer clipLoader(gtx.Ops, -math.Pi/2, -math.Pi/2+math.Pi*2*p.Progress, radius).Push(gtx.Ops).Pop()
 	paint.ColorOp{
 		Color: p.Color,
 	}.Add(gtx.Ops)
-	op.Offset(f32.Pt(-radius, -radius)).Add(gtx.Ops)
+	defer op.Offset(f32.Pt(-radius, -radius)).Push(gtx.Ops).Pop()
 	paint.PaintOp{}.Add(gtx.Ops)
 	return layout.Dimensions{
 		Size: sz,

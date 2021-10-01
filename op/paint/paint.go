@@ -136,8 +136,7 @@ func (d PaintOp) Add(o *op.Ops) {
 
 // FillShape fills the clip shape with a color.
 func FillShape(ops *op.Ops, c color.NRGBA, shape clip.Op) {
-	defer op.Save(ops).Load()
-	shape.Add(ops)
+	defer shape.Push(ops).Pop()
 	Fill(ops, c)
 }
 
@@ -146,7 +145,6 @@ func FillShape(ops *op.Ops, c color.NRGBA, shape clip.Op) {
 // the painted area. Use FillShape unless you need to paint several
 // times within the same clip.Op.
 func Fill(ops *op.Ops, c color.NRGBA) {
-	defer op.Save(ops).Load()
 	ColorOp{Color: c}.Add(ops)
 	PaintOp{}.Add(ops)
 }

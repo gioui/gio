@@ -8,7 +8,6 @@ import (
 	"gioui.org/gesture"
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
-	"gioui.org/op"
 )
 
 // Float is for selecting a value in a range.
@@ -59,13 +58,12 @@ func (f *Float) Layout(gtx layout.Context, pointerMargin int, min, max float32) 
 		f.pos = 1
 	}
 
-	defer op.Save(gtx.Ops).Load()
 	margin := f.Axis.Convert(image.Pt(pointerMargin, 0))
 	rect := image.Rectangle{
 		Min: margin.Mul(-1),
 		Max: size.Add(margin),
 	}
-	pointer.Rect(rect).Add(gtx.Ops)
+	defer pointer.Rect(rect).Push(gtx.Ops).Pop()
 	f.drag.Add(gtx.Ops)
 
 	return layout.Dimensions{Size: size}

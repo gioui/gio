@@ -9,7 +9,6 @@ import (
 
 	"gioui.org/internal/f32color"
 	"gioui.org/layout"
-	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
@@ -43,8 +42,7 @@ func (ic *Icon) Layout(gtx layout.Context, color color.NRGBA) layout.Dimensions 
 		sz = gtx.Metric.Px(defaultIconSize)
 	}
 	size := gtx.Constraints.Constrain(image.Pt(sz, sz))
-	defer op.Save(gtx.Ops).Load()
-	clip.Rect{Max: size}.Add(gtx.Ops)
+	defer clip.Rect{Max: size}.Push(gtx.Ops).Pop()
 
 	ico := ic.image(size.X, color)
 	ico.Add(gtx.Ops)

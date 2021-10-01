@@ -33,7 +33,7 @@ func ExampleClickable_passthrough() {
 		// button2 completely covers button1, but pass-through allows pointer
 		// events to pass through to button1.
 		area.PassThrough = true
-		area.Add(gtx.Ops)
+		defer area.Push(gtx.Ops).Pop()
 		button2.Layout(gtx)
 	}
 

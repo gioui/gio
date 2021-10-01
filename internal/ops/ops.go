@@ -22,11 +22,12 @@ func EncodeCommand(out []byte, cmd scene.Command) {
 	copy(out, byteslice.Uint32(cmd[:]))
 }
 
-func DecodeTransform(data []byte) (t f32.Affine2D) {
+func DecodeTransform(data []byte) (t f32.Affine2D, push bool) {
 	if opconst.OpType(data[0]) != opconst.TypeTransform {
 		panic("invalid op")
 	}
-	data = data[1:]
+	push = data[1] != 0
+	data = data[2:]
 	data = data[:4*6]
 
 	bo := binary.LittleEndian
@@ -36,7 +37,7 @@ func DecodeTransform(data []byte) (t f32.Affine2D) {
 	d := math.Float32frombits(bo.Uint32(data[4*3:]))
 	e := math.Float32frombits(bo.Uint32(data[4*4:]))
 	f := math.Float32frombits(bo.Uint32(data[4*5:]))
-	return f32.NewAffine2D(a, b, c, d, e, f)
+	return f32.NewAffine2D(a, b, c, d, e, f), push
 }
 
 // DecodeSave decodes the state id of a save op.
@@ -48,11 +49,11 @@ func DecodeSave(data []byte) int {
 	return int(bo.Uint32(data[1:]))
 }
 
-// DecodeLoad decodes the state id and mask of a load op.
-func DecodeLoad(data []byte) (int, opconst.StateMask) {
+// DecodeLoad decodes the state id of a load op.
+func DecodeLoad(data []byte) int {
 	if opconst.OpType(data[0]) != opconst.TypeLoad {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
-	return int(bo.Uint32(data[2:])), opconst.StateMask(data[1])
+	return int(bo.Uint32(data[1:]))
 }

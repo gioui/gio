@@ -84,13 +84,12 @@ func BenchmarkDrawUI(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		resetOps(gtx)
 
-		p := op.Save(gtx.Ops)
 		off := float32(math.Mod(float64(i)/10, 10))
-		op.Offset(f32.Pt(off, off)).Add(gtx.Ops)
+		t := op.Offset(f32.Pt(off, off)).Push(gtx.Ops)
 
 		drawCore(gtx, th)
 
-		p.Load()
+		t.Pop()
 		w.Frame(gtx.Ops)
 	}
 	finishBenchmark(b, w)
@@ -107,14 +106,13 @@ func BenchmarkDrawUITransformed(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		resetOps(gtx)
 
-		p := op.Save(gtx.Ops)
 		angle := float32(math.Mod(float64(i)/1000, 0.05))
 		a := f32.Affine2D{}.Shear(f32.Point{}, angle, angle).Rotate(f32.Point{}, angle)
-		op.Affine(a).Add(gtx.Ops)
+		t := op.Affine(a).Push(gtx.Ops)
 
 		drawCore(gtx, th)
 
-		p.Load()
+		t.Pop()
 		w.Frame(gtx.Ops)
 	}
 	finishBenchmark(b, w)
@@ -158,7 +156,6 @@ func Benchmark1000CirclesInstanced(b *testing.B) {
 func draw1000Circles(gtx layout.Context) {
 	ops := gtx.Ops
 	for x := 0; x < 100; x++ {
-		p := op.Save(ops)
 		op.Offset(f32.Pt(float32(x*10), 0)).Add(ops)
 		for y := 0; y < 10; y++ {
 			paint.FillShape(ops,
@@ -167,7 +164,6 @@ func draw1000Circles(gtx layout.Context) {
 			)
 			op.Offset(f32.Pt(0, float32(100))).Add(ops)
 		}
-		p.Load()
 	}
 }
 
@@ -175,21 +171,18 @@ func draw1000CirclesInstanced(gtx layout.Context) {
 	ops := gtx.Ops
 
 	r := op.Record(ops)
-	clip.RRect{Rect: f32.Rect(0, 0, 10, 10), NE: 5, SE: 5, SW: 5, NW: 5}.Add(ops)
+	cl := clip.RRect{Rect: f32.Rect(0, 0, 10, 10), NE: 5, SE: 5, SW: 5, NW: 5}.Push(ops)
 	paint.PaintOp{}.Add(ops)
+	cl.Pop()
 	c := r.Stop()
 
 	for x := 0; x < 100; x++ {
-		p := op.Save(ops)
 		op.Offset(f32.Pt(float32(x*10), 0)).Add(ops)
 		for y := 0; y < 10; y++ {
-			pi := op.Save(ops)
 			paint.ColorOp{Color: color.NRGBA{R: 100 + uint8(x), G: 100 + uint8(y), B: 100, A: 120}}.Add(ops)
 			c.Add(ops)
-			pi.Load()
 			op.Offset(f32.Pt(0, float32(100))).Add(ops)
 		}
-		p.Load()
 	}
 }
 
@@ -209,7 +202,6 @@ func drawIndividualShapes(gtx layout.Context, th *material.Theme) chan op.CallOp
 		ops := &op1
 		c := op.Record(ops)
 		for x := 0; x < 9; x++ {
-			p := op.Save(ops)
 			op.Offset(f32.Pt(float32(x*50), 0)).Add(ops)
 			for y := 0; y < 9; y++ {
 				paint.FillShape(ops,
@@ -218,7 +210,6 @@ func drawIndividualShapes(gtx layout.Context, th *material.Theme) chan op.CallOp
 				)
 				op.Offset(f32.Pt(0, float32(50))).Add(ops)
 			}
-			p.Load()
 		}
 		c1 <- c.Stop()
 	}()
@@ -232,18 +223,18 @@ func drawShapeInstances(gtx layout.Context, th *material.Theme) chan op.CallOp {
 		co := op.Record(ops)
 
 		r := op.Record(ops)
-		clip.RRect{Rect: f32.Rect(0, 0, 25, 25), NE: 10, SE: 10, SW: 10, NW: 10}.Add(ops)
+		cl := clip.RRect{Rect: f32.Rect(0, 0, 25, 25), NE: 10, SE: 10, SW: 10, NW: 10}.Push(ops)
 		paint.PaintOp{}.Add(ops)
+		cl.Pop()
 		c := r.Stop()
 
 		squares.Add(ops)
 		rad := float32(0)
 		for x := 0; x < 20; x++ {
 			for y := 0; y < 20; y++ {
-				p := op.Save(ops)
-				op.Offset(f32.Pt(float32(x*50+25), float32(y*50+25))).Add(ops)
+				t := op.Offset(f32.Pt(float32(x*50+25), float32(y*50+25))).Push(ops)
 				c.Add(ops)
-				p.Load()
+				t.Pop()
 				rad += math.Pi * 2 / 400
 			}
 		}
@@ -261,11 +252,10 @@ func drawText(gtx layout.Context, th *material.Theme) chan op.CallOp {
 		txt := material.H6(th, "")
 		for x := 0; x < 40; x++ {
 			txt.Text = textRows[x]
-			p := op.Save(ops)
-			op.Offset(f32.Pt(float32(0), float32(24*x))).Add(ops)
+			t := op.Offset(f32.Pt(float32(0), float32(24*x))).Push(ops)
 			gtx.Ops = ops
 			txt.Layout(gtx)
-			p.Load()
+			t.Pop()
 		}
 		c3 <- c.Stop()
 	}()

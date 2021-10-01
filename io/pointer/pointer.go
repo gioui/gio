@@ -54,6 +54,13 @@ type AreaOp struct {
 	rect image.Rectangle
 }
 
+// AreaStack represents an AreaOp on the stack of areas.
+type AreaStack struct {
+	ops     *op.Ops
+	id      op.StackID
+	macroID int
+}
+
 // CursorNameOp sets the cursor for the current area.
 type CursorNameOp struct {
 	Name CursorName
@@ -185,18 +192,32 @@ func Ellipse(size image.Rectangle) AreaOp {
 	}
 }
 
-func (op AreaOp) Add(o *op.Ops) {
-	data := o.Write(opconst.TypeAreaLen)
+// Push the current area to the stack and intersects the current area with the
+// area represented by o.
+func (o AreaOp) Push(ops *op.Ops) AreaStack {
+	id, macroID := ops.PushOp(op.AreaStack)
+	o.add(ops, true)
+	return AreaStack{ops: ops, id: id, macroID: macroID}
+}
+
+func (o AreaOp) add(ops *op.Ops, push bool) {
+	data := ops.Write(opconst.TypeAreaLen)
 	data[0] = byte(opconst.TypeArea)
-	data[1] = byte(op.kind)
-	if op.PassThrough {
+	data[1] = byte(o.kind)
+	if o.PassThrough {
 		data[2] = 1
 	}
 	bo := binary.LittleEndian
-	bo.PutUint32(data[3:], uint32(op.rect.Min.X))
-	bo.PutUint32(data[7:], uint32(op.rect.Min.Y))
-	bo.PutUint32(data[11:], uint32(op.rect.Max.X))
-	bo.PutUint32(data[15:], uint32(op.rect.Max.Y))
+	bo.PutUint32(data[3:], uint32(o.rect.Min.X))
+	bo.PutUint32(data[7:], uint32(o.rect.Min.Y))
+	bo.PutUint32(data[11:], uint32(o.rect.Max.X))
+	bo.PutUint32(data[15:], uint32(o.rect.Max.Y))
+}
+
+func (o AreaStack) Pop() {
+	o.ops.PopOp(op.AreaStack, o.id, o.macroID)
+	data := o.ops.Write(opconst.TypePopAreaLen)
+	data[0] = byte(opconst.TypePopArea)
 }
 
 func (op CursorNameOp) Add(o *op.Ops) {

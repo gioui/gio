@@ -35,26 +35,24 @@ func TestTransformMacro(t *testing.T) {
 		m2 := op.Record(o)
 		paint.ColorOp{Color: red}.Add(o)
 		// Simulate a draw text call
-		stack := op.Save(o)
-		op.Offset(f32.Pt(0, 10)).Add(o)
+		t := op.Offset(f32.Pt(0, 10)).Push(o)
 
 		// Apply the clip-path.
-		c.Add(o)
+		cl := c.Push(o)
 
 		paint.PaintOp{}.Add(o)
-		stack.Load()
+		cl.Pop()
+		t.Pop()
 
 		c2 := m2.Stop()
 
 		// Call each of them in a transform
-		s1 := op.Save(o)
-		op.Offset(f32.Pt(0, 0)).Add(o)
+		t = op.Offset(f32.Pt(0, 0)).Push(o)
 		c1.Add(o)
-		s1.Load()
-		s2 := op.Save(o)
-		op.Offset(f32.Pt(0, 0)).Add(o)
+		t.Pop()
+		t = op.Offset(f32.Pt(0, 0)).Push(o)
 		c2.Add(o)
-		s2.Load()
+		t.Pop()
 	}, func(r result) {
 		r.expect(5, 15, colornames.Red)
 		r.expect(15, 15, colornames.Black)
@@ -75,9 +73,9 @@ func TestRepeatedPaintsZ(t *testing.T) {
 		builder.Line(f32.Pt(-10, 0))
 		builder.Line(f32.Pt(0, -10))
 		p := builder.End()
-		clip.Outline{
+		defer clip.Outline{
 			Path: p,
-		}.Op().Add(o)
+		}.Op().Push(o).Pop()
 		paint.Fill(o, red)
 	}, func(r result) {
 		r.expect(5, 5, colornames.Red)
@@ -91,10 +89,10 @@ func TestNoClipFromPaint(t *testing.T) {
 	// by leaving any clip paths in place.
 	run(t, func(o *op.Ops) {
 		a := f32.Affine2D{}.Rotate(f32.Pt(20, 20), math.Pi/4)
-		op.Affine(a).Add(o)
+		defer op.Affine(a).Push(o).Pop()
 		paint.FillShape(o, red, clip.Rect(image.Rect(10, 10, 30, 30)).Op())
 		a = f32.Affine2D{}.Rotate(f32.Pt(20, 20), -math.Pi/4)
-		op.Affine(a).Add(o)
+		defer op.Affine(a).Push(o).Pop()
 
 		paint.FillShape(o, black, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
 	}, func(r result) {
@@ -107,31 +105,31 @@ func TestNoClipFromPaint(t *testing.T) {
 
 func TestDeferredPaint(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		state := op.Save(o)
-		clip.Rect(image.Rect(0, 0, 80, 80)).Op().Add(o)
+		cl := clip.Rect(image.Rect(0, 0, 80, 80)).Op().Push(o)
 		paint.ColorOp{Color: color.NRGBA{A: 0x60, G: 0xff}}.Add(o)
 		paint.PaintOp{}.Add(o)
+		cl.Pop()
 
-		op.Affine(f32.Affine2D{}.Offset(f32.Pt(20, 20))).Add(o)
+		t := op.Affine(f32.Affine2D{}.Offset(f32.Pt(20, 20))).Push(o)
 		m := op.Record(o)
-		clip.Rect(image.Rect(0, 0, 80, 80)).Op().Add(o)
+		cl2 := clip.Rect(image.Rect(0, 0, 80, 80)).Op().Push(o)
 		paint.ColorOp{Color: color.NRGBA{A: 0x60, R: 0xff, G: 0xff}}.Add(o)
 		paint.PaintOp{}.Add(o)
+		cl2.Pop()
 		paintMacro := m.Stop()
 		op.Defer(o, paintMacro)
+		t.Pop()
 
-		state.Load()
-		op.Affine(f32.Affine2D{}.Offset(f32.Pt(10, 10))).Add(o)
-		clip.Rect(image.Rect(0, 0, 80, 80)).Op().Add(o)
+		defer op.Affine(f32.Affine2D{}.Offset(f32.Pt(10, 10))).Push(o).Pop()
+		defer clip.Rect(image.Rect(0, 0, 80, 80)).Op().Push(o).Pop()
 		paint.ColorOp{Color: color.NRGBA{A: 0x60, B: 0xff}}.Add(o)
 		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 	})
 }
 
-func constSqPath() op.CallOp {
+func constSqPath() clip.Op {
 	innerOps := new(op.Ops)
-	m := op.Record(innerOps)
 	builder := clip.Path{}
 	builder.Begin(innerOps)
 	builder.Move(f32.Pt(0, 0))
@@ -140,22 +138,20 @@ func constSqPath() op.CallOp {
 	builder.Line(f32.Pt(-10, 0))
 	builder.Line(f32.Pt(0, -10))
 	p := builder.End()
-	clip.Outline{Path: p}.Op().Add(innerOps)
-	return m.Stop()
+	return clip.Outline{Path: p}.Op()
 }
 
-func constSqCirc() op.CallOp {
+func constSqCirc() clip.Op {
 	innerOps := new(op.Ops)
-	m := op.Record(innerOps)
-	clip.RRect{Rect: f32.Rect(0, 0, 40, 40),
-		NW: 20, NE: 20, SW: 20, SE: 20}.Add(innerOps)
-	return m.Stop()
+	return clip.RRect{Rect: f32.Rect(0, 0, 40, 40),
+		NW: 20, NE: 20, SW: 20, SE: 20}.Op(innerOps)
 }
 
-func drawChild(ops *op.Ops, text op.CallOp) op.CallOp {
+func drawChild(ops *op.Ops, text clip.Op) op.CallOp {
 	r1 := op.Record(ops)
-	text.Add(ops)
+	cl := text.Push(ops)
 	paint.PaintOp{}.Add(ops)
+	cl.Pop()
 	return r1.Stop()
 }
 
@@ -166,14 +162,10 @@ func TestReuseStencil(t *testing.T) {
 		c2 := drawChild(ops, txt)
 
 		// lay out the children
-		stack1 := op.Save(ops)
 		c1.Add(ops)
-		stack1.Load()
 
-		stack2 := op.Save(ops)
-		op.Offset(f32.Pt(0, 50)).Add(ops)
+		defer op.Offset(f32.Pt(0, 50)).Push(ops).Pop()
 		c2.Add(ops)
-		stack2.Load()
 	}, func(r result) {
 		r.expect(5, 5, colornames.Black)
 		r.expect(5, 55, colornames.Black)
@@ -187,11 +179,9 @@ func TestBuildOffscreen(t *testing.T) {
 
 	txt := constSqCirc()
 	draw := func(off float32, o *op.Ops) {
-		s := op.Save(o)
-		op.Offset(f32.Pt(0, off)).Add(o)
-		txt.Add(o)
+		defer op.Offset(f32.Pt(0, off)).Push(o).Pop()
+		defer txt.Push(o).Pop()
 		paint.PaintOp{}.Add(o)
-		s.Load()
 	}
 
 	multiRun(t,
@@ -214,8 +204,8 @@ func TestBuildOffscreen(t *testing.T) {
 
 func TestNegativeOverlaps(t *testing.T) {
 	run(t, func(ops *op.Ops) {
-		clip.RRect{Rect: f32.Rect(50, 50, 100, 100)}.Add(ops)
-		clip.Rect(image.Rect(0, 120, 100, 122)).Add(ops)
+		defer clip.RRect{Rect: f32.Rect(50, 50, 100, 100)}.Push(ops).Pop()
+		clip.Rect(image.Rect(0, 120, 100, 122)).Push(ops).Pop()
 		paint.PaintOp{}.Add(ops)
 	}, func(r result) {
 		r.expect(60, 60, transparent)
@@ -227,13 +217,8 @@ func TestNegativeOverlaps(t *testing.T) {
 
 func TestDepthOverlap(t *testing.T) {
 	run(t, func(ops *op.Ops) {
-		stack := op.Save(ops)
 		paint.FillShape(ops, red, clip.Rect{Max: image.Pt(128, 64)}.Op())
-		stack.Load()
-
-		stack = op.Save(ops)
 		paint.FillShape(ops, green, clip.Rect{Max: image.Pt(64, 128)}.Op())
-		stack.Load()
 	}, func(r result) {
 		r.expect(96, 32, colornames.Red)
 		r.expect(32, 96, colornames.Green)
@@ -272,12 +257,13 @@ func TestLinearGradient(t *testing.T) {
 				Stop2:  f32.Pt(gr.Max.X, gr.Min.Y),
 				Color2: g.To,
 			}.Add(ops)
-			st := op.Save(ops)
-			clip.RRect{Rect: gr}.Add(ops)
-			op.Affine(f32.Affine2D{}.Offset(pixelAligned.Min)).Add(ops)
-			scale(pixelAligned.Dx()/128, 1).Add(ops)
+			cl := clip.RRect{Rect: gr}.Push(ops)
+			t1 := op.Affine(f32.Affine2D{}.Offset(pixelAligned.Min)).Push(ops)
+			t2 := scale(pixelAligned.Dx()/128, 1).Push(ops)
 			paint.PaintOp{}.Add(ops)
-			st.Load()
+			t2.Pop()
+			t1.Pop()
+			cl.Pop()
 			gr = gr.Add(f32.Pt(0, gradienth))
 		}
 	}, func(r result) {
@@ -302,10 +288,9 @@ func TestLinearGradientAngled(t *testing.T) {
 			Stop2:  f32.Pt(0, 0),
 			Color2: red,
 		}.Add(ops)
-		st := op.Save(ops)
-		clip.Rect(image.Rect(0, 0, 64, 64)).Add(ops)
+		cl := clip.Rect(image.Rect(0, 0, 64, 64)).Push(ops)
 		paint.PaintOp{}.Add(ops)
-		st.Load()
+		cl.Pop()
 
 		paint.LinearGradientOp{
 			Stop1:  f32.Pt(64, 64),
@@ -313,10 +298,9 @@ func TestLinearGradientAngled(t *testing.T) {
 			Stop2:  f32.Pt(128, 0),
 			Color2: green,
 		}.Add(ops)
-		st = op.Save(ops)
-		clip.Rect(image.Rect(64, 0, 128, 64)).Add(ops)
+		cl = clip.Rect(image.Rect(64, 0, 128, 64)).Push(ops)
 		paint.PaintOp{}.Add(ops)
-		st.Load()
+		cl.Pop()
 
 		paint.LinearGradientOp{
 			Stop1:  f32.Pt(64, 64),
@@ -324,10 +308,9 @@ func TestLinearGradientAngled(t *testing.T) {
 			Stop2:  f32.Pt(128, 128),
 			Color2: blue,
 		}.Add(ops)
-		st = op.Save(ops)
-		clip.Rect(image.Rect(64, 64, 128, 128)).Add(ops)
+		cl = clip.Rect(image.Rect(64, 64, 128, 128)).Push(ops)
 		paint.PaintOp{}.Add(ops)
-		st.Load()
+		cl.Pop()
 
 		paint.LinearGradientOp{
 			Stop1:  f32.Pt(64, 64),
@@ -335,10 +318,9 @@ func TestLinearGradientAngled(t *testing.T) {
 			Stop2:  f32.Pt(0, 128),
 			Color2: magenta,
 		}.Add(ops)
-		st = op.Save(ops)
-		clip.Rect(image.Rect(0, 64, 64, 128)).Add(ops)
+		cl = clip.Rect(image.Rect(0, 64, 64, 128)).Push(ops)
 		paint.PaintOp{}.Add(ops)
-		st.Load()
+		cl.Pop()
 	}, func(r result) {})
 }
 

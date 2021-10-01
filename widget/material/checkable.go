@@ -8,7 +8,6 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/internal/f32color"
-	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
@@ -84,6 +83,5 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 			})
 		}),
 	)
-	pointer.Rect(image.Rectangle{Max: dims.Size}).Add(gtx.Ops)
 	return dims
 }

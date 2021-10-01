@@ -90,7 +90,7 @@ func Clickable(gtx layout.Context, button *widget.Clickable, w layout.Widget) la
 	return layout.Stack{}.Layout(gtx,
 		layout.Expanded(button.Layout),
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
-			clip.Rect{Max: gtx.Constraints.Min}.Add(gtx.Ops)
+			defer clip.Rect{Max: gtx.Constraints.Min}.Push(gtx.Ops).Pop()
 			for _, c := range button.History() {
 				drawInk(gtx, c)
 			}
@@ -118,10 +118,10 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 	return layout.Stack{Alignment: layout.Center}.Layout(gtx,
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
 			rr := float32(gtx.Px(b.CornerRadius))
-			clip.UniformRRect(f32.Rectangle{Max: f32.Point{
+			defer clip.UniformRRect(f32.Rectangle{Max: f32.Point{
 				X: float32(gtx.Constraints.Min.X),
 				Y: float32(gtx.Constraints.Min.Y),
-			}}, rr).Add(gtx.Ops)
+			}}, rr).Push(gtx.Ops).Pop()
 			background := b.Background
 			switch {
 			case gtx.Queue == nil:
@@ -149,9 +149,9 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 			sizex, sizey := gtx.Constraints.Min.X, gtx.Constraints.Min.Y
 			sizexf, sizeyf := float32(sizex), float32(sizey)
 			rr := (sizexf + sizeyf) * .25
-			clip.UniformRRect(f32.Rectangle{
+			defer clip.UniformRRect(f32.Rectangle{
 				Max: f32.Point{X: sizexf, Y: sizeyf},
-			}, rr).Add(gtx.Ops)
+			}, rr).Push(gtx.Ops).Pop()
 			background := b.Background
 			switch {
 			case gtx.Queue == nil:
@@ -178,7 +178,7 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 			})
 		}),
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
-			pointer.Ellipse(image.Rectangle{Max: gtx.Constraints.Min}).Add(gtx.Ops)
+			defer pointer.Ellipse(image.Rectangle{Max: gtx.Constraints.Min}).Push(gtx.Ops).Pop()
 			return b.Button.Layout(gtx)
 		}),
 	)
@@ -272,15 +272,14 @@ func drawInk(gtx layout.Context, c widget.Press) {
 	alpha := 0.7 * alphaBezier
 	const col = 0.8
 	ba, bc := byte(alpha*0xff), byte(col*0xff)
-	defer op.Save(gtx.Ops).Load()
 	rgba := f32color.MulAlpha(color.NRGBA{A: 0xff, R: bc, G: bc, B: bc}, ba)
 	ink := paint.ColorOp{Color: rgba}
 	ink.Add(gtx.Ops)
 	rr := size * .5
-	op.Offset(c.Position.Add(f32.Point{
+	defer op.Offset(c.Position.Add(f32.Point{
 		X: -rr,
 		Y: -rr,
-	})).Add(gtx.Ops)
-	clip.UniformRRect(f32.Rectangle{Max: f32.Pt(size, size)}, rr).Add(gtx.Ops)
+	})).Push(gtx.Ops).Pop()
+	defer clip.UniformRRect(f32.Rectangle{Max: f32.Pt(size, size)}, rr).Push(gtx.Ops).Pop()
 	paint.PaintOp{}.Add(gtx.Ops)
 }

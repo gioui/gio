@@ -176,12 +176,13 @@ func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size un
 		if !ok {
 			break
 		}
-		stack := op.Save(gtx.Ops)
-		op.Offset(layout.FPt(off)).Add(gtx.Ops)
-		clip.Rect(cl.Sub(off)).Add(gtx.Ops)
-		s.Shape(font, textSize, l).Add(gtx.Ops)
+		t := op.Offset(layout.FPt(off)).Push(gtx.Ops)
+		rcl := clip.Rect(cl.Sub(off)).Push(gtx.Ops)
+		cl := s.Shape(font, textSize, l).Push(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
-		stack.Load()
+		cl.Pop()
+		rcl.Pop()
+		t.Pop()
 	}
 	return dims
 }

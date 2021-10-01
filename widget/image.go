@@ -32,8 +32,6 @@ type Image struct {
 const defaultScale = float32(160.0 / 72.0)
 
 func (im Image) Layout(gtx layout.Context) layout.Dimensions {
-	defer op.Save(gtx.Ops).Load()
-
 	scale := im.Scale
 	if scale == 0 {
 		scale = defaultScale
@@ -44,11 +42,11 @@ func (im Image) Layout(gtx layout.Context) layout.Dimensions {
 	w, h := gtx.Px(unit.Dp(wf*scale)), gtx.Px(unit.Dp(hf*scale))
 
 	dims, trans := im.Fit.scale(gtx.Constraints, im.Position, layout.Dimensions{Size: image.Pt(w, h)})
-	clip.Rect{Max: dims.Size}.Add(gtx.Ops)
+	defer clip.Rect{Max: dims.Size}.Push(gtx.Ops).Pop()
 
 	pixelScale := scale * gtx.Metric.PxPerDp
 	trans = trans.Mul(f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(pixelScale, pixelScale)))
-	op.Affine(trans).Add(gtx.Ops)
+	defer op.Affine(trans).Push(gtx.Ops).Pop()
 
 	im.Src.Add(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)

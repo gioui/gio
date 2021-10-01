@@ -30,24 +30,24 @@ Drawing a colored square:
 
 State
 
-An Ops list can be viewed as a very simple virtual machine: it has an implicit
-mutable state stack and execution flow can be controlled with macros.
+An Ops list can be viewed as a very simple virtual machine: it has state such
+as transformation and color and execution flow can be controlled with macros.
 
-The Save function saves the current state for later restoring:
+Some state, such as the current color, is modified directly by operations with
+Add methods. Other state, such as transformation and clip shape, are
+represented by stacks.
+
+This example sets the simple color state and pushes an offset to the
+transformation stack.
 
 	ops := new(op.Ops)
-	// Save the current state, in particular the transform.
-	state := op.Save(ops)
-	// Apply a transform to subsequent operations.
-	op.Offset(...).Add(ops)
+	// Set the color.
+	paint.ColorOp{...}.Add(ops)
+	// Apply an offset to subsequent operations.
+	stack := op.Offset(...).Push(ops)
 	...
-	// Restore the previous transform.
-	state.Load()
-
-You can also use this one-line to save the current state and restore it at the
-end of a function :
-
-  defer op.Save(ops).Load()
+	// Undo the offset transformation.
+	stack.Pop()
 
 The MacroOp records a list of operations to be executed later:
 
@@ -67,6 +67,7 @@ package op
 
 import (
 	"encoding/binary"
+	"image"
 	"math"
 	"time"
 
@@ -89,11 +90,20 @@ type Ops struct {
 	nextStateID int
 
 	macroStack stack
+	stacks     [3]stack
 }
 
-// StateOp represents a saved operation snapshop to be restored
+type StackKind uint8
+
+const (
+	ClipStack StackKind = iota
+	AreaStack
+	TransStack
+)
+
+// stateOp represents a saved operation snapshop to be restored
 // later.
-type StateOp struct {
+type stateOp struct {
 	id      int
 	macroID int
 	ops     *Ops
@@ -102,7 +112,7 @@ type StateOp struct {
 // MacroOp records a list of operations for later use.
 type MacroOp struct {
 	ops *Ops
-	id  stackID
+	id  StackID
 	pc  pc
 }
 
@@ -119,20 +129,27 @@ type InvalidateOp struct {
 	At time.Time
 }
 
-// TransformOp applies a transform to the current transform. The zero value
-// for TransformOp represents the identity transform.
+// TransformOp represents a transformation that can be pushed on the
+// transformation stack.
 type TransformOp struct {
 	t f32.Affine2D
 }
 
-// stack tracks the integer identities of MacroOp
-// operations to ensure correct pairing of Record/End.
+// TransformStack represents a TransformOp pushed on the transformation stack.
+type TransformStack struct {
+	id      StackID
+	macroID int
+	ops     *Ops
+}
+
+// stack tracks the integer identities of stack operations to ensure correct
+// pairing of their push and pop methods.
 type stack struct {
 	currentID int
 	nextID    int
 }
 
-type stackID struct {
+type StackID struct {
 	id   int
 	prev int
 }
@@ -142,22 +159,21 @@ type pc struct {
 	refs int
 }
 
-// Defer executes c after all other operations have completed,
-// including previously deferred operations.
-// Defer saves the current transformation and restores it prior
-// to execution. All other operation state is reset.
+// Defer executes c after all other operations have completed, including
+// previously deferred operations.
+// Defer saves the transformation stack and pushes it prior to executing
+// c. All other operation state is reset.
 //
-// Note that deferred operations are executed in first-in-first-out
-// order, unlike the Go facility of the same name.
+// Note that deferred operations are executed in first-in-first-out order,
+// unlike the Go facility of the same name.
 func Defer(o *Ops, c CallOp) {
 	if c.ops == nil {
 		return
 	}
-	state := Save(o)
+	state := save(o)
 	// Wrap c in a macro that loads the saved state before execution.
 	m := Record(o)
-	load(o, opconst.InitialStateID, opconst.AllState)
-	load(o, state.id, opconst.TransformState)
+	state.load()
 	c.Add(o)
 	c = m.Stop()
 	// A Defer is recorded as a TypeDefer followed by the
@@ -167,52 +183,80 @@ func Defer(o *Ops, c CallOp) {
 	c.Add(o)
 }
 
-// Save the current operations state.
-func Save(o *Ops) StateOp {
+type SaveStack struct {
+	ops  *Ops
+	clip struct {
+		id      StackID
+		macroID int
+	}
+	trans TransformStack
+}
+
+// Deprecated: use state-specific stack operations instead (TransformOp.Push
+// etc.).
+func Save(o *Ops) SaveStack {
+	st := SaveStack{
+		ops:   o,
+		trans: Offset(f32.Point{}).Push(o),
+	}
+	const inf = 1e6
+	bounds := image.Rectangle{Min: image.Pt(-inf, -inf), Max: image.Pt(inf, inf)}
+	{
+		st.clip.id, st.clip.macroID = o.PushOp(ClipStack)
+		// Push clip stack with no-op (infinite) clipping rect. Copied from clip.Op.Push.
+		bo := binary.LittleEndian
+		data := o.Write(opconst.TypeClipLen)
+		data[0] = byte(opconst.TypeClip)
+		bo.PutUint32(data[1:], uint32(bounds.Min.X))
+		bo.PutUint32(data[5:], uint32(bounds.Min.Y))
+		bo.PutUint32(data[9:], uint32(bounds.Max.X))
+		bo.PutUint32(data[13:], uint32(bounds.Max.Y))
+		data[17] = byte(1) // Outline
+		data[18] = byte(1) // Push
+	}
+	return st
+}
+
+func (s SaveStack) Load() {
+	// Pop clip.
+	s.ops.PopOp(ClipStack, s.clip.id, s.clip.macroID)
+	data := s.ops.Write(opconst.TypePopClipLen)
+	data[0] = byte(opconst.TypePopClip)
+
+	s.trans.Pop()
+}
+
+// save the effective transformation.
+func save(o *Ops) stateOp {
 	o.nextStateID++
-	s := StateOp{
+	s := stateOp{
 		ops:     o,
 		id:      o.nextStateID,
 		macroID: o.macroStack.currentID,
 	}
-	save(o, s.id)
-	return s
-}
-
-// save records a save of the operations state to
-// id.
-func save(o *Ops, id int) {
 	bo := binary.LittleEndian
 	data := o.Write(opconst.TypeSaveLen)
 	data[0] = byte(opconst.TypeSave)
-	bo.PutUint32(data[1:], uint32(id))
-}
-
-// Load a previously saved operations state.
-func (s StateOp) Load() {
-	if s.ops.macroStack.currentID != s.macroID {
-		panic("load in a different macro than save")
-	}
-	if s.id == 0 {
-		panic("zero-value op")
-	}
-	load(s.ops, s.id, opconst.AllState)
+	bo.PutUint32(data[1:], uint32(s.id))
+	return s
 }
 
 // load a previously saved operations state given
-// its ID. Only state included in mask is affected.
-func load(o *Ops, id int, m opconst.StateMask) {
+// its ID.
+func (s stateOp) load() {
 	bo := binary.LittleEndian
-	data := o.Write(opconst.TypeLoadLen)
+	data := s.ops.Write(opconst.TypeLoadLen)
 	data[0] = byte(opconst.TypeLoad)
-	data[1] = byte(m)
-	bo.PutUint32(data[2:], uint32(id))
+	bo.PutUint32(data[1:], uint32(s.id))
 }
 
 // Reset the Ops, preparing it for re-use. Reset invalidates
 // any recorded macros.
 func (o *Ops) Reset() {
 	o.macroStack = stack{}
+	for i := range o.stacks {
+		o.stacks[i] = stack{}
+	}
 	// Leave references to the GC.
 	for i := range o.refs {
 		o.refs[i] = nil
@@ -242,6 +286,17 @@ func (o *Ops) Version() int {
 func (o *Ops) Write(n int) []byte {
 	o.data = append(o.data, make([]byte, n)...)
 	return o.data[len(o.data)-n:]
+}
+
+func (o *Ops) PushOp(kind StackKind) (StackID, int) {
+	return o.stacks[kind].push(), o.macroStack.currentID
+}
+
+func (o *Ops) PopOp(kind StackKind, sid StackID, macroID int) {
+	if o.macroStack.currentID != macroID {
+		panic("stack push and pop must not cross macro boundary")
+	}
+	o.stacks[kind].pop(sid)
 }
 
 // Write1 is for internal use only.
@@ -334,22 +389,45 @@ func Affine(a f32.Affine2D) TransformOp {
 	return TransformOp{t: a}
 }
 
-func (t TransformOp) Add(o *Ops) {
-	data := o.Write(opconst.TypeTransformLen)
-	data[0] = byte(opconst.TypeTransform)
-	bo := binary.LittleEndian
-	a, b, c, d, e, f := t.t.Elems()
-	bo.PutUint32(data[1:], math.Float32bits(a))
-	bo.PutUint32(data[1+4*1:], math.Float32bits(b))
-	bo.PutUint32(data[1+4*2:], math.Float32bits(c))
-	bo.PutUint32(data[1+4*3:], math.Float32bits(d))
-	bo.PutUint32(data[1+4*4:], math.Float32bits(e))
-	bo.PutUint32(data[1+4*5:], math.Float32bits(f))
+// Push the current transformation to the stack and then multiply the
+// current transformation with t.
+func (t TransformOp) Push(o *Ops) TransformStack {
+	id, macroID := o.PushOp(TransStack)
+	t.add(o, true)
+	return TransformStack{ops: o, id: id, macroID: macroID}
 }
 
-func (s *stack) push() stackID {
+// Add is like Push except it doesn't push the current transformation to the
+// stack.
+func (t TransformOp) Add(o *Ops) {
+	t.add(o, false)
+}
+
+func (t TransformOp) add(o *Ops, push bool) {
+	data := o.Write(opconst.TypeTransformLen)
+	data[0] = byte(opconst.TypeTransform)
+	if push {
+		data[1] = 1
+	}
+	bo := binary.LittleEndian
+	a, b, c, d, e, f := t.t.Elems()
+	bo.PutUint32(data[2:], math.Float32bits(a))
+	bo.PutUint32(data[2+4*1:], math.Float32bits(b))
+	bo.PutUint32(data[2+4*2:], math.Float32bits(c))
+	bo.PutUint32(data[2+4*3:], math.Float32bits(d))
+	bo.PutUint32(data[2+4*4:], math.Float32bits(e))
+	bo.PutUint32(data[2+4*5:], math.Float32bits(f))
+}
+
+func (t TransformStack) Pop() {
+	t.ops.PopOp(TransStack, t.id, t.macroID)
+	data := t.ops.Write(opconst.TypePopTransformLen)
+	data[0] = byte(opconst.TypePopTransform)
+}
+
+func (s *stack) push() StackID {
 	s.nextID++
-	sid := stackID{
+	sid := StackID{
 		id:   s.nextID,
 		prev: s.currentID,
 	}
@@ -357,13 +435,13 @@ func (s *stack) push() stackID {
 	return sid
 }
 
-func (s *stack) check(sid stackID) {
+func (s *stack) check(sid StackID) {
 	if s.currentID != sid.id {
 		panic("unbalanced operation")
 	}
 }
 
-func (s *stack) pop(sid stackID) {
+func (s *stack) pop(sid StackID) {
 	s.check(sid)
 	s.currentID = sid.prev
 }

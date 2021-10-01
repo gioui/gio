@@ -75,7 +75,8 @@ type renderer struct {
 type drawOps struct {
 	profile     bool
 	reader      ops.Reader
-	states      []drawState
+	states      []f32.Affine2D
+	transStack  []f32.Affine2D
 	cache       *resourceCache
 	vertCache   []byte
 	viewport    image.Point
@@ -110,6 +111,9 @@ type pathOp struct {
 	// rect tracks whether the clip stack can be represented by a
 	// pixel-aligned rectangle.
 	rect bool
+	// push is set to true for clip operations that corresponds to
+	// a push operation.
+	push bool
 	// clip is the union of all
 	// later clip rectangles.
 	clip   image.Rectangle
@@ -171,6 +175,7 @@ type clipOp struct {
 	// TODO: Use image.Rectangle?
 	bounds  f32.Rectangle
 	outline bool
+	push    bool
 }
 
 // imageOpData is the shadow of paint.ImageOp.
@@ -204,6 +209,7 @@ func (op *clipOp) decode(data []byte) {
 	*op = clipOp{
 		bounds:  layout.FRect(r),
 		outline: data[17] == 1,
+		push:    data[18] == 1,
 	}
 }
 
@@ -822,6 +828,7 @@ func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
 	d.pathOps = d.pathOps[:0]
 	d.pathOpCache = d.pathOpCache[:0]
 	d.vertCache = d.vertCache[:0]
+	d.transStack = d.transStack[:0]
 }
 
 func (d *drawOps) collect(root *op.Ops, viewport image.Point) {
@@ -829,10 +836,7 @@ func (d *drawOps) collect(root *op.Ops, viewport image.Point) {
 		Max: f32.Point{X: float32(viewport.X), Y: float32(viewport.Y)},
 	}
 	d.reader.Reset(root)
-	state := drawState{
-		color: color.NRGBA{A: 0xff},
-	}
-	d.collectOps(&d.reader, viewf, state)
+	d.collectOps(&d.reader, viewf)
 }
 
 func (d *drawOps) buildPaths(ctx driver.Device) {
@@ -853,7 +857,7 @@ func (d *drawOps) newPathOp() *pathOp {
 	return &d.pathOpCache[len(d.pathOpCache)-1]
 }
 
-func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey opKey, bounds f32.Rectangle, off f32.Point) {
+func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey opKey, bounds f32.Rectangle, off f32.Point, push bool) {
 	npath := d.newPathOp()
 	*npath = pathOp{
 		parent:    state.cpath,
@@ -861,6 +865,7 @@ func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey opKey, bounds
 		off:       off,
 		intersect: bounds.Add(off),
 		rect:      true,
+		push:      push,
 	}
 	if npath.parent != nil {
 		npath.rect = npath.parent.rect
@@ -885,9 +890,9 @@ func splitTransform(t f32.Affine2D) (srs f32.Affine2D, offset f32.Point) {
 	return
 }
 
-func (d *drawOps) save(id int, state drawState) {
+func (d *drawOps) save(id int, state f32.Affine2D) {
 	if extra := id - len(d.states) + 1; extra > 0 {
-		d.states = append(d.states, make([]drawState, extra)...)
+		d.states = append(d.states, make([]f32.Affine2D, extra)...)
 	}
 	d.states[id] = state
 }
@@ -901,20 +906,33 @@ func (k opKey) SetTransform(t f32.Affine2D) opKey {
 	return k
 }
 
-func (d *drawOps) collectOps(r *ops.Reader, viewport f32.Rectangle, state drawState) {
+func (d *drawOps) collectOps(r *ops.Reader, viewport f32.Rectangle) {
 	var (
 		quads quadsOp
 		str   clip.StrokeStyle
+		state drawState
 	)
-	d.save(opconst.InitialStateID, state)
+	reset := func() {
+		state = drawState{
+			color: color.NRGBA{A: 0xff},
+		}
+	}
+	reset()
 loop:
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypeProfile:
 			d.profile = true
 		case opconst.TypeTransform:
-			dop := ops.DecodeTransform(encOp.Data)
+			dop, push := ops.DecodeTransform(encOp.Data)
+			if push {
+				d.transStack = append(d.transStack, state.t)
+			}
 			state.t = state.t.Mul(dop)
+		case opconst.TypePopTransform:
+			n := len(d.transStack)
+			state.t = d.transStack[n-1]
+			d.transStack = d.transStack[:n-1]
 
 		case opconst.TypeStroke:
 			str = decodeStrokeOp(encOp.Data)
@@ -954,11 +972,18 @@ loop:
 			} else {
 				quads.aux, op.bounds, _ = d.boundsForTransformedRect(bounds, trans)
 				quads.key = opKey{Key: encOp.Key}
-				quads.key.SetTransform(trans) // TODO: This call has no effect.
 			}
-			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off)
+			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off, op.push)
 			quads = quadsOp{}
 			str = clip.StrokeStyle{}
+		case opconst.TypePopClip:
+			for {
+				push := state.cpath.push
+				state.cpath = state.cpath.parent
+				if push {
+					break
+				}
+			}
 
 		case opconst.TypeColor:
 			state.matType = materialColor
@@ -977,7 +1002,7 @@ loop:
 			// Transform (if needed) the painting rectangle and if so generate a clip path,
 			// for those cases also compute a partialTrans that maps texture coordinates between
 			// the new bounding rectangle and the transformed original paint rectangle.
-			trans, off := splitTransform(state.t)
+			t, off := splitTransform(state.t)
 			// Fill the clip area, unless the material is a (bounded) image.
 			// TODO: Find a tighter bound.
 			inf := float32(1e6)
@@ -985,7 +1010,7 @@ loop:
 			if state.matType == materialTexture {
 				dst = layout.FRect(state.image.src.Rect)
 			}
-			clipData, bnd, partialTrans := d.boundsForTransformedRect(dst, trans)
+			clipData, bnd, partialTrans := d.boundsForTransformedRect(dst, t)
 			cl := viewport.Intersect(bnd.Add(off))
 			if state.cpath != nil {
 				cl = state.cpath.intersect.Intersect(cl)
@@ -998,8 +1023,8 @@ loop:
 				// The paint operation is sheared or rotated, add a clip path representing
 				// this transformed rectangle.
 				k := opKey{Key: encOp.Key}
-				k.SetTransform(trans) // TODO: This call has no effect.
-				d.addClipPath(&state, clipData, k, bnd, off)
+				k.SetTransform(t) // TODO: This call has no effect.
+				d.addClipPath(&state, clipData, k, bnd, off, false)
 			}
 
 			bounds := boundRectF(cl)
@@ -1027,16 +1052,11 @@ loop:
 			}
 		case opconst.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
-			d.save(id, state)
+			d.save(id, state.t)
 		case opconst.TypeLoad:
-			id, mask := ops.DecodeLoad(encOp.Data)
-			s := d.states[id]
-			if mask&opconst.TransformState != 0 {
-				state.t = s.t
-			}
-			if mask&^opconst.TransformState != 0 {
-				state = s
-			}
+			reset()
+			id := ops.DecodeLoad(encOp.Data)
+			state.t = d.states[id]
 		}
 	}
 }

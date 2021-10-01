@@ -156,16 +156,14 @@ func (s ScrollbarStyle) layout(gtx layout.Context, axis layout.Axis, viewportSta
 				Max: gtx.Constraints.Min,
 			}
 			pointerArea := pointer.Rect(area)
-			pointerArea.Add(gtx.Ops)
+			defer pointerArea.Push(gtx.Ops).Pop()
 			s.Scrollbar.AddDrag(gtx.Ops)
 
 			// Stack a normal clickable area on top of the draggable area
 			// to capture non-dragging clicks.
-			saved := op.Save(gtx.Ops)
 			pointerArea.PassThrough = true
-			pointerArea.Add(gtx.Ops)
+			defer pointerArea.Push(gtx.Ops).Pop()
 			s.Scrollbar.AddTrack(gtx.Ops)
-			saved.Load()
 
 			paint.FillShape(gtx.Ops, s.Track.Color, clip.Rect(area).Op())
 			return layout.Dimensions{}
@@ -194,9 +192,8 @@ func (s ScrollbarStyle) layout(gtx layout.Context, axis layout.Axis, viewportSta
 				radius := float32(gtx.Px(s.Indicator.CornerRadius))
 
 				// Lay out the indicator.
-				defer op.Save(gtx.Ops).Load()
 				offset := axis.Convert(image.Pt(viewStart, 0))
-				op.Offset(layout.FPt(offset)).Add(gtx.Ops)
+				defer op.Offset(layout.FPt(offset)).Push(gtx.Ops).Pop()
 				paint.FillShape(gtx.Ops, s.Indicator.Color, clip.RRect{
 					Rect: f32.Rectangle{
 						Max: indicatorDimsF,
@@ -210,7 +207,7 @@ func (s ScrollbarStyle) layout(gtx layout.Context, axis layout.Axis, viewportSta
 				// Add the indicator pointer hit area.
 				area := pointer.Rect(image.Rectangle{Max: indicatorDims})
 				area.PassThrough = true
-				area.Add(gtx.Ops)
+				defer area.Push(gtx.Ops).Pop()
 				s.Scrollbar.AddIndicator(gtx.Ops)
 
 				return layout.Dimensions{Size: axis.Convert(gtx.Constraints.Min)}

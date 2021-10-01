@@ -547,7 +547,7 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 	r.Min.Y -= pointerPadding
 	r.Max.X += pointerPadding
 	r.Max.X += pointerPadding
-	pointer.Rect(r).Add(gtx.Ops)
+	defer pointer.Rect(r).Push(gtx.Ops).Pop()
 	pointer.CursorNameOp{Name: pointer.CursorText}.Add(gtx.Ops)
 
 	var scrollRange image.Rectangle
@@ -583,31 +583,31 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 func (e *Editor) PaintSelection(gtx layout.Context) {
 	cl := textPadding(e.lines)
 	cl.Max = cl.Max.Add(e.viewSize)
-	clip.Rect(cl).Add(gtx.Ops)
+	defer clip.Rect(cl).Push(gtx.Ops).Pop()
 	for _, shape := range e.shapes {
 		if !shape.selected {
 			continue
 		}
-		stack := op.Save(gtx.Ops)
 		offset := shape.offset
 		offset.Y += shape.selectionYOffs
-		op.Offset(layout.FPt(offset)).Add(gtx.Ops)
-		clip.Rect(image.Rectangle{Max: shape.selectionSize}).Add(gtx.Ops)
+		t := op.Offset(layout.FPt(offset)).Push(gtx.Ops)
+		cl := clip.Rect(image.Rectangle{Max: shape.selectionSize}).Push(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
-		stack.Load()
+		cl.Pop()
+		t.Pop()
 	}
 }
 
 func (e *Editor) PaintText(gtx layout.Context) {
 	cl := textPadding(e.lines)
 	cl.Max = cl.Max.Add(e.viewSize)
-	clip.Rect(cl).Add(gtx.Ops)
+	defer clip.Rect(cl).Push(gtx.Ops).Pop()
 	for _, shape := range e.shapes {
-		stack := op.Save(gtx.Ops)
-		op.Offset(layout.FPt(shape.offset)).Add(gtx.Ops)
-		shape.clip.Add(gtx.Ops)
+		t := op.Offset(layout.FPt(shape.offset)).Push(gtx.Ops)
+		cl := shape.clip.Push(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
-		stack.Load()
+		cl.Pop()
+		t.Pop()
 	}
 }
 
@@ -620,7 +620,6 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 	carX := e.caret.start.x
 	carY := e.caret.start.y
 
-	defer op.Save(gtx.Ops).Load()
 	carX -= carWidth / 2
 	carAsc, carDesc := -e.lines[e.caret.start.lineCol.Y].Bounds.Min.Y, e.lines[e.caret.start.lineCol.Y].Bounds.Max.Y
 	carRect := image.Rectangle{
@@ -643,10 +642,8 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 	cl.Max = cl.Max.Add(e.viewSize)
 	carRect = cl.Intersect(carRect)
 	if !carRect.Empty() {
-		st := op.Save(gtx.Ops)
-		clip.Rect(carRect).Add(gtx.Ops)
+		defer clip.Rect(carRect).Push(gtx.Ops).Pop()
 		paint.PaintOp{}.Add(gtx.Ops)
-		st.Load()
 	}
 }
 

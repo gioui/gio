@@ -41,25 +41,23 @@ operations is the intersection of the areas.
 
 Matching events
 
-StackOp operations and input handlers form an implicit tree.
-Each stack operation is a node, and each input handler is associated
-with the most recent node.
+Areas form an implicit tree, with input handlers as leaves. The children of
+an area is every area and handler added between its Push and corresponding Pop.
 
 For example:
 
 	ops := new(op.Ops)
-	var stack op.StackOp
 	var h1, h2 *Handler
 
-	state := op.Save(ops)
+	area := pointer.Rect(...).Push(ops)
 	pointer.InputOp{Tag: h1}.Add(Ops)
-	state.Load()
+	area.Pop()
 
-	state = op.Save(ops)
+	area := pointer.Rect(...).Push(ops)
 	pointer.InputOp{Tag: h2}.Add(ops)
-	state.Load()
+	area.Pop()
 
-implies a tree of two inner nodes, each with one pointer handler.
+implies a tree of two inner nodes, each with one pointer handler attached.
 
 When determining which handlers match an Event, only handlers whose
 areas contain the event position are considered. The matching

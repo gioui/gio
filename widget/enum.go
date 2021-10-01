@@ -6,7 +6,6 @@ import (
 	"gioui.org/gesture"
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
-	"gioui.org/op"
 )
 
 type Enum struct {
@@ -44,8 +43,7 @@ func (e *Enum) Hovered() (string, bool) {
 
 // Layout adds the event handler for key.
 func (e *Enum) Layout(gtx layout.Context, key string) layout.Dimensions {
-	defer op.Save(gtx.Ops).Load()
-	pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min}).Add(gtx.Ops)
+	defer pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min}).Push(gtx.Ops).Pop()
 
 	if index(e.values, key) == -1 {
 		e.values = append(e.values, key)

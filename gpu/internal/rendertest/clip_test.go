@@ -28,7 +28,7 @@ func TestPaintRect(t *testing.T) {
 
 func TestPaintClippedRect(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		clip.RRect{Rect: f32.Rect(25, 25, 60, 60)}.Add(o)
+		defer clip.RRect{Rect: f32.Rect(25, 25, 60, 60)}.Push(o).Pop()
 		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
 	}, func(r result) {
 		r.expect(0, 0, transparent)
@@ -42,8 +42,8 @@ func TestPaintClippedRect(t *testing.T) {
 func TestPaintClippedCircle(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		r := float32(10)
-		clip.RRect{Rect: f32.Rect(20, 20, 40, 40), SE: r, SW: r, NW: r, NE: r}.Add(o)
-		clip.Rect(image.Rect(0, 0, 30, 50)).Add(o)
+		defer clip.RRect{Rect: f32.Rect(20, 20, 40, 40), SE: r, SW: r, NW: r, NE: r}.Push(o).Pop()
+		defer clip.Rect(image.Rect(0, 0, 30, 50)).Push(o).Pop()
 		paint.Fill(o, red)
 	}, func(r result) {
 		r.expect(21, 21, transparent)
@@ -72,9 +72,9 @@ func TestPaintArc(t *testing.T) {
 		p.Line(f32.Pt(0, -10))
 		p.Line(f32.Pt(-50, 0))
 		p.Close()
-		clip.Outline{
+		defer clip.Outline{
 			Path: p.End(),
-		}.Op().Add(o)
+		}.Op().Push(o).Pop()
 
 		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 128, 128)).Op())
 	}, func(r result) {
@@ -94,9 +94,9 @@ func TestPaintAbsolute(t *testing.T) {
 		p.LineTo(f32.Pt(80, 20))
 		p.QuadTo(f32.Pt(80, 80), f32.Pt(20, 80))
 		p.Close()
-		clip.Outline{
+		defer clip.Outline{
 			Path: p.End(),
-		}.Op().Add(o)
+		}.Op().Push(o).Pop()
 
 		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 128, 128)).Op())
 	}, func(r result) {
@@ -110,7 +110,7 @@ func TestPaintAbsolute(t *testing.T) {
 func TestPaintTexture(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		squares.Add(o)
-		scale(80.0/512, 80.0/512).Add(o)
+		defer scale(80.0/512, 80.0/512).Push(o).Pop()
 		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 		r.expect(0, 0, colornames.Blue)
@@ -123,15 +123,15 @@ func TestPaintTexture(t *testing.T) {
 func TestTexturedStrokeClipped(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		smallSquares.Add(o)
-		op.Offset(f32.Pt(50, 50)).Add(o)
-		clip.Stroke{
+		defer op.Offset(f32.Pt(50, 50)).Push(o).Pop()
+		defer clip.Stroke{
 			Path: clip.RRect{Rect: f32.Rect(0, 0, 30, 30)}.Path(o),
 			Style: clip.StrokeStyle{
 				Width: 10,
 			},
-		}.Op().Add(o)
-		clip.RRect{Rect: f32.Rect(-30, -30, 60, 60)}.Add(o)
-		op.Offset(f32.Pt(-10, -10)).Add(o)
+		}.Op().Push(o).Pop()
+		defer clip.RRect{Rect: f32.Rect(-30, -30, 60, 60)}.Push(o).Pop()
+		defer op.Offset(f32.Pt(-10, -10)).Push(o).Pop()
 		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 	})
@@ -140,14 +140,14 @@ func TestTexturedStrokeClipped(t *testing.T) {
 func TestTexturedStroke(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		smallSquares.Add(o)
-		op.Offset(f32.Pt(50, 50)).Add(o)
-		clip.Stroke{
+		defer op.Offset(f32.Pt(50, 50)).Push(o).Pop()
+		defer clip.Stroke{
 			Path: clip.RRect{Rect: f32.Rect(0, 0, 30, 30)}.Path(o),
 			Style: clip.StrokeStyle{
 				Width: 10,
 			},
-		}.Op().Add(o)
-		op.Offset(f32.Pt(-10, -10)).Add(o)
+		}.Op().Push(o).Pop()
+		defer op.Offset(f32.Pt(-10, -10)).Push(o).Pop()
 		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 	})
@@ -156,8 +156,8 @@ func TestTexturedStroke(t *testing.T) {
 func TestPaintClippedTexture(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		squares.Add(o)
-		clip.RRect{Rect: f32.Rect(0, 0, 40, 40)}.Add(o)
-		scale(80.0/512, 80.0/512).Add(o)
+		defer clip.RRect{Rect: f32.Rect(0, 0, 40, 40)}.Push(o).Pop()
+		defer scale(80.0/512, 80.0/512).Push(o).Pop()
 		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 		r.expect(40, 40, transparent)
@@ -168,14 +168,14 @@ func TestPaintClippedTexture(t *testing.T) {
 func TestStrokedPathBevelFlat(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		p := newStrokedPath(o)
-		clip.Stroke{
+		defer clip.Stroke{
 			Path: p,
 			Style: clip.StrokeStyle{
 				Width: 2.5,
 				Cap:   clip.FlatCap,
 				Join:  clip.BevelJoin,
 			},
-		}.Op().Add(o)
+		}.Op().Push(o).Pop()
 
 		paint.Fill(o, red)
 	}, func(r result) {
@@ -187,14 +187,14 @@ func TestStrokedPathBevelFlat(t *testing.T) {
 func TestStrokedPathBevelRound(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		p := newStrokedPath(o)
-		clip.Stroke{
+		defer clip.Stroke{
 			Path: p,
 			Style: clip.StrokeStyle{
 				Width: 2.5,
 				Cap:   clip.RoundCap,
 				Join:  clip.BevelJoin,
 			},
-		}.Op().Add(o)
+		}.Op().Push(o).Pop()
 
 		paint.Fill(o, red)
 	}, func(r result) {
@@ -206,14 +206,14 @@ func TestStrokedPathBevelRound(t *testing.T) {
 func TestStrokedPathBevelSquare(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		p := newStrokedPath(o)
-		clip.Stroke{
+		defer clip.Stroke{
 			Path: p,
 			Style: clip.StrokeStyle{
 				Width: 2.5,
 				Cap:   clip.SquareCap,
 				Join:  clip.BevelJoin,
 			},
-		}.Op().Add(o)
+		}.Op().Push(o).Pop()
 
 		paint.Fill(o, red)
 	}, func(r result) {
@@ -225,14 +225,14 @@ func TestStrokedPathBevelSquare(t *testing.T) {
 func TestStrokedPathRoundRound(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		p := newStrokedPath(o)
-		clip.Stroke{
+		defer clip.Stroke{
 			Path: p,
 			Style: clip.StrokeStyle{
 				Width: 2.5,
 				Cap:   clip.RoundCap,
 				Join:  clip.RoundJoin,
 			},
-		}.Op().Add(o)
+		}.Op().Push(o).Pop()
 
 		paint.Fill(o, red)
 	}, func(r result) {
@@ -244,9 +244,8 @@ func TestStrokedPathRoundRound(t *testing.T) {
 func TestStrokedPathFlatMiter(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		{
-			stk := op.Save(o)
 			p := newZigZagPath(o)
-			clip.Stroke{
+			cl := clip.Stroke{
 				Path: p,
 				Style: clip.StrokeStyle{
 					Width: 10,
@@ -254,23 +253,22 @@ func TestStrokedPathFlatMiter(t *testing.T) {
 					Join:  clip.BevelJoin,
 					Miter: 5,
 				},
-			}.Op().Add(o)
+			}.Op().Push(o)
 			paint.Fill(o, red)
-			stk.Load()
+			cl.Pop()
 		}
 		{
-			stk := op.Save(o)
 			p := newZigZagPath(o)
-			clip.Stroke{
+			cl := clip.Stroke{
 				Path: p,
 				Style: clip.StrokeStyle{
 					Width: 2,
 					Cap:   clip.FlatCap,
 					Join:  clip.BevelJoin,
 				},
-			}.Op().Add(o)
+			}.Op().Push(o)
 			paint.Fill(o, black)
-			stk.Load()
+			cl.Pop()
 		}
 
 	}, func(r result) {
@@ -283,9 +281,8 @@ func TestStrokedPathFlatMiter(t *testing.T) {
 func TestStrokedPathFlatMiterInf(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		{
-			stk := op.Save(o)
 			p := newZigZagPath(o)
-			clip.Stroke{
+			cl := clip.Stroke{
 				Path: p,
 				Style: clip.StrokeStyle{
 					Width: 10,
@@ -293,25 +290,23 @@ func TestStrokedPathFlatMiterInf(t *testing.T) {
 					Join:  clip.BevelJoin,
 					Miter: float32(math.Inf(+1)),
 				},
-			}.Op().Add(o)
+			}.Op().Push(o)
 			paint.Fill(o, red)
-			stk.Load()
+			cl.Pop()
 		}
 		{
-			stk := op.Save(o)
 			p := newZigZagPath(o)
-			clip.Stroke{
+			cl := clip.Stroke{
 				Path: p,
 				Style: clip.StrokeStyle{
 					Width: 2,
 					Cap:   clip.FlatCap,
 					Join:  clip.BevelJoin,
 				},
-			}.Op().Add(o)
+			}.Op().Push(o)
 			paint.Fill(o, black)
-			stk.Load()
+			cl.Pop()
 		}
-
 	}, func(r result) {
 		r.expect(0, 0, transparent)
 		r.expect(40, 10, colornames.Black)
@@ -322,36 +317,34 @@ func TestStrokedPathFlatMiterInf(t *testing.T) {
 func TestStrokedPathZeroWidth(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		{
-			stk := op.Save(o)
 			p := new(clip.Path)
 			p.Begin(o)
 			p.Move(f32.Pt(10, 50))
 			p.Line(f32.Pt(50, 0))
-			clip.Stroke{
+			cl := clip.Stroke{
 				Path: p.End(),
 				Style: clip.StrokeStyle{
 					Width: 2,
 					Cap:   clip.FlatCap,
 					Join:  clip.BevelJoin,
 				},
-			}.Op().Add(o)
+			}.Op().Push(o)
 
 			paint.Fill(o, black)
-			stk.Load()
+			cl.Pop()
 		}
 
 		{
-			stk := op.Save(o)
 			p := new(clip.Path)
 			p.Begin(o)
 			p.Move(f32.Pt(10, 50))
 			p.Line(f32.Pt(30, 0))
-			clip.Stroke{
+			cl := clip.Stroke{
 				Path: p.End(),
-			}.Op().Add(o) // width=0, disable stroke
+			}.Op().Push(o) // width=0, disable stroke
 
 			paint.Fill(o, red)
-			stk.Load()
+			cl.Pop()
 		}
 
 	}, func(r result) {
@@ -365,7 +358,6 @@ func TestStrokedPathZeroWidth(t *testing.T) {
 func TestDashedPathFlatCapEllipse(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		{
-			stk := op.Save(o)
 			p := newEllipsePath(o)
 
 			var dash clip.Dash
@@ -373,7 +365,7 @@ func TestDashedPathFlatCapEllipse(t *testing.T) {
 			dash.Dash(5)
 			dash.Dash(3)
 
-			clip.Stroke{
+			cl := clip.Stroke{
 				Path: p,
 				Style: clip.StrokeStyle{
 					Width: 10,
@@ -382,29 +374,28 @@ func TestDashedPathFlatCapEllipse(t *testing.T) {
 					Miter: float32(math.Inf(+1)),
 				},
 				Dashes: dash.End(),
-			}.Op().Add(o)
+			}.Op().Push(o)
 
 			paint.Fill(
 				o,
 				red,
 			)
-			stk.Load()
+			cl.Pop()
 		}
 		{
-			stk := op.Save(o)
 			p := newEllipsePath(o)
-			clip.Stroke{
+			cl := clip.Stroke{
 				Path: p,
 				Style: clip.StrokeStyle{
 					Width: 2,
 				},
-			}.Op().Add(o)
+			}.Op().Push(o)
 
 			paint.Fill(
 				o,
 				black,
 			)
-			stk.Load()
+			cl.Pop()
 		}
 
 	}, func(r result) {
@@ -417,14 +408,13 @@ func TestDashedPathFlatCapEllipse(t *testing.T) {
 func TestDashedPathFlatCapZ(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		{
-			stk := op.Save(o)
 			p := newZigZagPath(o)
 			var dash clip.Dash
 			dash.Begin(o)
 			dash.Dash(5)
 			dash.Dash(3)
 
-			clip.Stroke{
+			cl := clip.Stroke{
 				Path: p,
 				Style: clip.StrokeStyle{
 					Width: 10,
@@ -433,24 +423,23 @@ func TestDashedPathFlatCapZ(t *testing.T) {
 					Miter: float32(math.Inf(+1)),
 				},
 				Dashes: dash.End(),
-			}.Op().Add(o)
+			}.Op().Push(o)
 			paint.Fill(o, red)
-			stk.Load()
+			cl.Pop()
 		}
 
 		{
-			stk := op.Save(o)
 			p := newZigZagPath(o)
-			clip.Stroke{
+			cl := clip.Stroke{
 				Path: p,
 				Style: clip.StrokeStyle{
 					Width: 2,
 					Cap:   clip.FlatCap,
 					Join:  clip.BevelJoin,
 				},
-			}.Op().Add(o)
+			}.Op().Push(o)
 			paint.Fill(o, black)
-			stk.Load()
+			cl.Pop()
 		}
 	}, func(r result) {
 		r.expect(0, 0, transparent)
@@ -463,13 +452,12 @@ func TestDashedPathFlatCapZ(t *testing.T) {
 func TestDashedPathFlatCapZNoDash(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		{
-			stk := op.Save(o)
 			p := newZigZagPath(o)
 			var dash clip.Dash
 			dash.Begin(o)
 			dash.Phase(1)
 
-			clip.Stroke{
+			cl := clip.Stroke{
 				Path: p,
 				Style: clip.StrokeStyle{
 					Width: 10,
@@ -478,22 +466,21 @@ func TestDashedPathFlatCapZNoDash(t *testing.T) {
 					Miter: float32(math.Inf(+1)),
 				},
 				Dashes: dash.End(),
-			}.Op().Add(o)
+			}.Op().Push(o)
 			paint.Fill(o, red)
-			stk.Load()
+			cl.Pop()
 		}
 		{
-			stk := op.Save(o)
-			clip.Stroke{
+			cl := clip.Stroke{
 				Path: newZigZagPath(o),
 				Style: clip.StrokeStyle{
 					Width: 2,
 					Cap:   clip.FlatCap,
 					Join:  clip.BevelJoin,
 				},
-			}.Op().Add(o)
+			}.Op().Push(o)
 			paint.Fill(o, black)
-			stk.Load()
+			cl.Pop()
 		}
 	}, func(r result) {
 		r.expect(0, 0, transparent)
@@ -506,11 +493,10 @@ func TestDashedPathFlatCapZNoDash(t *testing.T) {
 func TestDashedPathFlatCapZNoPath(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		{
-			stk := op.Save(o)
 			var dash clip.Dash
 			dash.Begin(o)
 			dash.Dash(0)
-			clip.Stroke{
+			cl := clip.Stroke{
 				Path: newZigZagPath(o),
 				Style: clip.StrokeStyle{
 					Width: 10,
@@ -519,23 +505,22 @@ func TestDashedPathFlatCapZNoPath(t *testing.T) {
 					Miter: float32(math.Inf(+1)),
 				},
 				Dashes: dash.End(),
-			}.Op().Add(o)
+			}.Op().Push(o)
 			paint.Fill(o, red)
-			stk.Load()
+			cl.Pop()
 		}
 		{
-			stk := op.Save(o)
 			p := newZigZagPath(o)
-			clip.Stroke{
+			cl := clip.Stroke{
 				Path: p,
 				Style: clip.StrokeStyle{
 					Width: 2,
 					Cap:   clip.FlatCap,
 					Join:  clip.BevelJoin,
 				},
-			}.Op().Add(o)
+			}.Op().Push(o)
 			paint.Fill(o, black)
-			stk.Load()
+			cl.Pop()
 		}
 	}, func(r result) {
 		r.expect(0, 0, transparent)

@@ -179,13 +179,19 @@ type collector struct {
 	hasher     maphash.Hash
 	profile    bool
 	reader     ops.Reader
-	states     []encoderState
+	states     []f32.Affine2D
 	clear      bool
 	clearColor f32color.RGBA
 	clipStates []clipState
 	order      []hashIndex
+	transStack []transEntry
 	prevFrame  opsCollector
 	frame      opsCollector
+}
+
+type transEntry struct {
+	t        f32.Affine2D
+	relTrans f32.Affine2D
 }
 
 type hashIndex struct {
@@ -260,6 +266,7 @@ type clipState struct {
 	path      []byte
 	pathKey   ops.Key
 	intersect f32.Rectangle
+	push      bool
 
 	clipKey
 }
@@ -1666,6 +1673,7 @@ func (c *collector) reset() {
 	c.prevFrame, c.frame = c.frame, c.prevFrame
 	c.profile = false
 	c.clipStates = c.clipStates[:0]
+	c.transStack = c.transStack[:0]
 	c.frame.reset()
 }
 
@@ -1676,9 +1684,9 @@ func (c *opsCollector) reset() {
 	c.layers = c.layers[:0]
 }
 
-func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle, path []byte, key ops.Key, hash uint64, stroke clip.StrokeStyle) {
+func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle, path []byte, key ops.Key, hash uint64, stroke clip.StrokeStyle, push bool) {
 	// Rectangle clip regions.
-	if len(path) == 0 {
+	if len(path) == 0 && !push {
 		// If the rectangular clip region contains a previous path it can be discarded.
 		p := state.clip
 		t := state.relTrans.Invert()
@@ -1704,6 +1712,7 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 		path:      path,
 		pathKey:   key,
 		intersect: intersect,
+		push:      push,
 		clipKey: clipKey{
 			bounds:   bounds,
 			relTrans: state.relTrans,
@@ -1718,11 +1727,15 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textureOp) {
 	fview := f32.Rectangle{Max: layout.FPt(viewport)}
 	c.reader.Reset(root)
-	state := encoderState{
-		paintKey: paintKey{
-			color: color.NRGBA{A: 0xff},
-		},
+	var state encoderState
+	reset := func() {
+		state = encoderState{
+			paintKey: paintKey{
+				color: color.NRGBA{A: 0xff},
+			},
+		}
 	}
+	reset()
 	r := &c.reader
 	var (
 		pathData struct {
@@ -1732,16 +1745,24 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 		}
 		str clip.StrokeStyle
 	)
-	c.save(opconst.InitialStateID, state)
-	c.addClip(&state, fview, fview, nil, ops.Key{}, 0, clip.StrokeStyle{})
+	c.addClip(&state, fview, fview, nil, ops.Key{}, 0, clip.StrokeStyle{}, false)
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypeProfile:
 			c.profile = true
 		case opconst.TypeTransform:
-			dop := ops.DecodeTransform(encOp.Data)
+			dop, push := ops.DecodeTransform(encOp.Data)
+			if push {
+				c.transStack = append(c.transStack, transEntry{t: state.t, relTrans: state.relTrans})
+			}
 			state.t = state.t.Mul(dop)
 			state.relTrans = state.relTrans.Mul(dop)
+		case opconst.TypePopTransform:
+			n := len(c.transStack)
+			st := c.transStack[n-1]
+			c.transStack = c.transStack[:n-1]
+			state.t = st.t
+			state.relTrans = st.relTrans
 		case opconst.TypeStroke:
 			str = decodeStrokeOp(encOp.Data)
 		case opconst.TypePath:
@@ -1756,9 +1777,18 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 		case opconst.TypeClip:
 			var op clipOp
 			op.decode(encOp.Data)
-			c.addClip(&state, fview, op.bounds, pathData.data, pathData.key, pathData.hash, str)
+			c.addClip(&state, fview, op.bounds, pathData.data, pathData.key, pathData.hash, str, op.push)
 			pathData.data = nil
 			str = clip.StrokeStyle{}
+		case opconst.TypePopClip:
+			for {
+				push := state.clip.push
+				state.relTrans = state.clip.relTrans.Mul(state.relTrans)
+				state.clip = state.clip.parent
+				if push {
+					break
+				}
+			}
 		case opconst.TypeColor:
 			state.matType = materialColor
 			state.color = decodeColorOp(encOp.Data)
@@ -1777,7 +1807,7 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 			if paintState.matType == materialTexture {
 				// Clip to the bounds of the image, to hide other images in the atlas.
 				bounds := paintState.image.src.Bounds()
-				c.addClip(&paintState, fview, layout.FRect(bounds), nil, ops.Key{}, 0, clip.StrokeStyle{})
+				c.addClip(&paintState, fview, layout.FRect(bounds), nil, ops.Key{}, 0, clip.StrokeStyle{}, false)
 			}
 			intersect := paintState.clip.intersect
 			if intersect.Empty() {
@@ -1818,24 +1848,12 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 			})
 		case opconst.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
-			c.save(id, state)
+			c.save(id, state.t)
 		case opconst.TypeLoad:
-			id, mask := ops.DecodeLoad(encOp.Data)
-			s := c.states[id]
-			if mask&^opconst.TransformState != 0 {
-				state = s
-			} else if mask&opconst.TransformState != 0 {
-				state.t = s.t
-				state.relTrans = s.t
-				if cl := state.clip; cl != nil {
-					var relTrans f32.Affine2D
-					for cl != nil {
-						relTrans = cl.relTrans.Mul(relTrans)
-						cl = cl.parent
-					}
-					state.relTrans = relTrans.Invert().Mul(state.relTrans)
-				}
-			}
+			reset()
+			id := ops.DecodeLoad(encOp.Data)
+			state.t = c.states[id]
+			state.relTrans = state.t
 		}
 	}
 	for i := range c.frame.ops {
@@ -2132,9 +2150,9 @@ func encodeOp(viewport image.Point, absOff image.Point, enc *encoder, texOps []t
 	}
 }
 
-func (c *collector) save(id int, state encoderState) {
+func (c *collector) save(id int, state f32.Affine2D) {
 	if extra := id - len(c.states) + 1; extra > 0 {
-		c.states = append(c.states, make([]encoderState, extra)...)
+		c.states = append(c.states, make([]f32.Affine2D, extra)...)
 	}
 	c.states[id] = state
 }

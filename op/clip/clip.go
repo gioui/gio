@@ -16,12 +16,6 @@ import (
 	"gioui.org/op"
 )
 
-var pathSeed maphash.Seed
-
-func init() {
-	pathSeed = maphash.MakeSeed()
-}
-
 // Op represents a clip area. Op intersects the current clip area with
 // itself.
 type Op struct {
@@ -32,7 +26,35 @@ type Op struct {
 	dashes  DashSpec
 }
 
+// Stack represents an Op pushed on the clip stack.
+type Stack struct {
+	ops     *op.Ops
+	id      op.StackID
+	macroID int
+}
+
+var pathSeed maphash.Seed
+
+func init() {
+	pathSeed = maphash.MakeSeed()
+}
+
+// Push saves the current clip state on the stack and updates the current
+// state to the intersection of the current p.
+func (p Op) Push(o *op.Ops) Stack {
+	id, macroID := o.PushOp(op.ClipStack)
+	p.add(o, true)
+	return Stack{ops: o, id: id, macroID: macroID}
+}
+
+// Add is like Push except it doesn't save the current state on the stack.
+//
+// Deprecated: use Push instead.
 func (p Op) Add(o *op.Ops) {
+	p.add(o, false)
+}
+
+func (p Op) add(o *op.Ops, push bool) {
 	str := p.stroke
 	path := p.path
 	outline := p.outline
@@ -76,6 +98,15 @@ func (p Op) Add(o *op.Ops) {
 	if outline {
 		data[17] = byte(1)
 	}
+	if push {
+		data[18] = byte(1)
+	}
+}
+
+func (s Stack) Pop() {
+	s.ops.PopOp(op.ClipStack, s.id, s.macroID)
+	data := s.ops.Write(opconst.TypePopClipLen)
+	data[0] = byte(opconst.TypePopClip)
 }
 
 func (p Op) approximateStroke(o *op.Ops) PathSpec {

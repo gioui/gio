@@ -12,12 +12,14 @@ const (
 	TypeCall
 	TypeDefer
 	TypeTransform
+	TypePopTransform
 	TypeInvalidate
 	TypeImage
 	TypePaint
 	TypeColor
 	TypeLinearGradient
 	TypeArea
+	TypePopArea
 	TypePointerInput
 	TypeClipboardRead
 	TypeClipboardWrite
@@ -28,6 +30,7 @@ const (
 	TypeLoad
 	TypeAux
 	TypeClip
+	TypePopClip
 	TypeProfile
 	TypeCursor
 	TypePath
@@ -38,13 +41,15 @@ const (
 	TypeMacroLen           = 1 + 4 + 4
 	TypeCallLen            = 1 + 4 + 4
 	TypeDeferLen           = 1
-	TypeTransformLen       = 1 + 4*6
+	TypeTransformLen       = 1 + 1 + 4*6
+	TypePopTransformLen    = 1
 	TypeRedrawLen          = 1 + 8
 	TypeImageLen           = 1
 	TypePaintLen           = 1
 	TypeColorLen           = 1 + 4
 	TypeLinearGradientLen  = 1 + 8*2 + 4*2
 	TypeAreaLen            = 1 + 1 + 1 + 4*4
+	TypePopAreaLen         = 1
 	TypePointerInputLen    = 1 + 1 + 1 + 2*4 + 2*4
 	TypeClipboardReadLen   = 1
 	TypeClipboardWriteLen  = 1
@@ -52,28 +57,15 @@ const (
 	TypeKeyFocusLen        = 1 + 1
 	TypeKeySoftKeyboardLen = 1 + 1
 	TypeSaveLen            = 1 + 4
-	TypeLoadLen            = 1 + 1 + 4
+	TypeLoadLen            = 1 + 4
 	TypeAuxLen             = 1
-	TypeClipLen            = 1 + 4*4 + 1
+	TypeClipLen            = 1 + 4*4 + 1 + 1
+	TypePopClipLen         = 1
 	TypeProfileLen         = 1
 	TypeCursorLen          = 1 + 1
 	TypePathLen            = 8 + 1
 	TypeStrokeLen          = 1 + 4
 )
-
-// StateMask is a bitmask of state types a load operation
-// should restore.
-type StateMask uint8
-
-const (
-	TransformState StateMask = 1 << iota
-
-	AllState = ^StateMask(0)
-)
-
-// InitialStateID is the ID for saving and loading
-// the initial operation state.
-const InitialStateID = 0
 
 func (t OpType) Size() int {
 	return [...]int{
@@ -81,12 +73,14 @@ func (t OpType) Size() int {
 		TypeCallLen,
 		TypeDeferLen,
 		TypeTransformLen,
+		TypePopTransformLen,
 		TypeRedrawLen,
 		TypeImageLen,
 		TypePaintLen,
 		TypeColorLen,
 		TypeLinearGradientLen,
 		TypeAreaLen,
+		TypePopAreaLen,
 		TypePointerInputLen,
 		TypeClipboardReadLen,
 		TypeClipboardWriteLen,
@@ -97,6 +91,7 @@ func (t OpType) Size() int {
 		TypeLoadLen,
 		TypeAuxLen,
 		TypeClipLen,
+		TypePopClipLen,
 		TypeProfileLen,
 		TypeCursorLen,
 		TypePathLen,
@@ -125,6 +120,8 @@ func (t OpType) String() string {
 		return "Defer"
 	case TypeTransform:
 		return "Transform"
+	case TypePopTransform:
+		return "PopTransform"
 	case TypeInvalidate:
 		return "Invalidate"
 	case TypeImage:
@@ -137,6 +134,8 @@ func (t OpType) String() string {
 		return "LinearGradient"
 	case TypeArea:
 		return "Area"
+	case TypePopArea:
+		return "PopArea"
 	case TypePointerInput:
 		return "PointerInput"
 	case TypeClipboardRead:
@@ -157,6 +156,8 @@ func (t OpType) String() string {
 		return "Aux"
 	case TypeClip:
 		return "Clip"
+	case TypePopClip:
+		return "PopClip"
 	case TypeProfile:
 		return "Profile"
 	case TypeCursor:

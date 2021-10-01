@@ -274,12 +274,12 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 			Min: l.Axis.Convert(image.Pt(min, -inf)),
 			Max: l.Axis.Convert(image.Pt(max, inf)),
 		}
-		stack := op.Save(ops)
-		clip.Rect(r).Add(ops)
+		cl := clip.Rect(r).Push(ops)
 		pt := l.Axis.Convert(image.Pt(pos, cross))
-		op.Offset(FPt(pt)).Add(ops)
+		trans := op.Offset(FPt(pt)).Push(ops)
 		child.call.Add(ops)
-		stack.Load()
+		trans.Pop()
+		cl.Pop()
 		pos += childSize
 	}
 	atStart := l.Position.First == 0 && l.Position.Offset <= 0
@@ -296,8 +296,7 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 	}
 	dims := l.Axis.Convert(image.Pt(pos, maxCross))
 	call := macro.Stop()
-	defer op.Save(ops).Load()
-	pointer.Rect(image.Rectangle{Max: dims}).Add(ops)
+	defer pointer.Rect(image.Rectangle{Max: dims}).Push(ops).Pop()
 
 	var min, max int
 	if o := l.Position.Offset; o > 0 {

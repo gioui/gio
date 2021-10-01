@@ -23,8 +23,10 @@ type pointerQueue struct {
 	pointers []pointerInfo
 	reader   ops.Reader
 
+	nodeStack  []int
+	transStack []f32.Affine2D
 	// states holds the storage for save/restore ops.
-	states  []collectState
+	states  []f32.Affine2D
 	scratch []event.Tag
 }
 
@@ -81,6 +83,7 @@ type areaKind uint8
 type collectState struct {
 	t    f32.Affine2D
 	node int
+	pass bool
 }
 
 const (
@@ -88,32 +91,30 @@ const (
 	areaEllipse
 )
 
-func (q *pointerQueue) save(id int, state collectState) {
+func (q *pointerQueue) save(id int, state f32.Affine2D) {
 	if extra := id - len(q.states) + 1; extra > 0 {
-		q.states = append(q.states, make([]collectState, extra)...)
+		q.states = append(q.states, make([]f32.Affine2D, extra)...)
 	}
 	q.states[id] = state
 }
 
 func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
-	state := collectState{
-		node: -1,
+	var state collectState
+	reset := func() {
+		state = collectState{
+			node: -1,
+		}
 	}
-	q.save(opconst.InitialStateID, state)
+	reset()
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch opconst.OpType(encOp.Data[0]) {
 		case opconst.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
-			q.save(id, state)
+			q.save(id, state.t)
 		case opconst.TypeLoad:
-			id, mask := ops.DecodeLoad(encOp.Data)
-			s := q.states[id]
-			if mask&opconst.TransformState != 0 {
-				state.t = s.t
-			}
-			if mask&^opconst.TransformState != 0 {
-				state = s
-			}
+			reset()
+			id := ops.DecodeLoad(encOp.Data)
+			state.t = q.states[id]
 		case opconst.TypeArea:
 			var op areaOp
 			op.Decode(encOp.Data)
@@ -123,14 +124,26 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 				area = n.area
 			}
 			q.areas = append(q.areas, areaNode{trans: state.t, next: area, area: op, pass: op.pass})
+			q.nodeStack = append(q.nodeStack, state.node)
 			q.hitTree = append(q.hitTree, hitNode{
 				next: state.node,
 				area: len(q.areas) - 1,
 			})
 			state.node = len(q.hitTree) - 1
+		case opconst.TypePopArea:
+			n := len(q.nodeStack)
+			state.node = q.nodeStack[n-1]
+			q.nodeStack = q.nodeStack[:n-1]
 		case opconst.TypeTransform:
-			dop := ops.DecodeTransform(encOp.Data)
+			dop, push := ops.DecodeTransform(encOp.Data)
+			if push {
+				q.transStack = append(q.transStack, state.t)
+			}
 			state.t = state.t.Mul(dop)
+		case opconst.TypePopTransform:
+			n := len(q.transStack)
+			state.t = q.transStack[n-1]
+			q.transStack = q.transStack[:n-1]
 		case opconst.TypePointerInput:
 			op := pointer.InputOp{
 				Tag:   encOp.Refs[0].(event.Tag),
@@ -242,6 +255,8 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	}
 	q.hitTree = q.hitTree[:0]
 	q.areas = q.areas[:0]
+	q.nodeStack = q.nodeStack[:0]
+	q.transStack = q.transStack[:0]
 	q.cursors = q.cursors[:0]
 	q.reader.Reset(root)
 	q.collectHandlers(&q.reader, events)
