@@ -3,15 +3,11 @@
 package widget
 
 import (
-	"bytes"
-	"encoding/binary"
 	"image"
-	"math"
 	"testing"
 
 	"gioui.org/f32"
 	"gioui.org/layout"
-	"gioui.org/op"
 )
 
 func TestFit(t *testing.T) {
@@ -81,26 +77,13 @@ func TestFit(t *testing.T) {
 	for fit, tests := range fittests {
 		fit := Fit(fit)
 		for i, test := range tests {
-			ops := new(op.Ops)
-			gtx := layout.Context{
-				Ops: ops,
-				Constraints: layout.Constraints{
-					Max: image.Point{X: 100, Y: 100},
-				},
+			cs := layout.Constraints{
+				Max: image.Point{X: 100, Y: 100},
 			}
-
-			result := fit.scale(gtx, layout.NW, layout.Dimensions{Size: test.Dims})
-
-			if test.Scale.X != 1 || test.Scale.Y != 1 {
-				opsdata := gtx.Ops.Data()
-				scaleX := float32Bytes(test.Scale.X)
-				scaleY := float32Bytes(test.Scale.Y)
-				if !bytes.Contains(opsdata, scaleX) {
-					t.Errorf("did not find scale.X:%v (%x) in ops: %x", test.Scale.X, scaleX, opsdata)
-				}
-				if !bytes.Contains(opsdata, scaleY) {
-					t.Errorf("did not find scale.Y:%v (%x) in ops: %x", test.Scale.Y, scaleY, opsdata)
-				}
+			result, trans := fit.scale(cs, layout.NW, layout.Dimensions{Size: test.Dims})
+			sx, _, _, _, sy, _ := trans.Elems()
+			if scale := f32.Pt(sx, sy); scale != test.Scale {
+				t.Errorf("got scale %v expected %v", scale, test.Scale)
 			}
 
 			if result.Size != test.Result {
@@ -108,10 +91,4 @@ func TestFit(t *testing.T) {
 			}
 		}
 	}
-}
-
-func float32Bytes(v float32) []byte {
-	var dst [4]byte
-	binary.LittleEndian.PutUint32(dst[:], math.Float32bits(v))
-	return dst[:]
 }

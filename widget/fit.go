@@ -7,8 +7,6 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/layout"
-	"gioui.org/op"
-	"gioui.org/op/clip"
 )
 
 // Fit scales a widget to fit and clip to the constraints.
@@ -32,25 +30,21 @@ const (
 	Fill
 )
 
-// scale adds clip and scale operations to fit dims to the constraints.
-// It positions the widget to the appropriate position.
-// It returns dimensions modified accordingly.
-func (fit Fit) scale(gtx layout.Context, pos layout.Direction, dims layout.Dimensions) layout.Dimensions {
+// scale computes the new dimensions and transformation required to fit dims to cs, given the position.
+func (fit Fit) scale(cs layout.Constraints, pos layout.Direction, dims layout.Dimensions) (layout.Dimensions, f32.Affine2D) {
 	widgetSize := dims.Size
 
 	if fit == Unscaled || dims.Size.X == 0 || dims.Size.Y == 0 {
-		dims.Size = gtx.Constraints.Constrain(dims.Size)
-		clip.Rect{Max: dims.Size}.Add(gtx.Ops)
+		dims.Size = cs.Constrain(dims.Size)
 
 		offset := pos.Position(widgetSize, dims.Size)
-		op.Offset(layout.FPt(offset)).Add(gtx.Ops)
 		dims.Baseline += offset.Y
-		return dims
+		return dims, f32.Affine2D{}.Offset(layout.FPt(offset))
 	}
 
 	scale := f32.Point{
-		X: float32(gtx.Constraints.Max.X) / float32(dims.Size.X),
-		Y: float32(gtx.Constraints.Max.Y) / float32(dims.Size.Y),
+		X: float32(cs.Max.X) / float32(dims.Size.X),
+		Y: float32(cs.Max.Y) / float32(dims.Size.Y),
 	}
 
 	switch fit {
@@ -75,13 +69,11 @@ func (fit Fit) scale(gtx layout.Context, pos layout.Direction, dims layout.Dimen
 
 		// The widget would need to be scaled up, no change needed.
 		if scale.X >= 1 {
-			dims.Size = gtx.Constraints.Constrain(dims.Size)
-			clip.Rect{Max: dims.Size}.Add(gtx.Ops)
+			dims.Size = cs.Constrain(dims.Size)
 
 			offset := pos.Position(widgetSize, dims.Size)
-			op.Offset(layout.FPt(offset)).Add(gtx.Ops)
 			dims.Baseline += offset.Y
-			return dims
+			return dims, f32.Affine2D{}.Offset(layout.FPt(offset))
 		}
 	case Fill:
 	}
@@ -89,18 +81,15 @@ func (fit Fit) scale(gtx layout.Context, pos layout.Direction, dims layout.Dimen
 	var scaledSize image.Point
 	scaledSize.X = int(float32(widgetSize.X) * scale.X)
 	scaledSize.Y = int(float32(widgetSize.Y) * scale.Y)
-	dims.Size = gtx.Constraints.Constrain(scaledSize)
+	dims.Size = cs.Constrain(scaledSize)
 	dims.Baseline = int(float32(dims.Baseline) * scale.Y)
 
-	clip.Rect{Max: dims.Size}.Add(gtx.Ops)
-
 	offset := pos.Position(scaledSize, dims.Size)
-	op.Affine(f32.Affine2D{}.
+	trans := f32.Affine2D{}.
 		Scale(f32.Point{}, scale).
-		Offset(layout.FPt(offset)),
-	).Add(gtx.Ops)
+		Offset(layout.FPt(offset))
 
 	dims.Baseline += offset.Y
 
-	return dims
+	return dims, trans
 }
