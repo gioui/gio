@@ -539,6 +539,7 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 	if e.requestFocus {
 		key.FocusOp{Tag: &e.eventKey}.Add(gtx.Ops)
 		key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)
+		e.focused = true
 	}
 	e.requestFocus = false
 	pointerPadding := gtx.Px(unit.Dp(4))
