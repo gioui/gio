@@ -89,7 +89,6 @@ type drawOps struct {
 }
 
 type drawState struct {
-	clip  f32.Rectangle
 	t     f32.Affine2D
 	cpath *pathOp
 
@@ -113,8 +112,11 @@ type pathOp struct {
 	rect bool
 	// clip is the union of all
 	// later clip rectangles.
-	clip      image.Rectangle
-	bounds    f32.Rectangle
+	clip   image.Rectangle
+	bounds f32.Rectangle
+	// intersect is the intersection of bounds and all
+	// previous clip bounds.
+	intersect f32.Rectangle
 	pathKey   opKey
 	path      bool
 	pathVerts []byte
@@ -823,15 +825,14 @@ func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
 }
 
 func (d *drawOps) collect(root *op.Ops, viewport image.Point) {
-	clip := f32.Rectangle{
+	viewf := f32.Rectangle{
 		Max: f32.Point{X: float32(viewport.X), Y: float32(viewport.Y)},
 	}
 	d.reader.Reset(root)
 	state := drawState{
-		clip:  clip,
 		color: color.NRGBA{A: 0xff},
 	}
-	d.collectOps(&d.reader, state)
+	d.collectOps(&d.reader, viewf, state)
 }
 
 func (d *drawOps) buildPaths(ctx driver.Device) {
@@ -855,10 +856,15 @@ func (d *drawOps) newPathOp() *pathOp {
 func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey opKey, bounds f32.Rectangle, off f32.Point) {
 	npath := d.newPathOp()
 	*npath = pathOp{
-		parent: state.cpath,
-		bounds: bounds,
-		off:    off,
-		rect:   npath.parent == nil || npath.parent.rect,
+		parent:    state.cpath,
+		bounds:    bounds,
+		off:       off,
+		intersect: bounds.Add(off),
+		rect:      true,
+	}
+	if npath.parent != nil {
+		npath.rect = npath.parent.rect
+		npath.intersect = npath.parent.intersect.Intersect(npath.intersect)
 	}
 	if len(aux) > 0 {
 		npath.rect = false
@@ -895,7 +901,7 @@ func (k opKey) SetTransform(t f32.Affine2D) opKey {
 	return k
 }
 
-func (d *drawOps) collectOps(r *ops.Reader, state drawState) {
+func (d *drawOps) collectOps(r *ops.Reader, viewport f32.Rectangle, state drawState) {
 	var (
 		quads quadsOp
 		str   clip.StrokeStyle
@@ -950,7 +956,6 @@ loop:
 				quads.key = opKey{Key: encOp.Key}
 				quads.key.SetTransform(trans) // TODO: This call has no effect.
 			}
-			state.clip = state.clip.Intersect(op.bounds.Add(off))
 			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off)
 			quads = quadsOp{}
 			str = clip.StrokeStyle{}
@@ -981,7 +986,10 @@ loop:
 				dst = layout.FRect(state.image.src.Rect)
 			}
 			clipData, bnd, partialTrans := d.boundsForTransformedRect(dst, trans)
-			cl := state.clip.Intersect(bnd.Add(off))
+			cl := viewport.Intersect(bnd.Add(off))
+			if state.cpath != nil {
+				cl = state.cpath.intersect.Intersect(cl)
+			}
 			if cl.Empty() {
 				continue
 			}
