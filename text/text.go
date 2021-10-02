@@ -5,9 +5,8 @@ package text
 import (
 	"io"
 
+	"gioui.org/op/clip"
 	"golang.org/x/image/math/fixed"
-
-	"gioui.org/op"
 )
 
 // A Line contains the measurements of a line of text.
@@ -49,7 +48,7 @@ type Font struct {
 // methods must be safe for concurrent use.
 type Face interface {
 	Layout(ppem fixed.Int26_6, maxWidth int, txt io.Reader) ([]Line, error)
-	Shape(ppem fixed.Int26_6, str Layout) op.CallOp
+	Shape(ppem fixed.Int26_6, str Layout) clip.Op
 }
 
 // Typeface identifies a particular typeface design. The empty

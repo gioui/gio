@@ -119,7 +119,7 @@ func (f *Font) Layout(ppem fixed.Int26_6, maxWidth int, txt io.Reader) ([]text.L
 	return layoutText(&buf, ppem, maxWidth, fonts, glyphs)
 }
 
-func (f *Font) Shape(ppem fixed.Int26_6, str text.Layout) op.CallOp {
+func (f *Font) Shape(ppem fixed.Int26_6, str text.Layout) clip.Op {
 	var buf sfnt.Buffer
 	return textPath(&buf, ppem, []*opentype{{Font: f.font, Hinting: font.HintingFull}}, str)
 }
@@ -139,7 +139,7 @@ func (c *Collection) Layout(ppem fixed.Int26_6, maxWidth int, txt io.Reader) ([]
 	return layoutText(&buf, ppem, maxWidth, c.fonts, glyphs)
 }
 
-func (c *Collection) Shape(ppem fixed.Int26_6, str text.Layout) op.CallOp {
+func (c *Collection) Shape(ppem fixed.Int26_6, str text.Layout) clip.Op {
 	var buf sfnt.Buffer
 	return textPath(&buf, ppem, c.fonts, str)
 }
@@ -261,11 +261,10 @@ func toLayout(glyphs []glyph) text.Layout {
 	return text.Layout{Text: buf.String(), Advances: advs}
 }
 
-func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, fonts []*opentype, str text.Layout) op.CallOp {
+func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, fonts []*opentype, str text.Layout) clip.Op {
 	var lastPos f32.Point
 	var builder clip.Path
 	ops := new(op.Ops)
-	m := op.Record(ops)
 	var x fixed.Int26_6
 	builder.Begin(ops)
 	rune := 0
@@ -324,10 +323,9 @@ func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, fonts []*opentype, str text.
 		x += str.Advances[rune]
 		rune++
 	}
-	clip.Outline{
+	return clip.Outline{
 		Path: builder.End(),
-	}.Op().Add(ops)
-	return m.Stop()
+	}.Op()
 }
 
 func readGlyphs(r io.Reader) ([]glyph, error) {

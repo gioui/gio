@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/image/math/fixed"
 
-	"gioui.org/op"
+	"gioui.org/op/clip"
 )
 
 // Shaper implements layout and shaping of text.
@@ -18,7 +18,7 @@ type Shaper interface {
 	// LayoutString is Layout for strings.
 	LayoutString(font Font, size fixed.Int26_6, maxWidth int, str string) []Line
 	// Shape a line of text and return a clipping operation for its outline.
-	Shape(font Font, size fixed.Int26_6, layout Layout) op.CallOp
+	Shape(font Font, size fixed.Int26_6, layout Layout) clip.Op
 }
 
 // A FontFace is a Font and a matching Face.
@@ -121,7 +121,7 @@ func (c *Cache) LayoutString(font Font, size fixed.Int26_6, maxWidth int, str st
 
 // Shape is a caching implementation of the Shaper interface. Shape assumes that the layout
 // argument is unchanged from a call to Layout or LayoutString.
-func (c *Cache) Shape(font Font, size fixed.Int26_6, layout Layout) op.CallOp {
+func (c *Cache) Shape(font Font, size fixed.Int26_6, layout Layout) clip.Op {
 	cache := c.lookup(font)
 	return cache.shape(size, layout)
 }
@@ -143,9 +143,9 @@ func (f *faceCache) layout(ppem fixed.Int26_6, maxWidth int, str string) []Line 
 	return l
 }
 
-func (f *faceCache) shape(ppem fixed.Int26_6, layout Layout) op.CallOp {
+func (f *faceCache) shape(ppem fixed.Int26_6, layout Layout) clip.Op {
 	if f == nil {
-		return op.CallOp{}
+		return clip.Op{}
 	}
 	pk := pathKey{
 		ppem: ppem,

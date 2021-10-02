@@ -17,6 +17,7 @@ import (
 
 	"gioui.org/internal/ops"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 	"gioui.org/text"
 )
 
@@ -69,7 +70,7 @@ func TestCollectionAsFace(t *testing.T) {
 
 	// All shapes from the original fonts should be distinct because the glyphs are distinct, including the replacement
 	// glyphs.
-	distinctShapes := []op.CallOp{shapeValid1, shapeInvalid1, shapeValid2, shapeInvalid2}
+	distinctShapes := []clip.Op{shapeValid1, shapeInvalid1, shapeValid2, shapeInvalid2}
 	for i := 0; i < len(distinctShapes); i++ {
 		for j := i + 1; j < len(distinctShapes); j++ {
 			if areShapesEqual(distinctShapes[i], distinctShapes[j]) {
@@ -173,20 +174,20 @@ func mergeFonts(ttf1, ttf2 []byte) []byte {
 }
 
 // shapeRune uses a given Face to shape exactly one rune at a fixed size, then returns the resulting shape data.
-func shapeRune(f text.Face, r rune) (op.CallOp, error) {
+func shapeRune(f text.Face, r rune) (clip.Op, error) {
 	ppem := fixed.I(200)
 	lines, err := f.Layout(ppem, 2000, strings.NewReader(string(r)))
 	if err != nil {
-		return op.CallOp{}, err
+		return clip.Op{}, err
 	}
 	if len(lines) != 1 {
-		return op.CallOp{}, fmt.Errorf("unexpected rendering for \"U+%08X\": got %d lines (expected: 1)", r, len(lines))
+		return clip.Op{}, fmt.Errorf("unexpected rendering for \"U+%08X\": got %d lines (expected: 1)", r, len(lines))
 	}
 	return f.Shape(ppem, lines[0].Layout), nil
 }
 
 // areShapesEqual returns true iff both given text shapes are produced with identical operations.
-func areShapesEqual(shape1, shape2 op.CallOp) bool {
+func areShapesEqual(shape1, shape2 clip.Op) bool {
 	var ops1, ops2 op.Ops
 	shape1.Add(&ops1)
 	shape2.Add(&ops2)

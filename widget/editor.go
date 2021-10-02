@@ -180,7 +180,7 @@ type SelectEvent struct{}
 
 type line struct {
 	offset         image.Point
-	clip           op.CallOp
+	clip           clip.Op
 	selected       bool
 	selectionYOffs int
 	selectionSize  image.Point
