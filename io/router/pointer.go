@@ -242,7 +242,7 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	q.collectHandlers(&q.reader, events)
 	for k, h := range q.handlers {
 		if !h.active {
-			q.dropHandlers(events, k)
+			q.dropHandlers(nil, k)
 			delete(q.handlers, k)
 		}
 		if h.wantsGrab {
@@ -256,7 +256,6 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 						dropped := make([]event.Tag, 0, len(p.handlers)-1)
 						dropped = append(dropped, p.handlers[:i]...)
 						dropped = append(dropped, p.handlers[i+1:]...)
-						cancelHandlers(events, dropped...)
 						q.dropHandlers(events, dropped...)
 						break
 					}
@@ -270,14 +269,11 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	}
 }
 
-func cancelHandlers(events *handlerEvents, tags ...event.Tag) {
-	for _, k := range tags {
-		events.Add(k, pointer.Event{Type: pointer.Cancel})
-	}
-}
-
 func (q *pointerQueue) dropHandlers(events *handlerEvents, tags ...event.Tag) {
 	for _, k := range tags {
+		if events != nil {
+			events.Add(k, pointer.Event{Type: pointer.Cancel})
+		}
 		for i := range q.pointers {
 			p := &q.pointers[i]
 			for i := len(p.handlers) - 1; i >= 0; i-- {
@@ -299,7 +295,6 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	if e.Type == pointer.Cancel {
 		q.pointers = q.pointers[:0]
 		for k := range q.handlers {
-			cancelHandlers(events, k)
 			q.dropHandlers(events, k)
 		}
 		return
