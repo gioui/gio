@@ -80,7 +80,6 @@ type areaKind uint8
 // collectState represents the state for collectHandlers
 type collectState struct {
 	t    f32.Affine2D
-	area int
 	node int
 	pass bool
 }
@@ -99,7 +98,6 @@ func (q *pointerQueue) save(id int, state collectState) {
 
 func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 	state := collectState{
-		area: -1,
 		node: -1,
 	}
 	q.save(opconst.InitialStateID, state)
@@ -122,11 +120,14 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 		case opconst.TypeArea:
 			var op areaOp
 			op.Decode(encOp.Data)
-			q.areas = append(q.areas, areaNode{trans: state.t, next: state.area, area: op})
-			state.area = len(q.areas) - 1
+			area := -1
+			if n := state.node; n != -1 {
+				area = q.hitTree[n].area
+			}
+			q.areas = append(q.areas, areaNode{trans: state.t, next: area, area: op})
 			q.hitTree = append(q.hitTree, hitNode{
 				next: state.node,
-				area: state.area,
+				area: len(q.areas) - 1,
 				pass: state.pass,
 			})
 			state.node = len(q.hitTree) - 1
@@ -139,9 +140,13 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 				Grab:  encOp.Data[1] != 0,
 				Types: pointer.Type(encOp.Data[2]),
 			}
+			area := -1
+			if n := state.node; n != -1 {
+				area = q.hitTree[n].area
+			}
 			q.hitTree = append(q.hitTree, hitNode{
 				next: state.node,
-				area: state.area,
+				area: area,
 				pass: state.pass,
 				tag:  op.Tag,
 			})
@@ -155,7 +160,7 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 				events.AddNoRedraw(op.Tag, pointer.Event{Type: pointer.Cancel})
 			}
 			h.active = true
-			h.area = state.area
+			h.area = area
 			h.wantsGrab = h.wantsGrab || op.Grab
 			h.types = h.types | op.Types
 			bo := binary.LittleEndian.Uint32
