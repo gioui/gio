@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"image/png"
 	"io"
@@ -119,6 +120,9 @@ func (b *bufferCoff) Size() int64 {
 func (b *windowsBuilder) embedIcon(path string) (err error) {
 	iconFile, err := os.Open(path)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
 		return fmt.Errorf("can't read the icon located at %s: %v", path, err)
 	}
 	defer iconFile.Close()
