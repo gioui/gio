@@ -65,14 +65,17 @@ When determining which handlers match an Event, only handlers whose
 areas contain the event position are considered. The matching
 proceeds as follows.
 
-First, the foremost matching handler is included. If the handler
-has pass-through enabled, this step is repeated.
+First, the foremost area that contains the event is found. If no such area
+exists, matching stops.
 
-Then, all matching handlers from the current node and all parent
-nodes are included.
+Then, every handler attached to the area or an area in the area stack is
+matched with the event.
+
+Third, If the area or any area in the area stack has pass-through enabled,
+the matching repeats with the next foremost area.
 
 In the example above, all events will go to h2 only even though both
-handlers have the same area (the entire screen).
+handlers have the same area (the implicit area that fills the window).
 
 Pass-through
 

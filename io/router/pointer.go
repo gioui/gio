@@ -31,8 +31,6 @@ type pointerQueue struct {
 type hitNode struct {
 	next int
 	area int
-	// Pass tracks the most recent PassOp mode.
-	pass bool
 
 	// For handler nodes.
 	tag event.Tag
@@ -65,6 +63,7 @@ type pointerHandler struct {
 }
 
 type areaOp struct {
+	pass bool
 	kind areaKind
 	rect f32.Rectangle
 }
@@ -73,6 +72,7 @@ type areaNode struct {
 	trans f32.Affine2D
 	next  int
 	area  areaOp
+	pass  bool
 }
 
 type areaKind uint8
@@ -81,7 +81,6 @@ type areaKind uint8
 type collectState struct {
 	t    f32.Affine2D
 	node int
-	pass bool
 }
 
 const (
@@ -115,20 +114,18 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 			if mask&^opconst.TransformState != 0 {
 				state = s
 			}
-		case opconst.TypePass:
-			state.pass = encOp.Data[1] != 0
 		case opconst.TypeArea:
 			var op areaOp
 			op.Decode(encOp.Data)
 			area := -1
-			if n := state.node; n != -1 {
-				area = q.hitTree[n].area
+			if i := state.node; i != -1 {
+				n := q.hitTree[i]
+				area = n.area
 			}
-			q.areas = append(q.areas, areaNode{trans: state.t, next: area, area: op})
+			q.areas = append(q.areas, areaNode{trans: state.t, next: area, area: op, pass: op.pass})
 			q.hitTree = append(q.hitTree, hitNode{
 				next: state.node,
 				area: len(q.areas) - 1,
-				pass: state.pass,
 			})
 			state.node = len(q.hitTree) - 1
 		case opconst.TypeTransform:
@@ -141,13 +138,13 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 				Types: pointer.Type(encOp.Data[2]),
 			}
 			area := -1
-			if n := state.node; n != -1 {
-				area = q.hitTree[n].area
+			if i := state.node; i != -1 {
+				n := q.hitTree[i]
+				area = n.area
 			}
 			q.hitTree = append(q.hitTree, hitNode{
 				next: state.node,
 				area: area,
-				pass: state.pass,
 				tag:  op.Tag,
 			})
 			state.node = len(q.hitTree) - 1
@@ -189,11 +186,12 @@ func (q *pointerQueue) opHit(handlers *[]event.Tag, pos f32.Point) {
 	idx := len(q.hitTree) - 1
 	for idx >= 0 {
 		n := &q.hitTree[idx]
-		if !q.hit(n.area, pos) {
+		hit, areaPass := q.hit(n.area, pos)
+		if !hit {
 			idx--
 			continue
 		}
-		pass = pass && n.pass
+		pass = pass && areaPass
 		if pass {
 			idx--
 		} else {
@@ -214,16 +212,18 @@ func (q *pointerQueue) invTransform(areaIdx int, p f32.Point) f32.Point {
 	return q.areas[areaIdx].trans.Invert().Transform(p)
 }
 
-func (q *pointerQueue) hit(areaIdx int, p f32.Point) bool {
+func (q *pointerQueue) hit(areaIdx int, p f32.Point) (bool, bool) {
+	pass := false
 	for areaIdx != -1 {
 		a := &q.areas[areaIdx]
 		p := a.trans.Invert().Transform(p)
 		if !a.area.Hit(p) {
-			return false
+			return false, false
 		}
 		areaIdx = a.next
+		pass = pass || a.pass
 	}
-	return true
+	return true, pass
 }
 
 func (q *pointerQueue) reset() {
@@ -466,17 +466,18 @@ func (op *areaOp) Decode(d []byte) {
 	}
 	rect := f32.Rectangle{
 		Min: f32.Point{
-			X: opDecodeFloat32(d[2:]),
-			Y: opDecodeFloat32(d[6:]),
+			X: opDecodeFloat32(d[3:]),
+			Y: opDecodeFloat32(d[7:]),
 		},
 		Max: f32.Point{
-			X: opDecodeFloat32(d[10:]),
-			Y: opDecodeFloat32(d[14:]),
+			X: opDecodeFloat32(d[11:]),
+			Y: opDecodeFloat32(d[15:]),
 		},
 	}
 	*op = areaOp{
 		kind: areaKind(d[1]),
 		rect: rect,
+		pass: d[2] != 0,
 	}
 }
 

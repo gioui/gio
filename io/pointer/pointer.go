@@ -46,6 +46,10 @@ type Event struct {
 // hit area and the area. The area is transformed before applying
 // it.
 type AreaOp struct {
+	// PassThrough areas and their children don't block events to siblings
+	// them.
+	PassThrough bool
+
 	kind areaKind
 	rect image.Rectangle
 }
@@ -70,11 +74,6 @@ type InputOp struct {
 	// ScrollBounds.Min.X <= e.Scroll.X <= ScrollBounds.Max.X (horizontal axis)
 	// ScrollBounds.Min.Y <= e.Scroll.Y <= ScrollBounds.Max.Y (vertical axis)
 	ScrollBounds image.Rectangle
-}
-
-// PassOp sets the pass-through mode.
-type PassOp struct {
-	Pass bool
 }
 
 type ID uint16
@@ -190,11 +189,14 @@ func (op AreaOp) Add(o *op.Ops) {
 	data := o.Write(opconst.TypeAreaLen)
 	data[0] = byte(opconst.TypeArea)
 	data[1] = byte(op.kind)
+	if op.PassThrough {
+		data[2] = 1
+	}
 	bo := binary.LittleEndian
-	bo.PutUint32(data[2:], uint32(op.rect.Min.X))
-	bo.PutUint32(data[6:], uint32(op.rect.Min.Y))
-	bo.PutUint32(data[10:], uint32(op.rect.Max.X))
-	bo.PutUint32(data[14:], uint32(op.rect.Max.Y))
+	bo.PutUint32(data[3:], uint32(op.rect.Min.X))
+	bo.PutUint32(data[7:], uint32(op.rect.Min.Y))
+	bo.PutUint32(data[11:], uint32(op.rect.Max.X))
+	bo.PutUint32(data[15:], uint32(op.rect.Max.Y))
 }
 
 func (op CursorNameOp) Add(o *op.Ops) {
@@ -221,14 +223,6 @@ func (op InputOp) Add(o *op.Ops) {
 	bo.PutUint32(data[7:], uint32(op.ScrollBounds.Min.Y))
 	bo.PutUint32(data[11:], uint32(op.ScrollBounds.Max.X))
 	bo.PutUint32(data[15:], uint32(op.ScrollBounds.Max.Y))
-}
-
-func (op PassOp) Add(o *op.Ops) {
-	data := o.Write(opconst.TypePassLen)
-	data[0] = byte(opconst.TypePass)
-	if op.Pass {
-		data[1] = 1
-	}
 }
 
 func (t Type) String() string {

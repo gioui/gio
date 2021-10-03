@@ -19,7 +19,6 @@ const (
 	TypeLinearGradient
 	TypeArea
 	TypePointerInput
-	TypePass
 	TypeClipboardRead
 	TypeClipboardWrite
 	TypeKeyInput
@@ -45,9 +44,8 @@ const (
 	TypePaintLen           = 1
 	TypeColorLen           = 1 + 4
 	TypeLinearGradientLen  = 1 + 8*2 + 4*2
-	TypeAreaLen            = 1 + 1 + 4*4
+	TypeAreaLen            = 1 + 1 + 1 + 4*4
 	TypePointerInputLen    = 1 + 1 + 1 + 2*4 + 2*4
-	TypePassLen            = 1 + 1
 	TypeClipboardReadLen   = 1
 	TypeClipboardWriteLen  = 1
 	TypeKeyInputLen        = 1 + 1
@@ -90,7 +88,6 @@ func (t OpType) Size() int {
 		TypeLinearGradientLen,
 		TypeAreaLen,
 		TypePointerInputLen,
-		TypePassLen,
 		TypeClipboardReadLen,
 		TypeClipboardWriteLen,
 		TypeKeyInputLen,
@@ -142,8 +139,6 @@ func (t OpType) String() string {
 		return "Area"
 	case TypePointerInput:
 		return "PointerInput"
-	case TypePass:
-		return "Pass"
 	case TypeClipboardRead:
 		return "ClipboardRead"
 	case TypeClipboardWrite:
