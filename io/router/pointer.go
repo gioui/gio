@@ -290,6 +290,17 @@ func (q *pointerQueue) dropHandlers(events *handlerEvents, tags ...event.Tag) {
 	}
 }
 
+// pointerOf returns the pointerInfo index corresponding to the pointer in e.
+func (q *pointerQueue) pointerOf(e pointer.Event) int {
+	for i, p := range q.pointers {
+		if p.id == e.PointerID {
+			return i
+		}
+	}
+	q.pointers = append(q.pointers, pointerInfo{id: e.PointerID})
+	return len(q.pointers) - 1
+}
+
 func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	q.reset()
 	if e.Type == pointer.Cancel {
@@ -299,43 +310,32 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 		}
 		return
 	}
-	pidx := -1
-	for i, p := range q.pointers {
-		if p.id == e.PointerID {
-			pidx = i
-			break
-		}
-	}
-	if pidx == -1 {
-		q.pointers = append(q.pointers, pointerInfo{id: e.PointerID})
-		pidx = len(q.pointers) - 1
-	}
+	pidx := q.pointerOf(e)
 	p := &q.pointers[pidx]
 	p.last = e
 
-	if e.Type == pointer.Move && p.pressed {
-		e.Type = pointer.Drag
-	}
-
-	if e.Type == pointer.Release {
+	switch e.Type {
+	case pointer.Press:
+		q.deliverEnterLeaveEvents(p, events, e)
+		p.pressed = true
+		q.deliverEvent(p, events, e)
+	case pointer.Move:
+		if p.pressed {
+			e.Type = pointer.Drag
+		}
+		q.deliverEnterLeaveEvents(p, events, e)
+		q.deliverEvent(p, events, e)
+	case pointer.Release:
 		q.deliverEvent(p, events, e)
 		p.pressed = false
-	}
-	q.deliverEnterLeaveEvents(p, events, e)
-
-	if !p.pressed {
-		p.handlers = append(p.handlers[:0], q.scratch...)
-	}
-	if e.Type == pointer.Press {
-		p.pressed = true
-	}
-	switch e.Type {
-	case pointer.Release:
+		q.deliverEnterLeaveEvents(p, events, e)
 	case pointer.Scroll:
+		q.deliverEnterLeaveEvents(p, events, e)
 		q.deliverScrollEvent(p, events, e)
 	default:
-		q.deliverEvent(p, events, e)
+		panic("unsupported pointer event type")
 	}
+
 	if !p.pressed && len(p.entered) == 0 {
 		// No longer need to track pointer.
 		q.pointers = append(q.pointers[:pidx], q.pointers[pidx+1:]...)
@@ -398,6 +398,8 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 				q.scratch = append(q.scratch[:i], q.scratch[i+1:]...)
 			}
 		}
+	} else {
+		p.handlers = append(p.handlers[:0], q.scratch...)
 	}
 	hits := q.scratch
 	if e.Source != pointer.Mouse && !p.pressed && e.Type != pointer.Press {
