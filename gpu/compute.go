@@ -222,9 +222,8 @@ type clipCmd struct {
 }
 
 type encoderState struct {
-	relTrans  f32.Affine2D
-	clip      *clipState
-	intersect f32.Rectangle
+	relTrans f32.Affine2D
+	clip     *clipState
 
 	paintKey
 }
@@ -260,6 +259,7 @@ type clipState struct {
 	parent    *clipState
 	path      []byte
 	pathKey   ops.Key
+	intersect f32.Rectangle
 
 	clipKey
 }
@@ -1694,11 +1694,16 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 	}
 
 	absBounds := transformBounds(state.t, bounds).Bounds()
+	intersect := absBounds
+	if state.clip != nil {
+		intersect = state.clip.intersect.Intersect(intersect)
+	}
 	c.clipStates = append(c.clipStates, clipState{
 		parent:    state.clip,
 		absBounds: absBounds,
 		path:      path,
 		pathKey:   key,
+		intersect: intersect,
 		clipKey: clipKey{
 			bounds:   bounds,
 			relTrans: state.relTrans,
@@ -1706,7 +1711,6 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 			pathHash: hash,
 		},
 	})
-	state.intersect = state.intersect.Intersect(absBounds)
 	state.clip = &c.clipStates[len(c.clipStates)-1]
 	state.relTrans = f32.Affine2D{}
 }
@@ -1715,7 +1719,6 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 	fview := f32.Rectangle{Max: layout.FPt(viewport)}
 	c.reader.Reset(root)
 	state := encoderState{
-		intersect: fview,
 		paintKey: paintKey{
 			color: color.NRGBA{A: 0xff},
 		},
@@ -1776,7 +1779,8 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 				bounds := paintState.image.src.Bounds()
 				c.addClip(&paintState, fview, layout.FRect(bounds), nil, ops.Key{}, 0, clip.StrokeStyle{})
 			}
-			if paintState.intersect.Empty() {
+			intersect := paintState.clip.intersect
+			if intersect.Empty() {
 				break
 			}
 
@@ -1810,7 +1814,7 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 			c.frame.ops = append(c.frame.ops, paintOp{
 				clipStack: clipStack,
 				state:     paintState.paintKey,
-				intersect: paintState.intersect,
+				intersect: intersect,
 			})
 		case opconst.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
