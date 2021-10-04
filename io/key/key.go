@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gioui.org/internal/opconst"
+	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/op"
 )
@@ -145,22 +145,22 @@ func (h InputOp) Add(o *op.Ops) {
 	if h.Tag == nil {
 		panic("Tag must be non-nil")
 	}
-	data := o.Write1(opconst.TypeKeyInputLen, h.Tag)
-	data[0] = byte(opconst.TypeKeyInput)
+	data := o.Internal.Write1(ops.TypeKeyInputLen, h.Tag)
+	data[0] = byte(ops.TypeKeyInput)
 	data[1] = byte(h.Hint)
 }
 
 func (h SoftKeyboardOp) Add(o *op.Ops) {
-	data := o.Write(opconst.TypeKeySoftKeyboardLen)
-	data[0] = byte(opconst.TypeKeySoftKeyboard)
+	data := o.Internal.Write(ops.TypeKeySoftKeyboardLen)
+	data[0] = byte(ops.TypeKeySoftKeyboard)
 	if h.Show {
 		data[1] = 1
 	}
 }
 
 func (h FocusOp) Add(o *op.Ops) {
-	data := o.Write1(opconst.TypeKeyFocusLen, h.Tag)
-	data[0] = byte(opconst.TypeKeyFocus)
+	data := o.Internal.Write1(ops.TypeKeyFocusLen, h.Tag)
+	data[0] = byte(ops.TypeKeyFocus)
 }
 
 func (EditEvent) ImplementsEvent()  {}

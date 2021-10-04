@@ -24,7 +24,6 @@ import (
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/byteslice"
 	"gioui.org/internal/f32color"
-	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
 	"gioui.org/internal/scene"
 	"gioui.org/layout"
@@ -1726,7 +1725,7 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 
 func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textureOp) {
 	fview := f32.Rectangle{Max: layout.FPt(viewport)}
-	c.reader.Reset(root)
+	c.reader.Reset(&root.Internal)
 	var state encoderState
 	reset := func() {
 		state = encoderState{
@@ -1747,40 +1746,40 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 	)
 	c.addClip(&state, fview, fview, nil, ops.Key{}, 0, clip.StrokeStyle{}, false)
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
-		switch opconst.OpType(encOp.Data[0]) {
-		case opconst.TypeProfile:
+		switch ops.OpType(encOp.Data[0]) {
+		case ops.TypeProfile:
 			c.profile = true
-		case opconst.TypeTransform:
+		case ops.TypeTransform:
 			dop, push := ops.DecodeTransform(encOp.Data)
 			if push {
 				c.transStack = append(c.transStack, transEntry{t: state.t, relTrans: state.relTrans})
 			}
 			state.t = state.t.Mul(dop)
 			state.relTrans = state.relTrans.Mul(dop)
-		case opconst.TypePopTransform:
+		case ops.TypePopTransform:
 			n := len(c.transStack)
 			st := c.transStack[n-1]
 			c.transStack = c.transStack[:n-1]
 			state.t = st.t
 			state.relTrans = st.relTrans
-		case opconst.TypeStroke:
+		case ops.TypeStroke:
 			str = decodeStrokeOp(encOp.Data)
-		case opconst.TypePath:
+		case ops.TypePath:
 			hash := bo.Uint64(encOp.Data[1:])
 			encOp, ok = r.Decode()
 			if !ok {
 				panic("unexpected end of path operation")
 			}
-			pathData.data = encOp.Data[opconst.TypeAuxLen:]
+			pathData.data = encOp.Data[ops.TypeAuxLen:]
 			pathData.key = encOp.Key
 			pathData.hash = hash
-		case opconst.TypeClip:
+		case ops.TypeClip:
 			var op clipOp
 			op.decode(encOp.Data)
 			c.addClip(&state, fview, op.bounds, pathData.data, pathData.key, pathData.hash, str, op.push)
 			pathData.data = nil
 			str = clip.StrokeStyle{}
-		case opconst.TypePopClip:
+		case ops.TypePopClip:
 			for {
 				push := state.clip.push
 				state.relTrans = state.clip.relTrans.Mul(state.relTrans)
@@ -1789,20 +1788,20 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 					break
 				}
 			}
-		case opconst.TypeColor:
+		case ops.TypeColor:
 			state.matType = materialColor
 			state.color = decodeColorOp(encOp.Data)
-		case opconst.TypeLinearGradient:
+		case ops.TypeLinearGradient:
 			state.matType = materialLinearGradient
 			op := decodeLinearGradientOp(encOp.Data)
 			state.stop1 = op.stop1
 			state.stop2 = op.stop2
 			state.color1 = op.color1
 			state.color2 = op.color2
-		case opconst.TypeImage:
+		case ops.TypeImage:
 			state.matType = materialTexture
 			state.image = decodeImageOp(encOp.Data, encOp.Refs)
-		case opconst.TypePaint:
+		case ops.TypePaint:
 			paintState := state
 			if paintState.matType == materialTexture {
 				// Clip to the bounds of the image, to hide other images in the atlas.
@@ -1846,10 +1845,10 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 				state:     paintState.paintKey,
 				intersect: intersect,
 			})
-		case opconst.TypeSave:
+		case ops.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
 			c.save(id, state.t)
-		case opconst.TypeLoad:
+		case ops.TypeLoad:
 			reset()
 			id := ops.DecodeLoad(encOp.Data)
 			state.t = c.states[id]

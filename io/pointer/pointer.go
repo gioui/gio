@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"gioui.org/f32"
-	"gioui.org/internal/opconst"
+	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/op"
@@ -56,8 +56,8 @@ type AreaOp struct {
 
 // AreaStack represents an AreaOp on the stack of areas.
 type AreaStack struct {
-	ops     *op.Ops
-	id      op.StackID
+	ops     *ops.Ops
+	id      ops.StackID
 	macroID int
 }
 
@@ -194,35 +194,35 @@ func Ellipse(size image.Rectangle) AreaOp {
 
 // Push the current area to the stack and intersects the current area with the
 // area represented by o.
-func (o AreaOp) Push(ops *op.Ops) AreaStack {
-	id, macroID := ops.PushOp(op.AreaStack)
-	o.add(ops, true)
-	return AreaStack{ops: ops, id: id, macroID: macroID}
+func (a AreaOp) Push(o *op.Ops) AreaStack {
+	id, macroID := o.Internal.PushOp(ops.AreaStack)
+	a.add(o, true)
+	return AreaStack{ops: &o.Internal, id: id, macroID: macroID}
 }
 
-func (o AreaOp) add(ops *op.Ops, push bool) {
-	data := ops.Write(opconst.TypeAreaLen)
-	data[0] = byte(opconst.TypeArea)
-	data[1] = byte(o.kind)
-	if o.PassThrough {
+func (a AreaOp) add(o *op.Ops, push bool) {
+	data := o.Internal.Write(ops.TypeAreaLen)
+	data[0] = byte(ops.TypeArea)
+	data[1] = byte(a.kind)
+	if a.PassThrough {
 		data[2] = 1
 	}
 	bo := binary.LittleEndian
-	bo.PutUint32(data[3:], uint32(o.rect.Min.X))
-	bo.PutUint32(data[7:], uint32(o.rect.Min.Y))
-	bo.PutUint32(data[11:], uint32(o.rect.Max.X))
-	bo.PutUint32(data[15:], uint32(o.rect.Max.Y))
+	bo.PutUint32(data[3:], uint32(a.rect.Min.X))
+	bo.PutUint32(data[7:], uint32(a.rect.Min.Y))
+	bo.PutUint32(data[11:], uint32(a.rect.Max.X))
+	bo.PutUint32(data[15:], uint32(a.rect.Max.Y))
 }
 
 func (o AreaStack) Pop() {
-	o.ops.PopOp(op.AreaStack, o.id, o.macroID)
-	data := o.ops.Write(opconst.TypePopAreaLen)
-	data[0] = byte(opconst.TypePopArea)
+	o.ops.PopOp(ops.AreaStack, o.id, o.macroID)
+	data := o.ops.Write(ops.TypePopAreaLen)
+	data[0] = byte(ops.TypePopArea)
 }
 
 func (op CursorNameOp) Add(o *op.Ops) {
-	data := o.Write1(opconst.TypeCursorLen, op.Name)
-	data[0] = byte(opconst.TypeCursor)
+	data := o.Internal.Write1(ops.TypeCursorLen, op.Name)
+	data[0] = byte(ops.TypeCursor)
 }
 
 // Add panics if the scroll range does not contain zero.
@@ -233,8 +233,8 @@ func (op InputOp) Add(o *op.Ops) {
 	if b := op.ScrollBounds; b.Min.X > 0 || b.Max.X < 0 || b.Min.Y > 0 || b.Max.Y < 0 {
 		panic(fmt.Errorf("invalid scroll range value %v", b))
 	}
-	data := o.Write1(opconst.TypePointerInputLen, op.Tag)
-	data[0] = byte(opconst.TypePointerInput)
+	data := o.Internal.Write1(ops.TypePointerInputLen, op.Tag)
+	data[0] = byte(ops.TypePointerInput)
 	if op.Grab {
 		data[1] = 1
 	}

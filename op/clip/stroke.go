@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"math"
 
-	"gioui.org/internal/opconst"
+	"gioui.org/internal/ops"
 	"gioui.org/op"
 )
 
@@ -73,18 +73,18 @@ const (
 
 // Dash records dashes' lengths and phase for a stroked path.
 type Dash struct {
-	ops   *op.Ops
+	ops   *ops.Ops
 	macro op.MacroOp
 	phase float32
 	size  uint8 // size of the pattern
 }
 
-func (d *Dash) Begin(ops *op.Ops) {
-	d.ops = ops
-	d.macro = op.Record(ops)
+func (d *Dash) Begin(o *op.Ops) {
+	d.ops = &o.Internal
+	d.macro = op.Record(o)
 	// Write the TypeAux opcode
-	data := ops.Write(opconst.TypeAuxLen)
-	data[0] = byte(opconst.TypeAux)
+	data := d.ops.Write(ops.TypeAuxLen)
+	data[0] = byte(ops.TypeAux)
 }
 
 func (d *Dash) Phase(v float32) {

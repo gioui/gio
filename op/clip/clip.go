@@ -9,7 +9,6 @@ import (
 	"math"
 
 	"gioui.org/f32"
-	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
 	"gioui.org/internal/scene"
 	"gioui.org/internal/stroke"
@@ -28,8 +27,8 @@ type Op struct {
 
 // Stack represents an Op pushed on the clip stack.
 type Stack struct {
-	ops     *op.Ops
-	id      op.StackID
+	ops     *ops.Ops
+	id      ops.StackID
 	macroID int
 }
 
@@ -42,9 +41,9 @@ func init() {
 // Push saves the current clip state on the stack and updates the current
 // state to the intersection of the current p.
 func (p Op) Push(o *op.Ops) Stack {
-	id, macroID := o.PushOp(op.ClipStack)
+	id, macroID := o.Internal.PushOp(ops.ClipStack)
 	p.add(o, true)
-	return Stack{ops: o, id: id, macroID: macroID}
+	return Stack{ops: &o.Internal, id: id, macroID: macroID}
 }
 
 // Add is like Push except it doesn't save the current state on the stack.
@@ -69,8 +68,8 @@ func (p Op) add(o *op.Ops, push bool) {
 
 	bo := binary.LittleEndian
 	if path.hasSegments {
-		data := o.Write(opconst.TypePathLen)
-		data[0] = byte(opconst.TypePath)
+		data := o.Internal.Write(ops.TypePathLen)
+		data[0] = byte(ops.TypePath)
 		bo.PutUint64(data[1:], path.hash)
 		path.spec.Add(o)
 	}
@@ -83,14 +82,14 @@ func (p Op) add(o *op.Ops, push bool) {
 		bounds.Min.Y -= half
 		bounds.Max.X += half
 		bounds.Max.Y += half
-		data := o.Write(opconst.TypeStrokeLen)
-		data[0] = byte(opconst.TypeStroke)
+		data := o.Internal.Write(ops.TypeStrokeLen)
+		data[0] = byte(ops.TypeStroke)
 		bo := binary.LittleEndian
 		bo.PutUint32(data[1:], math.Float32bits(str.Width))
 	}
 
-	data := o.Write(opconst.TypeClipLen)
-	data[0] = byte(opconst.TypeClip)
+	data := o.Internal.Write(ops.TypeClipLen)
+	data[0] = byte(ops.TypeClip)
 	bo.PutUint32(data[1:], uint32(bounds.Min.X))
 	bo.PutUint32(data[5:], uint32(bounds.Min.Y))
 	bo.PutUint32(data[9:], uint32(bounds.Max.X))
@@ -104,9 +103,9 @@ func (p Op) add(o *op.Ops, push bool) {
 }
 
 func (s Stack) Pop() {
-	s.ops.PopOp(op.ClipStack, s.id, s.macroID)
-	data := s.ops.Write(opconst.TypePopClipLen)
-	data[0] = byte(opconst.TypePopClip)
+	s.ops.PopOp(ops.ClipStack, s.id, s.macroID)
+	data := s.ops.Write(ops.TypePopClipLen)
+	data[0] = byte(ops.TypePopClip)
 }
 
 func (p Op) approximateStroke(o *op.Ops) PathSpec {
@@ -117,28 +116,28 @@ func (p Op) approximateStroke(o *op.Ops) PathSpec {
 	var r ops.Reader
 	// Add path op for us to decode. Use a macro to omit it from later decodes.
 	ignore := op.Record(o)
-	r.ResetAt(o, ops.NewPC(o))
+	r.ResetAt(&o.Internal, o.Internal.PC())
 	p.path.spec.Add(o)
 	ignore.Stop()
 	encOp, ok := r.Decode()
-	if !ok || opconst.OpType(encOp.Data[0]) != opconst.TypeAux {
+	if !ok || ops.OpType(encOp.Data[0]) != ops.TypeAux {
 		panic("corrupt path data")
 	}
-	pathData := encOp.Data[opconst.TypeAuxLen:]
+	pathData := encOp.Data[ops.TypeAuxLen:]
 
 	// Decode dashes in a similar way.
 	var dashes stroke.DashOp
 	if p.dashes.phase != 0 || p.dashes.size > 0 {
 		ignore := op.Record(o)
-		r.ResetAt(o, ops.NewPC(o))
+		r.ResetAt(&o.Internal, o.Internal.PC())
 		p.dashes.spec.Add(o)
 		ignore.Stop()
 		encOp, ok := r.Decode()
-		if !ok || opconst.OpType(encOp.Data[0]) != opconst.TypeAux {
+		if !ok || ops.OpType(encOp.Data[0]) != ops.TypeAux {
 			panic("corrupt dash data")
 		}
 		dashes.Dashes = make([]float32, p.dashes.size)
-		dashData := encOp.Data[opconst.TypeAuxLen:]
+		dashData := encOp.Data[ops.TypeAuxLen:]
 		bo := binary.LittleEndian
 		for i := range dashes.Dashes {
 			dashes.Dashes[i] = math.Float32frombits(bo.Uint32(dashData[i*4:]))
@@ -188,7 +187,7 @@ type PathSpec struct {
 // Path generates no garbage and can be used for dynamic paths; path
 // data is stored directly in the Ops list supplied to Begin.
 type Path struct {
-	ops         *op.Ops
+	ops         *ops.Ops
 	open        bool
 	contour     int
 	pen         f32.Point
@@ -203,13 +202,13 @@ type Path struct {
 func (p *Path) Pos() f32.Point { return p.pen }
 
 // Begin the path, storing the path data and final Op into ops.
-func (p *Path) Begin(ops *op.Ops) {
+func (p *Path) Begin(o *op.Ops) {
 	p.hash.SetSeed(pathSeed)
-	p.ops = ops
-	p.macro = op.Record(ops)
+	p.ops = &o.Internal
+	p.macro = op.Record(o)
 	// Write the TypeAux opcode
-	data := ops.Write(opconst.TypeAuxLen)
-	data[0] = byte(opconst.TypeAux)
+	data := p.ops.Write(ops.TypeAuxLen)
+	data[0] = byte(ops.TypeAux)
 }
 
 // End returns a PathSpec ready to use in clipping operations.

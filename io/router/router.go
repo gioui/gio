@@ -14,7 +14,6 @@ import (
 	"encoding/binary"
 	"time"
 
-	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
 	"gioui.org/io/clipboard"
 	"gioui.org/io/event"
@@ -68,7 +67,7 @@ func (q *Router) Frame(ops *op.Ops) {
 	for k := range q.profHandlers {
 		delete(q.profHandlers, k)
 	}
-	q.reader.Reset(ops)
+	q.reader.Reset(&ops.Internal)
 	q.collect()
 
 	q.pqueue.Frame(ops, &q.handlers)
@@ -126,22 +125,22 @@ func (q *Router) Cursor() pointer.CursorName {
 
 func (q *Router) collect() {
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
-		switch opconst.OpType(encOp.Data[0]) {
-		case opconst.TypeInvalidate:
+		switch ops.OpType(encOp.Data[0]) {
+		case ops.TypeInvalidate:
 			op := decodeInvalidateOp(encOp.Data)
 			if !q.wakeup || op.At.Before(q.wakeupTime) {
 				q.wakeup = true
 				q.wakeupTime = op.At
 			}
-		case opconst.TypeProfile:
+		case ops.TypeProfile:
 			op := decodeProfileOp(encOp.Data, encOp.Refs)
 			if q.profHandlers == nil {
 				q.profHandlers = make(map[event.Tag]struct{})
 			}
 			q.profHandlers[op.Tag] = struct{}{}
-		case opconst.TypeClipboardRead:
+		case ops.TypeClipboardRead:
 			q.cqueue.ProcessReadClipboard(encOp.Refs)
-		case opconst.TypeClipboardWrite:
+		case ops.TypeClipboardWrite:
 			q.cqueue.ProcessWriteClipboard(encOp.Refs)
 		}
 	}
@@ -206,7 +205,7 @@ func (h *handlerEvents) Clear() {
 }
 
 func decodeProfileOp(d []byte, refs []interface{}) profile.Op {
-	if opconst.OpType(d[0]) != opconst.TypeProfile {
+	if ops.OpType(d[0]) != ops.TypeProfile {
 		panic("invalid op")
 	}
 	return profile.Op{
@@ -216,7 +215,7 @@ func decodeProfileOp(d []byte, refs []interface{}) profile.Op {
 
 func decodeInvalidateOp(d []byte) op.InvalidateOp {
 	bo := binary.LittleEndian
-	if opconst.OpType(d[0]) != opconst.TypeInvalidate {
+	if ops.OpType(d[0]) != ops.TypeInvalidate {
 		panic("invalid op")
 	}
 	var o op.InvalidateOp

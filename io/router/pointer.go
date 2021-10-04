@@ -7,7 +7,6 @@ import (
 	"image"
 
 	"gioui.org/f32"
-	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
@@ -107,15 +106,15 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 	}
 	reset()
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
-		switch opconst.OpType(encOp.Data[0]) {
-		case opconst.TypeSave:
+		switch ops.OpType(encOp.Data[0]) {
+		case ops.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
 			q.save(id, state.t)
-		case opconst.TypeLoad:
+		case ops.TypeLoad:
 			reset()
 			id := ops.DecodeLoad(encOp.Data)
 			state.t = q.states[id]
-		case opconst.TypeArea:
+		case ops.TypeArea:
 			var op areaOp
 			op.Decode(encOp.Data)
 			area := -1
@@ -130,21 +129,21 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 				area: len(q.areas) - 1,
 			})
 			state.node = len(q.hitTree) - 1
-		case opconst.TypePopArea:
+		case ops.TypePopArea:
 			n := len(q.nodeStack)
 			state.node = q.nodeStack[n-1]
 			q.nodeStack = q.nodeStack[:n-1]
-		case opconst.TypeTransform:
+		case ops.TypeTransform:
 			dop, push := ops.DecodeTransform(encOp.Data)
 			if push {
 				q.transStack = append(q.transStack, state.t)
 			}
 			state.t = state.t.Mul(dop)
-		case opconst.TypePopTransform:
+		case ops.TypePopTransform:
 			n := len(q.transStack)
 			state.t = q.transStack[n-1]
 			q.transStack = q.transStack[:n-1]
-		case opconst.TypePointerInput:
+		case ops.TypePointerInput:
 			op := pointer.InputOp{
 				Tag:   encOp.Refs[0].(event.Tag),
 				Grab:  encOp.Data[1] != 0,
@@ -184,7 +183,7 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 					Y: int(int32(bo(encOp.Data[15:]))),
 				},
 			}
-		case opconst.TypeCursor:
+		case ops.TypeCursor:
 			q.cursors = append(q.cursors, cursorNode{
 				name: encOp.Refs[0].(pointer.CursorName),
 				area: len(q.areas) - 1,
@@ -258,7 +257,7 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	q.nodeStack = q.nodeStack[:0]
 	q.transStack = q.transStack[:0]
 	q.cursors = q.cursors[:0]
-	q.reader.Reset(root)
+	q.reader.Reset(&root.Internal)
 	q.collectHandlers(&q.reader, events)
 	for k, h := range q.handlers {
 		if !h.active {
@@ -476,7 +475,7 @@ func opDecodeFloat32(d []byte) float32 {
 }
 
 func (op *areaOp) Decode(d []byte) {
-	if opconst.OpType(d[0]) != opconst.TypeArea {
+	if ops.OpType(d[0]) != ops.TypeArea {
 		panic("invalid op")
 	}
 	rect := f32.Rectangle{

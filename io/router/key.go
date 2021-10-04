@@ -3,7 +3,6 @@
 package router
 
 import (
-	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
@@ -61,7 +60,7 @@ func (q *keyQueue) Frame(root *op.Ops, events *handlerEvents) {
 	for _, h := range q.handlers {
 		h.visible, h.new = false, false
 	}
-	q.reader.Reset(root)
+	q.reader.Reset(&root.Internal)
 
 	focus, changed, state := q.resolveFocus(events)
 	for k, h := range q.handlers {
@@ -104,19 +103,19 @@ func (q *keyQueue) Push(e event.Event, events *handlerEvents) {
 
 func (q *keyQueue) resolveFocus(events *handlerEvents) (focus event.Tag, changed bool, state TextInputState) {
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
-		switch opconst.OpType(encOp.Data[0]) {
-		case opconst.TypeKeyFocus:
+		switch ops.OpType(encOp.Data[0]) {
+		case ops.TypeKeyFocus:
 			op := decodeFocusOp(encOp.Data, encOp.Refs)
 			changed = true
 			focus = op.Tag
-		case opconst.TypeKeySoftKeyboard:
+		case ops.TypeKeySoftKeyboard:
 			op := decodeSoftKeyboardOp(encOp.Data, encOp.Refs)
 			if op.Show {
 				state = TextInputOpen
 			} else {
 				state = TextInputClose
 			}
-		case opconst.TypeKeyInput:
+		case ops.TypeKeyInput:
 			op := decodeKeyInputOp(encOp.Data, encOp.Refs)
 			h, ok := q.handlers[op.Tag]
 			if !ok {
@@ -131,7 +130,7 @@ func (q *keyQueue) resolveFocus(events *handlerEvents) (focus event.Tag, changed
 }
 
 func decodeKeyInputOp(d []byte, refs []interface{}) key.InputOp {
-	if opconst.OpType(d[0]) != opconst.TypeKeyInput {
+	if ops.OpType(d[0]) != ops.TypeKeyInput {
 		panic("invalid op")
 	}
 	return key.InputOp{
@@ -141,7 +140,7 @@ func decodeKeyInputOp(d []byte, refs []interface{}) key.InputOp {
 }
 
 func decodeSoftKeyboardOp(d []byte, refs []interface{}) key.SoftKeyboardOp {
-	if opconst.OpType(d[0]) != opconst.TypeKeySoftKeyboard {
+	if ops.OpType(d[0]) != ops.TypeKeySoftKeyboard {
 		panic("invalid op")
 	}
 	return key.SoftKeyboardOp{
@@ -150,7 +149,7 @@ func decodeSoftKeyboardOp(d []byte, refs []interface{}) key.SoftKeyboardOp {
 }
 
 func decodeFocusOp(d []byte, refs []interface{}) key.FocusOp {
-	if opconst.OpType(d[0]) != opconst.TypeKeyFocus {
+	if ops.OpType(d[0]) != ops.TypeKeyFocus {
 		panic("invalid op")
 	}
 	return key.FocusOp{

@@ -192,8 +192,8 @@ func areShapesEqual(shape1, shape2 clip.Op) bool {
 	shape1.Push(&ops1).Pop()
 	shape2.Push(&ops2).Pop()
 	var r1, r2 ops.Reader
-	r1.Reset(&ops1)
-	r2.Reset(&ops2)
+	r1.Reset(&ops1.Internal)
+	r2.Reset(&ops2.Internal)
 	for {
 		encOp1, ok1 := r1.Decode()
 		encOp2, ok2 := r2.Decode()

@@ -10,7 +10,7 @@ import (
 	"math"
 
 	"gioui.org/f32"
-	"gioui.org/internal/opconst"
+	"gioui.org/internal/ops"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 )
@@ -96,13 +96,13 @@ func (i ImageOp) Add(o *op.Ops) {
 	} else if i.src == nil || i.src.Bounds().Empty() {
 		return
 	}
-	data := o.Write2(opconst.TypeImageLen, i.src, i.handle)
-	data[0] = byte(opconst.TypeImage)
+	data := o.Internal.Write2(ops.TypeImageLen, i.src, i.handle)
+	data[0] = byte(ops.TypeImage)
 }
 
 func (c ColorOp) Add(o *op.Ops) {
-	data := o.Write(opconst.TypeColorLen)
-	data[0] = byte(opconst.TypeColor)
+	data := o.Internal.Write(ops.TypeColorLen)
+	data[0] = byte(ops.TypeColor)
 	data[1] = c.Color.R
 	data[2] = c.Color.G
 	data[3] = c.Color.B
@@ -110,8 +110,8 @@ func (c ColorOp) Add(o *op.Ops) {
 }
 
 func (c LinearGradientOp) Add(o *op.Ops) {
-	data := o.Write(opconst.TypeLinearGradientLen)
-	data[0] = byte(opconst.TypeLinearGradient)
+	data := o.Internal.Write(ops.TypeLinearGradientLen)
+	data[0] = byte(ops.TypeLinearGradient)
 
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], math.Float32bits(c.Stop1.X))
@@ -130,8 +130,8 @@ func (c LinearGradientOp) Add(o *op.Ops) {
 }
 
 func (d PaintOp) Add(o *op.Ops) {
-	data := o.Write(opconst.TypePaintLen)
-	data[0] = byte(opconst.TypePaint)
+	data := o.Internal.Write(ops.TypePaintLen)
+	data[0] = byte(ops.TypePaint)
 }
 
 // FillShape fills the clip shape with a color.

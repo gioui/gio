@@ -22,7 +22,6 @@ import (
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/byteslice"
 	"gioui.org/internal/f32color"
-	"gioui.org/internal/opconst"
 	"gioui.org/internal/ops"
 	"gioui.org/internal/scene"
 	"gioui.org/internal/stroke"
@@ -138,7 +137,7 @@ type imageOp struct {
 
 func decodeStrokeOp(data []byte) clip.StrokeStyle {
 	_ = data[4]
-	if opconst.OpType(data[0]) != opconst.TypeStroke {
+	if ops.OpType(data[0]) != ops.TypeStroke {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
@@ -192,7 +191,7 @@ type linearGradientOpData struct {
 }
 
 func (op *clipOp) decode(data []byte) {
-	if opconst.OpType(data[0]) != opconst.TypeClip {
+	if ops.OpType(data[0]) != ops.TypeClip {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
@@ -214,7 +213,7 @@ func (op *clipOp) decode(data []byte) {
 }
 
 func decodeImageOp(data []byte, refs []interface{}) imageOpData {
-	if opconst.OpType(data[0]) != opconst.TypeImage {
+	if ops.OpType(data[0]) != ops.TypeImage {
 		panic("invalid op")
 	}
 	handle := refs[1]
@@ -228,7 +227,7 @@ func decodeImageOp(data []byte, refs []interface{}) imageOpData {
 }
 
 func decodeColorOp(data []byte) color.NRGBA {
-	if opconst.OpType(data[0]) != opconst.TypeColor {
+	if ops.OpType(data[0]) != ops.TypeColor {
 		panic("invalid op")
 	}
 	return color.NRGBA{
@@ -240,7 +239,7 @@ func decodeColorOp(data []byte) color.NRGBA {
 }
 
 func decodeLinearGradientOp(data []byte) linearGradientOpData {
-	if opconst.OpType(data[0]) != opconst.TypeLinearGradient {
+	if ops.OpType(data[0]) != ops.TypeLinearGradient {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
@@ -835,7 +834,7 @@ func (d *drawOps) collect(root *op.Ops, viewport image.Point) {
 	viewf := f32.Rectangle{
 		Max: f32.Point{X: float32(viewport.X), Y: float32(viewport.Y)},
 	}
-	d.reader.Reset(root)
+	d.reader.Reset(&root.Internal)
 	d.collectOps(&d.reader, viewf)
 }
 
@@ -920,32 +919,32 @@ func (d *drawOps) collectOps(r *ops.Reader, viewport f32.Rectangle) {
 	reset()
 loop:
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
-		switch opconst.OpType(encOp.Data[0]) {
-		case opconst.TypeProfile:
+		switch ops.OpType(encOp.Data[0]) {
+		case ops.TypeProfile:
 			d.profile = true
-		case opconst.TypeTransform:
+		case ops.TypeTransform:
 			dop, push := ops.DecodeTransform(encOp.Data)
 			if push {
 				d.transStack = append(d.transStack, state.t)
 			}
 			state.t = state.t.Mul(dop)
-		case opconst.TypePopTransform:
+		case ops.TypePopTransform:
 			n := len(d.transStack)
 			state.t = d.transStack[n-1]
 			d.transStack = d.transStack[:n-1]
 
-		case opconst.TypeStroke:
+		case ops.TypeStroke:
 			str = decodeStrokeOp(encOp.Data)
 
-		case opconst.TypePath:
+		case ops.TypePath:
 			encOp, ok = r.Decode()
 			if !ok {
 				break loop
 			}
-			quads.aux = encOp.Data[opconst.TypeAuxLen:]
+			quads.aux = encOp.Data[ops.TypeAuxLen:]
 			quads.key = opKey{Key: encOp.Key}
 
-		case opconst.TypeClip:
+		case ops.TypeClip:
 			var op clipOp
 			op.decode(encOp.Data)
 			bounds := op.bounds
@@ -976,7 +975,7 @@ loop:
 			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off, op.push)
 			quads = quadsOp{}
 			str = clip.StrokeStyle{}
-		case opconst.TypePopClip:
+		case ops.TypePopClip:
 			for {
 				push := state.cpath.push
 				state.cpath = state.cpath.parent
@@ -985,20 +984,20 @@ loop:
 				}
 			}
 
-		case opconst.TypeColor:
+		case ops.TypeColor:
 			state.matType = materialColor
 			state.color = decodeColorOp(encOp.Data)
-		case opconst.TypeLinearGradient:
+		case ops.TypeLinearGradient:
 			state.matType = materialLinearGradient
 			op := decodeLinearGradientOp(encOp.Data)
 			state.stop1 = op.stop1
 			state.stop2 = op.stop2
 			state.color1 = op.color1
 			state.color2 = op.color2
-		case opconst.TypeImage:
+		case ops.TypeImage:
 			state.matType = materialTexture
 			state.image = decodeImageOp(encOp.Data, encOp.Refs)
-		case opconst.TypePaint:
+		case ops.TypePaint:
 			// Transform (if needed) the painting rectangle and if so generate a clip path,
 			// for those cases also compute a partialTrans that maps texture coordinates between
 			// the new bounding rectangle and the transformed original paint rectangle.
@@ -1050,10 +1049,10 @@ loop:
 				// we added a clip path that should not remain
 				state.cpath = state.cpath.parent
 			}
-		case opconst.TypeSave:
+		case ops.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
 			d.save(id, state.t)
-		case opconst.TypeLoad:
+		case ops.TypeLoad:
 			reset()
 			id := ops.DecodeLoad(encOp.Data)
 			state.t = d.states[id]
