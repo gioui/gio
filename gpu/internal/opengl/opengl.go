@@ -23,6 +23,7 @@ type Backend struct {
 	glstate    glState
 	state      state
 	savedState glState
+	sharedCtx  bool
 
 	glver [2]int
 	gles  bool
@@ -201,6 +202,7 @@ func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 		floatTriple: floatTriple,
 		alphaTriple: alphaTripleFor(ver),
 		srgbaTriple: srgbaTriple,
+		sharedCtx:   api.Shared,
 	}
 	b.feats.BottomLeftOrigin = true
 	if srgbErr == nil {
@@ -216,13 +218,20 @@ func newOpenGLDevice(api driver.OpenGL) (driver.Device, error) {
 		b.feats.Features |= driver.FeatureTimers
 	}
 	b.feats.MaxTextureSize = f.GetInteger(gl.MAX_TEXTURE_SIZE)
+	if !b.sharedCtx {
+		// We have exclusive access to the context, so query the GL state once
+		// instead of at each frame.
+		b.glstate = b.queryState()
+	}
 	return b, nil
 }
 
 func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport image.Point) driver.Texture {
 	b.clear = clear
-	b.glstate = b.queryState()
-	b.savedState = b.glstate
+	if b.sharedCtx {
+		b.glstate = b.queryState()
+		b.savedState = b.glstate
+	}
 	b.state = state{}
 	var renderFBO gl.Framebuffer
 	if target != nil {
@@ -286,7 +295,9 @@ func (b *Backend) EndFrame() {
 		}
 		b.sRGBFBO.Blit()
 	}
-	b.restoreState(b.savedState)
+	if b.sharedCtx {
+		b.restoreState(b.savedState)
+	}
 }
 
 func (b *Backend) queryState() glState {

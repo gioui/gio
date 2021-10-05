@@ -50,6 +50,9 @@ type OpenGL struct {
 	// empty for all other platforms; an OpenGL context is assumed current when
 	// calling NewDevice.
 	Context gl.Context
+	// Shared instructs users of the context to restore the GL state after
+	// use.
+	Shared bool
 }
 
 type Direct3D11 struct {
