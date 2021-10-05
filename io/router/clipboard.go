@@ -3,9 +3,9 @@
 package router
 
 import (
-	"gioui.org/internal/opconst"
-	"gioui.org/internal/ops"
 	"gioui.org/io/event"
+
+	"gioui.org/internal/opconst"
 )
 
 type clipboardQueue struct {
@@ -13,7 +13,6 @@ type clipboardQueue struct {
 	// request avoid read clipboard every frame while waiting.
 	requested bool
 	text      *string
-	reader    ops.Reader
 }
 
 // WriteClipboard returns the most recent text to be copied
