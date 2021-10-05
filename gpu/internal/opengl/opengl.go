@@ -35,7 +35,8 @@ type Backend struct {
 	srgbaTriple textureTriple
 	storage     [storageBindings]*buffer
 
-	sRGBFBO *SRGBFBO
+	outputFBO gl.Framebuffer
+	sRGBFBO   *SRGBFBO
 
 	// vertArray is bound during a frame. We don't need it, but
 	// core desktop OpenGL profile 3.3 requires some array bound.
@@ -234,6 +235,7 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 			panic(fmt.Errorf("opengl: invalid render target type: %T", target))
 		}
 	}
+	b.outputFBO = renderFBO
 	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, renderFBO)
 	if b.gles {
 		// If the output framebuffer is not in the sRGB colorspace already, emulate it.
@@ -275,7 +277,7 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 
 func (b *Backend) EndFrame() {
 	if b.sRGBFBO != nil {
-		b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, b.savedState.drawFBO)
+		b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, b.outputFBO)
 		if b.clear {
 			b.SetBlend(false)
 		} else {
