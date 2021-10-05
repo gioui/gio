@@ -62,6 +62,7 @@ type ClickType uint8
 // Drag detects drag gestures in the form of pointer.Drag events.
 type Drag struct {
 	dragging bool
+	pressed  bool
 	pid      pointer.ID
 	start    f32.Point
 	grab     bool
@@ -339,6 +340,7 @@ func (d *Drag) Events(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event
 			if !(e.Buttons == pointer.ButtonPrimary || e.Source == pointer.Touch) {
 				continue
 			}
+			d.pressed = true
 			if d.dragging {
 				continue
 			}
@@ -365,6 +367,7 @@ func (d *Drag) Events(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event
 				}
 			}
 		case pointer.Release, pointer.Cancel:
+			d.pressed = false
 			if !d.dragging || e.PointerID != d.pid {
 				continue
 			}
@@ -380,6 +383,9 @@ func (d *Drag) Events(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event
 
 // Dragging reports whether it is currently in use.
 func (d *Drag) Dragging() bool { return d.dragging }
+
+// Pressed returns whether a pointer is pressing.
+func (d *Drag) Pressed() bool { return d.pressed }
 
 func (a Axis) String() string {
 	switch a {
