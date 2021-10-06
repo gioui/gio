@@ -107,7 +107,7 @@ func newWindow(win *callbacks, options []Option) error {
 		for {
 			select {
 			case <-w.wakeups:
-				w.w.Event(wakeupEvent{})
+				go w.w.Event(wakeupEvent{})
 			case <-w.chanAnimation:
 				w.animCallback()
 			case <-w.chanRedraw:
@@ -173,7 +173,7 @@ func (w *window) addEventListeners() {
 	})
 	w.addEventListener(w.window, "popstate", func(this js.Value, args []js.Value) interface{} {
 		ev := &system.CommandEvent{Type: system.CommandBack}
-		w.w.Event(ev)
+		go w.w.Event(ev)
 		if ev.Cancel {
 			return w.browserHistory.Call("forward")
 		}
@@ -188,7 +188,7 @@ func (w *window) addEventListeners() {
 		default:
 			ev.Stage = system.StageRunning
 		}
-		w.w.Event(ev)
+		go w.w.Event(ev)
 		return nil
 	})
 	w.addEventListener(w.cnv, "mousemove", func(this js.Value, args []js.Value) interface{} {
@@ -244,18 +244,18 @@ func (w *window) addEventListeners() {
 			w.touches[i] = js.Null()
 		}
 		w.touches = w.touches[:0]
-		w.w.Event(pointer.Event{
+		go w.w.Event(pointer.Event{
 			Type:   pointer.Cancel,
 			Source: pointer.Touch,
 		})
 		return nil
 	})
 	w.addEventListener(w.tarea, "focus", func(this js.Value, args []js.Value) interface{} {
-		w.w.Event(key.FocusEvent{Focus: true})
+		go w.w.Event(key.FocusEvent{Focus: true})
 		return nil
 	})
 	w.addEventListener(w.tarea, "blur", func(this js.Value, args []js.Value) interface{} {
-		w.w.Event(key.FocusEvent{Focus: false})
+		go w.w.Event(key.FocusEvent{Focus: false})
 		w.blur()
 		return nil
 	})
@@ -300,7 +300,7 @@ func (w *window) addHistory() {
 func (w *window) flushInput() {
 	val := w.tarea.Get("value").String()
 	w.tarea.Set("value", "")
-	w.w.Event(key.EditEvent{Text: string(val)})
+	go w.w.Event(key.EditEvent{Text: string(val)})
 }
 
 func (w *window) blur() {
@@ -342,7 +342,7 @@ func (w *window) keyEvent(e js.Value, ks key.State) {
 			Modifiers: modifiersFor(e),
 			State:     ks,
 		}
-		w.w.Event(cmd)
+		go w.w.Event(cmd)
 	}
 }
 
@@ -393,7 +393,7 @@ func (w *window) touchEvent(typ pointer.Type, e js.Value) {
 			X: float32(x) * scale,
 			Y: float32(y) * scale,
 		}
-		w.w.Event(pointer.Event{
+		go w.w.Event(pointer.Event{
 			Type:      typ,
 			Source:    pointer.Touch,
 			Position:  pos,
@@ -443,7 +443,7 @@ func (w *window) pointerEvent(typ pointer.Type, dx, dy float32, e js.Value) {
 	if jbtns&4 != 0 {
 		btns |= pointer.ButtonTertiary
 	}
-	w.w.Event(pointer.Event{
+	go w.w.Event(pointer.Event{
 		Type:      typ,
 		Source:    pointer.Mouse,
 		Buttons:   btns,
@@ -529,7 +529,7 @@ func (w *window) Configure(options []Option) {
 		w.orientation(cnf.Orientation)
 	}
 	if w.config != prev {
-		w.w.Event(ConfigEvent{Config: w.config})
+		go w.w.Event(ConfigEvent{Config: w.config})
 	}
 }
 
@@ -576,7 +576,7 @@ func (w *window) resize() {
 	}
 	if size != w.config.Size {
 		w.config.Size = size
-		w.w.Event(ConfigEvent{Config: w.config})
+		go w.w.Event(ConfigEvent{Config: w.config})
 	}
 
 	if vx, vy := w.visualViewport.Get("width"), w.visualViewport.Get("height"); !vx.IsUndefined() && !vy.IsUndefined() {
@@ -597,7 +597,7 @@ func (w *window) draw(sync bool) {
 	if metric == (unit.Metric{}) || size.X == 0 || size.Y == 0 {
 		return
 	}
-	w.w.Event(frameEvent{
+	go w.w.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
 			Now:    time.Now(),
 			Size:   size,
