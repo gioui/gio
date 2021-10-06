@@ -4,8 +4,6 @@ package router
 
 import (
 	"gioui.org/io/event"
-
-	"gioui.org/internal/opconst"
 )
 
 type clipboardQueue struct {
@@ -29,7 +27,7 @@ func (q *clipboardQueue) WriteClipboard() (string, bool) {
 // ReadClipboard reports if any new handler is waiting
 // to read the clipboard.
 func (q *clipboardQueue) ReadClipboard() bool {
-	if len(q.receivers) <= 0 || q.requested {
+	if len(q.receivers) == 0 || q.requested {
 		return false
 	}
 	q.requested = true
@@ -43,17 +41,11 @@ func (q *clipboardQueue) Push(e event.Event, events *handlerEvents) {
 	}
 }
 
-func (q *clipboardQueue) ProcessWriteClipboard(d []byte, refs []interface{}) {
-	if opconst.OpType(d[0]) != opconst.TypeClipboardWrite {
-		panic("invalid op")
-	}
+func (q *clipboardQueue) ProcessWriteClipboard(refs []interface{}) {
 	q.text = refs[0].(*string)
 }
 
-func (q *clipboardQueue) ProcessReadClipboard(d []byte, refs []interface{}) {
-	if opconst.OpType(d[0]) != opconst.TypeClipboardRead {
-		panic("invalid op")
-	}
+func (q *clipboardQueue) ProcessReadClipboard(refs []interface{}) {
 	if q.receivers == nil {
 		q.receivers = make(map[event.Tag]struct{})
 	}

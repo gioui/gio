@@ -140,9 +140,9 @@ func (q *Router) collect() {
 			}
 			q.profHandlers[op.Tag] = struct{}{}
 		case opconst.TypeClipboardRead:
-			q.cqueue.ProcessReadClipboard(encOp.Data, encOp.Refs)
+			q.cqueue.ProcessReadClipboard(encOp.Refs)
 		case opconst.TypeClipboardWrite:
-			q.cqueue.ProcessWriteClipboard(encOp.Data, encOp.Refs)
+			q.cqueue.ProcessWriteClipboard(encOp.Refs)
 		}
 	}
 }
