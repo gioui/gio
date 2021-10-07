@@ -297,14 +297,12 @@ func (p *Path) QuadTo(ctrl, to f32.Point) {
 	p.expand(to)
 }
 
-// Arc adds an elliptical arc to the path. The implied ellipse is defined
+// ArcTo adds an elliptical arc to the path. The implied ellipse is defined
 // by its focus points f1 and f2.
 // The arc starts in the current point and ends angle radians along the ellipse boundary.
 // The sign of angle determines the direction; positive being counter-clockwise,
 // negative clockwise.
-func (p *Path) Arc(f1, f2 f32.Point, angle float32) {
-	f1 = f1.Add(p.pen)
-	f2 = f2.Add(p.pen)
+func (p *Path) ArcTo(f1, f2 f32.Point, angle float32) {
 	const segments = 16
 	m := stroke.ArcTransform(p.pen, f1, f2, angle, segments)
 
@@ -315,6 +313,13 @@ func (p *Path) Arc(f1, f2 f32.Point, angle float32) {
 		ctl := p1.Mul(2).Sub(p0.Add(p2).Mul(.5))
 		p.QuadTo(ctl, p2)
 	}
+}
+
+// Arc is like ArcTo where f1 and f2 are relative to the current position.
+func (p *Path) Arc(f1, f2 f32.Point, angle float32) {
+	f1 = f1.Add(p.pen)
+	f2 = f2.Add(p.pen)
+	p.ArcTo(f1, f2, angle)
 }
 
 // Cube records a cubic Bézier from the pen through
