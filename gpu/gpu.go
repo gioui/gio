@@ -27,7 +27,6 @@ import (
 	"gioui.org/internal/stroke"
 	"gioui.org/layout"
 	"gioui.org/op"
-	"gioui.org/op/clip"
 	"gioui.org/shader"
 	"gioui.org/shader/gio"
 
@@ -135,15 +134,13 @@ type imageOp struct {
 	place    placement
 }
 
-func decodeStrokeOp(data []byte) clip.StrokeStyle {
+func decodeStrokeOp(data []byte) float32 {
 	_ = data[4]
 	if ops.OpType(data[0]) != ops.TypeStroke {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
-	return clip.StrokeStyle{
-		Width: math.Float32frombits(bo.Uint32(data[1:])),
-	}
+	return math.Float32frombits(bo.Uint32(data[1:]))
 }
 
 type quadsOp struct {
@@ -907,9 +904,9 @@ func (k opKey) SetTransform(t f32.Affine2D) opKey {
 
 func (d *drawOps) collectOps(r *ops.Reader, viewport f32.Rectangle) {
 	var (
-		quads quadsOp
-		str   clip.StrokeStyle
-		state drawState
+		quads    quadsOp
+		strWidth float32
+		state    drawState
 	)
 	reset := func() {
 		state = drawState{
@@ -934,7 +931,7 @@ loop:
 			d.transStack = d.transStack[:n-1]
 
 		case ops.TypeStroke:
-			str = decodeStrokeOp(encOp.Data)
+			strWidth = decodeStrokeOp(encOp.Data)
 
 		case ops.TypePath:
 			encOp, ok = r.Decode()
@@ -960,7 +957,7 @@ loop:
 					op.bounds = v.bounds
 				} else {
 					pathData, bounds := d.buildVerts(
-						quads.aux, trans, op.outline, str,
+						quads.aux, trans, op.outline, strWidth,
 					)
 					op.bounds = bounds
 					quads.aux = pathData
@@ -974,7 +971,7 @@ loop:
 			}
 			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off, op.push)
 			quads = quadsOp{}
-			str = clip.StrokeStyle{}
+			strWidth = 0
 		case ops.TypePopClip:
 			for {
 				push := state.cpath.push
@@ -1343,7 +1340,7 @@ func (d *drawOps) writeVertCache(n int) []byte {
 }
 
 // transform, split paths as needed, calculate maxY, bounds and create GPU vertices.
-func (d *drawOps) buildVerts(pathData []byte, tr f32.Affine2D, outline bool, str clip.StrokeStyle) (verts []byte, bounds f32.Rectangle) {
+func (d *drawOps) buildVerts(pathData []byte, tr f32.Affine2D, outline bool, strWidth float32) (verts []byte, bounds f32.Rectangle) {
 	inf := float32(math.Inf(+1))
 	d.qs.bounds = f32.Rectangle{
 		Min: f32.Point{X: inf, Y: inf},
@@ -1353,15 +1350,12 @@ func (d *drawOps) buildVerts(pathData []byte, tr f32.Affine2D, outline bool, str
 	startLength := len(d.vertCache)
 
 	switch {
-	case str.Width > 0:
+	case strWidth > 0:
 		// Stroke path.
 		ss := stroke.StrokeStyle{
-			Width: str.Width,
-			Miter: str.Miter,
-			Cap:   stroke.StrokeCap(str.Cap),
-			Join:  stroke.StrokeJoin(str.Join),
+			Width: strWidth,
 		}
-		quads := stroke.StrokePathCommands(ss, stroke.DashOp{}, pathData)
+		quads := stroke.StrokePathCommands(ss, pathData)
 		for _, quad := range quads {
 			d.qs.contour = quad.Contour
 			quad.Quad = quad.Quad.Transform(tr)

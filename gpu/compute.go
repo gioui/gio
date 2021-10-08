@@ -28,7 +28,6 @@ import (
 	"gioui.org/internal/scene"
 	"gioui.org/layout"
 	"gioui.org/op"
-	"gioui.org/op/clip"
 	"gioui.org/shader"
 	"gioui.org/shader/gio"
 	"gioui.org/shader/piet"
@@ -236,10 +235,10 @@ type encoderState struct {
 // clipKey completely describes a clip operation (along with its path) and is appropriate
 // for hashing and equality checks.
 type clipKey struct {
-	bounds   f32.Rectangle
-	stroke   clip.StrokeStyle
-	relTrans f32.Affine2D
-	pathHash uint64
+	bounds      f32.Rectangle
+	strokeWidth float32
+	relTrans    f32.Affine2D
+	pathHash    uint64
 }
 
 // paintKey completely defines a paint operation. It is suitable for hashing and
@@ -1683,7 +1682,7 @@ func (c *opsCollector) reset() {
 	c.layers = c.layers[:0]
 }
 
-func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle, path []byte, key ops.Key, hash uint64, stroke clip.StrokeStyle, push bool) {
+func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle, path []byte, key ops.Key, hash uint64, strokeWidth float32, push bool) {
 	// Rectangle clip regions.
 	if len(path) == 0 && !push {
 		// If the rectangular clip region contains a previous path it can be discarded.
@@ -1713,10 +1712,10 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 		intersect: intersect,
 		push:      push,
 		clipKey: clipKey{
-			bounds:   bounds,
-			relTrans: state.relTrans,
-			stroke:   stroke,
-			pathHash: hash,
+			bounds:      bounds,
+			relTrans:    state.relTrans,
+			strokeWidth: strokeWidth,
+			pathHash:    hash,
 		},
 	})
 	state.clip = &c.clipStates[len(c.clipStates)-1]
@@ -1742,9 +1741,9 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 			key  ops.Key
 			hash uint64
 		}
-		str clip.StrokeStyle
+		strWidth float32
 	)
-	c.addClip(&state, fview, fview, nil, ops.Key{}, 0, clip.StrokeStyle{}, false)
+	c.addClip(&state, fview, fview, nil, ops.Key{}, 0, 0, false)
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeProfile:
@@ -1763,7 +1762,7 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 			state.t = st.t
 			state.relTrans = st.relTrans
 		case ops.TypeStroke:
-			str = decodeStrokeOp(encOp.Data)
+			strWidth = decodeStrokeOp(encOp.Data)
 		case ops.TypePath:
 			hash := bo.Uint64(encOp.Data[1:])
 			encOp, ok = r.Decode()
@@ -1776,9 +1775,9 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 		case ops.TypeClip:
 			var op clipOp
 			op.decode(encOp.Data)
-			c.addClip(&state, fview, op.bounds, pathData.data, pathData.key, pathData.hash, str, op.push)
+			c.addClip(&state, fview, op.bounds, pathData.data, pathData.key, pathData.hash, strWidth, op.push)
 			pathData.data = nil
-			str = clip.StrokeStyle{}
+			strWidth = 0
 		case ops.TypePopClip:
 			for {
 				push := state.clip.push
@@ -1806,7 +1805,7 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 			if paintState.matType == materialTexture {
 				// Clip to the bounds of the image, to hide other images in the atlas.
 				bounds := paintState.image.src.Bounds()
-				c.addClip(&paintState, fview, layout.FRect(bounds), nil, ops.Key{}, 0, clip.StrokeStyle{}, false)
+				c.addClip(&paintState, fview, layout.FRect(bounds), nil, ops.Key{}, 0, 0, false)
 			}
 			intersect := paintState.clip.intersect
 			if intersect.Empty() {
@@ -2101,9 +2100,9 @@ func encodeOp(viewport image.Point, absOff image.Point, enc *encoder, texOps []t
 	enc.transform(inv)
 	for i := len(op.clipStack) - 1; i >= 0; i-- {
 		cl := op.clipStack[i]
-		if str := cl.state.stroke; str.Width > 0 {
+		if w := cl.state.strokeWidth; w > 0 {
 			enc.fillMode(scene.FillModeStroke)
-			enc.lineWidth(str.Width)
+			enc.lineWidth(w)
 			fillMode = scene.FillModeStroke
 		} else if fillMode != scene.FillModeNonzero {
 			enc.fillMode(scene.FillModeNonzero)

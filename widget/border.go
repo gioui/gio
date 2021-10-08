@@ -35,7 +35,7 @@ func (b Border) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 		b.Color,
 		clip.Stroke{
 			Path:  clip.UniformRRect(r, rr).Path(gtx.Ops),
-			Style: clip.StrokeStyle{Width: width},
+			Width: width,
 		}.Op(),
 	)
 

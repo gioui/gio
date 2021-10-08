@@ -40,25 +40,7 @@ import (
 // op/clip, eliminating the duplicate types.
 type StrokeStyle struct {
 	Width float32
-	Miter float32
-	Cap   StrokeCap
-	Join  StrokeJoin
 }
-
-type StrokeCap uint8
-
-const (
-	RoundCap StrokeCap = iota
-	FlatCap
-	SquareCap
-)
-
-type StrokeJoin uint8
-
-const (
-	RoundJoin StrokeJoin = iota
-	BevelJoin
-)
 
 // strokeTolerance is used to reconcile rounding errors arising
 // when splitting quads into smaller and smaller segments to approximate
@@ -95,12 +77,6 @@ func (qs *StrokeQuads) setContour(n uint32) {
 
 func (qs *StrokeQuads) pen() f32.Point {
 	return (*qs)[len(*qs)-1].Quad.To
-}
-
-func (qs *StrokeQuads) closed() bool {
-	beg := (*qs)[0].Quad.From
-	end := (*qs)[len(*qs)-1].Quad.To
-	return f32Eq(beg.X, end.X) && f32Eq(beg.Y, end.Y)
 }
 
 func (qs *StrokeQuads) lineTo(pt f32.Point) {
@@ -155,11 +131,7 @@ func (qs StrokeQuads) split() []StrokeQuads {
 	return o
 }
 
-func (qs StrokeQuads) stroke(stroke StrokeStyle, dashes DashOp) StrokeQuads {
-	if !IsSolidLine(dashes) {
-		qs = qs.dash(dashes)
-	}
-
+func (qs StrokeQuads) stroke(stroke StrokeStyle) StrokeQuads {
 	var (
 		o  StrokeQuads
 		hw = 0.5 * stroke.Width
@@ -441,29 +413,6 @@ func quadBezierD2(p0, p1, p2 f32.Point, t float32) f32.Point {
 	return p.Mul(2)
 }
 
-// quadBezierLen returns the length of the Bézier curve.
-// See:
-//  https://malczak.linuxpl.com/blog/quadratic-bezier-curve-length/
-func quadBezierLen(p0, p1, p2 f32.Point) float32 {
-	a := p0.Sub(p1.Mul(2)).Add(p2)
-	b := p1.Mul(2).Sub(p0.Mul(2))
-	A := float64(4 * dotPt(a, a))
-	B := float64(4 * dotPt(a, b))
-	C := float64(dotPt(b, b))
-	if f64Eq(A, 0.0) {
-		// p1 is in the middle between p0 and p2,
-		// so it is a straight line from p0 to p2.
-		return lenPt(p2.Sub(p0))
-	}
-
-	Sabc := 2 * math.Sqrt(A+B+C)
-	A2 := math.Sqrt(A)
-	A32 := 2 * A * A2
-	C2 := 2 * math.Sqrt(C)
-	BA := B / A2
-	return float32((A32*Sabc + A2*B*(Sabc-C2) + (4*C*A-B*B)*math.Log((2*A2+BA+Sabc)/(BA+C2))) / (4 * A32))
-}
-
 func strokeQuadBezier(state strokeState, d, flatness float32) StrokeQuads {
 	// Gio strokes are only quadratic Bézier curves, w/o any inflection point.
 	// So we just have to flatten them.
@@ -549,27 +498,7 @@ func quadBezierSplit(p0, p1, p2 f32.Point, t float32) (f32.Point, f32.Point, f32
 // strokePathJoin joins the two paths rhs and lhs, according to the provided
 // stroke operation.
 func strokePathJoin(stroke StrokeStyle, rhs, lhs *StrokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
-	if stroke.Miter > 0 {
-		strokePathMiterJoin(stroke, rhs, lhs, hw, pivot, n0, n1, r0, r1)
-		return
-	}
-	switch stroke.Join {
-	case BevelJoin:
-		strokePathBevelJoin(rhs, lhs, hw, pivot, n0, n1, r0, r1)
-	case RoundJoin:
-		strokePathRoundJoin(rhs, lhs, hw, pivot, n0, n1, r0, r1)
-	default:
-		panic("impossible")
-	}
-}
-
-func strokePathBevelJoin(rhs, lhs *StrokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
-
-	rp := pivot.Add(n1)
-	lp := pivot.Sub(n1)
-
-	rhs.lineTo(rp)
-	lhs.lineTo(lp)
+	strokePathRoundJoin(rhs, lhs, hw, pivot, n0, n1, r0, r1)
 }
 
 func strokePathRoundJoin(rhs, lhs *StrokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
@@ -594,79 +523,9 @@ func strokePathRoundJoin(rhs, lhs *StrokeQuads, hw float32, pivot, n0, n1 f32.Po
 	}
 }
 
-func strokePathMiterJoin(stroke StrokeStyle, rhs, lhs *StrokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
-	if n0 == n1.Mul(-1) {
-		strokePathBevelJoin(rhs, lhs, hw, pivot, n0, n1, r0, r1)
-		return
-	}
-
-	// This is to handle nearly linear joints that would be clipped otherwise.
-	limit := math.Max(float64(stroke.Miter), 1.001)
-
-	cw := dotPt(rot90CW(n0), n1) >= 0.0
-	if cw {
-		// hw is used to calculate |R|.
-		// When running CW, n0 and n1 point the other way,
-		// so the sign of r0 and r1 is negated.
-		hw = -hw
-	}
-	hw64 := float64(hw)
-
-	cos := math.Sqrt(0.5 * (1 + float64(cosPt(n0, n1))))
-	d := hw64 / cos
-	if math.Abs(limit*hw64) < math.Abs(d) {
-		stroke.Miter = 0 // Set miter to zero to disable the miter joint.
-		strokePathJoin(stroke, rhs, lhs, hw, pivot, n0, n1, r0, r1)
-		return
-	}
-	mid := pivot.Add(normPt(n0.Add(n1), float32(d)))
-
-	rp := pivot.Add(n1)
-	lp := pivot.Sub(n1)
-	switch {
-	case cw:
-		// Path bends to the right, ie. CW.
-		lhs.lineTo(mid)
-	default:
-		// Path bends to the left, ie. CCW.
-		rhs.lineTo(mid)
-	}
-	rhs.lineTo(rp)
-	lhs.lineTo(lp)
-}
-
 // strokePathCap caps the provided path qs, according to the provided stroke operation.
 func strokePathCap(stroke StrokeStyle, qs *StrokeQuads, hw float32, pivot, n0 f32.Point) {
-	switch stroke.Cap {
-	case FlatCap:
-		strokePathFlatCap(qs, hw, pivot, n0)
-	case SquareCap:
-		strokePathSquareCap(qs, hw, pivot, n0)
-	case RoundCap:
-		strokePathRoundCap(qs, hw, pivot, n0)
-	default:
-		panic("impossible")
-	}
-}
-
-// strokePathFlatCap caps the start or end of a path with a flat cap.
-func strokePathFlatCap(qs *StrokeQuads, hw float32, pivot, n0 f32.Point) {
-	end := pivot.Sub(n0)
-	qs.lineTo(end)
-}
-
-// strokePathSquareCap caps the start or end of a path with a square cap.
-func strokePathSquareCap(qs *StrokeQuads, hw float32, pivot, n0 f32.Point) {
-	var (
-		e       = pivot.Add(rot90CCW(n0))
-		corner1 = e.Add(n0)
-		corner2 = e.Sub(n0)
-		end     = pivot.Sub(n0)
-	)
-
-	qs.lineTo(corner1)
-	qs.lineTo(corner2)
-	qs.lineTo(end)
+	strokePathRoundCap(qs, hw, pivot, n0)
 }
 
 // strokePathRoundCap caps the start or end of a path with a round cap.
@@ -763,9 +622,9 @@ func dist(p1, p2 f32.Point) float64 {
 	return math.Hypot(dx, dy)
 }
 
-func StrokePathCommands(style StrokeStyle, dashes DashOp, scene []byte) StrokeQuads {
+func StrokePathCommands(style StrokeStyle, scene []byte) StrokeQuads {
 	quads := decodeToStrokeQuads(scene)
-	return quads.stroke(style, dashes)
+	return quads.stroke(style)
 }
 
 // decodeToStrokeQuads decodes scene commands to quads ready to stroke.

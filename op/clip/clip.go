@@ -21,8 +21,7 @@ type Op struct {
 	path PathSpec
 
 	outline bool
-	stroke  StrokeStyle
-	dashes  DashSpec
+	width   float32
 }
 
 // Stack represents an Op pushed on the clip stack.
@@ -54,17 +53,8 @@ func (p Op) Add(o *op.Ops) {
 }
 
 func (p Op) add(o *op.Ops, push bool) {
-	str := p.stroke
 	path := p.path
 	outline := p.outline
-	approx := str.Width > 0 && !(p.dashes == DashSpec{} && str.Miter == 0 && str.Join == RoundJoin && str.Cap == RoundCap)
-	if approx {
-		// If the stroke is not natively supported by the compute renderer, construct a filled path
-		// that approximates it.
-		path = p.approximateStroke(o)
-		str = StrokeStyle{}
-		outline = true
-	}
 
 	bo := binary.LittleEndian
 	if path.hasSegments {
@@ -75,9 +65,9 @@ func (p Op) add(o *op.Ops, push bool) {
 	}
 
 	bounds := path.bounds
-	if str.Width > 0 {
+	if p.width > 0 {
 		// Expand bounds to cover stroke.
-		half := int(str.Width*.5 + .5)
+		half := int(p.width*.5 + .5)
 		bounds.Min.X -= half
 		bounds.Min.Y -= half
 		bounds.Max.X += half
@@ -85,7 +75,7 @@ func (p Op) add(o *op.Ops, push bool) {
 		data := o.Internal.Write(ops.TypeStrokeLen)
 		data[0] = byte(ops.TypeStroke)
 		bo := binary.LittleEndian
-		bo.PutUint32(data[1:], math.Float32bits(str.Width))
+		bo.PutUint32(data[1:], math.Float32bits(p.width))
 	}
 
 	data := o.Internal.Write(ops.TypeClipLen)
@@ -106,66 +96,6 @@ func (s Stack) Pop() {
 	s.ops.PopOp(ops.ClipStack, s.id, s.macroID)
 	data := s.ops.Write(ops.TypePopClipLen)
 	data[0] = byte(ops.TypePopClip)
-}
-
-func (p Op) approximateStroke(o *op.Ops) PathSpec {
-	if !p.path.hasSegments {
-		return PathSpec{}
-	}
-
-	var r ops.Reader
-	// Add path op for us to decode. Use a macro to omit it from later decodes.
-	ignore := op.Record(o)
-	r.ResetAt(&o.Internal, o.Internal.PC())
-	p.path.spec.Add(o)
-	ignore.Stop()
-	encOp, ok := r.Decode()
-	if !ok || ops.OpType(encOp.Data[0]) != ops.TypeAux {
-		panic("corrupt path data")
-	}
-	pathData := encOp.Data[ops.TypeAuxLen:]
-
-	// Decode dashes in a similar way.
-	var dashes stroke.DashOp
-	if p.dashes.phase != 0 || p.dashes.size > 0 {
-		ignore := op.Record(o)
-		r.ResetAt(&o.Internal, o.Internal.PC())
-		p.dashes.spec.Add(o)
-		ignore.Stop()
-		encOp, ok := r.Decode()
-		if !ok || ops.OpType(encOp.Data[0]) != ops.TypeAux {
-			panic("corrupt dash data")
-		}
-		dashes.Dashes = make([]float32, p.dashes.size)
-		dashData := encOp.Data[ops.TypeAuxLen:]
-		bo := binary.LittleEndian
-		for i := range dashes.Dashes {
-			dashes.Dashes[i] = math.Float32frombits(bo.Uint32(dashData[i*4:]))
-		}
-		dashes.Phase = p.dashes.phase
-	}
-
-	// Approximate and output path data.
-	var outline Path
-	outline.Begin(o)
-	ss := stroke.StrokeStyle{
-		Width: p.stroke.Width,
-		Miter: p.stroke.Miter,
-		Cap:   stroke.StrokeCap(p.stroke.Cap),
-		Join:  stroke.StrokeJoin(p.stroke.Join),
-	}
-	quads := stroke.StrokePathCommands(ss, dashes, pathData)
-	pen := f32.Pt(0, 0)
-	for _, quad := range quads {
-		q := quad.Quad
-		if q.From != pen {
-			pen = q.From
-			outline.MoveTo(pen)
-		}
-		outline.contour = int(quad.Contour)
-		outline.QuadTo(q.Ctrl, q.To)
-	}
-	return outline.End()
 }
 
 type PathSpec struct {
@@ -380,6 +310,21 @@ func (p *Path) Close() {
 		p.LineTo(p.start)
 	}
 	p.end()
+}
+
+// Stroke represents a stroked path.
+type Stroke struct {
+	Path PathSpec
+	// Width of the stroked path.
+	Width float32
+}
+
+// Op returns a clip operation representing the stroke.
+func (s Stroke) Op() Op {
+	return Op{
+		path:  s.Path,
+		width: s.Width,
+	}
 }
 
 // Outline represents the area inside of a path, according to the

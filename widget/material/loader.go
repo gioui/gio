@@ -74,10 +74,7 @@ func clipLoader(ops *op.Ops, startAngle, endAngle, radius float32) clip.Op {
 	p.Move(pen)
 	p.Arc(center, center, delta)
 	return clip.Stroke{
-		Path: p.End(),
-		Style: clip.StrokeStyle{
-			Width: width,
-			Cap:   clip.FlatCap,
-		},
+		Path:  p.End(),
+		Width: width,
 	}.Op()
 }
