@@ -327,6 +327,10 @@ static VkResult vkResetFences(PFN_vkResetFences f, VkDevice device, uint32_t fen
 	return f(device, fenceCount, pFences);
 }
 
+static void vkGetPhysicalDeviceProperties(PFN_vkGetPhysicalDeviceProperties f, VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties *pProperties) {
+	f(physicalDevice, pProperties);
+}
+
 static VkResult vkGetPhysicalDeviceSurfaceSupportKHR(PFN_vkGetPhysicalDeviceSurfaceSupportKHR f, VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, VkSurfaceKHR surface, VkBool32 *pSupported) {
 	return f(physicalDevice, queueFamilyIndex, surface, pSupported);
 }
@@ -654,6 +658,7 @@ var funcs struct {
 	vkDestroyFence                           C.PFN_vkDestroyFence
 	vkWaitForFences                          C.PFN_vkWaitForFences
 	vkResetFences                            C.PFN_vkResetFences
+	vkGetPhysicalDeviceProperties            C.PFN_vkGetPhysicalDeviceProperties
 
 	vkGetPhysicalDeviceSurfaceSupportKHR      C.PFN_vkGetPhysicalDeviceSurfaceSupportKHR
 	vkDestroySurfaceKHR                       C.PFN_vkDestroySurfaceKHR
@@ -793,6 +798,7 @@ func vkInit() error {
 		funcs.vkDestroyFence = must("vkDestroyFence")
 		funcs.vkWaitForFences = must("vkWaitForFences")
 		funcs.vkResetFences = must("vkResetFences")
+		funcs.vkGetPhysicalDeviceProperties = must("vkGetPhysicalDeviceProperties")
 
 		funcs.vkGetPhysicalDeviceSurfaceSupportKHR = dlopen("vkGetPhysicalDeviceSurfaceSupportKHR")
 		funcs.vkDestroySurfaceKHR = dlopen("vkDestroySurfaceKHR")
@@ -884,6 +890,12 @@ func ChoosePhysicalDevice(inst Instance, surf Surface) (PhysicalDevice, int, err
 		return nil, 0, err
 	}
 	for _, pd := range devs {
+		var props C.VkPhysicalDeviceProperties
+		C.vkGetPhysicalDeviceProperties(funcs.vkGetPhysicalDeviceProperties, pd, &props)
+		// Skip software implementations such as lavapipe.
+		if props.deviceType == C.VK_PHYSICAL_DEVICE_TYPE_CPU {
+			continue
+		}
 		const caps = C.VK_QUEUE_GRAPHICS_BIT | C.VK_QUEUE_COMPUTE_BIT
 		queueIdx, ok, err := chooseQueue(pd, surf, caps)
 		if err != nil {
