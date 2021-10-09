@@ -248,6 +248,9 @@ func compileAndroid(tmpDir string, tools *androidTools, bi *buildInfo) (err erro
 	if err != nil {
 		return err
 	}
+	if len(javaFiles) == 0 {
+		return fmt.Errorf("the gioui.org/app package contains no .java files (gioui.org module too old?)")
+	}
 	if len(javaFiles) > 0 {
 		classes := filepath.Join(tmpDir, "classes")
 		if err := os.MkdirAll(classes, 0755); err != nil {
@@ -559,12 +562,14 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, pe
 	}
 
 	// Append classes.dex.
-	classesFolder := "classes.dex"
-	if isBundle {
-		classesFolder = "dex/classes.dex"
-	}
-	if err := appendToZip(classesFolder, filepath.Join(dexDir, "classes.dex")); err != nil {
-		return err
+	if len(classFiles) > 0 {
+		classesFolder := "classes.dex"
+		if isBundle {
+			classesFolder = "dex/classes.dex"
+		}
+		if err := appendToZip(classesFolder, filepath.Join(dexDir, "classes.dex")); err != nil {
+			return err
+		}
 	}
 
 	return unsignedAPKZip.Close()
