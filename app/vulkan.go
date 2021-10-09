@@ -71,8 +71,8 @@ func (c *vkContext) RenderTarget() (gpu.RenderTarget, error) {
 	vk.DeviceWaitIdle(c.dev)
 
 	imgIdx, err := vk.AcquireNextImage(c.dev, c.swchain, c.acquireSem, 0)
-	if err != nil {
-		return nil, mapErr(err)
+	if err := mapSurfaceErr(err); err != nil {
+		return nil, err
 	}
 	c.presentIdx = imgIdx
 	return gpu.VulkanRenderTarget{
@@ -95,6 +95,14 @@ func (c *vkContext) api() gpu.API {
 
 func mapErr(err error) error {
 	var vkErr vk.Error
+	if errors.As(err, &vkErr) && vkErr == vk.ERROR_DEVICE_LOST {
+		return gpu.ErrDeviceLost
+	}
+	return err
+}
+
+func mapSurfaceErr(err error) error {
+	var vkErr vk.Error
 	if !errors.As(err, &vkErr) {
 		return err
 	}
@@ -108,12 +116,10 @@ func mapErr(err error) error {
 		return errOutOfDate
 	case vkErr == vk.ERROR_SURFACE_LOST_KHR:
 		// Treating a lost surface as a lost device isn't accurate, but
-		// porbably not worth optimizing.
-		return gpu.ErrDeviceLost
-	case vkErr == vk.ERROR_DEVICE_LOST:
+		// probably not worth optimizing.
 		return gpu.ErrDeviceLost
 	}
-	return err
+	return mapErr(err)
 }
 
 func (c *vkContext) release() {
@@ -127,7 +133,7 @@ func (c *vkContext) release() {
 }
 
 func (c *vkContext) present() error {
-	return mapErr(vk.PresentQueue(c.queue, c.swchain, c.presentSem, c.presentIdx))
+	return mapSurfaceErr(vk.PresentQueue(c.queue, c.swchain, c.presentSem, c.presentIdx))
 }
 
 func (c *vkContext) destroyImageViews() {
@@ -170,8 +176,8 @@ func (c *vkContext) refresh(surf vk.Surface, width, height int) error {
 		vk.DestroySwapchain(c.dev, c.swchain)
 		c.swchain = 0
 	}
-	if err != nil {
-		return mapErr(err)
+	if err := mapSurfaceErr(err); err != nil {
+		return err
 	}
 	c.swchain = swchain
 	c.imgs = imgs
@@ -184,19 +190,19 @@ func (c *vkContext) refresh(surf vk.Surface, width, height int) error {
 		vk.IMAGE_LAYOUT_PRESENT_SRC_KHR,
 		nil,
 	)
-	if err != nil {
-		return mapErr(err)
+	if err := mapErr(err); err != nil {
+		return err
 	}
 	defer vk.DestroyRenderPass(c.dev, pass)
 	for _, img := range imgs {
 		view, err := vk.CreateImageView(c.dev, img, format)
-		if err != nil {
-			return mapErr(err)
+		if err := mapErr(err); err != nil {
+			return err
 		}
 		c.views = append(c.views, view)
 		fbo, err := vk.CreateFramebuffer(c.dev, pass, view, width, height)
-		if err != nil {
-			return mapErr(err)
+		if err := mapErr(err); err != nil {
+			return err
 		}
 		c.fbos = append(c.fbos, fbo)
 	}
