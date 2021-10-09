@@ -64,7 +64,6 @@ type pointerHandler struct {
 }
 
 type areaOp struct {
-	pass bool
 	kind areaKind
 	rect f32.Rectangle
 }
@@ -82,7 +81,7 @@ type areaKind uint8
 type collectState struct {
 	t    f32.Affine2D
 	node int
-	pass bool
+	pass int
 }
 
 const (
@@ -122,7 +121,7 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 				n := q.hitTree[i]
 				area = n.area
 			}
-			q.areas = append(q.areas, areaNode{trans: state.t, next: area, area: op, pass: op.pass})
+			q.areas = append(q.areas, areaNode{trans: state.t, next: area, area: op, pass: state.pass > 0})
 			q.nodeStack = append(q.nodeStack, state.node)
 			q.hitTree = append(q.hitTree, hitNode{
 				next: state.node,
@@ -133,6 +132,10 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 			n := len(q.nodeStack)
 			state.node = q.nodeStack[n-1]
 			q.nodeStack = q.nodeStack[:n-1]
+		case ops.TypePass:
+			state.pass++
+		case ops.TypePopPass:
+			state.pass--
 		case ops.TypeTransform:
 			dop, push := ops.DecodeTransform(encOp.Data)
 			if push {
@@ -480,18 +483,17 @@ func (op *areaOp) Decode(d []byte) {
 	}
 	rect := f32.Rectangle{
 		Min: f32.Point{
-			X: opDecodeFloat32(d[3:]),
-			Y: opDecodeFloat32(d[7:]),
+			X: opDecodeFloat32(d[2:]),
+			Y: opDecodeFloat32(d[6:]),
 		},
 		Max: f32.Point{
-			X: opDecodeFloat32(d[11:]),
-			Y: opDecodeFloat32(d[15:]),
+			X: opDecodeFloat32(d[10:]),
+			Y: opDecodeFloat32(d[14:]),
 		},
 	}
 	*op = areaOp{
 		kind: areaKind(d[1]),
 		rect: rect,
-		pass: d[2] != 0,
 	}
 }
 

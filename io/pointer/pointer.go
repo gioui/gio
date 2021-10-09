@@ -42,20 +42,27 @@ type Event struct {
 	Modifiers key.Modifiers
 }
 
-// AreaOp updates the hit area to the intersection of the current
-// hit area and the area. The area is transformed before applying
-// it.
+// AreaOp pushes the current hit area to the stack and updates it to the
+// intersection of the current hit area and the transformed area.
 type AreaOp struct {
-	// PassThrough areas and their children don't block events to siblings
-	// them.
-	PassThrough bool
-
 	kind areaKind
 	rect image.Rectangle
 }
 
 // AreaStack represents an AreaOp on the stack of areas.
 type AreaStack struct {
+	ops     *ops.Ops
+	id      ops.StackID
+	macroID int
+}
+
+// PassOp sets the pass-through mode. AreaOps added while the pass-through
+// mode is set don't block events to siblings.
+type PassOp struct {
+}
+
+// PassStack represents a PassOp on the pass stack.
+type PassStack struct {
 	ops     *ops.Ops
 	id      ops.StackID
 	macroID int
@@ -204,20 +211,31 @@ func (a AreaOp) add(o *op.Ops, push bool) {
 	data := o.Internal.Write(ops.TypeAreaLen)
 	data[0] = byte(ops.TypeArea)
 	data[1] = byte(a.kind)
-	if a.PassThrough {
-		data[2] = 1
-	}
 	bo := binary.LittleEndian
-	bo.PutUint32(data[3:], uint32(a.rect.Min.X))
-	bo.PutUint32(data[7:], uint32(a.rect.Min.Y))
-	bo.PutUint32(data[11:], uint32(a.rect.Max.X))
-	bo.PutUint32(data[15:], uint32(a.rect.Max.Y))
+	bo.PutUint32(data[2:], uint32(a.rect.Min.X))
+	bo.PutUint32(data[6:], uint32(a.rect.Min.Y))
+	bo.PutUint32(data[10:], uint32(a.rect.Max.X))
+	bo.PutUint32(data[14:], uint32(a.rect.Max.Y))
 }
 
 func (o AreaStack) Pop() {
 	o.ops.PopOp(ops.AreaStack, o.id, o.macroID)
 	data := o.ops.Write(ops.TypePopAreaLen)
 	data[0] = byte(ops.TypePopArea)
+}
+
+// Push the current pass mode to the pass stack and set the pass mode.
+func (p PassOp) Push(o *op.Ops) PassStack {
+	id, mid := o.Internal.PushOp(ops.PassStack)
+	data := o.Internal.Write(ops.TypePassLen)
+	data[0] = byte(ops.TypePass)
+	return PassStack{ops: &o.Internal, id: id, macroID: mid}
+}
+
+func (p PassStack) Pop() {
+	p.ops.PopOp(ops.PassStack, p.id, p.macroID)
+	data := p.ops.Write(ops.TypePopPassLen)
+	data[0] = byte(ops.TypePopPass)
 }
 
 func (op CursorNameOp) Add(o *op.Ops) {

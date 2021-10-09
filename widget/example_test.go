@@ -29,11 +29,9 @@ func ExampleClickable_passthrough() {
 	// widget lays out two buttons on top of each other.
 	widget := func() {
 		button1.Layout(gtx)
-		area := pointer.Rect(image.Rectangle{Max: gtx.Constraints.Max})
 		// button2 completely covers button1, but pass-through allows pointer
 		// events to pass through to button1.
-		area.PassThrough = true
-		defer area.Push(gtx.Ops).Pop()
+		defer pointer.PassOp{}.Push(gtx.Ops).Pop()
 		button2.Layout(gtx)
 	}
 

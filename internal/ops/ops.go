@@ -23,7 +23,7 @@ type Ops struct {
 	nextStateID int
 
 	macroStack stack
-	stacks     [3]stack
+	stacks     [4]stack
 }
 
 type OpType byte
@@ -45,6 +45,8 @@ const (
 	TypeLinearGradient
 	TypeArea
 	TypePopArea
+	TypePass
+	TypePopPass
 	TypePointerInput
 	TypeClipboardRead
 	TypeClipboardWrite
@@ -88,6 +90,7 @@ const (
 	ClipStack StackKind = iota
 	AreaStack
 	TransStack
+	PassStack
 )
 
 const (
@@ -102,8 +105,10 @@ const (
 	TypePaintLen           = 1
 	TypeColorLen           = 1 + 4
 	TypeLinearGradientLen  = 1 + 8*2 + 4*2
-	TypeAreaLen            = 1 + 1 + 1 + 4*4
+	TypeAreaLen            = 1 + 1 + 4*4
 	TypePopAreaLen         = 1
+	TypePassLen            = 1
+	TypePopPassLen         = 1
 	TypePointerInputLen    = 1 + 1 + 1 + 2*4 + 2*4
 	TypeClipboardReadLen   = 1
 	TypeClipboardWriteLen  = 1
@@ -313,6 +318,8 @@ func (t OpType) Size() int {
 		TypeLinearGradientLen,
 		TypeAreaLen,
 		TypePopAreaLen,
+		TypePassLen,
+		TypePopPassLen,
 		TypePointerInputLen,
 		TypeClipboardReadLen,
 		TypeClipboardWriteLen,
@@ -370,6 +377,10 @@ func (t OpType) String() string {
 		return "Area"
 	case TypePopArea:
 		return "PopArea"
+	case TypePass:
+		return "Pass"
+	case TypePopPass:
+		return "PopPass"
 	case TypePointerInput:
 		return "PointerInput"
 	case TypeClipboardRead:
