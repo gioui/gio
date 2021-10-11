@@ -66,6 +66,11 @@ func (p Point) Mul(s float32) Point {
 	return Point{X: p.X * s, Y: p.Y * s}
 }
 
+// Div returns the vector p/s.
+func (p Point) Div(s float32) Point {
+	return Point{X: p.X / s, Y: p.Y / s}
+}
+
 // In reports whether p is in r.
 func (p Point) In(r Rectangle) bool {
 	return r.Min.X <= p.X && p.X < r.Max.X &&
