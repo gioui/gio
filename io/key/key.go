@@ -145,13 +145,13 @@ func (h InputOp) Add(o *op.Ops) {
 	if h.Tag == nil {
 		panic("Tag must be non-nil")
 	}
-	data := o.Internal.Write1(ops.TypeKeyInputLen, h.Tag)
+	data := ops.Write1(&o.Internal, ops.TypeKeyInputLen, h.Tag)
 	data[0] = byte(ops.TypeKeyInput)
 	data[1] = byte(h.Hint)
 }
 
 func (h SoftKeyboardOp) Add(o *op.Ops) {
-	data := o.Internal.Write(ops.TypeKeySoftKeyboardLen)
+	data := ops.Write(&o.Internal, ops.TypeKeySoftKeyboardLen)
 	data[0] = byte(ops.TypeKeySoftKeyboard)
 	if h.Show {
 		data[1] = 1
@@ -159,7 +159,7 @@ func (h SoftKeyboardOp) Add(o *op.Ops) {
 }
 
 func (h FocusOp) Add(o *op.Ops) {
-	data := o.Internal.Write1(ops.TypeKeyFocusLen, h.Tag)
+	data := ops.Write1(&o.Internal, ops.TypeKeyFocusLen, h.Tag)
 	data[0] = byte(ops.TypeKeyFocus)
 }
 

@@ -40,7 +40,7 @@ func init() {
 // Push saves the current clip state on the stack and updates the current
 // state to the intersection of the current p.
 func (p Op) Push(o *op.Ops) Stack {
-	id, macroID := o.Internal.PushOp(ops.ClipStack)
+	id, macroID := ops.PushOp(&o.Internal, ops.ClipStack)
 	p.add(o, true)
 	return Stack{ops: &o.Internal, id: id, macroID: macroID}
 }
@@ -58,7 +58,7 @@ func (p Op) add(o *op.Ops, push bool) {
 
 	bo := binary.LittleEndian
 	if path.hasSegments {
-		data := o.Internal.Write(ops.TypePathLen)
+		data := ops.Write(&o.Internal, ops.TypePathLen)
 		data[0] = byte(ops.TypePath)
 		bo.PutUint64(data[1:], path.hash)
 		path.spec.Add(o)
@@ -72,13 +72,13 @@ func (p Op) add(o *op.Ops, push bool) {
 		bounds.Min.Y -= half
 		bounds.Max.X += half
 		bounds.Max.Y += half
-		data := o.Internal.Write(ops.TypeStrokeLen)
+		data := ops.Write(&o.Internal, ops.TypeStrokeLen)
 		data[0] = byte(ops.TypeStroke)
 		bo := binary.LittleEndian
 		bo.PutUint32(data[1:], math.Float32bits(p.width))
 	}
 
-	data := o.Internal.Write(ops.TypeClipLen)
+	data := ops.Write(&o.Internal, ops.TypeClipLen)
 	data[0] = byte(ops.TypeClip)
 	bo.PutUint32(data[1:], uint32(bounds.Min.X))
 	bo.PutUint32(data[5:], uint32(bounds.Min.Y))
@@ -93,8 +93,8 @@ func (p Op) add(o *op.Ops, push bool) {
 }
 
 func (s Stack) Pop() {
-	s.ops.PopOp(ops.ClipStack, s.id, s.macroID)
-	data := s.ops.Write(ops.TypePopClipLen)
+	ops.PopOp(s.ops, ops.ClipStack, s.id, s.macroID)
+	data := ops.Write(s.ops, ops.TypePopClipLen)
 	data[0] = byte(ops.TypePopClip)
 }
 
@@ -137,7 +137,7 @@ func (p *Path) Begin(o *op.Ops) {
 	p.ops = &o.Internal
 	p.macro = op.Record(o)
 	// Write the TypeAux opcode
-	data := p.ops.Write(ops.TypeAuxLen)
+	data := ops.Write(p.ops, ops.TypeAuxLen)
 	data[0] = byte(ops.TypeAux)
 }
 
@@ -180,7 +180,7 @@ func (p *Path) Line(delta f32.Point) {
 
 // LineTo moves the pen to the absolute point specified, recording a line.
 func (p *Path) LineTo(to f32.Point) {
-	data := p.ops.Write(scene.CommandSize + 4)
+	data := ops.Write(p.ops, scene.CommandSize+4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
 	p.cmd(data[4:], scene.Line(p.pen, to))
@@ -248,7 +248,7 @@ func (p *Path) Quad(ctrl, to f32.Point) {
 // QuadTo records a quadratic Bézier from the pen to end
 // with the control point ctrl, with absolute coordinates.
 func (p *Path) QuadTo(ctrl, to f32.Point) {
-	data := p.ops.Write(scene.CommandSize + 4)
+	data := ops.Write(p.ops, scene.CommandSize+4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
 	p.cmd(data[4:], scene.Quad(p.pen, ctrl, to))
@@ -294,7 +294,7 @@ func (p *Path) CubeTo(ctrl0, ctrl1, to f32.Point) {
 	if ctrl0 == p.pen && ctrl1 == p.pen && to == p.pen {
 		return
 	}
-	data := p.ops.Write(scene.CommandSize + 4)
+	data := ops.Write(p.ops, scene.CommandSize+4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
 	p.cmd(data[4:], scene.Cubic(p.pen, ctrl0, ctrl1, to))

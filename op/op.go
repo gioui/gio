@@ -127,7 +127,7 @@ func Defer(o *Ops, c CallOp) {
 	if c.ops == nil {
 		return
 	}
-	state := o.Internal.Save()
+	state := ops.Save(&o.Internal)
 	// Wrap c in a macro that loads the saved state before execution.
 	m := Record(o)
 	state.Load()
@@ -135,7 +135,7 @@ func Defer(o *Ops, c CallOp) {
 	c = m.Stop()
 	// A Defer is recorded as a TypeDefer followed by the
 	// wrapped macro.
-	data := o.Internal.Write(ops.TypeDeferLen)
+	data := ops.Write(&o.Internal, ops.TypeDeferLen)
 	data[0] = byte(ops.TypeDefer)
 	c.Add(o)
 }
@@ -159,10 +159,10 @@ func Save(o *Ops) SaveStack {
 	const inf = 1e6
 	bounds := image.Rectangle{Min: image.Pt(-inf, -inf), Max: image.Pt(inf, inf)}
 	{
-		st.clip.id, st.clip.macroID = o.Internal.PushOp(ops.ClipStack)
+		st.clip.id, st.clip.macroID = ops.PushOp(&o.Internal, ops.ClipStack)
 		// Push clip stack with no-op (infinite) clipping rect. Copied from clip.Op.Push.
 		bo := binary.LittleEndian
-		data := o.Internal.Write(ops.TypeClipLen)
+		data := ops.Write(&o.Internal, ops.TypeClipLen)
 		data[0] = byte(ops.TypeClip)
 		bo.PutUint32(data[1:], uint32(bounds.Min.X))
 		bo.PutUint32(data[5:], uint32(bounds.Min.Y))
@@ -176,8 +176,8 @@ func Save(o *Ops) SaveStack {
 
 func (s SaveStack) Load() {
 	// Pop clip.
-	s.ops.PopOp(ops.ClipStack, s.clip.id, s.clip.macroID)
-	data := s.ops.Write(ops.TypePopClipLen)
+	ops.PopOp(s.ops, ops.ClipStack, s.clip.id, s.clip.macroID)
+	data := ops.Write(s.ops, ops.TypePopClipLen)
 	data[0] = byte(ops.TypePopClip)
 
 	s.trans.Pop()
@@ -186,18 +186,18 @@ func (s SaveStack) Load() {
 // Reset the Ops, preparing it for re-use. Reset invalidates
 // any recorded macros.
 func (o *Ops) Reset() {
-	o.Internal.Reset()
+	ops.Reset(&o.Internal)
 }
 
 // Record a macro of operations.
 func Record(o *Ops) MacroOp {
 	m := MacroOp{
 		ops: &o.Internal,
-		id:  o.Internal.PushMacro(),
-		pc:  o.Internal.PC(),
+		id:  ops.PushMacro(&o.Internal),
+		pc:  ops.PCFor(&o.Internal),
 	}
 	// Reserve room for a macro definition. Updated in Stop.
-	m.ops.Write(ops.TypeMacroLen)
+	ops.Write(m.ops, ops.TypeMacroLen)
 	m.fill()
 	return m
 }
@@ -205,7 +205,7 @@ func Record(o *Ops) MacroOp {
 // Stop ends a previously started recording and returns an
 // operation for replaying it.
 func (m MacroOp) Stop() CallOp {
-	m.ops.PopMacro(m.id)
+	ops.PopMacro(m.ops, m.id)
 	m.fill()
 	return CallOp{
 		ops: m.ops,
@@ -214,7 +214,7 @@ func (m MacroOp) Stop() CallOp {
 }
 
 func (m MacroOp) fill() {
-	m.ops.FillMacro(m.pc)
+	ops.FillMacro(m.ops, m.pc)
 }
 
 // Add the recorded list of operations. Add
@@ -224,11 +224,11 @@ func (c CallOp) Add(o *Ops) {
 	if c.ops == nil {
 		return
 	}
-	o.Internal.AddCall(c.ops, c.pc)
+	ops.AddCall(&o.Internal, c.ops, c.pc)
 }
 
 func (r InvalidateOp) Add(o *Ops) {
-	data := o.Internal.Write(ops.TypeRedrawLen)
+	data := ops.Write(&o.Internal, ops.TypeRedrawLen)
 	data[0] = byte(ops.TypeInvalidate)
 	bo := binary.LittleEndian
 	// UnixNano cannot represent the zero time.
@@ -253,7 +253,7 @@ func Affine(a f32.Affine2D) TransformOp {
 // Push the current transformation to the stack and then multiply the
 // current transformation with t.
 func (t TransformOp) Push(o *Ops) TransformStack {
-	id, macroID := o.Internal.PushOp(ops.TransStack)
+	id, macroID := ops.PushOp(&o.Internal, ops.TransStack)
 	t.add(o, true)
 	return TransformStack{ops: &o.Internal, id: id, macroID: macroID}
 }
@@ -265,7 +265,7 @@ func (t TransformOp) Add(o *Ops) {
 }
 
 func (t TransformOp) add(o *Ops, push bool) {
-	data := o.Internal.Write(ops.TypeTransformLen)
+	data := ops.Write(&o.Internal, ops.TypeTransformLen)
 	data[0] = byte(ops.TypeTransform)
 	if push {
 		data[1] = 1
@@ -281,7 +281,7 @@ func (t TransformOp) add(o *Ops, push bool) {
 }
 
 func (t TransformStack) Pop() {
-	t.ops.PopOp(ops.TransStack, t.id, t.macroID)
-	data := t.ops.Write(ops.TypePopTransformLen)
+	ops.PopOp(t.ops, ops.TransStack, t.id, t.macroID)
+	data := ops.Write(t.ops, ops.TypePopTransformLen)
 	data[0] = byte(ops.TypePopTransform)
 }

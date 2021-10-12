@@ -202,13 +202,13 @@ func Ellipse(size image.Rectangle) AreaOp {
 // Push the current area to the stack and intersects the current area with the
 // area represented by o.
 func (a AreaOp) Push(o *op.Ops) AreaStack {
-	id, macroID := o.Internal.PushOp(ops.AreaStack)
+	id, macroID := ops.PushOp(&o.Internal, ops.AreaStack)
 	a.add(o, true)
 	return AreaStack{ops: &o.Internal, id: id, macroID: macroID}
 }
 
 func (a AreaOp) add(o *op.Ops, push bool) {
-	data := o.Internal.Write(ops.TypeAreaLen)
+	data := ops.Write(&o.Internal, ops.TypeAreaLen)
 	data[0] = byte(ops.TypeArea)
 	data[1] = byte(a.kind)
 	bo := binary.LittleEndian
@@ -219,27 +219,27 @@ func (a AreaOp) add(o *op.Ops, push bool) {
 }
 
 func (o AreaStack) Pop() {
-	o.ops.PopOp(ops.AreaStack, o.id, o.macroID)
-	data := o.ops.Write(ops.TypePopAreaLen)
+	ops.PopOp(o.ops, ops.AreaStack, o.id, o.macroID)
+	data := ops.Write(o.ops, ops.TypePopAreaLen)
 	data[0] = byte(ops.TypePopArea)
 }
 
 // Push the current pass mode to the pass stack and set the pass mode.
 func (p PassOp) Push(o *op.Ops) PassStack {
-	id, mid := o.Internal.PushOp(ops.PassStack)
-	data := o.Internal.Write(ops.TypePassLen)
+	id, mid := ops.PushOp(&o.Internal, ops.PassStack)
+	data := ops.Write(&o.Internal, ops.TypePassLen)
 	data[0] = byte(ops.TypePass)
 	return PassStack{ops: &o.Internal, id: id, macroID: mid}
 }
 
 func (p PassStack) Pop() {
-	p.ops.PopOp(ops.PassStack, p.id, p.macroID)
-	data := p.ops.Write(ops.TypePopPassLen)
+	ops.PopOp(p.ops, ops.PassStack, p.id, p.macroID)
+	data := ops.Write(p.ops, ops.TypePopPassLen)
 	data[0] = byte(ops.TypePopPass)
 }
 
 func (op CursorNameOp) Add(o *op.Ops) {
-	data := o.Internal.Write1(ops.TypeCursorLen, op.Name)
+	data := ops.Write1(&o.Internal, ops.TypeCursorLen, op.Name)
 	data[0] = byte(ops.TypeCursor)
 }
 
@@ -251,7 +251,7 @@ func (op InputOp) Add(o *op.Ops) {
 	if b := op.ScrollBounds; b.Min.X > 0 || b.Max.X < 0 || b.Min.Y > 0 || b.Max.Y < 0 {
 		panic(fmt.Errorf("invalid scroll range value %v", b))
 	}
-	data := o.Internal.Write1(ops.TypePointerInputLen, op.Tag)
+	data := ops.Write1(&o.Internal, ops.TypePointerInputLen, op.Tag)
 	data[0] = byte(ops.TypePointerInput)
 	if op.Grab {
 		data[1] = 1

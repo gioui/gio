@@ -126,7 +126,7 @@ const (
 	TypeStrokeLen          = 1 + 4
 )
 
-func (o *Ops) Reset() {
+func Reset(o *Ops) {
 	o.macroStack = stack{}
 	for i := range o.stacks {
 		o.stacks[i] = stack{}
@@ -141,21 +141,21 @@ func (o *Ops) Reset() {
 	o.version++
 }
 
-func (o *Ops) Write(n int) []byte {
+func Write(o *Ops, n int) []byte {
 	o.data = append(o.data, make([]byte, n)...)
 	return o.data[len(o.data)-n:]
 }
 
-func (o *Ops) PushMacro() StackID {
+func PushMacro(o *Ops) StackID {
 	return o.macroStack.push()
 }
 
-func (o *Ops) PopMacro(id StackID) {
+func PopMacro(o *Ops, id StackID) {
 	o.macroStack.pop(id)
 }
 
-func (o *Ops) FillMacro(startPC PC) {
-	pc := o.PC()
+func FillMacro(o *Ops, startPC PC) {
+	pc := PCFor(o)
 	// Fill out the macro definition reserved in Record.
 	data := o.data[startPC.data:]
 	data = data[:TypeMacroLen]
@@ -165,38 +165,38 @@ func (o *Ops) FillMacro(startPC PC) {
 	bo.PutUint32(data[5:], uint32(pc.refs))
 }
 
-func (o *Ops) AddCall(callOps *Ops, pc PC) {
-	data := o.Write1(TypeCallLen, callOps)
+func AddCall(o *Ops, callOps *Ops, pc PC) {
+	data := Write1(o, TypeCallLen, callOps)
 	data[0] = byte(TypeCall)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(pc.data))
 	bo.PutUint32(data[5:], uint32(pc.refs))
 }
 
-func (o *Ops) PushOp(kind StackKind) (StackID, int) {
+func PushOp(o *Ops, kind StackKind) (StackID, int) {
 	return o.stacks[kind].push(), o.macroStack.currentID
 }
 
-func (o *Ops) PopOp(kind StackKind, sid StackID, macroID int) {
+func PopOp(o *Ops, kind StackKind, sid StackID, macroID int) {
 	if o.macroStack.currentID != macroID {
 		panic("stack push and pop must not cross macro boundary")
 	}
 	o.stacks[kind].pop(sid)
 }
 
-func (o *Ops) Write1(n int, ref1 interface{}) []byte {
+func Write1(o *Ops, n int, ref1 interface{}) []byte {
 	o.data = append(o.data, make([]byte, n)...)
 	o.refs = append(o.refs, ref1)
 	return o.data[len(o.data)-n:]
 }
 
-func (o *Ops) Write2(n int, ref1, ref2 interface{}) []byte {
+func Write2(o *Ops, n int, ref1, ref2 interface{}) []byte {
 	o.data = append(o.data, make([]byte, n)...)
 	o.refs = append(o.refs, ref1, ref2)
 	return o.data[len(o.data)-n:]
 }
 
-func (o *Ops) PC() PC {
+func PCFor(o *Ops) PC {
 	return PC{data: len(o.data), refs: len(o.refs)}
 }
 
@@ -222,7 +222,7 @@ func (s *stack) pop(sid StackID) {
 }
 
 // Save the effective transformation.
-func (o *Ops) Save() StateOP {
+func Save(o *Ops) StateOP {
 	o.nextStateID++
 	s := StateOP{
 		ops:     o,
@@ -230,7 +230,7 @@ func (o *Ops) Save() StateOP {
 		macroID: o.macroStack.currentID,
 	}
 	bo := binary.LittleEndian
-	data := o.Write(TypeSaveLen)
+	data := Write(o, TypeSaveLen)
 	data[0] = byte(TypeSave)
 	bo.PutUint32(data[1:], uint32(s.id))
 	return s
@@ -240,7 +240,7 @@ func (o *Ops) Save() StateOP {
 // its ID.
 func (s StateOP) Load() {
 	bo := binary.LittleEndian
-	data := s.ops.Write(TypeLoadLen)
+	data := Write(s.ops, TypeLoadLen)
 	data[0] = byte(TypeLoad)
 	bo.PutUint32(data[1:], uint32(s.id))
 }

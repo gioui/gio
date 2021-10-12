@@ -96,12 +96,12 @@ func (i ImageOp) Add(o *op.Ops) {
 	} else if i.src == nil || i.src.Bounds().Empty() {
 		return
 	}
-	data := o.Internal.Write2(ops.TypeImageLen, i.src, i.handle)
+	data := ops.Write2(&o.Internal, ops.TypeImageLen, i.src, i.handle)
 	data[0] = byte(ops.TypeImage)
 }
 
 func (c ColorOp) Add(o *op.Ops) {
-	data := o.Internal.Write(ops.TypeColorLen)
+	data := ops.Write(&o.Internal, ops.TypeColorLen)
 	data[0] = byte(ops.TypeColor)
 	data[1] = c.Color.R
 	data[2] = c.Color.G
@@ -110,7 +110,7 @@ func (c ColorOp) Add(o *op.Ops) {
 }
 
 func (c LinearGradientOp) Add(o *op.Ops) {
-	data := o.Internal.Write(ops.TypeLinearGradientLen)
+	data := ops.Write(&o.Internal, ops.TypeLinearGradientLen)
 	data[0] = byte(ops.TypeLinearGradient)
 
 	bo := binary.LittleEndian
@@ -130,7 +130,7 @@ func (c LinearGradientOp) Add(o *op.Ops) {
 }
 
 func (d PaintOp) Add(o *op.Ops) {
-	data := o.Internal.Write(ops.TypePaintLen)
+	data := ops.Write(&o.Internal, ops.TypePaintLen)
 	data[0] = byte(ops.TypePaint)
 }
 

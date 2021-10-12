@@ -60,7 +60,7 @@ func (r *Reader) Reset(ops *Ops) {
 // ResetAt is like Reset, except it starts reading from pc.
 func (r *Reader) ResetAt(ops *Ops, pc PC) {
 	r.stack = r.stack[:0]
-	r.deferOps.Reset()
+	Reset(&r.deferOps)
 	r.deferDone = false
 	r.pc = pc
 	r.ops = ops
@@ -120,7 +120,7 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 				if t.NumRefs() != 1 {
 					panic("internal error: unexpected number of macro refs")
 				}
-				deferData := r.deferOps.Write1(t.Size(), refs[0])
+				deferData := Write1(&r.deferOps, t.Size(), refs[0])
 				copy(deferData, data)
 				r.pc.data += n
 				r.pc.refs += nrefs

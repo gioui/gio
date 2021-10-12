@@ -25,12 +25,12 @@ type WriteOp struct {
 }
 
 func (h ReadOp) Add(o *op.Ops) {
-	data := o.Internal.Write1(ops.TypeClipboardReadLen, h.Tag)
+	data := ops.Write1(&o.Internal, ops.TypeClipboardReadLen, h.Tag)
 	data[0] = byte(ops.TypeClipboardRead)
 }
 
 func (h WriteOp) Add(o *op.Ops) {
-	data := o.Internal.Write1(ops.TypeClipboardWriteLen, &h.Text)
+	data := ops.Write1(&o.Internal, ops.TypeClipboardWriteLen, &h.Text)
 	data[0] = byte(ops.TypeClipboardWrite)
 }
 
