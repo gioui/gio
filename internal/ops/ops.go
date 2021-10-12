@@ -141,18 +141,6 @@ func (o *Ops) Reset() {
 	o.version++
 }
 
-func (o *Ops) Data() []byte {
-	return o.data
-}
-
-func (o *Ops) Refs() []interface{} {
-	return o.refs
-}
-
-func (o *Ops) Version() int {
-	return o.version
-}
-
 func (o *Ops) Write(n int) []byte {
 	o.data = append(o.data, make([]byte, n)...)
 	return o.data[len(o.data)-n:]

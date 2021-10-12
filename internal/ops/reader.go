@@ -81,9 +81,9 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 				continue
 			}
 		}
-		data := r.ops.Data()
+		data := r.ops.data
 		data = data[r.pc.data:]
-		refs := r.ops.Refs()
+		refs := r.ops.refs
 		if len(data) == 0 {
 			if r.deferDone {
 				return EncodedOp{}, false
@@ -94,7 +94,7 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 			r.pc = PC{}
 			continue
 		}
-		key := Key{ops: r.ops, pc: r.pc.data, version: r.ops.Version()}
+		key := Key{ops: r.ops, pc: r.pc.data, version: r.ops.version}
 		t := OpType(data[0])
 		n := t.Size()
 		nrefs := t.NumRefs()
@@ -128,7 +128,7 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 			}
 			var op macroOp
 			op.decode(data, refs)
-			macroData := op.ops.Data()[op.pc.data:]
+			macroData := op.ops.data[op.pc.data:]
 			if OpType(macroData[0]) != TypeMacro {
 				panic("invalid macro reference")
 			}
