@@ -648,6 +648,8 @@ func Java_org_gioui_GioView_onTouchEvent(env *C.JNIEnv, class C.jclass, handle C
 	switch tool {
 	case C.AMOTION_EVENT_TOOL_TYPE_FINGER:
 		src = pointer.Touch
+	case C.AMOTION_EVENT_TOOL_TYPE_STYLUS:
+		src = pointer.Touch
 	case C.AMOTION_EVENT_TOOL_TYPE_MOUSE:
 		src = pointer.Mouse
 	case C.AMOTION_EVENT_TOOL_TYPE_UNKNOWN:
