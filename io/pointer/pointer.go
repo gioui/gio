@@ -265,6 +265,22 @@ func (op InputOp) Add(o *op.Ops) {
 }
 
 func (t Type) String() string {
+	if t == Cancel {
+		return "Cancel"
+	}
+	var buf strings.Builder
+	for tt := Type(1); tt > 0; tt <<= 1 {
+		if t&tt > 0 {
+			if buf.Len() > 0 {
+				buf.WriteByte('|')
+			}
+			buf.WriteString((t & tt).string())
+		}
+	}
+	return buf.String()
+}
+
+func (t Type) string() string {
 	switch t {
 	case Press:
 		return "Press"
