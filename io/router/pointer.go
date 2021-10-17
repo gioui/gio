@@ -264,7 +264,7 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	q.collectHandlers(&q.reader, events)
 	for k, h := range q.handlers {
 		if !h.active {
-			q.dropHandlers(nil, k)
+			q.dropHandler(nil, k)
 			delete(q.handlers, k)
 		}
 		if h.wantsGrab {
@@ -278,7 +278,9 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 						dropped := make([]event.Tag, 0, len(p.handlers)-1)
 						dropped = append(dropped, p.handlers[:i]...)
 						dropped = append(dropped, p.handlers[i+1:]...)
-						q.dropHandlers(events, dropped...)
+						for _, tag := range dropped {
+							q.dropHandler(events, tag)
+						}
 						break
 					}
 				}
@@ -291,22 +293,20 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	}
 }
 
-func (q *pointerQueue) dropHandlers(events *handlerEvents, tags ...event.Tag) {
-	for _, k := range tags {
-		if events != nil {
-			events.Add(k, pointer.Event{Type: pointer.Cancel})
-		}
-		for i := range q.pointers {
-			p := &q.pointers[i]
-			for i := len(p.handlers) - 1; i >= 0; i-- {
-				if p.handlers[i] == k {
-					p.handlers = append(p.handlers[:i], p.handlers[i+1:]...)
-				}
+func (q *pointerQueue) dropHandler(events *handlerEvents, tag event.Tag) {
+	if events != nil {
+		events.Add(tag, pointer.Event{Type: pointer.Cancel})
+	}
+	for i := range q.pointers {
+		p := &q.pointers[i]
+		for i := len(p.handlers) - 1; i >= 0; i-- {
+			if p.handlers[i] == tag {
+				p.handlers = append(p.handlers[:i], p.handlers[i+1:]...)
 			}
-			for i := len(p.entered) - 1; i >= 0; i-- {
-				if p.entered[i] == k {
-					p.entered = append(p.entered[:i], p.entered[i+1:]...)
-				}
+		}
+		for i := len(p.entered) - 1; i >= 0; i-- {
+			if p.entered[i] == tag {
+				p.entered = append(p.entered[:i], p.entered[i+1:]...)
 			}
 		}
 	}
@@ -328,7 +328,7 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	if e.Type == pointer.Cancel {
 		q.pointers = q.pointers[:0]
 		for k := range q.handlers {
-			q.dropHandlers(events, k)
+			q.dropHandler(events, k)
 		}
 		return
 	}
