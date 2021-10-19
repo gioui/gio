@@ -109,7 +109,7 @@ const (
 	TypePopAreaLen         = 1
 	TypePassLen            = 1
 	TypePopPassLen         = 1
-	TypePointerInputLen    = 1 + 1 + 1 + 2*4 + 2*4
+	TypePointerInputLen    = 1 + 1 + 1*2 + 2*4 + 2*4
 	TypeClipboardReadLen   = 1
 	TypeClipboardWriteLen  = 1
 	TypeKeyInputLen        = 1 + 1

@@ -147,10 +147,11 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 			state.t = q.transStack[n-1]
 			q.transStack = q.transStack[:n-1]
 		case ops.TypePointerInput:
+			bo := binary.LittleEndian
 			op := pointer.InputOp{
 				Tag:   encOp.Refs[0].(event.Tag),
 				Grab:  encOp.Data[1] != 0,
-				Types: pointer.Type(encOp.Data[2]),
+				Types: pointer.Type(bo.Uint16(encOp.Data[2:])),
 			}
 			area := -1
 			if i := state.node; i != -1 {
@@ -175,15 +176,14 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 			h.area = area
 			h.wantsGrab = h.wantsGrab || op.Grab
 			h.types = h.types | op.Types
-			bo := binary.LittleEndian.Uint32
 			h.scrollRange = image.Rectangle{
 				Min: image.Point{
-					X: int(int32(bo(encOp.Data[3:]))),
-					Y: int(int32(bo(encOp.Data[7:]))),
+					X: int(int32(bo.Uint32(encOp.Data[4:]))),
+					Y: int(int32(bo.Uint32(encOp.Data[8:]))),
 				},
 				Max: image.Point{
-					X: int(int32(bo(encOp.Data[11:]))),
-					Y: int(int32(bo(encOp.Data[15:]))),
+					X: int(int32(bo.Uint32(encOp.Data[12:]))),
+					Y: int(int32(bo.Uint32(encOp.Data[16:]))),
 				},
 			}
 		case ops.TypeCursor:

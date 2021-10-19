@@ -93,7 +93,7 @@ type InputOp struct {
 type ID uint16
 
 // Type of an Event.
-type Type uint8
+type Type uint
 
 // Priority of an Event.
 type Priority uint8
@@ -251,17 +251,20 @@ func (op InputOp) Add(o *op.Ops) {
 	if b := op.ScrollBounds; b.Min.X > 0 || b.Max.X < 0 || b.Min.Y > 0 || b.Max.Y < 0 {
 		panic(fmt.Errorf("invalid scroll range value %v", b))
 	}
+	if op.Types>>16 > 0 {
+		panic(fmt.Errorf("value in Types overflows uint16"))
+	}
 	data := ops.Write1(&o.Internal, ops.TypePointerInputLen, op.Tag)
 	data[0] = byte(ops.TypePointerInput)
 	if op.Grab {
 		data[1] = 1
 	}
-	data[2] = byte(op.Types)
 	bo := binary.LittleEndian
-	bo.PutUint32(data[3:], uint32(op.ScrollBounds.Min.X))
-	bo.PutUint32(data[7:], uint32(op.ScrollBounds.Min.Y))
-	bo.PutUint32(data[11:], uint32(op.ScrollBounds.Max.X))
-	bo.PutUint32(data[15:], uint32(op.ScrollBounds.Max.Y))
+	bo.PutUint16(data[2:], uint16(op.Types))
+	bo.PutUint32(data[4:], uint32(op.ScrollBounds.Min.X))
+	bo.PutUint32(data[8:], uint32(op.ScrollBounds.Min.Y))
+	bo.PutUint32(data[12:], uint32(op.ScrollBounds.Max.X))
+	bo.PutUint32(data[16:], uint32(op.ScrollBounds.Max.Y))
 }
 
 func (t Type) String() string {
