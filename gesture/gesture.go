@@ -27,6 +27,46 @@ import (
 // The duration is somewhat arbitrary.
 const doubleClickDuration = 200 * time.Millisecond
 
+// Hover detects the hover gesture for a pointer area.
+type Hover struct {
+	// entered tracks whether the pointer is inside the gesture.
+	entered bool
+	// pid is the pointer.ID.
+	pid pointer.ID
+}
+
+// Add the gesture to detect hovering over the current pointer area.
+func (h *Hover) Add(ops *op.Ops) {
+	pointer.InputOp{
+		Tag:   h,
+		Types: pointer.Enter | pointer.Leave,
+	}.Add(ops)
+}
+
+// Hovered returns whether a pointer is inside the area.
+func (h *Hover) Hovered(q event.Queue) bool {
+	for _, ev := range q.Events(h) {
+		e, ok := ev.(pointer.Event)
+		if !ok {
+			continue
+		}
+		switch e.Type {
+		case pointer.Leave:
+			if h.entered && h.pid == e.PointerID {
+				h.entered = false
+			}
+		case pointer.Enter:
+			if !h.entered {
+				h.pid = e.PointerID
+			}
+			if h.pid == e.PointerID {
+				h.entered = true
+			}
+		}
+	}
+	return h.entered
+}
+
 // Click detects click gestures in the form
 // of ClickEvents.
 type Click struct {

@@ -1,14 +1,41 @@
 package gesture
 
 import (
+	"image"
 	"testing"
 	"time"
 
+	"gioui.org/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/io/router"
 	"gioui.org/op"
 )
+
+func TestHover(t *testing.T) {
+	ops := new(op.Ops)
+	var h Hover
+	rect := image.Rect(20, 20, 40, 40)
+	stack := pointer.Rect(rect).Push(ops)
+	h.Add(ops)
+	stack.Pop()
+	r := new(router.Router)
+	r.Frame(ops)
+
+	r.Queue(
+		pointer.Event{Type: pointer.Move, Position: f32.Pt(30, 30)},
+	)
+	if !h.Hovered(r) {
+		t.Fatal("expected hovered")
+	}
+
+	r.Queue(
+		pointer.Event{Type: pointer.Move, Position: f32.Pt(50, 50)},
+	)
+	if h.Hovered(r) {
+		t.Fatal("expected not hovered")
+	}
+}
 
 func TestMouseClicks(t *testing.T) {
 	for _, tc := range []struct {
