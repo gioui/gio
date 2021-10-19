@@ -114,6 +114,38 @@ func TestPointerGrab(t *testing.T) {
 	assertEventSequence(t, r.Events(handler3), pointer.Cancel)
 }
 
+func TestPointerGrabSameHandlerTwice(t *testing.T) {
+	handler1 := new(int)
+	handler2 := new(int)
+	var ops op.Ops
+
+	types := pointer.Press | pointer.Release
+
+	pointer.InputOp{Tag: handler1, Types: types, Grab: true}.Add(&ops)
+	pointer.InputOp{Tag: handler1, Types: types}.Add(&ops)
+	pointer.InputOp{Tag: handler2, Types: types}.Add(&ops)
+
+	var r Router
+	r.Frame(&ops)
+	r.Queue(
+		pointer.Event{
+			Type:     pointer.Press,
+			Position: f32.Pt(50, 50),
+		},
+	)
+	assertEventSequence(t, r.Events(handler1), pointer.Cancel, pointer.Press)
+	assertEventSequence(t, r.Events(handler2), pointer.Cancel, pointer.Press)
+	r.Frame(&ops)
+	r.Queue(
+		pointer.Event{
+			Type:     pointer.Release,
+			Position: f32.Pt(50, 50),
+		},
+	)
+	assertEventSequence(t, r.Events(handler1), pointer.Release)
+	assertEventSequence(t, r.Events(handler2), pointer.Cancel)
+}
+
 func TestPointerMove(t *testing.T) {
 	handler1 := new(int)
 	handler2 := new(int)

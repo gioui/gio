@@ -214,7 +214,7 @@ func (q *pointerQueue) opHit(handlers *[]event.Tag, pos f32.Point) {
 		}
 		if n.tag != nil {
 			if _, exists := q.handlers[n.tag]; exists {
-				*handlers = append(*handlers, n.tag)
+				*handlers = addHandler(*handlers, n.tag)
 			}
 		}
 	}
@@ -471,6 +471,16 @@ func searchTag(tags []event.Tag, tag event.Tag) (int, bool) {
 		}
 	}
 	return 0, false
+}
+
+// addHandler adds tag to the slice if not present.
+func addHandler(tags []event.Tag, tag event.Tag) []event.Tag {
+	for _, t := range tags {
+		if t == tag {
+			return tags
+		}
+	}
+	return append(tags, tag)
 }
 
 func opDecodeFloat32(d []byte) float32 {
