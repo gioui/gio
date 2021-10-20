@@ -12,6 +12,7 @@ package router
 
 import (
 	"encoding/binary"
+	"image"
 	"time"
 
 	"gioui.org/internal/ops"
@@ -26,7 +27,10 @@ import (
 // Router is a Queue implementation that routes events
 // to handlers declared in operation lists.
 type Router struct {
-	pqueue pointerQueue
+	pointer struct {
+		queue     pointerQueue
+		collector pointerCollector
+	}
 	kqueue keyQueue
 	cqueue clipboardQueue
 
@@ -70,7 +74,7 @@ func (q *Router) Frame(ops *op.Ops) {
 	q.reader.Reset(&ops.Internal)
 	q.collect()
 
-	q.pqueue.Frame(ops, &q.handlers)
+	q.pointer.queue.Frame(&q.handlers)
 	q.kqueue.Frame(ops, &q.handlers)
 	if q.handlers.HadEvents() {
 		q.wakeup = true
@@ -85,7 +89,7 @@ func (q *Router) Queue(events ...event.Event) bool {
 		case profile.Event:
 			q.profile = e
 		case pointer.Event:
-			q.pqueue.Push(e, &q.handlers)
+			q.pointer.queue.Push(e, &q.handlers)
 		case key.EditEvent, key.Event, key.FocusEvent:
 			q.kqueue.Push(e, &q.handlers)
 		case clipboard.Event:
@@ -120,10 +124,12 @@ func (q *Router) ReadClipboard() bool {
 
 // Cursor returns the last cursor set.
 func (q *Router) Cursor() pointer.CursorName {
-	return q.pqueue.cursor
+	return q.pointer.queue.cursor
 }
 
 func (q *Router) collect() {
+	pc := &q.pointer.collector
+	pc.reset(&q.pointer.queue)
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeInvalidate:
@@ -142,6 +148,48 @@ func (q *Router) collect() {
 			q.cqueue.ProcessReadClipboard(encOp.Refs)
 		case ops.TypeClipboardWrite:
 			q.cqueue.ProcessWriteClipboard(encOp.Refs)
+		case ops.TypeSave:
+			id := ops.DecodeSave(encOp.Data)
+			pc.save(id)
+		case ops.TypeLoad:
+			id := ops.DecodeLoad(encOp.Data)
+			pc.load(id)
+		case ops.TypeArea:
+			var op areaOp
+			op.Decode(encOp.Data)
+			pc.area(op)
+		case ops.TypePopArea:
+			pc.popArea()
+		case ops.TypePass:
+			pc.pass()
+		case ops.TypePopPass:
+			pc.popPass()
+		case ops.TypeTransform:
+			t, push := ops.DecodeTransform(encOp.Data)
+			pc.transform(t, push)
+		case ops.TypePopTransform:
+			pc.popTransform()
+		case ops.TypePointerInput:
+			bo := binary.LittleEndian
+			op := pointer.InputOp{
+				Tag:   encOp.Refs[0].(event.Tag),
+				Grab:  encOp.Data[1] != 0,
+				Types: pointer.Type(bo.Uint16(encOp.Data[2:])),
+				ScrollBounds: image.Rectangle{
+					Min: image.Point{
+						X: int(int32(bo.Uint32(encOp.Data[4:]))),
+						Y: int(int32(bo.Uint32(encOp.Data[8:]))),
+					},
+					Max: image.Point{
+						X: int(int32(bo.Uint32(encOp.Data[12:]))),
+						Y: int(int32(bo.Uint32(encOp.Data[16:]))),
+					},
+				},
+			}
+			pc.inputOp(op, &q.handlers)
+		case ops.TypeCursor:
+			name := encOp.Refs[0].(pointer.CursorName)
+			pc.cursor(name)
 		}
 	}
 }

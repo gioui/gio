@@ -10,7 +10,6 @@ import (
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
-	"gioui.org/op"
 )
 
 type pointerQueue struct {
@@ -20,12 +19,7 @@ type pointerQueue struct {
 	cursor   pointer.CursorName
 	handlers map[event.Tag]*pointerHandler
 	pointers []pointerInfo
-	reader   ops.Reader
 
-	nodeStack  []int
-	transStack []f32.Affine2D
-	// states holds the storage for save/restore ops.
-	states  []f32.Affine2D
 	scratch []event.Tag
 }
 
@@ -77,7 +71,7 @@ type areaNode struct {
 
 type areaKind uint8
 
-// collectState represents the state for collectHandlers
+// collectState represents the state for pointerCollector.
 type collectState struct {
 	t f32.Affine2D
 	// nodePlusOne is the current node index, plus one to
@@ -86,109 +80,115 @@ type collectState struct {
 	pass        int
 }
 
+// pointerCollector tracks the state needed to update an pointerQueue
+// from pointer ops.
+type pointerCollector struct {
+	q          *pointerQueue
+	state      collectState
+	nodeStack  []int
+	transStack []f32.Affine2D
+	// states holds the storage for save/restore ops.
+	states []f32.Affine2D
+}
+
 const (
 	areaRect areaKind = iota
 	areaEllipse
 )
 
-func (q *pointerQueue) save(id int, state f32.Affine2D) {
-	if extra := id - len(q.states) + 1; extra > 0 {
-		q.states = append(q.states, make([]f32.Affine2D, extra)...)
+func (c *pointerCollector) save(id int) {
+	if extra := id - len(c.states) + 1; extra > 0 {
+		c.states = append(c.states, make([]f32.Affine2D, extra)...)
 	}
-	q.states[id] = state
+	c.states[id] = c.state.t
 }
 
-func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
-	var state collectState
-	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
-		switch ops.OpType(encOp.Data[0]) {
-		case ops.TypeSave:
-			id := ops.DecodeSave(encOp.Data)
-			q.save(id, state.t)
-		case ops.TypeLoad:
-			state = collectState{}
-			id := ops.DecodeLoad(encOp.Data)
-			state.t = q.states[id]
-		case ops.TypeArea:
-			var op areaOp
-			op.Decode(encOp.Data)
-			area := -1
-			if i := state.nodePlusOne - 1; i != -1 {
-				n := q.hitTree[i]
-				area = n.area
-			}
-			q.areas = append(q.areas, areaNode{trans: state.t, next: area, area: op, pass: state.pass > 0})
-			q.nodeStack = append(q.nodeStack, state.nodePlusOne-1)
-			q.hitTree = append(q.hitTree, hitNode{
-				next: state.nodePlusOne - 1,
-				area: len(q.areas) - 1,
-			})
-			state.nodePlusOne = len(q.hitTree) - 1 + 1
-		case ops.TypePopArea:
-			n := len(q.nodeStack)
-			state.nodePlusOne = q.nodeStack[n-1] + 1
-			q.nodeStack = q.nodeStack[:n-1]
-		case ops.TypePass:
-			state.pass++
-		case ops.TypePopPass:
-			state.pass--
-		case ops.TypeTransform:
-			dop, push := ops.DecodeTransform(encOp.Data)
-			if push {
-				q.transStack = append(q.transStack, state.t)
-			}
-			state.t = state.t.Mul(dop)
-		case ops.TypePopTransform:
-			n := len(q.transStack)
-			state.t = q.transStack[n-1]
-			q.transStack = q.transStack[:n-1]
-		case ops.TypePointerInput:
-			bo := binary.LittleEndian
-			op := pointer.InputOp{
-				Tag:   encOp.Refs[0].(event.Tag),
-				Grab:  encOp.Data[1] != 0,
-				Types: pointer.Type(bo.Uint16(encOp.Data[2:])),
-			}
-			area := -1
-			if i := state.nodePlusOne - 1; i != -1 {
-				n := q.hitTree[i]
-				area = n.area
-			}
-			q.hitTree = append(q.hitTree, hitNode{
-				next: state.nodePlusOne - 1,
-				area: area,
-				tag:  op.Tag,
-			})
-			state.nodePlusOne = len(q.hitTree) - 1 + 1
-			h, ok := q.handlers[op.Tag]
-			if !ok {
-				h = new(pointerHandler)
-				q.handlers[op.Tag] = h
-				// Cancel handlers on (each) first appearance, but don't
-				// trigger redraw.
-				events.AddNoRedraw(op.Tag, pointer.Event{Type: pointer.Cancel})
-			}
-			h.active = true
-			h.area = area
-			h.wantsGrab = h.wantsGrab || op.Grab
-			h.types = h.types | op.Types
-			h.scrollRange = image.Rectangle{
-				Min: image.Point{
-					X: int(int32(bo.Uint32(encOp.Data[4:]))),
-					Y: int(int32(bo.Uint32(encOp.Data[8:]))),
-				},
-				Max: image.Point{
-					X: int(int32(bo.Uint32(encOp.Data[12:]))),
-					Y: int(int32(bo.Uint32(encOp.Data[16:]))),
-				},
-			}
-		case ops.TypeCursor:
-			q.cursors = append(q.cursors, cursorNode{
-				name: encOp.Refs[0].(pointer.CursorName),
-				area: len(q.areas) - 1,
-			})
-		}
+func (c *pointerCollector) load(id int) {
+	c.state = collectState{t: c.states[id]}
+}
+
+func (c *pointerCollector) area(op areaOp) {
+	area := -1
+	if i := c.state.nodePlusOne - 1; i != -1 {
+		n := c.q.hitTree[i]
+		area = n.area
 	}
+	c.q.areas = append(c.q.areas, areaNode{trans: c.state.t, next: area, area: op, pass: c.state.pass > 0})
+	c.nodeStack = append(c.nodeStack, c.state.nodePlusOne-1)
+	c.q.hitTree = append(c.q.hitTree, hitNode{
+		next: c.state.nodePlusOne - 1,
+		area: len(c.q.areas) - 1,
+	})
+	c.state.nodePlusOne = len(c.q.hitTree) - 1 + 1
+}
+
+func (c *pointerCollector) popArea() {
+	n := len(c.nodeStack)
+	c.state.nodePlusOne = c.nodeStack[n-1] + 1
+	c.nodeStack = c.nodeStack[:n-1]
+}
+
+func (c *pointerCollector) pass() {
+	c.state.pass++
+}
+
+func (c *pointerCollector) popPass() {
+	c.state.pass--
+}
+
+func (c *pointerCollector) transform(t f32.Affine2D, push bool) {
+	if push {
+		c.transStack = append(c.transStack, c.state.t)
+	}
+	c.state.t = c.state.t.Mul(t)
+}
+
+func (c *pointerCollector) popTransform() {
+	n := len(c.transStack)
+	c.state.t = c.transStack[n-1]
+	c.transStack = c.transStack[:n-1]
+}
+
+func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
+	area := -1
+	if i := c.state.nodePlusOne - 1; i != -1 {
+		n := c.q.hitTree[i]
+		area = n.area
+	}
+	c.q.hitTree = append(c.q.hitTree, hitNode{
+		next: c.state.nodePlusOne - 1,
+		area: area,
+		tag:  op.Tag,
+	})
+	c.state.nodePlusOne = len(c.q.hitTree) - 1 + 1
+	h, ok := c.q.handlers[op.Tag]
+	if !ok {
+		h = new(pointerHandler)
+		c.q.handlers[op.Tag] = h
+		// Cancel handlers on (each) first appearance, but don't
+		// trigger redraw.
+		events.AddNoRedraw(op.Tag, pointer.Event{Type: pointer.Cancel})
+	}
+	h.active = true
+	h.area = area
+	h.wantsGrab = h.wantsGrab || op.Grab
+	h.types = h.types | op.Types
+	h.scrollRange = op.ScrollBounds
+}
+
+func (c *pointerCollector) cursor(name pointer.CursorName) {
+	c.q.cursors = append(c.q.cursors, cursorNode{
+		name: name,
+		area: len(c.q.areas) - 1,
+	})
+}
+
+func (c *pointerCollector) reset(q *pointerQueue) {
+	q.reset()
+	c.state = collectState{}
+	c.nodeStack = c.nodeStack[:0]
+	c.transStack = c.transStack[:0]
+	c.q = q
 }
 
 func (q *pointerQueue) opHit(handlers *[]event.Tag, pos f32.Point) {
@@ -241,10 +241,6 @@ func (q *pointerQueue) reset() {
 	if q.handlers == nil {
 		q.handlers = make(map[event.Tag]*pointerHandler)
 	}
-}
-
-func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
-	q.reset()
 	for _, h := range q.handlers {
 		// Reset handler.
 		h.active = false
@@ -253,11 +249,10 @@ func (q *pointerQueue) Frame(root *op.Ops, events *handlerEvents) {
 	}
 	q.hitTree = q.hitTree[:0]
 	q.areas = q.areas[:0]
-	q.nodeStack = q.nodeStack[:0]
-	q.transStack = q.transStack[:0]
 	q.cursors = q.cursors[:0]
-	q.reader.Reset(&root.Internal)
-	q.collectHandlers(&q.reader, events)
+}
+
+func (q *pointerQueue) Frame(events *handlerEvents) {
 	for k, h := range q.handlers {
 		if !h.active {
 			q.dropHandler(nil, k)
@@ -320,7 +315,6 @@ func (q *pointerQueue) pointerOf(e pointer.Event) int {
 }
 
 func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
-	q.reset()
 	if e.Type == pointer.Cancel {
 		q.pointers = q.pointers[:0]
 		for k := range q.handlers {
