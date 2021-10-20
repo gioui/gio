@@ -4,6 +4,7 @@ package rendertest
 
 import (
 	"image"
+	"image/color"
 	"math"
 	"testing"
 
@@ -181,5 +182,26 @@ func TestStrokedPathZeroWidth(t *testing.T) {
 		r.expect(10, 50, colornames.Black)
 		r.expect(30, 50, colornames.Black)
 		r.expect(65, 50, transparent)
+	})
+}
+
+func TestPathReuse(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		var path clip.Path
+		path.Begin(o)
+		path.MoveTo(f32.Pt(60, 10))
+		path.LineTo(f32.Pt(110, 75))
+		path.LineTo(f32.Pt(10, 75))
+		path.Close()
+		spec := path.End()
+
+		outline := clip.Outline{Path: spec}.Op().Push(o)
+		paint.Fill(o, color.NRGBA{R: 0xFF, A: 0xFF})
+		outline.Pop()
+
+		stroke := clip.Stroke{Path: spec, Width: 3}.Op().Push(o)
+		paint.Fill(o, color.NRGBA{B: 0xFF, A: 0xFF})
+		stroke.Pop()
+	}, func(r result) {
 	})
 }

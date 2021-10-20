@@ -149,6 +149,8 @@ type quadsOp struct {
 }
 
 type opKey struct {
+	outline        bool
+	strokeWidth    float32
 	sx, hx, sy, hy float32
 	ops.Key
 }
@@ -904,9 +906,8 @@ func (k opKey) SetTransform(t f32.Affine2D) opKey {
 
 func (d *drawOps) collectOps(r *ops.Reader, viewport f32.Rectangle) {
 	var (
-		quads    quadsOp
-		strWidth float32
-		state    drawState
+		quads quadsOp
+		state drawState
 	)
 	reset := func() {
 		state = drawState{
@@ -931,7 +932,7 @@ loop:
 			d.transStack = d.transStack[:n-1]
 
 		case ops.TypeStroke:
-			strWidth = decodeStrokeOp(encOp.Data)
+			quads.key.strokeWidth = decodeStrokeOp(encOp.Data)
 
 		case ops.TypePath:
 			encOp, ok = r.Decode()
@@ -939,11 +940,12 @@ loop:
 				break loop
 			}
 			quads.aux = encOp.Data[ops.TypeAuxLen:]
-			quads.key = opKey{Key: encOp.Key}
+			quads.key.Key = encOp.Key
 
 		case ops.TypeClip:
 			var op clipOp
 			op.decode(encOp.Data)
+			quads.key.outline = op.outline
 			bounds := op.bounds
 			trans, off := splitTransform(state.t)
 			if len(quads.aux) > 0 {
@@ -957,7 +959,7 @@ loop:
 					op.bounds = v.bounds
 				} else {
 					pathData, bounds := d.buildVerts(
-						quads.aux, trans, op.outline, strWidth,
+						quads.aux, trans, quads.key.outline, quads.key.strokeWidth,
 					)
 					op.bounds = bounds
 					quads.aux = pathData
@@ -971,7 +973,6 @@ loop:
 			}
 			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off, op.push)
 			quads = quadsOp{}
-			strWidth = 0
 		case ops.TypePopClip:
 			for {
 				push := state.cpath.push
