@@ -79,9 +79,11 @@ type areaKind uint8
 
 // collectState represents the state for collectHandlers
 type collectState struct {
-	t    f32.Affine2D
-	node int
-	pass int
+	t f32.Affine2D
+	// nodePlusOne is the current node index, plus one to
+	// make the zero value collectState the initial state.
+	nodePlusOne int
+	pass        int
 }
 
 const (
@@ -98,39 +100,33 @@ func (q *pointerQueue) save(id int, state f32.Affine2D) {
 
 func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 	var state collectState
-	reset := func() {
-		state = collectState{
-			node: -1,
-		}
-	}
-	reset()
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
 			q.save(id, state.t)
 		case ops.TypeLoad:
-			reset()
+			state = collectState{}
 			id := ops.DecodeLoad(encOp.Data)
 			state.t = q.states[id]
 		case ops.TypeArea:
 			var op areaOp
 			op.Decode(encOp.Data)
 			area := -1
-			if i := state.node; i != -1 {
+			if i := state.nodePlusOne - 1; i != -1 {
 				n := q.hitTree[i]
 				area = n.area
 			}
 			q.areas = append(q.areas, areaNode{trans: state.t, next: area, area: op, pass: state.pass > 0})
-			q.nodeStack = append(q.nodeStack, state.node)
+			q.nodeStack = append(q.nodeStack, state.nodePlusOne-1)
 			q.hitTree = append(q.hitTree, hitNode{
-				next: state.node,
+				next: state.nodePlusOne - 1,
 				area: len(q.areas) - 1,
 			})
-			state.node = len(q.hitTree) - 1
+			state.nodePlusOne = len(q.hitTree) - 1 + 1
 		case ops.TypePopArea:
 			n := len(q.nodeStack)
-			state.node = q.nodeStack[n-1]
+			state.nodePlusOne = q.nodeStack[n-1] + 1
 			q.nodeStack = q.nodeStack[:n-1]
 		case ops.TypePass:
 			state.pass++
@@ -154,16 +150,16 @@ func (q *pointerQueue) collectHandlers(r *ops.Reader, events *handlerEvents) {
 				Types: pointer.Type(bo.Uint16(encOp.Data[2:])),
 			}
 			area := -1
-			if i := state.node; i != -1 {
+			if i := state.nodePlusOne - 1; i != -1 {
 				n := q.hitTree[i]
 				area = n.area
 			}
 			q.hitTree = append(q.hitTree, hitNode{
-				next: state.node,
+				next: state.nodePlusOne - 1,
 				area: area,
 				tag:  op.Tag,
 			})
-			state.node = len(q.hitTree) - 1
+			state.nodePlusOne = len(q.hitTree) - 1 + 1
 			h, ok := q.handlers[op.Tag]
 			if !ok {
 				h = new(pointerHandler)
