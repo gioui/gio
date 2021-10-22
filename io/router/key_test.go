@@ -268,14 +268,14 @@ func assertKeyEventUnexpected(t *testing.T, events []event.Event) {
 
 func assertFocus(t *testing.T, router *Router, expected event.Tag) {
 	t.Helper()
-	if router.kqueue.focus != expected {
-		t.Errorf("expected %v to be focused, got %v", expected, router.kqueue.focus)
+	if got := router.key.queue.focus; got != expected {
+		t.Errorf("expected %v to be focused, got %v", expected, got)
 	}
 }
 
 func assertKeyboard(t *testing.T, router *Router, expected TextInputState) {
 	t.Helper()
-	if router.kqueue.state != expected {
-		t.Errorf("expected %v keyboard, got %v", expected, router.kqueue.state)
+	if got := router.key.queue.state; got != expected {
+		t.Errorf("expected %v keyboard, got %v", expected, got)
 	}
 }

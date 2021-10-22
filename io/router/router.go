@@ -31,7 +31,10 @@ type Router struct {
 		queue     pointerQueue
 		collector pointerCollector
 	}
-	kqueue keyQueue
+	key struct {
+		queue     keyQueue
+		collector keyCollector
+	}
 	cqueue clipboardQueue
 
 	handlers handlerEvents
@@ -75,7 +78,7 @@ func (q *Router) Frame(ops *op.Ops) {
 	q.collect()
 
 	q.pointer.queue.Frame(&q.handlers)
-	q.kqueue.Frame(ops, &q.handlers)
+	q.key.queue.Frame(&q.handlers, q.key.collector)
 	if q.handlers.HadEvents() {
 		q.wakeup = true
 		q.wakeupTime = time.Time{}
@@ -91,7 +94,7 @@ func (q *Router) Queue(events ...event.Event) bool {
 		case pointer.Event:
 			q.pointer.queue.Push(e, &q.handlers)
 		case key.EditEvent, key.Event, key.FocusEvent:
-			q.kqueue.Push(e, &q.handlers)
+			q.key.queue.Push(e, &q.handlers)
 		case clipboard.Event:
 			q.cqueue.Push(e, &q.handlers)
 		}
@@ -102,12 +105,12 @@ func (q *Router) Queue(events ...event.Event) bool {
 // TextInputState returns the input state from the most recent
 // call to Frame.
 func (q *Router) TextInputState() TextInputState {
-	return q.kqueue.InputState()
+	return q.key.queue.InputState()
 }
 
 // TextInputHint returns the input mode from the most recent key.InputOp.
 func (q *Router) TextInputHint() (key.InputHint, bool) {
-	return q.kqueue.InputHint()
+	return q.key.queue.InputHint()
 }
 
 // WriteClipboard returns the most recent text to be copied
@@ -130,6 +133,9 @@ func (q *Router) Cursor() pointer.CursorName {
 func (q *Router) collect() {
 	pc := &q.pointer.collector
 	pc.reset(&q.pointer.queue)
+	kc := &q.key.collector
+	*kc = keyCollector{q: &q.key.queue}
+	q.key.queue.Reset()
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeInvalidate:
@@ -154,6 +160,8 @@ func (q *Router) collect() {
 		case ops.TypeLoad:
 			id := ops.DecodeLoad(encOp.Data)
 			pc.load(id)
+
+		// Pointer ops.
 		case ops.TypeArea:
 			var op areaOp
 			op.Decode(encOp.Data)
@@ -190,6 +198,17 @@ func (q *Router) collect() {
 		case ops.TypeCursor:
 			name := encOp.Refs[0].(pointer.CursorName)
 			pc.cursor(name)
+
+		// Key ops.
+		case ops.TypeKeyFocus:
+			op := decodeFocusOp(encOp.Data, encOp.Refs)
+			kc.focusOp(op.Tag)
+		case ops.TypeKeySoftKeyboard:
+			op := decodeSoftKeyboardOp(encOp.Data, encOp.Refs)
+			kc.softKeyboard(op.Show)
+		case ops.TypeKeyInput:
+			op := decodeKeyInputOp(encOp.Data, encOp.Refs)
+			kc.inputOp(op)
 		}
 	}
 }
