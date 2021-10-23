@@ -201,13 +201,21 @@ func (q *Router) collect() {
 
 		// Key ops.
 		case ops.TypeKeyFocus:
-			op := decodeFocusOp(encOp.Data, encOp.Refs)
+			tag, _ := encOp.Refs[0].(event.Tag)
+			op := key.FocusOp{
+				Tag: tag,
+			}
 			kc.focusOp(op.Tag)
 		case ops.TypeKeySoftKeyboard:
-			op := decodeSoftKeyboardOp(encOp.Data, encOp.Refs)
+			op := key.SoftKeyboardOp{
+				Show: encOp.Data[1] != 0,
+			}
 			kc.softKeyboard(op.Show)
 		case ops.TypeKeyInput:
-			op := decodeKeyInputOp(encOp.Data, encOp.Refs)
+			op := key.InputOp{
+				Tag:  encOp.Refs[0].(event.Tag),
+				Hint: key.InputHint(encOp.Data[1]),
+			}
 			kc.inputOp(op)
 		}
 	}

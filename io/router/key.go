@@ -3,7 +3,6 @@
 package router
 
 import (
-	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 )
@@ -128,34 +127,6 @@ func (k *keyCollector) inputOp(op key.InputOp) {
 	}
 	h.visible = true
 	h.hint = op.Hint
-}
-
-func decodeKeyInputOp(d []byte, refs []interface{}) key.InputOp {
-	if ops.OpType(d[0]) != ops.TypeKeyInput {
-		panic("invalid op")
-	}
-	return key.InputOp{
-		Tag:  refs[0].(event.Tag),
-		Hint: key.InputHint(d[1]),
-	}
-}
-
-func decodeSoftKeyboardOp(d []byte, refs []interface{}) key.SoftKeyboardOp {
-	if ops.OpType(d[0]) != ops.TypeKeySoftKeyboard {
-		panic("invalid op")
-	}
-	return key.SoftKeyboardOp{
-		Show: d[1] != 0,
-	}
-}
-
-func decodeFocusOp(d []byte, refs []interface{}) key.FocusOp {
-	if ops.OpType(d[0]) != ops.TypeKeyFocus {
-		panic("invalid op")
-	}
-	return key.FocusOp{
-		Tag: refs[0],
-	}
 }
 
 func (t TextInputState) String() string {
