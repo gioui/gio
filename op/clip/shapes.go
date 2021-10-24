@@ -28,13 +28,6 @@ func (r Rect) Push(ops *op.Ops) Stack {
 	return r.Op().Push(ops)
 }
 
-// Add the rectangle clip to the clip state.
-//
-// Deprecated: use Push instead.
-func (r Rect) Add(ops *op.Ops) {
-	r.Op().Add(ops)
-}
-
 // UniformRRect returns an RRect with all corner radii set to the
 // provided radius.
 func UniformRRect(rect f32.Rectangle, radius float32) RRect {
@@ -76,13 +69,6 @@ func (rr RRect) Op(ops *op.Ops) Op {
 // Push the rectangle clip on the clip stack.
 func (rr RRect) Push(ops *op.Ops) Stack {
 	return rr.Op(ops).Push(ops)
-}
-
-// Add the rectangle clip to the clip state.
-//
-// Deprecated: use Push instead.
-func (rr RRect) Add(ops *op.Ops) {
-	rr.Op(ops).Add(ops)
 }
 
 // Path returns the PathSpec for the rounded rectangle.
@@ -136,13 +122,6 @@ func (c Circle) Op(ops *op.Ops) Op {
 // Push the circle clip on the clip stack.
 func (c Circle) Push(ops *op.Ops) Stack {
 	return c.Op(ops).Push(ops)
-}
-
-// Add the circle clip to the clip state.
-//
-// Deprecated: use Push instead.
-func (c Circle) Add(ops *op.Ops) {
-	c.Op(ops).Add(ops)
 }
 
 // Path returns the PathSpec for the circle.

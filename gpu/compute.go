@@ -1710,7 +1710,6 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 		path:      path,
 		pathKey:   key,
 		intersect: intersect,
-		push:      push,
 		clipKey: clipKey{
 			bounds:      bounds,
 			relTrans:    state.relTrans,
@@ -1775,18 +1774,12 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 		case ops.TypeClip:
 			var op clipOp
 			op.decode(encOp.Data)
-			c.addClip(&state, fview, op.bounds, pathData.data, pathData.key, pathData.hash, strWidth, op.push)
+			c.addClip(&state, fview, op.bounds, pathData.data, pathData.key, pathData.hash, strWidth, true)
 			pathData.data = nil
 			strWidth = 0
 		case ops.TypePopClip:
-			for {
-				push := state.clip.push
-				state.relTrans = state.clip.relTrans.Mul(state.relTrans)
-				state.clip = state.clip.parent
-				if push {
-					break
-				}
-			}
+			state.relTrans = state.clip.relTrans.Mul(state.relTrans)
+			state.clip = state.clip.parent
 		case ops.TypeColor:
 			state.matType = materialColor
 			state.color = decodeColorOp(encOp.Data)

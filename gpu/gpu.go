@@ -109,9 +109,6 @@ type pathOp struct {
 	// rect tracks whether the clip stack can be represented by a
 	// pixel-aligned rectangle.
 	rect bool
-	// push is set to true for clip operations that corresponds to
-	// a push operation.
-	push bool
 	// clip is the union of all
 	// later clip rectangles.
 	clip   image.Rectangle
@@ -173,7 +170,6 @@ type clipOp struct {
 	// TODO: Use image.Rectangle?
 	bounds  f32.Rectangle
 	outline bool
-	push    bool
 }
 
 // imageOpData is the shadow of paint.ImageOp.
@@ -207,7 +203,6 @@ func (op *clipOp) decode(data []byte) {
 	*op = clipOp{
 		bounds:  layout.FRect(r),
 		outline: data[17] == 1,
-		push:    data[18] == 1,
 	}
 }
 
@@ -863,7 +858,6 @@ func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey opKey, bounds
 		off:       off,
 		intersect: bounds.Add(off),
 		rect:      true,
-		push:      push,
 	}
 	if npath.parent != nil {
 		npath.rect = npath.parent.rect
@@ -971,16 +965,10 @@ loop:
 				quads.aux, op.bounds, _ = d.boundsForTransformedRect(bounds, trans)
 				quads.key = opKey{Key: encOp.Key}
 			}
-			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off, op.push)
+			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off, true)
 			quads = quadsOp{}
 		case ops.TypePopClip:
-			for {
-				push := state.cpath.push
-				state.cpath = state.cpath.parent
-				if push {
-					break
-				}
-			}
+			state.cpath = state.cpath.parent
 
 		case ops.TypeColor:
 			state.matType = materialColor

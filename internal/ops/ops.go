@@ -118,7 +118,7 @@ const (
 	TypeSaveLen            = 1 + 4
 	TypeLoadLen            = 1 + 4
 	TypeAuxLen             = 1
-	TypeClipLen            = 1 + 4*4 + 1 + 1
+	TypeClipLen            = 1 + 4*4 + 1
 	TypePopClipLen         = 1
 	TypeProfileLen         = 1
 	TypeCursorLen          = 1 + 1

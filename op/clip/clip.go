@@ -41,18 +41,11 @@ func init() {
 // state to the intersection of the current p.
 func (p Op) Push(o *op.Ops) Stack {
 	id, macroID := ops.PushOp(&o.Internal, ops.ClipStack)
-	p.add(o, true)
+	p.add(o)
 	return Stack{ops: &o.Internal, id: id, macroID: macroID}
 }
 
-// Add is like Push except it doesn't save the current state on the stack.
-//
-// Deprecated: use Push instead.
-func (p Op) Add(o *op.Ops) {
-	p.add(o, false)
-}
-
-func (p Op) add(o *op.Ops, push bool) {
+func (p Op) add(o *op.Ops) {
 	path := p.path
 	outline := p.outline
 
@@ -86,9 +79,6 @@ func (p Op) add(o *op.Ops, push bool) {
 	bo.PutUint32(data[13:], uint32(bounds.Max.Y))
 	if outline {
 		data[17] = byte(1)
-	}
-	if push {
-		data[18] = byte(1)
 	}
 }
 
