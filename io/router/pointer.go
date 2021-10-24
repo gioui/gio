@@ -28,7 +28,8 @@ type hitNode struct {
 	area int
 
 	// For handler nodes.
-	tag event.Tag
+	tag  event.Tag
+	pass bool
 }
 
 type cursorNode struct {
@@ -66,7 +67,6 @@ type areaNode struct {
 	trans f32.Affine2D
 	next  int
 	area  areaOp
-	pass  bool
 }
 
 type areaKind uint8
@@ -113,11 +113,12 @@ func (c *pointerCollector) area(op areaOp) {
 		n := c.q.hitTree[i]
 		area = n.area
 	}
-	c.q.areas = append(c.q.areas, areaNode{trans: c.state.t, next: area, area: op, pass: c.state.pass > 0})
+	c.q.areas = append(c.q.areas, areaNode{trans: c.state.t, next: area, area: op})
 	c.nodeStack = append(c.nodeStack, c.state.nodePlusOne-1)
 	c.q.hitTree = append(c.q.hitTree, hitNode{
 		next: c.state.nodePlusOne - 1,
 		area: len(c.q.areas) - 1,
+		pass: true,
 	})
 	c.state.nodePlusOne = len(c.q.hitTree) - 1 + 1
 }
@@ -159,6 +160,7 @@ func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
 		next: c.state.nodePlusOne - 1,
 		area: area,
 		tag:  op.Tag,
+		pass: c.state.pass > 0,
 	})
 	c.state.nodePlusOne = len(c.q.hitTree) - 1 + 1
 	h, ok := c.q.handlers[op.Tag]
@@ -197,12 +199,12 @@ func (q *pointerQueue) opHit(handlers *[]event.Tag, pos f32.Point) {
 	idx := len(q.hitTree) - 1
 	for idx >= 0 {
 		n := &q.hitTree[idx]
-		hit, areaPass := q.hit(n.area, pos)
+		hit := q.hit(n.area, pos, n.pass)
 		if !hit {
 			idx--
 			continue
 		}
-		pass = pass && areaPass
+		pass = pass && n.pass
 		if pass {
 			idx--
 		} else {
@@ -223,18 +225,16 @@ func (q *pointerQueue) invTransform(areaIdx int, p f32.Point) f32.Point {
 	return q.areas[areaIdx].trans.Invert().Transform(p)
 }
 
-func (q *pointerQueue) hit(areaIdx int, p f32.Point) (bool, bool) {
-	pass := false
+func (q *pointerQueue) hit(areaIdx int, p f32.Point, pass bool) bool {
 	for areaIdx != -1 {
 		a := &q.areas[areaIdx]
 		p := a.trans.Invert().Transform(p)
 		if !a.area.Hit(p) {
-			return false, false
+			return false
 		}
 		areaIdx = a.next
-		pass = pass || a.pass
 	}
-	return true, pass
+	return true
 }
 
 func (q *pointerQueue) reset() {

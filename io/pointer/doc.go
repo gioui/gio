@@ -59,30 +59,29 @@ For example:
 
 implies a tree of two inner nodes, each with one pointer handler attached.
 
-When determining which handlers match an Event, only handlers whose
-areas contain the event position are considered. The matching
-proceeds as follows.
+The matching proceeds as follows.
 
-First, the foremost area that contains the event is found. If no such area
-exists, matching stops.
+First, the foremost area that contains the event is found. Only areas whose
+parent areas all contain the event is considered.
 
-Then, every handler attached to the area or an area in the area stack is
-matched with the event.
+Then, every handler attached to the area is matched with the event.
 
-Third, If the area or any area in the area stack has pass-through enabled,
-the matching repeats with the next foremost area.
+If all attached handlers are marked pass-through, the matching repeats with the
+next foremost (sibling) area. Otherwise the matching repeats with the parent
+area.
 
-In the example above, all events will go to h2 only even though both
-handlers have the same area (the implicit area that fills the window).
+In the example above, all events will go to h2 because it and h1 are siblings
+and none are pass-through.
 
 Pass-through
 
-The PassOp operations controls the pass-through setting. A handler's
-pass-through setting is recorded along with the InputOp.
+The PassOp operations controls the pass-through setting. All handlers added
+inside one or more PassOp scopes are marked pass-through.
 
-Pass-through handlers are useful for overlay widgets such as a hidden
-side drawer. When the user touches the side, both the (transparent)
-drawer handle and the interface below should receive pointer events.
+Pass-through is useful for overlay widgets. Consider a hidden side drawer: when
+the user touches the side, both the (transparent) drawer handle and the
+interface below should receive pointer events. This effect is achieved by
+marking the drawer handle pass-through.
 
 Disambiguation
 

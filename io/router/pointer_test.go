@@ -686,6 +686,53 @@ func TestCursorNameOp(t *testing.T) {
 	}
 }
 
+func TestPassOp(t *testing.T) {
+	var ops op.Ops
+
+	h1, h2, h3, h4 := new(int), new(int), new(int), new(int)
+	area := pointer.Rect(image.Rect(0, 0, 100, 100))
+	root := area.Push(&ops)
+	pointer.InputOp{Tag: h1, Types: pointer.Press}.Add(&ops)
+	child1 := area.Push(&ops)
+	pointer.InputOp{Tag: h2, Types: pointer.Press}.Add(&ops)
+	child1.Pop()
+	child2 := area.Push(&ops)
+	pass := pointer.PassOp{}.Push(&ops)
+	pointer.InputOp{Tag: h3, Types: pointer.Press}.Add(&ops)
+	pointer.InputOp{Tag: h4, Types: pointer.Press}.Add(&ops)
+	pass.Pop()
+	child2.Pop()
+	root.Pop()
+
+	var r Router
+	r.Frame(&ops)
+	r.Queue(
+		pointer.Event{
+			Type: pointer.Press,
+		},
+	)
+	assertEventSequence(t, r.Events(h1), pointer.Cancel, pointer.Press)
+	assertEventSequence(t, r.Events(h2), pointer.Cancel, pointer.Press)
+	assertEventSequence(t, r.Events(h3), pointer.Cancel, pointer.Press)
+	assertEventSequence(t, r.Events(h4), pointer.Cancel, pointer.Press)
+}
+
+func TestAreaPassthrough(t *testing.T) {
+	var ops op.Ops
+
+	h := new(int)
+	pointer.InputOp{Tag: h, Types: pointer.Press}.Add(&ops)
+	pointer.Rect(image.Rect(0, 0, 100, 100)).Push(&ops).Pop()
+	var r Router
+	r.Frame(&ops)
+	r.Queue(
+		pointer.Event{
+			Type: pointer.Press,
+		},
+	)
+	assertEventSequence(t, r.Events(h), pointer.Cancel, pointer.Press)
+}
+
 // addPointerHandler adds a pointer.InputOp for the tag in a
 // rectangular area.
 func addPointerHandler(ops *op.Ops, tag event.Tag, area image.Rectangle) {
