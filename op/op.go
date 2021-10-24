@@ -67,7 +67,6 @@ package op
 
 import (
 	"encoding/binary"
-	"image"
 	"math"
 	"time"
 
@@ -138,49 +137,6 @@ func Defer(o *Ops, c CallOp) {
 	data := ops.Write(&o.Internal, ops.TypeDeferLen)
 	data[0] = byte(ops.TypeDefer)
 	c.Add(o)
-}
-
-type SaveStack struct {
-	ops  *ops.Ops
-	clip struct {
-		id      ops.StackID
-		macroID int
-	}
-	trans TransformStack
-}
-
-// Deprecated: use state-specific stack operations instead (TransformOp.Push
-// etc.).
-func Save(o *Ops) SaveStack {
-	st := SaveStack{
-		ops:   &o.Internal,
-		trans: Offset(f32.Point{}).Push(o),
-	}
-	const inf = 1e6
-	bounds := image.Rectangle{Min: image.Pt(-inf, -inf), Max: image.Pt(inf, inf)}
-	{
-		st.clip.id, st.clip.macroID = ops.PushOp(&o.Internal, ops.ClipStack)
-		// Push clip stack with no-op (infinite) clipping rect. Copied from clip.Op.Push.
-		bo := binary.LittleEndian
-		data := ops.Write(&o.Internal, ops.TypeClipLen)
-		data[0] = byte(ops.TypeClip)
-		bo.PutUint32(data[1:], uint32(bounds.Min.X))
-		bo.PutUint32(data[5:], uint32(bounds.Min.Y))
-		bo.PutUint32(data[9:], uint32(bounds.Max.X))
-		bo.PutUint32(data[13:], uint32(bounds.Max.Y))
-		data[17] = byte(1) // Outline
-		data[18] = byte(1) // Push
-	}
-	return st
-}
-
-func (s SaveStack) Load() {
-	// Pop clip.
-	ops.PopOp(s.ops, ops.ClipStack, s.clip.id, s.clip.macroID)
-	data := ops.Write(s.ops, ops.TypePopClipLen)
-	data[0] = byte(ops.TypePopClip)
-
-	s.trans.Pop()
 }
 
 // Reset the Ops, preparing it for re-use. Reset invalidates
