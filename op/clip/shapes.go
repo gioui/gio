@@ -114,7 +114,7 @@ type Circle struct {
 	Radius float32
 }
 
-// Op returns the op for the circle.
+// Op returns the op for the filled circle.
 func (c Circle) Op(ops *op.Ops) Op {
 	return Outline{Path: c.Path(ops)}.Op()
 }
@@ -125,38 +125,69 @@ func (c Circle) Push(ops *op.Ops) Stack {
 }
 
 // Path returns the PathSpec for the circle.
+//
+// Deprecated: use Ellipse instead.
 func (c Circle) Path(ops *op.Ops) PathSpec {
+	b := f32.Rectangle{
+		Min: f32.Pt(c.Center.X-c.Radius, c.Center.Y-c.Radius),
+		Max: f32.Pt(c.Center.X+c.Radius, c.Center.Y+c.Radius),
+	}
+	return Ellipse{b}.Path(ops)
+}
+
+// Ellipse represents the largest axis-aligned ellipse that
+// is contained in its bounds.
+type Ellipse struct {
+	Bounds f32.Rectangle
+}
+
+// Op returns the op for the filled ellipse.
+func (e Ellipse) Op(ops *op.Ops) Op {
+	return Outline{Path: e.Path(ops)}.Op()
+}
+
+// Push the filled ellipse clip op on the clip stack.
+func (e Ellipse) Push(ops *op.Ops) Stack {
+	return e.Op(ops).Push(ops)
+}
+
+// Path constructs a path for the ellipse.
+func (e Ellipse) Path(ops *op.Ops) PathSpec {
 	var p Path
 	p.Begin(ops)
 
-	center := c.Center
-	r := c.Radius
+	center := e.Bounds.Max.Add(e.Bounds.Min).Mul(.5)
+	diam := e.Bounds.Dx()
+	r := diam * .5
+	// We'll model the ellipse as a circle scaled in the Y
+	// direction.
+	scale := e.Bounds.Dy() / diam
 
 	// https://pomax.github.io/bezierinfo/#circles_cubic.
 	const q = 4 * (math.Sqrt2 - 1) / 3
 
 	curve := r * q
-	top := f32.Point{X: center.X, Y: center.Y - r}
+	top := f32.Point{X: center.X, Y: center.Y - r*scale}
 
 	p.MoveTo(top)
 	p.CubeTo(
-		f32.Point{X: center.X + curve, Y: center.Y - r},
-		f32.Point{X: center.X + r, Y: center.Y - curve},
+		f32.Point{X: center.X + curve, Y: center.Y - r*scale},
+		f32.Point{X: center.X + r, Y: center.Y - curve*scale},
 		f32.Point{X: center.X + r, Y: center.Y},
 	)
 	p.CubeTo(
-		f32.Point{X: center.X + r, Y: center.Y + curve},
-		f32.Point{X: center.X + curve, Y: center.Y + r},
-		f32.Point{X: center.X, Y: center.Y + r},
+		f32.Point{X: center.X + r, Y: center.Y + curve*scale},
+		f32.Point{X: center.X + curve, Y: center.Y + r*scale},
+		f32.Point{X: center.X, Y: center.Y + r*scale},
 	)
 	p.CubeTo(
-		f32.Point{X: center.X - curve, Y: center.Y + r},
-		f32.Point{X: center.X - r, Y: center.Y + curve},
+		f32.Point{X: center.X - curve, Y: center.Y + r*scale},
+		f32.Point{X: center.X - r, Y: center.Y + curve*scale},
 		f32.Point{X: center.X - r, Y: center.Y},
 	)
 	p.CubeTo(
-		f32.Point{X: center.X - r, Y: center.Y - curve},
-		f32.Point{X: center.X - curve, Y: center.Y - r},
+		f32.Point{X: center.X - r, Y: center.Y - curve*scale},
+		f32.Point{X: center.X - curve, Y: center.Y - r*scale},
 		top,
 	)
 	return p.End()
