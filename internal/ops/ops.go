@@ -29,6 +29,8 @@ type Ops struct {
 
 type OpType byte
 
+type Shape byte
+
 // Start at a high number for easier debugging.
 const firstOpIndex = 200
 
@@ -44,8 +46,6 @@ const (
 	TypePaint
 	TypeColor
 	TypeLinearGradient
-	TypeArea
-	TypePopArea
 	TypePass
 	TypePopPass
 	TypePointerInput
@@ -91,13 +91,19 @@ type StackKind uint8
 type ClipOp struct {
 	Bounds  image.Rectangle
 	Outline bool
+	Shape   Shape
 }
 
 const (
 	ClipStack StackKind = iota
-	AreaStack
 	TransStack
 	PassStack
+)
+
+const (
+	Path Shape = iota
+	Ellipse
+	Rect
 )
 
 const (
@@ -112,8 +118,6 @@ const (
 	TypePaintLen           = 1
 	TypeColorLen           = 1 + 4
 	TypeLinearGradientLen  = 1 + 8*2 + 4*2
-	TypeAreaLen            = 1 + 1 + 4*4
-	TypePopAreaLen         = 1
 	TypePassLen            = 1
 	TypePopPassLen         = 1
 	TypePointerInputLen    = 1 + 1 + 1*2 + 2*4 + 2*4
@@ -125,7 +129,7 @@ const (
 	TypeSaveLen            = 1 + 4
 	TypeLoadLen            = 1 + 4
 	TypeAuxLen             = 1
-	TypeClipLen            = 1 + 4*4 + 1
+	TypeClipLen            = 1 + 4*4 + 1 + 1
 	TypePopClipLen         = 1
 	TypeProfileLen         = 1
 	TypeCursorLen          = 1 + 1
@@ -151,6 +155,7 @@ func (op *ClipOp) Decode(data []byte) {
 	*op = ClipOp{
 		Bounds:  r,
 		Outline: data[17] == 1,
+		Shape:   Shape(data[18]),
 	}
 }
 
@@ -332,8 +337,6 @@ func (t OpType) Size() int {
 		TypePaintLen,
 		TypeColorLen,
 		TypeLinearGradientLen,
-		TypeAreaLen,
-		TypePopAreaLen,
 		TypePassLen,
 		TypePopPassLen,
 		TypePointerInputLen,
@@ -389,10 +392,6 @@ func (t OpType) String() string {
 		return "Color"
 	case TypeLinearGradient:
 		return "LinearGradient"
-	case TypeArea:
-		return "Area"
-	case TypePopArea:
-		return "PopArea"
 	case TypePass:
 		return "Pass"
 	case TypePopPass:

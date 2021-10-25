@@ -14,6 +14,7 @@ import (
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 )
 
 // Event is a pointer event.
@@ -40,20 +41,6 @@ type Event struct {
 	// Modifiers is the set of active modifiers when
 	// the mouse button was pressed.
 	Modifiers key.Modifiers
-}
-
-// AreaOp pushes the current hit area to the stack and updates it to the
-// intersection of the current hit area and the transformed area.
-type AreaOp struct {
-	kind areaKind
-	rect image.Rectangle
-}
-
-// AreaStack represents an AreaOp on the stack of areas.
-type AreaStack struct {
-	ops     *ops.Ops
-	id      ops.StackID
-	macroID int
 }
 
 // PassOp sets the pass-through mode. InputOps added while the pass-through
@@ -106,9 +93,6 @@ type Buttons uint8
 
 // CursorName is the name of a cursor.
 type CursorName string
-
-// Must match app/internal/input.areaKind
-type areaKind uint8
 
 const (
 	// CursorDefault is the default cursor.
@@ -178,50 +162,32 @@ const (
 	ButtonTertiary
 )
 
-const (
-	areaRect areaKind = iota
-	areaEllipse
-)
-
 // Rect constructs a rectangular hit area.
-func Rect(size image.Rectangle) AreaOp {
-	return AreaOp{
-		kind: areaRect,
-		rect: size,
-	}
+//
+// Deprecated: use clip.Rect instead.
+func Rect(size image.Rectangle) clip.Op {
+	return clip.Rect(size).Op()
 }
 
 // Ellipse constructs an ellipsoid hit area.
-func Ellipse(size image.Rectangle) AreaOp {
-	return AreaOp{
-		kind: areaEllipse,
-		rect: size,
+//
+// Deprecated: use clip.Ellipse instead.
+func Ellipse(size image.Rectangle) clip.Ellipse {
+	return clip.Ellipse(frect(size))
+}
+
+// frect converts a rectangle to a f32.Rectangle.
+func frect(r image.Rectangle) f32.Rectangle {
+	return f32.Rectangle{
+		Min: fpt(r.Min), Max: fpt(r.Max),
 	}
 }
 
-// Push the current area to the stack and intersects the current area with the
-// area represented by o.
-func (a AreaOp) Push(o *op.Ops) AreaStack {
-	id, macroID := ops.PushOp(&o.Internal, ops.AreaStack)
-	a.add(o, true)
-	return AreaStack{ops: &o.Internal, id: id, macroID: macroID}
-}
-
-func (a AreaOp) add(o *op.Ops, push bool) {
-	data := ops.Write(&o.Internal, ops.TypeAreaLen)
-	data[0] = byte(ops.TypeArea)
-	data[1] = byte(a.kind)
-	bo := binary.LittleEndian
-	bo.PutUint32(data[2:], uint32(a.rect.Min.X))
-	bo.PutUint32(data[6:], uint32(a.rect.Min.Y))
-	bo.PutUint32(data[10:], uint32(a.rect.Max.X))
-	bo.PutUint32(data[14:], uint32(a.rect.Max.Y))
-}
-
-func (o AreaStack) Pop() {
-	ops.PopOp(o.ops, ops.AreaStack, o.id, o.macroID)
-	data := ops.Write(o.ops, ops.TypePopAreaLen)
-	data[0] = byte(ops.TypePopArea)
+// fpt converts an point to a f32.Point.
+func fpt(p image.Point) f32.Point {
+	return f32.Point{
+		X: float32(p.X), Y: float32(p.Y),
+	}
 }
 
 // Push the current pass mode to the pass stack and set the pass mode.

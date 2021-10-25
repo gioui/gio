@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 /*
-Package clip provides operations for clipping paint operations.
-Drawing outside the current clip area is ignored.
+Package clip provides operations for defining areas that applies to operations
+such as paints and pointer handlers.
 
-The current clip is initially the infinite set. Pushing and Op sets the clip
+The current clip is initially the infinite set. Pushing an Op sets the clip
 to the intersection of the current clip and pushed clip area. Popping the
 area restores the clip to its state before pushing.
 

@@ -92,19 +92,19 @@ func (s *Scrollbar) Layout(gtx layout.Context, axis layout.Axis, viewportStart, 
 }
 
 // AddTrack configures the track click listener for the scrollbar to use
-// the most recently added pointer.AreaOp.
+// the current clip area.
 func (s *Scrollbar) AddTrack(ops *op.Ops) {
 	s.track.Add(ops)
 }
 
 // AddIndicator configures the indicator click listener for the scrollbar to use
-// the most recently added pointer.AreaOp.
+// the current clip area.
 func (s *Scrollbar) AddIndicator(ops *op.Ops) {
 	s.indicator.Add(ops)
 }
 
 // AddDrag configures the drag listener for the scrollbar to use
-// the most recently added pointer.AreaOp.
+// the current clip area.
 func (s *Scrollbar) AddDrag(ops *op.Ops) {
 	s.drag.Add(ops)
 }

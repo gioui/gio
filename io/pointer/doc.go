@@ -25,19 +25,23 @@ Leave, or Scroll):
 
 Cancel events are always delivered.
 
-Areas
+Hit areas
 
-The area operations are used for specifying the area where
-subsequent InputOp are active.
+Clip operations from package op/clip are used for specifying
+hit areas where subsequent InputOps are active.
 
-For example, to set up a rectangular hit area:
+For example, to set up a handler with a rectangular hit area:
 
 	r := image.Rectangle{...}
-	pointer.Rect(r).Add(ops)
+	area := clip.Rect(r).Push(ops)
 	pointer.InputOp{Tag: h}.Add(ops)
+	area.Pop()
 
-Note that areas compound: the effective area of multiple area
-operations is the intersection of the areas.
+Note that hit areas behave similar to painting: the effective area of a stack
+of multiple area operations is the intersection of the areas.
+
+BUG: Clip operations other than clip.Rect and clip.Ellipse are approximated
+with their bounding boxes.
 
 Matching events
 
@@ -49,11 +53,11 @@ For example:
 	ops := new(op.Ops)
 	var h1, h2 *Handler
 
-	area := pointer.Rect(...).Push(ops)
+	area := clip.Rect(...).Push(ops)
 	pointer.InputOp{Tag: h1}.Add(Ops)
 	area.Pop()
 
-	area := pointer.Rect(...).Push(ops)
+	area := clip.Rect(...).Push(ops)
 	pointer.InputOp{Tag: h2}.Add(ops)
 	area.Pop()
 
@@ -66,9 +70,9 @@ parent areas all contain the event is considered.
 
 Then, every handler attached to the area is matched with the event.
 
-If all attached handlers are marked pass-through, the matching repeats with the
-next foremost (sibling) area. Otherwise the matching repeats with the parent
-area.
+If all attached handlers are marked pass-through or if no handlers are
+attached, the matching repeats with the next foremost (sibling) area. Otherwise
+the matching repeats with the parent area.
 
 In the example above, all events will go to h2 because it and h1 are siblings
 and none are pass-through.

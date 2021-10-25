@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"gioui.org/f32"
+	"gioui.org/internal/ops"
 	"gioui.org/op"
 )
 
@@ -18,6 +19,7 @@ func (r Rect) Op() Op {
 	return Op{
 		outline: true,
 		path: PathSpec{
+			shape:  ops.Rect,
 			bounds: image.Rectangle(r),
 		},
 	}
@@ -132,18 +134,16 @@ func (c Circle) Path(ops *op.Ops) PathSpec {
 		Min: f32.Pt(c.Center.X-c.Radius, c.Center.Y-c.Radius),
 		Max: f32.Pt(c.Center.X+c.Radius, c.Center.Y+c.Radius),
 	}
-	return Ellipse{b}.Path(ops)
+	return Ellipse(b).path(ops)
 }
 
 // Ellipse represents the largest axis-aligned ellipse that
 // is contained in its bounds.
-type Ellipse struct {
-	Bounds f32.Rectangle
-}
+type Ellipse f32.Rectangle
 
 // Op returns the op for the filled ellipse.
 func (e Ellipse) Op(ops *op.Ops) Op {
-	return Outline{Path: e.Path(ops)}.Op()
+	return Outline{Path: e.path(ops)}.Op()
 }
 
 // Push the filled ellipse clip op on the clip stack.
@@ -151,17 +151,18 @@ func (e Ellipse) Push(ops *op.Ops) Stack {
 	return e.Op(ops).Push(ops)
 }
 
-// Path constructs a path for the ellipse.
-func (e Ellipse) Path(ops *op.Ops) PathSpec {
+// path constructs a path for the ellipse.
+func (e Ellipse) path(o *op.Ops) PathSpec {
 	var p Path
-	p.Begin(ops)
+	p.Begin(o)
 
-	center := e.Bounds.Max.Add(e.Bounds.Min).Mul(.5)
-	diam := e.Bounds.Dx()
+	bounds := f32.Rectangle(e)
+	center := bounds.Max.Add(bounds.Min).Mul(.5)
+	diam := bounds.Dx()
 	r := diam * .5
 	// We'll model the ellipse as a circle scaled in the Y
 	// direction.
-	scale := e.Bounds.Dy() / diam
+	scale := bounds.Dy() / diam
 
 	// https://pomax.github.io/bezierinfo/#circles_cubic.
 	const q = 4 * (math.Sqrt2 - 1) / 3
@@ -190,7 +191,9 @@ func (e Ellipse) Path(ops *op.Ops) PathSpec {
 		f32.Point{X: center.X - curve, Y: center.Y - r*scale},
 		top,
 	)
-	return p.End()
+	ellipse := p.End()
+	ellipse.shape = ops.Ellipse
+	return ellipse
 }
 
 func fPt(p image.Point) f32.Point {

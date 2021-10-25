@@ -107,13 +107,18 @@ func (c *pointerCollector) load(id int) {
 	c.state = collectState{t: c.states[id]}
 }
 
-func (c *pointerCollector) area(op areaOp) {
+func (c *pointerCollector) clip(op ops.ClipOp) {
 	area := -1
 	if i := c.state.nodePlusOne - 1; i != -1 {
 		n := c.q.hitTree[i]
 		area = n.area
 	}
-	c.q.areas = append(c.q.areas, areaNode{trans: c.state.t, next: area, area: op})
+	kind := areaRect
+	if op.Shape == ops.Ellipse {
+		kind = areaEllipse
+	}
+	areaOp := areaOp{kind: kind, rect: frect(op.Bounds)}
+	c.q.areas = append(c.q.areas, areaNode{trans: c.state.t, next: area, area: areaOp})
 	c.nodeStack = append(c.nodeStack, c.state.nodePlusOne-1)
 	c.q.hitTree = append(c.q.hitTree, hitNode{
 		next: c.state.nodePlusOne - 1,
@@ -121,6 +126,20 @@ func (c *pointerCollector) area(op areaOp) {
 		pass: true,
 	})
 	c.state.nodePlusOne = len(c.q.hitTree) - 1 + 1
+}
+
+// frect converts a rectangle to a f32.Rectangle.
+func frect(r image.Rectangle) f32.Rectangle {
+	return f32.Rectangle{
+		Min: fpt(r.Min), Max: fpt(r.Max),
+	}
+}
+
+// fpt converts an point to a f32.Point.
+func fpt(p image.Point) f32.Point {
+	return f32.Point{
+		X: float32(p.X), Y: float32(p.Y),
+	}
 }
 
 func (c *pointerCollector) popArea() {
@@ -475,26 +494,6 @@ func addHandler(tags []event.Tag, tag event.Tag) []event.Tag {
 
 func opDecodeFloat32(d []byte) float32 {
 	return float32(int32(binary.LittleEndian.Uint32(d)))
-}
-
-func (op *areaOp) Decode(d []byte) {
-	if ops.OpType(d[0]) != ops.TypeArea {
-		panic("invalid op")
-	}
-	rect := f32.Rectangle{
-		Min: f32.Point{
-			X: opDecodeFloat32(d[2:]),
-			Y: opDecodeFloat32(d[6:]),
-		},
-		Max: f32.Point{
-			X: opDecodeFloat32(d[10:]),
-			Y: opDecodeFloat32(d[14:]),
-		},
-	}
-	*op = areaOp{
-		kind: areaKind(d[1]),
-		rect: rect,
-	}
 }
 
 func (op *areaOp) Hit(pos f32.Point) bool {

@@ -162,11 +162,11 @@ func (q *Router) collect() {
 			pc.load(id)
 
 		// Pointer ops.
-		case ops.TypeArea:
-			var op areaOp
+		case ops.TypeClip:
+			var op ops.ClipOp
 			op.Decode(encOp.Data)
-			pc.area(op)
-		case ops.TypePopArea:
+			pc.clip(op)
+		case ops.TypePopClip:
 			pc.popArea()
 		case ops.TypePass:
 			pc.pass()

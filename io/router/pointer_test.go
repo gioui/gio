@@ -13,6 +13,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 )
 
 func TestPointerWakeup(t *testing.T) {
@@ -728,6 +729,33 @@ func TestAreaPassthrough(t *testing.T) {
 	r.Queue(
 		pointer.Event{
 			Type: pointer.Press,
+		},
+	)
+	assertEventSequence(t, r.Events(h), pointer.Cancel, pointer.Press)
+}
+
+func TestEllipse(t *testing.T) {
+	var ops op.Ops
+
+	h := new(int)
+	cl := clip.Ellipse(f32.Rect(0, 0, 100, 100)).Push(&ops)
+	pointer.InputOp{Tag: h, Types: pointer.Press}.Add(&ops)
+	cl.Pop()
+	var r Router
+	r.Frame(&ops)
+	r.Queue(
+		// Outside ellipse.
+		pointer.Event{
+			Position: f32.Pt(10, 10),
+			Type:     pointer.Press,
+		},
+		pointer.Event{
+			Type: pointer.Release,
+		},
+		// Inside ellipse.
+		pointer.Event{
+			Position: f32.Pt(50, 50),
+			Type:     pointer.Press,
 		},
 	)
 	assertEventSequence(t, r.Events(h), pointer.Cancel, pointer.Press)

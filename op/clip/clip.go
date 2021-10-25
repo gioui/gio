@@ -47,7 +47,6 @@ func (p Op) Push(o *op.Ops) Stack {
 
 func (p Op) add(o *op.Ops) {
 	path := p.path
-	outline := p.outline
 
 	bo := binary.LittleEndian
 	if path.hasSegments {
@@ -77,9 +76,10 @@ func (p Op) add(o *op.Ops) {
 	bo.PutUint32(data[5:], uint32(bounds.Min.Y))
 	bo.PutUint32(data[9:], uint32(bounds.Max.X))
 	bo.PutUint32(data[13:], uint32(bounds.Max.Y))
-	if outline {
+	if p.outline {
 		data[17] = byte(1)
 	}
+	data[18] = byte(path.shape)
 }
 
 func (s Stack) Pop() {
@@ -96,6 +96,7 @@ type PathSpec struct {
 	// hasSegments tracks whether there are any segments in the path.
 	hasSegments bool
 	bounds      image.Rectangle
+	shape       ops.Shape
 	hash        uint64
 }
 
