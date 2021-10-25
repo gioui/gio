@@ -1772,9 +1772,10 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 			pathData.key = encOp.Key
 			pathData.hash = hash
 		case ops.TypeClip:
-			var op clipOp
-			op.decode(encOp.Data)
-			c.addClip(&state, fview, op.bounds, pathData.data, pathData.key, pathData.hash, strWidth, true)
+			var op ops.ClipOp
+			op.Decode(encOp.Data)
+			bounds := layout.FRect(op.Bounds)
+			c.addClip(&state, fview, bounds, pathData.data, pathData.key, pathData.hash, strWidth, true)
 			pathData.data = nil
 			strWidth = 0
 		case ops.TypePopClip:

@@ -165,13 +165,6 @@ type material struct {
 	uvTrans f32.Affine2D
 }
 
-// clipOp is the shadow of clip.Op.
-type clipOp struct {
-	// TODO: Use image.Rectangle?
-	bounds  f32.Rectangle
-	outline bool
-}
-
 // imageOpData is the shadow of paint.ImageOp.
 type imageOpData struct {
 	src    *image.RGBA
@@ -183,27 +176,6 @@ type linearGradientOpData struct {
 	color1 color.NRGBA
 	stop2  f32.Point
 	color2 color.NRGBA
-}
-
-func (op *clipOp) decode(data []byte) {
-	if ops.OpType(data[0]) != ops.TypeClip {
-		panic("invalid op")
-	}
-	bo := binary.LittleEndian
-	r := image.Rectangle{
-		Min: image.Point{
-			X: int(int32(bo.Uint32(data[1:]))),
-			Y: int(int32(bo.Uint32(data[5:]))),
-		},
-		Max: image.Point{
-			X: int(int32(bo.Uint32(data[9:]))),
-			Y: int(int32(bo.Uint32(data[13:]))),
-		},
-	}
-	*op = clipOp{
-		bounds:  layout.FRect(r),
-		outline: data[17] == 1,
-	}
 }
 
 func decodeImageOp(data []byte, refs []interface{}) imageOpData {
@@ -937,10 +909,10 @@ loop:
 			quads.key.Key = encOp.Key
 
 		case ops.TypeClip:
-			var op clipOp
-			op.decode(encOp.Data)
-			quads.key.outline = op.outline
-			bounds := op.bounds
+			var op ops.ClipOp
+			op.Decode(encOp.Data)
+			quads.key.outline = op.Outline
+			bounds := layout.FRect(op.Bounds)
 			trans, off := splitTransform(state.t)
 			if len(quads.aux) > 0 {
 				// There is a clipping path, build the gpu data and update the
@@ -950,22 +922,22 @@ loop:
 				if v, ok := d.pathCache.get(quads.key); ok {
 					// Since the GPU data exists in the cache aux will not be used.
 					// Why is this not used for the offset shapes?
-					op.bounds = v.bounds
+					bounds = v.bounds
 				} else {
-					pathData, bounds := d.buildVerts(
+					var pathData []byte
+					pathData, bounds = d.buildVerts(
 						quads.aux, trans, quads.key.outline, quads.key.strokeWidth,
 					)
-					op.bounds = bounds
 					quads.aux = pathData
 					// add it to the cache, without GPU data, so the transform can be
 					// reused.
-					d.pathCache.put(quads.key, opCacheValue{bounds: op.bounds})
+					d.pathCache.put(quads.key, opCacheValue{bounds: bounds})
 				}
 			} else {
-				quads.aux, op.bounds, _ = d.boundsForTransformedRect(bounds, trans)
+				quads.aux, bounds, _ = d.boundsForTransformedRect(bounds, trans)
 				quads.key = opKey{Key: encOp.Key}
 			}
-			d.addClipPath(&state, quads.aux, quads.key, op.bounds, off, true)
+			d.addClipPath(&state, quads.aux, quads.key, bounds, off, true)
 			quads = quadsOp{}
 		case ops.TypePopClip:
 			state.cpath = state.cpath.parent

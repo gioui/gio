@@ -4,6 +4,7 @@ package ops
 
 import (
 	"encoding/binary"
+	"image"
 	"math"
 
 	"gioui.org/f32"
@@ -86,6 +87,12 @@ type stack struct {
 
 type StackKind uint8
 
+// ClipOp is the shadow of clip.Op.
+type ClipOp struct {
+	Bounds  image.Rectangle
+	Outline bool
+}
+
 const (
 	ClipStack StackKind = iota
 	AreaStack
@@ -125,6 +132,27 @@ const (
 	TypePathLen            = 8 + 1
 	TypeStrokeLen          = 1 + 4
 )
+
+func (op *ClipOp) Decode(data []byte) {
+	if OpType(data[0]) != TypeClip {
+		panic("invalid op")
+	}
+	bo := binary.LittleEndian
+	r := image.Rectangle{
+		Min: image.Point{
+			X: int(int32(bo.Uint32(data[1:]))),
+			Y: int(int32(bo.Uint32(data[5:]))),
+		},
+		Max: image.Point{
+			X: int(int32(bo.Uint32(data[9:]))),
+			Y: int(int32(bo.Uint32(data[13:]))),
+		},
+	}
+	*op = ClipOp{
+		Bounds:  r,
+		Outline: data[17] == 1,
+	}
+}
 
 func Reset(o *Ops) {
 	o.macroStack = stack{}
