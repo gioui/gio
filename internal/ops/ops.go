@@ -71,7 +71,7 @@ type StackID struct {
 
 // StateOp represents a saved operation snapshop to be restored
 // later.
-type StateOP struct {
+type StateOp struct {
 	id      int
 	macroID int
 	ops     *Ops
@@ -222,9 +222,9 @@ func (s *stack) pop(sid StackID) {
 }
 
 // Save the effective transformation.
-func Save(o *Ops) StateOP {
+func Save(o *Ops) StateOp {
 	o.nextStateID++
-	s := StateOP{
+	s := StateOp{
 		ops:     o,
 		id:      o.nextStateID,
 		macroID: o.macroStack.currentID,
@@ -238,7 +238,7 @@ func Save(o *Ops) StateOP {
 
 // load a previously saved operations state given
 // its ID.
-func (s StateOP) Load() {
+func (s StateOp) Load() {
 	bo := binary.LittleEndian
 	data := Write(s.ops, TypeLoadLen)
 	data[0] = byte(TypeLoad)
