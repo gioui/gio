@@ -56,7 +56,7 @@ type AreaStack struct {
 	macroID int
 }
 
-// PassOp sets the pass-through mode. AreaOps added while the pass-through
+// PassOp sets the pass-through mode. InputOps added while the pass-through
 // mode is set don't block events to siblings.
 type PassOp struct {
 }
