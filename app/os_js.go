@@ -35,6 +35,7 @@ type window struct {
 	redraw                js.Func
 	clipboardCallback     js.Func
 	requestAnimationFrame js.Value
+	requestAnimationID    int
 	browserHistory        js.Value
 	visualViewport        js.Value
 	screenOrientation     js.Value
@@ -54,6 +55,9 @@ type window struct {
 	// is pending.
 	animRequested bool
 	wakeups       chan struct{}
+
+	contextLost          bool
+	contextLostRecovered bool
 }
 
 func newWindow(win *callbacks, options []Option) error {
@@ -84,7 +88,9 @@ func newWindow(win *callbacks, options []Option) error {
 	w.chanAnimation = make(chan struct{}, 1)
 	w.chanRedraw = make(chan struct{}, 1)
 	w.redraw = w.funcOf(func(this js.Value, args []js.Value) interface{} {
-		w.chanAnimation <- struct{}{}
+		go func() {
+			w.chanAnimation <- struct{}{}
+		}()
 		return nil
 	})
 	w.clipboardCallback = w.funcOf(func(this js.Value, args []js.Value) interface{} {
@@ -107,7 +113,7 @@ func newWindow(win *callbacks, options []Option) error {
 		for {
 			select {
 			case <-w.wakeups:
-				go w.w.Event(wakeupEvent{})
+				w.w.Event(wakeupEvent{})
 			case <-w.chanAnimation:
 				w.animCallback()
 			case <-w.chanRedraw:
@@ -162,9 +168,29 @@ func (w *window) cleanup() {
 }
 
 func (w *window) addEventListeners() {
-	w.addEventListener(w.visualViewport, "resize", func(this js.Value, args []js.Value) interface{} {
+	w.addEventListener(w.cnv, "webglcontextlost", func(this js.Value, args []js.Value) interface{} {
+		args[0].Call("preventDefault")
+		w.contextLost = true
+		w.cnv.Set("width", 0)
+		w.cnv.Set("height", 0)
+		go w.w.Event(system.StageEvent{Stage: system.StagePaused})
+		return nil
+	})
+	w.addEventListener(w.cnv, "webglcontextrestored", func(this js.Value, args []js.Value) interface{} {
+		w.contextLost = false
+		w.contextLostRecovered = true
 		w.resize()
-		w.chanRedraw <- struct{}{}
+		go func() {
+			w.w.Event(system.StageEvent{Stage: system.StageRunning})
+			w.chanRedraw <- struct{}{}
+		}()
+		return nil
+	})
+	w.addEventListener(w.visualViewport, "resize", func(this js.Value, args []js.Value) interface{} {
+		go func() {
+			w.resize()
+			w.chanRedraw <- struct{}{}
+		}()
 		return nil
 	})
 	w.addEventListener(w.window, "contextmenu", func(this js.Value, args []js.Value) interface{} {
@@ -192,11 +218,11 @@ func (w *window) addEventListeners() {
 		return nil
 	})
 	w.addEventListener(w.cnv, "mousemove", func(this js.Value, args []js.Value) interface{} {
-		w.pointerEvent(pointer.Move, 0, 0, args[0])
+		go w.pointerEvent(pointer.Move, 0, 0, args[0])
 		return nil
 	})
 	w.addEventListener(w.cnv, "mousedown", func(this js.Value, args []js.Value) interface{} {
-		w.pointerEvent(pointer.Press, 0, 0, args[0])
+		go w.pointerEvent(pointer.Press, 0, 0, args[0])
 		if w.requestFocus {
 			w.focus()
 			w.requestFocus = false
@@ -204,7 +230,7 @@ func (w *window) addEventListeners() {
 		return nil
 	})
 	w.addEventListener(w.cnv, "mouseup", func(this js.Value, args []js.Value) interface{} {
-		w.pointerEvent(pointer.Release, 0, 0, args[0])
+		go w.pointerEvent(pointer.Release, 0, 0, args[0])
 		return nil
 	})
 	w.addEventListener(w.cnv, "wheel", func(this js.Value, args []js.Value) interface{} {
@@ -223,7 +249,7 @@ func (w *window) addEventListeners() {
 		return nil
 	})
 	w.addEventListener(w.cnv, "touchstart", func(this js.Value, args []js.Value) interface{} {
-		w.touchEvent(pointer.Press, args[0])
+		go w.touchEvent(pointer.Press, args[0])
 		if w.requestFocus {
 			w.focus() // iOS can only focus inside a Touch event.
 			w.requestFocus = false
@@ -231,11 +257,11 @@ func (w *window) addEventListeners() {
 		return nil
 	})
 	w.addEventListener(w.cnv, "touchend", func(this js.Value, args []js.Value) interface{} {
-		w.touchEvent(pointer.Release, args[0])
+		go w.touchEvent(pointer.Release, args[0])
 		return nil
 	})
 	w.addEventListener(w.cnv, "touchmove", func(this js.Value, args []js.Value) interface{} {
-		w.touchEvent(pointer.Move, args[0])
+		go w.touchEvent(pointer.Move, args[0])
 		return nil
 	})
 	w.addEventListener(w.cnv, "touchcancel", func(this js.Value, args []js.Value) interface{} {
@@ -260,20 +286,20 @@ func (w *window) addEventListeners() {
 		return nil
 	})
 	w.addEventListener(w.tarea, "keydown", func(this js.Value, args []js.Value) interface{} {
-		w.keyEvent(args[0], key.Press)
+		go w.keyEvent(args[0], key.Press)
 		return nil
 	})
 	w.addEventListener(w.tarea, "keyup", func(this js.Value, args []js.Value) interface{} {
-		w.keyEvent(args[0], key.Release)
+		go w.keyEvent(args[0], key.Release)
 		return nil
 	})
 	w.addEventListener(w.tarea, "compositionstart", func(this js.Value, args []js.Value) interface{} {
-		w.composing = true
+		//w.composing = true
 		return nil
 	})
 	w.addEventListener(w.tarea, "compositionend", func(this js.Value, args []js.Value) interface{} {
-		w.composing = false
-		w.flushInput()
+		//w.composing = false
+		//w.flushInput()
 		return nil
 	})
 	w.addEventListener(w.tarea, "input", func(this js.Value, args []js.Value) interface{} {
@@ -342,7 +368,7 @@ func (w *window) keyEvent(e js.Value, ks key.State) {
 			Modifiers: modifiersFor(e),
 			State:     ks,
 		}
-		go w.w.Event(cmd)
+		w.w.Event(cmd)
 	}
 }
 
@@ -393,7 +419,7 @@ func (w *window) touchEvent(typ pointer.Type, e js.Value) {
 			X: float32(x) * scale,
 			Y: float32(y) * scale,
 		}
-		go w.w.Event(pointer.Event{
+		w.w.Event(pointer.Event{
 			Type:      typ,
 			Source:    pointer.Touch,
 			Position:  pos,
@@ -443,7 +469,7 @@ func (w *window) pointerEvent(typ pointer.Type, dx, dy float32, e js.Value) {
 	if jbtns&4 != 0 {
 		btns |= pointer.ButtonTertiary
 	}
-	go w.w.Event(pointer.Event{
+	w.w.Event(pointer.Event{
 		Type:      typ,
 		Source:    pointer.Mouse,
 		Buttons:   btns,
@@ -474,7 +500,7 @@ func (w *window) animCallback() {
 	anim := w.animating
 	w.animRequested = anim
 	if anim {
-		w.requestAnimationFrame.Invoke(w.redraw)
+		w.requestAnimationID = w.requestAnimationFrame.Invoke(w.redraw).Int()
 	}
 	if anim {
 		w.draw(false)
@@ -485,7 +511,7 @@ func (w *window) SetAnimating(anim bool) {
 	w.animating = anim
 	if anim && !w.animRequested {
 		w.animRequested = true
-		w.requestAnimationFrame.Invoke(w.redraw)
+		w.requestAnimationID = w.requestAnimationFrame.Invoke(w.redraw).Int()
 	}
 }
 
@@ -593,6 +619,10 @@ func (w *window) resize() {
 }
 
 func (w *window) draw(sync bool) {
+	if w.contextLost {
+		return
+	}
+	
 	size, insets, metric := w.getConfig()
 	if metric == (unit.Metric{}) || size.X == 0 || size.Y == 0 {
 		return

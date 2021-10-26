@@ -141,6 +141,10 @@ func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync
 					w.ctx, err = d.NewContext()
 				})
 				if err != nil {
+					if errors.Is(err, gpu.ErrDeviceLost) {
+						// Return to wait until the context is recovered.
+						return nil
+					}
 					return err
 				}
 				sync = true

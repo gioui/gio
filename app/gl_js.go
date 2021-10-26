@@ -13,6 +13,7 @@ import (
 type glContext struct {
 	ctx js.Value
 	cnv js.Value
+	w   *window
 }
 
 func newContext(w *window) (*glContext, error) {
@@ -20,7 +21,8 @@ func newContext(w *window) (*glContext, error) {
 		// Enable low latency rendering.
 		// See https://developers.google.com/web/updates/2019/05/desynchronized.
 		"desynchronized":        true,
-		"preserveDrawingBuffer": true,
+		"preserveDrawingBuffer": false,
+		"powerPreference":       "high-performance",
 	}
 	ctx := w.cnv.Call("getContext", "webgl2", args)
 	if ctx.IsNull() {
@@ -32,6 +34,7 @@ func newContext(w *window) (*glContext, error) {
 	c := &glContext{
 		ctx: ctx,
 		cnv: w.cnv,
+		w:   w,
 	}
 	return c, nil
 }
@@ -45,11 +48,19 @@ func (c *glContext) API() gpu.API {
 }
 
 func (c *glContext) Release() {
+
 }
 
 func (c *glContext) Present() error {
+	if c.w.contextLost {
+		return gpu.ErrDeviceLost
+	}
+	if c.w.contextLostRecovered {
+		c.w.contextLostRecovered = false
+		return gpu.ErrDeviceLost
+	}
 	if c.ctx.Call("isContextLost").Bool() {
-		return errors.New("context lost")
+		return gpu.ErrDeviceLost
 	}
 	return nil
 }
@@ -65,5 +76,8 @@ func (c *glContext) Refresh() error {
 }
 
 func (w *window) NewContext() (context, error) {
+	if w.contextLost {
+		return nil, gpu.ErrDeviceLost
+	}
 	return newContext(w)
 }
