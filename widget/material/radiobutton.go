@@ -5,8 +5,8 @@ package material
 import (
 	"image"
 
-	"gioui.org/io/pointer"
 	"gioui.org/layout"
+	"gioui.org/op/clip"
 	"gioui.org/unit"
 	"gioui.org/widget"
 )
@@ -41,7 +41,7 @@ func RadioButton(th *Theme, group *widget.Enum, key, label string) RadioButtonSt
 func (r RadioButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 	hovered, hovering := r.Group.Hovered()
 	dims := r.layout(gtx, r.Group.Value == r.Key, hovering && hovered == r.Key)
-	defer pointer.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
+	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
 	gtx.Constraints.Min = dims.Size
 	r.Group.Layout(gtx, r.Key)
 	return dims

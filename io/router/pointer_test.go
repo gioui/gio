@@ -155,10 +155,10 @@ func TestPointerMove(t *testing.T) {
 	types := pointer.Move | pointer.Enter | pointer.Leave
 
 	// Handler 1 area: (0, 0) - (100, 100)
-	r1 := pointer.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
+	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
 	pointer.InputOp{Tag: handler1, Types: types}.Add(&ops)
 	// Handler 2 area: (50, 50) - (100, 100) (areas intersect).
-	r2 := pointer.Rect(image.Rect(50, 50, 200, 200)).Push(&ops)
+	r2 := clip.Rect(image.Rect(50, 50, 200, 200)).Push(&ops)
 	pointer.InputOp{Tag: handler2, Types: types}.Add(&ops)
 	r2.Pop()
 	r1.Pop()
@@ -192,7 +192,7 @@ func TestPointerMove(t *testing.T) {
 func TestPointerTypes(t *testing.T) {
 	handler := new(int)
 	var ops op.Ops
-	r1 := pointer.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
+	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
 	pointer.InputOp{
 		Tag:   handler,
 		Types: pointer.Press | pointer.Release,
@@ -224,14 +224,14 @@ func TestPointerPriority(t *testing.T) {
 	handler3 := new(int)
 	var ops op.Ops
 
-	r1 := pointer.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
+	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
 	pointer.InputOp{
 		Tag:          handler1,
 		Types:        pointer.Scroll,
 		ScrollBounds: image.Rectangle{Max: image.Point{X: 100}},
 	}.Add(&ops)
 
-	r2 := pointer.Rect(image.Rect(0, 0, 100, 50)).Push(&ops)
+	r2 := clip.Rect(image.Rect(0, 0, 100, 50)).Push(&ops)
 	pointer.InputOp{
 		Tag:          handler2,
 		Types:        pointer.Scroll,
@@ -240,7 +240,7 @@ func TestPointerPriority(t *testing.T) {
 	r2.Pop()
 	r1.Pop()
 
-	r3 := pointer.Rect(image.Rect(0, 100, 100, 200)).Push(&ops)
+	r3 := clip.Rect(image.Rect(0, 100, 100, 200)).Push(&ops)
 	pointer.InputOp{
 		Tag:          handler3,
 		Types:        pointer.Scroll,
@@ -394,7 +394,7 @@ func TestMultipleAreas(t *testing.T) {
 	var ops op.Ops
 
 	addPointerHandler(&ops, handler, image.Rect(0, 0, 100, 100))
-	r1 := pointer.Rect(image.Rect(50, 50, 200, 200)).Push(&ops)
+	r1 := clip.Rect(image.Rect(50, 50, 200, 200)).Push(&ops)
 	// Second area has no Types set, yet should receive events because
 	// Types for the same handles are or-ed together.
 	pointer.InputOp{Tag: handler}.Add(&ops)
@@ -428,11 +428,11 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	types := pointer.Press | pointer.Move | pointer.Release | pointer.Enter | pointer.Leave
 
 	// Handler 1 area: (0, 0) - (100, 100)
-	r1 := pointer.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
+	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
 	pointer.InputOp{Tag: handler1, Types: types}.Add(&ops)
 
 	// Handler 2 area: (25, 25) - (75, 75) (nested within first).
-	r2 := pointer.Rect(image.Rect(25, 25, 75, 75)).Push(&ops)
+	r2 := clip.Rect(image.Rect(25, 25, 75, 75)).Push(&ops)
 	pointer.InputOp{Tag: handler2, Types: types}.Add(&ops)
 	r2.Pop()
 	r1.Pop()
@@ -576,7 +576,7 @@ func TestCursorNameOp(t *testing.T) {
 	var widget2 func()
 	widget := func() {
 		// This is the area where the cursor is changed to CursorPointer.
-		defer pointer.Rect(image.Rectangle{Max: image.Pt(100, 100)}).Push(ops).Pop()
+		defer clip.Rect(image.Rectangle{Max: image.Pt(100, 100)}).Push(ops).Pop()
 		// The cursor is checked and changed upon cursor movement.
 		pointer.InputOp{Tag: &h}.Add(ops)
 		pointer.CursorNameOp{Name: pointer.CursorPointer}.Add(ops)
@@ -691,7 +691,7 @@ func TestPassOp(t *testing.T) {
 	var ops op.Ops
 
 	h1, h2, h3, h4 := new(int), new(int), new(int), new(int)
-	area := pointer.Rect(image.Rect(0, 0, 100, 100))
+	area := clip.Rect(image.Rect(0, 0, 100, 100))
 	root := area.Push(&ops)
 	pointer.InputOp{Tag: h1, Types: pointer.Press}.Add(&ops)
 	child1 := area.Push(&ops)
@@ -723,7 +723,7 @@ func TestAreaPassthrough(t *testing.T) {
 
 	h := new(int)
 	pointer.InputOp{Tag: h, Types: pointer.Press}.Add(&ops)
-	pointer.Rect(image.Rect(0, 0, 100, 100)).Push(&ops).Pop()
+	clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops).Pop()
 	var r Router
 	r.Frame(&ops)
 	r.Queue(
@@ -764,7 +764,7 @@ func TestEllipse(t *testing.T) {
 // addPointerHandler adds a pointer.InputOp for the tag in a
 // rectangular area.
 func addPointerHandler(ops *op.Ops, tag event.Tag, area image.Rectangle) {
-	defer pointer.Rect(area).Push(ops).Pop()
+	defer clip.Rect(area).Push(ops).Pop()
 	pointer.InputOp{
 		Tag:   tag,
 		Types: pointer.Press | pointer.Release | pointer.Move | pointer.Drag | pointer.Enter | pointer.Leave,
@@ -835,12 +835,13 @@ func BenchmarkRouterAdd(b *testing.B) {
 			var ops op.Ops
 
 			for i := range handlers {
-				pointer.Rect(image.Rectangle{
+				clip.Rect(image.Rectangle{
 					Max: image.Point{
 						X: 100,
 						Y: 100,
 					},
-				}).Push(&ops)
+				}).
+					Push(&ops)
 				pointer.InputOp{
 					Tag:   handlers[i],
 					Types: pointer.Move,

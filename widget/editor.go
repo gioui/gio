@@ -513,14 +513,14 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 		X: -e.scrollOff.X,
 		Y: -e.scrollOff.Y,
 	}
-	clip := textPadding(e.lines)
-	clip.Max = clip.Max.Add(e.viewSize)
+	cl := textPadding(e.lines)
+	cl.Max = cl.Max.Add(e.viewSize)
 	startSel, endSel := sortPoints(e.caret.start.lineCol, e.caret.end.lineCol)
 	it := segmentIterator{
 		startSel:  startSel,
 		endSel:    endSel,
 		Lines:     e.lines,
-		Clip:      clip,
+		Clip:      cl,
 		Alignment: e.Alignment,
 		Width:     e.viewSize.X,
 		Offset:    off,
@@ -547,7 +547,7 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 	r.Min.Y -= pointerPadding
 	r.Max.X += pointerPadding
 	r.Max.X += pointerPadding
-	defer pointer.Rect(r).Push(gtx.Ops).Pop()
+	defer clip.Rect(r).Push(gtx.Ops).Pop()
 	pointer.CursorNameOp{Name: pointer.CursorText}.Add(gtx.Ops)
 
 	var scrollRange image.Rectangle

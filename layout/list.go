@@ -6,7 +6,6 @@ import (
 	"image"
 
 	"gioui.org/gesture"
-	"gioui.org/io/pointer"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 )
@@ -296,7 +295,7 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 	}
 	dims := l.Axis.Convert(image.Pt(pos, maxCross))
 	call := macro.Stop()
-	defer pointer.Rect(image.Rectangle{Max: dims}).Push(ops).Pop()
+	defer clip.Rect(image.Rectangle{Max: dims}).Push(ops).Pop()
 
 	var min, max int
 	if o := l.Position.Offset; o > 0 {

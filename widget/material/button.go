@@ -9,7 +9,6 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/internal/f32color"
-	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -178,7 +177,8 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 			})
 		}),
 		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
-			defer pointer.Ellipse(image.Rectangle{Max: gtx.Constraints.Min}).Push(gtx.Ops).Pop()
+			bounds := f32.Rectangle{Max: layout.FPt(gtx.Constraints.Min)}
+			defer clip.Ellipse(bounds).Push(gtx.Ops).Pop()
 			return b.Button.Layout(gtx)
 		}),
 	)

@@ -155,7 +155,7 @@ func (s ScrollbarStyle) layout(gtx layout.Context, axis layout.Axis, viewportSta
 			area := image.Rectangle{
 				Max: gtx.Constraints.Min,
 			}
-			pointerArea := pointer.Rect(area)
+			pointerArea := clip.Rect(area)
 			defer pointerArea.Push(gtx.Ops).Pop()
 			s.Scrollbar.AddDrag(gtx.Ops)
 
@@ -205,7 +205,7 @@ func (s ScrollbarStyle) layout(gtx layout.Context, axis layout.Axis, viewportSta
 				}.Op(gtx.Ops))
 
 				// Add the indicator pointer hit area.
-				area := pointer.Rect(image.Rectangle{Max: indicatorDims})
+				area := clip.Rect(image.Rectangle{Max: indicatorDims})
 				defer pointer.PassOp{}.Push(gtx.Ops).Pop()
 				defer area.Push(gtx.Ops).Pop()
 				s.Scrollbar.AddIndicator(gtx.Ops)

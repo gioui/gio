@@ -8,7 +8,6 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/internal/f32color"
-	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -124,7 +123,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}
 	defer op.Offset(clickOff).Push(gtx.Ops).Pop()
 	sz := image.Pt(clickSize, clickSize)
-	defer pointer.Ellipse(image.Rectangle{Max: sz}).Push(gtx.Ops).Pop()
+	defer clip.Ellipse(f32.Rectangle{Max: layout.FPt(sz)}).Push(gtx.Ops).Pop()
 	gtx.Constraints.Min = sz
 	s.Switch.Layout(gtx)
 

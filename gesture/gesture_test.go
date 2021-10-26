@@ -12,13 +12,14 @@ import (
 	"gioui.org/io/pointer"
 	"gioui.org/io/router"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 )
 
 func TestHover(t *testing.T) {
 	ops := new(op.Ops)
 	var h Hover
 	rect := image.Rect(20, 20, 40, 40)
-	stack := pointer.Rect(rect).Push(ops)
+	stack := clip.Rect(rect).Push(ops)
 	h.Add(ops)
 	stack.Pop()
 	r := new(router.Router)

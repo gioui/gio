@@ -9,8 +9,8 @@ import (
 	"gioui.org/f32"
 	"gioui.org/gesture"
 	"gioui.org/io/key"
-	"gioui.org/io/pointer"
 	"gioui.org/layout"
+	"gioui.org/op/clip"
 )
 
 // Clickable represents a clickable area.
@@ -92,7 +92,7 @@ func (b *Clickable) History() []Press {
 // Layout and update the button state
 func (b *Clickable) Layout(gtx layout.Context) layout.Dimensions {
 	b.update(gtx)
-	defer pointer.Rect(image.Rectangle{Max: gtx.Constraints.Min}).Push(gtx.Ops).Pop()
+	defer clip.Rect(image.Rectangle{Max: gtx.Constraints.Min}).Push(gtx.Ops).Pop()
 	b.click.Add(gtx.Ops)
 	for len(b.history) > 0 {
 		c := b.history[0]
