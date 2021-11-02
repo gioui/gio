@@ -42,7 +42,6 @@ func (p ProgressCircleStyle) Layout(gtx layout.Context) layout.Dimensions {
 	paint.ColorOp{
 		Color: p.Color,
 	}.Add(gtx.Ops)
-	defer op.Offset(f32.Pt(-radius, -radius)).Push(gtx.Ops).Pop()
 	paint.PaintOp{}.Add(gtx.Ops)
 	return layout.Dimensions{
 		Size: sz,
