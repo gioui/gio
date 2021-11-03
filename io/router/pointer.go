@@ -82,12 +82,9 @@ type collectState struct {
 // pointerCollector tracks the state needed to update an pointerQueue
 // from pointer ops.
 type pointerCollector struct {
-	q          *pointerQueue
-	state      collectState
-	nodeStack  []int
-	transStack []f32.Affine2D
-	// states holds the storage for save/restore ops.
-	states []f32.Affine2D
+	q         *pointerQueue
+	state     collectState
+	nodeStack []int
 }
 
 const (
@@ -95,15 +92,12 @@ const (
 	areaEllipse
 )
 
-func (c *pointerCollector) save(id int) {
-	if extra := id - len(c.states) + 1; extra > 0 {
-		c.states = append(c.states, make([]f32.Affine2D, extra)...)
-	}
-	c.states[id] = c.state.t
+func (c *pointerCollector) resetState() {
+	c.state = collectState{}
 }
 
-func (c *pointerCollector) load(id int) {
-	c.state = collectState{t: c.states[id]}
+func (c *pointerCollector) setTrans(t f32.Affine2D) {
+	c.state.t = t
 }
 
 func (c *pointerCollector) clip(op ops.ClipOp) {
@@ -155,19 +149,6 @@ func (c *pointerCollector) popPass() {
 	c.state.pass--
 }
 
-func (c *pointerCollector) transform(t f32.Affine2D, push bool) {
-	if push {
-		c.transStack = append(c.transStack, c.state.t)
-	}
-	c.state.t = c.state.t.Mul(t)
-}
-
-func (c *pointerCollector) popTransform() {
-	n := len(c.transStack)
-	c.state.t = c.transStack[n-1]
-	c.transStack = c.transStack[:n-1]
-}
-
 func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
 	area := -1
 	if i := c.state.nodePlusOne - 1; i != -1 {
@@ -207,7 +188,6 @@ func (c *pointerCollector) reset(q *pointerQueue) {
 	q.reset()
 	c.state = collectState{}
 	c.nodeStack = c.nodeStack[:0]
-	c.transStack = c.transStack[:0]
 	c.q = q
 }
 

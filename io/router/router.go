@@ -15,6 +15,7 @@ import (
 	"image"
 	"time"
 
+	"gioui.org/f32"
 	"gioui.org/internal/ops"
 	"gioui.org/io/clipboard"
 	"gioui.org/io/event"
@@ -27,7 +28,9 @@ import (
 // Router is a Queue implementation that routes events
 // to handlers declared in operation lists.
 type Router struct {
-	pointer struct {
+	savedTrans []f32.Affine2D
+	transStack []f32.Affine2D
+	pointer    struct {
 		queue     pointerQueue
 		collector pointerCollector
 	}
@@ -135,11 +138,13 @@ func (q *Router) Cursor() pointer.CursorName {
 }
 
 func (q *Router) collect() {
+	q.transStack = q.transStack[:0]
 	pc := &q.pointer.collector
 	pc.reset(&q.pointer.queue)
 	kc := &q.key.collector
 	*kc = keyCollector{q: &q.key.queue}
 	q.key.queue.Reset()
+	var t f32.Affine2D
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeInvalidate:
@@ -160,10 +165,15 @@ func (q *Router) collect() {
 			q.cqueue.ProcessWriteClipboard(encOp.Refs)
 		case ops.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
-			pc.save(id)
+			if extra := id - len(q.savedTrans) + 1; extra > 0 {
+				q.savedTrans = append(q.savedTrans, make([]f32.Affine2D, extra)...)
+			}
+			q.savedTrans[id] = t
 		case ops.TypeLoad:
 			id := ops.DecodeLoad(encOp.Data)
-			pc.load(id)
+			t = q.savedTrans[id]
+			pc.resetState()
+			pc.setTrans(t)
 
 		// Pointer ops.
 		case ops.TypeClip:
@@ -177,10 +187,17 @@ func (q *Router) collect() {
 		case ops.TypePopPass:
 			pc.popPass()
 		case ops.TypeTransform:
-			t, push := ops.DecodeTransform(encOp.Data)
-			pc.transform(t, push)
+			t2, push := ops.DecodeTransform(encOp.Data)
+			if push {
+				q.transStack = append(q.transStack, t)
+			}
+			t = t.Mul(t2)
+			pc.setTrans(t)
 		case ops.TypePopTransform:
-			pc.popTransform()
+			n := len(q.transStack)
+			t = q.transStack[n-1]
+			q.transStack = q.transStack[:n-1]
+			pc.setTrans(t)
 		case ops.TypePointerInput:
 			bo := binary.LittleEndian
 			op := pointer.InputOp{
