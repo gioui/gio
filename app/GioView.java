@@ -143,92 +143,92 @@ public final class GioView extends SurfaceView {
 		setPointerIcon(pointerIcon);
 	}
 
-    private void setOrientation(int id, int fallback) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR2) {
-            id = fallback;
-        }
-        ((Activity) this.getContext()).setRequestedOrientation(id);
-    }
+	private void setOrientation(int id, int fallback) {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR2) {
+			id = fallback;
+		}
+		((Activity) this.getContext()).setRequestedOrientation(id);
+	}
 
-    private void setFullscreen(boolean enabled) {
-        int flags = this.getSystemUiVisibility();
-        if (enabled) {
-           flags |= SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-           flags |= SYSTEM_UI_FLAG_HIDE_NAVIGATION;
-           flags |= SYSTEM_UI_FLAG_FULLSCREEN;
-           flags |= SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
-        } else {
-           flags &= ~SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-           flags &= ~SYSTEM_UI_FLAG_HIDE_NAVIGATION;
-           flags &= ~SYSTEM_UI_FLAG_FULLSCREEN;
-           flags &= ~SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
-        }
-        this.setSystemUiVisibility(flags);
-    }
+	private void setFullscreen(boolean enabled) {
+		int flags = this.getSystemUiVisibility();
+		if (enabled) {
+		   flags |= SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+		   flags |= SYSTEM_UI_FLAG_HIDE_NAVIGATION;
+		   flags |= SYSTEM_UI_FLAG_FULLSCREEN;
+		   flags |= SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+		} else {
+		   flags &= ~SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+		   flags &= ~SYSTEM_UI_FLAG_HIDE_NAVIGATION;
+		   flags &= ~SYSTEM_UI_FLAG_FULLSCREEN;
+		   flags &= ~SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+		}
+		this.setSystemUiVisibility(flags);
+	}
 
-    private enum Bar {
-        NAVIGATION,
-        STATUS,
-    }
+	private enum Bar {
+		NAVIGATION,
+		STATUS,
+	}
 
-    private void setBarColor(Bar t, int color, int luminance) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-            return;
-        }
+	private void setBarColor(Bar t, int color, int luminance) {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+			return;
+		}
 
-        Window window = ((Activity) this.getContext()).getWindow();
+		Window window = ((Activity) this.getContext()).getWindow();
 
-        int insetsMask;
-        int viewMask;
+		int insetsMask;
+		int viewMask;
 
-        switch (t) {
-        case STATUS:
-            insetsMask = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS;
-            viewMask = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-            window.setStatusBarColor(color);
-            break;
-        case NAVIGATION:
-            insetsMask = WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
-            viewMask = View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-            window.setNavigationBarColor(color);
-            break;
-        default:
-            throw new RuntimeException("invalid bar type");
-        }
+		switch (t) {
+		case STATUS:
+			insetsMask = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS;
+			viewMask = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+			window.setStatusBarColor(color);
+			break;
+		case NAVIGATION:
+			insetsMask = WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+			viewMask = View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+			window.setNavigationBarColor(color);
+			break;
+		default:
+			throw new RuntimeException("invalid bar type");
+		}
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            return;
-        }
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+			return;
+		}
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            int flags = this.getSystemUiVisibility();
-            if (luminance > 128) {
-               flags |=  viewMask;
-            } else {
-               flags &= ~viewMask;
-            }
-            this.setSystemUiVisibility(flags);
-            return;
-        }
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+			int flags = this.getSystemUiVisibility();
+			if (luminance > 128) {
+			   flags |=  viewMask;
+			} else {
+			   flags &= ~viewMask;
+			}
+			this.setSystemUiVisibility(flags);
+			return;
+		}
 
-        WindowInsetsController insetsController = window.getInsetsController();
-        if (insetsController == null) {
-            return;
-        }
-        if (luminance > 128) {
-            insetsController.setSystemBarsAppearance(insetsMask, insetsMask);
-        } else {
-            insetsController.setSystemBarsAppearance(0, insetsMask);
-        }
-    }
+		WindowInsetsController insetsController = window.getInsetsController();
+		if (insetsController == null) {
+			return;
+		}
+		if (luminance > 128) {
+			insetsController.setSystemBarsAppearance(insetsMask, insetsMask);
+		} else {
+			insetsController.setSystemBarsAppearance(0, insetsMask);
+		}
+	}
 
-    private void setStatusColor(int color, int luminance) {
-        this.setBarColor(Bar.STATUS, color, luminance);
-    }
+	private void setStatusColor(int color, int luminance) {
+		this.setBarColor(Bar.STATUS, color, luminance);
+	}
 
-    private void setNavigationColor(int color, int luminance) {
-        this.setBarColor(Bar.NAVIGATION, color, luminance);
-    }
+	private void setNavigationColor(int color, int luminance) {
+		this.setBarColor(Bar.NAVIGATION, color, luminance);
+	}
 
 	private void dispatchMotionEvent(MotionEvent event) {
 		if (nhandle == 0) {
@@ -277,11 +277,11 @@ public final class GioView extends SurfaceView {
 	}
 
 	void setInputHint(int hint) {
-	    if (hint == this.keyboardHint) {
-	        return;
-	    }
-	    this.keyboardHint = hint;
-	    imm.restartInput(this);
+		if (hint == this.keyboardHint) {
+			return;
+		}
+		this.keyboardHint = hint;
+		imm.restartInput(this);
 	}
 
 	void showTextInput() {
