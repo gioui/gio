@@ -18,16 +18,21 @@ type Rect image.Rectangle
 func (r Rect) Op() Op {
 	return Op{
 		outline: true,
-		path: PathSpec{
-			shape:  ops.Rect,
-			bounds: image.Rectangle(r),
-		},
+		path:    r.Path(),
 	}
 }
 
 // Push the clip operation on the clip stack.
 func (r Rect) Push(ops *op.Ops) Stack {
 	return r.Op().Push(ops)
+}
+
+// Path returns the PathSpec for the rectangle.
+func (r Rect) Path() PathSpec {
+	return PathSpec{
+		shape:  ops.Rect,
+		bounds: image.Rectangle(r),
+	}
 }
 
 // UniformRRect returns an RRect with all corner radii set to the
