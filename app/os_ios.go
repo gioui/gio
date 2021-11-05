@@ -86,7 +86,10 @@ import (
 	"gioui.org/unit"
 )
 
-type ViewEvent struct{}
+type ViewEvent struct {
+	// View is a CFTypeRef for the UIView backing a Window.
+	View uintptr
+}
 
 type window struct {
 	view        C.CFTypeRef
@@ -125,6 +128,7 @@ func onCreate(view C.CFTypeRef) {
 	w.w.SetDriver(w)
 	views[view] = w
 	w.w.Event(system.StageEvent{Stage: system.StagePaused})
+	w.w.Event(ViewEvent{View: uintptr(view)})
 }
 
 //export gio_onDraw
@@ -177,6 +181,7 @@ func onStop(view C.CFTypeRef) {
 func onDestroy(view C.CFTypeRef) {
 	w := views[view]
 	delete(views, view)
+	w.w.Event(ViewEvent{})
 	w.w.Event(system.DestroyEvent{})
 	w.displayLink.Close()
 	w.view = 0
