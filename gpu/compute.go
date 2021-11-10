@@ -1723,7 +1723,11 @@ func (c *collector) addClip(state *encoderState, viewport, bounds f32.Rectangle,
 
 func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textureOp) {
 	fview := f32.Rectangle{Max: layout.FPt(viewport)}
-	c.reader.Reset(&root.Internal)
+	var intOps *ops.Ops
+	if root != nil {
+		intOps = &root.Internal
+	}
+	c.reader.Reset(intOps)
 	var state encoderState
 	reset := func() {
 		state = encoderState{

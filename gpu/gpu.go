@@ -800,7 +800,11 @@ func (d *drawOps) collect(root *op.Ops, viewport image.Point) {
 	viewf := f32.Rectangle{
 		Max: f32.Point{X: float32(viewport.X), Y: float32(viewport.Y)},
 	}
-	d.reader.Reset(&root.Internal)
+	var ops *ops.Ops
+	if root != nil {
+		ops = &root.Internal
+	}
+	d.reader.Reset(ops)
 	d.collectOps(&d.reader, viewf)
 }
 

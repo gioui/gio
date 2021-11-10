@@ -132,6 +132,14 @@ func TestDepth(t *testing.T) {
 	}
 }
 
+func TestNoOps(t *testing.T) {
+	w, release := newTestWindow(t)
+	defer release()
+	if err := w.Frame(nil); err != nil {
+		t.Error(err)
+	}
+}
+
 func newTestWindow(t *testing.T) (*Window, func()) {
 	t.Helper()
 	sz := image.Point{X: 800, Y: 600}

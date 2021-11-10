@@ -55,7 +55,7 @@ func newContext() (context, error) {
 	if firstErr != nil {
 		return nil, firstErr
 	}
-	return nil, errors.New("x11: no available GPU backends")
+	return nil, errors.New("headless: no available GPU backends")
 }
 
 // NewWindow creates a new headless window.
