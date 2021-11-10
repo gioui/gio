@@ -75,7 +75,6 @@ type drawOps struct {
 	reader      ops.Reader
 	states      []f32.Affine2D
 	transStack  []f32.Affine2D
-	cache       *resourceCache
 	vertCache   []byte
 	viewport    image.Point
 	clear       bool
@@ -353,7 +352,7 @@ func (g *gpu) Frame(frameOps *op.Ops, target RenderTarget, viewport image.Point)
 func (g *gpu) collect(viewport image.Point, frameOps *op.Ops) {
 	g.renderer.blitter.viewport = viewport
 	g.renderer.pather.viewport = viewport
-	g.drawOps.reset(g.cache, viewport)
+	g.drawOps.reset(viewport)
 	g.drawOps.collect(frameOps, viewport)
 	g.frameStart = time.Now()
 	if g.drawOps.profile && g.timers == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
@@ -773,9 +772,8 @@ func floor(v float32) int {
 	return int(math.Floor(float64(v)))
 }
 
-func (d *drawOps) reset(cache *resourceCache, viewport image.Point) {
+func (d *drawOps) reset(viewport image.Point) {
 	d.profile = false
-	d.cache = cache
 	d.viewport = viewport
 	d.imageOps = d.imageOps[:0]
 	d.pathOps = d.pathOps[:0]
