@@ -133,9 +133,6 @@ type imageOp struct {
 
 func decodeStrokeOp(data []byte) float32 {
 	_ = data[4]
-	if ops.OpType(data[0]) != ops.TypeStroke {
-		panic("invalid op")
-	}
 	bo := binary.LittleEndian
 	return math.Float32frombits(bo.Uint32(data[1:]))
 }
@@ -179,9 +176,6 @@ type linearGradientOpData struct {
 }
 
 func decodeImageOp(data []byte, refs []interface{}) imageOpData {
-	if ops.OpType(data[0]) != ops.TypeImage {
-		panic("invalid op")
-	}
 	handle := refs[1]
 	if handle == nil {
 		return imageOpData{}
@@ -193,9 +187,6 @@ func decodeImageOp(data []byte, refs []interface{}) imageOpData {
 }
 
 func decodeColorOp(data []byte) color.NRGBA {
-	if ops.OpType(data[0]) != ops.TypeColor {
-		panic("invalid op")
-	}
 	return color.NRGBA{
 		R: data[1],
 		G: data[2],
@@ -205,9 +196,6 @@ func decodeColorOp(data []byte) color.NRGBA {
 }
 
 func decodeLinearGradientOp(data []byte) linearGradientOpData {
-	if ops.OpType(data[0]) != ops.TypeLinearGradient {
-		panic("invalid op")
-	}
 	bo := binary.LittleEndian
 	return linearGradientOpData{
 		stop1: f32.Point{
