@@ -539,6 +539,46 @@ func (w *window) Configure(options []Option) {
 	}
 }
 
+// Maximize the window. It will have no effect when in fullscreen mode.
+func (w *window) Maximize() {
+	if w.config.Mode == Fullscreen {
+		return
+	}
+	style := windows.GetWindowLong(w.hwnd)
+	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW|windows.WS_MAXIMIZE)
+	mi := windows.GetMonitorInfo(w.hwnd)
+	windows.SetWindowPos(w.hwnd, 0,
+		mi.Monitor.Left, mi.Monitor.Top,
+		mi.Monitor.Right-mi.Monitor.Left,
+		mi.Monitor.Bottom-mi.Monitor.Top,
+		windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED,
+	)
+}
+
+// Center will place window at monitor center.
+func (w *window) Center() {
+	// Make sure that the window is sizeable
+	style := windows.GetWindowLong(w.hwnd) & (^uintptr(windows.WS_MAXIMIZE))
+	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW)
+
+	// Find with/height including the window decorations.
+	wr := windows.Rect{
+		Right:  int32(w.config.Size.X),
+		Bottom: int32(w.config.Size.Y),
+	}
+	dwStyle := uint32(windows.WS_OVERLAPPEDWINDOW)
+	dwExStyle := uint32(windows.WS_EX_APPWINDOW | windows.WS_EX_WINDOWEDGE)
+	windows.AdjustWindowRectEx(&wr, dwStyle, 0, dwExStyle)
+	width := wr.Right - wr.Left
+	height := wr.Bottom - wr.Top
+
+	// Move to center of current monitor
+	mi := windows.GetMonitorInfo(w.hwnd).Monitor
+	x := mi.Left + (mi.Right-mi.Left-width)/2
+	y := mi.Top + (mi.Bottom-mi.Top-height)/2
+	windows.MoveWindow(w.hwnd, x, y, width, height, true)
+}
+
 func (w *window) SetWindowMode(mode WindowMode) {
 	// https://devblogs.microsoft.com/oldnewthing/20100412-00/?p=14353
 	switch mode {

@@ -291,6 +291,12 @@ func (w *window) Close() {
 	C.closeWindow(w.window)
 }
 
+// Maximize the window. Not implemented for macos.
+func (w *window) Maximize() {}
+
+// Center the window. Not implemented for macos.
+func (w *window) Center() {}
+
 func (w *window) setStage(stage system.Stage) {
 	if stage == w.stage {
 		return

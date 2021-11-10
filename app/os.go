@@ -149,6 +149,11 @@ type driver interface {
 	Close()
 	// Wakeup wakes up the event loop and sends a WakeupEvent.
 	Wakeup()
+
+	// Maximize will make the window as large as possible, but keep the frame decorations.
+	Maximize()
+	// Center will place the window at monitor center.
+	Center()
 }
 
 type windowRendezvous struct {

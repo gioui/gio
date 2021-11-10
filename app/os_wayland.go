@@ -1481,6 +1481,12 @@ func (w *window) SetInputHint(_ key.InputHint) {}
 // Close the window. Not implemented for Wayland.
 func (w *window) Close() {}
 
+// Maximize the window. Not implemented for Wayland.
+func (w *window) Maximize() {}
+
+// Center the window. Not implemented for Wayland.
+func (w *window) Center() {}
+
 func (w *window) NewContext() (context, error) {
 	var firstErr error
 	if f := newWaylandVulkanContext; f != nil {

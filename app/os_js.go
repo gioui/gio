@@ -566,6 +566,12 @@ func (w *window) SetInputHint(mode key.InputHint) {
 // Close the window. Not implemented for js.
 func (w *window) Close() {}
 
+// Maximize the window. Not implemented for js.
+func (w *window) Maximize() {}
+
+// Center the window. Not implemented for js.
+func (w *window) Center() {}
+
 func (w *window) resize() {
 	w.scale = float32(w.window.Get("devicePixelRatio").Float())
 

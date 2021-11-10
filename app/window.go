@@ -311,6 +311,22 @@ func (w *Window) Close() {
 	})
 }
 
+// Maximize the window.
+// Note: only implemented on Windows.
+func (w *Window) Maximize() {
+	w.driverDefer(func(d driver) {
+		d.Maximize()
+	})
+}
+
+// Center the window.
+// Note: only implemented on Windows.
+func (w *Window) Center() {
+	w.driverDefer(func(d driver) {
+		d.Center()
+	})
+}
+
 // Run f in the same thread as the native window event loop, and wait for f to
 // return or the window to close. Run is guaranteed not to deadlock if it is
 // invoked during the handling of a ViewEvent, system.FrameEvent,

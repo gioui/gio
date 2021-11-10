@@ -295,6 +295,12 @@ func (w *x11Window) Close() {
 	C.XSendEvent(w.x, w.xw, C.False, C.NoEventMask, &xev)
 }
 
+// Maximize the window. Not implemented for x11.
+func (w *x11Window) Maximize() {}
+
+// Center the window. Not implemented for x11.
+func (w *x11Window) Center() {}
+
 var x11OneByte = make([]byte, 1)
 
 func (w *x11Window) Wakeup() {
