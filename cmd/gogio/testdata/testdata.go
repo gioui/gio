@@ -123,10 +123,9 @@ func (w *quarterWidget) Layout(gtx layout.Context) layout.Dimensions {
 	r := image.Rectangle{Max: gtx.Constraints.Max}
 	paint.FillShape(gtx.Ops, color, clip.Rect(r).Op())
 
-	clip.Rect(image.Rectangle{
+	defer clip.Rect(image.Rectangle{
 		Max: image.Pt(gtx.Constraints.Max.X, gtx.Constraints.Max.Y),
-	}).
-		Add(gtx.Ops)
+	}).Push(gtx.Ops).Pop()
 	pointer.InputOp{
 		Tag:   w,
 		Types: pointer.Press,
