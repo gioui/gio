@@ -59,12 +59,9 @@ func NewImageOp(src image.Image) ImageOp {
 			color:   col,
 		}
 	case *image.RGBA:
-		bounds := src.Bounds()
-		if bounds.Min == (image.Point{}) && src.Stride == bounds.Dx()*4 {
-			return ImageOp{
-				src:    src,
-				handle: new(int),
-			}
+		return ImageOp{
+			src:    src,
+			handle: new(int),
 		}
 	}
 

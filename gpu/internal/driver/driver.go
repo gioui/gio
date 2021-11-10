@@ -229,8 +229,9 @@ func flipImageY(stride, height int, pixels []byte) {
 func UploadImage(t Texture, offset image.Point, img *image.RGBA) {
 	var pixels []byte
 	size := img.Bounds().Size()
-	start := img.PixOffset(0, 0)
-	end := img.PixOffset(size.X, size.Y-1)
+	min := img.Rect.Min
+	start := img.PixOffset(min.X, min.Y)
+	end := img.PixOffset(min.X+size.X, min.Y+size.Y-1)
 	pixels = img.Pix[start:end]
 	t.Upload(offset, size, pixels, img.Stride)
 }

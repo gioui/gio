@@ -145,6 +145,10 @@ func verifyRef(t *testing.T, img *image.RGBA, frame int) (ok bool) {
 	if frame != 0 {
 		path = filepath.Join("refs", t.Name()+"_"+strconv.Itoa(frame)+".png")
 	}
+	if *dumpImages {
+		saveImage(t, path, img)
+		return true
+	}
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		t.Error("could not open ref:", err)

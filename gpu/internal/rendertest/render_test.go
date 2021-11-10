@@ -334,6 +334,29 @@ func TestZeroImage(t *testing.T) {
 	}
 }
 
+func TestImageRGBA(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		w := newWindow(t, 10, 10)
+
+		im := image.NewRGBA(image.Rect(0, 0, 5, 5))
+		im.Set(3, 3, colornames.Black)
+		im.Set(4, 3, colornames.Black)
+		im.Set(3, 4, colornames.Black)
+		im.Set(4, 4, colornames.Black)
+		im = im.SubImage(image.Rect(2, 2, 5, 5)).(*image.RGBA)
+		paint.NewImageOp(im).Add(o)
+		paint.PaintOp{}.Add(o)
+		if err := w.Frame(o); err != nil {
+			t.Error(err)
+		}
+	}, func(r result) {
+		r.expect(1, 1, colornames.Black)
+		r.expect(2, 1, colornames.Black)
+		r.expect(1, 2, colornames.Black)
+		r.expect(2, 2, colornames.Black)
+	})
+}
+
 // lerp calculates linear interpolation with color b and p.
 func lerp(a, b f32color.RGBA, p float32) f32color.RGBA {
 	return f32color.RGBA{
