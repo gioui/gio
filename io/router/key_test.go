@@ -220,6 +220,11 @@ func TestKeyFocusedInvisible(t *testing.T) {
 
 }
 
+func TestNoOps(t *testing.T) {
+	r := new(Router)
+	r.Frame(nil)
+}
+
 func assertKeyEvent(t *testing.T, events []event.Event, expected bool, expectedInputs ...event.Event) {
 	t.Helper()
 	var evtFocus int

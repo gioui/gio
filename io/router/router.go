@@ -68,13 +68,17 @@ func (q *Router) Events(k event.Tag) []event.Event {
 // Frame replaces the declared handlers from the supplied
 // operation list. The text input state, wakeup time and whether
 // there are active profile handlers is also saved.
-func (q *Router) Frame(ops *op.Ops) {
+func (q *Router) Frame(frame *op.Ops) {
 	q.handlers.Clear()
 	q.wakeup = false
 	for k := range q.profHandlers {
 		delete(q.profHandlers, k)
 	}
-	q.reader.Reset(&ops.Internal)
+	var ops *ops.Ops
+	if frame != nil {
+		ops = &frame.Internal
+	}
+	q.reader.Reset(ops)
 	q.collect()
 
 	q.pointer.queue.Frame(&q.handlers)
