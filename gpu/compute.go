@@ -1802,8 +1802,9 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 			paintState := state
 			if paintState.matType == materialTexture {
 				// Clip to the bounds of the image, to hide other images in the atlas.
-				bounds := paintState.image.src.Bounds()
-				c.addClip(&paintState, fview, layout.FRect(bounds), nil, ops.Key{}, 0, 0, false)
+				sz := state.image.src.Rect.Size()
+				bounds := f32.Rectangle{Max: layout.FPt(sz)}
+				c.addClip(&paintState, fview, bounds, nil, ops.Key{}, 0, 0, false)
 			}
 			intersect := paintState.clip.intersect
 			if intersect.Empty() {

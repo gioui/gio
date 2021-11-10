@@ -339,10 +339,10 @@ func TestImageRGBA(t *testing.T) {
 		w := newWindow(t, 10, 10)
 
 		im := image.NewRGBA(image.Rect(0, 0, 5, 5))
-		im.Set(3, 3, colornames.Black)
-		im.Set(4, 3, colornames.Black)
-		im.Set(3, 4, colornames.Black)
-		im.Set(4, 4, colornames.Black)
+		im.Set(3, 3, colornames.Red)
+		im.Set(4, 3, colornames.Red)
+		im.Set(3, 4, colornames.Red)
+		im.Set(4, 4, colornames.Red)
 		im = im.SubImage(image.Rect(2, 2, 5, 5)).(*image.RGBA)
 		paint.NewImageOp(im).Add(o)
 		paint.PaintOp{}.Add(o)
@@ -350,10 +350,10 @@ func TestImageRGBA(t *testing.T) {
 			t.Error(err)
 		}
 	}, func(r result) {
-		r.expect(1, 1, colornames.Black)
-		r.expect(2, 1, colornames.Black)
-		r.expect(1, 2, colornames.Black)
-		r.expect(2, 2, colornames.Black)
+		r.expect(1, 1, colornames.Red)
+		r.expect(2, 1, colornames.Red)
+		r.expect(1, 2, colornames.Red)
+		r.expect(2, 2, colornames.Red)
 	})
 }
 

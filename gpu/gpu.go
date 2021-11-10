@@ -955,7 +955,8 @@ loop:
 			inf := float32(1e6)
 			dst := f32.Rect(-inf, -inf, inf, inf)
 			if state.matType == materialTexture {
-				dst = layout.FRect(state.image.src.Rect)
+				sz := state.image.src.Rect.Size()
+				dst = f32.Rectangle{Max: layout.FPt(sz)}
 			}
 			clipData, bnd, partialTrans := d.boundsForTransformedRect(dst, t)
 			cl := viewport.Intersect(bnd.Add(off))
