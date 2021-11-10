@@ -17,6 +17,7 @@ packages:
  - libxinerama-dev
  - libxi-dev
  - libxxf86vm-dev
+ - mesa-vulkan-drivers
  - wine
  - xvfb
  - xdotool
@@ -55,7 +56,6 @@ tasks:
      done
  - test_gio: |
      cd gio
-     export EGL_PLATFORM=surfaceless # for headless tests
      go test -race ./...
      GOOS=windows go test -exec=wine ./...
      GOOS=js GOARCH=wasm go build -o /dev/null ./...
