@@ -892,8 +892,9 @@ func ChoosePhysicalDevice(inst Instance, surf Surface) (PhysicalDevice, int, err
 	for _, pd := range devs {
 		var props C.VkPhysicalDeviceProperties
 		C.vkGetPhysicalDeviceProperties(funcs.vkGetPhysicalDeviceProperties, pd, &props)
-		// Skip software implementations such as lavapipe.
-		if props.deviceType == C.VK_PHYSICAL_DEVICE_TYPE_CPU {
+		// The lavapipe software implementation doesn't work well rendering to a surface.
+		// See https://gitlab.freedesktop.org/mesa/mesa/-/issues/5473.
+		if surf != 0 && props.deviceType == C.VK_PHYSICAL_DEVICE_TYPE_CPU {
 			continue
 		}
 		const caps = C.VK_QUEUE_GRAPHICS_BIT | C.VK_QUEUE_COMPUTE_BIT
