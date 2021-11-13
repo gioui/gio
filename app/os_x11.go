@@ -49,6 +49,11 @@ import (
 	"gioui.org/app/internal/xkb"
 )
 
+const (
+	_NET_WM_STATE_REMOVE = 0
+	_NET_WM_STATE_ADD    = 1
+)
+
 type x11Window struct {
 	w            *callbacks
 	x            *C.Display
@@ -81,6 +86,10 @@ type x11Window struct {
 		wmStateFullscreen C.Atom
 		// "_NET_ACTIVE_WINDOW"
 		wmActiveWindow C.Atom
+		// _NET_WM_STATE_MAXIMIZED_HORZ
+		wmStateMaximizedHorz C.Atom
+		// _NET_WM_STATE_MAXIMIZED_VERT
+		wmStateMaximizedVert C.Atom
 	}
 	stage  system.Stage
 	metric unit.Metric
@@ -241,37 +250,16 @@ func (w *x11Window) SetWindowMode(mode WindowMode) {
 	var action C.long
 	switch mode {
 	case Windowed:
-		action = 0 // _NET_WM_STATE_REMOVE
+		action = _NET_WM_STATE_REMOVE
 	case Fullscreen:
-		action = 1 // _NET_WM_STATE_ADD
+		action = _NET_WM_STATE_ADD
 	default:
 		return
 	}
 	w.config.Mode = mode
 	// "A Client wishing to change the state of a window MUST send
 	//  a _NET_WM_STATE client message to the root window."
-	var xev C.XEvent
-	ev := (*C.XClientMessageEvent)(unsafe.Pointer(&xev))
-	*ev = C.XClientMessageEvent{
-		_type:        C.ClientMessage,
-		display:      w.x,
-		window:       w.xw,
-		message_type: w.atoms.wmState,
-		format:       32,
-	}
-	arr := (*[5]C.long)(unsafe.Pointer(&ev.data))
-	arr[0] = action
-	arr[1] = C.long(w.atoms.wmStateFullscreen)
-	arr[2] = 0
-	arr[3] = 1 // application
-	arr[4] = 0
-	C.XSendEvent(
-		w.x,
-		C.XDefaultRootWindow(w.x), // MUST be the root window
-		C.False,
-		C.SubstructureNotifyMask|C.SubstructureRedirectMask,
-		&xev,
-	)
+	w.sendWMStateEvent(action, w.atoms.wmStateFullscreen, 0)
 }
 
 func (w *x11Window) ShowTextInput(show bool) {}
@@ -295,11 +283,54 @@ func (w *x11Window) Close() {
 	C.XSendEvent(w.x, w.xw, C.False, C.NoEventMask, &xev)
 }
 
-// Maximize the window. Not implemented for x11.
-func (w *x11Window) Maximize() {}
+// Maximize the window.
+func (w *x11Window) Maximize() {
+	w.sendWMStateEvent(_NET_WM_STATE_ADD, w.atoms.wmStateMaximizedHorz, w.atoms.wmStateMaximizedVert)
+}
 
-// Center the window. Not implemented for x11.
-func (w *x11Window) Center() {}
+// Center the window.
+func (w *x11Window) Center() {
+	screen := C.XDefaultScreen(w.x)
+	width := C.XDisplayWidth(w.x, screen)
+	height := C.XDisplayHeight(w.x, screen)
+
+	var attrs C.XWindowAttributes
+	C.XGetWindowAttributes(w.x, w.xw, &attrs)
+	width -= attrs.border_width
+	height -= attrs.border_width
+
+	sz := w.config.Size
+	x := (int(width) - sz.X) / 2
+	y := (int(height) - sz.Y) / 2
+
+	C.XMoveResizeWindow(w.x, w.xw, C.int(x), C.int(y), C.uint(sz.X), C.uint(sz.Y))
+}
+
+// action is one of _NET_WM_STATE_REMOVE, _NET_WM_STATE_ADD.
+func (w *x11Window) sendWMStateEvent(action C.long, atom1, atom2 C.ulong) {
+	var xev C.XEvent
+	ev := (*C.XClientMessageEvent)(unsafe.Pointer(&xev))
+	*ev = C.XClientMessageEvent{
+		_type:        C.ClientMessage,
+		display:      w.x,
+		window:       w.xw,
+		message_type: w.atoms.wmState,
+		format:       32,
+	}
+	data := (*[5]C.long)(unsafe.Pointer(&ev.data))
+	data[0] = C.long(action)
+	data[1] = C.long(atom1)
+	data[2] = C.long(atom2)
+	data[3] = 1 // application
+
+	C.XSendEvent(
+		w.x,
+		C.XDefaultRootWindow(w.x), // MUST be the root window
+		C.False,
+		C.SubstructureNotifyMask|C.SubstructureRedirectMask,
+		&xev,
+	)
+}
 
 var x11OneByte = make([]byte, 1)
 
@@ -735,6 +766,8 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 	w.atoms.wmState = w.atom("_NET_WM_STATE", false)
 	w.atoms.wmStateFullscreen = w.atom("_NET_WM_STATE_FULLSCREEN", false)
 	w.atoms.wmActiveWindow = w.atom("_NET_ACTIVE_WINDOW", false)
+	w.atoms.wmStateMaximizedHorz = w.atom("_NET_WM_STATE_MAXIMIZED_HORZ", false)
+	w.atoms.wmStateMaximizedVert = w.atom("_NET_WM_STATE_MAXIMIZED_VERT", false)
 
 	// extensions
 	C.XSetWMProtocols(dpy, win, &w.atoms.evDelWindow, 1)

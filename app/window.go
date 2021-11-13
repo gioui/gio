@@ -312,7 +312,7 @@ func (w *Window) Close() {
 }
 
 // Maximize the window.
-// Note: only implemented on Windows.
+// Note: only implemented on Windows, macOS and X11.
 func (w *Window) Maximize() {
 	w.driverDefer(func(d driver) {
 		d.Maximize()
@@ -320,7 +320,7 @@ func (w *Window) Maximize() {
 }
 
 // Center the window.
-// Note: only implemented on Windows.
+// Note: only implemented on Windows, macOS and X11.
 func (w *Window) Center() {
 	w.driverDefer(func(d driver) {
 		d.Center()

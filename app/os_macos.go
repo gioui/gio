@@ -118,6 +118,17 @@ static void setMaxSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
 	window.contentMaxSize = NSMakeSize(width, height);
 }
 
+static void setScreenFrame(CFTypeRef windowRef, CGFloat x, CGFloat y, CGFloat w, CGFloat h) {
+	NSWindow* window = (__bridge NSWindow *)windowRef;
+	NSRect r = NSMakeRect(x, y, w, h);
+	[window setFrame:r display:YES];
+}
+
+static NSRect getScreenFrame(CFTypeRef windowRef) {
+	NSWindow* window = (__bridge NSWindow *)windowRef;
+	return [[window screen] frame];
+}
+
 static void setTitle(CFTypeRef windowRef, const char *title) {
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	window.title = [NSString stringWithUTF8String: title];
@@ -291,11 +302,23 @@ func (w *window) Close() {
 	C.closeWindow(w.window)
 }
 
-// Maximize the window. Not implemented for macos.
-func (w *window) Maximize() {}
+// Maximize the window.
+func (w *window) Maximize() {
+	r := C.getScreenFrame(w.window) // the screen size of the window
+	C.setScreenFrame(w.window, C.CGFloat(0), C.CGFloat(0), r.size.width, r.size.height)
+}
 
-// Center the window. Not implemented for macos.
-func (w *window) Center() {}
+// Center the window.
+func (w *window) Center() {
+	r := C.getScreenFrame(w.window) // the screen size of the window
+
+	screenScale := float32(C.getScreenBackingScale())
+	sz := w.config.Size.Div(int(screenScale))
+	x := (int(r.size.width) - sz.X) / 2
+	y := (int(r.size.height) - sz.Y) / 2
+
+	C.setScreenFrame(w.window, C.CGFloat(x), C.CGFloat(y), C.CGFloat(sz.X), C.CGFloat(sz.Y))
+}
 
 func (w *window) setStage(stage system.Stage) {
 	if stage == w.stage {
