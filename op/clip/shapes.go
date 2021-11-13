@@ -158,10 +158,14 @@ func (e Ellipse) Push(ops *op.Ops) Stack {
 
 // path constructs a path for the ellipse.
 func (e Ellipse) path(o *op.Ops) PathSpec {
+	bounds := f32.Rectangle(e)
+	if bounds.Dx() == 0 || bounds.Dy() == 0 {
+		return PathSpec{shape: ops.Rect}
+	}
+
 	var p Path
 	p.Begin(o)
 
-	bounds := f32.Rectangle(e)
 	center := bounds.Max.Add(bounds.Min).Mul(.5)
 	diam := bounds.Dx()
 	r := diam * .5
