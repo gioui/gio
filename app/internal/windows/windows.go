@@ -268,6 +268,7 @@ var (
 	_GetMessageTime              = user32.NewProc("GetMessageTime")
 	_GetMonitorInfo              = user32.NewProc("GetMonitorInfoW")
 	_GetWindowLong               = user32.NewProc("GetWindowLongPtrW")
+	_GetWindowLong32             = user32.NewProc("GetWindowLongW")
 	_GetWindowPlacement          = user32.NewProc("GetWindowPlacement")
 	_KillTimer                   = user32.NewProc("KillTimer")
 	_LoadCursor                  = user32.NewProc("LoadCursorW")
@@ -293,6 +294,7 @@ var (
 	_SetProcessDPIAware          = user32.NewProc("SetProcessDPIAware")
 	_SetTimer                    = user32.NewProc("SetTimer")
 	_SetWindowLong               = user32.NewProc("SetWindowLongPtrW")
+	_SetWindowLong32             = user32.NewProc("SetWindowLongW")
 	_SetWindowPlacement          = user32.NewProc("SetWindowPlacement")
 	_SetWindowPos                = user32.NewProc("SetWindowPos")
 	_SetWindowText               = user32.NewProc("SetWindowTextW")
@@ -471,12 +473,20 @@ func GetMonitorInfo(hwnd syscall.Handle) MonitorInfo {
 }
 
 func GetWindowLong(hwnd syscall.Handle) (style uintptr) {
-	style, _, _ = _GetWindowLong.Call(uintptr(hwnd), uintptr(GWL_STYLE))
+	if runtime.GOARCH == "386" {
+		style, _, _ = _GetWindowLong32.Call(uintptr(hwnd), uintptr(GWL_STYLE))
+	} else {
+		style, _, _ = _GetWindowLong.Call(uintptr(hwnd), uintptr(GWL_STYLE))
+	}
 	return
 }
 
 func SetWindowLong(hwnd syscall.Handle, idx uint32, style uintptr) {
-	_SetWindowLong.Call(uintptr(hwnd), uintptr(idx), style)
+	if runtime.GOARCH == "386" {
+		_SetWindowLong32.Call(uintptr(hwnd), uintptr(idx), style)
+	} else {
+		_SetWindowLong.Call(uintptr(hwnd), uintptr(idx), style)
+	}
 }
 
 func SetWindowPlacement(hwnd syscall.Handle, wp *WindowPlacement) {
