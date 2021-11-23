@@ -139,7 +139,7 @@ func (c Circle) Path(ops *op.Ops) PathSpec {
 		Min: f32.Pt(c.Center.X-c.Radius, c.Center.Y-c.Radius),
 		Max: f32.Pt(c.Center.X+c.Radius, c.Center.Y+c.Radius),
 	}
-	return Ellipse(b).path(ops)
+	return Ellipse(b).Path(ops)
 }
 
 // Ellipse represents the largest axis-aligned ellipse that
@@ -148,7 +148,7 @@ type Ellipse f32.Rectangle
 
 // Op returns the op for the filled ellipse.
 func (e Ellipse) Op(ops *op.Ops) Op {
-	return Outline{Path: e.path(ops)}.Op()
+	return Outline{Path: e.Path(ops)}.Op()
 }
 
 // Push the filled ellipse clip op on the clip stack.
@@ -156,8 +156,8 @@ func (e Ellipse) Push(ops *op.Ops) Stack {
 	return e.Op(ops).Push(ops)
 }
 
-// path constructs a path for the ellipse.
-func (e Ellipse) path(o *op.Ops) PathSpec {
+// Path constructs a path for the ellipse.
+func (e Ellipse) Path(o *op.Ops) PathSpec {
 	bounds := f32.Rectangle(e)
 	if bounds.Dx() == 0 || bounds.Dy() == 0 {
 		return PathSpec{shape: ops.Rect}
