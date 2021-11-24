@@ -269,7 +269,7 @@ func Save(o *Ops) StateOp {
 	return s
 }
 
-// load a previously saved operations state given
+// Load a previously saved operations state given
 // its ID.
 func (s StateOp) Load() {
 	bo := binary.LittleEndian
@@ -427,6 +427,6 @@ func (t OpType) String() string {
 	case TypeStroke:
 		return "Stroke"
 	default:
-		panic("unnkown OpType")
+		panic("unknown OpType")
 	}
 }
