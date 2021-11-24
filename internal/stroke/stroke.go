@@ -543,47 +543,37 @@ func strokePathRoundCap(qs *StrokeQuads, hw float32, pivot, n0 f32.Point) {
 // An electronic version may be found at:
 //  http://spaceroots.org/documents/ellipse/elliptical-arc.pdf
 func ArcTransform(p, f1, f2 f32.Point, angle float32, segments int) f32.Affine2D {
-	center := f32.Point{
-		X: 0.5 * (f1.X + f2.X),
-		Y: 0.5 * (f1.Y + f2.Y),
-	}
-
-	// semi-major axis: 2a = |PF1| + |PF2|
-	a := 0.5 * (dist(f1, p) + dist(f2, p))
-
-	// semi-minor axis: c^2 = a^2 - b^2 (c: focal distance)
-	c := dist(f1, center)
-	b := math.Sqrt(a*a - c*c)
-
 	var rx, ry, alpha float64
-	switch {
-	case a > b:
-		rx = a
-		ry = b
-	default:
-		rx = b
-		ry = a
-	}
-
-	var x float64
-	switch {
-	case f1 == f2:
+	if f1 == f2 {
 		// degenerate case of a circle.
-		alpha = 0
-	default:
+		rx = dist(f1, p)
+		ry = rx
+	} else {
+		// semi-major axis: 2a = |PF1| + |PF2|
+		a := 0.5 * (dist(f1, p) + dist(f2, p))
+		// semi-minor axis: c^2 = a^2 - b^2 (c: focal distance)
+		c := dist(f1, f2) * 0.5
+		b := math.Sqrt(a*a - c*c)
 		switch {
-		case f1.X > center.X:
-			x = float64(f1.X - center.X)
-			alpha = math.Acos(x / c)
-		case f1.X < center.X:
-			x = float64(f2.X - center.X)
-			alpha = math.Acos(x / c)
-		case f1.X == center.X:
+		case a > b:
+			rx = a
+			ry = b
+		default:
+			rx = b
+			ry = a
+		}
+		if f1.X == f2.X {
 			// special case of a "vertical" ellipse.
 			alpha = math.Pi / 2
-			if f1.Y < center.Y {
+			if f1.Y < f2.Y {
 				alpha = -alpha
 			}
+		} else {
+			x := float64(f1.X-f2.X) * 0.5
+			if x < 0 {
+				x = -x
+			}
+			alpha = math.Acos(x / c)
 		}
 	}
 
@@ -593,6 +583,10 @@ func ArcTransform(p, f1, f2 f32.Point, angle float32, segments int) f32.Affine2D
 		rot f32.Affine2D // rotation matrix for each segment
 		inv f32.Affine2D // transform from ellipse-based frame to absolute one
 	)
+	center := f32.Point{
+		X: 0.5 * (f1.X + f2.X),
+		Y: 0.5 * (f1.Y + f2.Y),
+	}
 	ref = ref.Offset(f32.Point{}.Sub(center))
 	ref = ref.Rotate(f32.Point{}, float32(-alpha))
 	ref = ref.Scale(f32.Point{}, f32.Point{
