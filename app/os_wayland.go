@@ -1478,8 +1478,10 @@ func (w *window) ShowTextInput(show bool) {}
 
 func (w *window) SetInputHint(_ key.InputHint) {}
 
-// Close the window. Not implemented for Wayland.
-func (w *window) Close() {}
+// Close the window.
+func (w *window) Close() {
+	w.dead = true
+}
 
 // Maximize the window. Not implemented for Wayland.
 func (w *window) Maximize() {}

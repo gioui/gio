@@ -303,7 +303,7 @@ func (w *Window) SetCursorName(name pointer.CursorName) {
 // Close the window. The window's event loop should exit when it receives
 // system.DestroyEvent.
 //
-// Currently, only macOS, Windows and X11 drivers implement this functionality,
+// Currently, only macOS, Windows, X11 and Wayland drivers implement this functionality,
 // all others are stubbed.
 func (w *Window) Close() {
 	w.driverDefer(func(d driver) {
