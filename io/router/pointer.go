@@ -3,7 +3,6 @@
 package router
 
 import (
-	"encoding/binary"
 	"image"
 
 	"gioui.org/f32"
@@ -218,7 +217,7 @@ func (q *pointerQueue) opHit(handlers *[]event.Tag, pos f32.Point) {
 	idx := len(q.hitTree) - 1
 	for idx >= 0 {
 		n := &q.hitTree[idx]
-		hit := q.hit(n.area, pos, n.pass)
+		hit := q.hit(n.area, pos)
 		if !hit {
 			idx--
 			continue
@@ -244,7 +243,7 @@ func (q *pointerQueue) invTransform(areaIdx int, p f32.Point) f32.Point {
 	return q.areas[areaIdx].trans.Invert().Transform(p)
 }
 
-func (q *pointerQueue) hit(areaIdx int, p f32.Point, pass bool) bool {
+func (q *pointerQueue) hit(areaIdx int, p f32.Point) bool {
 	for areaIdx != -1 {
 		a := &q.areas[areaIdx]
 		p := a.trans.Invert().Transform(p)
@@ -490,10 +489,6 @@ func addHandler(tags []event.Tag, tag event.Tag) []event.Tag {
 		}
 	}
 	return append(tags, tag)
-}
-
-func opDecodeFloat32(d []byte) float32 {
-	return float32(int32(binary.LittleEndian.Uint32(d)))
 }
 
 func (op *areaOp) Hit(pos f32.Point) bool {
