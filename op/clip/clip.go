@@ -124,10 +124,12 @@ func (p *Path) Pos() f32.Point { return p.pen }
 
 // Begin the path, storing the path data and final Op into ops.
 func (p *Path) Begin(o *op.Ops) {
+	*p = Path{
+		ops:     &o.Internal,
+		macro:   op.Record(o),
+		contour: 1,
+	}
 	p.hash.SetSeed(pathSeed)
-	p.ops = &o.Internal
-	p.macro = op.Record(o)
-	// Write the TypeAux opcode
 	data := ops.Write(p.ops, ops.TypeAuxLen)
 	data[0] = byte(ops.TypeAux)
 }
