@@ -675,7 +675,7 @@ func TestCursorNameOp(t *testing.T) {
 			case func() []event.Event:
 				r.Queue(ev()...)
 			default:
-				panic(fmt.Sprintf("unkown event %T", ev))
+				panic(fmt.Sprintf("unknown event %T", ev))
 			}
 			widget()
 			r.Frame(ops)
