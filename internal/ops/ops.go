@@ -51,6 +51,9 @@ const (
 	TypePointerInput
 	TypeClipboardRead
 	TypeClipboardWrite
+	TypeSource
+	TypeTarget
+	TypeOffer
 	TypeKeyInput
 	TypeKeyFocus
 	TypeKeySoftKeyboard
@@ -129,6 +132,9 @@ const (
 	TypePointerInputLen     = 1 + 1 + 1*2 + 2*4 + 2*4
 	TypeClipboardReadLen    = 1
 	TypeClipboardWriteLen   = 1
+	TypeSourceLen           = 1
+	TypeTargetLen           = 1
+	TypeOfferLen            = 1
 	TypeKeyInputLen         = 1 + 1
 	TypeKeyFocusLen         = 1 + 1
 	TypeKeySoftKeyboardLen  = 1 + 1
@@ -237,6 +243,12 @@ func Write1(o *Ops, n int, ref1 interface{}) []byte {
 func Write2(o *Ops, n int, ref1, ref2 interface{}) []byte {
 	o.data = append(o.data, make([]byte, n)...)
 	o.refs = append(o.refs, ref1, ref2)
+	return o.data[len(o.data)-n:]
+}
+
+func Write3(o *Ops, n int, ref1, ref2, ref3 interface{}) []byte {
+	o.data = append(o.data, make([]byte, n)...)
+	o.refs = append(o.refs, ref1, ref2, ref3)
 	return o.data[len(o.data)-n:]
 }
 
@@ -353,6 +365,9 @@ func (t OpType) Size() int {
 		TypePointerInputLen,
 		TypeClipboardReadLen,
 		TypeClipboardWriteLen,
+		TypeSourceLen,
+		TypeTargetLen,
+		TypeOfferLen,
 		TypeKeyInputLen,
 		TypeKeyFocusLen,
 		TypeKeySoftKeyboardLen,
@@ -377,8 +392,10 @@ func (t OpType) NumRefs() int {
 	switch t {
 	case TypeKeyInput, TypeKeyFocus, TypePointerInput, TypeProfile, TypeCall, TypeClipboardRead, TypeClipboardWrite, TypeCursor, TypeSemanticLabel, TypeSemanticDesc:
 		return 1
-	case TypeImage:
+	case TypeImage, TypeSource, TypeTarget:
 		return 2
+	case TypeOffer:
+		return 3
 	default:
 		return 0
 	}
@@ -418,6 +435,12 @@ func (t OpType) String() string {
 		return "ClipboardRead"
 	case TypeClipboardWrite:
 		return "ClipboardWrite"
+	case TypeSource:
+		return "Source"
+	case TypeTarget:
+		return "Target"
+	case TypeOffer:
+		return "Offer"
 	case TypeKeyInput:
 		return "KeyInput"
 	case TypeKeyFocus:

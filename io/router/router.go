@@ -13,6 +13,7 @@ package router
 import (
 	"encoding/binary"
 	"image"
+	"io"
 	"strings"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"gioui.org/io/pointer"
 	"gioui.org/io/profile"
 	"gioui.org/io/semantic"
+	"gioui.org/io/transfer"
 	"gioui.org/op"
 )
 
@@ -267,6 +269,25 @@ func (q *Router) collect() {
 		case ops.TypeCursor:
 			name := encOp.Refs[0].(pointer.CursorName)
 			pc.cursor(name)
+		case ops.TypeSource:
+			op := transfer.SourceOp{
+				Tag:  encOp.Refs[0].(event.Tag),
+				Type: encOp.Refs[1].(string),
+			}
+			pc.sourceOp(op, &q.handlers)
+		case ops.TypeTarget:
+			op := transfer.TargetOp{
+				Tag:  encOp.Refs[0].(event.Tag),
+				Type: encOp.Refs[1].(string),
+			}
+			pc.targetOp(op, &q.handlers)
+		case ops.TypeOffer:
+			op := transfer.OfferOp{
+				Tag:  encOp.Refs[0].(event.Tag),
+				Type: encOp.Refs[1].(string),
+				Data: encOp.Refs[2].(io.ReadCloser),
+			}
+			pc.offerOp(op, &q.handlers)
 
 		// Key ops.
 		case ops.TypeKeyFocus:

@@ -4,21 +4,24 @@ package router
 
 import (
 	"image"
+	"io"
 
 	"gioui.org/f32"
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/io/semantic"
+	"gioui.org/io/transfer"
 )
 
 type pointerQueue struct {
-	hitTree  []hitNode
-	areas    []areaNode
-	cursors  []cursorNode
-	cursor   pointer.CursorName
-	handlers map[event.Tag]*pointerHandler
-	pointers []pointerInfo
+	hitTree   []hitNode
+	areas     []areaNode
+	cursors   []cursorNode
+	cursor    pointer.CursorName
+	handlers  map[event.Tag]*pointerHandler
+	pointers  []pointerInfo
+	transfers []io.ReadCloser // pending data transfers
 
 	scratch []event.Tag
 
@@ -56,6 +59,9 @@ type pointerInfo struct {
 
 	// entered tracks the tags that contain the pointer.
 	entered []event.Tag
+
+	dataSource event.Tag // dragging source tag
+	dataTarget event.Tag // dragging target tag
 }
 
 type pointerHandler struct {
@@ -65,6 +71,11 @@ type pointerHandler struct {
 	types     pointer.Type
 	// min and max horizontal/vertical scroll
 	scrollRange image.Rectangle
+
+	sourceMimes []string
+	targetMimes []string
+	offeredMime string
+	data        io.ReadCloser
 }
 
 type areaOp struct {
@@ -182,7 +193,7 @@ func frect(r image.Rectangle) f32.Rectangle {
 	}
 }
 
-// fpt converts an point to a f32.Point.
+// fpt converts a point to a f32.Point.
 func fpt(p image.Point) f32.Point {
 	return f32.Point{
 		X: float32(p.X), Y: float32(p.Y),
@@ -217,6 +228,27 @@ func (c *pointerCollector) addHitNode(n hitNode) {
 	c.state.nodePlusOne = len(c.q.hitTree) - 1 + 1
 }
 
+// newHandler returns the current handler or a new one for tag.
+func (c *pointerCollector) newHandler(tag event.Tag, events *handlerEvents) *pointerHandler {
+	areaID := c.currentArea()
+	c.addHitNode(hitNode{
+		area: areaID,
+		tag:  tag,
+		pass: c.state.pass > 0,
+	})
+	h, ok := c.q.handlers[tag]
+	if !ok {
+		h = new(pointerHandler)
+		c.q.handlers[tag] = h
+		// Cancel handlers on (each) first appearance, but don't
+		// trigger redraw.
+		events.AddNoRedraw(tag, pointer.Event{Type: pointer.Cancel})
+	}
+	h.active = true
+	h.area = areaID
+	return h
+}
+
 func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
 	areaID := c.currentArea()
 	area := &c.q.areas[areaID]
@@ -225,21 +257,7 @@ func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
 		area.semantic.content.gestures |= ClickGesture
 	}
 	area.semantic.valid = area.semantic.content.gestures != 0
-	c.addHitNode(hitNode{
-		area: areaID,
-		tag:  op.Tag,
-		pass: c.state.pass > 0,
-	})
-	h, ok := c.q.handlers[op.Tag]
-	if !ok {
-		h = new(pointerHandler)
-		c.q.handlers[op.Tag] = h
-		// Cancel handlers on (each) first appearance, but don't
-		// trigger redraw.
-		events.AddNoRedraw(op.Tag, pointer.Event{Type: pointer.Cancel})
-	}
-	h.active = true
-	h.area = areaID
+	h := c.newHandler(op.Tag, events)
 	h.wantsGrab = h.wantsGrab || op.Grab
 	h.types = h.types | op.Types
 	h.scrollRange = op.ScrollBounds
@@ -285,6 +303,22 @@ func (c *pointerCollector) cursor(name pointer.CursorName) {
 		name: name,
 		area: len(c.q.areas) - 1,
 	})
+}
+
+func (c *pointerCollector) sourceOp(op transfer.SourceOp, events *handlerEvents) {
+	h := c.newHandler(op.Tag, events)
+	h.sourceMimes = append(h.sourceMimes, op.Type)
+}
+
+func (c *pointerCollector) targetOp(op transfer.TargetOp, events *handlerEvents) {
+	h := c.newHandler(op.Tag, events)
+	h.targetMimes = append(h.targetMimes, op.Type)
+}
+
+func (c *pointerCollector) offerOp(op transfer.OfferOp, events *handlerEvents) {
+	h := c.newHandler(op.Tag, events)
+	h.offeredMime = op.Type
+	h.data = op.Data
 }
 
 func (c *pointerCollector) reset(q *pointerQueue) {
@@ -448,6 +482,8 @@ func (q *pointerQueue) reset() {
 		h.active = false
 		h.wantsGrab = false
 		h.types = 0
+		h.sourceMimes = h.sourceMimes[:0]
+		h.targetMimes = h.targetMimes[:0]
 	}
 	q.hitTree = q.hitTree[:0]
 	q.areas = q.areas[:0]
@@ -467,6 +503,12 @@ func (q *pointerQueue) reset() {
 			delete(q.semantic.contentIDs, k)
 		}
 	}
+	for _, rc := range q.transfers {
+		if rc != nil {
+			rc.Close()
+		}
+	}
+	q.transfers = nil
 }
 
 func (q *pointerQueue) Frame(events *handlerEvents) {
@@ -498,6 +540,7 @@ func (q *pointerQueue) Frame(events *handlerEvents) {
 	for i := range q.pointers {
 		p := &q.pointers[i]
 		q.deliverEnterLeaveEvents(p, events, p.last)
+		q.deliverTransferDataEvent(p, events)
 	}
 }
 
@@ -554,10 +597,14 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 		}
 		q.deliverEnterLeaveEvents(p, events, e)
 		q.deliverEvent(p, events, e)
+		if p.pressed {
+			q.deliverDragEvent(p, events)
+		}
 	case pointer.Release:
 		q.deliverEvent(p, events, e)
 		p.pressed = false
 		q.deliverEnterLeaveEvents(p, events, e)
+		q.deliverDropEvent(p, events)
 	case pointer.Scroll:
 		q.deliverEnterLeaveEvents(p, events, e)
 		q.deliverScrollEvent(p, events, e)
@@ -671,6 +718,87 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 	p.entered = append(p.entered[:0], hits...)
 }
 
+func (q *pointerQueue) deliverDragEvent(p *pointerInfo, events *handlerEvents) {
+	if p.dataSource != nil {
+		return
+	}
+	// Identify the data source.
+	for _, k := range p.entered {
+		src := q.handlers[k]
+		if len(src.sourceMimes) == 0 {
+			continue
+		}
+		// One data source handler per pointer.
+		p.dataSource = k
+		// Notify all potential targets.
+		for k, tgt := range q.handlers {
+			if _, ok := firstMimeMatch(src, tgt); ok {
+				events.Add(k, transfer.InitiateEvent{})
+			}
+		}
+		break
+	}
+}
+
+func (q *pointerQueue) deliverDropEvent(p *pointerInfo, events *handlerEvents) {
+	if p.dataSource == nil {
+		return
+	}
+	// Request data from the source.
+	src := q.handlers[p.dataSource]
+	for _, k := range p.entered {
+		h := q.handlers[k]
+		if m, ok := firstMimeMatch(src, h); ok {
+			p.dataTarget = k
+			events.Add(p.dataSource, transfer.RequestEvent{Type: m})
+			return
+		}
+	}
+	// No valid target found, abort.
+	q.deliverTransferCancelEvent(p, events)
+}
+
+func (q *pointerQueue) deliverTransferDataEvent(p *pointerInfo, events *handlerEvents) {
+	if p.dataSource == nil {
+		return
+	}
+	src := q.handlers[p.dataSource]
+	if src.data == nil {
+		// Data not received yet.
+		return
+	}
+	if p.dataTarget == nil {
+		q.deliverTransferCancelEvent(p, events)
+		return
+	}
+	// Send the offered data to the target.
+	transferIdx := len(q.transfers)
+	events.Add(p.dataTarget, transfer.DataEvent{
+		Type: src.offeredMime,
+		Open: func() io.ReadCloser {
+			q.transfers[transferIdx] = nil
+			return src.data
+		},
+	})
+	q.transfers = append(q.transfers, src.data)
+	p.dataTarget = nil
+}
+
+func (q *pointerQueue) deliverTransferCancelEvent(p *pointerInfo, events *handlerEvents) {
+	events.Add(p.dataSource, transfer.CancelEvent{})
+	// Cancel all potential targets.
+	src := q.handlers[p.dataSource]
+	for k, h := range q.handlers {
+		if _, ok := firstMimeMatch(src, h); ok {
+			events.Add(k, transfer.CancelEvent{})
+		}
+	}
+	src.offeredMime = ""
+	src.data = nil
+	p.dataSource = nil
+	p.dataTarget = nil
+}
+
 func searchTag(tags []event.Tag, tag event.Tag) (int, bool) {
 	for i, t := range tags {
 		if t == tag {
@@ -688,6 +816,18 @@ func addHandler(tags []event.Tag, tag event.Tag) []event.Tag {
 		}
 	}
 	return append(tags, tag)
+}
+
+// firstMimeMatch returns the first type match between src and tgt.
+func firstMimeMatch(src, tgt *pointerHandler) (first string, matched bool) {
+	for _, m1 := range tgt.targetMimes {
+		for _, m2 := range src.sourceMimes {
+			if m1 == m2 {
+				return m1, true
+			}
+		}
+	}
+	return "", false
 }
 
 func (op *areaOp) Hit(pos f32.Point) bool {

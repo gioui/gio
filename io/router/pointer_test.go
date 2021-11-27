@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"image"
 	"reflect"
+	"strings"
 	"testing"
 
 	"gioui.org/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
+	"gioui.org/io/transfer"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 )
@@ -761,6 +763,255 @@ func TestEllipse(t *testing.T) {
 	assertEventPointerTypeSequence(t, r.Events(h), pointer.Cancel, pointer.Press)
 }
 
+func TestTransfer(t *testing.T) {
+	srcArea := image.Rect(0, 0, 20, 20)
+	tgtArea := srcArea.Add(image.Pt(40, 0))
+	setup := func(ops *op.Ops, srcType, tgtType string) (src, tgt event.Tag) {
+		src, tgt = new(int), new(int)
+
+		srcStack := clip.Rect(srcArea).Push(ops)
+		transfer.SourceOp{
+			Tag:  src,
+			Type: srcType,
+		}.Add(ops)
+		srcStack.Pop()
+
+		tgt1Stack := clip.Rect(tgtArea).Push(ops)
+		transfer.TargetOp{
+			Tag:  tgt,
+			Type: tgtType,
+		}.Add(ops)
+		tgt1Stack.Pop()
+
+		return src, tgt
+	}
+	// Cancel is received when the pointer is first seen.
+	cancel := pointer.Event{Type: pointer.Cancel}
+
+	t.Run("transfer.Offer should panic on nil Data", func(t *testing.T) {
+		defer func() {
+			if recover() == nil {
+				t.Error("expected panic upon invalid data")
+			}
+		}()
+		transfer.OfferOp{}.Add(new(op.Ops))
+	})
+
+	t.Run("drop on no target", func(t *testing.T) {
+		ops := new(op.Ops)
+		src, tgt := setup(ops, "file", "file")
+		var r Router
+		r.Frame(ops)
+		// Initiate a drag.
+		r.Queue(
+			pointer.Event{
+				Position: f32.Pt(10, 10),
+				Type:     pointer.Press,
+			},
+			pointer.Event{
+				Position: f32.Pt(10, 10),
+				Type:     pointer.Move,
+			},
+		)
+		assertEventSequence(t, r.Events(src), cancel)
+		assertEventSequence(t, r.Events(tgt), cancel, transfer.InitiateEvent{})
+
+		// Drop.
+		r.Queue(
+			pointer.Event{
+				Position: f32.Pt(30, 10),
+				Type:     pointer.Move,
+			},
+			pointer.Event{
+				Position: f32.Pt(30, 10),
+				Type:     pointer.Release,
+			},
+		)
+		assertEventSequence(t, r.Events(src), transfer.CancelEvent{})
+		assertEventSequence(t, r.Events(tgt), transfer.CancelEvent{})
+	})
+
+	t.Run("drag with valid and invalid targets", func(t *testing.T) {
+		ops := new(op.Ops)
+		src, tgt1 := setup(ops, "file", "file")
+		tgt2 := new(int)
+		stack := clip.Rect(tgtArea).Push(ops)
+		transfer.TargetOp{
+			Tag:  tgt2,
+			Type: "nofile",
+		}.Add(ops)
+		stack.Pop()
+		var r Router
+		r.Frame(ops)
+		// Initiate a drag.
+		r.Queue(
+			pointer.Event{
+				Position: f32.Pt(10, 10),
+				Type:     pointer.Press,
+			},
+			pointer.Event{
+				Position: f32.Pt(10, 10),
+				Type:     pointer.Move,
+			},
+		)
+		assertEventSequence(t, r.Events(src), cancel)
+		assertEventSequence(t, r.Events(tgt1), cancel, transfer.InitiateEvent{})
+		assertEventSequence(t, r.Events(tgt2), cancel)
+	})
+
+	t.Run("drop on invalid target", func(t *testing.T) {
+		ops := new(op.Ops)
+		src, tgt := setup(ops, "file", "nofile")
+		var r Router
+		r.Frame(ops)
+		// Drag.
+		r.Queue(
+			pointer.Event{
+				Position: f32.Pt(10, 10),
+				Type:     pointer.Press,
+			},
+			pointer.Event{
+				Position: f32.Pt(10, 10),
+				Type:     pointer.Move,
+			},
+		)
+		assertEventSequence(t, r.Events(src), cancel)
+		assertEventSequence(t, r.Events(tgt), cancel)
+
+		// Drop.
+		r.Queue(
+			pointer.Event{
+				Position: f32.Pt(40, 10),
+				Type:     pointer.Release,
+			},
+		)
+		assertEventSequence(t, r.Events(src), transfer.CancelEvent{})
+		assertEventSequence(t, r.Events(tgt))
+	})
+
+	t.Run("drop on valid target", func(t *testing.T) {
+		ops := new(op.Ops)
+		src, tgt := setup(ops, "file", "file")
+		// Make the target also a source. This should have no effect.
+		stack := clip.Rect(tgtArea).Push(ops)
+		transfer.SourceOp{
+			Tag:  tgt,
+			Type: "file",
+		}.Add(ops)
+		stack.Pop()
+		var r Router
+		r.Frame(ops)
+		// Drag.
+		r.Queue(
+			pointer.Event{
+				Position: f32.Pt(10, 10),
+				Type:     pointer.Press,
+			},
+			pointer.Event{
+				Position: f32.Pt(10, 10),
+				Type:     pointer.Move,
+			},
+		)
+		assertEventSequence(t, r.Events(src), cancel)
+		assertEventSequence(t, r.Events(tgt), cancel, transfer.InitiateEvent{})
+
+		// Drop.
+		r.Queue(
+			pointer.Event{
+				Position: f32.Pt(40, 10),
+				Type:     pointer.Release,
+			},
+		)
+		assertEventSequence(t, r.Events(src), transfer.RequestEvent{Type: "file"})
+
+		// Offer valid type and data.
+		ofr := &offer{data: "hello"}
+		transfer.OfferOp{
+			Tag:  src,
+			Type: "file",
+			Data: ofr,
+		}.Add(ops)
+		r.Frame(ops)
+		evs := r.Events(tgt)
+		if len(evs) != 1 {
+			t.Fatalf("unexpected number of events: %d, want 1", len(evs))
+		}
+		dataEvent, ok := evs[0].(transfer.DataEvent)
+		if !ok {
+			t.Fatalf("unexpected event type: %T, want %T", dataEvent, transfer.DataEvent{})
+		}
+		if got, want := dataEvent.Type, "file"; got != want {
+			t.Fatalf("got %s; want %s", got, want)
+		}
+		if got, want := dataEvent.Open(), ofr; got != want {
+			t.Fatalf("got %v; want %v", got, want)
+		}
+
+		// Drag and drop complete.
+		if ofr.closed {
+			t.Error("offer closed prematurely")
+		}
+		r.Frame(ops)
+		assertEventSequence(t, r.Events(src), transfer.CancelEvent{})
+		assertEventSequence(t, r.Events(tgt), transfer.CancelEvent{})
+	})
+
+	t.Run("drop on valid target, DataEvent not used", func(t *testing.T) {
+		ops := new(op.Ops)
+		src, tgt := setup(ops, "file", "file")
+		// Make the target also a source. This should have no effect.
+		stack := clip.Rect(tgtArea).Push(ops)
+		transfer.SourceOp{
+			Tag:  tgt,
+			Type: "file",
+		}.Add(ops)
+		stack.Pop()
+		var r Router
+		r.Frame(ops)
+		// Drag.
+		r.Queue(
+			pointer.Event{
+				Position: f32.Pt(10, 10),
+				Type:     pointer.Press,
+			},
+			pointer.Event{
+				Position: f32.Pt(10, 10),
+				Type:     pointer.Move,
+			},
+			pointer.Event{
+				Position: f32.Pt(40, 10),
+				Type:     pointer.Release,
+			},
+		)
+		ofr := &offer{data: "hello"}
+		transfer.OfferOp{
+			Tag:  src,
+			Type: "file",
+			Data: ofr,
+		}.Add(ops)
+		r.Frame(ops)
+		// DataEvent should be used here. The next frame should close it as unused.
+		r.Frame(ops)
+		assertEventSequence(t, r.Events(src), transfer.CancelEvent{})
+		assertEventSequence(t, r.Events(tgt), transfer.CancelEvent{})
+		if !ofr.closed {
+			t.Error("offer was not closed")
+		}
+	})
+}
+
+// offer satisfies io.ReadCloser for use in data transfers.
+type offer struct {
+	data   string
+	closed bool
+}
+
+func (offer) Read([]byte) (int, error) { return 0, nil }
+func (o *offer) Close() error {
+	o.closed = true
+	return nil
+}
+
 // addPointerHandler adds a pointer.InputOp for the tag in a
 // rectangular area.
 func addPointerHandler(ops *op.Ops, tag event.Tag, area image.Rectangle) {
@@ -792,6 +1043,34 @@ func assertEventPointerTypeSequence(t *testing.T, events []event.Event, expected
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("expected %v events, got %v", expected, got)
 	}
+}
+
+// assertEventSequence checks that the provided events match the expected ones
+// in the provided order.
+func assertEventSequence(t *testing.T, got []event.Event, expected ...event.Event) {
+	t.Helper()
+	if len(expected) == 0 {
+		if len(got) > 0 {
+			t.Errorf("unexpected events: %v", eventsToString(got))
+		}
+		return
+	}
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("expected %s events, got %s", eventsToString(expected), eventsToString(got))
+	}
+}
+
+func eventsToString(evs []event.Event) string {
+	var s []string
+	for _, ev := range evs {
+		switch e := ev.(type) {
+		case pointer.Event:
+			s = append(s, fmt.Sprintf("%T{%s}", e, e.Type.String()))
+		default:
+			s = append(s, fmt.Sprintf("{%T}", e))
+		}
+	}
+	return "[" + strings.Join(s, ",") + "]"
 }
 
 // assertEventPriorities checks that the pointer.Event priorities of events match prios.
