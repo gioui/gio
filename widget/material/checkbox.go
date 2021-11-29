@@ -3,10 +3,7 @@
 package material
 
 import (
-	"image"
-
 	"gioui.org/layout"
-	"gioui.org/op/clip"
 	"gioui.org/unit"
 	"gioui.org/widget"
 )
@@ -34,9 +31,7 @@ func CheckBox(th *Theme, checkBox *widget.Bool, label string) CheckBoxStyle {
 
 // Layout updates the checkBox and displays it.
 func (c CheckBoxStyle) Layout(gtx layout.Context) layout.Dimensions {
-	dims := c.layout(gtx, c.CheckBox.Value, c.CheckBox.Hovered())
-	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
-	gtx.Constraints.Min = dims.Size
-	c.CheckBox.Layout(gtx)
-	return dims
+	return c.CheckBox.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return c.layout(gtx, c.CheckBox.Value, c.CheckBox.Hovered())
+	})
 }

@@ -36,8 +36,8 @@ func (b *Bool) History() []Press {
 	return b.clk.History()
 }
 
-func (b *Bool) Layout(gtx layout.Context) layout.Dimensions {
-	dims := b.clk.Layout(gtx)
+func (b *Bool) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
+	dims := b.clk.Layout(gtx, w)
 	for b.clk.Clicked() {
 		b.Value = !b.Value
 		b.changed = true

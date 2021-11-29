@@ -10,6 +10,7 @@ import (
 	"gioui.org/gesture"
 	"gioui.org/io/key"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/op/clip"
 )
 
@@ -90,10 +91,14 @@ func (b *Clickable) History() []Press {
 }
 
 // Layout and update the button state
-func (b *Clickable) Layout(gtx layout.Context) layout.Dimensions {
+func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 	b.update(gtx)
-	defer clip.Rect(image.Rectangle{Max: gtx.Constraints.Min}).Push(gtx.Ops).Pop()
+	m := op.Record(gtx.Ops)
+	dims := w(gtx)
+	c := m.Stop()
+	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
 	b.click.Add(gtx.Ops)
+	c.Add(gtx.Ops)
 	for len(b.history) > 0 {
 		c := b.history[0]
 		if c.End.IsZero() || gtx.Now.Sub(c.End) < 1*time.Second {
@@ -102,7 +107,7 @@ func (b *Clickable) Layout(gtx layout.Context) layout.Dimensions {
 		n := copy(b.history, b.history[1:])
 		b.history = b.history[:n]
 	}
-	return layout.Dimensions{Size: gtx.Constraints.Min}
+	return dims
 }
 
 // update the button state by processing events.
