@@ -39,7 +39,7 @@ func TestEditor(t *testing.T) {
 	e.SetCaret(0, 0) // shouldn't panic
 	assertCaret(t, e, 0, 0, 0)
 	e.SetText("æbc\naøå•")
-	e.Layout(gtx, cache, font, fontSize)
+	e.Layout(gtx, cache, font, fontSize, nil)
 	assertCaret(t, e, 0, 0, 0)
 	e.moveEnd(selectionClear)
 	assertCaret(t, e, 0, 3, len("æbc"))
@@ -65,12 +65,12 @@ func TestEditor(t *testing.T) {
 	e.MoveCaret(-3, -3)
 	assertCaret(t, e, 1, 1, len("æbc\na"))
 	e.Mask = '*'
-	e.Layout(gtx, cache, font, fontSize)
+	e.Layout(gtx, cache, font, fontSize, nil)
 	assertCaret(t, e, 1, 1, len("æbc\na"))
 	e.MoveCaret(-3, -3)
 	assertCaret(t, e, 0, 2, len("æb"))
 	e.Mask = '\U0001F92B'
-	e.Layout(gtx, cache, font, fontSize)
+	e.Layout(gtx, cache, font, fontSize, nil)
 	e.moveEnd(selectionClear)
 	assertCaret(t, e, 0, 3, len("æbc"))
 
@@ -99,7 +99,7 @@ func TestEditorDimensions(t *testing.T) {
 	cache := text.NewCache(gofont.Collection())
 	fontSize := unit.Px(10)
 	font := text.Font{}
-	dims := e.Layout(gtx, cache, font, fontSize)
+	dims := e.Layout(gtx, cache, font, fontSize, nil)
 	if dims.Size.X == 0 {
 		t.Errorf("EditEvent was not reflected in Editor width")
 	}
@@ -145,7 +145,7 @@ func TestEditorCaretConsistency(t *testing.T) {
 		e := &Editor{
 			Alignment: a,
 		}
-		e.Layout(gtx, cache, font, fontSize)
+		e.Layout(gtx, cache, font, fontSize, nil)
 
 		consistent := func() error {
 			t.Helper()
@@ -167,7 +167,7 @@ func TestEditorCaretConsistency(t *testing.T) {
 			switch mutation {
 			case setText:
 				e.SetText(str)
-				e.Layout(gtx, cache, font, fontSize)
+				e.Layout(gtx, cache, font, fontSize, nil)
 			case moveRune:
 				e.MoveCaret(int(distance), int(distance))
 			case moveLine:
@@ -232,7 +232,7 @@ func TestEditorMoveWord(t *testing.T) {
 		fontSize := unit.Px(10)
 		font := text.Font{}
 		e.SetText(t)
-		e.Layout(gtx, cache, font, fontSize)
+		e.Layout(gtx, cache, font, fontSize, nil)
 		return e
 	}
 	for ii, tt := range tests {
@@ -314,7 +314,7 @@ func TestEditorDeleteWord(t *testing.T) {
 		fontSize := unit.Px(10)
 		font := text.Font{}
 		e.SetText(t)
-		e.Layout(gtx, cache, font, fontSize)
+		e.Layout(gtx, cache, font, fontSize, nil)
 		return e
 	}
 	for ii, tt := range tests {
@@ -367,7 +367,7 @@ g123456789g
 	selected := func(start, end int) string {
 		// Layout once with no events; populate e.lines.
 		gtx.Queue = nil
-		e.Layout(gtx, cache, font, fontSize)
+		e.Layout(gtx, cache, font, fontSize, nil)
 		_ = e.Events() // throw away any events from this layout
 
 		// Build the selection events
@@ -389,7 +389,7 @@ g123456789g
 		}
 		gtx.Queue = tq
 
-		e.Layout(gtx, cache, font, fontSize)
+		e.Layout(gtx, cache, font, fontSize, nil)
 		for _, evt := range e.Events() {
 			switch evt.(type) {
 			case SelectEvent:
@@ -428,7 +428,7 @@ g123456789g
 		gtx.Constraints = layout.Exact(image.Pt(36, 36))
 		// Keep existing selection
 		gtx.Queue = nil
-		e.Layout(gtx, cache, font, fontSize)
+		e.Layout(gtx, cache, font, fontSize, nil)
 
 		if e.caret.end.lineCol != tst.startPos || e.caret.start.lineCol != tst.endPos {
 			t.Errorf("Test %d pt2: Expected %#v, %#v; got %#v, %#v",
@@ -454,7 +454,7 @@ func TestSelectMove(t *testing.T) {
 
 	// Layout once to populate e.lines and get focus.
 	gtx.Queue = newQueue(key.FocusEvent{Focus: true})
-	e.Layout(gtx, cache, font, fontSize)
+	e.Layout(gtx, cache, font, fontSize, nil)
 
 	testKey := func(keyName string) {
 		// Select 345
@@ -465,7 +465,7 @@ func TestSelectMove(t *testing.T) {
 
 		// Press the key
 		gtx.Queue = newQueue(key.Event{State: key.Press, Name: keyName})
-		e.Layout(gtx, cache, font, fontSize)
+		e.Layout(gtx, cache, font, fontSize, nil)
 
 		if expected, got := "", e.SelectedText(); expected != got {
 			t.Errorf("KeyName %s, expected %q, got %q", keyName, expected, got)

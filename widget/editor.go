@@ -462,8 +462,8 @@ func (e *Editor) Focused() bool {
 	return e.focused
 }
 
-// Layout lays out the editor.
-func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size unit.Value) layout.Dimensions {
+// Layout lays out the editor. If content is not nil, it is laid out on top.
+func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size unit.Value, content layout.Widget) layout.Dimensions {
 	textSize := fixed.I(gtx.Px(size))
 	if e.font != font || e.textSize != textSize {
 		e.invalidate()
@@ -497,10 +497,10 @@ func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size
 	}
 	e.makeValid()
 
-	return e.layout(gtx)
+	return e.layout(gtx, content)
 }
 
-func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
+func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimensions {
 	// Adjust scrolling for new viewport and layout.
 	e.scrollRel(0, 0)
 
@@ -576,6 +576,9 @@ func (e *Editor) layout(gtx layout.Context) layout.Dimensions {
 		e.caret.on = e.focused && (!blinking || dt%timePerBlink < timePerBlink/2)
 	}
 
+	if content != nil {
+		content(gtx)
+	}
 	return layout.Dimensions{Size: e.viewSize, Baseline: e.dims.Baseline}
 }
 
