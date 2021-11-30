@@ -43,9 +43,10 @@ type IconButtonStyle struct {
 	Color color.NRGBA
 	Icon  *widget.Icon
 	// Size is the icon size.
-	Size   unit.Value
-	Inset  layout.Inset
-	Button *widget.Clickable
+	Size        unit.Value
+	Inset       layout.Inset
+	Button      *widget.Clickable
+	Description string
 }
 
 func Button(th *Theme, button *widget.Clickable, txt string) ButtonStyle {
@@ -72,14 +73,15 @@ func ButtonLayout(th *Theme, button *widget.Clickable) ButtonLayoutStyle {
 	}
 }
 
-func IconButton(th *Theme, button *widget.Clickable, icon *widget.Icon) IconButtonStyle {
+func IconButton(th *Theme, button *widget.Clickable, icon *widget.Icon, description string) IconButtonStyle {
 	return IconButtonStyle{
-		Background: th.Palette.ContrastBg,
-		Color:      th.Palette.ContrastFg,
-		Icon:       icon,
-		Size:       unit.Dp(24),
-		Inset:      layout.UniformInset(unit.Dp(12)),
-		Button:     button,
+		Background:  th.Palette.ContrastBg,
+		Color:       th.Palette.ContrastFg,
+		Icon:        icon,
+		Size:        unit.Dp(24),
+		Inset:       layout.UniformInset(unit.Dp(12)),
+		Button:      button,
+		Description: description,
 	}
 }
 
