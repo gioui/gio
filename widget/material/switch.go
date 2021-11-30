@@ -118,7 +118,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	// Set up click area.
 	clickSize := gtx.Px(unit.Dp(40))
 	clickOff := f32.Point{
-		X: (float32(trackWidth) - float32(clickSize)) * .5,
+		X: thumbRadius - float32(clickSize)*.5,
 		Y: (float32(trackHeight)-float32(clickSize))*.5 + trackOff,
 	}
 	defer op.Offset(clickOff).Push(gtx.Ops).Pop()
