@@ -7,6 +7,7 @@ import (
 
 	"gioui.org/gesture"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/op/clip"
 )
 
@@ -44,8 +45,11 @@ func (e *Enum) Hovered() (string, bool) {
 }
 
 // Layout adds the event handler for key.
-func (e *Enum) Layout(gtx layout.Context, key string) layout.Dimensions {
-	defer clip.Rect(image.Rectangle{Max: gtx.Constraints.Min}).Push(gtx.Ops).Pop()
+func (e *Enum) Layout(gtx layout.Context, key string, content layout.Widget) layout.Dimensions {
+	m := op.Record(gtx.Ops)
+	dims := content(gtx)
+	c := m.Stop()
+	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
 
 	if index(e.values, key) == -1 {
 		e.values = append(e.values, key)
@@ -72,6 +76,7 @@ func (e *Enum) Layout(gtx layout.Context, key string) layout.Dimensions {
 		}
 		clk.Add(gtx.Ops)
 	}
+	c.Add(gtx.Ops)
 
-	return layout.Dimensions{Size: gtx.Constraints.Min}
+	return dims
 }
