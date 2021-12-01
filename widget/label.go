@@ -7,6 +7,7 @@ import (
 	"image"
 	"unicode/utf8"
 
+	"gioui.org/io/semantic"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -184,6 +185,8 @@ func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size un
 		rcl.Pop()
 		t.Pop()
 	}
+	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
+	semantic.LabelOp(txt).Add(gtx.Ops)
 	return dims
 }
 

@@ -9,6 +9,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/gesture"
 	"gioui.org/io/key"
+	"gioui.org/io/semantic"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -97,6 +98,7 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 	dims := w(gtx)
 	c := m.Stop()
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
+	semantic.DisabledOp(gtx.Queue == nil).Add(gtx.Ops)
 	b.click.Add(gtx.Ops)
 	c.Add(gtx.Ops)
 	for len(b.history) > 0 {

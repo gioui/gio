@@ -6,6 +6,7 @@ import (
 	"image/color"
 
 	"gioui.org/internal/f32color"
+	"gioui.org/io/semantic"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/paint"
@@ -59,6 +60,7 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 		gtx.Constraints.Min.Y = h
 	}
 	dims = e.Editor.Layout(gtx, e.shaper, e.Font, e.TextSize, func(gtx layout.Context) layout.Dimensions {
+		semantic.Editor.Add(gtx.Ops)
 		disabled := gtx.Queue == nil
 		if e.Editor.Len() > 0 {
 			paint.ColorOp{Color: blendDisabledColor(disabled, e.SelectionColor)}.Add(gtx.Ops)

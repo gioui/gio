@@ -3,6 +3,7 @@
 package material
 
 import (
+	"gioui.org/io/semantic"
 	"gioui.org/layout"
 	"gioui.org/unit"
 	"gioui.org/widget"
@@ -38,6 +39,7 @@ func RadioButton(th *Theme, group *widget.Enum, key, label string) RadioButtonSt
 func (r RadioButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 	hovered, hovering := r.Group.Hovered()
 	return r.Group.Layout(gtx, r.Key, func(gtx layout.Context) layout.Dimensions {
+		semantic.RadioButton.Add(gtx.Ops)
 		return r.layout(gtx, r.Group.Value == r.Key, hovering && hovered == r.Key)
 	})
 }

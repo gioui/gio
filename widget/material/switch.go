@@ -8,6 +8,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/internal/f32color"
+	"gioui.org/io/semantic"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -127,6 +128,10 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	sz := image.Pt(clickSize, clickSize)
 	defer clip.Ellipse(f32.Rectangle{Max: layout.FPt(sz)}).Push(gtx.Ops).Pop()
 	s.Switch.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		if d := s.Description; d != "" {
+			semantic.DescriptionOp(d).Add(gtx.Ops)
+		}
+		semantic.Switch.Add(gtx.Ops)
 		return layout.Dimensions{Size: sz}
 	})
 

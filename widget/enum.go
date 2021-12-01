@@ -6,6 +6,7 @@ import (
 	"image"
 
 	"gioui.org/gesture"
+	"gioui.org/io/semantic"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -76,6 +77,8 @@ func (e *Enum) Layout(gtx layout.Context, key string, content layout.Widget) lay
 		}
 		clk.Add(gtx.Ops)
 	}
+	semantic.SelectedOp(key == e.Value).Add(gtx.Ops)
+	semantic.DisabledOp(gtx.Queue == nil).Add(gtx.Ops)
 	c.Add(gtx.Ops)
 
 	return dims

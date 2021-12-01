@@ -3,6 +3,7 @@
 package widget
 
 import (
+	"gioui.org/io/semantic"
 	"gioui.org/layout"
 )
 
@@ -37,10 +38,14 @@ func (b *Bool) History() []Press {
 }
 
 func (b *Bool) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
-	dims := b.clk.Layout(gtx, w)
-	for b.clk.Clicked() {
-		b.Value = !b.Value
-		b.changed = true
-	}
+	dims := b.clk.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		for b.clk.Clicked() {
+			b.Value = !b.Value
+			b.changed = true
+		}
+		semantic.SelectedOp(b.Value).Add(gtx.Ops)
+		semantic.DisabledOp(gtx.Queue == nil).Add(gtx.Ops)
+		return w(gtx)
+	})
 	return dims
 }

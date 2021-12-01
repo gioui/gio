@@ -9,6 +9,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/internal/f32color"
+	"gioui.org/io/semantic"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -89,6 +90,7 @@ func IconButton(th *Theme, button *widget.Clickable, icon *widget.Icon, descript
 // decoration.
 func Clickable(gtx layout.Context, button *widget.Clickable, w layout.Widget) layout.Dimensions {
 	return button.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		semantic.Button.Add(gtx.Ops)
 		return layout.Stack{}.Layout(gtx,
 			layout.Expanded(func(gtx layout.Context) layout.Dimensions {
 				defer clip.Rect{Max: gtx.Constraints.Min}.Push(gtx.Ops).Pop()
@@ -118,6 +120,7 @@ func (b ButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 	min := gtx.Constraints.Min
 	return b.Button.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		semantic.Button.Add(gtx.Ops)
 		return layout.Stack{Alignment: layout.Center}.Layout(gtx,
 			layout.Expanded(func(gtx layout.Context) layout.Dimensions {
 				rr := float32(gtx.Px(b.CornerRadius))
@@ -149,6 +152,10 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 	m := op.Record(gtx.Ops)
 	dims := b.Button.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		semantic.Button.Add(gtx.Ops)
+		if d := b.Description; d != "" {
+			semantic.DescriptionOp(b.Description).Add(gtx.Ops)
+		}
 		return layout.Stack{Alignment: layout.Center}.Layout(gtx,
 			layout.Expanded(func(gtx layout.Context) layout.Dimensions {
 				sizex, sizey := gtx.Constraints.Min.X, gtx.Constraints.Min.Y
