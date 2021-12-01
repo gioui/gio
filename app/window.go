@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"time"
 
+	"gioui.org/f32"
 	"gioui.org/gpu"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
@@ -61,6 +62,46 @@ type Window struct {
 	callbacks callbacks
 
 	nocontext bool
+
+	// semantic data, lazily evaluated if requested by a backend to speed up
+	// the cases where semantic data is not needed.
+	semantic struct {
+		// requestDiffs is notified when a backend requests the list of changed
+		// semantic ids.
+		requestDiffs chan struct{}
+		// diffs is sent every changed semantic id when semRequestDiffs is requested,
+		// ending with the zero id.
+		diffs chan router.SemanticID
+		// lookups is sent semantic IDs for lookup.
+		lookups chan router.SemanticID
+		// results is sent the responses for semLookups queries.
+		results chan semanticResult
+		// requestRoots is sent request for the root ID.
+		requestRoots chan struct{}
+		// roots is sent root IDs when requested throught queryRoots.
+		roots chan router.SemanticID
+		// positions is sent positional requests.
+		positions chan f32.Point
+		// positionIDs is sent results for positions requests.
+		positionIDs chan semanticID
+
+		// uptodate tracks whether the fields below are up to date.
+		uptodate bool
+		root     router.SemanticID
+		prevTree []router.SemanticNode
+		tree     []router.SemanticNode
+		ids      map[router.SemanticID]router.SemanticNode
+	}
+}
+
+type semanticID struct {
+	found bool
+	id    router.SemanticID
+}
+
+type semanticResult struct {
+	found bool
+	node  router.SemanticNode
 }
 
 type callbacks struct {
@@ -114,6 +155,16 @@ func NewWindow(options ...Option) *Window {
 		dead:         make(chan struct{}),
 		nocontext:    cnf.CustomRenderer,
 	}
+	w.semantic.ids = make(map[router.SemanticID]router.SemanticNode)
+	w.semantic.lookups = make(chan router.SemanticID)
+	w.semantic.results = make(chan semanticResult)
+	w.semantic.requestDiffs = make(chan struct{})
+	w.semantic.requestRoots = make(chan struct{})
+	w.semantic.roots = make(chan router.SemanticID)
+	w.semantic.positions = make(chan f32.Point)
+	w.semantic.positionIDs = make(chan semanticID)
+	// Add buffer to limit context switching when the diff is large.
+	w.semantic.diffs = make(chan router.SemanticID, 50)
 	w.callbacks.w = w
 	go w.run(options)
 	return w
@@ -220,6 +271,10 @@ func (w *Window) render(frame *op.Ops, viewport image.Point) error {
 
 func (w *Window) processFrame(frameStart time.Time, frame *op.Ops) {
 	w.queue.q.Frame(frame)
+	for k := range w.semantic.ids {
+		delete(w.semantic.ids, k)
+	}
+	w.semantic.uptodate = false
 	switch w.queue.q.TextInputState() {
 	case router.TextInputOpen:
 		w.driverDefer(func(d driver) { d.ShowTextInput(true) })
@@ -442,6 +497,30 @@ func (c *callbacks) Event(e event.Event) {
 	}
 }
 
+// SemanticRoot returns the ID of the semantic root.
+func (c *callbacks) SemanticRoot() router.SemanticID {
+	c.w.semantic.requestRoots <- struct{}{}
+	return <-c.w.semantic.roots
+}
+
+// LookupSemantic looks up a semantic node from an ID. The zero ID denotes the root.
+func (c *callbacks) LookupSemantic(semID router.SemanticID) (router.SemanticNode, bool) {
+	c.w.semantic.lookups <- semID
+	res := <-c.w.semantic.results
+	return res.node, res.found
+}
+
+func (c *callbacks) RequestSemanticDiffs() <-chan router.SemanticID {
+	c.w.semantic.requestDiffs <- struct{}{}
+	return c.w.semantic.diffs
+}
+
+func (c *callbacks) SemanticAt(pos f32.Point) (router.SemanticID, bool) {
+	c.w.semantic.positions <- pos
+	res := <-c.w.semantic.positionIDs
+	return res.id, res.found
+}
+
 func (w *Window) runFuncs(d driver) {
 	// Don't run driver functions if there's no driver.
 	if d == nil {
@@ -523,6 +602,61 @@ func (w *Window) waitFrame() (*op.Ops, bool) {
 	}
 }
 
+func (w *Window) lookupSemantic(id router.SemanticID) (router.SemanticNode, bool) {
+	w.updateSemantics()
+	n, ok := w.semantic.ids[id]
+	return n, ok
+}
+
+// updateSemantics refreshes the semantics tree, the id to node map and the ids of
+// updated nodes.
+func (w *Window) updateSemantics() {
+	if w.semantic.uptodate {
+		return
+	}
+	w.semantic.uptodate = true
+	w.semantic.prevTree, w.semantic.tree = w.semantic.tree, w.semantic.prevTree
+	w.semantic.tree = w.queue.q.AppendSemantics(w.semantic.tree[:0])
+	w.semantic.root = w.semantic.tree[0].ID
+	for _, n := range w.semantic.tree {
+		w.semantic.ids[n.ID] = n
+	}
+}
+
+// sendSemanticDiffs traverses the previous semantic tree and sends changed ids to
+// w.semDiffs.
+func (w *Window) sendSemanticDiffs() {
+	w.updateSemantics()
+	defer func() {
+		// Mark end of list.
+		w.semantic.diffs <- 0
+	}()
+	if tree := w.semantic.prevTree; len(tree) > 0 {
+		w.collectSemanticDiffs(w.semantic.prevTree[0])
+	}
+}
+
+// collectSemanticDiffs traverses the previous semantic tree, noting changed nodes.
+func (w *Window) collectSemanticDiffs(n router.SemanticNode) {
+	newNode, exists := w.semantic.ids[n.ID]
+	// Ignore deleted nodes, as their disappearance will be reported through an
+	// ancestor node.
+	if !exists {
+		return
+	}
+	diff := newNode.Desc != n.Desc || len(n.Children) != len(newNode.Children)
+	for i, ch := range n.Children {
+		if !diff {
+			newCh := newNode.Children[i]
+			diff = ch.ID != newCh.ID
+		}
+		w.collectSemanticDiffs(ch)
+	}
+	if diff {
+		w.semantic.diffs <- n.ID
+	}
+}
+
 func (w *Window) run(options []Option) {
 	// Some OpenGL drivers don't like being made current on many different
 	// OS threads. Force the Go runtime to map the event loop goroutine to
@@ -563,6 +697,22 @@ func (w *Window) run(options []Option) {
 			w.updateAnimation()
 		case <-wakeups:
 			wakeup()
+		case semID := <-w.semantic.lookups:
+			node, found := w.lookupSemantic(semID)
+			w.semantic.results <- semanticResult{
+				found: found,
+				node:  node,
+			}
+		case <-w.semantic.requestDiffs:
+			w.sendSemanticDiffs()
+		case <-w.semantic.requestRoots:
+			w.semantic.roots <- w.semantic.root
+		case pos := <-w.semantic.positions:
+			sid, exists := w.queue.q.SemanticAt(pos)
+			w.semantic.positionIDs <- semanticID{
+				found: exists,
+				id:    sid,
+			}
 		case e := <-w.in:
 			switch e2 := e.(type) {
 			case system.StageEvent:

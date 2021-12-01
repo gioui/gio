@@ -16,6 +16,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.os.Build;
+import android.os.Bundle;
 import android.text.Editable;
 import android.util.AttributeSet;
 import android.util.TypedValue;
@@ -37,6 +38,10 @@ import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 import android.view.inputmethod.EditorInfo;
 import android.text.InputType;
+import android.view.accessibility.AccessibilityNodeProvider;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityManager;
 
 import java.io.UnsupportedEncodingException;
 
@@ -49,6 +54,7 @@ public final class GioView extends SurfaceView {
 	private final float scrollXScale;
 	private final float scrollYScale;
 	private int keyboardHint;
+	private AccessibilityManager accessManager;
 
 	private long nhandle;
 
@@ -88,6 +94,7 @@ public final class GioView extends SurfaceView {
 			scrollYScale = px;
 		}
 
+		accessManager = (AccessibilityManager)context.getSystemService(Context.ACCESSIBILITY_SERVICE);
 		nhandle = onCreateView(this);
 		imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
 		setFocusable(true);
@@ -230,6 +237,53 @@ public final class GioView extends SurfaceView {
 		this.setBarColor(Bar.NAVIGATION, color, luminance);
 	}
 
+	@Override protected boolean dispatchHoverEvent(MotionEvent event) {
+		if (!accessManager.isTouchExplorationEnabled()) {
+			return super.dispatchHoverEvent(event);
+		}
+		switch (event.getAction()) {
+		case MotionEvent.ACTION_HOVER_ENTER:
+			// Fall through.
+		case MotionEvent.ACTION_HOVER_MOVE:
+			onTouchExploration(nhandle, event.getX(), event.getY());
+			break;
+		case MotionEvent.ACTION_HOVER_EXIT:
+			onExitTouchExploration(nhandle);
+			break;
+		}
+		return true;
+	}
+
+	void sendA11yEvent(int eventType, int viewId) {
+		if (!accessManager.isEnabled()) {
+			return;
+		}
+		AccessibilityEvent event = obtainA11yEvent(eventType, viewId);
+		getParent().requestSendAccessibilityEvent(this, event);
+	}
+
+	AccessibilityEvent obtainA11yEvent(int eventType, int viewId) {
+		AccessibilityEvent event = AccessibilityEvent.obtain(eventType);
+		event.setPackageName(getContext().getPackageName());
+		event.setSource(this, viewId);
+		return event;
+	}
+
+	boolean isA11yActive() {
+		return accessManager.isEnabled();
+	}
+
+	void sendA11yChange(int viewId) {
+		if (!accessManager.isEnabled()) {
+			return;
+		}
+		AccessibilityEvent event = obtainA11yEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED, viewId);
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+			event.setContentChangeTypes(AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE);
+		}
+		getParent().requestSendAccessibilityEvent(this, event);
+	}
+
 	private void dispatchMotionEvent(MotionEvent event) {
 		if (nhandle == 0) {
 			return;
@@ -365,6 +419,11 @@ public final class GioView extends SurfaceView {
 	static private native void onFrameCallback(long handle);
 	static private native boolean onBack(long handle);
 	static private native void onFocusChange(long handle, boolean focus);
+	static private native AccessibilityNodeInfo initializeAccessibilityNodeInfo(long handle, int viewId, int screenX, int screenY, AccessibilityNodeInfo info);
+	static private native void onTouchExploration(long handle, float x, float y);
+	static private native void onExitTouchExploration(long handle);
+	static private native void onA11yFocus(long handle, int viewId);
+	static private native void onClearA11yFocus(long handle, int viewId);
 
 	private static class InputConnection extends BaseInputConnection {
 		private final Editable editable;
@@ -379,5 +438,43 @@ public final class GioView extends SurfaceView {
 		@Override public Editable getEditable() {
 			return editable;
 		}
+	}
+
+	@Override public AccessibilityNodeProvider getAccessibilityNodeProvider() {
+		return new AccessibilityNodeProvider() {
+			private final int[] screenOff = new int[2];
+
+			@Override public AccessibilityNodeInfo createAccessibilityNodeInfo(int viewId) {
+				AccessibilityNodeInfo info = null;
+				if (viewId == View.NO_ID) {
+					info = AccessibilityNodeInfo.obtain(GioView.this);
+					GioView.this.onInitializeAccessibilityNodeInfo(info);
+				} else {
+					info = AccessibilityNodeInfo.obtain(GioView.this, viewId);
+					info.setPackageName(getContext().getPackageName());
+					info.setVisibleToUser(true);
+				}
+				GioView.this.getLocationOnScreen(screenOff);
+				info = GioView.this.initializeAccessibilityNodeInfo(nhandle, viewId, screenOff[0], screenOff[1], info);
+				return info;
+			}
+
+			@Override public boolean performAction(int viewId, int action, Bundle arguments) {
+				if (viewId == View.NO_ID) {
+					return GioView.this.performAccessibilityAction(action, arguments);
+				}
+				switch (action) {
+				case AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS:
+					GioView.this.onA11yFocus(nhandle, viewId);
+					GioView.this.sendA11yEvent(AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED, viewId);
+					return true;
+				case AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS:
+					GioView.this.onClearA11yFocus(nhandle, viewId);
+					GioView.this.sendA11yEvent(AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED, viewId);
+					return true;
+				}
+				return false;
+			}
+		};
 	}
 }
