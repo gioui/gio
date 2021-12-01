@@ -17,7 +17,8 @@ import (
 )
 
 type SwitchStyle struct {
-	Color struct {
+	Description string
+	Color       struct {
 		Enabled  color.NRGBA
 		Disabled color.NRGBA
 		Track    color.NRGBA
@@ -26,9 +27,10 @@ type SwitchStyle struct {
 }
 
 // Switch is for selecting a boolean value.
-func Switch(th *Theme, swtch *widget.Bool) SwitchStyle {
+func Switch(th *Theme, swtch *widget.Bool, description string) SwitchStyle {
 	sw := SwitchStyle{
-		Switch: swtch,
+		Switch:      swtch,
+		Description: description,
 	}
 	sw.Color.Enabled = th.Palette.ContrastBg
 	sw.Color.Disabled = th.Palette.Bg
