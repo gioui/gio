@@ -13,6 +13,7 @@ package router
 import (
 	"encoding/binary"
 	"image"
+	"strings"
 	"time"
 
 	"gioui.org/f32"
@@ -22,6 +23,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/profile"
+	"gioui.org/io/semantic"
 	"gioui.org/op"
 )
 
@@ -52,6 +54,40 @@ type Router struct {
 	profHandlers map[event.Tag]struct{}
 	profile      profile.Event
 }
+
+// SemanticNode represents a node in the tree describing the components
+// contained in a frame.
+type SemanticNode struct {
+	ID       SemanticID
+	ParentID SemanticID
+	Children []SemanticNode
+	Desc     SemanticDesc
+
+	areaIdx int
+}
+
+// SemanticDesc provides a semantic description of a UI component.
+type SemanticDesc struct {
+	Class       semantic.ClassOp
+	Description string
+	Label       string
+	Selected    bool
+	Disabled    bool
+	Gestures    SemanticGestures
+	Bounds      f32.Rectangle
+}
+
+// SemanticGestures is a bit-set of supported gestures.
+type SemanticGestures int
+
+const (
+	ClickGesture SemanticGestures = 1 << iota
+)
+
+// SemanticID uniquely identifies a SemanticDescription.
+//
+// By convention, the zero value denotes the non-existent ID.
+type SemanticID uint64
 
 type handlerEvents struct {
 	handlers  map[event.Tag][]event.Event
@@ -137,6 +173,17 @@ func (q *Router) Cursor() pointer.CursorName {
 	return q.pointer.queue.cursor
 }
 
+// SemanticAt returns the first semantic description under pos, if any.
+func (q *Router) SemanticAt(pos f32.Point) (SemanticID, bool) {
+	return q.pointer.queue.SemanticAt(pos)
+}
+
+// AppendSemantics appends the semantic tree to nodes, and returns the result.
+// The root node is the first added.
+func (q *Router) AppendSemantics(nodes []SemanticNode) []SemanticNode {
+	return q.pointer.queue.AppendSemantics(nodes)
+}
+
 func (q *Router) collect() {
 	q.transStack = q.transStack[:0]
 	pc := &q.pointer.collector
@@ -175,17 +222,12 @@ func (q *Router) collect() {
 			pc.resetState()
 			pc.setTrans(t)
 
-		// Pointer ops.
 		case ops.TypeClip:
 			var op ops.ClipOp
 			op.Decode(encOp.Data)
 			pc.clip(op)
 		case ops.TypePopClip:
 			pc.popArea()
-		case ops.TypePass:
-			pc.pass()
-		case ops.TypePopPass:
-			pc.popPass()
 		case ops.TypeTransform:
 			t2, push := ops.DecodeTransform(encOp.Data)
 			if push {
@@ -198,6 +240,12 @@ func (q *Router) collect() {
 			t = q.transStack[n-1]
 			q.transStack = q.transStack[:n-1]
 			pc.setTrans(t)
+
+		// Pointer ops.
+		case ops.TypePass:
+			pc.pass()
+		case ops.TypePopPass:
+			pc.popPass()
 		case ops.TypePointerInput:
 			bo := binary.LittleEndian
 			op := pointer.InputOp{
@@ -238,6 +286,29 @@ func (q *Router) collect() {
 				Hint: key.InputHint(encOp.Data[1]),
 			}
 			kc.inputOp(op)
+
+		// Semantic ops.
+		case ops.TypeSemanticLabel:
+			lbl := encOp.Refs[0].(*string)
+			pc.semanticLabel(*lbl)
+		case ops.TypeSemanticDesc:
+			desc := encOp.Refs[0].(*string)
+			pc.semanticDesc(*desc)
+		case ops.TypeSemanticClass:
+			class := semantic.ClassOp(encOp.Data[1])
+			pc.semanticClass(class)
+		case ops.TypeSemanticSelected:
+			if encOp.Data[1] != 0 {
+				pc.semanticSelected(true)
+			} else {
+				pc.semanticSelected(false)
+			}
+		case ops.TypeSemanticDisabled:
+			if encOp.Data[1] != 0 {
+				pc.semanticDisabled(true)
+			} else {
+				pc.semanticDisabled(false)
+			}
 		}
 	}
 }
@@ -319,4 +390,12 @@ func decodeInvalidateOp(d []byte) op.InvalidateOp {
 		o.At = time.Unix(0, int64(nanos))
 	}
 	return o
+}
+
+func (s SemanticGestures) String() string {
+	var gestures []string
+	if s&ClickGesture != 0 {
+		gestures = append(gestures, "Click")
+	}
+	return strings.Join(gestures, ",")
 }

@@ -24,7 +24,7 @@ type Ops struct {
 	nextStateID int
 
 	macroStack stack
-	stacks     [4]stack
+	stacks     [5]stack
 }
 
 type OpType byte
@@ -63,6 +63,11 @@ const (
 	TypeCursor
 	TypePath
 	TypeStroke
+	TypeSemanticLabel
+	TypeSemanticDesc
+	TypeSemanticClass
+	TypeSemanticSelected
+	TypeSemanticDisabled
 )
 
 type StackID struct {
@@ -98,6 +103,7 @@ const (
 	ClipStack StackKind = iota
 	TransStack
 	PassStack
+	MetaStack
 )
 
 const (
@@ -107,34 +113,39 @@ const (
 )
 
 const (
-	TypeMacroLen           = 1 + 4 + 4
-	TypeCallLen            = 1 + 4 + 4
-	TypeDeferLen           = 1
-	TypePushTransformLen   = 1 + 4*6
-	TypeTransformLen       = 1 + 1 + 4*6
-	TypePopTransformLen    = 1
-	TypeRedrawLen          = 1 + 8
-	TypeImageLen           = 1
-	TypePaintLen           = 1
-	TypeColorLen           = 1 + 4
-	TypeLinearGradientLen  = 1 + 8*2 + 4*2
-	TypePassLen            = 1
-	TypePopPassLen         = 1
-	TypePointerInputLen    = 1 + 1 + 1*2 + 2*4 + 2*4
-	TypeClipboardReadLen   = 1
-	TypeClipboardWriteLen  = 1
-	TypeKeyInputLen        = 1 + 1
-	TypeKeyFocusLen        = 1 + 1
-	TypeKeySoftKeyboardLen = 1 + 1
-	TypeSaveLen            = 1 + 4
-	TypeLoadLen            = 1 + 4
-	TypeAuxLen             = 1
-	TypeClipLen            = 1 + 4*4 + 1 + 1
-	TypePopClipLen         = 1
-	TypeProfileLen         = 1
-	TypeCursorLen          = 1 + 1
-	TypePathLen            = 8 + 1
-	TypeStrokeLen          = 1 + 4
+	TypeMacroLen            = 1 + 4 + 4
+	TypeCallLen             = 1 + 4 + 4
+	TypeDeferLen            = 1
+	TypePushTransformLen    = 1 + 4*6
+	TypeTransformLen        = 1 + 1 + 4*6
+	TypePopTransformLen     = 1
+	TypeRedrawLen           = 1 + 8
+	TypeImageLen            = 1
+	TypePaintLen            = 1
+	TypeColorLen            = 1 + 4
+	TypeLinearGradientLen   = 1 + 8*2 + 4*2
+	TypePassLen             = 1
+	TypePopPassLen          = 1
+	TypePointerInputLen     = 1 + 1 + 1*2 + 2*4 + 2*4
+	TypeClipboardReadLen    = 1
+	TypeClipboardWriteLen   = 1
+	TypeKeyInputLen         = 1 + 1
+	TypeKeyFocusLen         = 1 + 1
+	TypeKeySoftKeyboardLen  = 1 + 1
+	TypeSaveLen             = 1 + 4
+	TypeLoadLen             = 1 + 4
+	TypeAuxLen              = 1
+	TypeClipLen             = 1 + 4*4 + 1 + 1
+	TypePopClipLen          = 1
+	TypeProfileLen          = 1
+	TypeCursorLen           = 1 + 1
+	TypePathLen             = 8 + 1
+	TypeStrokeLen           = 1 + 4
+	TypeSemanticLabelLen    = 1
+	TypeSemanticDescLen     = 1
+	TypeSemanticClassLen    = 2
+	TypeSemanticSelectedLen = 2
+	TypeSemanticDisabledLen = 2
 )
 
 func (op *ClipOp) Decode(data []byte) {
@@ -354,12 +365,17 @@ func (t OpType) Size() int {
 		TypeCursorLen,
 		TypePathLen,
 		TypeStrokeLen,
+		TypeSemanticLabelLen,
+		TypeSemanticDescLen,
+		TypeSemanticClassLen,
+		TypeSemanticSelectedLen,
+		TypeSemanticDisabledLen,
 	}[t-firstOpIndex]
 }
 
 func (t OpType) NumRefs() int {
 	switch t {
-	case TypeKeyInput, TypeKeyFocus, TypePointerInput, TypeProfile, TypeCall, TypeClipboardRead, TypeClipboardWrite, TypeCursor:
+	case TypeKeyInput, TypeKeyFocus, TypePointerInput, TypeProfile, TypeCall, TypeClipboardRead, TypeClipboardWrite, TypeCursor, TypeSemanticLabel, TypeSemanticDesc:
 		return 1
 	case TypeImage:
 		return 2
@@ -426,6 +442,8 @@ func (t OpType) String() string {
 		return "Path"
 	case TypeStroke:
 		return "Stroke"
+	case TypeSemanticLabel:
+		return "SemanticDescription"
 	default:
 		panic("unknown OpType")
 	}

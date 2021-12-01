@@ -9,6 +9,7 @@ import (
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
+	"gioui.org/io/semantic"
 )
 
 type pointerQueue struct {
@@ -20,6 +21,15 @@ type pointerQueue struct {
 	pointers []pointerInfo
 
 	scratch []event.Tag
+
+	semantic struct {
+		idsAssigned bool
+		lastID      SemanticID
+		// contentIDs maps semantic content to a list of semantic IDs
+		// previously assigned. It is used to maintain stable IDs across
+		// frames.
+		contentIDs map[semanticContent][]semanticID
+	}
 }
 
 type hitNode struct {
@@ -64,8 +74,19 @@ type areaOp struct {
 
 type areaNode struct {
 	trans f32.Affine2D
-	next  int
 	area  areaOp
+
+	// Tree indices, with -1 being the sentinel.
+	parent     int
+	firstChild int
+	lastChild  int
+	sibling    int
+
+	semantic struct {
+		valid   bool
+		id      SemanticID
+		content semanticContent
+	}
 }
 
 type areaKind uint8
@@ -87,6 +108,21 @@ type pointerCollector struct {
 	nodeStack []int
 }
 
+type semanticContent struct {
+	tag      event.Tag
+	label    string
+	desc     string
+	class    semantic.ClassOp
+	gestures SemanticGestures
+	selected bool
+	disabled bool
+}
+
+type semanticID struct {
+	id   SemanticID
+	used bool
+}
+
 const (
 	areaRect areaKind = iota
 	areaEllipse
@@ -101,24 +137,42 @@ func (c *pointerCollector) setTrans(t f32.Affine2D) {
 }
 
 func (c *pointerCollector) clip(op ops.ClipOp) {
-	area := -1
-	if i := c.state.nodePlusOne - 1; i != -1 {
-		n := c.q.hitTree[i]
-		area = n.area
-	}
 	kind := areaRect
 	if op.Shape == ops.Ellipse {
 		kind = areaEllipse
 	}
-	areaOp := areaOp{kind: kind, rect: frect(op.Bounds)}
-	c.q.areas = append(c.q.areas, areaNode{trans: c.state.t, next: area, area: areaOp})
+	c.pushArea(kind, frect(op.Bounds))
+}
+
+func (c *pointerCollector) pushArea(kind areaKind, bounds f32.Rectangle) {
+	parentID := c.currentArea()
+	areaID := len(c.q.areas)
+	areaOp := areaOp{kind: kind, rect: bounds}
+	if parentID != -1 {
+		parent := &c.q.areas[parentID]
+		if parent.firstChild == -1 {
+			parent.firstChild = areaID
+		}
+		if siblingID := parent.lastChild; siblingID != -1 {
+			c.q.areas[siblingID].sibling = areaID
+		}
+		parent.lastChild = areaID
+	}
+	an := areaNode{
+		trans:      c.state.t,
+		area:       areaOp,
+		parent:     parentID,
+		sibling:    -1,
+		firstChild: -1,
+		lastChild:  -1,
+	}
+
+	c.q.areas = append(c.q.areas, an)
 	c.nodeStack = append(c.nodeStack, c.state.nodePlusOne-1)
-	c.q.hitTree = append(c.q.hitTree, hitNode{
-		next: c.state.nodePlusOne - 1,
-		area: len(c.q.areas) - 1,
+	c.addHitNode(hitNode{
+		area: areaID,
 		pass: true,
 	})
-	c.state.nodePlusOne = len(c.q.hitTree) - 1 + 1
 }
 
 // frect converts a rectangle to a f32.Rectangle.
@@ -149,19 +203,33 @@ func (c *pointerCollector) popPass() {
 	c.state.pass--
 }
 
-func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
-	area := -1
+func (c *pointerCollector) currentArea() int {
 	if i := c.state.nodePlusOne - 1; i != -1 {
 		n := c.q.hitTree[i]
-		area = n.area
+		return n.area
 	}
-	c.q.hitTree = append(c.q.hitTree, hitNode{
-		next: c.state.nodePlusOne - 1,
-		area: area,
+	return -1
+}
+
+func (c *pointerCollector) addHitNode(n hitNode) {
+	n.next = c.state.nodePlusOne - 1
+	c.q.hitTree = append(c.q.hitTree, n)
+	c.state.nodePlusOne = len(c.q.hitTree) - 1 + 1
+}
+
+func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
+	areaID := c.currentArea()
+	area := &c.q.areas[areaID]
+	area.semantic.content.tag = op.Tag
+	if op.Types&(pointer.Press|pointer.Release) != 0 {
+		area.semantic.content.gestures |= ClickGesture
+	}
+	area.semantic.valid = area.semantic.content.gestures != 0
+	c.addHitNode(hitNode{
+		area: areaID,
 		tag:  op.Tag,
 		pass: c.state.pass > 0,
 	})
-	c.state.nodePlusOne = len(c.q.hitTree) - 1 + 1
 	h, ok := c.q.handlers[op.Tag]
 	if !ok {
 		h = new(pointerHandler)
@@ -171,10 +239,45 @@ func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
 		events.AddNoRedraw(op.Tag, pointer.Event{Type: pointer.Cancel})
 	}
 	h.active = true
-	h.area = area
+	h.area = areaID
 	h.wantsGrab = h.wantsGrab || op.Grab
 	h.types = h.types | op.Types
 	h.scrollRange = op.ScrollBounds
+}
+
+func (c *pointerCollector) semanticLabel(lbl string) {
+	areaID := c.currentArea()
+	area := &c.q.areas[areaID]
+	area.semantic.valid = true
+	area.semantic.content.label = lbl
+}
+
+func (c *pointerCollector) semanticDesc(desc string) {
+	areaID := c.currentArea()
+	area := &c.q.areas[areaID]
+	area.semantic.valid = true
+	area.semantic.content.desc = desc
+}
+
+func (c *pointerCollector) semanticClass(class semantic.ClassOp) {
+	areaID := c.currentArea()
+	area := &c.q.areas[areaID]
+	area.semantic.valid = true
+	area.semantic.content.class = class
+}
+
+func (c *pointerCollector) semanticSelected(selected bool) {
+	areaID := c.currentArea()
+	area := &c.q.areas[areaID]
+	area.semantic.valid = true
+	area.semantic.content.selected = selected
+}
+
+func (c *pointerCollector) semanticDisabled(disabled bool) {
+	areaID := c.currentArea()
+	area := &c.q.areas[areaID]
+	area.semantic.valid = true
+	area.semantic.content.disabled = disabled
 }
 
 func (c *pointerCollector) cursor(name pointer.CursorName) {
@@ -186,9 +289,110 @@ func (c *pointerCollector) cursor(name pointer.CursorName) {
 
 func (c *pointerCollector) reset(q *pointerQueue) {
 	q.reset()
-	c.state = collectState{}
+	c.resetState()
 	c.nodeStack = c.nodeStack[:0]
 	c.q = q
+	// Add implicit root area for semantic descriptions to hang onto.
+	c.pushArea(areaRect, f32.Rect(-1e6, -1e6, 1e6, 1e6))
+	// Make it semantic to ensure a single semantic root.
+	c.q.areas[0].semantic.valid = true
+}
+
+func (q *pointerQueue) assignSemIDs() {
+	if q.semantic.idsAssigned {
+		return
+	}
+	q.semantic.idsAssigned = true
+	for i, a := range q.areas {
+		if a.semantic.valid {
+			q.areas[i].semantic.id = q.semanticIDFor(a.semantic.content)
+		}
+	}
+}
+
+func (q *pointerQueue) AppendSemantics(nodes []SemanticNode) []SemanticNode {
+	q.assignSemIDs()
+	nodes = q.appendSemanticChildren(nodes, 0)
+	nodes = q.appendSemanticArea(nodes, 0, 0)
+	return nodes
+}
+
+func (q *pointerQueue) appendSemanticArea(nodes []SemanticNode, parentID SemanticID, nodeIdx int) []SemanticNode {
+	areaIdx := nodes[nodeIdx].areaIdx
+	a := q.areas[areaIdx]
+	childStart := len(nodes)
+	nodes = q.appendSemanticChildren(nodes, a.firstChild)
+	childEnd := len(nodes)
+	for i := childStart; i < childEnd; i++ {
+		nodes = q.appendSemanticArea(nodes, a.semantic.id, i)
+	}
+	n := &nodes[nodeIdx]
+	n.ParentID = parentID
+	n.Children = nodes[childStart:childEnd]
+	return nodes
+}
+
+func (q *pointerQueue) appendSemanticChildren(nodes []SemanticNode, areaIdx int) []SemanticNode {
+	if areaIdx == -1 {
+		return nodes
+	}
+	a := q.areas[areaIdx]
+	if semID := a.semantic.id; semID != 0 {
+		cnt := a.semantic.content
+		nodes = append(nodes, SemanticNode{
+			ID: semID,
+			Desc: SemanticDesc{
+				Bounds: f32.Rectangle{
+					Min: a.trans.Transform(a.area.rect.Min),
+					Max: a.trans.Transform(a.area.rect.Max),
+				},
+				Label:       cnt.label,
+				Description: cnt.desc,
+				Class:       cnt.class,
+				Gestures:    cnt.gestures,
+				Selected:    cnt.selected,
+				Disabled:    cnt.disabled,
+			},
+			areaIdx: areaIdx,
+		})
+	} else {
+		nodes = q.appendSemanticChildren(nodes, a.firstChild)
+	}
+	return q.appendSemanticChildren(nodes, a.sibling)
+}
+
+func (q *pointerQueue) semanticIDFor(content semanticContent) SemanticID {
+	ids := q.semantic.contentIDs[content]
+	for i, id := range ids {
+		if !id.used {
+			ids[i].used = true
+			return id.id
+		}
+	}
+	// No prior assigned ID; allocate a new one.
+	q.semantic.lastID++
+	id := semanticID{id: q.semantic.lastID, used: true}
+	if q.semantic.contentIDs == nil {
+		q.semantic.contentIDs = make(map[semanticContent][]semanticID)
+	}
+	q.semantic.contentIDs[content] = append(q.semantic.contentIDs[content], id)
+	return id.id
+}
+
+func (q *pointerQueue) SemanticAt(pos f32.Point) (SemanticID, bool) {
+	q.assignSemIDs()
+	for i := len(q.hitTree) - 1; i >= 0; i-- {
+		n := &q.hitTree[i]
+		hit := q.hit(n.area, pos)
+		if !hit {
+			continue
+		}
+		area := q.areas[n.area]
+		if area.semantic.id != 0 {
+			return area.semantic.id, true
+		}
+	}
+	return 0, false
 }
 
 func (q *pointerQueue) opHit(handlers *[]event.Tag, pos f32.Point) {
@@ -230,7 +434,7 @@ func (q *pointerQueue) hit(areaIdx int, p f32.Point) bool {
 		if !a.area.Hit(p) {
 			return false
 		}
-		areaIdx = a.next
+		areaIdx = a.parent
 	}
 	return true
 }
@@ -248,6 +452,21 @@ func (q *pointerQueue) reset() {
 	q.hitTree = q.hitTree[:0]
 	q.areas = q.areas[:0]
 	q.cursors = q.cursors[:0]
+	q.semantic.idsAssigned = false
+	for k, ids := range q.semantic.contentIDs {
+		for i := len(ids) - 1; i >= 0; i-- {
+			if !ids[i].used {
+				ids = append(ids[:i], ids[i+1:]...)
+			} else {
+				ids[i].used = false
+			}
+		}
+		if len(ids) > 0 {
+			q.semantic.contentIDs[k] = ids
+		} else {
+			delete(q.semantic.contentIDs, k)
+		}
+	}
 }
 
 func (q *pointerQueue) Frame(events *handlerEvents) {
