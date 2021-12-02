@@ -4,6 +4,7 @@ package clip_test
 
 import (
 	"image/color"
+	"math"
 	"testing"
 
 	"gioui.org/f32"
@@ -13,16 +14,34 @@ import (
 	"gioui.org/op/paint"
 )
 
-func TestOpenPathOutlinePanic(t *testing.T) {
-	defer func() {
-		if err := recover(); err == nil {
-			t.Error("Outline of an open path didn't panic")
-		}
-	}()
-	var p clip.Path
-	p.Begin(new(op.Ops))
-	p.Line(f32.Pt(10, 10))
-	clip.Outline{Path: p.End()}.Op()
+func TestPathOutline(t *testing.T) {
+	t.Run("unclosed path", func(t *testing.T) {
+		defer func() {
+			if err := recover(); err == nil {
+				t.Error("Outline of an open path didn't panic")
+			}
+		}()
+		var p clip.Path
+		p.Begin(new(op.Ops))
+		p.Line(f32.Pt(10, 10))
+		clip.Outline{Path: p.End()}.Op()
+	})
+	t.Run("closed path", func(t *testing.T) {
+		defer func() {
+			if err := recover(); err != nil {
+				t.Error("Outline of a closed path did panic")
+			}
+		}()
+		var p clip.Path
+		p.Begin(new(op.Ops))
+		p.MoveTo(f32.Pt(300, 200))
+		p.LineTo(f32.Pt(150, 200))
+		p.MoveTo(f32.Pt(150, 200))
+		p.ArcTo(f32.Pt(300, 200), f32.Pt(300, 200), 3*math.Pi/4)
+		p.LineTo(f32.Pt(300, 200))
+		p.Close()
+		clip.Outline{Path: p.End()}.Op()
+	})
 }
 
 func TestPathBegin(t *testing.T) {

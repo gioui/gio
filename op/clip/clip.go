@@ -154,6 +154,9 @@ func (p *Path) Move(delta f32.Point) {
 
 // MoveTo moves the pen to the specified absolute coordinate.
 func (p *Path) MoveTo(to f32.Point) {
+	if p.pen == to {
+		return
+	}
 	p.open = p.open || p.pen != p.start
 	p.end()
 	p.pen = to
