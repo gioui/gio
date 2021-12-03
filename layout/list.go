@@ -293,6 +293,11 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 	if pos > mainMax {
 		pos = mainMax
 	}
+	if crossMin, crossMax := l.Axis.crossConstraint(l.cs); maxCross < crossMin {
+		maxCross = crossMin
+	} else if maxCross > crossMax {
+		maxCross = crossMax
+	}
 	dims := l.Axis.Convert(image.Pt(pos, maxCross))
 	call := macro.Stop()
 	defer clip.Rect(image.Rectangle{Max: dims}).Push(ops).Pop()

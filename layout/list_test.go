@@ -13,6 +13,18 @@ import (
 	"gioui.org/op"
 )
 
+func TestEmptyList(t *testing.T) {
+	var l List
+	gtx := Context{
+		Ops:         new(op.Ops),
+		Constraints: Exact(image.Pt(20, 10)),
+	}
+	dims := l.Layout(gtx, 0, nil)
+	if got, want := dims.Size, gtx.Constraints.Min; got != want {
+		t.Errorf("got %v; want %v", got, want)
+	}
+}
+
 func TestListPosition(t *testing.T) {
 	_s := func(e ...event.Event) []event.Event { return e }
 	r := new(router.Router)
