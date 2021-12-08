@@ -5,6 +5,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"gioui.org/io/plugins"
 	"image"
 	"image/color"
 	"runtime"
@@ -166,6 +167,9 @@ func NewWindow(options ...Option) *Window {
 	// Add buffer to limit context switching when the diff is large.
 	w.semantic.diffs = make(chan router.SemanticID, 50)
 	w.callbacks.w = w
+	for _, initPlugin := range plugins.RegisteredPlugins {
+		w.queue.q.AddPlugin(initPlugin(w))
+	}
 	go w.run(options)
 	return w
 }
@@ -394,6 +398,14 @@ func (w *Window) Run(f func()) {
 	w.driverRun(func(_ driver) {
 		f()
 	})
+}
+
+// SendEvent inserts a custom event into the channel.
+//
+// Note that most programs must never call SendEvent.
+func (w *Window) SendEvent(evt event.Event) {
+	w.in <- evt
+	<-w.ack
 }
 
 // driverRun runs f on the driver event goroutine and returns when f has
@@ -768,12 +780,12 @@ func (w *Window) run(options []Option) {
 				w.waitAck()
 			case wakeupEvent:
 			case event.Event:
-				if w.queue.q.Queue(e2) {
-					w.setNextFrame(time.Time{})
-					w.updateAnimation()
-				}
 				w.updateCursor()
 				w.out <- e
+			}
+			if w.queue.q.Queue(e) {
+				w.setNextFrame(time.Time{})
+				w.updateAnimation()
 			}
 			w.ack <- struct{}{}
 		}

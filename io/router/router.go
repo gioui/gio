@@ -12,6 +12,7 @@ package router
 
 import (
 	"encoding/binary"
+	"gioui.org/io/plugins"
 	"image"
 	"strings"
 	"time"
@@ -41,6 +42,8 @@ type Router struct {
 		collector keyCollector
 	}
 	cqueue clipboardQueue
+
+	plugins []plugins.Plugin
 
 	handlers handlerEvents
 
@@ -140,9 +143,19 @@ func (q *Router) Queue(events ...event.Event) bool {
 			q.key.queue.Push(e, &q.handlers)
 		case clipboard.Event:
 			q.cqueue.Push(e, &q.handlers)
+		case event.Event:
+			for _, p := range q.plugins {
+				if tag, evt, ok := p.Push(e); ok {
+					q.handlers.Add(tag, evt)
+				}
+			}
 		}
 	}
 	return q.handlers.HadEvents()
+}
+
+func (q *Router) AddPlugin(plugin plugins.Plugin) {
+	q.plugins = append(q.plugins, plugin)
 }
 
 // TextInputState returns the input state from the most recent
@@ -309,6 +322,11 @@ func (q *Router) collect() {
 			} else {
 				pc.semanticDisabled(false)
 			}
+
+		// Plugins ops.
+		case ops.TypeCustomPlugin:
+			o := encOp.Refs[0].(plugins.PluginOp)
+			q.plugins[o.ID].Process(o.Content)
 		}
 	}
 }
