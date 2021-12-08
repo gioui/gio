@@ -30,7 +30,7 @@ CGFloat _keyboardHeight;
 #endif
 	drawView.preservesSuperviewLayoutMargins = YES;
 	drawView.layoutMargins = UIEdgeInsetsMake(0, 0, 0, 0);
-	onCreate((__bridge CFTypeRef)drawView);
+	onCreate((__bridge CFTypeRef)drawView, (__bridge CFTypeRef)self);
 	[[NSNotificationCenter defaultCenter] addObserver:self
 											 selector:@selector(keyboardWillChange:)
 												 name:UIKeyboardWillShowNotification

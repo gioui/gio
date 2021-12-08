@@ -87,8 +87,8 @@ import (
 )
 
 type ViewEvent struct {
-	// View is a CFTypeRef for the UIView backing a Window.
-	View uintptr
+	// ViewController is a CFTypeRef for the UIViewController backing a Window.
+	ViewController uintptr
 }
 
 type window struct {
@@ -112,7 +112,7 @@ func init() {
 }
 
 //export onCreate
-func onCreate(view C.CFTypeRef) {
+func onCreate(view, controller C.CFTypeRef) {
 	w := &window{
 		view: view,
 	}
@@ -128,7 +128,7 @@ func onCreate(view C.CFTypeRef) {
 	w.w.SetDriver(w)
 	views[view] = w
 	w.w.Event(system.StageEvent{Stage: system.StagePaused})
-	w.w.Event(ViewEvent{View: uintptr(view)})
+	w.w.Event(ViewEvent{ViewController: uintptr(controller)})
 }
 
 //export gio_onDraw
