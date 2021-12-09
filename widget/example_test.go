@@ -9,8 +9,10 @@ import (
 	"gioui.org/f32"
 	"gioui.org/io/pointer"
 	"gioui.org/io/router"
+	"gioui.org/io/transfer"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 	"gioui.org/widget"
 )
 
@@ -69,3 +71,86 @@ func ExampleClickable_passthrough() {
 	// button1 clicked!
 	// button2 clicked!
 }
+
+func ExampleDraggable_Layout() {
+	var r router.Router
+	gtx := layout.Context{
+		Ops:         new(op.Ops),
+		Constraints: layout.Exact(image.Pt(100, 100)),
+		Queue:       &r,
+	}
+	// mime is the type used to match drag and drop operations.
+	// It could be left empty in this example.
+	mime := "MyMime"
+	drag := &widget.Draggable{Type: mime}
+	var drop int
+	// widget lays out the drag and drop handlers and processes
+	// the transfer events.
+	widget := func() {
+		// Setup the draggable widget.
+		w := func(gtx layout.Context) layout.Dimensions {
+			sz := image.Pt(10, 10) // drag area
+			return layout.Dimensions{Size: sz}
+		}
+		drag.Layout(gtx, w, w)
+		// drag must respond with an Offer event when requested.
+		// Use the drag method for this.
+		if m, ok := drag.Requested(); ok {
+			drag.Offer(gtx.Ops, m, offer{Data: "hello world"})
+		}
+
+		// Setup the area for drops.
+		ds := clip.Rect{
+			Min: image.Pt(20, 20),
+			Max: image.Pt(40, 40),
+		}.Push(gtx.Ops)
+		transfer.TargetOp{
+			Tag:  &drop,
+			Type: mime, // this must match the drag Type for the drop to succeed
+		}.Add(gtx.Ops)
+		ds.Pop()
+		// Check for the received data.
+		for _, ev := range gtx.Events(&drop) {
+			switch e := ev.(type) {
+			case transfer.DataEvent:
+				data := e.Open()
+				fmt.Println(data.(offer).Data)
+			}
+		}
+	}
+	// Register and lay out the widget.
+	widget()
+	r.Frame(gtx.Ops)
+
+	// Send drag and drop gesture events.
+	r.Queue(
+		pointer.Event{
+			Type:     pointer.Press,
+			Position: f32.Pt(5, 5), // in the drag area
+		},
+		pointer.Event{
+			Type:     pointer.Move,
+			Position: f32.Pt(5, 5), // in the drop area
+		},
+		pointer.Event{
+			Type:     pointer.Release,
+			Position: f32.Pt(30, 30), // in the drop area
+		},
+	)
+	// Let the widget process the events.
+	widget()
+	r.Frame(gtx.Ops)
+
+	// Process the transfer.DataEvent.
+	widget()
+
+	// Output:
+	// hello world
+}
+
+type offer struct {
+	Data string
+}
+
+func (offer) Read([]byte) (int, error) { return 0, nil }
+func (offer) Close() error             { return nil }

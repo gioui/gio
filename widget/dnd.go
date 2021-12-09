@@ -26,6 +26,9 @@ type Draggable struct {
 }
 
 func (d *Draggable) Layout(gtx layout.Context, w, drag layout.Widget) layout.Dimensions {
+	if gtx.Queue == nil {
+		return w(gtx)
+	}
 	pos := d.pos
 	for _, ev := range d.drag.Events(gtx.Metric, gtx.Queue, gesture.Both) {
 		switch ev.Type {
