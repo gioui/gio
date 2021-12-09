@@ -429,9 +429,10 @@ func (q *pointerQueue) SemanticAt(pos f32.Point) (SemanticID, bool) {
 	return 0, false
 }
 
-func (q *pointerQueue) opHit(handlers *[]event.Tag, pos f32.Point) {
+func (q *pointerQueue) opHit(pos f32.Point) []event.Tag {
 	// Track whether we're passing through hits.
 	pass := true
+	hits := q.scratch[:0]
 	idx := len(q.hitTree) - 1
 	for idx >= 0 {
 		n := &q.hitTree[idx]
@@ -448,10 +449,12 @@ func (q *pointerQueue) opHit(handlers *[]event.Tag, pos f32.Point) {
 		}
 		if n.tag != nil {
 			if _, exists := q.handlers[n.tag]; exists {
-				*handlers = addHandler(*handlers, n.tag)
+				hits = addHandler(hits, n.tag)
 			}
 		}
 	}
+	q.scratch = hits[:0]
+	return hits
 }
 
 func (q *pointerQueue) invTransform(areaIdx int, p f32.Point) f32.Point {
@@ -665,22 +668,21 @@ func (q *pointerQueue) deliverScrollEvent(p *pointerInfo, events *handlerEvents,
 }
 
 func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEvents, e pointer.Event) {
-	q.scratch = q.scratch[:0]
-	q.opHit(&q.scratch, e.Position)
-	if p.pressed {
-		// Filter out non-participating handlers.
-		for i := len(q.scratch) - 1; i >= 0; i-- {
-			if _, found := searchTag(p.handlers, q.scratch[i]); !found {
-				q.scratch = append(q.scratch[:i], q.scratch[i+1:]...)
-			}
-		}
-	} else {
-		p.handlers = append(p.handlers[:0], q.scratch...)
-	}
-	hits := q.scratch
+	var hits []event.Tag
 	if e.Source != pointer.Mouse && !p.pressed && e.Type != pointer.Press {
 		// Consider non-mouse pointers leaving when they're released.
-		hits = nil
+	} else {
+		hits = q.opHit(e.Position)
+		if p.pressed {
+			// Filter out non-participating handlers.
+			for i := len(hits) - 1; i >= 0; i-- {
+				if _, found := searchTag(p.handlers, hits[i]); !found {
+					hits = append(hits[:i], hits[i+1:]...)
+				}
+			}
+		} else {
+			p.handlers = append(p.handlers[:0], hits...)
+		}
 	}
 	// Deliver Leave events.
 	for _, k := range p.entered {
