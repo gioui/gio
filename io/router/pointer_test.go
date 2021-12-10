@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"gioui.org/f32"
+	"gioui.org/gesture"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
@@ -997,6 +998,43 @@ func TestTransfer(t *testing.T) {
 		if !ofr.closed {
 			t.Error("offer was not closed")
 		}
+	})
+
+	t.Run("valid target enter/leave events", func(t *testing.T) {
+		ops := new(op.Ops)
+		src, _ := setup(ops, "file", "file")
+		var hover gesture.Hover
+		stack := clip.Rect(tgtArea).Push(ops)
+		hover.Add(ops)
+		stack.Pop()
+		var r Router
+		r.Frame(ops)
+		// Drag and drop.
+		r.Queue(
+			pointer.Event{
+				Position: f32.Pt(10, 10),
+				Type:     pointer.Press,
+			},
+			pointer.Event{
+				Position: f32.Pt(10, 10),
+				Type:     pointer.Move,
+			},
+			pointer.Event{
+				Position: f32.Pt(40, 10),
+				Type:     pointer.Release,
+			},
+		)
+		assertEventPointerTypeSequence(t, r.Events(&hover), pointer.Cancel, pointer.Enter)
+
+		// Offer valid type and data.
+		ofr := &offer{data: "hello"}
+		transfer.OfferOp{
+			Tag:  src,
+			Type: "file",
+			Data: ofr,
+		}.Add(ops)
+		r.Frame(ops)
+		assertEventPointerTypeSequence(t, r.Events(&hover), pointer.Leave)
 	})
 }
 
