@@ -70,6 +70,8 @@ type x11Window struct {
 		targets C.Atom
 		// "CLIPBOARD".
 		clipboard C.Atom
+		// "PRIMARY".
+		primary C.Atom
 		// "CLIPBOARD_CONTENT", the clipboard destination property.
 		clipboardContent C.Atom
 		// "WM_DELETE_WINDOW"
@@ -150,6 +152,7 @@ func (w *x11Window) ReadClipboard() {
 func (w *x11Window) WriteClipboard(s string) {
 	w.clipboard.content = []byte(s)
 	C.XSetSelectionOwner(w.x, w.atoms.clipboard, w.xw, C.CurrentTime)
+	C.XSetSelectionOwner(w.x, w.atoms.primary, w.xw, C.CurrentTime)
 }
 
 func (w *x11Window) Configure(options []Option) {
@@ -603,7 +606,7 @@ func (h *x11EventHandler) handleEvents() bool {
 			w.w.Event(clipboard.Event{Text: str})
 		case C.SelectionRequest:
 			cevt := (*C.XSelectionRequestEvent)(unsafe.Pointer(xev))
-			if cevt.selection != w.atoms.clipboard || cevt.property == C.None {
+			if (cevt.selection != w.atoms.clipboard && cevt.selection != w.atoms.primary) || cevt.property == C.None {
 				// Unsupported clipboard or obsolete requestor.
 				break
 			}
@@ -759,6 +762,7 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 	w.atoms.gtk_text_buffer_contents = w.atom("GTK_TEXT_BUFFER_CONTENTS", false)
 	w.atoms.evDelWindow = w.atom("WM_DELETE_WINDOW", false)
 	w.atoms.clipboard = w.atom("CLIPBOARD", false)
+	w.atoms.primary = w.atom("PRIMARY", false)
 	w.atoms.clipboardContent = w.atom("CLIPBOARD_CONTENT", false)
 	w.atoms.atom = w.atom("ATOM", false)
 	w.atoms.targets = w.atom("TARGETS", false)
