@@ -69,8 +69,7 @@ func NewWindow(width, height int) (*Window, error) {
 		ctx:  ctx,
 	}
 	err = contextDo(ctx, func() error {
-		api := ctx.API()
-		dev, err := driver.NewDevice(api)
+		dev, err := driver.NewDevice(ctx.API())
 		if err != nil {
 			return err
 		}
@@ -81,12 +80,13 @@ func NewWindow(width, height int) (*Window, error) {
 			driver.BufferBindingFramebuffer,
 		)
 		if err != nil {
+			dev.Release()
 			return nil
 		}
-		gp, err := gpu.New(api)
+		// Note that the gpu takes ownership of dev.
+		gp, err := gpu.NewWithDevice(dev)
 		if err != nil {
 			fboTex.Release()
-			dev.Release()
 			return err
 		}
 		w.fboTex = fboTex
@@ -112,10 +112,8 @@ func (w *Window) Release() {
 			w.gpu.Release()
 			w.gpu = nil
 		}
-		if w.dev != nil {
-			w.dev.Release()
-			w.dev = nil
-		}
+		// w.dev is owned and freed by w.gpu.
+		w.dev = nil
 		return nil
 	})
 	if w.ctx != nil {

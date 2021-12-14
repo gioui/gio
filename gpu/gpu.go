@@ -296,11 +296,19 @@ const (
 	materialTexture
 )
 
+// New creates a GPU for the given API.
 func New(api API) (GPU, error) {
 	d, err := driver.NewDevice(api)
 	if err != nil {
 		return nil, err
 	}
+	return NewWithDevice(d)
+}
+
+// NewWithDevice creates a GPU with a pre-existing device.
+//
+// Note: for internal use only.
+func NewWithDevice(d driver.Device) (GPU, error) {
 	d.BeginFrame(nil, false, image.Point{})
 	defer d.EndFrame()
 	forceCompute := os.Getenv("GIORENDERER") == "forcecompute"
