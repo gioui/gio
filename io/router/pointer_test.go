@@ -1004,12 +1004,15 @@ func TestTransfer(t *testing.T) {
 		ops := new(op.Ops)
 		src, _ := setup(ops, "file", "file")
 		var hover gesture.Hover
+		pass := pointer.PassOp{}.Push(ops)
 		stack := clip.Rect(tgtArea).Push(ops)
 		hover.Add(ops)
 		stack.Pop()
+		pass.Pop()
+
 		var r Router
 		r.Frame(ops)
-		// Drag and drop.
+		// Drag.
 		r.Queue(
 			pointer.Event{
 				Position: f32.Pt(10, 10),
@@ -1021,10 +1024,66 @@ func TestTransfer(t *testing.T) {
 			},
 			pointer.Event{
 				Position: f32.Pt(40, 10),
-				Type:     pointer.Release,
+				Type:     pointer.Move,
 			},
 		)
 		assertEventPointerTypeSequence(t, r.Events(&hover), pointer.Cancel, pointer.Enter)
+
+		// Drop.
+		r.Queue(
+			pointer.Event{
+				Position: f32.Pt(40, 10),
+				Type:     pointer.Release,
+			},
+		)
+
+		// Offer valid type and data.
+		ofr := &offer{data: "hello"}
+		transfer.OfferOp{
+			Tag:  src,
+			Type: "file",
+			Data: ofr,
+		}.Add(ops)
+		r.Frame(ops)
+		assertEventPointerTypeSequence(t, r.Events(&hover), pointer.Leave)
+	})
+
+	t.Run("invalid target NO enter/leave events", func(t *testing.T) {
+		ops := new(op.Ops)
+		src, _ := setup(ops, "file", "nofile")
+		var hover gesture.Hover
+		pass := pointer.PassOp{}.Push(ops)
+		stack := clip.Rect(tgtArea).Push(ops)
+		hover.Add(ops)
+		stack.Pop()
+		pass.Pop()
+
+		var r Router
+		r.Frame(ops)
+		// Drag.
+		r.Queue(
+			pointer.Event{
+				Position: f32.Pt(10, 10),
+				Type:     pointer.Press,
+			},
+			pointer.Event{
+				Position: f32.Pt(10, 10),
+				Type:     pointer.Move,
+			},
+			pointer.Event{
+				Position: f32.Pt(40, 10),
+				Type:     pointer.Move,
+			},
+		)
+		assertEventPointerTypeSequence(t, r.Events(&hover), pointer.Cancel)
+
+		// Drop.
+		r.Queue(
+			pointer.Event{
+				Position: f32.Pt(40, 10),
+				Type:     pointer.Release,
+			},
+		)
 
 		// Offer valid type and data.
 		ofr := &offer{data: "hello"}

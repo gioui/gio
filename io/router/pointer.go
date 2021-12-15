@@ -676,18 +676,18 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 		if p.pressed {
 			// Filter out non-participating handlers,
 			// except potential transfer targets when a transfer has been initiated.
-			var transferSource *pointerHandler
+			var hitsHaveTarget bool
 			if p.dataSource != nil {
-				transferSource = q.handlers[p.dataSource]
-			}
-			for i := len(hits) - 1; i >= 0; i-- {
-				tag := hits[i]
-				if transferSource != nil {
-					if _, ok := firstMimeMatch(transferSource, q.handlers[tag]); ok {
-						continue
+				transferSource := q.handlers[p.dataSource]
+				for _, hit := range hits {
+					if _, ok := firstMimeMatch(transferSource, q.handlers[hit]); ok {
+						hitsHaveTarget = true
+						break
 					}
 				}
-				if _, found := searchTag(p.handlers, tag); !found {
+			}
+			for i := len(hits) - 1; i >= 0; i-- {
+				if _, found := searchTag(p.handlers, hits[i]); !found && !hitsHaveTarget {
 					hits = append(hits[:i], hits[i+1:]...)
 				}
 			}
