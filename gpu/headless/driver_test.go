@@ -185,7 +185,8 @@ func newDriver(t *testing.T) driver.Device {
 }
 
 func screenshot(t *testing.T, d driver.Device, fbo driver.Texture, size image.Point) *image.RGBA {
-	img, err := driver.DownloadImage(d, fbo, image.Rectangle{Max: size})
+	img := image.NewRGBA(image.Rectangle{Max: size})
+	err := driver.DownloadImage(d, fbo, img)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -47,7 +47,8 @@ func resetOps(gtx layout.Context) {
 func finishBenchmark(b *testing.B, w *headless.Window) {
 	b.StopTimer()
 	if *dumpImages {
-		img, err := w.Screenshot()
+		img := image.NewRGBA(image.Rectangle{Max: w.Size()})
+		err := w.Screenshot(img)
 		w.Release()
 		if err != nil {
 			b.Error(err)

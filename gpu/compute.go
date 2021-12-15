@@ -10,6 +10,7 @@ import (
 	"hash/maphash"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"io/ioutil"
 	"math"
@@ -648,17 +649,13 @@ func (g *compute) frame(target RenderTarget) error {
 
 func (g *compute) dumpAtlases() {
 	for i, a := range g.atlases {
-		dump, err := driver.DownloadImage(g.ctx, a.image, image.Rectangle{Max: a.size})
+		dump := image.NewRGBA(image.Rectangle{Max: a.size})
+		err := driver.DownloadImage(g.ctx, a.image, dump)
 		if err != nil {
 			panic(err)
 		}
 		nrgba := image.NewNRGBA(dump.Bounds())
-		bnd := dump.Bounds()
-		for x := bnd.Min.X; x < bnd.Max.X; x++ {
-			for y := bnd.Min.Y; y < bnd.Max.Y; y++ {
-				nrgba.SetNRGBA(x, y, f32color.RGBAToNRGBA(dump.RGBAAt(x, y)))
-			}
-		}
+		draw.Draw(nrgba, image.Rectangle{}, dump, image.Point{}, draw.Src)
 		var buf bytes.Buffer
 		if err := png.Encode(&buf, nrgba); err != nil {
 			panic(err)

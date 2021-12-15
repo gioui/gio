@@ -59,7 +59,7 @@ func buildSquares(size int) paint.ImageOp {
 	return paint.NewImageOp(im)
 }
 
-func drawImage(t *testing.T, size int, ops *op.Ops, draw func(o *op.Ops)) (im *image.RGBA, err error) {
+func drawImage(t *testing.T, size int, ops *op.Ops, draw func(o *op.Ops)) (*image.RGBA, error) {
 	sz := image.Point{X: size, Y: size}
 	w := newWindow(t, sz.X, sz.Y)
 	defer w.Release()
@@ -67,7 +67,9 @@ func drawImage(t *testing.T, size int, ops *op.Ops, draw func(o *op.Ops)) (im *i
 	if err := w.Frame(ops); err != nil {
 		return nil, err
 	}
-	return w.Screenshot()
+	img := image.NewRGBA(image.Rectangle{Max: sz})
+	err := w.Screenshot(img)
+	return img, err
 }
 
 func run(t *testing.T, f func(o *op.Ops), c func(r result)) {
@@ -106,7 +108,6 @@ type frameT struct {
 func multiRun(t *testing.T, frames ...frameT) {
 	// draw a few times and check that it is correct each time, to
 	// ensure any caching effects still generate the correct images.
-	var img *image.RGBA
 	var err error
 	sz := image.Point{X: 128, Y: 128}
 	w := newWindow(t, sz.X, sz.Y)
@@ -119,7 +120,8 @@ func multiRun(t *testing.T, frames ...frameT) {
 			t.Errorf("rendering failed: %v", err)
 			continue
 		}
-		img, err = w.Screenshot()
+		img := image.NewRGBA(image.Rectangle{Max: sz})
+		err = w.Screenshot(img)
 		if err != nil {
 			t.Errorf("screenshot failed: %v", err)
 			continue

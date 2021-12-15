@@ -28,7 +28,8 @@ func TestHeadless(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	img, err := w.Screenshot()
+	img := image.NewRGBA(image.Rectangle{Max: w.Size()})
+	err := w.Screenshot(img)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +70,8 @@ func TestClipping(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	img, err := w.Screenshot()
+	img := image.NewRGBA(image.Rectangle{Max: w.Size()})
+	err := w.Screenshot(img)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +110,8 @@ func TestDepth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	img, err := w.Screenshot()
+	img := image.NewRGBA(image.Rectangle{Max: w.Size()})
+	err := w.Screenshot(img)
 	if err != nil {
 		t.Fatal(err)
 	}

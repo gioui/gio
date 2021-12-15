@@ -122,7 +122,12 @@ func (w *Window) Release() {
 	}
 }
 
-// Frame replace the window content and state with the
+// Size returns the window size.
+func (w *Window) Size() image.Point {
+	return w.size
+}
+
+// Frame replaces the window content and state with the
 // operation list.
 func (w *Window) Frame(frame *op.Ops) error {
 	return contextDo(w.ctx, func() error {
@@ -131,18 +136,11 @@ func (w *Window) Frame(frame *op.Ops) error {
 	})
 }
 
-// Screenshot returns an image with the content of the window.
-func (w *Window) Screenshot() (*image.RGBA, error) {
-	var img *image.RGBA
-	err := contextDo(w.ctx, func() error {
-		var err error
-		img, err = driver.DownloadImage(w.dev, w.fboTex, image.Rectangle{Max: w.size})
-		return err
+// Screenshot transfers the Window content at origin img.Rect.Min to img.
+func (w *Window) Screenshot(img *image.RGBA) error {
+	return contextDo(w.ctx, func() error {
+		return driver.DownloadImage(w.dev, w.fboTex, img)
 	})
-	if err != nil {
-		return nil, err
-	}
-	return img, nil
 }
 
 func contextDo(ctx context, f func() error) error {
