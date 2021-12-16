@@ -24,7 +24,7 @@ func TestLayoutLRU(t *testing.T) {
 func TestPathLRU(t *testing.T) {
 	c := new(pathCache)
 	put := func(i int) {
-		c.Put(pathKey{str: strconv.Itoa(i)}, clip.Op{})
+		c.Put(pathKey{str: strconv.Itoa(i)}, clip.PathSpec{})
 	}
 	get := func(i int) bool {
 		_, ok := c.Get(pathKey{str: strconv.Itoa(i)})

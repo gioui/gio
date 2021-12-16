@@ -26,7 +26,7 @@ type layoutElem struct {
 type path struct {
 	next, prev *path
 	key        pathKey
-	val        clip.Op
+	val        clip.PathSpec
 }
 
 type layoutKey struct {
@@ -81,16 +81,16 @@ func (l *layoutCache) insert(lt *layoutElem) {
 	lt.next.prev = lt
 }
 
-func (c *pathCache) Get(k pathKey) (clip.Op, bool) {
+func (c *pathCache) Get(k pathKey) (clip.PathSpec, bool) {
 	if v, ok := c.m[k]; ok {
 		c.remove(v)
 		c.insert(v)
 		return v.val, true
 	}
-	return clip.Op{}, false
+	return clip.PathSpec{}, false
 }
 
-func (c *pathCache) Put(k pathKey, v clip.Op) {
+func (c *pathCache) Put(k pathKey, v clip.PathSpec) {
 	if c.m == nil {
 		c.m = make(map[pathKey]*path)
 		c.head = new(path)
