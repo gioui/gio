@@ -70,7 +70,7 @@ func TestCollectionAsFace(t *testing.T) {
 
 	// All shapes from the original fonts should be distinct because the glyphs are distinct, including the replacement
 	// glyphs.
-	distinctShapes := []clip.Op{shapeValid1, shapeInvalid1, shapeValid2, shapeInvalid2}
+	distinctShapes := []clip.PathSpec{shapeValid1, shapeInvalid1, shapeValid2, shapeInvalid2}
 	for i := 0; i < len(distinctShapes); i++ {
 		for j := i + 1; j < len(distinctShapes); j++ {
 			if areShapesEqual(distinctShapes[i], distinctShapes[j]) {
@@ -174,23 +174,23 @@ func mergeFonts(ttf1, ttf2 []byte) []byte {
 }
 
 // shapeRune uses a given Face to shape exactly one rune at a fixed size, then returns the resulting shape data.
-func shapeRune(f text.Face, r rune) (clip.Op, error) {
+func shapeRune(f text.Face, r rune) (clip.PathSpec, error) {
 	ppem := fixed.I(200)
 	lines, err := f.Layout(ppem, 2000, strings.NewReader(string(r)))
 	if err != nil {
-		return clip.Op{}, err
+		return clip.PathSpec{}, err
 	}
 	if len(lines) != 1 {
-		return clip.Op{}, fmt.Errorf("unexpected rendering for \"U+%08X\": got %d lines (expected: 1)", r, len(lines))
+		return clip.PathSpec{}, fmt.Errorf("unexpected rendering for \"U+%08X\": got %d lines (expected: 1)", r, len(lines))
 	}
 	return f.Shape(ppem, lines[0].Layout), nil
 }
 
 // areShapesEqual returns true iff both given text shapes are produced with identical operations.
-func areShapesEqual(shape1, shape2 clip.Op) bool {
+func areShapesEqual(shape1, shape2 clip.PathSpec) bool {
 	var ops1, ops2 op.Ops
-	shape1.Push(&ops1).Pop()
-	shape2.Push(&ops2).Pop()
+	clip.Outline{Path: shape1}.Op().Push(&ops1).Pop()
+	clip.Outline{Path: shape2}.Op().Push(&ops2).Pop()
 	var r1, r2 ops.Reader
 	r1.Reset(&ops1.Internal)
 	r2.Reset(&ops2.Internal)

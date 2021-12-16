@@ -531,8 +531,8 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 		if !ok {
 			break
 		}
-		path := e.shaper.Shape(e.font, e.textSize, layout)
-		e.shapes = append(e.shapes, line{off, path, selected, yOffs, size})
+		op := clip.Outline{Path: e.shaper.Shape(e.font, e.textSize, layout)}.Op()
+		e.shapes = append(e.shapes, line{off, op, selected, yOffs, size})
 	}
 
 	key.InputOp{Tag: &e.eventKey, Hint: e.InputHint}.Add(gtx.Ops)
