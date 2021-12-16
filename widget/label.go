@@ -179,7 +179,7 @@ func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size un
 		}
 		t := op.Offset(layout.FPt(off)).Push(gtx.Ops)
 		rcl := clip.Rect(cl.Sub(off)).Push(gtx.Ops)
-		cl := s.Shape(font, textSize, l).Push(gtx.Ops)
+		cl := clip.Outline{Path: s.Shape(font, textSize, l)}.Op().Push(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
 		cl.Pop()
 		rcl.Pop()
