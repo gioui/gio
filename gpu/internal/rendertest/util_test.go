@@ -11,6 +11,7 @@ import (
 	"image/draw"
 	"image/png"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -143,11 +144,20 @@ func multiRun(t *testing.T, frames ...frameT) {
 
 func verifyRef(t *testing.T, img *image.RGBA, frame int) (ok bool) {
 	// ensure identical to ref data
-	path := filepath.Join("refs", t.Name()+".png")
-	if frame != 0 {
-		path = filepath.Join("refs", t.Name()+"_"+strconv.Itoa(frame)+".png")
+	var path string
+	if frame == 0 {
+		path = t.Name()
+	} else {
+		path = t.Name() + "_" + strconv.Itoa(frame)
 	}
+	path = filepath.Join("refs", path+".png")
 	if *dumpImages {
+		if err := os.MkdirAll(filepath.Dir(path), 0766); err != nil {
+			if !os.IsExist(err) {
+				t.Error(err)
+				return
+			}
+		}
 		saveImage(t, path, img)
 		return true
 	}

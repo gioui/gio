@@ -90,9 +90,6 @@ func (s Stack) Pop() {
 
 type PathSpec struct {
 	spec op.CallOp
-	// open is true if any path contour is not closed. A closed contour starts
-	// and ends in the same point.
-	open bool
 	// hasSegments tracks whether there are any segments in the path.
 	hasSegments bool
 	bounds      image.Rectangle
@@ -109,7 +106,6 @@ type PathSpec struct {
 // data is stored directly in the Ops list supplied to Begin.
 type Path struct {
 	ops         *ops.Ops
-	open        bool
 	contour     int
 	pen         f32.Point
 	macro       op.MacroOp
@@ -136,10 +132,10 @@ func (p *Path) Begin(o *op.Ops) {
 
 // End returns a PathSpec ready to use in clipping operations.
 func (p *Path) End() PathSpec {
+	p.gap()
 	c := p.macro.Stop()
 	return PathSpec{
 		spec:        c,
-		open:        p.open || p.pen != p.start,
 		hasSegments: p.hasSegments,
 		bounds:      boundRectF(p.bounds),
 		hash:        p.hash.Sum64(),
@@ -157,10 +153,21 @@ func (p *Path) MoveTo(to f32.Point) {
 	if p.pen == to {
 		return
 	}
-	p.open = p.open || p.pen != p.start
+	p.gap()
 	p.end()
 	p.pen = to
 	p.start = to
+}
+
+func (p *Path) gap() {
+	if p.pen != p.start {
+		// A closed contour starts and ends in the same point.
+		// This move creates a gap in the contour, register it.
+		data := ops.Write(p.ops, scene.CommandSize+4)
+		bo := binary.LittleEndian
+		bo.PutUint32(data[0:], uint32(p.contour))
+		p.cmd(data[4:], scene.Gap(p.pen, p.start))
+	}
 }
 
 // end completes the current contour.
@@ -331,9 +338,6 @@ type Outline struct {
 
 // Op returns a clip operation representing the outline.
 func (o Outline) Op() Op {
-	if o.Path.open {
-		panic("not all path contours are closed")
-	}
 	return Op{
 		path:    o.Path,
 		outline: true,

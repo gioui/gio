@@ -357,6 +357,60 @@ func TestImageRGBA(t *testing.T) {
 	})
 }
 
+func TestGapsInPath(t *testing.T) {
+	ops := new(op.Ops)
+	var p clip.Path
+	p.Begin(ops)
+	// Unclosed square 1
+	p.MoveTo(f32.Point{X: 10})
+	p.LineTo(f32.Point{X: 40})
+	p.LineTo(f32.Point{X: 40, Y: 30})
+	p.LineTo(f32.Point{X: 10, Y: 30})
+
+	// Unclosed square 2
+	p.MoveTo(f32.Point{X: 50})
+	p.LineTo(f32.Point{X: 80})
+	p.LineTo(f32.Point{X: 80, Y: 30})
+	p.LineTo(f32.Point{X: 50, Y: 30})
+
+	spec := p.End()
+
+	t.Run("Stroke", func(t *testing.T) {
+		run(t,
+			func(ops *op.Ops) {
+				stack := clip.Stroke{
+					Path:  spec,
+					Width: 2,
+				}.Op().Push(ops)
+				paint.ColorOp{Color: color.NRGBA{R: 255, A: 255}}.Add(ops)
+				paint.PaintOp{}.Add(ops)
+				stack.Pop()
+			},
+			func(r result) {
+				r.expect(10, 20, color.RGBA{})
+				r.expect(50, 20, color.RGBA{})
+			},
+		)
+	})
+
+	t.Run("Outline", func(t *testing.T) {
+		run(t,
+			func(ops *op.Ops) {
+				stack := clip.Outline{Path: spec}.Op().Push(ops)
+				paint.ColorOp{Color: color.NRGBA{R: 255, A: 255}}.Add(ops)
+				paint.PaintOp{}.Add(ops)
+				stack.Pop()
+			},
+			func(r result) {
+				r.expect(10, 20, colornames.Red)
+				r.expect(20, 20, colornames.Red)
+				r.expect(50, 20, colornames.Red)
+				r.expect(60, 20, colornames.Red)
+			},
+		)
+	})
+}
+
 // lerp calculates linear interpolation with color b and p.
 func lerp(a, b f32color.RGBA, p float32) f32color.RGBA {
 	return f32color.RGBA{

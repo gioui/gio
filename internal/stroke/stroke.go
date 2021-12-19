@@ -637,6 +637,8 @@ func decodeToStrokeQuads(pathData []byte) StrokeQuads {
 				Quad:    q,
 			}
 			quads = append(quads, quad)
+		case scene.OpGap:
+			// Ignore gaps for strokes.
 		case scene.OpQuad:
 			var q QuadSegment
 			q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)

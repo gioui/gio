@@ -1344,6 +1344,12 @@ func decodeToOutlineQuads(qs *quadSplitter, tr f32.Affine2D, pathData []byte) {
 			q.Ctrl = q.From.Add(q.To).Mul(.5)
 			q = q.Transform(tr)
 			qs.splitAndEncode(q)
+		case scene.OpGap:
+			var q stroke.QuadSegment
+			q.From, q.To = scene.DecodeGap(cmd)
+			q.Ctrl = q.From.Add(q.To).Mul(.5)
+			q = q.Transform(tr)
+			qs.splitAndEncode(q)
 		case scene.OpQuad:
 			var q stroke.QuadSegment
 			q.From, q.Ctrl, q.To = scene.DecodeQuad(cmd)

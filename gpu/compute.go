@@ -1186,12 +1186,19 @@ func min(p1, p2 f32.Point) f32.Point {
 	return p
 }
 
-func (enc *encoder) encodePath(verts []byte) {
-	for len(verts) >= scene.CommandSize+4 {
+func (enc *encoder) encodePath(verts []byte, fillMode int) {
+	for ; len(verts) >= scene.CommandSize+4; verts = verts[scene.CommandSize+4:] {
 		cmd := ops.DecodeCommand(verts[4:])
+		if cmd.Op() == scene.OpGap {
+			if fillMode != scene.FillModeNonzero {
+				// Skip gaps in strokes.
+				continue
+			}
+			// Replace them by a straight line in outlines.
+			cmd = scene.Line(scene.DecodeGap(cmd))
+		}
 		enc.scene = append(enc.scene, cmd)
 		enc.npathseg++
-		verts = verts[scene.CommandSize+4:]
 	}
 }
 
@@ -2109,7 +2116,7 @@ func encodeOp(viewport image.Point, absOff image.Point, enc *encoder, texOps []t
 		if len(cl.path) == 0 {
 			enc.rect(cl.state.bounds)
 		} else {
-			enc.encodePath(cl.path)
+			enc.encodePath(cl.path, fillMode)
 		}
 		if i != 0 {
 			enc.beginClip(cl.union.Add(absOfff))

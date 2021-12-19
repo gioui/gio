@@ -15,17 +15,6 @@ import (
 )
 
 func TestPathOutline(t *testing.T) {
-	t.Run("unclosed path", func(t *testing.T) {
-		defer func() {
-			if err := recover(); err == nil {
-				t.Error("Outline of an open path didn't panic")
-			}
-		}()
-		var p clip.Path
-		p.Begin(new(op.Ops))
-		p.Line(f32.Pt(10, 10))
-		clip.Outline{Path: p.End()}.Op()
-	})
 	t.Run("closed path", func(t *testing.T) {
 		defer func() {
 			if err := recover(); err != nil {
