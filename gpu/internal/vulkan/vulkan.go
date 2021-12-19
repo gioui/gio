@@ -678,10 +678,11 @@ func (p *descPool) release(d vk.Device) {
 func (p *descPool) bindDescriptorSet(b *Backend, cmdBuf vk.CommandBuffer, bindPoint vk.PipelineBindPoint, texBinds [texUnits]*Texture, bufBinds [storageUnits]*Buffer) {
 	realloced := false
 	destroyPool := func() {
-		pool := p.pool
-		b.deferFunc(func(d vk.Device) {
-			vk.DestroyDescriptorPool(d, pool)
-		})
+		if pool := p.pool; pool != 0 {
+			b.deferFunc(func(d vk.Device) {
+				vk.DestroyDescriptorPool(d, pool)
+			})
+		}
 		p.pool = 0
 		p.cap = 0
 	}
