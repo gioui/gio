@@ -91,32 +91,27 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 	thumbRadius := float32(thumbSize) / 2
 
+	circle := func(x, y, r float32) clip.Op {
+		b := f32.Rectangle{
+			Min: f32.Pt(x-r, y-r),
+			Max: f32.Pt(x+r, y+r),
+		}
+		return clip.Ellipse(b).Op(gtx.Ops)
+	}
 	// Draw hover.
 	if s.Switch.Hovered() {
 		r := 1.7 * thumbRadius
 		background := f32color.MulAlpha(s.Color.Enabled, 70)
-		paint.FillShape(gtx.Ops, background,
-			clip.Circle{
-				Center: f32.Point{X: thumbRadius, Y: thumbRadius},
-				Radius: r,
-			}.Op(gtx.Ops))
+		paint.FillShape(gtx.Ops, background, circle(thumbRadius, thumbRadius, r))
 	}
 
 	// Draw thumb shadow, a translucent disc slightly larger than the
 	// thumb itself.
 	// Center shadow horizontally and slightly adjust its Y.
-	paint.FillShape(gtx.Ops, argb(0x55000000),
-		clip.Circle{
-			Center: f32.Point{X: thumbRadius, Y: thumbRadius + .25},
-			Radius: thumbRadius + 1,
-		}.Op(gtx.Ops))
+	paint.FillShape(gtx.Ops, argb(0x55000000), circle(thumbRadius, thumbRadius+.25, thumbRadius+1))
 
 	// Draw thumb.
-	paint.FillShape(gtx.Ops, col,
-		clip.Circle{
-			Center: f32.Point{X: thumbRadius, Y: thumbRadius},
-			Radius: thumbRadius,
-		}.Op(gtx.Ops))
+	paint.FillShape(gtx.Ops, col, circle(thumbRadius, thumbRadius, thumbRadius))
 
 	// Set up click area.
 	clickSize := gtx.Px(unit.Dp(40))

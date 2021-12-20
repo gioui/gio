@@ -50,12 +50,8 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 
 					background := f32color.MulAlpha(c.IconColor, 70)
 
-					radius := float32(size) / 2
-					paint.FillShape(gtx.Ops, background,
-						clip.Circle{
-							Center: f32.Point{X: radius, Y: radius},
-							Radius: radius,
-						}.Op(gtx.Ops))
+					b := f32.Rectangle{Max: f32.Pt(float32(size), float32(size))}
+					paint.FillShape(gtx.Ops, background, clip.Ellipse(b).Op(gtx.Ops))
 
 					return dims
 				}),

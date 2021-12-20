@@ -78,11 +78,11 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 	// Draw thumb.
 	pt := axis.Convert(image.Pt(thumbPos, sizeCross/2))
-	paint.FillShape(gtx.Ops, color,
-		clip.Circle{
-			Center: f32.Point{X: float32(pt.X), Y: float32(pt.Y)},
-			Radius: float32(thumbRadius),
-		}.Op(gtx.Ops))
+	thumb := f32.Rectangle{
+		Min: f32.Pt(float32(pt.X-thumbRadius), float32(pt.Y-thumbRadius)),
+		Max: f32.Pt(float32(pt.X+thumbRadius), float32(pt.Y+thumbRadius)),
+	}
+	paint.FillShape(gtx.Ops, color, clip.Ellipse(thumb).Op(gtx.Ops))
 
 	return layout.Dimensions{Size: size}
 }
