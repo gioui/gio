@@ -81,6 +81,16 @@ func (m WindowMode) Option() Option {
 	}
 }
 
+func (m WindowMode) String() string {
+	switch m {
+	case Windowed:
+		return "windowed"
+	case Fullscreen:
+		return "fullscreen"
+	}
+	return ""
+}
+
 // Orientation is the orientation of the app (Orientation.Option sets it).
 //
 // Supported platforms are Android and JS.
@@ -99,6 +109,18 @@ func (o Orientation) Option() Option {
 	return func(_ unit.Metric, cnf *Config) {
 		cnf.Orientation = o
 	}
+}
+
+func (o Orientation) String() string {
+	switch o {
+	case AnyOrientation:
+		return "any"
+	case LandscapeOrientation:
+		return "landscape"
+	case PortraitOrientation:
+		return "portrait"
+	}
+	return ""
 }
 
 type frameEvent struct {
