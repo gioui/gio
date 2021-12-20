@@ -115,33 +115,6 @@ func (rr RRect) Path(ops *op.Ops) PathSpec {
 	return p.End()
 }
 
-// Circle represents the clip area of a circle.
-type Circle struct {
-	Center f32.Point
-	Radius float32
-}
-
-// Op returns the op for the filled circle.
-func (c Circle) Op(ops *op.Ops) Op {
-	return Outline{Path: c.Path(ops)}.Op()
-}
-
-// Push the circle clip on the clip stack.
-func (c Circle) Push(ops *op.Ops) Stack {
-	return c.Op(ops).Push(ops)
-}
-
-// Path returns the PathSpec for the circle.
-//
-// Deprecated: use Ellipse instead.
-func (c Circle) Path(ops *op.Ops) PathSpec {
-	b := f32.Rectangle{
-		Min: f32.Pt(c.Center.X-c.Radius, c.Center.Y-c.Radius),
-		Max: f32.Pt(c.Center.X+c.Radius, c.Center.Y+c.Radius),
-	}
-	return Ellipse(b).Path(ops)
-}
-
 // Ellipse represents the largest axis-aligned ellipse that
 // is contained in its bounds.
 type Ellipse f32.Rectangle

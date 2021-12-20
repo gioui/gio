@@ -14,7 +14,6 @@ import (
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/op"
-	"gioui.org/op/clip"
 )
 
 // Event is a pointer event.
@@ -161,20 +160,6 @@ const (
 	// ButtonTertiary is the tertiary button, usually the middle button.
 	ButtonTertiary
 )
-
-// Rect constructs a rectangular hit area.
-//
-// Deprecated: use clip.Rect instead.
-func Rect(size image.Rectangle) clip.Op {
-	return clip.Rect(size).Op()
-}
-
-// Ellipse constructs an ellipsoid hit area.
-//
-// Deprecated: use clip.Ellipse instead.
-func Ellipse(size image.Rectangle) clip.Ellipse {
-	return clip.Ellipse(frect(size))
-}
 
 // frect converts a rectangle to a f32.Rectangle.
 func frect(r image.Rectangle) f32.Rectangle {
