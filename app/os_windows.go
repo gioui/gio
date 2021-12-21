@@ -282,6 +282,27 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		case windows.SIZE_MINIMIZED:
 			w.setStage(system.StagePaused)
 		case windows.SIZE_MAXIMIZED, windows.SIZE_RESTORED:
+			var triggerEvent bool
+			// Check the window size change.
+			var r windows.Rect
+			windows.GetClientRect(w.hwnd, &r)
+			size := image.Point{
+				X: int(r.Right - r.Left),
+				Y: int(r.Bottom - r.Top),
+			}
+			if size != w.config.Size {
+				w.config.Size = size
+				triggerEvent = true
+			}
+			// Check the window mode.
+			mode := w.config.Mode
+			w.updateWindowMode()
+			if mode != w.config.Mode {
+				triggerEvent = true
+			}
+			if triggerEvent {
+				w.w.Event(ConfigEvent{Config: w.config})
+			}
 			w.setStage(system.StageRunning)
 		}
 	case windows.WM_GETMINMAXINFO:
@@ -426,16 +447,6 @@ func (w *window) setStage(s system.Stage) {
 }
 
 func (w *window) draw(sync bool) {
-	var r windows.Rect
-	windows.GetClientRect(w.hwnd, &r)
-	size := image.Point{
-		X: int(r.Right - r.Left),
-		Y: int(r.Bottom - r.Top),
-	}
-	if size != w.config.Size {
-		w.config.Size = size
-		w.w.Event(ConfigEvent{Config: w.config})
-	}
 	if w.config.Size.X == 0 || w.config.Size.Y == 0 {
 		return
 	}
@@ -492,10 +503,22 @@ func (w *window) readClipboard() error {
 	return nil
 }
 
+func (w *window) updateWindowMode() {
+	p := windows.GetWindowPlacement(w.hwnd)
+	r := p.Rect()
+	mi := windows.GetMonitorInfo(w.hwnd)
+	if r == mi.Monitor {
+		w.config.Mode = Fullscreen
+	} else {
+		w.config.Mode = Windowed
+	}
+}
+
 func (w *window) Configure(options []Option) {
 	dpi := windows.GetSystemDPI()
 	cfg := configForDPI(dpi)
 	prev := w.config
+	w.updateWindowMode()
 	cnf := w.config
 	cnf.apply(cfg, options)
 

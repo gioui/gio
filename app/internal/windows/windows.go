@@ -679,6 +679,10 @@ func UpdateWindow(hwnd syscall.Handle) {
 	_UpdateWindow.Call(uintptr(hwnd))
 }
 
+func (p WindowPlacement) Rect() Rect {
+	return p.rcNormalPosition
+}
+
 // issue34474KeepAlive calls runtime.KeepAlive as a
 // workaround for golang.org/issue/34474.
 func issue34474KeepAlive(v interface{}) {

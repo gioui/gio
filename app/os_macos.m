@@ -23,6 +23,14 @@ __attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(void);
 	NSWindow *window = (NSWindow *)[notification object];
 	gio_onShow((__bridge CFTypeRef)window.contentView);
 }
+- (void)windowWillEnterFullScreen:(NSNotification *)notification {
+	NSWindow *window = (NSWindow *)[notification object];
+	gio_onFullscreen((__bridge CFTypeRef)window.contentView);
+}
+- (void)windowWillExitFullScreen:(NSNotification *)notification {
+	NSWindow *window = (NSWindow *)[notification object];
+	gio_onWindowed((__bridge CFTypeRef)window.contentView);
+}
 - (void)windowDidChangeScreen:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
 	CGDirectDisplayID dispID = [[[window screen] deviceDescription][@"NSScreenNumber"] unsignedIntValue];

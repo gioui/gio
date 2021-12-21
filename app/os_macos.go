@@ -97,6 +97,11 @@ static void toggleFullScreen(CFTypeRef windowRef) {
 	[window toggleFullScreen:nil];
 }
 
+static NSWindowStyleMask getWindowStyleMask(CFTypeRef windowRef) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	return [window styleMask];
+}
+
 static void closeWindow(CFTypeRef windowRef) {
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	[window performClose:nil];
@@ -227,10 +232,20 @@ func (w *window) WriteClipboard(s string) {
 	C.writeClipboard(chars, C.NSUInteger(len(u16)))
 }
 
+func (w *window) updateWindowMode() {
+	style := int(C.getWindowStyleMask(w.window))
+	if style&C.NSWindowStyleMaskFullScreen > 0 {
+		w.config.Mode = Fullscreen
+	} else {
+		w.config.Mode = Windowed
+	}
+}
+
 func (w *window) Configure(options []Option) {
 	screenScale := float32(C.getScreenBackingScale())
 	cfg := configFor(screenScale)
 	prev := w.config
+	w.updateWindowMode()
 	cnf := w.config
 	cnf.apply(cfg, options)
 	cnf.Size = cnf.Size.Div(int(screenScale))
@@ -471,6 +486,20 @@ func gio_onHide(view C.CFTypeRef) {
 func gio_onShow(view C.CFTypeRef) {
 	w := mustView(view)
 	w.setStage(system.StageRunning)
+}
+
+//export gio_onFullscreen
+func gio_onFullscreen(view C.CFTypeRef) {
+	w := mustView(view)
+	w.config.Mode = Fullscreen
+	w.w.Event(ConfigEvent{Config: w.config})
+}
+
+//export gio_onWindowed
+func gio_onWindowed(view C.CFTypeRef) {
+	w := mustView(view)
+	w.config.Mode = Windowed
+	w.w.Event(ConfigEvent{Config: w.config})
 }
 
 //export gio_onAppHide
