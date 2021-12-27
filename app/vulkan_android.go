@@ -84,5 +84,6 @@ func (c *wlVkContext) Refresh() error {
 	if err != nil {
 		return err
 	}
-	return c.ctx.refresh(surf, w, h)
+	c.surf = surf
+	return c.ctx.refresh(c.surf, w, h)
 }
