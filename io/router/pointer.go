@@ -352,6 +352,9 @@ func (q *pointerQueue) AppendSemantics(nodes []SemanticNode) []SemanticNode {
 }
 
 func (q *pointerQueue) appendSemanticArea(nodes []SemanticNode, parentID SemanticID, nodeIdx int) []SemanticNode {
+	if len(nodes) <= nodeIdx {
+		return nodes
+	}
 	areaIdx := nodes[nodeIdx].areaIdx
 	a := q.areas[areaIdx]
 	childStart := len(nodes)
@@ -367,7 +370,7 @@ func (q *pointerQueue) appendSemanticArea(nodes []SemanticNode, parentID Semanti
 }
 
 func (q *pointerQueue) appendSemanticChildren(nodes []SemanticNode, areaIdx int) []SemanticNode {
-	if areaIdx == -1 {
+	if areaIdx == -1 || len(q.areas) <= areaIdx {
 		return nodes
 	}
 	a := q.areas[areaIdx]

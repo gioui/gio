@@ -617,6 +617,9 @@ func (w *Window) updateSemantics() {
 	w.semantic.uptodate = true
 	w.semantic.prevTree, w.semantic.tree = w.semantic.tree, w.semantic.prevTree
 	w.semantic.tree = w.queue.q.AppendSemantics(w.semantic.tree[:0])
+	if len(w.semantic.tree) == 0 {
+		return
+	}
 	w.semantic.root = w.semantic.tree[0].ID
 	for _, n := range w.semantic.tree {
 		w.semantic.ids[n.ID] = n
