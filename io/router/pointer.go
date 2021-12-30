@@ -321,12 +321,18 @@ func (c *pointerCollector) offerOp(op transfer.OfferOp, events *handlerEvents) {
 	h.data = op.Data
 }
 
-func (c *pointerCollector) reset(q *pointerQueue) {
-	q.reset()
+func (c *pointerCollector) reset() {
+	c.q.reset()
 	c.resetState()
 	c.nodeStack = c.nodeStack[:0]
-	c.q = q
-	// Add implicit root area for semantic descriptions to hang onto.
+	c.ensureRoot()
+}
+
+// Ensure implicit root area for semantic descriptions to hang onto.
+func (c *pointerCollector) ensureRoot() {
+	if len(c.q.areas) > 0 {
+		return
+	}
 	c.pushArea(areaRect, f32.Rect(-1e6, -1e6, 1e6, 1e6))
 	// Make it semantic to ensure a single semantic root.
 	c.q.areas[0].semantic.valid = true

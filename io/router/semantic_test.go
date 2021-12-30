@@ -15,6 +15,14 @@ import (
 	"gioui.org/op/clip"
 )
 
+func TestEmptySemantics(t *testing.T) {
+	var r Router
+	tree := r.AppendSemantics(nil)
+	if len(tree) != 1 {
+		t.Errorf("expected 1 semantic node for empty tree, got %d", len(tree))
+	}
+}
+
 func TestSemanticTree(t *testing.T) {
 	var (
 		ops op.Ops

@@ -183,13 +183,16 @@ func (q *Router) SemanticAt(pos f32.Point) (SemanticID, bool) {
 // AppendSemantics appends the semantic tree to nodes, and returns the result.
 // The root node is the first added.
 func (q *Router) AppendSemantics(nodes []SemanticNode) []SemanticNode {
+	q.pointer.collector.q = &q.pointer.queue
+	q.pointer.collector.ensureRoot()
 	return q.pointer.queue.AppendSemantics(nodes)
 }
 
 func (q *Router) collect() {
 	q.transStack = q.transStack[:0]
 	pc := &q.pointer.collector
-	pc.reset(&q.pointer.queue)
+	pc.q = &q.pointer.queue
+	pc.reset()
 	kc := &q.key.collector
 	*kc = keyCollector{q: &q.key.queue}
 	q.key.queue.Reset()
