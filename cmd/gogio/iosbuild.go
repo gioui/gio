@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,10 +21,10 @@ import (
 )
 
 const (
-	minIOSVersion = "10.0"
+	minIOSVersion = 10
 	// Metal is available from iOS 8 on devices, yet from version 13 on the
 	// simulator.
-	minSimulatorVersion = "13.0"
+	minSimulatorVersion = 13
 )
 
 func buildIOS(tmpDir, target string, bi *buildInfo) error {
@@ -193,7 +194,7 @@ int main(int argc, char * argv[]) {
 	lipo := exec.Command("xcrun", "lipo", "-o", exe, "-create")
 	var builds errgroup.Group
 	for _, a := range bi.archs {
-		clang, cflags, err := iosCompilerFor(target, a)
+		clang, cflags, err := iosCompilerFor(target, a, bi.minsdk)
 		if err != nil {
 			return err
 		}
@@ -291,11 +292,16 @@ func iosIcons(bi *buildInfo, tmpDir, appDir, icon string) (string, error) {
 		return "", err
 	}
 	assetPlist := filepath.Join(tmpDir, "assets.plist")
+
+	minsdk := bi.minsdk
+	if minsdk == 0 {
+		minsdk = minIOSVersion
+	}
 	compile := exec.Command(
 		"actool",
 		"--compile", appDir,
 		"--platform", iosPlatformFor(bi.target),
-		"--minimum-deployment-target", minIOSVersion,
+		"--minimum-deployment-target", strconv.Itoa(minsdk),
 		"--app-icon", "AppIcon",
 		"--output-partial-info-plist", assetPlist,
 		assets)
@@ -342,7 +348,7 @@ func buildInfoPlist(bi *buildInfo) string {
 	<key>DTPlatformVersion</key>
 	<string>12.4</string>
 	<key>MinimumOSVersion</key>
-	<string>%s</string>
+	<string>%d</string>
 	<key>UIDeviceFamily</key>
 	<array>
 		<integer>1</integer>
@@ -428,7 +434,7 @@ func archiveIOS(tmpDir, target, frameworkRoot string, bi *buildInfo) error {
 		tags = "ios " + tags
 	}
 	for _, a := range bi.archs {
-		clang, cflags, err := iosCompilerFor(target, a)
+		clang, cflags, err := iosCompilerFor(target, a, bi.minsdk)
 		if err != nil {
 			return err
 		}
@@ -500,11 +506,10 @@ func supportsGOOS(wantGoos string) (bool, error) {
 	return false, nil
 }
 
-func iosCompilerFor(target, arch string) (string, []string, error) {
+func iosCompilerFor(target, arch string, minsdk int) (string, []string, error) {
 	var (
 		platformSDK string
 		platformOS  string
-		minVer      = minIOSVersion
 	)
 	switch target {
 	case "ios":
@@ -513,15 +518,19 @@ func iosCompilerFor(target, arch string) (string, []string, error) {
 	case "tvos":
 		platformOS = "tvos"
 		platformSDK = "appletv"
-
 	}
 	switch arch {
 	case "arm", "arm64":
 		platformSDK += "os"
+		if minsdk == 0 {
+			minsdk = minIOSVersion
+		}
 	case "386", "amd64":
 		platformOS += "-simulator"
 		platformSDK += "simulator"
-		minVer = minSimulatorVersion
+		if minsdk == 0 {
+			minsdk = minSimulatorVersion
+		}
 	default:
 		return "", nil, fmt.Errorf("unsupported -arch: %s", arch)
 	}
@@ -537,7 +546,7 @@ func iosCompilerFor(target, arch string) (string, []string, error) {
 		"-fembed-bitcode",
 		"-arch", allArchs[arch].iosArch,
 		"-isysroot", sdkPath,
-		"-m" + platformOS + "-version-min=" + minVer,
+		"-m" + platformOS + "-version-min=" + strconv.Itoa(minsdk),
 	}
 	return clang, cflags, nil
 }
