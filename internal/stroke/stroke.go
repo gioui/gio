@@ -670,7 +670,10 @@ func SplitCubic(from, ctrl0, ctrl1, to f32.Point) []QuadSegment {
 	hull := f32.Rectangle{
 		Min: from,
 		Max: ctrl0,
-	}.Canon().Add(ctrl1).Add(to)
+	}.Canon().Union(f32.Rectangle{
+		Min: ctrl1,
+		Max: to,
+	}.Canon())
 	l := hull.Dx()
 	if h := hull.Dy(); h > l {
 		l = h
