@@ -46,6 +46,25 @@ func (e *editBuffer) deleteRunes(caret, runes int) int {
 	return caret
 }
 
+func (e *editBuffer) deleteBytes(caret, bytes int) int {
+	e.moveGap(caret, 0)
+	if bytes < 0 {
+		e.gapstart += bytes
+		if e.gapstart < 0 {
+			e.gapstart = 0
+		}
+		caret = e.gapstart
+	}
+	if bytes > 0 {
+		e.gapend += bytes
+		if e.gapend > len(e.text) {
+			e.gapend = len(e.text)
+		}
+	}
+	e.changed = e.changed || bytes != 0
+	return caret
+}
+
 // moveGap moves the gap to the caret position. After returning,
 // the gap is guaranteed to be at least space bytes long.
 func (e *editBuffer) moveGap(caret, space int) {

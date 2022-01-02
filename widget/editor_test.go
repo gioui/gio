@@ -245,6 +245,110 @@ func TestEditorMoveWord(t *testing.T) {
 	}
 }
 
+func TestEditorInsert(t *testing.T) {
+	type Test struct {
+		Text      string
+		Start     int
+		Selection int
+		Insertion string
+
+		Result string
+	}
+	tests := []Test{
+		// Nothing inserted
+		{"", 0, 0, "", ""},
+		{"", 0, -1, "", ""},
+		{"", 0, 1, "", ""},
+		{"", 0, -2, "", ""},
+		{"", 0, 2, "", ""},
+		{"world", 0, 0, "", "world"},
+		{"world", 0, -1, "", "world"},
+		{"world", 0, 1, "", "orld"},
+		{"world", 2, 0, "", "world"},
+		{"world", 2, -1, "", "wrld"},
+		{"world", 2, 1, "", "wold"},
+		{"world", 5, 0, "", "world"},
+		{"world", 5, -1, "", "worl"},
+		{"world", 5, 1, "", "world"},
+		// One rune inserted
+		{"", 0, 0, "_", "_"},
+		{"", 0, -1, "_", "_"},
+		{"", 0, 1, "_", "_"},
+		{"", 0, -2, "_", "_"},
+		{"", 0, 2, "_", "_"},
+		{"world", 0, 0, "_", "_world"},
+		{"world", 0, -1, "_", "_world"},
+		{"world", 0, 1, "_", "_orld"},
+		{"world", 2, 0, "_", "wo_rld"},
+		{"world", 2, -1, "_", "w_rld"},
+		{"world", 2, 1, "_", "wo_ld"},
+		{"world", 5, 0, "_", "world_"},
+		{"world", 5, -1, "_", "worl_"},
+		{"world", 5, 1, "_", "world_"},
+		// More runes inserted
+		{"", 0, 0, "-3-", "-3-"},
+		{"", 0, -1, "-3-", "-3-"},
+		{"", 0, 1, "-3-", "-3-"},
+		{"", 0, -2, "-3-", "-3-"},
+		{"", 0, 2, "-3-", "-3-"},
+		{"world", 0, 0, "-3-", "-3-world"},
+		{"world", 0, -1, "-3-", "-3-world"},
+		{"world", 0, 1, "-3-", "-3-orld"},
+		{"world", 2, 0, "-3-", "wo-3-rld"},
+		{"world", 2, -1, "-3-", "w-3-rld"},
+		{"world", 2, 1, "-3-", "wo-3-ld"},
+		{"world", 5, 0, "-3-", "world-3-"},
+		{"world", 5, -1, "-3-", "worl-3-"},
+		{"world", 5, 1, "-3-", "world-3-"},
+		// Runes with length > 1 inserted
+		{"", 0, 0, "éêè", "éêè"},
+		{"", 0, -1, "éêè", "éêè"},
+		{"", 0, 1, "éêè", "éêè"},
+		{"", 0, -2, "éêè", "éêè"},
+		{"", 0, 2, "éêè", "éêè"},
+		{"world", 0, 0, "éêè", "éêèworld"},
+		{"world", 0, -1, "éêè", "éêèworld"},
+		{"world", 0, 1, "éêè", "éêèorld"},
+		{"world", 2, 0, "éêè", "woéêèrld"},
+		{"world", 2, -1, "éêè", "wéêèrld"},
+		{"world", 2, 1, "éêè", "woéêèld"},
+		{"world", 5, 0, "éêè", "worldéêè"},
+		{"world", 5, -1, "éêè", "worléêè"},
+		{"world", 5, 1, "éêè", "worldéêè"},
+		// Runes with length > 1 deleted from selection
+		{"élançé", 0, 1, "", "lançé"},
+		{"élançé", 0, 1, "-3-", "-3-lançé"},
+		{"élançé", 3, 2, "-3-", "éla-3-é"},
+		{"élançé", 3, 3, "-3-", "éla-3-"},
+		{"élançé", 3, 10, "-3-", "éla-3-"},
+		{"élançé", 5, -1, "-3-", "élan-3-é"},
+		{"élançé", 6, -1, "-3-", "élanç-3-"},
+		{"élançé", 6, -3, "-3-", "éla-3-"},
+	}
+	setup := func(t string) *Editor {
+		e := new(Editor)
+		gtx := layout.Context{
+			Ops:         new(op.Ops),
+			Constraints: layout.Exact(image.Pt(100, 100)),
+		}
+		cache := text.NewCache(gofont.Collection())
+		fontSize := unit.Px(10)
+		font := text.Font{}
+		e.SetText(t)
+		e.Layout(gtx, cache, font, fontSize, nil)
+		return e
+	}
+	for ii, tt := range tests {
+		e := setup(tt.Text)
+		e.MoveCaret(tt.Start, tt.Start)
+		e.MoveCaret(0, tt.Selection)
+		e.Insert(tt.Insertion)
+		if e.Text() != tt.Result {
+			t.Fatalf("[%d] Insert: invalid result: got %q, want %q", ii, e.Text(), tt.Result)
+		}
+	}
+}
+
 func TestEditorDeleteWord(t *testing.T) {
 	type Test struct {
 		Text      string
@@ -283,6 +387,7 @@ func TestEditorDeleteWord(t *testing.T) {
 		{"hello    world", 8, 0, 1, 8, "hello   "},
 		{"hello    world", 8, 0, -1, 5, "hello world"},
 		{"hello brave new world", 0, 0, 3, 0, " new world"},
+		{"helléèçàô world", 3, 0, 1, 3, "hel world"}, // unicode char with length > 1 in deleted part
 		// Add selected text.
 		//
 		// Several permutations must be tested:
@@ -295,11 +400,16 @@ func TestEditorDeleteWord(t *testing.T) {
 		{"hello there brave new world", 12, 6, 2, 12, "hello there  world"},    // The two spaces after "there" are actually suboptimal, if you ask me. See also above cases.
 		{"hello there brave new world", 12, 6, -1, 12, "hello there new world"},
 		{"hello there brave new world", 12, 6, -2, 6, "hello new world"},
+		{"hello there b®âve new world", 12, 6, 1, 12, "hello there new world"},  // unicode chars with length > 1 in selection
+		{"hello there b®âve new world", 12, 6, 2, 12, "hello there  world"},     // ditto
+		{"hello there b®âve new world", 12, 6, -1, 12, "hello there new world"}, // ditto
+		{"hello there b®âve new world", 12, 6, -2, 6, "hello new world"},        // ditto
 		// "|brave " selected
 		{"hello there brave new world", 18, -6, 1, 12, "hello there new world"}, // #20
 		{"hello there brave new world", 18, -6, 2, 12, "hello there  world"},    // ditto
 		{"hello there brave new world", 18, -6, -1, 12, "hello there new world"},
 		{"hello there brave new world", 18, -6, -2, 6, "hello new world"},
+		{"hello there b®âve new world", 18, -6, 1, 12, "hello there new world"}, // unicode chars with length > 1 in selection
 		// Random edge cases
 		{"hello there brave new world", 12, 6, 99, 12, "hello there "},
 		{"hello there brave new world", 18, -6, -99, 0, "new world"},

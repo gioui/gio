@@ -838,7 +838,7 @@ func (e *Editor) Delete(runes int) {
 	}
 
 	if l := e.caret.end.ofs - e.caret.start.ofs; l != 0 {
-		e.caret.start.ofs = e.rr.deleteRunes(e.caret.start.ofs, l)
+		e.caret.start.ofs = e.rr.deleteBytes(e.caret.start.ofs, l)
 		runes -= sign(runes)
 	}
 
@@ -871,7 +871,7 @@ func (e *Editor) prepend(s string) {
 	if e.SingleLine {
 		s = strings.ReplaceAll(s, "\n", " ")
 	}
-	e.caret.start.ofs = e.rr.deleteRunes(e.caret.start.ofs, e.caret.end.ofs-e.caret.start.ofs) // Delete any selection first.
+	e.caret.start.ofs = e.rr.deleteBytes(e.caret.start.ofs, e.caret.end.ofs-e.caret.start.ofs) // Delete any selection first.
 	e.rr.prepend(e.caret.start.ofs, s)
 	e.caret.start.xoff = 0
 	e.invalidate()
@@ -1122,8 +1122,8 @@ func (e *Editor) deleteWord(distance int) {
 		idx := e.caret.start.ofs + offset*direction
 		return idx <= 0 || idx >= e.rr.len()
 	}
-	// next returns the appropriate rune given the direction and offset.
-	next := func(offset int) (r rune) {
+	// next returns the appropriate rune and length given the direction and offset (in bytes).
+	next := func(offset int) (r rune, l int) {
 		idx := e.caret.start.ofs + offset*direction
 		if idx < 0 {
 			idx = 0
@@ -1131,21 +1131,27 @@ func (e *Editor) deleteWord(distance int) {
 			idx = e.rr.len()
 		}
 		if direction < 0 {
-			r, _ = e.rr.runeBefore(idx)
+			r, l = e.rr.runeBefore(idx)
 		} else {
-			r, _ = e.rr.runeAt(idx)
+			r, l = e.rr.runeAt(idx)
 		}
-		return r
+		return
 	}
 	var runes = 1
+	_, bytes := e.rr.runeAt(e.caret.start.ofs)
+	if direction < 0 {
+		_, bytes = e.rr.runeBefore(e.caret.start.ofs)
+	}
 	for ii := 0; ii < words; ii++ {
-		if r := next(runes); unicode.IsSpace(r) {
-			for r := next(runes); unicode.IsSpace(r) && !atEnd(runes); r = next(runes) {
+		if r, _ := next(bytes); unicode.IsSpace(r) {
+			for r, lg := next(bytes); unicode.IsSpace(r) && !atEnd(bytes); r, lg = next(bytes) {
 				runes += 1
+				bytes += lg
 			}
 		} else {
-			for r := next(runes); !unicode.IsSpace(r) && !atEnd(runes); r = next(runes) {
+			for r, lg := next(bytes); !unicode.IsSpace(r) && !atEnd(bytes); r, lg = next(bytes) {
 				runes += 1
+				bytes += lg
 			}
 		}
 	}
