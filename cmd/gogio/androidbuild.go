@@ -955,9 +955,6 @@ loop:
 	for _, path := range paths {
 		name := filepath.Base(path)
 		s := strings.SplitN(name, ".", 3)
-		if len(s) != len(bestVer) {
-			continue
-		}
 		var version [3]int
 		for i, v := range s {
 			v, err := strconv.Atoi(v)
