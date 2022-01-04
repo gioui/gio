@@ -34,19 +34,21 @@ type Window struct {
 	// driverFuncs is a channel of functions to run when
 	// the Window has a valid driver.
 	driverFuncs chan func(d driver)
-	// driverDefers is like driverFuncs for functions that may
-	// block and shouldn't be waited for.
-	driverDefers chan func(d driver)
 	// wakeups wakes up the native event loop to send a
 	// WakeupEvent that flushes driverFuncs.
 	wakeups chan struct{}
+	// wakeupFuncs is sent wakeup functions when the driver changes.
+	wakeupFuncs chan func()
+	// redraws is notified when a redraw is requested by the client.
+	redraws chan struct{}
+	// immediateRedraws is like redraw but doesn't need a wakeup.
+	immediateRedraws chan struct{}
+	// scheduledRedraws is sent the most recent delayed redraw time.
+	scheduledRedraws chan time.Time
 
-	out         chan event.Event
-	in          chan event.Event
-	ack         chan struct{}
-	invalidates chan struct{}
-	frames      chan *op.Ops
-	frameAck    chan struct{}
+	out      chan event.Event
+	frames   chan *op.Ops
+	frameAck chan struct{}
 	// dead is closed when the window is destroyed.
 	dead chan struct{}
 
@@ -66,25 +68,6 @@ type Window struct {
 	// semantic data, lazily evaluated if requested by a backend to speed up
 	// the cases where semantic data is not needed.
 	semantic struct {
-		// requestDiffs is notified when a backend requests the list of changed
-		// semantic ids.
-		requestDiffs chan struct{}
-		// diffs is sent every changed semantic id when semRequestDiffs is requested,
-		// ending with the zero id.
-		diffs chan router.SemanticID
-		// lookups is sent semantic IDs for lookup.
-		lookups chan router.SemanticID
-		// results is sent the responses for semLookups queries.
-		results chan semanticResult
-		// requestRoots is sent request for the root ID.
-		requestRoots chan struct{}
-		// roots is sent root IDs when requested throught queryRoots.
-		roots chan router.SemanticID
-		// positions is sent positional requests.
-		positions chan f32.Point
-		// positionIDs is sent results for positions requests.
-		positionIDs chan semanticID
-
 		// uptodate tracks whether the fields below are up to date.
 		uptodate bool
 		root     router.SemanticID
@@ -92,11 +75,6 @@ type Window struct {
 		tree     []router.SemanticNode
 		ids      map[router.SemanticID]router.SemanticNode
 	}
-}
-
-type semanticID struct {
-	found bool
-	id    router.SemanticID
 }
 
 type semanticResult struct {
@@ -113,11 +91,6 @@ type callbacks struct {
 // to the input handlers declared in the most recent frame.
 type queue struct {
 	q router.Router
-}
-
-// driverEvent is sent when the underlying driver changes.
-type driverEvent struct {
-	wakeup func()
 }
 
 // Pre-allocate the ack event to avoid garbage.
@@ -143,28 +116,19 @@ func NewWindow(options ...Option) *Window {
 	cnf.apply(unit.Metric{}, options)
 
 	w := &Window{
-		in:           make(chan event.Event),
-		out:          make(chan event.Event),
-		ack:          make(chan struct{}),
-		invalidates:  make(chan struct{}, 1),
-		frames:       make(chan *op.Ops),
-		frameAck:     make(chan struct{}),
-		driverFuncs:  make(chan func(d driver), 1),
-		driverDefers: make(chan func(d driver), 1),
-		wakeups:      make(chan struct{}, 1),
-		dead:         make(chan struct{}),
-		nocontext:    cnf.CustomRenderer,
+		out:              make(chan event.Event),
+		immediateRedraws: make(chan struct{}, 0),
+		redraws:          make(chan struct{}, 1),
+		scheduledRedraws: make(chan time.Time, 1),
+		frames:           make(chan *op.Ops),
+		frameAck:         make(chan struct{}),
+		driverFuncs:      make(chan func(d driver), 1),
+		wakeups:          make(chan struct{}, 1),
+		wakeupFuncs:      make(chan func()),
+		dead:             make(chan struct{}),
+		nocontext:        cnf.CustomRenderer,
 	}
 	w.semantic.ids = make(map[router.SemanticID]router.SemanticNode)
-	w.semantic.lookups = make(chan router.SemanticID)
-	w.semantic.results = make(chan semanticResult)
-	w.semantic.requestDiffs = make(chan struct{})
-	w.semantic.requestRoots = make(chan struct{})
-	w.semantic.roots = make(chan router.SemanticID)
-	w.semantic.positions = make(chan f32.Point)
-	w.semantic.positionIDs = make(chan semanticID)
-	// Add buffer to limit context switching when the diff is large.
-	w.semantic.diffs = make(chan router.SemanticID, 50)
 	w.callbacks.w = w
 	go w.run(options)
 	return w
@@ -183,14 +147,12 @@ func (w *Window) update(frame *op.Ops) {
 	<-w.frameAck
 }
 
-func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync bool, frame *op.Ops) error {
+func (w *Window) validateAndProcess(d driver, frameStart time.Time, size image.Point, sync bool, frame *op.Ops) error {
 	for {
 		if w.gpu == nil && !w.nocontext {
 			var err error
 			if w.ctx == nil {
-				w.driverRun(func(d driver) {
-					w.ctx, err = d.NewContext()
-				})
+				w.ctx, err = d.NewContext()
 				if err != nil {
 					return err
 				}
@@ -198,11 +160,7 @@ func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync
 			}
 		}
 		if sync && w.ctx != nil {
-			var err error
-			w.driverRun(func(d driver) {
-				err = w.ctx.Refresh()
-			})
-			if err != nil {
+			if err := w.ctx.Refresh(); err != nil {
 				if errors.Is(err, errOutOfDate) {
 					// Surface couldn't be created for transient reasons. Skip
 					// this frame and wait for the next.
@@ -242,7 +200,7 @@ func (w *Window) validateAndProcess(frameStart time.Time, size image.Point, sync
 				return err
 			}
 		}
-		w.processFrame(frameStart, frame)
+		w.processFrame(d, frameStart, frame)
 		return nil
 	}
 }
@@ -269,7 +227,7 @@ func (w *Window) render(frame *op.Ops, viewport image.Point) error {
 	return w.ctx.Present()
 }
 
-func (w *Window) processFrame(frameStart time.Time, frame *op.Ops) {
+func (w *Window) processFrame(d driver, frameStart time.Time, frame *op.Ops) {
 	w.queue.q.Frame(frame)
 	for k := range w.semantic.ids {
 		delete(w.semantic.ids, k)
@@ -277,12 +235,12 @@ func (w *Window) processFrame(frameStart time.Time, frame *op.Ops) {
 	w.semantic.uptodate = false
 	switch w.queue.q.TextInputState() {
 	case router.TextInputOpen:
-		w.driverDefer(func(d driver) { d.ShowTextInput(true) })
+		d.ShowTextInput(true)
 	case router.TextInputClose:
-		w.driverDefer(func(d driver) { d.ShowTextInput(false) })
+		d.ShowTextInput(false)
 	}
 	if hint, ok := w.queue.q.TextInputHint(); ok {
-		w.driverDefer(func(d driver) { d.SetInputHint(hint) })
+		d.SetInputHint(hint)
 	}
 	if txt, ok := w.queue.q.WriteClipboard(); ok {
 		w.WriteClipboard(txt)
@@ -300,14 +258,7 @@ func (w *Window) processFrame(frameStart time.Time, frame *op.Ops) {
 	if t, ok := w.queue.q.WakeupTime(); ok {
 		w.setNextFrame(t)
 	}
-	// Opportunistically check whether Invalidate has been called, to avoid
-	// stopping and starting animation mode.
-	select {
-	case <-w.invalidates:
-		w.setNextFrame(time.Time{})
-	default:
-	}
-	w.updateAnimation()
+	w.updateAnimation(d)
 }
 
 // Invalidate the window such that a FrameEvent will be generated immediately.
@@ -320,7 +271,13 @@ func (w *Window) processFrame(frameStart time.Time, frame *op.Ops) {
 // Invalidate is safe for concurrent use.
 func (w *Window) Invalidate() {
 	select {
-	case w.invalidates <- struct{}{}:
+	case w.immediateRedraws <- struct{}{}:
+		return
+	default:
+	}
+	select {
+	case w.redraws <- struct{}{}:
+		w.wakeup()
 	default:
 	}
 }
@@ -391,69 +348,45 @@ func (w *Window) Center() {
 // Note that most programs should not call Run; configuring a Window with
 // CustomRenderer is a notable exception.
 func (w *Window) Run(f func()) {
-	w.driverRun(func(_ driver) {
+	done := make(chan struct{})
+	w.driverDefer(func(d driver) {
+		defer close(done)
 		f()
 	})
-}
-
-// driverRun runs f on the driver event goroutine and returns when f has
-// completed. It can only be called during the processing of an event from
-// w.in.
-func (w *Window) driverRun(f func(d driver)) {
-	done := make(chan struct{})
-	wrapper := func(d driver) {
-		defer close(done)
-		f(d)
-	}
 	select {
-	case w.driverFuncs <- wrapper:
-		select {
-		case <-done:
-		case <-w.dead:
-		}
+	case <-done:
 	case <-w.dead:
 	}
 }
 
-// driverDefer is like driverRun but can be run from any context. It doesn't wait
+// driverDefer is like Run but can be run from any context. It doesn't wait
 // for f to return.
 func (w *Window) driverDefer(f func(d driver)) {
 	select {
-	case w.driverDefers <- f:
+	case w.driverFuncs <- f:
 		w.wakeup()
 	case <-w.dead:
 	}
 }
 
-func (w *Window) updateAnimation() {
+func (w *Window) updateAnimation(d driver) {
 	animate := false
-	if w.delayedDraw != nil {
-		w.delayedDraw.Stop()
-		w.delayedDraw = nil
-	}
 	if w.stage >= system.StageRunning && w.hasNextFrame {
 		if dt := time.Until(w.nextFrame); dt <= 0 {
 			animate = true
 		} else {
-			w.delayedDraw = time.NewTimer(dt)
+			// Schedule redraw.
+			select {
+			case <-w.scheduledRedraws:
+			default:
+			}
+			w.scheduledRedraws <- w.nextFrame
 		}
 	}
 	if animate != w.animating {
 		w.animating = animate
-		if animate {
-			w.driverDefer(enableAnim)
-		} else {
-			w.driverDefer(disableAnim)
-		}
+		d.SetAnimating(animate)
 	}
-}
-
-func enableAnim(d driver) {
-	d.SetAnimating(true)
-}
-
-func disableAnim(d driver) {
-	d.SetAnimating(false)
 }
 
 func (w *Window) wakeup() {
@@ -476,100 +409,54 @@ func (c *callbacks) SetDriver(d driver) {
 	if d != nil {
 		wakeup = d.Wakeup
 	}
-	c.Event(driverEvent{wakeup})
+	c.w.wakeupFuncs <- wakeup
 }
 
 func (c *callbacks) Event(e event.Event) {
-	deferChan := c.w.driverDefers
 	if c.d == nil {
-		deferChan = nil
+		panic("event while no driver active")
 	}
-	for {
-		select {
-		case f := <-deferChan:
-			f(c.d)
-		case c.w.in <- e:
-			c.w.runFuncs(c.d)
-			return
-		case <-c.w.dead:
-			return
-		}
-	}
+	c.w.processEvent(c.d, e)
+	c.w.updateState(c.d)
 }
 
 // SemanticRoot returns the ID of the semantic root.
 func (c *callbacks) SemanticRoot() router.SemanticID {
-	c.w.semantic.requestRoots <- struct{}{}
-	return <-c.w.semantic.roots
+	c.w.updateSemantics()
+	return c.w.semantic.root
 }
 
 // LookupSemantic looks up a semantic node from an ID. The zero ID denotes the root.
 func (c *callbacks) LookupSemantic(semID router.SemanticID) (router.SemanticNode, bool) {
-	c.w.semantic.lookups <- semID
-	res := <-c.w.semantic.results
-	return res.node, res.found
+	c.w.updateSemantics()
+	n, found := c.w.semantic.ids[semID]
+	return n, found
 }
 
-func (c *callbacks) RequestSemanticDiffs() <-chan router.SemanticID {
-	c.w.semantic.requestDiffs <- struct{}{}
-	return c.w.semantic.diffs
+func (c *callbacks) AppendSemanticDiffs(diffs []router.SemanticID) []router.SemanticID {
+	c.w.updateSemantics()
+	if tree := c.w.semantic.prevTree; len(tree) > 0 {
+		c.w.collectSemanticDiffs(&diffs, c.w.semantic.prevTree[0])
+	}
+	return diffs
 }
 
 func (c *callbacks) SemanticAt(pos f32.Point) (router.SemanticID, bool) {
-	c.w.semantic.positions <- pos
-	res := <-c.w.semantic.positionIDs
-	return res.id, res.found
+	c.w.updateSemantics()
+	return c.w.queue.q.SemanticAt(pos)
 }
 
-func (w *Window) runFuncs(d driver) {
-	// Don't run driver functions if there's no driver.
-	if d == nil {
-		<-w.ack
-		return
-	}
-	var defers []func(d driver)
-	// Don't miss deferred functions when ack arrives immediately. There is one
-	// wakeup event per function, so one select is enough.
-	select {
-	case f := <-w.driverDefers:
-		defers = append(defers, f)
-	default:
-	}
-	// Wait for ack while running incoming runnables.
+func (w *Window) waitAck(d driver) {
 	for {
 		select {
 		case f := <-w.driverFuncs:
 			f(d)
-		case f := <-w.driverDefers:
-			defers = append(defers, f)
-		case <-w.ack:
-			for _, f := range defers {
-				f(d)
-			}
+		case w.out <- ackEvent:
+			// A dummy event went through, so we know the application has processed the previous event.
 			return
-		}
-	}
-}
-
-func (w *Window) waitAck() {
-	// Send a dummy event; when it gets through we
-	// know the application has processed the previous event.
-	w.out <- ackEvent
-}
-
-// Prematurely destroy the window and wait for the native window
-// destroy event.
-func (w *Window) destroy(err error) {
-	w.destroyGPU()
-	// Ack the current event.
-	w.ack <- struct{}{}
-	w.out <- system.DestroyEvent{Err: err}
-	close(w.dead)
-	close(w.out)
-	for e := range w.in {
-		w.ack <- struct{}{}
-		if _, ok := e.(system.DestroyEvent); ok {
-			return
+		case <-w.immediateRedraws:
+			// Invalidate was called during frame processing.
+			w.setNextFrame(time.Time{})
 		}
 	}
 }
@@ -590,22 +477,23 @@ func (w *Window) destroyGPU() {
 // waitFrame waits for the client to either call FrameEvent.Frame
 // or to continue event handling. It returns whether the client
 // called Frame or not.
-func (w *Window) waitFrame() (*op.Ops, bool) {
-	select {
-	case frame := <-w.frames:
-		// The client called FrameEvent.Frame.
-		return frame, true
-	case w.out <- ackEvent:
-		// The client ignored FrameEvent and continued processing
-		// events.
-		return nil, false
+func (w *Window) waitFrame(d driver) (*op.Ops, bool) {
+	for {
+		select {
+		case f := <-w.driverFuncs:
+			f(d)
+		case frame := <-w.frames:
+			// The client called FrameEvent.Frame.
+			return frame, true
+		case w.out <- ackEvent:
+			// The client ignored FrameEvent and continued processing
+			// events.
+			return nil, false
+		case <-w.immediateRedraws:
+			// Invalidate was called during frame processing.
+			w.setNextFrame(time.Time{})
+		}
 	}
-}
-
-func (w *Window) lookupSemantic(id router.SemanticID) (router.SemanticNode, bool) {
-	w.updateSemantics()
-	n, ok := w.semantic.ids[id]
-	return n, ok
 }
 
 // updateSemantics refreshes the semantics tree, the id to node map and the ids of
@@ -623,21 +511,8 @@ func (w *Window) updateSemantics() {
 	}
 }
 
-// sendSemanticDiffs traverses the previous semantic tree and sends changed ids to
-// w.semDiffs.
-func (w *Window) sendSemanticDiffs() {
-	w.updateSemantics()
-	defer func() {
-		// Mark end of list.
-		w.semantic.diffs <- 0
-	}()
-	if tree := w.semantic.prevTree; len(tree) > 0 {
-		w.collectSemanticDiffs(w.semantic.prevTree[0])
-	}
-}
-
 // collectSemanticDiffs traverses the previous semantic tree, noting changed nodes.
-func (w *Window) collectSemanticDiffs(n router.SemanticNode) {
+func (w *Window) collectSemanticDiffs(diffs *[]router.SemanticID, n router.SemanticNode) {
 	newNode, exists := w.semantic.ids[n.ID]
 	// Ignore deleted nodes, as their disappearance will be reported through an
 	// ancestor node.
@@ -650,132 +525,133 @@ func (w *Window) collectSemanticDiffs(n router.SemanticNode) {
 			newCh := newNode.Children[i]
 			diff = ch.ID != newCh.ID
 		}
-		w.collectSemanticDiffs(ch)
+		w.collectSemanticDiffs(diffs, ch)
 	}
 	if diff {
-		w.semantic.diffs <- n.ID
+		*diffs = append(*diffs, n.ID)
+	}
+}
+
+func (w *Window) updateState(d driver) {
+	for {
+		select {
+		case f := <-w.driverFuncs:
+			f(d)
+		case <-w.redraws:
+			w.setNextFrame(time.Time{})
+			w.updateAnimation(d)
+		default:
+			return
+		}
+	}
+}
+
+func (w *Window) processEvent(d driver, e event.Event) {
+	select {
+	case <-w.dead:
+		return
+	default:
+	}
+	switch e2 := e.(type) {
+	case system.StageEvent:
+		if e2.Stage < system.StageRunning {
+			if w.gpu != nil {
+				w.ctx.Lock()
+				w.gpu.Release()
+				w.gpu = nil
+				w.ctx.Unlock()
+			}
+		}
+		w.stage = e2.Stage
+		w.updateAnimation(d)
+		w.out <- e
+		w.waitAck(d)
+	case frameEvent:
+		if e2.Size == (image.Point{}) {
+			panic(errors.New("internal error: zero-sized Draw"))
+		}
+		if w.stage < system.StageRunning {
+			// No drawing if not visible.
+			break
+		}
+		frameStart := time.Now()
+		w.hasNextFrame = false
+		e2.Frame = w.update
+		e2.Queue = &w.queue
+		w.out <- e2.FrameEvent
+		frame, gotFrame := w.waitFrame(d)
+		err := w.validateAndProcess(d, frameStart, e2.Size, e2.Sync, frame)
+		if gotFrame {
+			// We're done with frame, let the client continue.
+			w.frameAck <- struct{}{}
+		}
+		if err != nil {
+			w.destroyGPU()
+			w.out <- system.DestroyEvent{Err: err}
+			close(w.dead)
+			close(w.out)
+			break
+		}
+		w.updateCursor()
+	case *system.CommandEvent:
+		w.out <- e
+		w.waitAck(d)
+	case system.DestroyEvent:
+		w.destroyGPU()
+		w.out <- e2
+		close(w.dead)
+		close(w.out)
+	case ViewEvent:
+		w.out <- e2
+		w.waitAck(d)
+	case wakeupEvent:
+	case event.Event:
+		if w.queue.q.Queue(e2) {
+			w.setNextFrame(time.Time{})
+			w.updateAnimation(d)
+		}
+		w.updateCursor()
+		w.out <- e
 	}
 }
 
 func (w *Window) run(options []Option) {
-	// Some OpenGL drivers don't like being made current on many different
-	// OS threads. Force the Go runtime to map the event loop goroutine to
-	// only one thread.
-	runtime.LockOSThread()
-
-	defer close(w.out)
-	defer close(w.dead)
 	if err := newWindow(&w.callbacks, options); err != nil {
 		w.out <- system.DestroyEvent{Err: err}
+		close(w.dead)
+		close(w.out)
 		return
 	}
 	var wakeup func()
+	var timer *time.Timer
 	for {
 		var (
 			wakeups <-chan struct{}
-			timer   <-chan time.Time
+			timeC   <-chan time.Time
 		)
 		if wakeup != nil {
 			wakeups = w.wakeups
-			// Make sure any pending deferred driver functions are processed before calling
-			// into driverFunc again; only one driver function can be queued at a time.
+			if timer != nil {
+				timeC = timer.C
+			}
+		}
+		select {
+		case t := <-w.scheduledRedraws:
+			if timer != nil {
+				timer.Stop()
+			}
+			timer = time.NewTimer(time.Until(t))
+		case <-w.dead:
+			return
+		case <-timeC:
 			select {
-			case <-wakeups:
+			case w.redraws <- struct{}{}:
 				wakeup()
 			default:
 			}
-		}
-		if w.delayedDraw != nil {
-			timer = w.delayedDraw.C
-		}
-		select {
-		case <-timer:
-			w.setNextFrame(time.Time{})
-			w.updateAnimation()
-		case <-w.invalidates:
-			w.setNextFrame(time.Time{})
-			w.updateAnimation()
 		case <-wakeups:
 			wakeup()
-		case semID := <-w.semantic.lookups:
-			node, found := w.lookupSemantic(semID)
-			w.semantic.results <- semanticResult{
-				found: found,
-				node:  node,
-			}
-		case <-w.semantic.requestDiffs:
-			w.sendSemanticDiffs()
-		case <-w.semantic.requestRoots:
-			w.semantic.roots <- w.semantic.root
-		case pos := <-w.semantic.positions:
-			sid, exists := w.queue.q.SemanticAt(pos)
-			w.semantic.positionIDs <- semanticID{
-				found: exists,
-				id:    sid,
-			}
-		case e := <-w.in:
-			switch e2 := e.(type) {
-			case system.StageEvent:
-				if e2.Stage < system.StageRunning {
-					if w.gpu != nil {
-						w.ctx.Lock()
-						w.gpu.Release()
-						w.gpu = nil
-						w.ctx.Unlock()
-					}
-				}
-				w.stage = e2.Stage
-				w.updateAnimation()
-				w.out <- e
-				w.waitAck()
-			case frameEvent:
-				if e2.Size == (image.Point{}) {
-					panic(errors.New("internal error: zero-sized Draw"))
-				}
-				if w.stage < system.StageRunning {
-					// No drawing if not visible.
-					break
-				}
-				frameStart := time.Now()
-				w.hasNextFrame = false
-				e2.Frame = w.update
-				e2.Queue = &w.queue
-				w.out <- e2.FrameEvent
-				frame, gotFrame := w.waitFrame()
-				err := w.validateAndProcess(frameStart, e2.Size, e2.Sync, frame)
-				if gotFrame {
-					// We're done with frame, let the client continue.
-					w.frameAck <- struct{}{}
-				}
-				if err != nil {
-					w.destroyGPU()
-					w.destroy(err)
-					return
-				}
-				w.updateCursor()
-			case *system.CommandEvent:
-				w.out <- e
-				w.waitAck()
-			case driverEvent:
-				wakeup = e2.wakeup
-			case system.DestroyEvent:
-				w.destroyGPU()
-				w.out <- e2
-				w.ack <- struct{}{}
-				return
-			case ViewEvent:
-				w.out <- e2
-				w.waitAck()
-			case wakeupEvent:
-			case event.Event:
-				if w.queue.q.Queue(e2) {
-					w.setNextFrame(time.Time{})
-					w.updateAnimation()
-				}
-				w.updateCursor()
-				w.out <- e
-			}
-			w.ack <- struct{}{}
+		case wakeup = <-w.wakeupFuncs:
 		}
 	}
 }
@@ -878,5 +754,3 @@ func CustomRenderer(custom bool) Option {
 		cnf.CustomRenderer = custom
 	}
 }
-
-func (driverEvent) ImplementsEvent() {}

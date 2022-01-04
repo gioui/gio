@@ -165,6 +165,7 @@ type window struct {
 		hoverID router.SemanticID
 		rootID  router.SemanticID
 		focusID router.SemanticID
+		diffs   []router.SemanticID
 	}
 }
 
@@ -856,12 +857,8 @@ func (w *window) draw(env *C.JNIEnv, sync bool) {
 			w.semantic.rootID = newR
 			callVoidMethod(env, w.view, gioView.sendA11yChange, jvalue(w.virtualIDFor(newR)))
 		}
-		diffs := w.callbacks.RequestSemanticDiffs()
-		for {
-			id := <-diffs
-			if id == 0 {
-				break
-			}
+		w.semantic.diffs = w.callbacks.AppendSemanticDiffs(w.semantic.diffs[:0])
+		for _, id := range w.semantic.diffs {
 			callVoidMethod(env, w.view, gioView.sendA11yChange, jvalue(w.virtualIDFor(id)))
 		}
 	}
