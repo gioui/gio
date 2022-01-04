@@ -777,12 +777,11 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 	C.XSetWMProtocols(dpy, win, &w.atoms.evDelWindow, 1)
 
 	go func() {
+		w.w.SetDriver(w)
 		w.Configure(options)
 
 		// make the window visible on the screen
 		C.XMapWindow(dpy, win)
-
-		w.w.SetDriver(w)
 		w.w.Event(ViewEvent{Display: unsafe.Pointer(dpy), Window: uintptr(win)})
 		w.setStage(system.StageRunning)
 		w.loop()

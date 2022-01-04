@@ -243,11 +243,11 @@ func newWLWindow(callbacks *callbacks, options []Option) error {
 	go func() {
 		defer d.destroy()
 		defer w.destroy()
+
+		w.w.SetDriver(w)
 		// Finish and commit setup from createNativeWindow.
 		w.Configure(options)
 		C.wl_surface_commit(w.surf)
-
-		w.w.SetDriver(w)
 		if err := w.loop(); err != nil {
 			panic(err)
 		}
