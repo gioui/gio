@@ -174,19 +174,19 @@ func (e Event) String() string {
 func (m Modifiers) String() string {
 	var strs []string
 	if m.Contain(ModCtrl) {
-		strs = append(strs, "ModCtrl")
+		strs = append(strs, "Ctrl")
 	}
 	if m.Contain(ModCommand) {
-		strs = append(strs, "ModCommand")
+		strs = append(strs, "Command")
 	}
 	if m.Contain(ModShift) {
-		strs = append(strs, "ModShift")
+		strs = append(strs, "Shift")
 	}
 	if m.Contain(ModAlt) {
-		strs = append(strs, "ModAlt")
+		strs = append(strs, "Alt")
 	}
 	if m.Contain(ModSuper) {
-		strs = append(strs, "ModSuper")
+		strs = append(strs, "Super")
 	}
 	return strings.Join(strs, "|")
 }
