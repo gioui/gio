@@ -937,8 +937,12 @@ func (w *window) Configure(options []Option) {
 func (w *window) Raise() {}
 
 func (w *window) SetCursor(name pointer.CursorName) {
+	ptr := w.disp.seat.pointer
+	if ptr == nil {
+		return
+	}
 	if name == pointer.CursorNone {
-		C.wl_pointer_set_cursor(w.disp.seat.pointer, w.serial, nil, 0, 0)
+		C.wl_pointer_set_cursor(ptr, w.serial, nil, 0, 0)
 		return
 	}
 	switch name {
@@ -966,7 +970,7 @@ func (w *window) SetCursor(name pointer.CursorName) {
 		return
 	}
 	w.cursor.cursor = c
-	w.setCursor(w.disp.seat.pointer, w.serial)
+	w.setCursor(ptr, w.serial)
 }
 
 func (w *window) setCursor(pointer *C.struct_wl_pointer, serial C.uint32_t) {
