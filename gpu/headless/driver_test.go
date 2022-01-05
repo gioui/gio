@@ -165,7 +165,6 @@ func newDriver(t *testing.T) driver.Device {
 	if err != nil {
 		t.Skipf("no context available: %v", err)
 	}
-	runtime.LockOSThread()
 	if err := ctx.MakeCurrent(); err != nil {
 		t.Fatal(err)
 	}

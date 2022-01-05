@@ -8,7 +8,6 @@ import (
 	"errors"
 	"image"
 	"image/color"
-	"runtime"
 
 	"gioui.org/gpu"
 	"gioui.org/gpu/internal/driver"
@@ -146,8 +145,6 @@ func (w *Window) Screenshot(img *image.RGBA) error {
 func contextDo(ctx context, f func() error) error {
 	errCh := make(chan error)
 	go func() {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
 		if err := ctx.MakeCurrent(); err != nil {
 			errCh <- err
 			return
