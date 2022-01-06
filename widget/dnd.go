@@ -96,3 +96,8 @@ func (d *Draggable) Offer(ops *op.Ops, mime string, data io.ReadCloser) {
 		Data: data,
 	}.Add(ops)
 }
+
+// Pos returns the drag position relative to its area.
+func (d *Draggable) Pos() f32.Point {
+	return d.pos.Add(d.click)
+}
