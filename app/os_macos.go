@@ -558,10 +558,14 @@ func newOSWindow() (*window, error) {
 		view:  view,
 		scale: scale,
 	}
+	done := make(chan struct{})
+	setNeedsDisplay := func() {
+		C.setNeedsDisplay(w.view)
+		done <- struct{}{}
+	}
 	dl, err := NewDisplayLink(func() {
-		w.runOnMain(func() {
-			C.setNeedsDisplay(w.view)
-		})
+		w.runOnMain(setNeedsDisplay)
+		<-done
 	})
 	w.displayLink = dl
 	if err != nil {
