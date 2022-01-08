@@ -202,7 +202,7 @@ func (w *Window) validateAndProcess(d driver, frameStart time.Time, size image.P
 				return err
 			}
 		}
-		w.processFrame(d, frameStart, frame)
+		w.queue.q.Frame(frame)
 		return nil
 	}
 }
@@ -229,8 +229,7 @@ func (w *Window) render(frame *op.Ops, viewport image.Point) error {
 	return w.ctx.Present()
 }
 
-func (w *Window) processFrame(d driver, frameStart time.Time, frame *op.Ops) {
-	w.queue.q.Frame(frame)
+func (w *Window) processFrame(d driver, frameStart time.Time) {
 	for k := range w.semantic.ids {
 		delete(w.semantic.ids, k)
 	}
@@ -612,6 +611,7 @@ func (w *Window) processEvent(d driver, e event.Event) {
 			close(w.out)
 			break
 		}
+		w.processFrame(d, frameStart)
 		w.updateCursor()
 	case *system.CommandEvent:
 		w.out <- e
