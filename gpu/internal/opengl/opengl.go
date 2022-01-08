@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"runtime"
 	"strings"
 	"time"
 	"unsafe"
@@ -297,6 +298,10 @@ func (b *Backend) EndFrame() {
 	}
 	if b.sharedCtx {
 		b.restoreState(b.savedState)
+	} else if runtime.GOOS == "android" {
+		// The Android emulator needs the output framebuffer to be current when
+		// eglSwapBuffers is called.
+		b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, b.outputFBO)
 	}
 }
 
