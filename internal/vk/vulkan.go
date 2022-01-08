@@ -823,8 +823,19 @@ func CreateInstance(exts ...string) (Instance, error) {
 	if err := vkInit(); err != nil {
 		return nil, err
 	}
+	// VK_MAKE_API_VERSION macro.
+	makeVer := func(variant, major, minor, patch int) C.uint32_t {
+		return ((((C.uint32_t)(variant)) << 29) | (((C.uint32_t)(major)) << 22) | (((C.uint32_t)(minor)) << 12) | ((C.uint32_t)(patch)))
+	}
+	appInf := C.VkApplicationInfo{
+		sType:      C.VK_STRUCTURE_TYPE_APPLICATION_INFO,
+		apiVersion: makeVer(0, 1, 0, 0),
+	}
 	inf := C.VkInstanceCreateInfo{
 		sType: C.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+		// pApplicationInfo may be omitted according to the spec, but the Android
+		// emulator crashes without it.
+		pApplicationInfo: &appInf,
 	}
 	if len(exts) > 0 {
 		cexts := mallocCStringArr(exts)
