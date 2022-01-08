@@ -40,10 +40,6 @@ func newVulkanContext(inst vk.Instance, surf vk.Surface) (*vkContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err != nil {
-		vk.DestroyDevice(dev)
-		return nil, err
-	}
 	acquireSem, err := vk.CreateSemaphore(dev)
 	if err != nil {
 		vk.DestroyDevice(dev)
