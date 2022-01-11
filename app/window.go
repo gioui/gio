@@ -80,11 +80,6 @@ type Window struct {
 	}
 }
 
-type semanticResult struct {
-	found bool
-	node  router.SemanticNode
-}
-
 type callbacks struct {
 	w *Window
 	d driver
@@ -142,7 +137,7 @@ func (w *Window) Events() <-chan event.Event {
 	return w.out
 }
 
-// update updates the window contents, input operations declare input handlers,
+// update the window contents, input operations declare input handlers,
 // and so on. The supplied operations list completely replaces the window state
 // from previous calls.
 func (w *Window) update(frame *op.Ops) {
@@ -150,7 +145,7 @@ func (w *Window) update(frame *op.Ops) {
 	<-w.frameAck
 }
 
-func (w *Window) validateAndProcess(d driver, frameStart time.Time, size image.Point, sync bool, frame *op.Ops) error {
+func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame *op.Ops) error {
 	for {
 		if w.gpu == nil && !w.nocontext {
 			var err error
@@ -463,7 +458,7 @@ func (c *callbacks) SemanticAt(pos f32.Point) (router.SemanticID, bool) {
 	return c.w.queue.q.SemanticAt(pos)
 }
 
-func (w *Window) waitAck(d driver) {
+func (w *Window) waitAck() {
 	w.waiting = true
 	defer func() {
 		w.waiting = false
@@ -498,7 +493,7 @@ func (w *Window) destroyGPU() {
 // waitFrame waits for the client to either call FrameEvent.Frame
 // or to continue event handling. It returns whether the client
 // called Frame or not.
-func (w *Window) waitFrame(d driver) (*op.Ops, bool) {
+func (w *Window) waitFrame() (*op.Ops, bool) {
 	w.waiting = true
 	defer func() {
 		w.waiting = false
@@ -588,7 +583,7 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		w.stage = e2.Stage
 		w.updateAnimation(d)
 		w.out <- e
-		w.waitAck(d)
+		w.waitAck()
 	case frameEvent:
 		if e2.Size == (image.Point{}) {
 			panic(errors.New("internal error: zero-sized Draw"))
@@ -602,8 +597,8 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		e2.Frame = w.update
 		e2.Queue = &w.queue
 		w.out <- e2.FrameEvent
-		frame, gotFrame := w.waitFrame(d)
-		err := w.validateAndProcess(d, frameStart, e2.Size, e2.Sync, frame)
+		frame, gotFrame := w.waitFrame()
+		err := w.validateAndProcess(d, e2.Size, e2.Sync, frame)
 		if gotFrame {
 			// We're done with frame, let the client continue.
 			w.frameAck <- struct{}{}
@@ -619,7 +614,7 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		w.updateCursor(d)
 	case *system.CommandEvent:
 		w.out <- e
-		w.waitAck(d)
+		w.waitAck()
 	case system.DestroyEvent:
 		w.destroyGPU()
 		w.out <- e2
@@ -627,7 +622,7 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		close(w.out)
 	case ViewEvent:
 		w.out <- e2
-		w.waitAck(d)
+		w.waitAck()
 	case wakeupEvent:
 	case event.Event:
 		if w.queue.q.Queue(e2) {

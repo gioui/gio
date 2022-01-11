@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// package app implements platform specific windows
-// and GPU contexts.
 package app
 
 import (
@@ -16,11 +14,6 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/unit"
 )
-
-type size struct {
-	Width  unit.Value
-	Height unit.Value
-}
 
 // errOutOfDate is reported when the GPU surface dimensions or properties no
 // longer match the window.
