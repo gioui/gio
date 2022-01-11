@@ -48,6 +48,7 @@ type Window struct {
 
 	waiting    bool
 	waitEvents []event.Event
+	defers     []func(d driver)
 	out        chan event.Event
 	frames     chan *op.Ops
 	frameAck   chan struct{}
@@ -428,6 +429,10 @@ func (c *callbacks) Event(e event.Event) {
 		c.w.waitEvents = c.w.waitEvents[:len(c.w.waitEvents)-1]
 		c.w.processEvent(c.d, we)
 	}
+	for _, f := range c.w.defers {
+		f(c.d)
+	}
+	c.w.defers = nil
 	c.w.updateState(c.d)
 }
 
@@ -465,7 +470,7 @@ func (w *Window) waitAck(d driver) {
 	for {
 		select {
 		case f := <-w.driverFuncs:
-			f(d)
+			w.defers = append(w.defers, f)
 		case w.out <- ackEvent:
 			// A dummy event went through, so we know the application has processed the previous event.
 			return
@@ -500,7 +505,7 @@ func (w *Window) waitFrame(d driver) (*op.Ops, bool) {
 	for {
 		select {
 		case f := <-w.driverFuncs:
-			f(d)
+			w.defers = append(w.defers, f)
 		case frame := <-w.frames:
 			// The client called FrameEvent.Frame.
 			return frame, true
@@ -554,8 +559,6 @@ func (w *Window) collectSemanticDiffs(diffs *[]router.SemanticID, n router.Seman
 func (w *Window) updateState(d driver) {
 	for {
 		select {
-		case f := <-w.driverFuncs:
-			f(d)
 		case <-w.redraws:
 			w.setNextFrame(time.Time{})
 			w.updateAnimation(d)
