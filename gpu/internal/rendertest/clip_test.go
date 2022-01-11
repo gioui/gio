@@ -185,6 +185,28 @@ func TestStrokedPathZeroWidth(t *testing.T) {
 	})
 }
 
+func TestStrokedPathCoincidentControlPoint(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		p := new(clip.Path)
+		p.Begin(o)
+		p.MoveTo(f32.Pt(70, 20))
+		p.CubeTo(f32.Pt(70, 20), f32.Pt(70, 110), f32.Pt(120, 120))
+		p.LineTo(f32.Pt(20, 120))
+		p.LineTo(f32.Pt(70, 20))
+		cl := clip.Stroke{
+			Path:  p.End(),
+			Width: 20,
+		}.Op().Push(o)
+
+		paint.Fill(o, black)
+		cl.Pop()
+	}, func(r result) {
+		r.expect(0, 0, transparent)
+		r.expect(70, 20, colornames.Black)
+		r.expect(70, 90, transparent)
+	})
+}
+
 func TestPathReuse(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		var path clip.Path

@@ -195,7 +195,7 @@ func verifyRef(t *testing.T, img *image.RGBA, frame int) (ok bool) {
 		for y := bnd.Min.Y; y < bnd.Max.Y; y++ {
 			exp := ref.RGBAAt(x, y)
 			got := img.RGBAAt(x, y)
-			if !colorsClose(exp, got) {
+			if !colorsClose(exp, got) || !alphaClose(exp, got) {
 				t.Error("not equal to ref at", x, y, " ", got, exp)
 				return false
 			}
@@ -207,6 +207,11 @@ func verifyRef(t *testing.T, img *image.RGBA, frame int) (ok bool) {
 func colorsClose(c1, c2 color.RGBA) bool {
 	const delta = 0.01 // magic value obtained from experimentation.
 	return yiqEqApprox(c1, c2, delta)
+}
+
+func alphaClose(c1, c2 color.RGBA) bool {
+	d := int8(c1.A - c2.A)
+	return d > -5 && d < 5
 }
 
 // yiqEqApprox compares the colors of 2 pixels, in the NTSC YIQ color space,
