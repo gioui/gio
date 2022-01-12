@@ -321,22 +321,6 @@ func (w *Window) Close() {
 	})
 }
 
-// Maximize the window.
-// Note: only implemented on Windows, macOS and X11.
-func (w *Window) Maximize() {
-	w.driverDefer(func(d driver) {
-		d.Maximize()
-	})
-}
-
-// Center the window.
-// Note: only implemented on Windows, macOS and X11.
-func (w *Window) Center() {
-	w.driverDefer(func(d driver) {
-		d.Center()
-	})
-}
-
 // Run f in the same thread as the native window event loop, and wait for f to
 // return or the window to close. Run is guaranteed not to deadlock if it is
 // invoked during the handling of a ViewEvent, system.FrameEvent,
@@ -703,8 +687,7 @@ func Title(t string) Option {
 	}
 }
 
-// Size sets the size of the window. The option is ignored
-// in Fullscreen mode.
+// Size sets the size of the window. The mode will be changed to Windowed.
 func Size(w, h unit.Value) Option {
 	if w.V <= 0 {
 		panic("width must be larger than or equal to 0")
@@ -713,10 +696,20 @@ func Size(w, h unit.Value) Option {
 		panic("height must be larger than or equal to 0")
 	}
 	return func(m unit.Metric, cnf *Config) {
+		cnf.Mode = Windowed
 		cnf.Size = image.Point{
 			X: m.Px(w),
 			Y: m.Px(h),
 		}
+	}
+}
+
+// Center is an option to center the window on the screen.
+// The option is ignored in Fullscreen mode.
+func Centered() Option {
+	return func(m unit.Metric, cnf *Config) {
+		// Set the flag so the driver can later do the actual centering.
+		cnf.center = true
 	}
 }
 

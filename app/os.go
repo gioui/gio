@@ -41,6 +41,8 @@ type Config struct {
 	// CustomRenderer is true when the window content is rendered by the
 	// client.
 	CustomRenderer bool
+	// center is a flag used to center the window. Set by option.
+	center bool
 }
 
 // ConfigEvent is sent whenever the configuration of a Window changes.
@@ -57,8 +59,8 @@ func (c *Config) apply(m unit.Metric, options []Option) {
 type wakeupEvent struct{}
 
 // WindowMode is the window mode (WindowMode.Option sets it).
-//
-// Supported platforms are macOS, X11, Windows, Android and JS.
+// Note that mode can be changed programatically as well as by the user
+// clicking on the minimize/maximize buttons on the window's title bar.
 type WindowMode uint8
 
 const (
@@ -66,20 +68,30 @@ const (
 	Windowed WindowMode = iota
 	// Fullscreen is the full screen window mode.
 	Fullscreen
+	// Minimized is for systems where the window can be minimized to an icon.
+	Minimized
+	// Maximized is for systems where the window can be made to fill the available monitor area.
+	Maximized
 )
 
+// Option changes the mode of a Window.
 func (m WindowMode) Option() Option {
 	return func(_ unit.Metric, cnf *Config) {
 		cnf.Mode = m
 	}
 }
 
+// String returns the mode name.
 func (m WindowMode) String() string {
 	switch m {
 	case Windowed:
 		return "windowed"
 	case Fullscreen:
 		return "fullscreen"
+	case Minimized:
+		return "minimized"
+	case Maximized:
+		return "maximized"
 	}
 	return ""
 }
@@ -165,11 +177,6 @@ type driver interface {
 
 	// Wakeup wakes up the event loop and sends a WakeupEvent.
 	Wakeup()
-
-	// Maximize will make the window as large as possible, but keep the frame decorations.
-	Maximize()
-	// Center will place the window at monitor center.
-	Center()
 }
 
 type windowRendezvous struct {

@@ -106,9 +106,13 @@ const (
 	SIZE_MINIMIZED = 1
 	SIZE_RESTORED  = 0
 
-	SW_SHOWDEFAULT = 10
+	SW_SHOWDEFAULT   = 10
+	SW_SHOWMINIMIZED = 2
+	SW_SHOWMAXIMIZED = 3
+	SW_SHOWNORMAL    = 1
+	SW_SHOW          = 5
+	SWP_FRAMECHANGED = 0x0020
 
-	SWP_FRAMECHANGED  = 0x0020
 	SWP_NOMOVE        = 0x0002
 	SWP_NOOWNERZORDER = 0x0200
 	SWP_NOSIZE        = 0x0001
@@ -166,42 +170,44 @@ const (
 
 	UNICODE_NOCHAR = 65535
 
-	WM_CANCELMODE    = 0x001F
-	WM_CHAR          = 0x0102
-	WM_CREATE        = 0x0001
-	WM_DPICHANGED    = 0x02E0
-	WM_DESTROY       = 0x0002
-	WM_ERASEBKGND    = 0x0014
-	WM_KEYDOWN       = 0x0100
-	WM_KEYUP         = 0x0101
-	WM_LBUTTONDOWN   = 0x0201
-	WM_LBUTTONUP     = 0x0202
-	WM_MBUTTONDOWN   = 0x0207
-	WM_MBUTTONUP     = 0x0208
-	WM_MOUSEMOVE     = 0x0200
-	WM_MOUSEWHEEL    = 0x020A
-	WM_MOUSEHWHEEL   = 0x020E
-	WM_PAINT         = 0x000F
-	WM_CLOSE         = 0x0010
-	WM_QUIT          = 0x0012
-	WM_SETCURSOR     = 0x0020
-	WM_SETFOCUS      = 0x0007
-	WM_KILLFOCUS     = 0x0008
-	WM_SHOWWINDOW    = 0x0018
-	WM_SIZE          = 0x0005
-	WM_SYSKEYDOWN    = 0x0104
-	WM_SYSKEYUP      = 0x0105
-	WM_RBUTTONDOWN   = 0x0204
-	WM_RBUTTONUP     = 0x0205
-	WM_TIMER         = 0x0113
-	WM_UNICHAR       = 0x0109
-	WM_USER          = 0x0400
-	WM_GETMINMAXINFO = 0x0024
-
+	WM_CANCELMODE       = 0x001F
+	WM_CHAR             = 0x0102
+	WM_CREATE           = 0x0001
+	WM_DPICHANGED       = 0x02E0
+	WM_DESTROY          = 0x0002
+	WM_ERASEBKGND       = 0x0014
+	WM_KEYDOWN          = 0x0100
+	WM_KEYUP            = 0x0101
+	WM_LBUTTONDOWN      = 0x0201
+	WM_LBUTTONUP        = 0x0202
+	WM_MBUTTONDOWN      = 0x0207
+	WM_MBUTTONUP        = 0x0208
+	WM_MOUSEMOVE        = 0x0200
+	WM_MOUSEWHEEL       = 0x020A
+	WM_MOUSEHWHEEL      = 0x020E
+	WM_PAINT            = 0x000F
+	WM_CLOSE            = 0x0010
+	WM_QUIT             = 0x0012
+	WM_SETCURSOR        = 0x0020
+	WM_SETFOCUS         = 0x0007
+	WM_KILLFOCUS        = 0x0008
+	WM_SHOWWINDOW       = 0x0018
+	WM_SIZE             = 0x0005
+	WM_SYSKEYDOWN       = 0x0104
+	WM_SYSKEYUP         = 0x0105
+	WM_RBUTTONDOWN      = 0x0204
+	WM_RBUTTONUP        = 0x0205
+	WM_TIMER            = 0x0113
+	WM_UNICHAR          = 0x0109
+	WM_USER             = 0x0400
+	WM_GETMINMAXINFO    = 0x0024
+	WM_WINDOWPOSCHANGED = 0x0047
 	WS_CLIPCHILDREN     = 0x00010000
 	WS_CLIPSIBLINGS     = 0x04000000
 	WS_MAXIMIZE         = 0x01000000
+	WS_ICONIC           = 0x20000000
 	WS_VISIBLE          = 0x10000000
+
 	WS_OVERLAPPED       = 0x00000000
 	WS_OVERLAPPEDWINDOW = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME |
 		WS_MINIMIZEBOX | WS_MAXIMIZEBOX
@@ -259,7 +265,7 @@ var (
 	_DestroyWindow               = user32.NewProc("DestroyWindow")
 	_DispatchMessage             = user32.NewProc("DispatchMessageW")
 	_EmptyClipboard              = user32.NewProc("EmptyClipboard")
-	_GetClientRect               = user32.NewProc("GetClientRect")
+	_GetWindowRect               = user32.NewProc("GetWindowRect")
 	_GetClipboardData            = user32.NewProc("GetClipboardData")
 	_GetDC                       = user32.NewProc("GetDC")
 	_GetDpiForWindow             = user32.NewProc("GetDpiForWindow")
@@ -370,8 +376,8 @@ func EmptyClipboard() error {
 	return nil
 }
 
-func GetClientRect(hwnd syscall.Handle, r *Rect) {
-	_GetClientRect.Call(uintptr(hwnd), uintptr(unsafe.Pointer(r)))
+func GetWindowRect(hwnd syscall.Handle, r *Rect) {
+	_GetWindowRect.Call(uintptr(hwnd), uintptr(unsafe.Pointer(r)))
 	issue34474KeepAlive(r)
 }
 
@@ -681,6 +687,21 @@ func UpdateWindow(hwnd syscall.Handle) {
 
 func (p WindowPlacement) Rect() Rect {
 	return p.rcNormalPosition
+}
+
+func (p WindowPlacement) IsMinimized() bool {
+	return p.showCmd == SW_SHOWMINIMIZED
+}
+
+func (p WindowPlacement) IsMaximized() bool {
+	return p.showCmd == SW_SHOWMAXIMIZED
+}
+
+func (p *WindowPlacement) Set(Left, Top, Right, Bottom int) {
+	p.rcNormalPosition.Left = int32(Left)
+	p.rcNormalPosition.Top = int32(Top)
+	p.rcNormalPosition.Right = int32(Right)
+	p.rcNormalPosition.Bottom = int32(Bottom)
 }
 
 // issue34474KeepAlive calls runtime.KeepAlive as a

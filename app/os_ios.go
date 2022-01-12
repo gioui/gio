@@ -336,12 +336,6 @@ func (w *window) SetInputHint(_ key.InputHint) {}
 // Close the window. Not implemented for iOS.
 func (w *window) Close() {}
 
-// Maximize the window. Not implemented for iOS.
-func (w *window) Maximize() {}
-
-// Center the window. Not implemented for iOS.
-func (w *window) Center() {}
-
 func newWindow(win *callbacks, options []Option) error {
 	mainWindow.in <- windowAndConfig{win, options}
 	return <-mainWindow.errs

@@ -108,7 +108,6 @@ func newWindow(window *callbacks, options []Option) error {
 		w.w.SetDriver(w)
 		w.w.Event(ViewEvent{HWND: uintptr(w.hwnd)})
 		w.Configure(options)
-		windows.ShowWindow(w.hwnd, windows.SW_SHOWDEFAULT)
 		windows.SetForegroundWindow(w.hwnd)
 		windows.SetFocus(w.hwnd)
 		// Since the window class for the cursor is null,
@@ -183,6 +182,43 @@ func createNativeWindow() (*window, error) {
 		return nil, err
 	}
 	return w, nil
+}
+
+// update() handles changes done by the user, and updates the configuration.
+// It reads the window style and size/position and updates w.config.
+// If anything has changed it emits a ConfigEvent to notify the application.
+func (w *window) update() {
+	var triggerEvent bool
+	var r windows.Rect
+	windows.GetWindowRect(w.hwnd, &r)
+	size := image.Point{
+		X: int(r.Right - r.Left - w.deltas.width),
+		Y: int(r.Bottom - r.Top - w.deltas.height),
+	}
+	if size != w.config.Size {
+		w.config.Size = size
+		triggerEvent = true
+	}
+	// Check the window mode.
+	mode := w.config.Mode
+	p := windows.GetWindowPlacement(w.hwnd)
+	style := windows.GetWindowLong(w.hwnd)
+	if style&windows.WS_OVERLAPPEDWINDOW == 0 {
+		mode = Fullscreen
+	} else if p.IsMinimized() {
+		mode = Minimized
+	} else if p.IsMaximized() {
+		mode = Maximized
+	} else {
+		mode = Windowed
+	}
+	if mode != w.config.Mode {
+		w.config.Mode = mode
+		triggerEvent = true
+	}
+	if triggerEvent {
+		w.w.Event(ConfigEvent{Config: w.config})
+	}
 }
 
 func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr {
@@ -280,29 +316,10 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_SIZE:
 		switch wParam {
 		case windows.SIZE_MINIMIZED:
+			w.update()
 			w.setStage(system.StagePaused)
 		case windows.SIZE_MAXIMIZED, windows.SIZE_RESTORED:
-			var triggerEvent bool
-			// Check the window size change.
-			var r windows.Rect
-			windows.GetClientRect(w.hwnd, &r)
-			size := image.Point{
-				X: int(r.Right - r.Left),
-				Y: int(r.Bottom - r.Top),
-			}
-			if size != w.config.Size {
-				w.config.Size = size
-				triggerEvent = true
-			}
-			// Check the window mode.
-			mode := w.config.Mode
-			w.updateWindowMode()
-			if mode != w.config.Mode {
-				triggerEvent = true
-			}
-			if triggerEvent {
-				w.w.Event(ConfigEvent{Config: w.config})
-			}
+			w.update()
 			w.setStage(system.StageRunning)
 		}
 	case windows.WM_GETMINMAXINFO:
@@ -503,127 +520,44 @@ func (w *window) readClipboard() error {
 	return nil
 }
 
-func (w *window) updateWindowMode() {
-	p := windows.GetWindowPlacement(w.hwnd)
-	r := p.Rect()
-	mi := windows.GetMonitorInfo(w.hwnd)
-	if r == mi.Monitor {
-		w.config.Mode = Fullscreen
-	} else {
-		w.config.Mode = Windowed
-	}
-}
-
 func (w *window) Configure(options []Option) {
+	oldConfig := w.config
 	dpi := windows.GetSystemDPI()
-	cfg := configForDPI(dpi)
-	prev := w.config
-	w.updateWindowMode()
-	cnf := w.config
-	cnf.apply(cfg, options)
+	metric := configForDPI(dpi)
+	w.config.apply(metric, options)
+	switch w.config.Mode {
+	case Minimized:
+		windows.ShowWindow(w.hwnd, windows.SW_SHOWMINIMIZED)
 
-	if cnf.Mode != Fullscreen && prev.Size != cnf.Size {
-		width := int32(cnf.Size.X)
-		height := int32(cnf.Size.Y)
-		w.config.Size = cnf.Size
-
-		// Include the window decorations.
-		wr := windows.Rect{
-			Right:  width,
-			Bottom: height,
-		}
-		dwStyle := uint32(windows.WS_OVERLAPPEDWINDOW)
-		dwExStyle := uint32(windows.WS_EX_APPWINDOW | windows.WS_EX_WINDOWEDGE)
-		windows.AdjustWindowRectEx(&wr, dwStyle, 0, dwExStyle)
-
-		dw, dh := width, height
-		width = wr.Right - wr.Left
-		height = wr.Bottom - wr.Top
-		w.deltas.width = width - dw
-		w.deltas.height = height - dh
-
-		windows.MoveWindow(w.hwnd, 0, 0, width, height, true)
-	}
-	if prev.MinSize != cnf.MinSize {
-		w.config.MinSize = cnf.MinSize
-	}
-	if prev.MaxSize != cnf.MaxSize {
-		w.config.MaxSize = cnf.MaxSize
-	}
-	if prev.Title != cnf.Title {
-		w.config.Title = cnf.Title
-		windows.SetWindowText(w.hwnd, cnf.Title)
-	}
-	if prev.Mode != cnf.Mode {
-		w.SetWindowMode(cnf.Mode)
-	}
-	if w.config != prev {
-		w.w.Event(ConfigEvent{Config: w.config})
-	}
-}
-
-// Maximize the window. It will have no effect when in fullscreen mode.
-func (w *window) Maximize() {
-	if w.config.Mode == Fullscreen {
-		return
-	}
-	style := windows.GetWindowLong(w.hwnd)
-	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW|windows.WS_MAXIMIZE)
-	mi := windows.GetMonitorInfo(w.hwnd)
-	windows.SetWindowPos(w.hwnd, 0,
-		mi.Monitor.Left, mi.Monitor.Top,
-		mi.Monitor.Right-mi.Monitor.Left,
-		mi.Monitor.Bottom-mi.Monitor.Top,
-		windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED,
-	)
-}
-
-// Center will place window at monitor center.
-func (w *window) Center() {
-	// Make sure that the window is sizeable
-	style := windows.GetWindowLong(w.hwnd) & (^uintptr(windows.WS_MAXIMIZE))
-	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW)
-
-	// Find with/height including the window decorations.
-	wr := windows.Rect{
-		Right:  int32(w.config.Size.X),
-		Bottom: int32(w.config.Size.Y),
-	}
-	dwStyle := uint32(windows.WS_OVERLAPPEDWINDOW)
-	dwExStyle := uint32(windows.WS_EX_APPWINDOW | windows.WS_EX_WINDOWEDGE)
-	windows.AdjustWindowRectEx(&wr, dwStyle, 0, dwExStyle)
-	width := wr.Right - wr.Left
-	height := wr.Bottom - wr.Top
-
-	// Move to center of current monitor
-	mi := windows.GetMonitorInfo(w.hwnd).Monitor
-	x := mi.Left + (mi.Right-mi.Left-width)/2
-	y := mi.Top + (mi.Bottom-mi.Top-height)/2
-	windows.MoveWindow(w.hwnd, x, y, width, height, true)
-}
-
-func (w *window) SetWindowMode(mode WindowMode) {
-	// https://devblogs.microsoft.com/oldnewthing/20100412-00/?p=14353
-	switch mode {
-	case Windowed:
-		if w.placement == nil {
-			return
-		}
-		w.config.Mode = Windowed
-		windows.SetWindowPlacement(w.hwnd, w.placement)
-		w.placement = nil
-		style := windows.GetWindowLong(w.hwnd)
+	case Maximized:
+		windows.SetWindowText(w.hwnd, w.config.Title)
+		style := windows.GetWindowLong(w.hwnd) & (^uintptr(windows.WS_MAXIMIZE))
 		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW)
-		windows.SetWindowPos(w.hwnd, windows.HWND_TOPMOST,
-			0, 0, 0, 0,
-			windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED,
-		)
-	case Fullscreen:
-		if w.placement != nil {
-			return
+		windows.ShowWindow(w.hwnd, windows.SW_SHOWMAXIMIZED)
+
+	case Windowed:
+		var r windows.Rect
+		windows.SetWindowText(w.hwnd, w.config.Title)
+		windows.GetWindowRect(w.hwnd, &r)
+		style := windows.GetWindowLong(w.hwnd) & (^uintptr(windows.WS_MAXIMIZE))
+		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW)
+		width := int32(w.config.Size.X)
+		height := int32(w.config.Size.Y)
+
+		if w.config.center {
+			// Calculate center position on current monitor
+			mi := windows.GetMonitorInfo(w.hwnd).Monitor
+			r.Left = mi.Left + (mi.Right-mi.Left-width)/2
+			r.Top = mi.Top + (mi.Bottom-mi.Top-height)/2
+			// Centering is done only once.
+			w.config.center = false
 		}
-		w.config.Mode = Fullscreen
-		w.placement = windows.GetWindowPlacement(w.hwnd)
+
+		windows.SetWindowPos(w.hwnd, 0, r.Left, r.Top, width, height,
+			windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED)
+		windows.ShowWindow(w.hwnd, windows.SW_SHOWNORMAL)
+
+	case Fullscreen:
 		style := windows.GetWindowLong(w.hwnd)
 		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style&^windows.WS_OVERLAPPEDWINDOW)
 		mi := windows.GetMonitorInfo(w.hwnd)
@@ -633,6 +567,12 @@ func (w *window) SetWindowMode(mode WindowMode) {
 			mi.Monitor.Bottom-mi.Monitor.Top,
 			windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED,
 		)
+		windows.ShowWindow(w.hwnd, windows.SW_SHOWNORMAL)
+	}
+
+	// A config event is sent to the main event loop whenever the configuration is changed
+	if oldConfig.Mode != w.config.Mode || oldConfig.Size != w.config.Size {
+		w.w.Event(ConfigEvent{Config: w.config})
 	}
 }
 

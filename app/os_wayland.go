@@ -1487,12 +1487,6 @@ func (w *window) Close() {
 	w.dead = true
 }
 
-// Maximize the window. Not implemented for Wayland.
-func (w *window) Maximize() {}
-
-// Center the window. Not implemented for Wayland.
-func (w *window) Center() {}
-
 func (w *window) NewContext() (context, error) {
 	var firstErr error
 	if f := newWaylandVulkanContext; f != nil {
