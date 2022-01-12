@@ -905,6 +905,14 @@ func convertKeyCode(code C.jint) (string, bool) {
 		n = key.NameEnter
 	case C.AKEYCODE_ENTER:
 		n = key.NameEnter
+	case C.AKEYCODE_CTRL_LEFT, C.AKEYCODE_CTRL_RIGHT:
+		n = key.NameCtrl
+	case C.AKEYCODE_SHIFT_LEFT, C.AKEYCODE_SHIFT_RIGHT:
+		n = key.NameShift
+	case C.AKEYCODE_ALT_LEFT, C.AKEYCODE_ALT_RIGHT:
+		n = key.NameAlt
+	case C.AKEYCODE_META_LEFT, C.AKEYCODE_META_RIGHT:
+		n = key.NameSuper
 	default:
 		return "", false
 	}

@@ -610,29 +610,29 @@ func convertKey(k rune) (string, bool) {
 	case C.NSPageDownFunctionKey:
 		n = key.NamePageDown
 	case C.NSF1FunctionKey:
-		n = "F1"
+		n = key.NameF1
 	case C.NSF2FunctionKey:
-		n = "F2"
+		n = key.NameF2
 	case C.NSF3FunctionKey:
-		n = "F3"
+		n = key.NameF3
 	case C.NSF4FunctionKey:
-		n = "F4"
+		n = key.NameF4
 	case C.NSF5FunctionKey:
-		n = "F5"
+		n = key.NameF5
 	case C.NSF6FunctionKey:
-		n = "F6"
+		n = key.NameF6
 	case C.NSF7FunctionKey:
-		n = "F7"
+		n = key.NameF7
 	case C.NSF8FunctionKey:
-		n = "F8"
+		n = key.NameF8
 	case C.NSF9FunctionKey:
-		n = "F9"
+		n = key.NameF9
 	case C.NSF10FunctionKey:
-		n = "F10"
+		n = key.NameF10
 	case C.NSF11FunctionKey:
-		n = "F11"
+		n = key.NameF11
 	case C.NSF12FunctionKey:
-		n = "F12"
+		n = key.NameF12
 	case 0x09, 0x19:
 		n = key.NameTab
 	case 0x20:

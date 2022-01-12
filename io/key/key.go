@@ -133,6 +133,22 @@ const (
 	NamePageDown       = "⇟"
 	NameTab            = "⇥"
 	NameSpace          = "Space"
+	NameCtrl           = "⌃"
+	NameShift          = "⇧"
+	NameAlt            = "⎇"
+	NameSuper          = "⊞"
+	NameF1             = "F1"
+	NameF2             = "F2"
+	NameF3             = "F3"
+	NameF4             = "F4"
+	NameF5             = "F5"
+	NameF6             = "F6"
+	NameF7             = "F7"
+	NameF8             = "F8"
+	NameF9             = "F9"
+	NameF10            = "F10"
+	NameF11            = "F11"
+	NameF12            = "F12"
 )
 
 // Contain reports whether m contains all modifiers

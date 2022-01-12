@@ -739,6 +739,7 @@ func convertKeyCode(code uintptr) (string, bool) {
 		return string(rune(code)), true
 	}
 	var r string
+
 	switch code {
 	case windows.VK_ESCAPE:
 		r = key.NameEscape
@@ -765,29 +766,29 @@ func convertKeyCode(code uintptr) (string, bool) {
 	case windows.VK_NEXT:
 		r = key.NamePageDown
 	case windows.VK_F1:
-		r = "F1"
+		r = key.NameF1
 	case windows.VK_F2:
-		r = "F2"
+		r = key.NameF2
 	case windows.VK_F3:
-		r = "F3"
+		r = key.NameF3
 	case windows.VK_F4:
-		r = "F4"
+		r = key.NameF4
 	case windows.VK_F5:
-		r = "F5"
+		r = key.NameF5
 	case windows.VK_F6:
-		r = "F6"
+		r = key.NameF6
 	case windows.VK_F7:
-		r = "F7"
+		r = key.NameF7
 	case windows.VK_F8:
-		r = "F8"
+		r = key.NameF8
 	case windows.VK_F9:
-		r = "F9"
+		r = key.NameF9
 	case windows.VK_F10:
-		r = "F10"
+		r = key.NameF10
 	case windows.VK_F11:
-		r = "F11"
+		r = key.NameF11
 	case windows.VK_F12:
-		r = "F12"
+		r = key.NameF12
 	case windows.VK_TAB:
 		r = key.NameTab
 	case windows.VK_SPACE:
@@ -814,6 +815,14 @@ func convertKeyCode(code uintptr) (string, bool) {
 		r = "]"
 	case windows.VK_OEM_7:
 		r = "'"
+	case windows.VK_CONTROL:
+		r = key.NameCtrl
+	case windows.VK_SHIFT:
+		r = key.NameShift
+	case windows.VK_MENU:
+		r = key.NameAlt
+	case windows.VK_LWIN, windows.VK_RWIN:
+		r = key.NameSuper
 	default:
 		return "", false
 	}

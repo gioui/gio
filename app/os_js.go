@@ -677,6 +677,7 @@ func osMain() {
 
 func translateKey(k string) (string, bool) {
 	var n string
+
 	switch k {
 	case "ArrowUp":
 		n = key.NameUpArrow
@@ -706,8 +707,38 @@ func translateKey(k string) (string, bool) {
 		n = key.NameTab
 	case " ":
 		n = key.NameSpace
-	case "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12":
-		n = k
+	case "F1":
+		n = key.NameF1
+	case "F2":
+		n = key.NameF2
+	case "F3":
+		n = key.NameF3
+	case "F4":
+		n = key.NameF4
+	case "F5":
+		n = key.NameF5
+	case "F6":
+		n = key.NameF6
+	case "F7":
+		n = key.NameF7
+	case "F8":
+		n = key.NameF8
+	case "F9":
+		n = key.NameF9
+	case "F10":
+		n = key.NameF10
+	case "F11":
+		n = key.NameF11
+	case "F12":
+		n = key.NameF12
+	case "Control":
+		n = key.NameCtrl
+	case "Shift":
+		n = key.NameShift
+	case "Alt":
+		n = key.NameAlt
+	case "OS":
+		n = key.NameSuper
 	default:
 		r, s := utf8.DecodeRuneInString(k)
 		// If there is exactly one printable character, return that.
