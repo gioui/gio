@@ -235,29 +235,30 @@ func (w *Window) processFrame(d driver, frameStart time.Time) {
 		delete(w.semantic.ids, k)
 	}
 	w.semantic.uptodate = false
-	switch w.queue.q.TextInputState() {
+	q := &w.queue.q
+	switch q.TextInputState() {
 	case router.TextInputOpen:
 		d.ShowTextInput(true)
 	case router.TextInputClose:
 		d.ShowTextInput(false)
 	}
-	if hint, ok := w.queue.q.TextInputHint(); ok {
+	if hint, ok := q.TextInputHint(); ok {
 		d.SetInputHint(hint)
 	}
-	if txt, ok := w.queue.q.WriteClipboard(); ok {
-		w.WriteClipboard(txt)
+	if txt, ok := q.WriteClipboard(); ok {
+		d.WriteClipboard(txt)
 	}
-	if w.queue.q.ReadClipboard() {
-		w.ReadClipboard()
+	if q.ReadClipboard() {
+		d.ReadClipboard()
 	}
-	if w.queue.q.Profiling() && w.gpu != nil {
+	if q.Profiling() && w.gpu != nil {
 		frameDur := time.Since(frameStart)
 		frameDur = frameDur.Truncate(100 * time.Microsecond)
-		q := 100 * time.Microsecond
-		timings := fmt.Sprintf("tot:%7s %s", frameDur.Round(q), w.gpu.Profile())
-		w.queue.q.Queue(profile.Event{Timings: timings})
+		quantum := 100 * time.Microsecond
+		timings := fmt.Sprintf("tot:%7s %s", frameDur.Round(quantum), w.gpu.Profile())
+		q.Queue(profile.Event{Timings: timings})
 	}
-	if t, ok := w.queue.q.WakeupTime(); ok {
+	if t, ok := q.WakeupTime(); ok {
 		w.setNextFrame(t)
 	}
 	w.updateAnimation(d)
