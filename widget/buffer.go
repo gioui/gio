@@ -146,9 +146,6 @@ func (e *editBuffer) Read(p []byte) (int, error) {
 		total += n
 		e.pos += n
 	}
-	if e.pos > e.len() {
-		panic("hey!")
-	}
 	return total, nil
 }
 
