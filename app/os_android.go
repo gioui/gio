@@ -1024,11 +1024,12 @@ func javaBool(b bool) C.jboolean {
 }
 
 func javaString(env *C.JNIEnv, str string) C.jstring {
-	if str == "" {
-		return 0
-	}
 	utf16Chars := utf16.Encode([]rune(str))
-	return C.jni_NewString(env, (*C.jchar)(unsafe.Pointer(&utf16Chars[0])), C.int(len(utf16Chars)))
+	var ptr *C.jchar
+	if len(utf16Chars) > 0 {
+		ptr = (*C.jchar)(unsafe.Pointer(&utf16Chars[0]))
+	}
+	return C.jni_NewString(env, ptr, C.int(len(utf16Chars)))
 }
 
 func varArgs(args []jvalue) *C.jvalue {
