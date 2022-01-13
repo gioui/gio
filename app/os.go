@@ -152,36 +152,28 @@ type driver interface {
 	// SetAnimating sets the animation flag. When the window is animating,
 	// FrameEvents are delivered as fast as the display can handle them.
 	SetAnimating(anim bool)
-
 	// ShowTextInput updates the virtual keyboard state.
 	ShowTextInput(show bool)
-
 	SetInputHint(mode key.InputHint)
-
 	NewContext() (context, error)
-
 	// ReadClipboard requests the clipboard content.
 	ReadClipboard()
 	// WriteClipboard requests a clipboard write.
 	WriteClipboard(s string)
-
 	// Configure the window.
 	Configure([]Option)
-
 	// SetCursor updates the current cursor to name.
 	SetCursor(name pointer.CursorName)
-
 	// Raise the window at the top.
 	Raise()
-
 	// Close the window.
 	Close()
-
 	// Wakeup wakes up the event loop and sends a WakeupEvent.
 	Wakeup()
-
 	// Perform actions on the window.
 	Perform(system.Action)
+	// EditorStateChanged notifies the driver that the editor state changed.
+	EditorStateChanged(old, new editorState)
 }
 
 type windowRendezvous struct {

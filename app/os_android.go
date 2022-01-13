@@ -188,6 +188,8 @@ var gioView struct {
 	sendA11yEvent      C.jmethodID
 	sendA11yChange     C.jmethodID
 	isA11yActive       C.jmethodID
+	restartInput       C.jmethodID
+	updateSelection    C.jmethodID
 }
 
 // ViewEvent is sent whenever the Window's underlying Android view
@@ -471,6 +473,8 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.sendA11yEvent = getMethodID(env, class, "sendA11yEvent", "(II)V")
 		m.sendA11yChange = getMethodID(env, class, "sendA11yChange", "(I)V")
 		m.isA11yActive = getMethodID(env, class, "isA11yActive", "()Z")
+		m.restartInput = getMethodID(env, class, "restartInput", "()V")
+		m.updateSelection = getMethodID(env, class, "updateSelection", "()V")
 	})
 	view = C.jni_NewGlobalRef(env, view)
 	wopts := <-mainWindow.out
@@ -490,6 +494,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 	views[handle] = w
 	w.loadConfig(env, class)
 	w.Configure(wopts.options)
+	w.SetInputHint(key.HintAny)
 	w.setStage(system.StagePaused)
 	w.callbacks.Event(ViewEvent{View: uintptr(view)})
 	return handle
@@ -930,7 +935,7 @@ func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.j
 		w.callbacks.Event(key.Event{Name: n, State: state})
 	}
 	if pressed == C.JNI_TRUE && r != 0 && r != '\n' { // Checking for "\n" to prevent duplication with key.NameEnter (gio#224).
-		w.callbacks.Event(key.EditEvent{Text: string(rune(r))})
+		w.callbacks.EditorInsert(string(rune(r)))
 	}
 }
 
@@ -988,6 +993,107 @@ func Java_org_gioui_GioView_onTouchEvent(env *C.JNIEnv, class C.jclass, handle C
 	})
 }
 
+//export Java_org_gioui_GioView_imeSelectionStart
+func Java_org_gioui_GioView_imeSelectionStart(env *C.JNIEnv, class C.jclass, handle C.jlong) C.jint {
+	w := views[handle]
+	sel := w.callbacks.EditorState().Selection
+	start := sel.Start
+	if sel.End < sel.Start {
+		start = sel.End
+	}
+	return C.jint(start)
+}
+
+//export Java_org_gioui_GioView_imeSelectionEnd
+func Java_org_gioui_GioView_imeSelectionEnd(env *C.JNIEnv, class C.jclass, handle C.jlong) C.jint {
+	w := views[handle]
+	sel := w.callbacks.EditorState().Selection
+	end := sel.End
+	if sel.End < sel.Start {
+		end = sel.Start
+	}
+	return C.jint(end)
+}
+
+//export Java_org_gioui_GioView_imeComposingStart
+func Java_org_gioui_GioView_imeComposingStart(env *C.JNIEnv, class C.jclass, handle C.jlong) C.jint {
+	w := views[handle]
+	comp := w.callbacks.EditorState().compose
+	start := comp.Start
+	if e := comp.End; e < start {
+		start = e
+	}
+	return C.jint(start)
+}
+
+//export Java_org_gioui_GioView_imeComposingEnd
+func Java_org_gioui_GioView_imeComposingEnd(env *C.JNIEnv, class C.jclass, handle C.jlong) C.jint {
+	w := views[handle]
+	comp := w.callbacks.EditorState().compose
+	end := comp.End
+	if s := comp.Start; s > end {
+		end = s
+	}
+	return C.jint(end)
+}
+
+//export Java_org_gioui_GioView_imeSnippet
+func Java_org_gioui_GioView_imeSnippet(env *C.JNIEnv, class C.jclass, handle C.jlong) C.jstring {
+	w := views[handle]
+	snip := w.callbacks.EditorState().Snippet.Text
+	return javaString(env, snip)
+}
+
+//export Java_org_gioui_GioView_imeSnippetStart
+func Java_org_gioui_GioView_imeSnippetStart(env *C.JNIEnv, class C.jclass, handle C.jlong) C.jint {
+	w := views[handle]
+	return C.jint(w.callbacks.EditorState().Snippet.Start)
+}
+
+//export Java_org_gioui_GioView_imeSetSnippet
+func Java_org_gioui_GioView_imeSetSnippet(env *C.JNIEnv, class C.jclass, handle C.jlong, start, end C.jint) {
+	w := views[handle]
+	r := key.Range{Start: int(start), End: int(end)}
+	w.callbacks.SetEditorSnippet(r)
+}
+
+//export Java_org_gioui_GioView_imeSetSelection
+func Java_org_gioui_GioView_imeSetSelection(env *C.JNIEnv, class C.jclass, handle C.jlong, start, end C.jint) {
+	w := views[handle]
+	r := key.Range{Start: int(start), End: int(end)}
+	w.callbacks.SetEditorSelection(r)
+}
+
+//export Java_org_gioui_GioView_imeSetComposingRegion
+func Java_org_gioui_GioView_imeSetComposingRegion(env *C.JNIEnv, class C.jclass, handle C.jlong, start, end C.jint) {
+	w := views[handle]
+	w.callbacks.SetComposingRegion(key.Range{
+		Start: int(start),
+		End:   int(end),
+	})
+}
+
+//export Java_org_gioui_GioView_imeReplace
+func Java_org_gioui_GioView_imeReplace(env *C.JNIEnv, class C.jclass, handle C.jlong, start, end C.jint, jtext C.jstring) {
+	w := views[handle]
+	r := key.Range{Start: int(start), End: int(end)}
+	text := goString(env, jtext)
+	w.callbacks.EditorReplace(r, text)
+}
+
+func (w *window) EditorStateChanged(old, new editorState) {
+	runInJVM(javaVM(), func(env *C.JNIEnv) {
+		if old.Snippet != new.Snippet {
+			callVoidMethod(env, w.view, gioView.restartInput)
+			return
+		}
+		if old.Selection != new.Selection {
+			w.callbacks.SetComposingRegion(key.Range{Start: -1, End: -1})
+		}
+		callVoidMethod(env, w.view, gioView.updateSelection)
+	})
+}
+
 func (w *window) ShowTextInput(show bool) {
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
 		if show {
@@ -1002,6 +1108,7 @@ func (w *window) SetInputHint(mode key.InputHint) {
 	// Constants defined at https://developer.android.com/reference/android/text/InputType.
 	const (
 		TYPE_NULL                            = 0
+		TYPE_CLASS_TEXT                      = 1
 		TYPE_CLASS_NUMBER                    = 2
 		TYPE_NUMBER_FLAG_DECIMAL             = 8192
 		TYPE_NUMBER_FLAG_SIGNED              = 4096
@@ -1015,13 +1122,8 @@ func (w *window) SetInputHint(mode key.InputHint) {
 		case key.HintNumeric:
 			m = TYPE_CLASS_NUMBER | TYPE_NUMBER_FLAG_DECIMAL | TYPE_NUMBER_FLAG_SIGNED
 		default:
-			// TYPE_NULL, since TYPE_CLASS_TEXT isn't currently supported.
-			m = TYPE_NULL
+			m = TYPE_CLASS_TEXT
 		}
-
-		// The TYPE_TEXT_FLAG_NO_SUGGESTIONS and TYPE_TEXT_VARIATION_VISIBLE_PASSWORD are used to fix the
-		// Samsung keyboard compatibility, forcing to disable the suggests/auto-complete. gio#116.
-		m = m | TYPE_TEXT_FLAG_NO_SUGGESTIONS | TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
 
 		callVoidMethod(env, w.view, gioView.setInputHint, m)
 	})

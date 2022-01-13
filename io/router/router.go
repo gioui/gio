@@ -138,7 +138,7 @@ func (q *Router) Queue(events ...event.Event) bool {
 			q.profile = e
 		case pointer.Event:
 			q.pointer.queue.Push(e, &q.handlers)
-		case key.EditEvent, key.Event, key.FocusEvent:
+		case key.EditEvent, key.Event, key.FocusEvent, key.SnippetEvent, key.SelectionEvent:
 			q.key.queue.Push(e, &q.handlers)
 		case clipboard.Event:
 			q.cqueue.Push(e, &q.handlers)
@@ -188,6 +188,12 @@ func (q *Router) AppendSemantics(nodes []SemanticNode) []SemanticNode {
 	return q.pointer.queue.AppendSemantics(nodes)
 }
 
+// EditorState returns the editor state for the focused handler, or the
+// zero value if there is none.
+func (q *Router) EditorState() EditorState {
+	return q.key.queue.content
+}
+
 func (q *Router) collect() {
 	q.transStack = q.transStack[:0]
 	pc := &q.pointer.collector
@@ -197,6 +203,7 @@ func (q *Router) collect() {
 	*kc = keyCollector{q: &q.key.queue}
 	q.key.queue.Reset()
 	var t f32.Affine2D
+	bo := binary.LittleEndian
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeInvalidate:
@@ -252,7 +259,6 @@ func (q *Router) collect() {
 		case ops.TypePopPass:
 			pc.popPass()
 		case ops.TypePointerInput:
-			bo := binary.LittleEndian
 			op := pointer.InputOp{
 				Tag:   encOp.Refs[0].(event.Tag),
 				Grab:  encOp.Data[1] != 0,
@@ -310,6 +316,27 @@ func (q *Router) collect() {
 				Hint: key.InputHint(encOp.Data[1]),
 			}
 			kc.inputOp(op)
+		case ops.TypeSnippet:
+			op := key.SnippetOp{
+				Tag: encOp.Refs[0].(event.Tag),
+				Snippet: key.Snippet{
+					Range: key.Range{
+						Start: int(int32(bo.Uint32(encOp.Data[1:]))),
+						End:   int(int32(bo.Uint32(encOp.Data[5:]))),
+					},
+					Text: *(encOp.Refs[1].(*string)),
+				},
+			}
+			kc.snippetOp(op)
+		case ops.TypeSelection:
+			op := key.SelectionOp{
+				Tag: encOp.Refs[0].(event.Tag),
+				Range: key.Range{
+					Start: int(int32(bo.Uint32(encOp.Data[1:]))),
+					End:   int(int32(bo.Uint32(encOp.Data[5:]))),
+				},
+			}
+			kc.selectionOp(op)
 
 		// Semantic ops.
 		case ops.TypeSemanticLabel:

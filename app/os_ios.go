@@ -228,9 +228,7 @@ func onDeleteBackward(view C.CFTypeRef) {
 //export onText
 func onText(view C.CFTypeRef, str *C.char) {
 	w := views[view]
-	w.w.Event(key.EditEvent{
-		Text: C.GoString(str),
-	})
+	w.w.EditorInsert(C.GoString(str))
 }
 
 //export onTouch
@@ -282,6 +280,8 @@ func (w *window) Configure([]Option) {
 		w.w.Event(ConfigEvent{Config: w.config})
 	}
 }
+
+func (w *window) EditorStateChanged(old, new editorState) {}
 
 func (w *window) Perform(system.Action) {}
 

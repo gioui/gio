@@ -300,7 +300,7 @@ func (w *window) addHistory() {
 func (w *window) flushInput() {
 	val := w.tarea.Get("value").String()
 	w.tarea.Set("value", "")
-	w.w.Event(key.EditEvent{Text: string(val)})
+	w.w.EditorInsert(string(val))
 }
 
 func (w *window) blur() {
@@ -480,6 +480,8 @@ func (w *window) animCallback() {
 		w.draw(false)
 	}
 }
+
+func (w *window) EditorStateChanged(old, new editorState) {}
 
 func (w *window) SetAnimating(anim bool) {
 	w.animating = anim

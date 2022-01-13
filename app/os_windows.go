@@ -243,7 +243,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		fallthrough
 	case windows.WM_CHAR:
 		if r := rune(wParam); unicode.IsPrint(r) {
-			w.w.Event(key.EditEvent{Text: string(r)})
+			w.w.EditorInsert(string(r))
 		}
 		// The message is processed.
 		return windows.TRUE
@@ -450,6 +450,8 @@ loop:
 	}
 	return nil
 }
+
+func (w *window) EditorStateChanged(old, new editorState) {}
 
 func (w *window) SetAnimating(anim bool) {
 	w.animating = anim

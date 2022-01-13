@@ -73,6 +73,8 @@ const (
 	TypeSemanticClass
 	TypeSemanticSelected
 	TypeSemanticDisabled
+	TypeSnippet
+	TypeSelection
 )
 
 type StackID struct {
@@ -154,6 +156,8 @@ const (
 	TypeSemanticClassLen    = 2
 	TypeSemanticSelectedLen = 2
 	TypeSemanticDisabledLen = 2
+	TypeSnippetLen          = 1 + 4 + 4
+	TypeSelectionLen        = 1 + 4 + 4
 )
 
 func (op *ClipOp) Decode(data []byte) {
@@ -412,14 +416,16 @@ func (t OpType) Size() int {
 		TypeSemanticClassLen,
 		TypeSemanticSelectedLen,
 		TypeSemanticDisabledLen,
+		TypeSnippetLen,
+		TypeSelectionLen,
 	}[t-firstOpIndex]
 }
 
 func (t OpType) NumRefs() int {
 	switch t {
-	case TypeKeyInput, TypeKeyFocus, TypePointerInput, TypeProfile, TypeCall, TypeClipboardRead, TypeClipboardWrite, TypeCursor, TypeSemanticLabel, TypeSemanticDesc:
+	case TypeKeyInput, TypeKeyFocus, TypePointerInput, TypeProfile, TypeCall, TypeClipboardRead, TypeClipboardWrite, TypeCursor, TypeSemanticLabel, TypeSemanticDesc, TypeSelection:
 		return 1
-	case TypeImage, TypeSource, TypeTarget:
+	case TypeImage, TypeSource, TypeTarget, TypeSnippet:
 		return 2
 	case TypeOffer:
 		return 3

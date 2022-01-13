@@ -7,6 +7,12 @@ import (
 	"gioui.org/io/key"
 )
 
+// EditorState represents the state of an editor needed by input handlers.
+type EditorState struct {
+	Selection key.Range
+	Snippet   key.Snippet
+}
+
 type TextInputState uint8
 
 type keyQueue struct {
@@ -14,6 +20,7 @@ type keyQueue struct {
 	handlers map[event.Tag]*keyHandler
 	state    TextInputState
 	hint     key.InputHint
+	content  EditorState
 }
 
 type keyHandler struct {
@@ -88,6 +95,7 @@ func (q *keyQueue) Frame(events *handlerEvents, collector keyCollector) {
 		}
 	}
 	if collector.changed && collector.focus != q.focus {
+		q.content = EditorState{}
 		if q.focus != nil {
 			events.Add(q.focus, key.FocusEvent{Focus: false})
 		}
@@ -119,14 +127,32 @@ func (k *keyCollector) softKeyboard(show bool) {
 	}
 }
 
-func (k *keyCollector) inputOp(op key.InputOp) {
-	h, ok := k.q.handlers[op.Tag]
-	if !ok {
-		h = &keyHandler{new: true}
-		k.q.handlers[op.Tag] = h
+func (k *keyCollector) handlerFor(tag event.Tag) *keyHandler {
+	h, ok := k.q.handlers[tag]
+	if ok {
+		return h
 	}
+	h = &keyHandler{new: true}
+	k.q.handlers[tag] = h
+	return h
+}
+
+func (k *keyCollector) inputOp(op key.InputOp) {
+	h := k.handlerFor(op.Tag)
 	h.visible = true
 	h.hint = op.Hint
+}
+
+func (k *keyCollector) selectionOp(op key.SelectionOp) {
+	if op.Tag == k.q.focus {
+		k.q.content.Selection = op.Range
+	}
+}
+
+func (k *keyCollector) snippetOp(op key.SnippetOp) {
+	if op.Tag == k.q.focus {
+		k.q.content.Snippet = op.Snippet
+	}
 }
 
 func (t TextInputState) String() string {

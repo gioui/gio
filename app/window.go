@@ -9,12 +9,14 @@ import (
 	"image/color"
 	"runtime"
 	"time"
+	"unicode/utf8"
 
 	"gioui.org/f32"
 	"gioui.org/font/gofont"
 	"gioui.org/gpu"
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
+	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/profile"
 	"gioui.org/io/router"
@@ -88,6 +90,13 @@ type Window struct {
 		tree     []router.SemanticNode
 		ids      map[router.SemanticID]router.SemanticNode
 	}
+
+	imeState editorState
+}
+
+type editorState struct {
+	router.EditorState
+	compose key.Range
 }
 
 type callbacks struct {
@@ -257,6 +266,13 @@ func (w *Window) processFrame(d driver, frameStart time.Time) {
 	}
 	if q.ReadClipboard() {
 		d.ReadClipboard()
+	}
+	oldState := w.imeState
+	newState := oldState
+	newState.EditorState = q.EditorState()
+	if newState != oldState {
+		w.imeState = newState
+		d.EditorStateChanged(oldState, newState)
 	}
 	if q.Profiling() && w.gpu != nil {
 		frameDur := time.Since(frameStart)
@@ -442,6 +458,95 @@ func (c *callbacks) AppendSemanticDiffs(diffs []router.SemanticID) []router.Sema
 func (c *callbacks) SemanticAt(pos f32.Point) (router.SemanticID, bool) {
 	c.w.updateSemantics()
 	return c.w.queue.q.SemanticAt(pos)
+}
+
+func (c *callbacks) EditorState() editorState {
+	return c.w.imeState
+}
+
+func (c *callbacks) SetComposingRegion(r key.Range) {
+	c.w.imeState.compose = r
+}
+
+func (c *callbacks) EditorInsert(text string) {
+	sel := c.w.imeState.Selection
+	c.EditorReplace(sel, text)
+	start := sel.Start
+	if sel.End < start {
+		start = sel.End
+	}
+	sel.Start = start + utf8.RuneCountInString(text)
+	sel.End = sel.Start
+	c.SetEditorSelection(sel)
+}
+
+func (c *callbacks) EditorReplace(r key.Range, text string) {
+	c.w.imeState.Replace(r, text)
+	c.Event(key.EditEvent{Range: r, Text: text})
+	c.Event(key.SnippetEvent(c.w.imeState.Snippet.Range))
+}
+
+func (c *callbacks) SetEditorSelection(r key.Range) {
+	c.w.imeState.Selection = r
+	c.Event(key.SelectionEvent(r))
+}
+
+func (c *callbacks) SetEditorSnippet(r key.Range) {
+	if sn := c.EditorState().Snippet.Range; sn == r {
+		// No need to expand.
+		return
+	}
+	c.Event(key.SnippetEvent(r))
+}
+
+func (e *editorState) Replace(r key.Range, text string) {
+	if r.Start > r.End {
+		r.Start, r.End = r.End, r.Start
+	}
+	runes := []rune(text)
+	newEnd := r.Start + len(runes)
+	adjust := func(pos int) int {
+		switch {
+		case newEnd < pos && pos <= r.End:
+			return newEnd
+		case r.End < pos:
+			diff := newEnd - r.End
+			return pos + diff
+		}
+		return pos
+	}
+	e.Selection.Start = adjust(e.Selection.Start)
+	e.Selection.End = adjust(e.Selection.End)
+	e.compose.Start = adjust(e.compose.Start)
+	e.compose.End = adjust(e.compose.End)
+	s := e.Snippet
+	if r.End < s.Start || r.Start > s.End {
+		// Replacement does not overlap snippet.
+		e.Snippet.Start = adjust(s.Start)
+		e.Snippet.End = adjust(s.End)
+		return
+	}
+	// Replacement overlaps; replace content and expand snippet
+	// to include all of the replacement.
+	var newSnippet []rune
+	snippet := []rune(s.Text)
+	// Append first part of existing snippet.
+	if end := r.Start - s.Start; end > 0 {
+		newSnippet = append(newSnippet, snippet[:end]...)
+	}
+	// Append replacement.
+	newSnippet = append(newSnippet, runes...)
+	// Append last part of existing snippet.
+	if start := r.End; start < s.End {
+		newSnippet = append(newSnippet, snippet[start-s.Start:]...)
+	}
+	// Adjust snippet range to include replacement.
+	if r.Start < s.Start {
+		s.Start = r.Start
+	}
+	s.End = s.Start + len(newSnippet)
+	s.Text = string(newSnippet)
+	e.Snippet = s
 }
 
 func (w *Window) waitAck(d driver) {

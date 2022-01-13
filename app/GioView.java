@@ -17,7 +17,11 @@ import android.graphics.Color;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
-import android.text.Editable;
+import android.os.Handler;
+import android.os.SystemClock;
+import android.text.TextUtils;
+import android.text.Selection;
+import android.text.SpannableStringBuilder;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.KeyCharacterMap;
@@ -33,11 +37,15 @@ import android.view.SurfaceHolder;
 import android.view.Window;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
-import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 import android.view.inputmethod.EditorInfo;
-import android.text.InputType;
+import android.view.inputmethod.CorrectionInfo;
+import android.view.inputmethod.CompletionInfo;
+import android.view.inputmethod.InputContentInfo;
+import android.view.inputmethod.ExtractedText;
+import android.view.inputmethod.ExtractedTextRequest;
+import android.view.inputmethod.SurroundingText;
 import android.view.accessibility.AccessibilityNodeProvider;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityEvent;
@@ -332,9 +340,18 @@ public final class GioView extends SurfaceView {
 	}
 
 	@Override public InputConnection onCreateInputConnection(EditorInfo editor) {
+		Snippet snip = getSnippet();
 		editor.inputType = this.keyboardHint;
 		editor.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN | EditorInfo.IME_FLAG_NO_EXTRACT_UI;
-		return new InputConnection(this);
+		editor.initialSelStart = snip.toChars(imeSelectionStart(nhandle));
+		editor.initialSelEnd = snip.toChars(imeSelectionEnd(nhandle));
+		int selStart = editor.initialSelStart - snip.offset;
+		editor.initialCapsMode = TextUtils.getCapsMode(snip.snippet, selStart, this.keyboardHint);
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+			editor.setInitialSurroundingSubText(snip.snippet, snip.toChars(snip.offset));
+		}
+		imeSetComposingRegion(nhandle, -1, -1);
+		return new GioInputConnection();
 	}
 
 	void setInputHint(int hint) {
@@ -342,7 +359,7 @@ public final class GioView extends SurfaceView {
 			return;
 		}
 		this.keyboardHint = hint;
-		imm.restartInput(this);
+		restartInput();
 	}
 
 	void showTextInput() {
@@ -412,6 +429,19 @@ public final class GioView extends SurfaceView {
 		return onBack(nhandle);
 	}
 
+	void restartInput() {
+		imm.restartInput(this);
+	}
+
+	void updateSelection() {
+		Snippet snip = getSnippet();
+		int selStart = snip.toChars(imeSelectionStart(nhandle));
+		int selEnd = snip.toChars(imeSelectionEnd(nhandle));
+		int compStart = snip.toChars(imeComposingStart(nhandle));
+		int compEnd = snip.toChars(imeComposingEnd(nhandle));
+		imm.updateSelection(this, selStart, selEnd, compStart, compEnd);
+	}
+
 	static private native long onCreateView(GioView view);
 	static private native void onDestroyView(long handle);
 	static private native void onStartView(long handle);
@@ -431,19 +461,287 @@ public final class GioView extends SurfaceView {
 	static private native void onExitTouchExploration(long handle);
 	static private native void onA11yFocus(long handle, int viewId);
 	static private native void onClearA11yFocus(long handle, int viewId);
+	static private native void imeSetSnippet(long handle, int start, int end);
+	static private native String imeSnippet(long handle);
+	static private native int imeSnippetStart(long handle);
+	static private native int imeSelectionStart(long handle);
+	static private native int imeSelectionEnd(long handle);
+	static private native int imeComposingStart(long handle);
+	static private native int imeComposingEnd(long handle);
+	static private native int imeReplace(long handle, int start, int end, String text);
+	static private native int imeSetSelection(long handle, int start, int end);
+	static private native int imeSetComposingRegion(long handle, int start, int end);
 
-	private static class InputConnection extends BaseInputConnection {
-		private final Editable editable;
+	private class GioInputConnection implements InputConnection {
+		private int batchDepth;
 
-		InputConnection(View view) {
-			// Passing false enables "dummy mode", where the BaseInputConnection
-			// attempts to convert IME operations to key events.
-			super(view, false);
-			editable = Editable.Factory.getInstance().newEditable("");
+		@Override public boolean beginBatchEdit() {
+			batchDepth++;
+			return true;
 		}
 
-		@Override public Editable getEditable() {
-			return editable;
+		@Override public boolean endBatchEdit() {
+			batchDepth--;
+			return batchDepth > 0;
+		}
+
+		@Override public boolean clearMetaKeyStates(int states) {
+			return false;
+		}
+
+		@Override public boolean commitCompletion(CompletionInfo text) {
+			return false;
+		}
+
+		@Override public boolean commitCorrection(CorrectionInfo info) {
+			return false;
+		}
+
+		@Override public boolean commitText(CharSequence text, int cursor) {
+			setComposingText(text, cursor);
+			return finishComposingText();
+		}
+
+		@Override public boolean deleteSurroundingText(int beforeChars, int afterChars) {
+			// translate before and after to runes.
+			int selStart = imeSelectionStart(nhandle);
+			int selEnd = imeSelectionEnd(nhandle);
+			Snippet snip = getSnippet();
+			int before = selStart - snip.toRunes(snip.toChars(selStart) - beforeChars);
+			int after = selEnd - snip.toRunes(snip.toChars(selEnd) - afterChars);
+			return deleteSurroundingTextInCodePoints(before, after);
+		}
+
+		@Override public boolean finishComposingText() {
+			imeSetComposingRegion(nhandle, -1, -1);
+			return true;
+		}
+
+		@Override public int getCursorCapsMode(int reqModes) {
+			Snippet snip = getSnippet();
+			int selStart = imeSelectionStart(nhandle);
+			return TextUtils.getCapsMode(snip.snippet, snip.toChars(selStart), reqModes);
+		}
+
+		@Override public ExtractedText getExtractedText(ExtractedTextRequest request, int flags) {
+			return null;
+		}
+
+		@Override public CharSequence getSelectedText(int flags) {
+			Snippet snip = getSnippet();
+			int selStart = imeSelectionStart(nhandle);
+			int selEnd = imeSelectionEnd(nhandle);
+			String sub = snip.substringRunes(selStart, selEnd);
+			return sub;
+		}
+
+		@Override public CharSequence getTextAfterCursor(int n, int flags) {
+			Snippet snip = getSnippet();
+			int selStart = imeSelectionStart(nhandle);
+			int selEnd = imeSelectionEnd(nhandle);
+			// n are in Java characters, but in worst case we'll just ask for more runes
+			// than wanted.
+			imeSetSnippet(nhandle, selStart - n, selEnd + n);
+			int start = selEnd;
+			int end = snip.toRunes(snip.toChars(selEnd) + n);
+			String ret = snip.substringRunes(start, end);
+			return ret;
+		}
+
+		@Override public CharSequence getTextBeforeCursor(int n, int flags) {
+			Snippet snip = getSnippet();
+			int selStart = imeSelectionStart(nhandle);
+			int selEnd = imeSelectionEnd(nhandle);
+			// n are in Java characters, but in worst case we'll just ask for more runes
+			// than wanted.
+			imeSetSnippet(nhandle, selStart - n, selEnd + n);
+			int start = snip.toRunes(snip.toChars(selStart) - n);
+			int end = selStart;
+			String ret = snip.substringRunes(start, end);
+			return ret;
+		}
+
+		@Override public boolean performContextMenuAction(int id) {
+			return false;
+		}
+
+		@Override public boolean performEditorAction(int editorAction) {
+			long eventTime = SystemClock.uptimeMillis();
+			// Translate to enter key.
+			onKeyEvent(nhandle, KeyEvent.KEYCODE_ENTER, '\n', true, eventTime);
+			onKeyEvent(nhandle, KeyEvent.KEYCODE_ENTER, '\n', false, eventTime);
+			return true;
+		}
+
+		@Override public boolean performPrivateCommand(String action, Bundle data) {
+			return false;
+		}
+
+		@Override public boolean reportFullscreenMode(boolean enabled) {
+			return false;
+		}
+
+		@Override public boolean sendKeyEvent(KeyEvent event) {
+			boolean pressed = event.getAction() == KeyEvent.ACTION_DOWN;
+			onKeyEvent(nhandle, event.getKeyCode(), event.getUnicodeChar(), pressed, event.getEventTime());
+			return true;
+		}
+
+		@Override public boolean setComposingRegion(int startChars, int endChars) {
+			Snippet snip = getSnippet();
+			int compStart = snip.toRunes(startChars);
+			int compEnd = snip.toRunes(endChars);
+			imeSetComposingRegion(nhandle, compStart, compEnd);
+			return true;
+		}
+
+		@Override public boolean setComposingText(CharSequence text, int relCursor) {
+			int start = imeComposingStart(nhandle);
+			int end = imeComposingEnd(nhandle);
+			if (start == -1 || end == -1) {
+				start = imeSelectionStart(nhandle);
+				end = imeSelectionEnd(nhandle);
+			}
+			String str = text.toString();
+			imeReplace(nhandle, start, end, str);
+			int cursor = start;
+			int runes = str.codePointCount(0, str.length());
+			if (relCursor > 0) {
+				cursor += runes;
+				relCursor--;
+			}
+			imeSetComposingRegion(nhandle, start, start + runes);
+
+			// Move cursor.
+			Snippet snip = getSnippet();
+			cursor = snip.toRunes(snip.toChars(cursor) + relCursor);
+			imeSetSelection(nhandle, cursor, cursor);
+			return true;
+		}
+
+		@Override public boolean setSelection(int startChars, int endChars) {
+			Snippet snip = getSnippet();
+			int start = snip.toRunes(startChars);
+			int end = snip.toRunes(endChars);
+			imeSetSelection(nhandle, start, end);
+			return true;
+		}
+
+		/*@Override*/ public boolean requestCursorUpdates(int cursorUpdateMode) {
+			return false;
+		}
+
+		/*@Override*/ public void closeConnection() {
+		}
+
+		/*@Override*/ public Handler getHandler() {
+			return null;
+		}
+
+		/*@Override*/ public boolean commitContent(InputContentInfo info, int flags, Bundle opts) {
+			return false;
+		}
+
+		/*@Override*/ public boolean deleteSurroundingTextInCodePoints(int before, int after) {
+			if (after > 0) {
+				int selEnd = imeSelectionEnd(nhandle);
+				imeReplace(nhandle, selEnd, selEnd + after, "");
+			}
+			if (before > 0) {
+				int selStart = imeSelectionStart(nhandle);
+				imeReplace(nhandle, selStart - before, selStart, "");
+			}
+			return true;
+		}
+
+		/*@Override*/ public SurroundingText getSurroundingText(int beforeChars, int afterChars, int flags) {
+			Snippet snip = getSnippet();
+			int selStart = imeSelectionStart(nhandle);
+			int selEnd = imeSelectionEnd(nhandle);
+			// Expanding in Java characters is ok.
+			imeSetSnippet(nhandle, selStart - beforeChars, selEnd + afterChars);
+			return new SurroundingText(snip.snippet, snip.toChars(selStart), snip.toChars(selEnd), snip.toChars(snip.offset));
+		}
+	}
+
+	private Snippet getSnippet() {
+		Snippet snip = new Snippet();
+		snip.snippet = imeSnippet(nhandle);
+		snip.offset = imeSnippetStart(nhandle);
+		return snip;
+	}
+
+	// Snippet is like android.view.inputmethod.SurroundingText but available for Android < 31.
+	private static class Snippet {
+		String snippet;
+		// offset of snippet into the entire editor content. It is in runes because we won't require
+		// Gio editors to keep track of UTF-16 offsets. The disctinction won't matter in practice because IMEs only
+		// ever see snippets.
+		int offset;
+
+		// toRunes converts the Java character index into runes (Java code points).
+		int toRunes(int chars) {
+			if (chars == -1) {
+				return -1;
+			}
+			if (chars < this.offset) {
+				// Assume runes before offset are one Java character each.
+				return chars;
+			}
+			int runes = this.offset;
+			chars -= this.offset;
+			if (chars > snippet.length()) {
+				// Assume runes after snippets are one Java character each.
+				runes += chars - snippet.length();
+				chars = snippet.length();
+			}
+			runes += snippet.codePointCount(0, chars);
+			return runes;
+		}
+
+		// toChars converts the rune index into Java characters.
+		int toChars(int runes) {
+			if (runes == -1) {
+				return -1;
+			}
+			if (runes < this.offset) {
+				// Assume runes before offset are one Java character each.
+				return runes;
+			}
+			int chars = this.offset;
+			runes -= this.offset;
+			int n = snippet.codePointCount(0, snippet.length());
+			if (runes > n) {
+				// Assume runes after snippets are one Java character each.
+				chars += runes - n;
+				runes = n;
+			}
+			chars += snippet.offsetByCodePoints(0, runes);
+			return chars;
+		}
+
+		// substringRunes returns the substring from start to end in runes. The resuls is
+		// truncated to the snippet.
+		String substringRunes(int start, int end) {
+			start -= this.offset;
+			end -= this.offset;
+			int runes = snippet.codePointCount(0, snippet.length());
+			if (start < 0) {
+				start = 0;
+			}
+			if (end < 0) {
+				end = 0;
+			}
+			if (start > runes) {
+				start = runes;
+			}
+			if (end > runes) {
+				end = runes;
+			}
+			return snippet.substring(
+				snippet.offsetByCodePoints(0, start),
+				snippet.offsetByCodePoints(0, end)
+			);
 		}
 	}
 

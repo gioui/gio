@@ -350,6 +350,8 @@ func (w *window) SetCursor(name pointer.CursorName) {
 	w.cursor = windowSetCursor(w.cursor, name)
 }
 
+func (w *window) EditorStateChanged(old, new editorState) {}
+
 func (w *window) ShowTextInput(show bool) {}
 
 func (w *window) SetInputHint(_ key.InputHint) {}
@@ -412,7 +414,7 @@ func gio_onKeys(view C.CFTypeRef, cstr *C.char, ti C.double, mods C.NSUInteger, 
 func gio_onText(view C.CFTypeRef, cstr *C.char) {
 	str := C.GoString(cstr)
 	w := mustView(view)
-	w.w.Event(key.EditEvent{Text: str})
+	w.w.EditorInsert(str)
 }
 
 //export gio_onMouse

@@ -1202,7 +1202,12 @@ func gio_onKeyboardKey(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, seri
 	kc := mapXKBKeycode(uint32(keyCode))
 	ks := mapXKBKeyState(uint32(state))
 	for _, e := range w.disp.xkb.DispatchKey(kc, ks) {
-		w.w.Event(e)
+		if ee, ok := e.(key.EditEvent); ok {
+			// There's no support for IME yet.
+			w.w.EditorInsert(ee.Text)
+		} else {
+			w.w.Event(e)
+		}
 	}
 	if state != C.WL_KEYBOARD_KEY_STATE_PRESSED {
 		return
@@ -1641,6 +1646,8 @@ func (w *window) surface() (*C.struct_wl_surface, int, int) {
 func (w *window) ShowTextInput(show bool) {}
 
 func (w *window) SetInputHint(_ key.InputHint) {}
+
+func (w *window) EditorStateChanged(old, new editorState) {}
 
 // Close the window.
 func (w *window) Close() {

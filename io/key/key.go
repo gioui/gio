@@ -10,6 +10,7 @@ events.
 package key
 
 import (
+	"encoding/binary"
 	"fmt"
 	"strings"
 
@@ -40,6 +41,39 @@ type FocusOp struct {
 	Tag event.Tag
 }
 
+// SelectionOp updates the selection for an input handler.
+type SelectionOp struct {
+	Tag event.Tag
+	Range
+}
+
+// SnippetOp updates the content snippet for an input handler.
+type SnippetOp struct {
+	Tag event.Tag
+	Snippet
+}
+
+// Range represents a range of text, such as an editor's selection.
+// Start and End are in runes.
+type Range struct {
+	Start int
+	End   int
+}
+
+// Snippet represents a snippet of text content used for communicating between
+// an editor and an input method. Offset and Length are in runes.
+type Snippet struct {
+	Range
+	Text string
+}
+
+// SelectionEvent is generated when an input method changes the selection.
+type SelectionEvent Range
+
+// SnippetEvent is generated when the snippet range is updated by an
+// input method.
+type SnippetEvent Range
+
 // A FocusEvent is generated when a handler gains or loses
 // focus.
 type FocusEvent struct {
@@ -60,9 +94,11 @@ type Event struct {
 	State State
 }
 
-// An EditEvent is generated when text is input.
+// An EditEvent requests an edit by an input method.
 type EditEvent struct {
-	Text string
+	// Range specifies the range to replace with Text.
+	Range Range
+	Text  string
 }
 
 // InputHint changes the on-screen-keyboard type. That hints the
@@ -179,9 +215,27 @@ func (h FocusOp) Add(o *op.Ops) {
 	data[0] = byte(ops.TypeKeyFocus)
 }
 
-func (EditEvent) ImplementsEvent()  {}
-func (Event) ImplementsEvent()      {}
-func (FocusEvent) ImplementsEvent() {}
+func (s SnippetOp) Add(o *op.Ops) {
+	data := ops.Write2(&o.Internal, ops.TypeSnippetLen, s.Tag, &s.Text)
+	data[0] = byte(ops.TypeSnippet)
+	bo := binary.LittleEndian
+	bo.PutUint32(data[1:], uint32(s.Range.Start))
+	bo.PutUint32(data[5:], uint32(s.Range.End))
+}
+
+func (s SelectionOp) Add(o *op.Ops) {
+	data := ops.Write1(&o.Internal, ops.TypeSelectionLen, s.Tag)
+	data[0] = byte(ops.TypeSelection)
+	bo := binary.LittleEndian
+	bo.PutUint32(data[1:], uint32(s.Start))
+	bo.PutUint32(data[5:], uint32(s.End))
+}
+
+func (EditEvent) ImplementsEvent()      {}
+func (Event) ImplementsEvent()          {}
+func (FocusEvent) ImplementsEvent()     {}
+func (SnippetEvent) ImplementsEvent()   {}
+func (SelectionEvent) ImplementsEvent() {}
 
 func (e Event) String() string {
 	return fmt.Sprintf("%v %v %v}", e.Name, e.Modifiers, e.State)

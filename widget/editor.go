@@ -69,6 +69,12 @@ type Editor struct {
 	// spaced intervals to speed up caret seeking.
 	index []combinedPos
 
+	// ime tracks the state relevant to input methods.
+	ime struct {
+		imeState
+		scratch []byte
+	}
+
 	caret struct {
 		on     bool
 		scroll bool
@@ -94,6 +100,12 @@ type Editor struct {
 	events []EditorEvent
 	// prevEvents is the number of events from the previous frame.
 	prevEvents int
+}
+
+type imeState struct {
+	selection  key.Range
+	snippet    key.Snippet
+	start, end int
 }
 
 type maskReader struct {
@@ -336,6 +348,8 @@ func (e *Editor) processKey(gtx layout.Context) {
 		switch ke := ke.(type) {
 		case key.FocusEvent:
 			e.focused = ke.Focus
+			// Reset IME state.
+			e.ime.imeState = imeState{}
 		case key.Event:
 			if !e.focused || ke.State != key.Press {
 				break
@@ -352,15 +366,23 @@ func (e *Editor) processKey(gtx layout.Context) {
 				e.caret.scroll = true
 				e.scroller.Stop()
 			}
+		case key.SnippetEvent:
+			e.updateSnippet(gtx, ke.Start, ke.End)
 		case key.EditEvent:
 			e.caret.scroll = true
 			e.scroller.Stop()
-			e.append(ke.Text)
+			e.replace(ke.Range.Start, ke.Range.End, ke.Text)
+			e.caret.xoff = 0
 		// Complete a paste event, initiated by Shortcut-V in Editor.command().
 		case clipboard.Event:
 			e.caret.scroll = true
 			e.scroller.Stop()
 			e.append(ke.Text)
+		case key.SelectionEvent:
+			e.caret.scroll = true
+			e.scroller.Stop()
+			e.caret.start = e.closestPosition(combinedPos{runes: ke.Start}).runes
+			e.caret.end = e.closestPosition(combinedPos{runes: ke.End}).runes
 		}
 		if e.rr.Changed() {
 			e.events = append(e.events, ChangeEvent{})
@@ -504,6 +526,23 @@ func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size
 	e.processEvents(gtx)
 	e.makeValid()
 
+	if e.focused {
+		// Notify IME of selection if it changed.
+		newSel := key.Range{
+			Start: e.caret.start,
+			End:   e.caret.end,
+		}
+		if newSel != e.ime.selection {
+			e.ime.selection = newSel
+			key.SelectionOp{
+				Tag:   &e.eventKey,
+				Range: newSel,
+			}.Add(gtx.Ops)
+		}
+
+		e.updateSnippet(gtx, e.ime.start, e.ime.end)
+	}
+
 	if viewSize := gtx.Constraints.Constrain(e.dims.Size); viewSize != e.viewSize {
 		e.viewSize = viewSize
 		e.invalidate()
@@ -511,6 +550,47 @@ func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size
 	e.makeValid()
 
 	return e.layout(gtx, content)
+}
+
+// updateSnippet adds a key.SnippetOp if the snippet content or position
+// have changed. off and len are in runes.
+func (e *Editor) updateSnippet(gtx layout.Context, start, end int) {
+	e.makeValid()
+	if start > end {
+		start, end = end, start
+	}
+	imeStart := e.closestPosition(combinedPos{runes: start})
+	imeEnd := e.closestPosition(combinedPos{runes: end})
+	e.ime.start = imeStart.runes
+	e.ime.end = imeEnd.runes
+	e.rr.Seek(int64(imeStart.ofs), io.SeekStart)
+	n := imeEnd.ofs - imeStart.ofs
+	if n > len(e.ime.scratch) {
+		e.ime.scratch = make([]byte, n)
+	}
+	scratch := e.ime.scratch[:n]
+	read, _ := e.rr.Read(scratch)
+	if read != len(scratch) {
+		panic("e.rr.Read truncated data")
+	}
+	newSnip := key.Snippet{
+		Range: key.Range{
+			Start: e.ime.start,
+			End:   e.ime.end,
+		},
+		Text: e.ime.snippet.Text,
+	}
+	if string(scratch) != newSnip.Text {
+		newSnip.Text = string(scratch)
+	}
+	if newSnip == e.ime.snippet {
+		return
+	}
+	e.ime.snippet = newSnip
+	key.SnippetOp{
+		Tag:     &e.eventKey,
+		Snippet: newSnip,
+	}.Add(gtx.Ops)
 }
 
 func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimensions {
@@ -910,7 +990,11 @@ func (e *Editor) Insert(s string) {
 func (e *Editor) append(s string) {
 	e.replace(e.caret.start, e.caret.end, s)
 	e.caret.xoff = 0
-	e.caret.start += utf8.RuneCountInString(s)
+	start := e.caret.start
+	if end := e.caret.end; end < start {
+		start = end
+	}
+	e.caret.start = start + utf8.RuneCountInString(s)
 	e.caret.end = e.caret.start
 }
 
@@ -940,6 +1024,8 @@ func (e *Editor) replace(start, end int, s string) {
 	}
 	e.caret.start = adjust(e.caret.start)
 	e.caret.end = adjust(e.caret.end)
+	e.ime.start = adjust(e.ime.start)
+	e.ime.end = adjust(e.ime.end)
 	e.invalidate()
 }
 

@@ -323,6 +323,8 @@ func (w *x11Window) ShowTextInput(show bool) {}
 
 func (w *x11Window) SetInputHint(_ key.InputHint) {}
 
+func (w *x11Window) EditorStateChanged(old, new editorState) {}
+
 // Close the window.
 func (w *x11Window) Close() {
 	var xev C.XEvent
@@ -534,7 +536,12 @@ func (h *x11EventHandler) handleEvents() bool {
 			}
 			kevt := (*C.XKeyPressedEvent)(unsafe.Pointer(xev))
 			for _, e := range h.w.xkb.DispatchKey(uint32(kevt.keycode), ks) {
-				w.w.Event(e)
+				if ee, ok := e.(key.EditEvent); ok {
+					// There's no support for IME yet.
+					w.w.EditorInsert(ee.Text)
+				} else {
+					w.w.Event(e)
+				}
 			}
 		case C.ButtonPress, C.ButtonRelease:
 			bevt := (*C.XButtonEvent)(unsafe.Pointer(xev))
