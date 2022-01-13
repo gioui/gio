@@ -616,7 +616,7 @@ func (w *Window) processEvent(d driver, e event.Event) {
 			break
 		}
 		w.processFrame(d, frameStart)
-		w.updateCursor()
+		w.updateCursor(d)
 	case *system.CommandEvent:
 		w.out <- e
 		w.waitAck(d)
@@ -634,7 +634,7 @@ func (w *Window) processEvent(d driver, e event.Event) {
 			w.setNextFrame(time.Time{})
 			w.updateAnimation(d)
 		}
-		w.updateCursor()
+		w.updateCursor(d)
 		w.out <- e
 	}
 }
@@ -680,10 +680,10 @@ func (w *Window) run(options []Option) {
 	}
 }
 
-func (w *Window) updateCursor() {
+func (w *Window) updateCursor(d driver) {
 	if c := w.queue.q.Cursor(); c != w.cursor {
 		w.cursor = c
-		w.SetCursorName(c)
+		d.SetCursor(c)
 	}
 }
 
