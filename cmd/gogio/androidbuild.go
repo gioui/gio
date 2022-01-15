@@ -595,8 +595,9 @@ func determineJDKVersion() (int, int, bool) {
 	if err != nil {
 		return 0, 0, false
 	}
+	var vendor string
 	var major, minor int
-	_, err = fmt.Sscanf(string(out), "java version \"%d.%d", &major, &minor)
+	_, err = fmt.Sscanf(string(out), "%s version \"%d.%d", &vendor, &major, &minor)
 	return major, minor, err == nil
 }
 
