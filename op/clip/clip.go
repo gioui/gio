@@ -126,7 +126,8 @@ func (p *Path) Begin(o *op.Ops) {
 		contour: 1,
 	}
 	p.hash.SetSeed(pathSeed)
-	data := ops.Write(p.ops, ops.TypeAuxLen)
+	ops.BeginMulti(p.ops)
+	data := ops.WriteMulti(p.ops, ops.TypeAuxLen)
 	data[0] = byte(ops.TypeAux)
 }
 
@@ -134,6 +135,7 @@ func (p *Path) Begin(o *op.Ops) {
 func (p *Path) End() PathSpec {
 	p.gap()
 	c := p.macro.Stop()
+	ops.EndMulti(p.ops)
 	return PathSpec{
 		spec:        c,
 		hasSegments: p.hasSegments,
@@ -163,7 +165,7 @@ func (p *Path) gap() {
 	if p.pen != p.start {
 		// A closed contour starts and ends in the same point.
 		// This move creates a gap in the contour, register it.
-		data := ops.Write(p.ops, scene.CommandSize+4)
+		data := ops.WriteMulti(p.ops, scene.CommandSize+4)
 		bo := binary.LittleEndian
 		bo.PutUint32(data[0:], uint32(p.contour))
 		p.cmd(data[4:], scene.Gap(p.pen, p.start))
@@ -183,7 +185,7 @@ func (p *Path) Line(delta f32.Point) {
 
 // LineTo moves the pen to the absolute point specified, recording a line.
 func (p *Path) LineTo(to f32.Point) {
-	data := ops.Write(p.ops, scene.CommandSize+4)
+	data := ops.WriteMulti(p.ops, scene.CommandSize+4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
 	p.cmd(data[4:], scene.Line(p.pen, to))
@@ -251,7 +253,7 @@ func (p *Path) Quad(ctrl, to f32.Point) {
 // QuadTo records a quadratic Bézier from the pen to end
 // with the control point ctrl, with absolute coordinates.
 func (p *Path) QuadTo(ctrl, to f32.Point) {
-	data := ops.Write(p.ops, scene.CommandSize+4)
+	data := ops.WriteMulti(p.ops, scene.CommandSize+4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
 	p.cmd(data[4:], scene.Quad(p.pen, ctrl, to))
@@ -297,7 +299,7 @@ func (p *Path) CubeTo(ctrl0, ctrl1, to f32.Point) {
 	if ctrl0 == p.pen && ctrl1 == p.pen && to == p.pen {
 		return
 	}
-	data := ops.Write(p.ops, scene.CommandSize+4)
+	data := ops.WriteMulti(p.ops, scene.CommandSize+4)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
 	p.cmd(data[4:], scene.Cubic(p.pen, ctrl0, ctrl1, to))

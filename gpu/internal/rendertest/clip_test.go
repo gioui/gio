@@ -227,3 +227,27 @@ func TestPathReuse(t *testing.T) {
 	}, func(r result) {
 	})
 }
+
+func TestPathInterleave(t *testing.T) {
+	t.Run("interleave op in clip.Path", func(t *testing.T) {
+		defer func() {
+			if err := recover(); err == nil {
+				t.Error("expected panic did not occur")
+			}
+		}()
+		ops := new(op.Ops)
+		var path clip.Path
+		path.Begin(ops)
+		path.LineTo(f32.Point{X: 123, Y: 456})
+		paint.ColorOp{}.Add(ops)
+		path.End()
+	})
+	t.Run("use ops after clip.Path", func(t *testing.T) {
+		ops := new(op.Ops)
+		var path clip.Path
+		path.Begin(ops)
+		path.LineTo(f32.Point{X: 123, Y: 456})
+		path.End()
+		paint.ColorOp{}.Add(ops)
+	})
+}

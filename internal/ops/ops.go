@@ -22,6 +22,8 @@ type Ops struct {
 	// nextStateID is the id allocated for the next
 	// StateOp.
 	nextStateID int
+	// multipOp indicates a multi-op such as clip.Path is being added.
+	multipOp bool
 
 	macroStack stack
 	stacks     [5]stack
@@ -192,6 +194,31 @@ func Reset(o *Ops) {
 }
 
 func Write(o *Ops, n int) []byte {
+	if o.multipOp {
+		panic("cannot mix multi ops with single ones")
+	}
+	o.data = append(o.data, make([]byte, n)...)
+	return o.data[len(o.data)-n:]
+}
+
+func BeginMulti(o *Ops) {
+	if o.multipOp {
+		panic("cannot interleave multi ops")
+	}
+	o.multipOp = true
+}
+
+func EndMulti(o *Ops) {
+	if !o.multipOp {
+		panic("cannot end non multi ops")
+	}
+	o.multipOp = false
+}
+
+func WriteMulti(o *Ops, n int) []byte {
+	if !o.multipOp {
+		panic("cannot use multi ops in single ops")
+	}
 	o.data = append(o.data, make([]byte, n)...)
 	return o.data[len(o.data)-n:]
 }
