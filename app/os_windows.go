@@ -571,7 +571,7 @@ func (w *window) Configure(options []Option) {
 	}
 
 	// A config event is sent to the main event loop whenever the configuration is changed
-	if oldConfig.Mode != w.config.Mode || oldConfig.Size != w.config.Size {
+	if oldConfig != w.config {
 		w.w.Event(ConfigEvent{Config: w.config})
 	}
 }

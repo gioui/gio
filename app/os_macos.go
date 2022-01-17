@@ -129,6 +129,16 @@ static void setScreenFrame(CFTypeRef windowRef, CGFloat x, CGFloat y, CGFloat w,
 	[window setFrame:r display:YES];
 }
 
+static void hideWindow(CFTypeRef windowRef) {
+	NSWindow* window = (__bridge NSWindow *)windowRef;
+	[window miniaturize:window];
+}
+
+static void unhideWindow(CFTypeRef windowRef) {
+	NSWindow* window = (__bridge NSWindow *)windowRef;
+	[window deminiaturize:window];
+}
+
 static NSRect getScreenFrame(CFTypeRef windowRef) {
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	return [[window screen] frame];
@@ -252,34 +262,80 @@ func (w *window) Configure(options []Option) {
 	cnf.MinSize = cnf.MinSize.Div(int(screenScale))
 	cnf.MaxSize = cnf.MaxSize.Div(int(screenScale))
 
-	if cnf.Mode != Fullscreen && prev.Size != cnf.Size {
-		w.config.Size = cnf.Size
-		C.setSize(w.window, C.CGFloat(cnf.Size.X), C.CGFloat(cnf.Size.Y))
+	switch cnf.Mode {
+	case Fullscreen:
+		switch prev.Mode {
+		case Fullscreen:
+		case Minimized:
+			C.unhideWindow(w.window)
+			fallthrough
+		default:
+			w.config.Mode = Fullscreen
+			C.toggleFullScreen(w.window)
+		}
+	case Minimized:
+		switch prev.Mode {
+		case Minimized, Fullscreen:
+		default:
+			w.config.Mode = Minimized
+			C.hideWindow(w.window)
+		}
+	case Maximized:
+		switch prev.Mode {
+		case Fullscreen:
+		case Minimized:
+			C.unhideWindow(w.window)
+			fallthrough
+		default:
+			w.config.Mode = Maximized
+			r := C.getScreenFrame(w.window) // the screen size of the window
+			C.setScreenFrame(w.window, C.CGFloat(0), C.CGFloat(0), r.size.width, r.size.height)
+			w.config.Size = image.Pt(int(r.size.width), int(r.size.height))
+			w.setTitle(prev, cnf)
+		}
+	case Windowed:
+		switch prev.Mode {
+		case Fullscreen:
+			w.config.Mode = Windowed
+			C.toggleFullScreen(w.window)
+		case Minimized:
+			w.config.Mode = Windowed
+			C.unhideWindow(w.window)
+		case Maximized:
+			w.config.Mode = Windowed
+		}
+		w.setTitle(prev, cnf)
+		if prev.Size != cnf.Size {
+			w.config.Size = cnf.Size
+			C.setSize(w.window, C.CGFloat(cnf.Size.X), C.CGFloat(cnf.Size.Y))
+		}
+		if prev.MinSize != cnf.MinSize {
+			w.config.MinSize = cnf.MinSize
+			C.setMinSize(w.window, C.CGFloat(cnf.MinSize.X), C.CGFloat(cnf.MinSize.Y))
+		}
+		if prev.MaxSize != cnf.MaxSize {
+			w.config.MaxSize = cnf.MaxSize
+			C.setMaxSize(w.window, C.CGFloat(cnf.MaxSize.X), C.CGFloat(cnf.MaxSize.Y))
+		}
+		if cnf.center {
+			r := C.getScreenFrame(w.window) // the screen size of the window
+			sz := w.config.Size
+			x := (int(r.size.width) - sz.X) / 2
+			y := (int(r.size.height) - sz.Y) / 2
+			C.setScreenFrame(w.window, C.CGFloat(x), C.CGFloat(y), C.CGFloat(sz.X), C.CGFloat(sz.Y))
+		}
 	}
-	if prev.MinSize != cnf.MinSize {
-		w.config.MinSize = cnf.MinSize
-		C.setMinSize(w.window, C.CGFloat(cnf.MinSize.X), C.CGFloat(cnf.MinSize.Y))
+	if w.config != prev {
+		w.w.Event(ConfigEvent{Config: w.config})
 	}
-	if prev.MaxSize != cnf.MaxSize {
-		w.config.MaxSize = cnf.MaxSize
-		C.setMaxSize(w.window, C.CGFloat(cnf.MaxSize.X), C.CGFloat(cnf.MaxSize.Y))
-	}
+}
 
+func (w *window) setTitle(prev, cnf Config) {
 	if prev.Title != cnf.Title {
 		w.config.Title = cnf.Title
 		title := C.CString(cnf.Title)
 		defer C.free(unsafe.Pointer(title))
 		C.setTitle(w.window, title)
-	}
-	if prev.Mode != cnf.Mode {
-		switch cnf.Mode {
-		case Windowed, Fullscreen:
-			w.config.Mode = cnf.Mode
-			C.toggleFullScreen(w.window)
-		}
-	}
-	if w.config != prev {
-		w.w.Event(ConfigEvent{Config: w.config})
 	}
 }
 
@@ -315,24 +371,6 @@ func (w *window) runOnMain(f func()) {
 
 func (w *window) Close() {
 	C.closeWindow(w.window)
-}
-
-// Maximize the window.
-func (w *window) Maximize() {
-	r := C.getScreenFrame(w.window) // the screen size of the window
-	C.setScreenFrame(w.window, C.CGFloat(0), C.CGFloat(0), r.size.width, r.size.height)
-}
-
-// Center the window.
-func (w *window) Center() {
-	r := C.getScreenFrame(w.window) // the screen size of the window
-
-	screenScale := float32(C.getScreenBackingScale())
-	sz := w.config.Size.Div(int(screenScale))
-	x := (int(r.size.width) - sz.X) / 2
-	y := (int(r.size.height) - sz.Y) / 2
-
-	C.setScreenFrame(w.window, C.CGFloat(x), C.CGFloat(y), C.CGFloat(sz.X), C.CGFloat(sz.Y))
 }
 
 func (w *window) setStage(stage system.Stage) {

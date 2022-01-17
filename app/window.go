@@ -704,8 +704,8 @@ func Size(w, h unit.Value) Option {
 	}
 }
 
-// Center is an option to center the window on the screen.
-// The option is ignored in Fullscreen mode.
+// Centered is an option to center the window on the screen.
+// The option is ignored in Fullscreen mode and on Wayland.
 func Centered() Option {
 	return func(m unit.Metric, cnf *Config) {
 		// Set the flag so the driver can later do the actual centering.

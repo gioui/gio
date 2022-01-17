@@ -190,6 +190,7 @@ type window struct {
 	// size is the unscaled window size (unlike config.Size which is scaled).
 	size   image.Point
 	config Config
+	wsize  image.Point // window config size before going fullscreen
 
 	wakeups chan struct{}
 }
@@ -919,22 +920,77 @@ func (w *window) Configure(options []Option) {
 	prev := w.config
 	cnf := w.config
 	cnf.apply(cfg, options)
-	if prev.Size != cnf.Size {
-		w.size = image.Pt(cnf.Size.X/w.scale, cnf.Size.Y/w.scale)
-		w.config.Size = cnf.Size
-	}
-	if prev.Title != cnf.Title {
-		w.config.Title = cnf.Title
-		title := C.CString(cnf.Title)
-		C.xdg_toplevel_set_title(w.topLvl, title)
-		C.free(unsafe.Pointer(title))
+
+	switch cnf.Mode {
+	case Fullscreen:
+		switch prev.Mode {
+		case Minimized, Fullscreen:
+		default:
+			w.config.Mode = Fullscreen
+			w.wsize = w.config.Size
+			C.xdg_toplevel_set_fullscreen(w.topLvl, nil)
+		}
+	case Minimized:
+		switch prev.Mode {
+		case Minimized, Fullscreen:
+		default:
+			w.config.Mode = Minimized
+			C.xdg_toplevel_set_minimized(w.topLvl)
+		}
+	case Maximized:
+		switch prev.Mode {
+		case Minimized, Fullscreen:
+		default:
+			w.config.Mode = Maximized
+			w.wsize = w.config.Size
+			C.xdg_toplevel_set_maximized(w.topLvl)
+		}
+	case Windowed:
+		switch prev.Mode {
+		case Fullscreen:
+			w.config.Mode = Windowed
+			w.size = w.wsize.Div(w.scale)
+			C.xdg_toplevel_unset_fullscreen(w.topLvl)
+		case Minimized:
+			w.config.Mode = Windowed
+			w.config.Size = w.wsize
+		case Maximized:
+			w.config.Mode = Windowed
+			w.size = w.wsize.Div(w.scale)
+			C.xdg_toplevel_unset_maximized(w.topLvl)
+		}
+		w.setTitle(prev, cnf)
+		if prev.Size != cnf.Size {
+			w.config.Size = cnf.Size
+			w.size = cnf.Size.Div(w.scale)
+		}
+		if prev.MinSize != cnf.MinSize {
+			w.config.MinSize = cnf.MinSize
+			C.xdg_toplevel_set_min_size(w.topLvl, C.int32_t(cnf.MinSize.X), C.int32_t(cnf.MinSize.Y))
+		}
+		if prev.MaxSize != cnf.MaxSize {
+			w.config.MaxSize = cnf.MaxSize
+			C.xdg_toplevel_set_max_size(w.topLvl, C.int32_t(cnf.MaxSize.X), C.int32_t(cnf.MaxSize.Y))
+		}
 	}
 	if w.config != prev {
 		w.w.Event(ConfigEvent{Config: w.config})
 	}
 }
 
-func (w *window) Raise() {}
+func (w *window) setTitle(prev, cnf Config) {
+	if prev.Title != cnf.Title {
+		w.config.Title = cnf.Title
+		title := C.CString(cnf.Title)
+		C.xdg_toplevel_set_title(w.topLvl, title)
+		C.free(unsafe.Pointer(title))
+	}
+}
+
+func (w *window) Raise() {
+	// NB. there is no way for a minimized window to be unminimized.
+	// https://wayland.app/protocols/xdg-shell#xdg_toplevel:request:set_minimized
+}
 
 func (w *window) SetCursor(name pointer.CursorName) {
 	ptr := w.disp.seat.pointer

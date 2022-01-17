@@ -160,27 +160,93 @@ func (w *x11Window) Configure(options []Option) {
 	prev := w.config
 	cnf := w.config
 	cnf.apply(w.metric, options)
-	if prev.MinSize != cnf.MinSize {
-		w.config.MinSize = cnf.MinSize
-		shints.min_width = C.int(cnf.MinSize.X)
-		shints.min_height = C.int(cnf.MinSize.Y)
-		shints.flags = C.PMinSize
-	}
-	if prev.MaxSize != cnf.MaxSize {
-		w.config.MaxSize = cnf.MaxSize
-		shints.max_width = C.int(cnf.MaxSize.X)
-		shints.max_height = C.int(cnf.MaxSize.Y)
-		shints.flags = shints.flags | C.PMaxSize
-	}
-	if shints.flags != 0 {
-		C.XSetWMNormalHints(w.x, w.xw, &shints)
-	}
 
-	if cnf.Mode != Fullscreen && prev.Size != cnf.Size {
-		w.config.Size = cnf.Size
-		C.XResizeWindow(w.x, w.xw, C.uint(cnf.Size.X), C.uint(cnf.Size.Y))
-	}
+	switch cnf.Mode {
+	case Fullscreen:
+		switch prev.Mode {
+		case Fullscreen:
+		case Minimized:
+			w.Raise()
+			fallthrough
+		default:
+			w.config.Mode = Fullscreen
+			w.sendWMStateEvent(_NET_WM_STATE_ADD, w.atoms.wmStateFullscreen, 0)
+		}
+	case Minimized:
+		switch prev.Mode {
+		case Minimized, Fullscreen:
+		default:
+			w.config.Mode = Minimized
+			screen := C.XDefaultScreen(w.x)
+			C.XIconifyWindow(w.x, w.xw, screen)
+		}
+	case Maximized:
+		switch prev.Mode {
+		case Fullscreen:
+		case Minimized:
+			w.Raise()
+			fallthrough
+		default:
+			w.config.Mode = Maximized
+			w.sendWMStateEvent(_NET_WM_STATE_ADD, w.atoms.wmStateMaximizedHorz, w.atoms.wmStateMaximizedVert)
+			w.setTitle(prev, cnf)
+		}
+	case Windowed:
+		switch prev.Mode {
+		case Fullscreen:
+			w.config.Mode = Windowed
+			w.sendWMStateEvent(_NET_WM_STATE_REMOVE, w.atoms.wmStateFullscreen, 0)
+			C.XResizeWindow(w.x, w.xw, C.uint(cnf.Size.X), C.uint(cnf.Size.Y))
+		case Minimized:
+			w.config.Mode = Windowed
+			w.Raise()
+		case Maximized:
+			w.config.Mode = Windowed
+			w.sendWMStateEvent(_NET_WM_STATE_REMOVE, w.atoms.wmStateMaximizedHorz, w.atoms.wmStateMaximizedVert)
+		}
+		w.setTitle(prev, cnf)
+		if prev.Size != cnf.Size {
+			w.config.Size = cnf.Size
+			C.XResizeWindow(w.x, w.xw, C.uint(cnf.Size.X), C.uint(cnf.Size.Y))
+		}
+		if prev.MinSize != cnf.MinSize {
+			w.config.MinSize = cnf.MinSize
+			shints.min_width = C.int(cnf.MinSize.X)
+			shints.min_height = C.int(cnf.MinSize.Y)
+			shints.flags = C.PMinSize
+		}
+		if prev.MaxSize != cnf.MaxSize {
+			w.config.MaxSize = cnf.MaxSize
+			shints.max_width = C.int(cnf.MaxSize.X)
+			shints.max_height = C.int(cnf.MaxSize.Y)
+			shints.flags = shints.flags | C.PMaxSize
+		}
+		if shints.flags != 0 {
+			C.XSetWMNormalHints(w.x, w.xw, &shints)
+		}
+		if cnf.center {
+			screen := C.XDefaultScreen(w.x)
+			width := C.XDisplayWidth(w.x, screen)
+			height := C.XDisplayHeight(w.x, screen)
 
+			var attrs C.XWindowAttributes
+			C.XGetWindowAttributes(w.x, w.xw, &attrs)
+			width -= attrs.border_width
+			height -= attrs.border_width
+
+			sz := w.config.Size
+			x := (int(width) - sz.X) / 2
+			y := (int(height) - sz.Y) / 2
+
+			C.XMoveResizeWindow(w.x, w.xw, C.int(x), C.int(y), C.uint(sz.X), C.uint(sz.Y))
+		}
+	}
+	if w.config != prev {
+		w.w.Event(ConfigEvent{Config: w.config})
+	}
+}
+
+func (w *x11Window) setTitle(prev, cnf Config) {
 	if prev.Title != cnf.Title {
 		title := cnf.Title
 		ctitle := C.CString(title)
@@ -195,13 +261,6 @@ func (w *x11Window) Configure(options []Option) {
 				nitems:   C.ulong(len(title)),
 			},
 			w.atoms.wmName)
-	}
-
-	if prev.Mode != cnf.Mode {
-		w.SetWindowMode(cnf.Mode)
-	}
-	if w.config != prev {
-		w.w.Event(ConfigEvent{Config: w.config})
 	}
 }
 
@@ -249,22 +308,6 @@ func (w *x11Window) SetCursor(name pointer.CursorName) {
 	C.XDefineCursor(w.x, w.xw, c)
 }
 
-func (w *x11Window) SetWindowMode(mode WindowMode) {
-	var action C.long
-	switch mode {
-	case Windowed:
-		action = _NET_WM_STATE_REMOVE
-	case Fullscreen:
-		action = _NET_WM_STATE_ADD
-	default:
-		return
-	}
-	w.config.Mode = mode
-	// "A Client wishing to change the state of a window MUST send
-	//  a _NET_WM_STATE client message to the root window."
-	w.sendWMStateEvent(action, w.atoms.wmStateFullscreen, 0)
-}
-
 func (w *x11Window) ShowTextInput(show bool) {}
 
 func (w *x11Window) SetInputHint(_ key.InputHint) {}
@@ -284,29 +327,6 @@ func (w *x11Window) Close() {
 	arr[0] = C.long(w.atoms.evDelWindow)
 	arr[1] = C.CurrentTime
 	C.XSendEvent(w.x, w.xw, C.False, C.NoEventMask, &xev)
-}
-
-// Maximize the window.
-func (w *x11Window) Maximize() {
-	w.sendWMStateEvent(_NET_WM_STATE_ADD, w.atoms.wmStateMaximizedHorz, w.atoms.wmStateMaximizedVert)
-}
-
-// Center the window.
-func (w *x11Window) Center() {
-	screen := C.XDefaultScreen(w.x)
-	width := C.XDisplayWidth(w.x, screen)
-	height := C.XDisplayHeight(w.x, screen)
-
-	var attrs C.XWindowAttributes
-	C.XGetWindowAttributes(w.x, w.xw, &attrs)
-	width -= attrs.border_width
-	height -= attrs.border_width
-
-	sz := w.config.Size
-	x := (int(width) - sz.X) / 2
-	y := (int(height) - sz.Y) / 2
-
-	C.XMoveResizeWindow(w.x, w.xw, C.int(x), C.int(y), C.uint(sz.X), C.uint(sz.Y))
 }
 
 // action is one of _NET_WM_STATE_REMOVE, _NET_WM_STATE_ADD.
