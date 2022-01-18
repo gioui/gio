@@ -944,6 +944,7 @@ func (w *window) Configure(options []Option) {
 			w.config.Mode = Maximized
 			w.wsize = w.config.Size
 			C.xdg_toplevel_set_maximized(w.topLvl)
+			w.setTitle(prev, cnf)
 		}
 	case Windowed:
 		switch prev.Mode {
@@ -953,7 +954,6 @@ func (w *window) Configure(options []Option) {
 			C.xdg_toplevel_unset_fullscreen(w.topLvl)
 		case Minimized:
 			w.config.Mode = Windowed
-			w.config.Size = w.wsize
 		case Maximized:
 			w.config.Mode = Windowed
 			w.size = w.wsize.Div(w.scale)
