@@ -46,12 +46,10 @@ type Window struct {
 	// scheduledRedraws is sent the most recent delayed redraw time.
 	scheduledRedraws chan time.Time
 
-	waiting    bool
-	waitEvents []event.Event
-	defers     []func(d driver)
-	out        chan event.Event
-	frames     chan *op.Ops
-	frameAck   chan struct{}
+	defers   []func(d driver)
+	out      chan event.Event
+	frames   chan *op.Ops
+	frameAck chan struct{}
 	// dead is closed when the window is destroyed.
 	dead chan struct{}
 
@@ -81,8 +79,10 @@ type Window struct {
 }
 
 type callbacks struct {
-	w *Window
-	d driver
+	w          *Window
+	d          driver
+	busy       bool
+	waitEvents []event.Event
 }
 
 // queue is an event.Queue implementation that distributes system events
@@ -398,21 +398,23 @@ func (c *callbacks) Event(e event.Event) {
 	if c.d == nil {
 		panic("event while no driver active")
 	}
-	if c.w.waiting {
-		c.w.waitEvents = append(c.w.waitEvents, e)
+	if c.busy {
+		c.waitEvents = append(c.waitEvents, e)
 		return
 	}
+	c.busy = true
+	defer func() {
+		c.busy = false
+	}()
 	c.w.processEvent(c.d, e)
-	for len(c.w.waitEvents) > 0 {
-		we := c.w.waitEvents[0]
-		copy(c.w.waitEvents, c.w.waitEvents[1:])
-		c.w.waitEvents = c.w.waitEvents[:len(c.w.waitEvents)-1]
-		c.w.processEvent(c.d, we)
+	for _, e := range c.waitEvents {
+		c.w.processEvent(c.d, e)
 	}
+	c.waitEvents = c.waitEvents[:0]
 	for _, f := range c.w.defers {
 		f(c.d)
 	}
-	c.w.defers = nil
+	c.w.defers = c.w.defers[:0]
 	c.w.updateState(c.d)
 }
 
@@ -443,10 +445,6 @@ func (c *callbacks) SemanticAt(pos f32.Point) (router.SemanticID, bool) {
 }
 
 func (w *Window) waitAck() {
-	w.waiting = true
-	defer func() {
-		w.waiting = false
-	}()
 	for {
 		select {
 		case f := <-w.driverFuncs:
@@ -478,10 +476,6 @@ func (w *Window) destroyGPU() {
 // or to continue event handling. It returns whether the client
 // called Frame or not.
 func (w *Window) waitFrame() (*op.Ops, bool) {
-	w.waiting = true
-	defer func() {
-		w.waiting = false
-	}()
 	for {
 		select {
 		case f := <-w.driverFuncs:
