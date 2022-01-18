@@ -1018,6 +1018,22 @@ func (w *window) SetCursor(name pointer.CursorName) {
 		name = "left_side"
 	case pointer.CursorGrab:
 		name = "hand1"
+	case pointer.CursorTopLeftResize:
+		name = "top_left_corner"
+	case pointer.CursorTopRightResize:
+		name = "bottom_left_corner"
+	case pointer.CursorBottomLeftResize:
+		name = "top_right_corner"
+	case pointer.CursorBottomRightResize:
+		name = "bottom_right_corner"
+	case pointer.CursorLeftResize:
+		name = "right_side"
+	case pointer.CursorRightResize:
+		name = "left_side"
+	case pointer.CursorTopResize:
+		name = "top_side"
+	case pointer.CursorBottomResize:
+		name = "bottom_side"
 	}
 	cname := C.CString(string(name))
 	defer C.free(unsafe.Pointer(cname))

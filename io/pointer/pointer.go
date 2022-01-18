@@ -110,6 +110,22 @@ const (
 	CursorGrab CursorName = "grab"
 	// CursorNone hides the cursor. To show it again, use any other cursor.
 	CursorNone CursorName = "none"
+	// CursorTopLeftResize is the cursor for top-left corner resizing.
+	CursorTopLeftResize = "top-left-resize"
+	// CursorTopRightResize is the cursor for top-right corner resizing.
+	CursorTopRightResize = "top-right-resize"
+	// CursorBottomLeftResize is the cursor for bottom-left corner resizing.
+	CursorBottomLeftResize = "bottom-left-resize"
+	// CursorBottomRightResize is the cursor for bottom-right corner resizing.
+	CursorBottomRightResize = "bottom-right-resize"
+	// CursorLeftResize is the cursor for left resizing.
+	CursorLeftResize = "left-resize"
+	// CursorRightResize is the cursor for right resizing.
+	CursorRightResize = "right-resize"
+	// CursorTopResize is the cursor for top resizing.
+	CursorTopResize = "top-resize"
+	// CursorBottomResize is the cursor for bottom resizing.
+	CursorBottomResize = "bottom-resize"
 )
 
 const (
