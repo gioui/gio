@@ -153,8 +153,8 @@ func Record(o *Ops) MacroOp {
 		pc:  ops.PCFor(&o.Internal),
 	}
 	// Reserve room for a macro definition. Updated in Stop.
-	ops.Write(m.ops, ops.TypeMacroLen)
-	m.fill()
+	data := ops.Write(m.ops, ops.TypeMacroLen)
+	data[0] = byte(ops.TypeMacro)
 	return m
 }
 
@@ -162,15 +162,11 @@ func Record(o *Ops) MacroOp {
 // operation for replaying it.
 func (m MacroOp) Stop() CallOp {
 	ops.PopMacro(m.ops, m.id)
-	m.fill()
+	ops.FillMacro(m.ops, m.pc)
 	return CallOp{
 		ops: m.ops,
 		pc:  m.pc,
 	}
-}
-
-func (m MacroOp) fill() {
-	ops.FillMacro(m.ops, m.pc)
 }
 
 // Add the recorded list of operations. Add

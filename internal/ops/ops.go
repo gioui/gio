@@ -26,7 +26,7 @@ type Ops struct {
 	multipOp bool
 
 	macroStack stack
-	stacks     [5]stack
+	stacks     [_StackKind]stack
 }
 
 type OpType byte
@@ -80,7 +80,7 @@ type StackID struct {
 	prev int
 }
 
-// StateOp represents a saved operation snapshop to be restored
+// StateOp represents a saved operation snapshot to be restored
 // later.
 type StateOp struct {
 	id      int
@@ -108,7 +108,7 @@ const (
 	ClipStack StackKind = iota
 	TransStack
 	PassStack
-	MetaStack
+	_StackKind
 )
 
 const (
@@ -180,9 +180,7 @@ func (op *ClipOp) Decode(data []byte) {
 
 func Reset(o *Ops) {
 	o.macroStack = stack{}
-	for i := range o.stacks {
-		o.stacks[i] = stack{}
-	}
+	o.stacks = [_StackKind]stack{}
 	// Leave references to the GC.
 	for i := range o.refs {
 		o.refs[i] = nil
