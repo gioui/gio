@@ -798,10 +798,10 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 
 	go func() {
 		w.w.SetDriver(w)
-		w.Configure(options)
 
 		// make the window visible on the screen
 		C.XMapWindow(dpy, win)
+		w.Configure(options)
 		w.w.Event(ViewEvent{Display: unsafe.Pointer(dpy), Window: uintptr(win)})
 		w.setStage(system.StageRunning)
 		w.loop()
