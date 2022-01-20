@@ -121,7 +121,14 @@ public final class GioView extends SurfaceView {
 
 	@Override public boolean onKeyDown(int keyCode, KeyEvent event) {
 		if (nhandle != 0) {
-			onKeyEvent(nhandle, keyCode, event.getUnicodeChar(), event.getEventTime());
+			onKeyEvent(nhandle, keyCode, event.getUnicodeChar(), true, event.getEventTime());
+		}
+		return false;
+	}
+
+	@Override public boolean onKeyUp(int keyCode, KeyEvent event) {
+		if (nhandle != 0) {
+			onKeyEvent(nhandle, keyCode, event.getUnicodeChar(), false, event.getEventTime());
 		}
 		return false;
 	}
@@ -415,7 +422,7 @@ public final class GioView extends SurfaceView {
 	static private native void onWindowInsets(long handle, int top, int right, int bottom, int left);
 	static public native void onLowMemory();
 	static private native void onTouchEvent(long handle, int action, int pointerID, int tool, float x, float y, float scrollX, float scrollY, int buttons, long time);
-	static private native void onKeyEvent(long handle, int code, int character, long time);
+	static private native void onKeyEvent(long handle, int code, int character, boolean pressed, long time);
 	static private native void onFrameCallback(long handle);
 	static private native boolean onBack(long handle);
 	static private native void onFocusChange(long handle, boolean focus);

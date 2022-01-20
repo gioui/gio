@@ -920,12 +920,16 @@ func convertKeyCode(code C.jint) (string, bool) {
 }
 
 //export Java_org_gioui_GioView_onKeyEvent
-func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, keyCode, r C.jint, t C.jlong) {
+func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, keyCode, r C.jint, pressed C.jboolean, t C.jlong) {
 	w := views[handle]
 	if n, ok := convertKeyCode(keyCode); ok {
-		w.callbacks.Event(key.Event{Name: n})
+		state := key.Release
+		if pressed == C.JNI_TRUE {
+			state = key.Press
+		}
+		w.callbacks.Event(key.Event{Name: n, State: state})
 	}
-	if r != 0 && r != '\n' { // Checking for "\n" to prevent duplication with key.NameEnter (gio#224).
+	if pressed == C.JNI_TRUE && r != 0 && r != '\n' { // Checking for "\n" to prevent duplication with key.NameEnter (gio#224).
 		w.callbacks.Event(key.EditEvent{Text: string(rune(r))})
 	}
 }
