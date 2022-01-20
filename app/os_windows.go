@@ -195,22 +195,27 @@ func (w *window) update() {
 		X: int(r.Right - r.Left - w.deltas.width),
 		Y: int(r.Bottom - r.Top - w.deltas.height),
 	}
-	if size != w.config.Size {
-		w.config.Size = size
-		triggerEvent = true
-	}
+
 	// Check the window mode.
 	mode := w.config.Mode
 	p := windows.GetWindowPlacement(w.hwnd)
 	style := windows.GetWindowLong(w.hwnd)
 	if style&windows.WS_OVERLAPPEDWINDOW == 0 {
 		mode = Fullscreen
+		mi := windows.GetMonitorInfo(w.hwnd).Monitor
+		size = image.Point{X: int(mi.Right - mi.Left), Y: int(mi.Bottom - mi.Top)}
 	} else if p.IsMinimized() {
 		mode = Minimized
 	} else if p.IsMaximized() {
 		mode = Maximized
+		mi := windows.GetMonitorInfo(w.hwnd).Monitor
+		size = image.Point{X: int(mi.Right - mi.Left), Y: int(mi.Bottom - mi.Top)}
 	} else {
 		mode = Windowed
+	}
+	if size != w.config.Size {
+		w.config.Size = size
+		triggerEvent = true
 	}
 	if mode != w.config.Mode {
 		w.config.Mode = mode
@@ -525,51 +530,69 @@ func (w *window) Configure(options []Option) {
 	dpi := windows.GetSystemDPI()
 	metric := configForDPI(dpi)
 	w.config.apply(metric, options)
+	windows.SetWindowText(w.hwnd, w.config.Title)
+
 	switch w.config.Mode {
 	case Minimized:
 		windows.ShowWindow(w.hwnd, windows.SW_SHOWMINIMIZED)
 
 	case Maximized:
-		windows.SetWindowText(w.hwnd, w.config.Title)
+		// Set window style.
 		style := windows.GetWindowLong(w.hwnd) & (^uintptr(windows.WS_MAXIMIZE))
 		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW)
+		mi := windows.GetMonitorInfo(w.hwnd).Monitor
+		w.config.Size = image.Point{X: int(mi.Right - mi.Left), Y: int(mi.Bottom - mi.Top)}
 		windows.ShowWindow(w.hwnd, windows.SW_SHOWMAXIMIZED)
 
 	case Windowed:
-		var r windows.Rect
 		windows.SetWindowText(w.hwnd, w.config.Title)
-		windows.GetWindowRect(w.hwnd, &r)
+		// Set window style.
 		style := windows.GetWindowLong(w.hwnd) & (^uintptr(windows.WS_MAXIMIZE))
 		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW)
+		// Get target for client areaa size.
 		width := int32(w.config.Size.X)
 		height := int32(w.config.Size.Y)
-
+		// Get the current window size and position.
+		var wr windows.Rect
+		windows.GetWindowRect(w.hwnd, &wr)
+		// Set desired window size.
+		wr.Right = wr.Left + width
+		wr.Bottom = wr.Top + height
+		// Convert from client size to window size.
+		r := wr
+		windows.AdjustWindowRectEx(&r, windows.WS_OVERLAPPEDWINDOW, 0, windows.WS_EX_APPWINDOW|windows.WS_EX_WINDOWEDGE)
+		// Calculate difference between client and full window sizes.
+		w.deltas.width = r.Right - wr.Right + wr.Left - r.Left
+		w.deltas.height = r.Bottom - wr.Bottom + wr.Top - r.Top
+		// Set new window size and position.
+		x := wr.Left
+		y := wr.Top
+		dx := r.Right - r.Left
+		dy := r.Bottom - r.Top
 		if w.config.center {
-			// Calculate center position on current monitor
+			// Calculate center position on current monitor.
 			mi := windows.GetMonitorInfo(w.hwnd).Monitor
-			r.Left = mi.Left + (mi.Right-mi.Left-width)/2
-			r.Top = mi.Top + (mi.Bottom-mi.Top-height)/2
+			x = (mi.Right - mi.Left - dx) / 2
+			y = (mi.Bottom - mi.Top - dy) / 2
 			// Centering is done only once.
 			w.config.center = false
 		}
-
-		windows.SetWindowPos(w.hwnd, 0, r.Left, r.Top, width, height,
-			windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED)
+		windows.SetWindowPos(w.hwnd, 0, x, y, dx, dy, windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED)
 		windows.ShowWindow(w.hwnd, windows.SW_SHOWNORMAL)
 
 	case Fullscreen:
 		style := windows.GetWindowLong(w.hwnd)
 		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style&^windows.WS_OVERLAPPEDWINDOW)
 		mi := windows.GetMonitorInfo(w.hwnd)
+		w.config.Size = image.Point{X: int(mi.Monitor.Right - mi.Monitor.Left), Y: int(mi.Monitor.Bottom - mi.Monitor.Top)}
 		windows.SetWindowPos(w.hwnd, 0,
 			mi.Monitor.Left, mi.Monitor.Top,
 			mi.Monitor.Right-mi.Monitor.Left,
 			mi.Monitor.Bottom-mi.Monitor.Top,
 			windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED,
 		)
-		windows.ShowWindow(w.hwnd, windows.SW_SHOWNORMAL)
+		windows.ShowWindow(w.hwnd, windows.SW_SHOW)
 	}
-
 	// A config event is sent to the main event loop whenever the configuration is changed
 	if oldConfig != w.config {
 		w.w.Event(ConfigEvent{Config: w.config})
