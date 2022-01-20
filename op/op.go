@@ -92,8 +92,9 @@ type MacroOp struct {
 // CallOp invokes the operations recorded by Record.
 type CallOp struct {
 	// Ops is the list of operations to invoke.
-	ops *ops.Ops
-	pc  ops.PC
+	ops   *ops.Ops
+	start ops.PC
+	end   ops.PC
 }
 
 // InvalidateOp requests a redraw at the given time. Use
@@ -165,7 +166,9 @@ func (m MacroOp) Stop() CallOp {
 	ops.FillMacro(m.ops, m.pc)
 	return CallOp{
 		ops: m.ops,
-		pc:  m.pc,
+		// Skip macro header.
+		start: m.pc.Add(ops.TypeMacro),
+		end:   ops.PCFor(m.ops),
 	}
 }
 
@@ -176,7 +179,7 @@ func (c CallOp) Add(o *Ops) {
 	if c.ops == nil {
 		return
 	}
-	ops.AddCall(&o.Internal, c.ops, c.pc)
+	ops.AddCall(&o.Internal, c.ops, c.start, c.end)
 }
 
 func (r InvalidateOp) Add(o *Ops) {

@@ -119,7 +119,7 @@ const (
 
 const (
 	TypeMacroLen            = 1 + 4 + 4
-	TypeCallLen             = 1 + 4 + 4
+	TypeCallLen             = 1 + 4 + 4 + 4 + 4
 	TypeDeferLen            = 1
 	TypePushTransformLen    = 1 + 4*6
 	TypeTransformLen        = 1 + 1 + 4*6
@@ -240,12 +240,14 @@ func FillMacro(o *Ops, startPC PC) {
 	bo.PutUint32(data[5:], uint32(pc.refs))
 }
 
-func AddCall(o *Ops, callOps *Ops, pc PC) {
+func AddCall(o *Ops, callOps *Ops, pc PC, end PC) {
 	data := Write1(o, TypeCallLen, callOps)
 	data[0] = byte(TypeCall)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(pc.data))
 	bo.PutUint32(data[5:], uint32(pc.refs))
+	bo.PutUint32(data[9:], uint32(end.data))
+	bo.PutUint32(data[13:], uint32(end.refs))
 }
 
 func PushOp(o *Ops, kind StackKind) (StackID, int) {
