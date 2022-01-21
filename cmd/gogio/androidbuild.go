@@ -362,8 +362,8 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, pe
 		d8.Args = append(d8.Args, classFiles...)
 		if _, err := runCmd(d8); err != nil {
 			major, minor, ok := determineJDKVersion()
-			if ok && (major != 1 || minor < 7 || 8 < minor) {
-				return fmt.Errorf("unsupported JDK version %d.%d, expected 1.7 or 1.8\nd8 error: %v", major, minor, err)
+			if ok && (major != 1 || minor != 8) {
+				return fmt.Errorf("unsupported JDK version %d.%d, expected 1.8\nd8 error: %v", major, minor, err)
 			}
 			return err
 		}
