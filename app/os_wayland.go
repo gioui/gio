@@ -552,6 +552,11 @@ func gio_onSurfaceEnter(data unsafe.Pointer, surf *C.struct_wl_surface, output *
 		conf.windows = append(conf.windows, w)
 	}
 	w.updateOutputs()
+	if w.config.Mode == Minimized {
+		// Minimized window got brought back up: it is no longer so.
+		w.config.Mode = Windowed
+		w.w.Event(ConfigEvent{Config: w.config})
+	}
 }
 
 //export gio_onSurfaceLeave
