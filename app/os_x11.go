@@ -164,6 +164,8 @@ func (w *x11Window) Configure(options []Option) {
 	prev := w.config
 	cnf := w.config
 	cnf.apply(w.metric, options)
+	// Decorations are never disabled.
+	cnf.Decorated = true
 
 	switch cnf.Mode {
 	case Fullscreen:
@@ -245,6 +247,9 @@ func (w *x11Window) Configure(options []Option) {
 			C.XMoveResizeWindow(w.x, w.xw, C.int(x), C.int(y), C.uint(sz.X), C.uint(sz.Y))
 		}
 	}
+	if cnf.Decorated != prev.Decorated {
+		w.config.Decorated = cnf.Decorated
+	}
 	if w.config != prev {
 		w.w.Event(ConfigEvent{Config: w.config})
 	}
@@ -267,6 +272,8 @@ func (w *x11Window) setTitle(prev, cnf Config) {
 			w.atoms.wmName)
 	}
 }
+
+func (w *x11Window) Perform(system.Action) {}
 
 func (w *x11Window) Raise() {
 	var xev C.XEvent

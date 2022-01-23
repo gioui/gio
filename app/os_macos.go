@@ -261,6 +261,8 @@ func (w *window) Configure(options []Option) {
 	cnf.Size = cnf.Size.Div(int(screenScale))
 	cnf.MinSize = cnf.MinSize.Div(int(screenScale))
 	cnf.MaxSize = cnf.MaxSize.Div(int(screenScale))
+	// Decorations are never disabled.
+	cnf.Decorated = true
 
 	switch cnf.Mode {
 	case Fullscreen:
@@ -325,6 +327,9 @@ func (w *window) Configure(options []Option) {
 			C.setScreenFrame(w.window, C.CGFloat(x), C.CGFloat(y), C.CGFloat(sz.X), C.CGFloat(sz.Y))
 		}
 	}
+	if cnf.Decorated != prev.Decorated {
+		w.config.Decorated = cnf.Decorated
+	}
 	if w.config != prev {
 		w.w.Event(ConfigEvent{Config: w.config})
 	}
@@ -338,6 +343,8 @@ func (w *window) setTitle(prev, cnf Config) {
 		C.setTitle(w.window, title)
 	}
 }
+
+func (w *window) Perform(system.Action) {}
 
 func (w *window) SetCursor(name pointer.CursorName) {
 	w.cursor = windowSetCursor(w.cursor, name)

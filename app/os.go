@@ -43,6 +43,8 @@ type Config struct {
 	CustomRenderer bool
 	// center is a flag used to center the window. Set by option.
 	center bool
+	// Decorated reports whether window decorations are provided automatically.
+	Decorated bool
 }
 
 // ConfigEvent is sent whenever the configuration of a Window changes.
@@ -177,6 +179,9 @@ type driver interface {
 
 	// Wakeup wakes up the event loop and sends a WakeupEvent.
 	Wakeup()
+
+	// Perform actions on the window.
+	Perform(system.Action)
 }
 
 type windowRendezvous struct {
@@ -218,3 +223,12 @@ func newWindowRendezvous() *windowRendezvous {
 
 func (wakeupEvent) ImplementsEvent() {}
 func (ConfigEvent) ImplementsEvent() {}
+
+func walkActions(actions system.Action, do func(system.Action)) {
+	for a := system.Action(1); actions != 0; a <<= 1 {
+		if actions&a != 0 {
+			actions &^= a
+			do(a)
+		}
+	}
+}

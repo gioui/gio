@@ -57,7 +57,7 @@ type Decorations struct {
 // Decorate a window with the title and actions defined in DecorationsStyle.
 // The space used by the decorations is returned as an inset for the window
 // content.
-func (d *Decorations) Decorate(gtx layout.Context, title string) layout.Inset {
+func (d *Decorations) Decorate(gtx layout.Context, title string) layout.Dimensions {
 	rec := op.Record(gtx.Ops)
 	dims := d.layoutDecorations(gtx, title)
 	decos := rec.Stop()
@@ -65,9 +65,7 @@ func (d *Decorations) Decorate(gtx layout.Context, title string) layout.Inset {
 	paint.FillShape(gtx.Ops, d.DecorationsStyle.Background, r.Op())
 	decos.Add(gtx.Ops)
 	d.layoutResizing(gtx)
-	return layout.Inset{
-		Top: unit.Px(float32(dims.Size.Y)),
-	}
+	return dims
 }
 
 func (d *Decorations) layoutResizing(gtx layout.Context) {

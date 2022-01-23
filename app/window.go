@@ -11,14 +11,18 @@ import (
 	"time"
 
 	"gioui.org/f32"
+	"gioui.org/font/gofont"
 	"gioui.org/gpu"
+	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/io/profile"
 	"gioui.org/io/router"
 	"gioui.org/io/system"
+	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/unit"
+	"gioui.org/widget/material"
 
 	_ "gioui.org/app/internal/log"
 )
@@ -59,8 +63,13 @@ type Window struct {
 	nextFrame    time.Time
 	delayedDraw  *time.Timer
 
-	queue  queue
-	cursor pointer.CursorName
+	queue       queue
+	cursor      pointer.CursorName
+	decorations struct {
+		op.Ops
+		Config
+		*material.Decorations
+	}
 
 	callbacks callbacks
 
@@ -578,9 +587,16 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		w.hasNextFrame = false
 		e2.Frame = w.update
 		e2.Queue = &w.queue
+
+		// Prepare the decorations and update the frame insets.
+		wrapper := &w.decorations.Ops
+		wrapper.Reset()
+		size := e2.Size // save the initial window size as the decorations will change it.
+		e2.FrameEvent.Size = w.decorate(d, e2.FrameEvent, wrapper)
 		w.out <- e2.FrameEvent
 		frame, gotFrame := w.waitFrame()
-		err := w.validateAndProcess(d, e2.Size, e2.Sync, frame)
+		ops.AddCall(&wrapper.Internal, &frame.Internal, ops.PC{}, ops.PCFor(&frame.Internal))
+		err := w.validateAndProcess(d, size, e2.Sync, wrapper)
 		if gotFrame {
 			// We're done with frame, let the client continue.
 			w.frameAck <- struct{}{}
@@ -606,6 +622,9 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		w.out <- e2
 		w.waitAck()
 	case wakeupEvent:
+	case ConfigEvent:
+		w.decorations.Config = e2.Config
+		w.out <- e
 	case event.Event:
 		if w.queue.q.Queue(e2) {
 			w.setNextFrame(time.Time{})
@@ -662,6 +681,59 @@ func (w *Window) updateCursor(d driver) {
 		w.cursor = c
 		d.SetCursor(c)
 	}
+}
+
+// decorate the window if enabled and returns the corresponding Insets.
+func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point {
+	if w.decorations.Config.Decorated || w.decorations.Config.Mode == Fullscreen {
+		return e.Size
+	}
+	deco := w.decorations.Decorations
+	if deco == nil {
+		theme := material.NewTheme(gofont.Collection())
+		allActions := system.ActionMinimize | system.ActionMaximize | system.ActionUnmaximize |
+			system.ActionClose | system.ActionMove |
+			system.ActionResizeNorth | system.ActionResizeSouth |
+			system.ActionResizeWest | system.ActionResizeEast |
+			system.ActionResizeNorthWest | system.ActionResizeSouthWest |
+			system.ActionResizeNorthEast | system.ActionResizeSouthEast
+		deco = &material.Decorations{
+			DecorationsStyle: material.Decorate(theme, allActions),
+		}
+		w.decorations.Decorations = deco
+	}
+	// Update the decorations based on the current window mode.
+	var actions system.Action
+	switch m := w.decorations.Config.Mode; m {
+	case Windowed:
+		actions |= system.ActionUnmaximize
+	case Minimized:
+		actions |= system.ActionMinimize
+	case Maximized:
+		actions |= system.ActionMaximize
+	case Fullscreen:
+		actions |= system.ActionFullscreen
+	default:
+		panic(fmt.Errorf("unknown WindowMode %v", m))
+	}
+	deco.Perform(actions)
+	// Update the window based on the actions on the decorations.
+	d.Perform(deco.Actions())
+
+	gtx := layout.Context{
+		Ops:         o,
+		Now:         e.Now,
+		Queue:       e.Queue,
+		Metric:      e.Metric,
+		Constraints: layout.Exact(e.Size),
+	}
+	rec := op.Record(o)
+	dims := deco.Decorate(gtx, w.decorations.Config.Title)
+	op.Defer(o, rec.Stop())
+	// Offset to place the frame content below the decorations.
+	size := image.Point{Y: dims.Size.Y}
+	op.Offset(f32.Point{Y: float32(size.Y)}).Add(o)
+	return e.Size.Sub(size)
 }
 
 // Raise requests that the platform bring this window to the top of all open windows.
@@ -762,5 +834,13 @@ func NavigationColor(color color.NRGBA) Option {
 func CustomRenderer(custom bool) Option {
 	return func(_ unit.Metric, cnf *Config) {
 		cnf.CustomRenderer = custom
+	}
+}
+
+// Decorated controls whether automatic window decorations
+// are enabled.
+func Decorated(enabled bool) Option {
+	return func(_ unit.Metric, cnf *Config) {
+		cnf.Decorated = enabled
 	}
 }

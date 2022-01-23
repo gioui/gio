@@ -1166,6 +1166,9 @@ func (w *window) Configure(options []Option) {
 		prev := w.config
 		cnf := w.config
 		cnf.apply(unit.Metric{}, options)
+		// Decorations are never disabled.
+		cnf.Decorated = true
+
 		if prev.Orientation != cnf.Orientation {
 			w.config.Orientation = cnf.Orientation
 			setOrientation(env, w.view, cnf.Orientation)
@@ -1188,11 +1191,16 @@ func (w *window) Configure(options []Option) {
 				w.config.Mode = Windowed
 			}
 		}
+		if cnf.Decorated != prev.Decorated {
+			w.config.Decorated = cnf.Decorated
+		}
 		if w.config != prev {
 			w.callbacks.Event(ConfigEvent{Config: w.config})
 		}
 	})
 }
+
+func (w *window) Perform(system.Action) {}
 
 func (w *window) Raise() {}
 

@@ -513,6 +513,9 @@ func (w *window) Configure(options []Option) {
 	prev := w.config
 	cnf := w.config
 	cnf.apply(unit.Metric{}, options)
+	// Decorations are never disabled.
+	cnf.Decorated = true
+
 	if prev.Title != cnf.Title {
 		w.config.Title = cnf.Title
 		w.document.Set("title", cnf.Title)
@@ -528,10 +531,15 @@ func (w *window) Configure(options []Option) {
 		w.config.Orientation = cnf.Orientation
 		w.orientation(cnf.Orientation)
 	}
+	if cnf.Decorated != prev.Decorated {
+		w.config.Decorated = cnf.Decorated
+	}
 	if w.config != prev {
 		w.w.Event(ConfigEvent{Config: w.config})
 	}
 }
+
+func (w *window) Perform(system.Action) {}
 
 func (w *window) Raise() {}
 

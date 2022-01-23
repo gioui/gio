@@ -29,7 +29,7 @@ var wlDriver, x11Driver windowDriver
 
 func newWindow(window *callbacks, options []Option) error {
 	var errFirst error
-	for _, d := range []windowDriver{x11Driver, wlDriver} {
+	for _, d := range []windowDriver{wlDriver, x11Driver} {
 		if d == nil {
 			continue
 		}

@@ -531,6 +531,8 @@ func (w *window) Configure(options []Option) {
 	metric := configForDPI(dpi)
 	w.config.apply(metric, options)
 	windows.SetWindowText(w.hwnd, w.config.Title)
+	// Decorations are never disabled.
+	w.config.Decorated = true
 
 	switch w.config.Mode {
 	case Minimized:
@@ -690,6 +692,8 @@ func (w *window) HWND() (syscall.Handle, int, int) {
 func (w *window) Close() {
 	windows.PostMessage(w.hwnd, windows.WM_CLOSE, 0, 0)
 }
+
+func (w *window) Perform(system.Action) {}
 
 func (w *window) Raise() {
 	windows.SetForegroundWindow(w.hwnd)

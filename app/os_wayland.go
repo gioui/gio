@@ -64,6 +64,7 @@ extern const struct wl_registry_listener gio_registry_listener;
 extern const struct wl_surface_listener gio_surface_listener;
 extern const struct xdg_surface_listener gio_xdg_surface_listener;
 extern const struct xdg_toplevel_listener gio_xdg_toplevel_listener;
+extern const struct zxdg_toplevel_decoration_v1_listener gio_zxdg_toplevel_decoration_v1_listener;
 extern const struct xdg_wm_base_listener gio_xdg_wm_base_listener;
 extern const struct wl_callback_listener gio_callback_listener;
 extern const struct wl_output_listener gio_output_listener;
@@ -149,6 +150,7 @@ type repeatState struct {
 type window struct {
 	w          *callbacks
 	disp       *wlDisplay
+	seat       *wlSeat
 	surf       *C.struct_wl_surface
 	wmSurf     *C.struct_xdg_surface
 	topLvl     *C.struct_xdg_toplevel
@@ -188,9 +190,10 @@ type window struct {
 	newScale bool
 	scale    int
 	// size is the unscaled window size (unlike config.Size which is scaled).
-	size   image.Point
-	config Config
-	wsize  image.Point // window config size before going fullscreen
+	size         image.Point
+	config       Config
+	wsize        image.Point // window config size before going fullscreen or maximized
+	inCompositor bool        // window is moving or being resized
 
 	wakeups chan struct{}
 }
@@ -212,7 +215,7 @@ type wlOutput struct {
 }
 
 // callbackMap maps Wayland native handles to corresponding Go
-// references. It is necessary because the the Wayland client API
+// references. It is necessary because the Wayland client API
 // forces the use of callbacks and storing pointers to Go values
 // in C is forbidden.
 var callbackMap sync.Map
@@ -369,9 +372,8 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 	C.xdg_toplevel_add_listener(w.topLvl, &C.gio_xdg_toplevel_listener, unsafe.Pointer(w.surf))
 
 	if d.decor != nil {
-		// Request server side decorations.
 		w.decor = C.zxdg_decoration_manager_v1_get_toplevel_decoration(d.decor, w.topLvl)
-		C.zxdg_toplevel_decoration_v1_set_mode(w.decor, C.ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE)
+		C.zxdg_toplevel_decoration_v1_add_listener(w.decor, &C.gio_zxdg_toplevel_decoration_v1_listener, unsafe.Pointer(w.surf))
 	}
 	w.updateOpaqueRegion()
 	return w, nil
@@ -499,6 +501,24 @@ func gio_onToplevelConfigure(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel,
 		w.size = image.Pt(int(width), int(height))
 		w.updateOpaqueRegion()
 	}
+	w.needAck = true
+}
+
+//export gio_onToplevelDecorationConfigure
+func gio_onToplevelDecorationConfigure(data unsafe.Pointer, deco *C.struct_zxdg_toplevel_decoration_v1, mode C.uint32_t) {
+	w := callbackLoad(data).(*window)
+	decorated := w.config.Decorated
+	switch mode {
+	case C.ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE:
+		w.config.Decorated = false
+	case C.ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE:
+		w.config.Decorated = true
+	}
+	if decorated != w.config.Decorated {
+		w.w.Event(ConfigEvent{Config: w.config})
+	}
+	w.needAck = true
+	w.draw(true)
 }
 
 //export gio_onOutputMode
@@ -772,15 +792,22 @@ func gio_onPointerEnter(data unsafe.Pointer, pointer *C.struct_wl_pointer, seria
 	s := callbackLoad(data).(*wlSeat)
 	s.serial = serial
 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
+	w.seat = s
 	s.pointerFocus = w
 	w.setCursor(pointer, serial)
 	w.lastPos = f32.Point{X: fromFixed(x), Y: fromFixed(y)}
 }
 
 //export gio_onPointerLeave
-func gio_onPointerLeave(data unsafe.Pointer, p *C.struct_wl_pointer, serial C.uint32_t, surface *C.struct_wl_surface) {
+func gio_onPointerLeave(data unsafe.Pointer, p *C.struct_wl_pointer, serial C.uint32_t, surf *C.struct_wl_surface) {
+	w := callbackLoad(unsafe.Pointer(surf)).(*window)
+	w.seat = nil
 	s := callbackLoad(data).(*wlSeat)
 	s.serial = serial
+	if w.inCompositor {
+		w.inCompositor = false
+		w.w.Event(pointer.Event{Type: pointer.Cancel})
+	}
 }
 
 //export gio_onPointerMotion
@@ -818,6 +845,8 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 	case 0:
 		w.pointerBtns &^= btn
 		typ = pointer.Release
+		// Move or resize gestures no longer applies.
+		w.inCompositor = false
 	case 1:
 		w.pointerBtns |= btn
 		typ = pointer.Press
@@ -978,6 +1007,9 @@ func (w *window) Configure(options []Option) {
 			C.xdg_toplevel_set_max_size(w.topLvl, C.int32_t(cnf.MaxSize.X), C.int32_t(cnf.MaxSize.Y))
 		}
 	}
+	if cnf.Decorated != prev.Decorated {
+		w.config.Decorated = cnf.Decorated
+	}
 	if w.config != prev {
 		w.w.Event(ConfigEvent{Config: w.config})
 	}
@@ -990,6 +1022,63 @@ func (w *window) setTitle(prev, cnf Config) {
 		C.xdg_toplevel_set_title(w.topLvl, title)
 		C.free(unsafe.Pointer(title))
 	}
+}
+
+func (w *window) Perform(actions system.Action) {
+	walkActions(actions, func(action system.Action) {
+		switch action {
+		case system.ActionMinimize:
+			w.Configure([]Option{Minimized.Option()})
+		case system.ActionMaximize:
+			w.Configure([]Option{Maximized.Option()})
+		case system.ActionUnmaximize:
+			w.Configure([]Option{Windowed.Option()})
+		case system.ActionClose:
+			w.Close()
+		case system.ActionMove:
+			w.move()
+		default:
+			w.resize(action)
+		}
+	})
+}
+
+func (w *window) move() {
+	if !w.inCompositor && w.seat != nil {
+		w.inCompositor = true
+		s := w.seat
+		C.xdg_toplevel_move(w.topLvl, s.seat, s.serial)
+	}
+}
+
+func (w *window) resize(a system.Action) {
+	if w.inCompositor || w.seat == nil {
+		return
+	}
+	var edge int
+	switch a {
+	case system.ActionResizeNorth:
+		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_TOP
+	case system.ActionResizeSouth:
+		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM
+	case system.ActionResizeEast:
+		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_LEFT
+	case system.ActionResizeWest:
+		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_RIGHT
+	case system.ActionResizeNorthWest:
+		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_TOP_LEFT
+	case system.ActionResizeNorthEast:
+		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_LEFT
+	case system.ActionResizeSouthEast:
+		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_RIGHT
+	case system.ActionResizeSouthWest:
+		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_TOP_RIGHT
+	default:
+		return
+	}
+	w.inCompositor = true
+	s := w.seat
+	C.xdg_toplevel_resize(w.topLvl, s.seat, s.serial, C.uint32_t(edge))
 }
 
 func (w *window) Raise() {
