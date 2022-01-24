@@ -51,7 +51,7 @@ func (h *Hover) Hovered(q event.Queue) bool {
 			continue
 		}
 		switch e.Type {
-		case pointer.Leave:
+		case pointer.Leave, pointer.Cancel:
 			if h.entered && h.pid == e.PointerID {
 				h.entered = false
 			}
