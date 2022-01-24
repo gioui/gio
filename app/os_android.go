@@ -587,9 +587,9 @@ func Java_org_gioui_GioView_onWindowInsets(env *C.JNIEnv, class C.jclass, view C
 	w := views[view]
 	w.insets = system.Insets{
 		Top:    unit.Px(float32(top)),
-		Right:  unit.Px(float32(right)),
 		Bottom: unit.Px(float32(bottom)),
 		Left:   unit.Px(float32(left)),
+		Right:  unit.Px(float32(right)),
 	}
 	if w.stage >= system.StageRunning {
 		w.draw(env, true)

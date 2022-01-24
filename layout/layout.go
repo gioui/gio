@@ -113,7 +113,7 @@ func (c Constraints) Constrain(size image.Point) image.Point {
 // constraints. The minimum constraints will be adjusted to ensure
 // they do not exceed the maximum.
 type Inset struct {
-	Top, Right, Bottom, Left unit.Value
+	Top, Bottom, Left, Right unit.Value
 }
 
 // Layout a widget.

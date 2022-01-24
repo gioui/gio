@@ -609,7 +609,8 @@ func (w *window) draw(sync bool) {
 }
 
 func (w *window) getConfig() (image.Point, system.Insets, unit.Metric) {
-	return image.Pt(w.config.Size.X, w.config.Size.Y), system.Insets{
+	return image.Pt(w.config.Size.X, w.config.Size.Y),
+		system.Insets{
 			Bottom: unit.Px(w.inset.Y),
 			Right:  unit.Px(w.inset.X),
 		}, unit.Metric{

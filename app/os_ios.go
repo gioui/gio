@@ -157,9 +157,9 @@ func (w *window) draw(sync bool) {
 			},
 			Insets: system.Insets{
 				Top:    unit.Px(float32(params.top)),
-				Right:  unit.Px(float32(params.right)),
 				Bottom: unit.Px(float32(params.bottom)),
 				Left:   unit.Px(float32(params.left)),
+				Right:  unit.Px(float32(params.right)),
 			},
 			Metric: unit.Metric{
 				PxPerDp: float32(params.dpi) * inchPrDp,
