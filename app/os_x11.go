@@ -118,9 +118,13 @@ var (
 	newX11VulkanContext func(w *x11Window) (context, error)
 )
 
+// X11 and Vulkan doesn't work reliably on NVIDIA systems.
+// See https://gioui.org/issue/347.
+const vulkanBuggy = true
+
 func (w *x11Window) NewContext() (context, error) {
 	var firstErr error
-	if f := newX11VulkanContext; f != nil {
+	if f := newX11VulkanContext; f != nil && !vulkanBuggy {
 		c, err := f(w)
 		if err == nil {
 			return c, nil
