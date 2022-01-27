@@ -398,19 +398,23 @@ func (c *callbacks) Event(e event.Event) {
 	if c.d == nil {
 		panic("event while no driver active")
 	}
+	c.waitEvents = append(c.waitEvents, e)
 	if c.busy {
-		c.waitEvents = append(c.waitEvents, e)
 		return
 	}
 	c.busy = true
 	defer func() {
 		c.busy = false
 	}()
-	c.w.processEvent(c.d, e)
 	for _, e := range c.waitEvents {
 		c.w.processEvent(c.d, e)
 	}
 	c.waitEvents = c.waitEvents[:0]
+	select {
+	case f := <-c.w.driverFuncs:
+		c.w.defers = append(c.w.defers, f)
+	default:
+	}
 	for _, f := range c.w.defers {
 		f(c.d)
 	}
