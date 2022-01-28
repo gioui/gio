@@ -258,9 +258,6 @@ func (w *window) Configure(options []Option) {
 	w.updateWindowMode()
 	cnf := w.config
 	cnf.apply(cfg, options)
-	cnf.Size = cnf.Size.Div(int(screenScale))
-	cnf.MinSize = cnf.MinSize.Div(int(screenScale))
-	cnf.MaxSize = cnf.MaxSize.Div(int(screenScale))
 	// Decorations are never disabled.
 	cnf.Decorated = true
 
@@ -309,14 +306,17 @@ func (w *window) Configure(options []Option) {
 		w.setTitle(prev, cnf)
 		if prev.Size != cnf.Size {
 			w.config.Size = cnf.Size
+			cnf.Size = cnf.Size.Div(int(screenScale))
 			C.setSize(w.window, C.CGFloat(cnf.Size.X), C.CGFloat(cnf.Size.Y))
 		}
 		if prev.MinSize != cnf.MinSize {
 			w.config.MinSize = cnf.MinSize
+			cnf.MinSize = cnf.MinSize.Div(int(screenScale))
 			C.setMinSize(w.window, C.CGFloat(cnf.MinSize.X), C.CGFloat(cnf.MinSize.Y))
 		}
 		if prev.MaxSize != cnf.MaxSize {
 			w.config.MaxSize = cnf.MaxSize
+			cnf.MaxSize = cnf.MaxSize.Div(int(screenScale))
 			C.setMaxSize(w.window, C.CGFloat(cnf.MaxSize.X), C.CGFloat(cnf.MaxSize.Y))
 		}
 		if cnf.center {
