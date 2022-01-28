@@ -19,6 +19,7 @@ import (
 
 // DecorationsStyle provides the style elements for Decorations.
 type DecorationsStyle struct {
+	Decorations
 	Actions    system.Action
 	Title      LabelStyle
 	Background color.NRGBA
@@ -39,7 +40,6 @@ func Decorate(th *Theme, actions system.Action) DecorationsStyle {
 
 // Decorations provides window decorations.
 type Decorations struct {
-	DecorationsStyle
 	actions struct {
 		layout.List
 		clicks []widget.Clickable
@@ -54,22 +54,23 @@ type Decorations struct {
 	maximized bool
 }
 
-// Decorate a window with the title and actions defined in DecorationsStyle.
-// The space used by the decorations is returned as an inset for the window
-// content.
-func (d *Decorations) Decorate(gtx layout.Context, title string) layout.Dimensions {
+// Layout a window with the title and actions defined in DecorationsStyle.
+func (d *DecorationsStyle) Layout(gtx layout.Context, title string) layout.Dimensions {
 	rec := op.Record(gtx.Ops)
-	dims := d.layoutDecorations(gtx, title)
+	label := d.Title
+	label.Text = title
+	paint.ColorOp{Color: d.Foreground}.Add(gtx.Ops)
+	dims := d.Decorations.layoutDecorations(gtx, d.Actions, label.Layout)
 	decos := rec.Stop()
 	r := clip.Rect{Max: dims.Size}
-	paint.FillShape(gtx.Ops, d.DecorationsStyle.Background, r.Op())
+	paint.FillShape(gtx.Ops, d.Background, r.Op())
 	decos.Add(gtx.Ops)
-	d.layoutResizing(gtx)
+	d.Decorations.layoutResizing(gtx, d.Actions)
 	return dims
 }
 
-func (d *Decorations) layoutResizing(gtx layout.Context) {
-	cs := gtx.Constraints.Min
+func (d *Decorations) layoutResizing(gtx layout.Context, actions system.Action) {
+	cs := gtx.Constraints.Max
 	wh := gtx.Px(unit.Dp(10))
 	s := []struct {
 		system.Action
@@ -80,13 +81,13 @@ func (d *Decorations) layoutResizing(gtx layout.Context) {
 		{system.ActionResizeWest, image.Rect(cs.X-wh, 0, cs.X, cs.Y)},
 		{system.ActionResizeEast, image.Rect(0, 0, wh, cs.Y)},
 		{system.ActionResizeNorthWest, image.Rect(0, 0, wh, wh)},
-		{system.ActionResizeSouthWest, image.Rect(cs.X-wh, 0, cs.X, wh)},
-		{system.ActionResizeNorthEast, image.Rect(0, cs.Y-wh, wh, cs.Y)},
+		{system.ActionResizeNorthEast, image.Rect(cs.X-wh, 0, cs.X, wh)},
+		{system.ActionResizeSouthWest, image.Rect(0, cs.Y-wh, wh, cs.Y)},
 		{system.ActionResizeSouthEast, image.Rect(cs.X-wh, cs.Y-wh, cs.X, cs.Y)},
 	}
 	for i, data := range s {
 		action := data.Action
-		if d.DecorationsStyle.Actions&action == 0 {
+		if actions&action == 0 {
 			continue
 		}
 		rsz := &d.actions.resize[i]
@@ -106,7 +107,7 @@ func (d *Decorations) layoutResizing(gtx layout.Context) {
 	}
 }
 
-func (d *Decorations) layoutDecorations(gtx layout.Context, title string) layout.Dimensions {
+func (d *Decorations) layoutDecorations(gtx layout.Context, actions system.Action, title layout.Widget) layout.Dimensions {
 	gtx.Constraints.Min.Y = 0
 	inset := layout.UniformInset(unit.Dp(10))
 	return layout.Flex{
@@ -115,9 +116,8 @@ func (d *Decorations) layoutDecorations(gtx layout.Context, title string) layout
 		Spacing:   layout.SpaceBetween,
 	}.Layout(gtx,
 		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-			d.DecorationsStyle.Title.Text = title
-			dims := inset.Layout(gtx, d.DecorationsStyle.Title.Layout)
-			if d.DecorationsStyle.Actions&system.ActionMove != 0 {
+			dims := inset.Layout(gtx, title)
+			if actions&system.ActionMove != 0 {
 				d.actions.move.Events(gtx.Metric, gtx, gesture.Both)
 
 				st := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
@@ -131,27 +131,16 @@ func (d *Decorations) layoutDecorations(gtx layout.Context, title string) layout
 		}),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			// Remove the unmaximize action as it is taken care of by maximize.
-			actions := d.DecorationsStyle.Actions &^ system.ActionUnmaximize
+			actions := actions &^ system.ActionUnmaximize
 			an := bits.OnesCount(uint(actions))
 			if n := len(d.actions.clicks); n < an {
 				d.actions.clicks = append(d.actions.clicks, make([]widget.Clickable, an-n)...)
 			}
+			action := system.Action(1)
 			return d.actions.Layout(gtx, an, func(gtx layout.Context, idx int) layout.Dimensions {
-				action := system.Action(1 << idx)
-				var w layout.Widget
-				switch actions & action {
-				case system.ActionMinimize:
-					w = d.minimizeWindow
-				case system.ActionMaximize:
-					if d.maximized {
-						w = d.maximizedWindow
-					} else {
-						w = d.maximizeWindow
-					}
-				case system.ActionClose:
-					w = d.closeWindow
-				default:
-					return layout.Dimensions{}
+				defer func() { action <<= 1 }()
+				for actions&action == 0 {
+					action <<= 1
 				}
 				click := &d.actions.clicks[idx]
 				if click.Clicked() {
@@ -168,6 +157,21 @@ func (d *Decorations) layoutDecorations(gtx layout.Context, title string) layout
 					}
 				}
 				return Clickable(gtx, click, func(gtx layout.Context) layout.Dimensions {
+					var w layout.Widget
+					switch actions & action {
+					case system.ActionMinimize:
+						w = minimizeWindow
+					case system.ActionMaximize:
+						if d.maximized {
+							w = maximizedWindow
+						} else {
+							w = maximizeWindow
+						}
+					case system.ActionClose:
+						w = closeWindow
+					default:
+						return layout.Dimensions{}
+					}
 					return inset.Layout(gtx, w)
 				})
 			})
@@ -200,13 +204,12 @@ var (
 )
 
 // minimizeWindows draws a line icon representing the minimize action.
-func (d *Decorations) minimizeWindow(gtx layout.Context) layout.Dimensions {
-	paint.ColorOp{Color: d.DecorationsStyle.Foreground}.Add(gtx.Ops)
+func minimizeWindow(gtx layout.Context) layout.Dimensions {
 	size := gtx.Px(winIconSize)
 	size32 := float32(size)
 	margin := float32(gtx.Px(winIconMargin))
 	width := float32(gtx.Px(winIconStroke))
-	p := &d.path
+	var p clip.Path
 	p.Begin(gtx.Ops)
 	p.MoveTo(f32.Point{X: margin, Y: size32 - margin})
 	p.LineTo(f32.Point{X: size32 - 2*margin, Y: size32 - margin})
@@ -220,8 +223,7 @@ func (d *Decorations) minimizeWindow(gtx layout.Context) layout.Dimensions {
 }
 
 // maximizeWindow draws a rectangle representing the maximize action.
-func (d *Decorations) maximizeWindow(gtx layout.Context) layout.Dimensions {
-	paint.ColorOp{Color: d.DecorationsStyle.Foreground}.Add(gtx.Ops)
+func maximizeWindow(gtx layout.Context) layout.Dimensions {
 	size := gtx.Px(winIconSize)
 	size32 := float32(size)
 	margin := float32(gtx.Px(winIconMargin))
@@ -245,8 +247,7 @@ func (d *Decorations) maximizeWindow(gtx layout.Context) layout.Dimensions {
 }
 
 // maximizedWindow draws interleaved rectangles representing the un-maximize action.
-func (d *Decorations) maximizedWindow(gtx layout.Context) layout.Dimensions {
-	paint.ColorOp{Color: d.DecorationsStyle.Foreground}.Add(gtx.Ops)
+func maximizedWindow(gtx layout.Context) layout.Dimensions {
 	size := gtx.Px(winIconSize)
 	size32 := float32(size)
 	margin := float32(gtx.Px(winIconMargin))
@@ -273,13 +274,12 @@ func (d *Decorations) maximizedWindow(gtx layout.Context) layout.Dimensions {
 }
 
 // closeWindow draws a cross representing the close action.
-func (d *Decorations) closeWindow(gtx layout.Context) layout.Dimensions {
-	paint.ColorOp{Color: d.DecorationsStyle.Foreground}.Add(gtx.Ops)
+func closeWindow(gtx layout.Context) layout.Dimensions {
 	size := gtx.Px(winIconSize)
 	size32 := float32(size)
 	margin := float32(gtx.Px(winIconMargin))
 	width := float32(gtx.Px(winIconStroke))
-	p := &d.path
+	var p clip.Path
 	p.Begin(gtx.Ops)
 	p.MoveTo(f32.Point{X: margin, Y: margin})
 	p.LineTo(f32.Point{X: size32 - margin, Y: size32 - margin})

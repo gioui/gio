@@ -68,7 +68,7 @@ type Window struct {
 	decorations struct {
 		op.Ops
 		Config
-		*material.Decorations
+		*material.DecorationsStyle
 	}
 
 	callbacks callbacks
@@ -688,7 +688,7 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 	if w.decorations.Config.Decorated || w.decorations.Config.Mode == Fullscreen {
 		return e.Size
 	}
-	deco := w.decorations.Decorations
+	deco := w.decorations.DecorationsStyle
 	if deco == nil {
 		theme := material.NewTheme(gofont.Collection())
 		allActions := system.ActionMinimize | system.ActionMaximize | system.ActionUnmaximize |
@@ -697,10 +697,9 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 			system.ActionResizeWest | system.ActionResizeEast |
 			system.ActionResizeNorthWest | system.ActionResizeSouthWest |
 			system.ActionResizeNorthEast | system.ActionResizeSouthEast
-		deco = &material.Decorations{
-			DecorationsStyle: material.Decorate(theme, allActions),
-		}
-		w.decorations.Decorations = deco
+		style := material.Decorate(theme, allActions)
+		deco = &style
+		w.decorations.DecorationsStyle = &style
 	}
 	// Update the decorations based on the current window mode.
 	var actions system.Action
@@ -716,9 +715,9 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 	default:
 		panic(fmt.Errorf("unknown WindowMode %v", m))
 	}
-	deco.Perform(actions)
+	deco.Decorations.Perform(actions)
 	// Update the window based on the actions on the decorations.
-	d.Perform(deco.Actions())
+	d.Perform(deco.Decorations.Actions())
 
 	gtx := layout.Context{
 		Ops:         o,
@@ -728,7 +727,7 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 		Constraints: layout.Exact(e.Size),
 	}
 	rec := op.Record(o)
-	dims := deco.Decorate(gtx, w.decorations.Config.Title)
+	dims := deco.Layout(gtx, w.decorations.Config.Title)
 	op.Defer(o, rec.Stop())
 	// Offset to place the frame content below the decorations.
 	size := image.Point{Y: dims.Size.Y}
@@ -837,8 +836,9 @@ func CustomRenderer(custom bool) Option {
 	}
 }
 
-// Decorated controls whether automatic window decorations
-// are enabled.
+// Decorated controls whether Gio and/or the platform are responsible
+// for drawing window decorations. Providing false indicates that
+// the application will either be undecorated or will draw its own decorations.
 func Decorated(enabled bool) Option {
 	return func(_ unit.Metric, cnf *Config) {
 		cnf.Decorated = enabled

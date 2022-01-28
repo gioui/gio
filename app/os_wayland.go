@@ -1068,11 +1068,11 @@ func (w *window) resize(a system.Action) {
 	case system.ActionResizeNorthWest:
 		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_TOP_LEFT
 	case system.ActionResizeNorthEast:
-		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_LEFT
+		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_TOP_RIGHT
 	case system.ActionResizeSouthEast:
 		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_RIGHT
 	case system.ActionResizeSouthWest:
-		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_TOP_RIGHT
+		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_LEFT
 	default:
 		return
 	}
@@ -1115,9 +1115,9 @@ func (w *window) SetCursor(name pointer.CursorName) {
 	case pointer.CursorTopLeftResize:
 		name = "top_left_corner"
 	case pointer.CursorTopRightResize:
-		name = "bottom_left_corner"
-	case pointer.CursorBottomLeftResize:
 		name = "top_right_corner"
+	case pointer.CursorBottomLeftResize:
+		name = "bottom_left_corner"
 	case pointer.CursorBottomRightResize:
 		name = "bottom_right_corner"
 	case pointer.CursorLeftResize:
