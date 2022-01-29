@@ -50,7 +50,6 @@ type Window struct {
 	// scheduledRedraws is sent the most recent delayed redraw time.
 	scheduledRedraws chan time.Time
 
-	defers   []func(d driver)
 	out      chan event.Event
 	frames   chan *op.Ops
 	frameAck chan struct{}
@@ -420,15 +419,6 @@ func (c *callbacks) Event(e event.Event) {
 		c.w.processEvent(c.d, e)
 	}
 	c.waitEvents = c.waitEvents[:0]
-	select {
-	case f := <-c.w.driverFuncs:
-		c.w.defers = append(c.w.defers, f)
-	default:
-	}
-	for _, f := range c.w.defers {
-		f(c.d)
-	}
-	c.w.defers = c.w.defers[:0]
 	c.w.updateState(c.d)
 	if c.w.closing {
 		c.w.closing = false
@@ -462,11 +452,11 @@ func (c *callbacks) SemanticAt(pos f32.Point) (router.SemanticID, bool) {
 	return c.w.queue.q.SemanticAt(pos)
 }
 
-func (w *Window) waitAck() {
+func (w *Window) waitAck(d driver) {
 	for {
 		select {
 		case f := <-w.driverFuncs:
-			w.defers = append(w.defers, f)
+			f(d)
 		case w.out <- ackEvent:
 			// A dummy event went through, so we know the application has processed the previous event.
 			return
@@ -493,11 +483,11 @@ func (w *Window) destroyGPU() {
 // waitFrame waits for the client to either call FrameEvent.Frame
 // or to continue event handling. It returns whether the client
 // called Frame or not.
-func (w *Window) waitFrame() (*op.Ops, bool) {
+func (w *Window) waitFrame(d driver) (*op.Ops, bool) {
 	for {
 		select {
 		case f := <-w.driverFuncs:
-			w.defers = append(w.defers, f)
+			f(d)
 		case frame := <-w.frames:
 			// The client called FrameEvent.Frame.
 			return frame, true
@@ -551,6 +541,8 @@ func (w *Window) collectSemanticDiffs(diffs *[]router.SemanticID, n router.Seman
 func (w *Window) updateState(d driver) {
 	for {
 		select {
+		case f := <-w.driverFuncs:
+			f(d)
 		case <-w.redraws:
 			w.setNextFrame(time.Time{})
 			w.updateAnimation(d)
@@ -579,7 +571,7 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		w.stage = e2.Stage
 		w.updateAnimation(d)
 		w.out <- e
-		w.waitAck()
+		w.waitAck(d)
 	case frameEvent:
 		if e2.Size == (image.Point{}) {
 			panic(errors.New("internal error: zero-sized Draw"))
@@ -599,7 +591,7 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		size := e2.Size // save the initial window size as the decorations will change it.
 		e2.FrameEvent.Size = w.decorate(d, e2.FrameEvent, wrapper)
 		w.out <- e2.FrameEvent
-		frame, gotFrame := w.waitFrame()
+		frame, gotFrame := w.waitFrame(d)
 		ops.AddCall(&wrapper.Internal, &frame.Internal, ops.PC{}, ops.PCFor(&frame.Internal))
 		err := w.validateAndProcess(d, size, e2.Sync, wrapper)
 		if gotFrame {
@@ -617,7 +609,7 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		w.updateCursor(d)
 	case *system.CommandEvent:
 		w.out <- e
-		w.waitAck()
+		w.waitAck(d)
 	case system.DestroyEvent:
 		w.destroyGPU()
 		w.out <- e2
@@ -625,7 +617,7 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		close(w.out)
 	case ViewEvent:
 		w.out <- e2
-		w.waitAck()
+		w.waitAck(d)
 	case wakeupEvent:
 	case ConfigEvent:
 		w.decorations.Config = e2.Config
