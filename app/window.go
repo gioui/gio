@@ -54,6 +54,7 @@ type Window struct {
 	out      chan event.Event
 	frames   chan *op.Ops
 	frameAck chan struct{}
+	closing  bool
 	// dead is closed when the window is destroyed.
 	dead chan struct{}
 
@@ -326,7 +327,7 @@ func (w *Window) SetCursorName(name pointer.CursorName) {
 // all others are stubbed.
 func (w *Window) Close() {
 	w.driverDefer(func(d driver) {
-		d.Close()
+		w.closing = true
 	})
 }
 
@@ -429,6 +430,10 @@ func (c *callbacks) Event(e event.Event) {
 	}
 	c.w.defers = c.w.defers[:0]
 	c.w.updateState(c.d)
+	if c.w.closing {
+		c.w.closing = false
+		c.d.Close()
+	}
 }
 
 // SemanticRoot returns the ID of the semantic root.
