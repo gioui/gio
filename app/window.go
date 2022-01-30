@@ -827,6 +827,10 @@ func NavigationColor(color color.NRGBA) Option {
 
 // CustomRenderer controls whether the window contents is
 // rendered by the client. If true, no GPU context is created.
+//
+// Caller must assume responsibility for rendering which includes
+// initializing the render backend, swapping the framebuffer and
+// handling frame pacing.
 func CustomRenderer(custom bool) Option {
 	return func(_ unit.Metric, cnf *Config) {
 		cnf.CustomRenderer = custom
