@@ -22,6 +22,7 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/unit"
+	"gioui.org/widget"
 	"gioui.org/widget/material"
 
 	_ "gioui.org/app/internal/log"
@@ -68,7 +69,9 @@ type Window struct {
 	decorations struct {
 		op.Ops
 		Config
-		*material.DecorationsStyle
+		*material.Theme
+		*widget.Decorations
+		size image.Point // decorations size
 	}
 
 	callbacks callbacks
@@ -620,8 +623,14 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		w.waitAck(d)
 	case wakeupEvent:
 	case ConfigEvent:
+		if w.decorations.Config.Decorated != e2.Config.Decorated && e2.Config.Decorated {
+			// Decorations are no longer applied.
+			w.decorations.Decorations = nil
+			w.decorations.size = image.Point{}
+		}
 		w.decorations.Config = e2.Config
-		w.out <- e
+		e2.Config.Size = e2.Config.Size.Sub(w.decorations.size)
+		w.out <- e2
 	case event.Event:
 		if w.queue.q.Queue(e2) {
 			w.setNextFrame(time.Time{})
@@ -685,19 +694,23 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 	if w.decorations.Config.Decorated || w.decorations.Config.Mode == Fullscreen {
 		return e.Size
 	}
-	deco := w.decorations.DecorationsStyle
-	if deco == nil {
-		theme := material.NewTheme(gofont.Collection())
-		allActions := system.ActionMinimize | system.ActionMaximize | system.ActionUnmaximize |
-			system.ActionClose | system.ActionMove |
-			system.ActionResizeNorth | system.ActionResizeSouth |
-			system.ActionResizeWest | system.ActionResizeEast |
-			system.ActionResizeNorthWest | system.ActionResizeSouthWest |
-			system.ActionResizeNorthEast | system.ActionResizeSouthEast
-		style := material.Decorate(theme, allActions)
-		deco = &style
-		w.decorations.DecorationsStyle = &style
+	theme := w.decorations.Theme
+	if theme == nil {
+		theme = material.NewTheme(gofont.Collection())
+		w.decorations.Theme = theme
 	}
+	deco := w.decorations.Decorations
+	if deco == nil {
+		deco = new(widget.Decorations)
+		w.decorations.Decorations = deco
+	}
+	allActions := system.ActionMinimize | system.ActionMaximize | system.ActionUnmaximize |
+		system.ActionClose | system.ActionMove |
+		system.ActionResizeNorth | system.ActionResizeSouth |
+		system.ActionResizeWest | system.ActionResizeEast |
+		system.ActionResizeNorthWest | system.ActionResizeSouthWest |
+		system.ActionResizeNorthEast | system.ActionResizeSouthEast
+	style := material.Decorations(theme, deco, allActions, w.decorations.Config.Title)
 	// Update the decorations based on the current window mode.
 	var actions system.Action
 	switch m := w.decorations.Config.Mode; m {
@@ -712,10 +725,7 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 	default:
 		panic(fmt.Errorf("unknown WindowMode %v", m))
 	}
-	deco.Decorations.Perform(actions)
-	// Update the window based on the actions on the decorations.
-	d.Perform(deco.Decorations.Actions())
-
+	deco.Perform(actions)
 	gtx := layout.Context{
 		Ops:         o,
 		Now:         e.Now,
@@ -724,12 +734,21 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 		Constraints: layout.Exact(e.Size),
 	}
 	rec := op.Record(o)
-	dims := deco.Layout(gtx, w.decorations.Config.Title)
+	dims := style.Layout(gtx)
 	op.Defer(o, rec.Stop())
+	// Update the window based on the actions on the decorations.
+	d.Perform(deco.Actions())
 	// Offset to place the frame content below the decorations.
 	size := image.Point{Y: dims.Size.Y}
 	op.Offset(f32.Point{Y: float32(size.Y)}).Add(o)
-	return e.Size.Sub(size)
+	appSize := e.Size.Sub(size)
+	if w.decorations.size != size {
+		w.decorations.size = size
+		cnf := w.decorations.Config
+		cnf.Size = appSize
+		w.out <- ConfigEvent{Config: cnf}
+	}
+	return appSize
 }
 
 // Raise requests that the platform bring this window to the top of all open windows.
