@@ -591,7 +591,11 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, pe
 }
 
 func determineJDKVersion() (int, int, bool) {
-	java := exec.Command("java", "-version")
+	path, err := findJavaC()
+	if err != nil {
+		return 0, 0, false
+	}
+	java := exec.Command(filepath.Join(filepath.Dir(path), "java"), "-version")
 	out, err := java.CombinedOutput()
 	if err != nil {
 		return 0, 0, false
@@ -761,35 +765,27 @@ func findNDK(androidHome string) (string, error) {
 }
 
 func findKeytool() (string, error) {
-	keytool, err := exec.LookPath("keytool")
-	if err == nil {
-		return keytool, err
-	}
 	javaHome := os.Getenv("JAVA_HOME")
 	if javaHome == "" {
+		return exec.LookPath("keytool")
+	}
+	keytool := filepath.Join(javaHome, "jre", "bin", "keytool"+exeSuffix)
+	if _, err := os.Stat(keytool); err != nil {
 		return "", err
 	}
-	keytool = filepath.Join(javaHome, "jre", "bin", "keytool"+exeSuffix)
-	if _, serr := os.Stat(keytool); serr == nil {
-		return keytool, nil
-	}
-	return "", err
+	return keytool, nil
 }
 
 func findJavaC() (string, error) {
-	javac, err := exec.LookPath("javac")
-	if err == nil {
-		return javac, err
-	}
 	javaHome := os.Getenv("JAVA_HOME")
 	if javaHome == "" {
+		return exec.LookPath("javac")
+	}
+	javac := filepath.Join(javaHome, "bin", "javac"+exeSuffix)
+	if _, err := os.Stat(javac); err != nil {
 		return "", err
 	}
-	javac = filepath.Join(javaHome, "bin", "javac"+exeSuffix)
-	if _, serr := os.Stat(javac); serr == nil {
-		return javac, nil
-	}
-	return "", err
+	return javac, nil
 }
 
 func writeJar(jarFile, dir string) (err error) {
