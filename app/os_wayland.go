@@ -186,9 +186,8 @@ type window struct {
 	animating bool
 	redraw    bool
 	// The most recent configure serial waiting to be ack'ed.
-	serial   C.uint32_t
-	newScale bool
-	scale    int
+	serial C.uint32_t
+	scale  int
 	// size is the unscaled window size (unlike config.Size which is scaled).
 	size         image.Point
 	config       Config
@@ -326,18 +325,18 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 	ppdp := detectUIScale()
 
 	w := &window{
-		disp:     d,
-		scale:    scale,
-		newScale: scale != 1,
-		ppdp:     ppdp,
-		ppsp:     ppdp,
-		wakeups:  make(chan struct{}, 1),
+		disp:    d,
+		scale:   scale,
+		ppdp:    ppdp,
+		ppsp:    ppdp,
+		wakeups: make(chan struct{}, 1),
 	}
 	w.surf = C.wl_compositor_create_surface(d.compositor)
 	if w.surf == nil {
 		w.destroy()
 		return nil, errors.New("wayland: wl_compositor_create_surface failed")
 	}
+	C.wl_surface_set_buffer_scale(w.surf, C.int32_t(w.scale))
 	callbackStore(unsafe.Pointer(w.surf), w)
 	w.wmSurf = C.xdg_wm_base_get_xdg_surface(d.wm, w.surf)
 	if w.wmSurf == nil {
@@ -1567,7 +1566,7 @@ func (w *window) updateOutputs() {
 	}
 	if found && scale != w.scale {
 		w.scale = scale
-		w.newScale = true
+		C.wl_surface_set_buffer_scale(w.surf, C.int32_t(w.scale))
 	}
 	if !found {
 		w.setStage(system.StagePaused)
@@ -1631,10 +1630,6 @@ func (w *window) display() *C.struct_wl_display {
 }
 
 func (w *window) surface() (*C.struct_wl_surface, int, int) {
-	if w.newScale {
-		C.wl_surface_set_buffer_scale(w.surf, C.int32_t(w.scale))
-		w.newScale = false
-	}
 	sz, _ := w.getConfig()
 	return w.surf, sz.X, sz.Y
 }
