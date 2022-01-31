@@ -248,12 +248,19 @@ func newWLWindow(callbacks *callbacks, options []Option) error {
 		defer w.destroy()
 
 		w.w.SetDriver(w)
+
 		// Finish and commit setup from createNativeWindow.
 		w.Configure(options)
 		C.wl_surface_commit(w.surf)
-		if err := w.loop(); err != nil {
-			panic(err)
-		}
+
+		w.w.Event(WaylandViewEvent{
+			Display: unsafe.Pointer(w.display()),
+			Surface: unsafe.Pointer(w.surf),
+		})
+		defer w.w.Event(WaylandViewEvent{})
+
+		err := w.loop()
+		w.w.Event(system.DestroyEvent{Err: err})
 	}()
 	return nil
 }
@@ -1308,7 +1315,6 @@ func (w *window) loop() error {
 		default:
 		}
 		if w.dead {
-			w.w.Event(system.DestroyEvent{})
 			break
 		}
 		w.draw()
