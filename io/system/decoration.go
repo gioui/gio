@@ -18,7 +18,16 @@ const (
 	ActionUnmaximize
 	// ActionFullscreen makes a window fullscreen.
 	ActionFullscreen
+	// ActionRaise requests that the platform bring this window to the top of all open windows.
+	// Some platforms do not allow this except under certain circumstances, such as when
+	// a window from the same application already has focus. If the platform does not
+	// support it, this method will do nothing.
+	ActionRaise
+	// ActionCenter centers the window on the screen.
+	// It is ignored in Fullscreen mode and on Wayland.
+	ActionCenter
 	// ActionClose closes a window.
+	// Only applicable on macOS, Windows, X11 and Wayland.
 	ActionClose
 	// ActionMove moves a window directed by the user.
 	ActionMove

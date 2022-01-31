@@ -322,17 +322,6 @@ func (w *Window) SetCursorName(name pointer.CursorName) {
 	})
 }
 
-// Close the window. The window's event loop should exit when it receives
-// system.DestroyEvent.
-//
-// Currently, only macOS, Windows, X11 and Wayland drivers implement this functionality,
-// all others are stubbed.
-func (w *Window) Close() {
-	w.driverDefer(func(d driver) {
-		w.closing = true
-	})
-}
-
 // Run f in the same thread as the native window event loop, and wait for f to
 // return or the window to close. Run is guaranteed not to deadlock if it is
 // invoked during the handling of a ViewEvent, system.FrameEvent,
@@ -737,7 +726,7 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 	dims := style.Layout(gtx)
 	op.Defer(o, rec.Stop())
 	// Update the window based on the actions on the decorations.
-	d.Perform(deco.Actions())
+	w.Perform(deco.Actions())
 	// Offset to place the frame content below the decorations.
 	size := image.Point{Y: dims.Size.Y}
 	op.Offset(f32.Point{Y: float32(size.Y)}).Add(o)
@@ -751,13 +740,37 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 	return appSize
 }
 
-// Raise requests that the platform bring this window to the top of all open windows.
-// Some platforms do not allow this except under certain circumstances, such as when
-// a window from the same application already has focus. If the platform does not
-// support it, this method will do nothing.
-func (w *Window) Raise() {
+// Perform the actions on the window.
+func (w *Window) Perform(actions system.Action) {
 	w.driverDefer(func(d driver) {
-		d.Raise()
+		var options []Option
+		walkActions(actions, func(action system.Action) {
+			switch action {
+			case system.ActionMinimize:
+				options = append(options, Minimized.Option())
+			case system.ActionMaximize:
+				options = append(options, Maximized.Option())
+			case system.ActionUnmaximize:
+				options = append(options, Windowed.Option())
+			case system.ActionRaise:
+				d.Raise()
+			case system.ActionCenter:
+				options = append(options,
+					func(m unit.Metric, cnf *Config) {
+						// Set the flag so the driver can later do the actual centering.
+						cnf.center = true
+					})
+			case system.ActionClose:
+				w.closing = true
+			default:
+				return
+			}
+			actions &^= action
+		})
+		if len(options) > 0 {
+			d.Configure(options)
+		}
+		d.Perform(actions)
 	})
 }
 
@@ -786,15 +799,6 @@ func Size(w, h unit.Value) Option {
 			X: m.Px(w),
 			Y: m.Px(h),
 		}
-	}
-}
-
-// Centered is an option to center the window on the screen.
-// The option is ignored in Fullscreen mode and on Wayland.
-func Centered() Option {
-	return func(m unit.Metric, cnf *Config) {
-		// Set the flag so the driver can later do the actual centering.
-		cnf.center = true
 	}
 }
 

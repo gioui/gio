@@ -1024,14 +1024,6 @@ func (w *window) setTitle(prev, cnf Config) {
 func (w *window) Perform(actions system.Action) {
 	walkActions(actions, func(action system.Action) {
 		switch action {
-		case system.ActionMinimize:
-			w.Configure([]Option{Minimized.Option()})
-		case system.ActionMaximize:
-			w.Configure([]Option{Maximized.Option()})
-		case system.ActionUnmaximize:
-			w.Configure([]Option{Windowed.Option()})
-		case system.ActionClose:
-			w.Close()
 		case system.ActionMove:
 			w.move()
 		default:
