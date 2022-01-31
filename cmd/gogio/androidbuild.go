@@ -353,11 +353,22 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, pe
 	if err := os.MkdirAll(dexDir, 0755); err != nil {
 		return err
 	}
+	// Currently, new apps must have a target SDK version of at least 30.
+	// https://developer.android.com/distribute/best-practices/develop/target-sdk
+	targetSDK := 30
+	if bi.minsdk > targetSDK {
+		targetSDK = bi.minsdk
+	}
+	minSDK := 16
+	if bi.minsdk > minSDK {
+		minSDK = bi.minsdk
+	}
 	if len(classFiles) > 0 {
 		d8 := exec.Command(
 			filepath.Join(tools.buildtools, "d8"),
-			"--classpath", tools.androidjar,
+			"--lib", tools.androidjar,
 			"--output", dexDir,
+			"--min-api", strconv.Itoa(minSDK),
 		)
 		d8.Args = append(d8.Args, classFiles...)
 		if _, err := runCmd(d8); err != nil {
@@ -425,16 +436,6 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, pe
 	}
 
 	// Link APK.
-	// Currently, new apps must have a target SDK version of at least 30.
-	// https://developer.android.com/distribute/best-practices/develop/target-sdk
-	targetSDK := 30
-	if bi.minsdk > targetSDK {
-		targetSDK = bi.minsdk
-	}
-	minSDK := 16
-	if bi.minsdk > minSDK {
-		minSDK = bi.minsdk
-	}
 	permissions, features := getPermissions(perms)
 	appName := strings.Title(bi.name)
 	manifestSrc := manifestData{
