@@ -184,7 +184,7 @@ type window struct {
 	lastFrameCallback *C.struct_wl_callback
 
 	animating bool
-	needAck   bool
+	redraw    bool
 	// The most recent configure serial waiting to be ack'ed.
 	serial   C.uint32_t
 	newScale bool
@@ -483,9 +483,9 @@ func gio_onSeatName(data unsafe.Pointer, seat *C.struct_wl_seat, name *C.char) {
 func gio_onXdgSurfaceConfigure(data unsafe.Pointer, wmSurf *C.struct_xdg_surface, serial C.uint32_t) {
 	w := callbackLoad(data).(*window)
 	w.serial = serial
-	w.needAck = true
+	w.redraw = true
+	C.xdg_surface_ack_configure(wmSurf, serial)
 	w.setStage(system.StageRunning)
-	w.draw(true)
 }
 
 //export gio_onToplevelClose
@@ -501,7 +501,6 @@ func gio_onToplevelConfigure(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel,
 		w.size = image.Pt(int(width), int(height))
 		w.updateOpaqueRegion()
 	}
-	w.needAck = true
 }
 
 //export gio_onToplevelDecorationConfigure
@@ -516,9 +515,8 @@ func gio_onToplevelDecorationConfigure(data unsafe.Pointer, deco *C.struct_zxdg_
 	}
 	if decorated != w.config.Decorated {
 		w.w.Event(ConfigEvent{Config: w.config})
+		w.redraw = true
 	}
-	w.needAck = true
-	w.draw(true)
 }
 
 //export gio_onOutputMode
@@ -553,7 +551,7 @@ func gio_onOutputDone(data unsafe.Pointer, output *C.struct_wl_output) {
 	d := callbackLoad(data).(*wlDisplay)
 	conf := d.outputConfig[output]
 	for _, w := range conf.windows {
-		w.draw(true)
+		w.redraw = true
 	}
 }
 
@@ -1304,7 +1302,6 @@ func gio_onFrameDone(data unsafe.Pointer, callback *C.struct_wl_callback, t C.ui
 	w := callbackLoad(data).(*window)
 	if w.lastFrameCallback == callback {
 		w.lastFrameCallback = nil
-		w.draw(false)
 	}
 }
 
@@ -1323,8 +1320,7 @@ func (w *window) loop() error {
 			w.w.Event(system.DestroyEvent{})
 			break
 		}
-		// pass false to skip unnecessary drawing.
-		w.draw(false)
+		w.draw()
 	}
 	return nil
 }
@@ -1577,7 +1573,7 @@ func (w *window) updateOutputs() {
 		w.setStage(system.StagePaused)
 	} else {
 		w.setStage(system.StageRunning)
-		w.draw(true)
+		w.redraw = true
 	}
 }
 
@@ -1589,22 +1585,25 @@ func (w *window) getConfig() (image.Point, unit.Metric) {
 	}
 }
 
-func (w *window) draw(sync bool) {
+func (w *window) draw() {
 	w.flushScroll()
-	anim := w.animating || w.fling.anim.Active()
-	dead := w.dead
-	if dead || (!anim && !sync) {
+	size, cfg := w.getConfig()
+	if cfg == (unit.Metric{}) {
 		return
 	}
-	size, cfg := w.getConfig()
 	if size != w.config.Size {
 		w.config.Size = size
 		w.w.Event(ConfigEvent{Config: w.config})
 	}
-	if cfg == (unit.Metric{}) {
+	anim := w.animating || w.fling.anim.Active()
+	// Draw animation only when not waiting for frame callback.
+	anim = anim && w.lastFrameCallback == nil
+	sync := w.redraw
+	w.redraw = false
+	if !anim && !sync {
 		return
 	}
-	if anim && w.lastFrameCallback == nil {
+	if anim {
 		w.lastFrameCallback = C.wl_surface_frame(w.surf)
 		// Use the surface as listener data for gio_onFrameDone.
 		C.wl_callback_add_listener(w.lastFrameCallback, &C.gio_callback_listener, unsafe.Pointer(w.surf))
@@ -1632,10 +1631,6 @@ func (w *window) display() *C.struct_wl_display {
 }
 
 func (w *window) surface() (*C.struct_wl_surface, int, int) {
-	if w.needAck {
-		C.xdg_surface_ack_configure(w.wmSurf, w.serial)
-		w.needAck = false
-	}
 	if w.newScale {
 		C.wl_surface_set_buffer_scale(w.surf, C.int32_t(w.scale))
 		w.newScale = false
