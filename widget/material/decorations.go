@@ -5,6 +5,7 @@ import (
 	"image/color"
 
 	"gioui.org/f32"
+	"gioui.org/io/semantic"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -39,7 +40,6 @@ func Decorations(th *Theme, deco *widget.Decorations, actions system.Action, tit
 // Layout a window with its title and action buttons.
 func (d *DecorationsStyle) Layout(gtx layout.Context) layout.Dimensions {
 	rec := op.Record(gtx.Ops)
-	paint.ColorOp{Color: d.Foreground}.Add(gtx.Ops)
 	dims := d.layoutDecorations(gtx)
 	decos := rec.Stop()
 	r := clip.Rect{Max: dims.Size}
@@ -89,8 +89,22 @@ func (d *DecorationsStyle) layoutDecorations(gtx layout.Context) layout.Dimensio
 				default:
 					continue
 				}
-				dims := d.Decorations.Clickable(a).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-					return inset.Layout(gtx, w)
+				cl := d.Decorations.Clickable(a)
+				dims := cl.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					semantic.Button.Add(gtx.Ops)
+					return layout.Stack{Alignment: layout.Center}.Layout(gtx,
+						layout.Expanded(func(gtx layout.Context) layout.Dimensions {
+							defer clip.Rect{Max: gtx.Constraints.Min}.Push(gtx.Ops).Pop()
+							for _, c := range cl.History() {
+								drawInk(gtx, c)
+							}
+							return layout.Dimensions{Size: gtx.Constraints.Min}
+						}),
+						layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+							paint.ColorOp{Color: d.Foreground}.Add(gtx.Ops)
+							return inset.Layout(gtx, w)
+						}),
+					)
 				})
 				size.X += dims.Size.X
 				if size.Y < dims.Size.Y {
