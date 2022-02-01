@@ -612,12 +612,12 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		w.waitAck(d)
 	case wakeupEvent:
 	case ConfigEvent:
-		if w.decorations.Config.Decorated != e2.Config.Decorated && e2.Config.Decorated {
+		w.decorations.Config = e2.Config
+		if !w.fallbackDecorate() {
 			// Decorations are no longer applied.
 			w.decorations.Decorations = nil
 			w.decorations.size = image.Point{}
 		}
-		w.decorations.Config = e2.Config
 		e2.Config.Size = e2.Config.Size.Sub(w.decorations.size)
 		w.out <- e2
 	case event.Event:
@@ -678,9 +678,14 @@ func (w *Window) updateCursor(d driver) {
 	}
 }
 
+func (w *Window) fallbackDecorate() bool {
+	cnf := w.decorations.Config
+	return !cnf.Decorated && cnf.Mode != Fullscreen && !w.nocontext
+}
+
 // decorate the window if enabled and returns the corresponding Insets.
 func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point {
-	if w.decorations.Config.Decorated || w.decorations.Config.Mode == Fullscreen {
+	if !w.fallbackDecorate() {
 		return e.Size
 	}
 	theme := w.decorations.Theme
