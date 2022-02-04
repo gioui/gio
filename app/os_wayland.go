@@ -257,9 +257,9 @@ func newWLWindow(callbacks *callbacks, options []Option) error {
 			Display: unsafe.Pointer(w.display()),
 			Surface: unsafe.Pointer(w.surf),
 		})
-		defer w.w.Event(WaylandViewEvent{})
 
 		err := w.loop()
+		w.w.Event(WaylandViewEvent{})
 		w.w.Event(system.DestroyEvent{Err: err})
 	}()
 	return nil
