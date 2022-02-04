@@ -151,7 +151,9 @@ func TestEditorCaretConsistency(t *testing.T) {
 			t.Helper()
 			gotLine, gotCol := e.CaretPos()
 			gotCoords := e.CaretCoords()
-			want := e.offsetToScreenPos(combinedPos{}, e.caret.start.ofs)
+			// Blow away index to re-compute position from scratch.
+			e.invalidate()
+			want := e.closestPosition(combinedPos{runes: e.caret.start.runes})
 			wantCoords := f32.Pt(float32(want.x)/64, float32(want.y))
 			if want.lineCol.Y != gotLine || want.lineCol.X != gotCol || gotCoords != wantCoords {
 				return fmt.Errorf("caret (%d,%d) pos %s, want (%d,%d) pos %s",
@@ -486,7 +488,8 @@ g123456789g
 		_ = e.Events() // throw away any events from this layout
 
 		// Build the selection events
-		startPos, endPos := e.offsetToScreenPos2(sortInts(start, end))
+		startPos := e.closestPosition(combinedPos{runes: start})
+		endPos := e.closestPosition(combinedPos{runes: end})
 		tq := &testQueue{
 			events: []event.Event{
 				pointer.Event{

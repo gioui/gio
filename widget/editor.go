@@ -65,6 +65,10 @@ type Editor struct {
 	dims         layout.Dimensions
 	requestFocus bool
 
+	// index tracks combined caret positions at regularly
+	// spaced intervals to speed up caret seeking.
+	index []combinedPos
+
 	caret struct {
 		on     bool
 		scroll bool
@@ -448,7 +452,8 @@ func (e *Editor) command(gtx layout.Context, k key.Event) bool {
 		if k.Modifiers != key.ModShortcut {
 			return false
 		}
-		e.caret.end, e.caret.start = e.offsetToScreenPos2(0, e.Len())
+		e.caret.end = e.closestPosition(combinedPos{})
+		e.caret.start = e.closestPosition(combinedPos{runes: math.MaxInt})
 	default:
 		return false
 	}
@@ -770,14 +775,6 @@ func (e *Editor) CaretCoords() f32.Point {
 	return f32.Pt(float32(e.caret.start.x)/64, float32(e.caret.start.y))
 }
 
-// offsetToScreenPos2 is a utility function to shortcut the common case of
-// wanting the positions of exactly two offsets.
-func (e *Editor) offsetToScreenPos2(o1, o2 int) (combinedPos, combinedPos) {
-	cp1 := e.offsetToScreenPos(combinedPos{}, o1)
-	cp2 := e.offsetToScreenPos(cp1, o2)
-	return cp1, cp2
-}
-
 // offsetToScreenPos takes an offset into the editor text (e.g.
 // e.caret.end.ofs) and returns a combinedPos that corresponds to its current
 // screen position. Hint is either the zero-value position or the result of
@@ -821,7 +818,104 @@ LOOP:
 	return hint
 }
 
+// indexPosition returns the latest position from the index no later than pos.
+func (e *Editor) indexPosition(pos combinedPos) combinedPos {
+	// Initialize index with first caret position.
+	if len(e.index) == 0 {
+		l := e.lines[0]
+		e.index = append(e.index, combinedPos{
+			x: align(e.Alignment, l.Width, e.viewSize.X),
+			y: l.Ascent.Ceil(),
+		})
+	}
+	i := sort.Search(len(e.index), func(i int) bool {
+		return e.positionGreaterOrEqual(e.index[i], pos)
+	})
+	// Return position just before pos, which is guaranteed to be less than or equal to pos.
+	if i > 0 {
+		i--
+	}
+	return e.index[i]
+}
+
+// positionGreaterOrEqual reports whether p1 >= p2 according to the non-zero fields
+// of p2. All fields of p1 must be a consistent and valid.
+func (e *Editor) positionGreaterOrEqual(p1, p2 combinedPos) bool {
+	l := e.lines[p1.lineCol.Y]
+	endCol := len(l.Layout.Advances) - 1
+	if lastLine := p1.lineCol.Y == len(e.lines)-1; lastLine {
+		endCol++
+	}
+	eol := p1.lineCol.X == endCol
+	switch {
+	case p2.runes != 0:
+		return p1.runes >= p2.runes
+	case p2.lineCol != (screenPos{}):
+		if p1.lineCol.Y != p2.lineCol.Y {
+			return p1.lineCol.Y > p2.lineCol.Y
+		}
+		return eol || p1.lineCol.X >= p2.lineCol.X
+	case p2.x != 0 || p2.y != 0:
+		ly := p1.y + l.Descent.Ceil()
+		prevy := p1.y - l.Ascent.Ceil()
+		switch {
+		case ly < p2.y && p1.lineCol.Y < len(e.lines)-1:
+			// p1 is on a line before p2.y.
+			return false
+		case prevy >= p2.y && p1.lineCol.Y > 0:
+			// p1 is on a line after p2.y.
+			return true
+		}
+		if eol {
+			return true
+		}
+		adv := l.Layout.Advances[p1.lineCol.X]
+		return p1.x+adv-p2.x >= p2.x-p1.x
+	}
+	return true
+}
+
+// closestPosition takes a position and returns its closest valid position.
+// Zero fields of pos and pos.ofs are ignored.
+func (e *Editor) closestPosition(pos combinedPos) combinedPos {
+	closest := e.indexPosition(pos)
+	l := e.lines[closest.lineCol.Y]
+	count := 0
+	const runesPerIndexEntry = 50
+	// Advance next and prev until next is greater than or equal to pos.
+	for {
+		for ; closest.lineCol.X < len(l.Layout.Advances); closest.lineCol.X++ {
+			if count == runesPerIndexEntry {
+				e.index = append(e.index, closest)
+				count = 0
+			}
+			count++
+			if e.positionGreaterOrEqual(closest, pos) {
+				return closest
+			}
+
+			adv := l.Layout.Advances[closest.lineCol.X]
+			closest.x += adv
+			_, s := e.rr.runeAt(closest.ofs)
+			closest.ofs += s
+			closest.runes++
+		}
+		if closest.lineCol.Y == len(e.lines)-1 {
+			// End of file.
+			return closest
+		}
+
+		prevDesc := l.Descent
+		closest.lineCol.Y++
+		closest.lineCol.X = 0
+		l = e.lines[closest.lineCol.Y]
+		closest.x = align(e.Alignment, l.Width, e.viewSize.X)
+		closest.y += (prevDesc + l.Ascent).Ceil()
+	}
+}
+
 func (e *Editor) invalidate() {
+	e.index = e.index[:0]
 	e.valid = false
 }
 
