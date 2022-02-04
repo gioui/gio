@@ -207,6 +207,32 @@ func TestStrokedPathCoincidentControlPoint(t *testing.T) {
 	})
 }
 
+func TestStrokedPathBalloon(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		// This shape is based on the one drawn by the Bubble function in
+		// github.com/llgcode/draw2d/samples/geometry/geometry.go.
+		p := new(clip.Path)
+		p.Begin(o)
+		p.MoveTo(f32.Pt(42.69375, 10.5))
+		p.CubeTo(f32.Pt(42.69375, 10.5), f32.Pt(14.85, 10.5), f32.Pt(14.85, 31.5))
+		p.CubeTo(f32.Pt(14.85, 31.5), f32.Pt(14.85, 52.5), f32.Pt(28.771875, 52.5))
+		p.CubeTo(f32.Pt(28.771875, 52.5), f32.Pt(28.771875, 63.7), f32.Pt(17.634375, 66.5))
+		p.CubeTo(f32.Pt(17.634375, 66.5), f32.Pt(34.340626, 63.7), f32.Pt(37.125, 52.5))
+		p.CubeTo(f32.Pt(37.125, 52.5), f32.Pt(70.5375, 52.5), f32.Pt(70.5375, 31.5))
+		p.CubeTo(f32.Pt(70.5375, 31.5), f32.Pt(70.5375, 10.5), f32.Pt(42.69375, 10.5))
+		cl := clip.Stroke{
+			Path:  p.End(),
+			Width: 2.83,
+		}.Op().Push(o)
+		paint.Fill(o, black)
+		cl.Pop()
+	}, func(r result) {
+		r.expect(0, 0, transparent)
+		r.expect(70, 52, colornames.Black)
+		r.expect(70, 90, transparent)
+	})
+}
+
 func TestPathReuse(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		var path clip.Path
