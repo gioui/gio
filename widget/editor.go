@@ -68,6 +68,8 @@ type Editor struct {
 	caret struct {
 		on     bool
 		scroll bool
+		// xoff is the offset to the current position when moving between lines.
+		xoff fixed.Int26_6
 		// start is the current caret position, and also the start position of
 		// selected text. end is the end position of selected text. If start.ofs
 		// == end.ofs, then there's no selection. Note that it's possible (and
@@ -112,9 +114,6 @@ type combinedPos struct {
 	// Pixel coordinates
 	x fixed.Int26_6
 	y int
-
-	// xoff is the offset to the current position when moving between lines.
-	xoff fixed.Int26_6
 }
 
 type selectionAction int
@@ -363,7 +362,9 @@ func (e *Editor) processKey(gtx layout.Context) {
 }
 
 func (e *Editor) moveLines(distance int, selAct selectionAction) {
-	e.caret.start = e.movePosToLine(e.caret.start, e.caret.start.x+e.caret.start.xoff, e.caret.start.lineCol.Y+distance)
+	x := e.caret.start.x + e.caret.xoff
+	e.caret.start = e.movePosToLine(e.caret.start, x, e.caret.start.lineCol.Y+distance)
+	e.caret.xoff = x - e.caret.start.x
 	e.updateSelection(selAct)
 }
 
@@ -722,7 +723,7 @@ func (e *Editor) moveCoord(pos image.Point) {
 	}
 	x := fixed.I(pos.X + e.scrollOff.X)
 	e.caret.start = e.movePosToLine(e.caret.start, x, carLine)
-	e.caret.start.xoff = 0
+	e.caret.xoff = 0
 }
 
 func (e *Editor) layoutText(s text.Shaper) ([]text.Line, layout.Dimensions) {
@@ -843,7 +844,7 @@ func (e *Editor) Delete(runes int) {
 	}
 
 	e.caret.start.ofs = e.rr.deleteRunes(e.caret.start.ofs, runes)
-	e.caret.start.xoff = 0
+	e.caret.xoff = 0
 	e.ClearSelection()
 	e.invalidate()
 }
@@ -873,7 +874,7 @@ func (e *Editor) prepend(s string) {
 	}
 	e.caret.start.ofs = e.rr.deleteBytes(e.caret.start.ofs, e.caret.end.ofs-e.caret.start.ofs) // Delete any selection first.
 	e.rr.prepend(e.caret.start.ofs, s)
-	e.caret.start.xoff = 0
+	e.caret.xoff = 0
 	e.invalidate()
 }
 
@@ -898,7 +899,9 @@ func (e *Editor) movePages(pages int, selAct selectionAction) {
 		y2 += h
 		carLine2++
 	}
-	e.caret.start = e.movePosToLine(e.caret.start, e.caret.start.x+e.caret.start.xoff, carLine2)
+	x := e.caret.start.x + e.caret.xoff
+	e.caret.start = e.movePosToLine(e.caret.start, x, carLine2)
+	e.caret.xoff = x - e.caret.start.x
 	e.updateSelection(selAct)
 }
 
@@ -913,7 +916,7 @@ func (e *Editor) movePosToLine(pos combinedPos, x fixed.Int26_6, line int) combi
 
 	prevDesc := e.lines[line].Descent
 	for pos.lineCol.Y < line {
-		pos = e.movePosToEnd(pos)
+		pos, _ = e.movePosToEnd(pos)
 		l := e.lines[pos.lineCol.Y]
 		_, s := e.rr.runeAt(pos.ofs)
 		pos.ofs += s
@@ -956,7 +959,6 @@ func (e *Editor) movePosToLine(pos combinedPos, x fixed.Int26_6, line int) combi
 		pos.ofs += s
 		pos.lineCol.X++
 	}
-	pos.xoff = x - pos.x
 	return pos
 }
 
@@ -967,14 +969,13 @@ func (e *Editor) MoveCaret(startDelta, endDelta int) {
 	e.makeValid()
 	keepSame := e.caret.start.ofs == e.caret.end.ofs && startDelta == endDelta
 	e.caret.start = e.movePos(e.caret.start, startDelta)
-	e.caret.start.xoff = 0
+	e.caret.xoff = 0
 	// If they were in the same place, and we're moving them the same distance,
 	// just assign the new position, instead of recalculating it.
 	if keepSame {
 		e.caret.end = e.caret.start
 	} else {
 		e.caret.end = e.movePos(e.caret.end, endDelta)
-		e.caret.end.xoff = 0
 	}
 }
 
@@ -1013,6 +1014,7 @@ func (e *Editor) movePos(pos combinedPos, distance int) combinedPos {
 
 func (e *Editor) moveStart(selAct selectionAction) {
 	e.caret.start = e.movePosToStart(e.caret.start)
+	e.caret.xoff = -e.caret.start.x
 	e.updateSelection(selAct)
 }
 
@@ -1025,16 +1027,15 @@ func (e *Editor) movePosToStart(pos combinedPos) combinedPos {
 		pos.x -= layout.Advances[i]
 	}
 	pos.lineCol.X = 0
-	pos.xoff = -pos.x
 	return pos
 }
 
 func (e *Editor) moveEnd(selAct selectionAction) {
-	e.caret.start = e.movePosToEnd(e.caret.start)
+	e.caret.start, e.caret.xoff = e.movePosToEnd(e.caret.start)
 	e.updateSelection(selAct)
 }
 
-func (e *Editor) movePosToEnd(pos combinedPos) combinedPos {
+func (e *Editor) movePosToEnd(pos combinedPos) (combinedPos, fixed.Int26_6) {
 	e.makeValid(&pos)
 	l := e.lines[pos.lineCol.Y]
 	// Only move past the end of the last line
@@ -1051,8 +1052,8 @@ func (e *Editor) movePosToEnd(pos combinedPos) combinedPos {
 		pos.lineCol.X++
 	}
 	a := align(e.Alignment, l.Width, e.viewSize.X)
-	pos.xoff = l.Width + a - pos.x
-	return pos
+	xoff := l.Width + a - pos.x
+	return pos, xoff
 }
 
 // moveWord moves the caret to the next word in the specified direction.
