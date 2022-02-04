@@ -194,6 +194,8 @@ type window struct {
 	wsize        image.Point // window config size before going fullscreen or maximized
 	inCompositor bool        // window is moving or being resized
 
+	clipReads chan clipboard.Event
+
 	wakeups chan struct{}
 }
 
@@ -332,11 +334,12 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 	ppdp := detectUIScale()
 
 	w := &window{
-		disp:    d,
-		scale:   scale,
-		ppdp:    ppdp,
-		ppsp:    ppdp,
-		wakeups: make(chan struct{}, 1),
+		disp:      d,
+		scale:     scale,
+		ppdp:      ppdp,
+		ppsp:      ppdp,
+		wakeups:   make(chan struct{}, 1),
+		clipReads: make(chan clipboard.Event, 1),
 	}
 	w.surf = C.wl_compositor_create_surface(d.compositor)
 	if w.surf == nil {
@@ -945,7 +948,8 @@ func (w *window) ReadClipboard() {
 	go func() {
 		defer r.Close()
 		data, _ := ioutil.ReadAll(r)
-		w.w.Event(clipboard.Event{Text: string(data)})
+		w.clipReads <- clipboard.Event{Text: string(data)}
+		w.Wakeup()
 	}()
 }
 
@@ -1310,6 +1314,8 @@ func (w *window) loop() error {
 			return err
 		}
 		select {
+		case e := <-w.clipReads:
+			w.w.Event(e)
 		case <-w.wakeups:
 			w.w.Event(wakeupEvent{})
 		default:
