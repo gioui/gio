@@ -773,62 +773,52 @@ func (e *Editor) CaretCoords() f32.Point {
 // offsetToScreenPos2 is a utility function to shortcut the common case of
 // wanting the positions of exactly two offsets.
 func (e *Editor) offsetToScreenPos2(o1, o2 int) (combinedPos, combinedPos) {
-	cp1, iter := e.offsetToScreenPos(o1)
-	return cp1, iter(o2)
+	cp1 := e.offsetToScreenPos(combinedPos{}, o1)
+	cp2 := e.offsetToScreenPos(cp1, o2)
+	return cp1, cp2
 }
 
 // offsetToScreenPos takes an offset into the editor text (e.g.
 // e.caret.end.ofs) and returns a combinedPos that corresponds to its current
-// screen position, as well as an iterator that lets you get the combinedPos
-// of a later offset. The offsets given to offsetToScreenPos and to the
-// returned iterator must be sorted, lowest first, and they must be valid (0
-// <= offset <= e.Len()).
+// screen position. Hint is either the zero-value position or the result of
+// a previous call with a lower offset.
 //
 // This function is written this way to take advantage of previous work done
 // for offsets after the first. Otherwise you have to start from the top each
 // time.
-func (e *Editor) offsetToScreenPos(offset int) (combinedPos, func(int) combinedPos) {
-	var col, line, idx int
-	var x fixed.Int26_6
-	runes := 0
-
-	l := e.lines[line]
-	y := l.Ascent.Ceil()
-	prevDesc := l.Descent
-
-	iter := func(offset int) combinedPos {
-	LOOP:
-		for {
-			for ; col < len(l.Layout.Advances); col++ {
-				if idx >= offset {
-					break LOOP
-				}
-
-				x += l.Layout.Advances[col]
-				_, s := e.rr.runeAt(idx)
-				idx += s
-				runes++
-			}
-			if lastLine := line == len(e.lines)-1; lastLine || idx > offset {
+func (e *Editor) offsetToScreenPos(hint combinedPos, offset int) combinedPos {
+	if hint == (combinedPos{}) {
+		l := e.lines[0]
+		hint = combinedPos{
+			x: align(e.Alignment, l.Width, e.viewSize.X),
+			y: l.Ascent.Ceil(),
+		}
+	}
+LOOP:
+	for {
+		l := e.lines[hint.lineCol.Y]
+		for ; hint.lineCol.X < len(l.Layout.Advances); hint.lineCol.X++ {
+			if hint.ofs >= offset {
 				break LOOP
 			}
 
-			line++
-			x = 0
-			col = 0
-			l = e.lines[line]
-			y += (prevDesc + l.Ascent).Ceil()
-			prevDesc = l.Descent
+			hint.x += l.Layout.Advances[hint.lineCol.X]
+			_, s := e.rr.runeAt(hint.ofs)
+			hint.ofs += s
+			hint.runes++
 		}
-		return combinedPos{
-			lineCol: screenPos{Y: line, X: col},
-			x:       x + align(e.Alignment, e.lines[line].Width, e.viewSize.X),
-			y:       y,
-			ofs:     offset,
-			runes:   runes,
+		if lastLine := hint.lineCol.Y == len(e.lines)-1; lastLine || hint.ofs > offset {
+			break LOOP
 		}
+
+		prevDesc := l.Descent
+		hint.lineCol.Y++
+		hint.lineCol.X = 0
+		l = e.lines[hint.lineCol.Y]
+		hint.x = align(e.Alignment, l.Width, e.viewSize.X)
+		hint.y += (prevDesc + l.Ascent).Ceil()
 	}
-	return iter(offset), iter
+	return hint
 }
 
 func (e *Editor) invalidate() {
@@ -1271,10 +1261,10 @@ func (e *Editor) makeValidCaret(positions ...*combinedPos) {
 	sort.Slice(positions, func(i, j int) bool {
 		return positions[i].ofs < positions[j].ofs
 	})
-	var iter func(offset int) combinedPos
-	*positions[0], iter = e.offsetToScreenPos(positions[0].ofs)
-	for _, cp := range positions[1:] {
-		*cp = iter(cp.ofs)
+	var hint combinedPos
+	for _, cp := range positions {
+		hint = e.offsetToScreenPos(hint, cp.ofs)
+		*cp = hint
 	}
 }
 

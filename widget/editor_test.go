@@ -151,7 +151,7 @@ func TestEditorCaretConsistency(t *testing.T) {
 			t.Helper()
 			gotLine, gotCol := e.CaretPos()
 			gotCoords := e.CaretCoords()
-			want, _ := e.offsetToScreenPos(e.caret.start.ofs)
+			want := e.offsetToScreenPos(combinedPos{}, e.caret.start.ofs)
 			wantCoords := f32.Pt(float32(want.x)/64, float32(want.y))
 			if want.lineCol.Y != gotLine || want.lineCol.X != gotCol || gotCoords != wantCoords {
 				return fmt.Errorf("caret (%d,%d) pos %s, want (%d,%d) pos %s",
