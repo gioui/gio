@@ -104,8 +104,10 @@ type maskReader struct {
 
 // combinedPos is a point in the editor.
 type combinedPos struct {
-	// editorBuffer offset. The other three fields are based off of this one.
+	// ofs is the offset into the editorBuffer in bytes. The other three fields are based off of this one.
 	ofs int
+	// runes is the offset in runes.
+	runes int
 
 	// lineCol.Y = line (offset into Editor.lines), and X = col (offset into
 	// Editor.lines[Y])
@@ -666,7 +668,8 @@ func (e *Editor) SetText(s string) {
 	e.rr = editBuffer{}
 	e.caret.start = combinedPos{}
 	e.caret.end = combinedPos{}
-	e.prepend(s)
+	e.replace(e.caret.start.runes, e.caret.end.runes, s)
+	e.caret.xoff = 0
 }
 
 func (e *Editor) scrollBounds() image.Rectangle {
@@ -787,6 +790,7 @@ func (e *Editor) offsetToScreenPos2(o1, o2 int) (combinedPos, combinedPos) {
 func (e *Editor) offsetToScreenPos(offset int) (combinedPos, func(int) combinedPos) {
 	var col, line, idx int
 	var x fixed.Int26_6
+	runes := 0
 
 	l := e.lines[line]
 	y := l.Ascent.Ceil()
@@ -803,6 +807,7 @@ func (e *Editor) offsetToScreenPos(offset int) (combinedPos, func(int) combinedP
 				x += l.Layout.Advances[col]
 				_, s := e.rr.runeAt(idx)
 				idx += s
+				runes++
 			}
 			if lastLine := line == len(e.lines)-1; lastLine || idx > offset {
 				break LOOP
@@ -820,6 +825,7 @@ func (e *Editor) offsetToScreenPos(offset int) (combinedPos, func(int) combinedP
 			x:       x + align(e.Alignment, e.lines[line].Width, e.viewSize.X),
 			y:       y,
 			ofs:     offset,
+			runes:   runes,
 		}
 	}
 	return iter(offset), iter
@@ -838,15 +844,16 @@ func (e *Editor) Delete(runes int) {
 		return
 	}
 
-	if l := e.caret.end.ofs - e.caret.start.ofs; l != 0 {
-		e.caret.start.ofs = e.rr.deleteBytes(e.caret.start.ofs, l)
+	start := e.caret.start.runes
+	end := e.caret.end.runes
+	if start != end {
 		runes -= sign(runes)
 	}
 
-	e.caret.start.ofs = e.rr.deleteRunes(e.caret.start.ofs, runes)
+	end += runes
+	e.replace(start, end, "")
 	e.caret.xoff = 0
 	e.ClearSelection()
-	e.invalidate()
 }
 
 // Insert inserts text at the caret, moving the caret forward. If there is a
@@ -860,22 +867,56 @@ func (e *Editor) Insert(s string) {
 // there is a selection, append overwrites it.
 // xxx|yyy + append zzz => xxxzzz|yyy
 func (e *Editor) append(s string) {
-	e.prepend(s)
+	e.replace(e.caret.start.runes, e.caret.end.runes, s)
+	e.caret.xoff = 0
 	e.caret.start.ofs += len(s)
-	e.caret.end.ofs = e.caret.start.ofs
+	e.caret.start.runes += utf8.RuneCountInString(s)
+	e.caret.end = e.caret.start
 }
 
-// prepend inserts s after the cursor; the caret does not change. If there is
-// a selection, prepend overwrites it.
-// xxx|yyy + prepend zzz => xxx|zzzyyy
-func (e *Editor) prepend(s string) {
+// replace the text between start and end with s. Indices are in runes.
+func (e *Editor) replace(start, end int, s string) {
 	if e.SingleLine {
 		s = strings.ReplaceAll(s, "\n", " ")
 	}
-	e.caret.start.ofs = e.rr.deleteBytes(e.caret.start.ofs, e.caret.end.ofs-e.caret.start.ofs) // Delete any selection first.
-	e.rr.prepend(e.caret.start.ofs, s)
-	e.caret.xoff = 0
+	if start > end {
+		start, end = end, start
+	}
+	startPos := e.seek(e.caret.start, start)
+	endPos := e.seek(e.caret.end, end)
+	e.rr.deleteRunes(startPos.ofs, endPos.runes-startPos.runes)
+	e.rr.prepend(startPos.ofs, s)
+	newEnd := startPos.runes + utf8.RuneCountInString(s)
+	adjust := func(pos combinedPos) combinedPos {
+		switch {
+		case newEnd < pos.runes && pos.runes <= endPos.runes:
+			pos.runes = newEnd
+		case endPos.runes < pos.runes:
+			diff := newEnd - endPos.runes
+			pos.runes = pos.runes + diff
+		}
+		return e.seek(startPos, pos.runes)
+	}
+	e.caret.start = adjust(e.caret.start)
+	e.caret.end = adjust(e.caret.end)
 	e.invalidate()
+}
+
+// seek returns the byte offset for an absolute rune offset. The provided hint
+// is a position potentially close.
+func (e *Editor) seek(hint combinedPos, runes int) combinedPos {
+	pos := hint
+	for pos.runes > runes && pos.ofs > 0 {
+		_, s := e.rr.runeBefore(pos.ofs)
+		pos.ofs -= s
+		pos.runes--
+	}
+	for pos.runes < runes && pos.ofs < e.rr.len() {
+		_, s := e.rr.runeAt(pos.ofs)
+		pos.ofs += s
+		pos.runes++
+	}
+	return pos
 }
 
 func (e *Editor) movePages(pages int, selAct selectionAction) {
@@ -920,6 +961,7 @@ func (e *Editor) movePosToLine(pos combinedPos, x fixed.Int26_6, line int) combi
 		l := e.lines[pos.lineCol.Y]
 		_, s := e.rr.runeAt(pos.ofs)
 		pos.ofs += s
+		pos.runes++
 		pos.y += (prevDesc + l.Ascent).Ceil()
 		pos.lineCol.X = 0
 		prevDesc = l.Descent
@@ -930,6 +972,7 @@ func (e *Editor) movePosToLine(pos combinedPos, x fixed.Int26_6, line int) combi
 		l := e.lines[pos.lineCol.Y]
 		_, s := e.rr.runeBefore(pos.ofs)
 		pos.ofs -= s
+		pos.runes--
 		pos.y -= (prevDesc + l.Ascent).Ceil()
 		prevDesc = l.Descent
 		pos.lineCol.Y--
@@ -957,6 +1000,7 @@ func (e *Editor) movePosToLine(pos combinedPos, x fixed.Int26_6, line int) combi
 		pos.x += adv
 		_, s := e.rr.runeAt(pos.ofs)
 		pos.ofs += s
+		pos.runes++
 		pos.lineCol.X++
 	}
 	return pos
@@ -989,6 +1033,7 @@ func (e *Editor) movePos(pos combinedPos, distance int) combinedPos {
 		l := e.lines[pos.lineCol.Y].Layout
 		_, s := e.rr.runeBefore(pos.ofs)
 		pos.ofs -= s
+		pos.runes--
 		pos.lineCol.X--
 		pos.x -= l.Advances[pos.lineCol.X]
 	}
@@ -1007,6 +1052,7 @@ func (e *Editor) movePos(pos combinedPos, distance int) combinedPos {
 		pos.x += l.Advances[pos.lineCol.X]
 		_, s := e.rr.runeAt(pos.ofs)
 		pos.ofs += s
+		pos.runes++
 		pos.lineCol.X++
 	}
 	return pos
@@ -1024,6 +1070,7 @@ func (e *Editor) movePosToStart(pos combinedPos) combinedPos {
 	for i := pos.lineCol.X - 1; i >= 0; i-- {
 		_, s := e.rr.runeBefore(pos.ofs)
 		pos.ofs -= s
+		pos.runes--
 		pos.x -= layout.Advances[i]
 	}
 	pos.lineCol.X = 0
@@ -1048,6 +1095,7 @@ func (e *Editor) movePosToEnd(pos combinedPos) (combinedPos, fixed.Int26_6) {
 		adv := layout.Advances[i]
 		_, s := e.rr.runeAt(pos.ofs)
 		pos.ofs += s
+		pos.runes++
 		pos.x += adv
 		pos.lineCol.X++
 	}

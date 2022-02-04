@@ -153,11 +153,16 @@ func TestEditorCaretConsistency(t *testing.T) {
 			gotCoords := e.CaretCoords()
 			want, _ := e.offsetToScreenPos(e.caret.start.ofs)
 			wantCoords := f32.Pt(float32(want.x)/64, float32(want.y))
-			if want.lineCol.Y == gotLine && want.lineCol.X == gotCol && gotCoords == wantCoords {
-				return nil
+			if want.lineCol.Y != gotLine || want.lineCol.X != gotCol || gotCoords != wantCoords {
+				return fmt.Errorf("caret (%d,%d) pos %s, want (%d,%d) pos %s",
+					gotLine, gotCol, gotCoords, want.lineCol.Y, want.lineCol.X, wantCoords)
 			}
-			return fmt.Errorf("caret (%d,%d) pos %s, want (%d,%d) pos %s",
-				gotLine, gotCol, gotCoords, want.lineCol.Y, want.lineCol.X, wantCoords)
+			seekCaret := e.seek(combinedPos{}, e.caret.start.runes)
+			if seekCaret.runes != e.caret.start.runes || seekCaret.ofs != e.caret.start.ofs {
+				return fmt.Errorf("caret ofs %d, runes %d, expected ofs %d runes %d",
+					e.caret.start.ofs, e.caret.start.runes, seekCaret.ofs, seekCaret.runes)
+			}
+			return nil
 		}
 		if err := consistent(); err != nil {
 			t.Errorf("initial editor inconsistency (alignment %s): %v", a, err)

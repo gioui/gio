@@ -30,39 +30,21 @@ func (e *editBuffer) Changed() bool {
 	return c
 }
 
-func (e *editBuffer) deleteRunes(caret, runes int) int {
+func (e *editBuffer) deleteRunes(caret, count int) (bytes int, runes int) {
 	e.moveGap(caret, 0)
-	for ; runes < 0 && e.gapstart > 0; runes++ {
+	for ; count < 0 && e.gapstart > 0; count++ {
 		_, s := utf8.DecodeLastRune(e.text[:e.gapstart])
 		e.gapstart -= s
-		caret -= s
+		bytes += s
+		runes++
 		e.changed = e.changed || s > 0
 	}
-	for ; runes > 0 && e.gapend < len(e.text); runes-- {
+	for ; count > 0 && e.gapend < len(e.text); count-- {
 		_, s := utf8.DecodeRune(e.text[e.gapend:])
 		e.gapend += s
 		e.changed = e.changed || s > 0
 	}
-	return caret
-}
-
-func (e *editBuffer) deleteBytes(caret, bytes int) int {
-	e.moveGap(caret, 0)
-	if bytes < 0 {
-		e.gapstart += bytes
-		if e.gapstart < 0 {
-			e.gapstart = 0
-		}
-		caret = e.gapstart
-	}
-	if bytes > 0 {
-		e.gapend += bytes
-		if e.gapend > len(e.text) {
-			e.gapend = len(e.text)
-		}
-	}
-	e.changed = e.changed || bytes != 0
-	return caret
+	return
 }
 
 // moveGap moves the gap to the caret position. After returning,
