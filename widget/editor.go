@@ -223,12 +223,13 @@ func (e *Editor) processEvents(gtx layout.Context) {
 	}
 }
 
-func (e *Editor) makeValid(positions ...*combinedPos) {
+func (e *Editor) makeValid() {
 	if e.valid {
 		return
 	}
 	e.lines, e.dims = e.layoutText(e.shaper)
-	e.makeValidCaret(positions...)
+	e.caret.start = e.closestPosition(combinedPos{runes: e.caret.start.runes})
+	e.caret.end = e.closestPosition(combinedPos{runes: e.caret.end.runes})
 	e.valid = true
 }
 
@@ -1119,19 +1120,10 @@ func (e *Editor) Selection() (start, end int) {
 // and end are in runes, and represent offsets into the editor text.
 func (e *Editor) SetCaret(start, end int) {
 	e.makeValid()
-	e.caret.start.runes, e.caret.end.runes = start, end
-	e.makeValidCaret()
+	e.caret.start = e.closestPosition(combinedPos{runes: start})
+	e.caret.end = e.closestPosition(combinedPos{runes: end})
 	e.caret.scroll = true
 	e.scroller.Stop()
-}
-
-func (e *Editor) makeValidCaret(positions ...*combinedPos) {
-	// Jump through some hoops to order the offsets given to offsetToScreenPos,
-	// but still be able to update them correctly with the results thereof.
-	positions = append(positions, &e.caret.start, &e.caret.end)
-	for _, cp := range positions {
-		*cp = e.closestPosition(combinedPos{runes: cp.runes})
-	}
 }
 
 // SelectedText returns the currently selected text (if any) from the editor.
