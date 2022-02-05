@@ -369,7 +369,10 @@ func (e *Editor) processKey(gtx layout.Context) {
 
 func (e *Editor) moveLines(distance int, selAct selectionAction) {
 	x := e.caret.start.x + e.caret.xoff
-	e.caret.start = e.movePosToLine(e.caret.start, x, e.caret.start.lineCol.Y+distance)
+	// Seek to line.
+	pos := e.closestPosition(combinedPos{lineCol: screenPos{Y: e.caret.start.lineCol.Y + distance}})
+	pos = e.closestPosition(combinedPos{x: x, y: pos.y})
+	e.caret.start = pos
 	e.caret.xoff = x - e.caret.start.x
 	e.updateSelection(selAct)
 }
@@ -952,89 +955,11 @@ func (e *Editor) seek(hint combinedPos, runes int) combinedPos {
 
 func (e *Editor) movePages(pages int, selAct selectionAction) {
 	e.makeValid()
-	y := e.caret.start.y + pages*e.viewSize.Y
-	var (
-		prevDesc fixed.Int26_6
-		carLine2 int
-	)
-	y2 := e.lines[0].Ascent.Ceil()
-	for i := 1; i < len(e.lines); i++ {
-		if y2 >= y {
-			break
-		}
-		l := e.lines[i]
-		h := (prevDesc + l.Ascent).Ceil()
-		prevDesc = l.Descent
-		if y2+h-y >= y-y2 {
-			break
-		}
-		y2 += h
-		carLine2++
-	}
 	x := e.caret.start.x + e.caret.xoff
-	e.caret.start = e.movePosToLine(e.caret.start, x, carLine2)
+	y := e.caret.start.y + pages*e.viewSize.Y
+	e.caret.start = e.closestPosition(combinedPos{x: x, y: y})
 	e.caret.xoff = x - e.caret.start.x
 	e.updateSelection(selAct)
-}
-
-func (e *Editor) movePosToLine(pos combinedPos, x fixed.Int26_6, line int) combinedPos {
-	e.makeValid(&pos)
-	if line < 0 {
-		line = 0
-	}
-	if line >= len(e.lines) {
-		line = len(e.lines) - 1
-	}
-
-	prevDesc := e.lines[line].Descent
-	for pos.lineCol.Y < line {
-		pos, _ = e.movePosToEnd(pos)
-		l := e.lines[pos.lineCol.Y]
-		_, s := e.rr.runeAt(pos.ofs)
-		pos.ofs += s
-		pos.runes++
-		pos.y += (prevDesc + l.Ascent).Ceil()
-		pos.lineCol.X = 0
-		prevDesc = l.Descent
-		pos.lineCol.Y++
-	}
-	for pos.lineCol.Y > line {
-		pos = e.movePosToStart(pos)
-		l := e.lines[pos.lineCol.Y]
-		_, s := e.rr.runeBefore(pos.ofs)
-		pos.ofs -= s
-		pos.runes--
-		pos.y -= (prevDesc + l.Ascent).Ceil()
-		prevDesc = l.Descent
-		pos.lineCol.Y--
-		l = e.lines[pos.lineCol.Y]
-		pos.lineCol.X = len(l.Layout.Advances) - 1
-	}
-
-	pos = e.movePosToStart(pos)
-	l := e.lines[line]
-	pos.x = align(e.Alignment, l.Width, e.viewSize.X)
-	// Only move past the end of the last line
-	end := 0
-	if line < len(e.lines)-1 {
-		end = 1
-	}
-	// Move to rune closest to x.
-	for i := 0; i < len(l.Layout.Advances)-end; i++ {
-		adv := l.Layout.Advances[i]
-		if pos.x >= x {
-			break
-		}
-		if pos.x+adv-x >= x-pos.x {
-			break
-		}
-		pos.x += adv
-		_, s := e.rr.runeAt(pos.ofs)
-		pos.ofs += s
-		pos.runes++
-		pos.lineCol.X++
-	}
-	return pos
 }
 
 // MoveCaret moves the caret (aka selection start) and the selection end
