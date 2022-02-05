@@ -716,21 +716,9 @@ func (e *Editor) scrollAbs(x, y int) {
 }
 
 func (e *Editor) moveCoord(pos image.Point) {
-	var (
-		prevDesc fixed.Int26_6
-		carLine  int
-		y        int
-	)
-	for _, l := range e.lines {
-		y += (prevDesc + l.Ascent).Ceil()
-		prevDesc = l.Descent
-		if y+prevDesc.Ceil() >= pos.Y+e.scrollOff.Y {
-			break
-		}
-		carLine++
-	}
 	x := fixed.I(pos.X + e.scrollOff.X)
-	e.caret.start = e.movePosToLine(e.caret.start, x, carLine)
+	y := pos.Y + e.scrollOff.Y
+	e.caret.start = e.closestPosition(combinedPos{x: x, y: y})
 	e.caret.xoff = 0
 }
 
