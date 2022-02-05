@@ -117,8 +117,9 @@ func assertCaret(t *testing.T, e *Editor, line, col, bytes int) {
 	if gotLine != line || gotCol != col {
 		t.Errorf("caret at (%d, %d), expected (%d, %d)", gotLine, gotCol, line, col)
 	}
-	if bytes != e.caret.start.ofs {
-		t.Errorf("caret at buffer position %d, expected %d", e.caret.start.ofs, bytes)
+	caretBytes := e.closestPosition(combinedPos{runes: e.caret.start}).ofs
+	if bytes != caretBytes {
+		t.Errorf("caret at buffer position %d, expected %d", caretBytes, bytes)
 	}
 }
 
@@ -157,7 +158,7 @@ func TestEditorCaretConsistency(t *testing.T) {
 			gotCoords := e.CaretCoords()
 			// Blow away index to re-compute position from scratch.
 			e.invalidate()
-			want := e.closestPosition(combinedPos{runes: e.caret.start.runes})
+			want := e.closestPosition(combinedPos{runes: e.caret.start})
 			wantCoords := f32.Pt(float32(want.x)/64, float32(want.y))
 			if want.lineCol.Y != gotLine || want.lineCol.X != gotCol || gotCoords != wantCoords {
 				return fmt.Errorf("caret (%d,%d) pos %s, want (%d,%d) pos %s",
@@ -245,8 +246,9 @@ func TestEditorMoveWord(t *testing.T) {
 		e := setup(tt.Text)
 		e.MoveCaret(tt.Start, tt.Start)
 		e.moveWord(tt.Skip, selectionClear)
-		if e.caret.start.ofs != tt.Want {
-			t.Fatalf("[%d] moveWord: bad caret position: got %d, want %d", ii, e.caret.start.ofs, tt.Want)
+		caretBytes := e.closestPosition(combinedPos{runes: e.caret.start}).ofs
+		if caretBytes != tt.Want {
+			t.Fatalf("[%d] moveWord: bad caret position: got %d, want %d", ii, caretBytes, tt.Want)
 		}
 	}
 }
@@ -438,8 +440,9 @@ func TestEditorDeleteWord(t *testing.T) {
 		e.MoveCaret(tt.Start, tt.Start)
 		e.MoveCaret(0, tt.Selection)
 		e.deleteWord(tt.Delete)
-		if e.caret.start.ofs != tt.Want {
-			t.Fatalf("[%d] deleteWord: bad caret position: got %d, want %d", ii, e.caret.start.ofs, tt.Want)
+		caretBytes := e.closestPosition(combinedPos{runes: e.caret.start}).ofs
+		if caretBytes != tt.Want {
+			t.Fatalf("[%d] deleteWord: bad caret position: got %d, want %d", ii, caretBytes, tt.Want)
 		}
 		if e.Text() != tt.Result {
 			t.Fatalf("[%d] deleteWord: invalid result: got %q, want %q", ii, e.Text(), tt.Result)
@@ -547,11 +550,12 @@ g123456789g
 		gtx.Queue = nil
 		e.Layout(gtx, cache, font, fontSize, nil)
 
+		caretStart := e.closestPosition(combinedPos{runes: e.caret.start})
 		caretEnd := e.closestPosition(combinedPos{runes: e.caret.end})
-		if caretEnd.lineCol != tst.startPos || e.caret.start.lineCol != tst.endPos {
+		if caretEnd.lineCol != tst.startPos || caretStart.lineCol != tst.endPos {
 			t.Errorf("Test %d pt2: Expected %#v, %#v; got %#v, %#v",
 				n,
-				caretEnd.lineCol, e.caret.start.lineCol,
+				caretEnd.lineCol, caretStart.lineCol,
 				tst.startPos, tst.endPos)
 			continue
 		}
