@@ -913,11 +913,12 @@ func (e *Editor) replace(start, end int, s string) {
 	if e.SingleLine {
 		s = strings.ReplaceAll(s, "\n", " ")
 	}
+	e.makeValid()
 	if start > end {
 		start, end = end, start
 	}
-	startPos := e.seek(e.caret.start, start)
-	endPos := e.seek(e.caret.end, end)
+	startPos := e.closestPosition(combinedPos{runes: start})
+	endPos := e.closestPosition(combinedPos{runes: end})
 	e.rr.deleteRunes(startPos.ofs, endPos.runes-startPos.runes)
 	e.rr.prepend(startPos.ofs, s)
 	newEnd := startPos.runes + utf8.RuneCountInString(s)
@@ -929,28 +930,11 @@ func (e *Editor) replace(start, end int, s string) {
 			diff := newEnd - endPos.runes
 			pos.runes = pos.runes + diff
 		}
-		return e.seek(startPos, pos.runes)
+		return e.closestPosition(combinedPos{runes: pos.runes})
 	}
 	e.caret.start = adjust(e.caret.start)
 	e.caret.end = adjust(e.caret.end)
 	e.invalidate()
-}
-
-// seek returns the byte offset for an absolute rune offset. The provided hint
-// is a position potentially close.
-func (e *Editor) seek(hint combinedPos, runes int) combinedPos {
-	pos := hint
-	for pos.runes > runes && pos.ofs > 0 {
-		_, s := e.rr.runeBefore(pos.ofs)
-		pos.ofs -= s
-		pos.runes--
-	}
-	for pos.runes < runes && pos.ofs < e.rr.len() {
-		_, s := e.rr.runeAt(pos.ofs)
-		pos.ofs += s
-		pos.runes++
-	}
-	return pos
 }
 
 func (e *Editor) movePages(pages int, selAct selectionAction) {

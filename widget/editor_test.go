@@ -163,11 +163,6 @@ func TestEditorCaretConsistency(t *testing.T) {
 				return fmt.Errorf("caret (%d,%d) pos %s, want (%d,%d) pos %s",
 					gotLine, gotCol, gotCoords, want.lineCol.Y, want.lineCol.X, wantCoords)
 			}
-			seekCaret := e.seek(combinedPos{}, e.caret.start.runes)
-			if seekCaret.runes != e.caret.start.runes || seekCaret.ofs != e.caret.start.ofs {
-				return fmt.Errorf("caret ofs %d, runes %d, expected ofs %d runes %d",
-					e.caret.start.ofs, e.caret.start.runes, seekCaret.ofs, seekCaret.runes)
-			}
 			return nil
 		}
 		if err := consistent(); err != nil {
