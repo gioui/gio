@@ -957,49 +957,17 @@ func (e *Editor) MoveCaret(startDelta, endDelta int) {
 }
 
 func (e *Editor) moveStart(selAct selectionAction) {
-	e.caret.start = e.movePosToStart(e.caret.start)
+	e.caret.start = e.closestPosition(combinedPos{lineCol: screenPos{Y: e.caret.start.lineCol.Y}})
 	e.caret.xoff = -e.caret.start.x
 	e.updateSelection(selAct)
 }
 
-func (e *Editor) movePosToStart(pos combinedPos) combinedPos {
-	e.makeValid(&pos)
-	layout := e.lines[pos.lineCol.Y].Layout
-	for i := pos.lineCol.X - 1; i >= 0; i-- {
-		_, s := e.rr.runeBefore(pos.ofs)
-		pos.ofs -= s
-		pos.runes--
-		pos.x -= layout.Advances[i]
-	}
-	pos.lineCol.X = 0
-	return pos
-}
-
 func (e *Editor) moveEnd(selAct selectionAction) {
-	e.caret.start, e.caret.xoff = e.movePosToEnd(e.caret.start)
-	e.updateSelection(selAct)
-}
-
-func (e *Editor) movePosToEnd(pos combinedPos) (combinedPos, fixed.Int26_6) {
-	e.makeValid(&pos)
-	l := e.lines[pos.lineCol.Y]
-	// Only move past the end of the last line
-	end := 0
-	if pos.lineCol.Y < len(e.lines)-1 {
-		end = 1
-	}
-	layout := l.Layout
-	for i := pos.lineCol.X; i < len(layout.Advances)-end; i++ {
-		adv := layout.Advances[i]
-		_, s := e.rr.runeAt(pos.ofs)
-		pos.ofs += s
-		pos.runes++
-		pos.x += adv
-		pos.lineCol.X++
-	}
+	e.caret.start = e.closestPosition(combinedPos{lineCol: screenPos{X: math.MaxInt, Y: e.caret.start.lineCol.Y}})
+	l := e.lines[e.caret.start.lineCol.Y]
 	a := align(e.Alignment, l.Width, e.viewSize.X)
-	xoff := l.Width + a - pos.x
-	return pos, xoff
+	e.caret.xoff = l.Width + a - e.caret.start.x
+	e.updateSelection(selAct)
 }
 
 // moveWord moves the caret to the next word in the specified direction.
