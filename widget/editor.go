@@ -1042,51 +1042,9 @@ func (e *Editor) movePosToLine(pos combinedPos, x fixed.Int26_6, line int) combi
 // negative distances moves backward. Distances are in runes.
 func (e *Editor) MoveCaret(startDelta, endDelta int) {
 	e.makeValid()
-	keepSame := e.caret.start.runes == e.caret.end.runes && startDelta == endDelta
-	e.caret.start = e.movePos(e.caret.start, startDelta)
 	e.caret.xoff = 0
-	// If they were in the same place, and we're moving them the same distance,
-	// just assign the new position, instead of recalculating it.
-	if keepSame {
-		e.caret.end = e.caret.start
-	} else {
-		e.caret.end = e.movePos(e.caret.end, endDelta)
-	}
-}
-
-func (e *Editor) movePos(pos combinedPos, distance int) combinedPos {
-	for ; distance < 0 && pos.ofs > 0; distance++ {
-		if pos.lineCol.X == 0 {
-			// Move to end of previous line.
-			pos = e.movePosToLine(pos, fixed.I(e.maxWidth), pos.lineCol.Y-1)
-			continue
-		}
-		l := e.lines[pos.lineCol.Y].Layout
-		_, s := e.rr.runeBefore(pos.ofs)
-		pos.ofs -= s
-		pos.runes--
-		pos.lineCol.X--
-		pos.x -= l.Advances[pos.lineCol.X]
-	}
-	for ; distance > 0 && pos.ofs < e.rr.len(); distance-- {
-		l := e.lines[pos.lineCol.Y].Layout
-		// Only move past the end of the last line
-		end := 0
-		if pos.lineCol.Y < len(e.lines)-1 {
-			end = 1
-		}
-		if pos.lineCol.X >= len(l.Advances)-end {
-			// Move to start of next line.
-			pos = e.movePosToLine(pos, 0, pos.lineCol.Y+1)
-			continue
-		}
-		pos.x += l.Advances[pos.lineCol.X]
-		_, s := e.rr.runeAt(pos.ofs)
-		pos.ofs += s
-		pos.runes++
-		pos.lineCol.X++
-	}
-	return pos
+	e.caret.start = e.closestPosition(combinedPos{runes: e.caret.start.runes + startDelta})
+	e.caret.end = e.closestPosition(combinedPos{runes: e.caret.end.runes + endDelta})
 }
 
 func (e *Editor) moveStart(selAct selectionAction) {
