@@ -13,6 +13,7 @@ import (
 	"testing"
 	"testing/quick"
 	"unicode"
+	"unicode/utf8"
 
 	"gioui.org/f32"
 	"gioui.org/font/gofont"
@@ -39,6 +40,9 @@ func TestEditor(t *testing.T) {
 	e.SetCaret(0, 0) // shouldn't panic
 	assertCaret(t, e, 0, 0, 0)
 	e.SetText("æbc\naøå•")
+	if got, exp := e.Len(), utf8.RuneCountInString(e.Text()); got != exp {
+		t.Errorf("got length %d, expected %d", got, exp)
+	}
 	e.Layout(gtx, cache, font, fontSize, nil)
 	assertCaret(t, e, 0, 0, 0)
 	e.moveEnd(selectionClear)
@@ -56,9 +60,9 @@ func TestEditor(t *testing.T) {
 
 	e.SetCaret(0, 0)
 	assertCaret(t, e, 0, 0, 0)
-	e.SetCaret(len("æ"), len("æ"))
+	e.SetCaret(utf8.RuneCountInString("æ"), utf8.RuneCountInString("æ"))
 	assertCaret(t, e, 0, 1, 2)
-	e.SetCaret(len("æbc\naøå•"), len("æbc\naøå•"))
+	e.SetCaret(utf8.RuneCountInString("æbc\naøå•"), utf8.RuneCountInString("æbc\naøå•"))
 	assertCaret(t, e, 1, 4, len("æbc\naøå•"))
 
 	// Ensure that password masking does not affect caret behavior

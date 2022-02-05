@@ -214,11 +214,11 @@ func (e *Editor) processEvents(gtx layout.Context) {
 		// Can't process events without a shaper.
 		return
 	}
-	oldStart, oldLen := min(e.caret.start.ofs, e.caret.end.ofs), e.SelectionLen()
+	oldStart, oldLen := min(e.caret.start.runes, e.caret.end.runes), e.SelectionLen()
 	e.processPointer(gtx)
 	e.processKey(gtx)
 	// Queue a SelectEvent if the selection changed, including if it went away.
-	if newStart, newLen := min(e.caret.start.ofs, e.caret.end.ofs), e.SelectionLen(); oldStart != newStart || oldLen != newLen {
+	if newStart, newLen := min(e.caret.start.runes, e.caret.end.runes), e.SelectionLen(); oldStart != newStart || oldLen != newLen {
 		e.events = append(e.events, SelectEvent{})
 	}
 }
@@ -658,9 +658,11 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 	}
 }
 
-// Len is the length of the editor contents.
+// Len is the length of the editor contents, in runes.
 func (e *Editor) Len() int {
-	return e.rr.len()
+	e.makeValid()
+	end := e.closestPosition(combinedPos{runes: math.MaxInt})
+	return end.runes
 }
 
 // Text returns the contents of the editor.
@@ -761,49 +763,6 @@ func (e *Editor) CaretPos() (line, col int) {
 func (e *Editor) CaretCoords() f32.Point {
 	e.makeValid()
 	return f32.Pt(float32(e.caret.start.x)/64, float32(e.caret.start.y))
-}
-
-// offsetToScreenPos takes an offset into the editor text (e.g.
-// e.caret.end.ofs) and returns a combinedPos that corresponds to its current
-// screen position. Hint is either the zero-value position or the result of
-// a previous call with a lower offset.
-//
-// This function is written this way to take advantage of previous work done
-// for offsets after the first. Otherwise you have to start from the top each
-// time.
-func (e *Editor) offsetToScreenPos(hint combinedPos, offset int) combinedPos {
-	if hint == (combinedPos{}) {
-		l := e.lines[0]
-		hint = combinedPos{
-			x: align(e.Alignment, l.Width, e.viewSize.X),
-			y: l.Ascent.Ceil(),
-		}
-	}
-LOOP:
-	for {
-		l := e.lines[hint.lineCol.Y]
-		for ; hint.lineCol.X < len(l.Layout.Advances); hint.lineCol.X++ {
-			if hint.ofs >= offset {
-				break LOOP
-			}
-
-			hint.x += l.Layout.Advances[hint.lineCol.X]
-			_, s := e.rr.runeAt(hint.ofs)
-			hint.ofs += s
-			hint.runes++
-		}
-		if lastLine := hint.lineCol.Y == len(e.lines)-1; lastLine || hint.ofs > offset {
-			break LOOP
-		}
-
-		prevDesc := l.Descent
-		hint.lineCol.Y++
-		hint.lineCol.X = 0
-		l = e.lines[hint.lineCol.Y]
-		hint.x = align(e.Alignment, l.Width, e.viewSize.X)
-		hint.y += (prevDesc + l.Ascent).Ceil()
-	}
-	return hint
 }
 
 // indexPosition returns the latest position from the index no later than pos.
@@ -1083,7 +1042,7 @@ func (e *Editor) movePosToLine(pos combinedPos, x fixed.Int26_6, line int) combi
 // negative distances moves backward. Distances are in runes.
 func (e *Editor) MoveCaret(startDelta, endDelta int) {
 	e.makeValid()
-	keepSame := e.caret.start.ofs == e.caret.end.ofs && startDelta == endDelta
+	keepSame := e.caret.start.runes == e.caret.end.runes && startDelta == endDelta
 	e.caret.start = e.movePos(e.caret.start, startDelta)
 	e.caret.xoff = 0
 	// If they were in the same place, and we're moving them the same distance,
@@ -1309,28 +1268,23 @@ func (e *Editor) NumLines() int {
 	return len(e.lines)
 }
 
-// SelectionLen returns the length of the selection, in bytes; it is
-// equivalent to len(e.SelectedText()).
+// SelectionLen returns the length of the selection, in runes; it is
+// equivalent to utf8.RuneCountInString(e.SelectedText()).
 func (e *Editor) SelectionLen() int {
-	return abs(e.caret.start.ofs - e.caret.end.ofs)
+	return abs(e.caret.start.runes - e.caret.end.runes)
 }
 
-// Selection returns the start and end of the selection, as offsets into the
-// editor text. start can be > end.
+// Selection returns the start and end of the selection, as rune offsets.
+// start can be > end.
 func (e *Editor) Selection() (start, end int) {
-	return e.caret.start.ofs, e.caret.end.ofs
+	return e.caret.start.runes, e.caret.end.runes
 }
 
 // SetCaret moves the caret to start, and sets the selection end to end. start
-// and end are in bytes, and represent offsets into the editor text. start and
-// end must be at a rune boundary.
+// and end are in runes, and represent offsets into the editor text.
 func (e *Editor) SetCaret(start, end int) {
 	e.makeValid()
-	// Constrain start and end to [0, e.Len()].
-	l := e.Len()
-	start = max(min(start, l), 0)
-	end = max(min(end, l), 0)
-	e.caret.start.ofs, e.caret.end.ofs = start, end
+	e.caret.start.runes, e.caret.end.runes = start, end
 	e.makeValidCaret()
 	e.caret.scroll = true
 	e.scroller.Stop()
@@ -1340,24 +1294,17 @@ func (e *Editor) makeValidCaret(positions ...*combinedPos) {
 	// Jump through some hoops to order the offsets given to offsetToScreenPos,
 	// but still be able to update them correctly with the results thereof.
 	positions = append(positions, &e.caret.start, &e.caret.end)
-	sort.Slice(positions, func(i, j int) bool {
-		return positions[i].ofs < positions[j].ofs
-	})
-	var hint combinedPos
 	for _, cp := range positions {
-		hint = e.offsetToScreenPos(hint, cp.ofs)
-		*cp = hint
+		*cp = e.closestPosition(combinedPos{runes: cp.runes})
 	}
 }
 
 // SelectedText returns the currently selected text (if any) from the editor.
 func (e *Editor) SelectedText() string {
-	l := e.SelectionLen()
-	if l == 0 {
-		return ""
-	}
-	buf := make([]byte, l)
-	e.rr.Seek(int64(min(e.caret.start.ofs, e.caret.end.ofs)), io.SeekStart)
+	start := min(e.caret.start.ofs, e.caret.end.ofs)
+	end := max(e.caret.start.ofs, e.caret.end.ofs)
+	buf := make([]byte, end-start)
+	e.rr.Seek(int64(start), io.SeekStart)
 	_, err := e.rr.Read(buf)
 	if err != nil {
 		// The only error that rr.Read can return is EOF, which just means no
@@ -1440,13 +1387,13 @@ func nullLayout(r io.Reader) ([]text.Line, error) {
 	var n int
 	var buf bytes.Buffer
 	for {
-		r, s, err := rr.ReadRune()
-		n += s
-		buf.WriteRune(r)
+		r, _, err := rr.ReadRune()
 		if err != nil {
 			rerr = err
 			break
 		}
+		n++
+		buf.WriteRune(r)
 	}
 	return []text.Line{
 		{
