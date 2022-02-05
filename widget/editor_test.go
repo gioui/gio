@@ -547,10 +547,11 @@ g123456789g
 		gtx.Queue = nil
 		e.Layout(gtx, cache, font, fontSize, nil)
 
-		if e.caret.end.lineCol != tst.startPos || e.caret.start.lineCol != tst.endPos {
+		caretEnd := e.closestPosition(combinedPos{runes: e.caret.end})
+		if caretEnd.lineCol != tst.startPos || e.caret.start.lineCol != tst.endPos {
 			t.Errorf("Test %d pt2: Expected %#v, %#v; got %#v, %#v",
 				n,
-				e.caret.end.lineCol, e.caret.start.lineCol,
+				caretEnd.lineCol, e.caret.start.lineCol,
 				tst.startPos, tst.endPos)
 			continue
 		}

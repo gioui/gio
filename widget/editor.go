@@ -80,7 +80,7 @@ type Editor struct {
 		// common) that the caret (start) is after the end, e.g. after
 		// Shift-DownArrow.
 		start combinedPos
-		end   combinedPos
+		end   int
 	}
 
 	dragging  bool
@@ -214,11 +214,11 @@ func (e *Editor) processEvents(gtx layout.Context) {
 		// Can't process events without a shaper.
 		return
 	}
-	oldStart, oldLen := min(e.caret.start.runes, e.caret.end.runes), e.SelectionLen()
+	oldStart, oldLen := min(e.caret.start.runes, e.caret.end), e.SelectionLen()
 	e.processPointer(gtx)
 	e.processKey(gtx)
 	// Queue a SelectEvent if the selection changed, including if it went away.
-	if newStart, newLen := min(e.caret.start.runes, e.caret.end.runes), e.SelectionLen(); oldStart != newStart || oldLen != newLen {
+	if newStart, newLen := min(e.caret.start.runes, e.caret.end), e.SelectionLen(); oldStart != newStart || oldLen != newLen {
 		e.events = append(e.events, SelectEvent{})
 	}
 }
@@ -229,7 +229,7 @@ func (e *Editor) makeValid() {
 	}
 	e.lines, e.dims = e.layoutText(e.shaper)
 	e.caret.start = e.closestPosition(combinedPos{runes: e.caret.start.runes})
-	e.caret.end = e.closestPosition(combinedPos{runes: e.caret.end.runes})
+	e.caret.end = e.closestPosition(combinedPos{runes: e.caret.end}).runes
 	e.valid = true
 }
 
@@ -273,8 +273,8 @@ func (e *Editor) processPointer(gtx layout.Context) {
 				if evt.Modifiers == key.ModShift {
 					// If they clicked closer to the end, then change the end to
 					// where the caret used to be (effectively swapping start & end).
-					if abs(e.caret.end.ofs-e.caret.start.ofs) < abs(e.caret.start.ofs-prevCaretPos.ofs) {
-						e.caret.end = prevCaretPos
+					if abs(e.caret.end-e.caret.start.runes) < abs(e.caret.start.runes-prevCaretPos.runes) {
+						e.caret.end = prevCaretPos.runes
 					}
 				} else {
 					e.ClearSelection()
@@ -456,7 +456,7 @@ func (e *Editor) command(gtx layout.Context, k key.Event) bool {
 		if k.Modifiers != key.ModShortcut {
 			return false
 		}
-		e.caret.end = e.closestPosition(combinedPos{})
+		e.caret.end = 0
 		e.caret.start = e.closestPosition(combinedPos{runes: math.MaxInt})
 	default:
 		return false
@@ -527,7 +527,8 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 	}
 	cl := textPadding(e.lines)
 	cl.Max = cl.Max.Add(e.viewSize)
-	startSel, endSel := sortPoints(e.caret.start.lineCol, e.caret.end.lineCol)
+	caretEnd := e.closestPosition(combinedPos{runes: e.caret.end})
+	startSel, endSel := sortPoints(e.caret.start.lineCol, caretEnd.lineCol)
 	it := segmentIterator{
 		startSel:  startSel,
 		endSel:    endSel,
@@ -678,8 +679,8 @@ func (e *Editor) Text() string {
 func (e *Editor) SetText(s string) {
 	e.rr = editBuffer{}
 	e.caret.start = combinedPos{}
-	e.caret.end = combinedPos{}
-	e.replace(e.caret.start.runes, e.caret.end.runes, s)
+	e.caret.end = 0
+	e.replace(e.caret.start.runes, e.caret.end, s)
 	e.caret.xoff = 0
 }
 
@@ -880,7 +881,7 @@ func (e *Editor) Delete(runes int) {
 	}
 
 	start := e.caret.start.runes
-	end := e.caret.end.runes
+	end := e.caret.end
 	if start != end {
 		runes -= sign(runes)
 	}
@@ -902,11 +903,11 @@ func (e *Editor) Insert(s string) {
 // there is a selection, append overwrites it.
 // xxx|yyy + append zzz => xxxzzz|yyy
 func (e *Editor) append(s string) {
-	e.replace(e.caret.start.runes, e.caret.end.runes, s)
+	e.replace(e.caret.start.runes, e.caret.end, s)
 	e.caret.xoff = 0
 	e.caret.start.ofs += len(s)
 	e.caret.start.runes += utf8.RuneCountInString(s)
-	e.caret.end = e.caret.start
+	e.caret.end = e.caret.start.runes
 }
 
 // replace the text between start and end with s. Indices are in runes.
@@ -923,17 +924,17 @@ func (e *Editor) replace(start, end int, s string) {
 	e.rr.deleteRunes(startPos.ofs, endPos.runes-startPos.runes)
 	e.rr.prepend(startPos.ofs, s)
 	newEnd := startPos.runes + utf8.RuneCountInString(s)
-	adjust := func(pos combinedPos) combinedPos {
+	adjust := func(pos int) int {
 		switch {
-		case newEnd < pos.runes && pos.runes <= endPos.runes:
-			pos.runes = newEnd
-		case endPos.runes < pos.runes:
+		case newEnd < pos && pos <= endPos.runes:
+			pos = newEnd
+		case endPos.runes < pos:
 			diff := newEnd - endPos.runes
-			pos.runes = pos.runes + diff
+			pos = pos + diff
 		}
-		return e.closestPosition(combinedPos{runes: pos.runes})
+		return pos
 	}
-	e.caret.start = adjust(e.caret.start)
+	e.caret.start = e.closestPosition(combinedPos{runes: adjust(e.caret.start.runes)})
 	e.caret.end = adjust(e.caret.end)
 	e.invalidate()
 }
@@ -954,7 +955,7 @@ func (e *Editor) MoveCaret(startDelta, endDelta int) {
 	e.makeValid()
 	e.caret.xoff = 0
 	e.caret.start = e.closestPosition(combinedPos{runes: e.caret.start.runes + startDelta})
-	e.caret.end = e.closestPosition(combinedPos{runes: e.caret.end.runes + endDelta})
+	e.caret.end = e.closestPosition(combinedPos{runes: e.caret.end + endDelta}).runes
 }
 
 func (e *Editor) moveStart(selAct selectionAction) {
@@ -1019,7 +1020,7 @@ func (e *Editor) deleteWord(distance int) {
 
 	e.makeValid()
 
-	if e.caret.start.ofs != e.caret.end.ofs {
+	if e.caret.start.runes != e.caret.end {
 		e.Delete(1)
 		distance -= sign(distance)
 	}
@@ -1107,13 +1108,13 @@ func (e *Editor) NumLines() int {
 // SelectionLen returns the length of the selection, in runes; it is
 // equivalent to utf8.RuneCountInString(e.SelectedText()).
 func (e *Editor) SelectionLen() int {
-	return abs(e.caret.start.runes - e.caret.end.runes)
+	return abs(e.caret.start.runes - e.caret.end)
 }
 
 // Selection returns the start and end of the selection, as rune offsets.
 // start can be > end.
 func (e *Editor) Selection() (start, end int) {
-	return e.caret.start.runes, e.caret.end.runes
+	return e.caret.start.runes, e.caret.end
 }
 
 // SetCaret moves the caret to start, and sets the selection end to end. start
@@ -1121,15 +1122,16 @@ func (e *Editor) Selection() (start, end int) {
 func (e *Editor) SetCaret(start, end int) {
 	e.makeValid()
 	e.caret.start = e.closestPosition(combinedPos{runes: start})
-	e.caret.end = e.closestPosition(combinedPos{runes: end})
+	e.caret.end = e.closestPosition(combinedPos{runes: end}).runes
 	e.caret.scroll = true
 	e.scroller.Stop()
 }
 
 // SelectedText returns the currently selected text (if any) from the editor.
 func (e *Editor) SelectedText() string {
-	start := min(e.caret.start.ofs, e.caret.end.ofs)
-	end := max(e.caret.start.ofs, e.caret.end.ofs)
+	caretEnd := e.closestPosition(combinedPos{runes: e.caret.end})
+	start := min(e.caret.start.ofs, caretEnd.ofs)
+	end := max(e.caret.start.ofs, caretEnd.ofs)
 	buf := make([]byte, end-start)
 	e.rr.Seek(int64(start), io.SeekStart)
 	_, err := e.rr.Read(buf)
@@ -1150,7 +1152,7 @@ func (e *Editor) updateSelection(selAct selectionAction) {
 // ClearSelection clears the selection, by setting the selection end equal to
 // the selection start.
 func (e *Editor) ClearSelection() {
-	e.caret.end = e.caret.start
+	e.caret.end = e.caret.start.runes
 }
 
 // WriteTo implements io.WriterTo.
