@@ -423,10 +423,12 @@ func (c *callbacks) Event(e event.Event) {
 	defer func() {
 		c.busy = false
 	}()
-	for _, e := range c.waitEvents {
+	for len(c.waitEvents) > 0 {
+		e := c.waitEvents[0]
+		copy(c.waitEvents, c.waitEvents[1:])
+		c.waitEvents = c.waitEvents[:len(c.waitEvents)-1]
 		c.w.processEvent(c.d, e)
 	}
-	c.waitEvents = c.waitEvents[:0]
 	c.w.updateState(c.d)
 	if c.w.closing {
 		c.w.closing = false
