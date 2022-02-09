@@ -359,10 +359,12 @@ func (b *Backend) queryState() glState {
 func (b *Backend) restoreState(dst glState) {
 	src := b.glstate
 	f := b.funcs
+
+	prev := src.texUnits.active
 	for i, unit := range dst.texUnits.binds {
 		src.bindTexture(f, i, unit)
 	}
-	src.activeTexture(f, dst.texUnits.active)
+	src.activeTexture(f, prev)
 	src.bindFramebuffer(f, gl.FRAMEBUFFER, dst.drawFBO)
 	src.bindFramebuffer(f, gl.READ_FRAMEBUFFER, dst.readFBO)
 	src.set(f, gl.BLEND, dst.blend.enable)
