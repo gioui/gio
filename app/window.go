@@ -149,6 +149,7 @@ func NewWindow(options ...Option) *Window {
 		dead:             make(chan struct{}),
 		nocontext:        cnf.CustomRenderer,
 	}
+	w.imeState.compose = key.Range{Start: -1, End: -1}
 	w.semantic.ids = make(map[router.SemanticID]router.SemanticNode)
 	w.callbacks.w = w
 	go w.run(options)
@@ -521,8 +522,10 @@ func (e *editorState) Replace(r key.Range, text string) {
 	}
 	e.Selection.Start = adjust(e.Selection.Start)
 	e.Selection.End = adjust(e.Selection.End)
-	e.compose.Start = adjust(e.compose.Start)
-	e.compose.End = adjust(e.compose.End)
+	if e.compose.Start != -1 {
+		e.compose.Start = adjust(e.compose.Start)
+		e.compose.End = adjust(e.compose.End)
+	}
 	s := e.Snippet
 	if r.End < s.Start || r.Start > s.End {
 		// Replacement does not overlap snippet.

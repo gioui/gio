@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"gioui.org/f32"
 	"gioui.org/io/clipboard"
@@ -154,6 +155,23 @@ static void raiseWindow(CFTypeRef windowRef) {
 	[window makeKeyAndOrderFront:nil];
 }
 
+static CFTypeRef createInputContext(CFTypeRef clientRef) {
+	@autoreleasepool {
+		id<NSTextInputClient> client = (__bridge id<NSTextInputClient>)clientRef;
+		NSTextInputContext *ctx = [[NSTextInputContext alloc] initWithClient:client];
+		return CFBridgingRetain(ctx);
+	}
+}
+
+static void discardMarkedText(CFTypeRef viewRef) {
+    @autoreleasepool {
+		id<NSTextInputClient> view = (__bridge id<NSTextInputClient>)viewRef;
+		NSTextInputContext *ctx = [NSTextInputContext currentInputContext];
+		if (view == [ctx client]) {
+			[ctx discardMarkedText];
+		}
+    }
+}
 */
 import "C"
 
@@ -344,7 +362,12 @@ func (w *window) SetCursor(name pointer.CursorName) {
 	w.cursor = windowSetCursor(w.cursor, name)
 }
 
-func (w *window) EditorStateChanged(old, new editorState) {}
+func (w *window) EditorStateChanged(old, new editorState) {
+	if old != new {
+		C.discardMarkedText(w.view)
+		w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+	}
+}
 
 func (w *window) ShowTextInput(show bool) {}
 
@@ -470,6 +493,133 @@ func gio_onChangeScreen(view C.CFTypeRef, did uint64) {
 	w.displayLink.SetDisplayID(did)
 }
 
+//export gio_hasMarkedText
+func gio_hasMarkedText(view C.CFTypeRef) C.int {
+	w := mustView(view)
+	state := w.w.EditorState()
+	if state.compose.Start != -1 {
+		return 1
+	}
+	return 0
+}
+
+//export gio_markedRange
+func gio_markedRange(view C.CFTypeRef) C.NSRange {
+	w := mustView(view)
+	state := w.w.EditorState()
+	rng := state.compose
+	start, end := rng.Start, rng.End
+	if start == -1 {
+		return C.NSMakeRange(C.NSNotFound, 0)
+	}
+	u16start := state.UTF16Index(start)
+	return C.NSMakeRange(
+		C.NSUInteger(u16start),
+		C.NSUInteger(state.UTF16Index(end)-u16start),
+	)
+}
+
+//export gio_selectedRange
+func gio_selectedRange(view C.CFTypeRef) C.NSRange {
+	w := mustView(view)
+	state := w.w.EditorState()
+	rng := state.Selection
+	start, end := rng.Start, rng.End
+	if start > end {
+		start, end = end, start
+	}
+	u16start := state.UTF16Index(start)
+	return C.NSMakeRange(
+		C.NSUInteger(u16start),
+		C.NSUInteger(state.UTF16Index(end)-u16start),
+	)
+}
+
+//export gio_unmarkText
+func gio_unmarkText(view C.CFTypeRef) {
+	w := mustView(view)
+	w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+}
+
+//export gio_setMarkedText
+func gio_setMarkedText(view, cstr C.CFTypeRef, selRange C.NSRange, replaceRange C.NSRange) {
+	w := mustView(view)
+	str := nsstringToString(cstr)
+	state := w.w.EditorState()
+	rng := state.compose
+	if rng.Start == -1 {
+		rng = state.Selection
+	}
+	if replaceRange.location != C.NSNotFound {
+		// replaceRange is relative to marked (or selected) text.
+		offset := state.UTF16Index(rng.Start)
+		start := state.RunesIndex(int(replaceRange.location) + offset)
+		end := state.RunesIndex(int(replaceRange.location+replaceRange.length) + offset)
+		rng = key.Range{
+			Start: start,
+			End:   end,
+		}
+	}
+	w.w.EditorReplace(rng, str)
+	comp := key.Range{
+		Start: rng.Start,
+		End:   rng.Start + utf8.RuneCountInString(str),
+	}
+	w.w.SetComposingRegion(comp)
+
+	sel := key.Range{Start: comp.End, End: comp.End}
+	if selRange.location != C.NSNotFound {
+		// selRange is relative to inserted text.
+		offset := state.UTF16Index(rng.Start)
+		start := state.RunesIndex(int(selRange.location) + offset)
+		end := state.RunesIndex(int(selRange.location+selRange.length) + offset)
+		sel = key.Range{
+			Start: start,
+			End:   end,
+		}
+	}
+	w.w.SetEditorSelection(sel)
+}
+
+//export gio_substringForProposedRange
+func gio_substringForProposedRange(view C.CFTypeRef, rng C.NSRange, actual C.NSRangePointer) C.CFTypeRef {
+	w := mustView(view)
+	state := w.w.EditorState()
+	start, end := state.Snippet.Start, state.Snippet.End
+	if start > end {
+		start, end = end, start
+	}
+	w.w.SetEditorSnippet(key.Range{
+		Start: state.RunesIndex(int(rng.location)),
+		End:   state.RunesIndex(int(rng.location + rng.length)),
+	})
+	u16start := state.UTF16Index(start)
+	actual.location = C.NSUInteger(u16start)
+	actual.length = C.NSUInteger(state.UTF16Index(end) - u16start)
+	return stringToNSString(state.Snippet.Text)
+}
+
+//export gio_insertText
+func gio_insertText(view, cstr C.CFTypeRef, crng C.NSRange) {
+	w := mustView(view)
+	state := w.w.EditorState()
+	rng := state.compose
+	if rng.Start == -1 {
+		rng = state.Selection
+	}
+	if crng.location != C.NSNotFound {
+		rng = key.Range{
+			Start: state.RunesIndex(int(crng.location)),
+			End:   state.RunesIndex(int(crng.location + crng.length)),
+		}
+	}
+	str := nsstringToString(cstr)
+	w.w.EditorReplace(rng, str)
+	w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+	pos := rng.Start + utf8.RuneCountInString(str)
+	w.w.SetEditorSelection(key.Range{Start: pos, End: pos})
+}
+
 func (w *window) draw() {
 	w.scale = float32(C.getViewBackingScale(w.view))
 	wf, hf := float32(C.viewWidth(w.view)), float32(C.viewHeight(w.view))
@@ -592,7 +742,7 @@ func newWindow(win *callbacks, options []Option) error {
 func newOSWindow() (*window, error) {
 	view := C.gio_createView()
 	if view == 0 {
-		return nil, errors.New("CreateWindow: failed to create view")
+		return nil, errors.New("newOSWindows: failed to create view")
 	}
 	scale := float32(C.getViewBackingScale(view))
 	w := &window{

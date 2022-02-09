@@ -64,7 +64,7 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 	gio_onMouse((__bridge CFTypeRef)view, typ, [NSEvent pressedMouseButtons], p.x, height - p.y, dx, dy, [event timestamp], [event modifierFlags]);
 }
 
-@interface GioView : NSView <CALayerDelegate>
+@interface GioView : NSView <CALayerDelegate,NSTextInputClient>
 @end
 
 @implementation GioView
@@ -130,6 +130,58 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 - (void)doCommandBySelector:(SEL)sel {
 	// Don't pass commands up the responder chain.
 	// They will end up in a beep.
+}
+
+- (BOOL)hasMarkedText {
+	int res = gio_hasMarkedText((__bridge CFTypeRef)self);
+	return res ? YES : NO;
+}
+- (NSRange)markedRange {
+	return gio_markedRange((__bridge CFTypeRef)self);
+}
+- (NSRange)selectedRange {
+	return gio_selectedRange((__bridge CFTypeRef)self);
+}
+- (void)unmarkText {
+	gio_unmarkText((__bridge CFTypeRef)self);
+}
+- (void)setMarkedText:(id)string
+        selectedRange:(NSRange)selRange
+     replacementRange:(NSRange)replaceRange {
+	NSString *str;
+	// string is either an NSAttributedString or an NSString.
+	if ([string isKindOfClass:[NSAttributedString class]]) {
+		str = [string string];
+	} else {
+		str = string;
+	}
+	gio_setMarkedText((__bridge CFTypeRef)self, (__bridge CFTypeRef)str, selRange, replaceRange);
+}
+- (NSArray<NSAttributedStringKey> *)validAttributesForMarkedText {
+	return nil;
+}
+- (NSAttributedString *)attributedSubstringForProposedRange:(NSRange)range
+                                                actualRange:(NSRangePointer)actualRange {
+	NSString *str = CFBridgingRelease(gio_substringForProposedRange((__bridge CFTypeRef)self, range, actualRange));
+	return [[NSAttributedString alloc] initWithString:str attributes:nil];
+}
+- (void)insertText:(id)string
+  replacementRange:(NSRange)replaceRange {
+	NSString *str;
+	// string is either an NSAttributedString or an NSString.
+	if ([string isKindOfClass:[NSAttributedString class]]) {
+		str = [string string];
+	} else {
+		str = string;
+	}
+	gio_insertText((__bridge CFTypeRef)self, (__bridge CFTypeRef)str, replaceRange);
+}
+- (NSUInteger)characterIndexForPoint:(NSPoint)point {
+	return NSNotFound;
+}
+- (NSRect)firstRectForCharacterRange:(NSRange)range
+                         actualRange:(NSRangePointer)actualRange {
+	return NSZeroRect;
 }
 @end
 
