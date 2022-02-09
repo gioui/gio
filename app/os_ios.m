@@ -179,7 +179,7 @@ NSArray<UIKeyCommand *> *_keyCommands;
 }
 
 - (void)insertText:(NSString *)text {
-	onText((__bridge CFTypeRef)self, (char *)text.UTF8String);
+	onText((__bridge CFTypeRef)self, (__bridge CFTypeRef)text);
 }
 
 - (BOOL)canBecomeFirstResponder {

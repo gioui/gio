@@ -226,9 +226,9 @@ func onDeleteBackward(view C.CFTypeRef) {
 }
 
 //export onText
-func onText(view C.CFTypeRef, str *C.char) {
+func onText(view, str C.CFTypeRef) {
 	w := views[view]
-	w.w.EditorInsert(C.GoString(str))
+	w.w.EditorInsert(nsstringToString(str))
 }
 
 //export onTouch
@@ -259,7 +259,9 @@ func onTouch(last C.int, view, touchRef C.CFTypeRef, phase C.NSInteger, x, y C.C
 }
 
 func (w *window) ReadClipboard() {
-	content := nsstringToString(C.readClipboard())
+	cstr := C.readClipboard()
+	defer C.CFRelease(cstr)
+	content := nsstringToString(cstr)
 	w.w.Event(clipboard.Event{Text: content})
 }
 

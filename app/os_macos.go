@@ -11,8 +11,6 @@ import (
 	"runtime"
 	"time"
 	"unicode"
-	"unicode/utf16"
-	"unsafe"
 
 	"gioui.org/f32"
 	"gioui.org/io/clipboard"
@@ -36,14 +34,11 @@ import (
 
 __attribute__ ((visibility ("hidden"))) void gio_main(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(void);
-__attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight);
+__attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight);
 
-static void writeClipboard(unichar *chars, NSUInteger length) {
+static void writeClipboard(CFTypeRef str) {
 	@autoreleasepool {
-		NSString *s = [NSString string];
-		if (length > 0) {
-			s = [NSString stringWithCharacters:chars length:length];
-		}
+		NSString *s = (__bridge NSString *)str;
 		NSPasteboard *p = NSPasteboard.generalPasteboard;
 		[p declareTypes:@[NSPasteboardTypeString] owner:nil];
 		[p setString:s forType:NSPasteboardTypeString];
@@ -144,9 +139,9 @@ static NSRect getScreenFrame(CFTypeRef windowRef) {
 	return [[window screen] frame];
 }
 
-static void setTitle(CFTypeRef windowRef, const char *title) {
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	window.title = [NSString stringWithUTF8String: title];
+static void setTitle(CFTypeRef windowRef, CFTypeRef titleRef) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	window.title = (__bridge NSString *)titleRef;
 }
 
 static CFTypeRef layerForView(CFTypeRef viewRef) {
@@ -229,17 +224,16 @@ func (w *window) contextView() C.CFTypeRef {
 }
 
 func (w *window) ReadClipboard() {
-	content := nsstringToString(C.readClipboard())
+	cstr := C.readClipboard()
+	defer C.CFRelease(cstr)
+	content := nsstringToString(cstr)
 	w.w.Event(clipboard.Event{Text: content})
 }
 
 func (w *window) WriteClipboard(s string) {
-	u16 := utf16.Encode([]rune(s))
-	var chars *C.unichar
-	if len(u16) > 0 {
-		chars = (*C.unichar)(unsafe.Pointer(&u16[0]))
-	}
-	C.writeClipboard(chars, C.NSUInteger(len(u16)))
+	cstr := stringToNSString(s)
+	defer C.CFRelease(cstr)
+	C.writeClipboard(cstr)
 }
 
 func (w *window) updateWindowMode() {
@@ -338,8 +332,8 @@ func (w *window) Configure(options []Option) {
 func (w *window) setTitle(prev, cnf Config) {
 	if prev.Title != cnf.Title {
 		w.config.Title = cnf.Title
-		title := C.CString(cnf.Title)
-		defer C.free(unsafe.Pointer(title))
+		title := stringToNSString(cnf.Title)
+		defer C.CFRelease(title)
 		C.setTitle(w.window, title)
 	}
 }
@@ -391,8 +385,8 @@ func (w *window) setStage(stage system.Stage) {
 }
 
 //export gio_onKeys
-func gio_onKeys(view C.CFTypeRef, cstr *C.char, ti C.double, mods C.NSUInteger, keyDown C.bool) {
-	str := C.GoString(cstr)
+func gio_onKeys(view, cstr C.CFTypeRef, ti C.double, mods C.NSUInteger, keyDown C.bool) {
+	str := nsstringToString(cstr)
 	kmods := convertMods(mods)
 	ks := key.Release
 	if keyDown {
@@ -411,8 +405,8 @@ func gio_onKeys(view C.CFTypeRef, cstr *C.char, ti C.double, mods C.NSUInteger, 
 }
 
 //export gio_onText
-func gio_onText(view C.CFTypeRef, cstr *C.char) {
-	str := C.GoString(cstr)
+func gio_onText(view, cstr C.CFTypeRef) {
+	str := nsstringToString(cstr)
 	w := mustView(view)
 	w.w.EditorInsert(str)
 }
@@ -579,7 +573,7 @@ func newWindow(win *callbacks, options []Option) error {
 		}
 		errch <- nil
 		w.w = win
-		w.window = C.gio_createWindow(w.view, nil, 0, 0, 0, 0, 0, 0)
+		w.window = C.gio_createWindow(w.view, 0, 0, 0, 0, 0, 0)
 		win.SetDriver(w)
 		w.Configure(options)
 		if nextTopLeft.x == 0 && nextTopLeft.y == 0 {

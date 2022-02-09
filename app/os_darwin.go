@@ -28,6 +28,16 @@ static void nsstringGetCharacters(CFTypeRef cstr, unichar *chars, NSUInteger loc
 	NSString *str = (__bridge NSString *)cstr;
 	[str getCharacters:chars range:NSMakeRange(loc, length)];
 }
+
+static CFTypeRef newNSString(unichar *chars, NSUInteger length) {
+	@autoreleasepool {
+		NSString *s = [NSString string];
+		if (length > 0) {
+			s = [NSString stringWithCharacters:chars length:length];
+		}
+		return CFBridgingRetain(s);
+	}
+}
 */
 import "C"
 import (
@@ -89,13 +99,11 @@ func gio_dispatchMainFuncs() {
 	}
 }
 
-// nsstringToString converts a NSString to a Go string, and
-// releases the original string.
+// nsstringToString converts a NSString to a Go string.
 func nsstringToString(str C.CFTypeRef) string {
 	if str == 0 {
 		return ""
 	}
-	defer C.CFRelease(str)
 	n := C.nsstringLength(str)
 	if n == 0 {
 		return ""
@@ -104,6 +112,16 @@ func nsstringToString(str C.CFTypeRef) string {
 	C.nsstringGetCharacters(str, (*C.unichar)(unsafe.Pointer(&chars[0])), 0, n)
 	utf8 := utf16.Decode(chars)
 	return string(utf8)
+}
+
+// stringToNSString converts a Go string to a retained NSString.
+func stringToNSString(str string) C.CFTypeRef {
+	u16 := utf16.Encode([]rune(str))
+	var chars *C.unichar
+	if len(u16) > 0 {
+		chars = (*C.unichar)(unsafe.Pointer(&u16[0]))
+	}
+	return C.newNSString(chars, C.NSUInteger(len(u16)))
 }
 
 func NewDisplayLink(callback func()) (*displayLink, error) {

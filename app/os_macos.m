@@ -117,16 +117,15 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 }
 - (void)keyDown:(NSEvent *)event {
 	NSString *keys = [event charactersIgnoringModifiers];
-	gio_onKeys((__bridge CFTypeRef)self, (char *)[keys UTF8String], [event timestamp], [event modifierFlags], true);
+	gio_onKeys((__bridge CFTypeRef)self, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], true);
 	[self interpretKeyEvents:[NSArray arrayWithObject:event]];
 }
 - (void)keyUp:(NSEvent *)event {
 	NSString *keys = [event charactersIgnoringModifiers];
-	gio_onKeys((__bridge CFTypeRef)self, (char *)[keys UTF8String], [event timestamp], [event modifierFlags], false);
+	gio_onKeys((__bridge CFTypeRef)self, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], false);
 }
 - (void)insertText:(id)string {
-	const char *utf8 = [string UTF8String];
-	gio_onText((__bridge CFTypeRef)self, (char *)utf8);
+	gio_onText((__bridge CFTypeRef)self, (__bridge CFTypeRef)string);
 }
 - (void)doCommandBySelector:(SEL)sel {
 	// Don't pass commands up the responder chain.
@@ -210,7 +209,7 @@ void gio_setCursor(NSUInteger curID) {
 	}
 }
 
-CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight) {
+CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight) {
 	@autoreleasepool {
 		NSRect rect = NSMakeRect(0, 0, width, height);
 		NSUInteger styleMask = NSTitledWindowMask |
@@ -229,9 +228,6 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, const char *title, CGFloat width, 
 			window.contentMaxSize = NSMakeSize(maxWidth, maxHeight);
 		}
 		[window setAcceptsMouseMovedEvents:YES];
-		if (title != nil) {
-			window.title = [NSString stringWithUTF8String: title];
-		}
 		NSView *view = (__bridge NSView *)viewRef;
 		[window setContentView:view];
 		[window makeFirstResponder:view];
