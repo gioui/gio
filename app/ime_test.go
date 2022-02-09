@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
+//go:build go1.18
+// +build go1.18
+
 package app
 
 import (
 	"testing"
+	"unicode/utf8"
 
 	"gioui.org/font/gofont"
 	"gioui.org/io/key"
@@ -106,4 +110,29 @@ func FuzzIME(f *testing.F) {
 			}
 		}
 	})
+}
+
+func TestEditorIndices(t *testing.T) {
+	var s editorState
+	const str = "Hello, 😀"
+	s.Snippet = key.Snippet{
+		Text: str,
+		Range: key.Range{
+			Start: 10,
+			End:   utf8.RuneCountInString(str),
+		},
+	}
+	utf16Indices := [...]struct {
+		Runes, UTF16 int
+	}{
+		{0, 0}, {10, 10}, {17, 17}, {18, 19}, {30, 31},
+	}
+	for _, p := range utf16Indices {
+		if want, got := p.UTF16, s.UTF16Index(p.Runes); want != got {
+			t.Errorf("UTF16Index(%d) = %d, wanted %d", p.Runes, got, want)
+		}
+		if want, got := p.Runes, s.RunesIndex(p.UTF16); want != got {
+			t.Errorf("RunesIndex(%d) = %d, wanted %d", p.UTF16, got, want)
+		}
+	}
 }

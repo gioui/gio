@@ -1081,6 +1081,20 @@ func Java_org_gioui_GioView_imeReplace(env *C.JNIEnv, class C.jclass, handle C.j
 	w.callbacks.EditorReplace(r, text)
 }
 
+//export Java_org_gioui_GioView_imeToRunes
+func Java_org_gioui_GioView_imeToRunes(env *C.JNIEnv, class C.jclass, handle C.jlong, chars C.jint) C.jint {
+	w := views[handle]
+	state := w.callbacks.EditorState()
+	return C.jint(state.RunesIndex(int(chars)))
+}
+
+//export Java_org_gioui_GioView_imeToUTF16
+func Java_org_gioui_GioView_imeToUTF16(env *C.JNIEnv, class C.jclass, handle C.jlong, runes C.jint) C.jint {
+	w := views[handle]
+	state := w.callbacks.EditorState()
+	return C.jint(state.UTF16Index(int(runes)))
+}
+
 func (w *window) EditorStateChanged(old, new editorState) {
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
 		if old.Snippet != new.Snippet {

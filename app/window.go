@@ -9,6 +9,8 @@ import (
 	"image/color"
 	"runtime"
 	"time"
+	"unicode"
+	"unicode/utf16"
 	"unicode/utf8"
 
 	"gioui.org/f32"
@@ -549,6 +551,56 @@ func (e *editorState) Replace(r key.Range, text string) {
 	s.End = s.Start + len(newSnippet)
 	s.Text = string(newSnippet)
 	e.Snippet = s
+}
+
+// UTF16Index converts the given index in runes into an index in utf16 characters.
+func (e *editorState) UTF16Index(runes int) int {
+	if runes == -1 {
+		return -1
+	}
+	if runes < e.Snippet.Start {
+		// Assume runes before sippet are one UTF-16 character each.
+		return runes
+	}
+	chars := e.Snippet.Start
+	runes -= e.Snippet.Start
+	for _, r := range e.Snippet.Text {
+		if runes == 0 {
+			break
+		}
+		runes--
+		chars++
+		if r1, _ := utf16.EncodeRune(r); r1 != unicode.ReplacementChar {
+			chars++
+		}
+	}
+	// Assume runes after snippets are one UTF-16 character each.
+	return chars + runes
+}
+
+// RunesIndex converts the given index in utf16 characters to an index in runes.
+func (e *editorState) RunesIndex(chars int) int {
+	if chars == -1 {
+		return -1
+	}
+	if chars < e.Snippet.Start {
+		// Assume runes before offset are one UTF-16 character each.
+		return chars
+	}
+	runes := e.Snippet.Start
+	chars -= e.Snippet.Start
+	for _, r := range e.Snippet.Text {
+		if chars == 0 {
+			break
+		}
+		chars--
+		runes++
+		if r1, _ := utf16.EncodeRune(r); r1 != unicode.ReplacementChar {
+			chars--
+		}
+	}
+	// Assume runes after snippets are one UTF-16 character each.
+	return runes + chars
 }
 
 func (w *Window) waitAck(d driver) {

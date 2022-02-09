@@ -343,12 +343,12 @@ public final class GioView extends SurfaceView {
 		Snippet snip = getSnippet();
 		editor.inputType = this.keyboardHint;
 		editor.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN | EditorInfo.IME_FLAG_NO_EXTRACT_UI;
-		editor.initialSelStart = snip.toChars(imeSelectionStart(nhandle));
-		editor.initialSelEnd = snip.toChars(imeSelectionEnd(nhandle));
+		editor.initialSelStart = imeToUTF16(nhandle, imeSelectionStart(nhandle));
+		editor.initialSelEnd = imeToUTF16(nhandle, imeSelectionEnd(nhandle));
 		int selStart = editor.initialSelStart - snip.offset;
 		editor.initialCapsMode = TextUtils.getCapsMode(snip.snippet, selStart, this.keyboardHint);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-			editor.setInitialSurroundingSubText(snip.snippet, snip.toChars(snip.offset));
+			editor.setInitialSurroundingSubText(snip.snippet, imeToUTF16(nhandle, snip.offset));
 		}
 		imeSetComposingRegion(nhandle, -1, -1);
 		return new GioInputConnection();
@@ -435,10 +435,10 @@ public final class GioView extends SurfaceView {
 
 	void updateSelection() {
 		Snippet snip = getSnippet();
-		int selStart = snip.toChars(imeSelectionStart(nhandle));
-		int selEnd = snip.toChars(imeSelectionEnd(nhandle));
-		int compStart = snip.toChars(imeComposingStart(nhandle));
-		int compEnd = snip.toChars(imeComposingEnd(nhandle));
+		int selStart = imeToUTF16(nhandle, imeSelectionStart(nhandle));
+		int selEnd = imeToUTF16(nhandle, imeSelectionEnd(nhandle));
+		int compStart = imeToUTF16(nhandle, imeComposingStart(nhandle));
+		int compEnd = imeToUTF16(nhandle, imeComposingEnd(nhandle));
 		imm.updateSelection(this, selStart, selEnd, compStart, compEnd);
 	}
 
@@ -471,6 +471,10 @@ public final class GioView extends SurfaceView {
 	static private native int imeReplace(long handle, int start, int end, String text);
 	static private native int imeSetSelection(long handle, int start, int end);
 	static private native int imeSetComposingRegion(long handle, int start, int end);
+	// imeToRunes converts the Java character index into runes (Java code points).
+	static private native int imeToRunes(long handle, int chars);
+	// imeToUTF16 converts the rune index into Java characters.
+	static private native int imeToUTF16(long handle, int runes);
 
 	private class GioInputConnection implements InputConnection {
 		private int batchDepth;
@@ -507,8 +511,8 @@ public final class GioView extends SurfaceView {
 			int selStart = imeSelectionStart(nhandle);
 			int selEnd = imeSelectionEnd(nhandle);
 			Snippet snip = getSnippet();
-			int before = selStart - snip.toRunes(snip.toChars(selStart) - beforeChars);
-			int after = selEnd - snip.toRunes(snip.toChars(selEnd) - afterChars);
+			int before = selStart - imeToRunes(nhandle, imeToUTF16(nhandle, selStart) - beforeChars);
+			int after = selEnd - imeToRunes(nhandle, imeToUTF16(nhandle, selEnd) - afterChars);
 			return deleteSurroundingTextInCodePoints(before, after);
 		}
 
@@ -520,7 +524,7 @@ public final class GioView extends SurfaceView {
 		@Override public int getCursorCapsMode(int reqModes) {
 			Snippet snip = getSnippet();
 			int selStart = imeSelectionStart(nhandle);
-			return TextUtils.getCapsMode(snip.snippet, snip.toChars(selStart), reqModes);
+			return TextUtils.getCapsMode(snip.snippet, imeToUTF16(nhandle, selStart), reqModes);
 		}
 
 		@Override public ExtractedText getExtractedText(ExtractedTextRequest request, int flags) {
@@ -543,7 +547,7 @@ public final class GioView extends SurfaceView {
 			// than wanted.
 			imeSetSnippet(nhandle, selStart - n, selEnd + n);
 			int start = selEnd;
-			int end = snip.toRunes(snip.toChars(selEnd) + n);
+			int end = imeToRunes(nhandle, imeToUTF16(nhandle, selEnd) + n);
 			String ret = snip.substringRunes(start, end);
 			return ret;
 		}
@@ -555,7 +559,7 @@ public final class GioView extends SurfaceView {
 			// n are in Java characters, but in worst case we'll just ask for more runes
 			// than wanted.
 			imeSetSnippet(nhandle, selStart - n, selEnd + n);
-			int start = snip.toRunes(snip.toChars(selStart) - n);
+			int start = imeToRunes(nhandle, imeToUTF16(nhandle, selStart) - n);
 			int end = selStart;
 			String ret = snip.substringRunes(start, end);
 			return ret;
@@ -589,8 +593,8 @@ public final class GioView extends SurfaceView {
 
 		@Override public boolean setComposingRegion(int startChars, int endChars) {
 			Snippet snip = getSnippet();
-			int compStart = snip.toRunes(startChars);
-			int compEnd = snip.toRunes(endChars);
+			int compStart = imeToRunes(nhandle, startChars);
+			int compEnd = imeToRunes(nhandle, endChars);
 			imeSetComposingRegion(nhandle, compStart, compEnd);
 			return true;
 		}
@@ -614,15 +618,15 @@ public final class GioView extends SurfaceView {
 
 			// Move cursor.
 			Snippet snip = getSnippet();
-			cursor = snip.toRunes(snip.toChars(cursor) + relCursor);
+			cursor = imeToRunes(nhandle, imeToUTF16(nhandle, cursor) + relCursor);
 			imeSetSelection(nhandle, cursor, cursor);
 			return true;
 		}
 
 		@Override public boolean setSelection(int startChars, int endChars) {
 			Snippet snip = getSnippet();
-			int start = snip.toRunes(startChars);
-			int end = snip.toRunes(endChars);
+			int start = imeToRunes(nhandle, startChars);
+			int end = imeToRunes(nhandle, endChars);
 			imeSetSelection(nhandle, start, end);
 			return true;
 		}
@@ -660,7 +664,7 @@ public final class GioView extends SurfaceView {
 			int selEnd = imeSelectionEnd(nhandle);
 			// Expanding in Java characters is ok.
 			imeSetSnippet(nhandle, selStart - beforeChars, selEnd + afterChars);
-			return new SurroundingText(snip.snippet, snip.toChars(selStart), snip.toChars(selEnd), snip.toChars(snip.offset));
+			return new SurroundingText(snip.snippet, imeToUTF16(nhandle, selStart), imeToUTF16(nhandle, selEnd), imeToUTF16(nhandle, snip.offset));
 		}
 	}
 
@@ -678,47 +682,6 @@ public final class GioView extends SurfaceView {
 		// Gio editors to keep track of UTF-16 offsets. The disctinction won't matter in practice because IMEs only
 		// ever see snippets.
 		int offset;
-
-		// toRunes converts the Java character index into runes (Java code points).
-		int toRunes(int chars) {
-			if (chars == -1) {
-				return -1;
-			}
-			if (chars < this.offset) {
-				// Assume runes before offset are one Java character each.
-				return chars;
-			}
-			int runes = this.offset;
-			chars -= this.offset;
-			if (chars > snippet.length()) {
-				// Assume runes after snippets are one Java character each.
-				runes += chars - snippet.length();
-				chars = snippet.length();
-			}
-			runes += snippet.codePointCount(0, chars);
-			return runes;
-		}
-
-		// toChars converts the rune index into Java characters.
-		int toChars(int runes) {
-			if (runes == -1) {
-				return -1;
-			}
-			if (runes < this.offset) {
-				// Assume runes before offset are one Java character each.
-				return runes;
-			}
-			int chars = this.offset;
-			runes -= this.offset;
-			int n = snippet.codePointCount(0, snippet.length());
-			if (runes > n) {
-				// Assume runes after snippets are one Java character each.
-				chars += runes - n;
-				runes = n;
-			}
-			chars += snippet.offsetByCodePoints(0, runes);
-			return chars;
-		}
 
 		// substringRunes returns the substring from start to end in runes. The resuls is
 		// truncated to the snippet.
