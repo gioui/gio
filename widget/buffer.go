@@ -113,6 +113,9 @@ func (e *editBuffer) Seek(offset int64, whence int) (ret int64, err error) {
 }
 
 func (e *editBuffer) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	if e.pos == e.len() {
 		return 0, io.EOF
 	}

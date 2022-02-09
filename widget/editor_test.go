@@ -121,6 +121,9 @@ func assertCaret(t *testing.T, e *Editor, line, col, bytes int) {
 	if bytes != caretBytes {
 		t.Errorf("caret at buffer position %d, expected %d", caretBytes, bytes)
 	}
+	// Ensure that SelectedText() does not panic no matter what the
+	// editor's state is.
+	_ = e.SelectedText()
 }
 
 type editMutation int
