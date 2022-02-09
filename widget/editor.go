@@ -553,7 +553,6 @@ func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size
 // updateSnippet adds a key.SnippetOp if the snippet content or position
 // have changed. off and len are in runes.
 func (e *Editor) updateSnippet(gtx layout.Context, start, end int) {
-	e.makeValid()
 	if start > end {
 		start, end = end, start
 	}
@@ -711,7 +710,6 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 	if !e.caret.on {
 		return
 	}
-	e.makeValid()
 	carWidth := fixed.I(gtx.Px(unit.Dp(1)))
 	caretStart := e.closestPosition(combinedPos{runes: e.caret.start})
 	carX := caretStart.x
@@ -746,7 +744,6 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 
 // Len is the length of the editor contents, in runes.
 func (e *Editor) Len() int {
-	e.makeValid()
 	end := e.closestPosition(combinedPos{runes: math.MaxInt})
 	return end.runes
 }
@@ -840,7 +837,6 @@ func (e *Editor) layoutText(s text.Shaper) ([]text.Line, layout.Dimensions) {
 
 // CaretPos returns the line & column numbers of the caret.
 func (e *Editor) CaretPos() (line, col int) {
-	e.makeValid()
 	caret := e.closestPosition(combinedPos{runes: e.caret.start})
 	return caret.lineCol.Y, caret.lineCol.X
 }
@@ -848,13 +844,13 @@ func (e *Editor) CaretPos() (line, col int) {
 // CaretCoords returns the coordinates of the caret, relative to the
 // editor itself.
 func (e *Editor) CaretCoords() f32.Point {
-	e.makeValid()
 	caret := e.closestPosition(combinedPos{runes: e.caret.start})
 	return f32.Pt(float32(caret.x)/64, float32(caret.y))
 }
 
 // indexPosition returns the latest position from the index no later than pos.
 func (e *Editor) indexPosition(pos combinedPos) combinedPos {
+	e.makeValid()
 	// Initialize index with first caret position.
 	if len(e.index) == 0 {
 		l := e.lines[0]
@@ -1001,7 +997,6 @@ func (e *Editor) replace(start, end int, s string) {
 	if e.SingleLine {
 		s = strings.ReplaceAll(s, "\n", " ")
 	}
-	e.makeValid()
 	if start > end {
 		start, end = end, start
 	}
@@ -1028,7 +1023,6 @@ func (e *Editor) replace(start, end int, s string) {
 }
 
 func (e *Editor) movePages(pages int, selAct selectionAction) {
-	e.makeValid()
 	caret := e.closestPosition(combinedPos{runes: e.caret.start})
 	x := caret.x + e.caret.xoff
 	y := caret.y + pages*e.viewSize.Y
@@ -1042,7 +1036,6 @@ func (e *Editor) movePages(pages int, selAct selectionAction) {
 // relative to their current positions. Positive distances moves forward,
 // negative distances moves backward. Distances are in runes.
 func (e *Editor) MoveCaret(startDelta, endDelta int) {
-	e.makeValid()
 	e.caret.xoff = 0
 	e.caret.start = e.closestPosition(combinedPos{runes: e.caret.start + startDelta}).runes
 	e.caret.end = e.closestPosition(combinedPos{runes: e.caret.end + endDelta}).runes
@@ -1070,7 +1063,6 @@ func (e *Editor) moveEnd(selAct selectionAction) {
 // Positive is forward, negative is backward.
 // Absolute values greater than one will skip that many words.
 func (e *Editor) moveWord(distance int, selAct selectionAction) {
-	e.makeValid()
 	// split the distance information into constituent parts to be
 	// used independently.
 	words, direction := distance, 1
@@ -1115,8 +1107,6 @@ func (e *Editor) deleteWord(distance int) {
 	if distance == 0 {
 		return
 	}
-
-	e.makeValid()
 
 	if e.caret.start != e.caret.end {
 		e.Delete(1)
@@ -1175,7 +1165,6 @@ func (e *Editor) deleteWord(distance int) {
 }
 
 func (e *Editor) scrollToCaret() {
-	e.makeValid()
 	caret := e.closestPosition(combinedPos{runes: e.caret.start})
 	l := e.lines[caret.lineCol.Y]
 	if e.SingleLine {
@@ -1220,7 +1209,6 @@ func (e *Editor) Selection() (start, end int) {
 // SetCaret moves the caret to start, and sets the selection end to end. start
 // and end are in runes, and represent offsets into the editor text.
 func (e *Editor) SetCaret(start, end int) {
-	e.makeValid()
 	e.caret.start = e.closestPosition(combinedPos{runes: start}).runes
 	e.caret.end = e.closestPosition(combinedPos{runes: end}).runes
 	e.caret.scroll = true
