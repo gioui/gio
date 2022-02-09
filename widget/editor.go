@@ -240,8 +240,6 @@ func (e *Editor) makeValid() {
 		return
 	}
 	e.lines, e.dims = e.layoutText(e.shaper)
-	e.caret.start = e.closestPosition(combinedPos{runes: e.caret.start}).runes
-	e.caret.end = e.closestPosition(combinedPos{runes: e.caret.end}).runes
 	e.valid = true
 }
 
