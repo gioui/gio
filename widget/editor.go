@@ -742,9 +742,15 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 	}
 }
 
+// TODO: copied from package math. Remove when Go 1.18 is minimum.
+const (
+	intSize = 32 << (^uint(0) >> 63) // 32 or 64
+	maxInt  = 1<<(intSize-1) - 1
+)
+
 // Len is the length of the editor contents, in runes.
 func (e *Editor) Len() int {
-	end := e.closestPosition(combinedPos{runes: math.MaxInt})
+	end := e.closestPosition(combinedPos{runes: maxInt})
 	return end.runes
 }
 
@@ -1051,7 +1057,7 @@ func (e *Editor) moveStart(selAct selectionAction) {
 
 func (e *Editor) moveEnd(selAct selectionAction) {
 	caret := e.closestPosition(combinedPos{runes: e.caret.start})
-	caret = e.closestPosition(combinedPos{lineCol: screenPos{X: math.MaxInt, Y: caret.lineCol.Y}})
+	caret = e.closestPosition(combinedPos{lineCol: screenPos{X: maxInt, Y: caret.lineCol.Y}})
 	e.caret.start = caret.runes
 	l := e.lines[caret.lineCol.Y]
 	a := align(e.Alignment, l.Width, e.viewSize.X)
