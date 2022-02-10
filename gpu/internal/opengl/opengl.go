@@ -339,10 +339,12 @@ func (b *Backend) queryState() glState {
 			s.storeBufs[i] = gl.Buffer(b.funcs.GetBindingi(gl.SHADER_STORAGE_BUFFER_BINDING, i))
 		}
 	}
+	active := s.texUnits.active
 	for i := range s.texUnits.binds {
 		s.activeTexture(b.funcs, gl.TEXTURE0+gl.Enum(i))
 		s.texUnits.binds[i] = gl.Texture(b.funcs.GetBinding(gl.TEXTURE_BINDING_2D))
 	}
+	s.activeTexture(b.funcs, active)
 	for i := range s.vertAttribs {
 		a := &s.vertAttribs[i]
 		a.enabled = b.funcs.GetVertexAttrib(i, gl.VERTEX_ATTRIB_ARRAY_ENABLED) != gl.FALSE
@@ -357,7 +359,7 @@ func (b *Backend) queryState() glState {
 }
 
 func (b *Backend) restoreState(dst glState) {
-	src := b.glstate
+	src := &b.glstate
 	f := b.funcs
 	for i, unit := range dst.texUnits.binds {
 		src.bindTexture(f, i, unit)
