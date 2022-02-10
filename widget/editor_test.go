@@ -27,6 +27,40 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
+func TestEditorConfigurations(t *testing.T) {
+	gtx := layout.Context{
+		Ops:         new(op.Ops),
+		Constraints: layout.Exact(image.Pt(100, 100)),
+	}
+	cache := text.NewCache(gofont.Collection())
+	fontSize := unit.Px(10)
+	font := text.Font{}
+	sentence := "the quick brown fox jumps over the lazy dog"
+	runes := len([]rune(sentence))
+
+	// Ensure that both ends of the text are reachable in all permutations
+	// of settings that influence layout.
+	for _, lineMode := range []bool{true, false} {
+		for _, alignment := range []text.Alignment{text.Start, text.Middle, text.End} {
+			t.Run(fmt.Sprintf("SingleLine: %v Alignment: %v", lineMode, alignment), func(t *testing.T) {
+				defer func() {
+					if err := recover(); err != nil {
+						t.Error(err)
+					}
+				}()
+				e := new(Editor)
+				e.SingleLine = lineMode
+				e.Alignment = alignment
+				e.SetText(sentence)
+				e.SetCaret(0, 0)
+				e.Layout(gtx, cache, font, fontSize, nil)
+				e.SetCaret(runes, runes)
+				e.Layout(gtx, cache, font, fontSize, nil)
+			})
+		}
+	}
+}
+
 func TestEditor(t *testing.T) {
 	e := new(Editor)
 	gtx := layout.Context{

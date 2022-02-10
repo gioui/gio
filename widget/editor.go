@@ -644,7 +644,7 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 
 	var scrollRange image.Rectangle
 	if e.SingleLine {
-		scrollRange.Min.X = -e.scrollOff.X
+		scrollRange.Min.X = min(-e.scrollOff.X, 0)
 		scrollRange.Max.X = max(0, e.dims.Size.X-(e.scrollOff.X+e.viewSize.X))
 	} else {
 		scrollRange.Min.Y = -e.scrollOff.Y
