@@ -48,6 +48,20 @@ func (p Op) Push(o *op.Ops) Stack {
 func (p Op) add(o *op.Ops) {
 	path := p.path
 
+	if !path.hasSegments && p.width > 0 {
+		if p.path.shape != ops.Rect {
+			panic("only rects have empty paths")
+		}
+		b := frect(path.bounds)
+		var rect Path
+		rect.Begin(o)
+		rect.MoveTo(b.Min)
+		rect.LineTo(f32.Pt(b.Max.X, b.Min.Y))
+		rect.LineTo(b.Max)
+		rect.LineTo(f32.Pt(b.Min.X, b.Max.Y))
+		rect.Close()
+		path = rect.End()
+	}
 	bo := binary.LittleEndian
 	if path.hasSegments {
 		data := ops.Write(&o.Internal, ops.TypePathLen)
@@ -343,5 +357,19 @@ func (o Outline) Op() Op {
 	return Op{
 		path:    o.Path,
 		outline: true,
+	}
+}
+
+// frect converts a rectangle to a f32.Rectangle.
+func frect(r image.Rectangle) f32.Rectangle {
+	return f32.Rectangle{
+		Min: fpt(r.Min), Max: fpt(r.Max),
+	}
+}
+
+// fpt converts an point to a f32.Point.
+func fpt(p image.Point) f32.Point {
+	return f32.Point{
+		X: float32(p.X), Y: float32(p.Y),
 	}
 }

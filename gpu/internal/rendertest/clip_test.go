@@ -277,3 +277,17 @@ func TestPathInterleave(t *testing.T) {
 		paint.ColorOp{}.Add(ops)
 	})
 }
+
+func TestStrokedRect(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		r := clip.Rect{Min: image.Pt(50, 50), Max: image.Pt(100, 100)}
+		paint.FillShape(o,
+			color.NRGBA{R: 0xff, A: 0xFF},
+			clip.Stroke{
+				Path:  r.Path(),
+				Width: 5,
+			}.Op(),
+		)
+	}, func(r result) {
+	})
+}
