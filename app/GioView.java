@@ -434,7 +434,6 @@ public final class GioView extends SurfaceView {
 	}
 
 	void updateSelection() {
-		Snippet snip = getSnippet();
 		int selStart = imeToUTF16(nhandle, imeSelectionStart(nhandle));
 		int selEnd = imeToUTF16(nhandle, imeSelectionEnd(nhandle));
 		int compStart = imeToUTF16(nhandle, imeComposingStart(nhandle));
@@ -510,7 +509,6 @@ public final class GioView extends SurfaceView {
 			// translate before and after to runes.
 			int selStart = imeSelectionStart(nhandle);
 			int selEnd = imeSelectionEnd(nhandle);
-			Snippet snip = getSnippet();
 			int before = selStart - imeToRunes(nhandle, imeToUTF16(nhandle, selStart) - beforeChars);
 			int after = selEnd - imeToRunes(nhandle, imeToUTF16(nhandle, selEnd) - afterChars);
 			return deleteSurroundingTextInCodePoints(before, after);
@@ -592,7 +590,6 @@ public final class GioView extends SurfaceView {
 		}
 
 		@Override public boolean setComposingRegion(int startChars, int endChars) {
-			Snippet snip = getSnippet();
 			int compStart = imeToRunes(nhandle, startChars);
 			int compEnd = imeToRunes(nhandle, endChars);
 			imeSetComposingRegion(nhandle, compStart, compEnd);
@@ -624,7 +621,6 @@ public final class GioView extends SurfaceView {
 		}
 
 		@Override public boolean setSelection(int startChars, int endChars) {
-			Snippet snip = getSnippet();
 			int start = imeToRunes(nhandle, startChars);
 			int end = imeToRunes(nhandle, endChars);
 			imeSetSelection(nhandle, start, end);
