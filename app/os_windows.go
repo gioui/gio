@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 	"unsafe"
 
 	syscall "golang.org/x/sys/windows"
@@ -349,6 +350,48 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		}
 	case _WM_WAKEUP:
 		w.w.Event(wakeupEvent{})
+	case windows.WM_IME_COMPOSITION:
+		imc := windows.ImmGetContext(w.hwnd)
+		if imc == 0 {
+			return windows.TRUE
+		}
+		defer windows.ImmReleaseContext(w.hwnd, imc)
+		state := w.w.EditorState()
+		rng := state.compose
+		if rng.Start == -1 {
+			rng = state.Selection
+		}
+		if rng.Start > rng.End {
+			rng.Start, rng.End = rng.End, rng.Start
+		}
+		var replacement string
+		switch {
+		case lParam&windows.GCS_RESULTSTR != 0:
+			replacement = windows.ImmGetCompositionString(imc, windows.GCS_RESULTSTR)
+		case lParam&windows.GCS_COMPSTR != 0:
+			replacement = windows.ImmGetCompositionString(imc, windows.GCS_COMPSTR)
+		}
+		end := rng.Start + utf8.RuneCountInString(replacement)
+		w.w.EditorReplace(rng, replacement)
+		state = w.w.EditorState()
+		comp := key.Range{
+			Start: rng.Start,
+			End:   end,
+		}
+		if lParam&windows.GCS_DELTASTART != 0 {
+			start := windows.ImmGetCompositionValue(imc, windows.GCS_DELTASTART)
+			comp.Start = state.RunesIndex(state.UTF16Index(comp.Start) + start)
+		}
+		w.w.SetComposingRegion(comp)
+		if lParam&windows.GCS_CURSORPOS != 0 {
+			rel := windows.ImmGetCompositionValue(imc, windows.GCS_CURSORPOS)
+			pos := state.RunesIndex(state.UTF16Index(rng.Start) + rel)
+			w.w.SetEditorSelection(key.Range{Start: pos, End: pos})
+		}
+		return windows.TRUE
+	case windows.WM_IME_ENDCOMPOSITION:
+		w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+		return windows.TRUE
 	}
 
 	return windows.DefWindowProc(hwnd, msg, wParam, lParam)
@@ -451,7 +494,14 @@ loop:
 	return nil
 }
 
-func (w *window) EditorStateChanged(old, new editorState) {}
+func (w *window) EditorStateChanged(old, new editorState) {
+	imc := windows.ImmGetContext(w.hwnd)
+	if imc == 0 {
+		return
+	}
+	defer windows.ImmReleaseContext(w.hwnd, imc)
+	windows.ImmNotifyIME(imc, windows.NI_COMPOSITIONSTR, windows.CPS_CANCEL, 0)
+}
 
 func (w *window) SetAnimating(anim bool) {
 	w.animating = anim

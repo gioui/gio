@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"runtime"
 	"time"
+	"unicode/utf16"
 	"unsafe"
 
 	syscall "golang.org/x/sys/windows"
@@ -75,14 +76,26 @@ type MonitorInfo struct {
 const (
 	TRUE = 1
 
-	CS_HREDRAW = 0x0002
-	CS_VREDRAW = 0x0001
-	CS_OWNDC   = 0x0020
+	CPS_CANCEL = 0x0004
+
+	CS_HREDRAW     = 0x0002
+	CS_INSERTCHAR  = 0x2000
+	CS_NOMOVECARET = 0x4000
+	CS_VREDRAW     = 0x0001
+	CS_OWNDC       = 0x0020
 
 	CW_USEDEFAULT = -2147483648
 
-	GWL_STYLE    = ^(uint32(16) - 1) // -16
-	HWND_TOPMOST = ^(uint32(1) - 1)  // -1
+	GWL_STYLE = ^(uint32(16) - 1) // -16
+
+	GCS_COMPSTR       = 0x0008
+	GCS_COMPREADSTR   = 0x0001
+	GCS_CURSORPOS     = 0x0080
+	GCS_DELTASTART    = 0x0100
+	GCS_RESULTREADSTR = 0x0200
+	GCS_RESULTSTR     = 0x0800
+
+	HWND_TOPMOST = ^(uint32(1) - 1) // -1
 
 	HTCLIENT = 1
 
@@ -102,9 +115,13 @@ const (
 
 	MONITOR_DEFAULTTOPRIMARY = 1
 
+	NI_COMPOSITIONSTR = 0x0015
+
 	SIZE_MAXIMIZED = 2
 	SIZE_MINIMIZED = 1
 	SIZE_RESTORED  = 0
+
+	SCS_SETSTR = GCS_COMPREADSTR | GCS_COMPSTR
 
 	SW_SHOWDEFAULT   = 10
 	SW_SHOWMINIMIZED = 2
@@ -170,44 +187,46 @@ const (
 
 	UNICODE_NOCHAR = 65535
 
-	WM_CANCELMODE       = 0x001F
-	WM_CHAR             = 0x0102
-	WM_CREATE           = 0x0001
-	WM_DPICHANGED       = 0x02E0
-	WM_DESTROY          = 0x0002
-	WM_ERASEBKGND       = 0x0014
-	WM_KEYDOWN          = 0x0100
-	WM_KEYUP            = 0x0101
-	WM_LBUTTONDOWN      = 0x0201
-	WM_LBUTTONUP        = 0x0202
-	WM_MBUTTONDOWN      = 0x0207
-	WM_MBUTTONUP        = 0x0208
-	WM_MOUSEMOVE        = 0x0200
-	WM_MOUSEWHEEL       = 0x020A
-	WM_MOUSEHWHEEL      = 0x020E
-	WM_PAINT            = 0x000F
-	WM_CLOSE            = 0x0010
-	WM_QUIT             = 0x0012
-	WM_SETCURSOR        = 0x0020
-	WM_SETFOCUS         = 0x0007
-	WM_KILLFOCUS        = 0x0008
-	WM_SHOWWINDOW       = 0x0018
-	WM_SIZE             = 0x0005
-	WM_SYSKEYDOWN       = 0x0104
-	WM_SYSKEYUP         = 0x0105
-	WM_RBUTTONDOWN      = 0x0204
-	WM_RBUTTONUP        = 0x0205
-	WM_TIMER            = 0x0113
-	WM_UNICHAR          = 0x0109
-	WM_USER             = 0x0400
-	WM_GETMINMAXINFO    = 0x0024
-	WM_WINDOWPOSCHANGED = 0x0047
+	WM_CANCELMODE         = 0x001F
+	WM_CHAR               = 0x0102
+	WM_CLOSE              = 0x0010
+	WM_CREATE             = 0x0001
+	WM_DPICHANGED         = 0x02E0
+	WM_DESTROY            = 0x0002
+	WM_ERASEBKGND         = 0x0014
+	WM_GETMINMAXINFO      = 0x0024
+	WM_IME_COMPOSITION    = 0x010F
+	WM_IME_ENDCOMPOSITION = 0x010E
+	WM_KEYDOWN            = 0x0100
+	WM_KEYUP              = 0x0101
+	WM_KILLFOCUS          = 0x0008
+	WM_LBUTTONDOWN        = 0x0201
+	WM_LBUTTONUP          = 0x0202
+	WM_MBUTTONDOWN        = 0x0207
+	WM_MBUTTONUP          = 0x0208
+	WM_MOUSEMOVE          = 0x0200
+	WM_MOUSEWHEEL         = 0x020A
+	WM_MOUSEHWHEEL        = 0x020E
+	WM_PAINT              = 0x000F
+	WM_QUIT               = 0x0012
+	WM_SETCURSOR          = 0x0020
+	WM_SETFOCUS           = 0x0007
+	WM_SHOWWINDOW         = 0x0018
+	WM_SIZE               = 0x0005
+	WM_SYSKEYDOWN         = 0x0104
+	WM_SYSKEYUP           = 0x0105
+	WM_RBUTTONDOWN        = 0x0204
+	WM_RBUTTONUP          = 0x0205
+	WM_TIMER              = 0x0113
+	WM_UNICHAR            = 0x0109
+	WM_USER               = 0x0400
+	WM_WINDOWPOSCHANGED   = 0x0047
+
 	WS_CLIPCHILDREN     = 0x00010000
 	WS_CLIPSIBLINGS     = 0x04000000
 	WS_MAXIMIZE         = 0x01000000
 	WS_ICONIC           = 0x20000000
 	WS_VISIBLE          = 0x10000000
-
 	WS_OVERLAPPED       = 0x00000000
 	WS_OVERLAPPEDWINDOW = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME |
 		WS_MINIMIZEBOX | WS_MAXIMIZEBOX
@@ -313,6 +332,12 @@ var (
 
 	gdi32          = syscall.NewLazySystemDLL("gdi32")
 	_GetDeviceCaps = gdi32.NewProc("GetDeviceCaps")
+
+	imm32                    = syscall.NewLazySystemDLL("imm32")
+	_ImmGetContext           = imm32.NewProc("ImmGetContext")
+	_ImmGetCompositionString = imm32.NewProc("ImmGetCompositionStringW")
+	_ImmNotifyIME            = imm32.NewProc("ImmNotifyIME")
+	_ImmReleaseContext       = imm32.NewProc("ImmReleaseContext")
 )
 
 func AdjustWindowRectEx(r *Rect, dwStyle uint32, bMenu int, dwExStyle uint32) {
@@ -485,6 +510,34 @@ func GetWindowLong(hwnd syscall.Handle) (style uintptr) {
 		style, _, _ = _GetWindowLong.Call(uintptr(hwnd), uintptr(GWL_STYLE))
 	}
 	return
+}
+
+func ImmGetContext(hwnd syscall.Handle) syscall.Handle {
+	h, _, _ := _ImmGetContext.Call(uintptr(hwnd))
+	return syscall.Handle(h)
+}
+
+func ImmReleaseContext(hwnd, imc syscall.Handle) {
+	_ImmReleaseContext.Call(uintptr(hwnd), uintptr(imc))
+}
+
+func ImmNotifyIME(imc syscall.Handle, action, index, value int) {
+	_ImmNotifyIME.Call(uintptr(imc), uintptr(action), uintptr(index), uintptr(value))
+}
+
+func ImmGetCompositionString(imc syscall.Handle, key int) string {
+	size, _, _ := _ImmGetCompositionString.Call(uintptr(imc), uintptr(key), 0, 0)
+	if int32(size) <= 0 {
+		return ""
+	}
+	u16 := make([]uint16, size/unsafe.Sizeof(uint16(0)))
+	_ImmGetCompositionString.Call(uintptr(imc), uintptr(key), uintptr(unsafe.Pointer(&u16[0])), size)
+	return string(utf16.Decode(u16))
+}
+
+func ImmGetCompositionValue(imc syscall.Handle, key int) int {
+	val, _, _ := _ImmGetCompositionString.Call(uintptr(imc), uintptr(key), 0, 0)
+	return int(int32(val))
 }
 
 func SetWindowLong(hwnd syscall.Handle, idx uint32, style uintptr) {
