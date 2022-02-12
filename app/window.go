@@ -528,13 +528,14 @@ func (e *editorState) Replace(r key.Range, text string) {
 	}
 	s := e.Snippet
 	if r.End < s.Start || r.Start > s.End {
-		// Replacement does not overlap snippet.
-		e.Snippet.Start = adjust(s.Start)
-		e.Snippet.End = adjust(s.End)
-		return
+		// Discard snippet if it doesn't overlap with replacement.
+		s = key.Snippet{
+			Range: key.Range{
+				Start: r.Start,
+				End:   r.Start,
+			},
+		}
 	}
-	// Replacement overlaps; replace content and expand snippet
-	// to include all of the replacement.
 	var newSnippet []rune
 	snippet := []rune(s.Text)
 	// Append first part of existing snippet.

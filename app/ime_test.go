@@ -47,9 +47,10 @@ func FuzzIME(f *testing.F) {
 		)
 		const cmdLen = 5
 		for len(cmds) >= cmdLen {
+			n := e.Len()
 			rng := key.Range{
-				Start: int(cmds[1]),
-				End:   int(cmds[2]),
+				Start: int(cmds[1]) % (n + 1),
+				End:   int(cmds[2]) % (n + 1),
 			}
 			switch cmds[0] % cmdLen {
 			case cmdReplace:
