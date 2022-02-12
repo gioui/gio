@@ -363,10 +363,8 @@ func (w *window) SetCursor(name pointer.CursorName) {
 }
 
 func (w *window) EditorStateChanged(old, new editorState) {
-	if old != new {
-		C.discardMarkedText(w.view)
-		w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
-	}
+	C.discardMarkedText(w.view)
+	w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
 }
 
 func (w *window) ShowTextInput(show bool) {}
