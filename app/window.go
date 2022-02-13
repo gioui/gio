@@ -474,7 +474,7 @@ func (c *callbacks) SetComposingRegion(r key.Range) {
 }
 
 func (c *callbacks) EditorInsert(text string) {
-	sel := c.w.imeState.Selection
+	sel := c.w.imeState.Selection.Range
 	c.EditorReplace(sel, text)
 	start := sel.Start
 	if sel.End < start {
@@ -492,7 +492,7 @@ func (c *callbacks) EditorReplace(r key.Range, text string) {
 }
 
 func (c *callbacks) SetEditorSelection(r key.Range) {
-	c.w.imeState.Selection = r
+	c.w.imeState.Selection.Range = r
 	c.Event(key.SelectionEvent(r))
 }
 

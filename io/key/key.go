@@ -12,8 +12,10 @@ package key
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"strings"
 
+	"gioui.org/f32"
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/op"
@@ -45,6 +47,7 @@ type FocusOp struct {
 type SelectionOp struct {
 	Tag event.Tag
 	Range
+	Caret
 }
 
 // SnippetOp updates the content snippet for an input handler.
@@ -65,6 +68,16 @@ type Range struct {
 type Snippet struct {
 	Range
 	Text string
+}
+
+// Caret represents the position of a caret.
+type Caret struct {
+	// Pos is the intersection point of the caret and its baseline.
+	Pos f32.Point
+	// Ascent is the length of the caret above its baseline.
+	Ascent float32
+	// Descent is the length of the caret below its baseline.
+	Descent float32
 }
 
 // SelectionEvent is generated when an input method changes the selection.
@@ -229,6 +242,10 @@ func (s SelectionOp) Add(o *op.Ops) {
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(s.Start))
 	bo.PutUint32(data[5:], uint32(s.End))
+	bo.PutUint32(data[9:], math.Float32bits(s.Pos.X))
+	bo.PutUint32(data[13:], math.Float32bits(s.Pos.Y))
+	bo.PutUint32(data[17:], math.Float32bits(s.Ascent))
+	bo.PutUint32(data[21:], math.Float32bits(s.Descent))
 }
 
 func (EditEvent) ImplementsEvent()      {}

@@ -157,7 +157,7 @@ const (
 	TypeSemanticSelectedLen = 2
 	TypeSemanticDisabledLen = 2
 	TypeSnippetLen          = 1 + 4 + 4
-	TypeSelectionLen        = 1 + 4 + 4
+	TypeSelectionLen        = 1 + 2*4 + 2*4 + 4 + 4
 )
 
 func (op *ClipOp) Decode(data []byte) {

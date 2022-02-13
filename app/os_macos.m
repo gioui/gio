@@ -176,12 +176,14 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 	}
 	gio_insertText((__bridge CFTypeRef)self, (__bridge CFTypeRef)str, replaceRange);
 }
-- (NSUInteger)characterIndexForPoint:(NSPoint)point {
-	return NSNotFound;
+- (NSUInteger)characterIndexForPoint:(NSPoint)p {
+	return gio_characterIndexForPoint((__bridge CFTypeRef)self, p);
 }
-- (NSRect)firstRectForCharacterRange:(NSRange)range
-                         actualRange:(NSRangePointer)actualRange {
-	return NSZeroRect;
+- (NSRect)firstRectForCharacterRange:(NSRange)rng
+                         actualRange:(NSRangePointer)actual {
+    NSRect r = gio_firstRectForCharacterRange((__bridge CFTypeRef)self, rng, actual);
+    r = [self convertRect:r toView:nil];
+    return [[self window] convertRectToScreen:r];
 }
 @end
 

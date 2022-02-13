@@ -172,6 +172,16 @@ static void discardMarkedText(CFTypeRef viewRef) {
 		}
     }
 }
+
+static void invalidateCharacterCoordinates(CFTypeRef viewRef) {
+    @autoreleasepool {
+		id<NSTextInputClient> view = (__bridge id<NSTextInputClient>)viewRef;
+		NSTextInputContext *ctx = [NSTextInputContext currentInputContext];
+		if (view == [ctx client]) {
+			[ctx invalidateCharacterCoordinates];
+		}
+    }
+}
 */
 import "C"
 
@@ -363,8 +373,13 @@ func (w *window) SetCursor(name pointer.CursorName) {
 }
 
 func (w *window) EditorStateChanged(old, new editorState) {
-	C.discardMarkedText(w.view)
-	w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+	if old.Selection.Range != new.Selection.Range || old.Snippet != new.Snippet {
+		C.discardMarkedText(w.view)
+		w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+	}
+	if old.Selection.Caret != new.Selection.Caret || old.Selection.Transform != new.Selection.Transform {
+		C.invalidateCharacterCoordinates(w.view)
+	}
 }
 
 func (w *window) ShowTextInput(show bool) {}
@@ -546,7 +561,7 @@ func gio_setMarkedText(view, cstr C.CFTypeRef, selRange C.NSRange, replaceRange 
 	state := w.w.EditorState()
 	rng := state.compose
 	if rng.Start == -1 {
-		rng = state.Selection
+		rng = state.Selection.Range
 	}
 	if replaceRange.location != C.NSNotFound {
 		// replaceRange is relative to marked (or selected) text.
@@ -606,7 +621,7 @@ func gio_insertText(view, cstr C.CFTypeRef, crng C.NSRange) {
 	state := w.w.EditorState()
 	rng := state.compose
 	if rng.Start == -1 {
-		rng = state.Selection
+		rng = state.Selection.Range
 	}
 	if crng.location != C.NSNotFound {
 		rng = key.Range{
@@ -619,6 +634,35 @@ func gio_insertText(view, cstr C.CFTypeRef, crng C.NSRange) {
 	w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
 	pos := rng.Start + utf8.RuneCountInString(str)
 	w.w.SetEditorSelection(key.Range{Start: pos, End: pos})
+}
+
+//export gio_characterIndexForPoint
+func gio_characterIndexForPoint(view C.CFTypeRef, p C.NSPoint) C.NSUInteger {
+	return C.NSNotFound
+}
+
+//export gio_firstRectForCharacterRange
+func gio_firstRectForCharacterRange(view C.CFTypeRef, crng C.NSRange, actual C.NSRangePointer) C.NSRect {
+	w := mustView(view)
+	state := w.w.EditorState()
+	sel := state.Selection
+	u16start := state.UTF16Index(sel.Start)
+	actual.location = C.NSUInteger(u16start)
+	actual.length = 0
+	// Transform to NSView local coordinates (lower left origin, undo backing scale).
+	scale := 1. / float32(C.getViewBackingScale(w.view))
+	height := float32(C.viewHeight(w.view))
+	local := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(scale, -scale)).Offset(f32.Pt(0, height))
+	t := local.Mul(sel.Transform)
+	bounds := f32.Rectangle{
+		Min: t.Transform(sel.Pos.Sub(f32.Pt(0, sel.Ascent))),
+		Max: t.Transform(sel.Pos.Add(f32.Pt(0, sel.Descent))),
+	}.Canon()
+	sz := bounds.Size()
+	return C.NSMakeRect(
+		C.CGFloat(bounds.Min.X), C.CGFloat(bounds.Min.Y),
+		C.CGFloat(sz.X), C.CGFloat(sz.Y),
+	)
 }
 
 func (w *window) draw() {

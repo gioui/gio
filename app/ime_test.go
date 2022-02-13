@@ -78,7 +78,7 @@ func FuzzIME(f *testing.F) {
 				if rng.End > len(runes) {
 					rng.End = len(runes)
 				}
-				state.Selection = rng
+				state.Selection.Range = rng
 			case cmdSnip:
 				r.Queue(key.SnippetEvent(rng))
 				runes := []rune(e.Text())
@@ -106,6 +106,8 @@ func FuzzIME(f *testing.F) {
 			e.Layout(gtx, cache, text.Font{}, unit.Px(10), nil)
 			r.Frame(gtx.Ops)
 			newState := r.EditorState()
+			// We don't track caret position.
+			state.Selection.Caret = newState.Selection.Caret
 			if newState != state.EditorState {
 				t.Errorf("IME state: %+v\neditor state: %+v", state.EditorState, newState)
 			}

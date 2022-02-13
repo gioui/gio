@@ -15,6 +15,19 @@ import (
 	syscall "golang.org/x/sys/windows"
 )
 
+type CompositionForm struct {
+	dwStyle      uint32
+	ptCurrentPos Point
+	rcArea       Rect
+}
+
+type CandidateForm struct {
+	dwIndex      uint32
+	dwStyle      uint32
+	ptCurrentPos Point
+	rcArea       Rect
+}
+
 type Rect struct {
 	Left, Top, Right, Bottom int32
 }
@@ -94,6 +107,9 @@ const (
 	GCS_DELTASTART    = 0x0100
 	GCS_RESULTREADSTR = 0x0200
 	GCS_RESULTSTR     = 0x0800
+
+	CFS_POINT        = 0x0002
+	CFS_CANDIDATEPOS = 0x0040
 
 	HWND_TOPMOST = ^(uint32(1) - 1) // -1
 
@@ -187,40 +203,41 @@ const (
 
 	UNICODE_NOCHAR = 65535
 
-	WM_CANCELMODE         = 0x001F
-	WM_CHAR               = 0x0102
-	WM_CLOSE              = 0x0010
-	WM_CREATE             = 0x0001
-	WM_DPICHANGED         = 0x02E0
-	WM_DESTROY            = 0x0002
-	WM_ERASEBKGND         = 0x0014
-	WM_GETMINMAXINFO      = 0x0024
-	WM_IME_COMPOSITION    = 0x010F
-	WM_IME_ENDCOMPOSITION = 0x010E
-	WM_KEYDOWN            = 0x0100
-	WM_KEYUP              = 0x0101
-	WM_KILLFOCUS          = 0x0008
-	WM_LBUTTONDOWN        = 0x0201
-	WM_LBUTTONUP          = 0x0202
-	WM_MBUTTONDOWN        = 0x0207
-	WM_MBUTTONUP          = 0x0208
-	WM_MOUSEMOVE          = 0x0200
-	WM_MOUSEWHEEL         = 0x020A
-	WM_MOUSEHWHEEL        = 0x020E
-	WM_PAINT              = 0x000F
-	WM_QUIT               = 0x0012
-	WM_SETCURSOR          = 0x0020
-	WM_SETFOCUS           = 0x0007
-	WM_SHOWWINDOW         = 0x0018
-	WM_SIZE               = 0x0005
-	WM_SYSKEYDOWN         = 0x0104
-	WM_SYSKEYUP           = 0x0105
-	WM_RBUTTONDOWN        = 0x0204
-	WM_RBUTTONUP          = 0x0205
-	WM_TIMER              = 0x0113
-	WM_UNICHAR            = 0x0109
-	WM_USER               = 0x0400
-	WM_WINDOWPOSCHANGED   = 0x0047
+	WM_CANCELMODE           = 0x001F
+	WM_CHAR                 = 0x0102
+	WM_CLOSE                = 0x0010
+	WM_CREATE               = 0x0001
+	WM_DPICHANGED           = 0x02E0
+	WM_DESTROY              = 0x0002
+	WM_ERASEBKGND           = 0x0014
+	WM_GETMINMAXINFO        = 0x0024
+	WM_IME_COMPOSITION      = 0x010F
+	WM_IME_ENDCOMPOSITION   = 0x010E
+	WM_IME_STARTCOMPOSITION = 0x010D
+	WM_KEYDOWN              = 0x0100
+	WM_KEYUP                = 0x0101
+	WM_KILLFOCUS            = 0x0008
+	WM_LBUTTONDOWN          = 0x0201
+	WM_LBUTTONUP            = 0x0202
+	WM_MBUTTONDOWN          = 0x0207
+	WM_MBUTTONUP            = 0x0208
+	WM_MOUSEMOVE            = 0x0200
+	WM_MOUSEWHEEL           = 0x020A
+	WM_MOUSEHWHEEL          = 0x020E
+	WM_PAINT                = 0x000F
+	WM_QUIT                 = 0x0012
+	WM_SETCURSOR            = 0x0020
+	WM_SETFOCUS             = 0x0007
+	WM_SHOWWINDOW           = 0x0018
+	WM_SIZE                 = 0x0005
+	WM_SYSKEYDOWN           = 0x0104
+	WM_SYSKEYUP             = 0x0105
+	WM_RBUTTONDOWN          = 0x0204
+	WM_RBUTTONUP            = 0x0205
+	WM_TIMER                = 0x0113
+	WM_UNICHAR              = 0x0109
+	WM_USER                 = 0x0400
+	WM_WINDOWPOSCHANGED     = 0x0047
 
 	WS_CLIPCHILDREN     = 0x00010000
 	WS_CLIPSIBLINGS     = 0x04000000
@@ -338,6 +355,8 @@ var (
 	_ImmGetCompositionString = imm32.NewProc("ImmGetCompositionStringW")
 	_ImmNotifyIME            = imm32.NewProc("ImmNotifyIME")
 	_ImmReleaseContext       = imm32.NewProc("ImmReleaseContext")
+	_ImmSetCandidateWindow   = imm32.NewProc("ImmSetCandidateWindow")
+	_ImmSetCompositionWindow = imm32.NewProc("ImmSetCompositionWindow")
 )
 
 func AdjustWindowRectEx(r *Rect, dwStyle uint32, bMenu int, dwExStyle uint32) {
@@ -534,6 +553,26 @@ func ImmGetCompositionString(imc syscall.Handle, key int) string {
 func ImmGetCompositionValue(imc syscall.Handle, key int) int {
 	val, _, _ := _ImmGetCompositionString.Call(uintptr(imc), uintptr(key), 0, 0)
 	return int(int32(val))
+}
+
+func ImmSetCompositionWindow(imc syscall.Handle, x, y int) {
+	f := CompositionForm{
+		dwStyle: CFS_POINT,
+		ptCurrentPos: Point{
+			X: int32(x), Y: int32(y),
+		},
+	}
+	_ImmSetCompositionWindow.Call(uintptr(imc), uintptr(unsafe.Pointer(&f)))
+}
+
+func ImmSetCandidateWindow(imc syscall.Handle, x, y int) {
+	f := CandidateForm{
+		dwStyle: CFS_CANDIDATEPOS,
+		ptCurrentPos: Point{
+			X: int32(x), Y: int32(y),
+		},
+	}
+	_ImmSetCandidateWindow.Call(uintptr(imc), uintptr(unsafe.Pointer(&f)))
 }
 
 func SetWindowLong(hwnd syscall.Handle, idx uint32, style uintptr) {

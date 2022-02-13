@@ -14,6 +14,7 @@ import (
 	"encoding/binary"
 	"image"
 	"io"
+	"math"
 	"strings"
 	"time"
 
@@ -335,8 +336,16 @@ func (q *Router) collect() {
 					Start: int(int32(bo.Uint32(encOp.Data[1:]))),
 					End:   int(int32(bo.Uint32(encOp.Data[5:]))),
 				},
+				Caret: key.Caret{
+					Pos: f32.Point{
+						X: math.Float32frombits(bo.Uint32(encOp.Data[9:])),
+						Y: math.Float32frombits(bo.Uint32(encOp.Data[13:])),
+					},
+					Ascent:  math.Float32frombits(bo.Uint32(encOp.Data[17:])),
+					Descent: math.Float32frombits(bo.Uint32(encOp.Data[21:])),
+				},
 			}
-			kc.selectionOp(op)
+			kc.selectionOp(t, op)
 
 		// Semantic ops.
 		case ops.TypeSemanticLabel:

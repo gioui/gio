@@ -14,6 +14,7 @@ import android.app.FragmentTransaction;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
@@ -37,14 +38,15 @@ import android.view.SurfaceHolder;
 import android.view.Window;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
-import android.view.inputmethod.InputConnection;
-import android.view.inputmethod.InputMethodManager;
-import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.CorrectionInfo;
 import android.view.inputmethod.CompletionInfo;
-import android.view.inputmethod.InputContentInfo;
+import android.view.inputmethod.CursorAnchorInfo;
+import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.ExtractedText;
 import android.view.inputmethod.ExtractedTextRequest;
+import android.view.inputmethod.InputConnection;
+import android.view.inputmethod.InputMethodManager;
+import android.view.inputmethod.InputContentInfo;
 import android.view.inputmethod.SurroundingText;
 import android.view.accessibility.AccessibilityNodeProvider;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -441,6 +443,31 @@ public final class GioView extends SurfaceView {
 		imm.updateSelection(this, selStart, selEnd, compStart, compEnd);
 	}
 
+	void updateCaret(float m00, float m01, float m02, float m10, float m11, float m12, float caretX, float caretTop, float caretBase, float caretBottom) {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+			return;
+		}
+		Matrix m = new Matrix();
+		m.setValues(new float[]{m00, m01, m02, m10, m11, m12, 0.0f, 0.0f, 1.0f});
+		m.setConcat(getMatrix(), m);
+		int selStart = imeSelectionStart(nhandle);
+		int selEnd = imeSelectionEnd(nhandle);
+		int compStart = imeComposingStart(nhandle);
+		int compEnd = imeComposingEnd(nhandle);
+		Snippet snip = getSnippet();
+		String composing = "";
+		if (compStart != -1) {
+			composing = snip.substringRunes(compStart, compEnd);
+		}
+		CursorAnchorInfo inf = new CursorAnchorInfo.Builder()
+			.setMatrix(m)
+			.setComposingText(imeToUTF16(nhandle, compStart), composing)
+			.setSelectionRange(imeToUTF16(nhandle, selStart), imeToUTF16(nhandle, selEnd))
+			.setInsertionMarkerLocation(caretX, caretTop, caretBase, caretBottom, 0)
+			.build();
+		imm.updateCursorAnchorInfo(this, inf);
+	}
+
 	static private native long onCreateView(GioView view);
 	static private native void onDestroyView(long handle);
 	static private native void onStartView(long handle);
@@ -628,7 +655,8 @@ public final class GioView extends SurfaceView {
 		}
 
 		/*@Override*/ public boolean requestCursorUpdates(int cursorUpdateMode) {
-			return false;
+			// We always provide cursor updates.
+			return true;
 		}
 
 		/*@Override*/ public void closeConnection() {
@@ -675,7 +703,7 @@ public final class GioView extends SurfaceView {
 	private static class Snippet {
 		String snippet;
 		// offset of snippet into the entire editor content. It is in runes because we won't require
-		// Gio editors to keep track of UTF-16 offsets. The disctinction won't matter in practice because IMEs only
+		// Gio editors to keep track of UTF-16 offsets. The distinction won't matter in practice because IMEs only
 		// ever see snippets.
 		int offset;
 

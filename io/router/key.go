@@ -3,14 +3,19 @@
 package router
 
 import (
+	"gioui.org/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 )
 
 // EditorState represents the state of an editor needed by input handlers.
 type EditorState struct {
-	Selection key.Range
-	Snippet   key.Snippet
+	Selection struct {
+		Transform f32.Affine2D
+		key.Range
+		key.Caret
+	}
+	Snippet key.Snippet
 }
 
 type TextInputState uint8
@@ -143,9 +148,11 @@ func (k *keyCollector) inputOp(op key.InputOp) {
 	h.hint = op.Hint
 }
 
-func (k *keyCollector) selectionOp(op key.SelectionOp) {
+func (k *keyCollector) selectionOp(t f32.Affine2D, op key.SelectionOp) {
 	if op.Tag == k.q.focus {
-		k.q.content.Selection = op.Range
+		k.q.content.Selection.Range = op.Range
+		k.q.content.Selection.Caret = op.Caret
+		k.q.content.Selection.Transform = t
 	}
 }
 

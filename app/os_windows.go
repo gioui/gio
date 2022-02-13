@@ -349,6 +349,17 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		}
 	case _WM_WAKEUP:
 		w.w.Event(wakeupEvent{})
+	case windows.WM_IME_STARTCOMPOSITION:
+		imc := windows.ImmGetContext(w.hwnd)
+		if imc == 0 {
+			return windows.TRUE
+		}
+		defer windows.ImmReleaseContext(w.hwnd, imc)
+		sel := w.w.EditorState().Selection
+		caret := sel.Transform.Transform(sel.Caret.Pos.Add(f32.Pt(0, sel.Caret.Descent)))
+		icaret := image.Pt(int(caret.X+.5), int(caret.Y+.5))
+		windows.ImmSetCompositionWindow(imc, icaret.X, icaret.Y)
+		windows.ImmSetCandidateWindow(imc, icaret.X, icaret.Y)
 	case windows.WM_IME_COMPOSITION:
 		imc := windows.ImmGetContext(w.hwnd)
 		if imc == 0 {
@@ -358,7 +369,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		state := w.w.EditorState()
 		rng := state.compose
 		if rng.Start == -1 {
-			rng = state.Selection
+			rng = state.Selection.Range
 		}
 		if rng.Start > rng.End {
 			rng.Start, rng.End = rng.End, rng.Start
@@ -499,7 +510,9 @@ func (w *window) EditorStateChanged(old, new editorState) {
 		return
 	}
 	defer windows.ImmReleaseContext(w.hwnd, imc)
-	windows.ImmNotifyIME(imc, windows.NI_COMPOSITIONSTR, windows.CPS_CANCEL, 0)
+	if old.Selection.Range != new.Selection.Range || old.Snippet != new.Snippet {
+		windows.ImmNotifyIME(imc, windows.NI_COMPOSITIONSTR, windows.CPS_CANCEL, 0)
+	}
 }
 
 func (w *window) SetAnimating(anim bool) {

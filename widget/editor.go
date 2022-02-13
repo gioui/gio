@@ -103,7 +103,10 @@ type Editor struct {
 }
 
 type imeState struct {
-	selection  key.Range
+	selection struct {
+		rng   key.Range
+		caret key.Caret
+	}
 	snippet    key.Snippet
 	start, end int
 }
@@ -524,30 +527,40 @@ func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size
 	e.processEvents(gtx)
 	e.makeValid()
 
-	if e.focused {
-		// Notify IME of selection if it changed.
-		newSel := key.Range{
-			Start: e.caret.start,
-			End:   e.caret.end,
-		}
-		if newSel != e.ime.selection {
-			e.ime.selection = newSel
-			key.SelectionOp{
-				Tag:   &e.eventKey,
-				Range: newSel,
-			}.Add(gtx.Ops)
-		}
-
-		e.updateSnippet(gtx, e.ime.start, e.ime.end)
-	}
-
 	if viewSize := gtx.Constraints.Constrain(e.dims.Size); viewSize != e.viewSize {
 		e.viewSize = viewSize
 		e.invalidate()
 	}
 	e.makeValid()
 
-	return e.layout(gtx, content)
+	dims := e.layout(gtx, content)
+
+	if e.focused {
+		// Notify IME of selection if it changed.
+		newSel := e.ime.selection
+		newSel.rng = key.Range{
+			Start: e.caret.start,
+			End:   e.caret.end,
+		}
+		caretPos, carAsc, carDesc := e.caretInfo()
+		newSel.caret = key.Caret{
+			Pos:     layout.FPt(caretPos),
+			Ascent:  float32(carAsc),
+			Descent: float32(carDesc),
+		}
+		if newSel != e.ime.selection {
+			e.ime.selection = newSel
+			key.SelectionOp{
+				Tag:   &e.eventKey,
+				Range: newSel.rng,
+				Caret: newSel.caret,
+			}.Add(gtx.Ops)
+		}
+
+		e.updateSnippet(gtx, e.ime.start, e.ime.end)
+	}
+
+	return dims
 }
 
 // updateSnippet adds a key.SnippetOp if the snippet content or position
@@ -710,29 +723,23 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 	if !e.caret.on {
 		return
 	}
-	carWidth := fixed.I(gtx.Px(unit.Dp(1)))
-	caretStart := e.closestPosition(combinedPos{runes: e.caret.start})
-	carX := caretStart.x
-	carY := caretStart.y
-
-	carX -= carWidth / 2
-	carAsc, carDesc := -e.lines[caretStart.lineCol.Y].Bounds.Min.Y, e.lines[caretStart.lineCol.Y].Bounds.Max.Y
-	carRect := image.Rectangle{
-		Min: image.Point{X: carX.Ceil(), Y: carY - carAsc.Ceil()},
-		Max: image.Point{X: carX.Ceil() + carWidth.Ceil(), Y: carY + carDesc.Ceil()},
+	carWidth2 := gtx.Px(unit.Dp(1)) / 2
+	if carWidth2 < 1 {
+		carWidth2 = 1
 	}
-	carRect = carRect.Add(image.Point{
-		X: -e.scrollOff.X,
-		Y: -e.scrollOff.Y,
-	})
+	caretPos, carAsc, carDesc := e.caretInfo()
+
+	carRect := image.Rectangle{
+		Min: caretPos.Sub(image.Pt(carWidth2, carAsc)),
+		Max: caretPos.Add(image.Pt(carWidth2, carDesc)),
+	}
 	cl := textPadding(e.lines)
 	// Account for caret width to each side.
-	whalf := (carWidth / 2).Ceil()
-	if cl.Max.X < whalf {
-		cl.Max.X = whalf
+	if cl.Max.X < carWidth2 {
+		cl.Max.X = carWidth2
 	}
-	if cl.Min.X > -whalf {
-		cl.Min.X = -whalf
+	if cl.Min.X > -carWidth2 {
+		cl.Min.X = -carWidth2
 	}
 	cl.Max = cl.Max.Add(e.viewSize)
 	carRect = cl.Intersect(carRect)
@@ -740,6 +747,21 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 		defer clip.Rect(carRect).Push(gtx.Ops).Pop()
 		paint.PaintOp{}.Add(gtx.Ops)
 	}
+}
+
+func (e *Editor) caretInfo() (pos image.Point, ascent, descent int) {
+	caretStart := e.closestPosition(combinedPos{runes: e.caret.start})
+	carX := caretStart.x
+	carY := caretStart.y
+
+	ascent = -e.lines[caretStart.lineCol.Y].Bounds.Min.Y.Ceil()
+	descent = e.lines[caretStart.lineCol.Y].Bounds.Max.Y.Ceil()
+	pos = image.Point{
+		X: carX.Round(),
+		Y: carY,
+	}
+	pos = pos.Sub(e.scrollOff)
+	return
 }
 
 // TODO: copied from package math. Remove when Go 1.18 is minimum.

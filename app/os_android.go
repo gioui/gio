@@ -123,6 +123,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -190,6 +191,7 @@ var gioView struct {
 	isA11yActive       C.jmethodID
 	restartInput       C.jmethodID
 	updateSelection    C.jmethodID
+	updateCaret        C.jmethodID
 }
 
 // ViewEvent is sent whenever the Window's underlying Android view
@@ -475,6 +477,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.isA11yActive = getMethodID(env, class, "isA11yActive", "()Z")
 		m.restartInput = getMethodID(env, class, "restartInput", "()V")
 		m.updateSelection = getMethodID(env, class, "updateSelection", "()V")
+		m.updateCaret = getMethodID(env, class, "updateCaret", "(FFFFFFFFFF)V")
 	})
 	view = C.jni_NewGlobalRef(env, view)
 	wopts := <-mainWindow.out
@@ -1101,10 +1104,19 @@ func (w *window) EditorStateChanged(old, new editorState) {
 			callVoidMethod(env, w.view, gioView.restartInput)
 			return
 		}
-		if old.Selection != new.Selection {
+		if old.Selection.Range != new.Selection.Range {
 			w.callbacks.SetComposingRegion(key.Range{Start: -1, End: -1})
+			callVoidMethod(env, w.view, gioView.updateSelection)
 		}
-		callVoidMethod(env, w.view, gioView.updateSelection)
+		if old.Selection.Transform != new.Selection.Transform || old.Selection.Caret != new.Selection.Caret {
+			sel := new.Selection
+			m00, m01, m02, m10, m11, m12 := sel.Transform.Elems()
+			f := func(v float32) jvalue {
+				return jvalue(math.Float32bits(v))
+			}
+			c := sel.Caret
+			callVoidMethod(env, w.view, gioView.updateCaret, f(m00), f(m01), f(m02), f(m10), f(m11), f(m12), f(c.Pos.X), f(c.Pos.Y-c.Ascent), f(c.Pos.Y), f(c.Pos.Y+c.Descent))
+		}
 	})
 }
 
