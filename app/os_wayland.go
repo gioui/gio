@@ -1297,7 +1297,12 @@ func (r *repeatState) Repeat(d *wlDisplay) {
 			break
 		}
 		for _, e := range d.xkb.DispatchKey(r.key, key.Press) {
-			r.win.Event(e)
+			if ee, ok := e.(key.EditEvent); ok {
+				// There's no support for IME yet.
+				r.win.EditorInsert(ee.Text)
+			} else {
+				r.win.Event(e)
+			}
 		}
 		r.last += delay
 	}
