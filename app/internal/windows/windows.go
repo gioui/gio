@@ -342,12 +342,10 @@ var (
 
 func AdjustWindowRectEx(r *Rect, dwStyle uint32, bMenu int, dwExStyle uint32) {
 	_AdjustWindowRectEx.Call(uintptr(unsafe.Pointer(r)), uintptr(dwStyle), uintptr(bMenu), uintptr(dwExStyle))
-	issue34474KeepAlive(r)
 }
 
 func CallMsgFilter(m *Msg, nCode uintptr) bool {
 	r, _, _ := _CallMsgFilter.Call(uintptr(unsafe.Pointer(m)), nCode)
-	issue34474KeepAlive(m)
 	return r != 0
 }
 
@@ -372,7 +370,6 @@ func CreateWindowEx(dwExStyle uint32, lpClassName uint16, lpWindowName string, d
 		uintptr(hMenu),
 		uintptr(hInstance),
 		uintptr(lpParam))
-	issue34474KeepAlive(wname)
 	if hwnd == 0 {
 		return 0, fmt.Errorf("CreateWindowEx failed: %v", err)
 	}
@@ -390,7 +387,6 @@ func DestroyWindow(hwnd syscall.Handle) {
 
 func DispatchMessage(m *Msg) {
 	_DispatchMessage.Call(uintptr(unsafe.Pointer(m)))
-	issue34474KeepAlive(m)
 }
 
 func EmptyClipboard() error {
@@ -401,9 +397,10 @@ func EmptyClipboard() error {
 	return nil
 }
 
-func GetWindowRect(hwnd syscall.Handle, r *Rect) {
-	_GetWindowRect.Call(uintptr(hwnd), uintptr(unsafe.Pointer(r)))
-	issue34474KeepAlive(r)
+func GetWindowRect(hwnd syscall.Handle) Rect {
+	var r Rect
+	_GetWindowRect.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&r)))
+	return r
 }
 
 func GetClipboardData(format uint32) (syscall.Handle, error) {
@@ -468,7 +465,6 @@ func GetMessage(m *Msg, hwnd syscall.Handle, wMsgFilterMin, wMsgFilterMax uint32
 		uintptr(hwnd),
 		uintptr(wMsgFilterMin),
 		uintptr(wMsgFilterMax))
-	issue34474KeepAlive(m)
 	return int32(r)
 }
 
@@ -645,7 +641,6 @@ func OpenClipboard(hwnd syscall.Handle) error {
 
 func PeekMessage(m *Msg, hwnd syscall.Handle, wMsgFilterMin, wMsgFilterMax, wRemoveMsg uint32) bool {
 	r, _, _ := _PeekMessage.Call(uintptr(unsafe.Pointer(m)), uintptr(hwnd), uintptr(wMsgFilterMin), uintptr(wMsgFilterMax), uintptr(wRemoveMsg))
-	issue34474KeepAlive(m)
 	return r != 0
 }
 
@@ -668,7 +663,6 @@ func ReleaseCapture() bool {
 
 func RegisterClassEx(cls *WndClassEx) (uint16, error) {
 	a, _, err := _RegisterClassExW.Call(uintptr(unsafe.Pointer(cls)))
-	issue34474KeepAlive(cls)
 	if a == 0 {
 		return 0, fmt.Errorf("RegisterClassExW failed: %v", err)
 	}
@@ -718,7 +712,6 @@ func SetTimer(hwnd syscall.Handle, nIDEvent uintptr, uElapse uint32, timerProc u
 
 func ScreenToClient(hwnd syscall.Handle, p *Point) {
 	_ScreenToClient.Call(uintptr(hwnd), uintptr(unsafe.Pointer(p)))
-	issue34474KeepAlive(p)
 }
 
 func ShowWindow(hwnd syscall.Handle, nCmdShow int32) {
@@ -727,7 +720,6 @@ func ShowWindow(hwnd syscall.Handle, nCmdShow int32) {
 
 func TranslateMessage(m *Msg) {
 	_TranslateMessage.Call(uintptr(unsafe.Pointer(m)))
-	issue34474KeepAlive(m)
 }
 
 func UnregisterClass(cls uint16, hInst syscall.Handle) {
@@ -755,10 +747,4 @@ func (p *WindowPlacement) Set(Left, Top, Right, Bottom int) {
 	p.rcNormalPosition.Top = int32(Top)
 	p.rcNormalPosition.Right = int32(Right)
 	p.rcNormalPosition.Bottom = int32(Bottom)
-}
-
-// issue34474KeepAlive calls runtime.KeepAlive as a
-// workaround for golang.org/issue/34474.
-func issue34474KeepAlive(v interface{}) {
-	runtime.KeepAlive(v)
 }

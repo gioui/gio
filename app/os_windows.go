@@ -190,8 +190,7 @@ func createNativeWindow() (*window, error) {
 // If anything has changed it emits a ConfigEvent to notify the application.
 func (w *window) update() {
 	var triggerEvent bool
-	var r windows.Rect
-	windows.GetWindowRect(w.hwnd, &r)
+	r := windows.GetWindowRect(w.hwnd)
 	size := image.Point{
 		X: int(r.Right - r.Left - w.deltas.width),
 		Y: int(r.Bottom - r.Top - w.deltas.height),
@@ -607,8 +606,7 @@ func (w *window) Configure(options []Option) {
 		width := int32(w.config.Size.X)
 		height := int32(w.config.Size.Y)
 		// Get the current window size and position.
-		var wr windows.Rect
-		windows.GetWindowRect(w.hwnd, &wr)
+		wr := windows.GetWindowRect(w.hwnd)
 		// Set desired window size.
 		wr.Right = wr.Left + width
 		wr.Bottom = wr.Top + height
