@@ -580,17 +580,20 @@ func gio_setMarkedText(view, cstr C.CFTypeRef, selRange C.NSRange, replaceRange 
 }
 
 //export gio_substringForProposedRange
-func gio_substringForProposedRange(view C.CFTypeRef, rng C.NSRange, actual C.NSRangePointer) C.CFTypeRef {
+func gio_substringForProposedRange(view C.CFTypeRef, crng C.NSRange, actual C.NSRangePointer) C.CFTypeRef {
 	w := mustView(view)
 	state := w.w.EditorState()
 	start, end := state.Snippet.Start, state.Snippet.End
 	if start > end {
 		start, end = end, start
 	}
-	w.w.SetEditorSnippet(key.Range{
-		Start: state.RunesIndex(int(rng.location)),
-		End:   state.RunesIndex(int(rng.location + rng.length)),
-	})
+	rng := key.Range{
+		Start: state.RunesIndex(int(crng.location)),
+		End:   state.RunesIndex(int(crng.location + crng.length)),
+	}
+	if rng.Start < start || end < rng.End {
+		w.w.SetEditorSnippet(rng)
+	}
 	u16start := state.UTF16Index(start)
 	actual.location = C.NSUInteger(u16start)
 	actual.length = C.NSUInteger(state.UTF16Index(end) - u16start)
