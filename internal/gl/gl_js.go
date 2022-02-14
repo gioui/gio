@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"syscall/js"
+	"unsafe"
 )
 
 type Functions struct {
@@ -108,6 +109,10 @@ type Functions struct {
 	_useProgram                        js.Value
 	_vertexAttribPointer               js.Value
 	_viewport                          js.Value
+	_fastReadPixels                    js.Value
+	_fastBufferData                    js.Value
+	_fastBufferSubData                 js.Value
+	_fastTexSubImage2D                 js.Value
 }
 
 type Context js.Value
@@ -203,6 +208,11 @@ func NewFunctions(ctx Context, forceES bool) (*Functions, error) {
 		_useProgram:                        _bind(webgl, `useProgram`),
 		_vertexAttribPointer:               _bind(webgl, `vertexAttribPointer`),
 		_viewport:                          _bind(webgl, `viewport`),
+
+		_fastReadPixels:    js.Global().Get("_fastReadPixels"),
+		_fastBufferData:    js.Global().Get("_fastBufferData"),
+		_fastBufferSubData: js.Global().Get("_fastBufferSubData"),
+		_fastTexSubImage2D: js.Global().Get("_fastTexSubImage2D"),
 	}
 	if err := f.Init(); err != nil {
 		return nil, err
@@ -292,11 +302,11 @@ func (f *Functions) BufferData(target Enum, size int, usage Enum, data []byte) {
 		if len(data) != size {
 			panic("size mismatch")
 		}
-		f._bufferData.Invoke(int(target), f.byteArrayOf(data), int(usage))
+		f._fastBufferData.Invoke(f._bufferData, int(target), int(uintptr(unsafe.Pointer(&data[0]))), len(data), int(usage))
 	}
 }
 func (f *Functions) BufferSubData(target Enum, offset int, src []byte) {
-	f._bufferSubData.Invoke(int(target), offset, f.byteArrayOf(src))
+	f._fastBufferSubData.Invoke(f._bufferSubData, int(target), offset, int(uintptr(unsafe.Pointer(&src[0]))), len(src))
 }
 func (f *Functions) CheckFramebufferStatus(target Enum) Enum {
 	return Enum(f._checkFramebufferStatus.Invoke(int(target)).Int())
@@ -550,9 +560,7 @@ func (f *Functions) RenderbufferStorage(target, internalformat Enum, width, heig
 	f._renderbufferStorage.Invoke(int(target), int(internalformat), width, height)
 }
 func (f *Functions) ReadPixels(x, y, width, height int, format, ty Enum, data []byte) {
-	ba := f.byteArrayOf(data)
-	f._readPixels.Invoke(x, y, width, height, int(format), int(ty), ba)
-	js.CopyBytesToGo(data, ba)
+	f._fastReadPixels.Invoke(f._readPixels, x, y, width, height, int(format), int(ty), int(uintptr(unsafe.Pointer(&data[0]))), len(data))
 }
 func (f *Functions) Scissor(x, y, width, height int32) {
 	f._scissor.Invoke(x, y, width, height)
@@ -567,7 +575,7 @@ func (f *Functions) TexStorage2D(target Enum, levels int, internalFormat Enum, w
 	f._texStorage2D.Invoke(int(target), levels, int(internalFormat), width, height)
 }
 func (f *Functions) TexSubImage2D(target Enum, level int, x, y, width, height int, format, ty Enum, data []byte) {
-	f._texSubImage2D.Invoke(int(target), level, x, y, width, height, int(format), int(ty), f.byteArrayOf(data))
+	f._fastTexSubImage2D.Invoke(f._texSubImage2D, int(target), level, x, y, width, height, int(format), int(ty), int(uintptr(unsafe.Pointer(&data[0]))), len(data))
 }
 func (f *Functions) TexParameteri(target, pname Enum, param int) {
 	f._texParameteri.Invoke(int(target), int(pname), int(param))
@@ -601,16 +609,6 @@ func (f *Functions) VertexAttribPointer(dst Attrib, size int, ty Enum, normalize
 }
 func (f *Functions) Viewport(x, y, width, height int) {
 	f._viewport.Invoke(x, y, width, height)
-}
-
-func (f *Functions) byteArrayOf(data []byte) js.Value {
-	if len(data) == 0 {
-		return js.Null()
-	}
-	f.resizeByteBuffer(len(data))
-	ba := f.uint8Array.New(f.arrayBuf, int(0), int(len(data)))
-	js.CopyBytesToJS(ba, data)
-	return ba
 }
 
 func (f *Functions) resizeByteBuffer(n int) {
