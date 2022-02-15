@@ -64,7 +64,7 @@ type Range struct {
 }
 
 // Snippet represents a snippet of text content used for communicating between
-// an editor and an input method. Offset and Length are in runes.
+// an editor and an input method.
 type Snippet struct {
 	Range
 	Text string
