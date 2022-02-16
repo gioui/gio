@@ -61,7 +61,6 @@ type Editor struct {
 	viewSize     image.Point
 	valid        bool
 	lines        []text.Line
-	shapes       []line
 	dims         layout.Dimensions
 	requestFocus bool
 
@@ -620,34 +619,6 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 		e.scrollToCaret()
 	}
 
-	off := image.Point{
-		X: -e.scrollOff.X,
-		Y: -e.scrollOff.Y,
-	}
-	cl := textPadding(e.lines)
-	cl.Max = cl.Max.Add(e.viewSize)
-	caretStart := e.closestPosition(combinedPos{runes: e.caret.start})
-	caretEnd := e.closestPosition(combinedPos{runes: e.caret.end})
-	startSel, endSel := sortPoints(caretStart.lineCol, caretEnd.lineCol)
-	it := segmentIterator{
-		startSel:  startSel,
-		endSel:    endSel,
-		Lines:     e.lines,
-		Clip:      cl,
-		Alignment: e.Alignment,
-		Width:     e.viewSize.X,
-		Offset:    off,
-	}
-	e.shapes = e.shapes[:0]
-	for {
-		layout, off, selected, yOffs, size, ok := it.Next()
-		if !ok {
-			break
-		}
-		op := clip.Outline{Path: e.shaper.Shape(e.font, e.textSize, layout)}.Op()
-		e.shapes = append(e.shapes, line{off, op, selected, yOffs, size})
-	}
-
 	key.InputOp{Tag: &e.eventKey, Hint: e.InputHint}.Add(gtx.Ops)
 	if e.requestFocus {
 		key.FocusOp{Tag: &e.eventKey}.Add(gtx.Ops)
@@ -700,17 +671,50 @@ func (e *Editor) PaintSelection(gtx layout.Context) {
 	cl := textPadding(e.lines)
 	cl.Max = cl.Max.Add(e.viewSize)
 	defer clip.Rect(cl).Push(gtx.Ops).Pop()
-	for _, shape := range e.shapes {
-		if !shape.selected {
-			continue
+	selStart, selEnd := e.caret.start, e.caret.end
+	if selStart > selEnd {
+		selStart, selEnd = selEnd, selStart
+	}
+	caretStart := e.closestPosition(combinedPos{runes: selStart})
+	caretEnd := e.closestPosition(combinedPos{runes: selEnd})
+	scroll := image.Point{
+		X: e.scrollOff.X,
+		Y: e.scrollOff.Y,
+	}
+	cl = cl.Add(scroll)
+	pos := e.seekFirstVisibleLine(cl.Min.Y)
+	for !posIsBelow(e.lines, pos, cl.Max.Y) {
+		start, end := clipLine(e.lines, e.Alignment, e.viewSize.X, cl, pos)
+		lineIdx := start.lineCol.Y
+		if lineIdx > caretEnd.lineCol.Y {
+			// Line is after selection end; we're done.
+			return
 		}
-		offset := shape.offset
-		offset.Y += shape.selectionYOffs
-		t := op.Offset(layout.FPt(offset)).Push(gtx.Ops)
-		cl := clip.Rect(image.Rectangle{Max: shape.selectionSize}).Push(gtx.Ops)
+		// Clamp start, end to selection.
+		if start.runes < selStart {
+			start = caretStart
+		}
+		if end.runes > selEnd {
+			end = caretEnd
+		}
+
+		line := e.lines[start.lineCol.Y]
+		dotStart := image.Pt(start.x.Round(), start.y)
+		dotEnd := image.Pt(end.x.Round(), end.y)
+		t := op.Offset(layout.FPt(scroll.Mul(-1))).Push(gtx.Ops)
+		size := image.Rectangle{
+			Min: dotStart.Sub(image.Point{Y: line.Ascent.Ceil()}),
+			Max: dotEnd.Add(image.Point{Y: line.Descent.Ceil()}),
+		}
+		op := clip.Rect(size).Push(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
-		cl.Pop()
+		op.Pop()
 		t.Pop()
+
+		if pos.lineCol.Y == len(e.lines)-1 {
+			break
+		}
+		pos = e.closestPosition(combinedPos{lineCol: screenPos{Y: pos.lineCol.Y + 1}})
 	}
 }
 
@@ -718,12 +722,28 @@ func (e *Editor) PaintText(gtx layout.Context) {
 	cl := textPadding(e.lines)
 	cl.Max = cl.Max.Add(e.viewSize)
 	defer clip.Rect(cl).Push(gtx.Ops).Pop()
-	for _, shape := range e.shapes {
-		t := op.Offset(layout.FPt(shape.offset)).Push(gtx.Ops)
-		cl := shape.clip.Push(gtx.Ops)
+	scroll := image.Point{
+		X: e.scrollOff.X,
+		Y: e.scrollOff.Y,
+	}
+	cl = cl.Add(scroll)
+	pos := e.seekFirstVisibleLine(cl.Min.Y)
+	for !posIsBelow(e.lines, pos, cl.Max.Y) {
+		start, end := clipLine(e.lines, e.Alignment, e.viewSize.X, cl, pos)
+		line := e.lines[start.lineCol.Y]
+		l := subLayout(line, start.lineCol.X, end.lineCol.X)
+
+		off := image.Point{X: start.x.Floor(), Y: start.y}.Sub(scroll)
+		t := op.Offset(layout.FPt(off)).Push(gtx.Ops)
+		op := clip.Outline{Path: e.shaper.Shape(e.font, e.textSize, l)}.Op().Push(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
-		cl.Pop()
+		op.Pop()
 		t.Pop()
+
+		if pos.lineCol.Y == len(e.lines)-1 {
+			break
+		}
+		pos = e.closestPosition(combinedPos{lineCol: screenPos{Y: pos.lineCol.Y + 1}})
 	}
 }
 
@@ -755,6 +775,19 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 		defer clip.Rect(carRect).Push(gtx.Ops).Pop()
 		paint.PaintOp{}.Add(gtx.Ops)
 	}
+}
+
+func (e *Editor) seekFirstVisibleLine(y int) combinedPos {
+	pos := e.closestPosition(combinedPos{y: y})
+	for pos.lineCol.Y > 0 {
+		prevLine := pos.lineCol.Y - 1
+		prev := e.closestPosition(combinedPos{lineCol: screenPos{Y: prevLine}})
+		if posIsAbove(e.lines, prev, y) {
+			break
+		}
+		pos = prev
+	}
+	return pos
 }
 
 func (e *Editor) caretInfo() (pos image.Point, ascent, descent int) {
@@ -889,11 +922,7 @@ func (e *Editor) indexPosition(pos combinedPos) combinedPos {
 	e.makeValid()
 	// Initialize index with first caret position.
 	if len(e.index) == 0 {
-		l := e.lines[0]
-		e.index = append(e.index, combinedPos{
-			x: align(e.Alignment, l.Width, e.viewSize.X),
-			y: l.Ascent.Ceil(),
-		})
+		e.index = append(e.index, firstPos(e.lines[0], e.Alignment, e.viewSize.X))
 	}
 	i := sort.Search(len(e.index), func(i int) bool {
 		return positionGreaterOrEqual(e.lines, e.index[i], pos)
@@ -949,7 +978,7 @@ func (e *Editor) closestPosition(pos combinedPos) combinedPos {
 	const runesPerIndexEntry = 50
 	for {
 		var done bool
-		closest, done = seekPosition(e.lines, closest, pos, e.Alignment, e.viewSize.X, runesPerIndexEntry)
+		closest, done = seekPosition(e.lines, e.Alignment, e.viewSize.X, closest, pos, runesPerIndexEntry)
 		if done {
 			return closest
 		}
@@ -959,7 +988,7 @@ func (e *Editor) closestPosition(pos combinedPos) combinedPos {
 
 // seekPosition seeks to the position closest to needle, starting at start and returns true.
 // If limit is non-zero, seekPosition stops seeks after limit runes and returns false.
-func seekPosition(lines []text.Line, start, needle combinedPos, alignment text.Alignment, width, limit int) (combinedPos, bool) {
+func seekPosition(lines []text.Line, alignment text.Alignment, width int, start, needle combinedPos, limit int) (combinedPos, bool) {
 	l := lines[start.lineCol.Y]
 	count := 0
 	// Advance next and prev until next is greater than or equal to pos.
