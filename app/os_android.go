@@ -911,7 +911,7 @@ func convertKeyCode(code C.jint) (string, bool) {
 		n = key.NameDeleteBackward
 	case C.AKEYCODE_NUMPAD_ENTER:
 		n = key.NameEnter
-	case C.AKEYCODE_ENTER:
+	case C.AKEYCODE_ENTER, C.AKEYCODE_DPAD_CENTER:
 		n = key.NameEnter
 	case C.AKEYCODE_CTRL_LEFT, C.AKEYCODE_CTRL_RIGHT:
 		n = key.NameCtrl
