@@ -398,7 +398,7 @@ func (e *Editor) moveLines(distance int, selAct selectionAction) {
 	pos := e.closestPosition(combinedPos{lineCol: screenPos{Y: caretStart.lineCol.Y + distance}})
 	pos = e.closestPosition(combinedPos{x: x, y: pos.y})
 	e.caret.start = pos.runes
-	e.caret.xoff = x - caretStart.x
+	e.caret.xoff = x - pos.x
 	e.updateSelection(selAct)
 }
 

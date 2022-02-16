@@ -120,6 +120,14 @@ func TestEditor(t *testing.T) {
 			}
 		}
 	}
+
+	// Test that moveLine applies x offsets from previous moves.
+	e.SetText("long line\nshort")
+	e.SetCaret(0, 0)
+	e.moveEnd(selectionClear)
+	e.moveLines(+1, selectionClear)
+	e.moveLines(-1, selectionClear)
+	assertCaret(t, e, 0, utf8.RuneCountInString("long line"), len("long line"))
 }
 
 func TestEditorDimensions(t *testing.T) {
