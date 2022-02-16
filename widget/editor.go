@@ -69,6 +69,9 @@ type Editor struct {
 	// spaced intervals to speed up caret seeking.
 	index []combinedPos
 
+	// offIndex is an index of rune index to byte offsets.
+	offIndex []offEntry
+
 	// ime tracks the state relevant to input methods.
 	ime struct {
 		imeState
@@ -102,6 +105,11 @@ type Editor struct {
 	prevEvents int
 }
 
+type offEntry struct {
+	runes int
+	bytes int
+}
+
 type imeState struct {
 	selection struct {
 		rng   key.Range
@@ -123,8 +131,6 @@ type maskReader struct {
 
 // combinedPos is a point in the editor.
 type combinedPos struct {
-	// ofs is the offset into the editorBuffer in bytes. The other three fields are based off of this one.
-	ofs int
 	// runes is the offset in runes.
 	runes int
 
@@ -573,8 +579,10 @@ func (e *Editor) updateSnippet(gtx layout.Context, start, end int) {
 	imeEnd := e.closestPosition(combinedPos{runes: end})
 	e.ime.start = imeStart.runes
 	e.ime.end = imeEnd.runes
-	e.rr.Seek(int64(imeStart.ofs), io.SeekStart)
-	n := imeEnd.ofs - imeStart.ofs
+	startOff := e.runeOffset(imeStart.runes)
+	endOff := e.runeOffset(imeEnd.runes)
+	e.rr.Seek(int64(startOff), io.SeekStart)
+	n := endOff - startOff
 	if n > len(e.ime.scratch) {
 		e.ime.scratch = make([]byte, n)
 	}
@@ -888,7 +896,7 @@ func (e *Editor) indexPosition(pos combinedPos) combinedPos {
 		})
 	}
 	i := sort.Search(len(e.index), func(i int) bool {
-		return e.positionGreaterOrEqual(e.index[i], pos)
+		return positionGreaterOrEqual(e.lines, e.index[i], pos)
 	})
 	// Return position just before pos, which is guaranteed to be less than or equal to pos.
 	if i > 0 {
@@ -899,10 +907,10 @@ func (e *Editor) indexPosition(pos combinedPos) combinedPos {
 
 // positionGreaterOrEqual reports whether p1 >= p2 according to the non-zero fields
 // of p2. All fields of p1 must be a consistent and valid.
-func (e *Editor) positionGreaterOrEqual(p1, p2 combinedPos) bool {
-	l := e.lines[p1.lineCol.Y]
+func positionGreaterOrEqual(lines []text.Line, p1, p2 combinedPos) bool {
+	l := lines[p1.lineCol.Y]
 	endCol := len(l.Layout.Advances) - 1
-	if lastLine := p1.lineCol.Y == len(e.lines)-1; lastLine {
+	if lastLine := p1.lineCol.Y == len(lines)-1; lastLine {
 		endCol++
 	}
 	eol := p1.lineCol.X == endCol
@@ -918,7 +926,7 @@ func (e *Editor) positionGreaterOrEqual(p1, p2 combinedPos) bool {
 		ly := p1.y + l.Descent.Ceil()
 		prevy := p1.y - l.Ascent.Ceil()
 		switch {
-		case ly < p2.y && p1.lineCol.Y < len(e.lines)-1:
+		case ly < p2.y && p1.lineCol.Y < len(lines)-1:
 			// p1 is on a line before p2.y.
 			return false
 		case prevy >= p2.y && p1.lineCol.Y > 0:
@@ -935,46 +943,91 @@ func (e *Editor) positionGreaterOrEqual(p1, p2 combinedPos) bool {
 }
 
 // closestPosition takes a position and returns its closest valid position.
-// Zero fields of pos and pos.ofs are ignored.
+// Zero fields of pos are ignored.
 func (e *Editor) closestPosition(pos combinedPos) combinedPos {
 	closest := e.indexPosition(pos)
-	l := e.lines[closest.lineCol.Y]
-	count := 0
 	const runesPerIndexEntry = 50
+	for {
+		var done bool
+		closest, done = seekPosition(e.lines, closest, pos, e.Alignment, e.viewSize.X, runesPerIndexEntry)
+		if done {
+			return closest
+		}
+		e.index = append(e.index, closest)
+	}
+}
+
+// seekPosition seeks to the position closest to needle, starting at start and returns true.
+// If limit is non-zero, seekPosition stops seeks after limit runes and returns false.
+func seekPosition(lines []text.Line, start, needle combinedPos, alignment text.Alignment, width, limit int) (combinedPos, bool) {
+	l := lines[start.lineCol.Y]
+	count := 0
 	// Advance next and prev until next is greater than or equal to pos.
 	for {
-		for ; closest.lineCol.X < len(l.Layout.Advances); closest.lineCol.X++ {
-			if count == runesPerIndexEntry {
-				e.index = append(e.index, closest)
-				count = 0
+		for ; start.lineCol.X < len(l.Layout.Advances); start.lineCol.X++ {
+			if limit != 0 && count == limit {
+				return start, false
 			}
 			count++
-			if e.positionGreaterOrEqual(closest, pos) {
-				return closest
+			if positionGreaterOrEqual(lines, start, needle) {
+				return start, true
 			}
 
-			adv := l.Layout.Advances[closest.lineCol.X]
-			closest.x += adv
-			_, s := e.rr.runeAt(closest.ofs)
-			closest.ofs += s
-			closest.runes++
+			adv := l.Layout.Advances[start.lineCol.X]
+			start.x += adv
+			start.runes++
 		}
-		if closest.lineCol.Y == len(e.lines)-1 {
+		if start.lineCol.Y == len(lines)-1 {
 			// End of file.
-			return closest
+			return start, true
 		}
 
 		prevDesc := l.Descent
-		closest.lineCol.Y++
-		closest.lineCol.X = 0
-		l = e.lines[closest.lineCol.Y]
-		closest.x = align(e.Alignment, l.Width, e.viewSize.X)
-		closest.y += (prevDesc + l.Ascent).Ceil()
+		start.lineCol.Y++
+		start.lineCol.X = 0
+		l = lines[start.lineCol.Y]
+		start.x = align(alignment, l.Width, width)
+		start.y += (prevDesc + l.Ascent).Ceil()
 	}
+}
+
+// indexRune returns the latest rune index and byte offset no later than r.
+func (e *Editor) indexRune(r int) offEntry {
+	// Initialize index.
+	if len(e.offIndex) == 0 {
+		e.offIndex = append(e.offIndex, offEntry{})
+	}
+	i := sort.Search(len(e.offIndex), func(i int) bool {
+		entry := e.offIndex[i]
+		return entry.runes >= r
+	})
+	// Return the entry guaranteed to be less than or equal to r.
+	if i > 0 {
+		i--
+	}
+	return e.offIndex[i]
+}
+
+// runeOffset returns the byte offset into e.rr of the r'th rune.
+// r must be a valid rune index, usually returned by closestPosition.
+func (e *Editor) runeOffset(r int) int {
+	const runesPerIndexEntry = 50
+	entry := e.indexRune(r)
+	lastEntry := e.offIndex[len(e.offIndex)-1].runes
+	for entry.runes < r {
+		if entry.runes > lastEntry && entry.runes%runesPerIndexEntry == runesPerIndexEntry-1 {
+			e.offIndex = append(e.offIndex, entry)
+		}
+		_, s := e.rr.runeAt(entry.bytes)
+		entry.bytes += s
+		entry.runes++
+	}
+	return entry.bytes
 }
 
 func (e *Editor) invalidate() {
 	e.index = e.index[:0]
+	e.offIndex = e.offIndex[:0]
 	e.valid = false
 }
 
@@ -1030,8 +1083,9 @@ func (e *Editor) replace(start, end int, s string) {
 	}
 	startPos := e.closestPosition(combinedPos{runes: start})
 	endPos := e.closestPosition(combinedPos{runes: end})
-	e.rr.deleteRunes(startPos.ofs, endPos.runes-startPos.runes)
-	e.rr.prepend(startPos.ofs, s)
+	startOff := e.runeOffset(startPos.runes)
+	e.rr.deleteRunes(startOff, endPos.runes-startPos.runes)
+	e.rr.prepend(startOff, s)
 	newEnd := startPos.runes + utf8.RuneCountInString(s)
 	adjust := func(pos int) int {
 		switch {
@@ -1100,14 +1154,15 @@ func (e *Editor) moveWord(distance int, selAct selectionAction) {
 	// atEnd if caret is at either side of the buffer.
 	caret := e.closestPosition(combinedPos{runes: e.caret.start})
 	atEnd := func() bool {
-		return caret.ofs == 0 || caret.ofs == e.rr.len()
+		return caret.runes == 0 || caret.runes == e.Len()
 	}
 	// next returns the appropriate rune given the direction.
 	next := func() (r rune) {
+		off := e.runeOffset(caret.runes)
 		if direction < 0 {
-			r, _ = e.rr.runeBefore(caret.ofs)
+			r, _ = e.rr.runeBefore(off)
 		} else {
-			r, _ = e.rr.runeAt(caret.ofs)
+			r, _ = e.rr.runeAt(off)
 		}
 		return r
 	}
@@ -1152,41 +1207,33 @@ func (e *Editor) deleteWord(distance int) {
 	}
 	// atEnd if offset is at or beyond either side of the buffer.
 	caret := e.closestPosition(combinedPos{runes: e.caret.start})
-	atEnd := func(offset int) bool {
-		idx := caret.ofs + offset*direction
-		return idx <= 0 || idx >= e.rr.len()
+	atEnd := func(runes int) bool {
+		idx := caret.runes + runes*direction
+		return idx <= 0 || idx >= e.Len()
 	}
-	// next returns the appropriate rune and length given the direction and offset (in bytes).
-	next := func(offset int) (r rune, l int) {
-		idx := caret.ofs + offset*direction
+	// next returns the appropriate rune given the direction and offset in runes).
+	next := func(runes int) rune {
+		idx := caret.runes + runes*direction
 		if idx < 0 {
 			idx = 0
-		} else if idx > e.rr.len() {
-			idx = e.rr.len()
+		} else if idx > e.Len() {
+			idx = e.Len()
 		}
+		off := e.runeOffset(idx)
+		var r rune
 		if direction < 0 {
-			r, l = e.rr.runeBefore(idx)
+			r, _ = e.rr.runeBefore(off)
 		} else {
-			r, l = e.rr.runeAt(idx)
+			r, _ = e.rr.runeAt(off)
 		}
-		return
+		return r
 	}
 	var runes = 1
-	_, bytes := e.rr.runeAt(caret.ofs)
-	if direction < 0 {
-		_, bytes = e.rr.runeBefore(caret.ofs)
-	}
 	for ii := 0; ii < words; ii++ {
-		if r, _ := next(bytes); unicode.IsSpace(r) {
-			for r, lg := next(bytes); unicode.IsSpace(r) && !atEnd(bytes); r, lg = next(bytes) {
-				runes += 1
-				bytes += lg
-			}
-		} else {
-			for r, lg := next(bytes); !unicode.IsSpace(r) && !atEnd(bytes); r, lg = next(bytes) {
-				runes += 1
-				bytes += lg
-			}
+		r := next(runes)
+		wantSpace := unicode.IsSpace(r)
+		for r := next(runes); unicode.IsSpace(r) == wantSpace && !atEnd(runes); r = next(runes) {
+			runes += 1
 		}
 	}
 	e.Delete(runes * direction)
@@ -1245,10 +1292,10 @@ func (e *Editor) SetCaret(start, end int) {
 
 // SelectedText returns the currently selected text (if any) from the editor.
 func (e *Editor) SelectedText() string {
-	caretStart := e.closestPosition(combinedPos{runes: e.caret.start})
-	caretEnd := e.closestPosition(combinedPos{runes: e.caret.end})
-	start := min(caretStart.ofs, caretEnd.ofs)
-	end := max(caretStart.ofs, caretEnd.ofs)
+	startOff := e.runeOffset(e.caret.start)
+	endOff := e.runeOffset(e.caret.end)
+	start := min(startOff, endOff)
+	end := max(startOff, endOff)
 	buf := make([]byte, end-start)
 	e.rr.Seek(int64(start), io.SeekStart)
 	_, err := e.rr.Read(buf)

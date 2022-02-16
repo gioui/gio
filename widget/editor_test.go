@@ -159,7 +159,7 @@ func assertCaret(t *testing.T, e *Editor, line, col, bytes int) {
 	if gotLine != line || gotCol != col {
 		t.Errorf("caret at (%d, %d), expected (%d, %d)", gotLine, gotCol, line, col)
 	}
-	caretBytes := e.closestPosition(combinedPos{runes: e.caret.start}).ofs
+	caretBytes := e.runeOffset(e.caret.start)
 	if bytes != caretBytes {
 		t.Errorf("caret at buffer position %d, expected %d", caretBytes, bytes)
 	}
@@ -291,7 +291,7 @@ func TestEditorMoveWord(t *testing.T) {
 		e := setup(tt.Text)
 		e.MoveCaret(tt.Start, tt.Start)
 		e.moveWord(tt.Skip, selectionClear)
-		caretBytes := e.closestPosition(combinedPos{runes: e.caret.start}).ofs
+		caretBytes := e.runeOffset(e.caret.start)
 		if caretBytes != tt.Want {
 			t.Fatalf("[%d] moveWord: bad caret position: got %d, want %d", ii, caretBytes, tt.Want)
 		}
@@ -485,7 +485,7 @@ func TestEditorDeleteWord(t *testing.T) {
 		e.MoveCaret(tt.Start, tt.Start)
 		e.MoveCaret(0, tt.Selection)
 		e.deleteWord(tt.Delete)
-		caretBytes := e.closestPosition(combinedPos{runes: e.caret.start}).ofs
+		caretBytes := e.runeOffset(e.caret.start)
 		if caretBytes != tt.Want {
 			t.Fatalf("[%d] deleteWord: bad caret position: got %d, want %d", ii, caretBytes, tt.Want)
 		}
