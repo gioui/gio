@@ -890,9 +890,7 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 		Metric:      e.Metric,
 		Constraints: layout.Exact(e.Size),
 	}
-	rec := op.Record(o)
 	dims := style.Layout(gtx)
-	op.Defer(o, rec.Stop())
 	// Update the window based on the actions on the decorations.
 	w.Perform(deco.Actions())
 	// Offset to place the frame content below the decorations.
