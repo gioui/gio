@@ -35,9 +35,8 @@ func (d *Draggable) Layout(gtx layout.Context, w, drag layout.Widget) layout.Dim
 		case pointer.Press:
 			d.click = ev.Position
 			pos = f32.Point{}
-		case pointer.Drag:
+		case pointer.Drag, pointer.Release:
 			pos = ev.Position.Sub(d.click)
-		case pointer.Release:
 		}
 	}
 	d.pos = pos
@@ -97,7 +96,7 @@ func (d *Draggable) Offer(ops *op.Ops, mime string, data io.ReadCloser) {
 	}.Add(ops)
 }
 
-// Pos returns the drag position relative to its area.
+// Pos returns the drag position relative to its initial click position.
 func (d *Draggable) Pos() f32.Point {
-	return d.pos.Add(d.click)
+	return d.pos
 }
