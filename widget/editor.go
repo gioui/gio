@@ -625,13 +625,7 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 		key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)
 	}
 	e.requestFocus = false
-	pointerPadding := gtx.Px(unit.Dp(4))
-	r := image.Rectangle{Max: e.viewSize}
-	r.Min.X -= pointerPadding
-	r.Min.Y -= pointerPadding
-	r.Max.X += pointerPadding
-	r.Max.X += pointerPadding
-	defer clip.Rect(r).Push(gtx.Ops).Pop()
+	defer clip.Rect(image.Rectangle{Max: e.viewSize}).Push(gtx.Ops).Pop()
 	pointer.CursorNameOp{Name: pointer.CursorText}.Add(gtx.Ops)
 
 	var scrollRange image.Rectangle
