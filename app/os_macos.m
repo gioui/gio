@@ -232,29 +232,66 @@ void gio_showCursor() {
 	}
 }
 
+// some cursors are not public, this tries to use a private cursor
+// and uses fallback when the use of private cursor fails.
+void gio_trySetPrivateCursor(SEL cursorName, NSCursor* fallback) {
+	if ([NSCursor respondsToSelector:cursorName]) {
+		id object = [NSCursor performSelector:cursorName];
+		if ([object isKindOfClass:[NSCursor class]]) {
+			[(NSCursor*)object set];
+			return;
+		}
+	}
+	[fallback set];
+}
+
 void gio_setCursor(NSUInteger curID) {
 	@autoreleasepool {
 		switch (curID) {
-			case 1:
+			case 1: // pointer.CursorDefault
 				[NSCursor.arrowCursor set];
 				break;
-			case 2:
+			case 2: // pointer.CursorText
 				[NSCursor.IBeamCursor set];
 				break;
-			case 3:
+			case 3: // pointer.CursorPointer
 				[NSCursor.pointingHandCursor set];
 				break;
-			case 4:
+			case 4: // pointer.CursorCrossHair
 				[NSCursor.crosshairCursor set];
 				break;
-			case 5:
+			case 5: // pointer.CursorColResize
 				[NSCursor.resizeLeftRightCursor set];
 				break;
-			case 6:
+			case 6: // pointer.CursorRowResize
 				[NSCursor.resizeUpDownCursor set];
 				break;
-			case 7:
+			case 7: // pointer.CursorGrab
 				[NSCursor.openHandCursor set];
+				break;
+			case 8: // pointer.CursorTopLeftResize
+				gio_trySetPrivateCursor(@selector(_windowResizeNorthWestCursor), NSCursor.resizeUpDownCursor);
+				break;
+			case 9: // pointer.CursorTopRightResize
+				gio_trySetPrivateCursor(@selector(_windowResizeNorthEastCursor), NSCursor.resizeUpDownCursor);
+				break;
+			case 10: // pointer.CursorBottomLeftResize
+				gio_trySetPrivateCursor(@selector(_windowResizeSouthWestCursor), NSCursor.resizeUpDownCursor);
+				break;
+			case 11: // pointer.CursorBottomRightResize
+				gio_trySetPrivateCursor(@selector(_windowResizeSouthEastCursor), NSCursor.resizeUpDownCursor);
+				break;
+			case 12: // pointer.CursorLeftResize
+				[NSCursor.resizeLeftCursor set];
+				break;
+			case 13: // pointer.CursorRightResize
+				[NSCursor.resizeRightCursor set];
+				break;
+			case 14: // pointer.CursorTopResize
+				[NSCursor.resizeUpCursor set];
+				break;
+			case 15: // pointer.CursorBottomResize
+				[NSCursor.resizeDownCursor set];
 				break;
 			default:
 				[NSCursor.arrowCursor set];

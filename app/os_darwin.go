@@ -237,6 +237,23 @@ func windowSetCursor(from, to pointer.CursorName) pointer.CursorName {
 		curID = 6
 	case pointer.CursorGrab:
 		curID = 7
+	case pointer.CursorTopLeftResize:
+		curID = 8
+	case pointer.CursorTopRightResize:
+		curID = 9
+	case pointer.CursorBottomLeftResize:
+		curID = 10
+	case pointer.CursorBottomRightResize:
+		curID = 11
+	case pointer.CursorLeftResize:
+		curID = 12
+	case pointer.CursorRightResize:
+		curID = 13
+	case pointer.CursorTopResize:
+		curID = 14
+	case pointer.CursorBottomResize:
+		curID = 15
+
 	case pointer.CursorNone:
 		C.gio_hideCursor()
 		return to
