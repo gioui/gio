@@ -111,21 +111,21 @@ const (
 	// CursorNone hides the cursor. To show it again, use any other cursor.
 	CursorNone CursorName = "none"
 	// CursorTopLeftResize is the cursor for top-left corner resizing.
-	CursorTopLeftResize = "top-left-resize"
+	CursorTopLeftResize CursorName = "top-left-resize"
 	// CursorTopRightResize is the cursor for top-right corner resizing.
-	CursorTopRightResize = "top-right-resize"
+	CursorTopRightResize CursorName = "top-right-resize"
 	// CursorBottomLeftResize is the cursor for bottom-left corner resizing.
-	CursorBottomLeftResize = "bottom-left-resize"
+	CursorBottomLeftResize CursorName = "bottom-left-resize"
 	// CursorBottomRightResize is the cursor for bottom-right corner resizing.
-	CursorBottomRightResize = "bottom-right-resize"
+	CursorBottomRightResize CursorName = "bottom-right-resize"
 	// CursorLeftResize is the cursor for left resizing.
-	CursorLeftResize = "left-resize"
+	CursorLeftResize CursorName = "left-resize"
 	// CursorRightResize is the cursor for right resizing.
-	CursorRightResize = "right-resize"
+	CursorRightResize CursorName = "right-resize"
 	// CursorTopResize is the cursor for top resizing.
-	CursorTopResize = "top-resize"
+	CursorTopResize CursorName = "top-resize"
 	// CursorBottomResize is the cursor for bottom resizing.
-	CursorBottomResize = "bottom-resize"
+	CursorBottomResize CursorName = "bottom-resize"
 )
 
 const (

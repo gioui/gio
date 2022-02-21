@@ -115,13 +115,20 @@ const (
 
 	HTCLIENT = 1
 
-	IDC_ARROW   = 32512
-	IDC_IBEAM   = 32513
-	IDC_HAND    = 32649
-	IDC_CROSS   = 32515
-	IDC_SIZENS  = 32645
-	IDC_SIZEWE  = 32644
-	IDC_SIZEALL = 32646
+	IDC_APPSTARTING = 32650 // Standard arrow and small hourglass
+	IDC_ARROW       = 32512 // Standard arrow
+	IDC_CROSS       = 32515 // Crosshair
+	IDC_HAND        = 32649 // Hand
+	IDC_HELP        = 32651 // Arrow and question mark
+	IDC_IBEAM       = 32513 // I-beam
+	IDC_NO          = 32648 // Slashed circle
+	IDC_SIZEALL     = 32646 // Four-pointed arrow pointing north, south, east, and west
+	IDC_SIZENESW    = 32643 // Double-pointed arrow pointing northeast and southwest
+	IDC_SIZENS      = 32645 // Double-pointed arrow pointing north and south
+	IDC_SIZENWSE    = 32642 // Double-pointed arrow pointing northwest and southeast
+	IDC_SIZEWE      = 32644 // Double-pointed arrow pointing west and east
+	IDC_UPARROW     = 32516 // Vertical arrow
+	IDC_WAIT        = 32514 // Hour
 
 	INFINITE = 0xFFFFFFFF
 

@@ -734,6 +734,22 @@ func loadCursor(name pointer.CursorName) (syscall.Handle, error) {
 		curID = windows.IDC_SIZENS
 	case pointer.CursorGrab:
 		curID = windows.IDC_SIZEALL
+	case pointer.CursorTopLeftResize:
+		curID = windows.IDC_SIZENWSE
+	case pointer.CursorTopRightResize:
+		curID = windows.IDC_SIZENESW
+	case pointer.CursorBottomLeftResize:
+		curID = windows.IDC_SIZENESW
+	case pointer.CursorBottomRightResize:
+		curID = windows.IDC_SIZENWSE
+	case pointer.CursorLeftResize:
+		curID = windows.IDC_SIZEWE
+	case pointer.CursorRightResize:
+		curID = windows.IDC_SIZEWE
+	case pointer.CursorTopResize:
+		curID = windows.IDC_SIZENS
+	case pointer.CursorBottomResize:
+		curID = windows.IDC_SIZENS
 	case pointer.CursorNone:
 		return 0, nil
 	}
