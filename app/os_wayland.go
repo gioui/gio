@@ -1609,11 +1609,11 @@ func (w *window) draw() {
 		w.w.Event(ConfigEvent{Config: w.config})
 	}
 	anim := w.animating || w.fling.anim.Active()
-	// Draw animation only when not waiting for frame callback.
-	anim = anim && w.lastFrameCallback == nil
 	sync := w.redraw
 	w.redraw = false
-	if !anim && !sync {
+	// Draw animation only when not waiting for frame callback.
+	redrawAnim := anim && w.lastFrameCallback == nil
+	if !redrawAnim && !sync {
 		return
 	}
 	if anim {
