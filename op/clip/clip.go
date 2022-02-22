@@ -49,18 +49,22 @@ func (p Op) add(o *op.Ops) {
 	path := p.path
 
 	if !path.hasSegments && p.width > 0 {
-		if p.path.shape != ops.Rect {
-			panic("only rects have empty paths")
+		switch p.path.shape {
+		case ops.Rect:
+			b := frect(path.bounds)
+			var rect Path
+			rect.Begin(o)
+			rect.MoveTo(b.Min)
+			rect.LineTo(f32.Pt(b.Max.X, b.Min.Y))
+			rect.LineTo(b.Max)
+			rect.LineTo(f32.Pt(b.Min.X, b.Max.Y))
+			rect.Close()
+			path = rect.End()
+		case ops.Path:
+			// Nothing to do.
+		default:
+			panic("invalid empty path for shape")
 		}
-		b := frect(path.bounds)
-		var rect Path
-		rect.Begin(o)
-		rect.MoveTo(b.Min)
-		rect.LineTo(f32.Pt(b.Max.X, b.Min.Y))
-		rect.LineTo(b.Max)
-		rect.LineTo(f32.Pt(b.Min.X, b.Max.Y))
-		rect.Close()
-		path = rect.End()
 	}
 	bo := binary.LittleEndian
 	if path.hasSegments {

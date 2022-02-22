@@ -62,6 +62,16 @@ func TestTransformChecks(t *testing.T) {
 	st.Pop()
 }
 
+func TestEmptyPath(t *testing.T) {
+	var ops op.Ops
+	p := clip.Path{}
+	p.Begin(&ops)
+	defer clip.Stroke{
+		Path:  p.End(),
+		Width: 3,
+	}.Op().Push(&ops).Pop()
+}
+
 func newWindow(t testing.TB, width, height int) *headless.Window {
 	w, err := headless.NewWindow(width, height)
 	if err != nil {
