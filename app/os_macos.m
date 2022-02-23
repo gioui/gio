@@ -116,9 +116,9 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 	handleMouse(self, event, MOUSE_SCROLL, dx, dy);
 }
 - (void)keyDown:(NSEvent *)event {
+	[self interpretKeyEvents:[NSArray arrayWithObject:event]];
 	NSString *keys = [event charactersIgnoringModifiers];
 	gio_onKeys((__bridge CFTypeRef)self, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], true);
-	[self interpretKeyEvents:[NSArray arrayWithObject:event]];
 }
 - (void)keyUp:(NSEvent *)event {
 	NSString *keys = [event charactersIgnoringModifiers];
