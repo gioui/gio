@@ -132,7 +132,7 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 				switch {
 				case gtx.Queue == nil:
 					background = f32color.Disabled(b.Background)
-				case b.Button.Hovered():
+				case b.Button.Hovered() || b.Button.Focused():
 					background = f32color.Hovered(b.Background)
 				}
 				paint.Fill(gtx.Ops, background)
@@ -168,7 +168,7 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 				switch {
 				case gtx.Queue == nil:
 					background = f32color.Disabled(b.Background)
-				case b.Button.Hovered():
+				case b.Button.Hovered() || b.Button.Focused():
 					background = f32color.Hovered(b.Background)
 				}
 				paint.Fill(gtx.Ops, background)

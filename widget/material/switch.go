@@ -99,7 +99,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 		return clip.Ellipse(b).Op(gtx.Ops)
 	}
 	// Draw hover.
-	if s.Switch.Hovered() {
+	if s.Switch.Hovered() || s.Switch.Focused() {
 		r := 1.7 * thumbRadius
 		background := f32color.MulAlpha(s.Color.Enabled, 70)
 		paint.FillShape(gtx.Ops, background, circle(thumbRadius, thumbRadius, r))

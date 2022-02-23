@@ -23,14 +23,19 @@ func (b *Bool) Changed() bool {
 	return changed
 }
 
-// Hovered returns whether pointer is over the element.
+// Hovered reports whether pointer is over the element.
 func (b *Bool) Hovered() bool {
 	return b.clk.Hovered()
 }
 
-// Pressed returns whether pointer is pressing the element.
+// Pressed reports whether pointer is pressing the element.
 func (b *Bool) Pressed() bool {
 	return b.clk.Pressed()
+}
+
+// Focused reports whether b has focus.
+func (b *Bool) Focused() bool {
+	return b.clk.Focused()
 }
 
 func (b *Bool) History() []Press {
