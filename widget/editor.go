@@ -276,7 +276,7 @@ func (e *Editor) processPointer(gtx layout.Context) {
 		case gesture.ClickEvent:
 			switch {
 			case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
-				evt.Type == gesture.TypeClick:
+				evt.Type == gesture.TypeClick && evt.Source != pointer.Mouse:
 				prevCaretPos := e.caret.start
 				e.blinkStart = gtx.Now
 				e.moveCoord(image.Point{
