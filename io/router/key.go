@@ -22,6 +22,7 @@ type TextInputState uint8
 
 type keyQueue struct {
 	focus    event.Tag
+	order    []event.Tag
 	handlers map[event.Tag]*keyHandler
 	state    TextInputState
 	hint     key.InputHint
@@ -34,6 +35,7 @@ type keyHandler struct {
 	visible bool
 	new     bool
 	hint    key.InputHint
+	order   int
 }
 
 // keyCollector tracks state required to update a keyQueue
@@ -53,7 +55,9 @@ const (
 // InputState returns the last text input state as
 // determined in Frame.
 func (q *keyQueue) InputState() TextInputState {
-	return q.state
+	state := q.state
+	q.state = TextInputKeep
+	return state
 }
 
 // InputHint returns the input mode from the most recent key.InputOp.
@@ -76,46 +80,78 @@ func (q *keyQueue) Reset() {
 	}
 	for _, h := range q.handlers {
 		h.visible, h.new = false, false
+		h.order = -1
 	}
-	q.state = TextInputKeep
+	q.order = q.order[:0]
 }
 
 func (q *keyQueue) Frame(events *handlerEvents, collector keyCollector) {
+	changed, focus := collector.changed, collector.focus
 	for k, h := range q.handlers {
 		if !h.visible {
 			delete(q.handlers, k)
 			if q.focus == k {
-				// Remove the focus from the handler that is no longer visible.
+				// Remove focus from the handler that is no longer visible.
 				q.focus = nil
 				q.state = TextInputClose
 			}
-		} else if h.new && k != collector.focus {
+		} else if h.new && k != focus {
 			// Reset the handler on (each) first appearance, but don't trigger redraw.
 			events.AddNoRedraw(k, key.FocusEvent{Focus: false})
 		}
 	}
-	if collector.changed && collector.focus != nil {
-		if _, exists := q.handlers[collector.focus]; !exists {
-			collector.focus = nil
-		}
-	}
-	if collector.changed && collector.focus != q.focus {
-		q.content = EditorState{}
-		if q.focus != nil {
-			events.Add(q.focus, key.FocusEvent{Focus: false})
-		}
-		q.focus = collector.focus
-		if q.focus != nil {
-			events.Add(q.focus, key.FocusEvent{Focus: true})
-		} else {
-			q.state = TextInputClose
-		}
+	if changed {
+		q.setFocus(focus, events)
 	}
 }
 
 func (q *keyQueue) Push(e event.Event, events *handlerEvents) {
+	// Convert tab or shift+tab presses to focus moves.
+	if e, ok := e.(key.Event); ok && e.Name == key.NameTab && e.Modifiers&^key.ModShift == 0 {
+		if e.State == key.Release || len(q.order) == 0 {
+			return
+		}
+		forward := !e.Modifiers.Contain(key.ModShift)
+		order := 0
+		if !forward {
+			order = -1
+		}
+		if q.focus != nil {
+			order = q.handlers[q.focus].order
+			if forward {
+				order++
+			} else {
+				order--
+			}
+		}
+		order = (order + len(q.order)) % len(q.order)
+		q.setFocus(q.order[order], events)
+		return
+	}
 	if q.focus != nil {
 		events.Add(q.focus, e)
+	}
+}
+
+func (q *keyQueue) setFocus(focus event.Tag, events *handlerEvents) {
+	if focus != nil {
+		if _, exists := q.handlers[focus]; !exists {
+			focus = nil
+		}
+	}
+	if focus == q.focus {
+		return
+	}
+	q.content = EditorState{}
+	if q.focus != nil {
+		events.Add(q.focus, key.FocusEvent{Focus: false})
+	}
+	q.focus = focus
+	if q.focus != nil {
+		events.Add(q.focus, key.FocusEvent{Focus: true})
+	}
+	if q.focus == nil || q.state == TextInputKeep {
+		q.state = TextInputClose
 	}
 }
 
@@ -134,11 +170,14 @@ func (k *keyCollector) softKeyboard(show bool) {
 
 func (k *keyCollector) handlerFor(tag event.Tag) *keyHandler {
 	h, ok := k.q.handlers[tag]
-	if ok {
-		return h
+	if !ok {
+		h = &keyHandler{new: true, order: -1}
+		k.q.handlers[tag] = h
 	}
-	h = &keyHandler{new: true}
-	k.q.handlers[tag] = h
+	if h.order == -1 {
+		h.order = len(k.q.order)
+		k.q.order = append(k.q.order, tag)
+	}
 	return h
 }
 

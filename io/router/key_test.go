@@ -145,7 +145,7 @@ func TestKeyRemoveFocus(t *testing.T) {
 	assertKeyEventUnexpected(t, r.Events(&handlers[0]))
 	assertKeyEventUnexpected(t, r.Events(&handlers[1]))
 	assertFocus(t, r, nil)
-	assertKeyboard(t, r, TextInputKeep)
+	assertKeyboard(t, r, TextInputClose)
 
 	ops.Reset()
 
@@ -216,13 +216,34 @@ func TestKeyFocusedInvisible(t *testing.T) {
 	assertKeyEvent(t, r.Events(&handlers[0]), false)
 	assertKeyEventUnexpected(t, r.Events(&handlers[1]))
 	assertFocus(t, r, nil)
-	assertKeyboard(t, r, TextInputKeep)
+	assertKeyboard(t, r, TextInputClose)
 
 }
 
 func TestNoOps(t *testing.T) {
 	r := new(Router)
 	r.Frame(nil)
+}
+
+func TestTabFocus(t *testing.T) {
+	handlers := make([]int, 3)
+	ops := new(op.Ops)
+	r := new(Router)
+
+	for i := range handlers {
+		key.InputOp{Tag: &handlers[i]}.Add(ops)
+	}
+	r.Frame(ops)
+
+	tab := func(mod key.Modifiers) {
+		r.Queue(
+			key.Event{Name: key.NameTab, State: key.Press, Modifiers: mod},
+			key.Event{Name: key.NameTab, State: key.Release, Modifiers: mod},
+		)
+	}
+	tab(0)
+	tab(key.ModShift)
+	assertFocus(t, r, &handlers[2])
 }
 
 func assertKeyEvent(t *testing.T, events []event.Event, expected bool, expectedInputs ...event.Event) {
