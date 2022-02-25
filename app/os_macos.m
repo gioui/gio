@@ -248,50 +248,85 @@ void gio_trySetPrivateCursor(SEL cursorName, NSCursor* fallback) {
 void gio_setCursor(NSUInteger curID) {
 	@autoreleasepool {
 		switch (curID) {
-			case 1: // pointer.CursorDefault
+			case 0: // pointer.CursorDefault
 				[NSCursor.arrowCursor set];
 				break;
+			// case 1: // pointer.CursorNone
 			case 2: // pointer.CursorText
 				[NSCursor.IBeamCursor set];
 				break;
-			case 3: // pointer.CursorPointer
+			case 3: // pointer.CursorVerticalText
+				[NSCursor.IBeamCursorForVerticalLayout set];
+				break;
+			case 4: // pointer.CursorPointer
 				[NSCursor.pointingHandCursor set];
 				break;
-			case 4: // pointer.CursorCrossHair
+			case 5: // pointer.CursorCrosshair
 				[NSCursor.crosshairCursor set];
 				break;
-			case 5: // pointer.CursorColResize
+			case 6: // pointer.CursorAllScroll
+				// For some reason, using _moveCursor fails on Monterey.
+				// gio_trySetPrivateCursor(@selector(_moveCursor), NSCursor.arrowCursor);
+				[NSCursor.arrowCursor set];
+				break;
+			case 7: // pointer.CursorColResize
 				[NSCursor.resizeLeftRightCursor set];
 				break;
-			case 6: // pointer.CursorRowResize
+			case 8: // pointer.CursorRowResize
 				[NSCursor.resizeUpDownCursor set];
 				break;
-			case 7: // pointer.CursorGrab
-				[NSCursor.openHandCursor set];
+			case 9: // pointer.CursorGrab
+				// [NSCursor.openHandCursor set];
+				gio_trySetPrivateCursor(@selector(openHandCursor), NSCursor.arrowCursor);
 				break;
-			case 8: // pointer.CursorTopLeftResize
+			case 10: // pointer.CursorGrabbing
+				// [NSCursor.closedHandCursor set];
+				gio_trySetPrivateCursor(@selector(closedHandCursor), NSCursor.arrowCursor);
+				break;
+			case 11: // pointer.CursorNotAllowed
+				[NSCursor.operationNotAllowedCursor set];
+				break;
+			case 12: // pointer.CursorWait
+				gio_trySetPrivateCursor(@selector(busyButClickableCursor), NSCursor.arrowCursor);
+				break;
+			case 13: // pointer.CursorProgress
+				gio_trySetPrivateCursor(@selector(busyButClickableCursor), NSCursor.arrowCursor);
+				break;
+			case 14: // pointer.CursorNorthWestResize
 				gio_trySetPrivateCursor(@selector(_windowResizeNorthWestCursor), NSCursor.resizeUpDownCursor);
 				break;
-			case 9: // pointer.CursorTopRightResize
+			case 15: // pointer.CursorNorthEastResize
 				gio_trySetPrivateCursor(@selector(_windowResizeNorthEastCursor), NSCursor.resizeUpDownCursor);
 				break;
-			case 10: // pointer.CursorBottomLeftResize
+			case 16: // pointer.CursorSouthWestResize
 				gio_trySetPrivateCursor(@selector(_windowResizeSouthWestCursor), NSCursor.resizeUpDownCursor);
 				break;
-			case 11: // pointer.CursorBottomRightResize
+			case 17: // pointer.CursorSouthEastResize
 				gio_trySetPrivateCursor(@selector(_windowResizeSouthEastCursor), NSCursor.resizeUpDownCursor);
 				break;
-			case 12: // pointer.CursorLeftResize
+			case 18: // pointer.CursorNorthSouthResize
+				[NSCursor.resizeUpDownCursor set];
+				break;
+			case 19: // pointer.CursorEastWestResize
+				[NSCursor.resizeLeftRightCursor set];
+				break;
+			case 20: // pointer.CursorWestResize
 				[NSCursor.resizeLeftCursor set];
 				break;
-			case 13: // pointer.CursorRightResize
+			case 21: // pointer.CursorEastResize
 				[NSCursor.resizeRightCursor set];
 				break;
-			case 14: // pointer.CursorTopResize
+			case 22: // pointer.CursorNorthResize
 				[NSCursor.resizeUpCursor set];
 				break;
-			case 15: // pointer.CursorBottomResize
+			case 23: // pointer.CursorSouthResize
 				[NSCursor.resizeDownCursor set];
+				break;
+			case 24: // pointer.CursorNorthEastSouthWestResize
+				gio_trySetPrivateCursor(@selector(_windowResizeNorthEastSouthWestCursor), NSCursor.resizeUpDownCursor);
+				break;
+			case 25: // pointer.CursorNorthWestSouthEastResize
+				gio_trySetPrivateCursor(@selector(_windowResizeNorthWestSouthEastCursor), NSCursor.resizeUpDownCursor);
 				break;
 			default:
 				[NSCursor.arrowCursor set];

@@ -1350,26 +1350,37 @@ func (w *window) Wakeup() {
 	})
 }
 
+var androidCursor = [...]uint16{
+	pointer.CursorDefault:                  1000, // TYPE_ARROW
+	pointer.CursorNone:                     0,
+	pointer.CursorText:                     1008, // TYPE_TEXT
+	pointer.CursorVerticalText:             1009, // TYPE_VERTICAL_TEXT
+	pointer.CursorPointer:                  1002, // TYPE_HAND
+	pointer.CursorCrosshair:                1007, // TYPE_CROSSHAIR
+	pointer.CursorAllScroll:                1013, // TYPE_ALL_SCROLL
+	pointer.CursorColResize:                1014, // TYPE_HORIZONTAL_DOUBLE_ARROW
+	pointer.CursorRowResize:                1015, // TYPE_VERTICAL_DOUBLE_ARROW
+	pointer.CursorGrab:                     1020, // TYPE_GRAB
+	pointer.CursorGrabbing:                 1021, // TYPE_GRABBING
+	pointer.CursorNotAllowed:               1012, // TYPE_NO_DROP
+	pointer.CursorWait:                     1004, // TYPE_WAIT
+	pointer.CursorProgress:                 1000, // TYPE_ARROW
+	pointer.CursorNorthWestResize:          1017, // TYPE_TOP_LEFT_DIAGONAL_DOUBLE_ARROW
+	pointer.CursorNorthEastResize:          1016, // TYPE_TOP_RIGHT_DIAGONAL_DOUBLE_ARROW
+	pointer.CursorSouthWestResize:          1016, // TYPE_TOP_RIGHT_DIAGONAL_DOUBLE_ARROW
+	pointer.CursorSouthEastResize:          1017, // TYPE_TOP_LEFT_DIAGONAL_DOUBLE_ARROW
+	pointer.CursorNorthSouthResize:         1015, // TYPE_VERTICAL_DOUBLE_ARROW
+	pointer.CursorEastWestResize:           1014, // TYPE_HORIZONTAL_DOUBLE_ARROW
+	pointer.CursorWestResize:               1014, // TYPE_HORIZONTAL_DOUBLE_ARROW
+	pointer.CursorEastResize:               1014, // TYPE_HORIZONTAL_DOUBLE_ARROW
+	pointer.CursorNorthResize:              1015, // TYPE_VERTICAL_DOUBLE_ARROW
+	pointer.CursorSouthResize:              1015, // TYPE_VERTICAL_DOUBLE_ARROW
+	pointer.CursorNorthEastSouthWestResize: 1016, // TYPE_TOP_RIGHT_DIAGONAL_DOUBLE_ARROW
+	pointer.CursorNorthWestSouthEastResize: 1017, // TYPE_TOP_LEFT_DIAGONAL_DOUBLE_ARROW
+}
+
 func setCursor(env *C.JNIEnv, view C.jobject, name pointer.CursorName) {
-	var curID int
-	switch name {
-	default:
-		fallthrough
-	case pointer.CursorDefault:
-		curID = 1000 // TYPE_ARROW
-	case pointer.CursorText:
-		curID = 1008 // TYPE_TEXT
-	case pointer.CursorPointer:
-		curID = 1002 // TYPE_HAND
-	case pointer.CursorCrossHair:
-		curID = 1007 // TYPE_CROSSHAIR
-	case pointer.CursorColResize:
-		curID = 1014 // TYPE_HORIZONTAL_DOUBLE_ARROW
-	case pointer.CursorRowResize:
-		curID = 1015 // TYPE_VERTICAL_DOUBLE_ARROW
-	case pointer.CursorNone:
-		curID = 0 // TYPE_NULL
-	}
+	curID := androidCursor[name]
 	callVoidMethod(env, view, gioView.setCursor, jvalue(curID))
 }
 

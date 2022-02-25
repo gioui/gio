@@ -37,7 +37,7 @@ func TestPathBegin(t *testing.T) {
 	ops := new(op.Ops)
 	var p clip.Path
 	p.Begin(ops)
-	p.LineTo(f32.Point{10, 10})
+	p.LineTo(f32.Pt(10, 10))
 	p.Close()
 	stack := clip.Outline{Path: p.End()}.Op().Push(ops)
 	paint.Fill(ops, color.NRGBA{A: 255})

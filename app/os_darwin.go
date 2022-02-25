@@ -212,56 +212,49 @@ func gio_onFrameCallback(dl C.CFTypeRef) {
 	}
 }
 
+var macosCursorID = [...]byte{
+	pointer.CursorDefault:                  0,
+	pointer.CursorNone:                     1,
+	pointer.CursorText:                     2,
+	pointer.CursorVerticalText:             3,
+	pointer.CursorPointer:                  4,
+	pointer.CursorCrosshair:                5,
+	pointer.CursorAllScroll:                6,
+	pointer.CursorColResize:                7,
+	pointer.CursorRowResize:                8,
+	pointer.CursorGrab:                     9,
+	pointer.CursorGrabbing:                 10,
+	pointer.CursorNotAllowed:               11,
+	pointer.CursorWait:                     12,
+	pointer.CursorProgress:                 13,
+	pointer.CursorNorthWestResize:          14,
+	pointer.CursorNorthEastResize:          15,
+	pointer.CursorSouthWestResize:          16,
+	pointer.CursorSouthEastResize:          17,
+	pointer.CursorNorthSouthResize:         18,
+	pointer.CursorEastWestResize:           19,
+	pointer.CursorWestResize:               20,
+	pointer.CursorEastResize:               21,
+	pointer.CursorNorthResize:              22,
+	pointer.CursorSouthResize:              23,
+	pointer.CursorNorthEastSouthWestResize: 24,
+	pointer.CursorNorthWestSouthEastResize: 25,
+}
+
 // windowSetCursor updates the cursor from the current one to a new one
 // and returns the new one.
 func windowSetCursor(from, to pointer.CursorName) pointer.CursorName {
 	if from == to {
 		return to
 	}
-	var curID int
-	switch to {
-	default:
-		to = pointer.CursorDefault
-		fallthrough
-	case pointer.CursorDefault:
-		curID = 1
-	case pointer.CursorText:
-		curID = 2
-	case pointer.CursorPointer:
-		curID = 3
-	case pointer.CursorCrossHair:
-		curID = 4
-	case pointer.CursorColResize:
-		curID = 5
-	case pointer.CursorRowResize:
-		curID = 6
-	case pointer.CursorGrab:
-		curID = 7
-	case pointer.CursorTopLeftResize:
-		curID = 8
-	case pointer.CursorTopRightResize:
-		curID = 9
-	case pointer.CursorBottomLeftResize:
-		curID = 10
-	case pointer.CursorBottomRightResize:
-		curID = 11
-	case pointer.CursorLeftResize:
-		curID = 12
-	case pointer.CursorRightResize:
-		curID = 13
-	case pointer.CursorTopResize:
-		curID = 14
-	case pointer.CursorBottomResize:
-		curID = 15
-
-	case pointer.CursorNone:
+	if to == pointer.CursorNone {
 		C.gio_hideCursor()
 		return to
 	}
 	if from == pointer.CursorNone {
 		C.gio_showCursor()
 	}
-	C.gio_setCursor(C.NSUInteger(curID))
+	C.gio_setCursor(C.NSUInteger(macosCursorID[to]))
 	return to
 }
 

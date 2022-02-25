@@ -148,7 +148,7 @@ const (
 	TypeClipLen             = 1 + 4*4 + 1 + 1
 	TypePopClipLen          = 1
 	TypeProfileLen          = 1
-	TypeCursorLen           = 1 + 1
+	TypeCursorLen           = 2
 	TypePathLen             = 8 + 1
 	TypeStrokeLen           = 1 + 4
 	TypeSemanticLabelLen    = 1
@@ -423,7 +423,7 @@ func (t OpType) Size() int {
 
 func (t OpType) NumRefs() int {
 	switch t {
-	case TypeKeyInput, TypeKeyFocus, TypePointerInput, TypeProfile, TypeCall, TypeClipboardRead, TypeClipboardWrite, TypeCursor, TypeSemanticLabel, TypeSemanticDesc, TypeSelection:
+	case TypeKeyInput, TypeKeyFocus, TypePointerInput, TypeProfile, TypeCall, TypeClipboardRead, TypeClipboardWrite, TypeSemanticLabel, TypeSemanticDesc, TypeSelection:
 		return 1
 	case TypeImage, TypeSource, TypeTarget, TypeSnippet:
 		return 2

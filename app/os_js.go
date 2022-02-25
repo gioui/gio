@@ -545,9 +545,38 @@ func (w *window) Perform(system.Action) {}
 
 func (w *window) Raise() {}
 
+var webCursor = [...]string{
+	pointer.CursorDefault:                  "default",
+	pointer.CursorNone:                     "none",
+	pointer.CursorText:                     "text",
+	pointer.CursorVerticalText:             "vertical-text",
+	pointer.CursorPointer:                  "pointer",
+	pointer.CursorCrosshair:                "crosshair",
+	pointer.CursorAllScroll:                "all-scroll",
+	pointer.CursorColResize:                "col-resize",
+	pointer.CursorRowResize:                "row-resize",
+	pointer.CursorGrab:                     "grab",
+	pointer.CursorGrabbing:                 "grabbing",
+	pointer.CursorNotAllowed:               "not-allowed",
+	pointer.CursorWait:                     "wait",
+	pointer.CursorProgress:                 "progress",
+	pointer.CursorNorthWestResize:          "nw-resize",
+	pointer.CursorNorthEastResize:          "ne-resize",
+	pointer.CursorSouthWestResize:          "sw-resize",
+	pointer.CursorSouthEastResize:          "se-resize",
+	pointer.CursorNorthSouthResize:         "ns-resize",
+	pointer.CursorEastWestResize:           "ew-resize",
+	pointer.CursorWestResize:               "w-resize",
+	pointer.CursorEastResize:               "e-resize",
+	pointer.CursorNorthResize:              "n-resize",
+	pointer.CursorSouthResize:              "s-resize",
+	pointer.CursorNorthEastSouthWestResize: "nesw-resize",
+	pointer.CursorNorthWestSouthEastResize: "nwse-resize",
+}
+
 func (w *window) SetCursor(name pointer.CursorName) {
 	style := w.cnv.Get("style")
-	style.Set("cursor", string(name))
+	style.Set("cursor", webCursor[name])
 }
 
 func (w *window) Wakeup() {

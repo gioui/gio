@@ -638,7 +638,7 @@ func TestCursorNameOp(t *testing.T) {
 			event: func() []event.Event {
 				widget2 = func() {
 					pointer.InputOp{Tag: &h2}.Add(ops)
-					pointer.CursorNameOp{Name: pointer.CursorCrossHair}.Add(ops)
+					pointer.CursorNameOp{Name: pointer.CursorCrosshair}.Add(ops)
 				}
 				return []event.Event{
 					_at(50, 50),
@@ -648,7 +648,7 @@ func TestCursorNameOp(t *testing.T) {
 					},
 				}
 			},
-			want: pointer.CursorCrossHair,
+			want: pointer.CursorCrosshair,
 		},
 		{label: "remove input on top while inside",
 			event: func() []event.Event {

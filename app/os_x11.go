@@ -296,18 +296,14 @@ func (w *x11Window) Raise() {
 }
 
 func (w *x11Window) SetCursor(name pointer.CursorName) {
-	switch name {
-	case pointer.CursorNone:
+	if name == pointer.CursorNone {
 		w.cursor = name
 		C.XFixesHideCursor(w.x, w.xw)
 		return
-	case pointer.CursorGrab:
-		name = "hand1"
 	}
-	if w.cursor == pointer.CursorNone {
-		C.XFixesShowCursor(w.x, w.xw)
-	}
-	cname := C.CString(string(name))
+
+	xcursor := xCursor[name]
+	cname := C.CString(xcursor)
 	defer C.free(unsafe.Pointer(cname))
 	c := C.XcursorLibraryLoadCursor(w.x, cname)
 	if c == 0 {

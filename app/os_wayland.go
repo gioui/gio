@@ -1095,41 +1095,9 @@ func (w *window) SetCursor(name pointer.CursorName) {
 		C.wl_pointer_set_cursor(ptr, w.serial, nil, 0, 0)
 		return
 	}
-	switch name {
-	default:
-		fallthrough
-	case pointer.CursorDefault:
-		name = "left_ptr"
-	case pointer.CursorText:
-		name = "xterm"
-	case pointer.CursorPointer:
-		name = "hand1"
-	case pointer.CursorCrossHair:
-		name = "crosshair"
-	case pointer.CursorRowResize:
-		name = "top_side"
-	case pointer.CursorColResize:
-		name = "left_side"
-	case pointer.CursorGrab:
-		name = "hand1"
-	case pointer.CursorTopLeftResize:
-		name = "top_left_corner"
-	case pointer.CursorTopRightResize:
-		name = "top_right_corner"
-	case pointer.CursorBottomLeftResize:
-		name = "bottom_left_corner"
-	case pointer.CursorBottomRightResize:
-		name = "bottom_right_corner"
-	case pointer.CursorLeftResize:
-		name = "right_side"
-	case pointer.CursorRightResize:
-		name = "left_side"
-	case pointer.CursorTopResize:
-		name = "top_side"
-	case pointer.CursorBottomResize:
-		name = "bottom_side"
-	}
-	cname := C.CString(string(name))
+
+	xcursor := xCursor[name]
+	cname := C.CString(xcursor)
 	defer C.free(unsafe.Pointer(cname))
 	c := C.wl_cursor_theme_get_cursor(w.cursor.theme, cname)
 	if c == nil {

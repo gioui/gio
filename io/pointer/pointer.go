@@ -91,41 +91,83 @@ type Source uint8
 type Buttons uint8
 
 // CursorName is the name of a cursor.
-type CursorName string
+type CursorName byte
 
+// The cursors correspond to CSS pointer naming.
 const (
 	// CursorDefault is the default cursor.
-	CursorDefault CursorName = ""
-	// CursorText is the cursor for text.
-	CursorText CursorName = "text"
-	// CursorPointer is the cursor for a link.
-	CursorPointer CursorName = "pointer"
-	// CursorCrossHair is the cursor for precise location.
-	CursorCrossHair CursorName = "crosshair"
-	// CursorColResize is the cursor for vertical resize.
-	CursorColResize CursorName = "col-resize"
-	// CursorRowResize is the cursor for horizontal resize.
-	CursorRowResize CursorName = "row-resize"
-	// CursorGrab is the cursor for moving object in any direction.
-	CursorGrab CursorName = "grab"
+	CursorDefault CursorName = iota
 	// CursorNone hides the cursor. To show it again, use any other cursor.
-	CursorNone CursorName = "none"
-	// CursorTopLeftResize is the cursor for top-left corner resizing.
-	CursorTopLeftResize CursorName = "nw-resize"
-	// CursorTopRightResize is the cursor for top-right corner resizing.
-	CursorTopRightResize CursorName = "ne-resize"
-	// CursorBottomLeftResize is the cursor for bottom-left corner resizing.
-	CursorBottomLeftResize CursorName = "sw-resize"
-	// CursorBottomRightResize is the cursor for bottom-right corner resizing.
-	CursorBottomRightResize CursorName = "se-resize"
-	// CursorLeftResize is the cursor for left resizing.
-	CursorLeftResize CursorName = "w-resize"
-	// CursorRightResize is the cursor for right resizing.
-	CursorRightResize CursorName = "e-resize"
-	// CursorTopResize is the cursor for top resizing.
-	CursorTopResize CursorName = "n-resize"
-	// CursorBottomResize is the cursor for bottom resizing.
-	CursorBottomResize CursorName = "s-resize"
+	CursorNone
+	// CursorText is for selecting and inserting text.
+	CursorText
+	// CursorVerticalText is for selecting and inserting vertical text.
+	CursorVerticalText
+	// CursorPointer is for a link.
+	// Usually displayed as a pointing hand.
+	CursorPointer
+	// CursorCrosshair is for a precise location.
+	CursorCrosshair
+	// CursorAllScroll is for indicating scrolling in all directions.
+	// Usually displayed as arrows to all four directions.
+	CursorAllScroll
+	// CursorColResize is for vertical resize.
+	// Usually displayed as a vertical bar with arrows pointing east and west.
+	CursorColResize
+	// CursorRowResize is for horizontal resize.
+	// Usually displayed as a horizontal bar with arrows pointing north and south.
+	CursorRowResize
+	// CursorGrab is for content that can be grabbed (dragged to be moved).
+	// Usually displayed as an open hand.
+	CursorGrab
+	// CursorGrabbing is for content that is being grabbed (dragged to be moved).
+	// Usually displayed as a closed hand.
+	CursorGrabbing
+	// CursorWait is shown when the program is busy and user cannot interact.
+	// Usually displayed as a hourglass or the system equivalent.
+	CursorNotAllowed
+	// CursorNotAllowed is shown when the request action cannot be carried out.
+	// Usually displayed as a circle with a line through.
+	CursorWait
+	// CursorProgress is shown when the program is busy, but the user can still interact.
+	// Usually displayed as a default cursor with a hourglass.
+	CursorProgress
+	// CursorNorthWestResize is for top-left corner resizing.
+	// Usually displayed as an arrow towards north-west.
+	CursorNorthWestResize
+	// CursorNorthEastResize is for top-right corner resizing.
+	// Usually displayed as an arrow towards north-east.
+	CursorNorthEastResize
+	// CursorSouthWestResize is for bottom-left corner resizing.
+	// Usually displayed as an arrow towards south-west.
+	CursorSouthWestResize
+	// CursorSouthEastResize is for bottom-right corner resizing.
+	// Usually displayed as an arrow towards south-east.
+	CursorSouthEastResize
+	// CursorNorthSouth is for top-bottom resizing.
+	// Usually displayed as a bi-directional arrow towards north-south.
+	CursorNorthSouthResize
+	// CursorEastWestResize is for left-right resizing.
+	// Usually displayed as a bi-directional arrow towards east-west.
+	CursorEastWestResize
+	// CursorWestResize is for left resizing.
+	// Usually displayed as an arrow towards west.
+	CursorWestResize
+	// CursorEastResize is for right resizing.
+	// Usually displayed as an arrow towards east.
+	CursorEastResize
+	// CursorNorthResize is for top resizing.
+	// Usually displayed as an arrow towards north.
+	CursorNorthResize
+	// CursorSouthResize is for bottom resizing.
+	// Usually displayed as an arrow towards south.
+	CursorSouthResize
+	// CursorNorthEastSouthWestResize is for top-right to bottom-left diagonal resizing.
+	// Usually displayed as a double ended arrow on the corresponding diagonal.
+	CursorNorthEastSouthWestResize
+	// CursorNorthWestSouthEastResize is for top-left to bottom-right diagonal resizing.
+	// Usually displayed as a double ended arrow on the corresponding diagonal.
+	CursorNorthWestSouthEastResize
 )
 
 const (
@@ -206,8 +248,9 @@ func (p PassStack) Pop() {
 }
 
 func (op CursorNameOp) Add(o *op.Ops) {
-	data := ops.Write1(&o.Internal, ops.TypeCursorLen, op.Name)
+	data := ops.Write(&o.Internal, ops.TypeCursorLen)
 	data[0] = byte(ops.TypeCursor)
+	data[1] = byte(op.Name)
 }
 
 // Add panics if the scroll range does not contain zero.
@@ -318,10 +361,62 @@ func (b Buttons) String() string {
 }
 
 func (c CursorName) String() string {
-	if c == CursorDefault {
-		return "default"
+	switch c {
+	case CursorDefault:
+		return "Default"
+	case CursorNone:
+		return "None"
+	case CursorText:
+		return "Text"
+	case CursorVerticalText:
+		return "VerticalText"
+	case CursorPointer:
+		return "Pointer"
+	case CursorCrosshair:
+		return "Crosshair"
+	case CursorAllScroll:
+		return "AllScroll"
+	case CursorColResize:
+		return "ColResize"
+	case CursorRowResize:
+		return "RowResize"
+	case CursorGrab:
+		return "Grab"
+	case CursorGrabbing:
+		return "Grabbing"
+	case CursorNotAllowed:
+		return "NotAllowed"
+	case CursorWait:
+		return "Wait"
+	case CursorProgress:
+		return "Progress"
+	case CursorNorthWestResize:
+		return "NorthWestResize"
+	case CursorNorthEastResize:
+		return "NorthEastResize"
+	case CursorSouthWestResize:
+		return "SouthWestResize"
+	case CursorSouthEastResize:
+		return "SouthEastResize"
+	case CursorNorthSouthResize:
+		return "NorthSouthResize"
+	case CursorEastWestResize:
+		return "EastWestResize"
+	case CursorWestResize:
+		return "WestResize"
+	case CursorEastResize:
+		return "EastResize"
+	case CursorNorthResize:
+		return "NorthResize"
+	case CursorSouthResize:
+		return "SouthResize"
+	case CursorNorthEastSouthWestResize:
+		return "NorthEastSouthWestResize"
+	case CursorNorthWestSouthEastResize:
+		return "NorthWestSouthEastResize"
+	default:
+		panic("unknown Type")
 	}
-	return string(c)
 }
 
 func (Event) ImplementsEvent() {}

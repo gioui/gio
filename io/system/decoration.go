@@ -55,21 +55,21 @@ const (
 func (a Action) CursorName() pointer.CursorName {
 	switch a {
 	case ActionResizeNorthWest:
-		return pointer.CursorTopLeftResize
+		return pointer.CursorNorthWestResize
 	case ActionResizeSouthEast:
-		return pointer.CursorBottomRightResize
+		return pointer.CursorSouthEastResize
 	case ActionResizeNorthEast:
-		return pointer.CursorTopRightResize
+		return pointer.CursorNorthEastResize
 	case ActionResizeSouthWest:
-		return pointer.CursorBottomLeftResize
+		return pointer.CursorSouthWestResize
 	case ActionResizeWest:
-		return pointer.CursorLeftResize
+		return pointer.CursorWestResize
 	case ActionResizeEast:
-		return pointer.CursorRightResize
+		return pointer.CursorEastResize
 	case ActionResizeNorth:
-		return pointer.CursorTopResize
+		return pointer.CursorNorthResize
 	case ActionResizeSouth:
-		return pointer.CursorBottomResize
+		return pointer.CursorSouthResize
 	}
 	return pointer.CursorDefault
 }

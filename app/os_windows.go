@@ -715,45 +715,45 @@ func (w *window) SetCursor(name pointer.CursorName) {
 	}
 }
 
+// windowsCursor contains mapping from CursorName to an IDC.
+var windowsCursor = [...]uint16{
+	pointer.CursorDefault:                  windows.IDC_ARROW,
+	pointer.CursorNone:                     0,
+	pointer.CursorText:                     windows.IDC_IBEAM,
+	pointer.CursorVerticalText:             windows.IDC_IBEAM,
+	pointer.CursorPointer:                  windows.IDC_HAND,
+	pointer.CursorCrosshair:                windows.IDC_CROSS,
+	pointer.CursorAllScroll:                windows.IDC_SIZEALL,
+	pointer.CursorColResize:                windows.IDC_SIZEWE,
+	pointer.CursorRowResize:                windows.IDC_SIZENS,
+	pointer.CursorGrab:                     windows.IDC_SIZEALL,
+	pointer.CursorGrabbing:                 windows.IDC_SIZEALL,
+	pointer.CursorNotAllowed:               windows.IDC_NO,
+	pointer.CursorWait:                     windows.IDC_WAIT,
+	pointer.CursorProgress:                 windows.IDC_APPSTARTING,
+	pointer.CursorNorthWestResize:          windows.IDC_SIZENWSE,
+	pointer.CursorNorthEastResize:          windows.IDC_SIZENESW,
+	pointer.CursorSouthWestResize:          windows.IDC_SIZENESW,
+	pointer.CursorSouthEastResize:          windows.IDC_SIZENWSE,
+	pointer.CursorNorthSouthResize:         windows.IDC_SIZENS,
+	pointer.CursorEastWestResize:           windows.IDC_SIZEWE,
+	pointer.CursorWestResize:               windows.IDC_SIZEWE,
+	pointer.CursorEastResize:               windows.IDC_SIZEWE,
+	pointer.CursorNorthResize:              windows.IDC_SIZENS,
+	pointer.CursorSouthResize:              windows.IDC_SIZENS,
+	pointer.CursorNorthEastSouthWestResize: windows.IDC_SIZENESW,
+	pointer.CursorNorthWestSouthEastResize: windows.IDC_SIZENWSE,
+}
+
 func loadCursor(name pointer.CursorName) (syscall.Handle, error) {
-	var curID uint16
 	switch name {
-	default:
-		fallthrough
 	case pointer.CursorDefault:
 		return resources.cursor, nil
-	case pointer.CursorText:
-		curID = windows.IDC_IBEAM
-	case pointer.CursorPointer:
-		curID = windows.IDC_HAND
-	case pointer.CursorCrossHair:
-		curID = windows.IDC_CROSS
-	case pointer.CursorColResize:
-		curID = windows.IDC_SIZEWE
-	case pointer.CursorRowResize:
-		curID = windows.IDC_SIZENS
-	case pointer.CursorGrab:
-		curID = windows.IDC_SIZEALL
-	case pointer.CursorTopLeftResize:
-		curID = windows.IDC_SIZENWSE
-	case pointer.CursorTopRightResize:
-		curID = windows.IDC_SIZENESW
-	case pointer.CursorBottomLeftResize:
-		curID = windows.IDC_SIZENESW
-	case pointer.CursorBottomRightResize:
-		curID = windows.IDC_SIZENWSE
-	case pointer.CursorLeftResize:
-		curID = windows.IDC_SIZEWE
-	case pointer.CursorRightResize:
-		curID = windows.IDC_SIZEWE
-	case pointer.CursorTopResize:
-		curID = windows.IDC_SIZENS
-	case pointer.CursorBottomResize:
-		curID = windows.IDC_SIZENS
 	case pointer.CursorNone:
 		return 0, nil
+	default:
+		return windows.LoadCursor(windowsCursor[name])
 	}
-	return windows.LoadCursor(curID)
 }
 
 func (w *window) ShowTextInput(show bool) {}

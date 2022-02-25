@@ -8,6 +8,8 @@ package app
 import (
 	"errors"
 	"unsafe"
+
+	"gioui.org/io/pointer"
 )
 
 // ViewEvent provides handles to the underlying window objects for the
@@ -65,4 +67,34 @@ func newWindow(window *callbacks, options []Option) error {
 		return errFirst
 	}
 	return errors.New("app: no window driver available")
+}
+
+// xCursor contains mapping from pointer.CursorName to XCursor.
+var xCursor = [...]string{
+	pointer.CursorDefault:                  "left_ptr",
+	pointer.CursorNone:                     "",
+	pointer.CursorText:                     "xterm",
+	pointer.CursorVerticalText:             "vertical-text",
+	pointer.CursorPointer:                  "hand2",
+	pointer.CursorCrosshair:                "crosshair",
+	pointer.CursorAllScroll:                "fleur",
+	pointer.CursorColResize:                "sb_h_double_arrow",
+	pointer.CursorRowResize:                "sb_v_double_arrow",
+	pointer.CursorGrab:                     "hand1",
+	pointer.CursorGrabbing:                 "move",
+	pointer.CursorNotAllowed:               "crossed_circle",
+	pointer.CursorWait:                     "watch",
+	pointer.CursorProgress:                 "left_ptr_watch",
+	pointer.CursorNorthWestResize:          "top_left_corner",
+	pointer.CursorNorthEastResize:          "top_right_corner",
+	pointer.CursorSouthWestResize:          "bottom_left_corner",
+	pointer.CursorSouthEastResize:          "bottom_right_corner",
+	pointer.CursorNorthSouthResize:         "sb_v_double_arrow",
+	pointer.CursorEastWestResize:           "sb_h_double_arrow",
+	pointer.CursorWestResize:               "left_side",
+	pointer.CursorEastResize:               "right_side",
+	pointer.CursorNorthResize:              "top_side",
+	pointer.CursorSouthResize:              "bottom_side",
+	pointer.CursorNorthEastSouthWestResize: "fd_double_arrow",
+	pointer.CursorNorthWestSouthEastResize: "bd_double_arrow",
 }

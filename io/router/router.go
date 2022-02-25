@@ -298,7 +298,7 @@ func (q *Router) collect() {
 			}
 			pc.inputOp(op, &q.handlers)
 		case ops.TypeCursor:
-			name := encOp.Refs[0].(pointer.CursorName)
+			name := pointer.CursorName(encOp.Data[1])
 			pc.cursor(name)
 		case ops.TypeSource:
 			op := transfer.SourceOp{
