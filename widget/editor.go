@@ -1349,7 +1349,7 @@ func (e *Editor) WriteTo(w io.Writer) (int64, error) {
 
 // Seek implements io.Seeker.
 func (e *Editor) Seek(offset int64, whence int) (int64, error) {
-	return e.rr.Seek(0, io.SeekStart)
+	return e.rr.Seek(offset, io.SeekStart)
 }
 
 // Read implements io.Reader.
