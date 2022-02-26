@@ -908,7 +908,7 @@ func (e *Editor) CaretPos() (line, col int) {
 // editor itself.
 func (e *Editor) CaretCoords() f32.Point {
 	caret := e.closestPosition(combinedPos{runes: e.caret.start})
-	return f32.Pt(float32(caret.x)/64, float32(caret.y))
+	return f32.Pt(float32(caret.x)/64-float32(e.scrollOff.X), float32(caret.y-e.scrollOff.Y))
 }
 
 // indexPosition returns the latest position from the index no later than pos.
