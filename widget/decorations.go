@@ -93,7 +93,7 @@ func (d *Decorations) LayoutResize(gtx layout.Context, actions system.Action) {
 		}
 		st := clip.Rect(data.Rectangle).Push(gtx.Ops)
 		if rsz.Hover.Hovered(gtx) {
-			pointer.CursorNameOp{Name: action.CursorName()}.Add(gtx.Ops)
+			action.Cursor().Add(gtx.Ops)
 		}
 		rsz.Drag.Add(gtx.Ops)
 		pass := pointer.PassOp{}.Push(gtx.Ops)

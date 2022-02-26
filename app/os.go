@@ -163,7 +163,7 @@ type driver interface {
 	// Configure the window.
 	Configure([]Option)
 	// SetCursor updates the current cursor to name.
-	SetCursor(name pointer.CursorName)
+	SetCursor(cursor pointer.Cursor)
 	// Raise the window at the top.
 	Raise()
 	// Close the window.

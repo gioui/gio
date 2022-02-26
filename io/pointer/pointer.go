@@ -54,11 +54,6 @@ type PassStack struct {
 	macroID int
 }
 
-// CursorNameOp sets the cursor for the current area.
-type CursorNameOp struct {
-	Name CursorName
-}
-
 // InputOp declares an input handler ready for pointer
 // events.
 type InputOp struct {
@@ -90,13 +85,14 @@ type Source uint8
 // Buttons is a set of mouse buttons
 type Buttons uint8
 
-// CursorName is the name of a cursor.
-type CursorName byte
+// Cursor denotes a pre-defined cursor shape. Its Add method adds an
+// operation that sets the cursor shape for the current clip area.
+type Cursor byte
 
 // The cursors correspond to CSS pointer naming.
 const (
 	// CursorDefault is the default cursor.
-	CursorDefault CursorName = iota
+	CursorDefault Cursor = iota
 	// CursorNone hides the cursor. To show it again, use any other cursor.
 	CursorNone
 	// CursorText is for selecting and inserting text.
@@ -247,10 +243,10 @@ func (p PassStack) Pop() {
 	data[0] = byte(ops.TypePopPass)
 }
 
-func (op CursorNameOp) Add(o *op.Ops) {
+func (op Cursor) Add(o *op.Ops) {
 	data := ops.Write(&o.Internal, ops.TypeCursorLen)
 	data[0] = byte(ops.TypeCursor)
-	data[1] = byte(op.Name)
+	data[1] = byte(op)
 }
 
 // Add panics if the scroll range does not contain zero.
@@ -360,7 +356,7 @@ func (b Buttons) String() string {
 	return strings.Join(strs, "|")
 }
 
-func (c CursorName) String() string {
+func (c Cursor) String() string {
 	switch c {
 	case CursorDefault:
 		return "Default"

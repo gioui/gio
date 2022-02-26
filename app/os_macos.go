@@ -205,7 +205,7 @@ type window struct {
 	w           *callbacks
 	stage       system.Stage
 	displayLink *displayLink
-	cursor      pointer.CursorName
+	cursor      pointer.Cursor
 
 	scale  float32
 	config Config
@@ -368,8 +368,8 @@ func (w *window) setTitle(prev, cnf Config) {
 
 func (w *window) Perform(system.Action) {}
 
-func (w *window) SetCursor(name pointer.CursorName) {
-	w.cursor = windowSetCursor(w.cursor, name)
+func (w *window) SetCursor(cursor pointer.Cursor) {
+	w.cursor = windowSetCursor(w.cursor, cursor)
 }
 
 func (w *window) EditorStateChanged(old, new editorState) {

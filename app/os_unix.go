@@ -69,7 +69,7 @@ func newWindow(window *callbacks, options []Option) error {
 	return errors.New("app: no window driver available")
 }
 
-// xCursor contains mapping from pointer.CursorName to XCursor.
+// xCursor contains mapping from pointer.Cursor to XCursor.
 var xCursor = [...]string{
 	pointer.CursorDefault:                  "left_ptr",
 	pointer.CursorNone:                     "",

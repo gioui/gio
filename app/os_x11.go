@@ -107,7 +107,7 @@ type x11Window struct {
 	clipboard struct {
 		content []byte
 	}
-	cursor pointer.CursorName
+	cursor pointer.Cursor
 	config Config
 
 	wakeups chan struct{}
@@ -295,22 +295,22 @@ func (w *x11Window) Raise() {
 	C.XMapRaised(w.display(), w.xw)
 }
 
-func (w *x11Window) SetCursor(name pointer.CursorName) {
-	if name == pointer.CursorNone {
-		w.cursor = name
+func (w *x11Window) SetCursor(cursor pointer.Cursor) {
+	if cursor == pointer.CursorNone {
+		w.cursor = cursor
 		C.XFixesHideCursor(w.x, w.xw)
 		return
 	}
 
-	xcursor := xCursor[name]
+	xcursor := xCursor[cursor]
 	cname := C.CString(xcursor)
 	defer C.free(unsafe.Pointer(cname))
 	c := C.XcursorLibraryLoadCursor(w.x, cname)
 	if c == 0 {
-		name = pointer.CursorDefault
+		cursor = pointer.CursorDefault
 	}
-	w.cursor = name
-	// If c if null (i.e. name was not found),
+	w.cursor = cursor
+	// If c if null (i.e. cursor was not found),
 	// XDefineCursor will use the default cursor.
 	C.XDefineCursor(w.x, w.xw, c)
 }

@@ -1338,9 +1338,9 @@ func (w *window) Perform(system.Action) {}
 
 func (w *window) Raise() {}
 
-func (w *window) SetCursor(name pointer.CursorName) {
+func (w *window) SetCursor(cursor pointer.Cursor) {
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
-		setCursor(env, w.view, name)
+		setCursor(env, w.view, cursor)
 	})
 }
 
@@ -1379,8 +1379,8 @@ var androidCursor = [...]uint16{
 	pointer.CursorNorthWestSouthEastResize: 1017, // TYPE_TOP_LEFT_DIAGONAL_DOUBLE_ARROW
 }
 
-func setCursor(env *C.JNIEnv, view C.jobject, name pointer.CursorName) {
-	curID := androidCursor[name]
+func setCursor(env *C.JNIEnv, view C.jobject, cursor pointer.Cursor) {
+	curID := androidCursor[cursor]
 	callVoidMethod(env, view, gioView.setCursor, jvalue(curID))
 }
 

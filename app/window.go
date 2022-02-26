@@ -69,7 +69,7 @@ type Window struct {
 	delayedDraw  *time.Timer
 
 	queue       queue
-	cursor      pointer.CursorName
+	cursor      pointer.Cursor
 	decorations struct {
 		op.Ops
 		Config
@@ -331,13 +331,6 @@ func (w *Window) ReadClipboard() {
 func (w *Window) WriteClipboard(s string) {
 	w.driverDefer(func(d driver) {
 		d.WriteClipboard(s)
-	})
-}
-
-// SetCursorName changes the current window cursor to name.
-func (w *Window) SetCursorName(name pointer.CursorName) {
-	w.driverDefer(func(d driver) {
-		d.SetCursor(name)
 	})
 }
 

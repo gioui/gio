@@ -572,7 +572,7 @@ func TestMultitouch(t *testing.T) {
 	assertEventPointerTypeSequence(t, r.Events(h2), pointer.Cancel, pointer.Enter, pointer.Press, pointer.Release)
 }
 
-func TestCursorNameOp(t *testing.T) {
+func TestCursor(t *testing.T) {
 	ops := new(op.Ops)
 	var r Router
 	var h, h2 int
@@ -582,7 +582,7 @@ func TestCursorNameOp(t *testing.T) {
 		defer clip.Rect(image.Rectangle{Max: image.Pt(100, 100)}).Push(ops).Pop()
 		// The cursor is checked and changed upon cursor movement.
 		pointer.InputOp{Tag: &h}.Add(ops)
-		pointer.CursorNameOp{Name: pointer.CursorPointer}.Add(ops)
+		pointer.CursorPointer.Add(ops)
 		if widget2 != nil {
 			widget2()
 		}
@@ -605,7 +605,7 @@ func TestCursorNameOp(t *testing.T) {
 	for _, tc := range []struct {
 		label string
 		event interface{}
-		want  pointer.CursorName
+		want  pointer.Cursor
 	}{
 		{label: "move inside",
 			event: _at(50, 50),
@@ -638,7 +638,7 @@ func TestCursorNameOp(t *testing.T) {
 			event: func() []event.Event {
 				widget2 = func() {
 					pointer.InputOp{Tag: &h2}.Add(ops)
-					pointer.CursorNameOp{Name: pointer.CursorCrosshair}.Add(ops)
+					pointer.CursorCrosshair.Add(ops)
 				}
 				return []event.Event{
 					_at(50, 50),

@@ -626,7 +626,7 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 	}
 	e.requestFocus = false
 	defer clip.Rect(image.Rectangle{Max: e.viewSize}).Push(gtx.Ops).Pop()
-	pointer.CursorNameOp{Name: pointer.CursorText}.Add(gtx.Ops)
+	pointer.CursorText.Add(gtx.Ops)
 
 	var scrollRange image.Rectangle
 	if e.SingleLine {

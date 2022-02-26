@@ -49,10 +49,10 @@ const (
 	ActionResizeSouthEast
 )
 
-// CursorName returns the cursor for the action.
+// Cursor returns the cursor for the action.
 // It must be a single action otherwise the default
 // cursor is returned.
-func (a Action) CursorName() pointer.CursorName {
+func (a Action) Cursor() pointer.Cursor {
 	switch a {
 	case ActionResizeNorthWest:
 		return pointer.CursorNorthWestResize

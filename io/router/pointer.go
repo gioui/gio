@@ -18,7 +18,7 @@ type pointerQueue struct {
 	hitTree   []hitNode
 	areas     []areaNode
 	cursors   []cursorNode
-	cursor    pointer.CursorName
+	cursor    pointer.Cursor
 	handlers  map[event.Tag]*pointerHandler
 	pointers  []pointerInfo
 	transfers []io.ReadCloser // pending data transfers
@@ -45,8 +45,8 @@ type hitNode struct {
 }
 
 type cursorNode struct {
-	name pointer.CursorName
-	area int
+	cursor pointer.Cursor
+	area   int
 }
 
 type pointerInfo struct {
@@ -306,10 +306,10 @@ func (c *pointerCollector) semanticDisabled(disabled bool) {
 	area.semantic.content.disabled = disabled
 }
 
-func (c *pointerCollector) cursor(name pointer.CursorName) {
+func (c *pointerCollector) cursor(cursor pointer.Cursor) {
 	c.q.cursors = append(c.q.cursors, cursorNode{
-		name: name,
-		area: len(c.q.areas) - 1,
+		cursor: cursor,
+		area:   len(c.q.areas) - 1,
 	})
 }
 
@@ -725,7 +725,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 		h := q.handlers[k]
 		for i := len(q.cursors) - 1; i >= 0; i-- {
 			if c := q.cursors[i]; c.area == h.area {
-				q.cursor = c.name
+				q.cursor = c.cursor
 				break
 			}
 		}

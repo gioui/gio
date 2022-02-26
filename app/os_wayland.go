@@ -1086,17 +1086,17 @@ func (w *window) Raise() {
 	// https://wayland.app/protocols/xdg-shell#xdg_toplevel:request:set_minimized
 }
 
-func (w *window) SetCursor(name pointer.CursorName) {
+func (w *window) SetCursor(cursor pointer.Cursor) {
 	ptr := w.disp.seat.pointer
 	if ptr == nil {
 		return
 	}
-	if name == pointer.CursorNone {
+	if cursor == pointer.CursorNone {
 		C.wl_pointer_set_cursor(ptr, w.serial, nil, 0, 0)
 		return
 	}
 
-	xcursor := xCursor[name]
+	xcursor := xCursor[cursor]
 	cname := C.CString(xcursor)
 	defer C.free(unsafe.Pointer(cname))
 	c := C.wl_cursor_theme_get_cursor(w.cursor.theme, cname)

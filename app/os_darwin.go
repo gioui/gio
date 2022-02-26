@@ -243,7 +243,7 @@ var macosCursorID = [...]byte{
 
 // windowSetCursor updates the cursor from the current one to a new one
 // and returns the new one.
-func windowSetCursor(from, to pointer.CursorName) pointer.CursorName {
+func windowSetCursor(from, to pointer.Cursor) pointer.Cursor {
 	if from == to {
 		return to
 	}

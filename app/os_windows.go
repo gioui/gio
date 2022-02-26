@@ -704,8 +704,8 @@ func (w *window) writeClipboard(s string) error {
 	return nil
 }
 
-func (w *window) SetCursor(name pointer.CursorName) {
-	c, err := loadCursor(name)
+func (w *window) SetCursor(cursor pointer.Cursor) {
+	c, err := loadCursor(cursor)
 	if err != nil {
 		c = resources.cursor
 	}
@@ -715,7 +715,7 @@ func (w *window) SetCursor(name pointer.CursorName) {
 	}
 }
 
-// windowsCursor contains mapping from CursorName to an IDC.
+// windowsCursor contains mapping from pointer.Cursor to an IDC.
 var windowsCursor = [...]uint16{
 	pointer.CursorDefault:                  windows.IDC_ARROW,
 	pointer.CursorNone:                     0,
@@ -745,14 +745,14 @@ var windowsCursor = [...]uint16{
 	pointer.CursorNorthWestSouthEastResize: windows.IDC_SIZENWSE,
 }
 
-func loadCursor(name pointer.CursorName) (syscall.Handle, error) {
-	switch name {
+func loadCursor(cursor pointer.Cursor) (syscall.Handle, error) {
+	switch cursor {
 	case pointer.CursorDefault:
 		return resources.cursor, nil
 	case pointer.CursorNone:
 		return 0, nil
 	default:
-		return windows.LoadCursor(windowsCursor[name])
+		return windows.LoadCursor(windowsCursor[cursor])
 	}
 }
 

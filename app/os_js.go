@@ -574,9 +574,9 @@ var webCursor = [...]string{
 	pointer.CursorNorthWestSouthEastResize: "nwse-resize",
 }
 
-func (w *window) SetCursor(name pointer.CursorName) {
+func (w *window) SetCursor(cursor pointer.Cursor) {
 	style := w.cnv.Get("style")
-	style.Set("cursor", webCursor[name])
+	style.Set("cursor", webCursor[cursor])
 }
 
 func (w *window) Wakeup() {

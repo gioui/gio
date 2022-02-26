@@ -97,7 +97,7 @@ type window struct {
 	displayLink *displayLink
 
 	visible bool
-	cursor  pointer.CursorName
+	cursor  pointer.Cursor
 	config  Config
 
 	pointerMap []C.CFTypeRef
@@ -301,8 +301,8 @@ func (w *window) SetAnimating(anim bool) {
 	}
 }
 
-func (w *window) SetCursor(name pointer.CursorName) {
-	w.cursor = windowSetCursor(w.cursor, name)
+func (w *window) SetCursor(cursor pointer.Cursor) {
+	w.cursor = windowSetCursor(w.cursor, cursor)
 }
 
 func (w *window) onKeyCommand(name string) {

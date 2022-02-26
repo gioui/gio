@@ -193,7 +193,7 @@ func (q *Router) ReadClipboard() bool {
 }
 
 // Cursor returns the last cursor set.
-func (q *Router) Cursor() pointer.CursorName {
+func (q *Router) Cursor() pointer.Cursor {
 	return q.pointer.queue.cursor
 }
 
@@ -298,7 +298,7 @@ func (q *Router) collect() {
 			}
 			pc.inputOp(op, &q.handlers)
 		case ops.TypeCursor:
-			name := pointer.CursorName(encOp.Data[1])
+			name := pointer.Cursor(encOp.Data[1])
 			pc.cursor(name)
 		case ops.TypeSource:
 			op := transfer.SourceOp{
