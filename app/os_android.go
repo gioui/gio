@@ -897,14 +897,6 @@ func runInJVM(jvm *C.JavaVM, f func(env *C.JNIEnv)) {
 func convertKeyCode(code C.jint) (string, bool) {
 	var n string
 	switch code {
-	case C.AKEYCODE_DPAD_UP:
-		n = key.NameUpArrow
-	case C.AKEYCODE_DPAD_DOWN:
-		n = key.NameDownArrow
-	case C.AKEYCODE_DPAD_LEFT:
-		n = key.NameLeftArrow
-	case C.AKEYCODE_DPAD_RIGHT:
-		n = key.NameRightArrow
 	case C.AKEYCODE_FORWARD_DEL:
 		n = key.NameDeleteForward
 	case C.AKEYCODE_DEL:
@@ -930,6 +922,18 @@ func convertKeyCode(code C.jint) (string, bool) {
 //export Java_org_gioui_GioView_onKeyEvent
 func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, keyCode, r C.jint, pressed C.jboolean, t C.jlong) {
 	w := views[handle]
+	if pressed == C.JNI_TRUE {
+		switch keyCode {
+		case C.AKEYCODE_DPAD_UP:
+			w.callbacks.MoveFocus(router.FocusUp)
+		case C.AKEYCODE_DPAD_DOWN:
+			w.callbacks.MoveFocus(router.FocusDown)
+		case C.AKEYCODE_DPAD_LEFT:
+			w.callbacks.MoveFocus(router.FocusLeft)
+		case C.AKEYCODE_DPAD_RIGHT:
+			w.callbacks.MoveFocus(router.FocusRight)
+		}
+	}
 	if n, ok := convertKeyCode(keyCode); ok {
 		state := key.Release
 		if pressed == C.JNI_TRUE {

@@ -504,6 +504,12 @@ func (c *callbacks) SetEditorSnippet(r key.Range) {
 	c.Event(key.SnippetEvent(r))
 }
 
+func (c *callbacks) MoveFocus(dir router.FocusDirection) {
+	c.w.queue.q.MoveFocus(dir)
+	c.w.setNextFrame(time.Time{})
+	c.w.updateAnimation(c.d)
+}
+
 func (e *editorState) Replace(r key.Range, text string) {
 	if r.Start > r.End {
 		r.Start, r.End = r.End, r.Start

@@ -3,12 +3,14 @@
 package router
 
 import (
+	"image"
 	"reflect"
 	"testing"
 
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 )
 
 func TestKeyWakeup(t *testing.T) {
@@ -244,6 +246,41 @@ func TestTabFocus(t *testing.T) {
 	tab(0)
 	tab(key.ModShift)
 	assertFocus(t, r, &handlers[2])
+}
+
+func TestDirectionalFocus(t *testing.T) {
+	ops := new(op.Ops)
+	r := new(Router)
+	handlers := []image.Rectangle{
+		image.Rect(10, 10, 50, 50),
+		image.Rect(50, 20, 100, 80),
+		image.Rect(20, 26, 60, 80),
+		image.Rect(10, 60, 50, 100),
+	}
+
+	for i, bounds := range handlers {
+		cl := clip.Rect(bounds).Push(ops)
+		key.InputOp{Tag: &handlers[i]}.Add(ops)
+		cl.Pop()
+	}
+	r.Frame(ops)
+
+	r.MoveFocus(FocusLeft)
+	assertFocus(t, r, &handlers[0])
+	r.MoveFocus(FocusLeft)
+	assertFocus(t, r, &handlers[0])
+	r.MoveFocus(FocusRight)
+	assertFocus(t, r, &handlers[1])
+	r.MoveFocus(FocusRight)
+	assertFocus(t, r, &handlers[1])
+	r.MoveFocus(FocusDown)
+	assertFocus(t, r, &handlers[2])
+	r.MoveFocus(FocusDown)
+	assertFocus(t, r, &handlers[2])
+	r.MoveFocus(FocusLeft)
+	assertFocus(t, r, &handlers[3])
+	r.MoveFocus(FocusUp)
+	assertFocus(t, r, &handlers[0])
 }
 
 func assertKeyEvent(t *testing.T, events []event.Event, expected bool, expectedInputs ...event.Event) {

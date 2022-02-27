@@ -148,6 +148,10 @@ func (q *Router) Queue(events ...event.Event) bool {
 	return q.handlers.HadEvents()
 }
 
+func (q *Router) MoveFocus(dir FocusDirection) {
+	q.key.queue.MoveFocus(dir, &q.handlers)
+}
+
 // TextInputState returns the input state from the most recent
 // call to Frame.
 func (q *Router) TextInputState() TextInputState {
@@ -316,7 +320,8 @@ func (q *Router) collect() {
 				Tag:  encOp.Refs[0].(event.Tag),
 				Hint: key.InputHint(encOp.Data[1]),
 			}
-			kc.inputOp(op)
+			b := pc.currentAreaBounds()
+			kc.inputOp(op, b)
 		case ops.TypeSnippet:
 			op := key.SnippetOp{
 				Tag: encOp.Refs[0].(event.Tag),

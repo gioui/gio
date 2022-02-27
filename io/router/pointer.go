@@ -222,6 +222,14 @@ func (c *pointerCollector) currentArea() int {
 	return -1
 }
 
+func (c *pointerCollector) currentAreaBounds() f32.Rectangle {
+	a := c.currentArea()
+	if a == -1 {
+		panic("no root area")
+	}
+	return c.q.areas[a].bounds()
+}
+
 func (c *pointerCollector) addHitNode(n hitNode) {
 	n.next = c.state.nodePlusOne - 1
 	c.q.hitTree = append(c.q.hitTree, n)
@@ -382,10 +390,7 @@ func (q *pointerQueue) appendSemanticChildren(nodes []SemanticNode, areaIdx int)
 		nodes = append(nodes, SemanticNode{
 			ID: semID,
 			Desc: SemanticDesc{
-				Bounds: f32.Rectangle{
-					Min: a.trans.Transform(a.area.rect.Min),
-					Max: a.trans.Transform(a.area.rect.Max),
-				},
+				Bounds:      a.bounds(),
 				Label:       cnt.label,
 				Description: cnt.desc,
 				Class:       cnt.class,
@@ -866,6 +871,13 @@ func (op *areaOp) Hit(pos f32.Point) bool {
 		return (xh*xh)/(rx*rx)+(yk*yk)/(ry*ry) <= 1
 	default:
 		panic("invalid area kind")
+	}
+}
+
+func (a *areaNode) bounds() f32.Rectangle {
+	return f32.Rectangle{
+		Min: a.trans.Transform(a.area.rect.Min),
+		Max: a.trans.Transform(a.area.rect.Max),
 	}
 }
 
