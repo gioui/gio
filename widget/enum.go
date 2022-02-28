@@ -98,7 +98,7 @@ func (e *Enum) Layout(gtx layout.Context, k string, content layout.Widget) layou
 				e.focused = false
 			}
 		case key.Event:
-			if ev.State != key.Press {
+			if ev.State != key.Release {
 				break
 			}
 			if ev.Name != key.NameEnter && ev.Name != key.NameSpace {
