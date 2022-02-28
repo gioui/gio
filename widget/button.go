@@ -112,6 +112,8 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 	b.click.Add(gtx.Ops)
 	if !disabled {
 		key.InputOp{Tag: &b.keyTag}.Add(gtx.Ops)
+	} else {
+		b.focused = false
 	}
 	c.Add(gtx.Ops)
 	for len(b.history) > 0 {

@@ -121,6 +121,8 @@ func (e *Enum) Layout(gtx layout.Context, k string, content layout.Widget) layou
 	disabled := gtx.Queue == nil
 	if !disabled {
 		key.InputOp{Tag: &state.tag}.Add(gtx.Ops)
+	} else if e.focus == k {
+		e.focused = false
 	}
 	semantic.SelectedOp(k == e.Value).Add(gtx.Ops)
 	semantic.DisabledOp(disabled).Add(gtx.Ops)
