@@ -630,6 +630,7 @@ func (w *Window) waitAck(d driver) {
 		case <-w.immediateRedraws:
 			// Invalidate was called during frame processing.
 			w.setNextFrame(time.Time{})
+			w.updateAnimation(d)
 		}
 	}
 }
