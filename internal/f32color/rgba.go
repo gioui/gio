@@ -151,11 +151,15 @@ func Disabled(c color.NRGBA) (d color.NRGBA) {
 	return
 }
 
-// Hovered blends color towards a brighter color. It is approximate
-// because it operates in non-linear sRGB space.
+// Hovered blends dark colors towards white, and light colors towards
+// black. It is approximate because it operates in non-linear sRGB space.
 func Hovered(c color.NRGBA) (h color.NRGBA) {
-	const r = 0x20 // lighten ratio
-	return mix(color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: c.A}, c, r)
+	const ratio = 0x20
+	m := color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: c.A}
+	if approxLuminance(c) > 128 {
+		m = color.NRGBA{A: c.A}
+	}
+	return mix(m, c, ratio)
 }
 
 // mix mixes c1 and c2 weighted by (1 - a/256) and a/256 respectively.
