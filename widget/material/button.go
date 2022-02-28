@@ -94,6 +94,9 @@ func Clickable(gtx layout.Context, button *widget.Clickable, w layout.Widget) la
 		return layout.Stack{}.Layout(gtx,
 			layout.Expanded(func(gtx layout.Context) layout.Dimensions {
 				defer clip.Rect{Max: gtx.Constraints.Min}.Push(gtx.Ops).Pop()
+				if button.Hovered() || button.Focused() {
+					paint.Fill(gtx.Ops, f32color.Hovered(color.NRGBA{}))
+				}
 				for _, c := range button.History() {
 					drawInk(gtx, c)
 				}
