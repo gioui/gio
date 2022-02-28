@@ -510,6 +510,12 @@ func (c *callbacks) MoveFocus(dir router.FocusDirection) {
 	c.w.updateAnimation(c.d)
 }
 
+func (c *callbacks) ClickFocus() {
+	c.w.queue.q.ClickFocus()
+	c.w.setNextFrame(time.Time{})
+	c.w.updateAnimation(c.d)
+}
+
 func (e *editorState) Replace(r key.Range, text string) {
 	if r.Start > r.End {
 		r.Start, r.End = r.End, r.Start

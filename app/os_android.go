@@ -903,7 +903,7 @@ func convertKeyCode(code C.jint) (string, bool) {
 		n = key.NameDeleteBackward
 	case C.AKEYCODE_NUMPAD_ENTER:
 		n = key.NameEnter
-	case C.AKEYCODE_ENTER, C.AKEYCODE_DPAD_CENTER:
+	case C.AKEYCODE_ENTER:
 		n = key.NameReturn
 	case C.AKEYCODE_CTRL_LEFT, C.AKEYCODE_CTRL_RIGHT:
 		n = key.NameCtrl
@@ -932,6 +932,8 @@ func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.j
 			w.callbacks.MoveFocus(router.FocusLeft)
 		case C.AKEYCODE_DPAD_RIGHT:
 			w.callbacks.MoveFocus(router.FocusRight)
+		case C.AKEYCODE_DPAD_CENTER:
+			w.callbacks.ClickFocus()
 		}
 	}
 	if n, ok := convertKeyCode(keyCode); ok {

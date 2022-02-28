@@ -152,6 +152,23 @@ func (q *Router) MoveFocus(dir FocusDirection) {
 	q.key.queue.MoveFocus(dir, &q.handlers)
 }
 
+func (q *Router) ClickFocus() {
+	focus := q.key.queue.focus
+	if focus == nil {
+		return
+	}
+	bounds := q.key.queue.BoundsFor(focus)
+	center := bounds.Max.Add(bounds.Min).Mul(.5)
+	e := pointer.Event{
+		Position: center,
+		Source:   pointer.Touch,
+	}
+	e.Type = pointer.Press
+	q.pointer.queue.Push(e, &q.handlers)
+	e.Type = pointer.Release
+	q.pointer.queue.Push(e, &q.handlers)
+}
+
 // TextInputState returns the input state from the most recent
 // call to Frame.
 func (q *Router) TextInputState() TextInputState {

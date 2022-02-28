@@ -253,6 +253,11 @@ func (q *keyQueue) Push(e event.Event, events *handlerEvents) {
 	}
 }
 
+func (q *keyQueue) BoundsFor(t event.Tag) f32.Rectangle {
+	order := q.handlers[t].dirOrder
+	return q.dirOrder[order].bounds
+}
+
 func (q *keyQueue) setFocus(focus event.Tag, events *handlerEvents) {
 	if focus != nil {
 		if _, exists := q.handlers[focus]; !exists {
