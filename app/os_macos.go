@@ -504,6 +504,7 @@ func gio_onFocus(view C.CFTypeRef, focus C.int) {
 func gio_onChangeScreen(view C.CFTypeRef, did uint64) {
 	w := mustView(view)
 	w.displayLink.SetDisplayID(did)
+	C.setNeedsDisplay(w.view)
 }
 
 //export gio_hasMarkedText
