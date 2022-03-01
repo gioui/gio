@@ -35,7 +35,7 @@ func TestEditorConfigurations(t *testing.T) {
 	cache := text.NewCache(gofont.Collection())
 	fontSize := unit.Px(10)
 	font := text.Font{}
-	sentence := "the quick brown fox jumps over the lazy dog"
+	sentence := "\n\n\n\n\n\n\n\n\n\n\n\nthe quick brown fox jumps over the lazy dog"
 	runes := len([]rune(sentence))
 
 	// Ensure that both ends of the text are reachable in all permutations
@@ -56,6 +56,10 @@ func TestEditorConfigurations(t *testing.T) {
 				e.Layout(gtx, cache, font, fontSize, nil)
 				e.SetCaret(runes, runes)
 				e.Layout(gtx, cache, font, fontSize, nil)
+				coords := e.CaretCoords()
+				if int(coords.X) > gtx.Constraints.Max.X || int(coords.Y) > gtx.Constraints.Max.Y {
+					t.Errorf("caret coordinates %v exceed constraints %v", coords, gtx.Constraints.Max)
+				}
 			})
 		}
 	}
