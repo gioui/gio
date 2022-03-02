@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"reflect"
 	"runtime"
 	"sort"
 	"strings"
@@ -690,11 +689,7 @@ func (w *window) writeClipboard(s string) error {
 		windows.GlobalFree(mem)
 		return err
 	}
-	var u16v []uint16
-	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&u16v))
-	hdr.Data = ptr
-	hdr.Cap = len(u16)
-	hdr.Len = len(u16)
+	u16v := unsafe.Slice((*uint16)(ptr), len(u16))
 	copy(u16v, u16)
 	windows.GlobalUnlock(mem)
 	if err := windows.SetClipboardData(windows.CF_UNICODETEXT, mem); err != nil {

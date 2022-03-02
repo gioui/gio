@@ -619,12 +619,12 @@ func GlobalFree(h syscall.Handle) {
 	_GlobalFree.Call(uintptr(h))
 }
 
-func GlobalLock(h syscall.Handle) (uintptr, error) {
+func GlobalLock(h syscall.Handle) (unsafe.Pointer, error) {
 	r, _, err := _GlobalLock.Call(uintptr(h))
 	if r == 0 {
-		return 0, fmt.Errorf("GlobalLock: %v", err)
+		return nil, fmt.Errorf("GlobalLock: %v", err)
 	}
-	return r, nil
+	return unsafe.Pointer(r), nil
 }
 
 func GlobalUnlock(h syscall.Handle) {

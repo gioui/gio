@@ -1172,7 +1172,7 @@ func newUniformBuffer(b driver.Device, uniformBlock interface{}) *uniformBuffer 
 	// Determine the size of the uniforms structure, *uniforms.
 	size := ref.Elem().Type().Size()
 	// Map the uniforms structure as a byte slice.
-	ptr := (*[1 << 30]byte)(unsafe.Pointer(ref.Pointer()))[:size:size]
+	ptr := unsafe.Slice((*byte)(unsafe.Pointer(ref.Pointer())), size)
 	ubuf, err := b.NewBuffer(driver.BufferBindingUniforms, len(ptr))
 	if err != nil {
 		panic(err)

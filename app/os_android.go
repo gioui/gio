@@ -126,7 +126,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"runtime/debug"
 	"sync"
@@ -1252,11 +1251,7 @@ func goString(env *C.JNIEnv, str C.jstring) string {
 	}
 	strlen := C.jni_GetStringLength(env, C.jstring(str))
 	chars := C.jni_GetStringChars(env, C.jstring(str))
-	var utf16Chars []uint16
-	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&utf16Chars))
-	hdr.Data = uintptr(unsafe.Pointer(chars))
-	hdr.Cap = int(strlen)
-	hdr.Len = int(strlen)
+	utf16Chars := unsafe.Slice((*uint16)(unsafe.Pointer(chars)), strlen)
 	utf8 := utf16.Decode(utf16Chars)
 	return string(utf8)
 }
