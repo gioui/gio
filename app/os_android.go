@@ -127,6 +127,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/cgo"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -148,7 +149,8 @@ import (
 type window struct {
 	callbacks *callbacks
 
-	view C.jobject
+	view   C.jobject
+	handle cgo.Handle
 
 	dpi       int
 	fontScale float32
@@ -274,9 +276,6 @@ var android struct {
 		androidWidgetSwitch C.jstring
 	}
 }
-
-// view maps from GioView JNI refenreces to windows.
-var views = make(map[C.jlong]*window)
 
 var windows = make(map[*callbacks]*window)
 
@@ -491,33 +490,32 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		w.detach(env)
 	}
 	w.view = view
+	w.handle = cgo.NewHandle(w)
 	w.callbacks.SetDriver(w)
-	handle := C.jlong(view)
-	views[handle] = w
 	w.loadConfig(env, class)
 	w.Configure(wopts.options)
 	w.SetInputHint(key.HintAny)
 	w.setStage(system.StagePaused)
 	w.callbacks.Event(ViewEvent{View: uintptr(view)})
-	return handle
+	return C.jlong(w.handle)
 }
 
 //export Java_org_gioui_GioView_onDestroyView
 func Java_org_gioui_GioView_onDestroyView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	w.detach(env)
 }
 
 //export Java_org_gioui_GioView_onStopView
 func Java_org_gioui_GioView_onStopView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	w.started = false
 	w.setStage(system.StagePaused)
 }
 
 //export Java_org_gioui_GioView_onStartView
 func Java_org_gioui_GioView_onStartView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	w.started = true
 	if w.win != nil {
 		w.setVisible(env)
@@ -526,14 +524,14 @@ func Java_org_gioui_GioView_onStartView(env *C.JNIEnv, class C.jclass, handle C.
 
 //export Java_org_gioui_GioView_onSurfaceDestroyed
 func Java_org_gioui_GioView_onSurfaceDestroyed(env *C.JNIEnv, class C.jclass, handle C.jlong) {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	w.win = nil
 	w.setStage(system.StagePaused)
 }
 
 //export Java_org_gioui_GioView_onSurfaceChanged
 func Java_org_gioui_GioView_onSurfaceChanged(env *C.JNIEnv, class C.jclass, handle C.jlong, surf C.jobject) {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	w.win = C.ANativeWindow_fromSurface(env, surf)
 	if w.started {
 		w.setVisible(env)
@@ -548,7 +546,7 @@ func Java_org_gioui_GioView_onLowMemory(env *C.JNIEnv, class C.jclass) {
 
 //export Java_org_gioui_GioView_onConfigurationChanged
 func Java_org_gioui_GioView_onConfigurationChanged(env *C.JNIEnv, class C.jclass, view C.jlong) {
-	w := views[view]
+	w := cgo.Handle(view).Value().(*window)
 	w.loadConfig(env, class)
 	if w.stage >= system.StageRunning {
 		w.draw(env, true)
@@ -557,7 +555,7 @@ func Java_org_gioui_GioView_onConfigurationChanged(env *C.JNIEnv, class C.jclass
 
 //export Java_org_gioui_GioView_onFrameCallback
 func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view C.jlong) {
-	w, exist := views[view]
+	w, exist := cgo.Handle(view).Value().(*window)
 	if !exist {
 		return
 	}
@@ -574,7 +572,7 @@ func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view 
 
 //export Java_org_gioui_GioView_onBack
 func Java_org_gioui_GioView_onBack(env *C.JNIEnv, class C.jclass, view C.jlong) C.jboolean {
-	w := views[view]
+	w := cgo.Handle(view).Value().(*window)
 	ev := &system.CommandEvent{Type: system.CommandBack}
 	w.callbacks.Event(ev)
 	if ev.Cancel {
@@ -585,13 +583,13 @@ func Java_org_gioui_GioView_onBack(env *C.JNIEnv, class C.jclass, view C.jlong) 
 
 //export Java_org_gioui_GioView_onFocusChange
 func Java_org_gioui_GioView_onFocusChange(env *C.JNIEnv, class C.jclass, view C.jlong, focus C.jboolean) {
-	w := views[view]
+	w := cgo.Handle(view).Value().(*window)
 	w.callbacks.Event(key.FocusEvent{Focus: focus == C.JNI_TRUE})
 }
 
 //export Java_org_gioui_GioView_onWindowInsets
 func Java_org_gioui_GioView_onWindowInsets(env *C.JNIEnv, class C.jclass, view C.jlong, top, right, bottom, left C.jint) {
-	w := views[view]
+	w := cgo.Handle(view).Value().(*window)
 	w.insets = system.Insets{
 		Top:    unit.Px(float32(top)),
 		Bottom: unit.Px(float32(bottom)),
@@ -605,7 +603,7 @@ func Java_org_gioui_GioView_onWindowInsets(env *C.JNIEnv, class C.jclass, view C
 
 //export Java_org_gioui_GioView_initializeAccessibilityNodeInfo
 func Java_org_gioui_GioView_initializeAccessibilityNodeInfo(env *C.JNIEnv, class C.jclass, view C.jlong, virtID, screenX, screenY C.jint, info C.jobject) C.jobject {
-	w := views[view]
+	w := cgo.Handle(view).Value().(*window)
 	semID := w.semIDFor(virtID)
 	sem, found := w.callbacks.LookupSemantic(semID)
 	if found {
@@ -619,7 +617,7 @@ func Java_org_gioui_GioView_initializeAccessibilityNodeInfo(env *C.JNIEnv, class
 
 //export Java_org_gioui_GioView_onTouchExploration
 func Java_org_gioui_GioView_onTouchExploration(env *C.JNIEnv, class C.jclass, view C.jlong, x, y C.jfloat) {
-	w := views[view]
+	w := cgo.Handle(view).Value().(*window)
 	semID, _ := w.callbacks.SemanticAt(f32.Pt(float32(x), float32(y)))
 	if w.semantic.hoverID == semID {
 		return
@@ -636,7 +634,7 @@ func Java_org_gioui_GioView_onTouchExploration(env *C.JNIEnv, class C.jclass, vi
 
 //export Java_org_gioui_GioView_onExitTouchExploration
 func Java_org_gioui_GioView_onExitTouchExploration(env *C.JNIEnv, class C.jclass, view C.jlong) {
-	w := views[view]
+	w := cgo.Handle(view).Value().(*window)
 	if w.semantic.hoverID != 0 {
 		callVoidMethod(env, w.view, gioView.sendA11yEvent, TYPE_VIEW_HOVER_EXIT, jvalue(w.virtualIDFor(w.semantic.hoverID)))
 		w.semantic.hoverID = 0
@@ -645,7 +643,7 @@ func Java_org_gioui_GioView_onExitTouchExploration(env *C.JNIEnv, class C.jclass
 
 //export Java_org_gioui_GioView_onA11yFocus
 func Java_org_gioui_GioView_onA11yFocus(env *C.JNIEnv, class C.jclass, view C.jlong, virtID C.jint) {
-	w := views[view]
+	w := cgo.Handle(view).Value().(*window)
 	if semID := w.semIDFor(virtID); semID != w.semantic.focusID {
 		w.semantic.focusID = semID
 		// Android needs invalidate to refresh the TalkBack focus indicator.
@@ -655,7 +653,7 @@ func Java_org_gioui_GioView_onA11yFocus(env *C.JNIEnv, class C.jclass, view C.jl
 
 //export Java_org_gioui_GioView_onClearA11yFocus
 func Java_org_gioui_GioView_onClearA11yFocus(env *C.JNIEnv, class C.jclass, view C.jlong, virtID C.jint) {
-	w := views[view]
+	w := cgo.Handle(view).Value().(*window)
 	if w.semantic.focusID == w.semIDFor(virtID) {
 		w.semantic.focusID = 0
 	}
@@ -768,7 +766,7 @@ func (w *window) detach(env *C.JNIEnv) {
 	callVoidMethod(env, w.view, gioView.unregister)
 	w.callbacks.Event(ViewEvent{})
 	w.callbacks.SetDriver(nil)
-	delete(views, C.jlong(w.view))
+	w.handle.Delete()
 	C.jni_DeleteGlobalRef(env, w.view)
 	w.view = 0
 }
@@ -920,7 +918,7 @@ func convertKeyCode(code C.jint) (string, bool) {
 
 //export Java_org_gioui_GioView_onKeyEvent
 func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, keyCode, r C.jint, pressed C.jboolean, t C.jlong) {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	if pressed == C.JNI_TRUE {
 		switch keyCode {
 		case C.AKEYCODE_DPAD_UP:
@@ -949,7 +947,7 @@ func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.j
 
 //export Java_org_gioui_GioView_onTouchEvent
 func Java_org_gioui_GioView_onTouchEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, action, pointerID, tool C.jint, x, y, scrollX, scrollY C.jfloat, jbtns C.jint, t C.jlong) {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	var typ pointer.Type
 	switch action {
 	case C.AMOTION_EVENT_ACTION_DOWN, C.AMOTION_EVENT_ACTION_POINTER_DOWN:
@@ -1003,7 +1001,7 @@ func Java_org_gioui_GioView_onTouchEvent(env *C.JNIEnv, class C.jclass, handle C
 
 //export Java_org_gioui_GioView_imeSelectionStart
 func Java_org_gioui_GioView_imeSelectionStart(env *C.JNIEnv, class C.jclass, handle C.jlong) C.jint {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	sel := w.callbacks.EditorState().Selection
 	start := sel.Start
 	if sel.End < sel.Start {
@@ -1014,7 +1012,7 @@ func Java_org_gioui_GioView_imeSelectionStart(env *C.JNIEnv, class C.jclass, han
 
 //export Java_org_gioui_GioView_imeSelectionEnd
 func Java_org_gioui_GioView_imeSelectionEnd(env *C.JNIEnv, class C.jclass, handle C.jlong) C.jint {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	sel := w.callbacks.EditorState().Selection
 	end := sel.End
 	if sel.End < sel.Start {
@@ -1025,7 +1023,7 @@ func Java_org_gioui_GioView_imeSelectionEnd(env *C.JNIEnv, class C.jclass, handl
 
 //export Java_org_gioui_GioView_imeComposingStart
 func Java_org_gioui_GioView_imeComposingStart(env *C.JNIEnv, class C.jclass, handle C.jlong) C.jint {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	comp := w.callbacks.EditorState().compose
 	start := comp.Start
 	if e := comp.End; e < start {
@@ -1036,7 +1034,7 @@ func Java_org_gioui_GioView_imeComposingStart(env *C.JNIEnv, class C.jclass, han
 
 //export Java_org_gioui_GioView_imeComposingEnd
 func Java_org_gioui_GioView_imeComposingEnd(env *C.JNIEnv, class C.jclass, handle C.jlong) C.jint {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	comp := w.callbacks.EditorState().compose
 	end := comp.End
 	if s := comp.Start; s > end {
@@ -1047,34 +1045,34 @@ func Java_org_gioui_GioView_imeComposingEnd(env *C.JNIEnv, class C.jclass, handl
 
 //export Java_org_gioui_GioView_imeSnippet
 func Java_org_gioui_GioView_imeSnippet(env *C.JNIEnv, class C.jclass, handle C.jlong) C.jstring {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	snip := w.callbacks.EditorState().Snippet.Text
 	return javaString(env, snip)
 }
 
 //export Java_org_gioui_GioView_imeSnippetStart
 func Java_org_gioui_GioView_imeSnippetStart(env *C.JNIEnv, class C.jclass, handle C.jlong) C.jint {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	return C.jint(w.callbacks.EditorState().Snippet.Start)
 }
 
 //export Java_org_gioui_GioView_imeSetSnippet
 func Java_org_gioui_GioView_imeSetSnippet(env *C.JNIEnv, class C.jclass, handle C.jlong, start, end C.jint) {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	r := key.Range{Start: int(start), End: int(end)}
 	w.callbacks.SetEditorSnippet(r)
 }
 
 //export Java_org_gioui_GioView_imeSetSelection
 func Java_org_gioui_GioView_imeSetSelection(env *C.JNIEnv, class C.jclass, handle C.jlong, start, end C.jint) {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	r := key.Range{Start: int(start), End: int(end)}
 	w.callbacks.SetEditorSelection(r)
 }
 
 //export Java_org_gioui_GioView_imeSetComposingRegion
 func Java_org_gioui_GioView_imeSetComposingRegion(env *C.JNIEnv, class C.jclass, handle C.jlong, start, end C.jint) {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	w.callbacks.SetComposingRegion(key.Range{
 		Start: int(start),
 		End:   int(end),
@@ -1083,7 +1081,7 @@ func Java_org_gioui_GioView_imeSetComposingRegion(env *C.JNIEnv, class C.jclass,
 
 //export Java_org_gioui_GioView_imeReplace
 func Java_org_gioui_GioView_imeReplace(env *C.JNIEnv, class C.jclass, handle C.jlong, start, end C.jint, jtext C.jstring) {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	r := key.Range{Start: int(start), End: int(end)}
 	text := goString(env, jtext)
 	w.callbacks.EditorReplace(r, text)
@@ -1091,14 +1089,14 @@ func Java_org_gioui_GioView_imeReplace(env *C.JNIEnv, class C.jclass, handle C.j
 
 //export Java_org_gioui_GioView_imeToRunes
 func Java_org_gioui_GioView_imeToRunes(env *C.JNIEnv, class C.jclass, handle C.jlong, chars C.jint) C.jint {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	state := w.callbacks.EditorState()
 	return C.jint(state.RunesIndex(int(chars)))
 }
 
 //export Java_org_gioui_GioView_imeToUTF16
 func Java_org_gioui_GioView_imeToUTF16(env *C.JNIEnv, class C.jclass, handle C.jlong, runes C.jint) C.jint {
-	w := views[handle]
+	w := cgo.Handle(handle).Value().(*window)
 	state := w.callbacks.EditorState()
 	return C.jint(state.UTF16Index(int(runes)))
 }

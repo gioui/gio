@@ -192,15 +192,15 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 // keep a single global reference instead.
 static GioWindowDelegate *globalWindowDel;
 
-static CVReturn displayLinkCallback(CVDisplayLinkRef dl, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *displayLinkContext) {
-	gio_onFrameCallback(dl);
+static CVReturn displayLinkCallback(CVDisplayLinkRef dl, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *handle) {
+	gio_onFrameCallback(dl, (uintptr_t)handle);
 	return kCVReturnSuccess;
 }
 
-CFTypeRef gio_createDisplayLink(void) {
+CFTypeRef gio_createDisplayLink(uintptr_t handle) {
 	CVDisplayLinkRef dl;
 	CVDisplayLinkCreateWithActiveCGDisplays(&dl);
-	CVDisplayLinkSetOutputCallback(dl, displayLinkCallback, nil);
+	CVDisplayLinkSetOutputCallback(dl, displayLinkCallback, (void *)(handle));
 	return dl;
 }
 
