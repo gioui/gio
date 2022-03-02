@@ -128,6 +128,7 @@ func onCreate(view, controller C.CFTypeRef) {
 	w.w = wopts.window
 	w.w.SetDriver(w)
 	views[view] = w
+	w.Configure(wopts.options)
 	w.w.Event(system.StageEvent{Stage: system.StagePaused})
 	w.w.Event(ViewEvent{ViewController: uintptr(controller)})
 }
