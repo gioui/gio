@@ -105,8 +105,8 @@ public final class GioView extends SurfaceView {
 		}
 
 		accessManager = (AccessibilityManager)context.getSystemService(Context.ACCESSIBILITY_SERVICE);
-		nhandle = onCreateView(this);
 		imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
+		nhandle = onCreateView(this);
 		setFocusable(true);
 		setFocusableInTouchMode(true);
 		focusCallback = new View.OnFocusChangeListener() {
