@@ -198,7 +198,7 @@ func (w *window) update() {
 	// Check the window mode.
 	mode := w.config.Mode
 	p := windows.GetWindowPlacement(w.hwnd)
-	style := windows.GetWindowLong(w.hwnd)
+	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
 	if style&windows.WS_OVERLAPPEDWINDOW == 0 {
 		mode = Fullscreen
 		mi := windows.GetMonitorInfo(w.hwnd).Monitor
@@ -603,7 +603,7 @@ func (w *window) Configure(options []Option) {
 
 	case Maximized:
 		// Set window style.
-		style := windows.GetWindowLong(w.hwnd) & (^uintptr(windows.WS_MAXIMIZE))
+		style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE) & (^uintptr(windows.WS_MAXIMIZE))
 		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW)
 		mi := windows.GetMonitorInfo(w.hwnd).Monitor
 		w.config.Size = image.Point{X: int(mi.Right - mi.Left), Y: int(mi.Bottom - mi.Top)}
@@ -612,7 +612,7 @@ func (w *window) Configure(options []Option) {
 	case Windowed:
 		windows.SetWindowText(w.hwnd, w.config.Title)
 		// Set window style.
-		style := windows.GetWindowLong(w.hwnd) & (^uintptr(windows.WS_MAXIMIZE))
+		style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE) & (^uintptr(windows.WS_MAXIMIZE))
 		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW)
 		// Get target for client areaa size.
 		width := int32(w.config.Size.X)
@@ -645,7 +645,7 @@ func (w *window) Configure(options []Option) {
 		windows.ShowWindow(w.hwnd, windows.SW_SHOWNORMAL)
 
 	case Fullscreen:
-		style := windows.GetWindowLong(w.hwnd)
+		style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
 		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style&^windows.WS_OVERLAPPEDWINDOW)
 		mi := windows.GetMonitorInfo(w.hwnd)
 		w.config.Size = image.Point{X: int(mi.Monitor.Right - mi.Monitor.Left), Y: int(mi.Monitor.Bottom - mi.Monitor.Top)}

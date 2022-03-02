@@ -99,7 +99,7 @@ const (
 
 	CW_USEDEFAULT = -2147483648
 
-	GWL_STYLE = ^(uint32(16) - 1) // -16
+	GWL_STYLE = ^(uintptr(16) - 1) // -16
 
 	GCS_COMPSTR       = 0x0008
 	GCS_COMPREADSTR   = 0x0001
@@ -525,11 +525,11 @@ func GetMonitorInfo(hwnd syscall.Handle) MonitorInfo {
 	return mi
 }
 
-func GetWindowLong(hwnd syscall.Handle) (style uintptr) {
+func GetWindowLong(hwnd syscall.Handle, index uintptr) (val uintptr) {
 	if runtime.GOARCH == "386" {
-		style, _, _ = _GetWindowLong32.Call(uintptr(hwnd), uintptr(GWL_STYLE))
+		val, _, _ = _GetWindowLong32.Call(uintptr(hwnd), index)
 	} else {
-		style, _, _ = _GetWindowLong.Call(uintptr(hwnd), uintptr(GWL_STYLE))
+		val, _, _ = _GetWindowLong.Call(uintptr(hwnd), index)
 	}
 	return
 }
@@ -582,11 +582,11 @@ func ImmSetCandidateWindow(imc syscall.Handle, x, y int) {
 	_ImmSetCandidateWindow.Call(uintptr(imc), uintptr(unsafe.Pointer(&f)))
 }
 
-func SetWindowLong(hwnd syscall.Handle, idx uint32, style uintptr) {
+func SetWindowLong(hwnd syscall.Handle, idx uintptr, style uintptr) {
 	if runtime.GOARCH == "386" {
-		_SetWindowLong32.Call(uintptr(hwnd), uintptr(idx), style)
+		_SetWindowLong32.Call(uintptr(hwnd), idx, style)
 	} else {
-		_SetWindowLong.Call(uintptr(hwnd), uintptr(idx), style)
+		_SetWindowLong.Call(uintptr(hwnd), idx, style)
 	}
 }
 
