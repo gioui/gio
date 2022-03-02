@@ -24,7 +24,7 @@ environment:
 tasks:
  - install_go: |
      mkdir -p /home/build/sdk
-     curl -s https://dl.google.com/go/go1.16.6.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
+     curl -s https://dl.google.com/go/go1.17.7.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
  - prepare_toolchain: |
      mkdir -p $APPLE_TOOLCHAIN_ROOT
      cd $APPLE_TOOLCHAIN_ROOT
