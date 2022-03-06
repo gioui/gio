@@ -207,8 +207,6 @@ func (w *window) update() {
 		mode = Minimized
 	} else if p.IsMaximized() {
 		mode = Maximized
-		mi := windows.GetMonitorInfo(w.hwnd).Monitor
-		size = image.Point{X: int(mi.Right - mi.Left), Y: int(mi.Bottom - mi.Top)}
 	} else {
 		mode = Windowed
 	}
