@@ -82,7 +82,7 @@ tasks:
      rm ndk.zip
      mv android-ndk-* ndk-bundle
      yes|sdkmanager --licenses
-     sdkmanager "platforms;android-30" "build-tools;29.0.2"
+     sdkmanager "platforms;android-31" "build-tools;32.0.0"
  - test_android: |
      cd gio
      CC=$ANDROID_SDK_ROOT/ndk-bundle/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang GOOS=android GOARCH=arm64 CGO_ENABLED=1 go build ./...
