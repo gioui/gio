@@ -1109,6 +1109,33 @@ func TestDeferredInputOp(t *testing.T) {
 	r.Frame(&ops)
 }
 
+func TestPassCursor(t *testing.T) {
+	var ops op.Ops
+	var r Router
+
+	rect := clip.Rect(image.Rect(0, 0, 100, 100))
+	background := rect.Push(&ops)
+	pointer.InputOp{Tag: 1}.Add(&ops)
+	pointer.CursorDefault.Add(&ops)
+	background.Pop()
+
+	overlayPass := pointer.PassOp{}.Push(&ops)
+	overlay := rect.Push(&ops)
+	pointer.InputOp{Tag: 2}.Add(&ops)
+	want := pointer.CursorPointer
+	want.Add(&ops)
+	overlay.Pop()
+	overlayPass.Pop()
+	r.Frame(&ops)
+	r.Queue(pointer.Event{
+		Position: f32.Pt(10, 10),
+		Type:     pointer.Move,
+	})
+	if got := r.Cursor(); want != got {
+		t.Errorf("got cursor %v, want %v", got, want)
+	}
+}
+
 // offer satisfies io.ReadCloser for use in data transfers.
 type offer struct {
 	data   string

@@ -725,12 +725,16 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 	}
 	// Deliver Enter events and update cursor.
 	q.cursor = pointer.CursorDefault
+	cursorFound := false
 	for _, k := range hits {
 		h := q.handlers[k]
-		for i := len(q.cursors) - 1; i >= 0; i-- {
-			if c := q.cursors[i]; c.area == h.area {
-				q.cursor = c.cursor
-				break
+		if !cursorFound {
+			for i := len(q.cursors) - 1; i >= 0; i-- {
+				if c := q.cursors[i]; c.area == h.area {
+					q.cursor = c.cursor
+					cursorFound = true
+					break
+				}
 			}
 		}
 		if _, found := searchTag(p.entered, k); found {
