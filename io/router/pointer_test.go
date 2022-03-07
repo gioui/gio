@@ -1097,6 +1097,18 @@ func TestTransfer(t *testing.T) {
 	})
 }
 
+func TestDeferredInputOp(t *testing.T) {
+	var ops op.Ops
+
+	var r Router
+	m := op.Record(&ops)
+	key.InputOp{Tag: new(int)}.Add(&ops)
+	call := m.Stop()
+
+	op.Defer(&ops, call)
+	r.Frame(&ops)
+}
+
 // offer satisfies io.ReadCloser for use in data transfers.
 type offer struct {
 	data   string

@@ -141,6 +141,11 @@ const (
 
 func (c *pointerCollector) resetState() {
 	c.state = collectState{}
+	c.nodeStack = c.nodeStack[:0]
+	// Pop every node except the root.
+	if len(c.q.hitTree) > 0 {
+		c.state.nodePlusOne = 0 + 1
+	}
 }
 
 func (c *pointerCollector) setTrans(t f32.Affine2D) {
@@ -332,7 +337,6 @@ func (c *pointerCollector) offerOp(op transfer.OfferOp, events *handlerEvents) {
 func (c *pointerCollector) reset() {
 	c.q.reset()
 	c.resetState()
-	c.nodeStack = c.nodeStack[:0]
 	c.ensureRoot()
 }
 
