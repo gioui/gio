@@ -17,7 +17,6 @@ import (
 type pointerQueue struct {
 	hitTree   []hitNode
 	areas     []areaNode
-	cursors   []cursorNode
 	cursor    pointer.Cursor
 	handlers  map[event.Tag]*pointerHandler
 	pointers  []pointerInfo
@@ -42,11 +41,6 @@ type hitNode struct {
 	// For handler nodes.
 	tag  event.Tag
 	pass bool
-}
-
-type cursorNode struct {
-	cursor pointer.Cursor
-	area   int
 }
 
 type pointerInfo struct {
@@ -86,6 +80,8 @@ type areaOp struct {
 type areaNode struct {
 	trans f32.Affine2D
 	area  areaOp
+
+	cursor pointer.Cursor
 
 	// Tree indices, with -1 being the sentinel.
 	parent     int
@@ -312,10 +308,9 @@ func (c *pointerCollector) semanticDisabled(disabled bool) {
 }
 
 func (c *pointerCollector) cursor(cursor pointer.Cursor) {
-	c.q.cursors = append(c.q.cursors, cursorNode{
-		cursor: cursor,
-		area:   len(c.q.areas) - 1,
-	})
+	areaID := c.currentArea()
+	area := &c.q.areas[areaID]
+	area.cursor = cursor
 }
 
 func (c *pointerCollector) sourceOp(op transfer.SourceOp, events *handlerEvents) {
@@ -432,7 +427,7 @@ func (q *pointerQueue) SemanticAt(pos f32.Point) (SemanticID, bool) {
 	q.assignSemIDs()
 	for i := len(q.hitTree) - 1; i >= 0; i-- {
 		n := &q.hitTree[i]
-		hit := q.hit(n.area, pos)
+		hit, _ := q.hit(n.area, pos)
 		if !hit {
 			continue
 		}
@@ -444,17 +439,21 @@ func (q *pointerQueue) SemanticAt(pos f32.Point) (SemanticID, bool) {
 	return 0, false
 }
 
-func (q *pointerQueue) opHit(pos f32.Point) []event.Tag {
+func (q *pointerQueue) opHit(pos f32.Point) ([]event.Tag, pointer.Cursor) {
 	// Track whether we're passing through hits.
 	pass := true
 	hits := q.scratch[:0]
 	idx := len(q.hitTree) - 1
+	cursor := pointer.CursorDefault
 	for idx >= 0 {
 		n := &q.hitTree[idx]
-		hit := q.hit(n.area, pos)
+		hit, c := q.hit(n.area, pos)
 		if !hit {
 			idx--
 			continue
+		}
+		if cursor == pointer.CursorDefault {
+			cursor = c
 		}
 		pass = pass && n.pass
 		if pass {
@@ -469,7 +468,7 @@ func (q *pointerQueue) opHit(pos f32.Point) []event.Tag {
 		}
 	}
 	q.scratch = hits[:0]
-	return hits
+	return hits, cursor
 }
 
 func (q *pointerQueue) invTransform(areaIdx int, p f32.Point) f32.Point {
@@ -479,16 +478,20 @@ func (q *pointerQueue) invTransform(areaIdx int, p f32.Point) f32.Point {
 	return q.areas[areaIdx].trans.Invert().Transform(p)
 }
 
-func (q *pointerQueue) hit(areaIdx int, p f32.Point) bool {
+func (q *pointerQueue) hit(areaIdx int, p f32.Point) (bool, pointer.Cursor) {
+	c := pointer.CursorDefault
 	for areaIdx != -1 {
 		a := &q.areas[areaIdx]
+		if c == pointer.CursorDefault {
+			c = a.cursor
+		}
 		p := a.trans.Invert().Transform(p)
 		if !a.area.Hit(p) {
-			return false
+			return false, c
 		}
 		areaIdx = a.parent
 	}
-	return true
+	return true, c
 }
 
 func (q *pointerQueue) reset() {
@@ -505,7 +508,6 @@ func (q *pointerQueue) reset() {
 	}
 	q.hitTree = q.hitTree[:0]
 	q.areas = q.areas[:0]
-	q.cursors = q.cursors[:0]
 	q.semantic.idsAssigned = false
 	for k, ids := range q.semantic.contentIDs {
 		for i := len(ids) - 1; i >= 0; i-- {
@@ -687,7 +689,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 	if e.Source != pointer.Mouse && !p.pressed && e.Type != pointer.Press {
 		// Consider non-mouse pointers leaving when they're released.
 	} else {
-		hits = q.opHit(e.Position)
+		hits, q.cursor = q.opHit(e.Position)
 		if p.pressed {
 			// Filter out non-participating handlers,
 			// except potential transfer targets when a transfer has been initiated.
@@ -723,20 +725,9 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 			events.Add(k, e)
 		}
 	}
-	// Deliver Enter events and update cursor.
-	q.cursor = pointer.CursorDefault
-	cursorFound := false
+	// Deliver Enter events.
 	for _, k := range hits {
 		h := q.handlers[k]
-		if !cursorFound {
-			for i := len(q.cursors) - 1; i >= 0; i-- {
-				if c := q.cursors[i]; c.area == h.area {
-					q.cursor = c.cursor
-					cursorFound = true
-					break
-				}
-			}
-		}
 		if _, found := searchTag(p.entered, k); found {
 			continue
 		}
