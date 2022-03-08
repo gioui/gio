@@ -353,9 +353,8 @@ func exeAndroid(tmpDir string, tools *androidTools, bi *buildInfo, extraJars, pe
 	if err := os.MkdirAll(dexDir, 0755); err != nil {
 		return err
 	}
-	// Currently, new apps must have a target SDK version of at least 30.
 	// https://developer.android.com/distribute/best-practices/develop/target-sdk
-	targetSDK := 30
+	targetSDK := 31
 	if bi.minsdk > targetSDK {
 		targetSDK = bi.minsdk
 	}
