@@ -91,6 +91,7 @@ func IconButton(th *Theme, button *widget.Clickable, icon *widget.Icon, descript
 func Clickable(gtx layout.Context, button *widget.Clickable, w layout.Widget) layout.Dimensions {
 	return button.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		semantic.Button.Add(gtx.Ops)
+		constraints := gtx.Constraints
 		return layout.Stack{}.Layout(gtx,
 			layout.Expanded(func(gtx layout.Context) layout.Dimensions {
 				defer clip.Rect{Max: gtx.Constraints.Min}.Push(gtx.Ops).Pop()
@@ -102,7 +103,10 @@ func Clickable(gtx layout.Context, button *widget.Clickable, w layout.Widget) la
 				}
 				return layout.Dimensions{Size: gtx.Constraints.Min}
 			}),
-			layout.Stacked(w),
+			layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+				gtx.Constraints = constraints
+				return w(gtx)
+			}),
 		)
 	})
 }
