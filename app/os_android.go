@@ -179,7 +179,7 @@ var gioView struct {
 	showTextInput      C.jmethodID
 	hideTextInput      C.jmethodID
 	setInputHint       C.jmethodID
-	postInvalidate     C.jmethodID // requests draw, called from non-UI thread
+	postFrameCallback  C.jmethodID
 	invalidate         C.jmethodID // requests draw, called from UI thread
 	setCursor          C.jmethodID
 	setOrientation     C.jmethodID
@@ -462,7 +462,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.showTextInput = getMethodID(env, class, "showTextInput", "()V")
 		m.hideTextInput = getMethodID(env, class, "hideTextInput", "()V")
 		m.setInputHint = getMethodID(env, class, "setInputHint", "(I)V")
-		m.postInvalidate = getMethodID(env, class, "postInvalidate", "()V")
+		m.postFrameCallback = getMethodID(env, class, "postFrameCallback", "()V")
 		m.invalidate = getMethodID(env, class, "invalidate", "()V")
 		m.setCursor = getMethodID(env, class, "setCursor", "(I)V")
 		m.setOrientation = getMethodID(env, class, "setOrientation", "(II)V")
@@ -564,9 +564,7 @@ func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view 
 	}
 	if w.animating {
 		w.draw(env, false)
-		// Schedule the next draw immediately after this one. Since onFrameCallback runs
-		// on the UI thread, View.invalidate can be used here instead of postInvalidate.
-		callVoidMethod(env, w.view, gioView.invalidate)
+		callVoidMethod(env, w.view, gioView.postFrameCallback)
 	}
 }
 
@@ -818,7 +816,7 @@ func (w *window) SetAnimating(anim bool) {
 	w.animating = anim
 	if anim {
 		runInJVM(javaVM(), func(env *C.JNIEnv) {
-			callVoidMethod(env, w.view, gioView.postInvalidate)
+			callVoidMethod(env, w.view, gioView.postFrameCallback)
 		})
 	}
 }

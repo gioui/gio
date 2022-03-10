@@ -25,6 +25,7 @@ import android.text.Selection;
 import android.text.SpannableStringBuilder;
 import android.util.AttributeSet;
 import android.util.TypedValue;
+import android.view.Choreographer;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -55,7 +56,7 @@ import android.view.accessibility.AccessibilityManager;
 
 import java.io.UnsupportedEncodingException;
 
-public final class GioView extends SurfaceView {
+public final class GioView extends SurfaceView implements Choreographer.FrameCallback {
 	private static boolean jniLoaded;
 
 	private final SurfaceHolder.Callback surfCallbacks;
@@ -380,7 +381,12 @@ public final class GioView extends SurfaceView {
 		return true;
 	}
 
-	@Override protected void onDraw(Canvas canvas) {
+	void postFrameCallback() {
+		Choreographer.getInstance().removeFrameCallback(this);
+		Choreographer.getInstance().postFrameCallback(this);
+	}
+
+	@Override public void doFrame(long nanos) {
 		if (nhandle != 0) {
 			onFrameCallback(nhandle);
 		}
