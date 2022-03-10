@@ -205,7 +205,10 @@ type window struct {
 	w           *callbacks
 	stage       system.Stage
 	displayLink *displayLink
-	cursor      pointer.Cursor
+	// redraw is a single entry channel for making sure only one
+	// display link redraw request is in flight.
+	redraw chan struct{}
+	cursor pointer.Cursor
 
 	scale  float32
 	config Config
@@ -667,6 +670,10 @@ func gio_firstRectForCharacterRange(view C.CFTypeRef, crng C.NSRange, actual C.N
 }
 
 func (w *window) draw() {
+	select {
+	case <-w.redraw:
+	default:
+	}
 	w.scale = float32(C.getViewBackingScale(w.view))
 	wf, hf := float32(C.viewWidth(w.view)), float32(C.viewHeight(w.view))
 	sz := image.Point{
@@ -792,10 +799,16 @@ func newOSWindow() (*window, error) {
 	}
 	scale := float32(C.getViewBackingScale(view))
 	w := &window{
-		view:  view,
-		scale: scale,
+		view:   view,
+		scale:  scale,
+		redraw: make(chan struct{}, 1),
 	}
 	dl, err := NewDisplayLink(func() {
+		select {
+		case w.redraw <- struct{}{}:
+		default:
+			return
+		}
 		w.runOnMain(func() {
 			C.setNeedsDisplay(w.view)
 		})
