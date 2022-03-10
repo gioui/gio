@@ -691,9 +691,9 @@ func (p *descPool) bindDescriptorSet(b *Backend, cmdBuf vk.CommandBuffer, bindPo
 			if realloced {
 				panic("vulkan: vkAllocateDescriptorSet failed on a newly allocated descriptor pool")
 			}
+			newCap := p.cap * 2
 			destroyPool()
 			realloced = true
-			newCap := p.cap * 2
 			const initialPoolSize = 100
 			if newCap < initialPoolSize {
 				newCap = initialPoolSize
