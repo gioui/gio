@@ -22,6 +22,7 @@ type vkContext struct {
 	queue      vk.Queue
 	acquireSem vk.Semaphore
 	presentSem vk.Semaphore
+	fence      vk.Fence
 
 	swchain    vk.Swapchain
 	imgs       []vk.Image
@@ -51,6 +52,13 @@ func newVulkanContext(inst vk.Instance, surf vk.Surface) (*vkContext, error) {
 		vk.DestroyDevice(dev)
 		return nil, err
 	}
+	fence, err := vk.CreateFence(dev, vk.FENCE_CREATE_SIGNALED_BIT)
+	if err != nil {
+		vk.DestroySemaphore(dev, presentSem)
+		vk.DestroySemaphore(dev, acquireSem)
+		vk.DestroyDevice(dev)
+		return nil, err
+	}
 	c := &vkContext{
 		physDev:    physDev,
 		inst:       inst,
@@ -59,12 +67,14 @@ func newVulkanContext(inst vk.Instance, surf vk.Surface) (*vkContext, error) {
 		queue:      vk.GetDeviceQueue(dev, qFam, 0),
 		acquireSem: acquireSem,
 		presentSem: presentSem,
+		fence:      fence,
 	}
 	return c, nil
 }
 
 func (c *vkContext) RenderTarget() (gpu.RenderTarget, error) {
-	vk.DeviceWaitIdle(c.dev)
+	vk.WaitForFences(c.dev, c.fence)
+	vk.ResetFences(c.dev, c.fence)
 
 	imgIdx, err := vk.AcquireNextImage(c.dev, c.swchain, c.acquireSem, 0)
 	if err := mapSurfaceErr(err); err != nil {
@@ -74,6 +84,7 @@ func (c *vkContext) RenderTarget() (gpu.RenderTarget, error) {
 	return gpu.VulkanRenderTarget{
 		WaitSem:     uint64(c.acquireSem),
 		SignalSem:   uint64(c.presentSem),
+		Fence:       uint64(c.fence),
 		Framebuffer: uint64(c.fbos[imgIdx]),
 		Image:       uint64(c.imgs[imgIdx]),
 	}, nil
@@ -122,6 +133,7 @@ func (c *vkContext) release() {
 	vk.DeviceWaitIdle(c.dev)
 
 	c.destroySwapchain()
+	vk.DestroyFence(c.dev, c.fence)
 	vk.DestroySemaphore(c.dev, c.acquireSem)
 	vk.DestroySemaphore(c.dev, c.presentSem)
 	vk.DestroyDevice(c.dev)

@@ -519,6 +519,8 @@ const (
 	ERROR_DEVICE_LOST      = Error(C.VK_ERROR_DEVICE_LOST)
 	SUBOPTIMAL_KHR         = Error(C.VK_SUBOPTIMAL_KHR)
 
+	FENCE_CREATE_SIGNALED_BIT = 0x00000001
+
 	BLEND_FACTOR_ZERO                BlendFactor = C.VK_BLEND_FACTOR_ZERO
 	BLEND_FACTOR_ONE                 BlendFactor = C.VK_BLEND_FACTOR_ONE
 	BLEND_FACTOR_ONE_MINUS_SRC_ALPHA BlendFactor = C.VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA
@@ -1771,9 +1773,10 @@ func CreateComputePipeline(d Device, mod ShaderModule, layout PipelineLayout) (P
 	return pipe, nil
 }
 
-func CreateFence(d Device) (Fence, error) {
+func CreateFence(d Device, flags int) (Fence, error) {
 	inf := C.VkFenceCreateInfo{
 		sType: C.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+		flags: C.VkFenceCreateFlags(flags),
 	}
 	var f C.VkFence
 	if err := vkErr(C.vkCreateFence(funcs.vkCreateFence, d, &inf, nil, &f)); err != nil {

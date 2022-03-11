@@ -35,6 +35,7 @@ type Backend struct {
 	}
 	defers     []func(d vk.Device)
 	frameSig   vk.Semaphore
+	frameFence vk.Fence
 	waitSems   []vk.Semaphore
 	waitStages []vk.PipelineStageFlags
 	sigSems    []vk.Semaphore
@@ -159,7 +160,7 @@ func newVulkanDevice(api driver.Vulkan) (driver.Device, error) {
 	if props&reqs == reqs {
 		b.caps |= driver.FeatureSRGB
 	}
-	fence, err := vk.CreateFence(b.dev)
+	fence, err := vk.CreateFence(b.dev, 0)
 	if err != nil {
 		return nil, mapErr(err)
 	}
@@ -168,7 +169,6 @@ func newVulkanDevice(api driver.Vulkan) (driver.Device, error) {
 }
 
 func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport image.Point) driver.Texture {
-	vk.QueueWaitIdle(b.queue)
 	b.staging.size = 0
 	b.cmdPool.used = 0
 	b.runDefers()
@@ -184,6 +184,7 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 			layout = vk.IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 		}
 		b.frameSig = vk.Semaphore(t.SignalSem)
+		b.frameFence = vk.Fence(t.Fence)
 		tex := &Texture{
 			img:        vk.Image(t.Image),
 			fbo:        vk.Framebuffer(t.Framebuffer),
@@ -234,7 +235,16 @@ func (b *Backend) EndFrame() {
 		b.sigSems = append(b.sigSems, b.frameSig)
 		b.frameSig = 0
 	}
-	b.submitCmdBuf(false)
+	fence := b.frameFence
+	if fence == 0 {
+		// We're internally synchronized.
+		fence = b.fence
+	}
+	b.submitCmdBuf(fence)
+	if b.frameFence == 0 {
+		vk.WaitForFences(b.dev, fence)
+		vk.ResetFences(b.dev, fence)
+	}
 }
 
 func (b *Backend) Caps() driver.Caps {
@@ -858,7 +868,9 @@ func (b *Buffer) Download(data []byte) error {
 		vk.PIPELINE_STAGE_HOST_BIT,
 		vk.ACCESS_HOST_READ_BIT,
 	)
-	b.backend.submitCmdBuf(true)
+	b.backend.submitCmdBuf(b.backend.fence)
+	vk.WaitForFences(b.backend.dev, b.backend.fence)
+	vk.ResetFences(b.backend.dev, b.backend.fence)
 	copy(data, mem)
 	return nil
 }
@@ -940,7 +952,9 @@ func (t *Texture) ReadPixels(src image.Rectangle, pixels []byte, stride int) err
 		vk.PIPELINE_STAGE_HOST_BIT,
 		vk.ACCESS_HOST_READ_BIT,
 	)
-	t.backend.submitCmdBuf(true)
+	t.backend.submitCmdBuf(t.backend.fence)
+	vk.WaitForFences(t.backend.dev, t.backend.fence)
+	vk.ResetFences(t.backend.dev, t.backend.fence)
 	var srcOff, dstOff int
 	for y := 0; y < sz.Y; y++ {
 		dstRow := pixels[srcOff : srcOff+stageStride]
@@ -1043,18 +1057,15 @@ func (b *Backend) lookupPass(fmt vk.Format, loadAct vk.AttachmentLoadOp, initLay
 	return pass
 }
 
-func (b *Backend) submitCmdBuf(sync bool) {
+func (b *Backend) submitCmdBuf(fence vk.Fence) {
 	buf := b.cmdPool.current
-	if buf == nil {
+	if buf == nil && fence == 0 {
 		return
 	}
+	buf = b.ensureCmdBuf()
 	b.cmdPool.current = nil
 	if err := vk.EndCommandBuffer(buf); err != nil {
 		panic(err)
-	}
-	var fence vk.Fence
-	if sync {
-		fence = b.fence
 	}
 	if err := vk.QueueSubmit(b.queue, buf, b.waitSems, b.waitStages, b.sigSems, fence); err != nil {
 		panic(err)
@@ -1062,10 +1073,6 @@ func (b *Backend) submitCmdBuf(sync bool) {
 	b.waitSems = b.waitSems[:0]
 	b.sigSems = b.sigSems[:0]
 	b.waitStages = b.waitStages[:0]
-	if sync {
-		vk.WaitForFences(b.dev, b.fence)
-		vk.ResetFences(b.dev, b.fence)
-	}
 }
 
 func (b *Backend) stagingBuffer(size int) (*Buffer, []byte, int) {
