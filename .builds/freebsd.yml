@@ -5,7 +5,6 @@ packages:
  - libxkbcommon
  - libXcursor
  - libXfixes
- - vulkan-loader
  - vulkan-headers
  - wayland
  - mesa-libs
