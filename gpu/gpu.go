@@ -362,8 +362,8 @@ func (g *gpu) collect(viewport image.Point, frameOps *op.Ops) {
 	g.renderer.pather.viewport = viewport
 	g.drawOps.reset(viewport)
 	g.drawOps.collect(frameOps, viewport)
-	g.frameStart = time.Now()
 	if g.drawOps.profile && g.timers == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
+		g.frameStart = time.Now()
 		g.timers = newTimers(g.ctx)
 		g.stencilTimer = g.timers.newTimer()
 		g.coverTimer = g.timers.newTimer()

@@ -741,7 +741,10 @@ func (w *Window) processEvent(d driver, e event.Event) {
 			// No drawing if not visible.
 			break
 		}
-		frameStart := time.Now()
+		var frameStart time.Time
+		if w.queue.q.Profiling() {
+			frameStart = time.Now()
+		}
 		w.hasNextFrame = false
 		e2.Frame = w.update
 		e2.Queue = &w.queue
