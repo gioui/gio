@@ -1739,18 +1739,22 @@ func UpdateDescriptorSet(d Device, write WriteDescriptorSet) {
 	C.vkUpdateDescriptorSets(funcs.vkUpdateDescriptorSets, d, write, 0, nil)
 }
 
-func AllocateDescriptorSet(d Device, pool DescriptorPool, layout DescriptorSetLayout) (DescriptorSet, error) {
+func AllocateDescriptorSets(d Device, pool DescriptorPool, layout DescriptorSetLayout, count int) ([]DescriptorSet, error) {
+	layouts := make([]DescriptorSetLayout, count)
+	for i := range layouts {
+		layouts[i] = layout
+	}
 	inf := C.VkDescriptorSetAllocateInfo{
 		sType:              C.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
 		descriptorPool:     pool,
-		descriptorSetCount: 1,
-		pSetLayouts:        &layout,
+		descriptorSetCount: C.uint32_t(count),
+		pSetLayouts:        &layouts[0],
 	}
-	var set C.VkDescriptorSet
-	if err := vkErr(C.vkAllocateDescriptorSets(funcs.vkAllocateDescriptorSets, d, inf, &set)); err != nil {
-		return nilDescriptorSet, fmt.Errorf("vulkan: vkAllocateDescriptorSets: %w", err)
+	sets := make([]DescriptorSet, count, count)
+	if err := vkErr(C.vkAllocateDescriptorSets(funcs.vkAllocateDescriptorSets, d, inf, &sets[0])); err != nil {
+		return nil, fmt.Errorf("vulkan: vkAllocateDescriptorSets: %w", err)
 	}
-	return set, nil
+	return sets, nil
 }
 
 func CreateComputePipeline(d Device, mod ShaderModule, layout PipelineLayout) (Pipeline, error) {

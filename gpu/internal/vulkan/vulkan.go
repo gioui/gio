@@ -107,8 +107,8 @@ type descPool struct {
 	layout     vk.PipelineLayout
 	descLayout vk.DescriptorSetLayout
 	pool       vk.DescriptorPool
+	sets       []vk.DescriptorSet
 	size       int
-	cap        int
 	texBinds   []int
 	imgBinds   []int
 	bufBinds   []int
@@ -224,7 +224,6 @@ func (b *Backend) resetPipes() {
 			continue
 		}
 		if p.desc.size > 0 {
-			vk.ResetDescriptorPool(b.dev, p.desc.pool)
 			p.desc.size = 0
 		}
 	}
@@ -686,74 +685,61 @@ func (p *descPool) release(d vk.Device) {
 }
 
 func (p *descPool) bindDescriptorSet(b *Backend, cmdBuf vk.CommandBuffer, bindPoint vk.PipelineBindPoint, texBinds [texUnits]*Texture, bufBinds [storageUnits]*Buffer) {
-	realloced := false
-	destroyPool := func() {
+	if p.size == len(p.sets) {
+		l := p.descLayout
+		if l == 0 {
+			panic("vulkan: descriptor set is dirty, but pipeline has empty layout")
+		}
+		newCap := len(p.sets) * 2
 		if pool := p.pool; pool != 0 {
 			b.deferFunc(func(d vk.Device) {
 				vk.DestroyDescriptorPool(d, pool)
 			})
 		}
-		p.pool = 0
-		p.cap = 0
-	}
-	for {
-		if p.size == p.cap {
-			if realloced {
-				panic("vulkan: vkAllocateDescriptorSet failed on a newly allocated descriptor pool")
-			}
-			newCap := p.cap * 2
-			destroyPool()
-			realloced = true
-			const initialPoolSize = 100
-			if newCap < initialPoolSize {
-				newCap = initialPoolSize
-			}
-			var poolSizes []vk.DescriptorPoolSize
-			if n := len(p.texBinds); n > 0 {
-				poolSizes = append(poolSizes, vk.BuildDescriptorPoolSize(vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, newCap*n))
-			}
-			if n := len(p.imgBinds); n > 0 {
-				poolSizes = append(poolSizes, vk.BuildDescriptorPoolSize(vk.DESCRIPTOR_TYPE_STORAGE_IMAGE, newCap*n))
-			}
-			if n := len(p.bufBinds); n > 0 {
-				poolSizes = append(poolSizes, vk.BuildDescriptorPoolSize(vk.DESCRIPTOR_TYPE_STORAGE_BUFFER, newCap*n))
-			}
-			pool, err := vk.CreateDescriptorPool(b.dev, newCap, poolSizes)
-			if err != nil {
-				panic(fmt.Errorf("vulkan: failed to allocate descriptor pool with %d descriptors", newCap))
-			}
-			p.pool = pool
-			p.cap = newCap
-			p.size = 0
+		const initialPoolSize = 100
+		if newCap < initialPoolSize {
+			newCap = initialPoolSize
 		}
-		l := p.descLayout
-		if l == 0 {
-			panic("vulkan: descriptor set is dirty, but pipeline has empty layout")
+		var poolSizes []vk.DescriptorPoolSize
+		if n := len(p.texBinds); n > 0 {
+			poolSizes = append(poolSizes, vk.BuildDescriptorPoolSize(vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, newCap*n))
 		}
-		descSet, err := vk.AllocateDescriptorSet(b.dev, p.pool, l)
+		if n := len(p.imgBinds); n > 0 {
+			poolSizes = append(poolSizes, vk.BuildDescriptorPoolSize(vk.DESCRIPTOR_TYPE_STORAGE_IMAGE, newCap*n))
+		}
+		if n := len(p.bufBinds); n > 0 {
+			poolSizes = append(poolSizes, vk.BuildDescriptorPoolSize(vk.DESCRIPTOR_TYPE_STORAGE_BUFFER, newCap*n))
+		}
+		pool, err := vk.CreateDescriptorPool(b.dev, newCap, poolSizes)
 		if err != nil {
-			destroyPool()
-			continue
+			panic(fmt.Errorf("vulkan: failed to allocate descriptor pool with %d descriptors: %v", newCap, err))
 		}
-		p.size++
-		for _, bind := range p.texBinds {
-			tex := texBinds[bind]
-			write := vk.BuildWriteDescriptorSetImage(descSet, bind, vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, tex.sampler, tex.view, vk.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-			vk.UpdateDescriptorSet(b.dev, write)
+		p.pool = pool
+		sets, err := vk.AllocateDescriptorSets(b.dev, p.pool, l, newCap)
+		if err != nil {
+			panic(fmt.Errorf("vulkan: failed to allocate descriptor with %d sets: %v", newCap, err))
 		}
-		for _, bind := range p.imgBinds {
-			tex := texBinds[bind]
-			write := vk.BuildWriteDescriptorSetImage(descSet, bind, vk.DESCRIPTOR_TYPE_STORAGE_IMAGE, 0, tex.view, vk.IMAGE_LAYOUT_GENERAL)
-			vk.UpdateDescriptorSet(b.dev, write)
-		}
-		for _, bind := range p.bufBinds {
-			buf := bufBinds[bind]
-			write := vk.BuildWriteDescriptorSetBuffer(descSet, bind, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER, buf.buf)
-			vk.UpdateDescriptorSet(b.dev, write)
-		}
-		vk.CmdBindDescriptorSets(cmdBuf, bindPoint, p.layout, 0, []vk.DescriptorSet{descSet})
-		break
+		p.sets = sets
+		p.size = 0
 	}
+	descSet := p.sets[p.size]
+	p.size++
+	for _, bind := range p.texBinds {
+		tex := texBinds[bind]
+		write := vk.BuildWriteDescriptorSetImage(descSet, bind, vk.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, tex.sampler, tex.view, vk.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+		vk.UpdateDescriptorSet(b.dev, write)
+	}
+	for _, bind := range p.imgBinds {
+		tex := texBinds[bind]
+		write := vk.BuildWriteDescriptorSetImage(descSet, bind, vk.DESCRIPTOR_TYPE_STORAGE_IMAGE, 0, tex.view, vk.IMAGE_LAYOUT_GENERAL)
+		vk.UpdateDescriptorSet(b.dev, write)
+	}
+	for _, bind := range p.bufBinds {
+		buf := bufBinds[bind]
+		write := vk.BuildWriteDescriptorSetBuffer(descSet, bind, vk.DESCRIPTOR_TYPE_STORAGE_BUFFER, buf.buf)
+		vk.UpdateDescriptorSet(b.dev, write)
+	}
+	vk.CmdBindDescriptorSets(cmdBuf, bindPoint, p.layout, 0, []vk.DescriptorSet{descSet})
 }
 
 func (t *Texture) imageBarrier(cmdBuf vk.CommandBuffer, layout vk.ImageLayout, stage vk.PipelineStageFlags, access vk.AccessFlags) {
