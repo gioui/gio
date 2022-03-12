@@ -91,9 +91,8 @@ func (qs *StrokeQuads) lineTo(pt f32.Point) {
 }
 
 func (qs *StrokeQuads) arc(f1, f2 f32.Point, angle float32) {
-	const segments = 16
 	pen := qs.pen()
-	m := ArcTransform(pen, f1.Add(pen), f2.Add(pen), angle, segments)
+	m, segments := ArcTransform(pen, f1.Add(pen), f2.Add(pen), angle)
 	for i := 0; i < segments; i++ {
 		p0 := qs.pen()
 		p1 := m.Transform(p0)
@@ -546,7 +545,19 @@ func strokePathRoundCap(qs *StrokeQuads, hw float32, pivot, n0 f32.Point) {
 //   cubic Bezier curves", L. Maisonobe
 // An electronic version may be found at:
 //  http://spaceroots.org/documents/ellipse/elliptical-arc.pdf
-func ArcTransform(p, f1, f2 f32.Point, angle float32, segments int) f32.Affine2D {
+func ArcTransform(p, f1, f2 f32.Point, angle float32) (transform f32.Affine2D, segments int) {
+	const segmentsPerCircle = 16
+	const anglePerSegment = 2 * math.Pi / segmentsPerCircle
+
+	s := angle / anglePerSegment
+	if s < 0 {
+		s = -s
+	}
+	segments = int(math.Ceil(float64(s)))
+	if segments <= 0 {
+		segments = 1
+	}
+
 	var rx, ry, alpha float64
 	if f1 == f2 {
 		// degenerate case of a circle.
@@ -605,7 +616,7 @@ func ArcTransform(p, f1, f2 f32.Point, angle float32, segments int) f32.Affine2D
 	// Before applying the rotation matrix rot, transform the coordinates
 	// to a frame centered to the ellipse (and warped into a unit circle), then rotate.
 	// Finally, transform back into the original frame.
-	return inv.Mul(rot).Mul(ref)
+	return inv.Mul(rot).Mul(ref), segments
 }
 
 func dist(p1, p2 f32.Point) float64 {

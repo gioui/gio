@@ -286,9 +286,7 @@ func (p *Path) QuadTo(ctrl, to f32.Point) {
 // The sign of angle determines the direction; positive being counter-clockwise,
 // negative clockwise.
 func (p *Path) ArcTo(f1, f2 f32.Point, angle float32) {
-	const segments = 16
-	m := stroke.ArcTransform(p.pen, f1, f2, angle, segments)
-
+	m, segments := stroke.ArcTransform(p.pen, f1, f2, angle)
 	for i := 0; i < segments; i++ {
 		p0 := p.pen
 		p1 := m.Transform(p0)
