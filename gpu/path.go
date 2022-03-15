@@ -261,6 +261,13 @@ func (s *fboSet) resize(ctx driver.Device, sizes []image.Point) {
 			}
 			// Add 5% extra space in each dimension to minimize resizing.
 			sz = sz.Mul(105).Div(100)
+			max := ctx.Caps().MaxTextureSize
+			if sz.Y > max {
+				sz.Y = max
+			}
+			if sz.X > max {
+				sz.X = max
+			}
 			tex, err := ctx.NewTexture(driver.TextureFormatFloat, sz.X, sz.Y, driver.FilterNearest, driver.FilterNearest,
 				driver.BufferBindingTexture|driver.BufferBindingFramebuffer)
 			if err != nil {
