@@ -82,7 +82,7 @@ func subLayout(line text.Line, start, end combinedPos) text.Layout {
 
 func firstPos(line text.Line, alignment text.Alignment, width int) combinedPos {
 	p := combinedPos{
-		x: align(alignment, line.Width, width),
+		x: align(alignment, line.Layout.Direction, line.Width, width),
 		y: line.Ascent.Ceil(),
 	}
 
@@ -180,8 +180,19 @@ func linesDimens(lines []text.Line) layout.Dimensions {
 	}
 }
 
-func align(align text.Alignment, width fixed.Int26_6, maxWidth int) fixed.Int26_6 {
+// align returns the x offset that should be applied to text with width so that it
+// appears correctly aligned within a space of size maxWidth and with the primary
+// text direction dir.
+func align(align text.Alignment, dir system.TextDirection, width fixed.Int26_6, maxWidth int) fixed.Int26_6 {
 	mw := fixed.I(maxWidth)
+	if dir.Progression() == system.TowardOrigin {
+		switch align {
+		case text.Start:
+			align = text.End
+		case text.End:
+			align = text.Start
+		}
+	}
 	switch align {
 	case text.Middle:
 		return fixed.I(((mw - width) / 2).Floor())

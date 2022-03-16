@@ -851,7 +851,7 @@ func (e *Editor) scrollBounds() image.Rectangle {
 	var b image.Rectangle
 	if e.SingleLine {
 		if len(e.lines) > 0 {
-			b.Min.X = align(e.Alignment, e.lines[0].Width, e.viewSize.X).Floor()
+			b.Min.X = align(e.Alignment, e.locale.Direction, e.lines[0].Width, e.viewSize.X).Floor()
 			if b.Min.X > 0 {
 				b.Min.X = 0
 			}
@@ -1060,7 +1060,7 @@ func seekPosition(lines []text.Line, alignment text.Alignment, width int, start,
 		start.lineCol.X = 0
 		start.clusterIndex = 0
 		l = lines[start.lineCol.Y]
-		start.x = align(alignment, l.Width, width)
+		start.x = align(alignment, l.Layout.Direction, l.Width, width)
 		if l.Layout.Direction.Progression() == system.TowardOrigin {
 			start.x += l.Width
 		}
@@ -1213,7 +1213,7 @@ func (e *Editor) moveEnd(selAct selectionAction) {
 	caret = e.closestPosition(combinedPos{lineCol: screenPos{X: maxInt, Y: caret.lineCol.Y}})
 	e.caret.start = caret.runes
 	l := e.lines[caret.lineCol.Y]
-	a := align(e.Alignment, l.Width, e.viewSize.X)
+	a := align(e.Alignment, e.locale.Direction, l.Width, e.viewSize.X)
 	e.caret.xoff = l.Width + a - caret.x
 	e.updateSelection(selAct)
 }
