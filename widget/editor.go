@@ -889,17 +889,6 @@ func (e *Editor) layoutText(s text.Shaper) ([]text.Line, layout.Dimensions) {
 		lines, _ = nullLayout(r)
 	}
 	dims := linesDimens(lines)
-	for i := 0; i < len(lines)-1; i++ {
-		// To avoid layout flickering while editing, assume a soft newline takes
-		// up all available space.
-		if layout := lines[i].Layout; len(layout.Text) > 0 {
-			r := layout.Text[len(layout.Text)-1]
-			if r != '\n' {
-				dims.Size.X = e.maxWidth
-				break
-			}
-		}
-	}
 	return lines, dims
 }
 
