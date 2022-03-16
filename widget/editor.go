@@ -680,6 +680,11 @@ func (e *Editor) PaintSelection(gtx layout.Context) {
 	for !posIsBelow(e.lines, pos, cl.Max.Y) {
 		start, end := clipLine(e.lines, e.Alignment, e.viewSize.X, cl, pos)
 		lineIdx := start.lineCol.Y
+		if lineIdx < caretStart.lineCol.Y {
+			// Line is before selection start; skip.
+			pos = e.closestPosition(combinedPos{lineCol: screenPos{Y: pos.lineCol.Y + 1}})
+			continue
+		}
 		if lineIdx > caretEnd.lineCol.Y {
 			// Line is after selection end; we're done.
 			return
