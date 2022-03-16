@@ -16,80 +16,15 @@ import (
 	"golang.org/x/image/math/fixed"
 
 	"gioui.org/internal/ops"
+	"gioui.org/io/system"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/text"
 )
 
-func TestCollectionAsFace(t *testing.T) {
-	// Load two fonts with disjoint glyphs. Font 1 supports only '1', and font 2 supports only '2'.
-	// The fonts have different glyphs for the replacement character (".notdef").
-	font1, ttf1, err := decompressFontFile("testdata/only1.ttf.gz")
-	if err != nil {
-		t.Fatalf("failed to load test font 1: %v", err)
-	}
-	font2, ttf2, err := decompressFontFile("testdata/only2.ttf.gz")
-	if err != nil {
-		t.Fatalf("failed to load test font 2: %v", err)
-	}
-
-	otc := mergeFonts(ttf1, ttf2)
-	coll, err := ParseCollection(otc)
-	if err != nil {
-		t.Fatalf("failed to load merged test font: %v", err)
-	}
-
-	shapeValid1, err := shapeRune(font1, '1')
-	if err != nil {
-		t.Fatalf("failed shaping valid glyph with font 1: %v", err)
-	}
-	shapeInvalid1, err := shapeRune(font1, '3')
-	if err != nil {
-		t.Fatalf("failed shaping invalid glyph with font 1: %v", err)
-	}
-	shapeValid2, err := shapeRune(font2, '2')
-	if err != nil {
-		t.Fatalf("failed shaping valid glyph with font 2: %v", err)
-	}
-	shapeInvalid2, err := shapeRune(font2, '3') // Same invalid glyph as before to test replacement glyph difference
-	if err != nil {
-		t.Fatalf("failed shaping invalid glyph with font 2: %v", err)
-	}
-	shapeCollValid1, err := shapeRune(coll, '1')
-	if err != nil {
-		t.Fatalf("failed shaping valid glyph for font 1 with font collection: %v", err)
-	}
-	shapeCollValid2, err := shapeRune(coll, '2')
-	if err != nil {
-		t.Fatalf("failed shaping valid glyph for font 2 with font collection: %v", err)
-	}
-	shapeCollInvalid, err := shapeRune(coll, '4') // Different invalid glyph to confirm use of the replacement glyph
-	if err != nil {
-		t.Fatalf("failed shaping invalid glyph with font collection: %v", err)
-	}
-
-	// All shapes from the original fonts should be distinct because the glyphs are distinct, including the replacement
-	// glyphs.
-	distinctShapes := []clip.PathSpec{shapeValid1, shapeInvalid1, shapeValid2, shapeInvalid2}
-	for i := 0; i < len(distinctShapes); i++ {
-		for j := i + 1; j < len(distinctShapes); j++ {
-			if areShapesEqual(distinctShapes[i], distinctShapes[j]) {
-				t.Errorf("font shapes %d and %d are not distinct", i, j)
-			}
-		}
-	}
-
-	// Font collections should render glyphs from the first supported font. Replacement glyphs should come from the
-	// first font in all cases.
-	if !areShapesEqual(shapeCollValid1, shapeValid1) {
-		t.Error("font collection did not render the valid glyph using font 1")
-	}
-	if !areShapesEqual(shapeCollValid2, shapeValid2) {
-		t.Error("font collection did not render the valid glyph using font 2")
-	}
-	if !areShapesEqual(shapeCollInvalid, shapeInvalid1) {
-		t.Error("font collection did not render the invalid glyph using the replacement from font 1")
-	}
+var english = system.Locale{
+	Language:  "EN",
+	Direction: system.LTR,
 }
 
 func TestEmptyString(t *testing.T) {
@@ -100,7 +35,7 @@ func TestEmptyString(t *testing.T) {
 
 	ppem := fixed.I(200)
 
-	lines, err := face.Layout(ppem, 2000, strings.NewReader(""))
+	lines, err := face.Layout(ppem, 2000, english, strings.NewReader(""))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +111,7 @@ func mergeFonts(ttf1, ttf2 []byte) []byte {
 // shapeRune uses a given Face to shape exactly one rune at a fixed size, then returns the resulting shape data.
 func shapeRune(f text.Face, r rune) (clip.PathSpec, error) {
 	ppem := fixed.I(200)
-	lines, err := f.Layout(ppem, 2000, strings.NewReader(string(r)))
+	lines, err := f.Layout(ppem, 2000, english, strings.NewReader(string(r)))
 	if err != nil {
 		return clip.PathSpec{}, err
 	}

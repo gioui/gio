@@ -24,10 +24,10 @@ func TestLayoutLRU(t *testing.T) {
 func TestPathLRU(t *testing.T) {
 	c := new(pathCache)
 	put := func(i int) {
-		c.Put(pathKey{str: strconv.Itoa(i)}, clip.PathSpec{})
+		c.Put(pathKey{str: strconv.Itoa(i), gidHash: uint64(i)}, Layout{Runes: Range{Count: i}}, clip.PathSpec{})
 	}
 	get := func(i int) bool {
-		_, ok := c.Get(pathKey{str: strconv.Itoa(i)})
+		_, ok := c.Get(pathKey{str: strconv.Itoa(i), gidHash: uint64(i)}, Layout{Runes: Range{Count: i}})
 		return ok
 	}
 	testLRU(t, put, get)

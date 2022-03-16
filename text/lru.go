@@ -3,6 +3,7 @@
 package text
 
 import (
+	"gioui.org/io/system"
 	"gioui.org/op/clip"
 	"golang.org/x/image/math/fixed"
 )
@@ -27,17 +28,20 @@ type path struct {
 	next, prev *path
 	key        pathKey
 	val        clip.PathSpec
+	layout     Layout
 }
 
 type layoutKey struct {
 	ppem     fixed.Int26_6
 	maxWidth int
 	str      string
+	locale   system.Locale
 }
 
 type pathKey struct {
-	ppem fixed.Int26_6
-	str  string
+	ppem    fixed.Int26_6
+	str     string
+	gidHash uint64
 }
 
 const maxSize = 1000
@@ -81,8 +85,8 @@ func (l *layoutCache) insert(lt *layoutElem) {
 	lt.next.prev = lt
 }
 
-func (c *pathCache) Get(k pathKey) (clip.PathSpec, bool) {
-	if v, ok := c.m[k]; ok {
+func (c *pathCache) Get(k pathKey, l Layout) (clip.PathSpec, bool) {
+	if v, ok := c.m[k]; ok && l.equals(v.layout) {
 		c.remove(v)
 		c.insert(v)
 		return v.val, true
@@ -90,7 +94,7 @@ func (c *pathCache) Get(k pathKey) (clip.PathSpec, bool) {
 	return clip.PathSpec{}, false
 }
 
-func (c *pathCache) Put(k pathKey, v clip.PathSpec) {
+func (c *pathCache) Put(k pathKey, l Layout, v clip.PathSpec) {
 	if c.m == nil {
 		c.m = make(map[pathKey]*path)
 		c.head = new(path)
@@ -98,7 +102,7 @@ func (c *pathCache) Put(k pathKey, v clip.PathSpec) {
 		c.head.prev = c.tail
 		c.tail.next = c.head
 	}
-	val := &path{key: k, val: v}
+	val := &path{key: k, val: v, layout: l}
 	c.m[k] = val
 	c.insert(val)
 	if len(c.m) > maxSize {

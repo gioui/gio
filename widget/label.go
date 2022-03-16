@@ -58,7 +58,7 @@ func clipLine(lines []text.Line, alignment text.Alignment, width int, clip image
 
 func subLayout(line text.Line, startCol, endCol int) text.Layout {
 	adv := line.Layout.Advances
-	if startCol == len(adv) {
+	if startCol == line.Layout.Runes.Count {
 		return text.Layout{}
 	}
 	adv = adv[startCol:endCol]
@@ -90,7 +90,7 @@ func (p1 screenPos) Less(p2 screenPos) bool {
 func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size unit.Value, txt string) layout.Dimensions {
 	cs := gtx.Constraints
 	textSize := fixed.I(gtx.Px(size))
-	lines := s.LayoutString(font, textSize, cs.Max.X, txt)
+	lines := s.LayoutString(font, textSize, cs.Max.X, gtx.Locale, txt)
 	if max := l.MaxLines; max > 0 && len(lines) > max {
 		lines = lines[:max]
 	}

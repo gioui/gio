@@ -6,19 +6,74 @@ package opentype
 
 import (
 	"bytes"
+	"fmt"
+	"image"
 	"io"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/benoitkugler/textlayout/fonts"
+	"github.com/benoitkugler/textlayout/fonts/truetype"
+	"github.com/benoitkugler/textlayout/harfbuzz"
+	"github.com/go-text/typesetting/shaping"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
 
 	"gioui.org/f32"
+	"gioui.org/font/opentype/internal"
+	"gioui.org/io/system"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/text"
 )
+
+// HarfbuzzFont implements the text.Shaper interface using a rich text
+// shaping engine.
+type HarfbuzzFont struct {
+	font *truetype.Font
+}
+
+// ParseHarfbuzz constructs a HarfbuzzFont from source bytes.
+func ParseHarfbuzz(src []byte) (*HarfbuzzFont, error) {
+	face, err := truetype.Parse(bytes.NewReader(src))
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing truetype font: %w", err)
+	}
+	return &HarfbuzzFont{
+		font: face,
+	}, nil
+}
+
+func (f *HarfbuzzFont) Layout(ppem fixed.Int26_6, maxWidth int, lc system.Locale, txt io.RuneReader) ([]text.Line, error) {
+	return internal.Document(shaping.Shape, f.font, ppem, maxWidth, lc, txt), nil
+}
+
+func (f *HarfbuzzFont) Shape(ppem fixed.Int26_6, str text.Layout) clip.PathSpec {
+	return harfbuzzTextPath(ppem, f, str)
+}
+
+func (f *HarfbuzzFont) Metrics(ppem fixed.Int26_6) font.Metrics {
+	metrics := font.Metrics{}
+	font := harfbuzz.NewFont(f.font)
+	font.XScale = int32(ppem.Ceil()) << 6
+	font.YScale = font.XScale
+	// Use any horizontal direction.
+	fontExtents := font.ExtentsForDirection(harfbuzz.LeftToRight)
+	ascender := fixed.I(int(fontExtents.Ascender * 64))
+	descender := fixed.I(int(fontExtents.Descender * 64))
+	gap := fixed.I(int(fontExtents.LineGap * 64))
+	metrics.Height = ascender + descender + gap
+	metrics.Ascent = ascender
+	metrics.Descent = descender
+	// These three are not readily available.
+	// TODO(whereswaldon): figure out how to get these values.
+	metrics.XHeight = ascender
+	metrics.CapHeight = ascender
+	metrics.CaretSlope = image.Pt(0, 1)
+
+	return metrics
+}
 
 // Font implements text.Face. Its methods are safe to use
 // concurrently.
@@ -109,7 +164,7 @@ func (c *Collection) Font(i int) (*Font, error) {
 	return &Font{font: c.fonts[i].Font}, nil
 }
 
-func (f *Font) Layout(ppem fixed.Int26_6, maxWidth int, txt io.Reader) ([]text.Line, error) {
+func (f *Font) Layout(ppem fixed.Int26_6, maxWidth int, lc system.Locale, txt io.RuneReader) ([]text.Line, error) {
 	glyphs, err := readGlyphs(txt)
 	if err != nil {
 		return nil, err
@@ -130,7 +185,7 @@ func (f *Font) Metrics(ppem fixed.Int26_6) font.Metrics {
 	return o.Metrics(&buf, ppem)
 }
 
-func (c *Collection) Layout(ppem fixed.Int26_6, maxWidth int, txt io.Reader) ([]text.Line, error) {
+func (c *Collection) Layout(ppem fixed.Int26_6, maxWidth int, lc system.Locale, txt io.RuneReader) ([]text.Line, error) {
 	glyphs, err := readGlyphs(txt)
 	if err != nil {
 		return nil, err
@@ -325,31 +380,82 @@ func textPath(buf *sfnt.Buffer, ppem fixed.Int26_6, fonts []*opentype, str text.
 	return builder.End()
 }
 
-func readGlyphs(r io.Reader) ([]glyph, error) {
+func harfbuzzTextPath(ppem fixed.Int26_6, font *HarfbuzzFont, str text.Layout) clip.PathSpec {
+	var lastPos f32.Point
+	var builder clip.Path
+	ops := new(op.Ops)
+	var x fixed.Int26_6
+	builder.Begin(ops)
+	rune := 0
+	ppemInt := ppem.Round()
+	ppem16 := uint16(ppemInt)
+	scaleFactor := float32(ppemInt) / float32(font.font.Upem())
+	for _, g := range str.Glyphs {
+		advance := g.XAdvance
+		outline, ok := font.font.GlyphData(g.ID, ppem16, ppem16).(fonts.GlyphOutline)
+		if !ok {
+			continue
+		}
+		// Move to glyph position.
+		pos := f32.Point{
+			X: float32(x)/64 - float32(g.XOffset)/64,
+			Y: -float32(g.YOffset) / 64,
+		}
+		builder.Move(pos.Sub(lastPos))
+		lastPos = pos
+		var lastArg f32.Point
+
+		// Convert sfnt.Segments to relative segments.
+		for _, fseg := range outline.Segments {
+			nargs := 1
+			switch fseg.Op {
+			case fonts.SegmentOpQuadTo:
+				nargs = 2
+			case fonts.SegmentOpCubeTo:
+				nargs = 3
+			}
+			var args [3]f32.Point
+			for i := 0; i < nargs; i++ {
+				a := f32.Point{
+					X: fseg.Args[i].X * scaleFactor,
+					Y: -fseg.Args[i].Y * scaleFactor,
+				}
+				args[i] = a.Sub(lastArg)
+				if i == nargs-1 {
+					lastArg = a
+				}
+			}
+			switch fseg.Op {
+			case fonts.SegmentOpMoveTo:
+				builder.Move(args[0])
+			case fonts.SegmentOpLineTo:
+				builder.Line(args[0])
+			case fonts.SegmentOpQuadTo:
+				builder.Quad(args[0], args[1])
+			case fonts.SegmentOpCubeTo:
+				builder.Cube(args[0], args[1], args[2])
+			default:
+				panic("unsupported segment op")
+			}
+		}
+		lastPos = lastPos.Add(lastArg)
+		x += advance
+		rune++
+	}
+	return builder.End()
+}
+
+func readGlyphs(r io.RuneReader) ([]glyph, error) {
 	var glyphs []glyph
-	buf := make([]byte, 0, 1024)
 	for {
-		n, err := r.Read(buf[len(buf):cap(buf)])
-		buf = buf[:len(buf)+n]
-		lim := len(buf)
-		// Read full runes if possible.
-		if err != io.EOF {
-			lim -= utf8.UTFMax - 1
-		}
-		i := 0
-		for i < lim {
-			c, s := utf8.DecodeRune(buf[i:])
-			i += s
-			glyphs = append(glyphs, glyph{Rune: c})
-		}
-		n = copy(buf, buf[i:])
-		buf = buf[:n]
+		c, _, err := r.ReadRune()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			return nil, err
 		}
+		glyphs = append(glyphs, glyph{Rune: c})
 	}
 	return glyphs, nil
 }

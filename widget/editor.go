@@ -3,8 +3,8 @@
 package widget
 
 import (
-	"bufio"
 	"bytes"
+	"fmt"
 	"image"
 	"io"
 	"math"
@@ -21,6 +21,7 @@ import (
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
+	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -102,6 +103,8 @@ type Editor struct {
 	events []EditorEvent
 	// prevEvents is the number of events from the previous frame.
 	prevEvents int
+
+	locale system.Locale
 }
 
 type offEntry struct {
@@ -155,31 +158,20 @@ func (m *maskReader) Reset(r io.RuneReader, mr rune) {
 	m.mask = m.maskBuf[:n]
 }
 
-// Read reads from the underlying reader and replaces every
+// ReadRune reads a rune from the underlying reader and replaces every
 // rune with the mask rune.
-func (m *maskReader) Read(b []byte) (n int, err error) {
-	for len(b) > 0 {
-		var replacement []byte
-		if len(m.overflow) > 0 {
-			replacement = m.overflow
-		} else {
-			var r rune
-			r, _, err = m.rr.ReadRune()
-			if err != nil {
-				break
-			}
-			if r == '\n' {
-				replacement = []byte{'\n'}
-			} else {
-				replacement = m.mask
-			}
-		}
-		nn := copy(b, replacement)
-		m.overflow = replacement[nn:]
-		n += nn
-		b = b[nn:]
+func (m *maskReader) ReadRune() (r rune, n int, err error) {
+	r, _, err = m.rr.ReadRune()
+	if err != nil {
+		return
 	}
-	return n, err
+	if r != '\n' {
+		r, _ = utf8.DecodeRune(m.mask)
+		n = len(m.mask)
+	} else {
+		n = 1
+	}
+	return
 }
 
 type EditorEvent interface {
@@ -505,6 +497,10 @@ func (e *Editor) Focused() bool {
 
 // Layout lays out the editor. If content is not nil, it is laid out on top.
 func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size unit.Value, content layout.Widget) layout.Dimensions {
+	if e.locale != gtx.Locale {
+		e.locale = gtx.Locale
+		e.invalidate()
+	}
 	textSize := fixed.I(gtx.Px(size))
 	if e.font != font || e.textSize != textSize {
 		e.invalidate()
@@ -877,14 +873,18 @@ func (e *Editor) moveCoord(pos image.Point) {
 
 func (e *Editor) layoutText(s text.Shaper) ([]text.Line, layout.Dimensions) {
 	e.rr.Reset()
-	var r io.Reader = &e.rr
+	var r io.RuneReader = &e.rr
 	if e.Mask != 0 {
 		e.maskReader.Reset(&e.rr, e.Mask)
 		r = &e.maskReader
 	}
 	var lines []text.Line
 	if s != nil {
-		lines, _ = s.Layout(e.font, e.textSize, e.maxWidth, r)
+		lines, _ = s.Layout(e.font, e.textSize, e.maxWidth, e.locale, r)
+		if len(lines) == 0 {
+			// The editor does not tolerate a zero-length list of lines being returned from the shaper.
+			lines = append(lines, text.Line{})
+		}
 	} else {
 		lines, _ = nullLayout(r)
 	}
@@ -926,7 +926,7 @@ func (e *Editor) indexPosition(pos combinedPos) combinedPos {
 // of p2. All fields of p1 must be a consistent and valid.
 func positionGreaterOrEqual(lines []text.Line, p1, p2 combinedPos) bool {
 	l := lines[p1.lineCol.Y]
-	endCol := len(l.Layout.Advances) - 1
+	endCol := l.Layout.Runes.Count - 1
 	if lastLine := p1.lineCol.Y == len(lines)-1; lastLine {
 		endCol++
 	}
@@ -1391,8 +1391,7 @@ func sortPoints(a, b screenPos) (a2, b2 screenPos) {
 	return a, b
 }
 
-func nullLayout(r io.Reader) ([]text.Line, error) {
-	rr := bufio.NewReader(r)
+func nullLayout(rr io.RuneReader) ([]text.Line, error) {
 	var rerr error
 	var n int
 	var buf bytes.Buffer
@@ -1405,9 +1404,18 @@ func nullLayout(r io.Reader) ([]text.Line, error) {
 		n++
 		buf.WriteRune(r)
 	}
+	clusters := make([]text.GlyphCluster, n)
+	for i := range clusters {
+		clusters[i].Runes.Count = 1
+		clusters[i].Runes.Offset = i
+	}
 	return []text.Line{
 		{
 			Layout: text.Layout{
+				Clusters: clusters,
+				Runes: text.Range{
+					Count: n,
+				},
 				Text:     buf.String(),
 				Advances: make([]fixed.Int26_6, n),
 			},

@@ -3,20 +3,23 @@
 package text
 
 import (
+	"encoding/binary"
+	"hash/maphash"
 	"io"
 	"strings"
 
 	"golang.org/x/image/math/fixed"
 
+	"gioui.org/io/system"
 	"gioui.org/op/clip"
 )
 
 // Shaper implements layout and shaping of text.
 type Shaper interface {
 	// Layout a text according to a set of options.
-	Layout(font Font, size fixed.Int26_6, maxWidth int, txt io.Reader) ([]Line, error)
+	Layout(font Font, size fixed.Int26_6, maxWidth int, lc system.Locale, txt io.RuneReader) ([]Line, error)
 	// LayoutString is Layout for strings.
-	LayoutString(font Font, size fixed.Int26_6, maxWidth int, str string) []Line
+	LayoutString(font Font, size fixed.Int26_6, maxWidth int, lc system.Locale, str string) []Line
 	// Shape a line of text and return a clipping operation for its outline.
 	Shape(font Font, size fixed.Int26_6, layout Layout) clip.PathSpec
 }
@@ -44,6 +47,7 @@ type faceCache struct {
 	face        Face
 	layoutCache layoutCache
 	pathCache   pathCache
+	seed        maphash.Seed
 }
 
 func (c *Cache) lookup(font Font) *faceCache {
@@ -108,15 +112,15 @@ func NewCache(collection []FontFace) *Cache {
 }
 
 // Layout implements the Shaper interface.
-func (c *Cache) Layout(font Font, size fixed.Int26_6, maxWidth int, txt io.Reader) ([]Line, error) {
+func (c *Cache) Layout(font Font, size fixed.Int26_6, maxWidth int, lc system.Locale, txt io.RuneReader) ([]Line, error) {
 	cache := c.lookup(font)
-	return cache.face.Layout(size, maxWidth, txt)
+	return cache.face.Layout(size, maxWidth, lc, txt)
 }
 
 // LayoutString is a caching implementation of the Shaper interface.
-func (c *Cache) LayoutString(font Font, size fixed.Int26_6, maxWidth int, str string) []Line {
+func (c *Cache) LayoutString(font Font, size fixed.Int26_6, maxWidth int, lc system.Locale, str string) []Line {
 	cache := c.lookup(font)
-	return cache.layout(size, maxWidth, str)
+	return cache.layout(size, maxWidth, lc, str)
 }
 
 // Shape is a caching implementation of the Shaper interface. Shape assumes that the layout
@@ -126,7 +130,7 @@ func (c *Cache) Shape(font Font, size fixed.Int26_6, layout Layout) clip.PathSpe
 	return cache.shape(size, layout)
 }
 
-func (f *faceCache) layout(ppem fixed.Int26_6, maxWidth int, str string) []Line {
+func (f *faceCache) layout(ppem fixed.Int26_6, maxWidth int, lc system.Locale, str string) []Line {
 	if f == nil {
 		return nil
 	}
@@ -134,13 +138,28 @@ func (f *faceCache) layout(ppem fixed.Int26_6, maxWidth int, str string) []Line 
 		ppem:     ppem,
 		maxWidth: maxWidth,
 		str:      str,
+		locale:   lc,
 	}
 	if l, ok := f.layoutCache.Get(lk); ok {
 		return l
 	}
-	l, _ := f.face.Layout(ppem, maxWidth, strings.NewReader(str))
+	l, _ := f.face.Layout(ppem, maxWidth, lc, strings.NewReader(str))
 	f.layoutCache.Put(lk, l)
 	return l
+}
+
+// hashGIDs returns a 64-bit hash value of the font GIDs contained
+// within the provided layout.
+func (f *faceCache) hashGIDs(layout Layout) uint64 {
+	if f.seed == (maphash.Seed{}) {
+		f.seed = maphash.MakeSeed()
+	}
+	var h maphash.Hash
+	h.SetSeed(f.seed)
+	for _, g := range layout.Glyphs {
+		binary.Write(&h, binary.LittleEndian, g.ID)
+	}
+	return h.Sum64()
 }
 
 func (f *faceCache) shape(ppem fixed.Int26_6, layout Layout) clip.PathSpec {
@@ -148,13 +167,14 @@ func (f *faceCache) shape(ppem fixed.Int26_6, layout Layout) clip.PathSpec {
 		return clip.PathSpec{}
 	}
 	pk := pathKey{
-		ppem: ppem,
-		str:  layout.Text,
+		ppem:    ppem,
+		str:     layout.Text,
+		gidHash: f.hashGIDs(layout),
 	}
-	if clip, ok := f.pathCache.Get(pk); ok {
+	if clip, ok := f.pathCache.Get(pk, layout); ok {
 		return clip
 	}
 	clip := f.face.Shape(ppem, layout)
-	f.pathCache.Put(pk, clip)
+	f.pathCache.Put(pk, layout, clip)
 	return clip
 }
