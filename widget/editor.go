@@ -1476,8 +1476,6 @@ func nullLayout(rr io.RuneReader) ([]text.Line, error) {
 				Runes: text.Range{
 					Count: n,
 				},
-				Text:     buf.String(),
-				Advances: make([]fixed.Int26_6, n),
 			},
 		},
 	}, rerr

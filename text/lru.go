@@ -40,7 +40,6 @@ type layoutKey struct {
 
 type pathKey struct {
 	ppem    fixed.Int26_6
-	str     string
 	gidHash uint64
 }
 

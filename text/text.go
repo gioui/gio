@@ -92,8 +92,6 @@ type Layout struct {
 	// so the first cluster will describe the beginning of the text and may
 	// refer to the final glyphs in the Glyphs field if the text is RTL.
 	Clusters []GlyphCluster
-	Text     string
-	Advances []fixed.Int26_6
 	// Runes describes the position of the text data this layout represents
 	// within the overall body of text being shaped.
 	Runes Range

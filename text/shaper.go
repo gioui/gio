@@ -168,7 +168,6 @@ func (f *faceCache) shape(ppem fixed.Int26_6, layout Layout) clip.PathSpec {
 	}
 	pk := pathKey{
 		ppem:    ppem,
-		str:     layout.Text,
 		gidHash: f.hashGIDs(layout),
 	}
 	if clip, ok := f.pathCache.Get(pk, layout); ok {

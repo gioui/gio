@@ -966,8 +966,14 @@ func (q *testQueue) Events(_ event.Tag) []event.Event {
 }
 
 func printLines(e *Editor) {
-	for n, line := range e.lines {
-		text := strings.TrimSuffix(line.Layout.Text, "\n")
+	for _, line := range e.lines {
+		start := e.runeOffset(line.Layout.Runes.Offset)
+		buf := make([]byte, 0, 4*line.Layout.Runes.Count)
+		e.Seek(int64(start), 0)
+		n, _ := e.Read(buf)
+		buf = buf[:n]
+		asStr := string([]rune(string(buf))[:line.Layout.Runes.Count])
+		text := strings.TrimSuffix(asStr, "\n")
 		fmt.Printf("%d: %s\n", n, text)
 	}
 }

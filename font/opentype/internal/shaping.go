@@ -401,7 +401,6 @@ func (o output) ToLine() text.Line {
 		advances = append(advances, glyph.XAdvance)
 	}
 	layout := text.Layout{
-		Advances:  advances,
 		Glyphs:    toGioGlyphs(o.Shaped.Glyphs),
 		Runes:     o.RuneRange,
 		Direction: toSystemDirection(o.Shaped.Direction),
