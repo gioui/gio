@@ -42,7 +42,7 @@ func TestEditorConfigurations(t *testing.T) {
 		Constraints: layout.Exact(image.Pt(100, 100)),
 		Locale:      english,
 	}
-	cache := text.NewCache(gofont.CollectionHB())
+	cache := text.NewCache(gofont.Collection())
 	fontSize := unit.Px(10)
 	font := text.Font{}
 	sentence := "\n\n\n\n\n\n\n\n\n\n\n\nthe quick brown fox jumps over the lazy dog"
@@ -82,7 +82,7 @@ func TestEditor(t *testing.T) {
 		Constraints: layout.Exact(image.Pt(100, 100)),
 		Locale:      english,
 	}
-	cache := text.NewCache(gofont.CollectionHB())
+	cache := text.NewCache(gofont.Collection())
 	fontSize := unit.Px(10)
 	font := text.Font{}
 
@@ -378,7 +378,7 @@ func TestEditorDimensions(t *testing.T) {
 		Queue:       tq,
 		Locale:      english,
 	}
-	cache := text.NewCache(gofont.CollectionHB())
+	cache := text.NewCache(gofont.Collection())
 	fontSize := unit.Px(10)
 	font := text.Font{}
 	dims := e.Layout(gtx, cache, font, fontSize, nil)
@@ -425,7 +425,7 @@ func TestEditorCaretConsistency(t *testing.T) {
 		Constraints: layout.Exact(image.Pt(100, 100)),
 		Locale:      english,
 	}
-	cache := text.NewCache(gofont.CollectionHB())
+	cache := text.NewCache(gofont.Collection())
 	fontSize := unit.Px(10)
 	font := text.Font{}
 	for _, a := range []text.Alignment{text.Start, text.Middle, text.End} {
@@ -518,7 +518,7 @@ func TestEditorMoveWord(t *testing.T) {
 			Constraints: layout.Exact(image.Pt(100, 100)),
 			Locale:      english,
 		}
-		cache := text.NewCache(gofont.CollectionHB())
+		cache := text.NewCache(gofont.Collection())
 		fontSize := unit.Px(10)
 		font := text.Font{}
 		e.SetText(t)
@@ -623,7 +623,7 @@ func TestEditorInsert(t *testing.T) {
 			Constraints: layout.Exact(image.Pt(100, 100)),
 			Locale:      english,
 		}
-		cache := text.NewCache(gofont.CollectionHB())
+		cache := text.NewCache(gofont.Collection())
 		fontSize := unit.Px(10)
 		font := text.Font{}
 		e.SetText(t)
@@ -713,7 +713,7 @@ func TestEditorDeleteWord(t *testing.T) {
 			Constraints: layout.Exact(image.Pt(100, 100)),
 			Locale:      english,
 		}
-		cache := text.NewCache(gofont.CollectionHB())
+		cache := text.NewCache(gofont.Collection())
 		fontSize := unit.Px(10)
 		font := text.Font{}
 		e.SetText(t)
@@ -767,7 +767,7 @@ g 2 4 6 8 g
 		Ops:    new(op.Ops),
 		Locale: english,
 	}
-	cache := text.NewCache(gofont.CollectionHB())
+	cache := text.NewCache(gofont.Collection())
 	font := text.Font{}
 	fontSize := unit.Px(10)
 
@@ -861,7 +861,7 @@ func TestSelectMove(t *testing.T) {
 		Ops:    new(op.Ops),
 		Locale: english,
 	}
-	cache := text.NewCache(gofont.CollectionHB())
+	cache := text.NewCache(gofont.Collection())
 	font := text.Font{}
 	fontSize := unit.Px(10)
 

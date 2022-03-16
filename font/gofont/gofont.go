@@ -29,10 +29,8 @@ import (
 )
 
 var (
-	once         sync.Once
-	collection   []text.FontFace
-	onceHB       sync.Once
-	collectionHB []text.FontFace
+	once       sync.Once
+	collection []text.FontFace
 )
 
 func Collection() []text.FontFace {
@@ -54,36 +52,6 @@ func Collection() []text.FontFace {
 		collection = collection[:n:n]
 	})
 	return collection
-}
-
-func CollectionHB() []text.FontFace {
-	onceHB.Do(func() {
-		registerHB(text.Font{}, goregular.TTF)
-		registerHB(text.Font{Style: text.Italic}, goitalic.TTF)
-		registerHB(text.Font{Weight: text.Bold}, gobold.TTF)
-		registerHB(text.Font{Style: text.Italic, Weight: text.Bold}, gobolditalic.TTF)
-		registerHB(text.Font{Weight: text.Medium}, gomedium.TTF)
-		registerHB(text.Font{Weight: text.Medium, Style: text.Italic}, gomediumitalic.TTF)
-		registerHB(text.Font{Variant: "Mono"}, gomono.TTF)
-		registerHB(text.Font{Variant: "Mono", Weight: text.Bold}, gomonobold.TTF)
-		registerHB(text.Font{Variant: "Mono", Weight: text.Bold, Style: text.Italic}, gomonobolditalic.TTF)
-		registerHB(text.Font{Variant: "Mono", Style: text.Italic}, gomonoitalic.TTF)
-		registerHB(text.Font{Variant: "Smallcaps"}, gosmallcaps.TTF)
-		registerHB(text.Font{Variant: "Smallcaps", Style: text.Italic}, gosmallcapsitalic.TTF)
-		// Ensure that any outside appends will not reuse the backing store.
-		n := len(collectionHB)
-		collectionHB = collectionHB[:n:n]
-	})
-	return collectionHB
-}
-
-func registerHB(fnt text.Font, ttf []byte) {
-	face, err := opentype.Parse(ttf)
-	if err != nil {
-		panic(fmt.Errorf("failed to parse font: %v", err))
-	}
-	fnt.Typeface = "Go"
-	collectionHB = append(collectionHB, text.FontFace{Font: fnt, Face: face})
 }
 
 func register(fnt text.Font, ttf []byte) {
