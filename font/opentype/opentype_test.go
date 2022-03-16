@@ -10,9 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/goregular"
-	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
 
 	"gioui.org/internal/ops"
@@ -43,9 +41,13 @@ func TestEmptyString(t *testing.T) {
 		t.Fatalf("Layout returned no lines for empty string; expected 1")
 	}
 	l := lines[0]
-	exp, err := face.font.Bounds(new(sfnt.Buffer), ppem, font.HintingFull)
-	if err != nil {
-		t.Fatal(err)
+	exp := fixed.Rectangle26_6{
+		Min: fixed.Point26_6{
+			Y: fixed.Int26_6(-12094),
+		},
+		Max: fixed.Point26_6{
+			Y: fixed.Int26_6(2700),
+		},
 	}
 	if got := l.Bounds; got != exp {
 		t.Errorf("got bounds %+v for empty string; expected %+v", got, exp)

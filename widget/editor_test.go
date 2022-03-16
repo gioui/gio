@@ -174,7 +174,7 @@ var arabic = system.Locale{
 }
 
 var arabicCollection = func() []text.FontFace {
-	parsed, _ := opentype.ParseHarfbuzz(nsareg.TTF)
+	parsed, _ := opentype.Parse(nsareg.TTF)
 	return []text.FontFace{{Font: text.Font{}, Face: parsed}}
 }()
 
@@ -250,7 +250,7 @@ func TestEditorLigature(t *testing.T) {
 		Constraints: layout.Exact(image.Pt(100, 100)),
 		Locale:      english,
 	}
-	face, err := opentype.ParseHarfbuzz(robotoregular.TTF)
+	face, err := opentype.Parse(robotoregular.TTF)
 	if err != nil {
 		t.Skipf("failed parsing test font: %v", err)
 	}

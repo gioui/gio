@@ -78,7 +78,7 @@ func CollectionHB() []text.FontFace {
 }
 
 func registerHB(fnt text.Font, ttf []byte) {
-	face, err := opentype.ParseHarfbuzz(ttf)
+	face, err := opentype.Parse(ttf)
 	if err != nil {
 		panic(fmt.Errorf("failed to parse font: %v", err))
 	}
