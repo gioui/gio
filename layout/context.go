@@ -27,6 +27,11 @@ type Context struct {
 	// Now is the animation time.
 	Now time.Time
 
+	// Locale provides information on the system's language preferences.
+	// BUG(whereswaldon): this field is not currently populated automatically.
+	// Interested users must look up and populate these values manually.
+	Locale system.Locale
+
 	*op.Ops
 }
 
