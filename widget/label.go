@@ -5,9 +5,9 @@ package widget
 import (
 	"fmt"
 	"image"
-	"unicode/utf8"
 
 	"gioui.org/io/semantic"
+	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -48,39 +48,48 @@ func clipLine(lines []text.Line, alignment text.Alignment, width int, clip image
 	line := lines[lineIdx]
 	// runeWidth is the width of the widest rune in line.
 	runeWidth := (line.Bounds.Max.X - line.Width).Ceil()
-	q := combinedPos{y: start.y, x: fixed.I(clip.Min.X - runeWidth)}
+	lineStart := fixed.I(clip.Min.X - runeWidth)
+	lineEnd := fixed.I(clip.Max.X + runeWidth)
+
+	flip := line.Layout.Direction.Progression() == system.TowardOrigin
+	if flip {
+		lineStart, lineEnd = lineEnd, lineStart
+	}
+	q := combinedPos{y: start.y, x: lineStart}
 	start, _ = seekPosition(lines, alignment, width, linePos, q, 0)
 	// Seek to first invisible column after start.
-	q = combinedPos{y: start.y, x: fixed.I(clip.Max.X + runeWidth)}
+	q = combinedPos{y: start.y, x: lineEnd}
 	end, _ = seekPosition(lines, alignment, width, start, q, 0)
+	if flip {
+		start, end = end, start
+	}
+
 	return start, end
 }
 
-func subLayout(line text.Line, startCol, endCol int) text.Layout {
-	adv := line.Layout.Advances
-	if startCol == line.Layout.Runes.Count {
+func subLayout(line text.Line, start, end combinedPos) text.Layout {
+	if start.lineCol.X == line.Layout.Runes.Count {
 		return text.Layout{}
 	}
-	adv = adv[startCol:endCol]
-	txt := line.Layout.Text
-	for i := 0; i < startCol; i++ {
-		_, s := utf8.DecodeRuneInString(txt)
-		txt = txt[s:]
+
+	startCluster := clusterIndexFor(line, start.lineCol.X, start.clusterIndex)
+	endCluster := clusterIndexFor(line, end.lineCol.X, end.clusterIndex)
+	if startCluster > endCluster {
+		startCluster, endCluster = endCluster, startCluster
 	}
-	n := 0
-	for i := startCol; i < endCol; i++ {
-		_, s := utf8.DecodeRuneInString(txt[n:])
-		n += s
-	}
-	txt = txt[:n]
-	return text.Layout{Text: txt, Advances: adv}
+	return line.Layout.Slice(startCluster, endCluster)
 }
 
 func firstPos(line text.Line, alignment text.Alignment, width int) combinedPos {
-	return combinedPos{
+	p := combinedPos{
 		x: align(alignment, line.Width, width),
 		y: line.Ascent.Ceil(),
 	}
+
+	if line.Layout.Direction.Progression() == system.TowardOrigin {
+		p.x += line.Width
+	}
+	return p
 }
 
 func (p1 screenPos) Less(p2 screenPos) bool {
@@ -107,7 +116,7 @@ func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size un
 	for !posIsBelow(lines, pos, cl.Max.Y) {
 		start, end := clipLine(lines, l.Alignment, dims.Size.X, cl, pos)
 		line := lines[start.lineCol.Y]
-		lt := subLayout(line, start.lineCol.X, end.lineCol.X)
+		lt := subLayout(line, start, end)
 
 		off := image.Point{X: start.x.Floor(), Y: start.y}
 		t := op.Offset(layout.FPt(off)).Push(gtx.Ops)

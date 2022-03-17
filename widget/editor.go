@@ -136,13 +136,17 @@ type combinedPos struct {
 	// runes is the offset in runes.
 	runes int
 
-	// lineCol.Y = line (offset into Editor.lines), and X = col (offset into
+	// lineCol.Y = line (offset into Editor.lines), and X = col (rune offset into
 	// Editor.lines[Y])
 	lineCol screenPos
 
 	// Pixel coordinates
 	x fixed.Int26_6
 	y int
+
+	// clusterIndex is the glyph cluster index that contains the rune referred
+	// to by the y coordinate.
+	clusterIndex int
 }
 
 type selectionAction int
@@ -400,6 +404,10 @@ func (e *Editor) moveLines(distance int, selAct selectionAction) {
 }
 
 func (e *Editor) command(gtx layout.Context, k key.Event) bool {
+	direction := 1
+	if e.locale.Direction.Progression() == system.TowardOrigin {
+		direction = -1
+	}
 	modSkip := key.ModCtrl
 	if runtime.GOOS == "darwin" {
 		modSkip = key.ModAlt
@@ -430,21 +438,21 @@ func (e *Editor) command(gtx layout.Context, k key.Event) bool {
 		e.moveLines(+1, selAct)
 	case key.NameLeftArrow:
 		if moveByWord {
-			e.moveWord(-1, selAct)
+			e.moveWord(-1*direction, selAct)
 		} else {
 			if selAct == selectionClear {
 				e.ClearSelection()
 			}
-			e.MoveCaret(-1, -1*int(selAct))
+			e.MoveCaret(-1*direction, -1*direction*int(selAct))
 		}
 	case key.NameRightArrow:
 		if moveByWord {
-			e.moveWord(1, selAct)
+			e.moveWord(1*direction, selAct)
 		} else {
 			if selAct == selectionClear {
 				e.ClearSelection()
 			}
-			e.MoveCaret(1, int(selAct))
+			e.MoveCaret(1*direction, int(selAct)*direction)
 		}
 	case key.NamePageUp:
 		e.movePages(-1, selAct)
@@ -674,8 +682,8 @@ func (e *Editor) PaintSelection(gtx layout.Context) {
 	cl = cl.Add(scroll)
 	pos := e.seekFirstVisibleLine(cl.Min.Y)
 	for !posIsBelow(e.lines, pos, cl.Max.Y) {
-		start, end := clipLine(e.lines, e.Alignment, e.viewSize.X, cl, pos)
-		lineIdx := start.lineCol.Y
+		leftmost, rightmost := clipLine(e.lines, e.Alignment, e.viewSize.X, cl, pos)
+		lineIdx := leftmost.lineCol.Y
 		if lineIdx < caretStart.lineCol.Y {
 			// Line is before selection start; skip.
 			pos = e.closestPosition(combinedPos{lineCol: screenPos{Y: pos.lineCol.Y + 1}})
@@ -685,17 +693,27 @@ func (e *Editor) PaintSelection(gtx layout.Context) {
 			// Line is after selection end; we're done.
 			return
 		}
+		line := e.lines[leftmost.lineCol.Y]
+		flip := line.Layout.Direction.Progression() == system.TowardOrigin
 		// Clamp start, end to selection.
-		if start.runes < selStart {
-			start = caretStart
-		}
-		if end.runes > selEnd {
-			end = caretEnd
+		if !flip {
+			if leftmost.runes < selStart {
+				leftmost = caretStart
+			}
+			if rightmost.runes > selEnd {
+				rightmost = caretEnd
+			}
+		} else {
+			if leftmost.runes > selEnd {
+				leftmost = caretEnd
+			}
+			if rightmost.runes < selStart {
+				rightmost = caretStart
+			}
 		}
 
-		line := e.lines[start.lineCol.Y]
-		dotStart := image.Pt(start.x.Round(), start.y)
-		dotEnd := image.Pt(end.x.Round(), end.y)
+		dotStart := image.Pt(leftmost.x.Round(), leftmost.y)
+		dotEnd := image.Pt(rightmost.x.Round(), rightmost.y)
 		t := op.Offset(layout.FPt(scroll.Mul(-1))).Push(gtx.Ops)
 		size := image.Rectangle{
 			Min: dotStart.Sub(image.Point{Y: line.Ascent.Ceil()}),
@@ -726,9 +744,12 @@ func (e *Editor) PaintText(gtx layout.Context) {
 	for !posIsBelow(e.lines, pos, cl.Max.Y) {
 		start, end := clipLine(e.lines, e.Alignment, e.viewSize.X, cl, pos)
 		line := e.lines[start.lineCol.Y]
-		l := subLayout(line, start.lineCol.X, end.lineCol.X)
-
 		off := image.Point{X: start.x.Floor(), Y: start.y}.Sub(scroll)
+		if start.lineCol.X > end.lineCol.X {
+			start, end = end, start
+		}
+		l := subLayout(line, start, end)
+
 		t := op.Offset(layout.FPt(off)).Push(gtx.Ops)
 		op := clip.Outline{Path: e.shaper.Shape(e.font, e.textSize, l)}.Op().Push(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
@@ -953,10 +974,40 @@ func positionGreaterOrEqual(lines []text.Line, p1, p2 combinedPos) bool {
 		if eol {
 			return true
 		}
-		adv := l.Layout.Advances[p1.lineCol.X]
-		return p1.x+adv-p2.x >= p2.x-p1.x
+
+		// Find the cluster containing the rune position described by p1
+		// in order to determine the width of a rune within it.
+		clusterIdx := clusterIndexFor(l, p1.lineCol.X, p1.clusterIndex)
+		flip := l.Layout.Direction.Progression() == system.TowardOrigin
+		adv := l.Layout.Clusters[clusterIdx].RuneWidth()
+
+		left := p1.x + adv - p2.x
+		right := p2.x - p1.x
+
+		return (!flip && left >= right) || (flip && left <= right)
 	}
 	return true
+}
+
+// clusterIndexFor returns the index of the glyph cluster containing the rune
+// at the given position within the line. As a special case, if the rune is one
+// beyond the final rune of the line, it returns the length of the line's clusters
+// slice. Otherwise, it panics if given a rune beyond the
+// dimensions of the line.
+func clusterIndexFor(line text.Line, runeIdx, startIdx int) int {
+	if runeIdx == line.Layout.Runes.Count {
+		return len(line.Layout.Clusters)
+	}
+	lineStart := line.Layout.Runes.Offset
+	for i := startIdx; i < len(line.Layout.Clusters); i++ {
+		cluster := line.Layout.Clusters[i]
+		clusterStart := cluster.Runes.Offset - lineStart
+		clusterEnd := clusterStart + cluster.Runes.Count
+		if runeIdx >= clusterStart && runeIdx < clusterEnd {
+			return i
+		}
+	}
+	panic(fmt.Errorf("requested cluster index for rune %d outside of line with %d runes", runeIdx, line.Layout.Runes.Count))
 }
 
 // closestPosition takes a position and returns its closest valid position.
@@ -981,7 +1032,13 @@ func seekPosition(lines []text.Line, alignment text.Alignment, width int, start,
 	count := 0
 	// Advance next and prev until next is greater than or equal to pos.
 	for {
-		for ; start.lineCol.X < len(l.Layout.Advances); start.lineCol.X++ {
+		start.clusterIndex = clusterIndexFor(l, start.lineCol.X, start.clusterIndex)
+		for ; start.lineCol.X < l.Layout.Runes.Count; start.lineCol.X++ {
+			cluster := l.Layout.Clusters[start.clusterIndex]
+			if start.runes >= cluster.Runes.Offset+cluster.Runes.Count {
+				start.clusterIndex++
+				cluster = l.Layout.Clusters[start.clusterIndex]
+			}
 			if limit != 0 && count == limit {
 				return start, false
 			}
@@ -990,8 +1047,7 @@ func seekPosition(lines []text.Line, alignment text.Alignment, width int, start,
 				return start, true
 			}
 
-			adv := l.Layout.Advances[start.lineCol.X]
-			start.x += adv
+			start.x += cluster.RuneWidth()
 			start.runes++
 		}
 		if start.lineCol.Y == len(lines)-1 {
@@ -1002,8 +1058,12 @@ func seekPosition(lines []text.Line, alignment text.Alignment, width int, start,
 		prevDesc := l.Descent
 		start.lineCol.Y++
 		start.lineCol.X = 0
+		start.clusterIndex = 0
 		l = lines[start.lineCol.Y]
 		start.x = align(alignment, l.Width, width)
+		if l.Layout.Direction.Progression() == system.TowardOrigin {
+			start.x += l.Width
+		}
 		start.y += (prevDesc + l.Ascent).Ceil()
 	}
 }
