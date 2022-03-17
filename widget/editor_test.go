@@ -824,8 +824,6 @@ g 2 4 6 8 g
 		{6, 10, "6 8 ", screenPos{Y: 0, X: 6}, screenPos{Y: 1, X: 2}},
 		{41, 66, " 6 8 d\ne 2 4 6 8 e\nf 2 4 ", screenPos{Y: 6, X: 5}, screenPos{Y: 10, X: 6}},
 	} {
-		// printLines(e)
-
 		gtx.Constraints = layout.Exact(image.Pt(100, 100))
 		if got := selected(tst.start, tst.end); got != tst.selection {
 			t.Errorf("Test %d pt1: Expected %q, got %q", n, tst.selection, got)
@@ -847,8 +845,6 @@ g 2 4 6 8 g
 				tst.startPos, tst.endPos)
 			continue
 		}
-
-		// printLines(e)
 	}
 }
 
