@@ -6,11 +6,11 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/text"
 	"github.com/benoitkugler/textlayout/language"
+	"github.com/gioui/uax/segment"
+	"github.com/gioui/uax/uax14"
 	"github.com/go-text/typesetting/di"
 	"github.com/go-text/typesetting/font"
 	"github.com/go-text/typesetting/shaping"
-	"github.com/npillmayer/uax/segment"
-	"github.com/npillmayer/uax/uax14"
 	"golang.org/x/image/math/fixed"
 )
 
