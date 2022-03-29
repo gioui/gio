@@ -24,7 +24,6 @@
               [
                 build-tools-31-0-0
                 cmdline-tools-latest
-                emulator
                 platform-tools
                 platforms-android-31
                 ndk-bundle
