@@ -498,9 +498,13 @@ func (c *callbacks) SetEditorSnippet(r key.Range) {
 }
 
 func (c *callbacks) MoveFocus(dir router.FocusDirection) {
-	c.w.queue.q.MoveFocus(dir)
-	c.w.setNextFrame(time.Time{})
-	c.w.updateAnimation(c.d)
+	c.w.moveFocus(dir, c.d)
+}
+
+func (w *Window) moveFocus(dir router.FocusDirection, d driver) {
+	w.queue.q.MoveFocus(dir)
+	w.setNextFrame(time.Time{})
+	w.updateAnimation(d)
 }
 
 func (c *callbacks) ClickFocus() {
@@ -793,7 +797,14 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		e2.Config.Size = e2.Config.Size.Sub(w.decorations.size)
 		w.out <- e2
 	case event.Event:
-		if w.queue.q.Queue(e2) {
+		// Convert tab or shift+tab presses to focus moves.
+		if e, ok := e.(key.Event); ok && e.State == key.Press && e.Name == key.NameTab && e.Modifiers&^key.ModShift == 0 {
+			dir := router.FocusForward
+			if e.Modifiers.Contain(key.ModShift) {
+				dir = router.FocusBackward
+			}
+			w.moveFocus(dir, d)
+		} else if w.queue.q.Queue(e2) {
 			w.setNextFrame(time.Time{})
 			w.updateAnimation(d)
 		}

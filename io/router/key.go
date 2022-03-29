@@ -70,6 +70,8 @@ const (
 	FocusLeft
 	FocusUp
 	FocusDown
+	FocusForward
+	FocusBackward
 )
 
 // InputState returns the last text input state as
@@ -173,6 +175,24 @@ func (q *keyQueue) MoveFocus(dir FocusDirection, events *handlerEvents) {
 	}
 	focus := q.dirOrder[order]
 	switch dir {
+	case FocusForward, FocusBackward:
+		if len(q.order) == 0 {
+			break
+		}
+		order := 0
+		if dir == FocusBackward {
+			order = -1
+		}
+		if q.focus != nil {
+			order = q.handlers[q.focus].order
+			if dir == FocusForward {
+				order++
+			} else {
+				order--
+			}
+		}
+		order = (order + len(q.order)) % len(q.order)
+		q.setFocus(q.order[order], events)
 	case FocusRight, FocusLeft:
 		next := order
 		if q.focus != nil {
@@ -226,28 +246,6 @@ func (q *keyQueue) MoveFocus(dir FocusDirection, events *handlerEvents) {
 }
 
 func (q *keyQueue) Push(e event.Event, events *handlerEvents) {
-	// Convert tab or shift+tab presses to focus moves.
-	if e, ok := e.(key.Event); ok && e.Name == key.NameTab && e.Modifiers&^key.ModShift == 0 {
-		if e.State == key.Release || len(q.order) == 0 {
-			return
-		}
-		forward := !e.Modifiers.Contain(key.ModShift)
-		order := 0
-		if !forward {
-			order = -1
-		}
-		if q.focus != nil {
-			order = q.handlers[q.focus].order
-			if forward {
-				order++
-			} else {
-				order--
-			}
-		}
-		order = (order + len(q.order)) % len(q.order)
-		q.setFocus(q.order[order], events)
-		return
-	}
 	if q.focus != nil {
 		events.Add(q.focus, e)
 	}

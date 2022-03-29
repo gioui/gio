@@ -227,27 +227,6 @@ func TestNoOps(t *testing.T) {
 	r.Frame(nil)
 }
 
-func TestTabFocus(t *testing.T) {
-	handlers := make([]int, 3)
-	ops := new(op.Ops)
-	r := new(Router)
-
-	for i := range handlers {
-		key.InputOp{Tag: &handlers[i]}.Add(ops)
-	}
-	r.Frame(ops)
-
-	tab := func(mod key.Modifiers) {
-		r.Queue(
-			key.Event{Name: key.NameTab, State: key.Press, Modifiers: mod},
-			key.Event{Name: key.NameTab, State: key.Release, Modifiers: mod},
-		)
-	}
-	tab(0)
-	tab(key.ModShift)
-	assertFocus(t, r, &handlers[2])
-}
-
 func TestDirectionalFocus(t *testing.T) {
 	ops := new(op.Ops)
 	r := new(Router)
@@ -280,6 +259,11 @@ func TestDirectionalFocus(t *testing.T) {
 	r.MoveFocus(FocusLeft)
 	assertFocus(t, r, &handlers[3])
 	r.MoveFocus(FocusUp)
+	assertFocus(t, r, &handlers[0])
+
+	r.MoveFocus(FocusForward)
+	assertFocus(t, r, &handlers[1])
+	r.MoveFocus(FocusBackward)
 	assertFocus(t, r, &handlers[0])
 }
 
