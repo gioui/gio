@@ -30,24 +30,27 @@
               ]);
           in
           {
-            default = with pkgs; mkShell {
-              ANDROID_SDK_ROOT = "${android-sdk}/share/android-sdk";
-              JAVA_HOME = jdk8.home;
-              packages = [
-                android-sdk
-                jdk8
-                clang
-              ] ++ (if stdenv.isLinux then [
-                vulkan-headers
-                libxkbcommon
-                wayland
-                xorg.libX11
-                xorg.libXcursor
-                xorg.libXfixes
-                libGL
-                pkgconfig
-              ] else [ ]);
-            };
+            default = with pkgs; mkShell
+              ({
+                ANDROID_SDK_ROOT = "${android-sdk}/share/android-sdk";
+                JAVA_HOME = jdk8.home;
+                packages = [
+                  android-sdk
+                  jdk8
+                  clang
+                ] ++ (if stdenv.isLinux then [
+                  vulkan-headers
+                  libxkbcommon
+                  wayland
+                  xorg.libX11
+                  xorg.libXcursor
+                  xorg.libXfixes
+                  libGL
+                  pkgconfig
+                ] else [ ]);
+              } // (if stdenv.isLinux then {
+                LD_LIBRARY_PATH = "${vulkan-loader}/lib";
+              } else { }));
           }
         );
     };
