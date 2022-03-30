@@ -181,12 +181,25 @@ func (l *List) nextDir() iterationDir {
 	if l.Position.Offset < 0 && l.Position.First == 0 {
 		l.Position.Offset = 0
 	}
+	// Lay out an extra (invisible) child at each end to enable focus to
+	// move to them, triggering automatic scroll.
+	firstSize, lastSize := 0, 0
+	if len(l.children) > 0 {
+		if l.Position.First > 0 {
+			firstChild := l.children[0]
+			firstSize = l.Axis.Convert(firstChild.size).X
+		}
+		if last < l.len {
+			lastChild := l.children[len(l.children)-1]
+			lastSize = l.Axis.Convert(lastChild.size).X
+		}
+	}
 	switch {
 	case len(l.children) == l.len:
 		return iterateNone
-	case l.maxSize-l.Position.Offset < vsize:
+	case l.maxSize-l.Position.Offset-lastSize < vsize:
 		return iterateForward
-	case l.Position.Offset < 0:
+	case l.Position.Offset-firstSize < 0:
 		return iterateBackward
 	}
 	return iterateNone
@@ -219,9 +232,11 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 	}
 	mainMin, mainMax := l.Axis.mainConstraint(l.cs)
 	children := l.children
-	// Skip invisible children
+	var first scrollChild
+	// Skip invisible children.
 	for len(children) > 0 {
-		sz := children[0].size
+		child := children[0]
+		sz := child.size
 		mainSize := l.Axis.Convert(sz).X
 		if l.Position.Offset < mainSize {
 			// First child is partially visible.
@@ -229,10 +244,12 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 		}
 		l.Position.First++
 		l.Position.Offset -= mainSize
+		first = child
 		children = children[1:]
 	}
 	size := -l.Position.Offset
 	var maxCross int
+	var last scrollChild
 	for i, child := range children {
 		sz := l.Axis.Convert(child.size)
 		if c := sz.Y; c > maxCross {
@@ -240,6 +257,9 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 		}
 		size += sz.X
 		if size >= mainMax {
+			if i < len(children)-1 {
+				last = children[i+1]
+			}
 			children = children[:i+1]
 			break
 		}
@@ -251,7 +271,7 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 	if space := l.Position.OffsetLast; l.ScrollToEnd && space > 0 {
 		pos += space
 	}
-	for _, child := range children {
+	layout := func(child scrollChild) {
 		sz := l.Axis.Convert(child.size)
 		var cross int
 		switch l.Alignment {
@@ -280,6 +300,19 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 		trans.Pop()
 		cl.Pop()
 		pos += childSize
+	}
+	// Lay out leading invisible child.
+	if first != (scrollChild{}) {
+		sz := l.Axis.Convert(first.size)
+		pos -= sz.X
+		layout(first)
+	}
+	for _, child := range children {
+		layout(child)
+	}
+	// Lay out trailing invisible child.
+	if last != (scrollChild{}) {
+		layout(last)
 	}
 	atStart := l.Position.First == 0 && l.Position.Offset <= 0
 	atEnd := l.Position.First+len(children) == l.len && mainMax >= pos

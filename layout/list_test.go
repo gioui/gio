@@ -140,3 +140,21 @@ func TestListPosition(t *testing.T) {
 		})
 	}
 }
+
+func TestExtraChildren(t *testing.T) {
+	var l List
+	l.Position.First = 1
+	gtx := Context{
+		Ops:         new(op.Ops),
+		Constraints: Exact(image.Pt(10, 10)),
+	}
+	count := 0
+	const all = 3
+	l.Layout(gtx, all, func(gtx Context, idx int) Dimensions {
+		count++
+		return Dimensions{Size: image.Pt(10, 10)}
+	})
+	if count != all {
+		t.Errorf("laid out %d of %d children", count, all)
+	}
+}
