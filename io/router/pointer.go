@@ -664,7 +664,7 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 		q.deliverDropEvent(p, events)
 	case pointer.Scroll:
 		q.deliverEnterLeaveEvents(p, events, e)
-		q.deliverScrollEvent(p, events, e)
+		q.deliverEvent(p, events, e)
 	default:
 		panic("unsupported pointer event type")
 	}
@@ -681,36 +681,20 @@ func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e poi
 		e.Priority = pointer.Grabbed
 		foremost = false
 	}
+	var sx, sy = e.Scroll.X, e.Scroll.Y
 	for _, k := range p.handlers {
 		h := q.handlers[k]
+		if e.Type == pointer.Scroll {
+			if sx == 0 && sy == 0 {
+				return
+			}
+			// Distribute the scroll to the handler based on its ScrollRange.
+			sx, e.Scroll.X = setScrollEvent(sx, h.scrollRange.Min.X, h.scrollRange.Max.X)
+			sy, e.Scroll.Y = setScrollEvent(sy, h.scrollRange.Min.Y, h.scrollRange.Max.Y)
+		}
 		if e.Type&h.types == 0 {
 			continue
 		}
-		e := e
-		if foremost {
-			foremost = false
-			e.Priority = pointer.Foremost
-		}
-		e.Position = q.invTransform(h.area, e.Position)
-		events.Add(k, e)
-	}
-}
-
-func (q *pointerQueue) deliverScrollEvent(p *pointerInfo, events *handlerEvents, e pointer.Event) {
-	foremost := true
-	if p.pressed && len(p.handlers) == 1 {
-		e.Priority = pointer.Grabbed
-		foremost = false
-	}
-	var sx, sy = e.Scroll.X, e.Scroll.Y
-	for _, k := range p.handlers {
-		if sx == 0 && sy == 0 {
-			return
-		}
-		h := q.handlers[k]
-		// Distribute the scroll to the handler based on its ScrollRange.
-		sx, e.Scroll.X = setScrollEvent(sx, h.scrollRange.Min.X, h.scrollRange.Max.X)
-		sy, e.Scroll.Y = setScrollEvent(sy, h.scrollRange.Min.Y, h.scrollRange.Max.Y)
 		e := e
 		if foremost {
 			foremost = false
