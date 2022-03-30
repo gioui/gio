@@ -3,7 +3,7 @@
 package router
 
 import (
-	"math"
+	"image"
 	"sort"
 
 	"gioui.org/f32"
@@ -54,7 +54,7 @@ type keyCollector struct {
 type dirFocusEntry struct {
 	tag    event.Tag
 	row    int
-	bounds f32.Rectangle
+	bounds image.Rectangle
 }
 
 const (
@@ -150,7 +150,7 @@ func (q *keyQueue) updateFocusLayout() {
 		end := 1
 		for ; end < len(order); end++ {
 			h := &order[end]
-			center := (h.bounds.Min.Y + h.bounds.Max.Y) * .5
+			center := (h.bounds.Min.Y + h.bounds.Max.Y) / 2
 			if center > bottom {
 				break
 			}
@@ -217,14 +217,14 @@ func (q *keyQueue) MoveFocus(dir FocusDirection, events *handlerEvents) {
 			nextRow = focus.row + delta
 		}
 		var closest event.Tag
-		dist := float32(math.Inf(+1))
-		center := (focus.bounds.Min.X + focus.bounds.Max.X) * .5
+		dist := int(1e6)
+		center := (focus.bounds.Min.X + focus.bounds.Max.X) / 2
 	loop:
 		for 0 <= order && order < len(q.dirOrder) {
 			next := q.dirOrder[order]
 			switch next.row {
 			case nextRow:
-				nextCenter := (next.bounds.Min.X + next.bounds.Max.X) * .5
+				nextCenter := (next.bounds.Min.X + next.bounds.Max.X) / 2
 				d := center - nextCenter
 				if d < 0 {
 					d = -d
@@ -251,7 +251,7 @@ func (q *keyQueue) Push(e event.Event, events *handlerEvents) {
 	}
 }
 
-func (q *keyQueue) BoundsFor(t event.Tag) f32.Rectangle {
+func (q *keyQueue) BoundsFor(t event.Tag) image.Rectangle {
 	order := q.handlers[t].dirOrder
 	return q.dirOrder[order].bounds
 }
@@ -291,7 +291,7 @@ func (k *keyCollector) softKeyboard(show bool) {
 	}
 }
 
-func (k *keyCollector) handlerFor(tag event.Tag, bounds f32.Rectangle) *keyHandler {
+func (k *keyCollector) handlerFor(tag event.Tag, bounds image.Rectangle) *keyHandler {
 	h, ok := k.q.handlers[tag]
 	if !ok {
 		h = &keyHandler{new: true, order: -1}
@@ -305,7 +305,7 @@ func (k *keyCollector) handlerFor(tag event.Tag, bounds f32.Rectangle) *keyHandl
 	return h
 }
 
-func (k *keyCollector) inputOp(op key.InputOp, bounds f32.Rectangle) {
+func (k *keyCollector) inputOp(op key.InputOp, bounds image.Rectangle) {
 	h := k.handlerFor(op.Tag, bounds)
 	h.visible = true
 	h.hint = op.Hint

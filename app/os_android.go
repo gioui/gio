@@ -605,7 +605,7 @@ func Java_org_gioui_GioView_initializeAccessibilityNodeInfo(env *C.JNIEnv, class
 	semID := w.semIDFor(virtID)
 	sem, found := w.callbacks.LookupSemantic(semID)
 	if found {
-		off := f32.Pt(float32(screenX), float32(screenY))
+		off := image.Pt(int(screenX), int(screenY))
 		if err := w.initAccessibilityNodeInfo(env, sem, off, info); err != nil {
 			panic(err)
 		}
@@ -657,7 +657,7 @@ func Java_org_gioui_GioView_onClearA11yFocus(env *C.JNIEnv, class C.jclass, view
 	}
 }
 
-func (w *window) initAccessibilityNodeInfo(env *C.JNIEnv, sem router.SemanticNode, off f32.Point, info C.jobject) error {
+func (w *window) initAccessibilityNodeInfo(env *C.JNIEnv, sem router.SemanticNode, off image.Point, info C.jobject) error {
 	for _, ch := range sem.Children {
 		err := callVoidMethod(env, info, android.accessibilityNodeInfo.addChild, jvalue(w.view), jvalue(w.virtualIDFor(ch.ID)))
 		if err != nil {

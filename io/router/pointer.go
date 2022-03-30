@@ -74,7 +74,7 @@ type pointerHandler struct {
 
 type areaOp struct {
 	kind areaKind
-	rect f32.Rectangle
+	rect image.Rectangle
 }
 
 type areaNode struct {
@@ -153,10 +153,10 @@ func (c *pointerCollector) clip(op ops.ClipOp) {
 	if op.Shape == ops.Ellipse {
 		kind = areaEllipse
 	}
-	c.pushArea(kind, frect(op.Bounds))
+	c.pushArea(kind, op.Bounds)
 }
 
-func (c *pointerCollector) pushArea(kind areaKind, bounds f32.Rectangle) {
+func (c *pointerCollector) pushArea(kind areaKind, bounds image.Rectangle) {
 	parentID := c.currentArea()
 	areaID := len(c.q.areas)
 	areaOp := areaOp{kind: kind, rect: bounds}
@@ -223,7 +223,7 @@ func (c *pointerCollector) currentArea() int {
 	return -1
 }
 
-func (c *pointerCollector) currentAreaBounds() f32.Rectangle {
+func (c *pointerCollector) currentAreaBounds() image.Rectangle {
 	a := c.currentArea()
 	if a == -1 {
 		panic("no root area")
@@ -340,7 +340,7 @@ func (c *pointerCollector) ensureRoot() {
 	if len(c.q.areas) > 0 {
 		return
 	}
-	c.pushArea(areaRect, f32.Rect(-1e6, -1e6, 1e6, 1e6))
+	c.pushArea(areaRect, image.Rect(-1e6, -1e6, 1e6, 1e6))
 	// Make it semantic to ensure a single semantic root.
 	c.q.areas[0].semantic.valid = true
 }
@@ -854,8 +854,8 @@ func firstMimeMatch(src, tgt *pointerHandler) (first string, matched bool) {
 }
 
 func (op *areaOp) Hit(pos f32.Point) bool {
-	pos = pos.Sub(op.rect.Min)
-	size := op.rect.Size()
+	pos = pos.Sub(fpt(op.rect.Min))
+	size := fpt(op.rect.Size())
 	switch op.kind {
 	case areaRect:
 		return 0 <= pos.X && pos.X < size.X &&
@@ -873,11 +873,11 @@ func (op *areaOp) Hit(pos f32.Point) bool {
 	}
 }
 
-func (a *areaNode) bounds() f32.Rectangle {
+func (a *areaNode) bounds() image.Rectangle {
 	return f32.Rectangle{
-		Min: a.trans.Transform(a.area.rect.Min),
-		Max: a.trans.Transform(a.area.rect.Max),
-	}
+		Min: a.trans.Transform(fpt(a.area.rect.Min)),
+		Max: a.trans.Transform(fpt(a.area.rect.Max)),
+	}.Round()
 }
 
 func setScrollEvent(scroll float32, min, max int) (left, scrolled float32) {

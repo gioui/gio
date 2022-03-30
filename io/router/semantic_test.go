@@ -91,7 +91,7 @@ func TestSemanticDescription(t *testing.T) {
 		Selected:    true,
 		Disabled:    true,
 		Gestures:    ClickGesture,
-		Bounds:      f32.Rectangle{Min: f32.Point{X: -1e+06, Y: -1e+06}, Max: f32.Point{X: 1e+06, Y: 1e+06}},
+		Bounds:      image.Rectangle{Min: image.Point{X: -1e+06, Y: -1e+06}, Max: image.Point{X: 1e+06, Y: 1e+06}},
 	}
 	if got != exp {
 		t.Errorf("semantic description mismatch:\nGot:  %+v\nWant: %+v", got, exp)

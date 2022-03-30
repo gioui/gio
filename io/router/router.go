@@ -77,7 +77,7 @@ type SemanticDesc struct {
 	Selected    bool
 	Disabled    bool
 	Gestures    SemanticGestures
-	Bounds      f32.Rectangle
+	Bounds      image.Rectangle
 }
 
 // SemanticGestures is a bit-set of supported gestures.
@@ -158,9 +158,9 @@ func (q *Router) ClickFocus() {
 		return
 	}
 	bounds := q.key.queue.BoundsFor(focus)
-	center := bounds.Max.Add(bounds.Min).Mul(.5)
+	center := bounds.Max.Add(bounds.Min).Div(2)
 	e := pointer.Event{
-		Position: center,
+		Position: f32.Pt(float32(center.X), float32(center.Y)),
 		Source:   pointer.Touch,
 	}
 	e.Type = pointer.Press
