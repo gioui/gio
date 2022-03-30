@@ -85,6 +85,7 @@ type SemanticGestures int
 
 const (
 	ClickGesture SemanticGestures = 1 << iota
+	ScrollGesture
 )
 
 // SemanticID uniquely identifies a SemanticDescription.

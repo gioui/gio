@@ -265,6 +265,9 @@ func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
 	if op.Types&(pointer.Press|pointer.Release) != 0 {
 		area.semantic.content.gestures |= ClickGesture
 	}
+	if op.Types&pointer.Scroll != 0 {
+		area.semantic.content.gestures |= ScrollGesture
+	}
 	area.semantic.valid = area.semantic.content.gestures != 0
 	h := c.newHandler(op.Tag, events)
 	h.wantsGrab = h.wantsGrab || op.Grab
