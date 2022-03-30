@@ -157,7 +157,7 @@ func (p *Path) End() PathSpec {
 	return PathSpec{
 		spec:        c,
 		hasSegments: p.hasSegments,
-		bounds:      boundRectF(p.bounds),
+		bounds:      p.bounds.Round(),
 		hash:        p.hash.Sum64(),
 	}
 }
@@ -236,28 +236,6 @@ func (p *Path) expand(pt f32.Point) {
 		}
 		p.bounds = b
 	}
-}
-
-// boundRectF returns a bounding image.Rectangle for a f32.Rectangle.
-func boundRectF(r f32.Rectangle) image.Rectangle {
-	return image.Rectangle{
-		Min: image.Point{
-			X: int(floor(r.Min.X)),
-			Y: int(floor(r.Min.Y)),
-		},
-		Max: image.Point{
-			X: int(ceil(r.Max.X)),
-			Y: int(ceil(r.Max.Y)),
-		},
-	}
-}
-
-func ceil(v float32) int {
-	return int(math.Ceil(float64(v)))
-}
-
-func floor(v float32) int {
-	return int(math.Floor(float64(v)))
 }
 
 // Quad records a quadratic Bézier from the pen to end

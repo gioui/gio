@@ -9,7 +9,11 @@ corner with the axes extending right and down.
 */
 package f32
 
-import "strconv"
+import (
+	"image"
+	"math"
+	"strconv"
+)
 
 // A Point is a two dimensional point.
 type Point struct {
@@ -166,4 +170,27 @@ func (r Rectangle) Sub(p Point) Rectangle {
 		Point{r.Min.X - p.X, r.Min.Y - p.Y},
 		Point{r.Max.X - p.X, r.Max.Y - p.Y},
 	}
+}
+
+// Round returns the smallest integer rectangle that
+// contains r.
+func (r Rectangle) Round() image.Rectangle {
+	return image.Rectangle{
+		Min: image.Point{
+			X: int(floor(r.Min.X)),
+			Y: int(floor(r.Min.Y)),
+		},
+		Max: image.Point{
+			X: int(ceil(r.Max.X)),
+			Y: int(ceil(r.Max.Y)),
+		},
+	}
+}
+
+func ceil(v float32) int {
+	return int(math.Ceil(float64(v)))
+}
+
+func floor(v float32) int {
+	return int(math.Floor(float64(v)))
 }

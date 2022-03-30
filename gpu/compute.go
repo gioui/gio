@@ -942,7 +942,7 @@ func (g *compute) renderMaterials() error {
 			imgAtlas = op.imgAlloc.atlas
 			quad := g.materialQuad(imgAtlas.size, op.key.transform, op.img, op.imgAlloc.rect.Min)
 			boundsf := quadBounds(quad)
-			bounds := boundRectF(boundsf)
+			bounds := boundsf.Round()
 			bounds = bounds.Intersect(op.key.bounds)
 
 			size := bounds.Size()
@@ -1896,7 +1896,7 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 			// except for their integer offsets can share a transformed image.
 			t := op.state.t.Offset(layout.FPt(op.offset))
 			t, off := separateTransform(t)
-			bounds := boundRectF(op.intersect).Sub(off)
+			bounds := op.intersect.Round().Sub(off)
 			*texOps = append(*texOps, textureOp{
 				img: op.state.image,
 				off: off,
@@ -1963,7 +1963,7 @@ func (g *compute) layer(viewport image.Point, texOps []textureOp) {
 				}
 			}
 			for i, op := range l.ops {
-				l.rect = l.rect.Union(boundRectF(op.intersect))
+				l.rect = l.rect.Union(op.intersect.Round())
 				l.ops[i].layer = len(c.frame.layers)
 			}
 			c.frame.layers = append(c.frame.layers, l)

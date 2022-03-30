@@ -758,28 +758,6 @@ func (r *renderer) packStencils(pops *[]*pathOp) {
 	*pops = ops
 }
 
-// boundRectF returns a bounding image.Rectangle for a f32.Rectangle.
-func boundRectF(r f32.Rectangle) image.Rectangle {
-	return image.Rectangle{
-		Min: image.Point{
-			X: int(floor(r.Min.X)),
-			Y: int(floor(r.Min.Y)),
-		},
-		Max: image.Point{
-			X: int(ceil(r.Max.X)),
-			Y: int(ceil(r.Max.Y)),
-		},
-	}
-}
-
-func ceil(v float32) int {
-	return int(math.Ceil(float64(v)))
-}
-
-func floor(v float32) int {
-	return int(math.Floor(float64(v)))
-}
-
 func (d *drawOps) reset(viewport image.Point) {
 	d.profile = false
 	d.viewport = viewport
@@ -983,7 +961,7 @@ loop:
 				d.addClipPath(&state, clipData, k, bnd, off, false)
 			}
 
-			bounds := boundRectF(cl)
+			bounds := cl.Round()
 			mat := state.materialFor(bnd, off, partialTrans, bounds)
 
 			rect := state.cpath == nil || state.cpath.rect
@@ -1045,7 +1023,7 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 		m.uvTrans = partTrans.Mul(gradientSpaceTransform(clip, off, d.stop1, d.stop2))
 	case materialTexture:
 		m.material = materialTexture
-		dr := boundRectF(rect.Add(off))
+		dr := rect.Add(off).Round()
 		sz := d.image.src.Bounds().Size()
 		sr := f32.Rectangle{
 			Max: f32.Point{
