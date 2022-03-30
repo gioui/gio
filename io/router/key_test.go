@@ -290,6 +290,25 @@ func TestFocusScroll(t *testing.T) {
 	assertScrollEvent(t, evts[len(evts)-1], f32.Pt(5, -10))
 }
 
+func TestFocusClick(t *testing.T) {
+	ops := new(op.Ops)
+	r := new(Router)
+	h := new(int)
+
+	cl := clip.Rect(image.Rect(0, 0, 10, 10)).Push(ops)
+	key.InputOp{Tag: h}.Add(ops)
+	pointer.InputOp{
+		Tag:   h,
+		Types: pointer.Press | pointer.Release,
+	}.Add(ops)
+	cl.Pop()
+	r.Frame(ops)
+
+	r.MoveFocus(FocusLeft)
+	r.ClickFocus()
+	assertEventPointerTypeSequence(t, r.Events(h), pointer.Cancel, pointer.Press, pointer.Release)
+}
+
 func assertKeyEvent(t *testing.T, events []event.Event, expected bool, expectedInputs ...event.Event) {
 	t.Helper()
 	var evtFocus int

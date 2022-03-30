@@ -216,10 +216,11 @@ func (q *Router) ClickFocus() {
 		Position: f32.Pt(float32(center.X), float32(center.Y)),
 		Source:   pointer.Touch,
 	}
+	area := q.key.queue.AreaFor(focus)
 	e.Type = pointer.Press
-	q.pointer.queue.Push(e, &q.handlers)
+	q.pointer.queue.Deliver(area, e, &q.handlers)
 	e.Type = pointer.Release
-	q.pointer.queue.Push(e, &q.handlers)
+	q.pointer.queue.Deliver(area, e, &q.handlers)
 }
 
 // TextInputState returns the input state from the most recent
