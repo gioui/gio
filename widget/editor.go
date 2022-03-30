@@ -623,14 +623,14 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 		e.scrollToCaret()
 	}
 
+	defer clip.Rect(image.Rectangle{Max: e.viewSize}).Push(gtx.Ops).Pop()
+	pointer.CursorText.Add(gtx.Ops)
 	key.InputOp{Tag: &e.eventKey, Hint: e.InputHint}.Add(gtx.Ops)
 	if e.requestFocus {
 		key.FocusOp{Tag: &e.eventKey}.Add(gtx.Ops)
 		key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)
 	}
 	e.requestFocus = false
-	defer clip.Rect(image.Rectangle{Max: e.viewSize}).Push(gtx.Ops).Pop()
-	pointer.CursorText.Add(gtx.Ops)
 
 	var scrollRange image.Rectangle
 	if e.SingleLine {
