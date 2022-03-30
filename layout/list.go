@@ -266,11 +266,11 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 	}
 	l.Position.Count = len(children)
 	l.Position.OffsetLast = mainMax - size
-	pos := -l.Position.Offset
 	// ScrollToEnd lists are end aligned.
 	if space := l.Position.OffsetLast; l.ScrollToEnd && space > 0 {
-		pos += space
+		l.Position.Offset -= space
 	}
+	pos := -l.Position.Offset
 	layout := func(child scrollChild) {
 		sz := l.Axis.Convert(child.size)
 		var cross int
