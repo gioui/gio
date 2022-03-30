@@ -78,7 +78,9 @@ type Click struct {
 	clicks int
 	// pressed tracks whether the pointer is pressed.
 	pressed bool
-	// entered tracks whether the pointer is inside the gesture.
+	// hovered tracks whether the pointer is inside the gesture.
+	hovered bool
+	// entered tracks whether an Enter event has been received.
 	entered bool
 	// pid is the pointer.ID.
 	pid pointer.ID
@@ -167,7 +169,7 @@ func (c *Click) Add(ops *op.Ops) {
 
 // Hovered returns whether a pointer is inside the area.
 func (c *Click) Hovered() bool {
-	return c.entered
+	return c.hovered
 }
 
 // Pressed returns whether a pointer is pressing.
@@ -189,7 +191,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 				break
 			}
 			c.pressed = false
-			if c.entered {
+			if !c.entered || c.hovered {
 				if e.Time-c.clickedAt < doubleClickDuration {
 					c.clicks++
 				} else {
@@ -203,6 +205,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 		case pointer.Cancel:
 			wasPressed := c.pressed
 			c.pressed = false
+			c.hovered = false
 			c.entered = false
 			if wasPressed {
 				events = append(events, ClickEvent{Type: TypeCancel})
@@ -214,7 +217,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 			if e.Source == pointer.Mouse && e.Buttons != pointer.ButtonPrimary {
 				break
 			}
-			if !c.entered {
+			if !c.hovered {
 				c.pid = e.PointerID
 			}
 			if c.pid != e.PointerID {
@@ -227,13 +230,14 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 				c.pid = e.PointerID
 			}
 			if c.pid == e.PointerID {
-				c.entered = false
+				c.hovered = false
 			}
 		case pointer.Enter:
 			if !c.pressed {
 				c.pid = e.PointerID
 			}
 			if c.pid == e.PointerID {
+				c.hovered = true
 				c.entered = true
 			}
 		}
