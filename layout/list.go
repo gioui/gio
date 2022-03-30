@@ -302,17 +302,19 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 	call := macro.Stop()
 	defer clip.Rect(image.Rectangle{Max: dims}).Push(ops).Pop()
 
-	var min, max int
-	if o := l.Position.Offset; o > 0 {
+	min, max := int(-inf), int(inf)
+	if l.Position.First == 0 {
 		// Use the size of the invisible part as scroll boundary.
-		min = -o
-	} else if l.Position.First > 0 {
-		min = -inf
+		min = -l.Position.Offset
+		if min > 0 {
+			min = 0
+		}
 	}
-	if o := l.Position.OffsetLast; o < 0 {
-		max = -o
-	} else if l.Position.First+l.Position.Count < l.len {
-		max = inf
+	if l.Position.First+l.Position.Count == l.len {
+		max = -l.Position.OffsetLast
+		if max < 0 {
+			max = 0
+		}
 	}
 	scrollRange := image.Rectangle{
 		Min: l.Axis.Convert(image.Pt(min, 0)),
