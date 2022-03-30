@@ -67,6 +67,8 @@ type Window struct {
 	hasNextFrame bool
 	nextFrame    time.Time
 	delayedDraw  *time.Timer
+	// viewport is the latest frame size with insets applied.
+	viewport image.Rectangle
 
 	queue       queue
 	cursor      pointer.Cursor
@@ -505,6 +507,7 @@ func (w *Window) moveFocus(dir router.FocusDirection, d driver) {
 	w.queue.q.MoveFocus(dir)
 	w.setNextFrame(time.Time{})
 	w.updateAnimation(d)
+	w.queue.q.ScrollFocus(w.viewport)
 }
 
 func (c *callbacks) ClickFocus() {
@@ -756,6 +759,21 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		// Prepare the decorations and update the frame insets.
 		wrapper := &w.decorations.Ops
 		wrapper.Reset()
+		viewport := image.Rectangle{
+			Min: image.Point{
+				X: e2.Metric.Px(e2.Insets.Left),
+				Y: e2.Metric.Px(e2.Insets.Top),
+			},
+			Max: image.Point{
+				X: e2.Size.X - e2.Metric.Px(e2.Insets.Right),
+				Y: e2.Size.Y - e2.Metric.Px(e2.Insets.Bottom),
+			},
+		}
+		// Scroll to focus if viewport is shrinking in any dimension.
+		if old, new := w.viewport.Size(), viewport.Size(); new.X < old.X || new.Y < old.Y {
+			w.queue.q.ScrollFocus(viewport)
+		}
+		w.viewport = viewport
 		size := e2.Size // save the initial window size as the decorations will change it.
 		e2.FrameEvent.Size = w.decorate(d, e2.FrameEvent, wrapper)
 		w.out <- e2.FrameEvent

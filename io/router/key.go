@@ -54,6 +54,7 @@ type keyCollector struct {
 type dirFocusEntry struct {
 	tag    event.Tag
 	row    int
+	area   int
 	bounds image.Rectangle
 }
 
@@ -256,6 +257,11 @@ func (q *keyQueue) BoundsFor(t event.Tag) image.Rectangle {
 	return q.dirOrder[order].bounds
 }
 
+func (q *keyQueue) AreaFor(t event.Tag) int {
+	order := q.handlers[t].dirOrder
+	return q.dirOrder[order].area
+}
+
 func (q *keyQueue) setFocus(focus event.Tag, events *handlerEvents) {
 	if focus != nil {
 		if _, exists := q.handlers[focus]; !exists {
@@ -291,7 +297,7 @@ func (k *keyCollector) softKeyboard(show bool) {
 	}
 }
 
-func (k *keyCollector) handlerFor(tag event.Tag, bounds image.Rectangle) *keyHandler {
+func (k *keyCollector) handlerFor(tag event.Tag, area int, bounds image.Rectangle) *keyHandler {
 	h, ok := k.q.handlers[tag]
 	if !ok {
 		h = &keyHandler{new: true, order: -1}
@@ -300,13 +306,13 @@ func (k *keyCollector) handlerFor(tag event.Tag, bounds image.Rectangle) *keyHan
 	if h.order == -1 {
 		h.order = len(k.q.order)
 		k.q.order = append(k.q.order, tag)
-		k.q.dirOrder = append(k.q.dirOrder, dirFocusEntry{tag: tag, bounds: bounds})
+		k.q.dirOrder = append(k.q.dirOrder, dirFocusEntry{tag: tag, area: area, bounds: bounds})
 	}
 	return h
 }
 
-func (k *keyCollector) inputOp(op key.InputOp, bounds image.Rectangle) {
-	h := k.handlerFor(op.Tag, bounds)
+func (k *keyCollector) inputOp(op key.InputOp, area int, bounds image.Rectangle) {
+	h := k.handlerFor(op.Tag, area, bounds)
 	h.visible = true
 	h.hint = op.Hint
 }

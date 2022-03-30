@@ -153,6 +153,58 @@ func (q *Router) MoveFocus(dir FocusDirection) {
 	q.key.queue.MoveFocus(dir, &q.handlers)
 }
 
+// ScrollFocus scrolls the current focus (if any) into viewport
+// if there are scrollable parent handlers.
+func (q *Router) ScrollFocus(viewport image.Rectangle) {
+	focus := q.key.queue.focus
+	if focus == nil {
+		return
+	}
+	bounds := q.key.queue.BoundsFor(focus)
+
+	topleft := bounds.Min.Sub(viewport.Min)
+	topleft = max(topleft, bounds.Max.Sub(viewport.Max))
+	topleft = min(image.Pt(0, 0), topleft)
+	bottomright := bounds.Max.Sub(viewport.Max)
+	bottomright = min(bottomright, bounds.Min.Sub(viewport.Min))
+	bottomright = max(image.Pt(0, 0), bottomright)
+	s := topleft
+	if s.X == 0 {
+		s.X = bottomright.X
+	}
+	if s.Y == 0 {
+		s.Y = bottomright.Y
+	}
+	area := q.key.queue.AreaFor(focus)
+	q.pointer.queue.Deliver(area, pointer.Event{
+		Type:   pointer.Scroll,
+		Source: pointer.Touch,
+		Scroll: fpt(s),
+	}, &q.handlers)
+}
+
+func max(p1, p2 image.Point) image.Point {
+	m := p1
+	if p2.X > m.X {
+		m.X = p2.X
+	}
+	if p2.Y > m.Y {
+		m.Y = p2.Y
+	}
+	return m
+}
+
+func min(p1, p2 image.Point) image.Point {
+	m := p1
+	if p2.X < m.X {
+		m.X = p2.X
+	}
+	if p2.Y < m.Y {
+		m.Y = p2.Y
+	}
+	return m
+}
+
 func (q *Router) ClickFocus() {
 	focus := q.key.queue.focus
 	if focus == nil {
@@ -338,8 +390,9 @@ func (q *Router) collect() {
 				Tag:  encOp.Refs[0].(event.Tag),
 				Hint: key.InputHint(encOp.Data[1]),
 			}
+			a := pc.currentArea()
 			b := pc.currentAreaBounds()
-			kc.inputOp(op, b)
+			kc.inputOp(op, a, b)
 		case ops.TypeSnippet:
 			op := key.SnippetOp{
 				Tag: encOp.Refs[0].(event.Tag),

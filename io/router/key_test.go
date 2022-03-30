@@ -7,8 +7,10 @@ import (
 	"reflect"
 	"testing"
 
+	"gioui.org/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
+	"gioui.org/io/pointer"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 )
@@ -265,6 +267,27 @@ func TestDirectionalFocus(t *testing.T) {
 	assertFocus(t, r, &handlers[1])
 	r.MoveFocus(FocusBackward)
 	assertFocus(t, r, &handlers[0])
+}
+
+func TestFocusScroll(t *testing.T) {
+	ops := new(op.Ops)
+	r := new(Router)
+	h := new(int)
+
+	cl := clip.Rect(image.Rect(10, -20, 20, 30)).Push(ops)
+	key.InputOp{Tag: h}.Add(ops)
+	pointer.InputOp{
+		Tag:          h,
+		Types:        pointer.Scroll,
+		ScrollBounds: image.Rect(-100, -100, 100, 100),
+	}.Add(ops)
+	cl.Pop()
+	r.Frame(ops)
+
+	r.MoveFocus(FocusLeft)
+	r.ScrollFocus(image.Rect(0, 0, 15, 40))
+	evts := r.Events(h)
+	assertScrollEvent(t, evts[len(evts)-1], f32.Pt(5, -10))
 }
 
 func assertKeyEvent(t *testing.T, events []event.Event, expected bool, expectedInputs ...event.Event) {

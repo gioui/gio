@@ -597,6 +597,40 @@ func (q *pointerQueue) pointerOf(e pointer.Event) int {
 	return len(q.pointers) - 1
 }
 
+// Deliver is like Push, but delivers an event to a particular area.
+func (q *pointerQueue) Deliver(areaIdx int, e pointer.Event, events *handlerEvents) {
+	var sx, sy = e.Scroll.X, e.Scroll.Y
+	for areaIdx != -1 {
+		a := &q.areas[areaIdx]
+		areaIdx = a.parent
+		if !a.semantic.valid {
+			continue
+		}
+		cnt := a.semantic.content
+		if cnt.tag == nil {
+			continue
+		}
+		h := q.handlers[cnt.tag]
+		if e.Type == pointer.Scroll {
+			if sx == 0 && sy == 0 {
+				break
+			}
+			// Distribute the scroll to the handler based on its ScrollRange.
+			sx, e.Scroll.X = setScrollEvent(sx, h.scrollRange.Min.X, h.scrollRange.Max.X)
+			sy, e.Scroll.Y = setScrollEvent(sy, h.scrollRange.Min.Y, h.scrollRange.Max.Y)
+		}
+		if e.Type&h.types == 0 {
+			continue
+		}
+		e := e
+		e.Position = q.invTransform(h.area, e.Position)
+		events.Add(cnt.tag, e)
+		if e.Type != pointer.Scroll {
+			break
+		}
+	}
+}
+
 func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	if e.Type == pointer.Cancel {
 		q.pointers = q.pointers[:0]
