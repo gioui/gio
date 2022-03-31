@@ -169,7 +169,8 @@ func (q *keyQueue) updateFocusLayout() {
 	}
 }
 
-func (q *keyQueue) MoveFocus(dir FocusDirection, events *handlerEvents) {
+// MoveFocus attempts to move the focus in the direction of dir, returning true if it succeeds.
+func (q *keyQueue) MoveFocus(dir FocusDirection, events *handlerEvents) bool {
 	order := 0
 	if q.focus != nil {
 		order = q.handlers[q.focus].dirOrder
@@ -194,6 +195,7 @@ func (q *keyQueue) MoveFocus(dir FocusDirection, events *handlerEvents) {
 		}
 		order = (order + len(q.order)) % len(q.order)
 		q.setFocus(q.order[order], events)
+		return true
 	case FocusRight, FocusLeft:
 		next := order
 		if q.focus != nil {
@@ -206,6 +208,7 @@ func (q *keyQueue) MoveFocus(dir FocusDirection, events *handlerEvents) {
 			newFocus := q.dirOrder[next]
 			if newFocus.row == focus.row {
 				q.setFocus(newFocus.tag, events)
+				return true
 			}
 		}
 	case FocusUp, FocusDown:
@@ -242,8 +245,10 @@ func (q *keyQueue) MoveFocus(dir FocusDirection, events *handlerEvents) {
 		}
 		if closest != nil {
 			q.setFocus(closest, events)
+			return true
 		}
 	}
+	return false
 }
 
 func (q *keyQueue) Push(e event.Event, events *handlerEvents) {

@@ -149,13 +149,13 @@ func (q *Router) Queue(events ...event.Event) bool {
 	return q.handlers.HadEvents()
 }
 
-func (q *Router) MoveFocus(dir FocusDirection) {
-	q.key.queue.MoveFocus(dir, &q.handlers)
+func (q *Router) MoveFocus(dir FocusDirection) bool {
+	return q.key.queue.MoveFocus(dir, &q.handlers)
 }
 
-// ScrollFocus scrolls the current focus (if any) into viewport
+// RevealFocus scrolls the current focus (if any) into viewport
 // if there are scrollable parent handlers.
-func (q *Router) ScrollFocus(viewport image.Rectangle) {
+func (q *Router) RevealFocus(viewport image.Rectangle) {
 	focus := q.key.queue.focus
 	if focus == nil {
 		return
@@ -175,11 +175,20 @@ func (q *Router) ScrollFocus(viewport image.Rectangle) {
 	if s.Y == 0 {
 		s.Y = bottomright.Y
 	}
+	q.ScrollFocus(s)
+}
+
+// ScrollFocus scrolls the focused widget, if any, by dist.
+func (q *Router) ScrollFocus(dist image.Point) {
+	focus := q.key.queue.focus
+	if focus == nil {
+		return
+	}
 	area := q.key.queue.AreaFor(focus)
 	q.pointer.queue.Deliver(area, pointer.Event{
 		Type:   pointer.Scroll,
 		Source: pointer.Touch,
-		Scroll: fpt(s),
+		Scroll: fpt(dist),
 	}, &q.handlers)
 }
 

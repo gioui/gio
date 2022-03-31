@@ -69,6 +69,8 @@ type Window struct {
 	delayedDraw  *time.Timer
 	// viewport is the latest frame size with insets applied.
 	viewport image.Rectangle
+	// metric is the metric from the most recent frame.
+	metric unit.Metric
 
 	queue       queue
 	cursor      pointer.Cursor
@@ -504,10 +506,28 @@ func (c *callbacks) MoveFocus(dir router.FocusDirection) {
 }
 
 func (w *Window) moveFocus(dir router.FocusDirection, d driver) {
-	w.queue.q.MoveFocus(dir)
+	if w.queue.q.MoveFocus(dir) {
+		w.queue.q.RevealFocus(w.viewport)
+	} else {
+		var v image.Point
+		switch dir {
+		case router.FocusRight:
+			v = image.Pt(+1, 0)
+		case router.FocusLeft:
+			v = image.Pt(-1, 0)
+		case router.FocusDown:
+			v = image.Pt(0, +1)
+		case router.FocusUp:
+			v = image.Pt(0, -1)
+		default:
+			return
+		}
+		const scrollABit = 50
+		dist := v.Mul(w.metric.Px(unit.Dp(scrollABit)))
+		w.queue.q.ScrollFocus(dist)
+	}
 	w.setNextFrame(time.Time{})
 	w.updateAnimation(d)
-	w.queue.q.ScrollFocus(w.viewport)
 }
 
 func (c *callbacks) ClickFocus() {
@@ -748,6 +768,7 @@ func (w *Window) processEvent(d driver, e event.Event) {
 			// No drawing if not visible.
 			break
 		}
+		w.metric = e2.Metric
 		var frameStart time.Time
 		if w.queue.q.Profiling() {
 			frameStart = time.Now()
@@ -771,7 +792,7 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		}
 		// Scroll to focus if viewport is shrinking in any dimension.
 		if old, new := w.viewport.Size(), viewport.Size(); new.X < old.X || new.Y < old.Y {
-			w.queue.q.ScrollFocus(viewport)
+			w.queue.q.RevealFocus(viewport)
 		}
 		w.viewport = viewport
 		size := e2.Size // save the initial window size as the decorations will change it.

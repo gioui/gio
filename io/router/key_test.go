@@ -285,7 +285,7 @@ func TestFocusScroll(t *testing.T) {
 	r.Frame(ops)
 
 	r.MoveFocus(FocusLeft)
-	r.ScrollFocus(image.Rect(0, 0, 15, 40))
+	r.RevealFocus(image.Rect(0, 0, 15, 40))
 	evts := r.Events(h)
 	assertScrollEvent(t, evts[len(evts)-1], f32.Pt(5, -10))
 }
