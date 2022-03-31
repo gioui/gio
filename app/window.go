@@ -851,7 +851,6 @@ func (w *Window) processEvent(d driver, e event.Event) {
 			w.updateAnimation(d)
 		}
 		w.updateCursor(d)
-		w.out <- e
 	}
 }
 
