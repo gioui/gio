@@ -289,16 +289,10 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 		if min < 0 {
 			min = 0
 		}
-		r := image.Rectangle{
-			Min: l.Axis.Convert(image.Pt(min, -inf)),
-			Max: l.Axis.Convert(image.Pt(max, inf)),
-		}
-		cl := clip.Rect(r).Push(ops)
 		pt := l.Axis.Convert(image.Pt(pos, cross))
 		trans := op.Offset(FPt(pt)).Push(ops)
 		child.call.Add(ops)
 		trans.Pop()
-		cl.Pop()
 		pos += childSize
 	}
 	// Lay out leading invisible child.
