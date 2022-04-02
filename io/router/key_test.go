@@ -274,6 +274,7 @@ func TestFocusScroll(t *testing.T) {
 	r := new(Router)
 	h := new(int)
 
+	parent := clip.Rect(image.Rect(1, 1, 14, 39)).Push(ops)
 	cl := clip.Rect(image.Rect(10, -20, 20, 30)).Push(ops)
 	key.InputOp{Tag: h}.Add(ops)
 	pointer.InputOp{
@@ -282,12 +283,13 @@ func TestFocusScroll(t *testing.T) {
 		ScrollBounds: image.Rect(-100, -100, 100, 100),
 	}.Add(ops)
 	cl.Pop()
+	parent.Pop()
 	r.Frame(ops)
 
 	r.MoveFocus(FocusLeft)
 	r.RevealFocus(image.Rect(0, 0, 15, 40))
 	evts := r.Events(h)
-	assertScrollEvent(t, evts[len(evts)-1], f32.Pt(5, -10))
+	assertScrollEvent(t, evts[len(evts)-1], f32.Pt(6, -9))
 }
 
 func TestFocusClick(t *testing.T) {

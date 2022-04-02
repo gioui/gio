@@ -161,6 +161,8 @@ func (q *Router) RevealFocus(viewport image.Rectangle) {
 		return
 	}
 	bounds := q.key.queue.BoundsFor(focus)
+	area := q.key.queue.AreaFor(focus)
+	viewport = q.pointer.queue.ClipFor(area, viewport)
 
 	topleft := bounds.Min.Sub(viewport.Min)
 	topleft = max(topleft, bounds.Max.Sub(viewport.Max))

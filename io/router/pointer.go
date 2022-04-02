@@ -845,6 +845,18 @@ func (q *pointerQueue) deliverTransferCancelEvent(p *pointerInfo, events *handle
 	p.dataTarget = nil
 }
 
+// ClipFor clips r to the parents of area.
+func (q *pointerQueue) ClipFor(area int, r image.Rectangle) image.Rectangle {
+	a := &q.areas[area]
+	parent := a.parent
+	for parent != -1 {
+		a := &q.areas[parent]
+		r = r.Intersect(a.bounds())
+		parent = a.parent
+	}
+	return r
+}
+
 func searchTag(tags []event.Tag, tag event.Tag) (int, bool) {
 	for i, t := range tags {
 		if t == tag {
