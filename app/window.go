@@ -25,6 +25,7 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/clip"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
@@ -799,7 +800,9 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		e2.FrameEvent.Size = w.decorate(d, e2.FrameEvent, wrapper)
 		w.out <- e2.FrameEvent
 		frame, gotFrame := w.waitFrame(d)
+		cl := clip.Rect(image.Rectangle{Max: e2.FrameEvent.Size}).Push(wrapper)
 		ops.AddCall(&wrapper.Internal, &frame.Internal, ops.PC{}, ops.PCFor(&frame.Internal))
+		cl.Pop()
 		err := w.validateAndProcess(d, size, e2.Sync, wrapper)
 		if gotFrame {
 			// We're done with frame, let the client continue.
