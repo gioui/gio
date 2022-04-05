@@ -311,6 +311,11 @@ func TestFocusClick(t *testing.T) {
 	assertEventPointerTypeSequence(t, r.Events(h), pointer.Cancel, pointer.Press, pointer.Release)
 }
 
+func TestNoFocus(t *testing.T) {
+	r := new(Router)
+	r.MoveFocus(FocusForward)
+}
+
 func assertKeyEvent(t *testing.T, events []event.Event, expected bool, expectedInputs ...event.Event) {
 	t.Helper()
 	var evtFocus int

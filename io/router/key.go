@@ -171,6 +171,9 @@ func (q *keyQueue) updateFocusLayout() {
 
 // MoveFocus attempts to move the focus in the direction of dir, returning true if it succeeds.
 func (q *keyQueue) MoveFocus(dir FocusDirection, events *handlerEvents) bool {
+	if len(q.dirOrder) == 0 {
+		return false
+	}
 	order := 0
 	if q.focus != nil {
 		order = q.handlers[q.focus].dirOrder
