@@ -636,7 +636,11 @@ func gio_insertText(view, cstr C.CFTypeRef, crng C.NSRange) {
 	str := nsstringToString(cstr)
 	w.w.EditorReplace(rng, str)
 	w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
-	pos := rng.Start + utf8.RuneCountInString(str)
+	start := rng.Start
+	if rng.End < start {
+		start = rng.End
+	}
+	pos := start + utf8.RuneCountInString(str)
 	w.w.SetEditorSelection(key.Range{Start: pos, End: pos})
 }
 
