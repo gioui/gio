@@ -14,7 +14,7 @@ require (
 	gioui.org/shader v1.0.6
 	github.com/benoitkugler/textlayout v0.0.10
 	github.com/gioui/uax v0.2.1-0.20220325163150-e3d987515a12
-	github.com/go-text/typesetting v0.0.0-20220112121102-58fe93c84506
+	github.com/go-text/typesetting v0.0.0-20220411150340-35994bc27a7b
 )
 
-require golang.org/x/text v0.3.6 // indirect
+require golang.org/x/text v0.3.7 // indirect
