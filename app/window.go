@@ -248,10 +248,7 @@ func (w *Window) render(frame *op.Ops, viewport image.Point) error {
 	if err != nil {
 		return err
 	}
-	if err := w.gpu.Frame(frame, target, viewport); err != nil {
-		return err
-	}
-	return w.ctx.Present()
+	return w.gpu.Frame(frame, target, viewport)
 }
 
 func (w *Window) processFrame(d driver, frameStart time.Time) {
@@ -807,6 +804,9 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		if gotFrame {
 			// We're done with frame, let the client continue.
 			w.frameAck <- struct{}{}
+		}
+		if err == nil && w.gpu != nil {
+			err = w.ctx.Present()
 		}
 		if err != nil {
 			w.destroyGPU()
