@@ -174,7 +174,7 @@ func (w *Window) update(frame *op.Ops) {
 	<-w.frameAck
 }
 
-func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame *op.Ops) error {
+func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame *op.Ops, signal chan<- struct{}) error {
 	for {
 		if w.gpu == nil && !w.nocontext {
 			var err error
@@ -214,7 +214,7 @@ func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame
 			w.gpu = gpu
 		}
 		if w.gpu != nil {
-			if err := w.render(frame, size); err != nil {
+			if err := w.frame(frame, size, signal); err != nil {
 				if errors.Is(err, errOutOfDate) {
 					// GPU surface needs refreshing.
 					sync = true
@@ -227,12 +227,11 @@ func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame
 				return err
 			}
 		}
-		w.queue.q.Frame(frame)
 		return nil
 	}
 }
 
-func (w *Window) render(frame *op.Ops, viewport image.Point) error {
+func (w *Window) frame(frame *op.Ops, viewport image.Point, signal chan<- struct{}) error {
 	if err := w.ctx.Lock(); err != nil {
 		return err
 	}
@@ -250,6 +249,11 @@ func (w *Window) render(frame *op.Ops, viewport image.Point) error {
 	}
 	if err := w.gpu.Frame(frame, target, viewport); err != nil {
 		return err
+	}
+	w.queue.q.Frame(frame)
+	// We're done with frame, let the client continue.
+	if signal != nil {
+		signal <- struct{}{}
 	}
 	return w.ctx.Present()
 }
@@ -672,18 +676,18 @@ func (w *Window) destroyGPU() {
 // waitFrame waits for the client to either call FrameEvent.Frame
 // or to continue event handling. It returns whether the client
 // called Frame or not.
-func (w *Window) waitFrame(d driver) (*op.Ops, bool) {
+func (w *Window) waitFrame(d driver) (*op.Ops, chan<- struct{}) {
 	for {
 		select {
 		case f := <-w.driverFuncs:
 			f(d)
 		case frame := <-w.frames:
 			// The client called FrameEvent.Frame.
-			return frame, true
+			return frame, w.frameAck
 		case w.out <- ackEvent:
 			// The client ignored FrameEvent and continued processing
 			// events.
-			return nil, false
+			return nil, nil
 		case <-w.immediateRedraws:
 			// Invalidate was called during frame processing.
 			w.setNextFrame(time.Time{})
@@ -799,15 +803,11 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		size := e2.Size // save the initial window size as the decorations will change it.
 		e2.FrameEvent.Size = w.decorate(d, e2.FrameEvent, wrapper)
 		w.out <- e2.FrameEvent
-		frame, gotFrame := w.waitFrame(d)
+		frame, signal := w.waitFrame(d)
 		cl := clip.Rect(image.Rectangle{Max: e2.FrameEvent.Size}).Push(wrapper)
 		ops.AddCall(&wrapper.Internal, &frame.Internal, ops.PC{}, ops.PCFor(&frame.Internal))
 		cl.Pop()
-		err := w.validateAndProcess(d, size, e2.Sync, wrapper)
-		if gotFrame {
-			// We're done with frame, let the client continue.
-			w.frameAck <- struct{}{}
-		}
+		err := w.validateAndProcess(d, size, e2.Sync, wrapper, signal)
 		if err != nil {
 			w.destroyGPU()
 			w.out <- system.DestroyEvent{Err: err}
