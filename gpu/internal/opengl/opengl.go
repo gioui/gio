@@ -1156,17 +1156,25 @@ func (b *Backend) CopyTexture(dst driver.Texture, dstOrigin image.Point, src dri
 func (t *texture) ReadPixels(src image.Rectangle, pixels []byte, stride int) error {
 	glErr(t.backend.funcs)
 	t.backend.glstate.bindFramebuffer(t.backend.funcs, gl.FRAMEBUFFER, t.ensureFBO())
-	if len(pixels) < src.Dx()*src.Dy()*4 {
+	w, h := src.Dx(), src.Dy()
+	if len(pixels) < w*h*4 {
 		return errors.New("unexpected RGBA size")
 	}
-	w, h := src.Dx(), src.Dy()
-	// WebGL 1 doesn't support PACK_ROW_LENGTH != 0. Avoid it if possible.
+	// OpenGL ES 2 doesn't support PACK_ROW_LENGTH != 0. Avoid it if possible.
 	rowLen := 0
 	if n := stride / 4; n != w {
 		rowLen = n
 	}
-	t.backend.glstate.pixelStorei(t.backend.funcs, gl.PACK_ROW_LENGTH, rowLen)
-	t.backend.funcs.ReadPixels(src.Min.X, src.Min.Y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+	if rowLen == 0 || t.backend.glver[0] > 2 {
+		t.backend.glstate.pixelStorei(t.backend.funcs, gl.PACK_ROW_LENGTH, rowLen)
+		t.backend.funcs.ReadPixels(src.Min.X, src.Min.Y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+	} else {
+		tmp := make([]byte, w*h*4)
+		t.backend.funcs.ReadPixels(src.Min.X, src.Min.Y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, tmp)
+		for y := 0; y < h; y++ {
+			copy(pixels[y*stride:], tmp[y*w*4:])
+		}
+	}
 	return glErr(t.backend.funcs)
 }
 
