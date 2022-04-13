@@ -80,7 +80,7 @@ func NewWindow(width, height int) (*Window, error) {
 		)
 		if err != nil {
 			dev.Release()
-			return nil
+			return err
 		}
 		// Note that the gpu takes ownership of dev.
 		gp, err := gpu.NewWithDevice(dev)
