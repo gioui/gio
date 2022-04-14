@@ -180,12 +180,13 @@ const (
 	NameDeleteForward  = "⌦"
 	NamePageUp         = "⇞"
 	NamePageDown       = "⇟"
-	NameTab            = "⇥"
+	NameTab            = "Tab"
 	NameSpace          = "Space"
-	NameCtrl           = "⌃"
-	NameShift          = "⇧"
-	NameAlt            = "⎇"
-	NameSuper          = "⊞"
+	NameCtrl           = "Ctrl"
+	NameShift          = "Shift"
+	NameAlt            = "Alt"
+	NameSuper          = "Super"
+	NameCommand        = "⌘"
 	NameF1             = "F1"
 	NameF2             = "F2"
 	NameF3             = "F3"
@@ -261,19 +262,19 @@ func (e Event) String() string {
 func (m Modifiers) String() string {
 	var strs []string
 	if m.Contain(ModCtrl) {
-		strs = append(strs, "Ctrl")
+		strs = append(strs, NameCtrl)
 	}
 	if m.Contain(ModCommand) {
-		strs = append(strs, "Command")
+		strs = append(strs, NameCommand)
 	}
 	if m.Contain(ModShift) {
-		strs = append(strs, "Shift")
+		strs = append(strs, NameShift)
 	}
 	if m.Contain(ModAlt) {
-		strs = append(strs, "Alt")
+		strs = append(strs, NameAlt)
 	}
 	if m.Contain(ModSuper) {
-		strs = append(strs, "Super")
+		strs = append(strs, NameSuper)
 	}
 	return strings.Join(strs, "|")
 }
