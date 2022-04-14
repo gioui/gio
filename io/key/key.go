@@ -276,7 +276,7 @@ func (m Modifiers) String() string {
 	if m.Contain(ModSuper) {
 		strs = append(strs, NameSuper)
 	}
-	return strings.Join(strs, "|")
+	return strings.Join(strs, "-")
 }
 
 func (s State) String() string {
