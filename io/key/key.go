@@ -223,6 +223,7 @@ const (
 	NameDown           = "Down"
 	NameLeft           = "Left"
 	NameRight          = "Right"
+	NameBack           = "Back"
 )
 
 // Contain reports whether m contains all modifiers

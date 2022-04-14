@@ -172,12 +172,9 @@ func (w *window) addEventListeners() {
 		return nil
 	})
 	w.addEventListener(w.window, "popstate", func(this js.Value, args []js.Value) interface{} {
-		ev := &system.CommandEvent{Type: system.CommandBack}
-		w.w.Event(ev)
-		if ev.Cancel {
+		if w.w.Event(key.Event{Name: key.NameBack}) {
 			return w.browserHistory.Call("forward")
 		}
-
 		return w.browserHistory.Call("back")
 	})
 	w.addEventListener(w.document, "visibilitychange", func(this js.Value, args []js.Value) interface{} {

@@ -571,9 +571,7 @@ func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view 
 //export Java_org_gioui_GioView_onBack
 func Java_org_gioui_GioView_onBack(env *C.JNIEnv, class C.jclass, view C.jlong) C.jboolean {
 	w := cgo.Handle(view).Value().(*window)
-	ev := &system.CommandEvent{Type: system.CommandBack}
-	w.callbacks.Event(ev)
-	if ev.Cancel {
+	if w.callbacks.Event(key.Event{Name: key.NameBack}) {
 		return C.JNI_TRUE
 	}
 	return C.JNI_FALSE

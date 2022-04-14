@@ -54,19 +54,8 @@ type StageEvent struct {
 	Stage Stage
 }
 
-// CommandEvent is a system event. Unlike most other events, CommandEvent is
-// delivered as a pointer to allow Cancel to suppress it.
-type CommandEvent struct {
-	Type CommandType
-	// Cancel suppress the default action of the command.
-	Cancel bool
-}
-
 // Stage of a Window.
 type Stage uint8
-
-// CommandType is the type of a CommandEvent.
-type CommandType uint8
 
 const (
 	// StagePaused is the Stage for inactive Windows.
@@ -74,12 +63,6 @@ const (
 	StagePaused Stage = iota
 	// StateRunning is for active Windows.
 	StageRunning
-)
-
-const (
-	// CommandBack is the command for a back action
-	// such as the Android back button.
-	CommandBack CommandType = iota
 )
 
 func (l Stage) String() string {
@@ -93,7 +76,6 @@ func (l Stage) String() string {
 	}
 }
 
-func (FrameEvent) ImplementsEvent()    {}
-func (StageEvent) ImplementsEvent()    {}
-func (*CommandEvent) ImplementsEvent() {}
-func (DestroyEvent) ImplementsEvent()  {}
+func (FrameEvent) ImplementsEvent()   {}
+func (StageEvent) ImplementsEvent()   {}
+func (DestroyEvent) ImplementsEvent() {}

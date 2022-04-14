@@ -416,29 +416,31 @@ func (c *callbacks) SetDriver(d driver) {
 	c.w.wakeupFuncs <- wakeup
 }
 
-func (c *callbacks) Event(e event.Event) {
+func (c *callbacks) Event(e event.Event) bool {
 	if c.d == nil {
 		panic("event while no driver active")
 	}
 	c.waitEvents = append(c.waitEvents, e)
 	if c.busy {
-		return
+		return true
 	}
 	c.busy = true
 	defer func() {
 		c.busy = false
 	}()
+	var handled bool
 	for len(c.waitEvents) > 0 {
 		e := c.waitEvents[0]
 		copy(c.waitEvents, c.waitEvents[1:])
 		c.waitEvents = c.waitEvents[:len(c.waitEvents)-1]
-		c.w.processEvent(c.d, e)
+		handled = c.w.processEvent(c.d, e)
 	}
 	c.w.updateState(c.d)
 	if c.w.closing {
 		c.w.closing = false
 		c.d.Close()
 	}
+	return handled
 }
 
 // SemanticRoot returns the ID of the semantic root.
@@ -740,10 +742,10 @@ func (w *Window) updateState(d driver) {
 	}
 }
 
-func (w *Window) processEvent(d driver, e event.Event) {
+func (w *Window) processEvent(d driver, e event.Event) bool {
 	select {
 	case <-w.dead:
-		return
+		return false
 	default:
 	}
 	switch e2 := e.(type) {
@@ -816,9 +818,6 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		}
 		w.processFrame(d, frameStart)
 		w.updateCursor(d)
-	case *system.CommandEvent:
-		w.out <- e
-		w.waitAck(d)
 	case system.DestroyEvent:
 		w.destroyGPU()
 		w.out <- e2
@@ -838,10 +837,12 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		e2.Config.Size = e2.Config.Size.Sub(w.decorations.size)
 		w.out <- e2
 	case event.Event:
-		if w.queue.q.Queue(e2) {
+		handled := w.queue.q.Queue(e2)
+		if handled {
 			w.setNextFrame(time.Time{})
 			w.updateAnimation(d)
 		} else if e, ok := e.(key.Event); ok && e.State == key.Press {
+			handled = true
 			switch {
 			case e.Name == key.NameTab && e.Modifiers == 0:
 				w.moveFocus(router.FocusForward, d)
@@ -855,10 +856,14 @@ func (w *Window) processEvent(d driver, e event.Event) {
 				w.moveFocus(router.FocusLeft, d)
 			case e.Name == key.NameRight && e.Modifiers == 0:
 				w.moveFocus(router.FocusRight, d)
+			default:
+				handled = false
 			}
 		}
 		w.updateCursor(d)
+		return handled
 	}
+	return true
 }
 
 func (w *Window) run(options []Option) {
