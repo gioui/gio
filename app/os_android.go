@@ -867,8 +867,6 @@ func (w *window) draw(env *C.JNIEnv, sync bool) {
 	}
 }
 
-type keyMapper func(devId, keyCode C.int32_t) rune
-
 func runInJVM(jvm *C.JavaVM, f func(env *C.JNIEnv)) {
 	if jvm == nil {
 		panic("nil JVM")
@@ -908,6 +906,14 @@ func convertKeyCode(code C.jint) (string, bool) {
 		n = key.NameAlt
 	case C.AKEYCODE_META_LEFT, C.AKEYCODE_META_RIGHT:
 		n = key.NameSuper
+	case C.AKEYCODE_DPAD_UP:
+		n = key.NameUp
+	case C.AKEYCODE_DPAD_DOWN:
+		n = key.NameDown
+	case C.AKEYCODE_DPAD_LEFT:
+		n = key.NameLeft
+	case C.AKEYCODE_DPAD_RIGHT:
+		n = key.NameRight
 	default:
 		return "", false
 	}
@@ -917,19 +923,9 @@ func convertKeyCode(code C.jint) (string, bool) {
 //export Java_org_gioui_GioView_onKeyEvent
 func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, keyCode, r C.jint, pressed C.jboolean, t C.jlong) {
 	w := cgo.Handle(handle).Value().(*window)
-	if pressed == C.JNI_TRUE {
-		switch keyCode {
-		case C.AKEYCODE_DPAD_UP:
-			w.callbacks.MoveFocus(router.FocusUp)
-		case C.AKEYCODE_DPAD_DOWN:
-			w.callbacks.MoveFocus(router.FocusDown)
-		case C.AKEYCODE_DPAD_LEFT:
-			w.callbacks.MoveFocus(router.FocusLeft)
-		case C.AKEYCODE_DPAD_RIGHT:
-			w.callbacks.MoveFocus(router.FocusRight)
-		case C.AKEYCODE_DPAD_CENTER:
-			w.callbacks.ClickFocus()
-		}
+	if pressed == C.JNI_TRUE && keyCode == C.AKEYCODE_DPAD_CENTER {
+		w.callbacks.ClickFocus()
+		return
 	}
 	if n, ok := convertKeyCode(keyCode); ok {
 		state := key.Release

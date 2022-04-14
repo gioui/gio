@@ -219,6 +219,10 @@ const (
 	NameF10            = "F10"
 	NameF11            = "F11"
 	NameF12            = "F12"
+	NameUp             = "Up"
+	NameDown           = "Down"
+	NameLeft           = "Left"
+	NameRight          = "Right"
 )
 
 // Contain reports whether m contains all modifiers

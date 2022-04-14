@@ -506,10 +506,6 @@ func (c *callbacks) SetEditorSnippet(r key.Range) {
 	c.Event(key.SnippetEvent(r))
 }
 
-func (c *callbacks) MoveFocus(dir router.FocusDirection) {
-	c.w.moveFocus(dir, c.d)
-}
-
 func (w *Window) moveFocus(dir router.FocusDirection, d driver) {
 	if w.queue.q.MoveFocus(dir) {
 		w.queue.q.RevealFocus(w.viewport)
@@ -851,6 +847,14 @@ func (w *Window) processEvent(d driver, e event.Event) {
 				w.moveFocus(router.FocusForward, d)
 			case e.Name == key.NameTab && e.Modifiers == key.ModShift:
 				w.moveFocus(router.FocusBackward, d)
+			case e.Name == key.NameUp && e.Modifiers == 0:
+				w.moveFocus(router.FocusUp, d)
+			case e.Name == key.NameDown && e.Modifiers == 0:
+				w.moveFocus(router.FocusDown, d)
+			case e.Name == key.NameLeft && e.Modifiers == 0:
+				w.moveFocus(router.FocusLeft, d)
+			case e.Name == key.NameRight && e.Modifiers == 0:
+				w.moveFocus(router.FocusRight, d)
 			}
 		}
 		w.updateCursor(d)
