@@ -842,16 +842,16 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		e2.Config.Size = e2.Config.Size.Sub(w.decorations.size)
 		w.out <- e2
 	case event.Event:
-		// Convert tab or shift+tab presses to focus moves.
-		if e, ok := e.(key.Event); ok && e.State == key.Press && e.Name == key.NameTab && e.Modifiers&^key.ModShift == 0 {
-			dir := router.FocusForward
-			if e.Modifiers.Contain(key.ModShift) {
-				dir = router.FocusBackward
-			}
-			w.moveFocus(dir, d)
-		} else if w.queue.q.Queue(e2) {
+		if w.queue.q.Queue(e2) {
 			w.setNextFrame(time.Time{})
 			w.updateAnimation(d)
+		} else if e, ok := e.(key.Event); ok && e.State == key.Press {
+			switch {
+			case e.Name == key.NameTab && e.Modifiers == 0:
+				w.moveFocus(router.FocusForward, d)
+			case e.Name == key.NameTab && e.Modifiers == key.ModShift:
+				w.moveFocus(router.FocusBackward, d)
+			}
 		}
 		w.updateCursor(d)
 	}
