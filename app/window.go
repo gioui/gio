@@ -674,20 +674,19 @@ func (w *Window) destroyGPU() {
 }
 
 // waitFrame waits for the client to either call FrameEvent.Frame
-// or to continue event handling. It returns whether the client
-// called Frame or not.
-func (w *Window) waitFrame(d driver) (*op.Ops, chan<- struct{}) {
+// or to continue event handling.
+func (w *Window) waitFrame(d driver) *op.Ops {
 	for {
 		select {
 		case f := <-w.driverFuncs:
 			f(d)
 		case frame := <-w.frames:
 			// The client called FrameEvent.Frame.
-			return frame, w.frameAck
+			return frame
 		case w.out <- ackEvent:
 			// The client ignored FrameEvent and continued processing
 			// events.
-			return nil, nil
+			return nil
 		case <-w.immediateRedraws:
 			// Invalidate was called during frame processing.
 			w.setNextFrame(time.Time{})
@@ -803,10 +802,14 @@ func (w *Window) processEvent(d driver, e event.Event) {
 		size := e2.Size // save the initial window size as the decorations will change it.
 		e2.FrameEvent.Size = w.decorate(d, e2.FrameEvent, wrapper)
 		w.out <- e2.FrameEvent
-		frame, signal := w.waitFrame(d)
-		cl := clip.Rect(image.Rectangle{Max: e2.FrameEvent.Size}).Push(wrapper)
-		ops.AddCall(&wrapper.Internal, &frame.Internal, ops.PC{}, ops.PCFor(&frame.Internal))
-		cl.Pop()
+		frame := w.waitFrame(d)
+		var signal chan<- struct{}
+		if frame != nil {
+			signal = w.frameAck
+			cl := clip.Rect(image.Rectangle{Max: e2.FrameEvent.Size}).Push(wrapper)
+			ops.AddCall(&wrapper.Internal, &frame.Internal, ops.PC{}, ops.PCFor(&frame.Internal))
+			cl.Pop()
+		}
 		err := w.validateAndProcess(d, size, e2.Sync, wrapper, signal)
 		if err != nil {
 			w.destroyGPU()
