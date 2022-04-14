@@ -8,7 +8,6 @@ import (
 	"image"
 	"io"
 	"math"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -364,10 +363,9 @@ func (e *Editor) processKey(gtx layout.Context) {
 					continue
 				}
 			}
-			if e.command(gtx, ke) {
-				e.caret.scroll = true
-				e.scroller.Stop()
-			}
+			e.command(gtx, ke)
+			e.caret.scroll = true
+			e.scroller.Stop()
 		case key.SnippetEvent:
 			e.updateSnippet(gtx, ke.Start, ke.End)
 		case key.EditEvent:
@@ -403,16 +401,12 @@ func (e *Editor) moveLines(distance int, selAct selectionAction) {
 	e.updateSelection(selAct)
 }
 
-func (e *Editor) command(gtx layout.Context, k key.Event) bool {
+func (e *Editor) command(gtx layout.Context, k key.Event) {
 	direction := 1
 	if e.locale.Direction.Progression() == system.TowardOrigin {
 		direction = -1
 	}
-	modSkip := key.ModCtrl
-	if runtime.GOOS == "darwin" {
-		modSkip = key.ModAlt
-	}
-	moveByWord := k.Modifiers.Contain(modSkip)
+	moveByWord := k.Modifiers.Contain(key.ModShortcutAlt)
 	selAct := selectionClear
 	if k.Modifiers.Contain(key.ModShift) {
 		selAct = selectionExtend
@@ -465,15 +459,9 @@ func (e *Editor) command(gtx layout.Context, k key.Event) bool {
 	// Initiate a paste operation, by requesting the clipboard contents; other
 	// half is in Editor.processKey() under clipboard.Event.
 	case "V":
-		if k.Modifiers != key.ModShortcut {
-			return false
-		}
 		clipboard.ReadOp{Tag: &e.eventKey}.Add(gtx.Ops)
 	// Copy or Cut selection -- ignored if nothing selected.
 	case "C", "X":
-		if k.Modifiers != key.ModShortcut {
-			return false
-		}
 		if text := e.SelectedText(); text != "" {
 			clipboard.WriteOp{Text: text}.Add(gtx.Ops)
 			if k.Name == "X" {
@@ -482,15 +470,9 @@ func (e *Editor) command(gtx layout.Context, k key.Event) bool {
 		}
 	// Select all
 	case "A":
-		if k.Modifiers != key.ModShortcut {
-			return false
-		}
 		e.caret.end = 0
 		e.caret.start = e.Len()
-	default:
-		return false
 	}
-	return true
 }
 
 // Focus requests the input focus for the Editor.
@@ -625,7 +607,8 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 
 	defer clip.Rect(image.Rectangle{Max: e.viewSize}).Push(gtx.Ops).Pop()
 	pointer.CursorText.Add(gtx.Ops)
-	key.InputOp{Tag: &e.eventKey, Hint: e.InputHint}.Add(gtx.Ops)
+	const keyFilter = "(Short)-(Shift)-[←,→,↑,↓]|(Shift)-[⏎,⌤]|(Short)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]"
+	key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keyFilter}.Add(gtx.Ops)
 	if e.requestFocus {
 		key.FocusOp{Tag: &e.eventKey}.Add(gtx.Ops)
 		key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)

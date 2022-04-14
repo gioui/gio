@@ -140,8 +140,42 @@ func (q *Router) Queue(events ...event.Event) bool {
 			q.profile = e
 		case pointer.Event:
 			q.pointer.queue.Push(e, &q.handlers)
-		case key.EditEvent, key.Event, key.FocusEvent, key.SnippetEvent, key.SelectionEvent:
-			q.key.queue.Push(e, &q.handlers)
+		case key.Event:
+			f := q.key.queue.focus
+			if f == nil {
+				break
+			}
+			kq := &q.key.queue
+			if kq.Accepts(f, e) {
+				q.handlers.Add(f, e)
+				break
+			}
+			a := kq.AreaFor(f)
+			pq := &q.pointer.queue
+			idx := len(pq.hitTree) - 1
+			// Locate first potential receiver.
+			for idx != -1 {
+				n := &pq.hitTree[idx]
+				if n.area == a {
+					break
+				}
+				idx--
+			}
+			for idx != -1 {
+				n := &pq.hitTree[idx]
+				idx = n.next
+				if n.ktag == nil {
+					continue
+				}
+				if n.ktag != nil && kq.Accepts(n.ktag, e) {
+					q.handlers.Add(n.ktag, e)
+					break
+				}
+			}
+		case key.EditEvent, key.FocusEvent, key.SnippetEvent, key.SelectionEvent:
+			if f := q.key.queue.focus; f != nil {
+				q.handlers.Add(f, e)
+			}
 		case clipboard.Event:
 			q.cqueue.Push(e, &q.handlers)
 		}
@@ -398,12 +432,15 @@ func (q *Router) collect() {
 			}
 			kc.softKeyboard(op.Show)
 		case ops.TypeKeyInput:
+			filter := encOp.Refs[1].(*key.Set)
 			op := key.InputOp{
 				Tag:  encOp.Refs[0].(event.Tag),
 				Hint: key.InputHint(encOp.Data[1]),
+				Keys: *filter,
 			}
 			a := pc.currentArea()
 			b := pc.currentAreaBounds()
+			pc.keyInputOp(op)
 			kc.inputOp(op, a, b)
 		case ops.TypeSnippet:
 			op := key.SnippetOp{

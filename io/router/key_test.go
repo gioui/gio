@@ -103,12 +103,12 @@ func TestKeyRemoveFocus(t *testing.T) {
 	r := new(Router)
 
 	// New InputOp with Focus and Keyboard:
-	key.InputOp{Tag: &handlers[0]}.Add(ops)
+	key.InputOp{Tag: &handlers[0], Keys: "Short-Tab"}.Add(ops)
 	key.FocusOp{Tag: &handlers[0]}.Add(ops)
 	key.SoftKeyboardOp{Show: true}.Add(ops)
 
 	// New InputOp without any focus:
-	key.InputOp{Tag: &handlers[1]}.Add(ops)
+	key.InputOp{Tag: &handlers[1], Keys: "Short-Tab"}.Add(ops)
 
 	r.Frame(ops)
 
@@ -320,6 +320,31 @@ func TestNoFocus(t *testing.T) {
 	r.MoveFocus(FocusForward)
 }
 
+func TestKeyRouting(t *testing.T) {
+	handlers := make([]int, 3)
+	ops := new(op.Ops)
+	r := new(Router)
+
+	rect := clip.Rect{Max: image.Pt(10, 10)}
+
+	key.InputOp{Tag: &handlers[0], Keys: "A"}.Add(ops)
+	cl1 := rect.Push(ops)
+	key.InputOp{Tag: &handlers[1], Keys: "B"}.Add(ops)
+	key.InputOp{Tag: &handlers[2], Keys: "A"}.Add(ops)
+	cl1.Pop()
+
+	key.FocusOp{Tag: &handlers[2]}.Add(ops)
+
+	r.Frame(ops)
+
+	A, B := key.Event{Name: "A"}, key.Event{Name: "B"}
+	r.Queue(A, B)
+
+	assertKeyEvent(t, r.Events(&handlers[2]), true, A)
+	assertKeyEvent(t, r.Events(&handlers[1]), false, B)
+	assertKeyEvent(t, r.Events(&handlers[0]), false)
+}
+
 func assertKeyEvent(t *testing.T, events []event.Event, expected bool, expectedInputs ...event.Event) {
 	t.Helper()
 	var evtFocus int
@@ -333,7 +358,7 @@ func assertKeyEvent(t *testing.T, events []event.Event, expected bool, expectedI
 			evtFocus++
 		case key.Event, key.EditEvent:
 			if len(expectedInputs) <= evtKeyPress {
-				t.Errorf("unexpected key events")
+				t.Fatalf("unexpected key events")
 			}
 			if !reflect.DeepEqual(ev, expectedInputs[evtKeyPress]) {
 				t.Errorf("expected %v events, got %v", expectedInputs[evtKeyPress], ev)

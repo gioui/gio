@@ -423,9 +423,9 @@ func (t OpType) Size() int {
 
 func (t OpType) NumRefs() int {
 	switch t {
-	case TypeKeyInput, TypeKeyFocus, TypePointerInput, TypeProfile, TypeCall, TypeClipboardRead, TypeClipboardWrite, TypeSemanticLabel, TypeSemanticDesc, TypeSelection:
+	case TypeKeyFocus, TypePointerInput, TypeProfile, TypeCall, TypeClipboardRead, TypeClipboardWrite, TypeSemanticLabel, TypeSemanticDesc, TypeSelection:
 		return 1
-	case TypeImage, TypeSource, TypeTarget, TypeSnippet:
+	case TypeKeyInput, TypeImage, TypeSource, TypeTarget, TypeSnippet:
 		return 2
 	case TypeOffer:
 		return 3

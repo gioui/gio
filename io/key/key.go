@@ -25,9 +25,29 @@ import (
 // Key events are in general only delivered to the
 // focused key handler.
 type InputOp struct {
-	Tag  event.Tag
+	Tag event.Tag
+	// Hint describes the type of text expected by Tag.
 	Hint InputHint
+	// Keys is the set of keys Tag can handle. That is, Tag will only
+	// receive an Event if its key and modifiers are accepted by Keys.Contains.
+	Keys Set
 }
+
+// Set is an expression that describes a set of key combinations, in the form
+// "<modifiers>-<keyset>|...".  Modifiers are separated by dashes, optional
+// modifiers are enclosed by parentheses.  A key set is either a literal key
+// name or a list of key names separated by commas and enclosed in brackets.
+//
+// The "Short" modifier matches the shortcut modifier (ModShortcut) and
+// "ShortAlt" matches the alternative modifier (ModShortcutAlt).
+//
+// Examples:
+//
+//   - A|B matches the A and B keys
+//   - [A,B] also matches the A and B keys
+//   - Shift-A matches A key if shift is pressed, and no other modifier.
+//   - Shift-(Ctrl)-A matches A if shift is pressed, and optionally ctrl.
+type Set string
 
 // SoftKeyboardOp shows or hide the on-screen keyboard, if available.
 // It replaces any previous SoftKeyboardOp.
@@ -207,11 +227,99 @@ func (m Modifiers) Contain(m2 Modifiers) bool {
 	return m&m2 == m2
 }
 
+func (k Set) Contains(name string, mods Modifiers) bool {
+	ks := string(k)
+	for len(ks) > 0 {
+		// Cut next key expression.
+		chord, rest, _ := cut(ks, "|")
+		ks = rest
+		// Separate key set and modifier set.
+		var modSet, keySet string
+		sep := strings.LastIndex(chord, "-")
+		if sep != -1 {
+			modSet, keySet = chord[:sep], chord[sep+1:]
+		} else {
+			modSet, keySet = "", chord
+		}
+		if !keySetContains(keySet, name) {
+			continue
+		}
+		if modSetContains(modSet, mods) {
+			return true
+		}
+	}
+	return false
+}
+
+func keySetContains(keySet, name string) bool {
+	// Check for single key match.
+	if keySet == name {
+		return true
+	}
+	// Check for set match.
+	if len(keySet) < 2 || keySet[0] != '[' || keySet[len(keySet)-1] != ']' {
+		return false
+	}
+	keySet = keySet[1 : len(keySet)-1]
+	for len(keySet) > 0 {
+		key, rest, _ := cut(keySet, ",")
+		keySet = rest
+		if key == name {
+			return true
+		}
+	}
+	return false
+}
+
+func modSetContains(modSet string, mods Modifiers) bool {
+	var smods Modifiers
+	for len(modSet) > 0 {
+		mod, rest, _ := cut(modSet, "-")
+		modSet = rest
+		if len(mod) >= 2 && mod[0] == '(' && mod[len(mod)-1] == ')' {
+			mods &^= modFor(mod[1 : len(mod)-1])
+		} else {
+			smods |= modFor(mod)
+		}
+	}
+	return mods == smods
+}
+
+// cut is a copy of the standard library strings.Cut.
+// TODO: remove when Go 1.18 is our minimum.
+func cut(s, sep string) (before, after string, found bool) {
+	if i := strings.Index(s, sep); i >= 0 {
+		return s[:i], s[i+len(sep):], true
+	}
+	return s, "", false
+}
+
+func modFor(name string) Modifiers {
+	switch name {
+	case NameCtrl:
+		return ModCtrl
+	case NameShift:
+		return ModShift
+	case NameAlt:
+		return ModAlt
+	case NameSuper:
+		return ModSuper
+	case NameCommand:
+		return ModCommand
+	case "Short":
+		return ModShortcut
+	case "ShortAlt":
+		return ModShortcutAlt
+	}
+	return 0
+}
+
 func (h InputOp) Add(o *op.Ops) {
 	if h.Tag == nil {
 		panic("Tag must be non-nil")
 	}
-	data := ops.Write1(&o.Internal, ops.TypeKeyInputLen, h.Tag)
+	filter := h.Keys
+	data := ops.Write2(&o.Internal, ops.TypeKeyInputLen, h.Tag, &filter)
 	data[0] = byte(ops.TypeKeyInput)
 	data[1] = byte(h.Hint)
 }

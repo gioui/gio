@@ -41,6 +41,7 @@ type keyHandler struct {
 	hint     key.InputHint
 	order    int
 	dirOrder int
+	filter   key.Set
 }
 
 // keyCollector tracks state required to update a keyQueue
@@ -254,12 +255,6 @@ func (q *keyQueue) MoveFocus(dir FocusDirection, events *handlerEvents) bool {
 	return false
 }
 
-func (q *keyQueue) Push(e event.Event, events *handlerEvents) {
-	if q.focus != nil {
-		events.Add(q.focus, e)
-	}
-}
-
 func (q *keyQueue) BoundsFor(t event.Tag) image.Rectangle {
 	order := q.handlers[t].dirOrder
 	return q.dirOrder[order].bounds
@@ -268,6 +263,10 @@ func (q *keyQueue) BoundsFor(t event.Tag) image.Rectangle {
 func (q *keyQueue) AreaFor(t event.Tag) int {
 	order := q.handlers[t].dirOrder
 	return q.dirOrder[order].area
+}
+
+func (q *keyQueue) Accepts(t event.Tag, e key.Event) bool {
+	return q.handlers[t].filter.Contains(e.Name, e.Modifiers)
 }
 
 func (q *keyQueue) setFocus(focus event.Tag, events *handlerEvents) {
@@ -323,6 +322,7 @@ func (k *keyCollector) inputOp(op key.InputOp, area int, bounds image.Rectangle)
 	h := k.handlerFor(op.Tag, area, bounds)
 	h.visible = true
 	h.hint = op.Hint
+	h.filter = op.Keys
 }
 
 func (k *keyCollector) selectionOp(t f32.Affine2D, op key.SelectionOp) {

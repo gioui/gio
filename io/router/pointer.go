@@ -9,6 +9,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
+	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/semantic"
 	"gioui.org/io/transfer"
@@ -40,6 +41,7 @@ type hitNode struct {
 
 	// For handler nodes.
 	tag  event.Tag
+	ktag event.Tag
 	pass bool
 }
 
@@ -256,6 +258,15 @@ func (c *pointerCollector) newHandler(tag event.Tag, events *handlerEvents) *poi
 	h.active = true
 	h.area = areaID
 	return h
+}
+
+func (c *pointerCollector) keyInputOp(op key.InputOp) {
+	areaID := c.currentArea()
+	c.addHitNode(hitNode{
+		area: areaID,
+		ktag: op.Tag,
+		pass: true,
+	})
 }
 
 func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
@@ -634,6 +645,19 @@ func (q *pointerQueue) Deliver(areaIdx int, e pointer.Event, events *handlerEven
 			break
 		}
 	}
+}
+
+// SemanticArea returns the sematic content for area, and its parent area.
+func (q *pointerQueue) SemanticArea(areaIdx int) (semanticContent, int) {
+	for areaIdx != -1 {
+		a := &q.areas[areaIdx]
+		areaIdx = a.parent
+		if !a.semantic.valid {
+			continue
+		}
+		return a.semantic.content, areaIdx
+	}
+	return semanticContent{}, -1
 }
 
 func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
