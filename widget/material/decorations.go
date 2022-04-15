@@ -65,7 +65,6 @@ func (d *DecorationsStyle) layoutDecorations(gtx layout.Context) layout.Dimensio
 			})
 		}),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			defer op.Offset(f32.Point{}).Push(gtx.Ops).Pop()
 			// Remove the unmaximize action as it is taken care of by maximize.
 			actions := d.Actions &^ system.ActionUnmaximize
 			var size image.Point
