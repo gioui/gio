@@ -607,7 +607,7 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 
 	defer clip.Rect(image.Rectangle{Max: e.viewSize}).Push(gtx.Ops).Pop()
 	pointer.CursorText.Add(gtx.Ops)
-	const keyFilter = "(Short)-(Shift)-[←,→,↑,↓]|(Shift)-[⏎,⌤]|(Short)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]"
+	const keyFilter = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]"
 	key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keyFilter}.Add(gtx.Ops)
 	if e.requestFocus {
 		key.FocusOp{Tag: &e.eventKey}.Add(gtx.Ops)
