@@ -649,6 +649,9 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 
 // PaintSelection paints the contrasting background for selected text.
 func (e *Editor) PaintSelection(gtx layout.Context) {
+	if !e.focused {
+		return
+	}
 	cl := textPadding(e.lines)
 	cl.Max = cl.Max.Add(e.viewSize)
 	defer clip.Rect(cl).Push(gtx.Ops).Pop()
