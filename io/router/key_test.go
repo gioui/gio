@@ -345,6 +345,20 @@ func TestKeyRouting(t *testing.T) {
 	assertKeyEvent(t, r.Events(&handlers[0]), false)
 }
 
+func TestTopLevelInputOp(t *testing.T) {
+	h := new(int)
+	ops := new(op.Ops)
+	r := new(Router)
+
+	key.InputOp{Tag: h, Keys: "A"}.Add(ops)
+	r.Frame(ops)
+
+	A := key.Event{Name: "A"}
+	r.Queue(A)
+
+	assertKeyEvent(t, r.Events(h), false, A)
+}
+
 func assertKeyEvent(t *testing.T, events []event.Event, expected bool, expectedInputs ...event.Event) {
 	t.Helper()
 	var evtFocus int

@@ -141,37 +141,7 @@ func (q *Router) Queue(events ...event.Event) bool {
 		case pointer.Event:
 			q.pointer.queue.Push(e, &q.handlers)
 		case key.Event:
-			f := q.key.queue.focus
-			if f == nil {
-				break
-			}
-			kq := &q.key.queue
-			if kq.Accepts(f, e) {
-				q.handlers.Add(f, e)
-				break
-			}
-			a := kq.AreaFor(f)
-			pq := &q.pointer.queue
-			idx := len(pq.hitTree) - 1
-			// Locate first potential receiver.
-			for idx != -1 {
-				n := &pq.hitTree[idx]
-				if n.area == a {
-					break
-				}
-				idx--
-			}
-			for idx != -1 {
-				n := &pq.hitTree[idx]
-				idx = n.next
-				if n.ktag == nil {
-					continue
-				}
-				if n.ktag != nil && kq.Accepts(n.ktag, e) {
-					q.handlers.Add(n.ktag, e)
-					break
-				}
-			}
+			q.queueKeyEvent(e)
 		case key.EditEvent, key.FocusEvent, key.SnippetEvent, key.SelectionEvent:
 			if f := q.key.queue.focus; f != nil {
 				q.handlers.Add(f, e)
@@ -181,6 +151,40 @@ func (q *Router) Queue(events ...event.Event) bool {
 		}
 	}
 	return q.handlers.HadEvents()
+}
+
+func (q *Router) queueKeyEvent(e key.Event) {
+	kq := &q.key.queue
+	f := q.key.queue.focus
+	a := 0 // Root area
+	if f != nil {
+		if kq.Accepts(f, e) {
+			q.handlers.Add(f, e)
+			return
+		}
+		a = kq.AreaFor(f)
+	}
+	pq := &q.pointer.queue
+	idx := len(pq.hitTree) - 1
+	// Locate first potential receiver.
+	for idx != -1 {
+		n := &pq.hitTree[idx]
+		if n.area == a {
+			break
+		}
+		idx--
+	}
+	for idx != -1 {
+		n := &pq.hitTree[idx]
+		idx = n.next
+		if n.ktag == nil {
+			continue
+		}
+		if n.ktag != nil && kq.Accepts(n.ktag, e) {
+			q.handlers.Add(n.ktag, e)
+			break
+		}
+	}
 }
 
 func (q *Router) MoveFocus(dir FocusDirection) bool {
