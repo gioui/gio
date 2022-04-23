@@ -142,7 +142,20 @@ func (q *Router) Queue(events ...event.Event) bool {
 			q.pointer.queue.Push(e, &q.handlers)
 		case key.Event:
 			q.queueKeyEvent(e)
-		case key.EditEvent, key.FocusEvent, key.SnippetEvent, key.SelectionEvent:
+		case key.SnippetEvent:
+			// Expand existing, overlapping snippet.
+			if r := q.key.queue.content.Snippet.Range; rangeOverlaps(r, key.Range(e)) {
+				if e.Start > r.Start {
+					e.Start = r.Start
+				}
+				if e.End < r.End {
+					e.End = r.End
+				}
+			}
+			if f := q.key.queue.focus; f != nil {
+				q.handlers.Add(f, e)
+			}
+		case key.EditEvent, key.FocusEvent, key.SelectionEvent:
 			if f := q.key.queue.focus; f != nil {
 				q.handlers.Add(f, e)
 			}
@@ -151,6 +164,20 @@ func (q *Router) Queue(events ...event.Event) bool {
 		}
 	}
 	return q.handlers.HadEvents()
+}
+
+func rangeOverlaps(r1, r2 key.Range) bool {
+	r1 = rangeNorm(r1)
+	r2 = rangeNorm(r2)
+	return r1.Start <= r2.Start && r2.Start < r1.End ||
+		r1.Start <= r2.End && r2.End < r1.End
+}
+
+func rangeNorm(r key.Range) key.Range {
+	if r.End < r.Start {
+		r.End, r.Start = r.Start, r.End
+	}
+	return r
 }
 
 func (q *Router) queueKeyEvent(e key.Event) {

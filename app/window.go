@@ -492,7 +492,6 @@ func (c *callbacks) EditorInsert(text string) {
 func (c *callbacks) EditorReplace(r key.Range, text string) {
 	c.w.imeState.Replace(r, text)
 	c.Event(key.EditEvent{Range: r, Text: text})
-	c.Event(key.SnippetEvent(c.w.imeState.Snippet.Range))
 }
 
 func (c *callbacks) SetEditorSelection(r key.Range) {

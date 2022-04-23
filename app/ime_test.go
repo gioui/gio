@@ -108,6 +108,27 @@ func FuzzIME(f *testing.F) {
 			newState := r.EditorState()
 			// We don't track caret position.
 			state.Selection.Caret = newState.Selection.Caret
+			// Expanded snippets are ok.
+			their, our := newState.Snippet, state.EditorState.Snippet
+			beforeLen := 0
+			for before := our.Start - their.Start; before > 0; before-- {
+				_, n := utf8.DecodeRuneInString(their.Text[beforeLen:])
+				beforeLen += n
+			}
+			afterLen := 0
+			for after := their.End - our.End; after > 0; after-- {
+				_, n := utf8.DecodeLastRuneInString(their.Text[:len(their.Text)-afterLen])
+				afterLen += n
+			}
+			if beforeLen > 0 {
+				our.Text = their.Text[:beforeLen] + our.Text
+				our.Start = their.Start
+			}
+			if afterLen > 0 {
+				our.Text = our.Text + their.Text[len(their.Text)-afterLen:]
+				our.End = their.End
+			}
+			state.EditorState.Snippet = our
 			if newState != state.EditorState {
 				t.Errorf("IME state: %+v\neditor state: %+v", state.EditorState, newState)
 			}
