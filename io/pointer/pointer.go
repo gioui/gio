@@ -215,20 +215,6 @@ const (
 	ButtonTertiary
 )
 
-// frect converts a rectangle to a f32.Rectangle.
-func frect(r image.Rectangle) f32.Rectangle {
-	return f32.Rectangle{
-		Min: fpt(r.Min), Max: fpt(r.Max),
-	}
-}
-
-// fpt converts an point to a f32.Point.
-func fpt(p image.Point) f32.Point {
-	return f32.Point{
-		X: float32(p.X), Y: float32(p.Y),
-	}
-}
-
 // Push the current pass mode to the pass stack and set the pass mode.
 func (p PassOp) Push(o *op.Ops) PassStack {
 	id, mid := ops.PushOp(&o.Internal, ops.PassStack)
