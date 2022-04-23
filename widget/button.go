@@ -166,7 +166,7 @@ func (b *Clickable) update(gtx layout.Context) {
 		case key.FocusEvent:
 			b.focused = e.Focus
 		case key.Event:
-			if e.State != key.Release {
+			if !b.focused || e.State != key.Release {
 				break
 			}
 			if e.Name != key.NameReturn && e.Name != key.NameSpace {

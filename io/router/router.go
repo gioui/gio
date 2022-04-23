@@ -182,25 +182,12 @@ func rangeNorm(r key.Range) key.Range {
 
 func (q *Router) queueKeyEvent(e key.Event) {
 	kq := &q.key.queue
-	f := q.key.queue.focus
-	a := 0 // Root area
-	if f != nil {
-		if kq.Accepts(f, e) {
-			q.handlers.Add(f, e)
-			return
-		}
-		a = kq.AreaFor(f)
+	if f := q.key.queue.focus; f != nil && kq.Accepts(f, e) {
+		q.handlers.Add(f, e)
+		return
 	}
 	pq := &q.pointer.queue
 	idx := len(pq.hitTree) - 1
-	// Locate first potential receiver.
-	for idx != -1 {
-		n := &pq.hitTree[idx]
-		if n.area == a {
-			break
-		}
-		idx--
-	}
 	for idx != -1 {
 		n := &pq.hitTree[idx]
 		idx = n.next
