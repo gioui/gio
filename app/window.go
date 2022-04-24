@@ -62,6 +62,10 @@ type Window struct {
 	closing  bool
 	// dead is closed when the window is destroyed.
 	dead chan struct{}
+	// options are the options waiting to be applied.
+	options []Option
+	// actions are the actions waiting to be performed.
+	actions system.Action
 
 	stage        system.Stage
 	animating    bool
@@ -322,9 +326,8 @@ func (w *Window) Invalidate() {
 
 // Option applies the options to the window.
 func (w *Window) Option(opts ...Option) {
-	w.driverDefer(func(d driver) {
-		d.Configure(opts)
-	})
+	w.options = append(w.options, opts...)
+	w.wakeup()
 }
 
 // ReadClipboard initiates a read of the clipboard in the form
@@ -434,6 +437,16 @@ func (c *callbacks) Event(e event.Event) bool {
 		copy(c.waitEvents, c.waitEvents[1:])
 		c.waitEvents = c.waitEvents[:len(c.waitEvents)-1]
 		handled = c.w.processEvent(c.d, e)
+	}
+	if _, iswakeup := e.(wakeupEvent); iswakeup {
+		if len(c.w.options) > 0 {
+			c.d.Configure(c.w.options)
+			c.w.options = nil
+		}
+		if c.w.actions != 0 {
+			c.d.Perform(c.w.actions)
+			c.w.actions = 0
+		}
 	}
 	c.w.updateState(c.d)
 	if c.w.closing {
@@ -980,15 +993,14 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 
 // Perform the actions on the window.
 func (w *Window) Perform(actions system.Action) {
-	var options []Option
 	walkActions(actions, func(action system.Action) {
 		switch action {
 		case system.ActionMinimize:
-			options = append(options, Minimized.Option())
+			w.options = append(w.options, Minimized.Option())
 		case system.ActionMaximize:
-			options = append(options, Maximized.Option())
+			w.options = append(w.options, Maximized.Option())
 		case system.ActionUnmaximize:
-			options = append(options, Windowed.Option())
+			w.options = append(w.options, Windowed.Option())
 		case system.ActionClose:
 			w.closing = true
 		default:
@@ -996,12 +1008,8 @@ func (w *Window) Perform(actions system.Action) {
 		}
 		actions &^= action
 	})
-	w.driverDefer(func(d driver) {
-		if len(options) > 0 {
-			d.Configure(options)
-		}
-		d.Perform(actions)
-	})
+	w.actions = w.actions | actions
+	w.wakeup()
 }
 
 func (q *queue) Events(k event.Tag) []event.Event {
