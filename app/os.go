@@ -41,8 +41,6 @@ type Config struct {
 	// CustomRenderer is true when the window content is rendered by the
 	// client.
 	CustomRenderer bool
-	// center is a flag used to center the window. Set by option.
-	center bool
 	// Decorated reports whether window decorations are provided automatically.
 	Decorated bool
 }

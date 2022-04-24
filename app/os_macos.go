@@ -344,13 +344,6 @@ func (w *window) Configure(options []Option) {
 			cnf.MaxSize = cnf.MaxSize.Div(int(screenScale))
 			C.setMaxSize(w.window, C.CGFloat(cnf.MaxSize.X), C.CGFloat(cnf.MaxSize.Y))
 		}
-		if cnf.center {
-			r := C.getScreenFrame(w.window) // the screen size of the window
-			sz := w.config.Size
-			x := (int(r.size.width) - sz.X) / 2
-			y := (int(r.size.height) - sz.Y) / 2
-			C.setScreenFrame(w.window, C.CGFloat(x), C.CGFloat(y), C.CGFloat(sz.X), C.CGFloat(sz.Y))
-		}
 	}
 	if cnf.Decorated != prev.Decorated {
 		w.config.Decorated = cnf.Decorated
@@ -372,6 +365,12 @@ func (w *window) setTitle(prev, cnf Config) {
 func (w *window) Perform(acts system.Action) {
 	walkActions(acts, func(a system.Action) {
 		switch a {
+		case system.ActionCenter:
+			r := C.getScreenFrame(w.window) // the screen size of the window
+			sz := w.config.Size
+			x := (int(r.size.width) - sz.X) / 2
+			y := (int(r.size.height) - sz.Y) / 2
+			C.setScreenFrame(w.window, C.CGFloat(x), C.CGFloat(y), C.CGFloat(sz.X), C.CGFloat(sz.Y))
 		case system.ActionRaise:
 			C.raiseWindow(w.window)
 		}

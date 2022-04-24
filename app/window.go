@@ -989,12 +989,6 @@ func (w *Window) Perform(actions system.Action) {
 			options = append(options, Maximized.Option())
 		case system.ActionUnmaximize:
 			options = append(options, Windowed.Option())
-		case system.ActionCenter:
-			options = append(options,
-				func(m unit.Metric, cnf *Config) {
-					// Set the flag so the driver can later do the actual centering.
-					cnf.center = true
-				})
 		case system.ActionClose:
 			w.closing = true
 		default:

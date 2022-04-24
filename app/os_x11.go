@@ -230,22 +230,6 @@ func (w *x11Window) Configure(options []Option) {
 		if shints.flags != 0 {
 			C.XSetWMNormalHints(w.x, w.xw, &shints)
 		}
-		if cnf.center {
-			screen := C.XDefaultScreen(w.x)
-			width := C.XDisplayWidth(w.x, screen)
-			height := C.XDisplayHeight(w.x, screen)
-
-			var attrs C.XWindowAttributes
-			C.XGetWindowAttributes(w.x, w.xw, &attrs)
-			width -= attrs.border_width
-			height -= attrs.border_width
-
-			sz := w.config.Size
-			x := (int(width) - sz.X) / 2
-			y := (int(height) - sz.Y) / 2
-
-			C.XMoveResizeWindow(w.x, w.xw, C.int(x), C.int(y), C.uint(sz.X), C.uint(sz.Y))
-		}
 	}
 	if cnf.Decorated != prev.Decorated {
 		w.config.Decorated = cnf.Decorated
@@ -276,10 +260,29 @@ func (w *x11Window) setTitle(prev, cnf Config) {
 func (w *x11Window) Perform(acts system.Action) {
 	walkActions(acts, func(a system.Action) {
 		switch a {
+		case system.ActionCenter:
+			w.center()
 		case system.ActionRaise:
 			w.raise()
 		}
 	})
+}
+
+func (w *x11Window) center() {
+	screen := C.XDefaultScreen(w.x)
+	width := C.XDisplayWidth(w.x, screen)
+	height := C.XDisplayHeight(w.x, screen)
+
+	var attrs C.XWindowAttributes
+	C.XGetWindowAttributes(w.x, w.xw, &attrs)
+	width -= attrs.border_width
+	height -= attrs.border_width
+
+	sz := w.config.Size
+	x := (int(width) - sz.X) / 2
+	y := (int(height) - sz.Y) / 2
+
+	C.XMoveResizeWindow(w.x, w.xw, C.int(x), C.int(y), C.uint(sz.X), C.uint(sz.Y))
 }
 
 func (w *x11Window) raise() {

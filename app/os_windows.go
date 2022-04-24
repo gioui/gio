@@ -631,14 +631,6 @@ func (w *window) Configure(options []Option) {
 		y := wr.Top
 		dx := r.Right - r.Left
 		dy := r.Bottom - r.Top
-		if w.config.center {
-			// Calculate center position on current monitor.
-			mi := windows.GetMonitorInfo(w.hwnd).Monitor
-			x = (mi.Right - mi.Left - dx) / 2
-			y = (mi.Bottom - mi.Top - dy) / 2
-			// Centering is done only once.
-			w.config.center = false
-		}
 		windows.SetWindowPos(w.hwnd, 0, x, y, dx, dy, windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED)
 		windows.ShowWindow(w.hwnd, windows.SW_SHOWNORMAL)
 
@@ -768,6 +760,18 @@ func (w *window) Close() {
 func (w *window) Perform(acts system.Action) {
 	walkActions(acts, func(a system.Action) {
 		switch a {
+		case system.ActionCenter:
+			if w.config.Mode != Windowed {
+				break
+			}
+			r := windows.GetWindowRect(w.hwnd)
+			dx := r.Right - r.Left
+			dy := r.Bottom - r.Top
+			// Calculate center position on current monitor.
+			mi := windows.GetMonitorInfo(w.hwnd).Monitor
+			x := (mi.Right - mi.Left - dx) / 2
+			y := (mi.Bottom - mi.Top - dy) / 2
+			windows.SetWindowPos(w.hwnd, 0, x, y, dx, dy, windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED)
 		case system.ActionRaise:
 			w.raise()
 		}
