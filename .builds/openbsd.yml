@@ -16,6 +16,3 @@ tasks:
  - test_gio: |
      cd gio
      go test ./...
- - test_cmd: |
-     cd gio/cmd
-     go test ./...

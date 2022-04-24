@@ -62,13 +62,3 @@ tasks:
  - test_ios: |
      cd gio
      CC=$APPLE_TOOLCHAIN_ROOT/tools/clang-ios GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build -tags ios ./...
- - install_gogio: |
-     cd gio/cmd
-     go install ./gogio
- - test_ios_gogio: |
-     mkdir tmp
-     cd tmp
-     go mod init example.com
-     go get -d gioui.org/example/kitchen
-     export PATH=/home/build/appletools/bin:$PATH
-     gogio -target ios -o app.app gioui.org/example/kitchen

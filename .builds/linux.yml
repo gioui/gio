@@ -29,7 +29,6 @@ packages:
 sources:
  - https://git.sr.ht/~eliasnaur/gio
 environment:
- GOFLAGS: -mod=readonly
  PATH: /home/build/sdk/go/bin:/usr/bin:/home/build/go/bin:/home/build/android/tools/bin
  ANDROID_SDK_ROOT: /home/build/android
  android_sdk_tools_zip: sdk-tools-linux-3859397.zip
@@ -54,6 +53,9 @@ tasks:
             exit 1
         fi
      done
+ - mirror: |
+     # mirror to github
+     ssh-keyscan github.com > "$HOME"/.ssh/known_hosts && cd gio && git push --mirror "$github_mirror" || echo "failed mirroring"
  - test_gio: |
      cd gio
      go test -race ./...
@@ -64,10 +66,6 @@ tasks:
      sudo sh -c 'echo "deb [arch=amd64] https://dl-ssl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
      sudo apt-get -qq update
      sudo apt-get -qq install -y google-chrome-stable
- - test_cmd: |
-     cd gio/cmd
-     go test ./...
-     go test -race ./...
  - install_jdk8: |
      curl -so jdk.deb "https://cdn.azul.com/zulu/bin/zulu8.42.0.21-ca-jdk8.0.232-linux_amd64.deb"
      sudo apt-get -qq install -y -f ./jdk.deb
@@ -87,15 +85,3 @@ tasks:
      cd gio
      CC=$ANDROID_SDK_ROOT/ndk-bundle/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang GOOS=android GOARCH=arm64 CGO_ENABLED=1 go build ./...
      CC=$ANDROID_SDK_ROOT/ndk-bundle/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi29-clang GOOS=android GOARCH=arm CGO_ENABLED=1 go build ./...
- - install_gogio: |
-     cd gio/cmd
-     go install ./gogio
- - test_android_gogio: |
-     mkdir tmp
-     cd tmp
-     go mod init example.com
-     go get -d gioui.org/example/kitchen
-     gogio -target android gioui.org/example/kitchen
- - mirror: |
-     # mirror to github
-     ssh-keyscan github.com > "$HOME"/.ssh/known_hosts && cd gio && git push --mirror "$github_mirror" || echo "failed mirroring"
