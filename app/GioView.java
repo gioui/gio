@@ -555,7 +555,11 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		@Override public int getCursorCapsMode(int reqModes) {
 			Snippet snip = getSnippet();
 			int selStart = imeSelectionStart(nhandle);
-			return TextUtils.getCapsMode(snip.snippet, imeToUTF16(nhandle, selStart - snip.offset), reqModes);
+			int off = imeToUTF16(nhandle, selStart - snip.offset);
+			if (off < 0 || off > snip.snippet.length()) {
+				return 0;
+			}
+			return TextUtils.getCapsMode(snip.snippet, off, reqModes);
 		}
 
 		@Override public ExtractedText getExtractedText(ExtractedTextRequest request, int flags) {
