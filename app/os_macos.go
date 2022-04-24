@@ -369,7 +369,14 @@ func (w *window) setTitle(prev, cnf Config) {
 	}
 }
 
-func (w *window) Perform(system.Action) {}
+func (w *window) Perform(acts system.Action) {
+	walkActions(acts, func(a system.Action) {
+		switch a {
+		case system.ActionRaise:
+			C.raiseWindow(w.window)
+		}
+	})
+}
 
 func (w *window) SetCursor(cursor pointer.Cursor) {
 	w.cursor = windowSetCursor(w.cursor, cursor)
@@ -395,10 +402,6 @@ func (w *window) SetAnimating(anim bool) {
 	} else {
 		w.displayLink.Stop()
 	}
-}
-
-func (w *window) Raise() {
-	C.raiseWindow(w.window)
 }
 
 func (w *window) runOnMain(f func()) {

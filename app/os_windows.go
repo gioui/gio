@@ -765,9 +765,16 @@ func (w *window) Close() {
 	windows.PostMessage(w.hwnd, windows.WM_CLOSE, 0, 0)
 }
 
-func (w *window) Perform(system.Action) {}
+func (w *window) Perform(acts system.Action) {
+	walkActions(acts, func(a system.Action) {
+		switch a {
+		case system.ActionRaise:
+			w.raise()
+		}
+	})
+}
 
-func (w *window) Raise() {
+func (w *window) raise() {
 	windows.SetForegroundWindow(w.hwnd)
 	windows.SetWindowPos(w.hwnd, windows.HWND_TOPMOST, 0, 0, 0, 0,
 		windows.SWP_NOMOVE|windows.SWP_NOSIZE|windows.SWP_SHOWWINDOW)

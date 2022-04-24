@@ -172,7 +172,7 @@ func (w *x11Window) Configure(options []Option) {
 		switch prev.Mode {
 		case Fullscreen:
 		case Minimized:
-			w.Raise()
+			w.raise()
 			fallthrough
 		default:
 			w.config.Mode = Fullscreen
@@ -190,7 +190,7 @@ func (w *x11Window) Configure(options []Option) {
 		switch prev.Mode {
 		case Fullscreen:
 		case Minimized:
-			w.Raise()
+			w.raise()
 			fallthrough
 		default:
 			w.config.Mode = Maximized
@@ -205,7 +205,7 @@ func (w *x11Window) Configure(options []Option) {
 			C.XResizeWindow(w.x, w.xw, C.uint(cnf.Size.X), C.uint(cnf.Size.Y))
 		case Minimized:
 			w.config.Mode = Windowed
-			w.Raise()
+			w.raise()
 		case Maximized:
 			w.config.Mode = Windowed
 			w.sendWMStateEvent(_NET_WM_STATE_REMOVE, w.atoms.wmStateMaximizedHorz, w.atoms.wmStateMaximizedVert)
@@ -273,9 +273,16 @@ func (w *x11Window) setTitle(prev, cnf Config) {
 	}
 }
 
-func (w *x11Window) Perform(system.Action) {}
+func (w *x11Window) Perform(acts system.Action) {
+	walkActions(acts, func(a system.Action) {
+		switch a {
+		case system.ActionRaise:
+			w.raise()
+		}
+	})
+}
 
-func (w *x11Window) Raise() {
+func (w *x11Window) raise() {
 	var xev C.XEvent
 	ev := (*C.XClientMessageEvent)(unsafe.Pointer(&xev))
 	*ev = C.XClientMessageEvent{

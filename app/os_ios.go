@@ -288,8 +288,6 @@ func (w *window) EditorStateChanged(old, new editorState) {}
 
 func (w *window) Perform(system.Action) {}
 
-func (w *window) Raise() {}
-
 func (w *window) SetAnimating(anim bool) {
 	v := w.view
 	if v == 0 {

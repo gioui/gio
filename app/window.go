@@ -980,31 +980,29 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 
 // Perform the actions on the window.
 func (w *Window) Perform(actions system.Action) {
+	var options []Option
+	walkActions(actions, func(action system.Action) {
+		switch action {
+		case system.ActionMinimize:
+			options = append(options, Minimized.Option())
+		case system.ActionMaximize:
+			options = append(options, Maximized.Option())
+		case system.ActionUnmaximize:
+			options = append(options, Windowed.Option())
+		case system.ActionCenter:
+			options = append(options,
+				func(m unit.Metric, cnf *Config) {
+					// Set the flag so the driver can later do the actual centering.
+					cnf.center = true
+				})
+		case system.ActionClose:
+			w.closing = true
+		default:
+			return
+		}
+		actions &^= action
+	})
 	w.driverDefer(func(d driver) {
-		var options []Option
-		walkActions(actions, func(action system.Action) {
-			switch action {
-			case system.ActionMinimize:
-				options = append(options, Minimized.Option())
-			case system.ActionMaximize:
-				options = append(options, Maximized.Option())
-			case system.ActionUnmaximize:
-				options = append(options, Windowed.Option())
-			case system.ActionRaise:
-				d.Raise()
-			case system.ActionCenter:
-				options = append(options,
-					func(m unit.Metric, cnf *Config) {
-						// Set the flag so the driver can later do the actual centering.
-						cnf.center = true
-					})
-			case system.ActionClose:
-				w.closing = true
-			default:
-				return
-			}
-			actions &^= action
-		})
 		if len(options) > 0 {
 			d.Configure(options)
 		}

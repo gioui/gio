@@ -1321,8 +1321,6 @@ func (w *window) Configure(options []Option) {
 
 func (w *window) Perform(system.Action) {}
 
-func (w *window) Raise() {}
-
 func (w *window) SetCursor(cursor pointer.Cursor) {
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
 		setCursor(env, w.view, cursor)

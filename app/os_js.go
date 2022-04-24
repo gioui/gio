@@ -540,8 +540,6 @@ func (w *window) Configure(options []Option) {
 
 func (w *window) Perform(system.Action) {}
 
-func (w *window) Raise() {}
-
 var webCursor = [...]string{
 	pointer.CursorDefault:                  "default",
 	pointer.CursorNone:                     "none",

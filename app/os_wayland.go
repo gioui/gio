@@ -1033,6 +1033,8 @@ func (w *window) setTitle(prev, cnf Config) {
 }
 
 func (w *window) Perform(actions system.Action) {
+	// NB. there is no way for a minimized window to be unminimized.
+	// https://wayland.app/protocols/xdg-shell#xdg_toplevel:request:set_minimized
 	walkActions(actions, func(action system.Action) {
 		switch action {
 		case system.ActionMove:
@@ -1079,11 +1081,6 @@ func (w *window) resize(a system.Action) {
 	w.inCompositor = true
 	s := w.seat
 	C.xdg_toplevel_resize(w.topLvl, s.seat, s.serial, C.uint32_t(edge))
-}
-
-func (w *window) Raise() {
-	// NB. there is no way for a minimized window to be unminimized.
-	// https://wayland.app/protocols/xdg-shell#xdg_toplevel:request:set_minimized
 }
 
 func (w *window) SetCursor(cursor pointer.Cursor) {
