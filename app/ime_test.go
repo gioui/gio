@@ -35,7 +35,7 @@ func FuzzIME(f *testing.F) {
 		var r router.Router
 		gtx := layout.Context{Ops: new(op.Ops), Queue: &r}
 		// Layout once to register focus.
-		e.Layout(gtx, cache, text.Font{}, unit.Px(10), nil)
+		e.Layout(gtx, cache, text.Font{}, unit.Sp(10), nil)
 		r.Frame(gtx.Ops)
 
 		var state editorState
@@ -103,7 +103,7 @@ func FuzzIME(f *testing.F) {
 				}
 			}
 			cmds = cmds[cmdLen:]
-			e.Layout(gtx, cache, text.Font{}, unit.Px(10), nil)
+			e.Layout(gtx, cache, text.Font{}, unit.Sp(10), nil)
 			r.Frame(gtx.Ops)
 			newState := r.EditorState()
 			// We don't track caret position.

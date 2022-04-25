@@ -53,7 +53,7 @@ func (d *DecorationsStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 func (d *DecorationsStyle) layoutDecorations(gtx layout.Context) layout.Dimensions {
 	gtx.Constraints.Min.Y = 0
-	inset := layout.UniformInset(unit.Dp(10))
+	inset := layout.UniformInset(10)
 	return layout.Flex{
 		Axis:      layout.Horizontal,
 		Alignment: layout.Middle,
@@ -116,7 +116,7 @@ func (d *DecorationsStyle) layoutDecorations(gtx layout.Context) layout.Dimensio
 	)
 }
 
-var (
+const (
 	winIconSize   = unit.Dp(20)
 	winIconMargin = unit.Dp(4)
 	winIconStroke = unit.Dp(2)
@@ -124,10 +124,10 @@ var (
 
 // minimizeWindows draws a line icon representing the minimize action.
 func minimizeWindow(gtx layout.Context) layout.Dimensions {
-	size := gtx.Px(winIconSize)
+	size := gtx.Dp(winIconSize)
 	size32 := float32(size)
-	margin := float32(gtx.Px(winIconMargin))
-	width := float32(gtx.Px(winIconStroke))
+	margin := float32(gtx.Dp(winIconMargin))
+	width := float32(gtx.Dp(winIconStroke))
 	var p clip.Path
 	p.Begin(gtx.Ops)
 	p.MoveTo(f32.Point{X: margin, Y: size32 - margin})
@@ -143,9 +143,9 @@ func minimizeWindow(gtx layout.Context) layout.Dimensions {
 
 // maximizeWindow draws a rectangle representing the maximize action.
 func maximizeWindow(gtx layout.Context) layout.Dimensions {
-	size := gtx.Px(winIconSize)
-	margin := gtx.Px(winIconMargin)
-	width := gtx.Px(winIconStroke)
+	size := gtx.Dp(winIconSize)
+	margin := gtx.Dp(winIconMargin)
+	width := gtx.Dp(winIconStroke)
 	r := clip.RRect{
 		Rect: image.Rect(margin, margin, size-margin, size-margin),
 	}
@@ -166,9 +166,9 @@ func maximizeWindow(gtx layout.Context) layout.Dimensions {
 
 // maximizedWindow draws interleaved rectangles representing the un-maximize action.
 func maximizedWindow(gtx layout.Context) layout.Dimensions {
-	size := gtx.Px(winIconSize)
-	margin := gtx.Px(winIconMargin)
-	width := gtx.Px(winIconStroke)
+	size := gtx.Dp(winIconSize)
+	margin := gtx.Dp(winIconMargin)
+	width := gtx.Dp(winIconStroke)
 	r := clip.RRect{
 		Rect: image.Rect(margin, margin, size-2*margin, size-2*margin),
 	}
@@ -192,10 +192,10 @@ func maximizedWindow(gtx layout.Context) layout.Dimensions {
 
 // closeWindow draws a cross representing the close action.
 func closeWindow(gtx layout.Context) layout.Dimensions {
-	size := gtx.Px(winIconSize)
+	size := gtx.Dp(winIconSize)
 	size32 := float32(size)
-	margin := float32(gtx.Px(winIconMargin))
-	width := float32(gtx.Px(winIconStroke))
+	margin := float32(gtx.Dp(winIconMargin))
+	width := float32(gtx.Dp(winIconStroke))
 	var p clip.Path
 	p.Begin(gtx.Ops)
 	p.MoveTo(f32.Point{X: margin, Y: margin})

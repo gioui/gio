@@ -154,7 +154,7 @@ type window struct {
 
 	dpi       int
 	fontScale float32
-	insets    system.Insets
+	insets    image.Rectangle
 
 	stage     system.Stage
 	started   bool
@@ -586,12 +586,7 @@ func Java_org_gioui_GioView_onFocusChange(env *C.JNIEnv, class C.jclass, view C.
 //export Java_org_gioui_GioView_onWindowInsets
 func Java_org_gioui_GioView_onWindowInsets(env *C.JNIEnv, class C.jclass, view C.jlong, top, right, bottom, left C.jint) {
 	w := cgo.Handle(view).Value().(*window)
-	w.insets = system.Insets{
-		Top:    unit.Px(float32(top)),
-		Bottom: unit.Px(float32(bottom)),
-		Left:   unit.Px(float32(left)),
-		Right:  unit.Px(float32(right)),
-	}
+	w.insets = image.Rect(int(left), int(top), int(right), int(bottom))
 	if w.stage >= system.StageRunning {
 		w.draw(env, true)
 	}
@@ -830,11 +825,18 @@ func (w *window) draw(env *C.JNIEnv, sync bool) {
 	}
 	const inchPrDp = 1.0 / 160
 	ppdp := float32(w.dpi) * inchPrDp
+	dppp := unit.Dp(1.0 / ppdp)
+	insets := system.Insets{
+		Top:    unit.Dp(w.insets.Min.Y) * dppp,
+		Bottom: unit.Dp(w.insets.Max.Y) * dppp,
+		Left:   unit.Dp(w.insets.Min.X) * dppp,
+		Right:  unit.Dp(w.insets.Max.X) * dppp,
+	}
 	w.callbacks.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
 			Now:    time.Now(),
 			Size:   w.config.Size,
-			Insets: w.insets,
+			Insets: insets,
 			Metric: unit.Metric{
 				PxPerDp: ppdp,
 				PxPerSp: w.fontScale * ppdp,

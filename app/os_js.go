@@ -643,10 +643,11 @@ func (w *window) draw(sync bool) {
 }
 
 func (w *window) getConfig() (image.Point, system.Insets, unit.Metric) {
+	invscale := unit.Dp(1. / w.scale)
 	return image.Pt(w.config.Size.X, w.config.Size.Y),
 		system.Insets{
-			Bottom: unit.Px(w.inset.Y),
-			Right:  unit.Px(w.inset.X),
+			Bottom: unit.Dp(w.inset.Y) * invscale,
+			Right:  unit.Dp(w.inset.X) * invscale,
 		}, unit.Metric{
 			PxPerDp: w.scale,
 			PxPerSp: w.scale,

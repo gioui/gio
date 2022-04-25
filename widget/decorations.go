@@ -10,7 +10,6 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op/clip"
-	"gioui.org/unit"
 )
 
 // Decorations handles the states of window decorations.
@@ -67,7 +66,7 @@ func (d *Decorations) Clickable(action system.Action) *Clickable {
 // LayoutResize lays out the resize actions.
 func (d *Decorations) LayoutResize(gtx layout.Context, actions system.Action) {
 	cs := gtx.Constraints.Max
-	wh := gtx.Px(unit.Dp(10))
+	wh := gtx.Dp(10)
 	s := []struct {
 		system.Action
 		image.Rectangle

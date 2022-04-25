@@ -6,7 +6,6 @@ import (
 
 	"gioui.org/layout"
 	"gioui.org/op"
-	"gioui.org/unit"
 )
 
 func ExampleInset() {
@@ -19,7 +18,7 @@ func ExampleInset() {
 	}
 
 	// Inset all edges by 10.
-	inset := layout.UniformInset(unit.Dp(10))
+	inset := layout.UniformInset(10)
 	dims := inset.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		// Lay out a 50x50 sized widget.
 		dims := layoutWidget(gtx, 50, 50)

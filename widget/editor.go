@@ -497,12 +497,12 @@ func (e *Editor) calculateViewSize(gtx layout.Context) image.Point {
 }
 
 // Layout lays out the editor. If content is not nil, it is laid out on top.
-func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size unit.Value, content layout.Widget) layout.Dimensions {
+func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size unit.Sp, content layout.Widget) layout.Dimensions {
 	if e.locale != gtx.Locale {
 		e.locale = gtx.Locale
 		e.invalidate()
 	}
-	textSize := fixed.I(gtx.Px(size))
+	textSize := fixed.I(gtx.Sp(size))
 	if e.font != font || e.textSize != textSize {
 		e.invalidate()
 		e.font = font
@@ -776,7 +776,7 @@ func (e *Editor) PaintText(gtx layout.Context) {
 // caretWidth returns the width occupied by the caret for the current
 // gtx.
 func (e *Editor) caretWidth(gtx layout.Context) int {
-	carWidth2 := gtx.Px(unit.Dp(1)) / 2
+	carWidth2 := gtx.Dp(1) / 2
 	if carWidth2 < 1 {
 		carWidth2 = 1
 	}

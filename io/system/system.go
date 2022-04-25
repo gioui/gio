@@ -45,7 +45,8 @@ type DestroyEvent struct {
 // system decoration such as translucent
 // system bars and software keyboards.
 type Insets struct {
-	Top, Bottom, Left, Right unit.Value
+	// Values are in pixels.
+	Top, Bottom, Left, Right unit.Dp
 }
 
 // A StageEvent is generated whenever the stage of a

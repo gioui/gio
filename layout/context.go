@@ -52,15 +52,15 @@ func NewContext(ops *op.Ops, e system.FrameEvent) Context {
 	size := e.Size
 
 	if e.Insets != (system.Insets{}) {
-		left := e.Metric.Px(e.Insets.Left)
-		top := e.Metric.Px(e.Insets.Top)
+		left := e.Metric.Dp(e.Insets.Left)
+		top := e.Metric.Dp(e.Insets.Top)
 		op.Offset(image.Point{
 			X: left,
 			Y: top,
 		}).Add(ops)
 
-		size.X -= left + e.Metric.Px(e.Insets.Right)
-		size.Y -= top + e.Metric.Px(e.Insets.Bottom)
+		size.X -= left + e.Metric.Dp(e.Insets.Right)
+		size.Y -= top + e.Metric.Dp(e.Insets.Bottom)
 	}
 
 	return Context{
@@ -72,9 +72,14 @@ func NewContext(ops *op.Ops, e system.FrameEvent) Context {
 	}
 }
 
-// Px maps the value to pixels.
-func (c Context) Px(v unit.Value) int {
-	return c.Metric.Px(v)
+// Dp converts v to pixels.
+func (c Context) Dp(v unit.Dp) int {
+	return c.Metric.Dp(v)
+}
+
+// Sp converts v to pixels.
+func (c Context) Sp(v unit.Sp) int {
+	return c.Metric.Sp(v)
 }
 
 // Events returns the events available for the key. If no

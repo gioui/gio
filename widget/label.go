@@ -96,9 +96,9 @@ func (p1 screenPos) Less(p2 screenPos) bool {
 	return p1.Y < p2.Y || (p1.Y == p2.Y && p1.X < p2.X)
 }
 
-func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size unit.Value, txt string) layout.Dimensions {
+func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size unit.Sp, txt string) layout.Dimensions {
 	cs := gtx.Constraints
-	textSize := fixed.I(gtx.Px(size))
+	textSize := fixed.I(gtx.Sp(size))
 	lines := s.LayoutString(font, textSize, cs.Max.X, gtx.Locale, txt)
 	if max := l.MaxLines; max > 0 && len(lines) > max {
 		lines = lines[:max]

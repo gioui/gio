@@ -38,7 +38,7 @@ func TestListAnchorStrategies(t *testing.T) {
 		}
 		return layout.Dimensions{Size: image.Point{
 			X: gtx.Constraints.Max.X,
-			Y: gtx.Px(unit.Dp(20)),
+			Y: gtx.Dp(20),
 		}}
 	}
 
@@ -47,7 +47,7 @@ func TestListAnchorStrategies(t *testing.T) {
 	elements := 100
 	th := material.NewTheme(gofont.Collection())
 	materialList := material.List(th, &list)
-	indicatorWidth := gtx.Px(materialList.Width(gtx.Metric))
+	indicatorWidth := gtx.Dp(materialList.Width())
 
 	materialList.AnchorStrategy = material.Occupy
 	occupyDims := materialList.Layout(gtx, elements, space)

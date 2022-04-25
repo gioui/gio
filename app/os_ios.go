@@ -150,6 +150,11 @@ func (w *window) draw(sync bool) {
 		w.w.Event(system.StageEvent{Stage: system.StageRunning})
 	}
 	const inchPrDp = 1.0 / 163
+	m := unit.Metric{
+		PxPerDp: float32(params.dpi) * inchPrDp,
+		PxPerSp: float32(params.sdpi) * inchPrDp,
+	}
+	dppp := unit.Dp(1. / m.PxPerDp)
 	w.w.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
 			Now: time.Now(),
@@ -158,15 +163,12 @@ func (w *window) draw(sync bool) {
 				Y: int(params.height + .5),
 			},
 			Insets: system.Insets{
-				Top:    unit.Px(float32(params.top)),
-				Bottom: unit.Px(float32(params.bottom)),
-				Left:   unit.Px(float32(params.left)),
-				Right:  unit.Px(float32(params.right)),
+				Top:    unit.Dp(params.top) * dppp,
+				Bottom: unit.Dp(params.bottom) * dppp,
+				Left:   unit.Dp(params.left) * dppp,
+				Right:  unit.Dp(params.right) * dppp,
 			},
-			Metric: unit.Metric{
-				PxPerDp: float32(params.dpi) * inchPrDp,
-				PxPerSp: float32(params.sdpi) * inchPrDp,
-			},
+			Metric: m,
 		},
 		Sync: sync,
 	})

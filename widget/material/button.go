@@ -23,9 +23,9 @@ type ButtonStyle struct {
 	// Color is the text color.
 	Color        color.NRGBA
 	Font         text.Font
-	TextSize     unit.Value
+	TextSize     unit.Sp
 	Background   color.NRGBA
-	CornerRadius unit.Value
+	CornerRadius unit.Dp
 	Inset        layout.Inset
 	Button       *widget.Clickable
 	shaper       text.Shaper
@@ -33,7 +33,7 @@ type ButtonStyle struct {
 
 type ButtonLayoutStyle struct {
 	Background   color.NRGBA
-	CornerRadius unit.Value
+	CornerRadius unit.Dp
 	Button       *widget.Clickable
 }
 
@@ -43,7 +43,7 @@ type IconButtonStyle struct {
 	Color color.NRGBA
 	Icon  *widget.Icon
 	// Size is the icon size.
-	Size        unit.Value
+	Size        unit.Dp
 	Inset       layout.Inset
 	Button      *widget.Clickable
 	Description string
@@ -53,12 +53,12 @@ func Button(th *Theme, button *widget.Clickable, txt string) ButtonStyle {
 	return ButtonStyle{
 		Text:         txt,
 		Color:        th.Palette.ContrastFg,
-		CornerRadius: unit.Dp(4),
+		CornerRadius: 4,
 		Background:   th.Palette.ContrastBg,
-		TextSize:     th.TextSize.Scale(14.0 / 16.0),
+		TextSize:     th.TextSize * 14.0 / 16.0,
 		Inset: layout.Inset{
-			Top: unit.Dp(10), Bottom: unit.Dp(10),
-			Left: unit.Dp(12), Right: unit.Dp(12),
+			Top: 10, Bottom: 10,
+			Left: 12, Right: 12,
 		},
 		Button: button,
 		shaper: th.Shaper,
@@ -69,7 +69,7 @@ func ButtonLayout(th *Theme, button *widget.Clickable) ButtonLayoutStyle {
 	return ButtonLayoutStyle{
 		Button:       button,
 		Background:   th.Palette.ContrastBg,
-		CornerRadius: unit.Dp(4),
+		CornerRadius: 4,
 	}
 }
 
@@ -78,8 +78,8 @@ func IconButton(th *Theme, button *widget.Clickable, icon *widget.Icon, descript
 		Background:  th.Palette.ContrastBg,
 		Color:       th.Palette.ContrastFg,
 		Icon:        icon,
-		Size:        unit.Dp(24),
-		Inset:       layout.UniformInset(unit.Dp(12)),
+		Size:        24,
+		Inset:       layout.UniformInset(12),
 		Button:      button,
 		Description: description,
 	}
@@ -129,7 +129,7 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 		semantic.Button.Add(gtx.Ops)
 		return layout.Stack{Alignment: layout.Center}.Layout(gtx,
 			layout.Expanded(func(gtx layout.Context) layout.Dimensions {
-				rr := gtx.Px(b.CornerRadius)
+				rr := gtx.Dp(b.CornerRadius)
 				defer clip.UniformRRect(image.Rectangle{Max: gtx.Constraints.Min}, rr).Push(gtx.Ops).Pop()
 				background := b.Background
 				switch {
@@ -178,7 +178,7 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 			}),
 			layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 				return b.Inset.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-					size := gtx.Px(b.Size)
+					size := gtx.Dp(b.Size)
 					if b.Icon != nil {
 						gtx.Constraints.Min = image.Point{X: size}
 						b.Icon.Layout(gtx, b.Color)

@@ -19,9 +19,9 @@ type checkable struct {
 	Label              string
 	Color              color.NRGBA
 	Font               text.Font
-	TextSize           unit.Value
+	TextSize           unit.Sp
 	IconColor          color.NRGBA
-	Size               unit.Value
+	Size               unit.Dp
 	shaper             text.Shaper
 	checkedStateIcon   *widget.Icon
 	uncheckedStateIcon *widget.Icon
@@ -39,7 +39,7 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return layout.Stack{Alignment: layout.Center}.Layout(gtx,
 				layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-					size := gtx.Px(c.Size) * 4 / 3
+					size := gtx.Dp(c.Size) * 4 / 3
 					dims := layout.Dimensions{
 						Size: image.Point{X: size, Y: size},
 					}
@@ -55,8 +55,8 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 					return dims
 				}),
 				layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-					return layout.UniformInset(unit.Dp(2)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-						size := gtx.Px(c.Size)
+					return layout.UniformInset(2).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+						size := gtx.Dp(c.Size)
 						col := c.IconColor
 						if gtx.Queue == nil {
 							col = f32color.Disabled(col)
@@ -72,7 +72,7 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 		}),
 
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return layout.UniformInset(unit.Dp(2)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			return layout.UniformInset(2).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 				paint.ColorOp{Color: c.Color}.Add(gtx.Ops)
 				return widget.Label{}.Layout(gtx, c.shaper, c.Font, c.TextSize, c.Label)
 			})

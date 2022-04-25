@@ -10,7 +10,6 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/paint"
-	"gioui.org/unit"
 )
 
 type ProgressCircleStyle struct {
@@ -31,7 +30,7 @@ func (p ProgressCircleStyle) Layout(gtx layout.Context) layout.Dimensions {
 		diam = minY
 	}
 	if diam == 0 {
-		diam = gtx.Px(unit.Dp(24))
+		diam = gtx.Dp(24)
 	}
 	sz := gtx.Constraints.Constrain(image.Pt(diam, diam))
 	radius := sz.X / 2

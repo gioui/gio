@@ -15,16 +15,16 @@ import (
 // Border lays out a widget and draws a border inside it.
 type Border struct {
 	Color        color.NRGBA
-	CornerRadius unit.Value
-	Width        unit.Value
+	CornerRadius unit.Dp
+	Width        unit.Dp
 }
 
 func (b Border) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 	dims := w(gtx)
 	sz := dims.Size
 
-	rr := gtx.Px(b.CornerRadius)
-	width := gtx.Px(b.Width)
+	rr := gtx.Dp(b.CornerRadius)
+	width := gtx.Dp(b.Width)
 	sz.X -= width
 	sz.Y -= width
 

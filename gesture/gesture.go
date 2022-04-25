@@ -157,7 +157,7 @@ const (
 	StateFlinging
 )
 
-var touchSlop = unit.Dp(3)
+const touchSlop = unit.Dp(3)
 
 // Add the handler to the operation list to receive click events.
 func (c *Click) Add(ops *op.Ops) {
@@ -303,7 +303,7 @@ func (s *Scroll) Scroll(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) 
 				break
 			}
 			fling := s.estimator.Estimate()
-			if slop, d := float32(cfg.Px(touchSlop)), fling.Distance; d < -slop || d > slop {
+			if slop, d := float32(cfg.Dp(touchSlop)), fling.Distance; d < -slop || d > slop {
 				s.flinger.Start(cfg, t, fling.Velocity)
 			}
 			fallthrough
@@ -329,7 +329,7 @@ func (s *Scroll) Scroll(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) 
 			v := int(math.Round(float64(val)))
 			dist := s.last - v
 			if e.Priority < pointer.Grabbed {
-				slop := cfg.Px(touchSlop)
+				slop := cfg.Dp(touchSlop)
 				if dist := dist; dist >= slop || -slop >= dist {
 					s.grab = true
 				}
@@ -407,7 +407,7 @@ func (d *Drag) Events(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event
 			}
 			if e.Priority < pointer.Grabbed {
 				diff := e.Position.Sub(d.start)
-				slop := cfg.Px(touchSlop)
+				slop := cfg.Dp(touchSlop)
 				if diff.X*diff.X+diff.Y*diff.Y > float32(slop*slop) {
 					d.grab = true
 				}

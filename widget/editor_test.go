@@ -47,7 +47,7 @@ func TestEditorZeroDimensions(t *testing.T) {
 		Locale: english,
 	}
 	cache := text.NewCache(gofont.Collection())
-	fontSize := unit.Px(10)
+	fontSize := unit.Sp(10)
 	font := text.Font{}
 	e := new(Editor)
 	dims := e.Layout(gtx, cache, font, fontSize, nil)
@@ -63,7 +63,7 @@ func TestEditorConfigurations(t *testing.T) {
 		Locale:      english,
 	}
 	cache := text.NewCache(gofont.Collection())
-	fontSize := unit.Px(10)
+	fontSize := unit.Sp(10)
 	font := text.Font{}
 	sentence := "\n\n\n\n\n\n\n\n\n\n\n\nthe quick brown fox jumps over the lazy dog"
 	runes := len([]rune(sentence))
@@ -103,7 +103,7 @@ func TestEditor(t *testing.T) {
 		Locale:      english,
 	}
 	cache := text.NewCache(gofont.Collection())
-	fontSize := unit.Px(10)
+	fontSize := unit.Sp(10)
 	font := text.Font{}
 
 	// Regression test for bad in-cluster rune offset math.
@@ -206,7 +206,7 @@ func TestEditorRTL(t *testing.T) {
 		Locale:      arabic,
 	}
 	cache := text.NewCache(arabicCollection)
-	fontSize := unit.Px(10)
+	fontSize := unit.Sp(10)
 	font := text.Font{}
 
 	e.SetCaret(0, 0) // shouldn't panic
@@ -282,7 +282,7 @@ func TestEditorLigature(t *testing.T) {
 			Face: face,
 		},
 	})
-	fontSize := unit.Px(10)
+	fontSize := unit.Sp(10)
 	font := text.Font{}
 
 	/*
@@ -399,7 +399,7 @@ func TestEditorDimensions(t *testing.T) {
 		Locale:      english,
 	}
 	cache := text.NewCache(gofont.Collection())
-	fontSize := unit.Px(10)
+	fontSize := unit.Sp(10)
 	font := text.Font{}
 	dims := e.Layout(gtx, cache, font, fontSize, nil)
 	if dims.Size.X == 0 {
@@ -446,7 +446,7 @@ func TestEditorCaretConsistency(t *testing.T) {
 		Locale:      english,
 	}
 	cache := text.NewCache(gofont.Collection())
-	fontSize := unit.Px(10)
+	fontSize := unit.Sp(10)
 	font := text.Font{}
 	for _, a := range []text.Alignment{text.Start, text.Middle, text.End} {
 		e := &Editor{
@@ -539,7 +539,7 @@ func TestEditorMoveWord(t *testing.T) {
 			Locale:      english,
 		}
 		cache := text.NewCache(gofont.Collection())
-		fontSize := unit.Px(10)
+		fontSize := unit.Sp(10)
 		font := text.Font{}
 		e.SetText(t)
 		e.Layout(gtx, cache, font, fontSize, nil)
@@ -644,7 +644,7 @@ func TestEditorInsert(t *testing.T) {
 			Locale:      english,
 		}
 		cache := text.NewCache(gofont.Collection())
-		fontSize := unit.Px(10)
+		fontSize := unit.Sp(10)
 		font := text.Font{}
 		e.SetText(t)
 		e.Layout(gtx, cache, font, fontSize, nil)
@@ -734,7 +734,7 @@ func TestEditorDeleteWord(t *testing.T) {
 			Locale:      english,
 		}
 		cache := text.NewCache(gofont.Collection())
-		fontSize := unit.Px(10)
+		fontSize := unit.Sp(10)
 		font := text.Font{}
 		e.SetText(t)
 		e.Layout(gtx, cache, font, fontSize, nil)
@@ -789,7 +789,7 @@ g 2 4 6 8 g
 	}
 	cache := text.NewCache(gofont.Collection())
 	font := text.Font{}
-	fontSize := unit.Px(10)
+	fontSize := unit.Sp(10)
 
 	selected := func(start, end int) string {
 		// Layout once with no events; populate e.lines.
@@ -879,7 +879,7 @@ func TestSelectMove(t *testing.T) {
 	}
 	cache := text.NewCache(gofont.Collection())
 	font := text.Font{}
-	fontSize := unit.Px(10)
+	fontSize := unit.Sp(10)
 
 	// Layout once to populate e.lines and get focus.
 	gtx.Queue = newQueue(key.FocusEvent{Focus: true})

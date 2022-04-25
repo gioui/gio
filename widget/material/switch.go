@@ -12,7 +12,6 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
-	"gioui.org/unit"
 	"gioui.org/widget"
 )
 
@@ -40,9 +39,9 @@ func Switch(th *Theme, swtch *widget.Bool, description string) SwitchStyle {
 
 // Layout updates the switch and displays it.
 func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
-	trackWidth := gtx.Px(unit.Dp(36))
-	trackHeight := gtx.Px(unit.Dp(16))
-	thumbSize := gtx.Px(unit.Dp(20))
+	trackWidth := gtx.Dp(36)
+	trackHeight := gtx.Dp(16)
+	thumbSize := gtx.Dp(20)
 	trackOff := (thumbSize - trackHeight) / 2
 
 	// Draw track.
@@ -67,7 +66,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	t.Pop()
 
 	// Draw thumb ink.
-	inkSize := gtx.Px(unit.Dp(44))
+	inkSize := gtx.Dp(44)
 	rr := inkSize / 2
 	inkOff := image.Point{
 		X: trackWidth/2 - rr,
@@ -107,13 +106,13 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	// Draw thumb shadow, a translucent disc slightly larger than the
 	// thumb itself.
 	// Center shadow horizontally and slightly adjust its Y.
-	paint.FillShape(gtx.Ops, argb(0x55000000), circle(thumbRadius, thumbRadius+gtx.Px(unit.Dp(.25)), thumbRadius+1))
+	paint.FillShape(gtx.Ops, argb(0x55000000), circle(thumbRadius, thumbRadius+gtx.Dp(.25), thumbRadius+1))
 
 	// Draw thumb.
 	paint.FillShape(gtx.Ops, col, circle(thumbRadius, thumbRadius, thumbRadius))
 
 	// Set up click area.
-	clickSize := gtx.Px(unit.Dp(40))
+	clickSize := gtx.Dp(40)
 	clickOff := image.Point{
 		X: (thumbSize - clickSize) / 2,
 		Y: (trackHeight-clickSize)/2 + trackOff,

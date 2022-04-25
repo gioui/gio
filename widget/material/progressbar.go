@@ -29,10 +29,10 @@ func ProgressBar(th *Theme, progress float32) ProgressBarStyle {
 
 func (p ProgressBarStyle) Layout(gtx layout.Context) layout.Dimensions {
 	shader := func(width int, color color.NRGBA) layout.Dimensions {
-		var maxHeight = unit.Dp(4)
-		rr := gtx.Px(unit.Dp(2))
+		const maxHeight = unit.Dp(4)
+		rr := gtx.Dp(2)
 
-		d := image.Point{X: width, Y: gtx.Px(maxHeight)}
+		d := image.Point{X: width, Y: gtx.Dp(maxHeight)}
 
 		defer clip.UniformRRect(image.Rectangle{Max: image.Pt(width, d.Y)}, rr).Push(gtx.Ops).Pop()
 		paint.ColorOp{Color: color}.Add(gtx.Ops)

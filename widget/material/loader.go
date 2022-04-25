@@ -13,7 +13,6 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
-	"gioui.org/unit"
 )
 
 type LoaderStyle struct {
@@ -32,7 +31,7 @@ func (l LoaderStyle) Layout(gtx layout.Context) layout.Dimensions {
 		diam = minY
 	}
 	if diam == 0 {
-		diam = gtx.Px(unit.Dp(24))
+		diam = gtx.Dp(24)
 	}
 	sz := gtx.Constraints.Constrain(image.Pt(diam, diam))
 	radius := sz.X / 2

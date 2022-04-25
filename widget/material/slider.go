@@ -31,19 +31,19 @@ type SliderStyle struct {
 	Color    color.NRGBA
 	Float    *widget.Float
 
-	FingerSize unit.Value
+	FingerSize unit.Dp
 }
 
 func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
-	thumbRadius := gtx.Px(unit.Dp(6))
-	trackWidth := gtx.Px(unit.Dp(2))
+	thumbRadius := gtx.Dp(6)
+	trackWidth := gtx.Dp(2)
 
 	axis := s.Float.Axis
 	// Keep a minimum length so that the track is always visible.
 	minLength := thumbRadius + 3*thumbRadius + thumbRadius
 	// Try to expand to finger size, but only if the constraints
 	// allow for it.
-	touchSizePx := min(gtx.Px(s.FingerSize), axis.Convert(gtx.Constraints.Max).Y)
+	touchSizePx := min(gtx.Dp(s.FingerSize), axis.Convert(gtx.Constraints.Max).Y)
 	sizeMain := max(axis.Convert(gtx.Constraints.Min).X, minLength)
 	sizeCross := max(2*thumbRadius, touchSizePx)
 	size := axis.Convert(image.Pt(sizeMain, sizeCross))

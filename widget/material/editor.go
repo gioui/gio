@@ -17,7 +17,7 @@ import (
 
 type EditorStyle struct {
 	Font     text.Font
-	TextSize unit.Value
+	TextSize unit.Sp
 	// Color is the text color.
 	Color color.NRGBA
 	// Hint contains the text displayed when the editor is empty.

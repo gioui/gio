@@ -138,7 +138,7 @@ var ackEvent event.Event
 // iOS, Android, WebAssembly.
 func NewWindow(options ...Option) *Window {
 	defaultOptions := []Option{
-		Size(unit.Dp(800), unit.Dp(600)),
+		Size(800, 600),
 		Title("Gio"),
 	}
 	options = append(defaultOptions, options...)
@@ -546,8 +546,8 @@ func (w *Window) moveFocus(dir router.FocusDirection, d driver) {
 		default:
 			return
 		}
-		const scrollABit = 50
-		dist := v.Mul(w.metric.Px(unit.Dp(scrollABit)))
+		const scrollABit = unit.Dp(50)
+		dist := v.Mul(int(w.metric.Dp(scrollABit)))
 		w.queue.q.ScrollFocus(dist)
 	}
 	w.setNextFrame(time.Time{})
@@ -805,12 +805,12 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		wrapper.Reset()
 		viewport := image.Rectangle{
 			Min: image.Point{
-				X: e2.Metric.Px(e2.Insets.Left),
-				Y: e2.Metric.Px(e2.Insets.Top),
+				X: e2.Metric.Dp(e2.Insets.Left),
+				Y: e2.Metric.Dp(e2.Insets.Top),
 			},
 			Max: image.Point{
-				X: e2.Size.X - e2.Metric.Px(e2.Insets.Right),
-				Y: e2.Size.Y - e2.Metric.Px(e2.Insets.Bottom),
+				X: e2.Size.X - e2.Metric.Dp(e2.Insets.Right),
+				Y: e2.Size.Y - e2.Metric.Dp(e2.Insets.Bottom),
 			},
 		}
 		// Scroll to focus if viewport is shrinking in any dimension.
@@ -1034,50 +1034,50 @@ func Title(t string) Option {
 }
 
 // Size sets the size of the window. The mode will be changed to Windowed.
-func Size(w, h unit.Value) Option {
-	if w.V <= 0 {
+func Size(w, h unit.Dp) Option {
+	if w <= 0 {
 		panic("width must be larger than or equal to 0")
 	}
-	if h.V <= 0 {
+	if h <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
 	return func(m unit.Metric, cnf *Config) {
 		cnf.Mode = Windowed
 		cnf.Size = image.Point{
-			X: m.Px(w),
-			Y: m.Px(h),
+			X: m.Dp(w),
+			Y: m.Dp(h),
 		}
 	}
 }
 
 // MaxSize sets the maximum size of the window.
-func MaxSize(w, h unit.Value) Option {
-	if w.V <= 0 {
+func MaxSize(w, h unit.Dp) Option {
+	if w <= 0 {
 		panic("width must be larger than or equal to 0")
 	}
-	if h.V <= 0 {
+	if h <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
 	return func(m unit.Metric, cnf *Config) {
 		cnf.MaxSize = image.Point{
-			X: m.Px(w),
-			Y: m.Px(h),
+			X: m.Dp(w),
+			Y: m.Dp(h),
 		}
 	}
 }
 
 // MinSize sets the minimum size of the window.
-func MinSize(w, h unit.Value) Option {
-	if w.V <= 0 {
+func MinSize(w, h unit.Dp) Option {
+	if w <= 0 {
 		panic("width must be larger than or equal to 0")
 	}
-	if h.V <= 0 {
+	if h <= 0 {
 		panic("height must be larger than or equal to 0")
 	}
 	return func(m unit.Metric, cnf *Config) {
 		cnf.MinSize = image.Point{
-			X: m.Px(w),
-			Y: m.Px(h),
+			X: m.Dp(w),
+			Y: m.Dp(h),
 		}
 	}
 }
