@@ -189,13 +189,6 @@ func (c *pointerCollector) pushArea(kind areaKind, bounds image.Rectangle) {
 	})
 }
 
-// frect converts a rectangle to a f32.Rectangle.
-func frect(r image.Rectangle) f32.Rectangle {
-	return f32.Rectangle{
-		Min: fpt(r.Min), Max: fpt(r.Max),
-	}
-}
-
 // fpt converts a point to a f32.Point.
 func fpt(p image.Point) f32.Point {
 	return f32.Point{
