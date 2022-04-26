@@ -11,9 +11,9 @@ import (
 	"math"
 	"unsafe"
 
-	"gioui.org/f32"
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/byteslice"
+	"gioui.org/internal/f32"
 	"gioui.org/internal/f32color"
 	"gioui.org/shader"
 	"gioui.org/shader/gio"

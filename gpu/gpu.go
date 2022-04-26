@@ -18,9 +18,9 @@ import (
 	"time"
 	"unsafe"
 
-	"gioui.org/f32"
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/byteslice"
+	"gioui.org/internal/f32"
 	"gioui.org/internal/f32color"
 	"gioui.org/internal/ops"
 	"gioui.org/internal/scene"
@@ -695,8 +695,8 @@ func (r *renderer) intersectPath(p *pathOp, clip image.Rectangle) {
 	}
 	fbo := r.pather.stenciler.cover(p.place.Idx)
 	r.ctx.BindTexture(0, fbo.tex)
-	coverScale, coverOff := texSpaceTransform(frect(uv), fbo.size)
-	subScale, subOff := texSpaceTransform(frect(sub), p.clip.Size())
+	coverScale, coverOff := texSpaceTransform(f32.FRect(uv), fbo.size)
+	subScale, subOff := texSpaceTransform(f32.FRect(sub), p.clip.Size())
 	r.pather.stenciler.ipipeline.uniforms.vert.uvTransform = [4]float32{coverScale.X, coverScale.Y, coverOff.X, coverOff.Y}
 	r.pather.stenciler.ipipeline.uniforms.vert.subUVTransform = [4]float32{subScale.X, subScale.Y, subOff.X, subOff.Y}
 	r.pather.stenciler.ipipeline.pipeline.UploadUniforms(r.ctx)
@@ -888,7 +888,7 @@ loop:
 			var op ops.ClipOp
 			op.Decode(encOp.Data)
 			quads.key.outline = op.Outline
-			bounds := frect(op.Bounds)
+			bounds := f32.FRect(op.Bounds)
 			trans, off := splitTransform(state.t)
 			if len(quads.aux) > 0 {
 				// There is a clipping path, build the gpu data and update the
@@ -1108,7 +1108,7 @@ func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 			Min: img.place.Pos,
 			Max: img.place.Pos.Add(drc.Size()),
 		}
-		coverScale, coverOff := texSpaceTransform(frect(uv), fbo.size)
+		coverScale, coverOff := texSpaceTransform(f32.FRect(uv), fbo.size)
 		p := r.pather.coverer.pipelines[m.material]
 		r.ctx.BindPipeline(p.pipeline)
 		r.ctx.BindVertexBuffer(r.blitter.quadVerts, 0)
@@ -1405,18 +1405,4 @@ func (d *drawOps) boundsForTransformedRect(r f32.Rectangle, tr f32.Affine2D) (au
 func isPureOffset(t f32.Affine2D) bool {
 	a, b, _, d, e, _ := t.Elems()
 	return a == 1 && b == 0 && d == 0 && e == 1
-}
-
-// frect converts a rectangle to a f32.Rectangle.
-func frect(r image.Rectangle) f32.Rectangle {
-	return f32.Rectangle{
-		Min: fpt(r.Min), Max: fpt(r.Max),
-	}
-}
-
-// fpt converts an point to a f32.Point.
-func fpt(p image.Point) f32.Point {
-	return f32.Point{
-		X: float32(p.X), Y: float32(p.Y),
-	}
 }

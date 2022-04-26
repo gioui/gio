@@ -21,9 +21,9 @@ import (
 	"unsafe"
 
 	"gioui.org/cpu"
-	"gioui.org/f32"
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/byteslice"
+	"gioui.org/internal/f32"
 	"gioui.org/internal/f32color"
 	"gioui.org/internal/ops"
 	"gioui.org/internal/scene"
@@ -855,7 +855,7 @@ func (g *compute) blitLayers(d driver.LoadDesc, fbo driver.Texture, viewport ima
 	for _, l := range layers {
 		placef := layout.FPt(l.alloc.rect.Min)
 		sizef := layout.FPt(l.rect.Size())
-		r := frect(l.rect)
+		r := f32.FRect(l.rect)
 		quad := [4]layerVertex{
 			{posX: float32(r.Min.X), posY: float32(r.Min.Y), u: placef.X, v: placef.Y},
 			{posX: float32(r.Max.X), posY: float32(r.Min.Y), u: placef.X + sizef.X, v: placef.Y},
@@ -1782,7 +1782,7 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 		case ops.TypeClip:
 			var op ops.ClipOp
 			op.Decode(encOp.Data)
-			bounds := frect(op.Bounds)
+			bounds := f32.FRect(op.Bounds)
 			c.addClip(&state, fview, bounds, pathData.data, pathData.key, pathData.hash, strWidth, true)
 			pathData.data = nil
 			strWidth = 0

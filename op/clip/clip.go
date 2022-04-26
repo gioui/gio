@@ -9,6 +9,7 @@ import (
 	"math"
 
 	"gioui.org/f32"
+	f32internal "gioui.org/internal/f32"
 	"gioui.org/internal/ops"
 	"gioui.org/internal/scene"
 	"gioui.org/internal/stroke"
@@ -51,7 +52,7 @@ func (p Op) add(o *op.Ops) {
 	if !path.hasSegments && p.width > 0 {
 		switch p.path.shape {
 		case ops.Rect:
-			b := frect(path.bounds)
+			b := f32internal.FRect(path.bounds)
 			var rect Path
 			rect.Begin(o)
 			rect.MoveTo(b.Min)
@@ -129,7 +130,7 @@ type Path struct {
 	macro       op.MacroOp
 	start       f32.Point
 	hasSegments bool
-	bounds      f32.Rectangle
+	bounds      f32internal.Rectangle
 	hash        maphash.Hash
 }
 
@@ -219,7 +220,7 @@ func (p *Path) cmd(data []byte, c scene.Command) {
 func (p *Path) expand(pt f32.Point) {
 	if !p.hasSegments {
 		p.hasSegments = true
-		p.bounds = f32.Rectangle{Min: pt, Max: pt}
+		p.bounds = f32internal.Rectangle{Min: pt, Max: pt}
 	} else {
 		b := p.bounds
 		if pt.X < b.Min.X {
@@ -337,19 +338,5 @@ func (o Outline) Op() Op {
 	return Op{
 		path:    o.Path,
 		outline: true,
-	}
-}
-
-// frect converts a rectangle to a f32.Rectangle.
-func frect(r image.Rectangle) f32.Rectangle {
-	return f32.Rectangle{
-		Min: fpt(r.Min), Max: fpt(r.Max),
-	}
-}
-
-// fpt converts an point to a f32.Point.
-func fpt(p image.Point) f32.Point {
-	return f32.Point{
-		X: float32(p.X), Y: float32(p.Y),
 	}
 }

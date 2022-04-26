@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"gioui.org/f32"
+	f32internal "gioui.org/internal/f32"
 	"gioui.org/internal/ops"
 	"gioui.org/op"
 )
@@ -81,7 +82,7 @@ func (rr RRect) Path(ops *op.Ops) PathSpec {
 	const iq = 1 - q
 
 	se, sw, nw, ne := float32(rr.SE), float32(rr.SW), float32(rr.NW), float32(rr.NE)
-	rrf := frect(rr.Rect)
+	rrf := f32internal.FRect(rr.Rect)
 	w, n, e, s := rrf.Min.X, rrf.Min.Y, rrf.Max.X, rrf.Max.Y
 
 	p.MoveTo(f32.Point{X: w + nw, Y: n})
@@ -133,7 +134,7 @@ func (e Ellipse) Path(o *op.Ops) PathSpec {
 	var p Path
 	p.Begin(o)
 
-	bf := frect(bounds)
+	bf := f32internal.FRect(bounds)
 	center := bf.Max.Add(bf.Min).Mul(.5)
 	diam := bf.Dx()
 	r := diam * .5

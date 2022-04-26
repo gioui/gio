@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"gioui.org/f32"
+	f32internal "gioui.org/internal/f32"
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
@@ -187,13 +188,6 @@ func (c *pointerCollector) pushArea(kind areaKind, bounds image.Rectangle) {
 		area: areaID,
 		pass: true,
 	})
-}
-
-// fpt converts a point to a f32.Point.
-func fpt(p image.Point) f32.Point {
-	return f32.Point{
-		X: float32(p.X), Y: float32(p.Y),
-	}
 }
 
 func (c *pointerCollector) popArea() {
@@ -911,8 +905,8 @@ func firstMimeMatch(src, tgt *pointerHandler) (first string, matched bool) {
 }
 
 func (op *areaOp) Hit(pos f32.Point) bool {
-	pos = pos.Sub(fpt(op.rect.Min))
-	size := fpt(op.rect.Size())
+	pos = pos.Sub(f32internal.FPt(op.rect.Min))
+	size := f32internal.FPt(op.rect.Size())
 	switch op.kind {
 	case areaRect:
 		return 0 <= pos.X && pos.X < size.X &&
@@ -931,9 +925,9 @@ func (op *areaOp) Hit(pos f32.Point) bool {
 }
 
 func (a *areaNode) bounds() image.Rectangle {
-	return f32.Rectangle{
-		Min: a.trans.Transform(fpt(a.area.rect.Min)),
-		Max: a.trans.Transform(fpt(a.area.rect.Max)),
+	return f32internal.Rectangle{
+		Min: a.trans.Transform(f32internal.FPt(a.area.rect.Min)),
+		Max: a.trans.Transform(f32internal.FPt(a.area.rect.Max)),
 	}.Round()
 }
 

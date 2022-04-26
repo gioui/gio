@@ -5,7 +5,7 @@ package gpu
 import (
 	"fmt"
 
-	"gioui.org/f32"
+	"gioui.org/internal/f32"
 )
 
 type resourceCache struct {

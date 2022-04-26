@@ -1,30 +1,23 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 /*
-Package f32 is a float32 implementation of package image's
-Point and Rectangle.
-
-The coordinate space has the origin in the top left
-corner with the axes extending right and down.
+Package f32 is an internal version of the public package f32 with
+extra types for internal use.
 */
 package f32
 
 import (
 	"image"
 	"math"
-	"strconv"
+
+	"gioui.org/f32"
 )
 
-// A Point is a two dimensional point.
-type Point struct {
-	X, Y float32
-}
+type Point = f32.Point
 
-// String return a string representation of p.
-func (p Point) String() string {
-	return "(" + strconv.FormatFloat(float64(p.X), 'f', -1, 32) +
-		"," + strconv.FormatFloat(float64(p.Y), 'f', -1, 32) + ")"
-}
+type Affine2D = f32.Affine2D
+
+var NewAffine2D = f32.NewAffine2D
 
 // A Rectangle contains the points (X, Y) where Min.X <= X < Max.X,
 // Min.Y <= Y < Max.Y.
@@ -51,43 +44,7 @@ func Rect(x0, y0, x1, y1 float32) Rectangle {
 }
 
 // Pt is shorthand for Point{X: x, Y: y}.
-func Pt(x, y float32) Point {
-	return Point{X: x, Y: y}
-}
-
-// Add return the point p+p2.
-func (p Point) Add(p2 Point) Point {
-	return Point{X: p.X + p2.X, Y: p.Y + p2.Y}
-}
-
-// Sub returns the vector p-p2.
-func (p Point) Sub(p2 Point) Point {
-	return Point{X: p.X - p2.X, Y: p.Y - p2.Y}
-}
-
-// Mul returns p scaled by s.
-func (p Point) Mul(s float32) Point {
-	return Point{X: p.X * s, Y: p.Y * s}
-}
-
-// Div returns the vector p/s.
-func (p Point) Div(s float32) Point {
-	return Point{X: p.X / s, Y: p.Y / s}
-}
-
-// In reports whether p is in r.
-func (p Point) In(r Rectangle) bool {
-	return r.Min.X <= p.X && p.X < r.Max.X &&
-		r.Min.Y <= p.Y && p.Y < r.Max.Y
-}
-
-// Round returns the integer point closest to p.
-func (p Point) Round() image.Point {
-	return image.Point{
-		X: int(math.Round(float64(p.X))),
-		Y: int(math.Round(float64(p.Y))),
-	}
-}
+var Pt = f32.Pt
 
 // Size returns r's width and height.
 func (r Rectangle) Size() Point {
@@ -192,6 +149,20 @@ func (r Rectangle) Round() image.Rectangle {
 			X: int(ceil(r.Max.X)),
 			Y: int(ceil(r.Max.Y)),
 		},
+	}
+}
+
+// fRect converts a rectangle to a f32internal.Rectangle.
+func FRect(r image.Rectangle) Rectangle {
+	return Rectangle{
+		Min: FPt(r.Min), Max: FPt(r.Max),
+	}
+}
+
+// Fpt converts an point to a f32.Point.
+func FPt(p image.Point) Point {
+	return Point{
+		X: float32(p.X), Y: float32(p.Y),
 	}
 }
 

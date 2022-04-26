@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"gioui.org/f32"
+	f32internal "gioui.org/internal/f32"
 	"gioui.org/internal/ops"
 	"gioui.org/io/clipboard"
 	"gioui.org/io/event"
@@ -242,7 +243,7 @@ func (q *Router) ScrollFocus(dist image.Point) {
 	q.pointer.queue.Deliver(area, pointer.Event{
 		Type:   pointer.Scroll,
 		Source: pointer.Touch,
-		Scroll: fpt(dist),
+		Scroll: f32internal.FPt(dist),
 	}, &q.handlers)
 }
 

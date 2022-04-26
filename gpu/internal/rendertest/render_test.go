@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/image/colornames"
 
-	"gioui.org/f32"
+	"gioui.org/internal/f32"
 	"gioui.org/internal/f32color"
 	"gioui.org/op"
 	"gioui.org/op/clip"

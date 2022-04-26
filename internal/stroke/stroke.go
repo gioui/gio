@@ -29,7 +29,7 @@ import (
 	"encoding/binary"
 	"math"
 
-	"gioui.org/f32"
+	"gioui.org/internal/f32"
 	"gioui.org/internal/ops"
 	"gioui.org/internal/scene"
 )
