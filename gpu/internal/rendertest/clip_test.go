@@ -124,13 +124,13 @@ func TestPaintTexture(t *testing.T) {
 func TestTexturedStrokeClipped(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		smallSquares.Add(o)
-		defer op.Offset(f32.Pt(50, 50)).Push(o).Pop()
+		defer op.Offset(image.Pt(50, 50)).Push(o).Pop()
 		defer clip.Stroke{
 			Path:  clip.RRect{Rect: f32.Rect(0, 0, 30, 30)}.Path(o),
 			Width: 10,
 		}.Op().Push(o).Pop()
 		defer clip.RRect{Rect: f32.Rect(-30, -30, 60, 60)}.Push(o).Pop()
-		defer op.Offset(f32.Pt(-10, -10)).Push(o).Pop()
+		defer op.Offset(image.Pt(-10, -10)).Push(o).Pop()
 		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 	})
@@ -139,12 +139,12 @@ func TestTexturedStrokeClipped(t *testing.T) {
 func TestTexturedStroke(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		smallSquares.Add(o)
-		defer op.Offset(f32.Pt(50, 50)).Push(o).Pop()
+		defer op.Offset(image.Pt(50, 50)).Push(o).Pop()
 		defer clip.Stroke{
 			Path:  clip.RRect{Rect: f32.Rect(0, 0, 30, 30)}.Path(o),
 			Width: 10,
 		}.Op().Push(o).Pop()
-		defer op.Offset(f32.Pt(-10, -10)).Push(o).Pop()
+		defer op.Offset(image.Pt(-10, -10)).Push(o).Pop()
 		paint.PaintOp{}.Add(o)
 	}, func(r result) {
 	})

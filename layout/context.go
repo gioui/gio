@@ -3,9 +3,9 @@
 package layout
 
 import (
+	"image"
 	"time"
 
-	"gioui.org/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/system"
 	"gioui.org/op"
@@ -54,9 +54,9 @@ func NewContext(ops *op.Ops, e system.FrameEvent) Context {
 	if e.Insets != (system.Insets{}) {
 		left := e.Metric.Px(e.Insets.Left)
 		top := e.Metric.Px(e.Insets.Top)
-		op.Offset(f32.Point{
-			X: float32(left),
-			Y: float32(top),
+		op.Offset(image.Point{
+			X: left,
+			Y: top,
 		}).Add(ops)
 
 		size.X -= left + e.Metric.Px(e.Insets.Right)

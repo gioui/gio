@@ -67,6 +67,7 @@ package op
 
 import (
 	"encoding/binary"
+	"image"
 	"math"
 	"time"
 
@@ -195,9 +196,10 @@ func (r InvalidateOp) Add(o *Ops) {
 	}
 }
 
-// Offset creates a TransformOp with the offset o.
-func Offset(o f32.Point) TransformOp {
-	return TransformOp{t: f32.Affine2D{}.Offset(o)}
+// Offset converts an offset to a TransformOp.
+func Offset(off image.Point) TransformOp {
+	offf := f32.Pt(float32(off.X), float32(off.Y))
+	return Affine(f32.Affine2D{}.Offset(offf))
 }
 
 // Affine creates a TransformOp representing the transformation a.

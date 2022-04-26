@@ -17,7 +17,7 @@ import (
 
 func TestPaintOffset(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		defer op.Offset(f32.Pt(10, 20)).Push(o).Pop()
+		defer op.Offset(image.Pt(10, 20)).Push(o).Pop()
 		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
 	}, func(r result) {
 		r.expect(0, 0, transparent)
@@ -53,7 +53,7 @@ func TestPaintShear(t *testing.T) {
 func TestClipPaintOffset(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		defer clip.RRect{Rect: f32.Rect(10, 10, 30, 30)}.Push(o).Pop()
-		defer op.Offset(f32.Pt(20, 20)).Push(o).Pop()
+		defer op.Offset(image.Pt(20, 20)).Push(o).Pop()
 		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 100, 100)).Op())
 	}, func(r result) {
 		r.expect(0, 0, transparent)
@@ -65,7 +65,7 @@ func TestClipPaintOffset(t *testing.T) {
 
 func TestClipOffset(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		defer op.Offset(f32.Pt(20, 20)).Push(o).Pop()
+		defer op.Offset(image.Pt(20, 20)).Push(o).Pop()
 		defer clip.RRect{Rect: f32.Rect(10, 10, 30, 30)}.Push(o).Pop()
 		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 100, 100)).Op())
 	}, func(r result) {
@@ -105,7 +105,7 @@ func TestClipRotate(t *testing.T) {
 
 func TestOffsetTexture(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		defer op.Offset(f32.Pt(15, 15)).Push(o).Pop()
+		defer op.Offset(image.Pt(15, 15)).Push(o).Pop()
 		squares.Add(o)
 		defer scale(50.0/512, 50.0/512).Push(o).Pop()
 		paint.PaintOp{}.Add(o)
@@ -119,7 +119,7 @@ func TestOffsetTexture(t *testing.T) {
 
 func TestOffsetScaleTexture(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		defer op.Offset(f32.Pt(15, 15)).Push(o).Pop()
+		defer op.Offset(image.Pt(15, 15)).Push(o).Pop()
 		squares.Add(o)
 		defer op.Affine(f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(2, 1))).Push(o).Pop()
 		defer scale(50.0/512, 50.0/512).Push(o).Pop()

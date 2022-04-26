@@ -292,7 +292,7 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 			min = 0
 		}
 		pt := l.Axis.Convert(image.Pt(pos, cross))
-		trans := op.Offset(FPt(pt)).Push(ops)
+		trans := op.Offset(pt).Push(ops)
 		child.call.Add(ops)
 		trans.Pop()
 		pos += childSize

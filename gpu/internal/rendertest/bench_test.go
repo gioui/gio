@@ -86,7 +86,7 @@ func BenchmarkDrawUI(b *testing.B) {
 		resetOps(gtx)
 
 		off := float32(math.Mod(float64(i)/10, 10))
-		t := op.Offset(f32.Pt(off, off)).Push(gtx.Ops)
+		t := op.Affine(f32.Affine2D{}.Offset(f32.Pt(off, off))).Push(gtx.Ops)
 
 		drawCore(gtx, th)
 
@@ -157,13 +157,13 @@ func Benchmark1000CirclesInstanced(b *testing.B) {
 func draw1000Circles(gtx layout.Context) {
 	ops := gtx.Ops
 	for x := 0; x < 100; x++ {
-		op.Offset(f32.Pt(float32(x*10), 0)).Add(ops)
+		op.Offset(image.Pt(x*10, 0)).Add(ops)
 		for y := 0; y < 10; y++ {
 			paint.FillShape(ops,
 				color.NRGBA{R: 100 + uint8(x), G: 100 + uint8(y), B: 100, A: 120},
 				clip.RRect{Rect: f32.Rect(0, 0, 10, 10), NE: 5, SE: 5, SW: 5, NW: 5}.Op(ops),
 			)
-			op.Offset(f32.Pt(0, float32(100))).Add(ops)
+			op.Offset(image.Pt(0, 100)).Add(ops)
 		}
 	}
 }
@@ -178,11 +178,11 @@ func draw1000CirclesInstanced(gtx layout.Context) {
 	c := r.Stop()
 
 	for x := 0; x < 100; x++ {
-		op.Offset(f32.Pt(float32(x*10), 0)).Add(ops)
+		op.Offset(image.Pt(x*10, 0)).Add(ops)
 		for y := 0; y < 10; y++ {
 			paint.ColorOp{Color: color.NRGBA{R: 100 + uint8(x), G: 100 + uint8(y), B: 100, A: 120}}.Add(ops)
 			c.Add(ops)
-			op.Offset(f32.Pt(0, float32(100))).Add(ops)
+			op.Offset(image.Pt(0, 100)).Add(ops)
 		}
 	}
 }
@@ -203,13 +203,13 @@ func drawIndividualShapes(gtx layout.Context, th *material.Theme) chan op.CallOp
 		ops := &op1
 		c := op.Record(ops)
 		for x := 0; x < 9; x++ {
-			op.Offset(f32.Pt(float32(x*50), 0)).Add(ops)
+			op.Offset(image.Pt(x*50, 0)).Add(ops)
 			for y := 0; y < 9; y++ {
 				paint.FillShape(ops,
 					color.NRGBA{R: 100 + uint8(x), G: 100 + uint8(y), B: 100, A: 120},
 					clip.RRect{Rect: f32.Rect(0, 0, 25, 25), NE: 10, SE: 10, SW: 10, NW: 10}.Op(ops),
 				)
-				op.Offset(f32.Pt(0, float32(50))).Add(ops)
+				op.Offset(image.Pt(0, 50)).Add(ops)
 			}
 		}
 		c1 <- c.Stop()
@@ -233,7 +233,7 @@ func drawShapeInstances(gtx layout.Context, th *material.Theme) chan op.CallOp {
 		rad := float32(0)
 		for x := 0; x < 20; x++ {
 			for y := 0; y < 20; y++ {
-				t := op.Offset(f32.Pt(float32(x*50+25), float32(y*50+25))).Push(ops)
+				t := op.Offset(image.Pt(x*50+25, y*50+25)).Push(ops)
 				c.Add(ops)
 				t.Pop()
 				rad += math.Pi * 2 / 400
@@ -253,7 +253,7 @@ func drawText(gtx layout.Context, th *material.Theme) chan op.CallOp {
 		txt := material.H6(th, "")
 		for x := 0; x < 40; x++ {
 			txt.Text = textRows[x]
-			t := op.Offset(f32.Pt(float32(0), float32(24*x))).Push(ops)
+			t := op.Offset(image.Pt(0, 24*x)).Push(ops)
 			gtx.Ops = ops
 			txt.Layout(gtx)
 			t.Pop()

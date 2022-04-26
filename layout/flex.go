@@ -184,7 +184,7 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 			}
 		}
 		pt := f.Axis.Convert(image.Pt(mainSize, cross))
-		trans := op.Offset(FPt(pt)).Push(gtx.Ops)
+		trans := op.Offset(pt).Push(gtx.Ops)
 		child.call.Add(gtx.Ops)
 		trans.Pop()
 		mainSize += f.Axis.Convert(dims.Size).X

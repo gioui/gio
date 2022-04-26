@@ -3,8 +3,6 @@
 package widget
 
 import (
-	"image"
-
 	"gioui.org/gesture"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
@@ -65,7 +63,7 @@ func (e *Enum) Layout(gtx layout.Context, k string, content layout.Widget) layou
 	m := op.Record(gtx.Ops)
 	dims := content(gtx)
 	c := m.Stop()
-	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
+	defer clip.Rect{Max: dims.Size}.Push(gtx.Ops).Pop()
 
 	state := e.index(k)
 	if state == nil {

@@ -3,9 +3,8 @@
 package op
 
 import (
+	"image"
 	"testing"
-
-	"gioui.org/f32"
 )
 
 func TestTransformChecks(t *testing.T) {
@@ -15,7 +14,7 @@ func TestTransformChecks(t *testing.T) {
 		}
 	}()
 	var ops Ops
-	trans := Offset(f32.Point{}).Push(&ops)
+	trans := Offset(image.Point{}).Push(&ops)
 	Record(&ops)
 	trans.Pop()
 }

@@ -724,7 +724,7 @@ func (e *Editor) PaintSelection(gtx layout.Context) {
 
 		dotStart := image.Pt(leftmost.x.Round(), leftmost.y)
 		dotEnd := image.Pt(rightmost.x.Round(), rightmost.y)
-		t := op.Offset(layout.FPt(scroll.Mul(-1))).Push(gtx.Ops)
+		t := op.Offset(scroll.Mul(-1)).Push(gtx.Ops)
 		size := image.Rectangle{
 			Min: dotStart.Sub(image.Point{Y: line.Ascent.Ceil()}),
 			Max: dotEnd.Add(image.Point{Y: line.Descent.Ceil()}),
@@ -760,7 +760,7 @@ func (e *Editor) PaintText(gtx layout.Context) {
 		}
 		l := subLayout(line, start, end)
 
-		t := op.Offset(layout.FPt(off)).Push(gtx.Ops)
+		t := op.Offset(off).Push(gtx.Ops)
 		op := clip.Outline{Path: e.shaper.Shape(e.font, e.textSize, l)}.Op().Push(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
 		op.Pop()

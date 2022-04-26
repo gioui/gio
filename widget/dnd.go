@@ -64,7 +64,7 @@ func (d *Draggable) Layout(gtx layout.Context, w, drag layout.Widget) layout.Dim
 
 	if drag != nil && d.drag.Pressed() {
 		rec := op.Record(gtx.Ops)
-		op.Offset(pos).Add(gtx.Ops)
+		op.Offset(pos.Round()).Add(gtx.Ops)
 		drag(gtx)
 		op.Defer(gtx.Ops, rec.Stop())
 	}

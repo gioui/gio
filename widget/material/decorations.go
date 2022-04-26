@@ -109,7 +109,7 @@ func (d *DecorationsStyle) layoutDecorations(gtx layout.Context) layout.Dimensio
 				if size.Y < dims.Size.Y {
 					size.Y = dims.Size.Y
 				}
-				op.Offset(f32.Point{X: float32(dims.Size.X)}).Add(gtx.Ops)
+				op.Offset(image.Pt(dims.Size.X, 0)).Add(gtx.Ops)
 			}
 			return layout.Dimensions{Size: size}
 		}),

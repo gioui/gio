@@ -50,7 +50,7 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	size := axis.Convert(image.Pt(sizeMain, sizeCross))
 
 	o := axis.Convert(image.Pt(thumbRadius, 0))
-	trans := op.Offset(layout.FPt(o)).Push(gtx.Ops)
+	trans := op.Offset(o).Push(gtx.Ops)
 	gtx.Constraints.Min = axis.Convert(image.Pt(sizeMain-2*thumbRadius, sizeCross))
 	s.Float.Layout(gtx, thumbRadius, s.Min, s.Max)
 	gtx.Constraints.Min = gtx.Constraints.Min.Add(axis.Convert(image.Pt(0, sizeCross)))

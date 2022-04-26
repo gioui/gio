@@ -297,9 +297,9 @@ func drawInk(gtx layout.Context, c widget.Press) {
 	ink := paint.ColorOp{Color: rgba}
 	ink.Add(gtx.Ops)
 	rr := size * .5
-	defer op.Offset(layout.FPt(c.Position).Add(f32.Point{
-		X: -rr,
-		Y: -rr,
+	defer op.Offset(c.Position.Add(image.Point{
+		X: -int(rr),
+		Y: -int(rr),
 	})).Push(gtx.Ops).Pop()
 	defer clip.UniformRRect(f32.Rectangle{Max: f32.Pt(size, size)}, rr).Push(gtx.Ops).Pop()
 	paint.PaintOp{}.Add(gtx.Ops)

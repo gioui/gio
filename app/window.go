@@ -825,7 +825,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		var signal chan<- struct{}
 		if frame != nil {
 			signal = w.frameAck
-			cl := clip.Rect(image.Rectangle{Max: e2.FrameEvent.Size}).Push(wrapper)
+			cl := clip.Rect{Max: e2.FrameEvent.Size}.Push(wrapper)
 			ops.AddCall(&wrapper.Internal, &frame.Internal, ops.PC{}, ops.PCFor(&frame.Internal))
 			cl.Pop()
 		}
@@ -990,7 +990,7 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 	w.Perform(deco.Actions())
 	// Offset to place the frame content below the decorations.
 	size := image.Point{Y: dims.Size.Y}
-	op.Offset(f32.Point{Y: float32(size.Y)}).Add(o)
+	op.Offset(image.Pt(0, size.Y)).Add(o)
 	appSize := e.Size.Sub(size)
 	if w.decorations.size != size {
 		w.decorations.size = size

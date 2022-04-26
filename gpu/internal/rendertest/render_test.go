@@ -35,7 +35,7 @@ func TestTransformMacro(t *testing.T) {
 		m2 := op.Record(o)
 		paint.ColorOp{Color: red}.Add(o)
 		// Simulate a draw text call
-		t := op.Offset(f32.Pt(0, 10)).Push(o)
+		t := op.Offset(image.Pt(0, 10)).Push(o)
 
 		// Apply the clip-path.
 		cl := c.Push(o)
@@ -47,10 +47,10 @@ func TestTransformMacro(t *testing.T) {
 		c2 := m2.Stop()
 
 		// Call each of them in a transform
-		t = op.Offset(f32.Pt(0, 0)).Push(o)
+		t = op.Offset(image.Pt(0, 0)).Push(o)
 		c1.Add(o)
 		t.Pop()
-		t = op.Offset(f32.Pt(0, 0)).Push(o)
+		t = op.Offset(image.Pt(0, 0)).Push(o)
 		c2.Add(o)
 		t.Pop()
 	}, func(r result) {
@@ -164,7 +164,7 @@ func TestReuseStencil(t *testing.T) {
 		// lay out the children
 		c1.Add(ops)
 
-		defer op.Offset(f32.Pt(0, 50)).Push(ops).Pop()
+		defer op.Offset(image.Pt(0, 50)).Push(ops).Pop()
 		c2.Add(ops)
 	}, func(r result) {
 		r.expect(5, 5, colornames.Black)
@@ -178,8 +178,8 @@ func TestBuildOffscreen(t *testing.T) {
 	// frame.
 
 	txt := constSqCirc()
-	draw := func(off float32, o *op.Ops) {
-		defer op.Offset(f32.Pt(0, off)).Push(o).Pop()
+	draw := func(off int, o *op.Ops) {
+		defer op.Offset(image.Pt(0, off)).Push(o).Pop()
 		defer txt.Push(o).Pop()
 		paint.PaintOp{}.Add(o)
 	}

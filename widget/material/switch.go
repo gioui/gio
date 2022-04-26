@@ -44,7 +44,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	trackWidth := gtx.Px(unit.Dp(36))
 	trackHeight := gtx.Px(unit.Dp(16))
 	thumbSize := gtx.Px(unit.Dp(20))
-	trackOff := float32(thumbSize-trackHeight) * .5
+	trackOff := (thumbSize - trackHeight) / 2
 
 	// Draw track.
 	trackCorner := float32(trackHeight) / 2
@@ -60,7 +60,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 		col = f32color.Disabled(col)
 	}
 	trackColor := s.Color.Track
-	t := op.Offset(f32.Point{Y: trackOff}).Push(gtx.Ops)
+	t := op.Offset(image.Point{Y: trackOff}).Push(gtx.Ops)
 	cl := clip.UniformRRect(trackRect, trackCorner).Push(gtx.Ops)
 	paint.ColorOp{Color: trackColor}.Add(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
@@ -70,9 +70,9 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	// Draw thumb ink.
 	inkSize := gtx.Px(unit.Dp(44))
 	rr := float32(inkSize) * .5
-	inkOff := f32.Point{
-		X: float32(trackWidth)*.5 - rr,
-		Y: -rr + float32(trackHeight)*.5 + trackOff,
+	inkOff := image.Point{
+		X: trackWidth/2 - int(rr),
+		Y: -int(rr) + trackHeight/2 + trackOff,
 	}
 	t = op.Offset(inkOff).Push(gtx.Ops)
 	gtx.Constraints.Min = image.Pt(inkSize, inkSize)
@@ -85,8 +85,8 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 	// Compute thumb offset.
 	if s.Switch.Value {
-		xoff := float32(trackWidth - thumbSize)
-		defer op.Offset(f32.Point{X: xoff}).Push(gtx.Ops).Pop()
+		xoff := trackWidth - thumbSize
+		defer op.Offset(image.Point{X: xoff}).Push(gtx.Ops).Pop()
 	}
 
 	thumbRadius := float32(thumbSize) / 2
@@ -115,9 +115,9 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 	// Set up click area.
 	clickSize := gtx.Px(unit.Dp(40))
-	clickOff := f32.Point{
-		X: thumbRadius - float32(clickSize)*.5,
-		Y: (float32(trackHeight)-float32(clickSize))*.5 + trackOff,
+	clickOff := image.Point{
+		X: (thumbSize - clickSize) / 2,
+		Y: (trackHeight-clickSize)/2 + trackOff,
 	}
 	defer op.Offset(clickOff).Push(gtx.Ops).Pop()
 	sz := image.Pt(clickSize, clickSize)
