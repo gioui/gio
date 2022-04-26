@@ -7,7 +7,6 @@ import (
 	"image/color"
 	"testing"
 
-	"gioui.org/f32"
 	"gioui.org/internal/f32color"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -50,20 +49,14 @@ func TestClipping(t *testing.T) {
 	var ops op.Ops
 	paint.ColorOp{Color: col}.Add(&ops)
 	clip.RRect{
-		Rect: f32.Rectangle{
-			Min: f32.Point{X: 50, Y: 50},
-			Max: f32.Point{X: 250, Y: 250},
-		},
-		SE: 75,
+		Rect: image.Rect(50, 50, 250, 250),
+		SE:   75,
 	}.Push(&ops)
 	paint.PaintOp{}.Add(&ops)
 	paint.ColorOp{Color: col2}.Add(&ops)
 	clip.RRect{
-		Rect: f32.Rectangle{
-			Min: f32.Point{X: 100, Y: 100},
-			Max: f32.Point{X: 350, Y: 350},
-		},
-		NW: 75,
+		Rect: image.Rect(100, 100, 350, 350),
+		NW:   75,
 	}.Push(&ops)
 	paint.PaintOp{}.Add(&ops)
 	if err := w.Frame(&ops); err != nil {

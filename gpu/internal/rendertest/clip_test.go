@@ -29,7 +29,7 @@ func TestPaintRect(t *testing.T) {
 
 func TestPaintClippedRect(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		defer clip.RRect{Rect: f32.Rect(25, 25, 60, 60)}.Push(o).Pop()
+		defer clip.RRect{Rect: image.Rect(25, 25, 60, 60)}.Push(o).Pop()
 		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
 	}, func(r result) {
 		r.expect(0, 0, transparent)
@@ -42,8 +42,8 @@ func TestPaintClippedRect(t *testing.T) {
 
 func TestPaintClippedCircle(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		r := float32(10)
-		defer clip.RRect{Rect: f32.Rect(20, 20, 40, 40), SE: r, SW: r, NW: r, NE: r}.Push(o).Pop()
+		const r = 10
+		defer clip.RRect{Rect: image.Rect(20, 20, 40, 40), SE: r, SW: r, NW: r, NE: r}.Push(o).Pop()
 		defer clip.Rect(image.Rect(0, 0, 30, 50)).Push(o).Pop()
 		paint.Fill(o, red)
 	}, func(r result) {
@@ -126,10 +126,10 @@ func TestTexturedStrokeClipped(t *testing.T) {
 		smallSquares.Add(o)
 		defer op.Offset(image.Pt(50, 50)).Push(o).Pop()
 		defer clip.Stroke{
-			Path:  clip.RRect{Rect: f32.Rect(0, 0, 30, 30)}.Path(o),
+			Path:  clip.RRect{Rect: image.Rect(0, 0, 30, 30)}.Path(o),
 			Width: 10,
 		}.Op().Push(o).Pop()
-		defer clip.RRect{Rect: f32.Rect(-30, -30, 60, 60)}.Push(o).Pop()
+		defer clip.RRect{Rect: image.Rect(-30, -30, 60, 60)}.Push(o).Pop()
 		defer op.Offset(image.Pt(-10, -10)).Push(o).Pop()
 		paint.PaintOp{}.Add(o)
 	}, func(r result) {
@@ -141,7 +141,7 @@ func TestTexturedStroke(t *testing.T) {
 		smallSquares.Add(o)
 		defer op.Offset(image.Pt(50, 50)).Push(o).Pop()
 		defer clip.Stroke{
-			Path:  clip.RRect{Rect: f32.Rect(0, 0, 30, 30)}.Path(o),
+			Path:  clip.RRect{Rect: image.Rect(0, 0, 30, 30)}.Path(o),
 			Width: 10,
 		}.Op().Push(o).Pop()
 		defer op.Offset(image.Pt(-10, -10)).Push(o).Pop()
@@ -153,7 +153,7 @@ func TestTexturedStroke(t *testing.T) {
 func TestPaintClippedTexture(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		squares.Add(o)
-		defer clip.RRect{Rect: f32.Rect(0, 0, 40, 40)}.Push(o).Pop()
+		defer clip.RRect{Rect: image.Rect(0, 0, 40, 40)}.Push(o).Pop()
 		defer scale(80.0/512, 80.0/512).Push(o).Pop()
 		paint.PaintOp{}.Add(o)
 	}, func(r result) {

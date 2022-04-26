@@ -741,7 +741,7 @@ func TestEllipse(t *testing.T) {
 	var ops op.Ops
 
 	h := new(int)
-	cl := clip.Ellipse(f32.Rect(0, 0, 100, 100)).Push(&ops)
+	cl := clip.Ellipse(image.Rect(0, 0, 100, 100)).Push(&ops)
 	pointer.InputOp{Tag: h, Types: pointer.Press}.Add(&ops)
 	cl.Pop()
 	var r Router

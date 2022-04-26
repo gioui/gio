@@ -3,9 +3,9 @@
 package widget
 
 import (
+	"image"
 	"image/color"
 
-	"gioui.org/f32"
 	"gioui.org/layout"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
@@ -21,21 +21,21 @@ type Border struct {
 
 func (b Border) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 	dims := w(gtx)
-	sz := layout.FPt(dims.Size)
+	sz := dims.Size
 
-	rr := float32(gtx.Px(b.CornerRadius))
-	width := float32(gtx.Px(b.Width))
+	rr := gtx.Px(b.CornerRadius)
+	width := gtx.Px(b.Width)
 	sz.X -= width
 	sz.Y -= width
 
-	r := f32.Rectangle{Max: sz}
-	r = r.Add(f32.Point{X: width * 0.5, Y: width * 0.5})
+	r := image.Rectangle{Max: sz}
+	r = r.Add(image.Point{X: width / 2, Y: width / 2})
 
 	paint.FillShape(gtx.Ops,
 		b.Color,
 		clip.Stroke{
 			Path:  clip.UniformRRect(r, rr).Path(gtx.Ops),
-			Width: width,
+			Width: float32(width),
 		}.Op(),
 	)
 

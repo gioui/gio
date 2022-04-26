@@ -143,7 +143,7 @@ func constSqPath() clip.Op {
 
 func constSqCirc() clip.Op {
 	innerOps := new(op.Ops)
-	return clip.RRect{Rect: f32.Rect(0, 0, 40, 40),
+	return clip.RRect{Rect: image.Rect(0, 0, 40, 40),
 		NW: 20, NE: 20, SW: 20, SE: 20}.Op(innerOps)
 }
 
@@ -204,7 +204,7 @@ func TestBuildOffscreen(t *testing.T) {
 
 func TestNegativeOverlaps(t *testing.T) {
 	run(t, func(ops *op.Ops) {
-		defer clip.RRect{Rect: f32.Rect(50, 50, 100, 100)}.Push(ops).Pop()
+		defer clip.RRect{Rect: image.Rect(50, 50, 100, 100)}.Push(ops).Pop()
 		clip.Rect(image.Rect(0, 120, 100, 122)).Push(ops).Pop()
 		paint.PaintOp{}.Add(ops)
 	}, func(r result) {
@@ -257,7 +257,7 @@ func TestLinearGradient(t *testing.T) {
 				Stop2:  f32.Pt(gr.Max.X, gr.Min.Y),
 				Color2: g.To,
 			}.Add(ops)
-			cl := clip.RRect{Rect: gr}.Push(ops)
+			cl := clip.RRect{Rect: gr.Round()}.Push(ops)
 			t1 := op.Affine(f32.Affine2D{}.Offset(pixelAligned.Min)).Push(ops)
 			t2 := scale(pixelAligned.Dx()/128, 1).Push(ops)
 			paint.PaintOp{}.Add(ops)

@@ -52,7 +52,7 @@ func TestPaintShear(t *testing.T) {
 
 func TestClipPaintOffset(t *testing.T) {
 	run(t, func(o *op.Ops) {
-		defer clip.RRect{Rect: f32.Rect(10, 10, 30, 30)}.Push(o).Pop()
+		defer clip.RRect{Rect: image.Rect(10, 10, 30, 30)}.Push(o).Pop()
 		defer op.Offset(image.Pt(20, 20)).Push(o).Pop()
 		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 100, 100)).Op())
 	}, func(r result) {
@@ -66,7 +66,7 @@ func TestClipPaintOffset(t *testing.T) {
 func TestClipOffset(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		defer op.Offset(image.Pt(20, 20)).Push(o).Pop()
-		defer clip.RRect{Rect: f32.Rect(10, 10, 30, 30)}.Push(o).Pop()
+		defer clip.RRect{Rect: image.Rect(10, 10, 30, 30)}.Push(o).Pop()
 		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 100, 100)).Op())
 	}, func(r result) {
 		r.expect(0, 0, transparent)
@@ -81,7 +81,7 @@ func TestClipScale(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		a := f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(2, 2)).Offset(f32.Pt(10, 10))
 		defer op.Affine(a).Push(o).Pop()
-		defer clip.RRect{Rect: f32.Rect(10, 10, 20, 20)}.Push(o).Pop()
+		defer clip.RRect{Rect: image.Rect(10, 10, 20, 20)}.Push(o).Pop()
 		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 1000, 1000)).Op())
 	}, func(r result) {
 		r.expect(19+10, 19+10, transparent)
@@ -94,7 +94,7 @@ func TestClipScale(t *testing.T) {
 func TestClipRotate(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		defer op.Affine(f32.Affine2D{}.Rotate(f32.Pt(40, 40), -math.Pi/4)).Push(o).Pop()
-		defer clip.RRect{Rect: f32.Rect(30, 30, 50, 50)}.Push(o).Pop()
+		defer clip.RRect{Rect: image.Rect(30, 30, 50, 50)}.Push(o).Pop()
 		paint.FillShape(o, red, clip.Rect(image.Rect(0, 40, 100, 100)).Op())
 	}, func(r result) {
 		r.expect(39, 39, transparent)
@@ -148,7 +148,7 @@ func TestRotateClipTexture(t *testing.T) {
 		squares.Add(o)
 		a := f32.Affine2D{}.Rotate(f32.Pt(40, 40), math.Pi/8)
 		defer op.Affine(a).Push(o).Pop()
-		defer clip.RRect{Rect: f32.Rect(30, 30, 50, 50)}.Push(o).Pop()
+		defer clip.RRect{Rect: image.Rect(30, 30, 50, 50)}.Push(o).Pop()
 		defer op.Affine(f32.Affine2D{}.Offset(f32.Pt(10, 10))).Push(o).Pop()
 		defer scale(60.0/512, 60.0/512).Push(o).Pop()
 		paint.PaintOp{}.Add(o)
@@ -166,11 +166,11 @@ func TestComplicatedTransform(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		squares.Add(o)
 
-		defer clip.RRect{Rect: f32.Rect(0, 0, 100, 100), SE: 50, SW: 50, NW: 50, NE: 50}.Push(o).Pop()
+		defer clip.RRect{Rect: image.Rect(0, 0, 100, 100), SE: 50, SW: 50, NW: 50, NE: 50}.Push(o).Pop()
 
 		a := f32.Affine2D{}.Shear(f32.Point{}, math.Pi/4, 0)
 		defer op.Affine(a).Push(o).Pop()
-		defer clip.RRect{Rect: f32.Rect(0, 0, 50, 40)}.Push(o).Pop()
+		defer clip.RRect{Rect: image.Rect(0, 0, 50, 40)}.Push(o).Pop()
 
 		defer scale(50.0/512, 50.0/512).Push(o).Pop()
 		paint.PaintOp{}.Add(o)

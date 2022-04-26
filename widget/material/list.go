@@ -7,7 +7,6 @@ import (
 	"image/color"
 	"math"
 
-	"gioui.org/f32"
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -188,15 +187,14 @@ func (s ScrollbarStyle) layout(gtx layout.Context, axis layout.Axis, viewportSta
 					X: indicatorLen,
 					Y: gtx.Px(s.Indicator.MinorWidth),
 				})
-				indicatorDimsF := layout.FPt(indicatorDims)
-				radius := float32(gtx.Px(s.Indicator.CornerRadius))
+				radius := gtx.Px(s.Indicator.CornerRadius)
 
 				// Lay out the indicator.
 				offset := axis.Convert(image.Pt(viewStart, 0))
 				defer op.Offset(offset).Push(gtx.Ops).Pop()
 				paint.FillShape(gtx.Ops, s.Indicator.Color, clip.RRect{
-					Rect: f32.Rectangle{
-						Max: indicatorDimsF,
+					Rect: image.Rectangle{
+						Max: indicatorDims,
 					},
 					SW: radius,
 					NW: radius,

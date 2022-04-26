@@ -6,7 +6,6 @@ import (
 	"image"
 	"image/color"
 
-	"gioui.org/f32"
 	"gioui.org/internal/f32color"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -78,9 +77,9 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 	// Draw thumb.
 	pt := axis.Convert(image.Pt(thumbPos, sizeCross/2))
-	thumb := f32.Rectangle{
-		Min: f32.Pt(float32(pt.X-thumbRadius), float32(pt.Y-thumbRadius)),
-		Max: f32.Pt(float32(pt.X+thumbRadius), float32(pt.Y+thumbRadius)),
+	thumb := image.Rectangle{
+		Min: image.Pt(pt.X-thumbRadius, pt.Y-thumbRadius),
+		Max: image.Pt(pt.X+thumbRadius, pt.Y+thumbRadius),
 	}
 	paint.FillShape(gtx.Ops, color, clip.Ellipse(thumb).Op(gtx.Ops))
 

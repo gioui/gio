@@ -7,7 +7,6 @@ import (
 	"image/color"
 	"math"
 
-	"gioui.org/f32"
 	"gioui.org/internal/f32color"
 	"gioui.org/io/semantic"
 	"gioui.org/layout"
@@ -130,11 +129,8 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 		semantic.Button.Add(gtx.Ops)
 		return layout.Stack{Alignment: layout.Center}.Layout(gtx,
 			layout.Expanded(func(gtx layout.Context) layout.Dimensions {
-				rr := float32(gtx.Px(b.CornerRadius))
-				defer clip.UniformRRect(f32.Rectangle{Max: f32.Point{
-					X: float32(gtx.Constraints.Min.X),
-					Y: float32(gtx.Constraints.Min.Y),
-				}}, rr).Push(gtx.Ops).Pop()
+				rr := gtx.Px(b.CornerRadius)
+				defer clip.UniformRRect(image.Rectangle{Max: gtx.Constraints.Min}, rr).Push(gtx.Ops).Pop()
 				background := b.Background
 				switch {
 				case gtx.Queue == nil:
@@ -165,12 +161,8 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 		}
 		return layout.Stack{Alignment: layout.Center}.Layout(gtx,
 			layout.Expanded(func(gtx layout.Context) layout.Dimensions {
-				sizex, sizey := gtx.Constraints.Min.X, gtx.Constraints.Min.Y
-				sizexf, sizeyf := float32(sizex), float32(sizey)
-				rr := (sizexf + sizeyf) * .25
-				defer clip.UniformRRect(f32.Rectangle{
-					Max: f32.Point{X: sizexf, Y: sizeyf},
-				}, rr).Push(gtx.Ops).Pop()
+				rr := (gtx.Constraints.Min.X + gtx.Constraints.Min.Y) / 4
+				defer clip.UniformRRect(image.Rectangle{Max: gtx.Constraints.Min}, rr).Push(gtx.Ops).Pop()
 				background := b.Background
 				switch {
 				case gtx.Queue == nil:
@@ -199,7 +191,7 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 		)
 	})
 	c := m.Stop()
-	bounds := f32.Rectangle{Max: layout.FPt(dims.Size)}
+	bounds := image.Rectangle{Max: dims.Size}
 	defer clip.Ellipse(bounds).Push(gtx.Ops).Pop()
 	c.Add(gtx.Ops)
 	return dims
@@ -282,25 +274,24 @@ func drawInk(gtx layout.Context, c widget.Press) {
 	// Beziér ease-in curve.
 	alphaBezier := t2 * t2 * (3.0 - 2.0*t2)
 	sizeBezier := sizet * sizet * (3.0 - 2.0*sizet)
-	size := float32(gtx.Constraints.Min.X)
-	if h := float32(gtx.Constraints.Min.Y); h > size {
+	size := gtx.Constraints.Min.X
+	if h := gtx.Constraints.Min.Y; h > size {
 		size = h
 	}
-	// Cover the entire constraints min rectangle.
-	size *= 2 * float32(math.Sqrt(2))
-	// Apply curve values to size and color.
-	size *= sizeBezier
+	// Cover the entire constraints min rectangle and
+	// apply curve values to size and color.
+	size = int(float32(size) * 2 * float32(math.Sqrt(2)) * sizeBezier)
 	alpha := 0.7 * alphaBezier
 	const col = 0.8
 	ba, bc := byte(alpha*0xff), byte(col*0xff)
 	rgba := f32color.MulAlpha(color.NRGBA{A: 0xff, R: bc, G: bc, B: bc}, ba)
 	ink := paint.ColorOp{Color: rgba}
 	ink.Add(gtx.Ops)
-	rr := size * .5
+	rr := size / 2
 	defer op.Offset(c.Position.Add(image.Point{
-		X: -int(rr),
-		Y: -int(rr),
+		X: -rr,
+		Y: -rr,
 	})).Push(gtx.Ops).Pop()
-	defer clip.UniformRRect(f32.Rectangle{Max: f32.Pt(size, size)}, rr).Push(gtx.Ops).Pop()
+	defer clip.UniformRRect(image.Rectangle{Max: image.Pt(size, size)}, rr).Push(gtx.Ops).Pop()
 	paint.PaintOp{}.Add(gtx.Ops)
 }

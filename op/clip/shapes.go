@@ -37,7 +37,7 @@ func (r Rect) Path() PathSpec {
 
 // UniformRRect returns an RRect with all corner radii set to the
 // provided radius.
-func UniformRRect(rect f32.Rectangle, radius float32) RRect {
+func UniformRRect(rect image.Rectangle, radius int) RRect {
 	return RRect{
 		Rect: rect,
 		SE:   radius,
@@ -53,22 +53,15 @@ func UniformRRect(rect f32.Rectangle, radius float32) RRect {
 // Specify a square with corner radii equal to half the square size to
 // construct a circular clip area.
 type RRect struct {
-	Rect f32.Rectangle
+	Rect image.Rectangle
 	// The corner radii.
-	SE, SW, NW, NE float32
+	SE, SW, NW, NE int
 }
 
 // Op returns the op for the rounded rectangle.
 func (rr RRect) Op(ops *op.Ops) Op {
 	if rr.SE == 0 && rr.SW == 0 && rr.NW == 0 && rr.NE == 0 {
-		r := image.Rectangle{
-			Min: image.Point{X: int(rr.Rect.Min.X), Y: int(rr.Rect.Min.Y)},
-			Max: image.Point{X: int(rr.Rect.Max.X), Y: int(rr.Rect.Max.Y)},
-		}
-		// Only use Rect if rr is pixel-aligned, as Rect is guaranteed to be.
-		if fPt(r.Min) == rr.Rect.Min && fPt(r.Max) == rr.Rect.Max {
-			return Rect(r).Op()
-		}
+		return Rect(rr.Rect).Op()
 	}
 	return Outline{Path: rr.Path(ops)}.Op()
 }
@@ -87,8 +80,9 @@ func (rr RRect) Path(ops *op.Ops) PathSpec {
 	const q = 4 * (math.Sqrt2 - 1) / 3
 	const iq = 1 - q
 
-	se, sw, nw, ne := rr.SE, rr.SW, rr.NW, rr.NE
-	w, n, e, s := rr.Rect.Min.X, rr.Rect.Min.Y, rr.Rect.Max.X, rr.Rect.Max.Y
+	se, sw, nw, ne := float32(rr.SE), float32(rr.SW), float32(rr.NW), float32(rr.NE)
+	rrf := frect(rr.Rect)
+	w, n, e, s := rrf.Min.X, rrf.Min.Y, rrf.Max.X, rrf.Max.Y
 
 	p.MoveTo(f32.Point{X: w + nw, Y: n})
 	p.LineTo(f32.Point{X: e - ne, Y: n}) // N
@@ -117,7 +111,7 @@ func (rr RRect) Path(ops *op.Ops) PathSpec {
 
 // Ellipse represents the largest axis-aligned ellipse that
 // is contained in its bounds.
-type Ellipse f32.Rectangle
+type Ellipse image.Rectangle
 
 // Op returns the op for the filled ellipse.
 func (e Ellipse) Op(ops *op.Ops) Op {
@@ -131,7 +125,7 @@ func (e Ellipse) Push(ops *op.Ops) Stack {
 
 // Path constructs a path for the ellipse.
 func (e Ellipse) Path(o *op.Ops) PathSpec {
-	bounds := f32.Rectangle(e)
+	bounds := image.Rectangle(e)
 	if bounds.Dx() == 0 || bounds.Dy() == 0 {
 		return PathSpec{shape: ops.Rect}
 	}
@@ -139,12 +133,13 @@ func (e Ellipse) Path(o *op.Ops) PathSpec {
 	var p Path
 	p.Begin(o)
 
-	center := bounds.Max.Add(bounds.Min).Mul(.5)
-	diam := bounds.Dx()
+	bf := frect(bounds)
+	center := bf.Max.Add(bf.Min).Mul(.5)
+	diam := bf.Dx()
 	r := diam * .5
 	// We'll model the ellipse as a circle scaled in the Y
 	// direction.
-	scale := bounds.Dy() / diam
+	scale := bf.Dy() / diam
 
 	// https://pomax.github.io/bezierinfo/#circles_cubic.
 	const q = 4 * (math.Sqrt2 - 1) / 3
@@ -176,10 +171,4 @@ func (e Ellipse) Path(o *op.Ops) PathSpec {
 	ellipse := p.End()
 	ellipse.shape = ops.Ellipse
 	return ellipse
-}
-
-func fPt(p image.Point) f32.Point {
-	return f32.Point{
-		X: float32(p.X), Y: float32(p.Y),
-	}
 }

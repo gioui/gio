@@ -144,19 +144,18 @@ func minimizeWindow(gtx layout.Context) layout.Dimensions {
 // maximizeWindow draws a rectangle representing the maximize action.
 func maximizeWindow(gtx layout.Context) layout.Dimensions {
 	size := gtx.Px(winIconSize)
-	size32 := float32(size)
-	margin := float32(gtx.Px(winIconMargin))
-	width := float32(gtx.Px(winIconStroke))
+	margin := gtx.Px(winIconMargin)
+	width := gtx.Px(winIconStroke)
 	r := clip.RRect{
-		Rect: f32.Rect(margin, margin, size32-margin, size32-margin),
+		Rect: image.Rect(margin, margin, size-margin, size-margin),
 	}
 	st := clip.Stroke{
 		Path:  r.Path(gtx.Ops),
-		Width: width,
+		Width: float32(width),
 	}.Op().Push(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
 	st.Pop()
-	r.Rect.Max = f32.Pt(size32-margin, 2*margin)
+	r.Rect.Max = image.Pt(size-margin, 2*margin)
 	st = clip.Outline{
 		Path: r.Path(gtx.Ops),
 	}.Op().Push(gtx.Ops)
@@ -168,24 +167,23 @@ func maximizeWindow(gtx layout.Context) layout.Dimensions {
 // maximizedWindow draws interleaved rectangles representing the un-maximize action.
 func maximizedWindow(gtx layout.Context) layout.Dimensions {
 	size := gtx.Px(winIconSize)
-	size32 := float32(size)
-	margin := float32(gtx.Px(winIconMargin))
-	width := float32(gtx.Px(winIconStroke))
+	margin := gtx.Px(winIconMargin)
+	width := gtx.Px(winIconStroke)
 	r := clip.RRect{
-		Rect: f32.Rect(margin, margin, size32-2*margin, size32-2*margin),
+		Rect: image.Rect(margin, margin, size-2*margin, size-2*margin),
 	}
 	st := clip.Stroke{
 		Path:  r.Path(gtx.Ops),
-		Width: width,
+		Width: float32(width),
 	}.Op().Push(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
 	st.Pop()
 	r = clip.RRect{
-		Rect: f32.Rect(2*margin, 2*margin, size32-margin, size32-margin),
+		Rect: image.Rect(2*margin, 2*margin, size-margin, size-margin),
 	}
 	st = clip.Stroke{
 		Path:  r.Path(gtx.Ops),
-		Width: width,
+		Width: float32(width),
 	}.Op().Push(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
 	st.Pop()
