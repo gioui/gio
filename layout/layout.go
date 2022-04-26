@@ -85,13 +85,6 @@ func FPt(p image.Point) f32.Point {
 	}
 }
 
-// FRect converts a rectangle to a f32.Rectangle.
-func FRect(r image.Rectangle) f32.Rectangle {
-	return f32.Rectangle{
-		Min: FPt(r.Min), Max: FPt(r.Max),
-	}
-}
-
 // Constrain a size so each dimension is in the range [min;max].
 func (c Constraints) Constrain(size image.Point) image.Point {
 	if min := c.Min.X; size.X < min {
