@@ -81,6 +81,14 @@ func (p Point) In(r Rectangle) bool {
 		r.Min.Y <= p.Y && p.Y < r.Max.Y
 }
 
+// Round returns the integer point closest to p.
+func (p Point) Round() image.Point {
+	return image.Point{
+		X: int(math.Round(float64(p.X))),
+		Y: int(math.Round(float64(p.Y))),
+	}
+}
+
 // Size returns r's width and height.
 func (r Rectangle) Size() Point {
 	return Point{X: r.Dx(), Y: r.Dy()}

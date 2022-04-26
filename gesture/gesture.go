@@ -91,7 +91,7 @@ type Click struct {
 // TypeClick for a completed click.
 type ClickEvent struct {
 	Type      ClickType
-	Position  f32.Point
+	Position  image.Point
 	Source    pointer.Source
 	Modifiers key.Modifiers
 	// NumClicks records successive clicks occurring
@@ -198,7 +198,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 					c.clicks = 1
 				}
 				c.clickedAt = e.Time
-				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
+				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
 			} else {
 				events = append(events, ClickEvent{Type: TypeCancel})
 			}
@@ -224,7 +224,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 				break
 			}
 			c.pressed = true
-			events = append(events, ClickEvent{Type: TypePress, Position: e.Position, Source: e.Source, Modifiers: e.Modifiers})
+			events = append(events, ClickEvent{Type: TypePress, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers})
 		case pointer.Leave:
 			if !c.pressed {
 				c.pid = e.PointerID

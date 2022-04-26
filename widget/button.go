@@ -6,7 +6,6 @@ import (
 	"image"
 	"time"
 
-	"gioui.org/f32"
 	"gioui.org/gesture"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
@@ -39,7 +38,7 @@ type Click struct {
 // Press represents a past pointer press.
 type Press struct {
 	// Position of the press.
-	Position f32.Point
+	Position image.Point
 	// Start is when the press began.
 	Start time.Time
 	// End is when the press was ended by a release or cancel.

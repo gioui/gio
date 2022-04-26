@@ -297,7 +297,7 @@ func drawInk(gtx layout.Context, c widget.Press) {
 	ink := paint.ColorOp{Color: rgba}
 	ink.Add(gtx.Ops)
 	rr := size * .5
-	defer op.Offset(c.Position.Add(f32.Point{
+	defer op.Offset(layout.FPt(c.Position).Add(f32.Point{
 		X: -rr,
 		Y: -rr,
 	})).Push(gtx.Ops).Pop()
