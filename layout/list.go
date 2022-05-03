@@ -101,7 +101,9 @@ func (l *List) init(gtx Context, len int) {
 	}
 }
 
-// Layout the List.
+// Layout a List of len items, where each item is implicitly defined
+// by the callback w. Layout can handle very large lists because it only calls
+// w to fill its viewport and the distance scrolled, if any.
 func (l *List) Layout(gtx Context, len int, w ListElement) Dimensions {
 	l.init(gtx, len)
 	crossMin, crossMax := l.Axis.crossConstraint(gtx.Constraints)
