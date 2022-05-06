@@ -485,6 +485,17 @@ func (e *Editor) Focused() bool {
 	return e.focused
 }
 
+// calculateViewSize determines the size of the current visible content,
+// ensuring that even if there is no text content, some space is reserved
+// for the caret.
+func (e *Editor) calculateViewSize(gtx layout.Context) image.Point {
+	base := e.dims.Size
+	if caretWidth := e.caretWidth(gtx); base.X < caretWidth {
+		base.X = caretWidth
+	}
+	return gtx.Constraints.Constrain(base)
+}
+
 // Layout lays out the editor. If content is not nil, it is laid out on top.
 func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size unit.Value, content layout.Widget) layout.Dimensions {
 	if e.locale != gtx.Locale {
@@ -518,7 +529,7 @@ func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size
 	e.processEvents(gtx)
 	e.makeValid()
 
-	if viewSize := gtx.Constraints.Constrain(e.dims.Size); viewSize != e.viewSize {
+	if viewSize := e.calculateViewSize(gtx); viewSize != e.viewSize {
 		e.viewSize = viewSize
 		e.invalidate()
 	}
@@ -749,14 +760,21 @@ func (e *Editor) PaintText(gtx layout.Context) {
 	}
 }
 
-func (e *Editor) PaintCaret(gtx layout.Context) {
-	if !e.caret.on {
-		return
-	}
+// caretWidth returns the width occupied by the caret for the current
+// gtx.
+func (e *Editor) caretWidth(gtx layout.Context) int {
 	carWidth2 := gtx.Px(unit.Dp(1)) / 2
 	if carWidth2 < 1 {
 		carWidth2 = 1
 	}
+	return carWidth2
+}
+
+func (e *Editor) PaintCaret(gtx layout.Context) {
+	if !e.caret.on {
+		return
+	}
+	carWidth2 := e.caretWidth(gtx)
 	caretPos, carAsc, carDesc := e.caretInfo()
 
 	carRect := image.Rectangle{

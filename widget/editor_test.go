@@ -36,6 +36,26 @@ var english = system.Locale{
 	Direction: system.LTR,
 }
 
+// TestEditorZeroDimensions ensures that an empty editor still reserves
+// space for displaying its caret when the constraints allow for it.
+func TestEditorZeroDimensions(t *testing.T) {
+	gtx := layout.Context{
+		Ops: new(op.Ops),
+		Constraints: layout.Constraints{
+			Max: image.Pt(100, 100),
+		},
+		Locale: english,
+	}
+	cache := text.NewCache(gofont.Collection())
+	fontSize := unit.Px(10)
+	font := text.Font{}
+	e := new(Editor)
+	dims := e.Layout(gtx, cache, font, fontSize, nil)
+	if dims.Size.X < 1 || dims.Size.Y < 1 {
+		t.Errorf("expected empty editor to occupy enough space to display cursor, but returned dimensions %v", dims)
+	}
+}
+
 func TestEditorConfigurations(t *testing.T) {
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
