@@ -618,8 +618,21 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 
 	defer clip.Rect(image.Rectangle{Max: e.viewSize}).Push(gtx.Ops).Pop()
 	pointer.CursorText.Add(gtx.Ops)
-	const keyFilter = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]"
-	key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keyFilter}.Add(gtx.Ops)
+	const keyFilterNoLeftUp = "(ShortAlt)-(Shift)-[→,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]"
+	const keyFilterNoRightDown = "(ShortAlt)-(Shift)-[←,↑]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]"
+	const keyFilterNoArrows = "(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]"
+	const keyFilterAllArrows = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]"
+	caret := e.closestPosition(combinedPos{runes: e.caret.start})
+	switch {
+	case caret.runes == 0 && caret.runes == e.Len():
+		key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keyFilterNoArrows}.Add(gtx.Ops)
+	case caret.runes == 0:
+		key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keyFilterNoLeftUp}.Add(gtx.Ops)
+	case caret.runes == e.Len():
+		key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keyFilterNoRightDown}.Add(gtx.Ops)
+	default:
+		key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keyFilterAllArrows}.Add(gtx.Ops)
+	}
 	if e.requestFocus {
 		key.FocusOp{Tag: &e.eventKey}.Add(gtx.Ops)
 		key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)

@@ -905,13 +905,13 @@ func convertKeyCode(code C.jint) (string, bool) {
 	case C.AKEYCODE_META_LEFT, C.AKEYCODE_META_RIGHT:
 		n = key.NameSuper
 	case C.AKEYCODE_DPAD_UP:
-		n = key.NameUp
+		n = key.NameUpArrow
 	case C.AKEYCODE_DPAD_DOWN:
-		n = key.NameDown
+		n = key.NameDownArrow
 	case C.AKEYCODE_DPAD_LEFT:
-		n = key.NameLeft
+		n = key.NameLeftArrow
 	case C.AKEYCODE_DPAD_RIGHT:
-		n = key.NameRight
+		n = key.NameRightArrow
 	default:
 		return "", false
 	}
