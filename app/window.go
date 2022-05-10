@@ -218,7 +218,7 @@ func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame
 			w.gpu = gpu
 		}
 		if w.gpu != nil {
-			if err := w.frame(frame, size, signal); err != nil {
+			if err := w.frame(frame, size); err != nil {
 				if errors.Is(err, errOutOfDate) {
 					// GPU surface needs refreshing.
 					sync = true
@@ -231,11 +231,19 @@ func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame
 				return err
 			}
 		}
+		w.queue.q.Frame(frame)
+		// We're done with frame, let the client continue.
+		if signal != nil {
+			signal <- struct{}{}
+		}
+		if w.gpu != nil {
+			return w.ctx.Present()
+		}
 		return nil
 	}
 }
 
-func (w *Window) frame(frame *op.Ops, viewport image.Point, signal chan<- struct{}) error {
+func (w *Window) frame(frame *op.Ops, viewport image.Point) error {
 	if err := w.ctx.Lock(); err != nil {
 		return err
 	}
@@ -251,15 +259,7 @@ func (w *Window) frame(frame *op.Ops, viewport image.Point, signal chan<- struct
 	if err != nil {
 		return err
 	}
-	if err := w.gpu.Frame(frame, target, viewport); err != nil {
-		return err
-	}
-	w.queue.q.Frame(frame)
-	// We're done with frame, let the client continue.
-	if signal != nil {
-		signal <- struct{}{}
-	}
-	return w.ctx.Present()
+	return w.gpu.Frame(frame, target, viewport)
 }
 
 func (w *Window) processFrame(d driver, frameStart time.Time) {
