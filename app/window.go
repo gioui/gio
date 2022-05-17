@@ -204,14 +204,16 @@ func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame
 				return err
 			}
 		}
-		if w.gpu == nil && !w.nocontext {
+		if w.ctx != nil {
 			if err := w.ctx.Lock(); err != nil {
 				w.destroyGPU()
 				return err
 			}
+		}
+		if w.gpu == nil && !w.nocontext {
 			gpu, err := gpu.New(w.ctx.API())
-			w.ctx.Unlock()
 			if err != nil {
+				w.ctx.Unlock()
 				w.destroyGPU()
 				return err
 			}
@@ -219,6 +221,7 @@ func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame
 		}
 		if w.gpu != nil {
 			if err := w.frame(frame, size); err != nil {
+				w.ctx.Unlock()
 				if errors.Is(err, errOutOfDate) {
 					// GPU surface needs refreshing.
 					sync = true
@@ -236,18 +239,16 @@ func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame
 		if signal != nil {
 			signal <- struct{}{}
 		}
+		var err error
 		if w.gpu != nil {
-			return w.ctx.Present()
+			err = w.ctx.Present()
+			w.ctx.Unlock()
 		}
-		return nil
+		return err
 	}
 }
 
 func (w *Window) frame(frame *op.Ops, viewport image.Point) error {
-	if err := w.ctx.Lock(); err != nil {
-		return err
-	}
-	defer w.ctx.Unlock()
 	if runtime.GOOS == "js" {
 		// Use transparent black when Gio is embedded, to allow mixing of Gio and
 		// foreign content below.
