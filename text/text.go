@@ -83,11 +83,11 @@ func (c GlyphCluster) RuneWidth() fixed.Int26_6 {
 }
 
 type Layout struct {
-	// Glyphs are the actual font characters for the text. The are ordered
+	// Glyphs are the actual font characters for the text. They are ordered
 	// from left to right regardless of the text direction of the underlying
 	// text.
 	Glyphs []Glyph
-	// Clusters is metadata about the shaped glyphs. It is mostly useful for
+	// Clusters are metadata about the shaped glyphs. They are mostly useful for
 	// interactive text widgets like editors. The order of clusters is logical,
 	// so the first cluster will describe the beginning of the text and may
 	// refer to the final glyphs in the Glyphs field if the text is RTL.
