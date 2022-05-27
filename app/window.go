@@ -178,7 +178,16 @@ func (w *Window) update(frame *op.Ops) {
 	<-w.frameAck
 }
 
-func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame *op.Ops, signal chan<- struct{}) error {
+func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame *op.Ops, sigChan chan<- struct{}) error {
+	signal := func() {
+		if sigChan != nil {
+			// We're done with frame, let the client continue.
+			sigChan <- struct{}{}
+			// Signal at most once.
+			sigChan = nil
+		}
+	}
+	defer signal()
 	for {
 		if w.gpu == nil && !w.nocontext {
 			var err error
@@ -235,10 +244,9 @@ func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame
 			}
 		}
 		w.queue.q.Frame(frame)
-		// We're done with frame, let the client continue.
-		if signal != nil {
-			signal <- struct{}{}
-		}
+		// Let the client continue as soon as possible, in particular before
+		// a potentially blocking Present.
+		signal()
 		var err error
 		if w.gpu != nil {
 			err = w.ctx.Present()
