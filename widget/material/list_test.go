@@ -27,10 +27,15 @@ func TestListAnchorStrategies(t *testing.T) {
 			Y: 500,
 		},
 	})
+	gtx.Constraints.Min = image.Point{}
 
 	var spaceConstraints layout.Constraints
 	space := func(gtx layout.Context, index int) layout.Dimensions {
 		spaceConstraints = gtx.Constraints
+		if spaceConstraints.Min.X < 0 || spaceConstraints.Min.Y < 0 ||
+			spaceConstraints.Max.X < 0 || spaceConstraints.Max.Y < 0 {
+			t.Errorf("invalid constraints at index %d: %#+v", index, spaceConstraints)
+		}
 		return layout.Dimensions{Size: image.Point{
 			X: gtx.Constraints.Max.X,
 			Y: gtx.Px(unit.Dp(20)),

@@ -257,7 +257,13 @@ func (l ListStyle) Layout(gtx layout.Context, length int, w layout.ListElement) 
 		max := l.state.Axis.Convert(gtx.Constraints.Max)
 		min := l.state.Axis.Convert(gtx.Constraints.Min)
 		max.Y -= barWidth
+		if max.Y < 0 {
+			max.Y = 0
+		}
 		min.Y -= barWidth
+		if min.Y < 0 {
+			min.Y = 0
+		}
 		gtx.Constraints.Max = l.state.Axis.Convert(max)
 		gtx.Constraints.Min = l.state.Axis.Convert(min)
 	}
