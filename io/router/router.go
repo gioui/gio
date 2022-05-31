@@ -183,12 +183,19 @@ func rangeNorm(r key.Range) key.Range {
 
 func (q *Router) queueKeyEvent(e key.Event) {
 	kq := &q.key.queue
-	if f := q.key.queue.focus; f != nil && kq.Accepts(f, e) {
+	f := q.key.queue.focus
+	if f != nil && kq.Accepts(f, e) {
 		q.handlers.Add(f, e)
 		return
 	}
 	pq := &q.pointer.queue
 	idx := len(pq.hitTree) - 1
+	if f != nil {
+		// If there is a focused tag, traverse its ancestry through the
+		// hit tree to search for handlers.
+		for ; pq.hitTree[idx].ktag != f; idx-- {
+		}
+	}
 	for idx != -1 {
 		n := &pq.hitTree[idx]
 		idx = n.next

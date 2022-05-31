@@ -321,37 +321,65 @@ func TestNoFocus(t *testing.T) {
 }
 
 func TestKeyRouting(t *testing.T) {
-	handlers := make([]int, 3)
+	handlers := make([]int, 5)
 	ops := new(op.Ops)
+	macroOps := new(op.Ops)
 	r := new(Router)
 
 	rect := clip.Rect{Max: image.Pt(10, 10)}
 
+	macro := op.Record(macroOps)
 	key.InputOp{Tag: &handlers[0], Keys: "A"}.Add(ops)
 	cl1 := rect.Push(ops)
 	key.InputOp{Tag: &handlers[1], Keys: "B"}.Add(ops)
 	key.InputOp{Tag: &handlers[2], Keys: "A"}.Add(ops)
 	cl1.Pop()
+	cl2 := rect.Push(ops)
+	key.InputOp{Tag: &handlers[3], Keys: "B"}.Add(ops)
+	key.InputOp{Tag: &handlers[4], Keys: "A"}.Add(ops)
+	cl2.Pop()
+	call := macro.Stop()
+	call.Add(ops)
 
 	r.Frame(ops)
 
 	A, B := key.Event{Name: "A"}, key.Event{Name: "B"}
 	r.Queue(A, B)
 
-	assertKeyEvent(t, r.Events(&handlers[2]), false, A)
-	assertKeyEvent(t, r.Events(&handlers[1]), false, B)
+	// With no focus, the events should traverse the final branch of the hit tree
+	// searching for handlers.
+	assertKeyEvent(t, r.Events(&handlers[4]), false, A)
+	assertKeyEvent(t, r.Events(&handlers[3]), false, B)
+	assertKeyEvent(t, r.Events(&handlers[2]), false)
+	assertKeyEvent(t, r.Events(&handlers[1]), false)
 	assertKeyEvent(t, r.Events(&handlers[0]), false)
+
+	r2 := new(Router)
+
+	call.Add(ops)
+	key.FocusOp{Tag: &handlers[2]}.Add(ops)
+	r2.Frame(ops)
+
+	r2.Queue(A, B)
+
+	// With focus, the events should traverse the branch of the hit tree
+	// containing the focused element.
+	assertKeyEvent(t, r2.Events(&handlers[4]), false)
+	assertKeyEvent(t, r2.Events(&handlers[3]), false)
+	assertKeyEvent(t, r2.Events(&handlers[2]), true, A)
+	assertKeyEvent(t, r2.Events(&handlers[1]), false, B)
+	assertKeyEvent(t, r2.Events(&handlers[0]), false)
 }
 
-func assertKeyEvent(t *testing.T, events []event.Event, expected bool, expectedInputs ...event.Event) {
+func assertKeyEvent(t *testing.T, events []event.Event, expectedFocus bool, expectedInputs ...event.Event) {
 	t.Helper()
 	var evtFocus int
 	var evtKeyPress int
 	for _, e := range events {
 		switch ev := e.(type) {
 		case key.FocusEvent:
-			if ev.Focus != expected {
-				t.Errorf("focus is expected to be %v, got %v", expected, ev.Focus)
+			if ev.Focus != expectedFocus {
+				t.Errorf("focus is expected to be %v, got %v", expectedFocus, ev.Focus)
 			}
 			evtFocus++
 		case key.Event, key.EditEvent:
