@@ -69,12 +69,6 @@ type strokeState struct {
 
 type StrokeQuads []StrokeQuad
 
-func (qs *StrokeQuads) setContour(n uint32) {
-	for i := range *qs {
-		(*qs)[i].Contour = n
-	}
-}
-
 func (qs *StrokeQuads) pen() f32.Point {
 	return (*qs)[len(*qs)-1].Quad.To
 }
@@ -330,8 +324,7 @@ func strokePathNorm(p0, p1, p2 f32.Point, t, d float32) f32.Point {
 	panic("impossible")
 }
 
-func rot90CW(p f32.Point) f32.Point  { return f32.Pt(+p.Y, -p.X) }
-func rot90CCW(p f32.Point) f32.Point { return f32.Pt(-p.Y, +p.X) }
+func rot90CW(p f32.Point) f32.Point { return f32.Pt(+p.Y, -p.X) }
 
 // cosPt returns the cosine of the opening angle between p and q.
 func cosPt(p, q f32.Point) float32 {

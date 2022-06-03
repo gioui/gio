@@ -283,10 +283,6 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 			cross = (maxCross - sz.Y) / 2
 		}
 		childSize := sz.X
-		max := childSize + pos
-		if max > mainMax {
-			max = mainMax
-		}
 		min := pos
 		if min < 0 {
 			min = 0

@@ -49,7 +49,6 @@ type Backend struct {
 type glState struct {
 	drawFBO     gl.Framebuffer
 	readFBO     gl.Framebuffer
-	renderBuf   gl.Renderbuffer
 	vertAttribs [5]struct {
 		obj        gl.Buffer
 		enabled    bool
@@ -152,11 +151,6 @@ type uniformLocation struct {
 	offset  int
 	typ     shader.DataType
 	size    int
-}
-
-type inputLayout struct {
-	inputs []shader.InputLocation
-	layout []driver.InputDesc
 }
 
 // textureTriple holds the type settings for
@@ -426,13 +420,6 @@ func (s *glState) activeTexture(f *gl.Functions, unit gl.Enum) {
 	}
 }
 
-func (s *glState) bindRenderbuffer(f *gl.Functions, target gl.Enum, r gl.Renderbuffer) {
-	if !r.Equal(s.renderBuf) {
-		f.BindRenderbuffer(gl.RENDERBUFFER, r)
-		s.renderBuf = r
-	}
-}
-
 func (s *glState) bindTexture(f *gl.Functions, unit int, t gl.Texture) {
 	s.activeTexture(f, gl.TEXTURE0+gl.Enum(unit))
 	if !t.Equal(s.texUnits.binds[unit]) {
@@ -445,13 +432,6 @@ func (s *glState) bindVertexArray(f *gl.Functions, a gl.VertexArray) {
 	if !a.Equal(s.vertArray) {
 		f.BindVertexArray(a)
 		s.vertArray = a
-	}
-}
-
-func (s *glState) deleteRenderbuffer(f *gl.Functions, r gl.Renderbuffer) {
-	f.DeleteRenderbuffer(r)
-	if r.Equal(s.renderBuf) {
-		s.renderBuf = gl.Renderbuffer{}
 	}
 }
 

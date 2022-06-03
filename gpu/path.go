@@ -58,7 +58,6 @@ type coverUniforms struct {
 	uvCoverTransform [4]float32
 	uvTransformR1    [4]float32
 	uvTransformR2    [4]float32
-	z                float32
 }
 
 type stenciler struct {
@@ -239,6 +238,9 @@ func newStenciler(ctx driver.Device) *stenciler {
 		Topology:    driver.TopologyTriangleStrip,
 	})
 	st.ipipeline.pipeline = &pipeline{ipipe, vertUniforms}
+	if err != nil {
+		panic(err)
+	}
 	return st
 }
 

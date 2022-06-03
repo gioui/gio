@@ -126,8 +126,6 @@ type maskReader struct {
 	maskBuf [utf8.UTFMax]byte
 	// mask is the utf-8 encoded mask rune.
 	mask []byte
-	// overflow contains excess mask bytes left over after the last Read call.
-	overflow []byte
 }
 
 // combinedPos is a point in the editor.
@@ -197,14 +195,6 @@ type SubmitEvent struct {
 // applications won't actually care about it, and those that do can call
 // Editor.SelectedText() (which can be empty).
 type SelectEvent struct{}
-
-type line struct {
-	offset         image.Point
-	clip           clip.Op
-	selected       bool
-	selectionYOffs int
-	selectionSize  image.Point
-}
 
 const (
 	blinksPerSecond  = 1
@@ -1458,14 +1448,6 @@ func sign(n int) int {
 	default:
 		return 0
 	}
-}
-
-// sortPoints returns a and b sorted such that a2 <= b2.
-func sortPoints(a, b screenPos) (a2, b2 screenPos) {
-	if b.Less(a) {
-		return b, a
-	}
-	return a, b
 }
 
 func nullLayout(rr io.RuneReader) ([]text.Line, error) {

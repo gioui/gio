@@ -1750,7 +1750,7 @@ func AllocateDescriptorSets(d Device, pool DescriptorPool, layout DescriptorSetL
 		descriptorSetCount: C.uint32_t(count),
 		pSetLayouts:        &layouts[0],
 	}
-	sets := make([]DescriptorSet, count, count)
+	sets := make([]DescriptorSet, count)
 	if err := vkErr(C.vkAllocateDescriptorSets(funcs.vkAllocateDescriptorSets, d, inf, &sets[0])); err != nil {
 		return nil, fmt.Errorf("vulkan: vkAllocateDescriptorSets: %w", err)
 	}

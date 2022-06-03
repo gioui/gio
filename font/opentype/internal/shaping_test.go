@@ -890,7 +890,6 @@ func TestEngineLineWrap(t *testing.T) {
 func TestEngineDocument(t *testing.T) {
 	const doc = `Rutrum quisque non tellus orci ac auctor augue.
 At risus viverra adipiscing at.`
-	const numLines = 2
 	english := system.Locale{
 		Language:  "EN",
 		Direction: system.LTR,
@@ -980,7 +979,6 @@ func TestLayoutComputeClusters(t *testing.T) {
 	type testcase struct {
 		name     string
 		line     text.Layout
-		lastLine bool
 		expected []text.GlyphCluster
 	}
 	for _, tc := range []testcase{

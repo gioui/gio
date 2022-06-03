@@ -993,11 +993,3 @@ func printLines(e *Editor) {
 		fmt.Printf("%d: %s\n", n, text)
 	}
 }
-
-// sortInts returns a and b sorted such that a2 <= b2.
-func sortInts(a, b int) (a2, b2 int) {
-	if b < a {
-		return b, a
-	}
-	return a, b
-}

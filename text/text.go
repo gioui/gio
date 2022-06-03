@@ -128,27 +128,6 @@ func (l Layout) Slice(start, end int) Layout {
 	return out
 }
 
-// equals returns true when l2 is logically equivalent to l.
-func (l Layout) equals(l2 Layout) bool {
-	if len(l.Glyphs) != len(l2.Glyphs) || len(l.Clusters) != len(l2.Clusters) {
-		return false
-	}
-	if l.Runes != l2.Runes || l.Direction != l2.Direction {
-		return false
-	}
-	for i := range l.Clusters {
-		if l.Clusters[i] != l2.Clusters[i] {
-			return false
-		}
-	}
-	for i := range l.Glyphs {
-		if l.Glyphs[i] != l2.Glyphs[i] {
-			return false
-		}
-	}
-	return true
-}
-
 // Style is the font style.
 type Style int
 

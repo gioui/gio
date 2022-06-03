@@ -265,7 +265,6 @@ type clipState struct {
 	path      []byte
 	pathKey   ops.Key
 	intersect f32.Rectangle
-	push      bool
 
 	clipKey
 }
@@ -306,11 +305,6 @@ type encoder struct {
 	npath    int
 	npathseg int
 	ntrans   int
-}
-
-type encodeState struct {
-	trans f32.Affine2D
-	clip  f32.Rectangle
 }
 
 // sizedBuffer holds a GPU buffer, or its equivalent CPU memory.
@@ -1612,13 +1606,6 @@ func (e *encoder) numElements() int {
 	return len(e.scene)
 }
 
-func (e *encoder) append(e2 encoder) {
-	e.scene = append(e.scene, e2.scene...)
-	e.npath += e2.npath
-	e.npathseg += e2.npathseg
-	e.ntrans += e2.ntrans
-}
-
 func (e *encoder) transform(m f32.Affine2D) {
 	e.scene = append(e.scene, scene.Transform(m))
 	e.ntrans++
@@ -1663,11 +1650,6 @@ func (e *encoder) fillImage(index int, offset image.Point) {
 
 func (e *encoder) line(start, end f32.Point) {
 	e.scene = append(e.scene, scene.Line(start, end))
-	e.npathseg++
-}
-
-func (e *encoder) quad(start, ctrl, end f32.Point) {
-	e.scene = append(e.scene, scene.Quad(start, ctrl, end))
 	e.npathseg++
 }
 

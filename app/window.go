@@ -71,7 +71,6 @@ type Window struct {
 	animating    bool
 	hasNextFrame bool
 	nextFrame    time.Time
-	delayedDraw  *time.Timer
 	// viewport is the latest frame size with insets applied.
 	viewport image.Rectangle
 	// metric is the metric from the most recent frame.
@@ -147,7 +146,7 @@ func NewWindow(options ...Option) *Window {
 
 	w := &Window{
 		out:              make(chan event.Event),
-		immediateRedraws: make(chan struct{}, 0),
+		immediateRedraws: make(chan struct{}),
 		redraws:          make(chan struct{}, 1),
 		scheduledRedraws: make(chan time.Time, 1),
 		frames:           make(chan *op.Ops),

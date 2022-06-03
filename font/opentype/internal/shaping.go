@@ -100,7 +100,6 @@ func computeGlyphClusters(l *text.Layout) {
 		clusters = append(clusters, newlineCluster)
 	}
 	l.Clusters = clusters
-	return
 }
 
 // langConfig describes the language and writing system of a body of text.
@@ -396,10 +395,6 @@ func toGioGlyphs(in []shaping.Glyph) []text.Glyph {
 
 // ToLine converts the output into a text.Line
 func (o output) ToLine() text.Line {
-	advances := make([]fixed.Int26_6, 0, len(o.Shaped.Glyphs))
-	for _, glyph := range o.Shaped.Glyphs {
-		advances = append(advances, glyph.XAdvance)
-	}
 	layout := text.Layout{
 		Glyphs:    toGioGlyphs(o.Shaped.Glyphs),
 		Runes:     o.RuneRange,
@@ -458,11 +453,7 @@ func Document(shaper Shaper, face font.Face, ppem fixed.Int26_6, maxWidth int, l
 			}
 			paragraphText = append(paragraphText, r)
 			script := language.LookupScript(r)
-			if _, ok := langs[script]; ok {
-				langs[script]++
-			} else {
-				langs[script] = 1
-			}
+			langs[script]++
 			bytes += sz
 			runes++
 			if r == '\n' {
