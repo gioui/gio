@@ -44,18 +44,27 @@ type (
 
 // Dp converts v to pixels, rounded to the nearest integer value.
 func (c Metric) Dp(v Dp) int {
-	s := c.PxPerDp
-	if s == 0. {
-		s = 1.
-	}
-	return int(math.Round(float64(s) * float64(v)))
+	return int(math.Round(float64(nonZero(c.PxPerDp)) * float64(v)))
 }
 
 // Sp converts v to pixels, rounded to the nearest integer value.
 func (c Metric) Sp(v Sp) int {
-	s := c.PxPerSp
-	if s == 0. {
-		s = 1.
+	return int(math.Round(float64(nonZero(c.PxPerSp)) * float64(v)))
+}
+
+// DpToSp converts v dp to sp.
+func (c Metric) DpToSp(v Dp) Sp {
+	return Sp(float32(v) * nonZero(c.PxPerDp) / nonZero(c.PxPerSp))
+}
+
+// SpToDp converts v sp to dp.
+func (c Metric) SpToDp(v Sp) Dp {
+	return Dp(float32(v) * nonZero(c.PxPerSp) / nonZero(c.PxPerDp))
+}
+
+func nonZero(v float32) float32 {
+	if v == 0. {
+		return 1
 	}
-	return int(math.Round(float64(s) * float64(v)))
+	return v
 }
