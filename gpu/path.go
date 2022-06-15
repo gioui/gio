@@ -58,6 +58,7 @@ type coverUniforms struct {
 	uvCoverTransform [4]float32
 	uvTransformR1    [4]float32
 	uvTransformR2    [4]float32
+	_                float32
 }
 
 type stenciler struct {
