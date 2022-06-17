@@ -628,15 +628,7 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 		}
 		callbackStore(unsafe.Pointer(s), d.seat)
 		C.wl_seat_add_listener(s, &C.gio_seat_listener, unsafe.Pointer(s))
-		if d.dataDeviceManager == nil {
-			break
-		}
-		d.seat.dataDev = C.wl_data_device_manager_get_data_device(d.dataDeviceManager, s)
-		if d.seat.dataDev == nil {
-			break
-		}
-		callbackStore(unsafe.Pointer(d.seat.dataDev), d.seat)
-		C.wl_data_device_add_listener(d.seat.dataDev, &C.gio_data_device_listener, unsafe.Pointer(d.seat.dataDev))
+		d.bindDataDevice()
 	case "wl_shm":
 		d.shm = (*C.struct_wl_shm)(C.wl_registry_bind(reg, name, &C.wl_shm_interface, 1))
 	case "xdg_wm_base":
@@ -648,6 +640,7 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 		d.imm = (*C.struct_zwp_text_input_manager_v3)(C.wl_registry_bind(reg, name, &C.zwp_text_input_manager_v3_interface, 1))*/
 	case "wl_data_device_manager":
 		d.dataDeviceManager = (*C.struct_wl_data_device_manager)(C.wl_registry_bind(reg, name, &C.wl_data_device_manager_interface, 3))
+		d.bindDataDevice()
 	}
 }
 
@@ -1301,6 +1294,19 @@ func (w *window) loop() error {
 		w.draw()
 	}
 	return nil
+}
+
+// bindDataDevice initializes the dataDev field if and only if both
+// the seat and dataDeviceManager fields are initialized.
+func (d *wlDisplay) bindDataDevice() {
+	if d.seat != nil && d.dataDeviceManager != nil {
+		d.seat.dataDev = C.wl_data_device_manager_get_data_device(d.dataDeviceManager, d.seat.seat)
+		if d.seat.dataDev == nil {
+			return
+		}
+		callbackStore(unsafe.Pointer(d.seat.dataDev), d.seat)
+		C.wl_data_device_add_listener(d.seat.dataDev, &C.gio_data_device_listener, unsafe.Pointer(d.seat.dataDev))
+	}
 }
 
 func (d *wlDisplay) dispatch(p *poller) error {
