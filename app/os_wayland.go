@@ -1001,11 +1001,13 @@ func (w *window) Configure(options []Option) {
 		}
 		if prev.MinSize != cnf.MinSize {
 			w.config.MinSize = cnf.MinSize
-			C.xdg_toplevel_set_min_size(w.topLvl, C.int32_t(cnf.MinSize.X), C.int32_t(cnf.MinSize.Y))
+			scaled := cnf.MinSize.Div(w.scale)
+			C.xdg_toplevel_set_min_size(w.topLvl, C.int32_t(scaled.X), C.int32_t(scaled.Y))
 		}
 		if prev.MaxSize != cnf.MaxSize {
 			w.config.MaxSize = cnf.MaxSize
-			C.xdg_toplevel_set_max_size(w.topLvl, C.int32_t(cnf.MaxSize.X), C.int32_t(cnf.MaxSize.Y))
+			scaled := cnf.MaxSize.Div(w.scale)
+			C.xdg_toplevel_set_max_size(w.topLvl, C.int32_t(scaled.X), C.int32_t(scaled.Y))
 		}
 	}
 	if cnf.Decorated != prev.Decorated {
