@@ -78,6 +78,11 @@ type Window struct {
 	cursor      pointer.Cursor
 	decorations struct {
 		op.Ops
+		// enabled tracks the Decorated option as
+		// given to the Option method. It may differ
+		// from Config.Decorated depending on platform
+		// capability.
+		enabled bool
 		Config
 		*material.Theme
 		*widget.Decorations
@@ -137,6 +142,7 @@ func NewWindow(options ...Option) *Window {
 	defaultOptions := []Option{
 		Size(800, 600),
 		Title("Gio"),
+		Decorated(true),
 	}
 	options = append(defaultOptions, options...)
 	var cnf Config
@@ -157,6 +163,7 @@ func NewWindow(options ...Option) *Window {
 		actions:          make(chan system.Action, 1),
 		nocontext:        cnf.CustomRenderer,
 	}
+	w.decorations.enabled = cnf.Decorated
 	w.imeState.compose = key.Range{Start: -1, End: -1}
 	w.semantic.ids = make(map[router.SemanticID]router.SemanticNode)
 	w.callbacks.w = w
@@ -854,6 +861,16 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 	case wakeupEvent:
 		select {
 		case opts := <-w.options:
+			// Send a decoration mode update, in case the driver does not
+			// support switching.
+			cnf := Config{Decorated: w.decorations.enabled}
+			for _, opt := range opts {
+				opt(w.metric, &cnf)
+			}
+			if w.decorations.enabled != cnf.Decorated {
+				w.decorations.enabled = cnf.Decorated
+				w.out <- ConfigEvent{Config: w.effectiveConfig()}
+			}
 			d.Configure(opts)
 		default:
 		}
@@ -869,7 +886,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 			w.decorations.Decorations = nil
 			w.decorations.size = image.Point{}
 		}
-		e2.Config.Size = e2.Config.Size.Sub(w.decorations.size)
+		e2.Config = w.effectiveConfig()
 		w.out <- e2
 	case event.Event:
 		handled := w.queue.q.Queue(e2)
@@ -952,7 +969,7 @@ func (w *Window) updateCursor(d driver) {
 
 func (w *Window) fallbackDecorate() bool {
 	cnf := w.decorations.Config
-	return !cnf.Decorated && cnf.Mode != Fullscreen && !w.nocontext
+	return w.decorations.enabled && !cnf.Decorated && cnf.Mode != Fullscreen && !w.nocontext
 }
 
 // decorate the window if enabled and returns the corresponding Insets.
@@ -1007,11 +1024,16 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) (size, offse
 	appSize := e.Size.Sub(decoSize)
 	if w.decorations.size != decoSize {
 		w.decorations.size = decoSize
-		cnf := w.decorations.Config
-		cnf.Size = appSize
-		w.out <- ConfigEvent{Config: cnf}
+		w.out <- ConfigEvent{Config: w.effectiveConfig()}
 	}
 	return appSize, image.Pt(0, decoSize.Y)
+}
+
+func (w *Window) effectiveConfig() Config {
+	cnf := w.decorations.Config
+	cnf.Size = cnf.Size.Sub(w.decorations.size)
+	cnf.Decorated = w.decorations.enabled || cnf.Decorated
+	return cnf
 }
 
 // Perform the actions on the window.
