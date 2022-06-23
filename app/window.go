@@ -25,7 +25,6 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
-	"gioui.org/op/clip"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
@@ -818,18 +817,22 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 			w.queue.q.RevealFocus(viewport)
 		}
 		w.viewport = viewport
-		size := e2.Size // save the initial window size as the decorations will change it.
-		e2.FrameEvent.Size = w.decorate(d, e2.FrameEvent, wrapper)
+		viewSize := e2.Size
+		m := op.Record(wrapper)
+		size, offset := w.decorate(d, e2.FrameEvent, wrapper)
+		e2.FrameEvent.Size = size
+		deco := m.Stop()
 		w.out <- e2.FrameEvent
 		frame := w.waitFrame(d)
 		var signal chan<- struct{}
 		if frame != nil {
 			signal = w.frameAck
-			cl := clip.Rect{Max: e2.FrameEvent.Size}.Push(wrapper)
+			off := op.Offset(offset).Push(wrapper)
 			ops.AddCall(&wrapper.Internal, &frame.Internal, ops.PC{}, ops.PCFor(&frame.Internal))
-			cl.Pop()
+			off.Pop()
 		}
-		err := w.validateAndProcess(d, size, e2.Sync, wrapper, signal)
+		deco.Add(wrapper)
+		err := w.validateAndProcess(d, viewSize, e2.Sync, wrapper, signal)
 		if err != nil {
 			w.destroyGPU()
 			w.out <- system.DestroyEvent{Err: err}
@@ -942,9 +945,9 @@ func (w *Window) fallbackDecorate() bool {
 }
 
 // decorate the window if enabled and returns the corresponding Insets.
-func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point {
+func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) (size, offset image.Point) {
 	if !w.fallbackDecorate() {
-		return e.Size
+		return e.Size, image.Pt(0, 0)
 	}
 	theme := w.decorations.Theme
 	if theme == nil {
@@ -989,16 +992,15 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) image.Point 
 	// Update the window based on the actions on the decorations.
 	w.Perform(deco.Actions())
 	// Offset to place the frame content below the decorations.
-	size := image.Point{Y: dims.Size.Y}
-	op.Offset(image.Pt(0, size.Y)).Add(o)
-	appSize := e.Size.Sub(size)
-	if w.decorations.size != size {
-		w.decorations.size = size
+	decoSize := image.Point{Y: dims.Size.Y}
+	appSize := e.Size.Sub(decoSize)
+	if w.decorations.size != decoSize {
+		w.decorations.size = decoSize
 		cnf := w.decorations.Config
 		cnf.Size = appSize
 		w.out <- ConfigEvent{Config: cnf}
 	}
-	return appSize
+	return appSize, image.Pt(0, decoSize.Y)
 }
 
 // Perform the actions on the window.
