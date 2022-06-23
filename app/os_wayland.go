@@ -374,7 +374,17 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 		w.destroy()
 		return nil, errors.New("wayland: xdg_surface_get_toplevel failed")
 	}
-	w.cursor.theme = C.wl_cursor_theme_load(nil, C.int(32*w.scale), d.shm)
+	cursorTheme := C.CString(os.Getenv("XCURSOR_THEME"))
+	defer C.free(unsafe.Pointer(cursorTheme))
+	cursorSize := 32
+	if envSize, ok := os.LookupEnv("XCURSOR_SIZE"); ok && envSize != "" {
+		size, err := strconv.Atoi(envSize)
+		if err == nil {
+			cursorSize = size
+		}
+	}
+
+	w.cursor.theme = C.wl_cursor_theme_load(cursorTheme, C.int(cursorSize*w.scale), d.shm)
 	if w.cursor.theme == nil {
 		w.destroy()
 		return nil, errors.New("wayland: wl_cursor_theme_load failed")
