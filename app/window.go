@@ -54,17 +54,16 @@ type Window struct {
 	immediateRedraws chan struct{}
 	// scheduledRedraws is sent the most recent delayed redraw time.
 	scheduledRedraws chan time.Time
+	// options are the options waiting to be applied.
+	options chan []Option
+	// actions are the actions waiting to be performed.
+	actions chan system.Action
 
 	out      chan event.Event
 	frames   chan *op.Ops
 	frameAck chan struct{}
-	closing  bool
 	// dead is closed when the window is destroyed.
 	dead chan struct{}
-	// options are the options waiting to be applied.
-	options []Option
-	// actions are the actions waiting to be performed.
-	actions system.Action
 
 	stage        system.Stage
 	animating    bool
@@ -154,6 +153,8 @@ func NewWindow(options ...Option) *Window {
 		wakeups:          make(chan struct{}, 1),
 		wakeupFuncs:      make(chan func()),
 		dead:             make(chan struct{}),
+		options:          make(chan []Option, 1),
+		actions:          make(chan system.Action, 1),
 		nocontext:        cnf.CustomRenderer,
 	}
 	w.imeState.compose = key.Range{Start: -1, End: -1}
@@ -333,8 +334,18 @@ func (w *Window) Invalidate() {
 
 // Option applies the options to the window.
 func (w *Window) Option(opts ...Option) {
-	w.options = append(w.options, opts...)
-	w.wakeup()
+	if len(opts) == 0 {
+		return
+	}
+	for {
+		select {
+		case old := <-w.options:
+			opts = append(old, opts...)
+		case w.options <- opts:
+			w.wakeup()
+			return
+		}
+	}
 }
 
 // ReadClipboard initiates a read of the clipboard in the form
@@ -445,19 +456,24 @@ func (c *callbacks) Event(e event.Event) bool {
 		c.waitEvents = c.waitEvents[:len(c.waitEvents)-1]
 		handled = c.w.processEvent(c.d, e)
 	}
+	closing := false
 	if _, iswakeup := e.(wakeupEvent); iswakeup {
-		if len(c.w.options) > 0 {
-			c.d.Configure(c.w.options)
-			c.w.options = nil
+		select {
+		case opts := <-c.w.options:
+			c.d.Configure(opts)
+		default:
 		}
-		if c.w.actions != 0 {
-			c.d.Perform(c.w.actions)
-			c.w.actions = 0
+		select {
+		case acts := <-c.w.actions:
+			// Pospone closing to last.
+			closing = (acts & system.ActionClose) != 0
+			acts &^= system.ActionClose
+			c.d.Perform(acts)
+		default:
 		}
 	}
 	c.w.updateState(c.d)
-	if c.w.closing {
-		c.w.closing = false
+	if closing {
 		c.d.Close()
 	}
 	return handled
@@ -1008,20 +1024,28 @@ func (w *Window) Perform(actions system.Action) {
 	walkActions(actions, func(action system.Action) {
 		switch action {
 		case system.ActionMinimize:
-			w.options = append(w.options, Minimized.Option())
+			w.Option(Minimized.Option())
 		case system.ActionMaximize:
-			w.options = append(w.options, Maximized.Option())
+			w.Option(Maximized.Option())
 		case system.ActionUnmaximize:
-			w.options = append(w.options, Windowed.Option())
-		case system.ActionClose:
-			w.closing = true
+			w.Option(Windowed.Option())
 		default:
 			return
 		}
 		actions &^= action
 	})
-	w.actions = w.actions | actions
-	w.wakeup()
+	if actions == 0 {
+		return
+	}
+	for {
+		select {
+		case old := <-w.actions:
+			actions |= old
+		case w.actions <- actions:
+			w.wakeup()
+			return
+		}
+	}
 }
 
 func (q *queue) Events(k event.Tag) []event.Event {
