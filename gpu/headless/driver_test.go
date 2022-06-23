@@ -122,7 +122,7 @@ func TestFramebuffers(t *testing.T) {
 	sz := image.Point{X: 800, Y: 600}
 	var (
 		col1 = color.NRGBA{R: 0xac, G: 0xbd, B: 0xef, A: 0xde}
-		col2 = color.NRGBA{R: 0xfe, G: 0xba, B: 0xbe, A: 0xca}
+		col2 = color.NRGBA{R: 0xfe, G: 0xbb, B: 0xbe, A: 0xca}
 	)
 	fbo1 := newFBO(t, b, sz)
 	fbo2 := newFBO(t, b, sz)
