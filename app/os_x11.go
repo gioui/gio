@@ -266,6 +266,9 @@ func (w *x11Window) Perform(acts system.Action) {
 			w.raise()
 		}
 	})
+	if acts&system.ActionClose != 0 {
+		w.close()
+	}
 }
 
 func (w *x11Window) center() {
@@ -331,8 +334,8 @@ func (w *x11Window) SetInputHint(_ key.InputHint) {}
 
 func (w *x11Window) EditorStateChanged(old, new editorState) {}
 
-// Close the window.
-func (w *x11Window) Close() {
+// close the window.
+func (w *x11Window) close() {
 	var xev C.XEvent
 	ev := (*C.XClientMessageEvent)(unsafe.Pointer(&xev))
 	*ev = C.XClientMessageEvent{

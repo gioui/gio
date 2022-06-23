@@ -1414,9 +1414,6 @@ func setNavigationColor(env *C.JNIEnv, view C.jobject, color color.NRGBA) {
 	)
 }
 
-// Close the window. Not implemented for Android.
-func (w *window) Close() {}
-
 // runOnMain runs a function on the Java main thread.
 func runOnMain(f func(env *C.JNIEnv)) {
 	go func() {

@@ -1034,6 +1034,8 @@ func (w *window) Perform(actions system.Action) {
 		switch action {
 		case system.ActionMove:
 			w.move()
+		case system.ActionClose:
+			w.dead = true
 		default:
 			w.resize(action)
 		}
@@ -1626,11 +1628,6 @@ func (w *window) ShowTextInput(show bool) {}
 func (w *window) SetInputHint(_ key.InputHint) {}
 
 func (w *window) EditorStateChanged(old, new editorState) {}
-
-// Close the window.
-func (w *window) Close() {
-	w.dead = true
-}
 
 func (w *window) NewContext() (context, error) {
 	var firstErr error

@@ -375,6 +375,9 @@ func (w *window) Perform(acts system.Action) {
 			C.raiseWindow(w.window)
 		}
 	})
+	if acts&system.ActionClose != 0 {
+		C.closeWindow(w.window)
+	}
 }
 
 func (w *window) SetCursor(cursor pointer.Cursor) {
@@ -411,10 +414,6 @@ func (w *window) runOnMain(f func()) {
 			f()
 		}
 	})
-}
-
-func (w *window) Close() {
-	C.closeWindow(w.window)
 }
 
 func (w *window) setStage(stage system.Stage) {

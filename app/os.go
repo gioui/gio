@@ -162,8 +162,6 @@ type driver interface {
 	Configure([]Option)
 	// SetCursor updates the current cursor to name.
 	SetCursor(cursor pointer.Cursor)
-	// Close the window.
-	Close()
 	// Wakeup wakes up the event loop and sends a WakeupEvent.
 	Wakeup()
 	// Perform actions on the window.

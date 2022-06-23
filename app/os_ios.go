@@ -346,9 +346,6 @@ func (w *window) ShowTextInput(show bool) {
 
 func (w *window) SetInputHint(_ key.InputHint) {}
 
-// Close the window. Not implemented for iOS.
-func (w *window) Close() {}
-
 func newWindow(win *callbacks, options []Option) error {
 	mainWindow.in <- windowAndConfig{win, options}
 	return <-mainWindow.errs

@@ -456,25 +456,10 @@ func (c *callbacks) Event(e event.Event) bool {
 		c.waitEvents = c.waitEvents[:len(c.waitEvents)-1]
 		handled = c.w.processEvent(c.d, e)
 	}
-	closing := false
-	if _, iswakeup := e.(wakeupEvent); iswakeup {
-		select {
-		case opts := <-c.w.options:
-			c.d.Configure(opts)
-		default:
-		}
-		select {
-		case acts := <-c.w.actions:
-			// Pospone closing to last.
-			closing = (acts & system.ActionClose) != 0
-			acts &^= system.ActionClose
-			c.d.Perform(acts)
-		default:
-		}
-	}
-	c.w.updateState(c.d)
-	if closing {
-		c.d.Close()
+	select {
+	case <-c.w.dead:
+	default:
+		c.w.updateState(c.d)
 	}
 	return handled
 }
@@ -867,6 +852,16 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		w.out <- e2
 		w.waitAck(d)
 	case wakeupEvent:
+		select {
+		case opts := <-w.options:
+			d.Configure(opts)
+		default:
+		}
+		select {
+		case acts := <-w.actions:
+			d.Perform(acts)
+		default:
+		}
 	case ConfigEvent:
 		w.decorations.Config = e2.Config
 		if !w.fallbackDecorate() {

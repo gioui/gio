@@ -753,10 +753,6 @@ func (w *window) HWND() (syscall.Handle, int, int) {
 	return w.hwnd, w.config.Size.X, w.config.Size.Y
 }
 
-func (w *window) Close() {
-	windows.PostMessage(w.hwnd, windows.WM_CLOSE, 0, 0)
-}
-
 func (w *window) Perform(acts system.Action) {
 	walkActions(acts, func(a system.Action) {
 		switch a {
@@ -774,6 +770,8 @@ func (w *window) Perform(acts system.Action) {
 			windows.SetWindowPos(w.hwnd, 0, x, y, dx, dy, windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED)
 		case system.ActionRaise:
 			w.raise()
+		case system.ActionClose:
+			windows.PostMessage(w.hwnd, windows.WM_CLOSE, 0, 0)
 		}
 	})
 }
