@@ -118,6 +118,11 @@ static void setWindowStandardButtonHidden(CFTypeRef windowRef, NSWindowButton bt
 	[window standardWindowButton:btn].hidden = (BOOL)hide;
 }
 
+static void performWindowDragWithEvent(CFTypeRef windowRef, CFTypeRef evt) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	[window performWindowDragWithEvent:(__bridge NSEvent*)evt];
+}
+
 static void closeWindow(CFTypeRef windowRef) {
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	[window performClose:nil];
@@ -227,8 +232,9 @@ type window struct {
 	displayLink *displayLink
 	// redraw is a single entry channel for making sure only one
 	// display link redraw request is in flight.
-	redraw chan struct{}
-	cursor pointer.Cursor
+	redraw    chan struct{}
+	cursor    pointer.Cursor
+	lastPress C.CFTypeRef
 
 	scale  float32
 	config Config
@@ -409,6 +415,12 @@ func (w *window) Perform(acts system.Action) {
 			C.setScreenFrame(w.window, C.CGFloat(x), C.CGFloat(y), C.CGFloat(sz.X), C.CGFloat(sz.Y))
 		case system.ActionRaise:
 			C.raiseWindow(w.window)
+		case system.ActionMove:
+			if w.lastPress != 0 {
+				C.performWindowDragWithEvent(w.window, w.lastPress)
+				C.CFRelease(w.lastPress)
+				w.lastPress = 0
+			}
 		}
 	})
 	if acts&system.ActionClose != 0 {
@@ -488,7 +500,8 @@ func gio_onText(view, cstr C.CFTypeRef) {
 }
 
 //export gio_onMouse
-func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy C.CGFloat, ti C.double, mods C.NSUInteger) {
+func gio_onMouse(view, evt C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy C.CGFloat, ti C.double, mods C.NSUInteger) {
+	w := mustView(view)
 	var typ pointer.Type
 	switch cdir {
 	case C.MOUSE_MOVE:
@@ -497,6 +510,11 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy 
 		typ = pointer.Release
 	case C.MOUSE_DOWN:
 		typ = pointer.Press
+		if w.lastPress != 0 {
+			C.CFRelease(w.lastPress)
+			w.lastPress = 0
+		}
+		w.lastPress = C.CFRetain(evt)
 	case C.MOUSE_SCROLL:
 		typ = pointer.Scroll
 	default:
@@ -513,7 +531,6 @@ func gio_onMouse(view C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy 
 		btns |= pointer.ButtonTertiary
 	}
 	t := time.Duration(float64(ti)*float64(time.Second) + .5)
-	w := mustView(view)
 	xf, yf := float32(x)*w.scale, float32(y)*w.scale
 	dxf, dyf := float32(dx)*w.scale, float32(dy)*w.scale
 	w.w.Event(pointer.Event{
@@ -753,6 +770,10 @@ func gio_onClose(view C.CFTypeRef) {
 	w.w.Event(ViewEvent{})
 	deleteView(view)
 	w.w.Event(system.DestroyEvent{})
+	if w.lastPress != 0 {
+		C.CFRelease(w.lastPress)
+		w.lastPress = 0
+	}
 	w.displayLink.Close()
 	C.CFRelease(w.view)
 	C.CFRelease(w.window)
