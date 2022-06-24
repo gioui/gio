@@ -98,6 +98,26 @@ static NSWindowStyleMask getWindowStyleMask(CFTypeRef windowRef) {
 	return [window styleMask];
 }
 
+static void setWindowStyleMask(CFTypeRef windowRef, NSWindowStyleMask mask) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	window.styleMask = mask;
+}
+
+static void setWindowTitleVisibility(CFTypeRef windowRef, NSWindowTitleVisibility state) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	window.titleVisibility = state;
+}
+
+static void setWindowTitlebarAppearsTransparent(CFTypeRef windowRef, int transparent) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	window.titlebarAppearsTransparent = (BOOL)transparent;
+}
+
+static void setWindowStandardButtonHidden(CFTypeRef windowRef, NSWindowButton btn, int hide) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	[window standardWindowButton:btn].hidden = (BOOL)hide;
+}
+
 static void closeWindow(CFTypeRef windowRef) {
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	[window performClose:nil];
@@ -269,11 +289,12 @@ func (w *window) WriteClipboard(s string) {
 
 func (w *window) updateWindowMode() {
 	style := int(C.getWindowStyleMask(w.window))
-	if style&C.NSWindowStyleMaskFullScreen > 0 {
+	if style&C.NSWindowStyleMaskFullScreen != 0 {
 		w.config.Mode = Fullscreen
 	} else {
 		w.config.Mode = Windowed
 	}
+	w.config.Decorated = style&C.NSWindowStyleMaskFullSizeContentView == 0
 }
 
 func (w *window) Configure(options []Option) {
@@ -283,8 +304,6 @@ func (w *window) Configure(options []Option) {
 	w.updateWindowMode()
 	cnf := w.config
 	cnf.apply(cfg, options)
-	// Decorations are never disabled.
-	cnf.Decorated = true
 
 	switch cnf.Mode {
 	case Fullscreen:
@@ -347,6 +366,23 @@ func (w *window) Configure(options []Option) {
 	}
 	if cnf.Decorated != prev.Decorated {
 		w.config.Decorated = cnf.Decorated
+		mask := C.getWindowStyleMask(w.window)
+		style := C.NSWindowStyleMask(C.NSWindowStyleMaskTitled | C.NSWindowStyleMaskResizable | C.NSWindowStyleMaskMiniaturizable | C.NSWindowStyleMaskClosable)
+		style = C.NSWindowStyleMaskFullSizeContentView
+		mask &^= style
+		barTrans := C.int(C.NO)
+		titleVis := C.NSWindowTitleVisibility(C.NSWindowTitleVisible)
+		if !cnf.Decorated {
+			mask |= style
+			barTrans = C.YES
+			titleVis = C.NSWindowTitleHidden
+		}
+		C.setWindowTitlebarAppearsTransparent(w.window, barTrans)
+		C.setWindowTitleVisibility(w.window, titleVis)
+		C.setWindowStyleMask(w.window, mask)
+		C.setWindowStandardButtonHidden(w.window, C.NSWindowCloseButton, barTrans)
+		C.setWindowStandardButtonHidden(w.window, C.NSWindowMiniaturizeButton, barTrans)
+		C.setWindowStandardButtonHidden(w.window, C.NSWindowZoomButton, barTrans)
 	}
 	if w.config != prev {
 		w.w.Event(ConfigEvent{Config: w.config})
@@ -782,6 +818,7 @@ func newWindow(win *callbacks, options []Option) error {
 		errch <- nil
 		w.w = win
 		w.window = C.gio_createWindow(w.view, 0, 0, 0, 0, 0, 0)
+		w.updateWindowMode()
 		win.SetDriver(w)
 		w.Configure(options)
 		if nextTopLeft.x == 0 && nextTopLeft.y == 0 {
