@@ -38,7 +38,7 @@ func Decorations(th *Theme, deco *widget.Decorations, actions system.Action, tit
 }
 
 // Layout a window with its title and action buttons.
-func (d *DecorationsStyle) Layout(gtx layout.Context) layout.Dimensions {
+func (d DecorationsStyle) Layout(gtx layout.Context) layout.Dimensions {
 	rec := op.Record(gtx.Ops)
 	dims := d.layoutDecorations(gtx)
 	decos := rec.Stop()
@@ -51,7 +51,7 @@ func (d *DecorationsStyle) Layout(gtx layout.Context) layout.Dimensions {
 	return dims
 }
 
-func (d *DecorationsStyle) layoutDecorations(gtx layout.Context) layout.Dimensions {
+func (d DecorationsStyle) layoutDecorations(gtx layout.Context) layout.Dimensions {
 	gtx.Constraints.Min.Y = 0
 	inset := layout.UniformInset(10)
 	return layout.Flex{
