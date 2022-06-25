@@ -594,7 +594,7 @@ func (w *window) Configure(options []Option) {
 
 	case Maximized:
 		// Set window style.
-		style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE) & (^uintptr(windows.WS_MAXIMIZE))
+		style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
 		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW)
 		mi := windows.GetMonitorInfo(w.hwnd).Monitor
 		w.config.Size = image.Point{X: int(mi.Right - mi.Left), Y: int(mi.Bottom - mi.Top)}
@@ -603,7 +603,7 @@ func (w *window) Configure(options []Option) {
 	case Windowed:
 		windows.SetWindowText(w.hwnd, w.config.Title)
 		// Set window style.
-		style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE) & (^uintptr(windows.WS_MAXIMIZE))
+		style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
 		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW)
 		// Get target for client areaa size.
 		width := int32(w.config.Size.X)
