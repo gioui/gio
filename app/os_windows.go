@@ -197,24 +197,19 @@ func (w *window) update() {
 	}
 
 	// Check the window mode.
-	mode := w.config.Mode
 	p := windows.GetWindowPlacement(w.hwnd)
 	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
-	if style&windows.WS_OVERLAPPEDWINDOW == 0 {
-		mode = Fullscreen
+	if p.IsMinimized() {
+		w.config.Mode = Minimized
+	} else if p.IsMaximized() {
+		w.config.Mode = Maximized
+	} else if style&windows.WS_OVERLAPPEDWINDOW == 0 {
 		size = image.Point{
 			X: int(r.Right - r.Left),
 			Y: int(r.Bottom - r.Top),
 		}
-	} else if p.IsMinimized() {
-		mode = Minimized
-	} else if p.IsMaximized() {
-		mode = Maximized
-	} else {
-		mode = Windowed
 	}
 	w.config.Size = size
-	w.config.Mode = mode
 	w.w.Event(ConfigEvent{Config: w.config})
 }
 
@@ -587,26 +582,29 @@ func (w *window) Configure(options []Option) {
 	metric := configForDPI(dpi)
 	w.config.apply(metric, options)
 	windows.SetWindowText(w.hwnd, w.config.Title)
-	// Decorations are never disabled.
-	w.config.Decorated = true
 
 	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
 	var showMode int32
 	var x, y, width, height int32
 	swpStyle := uintptr(windows.SWP_NOZORDER | windows.SWP_FRAMECHANGED)
+	winStyle := uintptr(windows.WS_OVERLAPPEDWINDOW)
+	style &^= winStyle
+	if !w.config.Decorated {
+		winStyle = 0
+	}
 	switch w.config.Mode {
 	case Minimized:
 		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
 		showMode = windows.SW_SHOWMINIMIZED
 
 	case Maximized:
-		style |= windows.WS_OVERLAPPEDWINDOW
+		style |= winStyle
 		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
 		showMode = windows.SW_SHOWMAXIMIZED
 
 	case Windowed:
 		windows.SetWindowText(w.hwnd, w.config.Title)
-		style |= windows.WS_OVERLAPPEDWINDOW
+		style |= winStyle
 		showMode = windows.SW_SHOWNORMAL
 		// Get target for client areaa size.
 		width = int32(w.config.Size.X)
