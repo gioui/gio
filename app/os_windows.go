@@ -150,6 +150,8 @@ func initResources() error {
 	return nil
 }
 
+const dwExStyle = windows.WS_EX_APPWINDOW | windows.WS_EX_WINDOWEDGE
+
 func createNativeWindow() (*window, error) {
 	var resErr error
 	resources.once.Do(func() {
@@ -158,10 +160,10 @@ func createNativeWindow() (*window, error) {
 	if resErr != nil {
 		return nil, resErr
 	}
-	dwStyle := uint32(windows.WS_OVERLAPPEDWINDOW)
-	dwExStyle := uint32(windows.WS_EX_APPWINDOW | windows.WS_EX_WINDOWEDGE)
+	const dwStyle = windows.WS_OVERLAPPEDWINDOW
 
-	hwnd, err := windows.CreateWindowEx(dwExStyle,
+	hwnd, err := windows.CreateWindowEx(
+		dwExStyle,
 		resources.class,
 		"",
 		dwStyle|windows.WS_CLIPSIBLINGS|windows.WS_CLIPCHILDREN,
@@ -615,7 +617,7 @@ func (w *window) Configure(options []Option) {
 		wr.Bottom = wr.Top + height
 		// Convert from client size to window size.
 		r := wr
-		windows.AdjustWindowRectEx(&r, windows.WS_OVERLAPPEDWINDOW, 0, windows.WS_EX_APPWINDOW|windows.WS_EX_WINDOWEDGE)
+		windows.AdjustWindowRectEx(&r, windows.WS_OVERLAPPEDWINDOW, 0, dwExStyle)
 		// Calculate difference between client and full window sizes.
 		w.deltas.width = r.Right - wr.Right + wr.Left - r.Left
 		w.deltas.height = r.Bottom - wr.Bottom + wr.Top - r.Top
