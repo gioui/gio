@@ -598,8 +598,6 @@ func (w *window) Configure(options []Option) {
 		// Set window style.
 		style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
 		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW)
-		mi := windows.GetMonitorInfo(w.hwnd).Monitor
-		w.config.Size = image.Point{X: int(mi.Right - mi.Left), Y: int(mi.Bottom - mi.Top)}
 		windows.ShowWindow(w.hwnd, windows.SW_SHOWMAXIMIZED)
 
 	case Windowed:
