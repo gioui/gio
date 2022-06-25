@@ -2,11 +2,9 @@ package widget
 
 import (
 	"fmt"
-	"image"
 	"math/bits"
 
 	"gioui.org/gesture"
-	"gioui.org/io/pointer"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op/clip"
@@ -61,45 +59,6 @@ func (d *Decorations) Clickable(action system.Action) *Clickable {
 		}
 	}
 	return click
-}
-
-// LayoutResize lays out the resize actions.
-func (d *Decorations) LayoutResize(gtx layout.Context, actions system.Action) {
-	cs := gtx.Constraints.Max
-	wh := gtx.Dp(10)
-	s := []struct {
-		system.Action
-		image.Rectangle
-	}{
-		{system.ActionResizeNorth, image.Rect(0, 0, cs.X, wh)},
-		{system.ActionResizeSouth, image.Rect(0, cs.Y-wh, cs.X, cs.Y)},
-		{system.ActionResizeWest, image.Rect(cs.X-wh, 0, cs.X, cs.Y)},
-		{system.ActionResizeEast, image.Rect(0, 0, wh, cs.Y)},
-		{system.ActionResizeNorthWest, image.Rect(0, 0, wh, wh)},
-		{system.ActionResizeNorthEast, image.Rect(cs.X-wh, 0, cs.X, wh)},
-		{system.ActionResizeSouthWest, image.Rect(0, cs.Y-wh, wh, cs.Y)},
-		{system.ActionResizeSouthEast, image.Rect(cs.X-wh, cs.Y-wh, cs.X, cs.Y)},
-	}
-	for i, data := range s {
-		action := data.Action
-		if actions&action == 0 {
-			continue
-		}
-		rsz := &d.resize[i]
-		rsz.Events(gtx.Metric, gtx, gesture.Both)
-		if rsz.Drag.Dragging() {
-			d.actions |= action
-		}
-		st := clip.Rect(data.Rectangle).Push(gtx.Ops)
-		if rsz.Hover.Hovered(gtx) {
-			action.Cursor().Add(gtx.Ops)
-		}
-		rsz.Drag.Add(gtx.Ops)
-		pass := pointer.PassOp{}.Push(gtx.Ops)
-		rsz.Hover.Add(gtx.Ops)
-		pass.Pop()
-		st.Pop()
-	}
 }
 
 // Perform updates the decorations as if the specified actions were

@@ -2,8 +2,6 @@ package system
 
 import (
 	"strings"
-
-	"gioui.org/io/pointer"
 )
 
 // Action is a set of window decoration actions.
@@ -31,48 +29,7 @@ const (
 	ActionClose
 	// ActionMove moves a window directed by the user.
 	ActionMove
-	// ActionResizeNorth resizes the top border of a window (directed by the user).
-	ActionResizeNorth
-	// ActionResizeSouth resizes the bottom border of a window (directed by the user).
-	ActionResizeSouth
-	// ActionResizeWest resizes the right border of a window (directed by the user).
-	ActionResizeWest
-	// ActionResizeEast resizes the left border of a window (directed by the user).
-	ActionResizeEast
-	// ActionResizeNorthWest resizes the top-left corner of a window (directed by the user).
-	ActionResizeNorthWest
-	// ActionResizeSouthWest resizes the bottom-left corner of a window (directed by the user).
-	ActionResizeSouthWest
-	// ActionResizeNorthEast resizes the top-right corner of a window (directed by the user).
-	ActionResizeNorthEast
-	// ActionResizeSouthEast resizes the bottom-right corner of a window (directed by the user).
-	ActionResizeSouthEast
 )
-
-// Cursor returns the cursor for the action.
-// It must be a single action otherwise the default
-// cursor is returned.
-func (a Action) Cursor() pointer.Cursor {
-	switch a {
-	case ActionResizeNorthWest:
-		return pointer.CursorNorthWestResize
-	case ActionResizeSouthEast:
-		return pointer.CursorSouthEastResize
-	case ActionResizeNorthEast:
-		return pointer.CursorNorthEastResize
-	case ActionResizeSouthWest:
-		return pointer.CursorSouthWestResize
-	case ActionResizeWest:
-		return pointer.CursorWestResize
-	case ActionResizeEast:
-		return pointer.CursorEastResize
-	case ActionResizeNorth:
-		return pointer.CursorNorthResize
-	case ActionResizeSouth:
-		return pointer.CursorSouthResize
-	}
-	return pointer.CursorDefault
-}
 
 func (a Action) String() string {
 	var buf strings.Builder
@@ -100,22 +57,6 @@ func (a Action) string() string {
 		return "ActionClose"
 	case ActionMove:
 		return "ActionMove"
-	case ActionResizeNorth:
-		return "ActionResizeNorth"
-	case ActionResizeSouth:
-		return "ActionResizeSouth"
-	case ActionResizeWest:
-		return "ActionResizeWest"
-	case ActionResizeEast:
-		return "ActionResizeEast"
-	case ActionResizeNorthWest:
-		return "ActionResizeNorthWest"
-	case ActionResizeSouthWest:
-		return "ActionResizeSouthWest"
-	case ActionResizeNorthEast:
-		return "ActionResizeNorthEast"
-	case ActionResizeSouthEast:
-		return "ActionResizeSouthEast"
 	}
 	return ""
 }

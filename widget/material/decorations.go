@@ -45,9 +45,6 @@ func (d DecorationsStyle) Layout(gtx layout.Context) layout.Dimensions {
 	r := clip.Rect{Max: dims.Size}
 	paint.FillShape(gtx.Ops, d.Background, r.Op())
 	decos.Add(gtx.Ops)
-	if !d.Decorations.Maximized() {
-		d.Decorations.LayoutResize(gtx, d.Actions)
-	}
 	return dims
 }
 

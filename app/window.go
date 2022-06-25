@@ -983,11 +983,7 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) (size, offse
 		w.decorations.Decorations = deco
 	}
 	allActions := system.ActionMinimize | system.ActionMaximize | system.ActionUnmaximize |
-		system.ActionClose | system.ActionMove |
-		system.ActionResizeNorth | system.ActionResizeSouth |
-		system.ActionResizeWest | system.ActionResizeEast |
-		system.ActionResizeNorthWest | system.ActionResizeSouthWest |
-		system.ActionResizeNorthEast | system.ActionResizeSouthEast
+		system.ActionClose | system.ActionMove
 	style := material.Decorations(theme, deco, allActions, w.decorations.Config.Title)
 	// Update the decorations based on the current window mode.
 	var actions system.Action
