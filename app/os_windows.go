@@ -629,7 +629,6 @@ func (w *window) Configure(options []Option) {
 	case Fullscreen:
 		style &^= windows.WS_OVERLAPPEDWINDOW
 		mi := windows.GetMonitorInfo(w.hwnd)
-		w.config.Size = image.Point{X: int(mi.Monitor.Right - mi.Monitor.Left), Y: int(mi.Monitor.Bottom - mi.Monitor.Top)}
 		x, y = mi.Monitor.Left, mi.Monitor.Top
 		width = mi.Monitor.Right - mi.Monitor.Left
 		height = mi.Monitor.Bottom - mi.Monitor.Top
