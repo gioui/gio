@@ -200,8 +200,10 @@ func (w *window) update() {
 	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
 	if style&windows.WS_OVERLAPPEDWINDOW == 0 {
 		mode = Fullscreen
-		mi := windows.GetMonitorInfo(w.hwnd).Monitor
-		size = image.Point{X: int(mi.Right - mi.Left), Y: int(mi.Bottom - mi.Top)}
+		size = image.Point{
+			X: int(r.Right - r.Left),
+			Y: int(r.Bottom - r.Top),
+		}
 	} else if p.IsMinimized() {
 		mode = Minimized
 	} else if p.IsMaximized() {
