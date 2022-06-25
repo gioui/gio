@@ -281,9 +281,7 @@ func (w *window) Configure([]Option) {
 	prev := w.config
 	// Decorations are never disabled.
 	w.config.Decorated = true
-	if w.config != prev {
-		w.w.Event(ConfigEvent{Config: w.config})
-	}
+	w.w.Event(ConfigEvent{Config: w.config})
 }
 
 func (w *window) EditorStateChanged(old, new editorState) {}

@@ -234,9 +234,7 @@ func (w *x11Window) Configure(options []Option) {
 	if cnf.Decorated != prev.Decorated {
 		w.config.Decorated = cnf.Decorated
 	}
-	if w.config != prev {
-		w.w.Event(ConfigEvent{Config: w.config})
-	}
+	w.w.Event(ConfigEvent{Config: w.config})
 }
 
 func (w *x11Window) setTitle(prev, cnf Config) {

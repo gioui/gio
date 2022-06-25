@@ -1329,9 +1329,7 @@ func (w *window) Configure(options []Option) {
 		if cnf.Decorated != prev.Decorated {
 			w.config.Decorated = cnf.Decorated
 		}
-		if w.config != prev {
-			w.callbacks.Event(ConfigEvent{Config: w.config})
-		}
+		w.callbacks.Event(ConfigEvent{Config: w.config})
 	})
 }
 

@@ -188,7 +188,6 @@ func createNativeWindow() (*window, error) {
 // It reads the window style and size/position and updates w.config.
 // If anything has changed it emits a ConfigEvent to notify the application.
 func (w *window) update() {
-	var triggerEvent bool
 	r := windows.GetWindowRect(w.hwnd)
 	size := image.Point{
 		X: int(r.Right - r.Left - w.deltas.width),
@@ -210,17 +209,9 @@ func (w *window) update() {
 	} else {
 		mode = Windowed
 	}
-	if size != w.config.Size {
-		w.config.Size = size
-		triggerEvent = true
-	}
-	if mode != w.config.Mode {
-		w.config.Mode = mode
-		triggerEvent = true
-	}
-	if triggerEvent {
-		w.w.Event(ConfigEvent{Config: w.config})
-	}
+	w.config.Size = size
+	w.config.Mode = mode
+	w.w.Event(ConfigEvent{Config: w.config})
 }
 
 func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr {

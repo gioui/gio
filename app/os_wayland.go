@@ -1010,9 +1010,7 @@ func (w *window) Configure(options []Option) {
 			C.xdg_toplevel_set_max_size(w.topLvl, C.int32_t(scaled.X), C.int32_t(scaled.Y))
 		}
 	}
-	if w.config != prev || w.config.Decorated != cnf.Decorated {
-		w.w.Event(ConfigEvent{Config: w.config})
-	}
+	w.w.Event(ConfigEvent{Config: w.config})
 }
 
 func (w *window) setTitle(prev, cnf Config) {

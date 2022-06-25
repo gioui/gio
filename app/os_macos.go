@@ -390,9 +390,7 @@ func (w *window) Configure(options []Option) {
 		C.setWindowStandardButtonHidden(w.window, C.NSWindowMiniaturizeButton, barTrans)
 		C.setWindowStandardButtonHidden(w.window, C.NSWindowZoomButton, barTrans)
 	}
-	if w.config != prev {
-		w.w.Event(ConfigEvent{Config: w.config})
-	}
+	w.w.Event(ConfigEvent{Config: w.config})
 }
 
 func (w *window) setTitle(prev, cnf Config) {

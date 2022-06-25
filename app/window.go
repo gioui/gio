@@ -861,16 +861,11 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 	case wakeupEvent:
 		select {
 		case opts := <-w.options:
-			// Send a decoration mode update, in case the driver does not
-			// support switching.
 			cnf := Config{Decorated: w.decorations.enabled}
 			for _, opt := range opts {
 				opt(w.metric, &cnf)
 			}
-			if w.decorations.enabled != cnf.Decorated {
-				w.decorations.enabled = cnf.Decorated
-				w.out <- ConfigEvent{Config: w.effectiveConfig()}
-			}
+			w.decorations.enabled = cnf.Decorated
 			d.Configure(opts)
 		default:
 		}
