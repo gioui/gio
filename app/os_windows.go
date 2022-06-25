@@ -624,7 +624,7 @@ func (w *window) Configure(options []Option) {
 		y := wr.Top
 		dx := r.Right - r.Left
 		dy := r.Bottom - r.Top
-		windows.SetWindowPos(w.hwnd, 0, x, y, dx, dy, windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED)
+		windows.SetWindowPos(w.hwnd, 0, x, y, dx, dy, windows.SWP_NOZORDER|windows.SWP_FRAMECHANGED)
 		windows.ShowWindow(w.hwnd, windows.SW_SHOWNORMAL)
 
 	case Fullscreen:
@@ -636,7 +636,7 @@ func (w *window) Configure(options []Option) {
 			mi.Monitor.Left, mi.Monitor.Top,
 			mi.Monitor.Right-mi.Monitor.Left,
 			mi.Monitor.Bottom-mi.Monitor.Top,
-			windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED,
+			windows.SWP_NOZORDER|windows.SWP_FRAMECHANGED,
 		)
 		windows.ShowWindow(w.hwnd, windows.SW_SHOW)
 	}
@@ -760,7 +760,7 @@ func (w *window) Perform(acts system.Action) {
 			mi := windows.GetMonitorInfo(w.hwnd).Monitor
 			x := (mi.Right - mi.Left - dx) / 2
 			y := (mi.Bottom - mi.Top - dy) / 2
-			windows.SetWindowPos(w.hwnd, 0, x, y, dx, dy, windows.SWP_NOOWNERZORDER|windows.SWP_FRAMECHANGED)
+			windows.SetWindowPos(w.hwnd, 0, x, y, dx, dy, windows.SWP_NOZORDER|windows.SWP_FRAMECHANGED)
 		case system.ActionRaise:
 			w.raise()
 		case system.ActionClose:
