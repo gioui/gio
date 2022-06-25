@@ -12,7 +12,6 @@ import (
 
 // Decorations handles the states of window decorations.
 type Decorations struct {
-	move   gesture.Drag
 	clicks []Clickable
 	resize [8]struct {
 		gesture.Hover
@@ -25,13 +24,8 @@ type Decorations struct {
 // LayoutMove lays out the widget that makes a window movable.
 func (d *Decorations) LayoutMove(gtx layout.Context, w layout.Widget) layout.Dimensions {
 	dims := w(gtx)
-	d.move.Events(gtx.Metric, gtx, gesture.Both)
-	st := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
-	d.move.Add(gtx.Ops)
-	if d.move.Pressed() {
-		d.actions |= system.ActionMove
-	}
-	st.Pop()
+	defer clip.Rect{Max: dims.Size}.Push(gtx.Ops).Pop()
+	system.ActionInputOp(system.ActionMove).Add(gtx.Ops)
 	return dims
 }
 

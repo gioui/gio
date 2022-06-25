@@ -75,6 +75,7 @@ const (
 	TypeSemanticDisabled
 	TypeSnippet
 	TypeSelection
+	TypeActionInput
 )
 
 type StackID struct {
@@ -158,6 +159,7 @@ const (
 	TypeSemanticDisabledLen = 2
 	TypeSnippetLen          = 1 + 4 + 4
 	TypeSelectionLen        = 1 + 2*4 + 2*4 + 4 + 4
+	TypeActionInputLen      = 1 + 1
 )
 
 func (op *ClipOp) Decode(data []byte) {
@@ -418,6 +420,7 @@ func (t OpType) Size() int {
 		TypeSemanticDisabledLen,
 		TypeSnippetLen,
 		TypeSelectionLen,
+		TypeActionInputLen,
 	}[t-firstOpIndex]
 }
 

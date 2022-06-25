@@ -13,6 +13,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/semantic"
+	"gioui.org/io/system"
 	"gioui.org/io/transfer"
 )
 
@@ -97,6 +98,7 @@ type areaNode struct {
 		id      SemanticID
 		content semanticContent
 	}
+	action system.Action
 }
 
 type areaKind uint8
@@ -254,6 +256,12 @@ func (c *pointerCollector) keyInputOp(op key.InputOp) {
 		ktag: op.Tag,
 		pass: true,
 	})
+}
+
+func (c *pointerCollector) actionInputOp(act system.Action) {
+	areaID := c.currentArea()
+	area := &c.q.areas[areaID]
+	area.action = act
 }
 
 func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
@@ -422,6 +430,19 @@ func (q *pointerQueue) semanticIDFor(content semanticContent) SemanticID {
 	}
 	q.semantic.contentIDs[content] = append(q.semantic.contentIDs[content], id)
 	return id.id
+}
+
+func (q *pointerQueue) ActionAt(pos f32.Point) (system.Action, bool) {
+	for i := len(q.hitTree) - 1; i >= 0; i-- {
+		n := &q.hitTree[i]
+		hit, _ := q.hit(n.area, pos)
+		if !hit {
+			continue
+		}
+		area := q.areas[n.area]
+		return area.action, area.action != 0
+	}
+	return 0, false
 }
 
 func (q *pointerQueue) SemanticAt(pos f32.Point) (SemanticID, bool) {

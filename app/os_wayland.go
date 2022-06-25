@@ -879,6 +879,14 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 			w.resize(serial, edge)
 			return
 		}
+		act, ok := w.w.ActionAt(w.lastPos)
+		if ok && w.config.Mode == Windowed {
+			switch act {
+			case system.ActionMove:
+				w.move(serial)
+				return
+			}
+		}
 	case BTN_RIGHT:
 		btn = pointer.ButtonSecondary
 	case BTN_MIDDLE:
@@ -1073,19 +1081,17 @@ func (w *window) Perform(actions system.Action) {
 	// https://wayland.app/protocols/xdg-shell#xdg_toplevel:request:set_minimized
 	walkActions(actions, func(action system.Action) {
 		switch action {
-		case system.ActionMove:
-			w.move()
 		case system.ActionClose:
 			w.dead = true
 		}
 	})
 }
 
-func (w *window) move() {
-	if !w.inCompositor && w.seat != nil {
+func (w *window) move(serial C.uint32_t) {
+	s := w.seat
+	if !w.inCompositor && s != nil {
 		w.inCompositor = true
-		s := w.seat
-		C.xdg_toplevel_move(w.topLvl, s.seat, s.serial)
+		C.xdg_toplevel_move(w.topLvl, s.seat, serial)
 	}
 }
 

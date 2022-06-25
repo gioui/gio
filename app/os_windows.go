@@ -437,6 +437,11 @@ func (w *window) hitTest(x, y int) uintptr {
 	default:
 		fallthrough
 	case !top && !bottom && !left && !right:
+		p := f32.Pt(float32(x), float32(y))
+		switch a, _ := w.w.ActionAt(p); a {
+		case system.ActionMove:
+			return windows.HTCAPTION
+		}
 		return windows.HTCLIENT
 	case top && left:
 		return windows.HTTOPLEFT

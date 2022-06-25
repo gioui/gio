@@ -27,6 +27,7 @@ import (
 	"gioui.org/io/pointer"
 	"gioui.org/io/profile"
 	"gioui.org/io/semantic"
+	"gioui.org/io/system"
 	"gioui.org/io/transfer"
 	"gioui.org/op"
 )
@@ -276,6 +277,10 @@ func min(p1, p2 image.Point) image.Point {
 	return m
 }
 
+func (q *Router) ActionAt(p f32.Point) (system.Action, bool) {
+	return q.pointer.queue.ActionAt(p)
+}
+
 func (q *Router) ClickFocus() {
 	focus := q.key.queue.focus
 	if focus == nil {
@@ -444,6 +449,9 @@ func (q *Router) collect() {
 				Data: encOp.Refs[2].(io.ReadCloser),
 			}
 			pc.offerOp(op, &q.handlers)
+		case ops.TypeActionInput:
+			act := system.Action(encOp.Data[1])
+			pc.actionInputOp(act)
 
 		// Key ops.
 		case ops.TypeKeyFocus:

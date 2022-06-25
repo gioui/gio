@@ -113,6 +113,7 @@ const (
 
 	HWND_TOPMOST = ^(uint32(1) - 1) // -1
 
+	HTCAPTION     = 2
 	HTCLIENT      = 1
 	HTLEFT        = 10
 	HTRIGHT       = 11

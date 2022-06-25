@@ -232,9 +232,8 @@ type window struct {
 	displayLink *displayLink
 	// redraw is a single entry channel for making sure only one
 	// display link redraw request is in flight.
-	redraw    chan struct{}
-	cursor    pointer.Cursor
-	lastPress C.CFTypeRef
+	redraw chan struct{}
+	cursor pointer.Cursor
 
 	scale  float32
 	config Config
@@ -413,12 +412,6 @@ func (w *window) Perform(acts system.Action) {
 			C.setScreenFrame(w.window, C.CGFloat(x), C.CGFloat(y), C.CGFloat(sz.X), C.CGFloat(sz.Y))
 		case system.ActionRaise:
 			C.raiseWindow(w.window)
-		case system.ActionMove:
-			if w.lastPress != 0 {
-				C.performWindowDragWithEvent(w.window, w.lastPress)
-				C.CFRelease(w.lastPress)
-				w.lastPress = 0
-			}
 		}
 	})
 	if acts&system.ActionClose != 0 {
@@ -500,6 +493,10 @@ func gio_onText(view, cstr C.CFTypeRef) {
 //export gio_onMouse
 func gio_onMouse(view, evt C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx, dy C.CGFloat, ti C.double, mods C.NSUInteger) {
 	w := mustView(view)
+	t := time.Duration(float64(ti)*float64(time.Second) + .5)
+	xf, yf := float32(x)*w.scale, float32(y)*w.scale
+	dxf, dyf := float32(dx)*w.scale, float32(dy)*w.scale
+	pos := f32.Point{X: xf, Y: yf}
 	var typ pointer.Type
 	switch cdir {
 	case C.MOUSE_MOVE:
@@ -508,11 +505,14 @@ func gio_onMouse(view, evt C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx
 		typ = pointer.Release
 	case C.MOUSE_DOWN:
 		typ = pointer.Press
-		if w.lastPress != 0 {
-			C.CFRelease(w.lastPress)
-			w.lastPress = 0
+		act, ok := w.w.ActionAt(pos)
+		if ok && w.config.Mode != Fullscreen {
+			switch act {
+			case system.ActionMove:
+				C.performWindowDragWithEvent(w.window, evt)
+				return
+			}
 		}
-		w.lastPress = C.CFRetain(evt)
 	case C.MOUSE_SCROLL:
 		typ = pointer.Scroll
 	default:
@@ -528,15 +528,12 @@ func gio_onMouse(view, evt C.CFTypeRef, cdir C.int, cbtns C.NSUInteger, x, y, dx
 	if cbtns&(1<<2) != 0 {
 		btns |= pointer.ButtonTertiary
 	}
-	t := time.Duration(float64(ti)*float64(time.Second) + .5)
-	xf, yf := float32(x)*w.scale, float32(y)*w.scale
-	dxf, dyf := float32(dx)*w.scale, float32(dy)*w.scale
 	w.w.Event(pointer.Event{
 		Type:      typ,
 		Source:    pointer.Mouse,
 		Time:      t,
 		Buttons:   btns,
-		Position:  f32.Point{X: xf, Y: yf},
+		Position:  pos,
 		Scroll:    f32.Point{X: dxf, Y: dyf},
 		Modifiers: convertMods(mods),
 	})
@@ -768,10 +765,6 @@ func gio_onClose(view C.CFTypeRef) {
 	w.w.Event(ViewEvent{})
 	deleteView(view)
 	w.w.Event(system.DestroyEvent{})
-	if w.lastPress != 0 {
-		C.CFRelease(w.lastPress)
-		w.lastPress = 0
-	}
 	w.displayLink.Close()
 	C.CFRelease(w.view)
 	C.CFRelease(w.window)

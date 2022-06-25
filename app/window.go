@@ -567,6 +567,10 @@ func (c *callbacks) ClickFocus() {
 	c.w.updateAnimation(c.d)
 }
 
+func (c *callbacks) ActionAt(p f32.Point) (system.Action, bool) {
+	return c.w.queue.q.ActionAt(p)
+}
+
 func (e *editorState) Replace(r key.Range, text string) {
 	if r.Start > r.End {
 		r.Start, r.End = r.End, r.Start

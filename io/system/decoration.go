@@ -2,7 +2,16 @@ package system
 
 import (
 	"strings"
+
+	"gioui.org/internal/ops"
+	"gioui.org/op"
 )
+
+// ActionAreaOp makes the current clip area available for
+// system gestures.
+//
+// Note: only ActionMove is supported.
+type ActionInputOp Action
 
 // Action is a set of window decoration actions.
 type Action uint
@@ -30,6 +39,12 @@ const (
 	// ActionMove moves a window directed by the user.
 	ActionMove
 )
+
+func (op ActionInputOp) Add(o *op.Ops) {
+	data := ops.Write(&o.Internal, ops.TypeActionInputLen)
+	data[0] = byte(ops.TypeActionInput)
+	data[1] = byte(op)
+}
 
 func (a Action) String() string {
 	var buf strings.Builder
