@@ -168,7 +168,23 @@ type window struct {
 	cursor struct {
 		theme  *C.struct_wl_cursor_theme
 		cursor *C.struct_wl_cursor
-		surf   *C.struct_wl_surface
+		// system is the active cursor for system gestures
+		// such as border resizes and window moves. It
+		// is nil if the pointer is not in a system gesture
+		// area.
+		system  *C.struct_wl_cursor
+		surf    *C.struct_wl_surface
+		cursors struct {
+			pointer         *C.struct_wl_cursor
+			resizeNorth     *C.struct_wl_cursor
+			resizeSouth     *C.struct_wl_cursor
+			resizeWest      *C.struct_wl_cursor
+			resizeEast      *C.struct_wl_cursor
+			resizeNorthWest *C.struct_wl_cursor
+			resizeNorthEast *C.struct_wl_cursor
+			resizeSouthWest *C.struct_wl_cursor
+			resizeSouthEast *C.struct_wl_cursor
+		}
 	}
 
 	fling struct {
@@ -363,9 +379,8 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 		w.destroy()
 		return nil, errors.New("wayland: wl_cursor_theme_load failed")
 	}
-	cname := C.CString("left_ptr")
-	defer C.free(unsafe.Pointer(cname))
-	w.cursor.cursor = C.wl_cursor_theme_get_cursor(w.cursor.theme, cname)
+	w.loadCursors()
+	w.cursor.cursor = w.cursor.cursors.pointer
 	if w.cursor.cursor == nil {
 		w.destroy()
 		return nil, errors.New("wayland: wl_cursor_theme_get_cursor failed")
@@ -386,6 +401,33 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 	}
 	w.updateOpaqueRegion()
 	return w, nil
+}
+
+func (w *window) loadCursors() {
+	w.cursor.cursors.pointer = w.loadCursor(pointer.CursorDefault)
+	w.cursor.cursors.resizeNorth = w.loadCursor(pointer.CursorNorthResize)
+	w.cursor.cursors.resizeSouth = w.loadCursor(pointer.CursorSouthResize)
+	w.cursor.cursors.resizeWest = w.loadCursor(pointer.CursorWestResize)
+	w.cursor.cursors.resizeEast = w.loadCursor(pointer.CursorEastResize)
+	w.cursor.cursors.resizeSouthWest = w.loadCursor(pointer.CursorSouthWestResize)
+	w.cursor.cursors.resizeSouthEast = w.loadCursor(pointer.CursorSouthEastResize)
+	w.cursor.cursors.resizeNorthWest = w.loadCursor(pointer.CursorNorthWestResize)
+	w.cursor.cursors.resizeNorthEast = w.loadCursor(pointer.CursorNorthEastResize)
+}
+
+func (w *window) loadCursor(name pointer.Cursor) *C.struct_wl_cursor {
+	if name == pointer.CursorNone {
+		return nil
+	}
+	xcursor := xCursor[name]
+	cname := C.CString(xcursor)
+	defer C.free(unsafe.Pointer(cname))
+	c := C.wl_cursor_theme_get_cursor(w.cursor.theme, cname)
+	if c == nil {
+		// Fall back to default cursor.
+		c = w.cursor.cursors.pointer
+	}
+	return c
 }
 
 func callbackDelete(k unsafe.Pointer) {
@@ -833,6 +875,10 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 	switch wbtn {
 	case BTN_LEFT:
 		btn = pointer.ButtonPrimary
+		if _, edge := w.systemGesture(); edge != 0 {
+			w.resize(serial, edge)
+			return
+		}
 	case BTN_RIGHT:
 		btn = pointer.ButtonSecondary
 	case BTN_MIDDLE:
@@ -1031,8 +1077,6 @@ func (w *window) Perform(actions system.Action) {
 			w.move()
 		case system.ActionClose:
 			w.dead = true
-		default:
-			w.resize(action)
 		}
 	})
 }
@@ -1045,60 +1089,39 @@ func (w *window) move() {
 	}
 }
 
-func (w *window) resize(a system.Action) {
-	if w.inCompositor || w.seat == nil {
-		return
-	}
-	var edge int
-	switch a {
-	case system.ActionResizeNorth:
-		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_TOP
-	case system.ActionResizeSouth:
-		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM
-	case system.ActionResizeEast:
-		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_LEFT
-	case system.ActionResizeWest:
-		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_RIGHT
-	case system.ActionResizeNorthWest:
-		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_TOP_LEFT
-	case system.ActionResizeNorthEast:
-		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_TOP_RIGHT
-	case system.ActionResizeSouthEast:
-		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_RIGHT
-	case system.ActionResizeSouthWest:
-		edge = C.XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_LEFT
-	default:
+func (w *window) resize(serial, edge C.uint32_t) {
+	s := w.seat
+	if w.inCompositor || s == nil {
 		return
 	}
 	w.inCompositor = true
-	s := w.seat
-	C.xdg_toplevel_resize(w.topLvl, s.seat, s.serial, C.uint32_t(edge))
+	C.xdg_toplevel_resize(w.topLvl, s.seat, serial, edge)
 }
 
 func (w *window) SetCursor(cursor pointer.Cursor) {
+	w.cursor.cursor = w.loadCursor(cursor)
+	w.updateCursor()
+}
+
+func (w *window) updateCursor() {
 	ptr := w.disp.seat.pointer
 	if ptr == nil {
 		return
 	}
-	if cursor == pointer.CursorNone {
-		C.wl_pointer_set_cursor(ptr, w.serial, nil, 0, 0)
-		return
-	}
-
-	xcursor := xCursor[cursor]
-	cname := C.CString(xcursor)
-	defer C.free(unsafe.Pointer(cname))
-	c := C.wl_cursor_theme_get_cursor(w.cursor.theme, cname)
-	if c == nil {
-		return
-	}
-	w.cursor.cursor = c
 	w.setCursor(ptr, w.serial)
 }
 
 func (w *window) setCursor(pointer *C.struct_wl_pointer, serial C.uint32_t) {
+	c := w.cursor.system
+	if c == nil {
+		c = w.cursor.cursor
+	}
+	if c == nil {
+		C.wl_pointer_set_cursor(pointer, w.serial, nil, 0, 0)
+		return
+	}
 	// Get images[0].
-	img := *w.cursor.cursor.images
+	img := *c.images
 	buf := C.wl_cursor_image_get_buffer(img)
 	if buf == nil {
 		return
@@ -1526,6 +1549,48 @@ func (w *window) onPointerMotion(x, y C.wl_fixed_t, t C.uint32_t) {
 		Time:      time.Duration(t) * time.Millisecond,
 		Modifiers: w.disp.xkb.Modifiers(),
 	})
+	c, _ := w.systemGesture()
+	if c != w.cursor.system {
+		w.cursor.system = c
+		w.updateCursor()
+	}
+}
+
+// updateCursor updates the system gesture cursor according to the pointer
+// position.
+func (w *window) systemGesture() (*C.struct_wl_cursor, C.uint32_t) {
+	if w.config.Mode != Windowed {
+		return nil, 0
+	}
+	border := w.w.w.metric.Dp(5)
+	x, y, size := int(w.lastPos.X), int(w.lastPos.Y), w.config.Size
+	north := y <= border
+	south := y >= size.Y-border
+	west := x <= border
+	east := x >= size.X-border
+
+	switch {
+	default:
+		fallthrough
+	case !north && !south && !west && !east:
+		return nil, 0
+	case north && west:
+		return w.cursor.cursors.resizeNorthWest, C.XDG_TOPLEVEL_RESIZE_EDGE_TOP_LEFT
+	case north && east:
+		return w.cursor.cursors.resizeNorthEast, C.XDG_TOPLEVEL_RESIZE_EDGE_TOP_RIGHT
+	case south && west:
+		return w.cursor.cursors.resizeSouthWest, C.XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_LEFT
+	case south && east:
+		return w.cursor.cursors.resizeSouthEast, C.XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_RIGHT
+	case north:
+		return w.cursor.cursors.resizeNorth, C.XDG_TOPLEVEL_RESIZE_EDGE_TOP
+	case south:
+		return w.cursor.cursors.resizeSouth, C.XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM
+	case west:
+		return w.cursor.cursors.resizeWest, C.XDG_TOPLEVEL_RESIZE_EDGE_LEFT
+	case east:
+		return w.cursor.cursors.resizeEast, C.XDG_TOPLEVEL_RESIZE_EDGE_RIGHT
+	}
 }
 
 func (w *window) updateOpaqueRegion() {
