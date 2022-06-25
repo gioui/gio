@@ -113,7 +113,15 @@ const (
 
 	HWND_TOPMOST = ^(uint32(1) - 1) // -1
 
-	HTCLIENT = 1
+	HTCLIENT      = 1
+	HTLEFT        = 10
+	HTRIGHT       = 11
+	HTTOP         = 12
+	HTTOPLEFT     = 13
+	HTTOPRIGHT    = 14
+	HTBOTTOM      = 15
+	HTBOTTOMLEFT  = 16
+	HTBOTTOMRIGHT = 17
 
 	IDC_APPSTARTING = 32650 // Standard arrow and small hourglass
 	IDC_ARROW       = 32512 // Standard arrow
@@ -146,13 +154,16 @@ const (
 
 	SCS_SETSTR = GCS_COMPREADSTR | GCS_COMPSTR
 
+	SM_CXSIZEFRAME = 32
+	SM_CYSIZEFRAME = 33
+
 	SW_SHOWDEFAULT   = 10
 	SW_SHOWMINIMIZED = 2
 	SW_SHOWMAXIMIZED = 3
 	SW_SHOWNORMAL    = 1
 	SW_SHOW          = 5
-	SWP_FRAMECHANGED = 0x0020
 
+	SWP_FRAMECHANGED  = 0x0020
 	SWP_NOMOVE        = 0x0002
 	SWP_NOOWNERZORDER = 0x0200
 	SWP_NOSIZE        = 0x0001
@@ -231,6 +242,7 @@ const (
 	WM_MOUSEMOVE            = 0x0200
 	WM_MOUSEWHEEL           = 0x020A
 	WM_MOUSEHWHEEL          = 0x020E
+	WM_NCHITTEST            = 0x0084
 	WM_PAINT                = 0x000F
 	WM_QUIT                 = 0x0012
 	WM_SETCURSOR            = 0x0020
@@ -316,6 +328,7 @@ var (
 	_GetMessage                  = user32.NewProc("GetMessageW")
 	_GetMessageTime              = user32.NewProc("GetMessageTime")
 	_GetMonitorInfo              = user32.NewProc("GetMonitorInfoW")
+	_GetSystemMetrics            = user32.NewProc("GetSystemMetrics")
 	_GetWindowLong               = user32.NewProc("GetWindowLongPtrW")
 	_GetWindowLong32             = user32.NewProc("GetWindowLongW")
 	_GetWindowPlacement          = user32.NewProc("GetWindowPlacement")
@@ -497,6 +510,11 @@ func GetMessage(m *Msg, hwnd syscall.Handle, wMsgFilterMin, wMsgFilterMax uint32
 func GetMessageTime() time.Duration {
 	r, _, _ := _GetMessageTime.Call()
 	return time.Duration(r) * time.Millisecond
+}
+
+func GetSystemMetrics(nIndex int) int {
+	r, _, _ := _GetSystemMetrics.Call(uintptr(nIndex))
+	return int(r)
 }
 
 // GetWindowDPI returns the effective DPI of the window.

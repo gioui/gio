@@ -54,8 +54,9 @@ type window struct {
 
 	animating bool
 
-	deltas winDeltas
-	config Config
+	deltas     winDeltas
+	borderSize image.Point
+	config     Config
 }
 
 const _WM_WAKEUP = windows.WM_USER + iota
@@ -210,6 +211,11 @@ func (w *window) update() {
 		}
 	}
 	w.config.Size = size
+
+	w.borderSize = image.Pt(
+		windows.GetSystemMetrics(windows.SM_CXSIZEFRAME),
+		windows.GetSystemMetrics(windows.SM_CYSIZEFRAME),
+	)
 	w.w.Event(ConfigEvent{Config: w.config})
 }
 
@@ -279,6 +285,15 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.w.Event(key.FocusEvent{Focus: true})
 	case windows.WM_KILLFOCUS:
 		w.w.Event(key.FocusEvent{Focus: false})
+	case windows.WM_NCHITTEST:
+		if w.config.Decorated || w.config.Mode != Windowed {
+			// Let the system handle it.
+			break
+		}
+		x, y := coordsFromlParam(lParam)
+		np := windows.Point{X: int32(x), Y: int32(y)}
+		windows.ScreenToClient(w.hwnd, &np)
+		return w.hitTest(int(np.X), int(np.Y))
 	case windows.WM_MOUSEMOVE:
 		x, y := coordsFromlParam(lParam)
 		p := f32.Point{X: float32(x), Y: float32(y)}
@@ -409,6 +424,37 @@ func getModifiers() key.Modifiers {
 		kmods |= key.ModShift
 	}
 	return kmods
+}
+
+// hitTest returns the non-client area hit by the point, needed to
+// process WM_NCHITTEST.
+func (w *window) hitTest(x, y int) uintptr {
+	top := y <= w.borderSize.Y
+	bottom := y >= w.config.Size.Y-w.borderSize.Y
+	left := x <= w.borderSize.X
+	right := x >= w.config.Size.X-w.borderSize.X
+	switch {
+	default:
+		fallthrough
+	case !top && !bottom && !left && !right:
+		return windows.HTCLIENT
+	case top && left:
+		return windows.HTTOPLEFT
+	case top && right:
+		return windows.HTTOPRIGHT
+	case bottom && left:
+		return windows.HTBOTTOMLEFT
+	case bottom && right:
+		return windows.HTBOTTOMRIGHT
+	case top:
+		return windows.HTTOP
+	case bottom:
+		return windows.HTBOTTOM
+	case left:
+		return windows.HTLEFT
+	case right:
+		return windows.HTRIGHT
+	}
 }
 
 func (w *window) pointerButton(btn pointer.Buttons, press bool, lParam uintptr, kmods key.Modifiers) {
