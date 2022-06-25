@@ -590,24 +590,27 @@ func (w *window) Configure(options []Option) {
 	// Decorations are never disabled.
 	w.config.Decorated = true
 
+	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
+	var showMode int32
+	var x, y, width, height int32
+	swpStyle := uintptr(windows.SWP_NOZORDER | windows.SWP_FRAMECHANGED)
 	switch w.config.Mode {
 	case Minimized:
-		windows.ShowWindow(w.hwnd, windows.SW_SHOWMINIMIZED)
+		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
+		showMode = windows.SW_SHOWMINIMIZED
 
 	case Maximized:
-		// Set window style.
-		style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
-		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW)
-		windows.ShowWindow(w.hwnd, windows.SW_SHOWMAXIMIZED)
+		style |= windows.WS_OVERLAPPEDWINDOW
+		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
+		showMode = windows.SW_SHOWMAXIMIZED
 
 	case Windowed:
 		windows.SetWindowText(w.hwnd, w.config.Title)
-		// Set window style.
-		style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
-		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style|windows.WS_OVERLAPPEDWINDOW)
+		style |= windows.WS_OVERLAPPEDWINDOW
+		showMode = windows.SW_SHOWNORMAL
 		// Get target for client areaa size.
-		width := int32(w.config.Size.X)
-		height := int32(w.config.Size.Y)
+		width = int32(w.config.Size.X)
+		height = int32(w.config.Size.Y)
 		// Get the current window size and position.
 		wr := windows.GetWindowRect(w.hwnd)
 		// Set desired window size.
@@ -615,31 +618,29 @@ func (w *window) Configure(options []Option) {
 		wr.Bottom = wr.Top + height
 		// Convert from client size to window size.
 		r := wr
-		windows.AdjustWindowRectEx(&r, windows.WS_OVERLAPPEDWINDOW, 0, dwExStyle)
+		windows.AdjustWindowRectEx(&r, uint32(style), 0, dwExStyle)
 		// Calculate difference between client and full window sizes.
 		w.deltas.width = r.Right - wr.Right + wr.Left - r.Left
 		w.deltas.height = r.Bottom - wr.Bottom + wr.Top - r.Top
 		// Set new window size and position.
-		x := wr.Left
-		y := wr.Top
-		dx := r.Right - r.Left
-		dy := r.Bottom - r.Top
-		windows.SetWindowPos(w.hwnd, 0, x, y, dx, dy, windows.SWP_NOZORDER|windows.SWP_FRAMECHANGED)
-		windows.ShowWindow(w.hwnd, windows.SW_SHOWNORMAL)
+		x = wr.Left
+		y = wr.Top
+		width = r.Right - r.Left
+		height = r.Bottom - r.Top
 
 	case Fullscreen:
-		style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
-		windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style&^windows.WS_OVERLAPPEDWINDOW)
+		style &^= windows.WS_OVERLAPPEDWINDOW
 		mi := windows.GetMonitorInfo(w.hwnd)
 		w.config.Size = image.Point{X: int(mi.Monitor.Right - mi.Monitor.Left), Y: int(mi.Monitor.Bottom - mi.Monitor.Top)}
-		windows.SetWindowPos(w.hwnd, 0,
-			mi.Monitor.Left, mi.Monitor.Top,
-			mi.Monitor.Right-mi.Monitor.Left,
-			mi.Monitor.Bottom-mi.Monitor.Top,
-			windows.SWP_NOZORDER|windows.SWP_FRAMECHANGED,
-		)
-		windows.ShowWindow(w.hwnd, windows.SW_SHOW)
+		x, y = mi.Monitor.Left, mi.Monitor.Top
+		width = mi.Monitor.Right - mi.Monitor.Left
+		height = mi.Monitor.Bottom - mi.Monitor.Top
+		showMode = windows.SW_SHOW
 	}
+	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style)
+	windows.SetWindowPos(w.hwnd, 0, x, y, width, height, swpStyle)
+	windows.ShowWindow(w.hwnd, showMode)
+
 	// A config event is sent to the main event loop whenever the configuration is changed
 	if oldConfig != w.config {
 		w.w.Event(ConfigEvent{Config: w.config})
