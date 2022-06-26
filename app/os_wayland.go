@@ -613,7 +613,7 @@ func gio_onOutputDone(data unsafe.Pointer, output *C.struct_wl_output) {
 	d := callbackLoad(data).(*wlDisplay)
 	conf := d.outputConfig[output]
 	for _, w := range conf.windows {
-		w.redraw = true
+		w.updateOutputs()
 	}
 }
 
@@ -1633,6 +1633,7 @@ func (w *window) updateOutputs() {
 	if found && scale != w.scale {
 		w.scale = scale
 		C.wl_surface_set_buffer_scale(w.surf, C.int32_t(w.scale))
+		w.redraw = true
 	}
 	if !found {
 		w.setStage(system.StagePaused)
