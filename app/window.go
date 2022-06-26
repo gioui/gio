@@ -125,9 +125,6 @@ type queue struct {
 	q router.Router
 }
 
-// Pre-allocate the ack event to avoid garbage.
-var ackEvent event.Event
-
 // NewWindow creates a new window for a set of window
 // options. The options are hints; the platform is free to
 // ignore or adjust them.
@@ -679,7 +676,7 @@ func (w *Window) waitAck(d driver) {
 		select {
 		case f := <-w.driverFuncs:
 			f(d)
-		case w.out <- ackEvent:
+		case w.out <- event.Event(nil):
 			// A dummy event went through, so we know the application has processed the previous event.
 			return
 		case <-w.immediateRedraws:
@@ -713,7 +710,7 @@ func (w *Window) waitFrame(d driver) *op.Ops {
 		case frame := <-w.frames:
 			// The client called FrameEvent.Frame.
 			return frame
-		case w.out <- ackEvent:
+		case w.out <- event.Event(nil):
 			// The client ignored FrameEvent and continued processing
 			// events.
 			return nil
@@ -844,8 +841,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 			off.Pop()
 		}
 		deco.Add(wrapper)
-		err := w.validateAndProcess(d, viewSize, e2.Sync, wrapper, signal)
-		if err != nil {
+		if err := w.validateAndProcess(d, viewSize, e2.Sync, wrapper, signal); err != nil {
 			w.destroyGPU()
 			w.out <- system.DestroyEvent{Err: err}
 			close(w.dead)
