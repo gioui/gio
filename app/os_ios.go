@@ -278,7 +278,6 @@ func (w *window) WriteClipboard(s string) {
 }
 
 func (w *window) Configure([]Option) {
-	prev := w.config
 	// Decorations are never disabled.
 	w.config.Decorated = true
 	w.w.Event(ConfigEvent{Config: w.config})
