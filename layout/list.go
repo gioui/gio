@@ -65,10 +65,10 @@ type Position struct {
 	BeforeEnd bool
 	// First is the index of the first visible child.
 	First int
-	// Offset is the distance in pixels from the top edge to the child at index
+	// Offset is the distance in pixels from the leading edge to the child at index
 	// First.
 	Offset int
-	// OffsetLast is the signed distance in pixels from the bottom edge to the
+	// OffsetLast is the signed distance in pixels from the trailing edge to the
 	// bottom edge of the child at index First+Count.
 	OffsetLast int
 	// Count is the number of visible children.
@@ -95,6 +95,10 @@ func (l *List) init(gtx Context, len int) {
 	l.children = l.children[:0]
 	l.len = len
 	l.update(gtx)
+	if l.Position.First < 0 {
+		l.Position.Offset = 0
+		l.Position.First = 0
+	}
 	if l.scrollToEnd() || l.Position.First > len {
 		l.Position.Offset = 0
 		l.Position.First = len

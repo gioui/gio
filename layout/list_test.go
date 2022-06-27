@@ -13,6 +13,25 @@ import (
 	"gioui.org/op"
 )
 
+func TestListPositionExtremes(t *testing.T) {
+	var l List
+	gtx := Context{
+		Ops:         new(op.Ops),
+		Constraints: Exact(image.Pt(20, 10)),
+	}
+	const n = 3
+	layout := func(_ Context, idx int) Dimensions {
+		if idx < 0 || idx >= n {
+			t.Errorf("list index %d out of bounds [0;%d]", idx, n-1)
+		}
+		return Dimensions{}
+	}
+	l.Position.First = -1
+	l.Layout(gtx, n, layout)
+	l.Position.First = n + 1
+	l.Layout(gtx, n, layout)
+}
+
 func TestEmptyList(t *testing.T) {
 	var l List
 	gtx := Context{
