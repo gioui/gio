@@ -198,13 +198,8 @@ func (w *window) update() {
 	}
 
 	// Check the window mode.
-	p := windows.GetWindowPlacement(w.hwnd)
 	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
-	if p.IsMinimized() {
-		w.config.Mode = Minimized
-	} else if p.IsMaximized() {
-		w.config.Mode = Maximized
-	} else if style&windows.WS_OVERLAPPEDWINDOW == 0 {
+	if style&windows.WS_OVERLAPPEDWINDOW == 0 {
 		size = image.Point{
 			X: int(r.Right - r.Left),
 			Y: int(r.Bottom - r.Top),
@@ -286,7 +281,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_KILLFOCUS:
 		w.w.Event(key.FocusEvent{Focus: false})
 	case windows.WM_NCHITTEST:
-		if w.config.Decorated || w.config.Mode != Windowed {
+		if w.config.Decorated {
 			// Let the system handle it.
 			break
 		}
@@ -321,12 +316,18 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_PAINT:
 		w.draw(true)
 	case windows.WM_SIZE:
+		w.update()
 		switch wParam {
 		case windows.SIZE_MINIMIZED:
-			w.update()
+			w.config.Mode = Minimized
 			w.setStage(system.StagePaused)
-		case windows.SIZE_MAXIMIZED, windows.SIZE_RESTORED:
-			w.update()
+		case windows.SIZE_MAXIMIZED:
+			w.config.Mode = Maximized
+			w.setStage(system.StageRunning)
+		case windows.SIZE_RESTORED:
+			if w.config.Mode != Fullscreen {
+				w.config.Mode = Windowed
+			}
 			w.setStage(system.StageRunning)
 		}
 	case windows.WM_GETMINMAXINFO:
@@ -429,6 +430,17 @@ func getModifiers() key.Modifiers {
 // hitTest returns the non-client area hit by the point, needed to
 // process WM_NCHITTEST.
 func (w *window) hitTest(x, y int) uintptr {
+	if w.config.Mode == Fullscreen {
+		return windows.HTCLIENT
+	}
+	p := f32.Pt(float32(x), float32(y))
+	if a, ok := w.w.ActionAt(p); ok && a == system.ActionMove {
+		return windows.HTCAPTION
+	}
+	if w.config.Mode != Windowed {
+		// Only windowed mode should allow resizing.
+		return windows.HTCLIENT
+	}
 	top := y <= w.borderSize.Y
 	bottom := y >= w.config.Size.Y-w.borderSize.Y
 	left := x <= w.borderSize.X
@@ -437,11 +449,6 @@ func (w *window) hitTest(x, y int) uintptr {
 	default:
 		fallthrough
 	case !top && !bottom && !left && !right:
-		p := f32.Pt(float32(x), float32(y))
-		switch a, _ := w.w.ActionAt(p); a {
-		case system.ActionMove:
-			return windows.HTCAPTION
-		}
 		return windows.HTCLIENT
 	case top && left:
 		return windows.HTTOPLEFT
@@ -644,6 +651,7 @@ func (w *window) Configure(options []Option) {
 	}
 	switch w.config.Mode {
 	case Minimized:
+		style |= winStyle
 		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
 		showMode = windows.SW_SHOWMINIMIZED
 
@@ -677,7 +685,6 @@ func (w *window) Configure(options []Option) {
 		height = r.Bottom - r.Top
 
 	case Fullscreen:
-		style &^= windows.WS_OVERLAPPEDWINDOW
 		mi := windows.GetMonitorInfo(w.hwnd)
 		x, y = mi.Monitor.Left, mi.Monitor.Top
 		width = mi.Monitor.Right - mi.Monitor.Left
