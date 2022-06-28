@@ -156,8 +156,10 @@ func (f *faceCache) hashGIDs(layout Layout) uint64 {
 	}
 	var h maphash.Hash
 	h.SetSeed(f.seed)
+	var b [4]byte
 	for _, g := range layout.Glyphs {
-		binary.Write(&h, binary.LittleEndian, g.ID)
+		binary.LittleEndian.PutUint32(b[:], uint32(g.ID))
+		h.Write(b[:])
 	}
 	return h.Sum64()
 }
