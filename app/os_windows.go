@@ -628,7 +628,6 @@ func (w *window) readClipboard() error {
 }
 
 func (w *window) Configure(options []Option) {
-	oldConfig := w.config
 	dpi := windows.GetSystemDPI()
 	metric := configForDPI(dpi)
 	w.config.apply(metric, options)
@@ -689,10 +688,7 @@ func (w *window) Configure(options []Option) {
 	windows.SetWindowPos(w.hwnd, 0, x, y, width, height, swpStyle)
 	windows.ShowWindow(w.hwnd, showMode)
 
-	// A config event is sent to the main event loop whenever the configuration is changed
-	if oldConfig != w.config {
-		w.w.Event(ConfigEvent{Config: w.config})
-	}
+	w.w.Event(ConfigEvent{Config: w.config})
 }
 
 func (w *window) WriteClipboard(s string) {
