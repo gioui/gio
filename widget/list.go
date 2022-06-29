@@ -74,6 +74,12 @@ func (s *Scrollbar) Layout(gtx layout.Context, axis layout.Axis, viewportStart, 
 			continue
 		}
 		dragOffset := axis.FConvert(event.Position).X
+		// The user can drag outside of the constraints, or even the window. Limit dragging to within the scrollbar.
+		if dragOffset < 0 {
+			dragOffset = 0
+		} else if dragOffset > trackHeight {
+			dragOffset = trackHeight
+		}
 		normalizedDragOffset := dragOffset / trackHeight
 
 		if !s.dragging {
