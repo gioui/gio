@@ -58,7 +58,11 @@ func (s *Scrollbar) Layout(gtx layout.Context, axis layout.Axis, viewportStart, 
 			Y: int(event.Position.Y),
 		})
 		normalizedPos := float32(pos.X) / trackHeight
-		s.delta += normalizedPos - viewportStart
+		// Clicking on the indicator should not jump to that position on the track. The user might've just intended to
+		// drag and changed their mind.
+		if !(normalizedPos >= viewportStart && normalizedPos <= viewportEnd) {
+			s.delta += normalizedPos - viewportStart
+		}
 	}
 
 	// Offset to account for any drags.
