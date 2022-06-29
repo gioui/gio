@@ -450,9 +450,6 @@ func (c *callbacks) Event(e event.Event) bool {
 		return true
 	}
 	c.busy = true
-	defer func() {
-		c.busy = false
-	}()
 	var handled bool
 	for len(c.waitEvents) > 0 {
 		e := c.waitEvents[0]
@@ -460,10 +457,29 @@ func (c *callbacks) Event(e event.Event) bool {
 		c.waitEvents = c.waitEvents[:len(c.waitEvents)-1]
 		handled = c.w.processEvent(c.d, e)
 	}
+	c.busy = false
 	select {
 	case <-c.w.dead:
+		return handled
 	default:
-		c.w.updateState(c.d)
+	}
+	c.w.updateState(c.d)
+	if _, ok := e.(wakeupEvent); ok {
+		select {
+		case opts := <-c.w.options:
+			cnf := Config{Decorated: c.w.decorations.enabled}
+			for _, opt := range opts {
+				opt(c.w.metric, &cnf)
+			}
+			c.w.decorations.enabled = cnf.Decorated
+			c.d.Configure(opts)
+		default:
+		}
+		select {
+		case acts := <-c.w.actions:
+			c.d.Perform(acts)
+		default:
+		}
 	}
 	return handled
 }
@@ -858,22 +874,6 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 	case ViewEvent:
 		w.out <- e2
 		w.waitAck(d)
-	case wakeupEvent:
-		select {
-		case opts := <-w.options:
-			cnf := Config{Decorated: w.decorations.enabled}
-			for _, opt := range opts {
-				opt(w.metric, &cnf)
-			}
-			w.decorations.enabled = cnf.Decorated
-			d.Configure(opts)
-		default:
-		}
-		select {
-		case acts := <-w.actions:
-			d.Perform(acts)
-		default:
-		}
 	case ConfigEvent:
 		w.decorations.Config = e2.Config
 		if !w.fallbackDecorate() {
