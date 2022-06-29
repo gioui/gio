@@ -65,9 +65,7 @@ func (s *Scrollbar) Layout(gtx layout.Context, axis layout.Axis, viewportStart, 
 	for _, event := range s.drag.Events(gtx.Metric, gtx, gesture.Axis(axis)) {
 		switch event.Type {
 		case pointer.Drag:
-		case pointer.Release:
-			s.dragging = false
-		case pointer.Cancel:
+		case pointer.Release, pointer.Cancel:
 			s.dragging = false
 			continue
 		default:
