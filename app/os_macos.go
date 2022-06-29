@@ -170,9 +170,9 @@ static void setTitle(CFTypeRef windowRef, CFTypeRef titleRef) {
 	window.title = (__bridge NSString *)titleRef;
 }
 
-static BOOL isWindowZoomed(CFTypeRef windowRef) {
+static int isWindowZoomed(CFTypeRef windowRef) {
 	NSWindow *window = (__bridge NSWindow *)windowRef;
-	return window.zoomed;
+	return window.zoomed ? 1 : 0;
 }
 
 static void zoomWindow(CFTypeRef windowRef) {
@@ -347,7 +347,7 @@ func (w *window) Configure(options []Option) {
 		default:
 			w.config.Mode = Maximized
 			w.setTitle(prev, cnf)
-			if !C.isWindowZoomed(w.window) {
+			if C.isWindowZoomed(w.window) == 0 {
 				C.zoomWindow(w.window)
 			}
 		}
@@ -360,7 +360,7 @@ func (w *window) Configure(options []Option) {
 		case Maximized:
 		}
 		w.config.Mode = Windowed
-		if C.isWindowZoomed(w.window) {
+		if C.isWindowZoomed(w.window) != 0 {
 			C.zoomWindow(w.window)
 		}
 		w.setTitle(prev, cnf)
