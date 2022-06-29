@@ -170,6 +170,16 @@ static void setTitle(CFTypeRef windowRef, CFTypeRef titleRef) {
 	window.title = (__bridge NSString *)titleRef;
 }
 
+static BOOL isWindowZoomed(CFTypeRef windowRef) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	return window.zoomed;
+}
+
+static void zoomWindow(CFTypeRef windowRef) {
+	NSWindow *window = (__bridge NSWindow *)windowRef;
+	[window zoom:nil];
+}
+
 static CFTypeRef layerForView(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
 	return (__bridge CFTypeRef)view.layer;
@@ -336,21 +346,22 @@ func (w *window) Configure(options []Option) {
 			fallthrough
 		default:
 			w.config.Mode = Maximized
-			r := C.getScreenFrame(w.window) // the screen size of the window
-			C.setScreenFrame(w.window, C.CGFloat(0), C.CGFloat(0), r.size.width, r.size.height)
-			w.config.Size = image.Pt(int(r.size.width), int(r.size.height))
 			w.setTitle(prev, cnf)
+			if !C.isWindowZoomed(w.window) {
+				C.zoomWindow(w.window)
+			}
 		}
 	case Windowed:
 		switch prev.Mode {
 		case Fullscreen:
-			w.config.Mode = Windowed
 			C.toggleFullScreen(w.window)
 		case Minimized:
-			w.config.Mode = Windowed
 			C.unhideWindow(w.window)
 		case Maximized:
-			w.config.Mode = Windowed
+		}
+		w.config.Mode = Windowed
+		if C.isWindowZoomed(w.window) {
+			C.zoomWindow(w.window)
 		}
 		w.setTitle(prev, cnf)
 		if prev.Size != cnf.Size {
