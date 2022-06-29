@@ -46,6 +46,20 @@ func (s *Scrollbar) Layout(gtx layout.Context, axis layout.Axis, viewportStart, 
 	trackHeight := float32(axis.Convert(gtx.Constraints.Max).X)
 	s.delta = 0
 
+	centerOnClick := func(normalizedPos float32) {
+		// When the user clicks on the scrollbar we center on that point, respecting the limits of the beginning and end
+		// of the scrollbar.
+		//
+		// Centering gives a consistent experience whether the user clicks above or below the indicator.
+		target := normalizedPos - (viewportEnd-viewportStart)/2
+		s.delta += target - viewportStart
+		if s.delta < -viewportStart {
+			s.delta = -viewportStart
+		} else if s.delta > 1-viewportEnd {
+			s.delta = 1 - viewportEnd
+		}
+	}
+
 	// Jump to a click in the track.
 	for _, event := range s.track.Events(gtx) {
 		if event.Type != gesture.TypeClick ||
@@ -61,7 +75,7 @@ func (s *Scrollbar) Layout(gtx layout.Context, axis layout.Axis, viewportStart, 
 		// Clicking on the indicator should not jump to that position on the track. The user might've just intended to
 		// drag and changed their mind.
 		if !(normalizedPos >= viewportStart && normalizedPos <= viewportEnd) {
-			s.delta += normalizedPos - viewportStart
+			centerOnClick(normalizedPos)
 		}
 	}
 
@@ -100,7 +114,7 @@ func (s *Scrollbar) Layout(gtx layout.Context, axis layout.Axis, viewportStart, 
 					Y: int(event.Position.Y),
 				})
 				normalizedPos := float32(pos.X) / trackHeight
-				s.delta += normalizedPos - viewportStart
+				centerOnClick(normalizedPos)
 			}
 		} else {
 			s.delta += normalizedDragOffset - s.oldDragPos
