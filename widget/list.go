@@ -87,21 +87,37 @@ func (s *Scrollbar) Layout(gtx layout.Context, axis layout.Axis, viewportStart, 
 		if !s.dragging {
 			s.dragging = true
 			s.oldDragPos = normalizedDragOffset
-		}
-		s.delta += normalizedDragOffset - s.oldDragPos
 
-		if viewportStart+s.delta < 0 {
-			// Adjust normalizedDragOffset - and thus the future s.oldDragPos - so that futile dragging up has to be
-			// countered with dragging down again. Otherwise, dragging up would have no effect, but dragging down would
-			// immediately start scrolling. We want the user to undo their ineffective drag first.
-			normalizedDragOffset -= viewportStart + s.delta
-			// Limit s.delta to the maximum amount scrollable
-			s.delta = -viewportStart
-		} else if viewportEnd+s.delta > 1 {
-			normalizedDragOffset += (1 - viewportEnd) - s.delta
-			s.delta = 1 - viewportEnd
+			if normalizedDragOffset < viewportStart || normalizedDragOffset > viewportEnd {
+				// The user started dragging somewhere on the track that isn't covered by the indicator. Consider this a
+				// click in addition to a drag and jump to the clicked point.
+				//
+				// TODO(dh): this isn't perfect. We only get the pointer.Drag event once the user has actually dragged,
+				// which means that if the user presses the mouse button and neither releases it nor drags it, nothing
+				// will happen.
+				pos := axis.Convert(image.Point{
+					X: int(event.Position.X),
+					Y: int(event.Position.Y),
+				})
+				normalizedPos := float32(pos.X) / trackHeight
+				s.delta += normalizedPos - viewportStart
+			}
+		} else {
+			s.delta += normalizedDragOffset - s.oldDragPos
+
+			if viewportStart+s.delta < 0 {
+				// Adjust normalizedDragOffset - and thus the future s.oldDragPos - so that futile dragging up has to be
+				// countered with dragging down again. Otherwise, dragging up would have no effect, but dragging down would
+				// immediately start scrolling. We want the user to undo their ineffective drag first.
+				normalizedDragOffset -= viewportStart + s.delta
+				// Limit s.delta to the maximum amount scrollable
+				s.delta = -viewportStart
+			} else if viewportEnd+s.delta > 1 {
+				normalizedDragOffset += (1 - viewportEnd) - s.delta
+				s.delta = 1 - viewportEnd
+			}
+			s.oldDragPos = normalizedDragOffset
 		}
-		s.oldDragPos = normalizedDragOffset
 	}
 
 	// Process events from the indicator so that hover is
