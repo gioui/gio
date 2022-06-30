@@ -1143,7 +1143,7 @@ func (w *window) setCursor(pointer *C.struct_wl_pointer, serial C.uint32_t) {
 	if buf == nil {
 		return
 	}
-	C.wl_pointer_set_cursor(pointer, serial, w.cursor.surf, C.int32_t(img.hotspot_x), C.int32_t(img.hotspot_y))
+	C.wl_pointer_set_cursor(pointer, serial, w.cursor.surf, C.int32_t(img.hotspot_x/C.uint(w.scale)), C.int32_t(img.hotspot_y/C.uint(w.scale)))
 	C.wl_surface_attach(w.cursor.surf, buf, 0, 0)
 	C.wl_surface_damage(w.cursor.surf, 0, 0, C.int32_t(img.width), C.int32_t(img.height))
 	C.wl_surface_commit(w.cursor.surf)
