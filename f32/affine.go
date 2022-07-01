@@ -112,6 +112,15 @@ func (a Affine2D) Elems() (sx, hx, ox, hy, sy, oy float32) {
 	return a.a + 1, a.b, a.c, a.d, a.e + 1, a.f
 }
 
+// Split a transform into two parts, one which is pure offset and the
+// other representing the scaling, shearing and rotation part.
+func (a *Affine2D) Split() (srs Affine2D, offset Point) {
+	return Affine2D{
+		a: a.a, b: a.b, c: 0,
+		d: a.d, e: a.e, f: 0,
+	}, Point{X: a.c, Y: a.f}
+}
+
 func (a Affine2D) scale(factor Point) Affine2D {
 	return Affine2D{
 		(a.a+1)*factor.X - 1, a.b * factor.X, a.c * factor.X,

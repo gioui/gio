@@ -821,15 +821,6 @@ func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey opKey, bounds
 	state.cpath = npath
 }
 
-// split a transform into two parts, one which is pure offset and the
-// other representing the scaling, shearing and rotation part
-func splitTransform(t f32.Affine2D) (srs f32.Affine2D, offset f32.Point) {
-	sx, hx, ox, hy, sy, oy := t.Elems()
-	offset = f32.Point{X: ox, Y: oy}
-	srs = f32.NewAffine2D(sx, hx, 0, hy, sy, 0)
-	return
-}
-
 func (d *drawOps) save(id int, state f32.Affine2D) {
 	if extra := id - len(d.states) + 1; extra > 0 {
 		d.states = append(d.states, make([]f32.Affine2D, extra)...)
@@ -889,7 +880,7 @@ loop:
 			op.Decode(encOp.Data)
 			quads.key.outline = op.Outline
 			bounds := f32.FRect(op.Bounds)
-			trans, off := splitTransform(state.t)
+			trans, off := state.t.Split()
 			if len(quads.aux) > 0 {
 				// There is a clipping path, build the gpu data and update the
 				// cache key such that it will be equal only if the transform is the
@@ -935,7 +926,7 @@ loop:
 			// Transform (if needed) the painting rectangle and if so generate a clip path,
 			// for those cases also compute a partialTrans that maps texture coordinates between
 			// the new bounding rectangle and the transformed original paint rectangle.
-			t, off := splitTransform(state.t)
+			t, off := state.t.Split()
 			// Fill the clip area, unless the material is a (bounded) image.
 			// TODO: Find a tighter bound.
 			inf := float32(1e6)
