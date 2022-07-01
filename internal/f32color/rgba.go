@@ -7,6 +7,8 @@ import (
 	"math"
 )
 
+//go:generate go run ./f32colorgen -out tables.go
+
 // RGBA is a 32 bit floating point linear premultiplied color space.
 type RGBA struct {
 	R, G, B, A float32
@@ -53,9 +55,9 @@ func (col RGBA) Opaque() RGBA {
 func LinearFromSRGB(col color.NRGBA) RGBA {
 	af := float32(col.A) / 0xFF
 	return RGBA{
-		R: sRGBToLinear(float32(col.R)/0xff) * af,
-		G: sRGBToLinear(float32(col.G)/0xff) * af,
-		B: sRGBToLinear(float32(col.B)/0xff) * af,
+		R: srgb8ToLinear[col.R] * af, // sRGBToLinear(float32(col.R)/0xff) * af,
+		G: srgb8ToLinear[col.G] * af, // sRGBToLinear(float32(col.G)/0xff) * af,
+		B: srgb8ToLinear[col.B] * af, // sRGBToLinear(float32(col.B)/0xff) * af,
 		A: af,
 	}
 }
