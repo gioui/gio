@@ -1581,7 +1581,7 @@ func (w *window) systemGesture() (*C.struct_wl_cursor, C.uint32_t) {
 	if w.config.Mode != Windowed || w.config.Decorated {
 		return nil, 0
 	}
-	border := w.w.w.metric.Dp(5)
+	border := w.w.w.metric.Dp(3)
 	x, y, size := int(w.lastPos.X), int(w.lastPos.Y), w.config.Size
 	north := y <= border
 	south := y >= size.Y-border
