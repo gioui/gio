@@ -886,18 +886,6 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 	switch wbtn {
 	case BTN_LEFT:
 		btn = pointer.ButtonPrimary
-		if _, edge := w.systemGesture(); edge != 0 {
-			w.resize(serial, edge)
-			return
-		}
-		act, ok := w.w.ActionAt(w.lastPos)
-		if ok && w.config.Mode == Windowed {
-			switch act {
-			case system.ActionMove:
-				w.move(serial)
-				return
-			}
-		}
 	case BTN_RIGHT:
 		btn = pointer.ButtonSecondary
 	case BTN_MIDDLE:
@@ -915,6 +903,20 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 	case 1:
 		w.pointerBtns |= btn
 		typ = pointer.Press
+	}
+	if typ == pointer.Press && btn == pointer.ButtonPrimary {
+		if _, edge := w.systemGesture(); edge != 0 {
+			w.resize(serial, edge)
+			return
+		}
+		act, ok := w.w.ActionAt(w.lastPos)
+		if ok && w.config.Mode == Windowed {
+			switch act {
+			case system.ActionMove:
+				w.move(serial)
+				return
+			}
+		}
 	}
 	w.flushScroll()
 	w.resetFling()
