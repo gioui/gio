@@ -335,7 +335,7 @@ func TestKeyRouting(t *testing.T) {
 	key.InputOp{Tag: &handlers[2], Keys: "A"}.Add(ops)
 	cl1.Pop()
 	cl2 := rect.Push(ops)
-	key.InputOp{Tag: &handlers[3], Keys: "B"}.Add(ops)
+	key.InputOp{Tag: &handlers[3]}.Add(ops)
 	key.InputOp{Tag: &handlers[4], Keys: "A"}.Add(ops)
 	cl2.Pop()
 	call := macro.Stop()
@@ -349,15 +349,15 @@ func TestKeyRouting(t *testing.T) {
 	// With no focus, the events should traverse the final branch of the hit tree
 	// searching for handlers.
 	assertKeyEvent(t, r.Events(&handlers[4]), false, A)
-	assertKeyEvent(t, r.Events(&handlers[3]), false, B)
+	assertKeyEvent(t, r.Events(&handlers[3]), false)
 	assertKeyEvent(t, r.Events(&handlers[2]), false)
-	assertKeyEvent(t, r.Events(&handlers[1]), false)
+	assertKeyEvent(t, r.Events(&handlers[1]), false, B)
 	assertKeyEvent(t, r.Events(&handlers[0]), false)
 
 	r2 := new(Router)
 
 	call.Add(ops)
-	key.FocusOp{Tag: &handlers[2]}.Add(ops)
+	key.FocusOp{Tag: &handlers[3]}.Add(ops)
 	r2.Frame(ops)
 
 	r2.Queue(A, B)
@@ -365,10 +365,10 @@ func TestKeyRouting(t *testing.T) {
 	// With focus, the events should traverse the branch of the hit tree
 	// containing the focused element.
 	assertKeyEvent(t, r2.Events(&handlers[4]), false)
-	assertKeyEvent(t, r2.Events(&handlers[3]), false)
-	assertKeyEvent(t, r2.Events(&handlers[2]), true, A)
-	assertKeyEvent(t, r2.Events(&handlers[1]), false, B)
-	assertKeyEvent(t, r2.Events(&handlers[0]), false)
+	assertKeyEvent(t, r2.Events(&handlers[3]), true)
+	assertKeyEvent(t, r2.Events(&handlers[2]), false)
+	assertKeyEvent(t, r2.Events(&handlers[1]), false)
+	assertKeyEvent(t, r2.Events(&handlers[0]), false, A)
 }
 
 func assertKeyEvent(t *testing.T, events []event.Event, expectedFocus bool, expectedInputs ...event.Event) {

@@ -191,7 +191,8 @@ func (q *Router) queueKeyEvent(e key.Event) {
 	}
 	pq := &q.pointer.queue
 	idx := len(pq.hitTree) - 1
-	if f != nil {
+	focused := f != nil
+	if focused {
 		// If there is a focused tag, traverse its ancestry through the
 		// hit tree to search for handlers.
 		for ; pq.hitTree[idx].ktag != f; idx-- {
@@ -199,11 +200,15 @@ func (q *Router) queueKeyEvent(e key.Event) {
 	}
 	for idx != -1 {
 		n := &pq.hitTree[idx]
-		idx = n.next
+		if focused {
+			idx = n.next
+		} else {
+			idx--
+		}
 		if n.ktag == nil {
 			continue
 		}
-		if n.ktag != nil && kq.Accepts(n.ktag, e) {
+		if kq.Accepts(n.ktag, e) {
 			q.handlers.Add(n.ktag, e)
 			break
 		}
