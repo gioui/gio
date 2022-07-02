@@ -165,14 +165,8 @@ func (op *opMacroDef) decode(data []byte) {
 	}
 	bo := binary.LittleEndian
 	data = data[:TypeMacroLen]
-	dataIdx := int(int32(bo.Uint32(data[1:])))
-	refsIdx := int(int32(bo.Uint32(data[5:])))
-	*op = opMacroDef{
-		endpc: PC{
-			data: dataIdx,
-			refs: refsIdx,
-		},
-	}
+	op.endpc.data = int(int32(bo.Uint32(data[1:])))
+	op.endpc.refs = int(int32(bo.Uint32(data[5:])))
 }
 
 func (m *macroOp) decode(data []byte, refs []interface{}) {
@@ -181,15 +175,10 @@ func (m *macroOp) decode(data []byte, refs []interface{}) {
 	}
 	bo := binary.LittleEndian
 	data = data[:TypeCallLen]
-	*m = macroOp{
-		ops: refs[0].(*Ops),
-		start: PC{
-			data: int(int32(bo.Uint32(data[1:]))),
-			refs: int(int32(bo.Uint32(data[5:]))),
-		},
-		end: PC{
-			data: int(int32(bo.Uint32(data[9:]))),
-			refs: int(int32(bo.Uint32(data[13:]))),
-		},
-	}
+
+	m.ops = refs[0].(*Ops)
+	m.start.data = int(int32(bo.Uint32(data[1:])))
+	m.start.refs = int(int32(bo.Uint32(data[5:])))
+	m.end.data = int(int32(bo.Uint32(data[9:])))
+	m.end.refs = int(int32(bo.Uint32(data[13:])))
 }

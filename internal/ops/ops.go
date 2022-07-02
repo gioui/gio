@@ -168,21 +168,12 @@ func (op *ClipOp) Decode(data []byte) {
 	}
 	data = data[:TypeClipLen]
 	bo := binary.LittleEndian
-	r := image.Rectangle{
-		Min: image.Point{
-			X: int(int32(bo.Uint32(data[1:]))),
-			Y: int(int32(bo.Uint32(data[5:]))),
-		},
-		Max: image.Point{
-			X: int(int32(bo.Uint32(data[9:]))),
-			Y: int(int32(bo.Uint32(data[13:]))),
-		},
-	}
-	*op = ClipOp{
-		Bounds:  r,
-		Outline: data[17] == 1,
-		Shape:   Shape(data[18]),
-	}
+	op.Bounds.Min.X = int(int32(bo.Uint32(data[1:])))
+	op.Bounds.Min.Y = int(int32(bo.Uint32(data[5:])))
+	op.Bounds.Max.X = int(int32(bo.Uint32(data[9:])))
+	op.Bounds.Max.Y = int(int32(bo.Uint32(data[13:])))
+	op.Outline = data[17] == 1
+	op.Shape = Shape(data[18])
 }
 
 func Reset(o *Ops) {
