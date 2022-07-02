@@ -54,9 +54,10 @@ type opMacroDef struct {
 }
 
 func (pc PC) Add(op OpType) PC {
+	size, numRefs := op.props()
 	return PC{
-		data: pc.data + op.Size(),
-		refs: pc.refs + op.NumRefs(),
+		data: pc.data + size,
+		refs: pc.refs + numRefs,
 	}
 }
 
@@ -104,8 +105,7 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 		}
 		key := Key{ops: r.ops, pc: r.pc.data, version: r.ops.version}
 		t := OpType(data[0])
-		n := t.Size()
-		nrefs := t.NumRefs()
+		n, nrefs := t.props()
 		data = data[:n]
 		refs = refs[r.pc.refs:]
 		refs = refs[:nrefs]
@@ -125,10 +125,10 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 			if deferring {
 				deferring = false
 				// Copy macro for deferred execution.
-				if t.NumRefs() != 1 {
+				if nrefs != 1 {
 					panic("internal error: unexpected number of macro refs")
 				}
-				deferData := Write1(&r.deferOps, t.Size(), refs[0])
+				deferData := Write1(&r.deferOps, n, refs[0])
 				copy(deferData, data)
 				r.pc.data += n
 				r.pc.refs += nrefs

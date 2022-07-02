@@ -381,74 +381,64 @@ func DecodeLoad(data []byte) int {
 	return int(bo.Uint32(data[1:]))
 }
 
-var opSize = [0x100]byte{
-	TypeMacro:            TypeMacroLen,
-	TypeCall:             TypeCallLen,
-	TypeDefer:            TypeDeferLen,
-	TypePushTransform:    TypePushTransformLen,
-	TypeTransform:        TypeTransformLen,
-	TypePopTransform:     TypePopTransformLen,
-	TypeInvalidate:       TypeRedrawLen,
-	TypeImage:            TypeImageLen,
-	TypePaint:            TypePaintLen,
-	TypeColor:            TypeColorLen,
-	TypeLinearGradient:   TypeLinearGradientLen,
-	TypePass:             TypePassLen,
-	TypePopPass:          TypePopPassLen,
-	TypePointerInput:     TypePointerInputLen,
-	TypeClipboardRead:    TypeClipboardReadLen,
-	TypeClipboardWrite:   TypeClipboardWriteLen,
-	TypeSource:           TypeSourceLen,
-	TypeTarget:           TypeTargetLen,
-	TypeOffer:            TypeOfferLen,
-	TypeKeyInput:         TypeKeyInputLen,
-	TypeKeyFocus:         TypeKeyFocusLen,
-	TypeKeySoftKeyboard:  TypeKeySoftKeyboardLen,
-	TypeSave:             TypeSaveLen,
-	TypeLoad:             TypeLoadLen,
-	TypeAux:              TypeAuxLen,
-	TypeClip:             TypeClipLen,
-	TypePopClip:          TypePopClipLen,
-	TypeProfile:          TypeProfileLen,
-	TypeCursor:           TypeCursorLen,
-	TypePath:             TypePathLen,
-	TypeStroke:           TypeStrokeLen,
-	TypeSemanticLabel:    TypeSemanticLabelLen,
-	TypeSemanticDesc:     TypeSemanticDescLen,
-	TypeSemanticClass:    TypeSemanticClassLen,
-	TypeSemanticSelected: TypeSemanticSelectedLen,
-	TypeSemanticDisabled: TypeSemanticDisabledLen,
-	TypeSnippet:          TypeSnippetLen,
-	TypeSelection:        TypeSelectionLen,
-	TypeActionInput:      TypeActionInputLen,
+type opProp struct {
+	Size    byte
+	NumRefs byte
+}
+
+var opProps = [0x100]opProp{
+	TypeMacro:            {Size: TypeMacroLen, NumRefs: 0},
+	TypeCall:             {Size: TypeCallLen, NumRefs: 1},
+	TypeDefer:            {Size: TypeDeferLen, NumRefs: 0},
+	TypePushTransform:    {Size: TypePushTransformLen, NumRefs: 0},
+	TypeTransform:        {Size: TypeTransformLen, NumRefs: 0},
+	TypePopTransform:     {Size: TypePopTransformLen, NumRefs: 0},
+	TypeInvalidate:       {Size: TypeRedrawLen, NumRefs: 0},
+	TypeImage:            {Size: TypeImageLen, NumRefs: 2},
+	TypePaint:            {Size: TypePaintLen, NumRefs: 0},
+	TypeColor:            {Size: TypeColorLen, NumRefs: 0},
+	TypeLinearGradient:   {Size: TypeLinearGradientLen, NumRefs: 0},
+	TypePass:             {Size: TypePassLen, NumRefs: 0},
+	TypePopPass:          {Size: TypePopPassLen, NumRefs: 0},
+	TypePointerInput:     {Size: TypePointerInputLen, NumRefs: 1},
+	TypeClipboardRead:    {Size: TypeClipboardReadLen, NumRefs: 1},
+	TypeClipboardWrite:   {Size: TypeClipboardWriteLen, NumRefs: 1},
+	TypeSource:           {Size: TypeSourceLen, NumRefs: 2},
+	TypeTarget:           {Size: TypeTargetLen, NumRefs: 2},
+	TypeOffer:            {Size: TypeOfferLen, NumRefs: 3},
+	TypeKeyInput:         {Size: TypeKeyInputLen, NumRefs: 2},
+	TypeKeyFocus:         {Size: TypeKeyFocusLen, NumRefs: 1},
+	TypeKeySoftKeyboard:  {Size: TypeKeySoftKeyboardLen, NumRefs: 0},
+	TypeSave:             {Size: TypeSaveLen, NumRefs: 0},
+	TypeLoad:             {Size: TypeLoadLen, NumRefs: 0},
+	TypeAux:              {Size: TypeAuxLen, NumRefs: 0},
+	TypeClip:             {Size: TypeClipLen, NumRefs: 0},
+	TypePopClip:          {Size: TypePopClipLen, NumRefs: 0},
+	TypeProfile:          {Size: TypeProfileLen, NumRefs: 1},
+	TypeCursor:           {Size: TypeCursorLen, NumRefs: 0},
+	TypePath:             {Size: TypePathLen, NumRefs: 0},
+	TypeStroke:           {Size: TypeStrokeLen, NumRefs: 0},
+	TypeSemanticLabel:    {Size: TypeSemanticLabelLen, NumRefs: 1},
+	TypeSemanticDesc:     {Size: TypeSemanticDescLen, NumRefs: 1},
+	TypeSemanticClass:    {Size: TypeSemanticClassLen, NumRefs: 0},
+	TypeSemanticSelected: {Size: TypeSemanticSelectedLen, NumRefs: 0},
+	TypeSemanticDisabled: {Size: TypeSemanticDisabledLen, NumRefs: 0},
+	TypeSnippet:          {Size: TypeSnippetLen, NumRefs: 2},
+	TypeSelection:        {Size: TypeSelectionLen, NumRefs: 1},
+	TypeActionInput:      {Size: TypeActionInputLen, NumRefs: 0},
+}
+
+func (t OpType) props() (size, numRefs int) {
+	v := opProps[t]
+	return int(v.Size), int(v.NumRefs)
 }
 
 func (t OpType) Size() int {
-	return int(opSize[t])
-}
-
-var opNumRefs = [0x100]byte{
-	TypeKeyFocus:       1,
-	TypePointerInput:   1,
-	TypeProfile:        1,
-	TypeCall:           1,
-	TypeClipboardRead:  1,
-	TypeClipboardWrite: 1,
-	TypeSemanticLabel:  1,
-	TypeSemanticDesc:   1,
-	TypeSelection:      1,
-
-	TypeKeyInput: 2,
-	TypeImage:    2,
-	TypeSource:   2,
-	TypeTarget:   2,
-	TypeSnippet:  2,
-
-	TypeOffer: 3,
+	return int(opProps[t].Size)
 }
 
 func (t OpType) NumRefs() int {
-	return int(opNumRefs[t])
+	return int(opProps[t].NumRefs)
 }
 
 func (t OpType) String() string {
