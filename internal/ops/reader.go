@@ -160,7 +160,7 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 }
 
 func (op *opMacroDef) decode(data []byte) {
-	if OpType(data[0]) != TypeMacro {
+	if len(data) < TypeMacroLen || OpType(data[0]) != TypeMacro {
 		panic("invalid op")
 	}
 	bo := binary.LittleEndian
@@ -176,11 +176,11 @@ func (op *opMacroDef) decode(data []byte) {
 }
 
 func (m *macroOp) decode(data []byte, refs []interface{}) {
-	if OpType(data[0]) != TypeCall {
+	if len(data) < TypeCallLen || len(refs) < 1 || OpType(data[0]) != TypeCall {
 		panic("invalid op")
 	}
-	data = data[:TypeCallLen]
 	bo := binary.LittleEndian
+	data = data[:TypeCallLen]
 	*m = macroOp{
 		ops: refs[0].(*Ops),
 		start: PC{

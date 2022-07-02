@@ -163,9 +163,10 @@ const (
 )
 
 func (op *ClipOp) Decode(data []byte) {
-	if OpType(data[0]) != TypeClip {
+	if len(data) < TypeClipLen || OpType(data[0]) != TypeClip {
 		panic("invalid op")
 	}
+	data = data[:TypeClipLen]
 	bo := binary.LittleEndian
 	r := image.Rectangle{
 		Min: image.Point{
