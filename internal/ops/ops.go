@@ -426,17 +426,28 @@ func (t OpType) Size() int {
 	return int(opSize[t])
 }
 
+var opNumRefs = [0x100]byte{
+	TypeKeyFocus:       1,
+	TypePointerInput:   1,
+	TypeProfile:        1,
+	TypeCall:           1,
+	TypeClipboardRead:  1,
+	TypeClipboardWrite: 1,
+	TypeSemanticLabel:  1,
+	TypeSemanticDesc:   1,
+	TypeSelection:      1,
+
+	TypeKeyInput: 2,
+	TypeImage:    2,
+	TypeSource:   2,
+	TypeTarget:   2,
+	TypeSnippet:  2,
+
+	TypeOffer: 3,
+}
+
 func (t OpType) NumRefs() int {
-	switch t {
-	case TypeKeyFocus, TypePointerInput, TypeProfile, TypeCall, TypeClipboardRead, TypeClipboardWrite, TypeSemanticLabel, TypeSemanticDesc, TypeSelection:
-		return 1
-	case TypeKeyInput, TypeImage, TypeSource, TypeTarget, TypeSnippet:
-		return 2
-	case TypeOffer:
-		return 3
-	default:
-		return 0
-	}
+	return int(opNumRefs[t])
 }
 
 func (t OpType) String() string {
