@@ -186,6 +186,7 @@ func decodeImageOp(data []byte, refs []interface{}) imageOpData {
 }
 
 func decodeColorOp(data []byte) color.NRGBA {
+	data = data[:ops.TypeColorLen]
 	return color.NRGBA{
 		R: data[1],
 		G: data[2],
@@ -195,6 +196,7 @@ func decodeColorOp(data []byte) color.NRGBA {
 }
 
 func decodeLinearGradientOp(data []byte) linearGradientOpData {
+	data = data[:ops.TypeLinearGradientLen]
 	bo := binary.LittleEndian
 	return linearGradientOpData{
 		stop1: f32.Point{
