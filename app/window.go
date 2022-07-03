@@ -1130,6 +1130,13 @@ func NavigationColor(color color.NRGBA) Option {
 	}
 }
 
+// IgnoreSafeAreaInsets ignores safe area insets for iOS >= 11.
+func IgnoreSafeAreaInsets(ignore bool) Option {
+	return func(_ unit.Metric, cnf *Config) {
+		cnf.IgnoreSafeAreaInsets = ignore
+	}
+}
+
 // CustomRenderer controls whether the window contents is
 // rendered by the client. If true, no GPU context is created.
 //

@@ -43,6 +43,8 @@ type Config struct {
 	CustomRenderer bool
 	// Decorated reports whether window decorations are provided automatically.
 	Decorated bool
+	// Ignore safe area insets for iOS >= 11.
+	IgnoreSafeAreaInsets bool
 }
 
 // ConfigEvent is sent whenever the configuration of a Window changes.

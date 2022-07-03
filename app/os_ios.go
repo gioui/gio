@@ -46,7 +46,7 @@ static void hideTextInput(CFTypeRef viewRef) {
 	[view resignFirstResponder];
 }
 
-static struct drawParams viewDrawParams(CFTypeRef viewRef) {
+static struct drawParams viewDrawParams(CFTypeRef viewRef, bool ignoreSafeAreaInsets) {
 	UIView *v = (__bridge UIView *)viewRef;
 	struct drawParams params;
 	CGFloat scale = v.layer.contentsScale;
@@ -58,6 +58,12 @@ static struct drawParams viewDrawParams(CFTypeRef viewRef) {
 		UIFontMetrics *metrics = [UIFontMetrics defaultMetrics];
 		params.sdpi = [metrics scaledValueForValue:params.sdpi];
 		insets = v.safeAreaInsets;
+		if (ignoreSafeAreaInsets) {
+			insets.top = 0;
+			insets.bottom = 0;
+			insets.left = 0;
+			insets.right = 0;
+		}
 	}
 	params.width = v.bounds.size.width*scale;
 	params.height = v.bounds.size.height*scale;
@@ -140,7 +146,7 @@ func gio_onDraw(view C.CFTypeRef) {
 }
 
 func (w *window) draw(sync bool) {
-	params := C.viewDrawParams(w.view)
+	params := C.viewDrawParams(w.view, C.bool(w.config.IgnoreSafeAreaInsets))
 	if params.width == 0 || params.height == 0 {
 		return
 	}
@@ -277,9 +283,17 @@ func (w *window) WriteClipboard(s string) {
 	C.writeClipboard(chars, C.NSUInteger(len(u16)))
 }
 
-func (w *window) Configure([]Option) {
+func (w *window) Configure(options []Option) {
+	// Create temporary config instance
+	cnf := w.config
+	cnf.apply(unit.Metric{}, options)
+
+	// Apply config values for window config
+	w.config.IgnoreSafeAreaInsets = cnf.IgnoreSafeAreaInsets
+
 	// Decorations are never disabled.
 	w.config.Decorated = true
+
 	w.w.Event(ConfigEvent{Config: w.config})
 }
 
