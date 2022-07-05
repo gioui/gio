@@ -99,7 +99,7 @@ func (e *Enum) Layout(gtx layout.Context, k string, content layout.Widget) layou
 			if !e.focused || ev.State != key.Release {
 				break
 			}
-			if ev.Name != key.NameEnter && ev.Name != key.NameSpace {
+			if ev.Name != key.NameReturn && ev.Name != key.NameSpace {
 				break
 			}
 			if state.key != e.Value {
