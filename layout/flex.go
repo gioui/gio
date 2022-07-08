@@ -216,6 +216,7 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 		}
 	}
 	sz := f.Axis.Convert(image.Pt(mainSize, maxCross))
+	sz = cs.Constrain(sz)
 	return Dimensions{Size: sz, Baseline: sz.Y - maxBaseline}
 }
 

@@ -30,6 +30,20 @@ func TestStack(t *testing.T) {
 	}
 }
 
+func TestFlex(t *testing.T) {
+	gtx := Context{
+		Ops: new(op.Ops),
+		Constraints: Constraints{
+			Min: image.Pt(100, 100),
+			Max: image.Pt(100, 100),
+		},
+	}
+	dims := Flex{}.Layout(gtx)
+	if got := dims.Size; got != gtx.Constraints.Min {
+		t.Errorf("Flex ignored minimum constraints, got %v expected %v", got, gtx.Constraints.Min)
+	}
+}
+
 func TestDirection(t *testing.T) {
 	max := image.Pt(100, 100)
 	for _, tc := range []struct {
