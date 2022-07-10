@@ -36,6 +36,64 @@ var english = system.Locale{
 	Direction: system.LTR,
 }
 
+// TestEditorHistory ensures that undo and redo behave correctly.
+func TestEditorHistory(t *testing.T) {
+	e := new(Editor)
+	// Insert some multi-byte unicode text.
+	e.SetText("안П你 hello 안П你")
+	assertContents(t, e, "안П你 hello 안П你", 0, 0)
+	// Overwrite all of the text with the empty string.
+	e.SetCaret(0, len([]rune("안П你 hello 안П你")))
+	e.Insert("")
+	assertContents(t, e, "", 0, 0)
+	// Ensure that undoing the overwrite succeeds.
+	e.undo()
+	assertContents(t, e, "안П你 hello 안П你", 13, 0)
+	// Ensure that redoing the overwrite succeeds.
+	e.redo()
+	assertContents(t, e, "", 0, 0)
+	// Insert some smaller text.
+	e.Insert("안П你 hello")
+	assertContents(t, e, "안П你 hello", 9, 9)
+	// Replace a region in the middle of the text.
+	e.SetCaret(1, 5)
+	e.Insert("П")
+	assertContents(t, e, "안Пello", 2, 2)
+	// Replace a second region in the middle.
+	e.SetCaret(3, 4)
+	e.Insert("П")
+	assertContents(t, e, "안ПeПlo", 4, 4)
+	// Ensure both operations undo successfully.
+	e.undo()
+	assertContents(t, e, "안Пello", 4, 3)
+	e.undo()
+	assertContents(t, e, "안П你 hello", 5, 1)
+	// Make a new modification.
+	e.Insert("Something New")
+	// Ensure that redo history is discarded now that
+	// we've diverged from the linear editing history.
+	// This redo() call should do nothing.
+	text := e.Text()
+	start, end := e.Selection()
+	e.redo()
+	assertContents(t, e, text, start, end)
+}
+
+func assertContents(t *testing.T, e *Editor, contents string, selectionStart, selectionEnd int) {
+	t.Helper()
+	actualContents := e.Text()
+	if actualContents != contents {
+		t.Errorf("expected editor to contain %s, got %s", contents, actualContents)
+	}
+	actualStart, actualEnd := e.Selection()
+	if actualStart != selectionStart {
+		t.Errorf("expected selection start to be %d, got %d", selectionStart, actualStart)
+	}
+	if actualEnd != selectionEnd {
+		t.Errorf("expected selection end to be %d, got %d", selectionEnd, actualEnd)
+	}
+}
+
 // TestEditorZeroDimensions ensures that an empty editor still reserves
 // space for displaying its caret when the constraints allow for it.
 func TestEditorZeroDimensions(t *testing.T) {

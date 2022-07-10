@@ -106,6 +106,13 @@ type Editor struct {
 	prevEvents int
 
 	locale system.Locale
+
+	// history contains undo history.
+	history []modification
+	// nextHistoryIdx is the index within the history of the next modification. This
+	// is only not len(history) immediately after undo operations occur. It is framed as the "next" value
+	// to make the zero value consistent.
+	nextHistoryIdx int
 }
 
 type offEntry struct {
@@ -365,7 +372,7 @@ func (e *Editor) processKey(gtx layout.Context) {
 		case key.EditEvent:
 			e.caret.scroll = true
 			e.scroller.Stop()
-			moves := e.replace(ke.Range.Start, ke.Range.End, ke.Text)
+			moves := e.replace(ke.Range.Start, ke.Range.End, ke.Text, true)
 			adjust += utf8.RuneCountInString(ke.Text) - moves
 			e.caret.xoff = 0
 		// Complete a paste event, initiated by Shortcut-V in Editor.command().
@@ -470,6 +477,12 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 	case "A":
 		e.caret.end = 0
 		e.caret.start = e.Len()
+	case "Z":
+		if k.Modifiers.Contain(key.ModShift) {
+			e.redo()
+		} else {
+			e.undo()
+		}
 	}
 }
 
@@ -616,10 +629,10 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 
 	defer clip.Rect(image.Rectangle{Max: e.viewSize}).Push(gtx.Ops).Pop()
 	pointer.CursorText.Add(gtx.Ops)
-	const keyFilterNoLeftUp = "(ShortAlt)-(Shift)-[→,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]"
-	const keyFilterNoRightDown = "(ShortAlt)-(Shift)-[←,↑]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]"
-	const keyFilterNoArrows = "(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]"
-	const keyFilterAllArrows = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]"
+	const keyFilterNoLeftUp = "(ShortAlt)-(Shift)-[→,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
+	const keyFilterNoRightDown = "(ShortAlt)-(Shift)-[←,↑]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
+	const keyFilterNoArrows = "(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
+	const keyFilterAllArrows = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
 	caret := e.closestPosition(combinedPos{runes: e.caret.start})
 	switch {
 	case caret.runes == 0 && caret.runes == e.Len():
@@ -858,7 +871,7 @@ func (e *Editor) SetText(s string) {
 	e.rr = editBuffer{}
 	e.caret.start = 0
 	e.caret.end = 0
-	e.replace(e.caret.start, e.caret.end, s)
+	e.replace(e.caret.start, e.caret.end, s, true)
 	e.caret.xoff = 0
 }
 
@@ -1139,7 +1152,7 @@ func (e *Editor) Delete(runes int) {
 	}
 
 	end += runes
-	e.replace(start, end, "")
+	e.replace(start, end, "", true)
 	e.caret.xoff = 0
 	e.ClearSelection()
 }
@@ -1155,7 +1168,7 @@ func (e *Editor) Insert(s string) {
 // there is a selection, append overwrites it.
 // xxx|yyy + append zzz => xxxzzz|yyy
 func (e *Editor) append(s string) {
-	moves := e.replace(e.caret.start, e.caret.end, s)
+	moves := e.replace(e.caret.start, e.caret.end, s, true)
 	e.caret.xoff = 0
 	start := e.caret.start
 	if end := e.caret.end; end < start {
@@ -1165,9 +1178,54 @@ func (e *Editor) append(s string) {
 	e.caret.end = e.caret.start
 }
 
+// modification represents a change to the contents of the editor buffer.
+// It contains the necessary information to both apply the change and
+// reverse it, and is useful for implementing undo/redo.
+type modification struct {
+	// StartRune is the inclusive index of the first rune
+	// modified.
+	StartRune int
+	// ApplyContent is the data inserted at StartRune to
+	// apply this operation. It overwrites len([]rune(ReverseContent)) runes.
+	ApplyContent string
+	// ReverseContent is the data inserted at StartRune to
+	// apply this operation. It overwrites len([]rune(ApplyContent)) runes.
+	ReverseContent string
+}
+
+// undo applies the modification at e.history[e.historyIdx] and decrements
+// e.historyIdx.
+func (e *Editor) undo() {
+	if len(e.history) < 1 || e.nextHistoryIdx == 0 {
+		return
+	}
+	mod := e.history[e.nextHistoryIdx-1]
+	replaceEnd := mod.StartRune + utf8.RuneCountInString(mod.ApplyContent)
+	e.replace(mod.StartRune, replaceEnd, mod.ReverseContent, false)
+	caretEnd := mod.StartRune + utf8.RuneCountInString(mod.ReverseContent)
+	e.SetCaret(caretEnd, mod.StartRune)
+	e.nextHistoryIdx--
+}
+
+// redo applies the modification at e.history[e.historyIdx] and increments
+// e.historyIdx.
+func (e *Editor) redo() {
+	if len(e.history) < 1 || e.nextHistoryIdx == len(e.history) {
+		return
+	}
+	mod := e.history[e.nextHistoryIdx]
+	end := mod.StartRune + utf8.RuneCountInString(mod.ReverseContent)
+	e.replace(mod.StartRune, end, mod.ApplyContent, false)
+	caretEnd := mod.StartRune + utf8.RuneCountInString(mod.ApplyContent)
+	e.SetCaret(caretEnd, mod.StartRune)
+	e.nextHistoryIdx++
+}
+
 // replace the text between start and end with s. Indices are in runes.
 // It returns the number of runes inserted.
-func (e *Editor) replace(start, end int, s string) int {
+// addHistory controls whether this modification is recorded in the undo
+// history.
+func (e *Editor) replace(start, end int, s string, addHistory bool) int {
 	if e.SingleLine {
 		s = strings.ReplaceAll(s, "\n", " ")
 	}
@@ -1177,7 +1235,6 @@ func (e *Editor) replace(start, end int, s string) int {
 	startPos := e.closestPosition(combinedPos{runes: start})
 	endPos := e.closestPosition(combinedPos{runes: end})
 	startOff := e.runeOffset(startPos.runes)
-	e.rr.deleteRunes(startOff, endPos.runes-startPos.runes)
 	sc := utf8.RuneCountInString(s)
 	el := e.Len()
 	for e.MaxLen > 0 && el+sc > e.MaxLen {
@@ -1185,8 +1242,29 @@ func (e *Editor) replace(start, end int, s string) int {
 		s = s[:len(s)-n]
 		sc--
 	}
-	e.rr.prepend(startOff, s)
 	newEnd := startPos.runes + sc
+	replaceSize := endPos.runes - startPos.runes
+
+	if addHistory {
+		e.rr.Seek(int64(startOff), 0)
+		deleted := make([]rune, 0, replaceSize)
+		for i := 0; i < replaceSize; i++ {
+			ru, _, _ := e.rr.ReadRune()
+			deleted = append(deleted, ru)
+		}
+		if e.nextHistoryIdx < len(e.history) {
+			e.history = e.history[:e.nextHistoryIdx]
+		}
+		e.history = append(e.history, modification{
+			StartRune:      startPos.runes,
+			ApplyContent:   s,
+			ReverseContent: string(deleted),
+		})
+		e.nextHistoryIdx++
+	}
+
+	e.rr.deleteRunes(startOff, replaceSize)
+	e.rr.prepend(startOff, s)
 	adjust := func(pos int) int {
 		switch {
 		case newEnd < pos && pos <= endPos.runes:
@@ -1329,7 +1407,7 @@ func (e *Editor) deleteWord(distance int) {
 		}
 		return r
 	}
-	var runes = 1
+	runes := 1
 	for ii := 0; ii < words; ii++ {
 		r := next(runes)
 		wantSpace := unicode.IsSpace(r)
