@@ -25,11 +25,12 @@ func (b Border) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 
 	rr := gtx.Dp(b.CornerRadius)
 	width := gtx.Dp(b.Width)
-	sz.X -= width
-	sz.Y -= width
+	whalf := (width + 1) / 2
+	sz.X -= whalf * 2
+	sz.Y -= whalf * 2
 
 	r := image.Rectangle{Max: sz}
-	r = r.Add(image.Point{X: width / 2, Y: width / 2})
+	r = r.Add(image.Point{X: whalf, Y: whalf})
 
 	paint.FillShape(gtx.Ops,
 		b.Color,
