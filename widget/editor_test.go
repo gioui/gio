@@ -947,6 +947,37 @@ func TestEditor_WriteTo(t *testing.T) {
 	}
 }
 
+func TestEditor_MaxLen(t *testing.T) {
+	e := new(Editor)
+
+	e.MaxLen = 8
+	e.SetText("123456789")
+	if got, want := e.Text(), "12345678"; got != want {
+		t.Errorf("editor failed to cap SetText")
+	}
+
+	e.SetText("2345678")
+	gtx := layout.Context{
+		Ops:         new(op.Ops),
+		Constraints: layout.Exact(image.Pt(100, 100)),
+		Queue: newQueue(
+			key.EditEvent{Range: key.Range{Start: 0, End: 0}, Text: "1234"},
+			key.SelectionEvent{Start: 4, End: 4},
+		),
+	}
+	cache := text.NewCache(gofont.Collection())
+	fontSize := unit.Sp(10)
+	font := text.Font{}
+	e.Layout(gtx, cache, font, fontSize, nil)
+
+	if got, want := e.Text(), "12345678"; got != want {
+		t.Errorf("editor failed to cap EditEvent")
+	}
+	if start, end := e.Selection(); start != 1 || end != 1 {
+		t.Errorf("editor failed to adjust SelectionEvent")
+	}
+}
+
 func textWidth(e *Editor, lineNum, colStart, colEnd int) float32 {
 	var w fixed.Int26_6
 	glyphs := e.lines[lineNum].Layout.Glyphs

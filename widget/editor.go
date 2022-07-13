@@ -47,6 +47,8 @@ type Editor struct {
 	Mask rune
 	// InputHint specifies the type of on-screen keyboard to be displayed.
 	InputHint key.InputHint
+	// MaxLen limits the editor content to a maximum length. Zero means no limit.
+	MaxLen int
 
 	eventKey     int
 	font         text.Font
@@ -334,6 +336,8 @@ func (e *Editor) processKey(gtx layout.Context) {
 	if e.rr.Changed() {
 		e.events = append(e.events, ChangeEvent{})
 	}
+	// adjust keeps track of runes dropped because of MaxLen.
+	var adjust int
 	for _, ke := range gtx.Events(&e.eventKey) {
 		e.blinkStart = gtx.Now
 		switch ke := ke.(type) {
@@ -361,7 +365,8 @@ func (e *Editor) processKey(gtx layout.Context) {
 		case key.EditEvent:
 			e.caret.scroll = true
 			e.scroller.Stop()
-			e.replace(ke.Range.Start, ke.Range.End, ke.Text)
+			moves := e.replace(ke.Range.Start, ke.Range.End, ke.Text)
+			adjust += utf8.RuneCountInString(ke.Text) - moves
 			e.caret.xoff = 0
 		// Complete a paste event, initiated by Shortcut-V in Editor.command().
 		case clipboard.Event:
@@ -371,6 +376,9 @@ func (e *Editor) processKey(gtx layout.Context) {
 		case key.SelectionEvent:
 			e.caret.scroll = true
 			e.scroller.Stop()
+			ke.Start -= adjust
+			ke.End -= adjust
+			adjust = 0
 			e.caret.start = e.closestPosition(combinedPos{runes: ke.Start}).runes
 			e.caret.end = e.closestPosition(combinedPos{runes: ke.End}).runes
 		}
@@ -1147,18 +1155,19 @@ func (e *Editor) Insert(s string) {
 // there is a selection, append overwrites it.
 // xxx|yyy + append zzz => xxxzzz|yyy
 func (e *Editor) append(s string) {
-	e.replace(e.caret.start, e.caret.end, s)
+	moves := e.replace(e.caret.start, e.caret.end, s)
 	e.caret.xoff = 0
 	start := e.caret.start
 	if end := e.caret.end; end < start {
 		start = end
 	}
-	e.caret.start = start + utf8.RuneCountInString(s)
+	e.caret.start = start + moves
 	e.caret.end = e.caret.start
 }
 
 // replace the text between start and end with s. Indices are in runes.
-func (e *Editor) replace(start, end int, s string) {
+// It returns the number of runes inserted.
+func (e *Editor) replace(start, end int, s string) int {
 	if e.SingleLine {
 		s = strings.ReplaceAll(s, "\n", " ")
 	}
@@ -1169,8 +1178,15 @@ func (e *Editor) replace(start, end int, s string) {
 	endPos := e.closestPosition(combinedPos{runes: end})
 	startOff := e.runeOffset(startPos.runes)
 	e.rr.deleteRunes(startOff, endPos.runes-startPos.runes)
+	sc := utf8.RuneCountInString(s)
+	el := e.Len()
+	for e.MaxLen > 0 && el+sc > e.MaxLen {
+		_, n := utf8.DecodeLastRuneInString(s)
+		s = s[:len(s)-n]
+		sc--
+	}
 	e.rr.prepend(startOff, s)
-	newEnd := startPos.runes + utf8.RuneCountInString(s)
+	newEnd := startPos.runes + sc
 	adjust := func(pos int) int {
 		switch {
 		case newEnd < pos && pos <= endPos.runes:
@@ -1186,6 +1202,7 @@ func (e *Editor) replace(start, end int, s string) {
 	e.ime.start = adjust(e.ime.start)
 	e.ime.end = adjust(e.ime.end)
 	e.invalidate()
+	return sc
 }
 
 func (e *Editor) movePages(pages int, selAct selectionAction) {
