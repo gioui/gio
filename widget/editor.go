@@ -374,9 +374,9 @@ func (e *Editor) processKey(gtx layout.Context) {
 			e.caret.start = e.closestPosition(combinedPos{runes: ke.Start}).runes
 			e.caret.end = e.closestPosition(combinedPos{runes: ke.End}).runes
 		}
-		if e.rr.Changed() {
-			e.events = append(e.events, ChangeEvent{})
-		}
+	}
+	if e.rr.Changed() {
+		e.events = append(e.events, ChangeEvent{})
 	}
 }
 
