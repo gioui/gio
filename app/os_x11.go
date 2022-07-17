@@ -469,7 +469,6 @@ loop:
 			})
 		}
 	}
-	w.w.Event(system.DestroyEvent{Err: nil})
 }
 
 func (w *x11Window) destroy() {
@@ -831,6 +830,7 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 		w.setStage(system.StageRunning)
 		w.loop()
 		w.w.Event(X11ViewEvent{})
+		w.w.Event(system.DestroyEvent{Err: nil})
 		w.destroy()
 	}()
 	return nil
