@@ -62,6 +62,7 @@ type Window struct {
 	out      chan event.Event
 	frames   chan *op.Ops
 	frameAck chan struct{}
+	destroy  chan struct{}
 	// dead is closed when the window is destroyed.
 	dead chan struct{}
 
@@ -155,6 +156,7 @@ func NewWindow(options ...Option) *Window {
 		driverFuncs:      make(chan func(d driver), 1),
 		wakeups:          make(chan struct{}, 1),
 		wakeupFuncs:      make(chan func()),
+		destroy:          make(chan struct{}),
 		dead:             make(chan struct{}),
 		options:          make(chan []Option, 1),
 		actions:          make(chan system.Action, 1),
@@ -860,8 +862,8 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		if err := w.validateAndProcess(d, viewSize, e2.Sync, wrapper, signal); err != nil {
 			w.destroyGPU()
 			w.out <- system.DestroyEvent{Err: err}
-			close(w.dead)
 			close(w.out)
+			w.destroy <- struct{}{}
 			break
 		}
 		w.processFrame(d, frameStart)
@@ -869,8 +871,8 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 	case system.DestroyEvent:
 		w.destroyGPU()
 		w.out <- e2
-		close(w.dead)
 		close(w.out)
+		w.destroy <- struct{}{}
 	case ViewEvent:
 		w.out <- e2
 		w.waitAck(d)
@@ -917,8 +919,8 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 func (w *Window) run(options []Option) {
 	if err := newWindow(&w.callbacks, options); err != nil {
 		w.out <- system.DestroyEvent{Err: err}
-		close(w.dead)
 		close(w.out)
+		w.destroy <- struct{}{}
 		return
 	}
 	var wakeup func()
@@ -940,7 +942,8 @@ func (w *Window) run(options []Option) {
 				timer.Stop()
 			}
 			timer = time.NewTimer(time.Until(t))
-		case <-w.dead:
+		case <-w.destroy:
+			close(w.dead)
 			return
 		case <-timeC:
 			select {
