@@ -43,6 +43,9 @@ type Config struct {
 	CustomRenderer bool
 	// Decorated reports whether window decorations are provided automatically.
 	Decorated bool
+	// decoHeight is the height of the fallback decoration for platforms such
+	// as Wayland that may need fallback client-side decorations.
+	decoHeight unit.Dp
 }
 
 // ConfigEvent is sent whenever the configuration of a Window changes.

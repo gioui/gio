@@ -576,6 +576,12 @@ func gio_onToplevelDecorationConfigure(data unsafe.Pointer, deco *C.struct_zxdg_
 		w.config.Decorated = true
 	}
 	if decorated != w.config.Decorated {
+		w.setWindowConstraints()
+		if w.config.Decorated {
+			w.size.Y -= int(w.config.decoHeight)
+		} else {
+			w.size.Y += int(w.config.decoHeight)
+		}
 		w.w.Event(ConfigEvent{Config: w.config})
 		w.redraw = true
 	}
@@ -1022,6 +1028,7 @@ func (w *window) Configure(options []Option) {
 	prev := w.config
 	cnf := w.config
 	cnf.apply(cfg, options)
+	w.config.decoHeight = cnf.decoHeight
 
 	switch cnf.Mode {
 	case Fullscreen:
@@ -1064,20 +1071,33 @@ func (w *window) Configure(options []Option) {
 		w.setTitle(prev, cnf)
 		if prev.Size != cnf.Size {
 			w.config.Size = cnf.Size
-			w.size = cnf.Size.Div(w.scale)
+			w.config.Size.Y += int(w.decoHeight()) * w.scale
+			w.size = w.config.Size.Div(w.scale)
 		}
-		if prev.MinSize != cnf.MinSize {
-			w.config.MinSize = cnf.MinSize
-			scaled := cnf.MinSize.Div(w.scale)
-			C.xdg_toplevel_set_min_size(w.topLvl, C.int32_t(scaled.X), C.int32_t(scaled.Y))
-		}
-		if prev.MaxSize != cnf.MaxSize {
-			w.config.MaxSize = cnf.MaxSize
-			scaled := cnf.MaxSize.Div(w.scale)
-			C.xdg_toplevel_set_max_size(w.topLvl, C.int32_t(scaled.X), C.int32_t(scaled.Y))
-		}
+		w.config.MinSize = cnf.MinSize
+		w.config.MaxSize = cnf.MaxSize
+		w.setWindowConstraints()
 	}
 	w.w.Event(ConfigEvent{Config: w.config})
+}
+
+func (w *window) setWindowConstraints() {
+	decoHeight := w.decoHeight()
+	if scaled := w.config.MinSize.Div(w.scale); scaled != (image.Point{}) {
+		C.xdg_toplevel_set_min_size(w.topLvl, C.int32_t(scaled.X), C.int32_t(scaled.Y+decoHeight))
+	}
+	if scaled := w.config.MaxSize.Div(w.scale); scaled != (image.Point{}) {
+		C.xdg_toplevel_set_max_size(w.topLvl, C.int32_t(scaled.X), C.int32_t(scaled.Y+decoHeight))
+	}
+}
+
+// decoHeight returns the adjustment for client-side decorations, if applicable.
+// The unit is in surface-local coordinates.
+func (w *window) decoHeight() int {
+	if !w.config.Decorated {
+		return int(w.config.decoHeight)
+	}
+	return 0
 }
 
 func (w *window) setTitle(prev, cnf Config) {

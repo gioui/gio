@@ -85,9 +85,10 @@ type Window struct {
 		// capability.
 		enabled bool
 		Config
+		height        unit.Dp
+		currentHeight int
 		*material.Theme
 		*widget.Decorations
-		size image.Point // decorations size
 	}
 
 	callbacks callbacks
@@ -137,10 +138,24 @@ type queue struct {
 // Calling NewWindow more than once is not supported on
 // iOS, Android, WebAssembly.
 func NewWindow(options ...Option) *Window {
+	// Measure decoration height.
+	deco := new(widget.Decorations)
+	theme := material.NewTheme(gofont.Collection())
+	decoStyle := material.Decorations(theme, deco, 0, "")
+	gtx := layout.Context{
+		Ops: new(op.Ops),
+		// Measure in Dp.
+		Metric: unit.Metric{},
+	}
+	// Allow plenty of space.
+	gtx.Constraints.Max.Y = 200
+	dims := decoStyle.Layout(gtx)
+	decoHeight := unit.Dp(dims.Size.Y)
 	defaultOptions := []Option{
 		Size(800, 600),
 		Title("Gio"),
 		Decorated(true),
+		decoHeightOpt(decoHeight),
 	}
 	options = append(defaultOptions, options...)
 	var cnf Config
@@ -162,12 +177,20 @@ func NewWindow(options ...Option) *Window {
 		actions:          make(chan system.Action, 1),
 		nocontext:        cnf.CustomRenderer,
 	}
+	w.decorations.Theme = theme
+	w.decorations.Decorations = deco
 	w.decorations.enabled = cnf.Decorated
 	w.imeState.compose = key.Range{Start: -1, End: -1}
 	w.semantic.ids = make(map[router.SemanticID]router.SemanticNode)
 	w.callbacks.w = w
 	go w.run(options)
 	return w
+}
+
+func decoHeightOpt(h unit.Dp) Option {
+	return func(m unit.Metric, c *Config) {
+		c.decoHeight = h
+	}
 }
 
 // Events returns the channel where events are delivered.
@@ -474,6 +497,11 @@ func (c *callbacks) Event(e event.Event) bool {
 				opt(c.w.metric, &cnf)
 			}
 			c.w.decorations.enabled = cnf.Decorated
+			decoHeight := c.w.decorations.height
+			if !c.w.decorations.enabled {
+				decoHeight = 0
+			}
+			opts = append(opts, decoHeightOpt(decoHeight))
 			c.d.Configure(opts)
 		default:
 		}
@@ -879,9 +907,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 	case ConfigEvent:
 		w.decorations.Config = e2.Config
 		if !w.fallbackDecorate() {
-			// Decorations are no longer applied.
-			w.decorations.Decorations = nil
-			w.decorations.size = image.Point{}
+			w.decorations.height = 0
 		}
 		e2.Config = w.effectiveConfig()
 		w.out <- e2
@@ -975,19 +1001,10 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) (size, offse
 	if !w.fallbackDecorate() {
 		return e.Size, image.Pt(0, 0)
 	}
-	theme := w.decorations.Theme
-	if theme == nil {
-		theme = material.NewTheme(gofont.Collection())
-		w.decorations.Theme = theme
-	}
 	deco := w.decorations.Decorations
-	if deco == nil {
-		deco = new(widget.Decorations)
-		w.decorations.Decorations = deco
-	}
 	allActions := system.ActionMinimize | system.ActionMaximize | system.ActionUnmaximize |
 		system.ActionClose | system.ActionMove
-	style := material.Decorations(theme, deco, allActions, w.decorations.Config.Title)
+	style := material.Decorations(w.decorations.Theme, deco, allActions, w.decorations.Config.Title)
 	// Update the decorations based on the current window mode.
 	var actions system.Action
 	switch m := w.decorations.Config.Mode; m {
@@ -1010,22 +1027,22 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) (size, offse
 		Metric:      e.Metric,
 		Constraints: layout.Exact(e.Size),
 	}
-	dims := style.Layout(gtx)
+	style.Layout(gtx)
 	// Update the window based on the actions on the decorations.
 	w.Perform(deco.Actions())
 	// Offset to place the frame content below the decorations.
-	decoSize := image.Point{Y: dims.Size.Y}
-	appSize := e.Size.Sub(decoSize)
-	if w.decorations.size != decoSize {
-		w.decorations.size = decoSize
+	decoHeight := gtx.Dp(w.decorations.Config.decoHeight)
+	if w.decorations.currentHeight != decoHeight {
+		w.decorations.currentHeight = decoHeight
 		w.out <- ConfigEvent{Config: w.effectiveConfig()}
 	}
-	return appSize, image.Pt(0, decoSize.Y)
+	e.Size.Y -= w.decorations.currentHeight
+	return e.Size, image.Pt(0, decoHeight)
 }
 
 func (w *Window) effectiveConfig() Config {
 	cnf := w.decorations.Config
-	cnf.Size = cnf.Size.Sub(w.decorations.size)
+	cnf.Size.Y -= w.decorations.currentHeight
 	cnf.Decorated = w.decorations.enabled || cnf.Decorated
 	return cnf
 }
