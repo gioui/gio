@@ -7,7 +7,7 @@ import (
 	"math"
 )
 
-// Affine2D represents an affine 2D transformation. The zero value if Affine2D
+// Affine2D represents an affine 2D transformation. The zero value of Affine2D
 // represents the identity transform.
 type Affine2D struct {
 	// in order to make the zero value of Affine2D represent the identity
