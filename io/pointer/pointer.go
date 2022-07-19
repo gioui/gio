@@ -119,11 +119,11 @@ const (
 	// CursorGrabbing is for content that is being grabbed (dragged to be moved).
 	// Usually displayed as a closed hand.
 	CursorGrabbing
-	// CursorWait is shown when the program is busy and user cannot interact.
-	// Usually displayed as a hourglass or the system equivalent.
-	CursorNotAllowed
 	// CursorNotAllowed is shown when the request action cannot be carried out.
 	// Usually displayed as a circle with a line through.
+	CursorNotAllowed
+	// CursorWait is shown when the program is busy and user cannot interact.
+	// Usually displayed as a hourglass or the system equivalent.
 	CursorWait
 	// CursorProgress is shown when the program is busy, but the user can still interact.
 	// Usually displayed as a default cursor with a hourglass.
