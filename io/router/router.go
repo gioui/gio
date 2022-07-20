@@ -202,6 +202,12 @@ func (q *Router) queueKeyEvent(e key.Event) {
 		n := &pq.hitTree[idx]
 		if focused {
 			idx = n.next
+			if idx == -1 {
+				// No handler found in focus ancestor tree.
+				// Try all handlers.
+				idx = len(pq.hitTree) - 1
+				focused = false
+			}
 		} else {
 			idx--
 		}
