@@ -76,6 +76,7 @@ const (
 	TypeSnippet
 	TypeSelection
 	TypeActionInput
+	TypeLinkedView
 )
 
 type StackID struct {
@@ -160,6 +161,7 @@ const (
 	TypeSnippetLen          = 1 + 4 + 4
 	TypeSelectionLen        = 1 + 2*4 + 2*4 + 4 + 4
 	TypeActionInputLen      = 1 + 1
+	TypeLinkedViewLen       = 1
 )
 
 func (op *ClipOp) Decode(data []byte) {
@@ -417,6 +419,7 @@ var opProps = [0x100]opProp{
 	TypeSnippet:          {Size: TypeSnippetLen, NumRefs: 2},
 	TypeSelection:        {Size: TypeSelectionLen, NumRefs: 1},
 	TypeActionInput:      {Size: TypeActionInputLen, NumRefs: 0},
+	TypeLinkedView:       {Size: TypeLinkedViewLen, NumRefs: 1},
 }
 
 func (t OpType) props() (size, numRefs int) {
