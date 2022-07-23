@@ -109,6 +109,12 @@ type Inset struct {
 	Top, Bottom, Left, Right unit.Dp
 }
 
+func (in Inset) LayoutW(w Widget) Widget {
+	return func(gtx Context) Dimensions {
+		return in.Layout(gtx, w)
+	}
+}
+
 // Layout a widget.
 func (in Inset) Layout(gtx Context, w Widget) Dimensions {
 	top := gtx.Dp(in.Top)
@@ -148,6 +154,12 @@ func (in Inset) Layout(gtx Context, w Widget) Dimensions {
 // edges.
 func UniformInset(v unit.Dp) Inset {
 	return Inset{Top: v, Right: v, Bottom: v, Left: v}
+}
+
+func (d Direction) LayoutW(w Widget) Widget {
+	return func(gtx Context) Dimensions {
+		return d.Layout(gtx, w)
+	}
 }
 
 // Layout a widget according to the direction.

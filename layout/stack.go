@@ -44,6 +44,12 @@ func Expanded(w Widget) StackChild {
 	}
 }
 
+func (f Stack) LayoutW(children ...StackChild) Widget {
+	return func(gtx Context) Dimensions {
+		return f.Layout(gtx, children...)
+	}
+}
+
 // Layout a stack of children. The position of the children are
 // determined by the specified order, but Stacked children are laid out
 // before Expanded children.

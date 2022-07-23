@@ -77,6 +77,12 @@ func Flexed(weight float32, widget Widget) FlexChild {
 	}
 }
 
+func (f Flex) LayoutW(children ...FlexChild) Widget {
+	return func(gtx Context) Dimensions {
+		return f.Layout(gtx, children...)
+	}
+}
+
 // Layout a list of children. The position of the children are
 // determined by the specified order, but Rigid children are laid out
 // before Flexed children.

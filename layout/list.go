@@ -105,6 +105,12 @@ func (l *List) init(gtx Context, len int) {
 	}
 }
 
+func (l *List) LayoutW(len int, w ListElement) Widget {
+	return func(gtx Context) Dimensions {
+		return l.Layout(gtx, len, w)
+	}
+}
+
 // Layout a List of len items, where each item is implicitly defined
 // by the callback w. Layout can handle very large lists because it only calls
 // w to fill its viewport and the distance scrolled, if any.
