@@ -1036,6 +1036,37 @@ func TestEditor_MaxLen(t *testing.T) {
 	}
 }
 
+func TestEditor_Filter(t *testing.T) {
+	e := new(Editor)
+
+	e.Filter = "123456789"
+	e.SetText("abcde1234")
+	if got, want := e.Text(), "1234"; got != want {
+		t.Errorf("editor failed to filter SetText")
+	}
+
+	e.SetText("2345678")
+	gtx := layout.Context{
+		Ops:         new(op.Ops),
+		Constraints: layout.Exact(image.Pt(100, 100)),
+		Queue: newQueue(
+			key.EditEvent{Range: key.Range{Start: 0, End: 0}, Text: "ab1"},
+			key.SelectionEvent{Start: 4, End: 4},
+		),
+	}
+	cache := text.NewCache(gofont.Collection())
+	fontSize := unit.Sp(10)
+	font := text.Font{}
+	e.Layout(gtx, cache, font, fontSize, nil)
+
+	if got, want := e.Text(), "12345678"; got != want {
+		t.Errorf("editor failed to filter EditEvent")
+	}
+	if start, end := e.Selection(); start != 2 || end != 2 {
+		t.Errorf("editor failed to adjust SelectionEvent")
+	}
+}
+
 func textWidth(e *Editor, lineNum, colStart, colEnd int) float32 {
 	var w fixed.Int26_6
 	glyphs := e.lines[lineNum].Layout.Glyphs
