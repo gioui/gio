@@ -217,6 +217,13 @@ static void invalidateCharacterCoordinates(CFTypeRef viewRef) {
 		}
     }
 }
+
+static void setFocus(CFTypeRef windowRef, CFTypeRef viewRef) {
+    NSWindow *window = (__bridge NSWindow *)windowRef;
+    NSView *view = (__bridge NSView *)viewRef;
+    [window makeFirstResponder:view];
+}
+
 */
 import "C"
 
@@ -246,8 +253,9 @@ type window struct {
 	cursor      pointer.Cursor
 	pointerBtns pointer.Buttons
 
-	scale  float32
-	config Config
+	scale   float32
+	config  Config
+	focused bool
 }
 
 // viewMap is the mapping from Cocoa NSViews to Go windows.
@@ -524,6 +532,9 @@ func gio_onMouse(view, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x, y, dx, 
 		typ = pointer.Release
 		w.pointerBtns &^= btn
 	case C.MOUSE_DOWN:
+		if !w.focused {
+			C.setFocus(w.window, w.view)
+		}
 		typ = pointer.Press
 		w.pointerBtns |= btn
 		act, ok := w.w.ActionAt(pos)
@@ -561,6 +572,16 @@ func gio_onFocus(view C.CFTypeRef, focus C.int) {
 	w := mustView(view)
 	w.w.Event(key.FocusEvent{Focus: focus == 1})
 	w.SetCursor(w.cursor)
+}
+
+//export gio_onResponder
+func gio_onResponder(view C.CFTypeRef, first C.int) {
+	// That function is called when some child view becomes first responder.
+	w := mustView(view)
+	w.focused = first == 1
+	if w.w.d != nil {
+		w.w.Event(key.FocusEvent{Focus: w.focused})
+	}
 }
 
 //export gio_onChangeScreen

@@ -185,6 +185,14 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
     r = [self convertRect:r toView:nil];
     return [[self window] convertRectToScreen:r];
 }
+- (BOOL) becomeFirstResponder {
+    gio_onResponder((__bridge CFTypeRef)self, 1);
+    return [super becomeFirstResponder];
+}
+- (BOOL) resignFirstResponder {
+    gio_onResponder((__bridge CFTypeRef)self, 0);
+    return [super resignFirstResponder];
+}
 @end
 
 // Delegates are weakly referenced from their peers. Nothing
