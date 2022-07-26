@@ -61,7 +61,7 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 	}
 	// Origin is in the lower left corner. Convert to upper left.
 	CGFloat height = view.bounds.size.height;
-	gio_onMouse((__bridge CFTypeRef)view, (__bridge CFTypeRef)event, typ, [NSEvent pressedMouseButtons], p.x, height - p.y, dx, dy, [event timestamp], [event modifierFlags]);
+	gio_onMouse((__bridge CFTypeRef)view, (__bridge CFTypeRef)event, typ, event.buttonNumber, p.x, height - p.y, dx, dy, [event timestamp], [event modifierFlags]);
 }
 
 @interface GioView : NSView <CALayerDelegate,NSTextInputClient>
