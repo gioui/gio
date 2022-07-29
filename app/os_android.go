@@ -154,7 +154,7 @@ type window struct {
 
 	dpi       int
 	fontScale float32
-	insets    image.Rectangle
+	insets    pixelInsets
 
 	stage     system.Stage
 	started   bool
@@ -193,6 +193,10 @@ var gioView struct {
 	restartInput       C.jmethodID
 	updateSelection    C.jmethodID
 	updateCaret        C.jmethodID
+}
+
+type pixelInsets struct {
+	top, bottom, left, right int
 }
 
 // ViewEvent is sent whenever the Window's underlying Android view
@@ -586,7 +590,12 @@ func Java_org_gioui_GioView_onFocusChange(env *C.JNIEnv, class C.jclass, view C.
 //export Java_org_gioui_GioView_onWindowInsets
 func Java_org_gioui_GioView_onWindowInsets(env *C.JNIEnv, class C.jclass, view C.jlong, top, right, bottom, left C.jint) {
 	w := cgo.Handle(view).Value().(*window)
-	w.insets = image.Rect(int(left), int(top), int(right), int(bottom))
+	w.insets = pixelInsets{
+		top:    int(top),
+		bottom: int(bottom),
+		left:   int(left),
+		right:  int(right),
+	}
 	if w.stage >= system.StageRunning {
 		w.draw(env, true)
 	}
@@ -827,10 +836,10 @@ func (w *window) draw(env *C.JNIEnv, sync bool) {
 	ppdp := float32(w.dpi) * inchPrDp
 	dppp := unit.Dp(1.0 / ppdp)
 	insets := system.Insets{
-		Top:    unit.Dp(w.insets.Min.Y) * dppp,
-		Bottom: unit.Dp(w.insets.Max.Y) * dppp,
-		Left:   unit.Dp(w.insets.Min.X) * dppp,
-		Right:  unit.Dp(w.insets.Max.X) * dppp,
+		Top:    unit.Dp(w.insets.top) * dppp,
+		Bottom: unit.Dp(w.insets.bottom) * dppp,
+		Left:   unit.Dp(w.insets.left) * dppp,
+		Right:  unit.Dp(w.insets.right) * dppp,
 	}
 	w.callbacks.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
