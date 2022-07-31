@@ -10,10 +10,10 @@ import (
 )
 
 /*
-#cgo CFLAGS: -Werror -Wno-deprecated-declarations -fmodules -fobjc-arc -x objective-c
-#cgo LDFLAGS: -framework CoreGraphics
+#cgo CFLAGS: -Werror -Wno-deprecated-declarations -fobjc-arc -x objective-c
+#cgo LDFLAGS: -framework CoreGraphics -framework Metal -framework Foundation
 
-@import Metal;
+#import <Metal/Metal.h>
 
 static CFTypeRef createDevice(void) {
 	@autoreleasepool {

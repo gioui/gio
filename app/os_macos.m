@@ -2,7 +2,7 @@
 
 // +build darwin,!ios
 
-@import AppKit;
+#import <AppKit/AppKit.h>
 
 #include "_cgo_export.h"
 

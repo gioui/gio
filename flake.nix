@@ -47,6 +47,12 @@
                   xorg.libXfixes
                   libGL
                   pkgconfig
+                ] else if stdenv.isDarwin then [
+                  darwin.apple_sdk_11_0.frameworks.Foundation
+                  darwin.apple_sdk_11_0.frameworks.Metal
+                  darwin.apple_sdk_11_0.frameworks.QuartzCore
+                  darwin.apple_sdk_11_0.frameworks.AppKit
+                  darwin.apple_sdk_11_0.MacOSX-SDK
                 ] else [ ]);
               } // (if stdenv.isLinux then {
                 LD_LIBRARY_PATH = "${vulkan-loader}/lib";

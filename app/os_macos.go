@@ -24,7 +24,8 @@ import (
 )
 
 /*
-#cgo CFLAGS: -DGL_SILENCE_DEPRECATION -Werror -Wno-deprecated-declarations -fmodules -fobjc-arc -x objective-c
+#cgo CFLAGS: -Werror -Wno-deprecated-declarations -fobjc-arc -x objective-c
+#cgo LDFLAGS: -framework AppKit -framework QuartzCore
 
 #include <AppKit/AppKit.h>
 
