@@ -376,7 +376,8 @@ func strokePathCurv(beg, ctl, end f32.Point, t float32) float32 {
 }
 
 // quadBezierSample returns the point on the Bézier curve at t.
-//  B(t) = (1-t)^2 P0 + 2(1-t)t P1 + t^2 P2
+//
+//	B(t) = (1-t)^2 P0 + 2(1-t)t P1 + t^2 P2
 func quadBezierSample(p0, p1, p2 f32.Point, t float32) f32.Point {
 	t1 := 1 - t
 	c0 := t1 * t1
@@ -390,7 +391,8 @@ func quadBezierSample(p0, p1, p2 f32.Point, t float32) f32.Point {
 }
 
 // quadBezierD1 returns the first derivative of the Bézier curve with respect to t.
-//  B'(t) = 2(1-t)(P1 - P0) + 2t(P2 - P1)
+//
+//	B'(t) = 2(1-t)(P1 - P0) + 2t(P2 - P1)
 func quadBezierD1(p0, p1, p2 f32.Point, t float32) f32.Point {
 	p10 := p1.Sub(p0).Mul(2 * (1 - t))
 	p21 := p2.Sub(p1).Mul(2 * t)
@@ -399,7 +401,8 @@ func quadBezierD1(p0, p1, p2 f32.Point, t float32) f32.Point {
 }
 
 // quadBezierD2 returns the second derivative of the Bézier curve with respect to t:
-//  B''(t) = 2(P2 - 2P1 + P0)
+//
+//	B''(t) = 2(P2 - 2P1 + P0)
 func quadBezierD2(p0, p1, p2 f32.Point, t float32) f32.Point {
 	p := p2.Sub(p1.Mul(2)).Add(p0)
 	return p.Mul(2)
@@ -534,10 +537,13 @@ func strokePathRoundCap(qs *StrokeQuads, hw float32, pivot, n0 f32.Point) {
 // curve approximations for an arc.
 //
 // The math is extracted from the following paper:
-//  "Drawing an elliptical arc using polylines, quadratic or
-//   cubic Bezier curves", L. Maisonobe
+//
+//	"Drawing an elliptical arc using polylines, quadratic or
+//	 cubic Bezier curves", L. Maisonobe
+//
 // An electronic version may be found at:
-//  http://spaceroots.org/documents/ellipse/elliptical-arc.pdf
+//
+//	http://spaceroots.org/documents/ellipse/elliptical-arc.pdf
 func ArcTransform(p, f1, f2 f32.Point, angle float32) (transform f32.Affine2D, segments int) {
 	const segmentsPerCircle = 16
 	const anglePerSegment = 2 * math.Pi / segmentsPerCircle

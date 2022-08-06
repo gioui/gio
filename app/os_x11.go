@@ -490,7 +490,6 @@ func (w *x11Window) destroy() {
 
 // atom is a wrapper around XInternAtom. Callers should cache the result
 // in order to limit round-trips to the X server.
-//
 func (w *x11Window) atom(name string, onlyIfExists bool) C.Atom {
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
@@ -504,7 +503,6 @@ func (w *x11Window) atom(name string, onlyIfExists bool) C.Atom {
 // x11EventHandler wraps static variables for the main event loop.
 // Its sole purpose is to prevent heap allocation and reduce clutter
 // in x11window.loop.
-//
 type x11EventHandler struct {
 	w    *x11Window
 	text []byte
@@ -512,7 +510,6 @@ type x11EventHandler struct {
 }
 
 // handleEvents returns true if the window needs to be redrawn.
-//
 func (h *x11EventHandler) handleEvents() bool {
 	w := h.w
 	xev := h.xev

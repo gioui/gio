@@ -217,9 +217,9 @@ func alphaClose(c1, c2 color.RGBA) bool {
 // yiqEqApprox compares the colors of 2 pixels, in the NTSC YIQ color space,
 // as described in:
 //
-//   Measuring perceived color difference using YIQ NTSC
-//   transmission color space in mobile applications.
-//   Yuriy Kotsarenko, Fernando Ramos.
+//	Measuring perceived color difference using YIQ NTSC
+//	transmission color space in mobile applications.
+//	Yuriy Kotsarenko, Fernando Ramos.
 //
 // An electronic version is available at:
 //

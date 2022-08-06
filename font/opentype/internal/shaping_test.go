@@ -524,7 +524,7 @@ var (
 	}
 )
 
-//splitShapedAt splits a single shaped output into multiple. It splits
+// splitShapedAt splits a single shaped output into multiple. It splits
 // on each provided glyph index in indices, with the index being the end of
 // a slice range (so it's exclusive). You can think of the index as the
 // first glyph of the next output.
@@ -925,25 +925,25 @@ At risus viverra adipiscing at.`
 }
 
 // simpleGlyph returns a simple square glyph with the provided cluster
-//value.
+// value.
 func simpleGlyph(cluster int) shaping.Glyph {
 	return complexGlyph(cluster, 1, 1)
 }
 
 // ligatureGlyph returns a simple square glyph with the provided cluster
-//value and number of runes.
+// value and number of runes.
 func ligatureGlyph(cluster, runes int) shaping.Glyph {
 	return complexGlyph(cluster, runes, 1)
 }
 
 // expansionGlyph returns a simple square glyph with the provided cluster
-//value and number of glyphs.
+// value and number of glyphs.
 func expansionGlyph(cluster, glyphs int) shaping.Glyph {
 	return complexGlyph(cluster, 1, glyphs)
 }
 
 // complexGlyph returns a simple square glyph with the provided cluster
-//value, number of associated runes, and number of glyphs in the cluster.
+// value, number of associated runes, and number of glyphs in the cluster.
 func complexGlyph(cluster, runes, glyphs int) shaping.Glyph {
 	return shaping.Glyph{
 		Width:        fixed.I(10),

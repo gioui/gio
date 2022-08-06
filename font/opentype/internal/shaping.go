@@ -263,14 +263,14 @@ func paragraph(shaper Shaper, face font.Face, ppem fixed.Int26_6, maxWidth int, 
 // whenever it returns false.
 //
 // The parameters require some explanation:
-// out - the shaping.Output that is being line-broken.
-// runeToGlyph - a mapping where accessing the slice at the index of a rune
-//     int out will yield the index of the first glyph corresponding to that rune.
-// lineStartRune - the index of the first rune in the line.
-// b - the line break candidate under consideration.
-// curLineWidth - the amount of space total in the current line.
-// curLineUsed - the amount of space in the current line that is already used.
-// nextLineWidth - the amount of space available on the next line.
+//   - out - the shaping.Output that is being line-broken.
+//   - runeToGlyph - a mapping where accessing the slice at the index of a rune
+//     into out will yield the index of the first glyph corresponding to that rune.
+//   - lineStartRune - the index of the first rune in the line.
+//   - b - the line break candidate under consideration.
+//   - curLineWidth - the amount of space total in the current line.
+//   - curLineUsed - the amount of space in the current line that is already used.
+//   - nextLineWidth - the amount of space available on the next line.
 //
 // This function returns both a valid shaping.Output broken at b and a boolean
 // indicating whether the returned output should be used.

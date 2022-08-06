@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 /*
-
 Package unit implements device independent units.
 
 Device independent pixel, or dp, is the unit for sizes independent of
@@ -16,7 +15,6 @@ size vary between platforms and displays.
 To maintain a constant visual size across platforms and displays, always
 use dps or sps to define user interfaces. Only use pixels for derived
 values.
-
 */
 package unit
 

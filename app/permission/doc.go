@@ -34,7 +34,7 @@ program's source code:
 		_ "net"
 	)
 
-Android -- Dangerous Permissions
+# Android -- Dangerous Permissions
 
 Certain permissions on Android are marked with a protection level of
 "dangerous". This means that, in addition to including the relevant
