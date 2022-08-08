@@ -1262,11 +1262,12 @@ func (e *Editor) replace(start, end int, s string, addHistory bool) int {
 	startPos := e.closestPosition(combinedPos{runes: start})
 	endPos := e.closestPosition(combinedPos{runes: end})
 	startOff := e.runeOffset(startPos.runes)
+	replaceSize := endPos.runes - startPos.runes
 	el := e.Len()
 	var sc int
 	idx := 0
 	for idx < len(s) {
-		if e.MaxLen > 0 && el+sc >= e.MaxLen {
+		if e.MaxLen > 0 && el-replaceSize+sc >= e.MaxLen {
 			s = s[:idx]
 			break
 		}
@@ -1279,7 +1280,6 @@ func (e *Editor) replace(start, end int, s string, addHistory bool) int {
 		sc++
 	}
 	newEnd := startPos.runes + sc
-	replaceSize := endPos.runes - startPos.runes
 
 	if addHistory {
 		e.rr.Seek(int64(startOff), 0)

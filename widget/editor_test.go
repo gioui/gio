@@ -1019,7 +1019,7 @@ func TestEditor_MaxLen(t *testing.T) {
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
 		Queue: newQueue(
-			key.EditEvent{Range: key.Range{Start: 0, End: 0}, Text: "1234"},
+			key.EditEvent{Range: key.Range{Start: 0, End: 2}, Text: "1234"},
 			key.SelectionEvent{Start: 4, End: 4},
 		),
 	}
@@ -1031,7 +1031,7 @@ func TestEditor_MaxLen(t *testing.T) {
 	if got, want := e.Text(), "12345678"; got != want {
 		t.Errorf("editor failed to cap EditEvent")
 	}
-	if start, end := e.Selection(); start != 1 || end != 1 {
+	if start, end := e.Selection(); start != 3 || end != 3 {
 		t.Errorf("editor failed to adjust SelectionEvent")
 	}
 }
