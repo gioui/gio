@@ -1067,6 +1067,35 @@ func TestEditor_Filter(t *testing.T) {
 	}
 }
 
+func TestEditor_Submit(t *testing.T) {
+	e := new(Editor)
+	e.Submit = true
+
+	gtx := layout.Context{
+		Ops:         new(op.Ops),
+		Constraints: layout.Exact(image.Pt(100, 100)),
+		Queue: newQueue(
+			key.EditEvent{Range: key.Range{Start: 0, End: 0}, Text: "ab1\n"},
+		),
+	}
+	cache := text.NewCache(gofont.Collection())
+	fontSize := unit.Sp(10)
+	font := text.Font{}
+	e.Layout(gtx, cache, font, fontSize, nil)
+
+	if got, want := e.Text(), "ab1"; got != want {
+		t.Errorf("editor failed to filter newline")
+	}
+	got := e.Events()
+	want := []EditorEvent{
+		ChangeEvent{},
+		SubmitEvent{Text: e.Text()},
+	}
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("editor failed to register submit")
+	}
+}
+
 func textWidth(e *Editor, lineNum, colStart, colEnd int) float32 {
 	var w fixed.Int26_6
 	glyphs := e.lines[lineNum].Layout.Glyphs

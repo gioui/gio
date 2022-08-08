@@ -375,9 +375,30 @@ func (e *Editor) processKey(gtx layout.Context) {
 		case key.EditEvent:
 			e.caret.scroll = true
 			e.scroller.Stop()
-			moves := e.replace(ke.Range.Start, ke.Range.End, ke.Text, true)
+			s := ke.Text
+			moves := 0
+			submit := false
+			switch {
+			case e.Submit:
+				if i := strings.IndexByte(s, '\n'); i != -1 {
+					submit = true
+					moves += len(s) - i
+					s = s[:i]
+				}
+			case e.SingleLine:
+				s = strings.ReplaceAll(s, "\n", " ")
+			}
+			moves += e.replace(ke.Range.Start, ke.Range.End, s, true)
 			adjust += utf8.RuneCountInString(ke.Text) - moves
 			e.caret.xoff = 0
+			if submit {
+				if e.rr.Changed() {
+					e.events = append(e.events, ChangeEvent{})
+				}
+				e.events = append(e.events, SubmitEvent{
+					Text: e.Text(),
+				})
+			}
 		// Complete a paste event, initiated by Shortcut-V in Editor.command().
 		case clipboard.Event:
 			e.caret.scroll = true
@@ -874,6 +895,9 @@ func (e *Editor) SetText(s string) {
 	e.rr = editBuffer{}
 	e.caret.start = 0
 	e.caret.end = 0
+	if e.SingleLine {
+		s = strings.ReplaceAll(s, "\n", " ")
+	}
 	e.replace(e.caret.start, e.caret.end, s, true)
 	e.caret.xoff = 0
 }
@@ -1171,6 +1195,9 @@ func (e *Editor) Insert(s string) {
 // there is a selection, append overwrites it.
 // xxx|yyy + append zzz => xxxzzz|yyy
 func (e *Editor) append(s string) {
+	if e.SingleLine {
+		s = strings.ReplaceAll(s, "\n", " ")
+	}
 	moves := e.replace(e.caret.start, e.caret.end, s, true)
 	e.caret.xoff = 0
 	start := e.caret.start
@@ -1229,9 +1256,6 @@ func (e *Editor) redo() {
 // addHistory controls whether this modification is recorded in the undo
 // history.
 func (e *Editor) replace(start, end int, s string, addHistory bool) int {
-	if e.SingleLine {
-		s = strings.ReplaceAll(s, "\n", " ")
-	}
 	if start > end {
 		start, end = end, start
 	}
