@@ -770,32 +770,30 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 			p.handlers = append(p.handlers[:0], hits...)
 		}
 	}
-	if e.Source == pointer.Mouse {
-		// Deliver Leave events.
-		for _, k := range p.entered {
-			if _, found := searchTag(hits, k); found {
-				continue
-			}
-			h := q.handlers[k]
-			e.Type = pointer.Leave
-
-			if e.Type&h.types != 0 {
-				e.Position = q.invTransform(h.area, e.Position)
-				events.Add(k, e)
-			}
+	// Deliver Leave events.
+	for _, k := range p.entered {
+		if _, found := searchTag(hits, k); found {
+			continue
 		}
-		// Deliver Enter events.
-		for _, k := range hits {
-			h := q.handlers[k]
-			if _, found := searchTag(p.entered, k); found {
-				continue
-			}
-			e.Type = pointer.Enter
+		h := q.handlers[k]
+		e.Type = pointer.Leave
 
-			if e.Type&h.types != 0 {
-				e.Position = q.invTransform(h.area, e.Position)
-				events.Add(k, e)
-			}
+		if e.Type&h.types != 0 {
+			e.Position = q.invTransform(h.area, e.Position)
+			events.Add(k, e)
+		}
+	}
+	// Deliver Enter events.
+	for _, k := range hits {
+		h := q.handlers[k]
+		if _, found := searchTag(p.entered, k); found {
+			continue
+		}
+		e.Type = pointer.Enter
+
+		if e.Type&h.types != 0 {
+			e.Position = q.invTransform(h.area, e.Position)
+			events.Add(k, e)
 		}
 	}
 	p.entered = append(p.entered[:0], hits...)
