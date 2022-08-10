@@ -111,11 +111,7 @@ type Editor struct {
 	locale system.Locale
 
 	// history contains undo history.
-	history []modification
-	// nextHistoryIdx is the index within the history of the next modification. This
-	// is only not len(history) immediately after undo operations occur. It is framed as the "next" value
-	// to make the zero value consistent.
-	nextHistoryIdx int
+	history History
 }
 
 type offEntry struct {
@@ -503,9 +499,9 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 		e.caret.start = e.Len()
 	case "Z":
 		if k.Modifiers.Contain(key.ModShift) {
-			e.redo()
+			e.Redo()
 		} else {
-			e.undo()
+			e.Undo()
 		}
 	}
 }
@@ -1223,32 +1219,57 @@ type modification struct {
 	ReverseContent string
 }
 
-// undo applies the modification at e.history[e.historyIdx] and decrements
-// e.historyIdx.
-func (e *Editor) undo() {
-	if len(e.history) < 1 || e.nextHistoryIdx == 0 {
+// History of modifications may be retrived/restored
+type History struct {
+	// data contains undo/redo history.
+	data []modification
+	// nextIdx is the index within the history data of the next modification. This
+	// is only not len(data) immediately after undo operations occur.
+	/// It is framed as the "next" value to make the zero value consistent.
+	nextIdx int
+}
+
+// Undo applies the modification at e.history.data[e.history.nextIdx]
+// and decrements e.history.nextIdx.
+func (e *Editor) Undo() {
+	if len(e.history.data) < 1 || e.history.nextIdx == 0 {
 		return
 	}
-	mod := e.history[e.nextHistoryIdx-1]
+	mod := e.history.data[e.history.nextIdx-1]
 	replaceEnd := mod.StartRune + utf8.RuneCountInString(mod.ApplyContent)
 	e.replace(mod.StartRune, replaceEnd, mod.ReverseContent, false)
 	caretEnd := mod.StartRune + utf8.RuneCountInString(mod.ReverseContent)
 	e.SetCaret(caretEnd, mod.StartRune)
-	e.nextHistoryIdx--
+	e.history.nextIdx--
 }
 
-// redo applies the modification at e.history[e.historyIdx] and increments
-// e.historyIdx.
-func (e *Editor) redo() {
-	if len(e.history) < 1 || e.nextHistoryIdx == len(e.history) {
+// Redo applies the modification at e.history.data[e.history.nextIdx]
+// and increments e.history.nextIdx.
+func (e *Editor) Redo() {
+	if len(e.history.data) < 1 || e.history.nextIdx == len(e.history.data) {
 		return
 	}
-	mod := e.history[e.nextHistoryIdx]
+	mod := e.history.data[e.history.nextIdx]
 	end := mod.StartRune + utf8.RuneCountInString(mod.ReverseContent)
 	e.replace(mod.StartRune, end, mod.ApplyContent, false)
 	caretEnd := mod.StartRune + utf8.RuneCountInString(mod.ApplyContent)
 	e.SetCaret(caretEnd, mod.StartRune)
-	e.nextHistoryIdx++
+	e.history.nextIdx++
+}
+
+// History returns the history data.
+func (e *Editor) History() *History {
+	return &History{data: e.history.data, nextIdx: e.history.nextIdx}
+}
+
+// SetHistory sets the history data to a saved value, previously read from History
+// or clears the history if history is nil
+func (e *Editor) SetHistory(history *History) {
+	if history == nil {
+		e.history = History{}
+	} else {
+		e.history = *history
+	}
 }
 
 // replace the text between start and end with s. Indices are in runes.
@@ -1288,15 +1309,15 @@ func (e *Editor) replace(start, end int, s string, addHistory bool) int {
 			ru, _, _ := e.rr.ReadRune()
 			deleted = append(deleted, ru)
 		}
-		if e.nextHistoryIdx < len(e.history) {
-			e.history = e.history[:e.nextHistoryIdx]
+		if e.history.nextIdx < len(e.history.data) {
+			e.history.data = e.history.data[:e.history.nextIdx]
 		}
-		e.history = append(e.history, modification{
+		e.history.data = append(e.history.data, modification{
 			StartRune:      startPos.runes,
 			ApplyContent:   s,
 			ReverseContent: string(deleted),
 		})
-		e.nextHistoryIdx++
+		e.history.nextIdx++
 	}
 
 	e.rr.deleteRunes(startOff, replaceSize)
