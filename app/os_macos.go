@@ -561,6 +561,13 @@ func gio_onDraw(view C.CFTypeRef) {
 func gio_onFocus(view C.CFTypeRef, focus C.int) {
 	w := mustView(view)
 	w.w.Event(key.FocusEvent{Focus: focus == 1})
+	if w.stage >= system.StageInactive {
+		if focus == 0 {
+			w.setStage(system.StageInactive)
+		} else {
+			w.setStage(system.StageRunning)
+		}
+	}
 	w.SetCursor(w.cursor)
 }
 
