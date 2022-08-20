@@ -283,6 +283,14 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_KILLFOCUS:
 		w.focused = false
 		w.w.Event(key.FocusEvent{Focus: false})
+	case windows.WM_NCACTIVATE:
+		if w.stage >= system.StageInactive {
+			if wParam == windows.TRUE {
+				w.setStage(system.StageRunning)
+			} else {
+				w.setStage(system.StageInactive)
+			}
+		}
 	case windows.WM_NCHITTEST:
 		if w.config.Decorated {
 			// Let the system handle it.

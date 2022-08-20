@@ -429,7 +429,7 @@ func (w *Window) driverDefer(f func(d driver)) {
 
 func (w *Window) updateAnimation(d driver) {
 	animate := false
-	if w.stage >= system.StageRunning && w.hasNextFrame {
+	if w.stage >= system.StageInactive && w.hasNextFrame {
 		if dt := time.Until(w.nextFrame); dt <= 0 {
 			animate = true
 		} else {
@@ -829,7 +829,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 	}
 	switch e2 := e.(type) {
 	case system.StageEvent:
-		if e2.Stage < system.StageRunning {
+		if e2.Stage < system.StageInactive {
 			if w.gpu != nil {
 				w.ctx.Lock()
 				w.gpu.Release()
@@ -845,7 +845,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		if e2.Size == (image.Point{}) {
 			panic(errors.New("internal error: zero-sized Draw"))
 		}
-		if w.stage < system.StageRunning {
+		if w.stage < system.StageInactive {
 			// No drawing if not visible.
 			break
 		}
