@@ -88,7 +88,8 @@ func TestEditorHistoryExpose(t *testing.T) {
 	e.Insert("П")
 	e.SetCaret(3, 4)
 	e.Insert("П")
-	// Save history
+	// Save text and history
+	savedText := e.Text()
 	savedHistory := e.History()
 	// Clear history
 	e.SetHistory(nil)
@@ -107,6 +108,22 @@ func TestEditorHistoryExpose(t *testing.T) {
 	// Ensure Redo also works
 	e.Redo()
 	assertContents(t, e, "안П你 hello", 9, 0)
+	// Init a new text
+	e.SetText("New text")
+	e.SetHistory(nil)
+	// Ensure history has been cleared
+	e.Undo()
+	assertContents(t, e, "New text", 0, 0)
+	// Put back previous text and history
+	e.SetText(savedText)
+	e.SetHistory(savedHistory)
+	// Ensure all Undos are back
+	e.Undo()
+	assertContents(t, e, "안Пello", 4, 3)
+	e.Undo()
+	assertContents(t, e, "안П你 hello", 5, 1)
+	e.Undo()
+	assertContents(t, e, "", 0, 0)
 }
 
 func assertContents(t *testing.T, e *Editor, contents string, selectionStart, selectionEnd int) {
