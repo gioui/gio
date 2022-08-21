@@ -1259,7 +1259,9 @@ func (e *Editor) Redo() {
 
 // History returns the history data.
 func (e *Editor) History() *History {
-	return &History{data: e.history.data, nextIdx: e.history.nextIdx}
+	dataCopy := make([]modification, len(e.history.data))
+	copy(dataCopy, e.history.data)
+	return &History{data: dataCopy, nextIdx: e.history.nextIdx}
 }
 
 // SetHistory sets the history data to a saved value, previously read from History
@@ -1268,7 +1270,9 @@ func (e *Editor) SetHistory(history *History) {
 	if history == nil {
 		e.history = History{}
 	} else {
-		e.history = *history
+		dataCopy := make([]modification, len(history.data))
+		copy(dataCopy, history.data)
+		e.history = History{data: dataCopy, nextIdx: history.nextIdx}
 	}
 }
 
