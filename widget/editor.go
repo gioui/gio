@@ -111,7 +111,7 @@ type Editor struct {
 	locale system.Locale
 
 	// history contains undo history.
-	history History
+	History *History
 }
 
 type offEntry struct {
@@ -887,15 +887,18 @@ func (e *Editor) Text() string {
 }
 
 // SetText replaces the contents of the editor, clearing any selection first.
+// History is cleared before and after replacement
 func (e *Editor) SetText(s string) {
 	e.rr = editBuffer{}
 	e.caret.start = 0
 	e.caret.end = 0
+	e.History = nil // avoid alteration of previous text history
 	if e.SingleLine {
 		s = strings.ReplaceAll(s, "\n", " ")
 	}
 	e.replace(e.caret.start, e.caret.end, s, true)
 	e.caret.xoff = 0
+	e.History = nil // initial text is not a modification
 }
 
 func (e *Editor) scrollBounds() image.Rectangle {
@@ -1223,57 +1226,38 @@ type modification struct {
 type History struct {
 	// data contains undo/redo history.
 	data []modification
-	// nextIdx is the index within the history data of the next modification. This
-	// is only not len(data) immediately after undo operations occur.
-	/// It is framed as the "next" value to make the zero value consistent.
+	// nextIdx is the index within the history data of the next modification.
+	// This is only not len(data) immediately after undo operations occur.
+	// It is framed as the "next" value to make the zero value consistent.
 	nextIdx int
 }
 
 // Undo applies the modification at e.history.data[e.history.nextIdx]
 // and decrements e.history.nextIdx.
 func (e *Editor) Undo() {
-	if len(e.history.data) < 1 || e.history.nextIdx == 0 {
+	if e.History == nil || len(e.History.data) < 1 || e.History.nextIdx == 0 {
 		return
 	}
-	mod := e.history.data[e.history.nextIdx-1]
+	mod := e.History.data[e.History.nextIdx-1]
 	replaceEnd := mod.StartRune + utf8.RuneCountInString(mod.ApplyContent)
 	e.replace(mod.StartRune, replaceEnd, mod.ReverseContent, false)
 	caretEnd := mod.StartRune + utf8.RuneCountInString(mod.ReverseContent)
 	e.SetCaret(caretEnd, mod.StartRune)
-	e.history.nextIdx--
+	e.History.nextIdx--
 }
 
 // Redo applies the modification at e.history.data[e.history.nextIdx]
 // and increments e.history.nextIdx.
 func (e *Editor) Redo() {
-	if len(e.history.data) < 1 || e.history.nextIdx == len(e.history.data) {
+	if e.History == nil || len(e.History.data) < 1 || e.History.nextIdx == len(e.History.data) {
 		return
 	}
-	mod := e.history.data[e.history.nextIdx]
+	mod := e.History.data[e.History.nextIdx]
 	end := mod.StartRune + utf8.RuneCountInString(mod.ReverseContent)
 	e.replace(mod.StartRune, end, mod.ApplyContent, false)
 	caretEnd := mod.StartRune + utf8.RuneCountInString(mod.ApplyContent)
 	e.SetCaret(caretEnd, mod.StartRune)
-	e.history.nextIdx++
-}
-
-// History returns the history data.
-func (e *Editor) History() *History {
-	dataCopy := make([]modification, len(e.history.data))
-	copy(dataCopy, e.history.data)
-	return &History{data: dataCopy, nextIdx: e.history.nextIdx}
-}
-
-// SetHistory sets the history data to a saved value, previously read from History
-// or clears the history if history is nil
-func (e *Editor) SetHistory(history *History) {
-	if history == nil {
-		e.history = History{}
-	} else {
-		dataCopy := make([]modification, len(history.data))
-		copy(dataCopy, history.data)
-		e.history = History{data: dataCopy, nextIdx: history.nextIdx}
-	}
+	e.History.nextIdx++
 }
 
 // replace the text between start and end with s. Indices are in runes.
@@ -1313,15 +1297,18 @@ func (e *Editor) replace(start, end int, s string, addHistory bool) int {
 			ru, _, _ := e.rr.ReadRune()
 			deleted = append(deleted, ru)
 		}
-		if e.history.nextIdx < len(e.history.data) {
-			e.history.data = e.history.data[:e.history.nextIdx]
+		if e.History == nil {
+			e.History = &History{}
 		}
-		e.history.data = append(e.history.data, modification{
+		if e.History.nextIdx < len(e.History.data) {
+			e.History.data = e.History.data[:e.History.nextIdx]
+		}
+		e.History.data = append(e.History.data, modification{
 			StartRune:      startPos.runes,
 			ApplyContent:   s,
 			ReverseContent: string(deleted),
 		})
-		e.history.nextIdx++
+		e.History.nextIdx++
 	}
 
 	e.rr.deleteRunes(startOff, replaceSize)
