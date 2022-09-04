@@ -180,6 +180,7 @@ func NewWindow(options ...Option) *Window {
 	w.decorations.Theme = theme
 	w.decorations.Decorations = deco
 	w.decorations.enabled = cnf.Decorated
+	w.decorations.height = decoHeight
 	w.imeState.compose = key.Range{Start: -1, End: -1}
 	w.semantic.ids = make(map[router.SemanticID]router.SemanticNode)
 	w.callbacks.w = w
@@ -906,9 +907,6 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		w.waitAck(d)
 	case ConfigEvent:
 		w.decorations.Config = e2.Config
-		if !w.fallbackDecorate() {
-			w.decorations.height = 0
-		}
 		e2.Config = w.effectiveConfig()
 		w.out <- e2
 	case event.Event:
