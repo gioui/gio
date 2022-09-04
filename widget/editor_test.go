@@ -47,10 +47,10 @@ func TestEditorHistory(t *testing.T) {
 	e.Insert("")
 	assertContents(t, e, "", 0, 0)
 	// Ensure that undoing the overwrite succeeds.
-	e.undo()
+	e.Undo()
 	assertContents(t, e, "안П你 hello 안П你", 13, 0)
 	// Ensure that redoing the overwrite succeeds.
-	e.redo()
+	e.Redo()
 	assertContents(t, e, "", 0, 0)
 	// Insert some smaller text.
 	e.Insert("안П你 hello")
@@ -64,9 +64,9 @@ func TestEditorHistory(t *testing.T) {
 	e.Insert("П")
 	assertContents(t, e, "안ПeПlo", 4, 4)
 	// Ensure both operations undo successfully.
-	e.undo()
+	e.Undo()
 	assertContents(t, e, "안Пello", 4, 3)
-	e.undo()
+	e.Undo()
 	assertContents(t, e, "안П你 hello", 5, 1)
 	// Make a new modification.
 	e.Insert("Something New")
@@ -75,8 +75,61 @@ func TestEditorHistory(t *testing.T) {
 	// This redo() call should do nothing.
 	text := e.Text()
 	start, end := e.Selection()
-	e.redo()
+	e.Redo()
 	assertContents(t, e, text, start, end)
+}
+
+// TestEditorHistoryExpose ensures that History and SetHistory behave correctly.
+func TestEditorHistoryExpose(t *testing.T) {
+	e := new(Editor)
+	// Insert some text and do modifications.
+	e.Insert("안П你 hello")
+	e.SetCaret(1, 5)
+	e.Insert("П")
+	e.SetCaret(3, 4)
+	e.Insert("П")
+	// Save text and history
+	savedText := e.Text()
+	savedHistory := e.History
+	// Clear history
+	e.History = nil
+	// Ensure no more Undo/Redo available
+	e.Undo()
+	assertContents(t, e, "안ПeПlo", 4, 4)
+	e.Redo()
+	assertContents(t, e, "안ПeПlo", 4, 4)
+	// restore history
+	e.History = savedHistory
+	// Ensure all Undos are back
+	e.Undo()
+	assertContents(t, e, "안Пello", 4, 3)
+	e.Undo()
+	assertContents(t, e, "안П你 hello", 5, 1)
+	e.Undo()
+	assertContents(t, e, "", 0, 0)
+	// Ensure Redo also works
+	e.Redo()
+	assertContents(t, e, "안П你 hello", 9, 0)
+	e.Redo()
+	assertContents(t, e, "안Пello", 2, 1)
+	e.Redo()
+	assertContents(t, e, "안ПeПlo", 4, 3)
+	// Init a new text
+	e.SetText("New text")
+	// Ensure history has been cleared
+	e.Undo()
+	assertContents(t, e, "New text", 0, 0)
+	// Put back previous text and history
+	e.SetText(savedText)
+	assertContents(t, e, "안ПeПlo", 0, 0)
+	e.History = savedHistory
+	// Ensure all Undos are back
+	e.Undo()
+	assertContents(t, e, "안Пello", 4, 3)
+	e.Undo()
+	assertContents(t, e, "안П你 hello", 5, 1)
+	e.Undo()
+	assertContents(t, e, "", 0, 0)
 }
 
 func assertContents(t *testing.T, e *Editor, contents string, selectionStart, selectionEnd int) {
