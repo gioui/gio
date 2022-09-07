@@ -21,7 +21,7 @@ type vkContext struct {
 }
 
 func init() {
-	newContextPrimary = newVulkanContext
+	newContextFallback = newVulkanContext
 }
 
 func newVulkanContext() (context, error) {

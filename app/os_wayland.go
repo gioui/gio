@@ -1731,14 +1731,14 @@ func (w *window) EditorStateChanged(old, new editorState) {}
 
 func (w *window) NewContext() (context, error) {
 	var firstErr error
-	if f := newWaylandVulkanContext; f != nil {
+	if f := newWaylandEGLContext; f != nil {
 		c, err := f(w)
 		if err == nil {
 			return c, nil
 		}
 		firstErr = err
 	}
-	if f := newWaylandEGLContext; f != nil {
+	if f := newWaylandVulkanContext; f != nil {
 		c, err := f(w)
 		if err == nil {
 			return c, nil

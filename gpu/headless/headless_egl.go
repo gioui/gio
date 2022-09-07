@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	newContextFallback = func() (context, error) {
+	newContextPrimary = func() (context, error) {
 		return egl.NewContext(egl.EGL_DEFAULT_DISPLAY)
 	}
 }
