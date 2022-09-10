@@ -779,6 +779,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 		e.Type = pointer.Leave
 
 		if e.Type&h.types != 0 {
+			e := e
 			e.Position = q.invTransform(h.area, e.Position)
 			events.Add(k, e)
 		}
@@ -792,6 +793,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 		e.Type = pointer.Enter
 
 		if e.Type&h.types != 0 {
+			e := e
 			e.Position = q.invTransform(h.area, e.Position)
 			events.Add(k, e)
 		}
