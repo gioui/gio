@@ -24,6 +24,14 @@ import (
 
 type ViewEvent struct{}
 
+type contextStatus int
+
+const (
+	contextStatusOkay contextStatus = iota
+	contextStatusLost
+	contextStatusRestored
+)
+
 type window struct {
 	window                js.Value
 	document              js.Value
@@ -54,6 +62,8 @@ type window struct {
 	// is pending.
 	animRequested bool
 	wakeups       chan struct{}
+
+	contextStatus contextStatus
 }
 
 func newWindow(win *callbacks, options []Option) error {
@@ -162,9 +172,25 @@ func (w *window) cleanup() {
 }
 
 func (w *window) addEventListeners() {
+	w.addEventListener(w.cnv, "webglcontextlost", func(this js.Value, args []js.Value) interface{} {
+		args[0].Call("preventDefault")
+		w.contextStatus = contextStatusLost
+		return nil
+	})
+	w.addEventListener(w.cnv, "webglcontextrestored", func(this js.Value, args []js.Value) interface{} {
+		args[0].Call("preventDefault")
+		w.contextStatus = contextStatusRestored
+
+		// Resize is required to force update the canvas content when restored.
+		w.cnv.Set("width", 0)
+		w.cnv.Set("height", 0)
+		w.resize()
+		w.requestRedraw()
+		return nil
+	})
 	w.addEventListener(w.visualViewport, "resize", func(this js.Value, args []js.Value) interface{} {
 		w.resize()
-		w.chanRedraw <- struct{}{}
+		w.requestRedraw()
 		return nil
 	})
 	w.addEventListener(w.window, "contextmenu", func(this js.Value, args []js.Value) interface{} {
@@ -622,10 +648,14 @@ func (w *window) resize() {
 }
 
 func (w *window) draw(sync bool) {
+	if w.contextStatus == contextStatusLost {
+		return
+	}
 	size, insets, metric := w.getConfig()
 	if metric == (unit.Metric{}) || size.X == 0 || size.Y == 0 {
 		return
 	}
+
 	w.w.Event(frameEvent{
 		FrameEvent: system.FrameEvent{
 			Now:    time.Now(),
@@ -694,6 +724,13 @@ func (w *window) navigationColor(c color.NRGBA) {
 	}
 	rgba := f32color.NRGBAToRGBA(c)
 	theme.Set("content", fmt.Sprintf("#%06X", []uint8{rgba.R, rgba.G, rgba.B}))
+}
+
+func (w *window) requestRedraw() {
+	select {
+	case w.chanRedraw <- struct{}{}:
+	default:
+	}
 }
 
 func osMain() {
