@@ -14,7 +14,7 @@ import (
 	"unicode/utf8"
 
 	"gioui.org/f32"
-	"gioui.org/font/gofont"
+	"gioui.org/font/opentype"
 	"gioui.org/gpu"
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
@@ -25,9 +25,11 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
+	"golang.org/x/image/font/gofont/goregular"
 
 	_ "gioui.org/app/internal/log"
 )
@@ -140,7 +142,8 @@ type queue struct {
 func NewWindow(options ...Option) *Window {
 	// Measure decoration height.
 	deco := new(widget.Decorations)
-	theme := material.NewTheme(gofont.Collection())
+	face, _ := opentype.Parse(goregular.TTF)
+	theme := material.NewTheme([]text.FontFace{{Font: text.Font{Typeface: "Go"}, Face: face}})
 	decoStyle := material.Decorations(theme, deco, 0, "")
 	gtx := layout.Context{
 		Ops: new(op.Ops),

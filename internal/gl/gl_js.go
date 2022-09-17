@@ -299,7 +299,12 @@ func (f *Functions) BufferSubData(target Enum, offset int, src []byte) {
 	f._bufferSubData.Invoke(int(target), offset, f.byteArrayOf(src))
 }
 func (f *Functions) CheckFramebufferStatus(target Enum) Enum {
-	return Enum(f._checkFramebufferStatus.Invoke(int(target)).Int())
+	status := Enum(f._checkFramebufferStatus.Invoke(int(target)).Int())
+	if status != FRAMEBUFFER_COMPLETE && f.Ctx.Call("isContextLost").Bool() {
+		// If the context is lost, we say that everything is fine. That saves internal/opengl/opengl.go from panic.
+		return FRAMEBUFFER_COMPLETE
+	}
+	return status
 }
 func (f *Functions) Clear(mask Enum) {
 	f._clear.Invoke(int(mask))
@@ -633,6 +638,10 @@ func paramVal(v js.Value) int {
 		}
 	case js.TypeNumber:
 		return v.Int()
+	case js.TypeUndefined:
+		return 0
+	case js.TypeNull:
+		return 0
 	default:
 		panic("unknown parameter type")
 	}
