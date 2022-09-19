@@ -358,15 +358,14 @@ func (w *window) keyboard(hint key.InputHint) {
 }
 
 func (w *window) keyEvent(e js.Value, ks key.State) {
+	c := e.Get("keyCode").Int()
 	k := e.Get("key").String()
-	if n, ok := translateKey(k); ok {
-		cmd := key.Event{
-			Name:      n,
-			Modifiers: modifiersFor(e),
-			State:     ks,
-		}
-		w.w.Event(cmd)
-	}
+	w.w.Event(key.Event{
+		Code:      c,
+		Name:      translateKey(k),
+		Modifiers: modifiersFor(e),
+		State:     ks,
+	})
 }
 
 // modifiersFor returns the modifier set for a DOM MouseEvent or
@@ -737,9 +736,8 @@ func osMain() {
 	select {}
 }
 
-func translateKey(k string) (string, bool) {
-	var n string
-
+func translateKey(k string) string {
+	n := k
 	switch k {
 	case "ArrowUp":
 		n = key.NameUpArrow
@@ -805,11 +803,10 @@ func translateKey(k string) (string, bool) {
 		r, s := utf8.DecodeRuneInString(k)
 		// If there is exactly one printable character, return that.
 		if s == len(k) && unicode.IsPrint(r) {
-			return strings.ToUpper(k), true
+			n = strings.ToUpper(k)
 		}
-		return "", false
 	}
-	return n, true
+	return n
 }
 
 func (_ ViewEvent) ImplementsEvent() {}

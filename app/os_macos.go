@@ -486,13 +486,12 @@ func gio_onKeys(view, cstr C.CFTypeRef, ti C.double, mods C.NSUInteger, keyDown 
 	}
 	w := mustView(view)
 	for _, k := range str {
-		if n, ok := convertKey(k); ok {
-			w.w.Event(key.Event{
-				Name:      n,
-				Modifiers: kmods,
-				State:     ks,
-			})
-		}
+		w.w.Event(key.Event{
+			Code:      int(k),
+			Name:      convertKey(k),
+			Modifiers: kmods,
+			State:     ks,
+		})
 	}
 }
 
@@ -892,8 +891,8 @@ func osMain() {
 	C.gio_main()
 }
 
-func convertKey(k rune) (string, bool) {
-	var n string
+func convertKey(k rune) string {
+	n := string(k)
 	switch k {
 	case 0x1b:
 		n = key.NameEscape
@@ -951,12 +950,11 @@ func convertKey(k rune) (string, bool) {
 		n = key.NameSpace
 	default:
 		k = unicode.ToUpper(k)
-		if !unicode.IsPrint(k) {
-			return "", false
+		if unicode.IsPrint(k) {
+			n = string(k)
 		}
-		n = string(k)
 	}
-	return n, true
+	return n
 }
 
 func convertMods(mods C.NSUInteger) key.Modifiers {

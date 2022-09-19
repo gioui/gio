@@ -896,7 +896,7 @@ func runInJVM(jvm *C.JavaVM, f func(env *C.JNIEnv)) {
 	f(env)
 }
 
-func convertKeyCode(code C.jint) (string, bool) {
+func convertKeyCode(code C.jint) string {
 	var n string
 	switch code {
 	case C.AKEYCODE_FORWARD_DEL:
@@ -923,10 +923,8 @@ func convertKeyCode(code C.jint) (string, bool) {
 		n = key.NameLeftArrow
 	case C.AKEYCODE_DPAD_RIGHT:
 		n = key.NameRightArrow
-	default:
-		return "", false
 	}
-	return n, true
+	return n
 }
 
 //export Java_org_gioui_GioView_onKeyEvent
@@ -936,13 +934,15 @@ func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.j
 		w.callbacks.ClickFocus()
 		return
 	}
-	if n, ok := convertKeyCode(keyCode); ok {
-		state := key.Release
-		if pressed == C.JNI_TRUE {
-			state = key.Press
-		}
-		w.callbacks.Event(key.Event{Name: n, State: state})
+	state := key.Release
+	if pressed == C.JNI_TRUE {
+		state = key.Press
 	}
+	w.callbacks.Event(key.Event{
+		Code:  int(keyCode),
+		Name:  convertKeyCode(keyCode),
+		State: state,
+	})
 	if pressed == C.JNI_TRUE && r != 0 && r != '\n' { // Checking for "\n" to prevent duplication with key.NameEnter (gio#224).
 		w.callbacks.EditorInsert(string(rune(r)))
 	}

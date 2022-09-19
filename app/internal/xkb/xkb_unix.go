@@ -160,19 +160,18 @@ func (x *Context) DispatchKey(keyCode uint32, state key.State) (events []event.E
 		x.utf8Buf = make([]byte, 1)
 	}
 	sym := C.xkb_state_key_get_one_sym(x.state, kc)
-	if name, ok := convertKeysym(sym); ok {
-		cmd := key.Event{
-			Name:      name,
-			Modifiers: x.Modifiers(),
-			State:     state,
-		}
-		// Ensure that a physical backtab key is translated to
-		// Shift-Tab.
-		if sym == C.XKB_KEY_ISO_Left_Tab {
-			cmd.Modifiers |= key.ModShift
-		}
-		events = append(events, cmd)
+	cmd := key.Event{
+		Code:      int(keyCode),
+		Name:      convertKeysym(sym),
+		Modifiers: x.Modifiers(),
+		State:     state,
 	}
+	// Ensure that a physical backtab key is translated to
+	// Shift-Tab.
+	if sym == C.XKB_KEY_ISO_Left_Tab {
+		cmd.Modifiers |= key.ModShift
+	}
+	events = append(events, cmd)
 	C.xkb_compose_state_feed(x.compState, sym)
 	var str []byte
 	switch C.xkb_compose_state_get_status(x.compState) {
@@ -231,12 +230,12 @@ func (x *Context) UpdateMask(depressed, latched, locked, depressedGroup, latched
 		C.xkb_layout_index_t(depressedGroup), C.xkb_layout_index_t(latchedGroup), C.xkb_layout_index_t(lockedGroup))
 }
 
-func convertKeysym(s C.xkb_keysym_t) (string, bool) {
+func convertKeysym(s C.xkb_keysym_t) string {
 	if 'a' <= s && s <= 'z' {
-		return string(rune(s - 'a' + 'A')), true
+		return string(rune(s - 'a' + 'A'))
 	}
 	if ' ' < s && s <= '~' {
-		return string(rune(s)), true
+		return string(rune(s))
 	}
 	var n string
 	switch s {
@@ -302,8 +301,6 @@ func convertKeysym(s C.xkb_keysym_t) (string, bool) {
 		n = key.NameAlt
 	case C.XKB_KEY_Super_L, C.XKB_KEY_Super_R:
 		n = key.NameSuper
-	default:
-		return "", false
 	}
-	return n, true
+	return n
 }

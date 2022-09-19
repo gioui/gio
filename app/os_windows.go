@@ -17,9 +17,10 @@ import (
 
 	syscall "golang.org/x/sys/windows"
 
+	gowindows "golang.org/x/sys/windows"
+
 	"gioui.org/app/internal/windows"
 	"gioui.org/unit"
-	gowindows "golang.org/x/sys/windows"
 
 	"gioui.org/f32"
 	"gioui.org/io/clipboard"
@@ -243,23 +244,21 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		// Avoid flickering between GPU content and background color.
 		return windows.TRUE
 	case windows.WM_KEYDOWN, windows.WM_KEYUP, windows.WM_SYSKEYDOWN, windows.WM_SYSKEYUP:
-		if n, ok := convertKeyCode(wParam); ok {
-			e := key.Event{
-				Name:      n,
-				Modifiers: getModifiers(),
-				State:     key.Press,
-			}
-			if msg == windows.WM_KEYUP || msg == windows.WM_SYSKEYUP {
-				e.State = key.Release
-			}
+		state := key.Press
+		if msg == windows.WM_KEYUP || msg == windows.WM_SYSKEYUP {
+			state = key.Release
+		}
+		w.w.Event(key.Event{
+			Code:      int(wParam),
+			Name:      convertKeyCode(wParam),
+			Modifiers: getModifiers(),
+			State:     state,
+		})
 
-			w.w.Event(e)
-
-			if (wParam == windows.VK_F10) && (msg == windows.WM_SYSKEYDOWN || msg == windows.WM_SYSKEYUP) {
-				// Reserve F10 for ourselves, and don't let it open the system menu. Other Windows programs
-				// such as cmd.exe and graphical debuggers also reserve F10.
-				return 0
-			}
+		if (wParam == windows.VK_F10) && (msg == windows.WM_SYSKEYDOWN || msg == windows.WM_SYSKEYUP) {
+			// Reserve F10 for ourselves, and don't let it open the system menu. Other Windows programs
+			// such as cmd.exe and graphical debuggers also reserve F10.
+			return 0
 		}
 	case windows.WM_LBUTTONDOWN:
 		w.pointerButton(pointer.ButtonPrimary, true, lParam, getModifiers())
@@ -834,9 +833,9 @@ func (w *window) raise() {
 		windows.SWP_NOMOVE|windows.SWP_NOSIZE|windows.SWP_SHOWWINDOW)
 }
 
-func convertKeyCode(code uintptr) (string, bool) {
+func convertKeyCode(code uintptr) string {
 	if '0' <= code && code <= '9' || 'A' <= code && code <= 'Z' {
-		return string(rune(code)), true
+		return string(rune(code))
 	}
 	var r string
 
@@ -923,10 +922,8 @@ func convertKeyCode(code uintptr) (string, bool) {
 		r = key.NameAlt
 	case windows.VK_LWIN, windows.VK_RWIN:
 		r = key.NameSuper
-	default:
-		return "", false
 	}
-	return r, true
+	return r
 }
 
 func configForDPI(dpi int) unit.Metric {
