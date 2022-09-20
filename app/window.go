@@ -96,6 +96,7 @@ type Window struct {
 	callbacks callbacks
 
 	nocontext bool
+	arrowsNav bool
 
 	// semantic data, lazily evaluated if requested by a backend to speed up
 	// the cases where semantic data is not needed.
@@ -162,6 +163,7 @@ func NewWindow(options ...Option) *Window {
 	}
 	options = append(defaultOptions, options...)
 	var cnf Config
+	cnf.defaults()
 	cnf.apply(unit.Metric{}, options)
 
 	w := &Window{
@@ -179,6 +181,7 @@ func NewWindow(options ...Option) *Window {
 		options:          make(chan []Option, 1),
 		actions:          make(chan system.Action, 1),
 		nocontext:        cnf.CustomRenderer,
+		arrowsNav:        cnf.ArrowsNavigation,
 	}
 	w.decorations.Theme = theme
 	w.decorations.Decorations = deco
@@ -919,19 +922,19 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 			w.updateAnimation(d)
 		} else if e, ok := e.(key.Event); ok && e.State == key.Press {
 			handled = true
-			isMobile := runtime.GOOS == "ios" || runtime.GOOS == "android"
+			arrowsNav := w.arrowsNav
 			switch {
 			case e.Name == key.NameTab && e.Modifiers == 0:
 				w.moveFocus(router.FocusForward, d)
 			case e.Name == key.NameTab && e.Modifiers == key.ModShift:
 				w.moveFocus(router.FocusBackward, d)
-			case e.Name == key.NameUpArrow && e.Modifiers == 0 && isMobile:
+			case e.Name == key.NameUpArrow && e.Modifiers == 0 && arrowsNav:
 				w.moveFocus(router.FocusUp, d)
-			case e.Name == key.NameDownArrow && e.Modifiers == 0 && isMobile:
+			case e.Name == key.NameDownArrow && e.Modifiers == 0 && arrowsNav:
 				w.moveFocus(router.FocusDown, d)
-			case e.Name == key.NameLeftArrow && e.Modifiers == 0 && isMobile:
+			case e.Name == key.NameLeftArrow && e.Modifiers == 0 && arrowsNav:
 				w.moveFocus(router.FocusLeft, d)
-			case e.Name == key.NameRightArrow && e.Modifiers == 0 && isMobile:
+			case e.Name == key.NameRightArrow && e.Modifiers == 0 && arrowsNav:
 				w.moveFocus(router.FocusRight, d)
 			default:
 				handled = false
@@ -1169,5 +1172,13 @@ func CustomRenderer(custom bool) Option {
 func Decorated(enabled bool) Option {
 	return func(_ unit.Metric, cnf *Config) {
 		cnf.Decorated = enabled
+	}
+}
+
+// ArrowsNavigation allows directional navigation with arrow keys or dpad.
+// It's enabled by default on mobile (Android and iOS) and disabled for desktop (which uses Tab instead).
+func ArrowsNavigation(enabled bool) Option {
+	return func(_ unit.Metric, cnf *Config) {
+		cnf.ArrowsNavigation = enabled
 	}
 }

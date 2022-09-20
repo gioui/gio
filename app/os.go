@@ -6,6 +6,7 @@ import (
 	"errors"
 	"image"
 	"image/color"
+	"runtime"
 
 	"gioui.org/io/key"
 
@@ -43,9 +44,16 @@ type Config struct {
 	CustomRenderer bool
 	// Decorated reports whether window decorations are provided automatically.
 	Decorated bool
+	// ArrowsNavigation allows directional navigation with arrow keys or dpad.
+	// It's enabled by default on mobile (Android and iOS) and disabled for desktop (which uses Tab instead).
+	ArrowsNavigation bool
 	// decoHeight is the height of the fallback decoration for platforms such
 	// as Wayland that may need fallback client-side decorations.
 	decoHeight unit.Dp
+}
+
+func (c *Config) defaults() {
+	c.ArrowsNavigation = runtime.GOOS == "ios" || runtime.GOOS == "android"
 }
 
 // ConfigEvent is sent whenever the configuration of a Window changes.
