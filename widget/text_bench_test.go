@@ -4,15 +4,19 @@ import (
 	"fmt"
 	"image"
 	"math/rand"
+	"os"
+	"sort"
 	"testing"
 	"time"
 
 	"gioui.org/font/gofont"
+	"gioui.org/gpu/headless"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/text"
 	"gioui.org/unit"
+	"golang.org/x/exp/maps"
 )
 
 var (
@@ -33,142 +37,218 @@ func init() {
 	rand.Seed(int64(time.Now().Nanosecond()))
 }
 
-func BenchmarkLabelStatic(b *testing.B) {
+func runBenchmarkPermutations(b *testing.B, benchmark func(b *testing.B, runes int, locale system.Locale, document string)) {
+	docKeys := maps.Keys(documents)
+	sort.Strings(docKeys)
 	for _, locale := range locales {
 		for _, runes := range sizes {
-			for textType, txt := range documents {
+			for _, textType := range docKeys {
+				txt := documents[textType]
 				b.Run(fmt.Sprintf("%drunes-%s-%s", runes, locale.Direction, textType), func(b *testing.B) {
-					gtx := layout.Context{
-						Ops: new(op.Ops),
-						Constraints: layout.Constraints{
-							Max: image.Pt(200, 1000),
-						},
-						Locale: locale,
-					}
-					cache := text.NewCache(benchFonts)
-					fontSize := unit.Sp(10)
-					font := text.Font{}
-					runes := []rune(txt)[:runes]
-					runesStr := string(runes)
-					l := Label{}
-					b.ResetTimer()
-					for i := 0; i < b.N; i++ {
-						l.Layout(gtx, cache, font, fontSize, runesStr)
-						gtx.Ops.Reset()
-					}
+					benchmark(b, runes, locale, txt)
 				})
 			}
 		}
 	}
+}
+
+var render bool
+
+func init() {
+	if _, ok := os.LookupEnv("RENDER_WIDGET_TESTS"); ok {
+		render = true
+	}
+}
+
+func BenchmarkLabelStatic(b *testing.B) {
+	runBenchmarkPermutations(b, func(b *testing.B, runeCount int, locale system.Locale, txt string) {
+		var win *headless.Window
+		size := image.Pt(200, 1000)
+		gtx := layout.Context{
+			Ops: new(op.Ops),
+			Constraints: layout.Constraints{
+				Max: size,
+			},
+			Locale: locale,
+		}
+		cache := text.NewShaper(benchFonts)
+		if render {
+			win, _ = headless.NewWindow(size.X, size.Y)
+			defer win.Release()
+		}
+		fontSize := unit.Sp(10)
+		font := text.Font{}
+		runes := []rune(txt)[:runeCount]
+		runesStr := string(runes)
+		l := Label{}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			l.Layout(gtx, cache, font, fontSize, runesStr)
+			if render {
+				win.Frame(gtx.Ops)
+			}
+			gtx.Ops.Reset()
+		}
+	})
 }
 
 func BenchmarkLabelDynamic(b *testing.B) {
-	for _, locale := range locales {
-		for _, runes := range sizes {
-			for textType, txt := range documents {
-				b.Run(fmt.Sprintf("%drunes-%s-%s", runes, locale.Direction, textType), func(b *testing.B) {
-					gtx := layout.Context{
-						Ops: new(op.Ops),
-						Constraints: layout.Constraints{
-							Max: image.Pt(200, 1000),
-						},
-						Locale: locale,
-					}
-					cache := text.NewCache(benchFonts)
-					fontSize := unit.Sp(10)
-					font := text.Font{}
-					runes := []rune(txt)[:runes]
-					l := Label{}
-					b.ResetTimer()
-					for i := 0; i < b.N; i++ {
-						// simulate a constantly changing string
-						a := rand.Intn(len(runes))
-						b := rand.Intn(len(runes))
-						runes[a], runes[b] = runes[b], runes[a]
-						l.Layout(gtx, cache, font, fontSize, string(runes))
-						gtx.Ops.Reset()
-					}
-				})
-			}
+	runBenchmarkPermutations(b, func(b *testing.B, runeCount int, locale system.Locale, txt string) {
+		var win *headless.Window
+		size := image.Pt(200, 1000)
+		gtx := layout.Context{
+			Ops: new(op.Ops),
+			Constraints: layout.Constraints{
+				Max: size,
+			},
+			Locale: locale,
 		}
-	}
+		cache := text.NewShaper(benchFonts)
+		if render {
+			win, _ = headless.NewWindow(size.X, size.Y)
+			defer win.Release()
+		}
+		fontSize := unit.Sp(10)
+		font := text.Font{}
+		runes := []rune(txt)[:runeCount]
+		l := Label{}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			// simulate a constantly changing string
+			a := rand.Intn(len(runes))
+			b := rand.Intn(len(runes))
+			runes[a], runes[b] = runes[b], runes[a]
+			l.Layout(gtx, cache, font, fontSize, string(runes))
+			if render {
+				win.Frame(gtx.Ops)
+			}
+			gtx.Ops.Reset()
+		}
+	})
 }
 
 func BenchmarkEditorStatic(b *testing.B) {
-	for _, locale := range locales {
-		for _, runes := range sizes {
-			for textType, txt := range documents {
-				b.Run(fmt.Sprintf("%drunes-%s-%s", runes, locale.Direction, textType), func(b *testing.B) {
-					gtx := layout.Context{
-						Ops: new(op.Ops),
-						Constraints: layout.Constraints{
-							Max: image.Pt(200, 1000),
-						},
-						Locale: locale,
-					}
-					cache := text.NewCache(benchFonts)
-					fontSize := unit.Sp(10)
-					font := text.Font{}
-					runes := []rune(txt)[:runes]
-					runesStr := string(runes)
-					e := Editor{}
-					e.SetText(runesStr)
-					b.ResetTimer()
-					for i := 0; i < b.N; i++ {
-						e.Layout(gtx, cache, font, fontSize, func(gtx layout.Context) layout.Dimensions {
-							e.PaintSelection(gtx)
-							e.PaintText(gtx)
-							e.PaintCaret(gtx)
-							return layout.Dimensions{Size: gtx.Constraints.Min}
-						})
-						gtx.Ops.Reset()
-					}
-				})
-			}
+	runBenchmarkPermutations(b, func(b *testing.B, runeCount int, locale system.Locale, txt string) {
+		var win *headless.Window
+		size := image.Pt(200, 1000)
+		gtx := layout.Context{
+			Ops: new(op.Ops),
+			Constraints: layout.Constraints{
+				Max: size,
+			},
+			Locale: locale,
 		}
-	}
+		cache := text.NewShaper(benchFonts)
+		if render {
+			win, _ = headless.NewWindow(size.X, size.Y)
+			defer win.Release()
+		}
+		fontSize := unit.Sp(10)
+		font := text.Font{}
+		runes := []rune(txt)[:runeCount]
+		runesStr := string(runes)
+		e := Editor{}
+		e.SetText(runesStr)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			e.Layout(gtx, cache, font, fontSize, func(gtx layout.Context) layout.Dimensions {
+				e.PaintSelection(gtx)
+				e.PaintText(gtx)
+				e.PaintCaret(gtx)
+				return layout.Dimensions{Size: gtx.Constraints.Min}
+			})
+			if render {
+				win.Frame(gtx.Ops)
+			}
+			gtx.Ops.Reset()
+		}
+	})
 }
 
 func BenchmarkEditorDynamic(b *testing.B) {
-	for _, locale := range locales {
-		for _, runes := range sizes {
-			for textType, txt := range documents {
-				b.Run(fmt.Sprintf("%drunes-%s-%s", runes, locale.Direction, textType), func(b *testing.B) {
-					gtx := layout.Context{
-						Ops: new(op.Ops),
-						Constraints: layout.Constraints{
-							Max: image.Pt(200, 1000),
-						},
-						Locale: locale,
-					}
-					cache := text.NewCache(benchFonts)
-					fontSize := unit.Sp(10)
-					font := text.Font{}
-					runes := []rune(txt)[:runes]
-					e := Editor{}
-					e.SetText(string(runes))
-					b.ResetTimer()
-					for i := 0; i < b.N; i++ {
-						// simulate a constantly changing string
-						a := rand.Intn(e.Len())
-						b := rand.Intn(e.Len())
-						e.SetCaret(a, a+1)
-						takeStr := e.SelectedText()
-						e.Insert("")
-						e.SetCaret(b, b)
-						e.Insert(takeStr)
-						e.Layout(gtx, cache, font, fontSize, func(gtx layout.Context) layout.Dimensions {
-							e.PaintSelection(gtx)
-							e.PaintText(gtx)
-							e.PaintCaret(gtx)
-							return layout.Dimensions{Size: gtx.Constraints.Min}
-						})
-						gtx.Ops.Reset()
-					}
-				})
-			}
+	runBenchmarkPermutations(b, func(b *testing.B, runeCount int, locale system.Locale, txt string) {
+		var win *headless.Window
+		size := image.Pt(200, 1000)
+		gtx := layout.Context{
+			Ops: new(op.Ops),
+			Constraints: layout.Constraints{
+				Max: size,
+			},
+			Locale: locale,
 		}
+		cache := text.NewShaper(benchFonts)
+		if render {
+			win, _ = headless.NewWindow(size.X, size.Y)
+			defer win.Release()
+		}
+		fontSize := unit.Sp(10)
+		font := text.Font{}
+		runes := []rune(txt)[:runeCount]
+		e := Editor{}
+		e.SetText(string(runes))
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			// simulate a constantly changing string
+			a := rand.Intn(e.Len())
+			b := rand.Intn(e.Len())
+			e.SetCaret(a, a+1)
+			takeStr := e.SelectedText()
+			e.Insert("")
+			e.SetCaret(b, b)
+			e.Insert(takeStr)
+			e.Layout(gtx, cache, font, fontSize, func(gtx layout.Context) layout.Dimensions {
+				e.PaintSelection(gtx)
+				e.PaintText(gtx)
+				e.PaintCaret(gtx)
+				return layout.Dimensions{Size: gtx.Constraints.Min}
+			})
+			if render {
+				win.Frame(gtx.Ops)
+			}
+			gtx.Ops.Reset()
+		}
+	})
+}
+
+func FuzzEditorEditing(f *testing.F) {
+	f.Add(complexDocument, int16(0), int16(len([]rune(complexDocument))))
+	gtx := layout.Context{
+		Ops: new(op.Ops),
+		Constraints: layout.Constraints{
+			Max: image.Pt(200, 1000),
+		},
+		Locale: arabic,
 	}
+	cache := text.NewShaper(benchFonts)
+	fontSize := unit.Sp(10)
+	font := text.Font{}
+	e := Editor{}
+	f.Fuzz(func(t *testing.T, txt string, replaceFrom, replaceTo int16) {
+		e.SetText(txt)
+		e.Layout(gtx, cache, font, fontSize, func(gtx layout.Context) layout.Dimensions {
+			e.PaintSelection(gtx)
+			e.PaintText(gtx)
+			e.PaintCaret(gtx)
+			return layout.Dimensions{Size: gtx.Constraints.Min}
+		})
+		// simulate a constantly changing string
+		if e.Len() > 0 {
+			a := int(replaceFrom) % e.Len()
+			b := int(replaceTo) % e.Len()
+			e.SetCaret(a, a+1)
+			takeStr := e.SelectedText()
+			e.Insert("")
+			e.SetCaret(b, b)
+			e.Insert(takeStr)
+		}
+		e.Layout(gtx, cache, font, fontSize, func(gtx layout.Context) layout.Dimensions {
+			e.PaintSelection(gtx)
+			e.PaintText(gtx)
+			e.PaintCaret(gtx)
+			return layout.Dimensions{Size: gtx.Constraints.Min}
+		})
+		gtx.Ops.Reset()
+	})
 }
 
 const (

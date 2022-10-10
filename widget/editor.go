@@ -3,8 +3,6 @@
 package widget
 
 import (
-	"bytes"
-	"fmt"
 	"image"
 	"io"
 	"math"
@@ -28,6 +26,7 @@ import (
 	"gioui.org/text"
 	"gioui.org/unit"
 
+	"golang.org/x/exp/constraints"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -55,7 +54,7 @@ type Editor struct {
 
 	eventKey     int
 	font         text.Font
-	shaper       text.Shaper
+	shaper       *text.Shaper
 	textSize     fixed.Int26_6
 	blinkStart   time.Time
 	focused      bool
@@ -65,16 +64,14 @@ type Editor struct {
 	maxWidth     int
 	viewSize     image.Point
 	valid        bool
-	lines        []text.Line
+	regions      []region
 	dims         layout.Dimensions
 	requestFocus bool
 
-	// index tracks combined caret positions at regularly
-	// spaced intervals to speed up caret seeking.
-	index []combinedPos
-
 	// offIndex is an index of rune index to byte offsets.
 	offIndex []offEntry
+
+	index glyphIndex
 
 	// ime tracks the state relevant to input methods.
 	ime struct {
@@ -138,24 +135,6 @@ type maskReader struct {
 	maskBuf [utf8.UTFMax]byte
 	// mask is the utf-8 encoded mask rune.
 	mask []byte
-}
-
-// combinedPos is a point in the editor.
-type combinedPos struct {
-	// runes is the offset in runes.
-	runes int
-
-	// lineCol.Y = line (offset into Editor.lines), and X = col (rune offset into
-	// Editor.lines[Y])
-	lineCol screenPos
-
-	// Pixel coordinates
-	x fixed.Int26_6
-	y int
-
-	// clusterIndex is the glyph cluster index that contains the rune referred
-	// to by the y coordinate.
-	clusterIndex int
 }
 
 type selectionAction int
@@ -244,7 +223,7 @@ func (e *Editor) makeValid() {
 	if e.valid {
 		return
 	}
-	e.lines, e.dims = e.layoutText(e.shaper)
+	e.layoutText(e.shaper)
 	e.valid = true
 }
 
@@ -415,8 +394,8 @@ func (e *Editor) processKey(gtx layout.Context) {
 			ke.Start -= adjust
 			ke.End -= adjust
 			adjust = 0
-			e.caret.start = e.closestPosition(combinedPos{runes: ke.Start}).runes
-			e.caret.end = e.closestPosition(combinedPos{runes: ke.End}).runes
+			e.caret.start = e.closestToRune(ke.Start).runes
+			e.caret.end = e.closestToRune(ke.End).runes
 		}
 	}
 	if e.rr.Changed() {
@@ -424,12 +403,28 @@ func (e *Editor) processKey(gtx layout.Context) {
 	}
 }
 
+func (e *Editor) closestToRune(runeIdx int) combinedPos {
+	e.makeValid()
+	pos, _ := e.index.closestToRune(runeIdx)
+	return pos
+}
+
+func (e *Editor) closestToLineCol(line, col int) combinedPos {
+	e.makeValid()
+	return e.index.closestToLineCol(screenPos{line: line, col: col})
+}
+
+func (e *Editor) closestToXY(x fixed.Int26_6, y int) combinedPos {
+	e.makeValid()
+	return e.index.closestToXY(x, y)
+}
+
 func (e *Editor) moveLines(distance int, selAct selectionAction) {
-	caretStart := e.closestPosition(combinedPos{runes: e.caret.start})
+	caretStart := e.closestToRune(e.caret.start)
 	x := caretStart.x + e.caret.xoff
 	// Seek to line.
-	pos := e.closestPosition(combinedPos{lineCol: screenPos{Y: caretStart.lineCol.Y + distance}})
-	pos = e.closestPosition(combinedPos{x: x, y: pos.y})
+	pos := e.closestToLineCol(caretStart.lineCol.line+distance, 0)
+	pos = e.closestToXY(x, pos.y)
 	e.caret.start = pos.runes
 	e.caret.xoff = x - pos.x
 	e.updateSelection(selAct)
@@ -537,7 +532,7 @@ func (e *Editor) calculateViewSize(gtx layout.Context) image.Point {
 }
 
 // Layout lays out the editor. If content is not nil, it is laid out on top.
-func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size unit.Sp, content layout.Widget) layout.Dimensions {
+func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, content layout.Widget) layout.Dimensions {
 	if e.locale != gtx.Locale {
 		e.locale = gtx.Locale
 		e.invalidate()
@@ -550,14 +545,14 @@ func (e *Editor) Layout(gtx layout.Context, sh text.Shaper, font text.Font, size
 	}
 	maxWidth := gtx.Constraints.Max.X
 	if e.SingleLine {
-		maxWidth = inf
+		maxWidth = math.MaxInt
 	}
 	if maxWidth != e.maxWidth {
 		e.maxWidth = maxWidth
 		e.invalidate()
 	}
-	if sh != e.shaper {
-		e.shaper = sh
+	if lt != e.shaper {
+		e.shaper = lt
 		e.invalidate()
 	}
 	if e.Mask != e.lastMask {
@@ -611,8 +606,8 @@ func (e *Editor) updateSnippet(gtx layout.Context, start, end int) {
 	if start > end {
 		start, end = end, start
 	}
-	imeStart := e.closestPosition(combinedPos{runes: start})
-	imeEnd := e.closestPosition(combinedPos{runes: end})
+	imeStart := e.closestToRune(start)
+	imeEnd := e.closestToRune(end)
 	e.ime.start = imeStart.runes
 	e.ime.end = imeEnd.runes
 	startOff := e.runeOffset(imeStart.runes)
@@ -664,14 +659,22 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 		const keyFilterNoRightDown = "(ShortAlt)-(Shift)-[←,↑]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
 		const keyFilterNoArrows = "(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
 		const keyFilterAllArrows = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
-		caret := e.closestPosition(combinedPos{runes: e.caret.start})
+		caret := e.closestToRune(e.caret.start)
 		switch {
 		case caret.runes == 0 && caret.runes == e.Len():
 			keys = keyFilterNoArrows
 		case caret.runes == 0:
-			keys = keyFilterNoLeftUp
+			if gtx.Locale.Direction.Progression() == system.FromOrigin {
+				keys = keyFilterNoLeftUp
+			} else {
+				keys = keyFilterNoRightDown
+			}
 		case caret.runes == e.Len():
-			keys = keyFilterNoRightDown
+			if gtx.Locale.Direction.Progression() == system.FromOrigin {
+				keys = keyFilterNoRightDown
+			} else {
+				keys = keyFilterNoLeftUp
+			}
 		default:
 			keys = keyFilterAllArrows
 		}
@@ -720,98 +723,60 @@ func (e *Editor) PaintSelection(gtx layout.Context) {
 	if !e.focused {
 		return
 	}
-	cl := textPadding(e.lines)
-	cl.Max = cl.Max.Add(e.viewSize)
-	defer clip.Rect(cl).Push(gtx.Ops).Pop()
-	selStart, selEnd := e.caret.start, e.caret.end
-	if selStart > selEnd {
-		selStart, selEnd = selEnd, selStart
-	}
-	caretStart := e.closestPosition(combinedPos{runes: selStart})
-	caretEnd := e.closestPosition(combinedPos{runes: selEnd})
-	scroll := image.Point{
-		X: e.scrollOff.X,
-		Y: e.scrollOff.Y,
-	}
-	cl = cl.Add(scroll)
-	pos := e.seekFirstVisibleLine(cl.Min.Y)
-	for !posIsBelow(e.lines, pos, cl.Max.Y) {
-		leftmost, rightmost := clipLine(e.lines, e.Alignment, e.viewSize.X, cl, pos)
-		lineIdx := leftmost.lineCol.Y
-		if lineIdx < caretStart.lineCol.Y {
-			// Line is before selection start; skip.
-			pos = e.closestPosition(combinedPos{lineCol: screenPos{Y: pos.lineCol.Y + 1}})
-			continue
-		}
-		if lineIdx > caretEnd.lineCol.Y {
-			// Line is after selection end; we're done.
-			return
-		}
-		line := e.lines[leftmost.lineCol.Y]
-		flip := line.Layout.Direction.Progression() == system.TowardOrigin
-		// Clamp start, end to selection.
-		if !flip {
-			if leftmost.runes < selStart {
-				leftmost = caretStart
-			}
-			if rightmost.runes > selEnd {
-				rightmost = caretEnd
-			}
-		} else {
-			if leftmost.runes > selEnd {
-				leftmost = caretEnd
-			}
-			if rightmost.runes < selStart {
-				rightmost = caretStart
-			}
-		}
-
-		dotStart := image.Pt(leftmost.x.Round(), leftmost.y)
-		dotEnd := image.Pt(rightmost.x.Round(), rightmost.y)
-		t := op.Offset(scroll.Mul(-1)).Push(gtx.Ops)
-		size := image.Rectangle{
-			Min: dotStart.Sub(image.Point{Y: line.Ascent.Ceil()}),
-			Max: dotEnd.Add(image.Point{Y: line.Descent.Ceil()}),
-		}
-		op := clip.Rect(size).Push(gtx.Ops)
+	localViewport := image.Rectangle{Max: e.viewSize}
+	docViewport := image.Rectangle{Max: e.viewSize}.Add(e.scrollOff)
+	defer clip.Rect(localViewport).Push(gtx.Ops).Pop()
+	e.regions = e.index.locate(docViewport, e.caret.start, e.caret.end, e.regions)
+	for _, region := range e.regions {
+		area := clip.Rect(region.bounds.Sub(e.scrollOff)).Push(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
-		op.Pop()
-		t.Pop()
-
-		if pos.lineCol.Y == len(e.lines)-1 {
-			break
-		}
-		pos = e.closestPosition(combinedPos{lineCol: screenPos{Y: pos.lineCol.Y + 1}})
+		area.Pop()
 	}
 }
 
 func (e *Editor) PaintText(gtx layout.Context) {
-	cl := textPadding(e.lines)
-	cl.Max = cl.Max.Add(e.viewSize)
-	defer clip.Rect(cl).Push(gtx.Ops).Pop()
-	scroll := image.Point{
-		X: e.scrollOff.X,
-		Y: e.scrollOff.Y,
+	var gs [32]text.Glyph
+	line := gs[:0]
+	var lineOff image.Point
+	m := op.Record(gtx.Ops)
+	viewport := image.Rectangle{
+		Min: e.scrollOff,
+		Max: e.viewSize.Add(e.scrollOff),
 	}
-	cl = cl.Add(scroll)
-	pos := e.seekFirstVisibleLine(cl.Min.Y)
-	for !posIsBelow(e.lines, pos, cl.Max.Y) {
-		start, end := clipLine(e.lines, e.Alignment, e.viewSize.X, cl, pos)
-		line := e.lines[start.lineCol.Y]
-		off := image.Point{X: start.x.Floor(), Y: start.y}.Sub(scroll)
-		l := subLayout(line, start, end)
+	it := textIterator{viewport: viewport}
 
-		t := op.Offset(off).Push(gtx.Ops)
-		op := clip.Outline{Path: e.shaper.Shape(e.font, e.textSize, l)}.Op().Push(gtx.Ops)
-		paint.PaintOp{}.Add(gtx.Ops)
-		op.Pop()
-		t.Pop()
-
-		if pos.lineCol.Y == len(e.lines)-1 {
+	startGlyph := 0
+	for _, line := range e.index.lines {
+		if line.descent.Ceil()+line.yOff >= viewport.Min.Y {
 			break
 		}
-		pos = e.closestPosition(combinedPos{lineCol: screenPos{Y: pos.lineCol.Y + 1}})
+		startGlyph += line.glyphs
 	}
+	for _, g := range e.index.glyphs[startGlyph:] {
+		if !it.Glyph(g, true) {
+			break
+		}
+		if it.visible {
+			if len(line) == 0 {
+				lineOff = image.Point{X: it.g.X.Floor(), Y: int(it.g.Y)}.Sub(e.scrollOff)
+			}
+			line = append(line, g)
+		}
+		if g.Flags&text.FlagLineBreak > 0 || cap(line)-len(line) == 0 {
+			t := op.Offset(lineOff).Push(gtx.Ops)
+			op := clip.Outline{Path: e.shaper.Shape(line)}.Op().Push(gtx.Ops)
+			paint.PaintOp{}.Add(gtx.Ops)
+			op.Pop()
+			t.Pop()
+			line = line[:0]
+		}
+
+	}
+	call := m.Stop()
+	viewport.Min = viewport.Min.Add(it.padding.Min)
+	viewport.Max = viewport.Max.Add(it.padding.Max)
+	defer clip.Rect(viewport.Sub(e.scrollOff)).Push(gtx.Ops).Pop()
+	call.Add(gtx.Ops)
 }
 
 // caretWidth returns the width occupied by the caret for the current
@@ -835,15 +800,7 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 		Min: caretPos.Sub(image.Pt(carWidth2, carAsc)),
 		Max: caretPos.Add(image.Pt(carWidth2, carDesc)),
 	}
-	cl := textPadding(e.lines)
-	// Account for caret width to each side.
-	if cl.Max.X < carWidth2 {
-		cl.Max.X = carWidth2
-	}
-	if cl.Min.X > -carWidth2 {
-		cl.Min.X = -carWidth2
-	}
-	cl.Max = cl.Max.Add(e.viewSize)
+	cl := image.Rectangle{Max: e.viewSize}
 	carRect = cl.Intersect(carRect)
 	if !carRect.Empty() {
 		defer clip.Rect(carRect).Push(gtx.Ops).Pop()
@@ -851,44 +808,24 @@ func (e *Editor) PaintCaret(gtx layout.Context) {
 	}
 }
 
-func (e *Editor) seekFirstVisibleLine(y int) combinedPos {
-	pos := e.closestPosition(combinedPos{y: y})
-	for pos.lineCol.Y > 0 {
-		prevLine := pos.lineCol.Y - 1
-		prev := e.closestPosition(combinedPos{lineCol: screenPos{Y: prevLine}})
-		if posIsAbove(e.lines, prev, y) {
-			break
-		}
-		pos = prev
-	}
-	return pos
-}
-
 func (e *Editor) caretInfo() (pos image.Point, ascent, descent int) {
-	caretStart := e.closestPosition(combinedPos{runes: e.caret.start})
-	carX := caretStart.x
-	carY := caretStart.y
+	caretStart := e.closestToRune(e.caret.start)
 
-	ascent = -e.lines[caretStart.lineCol.Y].Bounds.Min.Y.Ceil()
-	descent = e.lines[caretStart.lineCol.Y].Bounds.Max.Y.Ceil()
+	ascent = caretStart.ascent.Ceil()
+	descent = caretStart.descent.Ceil()
+
 	pos = image.Point{
-		X: carX.Round(),
-		Y: carY,
+		X: caretStart.x.Round(),
+		Y: caretStart.y,
 	}
 	pos = pos.Sub(e.scrollOff)
 	return
 }
 
-// TODO: copied from package math. Remove when Go 1.18 is minimum.
-const (
-	intSize = 32 << (^uint(0) >> 63) // 32 or 64
-	maxInt  = 1<<(intSize-1) - 1
-)
-
 // Len is the length of the editor contents, in runes.
 func (e *Editor) Len() int {
-	end := e.closestPosition(combinedPos{runes: maxInt})
-	return end.runes
+	e.makeValid()
+	return e.closestToRune(math.MaxInt).runes
 }
 
 // Text returns the contents of the editor.
@@ -911,8 +848,9 @@ func (e *Editor) SetText(s string) {
 func (e *Editor) scrollBounds() image.Rectangle {
 	var b image.Rectangle
 	if e.SingleLine {
-		if len(e.lines) > 0 {
-			b.Min.X = align(e.Alignment, e.locale.Direction, e.lines[0].Width, e.viewSize.X).Floor()
+		if len(e.index.lines) > 0 {
+			line := e.index.lines[0]
+			b.Min.X = line.xOff.Floor()
 			if b.Min.X > 0 {
 				b.Min.X = 0
 			}
@@ -949,234 +887,51 @@ func (e *Editor) scrollAbs(x, y int) {
 func (e *Editor) moveCoord(pos image.Point) {
 	x := fixed.I(pos.X + e.scrollOff.X)
 	y := pos.Y + e.scrollOff.Y
-	e.caret.start = e.closestPosition(combinedPos{x: x, y: y}).runes
+	e.caret.start = e.closestToXY(x, y).runes
 	e.caret.xoff = 0
 }
 
-func (e *Editor) layoutText(s text.Shaper) ([]text.Line, layout.Dimensions) {
+func (e *Editor) layoutText(lt *text.Shaper) {
 	e.rr.Reset()
 	var r io.RuneReader = &e.rr
 	if e.Mask != 0 {
 		e.maskReader.Reset(&e.rr, e.Mask)
 		r = &e.maskReader
 	}
-	var lines []text.Line
-	if s != nil {
-		lines, _ = s.Layout(e.font, e.textSize, e.maxWidth, e.locale, r)
-		if len(lines) == 0 {
-			// The editor does not tolerate a zero-length list of lines being returned from the shaper.
-			lines = append(lines, text.Line{})
+	e.index = glyphIndex{}
+	it := textIterator{viewport: image.Rectangle{Max: image.Point{X: math.MaxInt, Y: math.MaxInt}}}
+	if lt != nil {
+		lt.Layout(text.Parameters{
+			Font:      e.font,
+			PxPerEm:   e.textSize,
+			Alignment: e.Alignment,
+		}, 0, e.maxWidth, e.locale, r)
+		for it.Glyph(lt.NextGlyph()) {
+			e.index.Glyph(it.g)
 		}
 	} else {
-		lines, _ = nullLayout(r)
+		// Make a fake glyph for every rune in the reader.
+		for _, _, err := r.ReadRune(); err != io.EOF; _, _, err = r.ReadRune() {
+			it.Glyph(text.Glyph{Runes: 1, Flags: text.FlagClusterBreak}, true)
+			e.index.Glyph(it.g)
+		}
 	}
-	dims := linesDimens(lines)
-	return lines, dims
+	dims := layout.Dimensions{Size: it.bounds.Size()}
+	dims.Baseline = dims.Size.Y - it.baseline
+	e.dims = dims
 }
 
 // CaretPos returns the line & column numbers of the caret.
 func (e *Editor) CaretPos() (line, col int) {
-	caret := e.closestPosition(combinedPos{runes: e.caret.start})
-	return caret.lineCol.Y, caret.lineCol.X
+	pos := e.closestToRune(e.caret.start)
+	return pos.lineCol.line, pos.lineCol.col
 }
 
 // CaretCoords returns the coordinates of the caret, relative to the
 // editor itself.
 func (e *Editor) CaretCoords() f32.Point {
-	caret := e.closestPosition(combinedPos{runes: e.caret.start})
-	return f32.Pt(float32(caret.x)/64-float32(e.scrollOff.X), float32(caret.y-e.scrollOff.Y))
-}
-
-// indexPosition returns the latest position from the index no later than pos.
-func (e *Editor) indexPosition(pos combinedPos) combinedPos {
-	e.makeValid()
-	// Initialize index with first caret position.
-	if len(e.index) == 0 {
-		e.index = append(e.index, firstPos(e.lines[0], e.Alignment, e.viewSize.X))
-	}
-	i := sort.Search(len(e.index), func(i int) bool {
-		return positionGreaterOrEqual(e.lines, e.index[i], pos)
-	})
-	// Return position just before pos, which is guaranteed to be less than or equal to pos.
-	if i > 0 {
-		i--
-	}
-	return e.index[i]
-}
-
-// positionGreaterOrEqual reports whether p1 >= p2 according to the non-zero fields
-// of p2. All fields of p1 must be consistent and valid.
-func positionGreaterOrEqual(lines []text.Line, p1, p2 combinedPos) bool {
-	l := lines[p1.lineCol.Y]
-	// Check whether the final glyph cluster has no glyphs, indicating a newline
-	// rune that forced the existence of a line break.
-	hardNewLine := len(l.Layout.Clusters) > 0 && l.Layout.Clusters[len(l.Layout.Clusters)-1].Glyphs.Count == 0
-	endCol := l.Layout.Runes.Count
-	if hardNewLine {
-		// If there was a hard newline, prevent the cursor for passing it on
-		// this line.
-		endCol--
-	}
-	eol := p1.lineCol.X == endCol
-	switch {
-	case p2.runes != 0:
-		return p1.runes >= p2.runes
-	case p2.lineCol != (screenPos{}):
-		if p1.lineCol.Y != p2.lineCol.Y {
-			return p1.lineCol.Y > p2.lineCol.Y
-		}
-		return eol || p1.lineCol.X >= p2.lineCol.X
-	case p2.x != 0 || p2.y != 0:
-		ly := p1.y + l.Descent.Ceil()
-		prevy := p1.y - l.Ascent.Ceil()
-		switch {
-		case ly < p2.y && p1.lineCol.Y < len(lines)-1:
-			// p1 is on a line before p2.y.
-			return false
-		case prevy >= p2.y && p1.lineCol.Y > 0:
-			// p1 is on a line after p2.y.
-			return true
-		}
-		if eol {
-			return true
-		}
-		// If clusterIndex is equal, they could be positions of different
-		// runes within the same cluster, so we fall back to the positional
-		// test below.
-		if p2.clusterIndex != 0 && p1.clusterIndex != p2.clusterIndex {
-			return p1.clusterIndex > p2.clusterIndex
-		}
-
-		flip := l.Layout.Direction.Progression() == system.TowardOrigin
-		if p1.clusterIndex == len(l.Layout.Clusters) {
-			return (!flip && p1.x >= p2.x) || (flip && p1.x <= p2.x)
-		} else {
-			adv := l.Layout.Clusters[p1.clusterIndex].RuneWidth()
-
-			left := p1.x + adv - p2.x
-			right := p2.x - p1.x
-
-			return (!flip && left >= right) || (flip && left <= right)
-		}
-	}
-	return true
-}
-
-// clusterIndexFor returns the index of the glyph cluster containing the rune
-// at the given position within the line. As a special case, if the rune is one
-// beyond the final rune of the line, it returns the length of the line's clusters
-// slice. Otherwise, it panics if given a rune beyond the
-// dimensions of the line. The startIdx must be known to be at or before
-// the real index of the cluster. This means that this function is
-// only useful for searching forward through text, not backward.
-// Passing a startIdx after the cluster corresponding to the runeIdx
-// will trigger a panic.
-//
-// All indices are relative to the content in the line. The runeIdx 0
-// refers to the first rune on the line, regardless of the line's
-// rune offset. Similarly, the provided and returned glyph cluster
-// indices are relative to the line's cluster slice.
-func clusterIndexFor(line text.Line, runeIdx, startIdx int) int {
-	if runeIdx == line.Layout.Runes.Count {
-		return len(line.Layout.Clusters)
-	}
-	lineStart := line.Layout.Runes.Offset
-	for i := startIdx; i < len(line.Layout.Clusters); i++ {
-		cluster := line.Layout.Clusters[i]
-		clusterStart := cluster.Runes.Offset - lineStart
-		clusterEnd := clusterStart + cluster.Runes.Count
-		if runeIdx >= clusterStart && runeIdx < clusterEnd {
-			return i
-		}
-	}
-	panic(fmt.Errorf("requested cluster index for rune %d outside of line with %d runes", runeIdx, line.Layout.Runes.Count))
-}
-
-// closestPosition takes a position and returns its closest valid position.
-// Zero fields of pos are ignored.
-func (e *Editor) closestPosition(pos combinedPos) combinedPos {
-	closest := e.indexPosition(pos)
-	const runesPerIndexEntry = 50
-	for {
-		var done bool
-		closest, done = seekPosition(e.lines, e.Alignment, e.viewSize.X, closest, pos, runesPerIndexEntry)
-		if done {
-			return closest
-		}
-		e.index = append(e.index, closest)
-	}
-}
-
-// seekPosition seeks to the position closest to needle, starting at start and returns true.
-// If limit is non-zero, seekPosition stops seeks after limit runes and returns false.
-// Start must have all fields valid, and needle must have at least one of runes, lineCol,
-// or x+y valid. Start must be known to be before needle.
-func seekPosition(lines []text.Line, alignment text.Alignment, width int, start, needle combinedPos, limit int) (combinedPos, bool) {
-	count := 0
-	// Advance until start is greater than or equal to needle.
-	for {
-		if positionGreaterOrEqual(lines, start, needle) {
-			return start, true
-		}
-		var eof bool
-		start, eof = incrementPosition(lines, alignment, width, start)
-		if eof {
-			return start, true
-		}
-		count++
-		if limit != 0 && count == limit {
-			return start, false
-		}
-	}
-}
-
-// incrementLinePosition transitions pos from the end of a line to the beginning of the next one.
-// If pos is not at the end of a line, it will have no effect. It returns the (possibly modified)
-// position, whether it handled the transition from the end of a line, and whether the position
-// is at the end of the text data.
-func incrementLinePosition(lines []text.Line, alignment text.Alignment, width int, pos combinedPos) (_ combinedPos, eol, eof bool) {
-	l := lines[pos.lineCol.Y]
-	if pos.lineCol.X >= l.Layout.Runes.Count {
-		if pos.lineCol.Y == len(lines)-1 {
-			// End of file.
-			return pos, false, true
-		}
-		// Move to next line.
-		prevDesc := l.Descent
-		pos.lineCol.Y++
-		pos.lineCol.X = 0
-		pos.clusterIndex = 0
-		l = lines[pos.lineCol.Y]
-		// Use firstPos to get the correct x coordinate of the beginning of the line.
-		alignedPos := firstPos(l, alignment, width)
-		pos.x = alignedPos.x
-		pos.y += (prevDesc + l.Ascent).Ceil()
-		return pos, true, false
-	}
-	return pos, false, false
-}
-
-// incrementPosition updates pos to be one position further into the text. This will either
-// move pos one rune further into the text, transition pos from the end of one line to the
-// beginning of the next, or both.
-// All fields of pos must be valid before calling incrementPosition. eof will be true when
-// pos represents the final text position in the lines.
-func incrementPosition(lines []text.Line, alignment text.Alignment, width int, pos combinedPos) (_ combinedPos, eof bool) {
-	var eol bool
-	pos, eol, eof = incrementLinePosition(lines, alignment, width, pos)
-	if eof || eol {
-		return pos, eof
-	}
-	l := lines[pos.lineCol.Y]
-	isHardNewLine := l.Layout.Clusters[pos.clusterIndex].Glyphs.Count == 0
-	pos.x += l.Layout.Clusters[pos.clusterIndex].RuneWidth()
-	pos.runes++
-	pos.lineCol.X++
-	pos.clusterIndex = clusterIndexFor(l, pos.lineCol.X, pos.clusterIndex)
-	if isHardNewLine {
-		pos, _, eof = incrementLinePosition(lines, alignment, width, pos)
-	}
-	return pos, false
+	pos := e.closestToRune(e.caret.start)
+	return f32.Pt(float32(pos.x)/64-float32(e.scrollOff.X), float32(pos.y-e.scrollOff.Y))
 }
 
 // indexRune returns the latest rune index and byte offset no later than r.
@@ -1214,7 +969,6 @@ func (e *Editor) runeOffset(r int) int {
 }
 
 func (e *Editor) invalidate() {
-	e.index = e.index[:0]
 	e.offIndex = e.offIndex[:0]
 	e.valid = false
 }
@@ -1315,8 +1069,8 @@ func (e *Editor) replace(start, end int, s string, addHistory bool) int {
 	if start > end {
 		start, end = end, start
 	}
-	startPos := e.closestPosition(combinedPos{runes: start})
-	endPos := e.closestPosition(combinedPos{runes: end})
+	startPos := e.closestToRune(start)
+	endPos := e.closestToRune(end)
 	startOff := e.runeOffset(startPos.runes)
 	replaceSize := endPos.runes - startPos.runes
 	el := e.Len()
@@ -1376,10 +1130,10 @@ func (e *Editor) replace(start, end int, s string, addHistory bool) int {
 }
 
 func (e *Editor) movePages(pages int, selAct selectionAction) {
-	caret := e.closestPosition(combinedPos{runes: e.caret.start})
+	caret := e.closestToRune(e.caret.start)
 	x := caret.x + e.caret.xoff
 	y := caret.y + pages*e.viewSize.Y
-	pos := e.closestPosition(combinedPos{x: x, y: y})
+	pos := e.closestToXY(x, y)
 	e.caret.start = pos.runes
 	e.caret.xoff = x - pos.x
 	e.updateSelection(selAct)
@@ -1390,25 +1144,23 @@ func (e *Editor) movePages(pages int, selAct selectionAction) {
 // negative distances moves backward. Distances are in runes.
 func (e *Editor) MoveCaret(startDelta, endDelta int) {
 	e.caret.xoff = 0
-	e.caret.start = e.closestPosition(combinedPos{runes: e.caret.start + startDelta}).runes
-	e.caret.end = e.closestPosition(combinedPos{runes: e.caret.end + endDelta}).runes
+	e.caret.start = e.closestToRune(e.caret.start + startDelta).runes
+	e.caret.end = e.closestToRune(e.caret.end + endDelta).runes
 }
 
 func (e *Editor) moveStart(selAct selectionAction) {
-	caret := e.closestPosition(combinedPos{runes: e.caret.start})
-	caret = e.closestPosition(combinedPos{lineCol: screenPos{Y: caret.lineCol.Y}})
+	caret := e.closestToRune(e.caret.start)
+	caret = e.closestToLineCol(caret.lineCol.line, 0)
 	e.caret.start = caret.runes
 	e.caret.xoff = -caret.x
 	e.updateSelection(selAct)
 }
 
 func (e *Editor) moveEnd(selAct selectionAction) {
-	caret := e.closestPosition(combinedPos{runes: e.caret.start})
-	caret = e.closestPosition(combinedPos{lineCol: screenPos{X: maxInt, Y: caret.lineCol.Y}})
+	caret := e.closestToRune(e.caret.start)
+	caret = e.closestToLineCol(caret.lineCol.line, math.MaxInt)
 	e.caret.start = caret.runes
-	l := e.lines[caret.lineCol.Y]
-	a := align(e.Alignment, e.locale.Direction, l.Width, e.viewSize.X)
-	e.caret.xoff = l.Width + a - caret.x
+	e.caret.xoff = fixed.I(e.maxWidth) - caret.x
 	e.updateSelection(selAct)
 }
 
@@ -1423,7 +1175,7 @@ func (e *Editor) moveWord(distance int, selAct selectionAction) {
 		words, direction = distance*-1, -1
 	}
 	// atEnd if caret is at either side of the buffer.
-	caret := e.closestPosition(combinedPos{runes: e.caret.start})
+	caret := e.closestToRune(e.caret.start)
 	atEnd := func() bool {
 		return caret.runes == 0 || caret.runes == e.Len()
 	}
@@ -1440,13 +1192,13 @@ func (e *Editor) moveWord(distance int, selAct selectionAction) {
 	for ii := 0; ii < words; ii++ {
 		for r := next(); unicode.IsSpace(r) && !atEnd(); r = next() {
 			e.MoveCaret(direction, 0)
-			caret = e.closestPosition(combinedPos{runes: e.caret.start})
+			caret = e.closestToRune(e.caret.start)
 		}
 		e.MoveCaret(direction, 0)
-		caret = e.closestPosition(combinedPos{runes: e.caret.start})
+		caret = e.closestToRune(e.caret.start)
 		for r := next(); !unicode.IsSpace(r) && !atEnd(); r = next() {
 			e.MoveCaret(direction, 0)
-			caret = e.closestPosition(combinedPos{runes: e.caret.start})
+			caret = e.closestToRune(e.caret.start)
 		}
 	}
 	e.updateSelection(selAct)
@@ -1477,7 +1229,7 @@ func (e *Editor) deleteWord(distance int) {
 		words, direction = distance*-1, -1
 	}
 	// atEnd if offset is at or beyond either side of the buffer.
-	caret := e.closestPosition(combinedPos{runes: e.caret.start})
+	caret := e.closestToRune(e.caret.start)
 	atEnd := func(runes int) bool {
 		idx := caret.runes + runes*direction
 		return idx <= 0 || idx >= e.Len()
@@ -1511,8 +1263,7 @@ func (e *Editor) deleteWord(distance int) {
 }
 
 func (e *Editor) scrollToCaret() {
-	caret := e.closestPosition(combinedPos{runes: e.caret.start})
-	l := e.lines[caret.lineCol.Y]
+	caret := e.closestToRune(e.caret.start)
 	if e.SingleLine {
 		var dist int
 		if d := caret.x.Floor() - e.scrollOff.X; d < 0 {
@@ -1522,8 +1273,8 @@ func (e *Editor) scrollToCaret() {
 		}
 		e.scrollRel(dist, 0)
 	} else {
-		miny := caret.y - l.Ascent.Ceil()
-		maxy := caret.y + l.Descent.Ceil()
+		miny := caret.y - caret.ascent.Ceil()
+		maxy := caret.y + caret.descent.Ceil()
 		var dist int
 		if d := miny - e.scrollOff.Y; d < 0 {
 			dist = d
@@ -1532,12 +1283,6 @@ func (e *Editor) scrollToCaret() {
 		}
 		e.scrollRel(0, dist)
 	}
-}
-
-// NumLines returns the number of lines in the editor.
-func (e *Editor) NumLines() int {
-	e.makeValid()
-	return len(e.lines)
 }
 
 // SelectionLen returns the length of the selection, in runes; it is
@@ -1555,8 +1300,8 @@ func (e *Editor) Selection() (start, end int) {
 // SetCaret moves the caret to start, and sets the selection end to end. start
 // and end are in runes, and represent offsets into the editor text.
 func (e *Editor) SetCaret(start, end int) {
-	e.caret.start = e.closestPosition(combinedPos{runes: start}).runes
-	e.caret.end = e.closestPosition(combinedPos{runes: end}).runes
+	e.caret.start = e.closestToRune(start).runes
+	e.caret.end = e.closestToRune(end).runes
 	e.caret.scroll = true
 	e.scroller.Stop()
 }
@@ -1612,14 +1357,14 @@ func max(a, b int) int {
 	return b
 }
 
-func min(a, b int) int {
+func min[T constraints.Ordered](a, b T) T {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func abs(n int) int {
+func abs[T constraints.Signed](n T) T {
 	if n < 0 {
 		return -n
 	}
@@ -1635,36 +1380,6 @@ func sign(n int) int {
 	default:
 		return 0
 	}
-}
-
-func nullLayout(rr io.RuneReader) ([]text.Line, error) {
-	var rerr error
-	var n int
-	var buf bytes.Buffer
-	for {
-		r, _, err := rr.ReadRune()
-		if err != nil {
-			rerr = err
-			break
-		}
-		n++
-		buf.WriteRune(r)
-	}
-	clusters := make([]text.GlyphCluster, n)
-	for i := range clusters {
-		clusters[i].Runes.Count = 1
-		clusters[i].Runes.Offset = i
-	}
-	return []text.Line{
-		{
-			Layout: text.Layout{
-				Clusters: clusters,
-				Runes: text.Range{
-					Count: n,
-				},
-			},
-		},
-	}, rerr
 }
 
 func (s ChangeEvent) isEditorEvent() {}

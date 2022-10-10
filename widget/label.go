@@ -3,11 +3,9 @@
 package widget
 
 import (
-	"fmt"
 	"image"
 
 	"gioui.org/io/semantic"
-	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -26,190 +24,100 @@ type Label struct {
 	MaxLines int
 }
 
-// screenPos describes a character position (in text line and column numbers,
-// not pixels): Y = line number, X = rune column.
-type screenPos image.Point
-
-const inf = 1e6
-
-// posIsAbove returns whether the position described in pos by the lineCol and
-// y fields is above the given y coordinate. It is invalid to call this function
-// unless both the lineCol and (x,y) fields of pos are populated.
-func posIsAbove(lines []text.Line, pos combinedPos, y int) bool {
-	line := lines[pos.lineCol.Y]
-	return pos.y+line.Bounds.Max.Y.Ceil() < y
-}
-
-// posIsAbove returns whether the position described in pos by the lineCol and
-// y fields is below the given y coordinate. It is invalid to call this function
-// unless both the lineCol and (x,y) fields of pos are populated.
-func posIsBelow(lines []text.Line, pos combinedPos, y int) bool {
-	line := lines[pos.lineCol.Y]
-	return pos.y+line.Bounds.Min.Y.Floor() > y
-}
-
-func clipLine(lines []text.Line, alignment text.Alignment, width int, clip image.Rectangle, linePos combinedPos) (start combinedPos, end combinedPos) {
-	// Seek to first (potentially) visible column.
-	lineIdx := linePos.lineCol.Y
-	line := lines[lineIdx]
-	// runeWidth is the width of the widest rune in line.
-	runeWidth := (line.Bounds.Max.X - line.Width).Ceil()
-	lineStart := fixed.I(clip.Min.X - runeWidth)
-	lineEnd := fixed.I(clip.Max.X + runeWidth)
-
-	flip := line.Layout.Direction.Progression() == system.TowardOrigin
-	if flip {
-		lineStart, lineEnd = lineEnd, lineStart
-	}
-	q := combinedPos{y: start.y, x: lineStart}
-	start, _ = seekPosition(lines, alignment, width, linePos, q, 0)
-	// Seek to first invisible column after start.
-	q = combinedPos{y: start.y, x: lineEnd}
-	end, _ = seekPosition(lines, alignment, width, start, q, 0)
-	if flip {
-		start, end = end, start
-	}
-
-	return start, end
-}
-
-func subLayout(line text.Line, start, end combinedPos) text.Layout {
-	startCluster := clusterIndexFor(line, start.lineCol.X, start.clusterIndex)
-	endCluster := clusterIndexFor(line, end.lineCol.X, end.clusterIndex)
-	if line.Layout.Direction.Progression() == system.TowardOrigin {
-		startCluster, endCluster = endCluster, startCluster
-	}
-	return line.Layout.Slice(startCluster, endCluster)
-}
-
-// firstPos returns a combinedPos with *only* the x and y
-// fields populated. They will be set to the location of the
-// dot at the beginning of the line, with text alignment taken
-// into account. For RTL text, this will
-// be on the right edge of the available space.
-//
-// The results can be counterinuitive due to the fact that meaning
-// of alignment changes depending on the text direction.
-//
-// The returned pos can be considered valid only for the first line
-// of a body of text.
-func firstPos(line text.Line, alignment text.Alignment, width int) combinedPos {
-	p := combinedPos{
-		x: align(alignment, line.Layout.Direction, line.Width, width),
-		y: line.Ascent.Ceil(),
-	}
-
-	if line.Layout.Direction.Progression() == system.TowardOrigin {
-		p.x += line.Width
-	}
-	return p
-}
-
-func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size unit.Sp, txt string) layout.Dimensions {
+func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, txt string) layout.Dimensions {
 	cs := gtx.Constraints
 	textSize := fixed.I(gtx.Sp(size))
-	lines := s.LayoutString(font, textSize, cs.Max.X, gtx.Locale, txt)
-	if max := l.MaxLines; max > 0 && len(lines) > max {
-		lines = lines[:max]
-	}
-	dims := linesDimens(lines)
-	dims.Size = cs.Constrain(dims.Size)
-	if len(lines) == 0 {
-		return dims
-	}
-	cl := textPadding(lines)
-	cl.Max = cl.Max.Add(dims.Size)
-	defer clip.Rect(cl).Push(gtx.Ops).Pop()
+	lt.LayoutString(text.Parameters{
+		Font:      font,
+		PxPerEm:   textSize,
+		MaxLines:  l.MaxLines,
+		Alignment: l.Alignment,
+	}, cs.Min.X, cs.Max.X, gtx.Locale, txt)
+	m := op.Record(gtx.Ops)
+	viewport := image.Rectangle{Max: cs.Max}
+	it := textIterator{viewport: viewport}
 	semantic.LabelOp(txt).Add(gtx.Ops)
-	pos := firstPos(lines[0], l.Alignment, dims.Size.X)
-	for !posIsBelow(lines, pos, cl.Max.Y) {
-		start, end := clipLine(lines, l.Alignment, dims.Size.X, cl, pos)
-		line := lines[start.lineCol.Y]
-		lt := subLayout(line, start, end)
-
-		off := image.Point{X: start.x.Floor(), Y: start.y}
-		t := op.Offset(off).Push(gtx.Ops)
-		op := clip.Outline{Path: s.Shape(font, textSize, lt)}.Op().Push(gtx.Ops)
-		paint.PaintOp{}.Add(gtx.Ops)
-		op.Pop()
-		t.Pop()
-
-		if pos.lineCol.Y == len(lines)-1 {
-			break
+	var gs [32]text.Glyph
+	line := gs[:0]
+	var lineOff image.Point
+	for it.Glyph(lt.NextGlyph()) {
+		if it.visible {
+			if len(line) == 0 {
+				lineOff = image.Point{X: it.g.X.Floor(), Y: int(it.g.Y)}
+			}
+			line = append(line, it.g)
 		}
-		pos, _ = seekPosition(lines, l.Alignment, dims.Size.X, pos, combinedPos{lineCol: screenPos{Y: pos.lineCol.Y + 1}}, 0)
+		if it.g.Flags&text.FlagLineBreak > 0 || cap(line)-len(line) == 0 {
+			t := op.Offset(lineOff).Push(gtx.Ops)
+			op := clip.Outline{Path: lt.Shape(line)}.Op().Push(gtx.Ops)
+			paint.PaintOp{}.Add(gtx.Ops)
+			op.Pop()
+			t.Pop()
+			line = line[:0]
+		}
 	}
+	call := m.Stop()
+	viewport.Min = viewport.Min.Add(it.padding.Min)
+	viewport.Max = viewport.Max.Add(it.padding.Max)
+	clipStack := clip.Rect(viewport).Push(gtx.Ops)
+	call.Add(gtx.Ops)
+	dims := layout.Dimensions{Size: it.bounds.Size()}
+	dims.Size = cs.Constrain(dims.Size)
+	dims.Baseline = dims.Size.Y - it.baseline
+	clipStack.Pop()
 	return dims
 }
 
-func textPadding(lines []text.Line) (padding image.Rectangle) {
-	if len(lines) == 0 {
-		return
-	}
-	first := lines[0]
-	if d := first.Ascent + first.Bounds.Min.Y; d < 0 {
-		padding.Min.Y = d.Ceil()
-	}
-	last := lines[len(lines)-1]
-	if d := last.Bounds.Max.Y - last.Descent; d > 0 {
-		padding.Max.Y = d.Ceil()
-	}
-	if d := first.Bounds.Min.X; d < 0 {
-		padding.Min.X = d.Ceil()
-	}
-	if d := first.Bounds.Max.X - first.Width; d > 0 {
-		padding.Max.X = d.Ceil()
-	}
-	return
+func r2p(r clip.Rect) clip.Op {
+	return clip.Stroke{Path: r.Path(), Width: 1}.Op()
 }
 
-func linesDimens(lines []text.Line) layout.Dimensions {
-	var width fixed.Int26_6
-	var h int
-	var baseline int
-	if len(lines) > 0 {
-		baseline = lines[0].Ascent.Ceil()
-		var prevDesc fixed.Int26_6
-		for _, l := range lines {
-			h += (prevDesc + l.Ascent).Ceil()
-			prevDesc = l.Descent
-			if l.Width > width {
-				width = l.Width
-			}
-		}
-		h += lines[len(lines)-1].Descent.Ceil()
-	}
-	w := width.Ceil()
-	return layout.Dimensions{
-		Size: image.Point{
-			X: w,
-			Y: h,
-		},
-		Baseline: h - baseline,
-	}
+type textIterator struct {
+	g        text.Glyph
+	viewport image.Rectangle
+	padding  image.Rectangle
+	bounds   image.Rectangle
+	visible  bool
+	first    bool
+	baseline int
 }
 
-// align returns the x offset that should be applied to text with width so that it
-// appears correctly aligned within a space of size maxWidth and with the primary
-// text direction dir.
-func align(align text.Alignment, dir system.TextDirection, width fixed.Int26_6, maxWidth int) fixed.Int26_6 {
-	mw := fixed.I(maxWidth)
-	if dir.Progression() == system.TowardOrigin {
-		switch align {
-		case text.Start:
-			align = text.End
-		case text.End:
-			align = text.Start
-		}
+func (t *textIterator) Glyph(g text.Glyph, ok bool) bool {
+	t.g = g
+	bounds := image.Rectangle{
+		Min: image.Pt(g.Bounds.Min.X.Floor(), g.Bounds.Min.Y.Floor()),
+		Max: image.Pt(g.Bounds.Max.X.Ceil(), g.Bounds.Max.Y.Ceil()),
 	}
-	switch align {
-	case text.Middle:
-		return fixed.I(((mw - width) / 2).Floor())
-	case text.End:
-		return fixed.I((mw - width).Floor())
-	case text.Start:
-		return 0
-	default:
-		panic(fmt.Errorf("unknown alignment %v", align))
+	// Compute the maximum extent to which glyphs overhang on the horizontal
+	// axis.
+	if d := g.Bounds.Min.X.Floor(); d < t.padding.Min.X {
+		t.padding.Min.X = d
 	}
+	if d := (g.Bounds.Max.X - g.Advance).Ceil(); d > t.padding.Max.X {
+		t.padding.Max.X = d
+	}
+	// Convert the bounds from dot-relative coordinates to document coordinates.
+	bounds = bounds.Add(image.Pt(g.X.Round(), int(g.Y)))
+	if !t.first {
+		t.first = true
+		t.baseline = int(g.Y)
+		t.bounds = bounds
+	}
+
+	above := bounds.Max.Y < t.viewport.Min.Y
+	below := bounds.Min.Y > t.viewport.Max.Y
+	left := bounds.Max.X < t.viewport.Min.X
+	right := bounds.Min.X > t.viewport.Max.X
+	t.visible = !above && !below && !left && !right
+	if t.visible {
+		t.bounds.Min.X = min(t.bounds.Min.X, bounds.Min.X)
+		t.bounds.Min.Y = min(t.bounds.Min.Y, int(g.Y)-g.Ascent.Ceil())
+		t.bounds.Max.X = max(t.bounds.Max.X, bounds.Max.X)
+		t.bounds.Max.Y = max(t.bounds.Max.Y, int(g.Y)+g.Descent.Ceil())
+	}
+	if t.bounds.Dy() == 0 {
+		t.bounds.Min.Y = -g.Ascent.Ceil()
+		t.bounds.Max.Y = g.Descent.Ceil()
+	}
+	return ok && !below
 }

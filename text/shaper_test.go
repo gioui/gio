@@ -2,117 +2,202 @@ package text
 
 import (
 	"testing"
+
+	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
+	"gioui.org/font/opentype"
+	"gioui.org/io/system"
+	"golang.org/x/image/font/gofont/goregular"
+	"golang.org/x/image/math/fixed"
 )
 
-var (
-	testTF1 Typeface = "MockFace"
-	testTF2 Typeface = "TestFace"
-	testTF3 Typeface = "AnotherFace"
-)
-
-func TestClosestFontByWeight(t *testing.T) {
-	c := newTestCache(
-		Font{Style: Regular, Weight: Normal},
-		Font{Style: Regular, Weight: Light},
-		Font{Style: Regular, Weight: Bold},
-		Font{Style: Italic, Weight: Thin},
-	)
-	weightOnlyTests := []struct {
-		Lookup   Weight
-		Expected Weight
-	}{
-		// Test for existing weights.
-		{Lookup: Normal, Expected: Normal},
-		{Lookup: Light, Expected: Light},
-		{Lookup: Bold, Expected: Bold},
-		// Test for missing weights.
-		{Lookup: Thin, Expected: Light},
-		{Lookup: ExtraLight, Expected: Light},
-		{Lookup: Medium, Expected: Normal},
-		{Lookup: SemiBold, Expected: Bold},
-		{Lookup: ExtraBlack, Expected: Bold},
+// TestCacheEmptyString ensures that shaping the empty string returns a
+// single synthetic glyph with ascent/descent info.
+func TestCacheEmptyString(t *testing.T) {
+	ltrFace, _ := opentype.Parse(goregular.TTF)
+	collection := []FontFace{{Face: ltrFace}}
+	cache := NewShaper(collection)
+	cache.LayoutString(Parameters{
+		Alignment: Middle,
+		PxPerEm:   fixed.I(10),
+	}, 200, 200, english, "")
+	glyphs := make([]Glyph, 0, 1)
+	for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
+		glyphs = append(glyphs, g)
 	}
-	for _, test := range weightOnlyTests {
-		got, ok := c.closestFont(Font{Typeface: testTF1, Weight: test.Lookup})
-		if !ok {
-			t.Fatalf("expected closest font for %v to exist", test.Lookup)
-		}
-		if got.Weight != test.Expected {
-			t.Fatalf("got weight %v, expected %v", got.Weight, test.Expected)
-		}
+	if len(glyphs) != 1 {
+		t.Errorf("expected %d glyphs, got %d", 1, len(glyphs))
 	}
-	c = newTestCache(
-		Font{Style: Regular, Weight: Light},
-		Font{Style: Regular, Weight: Bold},
-		Font{Style: Italic, Weight: Normal},
-		Font{Typeface: testTF3, Style: Italic, Weight: Bold},
-	)
-	otherTests := []struct {
-		Lookup         Font
-		Expected       Font
-		ExpectedToFail bool
-	}{
-		// Test for existing fonts.
-		{
-			Lookup:   Font{Typeface: testTF1, Weight: Light},
-			Expected: Font{Typeface: testTF1, Style: Regular, Weight: Light},
-		},
-		{
-			Lookup:   Font{Typeface: testTF1, Style: Italic, Weight: Normal},
-			Expected: Font{Typeface: testTF1, Style: Italic, Weight: Normal},
-		},
-		// Test for missing fonts.
-		{
-			Lookup:   Font{Typeface: testTF1, Weight: Normal},
-			Expected: Font{Typeface: testTF1, Style: Regular, Weight: Light},
-		},
-		{
-			Lookup:   Font{Typeface: testTF3, Style: Italic, Weight: Normal},
-			Expected: Font{Typeface: testTF3, Style: Italic, Weight: Bold},
-		},
-		{
-			Lookup:   Font{Typeface: testTF1, Style: Italic, Weight: Thin},
-			Expected: Font{Typeface: testTF1, Style: Italic, Weight: Normal},
-		},
-		{
-			Lookup:   Font{Typeface: testTF1, Style: Italic, Weight: Bold},
-			Expected: Font{Typeface: testTF1, Style: Italic, Weight: Normal},
-		},
-		{
-			Lookup:         Font{Typeface: testTF2, Weight: Normal},
-			ExpectedToFail: true,
-		},
-		{
-			Lookup:         Font{Typeface: testTF2, Style: Italic, Weight: Normal},
-			ExpectedToFail: true,
-		},
+	glyph := glyphs[0]
+	checkFlag(t, true, FlagClusterBreak, glyph, 0)
+	checkFlag(t, true, FlagRunBreak, glyph, 0)
+	checkFlag(t, true, FlagLineBreak, glyph, 0)
+	checkFlag(t, true, FlagSynthetic, glyph, 0)
+	if glyph.Ascent == 0 {
+		t.Errorf("expected non-zero ascent")
 	}
-	for _, test := range otherTests {
-		got, ok := c.closestFont(test.Lookup)
-		if test.ExpectedToFail {
-			if ok {
-				t.Fatalf("expected closest font for %v to not exist", test.Lookup)
-			} else {
-				continue
-			}
-		}
-		if !ok {
-			t.Fatalf("expected closest font for %v to exist", test.Lookup)
-		}
-		if got != test.Expected {
-			t.Fatalf("got %v, expected %v", got, test.Expected)
-		}
+	if glyph.Descent == 0 {
+		t.Errorf("expected non-zero descent")
+	}
+	if glyph.Y == 0 {
+		t.Errorf("expected non-zero y offset")
+	}
+	if glyph.X == 0 {
+		t.Errorf("expected non-zero x offset")
 	}
 }
 
-func newTestCache(fonts ...Font) *Cache {
-	c := &Cache{faces: make(map[Font]*faceCache)}
-	c.def = testTF1
-	for _, font := range fonts {
-		if font.Typeface == "" {
-			font.Typeface = testTF1
-		}
-		c.faces[font] = &faceCache{face: nil}
+// TestCacheAlignment ensures that shaping with different alignments or dominant
+// text directions results in different X offsets.
+func TestCacheAlignment(t *testing.T) {
+	ltrFace, _ := opentype.Parse(goregular.TTF)
+	collection := []FontFace{{Face: ltrFace}}
+	cache := NewShaper(collection)
+	params := Parameters{Alignment: Start, PxPerEm: fixed.I(10)}
+	cache.LayoutString(params, 200, 200, english, "A")
+	glyph, _ := cache.NextGlyph()
+	startX := glyph.X
+	params.Alignment = Middle
+	cache.LayoutString(params, 200, 200, english, "A")
+	glyph, _ = cache.NextGlyph()
+	middleX := glyph.X
+	params.Alignment = End
+	cache.LayoutString(params, 200, 200, english, "A")
+	glyph, _ = cache.NextGlyph()
+	endX := glyph.X
+	if startX == middleX || startX == endX || endX == middleX {
+		t.Errorf("[LTR] shaping with with different alignments should not produce the same X, start %d, middle %d, end %d", startX, middleX, endX)
 	}
-	return c
+	params.Alignment = Start
+	cache.LayoutString(params, 200, 200, arabic, "A")
+	glyph, _ = cache.NextGlyph()
+	rtlStartX := glyph.X
+	params.Alignment = Middle
+	cache.LayoutString(params, 200, 200, arabic, "A")
+	glyph, _ = cache.NextGlyph()
+	rtlMiddleX := glyph.X
+	params.Alignment = End
+	cache.LayoutString(params, 200, 200, arabic, "A")
+	glyph, _ = cache.NextGlyph()
+	rtlEndX := glyph.X
+	if rtlStartX == rtlMiddleX || rtlStartX == rtlEndX || rtlEndX == rtlMiddleX {
+		t.Errorf("[RTL] shaping with with different alignments should not produce the same X, start %d, middle %d, end %d", rtlStartX, rtlMiddleX, rtlEndX)
+	}
+	if startX == rtlStartX || endX == rtlEndX {
+		t.Errorf("shaping with with different dominant text directions and the same alignment should not produce the same X unless it's middle-aligned")
+	}
+}
+
+func TestCacheGlyphConverstion(t *testing.T) {
+	ltrFace, _ := opentype.Parse(goregular.TTF)
+	rtlFace, _ := opentype.Parse(nsareg.TTF)
+	collection := []FontFace{{Face: ltrFace}, {Face: rtlFace}}
+	type testcase struct {
+		name     string
+		text     string
+		locale   system.Locale
+		expected []Glyph
+	}
+	for _, tc := range []testcase{
+		{
+			name:   "bidi ltr",
+			text:   "The quick سماء שלום لا fox تمط שלום\nغير the\nlazy dog.",
+			locale: english,
+		},
+		{
+			name:   "bidi rtl",
+			text:   "الحب سماء brown привет fox تمط jumps\nпривет over\nغير الأحلام.",
+			locale: arabic,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cache := NewShaper(collection)
+			cache.LayoutString(Parameters{
+				PxPerEm: fixed.I(10),
+			}, 0, 200, tc.locale, tc.text)
+			doc := cache.txt
+			glyphs := make([]Glyph, 0, len(tc.expected))
+			for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
+				glyphs = append(glyphs, g)
+			}
+			glyphCursor := 0
+			for _, line := range doc.lines {
+				for runIdx, run := range line.runs {
+					lastRun := runIdx == len(line.runs)-1
+					start := 0
+					end := len(run.Glyphs) - 1
+					inc := 1
+					towardOrigin := false
+					if run.Direction.Progression() == system.TowardOrigin {
+						start = len(run.Glyphs) - 1
+						end = 0
+						inc = -1
+						towardOrigin = true
+					}
+					for glyphIdx := start; ; glyphIdx += inc {
+						endOfRun := glyphIdx == end
+						glyph := run.Glyphs[glyphIdx]
+						endOfCluster := glyphIdx == end || run.Glyphs[glyphIdx+inc].clusterIndex != glyph.clusterIndex
+
+						actual := glyphs[glyphCursor]
+						if actual.ID != glyph.id {
+							t.Errorf("glyphs[%d] expected id %d, got id %d", glyphCursor, glyph.id, actual.ID)
+						}
+						// Synthetic glyphs should only ever show up at the end of lines.
+						endOfLine := lastRun && endOfRun
+						synthetic := glyph.glyphCount == 0 && endOfLine
+						checkFlag(t, endOfLine, FlagLineBreak, actual, glyphCursor)
+						checkFlag(t, endOfRun, FlagRunBreak, actual, glyphCursor)
+						checkFlag(t, towardOrigin, FlagTowardOrigin, actual, glyphCursor)
+						checkFlag(t, synthetic, FlagSynthetic, actual, glyphCursor)
+						checkFlag(t, endOfCluster, FlagClusterBreak, actual, glyphCursor)
+						glyphCursor++
+						if glyphIdx == end {
+							break
+						}
+					}
+				}
+			}
+
+			printLinePositioning(t, doc.lines, glyphs)
+		})
+	}
+}
+
+func checkFlag(t *testing.T, shouldHave bool, flag Flags, actual Glyph, glyphCursor int) {
+	t.Helper()
+	if shouldHave && actual.Flags&flag == 0 {
+		t.Errorf("glyphs[%d] should have %s set", glyphCursor, flag)
+	} else if !shouldHave && actual.Flags&flag != 0 {
+		t.Errorf("glyphs[%d] should not have %s set", glyphCursor, flag)
+	}
+}
+
+func printLinePositioning(t *testing.T, lines []line, glyphs []Glyph) {
+	t.Helper()
+	glyphCursor := 0
+	for i, line := range lines {
+		t.Logf("line %d, dir %s, width %d, visual %v, runeCount: %d", i, line.direction, line.width, line.visualOrder, line.runeCount)
+		for k, run := range line.runs {
+			t.Logf("run: %d, dir %s, width %d, runes {count: %d, offset: %d}", k, run.Direction, run.Advance, run.Runes.Count, run.Runes.Offset)
+			start := 0
+			end := len(run.Glyphs) - 1
+			inc := 1
+			if run.Direction.Progression() == system.TowardOrigin {
+				start = len(run.Glyphs) - 1
+				end = 0
+				inc = -1
+			}
+			for g := start; ; g += inc {
+				glyph := run.Glyphs[g]
+				if glyphCursor < len(glyphs) {
+					t.Logf("glyph %2d, adv %3d, runes %2d, glyphs %d - glyphs[%2d] flags %s", g, glyph.xAdvance, glyph.runeCount, glyph.glyphCount, glyphCursor, glyphs[glyphCursor].Flags)
+					t.Logf("glyph %2d, adv %3d, runes %2d, glyphs %d - n/a", g, glyph.xAdvance, glyph.runeCount, glyph.glyphCount)
+				}
+				glyphCursor++
+				if g == end {
+					break
+				}
+			}
+		}
+	}
 }

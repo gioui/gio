@@ -9,11 +9,9 @@ import (
 	"io"
 	"math/rand"
 	"reflect"
-	"strings"
 	"testing"
 	"testing/quick"
 	"time"
-	"unicode"
 	"unicode/utf8"
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
@@ -29,7 +27,6 @@ import (
 	"gioui.org/op"
 	"gioui.org/text"
 	"gioui.org/unit"
-	"golang.org/x/image/math/fixed"
 )
 
 var english = system.Locale{
@@ -105,7 +102,7 @@ func TestEditorZeroDimensions(t *testing.T) {
 		},
 		Locale: english,
 	}
-	cache := text.NewCache(gofont.Collection())
+	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
 	font := text.Font{}
 	e := new(Editor)
@@ -121,7 +118,7 @@ func TestEditorConfigurations(t *testing.T) {
 		Constraints: layout.Exact(image.Pt(100, 100)),
 		Locale:      english,
 	}
-	cache := text.NewCache(gofont.Collection())
+	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
 	font := text.Font{}
 	sentence := "\n\n\n\n\n\n\n\n\n\n\n\nthe quick brown fox jumps over the lazy dog"
@@ -161,7 +158,7 @@ func TestEditor(t *testing.T) {
 		Constraints: layout.Exact(image.Pt(100, 100)),
 		Locale:      english,
 	}
-	cache := text.NewCache(gofont.Collection())
+	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
 	font := text.Font{}
 
@@ -209,35 +206,40 @@ func TestEditor(t *testing.T) {
 	assertCaret(t, e, 1, 1, len("æbc\na"))
 	e.MoveCaret(-3, -3)
 	assertCaret(t, e, 0, 2, len("æb"))
-	e.Mask = '\U0001F92B'
-	e.Layout(gtx, cache, font, fontSize, nil)
-	e.moveEnd(selectionClear)
-	assertCaret(t, e, 0, 3, len("æbc"))
+	/*
+		    NOTE(whereswaldon): it isn't possible to check the raw glyph data
+		    like this anymore. How should we handle this?
+			e.Mask = '\U0001F92B'
+			e.Layout(gtx, cache, font, fontSize, nil)
+			e.moveEnd(selectionClear)
+			assertCaret(t, e, 0, 3, len("æbc"))
 
-	// When a password mask is applied, it should replace all visible glyphs
-	spaces := 0
-	for _, r := range textSample {
-		if unicode.IsSpace(r) {
-			spaces++
-		}
-	}
-	nonSpaces := len([]rune(textSample)) - spaces
-	glyphCounts := make(map[int]int)
-	for _, line := range e.lines {
-		for _, glyph := range line.Layout.Glyphs {
-			glyphCounts[int(glyph.ID)]++
-		}
-	}
-	if len(glyphCounts) > 2 {
-		t.Errorf("masked text contained glyphs other than mask and whitespace")
-	}
+			// When a password mask is applied, it should replace all visible glyphs
+			spaces := 0
+			for _, r := range textSample {
+				if unicode.IsSpace(r) {
+					spaces++
+				}
+			}
+			nonSpaces := len([]rune(textSample)) - spaces
+			glyphCounts := make(map[int]int)
+			// This loop assumes a single-run text, which we know is safe here.
+			for _, line := range e.lines {
+				for _, glyph := range line.Runs[0].Glyphs {
+					glyphCounts[int(glyph.ID)]++
+				}
+			}
+			if len(glyphCounts) > 2 {
+				t.Errorf("masked text contained glyphs other than mask and whitespace")
+			}
 
-	for gid, count := range glyphCounts {
-		if count != spaces && count != nonSpaces {
-			t.Errorf("glyph with id %d occurred %d times, expected either %d or %d", gid, count, spaces, nonSpaces)
-		}
-	}
+			for gid, count := range glyphCounts {
+				if count != spaces && count != nonSpaces {
+					t.Errorf("glyph with id %d occurred %d times, expected either %d or %d", gid, count, spaces, nonSpaces)
+				}
+			}
 
+	*/
 	// Test that moveLine applies x offsets from previous moves.
 	e.SetText("long line\nshort")
 	e.SetCaret(0, 0)
@@ -264,7 +266,7 @@ func TestEditorRTL(t *testing.T) {
 		Constraints: layout.Exact(image.Pt(100, 100)),
 		Locale:      arabic,
 	}
-	cache := text.NewCache(arabicCollection)
+	cache := text.NewShaper(arabicCollection)
 	fontSize := unit.Sp(10)
 	font := text.Font{}
 
@@ -333,7 +335,7 @@ func TestEditorLigature(t *testing.T) {
 	if err != nil {
 		t.Skipf("failed parsing test font: %v", err)
 	}
-	cache := text.NewCache([]text.FontFace{
+	cache := text.NewShaper([]text.FontFace{
 		{
 			Font: text.Font{
 				Typeface: "Roboto",
@@ -454,7 +456,7 @@ func TestEditorDimensions(t *testing.T) {
 		Queue:       tq,
 		Locale:      english,
 	}
-	cache := text.NewCache(gofont.Collection())
+	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
 	font := text.Font{}
 	dims := e.Layout(gtx, cache, font, fontSize, nil)
@@ -501,7 +503,7 @@ func TestEditorCaretConsistency(t *testing.T) {
 		Constraints: layout.Exact(image.Pt(100, 100)),
 		Locale:      english,
 	}
-	cache := text.NewCache(gofont.Collection())
+	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
 	font := text.Font{}
 	for _, a := range []text.Alignment{text.Start, text.Middle, text.End} {
@@ -516,11 +518,11 @@ func TestEditorCaretConsistency(t *testing.T) {
 			gotCoords := e.CaretCoords()
 			// Blow away index to re-compute position from scratch.
 			e.invalidate()
-			want := e.closestPosition(combinedPos{runes: e.caret.start})
+			want := e.closestToRune(e.caret.start)
 			wantCoords := f32.Pt(float32(want.x)/64, float32(want.y))
-			if want.lineCol.Y != gotLine || want.lineCol.X != gotCol || gotCoords != wantCoords {
+			if want.lineCol.line != gotLine || int(want.lineCol.col) != gotCol || gotCoords != wantCoords {
 				return fmt.Errorf("caret (%d,%d) pos %s, want (%d,%d) pos %s",
-					gotLine, gotCol, gotCoords, want.lineCol.Y, want.lineCol.X, wantCoords)
+					gotLine, gotCol, gotCoords, want.lineCol.line, want.lineCol.col, wantCoords)
 			}
 			return nil
 		}
@@ -594,7 +596,7 @@ func TestEditorMoveWord(t *testing.T) {
 			Constraints: layout.Exact(image.Pt(100, 100)),
 			Locale:      english,
 		}
-		cache := text.NewCache(gofont.Collection())
+		cache := text.NewShaper(gofont.Collection())
 		fontSize := unit.Sp(10)
 		font := text.Font{}
 		e.SetText(t)
@@ -699,7 +701,7 @@ func TestEditorInsert(t *testing.T) {
 			Constraints: layout.Exact(image.Pt(100, 100)),
 			Locale:      english,
 		}
-		cache := text.NewCache(gofont.Collection())
+		cache := text.NewShaper(gofont.Collection())
 		fontSize := unit.Sp(10)
 		font := text.Font{}
 		e.SetText(t)
@@ -789,7 +791,7 @@ func TestEditorDeleteWord(t *testing.T) {
 			Constraints: layout.Exact(image.Pt(100, 100)),
 			Locale:      english,
 		}
-		cache := text.NewCache(gofont.Collection())
+		cache := text.NewShaper(gofont.Collection())
 		fontSize := unit.Sp(10)
 		font := text.Font{}
 		e.SetText(t)
@@ -823,12 +825,12 @@ func (editMutation) Generate(rand *rand.Rand, size int) reflect.Value {
 	return reflect.ValueOf(t)
 }
 
-// TestSelect tests the selection code. It lays out an editor with several
+// TestEditorSelect tests the selection code. It lays out an editor with several
 // lines in it, selects some text, verifies the selection, resizes the editor
 // to make it much narrower (which makes the lines in the editor reflow), and
 // then verifies that the updated (col, line) positions of the selected text
 // are where we expect.
-func TestSelect(t *testing.T) {
+func TestEditorSelect(t *testing.T) {
 	e := new(Editor)
 	e.SetText(`a 2 4 6 8 a
 b 2 4 6 8 b
@@ -843,7 +845,7 @@ g 2 4 6 8 g
 		Ops:    new(op.Ops),
 		Locale: english,
 	}
-	cache := text.NewCache(gofont.Collection())
+	cache := text.NewShaper(gofont.Collection())
 	font := text.Font{}
 	fontSize := unit.Sp(10)
 
@@ -855,8 +857,8 @@ g 2 4 6 8 g
 		_ = e.Events() // throw away any events from this layout
 
 		// Build the selection events
-		startPos := e.closestPosition(combinedPos{runes: start})
-		endPos := e.closestPosition(combinedPos{runes: end})
+		startPos := e.closestToRune(start)
+		endPos := e.closestToRune(end)
 		tq := &testQueue{
 			events: []event.Event{
 				pointer.Event{
@@ -864,13 +866,13 @@ g 2 4 6 8 g
 					Type:     pointer.Press,
 					Source:   pointer.Mouse,
 					Time:     tim,
-					Position: f32.Pt(textWidth(e, startPos.lineCol.Y, 0, startPos.lineCol.X), textHeight(e, startPos.lineCol.Y)),
+					Position: f32.Pt(textWidth(e, startPos.lineCol.line, 0, startPos.lineCol.col), textBaseline(e, startPos.lineCol.line)),
 				},
 				pointer.Event{
 					Type:     pointer.Release,
 					Source:   pointer.Mouse,
 					Time:     tim,
-					Position: f32.Pt(textWidth(e, endPos.lineCol.Y, 0, endPos.lineCol.X), textHeight(e, endPos.lineCol.Y)),
+					Position: f32.Pt(textWidth(e, endPos.lineCol.line, 0, endPos.lineCol.col), textBaseline(e, endPos.lineCol.line)),
 				},
 			},
 		}
@@ -885,6 +887,15 @@ g 2 4 6 8 g
 			}
 		}
 		return ""
+	}
+	type screenPos image.Point
+	logicalPosMatch := func(t *testing.T, n int, label string, expected screenPos, actual combinedPos) {
+		t.Helper()
+		if actual.lineCol.line != expected.Y || actual.lineCol.col != expected.X {
+			t.Errorf("Test %d: Expected %s %#v; got %#v",
+				n, label,
+				expected, actual)
+		}
 	}
 
 	type testCase struct {
@@ -916,15 +927,10 @@ g 2 4 6 8 g
 		gtx.Queue = nil
 		e.Layout(gtx, cache, font, fontSize, nil)
 
-		caretStart := e.closestPosition(combinedPos{runes: e.caret.start})
-		caretEnd := e.closestPosition(combinedPos{runes: e.caret.end})
-		if caretEnd.lineCol != tst.startPos || caretStart.lineCol != tst.endPos {
-			t.Errorf("Test %d pt2: Expected %#v, %#v; got %#v, %#v",
-				n,
-				caretEnd.lineCol, caretStart.lineCol,
-				tst.startPos, tst.endPos)
-			continue
-		}
+		caretStart := e.closestToRune(e.caret.start)
+		caretEnd := e.closestToRune(e.caret.end)
+		logicalPosMatch(t, n, "start", tst.startPos, caretEnd)
+		logicalPosMatch(t, n, "end", tst.endPos, caretStart)
 	}
 }
 
@@ -937,7 +943,7 @@ func TestSelectMove(t *testing.T) {
 		Ops:    new(op.Ops),
 		Locale: english,
 	}
-	cache := text.NewCache(gofont.Collection())
+	cache := text.NewShaper(gofont.Collection())
 	font := text.Font{}
 	fontSize := unit.Sp(10)
 
@@ -1025,7 +1031,7 @@ func TestEditor_MaxLen(t *testing.T) {
 			key.SelectionEvent{Start: 4, End: 4},
 		),
 	}
-	cache := text.NewCache(gofont.Collection())
+	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
 	font := text.Font{}
 	e.Layout(gtx, cache, font, fontSize, nil)
@@ -1056,7 +1062,7 @@ func TestEditor_Filter(t *testing.T) {
 			key.SelectionEvent{Start: 4, End: 4},
 		),
 	}
-	cache := text.NewCache(gofont.Collection())
+	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
 	font := text.Font{}
 	e.Layout(gtx, cache, font, fontSize, nil)
@@ -1080,7 +1086,7 @@ func TestEditor_Submit(t *testing.T) {
 			key.EditEvent{Range: key.Range{Start: 0, End: 0}, Text: "ab1\n"},
 		),
 	}
-	cache := text.NewCache(gofont.Collection())
+	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
 	font := text.Font{}
 	e.Layout(gtx, cache, font, fontSize, nil)
@@ -1098,26 +1104,24 @@ func TestEditor_Submit(t *testing.T) {
 	}
 }
 
+// textWidth is a text helper for building simple selection events.
+// It assumes single-run lines, which isn't safe with non-test text
+// data.
 func textWidth(e *Editor, lineNum, colStart, colEnd int) float32 {
-	var w fixed.Int26_6
-	glyphs := e.lines[lineNum].Layout.Glyphs
-	if colEnd > len(glyphs) {
-		colEnd = len(glyphs)
+	start := e.closestToLineCol(lineNum, colStart)
+	end := e.closestToLineCol(lineNum, colEnd)
+	delta := start.x - end.x
+	if delta < 0 {
+		delta = -delta
 	}
-	for _, glyph := range glyphs[colStart:colEnd] {
-		w += glyph.XAdvance
-	}
-	return float32(w.Floor())
+	return float32(delta.Round())
 }
 
-func textHeight(e *Editor, lineNum int) float32 {
-	var h int
-	var prevDesc fixed.Int26_6
-	for _, line := range e.lines[0:lineNum] {
-		h += (line.Ascent + prevDesc).Ceil()
-		prevDesc = line.Descent
-	}
-	return float32(h + prevDesc.Ceil() + 1)
+// testBaseline returns the y coordinate of the baseline for the
+// given line number.
+func textBaseline(e *Editor, lineNum int) float32 {
+	start := e.closestToLineCol(lineNum, 0)
+	return float32(start.y)
 }
 
 type testQueue struct {
@@ -1130,17 +1134,4 @@ func newQueue(e ...event.Event) *testQueue {
 
 func (q *testQueue) Events(_ event.Tag) []event.Event {
 	return q.events
-}
-
-func printLines(e *Editor) {
-	for _, line := range e.lines {
-		start := e.runeOffset(line.Layout.Runes.Offset)
-		buf := make([]byte, 0, 4*line.Layout.Runes.Count)
-		e.Seek(int64(start), 0)
-		n, _ := e.Read(buf)
-		buf = buf[:n]
-		asStr := string([]rune(string(buf))[:line.Layout.Runes.Count])
-		text := strings.TrimSuffix(asStr, "\n")
-		fmt.Printf("%d: %s\n", n, text)
-	}
 }

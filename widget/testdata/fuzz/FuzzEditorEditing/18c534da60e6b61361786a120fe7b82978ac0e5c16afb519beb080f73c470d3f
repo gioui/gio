@@ -1,0 +1,4 @@
+go test fuzz v1
+string("\xa3\xd90")
+int16(-11)
+int16(2237)

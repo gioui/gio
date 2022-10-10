@@ -28,7 +28,7 @@ type ButtonStyle struct {
 	CornerRadius unit.Dp
 	Inset        layout.Inset
 	Button       *widget.Clickable
-	shaper       text.Shaper
+	shaper       *text.Shaper
 }
 
 type ButtonLayoutStyle struct {

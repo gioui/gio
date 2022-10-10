@@ -24,7 +24,7 @@ type LabelStyle struct {
 	Text     string
 	TextSize unit.Sp
 
-	shaper text.Shaper
+	shaper *text.Shaper
 }
 
 func H1(th *Theme, txt string) LabelStyle {

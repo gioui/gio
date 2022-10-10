@@ -1,0 +1,4 @@
+go test fuzz v1
+string("")
+int16(44)
+int16(2299)

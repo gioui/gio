@@ -32,7 +32,7 @@ type Palette struct {
 }
 
 type Theme struct {
-	Shaper text.Shaper
+	Shaper *text.Shaper
 	Palette
 	TextSize unit.Sp
 	Icon     struct {
@@ -48,7 +48,7 @@ type Theme struct {
 
 func NewTheme(fontCollection []text.FontFace) *Theme {
 	t := &Theme{
-		Shaper: text.NewCache(fontCollection),
+		Shaper: text.NewShaper(fontCollection),
 	}
 	t.Palette = Palette{
 		Fg:         rgb(0x000000),

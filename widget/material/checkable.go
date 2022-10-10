@@ -22,7 +22,7 @@ type checkable struct {
 	TextSize           unit.Sp
 	IconColor          color.NRGBA
 	Size               unit.Dp
-	shaper             text.Shaper
+	shaper             *text.Shaper
 	checkedStateIcon   *widget.Icon
 	uncheckedStateIcon *widget.Icon
 }

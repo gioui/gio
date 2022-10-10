@@ -12,7 +12,7 @@ import (
 func TestLayoutLRU(t *testing.T) {
 	c := new(layoutCache)
 	put := func(i int) {
-		c.Put(layoutKey{str: strconv.Itoa(i)}, nil)
+		c.Put(layoutKey{str: strconv.Itoa(i)}, document{})
 	}
 	get := func(i int) bool {
 		_, ok := c.Get(layoutKey{str: strconv.Itoa(i)})
@@ -23,11 +23,12 @@ func TestLayoutLRU(t *testing.T) {
 
 func TestPathLRU(t *testing.T) {
 	c := new(pathCache)
+	shaped := []Glyph{{ID: 1}}
 	put := func(i int) {
-		c.Put(pathKey{gidHash: uint64(i)}, Layout{Runes: Range{Count: i}}, clip.PathSpec{})
+		c.Put(uint64(i), shaped, clip.PathSpec{})
 	}
 	get := func(i int) bool {
-		_, ok := c.Get(pathKey{gidHash: uint64(i)}, Layout{Runes: Range{Count: i}})
+		_, ok := c.Get(uint64(i), shaped)
 		return ok
 	}
 	testLRU(t, put, get)
