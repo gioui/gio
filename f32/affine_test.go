@@ -37,6 +37,29 @@ func TestTransformOffset(t *testing.T) {
 	}
 }
 
+func TestString(t *testing.T) {
+	tests := []struct {
+		in  Affine2D
+		exp string
+	}{
+		{
+			in:  NewAffine2D(9, 11, 13, 17, 19, 23),
+			exp: "[[9 11 13] [17 19 23]]",
+		}, {
+			in:  NewAffine2D(29, 31, 37, 43, 47, 53),
+			exp: "[[29 31 37] [43 47 53]]",
+		}, {
+			in:  NewAffine2D(29.142342, 31.4123412, 37.53152, 43.51324213, 47.123412, 53.14312342),
+			exp: "[[29.1423 31.4123 37.5315] [43.5132 47.1234 53.1431]]",
+		},
+	}
+	for _, test := range tests {
+		if test.in.String() != test.exp {
+			t.Errorf("string mismatch: have %q, want %q", test.in.String(), test.exp)
+		}
+	}
+}
+
 func TestTransformScale(t *testing.T) {
 	p := Point{X: 1, Y: 2}
 	s := Point{X: -1, Y: 2}
