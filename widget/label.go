@@ -76,6 +76,14 @@ func subLayout(line text.Line, start, end combinedPos) text.Layout {
 	return line.Layout.Slice(startCluster, endCluster)
 }
 
+// firstPos returns a combinedPos with *only* the x and y
+// fields populated. They will be set to the location of the
+// dot at the beginning of the line, with text alignment taken
+// into account. For RTL text, this will
+// be on the right edge of the available space.
+//
+// The results can be counterinuitive due to the fact that meaning
+// of alignment changes depending on the text direction.
 func firstPos(line text.Line, alignment text.Alignment, width int) combinedPos {
 	p := combinedPos{
 		x: align(alignment, line.Layout.Direction, line.Width, width),
@@ -86,10 +94,6 @@ func firstPos(line text.Line, alignment text.Alignment, width int) combinedPos {
 		p.x += line.Width
 	}
 	return p
-}
-
-func (p1 screenPos) Less(p2 screenPos) bool {
-	return p1.Y < p2.Y || (p1.Y == p2.Y && p1.X < p2.X)
 }
 
 func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size unit.Sp, txt string) layout.Dimensions {
