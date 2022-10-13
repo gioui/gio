@@ -1049,7 +1049,16 @@ func positionGreaterOrEqual(lines []text.Line, p1, p2 combinedPos) bool {
 // at the given position within the line. As a special case, if the rune is one
 // beyond the final rune of the line, it returns the length of the line's clusters
 // slice. Otherwise, it panics if given a rune beyond the
-// dimensions of the line.
+// dimensions of the line. The startIdx must be known to be at or before
+// the real index of the cluster. This means that this function is
+// only useful for searching forward through text, not backward.
+// Passing a startIdx after the cluster corresponding to the runeIdx
+// will trigger a panic.
+//
+// All indices are relative to the content in the line. The runeIdx 0
+// refers to the first rune on the line, regardless of the line's
+// rune offset. Similarly, the provided and returned glyph cluster
+// indices are relative to the line's cluster slice.
 func clusterIndexFor(line text.Line, runeIdx, startIdx int) int {
 	if runeIdx == line.Layout.Runes.Count {
 		return len(line.Layout.Clusters)

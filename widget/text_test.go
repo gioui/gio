@@ -244,3 +244,114 @@ func TestIncrementPosition(t *testing.T) {
 		})
 	}
 }
+
+func TestClusterIndexFor(t *testing.T) {
+	fontSize := 16
+	lineWidth := fontSize * 3
+	ltrText, rtlText := makeTestText(fontSize, lineWidth)
+	type input struct {
+		runeIdx         int
+		clusterStartIdx int
+		expected        int
+		panics          bool
+	}
+	type testcase struct {
+		name   string
+		line   text.Line
+		inputs []input
+	}
+	for _, tc := range []testcase{
+		{
+			name: "ltr",
+			line: ltrText[0],
+			inputs: []input{
+				{runeIdx: 0, clusterStartIdx: 0, expected: 0},
+				{runeIdx: 1, clusterStartIdx: 0, expected: 1},
+				{runeIdx: 1, clusterStartIdx: 1, expected: 1},
+				{runeIdx: 1, clusterStartIdx: 2, panics: true},
+				{runeIdx: 2, clusterStartIdx: 0, expected: 2},
+				{runeIdx: 2, clusterStartIdx: 1, expected: 2},
+				{runeIdx: 2, clusterStartIdx: 2, expected: 2},
+				{runeIdx: 3, clusterStartIdx: 0, expected: 3},
+				{runeIdx: 3, clusterStartIdx: 1, expected: 3},
+				{runeIdx: 3, clusterStartIdx: 2, expected: 3},
+				{runeIdx: 3, clusterStartIdx: 3, expected: 3},
+				{runeIdx: 4, clusterStartIdx: 0, expected: 4},
+				{runeIdx: 4, clusterStartIdx: 1, expected: 4},
+				{runeIdx: 4, clusterStartIdx: 2, expected: 4},
+				{runeIdx: 4, clusterStartIdx: 3, expected: 4},
+				{runeIdx: 4, clusterStartIdx: 4, expected: 4},
+				{runeIdx: 5, panics: true},
+			},
+		},
+		{
+			name: "rtl",
+			line: rtlText[0],
+			inputs: []input{
+				{runeIdx: 0, clusterStartIdx: 0, expected: 0},
+				{runeIdx: 1, clusterStartIdx: 0, expected: 1},
+				{runeIdx: 1, clusterStartIdx: 1, expected: 1},
+				{runeIdx: 1, clusterStartIdx: 2, panics: true},
+				{runeIdx: 2, clusterStartIdx: 0, expected: 2},
+				{runeIdx: 2, clusterStartIdx: 1, expected: 2},
+				{runeIdx: 2, clusterStartIdx: 2, expected: 2},
+				{runeIdx: 3, clusterStartIdx: 0, expected: 3},
+				{runeIdx: 3, clusterStartIdx: 1, expected: 3},
+				{runeIdx: 3, clusterStartIdx: 2, expected: 3},
+				{runeIdx: 3, clusterStartIdx: 3, expected: 3},
+				{runeIdx: 4, clusterStartIdx: 0, expected: 4},
+				{runeIdx: 4, clusterStartIdx: 1, expected: 4},
+				{runeIdx: 4, clusterStartIdx: 2, expected: 4},
+				{runeIdx: 4, clusterStartIdx: 3, expected: 4},
+				{runeIdx: 4, clusterStartIdx: 4, expected: 4},
+				{runeIdx: 5, clusterStartIdx: 0, expected: 5},
+				{runeIdx: 6, panics: true},
+			},
+		},
+		{
+			name: "rtl-ligatures",
+			line: rtlText[4],
+			inputs: []input{
+				{runeIdx: 0, clusterStartIdx: 0, expected: 0},
+				{runeIdx: 1, clusterStartIdx: 0, expected: 1},
+				{runeIdx: 1, clusterStartIdx: 1, expected: 1},
+				{runeIdx: 2, clusterStartIdx: 0, expected: 1},
+				{runeIdx: 2, clusterStartIdx: 1, expected: 1},
+				{runeIdx: 2, clusterStartIdx: 2, panics: true},
+				{runeIdx: 3, clusterStartIdx: 0, expected: 2},
+				{runeIdx: 3, clusterStartIdx: 1, expected: 2},
+				{runeIdx: 3, clusterStartIdx: 2, expected: 2},
+				{runeIdx: 4, clusterStartIdx: 0, expected: 3},
+				{runeIdx: 4, clusterStartIdx: 1, expected: 3},
+				{runeIdx: 4, clusterStartIdx: 2, expected: 3},
+				{runeIdx: 4, clusterStartIdx: 3, expected: 3},
+				{runeIdx: 5, clusterStartIdx: 0, expected: 3},
+				{runeIdx: 5, clusterStartIdx: 1, expected: 3},
+				{runeIdx: 5, clusterStartIdx: 2, expected: 3},
+				{runeIdx: 5, clusterStartIdx: 3, expected: 3},
+				{runeIdx: 6, clusterStartIdx: 0, expected: 4},
+				{runeIdx: 6, clusterStartIdx: 1, expected: 4},
+				{runeIdx: 6, clusterStartIdx: 2, expected: 4},
+				{runeIdx: 6, clusterStartIdx: 3, expected: 4},
+				{runeIdx: 6, clusterStartIdx: 4, expected: 4},
+				{runeIdx: 7, clusterStartIdx: 0, expected: 5},
+				{runeIdx: 8, panics: true},
+			},
+		},
+	} {
+		for i, input := range tc.inputs {
+			t.Run(tc.name+strconv.Itoa(i), func(t *testing.T) {
+				defer func() {
+					err := recover()
+					if err != nil != input.panics {
+						t.Errorf("panic state mismatch")
+					}
+				}()
+				actual := clusterIndexFor(tc.line, input.runeIdx, input.clusterStartIdx)
+				if actual != input.expected {
+					t.Errorf("input[%d]: expected %d, got %d", i, input.expected, actual)
+				}
+			})
+		}
+	}
+}
