@@ -12,7 +12,10 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-func makeTestText(fontSize, lineWidth int) ([]text.Line, []text.Line) {
+// makeTestText returns an ltr and rtl sample of shaped text at the given
+// font size and wrapped to the given line width. The runeLimit, if nonzero,
+// truncates the sample text to ensure shorter output for expensive tests.
+func makeTestText(fontSize, lineWidth, runeLimit int) ([]text.Line, []text.Line) {
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
 
@@ -26,15 +29,27 @@ func makeTestText(fontSize, lineWidth int) ([]text.Line, []text.Line) {
 			Face: rtlFace,
 		},
 	})
-	ltrText := shaper.LayoutString(text.Font{Typeface: "LTR"}, fixed.I(fontSize), lineWidth, english, "The quick brown fox\njumps over the lazy dog.")
-	rtlText := shaper.LayoutString(text.Font{Typeface: "RTL"}, fixed.I(fontSize), lineWidth, arabic, "الحب سماء لا\nتمط غير الأحلام")
+	ltrSource := "The quick brown fox\njumps over the lazy dog."
+	rtlSource := "الحب سماء لا\nتمط غير الأحلام"
+	if runeLimit != 0 {
+		ltrRunes := []rune(ltrSource)
+		rtlRunes := []rune(rtlSource)
+		if runeLimit < len(ltrRunes) {
+			ltrSource = string(ltrRunes[:runeLimit])
+		}
+		if runeLimit < len(rtlRunes) {
+			rtlSource = string(rtlRunes[:runeLimit])
+		}
+	}
+	ltrText := shaper.LayoutString(text.Font{Typeface: "LTR"}, fixed.I(fontSize), lineWidth, english, ltrSource)
+	rtlText := shaper.LayoutString(text.Font{Typeface: "RTL"}, fixed.I(fontSize), lineWidth, arabic, rtlSource)
 	return ltrText, rtlText
 }
 
 func TestFirstPos(t *testing.T) {
 	fontSize := 16
 	lineWidth := fontSize * 10
-	ltrText, rtlText := makeTestText(fontSize, lineWidth)
+	ltrText, rtlText := makeTestText(fontSize, lineWidth, 0)
 	type testcase struct {
 		name      string
 		line      text.Line
@@ -151,7 +166,7 @@ func TestFirstPos(t *testing.T) {
 func TestIncrementPosition(t *testing.T) {
 	fontSize := 16
 	lineWidth := fontSize * 3
-	ltrText, rtlText := makeTestText(fontSize, lineWidth)
+	ltrText, rtlText := makeTestText(fontSize, lineWidth, 0)
 	type trial struct {
 		input, output combinedPos
 	}
@@ -248,7 +263,7 @@ func TestIncrementPosition(t *testing.T) {
 func TestClusterIndexFor(t *testing.T) {
 	fontSize := 16
 	lineWidth := fontSize * 3
-	ltrText, rtlText := makeTestText(fontSize, lineWidth)
+	ltrText, rtlText := makeTestText(fontSize, lineWidth, 0)
 	type input struct {
 		runeIdx         int
 		clusterStartIdx int
@@ -352,6 +367,76 @@ func TestClusterIndexFor(t *testing.T) {
 					t.Errorf("input[%d]: expected %d, got %d", i, input.expected, actual)
 				}
 			})
+		}
+	}
+}
+
+func TestPositionGreaterOrEqual(t *testing.T) {
+	fontSize := 16
+	lineWidth := fontSize * 10
+	// Be careful tuning the runeLimit here. This test case's complexity
+	// is O(N^2) where N=runeLimit. It's easy to make this test take a stupid
+	// amount of time accidentally.
+	ltrText, rtlText := makeTestText(fontSize, lineWidth, 15)
+	type testcase struct {
+		name  string
+		lines []text.Line
+		align text.Alignment
+		width int
+	}
+	for _, tc := range []testcase{
+		{
+			name:  "ltr",
+			lines: ltrText,
+			align: text.Start,
+			width: lineWidth,
+		},
+		{
+			name:  "rtl",
+			lines: rtlText,
+			align: text.Start,
+			width: lineWidth,
+		},
+	} {
+		finalLineRunes := tc.lines[len(tc.lines)-1].Layout.Runes
+		// Statically generate all valid positions.
+		positions := make([]combinedPos, finalLineRunes.Offset+finalLineRunes.Count+1)
+		positions[0] = firstPos(tc.lines[0], tc.align, tc.width)
+		for i := 1; i < len(positions); i++ {
+			positions[i], _ = incrementPosition(tc.lines, tc.align, tc.width, positions[i-1])
+		}
+		// For each valid position, check every other valid position returns the correct
+		// result with each permutation of populated fields.
+		for i, p1 := range positions {
+			for k, p2 := range positions {
+				t.Run(tc.name+" "+strconv.Itoa(i)+">="+strconv.Itoa(k), func(t *testing.T) {
+					for kind := 0; kind < 3; kind++ {
+						p2 := p2
+						transform := ""
+						switch kind {
+						case 0: // only runes populated
+							transform = "runes only"
+							p2.lineCol = screenPos{}
+							p2.x = 0
+							p2.y = 0
+						case 1: // only lineCol populated
+							transform = "lineCol only"
+							p2.runes = 0
+							p2.x = 0
+							p2.y = 0
+						case 2: // only x and y populated
+							transform = "x,y only"
+							p2.runes = 0
+							p2.lineCol = screenPos{}
+						}
+						isGreaterOrEqual := i >= k
+						result := positionGreaterOrEqual(tc.lines, p1, p2)
+						if result != isGreaterOrEqual {
+							t.Errorf("unexpected result comparing p[%d] >= p[%d](%s) (%v)\np1: %#+v\np2:%#+v", i, k, transform, result, p1, p2)
+						}
+					}
+				})
+			}
 		}
 	}
 }

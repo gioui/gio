@@ -1000,7 +1000,8 @@ func (e *Editor) indexPosition(pos combinedPos) combinedPos {
 }
 
 // positionGreaterOrEqual reports whether p1 >= p2 according to the non-zero fields
-// of p2. All fields of p1 must be a consistent and valid.
+// of p2. All fields of p1 must be a consistent and valid. The clusterIndex field
+// is never considered, as it is a line-local property.
 func positionGreaterOrEqual(lines []text.Line, p1, p2 combinedPos) bool {
 	l := lines[p1.lineCol.Y]
 	endCol := l.Layout.Runes.Count - 1
