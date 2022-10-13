@@ -1084,44 +1084,57 @@ func (e *Editor) closestPosition(pos combinedPos) combinedPos {
 // seekPosition seeks to the position closest to needle, starting at start and returns true.
 // If limit is non-zero, seekPosition stops seeks after limit runes and returns false.
 func seekPosition(lines []text.Line, alignment text.Alignment, width int, start, needle combinedPos, limit int) (combinedPos, bool) {
-	l := lines[start.lineCol.Y]
 	count := 0
-	// Advance next and prev until next is greater than or equal to pos.
+	// Advance until start is greater than or equal to needle.
 	for {
-		start.clusterIndex = clusterIndexFor(l, start.lineCol.X, start.clusterIndex)
-		for ; start.lineCol.X < l.Layout.Runes.Count; start.lineCol.X++ {
-			cluster := l.Layout.Clusters[start.clusterIndex]
-			if start.runes >= cluster.Runes.Offset+cluster.Runes.Count {
-				start.clusterIndex++
-				cluster = l.Layout.Clusters[start.clusterIndex]
-			}
-			if limit != 0 && count == limit {
-				return start, false
-			}
-			count++
-			if positionGreaterOrEqual(lines, start, needle) {
-				return start, true
-			}
-
-			start.x += cluster.RuneWidth()
-			start.runes++
-		}
-		if start.lineCol.Y == len(lines)-1 {
-			// End of file.
+		if positionGreaterOrEqual(lines, start, needle) {
 			return start, true
 		}
-
-		prevDesc := l.Descent
-		start.lineCol.Y++
-		start.lineCol.X = 0
-		start.clusterIndex = 0
-		l = lines[start.lineCol.Y]
-		start.x = align(alignment, l.Layout.Direction, l.Width, width)
-		if l.Layout.Direction.Progression() == system.TowardOrigin {
-			start.x += l.Width
+		var eof bool
+		start, eof = incrementPosition(lines, alignment, width, start)
+		if eof {
+			return start, true
 		}
-		start.y += (prevDesc + l.Ascent).Ceil()
+		count++
+		if limit != 0 && count == limit {
+			return start, false
+		}
 	}
+}
+
+// incrementPosition updates pos to be one rune further into the text.
+// All fields of pos must be valid before calling incrementPosition. eof will be true when
+// pos represents the final text position in the lines.
+func incrementPosition(lines []text.Line, alignment text.Alignment, width int, pos combinedPos) (_ combinedPos, eof bool) {
+	l := lines[pos.lineCol.Y]
+	handleLineTransition := func() bool {
+		if pos.lineCol.X >= l.Layout.Runes.Count {
+			if pos.lineCol.Y == len(lines)-1 {
+				// End of file.
+				return true
+			}
+			// Move to next line.
+			prevDesc := l.Descent
+			pos.lineCol.Y++
+			pos.lineCol.X = 0
+			pos.clusterIndex = 0
+			l = lines[pos.lineCol.Y]
+			// Use firstPos to get the correct x coordinate of the beginning of the line.
+			alignedPos := firstPos(l, alignment, width)
+			pos.x = alignedPos.x
+			pos.y += (prevDesc + l.Ascent).Ceil()
+		}
+		return false
+	}
+	if handleLineTransition() {
+		return pos, true
+	}
+	pos.x += l.Layout.Clusters[pos.clusterIndex].RuneWidth()
+	pos.runes++
+	pos.lineCol.X++
+	pos.clusterIndex = clusterIndexFor(l, pos.lineCol.X, pos.clusterIndex)
+
+	return pos, handleLineTransition()
 }
 
 // indexRune returns the latest rune index and byte offset no later than r.

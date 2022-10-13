@@ -32,11 +32,17 @@ type screenPos image.Point
 
 const inf = 1e6
 
+// posIsAbove returns whether the position described in pos by the lineCol and
+// y fields is above the given y coordinate. It is invalid to call this function
+// unless both the lineCol and (x,y) fields of pos are populated.
 func posIsAbove(lines []text.Line, pos combinedPos, y int) bool {
 	line := lines[pos.lineCol.Y]
 	return pos.y+line.Bounds.Max.Y.Ceil() < y
 }
 
+// posIsAbove returns whether the position described in pos by the lineCol and
+// y fields is below the given y coordinate. It is invalid to call this function
+// unless both the lineCol and (x,y) fields of pos are populated.
 func posIsBelow(lines []text.Line, pos combinedPos, y int) bool {
 	line := lines[pos.lineCol.Y]
 	return pos.y+line.Bounds.Min.Y.Floor() > y
@@ -84,6 +90,9 @@ func subLayout(line text.Line, start, end combinedPos) text.Layout {
 //
 // The results can be counterinuitive due to the fact that meaning
 // of alignment changes depending on the text direction.
+//
+// The returned pos can be considered valid only for the first line
+// of a body of text.
 func firstPos(line text.Line, alignment text.Alignment, width int) combinedPos {
 	p := combinedPos{
 		x: align(alignment, line.Layout.Direction, line.Width, width),
