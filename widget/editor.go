@@ -1093,6 +1093,8 @@ func (e *Editor) closestPosition(pos combinedPos) combinedPos {
 
 // seekPosition seeks to the position closest to needle, starting at start and returns true.
 // If limit is non-zero, seekPosition stops seeks after limit runes and returns false.
+// Start must have all fields valid, and needle must have at least one of runes, lineCol,
+// or x+y valid. Start must be known to be before needle.
 func seekPosition(lines []text.Line, alignment text.Alignment, width int, start, needle combinedPos, limit int) (combinedPos, bool) {
 	count := 0
 	// Advance until start is greater than or equal to needle.

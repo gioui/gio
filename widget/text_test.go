@@ -1,6 +1,7 @@
 package widget
 
 import (
+	"math"
 	"strconv"
 	"testing"
 
@@ -438,5 +439,90 @@ func TestPositionGreaterOrEqual(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+func TestSeekPosition(t *testing.T) {
+	fontSize := 16
+	lineWidth := fontSize * 10
+	// Be careful tuning the runeLimit here. This test case's complexity
+	// is O(N^2) where N=runeLimit. It's easy to make this test take a stupid
+	// amount of time accidentally.
+	ltrText, rtlText := makeTestText(fontSize, lineWidth, 15)
+	type testcase struct {
+		name  string
+		lines []text.Line
+		align text.Alignment
+		width int
+	}
+	for _, tc := range []testcase{
+		{
+			name:  "ltr",
+			lines: ltrText,
+			align: text.Start,
+			width: lineWidth,
+		},
+		{
+			name:  "rtl",
+			lines: rtlText,
+			align: text.Start,
+			width: lineWidth,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			finalLineRunes := tc.lines[len(tc.lines)-1].Layout.Runes
+			// Statically generate all valid positions.
+			positions := make([]combinedPos, 1, finalLineRunes.Offset+finalLineRunes.Count+1)
+			positions[0] = firstPos(tc.lines[0], tc.align, tc.width)
+			for i := 1; ; i++ {
+				pos, eof := incrementPosition(tc.lines, tc.align, tc.width, positions[i-1])
+				positions = append(positions, pos)
+				if eof {
+					break
+				}
+			}
+			for i, start := range positions {
+				for k, needle := range positions {
+					if k < i {
+						continue
+					}
+					t.Run(tc.name+" "+strconv.Itoa(i)+"->"+strconv.Itoa(k), func(t *testing.T) {
+						for kind := 0; kind < 3; kind++ {
+							p2 := needle
+							transform := ""
+							switch kind {
+							case 0: // only runes populated
+								transform = "runes only"
+								p2.lineCol = screenPos{}
+								p2.x = 0
+								p2.y = 0
+							case 1: // only lineCol populated
+								transform = "lineCol only"
+								p2.runes = 0
+								p2.x = 0
+								p2.y = 0
+							case 2: // only x and y populated
+								transform = "x,y only"
+								p2.runes = 0
+								p2.lineCol = screenPos{}
+							}
+							for limit := 0; limit <= 10; limit += 5 {
+								result, found := seekPosition(tc.lines, tc.align, tc.width, start, p2, limit)
+								if (found && result != needle) || (!found && needle.runes-start.runes < limit) {
+									t.Errorf("unexpected result seeking p[%d] -> p[%d](%s) (limit %d, found %v) = %#+v\np1: %#+v\np2:%#+v", i, k, transform, limit, found, result, start, p2)
+								}
+							}
+						}
+					})
+				}
+			}
+			result, found := seekPosition(tc.lines, tc.align, tc.width, positions[0], combinedPos{runes: math.MaxInt}, 0)
+			if !found {
+				t.Errorf("reported hit limit on max int")
+			}
+			if expected := positions[len(positions)-1]; result != expected {
+				t.Errorf("expected maximum int position to equal final position.\nexpected %#+v\nactual   %#+v", expected, result)
+			}
+		})
 	}
 }
