@@ -68,13 +68,9 @@ func clipLine(lines []text.Line, alignment text.Alignment, width int, clip image
 }
 
 func subLayout(line text.Line, start, end combinedPos) text.Layout {
-	if start.lineCol.X == line.Layout.Runes.Count {
-		return text.Layout{}
-	}
-
 	startCluster := clusterIndexFor(line, start.lineCol.X, start.clusterIndex)
 	endCluster := clusterIndexFor(line, end.lineCol.X, end.clusterIndex)
-	if startCluster > endCluster {
+	if line.Layout.Direction.Progression() == system.TowardOrigin {
 		startCluster, endCluster = endCluster, startCluster
 	}
 	return line.Layout.Slice(startCluster, endCluster)

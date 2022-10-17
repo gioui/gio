@@ -794,9 +794,6 @@ func (e *Editor) PaintText(gtx layout.Context) {
 		start, end := clipLine(e.lines, e.Alignment, e.viewSize.X, cl, pos)
 		line := e.lines[start.lineCol.Y]
 		off := image.Point{X: start.x.Floor(), Y: start.y}.Sub(scroll)
-		if start.lineCol.X > end.lineCol.X {
-			start, end = end, start
-		}
 		l := subLayout(line, start, end)
 
 		t := op.Offset(off).Push(gtx.Ops)
