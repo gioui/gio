@@ -1000,13 +1000,17 @@ func (e *Editor) indexPosition(pos combinedPos) combinedPos {
 }
 
 // positionGreaterOrEqual reports whether p1 >= p2 according to the non-zero fields
-// of p2. All fields of p1 must be a consistent and valid. The clusterIndex field
-// is never considered, as it is a line-local property.
+// of p2. All fields of p1 must be consistent and valid.
 func positionGreaterOrEqual(lines []text.Line, p1, p2 combinedPos) bool {
 	l := lines[p1.lineCol.Y]
-	endCol := l.Layout.Runes.Count - 1
-	if lastLine := p1.lineCol.Y == len(lines)-1; lastLine {
-		endCol++
+	// Check whether the final glyph cluster has no glyphs, indicating a newline
+	// rune that forced the existence of a line break.
+	hardNewLine := len(l.Layout.Clusters) > 0 && l.Layout.Clusters[len(l.Layout.Clusters)-1].Glyphs.Count == 0
+	endCol := l.Layout.Runes.Count
+	if hardNewLine {
+		// If there was a hard newline, prevent the cursor for passing it on
+		// this line.
+		endCol--
 	}
 	eol := p1.lineCol.X == endCol
 	switch {
@@ -1031,17 +1035,24 @@ func positionGreaterOrEqual(lines []text.Line, p1, p2 combinedPos) bool {
 		if eol {
 			return true
 		}
+		// If clusterIndex is equal, they could be positions of different
+		// runes within the same cluster, so we fall back to the positional
+		// test below.
+		if p2.clusterIndex != 0 && p1.clusterIndex != p2.clusterIndex {
+			return p1.clusterIndex > p2.clusterIndex
+		}
 
-		// Find the cluster containing the rune position described by p1
-		// in order to determine the width of a rune within it.
-		clusterIdx := clusterIndexFor(l, p1.lineCol.X, p1.clusterIndex)
 		flip := l.Layout.Direction.Progression() == system.TowardOrigin
-		adv := l.Layout.Clusters[clusterIdx].RuneWidth()
+		if p1.clusterIndex == len(l.Layout.Clusters) {
+			return (!flip && p1.x >= p2.x) || (flip && p1.x <= p2.x)
+		} else {
+			adv := l.Layout.Clusters[p1.clusterIndex].RuneWidth()
 
-		left := p1.x + adv - p2.x
-		right := p2.x - p1.x
+			left := p1.x + adv - p2.x
+			right := p2.x - p1.x
 
-		return (!flip && left >= right) || (flip && left <= right)
+			return (!flip && left >= right) || (flip && left <= right)
+		}
 	}
 	return true
 }
@@ -1114,39 +1125,53 @@ func seekPosition(lines []text.Line, alignment text.Alignment, width int, start,
 	}
 }
 
-// incrementPosition updates pos to be one rune further into the text.
+// incrementLinePosition transitions pos from the end of a line to the beginning of the next one.
+// If pos is not at the end of a line, it will have no effect. It returns the (possibly modified)
+// position, whether it handled the transition from the end of a line, and whether the position
+// is at the end of the text data.
+func incrementLinePosition(lines []text.Line, alignment text.Alignment, width int, pos combinedPos) (_ combinedPos, eol, eof bool) {
+	l := lines[pos.lineCol.Y]
+	if pos.lineCol.X >= l.Layout.Runes.Count {
+		if pos.lineCol.Y == len(lines)-1 {
+			// End of file.
+			return pos, false, true
+		}
+		// Move to next line.
+		prevDesc := l.Descent
+		pos.lineCol.Y++
+		pos.lineCol.X = 0
+		pos.clusterIndex = 0
+		l = lines[pos.lineCol.Y]
+		// Use firstPos to get the correct x coordinate of the beginning of the line.
+		alignedPos := firstPos(l, alignment, width)
+		pos.x = alignedPos.x
+		pos.y += (prevDesc + l.Ascent).Ceil()
+		return pos, true, false
+	}
+	return pos, false, false
+}
+
+// incrementPosition updates pos to be one position further into the text. This will either
+// move pos one rune further into the text, transition pos from the end of one line to the
+// beginning of the next, or both.
 // All fields of pos must be valid before calling incrementPosition. eof will be true when
 // pos represents the final text position in the lines.
 func incrementPosition(lines []text.Line, alignment text.Alignment, width int, pos combinedPos) (_ combinedPos, eof bool) {
+	var eol bool
+	pos, eol, eof = incrementLinePosition(lines, alignment, width, pos)
+	if eof || eol {
+		return pos, eof
+	}
 	l := lines[pos.lineCol.Y]
-	handleLineTransition := func() bool {
-		if pos.lineCol.X >= l.Layout.Runes.Count {
-			if pos.lineCol.Y == len(lines)-1 {
-				// End of file.
-				return true
-			}
-			// Move to next line.
-			prevDesc := l.Descent
-			pos.lineCol.Y++
-			pos.lineCol.X = 0
-			pos.clusterIndex = 0
-			l = lines[pos.lineCol.Y]
-			// Use firstPos to get the correct x coordinate of the beginning of the line.
-			alignedPos := firstPos(l, alignment, width)
-			pos.x = alignedPos.x
-			pos.y += (prevDesc + l.Ascent).Ceil()
-		}
-		return false
-	}
-	if handleLineTransition() {
-		return pos, true
-	}
+	isHardNewLine := l.Layout.Clusters[pos.clusterIndex].Glyphs.Count == 0
 	pos.x += l.Layout.Clusters[pos.clusterIndex].RuneWidth()
 	pos.runes++
 	pos.lineCol.X++
 	pos.clusterIndex = clusterIndexFor(l, pos.lineCol.X, pos.clusterIndex)
-
-	return pos, handleLineTransition()
+	if isHardNewLine {
+		pos, _, eof = incrementLinePosition(lines, alignment, width, pos)
+	}
+	return pos, false
 }
 
 // indexRune returns the latest rune index and byte offset no later than r.

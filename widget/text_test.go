@@ -231,6 +231,9 @@ func TestIncrementPosition(t *testing.T) {
 					if input.clusterIndex > output.clusterIndex {
 						t.Errorf("iteration %d advanced clusterIndex incorrectly: input %d output %d", i, input.clusterIndex, output.clusterIndex)
 					}
+					if output.runes != input.runes+1 {
+						t.Errorf("iteration %d advanced runes incorrectly: input %d output %d", i, input.runes, output.runes)
+					}
 				} else {
 					if input.y >= output.y {
 						t.Errorf("iteration %d advanced the wrong way on y axis: input %v(%d) output %v(%d)", i, input.y, input.y, output.y, output.y)
@@ -251,9 +254,6 @@ func TestIncrementPosition(t *testing.T) {
 					if output.lineCol.X != 0 {
 						t.Errorf("iteration %d should have zeroed lineCol.X, got: %d", i, output.lineCol.X)
 					}
-				}
-				if output.runes != input.runes+1 {
-					t.Errorf("iteration %d advanced runes incorrectly: input %d output %d", i, input.runes, output.runes)
 				}
 				input = output
 			}
