@@ -314,7 +314,7 @@ const (
 )
 
 func (w *window) NewContext() (context, error) {
-	funcs := []func(w *window) (context, error){newAndroidVulkanContext, newAndroidGLESContext}
+	funcs := []func(w *window) (context, error){newAndroidGLESContext, newAndroidVulkanContext}
 	var firstErr error
 	for _, f := range funcs {
 		if f == nil {
