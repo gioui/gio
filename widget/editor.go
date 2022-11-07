@@ -649,21 +649,25 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 
 	defer clip.Rect(image.Rectangle{Max: e.viewSize}).Push(gtx.Ops).Pop()
 	pointer.CursorText.Add(gtx.Ops)
-	const keyFilterNoLeftUp = "(ShortAlt)-(Shift)-[→,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
-	const keyFilterNoRightDown = "(ShortAlt)-(Shift)-[←,↑]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
-	const keyFilterNoArrows = "(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
-	const keyFilterAllArrows = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
-	caret := e.closestPosition(combinedPos{runes: e.caret.start})
-	switch {
-	case caret.runes == 0 && caret.runes == e.Len():
-		key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keyFilterNoArrows}.Add(gtx.Ops)
-	case caret.runes == 0:
-		key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keyFilterNoLeftUp}.Add(gtx.Ops)
-	case caret.runes == e.Len():
-		key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keyFilterNoRightDown}.Add(gtx.Ops)
-	default:
-		key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keyFilterAllArrows}.Add(gtx.Ops)
+	var keys key.Set
+	if e.focused {
+		const keyFilterNoLeftUp = "(ShortAlt)-(Shift)-[→,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
+		const keyFilterNoRightDown = "(ShortAlt)-(Shift)-[←,↑]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
+		const keyFilterNoArrows = "(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
+		const keyFilterAllArrows = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
+		caret := e.closestPosition(combinedPos{runes: e.caret.start})
+		switch {
+		case caret.runes == 0 && caret.runes == e.Len():
+			keys = keyFilterNoArrows
+		case caret.runes == 0:
+			keys = keyFilterNoLeftUp
+		case caret.runes == e.Len():
+			keys = keyFilterNoRightDown
+		default:
+			keys = keyFilterAllArrows
+		}
 	}
+	key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keys}.Add(gtx.Ops)
 	if e.requestFocus {
 		key.FocusOp{Tag: &e.eventKey}.Add(gtx.Ops)
 		key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)
@@ -786,9 +790,6 @@ func (e *Editor) PaintText(gtx layout.Context) {
 		start, end := clipLine(e.lines, e.Alignment, e.viewSize.X, cl, pos)
 		line := e.lines[start.lineCol.Y]
 		off := image.Point{X: start.x.Floor(), Y: start.y}.Sub(scroll)
-		if start.lineCol.X > end.lineCol.X {
-			start, end = end, start
-		}
 		l := subLayout(line, start, end)
 
 		t := op.Offset(off).Push(gtx.Ops)
@@ -998,12 +999,17 @@ func (e *Editor) indexPosition(pos combinedPos) combinedPos {
 }
 
 // positionGreaterOrEqual reports whether p1 >= p2 according to the non-zero fields
-// of p2. All fields of p1 must be a consistent and valid.
+// of p2. All fields of p1 must be consistent and valid.
 func positionGreaterOrEqual(lines []text.Line, p1, p2 combinedPos) bool {
 	l := lines[p1.lineCol.Y]
-	endCol := l.Layout.Runes.Count - 1
-	if lastLine := p1.lineCol.Y == len(lines)-1; lastLine {
-		endCol++
+	// Check whether the final glyph cluster has no glyphs, indicating a newline
+	// rune that forced the existence of a line break.
+	hardNewLine := len(l.Layout.Clusters) > 0 && l.Layout.Clusters[len(l.Layout.Clusters)-1].Glyphs.Count == 0
+	endCol := l.Layout.Runes.Count
+	if hardNewLine {
+		// If there was a hard newline, prevent the cursor for passing it on
+		// this line.
+		endCol--
 	}
 	eol := p1.lineCol.X == endCol
 	switch {
@@ -1028,17 +1034,24 @@ func positionGreaterOrEqual(lines []text.Line, p1, p2 combinedPos) bool {
 		if eol {
 			return true
 		}
+		// If clusterIndex is equal, they could be positions of different
+		// runes within the same cluster, so we fall back to the positional
+		// test below.
+		if p2.clusterIndex != 0 && p1.clusterIndex != p2.clusterIndex {
+			return p1.clusterIndex > p2.clusterIndex
+		}
 
-		// Find the cluster containing the rune position described by p1
-		// in order to determine the width of a rune within it.
-		clusterIdx := clusterIndexFor(l, p1.lineCol.X, p1.clusterIndex)
 		flip := l.Layout.Direction.Progression() == system.TowardOrigin
-		adv := l.Layout.Clusters[clusterIdx].RuneWidth()
+		if p1.clusterIndex == len(l.Layout.Clusters) {
+			return (!flip && p1.x >= p2.x) || (flip && p1.x <= p2.x)
+		} else {
+			adv := l.Layout.Clusters[p1.clusterIndex].RuneWidth()
 
-		left := p1.x + adv - p2.x
-		right := p2.x - p1.x
+			left := p1.x + adv - p2.x
+			right := p2.x - p1.x
 
-		return (!flip && left >= right) || (flip && left <= right)
+			return (!flip && left >= right) || (flip && left <= right)
+		}
 	}
 	return true
 }
@@ -1047,7 +1060,16 @@ func positionGreaterOrEqual(lines []text.Line, p1, p2 combinedPos) bool {
 // at the given position within the line. As a special case, if the rune is one
 // beyond the final rune of the line, it returns the length of the line's clusters
 // slice. Otherwise, it panics if given a rune beyond the
-// dimensions of the line.
+// dimensions of the line. The startIdx must be known to be at or before
+// the real index of the cluster. This means that this function is
+// only useful for searching forward through text, not backward.
+// Passing a startIdx after the cluster corresponding to the runeIdx
+// will trigger a panic.
+//
+// All indices are relative to the content in the line. The runeIdx 0
+// refers to the first rune on the line, regardless of the line's
+// rune offset. Similarly, the provided and returned glyph cluster
+// indices are relative to the line's cluster slice.
 func clusterIndexFor(line text.Line, runeIdx, startIdx int) int {
 	if runeIdx == line.Layout.Runes.Count {
 		return len(line.Layout.Clusters)
@@ -1081,45 +1103,74 @@ func (e *Editor) closestPosition(pos combinedPos) combinedPos {
 
 // seekPosition seeks to the position closest to needle, starting at start and returns true.
 // If limit is non-zero, seekPosition stops seeks after limit runes and returns false.
+// Start must have all fields valid, and needle must have at least one of runes, lineCol,
+// or x+y valid. Start must be known to be before needle.
 func seekPosition(lines []text.Line, alignment text.Alignment, width int, start, needle combinedPos, limit int) (combinedPos, bool) {
-	l := lines[start.lineCol.Y]
 	count := 0
-	// Advance next and prev until next is greater than or equal to pos.
+	// Advance until start is greater than or equal to needle.
 	for {
-		start.clusterIndex = clusterIndexFor(l, start.lineCol.X, start.clusterIndex)
-		for ; start.lineCol.X < l.Layout.Runes.Count; start.lineCol.X++ {
-			cluster := l.Layout.Clusters[start.clusterIndex]
-			if start.runes >= cluster.Runes.Offset+cluster.Runes.Count {
-				start.clusterIndex++
-				cluster = l.Layout.Clusters[start.clusterIndex]
-			}
-			if limit != 0 && count == limit {
-				return start, false
-			}
-			count++
-			if positionGreaterOrEqual(lines, start, needle) {
-				return start, true
-			}
-
-			start.x += cluster.RuneWidth()
-			start.runes++
-		}
-		if start.lineCol.Y == len(lines)-1 {
-			// End of file.
+		if positionGreaterOrEqual(lines, start, needle) {
 			return start, true
 		}
-
-		prevDesc := l.Descent
-		start.lineCol.Y++
-		start.lineCol.X = 0
-		start.clusterIndex = 0
-		l = lines[start.lineCol.Y]
-		start.x = align(alignment, l.Layout.Direction, l.Width, width)
-		if l.Layout.Direction.Progression() == system.TowardOrigin {
-			start.x += l.Width
+		var eof bool
+		start, eof = incrementPosition(lines, alignment, width, start)
+		if eof {
+			return start, true
 		}
-		start.y += (prevDesc + l.Ascent).Ceil()
+		count++
+		if limit != 0 && count == limit {
+			return start, false
+		}
 	}
+}
+
+// incrementLinePosition transitions pos from the end of a line to the beginning of the next one.
+// If pos is not at the end of a line, it will have no effect. It returns the (possibly modified)
+// position, whether it handled the transition from the end of a line, and whether the position
+// is at the end of the text data.
+func incrementLinePosition(lines []text.Line, alignment text.Alignment, width int, pos combinedPos) (_ combinedPos, eol, eof bool) {
+	l := lines[pos.lineCol.Y]
+	if pos.lineCol.X >= l.Layout.Runes.Count {
+		if pos.lineCol.Y == len(lines)-1 {
+			// End of file.
+			return pos, false, true
+		}
+		// Move to next line.
+		prevDesc := l.Descent
+		pos.lineCol.Y++
+		pos.lineCol.X = 0
+		pos.clusterIndex = 0
+		l = lines[pos.lineCol.Y]
+		// Use firstPos to get the correct x coordinate of the beginning of the line.
+		alignedPos := firstPos(l, alignment, width)
+		pos.x = alignedPos.x
+		pos.y += (prevDesc + l.Ascent).Ceil()
+		return pos, true, false
+	}
+	return pos, false, false
+}
+
+// incrementPosition updates pos to be one position further into the text. This will either
+// move pos one rune further into the text, transition pos from the end of one line to the
+// beginning of the next, or both.
+// All fields of pos must be valid before calling incrementPosition. eof will be true when
+// pos represents the final text position in the lines.
+func incrementPosition(lines []text.Line, alignment text.Alignment, width int, pos combinedPos) (_ combinedPos, eof bool) {
+	var eol bool
+	pos, eol, eof = incrementLinePosition(lines, alignment, width, pos)
+	if eof || eol {
+		return pos, eof
+	}
+	l := lines[pos.lineCol.Y]
+	isHardNewLine := l.Layout.Clusters[pos.clusterIndex].Glyphs.Count == 0
+	pos.x += l.Layout.Clusters[pos.clusterIndex].RuneWidth()
+	pos.runes++
+	pos.lineCol.X++
+	pos.clusterIndex = clusterIndexFor(l, pos.lineCol.X, pos.clusterIndex)
+	if isHardNewLine {
+		pos, _, eof = incrementLinePosition(lines, alignment, width, pos)
+	}
+	return pos, false
 }
 
 // indexRune returns the latest rune index and byte offset no later than r.

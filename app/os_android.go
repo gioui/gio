@@ -314,7 +314,7 @@ const (
 )
 
 func (w *window) NewContext() (context, error) {
-	funcs := []func(w *window) (context, error){newAndroidVulkanContext, newAndroidGLESContext}
+	funcs := []func(w *window) (context, error){newAndroidGLESContext, newAndroidVulkanContext}
 	var firstErr error
 	for _, f := range funcs {
 		if f == nil {
@@ -552,7 +552,7 @@ func Java_org_gioui_GioView_onLowMemory(env *C.JNIEnv, class C.jclass) {
 func Java_org_gioui_GioView_onConfigurationChanged(env *C.JNIEnv, class C.jclass, view C.jlong) {
 	w := cgo.Handle(view).Value().(*window)
 	w.loadConfig(env, class)
-	if w.stage >= system.StageRunning {
+	if w.stage >= system.StageInactive {
 		w.draw(env, true)
 	}
 }
@@ -563,7 +563,7 @@ func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view 
 	if !exist {
 		return
 	}
-	if w.stage < system.StageRunning {
+	if w.stage < system.StageInactive {
 		return
 	}
 	if w.animating {
@@ -596,7 +596,7 @@ func Java_org_gioui_GioView_onWindowInsets(env *C.JNIEnv, class C.jclass, view C
 		left:   int(left),
 		right:  int(right),
 	}
-	if w.stage >= system.StageRunning {
+	if w.stage >= system.StageInactive {
 		w.draw(env, true)
 	}
 }

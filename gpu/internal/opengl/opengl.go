@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"math/bits"
 	"runtime"
 	"strings"
 	"time"
@@ -105,6 +106,7 @@ type texture struct {
 	triple   textureTriple
 	width    int
 	height   int
+	mipmap   bool
 	bindings driver.BufferBinding
 	foreign  bool
 }
@@ -695,13 +697,29 @@ func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, min
 		return nil, errors.New("unsupported texture format")
 	}
 	b.BindTexture(0, tex)
-	b.funcs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, toTexFilter(magFilter))
-	b.funcs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, toTexFilter(minFilter))
+	min, mipmap := toTexFilter(minFilter)
+	mag, _ := toTexFilter(magFilter)
+	if b.gles && b.glver[0] < 3 {
+		// OpenGL ES 2 only supports mipmaps for power-of-two textures.
+		mipmap = false
+	}
+	tex.mipmap = mipmap
+	b.funcs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, mag)
+	b.funcs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, min)
 	b.funcs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 	b.funcs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-	if b.gles && b.glver[0] >= 3 {
+	if mipmap {
+		nmipmaps := 1
+		if mipmap {
+			dim := width
+			if height > dim {
+				dim = height
+			}
+			log2 := 32 - bits.LeadingZeros32(uint32(dim)) - 1
+			nmipmaps = log2 + 1
+		}
 		// Immutable textures are required for BindImageTexture, and can't hurt otherwise.
-		b.funcs.TexStorage2D(gl.TEXTURE_2D, 1, tex.triple.internalFormat, width, height)
+		b.funcs.TexStorage2D(gl.TEXTURE_2D, nmipmaps, tex.triple.internalFormat, width, height)
 	} else {
 		b.funcs.TexImage2D(gl.TEXTURE_2D, 0, tex.triple.internalFormat, width, height, tex.triple.format, tex.triple.typ)
 	}
@@ -1195,12 +1213,14 @@ func (p *pipeline) Release() {
 	*p = pipeline{}
 }
 
-func toTexFilter(f driver.TextureFilter) int {
+func toTexFilter(f driver.TextureFilter) (int, bool) {
 	switch f {
 	case driver.FilterNearest:
-		return gl.NEAREST
+		return gl.NEAREST, false
 	case driver.FilterLinear:
-		return gl.LINEAR
+		return gl.LINEAR, false
+	case driver.FilterLinearMipmapLinear:
+		return gl.LINEAR_MIPMAP_LINEAR, true
 	default:
 		panic("unsupported texture filter")
 	}
@@ -1234,6 +1254,9 @@ func (t *texture) Upload(offset, size image.Point, pixels []byte, stride int) {
 	}
 	t.backend.glstate.pixelStorei(t.backend.funcs, gl.UNPACK_ROW_LENGTH, rowLen)
 	t.backend.funcs.TexSubImage2D(gl.TEXTURE_2D, 0, offset.X, offset.Y, size.X, size.Y, t.triple.format, t.triple.typ, pixels)
+	if t.mipmap {
+		t.backend.funcs.GenerateMipmap(gl.TEXTURE_2D)
+	}
 }
 
 func (t *timer) Begin() {

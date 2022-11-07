@@ -32,11 +32,17 @@ type screenPos image.Point
 
 const inf = 1e6
 
+// posIsAbove returns whether the position described in pos by the lineCol and
+// y fields is above the given y coordinate. It is invalid to call this function
+// unless both the lineCol and (x,y) fields of pos are populated.
 func posIsAbove(lines []text.Line, pos combinedPos, y int) bool {
 	line := lines[pos.lineCol.Y]
 	return pos.y+line.Bounds.Max.Y.Ceil() < y
 }
 
+// posIsAbove returns whether the position described in pos by the lineCol and
+// y fields is below the given y coordinate. It is invalid to call this function
+// unless both the lineCol and (x,y) fields of pos are populated.
 func posIsBelow(lines []text.Line, pos combinedPos, y int) bool {
 	line := lines[pos.lineCol.Y]
 	return pos.y+line.Bounds.Min.Y.Floor() > y
@@ -68,18 +74,25 @@ func clipLine(lines []text.Line, alignment text.Alignment, width int, clip image
 }
 
 func subLayout(line text.Line, start, end combinedPos) text.Layout {
-	if start.lineCol.X == line.Layout.Runes.Count {
-		return text.Layout{}
-	}
-
 	startCluster := clusterIndexFor(line, start.lineCol.X, start.clusterIndex)
 	endCluster := clusterIndexFor(line, end.lineCol.X, end.clusterIndex)
-	if startCluster > endCluster {
+	if line.Layout.Direction.Progression() == system.TowardOrigin {
 		startCluster, endCluster = endCluster, startCluster
 	}
 	return line.Layout.Slice(startCluster, endCluster)
 }
 
+// firstPos returns a combinedPos with *only* the x and y
+// fields populated. They will be set to the location of the
+// dot at the beginning of the line, with text alignment taken
+// into account. For RTL text, this will
+// be on the right edge of the available space.
+//
+// The results can be counterinuitive due to the fact that meaning
+// of alignment changes depending on the text direction.
+//
+// The returned pos can be considered valid only for the first line
+// of a body of text.
 func firstPos(line text.Line, alignment text.Alignment, width int) combinedPos {
 	p := combinedPos{
 		x: align(alignment, line.Layout.Direction, line.Width, width),
@@ -90,10 +103,6 @@ func firstPos(line text.Line, alignment text.Alignment, width int) combinedPos {
 		p.x += line.Width
 	}
 	return p
-}
-
-func (p1 screenPos) Less(p2 screenPos) bool {
-	return p1.Y < p2.Y || (p1.Y == p2.Y && p1.X < p2.X)
 }
 
 func (l Label) Layout(gtx layout.Context, s text.Shaper, font text.Font, size unit.Sp, txt string) layout.Dimensions {
