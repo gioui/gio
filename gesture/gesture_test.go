@@ -98,9 +98,10 @@ func mouseClickEvents(times ...time.Duration) []event.Event {
 	}
 	events := make([]event.Event, 0, 2*len(times))
 	for _, t := range times {
+		press := press
+		press.Time = t
 		release := press
 		release.Type = pointer.Release
-		release.Time = t
 		events = append(events, press, release)
 	}
 	return events

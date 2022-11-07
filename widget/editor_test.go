@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 	"testing/quick"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -846,6 +847,7 @@ g 2 4 6 8 g
 	font := text.Font{}
 	fontSize := unit.Sp(10)
 
+	var tim time.Duration
 	selected := func(start, end int) string {
 		// Layout once with no events; populate e.lines.
 		gtx.Queue = nil
@@ -861,15 +863,18 @@ g 2 4 6 8 g
 					Buttons:  pointer.ButtonPrimary,
 					Type:     pointer.Press,
 					Source:   pointer.Mouse,
+					Time:     tim,
 					Position: f32.Pt(textWidth(e, startPos.lineCol.Y, 0, startPos.lineCol.X), textHeight(e, startPos.lineCol.Y)),
 				},
 				pointer.Event{
 					Type:     pointer.Release,
 					Source:   pointer.Mouse,
+					Time:     tim,
 					Position: f32.Pt(textWidth(e, endPos.lineCol.Y, 0, endPos.lineCol.X), textHeight(e, endPos.lineCol.Y)),
 				},
 			},
 		}
+		tim += time.Second // Avoid multi-clicks.
 		gtx.Queue = tq
 
 		e.Layout(gtx, cache, font, fontSize, nil)
