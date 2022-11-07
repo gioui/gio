@@ -296,10 +296,15 @@ func (e *Editor) processPointer(gtx layout.Context) {
 				}
 				e.dragging = true
 
-				// Process a double-click.
-				if evt.NumClicks == 2 {
+				// Process multi-clicks.
+				switch {
+				case evt.NumClicks == 2:
 					e.moveWord(-1, selectionClear)
 					e.moveWord(1, selectionExtend)
+					e.dragging = false
+				case evt.NumClicks >= 3:
+					e.moveStart(selectionClear)
+					e.moveEnd(selectionExtend)
 					e.dragging = false
 				}
 			}
