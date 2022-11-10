@@ -52,6 +52,15 @@ func DataDir() (string, error) {
 	return dataDir()
 }
 
+// Start starts the foreground service on android, notifies the system that the
+// program will perform background work and that it shouldn't be killed. The
+// foreground service is stopped using the cancel function returned by Start().
+// If multiple calls to Start are made, the foreground service will not be
+// stopped until the final cancel function has been called.
+func Start(title, text string) (stop func(), err error) {
+	return startForeground(title, text)
+}
+
 // Main must be called last from the program main function.
 // On most platforms Main blocks forever, for Android and
 // iOS it returns immediately to give control of the main
