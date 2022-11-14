@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 	"unicode/utf8"
+
+	"golang.org/x/text/runes"
 )
 
 // editBuffer implements a gap buffer for text editing.
@@ -162,6 +164,10 @@ func (e *editBuffer) String() string {
 }
 
 func (e *editBuffer) prepend(caret int, s string) {
+	if !utf8.ValidString(s) {
+		s = runes.ReplaceIllFormed().String(s)
+	}
+
 	e.moveGap(caret, len(s))
 	copy(e.text[caret:], s)
 	e.gapstart += len(s)
