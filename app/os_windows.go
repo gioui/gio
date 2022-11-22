@@ -407,11 +407,12 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			comp.Start = state.RunesIndex(state.UTF16Index(comp.Start) + start)
 		}
 		w.w.SetComposingRegion(comp)
+		pos := end
 		if lParam&windows.GCS_CURSORPOS != 0 {
 			rel := windows.ImmGetCompositionValue(imc, windows.GCS_CURSORPOS)
-			pos := state.RunesIndex(state.UTF16Index(rng.Start) + rel)
-			w.w.SetEditorSelection(key.Range{Start: pos, End: pos})
+			pos = state.RunesIndex(state.UTF16Index(rng.Start) + rel)
 		}
+		w.w.SetEditorSelection(key.Range{Start: pos, End: pos})
 		return windows.TRUE
 	case windows.WM_IME_ENDCOMPOSITION:
 		w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
