@@ -374,6 +374,11 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 		w.destroy()
 		return nil, errors.New("wayland: xdg_surface_get_toplevel failed")
 	}
+
+	id := C.CString(ID)
+	defer C.free(unsafe.Pointer(id))
+	C.xdg_toplevel_set_app_id(w.topLvl, id)
+
 	cursorTheme := C.CString(os.Getenv("XCURSOR_THEME"))
 	defer C.free(unsafe.Pointer(cursorTheme))
 	cursorSize := 32

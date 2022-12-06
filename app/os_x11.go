@@ -30,8 +30,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"os"
-	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -793,7 +791,7 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 	hints.flags = C.InputHint
 	C.XSetWMHints(dpy, win, &hints)
 
-	name := C.CString(filepath.Base(os.Args[0]))
+	name := C.CString(ID)
 	defer C.free(unsafe.Pointer(name))
 	wmhints := C.XClassHint{name, name}
 	C.XSetClassHint(dpy, win, &wmhints)
