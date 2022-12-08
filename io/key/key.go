@@ -238,7 +238,11 @@ func (k Set) Contains(name string, mods Modifiers) bool {
 		var modSet, keySet string
 		sep := strings.LastIndex(chord, "-")
 		if sep != -1 {
-			modSet, keySet = chord[:sep], chord[sep+1:]
+			if chord == "-" {
+				modSet, keySet = "", chord
+			} else {
+				modSet, keySet = chord[:sep], chord[sep+1:]
+			}
 		} else {
 			modSet, keySet = "", chord
 		}
