@@ -1079,6 +1079,7 @@ func (w *window) Configure(options []Option) {
 		w.setWindowConstraints()
 	}
 	w.w.Event(ConfigEvent{Config: w.config})
+	w.redraw = true
 }
 
 func (w *window) setWindowConstraints() {
