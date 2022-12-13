@@ -39,7 +39,7 @@ secrets:
 tasks:
  - install_go: |
      mkdir -p /home/build/sdk
-     curl -s https://dl.google.com/go/go1.17.7.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
+     curl -s https://dl.google.com/go/go1.18.9.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
  - check_gofmt: |
      cd gio
      test -z "$(gofmt -s -l .)"
