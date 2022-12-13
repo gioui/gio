@@ -95,7 +95,7 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 - (void)middleMouseDown:(NSEvent *)event {
 	handleMouse(self, event, MOUSE_DOWN, 0, 0);
 }
-- (void)middletMouseUp:(NSEvent *)event {
+- (void)middleMouseUp:(NSEvent *)event {
 	handleMouse(self, event, MOUSE_UP, 0, 0);
 }
 - (void)rightMouseDown:(NSEvent *)event {
