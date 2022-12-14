@@ -192,6 +192,8 @@ func (l *Shaper) layoutText(params Parameters, minWidth, maxWidth int, lc system
 		l.txt.append(l.layoutParagraph(params, minWidth, maxWidth, lc, "", nil))
 		return
 	}
+	truncating := params.MaxLines > 0
+	maxLines := params.MaxLines
 	var done bool
 	var startByte int
 	var endByte int
@@ -222,6 +224,12 @@ func (l *Shaper) layoutText(params Parameters, minWidth, maxWidth int, lc system
 			done = endByte == len(str)
 		}
 		l.txt.append(l.layoutParagraph(params, minWidth, maxWidth, lc, str[startByte:endByte], l.paragraph))
+		if truncating {
+			params.MaxLines = maxLines - len(l.txt.lines)
+			if params.MaxLines == 0 {
+				done = true
+			}
+		}
 		if done {
 			return
 		}

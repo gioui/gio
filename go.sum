@@ -6,12 +6,12 @@ gioui.org/cpu v0.0.0-20210817075930-8d6a761490d2/go.mod h1:A8M0Cn5o+vY5LTMlnRoK3
 gioui.org/shader v1.0.6 h1:cvZmU+eODFR2545X+/8XucgZdTtEjR3QWW6W65b0q5Y=
 gioui.org/shader v1.0.6/go.mod h1:mWdiME581d/kV7/iEhLmUgUK5iZ09XR5XpduXzbePVM=
 github.com/benoitkugler/pstokenizer v1.0.0/go.mod h1:l1G2Voirz0q/jj0TQfabNxVsa8HZXh/VMxFSRALWTiE=
-github.com/benoitkugler/textlayout v0.2.0 h1:I+s1LuIKckIJgDbsGF1iUNEZ24HZ8mMfb2LsMJU+Uko=
-github.com/benoitkugler/textlayout v0.2.0/go.mod h1:o+1hFV+JSHBC9qNLIuwVoLedERU7sBPgEFcuSgfvi/w=
+github.com/benoitkugler/textlayout v0.3.0 h1:2ehWXEkgb6RUokTjXh1LzdGwG4dRP6X3dqhYYDYhUVk=
+github.com/benoitkugler/textlayout v0.3.0/go.mod h1:o+1hFV+JSHBC9qNLIuwVoLedERU7sBPgEFcuSgfvi/w=
 github.com/benoitkugler/textlayout-testdata v0.1.1 h1:AvFxBxpfrQd8v55qH59mZOJOQjtD6K2SFe9/HvnIbJk=
 github.com/benoitkugler/textlayout-testdata v0.1.1/go.mod h1:i/qZl09BbUOtd7Bu/W1CAubRwTWrEXWq6JwMkw8wYxo=
-github.com/go-text/typesetting v0.0.0-20221111143014-22bec069817d h1:aAOmUgKRf9Rg2OsWezNWgsEjEtCIcFReQgXH81LrldI=
-github.com/go-text/typesetting v0.0.0-20221111143014-22bec069817d/go.mod h1:RO32JTaCKQV+XI9psTihlQhZsQJp0R4BIkJvHQGsuVo=
+github.com/go-text/typesetting v0.0.0-20221214153724-0399769901d5 h1:iOA0HmtpANn48hX2nlDNMu0VVaNza35HJG0WeetBVzQ=
+github.com/go-text/typesetting v0.0.0-20221214153724-0399769901d5/go.mod h1:/cmOXaoTiO+lbCwkTZBgCvevJpbFsZ5reXIpEJVh5MI=
 golang.org/x/exp v0.0.0-20221012211006-4de253d81b95 h1:sBdrWpxhGDdTAYNqbgBLAR+ULAPPhfgncLr1X0lyWtg=
 golang.org/x/exp v0.0.0-20221012211006-4de253d81b95/go.mod h1:cyybsKvd6eL0RnXn6p/Grxp8F5bW7iYuBgsNCOHpMYE=
 golang.org/x/exp/shiny v0.0.0-20220827204233-334a2380cb91 h1:ryT6Nf0R83ZgD8WnFFdfI8wCeyqgdXWN4+CkFVNPAT0=

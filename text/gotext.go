@@ -384,9 +384,11 @@ func (s *shaperImpl) shapeText(faces []font.Face, ppem fixed.Int26_6, lc system.
 }
 
 // shapeAndWrapText invokes the text shaper and returns wrapped lines in the shaper's native format.
-func (s *shaperImpl) shapeAndWrapText(faces []font.Face, ppem fixed.Int26_6, maxWidth int, lc system.Locale, txt []rune) []shaping.Line {
+func (s *shaperImpl) shapeAndWrapText(faces []font.Face, params Parameters, maxWidth int, lc system.Locale, txt []rune) []shaping.Line {
 	// Wrap outputs into lines.
-	return s.wrapper.WrapParagraph(maxWidth, txt, s.shapeText(faces, ppem, lc, txt)...)
+	return s.wrapper.WrapParagraph(shaping.WrapConfig{
+		TruncateAfterLines: params.MaxLines,
+	}, maxWidth, txt, s.shapeText(faces, params.PxPerEm, lc, txt)...)
 }
 
 // replaceControlCharacters replaces problematic unicode
@@ -445,7 +447,7 @@ func (s *shaperImpl) LayoutRunes(params Parameters, minWidth, maxWidth int, lc s
 	if hasNewline {
 		txt = txt[:len(txt)-1]
 	}
-	ls := s.shapeAndWrapText(s.orderer.sortedFacesForStyle(params.Font), params.PxPerEm, maxWidth, lc, replaceControlCharacters(txt))
+	ls := s.shapeAndWrapText(s.orderer.sortedFacesForStyle(params.Font), params, maxWidth, lc, replaceControlCharacters(txt))
 	// Convert to Lines.
 	textLines := make([]line, len(ls))
 	for i := range ls {

@@ -10,6 +10,36 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
+// TestWrappingTruncation checks that the line wrapper's truncation features
+// behave as expected.
+func TestWrappingTruncation(t *testing.T) {
+	// Use a test string containing multiple newlines to ensure that they are shaped
+	// as separate paragraphs.
+	textInput := "Lorem ipsum dolor sit amet, consectetur adipiscing elit,\nsed do eiusmod tempor incididunt ut labore et\ndolore magna aliqua."
+	ltrFace, _ := opentype.Parse(goregular.TTF)
+	collection := []FontFace{{Face: ltrFace}}
+	cache := NewShaper(collection)
+	cache.LayoutString(Parameters{
+		Alignment: Middle,
+		PxPerEm:   fixed.I(10),
+	}, 200, 200, english, textInput)
+	untruncatedCount := len(cache.txt.lines)
+
+	for i := untruncatedCount + 1; i > 0; i-- {
+		cache.LayoutString(Parameters{
+			Alignment: Middle,
+			PxPerEm:   fixed.I(10),
+			MaxLines:  i,
+		}, 200, 200, english, textInput)
+		lineCount := len(cache.txt.lines)
+		if i <= untruncatedCount && lineCount != i {
+			t.Errorf("expected %d lines, got %d", i, lineCount)
+		} else if i > untruncatedCount && lineCount != untruncatedCount {
+			t.Errorf("expected %d lines, got %d", untruncatedCount, lineCount)
+		}
+	}
+}
+
 // TestCacheEmptyString ensures that shaping the empty string returns a
 // single synthetic glyph with ascent/descent info.
 func TestCacheEmptyString(t *testing.T) {
