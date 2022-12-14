@@ -45,11 +45,6 @@ __attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(void);
 	NSWindow *window = (NSWindow *)[notification object];
 	gio_onFocus((__bridge CFTypeRef)window.contentView, 0);
 }
-- (void)windowWillClose:(NSNotification *)notification {
-	NSWindow *window = (NSWindow *)[notification object];
-	window.delegate = nil;
-	gio_onClose((__bridge CFTypeRef)window.contentView);
-}
 @end
 
 static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFloat dy) {
@@ -85,6 +80,11 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 	CALayer *layer = gio_layerFactory();
 	layer.delegate = self;
 	return layer;
+}
+- (void)viewDidMoveToWindow {
+	if (self.window == nil) {
+		gio_onClose((__bridge CFTypeRef)self);
+	}
 }
 - (void)mouseDown:(NSEvent *)event {
 	handleMouse(self, event, MOUSE_DOWN, 0, 0);
@@ -357,7 +357,6 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height, CGF
 		NSView *view = (__bridge NSView *)viewRef;
 		[window setContentView:view];
 		[window makeFirstResponder:view];
-		window.releasedWhenClosed = NO;
 		window.delegate = globalWindowDel;
 		return (__bridge_retained CFTypeRef)window;
 	}
