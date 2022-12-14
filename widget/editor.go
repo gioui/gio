@@ -735,9 +735,6 @@ func (e *Editor) PaintSelection(gtx layout.Context) {
 }
 
 func (e *Editor) PaintText(gtx layout.Context) {
-	var gs [32]text.Glyph
-	line := gs[:0]
-	var lineOff image.Point
 	m := op.Record(gtx.Ops)
 	viewport := image.Rectangle{
 		Min: e.scrollOff,
@@ -752,26 +749,15 @@ func (e *Editor) PaintText(gtx layout.Context) {
 		}
 		startGlyph += line.glyphs
 	}
+	var glyphs [32]text.Glyph
+	line := glyphs[:0]
 	for _, g := range e.index.glyphs[startGlyph:] {
-		if !it.Glyph(g, true) {
+		var ok bool
+		if line, ok = it.paintGlyph(gtx, e.shaper, g, line); !ok {
 			break
 		}
-		if it.visible {
-			if len(line) == 0 {
-				lineOff = image.Point{X: it.g.X.Floor(), Y: int(it.g.Y)}.Sub(e.scrollOff)
-			}
-			line = append(line, g)
-		}
-		if g.Flags&text.FlagLineBreak > 0 || cap(line)-len(line) == 0 {
-			t := op.Offset(lineOff).Push(gtx.Ops)
-			op := clip.Outline{Path: e.shaper.Shape(line)}.Op().Push(gtx.Ops)
-			paint.PaintOp{}.Add(gtx.Ops)
-			op.Pop()
-			t.Pop()
-			line = line[:0]
-		}
-
 	}
+
 	call := m.Stop()
 	viewport.Min = viewport.Min.Add(it.padding.Min)
 	viewport.Max = viewport.Max.Add(it.padding.Max)
@@ -906,14 +892,15 @@ func (e *Editor) layoutText(lt *text.Shaper) {
 			PxPerEm:   e.textSize,
 			Alignment: e.Alignment,
 		}, 0, e.maxWidth, e.locale, r)
-		for it.Glyph(lt.NextGlyph()) {
-			e.index.Glyph(it.g)
+		for glyph, ok := it.processGlyph(lt.NextGlyph()); ok; glyph, ok = it.processGlyph(lt.NextGlyph()) {
+			e.index.Glyph(glyph)
 		}
 	} else {
 		// Make a fake glyph for every rune in the reader.
 		for _, _, err := r.ReadRune(); err != io.EOF; _, _, err = r.ReadRune() {
-			it.Glyph(text.Glyph{Runes: 1, Flags: text.FlagClusterBreak}, true)
-			e.index.Glyph(it.g)
+			g, _ := it.processGlyph(text.Glyph{Runes: 1, Flags: text.FlagClusterBreak}, true)
+			e.index.Glyph(g)
+
 		}
 	}
 	dims := layout.Dimensions{Size: it.bounds.Size()}
