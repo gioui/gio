@@ -327,7 +327,7 @@ func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
 		}
 		glyph := Glyph{
 			ID:      g.id,
-			X:       align + line.xOffset + run.X + runOffset,
+			X:       align + run.X + runOffset,
 			Y:       int32(line.yOffset),
 			Ascent:  line.ascent,
 			Descent: line.descent,

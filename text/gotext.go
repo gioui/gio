@@ -80,7 +80,6 @@ type line struct {
 	// runeCount is the number of text runes represented by this line's runs.
 	runeCount int
 
-	xOffset fixed.Int26_6
 	yOffset int
 }
 
