@@ -1,6 +1,7 @@
 package text
 
 import (
+	"strings"
 	"testing"
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
@@ -37,6 +38,32 @@ func TestWrappingTruncation(t *testing.T) {
 		} else if i > untruncatedCount && lineCount != untruncatedCount {
 			t.Errorf("expected %d lines, got %d", untruncatedCount, lineCount)
 		}
+	}
+}
+
+// TestShapingNewlineHandling checks that the shaper's newline splitting behaves
+// consistently and does not create spurious lines of text.
+func TestShapingNewlineHandling(t *testing.T) {
+	// Use a test string containing multiple newlines to ensure that they are shaped
+	// as separate paragraphs.
+	textInput := "\n"
+	ltrFace, _ := opentype.Parse(goregular.TTF)
+	collection := []FontFace{{Face: ltrFace}}
+	cache := NewShaper(collection)
+	cache.LayoutString(Parameters{
+		Alignment: Middle,
+		PxPerEm:   fixed.I(10),
+	}, 200, 200, english, textInput)
+	if lineCount := len(cache.txt.lines); lineCount > 1 {
+		t.Errorf("shaping string %q created %d lines", textInput, lineCount)
+	}
+
+	cache.Layout(Parameters{
+		Alignment: Middle,
+		PxPerEm:   fixed.I(10),
+	}, 200, 200, english, strings.NewReader(textInput))
+	if lineCount := len(cache.txt.lines); lineCount > 1 {
+		t.Errorf("shaping reader %q created %d lines", textInput, lineCount)
 	}
 }
 
