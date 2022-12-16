@@ -108,7 +108,7 @@ func (g *glyphIndex) Glyph(gl text.Glyph) {
 	if end := gl.X + gl.Advance; end > g.currentLineMax {
 		g.currentLineMax = end
 	}
-	if !g.skipPrior || gl.Flags&text.FlagTowardOrigin != g.prog {
+	if !g.skipPrior || gl.Flags&text.FlagTowardOrigin != g.prog || gl.Flags&text.FlagParagraphStart != 0 {
 		// Set the new text progression based on that of the first glyph.
 		g.prog = gl.Flags & text.FlagTowardOrigin
 		g.pos.towardOrigin = g.prog == text.FlagTowardOrigin
@@ -127,19 +127,19 @@ func (g *glyphIndex) Glyph(gl text.Glyph) {
 	}
 	needsNewLine := gl.Flags&text.FlagLineBreak > 0
 	needsNewRun := gl.Flags&text.FlagRunBreak > 0
+	breaksParagraph := gl.Flags&text.FlagParagraphBreak > 0
 
 	// We should insert new positions if the glyph we're processing terminates
 	// a glyph cluster.
-	insertPositionAfter := gl.Flags&text.FlagClusterBreak > 0
-	if gl.Flags&text.FlagSynthetic > 0 {
-		// Synthetic clusters shouldn't have positions generated for both
+	insertPositionAfter := gl.Flags&text.FlagClusterBreak > 0 && !breaksParagraph && gl.Runes > 0
+	if breaksParagraph {
+		// Paragraph breaking clusters shouldn't have positions generated for both
 		// sides of them. They're always zero-width, so doing so would
 		// create two visually identical cursor positions. Just reset
 		// cluster state, increment by their runes, and move on to the
 		// next glyph.
 		g.clusterAdvance = 0
 		g.pos.runes += int(gl.Runes)
-		insertPositionAfter = false
 	}
 	// Always track the cumulative advance added by the glyph, even if it
 	// doesn't terminate a cluster itself.

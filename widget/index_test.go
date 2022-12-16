@@ -73,6 +73,122 @@ func makeAccountingTestText(fontSize, lineWidth int) (txt []text.Glyph) {
 	return txt
 }
 
+// getGlyphs shapes text as english.
+func getGlyphs(fontSize, minWidth, lineWidth int, align text.Alignment, str string) (txt []text.Glyph) {
+	ltrFace, _ := opentype.Parse(goregular.TTF)
+	rtlFace, _ := opentype.Parse(nsareg.TTF)
+
+	shaper := text.NewShaper([]text.FontFace{{
+		Font: text.Font{Typeface: "LTR"},
+		Face: ltrFace,
+	},
+		{
+			Font: text.Font{Typeface: "RTL"},
+			Face: rtlFace,
+		},
+	})
+	params := text.Parameters{PxPerEm: fixed.I(fontSize), Alignment: align}
+	shaper.LayoutString(params, minWidth, lineWidth, english, str)
+	for g, ok := shaper.NextGlyph(); ok; g, ok = shaper.NextGlyph() {
+		txt = append(txt, g)
+	}
+	return txt
+}
+
+// TestIndexPositionWhitespace checks that the index correctly generates cursor positions
+// for empty lines and the empty string.
+func TestIndexPositionWhitespace(t *testing.T) {
+	type testcase struct {
+		name     string
+		str      string
+		align    text.Alignment
+		expected []combinedPos
+	}
+	for _, tc := range []testcase{
+		{
+			name: "empty string",
+			str:  "",
+			expected: []combinedPos{
+				{x: fixed.Int26_6(0), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216)},
+			},
+		},
+		{
+			name: "just hard newline",
+			str:  "\n",
+			expected: []combinedPos{
+				{x: fixed.Int26_6(0), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216)},
+				{x: fixed.Int26_6(0), y: 35, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 1, lineCol: screenPos{line: 1}},
+			},
+		},
+		{
+			name: "trailing newline",
+			str:  "a\n",
+			expected: []combinedPos{
+				{x: fixed.Int26_6(0), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216)},
+				{x: fixed.Int26_6(570), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 1, lineCol: screenPos{col: 1}},
+				{x: fixed.Int26_6(0), y: 35, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 2, lineCol: screenPos{line: 1}},
+			},
+		},
+		{
+			name: "just blank line",
+			str:  "\n\n",
+			expected: []combinedPos{
+				{x: fixed.Int26_6(0), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216)},
+				{x: fixed.Int26_6(0), y: 35, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 1, lineCol: screenPos{line: 1}},
+				{x: fixed.Int26_6(0), y: 54, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 2, lineCol: screenPos{line: 2}},
+			},
+		},
+		{
+			name:  "middle aligned blank lines",
+			str:   "\n\n\nabc",
+			align: text.Middle,
+			expected: []combinedPos{
+				{x: fixed.Int26_6(832), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216)},
+				{x: fixed.Int26_6(832), y: 35, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 1, lineCol: screenPos{line: 1}},
+				{x: fixed.Int26_6(832), y: 54, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 2, lineCol: screenPos{line: 2}},
+				{x: fixed.Int26_6(0), y: 73, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 3, lineCol: screenPos{line: 3}},
+				{x: fixed.Int26_6(570), y: 73, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 4, lineCol: screenPos{line: 3, col: 1}},
+				{x: fixed.Int26_6(1140), y: 73, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 5, lineCol: screenPos{line: 3, col: 2}},
+				{x: fixed.Int26_6(1652), y: 73, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 6, lineCol: screenPos{line: 3, col: 3}},
+			},
+		},
+		{
+			name: "blank line",
+			str:  "a\n\nb",
+			expected: []combinedPos{
+				{x: fixed.Int26_6(0), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216)},
+				{x: fixed.Int26_6(570), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 1, lineCol: screenPos{col: 1}},
+				{x: fixed.Int26_6(0), y: 35, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 2, lineCol: screenPos{line: 1}},
+				{x: fixed.Int26_6(0), y: 54, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 3, lineCol: screenPos{line: 2}},
+				{x: fixed.Int26_6(570), y: 54, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 4, lineCol: screenPos{line: 2, col: 1}},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			glyphs := getGlyphs(16, 0, 200, tc.align, tc.str)
+			var gi glyphIndex
+			for _, g := range glyphs {
+				gi.Glyph(g)
+			}
+			if len(gi.positions) != len(tc.expected) {
+				t.Errorf("expected %d positions, got %d", len(tc.expected), len(gi.positions))
+			}
+			for i := 0; i < min(len(gi.positions), len(tc.expected)); i++ {
+				actual := gi.positions[i]
+				expected := tc.expected[i]
+				if actual != expected {
+					t.Errorf("position %d: expected:\n%#+v, got:\n%#+v", i, expected, actual)
+				}
+			}
+			if t.Failed() {
+				printPositions(t, gi.positions)
+				printGlyphs(t, glyphs)
+			}
+		})
+	}
+
+}
+
 // TestIndexPositionBidi tests whether the index correct generates cursor positions for
 // complex bidirectional text.
 func TestIndexPositionBidi(t *testing.T) {

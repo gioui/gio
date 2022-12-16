@@ -35,7 +35,7 @@ func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size 
 	}, cs.Min.X, cs.Max.X, gtx.Locale, txt)
 	m := op.Record(gtx.Ops)
 	viewport := image.Rectangle{Max: cs.Max}
-	it := textIterator{viewport: viewport}
+	it := textIterator{viewport: viewport, maxLines: l.MaxLines}
 	semantic.LabelOp(txt).Add(gtx.Ops)
 	var glyphs [32]text.Glyph
 	line := glyphs[:0]
@@ -66,7 +66,11 @@ type textIterator struct {
 	// viewport is the rectangle of document coordinates that the iterator is
 	// trying to fill with text.
 	viewport image.Rectangle
+	// maxLines is the maximum number of text lines that should be displayed.
+	maxLines int
 
+	// linesSeen tracks the quantity of line endings this iterator has seen.
+	linesSeen int
 	// lineOff tracks the origin for the glyphs in the current line.
 	lineOff image.Point
 	// padding is the space needed outside of the bounds of the text to ensure no
@@ -86,9 +90,13 @@ type textIterator struct {
 // processGlyph checks whether the glyph is visible within the iterator's configured
 // viewport and (if so) updates the iterator's text dimensions to include the glyph.
 func (it *textIterator) processGlyph(g text.Glyph, ok bool) (_ text.Glyph, visibleOrBefore bool) {
-	bounds := image.Rectangle{
-		Min: image.Pt(g.Bounds.Min.X.Floor(), g.Bounds.Min.Y.Floor()),
-		Max: image.Pt(g.Bounds.Max.X.Ceil(), g.Bounds.Max.Y.Ceil()),
+	if it.maxLines > 0 {
+		if g.Flags&text.FlagLineBreak != 0 {
+			it.linesSeen++
+		}
+		if it.linesSeen == it.maxLines && g.Flags&text.FlagParagraphBreak != 0 {
+			return g, false
+		}
 	}
 	// Compute the maximum extent to which glyphs overhang on the horizontal
 	// axis.
@@ -98,26 +106,26 @@ func (it *textIterator) processGlyph(g text.Glyph, ok bool) (_ text.Glyph, visib
 	if d := (g.Bounds.Max.X - g.Advance).Ceil(); d > it.padding.Max.X {
 		it.padding.Max.X = d
 	}
-	// Convert the bounds from dot-relative coordinates to document coordinates.
-	bounds = bounds.Add(image.Pt(g.X.Round(), int(g.Y)))
+	logicalBounds := image.Rectangle{
+		Min: image.Pt(g.X.Floor(), int(g.Y)-g.Ascent.Ceil()),
+		Max: image.Pt((g.X + g.Advance).Ceil(), int(g.Y)+g.Descent.Ceil()),
+	}
 	if !it.first {
 		it.first = true
 		it.baseline = int(g.Y)
-		it.bounds = bounds
+		it.bounds = logicalBounds
 	}
 
-	lineTop := int(g.Y) - g.Ascent.Ceil()
-	lineBottom := int(g.Y) + g.Descent.Ceil()
-	above := lineBottom < it.viewport.Min.Y
-	below := lineTop > it.viewport.Max.Y
-	left := bounds.Max.X < it.viewport.Min.X
-	right := bounds.Min.X > it.viewport.Max.X
+	above := logicalBounds.Max.Y < it.viewport.Min.Y
+	below := logicalBounds.Min.Y > it.viewport.Max.Y
+	left := logicalBounds.Max.X < it.viewport.Min.X
+	right := logicalBounds.Min.X > it.viewport.Max.X
 	it.visible = !above && !below && !left && !right
 	if it.visible {
-		it.bounds.Min.X = min(it.bounds.Min.X, bounds.Min.X)
-		it.bounds.Min.Y = min(it.bounds.Min.Y, lineTop)
-		it.bounds.Max.X = max(it.bounds.Max.X, bounds.Max.X)
-		it.bounds.Max.Y = max(it.bounds.Max.Y, lineBottom)
+		it.bounds.Min.X = min(it.bounds.Min.X, logicalBounds.Min.X)
+		it.bounds.Min.Y = min(it.bounds.Min.Y, logicalBounds.Min.Y)
+		it.bounds.Max.X = max(it.bounds.Max.X, logicalBounds.Max.X)
+		it.bounds.Max.Y = max(it.bounds.Max.Y, logicalBounds.Max.Y)
 	}
 	return g, ok && !below
 }
@@ -131,14 +139,13 @@ func (it *textIterator) processGlyph(g text.Glyph, ok bool) (_ text.Glyph, visib
 // to the heap.
 func (it *textIterator) paintGlyph(gtx layout.Context, shaper *text.Shaper, glyph text.Glyph, line []text.Glyph) ([]text.Glyph, bool) {
 	_, visibleOrBefore := it.processGlyph(glyph, true)
-	done := !visibleOrBefore
 	if it.visible {
 		if len(line) == 0 {
 			it.lineOff = image.Point{X: glyph.X.Floor(), Y: int(glyph.Y)}.Sub(it.viewport.Min)
 		}
 		line = append(line, glyph)
 	}
-	if glyph.Flags&text.FlagLineBreak > 0 || cap(line)-len(line) == 0 || done {
+	if glyph.Flags&text.FlagLineBreak > 0 || cap(line)-len(line) == 0 || !visibleOrBefore {
 		t := op.Offset(it.lineOff).Push(gtx.Ops)
 		op := clip.Outline{Path: shaper.Shape(line)}.Op().Push(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
@@ -146,5 +153,5 @@ func (it *textIterator) paintGlyph(gtx layout.Context, shaper *text.Shaper, glyp
 		t.Pop()
 		line = line[:0]
 	}
-	return line, !done
+	return line, visibleOrBefore
 }
