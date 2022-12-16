@@ -145,7 +145,7 @@ func (it *textIterator) paintGlyph(gtx layout.Context, shaper *text.Shaper, glyp
 		}
 		line = append(line, glyph)
 	}
-	if glyph.Flags&text.FlagLineBreak > 0 || cap(line)-len(line) == 0 || !visibleOrBefore {
+	if glyph.Flags&text.FlagLineBreak != 0 || cap(line)-len(line) == 0 || !visibleOrBefore {
 		t := op.Offset(it.lineOff).Push(gtx.Ops)
 		op := clip.Outline{Path: shaper.Shape(line)}.Op().Push(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)

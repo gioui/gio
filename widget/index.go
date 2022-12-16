@@ -125,13 +125,13 @@ func (g *glyphIndex) Glyph(gl text.Glyph) {
 		g.positions = append(g.positions, pos)
 		g.skipPrior = true
 	}
-	needsNewLine := gl.Flags&text.FlagLineBreak > 0
-	needsNewRun := gl.Flags&text.FlagRunBreak > 0
-	breaksParagraph := gl.Flags&text.FlagParagraphBreak > 0
+	needsNewLine := gl.Flags&text.FlagLineBreak != 0
+	needsNewRun := gl.Flags&text.FlagRunBreak != 0
+	breaksParagraph := gl.Flags&text.FlagParagraphBreak != 0
 
 	// We should insert new positions if the glyph we're processing terminates
 	// a glyph cluster.
-	insertPositionAfter := gl.Flags&text.FlagClusterBreak > 0 && !breaksParagraph && gl.Runes > 0
+	insertPositionAfter := gl.Flags&text.FlagClusterBreak != 0 && !breaksParagraph && gl.Runes > 0
 	if breaksParagraph {
 		// Paragraph breaking clusters shouldn't have positions generated for both
 		// sides of them. They're always zero-width, so doing so would

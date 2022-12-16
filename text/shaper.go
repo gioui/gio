@@ -108,32 +108,32 @@ const (
 
 func (f Flags) String() string {
 	var b strings.Builder
-	if f&FlagParagraphStart > 0 {
+	if f&FlagParagraphStart != 0 {
 		b.WriteString("S")
 	} else {
 		b.WriteString("_")
 	}
-	if f&FlagParagraphBreak > 0 {
+	if f&FlagParagraphBreak != 0 {
 		b.WriteString("P")
 	} else {
 		b.WriteString("_")
 	}
-	if f&FlagTowardOrigin > 0 {
+	if f&FlagTowardOrigin != 0 {
 		b.WriteString("T")
 	} else {
 		b.WriteString("_")
 	}
-	if f&FlagLineBreak > 0 {
+	if f&FlagLineBreak != 0 {
 		b.WriteString("L")
 	} else {
 		b.WriteString("_")
 	}
-	if f&FlagRunBreak > 0 {
+	if f&FlagRunBreak != 0 {
 		b.WriteString("R")
 	} else {
 		b.WriteString("_")
 	}
-	if f&FlagClusterBreak > 0 {
+	if f&FlagClusterBreak != 0 {
 		b.WriteString("C")
 	} else {
 		b.WriteString("_")
