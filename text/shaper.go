@@ -96,16 +96,25 @@ const (
 	// sequence of glyphs which are logically a single unit, but require multiple
 	// symbols from a font to display.
 	FlagClusterBreak
-	// FlagSynthetic indicates that the glyph cluster does not represent actual
+	// FlagParagraphBreak indicates that the glyph cluster does not represent actual
 	// font glyphs, but was inserted by the shaper to represent line-breaking
-	// whitespace characters.
-	FlagSynthetic
+	// whitespace characters. After a glyph with FlagParagraphBreak set, the shaper
+	// will always return a glyph with FlagParagraphStart providing the X and Y
+	// coordinates of the start of the next line, even if that line has no contents.
+	FlagParagraphBreak
+	// FlagParagraphStart indicates that the glyph starts a new paragraph.
+	FlagParagraphStart
 )
 
 func (f Flags) String() string {
 	var b strings.Builder
-	if f&FlagSynthetic > 0 {
+	if f&FlagParagraphStart > 0 {
 		b.WriteString("S")
+	} else {
+		b.WriteString("_")
+	}
+	if f&FlagParagraphBreak > 0 {
+		b.WriteString("P")
 	} else {
 		b.WriteString("_")
 	}
@@ -144,10 +153,12 @@ type Shaper struct {
 	reader strings.Reader
 
 	// Iterator state.
-	txt   document
-	line  int
-	run   int
-	glyph int
+	brokeParagraph   bool
+	pararagraphStart Glyph
+	txt              document
+	line             int
+	run              int
+	glyph            int
 	// advance is the width of glyphs from the current run that have already been displayed.
 	advance fixed.Int26_6
 	// done tracks whether iteration is over.
@@ -223,7 +234,7 @@ func (l *Shaper) layoutText(params Parameters, minWidth, maxWidth int, lc system
 			}
 			done = endByte == len(str)
 		}
-		if startByte != endByte || len(l.paragraph) > 0 {
+		if startByte != endByte || (len(l.paragraph) > 0 || len(l.txt.lines) == 0) {
 			l.txt.append(l.layoutParagraph(params, minWidth, maxWidth, lc, str[startByte:endByte], l.paragraph))
 			if truncating {
 				params.MaxLines = maxLines - len(l.txt.lines)
@@ -275,6 +286,10 @@ func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
 	}
 	for {
 		if l.line == len(l.txt.lines) {
+			if l.brokeParagraph {
+				l.brokeParagraph = false
+				return l.pararagraphStart, true
+			}
 			if l.err == nil {
 				l.err = io.EOF
 			}
@@ -297,7 +312,7 @@ func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
 				X:       align,
 				Y:       int32(line.yOffset),
 				Runes:   0,
-				Flags:   FlagLineBreak | FlagClusterBreak | FlagRunBreak | FlagSynthetic,
+				Flags:   FlagLineBreak | FlagClusterBreak | FlagRunBreak,
 				Ascent:  line.ascent,
 				Descent: line.descent,
 			}, true
@@ -352,6 +367,7 @@ func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
 		if endOfLine {
 			glyph.Flags |= FlagLineBreak
 		}
+		endOfText := endOfLine && l.line == len(l.txt.lines)-1
 		nextGlyph := l.glyph
 		if rtl {
 			nextGlyph = len(run.Glyphs) - 1 - nextGlyph
@@ -365,8 +381,26 @@ func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
 		if run.Direction.Progression() == system.TowardOrigin {
 			glyph.Flags |= FlagTowardOrigin
 		}
+		if l.brokeParagraph {
+			glyph.Flags |= FlagParagraphStart
+			l.brokeParagraph = false
+		}
 		if g.glyphCount == 0 {
-			glyph.Flags |= FlagSynthetic
+			glyph.Flags |= FlagParagraphBreak
+			l.brokeParagraph = true
+			if endOfText {
+				l.pararagraphStart = Glyph{
+					Ascent:  glyph.Ascent,
+					Descent: glyph.Descent,
+					Flags:   FlagParagraphStart | FlagLineBreak | FlagRunBreak | FlagClusterBreak,
+				}
+				// If a glyph is both a paragraph break and the final glyph, it's a newline
+				// at the end of the text. We must inform widgets like the text editor
+				// of a valid cursor position they can use for "after" such a newline,
+				// taking text alignment into account.
+				l.pararagraphStart.X = l.txt.alignment.Align(line.direction, 0, l.txt.alignWidth)
+				l.pararagraphStart.Y = glyph.Y + int32((glyph.Ascent + glyph.Descent).Ceil())
+			}
 		}
 
 		return glyph, true

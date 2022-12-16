@@ -1,12 +1,14 @@
 package text
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
 	"gioui.org/font/opentype"
 	"gioui.org/io/system"
+	"golang.org/x/exp/slices"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
 )
@@ -16,7 +18,7 @@ import (
 func TestWrappingTruncation(t *testing.T) {
 	// Use a test string containing multiple newlines to ensure that they are shaped
 	// as separate paragraphs.
-	textInput := "Lorem ipsum dolor sit amet, consectetur adipiscing elit,\nsed do eiusmod tempor incididunt ut labore et\ndolore magna aliqua."
+	textInput := "Lorem ipsum dolor sit amet, consectetur adipiscing elit,\nsed do eiusmod tempor incididunt ut labore et\ndolore magna aliqua.\n"
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	collection := []FontFace{{Face: ltrFace}}
 	cache := NewShaper(collection)
@@ -33,10 +35,18 @@ func TestWrappingTruncation(t *testing.T) {
 			MaxLines:  i,
 		}, 200, 200, english, textInput)
 		lineCount := len(cache.txt.lines)
-		if i <= untruncatedCount && lineCount != i {
-			t.Errorf("expected %d lines, got %d", i, lineCount)
-		} else if i > untruncatedCount && lineCount != untruncatedCount {
-			t.Errorf("expected %d lines, got %d", untruncatedCount, lineCount)
+		glyphs := []Glyph{}
+		for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
+			glyphs = append(glyphs, g)
+		}
+		if i <= untruncatedCount {
+			if lineCount != i {
+				t.Errorf("expected %d lines, got %d", i, lineCount)
+			}
+		} else if i > untruncatedCount {
+			if lineCount != untruncatedCount {
+				t.Errorf("expected %d lines, got %d", untruncatedCount, lineCount)
+			}
 		}
 	}
 }
@@ -44,26 +54,74 @@ func TestWrappingTruncation(t *testing.T) {
 // TestShapingNewlineHandling checks that the shaper's newline splitting behaves
 // consistently and does not create spurious lines of text.
 func TestShapingNewlineHandling(t *testing.T) {
-	// Use a test string containing multiple newlines to ensure that they are shaped
-	// as separate paragraphs.
-	textInput := "\n"
-	ltrFace, _ := opentype.Parse(goregular.TTF)
-	collection := []FontFace{{Face: ltrFace}}
-	cache := NewShaper(collection)
-	cache.LayoutString(Parameters{
-		Alignment: Middle,
-		PxPerEm:   fixed.I(10),
-	}, 200, 200, english, textInput)
-	if lineCount := len(cache.txt.lines); lineCount > 1 {
-		t.Errorf("shaping string %q created %d lines", textInput, lineCount)
+	type testcase struct {
+		textInput      string
+		expectedLines  int
+		expectedGlyphs int
 	}
+	for _, tc := range []testcase{
+		{textInput: "a\n", expectedLines: 1, expectedGlyphs: 3},
+		{textInput: "a\nb", expectedLines: 2, expectedGlyphs: 3},
+		{textInput: "", expectedLines: 1, expectedGlyphs: 1},
+	} {
+		t.Run(fmt.Sprintf("%q", tc.textInput), func(t *testing.T) {
+			ltrFace, _ := opentype.Parse(goregular.TTF)
+			collection := []FontFace{{Face: ltrFace}}
+			cache := NewShaper(collection)
+			checkGlyphs := func() {
+				glyphs := []Glyph{}
+				for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
+					glyphs = append(glyphs, g)
+				}
+				if len(glyphs) != tc.expectedGlyphs {
+					t.Errorf("expected %d glyphs, got %d", tc.expectedGlyphs, len(glyphs))
+				}
+				findBreak := func(g Glyph) bool {
+					return g.Flags&FlagParagraphBreak != 0
+				}
+				found := 0
+				for idx := slices.IndexFunc(glyphs, findBreak); idx != -1; idx = slices.IndexFunc(glyphs, findBreak) {
+					found++
+					breakGlyph := glyphs[idx]
+					startGlyph := glyphs[idx+1]
+					glyphs = glyphs[idx+1:]
+					if flags := breakGlyph.Flags; flags&FlagParagraphBreak == 0 {
+						t.Errorf("expected newline glyph to have P flag, got %s", flags)
+					}
+					if flags := startGlyph.Flags; flags&FlagParagraphStart == 0 {
+						t.Errorf("expected newline glyph to have S flag, got %s", flags)
+					}
+					breakX, breakY := breakGlyph.X, breakGlyph.Y
+					startX, startY := startGlyph.X, startGlyph.Y
+					if breakX == startX {
+						t.Errorf("expected paragraph start glyph to have cursor x")
+					}
+					if breakY == startY {
+						t.Errorf("expected paragraph start glyph to have cursor y")
+					}
+				}
+				if count := strings.Count(tc.textInput, "\n"); found != count {
+					t.Errorf("expected %d paragraph breaks, found %d", count, found)
+				}
+			}
+			cache.LayoutString(Parameters{
+				Alignment: Middle,
+				PxPerEm:   fixed.I(10),
+			}, 200, 200, english, tc.textInput)
+			if lineCount := len(cache.txt.lines); lineCount > tc.expectedLines {
+				t.Errorf("shaping string %q created %d lines", tc.textInput, lineCount)
+			}
+			checkGlyphs()
 
-	cache.Layout(Parameters{
-		Alignment: Middle,
-		PxPerEm:   fixed.I(10),
-	}, 200, 200, english, strings.NewReader(textInput))
-	if lineCount := len(cache.txt.lines); lineCount > 1 {
-		t.Errorf("shaping reader %q created %d lines", textInput, lineCount)
+			cache.Layout(Parameters{
+				Alignment: Middle,
+				PxPerEm:   fixed.I(10),
+			}, 200, 200, english, strings.NewReader(tc.textInput))
+			if lineCount := len(cache.txt.lines); lineCount > tc.expectedLines {
+				t.Errorf("shaping reader %q created %d lines", tc.textInput, lineCount)
+			}
+			checkGlyphs()
+		})
 	}
 }
 
@@ -88,7 +146,7 @@ func TestCacheEmptyString(t *testing.T) {
 	checkFlag(t, true, FlagClusterBreak, glyph, 0)
 	checkFlag(t, true, FlagRunBreak, glyph, 0)
 	checkFlag(t, true, FlagLineBreak, glyph, 0)
-	checkFlag(t, true, FlagSynthetic, glyph, 0)
+	checkFlag(t, false, FlagParagraphBreak, glyph, 0)
 	if glyph.Ascent == 0 {
 		t.Errorf("expected non-zero ascent")
 	}
@@ -205,7 +263,7 @@ func TestCacheGlyphConverstion(t *testing.T) {
 						checkFlag(t, endOfLine, FlagLineBreak, actual, glyphCursor)
 						checkFlag(t, endOfRun, FlagRunBreak, actual, glyphCursor)
 						checkFlag(t, towardOrigin, FlagTowardOrigin, actual, glyphCursor)
-						checkFlag(t, synthetic, FlagSynthetic, actual, glyphCursor)
+						checkFlag(t, synthetic, FlagParagraphBreak, actual, glyphCursor)
 						checkFlag(t, endOfCluster, FlagClusterBreak, actual, glyphCursor)
 						glyphCursor++
 						if glyphIdx == end {
