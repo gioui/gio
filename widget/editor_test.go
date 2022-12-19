@@ -115,7 +115,7 @@ func TestEditorZeroDimensions(t *testing.T) {
 func TestEditorConfigurations(t *testing.T) {
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
-		Constraints: layout.Exact(image.Pt(100, 100)),
+		Constraints: layout.Exact(image.Pt(300, 300)),
 		Locale:      english,
 	}
 	cache := text.NewShaper(gofont.Collection())
@@ -126,27 +126,41 @@ func TestEditorConfigurations(t *testing.T) {
 
 	// Ensure that both ends of the text are reachable in all permutations
 	// of settings that influence layout.
-	for _, lineMode := range []bool{true, false} {
+	for _, singleLine := range []bool{true, false} {
 		for _, alignment := range []text.Alignment{text.Start, text.Middle, text.End} {
-			t.Run(fmt.Sprintf("SingleLine: %v Alignment: %v", lineMode, alignment), func(t *testing.T) {
-				defer func() {
-					if err := recover(); err != nil {
-						t.Error(err)
+			for _, zeroMin := range []bool{true, false} {
+				t.Run(fmt.Sprintf("SingleLine: %v Alignment: %v ZeroMinConstraint: %v", singleLine, alignment, zeroMin), func(t *testing.T) {
+					defer func() {
+						if err := recover(); err != nil {
+							t.Error(err)
+						}
+					}()
+					if zeroMin {
+						gtx.Constraints.Min = image.Point{}
+					} else {
+						gtx.Constraints.Min = gtx.Constraints.Max
 					}
-				}()
-				e := new(Editor)
-				e.SingleLine = lineMode
-				e.Alignment = alignment
-				e.SetText(sentence)
-				e.SetCaret(0, 0)
-				e.Layout(gtx, cache, font, fontSize, nil)
-				e.SetCaret(runes, runes)
-				e.Layout(gtx, cache, font, fontSize, nil)
-				coords := e.CaretCoords()
-				if int(coords.X) > gtx.Constraints.Max.X || int(coords.Y) > gtx.Constraints.Max.Y {
-					t.Errorf("caret coordinates %v exceed constraints %v", coords, gtx.Constraints.Max)
-				}
-			})
+					e := new(Editor)
+					e.SingleLine = singleLine
+					e.Alignment = alignment
+					e.SetText(sentence)
+					e.SetCaret(0, 0)
+					dims := e.Layout(gtx, cache, font, fontSize, nil)
+					if dims.Size.X < gtx.Constraints.Min.X || dims.Size.Y < gtx.Constraints.Min.Y {
+						t.Errorf("expected min size %#+v, got %#+v", gtx.Constraints.Min, dims.Size)
+					}
+					coords := e.CaretCoords()
+					if halfway := float32(gtx.Constraints.Min.X) * .5; !singleLine && alignment == text.Middle && !zeroMin && coords.X != halfway {
+						t.Errorf("expected caret X to be %f, got %f", halfway, coords.X)
+					}
+					e.SetCaret(runes, runes)
+					e.Layout(gtx, cache, font, fontSize, nil)
+					coords = e.CaretCoords()
+					if int(coords.X) > gtx.Constraints.Max.X || int(coords.Y) > gtx.Constraints.Max.Y {
+						t.Errorf("caret coordinates %v exceed constraints %v", coords, gtx.Constraints.Max)
+					}
+				})
+			}
 		}
 	}
 }

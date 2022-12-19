@@ -52,21 +52,21 @@ type Editor struct {
 	// all characters are allowed.
 	Filter string
 
-	eventKey     int
-	font         text.Font
-	shaper       *text.Shaper
-	textSize     fixed.Int26_6
-	blinkStart   time.Time
-	focused      bool
-	rr           editBuffer
-	maskReader   maskReader
-	lastMask     rune
-	maxWidth     int
-	viewSize     image.Point
-	valid        bool
-	regions      []region
-	dims         layout.Dimensions
-	requestFocus bool
+	eventKey           int
+	font               text.Font
+	shaper             *text.Shaper
+	textSize           fixed.Int26_6
+	blinkStart         time.Time
+	focused            bool
+	rr                 editBuffer
+	maskReader         maskReader
+	lastMask           rune
+	maxWidth, minWidth int
+	viewSize           image.Point
+	valid              bool
+	regions            []region
+	dims               layout.Dimensions
+	requestFocus       bool
 
 	// offIndex is an index of rune index to byte offsets.
 	offIndex []offEntry
@@ -547,8 +547,13 @@ func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, siz
 	if e.SingleLine {
 		maxWidth = math.MaxInt
 	}
+	minWidth := gtx.Constraints.Min.X
 	if maxWidth != e.maxWidth {
 		e.maxWidth = maxWidth
+		e.invalidate()
+	}
+	if minWidth != e.minWidth {
+		e.minWidth = minWidth
 		e.invalidate()
 	}
 	if lt != e.shaper {
@@ -891,7 +896,7 @@ func (e *Editor) layoutText(lt *text.Shaper) {
 			Font:      e.font,
 			PxPerEm:   e.textSize,
 			Alignment: e.Alignment,
-		}, 0, e.maxWidth, e.locale, r)
+		}, e.minWidth, e.maxWidth, e.locale, r)
 		for glyph, ok := it.processGlyph(lt.NextGlyph()); ok; glyph, ok = it.processGlyph(lt.NextGlyph()) {
 			e.index.Glyph(glyph)
 		}
