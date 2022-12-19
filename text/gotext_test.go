@@ -55,6 +55,69 @@ func TestEmptyString(t *testing.T) {
 	}
 }
 
+func TestAlignWidth(t *testing.T) {
+	lines := []line{
+		{width: fixed.I(50)},
+		{width: fixed.I(75)},
+		{width: fixed.I(25)},
+	}
+	for _, minWidth := range []int{0, 50, 100} {
+		width := alignWidth(minWidth, lines)
+		if width < minWidth {
+			t.Errorf("expected width >= %d, got %d", minWidth, width)
+		}
+	}
+}
+
+func TestShapingAlignWidth(t *testing.T) {
+	ppem := fixed.I(10)
+	ltrFace, _ := opentype.Parse(goregular.TTF)
+	shaper := testShaper(ltrFace)
+
+	type testcase struct {
+		name               string
+		minWidth, maxWidth int
+		expected           int
+		str                string
+	}
+	for _, tc := range []testcase{
+		{
+			name:     "zero min",
+			maxWidth: 100,
+			str:      "a\nb\nc",
+			expected: 22,
+		},
+		{
+			name:     "min == max",
+			minWidth: 100,
+			maxWidth: 100,
+			str:      "a\nb\nc",
+			expected: 100,
+		},
+		{
+			name:     "min < max",
+			minWidth: 50,
+			maxWidth: 100,
+			str:      "a\nb\nc",
+			expected: 50,
+		},
+		{
+			name:     "min < max, text > min",
+			minWidth: 50,
+			maxWidth: 100,
+			str:      "aphabetic\nb\nc",
+			expected: 60,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			lines := shaper.LayoutString(Parameters{PxPerEm: ppem}, tc.minWidth, tc.maxWidth, english, tc.str)
+			if lines.alignWidth != tc.expected {
+				t.Errorf("expected line alignWidth to be %d, got %d", tc.expected, lines.alignWidth)
+			}
+		})
+	}
+}
+
 // TestNewlineSynthesis ensures that the shaper correctly inserts synthetic glyphs
 // representing newline runes.
 func TestNewlineSynthesis(t *testing.T) {

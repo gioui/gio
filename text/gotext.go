@@ -480,16 +480,19 @@ func (s *shaperImpl) LayoutRunes(params Parameters, minWidth, maxWidth int, lc s
 		}
 		textLines[i] = otLine
 	}
-	alignWidth := maxWidth
-	if len(textLines) == 1 {
-		alignWidth = max(minWidth, textLines[0].width.Ceil())
-	}
 	calculateYOffsets(textLines)
 	return document{
 		lines:      textLines,
 		alignment:  params.Alignment,
-		alignWidth: alignWidth,
+		alignWidth: alignWidth(minWidth, textLines),
 	}
+}
+
+func alignWidth(minWidth int, lines []line) int {
+	for _, l := range lines {
+		minWidth = max(minWidth, l.width.Ceil())
+	}
+	return minWidth
 }
 
 // Shape converts the provided glyphs into a path.

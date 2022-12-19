@@ -36,11 +36,11 @@ func makePosTestText(fontSize, lineWidth int, alignOpposite bool) (bidiLTR, bidi
 		ltrParams.Alignment = text.End
 		rtlParams.Alignment = text.Start
 	}
-	shaper.LayoutString(ltrParams, 0, lineWidth, english, bidiSource)
+	shaper.LayoutString(ltrParams, lineWidth, lineWidth, english, bidiSource)
 	for g, ok := shaper.NextGlyph(); ok; g, ok = shaper.NextGlyph() {
 		bidiLTR = append(bidiLTR, g)
 	}
-	shaper.LayoutString(rtlParams, 0, lineWidth, arabic, bidiSource)
+	shaper.LayoutString(rtlParams, lineWidth, lineWidth, arabic, bidiSource)
 	for g, ok := shaper.NextGlyph(); ok; g, ok = shaper.NextGlyph() {
 		bidiRTL = append(bidiRTL, g)
 	}
