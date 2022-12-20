@@ -92,9 +92,9 @@ func assertContents(t *testing.T, e *Editor, contents string, selectionStart, se
 	}
 }
 
-// TestEditorZeroDimensions ensures that an empty editor still reserves
-// space for displaying its caret when the constraints allow for it.
-func TestEditorZeroDimensions(t *testing.T) {
+// TestEditorReadOnly ensures that mouse and keyboard interactions with readonly
+// editors do nothing but manipulate the text selection.
+func TestEditorReadOnly(t *testing.T) {
 	gtx := layout.Context{
 		Ops: new(op.Ops),
 		Constraints: layout.Constraints{
@@ -102,13 +102,80 @@ func TestEditorZeroDimensions(t *testing.T) {
 		},
 		Locale: english,
 	}
+	gtx.Queue = &testQueue{
+		events: []event.Event{
+			key.FocusEvent{Focus: true},
+		},
+	}
 	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
 	font := text.Font{}
 	e := new(Editor)
+	e.ReadOnly = true
+	e.SetText("The quick brown fox jumps over the lazy dog. We just need a few lines of text in the editor so that it can adequately test a few different modes of selection. The quick brown fox jumps over the lazy dog. We just need a few lines of text in the editor so that it can adequately test a few different modes of selection.")
+	cStart, cEnd := e.Selection()
+	if cStart != cEnd {
+		t.Errorf("unexpected initial caret positions")
+	}
 	dims := e.Layout(gtx, cache, font, fontSize, nil)
-	if dims.Size.X < 1 || dims.Size.Y < 1 {
-		t.Errorf("expected empty editor to occupy enough space to display cursor, but returned dimensions %v", dims)
+
+	// Select everything.
+	gtx.Ops.Reset()
+	gtx.Queue.(*testQueue).events = append(gtx.Queue.(*testQueue).events, key.Event{Name: "A", Modifiers: key.ModShortcut})
+	dims = e.Layout(gtx, cache, font, fontSize, nil)
+	textContent := e.Text()
+	cStart2, cEnd2 := e.Selection()
+	if cStart2 > cEnd2 {
+		cStart2, cEnd2 = cEnd2, cStart2
+	}
+	if cEnd2 != e.Len() {
+		t.Errorf("expected selection to contain %d runes, got %d", e.Len(), cEnd2)
+	}
+	if cStart2 != 0 {
+		t.Errorf("expected selection to start at rune 0, got %d", cStart2)
+	}
+
+	// Type some new characters.
+	gtx.Ops.Reset()
+	gtx.Queue.(*testQueue).events = append(gtx.Queue.(*testQueue).events, key.EditEvent{Range: key.Range{Start: cStart2, End: cEnd2}, Text: "something else"})
+	dims = e.Layout(gtx, cache, font, fontSize, nil)
+	textContent2 := e.Text()
+	if textContent2 != textContent {
+		t.Errorf("readonly editor modified by key.EditEvent")
+	}
+
+	// Try to delete selection.
+	gtx.Ops.Reset()
+	gtx.Queue.(*testQueue).events = append(gtx.Queue.(*testQueue).events, key.Event{Name: key.NameDeleteBackward})
+	dims = e.Layout(gtx, cache, font, fontSize, nil)
+	textContent2 = e.Text()
+	if textContent2 != textContent {
+		t.Errorf("readonly editor modified by delete key.Event")
+	}
+
+	// Click and drag from the middle of the first line
+	// to the center.
+	gtx.Ops.Reset()
+	gtx.Queue.(*testQueue).events = append(gtx.Queue.(*testQueue).events,
+		pointer.Event{
+			Type:     pointer.Press,
+			Buttons:  pointer.ButtonPrimary,
+			Position: f32.Pt(float32(dims.Size.X)*.5, 5),
+		},
+		pointer.Event{
+			Type:     pointer.Drag,
+			Buttons:  pointer.ButtonPrimary,
+			Position: layout.FPt(dims.Size).Mul(.5),
+		},
+		pointer.Event{
+			Type:     pointer.Release,
+			Buttons:  pointer.ButtonPrimary,
+			Position: layout.FPt(dims.Size).Mul(.5),
+		},
+	)
+	cStart3, cEnd3 := e.Selection()
+	if cStart3 == cStart2 || cEnd3 == cEnd2 {
+		t.Errorf("expected mouse interaction to change selection.")
 	}
 }
 

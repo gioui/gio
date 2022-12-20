@@ -37,6 +37,10 @@ type Editor struct {
 	// SingleLine also sets the scrolling direction to
 	// horizontal.
 	SingleLine bool
+	// ReadOnly controls whether the contents of the editor can be altered by
+	// user interaction. If set to true, the editor will allow selecting text
+	// and copying it interactively, but not modifying it.
+	ReadOnly bool
 	// Submit enabled translation of carriage return keys to SubmitEvents.
 	// If not enabled, carriage returns are inserted as newlines in the text.
 	Submit bool
@@ -343,7 +347,7 @@ func (e *Editor) processKey(gtx layout.Context) {
 			if !e.focused || ke.State != key.Press {
 				break
 			}
-			if e.Submit && (ke.Name == key.NameReturn || ke.Name == key.NameEnter) {
+			if !e.ReadOnly && e.Submit && (ke.Name == key.NameReturn || ke.Name == key.NameEnter) {
 				if !ke.Modifiers.Contain(key.ModShift) {
 					e.events = append(e.events, SubmitEvent{
 						Text: e.Text(),
@@ -357,6 +361,9 @@ func (e *Editor) processKey(gtx layout.Context) {
 		case key.SnippetEvent:
 			e.updateSnippet(gtx, ke.Start, ke.End)
 		case key.EditEvent:
+			if e.ReadOnly {
+				break
+			}
 			e.caret.scroll = true
 			e.scroller.Stop()
 			s := ke.Text
@@ -442,18 +449,24 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 	}
 	switch k.Name {
 	case key.NameReturn, key.NameEnter:
-		e.append("\n")
+		if !e.ReadOnly {
+			e.append("\n")
+		}
 	case key.NameDeleteBackward:
-		if moveByWord {
-			e.deleteWord(-1)
-		} else {
-			e.Delete(-1)
+		if !e.ReadOnly {
+			if moveByWord {
+				e.deleteWord(-1)
+			} else {
+				e.Delete(-1)
+			}
 		}
 	case key.NameDeleteForward:
-		if moveByWord {
-			e.deleteWord(1)
-		} else {
-			e.Delete(1)
+		if !e.ReadOnly {
+			if moveByWord {
+				e.deleteWord(1)
+			} else {
+				e.Delete(1)
+			}
 		}
 	case key.NameUpArrow:
 		e.moveLines(-1, selAct)
@@ -488,12 +501,14 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 	// Initiate a paste operation, by requesting the clipboard contents; other
 	// half is in Editor.processKey() under clipboard.Event.
 	case "V":
-		clipboard.ReadOp{Tag: &e.eventKey}.Add(gtx.Ops)
+		if !e.ReadOnly {
+			clipboard.ReadOp{Tag: &e.eventKey}.Add(gtx.Ops)
+		}
 	// Copy or Cut selection -- ignored if nothing selected.
 	case "C", "X":
 		if text := e.SelectedText(); text != "" {
 			clipboard.WriteOp{Text: text}.Add(gtx.Ops)
-			if k.Name == "X" {
+			if k.Name == "X" && !e.ReadOnly {
 				e.Delete(1)
 			}
 		}
@@ -502,10 +517,12 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 		e.caret.end = 0
 		e.caret.start = e.Len()
 	case "Z":
-		if k.Modifiers.Contain(key.ModShift) {
-			e.redo()
-		} else {
-			e.undo()
+		if !e.ReadOnly {
+			if k.Modifiers.Contain(key.ModShift) {
+				e.redo()
+			} else {
+				e.undo()
+			}
 		}
 	}
 }
@@ -781,7 +798,7 @@ func (e *Editor) caretWidth(gtx layout.Context) int {
 }
 
 func (e *Editor) PaintCaret(gtx layout.Context) {
-	if !e.caret.on {
+	if !e.caret.on || e.ReadOnly {
 		return
 	}
 	carWidth2 := e.caretWidth(gtx)
