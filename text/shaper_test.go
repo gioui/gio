@@ -113,7 +113,7 @@ func TestShapingNewlineHandling(t *testing.T) {
 			}
 			checkGlyphs()
 
-			cache.Layout(Parameters{
+			cache.LayoutReader(Parameters{
 				Alignment: Middle,
 				PxPerEm:   fixed.I(10),
 			}, 200, 200, english, strings.NewReader(tc.textInput))
