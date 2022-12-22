@@ -281,34 +281,38 @@ func (g *glyphIndex) closestToXY(x fixed.Int26_6, y int) combinedPos {
 // makeRegion creates a text-aligned rectangle from start to end. The vertical
 // dimensions of the rectangle are derived from the provided line's ascent and
 // descent, and the y offset of the line's baseline is provided as y.
-func makeRegion(line lineInfo, y int, start, end fixed.Int26_6) region {
+func makeRegion(line lineInfo, y int, start, end fixed.Int26_6) Region {
 	if start > end {
 		start, end = end, start
 	}
 	dotStart := image.Pt(start.Round(), y)
 	dotEnd := image.Pt(end.Round(), y)
-	return region{
-		bounds: image.Rectangle{
+	return Region{
+		Bounds: image.Rectangle{
 			Min: dotStart.Sub(image.Point{Y: line.ascent.Ceil()}),
 			Max: dotEnd.Add(image.Point{Y: line.descent.Floor()}),
 		},
-		baseline: line.descent.Floor(),
+		Baseline: line.descent.Floor(),
 	}
 }
 
-// region describes an area of interest within shaped text.
-type region struct {
-	// bounds is the coordinates of the bounding box in document space.
-	bounds image.Rectangle
-	// baseline is the quantity of vertical pixels between the baseline and
+// Region describes the position and baseline of an area of interest within
+// shaped text.
+type Region struct {
+	// Bounds is the coordinates of the bounding box relative to the containing
+	// widget.
+	Bounds image.Rectangle
+	// Baseline is the quantity of vertical pixels between the baseline and
 	// the bottom of bounds.
-	baseline int
+	Baseline int
 }
 
 // locate returns highlight regions covering the glyphs that represent the runes in
 // [startRune,endRune). If the rects parameter is non-nil, locate will use it to
 // return results instead of allocating, provided that there is enough capacity.
-func (g *glyphIndex) locate(viewport image.Rectangle, startRune, endRune int, rects []region) []region {
+// The returned regions have their Bounds specified relative to the provided
+// viewport.
+func (g *glyphIndex) locate(viewport image.Rectangle, startRune, endRune int, rects []Region) []Region {
 	if startRune > endRune {
 		startRune, endRune = endRune, startRune
 	}
@@ -387,6 +391,9 @@ func (g *glyphIndex) locate(viewport image.Rectangle, startRune, endRune int, re
 				}
 			}
 		}
+	}
+	for i := range rects {
+		rects[i].Bounds = rects[i].Bounds.Sub(viewport.Min)
 	}
 	return rects
 }

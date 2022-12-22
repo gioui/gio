@@ -68,7 +68,7 @@ type Editor struct {
 	maxWidth, minWidth int
 	viewSize           image.Point
 	valid              bool
-	regions            []region
+	regions            []Region
 	dims               layout.Dimensions
 	requestFocus       bool
 
@@ -750,7 +750,7 @@ func (e *Editor) PaintSelection(gtx layout.Context) {
 	defer clip.Rect(localViewport).Push(gtx.Ops).Pop()
 	e.regions = e.index.locate(docViewport, e.caret.start, e.caret.end, e.regions)
 	for _, region := range e.regions {
-		area := clip.Rect(region.bounds.Sub(e.scrollOff)).Push(gtx.Ops)
+		area := clip.Rect(region.Bounds).Push(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
 		area.Pop()
 	}
