@@ -984,6 +984,12 @@ func (e *Editor) Read(p []byte) (int, error) {
 	return e.text.Read(p)
 }
 
+// Regions returns visible regions covering the rune range [start,end).
+func (e *Editor) Regions(start, end int, regions []Region) []Region {
+	e.initBuffer()
+	return e.text.Regions(start, end, regions)
+}
+
 func max(a, b int) int {
 	if a > b {
 		return a

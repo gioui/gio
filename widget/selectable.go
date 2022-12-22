@@ -341,3 +341,9 @@ func (l *Selectable) Events() []EditorEvent {
 	l.prevEvents = 0
 	return events
 }
+
+// Regions returns visible regions covering the rune range [start,end).
+func (l *Selectable) Regions(start, end int, regions []Region) []Region {
+	l.initialize()
+	return l.text.Regions(start, end, regions)
+}
