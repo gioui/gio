@@ -177,15 +177,9 @@ func NewShaper(collection []FontFace) *Shaper {
 	return l
 }
 
-// Layout a text according to a set of options. Results can be retrieved by
-// iteratively calling NextGlyph.
-func (l *Shaper) Layout(params Parameters, minWidth, maxWidth int, lc system.Locale, txt io.RuneReader) {
-	l.layoutText(params, minWidth, maxWidth, lc, txt, "")
-}
-
 // Layout text from an io.Reader according to a set of options. Results can be retrieved by
 // iteratively calling NextGlyph.
-func (l *Shaper) LayoutReader(params Parameters, minWidth, maxWidth int, lc system.Locale, txt io.Reader) {
+func (l *Shaper) Layout(params Parameters, minWidth, maxWidth int, lc system.Locale, txt io.Reader) {
 	l.layoutText(params, minWidth, maxWidth, lc, bufio.NewReader(txt), "")
 }
 
