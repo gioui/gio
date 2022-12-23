@@ -18,12 +18,30 @@ import (
 
 // Label is a widget for laying out and drawing text.
 type Label struct {
-	// Alignment specify the text alignment.
+	// Alignment specifies the text alignment.
 	Alignment text.Alignment
 	// MaxLines limits the number of lines. Zero means no limit.
 	MaxLines int
+	// Selectable optionally provides text selection state. If nil,
+	// text will not be selectable.
+	Selectable *Selectable
 }
 
+// Layout the label with the given shaper, font, size, and text. Content is a function that will be invoked
+// with the label's clip area applied, and should be used to set colors and paint the text/selection.
+// content will only be invoked for labels with a non-nil Selectable. For stateless labels, the paint color
+// should be set prior to calling Layout.
+func (l Label) LayoutSelectable(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, txt string, content layout.Widget) layout.Dimensions {
+	if l.Selectable == nil {
+		return l.Layout(gtx, lt, font, size, txt)
+	}
+	l.Selectable.text.Alignment = l.Alignment
+	l.Selectable.text.MaxLines = l.MaxLines
+	l.Selectable.SetText(txt)
+	return l.Selectable.Layout(gtx, lt, font, size, content)
+}
+
+// Layout the text as non-interactive.
 func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, txt string) layout.Dimensions {
 	cs := gtx.Constraints
 	textSize := fixed.I(gtx.Sp(size))

@@ -121,7 +121,7 @@ func TestEditorReadOnly(t *testing.T) {
 
 	// Select everything.
 	gtx.Ops.Reset()
-	gtx.Queue.(*testQueue).events = append(gtx.Queue.(*testQueue).events, key.Event{Name: "A", Modifiers: key.ModShortcut})
+	gtx.Queue = &testQueue{events: []event.Event{key.Event{Name: "A", Modifiers: key.ModShortcut}}}
 	dims = e.Layout(gtx, cache, font, fontSize, nil)
 	textContent := e.Text()
 	cStart2, cEnd2 := e.Selection()
@@ -137,7 +137,7 @@ func TestEditorReadOnly(t *testing.T) {
 
 	// Type some new characters.
 	gtx.Ops.Reset()
-	gtx.Queue.(*testQueue).events = append(gtx.Queue.(*testQueue).events, key.EditEvent{Range: key.Range{Start: cStart2, End: cEnd2}, Text: "something else"})
+	gtx.Queue = &testQueue{events: []event.Event{key.EditEvent{Range: key.Range{Start: cStart2, End: cEnd2}, Text: "something else"}}}
 	dims = e.Layout(gtx, cache, font, fontSize, nil)
 	textContent2 := e.Text()
 	if textContent2 != textContent {
@@ -146,7 +146,7 @@ func TestEditorReadOnly(t *testing.T) {
 
 	// Try to delete selection.
 	gtx.Ops.Reset()
-	gtx.Queue.(*testQueue).events = append(gtx.Queue.(*testQueue).events, key.Event{Name: key.NameDeleteBackward})
+	gtx.Queue = &testQueue{events: []event.Event{key.Event{Name: key.NameDeleteBackward}}}
 	dims = e.Layout(gtx, cache, font, fontSize, nil)
 	textContent2 = e.Text()
 	if textContent2 != textContent {
@@ -156,7 +156,7 @@ func TestEditorReadOnly(t *testing.T) {
 	// Click and drag from the middle of the first line
 	// to the center.
 	gtx.Ops.Reset()
-	gtx.Queue.(*testQueue).events = append(gtx.Queue.(*testQueue).events,
+	gtx.Queue = &testQueue{events: []event.Event{
 		pointer.Event{
 			Type:     pointer.Press,
 			Buttons:  pointer.ButtonPrimary,
@@ -172,7 +172,8 @@ func TestEditorReadOnly(t *testing.T) {
 			Buttons:  pointer.ButtonPrimary,
 			Position: layout.FPt(dims.Size).Mul(.5),
 		},
-	)
+	}}
+	e.Layout(gtx, cache, font, fontSize, nil)
 	cStart3, cEnd3 := e.Selection()
 	if cStart3 == cStart2 || cEnd3 == cEnd2 {
 		t.Errorf("expected mouse interaction to change selection.")
@@ -246,7 +247,7 @@ func TestEditor(t *testing.T) {
 	// Regression test for bad in-cluster rune offset math.
 	e.SetText("æbc")
 	e.Layout(gtx, cache, font, fontSize, nil)
-	e.moveEnd(selectionClear)
+	e.text.MoveEnd(selectionClear)
 	assertCaret(t, e, 0, 3, len("æbc"))
 
 	textSample := "æbc\naøå••"
@@ -258,19 +259,19 @@ func TestEditor(t *testing.T) {
 	}
 	e.Layout(gtx, cache, font, fontSize, nil)
 	assertCaret(t, e, 0, 0, 0)
-	e.moveEnd(selectionClear)
+	e.text.MoveEnd(selectionClear)
 	assertCaret(t, e, 0, 3, len("æbc"))
 	e.MoveCaret(+1, +1)
 	assertCaret(t, e, 1, 0, len("æbc\n"))
 	e.MoveCaret(-1, -1)
 	assertCaret(t, e, 0, 3, len("æbc"))
-	e.moveLines(+1, selectionClear)
+	e.text.MoveLines(+1, selectionClear)
 	assertCaret(t, e, 1, 4, len("æbc\naøå•"))
-	e.moveEnd(selectionClear)
+	e.text.MoveEnd(selectionClear)
 	assertCaret(t, e, 1, 5, len("æbc\naøå••"))
 	e.MoveCaret(+1, +1)
 	assertCaret(t, e, 1, 5, len("æbc\naøå••"))
-	e.moveLines(3, selectionClear)
+	e.text.MoveLines(3, selectionClear)
 
 	e.SetCaret(0, 0)
 	assertCaret(t, e, 0, 0, 0)
@@ -282,7 +283,7 @@ func TestEditor(t *testing.T) {
 	// Ensure that password masking does not affect caret behavior
 	e.MoveCaret(-3, -3)
 	assertCaret(t, e, 1, 1, len("æbc\na"))
-	e.Mask = '*'
+	e.text.Mask = '*'
 	e.Layout(gtx, cache, font, fontSize, nil)
 	assertCaret(t, e, 1, 1, len("æbc\na"))
 	e.MoveCaret(-3, -3)
@@ -324,9 +325,9 @@ func TestEditor(t *testing.T) {
 	// Test that moveLine applies x offsets from previous moves.
 	e.SetText("long line\nshort")
 	e.SetCaret(0, 0)
-	e.moveEnd(selectionClear)
-	e.moveLines(+1, selectionClear)
-	e.moveLines(-1, selectionClear)
+	e.text.MoveEnd(selectionClear)
+	e.text.MoveLines(+1, selectionClear)
+	e.text.MoveLines(-1, selectionClear)
 	assertCaret(t, e, 0, utf8.RuneCountInString("long line"), len("long line"))
 }
 
@@ -366,14 +367,14 @@ func TestEditorRTL(t *testing.T) {
 	e.MoveCaret(+1, +1)
 	assertCaret(t, e, 0, 3, len("الح"))
 	// Move to the "end" of the line. This moves to the left edge of the line.
-	e.moveEnd(selectionClear)
+	e.text.MoveEnd(selectionClear)
 	assertCaret(t, e, 0, 4, len("الحب"))
 
 	sentence := "الحب سماء لا\nتمط غير الأحلام"
 	e.SetText(sentence)
 	e.Layout(gtx, cache, font, fontSize, nil)
 	assertCaret(t, e, 0, 0, 0)
-	e.moveEnd(selectionClear)
+	e.text.MoveEnd(selectionClear)
 	assertCaret(t, e, 0, 12, len("الحب سماء لا"))
 	e.MoveCaret(+1, +1)
 	assertCaret(t, e, 1, 0, len("الحب سماء لا\n"))
@@ -383,13 +384,13 @@ func TestEditorRTL(t *testing.T) {
 	assertCaret(t, e, 1, 0, len("الحب سماء لا\n"))
 	e.MoveCaret(-1, -1)
 	assertCaret(t, e, 0, 12, len("الحب سماء لا"))
-	e.moveLines(+1, selectionClear)
+	e.text.MoveLines(+1, selectionClear)
 	assertCaret(t, e, 1, 14, len("الحب سماء لا\nتمط غير الأحلا"))
-	e.moveEnd(selectionClear)
+	e.text.MoveEnd(selectionClear)
 	assertCaret(t, e, 1, 15, len("الحب سماء لا\nتمط غير الأحلام"))
 	e.MoveCaret(+1, +1)
 	assertCaret(t, e, 1, 15, len("الحب سماء لا\nتمط غير الأحلام"))
-	e.moveLines(3, selectionClear)
+	e.text.MoveLines(3, selectionClear)
 	assertCaret(t, e, 1, 15, len("الحب سماء لا\nتمط غير الأحلام"))
 	e.SetCaret(utf8.RuneCountInString(sentence), 0)
 	assertCaret(t, e, 1, 15, len("الحب سماء لا\nتمط غير الأحلام"))
@@ -440,7 +441,7 @@ func TestEditorLigature(t *testing.T) {
 	assertCaret(t, e, 0, 0, 0)
 	e.SetText("fl") // just a ligature
 	e.Layout(gtx, cache, font, fontSize, nil)
-	e.moveEnd(selectionClear)
+	e.text.MoveEnd(selectionClear)
 	assertCaret(t, e, 0, 2, len("fl"))
 	e.MoveCaret(-1, -1)
 	assertCaret(t, e, 0, 1, len("f"))
@@ -451,7 +452,7 @@ func TestEditorLigature(t *testing.T) {
 	e.SetText("flaffl•ffi\n•fflfi") // 3 ligatures on line 0, 2 on line 1
 	e.Layout(gtx, cache, font, fontSize, nil)
 	assertCaret(t, e, 0, 0, 0)
-	e.moveEnd(selectionClear)
+	e.text.MoveEnd(selectionClear)
 	assertCaret(t, e, 0, 10, len("ffaffl•ffi"))
 	e.MoveCaret(+1, +1)
 	assertCaret(t, e, 1, 0, len("ffaffl•ffi\n"))
@@ -504,13 +505,13 @@ func TestEditorLigature(t *testing.T) {
 	e.Layout(gtx, cache, font, fontSize, nil)
 	// Ensure that all runes in the final cluster of a line are properly
 	// decoded when moving to the end of the line. This is a regression test.
-	e.moveEnd(selectionClear)
+	e.text.MoveEnd(selectionClear)
 	// The first line was broken by line wrapping, not a newline character. As such,
 	// the cursor can reach the position after the final glyph (a space).
 	assertCaret(t, e, 0, 14, len("fflffl fflffl "))
-	e.moveLines(1, selectionClear)
+	e.text.MoveLines(1, selectionClear)
 	assertCaret(t, e, 1, 13, len("fflffl fflffl fflffl fflffl"))
-	e.moveLines(-1, selectionClear)
+	e.text.MoveLines(-1, selectionClear)
 	assertCaret(t, e, 0, 14, len("fflffl fflffl "))
 
 	// Absurdly narrow constraints to force each ligature onto its own line.
@@ -554,7 +555,7 @@ func assertCaret(t *testing.T, e *Editor, line, col, bytes int) {
 	if gotLine != line || gotCol != col {
 		t.Errorf("caret at (%d, %d), expected (%d, %d)", gotLine, gotCol, line, col)
 	}
-	caretBytes := e.runeOffset(e.caret.start)
+	caretBytes := e.text.runeOffset(e.text.caret.start)
 	if bytes != caretBytes {
 		t.Errorf("caret at buffer position %d, expected %d", caretBytes, bytes)
 	}
@@ -588,9 +589,8 @@ func TestEditorCaretConsistency(t *testing.T) {
 	fontSize := unit.Sp(10)
 	font := text.Font{}
 	for _, a := range []text.Alignment{text.Start, text.Middle, text.End} {
-		e := &Editor{
-			Alignment: a,
-		}
+		e := &Editor{}
+		e.Alignment = a
 		e.Layout(gtx, cache, font, fontSize, nil)
 
 		consistent := func() error {
@@ -598,8 +598,8 @@ func TestEditorCaretConsistency(t *testing.T) {
 			gotLine, gotCol := e.CaretPos()
 			gotCoords := e.CaretCoords()
 			// Blow away index to re-compute position from scratch.
-			e.invalidate()
-			want := e.closestToRune(e.caret.start)
+			e.text.invalidate()
+			want := e.text.closestToRune(e.text.caret.start)
 			wantCoords := f32.Pt(float32(want.x)/64, float32(want.y))
 			if want.lineCol.line != gotLine || int(want.lineCol.col) != gotCol || gotCoords != wantCoords {
 				return fmt.Errorf("caret (%d,%d) pos %s, want (%d,%d) pos %s",
@@ -619,17 +619,17 @@ func TestEditorCaretConsistency(t *testing.T) {
 			case moveRune:
 				e.MoveCaret(int(distance), int(distance))
 			case moveLine:
-				e.moveLines(int(distance), selectionClear)
+				e.text.MoveLines(int(distance), selectionClear)
 			case movePage:
-				e.movePages(int(distance), selectionClear)
+				e.text.MovePages(int(distance), selectionClear)
 			case moveStart:
-				e.moveStart(selectionClear)
+				e.text.MoveStart(selectionClear)
 			case moveEnd:
-				e.moveEnd(selectionClear)
+				e.text.MoveEnd(selectionClear)
 			case moveCoord:
-				e.moveCoord(image.Pt(int(x), int(y)))
+				e.text.MoveCoord(image.Pt(int(x), int(y)))
 			case moveWord:
-				e.moveWord(int(distance), selectionClear)
+				e.text.MoveWord(int(distance), selectionClear)
 			case deleteWord:
 				e.deleteWord(int(distance))
 			default:
@@ -687,8 +687,8 @@ func TestEditorMoveWord(t *testing.T) {
 	for ii, tt := range tests {
 		e := setup(tt.Text)
 		e.MoveCaret(tt.Start, tt.Start)
-		e.moveWord(tt.Skip, selectionClear)
-		caretBytes := e.runeOffset(e.caret.start)
+		e.text.MoveWord(tt.Skip, selectionClear)
+		caretBytes := e.text.runeOffset(e.text.caret.start)
 		if caretBytes != tt.Want {
 			t.Fatalf("[%d] moveWord: bad caret position: got %d, want %d", ii, caretBytes, tt.Want)
 		}
@@ -884,7 +884,7 @@ func TestEditorDeleteWord(t *testing.T) {
 		e.MoveCaret(tt.Start, tt.Start)
 		e.MoveCaret(0, tt.Selection)
 		e.deleteWord(tt.Delete)
-		caretBytes := e.runeOffset(e.caret.start)
+		caretBytes := e.text.runeOffset(e.text.caret.start)
 		if caretBytes != tt.Want {
 			t.Fatalf("[%d] deleteWord: bad caret position: got %d, want %d", ii, caretBytes, tt.Want)
 		}
@@ -938,8 +938,8 @@ g 2 4 6 8 g
 		_ = e.Events() // throw away any events from this layout
 
 		// Build the selection events
-		startPos := e.closestToRune(start)
-		endPos := e.closestToRune(end)
+		startPos := e.text.closestToRune(start)
+		endPos := e.text.closestToRune(end)
 		tq := &testQueue{
 			events: []event.Event{
 				pointer.Event{
@@ -1008,8 +1008,8 @@ g 2 4 6 8 g
 		gtx.Queue = nil
 		e.Layout(gtx, cache, font, fontSize, nil)
 
-		caretStart := e.closestToRune(e.caret.start)
-		caretEnd := e.closestToRune(e.caret.end)
+		caretStart := e.text.closestToRune(e.text.caret.start)
+		caretEnd := e.text.closestToRune(e.text.caret.end)
 		logicalPosMatch(t, n, "start", tst.startPos, caretEnd)
 		logicalPosMatch(t, n, "end", tst.endPos, caretStart)
 	}
@@ -1189,8 +1189,8 @@ func TestEditor_Submit(t *testing.T) {
 // It assumes single-run lines, which isn't safe with non-test text
 // data.
 func textWidth(e *Editor, lineNum, colStart, colEnd int) float32 {
-	start := e.closestToLineCol(lineNum, colStart)
-	end := e.closestToLineCol(lineNum, colEnd)
+	start := e.text.closestToLineCol(lineNum, colStart)
+	end := e.text.closestToLineCol(lineNum, colEnd)
 	delta := start.x - end.x
 	if delta < 0 {
 		delta = -delta
@@ -1201,7 +1201,7 @@ func textWidth(e *Editor, lineNum, colStart, colEnd int) float32 {
 // testBaseline returns the y coordinate of the baseline for the
 // given line number.
 func textBaseline(e *Editor, lineNum int) float32 {
-	start := e.closestToLineCol(lineNum, 0)
+	start := e.text.closestToLineCol(lineNum, 0)
 	return float32(start.y)
 }
 

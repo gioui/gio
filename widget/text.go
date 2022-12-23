@@ -37,49 +37,6 @@ type textSource interface {
 	ReplaceRunes(byteOffset int64, runeCount int64, replacement string)
 }
 
-type maskReader2 struct {
-	// rr is the underlying reader.
-	rr      io.RuneReader
-	maskBuf [utf8.UTFMax]byte
-	// mask is the utf-8 encoded mask rune.
-	mask []byte
-	// overflow contains excess mask bytes left over after the last Read call.
-	overflow []byte
-}
-
-func (m *maskReader2) Reset(r io.Reader, mr rune) {
-	m.rr = bufio.NewReader(r)
-	n := utf8.EncodeRune(m.maskBuf[:], mr)
-	m.mask = m.maskBuf[:n]
-}
-
-// Read reads from the underlying reader and replaces every
-// rune with the mask rune.
-func (m *maskReader2) Read(b []byte) (n int, err error) {
-	for len(b) > 0 {
-		var replacement []byte
-		if len(m.overflow) > 0 {
-			replacement = m.overflow
-		} else {
-			var r rune
-			r, _, err = m.rr.ReadRune()
-			if err != nil {
-				break
-			}
-			if r == '\n' {
-				replacement = []byte{'\n'}
-			} else {
-				replacement = m.mask
-			}
-		}
-		nn := copy(b, replacement)
-		m.overflow = replacement[nn:]
-		n += nn
-		b = b[nn:]
-	}
-	return n, err
-}
-
 // textView provides efficient shaping and indexing of interactive text. When provided
 // with a TextSource, textView will shape and cache the runes within that source.
 // It provides methods for configuring a viewport onto the shaped text which can
@@ -102,7 +59,7 @@ type textView struct {
 	textSize           fixed.Int26_6
 	seekCursor         int64
 	rr                 textSource
-	maskReader         maskReader2
+	maskReader         maskReader
 	lastMask           rune
 	maxWidth, minWidth int
 	viewSize           image.Point

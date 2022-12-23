@@ -5,6 +5,7 @@ package material
 import (
 	"image/color"
 
+	"gioui.org/internal/f32color"
 	"gioui.org/layout"
 	"gioui.org/op/paint"
 	"gioui.org/text"
@@ -17,6 +18,8 @@ type LabelStyle struct {
 	Font text.Font
 	// Color is the text color.
 	Color color.NRGBA
+	// SelectionColor is the color of the background for selected text.
+	SelectionColor color.NRGBA
 	// Alignment specify the text alignment.
 	Alignment text.Alignment
 	// MaxLines limits the number of lines. Zero means no limit.
@@ -25,6 +28,7 @@ type LabelStyle struct {
 	TextSize unit.Sp
 
 	shaper *text.Shaper
+	State  *widget.Selectable
 }
 
 func H1(th *Theme, txt string) LabelStyle {
@@ -85,15 +89,25 @@ func Overline(th *Theme, txt string) LabelStyle {
 
 func Label(th *Theme, size unit.Sp, txt string) LabelStyle {
 	return LabelStyle{
-		Text:     txt,
-		Color:    th.Palette.Fg,
-		TextSize: size,
-		shaper:   th.Shaper,
+		Text:           txt,
+		Color:          th.Palette.Fg,
+		SelectionColor: f32color.MulAlpha(th.Palette.ContrastBg, 0x60),
+		TextSize:       size,
+		shaper:         th.Shaper,
 	}
 }
 
 func (l LabelStyle) Layout(gtx layout.Context) layout.Dimensions {
 	paint.ColorOp{Color: l.Color}.Add(gtx.Ops)
-	tl := widget.Label{Alignment: l.Alignment, MaxLines: l.MaxLines}
-	return tl.Layout(gtx, l.shaper, l.Font, l.TextSize, l.Text)
+	tl := widget.Label{Alignment: l.Alignment, MaxLines: l.MaxLines, Selectable: l.State}
+	if l.State == nil {
+		return tl.Layout(gtx, l.shaper, l.Font, l.TextSize, l.Text)
+	}
+	return tl.LayoutSelectable(gtx, l.shaper, l.Font, l.TextSize, l.Text, func(gtx layout.Context) layout.Dimensions {
+		paint.ColorOp{Color: l.SelectionColor}.Add(gtx.Ops)
+		l.State.PaintSelection(gtx)
+		paint.ColorOp{Color: l.Color}.Add(gtx.Ops)
+		l.State.PaintText(gtx)
+		return layout.Dimensions{}
+	})
 }
