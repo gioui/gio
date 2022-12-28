@@ -60,6 +60,16 @@ func (c Metric) SpToDp(v Sp) Dp {
 	return Dp(float32(v) * nonZero(c.PxPerSp) / nonZero(c.PxPerDp))
 }
 
+// PxToSp converts v px to sp.
+func (c Metric) PxToSp(v int) Sp {
+	return Sp(float32(v) / nonZero(c.PxPerSp))
+}
+
+// PxToDp converts v px to dp.
+func (c Metric) PxToDp(v int) Dp {
+	return Dp(float32(v) / nonZero(c.PxPerDp))
+}
+
 func nonZero(v float32) float32 {
 	if v == 0. {
 		return 1

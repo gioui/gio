@@ -29,4 +29,20 @@ func TestMetric_DpToSp(t *testing.T) {
 			t.Errorf("SpToDp conversion mismatch %v != %v", exp, got)
 		}
 	}
+
+	{
+		exp := unit.Dp(5)
+		got := m.PxToDp(m.Dp(5))
+		if got != exp {
+			t.Errorf("PxToDp conversion mismatch %v != %v", exp, got)
+		}
+	}
+
+	{
+		exp := unit.Sp(5)
+		got := m.PxToSp(m.Sp(5))
+		if got != exp {
+			t.Errorf("PxToSp conversion mismatch %v != %v", exp, got)
+		}
+	}
 }
