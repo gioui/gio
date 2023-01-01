@@ -181,6 +181,9 @@ func createNativeWindow() (*window, error) {
 	w := &window{
 		hwnd: hwnd,
 	}
+	// Prevents flickering when resizing windows
+	rc := windows.GetWindowRect(hwnd)
+	windows.SetWindowPos(hwnd, 0, rc.Left, rc.Top, rc.Right-rc.Left, rc.Bottom-rc.Top, windows.SWP_FRAMECHANGED)
 	w.hdc, err = windows.GetDC(hwnd)
 	if err != nil {
 		return nil, err
@@ -291,6 +294,32 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 				w.setStage(system.StageInactive)
 			}
 		}
+	case windows.WM_ACTIVATE:
+		// See: https://learn.microsoft.com/en-us/windows/win32/dwm/customframe
+		if !w.config.Decorated {
+			// 0 : Add the default window style, without border and shadow
+			// 1 : Add the default window style with border and shadow
+			margins := &windows.MARGINS{1, 1, 1, 1}
+			windows.DwmExtendFrameIntoClientArea(w.hwnd, margins)
+		}
+
+	case windows.WM_NCCALCSIZE:
+		// Hide title bar
+		// See: https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-nccalcsize
+		if !w.config.Decorated {
+			rgrc := (*windows.Rect)(unsafe.Pointer(lParam))
+			if wParam == windows.TRUE {
+				// When the window is maximized
+				if windows.IsZoomed(w.hwnd) {
+					rgrc.Top += 8
+					rgrc.Bottom -= 8
+				}
+				rgrc.Left += 8
+				rgrc.Right -= 8
+			}
+			return 0
+		}
+
 	case windows.WM_NCHITTEST:
 		if w.config.Decorated {
 			// Let the system handle it.
@@ -662,9 +691,9 @@ func (w *window) Configure(options []Option) {
 	swpStyle := uintptr(windows.SWP_NOZORDER | windows.SWP_FRAMECHANGED)
 	winStyle := uintptr(windows.WS_OVERLAPPEDWINDOW)
 	style &^= winStyle
-	if !w.config.Decorated {
-		winStyle = 0
-	}
+	//if !w.config.Decorated {
+	//	winStyle = 0
+	//}
 	switch w.config.Mode {
 	case Minimized:
 		style |= winStyle

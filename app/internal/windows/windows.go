@@ -86,6 +86,10 @@ type MonitorInfo struct {
 	Flags    uint32
 }
 
+type MARGINS struct {
+	CxLeftWidth, CxRightWidth, CyTopHeight, CyBottomHeight int32
+}
+
 const (
 	TRUE = 1
 
@@ -259,14 +263,15 @@ const (
 	WM_UNICHAR              = 0x0109
 	WM_USER                 = 0x0400
 	WM_WINDOWPOSCHANGED     = 0x0047
-
-	WS_CLIPCHILDREN     = 0x02000000
-	WS_CLIPSIBLINGS     = 0x04000000
-	WS_MAXIMIZE         = 0x01000000
-	WS_ICONIC           = 0x20000000
-	WS_VISIBLE          = 0x10000000
-	WS_OVERLAPPED       = 0x00000000
-	WS_OVERLAPPEDWINDOW = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME |
+	WM_ACTIVATE             = 0x0006
+	WM_NCCALCSIZE           = 0x0083
+	WS_CLIPCHILDREN         = 0x02000000
+	WS_CLIPSIBLINGS         = 0x04000000
+	WS_MAXIMIZE             = 0x01000000
+	WS_ICONIC               = 0x20000000
+	WS_VISIBLE              = 0x10000000
+	WS_OVERLAPPED           = 0x00000000
+	WS_OVERLAPPEDWINDOW     = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME |
 		WS_MINIMIZEBOX | WS_MAXIMIZEBOX
 	WS_CAPTION     = 0x00C00000
 	WS_SYSMENU     = 0x00080000
@@ -323,6 +328,7 @@ var (
 	_DispatchMessage             = user32.NewProc("DispatchMessageW")
 	_EmptyClipboard              = user32.NewProc("EmptyClipboard")
 	_GetWindowRect               = user32.NewProc("GetWindowRect")
+	_IsZoomed                    = user32.NewProc("IsZoomed")
 	_GetClipboardData            = user32.NewProc("GetClipboardData")
 	_GetDC                       = user32.NewProc("GetDC")
 	_GetDpiForWindow             = user32.NewProc("GetDpiForWindow")
@@ -379,6 +385,9 @@ var (
 	_ImmReleaseContext       = imm32.NewProc("ImmReleaseContext")
 	_ImmSetCandidateWindow   = imm32.NewProc("ImmSetCandidateWindow")
 	_ImmSetCompositionWindow = imm32.NewProc("ImmSetCompositionWindow")
+
+	dwmapi                        = syscall.NewLazySystemDLL("dwmapi.dll")
+	_DwmExtendFrameIntoClientArea = dwmapi.NewProc("DwmExtendFrameIntoClientArea")
 )
 
 func AdjustWindowRectEx(r *Rect, dwStyle uint32, bMenu int, dwExStyle uint32) {
@@ -442,6 +451,11 @@ func GetWindowRect(hwnd syscall.Handle) Rect {
 	var r Rect
 	_GetWindowRect.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&r)))
 	return r
+}
+
+func IsZoomed(hwnd syscall.Handle) bool {
+	r, _, _ := _IsZoomed.Call(uintptr(hwnd))
+	return r != 0
 }
 
 func GetClipboardData(format uint32) (syscall.Handle, error) {
@@ -600,6 +614,13 @@ func ImmSetCandidateWindow(imc syscall.Handle, x, y int) {
 		},
 	}
 	_ImmSetCandidateWindow.Call(uintptr(imc), uintptr(unsafe.Pointer(&f)))
+}
+
+func DwmExtendFrameIntoClientArea(hwnd syscall.Handle, pMarInset *MARGINS) bool {
+	ret, _, _ := _DwmExtendFrameIntoClientArea.Call(
+		uintptr(hwnd),
+		uintptr(unsafe.Pointer(pMarInset)))
+	return ret != 0
 }
 
 func SetWindowLong(hwnd syscall.Handle, idx uintptr, style uintptr) {
