@@ -24,8 +24,6 @@ import (
 	"gioui.org/op/clip"
 	"gioui.org/text"
 	"gioui.org/unit"
-
-	"golang.org/x/exp/constraints"
 )
 
 // Editor implements an editable and scrollable text area.
@@ -997,14 +995,14 @@ func max(a, b int) int {
 	return b
 }
 
-func min[T constraints.Ordered](a, b T) T {
+func min(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func abs[T constraints.Signed](n T) T {
+func abs(n int) int {
 	if n < 0 {
 		return -n
 	}
