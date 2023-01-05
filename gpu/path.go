@@ -113,16 +113,18 @@ type vertex struct {
 	ToX, ToY     float32
 }
 
+// encode needs to stay in-sync with the code in clip.go encodeQuadTo.
 func (v vertex) encode(d []byte, maxy uint32) {
+	d = d[0:32]
 	bo := binary.LittleEndian
-	bo.PutUint32(d[0:], math.Float32bits(v.Corner))
-	bo.PutUint32(d[4:], maxy)
-	bo.PutUint32(d[8:], math.Float32bits(v.FromX))
-	bo.PutUint32(d[12:], math.Float32bits(v.FromY))
-	bo.PutUint32(d[16:], math.Float32bits(v.CtrlX))
-	bo.PutUint32(d[20:], math.Float32bits(v.CtrlY))
-	bo.PutUint32(d[24:], math.Float32bits(v.ToX))
-	bo.PutUint32(d[28:], math.Float32bits(v.ToY))
+	bo.PutUint32(d[0:4], math.Float32bits(v.Corner))
+	bo.PutUint32(d[4:8], maxy)
+	bo.PutUint32(d[8:12], math.Float32bits(v.FromX))
+	bo.PutUint32(d[12:16], math.Float32bits(v.FromY))
+	bo.PutUint32(d[16:20], math.Float32bits(v.CtrlX))
+	bo.PutUint32(d[20:24], math.Float32bits(v.CtrlY))
+	bo.PutUint32(d[24:28], math.Float32bits(v.ToX))
+	bo.PutUint32(d[28:32], math.Float32bits(v.ToY))
 }
 
 const (
