@@ -303,14 +303,16 @@ func (b *Backend) EndFrame() {
 
 func (b *Backend) queryState() glState {
 	s := glState{
-		prog:              gl.Program(b.funcs.GetBinding(gl.CURRENT_PROGRAM)),
-		arrayBuf:          gl.Buffer(b.funcs.GetBinding(gl.ARRAY_BUFFER_BINDING)),
-		elemBuf:           gl.Buffer(b.funcs.GetBinding(gl.ELEMENT_ARRAY_BUFFER_BINDING)),
-		drawFBO:           gl.Framebuffer(b.funcs.GetBinding(gl.FRAMEBUFFER_BINDING)),
-		clearColor:        b.funcs.GetFloat4(gl.COLOR_CLEAR_VALUE),
-		viewport:          b.funcs.GetInteger4(gl.VIEWPORT),
-		unpack_row_length: b.funcs.GetInteger(gl.UNPACK_ROW_LENGTH),
-		pack_row_length:   b.funcs.GetInteger(gl.PACK_ROW_LENGTH),
+		prog:       gl.Program(b.funcs.GetBinding(gl.CURRENT_PROGRAM)),
+		arrayBuf:   gl.Buffer(b.funcs.GetBinding(gl.ARRAY_BUFFER_BINDING)),
+		elemBuf:    gl.Buffer(b.funcs.GetBinding(gl.ELEMENT_ARRAY_BUFFER_BINDING)),
+		drawFBO:    gl.Framebuffer(b.funcs.GetBinding(gl.FRAMEBUFFER_BINDING)),
+		clearColor: b.funcs.GetFloat4(gl.COLOR_CLEAR_VALUE),
+		viewport:   b.funcs.GetInteger4(gl.VIEWPORT),
+	}
+	if !b.gles || b.glver[0] > 2 {
+		s.unpack_row_length = b.funcs.GetInteger(gl.UNPACK_ROW_LENGTH)
+		s.pack_row_length = b.funcs.GetInteger(gl.PACK_ROW_LENGTH)
 	}
 	s.blend.enable = b.funcs.IsEnabled(gl.BLEND)
 	s.blend.srcRGB = gl.Enum(b.funcs.GetInteger(gl.BLEND_SRC_RGB))
