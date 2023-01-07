@@ -245,13 +245,17 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 	b.glstate.bindFramebuffer(b.funcs, gl.FRAMEBUFFER, renderFBO)
 	if b.gles {
 		// If the output framebuffer is not in the sRGB colorspace already, emulate it.
-		var fbEncoding int
-		if !renderFBO.Valid() {
-			fbEncoding = b.funcs.GetFramebufferAttachmentParameteri(gl.FRAMEBUFFER, gl.BACK, gl.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING)
-		} else {
-			fbEncoding = b.funcs.GetFramebufferAttachmentParameteri(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING)
+		fbSRGB := false
+		if !b.gles || b.glver[0] > 2 {
+			var fbEncoding int
+			if !renderFBO.Valid() {
+				fbEncoding = b.funcs.GetFramebufferAttachmentParameteri(gl.FRAMEBUFFER, gl.BACK, gl.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING)
+			} else {
+				fbEncoding = b.funcs.GetFramebufferAttachmentParameteri(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING)
+			}
+			fbSRGB = fbEncoding != gl.LINEAR
 		}
-		if fbEncoding == gl.LINEAR && viewport != (image.Point{}) {
+		if !fbSRGB && viewport != (image.Point{}) {
 			if b.sRGBFBO == nil {
 				sfbo, err := NewSRGBFBO(b.funcs, &b.glstate)
 				if err != nil {
