@@ -326,9 +326,8 @@ func (e *textView) CaretInfo() (pos image.Point, ascent, descent int) {
 	return
 }
 
-// ByteOffset returns the offset of the start byte of the rune nearest
-// to the rune at the given offset. If the given offset is before or
-// after the text, it will be clamped to the first or last rune.
+// ByteOffset returns the start byte of the rune at the given
+// rune offset, clamped to the size of the text.
 func (e *textView) ByteOffset(runeOffset int) int64 {
 	return int64(e.runeOffset(e.closestToRune(runeOffset).runes))
 }
