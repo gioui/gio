@@ -476,9 +476,6 @@ func (e *textView) invalidate() {
 
 // Replace the text between start and end with s. Indices are in runes.
 // It returns the number of runes inserted.
-// addHistory controls whether this modification is recorded in the undo
-// history. Replace can modify text in positions unrelated to the cursor
-// position.
 func (e *textView) Replace(start, end int, s string) int {
 	if start > end {
 		start, end = end, start
