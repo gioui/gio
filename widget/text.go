@@ -549,6 +549,10 @@ func (e *textView) MoveEnd(selAct selectionAction) {
 // MoveWord moves the caret to the next word in the specified direction.
 // Positive is forward, negative is backward.
 // Absolute values greater than one will skip that many words.
+// BUG(whereswaldon): this method's definition of a "word" is currently
+// whitespace-delimited. Languages that do not use whitespace to delimit
+// words will experience counter-intuitive behavior when navigating by
+// word.
 func (e *textView) MoveWord(distance int, selAct selectionAction) {
 	// split the distance information into constituent parts to be
 	// used independently.
