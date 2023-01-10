@@ -50,8 +50,11 @@ func (s stringSource) ReplaceRunes(byteOffset, runeCount int64, str string) {
 
 // Selectable holds text selection state.
 type Selectable struct {
-	initialized  bool
-	source       stringSource
+	initialized bool
+	source      stringSource
+	// scratch is a buffer reused to efficiently read text out of the
+	// textView.
+	scratch      []byte
 	lastValue    string
 	text         textView
 	focused      bool
@@ -127,7 +130,8 @@ func (l *Selectable) SetCaret(start, end int) {
 // SelectedText returns the currently selected text (if any) from the editor.
 func (l *Selectable) SelectedText() string {
 	l.initialize()
-	return l.text.SelectedText()
+	l.scratch = l.text.SelectedText(l.scratch)
+	return string(l.scratch)
 }
 
 // ClearSelection clears the selection, by setting the selection end equal to
@@ -140,7 +144,8 @@ func (l *Selectable) ClearSelection() {
 // Text returns the contents of the label.
 func (l *Selectable) Text() string {
 	l.initialize()
-	return l.text.Text()
+	l.scratch = l.text.Text(l.scratch)
+	return string(l.scratch)
 }
 
 // SetText updates the text to s if it does not already contain s. Updating the
@@ -325,7 +330,8 @@ func (e *Selectable) command(gtx layout.Context, k key.Event) {
 		e.text.MoveEnd(selAct)
 	// Copy or Cut selection -- ignored if nothing selected.
 	case "C", "X":
-		if text := e.text.SelectedText(); text != "" {
+		e.scratch = e.text.SelectedText(e.scratch)
+		if text := string(e.scratch); text != "" {
 			clipboard.WriteOp{Text: text}.Add(gtx.Ops)
 		}
 	// Select all

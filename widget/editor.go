@@ -56,7 +56,10 @@ type Editor struct {
 	// all characters are allowed.
 	Filter string
 
-	buffer       *editBuffer
+	buffer *editBuffer
+	// scratch is a byte buffer that is reused to efficiently read portions of text
+	// from the textView.
+	scratch      []byte
 	eventKey     int
 	blinkStart   time.Time
 	focused      bool
@@ -320,8 +323,9 @@ func (e *Editor) processKey(gtx layout.Context) {
 			}
 			if !e.ReadOnly && e.Submit && (ke.Name == key.NameReturn || ke.Name == key.NameEnter) {
 				if !ke.Modifiers.Contain(key.ModShift) {
+					e.scratch = e.text.Text(e.scratch)
 					e.events = append(e.events, SubmitEvent{
-						Text: e.text.Text(),
+						Text: string(e.scratch),
 					})
 					continue
 				}
@@ -358,8 +362,9 @@ func (e *Editor) processKey(gtx layout.Context) {
 				if e.text.Changed() {
 					e.events = append(e.events, ChangeEvent{})
 				}
+				e.scratch = e.text.Text(e.scratch)
 				e.events = append(e.events, SubmitEvent{
-					Text: e.text.Text(),
+					Text: string(e.scratch),
 				})
 			}
 		// Complete a paste event, initiated by Shortcut-V in Editor.command().
@@ -450,7 +455,8 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 		}
 	// Copy or Cut selection -- ignored if nothing selected.
 	case "C", "X":
-		if text := e.text.SelectedText(); text != "" {
+		e.scratch = e.text.SelectedText(e.scratch)
+		if text := string(e.scratch); text != "" {
 			clipboard.WriteOp{Text: text}.Add(gtx.Ops)
 			if k.Name == "X" && !e.ReadOnly {
 				e.Delete(1)
@@ -686,7 +692,8 @@ func (e *Editor) Len() int {
 // Text returns the contents of the editor.
 func (e *Editor) Text() string {
 	e.initBuffer()
-	return e.text.Text()
+	e.scratch = e.text.Text(e.scratch)
+	return string(e.scratch)
 }
 
 func (e *Editor) SetText(s string) {
@@ -954,7 +961,8 @@ func (e *Editor) SetCaret(start, end int) {
 // SelectedText returns the currently selected text (if any) from the editor.
 func (e *Editor) SelectedText() string {
 	e.initBuffer()
-	return e.text.SelectedText()
+	e.scratch = e.text.SelectedText(e.scratch)
+	return string(e.scratch)
 }
 
 // ClearSelection clears the selection, by setting the selection end equal to

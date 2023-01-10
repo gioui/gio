@@ -338,11 +338,19 @@ func (e *textView) Len() int {
 	return e.closestToRune(math.MaxInt).runes
 }
 
-// Text returns the contents of the editor.
-func (e *textView) Text() string {
+// Text returns the contents of the editor. If the provided buf is large enough, it will
+// be filled and returned. Otherwise a new buffer will be allocated.
+// Callers can guarantee that buf is large enough by giving it capacity e.Len()*utf8.UTFMax.
+func (e *textView) Text(buf []byte) []byte {
+	size := e.rr.Size()
+	if cap(buf) < int(size) {
+		buf = make([]byte, size)
+	}
+	buf = buf[:size]
 	e.Seek(0, io.SeekStart)
-	b, _ := io.ReadAll(e)
-	return string(b)
+	n, _ := io.ReadFull(e, buf)
+	buf = buf[:n]
+	return buf
 }
 
 func (e *textView) ScrollBounds() image.Rectangle {
@@ -632,19 +640,26 @@ func (e *textView) SetCaret(start, end int) {
 	e.caret.end = e.closestToRune(end).runes
 }
 
-// SelectedText returns the currently selected text (if any) from the editor.
-func (e *textView) SelectedText() string {
+// SelectedText returns the currently selected text (if any) from the editor,
+// filling the provided byte slice if it is large enough or allocating and
+// returning a new byte slice if the provided one is insufficient.
+// Callers can guarantee that the buf is large enough by providing a buffer
+// with capacity e.SelectionLen()*utf8.UTFMax.
+func (e *textView) SelectedText(buf []byte) []byte {
 	startOff := e.runeOffset(e.caret.start)
 	endOff := e.runeOffset(e.caret.end)
 	start := min(startOff, endOff)
 	end := max(startOff, endOff)
-	buf := make([]byte, end-start)
+	if cap(buf) < end-start {
+		buf = make([]byte, end-start)
+	}
+	buf = buf[:end-start]
 	n, _ := e.rr.ReadAt(buf, int64(start))
 	// There is no way to reasonably handle a read error here. We rely upon
 	// implementations of textSource to provide other ways to signal errors
 	// if the user cares about that, and here we use whatever data we were
 	// able to read.
-	return string(buf[:n])
+	return buf[:n]
 }
 
 func (e *textView) updateSelection(selAct selectionAction) {
