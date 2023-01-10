@@ -186,8 +186,8 @@ func (e *textView) calculateViewSize(gtx layout.Context) image.Point {
 }
 
 // Update the text, reshaping it as necessary. If not nil, eventHandling will be invoked after reshaping the text to
-// allow parent widgets to adapt to any changes in text content or positioning. If eventHandling invalidates the
-// Text, Update will ensure that it is valid again before returning.
+// allow parent widgets to adapt to any changes in text content or positioning. If eventHandling modifies the contents
+// of the textView, it is guaranteed to be reshaped (and ready for painting) before Update returns.
 func (e *textView) Update(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, eventHandling func(gtx layout.Context)) {
 	if e.locale != gtx.Locale {
 		e.locale = gtx.Locale
@@ -234,7 +234,9 @@ func (e *textView) Update(gtx layout.Context, lt *text.Shaper, font text.Font, s
 	e.makeValid()
 }
 
-// PaintSelection paints the contrasting background for selected text.
+// PaintSelection clips and paints the visible text selection rectangles. Callers
+// are expected to apply an appropriate paint material with a paint.ColorOp or
+// similar prior to calling PaintSelection.
 func (e *textView) PaintSelection(gtx layout.Context) {
 	localViewport := image.Rectangle{Max: e.viewSize}
 	docViewport := image.Rectangle{Max: e.viewSize}.Add(e.scrollOff)
@@ -247,6 +249,9 @@ func (e *textView) PaintSelection(gtx layout.Context) {
 	}
 }
 
+// PaintText clips and paints the visible text glyph outlines. Callers
+// are expected to apply an appropriate paint material with a paint.ColorOp or
+// similar prior to calling PaintSelection.
 func (e *textView) PaintText(gtx layout.Context) {
 	m := op.Record(gtx.Ops)
 	viewport := image.Rectangle{
@@ -288,6 +293,9 @@ func (e *textView) caretWidth(gtx layout.Context) int {
 	return carWidth2
 }
 
+// PaintCaret clips and paints the caret rectangle. Callers
+// are expected to apply an appropriate paint material with a paint.ColorOp or
+// similar prior to calling PaintSelection.
 func (e *textView) PaintCaret(gtx layout.Context) {
 	carWidth2 := e.caretWidth(gtx)
 	caretPos, carAsc, carDesc := e.CaretInfo()
