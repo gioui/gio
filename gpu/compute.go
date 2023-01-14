@@ -404,12 +404,6 @@ func newCompute(ctx driver.Device) (*compute, error) {
 		conf:          new(config),
 		memHeader:     new(memoryHeader),
 	}
-	null, err := ctx.NewTexture(driver.TextureFormatRGBA8, 1, 1, driver.FilterNearest, driver.FilterNearest, driver.BufferBindingShaderStorageRead)
-	if err != nil {
-		g.Release()
-		return nil, err
-	}
-	g.output.nullMaterials = null
 	shaders := []struct {
 		prog *computeProgram
 		src  shader.Sources
@@ -431,6 +425,13 @@ func newCompute(ctx driver.Device) (*compute, error) {
 	}
 	if g.useCPU {
 		g.dispatcher = newDispatcher(runtime.NumCPU())
+	} else {
+		null, err := ctx.NewTexture(driver.TextureFormatRGBA8, 1, 1, driver.FilterNearest, driver.FilterNearest, driver.BufferBindingShaderStorageRead)
+		if err != nil {
+			g.Release()
+			return nil, err
+		}
+		g.output.nullMaterials = null
 	}
 
 	copyVert, copyFrag, err := newShaders(ctx, gio.Shader_copy_vert, gio.Shader_copy_frag)
