@@ -25,8 +25,9 @@ type Clickable struct {
 	prevClicks int
 	history    []Press
 
-	keyTag  struct{}
-	focused bool
+	keyTag       struct{}
+	requestFocus bool
+	focused      bool
 }
 
 // Click represents a click.
@@ -80,6 +81,11 @@ func (b *Clickable) Pressed() bool {
 	return b.click.Pressed()
 }
 
+// Focus requests the input focus for the element.
+func (b *Clickable) Focus() {
+	b.requestFocus = true
+}
+
 // Focused reports whether b has focus.
 func (b *Clickable) Focused() bool {
 	return b.focused
@@ -115,6 +121,10 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 			keys = ""
 		}
 		key.InputOp{Tag: &b.keyTag, Keys: keys}.Add(gtx.Ops)
+		if b.requestFocus {
+			key.FocusOp{Tag: &b.keyTag}.Add(gtx.Ops)
+			b.requestFocus = false
+		}
 	} else {
 		b.focused = false
 	}
