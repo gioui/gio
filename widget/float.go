@@ -13,8 +13,9 @@ import (
 
 // Float is for selecting a value in a range.
 type Float struct {
-	Value float32
-	Axis  layout.Axis
+	Value  float32
+	Axis   layout.Axis
+	Invert bool
 
 	drag    gesture.Drag
 	pos     float32 // position normalized to [0, 1]
@@ -43,7 +44,10 @@ func (f *Float) Layout(gtx layout.Context, pointerMargin int, min, max float32) 
 	if de != nil {
 		xy := de.Position.X
 		if f.Axis == layout.Vertical {
-			xy = de.Position.Y
+			xy = f.length - de.Position.Y
+		}
+		if f.Invert {
+			xy = f.length - xy
 		}
 		f.pos = xy / f.length
 		value = min + (max-min)*f.pos
