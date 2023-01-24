@@ -27,7 +27,9 @@ func Slider(th *Theme, float *widget.Float, min, max float32) SliderStyle {
 }
 
 type SliderStyle struct {
+	Axis     layout.Axis
 	Min, Max float32
+	Invert   bool
 	Color    color.NRGBA
 	Float    *widget.Float
 
@@ -38,7 +40,7 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	thumbRadius := gtx.Dp(6)
 	trackWidth := gtx.Dp(2)
 
-	axis := s.Float.Axis
+	axis := s.Axis
 	// Keep a minimum length so that the track is always visible.
 	minLength := thumbRadius + 3*thumbRadius + thumbRadius
 	// Try to expand to finger size, but only if the constraints
@@ -51,7 +53,7 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	o := axis.Convert(image.Pt(thumbRadius, 0))
 	trans := op.Offset(o).Push(gtx.Ops)
 	gtx.Constraints.Min = axis.Convert(image.Pt(sizeMain-2*thumbRadius, sizeCross))
-	s.Float.Layout(gtx, thumbRadius, s.Min, s.Max)
+	s.Float.Layout(gtx, axis, s.Min, s.Max, s.Invert, thumbRadius)
 	gtx.Constraints.Min = gtx.Constraints.Min.Add(axis.Convert(image.Pt(0, sizeCross)))
 	thumbPos := thumbRadius + int(s.Float.Pos())
 	trans.Pop()
@@ -63,7 +65,7 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 
 	rect := func(minx, miny, maxx, maxy int) image.Rectangle {
 		r := image.Rect(minx, miny, maxx, maxy)
-		if s.Float.Invert != (axis == layout.Vertical) {
+		if s.Invert != (axis == layout.Vertical) {
 			r.Max.X, r.Min.X = sizeMain-r.Min.X, sizeMain-r.Max.X
 		}
 		r.Min = axis.Convert(r.Min)
