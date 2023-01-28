@@ -1062,6 +1062,12 @@ func Java_org_gioui_GioView_imeSnippetStart(env *C.JNIEnv, class C.jclass, handl
 //export Java_org_gioui_GioView_imeSetSnippet
 func Java_org_gioui_GioView_imeSetSnippet(env *C.JNIEnv, class C.jclass, handle C.jlong, start, end C.jint) {
 	w := cgo.Handle(handle).Value().(*window)
+	if start < 0 {
+		start = 0
+	}
+	if end < start {
+		end = start
+	}
 	r := key.Range{Start: int(start), End: int(end)}
 	w.callbacks.SetEditorSnippet(r)
 }
