@@ -198,7 +198,7 @@ func (qs StrokeQuads) offset(hw float32, stroke StrokeStyle) (rhs, lhs StrokeQua
 				next = states[0]
 			}
 			if state.n1 != next.n0 {
-				strokePathJoin(stroke, &rhs, &lhs, hw, state.p1, state.n1, next.n0, state.r1, next.r0)
+				strokePathRoundJoin(&rhs, &lhs, hw, state.p1, state.n1, next.n0, state.r1, next.r0)
 			}
 		}
 	}
@@ -326,13 +326,6 @@ func strokePathNorm(p0, p1, p2 f32.Point, t, d float32) f32.Point {
 
 func rot90CW(p f32.Point) f32.Point { return f32.Pt(+p.Y, -p.X) }
 
-// cosPt returns the cosine of the opening angle between p and q.
-func cosPt(p, q f32.Point) float32 {
-	np := math.Hypot(float64(p.X), float64(p.Y))
-	nq := math.Hypot(float64(q.X), float64(q.Y))
-	return dotPt(p, q) / float32(np*nq)
-}
-
 func normPt(p f32.Point, l float32) f32.Point {
 	d := math.Hypot(float64(p.X), float64(p.Y))
 	l64 := float64(l)
@@ -347,12 +340,13 @@ func lenPt(p f32.Point) float32 {
 	return float32(math.Hypot(float64(p.X), float64(p.Y)))
 }
 
-func dotPt(p, q f32.Point) float32 {
-	return p.X*q.X + p.Y*q.Y
-}
-
 func perpDot(p, q f32.Point) float32 {
 	return p.X*q.Y - p.Y*q.X
+}
+
+func angleBetween(n0, n1 f32.Point) float64 {
+	return math.Atan2(float64(n1.Y), float64(n1.X)) -
+		math.Atan2(float64(n0.Y), float64(n0.X))
 }
 
 // strokePathCurv returns the curvature at t, along the quadratic Bézier
@@ -490,33 +484,22 @@ func quadBezierSplit(p0, p1, p2 f32.Point, t float32) (f32.Point, f32.Point, f32
 	return b0, b1, b2, a0, a1, a2
 }
 
-// strokePathJoin joins the two paths rhs and lhs, according to the provided
-// stroke operation.
-func strokePathJoin(stroke StrokeStyle, rhs, lhs *StrokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
-	strokePathRoundJoin(rhs, lhs, hw, pivot, n0, n1, r0, r1)
-}
-
+// strokePathRoundJoin joins the two paths rhs and lhs, creating an arc.
 func strokePathRoundJoin(rhs, lhs *StrokeQuads, hw float32, pivot, n0, n1 f32.Point, r0, r1 float32) {
 	rp := pivot.Add(n1)
 	lp := pivot.Sub(n1)
-	cw := dotPt(rot90CW(n0), n1) >= 0.0
+	angle := angleBetween(n0, n1)
 	switch {
-	case cw:
+	case angle <= 0:
 		// Path bends to the right, ie. CW (or 180 degree turn).
 		c := pivot.Sub(lhs.pen())
-		angle := -math.Acos(float64(cosPt(n0, n1)))
-		if !math.IsNaN(angle) {
-			lhs.arc(c, c, float32(angle))
-		}
+		lhs.arc(c, c, float32(angle))
 		lhs.lineTo(lp) // Add a line to accommodate for rounding errors.
 		rhs.lineTo(rp)
 	default:
 		// Path bends to the left, ie. CCW.
-		angle := math.Acos(float64(cosPt(n0, n1)))
 		c := pivot.Sub(rhs.pen())
-		if !math.IsNaN(angle) {
-			rhs.arc(c, c, float32(angle))
-		}
+		rhs.arc(c, c, float32(angle))
 		rhs.lineTo(rp) // Add a line to accommodate for rounding errors.
 		lhs.lineTo(lp)
 	}
