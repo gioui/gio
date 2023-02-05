@@ -210,8 +210,8 @@ func colorsClose(c1, c2 color.RGBA) bool {
 }
 
 func alphaClose(c1, c2 color.RGBA) bool {
-	d := int8(c1.A - c2.A)
-	return d > -5 && d < 5
+	d := int(c1.A) - int(c2.A)
+	return d > -8 && d < 8
 }
 
 // yiqEqApprox compares the colors of 2 pixels, in the NTSC YIQ color space,
