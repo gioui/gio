@@ -163,7 +163,7 @@ func TestPaintClippedTexture(t *testing.T) {
 }
 
 func TestStrokedPathZeroWidth(t *testing.T) {
-	t.Skip("test broken")
+	t.Skip("test broken, see issue 479")
 
 	run(t, func(o *op.Ops) {
 		{

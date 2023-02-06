@@ -203,7 +203,7 @@ func TestBuildOffscreen(t *testing.T) {
 }
 
 func TestNegativeOverlaps(t *testing.T) {
-	t.Skip("test broken")
+	t.Skip("test broken; see issue 479")
 
 	run(t, func(ops *op.Ops) {
 		defer clip.RRect{Rect: image.Rect(50, 50, 100, 100)}.Push(ops).Pop()
