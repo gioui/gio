@@ -134,7 +134,26 @@ func (q *Router) Frame(frame *op.Ops) {
 	}
 }
 
-// Queue an event and report whether at least one handler had an event queued.
+// Queue key events to the topmost handler.
+func (q *Router) QueueTopmost(events ...key.Event) bool {
+	var topmost event.Tag
+	pq := &q.pointer.queue
+	for _, h := range pq.hitTree {
+		if h.ktag != nil {
+			topmost = h.ktag
+			break
+		}
+	}
+	if topmost == nil {
+		return false
+	}
+	for _, e := range events {
+		q.handlers.Add(topmost, e)
+	}
+	return q.handlers.HadEvents()
+}
+
+// Queue events and report whether at least one handler had an event queued.
 func (q *Router) Queue(events ...event.Event) bool {
 	for _, e := range events {
 		switch e := e.(type) {

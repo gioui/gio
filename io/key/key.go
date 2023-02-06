@@ -30,6 +30,8 @@ type InputOp struct {
 	Hint InputHint
 	// Keys is the set of keys Tag can handle. That is, Tag will only
 	// receive an Event if its key and modifiers are accepted by Keys.Contains.
+	// As a special case, the topmost (first added) InputOp handler receives all
+	// unhandled events.
 	Keys Set
 }
 

@@ -937,6 +937,11 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 				handled = false
 			}
 		}
+		// As a sepcial case, the top-most input handler receives all unhandled
+		// events.
+		if e, ok := e.(key.Event); ok && !handled {
+			handled = w.queue.q.QueueTopmost(e)
+		}
 		w.updateCursor(d)
 		return handled
 	}
