@@ -117,12 +117,12 @@ func TestEditorReadOnly(t *testing.T) {
 	if cStart != cEnd {
 		t.Errorf("unexpected initial caret positions")
 	}
-	dims := e.Layout(gtx, cache, font, fontSize, nil)
+	e.Layout(gtx, cache, font, fontSize, nil)
 
 	// Select everything.
 	gtx.Ops.Reset()
 	gtx.Queue = &testQueue{events: []event.Event{key.Event{Name: "A", Modifiers: key.ModShortcut}}}
-	dims = e.Layout(gtx, cache, font, fontSize, nil)
+	e.Layout(gtx, cache, font, fontSize, nil)
 	textContent := e.Text()
 	cStart2, cEnd2 := e.Selection()
 	if cStart2 > cEnd2 {
@@ -138,7 +138,7 @@ func TestEditorReadOnly(t *testing.T) {
 	// Type some new characters.
 	gtx.Ops.Reset()
 	gtx.Queue = &testQueue{events: []event.Event{key.EditEvent{Range: key.Range{Start: cStart2, End: cEnd2}, Text: "something else"}}}
-	dims = e.Layout(gtx, cache, font, fontSize, nil)
+	e.Layout(gtx, cache, font, fontSize, nil)
 	textContent2 := e.Text()
 	if textContent2 != textContent {
 		t.Errorf("readonly editor modified by key.EditEvent")
@@ -147,7 +147,7 @@ func TestEditorReadOnly(t *testing.T) {
 	// Try to delete selection.
 	gtx.Ops.Reset()
 	gtx.Queue = &testQueue{events: []event.Event{key.Event{Name: key.NameDeleteBackward}}}
-	dims = e.Layout(gtx, cache, font, fontSize, nil)
+	dims := e.Layout(gtx, cache, font, fontSize, nil)
 	textContent2 = e.Text()
 	if textContent2 != textContent {
 		t.Errorf("readonly editor modified by delete key.Event")
