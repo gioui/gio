@@ -45,7 +45,6 @@ func (s stringSource) ReadAt(b []byte, offset int64) (int, error) {
 
 // ReplaceRunes is unimplemented, as a stringSource is immutable.
 func (s stringSource) ReplaceRunes(byteOffset, runeCount int64, str string) {
-	return
 }
 
 // Selectable holds text selection state.
