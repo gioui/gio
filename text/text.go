@@ -53,22 +53,23 @@ const (
 )
 
 const (
-	Thin       Weight = 100 - 400
-	Hairline   Weight = Thin
-	ExtraLight Weight = 200 - 400
-	UltraLight Weight = ExtraLight
-	Light      Weight = 300 - 400
-	Normal     Weight = 400 - 400
-	Medium     Weight = 500 - 400
-	SemiBold   Weight = 600 - 400
-	DemiBold   Weight = SemiBold
-	Bold       Weight = 700 - 400
-	ExtraBold  Weight = 800 - 400
-	UltraBold  Weight = ExtraBold
-	Black      Weight = 900 - 400
-	Heavy      Weight = Black
-	ExtraBlack Weight = 950 - 400
-	UltraBlack Weight = ExtraBlack
+	Thin       Weight = -300
+	ExtraLight Weight = -200
+	Light      Weight = -100
+	Normal     Weight = 0
+	Medium     Weight = 100
+	SemiBold   Weight = 200
+	Bold       Weight = 300
+	ExtraBold  Weight = 400
+	Black      Weight = 500
+
+	Hairline   = Thin
+	UltraLight = ExtraLight
+	DemiBold   = SemiBold
+	UltraBold  = ExtraBold
+	Heavy      = Black
+	ExtraBlack = Black + 50
+	UltraBlack = ExtraBlack
 )
 
 func (a Alignment) String() string {
