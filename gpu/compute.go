@@ -12,9 +12,9 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
-	"io/ioutil"
 	"math"
 	"math/bits"
+	"os"
 	"runtime"
 	"sort"
 	"time"
@@ -655,7 +655,7 @@ func (g *compute) dumpAtlases() {
 		if err := png.Encode(&buf, nrgba); err != nil {
 			panic(err)
 		}
-		if err := ioutil.WriteFile(fmt.Sprintf("dump-%d.png", i), buf.Bytes(), 0600); err != nil {
+		if err := os.WriteFile(fmt.Sprintf("dump-%d.png", i), buf.Bytes(), 0600); err != nil {
 			panic(err)
 		}
 	}

@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"image"
 	"io"
-	"io/ioutil"
 	"math"
 	"os"
 	"os/exec"
@@ -1018,7 +1017,7 @@ func (w *window) ReadClipboard() {
 	// Don't let slow clipboard transfers block event loop.
 	go func() {
 		defer r.Close()
-		data, _ := ioutil.ReadAll(r)
+		data, _ := io.ReadAll(r)
 		w.clipReads <- clipboard.Event{Text: string(data)}
 		w.Wakeup()
 	}()

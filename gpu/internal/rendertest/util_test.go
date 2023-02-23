@@ -10,7 +10,6 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -161,7 +160,7 @@ func verifyRef(t *testing.T, img *image.RGBA, frame int) (ok bool) {
 		saveImage(t, path, img)
 		return true
 	}
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Error("could not open ref:", err)
 		return
@@ -286,7 +285,7 @@ func saveImage(t testing.TB, file string, img *image.RGBA) {
 		t.Error(err)
 		return
 	}
-	if err := ioutil.WriteFile(file, buf.Bytes(), 0666); err != nil {
+	if err := os.WriteFile(file, buf.Bytes(), 0666); err != nil {
 		t.Error(err)
 		return
 	}

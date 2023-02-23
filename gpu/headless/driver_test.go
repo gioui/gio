@@ -8,7 +8,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
-	"io/ioutil"
+	"os"
 	"runtime"
 	"testing"
 
@@ -202,5 +202,5 @@ func saveImage(file string, img image.Image) error {
 	if err := png.Encode(&buf, img); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(file, buf.Bytes(), 0666)
+	return os.WriteFile(file, buf.Bytes(), 0666)
 }
