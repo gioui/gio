@@ -28,25 +28,28 @@ func TestWrappingTruncation(t *testing.T) {
 	}, 200, 200, english, textInput)
 	untruncatedCount := len(cache.txt.lines)
 
-	for i := untruncatedCount + 1; i > 0; i-- {
+	for expectedLines := untruncatedCount; expectedLines > 0; expectedLines-- {
 		cache.LayoutString(Parameters{
 			Alignment: Middle,
 			PxPerEm:   fixed.I(10),
-			MaxLines:  i,
+			MaxLines:  expectedLines,
 		}, 200, 200, english, textInput)
-		lineCount := len(cache.txt.lines)
-		glyphs := []Glyph{}
+		lineCount := 0
+		lastGlyphWasLineBreak := false
 		for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
-			glyphs = append(glyphs, g)
+			if g.Flags&FlagLineBreak != 0 {
+				lineCount++
+				lastGlyphWasLineBreak = true
+			} else {
+				lastGlyphWasLineBreak = false
+			}
 		}
-		if i <= untruncatedCount {
-			if lineCount != i {
-				t.Errorf("expected %d lines, got %d", i, lineCount)
-			}
-		} else if i > untruncatedCount {
-			if lineCount != untruncatedCount {
-				t.Errorf("expected %d lines, got %d", untruncatedCount, lineCount)
-			}
+		if lastGlyphWasLineBreak {
+			// There was no actual line of text following this break.
+			lineCount--
+		}
+		if lineCount != expectedLines {
+			t.Errorf("expected %d lines, got %d", expectedLines, lineCount)
 		}
 	}
 }
