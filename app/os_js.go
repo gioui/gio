@@ -22,7 +22,9 @@ import (
 	"gioui.org/unit"
 )
 
-type ViewEvent struct{}
+type ViewEvent struct {
+	Element js.Value
+}
 
 type contextStatus int
 
@@ -111,6 +113,7 @@ func newWindow(win *callbacks, options []Option) error {
 		w.w.SetDriver(w)
 		w.Configure(options)
 		w.blur()
+		w.w.Event(ViewEvent{Element: cont})
 		w.w.Event(system.StageEvent{Stage: system.StageRunning})
 		w.resize()
 		w.draw(true)
