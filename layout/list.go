@@ -356,8 +356,11 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 	return Dimensions{Size: dims}
 }
 
-// ScrollBy scrolls the list by a relative amount of items. The result will only be accurate if all items have the same
-// height. Otherwise, it will be approximate.
+// ScrollBy scrolls the list by a relative amount of items.
+//
+// Fractional scrolling may be inaccurate for items of differing
+// dimensions. This includes scrolling by integer amounts if the current
+// l.Position.Offset is non-zero.
 func (l *List) ScrollBy(num float32) {
 	// Split number of items into integer and fractional parts
 	i, f := math.Modf(float64(num))
@@ -378,8 +381,7 @@ func (l *List) ScrollBy(num float32) {
 	l.Position.BeforeEnd = true
 }
 
-// ScrollTo scrolls to the specified item. THe result will only be accurate if all items have the same height.
-// Otherwise, it will be approximate.
+// ScrollTo scrolls to the specified item.
 func (l *List) ScrollTo(n int) {
 	l.Position.First = n
 	l.Position.Offset = 0
