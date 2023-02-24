@@ -381,7 +381,7 @@ func (l *List) ScrollBy(num float32) {
 // ScrollTo scrolls to the specified item. THe result will only be accurate if all items have the same height.
 // Otherwise, it will be approximate.
 func (l *List) ScrollTo(n int) {
-	l.Position.First = 0
+	l.Position.First = n
 	l.Position.Offset = 0
-	l.ScrollBy(float32(n))
+	l.Position.BeforeEnd = true
 }
