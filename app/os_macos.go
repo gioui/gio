@@ -8,6 +8,10 @@ package app
 import (
 	"errors"
 	"image"
+	"io"
+	"mime"
+	"os"
+	"path/filepath"
 	"runtime"
 	"time"
 	"unicode"
@@ -18,6 +22,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
 	"gioui.org/unit"
 
 	_ "gioui.org/internal/cocoainit"
@@ -554,6 +559,22 @@ func gio_onMouse(view, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x, y, dx, 
 		Position:  pos,
 		Scroll:    f32.Point{X: dxf, Y: dyf},
 		Modifiers: convertMods(mods),
+	})
+}
+
+//export gio_onExternalDrop
+func gio_onExternalDrop(view C.CFTypeRef, path *C.char) {
+	fileUrl := C.GoString(path)
+	w := mustView(view)
+
+	fileExtension := filepath.Ext(fileUrl)
+	mime := mime.TypeByExtension(fileExtension)
+
+	w.w.Event(transfer.DataEvent{
+		Type: mime,
+		Open: func() (io.ReadCloser, error) {
+			return os.Open(fileUrl)
+		},
 	})
 }
 

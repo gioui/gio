@@ -801,6 +801,14 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 	p.entered = append(p.entered[:0], hits...)
 }
 
+func (q *pointerQueue) notifyPotentialTargets(src *pointerHandler, events *handlerEvents, event event.Event) {
+	for k, tgt := range q.handlers {
+		if _, ok := firstMimeMatch(src, tgt); ok {
+			events.Add(k, event)
+		}
+	}
+}
+
 func (q *pointerQueue) deliverDragEvent(p *pointerInfo, events *handlerEvents) {
 	if p.dataSource != nil {
 		return
@@ -814,11 +822,7 @@ func (q *pointerQueue) deliverDragEvent(p *pointerInfo, events *handlerEvents) {
 		// One data source handler per pointer.
 		p.dataSource = k
 		// Notify all potential targets.
-		for k, tgt := range q.handlers {
-			if _, ok := firstMimeMatch(src, tgt); ok {
-				events.Add(k, transfer.InitiateEvent{})
-			}
-		}
+		q.notifyPotentialTargets(src, events, transfer.InitiateEvent{})
 		break
 	}
 }
@@ -858,9 +862,9 @@ func (q *pointerQueue) deliverTransferDataEvent(p *pointerInfo, events *handlerE
 	transferIdx := len(q.transfers)
 	events.Add(p.dataTarget, transfer.DataEvent{
 		Type: src.offeredMime,
-		Open: func() io.ReadCloser {
+		Open: func() (io.ReadCloser, error) {
 			q.transfers[transferIdx] = nil
-			return src.data
+			return src.data, nil
 		},
 	})
 	q.transfers = append(q.transfers, src.data)

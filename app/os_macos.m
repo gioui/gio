@@ -110,6 +110,20 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 - (void)mouseDragged:(NSEvent *)event {
 	handleMouse(self, event, MOUSE_MOVE, 0, 0);
 }
+-(NSDragOperation)draggingEntered:(id < NSDraggingInfo >)sender
+{
+	return NSDragOperationCopy;
+}
+- (void)draggingEnded:(id <NSDraggingInfo>)sender
+{
+	NSPasteboard* pbrd = [sender draggingPasteboard];
+	NSArray* droppedFiles = [pbrd propertyListForType:NSFilenamesPboardType];
+
+	for (NSString* filePath in droppedFiles) {
+		NSURL* url = [NSURL fileURLWithPath:filePath];
+		gio_onExternalDrop((__bridge CFTypeRef)self, (char*)[[url path] UTF8String]);
+	}
+}
 - (void)scrollWheel:(NSEvent *)event {
 	CGFloat dx = -event.scrollingDeltaX;
 	CGFloat dy = -event.scrollingDeltaY;
@@ -366,6 +380,7 @@ CFTypeRef gio_createView(void) {
 	@autoreleasepool {
 		NSRect frame = NSMakeRect(0, 0, 0, 0);
 		GioView* view = [[GioView alloc] initWithFrame:frame];
+		[view registerForDraggedTypes: [NSArray arrayWithObjects:NSTIFFPboardType, NSFilenamesPboardType, nil]];
 		view.wantsLayer = YES;
 		view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
 		return CFBridgingRetain(view);

@@ -103,7 +103,7 @@ type DataEvent struct {
 	Type string
 	// Open returns the transfer data. It is only valid to call Open in the frame
 	// the DataEvent is received. The caller must close the return value after use.
-	Open func() io.ReadCloser
+	Open func() (io.ReadCloser, error)
 }
 
 func (DataEvent) ImplementsEvent() {}
