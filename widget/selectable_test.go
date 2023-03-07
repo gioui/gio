@@ -46,10 +46,9 @@ func TestSelectableMove(t *testing.T) {
 	gtx.Queue = newQueue(key.FocusEvent{Focus: true})
 	s := new(Selectable)
 
-	w := func(layout.Context) layout.Dimensions { return layout.Dimensions{} }
 	Label{
 		Selectable: s,
-	}.LayoutSelectable(gtx, cache, text.Font{}, fontSize, str, w)
+	}.Layout(gtx, cache, text.Font{}, fontSize, str, op.CallOp{}, op.CallOp{})
 
 	testKey := func(keyName string) {
 		// Select 345
@@ -65,7 +64,7 @@ func TestSelectableMove(t *testing.T) {
 		gtx.Queue = newQueue(key.Event{State: key.Press, Name: keyName})
 		Label{
 			Selectable: s,
-		}.LayoutSelectable(gtx, cache, font, fontSize, str, w)
+		}.Layout(gtx, cache, font, fontSize, str, op.CallOp{}, op.CallOp{})
 
 		if expected, got := "", s.SelectedText(); expected != got {
 			t.Errorf("KeyName %s, expected %q, got %q", keyName, expected, got)
@@ -88,7 +87,6 @@ func TestSelectableConfigurations(t *testing.T) {
 	fontSize := unit.Sp(10)
 	font := text.Font{}
 	sentence := "\n\n\n\n\n\n\n\n\n\n\n\nthe quick brown fox jumps over the lazy dog"
-	w := func(layout.Context) layout.Dimensions { return layout.Dimensions{} }
 
 	for _, alignment := range []text.Alignment{text.Start, text.Middle, text.End} {
 		for _, zeroMin := range []bool{true, false} {
@@ -108,8 +106,8 @@ func TestSelectableConfigurations(t *testing.T) {
 					Alignment:  alignment,
 					Selectable: s,
 				}
-				interactiveDims := label.LayoutSelectable(gtx, cache, font, fontSize, sentence, w)
-				staticDims := label.Layout(gtx, cache, font, fontSize, sentence)
+				interactiveDims := label.Layout(gtx, cache, font, fontSize, sentence, op.CallOp{}, op.CallOp{})
+				staticDims := label.Layout(gtx, cache, font, fontSize, sentence, op.CallOp{}, op.CallOp{})
 
 				if interactiveDims != staticDims {
 					t.Errorf("expected consistent dimensions, static returned %#+v, interactive returned %#+v", staticDims, interactiveDims)

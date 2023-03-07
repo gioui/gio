@@ -6,7 +6,6 @@ import (
 	"image/color"
 
 	"gioui.org/internal/f32color"
-	"gioui.org/io/semantic"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/paint"
@@ -44,38 +43,37 @@ func Editor(th *Theme, editor *widget.Editor, hint string) EditorStyle {
 }
 
 func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
-	macro := op.Record(gtx.Ops)
+	// Choose colors.
+	textColorMacro := op.Record(gtx.Ops)
+	paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
+	textColor := textColorMacro.Stop()
+	hintColorMacro := op.Record(gtx.Ops)
 	paint.ColorOp{Color: e.HintColor}.Add(gtx.Ops)
+	hintColor := hintColorMacro.Stop()
+	selectionColorMacro := op.Record(gtx.Ops)
+	paint.ColorOp{Color: blendDisabledColor(gtx.Queue == nil, e.SelectionColor)}.Add(gtx.Ops)
+	selectionColor := selectionColorMacro.Stop()
+
 	var maxlines int
 	if e.Editor.SingleLine {
 		maxlines = 1
 	}
+
+	macro := op.Record(gtx.Ops)
 	tl := widget.Label{Alignment: e.Editor.Alignment, MaxLines: maxlines}
-	dims := tl.Layout(gtx, e.shaper, e.Font, e.TextSize, e.Hint)
+	dims := tl.Layout(gtx, e.shaper, e.Font, e.TextSize, e.Hint, hintColor, selectionColor)
 	call := macro.Stop()
+
 	if w := dims.Size.X; gtx.Constraints.Min.X < w {
 		gtx.Constraints.Min.X = w
 	}
 	if h := dims.Size.Y; gtx.Constraints.Min.Y < h {
 		gtx.Constraints.Min.Y = h
 	}
-	dims = e.Editor.Layout(gtx, e.shaper, e.Font, e.TextSize, func(gtx layout.Context) layout.Dimensions {
-		semantic.Editor.Add(gtx.Ops)
-		disabled := gtx.Queue == nil
-		if e.Editor.Len() > 0 {
-			paint.ColorOp{Color: blendDisabledColor(disabled, e.SelectionColor)}.Add(gtx.Ops)
-			e.Editor.PaintSelection(gtx)
-			paint.ColorOp{Color: blendDisabledColor(disabled, e.Color)}.Add(gtx.Ops)
-			e.Editor.PaintText(gtx)
-		} else {
-			call.Add(gtx.Ops)
-		}
-		if !disabled {
-			paint.ColorOp{Color: e.Color}.Add(gtx.Ops)
-			e.Editor.PaintCaret(gtx)
-		}
-		return dims
-	})
+	dims = e.Editor.Layout(gtx, e.shaper, e.Font, e.TextSize, textColor, selectionColor)
+	if e.Editor.Len() == 0 {
+		call.Add(gtx.Ops)
+	}
 	return dims
 }
 

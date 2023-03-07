@@ -3,6 +3,8 @@
 package text
 
 import (
+	"bytes"
+	"image"
 	"io"
 	"sort"
 
@@ -19,6 +21,7 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/op"
 	"gioui.org/op/clip"
+	"gioui.org/op/paint"
 )
 
 // document holds a collection of shaped lines and alignment information for
@@ -504,12 +507,13 @@ func alignWidth(minWidth int, lines []line) int {
 	return minWidth
 }
 
-// Shape converts the provided glyphs into a path.
-func (s *shaperImpl) Shape(ops *op.Ops, gs []Glyph) clip.PathSpec {
+// Shape converts the provided glyphs into a path. The path will enclose the forms
+// of all vector glyphs.
+func (s *shaperImpl) Shape(pathOps *op.Ops, gs []Glyph) clip.PathSpec {
 	var lastPos f32.Point
 	var x fixed.Int26_6
 	var builder clip.Path
-	builder.Begin(ops)
+	builder.Begin(pathOps)
 	for i, g := range gs {
 		if i == 0 {
 			x = g.X
@@ -568,6 +572,68 @@ func (s *shaperImpl) Shape(ops *op.Ops, gs []Glyph) clip.PathSpec {
 		}
 	}
 	return builder.End()
+}
+
+// Bitmaps returns an op.CallOp that will display all bitmap glyphs within gs.
+// The positioning of the bitmaps uses the same logic as Shape(), so the returned
+// CallOp can be added at the same offset as the path data returned by Shape()
+// and will align correctly.
+func (s *shaperImpl) Bitmaps(ops *op.Ops, gs []Glyph) op.CallOp {
+	var x fixed.Int26_6
+	bitmapMacro := op.Record(ops)
+	for i, g := range gs {
+		if i == 0 {
+			x = g.X
+		}
+		_, faceIdx, gid := splitGlyphID(g.ID)
+		face := s.orderer.faceFor(faceIdx)
+		glyphData := face.GlyphData(gid)
+		switch glyphData := glyphData.(type) {
+		case api.GlyphBitmap:
+			var imgOp paint.ImageOp
+			var imgSize image.Point
+			var img image.Image
+			switch glyphData.Format {
+			case api.PNG, api.JPG, api.TIFF:
+				img, _, _ = image.Decode(bytes.NewReader(glyphData.Data))
+			case api.BlackAndWhite:
+				// This is a complex family of uncompressed bitmaps that don't seem to be
+				// very common in practice. We can try adding support later if needed.
+				fallthrough
+			default:
+				// Unknown format.
+				continue
+			}
+			imgOp = paint.NewImageOp(img)
+			imgSize = img.Bounds().Size()
+			off := op.Offset(image.Point{
+				X: ((g.X - x) - g.Offset.X).Round(),
+				Y: g.Offset.Y.Round() - g.Ascent.Round(),
+			}).Push(ops)
+			cl := clip.Rect{Max: imgSize}.Push(ops)
+
+			glyphSize := image.Rectangle{
+				Min: image.Point{
+					X: g.Bounds.Min.X.Round(),
+					Y: g.Bounds.Min.Y.Round(),
+				},
+				Max: image.Point{
+					X: g.Bounds.Max.X.Round(),
+					Y: g.Bounds.Max.Y.Round(),
+				},
+			}.Size()
+			aff := op.Affine(f32.Affine2D{}.Scale(f32.Point{}, f32.Point{
+				X: float32(glyphSize.X) / float32(imgSize.X),
+				Y: float32(glyphSize.Y) / float32(imgSize.Y),
+			})).Push(ops)
+			imgOp.Add(ops)
+			paint.PaintOp{}.Add(ops)
+			aff.Pop()
+			cl.Pop()
+			off.Pop()
+		}
+	}
+	return bitmapMacro.Stop()
 }
 
 // langConfig describes the language and writing system of a body of text.

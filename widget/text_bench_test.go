@@ -83,7 +83,7 @@ func BenchmarkLabelStatic(b *testing.B) {
 		l := Label{}
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			l.Layout(gtx, cache, font, fontSize, runesStr)
+			l.Layout(gtx, cache, font, fontSize, runesStr, op.CallOp{}, op.CallOp{})
 			if render {
 				win.Frame(gtx.Ops)
 			}
@@ -118,7 +118,7 @@ func BenchmarkLabelDynamic(b *testing.B) {
 			a := rand.Intn(len(runes))
 			b := rand.Intn(len(runes))
 			runes[a], runes[b] = runes[b], runes[a]
-			l.Layout(gtx, cache, font, fontSize, string(runes))
+			l.Layout(gtx, cache, font, fontSize, string(runes), op.CallOp{}, op.CallOp{})
 			if render {
 				win.Frame(gtx.Ops)
 			}
@@ -151,12 +151,7 @@ func BenchmarkEditorStatic(b *testing.B) {
 		e.SetText(runesStr)
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			e.Layout(gtx, cache, font, fontSize, func(gtx layout.Context) layout.Dimensions {
-				e.PaintSelection(gtx)
-				e.PaintText(gtx)
-				e.PaintCaret(gtx)
-				return layout.Dimensions{Size: gtx.Constraints.Min}
-			})
+			e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 			if render {
 				win.Frame(gtx.Ops)
 			}
@@ -196,12 +191,7 @@ func BenchmarkEditorDynamic(b *testing.B) {
 			e.Insert("")
 			e.SetCaret(b, b)
 			e.Insert(takeStr)
-			e.Layout(gtx, cache, font, fontSize, func(gtx layout.Context) layout.Dimensions {
-				e.PaintSelection(gtx)
-				e.PaintText(gtx)
-				e.PaintCaret(gtx)
-				return layout.Dimensions{Size: gtx.Constraints.Min}
-			})
+			e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 			if render {
 				win.Frame(gtx.Ops)
 			}
@@ -225,12 +215,7 @@ func FuzzEditorEditing(f *testing.F) {
 	e := Editor{}
 	f.Fuzz(func(t *testing.T, txt string, replaceFrom, replaceTo int16) {
 		e.SetText(txt)
-		e.Layout(gtx, cache, font, fontSize, func(gtx layout.Context) layout.Dimensions {
-			e.PaintSelection(gtx)
-			e.PaintText(gtx)
-			e.PaintCaret(gtx)
-			return layout.Dimensions{Size: gtx.Constraints.Min}
-		})
+		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 		// simulate a constantly changing string
 		if e.Len() > 0 {
 			a := int(replaceFrom) % e.Len()
@@ -241,12 +226,7 @@ func FuzzEditorEditing(f *testing.F) {
 			e.SetCaret(b, b)
 			e.Insert(takeStr)
 		}
-		e.Layout(gtx, cache, font, fontSize, func(gtx layout.Context) layout.Dimensions {
-			e.PaintSelection(gtx)
-			e.PaintText(gtx)
-			e.PaintCaret(gtx)
-			return layout.Dimensions{Size: gtx.Constraints.Min}
-		})
+		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 		gtx.Ops.Reset()
 	})
 }

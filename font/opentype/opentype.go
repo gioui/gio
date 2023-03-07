@@ -2,11 +2,18 @@
 
 // Package opentype implements text layout and shaping for OpenType
 // files.
+//
+// NOTE: the OpenType specification allows for fonts to include bitmap images
+// in a variety of formats. In the interest of small binary sizes, the opentype
+// package only automatically imports the PNG image decoder. If you have a font
+// with glyphs in JPEG or TIFF formats, register those decoders with the image
+// package in order to ensure those glyphs are visible in text.
 package opentype
 
 import (
 	"bytes"
 	"fmt"
+	_ "image/png"
 
 	"github.com/go-text/typesetting/font"
 )

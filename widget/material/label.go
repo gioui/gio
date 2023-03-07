@@ -7,6 +7,7 @@ import (
 
 	"gioui.org/internal/f32color"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
@@ -98,16 +99,13 @@ func Label(th *Theme, size unit.Sp, txt string) LabelStyle {
 }
 
 func (l LabelStyle) Layout(gtx layout.Context) layout.Dimensions {
+	textColorMacro := op.Record(gtx.Ops)
 	paint.ColorOp{Color: l.Color}.Add(gtx.Ops)
+	textColor := textColorMacro.Stop()
+	selectColorMacro := op.Record(gtx.Ops)
+	paint.ColorOp{Color: l.SelectionColor}.Add(gtx.Ops)
+	selectColor := selectColorMacro.Stop()
+
 	tl := widget.Label{Alignment: l.Alignment, MaxLines: l.MaxLines, Selectable: l.State}
-	if l.State == nil {
-		return tl.Layout(gtx, l.shaper, l.Font, l.TextSize, l.Text)
-	}
-	return tl.LayoutSelectable(gtx, l.shaper, l.Font, l.TextSize, l.Text, func(gtx layout.Context) layout.Dimensions {
-		paint.ColorOp{Color: l.SelectionColor}.Add(gtx.Ops)
-		l.State.PaintSelection(gtx)
-		paint.ColorOp{Color: l.Color}.Add(gtx.Ops)
-		l.State.PaintText(gtx)
-		return layout.Dimensions{}
-	})
+	return tl.Layout(gtx, l.shaper, l.Font, l.TextSize, l.Text, textColor, selectColor)
 }

@@ -8,6 +8,7 @@ import (
 
 	"gioui.org/internal/f32color"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/text"
@@ -73,8 +74,9 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return layout.UniformInset(2).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				colMacro := op.Record(gtx.Ops)
 				paint.ColorOp{Color: c.Color}.Add(gtx.Ops)
-				return widget.Label{}.Layout(gtx, c.shaper, c.Font, c.TextSize, c.Label)
+				return widget.Label{}.Layout(gtx, c.shaper, c.Font, c.TextSize, c.Label, colMacro.Stop(), op.CallOp{})
 			})
 		}),
 	)

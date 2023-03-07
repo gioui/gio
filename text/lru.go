@@ -5,74 +5,50 @@ package text
 import (
 	"encoding/binary"
 	"hash/maphash"
+	"image"
 
 	"gioui.org/io/system"
+	"gioui.org/op"
 	"gioui.org/op/clip"
+	"gioui.org/op/paint"
 	"golang.org/x/image/math/fixed"
 )
 
-type layoutCache struct {
-	m          map[layoutKey]*layoutElem
-	head, tail *layoutElem
+// entry holds a single key-value pair for an LRU cache.
+type entry[K comparable, V any] struct {
+	next, prev *entry[K, V]
+	key        K
+	v          V
 }
 
-type pathCache struct {
-	seed       maphash.Seed
-	m          map[uint64]*path
-	head, tail *path
+// lru is a generic least-recently-used cache.
+type lru[K comparable, V any] struct {
+	m          map[K]*entry[K, V]
+	head, tail *entry[K, V]
 }
 
-type layoutElem struct {
-	next, prev *layoutElem
-	key        layoutKey
-	layout     document
-}
-
-type path struct {
-	next, prev *path
-	key        uint64
-	val        clip.PathSpec
-	glyphs     []glyphInfo
-}
-
-type glyphInfo struct {
-	ID GlyphID
-	X  fixed.Int26_6
-}
-
-type layoutKey struct {
-	ppem               fixed.Int26_6
-	maxWidth, minWidth int
-	maxLines           int
-	str                string
-	locale             system.Locale
-	font               Font
-}
-
-type pathKey struct {
-	gidHash uint64
-}
-
-const maxSize = 1000
-
-func (l *layoutCache) Get(k layoutKey) (document, bool) {
+// Get fetches the value associated with the given key, if any.
+func (l *lru[K, V]) Get(k K) (V, bool) {
 	if lt, ok := l.m[k]; ok {
 		l.remove(lt)
 		l.insert(lt)
-		return lt.layout, true
+		return lt.v, true
 	}
-	return document{}, false
+	var v V
+	return v, false
 }
 
-func (l *layoutCache) Put(k layoutKey, lt document) {
+// Put inserts the given value with the given key, evicting old
+// cache entries if necessary.
+func (l *lru[K, V]) Put(k K, v V) {
 	if l.m == nil {
-		l.m = make(map[layoutKey]*layoutElem)
-		l.head = new(layoutElem)
-		l.tail = new(layoutElem)
+		l.m = make(map[K]*entry[K, V])
+		l.head = new(entry[K, V])
+		l.tail = new(entry[K, V])
 		l.head.prev = l.tail
 		l.tail.next = l.head
 	}
-	val := &layoutElem{key: k, layout: lt}
+	val := &entry[K, V]{key: k, v: v}
 	l.m[k] = val
 	l.insert(val)
 	if len(l.m) > maxSize {
@@ -82,21 +58,42 @@ func (l *layoutCache) Put(k layoutKey, lt document) {
 	}
 }
 
-func (l *layoutCache) remove(lt *layoutElem) {
-	lt.next.prev = lt.prev
-	lt.prev.next = lt.next
+// remove cuts e out of the lru linked list.
+func (l *lru[K, V]) remove(e *entry[K, V]) {
+	e.next.prev = e.prev
+	e.prev.next = e.next
 }
 
-func (l *layoutCache) insert(lt *layoutElem) {
-	lt.next = l.head
-	lt.prev = l.head.prev
-	lt.prev.next = lt
-	lt.next.prev = lt
+// insert adds e to the lru linked list.
+func (l *lru[K, V]) insert(e *entry[K, V]) {
+	e.next = l.head
+	e.prev = l.head.prev
+	e.prev.next = e
+	e.next.prev = e
+}
+
+type bitmapCache = lru[GlyphID, bitmap]
+
+type bitmap struct {
+	img  paint.ImageOp
+	size image.Point
+}
+
+type layoutCache = lru[layoutKey, document]
+
+type glyphValue[V any] struct {
+	v      V
+	glyphs []glyphInfo
+}
+
+type glyphLRU[V any] struct {
+	seed  maphash.Seed
+	cache lru[uint64, glyphValue[V]]
 }
 
 // hashGlyphs computes a hash key based on the ID and X offset of
 // every glyph in the slice.
-func (c *pathCache) hashGlyphs(gs []Glyph) uint64 {
+func (c *glyphLRU[V]) hashGlyphs(gs []Glyph) uint64 {
 	if c.seed == (maphash.Seed{}) {
 		c.seed = maphash.MakeSeed()
 	}
@@ -118,6 +115,55 @@ func (c *pathCache) hashGlyphs(gs []Glyph) uint64 {
 	return sum
 }
 
+func (c *glyphLRU[V]) Get(key uint64, gs []Glyph) (V, bool) {
+	if v, ok := c.cache.Get(key); ok && gidsEqual(v.glyphs, gs) {
+		return v.v, true
+	}
+	var v V
+	return v, false
+}
+
+func (c *glyphLRU[V]) Put(key uint64, glyphs []Glyph, v V) {
+	gids := make([]glyphInfo, len(glyphs))
+	firstX := fixed.I(0)
+	for i, glyph := range glyphs {
+		if i == 0 {
+			firstX = glyph.X
+		}
+		// Cache glyph X offsets relative to the first glyph.
+		gids[i] = glyphInfo{ID: glyph.ID, X: glyph.X - firstX}
+	}
+	val := glyphValue[V]{
+		glyphs: gids,
+		v:      v,
+	}
+	c.cache.Put(key, val)
+}
+
+type pathCache = glyphLRU[clip.PathSpec]
+
+type bitmapShapeCache = glyphLRU[op.CallOp]
+
+type glyphInfo struct {
+	ID GlyphID
+	X  fixed.Int26_6
+}
+
+type layoutKey struct {
+	ppem               fixed.Int26_6
+	maxWidth, minWidth int
+	maxLines           int
+	str                string
+	locale             system.Locale
+	font               Font
+}
+
+type pathKey struct {
+	gidHash uint64
+}
+
+const maxSize = 1000
+
 func gidsEqual(a []glyphInfo, glyphs []Glyph) bool {
 	if len(a) != len(glyphs) {
 		return false
@@ -133,52 +179,4 @@ func gidsEqual(a []glyphInfo, glyphs []Glyph) bool {
 		}
 	}
 	return true
-}
-
-func (c *pathCache) Get(key uint64, gs []Glyph) (clip.PathSpec, bool) {
-	if v, ok := c.m[key]; ok && gidsEqual(v.glyphs, gs) {
-		c.remove(v)
-		c.insert(v)
-		return v.val, true
-	}
-	return clip.PathSpec{}, false
-}
-
-func (c *pathCache) Put(key uint64, glyphs []Glyph, v clip.PathSpec) {
-	if c.m == nil {
-		c.m = make(map[uint64]*path)
-		c.head = new(path)
-		c.tail = new(path)
-		c.head.prev = c.tail
-		c.tail.next = c.head
-	}
-	gids := make([]glyphInfo, len(glyphs))
-	firstX := fixed.I(0)
-	for i, glyph := range glyphs {
-		if i == 0 {
-			firstX = glyph.X
-		}
-		// Cache glyph X offsets relative to the first glyph.
-		gids[i] = glyphInfo{ID: glyph.ID, X: glyph.X - firstX}
-	}
-	val := &path{key: key, val: v, glyphs: gids}
-	c.m[key] = val
-	c.insert(val)
-	if len(c.m) > maxSize {
-		oldest := c.tail.next
-		c.remove(oldest)
-		delete(c.m, oldest.key)
-	}
-}
-
-func (c *pathCache) remove(v *path) {
-	v.next.prev = v.prev
-	v.prev.next = v.next
-}
-
-func (c *pathCache) insert(v *path) {
-	v.next = c.head
-	v.prev = c.head.prev
-	v.prev.next = v
-	v.next.prev = v
 }

@@ -18,6 +18,7 @@ import (
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
+	"gioui.org/io/semantic"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -504,12 +505,14 @@ func (e *Editor) initBuffer() {
 	e.text.Mask = e.Mask
 }
 
-// Layout lays out the editor. If content is not nil, it is laid out on top.
-func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, content layout.Widget) layout.Dimensions {
+// Layout lays out the editor using the provided textMaterial as the paint material
+// for the text glyphs+caret and the selectMaterial as the paint material for the
+// selection rectangle.
+func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, textMaterial, selectMaterial op.CallOp) layout.Dimensions {
 	e.initBuffer()
 	e.text.Update(gtx, lt, font, size, e.processEvents)
 
-	dims := e.layout(gtx, content)
+	dims := e.layout(gtx, textMaterial, selectMaterial)
 
 	if e.focused {
 		// Notify IME of selection if it changed.
@@ -586,7 +589,7 @@ func (e *Editor) updateSnippet(gtx layout.Context, start, end int) {
 	}.Add(gtx.Ops)
 }
 
-func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimensions {
+func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.CallOp) layout.Dimensions {
 	// Adjust scrolling for new viewport and layout.
 	e.text.ScrollRel(0, 0)
 
@@ -659,33 +662,44 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 		}
 		e.showCaret = e.focused && (!blinking || dt%timePerBlink < timePerBlink/2)
 	}
+	disabled := gtx.Queue == nil
 
-	if content != nil {
-		content(gtx)
+	semantic.Editor.Add(gtx.Ops)
+	if e.Len() > 0 {
+		e.paintSelection(gtx, selectMaterial)
+		e.paintText(gtx, textMaterial)
+	}
+	if !disabled {
+		e.paintCaret(gtx, textMaterial)
 	}
 	return visibleDims
 }
 
-// PaintSelection paints the contrasting background for selected text.
-func (e *Editor) PaintSelection(gtx layout.Context) {
+// paintSelection paints the contrasting background for selected text using the provided
+// material to set the painting material for the selection.
+func (e *Editor) paintSelection(gtx layout.Context, material op.CallOp) {
 	e.initBuffer()
 	if !e.focused {
 		return
 	}
-	e.text.PaintSelection(gtx)
+	e.text.PaintSelection(gtx, material)
 }
 
-func (e *Editor) PaintText(gtx layout.Context) {
+// paintText paints the text glyphs using the provided material to set the fill of the
+// glyphs.
+func (e *Editor) paintText(gtx layout.Context, material op.CallOp) {
 	e.initBuffer()
-	e.text.PaintText(gtx)
+	e.text.PaintText(gtx, material)
 }
 
-func (e *Editor) PaintCaret(gtx layout.Context) {
+// paintCaret paints the text glyphs using the provided material to set the fill material
+// of the caret rectangle.
+func (e *Editor) paintCaret(gtx layout.Context, material op.CallOp) {
 	e.initBuffer()
 	if !e.showCaret || e.ReadOnly {
 		return
 	}
-	e.text.PaintCaret(gtx)
+	e.text.PaintCaret(gtx, material)
 }
 
 // Len is the length of the editor contents, in runes.

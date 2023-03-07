@@ -27,22 +27,22 @@ type Label struct {
 	Selectable *Selectable
 }
 
-// Layout the label with the given shaper, font, size, and text. Content is a function that will be invoked
-// with the label's clip area applied, and should be used to set colors and paint the text/selection.
-// content will only be invoked for labels with a non-nil Selectable. For stateless labels, the paint color
-// should be set prior to calling Layout.
-func (l Label) LayoutSelectable(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, txt string, content layout.Widget) layout.Dimensions {
+// Layout the label with the given shaper, font, size, text, and materials. If the Selectable field is
+// populated, the label will support text selection. Otherwise, it will be non-interactive. The textMaterial
+// and selectionMaterial op.CallOps are responsible for setting the painting material for the text glyphs
+// and the text selection rectangles, respectively.
+func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, txt string, textMaterial, selectionMaterial op.CallOp) layout.Dimensions {
 	if l.Selectable == nil {
-		return l.Layout(gtx, lt, font, size, txt)
+		return l.layout(gtx, lt, font, size, txt, textMaterial, selectionMaterial)
 	}
 	l.Selectable.text.Alignment = l.Alignment
 	l.Selectable.text.MaxLines = l.MaxLines
 	l.Selectable.SetText(txt)
-	return l.Selectable.Layout(gtx, lt, font, size, content)
+	return l.Selectable.Layout(gtx, lt, font, size, textMaterial, selectionMaterial)
 }
 
-// Layout the text as non-interactive.
-func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, txt string) layout.Dimensions {
+// layout the text as non-interactive.
+func (l Label) layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, txt string, textMaterial, selectionMaterial op.CallOp) layout.Dimensions {
 	cs := gtx.Constraints
 	textSize := fixed.I(gtx.Sp(size))
 	lt.LayoutString(text.Parameters{
@@ -53,7 +53,11 @@ func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size 
 	}, cs.Min.X, cs.Max.X, gtx.Locale, txt)
 	m := op.Record(gtx.Ops)
 	viewport := image.Rectangle{Max: cs.Max}
-	it := textIterator{viewport: viewport, maxLines: l.MaxLines}
+	it := textIterator{
+		viewport: viewport,
+		maxLines: l.MaxLines,
+		material: textMaterial,
+	}
 	semantic.LabelOp(txt).Add(gtx.Ops)
 	var glyphs [32]text.Glyph
 	line := glyphs[:0]
@@ -86,6 +90,9 @@ type textIterator struct {
 	viewport image.Rectangle
 	// maxLines is the maximum number of text lines that should be displayed.
 	maxLines int
+	// material sets the paint material for the text glyphs. If none is provided
+	// the glyphs will be invisible.
+	material op.CallOp
 
 	// linesSeen tracks the quantity of line endings this iterator has seen.
 	linesSeen int
@@ -165,9 +172,14 @@ func (it *textIterator) paintGlyph(gtx layout.Context, shaper *text.Shaper, glyp
 	}
 	if glyph.Flags&text.FlagLineBreak != 0 || cap(line)-len(line) == 0 || !visibleOrBefore {
 		t := op.Offset(it.lineOff).Push(gtx.Ops)
-		op := clip.Outline{Path: shaper.Shape(line)}.Op().Push(gtx.Ops)
+		path := shaper.Shape(line)
+		outline := clip.Outline{Path: path}.Op().Push(gtx.Ops)
+		it.material.Add(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
-		op.Pop()
+		outline.Pop()
+		if call := shaper.Bitmaps(line); call != (op.CallOp{}) {
+			call.Add(gtx.Ops)
+		}
 		t.Pop()
 		line = line[:0]
 	}

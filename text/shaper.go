@@ -146,10 +146,11 @@ type GlyphID uint64
 
 // Shaper converts strings of text into glyphs that can be displayed.
 type Shaper struct {
-	shaper      shaperImpl
-	pathCache   pathCache
-	layoutCache layoutCache
-	paragraph   []rune
+	shaper           shaperImpl
+	pathCache        pathCache
+	bitmapShapeCache bitmapShapeCache
+	layoutCache      layoutCache
+	paragraph        []rune
 
 	reader strings.Reader
 
@@ -440,17 +441,33 @@ func splitGlyphID(g GlyphID) (fixed.Int26_6, int, font.GID) {
 	return ppem, faceIdx, gid
 }
 
-// Shape converts a slice of glyphs into a path describing their collective
-// shape. All glyphs are expected to be from a single line of text (their
-// Y offsets are ignored).
+// Shape converts the provided glyphs into a path. The path will enclose the forms
+// of all vector glyphs.
+// All glyphs are expected to be from a single line of text (their Y offsets are ignored).
 func (l *Shaper) Shape(gs []Glyph) clip.PathSpec {
 	key := l.pathCache.hashGlyphs(gs)
 	shape, ok := l.pathCache.Get(key, gs)
 	if ok {
 		return shape
 	}
-	ops := new(op.Ops)
-	shape = l.shaper.Shape(ops, gs)
+	pathOps := new(op.Ops)
+	shape = l.shaper.Shape(pathOps, gs)
 	l.pathCache.Put(key, gs, shape)
 	return shape
+}
+
+// Bitmaps extracts bitmap glyphs from the provided slice and creates an op.CallOp to present
+// them. The returned op.CallOp will align correctly with the return value of Shape() for the
+// same gs slice.
+// All glyphs are expected to be from a single line of text (their Y offsets are ignored).
+func (l *Shaper) Bitmaps(gs []Glyph) op.CallOp {
+	key := l.bitmapShapeCache.hashGlyphs(gs)
+	call, ok := l.bitmapShapeCache.Get(key, gs)
+	if ok {
+		return call
+	}
+	callOps := new(op.Ops)
+	call = l.shaper.Bitmaps(callOps, gs)
+	l.bitmapShapeCache.Put(key, gs, call)
+	return call
 }

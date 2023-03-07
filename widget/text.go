@@ -234,31 +234,33 @@ func (e *textView) Update(gtx layout.Context, lt *text.Shaper, font text.Font, s
 	e.makeValid()
 }
 
-// PaintSelection clips and paints the visible text selection rectangles. Callers
-// are expected to apply an appropriate paint material with a paint.ColorOp or
-// similar prior to calling PaintSelection.
-func (e *textView) PaintSelection(gtx layout.Context) {
+// PaintSelection clips and paints the visible text selection rectangles using
+// the provided material to fill the rectangles.
+func (e *textView) PaintSelection(gtx layout.Context, material op.CallOp) {
 	localViewport := image.Rectangle{Max: e.viewSize}
 	docViewport := image.Rectangle{Max: e.viewSize}.Add(e.scrollOff)
 	defer clip.Rect(localViewport).Push(gtx.Ops).Pop()
 	e.regions = e.index.locate(docViewport, e.caret.start, e.caret.end, e.regions)
 	for _, region := range e.regions {
 		area := clip.Rect(region.Bounds).Push(gtx.Ops)
+		material.Add(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
 		area.Pop()
 	}
 }
 
-// PaintText clips and paints the visible text glyph outlines. Callers
-// are expected to apply an appropriate paint material with a paint.ColorOp or
-// similar prior to calling PaintSelection.
-func (e *textView) PaintText(gtx layout.Context) {
+// PaintText clips and paints the visible text glyph outlines using the provided
+// material to fill the glyphs.
+func (e *textView) PaintText(gtx layout.Context, material op.CallOp) {
 	m := op.Record(gtx.Ops)
 	viewport := image.Rectangle{
 		Min: e.scrollOff,
 		Max: e.viewSize.Add(e.scrollOff),
 	}
-	it := textIterator{viewport: viewport}
+	it := textIterator{
+		viewport: viewport,
+		material: material,
+	}
 
 	startGlyph := 0
 	for _, line := range e.index.lines {
@@ -293,10 +295,9 @@ func (e *textView) caretWidth(gtx layout.Context) int {
 	return carWidth2
 }
 
-// PaintCaret clips and paints the caret rectangle. Callers
-// are expected to apply an appropriate paint material with a paint.ColorOp or
-// similar prior to calling PaintSelection.
-func (e *textView) PaintCaret(gtx layout.Context) {
+// PaintCaret clips and paints the caret rectangle, adding material immediately
+// before painting to set the appropriate paint material.
+func (e *textView) PaintCaret(gtx layout.Context, material op.CallOp) {
 	carWidth2 := e.caretWidth(gtx)
 	caretPos, carAsc, carDesc := e.CaretInfo()
 
@@ -308,6 +309,7 @@ func (e *textView) PaintCaret(gtx layout.Context) {
 	carRect = cl.Intersect(carRect)
 	if !carRect.Empty() {
 		defer clip.Rect(carRect).Push(gtx.Ops).Pop()
+		material.Add(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
 	}
 }

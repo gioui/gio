@@ -12,6 +12,7 @@ import (
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
 	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/text"
 	"gioui.org/unit"
@@ -91,18 +92,19 @@ func (l *Selectable) Focused() bool {
 	return l.focused
 }
 
-// PaintSelection paints the contrasting background for selected text.
-func (l *Selectable) PaintSelection(gtx layout.Context) {
+// paintSelection paints the contrasting background for selected text.
+func (l *Selectable) paintSelection(gtx layout.Context, material op.CallOp) {
 	l.initialize()
 	if !l.focused {
 		return
 	}
-	l.text.PaintSelection(gtx)
+	l.text.PaintSelection(gtx, material)
 }
 
-func (l *Selectable) PaintText(gtx layout.Context) {
+// paintText paints the text glyphs with the provided material.
+func (l *Selectable) paintText(gtx layout.Context, material op.CallOp) {
 	l.initialize()
-	l.text.PaintText(gtx)
+	l.text.PaintText(gtx, material)
 }
 
 // SelectionLen returns the length of the selection, in runes; it is
@@ -158,10 +160,10 @@ func (l *Selectable) SetText(s string) {
 	}
 }
 
-// Layout clips to the dimensions of the selectable, updates the shaped text, configures input handling, and invokes
-// content. content is expected to set colors and invoke the Paint methods. content may be nil, in which case nothing
-// will be displayed.
-func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, content layout.Widget) layout.Dimensions {
+// Layout clips to the dimensions of the selectable, updates the shaped text, configures input handling, and paints
+// the text and selection rectangles. The provided textMaterial and selectionMaterial ops are used to set the
+// paint material for the text and selection rectangles, respectively.
+func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, textMaterial, selectionMaterial op.CallOp) layout.Dimensions {
 	l.initialize()
 	l.text.Update(gtx, lt, font, size, l.handleEvents)
 	dims := l.text.Dimensions()
@@ -182,9 +184,8 @@ func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font text.Font,
 	l.clicker.Add(gtx.Ops)
 	l.dragger.Add(gtx.Ops)
 
-	if content != nil {
-		content(gtx)
-	}
+	l.paintSelection(gtx, selectionMaterial)
+	l.paintText(gtx, textMaterial)
 	return dims
 }
 
