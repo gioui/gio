@@ -3,7 +3,7 @@ module gioui.org
 go 1.18
 
 require (
-	eliasnaur.com/font v0.0.0-20220124212145-832bb8fc08c3
+	eliasnaur.com/font v0.0.0-20230308162249-dd43949cb42d
 	gioui.org/cpu v0.0.0-20210817075930-8d6a761490d2
 	gioui.org/shader v1.0.6
 	github.com/go-text/typesetting v0.0.0-20230327140021-5bac583ebb4f

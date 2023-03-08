@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	colEmoji "eliasnaur.com/font/noto/emoji/color"
 	"gioui.org/font/gofont"
+	"gioui.org/font/opentype"
 	"gioui.org/gpu/headless"
 	"gioui.org/io/system"
 	"gioui.org/layout"
@@ -24,12 +26,24 @@ var (
 		"latin":   latinDocument,
 		"arabic":  arabicDocument,
 		"complex": complexDocument,
+		"emoji":   emojiDocument,
 	}
+	emojiFace = func() opentype.Face {
+		face, _ := opentype.Parse(colEmoji.TTF)
+		return face
+	}()
 	sizes      = []int{10, 100, 1000}
 	locales    = []system.Locale{arabic, english}
 	benchFonts = func() []text.FontFace {
-		gofonts := gofont.Collection()
-		return append(arabicCollection, gofonts...)
+		collection := gofont.Collection()
+		collection = append(collection, arabicCollection...)
+		collection = append(collection, text.FontFace{
+			Font: text.Font{
+				Typeface: "Noto Color Emoji",
+			},
+			Face: emojiFace,
+		})
+		return collection
 	}()
 )
 
@@ -331,4 +345,11 @@ Velit ونظراً للالتزامات التي يفرضها ultrices.
 Nunc scelerisque viverra mauris in aliquam sem ر إما أن  ut.
 السعادة من أجل ما هو أكثر أهمية أو يتحمل الألم
 Convallis posuere morbi leo urna molestie at.`
+	emojiDocument = `📚🎶🐰🌷👹🌟 🔰🐲📑🍢🔎 👢💮👷👧💑🐪 📙📜🐎🏠🎠 👧🌼💛🎉💜🎍 🔜💷🐉👘🕟📗🍟 🎆🍚📹💄 🐾🎩💽👘 📒💕👅💽🐩 📷🌌🌚🎣📌. 🍈🍅🔖🍄 🍐🔈🍤🐽 🐹💘🍚👩📡 🎸🏠🔳🏩🌳💣 🔡🔠🕤🔔🎴📕 📼👝🎓🕗💸 📓🌽🍟💵🕗🌒🏉📨 🔀🏉🍴💘🍣💸 🔪🔻🕖🎰 🐲👮🔙🌇🐒🏇 🐝🌚🏫🔀👍 👾🎧🍋🍔👧 💣💞🐴👆🐢🏊📀 🕤🌃🍌🕛🔬. 🏃🍜🍔🐽🎁🏩🎰 📮🍄🐖💕👈 🔠🕡🐊💞🍬📳 🎤🌆🌛🐍🔳 🐄🔇🔱🌇📺👞 💌👍📳🎤🏂 👞🎉🍶📊🔶🌅🐭🕙 🍜📠🎴💒🔶 📀💂🌷👺👙.
+
+📥🕝🎎🐻💘🍇🔤 💠🎇📦👩🍁 👜🍏🔏👎 🔟🌹🌗🎬🔙 🐁📛🐝🐏🐣 🔃🗻🔎🌺👀 📰📮🏩👯🐳🍀🍇 🍨📵🌂📌 👌📐🏨🐉 🍏🍘🔟🎣🔏📠 👤📭🐱📣. 🕓👶🎳📭🔌📃🔧 📟🔰🌂🎈🔣 🔤👍🍤👔🐪 🔨🎼🎊🎪🕝🐬 📴🎶🔈🔐🔘 🐬🐯🕜🎎👴🎃 🎑🐾👏👇🔭 🐥🔙💦🔩🔮 👊🐶👗📕 🐎📹👠🍤 🔢💘📷🐷🐂 🐫💕🕕🍖🔆🎽 👼🎶🌸👻🔷🌰 🔔💉💱🔂👵🔑. 🌁🎪🎌🍘🍏 🌛🍂🔎🕃📧👻 🎍🌔🐦🐻 🔉🎌🌘💉👒 📙💠🔙📰 🌒👏💪🌇💈 🌌📯📂🌀🔁 🏧💷🍀🐐🏈 📢🌏🔷💭 👋🕓🌓🕛🏢👡👋 🍶🐂🍠🔟 👵🏇🔶🕜👎. 👹💉🔌🍳🕗 🐫🌈🔠🐀🎩🎽 👺🔣🔂👪👴🐚🕙 👀🕓🔱🌇 🎻🐘🔐🕕 🌉🔡🐊🍮 💫🎆🎹🐍🎯 🐑🐱🍠🕑🍒.
+
+🎳🐎🔹🎾🐹📖 📘🐒📷🕧🔛 🐾📺🎿🍖💂🕥 🍜🎷🍣👳 🕛📧💶🌑 🌀💣🎎🐛🎪🐒 🎇🌹👺🎆💄📚 🔓🍗📓🎂🌍🌘📢 🍩💞🏂💥🔹📇💴 🐇🕝💹🐣💔🎫 👐🍼🏰🎄🎨👚 👑🔗🍅🐈 🐰🐙🌻👹👆 👬🐧🍬🕡🐽💉 🌅🔉🎤🔁📨🔧🔀🍏 🎼🔛📉🌺. 👖🌔🍢🏂💯 🏁🐰🍉📬🍖 📨💜📮🔕🎣🔩 🔏🕀🏫🎳📵👭👟 💨💃📶🎃 📚🔇🍛👽🐍🐄 🔼👻🍮🍔🍨🏪🐺 📩📜🍨📖 🏢🎉🔢🌚🌀🔊💍 🐟🕚🔴🎿🍞 🌈📤👲🌿🌅🍲📛💍 🐦🔰🐗🐆🎻 👑🕐📔🎁🍙🔪🔭. 🎐🐵🎼🌒🎰🍳🎽 🐻🔉💺🕁🍷 🐛🍬💦📶🔖 🔕🌳💃🌺🔢 💒📒🔘🐸👩 🌺🍈🌀🏁🎢🔖 📈🎸🐖👪 🐅🏁🔹🎬🍖📊🗼 🎬📅💝📀🎐. 🌗📍👇🎠 🌸🐸🐐🍕🐋 💈🌌🐶💤🌻🐞 🍯🌳📌🍮🐻🍝 🕦📯🔱👒 💖🌱🐨🎰🏭🏈 🔳🏩🌟🔭📢📒 🔅💬💓💻💁💂 🔗🍂🏇🌒🌂💩🕢 🔙🌆💞📜🔘👇 🍎🌃🔢🌵🏬 🔄💢🍨📋💇🌄 🍝🍧💂🏮🏁. 🎬🐽🔇🎣🌜🔣 🌍🔒👿🎆🌞🍇🍸 👖🍘🏡🕣 📝🐖💆🎈 👙🔳👙🔩👀🔂 🐤📈💃👗🔌🎾🔭🍴 🌺👛🌵🌕🐺 🎆💼👌👘🍈👛 🎳🐪🕧🏄 💯🍟💂👖🎍 🕀💟🌷💕🐉🐲🎷. 🎍👂📓🌽 🐉🕕🐤🌲📟🔂💷 🎑📛🕠🔹🐚 🍆📹🐚🐵🏇🏢 🍠💱🕦💙🏢🐌🎎 🐄🍨📄🌾🎻🏈 🏇🍪💸🔆💍📢👢 💇🌋👝🕜🌍🐶🎓 🍪📄🐤🎃💖 🔲🕒🍧🌎🐪🌶 🍓👲🔭🍯🌔👌 🔼🐗🗼🍂 🔶🍯🎶🐅🐂💗🐴🐶 📭📰📔👬🏯🕟🐄🍊 💆👞📆🐶🌖🎁👺 🐃💺👊🌿🎌.
+
+🍧🕔👆🔭🕛👇 🐆🔖🎂🐭📗🗼🐐 🌐🎢🌞💛🐚 🌿🎶💎💬🔩 💾🔐🎷🍙🐬🕐 🌏🍄🎾🐎🌽🍓🐳 💥🍎👳📫🐤📼🎾 👨🕃🕞🍯🍲. 💥🎍🔉🎈👻🔵🏬🔸 🔼🍹🔱🔮🕔 🌈💎👜📠 👢🍻🍢🎃👺🌍👰 🍵👃🕠🍎🍑 📜💥📘📌 🔹🔵🍷👅💏 💮💘🐜📠👬📖 🌅🍺🔇🌈👒🔀 🎢🌆💌🍬📱🎰 🌺🍆🔰🏁🍁🎠 🔇🔁🌹🔞🎀🎬🐭🌹 🏬📫🗾🎻📌. 🐠🏣👋👊🐟 👲🔣💻👅🎎 🎇🌲🕑🍨📯 🐜📵💙📷🎒🕔 🎇🏀🔴🐑🌗 🎧🔡👅🕁🏉👛🐬 🕧🐞🎩📓🍆📪 🐼📻👼🌄 🌟🌺🏦🍧🍕🐯 🕕🕦🐤💆🍧💩 🐑📜👏👐🐧🍞👵 👞🌲🍼🔍 🌛🐔🌄🎸🐯.`
 )
