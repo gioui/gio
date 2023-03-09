@@ -3,11 +3,14 @@
 package widget
 
 import (
+	"bufio"
 	"image"
+	"io"
 	"math"
 	"sort"
 
 	"gioui.org/text"
+	"github.com/go-text/typesetting/segmenter"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -414,4 +417,75 @@ func (g *glyphIndex) locate(viewport image.Rectangle, startRune, endRune int, re
 		rects[i].Bounds = rects[i].Bounds.Sub(viewport.Min)
 	}
 	return rects
+}
+
+// graphemeReader segments paragraphs of text into grapheme clusters.
+type graphemeReader struct {
+	segmenter.Segmenter
+	graphemes  []int
+	paragraph  []rune
+	source     io.ReaderAt
+	cursor     int64
+	reader     *bufio.Reader
+	runeOffset int
+}
+
+// SetSource configures the reader to pull from source.
+func (p *graphemeReader) SetSource(source io.ReaderAt) {
+	p.source = source
+	p.cursor = 0
+	p.reader = bufio.NewReader(p)
+	p.runeOffset = 0
+}
+
+// Read exists to satisfy io.Reader. It should not be directly invoked.
+func (p *graphemeReader) Read(b []byte) (int, error) {
+	n, err := p.source.ReadAt(b, p.cursor)
+	p.cursor += int64(n)
+	return n, err
+}
+
+// next decodes one paragraph of rune data.
+func (p *graphemeReader) next() ([]rune, bool) {
+	p.paragraph = p.paragraph[:0]
+	var err error
+	var r rune
+	for err == nil {
+		r, _, err = p.reader.ReadRune()
+		if err != nil {
+			break
+		}
+		p.paragraph = append(p.paragraph, r)
+		if r == '\n' {
+			break
+		}
+	}
+	return p.paragraph, err == nil
+}
+
+// Graphemes will return the next paragraph's grapheme cluster boundaries,
+// if any. If it returns an empty slice, there is no more data (all paragraphs
+// have been segmented).
+func (p *graphemeReader) Graphemes() []int {
+	var more bool
+	p.graphemes = p.graphemes[:0]
+	p.paragraph, more = p.next()
+	if len(p.paragraph) == 0 && !more {
+		return nil
+	}
+	p.Segmenter.Init(p.paragraph)
+	iter := p.Segmenter.GraphemeIterator()
+	if iter.Next() {
+		graph := iter.Grapheme()
+		p.graphemes = append(p.graphemes,
+			p.runeOffset+graph.Offset,
+			p.runeOffset+graph.Offset+len(graph.Text),
+		)
+	}
+	for iter.Next() {
+		graph := iter.Grapheme()
+		p.graphemes = append(p.graphemes, p.runeOffset+graph.Offset+len(graph.Text))
+	}
+	p.runeOffset += len(p.paragraph)
+	return p.graphemes
 }

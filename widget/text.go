@@ -17,6 +17,7 @@ import (
 	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
+	"golang.org/x/exp/slices"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -54,12 +55,16 @@ type textView struct {
 	// are accessed by Len, Text, and SetText.
 	Mask rune
 
-	font               text.Font
-	shaper             *text.Shaper
-	textSize           fixed.Int26_6
-	seekCursor         int64
-	rr                 textSource
-	maskReader         maskReader
+	font       text.Font
+	shaper     *text.Shaper
+	textSize   fixed.Int26_6
+	seekCursor int64
+	rr         textSource
+	maskReader maskReader
+	// graphemes tracks the indices of grapheme cluster boundaries within rr.
+	graphemes []int
+	// paragraphReader is used to populate graphemes.
+	paragraphReader    graphemeReader
 	lastMask           rune
 	maxWidth, minWidth int
 	viewSize           image.Point
@@ -163,12 +168,43 @@ func (e *textView) closestToXY(x fixed.Int26_6, y int) combinedPos {
 	return e.index.closestToXY(x, y)
 }
 
+func (e *textView) closestToXYGraphemes(x fixed.Int26_6, y int) combinedPos {
+	// Find the closest existing rune position to the provided coordinates.
+	pos := e.closestToXY(x, y)
+	// Resolve cluster boundaries on either side of the rune position.
+	firstOption := e.moveByGraphemes(pos.runes, 0)
+	distance := 1
+	if firstOption > pos.runes {
+		distance = -1
+	}
+	secondOption := e.moveByGraphemes(firstOption, distance)
+	// Choose the closest grapheme cluster boundary to the desired point.
+	first := e.closestToRune(firstOption)
+	firstDist := absFixed(first.x - x)
+	second := e.closestToRune(secondOption)
+	secondDist := absFixed(second.x - x)
+	if firstDist > secondDist {
+		return second
+	} else {
+		return first
+	}
+}
+
+func absFixed(i fixed.Int26_6) fixed.Int26_6 {
+	if i < 0 {
+		return -i
+	}
+	return i
+}
+
+// MaxLines moves the cursor the specified number of lines vertically, ensuring
+// that the resulting position is aligned to a grapheme cluster.
 func (e *textView) MoveLines(distance int, selAct selectionAction) {
 	caretStart := e.closestToRune(e.caret.start)
 	x := caretStart.x + e.caret.xoff
 	// Seek to line.
 	pos := e.closestToLineCol(caretStart.lineCol.line+distance, 0)
-	pos = e.closestToXY(x, pos.y)
+	pos = e.closestToXYGraphemes(x, pos.y)
 	e.caret.start = pos.runes
 	e.caret.xoff = x - pos.x
 	e.updateSelection(selAct)
@@ -399,10 +435,12 @@ func (e *textView) scrollAbs(x, y int) {
 	}
 }
 
+// MoveCoord moves the caret to the position closest to the provided
+// point that is aligned to a grapheme cluster boundary.
 func (e *textView) MoveCoord(pos image.Point) {
 	x := fixed.I(pos.X + e.scrollOff.X)
 	y := pos.Y + e.scrollOff.Y
-	e.caret.start = e.closestToXY(x, y).runes
+	e.caret.start = e.closestToXYGraphemes(x, y).runes
 	e.caret.xoff = 0
 }
 
@@ -431,8 +469,15 @@ func (e *textView) layoutText(lt *text.Shaper) {
 		for _, _, err := b.ReadRune(); err != io.EOF; _, _, err = b.ReadRune() {
 			g, _ := it.processGlyph(text.Glyph{Runes: 1, Flags: text.FlagClusterBreak}, true)
 			e.index.Glyph(g)
-
 		}
+	}
+	e.paragraphReader.SetSource(e.rr)
+	e.graphemes = e.graphemes[:0]
+	for g := e.paragraphReader.Graphemes(); len(g) > 0; g = e.paragraphReader.Graphemes() {
+		if len(e.graphemes) > 0 && g[0] == e.graphemes[len(e.graphemes)-1] {
+			g = g[1:]
+		}
+		e.graphemes = append(e.graphemes, g...)
 	}
 	dims := layout.Dimensions{Size: it.bounds.Size()}
 	dims.Baseline = dims.Size.Y - it.baseline
@@ -521,44 +566,74 @@ func (e *textView) Replace(start, end int, s string) int {
 	return sc
 }
 
+// MovePages moves the caret position by vertical pages of text, ensuring that
+// the final position is aligned to a grapheme cluster boundary.
 func (e *textView) MovePages(pages int, selAct selectionAction) {
 	caret := e.closestToRune(e.caret.start)
 	x := caret.x + e.caret.xoff
 	y := caret.y + pages*e.viewSize.Y
-	pos := e.closestToXY(x, y)
+	pos := e.closestToXYGraphemes(x, y)
 	e.caret.start = pos.runes
 	e.caret.xoff = x - pos.x
 	e.updateSelection(selAct)
 }
 
-// MoveCaret moves the caret (aka selection start) and the selection end
-// relative to their current positions. Positive distances moves forward,
-// negative distances moves backward. Distances are in runes.
-func (e *textView) MoveCaret(startDelta, endDelta int) {
-	e.caret.xoff = 0
-	e.caret.start = e.closestToRune(e.caret.start + startDelta).runes
-	e.caret.end = e.closestToRune(e.caret.end + endDelta).runes
+// moveByGraphemes returns the rune index resulting from moving the
+// specified number of grapheme clusters from startRuneidx.
+func (e *textView) moveByGraphemes(startRuneidx, graphemes int) int {
+	if len(e.graphemes) == 0 {
+		return startRuneidx
+	}
+	startGraphemeIdx, _ := slices.BinarySearch(e.graphemes, startRuneidx)
+	startGraphemeIdx = max(startGraphemeIdx+graphemes, 0)
+	startGraphemeIdx = min(startGraphemeIdx, len(e.graphemes)-1)
+	startRuneIdx := e.graphemes[startGraphemeIdx]
+	return e.closestToRune(startRuneIdx).runes
 }
 
+// clampCursorToGraphemes ensures that the final start/end positions of
+// the cursor are on grapheme cluster boundaries.
+func (e *textView) clampCursorToGraphemes() {
+	e.caret.start = e.moveByGraphemes(e.caret.start, 0)
+	e.caret.end = e.moveByGraphemes(e.caret.end, 0)
+}
+
+// MoveCaret moves the caret (aka selection start) and the selection end
+// relative to their current positions. Positive distances moves forward,
+// negative distances moves backward. Distances are in grapheme clusters which
+// better match the expectations of users than runes.
+func (e *textView) MoveCaret(startDelta, endDelta int) {
+	e.caret.xoff = 0
+	e.caret.start = e.moveByGraphemes(e.caret.start, startDelta)
+	e.caret.end = e.moveByGraphemes(e.caret.end, endDelta)
+}
+
+// MoveStart moves the caret to the start of the current line, ensuring that the resulting
+// cursor position is on a grapheme cluster boundary.
 func (e *textView) MoveStart(selAct selectionAction) {
 	caret := e.closestToRune(e.caret.start)
 	caret = e.closestToLineCol(caret.lineCol.line, 0)
 	e.caret.start = caret.runes
 	e.caret.xoff = -caret.x
 	e.updateSelection(selAct)
+	e.clampCursorToGraphemes()
 }
 
+// MoveEnd moves the caret to the end of the current line, ensuring that the resulting
+// cursor position is on a grapheme cluster boundary.
 func (e *textView) MoveEnd(selAct selectionAction) {
 	caret := e.closestToRune(e.caret.start)
 	caret = e.closestToLineCol(caret.lineCol.line, math.MaxInt)
 	e.caret.start = caret.runes
 	e.caret.xoff = fixed.I(e.maxWidth) - caret.x
 	e.updateSelection(selAct)
+	e.clampCursorToGraphemes()
 }
 
 // MoveWord moves the caret to the next word in the specified direction.
 // Positive is forward, negative is backward.
 // Absolute values greater than one will skip that many words.
+// The final caret position will be aligned to a grapheme cluster boundary.
 // BUG(whereswaldon): this method's definition of a "word" is currently
 // whitespace-delimited. Languages that do not use whitespace to delimit
 // words will experience counter-intuitive behavior when navigating by
@@ -598,6 +673,7 @@ func (e *textView) MoveWord(distance int, selAct selectionAction) {
 		}
 	}
 	e.updateSelection(selAct)
+	e.clampCursorToGraphemes()
 }
 
 func (e *textView) ScrollToCaret() {
@@ -635,11 +711,13 @@ func (e *textView) Selection() (start, end int) {
 	return e.caret.start, e.caret.end
 }
 
-// SetCaret moves the caret to start, and sets the selection end to end. start
+// SetCaret moves the caret to start, and sets the selection end to end. Then
+// the two ends are clamped to the nearest grapheme cluster boundary. start
 // and end are in runes, and represent offsets into the editor text.
 func (e *textView) SetCaret(start, end int) {
 	e.caret.start = e.closestToRune(start).runes
 	e.caret.end = e.closestToRune(end).runes
+	e.clampCursorToGraphemes()
 }
 
 // SelectedText returns the currently selected text (if any) from the editor,

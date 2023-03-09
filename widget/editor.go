@@ -742,18 +742,21 @@ func (e *Editor) CaretCoords() f32.Point {
 // direction to delete: positive is forward, negative is backward.
 //
 // If there is a selection, it is deleted and counts as a single rune.
-func (e *Editor) Delete(runes int) {
+func (e *Editor) Delete(graphemeClusters int) {
 	e.initBuffer()
-	if runes == 0 {
+	if graphemeClusters == 0 {
 		return
 	}
 
 	start, end := e.text.Selection()
 	if start != end {
-		runes -= sign(runes)
+		graphemeClusters -= sign(graphemeClusters)
 	}
 
-	end += runes
+	// Move caret by the target quantity of clusters.
+	e.text.MoveCaret(0, graphemeClusters)
+	// Get the new rune offsets of the selection.
+	start, end = e.text.Selection()
 	e.replace(start, end, "", true)
 	// Reset xoff.
 	e.text.MoveCaret(0, 0)
@@ -889,7 +892,9 @@ func (e *Editor) replace(start, end int, s string, addHistory bool) int {
 
 // MoveCaret moves the caret (aka selection start) and the selection end
 // relative to their current positions. Positive distances moves forward,
-// negative distances moves backward. Distances are in runes.
+// negative distances moves backward. Distances are in grapheme clusters,
+// which closely match what users perceive as "characters" even when the
+// characters are multiple code points long.
 func (e *Editor) MoveCaret(startDelta, endDelta int) {
 	e.initBuffer()
 	e.text.MoveCaret(startDelta, endDelta)

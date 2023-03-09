@@ -1,6 +1,8 @@
 package widget
 
 import (
+	"bytes"
+	"io"
 	"testing"
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
@@ -548,5 +550,234 @@ func printGlyphs(t *testing.T, glyphs []text.Glyph) {
 	t.Helper()
 	for i, g := range glyphs {
 		t.Logf("glyphs[%2d] = {ID: 0x%013x, Flags: %4s, Advance: %4d(%6v), Runes: %d, Y: %3d, X: %4d(%6v)} ", i, g.ID, g.Flags, g.Advance, g.Advance, g.Runes, g.Y, g.X, g.X)
+	}
+}
+
+func TestGraphemeReaderNext(t *testing.T) {
+	latinDoc := bytes.NewReader([]byte(latinDocument))
+	arabicDoc := bytes.NewReader([]byte(arabicDocument))
+	emojiDoc := bytes.NewReader([]byte(emojiDocument))
+	complexDoc := bytes.NewReader([]byte(complexDocument))
+	type testcase struct {
+		name  string
+		input *bytes.Reader
+		read  func() ([]rune, bool)
+	}
+	var pr graphemeReader
+	for _, tc := range []testcase{
+		{
+			name:  "latin",
+			input: latinDoc,
+			read:  pr.next,
+		},
+		{
+			name:  "arabic",
+			input: arabicDoc,
+			read:  pr.next,
+		},
+		{
+			name:  "emoji",
+			input: emojiDoc,
+			read:  pr.next,
+		},
+		{
+			name:  "complex",
+			input: complexDoc,
+			read:  pr.next,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pr.SetSource(tc.input)
+
+			runes := []rune{}
+			var paragraph []rune
+			ok := true
+			for ok {
+				paragraph, ok = tc.read()
+				if ok && len(paragraph) > 0 && paragraph[len(paragraph)-1] != '\n' {
+				}
+				for i, r := range paragraph {
+					if i == len(paragraph)-1 {
+						if r != '\n' && ok {
+							t.Error("non-final paragraph does not end with newline")
+						}
+					} else if r == '\n' {
+						t.Errorf("paragraph[%d] contains newline", i)
+					}
+				}
+				runes = append(runes, paragraph...)
+			}
+			tc.input.Seek(0, 0)
+			b, _ := io.ReadAll(tc.input)
+			asRunes := []rune(string(b))
+			if len(asRunes) != len(runes) {
+				t.Errorf("expected %d runes, got %d", len(asRunes), len(runes))
+			}
+			for i := 0; i < max(len(asRunes), len(runes)); i++ {
+				if i < min(len(asRunes), len(runes)) {
+					if runes[i] != asRunes[i] {
+						t.Errorf("expected runes[%d]=%d, got %d", i, asRunes[i], runes[i])
+					}
+				} else if i < len(asRunes) {
+					t.Errorf("expected runes[%d]=%d, got nothing", i, asRunes[i])
+				} else if i < len(runes) {
+					t.Errorf("expected runes[%d]=nothing, got %d", i, runes[i])
+				}
+			}
+		})
+	}
+}
+func TestGraphemeReaderGraphemes(t *testing.T) {
+	latinDoc := bytes.NewReader([]byte(latinDocument))
+	arabicDoc := bytes.NewReader([]byte(arabicDocument))
+	emojiDoc := bytes.NewReader([]byte(emojiDocument))
+	complexDoc := bytes.NewReader([]byte(complexDocument))
+	type testcase struct {
+		name  string
+		input *bytes.Reader
+		read  func() []int
+	}
+	var pr graphemeReader
+	for _, tc := range []testcase{
+		{
+			name:  "latin",
+			input: latinDoc,
+			read:  pr.Graphemes,
+		},
+		{
+			name:  "arabic",
+			input: arabicDoc,
+			read:  pr.Graphemes,
+		},
+		{
+			name:  "emoji",
+			input: emojiDoc,
+			read:  pr.Graphemes,
+		},
+		{
+			name:  "complex",
+			input: complexDoc,
+			read:  pr.Graphemes,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pr.SetSource(tc.input)
+
+			graphemes := []int{}
+			for g := tc.read(); len(g) > 0; g = tc.read() {
+				if len(graphemes) > 0 && g[0] != graphemes[len(graphemes)-1] {
+					t.Errorf("expected first boundary in new paragraph %d to match final boundary in previous %d", g[0], graphemes[len(graphemes)-1])
+				}
+				if len(graphemes) > 0 {
+					// Drop duplicated boundary.
+					g = g[1:]
+				}
+				graphemes = append(graphemes, g...)
+			}
+			tc.input.Seek(0, 0)
+			b, _ := io.ReadAll(tc.input)
+			asRunes := []rune(string(b))
+			if len(asRunes)+1 < len(graphemes) {
+				t.Errorf("expected <= %d graphemes, got %d", len(asRunes)+1, len(graphemes))
+			}
+			for i := 0; i < len(graphemes)-1; i++ {
+				if graphemes[i] >= graphemes[i+1] {
+					t.Errorf("graphemes[%d](%d) >= graphemes[%d](%d)", i, graphemes[i], i+1, graphemes[i+1])
+				}
+			}
+		})
+	}
+}
+func BenchmarkGraphemeReaderNext(b *testing.B) {
+	latinDoc := bytes.NewReader([]byte(latinDocument))
+	arabicDoc := bytes.NewReader([]byte(arabicDocument))
+	emojiDoc := bytes.NewReader([]byte(emojiDocument))
+	complexDoc := bytes.NewReader([]byte(complexDocument))
+	type testcase struct {
+		name  string
+		input *bytes.Reader
+		read  func() ([]rune, bool)
+	}
+	pr := &graphemeReader{}
+	for _, tc := range []testcase{
+		{
+			name:  "latin",
+			input: latinDoc,
+			read:  pr.next,
+		},
+		{
+			name:  "arabic",
+			input: arabicDoc,
+			read:  pr.next,
+		},
+		{
+			name:  "emoji",
+			input: emojiDoc,
+			read:  pr.next,
+		},
+		{
+			name:  "complex",
+			input: complexDoc,
+			read:  pr.next,
+		},
+	} {
+		var paragraph []rune = make([]rune, 4096)
+		b.Run(tc.name, func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				pr.SetSource(tc.input)
+
+				ok := true
+				for ok {
+					paragraph, ok = tc.read()
+					_ = paragraph
+				}
+				_ = paragraph
+			}
+		})
+	}
+}
+func BenchmarkGraphemeReaderGraphemes(b *testing.B) {
+	latinDoc := bytes.NewReader([]byte(latinDocument))
+	arabicDoc := bytes.NewReader([]byte(arabicDocument))
+	emojiDoc := bytes.NewReader([]byte(emojiDocument))
+	complexDoc := bytes.NewReader([]byte(complexDocument))
+	type testcase struct {
+		name  string
+		input *bytes.Reader
+		read  func() []int
+	}
+	pr := &graphemeReader{}
+	for _, tc := range []testcase{
+		{
+			name:  "latin",
+			input: latinDoc,
+			read:  pr.Graphemes,
+		},
+		{
+			name:  "arabic",
+			input: arabicDoc,
+			read:  pr.Graphemes,
+		},
+		{
+			name:  "emoji",
+			input: emojiDoc,
+			read:  pr.Graphemes,
+		},
+		{
+			name:  "complex",
+			input: complexDoc,
+			read:  pr.Graphemes,
+		},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				pr.SetSource(tc.input)
+				for g := tc.read(); len(g) > 0; g = tc.read() {
+					_ = g
+				}
+			}
+		})
 	}
 }
