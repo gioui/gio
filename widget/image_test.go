@@ -26,8 +26,8 @@ func TestImageScale(t *testing.T) {
 	// Ensure the default scales correctly.
 	dims := Image{Src: imgOp}.Layout(gtx)
 	expectedSize := imgSize
-	expectedSize.X = int(float32(expectedSize.X) * defaultScale)
-	expectedSize.Y = int(float32(expectedSize.Y) * defaultScale)
+	expectedSize.X = int(float32(expectedSize.X))
+	expectedSize.Y = int(float32(expectedSize.Y))
 	if dims.Size != expectedSize {
 		t.Fatalf("non-scaled image is wrong size, expected %v, got %v", expectedSize, dims.Size)
 	}
