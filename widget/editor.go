@@ -396,6 +396,37 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 	if k.Modifiers.Contain(key.ModShift) {
 		selAct = selectionExtend
 	}
+	if k.Modifiers.Contain(key.ModShortcut) {
+		switch k.Name {
+		// Initiate a paste operation, by requesting the clipboard contents; other
+		// half is in Editor.processKey() under clipboard.Event.
+		case "V":
+			if !e.ReadOnly {
+				clipboard.ReadOp{Tag: &e.eventKey}.Add(gtx.Ops)
+			}
+		// Copy or Cut selection -- ignored if nothing selected.
+		case "C", "X":
+			e.scratch = e.text.SelectedText(e.scratch)
+			if text := string(e.scratch); text != "" {
+				clipboard.WriteOp{Text: text}.Add(gtx.Ops)
+				if k.Name == "X" && !e.ReadOnly {
+					e.Delete(1)
+				}
+			}
+		// Select all
+		case "A":
+			e.text.SetCaret(0, e.text.Len())
+		case "Z":
+			if !e.ReadOnly {
+				if k.Modifiers.Contain(key.ModShift) {
+					e.redo()
+				} else {
+					e.undo()
+				}
+			}
+		}
+		return
+	}
 	switch k.Name {
 	case key.NameReturn, key.NameEnter:
 		if !e.ReadOnly {
@@ -447,32 +478,6 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 		e.text.MoveStart(selAct)
 	case key.NameEnd:
 		e.text.MoveEnd(selAct)
-	// Initiate a paste operation, by requesting the clipboard contents; other
-	// half is in Editor.processKey() under clipboard.Event.
-	case "V":
-		if !e.ReadOnly {
-			clipboard.ReadOp{Tag: &e.eventKey}.Add(gtx.Ops)
-		}
-	// Copy or Cut selection -- ignored if nothing selected.
-	case "C", "X":
-		e.scratch = e.text.SelectedText(e.scratch)
-		if text := string(e.scratch); text != "" {
-			clipboard.WriteOp{Text: text}.Add(gtx.Ops)
-			if k.Name == "X" && !e.ReadOnly {
-				e.Delete(1)
-			}
-		}
-	// Select all
-	case "A":
-		e.text.SetCaret(0, e.text.Len())
-	case "Z":
-		if !e.ReadOnly {
-			if k.Modifiers.Contain(key.ModShift) {
-				e.redo()
-			} else {
-				e.undo()
-			}
-		}
 	}
 }
 

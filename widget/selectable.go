@@ -296,6 +296,20 @@ func (e *Selectable) command(gtx layout.Context, k key.Event) {
 	if k.Modifiers.Contain(key.ModShift) {
 		selAct = selectionExtend
 	}
+	if k.Modifiers == key.ModShortcut {
+		switch k.Name {
+		// Copy or Cut selection -- ignored if nothing selected.
+		case "C", "X":
+			e.scratch = e.text.SelectedText(e.scratch)
+			if text := string(e.scratch); text != "" {
+				clipboard.WriteOp{Text: text}.Add(gtx.Ops)
+			}
+		// Select all
+		case "A":
+			e.text.SetCaret(0, e.text.Len())
+		}
+		return
+	}
 	switch k.Name {
 	case key.NameUpArrow:
 		e.text.MoveLines(-1, selAct)
@@ -327,15 +341,6 @@ func (e *Selectable) command(gtx layout.Context, k key.Event) {
 		e.text.MoveStart(selAct)
 	case key.NameEnd:
 		e.text.MoveEnd(selAct)
-	// Copy or Cut selection -- ignored if nothing selected.
-	case "C", "X":
-		e.scratch = e.text.SelectedText(e.scratch)
-		if text := string(e.scratch); text != "" {
-			clipboard.WriteOp{Text: text}.Add(gtx.Ops)
-		}
-	// Select all
-	case "A":
-		e.text.SetCaret(0, e.text.Len())
 	}
 }
 
