@@ -20,6 +20,7 @@ type lineInfo struct {
 }
 
 type glyphIndex struct {
+	// glyphs holds the glyphs processed.
 	glyphs []text.Glyph
 	// positions contain all possible caret positions, sorted by rune index.
 	positions []combinedPos
@@ -44,6 +45,20 @@ type glyphIndex struct {
 	// next glyph. Usually this should not happen, but the boundaries of
 	// lines and bidi runs require it.
 	skipPrior bool
+}
+
+// reset prepares the index for reuse.
+func (g *glyphIndex) reset() {
+	g.glyphs = g.glyphs[:0]
+	g.positions = g.positions[:0]
+	g.lines = g.lines[:0]
+	g.currentLineMin = 0
+	g.currentLineMax = 0
+	g.currentLineGlyphs = 0
+	g.pos = combinedPos{}
+	g.prog = 0
+	g.clusterAdvance = 0
+	g.skipPrior = false
 }
 
 // screenPos represents a character position in text line and column numbers,
@@ -90,7 +105,6 @@ func (g *glyphIndex) incrementPosition(pos combinedPos) (next combinedPos, eof b
 		return g.positions[index+1], false
 	}
 	return candidate, true
-
 }
 
 // Glyph indexes the provided glyph, generating text cursor positions for it.

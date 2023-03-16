@@ -413,7 +413,7 @@ func (e *textView) layoutText(lt *text.Shaper) {
 		e.maskReader.Reset(e, e.Mask)
 		r = &e.maskReader
 	}
-	e.index = glyphIndex{}
+	e.index.reset()
 	it := textIterator{viewport: image.Rectangle{Max: image.Point{X: math.MaxInt, Y: math.MaxInt}}}
 	if lt != nil {
 		lt.Layout(text.Parameters{

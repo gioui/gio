@@ -13,7 +13,7 @@ import (
 // makePosTestText returns two bidi samples of shaped text at the given
 // font size and wrapped to the given line width. The runeLimit, if nonzero,
 // truncates the sample text to ensure shorter output for expensive tests.
-func makePosTestText(fontSize, lineWidth int, alignOpposite bool) (bidiLTR, bidiRTL []text.Glyph) {
+func makePosTestText(fontSize, lineWidth int, alignOpposite bool) (source string, bidiLTR, bidiRTL []text.Glyph) {
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
 
@@ -44,12 +44,12 @@ func makePosTestText(fontSize, lineWidth int, alignOpposite bool) (bidiLTR, bidi
 	for g, ok := shaper.NextGlyph(); ok; g, ok = shaper.NextGlyph() {
 		bidiRTL = append(bidiRTL, g)
 	}
-	return bidiLTR, bidiRTL
+	return bidiSource, bidiLTR, bidiRTL
 }
 
 // makeAccountingTestText shapes text designed to stress rune accounting
 // logic within the index.
-func makeAccountingTestText(fontSize, lineWidth int) (txt []text.Glyph) {
+func makeAccountingTestText(str string, fontSize, lineWidth int) (txt []text.Glyph) {
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
 
@@ -62,11 +62,8 @@ func makeAccountingTestText(fontSize, lineWidth int) (txt []text.Glyph) {
 			Face: rtlFace,
 		},
 	})
-	// bidiSource is crafted to contain multiple consecutive RTL runs (by
-	// changing scripts within the RTL).
-	bidiSource := "The\nquick سماء של\nום لا fox\nتمط של\nום."
 	params := text.Parameters{PxPerEm: fixed.I(fontSize)}
-	shaper.LayoutString(params, 0, lineWidth, english, bidiSource)
+	shaper.LayoutString(params, 0, lineWidth, english, str)
 	for g, ok := shaper.NextGlyph(); ok; g, ok = shaper.NextGlyph() {
 		txt = append(txt, g)
 	}
@@ -167,6 +164,7 @@ func TestIndexPositionWhitespace(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			glyphs := getGlyphs(16, 0, 200, tc.align, tc.str)
 			var gi glyphIndex
+			gi.reset()
 			for _, g := range glyphs {
 				gi.Glyph(g)
 			}
@@ -194,7 +192,7 @@ func TestIndexPositionWhitespace(t *testing.T) {
 func TestIndexPositionBidi(t *testing.T) {
 	fontSize := 16
 	lineWidth := fontSize * 10
-	bidiLTRText, bidiRTLText := makePosTestText(fontSize, lineWidth, false)
+	_, bidiLTRText, bidiRTLText := makePosTestText(fontSize, lineWidth, false)
 	type testcase struct {
 		name       string
 		glyphs     []text.Glyph
@@ -223,6 +221,7 @@ func TestIndexPositionBidi(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var gi glyphIndex
+			gi.reset()
 			for _, g := range tc.glyphs {
 				gi.Glyph(g)
 			}
@@ -267,19 +266,22 @@ func TestIndexPositionBidi(t *testing.T) {
 		})
 	}
 }
+
 func TestIndexPositionLines(t *testing.T) {
 	fontSize := 16
 	lineWidth := fontSize * 10
-	bidiLTRText, bidiRTLText := makePosTestText(fontSize, lineWidth, false)
-	bidiLTRTextOpp, bidiRTLTextOpp := makePosTestText(fontSize, lineWidth, true)
+	source1, bidiLTRText, bidiRTLText := makePosTestText(fontSize, lineWidth, false)
+	source2, bidiLTRTextOpp, bidiRTLTextOpp := makePosTestText(fontSize, lineWidth, true)
 	type testcase struct {
 		name          string
+		source        string
 		glyphs        []text.Glyph
 		expectedLines []lineInfo
 	}
 	for _, tc := range []testcase{
 		{
 			name:   "bidi ltr",
+			source: source1,
 			glyphs: bidiLTRText,
 			expectedLines: []lineInfo{
 				{
@@ -318,6 +320,7 @@ func TestIndexPositionLines(t *testing.T) {
 		},
 		{
 			name:   "bidi rtl",
+			source: source1,
 			glyphs: bidiRTLText,
 			expectedLines: []lineInfo{
 				{
@@ -348,6 +351,7 @@ func TestIndexPositionLines(t *testing.T) {
 		},
 		{
 			name:   "bidi ltr opposite alignment",
+			source: source2,
 			glyphs: bidiLTRTextOpp,
 			expectedLines: []lineInfo{
 				{
@@ -386,6 +390,7 @@ func TestIndexPositionLines(t *testing.T) {
 		},
 		{
 			name:   "bidi rtl opposite alignment",
+			source: source2,
 			glyphs: bidiRTLTextOpp,
 			expectedLines: []lineInfo{
 				{
@@ -417,6 +422,7 @@ func TestIndexPositionLines(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var gi glyphIndex
+			gi.reset()
 			for _, g := range tc.glyphs {
 				gi.Glyph(g)
 			}
@@ -439,15 +445,20 @@ func TestIndexPositionLines(t *testing.T) {
 func TestIndexPositionRunes(t *testing.T) {
 	fontSize := 16
 	lineWidth := fontSize * 10
-	testText := makeAccountingTestText(fontSize, lineWidth)
+	// source is crafted to contain multiple consecutive RTL runs (by
+	// changing scripts within the RTL).
+	source := "The\nquick سماء של\nום لا fox\nتمط של\nום."
+	testText := makeAccountingTestText(source, fontSize, lineWidth)
 	type testcase struct {
 		name     string
+		source   string
 		glyphs   []text.Glyph
 		expected []combinedPos
 	}
 	for _, tc := range []testcase{
 		{
 			name:   "many newlines",
+			source: source,
 			glyphs: testText,
 			expected: []combinedPos{
 				{runes: 0, lineCol: screenPos{line: 0, col: 0}, runIndex: 0, towardOrigin: false},
@@ -496,6 +507,7 @@ func TestIndexPositionRunes(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var gi glyphIndex
+			gi.reset()
 			for _, g := range tc.glyphs {
 				gi.Glyph(g)
 			}
