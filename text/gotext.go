@@ -221,12 +221,21 @@ func (c *faceOrderer) fontForStyle(font Font) (Font, bool) {
 // faces returns a slice of faces with primary as the first element and
 // the remaining faces ordered by insertion order.
 func (f *faceOrderer) sorted(primary Font) []font.Face {
-	sort.Slice(f.fonts, func(i, j int) bool {
+	// If we find primary, put it first, and omit it from the below sort.
+	lowest := 0
+	for i := range f.fonts {
 		if f.fonts[i] == primary {
-			return true
+			if i != 0 {
+				f.fonts[0], f.fonts[i] = f.fonts[i], f.fonts[0]
+			}
+			lowest = 1
+			break
 		}
-		a := f.fonts[i]
-		b := f.fonts[j]
+	}
+	sorting := f.fonts[lowest:]
+	sort.Slice(sorting, func(i, j int) bool {
+		a := sorting[i]
+		b := sorting[j]
 		return f.fontDefaultOrder[a] < f.fontDefaultOrder[b]
 	})
 	for i, font := range f.fonts {
