@@ -211,10 +211,10 @@ type Spacer struct {
 
 func (s Spacer) Layout(gtx Context) Dimensions {
 	return Dimensions{
-		Size: image.Point{
+		Size: gtx.Constraints.Constrain(image.Point{
 			X: gtx.Dp(s.Width),
 			Y: gtx.Dp(s.Height),
-		},
+		}),
 	}
 }
 
