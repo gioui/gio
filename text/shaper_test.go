@@ -28,29 +28,49 @@ func TestWrappingTruncation(t *testing.T) {
 	}, 200, 200, english, textInput)
 	untruncatedCount := len(cache.txt.lines)
 
-	for expectedLines := untruncatedCount; expectedLines > 0; expectedLines-- {
-		cache.LayoutString(Parameters{
-			Alignment: Middle,
-			PxPerEm:   fixed.I(10),
-			MaxLines:  expectedLines,
-		}, 200, 200, english, textInput)
-		lineCount := 0
-		lastGlyphWasLineBreak := false
-		for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
-			if g.Flags&FlagLineBreak != 0 {
-				lineCount++
-				lastGlyphWasLineBreak = true
-			} else {
-				lastGlyphWasLineBreak = false
+	for i := untruncatedCount + 1; i > 0; i-- {
+		t.Run(fmt.Sprintf("truncated to %d/%d lines", i, untruncatedCount), func(t *testing.T) {
+			cache.LayoutString(Parameters{
+				Alignment: Middle,
+				PxPerEm:   fixed.I(10),
+				MaxLines:  i,
+			}, 200, 200, english, textInput)
+			lineCount := 0
+			lastGlyphWasLineBreak := false
+			glyphs := []Glyph{}
+			untruncatedRunes := 0
+			truncatedRunes := 0
+			for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
+				glyphs = append(glyphs, g)
+				if g.Flags&FlagTruncator != 0 && g.Flags&FlagClusterBreak != 0 {
+					truncatedRunes += g.Runes
+				} else {
+					untruncatedRunes += g.Runes
+				}
+				if g.Flags&FlagLineBreak != 0 {
+					lineCount++
+					lastGlyphWasLineBreak = true
+				} else {
+					lastGlyphWasLineBreak = false
+				}
 			}
-		}
-		if lastGlyphWasLineBreak {
-			// There was no actual line of text following this break.
-			lineCount--
-		}
-		if lineCount != expectedLines {
-			t.Errorf("expected %d lines, got %d", expectedLines, lineCount)
-		}
+			if lastGlyphWasLineBreak && truncatedRunes == 0 {
+				// There was no actual line of text following this break.
+				lineCount--
+			}
+			if i <= untruncatedCount {
+				if lineCount != i {
+					t.Errorf("expected %d lines, got %d", i, lineCount)
+				}
+			} else if i > untruncatedCount {
+				if lineCount != untruncatedCount {
+					t.Errorf("expected %d lines, got %d", untruncatedCount, lineCount)
+				}
+			}
+			if expected := len([]rune(textInput)); truncatedRunes+untruncatedRunes != expected {
+				t.Errorf("expected %d total runes, got %d (%d truncated)", expected, truncatedRunes+untruncatedRunes, truncatedRunes)
+			}
+		})
 	}
 }
 

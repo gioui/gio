@@ -48,6 +48,8 @@ type glyphIndex struct {
 	// next glyph. Usually this should not happen, but the boundaries of
 	// lines and bidi runs require it.
 	skipPrior bool
+	// truncated indicates that the text was truncated by the shaper.
+	truncated bool
 }
 
 // reset prepares the index for reuse.
@@ -62,6 +64,7 @@ func (g *glyphIndex) reset() {
 	g.prog = 0
 	g.clusterAdvance = 0
 	g.skipPrior = false
+	g.truncated = false
 }
 
 // screenPos represents a character position in text line and column numbers,
@@ -168,7 +171,15 @@ func (g *glyphIndex) Glyph(gl text.Glyph) {
 		pos.ascent = gl.Ascent
 		pos.descent = gl.Descent
 		width := g.clusterAdvance
-		perRune := width / fixed.Int26_6(gl.Runes)
+		positionCount := int(gl.Runes)
+		runesPerPosition := 1
+		if gl.Flags&text.FlagTruncator != 0 {
+			// Treat the truncator as a single unit that is either selected or not.
+			positionCount = 1
+			runesPerPosition = int(gl.Runes)
+			g.truncated = true
+		}
+		perRune := width / fixed.Int26_6(positionCount)
 		adjust := fixed.Int26_6(0)
 		if pos.towardOrigin {
 			// If RTL, subtract increments from the width of the cluster
@@ -176,10 +187,10 @@ func (g *glyphIndex) Glyph(gl text.Glyph) {
 			adjust = width
 			perRune = -perRune
 		}
-		for i := 1; i <= int(gl.Runes); i++ {
+		for i := 1; i <= positionCount; i++ {
 			pos.x = gl.X + adjust + perRune*fixed.Int26_6(i)
-			pos.runes++
-			pos.lineCol.col++
+			pos.runes += runesPerPosition
+			pos.lineCol.col += runesPerPosition
 			g.positions = append(g.positions, pos)
 		}
 		g.pos = pos

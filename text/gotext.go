@@ -143,6 +143,9 @@ type runLayout struct {
 	Direction system.TextDirection
 	// face is the font face that the ID of each Glyph in the Layout refers to.
 	face font.Face
+	// truncator indicates that this run is a text truncator standing in for remaining
+	// text.
+	truncator bool
 }
 
 // faceOrderer chooses the order in which faces should be applied to text.
@@ -398,11 +401,20 @@ func (s *shaperImpl) shapeText(faces []font.Face, ppem fixed.Int26_6, lc system.
 }
 
 // shapeAndWrapText invokes the text shaper and returns wrapped lines in the shaper's native format.
-func (s *shaperImpl) shapeAndWrapText(faces []font.Face, params Parameters, maxWidth int, lc system.Locale, txt []rune) []shaping.Line {
-	// Wrap outputs into lines.
-	return s.wrapper.WrapParagraph(shaping.WrapConfig{
+func (s *shaperImpl) shapeAndWrapText(faces []font.Face, params Parameters, maxWidth int, lc system.Locale, txt []rune) (_ []shaping.Line, truncated int) {
+	wc := shaping.WrapConfig{
 		TruncateAfterLines: params.MaxLines,
-	}, maxWidth, txt, s.shapeText(faces, params.PxPerEm, lc, txt)...)
+	}
+	if wc.TruncateAfterLines > 0 {
+		if len(params.Truncator) == 0 {
+			params.Truncator = "…"
+		}
+		// We only permit a single run as the truncator, regardless of whether more were generated.
+		// Just use the first one.
+		wc.Truncator = s.shapeText(faces, params.PxPerEm, lc, []rune(params.Truncator))[0]
+	}
+	// Wrap outputs into lines.
+	return s.wrapper.WrapParagraph(wc, maxWidth, txt, s.shapeText(faces, params.PxPerEm, lc, txt)...)
 }
 
 // replaceControlCharacters replaces problematic unicode
@@ -461,12 +473,20 @@ func (s *shaperImpl) LayoutRunes(params Parameters, minWidth, maxWidth int, lc s
 	if hasNewline {
 		txt = txt[:len(txt)-1]
 	}
-	ls := s.shapeAndWrapText(s.orderer.sortedFacesForStyle(params.Font), params, maxWidth, lc, replaceControlCharacters(txt))
+	ls, truncated := s.shapeAndWrapText(s.orderer.sortedFacesForStyle(params.Font), params, maxWidth, lc, replaceControlCharacters(txt))
+
+	if truncated > 0 && hasNewline {
+		// We've truncated the newline, since it was at the end and we've truncated some amount of runes
+		// before it.
+		truncated++
+		hasNewline = false
+	}
 	// Convert to Lines.
 	textLines := make([]line, len(ls))
 	for i := range ls {
 		otLine := toLine(&s.orderer, ls[i], lc.Direction)
-		if i == len(ls)-1 && hasNewline {
+		isFinalLine := i == len(ls)-1
+		if isFinalLine && hasNewline {
 			// If there was a trailing newline update the rune counts to include
 			// it on the last line of the paragraph.
 			finalRunIdx := len(otLine.runs) - 1
@@ -491,6 +511,23 @@ func (s *shaperImpl) LayoutRunes(params Parameters, minWidth, maxWidth int, lc s
 				otLine.runs[finalRunIdx].Glyphs = append(otLine.runs[finalRunIdx].Glyphs, glyph{})
 				copy(otLine.runs[finalRunIdx].Glyphs[1:], otLine.runs[finalRunIdx].Glyphs)
 				otLine.runs[finalRunIdx].Glyphs[0] = syntheticGlyph
+			}
+		}
+		if isFinalLine && truncated > 0 {
+			// If we've truncated the text with a truncator, adjust the rune counts within the
+			// truncator to make it represent the truncated text.
+			finalRunIdx := len(otLine.runs) - 1
+			otLine.runs[finalRunIdx].truncator = true
+			finalGlyphIdx := len(otLine.runs[finalRunIdx].Glyphs) - 1
+			// The run represents all of the truncated text.
+			otLine.runs[finalRunIdx].Runes.Count = truncated
+			// Only the final glyph represents any runes, and it represents all truncated text.
+			for i := range otLine.runs[finalRunIdx].Glyphs {
+				if i == finalGlyphIdx {
+					otLine.runs[finalRunIdx].Glyphs[finalGlyphIdx].runeCount = truncated
+				} else {
+					otLine.runs[finalRunIdx].Glyphs[finalGlyphIdx].runeCount = 0
+				}
 			}
 		}
 		textLines[i] = otLine

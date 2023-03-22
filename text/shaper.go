@@ -27,6 +27,10 @@ type Parameters struct {
 	PxPerEm fixed.Int26_6
 	// MaxLines limits the quantity of shaped lines. Zero means no limit.
 	MaxLines int
+	// Truncator is a string of text to insert where the shaped text was truncated, which
+	// can currently ohly happen if MaxLines is nonzero and the text on the final line is
+	// truncated.
+	Truncator string
 }
 
 // A FontFace is a Font and a matching Face.
@@ -76,7 +80,7 @@ type Glyph struct {
 	// belongs to. If Flags does not contain FlagClusterBreak, this value will
 	// always be zero. The final glyph in the cluster contains the runes count
 	// for the entire cluster.
-	Runes byte
+	Runes int
 	// Flags encode special properties of this glyph.
 	Flags Flags
 }
@@ -105,6 +109,11 @@ const (
 	FlagParagraphBreak
 	// FlagParagraphStart indicates that the glyph starts a new paragraph.
 	FlagParagraphStart
+	// FlagTruncator indicates that the glyph is part of a special truncator run that
+	// represents the portion of text removed due to truncation. A glyph with both
+	// FlagTruncator and FlagClusterBreak will have a Runes field accounting for all
+	// runes truncated.
+	FlagTruncator
 )
 
 func (f Flags) String() string {
@@ -136,6 +145,11 @@ func (f Flags) String() string {
 	}
 	if f&FlagClusterBreak != 0 {
 		b.WriteString("C")
+	} else {
+		b.WriteString("_")
+	}
+	if f&FlagTruncator != 0 {
+		b.WriteString("…")
 	} else {
 		b.WriteString("_")
 	}
@@ -206,7 +220,6 @@ func (l *Shaper) layoutText(params Parameters, minWidth, maxWidth int, lc system
 		return
 	}
 	truncating := params.MaxLines > 0
-	maxLines := params.MaxLines
 	var done bool
 	var startByte int
 	var endByte int
@@ -237,13 +250,33 @@ func (l *Shaper) layoutText(params Parameters, minWidth, maxWidth int, lc system
 			done = endByte == len(str)
 		}
 		if startByte != endByte || (len(l.paragraph) > 0 || len(l.txt.lines) == 0) {
-			l.txt.append(l.layoutParagraph(params, minWidth, maxWidth, lc, str[startByte:endByte], l.paragraph))
+			lines := l.layoutParagraph(params, minWidth, maxWidth, lc, str[startByte:endByte], l.paragraph)
 			if truncating {
-				params.MaxLines = maxLines - len(l.txt.lines)
+				params.MaxLines -= len(lines.lines)
 				if params.MaxLines == 0 {
 					done = true
+					// We've truncated the text, but we need to account for all of the runes we never
+					// decoded in the truncator.
+					var unreadRunes int
+					if txt == nil {
+						unreadRunes = utf8.RuneCountInString(str[endByte:])
+					} else {
+						for {
+							_, _, e := txt.ReadRune()
+							if e != nil {
+								break
+							}
+							unreadRunes++
+						}
+					}
+					lastLineIdx := len(lines.lines) - 1
+					lastRunIdx := len(lines.lines[lastLineIdx].runs) - 1
+					lastGlyphIdx := len(lines.lines[lastLineIdx].runs[lastRunIdx].Glyphs) - 1
+					lines.lines[lastLineIdx].runs[lastRunIdx].Runes.Count += unreadRunes
+					lines.lines[lastLineIdx].runs[lastRunIdx].Glyphs[lastGlyphIdx].runeCount += unreadRunes
 				}
 			}
+			l.txt.append(lines)
 		}
 		if done {
 			return
@@ -261,13 +294,14 @@ func (l *Shaper) layoutParagraph(params Parameters, minWidth, maxWidth int, lc s
 	}
 	// Alignment is not part of the cache key because changing it does not impact shaping.
 	lk := layoutKey{
-		ppem:     params.PxPerEm,
-		maxWidth: maxWidth,
-		minWidth: minWidth,
-		maxLines: params.MaxLines,
-		str:      asStr,
-		locale:   lc,
-		font:     params.Font,
+		truncator: params.Truncator,
+		ppem:      params.PxPerEm,
+		maxWidth:  maxWidth,
+		minWidth:  minWidth,
+		maxLines:  params.MaxLines,
+		str:       asStr,
+		locale:    lc,
+		font:      params.Font,
 	}
 	if l, ok := l.layoutCache.Get(lk); ok {
 		return l
@@ -349,12 +383,15 @@ func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
 			Ascent:  line.ascent,
 			Descent: line.descent,
 			Advance: g.xAdvance,
-			Runes:   byte(g.runeCount),
+			Runes:   g.runeCount,
 			Offset: fixed.Point26_6{
 				X: g.xOffset,
 				Y: g.yOffset,
 			},
 			Bounds: g.bounds,
+		}
+		if run.truncator {
+			glyph.Flags |= FlagTruncator
 		}
 		l.glyph++
 		if !rtl {
@@ -375,6 +412,10 @@ func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
 			nextGlyph = len(run.Glyphs) - 1 - nextGlyph
 		}
 		endOfCluster := endOfRun || run.Glyphs[nextGlyph].clusterIndex != g.clusterIndex
+		if run.truncator {
+			// Only emit a single cluster for the entire truncator sequence.
+			endOfCluster = endOfRun
+		}
 		if endOfCluster {
 			glyph.Flags |= FlagClusterBreak
 		} else {
@@ -404,7 +445,6 @@ func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
 				l.pararagraphStart.Y = glyph.Y + int32((glyph.Ascent + glyph.Descent).Ceil())
 			}
 		}
-
 		return glyph, true
 	}
 }

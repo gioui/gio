@@ -50,6 +50,9 @@ type textView struct {
 	SingleLine bool
 	// MaxLines limits the shaped text to a specific quantity of shaped lines.
 	MaxLines int
+	// Truncator is the text that will be shown at the end of the final
+	// line if MaxLines is exceeded. Defaults to "…" if empty.
+	Truncator string
 	// Mask replaces the visual display of each rune in the contents with the given rune.
 	// Newline characters are not masked. When non-zero, the unmasked contents
 	// are accessed by Len, Text, and SetText.
@@ -459,6 +462,7 @@ func (e *textView) layoutText(lt *text.Shaper) {
 			PxPerEm:   e.textSize,
 			Alignment: e.Alignment,
 			MaxLines:  e.MaxLines,
+			Truncator: e.Truncator,
 		}, e.minWidth, e.maxWidth, e.locale, r)
 		for glyph, ok := it.processGlyph(lt.NextGlyph()); ok; glyph, ok = it.processGlyph(lt.NextGlyph()) {
 			e.index.Glyph(glyph)

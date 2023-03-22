@@ -22,6 +22,9 @@ type Label struct {
 	Alignment text.Alignment
 	// MaxLines limits the number of lines. Zero means no limit.
 	MaxLines int
+	// Truncator is the text that will be shown at the end of the final
+	// line if MaxLines is exceeded. Defaults to "…" if empty.
+	Truncator string
 	// Selectable optionally provides text selection state. If nil,
 	// text will not be selectable.
 	Selectable *Selectable
@@ -37,6 +40,7 @@ func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size 
 	}
 	l.Selectable.text.Alignment = l.Alignment
 	l.Selectable.text.MaxLines = l.MaxLines
+	l.Selectable.text.Truncator = l.Truncator
 	l.Selectable.SetText(txt)
 	return l.Selectable.Layout(gtx, lt, font, size, textMaterial, selectionMaterial)
 }
@@ -49,6 +53,7 @@ func (l Label) layout(gtx layout.Context, lt *text.Shaper, font text.Font, size 
 		Font:      font,
 		PxPerEm:   textSize,
 		MaxLines:  l.MaxLines,
+		Truncator: l.Truncator,
 		Alignment: l.Alignment,
 	}, cs.Min.X, cs.Max.X, gtx.Locale, txt)
 	m := op.Record(gtx.Ops)

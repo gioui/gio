@@ -256,8 +256,8 @@ func makeTestText(shaper *shaperImpl, primaryDir system.TextDirection, fontSize,
 			rtlSource = string(complexRunes[:runeLimit])
 		}
 	}
-	simpleText := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(Font{}), Parameters{PxPerEm: fixed.I(fontSize)}, lineWidth, locale, []rune(simpleSource))
-	complexText := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(Font{}), Parameters{PxPerEm: fixed.I(fontSize)}, lineWidth, locale, []rune(complexSource))
+	simpleText, _ := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(Font{}), Parameters{PxPerEm: fixed.I(fontSize)}, lineWidth, locale, []rune(simpleSource))
+	complexText, _ := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(Font{}), Parameters{PxPerEm: fixed.I(fontSize)}, lineWidth, locale, []rune(complexSource))
 	testShaper(rtlFace, ltrFace)
 	return simpleText, complexText
 }

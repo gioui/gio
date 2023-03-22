@@ -25,8 +25,11 @@ type LabelStyle struct {
 	Alignment text.Alignment
 	// MaxLines limits the number of lines. Zero means no limit.
 	MaxLines int
-	Text     string
-	TextSize unit.Sp
+	// Truncator is the text that will be shown at the end of the final
+	// line if MaxLines is exceeded. Defaults to "…" if empty.
+	Truncator string
+	Text      string
+	TextSize  unit.Sp
 
 	shaper *text.Shaper
 	State  *widget.Selectable

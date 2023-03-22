@@ -154,6 +154,7 @@ type layoutKey struct {
 	maxWidth, minWidth int
 	maxLines           int
 	str                string
+	truncator          string
 	locale             system.Locale
 	font               Font
 }
