@@ -6,10 +6,10 @@ import (
 	"io"
 	"sort"
 
-	"github.com/benoitkugler/textlayout/fonts"
-	"github.com/benoitkugler/textlayout/language"
 	"github.com/go-text/typesetting/di"
 	"github.com/go-text/typesetting/font"
+	"github.com/go-text/typesetting/language"
+	"github.com/go-text/typesetting/opentype/api"
 	"github.com/go-text/typesetting/shaping"
 	"golang.org/x/exp/slices"
 	"golang.org/x/image/math/fixed"
@@ -517,55 +517,55 @@ func (s *shaperImpl) Shape(ops *op.Ops, gs []Glyph) clip.PathSpec {
 		ppem, faceIdx, gid := splitGlyphID(g.ID)
 		face := s.orderer.faceFor(faceIdx)
 		ppemInt := ppem.Round()
-		ppem16 := uint16(ppemInt)
 		scaleFactor := float32(ppemInt) / float32(face.Upem())
-		outline, ok := face.GlyphData(gid, ppem16, ppem16).(fonts.GlyphOutline)
-		if !ok {
-			continue
-		}
-		// Move to glyph position.
-		pos := f32.Point{
-			X: float32(g.X-x)/64 - float32(g.Offset.X)/64,
-			Y: -float32(g.Offset.Y) / 64,
-		}
-		builder.Move(pos.Sub(lastPos))
-		lastPos = pos
-		var lastArg f32.Point
+		glyphData := face.GlyphData(gid)
+		switch glyphData := glyphData.(type) {
+		case api.GlyphOutline:
+			outline := glyphData
+			// Move to glyph position.
+			pos := f32.Point{
+				X: float32(g.X-x)/64 - float32(g.Offset.X)/64,
+				Y: -float32(g.Offset.Y) / 64,
+			}
+			builder.Move(pos.Sub(lastPos))
+			lastPos = pos
+			var lastArg f32.Point
 
-		// Convert fonts.Segments to relative segments.
-		for _, fseg := range outline.Segments {
-			nargs := 1
-			switch fseg.Op {
-			case fonts.SegmentOpQuadTo:
-				nargs = 2
-			case fonts.SegmentOpCubeTo:
-				nargs = 3
-			}
-			var args [3]f32.Point
-			for i := 0; i < nargs; i++ {
-				a := f32.Point{
-					X: fseg.Args[i].X * scaleFactor,
-					Y: -fseg.Args[i].Y * scaleFactor,
+			// Convert fonts.Segments to relative segments.
+			for _, fseg := range outline.Segments {
+				nargs := 1
+				switch fseg.Op {
+				case api.SegmentOpQuadTo:
+					nargs = 2
+				case api.SegmentOpCubeTo:
+					nargs = 3
 				}
-				args[i] = a.Sub(lastArg)
-				if i == nargs-1 {
-					lastArg = a
+				var args [3]f32.Point
+				for i := 0; i < nargs; i++ {
+					a := f32.Point{
+						X: fseg.Args[i].X * scaleFactor,
+						Y: -fseg.Args[i].Y * scaleFactor,
+					}
+					args[i] = a.Sub(lastArg)
+					if i == nargs-1 {
+						lastArg = a
+					}
+				}
+				switch fseg.Op {
+				case api.SegmentOpMoveTo:
+					builder.Move(args[0])
+				case api.SegmentOpLineTo:
+					builder.Line(args[0])
+				case api.SegmentOpQuadTo:
+					builder.Quad(args[0], args[1])
+				case api.SegmentOpCubeTo:
+					builder.Cube(args[0], args[1], args[2])
+				default:
+					panic("unsupported segment op")
 				}
 			}
-			switch fseg.Op {
-			case fonts.SegmentOpMoveTo:
-				builder.Move(args[0])
-			case fonts.SegmentOpLineTo:
-				builder.Line(args[0])
-			case fonts.SegmentOpQuadTo:
-				builder.Quad(args[0], args[1])
-			case fonts.SegmentOpCubeTo:
-				builder.Cube(args[0], args[1], args[2])
-			default:
-				panic("unsupported segment op")
-			}
+			lastPos = lastPos.Add(lastArg)
 		}
-		lastPos = lastPos.Add(lastArg)
 	}
 	return builder.End()
 }

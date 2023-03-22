@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/benoitkugler/textlayout/fonts/truetype"
 	"github.com/go-text/typesetting/font"
 )
 
@@ -19,7 +18,7 @@ type Face struct {
 
 // Parse constructs a Face from source bytes.
 func Parse(src []byte) (Face, error) {
-	face, err := truetype.Parse(bytes.NewReader(src))
+	face, err := font.ParseTTF(bytes.NewReader(src))
 	if err != nil {
 		return Face{}, fmt.Errorf("failed parsing truetype font: %w", err)
 	}
