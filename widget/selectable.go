@@ -160,6 +160,12 @@ func (l *Selectable) SetText(s string) {
 	}
 }
 
+// Truncated returns whether the text has been truncated by the text shaper to
+// fit within available constraints.
+func (l *Selectable) Truncated() bool {
+	return l.text.Truncated()
+}
+
 // Layout clips to the dimensions of the selectable, updates the shaped text, configures input handling, and paints
 // the text and selection rectangles. The provided textMaterial and selectionMaterial ops are used to set the
 // paint material for the text and selection rectangles, respectively.

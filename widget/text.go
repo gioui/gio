@@ -447,6 +447,12 @@ func (e *textView) MoveCoord(pos image.Point) {
 	e.caret.xoff = 0
 }
 
+// Truncated returns whether the text in the textView is currently
+// truncated due to a restriction on the number of lines.
+func (e *textView) Truncated() bool {
+	return e.index.truncated
+}
+
 func (e *textView) layoutText(lt *text.Shaper) {
 	e.Seek(0, io.SeekStart)
 	var r io.Reader = e
