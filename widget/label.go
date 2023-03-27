@@ -16,7 +16,8 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-// Label is a widget for laying out and drawing text.
+// Label is a widget for laying out and drawing text. Labels are always
+// non-interactive text. They cannot be selected or copied.
 type Label struct {
 	// Alignment specifies the text alignment.
 	Alignment text.Alignment
@@ -25,28 +26,10 @@ type Label struct {
 	// Truncator is the text that will be shown at the end of the final
 	// line if MaxLines is exceeded. Defaults to "…" if empty.
 	Truncator string
-	// Selectable optionally provides text selection state. If nil,
-	// text will not be selectable.
-	Selectable *Selectable
 }
 
-// Layout the label with the given shaper, font, size, text, and materials. If the Selectable field is
-// populated, the label will support text selection. Otherwise, it will be non-interactive. The textMaterial
-// and selectionMaterial op.CallOps are responsible for setting the painting material for the text glyphs
-// and the text selection rectangles, respectively.
-func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, txt string, textMaterial, selectionMaterial op.CallOp) layout.Dimensions {
-	if l.Selectable == nil {
-		return l.layout(gtx, lt, font, size, txt, textMaterial, selectionMaterial)
-	}
-	l.Selectable.text.Alignment = l.Alignment
-	l.Selectable.text.MaxLines = l.MaxLines
-	l.Selectable.text.Truncator = l.Truncator
-	l.Selectable.SetText(txt)
-	return l.Selectable.Layout(gtx, lt, font, size, textMaterial, selectionMaterial)
-}
-
-// layout the text as non-interactive.
-func (l Label) layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, txt string, textMaterial, selectionMaterial op.CallOp) layout.Dimensions {
+// Layout the label with the given shaper, font, size, text, and material.
+func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, txt string, textMaterial op.CallOp) layout.Dimensions {
 	cs := gtx.Constraints
 	textSize := fixed.I(gtx.Sp(size))
 	lt.LayoutString(text.Parameters{

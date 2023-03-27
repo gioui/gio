@@ -14,6 +14,9 @@ import (
 	"gioui.org/widget"
 )
 
+// LabelStyle configures the presentation of text. If the State field is set, the
+// label will be laid out as interactive (able to be selected and copied). Otherwise,
+// the label will be non-interactive.
 type LabelStyle struct {
 	// Face defines the text style.
 	Font text.Font
@@ -109,6 +112,12 @@ func (l LabelStyle) Layout(gtx layout.Context) layout.Dimensions {
 	paint.ColorOp{Color: l.SelectionColor}.Add(gtx.Ops)
 	selectColor := selectColorMacro.Stop()
 
-	tl := widget.Label{Alignment: l.Alignment, MaxLines: l.MaxLines, Selectable: l.State}
-	return tl.Layout(gtx, l.shaper, l.Font, l.TextSize, l.Text, textColor, selectColor)
+	if l.State != nil {
+		if l.State.Text() != l.Text {
+			l.State.SetText(l.Text)
+		}
+		return l.State.Layout(gtx, l.shaper, l.Font, l.TextSize, textColor, selectColor)
+	}
+	tl := widget.Label{Alignment: l.Alignment, MaxLines: l.MaxLines}
+	return tl.Layout(gtx, l.shaper, l.Font, l.TextSize, l.Text, textColor)
 }

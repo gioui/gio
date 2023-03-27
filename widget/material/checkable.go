@@ -76,7 +76,7 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 			return layout.UniformInset(2).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 				colMacro := op.Record(gtx.Ops)
 				paint.ColorOp{Color: c.Color}.Add(gtx.Ops)
-				return widget.Label{}.Layout(gtx, c.shaper, c.Font, c.TextSize, c.Label, colMacro.Stop(), op.CallOp{})
+				return widget.Label{}.Layout(gtx, c.shaper, c.Font, c.TextSize, c.Label, colMacro.Stop())
 			})
 		}),
 	)

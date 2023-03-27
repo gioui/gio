@@ -97,7 +97,7 @@ func BenchmarkLabelStatic(b *testing.B) {
 		l := Label{}
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			l.Layout(gtx, cache, font, fontSize, runesStr, op.CallOp{}, op.CallOp{})
+			l.Layout(gtx, cache, font, fontSize, runesStr, op.CallOp{})
 			if render {
 				win.Frame(gtx.Ops)
 			}
@@ -132,7 +132,7 @@ func BenchmarkLabelDynamic(b *testing.B) {
 			a := rand.Intn(len(runes))
 			b := rand.Intn(len(runes))
 			runes[a], runes[b] = runes[b], runes[a]
-			l.Layout(gtx, cache, font, fontSize, string(runes), op.CallOp{}, op.CallOp{})
+			l.Layout(gtx, cache, font, fontSize, string(runes), op.CallOp{})
 			if render {
 				win.Frame(gtx.Ops)
 			}

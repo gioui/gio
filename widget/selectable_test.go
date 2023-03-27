@@ -46,9 +46,8 @@ func TestSelectableMove(t *testing.T) {
 	gtx.Queue = newQueue(key.FocusEvent{Focus: true})
 	s := new(Selectable)
 
-	Label{
-		Selectable: s,
-	}.Layout(gtx, cache, text.Font{}, fontSize, str, op.CallOp{}, op.CallOp{})
+	s.SetText(str)
+	s.Layout(gtx, cache, text.Font{}, fontSize, op.CallOp{}, op.CallOp{})
 
 	testKey := func(keyName string) {
 		// Select 345
@@ -62,9 +61,8 @@ func TestSelectableMove(t *testing.T) {
 
 		// Press the key
 		gtx.Queue = newQueue(key.Event{State: key.Press, Name: keyName})
-		Label{
-			Selectable: s,
-		}.Layout(gtx, cache, font, fontSize, str, op.CallOp{}, op.CallOp{})
+		s.SetText(str)
+		s.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 
 		if expected, got := "", s.SelectedText(); expected != got {
 			t.Errorf("KeyName %s, expected %q, got %q", keyName, expected, got)
@@ -102,12 +100,10 @@ func TestSelectableConfigurations(t *testing.T) {
 					gtx.Constraints.Min = gtx.Constraints.Max
 				}
 				s := new(Selectable)
-				label := Label{
-					Alignment:  alignment,
-					Selectable: s,
-				}
-				interactiveDims := label.Layout(gtx, cache, font, fontSize, sentence, op.CallOp{}, op.CallOp{})
-				staticDims := label.Layout(gtx, cache, font, fontSize, sentence, op.CallOp{}, op.CallOp{})
+				s.text.Alignment = alignment
+				s.SetText(sentence)
+				interactiveDims := s.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+				staticDims := Label{Alignment: alignment}.Layout(gtx, cache, font, fontSize, sentence, op.CallOp{})
 
 				if interactiveDims != staticDims {
 					t.Errorf("expected consistent dimensions, static returned %#+v, interactive returned %#+v", staticDims, interactiveDims)
