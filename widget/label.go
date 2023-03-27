@@ -38,7 +38,10 @@ func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size 
 		MaxLines:  l.MaxLines,
 		Truncator: l.Truncator,
 		Alignment: l.Alignment,
-	}, cs.Min.X, cs.Max.X, gtx.Locale, txt)
+		MaxWidth:  cs.Max.X,
+		MinWidth:  cs.Min.X,
+		Locale:    gtx.Locale,
+	}, txt)
 	m := op.Record(gtx.Ops)
 	viewport := image.Rectangle{Max: cs.Max}
 	it := textIterator{

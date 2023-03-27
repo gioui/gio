@@ -25,7 +25,10 @@ func TestWrappingTruncation(t *testing.T) {
 	cache.LayoutString(Parameters{
 		Alignment: Middle,
 		PxPerEm:   fixed.I(10),
-	}, 200, 200, english, textInput)
+		MinWidth:  200,
+		MaxWidth:  200,
+		Locale:    english,
+	}, textInput)
 	untruncatedCount := len(cache.txt.lines)
 
 	for i := untruncatedCount + 1; i > 0; i-- {
@@ -34,7 +37,10 @@ func TestWrappingTruncation(t *testing.T) {
 				Alignment: Middle,
 				PxPerEm:   fixed.I(10),
 				MaxLines:  i,
-			}, 200, 200, english, textInput)
+				MinWidth:  200,
+				MaxWidth:  200,
+				Locale:    english,
+			}, textInput)
 			lineCount := 0
 			lastGlyphWasLineBreak := false
 			glyphs := []Glyph{}
@@ -130,7 +136,10 @@ func TestShapingNewlineHandling(t *testing.T) {
 			cache.LayoutString(Parameters{
 				Alignment: Middle,
 				PxPerEm:   fixed.I(10),
-			}, 200, 200, english, tc.textInput)
+				MinWidth:  200,
+				MaxWidth:  200,
+				Locale:    english,
+			}, tc.textInput)
 			if lineCount := len(cache.txt.lines); lineCount > tc.expectedLines {
 				t.Errorf("shaping string %q created %d lines", tc.textInput, lineCount)
 			}
@@ -139,7 +148,10 @@ func TestShapingNewlineHandling(t *testing.T) {
 			cache.Layout(Parameters{
 				Alignment: Middle,
 				PxPerEm:   fixed.I(10),
-			}, 200, 200, english, strings.NewReader(tc.textInput))
+				MinWidth:  200,
+				MaxWidth:  200,
+				Locale:    english,
+			}, strings.NewReader(tc.textInput))
 			if lineCount := len(cache.txt.lines); lineCount > tc.expectedLines {
 				t.Errorf("shaping reader %q created %d lines", tc.textInput, lineCount)
 			}
@@ -157,7 +169,10 @@ func TestCacheEmptyString(t *testing.T) {
 	cache.LayoutString(Parameters{
 		Alignment: Middle,
 		PxPerEm:   fixed.I(10),
-	}, 200, 200, english, "")
+		MinWidth:  200,
+		MaxWidth:  200,
+		Locale:    english,
+	}, "")
 	glyphs := make([]Glyph, 0, 1)
 	for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
 		glyphs = append(glyphs, g)
@@ -190,31 +205,38 @@ func TestCacheAlignment(t *testing.T) {
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	collection := []FontFace{{Face: ltrFace}}
 	cache := NewShaper(collection)
-	params := Parameters{Alignment: Start, PxPerEm: fixed.I(10)}
-	cache.LayoutString(params, 200, 200, english, "A")
+	params := Parameters{
+		Alignment: Start,
+		PxPerEm:   fixed.I(10),
+		MinWidth:  200,
+		MaxWidth:  200,
+		Locale:    english,
+	}
+	cache.LayoutString(params, "A")
 	glyph, _ := cache.NextGlyph()
 	startX := glyph.X
 	params.Alignment = Middle
-	cache.LayoutString(params, 200, 200, english, "A")
+	cache.LayoutString(params, "A")
 	glyph, _ = cache.NextGlyph()
 	middleX := glyph.X
 	params.Alignment = End
-	cache.LayoutString(params, 200, 200, english, "A")
+	cache.LayoutString(params, "A")
 	glyph, _ = cache.NextGlyph()
 	endX := glyph.X
 	if startX == middleX || startX == endX || endX == middleX {
 		t.Errorf("[LTR] shaping with with different alignments should not produce the same X, start %d, middle %d, end %d", startX, middleX, endX)
 	}
+	params.Locale = arabic
 	params.Alignment = Start
-	cache.LayoutString(params, 200, 200, arabic, "A")
+	cache.LayoutString(params, "A")
 	glyph, _ = cache.NextGlyph()
 	rtlStartX := glyph.X
 	params.Alignment = Middle
-	cache.LayoutString(params, 200, 200, arabic, "A")
+	cache.LayoutString(params, "A")
 	glyph, _ = cache.NextGlyph()
 	rtlMiddleX := glyph.X
 	params.Alignment = End
-	cache.LayoutString(params, 200, 200, arabic, "A")
+	cache.LayoutString(params, "A")
 	glyph, _ = cache.NextGlyph()
 	rtlEndX := glyph.X
 	if rtlStartX == rtlMiddleX || rtlStartX == rtlEndX || rtlEndX == rtlMiddleX {
@@ -250,8 +272,10 @@ func TestCacheGlyphConverstion(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cache := NewShaper(collection)
 			cache.LayoutString(Parameters{
-				PxPerEm: fixed.I(10),
-			}, 0, 200, tc.locale, tc.text)
+				PxPerEm:  fixed.I(10),
+				MaxWidth: 200,
+				Locale:   tc.locale,
+			}, tc.text)
 			doc := cache.txt
 			glyphs := make([]Glyph, 0, len(tc.expected))
 			for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {

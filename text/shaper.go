@@ -31,6 +31,11 @@ type Parameters struct {
 	// can currently ohly happen if MaxLines is nonzero and the text on the final line is
 	// truncated.
 	Truncator string
+	// MinWidth and MaxWidth provide the minimum and maximum horizontal space constraints
+	// for the shaped text.
+	MinWidth, MaxWidth int
+	// Locale provides primary direction and language information for the shaped text.
+	Locale system.Locale
 }
 
 // A FontFace is a Font and a matching Face.
@@ -194,13 +199,13 @@ func NewShaper(collection []FontFace) *Shaper {
 
 // Layout text from an io.Reader according to a set of options. Results can be retrieved by
 // iteratively calling NextGlyph.
-func (l *Shaper) Layout(params Parameters, minWidth, maxWidth int, lc system.Locale, txt io.Reader) {
-	l.layoutText(params, minWidth, maxWidth, lc, bufio.NewReader(txt), "")
+func (l *Shaper) Layout(params Parameters, txt io.Reader) {
+	l.layoutText(params, bufio.NewReader(txt), "")
 }
 
 // LayoutString is Layout for strings.
-func (l *Shaper) LayoutString(params Parameters, minWidth, maxWidth int, lc system.Locale, str string) {
-	l.layoutText(params, minWidth, maxWidth, lc, nil, str)
+func (l *Shaper) LayoutString(params Parameters, str string) {
+	l.layoutText(params, nil, str)
 }
 
 func (l *Shaper) reset(align Alignment) {
@@ -213,10 +218,10 @@ func (l *Shaper) reset(align Alignment) {
 // layoutText lays out a large text document by breaking it into paragraphs and laying
 // out each of them separately. This allows the shaping results to be cached independently
 // by paragraph. Only one of txt and str should be provided.
-func (l *Shaper) layoutText(params Parameters, minWidth, maxWidth int, lc system.Locale, txt io.RuneReader, str string) {
+func (l *Shaper) layoutText(params Parameters, txt io.RuneReader, str string) {
 	l.reset(params.Alignment)
 	if txt == nil && len(str) == 0 {
-		l.txt.append(l.layoutParagraph(params, minWidth, maxWidth, lc, "", nil))
+		l.txt.append(l.layoutParagraph(params, "", nil))
 		return
 	}
 	truncating := params.MaxLines > 0
@@ -250,7 +255,7 @@ func (l *Shaper) layoutText(params Parameters, minWidth, maxWidth int, lc system
 			done = endByte == len(str)
 		}
 		if startByte != endByte || (len(l.paragraph) > 0 || len(l.txt.lines) == 0) {
-			lines := l.layoutParagraph(params, minWidth, maxWidth, lc, str[startByte:endByte], l.paragraph)
+			lines := l.layoutParagraph(params, str[startByte:endByte], l.paragraph)
 			if truncating {
 				params.MaxLines -= len(lines.lines)
 				if params.MaxLines == 0 {
@@ -285,7 +290,7 @@ func (l *Shaper) layoutText(params Parameters, minWidth, maxWidth int, lc system
 	}
 }
 
-func (l *Shaper) layoutParagraph(params Parameters, minWidth, maxWidth int, lc system.Locale, asStr string, asRunes []rune) document {
+func (l *Shaper) layoutParagraph(params Parameters, asStr string, asRunes []rune) document {
 	if l == nil {
 		return document{}
 	}
@@ -294,14 +299,14 @@ func (l *Shaper) layoutParagraph(params Parameters, minWidth, maxWidth int, lc s
 	}
 	// Alignment is not part of the cache key because changing it does not impact shaping.
 	lk := layoutKey{
-		truncator: params.Truncator,
 		ppem:      params.PxPerEm,
-		maxWidth:  maxWidth,
-		minWidth:  minWidth,
+		maxWidth:  params.MaxWidth,
+		minWidth:  params.MinWidth,
 		maxLines:  params.MaxLines,
-		str:       asStr,
-		locale:    lc,
+		truncator: params.Truncator,
+		locale:    params.Locale,
 		font:      params.Font,
+		str:       asStr,
 	}
 	if l, ok := l.layoutCache.Get(lk); ok {
 		return l
@@ -309,7 +314,7 @@ func (l *Shaper) layoutParagraph(params Parameters, minWidth, maxWidth int, lc s
 	if len(asRunes) == 0 && len(asStr) > 0 {
 		asRunes = []rune(asStr)
 	}
-	lines := l.shaper.LayoutRunes(params, minWidth, maxWidth, lc, asRunes)
+	lines := l.shaper.LayoutRunes(params, asRunes)
 	l.layoutCache.Put(lk, lines)
 	return lines
 }

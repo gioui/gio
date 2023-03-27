@@ -32,17 +32,30 @@ func makePosTestText(fontSize, lineWidth int, alignOpposite bool) (source string
 	// bidiSource is crafted to contain multiple consecutive RTL runs (by
 	// changing scripts within the RTL).
 	bidiSource := "The quick سماء שלום لا fox تمط שלום غير the lazy dog."
-	ltrParams := text.Parameters{Font: text.Font{Typeface: "LTR"}, PxPerEm: fixed.I(fontSize)}
-	rtlParams := text.Parameters{Alignment: text.End, Font: text.Font{Typeface: "RTL"}, PxPerEm: fixed.I(fontSize)}
+	ltrParams := text.Parameters{
+		Font:     text.Font{Typeface: "LTR"},
+		PxPerEm:  fixed.I(fontSize),
+		MaxWidth: lineWidth,
+		MinWidth: lineWidth,
+		Locale:   english,
+	}
+	rtlParams := text.Parameters{
+		Alignment: text.End,
+		Font:      text.Font{Typeface: "RTL"},
+		PxPerEm:   fixed.I(fontSize),
+		MaxWidth:  lineWidth,
+		MinWidth:  lineWidth,
+		Locale:    arabic,
+	}
 	if alignOpposite {
 		ltrParams.Alignment = text.End
 		rtlParams.Alignment = text.Start
 	}
-	shaper.LayoutString(ltrParams, lineWidth, lineWidth, english, bidiSource)
+	shaper.LayoutString(ltrParams, bidiSource)
 	for g, ok := shaper.NextGlyph(); ok; g, ok = shaper.NextGlyph() {
 		bidiLTR = append(bidiLTR, g)
 	}
-	shaper.LayoutString(rtlParams, lineWidth, lineWidth, arabic, bidiSource)
+	shaper.LayoutString(rtlParams, bidiSource)
 	for g, ok := shaper.NextGlyph(); ok; g, ok = shaper.NextGlyph() {
 		bidiRTL = append(bidiRTL, g)
 	}
@@ -64,8 +77,12 @@ func makeAccountingTestText(str string, fontSize, lineWidth int) (txt []text.Gly
 			Face: rtlFace,
 		},
 	})
-	params := text.Parameters{PxPerEm: fixed.I(fontSize)}
-	shaper.LayoutString(params, 0, lineWidth, english, str)
+	params := text.Parameters{
+		PxPerEm:  fixed.I(fontSize),
+		MaxWidth: lineWidth,
+		Locale:   english,
+	}
+	shaper.LayoutString(params, str)
 	for g, ok := shaper.NextGlyph(); ok; g, ok = shaper.NextGlyph() {
 		txt = append(txt, g)
 	}
@@ -86,8 +103,14 @@ func getGlyphs(fontSize, minWidth, lineWidth int, align text.Alignment, str stri
 			Face: rtlFace,
 		},
 	})
-	params := text.Parameters{PxPerEm: fixed.I(fontSize), Alignment: align}
-	shaper.LayoutString(params, minWidth, lineWidth, english, str)
+	params := text.Parameters{
+		PxPerEm:   fixed.I(fontSize),
+		Alignment: align,
+		MinWidth:  minWidth,
+		MaxWidth:  lineWidth,
+		Locale:    english,
+	}
+	shaper.LayoutString(params, str)
 	for g, ok := shaper.NextGlyph(); ok; g, ok = shaper.NextGlyph() {
 		txt = append(txt, g)
 	}

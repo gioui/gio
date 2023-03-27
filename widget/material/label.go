@@ -116,8 +116,15 @@ func (l LabelStyle) Layout(gtx layout.Context) layout.Dimensions {
 		if l.State.Text() != l.Text {
 			l.State.SetText(l.Text)
 		}
+		l.State.Alignment = l.Alignment
+		l.State.MaxLines = l.MaxLines
+		l.State.Truncator = l.Truncator
 		return l.State.Layout(gtx, l.shaper, l.Font, l.TextSize, textColor, selectColor)
 	}
-	tl := widget.Label{Alignment: l.Alignment, MaxLines: l.MaxLines}
+	tl := widget.Label{
+		Alignment: l.Alignment,
+		MaxLines:  l.MaxLines,
+		Truncator: l.Truncator,
+	}
 	return tl.Layout(gtx, l.shaper, l.Font, l.TextSize, l.Text, textColor)
 }

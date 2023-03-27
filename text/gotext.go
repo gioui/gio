@@ -401,7 +401,7 @@ func (s *shaperImpl) shapeText(faces []font.Face, ppem fixed.Int26_6, lc system.
 }
 
 // shapeAndWrapText invokes the text shaper and returns wrapped lines in the shaper's native format.
-func (s *shaperImpl) shapeAndWrapText(faces []font.Face, params Parameters, maxWidth int, lc system.Locale, txt []rune) (_ []shaping.Line, truncated int) {
+func (s *shaperImpl) shapeAndWrapText(faces []font.Face, params Parameters, txt []rune) (_ []shaping.Line, truncated int) {
 	wc := shaping.WrapConfig{
 		TruncateAfterLines: params.MaxLines,
 	}
@@ -411,10 +411,10 @@ func (s *shaperImpl) shapeAndWrapText(faces []font.Face, params Parameters, maxW
 		}
 		// We only permit a single run as the truncator, regardless of whether more were generated.
 		// Just use the first one.
-		wc.Truncator = s.shapeText(faces, params.PxPerEm, lc, []rune(params.Truncator))[0]
+		wc.Truncator = s.shapeText(faces, params.PxPerEm, params.Locale, []rune(params.Truncator))[0]
 	}
 	// Wrap outputs into lines.
-	return s.wrapper.WrapParagraph(wc, maxWidth, txt, s.shapeText(faces, params.PxPerEm, lc, txt)...)
+	return s.wrapper.WrapParagraph(wc, params.MaxWidth, txt, s.shapeText(faces, params.PxPerEm, params.Locale, txt)...)
 }
 
 // replaceControlCharacters replaces problematic unicode
@@ -443,17 +443,17 @@ func replaceControlCharacters(in []rune) []rune {
 }
 
 // Layout shapes and wraps the text, and returns the result in Gio's shaped text format.
-func (s *shaperImpl) LayoutString(params Parameters, minWidth, maxWidth int, lc system.Locale, txt string) document {
-	return s.LayoutRunes(params, minWidth, maxWidth, lc, []rune(txt))
+func (s *shaperImpl) LayoutString(params Parameters, txt string) document {
+	return s.LayoutRunes(params, []rune(txt))
 }
 
 // Layout shapes and wraps the text, and returns the result in Gio's shaped text format.
-func (s *shaperImpl) Layout(params Parameters, minWidth, maxWidth int, lc system.Locale, txt io.RuneReader) document {
+func (s *shaperImpl) Layout(params Parameters, txt io.RuneReader) document {
 	s.scratchRunes = s.scratchRunes[:0]
 	for r, _, err := txt.ReadRune(); err != nil; r, _, err = txt.ReadRune() {
 		s.scratchRunes = append(s.scratchRunes, r)
 	}
-	return s.LayoutRunes(params, minWidth, maxWidth, lc, s.scratchRunes)
+	return s.LayoutRunes(params, s.scratchRunes)
 }
 
 func calculateYOffsets(lines []line) {
@@ -468,12 +468,12 @@ func calculateYOffsets(lines []line) {
 }
 
 // LayoutRunes shapes and wraps the text, and returns the result in Gio's shaped text format.
-func (s *shaperImpl) LayoutRunes(params Parameters, minWidth, maxWidth int, lc system.Locale, txt []rune) document {
+func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 	hasNewline := len(txt) > 0 && txt[len(txt)-1] == '\n'
 	if hasNewline {
 		txt = txt[:len(txt)-1]
 	}
-	ls, truncated := s.shapeAndWrapText(s.orderer.sortedFacesForStyle(params.Font), params, maxWidth, lc, replaceControlCharacters(txt))
+	ls, truncated := s.shapeAndWrapText(s.orderer.sortedFacesForStyle(params.Font), params, replaceControlCharacters(txt))
 
 	if truncated > 0 && hasNewline {
 		// We've truncated the newline, since it was at the end and we've truncated some amount of runes
@@ -484,7 +484,7 @@ func (s *shaperImpl) LayoutRunes(params Parameters, minWidth, maxWidth int, lc s
 	// Convert to Lines.
 	textLines := make([]line, len(ls))
 	for i := range ls {
-		otLine := toLine(&s.orderer, ls[i], lc.Direction)
+		otLine := toLine(&s.orderer, ls[i], params.Locale.Direction)
 		isFinalLine := i == len(ls)-1
 		if isFinalLine && hasNewline {
 			// If there was a trailing newline update the rune counts to include
@@ -536,7 +536,7 @@ func (s *shaperImpl) LayoutRunes(params Parameters, minWidth, maxWidth int, lc s
 	return document{
 		lines:      textLines,
 		alignment:  params.Alignment,
-		alignWidth: alignWidth(minWidth, textLines),
+		alignWidth: alignWidth(params.MinWidth, textLines),
 	}
 }
 

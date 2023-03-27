@@ -10,7 +10,6 @@ import (
 	"unicode/utf8"
 
 	"gioui.org/f32"
-	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -58,22 +57,20 @@ type textView struct {
 	// are accessed by Len, Text, and SetText.
 	Mask rune
 
-	font       text.Font
+	params     text.Parameters
 	shaper     *text.Shaper
-	textSize   fixed.Int26_6
 	seekCursor int64
 	rr         textSource
 	maskReader maskReader
 	// graphemes tracks the indices of grapheme cluster boundaries within rr.
 	graphemes []int
 	// paragraphReader is used to populate graphemes.
-	paragraphReader    graphemeReader
-	lastMask           rune
-	maxWidth, minWidth int
-	viewSize           image.Point
-	valid              bool
-	regions            []Region
-	dims               layout.Dimensions
+	paragraphReader graphemeReader
+	lastMask        rune
+	viewSize        image.Point
+	valid           bool
+	regions         []Region
+	dims            layout.Dimensions
 
 	// offIndex is an index of rune index to byte offsets.
 	offIndex []offEntry
@@ -93,8 +90,6 @@ type textView struct {
 	}
 
 	scrollOff image.Point
-
-	locale system.Locale
 }
 
 func (e *textView) Changed() bool {
@@ -228,27 +223,27 @@ func (e *textView) calculateViewSize(gtx layout.Context) image.Point {
 // allow parent widgets to adapt to any changes in text content or positioning. If eventHandling modifies the contents
 // of the textView, it is guaranteed to be reshaped (and ready for painting) before Update returns.
 func (e *textView) Update(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, eventHandling func(gtx layout.Context)) {
-	if e.locale != gtx.Locale {
-		e.locale = gtx.Locale
+	if e.params.Locale != gtx.Locale {
+		e.params.Locale = gtx.Locale
 		e.invalidate()
 	}
 	textSize := fixed.I(gtx.Sp(size))
-	if e.font != font || e.textSize != textSize {
+	if e.params.Font != font || e.params.PxPerEm != textSize {
 		e.invalidate()
-		e.font = font
-		e.textSize = textSize
+		e.params.Font = font
+		e.params.PxPerEm = textSize
 	}
 	maxWidth := gtx.Constraints.Max.X
 	if e.SingleLine {
 		maxWidth = math.MaxInt
 	}
 	minWidth := gtx.Constraints.Min.X
-	if maxWidth != e.maxWidth {
-		e.maxWidth = maxWidth
+	if maxWidth != e.params.MaxWidth {
+		e.params.MaxWidth = maxWidth
 		e.invalidate()
 	}
-	if minWidth != e.minWidth {
-		e.minWidth = minWidth
+	if minWidth != e.params.MinWidth {
+		e.params.MinWidth = minWidth
 		e.invalidate()
 	}
 	if lt != e.shaper {
@@ -257,6 +252,18 @@ func (e *textView) Update(gtx layout.Context, lt *text.Shaper, font text.Font, s
 	}
 	if e.Mask != e.lastMask {
 		e.lastMask = e.Mask
+		e.invalidate()
+	}
+	if e.Alignment != e.params.Alignment {
+		e.params.Alignment = e.Alignment
+		e.invalidate()
+	}
+	if e.Truncator != e.params.Truncator {
+		e.params.Truncator = e.Truncator
+		e.invalidate()
+	}
+	if e.MaxLines != e.params.MaxLines {
+		e.params.MaxLines = e.MaxLines
 		e.invalidate()
 	}
 
@@ -463,13 +470,7 @@ func (e *textView) layoutText(lt *text.Shaper) {
 	e.index.reset()
 	it := textIterator{viewport: image.Rectangle{Max: image.Point{X: math.MaxInt, Y: math.MaxInt}}}
 	if lt != nil {
-		lt.Layout(text.Parameters{
-			Font:      e.font,
-			PxPerEm:   e.textSize,
-			Alignment: e.Alignment,
-			MaxLines:  e.MaxLines,
-			Truncator: e.Truncator,
-		}, e.minWidth, e.maxWidth, e.locale, r)
+		lt.Layout(e.params, r)
 		for glyph, ok := it.processGlyph(lt.NextGlyph()); ok; glyph, ok = it.processGlyph(lt.NextGlyph()) {
 			e.index.Glyph(glyph)
 		}
@@ -635,7 +636,7 @@ func (e *textView) MoveEnd(selAct selectionAction) {
 	caret := e.closestToRune(e.caret.start)
 	caret = e.closestToLineCol(caret.lineCol.line, math.MaxInt)
 	e.caret.start = caret.runes
-	e.caret.xoff = fixed.I(e.maxWidth) - caret.x
+	e.caret.xoff = fixed.I(e.params.MaxWidth) - caret.x
 	e.updateSelection(selAct)
 	e.clampCursorToGraphemes()
 }

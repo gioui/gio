@@ -37,7 +37,11 @@ func TestEmptyString(t *testing.T) {
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	shaper := testShaper(ltrFace)
 
-	lines := shaper.LayoutRunes(Parameters{PxPerEm: ppem}, 0, 2000, english, []rune{})
+	lines := shaper.LayoutRunes(Parameters{
+		PxPerEm:  ppem,
+		MaxWidth: 2000,
+		Locale:   english,
+	}, []rune{})
 	if len(lines.lines) == 0 {
 		t.Fatalf("Layout returned no lines for empty string; expected 1")
 	}
@@ -110,7 +114,11 @@ func TestShapingAlignWidth(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			lines := shaper.LayoutString(Parameters{PxPerEm: ppem}, tc.minWidth, tc.maxWidth, english, tc.str)
+			lines := shaper.LayoutString(Parameters{PxPerEm: ppem,
+				MinWidth: tc.minWidth,
+				MaxWidth: tc.maxWidth,
+				Locale:   english,
+			}, tc.str)
 			if lines.alignWidth != tc.expected {
 				t.Errorf("expected line alignWidth to be %d, got %d", tc.expected, lines.alignWidth)
 			}
@@ -155,7 +163,11 @@ func TestNewlineSynthesis(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 
-			doc := shaper.LayoutRunes(Parameters{PxPerEm: ppem}, 0, 200, tc.locale, []rune(tc.txt))
+			doc := shaper.LayoutRunes(Parameters{
+				PxPerEm:  ppem,
+				MaxWidth: 200,
+				Locale:   tc.locale,
+			}, []rune(tc.txt))
 			for lineIdx, line := range doc.lines {
 				lastRunIdx := len(line.runs) - 1
 				lastRun := line.runs[lastRunIdx]
@@ -256,8 +268,16 @@ func makeTestText(shaper *shaperImpl, primaryDir system.TextDirection, fontSize,
 			rtlSource = string(complexRunes[:runeLimit])
 		}
 	}
-	simpleText, _ := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(Font{}), Parameters{PxPerEm: fixed.I(fontSize)}, lineWidth, locale, []rune(simpleSource))
-	complexText, _ := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(Font{}), Parameters{PxPerEm: fixed.I(fontSize)}, lineWidth, locale, []rune(complexSource))
+	simpleText, _ := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(Font{}), Parameters{
+		PxPerEm:  fixed.I(fontSize),
+		MaxWidth: lineWidth,
+		Locale:   locale,
+	}, []rune(simpleSource))
+	complexText, _ := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(Font{}), Parameters{
+		PxPerEm:  fixed.I(fontSize),
+		MaxWidth: lineWidth,
+		Locale:   locale,
+	}, []rune(complexSource))
 	testShaper(rtlFace, ltrFace)
 	return simpleText, complexText
 }
@@ -536,7 +556,11 @@ func FuzzLayout(f *testing.F) {
 		if fontSize < 1 {
 			fontSize = 1
 		}
-		lines := shaper.LayoutRunes(Parameters{PxPerEm: fixed.I(int(fontSize))}, 0, int(width), locale, []rune(txt))
+		lines := shaper.LayoutRunes(Parameters{
+			PxPerEm:  fixed.I(int(fontSize)),
+			MaxWidth: int(width),
+			Locale:   locale,
+		}, []rune(txt))
 		validateLines(t, lines.lines, len([]rune(txt)))
 	})
 }
@@ -595,11 +619,15 @@ func TestTextAppend(t *testing.T) {
 	shaper := testShaper(ltrFace, rtlFace)
 
 	text1 := shaper.LayoutString(Parameters{
-		PxPerEm: fixed.I(14),
-	}, 0, 200, english, "د عرمثال dstي met لم aqل جدmوpمg lرe dرd  لو عل ميrةsdiduntut lab renنيتذدagلaaiua.ئPocttأior رادرsاي mيrbلmnonaيdتد ماةعcلخ.")
+		PxPerEm:  fixed.I(14),
+		MaxWidth: 200,
+		Locale:   english,
+	}, "د عرمثال dstي met لم aqل جدmوpمg lرe dرd  لو عل ميrةsdiduntut lab renنيتذدagلaaiua.ئPocttأior رادرsاي mيrbلmnonaيdتد ماةعcلخ.")
 	text2 := shaper.LayoutString(Parameters{
-		PxPerEm: fixed.I(14),
-	}, 0, 200, english, "د عرمثال dstي met لم aqل جدmوpمg lرe dرd  لو عل ميrةsdiduntut lab renنيتذدagلaaiua.ئPocttأior رادرsاي mيrbلmnonaيdتد ماةعcلخ.")
+		PxPerEm:  fixed.I(14),
+		MaxWidth: 200,
+		Locale:   english,
+	}, "د عرمثال dstي met لم aqل جدmوpمg lرe dرd  لو عل ميrةsdiduntut lab renنيتذدagلaaiua.ئPocttأior رادرsاي mيrbلmnonaيdتد ماةعcلخ.")
 
 	text1.append(text2)
 	curY := math.MinInt

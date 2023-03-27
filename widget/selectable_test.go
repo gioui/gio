@@ -100,7 +100,7 @@ func TestSelectableConfigurations(t *testing.T) {
 					gtx.Constraints.Min = gtx.Constraints.Max
 				}
 				s := new(Selectable)
-				s.text.Alignment = alignment
+				s.Alignment = alignment
 				s.SetText(sentence)
 				interactiveDims := s.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 				staticDims := Label{Alignment: alignment}.Layout(gtx, cache, font, fontSize, sentence, op.CallOp{})

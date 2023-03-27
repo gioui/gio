@@ -48,8 +48,15 @@ func (s stringSource) ReadAt(b []byte, offset int64) (int, error) {
 func (s stringSource) ReplaceRunes(byteOffset, runeCount int64, str string) {
 }
 
-// Selectable holds text selection state.
+// Selectable displays selectable text.
 type Selectable struct {
+	// Alignment controls the alignment of the text.
+	Alignment text.Alignment
+	// MaxLines is the maximum number of lines of text to be displayed.
+	MaxLines int
+	// Truncator is the symbol to use at the end of the final line of text
+	// if text was cut off. Defaults to "…" if left empty.
+	Truncator   string
 	initialized bool
 	source      stringSource
 	// scratch is a buffer reused to efficiently read text out of the
@@ -171,6 +178,9 @@ func (l *Selectable) Truncated() bool {
 // paint material for the text and selection rectangles, respectively.
 func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, textMaterial, selectionMaterial op.CallOp) layout.Dimensions {
 	l.initialize()
+	l.text.Alignment = l.Alignment
+	l.text.MaxLines = l.MaxLines
+	l.text.Truncator = l.Truncator
 	l.text.Update(gtx, lt, font, size, l.handleEvents)
 	dims := l.text.Dimensions()
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
