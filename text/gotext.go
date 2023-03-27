@@ -262,6 +262,9 @@ type shaperImpl struct {
 	splitScratch1, splitScratch2 []shaping.Input
 	outScratchBuf                []shaping.Output
 	scratchRunes                 []rune
+
+	// bitmapGlyphCache caches extracted bitmap glyph images.
+	bitmapGlyphCache bitmapCache
 }
 
 // Load registers the provided FontFace with the shaper, if it is compatible.
@@ -592,20 +595,27 @@ func (s *shaperImpl) Bitmaps(ops *op.Ops, gs []Glyph) op.CallOp {
 		case api.GlyphBitmap:
 			var imgOp paint.ImageOp
 			var imgSize image.Point
-			var img image.Image
-			switch glyphData.Format {
-			case api.PNG, api.JPG, api.TIFF:
-				img, _, _ = image.Decode(bytes.NewReader(glyphData.Data))
-			case api.BlackAndWhite:
-				// This is a complex family of uncompressed bitmaps that don't seem to be
-				// very common in practice. We can try adding support later if needed.
-				fallthrough
-			default:
-				// Unknown format.
-				continue
+			bitmapData, ok := s.bitmapGlyphCache.Get(g.ID)
+			if !ok {
+				var img image.Image
+				switch glyphData.Format {
+				case api.PNG, api.JPG, api.TIFF:
+					img, _, _ = image.Decode(bytes.NewReader(glyphData.Data))
+				case api.BlackAndWhite:
+					// This is a complex family of uncompressed bitmaps that don't seem to be
+					// very common in practice. We can try adding support later if needed.
+					fallthrough
+				default:
+					// Unknown format.
+					continue
+				}
+				imgOp = paint.NewImageOp(img)
+				imgSize = img.Bounds().Size()
+				s.bitmapGlyphCache.Put(g.ID, bitmap{img: imgOp, size: imgSize})
+			} else {
+				imgOp = bitmapData.img
+				imgSize = bitmapData.size
 			}
-			imgOp = paint.NewImageOp(img)
-			imgSize = img.Bounds().Size()
 			off := op.Offset(image.Point{
 				X: ((g.X - x) - g.Offset.X).Round(),
 				Y: g.Offset.Y.Round() - g.Ascent.Round(),
