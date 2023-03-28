@@ -157,6 +157,7 @@ type layoutKey struct {
 	truncator          string
 	locale             system.Locale
 	font               Font
+	forceTruncate      bool
 }
 
 type pathKey struct {

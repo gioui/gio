@@ -404,6 +404,7 @@ func (s *shaperImpl) shapeText(faces []font.Face, ppem fixed.Int26_6, lc system.
 func (s *shaperImpl) shapeAndWrapText(faces []font.Face, params Parameters, txt []rune) (_ []shaping.Line, truncated int) {
 	wc := shaping.WrapConfig{
 		TruncateAfterLines: params.MaxLines,
+		TextContinues:      params.forceTruncate,
 	}
 	if wc.TruncateAfterLines > 0 {
 		if len(params.Truncator) == 0 {
@@ -475,7 +476,9 @@ func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 	}
 	ls, truncated := s.shapeAndWrapText(s.orderer.sortedFacesForStyle(params.Font), params, replaceControlCharacters(txt))
 
-	if truncated > 0 && hasNewline {
+	didTruncate := truncated > 0 || (params.forceTruncate && params.MaxLines == len(ls))
+
+	if didTruncate && hasNewline {
 		// We've truncated the newline, since it was at the end and we've truncated some amount of runes
 		// before it.
 		truncated++
@@ -513,7 +516,7 @@ func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 				otLine.runs[finalRunIdx].Glyphs[0] = syntheticGlyph
 			}
 		}
-		if isFinalLine && truncated > 0 {
+		if isFinalLine && didTruncate {
 			// If we've truncated the text with a truncator, adjust the rune counts within the
 			// truncator to make it represent the truncated text.
 			finalRunIdx := len(otLine.runs) - 1

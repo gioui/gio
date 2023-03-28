@@ -80,6 +80,74 @@ func TestWrappingTruncation(t *testing.T) {
 	}
 }
 
+// TestWrappingForcedTruncation checks that the line wrapper's truncation features
+// activate correctly on multi-paragraph text when later paragraphs are truncated.
+func TestWrappingForcedTruncation(t *testing.T) {
+	// Use a test string containing multiple newlines to ensure that they are shaped
+	// as separate paragraphs.
+	textInput := "Lorem ipsum\ndolor sit\namet"
+	ltrFace, _ := opentype.Parse(goregular.TTF)
+	collection := []FontFace{{Face: ltrFace}}
+	cache := NewShaper(collection)
+	cache.LayoutString(Parameters{
+		Alignment: Middle,
+		PxPerEm:   fixed.I(10),
+		MinWidth:  200,
+		MaxWidth:  200,
+		Locale:    english,
+	}, textInput)
+	untruncatedCount := len(cache.txt.lines)
+
+	for i := untruncatedCount + 1; i > 0; i-- {
+		t.Run(fmt.Sprintf("truncated to %d/%d lines", i, untruncatedCount), func(t *testing.T) {
+			cache.LayoutString(Parameters{
+				Alignment: Middle,
+				PxPerEm:   fixed.I(10),
+				MaxLines:  i,
+				MinWidth:  200,
+				MaxWidth:  200,
+				Locale:    english,
+			}, textInput)
+			lineCount := 0
+			glyphs := []Glyph{}
+			untruncatedRunes := 0
+			truncatedRunes := 0
+			for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
+				glyphs = append(glyphs, g)
+				if g.Flags&FlagTruncator != 0 && g.Flags&FlagClusterBreak != 0 {
+					truncatedRunes += g.Runes
+				} else {
+					untruncatedRunes += g.Runes
+				}
+				if g.Flags&FlagLineBreak != 0 {
+					lineCount++
+				}
+			}
+			expectedTruncated := false
+			expectedLines := 0
+			if i < untruncatedCount {
+				expectedLines = i
+				expectedTruncated = true
+			} else if i == untruncatedCount {
+				expectedLines = i
+				expectedTruncated = false
+			} else if i > untruncatedCount {
+				expectedLines = untruncatedCount
+				expectedTruncated = false
+			}
+			if lineCount != expectedLines {
+				t.Errorf("expected %d lines, got %d", expectedLines, lineCount)
+			}
+			if truncatedRunes > 0 != expectedTruncated {
+				t.Errorf("expected expectedTruncated=%v, truncatedRunes=%d", expectedTruncated, truncatedRunes)
+			}
+			if expected := len([]rune(textInput)); truncatedRunes+untruncatedRunes != expected {
+				t.Errorf("expected %d total runes, got %d (%d truncated)", expected, truncatedRunes+untruncatedRunes, truncatedRunes)
+			}
+		})
+	}
+}
+
 // TestShapingNewlineHandling checks that the shaper's newline splitting behaves
 // consistently and does not create spurious lines of text.
 func TestShapingNewlineHandling(t *testing.T) {

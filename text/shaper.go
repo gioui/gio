@@ -31,11 +31,17 @@ type Parameters struct {
 	// can currently ohly happen if MaxLines is nonzero and the text on the final line is
 	// truncated.
 	Truncator string
+
 	// MinWidth and MaxWidth provide the minimum and maximum horizontal space constraints
 	// for the shaped text.
 	MinWidth, MaxWidth int
 	// Locale provides primary direction and language information for the shaped text.
 	Locale system.Locale
+
+	// forceTruncate controls whether the truncator string is inserted on the final line of
+	// text with a MaxLines. It is unexported because this behavior only makes sense for the
+	// shaper to control when it iterates paragraphs of text.
+	forceTruncate bool
 }
 
 // A FontFace is a Font and a matching Face.
@@ -218,7 +224,7 @@ func (l *Shaper) reset(align Alignment) {
 // layoutText lays out a large text document by breaking it into paragraphs and laying
 // out each of them separately. This allows the shaping results to be cached independently
 // by paragraph. Only one of txt and str should be provided.
-func (l *Shaper) layoutText(params Parameters, txt io.RuneReader, str string) {
+func (l *Shaper) layoutText(params Parameters, txt *bufio.Reader, str string) {
 	l.reset(params.Alignment)
 	if txt == nil && len(str) == 0 {
 		l.txt.append(l.layoutParagraph(params, "", nil))
@@ -243,6 +249,9 @@ func (l *Shaper) layoutText(params Parameters, txt io.RuneReader, str string) {
 					break
 				}
 			}
+			_, _, re := txt.ReadRune()
+			done = re != nil
+			_ = txt.UnreadRune()
 		} else {
 			for endByte = startByte; endByte < len(str); {
 				r, width := utf8.DecodeRuneInString(str[endByte:])
@@ -255,6 +264,7 @@ func (l *Shaper) layoutText(params Parameters, txt io.RuneReader, str string) {
 			done = endByte == len(str)
 		}
 		if startByte != endByte || (len(l.paragraph) > 0 || len(l.txt.lines) == 0) {
+			params.forceTruncate = truncating && !done
 			lines := l.layoutParagraph(params, str[startByte:endByte], l.paragraph)
 			if truncating {
 				params.MaxLines -= len(lines.lines)
@@ -290,6 +300,9 @@ func (l *Shaper) layoutText(params Parameters, txt io.RuneReader, str string) {
 	}
 }
 
+// layoutParagraph shapes and wraps a paragraph using the provided parameters.
+// It accepts the paragraph data in either string or rune format, preferring the
+// string in order to hit the shaper cache more quickly.
 func (l *Shaper) layoutParagraph(params Parameters, asStr string, asRunes []rune) document {
 	if l == nil {
 		return document{}
@@ -299,14 +312,15 @@ func (l *Shaper) layoutParagraph(params Parameters, asStr string, asRunes []rune
 	}
 	// Alignment is not part of the cache key because changing it does not impact shaping.
 	lk := layoutKey{
-		ppem:      params.PxPerEm,
-		maxWidth:  params.MaxWidth,
-		minWidth:  params.MinWidth,
-		maxLines:  params.MaxLines,
-		truncator: params.Truncator,
-		locale:    params.Locale,
-		font:      params.Font,
-		str:       asStr,
+		ppem:          params.PxPerEm,
+		maxWidth:      params.MaxWidth,
+		minWidth:      params.MinWidth,
+		maxLines:      params.MaxLines,
+		truncator:     params.Truncator,
+		locale:        params.Locale,
+		font:          params.Font,
+		forceTruncate: params.forceTruncate,
+		str:           asStr,
 	}
 	if l, ok := l.layoutCache.Get(lk); ok {
 		return l
