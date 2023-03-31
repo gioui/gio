@@ -31,11 +31,18 @@ type LabelStyle struct {
 	// Truncator is the text that will be shown at the end of the final
 	// line if MaxLines is exceeded. Defaults to "…" if empty.
 	Truncator string
-	Text      string
-	TextSize  unit.Sp
+	// Text is the content displayed by the label.
+	Text string
+	// TextSize determines the size of the text glyphs.
+	TextSize unit.Sp
 
-	shaper *text.Shaper
-	State  *widget.Selectable
+	// Shaper is the text shaper used to display this labe. This field is automatically
+	// set using by all constructor functions. If constructing a LabelStyle literal, you
+	// must provide a Shaper or displaying text will panic.
+	Shaper *text.Shaper
+	// State provides text selection state for the label. If not set, the label cannot
+	// be selected or copied interactively.
+	State *widget.Selectable
 }
 
 func H1(th *Theme, txt string) LabelStyle {
@@ -100,7 +107,7 @@ func Label(th *Theme, size unit.Sp, txt string) LabelStyle {
 		Color:          th.Palette.Fg,
 		SelectionColor: f32color.MulAlpha(th.Palette.ContrastBg, 0x60),
 		TextSize:       size,
-		shaper:         th.Shaper,
+		Shaper:         th.Shaper,
 	}
 }
 
@@ -119,12 +126,12 @@ func (l LabelStyle) Layout(gtx layout.Context) layout.Dimensions {
 		l.State.Alignment = l.Alignment
 		l.State.MaxLines = l.MaxLines
 		l.State.Truncator = l.Truncator
-		return l.State.Layout(gtx, l.shaper, l.Font, l.TextSize, textColor, selectColor)
+		return l.State.Layout(gtx, l.Shaper, l.Font, l.TextSize, textColor, selectColor)
 	}
 	tl := widget.Label{
 		Alignment: l.Alignment,
 		MaxLines:  l.MaxLines,
 		Truncator: l.Truncator,
 	}
-	return tl.Layout(gtx, l.shaper, l.Font, l.TextSize, l.Text, textColor)
+	return tl.Layout(gtx, l.Shaper, l.Font, l.TextSize, l.Text, textColor)
 }
