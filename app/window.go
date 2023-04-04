@@ -604,8 +604,6 @@ func (w *Window) moveFocus(dir router.FocusDirection, d driver) {
 		dist := v.Mul(int(w.metric.Dp(scrollABit)))
 		w.queue.q.ScrollFocus(dist)
 	}
-	w.setNextFrame(time.Time{})
-	w.updateAnimation(d)
 }
 
 func (c *callbacks) ClickFocus() {
@@ -914,35 +912,38 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		w.out <- e2
 	case event.Event:
 		handled := w.queue.q.Queue(e2)
+		if e, ok := e.(key.Event); ok && !handled {
+			if e.State == key.Press {
+				handled = true
+				isMobile := runtime.GOOS == "ios" || runtime.GOOS == "android"
+				switch {
+				case e.Name == key.NameTab && e.Modifiers == 0:
+					w.moveFocus(router.FocusForward, d)
+				case e.Name == key.NameTab && e.Modifiers == key.ModShift:
+					w.moveFocus(router.FocusBackward, d)
+				case e.Name == key.NameUpArrow && e.Modifiers == 0 && isMobile:
+					w.moveFocus(router.FocusUp, d)
+				case e.Name == key.NameDownArrow && e.Modifiers == 0 && isMobile:
+					w.moveFocus(router.FocusDown, d)
+				case e.Name == key.NameLeftArrow && e.Modifiers == 0 && isMobile:
+					w.moveFocus(router.FocusLeft, d)
+				case e.Name == key.NameRightArrow && e.Modifiers == 0 && isMobile:
+					w.moveFocus(router.FocusRight, d)
+				default:
+					handled = false
+				}
+			}
+			// As a special case, the top-most input handler receives all unhandled
+			// events.
+			if !handled {
+				handled = w.queue.q.QueueTopmost(e)
+			}
+		}
+		w.updateCursor(d)
 		if handled {
 			w.setNextFrame(time.Time{})
 			w.updateAnimation(d)
-		} else if e, ok := e.(key.Event); ok && e.State == key.Press {
-			handled = true
-			isMobile := runtime.GOOS == "ios" || runtime.GOOS == "android"
-			switch {
-			case e.Name == key.NameTab && e.Modifiers == 0:
-				w.moveFocus(router.FocusForward, d)
-			case e.Name == key.NameTab && e.Modifiers == key.ModShift:
-				w.moveFocus(router.FocusBackward, d)
-			case e.Name == key.NameUpArrow && e.Modifiers == 0 && isMobile:
-				w.moveFocus(router.FocusUp, d)
-			case e.Name == key.NameDownArrow && e.Modifiers == 0 && isMobile:
-				w.moveFocus(router.FocusDown, d)
-			case e.Name == key.NameLeftArrow && e.Modifiers == 0 && isMobile:
-				w.moveFocus(router.FocusLeft, d)
-			case e.Name == key.NameRightArrow && e.Modifiers == 0 && isMobile:
-				w.moveFocus(router.FocusRight, d)
-			default:
-				handled = false
-			}
 		}
-		// As a sepcial case, the top-most input handler receives all unhandled
-		// events.
-		if e, ok := e.(key.Event); ok && !handled {
-			handled = w.queue.q.QueueTopmost(e)
-		}
-		w.updateCursor(d)
 		return handled
 	}
 	return true
