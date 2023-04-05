@@ -5,6 +5,7 @@ package widget
 import (
 	"image"
 
+	"gioui.org/f32"
 	"gioui.org/io/semantic"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -88,7 +89,7 @@ type textIterator struct {
 	// linesSeen tracks the quantity of line endings this iterator has seen.
 	linesSeen int
 	// lineOff tracks the origin for the glyphs in the current line.
-	lineOff image.Point
+	lineOff f32.Point
 	// padding is the space needed outside of the bounds of the text to ensure no
 	// part of a glyph is clipped.
 	padding image.Rectangle
@@ -146,6 +147,10 @@ func (it *textIterator) processGlyph(g text.Glyph, ok bool) (_ text.Glyph, visib
 	return g, ok && !below
 }
 
+func fixedToFloat(i fixed.Int26_6) float32 {
+	return float32(i) / 64.0
+}
+
 // paintGlyph buffers up and paints text glyphs. It should be invoked iteratively upon each glyph
 // until it returns false. The line parameter should be a slice with
 // a backing array of sufficient size to buffer multiple glyphs.
@@ -157,12 +162,12 @@ func (it *textIterator) paintGlyph(gtx layout.Context, shaper *text.Shaper, glyp
 	_, visibleOrBefore := it.processGlyph(glyph, true)
 	if it.visible {
 		if len(line) == 0 {
-			it.lineOff = image.Point{X: glyph.X.Floor(), Y: int(glyph.Y)}.Sub(it.viewport.Min)
+			it.lineOff = f32.Point{X: fixedToFloat(glyph.X), Y: float32(glyph.Y)}.Sub(layout.FPt(it.viewport.Min))
 		}
 		line = append(line, glyph)
 	}
 	if glyph.Flags&text.FlagLineBreak != 0 || cap(line)-len(line) == 0 || !visibleOrBefore {
-		t := op.Offset(it.lineOff).Push(gtx.Ops)
+		t := op.Affine(f32.Affine2D{}.Offset(it.lineOff)).Push(gtx.Ops)
 		path := shaper.Shape(line)
 		outline := clip.Outline{Path: path}.Op().Push(gtx.Ops)
 		it.material.Add(gtx.Ops)

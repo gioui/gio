@@ -100,9 +100,9 @@ func (a Alignment) Align(dir system.TextDirection, width fixed.Int26_6, maxWidth
 	}
 	switch a {
 	case Middle:
-		return fixed.I(((mw - width) / 2).Floor())
+		return (mw - width) / 2
 	case End:
-		return fixed.I((mw - width).Floor())
+		return (mw - width)
 	case Start:
 		return 0
 	default:

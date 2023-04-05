@@ -168,10 +168,10 @@ func TestIndexPositionWhitespace(t *testing.T) {
 				{x: fixed.Int26_6(832), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216)},
 				{x: fixed.Int26_6(832), y: 35, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 1, lineCol: screenPos{line: 1}},
 				{x: fixed.Int26_6(832), y: 54, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 2, lineCol: screenPos{line: 2}},
-				{x: fixed.Int26_6(0), y: 73, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 3, lineCol: screenPos{line: 3}},
-				{x: fixed.Int26_6(570), y: 73, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 4, lineCol: screenPos{line: 3, col: 1}},
-				{x: fixed.Int26_6(1140), y: 73, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 5, lineCol: screenPos{line: 3, col: 2}},
-				{x: fixed.Int26_6(1652), y: 73, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 6, lineCol: screenPos{line: 3, col: 3}},
+				{x: fixed.Int26_6(6), y: 73, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 3, lineCol: screenPos{line: 3}},
+				{x: fixed.Int26_6(576), y: 73, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 4, lineCol: screenPos{line: 3, col: 1}},
+				{x: fixed.Int26_6(1146), y: 73, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 5, lineCol: screenPos{line: 3, col: 2}},
+				{x: fixed.Int26_6(1658), y: 73, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 6, lineCol: screenPos{line: 3, col: 3}},
 			},
 		},
 		{
@@ -380,7 +380,7 @@ func TestIndexPositionLines(t *testing.T) {
 			glyphs: bidiLTRTextOpp,
 			expectedLines: []lineInfo{
 				{
-					xOff:    fixed.Int26_6(3072),
+					xOff:    fixed.Int26_6(3107),
 					yOff:    22,
 					glyphs:  15,
 					width:   fixed.Int26_6(7133),
@@ -388,7 +388,7 @@ func TestIndexPositionLines(t *testing.T) {
 					descent: fixed.Int26_6(756),
 				},
 				{
-					xOff:    fixed.Int26_6(2304),
+					xOff:    fixed.Int26_6(2335),
 					yOff:    56,
 					glyphs:  15,
 					width:   fixed.Int26_6(7905),
@@ -396,7 +396,7 @@ func TestIndexPositionLines(t *testing.T) {
 					descent: fixed.Int26_6(756),
 				},
 				{
-					xOff:    fixed.Int26_6(1408),
+					xOff:    fixed.Int26_6(1427),
 					yOff:    90,
 					glyphs:  18,
 					width:   fixed.Int26_6(8813),
@@ -404,7 +404,7 @@ func TestIndexPositionLines(t *testing.T) {
 					descent: fixed.Int26_6(756),
 				},
 				{
-					xOff:    fixed.Int26_6(8192),
+					xOff:    fixed.Int26_6(8206),
 					yOff:    117,
 					glyphs:  4,
 					width:   fixed.Int26_6(2034),
@@ -419,7 +419,7 @@ func TestIndexPositionLines(t *testing.T) {
 			glyphs: bidiRTLTextOpp,
 			expectedLines: []lineInfo{
 				{
-					xOff:    fixed.Int26_6(384),
+					xOff:    fixed.Int26_6(404),
 					yOff:    22,
 					glyphs:  20,
 					width:   fixed.Int26_6(9836),
@@ -427,7 +427,7 @@ func TestIndexPositionLines(t *testing.T) {
 					descent: fixed.Int26_6(756),
 				},
 				{
-					xOff:    fixed.Int26_6(1408),
+					xOff:    fixed.Int26_6(1439),
 					yOff:    56,
 					glyphs:  19,
 					width:   fixed.Int26_6(8801),
@@ -435,7 +435,7 @@ func TestIndexPositionLines(t *testing.T) {
 					descent: fixed.Int26_6(756),
 				},
 				{
-					xOff:    fixed.Int26_6(4352),
+					xOff:    fixed.Int26_6(4388),
 					yOff:    90,
 					glyphs:  13,
 					width:   fixed.Int26_6(5852),

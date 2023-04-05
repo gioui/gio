@@ -563,16 +563,15 @@ func (s *shaperImpl) Shape(pathOps *op.Ops, gs []Glyph) clip.PathSpec {
 		}
 		ppem, faceIdx, gid := splitGlyphID(g.ID)
 		face := s.orderer.faceFor(faceIdx)
-		ppemInt := ppem.Round()
-		scaleFactor := float32(ppemInt) / float32(face.Upem())
+		scaleFactor := fixedToFloat(ppem) / float32(face.Upem())
 		glyphData := face.GlyphData(gid)
 		switch glyphData := glyphData.(type) {
 		case api.GlyphOutline:
 			outline := glyphData
 			// Move to glyph position.
 			pos := f32.Point{
-				X: float32(g.X-x)/64 - float32(g.Offset.X)/64,
-				Y: -float32(g.Offset.Y) / 64,
+				X: fixedToFloat((g.X - x) - g.Offset.X),
+				Y: -fixedToFloat(g.Offset.Y),
 			}
 			builder.Move(pos.Sub(lastPos))
 			lastPos = pos
@@ -617,6 +616,10 @@ func (s *shaperImpl) Shape(pathOps *op.Ops, gs []Glyph) clip.PathSpec {
 	return builder.End()
 }
 
+func fixedToFloat(i fixed.Int26_6) float32 {
+	return float32(i) / 64.0
+}
+
 // Bitmaps returns an op.CallOp that will display all bitmap glyphs within gs.
 // The positioning of the bitmaps uses the same logic as Shape(), so the returned
 // CallOp can be added at the same offset as the path data returned by Shape()
@@ -656,10 +659,10 @@ func (s *shaperImpl) Bitmaps(ops *op.Ops, gs []Glyph) op.CallOp {
 				imgOp = bitmapData.img
 				imgSize = bitmapData.size
 			}
-			off := op.Offset(image.Point{
-				X: ((g.X - x) - g.Offset.X).Round(),
-				Y: g.Offset.Y.Round() - g.Ascent.Round(),
-			}).Push(ops)
+			off := op.Affine(f32.Affine2D{}.Offset(f32.Point{
+				X: fixedToFloat((g.X - x) - g.Offset.X),
+				Y: fixedToFloat(g.Offset.Y - g.Ascent),
+			})).Push(ops)
 			cl := clip.Rect{Max: imgSize}.Push(ops)
 
 			glyphSize := image.Rectangle{
