@@ -200,6 +200,7 @@ func NewShaper(collection []FontFace) *Shaper {
 	for _, f := range collection {
 		l.shaper.Load(f)
 	}
+	l.shaper.shaper.SetFontCacheSize(32)
 	return l
 }
 
