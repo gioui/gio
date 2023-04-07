@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"gioui.org/f32"
+	"gioui.org/font"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -222,7 +223,7 @@ func (e *textView) calculateViewSize(gtx layout.Context) image.Point {
 // Update the text, reshaping it as necessary. If not nil, eventHandling will be invoked after reshaping the text to
 // allow parent widgets to adapt to any changes in text content or positioning. If eventHandling modifies the contents
 // of the textView, it is guaranteed to be reshaped (and ready for painting) before Update returns.
-func (e *textView) Update(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, eventHandling func(gtx layout.Context)) {
+func (e *textView) Update(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, eventHandling func(gtx layout.Context)) {
 	if e.params.Locale != gtx.Locale {
 		e.params.Locale = gtx.Locale
 		e.invalidate()

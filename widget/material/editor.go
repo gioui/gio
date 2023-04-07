@@ -5,6 +5,7 @@ package material
 import (
 	"image/color"
 
+	"gioui.org/font"
 	"gioui.org/internal/f32color"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -15,7 +16,7 @@ import (
 )
 
 type EditorStyle struct {
-	Font     text.Font
+	Font     font.Font
 	TextSize unit.Sp
 	// Color is the text color.
 	Color color.NRGBA

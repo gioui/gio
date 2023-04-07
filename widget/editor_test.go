@@ -17,6 +17,7 @@ import (
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
 	"eliasnaur.com/font/roboto/robotoregular"
 	"gioui.org/f32"
+	"gioui.org/font"
 	"gioui.org/font/gofont"
 	"gioui.org/font/opentype"
 	"gioui.org/io/event"
@@ -109,7 +110,7 @@ func TestEditorReadOnly(t *testing.T) {
 	}
 	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
-	font := text.Font{}
+	font := font.Font{}
 	e := new(Editor)
 	e.ReadOnly = true
 	e.SetText("The quick brown fox jumps over the lazy dog. We just need a few lines of text in the editor so that it can adequately test a few different modes of selection. The quick brown fox jumps over the lazy dog. We just need a few lines of text in the editor so that it can adequately test a few different modes of selection.")
@@ -188,7 +189,7 @@ func TestEditorConfigurations(t *testing.T) {
 	}
 	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
-	font := text.Font{}
+	font := font.Font{}
 	sentence := "\n\n\n\n\n\n\n\n\n\n\n\nthe quick brown fox jumps over the lazy dog"
 	runes := len([]rune(sentence))
 
@@ -242,7 +243,7 @@ func TestEditor(t *testing.T) {
 	}
 	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
-	font := text.Font{}
+	font := font.Font{}
 
 	// Regression test for bad in-cluster rune offset math.
 	e.SetText("æbc")
@@ -336,9 +337,9 @@ var arabic = system.Locale{
 	Direction: system.RTL,
 }
 
-var arabicCollection = func() []text.FontFace {
+var arabicCollection = func() []font.FontFace {
 	parsed, _ := opentype.Parse(nsareg.TTF)
-	return []text.FontFace{{Font: text.Font{}, Face: parsed}}
+	return []font.FontFace{{Font: font.Font{}, Face: parsed}}
 }()
 
 func TestEditorRTL(t *testing.T) {
@@ -350,7 +351,7 @@ func TestEditorRTL(t *testing.T) {
 	}
 	cache := text.NewShaper(arabicCollection)
 	fontSize := unit.Sp(10)
-	font := text.Font{}
+	font := font.Font{}
 
 	e.SetCaret(0, 0) // shouldn't panic
 	assertCaret(t, e, 0, 0, 0)
@@ -417,16 +418,16 @@ func TestEditorLigature(t *testing.T) {
 	if err != nil {
 		t.Skipf("failed parsing test font: %v", err)
 	}
-	cache := text.NewShaper([]text.FontFace{
+	cache := text.NewShaper([]font.FontFace{
 		{
-			Font: text.Font{
+			Font: font.Font{
 				Typeface: "Roboto",
 			},
 			Face: face,
 		},
 	})
 	fontSize := unit.Sp(10)
-	font := text.Font{}
+	font := font.Font{}
 
 	/*
 		In this font, the following rune sequences form ligatures:
@@ -540,7 +541,7 @@ func TestEditorDimensions(t *testing.T) {
 	}
 	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
-	font := text.Font{}
+	font := font.Font{}
 	dims := e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 	if dims.Size.X == 0 {
 		t.Errorf("EditEvent was not reflected in Editor width")
@@ -587,7 +588,7 @@ func TestEditorCaretConsistency(t *testing.T) {
 	}
 	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
-	font := text.Font{}
+	font := font.Font{}
 	for _, a := range []text.Alignment{text.Start, text.Middle, text.End} {
 		e := &Editor{}
 		e.Alignment = a
@@ -679,7 +680,7 @@ func TestEditorMoveWord(t *testing.T) {
 		}
 		cache := text.NewShaper(gofont.Collection())
 		fontSize := unit.Sp(10)
-		font := text.Font{}
+		font := font.Font{}
 		e.SetText(t)
 		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 		return e
@@ -784,7 +785,7 @@ func TestEditorInsert(t *testing.T) {
 		}
 		cache := text.NewShaper(gofont.Collection())
 		fontSize := unit.Sp(10)
-		font := text.Font{}
+		font := font.Font{}
 		e.SetText(t)
 		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 		return e
@@ -874,7 +875,7 @@ func TestEditorDeleteWord(t *testing.T) {
 		}
 		cache := text.NewShaper(gofont.Collection())
 		fontSize := unit.Sp(10)
-		font := text.Font{}
+		font := font.Font{}
 		e.SetText(t)
 		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 		return e
@@ -927,7 +928,7 @@ g 2 4 6 8 g
 		Locale: english,
 	}
 	cache := text.NewShaper(gofont.Collection())
-	font := text.Font{}
+	font := font.Font{}
 	fontSize := unit.Sp(10)
 
 	var tim time.Duration
@@ -1025,7 +1026,7 @@ func TestSelectMove(t *testing.T) {
 		Locale: english,
 	}
 	cache := text.NewShaper(gofont.Collection())
-	font := text.Font{}
+	font := font.Font{}
 	fontSize := unit.Sp(10)
 
 	// Layout once to populate e.lines and get focus.
@@ -1114,7 +1115,7 @@ func TestEditor_MaxLen(t *testing.T) {
 	}
 	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
-	font := text.Font{}
+	font := font.Font{}
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 
 	if got, want := e.Text(), "12345678"; got != want {
@@ -1145,7 +1146,7 @@ func TestEditor_Filter(t *testing.T) {
 	}
 	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
-	font := text.Font{}
+	font := font.Font{}
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 
 	if got, want := e.Text(), "12345678"; got != want {
@@ -1169,7 +1170,7 @@ func TestEditor_Submit(t *testing.T) {
 	}
 	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
-	font := text.Font{}
+	font := font.Font{}
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 
 	if got, want := e.Text(), "ab1"; got != want {

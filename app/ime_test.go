@@ -9,6 +9,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"gioui.org/font"
 	"gioui.org/font/gofont"
 	"gioui.org/io/key"
 	"gioui.org/io/router"
@@ -35,7 +36,7 @@ func FuzzIME(f *testing.F) {
 		var r router.Router
 		gtx := layout.Context{Ops: new(op.Ops), Queue: &r}
 		// Layout once to register focus.
-		e.Layout(gtx, cache, text.Font{}, unit.Sp(10), op.CallOp{}, op.CallOp{})
+		e.Layout(gtx, cache, font.Font{}, unit.Sp(10), op.CallOp{}, op.CallOp{})
 		r.Frame(gtx.Ops)
 
 		var state editorState
@@ -103,7 +104,7 @@ func FuzzIME(f *testing.F) {
 				}
 			}
 			cmds = cmds[cmdLen:]
-			e.Layout(gtx, cache, text.Font{}, unit.Sp(10), op.CallOp{}, op.CallOp{})
+			e.Layout(gtx, cache, font.Font{}, unit.Sp(10), op.CallOp{}, op.CallOp{})
 			r.Frame(gtx.Ops)
 			newState := r.EditorState()
 			// We don't track caret position.

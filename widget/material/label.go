@@ -5,6 +5,7 @@ package material
 import (
 	"image/color"
 
+	"gioui.org/font"
 	"gioui.org/internal/f32color"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -19,7 +20,7 @@ import (
 // the label will be non-interactive.
 type LabelStyle struct {
 	// Face defines the text style.
-	Font text.Font
+	Font font.Font
 	// Color is the text color.
 	Color color.NRGBA
 	// SelectionColor is the color of the background for selected text.
@@ -47,13 +48,13 @@ type LabelStyle struct {
 
 func H1(th *Theme, txt string) LabelStyle {
 	label := Label(th, th.TextSize*96.0/16.0, txt)
-	label.Font.Weight = text.Light
+	label.Font.Weight = font.Light
 	return label
 }
 
 func H2(th *Theme, txt string) LabelStyle {
 	label := Label(th, th.TextSize*60.0/16.0, txt)
-	label.Font.Weight = text.Light
+	label.Font.Weight = font.Light
 	return label
 }
 
@@ -71,7 +72,7 @@ func H5(th *Theme, txt string) LabelStyle {
 
 func H6(th *Theme, txt string) LabelStyle {
 	label := Label(th, th.TextSize*20.0/16.0, txt)
-	label.Font.Weight = text.Medium
+	label.Font.Weight = font.Medium
 	return label
 }
 
@@ -81,7 +82,7 @@ func Subtitle1(th *Theme, txt string) LabelStyle {
 
 func Subtitle2(th *Theme, txt string) LabelStyle {
 	label := Label(th, th.TextSize*14.0/16.0, txt)
-	label.Font.Weight = text.Medium
+	label.Font.Weight = font.Medium
 	return label
 }
 

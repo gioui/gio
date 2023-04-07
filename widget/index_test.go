@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
+	"gioui.org/font"
 	"gioui.org/font/opentype"
 	"gioui.org/text"
 	"golang.org/x/image/font/gofont/goregular"
@@ -19,13 +20,13 @@ func makePosTestText(fontSize, lineWidth int, alignOpposite bool) (source string
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
 
-	shaper := text.NewShaper([]text.FontFace{
+	shaper := text.NewShaper([]font.FontFace{
 		{
-			Font: text.Font{Typeface: "LTR"},
+			Font: font.Font{Typeface: "LTR"},
 			Face: ltrFace,
 		},
 		{
-			Font: text.Font{Typeface: "RTL"},
+			Font: font.Font{Typeface: "RTL"},
 			Face: rtlFace,
 		},
 	})
@@ -33,7 +34,7 @@ func makePosTestText(fontSize, lineWidth int, alignOpposite bool) (source string
 	// changing scripts within the RTL).
 	bidiSource := "The quick سماء שלום لا fox تمط שלום غير the lazy dog."
 	ltrParams := text.Parameters{
-		Font:     text.Font{Typeface: "LTR"},
+		Font:     font.Font{Typeface: "LTR"},
 		PxPerEm:  fixed.I(fontSize),
 		MaxWidth: lineWidth,
 		MinWidth: lineWidth,
@@ -41,7 +42,7 @@ func makePosTestText(fontSize, lineWidth int, alignOpposite bool) (source string
 	}
 	rtlParams := text.Parameters{
 		Alignment: text.End,
-		Font:      text.Font{Typeface: "RTL"},
+		Font:      font.Font{Typeface: "RTL"},
 		PxPerEm:   fixed.I(fontSize),
 		MaxWidth:  lineWidth,
 		MinWidth:  lineWidth,
@@ -68,12 +69,12 @@ func makeAccountingTestText(str string, fontSize, lineWidth int) (txt []text.Gly
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
 
-	shaper := text.NewShaper([]text.FontFace{{
-		Font: text.Font{Typeface: "LTR"},
+	shaper := text.NewShaper([]font.FontFace{{
+		Font: font.Font{Typeface: "LTR"},
 		Face: ltrFace,
 	},
 		{
-			Font: text.Font{Typeface: "RTL"},
+			Font: font.Font{Typeface: "RTL"},
 			Face: rtlFace,
 		},
 	})
@@ -94,12 +95,12 @@ func getGlyphs(fontSize, minWidth, lineWidth int, align text.Alignment, str stri
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
 
-	shaper := text.NewShaper([]text.FontFace{{
-		Font: text.Font{Typeface: "LTR"},
+	shaper := text.NewShaper([]font.FontFace{{
+		Font: font.Font{Typeface: "LTR"},
 		Face: ltrFace,
 	},
 		{
-			Font: text.Font{Typeface: "RTL"},
+			Font: font.Font{Typeface: "RTL"},
 			Face: rtlFace,
 		},
 	})

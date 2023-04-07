@@ -15,23 +15,133 @@ import (
 	"fmt"
 	_ "image/png"
 
+	giofont "gioui.org/font"
 	"github.com/go-text/typesetting/font"
+	fontapi "github.com/go-text/typesetting/opentype/api/font"
+	"github.com/go-text/typesetting/opentype/api/metadata"
+	"github.com/go-text/typesetting/opentype/loader"
 )
 
 // Face is a shapeable representation of a font.
 type Face struct {
-	face font.Face
+	face    font.Face
+	aspect  metadata.Aspect
+	family  string
+	variant string
 }
 
 // Parse constructs a Face from source bytes.
 func Parse(src []byte) (Face, error) {
-	face, err := font.ParseTTF(bytes.NewReader(src))
+	ld, err := loader.NewLoader(bytes.NewReader(src))
+	if err != nil {
+		return Face{}, err
+	}
+	face, aspect, family, variant, err := parseLoader(ld)
 	if err != nil {
 		return Face{}, fmt.Errorf("failed parsing truetype font: %w", err)
 	}
-	return Face{face: face}, nil
+	return Face{
+		face:    face,
+		aspect:  aspect,
+		family:  family,
+		variant: variant,
+	}, nil
+}
+
+// ParseCollection parse an Opentype font file, with support for collections.
+// Single font files are supported, returning a slice with length 1.
+// The returned fonts are automatically wrapped in a text.FontFace with
+// inferred font metadata.
+// BUG(whereswaldon): the only Variant that can be detected automatically is
+// "Mono".
+func ParseCollection(src []byte) ([]giofont.FontFace, error) {
+	lds, err := loader.NewLoaders(bytes.NewReader(src))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]giofont.FontFace, len(lds))
+	for i, ld := range lds {
+		face, aspect, family, variant, err := parseLoader(ld)
+		if err != nil {
+			return nil, fmt.Errorf("reading font %d of collection: %s", i, err)
+		}
+		ff := Face{
+			face:    face,
+			aspect:  aspect,
+			family:  family,
+			variant: variant,
+		}
+		out[i] = giofont.FontFace{
+			Face: ff,
+			Font: ff.Font(),
+		}
+	}
+
+	return out, nil
+}
+
+// parseLoader parses the contents of the loader into a face and its metadata.
+func parseLoader(ld *loader.Loader) (_ font.Face, _ metadata.Aspect, family, variant string, _ error) {
+	ft, err := fontapi.NewFont(ld)
+	if err != nil {
+		return nil, metadata.Aspect{}, "", "", err
+	}
+	data := metadata.Metadata(ld)
+	if data.IsMonospace {
+		variant = "Mono"
+	}
+	return &fontapi.Face{Font: ft}, data.Aspect, data.Family, variant, nil
 }
 
 func (f Face) Face() font.Face {
 	return f.face
+}
+
+// FontFace returns a text.Font with populated font metadata for the
+// font.
+// BUG(whereswaldon): the only Variant that can be detected automatically is
+// "Mono".
+func (f Face) Font() giofont.Font {
+	return giofont.Font{
+		Typeface: giofont.Typeface(f.family),
+		Style:    f.style(),
+		Weight:   f.weight(),
+		Variant:  giofont.Variant(f.variant),
+	}
+}
+
+func (f Face) style() giofont.Style {
+	switch f.aspect.Style {
+	case metadata.StyleItalic:
+		return giofont.Italic
+	case metadata.StyleNormal:
+		fallthrough
+	default:
+		return giofont.Regular
+	}
+}
+
+func (f Face) weight() giofont.Weight {
+	switch f.aspect.Weight {
+	case metadata.WeightThin:
+		return giofont.Thin
+	case metadata.WeightExtraLight:
+		return giofont.ExtraLight
+	case metadata.WeightLight:
+		return giofont.Light
+	case metadata.WeightNormal:
+		return giofont.Normal
+	case metadata.WeightMedium:
+		return giofont.Medium
+	case metadata.WeightSemibold:
+		return giofont.SemiBold
+	case metadata.WeightBold:
+		return giofont.Bold
+	case metadata.WeightExtraBold:
+		return giofont.ExtraBold
+	case metadata.WeightBlack:
+		return giofont.Black
+	default:
+		return giofont.Normal
+	}
 }

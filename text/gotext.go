@@ -18,6 +18,7 @@ import (
 	"golang.org/x/text/unicode/bidi"
 
 	"gioui.org/f32"
+	giofont "gioui.org/font"
 	"gioui.org/io/system"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -150,24 +151,24 @@ type runLayout struct {
 
 // faceOrderer chooses the order in which faces should be applied to text.
 type faceOrderer struct {
-	def                 Font
+	def                 giofont.Font
 	faceScratch         []font.Face
-	fontDefaultOrder    map[Font]int
-	defaultOrderedFonts []Font
-	faces               map[Font]font.Face
+	fontDefaultOrder    map[giofont.Font]int
+	defaultOrderedFonts []giofont.Font
+	faces               map[giofont.Font]font.Face
 	faceToIndex         map[font.Face]int
-	fonts               []Font
+	fonts               []giofont.Font
 }
 
-func (f *faceOrderer) insert(fnt Font, face font.Face) {
+func (f *faceOrderer) insert(fnt giofont.Font, face font.Face) {
 	if len(f.fonts) == 0 {
 		f.def = fnt
 	}
 	if f.fontDefaultOrder == nil {
-		f.fontDefaultOrder = make(map[Font]int)
+		f.fontDefaultOrder = make(map[giofont.Font]int)
 	}
 	if f.faces == nil {
-		f.faces = make(map[Font]font.Face)
+		f.faces = make(map[giofont.Font]font.Face)
 		f.faceToIndex = make(map[font.Face]int)
 	}
 	f.fontDefaultOrder[fnt] = len(f.faceScratch)
@@ -198,7 +199,7 @@ func (c *faceOrderer) faceFor(idx int) font.Face {
 // TODO(whereswaldon): this function could sort all faces by appropriateness for the
 // given font characteristics. This would ensure that (if possible) text using a
 // fallback font would select similar weights and emphases to the primary font.
-func (c *faceOrderer) sortedFacesForStyle(font Font) []font.Face {
+func (c *faceOrderer) sortedFacesForStyle(font giofont.Font) []font.Face {
 	c.resetFontOrder()
 	primary, ok := c.fontForStyle(font)
 	if !ok {
@@ -213,11 +214,11 @@ func (c *faceOrderer) sortedFacesForStyle(font Font) []font.Face {
 
 // fontForStyle returns the closest existing font to the requested font within the
 // same typeface.
-func (c *faceOrderer) fontForStyle(font Font) (Font, bool) {
+func (c *faceOrderer) fontForStyle(font giofont.Font) (giofont.Font, bool) {
 	if closest, ok := closestFont(font, c.fonts); ok {
 		return closest, true
 	}
-	font.Style = Regular
+	font.Style = giofont.Regular
 	if closest, ok := closestFont(font, c.fonts); ok {
 		return closest, true
 	}
@@ -226,7 +227,7 @@ func (c *faceOrderer) fontForStyle(font Font) (Font, bool) {
 
 // faces returns a slice of faces with primary as the first element and
 // the remaining faces ordered by insertion order.
-func (f *faceOrderer) sorted(primary Font) []font.Face {
+func (f *faceOrderer) sorted(primary giofont.Font) []font.Face {
 	// If we find primary, put it first, and omit it from the below sort.
 	lowest := 0
 	for i := range f.fonts {
@@ -875,9 +876,9 @@ func computeVisualOrder(l *line) {
 
 // closestFont returns the closest Font in available by weight.
 // In case of equality the lighter weight will be returned.
-func closestFont(lookup Font, available []Font) (Font, bool) {
+func closestFont(lookup giofont.Font, available []giofont.Font) (giofont.Font, bool) {
 	found := false
-	var match Font
+	var match giofont.Font
 	for _, cf := range available {
 		if cf == lookup {
 			return lookup, true
@@ -902,7 +903,7 @@ func closestFont(lookup Font, available []Font) (Font, bool) {
 }
 
 // weightDistance returns the distance value between two font weights.
-func weightDistance(wa Weight, wb Weight) int {
+func weightDistance(wa giofont.Weight, wb giofont.Weight) int {
 	// Avoid dealing with negative Weight values.
 	a := int(wa) + 400
 	b := int(wb) + 400

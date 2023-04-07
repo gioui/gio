@@ -10,6 +10,7 @@ import (
 	"time"
 
 	colEmoji "eliasnaur.com/font/noto/emoji/color"
+	"gioui.org/font"
 	"gioui.org/font/gofont"
 	"gioui.org/font/opentype"
 	"gioui.org/gpu/headless"
@@ -34,11 +35,11 @@ var (
 	}()
 	sizes      = []int{10, 100, 1000}
 	locales    = []system.Locale{arabic, english}
-	benchFonts = func() []text.FontFace {
+	benchFonts = func() []font.FontFace {
 		collection := gofont.Collection()
 		collection = append(collection, arabicCollection...)
-		collection = append(collection, text.FontFace{
-			Font: text.Font{
+		collection = append(collection, font.FontFace{
+			Font: font.Font{
 				Typeface: "Noto Color Emoji",
 			},
 			Face: emojiFace,
@@ -91,7 +92,7 @@ func BenchmarkLabelStatic(b *testing.B) {
 			defer win.Release()
 		}
 		fontSize := unit.Sp(10)
-		font := text.Font{}
+		font := font.Font{}
 		runes := []rune(txt)[:runeCount]
 		runesStr := string(runes)
 		l := Label{}
@@ -123,7 +124,7 @@ func BenchmarkLabelDynamic(b *testing.B) {
 			defer win.Release()
 		}
 		fontSize := unit.Sp(10)
-		font := text.Font{}
+		font := font.Font{}
 		runes := []rune(txt)[:runeCount]
 		l := Label{}
 		b.ResetTimer()
@@ -158,7 +159,7 @@ func BenchmarkEditorStatic(b *testing.B) {
 			defer win.Release()
 		}
 		fontSize := unit.Sp(10)
-		font := text.Font{}
+		font := font.Font{}
 		runes := []rune(txt)[:runeCount]
 		runesStr := string(runes)
 		e := Editor{}
@@ -191,7 +192,7 @@ func BenchmarkEditorDynamic(b *testing.B) {
 			defer win.Release()
 		}
 		fontSize := unit.Sp(10)
-		font := text.Font{}
+		font := font.Font{}
 		runes := []rune(txt)[:runeCount]
 		e := Editor{}
 		e.SetText(string(runes))
@@ -225,7 +226,7 @@ func FuzzEditorEditing(f *testing.F) {
 	}
 	cache := text.NewShaper(benchFonts)
 	fontSize := unit.Sp(10)
-	font := text.Font{}
+	font := font.Font{}
 	e := Editor{}
 	f.Fuzz(func(t *testing.T, txt string, replaceFrom, replaceTo int16) {
 		e.SetText(txt)

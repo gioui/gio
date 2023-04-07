@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"gioui.org/f32"
+	"gioui.org/font"
 	"gioui.org/gesture"
 	"gioui.org/io/clipboard"
 	"gioui.org/io/event"
@@ -508,7 +509,7 @@ func (e *Editor) initBuffer() {
 // Layout lays out the editor using the provided textMaterial as the paint material
 // for the text glyphs+caret and the selectMaterial as the paint material for the
 // selection rectangle.
-func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, textMaterial, selectMaterial op.CallOp) layout.Dimensions {
+func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, textMaterial, selectMaterial op.CallOp) layout.Dimensions {
 	e.initBuffer()
 	e.text.Update(gtx, lt, font, size, e.processEvents)
 

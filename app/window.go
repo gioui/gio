@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"gioui.org/f32"
+	"gioui.org/font"
 	"gioui.org/font/opentype"
 	"gioui.org/gpu"
 	"gioui.org/internal/ops"
@@ -25,7 +26,6 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
-	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
@@ -143,7 +143,7 @@ func NewWindow(options ...Option) *Window {
 	// Measure decoration height.
 	deco := new(widget.Decorations)
 	face, _ := opentype.Parse(goregular.TTF)
-	theme := material.NewTheme([]text.FontFace{{Font: text.Font{Typeface: "Go"}, Face: face}})
+	theme := material.NewTheme([]font.FontFace{{Font: font.Font{Typeface: "Go"}, Face: face}})
 	decoStyle := material.Decorations(theme, deco, 0, "")
 	gtx := layout.Context{
 		Ops: new(op.Ops),

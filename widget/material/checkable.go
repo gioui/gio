@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 
+	"gioui.org/font"
 	"gioui.org/internal/f32color"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -19,7 +20,7 @@ import (
 type checkable struct {
 	Label              string
 	Color              color.NRGBA
-	Font               text.Font
+	Font               font.Font
 	TextSize           unit.Sp
 	IconColor          color.NRGBA
 	Size               unit.Dp

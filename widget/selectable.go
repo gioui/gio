@@ -5,6 +5,7 @@ import (
 	"math"
 	"strings"
 
+	"gioui.org/font"
 	"gioui.org/gesture"
 	"gioui.org/io/clipboard"
 	"gioui.org/io/event"
@@ -176,7 +177,7 @@ func (l *Selectable) Truncated() bool {
 // Layout clips to the dimensions of the selectable, updates the shaped text, configures input handling, and paints
 // the text and selection rectangles. The provided textMaterial and selectionMaterial ops are used to set the
 // paint material for the text and selection rectangles, respectively.
-func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, textMaterial, selectionMaterial op.CallOp) layout.Dimensions {
+func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, textMaterial, selectionMaterial op.CallOp) layout.Dimensions {
 	l.initialize()
 	l.text.Alignment = l.Alignment
 	l.text.MaxLines = l.MaxLines

@@ -6,6 +6,7 @@ import (
 	"image"
 
 	"gioui.org/f32"
+	"gioui.org/font"
 	"gioui.org/io/semantic"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -30,7 +31,7 @@ type Label struct {
 }
 
 // Layout the label with the given shaper, font, size, text, and material.
-func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, txt string, textMaterial op.CallOp) layout.Dimensions {
+func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, txt string, textMaterial op.CallOp) layout.Dimensions {
 	cs := gtx.Constraints
 	textSize := fixed.I(gtx.Sp(size))
 	lt.LayoutString(text.Parameters{

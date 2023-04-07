@@ -10,6 +10,7 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
 
+	giofont "gioui.org/font"
 	"gioui.org/font/opentype"
 	"gioui.org/io/system"
 )
@@ -24,7 +25,7 @@ var arabic = system.Locale{
 	Direction: system.RTL,
 }
 
-func testShaper(faces ...Face) *shaperImpl {
+func testShaper(faces ...giofont.Face) *shaperImpl {
 	shaper := shaperImpl{}
 	for _, face := range faces {
 		shaper.Load(FontFace{Face: face})
@@ -268,12 +269,12 @@ func makeTestText(shaper *shaperImpl, primaryDir system.TextDirection, fontSize,
 			rtlSource = string(complexRunes[:runeLimit])
 		}
 	}
-	simpleText, _ := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(Font{}), Parameters{
+	simpleText, _ := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(giofont.Font{}), Parameters{
 		PxPerEm:  fixed.I(fontSize),
 		MaxWidth: lineWidth,
 		Locale:   locale,
 	}, []rune(simpleSource))
-	complexText, _ := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(Font{}), Parameters{
+	complexText, _ := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(giofont.Font{}), Parameters{
 		PxPerEm:  fixed.I(fontSize),
 		MaxWidth: lineWidth,
 		Locale:   locale,
@@ -642,33 +643,33 @@ func TestTextAppend(t *testing.T) {
 
 func TestClosestFontByWeight(t *testing.T) {
 	const (
-		testTF1 Typeface = "MockFace"
-		testTF2 Typeface = "TestFace"
-		testTF3 Typeface = "AnotherFace"
+		testTF1 giofont.Typeface = "MockFace"
+		testTF2 giofont.Typeface = "TestFace"
+		testTF3 giofont.Typeface = "AnotherFace"
 	)
-	fonts := []Font{
-		{Typeface: testTF1, Style: Regular, Weight: Normal},
-		{Typeface: testTF1, Style: Regular, Weight: Light},
-		{Typeface: testTF1, Style: Regular, Weight: Bold},
-		{Typeface: testTF1, Style: Italic, Weight: Thin},
+	fonts := []giofont.Font{
+		{Typeface: testTF1, Style: giofont.Regular, Weight: giofont.Normal},
+		{Typeface: testTF1, Style: giofont.Regular, Weight: giofont.Light},
+		{Typeface: testTF1, Style: giofont.Regular, Weight: giofont.Bold},
+		{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Thin},
 	}
 	weightOnlyTests := []struct {
-		Lookup   Weight
-		Expected Weight
+		Lookup   giofont.Weight
+		Expected giofont.Weight
 	}{
 		// Test for existing weights.
-		{Lookup: Normal, Expected: Normal},
-		{Lookup: Light, Expected: Light},
-		{Lookup: Bold, Expected: Bold},
+		{Lookup: giofont.Normal, Expected: giofont.Normal},
+		{Lookup: giofont.Light, Expected: giofont.Light},
+		{Lookup: giofont.Bold, Expected: giofont.Bold},
 		// Test for missing weights.
-		{Lookup: Thin, Expected: Light},
-		{Lookup: ExtraLight, Expected: Light},
-		{Lookup: Medium, Expected: Normal},
-		{Lookup: SemiBold, Expected: Bold},
-		{Lookup: ExtraBlack, Expected: Bold},
+		{Lookup: giofont.Thin, Expected: giofont.Light},
+		{Lookup: giofont.ExtraLight, Expected: giofont.Light},
+		{Lookup: giofont.Medium, Expected: giofont.Normal},
+		{Lookup: giofont.SemiBold, Expected: giofont.Bold},
+		{Lookup: giofont.ExtraBold, Expected: giofont.Bold},
 	}
 	for _, test := range weightOnlyTests {
-		got, ok := closestFont(Font{Typeface: testTF1, Weight: test.Lookup}, fonts)
+		got, ok := closestFont(giofont.Font{Typeface: testTF1, Weight: test.Lookup}, fonts)
 		if !ok {
 			t.Errorf("expected closest font for %v to exist", test.Lookup)
 		}
@@ -676,49 +677,49 @@ func TestClosestFontByWeight(t *testing.T) {
 			t.Errorf("got weight %v, expected %v", got.Weight, test.Expected)
 		}
 	}
-	fonts = []Font{
-		{Typeface: testTF1, Style: Regular, Weight: Light},
-		{Typeface: testTF1, Style: Regular, Weight: Bold},
-		{Typeface: testTF1, Style: Italic, Weight: Normal},
-		{Typeface: testTF3, Style: Italic, Weight: Bold},
+	fonts = []giofont.Font{
+		{Typeface: testTF1, Style: giofont.Regular, Weight: giofont.Light},
+		{Typeface: testTF1, Style: giofont.Regular, Weight: giofont.Bold},
+		{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Normal},
+		{Typeface: testTF3, Style: giofont.Italic, Weight: giofont.Bold},
 	}
 	otherTests := []struct {
-		Lookup         Font
-		Expected       Font
+		Lookup         giofont.Font
+		Expected       giofont.Font
 		ExpectedToFail bool
 	}{
 		// Test for existing fonts.
 		{
-			Lookup:   Font{Typeface: testTF1, Weight: Light},
-			Expected: Font{Typeface: testTF1, Style: Regular, Weight: Light},
+			Lookup:   giofont.Font{Typeface: testTF1, Weight: giofont.Light},
+			Expected: giofont.Font{Typeface: testTF1, Style: giofont.Regular, Weight: giofont.Light},
 		},
 		{
-			Lookup:   Font{Typeface: testTF1, Style: Italic, Weight: Normal},
-			Expected: Font{Typeface: testTF1, Style: Italic, Weight: Normal},
+			Lookup:   giofont.Font{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Normal},
+			Expected: giofont.Font{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Normal},
 		},
 		// Test for missing fonts.
 		{
-			Lookup:   Font{Typeface: testTF1, Weight: Normal},
-			Expected: Font{Typeface: testTF1, Style: Regular, Weight: Light},
+			Lookup:   giofont.Font{Typeface: testTF1, Weight: giofont.Normal},
+			Expected: giofont.Font{Typeface: testTF1, Style: giofont.Regular, Weight: giofont.Light},
 		},
 		{
-			Lookup:   Font{Typeface: testTF3, Style: Italic, Weight: Normal},
-			Expected: Font{Typeface: testTF3, Style: Italic, Weight: Bold},
+			Lookup:   giofont.Font{Typeface: testTF3, Style: giofont.Italic, Weight: giofont.Normal},
+			Expected: giofont.Font{Typeface: testTF3, Style: giofont.Italic, Weight: giofont.Bold},
 		},
 		{
-			Lookup:   Font{Typeface: testTF1, Style: Italic, Weight: Thin},
-			Expected: Font{Typeface: testTF1, Style: Italic, Weight: Normal},
+			Lookup:   giofont.Font{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Thin},
+			Expected: giofont.Font{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Normal},
 		},
 		{
-			Lookup:   Font{Typeface: testTF1, Style: Italic, Weight: Bold},
-			Expected: Font{Typeface: testTF1, Style: Italic, Weight: Normal},
+			Lookup:   giofont.Font{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Bold},
+			Expected: giofont.Font{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Normal},
 		},
 		{
-			Lookup:         Font{Typeface: testTF2, Weight: Normal},
+			Lookup:         giofont.Font{Typeface: testTF2, Weight: giofont.Normal},
 			ExpectedToFail: true,
 		},
 		{
-			Lookup:         Font{Typeface: testTF2, Style: Italic, Weight: Normal},
+			Lookup:         giofont.Font{Typeface: testTF2, Style: giofont.Italic, Weight: giofont.Normal},
 			ExpectedToFail: true,
 		},
 	}

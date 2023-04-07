@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/exp/shiny/materialdesign/icons"
 
+	"gioui.org/font"
 	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
@@ -46,7 +47,7 @@ type Theme struct {
 	FingerSize unit.Dp
 }
 
-func NewTheme(fontCollection []text.FontFace) *Theme {
+func NewTheme(fontCollection []font.FontFace) *Theme {
 	t := &Theme{
 		Shaper: text.NewShaper(fontCollection),
 	}

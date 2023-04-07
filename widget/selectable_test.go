@@ -5,6 +5,7 @@ import (
 	"image"
 	"testing"
 
+	"gioui.org/font"
 	"gioui.org/font/gofont"
 	"gioui.org/io/key"
 	"gioui.org/layout"
@@ -37,7 +38,7 @@ func TestSelectableMove(t *testing.T) {
 		Locale: english,
 	}
 	cache := text.NewShaper(gofont.Collection())
-	font := text.Font{}
+	fnt := font.Font{}
 	fontSize := unit.Sp(10)
 
 	str := `0123456789`
@@ -47,7 +48,7 @@ func TestSelectableMove(t *testing.T) {
 	s := new(Selectable)
 
 	s.SetText(str)
-	s.Layout(gtx, cache, text.Font{}, fontSize, op.CallOp{}, op.CallOp{})
+	s.Layout(gtx, cache, font.Font{}, fontSize, op.CallOp{}, op.CallOp{})
 
 	testKey := func(keyName string) {
 		// Select 345
@@ -62,7 +63,7 @@ func TestSelectableMove(t *testing.T) {
 		// Press the key
 		gtx.Queue = newQueue(key.Event{State: key.Press, Name: keyName})
 		s.SetText(str)
-		s.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+		s.Layout(gtx, cache, fnt, fontSize, op.CallOp{}, op.CallOp{})
 
 		if expected, got := "", s.SelectedText(); expected != got {
 			t.Errorf("KeyName %s, expected %q, got %q", keyName, expected, got)
@@ -83,7 +84,7 @@ func TestSelectableConfigurations(t *testing.T) {
 	}
 	cache := text.NewShaper(gofont.Collection())
 	fontSize := unit.Sp(10)
-	font := text.Font{}
+	font := font.Font{}
 	sentence := "\n\n\n\n\n\n\n\n\n\n\n\nthe quick brown fox jumps over the lazy dog"
 
 	for _, alignment := range []text.Alignment{text.Start, text.Middle, text.End} {

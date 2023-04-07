@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	giofont "gioui.org/font"
 	"gioui.org/io/system"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -19,7 +20,7 @@ import (
 // Parameters are static text shaping attributes applied to the entire shaped text.
 type Parameters struct {
 	// Font describes the preferred typeface.
-	Font Font
+	Font giofont.Font
 	// Alignment characterizes the positioning of text within the line. It does not directly
 	// impact shaping, but is provided in order to allow efficient offset computation.
 	Alignment Alignment
@@ -44,11 +45,7 @@ type Parameters struct {
 	forceTruncate bool
 }
 
-// A FontFace is a Font and a matching Face.
-type FontFace struct {
-	Font Font
-	Face Face
-}
+type FontFace = giofont.FontFace
 
 // Glyph describes a shaped font glyph. Many fields are distances relative
 // to the "dot", which is a point on the baseline (the line upon which glyphs
