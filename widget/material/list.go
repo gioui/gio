@@ -93,7 +93,7 @@ func Scrollbar(th *Theme, state *widget.Scrollbar) ScrollbarStyle {
 			MinorPadding: 2,
 		},
 		Indicator: ScrollIndicatorStyle{
-			MajorMinLen:  8,
+			MajorMinLen:  th.FingerSize,
 			MinorWidth:   6,
 			CornerRadius: 3,
 			Color:        lightFg,
