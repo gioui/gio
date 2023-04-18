@@ -193,6 +193,8 @@ var gioView struct {
 	restartInput       C.jmethodID
 	updateSelection    C.jmethodID
 	updateCaret        C.jmethodID
+	countDisplayModes  C.jmethodID
+	setHighRefreshRate C.jmethodID
 }
 
 type pixelInsets struct {
@@ -480,6 +482,8 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.restartInput = getMethodID(env, class, "restartInput", "()V")
 		m.updateSelection = getMethodID(env, class, "updateSelection", "()V")
 		m.updateCaret = getMethodID(env, class, "updateCaret", "(FFFFFFFFFF)V")
+		m.countDisplayModes = getMethodID(env, class, "countDisplayModes", "()I")
+		m.setHighRefreshRate = getMethodID(env, class, "setHighRefreshRate", "()V")
 	})
 	view = C.jni_NewGlobalRef(env, view)
 	wopts := <-mainWindow.out
@@ -775,6 +779,13 @@ func (w *window) setVisible(env *C.JNIEnv) {
 	width, height := C.ANativeWindow_getWidth(w.win), C.ANativeWindow_getHeight(w.win)
 	if width == 0 || height == 0 {
 		return
+	}
+	displayModeCount := int(C.jni_CallIntMethod(env, w.view, gioView.countDisplayModes))
+	if displayModeCount > 1 {
+		// Only do the main thread work on devices that need it
+		runOnMainWithEnv(env, func(mainEnv *C.JNIEnv) {
+			callVoidMethod(mainEnv, w.view, gioView.setHighRefreshRate)
+		})
 	}
 	w.setStage(system.StageRunning)
 	w.draw(env, true)
@@ -1435,6 +1446,11 @@ func runOnMain(f func(env *C.JNIEnv)) {
 			callStaticVoidMethod(env, android.gioCls, android.mwakeupMainThread)
 		})
 	}()
+}
+
+func runOnMainWithEnv(env *C.JNIEnv, f func(mainEnv *C.JNIEnv)) {
+	mainFuncs <- f
+	callStaticVoidMethod(env, android.gioCls, android.mwakeupMainThread)
 }
 
 //export Java_org_gioui_Gio_scheduleMainFuncs

@@ -26,6 +26,7 @@ import android.text.SpannableStringBuilder;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Choreographer;
+import android.view.Display;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -472,6 +473,67 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 			.setInsertionMarkerLocation(caretX, caretTop, caretBase, caretBottom, 0)
 			.build();
 		imm.updateCursorAnchorInfo(this, inf);
+	}
+
+	int countDisplayModes() {
+		Context context = getContext();
+		Display display = context.getDisplay();
+		Display.Mode[] supportedModes = display.getSupportedModes();
+		return supportedModes.length;
+	}
+
+	/**
+	 * Pick the highest refresh rate supported at the current resolution. Needs to be called from the main
+	 * thread.
+	 */
+	void setHighRefreshRate() {
+		Context context = getContext();
+		Display display = context.getDisplay();
+		Display.Mode currentMode = display.getMode();
+		int currentWidth = currentMode.getPhysicalWidth();
+		int currentHeight = currentMode.getPhysicalHeight();
+		Display.Mode[] supportedModes = display.getSupportedModes();
+		
+		float minRefreshRate = -1;
+		float maxRefreshRate = -1;
+		float bestRefreshRate = -1;
+		int bestModeId = -1;
+		for (Display.Mode mode : supportedModes) {
+			float refreshRate = mode.getRefreshRate();
+			float width = mode.getPhysicalWidth();
+			float height = mode.getPhysicalHeight();
+			
+			if (minRefreshRate == -1 || refreshRate < minRefreshRate) {
+				minRefreshRate = refreshRate;
+			}
+			if (maxRefreshRate == -1 || refreshRate > maxRefreshRate) {
+				maxRefreshRate = refreshRate;
+			}
+
+			boolean refreshRateIsBetter = bestRefreshRate == -1 || refreshRate > bestRefreshRate;
+			if (width == currentWidth && height == currentHeight && refreshRateIsBetter) {
+				int modeId = mode.getModeId();
+				bestRefreshRate = refreshRate;
+				bestModeId = modeId;
+			}
+		}
+
+		if (bestModeId == -1) {
+			// Not expecting this but just in case
+			return;
+		}
+
+		if (minRefreshRate == maxRefreshRate) {
+			// Can't improve the refresh rate
+			return;
+		}
+
+		Window window = ((Activity) context).getWindow();
+		WindowManager.LayoutParams layoutParams = window.getAttributes();
+		layoutParams.preferredDisplayModeId = bestModeId;
+
+		// This is the call that needs to happen on the main thread
+		window.setAttributes(layoutParams);
 	}
 
 	static private native long onCreateView(GioView view);
