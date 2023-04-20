@@ -29,13 +29,33 @@ import (
 )
 
 var (
+	regOnce    sync.Once
+	reg        []font.FontFace
 	once       sync.Once
 	collection []font.FontFace
 )
 
+func loadRegular() {
+	regOnce.Do(func() {
+		face, err := opentype.Parse(goregular.TTF)
+		if err != nil {
+			panic(fmt.Errorf("failed to parse font: %v", err))
+		}
+		reg = []font.FontFace{{Font: font.Font{Typeface: "Go"}, Face: face}}
+		collection = append(collection, reg[0])
+	})
+}
+
+// Regular returns a collection of only the Go regular font face.
+func Regular() []font.FontFace {
+	loadRegular()
+	return reg
+}
+
+// Regular returns a collection of all available Go font faces.
 func Collection() []font.FontFace {
+	loadRegular()
 	once.Do(func() {
-		register(font.Font{}, goregular.TTF)
 		register(font.Font{Style: font.Italic}, goitalic.TTF)
 		register(font.Font{Weight: font.Bold}, gobold.TTF)
 		register(font.Font{Style: font.Italic, Weight: font.Bold}, gobolditalic.TTF)
