@@ -22,9 +22,11 @@ import (
 	"github.com/go-text/typesetting/opentype/loader"
 )
 
-// Face is a shapeable representation of a font.
+// Face is a thread-safe representation of a loaded font. For efficiency, applications
+// should construct a face for any given font file once, reusing it across different
+// text shapers.
 type Face struct {
-	face    font.Face
+	face    font.Font
 	aspect  metadata.Aspect
 	family  string
 	variant string
@@ -36,12 +38,12 @@ func Parse(src []byte) (Face, error) {
 	if err != nil {
 		return Face{}, err
 	}
-	face, aspect, family, variant, err := parseLoader(ld)
+	font, aspect, family, variant, err := parseLoader(ld)
 	if err != nil {
 		return Face{}, fmt.Errorf("failed parsing truetype font: %w", err)
 	}
 	return Face{
-		face:    face,
+		face:    font,
 		aspect:  aspect,
 		family:  family,
 		variant: variant,
@@ -81,7 +83,7 @@ func ParseCollection(src []byte) ([]giofont.FontFace, error) {
 }
 
 // parseLoader parses the contents of the loader into a face and its metadata.
-func parseLoader(ld *loader.Loader) (_ font.Face, _ metadata.Aspect, family, variant string, _ error) {
+func parseLoader(ld *loader.Loader) (_ font.Font, _ metadata.Aspect, family, variant string, _ error) {
 	ft, err := fontapi.NewFont(ld)
 	if err != nil {
 		return nil, metadata.Aspect{}, "", "", err
@@ -90,11 +92,14 @@ func parseLoader(ld *loader.Loader) (_ font.Face, _ metadata.Aspect, family, var
 	if data.IsMonospace {
 		variant = "Mono"
 	}
-	return &fontapi.Face{Font: ft}, data.Aspect, data.Family, variant, nil
+	return ft, data.Aspect, data.Family, variant, nil
 }
 
+// Face returns a thread-unsafe wrapper for this Face suitable for use by a single shaper.
+// Face many be invoked any number of times and is safe so long as each return value is
+// only used by one goroutine.
 func (f Face) Face() font.Face {
-	return f.face
+	return &fontapi.Face{Font: f.face}
 }
 
 // FontFace returns a text.Font with populated font metadata for the
