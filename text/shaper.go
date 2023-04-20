@@ -172,9 +172,9 @@ type Shaper struct {
 	pathCache        pathCache
 	bitmapShapeCache bitmapShapeCache
 	layoutCache      layoutCache
-	paragraph        []rune
 
-	reader strings.Reader
+	reader    *bufio.Reader
+	paragraph []byte
 
 	// Iterator state.
 	brokeParagraph   bool
@@ -198,13 +198,14 @@ func NewShaper(collection []FontFace) *Shaper {
 		l.shaper.Load(f)
 	}
 	l.shaper.shaper.SetFontCacheSize(32)
+	l.reader = bufio.NewReader(nil)
 	return l
 }
 
 // Layout text from an io.Reader according to a set of options. Results can be retrieved by
 // iteratively calling NextGlyph.
 func (l *Shaper) Layout(params Parameters, txt io.Reader) {
-	l.layoutText(params, bufio.NewReader(txt), "")
+	l.layoutText(params, txt, "")
 }
 
 // LayoutString is Layout for strings.
@@ -222,48 +223,46 @@ func (l *Shaper) reset(align Alignment) {
 // layoutText lays out a large text document by breaking it into paragraphs and laying
 // out each of them separately. This allows the shaping results to be cached independently
 // by paragraph. Only one of txt and str should be provided.
-func (l *Shaper) layoutText(params Parameters, txt *bufio.Reader, str string) {
+func (l *Shaper) layoutText(params Parameters, txt io.Reader, str string) {
 	l.reset(params.Alignment)
 	if txt == nil && len(str) == 0 {
 		l.txt.append(l.layoutParagraph(params, "", nil))
 		return
 	}
+	l.reader.Reset(txt)
 	truncating := params.MaxLines > 0
 	var done bool
-	var startByte int
 	var endByte int
 	for !done {
-		var runes int
 		l.paragraph = l.paragraph[:0]
 		if txt != nil {
-			for r, _, re := txt.ReadRune(); !done; r, _, re = txt.ReadRune() {
-				if re != nil {
+			for {
+				b, err := l.reader.ReadByte()
+				if err != nil {
+					// EOF or any other error ends processing here.
 					done = true
-					continue
+					break
 				}
-				l.paragraph = append(l.paragraph, r)
-				runes++
-				if r == '\n' {
+				l.paragraph = append(l.paragraph, b)
+				if b == '\n' {
 					break
 				}
 			}
-			_, _, re := txt.ReadRune()
+			_, re := l.reader.ReadByte()
 			done = re != nil
-			_ = txt.UnreadRune()
+			_ = l.reader.UnreadByte()
 		} else {
-			for endByte = startByte; endByte < len(str); {
-				r, width := utf8.DecodeRuneInString(str[endByte:])
-				endByte += width
-				runes++
-				if r == '\n' {
-					break
-				}
+			idx := strings.IndexByte(str, '\n')
+			if idx == -1 {
+				done = true
+				endByte = len(str)
+			} else {
+				endByte = idx + 1
 			}
-			done = endByte == len(str)
 		}
-		if startByte != endByte || (len(l.paragraph) > 0 || len(l.txt.lines) == 0) {
+		if len(str[:endByte]) > 0 || (len(l.paragraph) > 0 || len(l.txt.lines) == 0) {
 			params.forceTruncate = truncating && !done
-			lines := l.layoutParagraph(params, str[startByte:endByte], l.paragraph)
+			lines := l.layoutParagraph(params, str[:endByte], l.paragraph)
 			if truncating {
 				params.MaxLines -= len(lines.lines)
 				if params.MaxLines == 0 {
@@ -275,7 +274,7 @@ func (l *Shaper) layoutText(params Parameters, txt *bufio.Reader, str string) {
 						unreadRunes = utf8.RuneCountInString(str[endByte:])
 					} else {
 						for {
-							_, _, e := txt.ReadRune()
+							_, _, e := l.reader.ReadRune()
 							if e != nil {
 								break
 							}
@@ -294,19 +293,19 @@ func (l *Shaper) layoutText(params Parameters, txt *bufio.Reader, str string) {
 		if done {
 			return
 		}
-		startByte = endByte
+		str = str[endByte:]
 	}
 }
 
 // layoutParagraph shapes and wraps a paragraph using the provided parameters.
 // It accepts the paragraph data in either string or rune format, preferring the
 // string in order to hit the shaper cache more quickly.
-func (l *Shaper) layoutParagraph(params Parameters, asStr string, asRunes []rune) document {
+func (l *Shaper) layoutParagraph(params Parameters, asStr string, asBytes []byte) document {
 	if l == nil {
 		return document{}
 	}
-	if len(asStr) == 0 && len(asRunes) > 0 {
-		asStr = string(asRunes)
+	if len(asStr) == 0 && len(asBytes) > 0 {
+		asStr = string(asBytes)
 	}
 	// Alignment is not part of the cache key because changing it does not impact shaping.
 	lk := layoutKey{
@@ -323,10 +322,7 @@ func (l *Shaper) layoutParagraph(params Parameters, asStr string, asRunes []rune
 	if l, ok := l.layoutCache.Get(lk); ok {
 		return l
 	}
-	if len(asRunes) == 0 && len(asStr) > 0 {
-		asRunes = []rune(asStr)
-	}
-	lines := l.shaper.LayoutRunes(params, asRunes)
+	lines := l.shaper.LayoutRunes(params, []rune(asStr))
 	l.layoutCache.Put(lk, lines)
 	return lines
 }
