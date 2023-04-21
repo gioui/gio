@@ -106,6 +106,8 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 			scrollYScale = px;
 		}
 
+		setHighRefreshRate();
+
 		accessManager = (AccessibilityManager)context.getSystemService(Context.ACCESSIBILITY_SERVICE);
 		imm = (InputMethodManager)context.getSystemService(Context.INPUT_METHOD_SERVICE);
 		nhandle = onCreateView(this);
@@ -475,24 +477,18 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		imm.updateCursorAnchorInfo(this, inf);
 	}
 
-	int countDisplayModes() {
-		Context context = getContext();
-		Display display = context.getDisplay();
-		Display.Mode[] supportedModes = display.getSupportedModes();
-		return supportedModes.length;
-	}
-
-	/**
-	 * Pick the highest refresh rate supported at the current resolution. Needs to be called from the main
-	 * thread.
-	 */
 	void setHighRefreshRate() {
 		Context context = getContext();
 		Display display = context.getDisplay();
+		Display.Mode[] supportedModes = display.getSupportedModes();
+		if (supportedModes.length <= 1) {
+			// Nothing to set
+			return;
+		}
+
 		Display.Mode currentMode = display.getMode();
 		int currentWidth = currentMode.getPhysicalWidth();
 		int currentHeight = currentMode.getPhysicalHeight();
-		Display.Mode[] supportedModes = display.getSupportedModes();
 		
 		float minRefreshRate = -1;
 		float maxRefreshRate = -1;
@@ -531,8 +527,6 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		Window window = ((Activity) context).getWindow();
 		WindowManager.LayoutParams layoutParams = window.getAttributes();
 		layoutParams.preferredDisplayModeId = bestModeId;
-
-		// This is the call that needs to happen on the main thread
 		window.setAttributes(layoutParams);
 	}
 
