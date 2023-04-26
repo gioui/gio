@@ -84,7 +84,8 @@ type textIterator struct {
 	// maxLines is the maximum number of text lines that should be displayed.
 	maxLines int
 	// material sets the paint material for the text glyphs. If none is provided
-	// the glyphs will be invisible.
+	// the color of the glyphs is undefined and may change unpredictably if the
+	// text contains color glyphs.
 	material op.CallOp
 
 	// linesSeen tracks the quantity of line endings this iterator has seen.
