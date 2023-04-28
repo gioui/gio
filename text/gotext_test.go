@@ -1,11 +1,14 @@
 package text
 
 import (
+	"fmt"
 	"math"
 	"reflect"
+	"strconv"
 	"testing"
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
+	"github.com/go-text/typesetting/font"
 	"github.com/go-text/typesetting/shaping"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
@@ -738,5 +741,52 @@ func TestClosestFontByWeight(t *testing.T) {
 		if got != test.Expected {
 			t.Errorf("got %v, expected %v", got, test.Expected)
 		}
+	}
+}
+
+func TestGlyphIDPacking(t *testing.T) {
+	const maxPPem = fixed.Int26_6((1 << sizebits) - 1)
+	type testcase struct {
+		name      string
+		ppem      fixed.Int26_6
+		faceIndex int
+		gid       font.GID
+		expected  GlyphID
+	}
+	for _, tc := range []testcase{
+		{
+			name: "zero value",
+		},
+		{
+			name:      "10 ppem faceIdx 1 GID 5",
+			ppem:      fixed.I(10),
+			faceIndex: 1,
+			gid:       5,
+			expected:  284223755780101,
+		},
+		{
+			name:      maxPPem.String() + " ppem faceIdx " + strconv.Itoa(math.MaxUint16) + " GID " + fmt.Sprintf("%d", int64(math.MaxUint32)),
+			ppem:      maxPPem,
+			faceIndex: math.MaxUint16,
+			gid:       math.MaxUint32,
+			expected:  18446744073709551615,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := newGlyphID(tc.ppem, tc.faceIndex, tc.gid)
+			if actual != tc.expected {
+				t.Errorf("expected %d, got %d", tc.expected, actual)
+			}
+			actualPPEM, actualFaceIdx, actualGID := splitGlyphID(actual)
+			if actualPPEM != tc.ppem {
+				t.Errorf("expected ppem %d, got %d", tc.ppem, actualPPEM)
+			}
+			if actualFaceIdx != tc.faceIndex {
+				t.Errorf("expected faceIdx %d, got %d", tc.faceIndex, actualFaceIdx)
+			}
+			if actualGID != tc.gid {
+				t.Errorf("expected gid %d, got %d", tc.gid, actualGID)
+			}
+		})
 	}
 }

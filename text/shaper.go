@@ -4,7 +4,6 @@ package text
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"strings"
 	"unicode/utf8"
@@ -471,7 +470,6 @@ const (
 // newGlyphID encodes a face and a glyph id into a GlyphID.
 func newGlyphID(ppem fixed.Int26_6, faceIdx int, gid font.GID) GlyphID {
 	if gid&^((1<<gidbits)-1) != 0 {
-		fmt.Println(gid)
 		panic("glyph id out of bounds")
 	}
 	if faceIdx&^((1<<facebits)-1) != 0 {
@@ -488,7 +486,7 @@ func newGlyphID(ppem fixed.Int26_6, faceIdx int, gid font.GID) GlyphID {
 
 // splitGlyphID is the opposite of newGlyphID.
 func splitGlyphID(g GlyphID) (fixed.Int26_6, int, font.GID) {
-	faceIdx := int(g) >> (gidbits + sizebits)
+	faceIdx := int(uint64(g) >> (gidbits + sizebits))
 	ppem := fixed.Int26_6((g & ((1<<sizebits - 1) << gidbits)) >> gidbits)
 	gid := font.GID(g) & (1<<gidbits - 1)
 	return ppem, faceIdx, gid
