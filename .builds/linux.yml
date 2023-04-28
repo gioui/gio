@@ -3,6 +3,7 @@ image: debian/testing
 packages:
  - curl
  - pkg-config
+ - gcc-multilib
  - libwayland-dev
  - libx11-dev
  - libx11-xcb-dev
@@ -24,11 +25,11 @@ packages:
  - scrot
  - sway
  - grim
- - wine
  - unzip
 sources:
  - https://git.sr.ht/~eliasnaur/gio
 environment:
+ PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig/:/usr/lib/i386-linux-gnu/pkgconfig/
  PATH: /home/build/sdk/go/bin:/usr/bin:/home/build/go/bin:/home/build/android/tools/bin
  ANDROID_SDK_ROOT: /home/build/android
  android_sdk_tools_zip: sdk-tools-linux-3859397.zip
@@ -56,9 +57,14 @@ tasks:
  - mirror: |
      # mirror to github
      ssh-keyscan github.com > "$HOME"/.ssh/known_hosts && cd gio && git push --mirror "$github_mirror" || echo "failed mirroring"
+ - add_32bit_arch: |
+     sudo dpkg --add-architecture i386
+     sudo apt-get update
+     sudo apt-get install -y "libwayland-dev:i386" "libx11-dev:i386" "libx11-xcb-dev:i386" "libxkbcommon-dev:i386" "libxkbcommon-x11-dev:i386" "libgles2-mesa-dev:i386" "libegl1-mesa-dev:i386" "libffi-dev:i386" "libvulkan-dev:i386" "libxcursor-dev:i386"
  - test_gio: |
      cd gio
      go test -race ./...
+     CGO_ENABLED=1 GOARCH=386 go test ./...
      GOOS=windows go test -exec=wine ./...
      GOOS=js GOARCH=wasm go build -o /dev/null ./...
  - install_chrome: |
