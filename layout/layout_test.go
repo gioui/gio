@@ -76,3 +76,69 @@ func TestDirection(t *testing.T) {
 		})
 	}
 }
+
+func TestConstraints(t *testing.T) {
+	type testcase struct {
+		name     string
+		in       Constraints
+		subMax   image.Point
+		addMin   image.Point
+		expected Constraints
+	}
+	for _, tc := range []testcase{
+		{
+			name:     "no-op",
+			in:       Constraints{Max: image.Pt(100, 100)},
+			expected: Constraints{Max: image.Pt(100, 100)},
+		},
+		{
+			name:     "shrink max",
+			in:       Constraints{Max: image.Pt(100, 100)},
+			subMax:   image.Pt(25, 25),
+			expected: Constraints{Max: image.Pt(75, 75)},
+		},
+		{
+			name:     "shrink max below min",
+			in:       Constraints{Max: image.Pt(100, 100), Min: image.Pt(50, 50)},
+			subMax:   image.Pt(75, 75),
+			expected: Constraints{Max: image.Pt(25, 25), Min: image.Pt(25, 25)},
+		},
+		{
+			name:     "shrink max below zero",
+			in:       Constraints{Max: image.Pt(100, 100), Min: image.Pt(50, 50)},
+			subMax:   image.Pt(125, 125),
+			expected: Constraints{Max: image.Pt(0, 0), Min: image.Pt(0, 0)},
+		},
+		{
+			name:     "enlarge min",
+			in:       Constraints{Max: image.Pt(100, 100)},
+			addMin:   image.Pt(25, 25),
+			expected: Constraints{Max: image.Pt(100, 100), Min: image.Pt(25, 25)},
+		},
+		{
+			name:     "enlarge min beyond max",
+			in:       Constraints{Max: image.Pt(100, 100)},
+			addMin:   image.Pt(125, 125),
+			expected: Constraints{Max: image.Pt(100, 100), Min: image.Pt(100, 100)},
+		},
+		{
+			name:     "decrease min below zero",
+			in:       Constraints{Max: image.Pt(100, 100), Min: image.Pt(50, 50)},
+			addMin:   image.Pt(-125, -125),
+			expected: Constraints{Max: image.Pt(100, 100), Min: image.Pt(0, 0)},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			start := tc.in
+			if tc.subMax != (image.Point{}) {
+				start = start.SubMax(tc.subMax)
+			}
+			if tc.addMin != (image.Point{}) {
+				start = start.AddMin(tc.addMin)
+			}
+			if start != tc.expected {
+				t.Errorf("expected %#+v, got %#+v", tc.expected, start)
+			}
+		})
+	}
+}
