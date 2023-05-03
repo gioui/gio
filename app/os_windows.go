@@ -531,7 +531,12 @@ func (w *window) scrollEvent(wParam, lParam uintptr, horizontal bool, kmods key.
 	if horizontal {
 		sp.X = dist
 	} else {
-		sp.Y = -dist
+		// support horizontal scroll (shift + mousewheel)
+		if kmods == key.ModShift {
+			sp.X = -dist
+		} else {
+			sp.Y = -dist
+		}
 	}
 	w.w.Event(pointer.Event{
 		Type:      pointer.Scroll,

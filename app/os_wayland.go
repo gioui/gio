@@ -953,7 +953,12 @@ func gio_onPointerAxis(data unsafe.Pointer, p *C.struct_wl_pointer, t, axis C.ui
 	case C.WL_POINTER_AXIS_HORIZONTAL_SCROLL:
 		w.scroll.dist.X += v
 	case C.WL_POINTER_AXIS_VERTICAL_SCROLL:
-		w.scroll.dist.Y += v
+		// horizontal scroll if shift + mousewheel(up/down) pressed.
+		if w.disp.xkb.Modifiers() == key.ModShift {
+			w.scroll.dist.X += v
+		} else {
+			w.scroll.dist.Y += v
+		}
 	}
 }
 
@@ -1003,7 +1008,12 @@ func gio_onPointerAxisDiscrete(data unsafe.Pointer, p *C.struct_wl_pointer, axis
 	case C.WL_POINTER_AXIS_HORIZONTAL_SCROLL:
 		w.scroll.steps.X += int(discrete)
 	case C.WL_POINTER_AXIS_VERTICAL_SCROLL:
-		w.scroll.steps.Y += int(discrete)
+		// horizontal scroll if shift + mousewheel(up/down) pressed.
+		if w.disp.xkb.Modifiers() == key.ModShift {
+			w.scroll.steps.X += int(discrete)
+		} else {
+			w.scroll.steps.Y += int(discrete)
+		}
 	}
 }
 

@@ -236,6 +236,10 @@ func (w *window) addEventListeners() {
 	w.addEventListener(w.cnv, "wheel", func(this js.Value, args []js.Value) interface{} {
 		e := args[0]
 		dx, dy := e.Get("deltaX").Float(), e.Get("deltaY").Float()
+		// horizontal scroll if shift is pressed.
+		if e.Get("shiftKey").Bool() {
+			dx, dy = dy, dx
+		}
 		mode := e.Get("deltaMode").Int()
 		switch mode {
 		case 0x01: // DOM_DELTA_LINE
