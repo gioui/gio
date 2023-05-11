@@ -63,8 +63,6 @@ type Window struct {
 	frames   chan *op.Ops
 	frameAck chan struct{}
 	destroy  chan struct{}
-	// dead is closed when the window is destroyed.
-	dead chan struct{}
 
 	stage        system.Stage
 	animating    bool
@@ -172,7 +170,6 @@ func NewWindow(options ...Option) *Window {
 		wakeups:          make(chan struct{}, 1),
 		wakeupFuncs:      make(chan func()),
 		destroy:          make(chan struct{}),
-		dead:             make(chan struct{}),
 		options:          make(chan []Option, 1),
 		actions:          make(chan system.Action, 1),
 		nocontext:        cnf.CustomRenderer,
@@ -410,7 +407,7 @@ func (w *Window) Run(f func()) {
 	})
 	select {
 	case <-done:
-	case <-w.dead:
+	case <-w.destroy:
 	}
 }
 
@@ -420,7 +417,7 @@ func (w *Window) driverDefer(f func(d driver)) {
 	select {
 	case w.driverFuncs <- f:
 		w.wakeup()
-	case <-w.dead:
+	case <-w.destroy:
 	}
 }
 
@@ -485,7 +482,7 @@ func (c *callbacks) Event(e event.Event) bool {
 	}
 	c.busy = false
 	select {
-	case <-c.w.dead:
+	case <-c.w.destroy:
 		return handled
 	default:
 	}
@@ -818,7 +815,7 @@ func (w *Window) updateState(d driver) {
 
 func (w *Window) processEvent(d driver, e event.Event) bool {
 	select {
-	case <-w.dead:
+	case <-w.destroy:
 		return false
 	default:
 	}
@@ -890,7 +887,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 			w.destroyGPU()
 			w.out <- system.DestroyEvent{Err: err}
 			close(w.out)
-			w.destroy <- struct{}{}
+			close(w.destroy)
 			break
 		}
 		w.processFrame(d, frameStart)
@@ -899,7 +896,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		w.destroyGPU()
 		w.out <- e2
 		close(w.out)
-		w.destroy <- struct{}{}
+		close(w.destroy)
 	case ViewEvent:
 		w.out <- e2
 		w.waitAck(d)
@@ -950,7 +947,7 @@ func (w *Window) run(options []Option) {
 	if err := newWindow(&w.callbacks, options); err != nil {
 		w.out <- system.DestroyEvent{Err: err}
 		close(w.out)
-		w.destroy <- struct{}{}
+		close(w.destroy)
 		return
 	}
 	var wakeup func()
@@ -973,7 +970,6 @@ func (w *Window) run(options []Option) {
 			}
 			timer = time.NewTimer(time.Until(t))
 		case <-w.destroy:
-			close(w.dead)
 			return
 		case <-timeC:
 			select {
