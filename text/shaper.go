@@ -247,9 +247,11 @@ func (l *Shaper) layoutText(params Parameters, txt io.Reader, str string) {
 					break
 				}
 			}
-			_, re := l.reader.ReadByte()
-			done = re != nil
-			_ = l.reader.UnreadByte()
+			if !done {
+				_, re := l.reader.ReadByte()
+				done = re != nil
+				_ = l.reader.UnreadByte()
+			}
 		} else {
 			idx := strings.IndexByte(str, '\n')
 			if idx == -1 {

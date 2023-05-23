@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
+	"gioui.org/font/gofont"
 	"gioui.org/font/opentype"
 	"gioui.org/io/system"
 	"golang.org/x/exp/slices"
@@ -429,5 +430,73 @@ func printLinePositioning(t *testing.T, lines []line, glyphs []Glyph) {
 				}
 			}
 		}
+	}
+}
+
+// TestShapeStringRuneAccounting tries shaping the same string/parameter combinations with both
+// shaping methods and ensures that the resulting glyph stream always has the right number of
+// runes accounted for.
+func TestShapeStringRuneAccounting(t *testing.T) {
+	type testcase struct {
+		name   string
+		input  string
+		params Parameters
+	}
+	type setup struct {
+		kind string
+		do   func(*Shaper, Parameters, string)
+	}
+	for _, tc := range []testcase{
+		{
+			name:  "simple truncated",
+			input: "abc",
+			params: Parameters{
+				PxPerEm:  fixed.Int26_6(16),
+				MaxWidth: 100,
+				MaxLines: 1,
+			},
+		},
+		{
+			name:  "simple",
+			input: "abc",
+			params: Parameters{
+				PxPerEm:  fixed.Int26_6(16),
+				MaxWidth: 100,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, setup := range []setup{
+				{
+					kind: "LayoutString",
+					do: func(shaper *Shaper, params Parameters, input string) {
+						shaper.LayoutString(params, input)
+					},
+				},
+				{
+					kind: "Layout",
+					do: func(shaper *Shaper, params Parameters, input string) {
+						shaper.Layout(params, strings.NewReader(input))
+					},
+				},
+			} {
+				t.Run(setup.kind, func(t *testing.T) {
+					shaper := NewShaper(gofont.Collection())
+					setup.do(shaper, tc.params, tc.input)
+
+					glyphs := []Glyph{}
+					for g, ok := shaper.NextGlyph(); ok; g, ok = shaper.NextGlyph() {
+						glyphs = append(glyphs, g)
+					}
+					totalRunes := 0
+					for _, g := range glyphs {
+						totalRunes += g.Runes
+					}
+					if inputRunes := len([]rune(tc.input)); totalRunes != inputRunes {
+						t.Errorf("input contained %d runes, but glyphs contained %d", inputRunes, totalRunes)
+					}
+				})
+			}
+		})
 	}
 }
