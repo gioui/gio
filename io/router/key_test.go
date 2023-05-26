@@ -363,11 +363,11 @@ func TestKeyRouting(t *testing.T) {
 	r2.Queue(A, B)
 
 	// With focus, the events should traverse the branch of the hit tree
-	// containing the focused element, and then every handler.
+	// containing the focused element.
 	assertKeyEvent(t, r2.Events(&handlers[4]), false)
 	assertKeyEvent(t, r2.Events(&handlers[3]), true)
 	assertKeyEvent(t, r2.Events(&handlers[2]), false)
-	assertKeyEvent(t, r2.Events(&handlers[1]), false, B)
+	assertKeyEvent(t, r2.Events(&handlers[1]), false)
 	assertKeyEvent(t, r2.Events(&handlers[0]), false, A)
 }
 
