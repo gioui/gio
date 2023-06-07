@@ -53,6 +53,8 @@ type textView struct {
 	// Truncator is the text that will be shown at the end of the final
 	// line if MaxLines is exceeded. Defaults to "…" if empty.
 	Truncator string
+	// WrapPolicy configures how displayed text will be broken into lines.
+	WrapPolicy text.WrapPolicy
 	// Mask replaces the visual display of each rune in the contents with the given rune.
 	// Newline characters are not masked. When non-zero, the unmasked contents
 	// are accessed by Len, Text, and SetText.
@@ -265,6 +267,10 @@ func (e *textView) Update(gtx layout.Context, lt *text.Shaper, font font.Font, s
 	}
 	if e.MaxLines != e.params.MaxLines {
 		e.params.MaxLines = e.MaxLines
+		e.invalidate()
+	}
+	if e.WrapPolicy != e.params.WrapPolicy {
+		e.params.WrapPolicy = e.WrapPolicy
 		e.invalidate()
 	}
 

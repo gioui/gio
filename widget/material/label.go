@@ -29,6 +29,8 @@ type LabelStyle struct {
 	Alignment text.Alignment
 	// MaxLines limits the number of lines. Zero means no limit.
 	MaxLines int
+	// WrapPolicy configures how displayed text will be broken into lines.
+	WrapPolicy text.WrapPolicy
 	// Truncator is the text that will be shown at the end of the final
 	// line if MaxLines is exceeded. Defaults to "…" if empty.
 	Truncator string
@@ -127,12 +129,14 @@ func (l LabelStyle) Layout(gtx layout.Context) layout.Dimensions {
 		l.State.Alignment = l.Alignment
 		l.State.MaxLines = l.MaxLines
 		l.State.Truncator = l.Truncator
+		l.State.WrapPolicy = l.WrapPolicy
 		return l.State.Layout(gtx, l.Shaper, l.Font, l.TextSize, textColor, selectColor)
 	}
 	tl := widget.Label{
-		Alignment: l.Alignment,
-		MaxLines:  l.MaxLines,
-		Truncator: l.Truncator,
+		Alignment:  l.Alignment,
+		MaxLines:   l.MaxLines,
+		Truncator:  l.Truncator,
+		WrapPolicy: l.WrapPolicy,
 	}
 	return tl.Layout(gtx, l.Shaper, l.Font, l.TextSize, l.Text, textColor)
 }

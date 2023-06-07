@@ -57,7 +57,9 @@ type Selectable struct {
 	MaxLines int
 	// Truncator is the symbol to use at the end of the final line of text
 	// if text was cut off. Defaults to "…" if left empty.
-	Truncator   string
+	Truncator string
+	// WrapPolicy configures how displayed text will be broken into lines.
+	WrapPolicy  text.WrapPolicy
 	initialized bool
 	source      stringSource
 	// scratch is a buffer reused to efficiently read text out of the
@@ -182,6 +184,7 @@ func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font,
 	l.text.Alignment = l.Alignment
 	l.text.MaxLines = l.MaxLines
 	l.text.Truncator = l.Truncator
+	l.text.WrapPolicy = l.WrapPolicy
 	l.text.Update(gtx, lt, font, size, l.handleEvents)
 	dims := l.text.Dimensions()
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()

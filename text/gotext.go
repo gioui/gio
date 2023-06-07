@@ -401,11 +401,23 @@ func (s *shaperImpl) shapeText(faces []font.Face, ppem fixed.Int26_6, lc system.
 	return s.outScratchBuf
 }
 
+func wrapPolicyToGoText(p WrapPolicy) shaping.LineBreakPolicy {
+	switch p {
+	case WrapGraphemes:
+		return shaping.Always
+	case WrapWords:
+		return shaping.Never
+	default:
+		return shaping.WhenNecessary
+	}
+}
+
 // shapeAndWrapText invokes the text shaper and returns wrapped lines in the shaper's native format.
 func (s *shaperImpl) shapeAndWrapText(faces []font.Face, params Parameters, txt []rune) (_ []shaping.Line, truncated int) {
 	wc := shaping.WrapConfig{
 		TruncateAfterLines: params.MaxLines,
 		TextContinues:      params.forceTruncate,
+		BreakPolicy:        wrapPolicyToGoText(params.WrapPolicy),
 	}
 	if wc.TruncateAfterLines > 0 {
 		if len(params.Truncator) == 0 {
@@ -416,7 +428,7 @@ func (s *shaperImpl) shapeAndWrapText(faces []font.Face, params Parameters, txt 
 		wc.Truncator = s.shapeText(faces, params.PxPerEm, params.Locale, []rune(params.Truncator))[0]
 	}
 	// Wrap outputs into lines.
-	return s.wrapper.WrapParagraph(wc, params.MaxWidth, txt, s.shapeText(faces, params.PxPerEm, params.Locale, txt)...)
+	return s.wrapper.WrapParagraph(wc, params.MaxWidth, txt, shaping.NewSliceIterator(s.shapeText(faces, params.PxPerEm, params.Locale, txt)))
 }
 
 // replaceControlCharacters replaces problematic unicode

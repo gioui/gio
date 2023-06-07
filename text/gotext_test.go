@@ -10,6 +10,7 @@ import (
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
 	"github.com/go-text/typesetting/font"
 	"github.com/go-text/typesetting/shaping"
+	"golang.org/x/exp/slices"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
 
@@ -235,6 +236,21 @@ func complexGlyph(cluster, runes, glyphs int) shaping.Glyph {
 	}
 }
 
+// copyLines performs a deep copy of the provided lines. This is necessary if you
+// want to use the line wrapper again while also using the lines.
+func copyLines(lines []shaping.Line) []shaping.Line {
+	out := make([]shaping.Line, len(lines))
+	for lineIdx, line := range lines {
+		lineCopy := make([]shaping.Output, len(line))
+		for runIdx, run := range line {
+			lineCopy[runIdx] = run
+			lineCopy[runIdx].Glyphs = slices.Clone(run.Glyphs)
+		}
+		out[lineIdx] = lineCopy
+	}
+	return out
+}
+
 // makeTestText creates a simple and complex(bidi) sample of shaped text at the given
 // font size and wrapped to the given line width. The runeLimit, if nonzero,
 // truncates the sample text to ensure shorter output for expensive tests.
@@ -277,11 +293,13 @@ func makeTestText(shaper *shaperImpl, primaryDir system.TextDirection, fontSize,
 		MaxWidth: lineWidth,
 		Locale:   locale,
 	}, []rune(simpleSource))
+	simpleText = copyLines(simpleText)
 	complexText, _ := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(giofont.Font{}), Parameters{
 		PxPerEm:  fixed.I(fontSize),
 		MaxWidth: lineWidth,
 		Locale:   locale,
 	}, []rune(complexSource))
+	complexText = copyLines(complexText)
 	testShaper(rtlFace, ltrFace)
 	return simpleText, complexText
 }

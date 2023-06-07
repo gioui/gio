@@ -409,6 +409,7 @@ func TestEditorRTL(t *testing.T) {
 
 func TestEditorLigature(t *testing.T) {
 	e := new(Editor)
+	e.WrapPolicy = text.WrapWords
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),

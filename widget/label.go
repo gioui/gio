@@ -28,6 +28,8 @@ type Label struct {
 	// Truncator is the text that will be shown at the end of the final
 	// line if MaxLines is exceeded. Defaults to "…" if empty.
 	Truncator string
+	// WrapPolicy configures how displayed text will be broken into lines.
+	WrapPolicy text.WrapPolicy
 }
 
 // Layout the label with the given shaper, font, size, text, and material.
@@ -35,14 +37,15 @@ func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size 
 	cs := gtx.Constraints
 	textSize := fixed.I(gtx.Sp(size))
 	lt.LayoutString(text.Parameters{
-		Font:      font,
-		PxPerEm:   textSize,
-		MaxLines:  l.MaxLines,
-		Truncator: l.Truncator,
-		Alignment: l.Alignment,
-		MaxWidth:  cs.Max.X,
-		MinWidth:  cs.Min.X,
-		Locale:    gtx.Locale,
+		Font:       font,
+		PxPerEm:    textSize,
+		MaxLines:   l.MaxLines,
+		Truncator:  l.Truncator,
+		Alignment:  l.Alignment,
+		WrapPolicy: l.WrapPolicy,
+		MaxWidth:   cs.Max.X,
+		MinWidth:   cs.Min.X,
+		Locale:     gtx.Locale,
 	}, txt)
 	m := op.Record(gtx.Ops)
 	viewport := image.Rectangle{Max: cs.Max}
