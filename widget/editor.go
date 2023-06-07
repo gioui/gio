@@ -739,10 +739,11 @@ func (e *Editor) CaretCoords() f32.Point {
 	return e.text.CaretCoords()
 }
 
-// Delete runes from the caret position. The sign of runes specifies the
+// Delete runes from the caret position. The sign of the argument specifies the
 // direction to delete: positive is forward, negative is backward.
 //
-// If there is a selection, it is deleted and counts as a single rune.
+// If there is a selection, it is deleted and counts as a single grapheme
+// cluster.
 func (e *Editor) Delete(graphemeClusters int) {
 	e.initBuffer()
 	if graphemeClusters == 0 {
