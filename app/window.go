@@ -375,15 +375,6 @@ func (w *Window) Option(opts ...Option) {
 	}
 }
 
-// ReadClipboard initiates a read of the clipboard in the form
-// of a clipboard.Event. Multiple reads may be coalesced
-// to a single event.
-func (w *Window) ReadClipboard() {
-	w.driverDefer(func(d driver) {
-		d.ReadClipboard()
-	})
-}
-
 // WriteClipboard writes a string to the clipboard.
 func (w *Window) WriteClipboard(s string) {
 	w.driverDefer(func(d driver) {
