@@ -1327,7 +1327,9 @@ func decodeToOutlineQuads(qs *quadSplitter, tr f32.Affine2D, pathData []byte) {
 			q = q.Transform(tr)
 			qs.splitAndEncode(q)
 		case scene.OpCubic:
-			for _, q := range stroke.SplitCubic(scene.DecodeCubic(cmd)) {
+			from, ctrl0, ctrl1, to := scene.DecodeCubic(cmd)
+			qs.scratch = stroke.SplitCubic(from, ctrl0, ctrl1, to, qs.scratch[:0])
+			for _, q := range qs.scratch {
 				q = q.Transform(tr)
 				qs.splitAndEncode(q)
 			}

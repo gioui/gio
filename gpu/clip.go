@@ -12,6 +12,9 @@ type quadSplitter struct {
 	bounds  f32.Rectangle
 	contour uint32
 	d       *drawOps
+
+	// scratch space used by calls to stroke.SplitCubic
+	scratch []stroke.QuadSegment
 }
 
 func encodeQuadTo(data []byte, meta uint32, from, ctrl, to f32.Point) {

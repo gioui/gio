@@ -621,6 +621,7 @@ func StrokePathCommands(style StrokeStyle, scene []byte) StrokeQuads {
 // decodeToStrokeQuads decodes scene commands to quads ready to stroke.
 func decodeToStrokeQuads(pathData []byte) StrokeQuads {
 	quads := make(StrokeQuads, 0, 2*len(pathData)/(scene.CommandSize+4))
+	scratch := make([]QuadSegment, 0, 10)
 	for len(pathData) >= scene.CommandSize+4 {
 		contour := binary.LittleEndian.Uint32(pathData)
 		cmd := ops.DecodeCommand(pathData[4:])
@@ -645,7 +646,9 @@ func decodeToStrokeQuads(pathData []byte) StrokeQuads {
 			}
 			quads = append(quads, quad)
 		case scene.OpCubic:
-			for _, q := range SplitCubic(scene.DecodeCubic(cmd)) {
+			from, ctrl0, ctrl1, to := scene.DecodeCubic(cmd)
+			scratch = SplitCubic(from, ctrl0, ctrl1, to, scratch[:0])
+			for _, q := range scratch {
 				quad := StrokeQuad{
 					Contour: contour,
 					Quad:    q,
@@ -660,8 +663,7 @@ func decodeToStrokeQuads(pathData []byte) StrokeQuads {
 	return quads
 }
 
-func SplitCubic(from, ctrl0, ctrl1, to f32.Point) []QuadSegment {
-	quads := make([]QuadSegment, 0, 10)
+func SplitCubic(from, ctrl0, ctrl1, to f32.Point, quads []QuadSegment) []QuadSegment {
 	// Set the maximum distance proportionally to the longest side
 	// of the bounding rectangle.
 	hull := f32.Rectangle{
