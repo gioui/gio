@@ -34,6 +34,19 @@ type Label struct {
 
 // Layout the label with the given shaper, font, size, text, and material.
 func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, txt string, textMaterial op.CallOp) layout.Dimensions {
+	dims, _ := l.LayoutDetailed(gtx, lt, font, size, txt, textMaterial)
+	return dims
+}
+
+// TextInfo provides metadata about shaped text.
+type TextInfo struct {
+	// Truncated contains the number of runes of text that are represented by a truncator
+	// symbol in the text. If zero, there is no truncator symbol.
+	Truncated int
+}
+
+// Layout the label with the given shaper, font, size, text, and material, returning metadata about the shaped text.
+func (l Label) LayoutDetailed(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, txt string, textMaterial op.CallOp) (layout.Dimensions, TextInfo) {
 	cs := gtx.Constraints
 	textSize := fixed.I(gtx.Sp(size))
 	lt.LayoutString(text.Parameters{
@@ -72,7 +85,7 @@ func (l Label) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size 
 	dims.Size = cs.Constrain(dims.Size)
 	dims.Baseline = dims.Size.Y - it.baseline
 	clipStack.Pop()
-	return dims
+	return dims, TextInfo{Truncated: it.truncated}
 }
 
 func r2p(r clip.Rect) clip.Op {
@@ -90,7 +103,8 @@ type textIterator struct {
 	// the color of the glyphs is undefined and may change unpredictably if the
 	// text contains color glyphs.
 	material op.CallOp
-
+	// truncated tracks the count of truncated runes in the text.
+	truncated int
 	// linesSeen tracks the quantity of line endings this iterator has seen.
 	linesSeen int
 	// lineOff tracks the origin for the glyphs in the current line.
@@ -113,6 +127,10 @@ type textIterator struct {
 // viewport and (if so) updates the iterator's text dimensions to include the glyph.
 func (it *textIterator) processGlyph(g text.Glyph, ok bool) (_ text.Glyph, visibleOrBefore bool) {
 	if it.maxLines > 0 {
+		if g.Flags&text.FlagTruncator != 0 && g.Flags&text.FlagClusterBreak != 0 {
+			// A glyph carrying both of these flags provides the count of truncated runes.
+			it.truncated = g.Runes
+		}
 		if g.Flags&text.FlagLineBreak != 0 {
 			it.linesSeen++
 		}
