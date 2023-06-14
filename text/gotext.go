@@ -6,12 +6,15 @@ import (
 	"bytes"
 	"image"
 	"io"
-	"sort"
+	"log"
+	"os"
 
 	"github.com/go-text/typesetting/di"
 	"github.com/go-text/typesetting/font"
+	"github.com/go-text/typesetting/fontscan"
 	"github.com/go-text/typesetting/language"
 	"github.com/go-text/typesetting/opentype/api"
+	"github.com/go-text/typesetting/opentype/api/metadata"
 	"github.com/go-text/typesetting/shaping"
 	"golang.org/x/exp/slices"
 	"golang.org/x/image/math/fixed"
@@ -19,6 +22,8 @@ import (
 
 	"gioui.org/f32"
 	giofont "gioui.org/font"
+	"gioui.org/font/opentype"
+	"gioui.org/internal/debug"
 	"gioui.org/io/system"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -152,112 +157,17 @@ type runLayout struct {
 	truncator bool
 }
 
-// faceOrderer chooses the order in which faces should be applied to text.
-type faceOrderer struct {
-	def                 giofont.Font
-	faceScratch         []font.Face
-	fontDefaultOrder    map[giofont.Font]int
-	defaultOrderedFonts []giofont.Font
-	faces               map[giofont.Font]font.Face
-	faceToIndex         map[font.Face]int
-	fonts               []giofont.Font
-}
-
-func (f *faceOrderer) insert(fnt giofont.Font, face font.Face) {
-	if len(f.fonts) == 0 {
-		f.def = fnt
-	}
-	if f.fontDefaultOrder == nil {
-		f.fontDefaultOrder = make(map[giofont.Font]int)
-	}
-	if f.faces == nil {
-		f.faces = make(map[giofont.Font]font.Face)
-		f.faceToIndex = make(map[font.Face]int)
-	}
-	f.fontDefaultOrder[fnt] = len(f.faceScratch)
-	f.defaultOrderedFonts = append(f.defaultOrderedFonts, fnt)
-	f.faceScratch = append(f.faceScratch, face)
-	f.fonts = append(f.fonts, fnt)
-	f.faces[fnt] = face
-	f.faceToIndex[face] = f.fontDefaultOrder[fnt]
-}
-
-// resetFontOrder restores the fonts to a predictable order. It should be invoked
-// before any operation searching the fonts.
-func (c *faceOrderer) resetFontOrder() {
-	copy(c.fonts, c.defaultOrderedFonts)
-}
-
-func (c *faceOrderer) indexFor(face font.Face) int {
-	return c.faceToIndex[face]
-}
-
-func (c *faceOrderer) faceFor(idx int) font.Face {
-	if idx < len(c.defaultOrderedFonts) {
-		return c.faces[c.defaultOrderedFonts[idx]]
-	}
-	panic("face index not found")
-}
-
-// TODO(whereswaldon): this function could sort all faces by appropriateness for the
-// given font characteristics. This would ensure that (if possible) text using a
-// fallback font would select similar weights and emphases to the primary font.
-func (c *faceOrderer) sortedFacesForStyle(font giofont.Font) []font.Face {
-	c.resetFontOrder()
-	primary, ok := c.fontForStyle(font)
-	if !ok {
-		font.Typeface = c.def.Typeface
-		primary, ok = c.fontForStyle(font)
-		if !ok {
-			primary = c.def
-		}
-	}
-	return c.sorted(primary)
-}
-
-// fontForStyle returns the closest existing font to the requested font within the
-// same typeface.
-func (c *faceOrderer) fontForStyle(font giofont.Font) (giofont.Font, bool) {
-	if closest, ok := closestFont(font, c.fonts); ok {
-		return closest, true
-	}
-	font.Style = giofont.Regular
-	if closest, ok := closestFont(font, c.fonts); ok {
-		return closest, true
-	}
-	return font, false
-}
-
-// faces returns a slice of faces with primary as the first element and
-// the remaining faces ordered by insertion order.
-func (f *faceOrderer) sorted(primary giofont.Font) []font.Face {
-	// If we find primary, put it first, and omit it from the below sort.
-	lowest := 0
-	for i := range f.fonts {
-		if f.fonts[i] == primary {
-			if i != 0 {
-				f.fonts[0], f.fonts[i] = f.fonts[i], f.fonts[0]
-			}
-			lowest = 1
-			break
-		}
-	}
-	sorting := f.fonts[lowest:]
-	sort.Slice(sorting, func(i, j int) bool {
-		a := sorting[i]
-		b := sorting[j]
-		return f.fontDefaultOrder[a] < f.fontDefaultOrder[b]
-	})
-	for i, font := range f.fonts {
-		f.faceScratch[i] = f.faces[font]
-	}
-	return f.faceScratch
-}
-
 // shaperImpl implements the shaping and line-wrapping of opentype fonts.
 type shaperImpl struct {
 	// Fields for tracking fonts/faces.
-	orderer faceOrderer
+	fontMap      *fontscan.FontMap
+	faces        []font.Face
+	faceToIndex  map[font.Font]int
+	faceMeta     []giofont.Font
+	defaultFaces []string
+	logger       interface {
+		Printf(format string, args ...any)
+	}
 
 	// Shaping and wrapping state.
 	shaper        shaping.HarfbuzzShaper
@@ -274,11 +184,60 @@ type shaperImpl struct {
 	bitmapGlyphCache bitmapCache
 }
 
+// debugLogger only logs messages if debug.Text is true.
+type debugLogger struct {
+	*log.Logger
+}
+
+func newDebugLogger() debugLogger {
+	return debugLogger{Logger: log.New(log.Writer(), "[text] ", log.Default().Flags())}
+}
+
+func (d debugLogger) Printf(format string, args ...any) {
+	if debug.Text.Load() {
+		d.Logger.Printf(format, args...)
+	}
+}
+
+func newShaperImpl(systemFonts bool, collection []FontFace) *shaperImpl {
+	var shaper shaperImpl
+	shaper.logger = newDebugLogger()
+	shaper.fontMap = fontscan.NewFontMap(shaper.logger)
+	shaper.faceToIndex = make(map[font.Font]int)
+	if systemFonts {
+		str, err := os.UserCacheDir()
+		if err != nil {
+			shaper.logger.Printf("failed resolving font cache dir: %v", err)
+			shaper.logger.Printf("skipping system font load")
+		}
+		if err := shaper.fontMap.UseSystemFonts(str); err != nil {
+			shaper.logger.Printf("failed loading system fonts: %v", err)
+		}
+	}
+	for _, f := range collection {
+		shaper.Load(f)
+		shaper.defaultFaces = append(shaper.defaultFaces, string(f.Font.Typeface))
+	}
+	shaper.shaper.SetFontCacheSize(32)
+	return &shaper
+}
+
 // Load registers the provided FontFace with the shaper, if it is compatible.
 // It returns whether the face is now available for use. FontFaces are prioritized
 // in the order in which they are loaded, with the first face being the default.
 func (s *shaperImpl) Load(f FontFace) {
-	s.orderer.insert(f.Font, f.Face.Face())
+	s.fontMap.AddFace(f.Face.Face(), opentype.FontToDescription(f.Font))
+	s.addFace(f.Face.Face(), f.Font)
+}
+
+func (s *shaperImpl) addFace(f font.Face, md giofont.Font) {
+	if _, ok := s.faceToIndex[f.Font]; ok {
+		return
+	}
+	idx := len(s.faces)
+	s.faceToIndex[f.Font] = idx
+	s.faces = append(s.faces, f)
+	s.faceMeta = append(s.faceMeta, md)
 }
 
 // splitByScript divides the inputs into new, smaller inputs on script boundaries
@@ -362,9 +321,26 @@ func (s *shaperImpl) splitBidi(input shaping.Input) []shaping.Input {
 	return splitInputs
 }
 
+// ResolveFace allows shaperImpl to implement shaping.FontMap, wrapping its fontMap
+// field and ensuring that any faces loaded as part of the search are registered with
+// ids so that they can be referred to by a GlyphID.
+func (s *shaperImpl) ResolveFace(r rune) font.Face {
+	face := s.fontMap.ResolveFace(r)
+	if face != nil {
+		family, aspect := s.fontMap.FontMetadata(face.Font)
+		md := opentype.DescriptionToFont(metadata.Description{
+			Family: family,
+			Aspect: aspect,
+		})
+		s.addFace(face, md)
+		return face
+	}
+	return nil
+}
+
 // splitByFaces divides the inputs by font coverage in the provided faces. It will use the slice provided in buf
 // as the backing storage of the returned slice if buf is non-nil.
-func (s *shaperImpl) splitByFaces(inputs []shaping.Input, faces []font.Face, buf []shaping.Input) []shaping.Input {
+func (s *shaperImpl) splitByFaces(inputs []shaping.Input, buf []shaping.Input) []shaping.Input {
 	var split []shaping.Input
 	if buf == nil {
 		split = make([]shaping.Input, 0, len(inputs))
@@ -372,34 +348,78 @@ func (s *shaperImpl) splitByFaces(inputs []shaping.Input, faces []font.Face, buf
 		split = buf
 	}
 	for _, input := range inputs {
-		split = append(split, shaping.SplitByFontGlyphs(input, faces)...)
+		split = append(split, shaping.SplitByFace(input, s)...)
 	}
 	return split
 }
 
 // shapeText invokes the text shaper and returns the raw text data in the shaper's native
 // format. It does not wrap lines.
-func (s *shaperImpl) shapeText(faces []font.Face, ppem fixed.Int26_6, lc system.Locale, txt []rune) []shaping.Output {
-	if len(faces) < 1 {
-		return nil
-	}
+func (s *shaperImpl) shapeText(ppem fixed.Int26_6, lc system.Locale, txt []rune) []shaping.Output {
 	lcfg := langConfig{
 		Language:  language.NewLanguage(lc.Language),
 		Direction: mapDirection(lc.Direction),
 	}
 	// Create an initial input.
-	input := toInput(faces[0], ppem, lcfg, txt)
+	input := toInput(nil, ppem, lcfg, txt)
+	if input.RunStart == input.RunEnd && len(s.faces) > 0 {
+		// Give the empty string a face. This is a necessary special case because
+		// the face splitting process works by resolving faces for each rune, and
+		// the empty string contains no runes.
+		input.Face = s.faces[0]
+	}
 	// Break input on font glyph coverage.
 	inputs := s.splitBidi(input)
-	inputs = s.splitByFaces(inputs, faces, s.splitScratch1[:0])
+	inputs = s.splitByFaces(inputs, s.splitScratch1[:0])
 	inputs = splitByScript(inputs, lcfg.Direction, s.splitScratch2[:0])
 	// Shape all inputs.
 	if needed := len(inputs) - len(s.outScratchBuf); needed > 0 {
 		s.outScratchBuf = slices.Grow(s.outScratchBuf, needed)
 	}
-	s.outScratchBuf = s.outScratchBuf[:len(inputs)]
-	for i := range inputs {
-		s.outScratchBuf[i] = s.shaper.Shape(inputs[i])
+	s.outScratchBuf = s.outScratchBuf[:0]
+	for _, input := range inputs {
+		if input.Face != nil {
+			s.outScratchBuf = append(s.outScratchBuf, s.shaper.Shape(input))
+		} else {
+			s.outScratchBuf = append(s.outScratchBuf, shaping.Output{
+				// Use the text size as the advance of the entire fake run so that
+				// it doesn't occupy zero space.
+				Advance: input.Size,
+				Size:    input.Size,
+				Glyphs: []shaping.Glyph{
+					{
+						Width:        input.Size,
+						Height:       input.Size,
+						XBearing:     0,
+						YBearing:     0,
+						XAdvance:     input.Size,
+						YAdvance:     input.Size,
+						XOffset:      0,
+						YOffset:      0,
+						ClusterIndex: input.RunStart,
+						RuneCount:    input.RunEnd - input.RunStart,
+						GlyphCount:   1,
+						GlyphID:      0,
+						Mask:         0,
+					},
+				},
+				LineBounds: shaping.Bounds{
+					Ascent:  input.Size,
+					Descent: 0,
+					Gap:     0,
+				},
+				GlyphBounds: shaping.Bounds{
+					Ascent:  input.Size,
+					Descent: 0,
+					Gap:     0,
+				},
+				Direction: input.Direction,
+				Runes: shaping.Range{
+					Offset: input.RunStart,
+					Count:  input.RunEnd - input.RunStart,
+				},
+			})
+		}
 	}
 	return s.outScratchBuf
 }
@@ -416,22 +436,26 @@ func wrapPolicyToGoText(p WrapPolicy) shaping.LineBreakPolicy {
 }
 
 // shapeAndWrapText invokes the text shaper and returns wrapped lines in the shaper's native format.
-func (s *shaperImpl) shapeAndWrapText(faces []font.Face, params Parameters, txt []rune) (_ []shaping.Line, truncated int) {
+func (s *shaperImpl) shapeAndWrapText(params Parameters, txt []rune) (_ []shaping.Line, truncated int) {
 	wc := shaping.WrapConfig{
 		TruncateAfterLines: params.MaxLines,
 		TextContinues:      params.forceTruncate,
 		BreakPolicy:        wrapPolicyToGoText(params.WrapPolicy),
 	}
+	s.fontMap.SetQuery(fontscan.Query{
+		Families: []string{string(params.Font.Typeface)},
+		Aspect:   opentype.FontToDescription(params.Font).Aspect,
+	})
 	if wc.TruncateAfterLines > 0 {
 		if len(params.Truncator) == 0 {
 			params.Truncator = "…"
 		}
 		// We only permit a single run as the truncator, regardless of whether more were generated.
 		// Just use the first one.
-		wc.Truncator = s.shapeText(faces, params.PxPerEm, params.Locale, []rune(params.Truncator))[0]
+		wc.Truncator = s.shapeText(params.PxPerEm, params.Locale, []rune(params.Truncator))[0]
 	}
 	// Wrap outputs into lines.
-	return s.wrapper.WrapParagraph(wc, params.MaxWidth, txt, shaping.NewSliceIterator(s.shapeText(faces, params.PxPerEm, params.Locale, txt)))
+	return s.wrapper.WrapParagraph(wc, params.MaxWidth, txt, shaping.NewSliceIterator(s.shapeText(params.PxPerEm, params.Locale, txt)))
 }
 
 // replaceControlCharacters replaces problematic unicode
@@ -494,7 +518,7 @@ func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 	if hasNewline {
 		txt = txt[:len(txt)-1]
 	}
-	ls, truncated := s.shapeAndWrapText(s.orderer.sortedFacesForStyle(params.Font), params, replaceControlCharacters(txt))
+	ls, truncated := s.shapeAndWrapText(params, replaceControlCharacters(txt))
 
 	didTruncate := truncated > 0 || (params.forceTruncate && params.MaxLines == len(ls))
 
@@ -508,7 +532,7 @@ func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 	textLines := make([]line, len(ls))
 	maxHeight := fixed.Int26_6(0)
 	for i := range ls {
-		otLine := toLine(&s.orderer, ls[i], params.Locale.Direction)
+		otLine := toLine(s.faceToIndex, ls[i], params.Locale.Direction)
 		if otLine.lineHeight > maxHeight {
 			maxHeight = otLine.lineHeight
 		}
@@ -597,7 +621,13 @@ func (s *shaperImpl) Shape(pathOps *op.Ops, gs []Glyph) clip.PathSpec {
 			x = g.X
 		}
 		ppem, faceIdx, gid := splitGlyphID(g.ID)
-		face := s.orderer.faceFor(faceIdx)
+		if faceIdx >= len(s.faces) {
+			continue
+		}
+		face := s.faces[faceIdx]
+		if face == nil {
+			continue
+		}
 		scaleFactor := fixedToFloat(ppem) / float32(face.Upem())
 		glyphData := face.GlyphData(gid)
 		switch glyphData := glyphData.(type) {
@@ -671,7 +701,13 @@ func (s *shaperImpl) Bitmaps(ops *op.Ops, gs []Glyph) op.CallOp {
 			x = g.X
 		}
 		_, faceIdx, gid := splitGlyphID(g.ID)
-		face := s.orderer.faceFor(faceIdx)
+		if faceIdx >= len(s.faces) {
+			continue
+		}
+		face := s.faces[faceIdx]
+		if face == nil {
+			continue
+		}
 		glyphData := face.GlyphData(gid)
 		switch glyphData := glyphData.(type) {
 		case api.GlyphBitmap:
@@ -799,7 +835,7 @@ func toGioGlyphs(in []shaping.Glyph, ppem fixed.Int26_6, faceIdx int) []glyph {
 }
 
 // toLine converts the output into a Line with the provided dominant text direction.
-func toLine(orderer *faceOrderer, o shaping.Line, dir system.TextDirection) line {
+func toLine(faceToIndex map[font.Font]int, o shaping.Line, dir system.TextDirection) line {
 	if len(o) < 1 {
 		return line{}
 	}
@@ -813,8 +849,12 @@ func toLine(orderer *faceOrderer, o shaping.Line, dir system.TextDirection) line
 		if run.Size > maxSize {
 			maxSize = run.Size
 		}
+		var font font.Font
+		if run.Face != nil {
+			font = run.Face.Font
+		}
 		line.runs[i] = runLayout{
-			Glyphs: toGioGlyphs(run.Glyphs, run.Size, orderer.indexFor(run.Face)),
+			Glyphs: toGioGlyphs(run.Glyphs, run.Size, faceToIndex[font]),
 			Runes: Range{
 				Count:  run.Runes.Count,
 				Offset: line.runeCount,
@@ -915,44 +955,4 @@ func computeVisualOrder(l *line) {
 		l.runs[runIdx].X = x
 		x += l.runs[runIdx].Advance
 	}
-}
-
-// closestFont returns the closest Font in available by weight.
-// In case of equality the lighter weight will be returned.
-func closestFont(lookup giofont.Font, available []giofont.Font) (giofont.Font, bool) {
-	found := false
-	var match giofont.Font
-	for _, cf := range available {
-		if cf == lookup {
-			return lookup, true
-		}
-		if cf.Typeface != lookup.Typeface || cf.Style != lookup.Style {
-			continue
-		}
-		if !found {
-			found = true
-			match = cf
-			continue
-		}
-		cDist := weightDistance(lookup.Weight, cf.Weight)
-		mDist := weightDistance(lookup.Weight, match.Weight)
-		if cDist < mDist {
-			match = cf
-		} else if cDist == mDist && cf.Weight < match.Weight {
-			match = cf
-		}
-	}
-	return match, found
-}
-
-// weightDistance returns the distance value between two font weights.
-func weightDistance(wa giofont.Weight, wb giofont.Weight) int {
-	// Avoid dealing with negative Weight values.
-	a := int(wa) + 400
-	b := int(wb) + 400
-	diff := a - b
-	if diff < 0 {
-		return -diff
-	}
-	return diff
 }

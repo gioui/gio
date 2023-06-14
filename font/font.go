@@ -3,7 +3,9 @@ Package font provides type describing font faces attributes.
 */
 package font
 
-import "github.com/go-text/typesetting/font"
+import (
+	"github.com/go-text/typesetting/font"
+)
 
 // A FontFace is a Font and a matching Face.
 type FontFace struct {

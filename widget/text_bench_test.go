@@ -86,7 +86,7 @@ func BenchmarkLabelStatic(b *testing.B) {
 			},
 			Locale: locale,
 		}
-		cache := text.NewShaper(benchFonts)
+		cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(benchFonts))
 		if render {
 			win, _ = headless.NewWindow(size.X, size.Y)
 			defer win.Release()
@@ -118,7 +118,7 @@ func BenchmarkLabelDynamic(b *testing.B) {
 			},
 			Locale: locale,
 		}
-		cache := text.NewShaper(benchFonts)
+		cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(benchFonts))
 		if render {
 			win, _ = headless.NewWindow(size.X, size.Y)
 			defer win.Release()
@@ -153,7 +153,7 @@ func BenchmarkEditorStatic(b *testing.B) {
 			},
 			Locale: locale,
 		}
-		cache := text.NewShaper(benchFonts)
+		cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(benchFonts))
 		if render {
 			win, _ = headless.NewWindow(size.X, size.Y)
 			defer win.Release()
@@ -186,7 +186,7 @@ func BenchmarkEditorDynamic(b *testing.B) {
 			},
 			Locale: locale,
 		}
-		cache := text.NewShaper(benchFonts)
+		cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(benchFonts))
 		if render {
 			win, _ = headless.NewWindow(size.X, size.Y)
 			defer win.Release()
@@ -224,7 +224,7 @@ func FuzzEditorEditing(f *testing.F) {
 		},
 		Locale: arabic,
 	}
-	cache := text.NewShaper(benchFonts)
+	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(benchFonts))
 	fontSize := unit.Sp(10)
 	font := font.Font{}
 	e := Editor{}

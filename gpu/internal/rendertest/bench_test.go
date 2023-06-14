@@ -15,6 +15,7 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
+	"gioui.org/text"
 	"gioui.org/widget/material"
 )
 
@@ -33,7 +34,8 @@ func setupBenchmark(b *testing.B) (layout.Context, *headless.Window, *material.T
 		Ops:         ops,
 		Constraints: layout.Exact(sz),
 	}
-	th := material.NewTheme(gofont.Collection())
+	th := material.NewTheme()
+	th.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
 	return gtx, w, th
 }
 

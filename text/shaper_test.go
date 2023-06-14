@@ -22,7 +22,7 @@ func TestWrappingTruncation(t *testing.T) {
 	textInput := "Lorem ipsum dolor sit amet, consectetur adipiscing elit,\nsed do eiusmod tempor incididunt ut labore et\ndolore magna aliqua.\n"
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	collection := []FontFace{{Face: ltrFace}}
-	cache := NewShaper(collection)
+	cache := NewShaper(NoSystemFonts(), WithCollection(collection))
 	cache.LayoutString(Parameters{
 		Alignment: Middle,
 		PxPerEm:   fixed.I(10),
@@ -89,7 +89,7 @@ func TestWrappingForcedTruncation(t *testing.T) {
 	textInput := "Lorem ipsum\ndolor sit\namet"
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	collection := []FontFace{{Face: ltrFace}}
-	cache := NewShaper(collection)
+	cache := NewShaper(NoSystemFonts(), WithCollection(collection))
 	cache.LayoutString(Parameters{
 		Alignment: Middle,
 		PxPerEm:   fixed.I(10),
@@ -165,7 +165,7 @@ func TestShapingNewlineHandling(t *testing.T) {
 		t.Run(fmt.Sprintf("%q", tc.textInput), func(t *testing.T) {
 			ltrFace, _ := opentype.Parse(goregular.TTF)
 			collection := []FontFace{{Face: ltrFace}}
-			cache := NewShaper(collection)
+			cache := NewShaper(NoSystemFonts(), WithCollection(collection))
 			checkGlyphs := func() {
 				glyphs := []Glyph{}
 				for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
@@ -234,7 +234,7 @@ func TestShapingNewlineHandling(t *testing.T) {
 func TestCacheEmptyString(t *testing.T) {
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	collection := []FontFace{{Face: ltrFace}}
-	cache := NewShaper(collection)
+	cache := NewShaper(NoSystemFonts(), WithCollection(collection))
 	cache.LayoutString(Parameters{
 		Alignment: Middle,
 		PxPerEm:   fixed.I(10),
@@ -273,7 +273,7 @@ func TestCacheEmptyString(t *testing.T) {
 func TestCacheAlignment(t *testing.T) {
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	collection := []FontFace{{Face: ltrFace}}
-	cache := NewShaper(collection)
+	cache := NewShaper(NoSystemFonts(), WithCollection(collection))
 	params := Parameters{
 		Alignment: Start,
 		PxPerEm:   fixed.I(10),
@@ -339,7 +339,7 @@ func TestCacheGlyphConverstion(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			cache := NewShaper(collection)
+			cache := NewShaper(NoSystemFonts(), WithCollection(collection))
 			cache.LayoutString(Parameters{
 				PxPerEm:  fixed.I(10),
 				MaxWidth: 200,
@@ -481,7 +481,7 @@ func TestShapeStringRuneAccounting(t *testing.T) {
 				},
 			} {
 				t.Run(setup.kind, func(t *testing.T) {
-					shaper := NewShaper(gofont.Collection())
+					shaper := NewShaper(NoSystemFonts(), WithCollection(gofont.Collection()))
 					setup.do(shaper, tc.params, tc.input)
 
 					glyphs := []Glyph{}

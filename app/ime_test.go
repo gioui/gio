@@ -29,7 +29,7 @@ func FuzzIME(f *testing.F) {
 	f.Add([]byte("20007800002\x02000"))
 	f.Add([]byte("200A02000990\x19002\x17\x0200"))
 	f.Fuzz(func(t *testing.T, cmds []byte) {
-		cache := text.NewShaper(gofont.Collection())
+		cache := text.NewShaper(text.WithCollection(gofont.Collection()))
 		e := new(widget.Editor)
 		e.Focus()
 

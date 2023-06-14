@@ -37,7 +37,7 @@ func TestSelectableMove(t *testing.T) {
 		Ops:    new(op.Ops),
 		Locale: english,
 	}
-	cache := text.NewShaper(gofont.Collection())
+	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fnt := font.Font{}
 	fontSize := unit.Sp(10)
 
@@ -82,7 +82,7 @@ func TestSelectableConfigurations(t *testing.T) {
 		Constraints: layout.Exact(image.Pt(300, 300)),
 		Locale:      english,
 	}
-	cache := text.NewShaper(gofont.Collection())
+	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fontSize := unit.Sp(10)
 	font := font.Font{}
 	sentence := "\n\n\n\n\n\n\n\n\n\n\n\nthe quick brown fox jumps over the lazy dog"

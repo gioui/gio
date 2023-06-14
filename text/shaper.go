@@ -201,6 +201,11 @@ type GlyphID uint64
 
 // Shaper converts strings of text into glyphs that can be displayed.
 type Shaper struct {
+	config struct {
+		disableSystemFonts bool
+		collection         []FontFace
+	}
+	initialized      bool
 	shaper           shaperImpl
 	pathCache        pathCache
 	bitmapShapeCache bitmapShapeCache
@@ -223,26 +228,53 @@ type Shaper struct {
 	err  error
 }
 
+// ShaperOptions configure text shapers.
+type ShaperOption func(*Shaper)
+
+// NoSystemFonts can be used to disable system font loading.
+func NoSystemFonts() ShaperOption {
+	return func(s *Shaper) {
+		s.config.disableSystemFonts = true
+	}
+}
+
+// WithCollection can be used to provide a collection of pre-loaded fonts to the shaper.
+func WithCollection(collection []FontFace) ShaperOption {
+	return func(s *Shaper) {
+		s.config.collection = collection
+	}
+}
+
 // NewShaper constructs a shaper with the provided collection of font faces
 // available.
-func NewShaper(collection []FontFace) *Shaper {
+func NewShaper(options ...ShaperOption) *Shaper {
 	l := &Shaper{}
-	for _, f := range collection {
-		l.shaper.Load(f)
+	for _, opt := range options {
+		opt(l)
 	}
-	l.shaper.shaper.SetFontCacheSize(32)
-	l.reader = bufio.NewReader(nil)
+	l.init()
 	return l
+}
+
+func (l *Shaper) init() {
+	if l.initialized {
+		return
+	}
+	l.initialized = true
+	l.reader = bufio.NewReader(nil)
+	l.shaper = *newShaperImpl(!l.config.disableSystemFonts, l.config.collection)
 }
 
 // Layout text from an io.Reader according to a set of options. Results can be retrieved by
 // iteratively calling NextGlyph.
 func (l *Shaper) Layout(params Parameters, txt io.Reader) {
+	l.init()
 	l.layoutText(params, txt, "")
 }
 
 // LayoutString is Layout for strings.
 func (l *Shaper) LayoutString(params Parameters, str string) {
+	l.init()
 	l.layoutText(params, nil, str)
 }
 
@@ -368,6 +400,7 @@ func (l *Shaper) layoutParagraph(params Parameters, asStr string, asBytes []byte
 // NextGlyph returns the next glyph from the most recent shaping operation, if
 // any. If there are no more glyphs, ok will be false.
 func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
+	l.init()
 	if l.done {
 		return Glyph{}, false
 	}
@@ -535,6 +568,7 @@ func splitGlyphID(g GlyphID) (fixed.Int26_6, int, font.GID) {
 // of all vector glyphs.
 // All glyphs are expected to be from a single line of text (their Y offsets are ignored).
 func (l *Shaper) Shape(gs []Glyph) clip.PathSpec {
+	l.init()
 	key := l.pathCache.hashGlyphs(gs)
 	shape, ok := l.pathCache.Get(key, gs)
 	if ok {
@@ -551,6 +585,7 @@ func (l *Shaper) Shape(gs []Glyph) clip.PathSpec {
 // same gs slice.
 // All glyphs are expected to be from a single line of text (their Y offsets are ignored).
 func (l *Shaper) Bitmaps(gs []Glyph) op.CallOp {
+	l.init()
 	key := l.bitmapShapeCache.hashGlyphs(gs)
 	call, ok := l.bitmapShapeCache.Get(key, gs)
 	if ok {

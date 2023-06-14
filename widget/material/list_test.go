@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"gioui.org/font/gofont"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -45,7 +44,7 @@ func TestListAnchorStrategies(t *testing.T) {
 	var list widget.List
 	list.Axis = layout.Vertical
 	elements := 100
-	th := material.NewTheme(gofont.Collection())
+	th := material.NewTheme()
 	materialList := material.List(th, &list)
 	indicatorWidth := gtx.Dp(materialList.Width())
 

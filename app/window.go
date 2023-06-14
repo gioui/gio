@@ -26,6 +26,7 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
@@ -140,7 +141,8 @@ func NewWindow(options ...Option) *Window {
 	debug.Parse()
 	// Measure decoration height.
 	deco := new(widget.Decorations)
-	theme := material.NewTheme(gofont.Regular())
+	theme := material.NewTheme()
+	theme.Shaper = text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Regular()))
 	decoStyle := material.Decorations(theme, deco, 0, "")
 	gtx := layout.Context{
 		Ops: new(op.Ops),

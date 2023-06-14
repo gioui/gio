@@ -20,7 +20,7 @@ func makePosTestText(fontSize, lineWidth int, alignOpposite bool) (source string
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
 
-	shaper := text.NewShaper([]font.FontFace{
+	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection([]font.FontFace{
 		{
 			Font: font.Font{Typeface: "LTR"},
 			Face: ltrFace,
@@ -29,12 +29,11 @@ func makePosTestText(fontSize, lineWidth int, alignOpposite bool) (source string
 			Font: font.Font{Typeface: "RTL"},
 			Face: rtlFace,
 		},
-	})
+	}))
 	// bidiSource is crafted to contain multiple consecutive RTL runs (by
 	// changing scripts within the RTL).
 	bidiSource := "The quick سماء שלום لا fox تمط שלום غير the lazy dog."
 	ltrParams := text.Parameters{
-		Font:     font.Font{Typeface: "LTR"},
 		PxPerEm:  fixed.I(fontSize),
 		MaxWidth: lineWidth,
 		MinWidth: lineWidth,
@@ -42,7 +41,6 @@ func makePosTestText(fontSize, lineWidth int, alignOpposite bool) (source string
 	}
 	rtlParams := text.Parameters{
 		Alignment: text.End,
-		Font:      font.Font{Typeface: "RTL"},
 		PxPerEm:   fixed.I(fontSize),
 		MaxWidth:  lineWidth,
 		MinWidth:  lineWidth,
@@ -69,7 +67,7 @@ func makeAccountingTestText(str string, fontSize, lineWidth int) (txt []text.Gly
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
 
-	shaper := text.NewShaper([]font.FontFace{{
+	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection([]font.FontFace{{
 		Font: font.Font{Typeface: "LTR"},
 		Face: ltrFace,
 	},
@@ -77,7 +75,7 @@ func makeAccountingTestText(str string, fontSize, lineWidth int) (txt []text.Gly
 			Font: font.Font{Typeface: "RTL"},
 			Face: rtlFace,
 		},
-	})
+	}))
 	params := text.Parameters{
 		PxPerEm:  fixed.I(fontSize),
 		MaxWidth: lineWidth,
@@ -95,7 +93,7 @@ func getGlyphs(fontSize, minWidth, lineWidth int, align text.Alignment, str stri
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
 
-	shaper := text.NewShaper([]font.FontFace{{
+	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection([]font.FontFace{{
 		Font: font.Font{Typeface: "LTR"},
 		Face: ltrFace,
 	},
@@ -103,7 +101,7 @@ func getGlyphs(fontSize, minWidth, lineWidth int, align text.Alignment, str stri
 			Font: font.Font{Typeface: "RTL"},
 			Face: rtlFace,
 		},
-	})
+	}))
 	params := text.Parameters{
 		PxPerEm:   fixed.I(fontSize),
 		Alignment: align,
@@ -230,8 +228,11 @@ func TestIndexPositionBidi(t *testing.T) {
 			glyphs: bidiLTRText,
 			expectedXs: []fixed.Int26_6{
 				0, 626, 1196, 1766, 2051, 2621, 3191, 3444, 3956, 4468, 4753, 7133, 6330, 5738, 5440, 5019, 4753, // Positions on line 0.
+
 				3953, 3185, 2417, 1649, 881, 596, 298, 0, 3953, 4238, 4523, 5093, 5605, 5890, 7905, 7599, 7007, 6156, 5890, // Positions on line 1.
+
 				4660, 3892, 3124, 2356, 1588, 1303, 788, 406, 0, 4660, 4945, 5235, 5805, 6375, 6660, 6934, 7504, 8016, 8528, 8813, // Positions on line 2.
+
 				0, 570, 1140, 1710, 2034, // Positions on line 3.
 			},
 		},
@@ -239,9 +240,13 @@ func TestIndexPositionBidi(t *testing.T) {
 			name:   "bidi rtl",
 			glyphs: bidiRTLText,
 			expectedXs: []fixed.Int26_6{
-				5368, 5994, 6564, 7134, 7419, 7989, 8559, 8812, 9324, 9836, 5368, 5102, 4299, 3707, 3409, 2988, 2722, 2108, 1494, 880, 266, 0, // Positions on line 0.
-				8801, 8503, 8205, 7939, 6572, 6857, 7427, 7939, 6572, 6306, 6000, 5408, 4557, 4291, 3677, 3063, 2449, 1835, 1569, 1054, 672, 266, 0, // Positions on line 1.
-				274, 564, 1134, 1704, 1989, 2263, 2833, 3345, 3857, 4142, 4712, 5282, 5852, 274, 0, // Positions on line 2.
+				2665, 3291, 3861, 4431, 4716, 5286, 5856, 6109, 6621, 7133, 2665, 2380, 1577, 985, 687, 266, 0, // Positions on line 0.
+
+				7886, 7118, 6350, 5582, 4814, 4529, 4231, 3933, 3667, 2300, 2585, 3155, 3667, 2300, 2015, 1709, 1117, 266, 0, // Positions on line 1.
+
+				8794, 8026, 7258, 6490, 5722, 5437, 4922, 4540, 4134, 3868, 0, 290, 860, 1430, 1715, 1989, 2559, 3071, 3583, 3868, // Positions on line 2.
+
+				324, 894, 1464, 2034, 324, 0, // Positions on line 3.
 			},
 		},
 	} {
@@ -352,26 +357,34 @@ func TestIndexPositionLines(t *testing.T) {
 				{
 					xOff:    fixed.Int26_6(0),
 					yOff:    22,
-					glyphs:  20,
-					width:   fixed.Int26_6(9836),
+					glyphs:  15,
+					width:   fixed.Int26_6(7133),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
 				{
 					xOff:    fixed.Int26_6(0),
 					yOff:    41,
-					glyphs:  19,
-					width:   fixed.Int26_6(8801),
+					glyphs:  15,
+					width:   fixed.Int26_6(7886),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
 				{
 					xOff:    fixed.Int26_6(0),
 					yOff:    60,
-					glyphs:  13,
-					width:   fixed.Int26_6(5852),
+					glyphs:  18,
+					width:   fixed.Int26_6(8794),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
+				},
+				{
+					xOff:    fixed.Int26_6(0),
+					yOff:    80,
+					glyphs:  4,
+					width:   fixed.Int26_6(2034),
+					ascent:  fixed.Int26_6(968),
+					descent: fixed.Int26_6(216),
 				},
 			},
 		},
@@ -420,28 +433,36 @@ func TestIndexPositionLines(t *testing.T) {
 			glyphs: bidiRTLTextOpp,
 			expectedLines: []lineInfo{
 				{
-					xOff:    fixed.Int26_6(404),
+					xOff:    fixed.Int26_6(3107),
 					yOff:    22,
-					glyphs:  20,
-					width:   fixed.Int26_6(9836),
+					glyphs:  15,
+					width:   fixed.Int26_6(7133),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
 				{
-					xOff:    fixed.Int26_6(1439),
+					xOff:    fixed.Int26_6(2354),
 					yOff:    41,
-					glyphs:  19,
-					width:   fixed.Int26_6(8801),
+					glyphs:  15,
+					width:   fixed.Int26_6(7886),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
 				{
-					xOff:    fixed.Int26_6(4388),
+					xOff:    fixed.Int26_6(1446),
 					yOff:    60,
-					glyphs:  13,
-					width:   fixed.Int26_6(5852),
+					glyphs:  18,
+					width:   fixed.Int26_6(8794),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
+				},
+				{
+					xOff:    fixed.Int26_6(8206),
+					yOff:    80,
+					glyphs:  4,
+					width:   fixed.Int26_6(2034),
+					ascent:  fixed.Int26_6(968),
+					descent: fixed.Int26_6(216),
 				},
 			},
 		},

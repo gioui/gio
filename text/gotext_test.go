@@ -30,11 +30,12 @@ var arabic = system.Locale{
 }
 
 func testShaper(faces ...giofont.Face) *shaperImpl {
-	shaper := shaperImpl{}
+	ff := make([]FontFace, 0, len(faces))
 	for _, face := range faces {
-		shaper.Load(FontFace{Face: face})
+		ff = append(ff, FontFace{Face: face})
 	}
-	return &shaper
+	shaper := newShaperImpl(false, ff)
+	return shaper
 }
 
 func TestEmptyString(t *testing.T) {
@@ -62,6 +63,18 @@ func TestEmptyString(t *testing.T) {
 	if got := l.bounds; got != exp {
 		t.Errorf("got bounds %+v for empty string; expected %+v", got, exp)
 	}
+}
+
+func TestNoFaces(t *testing.T) {
+	ppem := fixed.I(200)
+	shaper := testShaper()
+
+	// Ensure shaping text with no faces does not panic.
+	shaper.LayoutRunes(Parameters{
+		PxPerEm:  ppem,
+		MaxWidth: 2000,
+		Locale:   english,
+	}, []rune("✨ⷽℎ↞⋇ⱜ⪫⢡⽛⣦␆Ⱨⳏ⳯⒛⭣╎⌞⟻⢇┃➡⬎⩱⸇ⷎ⟅▤⼶⇺⩳⎏⤬⬞ⴈ⋠⿶⢒₍☟⽂ⶦ⫰⭢⌹∼▀⾯⧂❽⩏ⓖ⟅⤔⍇␋⽓ₑ⢳⠑❂⊪⢘⽨⃯▴ⷿ"))
 }
 
 func TestAlignWidth(t *testing.T) {
@@ -288,13 +301,13 @@ func makeTestText(shaper *shaperImpl, primaryDir system.TextDirection, fontSize,
 			rtlSource = string(complexRunes[:runeLimit])
 		}
 	}
-	simpleText, _ := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(giofont.Font{}), Parameters{
+	simpleText, _ := shaper.shapeAndWrapText(Parameters{
 		PxPerEm:  fixed.I(fontSize),
 		MaxWidth: lineWidth,
 		Locale:   locale,
 	}, []rune(simpleSource))
 	simpleText = copyLines(simpleText)
-	complexText, _ := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(giofont.Font{}), Parameters{
+	complexText, _ := shaper.shapeAndWrapText(Parameters{
 		PxPerEm:  fixed.I(fontSize),
 		MaxWidth: lineWidth,
 		Locale:   locale,
@@ -378,7 +391,7 @@ func TestToLine(t *testing.T) {
 					totalInputGlyphs += len(run.Glyphs)
 					totalInputRunes += run.Runes.Count
 				}
-				output := toLine(&shaper.orderer, input, tc.dir)
+				output := toLine(shaper.faceToIndex, input, tc.dir)
 				if output.bounds.Min == (fixed.Point26_6{}) {
 					t.Errorf("line %d: Bounds.Min not populated", i)
 				}
@@ -659,106 +672,6 @@ func TestTextAppend(t *testing.T) {
 			t.Errorf("lines[%d] has y offset %d, <= to previous %d", lineNum, yOff, curY)
 		}
 		curY = yOff
-	}
-}
-
-func TestClosestFontByWeight(t *testing.T) {
-	const (
-		testTF1 giofont.Typeface = "MockFace"
-		testTF2 giofont.Typeface = "TestFace"
-		testTF3 giofont.Typeface = "AnotherFace"
-	)
-	fonts := []giofont.Font{
-		{Typeface: testTF1, Style: giofont.Regular, Weight: giofont.Normal},
-		{Typeface: testTF1, Style: giofont.Regular, Weight: giofont.Light},
-		{Typeface: testTF1, Style: giofont.Regular, Weight: giofont.Bold},
-		{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Thin},
-	}
-	weightOnlyTests := []struct {
-		Lookup   giofont.Weight
-		Expected giofont.Weight
-	}{
-		// Test for existing weights.
-		{Lookup: giofont.Normal, Expected: giofont.Normal},
-		{Lookup: giofont.Light, Expected: giofont.Light},
-		{Lookup: giofont.Bold, Expected: giofont.Bold},
-		// Test for missing weights.
-		{Lookup: giofont.Thin, Expected: giofont.Light},
-		{Lookup: giofont.ExtraLight, Expected: giofont.Light},
-		{Lookup: giofont.Medium, Expected: giofont.Normal},
-		{Lookup: giofont.SemiBold, Expected: giofont.Bold},
-		{Lookup: giofont.ExtraBold, Expected: giofont.Bold},
-	}
-	for _, test := range weightOnlyTests {
-		got, ok := closestFont(giofont.Font{Typeface: testTF1, Weight: test.Lookup}, fonts)
-		if !ok {
-			t.Errorf("expected closest font for %v to exist", test.Lookup)
-		}
-		if got.Weight != test.Expected {
-			t.Errorf("got weight %v, expected %v", got.Weight, test.Expected)
-		}
-	}
-	fonts = []giofont.Font{
-		{Typeface: testTF1, Style: giofont.Regular, Weight: giofont.Light},
-		{Typeface: testTF1, Style: giofont.Regular, Weight: giofont.Bold},
-		{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Normal},
-		{Typeface: testTF3, Style: giofont.Italic, Weight: giofont.Bold},
-	}
-	otherTests := []struct {
-		Lookup         giofont.Font
-		Expected       giofont.Font
-		ExpectedToFail bool
-	}{
-		// Test for existing fonts.
-		{
-			Lookup:   giofont.Font{Typeface: testTF1, Weight: giofont.Light},
-			Expected: giofont.Font{Typeface: testTF1, Style: giofont.Regular, Weight: giofont.Light},
-		},
-		{
-			Lookup:   giofont.Font{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Normal},
-			Expected: giofont.Font{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Normal},
-		},
-		// Test for missing fonts.
-		{
-			Lookup:   giofont.Font{Typeface: testTF1, Weight: giofont.Normal},
-			Expected: giofont.Font{Typeface: testTF1, Style: giofont.Regular, Weight: giofont.Light},
-		},
-		{
-			Lookup:   giofont.Font{Typeface: testTF3, Style: giofont.Italic, Weight: giofont.Normal},
-			Expected: giofont.Font{Typeface: testTF3, Style: giofont.Italic, Weight: giofont.Bold},
-		},
-		{
-			Lookup:   giofont.Font{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Thin},
-			Expected: giofont.Font{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Normal},
-		},
-		{
-			Lookup:   giofont.Font{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Bold},
-			Expected: giofont.Font{Typeface: testTF1, Style: giofont.Italic, Weight: giofont.Normal},
-		},
-		{
-			Lookup:         giofont.Font{Typeface: testTF2, Weight: giofont.Normal},
-			ExpectedToFail: true,
-		},
-		{
-			Lookup:         giofont.Font{Typeface: testTF2, Style: giofont.Italic, Weight: giofont.Normal},
-			ExpectedToFail: true,
-		},
-	}
-	for _, test := range otherTests {
-		got, ok := closestFont(test.Lookup, fonts)
-		if test.ExpectedToFail {
-			if ok {
-				t.Errorf("expected closest font for %v to not exist", test.Lookup)
-			} else {
-				continue
-			}
-		}
-		if !ok {
-			t.Errorf("expected closest font for %v to exist", test.Lookup)
-		}
-		if got != test.Expected {
-			t.Errorf("got %v, expected %v", got, test.Expected)
-		}
 	}
 }
 
