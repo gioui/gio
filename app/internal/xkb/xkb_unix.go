@@ -136,6 +136,10 @@ func (x *Context) LoadKeymap(format int, fd int, size int) error {
 
 func (x *Context) Modifiers() key.Modifiers {
 	var mods key.Modifiers
+	if x.state == nil {
+		return mods
+	}
+
 	if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_CTRL[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
 		mods |= key.ModCtrl
 	}
@@ -219,6 +223,9 @@ func (x *Context) charsForKeycode(keyCode C.xkb_keycode_t) []byte {
 }
 
 func (x *Context) IsRepeatKey(keyCode uint32) bool {
+	if x.state == nil {
+		return false
+	}
 	kc := C.xkb_keycode_t(keyCode)
 	return C.xkb_keymap_key_repeats(x.keyMap, kc) == 1
 }
