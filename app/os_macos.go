@@ -425,7 +425,8 @@ func (w *window) Perform(acts system.Action) {
 		switch a {
 		case system.ActionCenter:
 			r := C.getScreenFrame(window) // the screen size of the window
-			sz := w.config.Size
+			screenScale := float32(C.getScreenBackingScale())
+			sz := w.config.Size.Div(int(screenScale))
 			x := (int(r.size.width) - sz.X) / 2
 			y := (int(r.size.height) - sz.Y) / 2
 			C.setScreenFrame(window, C.CGFloat(x), C.CGFloat(y), C.CGFloat(sz.X), C.CGFloat(sz.Y))
