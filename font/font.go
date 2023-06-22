@@ -20,10 +20,11 @@ type Weight int
 
 // Font specify a particular typeface variant, style and weight.
 type Font struct {
+	// Typeface specifies the name of the family of faces.
 	Typeface Typeface
-	Variant  Variant
-	Style    Style
-	// Weight is the text weight. If zero, Normal is used instead.
+	// Style specifies the kind of text style.
+	Style Style
+	// Weight is the text weight.
 	Weight Weight
 }
 
@@ -36,9 +37,6 @@ type Face interface {
 // Typeface identifies a particular typeface design. The empty
 // string denotes the default typeface.
 type Typeface string
-
-// Variant denotes a typeface variant such as "Mono" or "Smallcaps".
-type Variant string
 
 const (
 	Regular Style = iota

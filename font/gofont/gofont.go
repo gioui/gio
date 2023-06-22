@@ -37,11 +37,11 @@ var (
 
 func loadRegular() {
 	regOnce.Do(func() {
-		face, err := opentype.Parse(goregular.TTF)
+		faces, err := opentype.ParseCollection(goregular.TTF)
 		if err != nil {
 			panic(fmt.Errorf("failed to parse font: %v", err))
 		}
-		reg = []font.FontFace{{Font: font.Font{Typeface: "Go"}, Face: face}}
+		reg = faces
 		collection = append(collection, reg[0])
 	})
 }
@@ -56,17 +56,17 @@ func Regular() []font.FontFace {
 func Collection() []font.FontFace {
 	loadRegular()
 	once.Do(func() {
-		register(font.Font{Style: font.Italic}, goitalic.TTF)
-		register(font.Font{Weight: font.Bold}, gobold.TTF)
-		register(font.Font{Style: font.Italic, Weight: font.Bold}, gobolditalic.TTF)
-		register(font.Font{Weight: font.Medium}, gomedium.TTF)
-		register(font.Font{Weight: font.Medium, Style: font.Italic}, gomediumitalic.TTF)
-		register(font.Font{Variant: "Mono"}, gomono.TTF)
-		register(font.Font{Variant: "Mono", Weight: font.Bold}, gomonobold.TTF)
-		register(font.Font{Variant: "Mono", Weight: font.Bold, Style: font.Italic}, gomonobolditalic.TTF)
-		register(font.Font{Variant: "Mono", Style: font.Italic}, gomonoitalic.TTF)
-		register(font.Font{Variant: "Smallcaps"}, gosmallcaps.TTF)
-		register(font.Font{Variant: "Smallcaps", Style: font.Italic}, gosmallcapsitalic.TTF)
+		register(goitalic.TTF)
+		register(gobold.TTF)
+		register(gobolditalic.TTF)
+		register(gomedium.TTF)
+		register(gomediumitalic.TTF)
+		register(gomono.TTF)
+		register(gomonobold.TTF)
+		register(gomonobolditalic.TTF)
+		register(gomonoitalic.TTF)
+		register(gosmallcaps.TTF)
+		register(gosmallcapsitalic.TTF)
 		// Ensure that any outside appends will not reuse the backing store.
 		n := len(collection)
 		collection = collection[:n:n]
@@ -74,11 +74,10 @@ func Collection() []font.FontFace {
 	return collection
 }
 
-func register(fnt font.Font, ttf []byte) {
-	face, err := opentype.Parse(ttf)
+func register(ttf []byte) {
+	faces, err := opentype.ParseCollection(ttf)
 	if err != nil {
 		panic(fmt.Errorf("failed to parse font: %v", err))
 	}
-	fnt.Typeface = "Go"
-	collection = append(collection, font.FontFace{Font: fnt, Face: face})
+	collection = append(collection, faces[0])
 }

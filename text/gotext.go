@@ -895,7 +895,7 @@ func closestFont(lookup giofont.Font, available []giofont.Font) (giofont.Font, b
 		if cf == lookup {
 			return lookup, true
 		}
-		if cf.Typeface != lookup.Typeface || cf.Variant != lookup.Variant || cf.Style != lookup.Style {
+		if cf.Typeface != lookup.Typeface || cf.Style != lookup.Style {
 			continue
 		}
 		if !found {
