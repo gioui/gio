@@ -51,7 +51,7 @@ type IconButtonStyle struct {
 }
 
 func Button(th *Theme, button *widget.Clickable, txt string) ButtonStyle {
-	return ButtonStyle{
+	b := ButtonStyle{
 		Text:         txt,
 		Color:        th.Palette.ContrastFg,
 		CornerRadius: 4,
@@ -64,6 +64,8 @@ func Button(th *Theme, button *widget.Clickable, txt string) ButtonStyle {
 		Button: button,
 		shaper: th.Shaper,
 	}
+	b.Font.Typeface = th.Face
+	return b
 }
 
 func ButtonLayout(th *Theme, button *widget.Clickable) ButtonLayoutStyle {

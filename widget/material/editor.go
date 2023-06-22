@@ -33,7 +33,10 @@ type EditorStyle struct {
 
 func Editor(th *Theme, editor *widget.Editor, hint string) EditorStyle {
 	return EditorStyle{
-		Editor:         editor,
+		Editor: editor,
+		Font: font.Font{
+			Typeface: th.Face,
+		},
 		TextSize:       th.TextSize,
 		Color:          th.Palette.Fg,
 		shaper:         th.Shaper,

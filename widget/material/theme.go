@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/exp/shiny/materialdesign/icons"
 
+	"gioui.org/font"
 	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
@@ -41,6 +42,8 @@ type Theme struct {
 		RadioChecked      *widget.Icon
 		RadioUnchecked    *widget.Icon
 	}
+	// Face selects the default typeface for text.
+	Face font.Typeface
 
 	// FingerSize is the minimum touch target size.
 	FingerSize unit.Dp

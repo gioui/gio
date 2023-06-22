@@ -105,13 +105,15 @@ func Overline(th *Theme, txt string) LabelStyle {
 }
 
 func Label(th *Theme, size unit.Sp, txt string) LabelStyle {
-	return LabelStyle{
+	l := LabelStyle{
 		Text:           txt,
 		Color:          th.Palette.Fg,
 		SelectionColor: f32color.MulAlpha(th.Palette.ContrastBg, 0x60),
 		TextSize:       size,
 		Shaper:         th.Shaper,
 	}
+	l.Font.Typeface = th.Face
+	return l
 }
 
 func (l LabelStyle) Layout(gtx layout.Context) layout.Dimensions {
