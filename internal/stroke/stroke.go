@@ -677,13 +677,14 @@ func SplitCubic(from, ctrl0, ctrl1, to f32.Point, quads []QuadSegment) []QuadSeg
 	if h := hull.Dy(); h > l {
 		l = h
 	}
-	approxCubeTo(&quads, 0, l*0.001, from, ctrl0, ctrl1, to)
+	maxDist := l * 0.001
+	approxCubeTo(&quads, 0, maxDist*maxDist, from, ctrl0, ctrl1, to)
 	return quads
 }
 
 // approxCubeTo approximates a cubic Bézier by a series of quadratic
 // curves.
-func approxCubeTo(quads *[]QuadSegment, splits int, maxDist float32, from, ctrl0, ctrl1, to f32.Point) int {
+func approxCubeTo(quads *[]QuadSegment, splits int, maxDistSq float32, from, ctrl0, ctrl1, to f32.Point) int {
 	// The idea is from
 	// https://caffeineowl.com/graphics/2d/vectorial/cubic2quad01.html
 	// where a quadratic approximates a cubic by eliminating its t³ term
@@ -722,7 +723,7 @@ func approxCubeTo(quads *[]QuadSegment, splits int, maxDist float32, from, ctrl0
 	// To save a square root, compare d² with the squared tolerance.
 	v := to.Sub(ctrl1.Mul(3)).Add(ctrl0.Mul(3)).Sub(from)
 	d2 := (v.X*v.X + v.Y*v.Y) * 3 / (36 * 36)
-	if d2 <= maxDist*maxDist {
+	if d2 <= maxDistSq {
 		*quads = append(*quads, QuadSegment{From: from, Ctrl: c, To: to})
 		return splits
 	}
@@ -735,7 +736,7 @@ func approxCubeTo(quads *[]QuadSegment, splits int, maxDist float32, from, ctrl0
 	c12 := c1.Add(c2.Sub(c1).Mul(t))
 	c0112 := c01.Add(c12.Sub(c01).Mul(t))
 	splits++
-	splits = approxCubeTo(quads, splits, maxDist, from, c0, c01, c0112)
-	splits = approxCubeTo(quads, splits, maxDist, c0112, c12, c2, to)
+	splits = approxCubeTo(quads, splits, maxDistSq, from, c0, c01, c0112)
+	splits = approxCubeTo(quads, splits, maxDistSq, c0112, c12, c2, to)
 	return splits
 }
