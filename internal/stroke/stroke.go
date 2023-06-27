@@ -709,7 +709,11 @@ func approxCubeTo(quads *[]QuadSegment, splits int, maxDistSq float32, from, ctr
 	// and use the midpoint between the two curves Q1 and Q2 as control point:
 	//
 	// C = (3ctrl0 - pen + 3ctrl1 - to)/4
-	c := ctrl0.Mul(3).Sub(from).Add(ctrl1.Mul(3)).Sub(to).Mul(1.0 / 4.0)
+	// using, q0 := 3ctrl0 - pen, q1 := 3ctrl1 - to
+	// C = (q0 + q1)/4
+	q0 := ctrl0.Mul(3).Sub(from)
+	q1 := ctrl1.Mul(3).Sub(to)
+	c := q0.Add(q1).Mul(1.0 / 4.0)
 	const maxSplits = 32
 	if splits >= maxSplits {
 		*quads = append(*quads, QuadSegment{From: from, Ctrl: c, To: to})
@@ -718,10 +722,12 @@ func approxCubeTo(quads *[]QuadSegment, splits int, maxDistSq float32, from, ctr
 	// The maximum distance between the cubic P and its approximation Q given t
 	// can be shown to be
 	//
-	// d = sqrt(3)/36*|to - 3ctrl1 + 3ctrl0 - pen|
+	// d = sqrt(3)/36 * |to - 3ctrl1 + 3ctrl0 - pen|
+	// reusing, q0 := 3ctrl0 - pen, q1 := 3ctrl1 - to
+	// d = sqrt(3)/36 * |-q1 + q0|
 	//
 	// To save a square root, compare d² with the squared tolerance.
-	v := to.Sub(ctrl1.Mul(3)).Add(ctrl0.Mul(3)).Sub(from)
+	v := q0.Sub(q1)
 	d2 := (v.X*v.X + v.Y*v.Y) * 3 / (36 * 36)
 	if d2 <= maxDistSq {
 		*quads = append(*quads, QuadSegment{From: from, Ctrl: c, To: to})
