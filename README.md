@@ -24,3 +24,12 @@ account is required and you can post without being subscribed.
 See the [contribution guide](https://gioui.org/doc/contribute) for more details.
 
 An [official GitHub mirror](https://github.com/gioui/gio) is available.
+
+## Tags
+
+Pre-1.0 tags are provided for reference only, and do not designate releases with ongoing support. Bugfixes will not be backported to older tags.
+
+Tags follow semantic versioning. In particular, as the major version is zero:
+
+- breaking API or behavior changes will increment the *minor* version component.
+- non-breaking changes will increment the *patch* version component.
