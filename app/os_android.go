@@ -338,20 +338,6 @@ func (w *window) NewContext() (context, error) {
 func dataDir() (string, error) {
 	dataDirOnce.Do(func() {
 		dataPath = <-dataDirChan
-		// Set XDG_CACHE_HOME to make os.UserCacheDir work.
-		if _, exists := os.LookupEnv("XDG_CACHE_HOME"); !exists {
-			cachePath := filepath.Join(dataPath, "cache")
-			os.Setenv("XDG_CACHE_HOME", cachePath)
-		}
-		// Set XDG_CONFIG_HOME to make os.UserConfigDir work.
-		if _, exists := os.LookupEnv("XDG_CONFIG_HOME"); !exists {
-			cfgPath := filepath.Join(dataPath, "config")
-			os.Setenv("XDG_CONFIG_HOME", cfgPath)
-		}
-		// Set HOME to make os.UserHomeDir work.
-		if _, exists := os.LookupEnv("HOME"); !exists {
-			os.Setenv("HOME", dataPath)
-		}
 	})
 	return dataPath, nil
 }
@@ -389,6 +375,22 @@ func Java_org_gioui_Gio_runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyt
 	}
 	n := C.jni_GetArrayLength(env, jdataDir)
 	dataDir := C.GoStringN((*C.char)(unsafe.Pointer(dirBytes)), n)
+
+	// Set XDG_CACHE_HOME to make os.UserCacheDir work.
+	if _, exists := os.LookupEnv("XDG_CACHE_HOME"); !exists {
+		cachePath := filepath.Join(dataDir, "cache")
+		os.Setenv("XDG_CACHE_HOME", cachePath)
+	}
+	// Set XDG_CONFIG_HOME to make os.UserConfigDir work.
+	if _, exists := os.LookupEnv("XDG_CONFIG_HOME"); !exists {
+		cfgPath := filepath.Join(dataDir, "config")
+		os.Setenv("XDG_CONFIG_HOME", cfgPath)
+	}
+	// Set HOME to make os.UserHomeDir work.
+	if _, exists := os.LookupEnv("HOME"); !exists {
+		os.Setenv("HOME", dataDir)
+	}
+
 	dataDirChan <- dataDir
 	C.jni_ReleaseByteArrayElements(env, jdataDir, dirBytes)
 
