@@ -168,6 +168,7 @@ type shaperImpl struct {
 	logger       interface {
 		Printf(format string, args ...any)
 	}
+	parser parser
 
 	// Shaping and wrapping state.
 	shaper        shaping.HarfbuzzShaper
@@ -442,8 +443,17 @@ func (s *shaperImpl) shapeAndWrapText(params Parameters, txt []rune) (_ []shapin
 		TextContinues:      params.forceTruncate,
 		BreakPolicy:        wrapPolicyToGoText(params.WrapPolicy),
 	}
+	families := s.defaultFaces
+	if params.Font.Typeface != "" {
+		parsed, err := s.parser.parse(string(params.Font.Typeface))
+		if err != nil {
+			s.logger.Printf("Unable to parse typeface %q: %v", params.Font.Typeface, err)
+		} else {
+			families = parsed
+		}
+	}
 	s.fontMap.SetQuery(fontscan.Query{
-		Families: []string{string(params.Font.Typeface)},
+		Families: families,
 		Aspect:   opentype.FontToDescription(params.Font).Aspect,
 	})
 	if wc.TruncateAfterLines > 0 {
