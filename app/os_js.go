@@ -373,6 +373,10 @@ func (w *window) keyEvent(e js.Value, ks key.State) {
 			State:     ks,
 		}
 		w.w.Event(cmd)
+
+		if cmd.Name == key.NameTab {
+			e.Call("preventDefault")
+		}
 	}
 }
 
