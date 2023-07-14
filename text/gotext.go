@@ -74,6 +74,9 @@ type line struct {
 	// descent is the height below the baseline, including
 	// the line gap.
 	descent fixed.Int26_6
+	// lineHeight captures the gap that should exist between the baseline of this
+	// line and the previous (if any).
+	lineHeight fixed.Int26_6
 	// bounds is the visible bounds of the line.
 	bounds fixed.Rectangle26_6
 	// direction is the dominant direction of the line. This direction will be
@@ -471,13 +474,17 @@ func (s *shaperImpl) Layout(params Parameters, txt io.RuneReader) document {
 }
 
 func calculateYOffsets(lines []line) {
-	currentY := 0
-	prevDesc := fixed.I(0)
+	if len(lines) < 1 {
+		return
+	}
+	// Ceil the first value to ensure that we don't baseline it too close to the top of the
+	// viewport and cut off the top pixel.
+	currentY := fixed.I(lines[0].ascent.Ceil())
 	for i := range lines {
-		ascent, descent := lines[i].ascent, lines[i].descent
-		currentY += (prevDesc + ascent).Ceil()
-		lines[i].yOffset = currentY
-		prevDesc = descent
+		if i > 0 {
+			currentY += lines[i].lineHeight
+		}
+		lines[i].yOffset = currentY.Round()
 	}
 }
 
@@ -499,8 +506,12 @@ func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 	}
 	// Convert to Lines.
 	textLines := make([]line, len(ls))
+	maxHeight := fixed.Int26_6(0)
 	for i := range ls {
 		otLine := toLine(&s.orderer, ls[i], params.Locale.Direction)
+		if otLine.lineHeight > maxHeight {
+			maxHeight = otLine.lineHeight
+		}
 		isFinalLine := i == len(ls)-1
 		if isFinalLine && hasNewline {
 			// If there was a trailing newline update the rune counts to include
@@ -547,6 +558,17 @@ func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 			}
 		}
 		textLines[i] = otLine
+	}
+	if params.LineHeight != 0 {
+		maxHeight = params.LineHeight
+	}
+	if params.LineHeightScale == 0 {
+		params.LineHeightScale = 1.2
+	}
+
+	maxHeight = floatToFixed(fixedToFloat(maxHeight) * params.LineHeightScale)
+	for i := range textLines {
+		textLines[i].lineHeight = maxHeight
 	}
 	calculateYOffsets(textLines)
 	return document{
@@ -631,6 +653,10 @@ func (s *shaperImpl) Shape(pathOps *op.Ops, gs []Glyph) clip.PathSpec {
 
 func fixedToFloat(i fixed.Int26_6) float32 {
 	return float32(i) / 64.0
+}
+
+func floatToFixed(f float32) fixed.Int26_6 {
+	return fixed.Int26_6(f * 64)
 }
 
 // Bitmaps returns an op.CallOp that will display all bitmap glyphs within gs.
@@ -781,8 +807,12 @@ func toLine(orderer *faceOrderer, o shaping.Line, dir system.TextDirection) line
 		runs:      make([]runLayout, len(o)),
 		direction: dir,
 	}
+	maxSize := fixed.Int26_6(0)
 	for i := range o {
 		run := o[i]
+		if run.Size > maxSize {
+			maxSize = run.Size
+		}
 		line.runs[i] = runLayout{
 			Glyphs: toGioGlyphs(run.Glyphs, run.Size, orderer.indexFor(run.Face)),
 			Runes: Range{
@@ -810,6 +840,7 @@ func toLine(orderer *faceOrderer, o shaping.Line, dir system.TextDirection) line
 			line.descent = -run.LineBounds.Descent + run.LineBounds.Gap
 		}
 	}
+	line.lineHeight = maxSize
 	computeVisualOrder(&line)
 	// Account for glyphs hanging off of either side in the bounds.
 	if len(line.visualOrder) > 0 {

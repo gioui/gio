@@ -62,6 +62,16 @@ type Parameters struct {
 	// Locale provides primary direction and language information for the shaped text.
 	Locale system.Locale
 
+	// LineHeightScale is a scaling factor applied to the LineHeight of a paragraph. If zero, a default
+	// value of 1.2 will be used.
+	LineHeightScale float32
+
+	// LineHeight is the distance between the baselines of two lines of text. If zero, the PxPerEm
+	// of the any given paragraph will set the LineHeight of that paragraph. This value will be
+	// scaled by LineHeightScale, so applications desiring a specific fixed value
+	// should set LineHeightScale to 1.
+	LineHeight fixed.Int26_6
+
 	// forceTruncate controls whether the truncator string is inserted on the final line of
 	// text with a MaxLines. It is unexported because this behavior only makes sense for the
 	// shaper to control when it iterates paragraphs of text.
@@ -334,16 +344,18 @@ func (l *Shaper) layoutParagraph(params Parameters, asStr string, asBytes []byte
 	}
 	// Alignment is not part of the cache key because changing it does not impact shaping.
 	lk := layoutKey{
-		ppem:          params.PxPerEm,
-		maxWidth:      params.MaxWidth,
-		minWidth:      params.MinWidth,
-		maxLines:      params.MaxLines,
-		truncator:     params.Truncator,
-		locale:        params.Locale,
-		font:          params.Font,
-		forceTruncate: params.forceTruncate,
-		wrapPolicy:    params.WrapPolicy,
-		str:           asStr,
+		ppem:            params.PxPerEm,
+		maxWidth:        params.MaxWidth,
+		minWidth:        params.MinWidth,
+		maxLines:        params.MaxLines,
+		truncator:       params.Truncator,
+		locale:          params.Locale,
+		font:            params.Font,
+		forceTruncate:   params.forceTruncate,
+		wrapPolicy:      params.WrapPolicy,
+		str:             asStr,
+		lineHeight:      params.LineHeight,
+		lineHeightScale: params.LineHeightScale,
 	}
 	if l, ok := l.layoutCache.Get(lk); ok {
 		return l
