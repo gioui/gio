@@ -674,7 +674,7 @@ func (s *shaperImpl) Bitmaps(ops *op.Ops, gs []Glyph) op.CallOp {
 			}
 			off := op.Affine(f32.Affine2D{}.Offset(f32.Point{
 				X: fixedToFloat((g.X - x) - g.Offset.X),
-				Y: fixedToFloat(g.Offset.Y - g.Ascent),
+				Y: fixedToFloat(g.Offset.Y + g.Bounds.Min.Y),
 			})).Push(ops)
 			cl := clip.Rect{Max: imgSize}.Push(ops)
 
