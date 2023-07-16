@@ -358,6 +358,8 @@ func (w *window) keyboard(hint key.InputHint) {
 		m = "url"
 	case key.HintTelephone:
 		m = "tel"
+	case key.HintPassword:
+		m = "password"
 	default:
 		m = "text"
 	}
