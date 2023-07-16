@@ -153,6 +153,8 @@ const (
 	HintURL
 	// HintTelephone hints that telephone number input is expected. It may activate shortcuts for 0-9, "#" and "*".
 	HintTelephone
+	// HintPassword hints that password input is expected. It may disable autocorrection and enable password autofill.
+	HintPassword
 )
 
 // State is the state of a key during an event.

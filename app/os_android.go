@@ -1150,6 +1150,7 @@ func (w *window) SetInputHint(mode key.InputHint) {
 		TYPE_CLASS_TEXT                   = 1
 		TYPE_TEXT_VARIATION_EMAIL_ADDRESS = 32
 		TYPE_TEXT_VARIATION_URI           = 16
+		TYPE_TEXT_VARIATION_PASSWORD      = 128
 		TYPE_TEXT_FLAG_CAP_SENTENCES      = 16384
 		TYPE_TEXT_FLAG_AUTO_CORRECT       = 32768
 
@@ -1173,6 +1174,8 @@ func (w *window) SetInputHint(mode key.InputHint) {
 			m = TYPE_CLASS_TEXT | TYPE_TEXT_VARIATION_URI
 		case key.HintTelephone:
 			m = TYPE_CLASS_PHONE
+		case key.HintPassword:
+			m = TYPE_CLASS_TEXT | TYPE_TEXT_VARIATION_PASSWORD
 		default:
 			m = TYPE_CLASS_TEXT
 		}
