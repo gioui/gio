@@ -16,6 +16,7 @@ import (
 	"gioui.org/f32"
 	"gioui.org/font/gofont"
 	"gioui.org/gpu"
+	"gioui.org/internal/debug"
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
@@ -136,6 +137,7 @@ type queue struct {
 // Calling NewWindow more than once is not supported on
 // iOS, Android, WebAssembly.
 func NewWindow(options ...Option) *Window {
+	debug.Parse()
 	// Measure decoration height.
 	deco := new(widget.Decorations)
 	theme := material.NewTheme(gofont.Regular())
