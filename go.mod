@@ -1,6 +1,6 @@
 module gioui.org
 
-go 1.18
+go 1.19
 
 require (
 	eliasnaur.com/font v0.0.0-20230308162249-dd43949cb42d

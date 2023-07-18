@@ -16,7 +16,7 @@ environment:
 tasks:
  - install_go: |
      mkdir -p /home/build/sdk
-     curl https://dl.google.com/go/go1.18.9.freebsd-amd64.tar.gz | tar -C /home/build/sdk -xzf -
+     curl https://dl.google.com/go/go1.19.11.freebsd-amd64.tar.gz | tar -C /home/build/sdk -xzf -
  - test_gio: |
      cd gio
      go test ./...
