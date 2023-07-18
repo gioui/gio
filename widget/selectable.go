@@ -59,9 +59,15 @@ type Selectable struct {
 	// if text was cut off. Defaults to "…" if left empty.
 	Truncator string
 	// WrapPolicy configures how displayed text will be broken into lines.
-	WrapPolicy  text.WrapPolicy
-	initialized bool
-	source      stringSource
+	WrapPolicy text.WrapPolicy
+	// LineHeight controls the distance between the baselines of lines of text.
+	// If zero, a sensible default will be used.
+	LineHeight unit.Sp
+	// LineHeightScale applies a scaling factor to the LineHeight. If zero, a
+	// sensible default will be used.
+	LineHeightScale float32
+	initialized     bool
+	source          stringSource
 	// scratch is a buffer reused to efficiently read text out of the
 	// textView.
 	scratch      []byte
@@ -181,6 +187,8 @@ func (l *Selectable) Truncated() bool {
 // paint material for the text and selection rectangles, respectively.
 func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, textMaterial, selectionMaterial op.CallOp) layout.Dimensions {
 	l.initialize()
+	l.text.LineHeight = l.LineHeight
+	l.text.LineHeightScale = l.LineHeightScale
 	l.text.Alignment = l.Alignment
 	l.text.MaxLines = l.MaxLines
 	l.text.Truncator = l.Truncator

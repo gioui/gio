@@ -44,6 +44,12 @@ type textSource interface {
 // be scrolled, and for configuring and drawing text selection boxes.
 type textView struct {
 	Alignment text.Alignment
+	// LineHeight controls the distance between the baselines of lines of text.
+	// If zero, a sensible default will be used.
+	LineHeight unit.Sp
+	// LineHeightScale applies a scaling factor to the LineHeight. If zero, a
+	// sensible default will be used.
+	LineHeightScale float32
 	// SingleLine forces the text to stay on a single line.
 	// SingleLine also sets the scrolling direction to
 	// horizontal.
@@ -271,6 +277,14 @@ func (e *textView) Update(gtx layout.Context, lt *text.Shaper, font font.Font, s
 	}
 	if e.WrapPolicy != e.params.WrapPolicy {
 		e.params.WrapPolicy = e.WrapPolicy
+		e.invalidate()
+	}
+	if lh := fixed.I(gtx.Sp(e.LineHeight)); lh != e.params.LineHeight {
+		e.params.LineHeight = lh
+		e.invalidate()
+	}
+	if e.LineHeightScale != e.params.LineHeightScale {
+		e.params.LineHeightScale = e.LineHeightScale
 		e.invalidate()
 	}
 

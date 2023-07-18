@@ -30,6 +30,12 @@ type Label struct {
 	Truncator string
 	// WrapPolicy configures how displayed text will be broken into lines.
 	WrapPolicy text.WrapPolicy
+	// LineHeight controls the distance between the baselines of lines of text.
+	// If zero, a sensible default will be used.
+	LineHeight unit.Sp
+	// LineHeightScale applies a scaling factor to the LineHeight. If zero, a
+	// sensible default will be used.
+	LineHeightScale float32
 }
 
 // Layout the label with the given shaper, font, size, text, and material.
@@ -49,16 +55,19 @@ type TextInfo struct {
 func (l Label) LayoutDetailed(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, txt string, textMaterial op.CallOp) (layout.Dimensions, TextInfo) {
 	cs := gtx.Constraints
 	textSize := fixed.I(gtx.Sp(size))
+	lineHeight := fixed.I(gtx.Sp(l.LineHeight))
 	lt.LayoutString(text.Parameters{
-		Font:       font,
-		PxPerEm:    textSize,
-		MaxLines:   l.MaxLines,
-		Truncator:  l.Truncator,
-		Alignment:  l.Alignment,
-		WrapPolicy: l.WrapPolicy,
-		MaxWidth:   cs.Max.X,
-		MinWidth:   cs.Min.X,
-		Locale:     gtx.Locale,
+		Font:            font,
+		PxPerEm:         textSize,
+		MaxLines:        l.MaxLines,
+		Truncator:       l.Truncator,
+		Alignment:       l.Alignment,
+		WrapPolicy:      l.WrapPolicy,
+		MaxWidth:        cs.Max.X,
+		MinWidth:        cs.Min.X,
+		Locale:          gtx.Locale,
+		LineHeight:      lineHeight,
+		LineHeightScale: l.LineHeightScale,
 	}, txt)
 	m := op.Record(gtx.Ops)
 	viewport := image.Rectangle{Max: cs.Max}

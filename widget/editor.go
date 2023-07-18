@@ -35,6 +35,12 @@ type Editor struct {
 	text textView
 	// Alignment controls the alignment of text within the editor.
 	Alignment text.Alignment
+	// LineHeight determines the gap between baselines of text. If zero, a sensible
+	// default will be used.
+	LineHeight unit.Sp
+	// LineHeightScale is multiplied by LineHeight to determine the final gap
+	// between baselines. If zero, a sensible default will be used.
+	LineHeightScale float32
 	// SingleLine force the text to stay on a single line.
 	// SingleLine also sets the scrolling direction to
 	// horizontal.
@@ -504,6 +510,8 @@ func (e *Editor) initBuffer() {
 		e.text.SetSource(e.buffer)
 	}
 	e.text.Alignment = e.Alignment
+	e.text.LineHeight = e.LineHeight
+	e.text.LineHeightScale = e.LineHeightScale
 	e.text.SingleLine = e.SingleLine
 	e.text.Mask = e.Mask
 	e.text.WrapPolicy = e.WrapPolicy

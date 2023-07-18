@@ -38,6 +38,12 @@ type LabelStyle struct {
 	Text string
 	// TextSize determines the size of the text glyphs.
 	TextSize unit.Sp
+	// LineHeight controls the distance between the baselines of lines of text.
+	// If zero, a sensible default will be used.
+	LineHeight unit.Sp
+	// LineHeightScale applies a scaling factor to the LineHeight. If zero, a
+	// sensible default will be used.
+	LineHeightScale float32
 
 	// Shaper is the text shaper used to display this labe. This field is automatically
 	// set using by all constructor functions. If constructing a LabelStyle literal, you
@@ -132,13 +138,17 @@ func (l LabelStyle) Layout(gtx layout.Context) layout.Dimensions {
 		l.State.MaxLines = l.MaxLines
 		l.State.Truncator = l.Truncator
 		l.State.WrapPolicy = l.WrapPolicy
+		l.State.LineHeight = l.LineHeight
+		l.State.LineHeightScale = l.LineHeightScale
 		return l.State.Layout(gtx, l.Shaper, l.Font, l.TextSize, textColor, selectColor)
 	}
 	tl := widget.Label{
-		Alignment:  l.Alignment,
-		MaxLines:   l.MaxLines,
-		Truncator:  l.Truncator,
-		WrapPolicy: l.WrapPolicy,
+		Alignment:       l.Alignment,
+		MaxLines:        l.MaxLines,
+		Truncator:       l.Truncator,
+		WrapPolicy:      l.WrapPolicy,
+		LineHeight:      l.LineHeight,
+		LineHeightScale: l.LineHeightScale,
 	}
 	return tl.Layout(gtx, l.Shaper, l.Font, l.TextSize, l.Text, textColor)
 }
