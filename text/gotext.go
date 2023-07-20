@@ -525,10 +525,23 @@ func calculateYOffsets(lines []line) {
 // LayoutRunes shapes and wraps the text, and returns the result in Gio's shaped text format.
 func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 	hasNewline := len(txt) > 0 && txt[len(txt)-1] == '\n'
+	justNewline := false
 	if hasNewline {
 		txt = txt[:len(txt)-1]
+		if len(txt) == 0 {
+			// If we only have a newline, shape a space to get line metrics.
+			txt = []rune{' '}
+			justNewline = true
+		}
 	}
 	ls, truncated := s.shapeAndWrapText(params, replaceControlCharacters(txt))
+	if justNewline {
+		// We shaped a space to get proper line metrics, but we need to drop
+		// the rune/glyph info since it isn't actually part of the text.
+		ls[0][0].Glyphs = ls[0][0].Glyphs[:0]
+		ls[0][0].Runes.Count = 0
+		ls[0][0].Advance = 0
+	}
 
 	didTruncate := truncated > 0 || (params.forceTruncate && params.MaxLines == len(ls))
 
