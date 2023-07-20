@@ -15,6 +15,8 @@ github.com/go-text/typesetting v0.0.0-20230712171355-59e4e8ecaa7b h1:kNuq6ZZRTU8
 github.com/go-text/typesetting v0.0.0-20230712171355-59e4e8ecaa7b/go.mod h1:evDBbvNR/KaVFZ2ZlDSOWWXIUKq0wCOEtzLxRM8SG3k=
 github.com/go-text/typesetting v0.0.0-20230717141307-09c70c30a055 h1:aUv3DYpk2eraRoyB7QZkyxgTVF7DrWcUui93iFRYO+8=
 github.com/go-text/typesetting v0.0.0-20230717141307-09c70c30a055/go.mod h1:evDBbvNR/KaVFZ2ZlDSOWWXIUKq0wCOEtzLxRM8SG3k=
+github.com/go-text/typesetting v0.0.0-20230720191532-efc36025df80 h1:hyqXubLnpwyvrg5vRGTvxtJLmxyXLtcNtZRfm1XlPfM=
+github.com/go-text/typesetting v0.0.0-20230720191532-efc36025df80/go.mod h1:evDBbvNR/KaVFZ2ZlDSOWWXIUKq0wCOEtzLxRM8SG3k=
 github.com/go-text/typesetting-utils v0.0.0-20230616150549-2a7df14b6a22 h1:LBQTFxP2MfsyEDqSKmUBZaDuDHN1vpqDyOZjcqS7MYI=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
