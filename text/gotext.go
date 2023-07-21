@@ -513,12 +513,12 @@ func calculateYOffsets(lines []line) {
 	}
 	// Ceil the first value to ensure that we don't baseline it too close to the top of the
 	// viewport and cut off the top pixel.
-	currentY := fixed.I(lines[0].ascent.Ceil())
+	currentY := lines[0].ascent.Ceil()
 	for i := range lines {
 		if i > 0 {
-			currentY += lines[i].lineHeight
+			currentY += lines[i].lineHeight.Round()
 		}
-		lines[i].yOffset = currentY.Round()
+		lines[i].yOffset = currentY
 	}
 }
 
