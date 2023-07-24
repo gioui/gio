@@ -44,12 +44,11 @@ type glyphIndex struct {
 	prog text.Flags
 	// clusterAdvance accumulates the advances of glyphs in a glyph cluster.
 	clusterAdvance fixed.Int26_6
-	// skipPrior controls whether a text position is inserted "before" the
-	// next glyph. Usually this should not happen, but the boundaries of
-	// lines and bidi runs require it.
-	skipPrior bool
 	// truncated indicates that the text was truncated by the shaper.
 	truncated bool
+	// midCluster tracks whether the next glyph processed is not the first glyph in a
+	// cluster.
+	midCluster bool
 }
 
 // reset prepares the index for reuse.
@@ -63,8 +62,8 @@ func (g *glyphIndex) reset() {
 	g.pos = combinedPos{}
 	g.prog = 0
 	g.clusterAdvance = 0
-	g.skipPrior = false
 	g.truncated = false
+	g.midCluster = false
 }
 
 // screenPos represents a character position in text line and column numbers,
@@ -113,6 +112,20 @@ func (g *glyphIndex) incrementPosition(pos combinedPos) (next combinedPos, eof b
 	return candidate, true
 }
 
+func (g *glyphIndex) insertPosition(pos combinedPos) {
+	lastIdx := len(g.positions) - 1
+	if lastIdx >= 0 {
+		lastPos := g.positions[lastIdx]
+		if lastPos.runes == pos.runes && (lastPos.y != pos.y || (lastPos.x == pos.x)) {
+			// If we insert a consecutive position with the same logical position,
+			// overwrite the previous position with the new one.
+			g.positions[lastIdx] = pos
+			return
+		}
+	}
+	g.positions = append(g.positions, pos)
+}
+
 // Glyph indexes the provided glyph, generating text cursor positions for it.
 func (g *glyphIndex) Glyph(gl text.Glyph) {
 	g.glyphs = append(g.glyphs, gl)
@@ -128,30 +141,32 @@ func (g *glyphIndex) Glyph(gl text.Glyph) {
 	if end := gl.X + gl.Advance; end > g.currentLineMax {
 		g.currentLineMax = end
 	}
-	if !g.skipPrior || gl.Flags&text.FlagTowardOrigin != g.prog || gl.Flags&text.FlagParagraphStart != 0 {
-		// Set the new text progression based on that of the first glyph.
-		g.prog = gl.Flags & text.FlagTowardOrigin
-		g.pos.towardOrigin = g.prog == text.FlagTowardOrigin
-		// Create the text position prior to the first glyph.
-		pos := g.pos
-		pos.x = gl.X
-		pos.y = int(gl.Y)
-		pos.ascent = gl.Ascent
-		pos.descent = gl.Descent
-		if pos.towardOrigin {
-			pos.x += gl.Advance
-		}
-		g.pos = pos
-		g.positions = append(g.positions, pos)
-		g.skipPrior = true
-	}
+
 	needsNewLine := gl.Flags&text.FlagLineBreak != 0
 	needsNewRun := gl.Flags&text.FlagRunBreak != 0
 	breaksParagraph := gl.Flags&text.FlagParagraphBreak != 0
-
+	breaksCluster := gl.Flags&text.FlagClusterBreak != 0
 	// We should insert new positions if the glyph we're processing terminates
-	// a glyph cluster.
-	insertPositionAfter := gl.Flags&text.FlagClusterBreak != 0 && !breaksParagraph && gl.Runes > 0
+	// a glyph cluster, has nonzero runes, and is not a hard newline.
+	insertPositionsWithin := breaksCluster && !breaksParagraph && gl.Runes > 0
+
+	// Get the text progression/direction right.
+	g.prog = gl.Flags & text.FlagTowardOrigin
+	g.pos.towardOrigin = g.prog == text.FlagTowardOrigin
+	if !g.midCluster {
+		// Create the text position prior to the glyph.
+		g.pos.x = gl.X
+		g.pos.y = int(gl.Y)
+		g.pos.ascent = gl.Ascent
+		g.pos.descent = gl.Descent
+		if g.pos.towardOrigin {
+			g.pos.x += gl.Advance
+		}
+		g.insertPosition(g.pos)
+	}
+
+	g.midCluster = !breaksCluster
+
 	if breaksParagraph {
 		// Paragraph breaking clusters shouldn't have positions generated for both
 		// sides of them. They're always zero-width, so doing so would
@@ -164,12 +179,11 @@ func (g *glyphIndex) Glyph(gl text.Glyph) {
 	// Always track the cumulative advance added by the glyph, even if it
 	// doesn't terminate a cluster itself.
 	g.clusterAdvance += gl.Advance
-	if insertPositionAfter {
-		// Construct the text position _after_ gl.
-		pos := g.pos
-		pos.y = int(gl.Y)
-		pos.ascent = gl.Ascent
-		pos.descent = gl.Descent
+	if insertPositionsWithin {
+		// Construct the text positions _within_ gl.
+		g.pos.y = int(gl.Y)
+		g.pos.ascent = gl.Ascent
+		g.pos.descent = gl.Descent
 		width := g.clusterAdvance
 		positionCount := int(gl.Runes)
 		runesPerPosition := 1
@@ -181,19 +195,18 @@ func (g *glyphIndex) Glyph(gl text.Glyph) {
 		}
 		perRune := width / fixed.Int26_6(positionCount)
 		adjust := fixed.Int26_6(0)
-		if pos.towardOrigin {
+		if g.pos.towardOrigin {
 			// If RTL, subtract increments from the width of the cluster
 			// instead of adding.
 			adjust = width
 			perRune = -perRune
 		}
 		for i := 1; i <= positionCount; i++ {
-			pos.x = gl.X + adjust + perRune*fixed.Int26_6(i)
-			pos.runes += runesPerPosition
-			pos.lineCol.col += runesPerPosition
-			g.positions = append(g.positions, pos)
+			g.pos.x = gl.X + adjust + perRune*fixed.Int26_6(i)
+			g.pos.runes += runesPerPosition
+			g.pos.lineCol.col += runesPerPosition
+			g.insertPosition(g.pos)
 		}
-		g.pos = pos
 		g.clusterAdvance = 0
 	}
 	if needsNewRun {
@@ -214,7 +227,6 @@ func (g *glyphIndex) Glyph(gl text.Glyph) {
 		g.currentLineMin = math.MaxInt32
 		g.currentLineMax = 0
 		g.currentLineGlyphs = 0
-		g.skipPrior = false
 	}
 }
 

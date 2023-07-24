@@ -103,11 +103,12 @@ func getGlyphs(fontSize, minWidth, lineWidth int, align text.Alignment, str stri
 		},
 	}))
 	params := text.Parameters{
-		PxPerEm:   fixed.I(fontSize),
-		Alignment: align,
-		MinWidth:  minWidth,
-		MaxWidth:  lineWidth,
-		Locale:    english,
+		PxPerEm:    fixed.I(fontSize),
+		Alignment:  align,
+		MinWidth:   minWidth,
+		MaxWidth:   lineWidth,
+		Locale:     english,
+		WrapPolicy: text.WrapWords,
 	}
 	shaper.LayoutString(params, str)
 	for g, ok := shaper.NextGlyph(); ok; g, ok = shaper.NextGlyph() {
@@ -120,30 +121,34 @@ func getGlyphs(fontSize, minWidth, lineWidth int, align text.Alignment, str stri
 // for empty lines and the empty string.
 func TestIndexPositionWhitespace(t *testing.T) {
 	type testcase struct {
-		name     string
-		str      string
-		align    text.Alignment
-		expected []combinedPos
+		name      string
+		str       string
+		lineWidth int
+		align     text.Alignment
+		expected  []combinedPos
 	}
 	for _, tc := range []testcase{
 		{
-			name: "empty string",
-			str:  "",
+			name:      "empty string",
+			str:       "",
+			lineWidth: 200,
 			expected: []combinedPos{
 				{x: fixed.Int26_6(0), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216)},
 			},
 		},
 		{
-			name: "just hard newline",
-			str:  "\n",
+			name:      "just hard newline",
+			str:       "\n",
+			lineWidth: 200,
 			expected: []combinedPos{
 				{x: fixed.Int26_6(0), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216)},
 				{x: fixed.Int26_6(0), y: 35, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 1, lineCol: screenPos{line: 1}},
 			},
 		},
 		{
-			name: "trailing newline",
-			str:  "a\n",
+			name:      "trailing newline",
+			str:       "a\n",
+			lineWidth: 200,
 			expected: []combinedPos{
 				{x: fixed.Int26_6(0), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216)},
 				{x: fixed.Int26_6(570), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 1, lineCol: screenPos{col: 1}},
@@ -151,8 +156,9 @@ func TestIndexPositionWhitespace(t *testing.T) {
 			},
 		},
 		{
-			name: "just blank line",
-			str:  "\n\n",
+			name:      "just blank line",
+			str:       "\n\n",
+			lineWidth: 200,
 			expected: []combinedPos{
 				{x: fixed.Int26_6(0), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216)},
 				{x: fixed.Int26_6(0), y: 35, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 1, lineCol: screenPos{line: 1}},
@@ -160,9 +166,10 @@ func TestIndexPositionWhitespace(t *testing.T) {
 			},
 		},
 		{
-			name:  "middle aligned blank lines",
-			str:   "\n\n\nabc",
-			align: text.Middle,
+			name:      "middle aligned blank lines",
+			str:       "\n\n\nabc",
+			align:     text.Middle,
+			lineWidth: 200,
 			expected: []combinedPos{
 				{x: fixed.Int26_6(832), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216)},
 				{x: fixed.Int26_6(832), y: 35, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 1, lineCol: screenPos{line: 1}},
@@ -174,8 +181,9 @@ func TestIndexPositionWhitespace(t *testing.T) {
 			},
 		},
 		{
-			name: "blank line",
-			str:  "a\n\nb",
+			name:      "blank line",
+			str:       "a\n\nb",
+			lineWidth: 200,
 			expected: []combinedPos{
 				{x: fixed.Int26_6(0), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216)},
 				{x: fixed.Int26_6(570), y: 16, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 1, lineCol: screenPos{col: 1}},
@@ -184,9 +192,45 @@ func TestIndexPositionWhitespace(t *testing.T) {
 				{x: fixed.Int26_6(570), y: 54, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), runes: 4, lineCol: screenPos{line: 2, col: 1}},
 			},
 		},
+		{
+			name:      "soft wrap",
+			str:       "abc def",
+			lineWidth: 30,
+			expected: []combinedPos{
+				{runes: 0, lineCol: screenPos{line: 0, col: 0}, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), x: 0, y: 16},
+				{runes: 1, lineCol: screenPos{line: 0, col: 1}, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), x: 570, y: 16},
+				{runes: 2, lineCol: screenPos{line: 0, col: 2}, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), x: 1140, y: 16},
+				{runes: 3, lineCol: screenPos{line: 0, col: 3}, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), x: 1652, y: 16},
+				{runes: 4, lineCol: screenPos{line: 1, col: 0}, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), x: 0, y: 35},
+				{runes: 5, lineCol: screenPos{line: 1, col: 1}, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), x: 570, y: 35},
+				{runes: 6, lineCol: screenPos{line: 1, col: 2}, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), x: 1140, y: 35},
+				{runes: 7, lineCol: screenPos{line: 1, col: 3}, ascent: fixed.Int26_6(968), descent: fixed.Int26_6(216), x: 1425, y: 35},
+			},
+		},
+		{
+			name:      "soft wrap arabic",
+			str:       "ثنائي الاتجاه",
+			lineWidth: 30,
+			expected: []combinedPos{
+				{runes: 0, lineCol: screenPos{line: 0, col: 0}, ascent: 1407, descent: 756, x: 2250, y: 22, towardOrigin: true},
+				{runes: 1, lineCol: screenPos{line: 0, col: 1}, ascent: 1407, descent: 756, x: 1944, y: 22, towardOrigin: true},
+				{runes: 2, lineCol: screenPos{line: 0, col: 2}, ascent: 1407, descent: 756, x: 1593, y: 22, towardOrigin: true},
+				{runes: 3, lineCol: screenPos{line: 0, col: 3}, ascent: 1407, descent: 756, x: 1295, y: 22, towardOrigin: true},
+				{runes: 4, lineCol: screenPos{line: 0, col: 4}, ascent: 1407, descent: 756, x: 1020, y: 22, towardOrigin: true},
+				{runes: 5, lineCol: screenPos{line: 0, col: 5}, ascent: 1407, descent: 756, x: 266, y: 22, towardOrigin: true},
+				{runes: 6, lineCol: screenPos{line: 1, col: 0}, ascent: 1407, descent: 756, x: 2511, y: 41, towardOrigin: true},
+				{runes: 7, lineCol: screenPos{line: 1, col: 1}, ascent: 1407, descent: 756, x: 2267, y: 41, towardOrigin: true},
+				{runes: 8, lineCol: screenPos{line: 1, col: 2}, ascent: 1407, descent: 756, x: 1969, y: 41, towardOrigin: true},
+				{runes: 9, lineCol: screenPos{line: 1, col: 3}, ascent: 1407, descent: 756, x: 1671, y: 41, towardOrigin: true},
+				{runes: 10, lineCol: screenPos{line: 1, col: 4}, ascent: 1407, descent: 756, x: 1365, y: 41, towardOrigin: true},
+				{runes: 11, lineCol: screenPos{line: 1, col: 5}, ascent: 1407, descent: 756, x: 713, y: 41, towardOrigin: true},
+				{runes: 12, lineCol: screenPos{line: 1, col: 6}, ascent: 1407, descent: 756, x: 415, y: 41, towardOrigin: true},
+				{runes: 13, lineCol: screenPos{line: 1, col: 7}, ascent: 1407, descent: 756, x: 0, y: 41, towardOrigin: true},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			glyphs := getGlyphs(16, 0, 200, tc.align, tc.str)
+			glyphs := getGlyphs(16, 0, tc.lineWidth, tc.align, tc.str)
 			var gi glyphIndex
 			gi.reset()
 			for _, g := range glyphs {
@@ -227,11 +271,11 @@ func TestIndexPositionBidi(t *testing.T) {
 			name:   "bidi ltr",
 			glyphs: bidiLTRText,
 			expectedXs: []fixed.Int26_6{
-				0, 626, 1196, 1766, 2051, 2621, 3191, 3444, 3956, 4468, 4753, 7133, 6330, 5738, 5440, 5019, 4753, // Positions on line 0.
+				0, 626, 1196, 1766, 2051, 2621, 3191, 3444, 3956, 4468, 4753, 7133, 6330, 5738, 5440, 5019, // Positions on line 0.
 
-				3953, 3185, 2417, 1649, 881, 596, 298, 0, 3953, 4238, 4523, 5093, 5605, 5890, 7905, 7599, 7007, 6156, 5890, // Positions on line 1.
+				3953, 3185, 2417, 1649, 881, 596, 298, 0, 3953, 4238, 4523, 5093, 5605, 5890, 7905, 7599, 7007, 6156, // Positions on line 1.
 
-				4660, 3892, 3124, 2356, 1588, 1303, 788, 406, 0, 4660, 4945, 5235, 5805, 6375, 6660, 6934, 7504, 8016, 8528, 8813, // Positions on line 2.
+				4660, 3892, 3124, 2356, 1588, 1303, 788, 406, 0, 4660, 4945, 5235, 5805, 6375, 6660, 6934, 7504, 8016, 8528, // Positions on line 2.
 
 				0, 570, 1140, 1710, 2034, // Positions on line 3.
 			},
@@ -240,11 +284,11 @@ func TestIndexPositionBidi(t *testing.T) {
 			name:   "bidi rtl",
 			glyphs: bidiRTLText,
 			expectedXs: []fixed.Int26_6{
-				2665, 3291, 3861, 4431, 4716, 5286, 5856, 6109, 6621, 7133, 2665, 2380, 1577, 985, 687, 266, 0, // Positions on line 0.
+				2665, 3291, 3861, 4431, 4716, 5286, 5856, 6109, 6621, 7133, 2665, 2380, 1577, 985, 687, 266, // Positions on line 0.
 
-				7886, 7118, 6350, 5582, 4814, 4529, 4231, 3933, 3667, 2300, 2585, 3155, 3667, 2300, 2015, 1709, 1117, 266, 0, // Positions on line 1.
+				7886, 7118, 6350, 5582, 4814, 4529, 4231, 3933, 3667, 2300, 2585, 3155, 3667, 2300, 2015, 1709, 1117, 266, // Positions on line 1.
 
-				8794, 8026, 7258, 6490, 5722, 5437, 4922, 4540, 4134, 3868, 0, 290, 860, 1430, 1715, 1989, 2559, 3071, 3583, 3868, // Positions on line 2.
+				8794, 8026, 7258, 6490, 5722, 5437, 4922, 4540, 4134, 3868, 0, 290, 860, 1430, 1715, 1989, 2559, 3071, 3583, // Positions on line 2.
 
 				324, 894, 1464, 2034, 324, 0, // Positions on line 3.
 			},
@@ -524,13 +568,13 @@ func TestIndexPositionRunes(t *testing.T) {
 				{runes: 12, lineCol: screenPos{line: 1, col: 8}, runIndex: 1, towardOrigin: true},
 				{runes: 13, lineCol: screenPos{line: 1, col: 9}, runIndex: 1, towardOrigin: true},
 				{runes: 14, lineCol: screenPos{line: 1, col: 10}, runIndex: 1, towardOrigin: true},
-				{runes: 15, lineCol: screenPos{line: 1, col: 11}, runIndex: 1, towardOrigin: true},
+				{runes: 15, lineCol: screenPos{line: 1, col: 11}, runIndex: 2, towardOrigin: true},
 				{runes: 16, lineCol: screenPos{line: 1, col: 12}, runIndex: 2, towardOrigin: true},
 				{runes: 17, lineCol: screenPos{line: 1, col: 13}, runIndex: 2, towardOrigin: true},
 				{runes: 18, lineCol: screenPos{line: 2, col: 0}, runIndex: 0, towardOrigin: true},
 				{runes: 19, lineCol: screenPos{line: 2, col: 1}, runIndex: 0, towardOrigin: true},
 				{runes: 20, lineCol: screenPos{line: 2, col: 2}, runIndex: 0, towardOrigin: true},
-				{runes: 21, lineCol: screenPos{line: 2, col: 3}, runIndex: 0, towardOrigin: true},
+				{runes: 21, lineCol: screenPos{line: 2, col: 3}, runIndex: 1, towardOrigin: true},
 				{runes: 22, lineCol: screenPos{line: 2, col: 4}, runIndex: 1, towardOrigin: true},
 				{runes: 23, lineCol: screenPos{line: 2, col: 5}, runIndex: 1, towardOrigin: true},
 				{runes: 24, lineCol: screenPos{line: 2, col: 6}, runIndex: 1, towardOrigin: true},
@@ -542,7 +586,7 @@ func TestIndexPositionRunes(t *testing.T) {
 				{runes: 29, lineCol: screenPos{line: 3, col: 1}, runIndex: 0, towardOrigin: true},
 				{runes: 30, lineCol: screenPos{line: 3, col: 2}, runIndex: 0, towardOrigin: true},
 				{runes: 31, lineCol: screenPos{line: 3, col: 3}, runIndex: 0, towardOrigin: true},
-				{runes: 32, lineCol: screenPos{line: 3, col: 4}, runIndex: 0, towardOrigin: true},
+				{runes: 32, lineCol: screenPos{line: 3, col: 4}, runIndex: 1, towardOrigin: true},
 				{runes: 33, lineCol: screenPos{line: 3, col: 5}, runIndex: 1, towardOrigin: true},
 				{runes: 34, lineCol: screenPos{line: 3, col: 6}, runIndex: 1, towardOrigin: true},
 				{runes: 35, lineCol: screenPos{line: 4, col: 0}, runIndex: 0, towardOrigin: true},

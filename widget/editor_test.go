@@ -508,13 +508,14 @@ func TestEditorLigature(t *testing.T) {
 	// Ensure that all runes in the final cluster of a line are properly
 	// decoded when moving to the end of the line. This is a regression test.
 	e.text.MoveEnd(selectionClear)
-	// The first line was broken by line wrapping, not a newline character. As such,
-	// the cursor can reach the position after the final glyph (a space).
-	assertCaret(t, e, 0, 14, len("fflffl fflffl "))
+	// The first line was broken by line wrapping, not a newline character, and has a trailing
+	// whitespace. However, we should never be able to reach the "other side" of such a trailing
+	// whitespace glyph.
+	assertCaret(t, e, 0, 13, len("fflffl fflffl"))
 	e.text.MoveLines(1, selectionClear)
 	assertCaret(t, e, 1, 13, len("fflffl fflffl fflffl fflffl"))
 	e.text.MoveLines(-1, selectionClear)
-	assertCaret(t, e, 0, 14, len("fflffl fflffl "))
+	assertCaret(t, e, 0, 13, len("fflffl fflffl"))
 
 	// Absurdly narrow constraints to force each ligature onto its own line.
 	gtx.Constraints = layout.Exact(image.Pt(10, 10))
