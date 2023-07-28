@@ -52,16 +52,11 @@ func TestEmptyString(t *testing.T) {
 		t.Fatalf("Layout returned no lines for empty string; expected 1")
 	}
 	l := lines.lines[0]
-	exp := fixed.Rectangle26_6{
-		Min: fixed.Point26_6{
-			Y: fixed.Int26_6(-12094),
-		},
-		Max: fixed.Point26_6{
-			Y: fixed.Int26_6(2700),
-		},
+	if expected := fixed.Int26_6(12094); l.ascent != expected {
+		t.Errorf("unexpected ascent for empty string: %v, expected %v", l.ascent, expected)
 	}
-	if got := l.bounds; got != exp {
-		t.Errorf("got bounds %+v for empty string; expected %+v", got, exp)
+	if expected := fixed.Int26_6(2700); l.descent != expected {
+		t.Errorf("unexpected descent for empty string: %v, expected %v", l.descent, expected)
 	}
 }
 
@@ -392,12 +387,6 @@ func TestToLine(t *testing.T) {
 					totalInputRunes += run.Runes.Count
 				}
 				output := toLine(shaper.faceToIndex, input, tc.dir)
-				if output.bounds.Min == (fixed.Point26_6{}) {
-					t.Errorf("line %d: Bounds.Min not populated", i)
-				}
-				if output.bounds.Max == (fixed.Point26_6{}) {
-					t.Errorf("line %d: Bounds.Max not populated", i)
-				}
 				if output.direction != tc.dir {
 					t.Errorf("line %d: expected direction %v, got %v", i, tc.dir, output.direction)
 				}
@@ -604,12 +593,6 @@ func validateLines(t *testing.T, lines []line, expectedRuneCount int) {
 	t.Helper()
 	runesSeen := 0
 	for i, line := range lines {
-		if line.bounds.Min == (fixed.Point26_6{}) {
-			t.Errorf("line %d: Bounds.Min not populated", i)
-		}
-		if line.bounds.Max == (fixed.Point26_6{}) {
-			t.Errorf("line %d: Bounds.Max not populated", i)
-		}
 		totalRunWidth := fixed.I(0)
 		totalLineGlyphs := 0
 		lineRunesSeen := 0

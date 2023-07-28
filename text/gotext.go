@@ -82,8 +82,6 @@ type line struct {
 	// lineHeight captures the gap that should exist between the baseline of this
 	// line and the previous (if any).
 	lineHeight fixed.Int26_6
-	// bounds is the visible bounds of the line.
-	bounds fixed.Rectangle26_6
 	// direction is the dominant direction of the line. This direction will be
 	// used to align the text content of the line, but may not match the actual
 	// direction of the runs of text within the line (such as an RTL sentence
@@ -888,13 +886,6 @@ func toLine(faceToIndex map[font.Font]int, o shaping.Line, dir system.TextDirect
 			PPEM:      run.Size,
 		}
 		line.runeCount += run.Runes.Count
-		if line.bounds.Min.Y > -run.LineBounds.Ascent {
-			line.bounds.Min.Y = -run.LineBounds.Ascent
-		}
-		if line.bounds.Max.Y < -run.LineBounds.Ascent+run.LineBounds.LineHeight() {
-			line.bounds.Max.Y = -run.LineBounds.Ascent + run.LineBounds.LineHeight()
-		}
-		line.bounds.Max.X += run.Advance
 		line.width += run.Advance
 		if line.ascent < run.LineBounds.Ascent {
 			line.ascent = run.LineBounds.Ascent
@@ -905,20 +896,6 @@ func toLine(faceToIndex map[font.Font]int, o shaping.Line, dir system.TextDirect
 	}
 	line.lineHeight = maxSize
 	computeVisualOrder(&line)
-	// Account for glyphs hanging off of either side in the bounds.
-	if len(line.visualOrder) > 0 {
-		runIdx := line.visualOrder[0]
-		run := o[runIdx]
-		if len(run.Glyphs) > 0 {
-			line.bounds.Min.X = run.Glyphs[0].LeftSideBearing()
-		}
-		runIdx = line.visualOrder[len(line.visualOrder)-1]
-		run = o[runIdx]
-		if len(run.Glyphs) > 0 {
-			lastGlyphIdx := len(run.Glyphs) - 1
-			line.bounds.Max.X += run.Glyphs[lastGlyphIdx].RightSideBearing()
-		}
-	}
 	return line
 }
 
