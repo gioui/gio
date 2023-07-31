@@ -166,3 +166,67 @@ func TestGlyphIterator(t *testing.T) {
 		})
 	}
 }
+
+// TestGlyphIteratorPadding ensures that the glyph iterator computes correct padding
+// around glyphs with unusual bounding boxes.
+func TestGlyphIteratorPadding(t *testing.T) {
+	type testcase struct {
+		name             string
+		glyph            text.Glyph
+		viewport         image.Rectangle
+		expectedDims     image.Rectangle
+		expectedPadding  image.Rectangle
+		expectedBaseline int
+	}
+	for _, tc := range []testcase{
+		{
+			name: "simple",
+			glyph: text.Glyph{
+				X:       0,
+				Y:       50,
+				Advance: fixed.I(50),
+				Ascent:  fixed.I(50),
+				Descent: fixed.I(50),
+				Bounds: fixed.Rectangle26_6{
+					Min: fixed.Point26_6{
+						X: fixed.I(-5),
+						Y: fixed.I(-56),
+					},
+					Max: fixed.Point26_6{
+						X: fixed.I(57),
+						Y: fixed.I(58),
+					},
+				},
+			},
+			viewport: image.Rectangle{Max: image.Pt(math.MaxInt, math.MaxInt)},
+			expectedDims: image.Rectangle{
+				Max: image.Point{X: 50, Y: 100},
+			},
+			expectedBaseline: 50,
+			expectedPadding: image.Rectangle{
+				Min: image.Point{
+					X: -5,
+					Y: -6,
+				},
+				Max: image.Point{
+					X: 7,
+					Y: 8,
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			it := textIterator{viewport: tc.viewport}
+			it.processGlyph(tc.glyph, true)
+			if it.bounds != tc.expectedDims {
+				t.Errorf("expected bounds %#+v, got %#+v", tc.expectedDims, it.bounds)
+			}
+			if it.baseline != tc.expectedBaseline {
+				t.Errorf("expected baseline %d, got %d", tc.expectedBaseline, it.baseline)
+			}
+			if it.padding != tc.expectedPadding {
+				t.Errorf("expected padding %d, got %d", tc.expectedPadding, it.padding)
+			}
+		})
+	}
+}

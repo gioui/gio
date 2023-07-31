@@ -150,10 +150,25 @@ func (it *textIterator) processGlyph(g text.Glyph, ok bool) (_ text.Glyph, visib
 	// Compute the maximum extent to which glyphs overhang on the horizontal
 	// axis.
 	if d := g.Bounds.Min.X.Floor(); d < it.padding.Min.X {
+		// If the distance between the dot and the left edge of this glyph is
+		// less than the current padding, increase the left padding.
 		it.padding.Min.X = d
 	}
 	if d := (g.Bounds.Max.X - g.Advance).Ceil(); d > it.padding.Max.X {
+		// If the distance between the dot and the right edge of this glyph
+		// minus the logical advance of this glyph is greater than the current
+		// padding, increase the right padding.
 		it.padding.Max.X = d
+	}
+	if d := (g.Bounds.Min.Y + g.Ascent).Floor(); d < it.padding.Min.Y {
+		// If the distance between the dot and the top of this glyph is greater
+		// than the ascent of the glyph, increase the top padding.
+		it.padding.Min.Y = d
+	}
+	if d := (g.Bounds.Max.Y - g.Descent).Ceil(); d > it.padding.Max.Y {
+		// If the distance between the dot and the bottom of this glyph is greater
+		// than the descent of the glyph, increase the bottom padding.
+		it.padding.Max.Y = d
 	}
 	logicalBounds := image.Rectangle{
 		Min: image.Pt(g.X.Floor(), int(g.Y)-g.Ascent.Ceil()),
