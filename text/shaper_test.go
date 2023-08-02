@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
+	"gioui.org/font"
 	"gioui.org/font/gofont"
 	"gioui.org/font/opentype"
 	"gioui.org/io/system"
@@ -161,6 +162,7 @@ func TestShapingNewlineHandling(t *testing.T) {
 		{textInput: "a\n", expectedLines: 1, expectedGlyphs: 3},
 		{textInput: "a\nb", expectedLines: 2, expectedGlyphs: 3},
 		{textInput: "", expectedLines: 1, expectedGlyphs: 1},
+		{textInput: "\n", expectedLines: 1, expectedGlyphs: 2},
 	} {
 		t.Run(fmt.Sprintf("%q", tc.textInput), func(t *testing.T) {
 			ltrFace, _ := opentype.Parse(goregular.TTF)
@@ -168,8 +170,13 @@ func TestShapingNewlineHandling(t *testing.T) {
 			cache := NewShaper(NoSystemFonts(), WithCollection(collection))
 			checkGlyphs := func() {
 				glyphs := []Glyph{}
+				runes := 0
 				for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
 					glyphs = append(glyphs, g)
+					runes += g.Runes
+				}
+				if expected := len([]rune(tc.textInput)); expected != runes {
+					t.Errorf("expected %d runes, got %d", expected, runes)
 				}
 				if len(glyphs) != tc.expectedGlyphs {
 					t.Errorf("expected %d glyphs, got %d", tc.expectedGlyphs, len(glyphs))
@@ -191,8 +198,8 @@ func TestShapingNewlineHandling(t *testing.T) {
 					}
 					breakX, breakY := breakGlyph.X, breakGlyph.Y
 					startX, startY := startGlyph.X, startGlyph.Y
-					if breakX == startX {
-						t.Errorf("expected paragraph start glyph to have cursor x")
+					if breakX == startX && idx != 0 {
+						t.Errorf("expected paragraph start glyph to have cursor x, got %v", startX)
 					}
 					if breakY == startY {
 						t.Errorf("expected paragraph start glyph to have cursor y")
@@ -462,6 +469,19 @@ func TestShapeStringRuneAccounting(t *testing.T) {
 			params: Parameters{
 				PxPerEm:  fixed.Int26_6(16),
 				MaxWidth: 100,
+			},
+		},
+		{
+			name:  "newline regression",
+			input: "\n",
+			params: Parameters{
+				Font:       font.Font{Typeface: "Go", Style: font.Regular, Weight: font.Normal},
+				Alignment:  Start,
+				PxPerEm:    768,
+				MaxLines:   1,
+				Truncator:  "\u200b",
+				WrapPolicy: WrapHeuristically,
+				MaxWidth:   999929,
 			},
 		},
 	} {

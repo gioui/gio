@@ -316,7 +316,9 @@ func (l *Shaper) layoutText(params Parameters, txt io.Reader, str string) {
 			if !done {
 				_, re := l.reader.ReadByte()
 				done = re != nil
-				_ = l.reader.UnreadByte()
+				if !done {
+					_ = l.reader.UnreadByte()
+				}
 			}
 		} else {
 			idx := strings.IndexByte(str, '\n')
@@ -325,6 +327,7 @@ func (l *Shaper) layoutText(params Parameters, txt io.Reader, str string) {
 				endByte = len(str)
 			} else {
 				endByte = idx + 1
+				done = endByte == len(str)
 			}
 		}
 		if len(str[:endByte]) > 0 || (len(l.paragraph) > 0 || len(l.txt.lines) == 0) {
