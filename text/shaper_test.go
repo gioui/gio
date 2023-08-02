@@ -484,6 +484,19 @@ func TestShapeStringRuneAccounting(t *testing.T) {
 				MaxWidth:   999929,
 			},
 		},
+		{
+			name:  "newline zero-width regression",
+			input: "\n",
+			params: Parameters{
+				Font:       font.Font{Typeface: "Go", Style: font.Regular, Weight: font.Normal},
+				Alignment:  Start,
+				PxPerEm:    768,
+				MaxLines:   1,
+				Truncator:  "\u200b",
+				WrapPolicy: WrapHeuristically,
+				MaxWidth:   0,
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, setup := range []setup{
