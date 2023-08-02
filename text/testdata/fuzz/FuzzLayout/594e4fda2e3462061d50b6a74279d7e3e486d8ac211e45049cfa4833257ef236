@@ -1,5 +1,6 @@
 go test fuzz v1
 string("\u2029")
 bool(false)
+bool(false)
 byte('*')
 uint16(72)

@@ -1,5 +1,6 @@
 go test fuzz v1
 string("\u0085")
 bool(true)
+bool(false)
 byte('\x10')
 uint16(271)

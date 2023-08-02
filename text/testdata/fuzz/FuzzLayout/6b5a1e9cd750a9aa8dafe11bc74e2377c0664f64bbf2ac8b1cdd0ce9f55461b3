@@ -1,5 +1,6 @@
 go test fuzz v1
 string("\x1e")
 bool(true)
+bool(false)
 byte('\n')
 uint16(254)

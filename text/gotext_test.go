@@ -567,10 +567,10 @@ func TestComputeVisualOrder(t *testing.T) {
 func FuzzLayout(f *testing.F) {
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
-	f.Add("د عرمثال dstي met لم aqل جدmوpمg lرe dرd  لو عل ميrةsdiduntut lab renنيتذدagلaaiua.ئPocttأior رادرsاي mيrbلmnonaيdتد ماةعcلخ.", true, uint8(10), uint16(200))
+	f.Add("د عرمثال dstي met لم aqل جدmوpمg lرe dرd  لو عل ميrةsdiduntut lab renنيتذدagلaaiua.ئPocttأior رادرsاي mيrbلmnonaيdتد ماةعcلخ.", true, false, uint8(10), uint16(200))
 
 	shaper := testShaper(ltrFace, rtlFace)
-	f.Fuzz(func(t *testing.T, txt string, rtl bool, fontSize uint8, width uint16) {
+	f.Fuzz(func(t *testing.T, txt string, rtl bool, truncate bool, fontSize uint8, width uint16) {
 		locale := system.Locale{
 			Direction: system.LTR,
 		}
@@ -580,9 +580,14 @@ func FuzzLayout(f *testing.F) {
 		if fontSize < 1 {
 			fontSize = 1
 		}
+		maxLines := 0
+		if truncate {
+			maxLines = 1
+		}
 		lines := shaper.LayoutRunes(Parameters{
 			PxPerEm:  fixed.I(int(fontSize)),
 			MaxWidth: int(width),
+			MaxLines: maxLines,
 			Locale:   locale,
 		}, []rune(txt))
 		validateLines(t, lines.lines, len([]rune(txt)))

@@ -1,5 +1,6 @@
 go test fuzz v1
 string("000000000000000 00000000 ٰ00000")
 bool(true)
+bool(false)
 byte('\n')
 uint16(121)

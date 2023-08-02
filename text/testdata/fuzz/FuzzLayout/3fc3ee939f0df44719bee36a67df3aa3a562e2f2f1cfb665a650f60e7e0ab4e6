@@ -1,5 +1,6 @@
 go test fuzz v1
 string("0")
 bool(true)
+bool(false)
 uint8(27)
 uint16(200)
