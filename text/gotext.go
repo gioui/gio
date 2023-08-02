@@ -528,6 +528,7 @@ func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 	if hasNewline {
 		txt = txt[:len(txt)-1]
 	}
+	truncatedNewline := false
 	if hasNewline && len(txt) == 0 {
 		// If we only have a newline, shape a space to get line metrics.
 		ls, truncated = s.shapeAndWrapText(params, []rune{' '})
@@ -535,6 +536,7 @@ func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 			// Our space was truncated. Since our space didn't exist in any meaningful
 			// capacity, ensure the truncated count is zeroed out.
 			truncated = 0
+			truncatedNewline = true
 		} else {
 			// We shaped a space to get proper line metrics, but we need to drop
 			// the rune/glyph info since it isn't actually part of the text.
@@ -546,7 +548,7 @@ func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 		ls, truncated = s.shapeAndWrapText(params, replaceControlCharacters(txt))
 	}
 
-	didTruncate := truncated > 0 || (params.forceTruncate && params.MaxLines == len(ls))
+	didTruncate := truncated > 0 || truncatedNewline || (params.forceTruncate && params.MaxLines == len(ls))
 
 	if didTruncate && hasNewline {
 		// We've truncated the newline, since it was at the end and we've truncated some amount of runes
