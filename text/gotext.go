@@ -530,6 +530,7 @@ func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 	}
 	truncatedNewline := false
 	if hasNewline && len(txt) == 0 {
+		params.forceTruncate = false
 		// If we only have a newline, shape a space to get line metrics.
 		ls, truncated = s.shapeAndWrapText(params, []rune{' '})
 		if truncated > 0 {

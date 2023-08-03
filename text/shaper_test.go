@@ -163,6 +163,8 @@ func TestShapingNewlineHandling(t *testing.T) {
 		{textInput: "a\nb", expectedLines: 2, expectedGlyphs: 3},
 		{textInput: "", expectedLines: 1, expectedGlyphs: 1},
 		{textInput: "\n", expectedLines: 1, expectedGlyphs: 2},
+		{textInput: "\n\n", expectedLines: 2, expectedGlyphs: 3},
+		{textInput: "\n\n\n", expectedLines: 3, expectedGlyphs: 4},
 	} {
 		t.Run(fmt.Sprintf("%q", tc.textInput), func(t *testing.T) {
 			ltrFace, _ := opentype.Parse(goregular.TTF)
@@ -495,6 +497,32 @@ func TestShapeStringRuneAccounting(t *testing.T) {
 				Truncator:  "\u200b",
 				WrapPolicy: WrapHeuristically,
 				MaxWidth:   0,
+			},
+		},
+		{
+			name:  "double newline regression",
+			input: "\n\n",
+			params: Parameters{
+				Font:       font.Font{Typeface: "Go", Style: font.Regular, Weight: font.Normal},
+				Alignment:  Start,
+				PxPerEm:    768,
+				MaxLines:   1,
+				Truncator:  "\u200b",
+				WrapPolicy: WrapHeuristically,
+				MaxWidth:   1000,
+			},
+		},
+		{
+			name:  "triple newline regression",
+			input: "\n\n\n",
+			params: Parameters{
+				Font:       font.Font{Typeface: "Go", Style: font.Regular, Weight: font.Normal},
+				Alignment:  Start,
+				PxPerEm:    768,
+				MaxLines:   1,
+				Truncator:  "\u200b",
+				WrapPolicy: WrapHeuristically,
+				MaxWidth:   1000,
 			},
 		},
 	} {
