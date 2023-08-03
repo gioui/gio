@@ -99,6 +99,11 @@ CGFloat _keyboardHeight;
 	_keyboardHeight = 0.0;
 	[self.view setNeedsLayout];
 }
+
+- (BOOL)onOpenURI:(NSString *)url {
+    gio_onOpenURI((__bridge CFTypeRef)url);
+    return YES;
+}
 @end
 
 static void handleTouches(int last, UIView *view, NSSet<UITouch *> *touches, UIEvent *event) {

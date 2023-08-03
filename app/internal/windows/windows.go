@@ -7,6 +7,8 @@ package windows
 
 import (
 	"fmt"
+	"golang.org/x/sys/windows/registry"
+	"os"
 	"runtime"
 	"time"
 	"unicode/utf16"
@@ -99,6 +101,8 @@ const (
 
 	CW_USEDEFAULT = -2147483648
 
+	ERROR_ALREADY_EXISTS = 183
+
 	GWL_STYLE = ^(uintptr(16) - 1) // -16
 
 	GCS_COMPSTR       = 0x0008
@@ -111,7 +115,8 @@ const (
 	CFS_POINT        = 0x0002
 	CFS_CANDIDATEPOS = 0x0040
 
-	HWND_TOPMOST = ^(uint32(1) - 1) // -1
+	HWND_TOPMOST   = ^(uint32(1) - 1) // -1
+	HWND_BROADCAST = 0xFFFF
 
 	HTCAPTION     = 2
 	HTCLIENT      = 1
@@ -303,15 +308,30 @@ const (
 	LR_MONOCHROME       = 0x00000001
 	LR_SHARED           = 0x00008000
 	LR_VGACOLOR         = 0x00000080
+
+	FILE_MAP_WRITE = 0x0002
+	FILE_MAP_READ  = 0x0004
+
+	PAGE_READWRITE = 0x00000004
+)
+
+var (
+	GIO_OPEN_URL uint32 // Custom message for deep linking, lazy init
 )
 
 var (
 	kernel32          = syscall.NewLazySystemDLL("kernel32.dll")
+	_CreateMutex      = kernel32.NewProc("CreateMutexW")
+	_GetMutexInfo     = kernel32.NewProc("GetMutexInfo")
 	_GetModuleHandleW = kernel32.NewProc("GetModuleHandleW")
 	_GlobalAlloc      = kernel32.NewProc("GlobalAlloc")
 	_GlobalFree       = kernel32.NewProc("GlobalFree")
 	_GlobalLock       = kernel32.NewProc("GlobalLock")
 	_GlobalUnlock     = kernel32.NewProc("GlobalUnlock")
+	_MapViewOfFile    = kernel32.NewProc("MapViewOfFile")
+	_OpenFileMapping  = kernel32.NewProc("OpenFileMappingW")
+	_ReleaseMutex     = kernel32.NewProc("ReleaseMutex")
+	_UnmapViewOfFile  = kernel32.NewProc("UnmapViewOfFile")
 
 	user32                       = syscall.NewLazySystemDLL("user32.dll")
 	_AdjustWindowRectEx          = user32.NewProc("AdjustWindowRectEx")
@@ -347,9 +367,11 @@ var (
 	_PostQuitMessage             = user32.NewProc("PostQuitMessage")
 	_ReleaseCapture              = user32.NewProc("ReleaseCapture")
 	_RegisterClassExW            = user32.NewProc("RegisterClassExW")
+	_RegisterWindowMessage       = user32.NewProc("RegisterWindowMessageW")
 	_ReleaseDC                   = user32.NewProc("ReleaseDC")
 	_ScreenToClient              = user32.NewProc("ScreenToClient")
 	_ShowWindow                  = user32.NewProc("ShowWindow")
+	_SendMessage                 = user32.NewProc("SendMessageW")
 	_SetCapture                  = user32.NewProc("SetCapture")
 	_SetCursor                   = user32.NewProc("SetCursor")
 	_SetClipboardData            = user32.NewProc("SetClipboardData")
@@ -651,6 +673,65 @@ func GlobalUnlock(h syscall.Handle) {
 	_GlobalUnlock.Call(uintptr(h))
 }
 
+func CreateMutex(name string) (ptr syscall.Handle, err error) {
+	r, _, err := _CreateMutex.Call(0, 0, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(name))))
+	switch err.(syscall.Errno) {
+	case ERROR_ALREADY_EXISTS:
+		return 0, err
+	}
+	return syscall.Handle(r), nil
+}
+
+func GetMutexInfo(h syscall.Handle) (pid, count uint32, err error) {
+	r, _, err := _GetMutexInfo.Call(uintptr(h), uintptr(unsafe.Pointer(&pid)), uintptr(unsafe.Pointer(&count)))
+	if r == 0 {
+		return 0, 0, fmt.Errorf("GetMutexInfo: %v", err)
+	}
+	return pid, count, nil
+}
+
+func CreateFileMapping(mode uint32, name string, size int) (ptr syscall.Handle, err error) {
+	return syscall.CreateFileMapping(syscall.InvalidHandle, nil, mode, 0, uint32(size), syscall.StringToUTF16Ptr("Local"+name))
+}
+
+func OpenFileMapping(mode int32, name string) (syscall.Handle, error) {
+	r, _, err := _OpenFileMapping.Call(uintptr(mode), 0, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr("Local"+name))))
+	if r == 0 {
+		return 0, fmt.Errorf("OpenFileMapping: %v", err)
+	}
+	return syscall.Handle(r), nil
+}
+
+func CloseFileMapping(h syscall.Handle) error {
+	return syscall.Close(h)
+}
+
+func MapViewOfFile(h syscall.Handle, mode int32, size int) ([]byte, error) {
+	r, _, err := _MapViewOfFile.Call(uintptr(h), uintptr(mode), 0, 0, uintptr(size))
+	if r == 0 {
+		return nil, fmt.Errorf("MapViewOfFile: %v", err)
+	}
+
+	slice := [3]uintptr{r, uintptr(size), uintptr(size)}
+	return *(*[]byte)(unsafe.Pointer(&slice)), nil
+}
+
+func UnmapViewOfFile(b []byte) error {
+	r, _, err := _UnmapViewOfFile.Call(uintptr(unsafe.Pointer(&b[0])))
+	if r == 0 {
+		return fmt.Errorf("UnmapViewOfFile: %v", err)
+	}
+	return nil
+}
+
+func ReleaseMutex(h uintptr) error {
+	r, _, err := _ReleaseMutex.Call(h)
+	if r == 0 {
+		return fmt.Errorf("ReleaseMutex: %v", err)
+	}
+	return nil
+}
+
 func KillTimer(hwnd syscall.Handle, nIDEvent uintptr) error {
 	r, _, err := _SetTimer.Call(uintptr(hwnd), uintptr(nIDEvent), 0, 0)
 	if r == 0 {
@@ -735,8 +816,24 @@ func RegisterClassEx(cls *WndClassEx) (uint16, error) {
 	return uint16(a), nil
 }
 
+func RegisterWindowMessage(name string) (uint32, error) {
+	r, _, err := _RegisterWindowMessage.Call(uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(name))))
+	if r == 0 {
+		return 0, fmt.Errorf("RegisterWindowMessage: %v", err)
+	}
+	return uint32(r), nil
+}
+
 func ReleaseDC(hdc syscall.Handle) {
 	_ReleaseDC.Call(uintptr(hdc))
+}
+
+func SendMessage(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) error {
+	r, _, err := _SendMessage.Call(uintptr(hwnd), uintptr(msg), wParam, lParam)
+	if r == 0 {
+		return fmt.Errorf("SendMessage failed: %v", err)
+	}
+	return nil
 }
 
 func SetForegroundWindow(hwnd syscall.Handle) {
@@ -813,4 +910,43 @@ func (p *WindowPlacement) Set(Left, Top, Right, Bottom int) {
 	p.rcNormalPosition.Top = int32(Top)
 	p.rcNormalPosition.Right = int32(Right)
 	p.rcNormalPosition.Bottom = int32(Bottom)
+}
+
+func RegisterScheme(scheme string) error {
+	path, err := os.Executable()
+	if err != nil {
+		return err
+	}
+
+	key, _, err := registry.CreateKey(registry.CURRENT_USER, `Software\\Classes\\`+scheme, registry.ALL_ACCESS)
+	if err != nil {
+		return err
+	}
+	defer key.Close()
+
+	if err = key.SetStringValue("", "URL:"+scheme+" Protocol"); err != nil {
+		return err
+	}
+
+	if err = key.SetStringValue("URL Protocol", ""); err != nil {
+		return err
+	}
+
+	icon, _, err := registry.CreateKey(key, `DefaultIcon`, registry.ALL_ACCESS)
+	if err != nil {
+		return err
+	}
+	defer icon.Close()
+
+	if err = icon.SetStringValue("", `"`+path+`",1`); err != nil {
+		return err
+	}
+
+	cmd, _, err := registry.CreateKey(key, `shell\\open\\command`, registry.ALL_ACCESS)
+	if err != nil {
+		return err
+	}
+	defer cmd.Close()
+
+	return cmd.SetStringValue("", `"`+path+`" "%1"`)
 }

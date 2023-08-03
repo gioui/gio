@@ -376,6 +376,7 @@ CFTypeRef gio_createView(void) {
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
 	[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 	[NSApp activateIgnoringOtherApps:YES];
+
 	gio_onFinishLaunching();
 }
 - (void)applicationDidHide:(NSNotification *)aNotification {
@@ -383,6 +384,11 @@ CFTypeRef gio_createView(void) {
 }
 - (void)applicationWillUnhide:(NSNotification *)notification {
 	gio_onAppShow();
+}
+- (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)urls {
+	for (NSURL *url in urls) {
+		gio_onOpenURI((__bridge CFTypeRef)url.absoluteString);
+	}
 }
 @end
 

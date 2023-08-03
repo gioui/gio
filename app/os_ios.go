@@ -71,7 +71,9 @@ static struct drawParams viewDrawParams(CFTypeRef viewRef) {
 import "C"
 
 import (
+	"gioui.org/io/transfer"
 	"image"
+	"net/url"
 	"runtime"
 	"runtime/debug"
 	"time"
@@ -131,6 +133,9 @@ func onCreate(view, controller C.CFTypeRef) {
 	w.Configure(wopts.options)
 	w.w.Event(system.StageEvent{Stage: system.StagePaused})
 	w.w.Event(ViewEvent{ViewController: uintptr(controller)})
+	if startupURI != nil {
+		w.w.Event(transfer.URLEvent{URL: startupURI})
+	}
 }
 
 //export gio_onDraw
@@ -349,6 +354,23 @@ func newWindow(win *callbacks, options []Option) error {
 }
 
 func osMain() {
+}
+
+var startupURI *url.URL
+
+//export gio_onOpenURI
+func gio_onOpenURI(uri C.CFTypeRef) {
+	u, err := url.Parse(nsstringToString(uri))
+	if err != nil {
+		return
+	}
+	if len(views) == 0 {
+		startupURI = u
+		return
+	}
+	for _, w := range views {
+		w.w.Event(transfer.URLEvent{URL: u})
+	}
 }
 
 //export gio_runMain

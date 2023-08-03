@@ -121,9 +121,11 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"gioui.org/io/transfer"
 	"image"
 	"image/color"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -659,6 +661,16 @@ func Java_org_gioui_GioView_onClearA11yFocus(env *C.JNIEnv, class C.jclass, view
 	if w.semantic.focusID == w.semIDFor(virtID) {
 		w.semantic.focusID = 0
 	}
+}
+
+//export Java_org_gioui_GioView_onOpenURI
+func Java_org_gioui_GioView_onOpenURI(env *C.JNIEnv, class C.jclass, view C.jlong, uri C.jstring) {
+	w := cgo.Handle(view).Value().(*window)
+	u, err := url.Parse(goString(env, uri))
+	if err != nil {
+		return
+	}
+	w.callbacks.Event(transfer.URLEvent{URL: u})
 }
 
 func (w *window) initAccessibilityNodeInfo(env *C.JNIEnv, sem router.SemanticNode, off image.Point, info C.jobject) error {

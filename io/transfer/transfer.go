@@ -19,6 +19,7 @@ package transfer
 
 import (
 	"io"
+	"net/url"
 
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
@@ -107,3 +108,16 @@ type DataEvent struct {
 }
 
 func (DataEvent) ImplementsEvent() {}
+
+// URLEvent is generated when the app is opened from a pre-defined scheme.
+//
+// In order to receive URLEvents, the app must register a scheme. The scheme can be
+// registered using gogio, with `-scheme <scheme>` argument.
+//
+// Due to differences between OSes, URLEvent might not be generated when the URL is
+// larger than 2048 bytes.
+type URLEvent struct {
+	URL *url.URL
+}
+
+func (URLEvent) ImplementsEvent() {}

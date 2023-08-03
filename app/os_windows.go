@@ -5,7 +5,11 @@ package app
 import (
 	"errors"
 	"fmt"
+	"gioui.org/io/transfer"
+	syscall "golang.org/x/sys/windows"
 	"image"
+	"net/url"
+	"os"
 	"runtime"
 	"sort"
 	"strings"
@@ -15,11 +19,8 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	syscall "golang.org/x/sys/windows"
-
 	"gioui.org/app/internal/windows"
 	"gioui.org/unit"
-	gowindows "golang.org/x/sys/windows"
 
 	"gioui.org/f32"
 	"gioui.org/io/clipboard"
@@ -109,6 +110,9 @@ func newWindow(window *callbacks, options []Option) error {
 		w.w = window
 		w.w.SetDriver(w)
 		w.w.Event(ViewEvent{HWND: uintptr(w.hwnd)})
+		if startupURI != "" {
+			w.onOpenURI(startupURI)
+		}
 		w.Configure(options)
 		windows.SetForegroundWindow(w.hwnd)
 		windows.SetFocus(w.hwnd)
@@ -418,6 +422,14 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_IME_ENDCOMPOSITION:
 		w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
 		return windows.TRUE
+	case windows.GIO_OPEN_URL:
+		if schemesURI == "" {
+			return windows.DefWindowProc(hwnd, msg, wParam, lParam)
+		}
+
+		if uri := readURI(wParam); uri != "" {
+			w.onOpenURI(uri)
+		}
 	}
 
 	return windows.DefWindowProc(hwnd, msg, wParam, lParam)
@@ -652,7 +664,7 @@ func (w *window) readClipboard() error {
 		return err
 	}
 	defer windows.GlobalUnlock(mem)
-	content := gowindows.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
+	content := syscall.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
 	w.w.Event(clipboard.Event{Text: content})
 	return nil
 }
@@ -733,7 +745,7 @@ func (w *window) writeClipboard(s string) error {
 	if err := windows.EmptyClipboard(); err != nil {
 		return err
 	}
-	u16, err := gowindows.UTF16FromString(s)
+	u16, err := syscall.UTF16FromString(s)
 	if err != nil {
 		return err
 	}
@@ -850,6 +862,27 @@ func (w *window) raise() {
 		windows.SWP_NOMOVE|windows.SWP_NOSIZE|windows.SWP_SHOWWINDOW)
 }
 
+func (w *window) onOpenURI(uri string) {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return
+	}
+
+	found := false
+	for _, scheme := range schemesURIList {
+		if u.Scheme == scheme {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return
+	}
+
+	w.w.Event(transfer.URLEvent{URL: u})
+}
+
 func convertKeyCode(code uintptr) (string, bool) {
 	if '0' <= code && code <= '9' || 'A' <= code && code <= 'Z' {
 		return string(rune(code)), true
@@ -952,6 +985,97 @@ func configForDPI(dpi int) unit.Metric {
 		PxPerDp: ppdp,
 		PxPerSp: ppdp,
 	}
+}
+
+// schemesURI is a list of schemes, comma separated, that must be
+// defined using -X compiler ldflag, that used in gogio.
+var schemesURI string
+var schemesURIList []string
+
+// startupURI is the URI that started the app, if any.
+var startupURI string
+
+func init() {
+	if schemesURI == "" {
+		return
+	}
+
+	schemesURIList = strings.Split(schemesURI, ",")
+
+	if len(os.Args) >= 2 {
+		startupURI = os.Args[1]
+	}
+
+	code, err := windows.RegisterWindowMessage(schemesURI)
+	if err != nil {
+		return
+	}
+	windows.GIO_OPEN_URL = code
+
+	/*
+		On Windows, launching the app using a URI will start a new instance of the app,
+		a new window. That behavior doesn't align with iOS/Android/macOS, where the deeplink
+		sends the event to the running app (if any).
+
+		In order to align the behavior, we use a global mutex to check if the app is already
+		running. If it is, we send the deeplink to the running app and exit the new instance.
+
+		That should happen on init to prevent the user from seeing the new window.
+	*/
+	if !createURISharedMemory() {
+		if startupURI != "" {
+			broadcastURI(startupURI)
+		}
+		os.Exit(0)
+		return
+	}
+
+	for _, scheme := range schemesURIList {
+		go windows.RegisterScheme(scheme)
+	}
+}
+
+func createURISharedMemory() (ok bool) {
+	if _, err := windows.CreateFileMapping(windows.PAGE_READWRITE, schemesURI, 1024*8); err != nil {
+		return false
+	}
+	return true
+}
+
+func readURI(wParam uintptr) string {
+	mmap, err := windows.OpenFileMapping(windows.FILE_MAP_READ, schemesURI)
+	if err != nil {
+		return ""
+	}
+	defer windows.CloseFileMapping(mmap)
+
+	src, err := windows.MapViewOfFile(mmap, windows.FILE_MAP_READ, 1024*8)
+	if err != nil {
+		return ""
+	}
+	defer windows.UnmapViewOfFile(src)
+
+	if wParam >= uintptr(len(src)) {
+		return ""
+	}
+	return string(src[:wParam])
+}
+
+func broadcastURI(uri string) {
+	mmap, err := windows.OpenFileMapping(windows.FILE_MAP_WRITE, schemesURI)
+	if err != nil {
+		return
+	}
+	defer windows.CloseFileMapping(mmap)
+
+	dst, err := windows.MapViewOfFile(mmap, windows.FILE_MAP_WRITE, 1024*8)
+	if err != nil {
+		return
+	}
+
+	copy(dst, uri)
+	windows.UnmapViewOfFile(dst)
+	windows.SendMessage(windows.HWND_BROADCAST, windows.GIO_OPEN_URL, uintptr(len(uri)), 0)
 }
 
 func (_ ViewEvent) ImplementsEvent() {}
