@@ -12,10 +12,12 @@ import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Rect;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -80,7 +82,7 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 			setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
 		}
 		setLayoutParams(new WindowManager.LayoutParams(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT));
-
+	
 		// Late initialization of the Go runtime to wait for a valid context.
 		Gio.init(context.getApplicationContext());
 
@@ -169,6 +171,12 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		}
 		PointerIcon pointerIcon = PointerIcon.getSystemIcon(getContext(), id);
 		setPointerIcon(pointerIcon);
+	}
+
+	private void openURL(String url) {
+		Uri webpage = Uri.parse(url);
+		Intent intent = new Intent(Intent.ACTION_VIEW, webpage);
+		((Activity) this.getContext()).startActivity(intent);
 	}
 
 	private void setOrientation(int id, int fallback) {

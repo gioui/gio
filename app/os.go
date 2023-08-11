@@ -167,6 +167,8 @@ type driver interface {
 	SetCursor(cursor pointer.Cursor)
 	// Wakeup wakes up the event loop and sends a WakeupEvent.
 	Wakeup()
+	// OpenUrl open explorer at a specific url location
+	OpenUrl(url string)
 	// Perform actions on the window.
 	Perform(system.Action)
 	// EditorStateChanged notifies the driver that the editor state changed.

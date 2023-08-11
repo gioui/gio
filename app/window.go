@@ -301,6 +301,12 @@ func (w *Window) frame(frame *op.Ops, viewport image.Point) error {
 	return w.gpu.Frame(frame, target, viewport)
 }
 
+func (w *Window) OpenUrl(url string) {
+	w.driverDefer(func(d driver) {
+		d.OpenUrl(url)
+	})
+}
+
 func (w *Window) processFrame(d driver, frameStart time.Time) {
 	for k := range w.semantic.ids {
 		delete(w.semantic.ids, k)

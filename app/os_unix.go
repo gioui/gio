@@ -7,6 +7,7 @@ package app
 
 import (
 	"errors"
+	"os/exec"
 	"unsafe"
 
 	"gioui.org/io/pointer"
@@ -97,4 +98,9 @@ var xCursor = [...]string{
 	pointer.CursorSouthResize:              "bottom_side",
 	pointer.CursorNorthEastSouthWestResize: "fd_double_arrow",
 	pointer.CursorNorthWestSouthEastResize: "bd_double_arrow",
+}
+
+func (w *window) OpenUrl(url string) {
+	cmd := exec.Command("xdg-open", url)
+	cmd.Run()
 }

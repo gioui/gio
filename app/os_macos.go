@@ -8,6 +8,7 @@ package app
 import (
 	"errors"
 	"image"
+	"os/exec"
 	"runtime"
 	"time"
 	"unicode"
@@ -441,6 +442,11 @@ func (w *window) Perform(acts system.Action) {
 
 func (w *window) SetCursor(cursor pointer.Cursor) {
 	w.cursor = windowSetCursor(w.cursor, cursor)
+}
+
+func (w *window) OpenUrl(url string) {
+	cmd := exec.Command("open", url)
+	cmd.Run()
 }
 
 func (w *window) EditorStateChanged(old, new editorState) {

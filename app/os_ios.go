@@ -29,6 +29,12 @@ static void writeClipboard(unichar *chars, NSUInteger length) {
 	}
 }
 
+static void openURL(NSString *)url {
+	NSURL *URL = [NSURL URLWithString:url];
+	UIApplication *application = [UIApplication sharedApplication];
+	[application openURL:URL options:@{} completionHandler:nil];
+}
+
 static CFTypeRef readClipboard(void) {
 	@autoreleasepool {
 		UIPasteboard *p = UIPasteboard.generalPasteboard;
@@ -301,6 +307,12 @@ func (w *window) SetAnimating(anim bool) {
 
 func (w *window) SetCursor(cursor pointer.Cursor) {
 	w.cursor = windowSetCursor(w.cursor, cursor)
+}
+
+func (w *window) OpenUrl(url string) {
+	cstr := stringToNSString(url)
+	defer C.CFRelease(cstr)
+	C.openURL(cstr)
 }
 
 func (w *window) onKeyCommand(name string) {

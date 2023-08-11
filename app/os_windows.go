@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"os/exec"
 	"runtime"
 	"sort"
 	"strings"
@@ -766,6 +767,11 @@ func (w *window) SetCursor(cursor pointer.Cursor) {
 	if w.cursorIn {
 		windows.SetCursor(w.cursor)
 	}
+}
+
+func (w *window) OpenUrl(url string) {
+	cmd := exec.Command("cmd", "/c", "start", url)
+	cmd.Run()
 }
 
 // windowsCursor contains mapping from pointer.Cursor to an IDC.

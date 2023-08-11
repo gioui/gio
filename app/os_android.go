@@ -193,6 +193,7 @@ var gioView struct {
 	restartInput       C.jmethodID
 	updateSelection    C.jmethodID
 	updateCaret        C.jmethodID
+	openURL            C.jmethodID
 }
 
 type pixelInsets struct {
@@ -482,6 +483,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.restartInput = getMethodID(env, class, "restartInput", "()V")
 		m.updateSelection = getMethodID(env, class, "updateSelection", "()V")
 		m.updateCaret = getMethodID(env, class, "updateCaret", "(FFFFFFFFFF)V")
+		m.openURL = getMethodID(env, class, "openURL", "(Ljava/lang/String;)V")
 	})
 	view = C.jni_NewGlobalRef(env, view)
 	wopts := <-mainWindow.out
@@ -1358,6 +1360,13 @@ func (w *window) Perform(system.Action) {}
 func (w *window) SetCursor(cursor pointer.Cursor) {
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
 		setCursor(env, w.view, cursor)
+	})
+}
+
+func (w *window) OpenUrl(url string) {
+	runInJVM(javaVM(), func(env *C.JNIEnv) {
+		str := javaString(env, url)
+		callVoidMethod(env, w.view, gioView.openURL, jvalue(str))
 	})
 }
 

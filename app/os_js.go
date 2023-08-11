@@ -607,6 +607,10 @@ func (w *window) SetCursor(cursor pointer.Cursor) {
 	style.Set("cursor", webCursor[cursor])
 }
 
+func (w *window) OpenUrl(url string) {
+	js.Global().Call("open", url, "_blank", "")
+}
+
 func (w *window) Wakeup() {
 	select {
 	case w.wakeups <- struct{}{}:
