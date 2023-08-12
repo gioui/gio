@@ -29,10 +29,13 @@ static void writeClipboard(unichar *chars, NSUInteger length) {
 	}
 }
 
-static void openURL(NSString *url) {
-    NSURL *URL = [NSURL URLWithString:url];
+static void openURL(CFTypeRef str) {
+	@autoreleasepool {
+		NSString *s = (__bridge NSString *)str;
+    NSURL *url = [NSURL URLWithString:s];
     UIApplication *application = [UIApplication sharedApplication];
-    [application openURL:URL options:@{} completionHandler:nil];
+    [application openURL:url options:@{} completionHandler:nil];
+	}
 }
 
 static CFTypeRef readClipboard(void) {
