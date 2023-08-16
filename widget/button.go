@@ -28,6 +28,7 @@ type Clickable struct {
 	keyTag       struct{}
 	requestFocus bool
 	focused      bool
+	pressedKey   string
 }
 
 // Click represents a click.
@@ -178,17 +179,30 @@ func (b *Clickable) update(gtx layout.Context) {
 		switch e := e.(type) {
 		case key.FocusEvent:
 			b.focused = e.Focus
+			if !b.focused {
+				b.pressedKey = ""
+			}
 		case key.Event:
-			if !b.focused || e.State != key.Release {
+			if !b.focused {
 				break
 			}
 			if e.Name != key.NameReturn && e.Name != key.NameSpace {
 				break
 			}
-			b.clicks = append(b.clicks, Click{
-				Modifiers: e.Modifiers,
-				NumClicks: 1,
-			})
+			switch e.State {
+			case key.Press:
+				b.pressedKey = e.Name
+			case key.Release:
+				if b.pressedKey != e.Name {
+					break
+				}
+				// only register a key as a click if the key was pressed and released while this button was focused
+				b.pressedKey = ""
+				b.clicks = append(b.clicks, Click{
+					Modifiers: e.Modifiers,
+					NumClicks: 1,
+				})
+			}
 		}
 	}
 }
