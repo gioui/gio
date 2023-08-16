@@ -47,6 +47,13 @@ type WndClassEx struct {
 	HIconSm       syscall.Handle
 }
 
+type Margins struct {
+	CxLeftWidth    int32
+	CxRightWidth   int32
+	CyTopHeight    int32
+	CyBottomHeight int32
+}
+
 type Msg struct {
 	Hwnd     syscall.Handle
 	Message  uint32
@@ -380,6 +387,9 @@ var (
 	_ImmReleaseContext       = imm32.NewProc("ImmReleaseContext")
 	_ImmSetCandidateWindow   = imm32.NewProc("ImmSetCandidateWindow")
 	_ImmSetCompositionWindow = imm32.NewProc("ImmSetCompositionWindow")
+
+	dwmapi                        = syscall.NewLazySystemDLL("dwmapi")
+	_DwmExtendFrameIntoClientArea = dwmapi.NewProc("DwmExtendFrameIntoClientArea")
 )
 
 func AdjustWindowRectEx(r *Rect, dwStyle uint32, bMenu int, dwExStyle uint32) {
@@ -429,6 +439,14 @@ func DestroyWindow(hwnd syscall.Handle) {
 
 func DispatchMessage(m *Msg) {
 	_DispatchMessage.Call(uintptr(unsafe.Pointer(m)))
+}
+
+func DwmExtendFrameIntoClientArea(hwnd syscall.Handle, margins Margins) error {
+	r, _, _ := _DwmExtendFrameIntoClientArea.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&margins)))
+	if r != 0 {
+		return fmt.Errorf("DwmExtendFrameIntoClientArea: %#x", r)
+	}
+	return nil
 }
 
 func EmptyClipboard() error {
