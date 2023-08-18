@@ -14,6 +14,7 @@ import (
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
+	"gioui.org/io/system"
 	"gioui.org/io/transfer"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -219,6 +220,30 @@ func TestPointerTypes(t *testing.T) {
 		},
 	)
 	assertEventPointerTypeSequence(t, r.Events(handler), pointer.Cancel, pointer.Press, pointer.Release)
+}
+
+func TestPointerSystemAction(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		var ops op.Ops
+		r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
+		system.ActionInputOp(system.ActionMove).Add(&ops)
+		r1.Pop()
+
+		var r Router
+		r.Frame(&ops)
+		assertActionAt(t, r, f32.Pt(50, 50), system.ActionMove)
+	})
+	t.Run("covered by another clip", func(t *testing.T) {
+		var ops op.Ops
+		r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
+		system.ActionInputOp(system.ActionMove).Add(&ops)
+		clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops).Pop()
+		r1.Pop()
+
+		var r Router
+		r.Frame(&ops)
+		assertActionAt(t, r, f32.Pt(50, 50), system.ActionMove)
+	})
 }
 
 func TestPointerPriority(t *testing.T) {
@@ -1228,6 +1253,17 @@ func assertScrollEvent(t *testing.T, ev event.Event, scroll f32.Point) {
 	t.Helper()
 	if got, want := ev.(pointer.Event).Scroll, scroll; got != want {
 		t.Errorf("got %v; want %v", got, want)
+	}
+}
+
+// assertActionAt checks that the router has a system action of the expected type at point.
+func assertActionAt(t *testing.T, q Router, point f32.Point, expected system.Action) {
+	t.Helper()
+	action, ok := q.ActionAt(point)
+	if !ok {
+		t.Errorf("expected action %v at %v, got no action", expected, point)
+	} else if action != expected {
+		t.Errorf("expected action %v at %v, got %v", expected, point, action)
 	}
 }
 

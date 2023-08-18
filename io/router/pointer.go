@@ -432,17 +432,15 @@ func (q *pointerQueue) semanticIDFor(content semanticContent) SemanticID {
 	return id.id
 }
 
-func (q *pointerQueue) ActionAt(pos f32.Point) (system.Action, bool) {
-	for i := len(q.hitTree) - 1; i >= 0; i-- {
-		n := &q.hitTree[i]
-		hit, _ := q.hit(n.area, pos)
-		if !hit {
-			continue
-		}
+func (q *pointerQueue) ActionAt(pos f32.Point) (action system.Action, hasAction bool) {
+	q.hitTest(pos, func(n *hitNode) {
 		area := q.areas[n.area]
-		return area.action, area.action != 0
-	}
-	return 0, false
+		if area.action != 0 {
+			action = area.action
+			hasAction = true
+		}
+	})
+	return action, hasAction
 }
 
 func (q *pointerQueue) SemanticAt(pos f32.Point) (SemanticID, bool) {
@@ -461,10 +459,14 @@ func (q *pointerQueue) SemanticAt(pos f32.Point) (SemanticID, bool) {
 	return 0, false
 }
 
-func (q *pointerQueue) opHit(pos f32.Point) ([]event.Tag, pointer.Cursor) {
+// hitTest searches the hit tree for nodes matching pos. Any node matching pos will
+// have the onNode func invoked on it to allow the caller to extract whatever information
+// is necessary for further processing. Providing this algorithm in this generic way
+// allows normal event routing and system action event routing to share the same traversal
+// logic even though they are interested in different aspects of hit nodes.
+func (q *pointerQueue) hitTest(pos f32.Point, onNode func(*hitNode)) pointer.Cursor {
 	// Track whether we're passing through hits.
 	pass := true
-	hits := q.scratch[:0]
 	idx := len(q.hitTree) - 1
 	cursor := pointer.CursorDefault
 	for idx >= 0 {
@@ -483,12 +485,20 @@ func (q *pointerQueue) opHit(pos f32.Point) ([]event.Tag, pointer.Cursor) {
 		} else {
 			idx = n.next
 		}
+		onNode(n)
+	}
+	return cursor
+}
+
+func (q *pointerQueue) opHit(pos f32.Point) ([]event.Tag, pointer.Cursor) {
+	hits := q.scratch[:0]
+	cursor := q.hitTest(pos, func(n *hitNode) {
 		if n.tag != nil {
 			if _, exists := q.handlers[n.tag]; exists {
 				hits = addHandler(hits, n.tag)
 			}
 		}
-	}
+	})
 	q.scratch = hits[:0]
 	return hits, cursor
 }
