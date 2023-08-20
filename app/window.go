@@ -5,7 +5,6 @@ package app
 import (
 	"errors"
 	"fmt"
-	"gioui.org/io/transfer"
 	"image"
 	"image/color"
 	"runtime"
@@ -899,8 +898,6 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 	case ConfigEvent:
 		w.decorations.Config = e2.Config
 		e2.Config = w.effectiveConfig()
-		w.out <- e2
-	case transfer.URLEvent:
 		w.out <- e2
 	case event.Event:
 		handled := w.queue.q.Queue(e2)
