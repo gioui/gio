@@ -422,13 +422,17 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_IME_ENDCOMPOSITION:
 		w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
 		return windows.TRUE
-	case windows.GIO_OPEN_URL:
-		if schemesURI == "" {
-			return windows.DefWindowProc(hwnd, msg, wParam, lParam)
-		}
+	case windows.WM_COPYDATA:
+		data := (*windows.CopyDataStruct)(unsafe.Pointer(lParam))
+		switch data.LpData {
+		case windows.GIO_OPEN_URL:
+			if schemesURI == "" {
+				return windows.TRUE
+			}
 
-		if uri := readURI(wParam); uri != "" {
+			uri := syscall.UTF16PtrToString((*uint16)(unsafe.Pointer(data.LpData)))
 			w.onOpenURI(uri)
+			return windows.TRUE
 		}
 	}
 
@@ -1006,11 +1010,10 @@ func init() {
 		startupURI = os.Args[1]
 	}
 
-	code, err := windows.RegisterWindowMessage(schemesURI)
+	path, err := os.Executable()
 	if err != nil {
 		return
 	}
-	windows.GIO_OPEN_URL = code
 
 	/*
 		On Windows, launching the app using a URI will start a new instance of the app,
@@ -1022,9 +1025,9 @@ func init() {
 
 		That should happen on init to prevent the user from seeing the new window.
 	*/
-	if !createURISharedMemory() {
+	if hwnd, ok := windows.SearchHWND(path); ok {
 		if startupURI != "" {
-			broadcastURI(startupURI)
+			broadcastURI(hwnd, startupURI)
 		}
 		os.Exit(0)
 		return
@@ -1035,47 +1038,15 @@ func init() {
 	}
 }
 
-func createURISharedMemory() (ok bool) {
-	if _, err := windows.CreateFileMapping(windows.PAGE_READWRITE, schemesURI, 1024*8); err != nil {
-		return false
-	}
-	return true
-}
-
-func readURI(wParam uintptr) string {
-	mmap, err := windows.OpenFileMapping(windows.FILE_MAP_READ, schemesURI)
-	if err != nil {
-		return ""
-	}
-	defer windows.CloseFileMapping(mmap)
-
-	src, err := windows.MapViewOfFile(mmap, windows.FILE_MAP_READ, 1024*8)
-	if err != nil {
-		return ""
-	}
-	defer windows.UnmapViewOfFile(src)
-
-	if wParam >= uintptr(len(src)) {
-		return ""
-	}
-	return string(src[:wParam])
-}
-
-func broadcastURI(uri string) {
-	mmap, err := windows.OpenFileMapping(windows.FILE_MAP_WRITE, schemesURI)
-	if err != nil {
-		return
-	}
-	defer windows.CloseFileMapping(mmap)
-
-	dst, err := windows.MapViewOfFile(mmap, windows.FILE_MAP_WRITE, 1024*8)
-	if err != nil {
-		return
+func broadcastURI(hwnd syscall.Handle, uri string) {
+	msg := &windows.CopyDataStruct{
+		DwData: windows.GIO_OPEN_URL,
+		CbData: uint32(len(uri)*2 + 1),
+		LpData: uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(uri))),
 	}
 
-	copy(dst, uri)
-	windows.UnmapViewOfFile(dst)
-	windows.SendMessage(windows.HWND_BROADCAST, windows.GIO_OPEN_URL, uintptr(len(uri)), 0)
+	windows.SendMessage(hwnd, windows.WM_COPYDATA, 0, uintptr(unsafe.Pointer(&msg)))
+	runtime.KeepAlive(msg)
 }
 
 func (_ ViewEvent) ImplementsEvent() {}

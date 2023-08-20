@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"golang.org/x/sys/windows/registry"
 	"os"
+	"path/filepath"
 	"runtime"
 	"time"
 	"unicode/utf16"
@@ -86,6 +87,12 @@ type MonitorInfo struct {
 	Monitor  Rect
 	WorkArea Rect
 	Flags    uint32
+}
+
+type CopyDataStruct struct {
+	DwData uintptr
+	CbData uint32
+	LpData uintptr
 }
 
 const (
@@ -230,6 +237,7 @@ const (
 	WM_CANCELMODE           = 0x001F
 	WM_CHAR                 = 0x0102
 	WM_CLOSE                = 0x0010
+	WM_COPYDATA             = 0x004A
 	WM_CREATE               = 0x0001
 	WM_DPICHANGED           = 0x02E0
 	WM_DESTROY              = 0x0002
@@ -315,23 +323,24 @@ const (
 	PAGE_READWRITE = 0x00000004
 )
 
-var (
-	GIO_OPEN_URL uint32 // Custom message for deep linking, lazy init
+const (
+	GIO_OPEN_URL uintptr = iota + 1 // Custom message
 )
 
 var (
-	kernel32          = syscall.NewLazySystemDLL("kernel32.dll")
-	_CreateMutex      = kernel32.NewProc("CreateMutexW")
-	_GetMutexInfo     = kernel32.NewProc("GetMutexInfo")
-	_GetModuleHandleW = kernel32.NewProc("GetModuleHandleW")
-	_GlobalAlloc      = kernel32.NewProc("GlobalAlloc")
-	_GlobalFree       = kernel32.NewProc("GlobalFree")
-	_GlobalLock       = kernel32.NewProc("GlobalLock")
-	_GlobalUnlock     = kernel32.NewProc("GlobalUnlock")
-	_MapViewOfFile    = kernel32.NewProc("MapViewOfFile")
-	_OpenFileMapping  = kernel32.NewProc("OpenFileMappingW")
-	_ReleaseMutex     = kernel32.NewProc("ReleaseMutex")
-	_UnmapViewOfFile  = kernel32.NewProc("UnmapViewOfFile")
+	kernel32                   = syscall.NewLazySystemDLL("kernel32.dll")
+	_CreateMutex               = kernel32.NewProc("CreateMutexW")
+	_GetMutexInfo              = kernel32.NewProc("GetMutexInfo")
+	_GetModuleHandleW          = kernel32.NewProc("GetModuleHandleW")
+	_GlobalAlloc               = kernel32.NewProc("GlobalAlloc")
+	_GlobalFree                = kernel32.NewProc("GlobalFree")
+	_GlobalLock                = kernel32.NewProc("GlobalLock")
+	_GlobalUnlock              = kernel32.NewProc("GlobalUnlock")
+	_MapViewOfFile             = kernel32.NewProc("MapViewOfFile")
+	_OpenFileMapping           = kernel32.NewProc("OpenFileMappingW")
+	_ReleaseMutex              = kernel32.NewProc("ReleaseMutex")
+	_UnmapViewOfFile           = kernel32.NewProc("UnmapViewOfFile")
+	_QueryFullProcessImageName = kernel32.NewProc("QueryFullProcessImageNameW")
 
 	user32                       = syscall.NewLazySystemDLL("user32.dll")
 	_AdjustWindowRectEx          = user32.NewProc("AdjustWindowRectEx")
@@ -342,6 +351,8 @@ var (
 	_DestroyWindow               = user32.NewProc("DestroyWindow")
 	_DispatchMessage             = user32.NewProc("DispatchMessageW")
 	_EmptyClipboard              = user32.NewProc("EmptyClipboard")
+	_EnumWindows                 = user32.NewProc("EnumWindows")
+	_GetWindowThreadProcessID    = user32.NewProc("GetWindowThreadProcessId")
 	_GetWindowRect               = user32.NewProc("GetWindowRect")
 	_GetClipboardData            = user32.NewProc("GetClipboardData")
 	_GetDC                       = user32.NewProc("GetDC")
@@ -910,6 +921,35 @@ func (p *WindowPlacement) Set(Left, Top, Right, Bottom int) {
 	p.rcNormalPosition.Top = int32(Top)
 	p.rcNormalPosition.Right = int32(Right)
 	p.rcNormalPosition.Bottom = int32(Bottom)
+}
+
+func SearchHWND(path string) (syscall.Handle, bool) {
+	base := filepath.Base(path)
+
+	var resHWND syscall.Handle
+	fn := syscall.NewCallback(func(hwnd uintptr, lparam uintptr) uintptr {
+		var processID uint32
+		_GetWindowThreadProcessID.Call(hwnd, uintptr(unsafe.Pointer(&processID)))
+
+		handle, _ := syscall.OpenProcess(syscall.PROCESS_QUERY_INFORMATION|syscall.PROCESS_VM_READ, false, processID)
+		if handle != 0 {
+			defer syscall.CloseHandle(handle)
+
+			var buffer [4096]uint16
+			size := uint32(len(buffer))
+			_QueryFullProcessImageName.Call(uintptr(handle), 0, uintptr(unsafe.Pointer(&buffer)), uintptr(unsafe.Pointer(&size)))
+
+			if base == filepath.Base(syscall.UTF16ToString(buffer[:size])) {
+				resHWND = syscall.Handle(hwnd)
+				return 0
+			}
+		}
+
+		return 1
+	})
+
+	_EnumWindows.Call(fn, 0)
+	return resHWND, resHWND != 0
 }
 
 func RegisterScheme(scheme string) error {
