@@ -23,7 +23,7 @@ func (q *transferQueue) Push(evt transfer.URLEvent, events *handlerEvents) {
 
 func (q *transferQueue) ProcessSchemeOp(op transfer.SchemeOp, events *handlerEvents) {
 	q.schemes = append(q.schemes, op)
-	if !q.initialized && q.firstURLEvent.URL != nil {
+	if q.firstURLEvent.URL != nil {
 		q.routeEvent(op, q.firstURLEvent, events)
 	}
 }
