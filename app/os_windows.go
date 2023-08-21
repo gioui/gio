@@ -424,14 +424,16 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		return windows.TRUE
 	case windows.WM_COPYDATA:
 		data := (*windows.CopyDataStruct)(unsafe.Pointer(lParam))
-		switch data.LpData {
+		switch data.DwData {
 		case windows.GIO_OPEN_URL:
 			if schemesURI == "" {
 				return windows.TRUE
 			}
 
 			uri := syscall.UTF16PtrToString((*uint16)(unsafe.Pointer(data.LpData)))
-			w.onOpenURI(uri)
+			if w.onOpenURI(uri) {
+				w.Perform(system.ActionRaise)
+			}
 			return windows.TRUE
 		}
 	}
@@ -866,10 +868,10 @@ func (w *window) raise() {
 		windows.SWP_NOMOVE|windows.SWP_NOSIZE|windows.SWP_SHOWWINDOW)
 }
 
-func (w *window) onOpenURI(uri string) {
+func (w *window) onOpenURI(uri string) bool {
 	u, err := url.Parse(uri)
 	if err != nil {
-		return
+		return false
 	}
 
 	found := false
@@ -881,10 +883,11 @@ func (w *window) onOpenURI(uri string) {
 	}
 
 	if !found {
-		return
+		return false
 	}
 
 	w.w.Event(transfer.URLEvent{URL: u})
+	return true
 }
 
 func convertKeyCode(code uintptr) (string, bool) {
@@ -1039,13 +1042,15 @@ func init() {
 }
 
 func broadcastURI(hwnd syscall.Handle, uri string) {
+	u := syscall.StringToUTF16Ptr(uri)
 	msg := &windows.CopyDataStruct{
 		DwData: windows.GIO_OPEN_URL,
 		CbData: uint32(len(uri)*2 + 1),
-		LpData: uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(uri))),
+		LpData: uintptr(unsafe.Pointer(u)),
 	}
 
-	windows.SendMessage(hwnd, windows.WM_COPYDATA, 0, uintptr(unsafe.Pointer(&msg)))
+	windows.SendMessage(hwnd, windows.WM_COPYDATA, 0, uintptr(unsafe.Pointer(msg)))
+	runtime.KeepAlive(u)
 	runtime.KeepAlive(msg)
 }
 
