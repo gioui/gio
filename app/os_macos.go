@@ -788,13 +788,13 @@ func configFor(scale float32) unit.Metric {
 //export gio_onClose
 func gio_onClose(view C.CFTypeRef) {
 	w := mustView(view)
-	w.displayLink.Close()
 	w.w.Event(ViewEvent{})
-	deleteView(view)
 	w.w.Event(system.DestroyEvent{})
+	w.displayLink.Close()
+	w.displayLink = nil
+	deleteView(view)
 	C.CFRelease(w.view)
 	w.view = 0
-	w.displayLink = nil
 }
 
 //export gio_onHide
