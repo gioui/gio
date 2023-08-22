@@ -95,6 +95,55 @@ type line struct {
 	yOffset int
 }
 
+// insertTrailingSyntheticNewline adds a synthetic newline to the final logical run of the line
+// with the given shaping cluster index.
+func (l *line) insertTrailingSyntheticNewline(newLineClusterIdx int) {
+	// If there was a newline at the end of this paragraph, insert a synthetic glyph representing it.
+	finalContentRun := len(l.runs) - 1
+	// If there was a trailing newline update the rune counts to include
+	// it on the last line of the paragraph.
+	l.runeCount += 1
+	l.runs[finalContentRun].Runes.Count += 1
+
+	syntheticGlyph := glyph{
+		id:           0,
+		clusterIndex: newLineClusterIdx,
+		glyphCount:   0,
+		runeCount:    1,
+		xAdvance:     0,
+		yAdvance:     0,
+		xOffset:      0,
+		yOffset:      0,
+	}
+	// Inset the synthetic newline glyph on the proper end of the run.
+	if l.runs[finalContentRun].Direction.Progression() == system.FromOrigin {
+		l.runs[finalContentRun].Glyphs = append(l.runs[finalContentRun].Glyphs, syntheticGlyph)
+	} else {
+		// Ensure capacity.
+		l.runs[finalContentRun].Glyphs = append(l.runs[finalContentRun].Glyphs, glyph{})
+		copy(l.runs[finalContentRun].Glyphs[1:], l.runs[finalContentRun].Glyphs)
+		l.runs[finalContentRun].Glyphs[0] = syntheticGlyph
+	}
+}
+
+func (l *line) setTruncatedCount(truncatedCount int) {
+	// If we've truncated the text with a truncator, adjust the rune counts within the
+	// truncator to make it represent the truncated text.
+	finalRunIdx := len(l.runs) - 1
+	l.runs[finalRunIdx].truncator = true
+	finalGlyphIdx := len(l.runs[finalRunIdx].Glyphs) - 1
+	// The run represents all of the truncated text.
+	l.runs[finalRunIdx].Runes.Count = truncatedCount
+	// Only the final glyph represents any runes, and it represents all truncated text.
+	for i := range l.runs[finalRunIdx].Glyphs {
+		if i == finalGlyphIdx {
+			l.runs[finalRunIdx].Glyphs[finalGlyphIdx].runeCount = truncatedCount
+		} else {
+			l.runs[finalRunIdx].Glyphs[finalGlyphIdx].runeCount = 0
+		}
+	}
+}
+
 // Range describes the position and quantity of a range of text elements
 // within a larger slice. The unit is usually runes of unicode data or
 // glyphs of shaped font data.
@@ -530,16 +579,21 @@ func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 	if hasNewline {
 		txt = txt[:len(txt)-1]
 	}
+	if params.MaxLines != 0 && hasNewline {
+		// If we might end up truncating a trailing newline, we must insert the truncator symbol
+		// on the final line (if we hit the limit).
+		params.forceTruncate = true
+	}
 	ls, truncated = s.shapeAndWrapText(params, replaceControlCharacters(txt))
 
-	didTruncate := truncated > 0 || (params.forceTruncate && params.MaxLines == len(ls))
-
-	if didTruncate && hasNewline {
-		// We've truncated the newline, since it was at the end and we've truncated some amount of runes
-		// before it.
+	hasTruncator := truncated > 0 || (params.forceTruncate && params.MaxLines == len(ls))
+	if hasTruncator && hasNewline {
+		// We have a truncator at the end of the line, so the newline is logically
+		// truncated as well.
 		truncated++
 		hasNewline = false
 	}
+
 	// Convert to Lines.
 	textLines := make([]line, len(ls))
 	maxHeight := fixed.Int26_6(0)
@@ -548,49 +602,12 @@ func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 		if otLine.lineHeight > maxHeight {
 			maxHeight = otLine.lineHeight
 		}
-		isFinalLine := i == len(ls)-1
-		if isFinalLine && hasNewline {
-			// If there was a trailing newline update the rune counts to include
-			// it on the last line of the paragraph.
-			finalRunIdx := len(otLine.runs) - 1
-			otLine.runeCount += 1
-			otLine.runs[finalRunIdx].Runes.Count += 1
-
-			syntheticGlyph := glyph{
-				id:           0,
-				clusterIndex: len(txt),
-				glyphCount:   0,
-				runeCount:    1,
-				xAdvance:     0,
-				yAdvance:     0,
-				xOffset:      0,
-				yOffset:      0,
+		if isFinalLine := i == len(ls)-1; isFinalLine {
+			if hasNewline {
+				otLine.insertTrailingSyntheticNewline(len(txt))
 			}
-			// Inset the synthetic newline glyph on the proper end of the run.
-			if otLine.runs[finalRunIdx].Direction.Progression() == system.FromOrigin {
-				otLine.runs[finalRunIdx].Glyphs = append(otLine.runs[finalRunIdx].Glyphs, syntheticGlyph)
-			} else {
-				// Ensure capacity.
-				otLine.runs[finalRunIdx].Glyphs = append(otLine.runs[finalRunIdx].Glyphs, glyph{})
-				copy(otLine.runs[finalRunIdx].Glyphs[1:], otLine.runs[finalRunIdx].Glyphs)
-				otLine.runs[finalRunIdx].Glyphs[0] = syntheticGlyph
-			}
-		}
-		if isFinalLine && didTruncate {
-			// If we've truncated the text with a truncator, adjust the rune counts within the
-			// truncator to make it represent the truncated text.
-			finalRunIdx := len(otLine.runs) - 1
-			otLine.runs[finalRunIdx].truncator = true
-			finalGlyphIdx := len(otLine.runs[finalRunIdx].Glyphs) - 1
-			// The run represents all of the truncated text.
-			otLine.runs[finalRunIdx].Runes.Count = truncated
-			// Only the final glyph represents any runes, and it represents all truncated text.
-			for i := range otLine.runs[finalRunIdx].Glyphs {
-				if i == finalGlyphIdx {
-					otLine.runs[finalRunIdx].Glyphs[finalGlyphIdx].runeCount = truncated
-				} else {
-					otLine.runs[finalRunIdx].Glyphs[finalGlyphIdx].runeCount = 0
-				}
+			if hasTruncator {
+				otLine.setTruncatedCount(truncated)
 			}
 		}
 		textLines[i] = otLine

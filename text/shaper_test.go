@@ -154,9 +154,11 @@ func TestWrappingForcedTruncation(t *testing.T) {
 // consistently and does not create spurious lines of text.
 func TestShapingNewlineHandling(t *testing.T) {
 	type testcase struct {
-		textInput      string
-		expectedLines  int
-		expectedGlyphs int
+		textInput         string
+		expectedLines     int
+		expectedGlyphs    int
+		maxLines          int
+		expectedTruncated int
 	}
 	for _, tc := range []testcase{
 		{textInput: "a\n", expectedLines: 1, expectedGlyphs: 3},
@@ -165,20 +167,40 @@ func TestShapingNewlineHandling(t *testing.T) {
 		{textInput: "\n", expectedLines: 1, expectedGlyphs: 2},
 		{textInput: "\n\n", expectedLines: 2, expectedGlyphs: 3},
 		{textInput: "\n\n\n", expectedLines: 3, expectedGlyphs: 4},
+		{textInput: "\n", expectedLines: 1, maxLines: 1, expectedGlyphs: 1, expectedTruncated: 1},
+		{textInput: "\n\n", expectedLines: 1, maxLines: 1, expectedGlyphs: 1, expectedTruncated: 2},
+		{textInput: "\n\n\n", expectedLines: 1, maxLines: 1, expectedGlyphs: 1, expectedTruncated: 3},
+		{textInput: "a\n", expectedLines: 1, maxLines: 1, expectedGlyphs: 2, expectedTruncated: 1},
+		{textInput: "a\n\n", expectedLines: 1, maxLines: 1, expectedGlyphs: 2, expectedTruncated: 2},
+		{textInput: "a\n\n\n", expectedLines: 1, maxLines: 1, expectedGlyphs: 2, expectedTruncated: 3},
+		{textInput: "\n", expectedLines: 1, maxLines: 2, expectedGlyphs: 2},
+		{textInput: "\n\n", expectedLines: 2, maxLines: 2, expectedGlyphs: 2, expectedTruncated: 1},
+		{textInput: "\n\n\n", expectedLines: 2, maxLines: 2, expectedGlyphs: 2, expectedTruncated: 2},
+		{textInput: "a\n", expectedLines: 1, maxLines: 2, expectedGlyphs: 3},
+		{textInput: "a\n\n", expectedLines: 2, maxLines: 2, expectedGlyphs: 3, expectedTruncated: 1},
+		{textInput: "a\n\n\n", expectedLines: 2, maxLines: 2, expectedGlyphs: 3, expectedTruncated: 2},
 	} {
-		t.Run(fmt.Sprintf("%q", tc.textInput), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%q-maxLines%d", tc.textInput, tc.maxLines), func(t *testing.T) {
 			ltrFace, _ := opentype.Parse(goregular.TTF)
 			collection := []FontFace{{Face: ltrFace}}
 			cache := NewShaper(NoSystemFonts(), WithCollection(collection))
 			checkGlyphs := func() {
 				glyphs := []Glyph{}
 				runes := 0
+				truncated := 0
 				for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
 					glyphs = append(glyphs, g)
-					runes += g.Runes
+					if g.Flags&FlagTruncator == 0 {
+						runes += g.Runes
+					} else {
+						truncated += g.Runes
+					}
 				}
-				if expected := len([]rune(tc.textInput)); expected != runes {
+				if expected := len([]rune(tc.textInput)) - tc.expectedTruncated; expected != runes {
 					t.Errorf("expected %d runes, got %d", expected, runes)
+				}
+				if truncated != tc.expectedTruncated {
+					t.Errorf("expected %d truncated runes, got %d", tc.expectedTruncated, truncated)
 				}
 				if len(glyphs) != tc.expectedGlyphs {
 					t.Errorf("expected %d glyphs, got %d", tc.expectedGlyphs, len(glyphs))
@@ -207,29 +229,27 @@ func TestShapingNewlineHandling(t *testing.T) {
 						t.Errorf("expected paragraph start glyph to have cursor y")
 					}
 				}
-				if count := strings.Count(tc.textInput, "\n"); found != count {
+				if count := strings.Count(tc.textInput, "\n"); found != count && tc.maxLines == 0 {
 					t.Errorf("expected %d paragraph breaks, found %d", count, found)
+				} else if tc.maxLines > 0 && found > tc.maxLines {
+					t.Errorf("expected %d paragraph breaks due to truncation, found %d", tc.maxLines, found)
 				}
 			}
-			cache.LayoutString(Parameters{
+			params := Parameters{
 				Alignment: Middle,
 				PxPerEm:   fixed.I(10),
 				MinWidth:  200,
 				MaxWidth:  200,
 				Locale:    english,
-			}, tc.textInput)
+				MaxLines:  tc.maxLines,
+			}
+			cache.LayoutString(params, tc.textInput)
 			if lineCount := len(cache.txt.lines); lineCount > tc.expectedLines {
 				t.Errorf("shaping string %q created %d lines", tc.textInput, lineCount)
 			}
 			checkGlyphs()
 
-			cache.Layout(Parameters{
-				Alignment: Middle,
-				PxPerEm:   fixed.I(10),
-				MinWidth:  200,
-				MaxWidth:  200,
-				Locale:    english,
-			}, strings.NewReader(tc.textInput))
+			cache.Layout(params, strings.NewReader(tc.textInput))
 			if lineCount := len(cache.txt.lines); lineCount > tc.expectedLines {
 				t.Errorf("shaping reader %q created %d lines", tc.textInput, lineCount)
 			}
