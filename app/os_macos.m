@@ -193,14 +193,14 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
 static GioWindowDelegate *globalWindowDel;
 
 static CVReturn displayLinkCallback(CVDisplayLinkRef dl, const CVTimeStamp *inNow, const CVTimeStamp *inOutputTime, CVOptionFlags flagsIn, CVOptionFlags *flagsOut, void *handle) {
-	gio_onFrameCallback(dl, (uintptr_t)handle);
+	gio_onFrameCallback(dl);
 	return kCVReturnSuccess;
 }
 
-CFTypeRef gio_createDisplayLink(uintptr_t handle) {
+CFTypeRef gio_createDisplayLink(void) {
 	CVDisplayLinkRef dl;
 	CVDisplayLinkCreateWithActiveCGDisplays(&dl);
-	CVDisplayLinkSetOutputCallback(dl, displayLinkCallback, (void *)(handle));
+	CVDisplayLinkSetOutputCallback(dl, displayLinkCallback, nil);
 	return dl;
 }
 
