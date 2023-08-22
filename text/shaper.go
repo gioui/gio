@@ -354,11 +354,7 @@ func (l *Shaper) layoutText(params Parameters, txt io.Reader, str string) {
 							unreadRunes++
 						}
 					}
-					lastLineIdx := len(lines.lines) - 1
-					lastRunIdx := len(lines.lines[lastLineIdx].runs) - 1
-					lastGlyphIdx := len(lines.lines[lastLineIdx].runs[lastRunIdx].Glyphs) - 1
-					lines.lines[lastLineIdx].runs[lastRunIdx].Runes.Count += unreadRunes
-					lines.lines[lastLineIdx].runs[lastRunIdx].Glyphs[lastGlyphIdx].runeCount += unreadRunes
+					l.txt.unreadRuneCount = unreadRunes
 				}
 			}
 			l.txt.append(lines)
@@ -508,6 +504,9 @@ func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
 		}
 		if endOfCluster {
 			glyph.Flags |= FlagClusterBreak
+			if run.truncator {
+				glyph.Runes += l.txt.unreadRuneCount
+			}
 		} else {
 			glyph.Runes = 0
 		}

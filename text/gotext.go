@@ -36,7 +36,8 @@ type document struct {
 	lines     []line
 	alignment Alignment
 	// alignWidth is the width used when aligning text.
-	alignWidth int
+	alignWidth      int
+	unreadRuneCount int
 }
 
 // append adds the lines of other to the end of l and ensures they
@@ -52,6 +53,7 @@ func (l *document) reset() {
 	l.lines = l.lines[:0]
 	l.alignment = Start
 	l.alignWidth = 0
+	l.unreadRuneCount = 0
 }
 
 func max(a, b int) int {
@@ -528,28 +530,9 @@ func (s *shaperImpl) LayoutRunes(params Parameters, txt []rune) document {
 	if hasNewline {
 		txt = txt[:len(txt)-1]
 	}
-	truncatedNewline := false
-	if hasNewline && len(txt) == 0 {
-		params.forceTruncate = false
-		// If we only have a newline, shape a space to get line metrics.
-		ls, truncated = s.shapeAndWrapText(params, []rune{' '})
-		if truncated > 0 {
-			// Our space was truncated. Since our space didn't exist in any meaningful
-			// capacity, ensure the truncated count is zeroed out.
-			truncated = 0
-			truncatedNewline = true
-		} else {
-			// We shaped a space to get proper line metrics, but we need to drop
-			// the rune/glyph info since it isn't actually part of the text.
-			ls[0][0].Glyphs = ls[0][0].Glyphs[:0]
-			ls[0][0].Advance = 0
-			ls[0][0].Runes.Count = 0
-		}
-	} else {
-		ls, truncated = s.shapeAndWrapText(params, replaceControlCharacters(txt))
-	}
+	ls, truncated = s.shapeAndWrapText(params, replaceControlCharacters(txt))
 
-	didTruncate := truncated > 0 || truncatedNewline || (params.forceTruncate && params.MaxLines == len(ls))
+	didTruncate := truncated > 0 || (params.forceTruncate && params.MaxLines == len(ls))
 
 	if didTruncate && hasNewline {
 		// We've truncated the newline, since it was at the end and we've truncated some amount of runes
