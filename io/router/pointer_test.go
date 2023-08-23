@@ -244,6 +244,19 @@ func TestPointerSystemAction(t *testing.T) {
 		r.Frame(&ops)
 		assertActionAt(t, r, f32.Pt(50, 50), system.ActionMove)
 	})
+	t.Run("uses topmost action op", func(t *testing.T) {
+		var ops op.Ops
+		r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
+		system.ActionInputOp(system.ActionMove).Add(&ops)
+		r2 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
+		system.ActionInputOp(system.ActionClose).Add(&ops)
+		r2.Pop()
+		r1.Pop()
+
+		var r Router
+		r.Frame(&ops)
+		assertActionAt(t, r, f32.Pt(50, 50), system.ActionClose)
+	})
 }
 
 func TestPointerPriority(t *testing.T) {

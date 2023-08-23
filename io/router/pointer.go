@@ -433,38 +433,39 @@ func (q *pointerQueue) semanticIDFor(content semanticContent) SemanticID {
 }
 
 func (q *pointerQueue) ActionAt(pos f32.Point) (action system.Action, hasAction bool) {
-	q.hitTest(pos, func(n *hitNode) {
+	q.hitTest(pos, func(n *hitNode) bool {
 		area := q.areas[n.area]
 		if area.action != 0 {
 			action = area.action
 			hasAction = true
+			return false
 		}
+		return true
 	})
 	return action, hasAction
 }
 
-func (q *pointerQueue) SemanticAt(pos f32.Point) (SemanticID, bool) {
+func (q *pointerQueue) SemanticAt(pos f32.Point) (semID SemanticID, hasSemID bool) {
 	q.assignSemIDs()
-	for i := len(q.hitTree) - 1; i >= 0; i-- {
-		n := &q.hitTree[i]
-		hit, _ := q.hit(n.area, pos)
-		if !hit {
-			continue
-		}
+	q.hitTest(pos, func(n *hitNode) bool {
 		area := q.areas[n.area]
 		if area.semantic.id != 0 {
-			return area.semantic.id, true
+			semID = area.semantic.id
+			hasSemID = true
+			return false
 		}
-	}
-	return 0, false
+		return true
+	})
+	return semID, hasSemID
 }
 
 // hitTest searches the hit tree for nodes matching pos. Any node matching pos will
 // have the onNode func invoked on it to allow the caller to extract whatever information
-// is necessary for further processing. Providing this algorithm in this generic way
+// is necessary for further processing. onNode may return false to terminate the walk of
+// the hit tree, or true to continue. Providing this algorithm in this generic way
 // allows normal event routing and system action event routing to share the same traversal
 // logic even though they are interested in different aspects of hit nodes.
-func (q *pointerQueue) hitTest(pos f32.Point, onNode func(*hitNode)) pointer.Cursor {
+func (q *pointerQueue) hitTest(pos f32.Point, onNode func(*hitNode) bool) pointer.Cursor {
 	// Track whether we're passing through hits.
 	pass := true
 	idx := len(q.hitTree) - 1
@@ -485,19 +486,22 @@ func (q *pointerQueue) hitTest(pos f32.Point, onNode func(*hitNode)) pointer.Cur
 		} else {
 			idx = n.next
 		}
-		onNode(n)
+		if !onNode(n) {
+			break
+		}
 	}
 	return cursor
 }
 
 func (q *pointerQueue) opHit(pos f32.Point) ([]event.Tag, pointer.Cursor) {
 	hits := q.scratch[:0]
-	cursor := q.hitTest(pos, func(n *hitNode) {
+	cursor := q.hitTest(pos, func(n *hitNode) bool {
 		if n.tag != nil {
 			if _, exists := q.handlers[n.tag]; exists {
 				hits = addHandler(hits, n.tag)
 			}
 		}
+		return true
 	})
 	q.scratch = hits[:0]
 	return hits, cursor
