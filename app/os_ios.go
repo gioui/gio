@@ -135,6 +135,7 @@ func onCreate(view, controller C.CFTypeRef) {
 	w.w.Event(ViewEvent{ViewController: uintptr(controller)})
 	if startupURI != nil {
 		w.w.Event(transfer.URLEvent{URL: startupURI})
+		startupURI = nil
 	}
 }
 

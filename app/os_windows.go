@@ -61,7 +61,10 @@ type window struct {
 	config     Config
 }
 
-const _WM_WAKEUP = windows.WM_USER + iota
+const (
+	_WM_WAKEUP = windows.WM_USER + iota
+	_WM_OPEN_URL
+)
 
 type gpuAPI struct {
 	priority    int
@@ -86,6 +89,9 @@ var resources struct {
 	// cursor is the arrow cursor resource.
 	cursor syscall.Handle
 }
+
+// appID is the application unique identifier, set using `-appid` in Gogio.
+var appID = "GioWindow"
 
 func osMain() {
 	select {}
@@ -112,6 +118,7 @@ func newWindow(window *callbacks, options []Option) error {
 		w.w.Event(ViewEvent{HWND: uintptr(w.hwnd)})
 		if startupURI != "" {
 			w.onOpenURI(startupURI)
+			startupURI = ""
 		}
 		w.Configure(options)
 		windows.SetForegroundWindow(w.hwnd)
@@ -146,7 +153,7 @@ func initResources() error {
 		LpfnWndProc:   syscall.NewCallback(windowProc),
 		HInstance:     hInst,
 		HIcon:         icon,
-		LpszClassName: syscall.StringToUTF16Ptr("GioWindow"),
+		LpszClassName: syscall.StringToUTF16Ptr(appID),
 	}
 	cls, err := windows.RegisterClassEx(&wcls)
 	if err != nil {
@@ -425,7 +432,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_COPYDATA:
 		data := (*windows.CopyDataStruct)(unsafe.Pointer(lParam))
 		switch data.DwData {
-		case windows.GIO_OPEN_URL:
+		case _WM_OPEN_URL:
 			if schemesURI == "" {
 				return windows.TRUE
 			}
@@ -875,7 +882,7 @@ func (w *window) onOpenURI(uri string) bool {
 	}
 
 	found := false
-	for _, scheme := range schemesURIList {
+	for _, scheme := range strings.Split(schemesURI, ",") {
 		if u.Scheme == scheme {
 			found = true
 			break
@@ -997,38 +1004,42 @@ func configForDPI(dpi int) unit.Metric {
 // schemesURI is a list of schemes, comma separated, that must be
 // defined using -X compiler ldflag, that used in gogio.
 var schemesURI string
-var schemesURIList []string
 
 // startupURI is the URI that started the app, if any.
 var startupURI string
 
 func init() {
-	if schemesURI == "" {
+	var currentSchemes []string
+	if schemesURI != "" {
+		currentSchemes = strings.Split(schemesURI, ",")
+	}
+
+	oldSchemes := windows.RegisteredSchemes(appID)
+	for _, s := range currentSchemes {
+		for i, o := range oldSchemes {
+			if s == o {
+				oldSchemes = append(oldSchemes[:i], oldSchemes[i+1:]...)
+				break
+			}
+		}
+	}
+
+	if len(oldSchemes) > 0 {
+		go windows.UnregisterSchemes(appID, oldSchemes)
+	}
+
+	if len(currentSchemes) == 0 {
 		return
 	}
 
-	schemesURIList = strings.Split(schemesURI, ",")
-
-	if len(os.Args) >= 2 {
-		startupURI = os.Args[1]
+	if len(os.Args) >= 3 && os.Args[1] == "-gio_launch_url" {
+		startupURI = os.Args[2]
 	}
 
-	path, err := os.Executable()
-	if err != nil {
-		return
-	}
-
-	/*
-		On Windows, launching the app using a URI will start a new instance of the app,
-		a new window. That behavior doesn't align with iOS/Android/macOS, where the deeplink
-		sends the event to the running app (if any).
-
-		In order to align the behavior, we use a global mutex to check if the app is already
-		running. If it is, we send the deeplink to the running app and exit the new instance.
-
-		That should happen on init to prevent the user from seeing the new window.
-	*/
-	if hwnd, ok := windows.SearchHWND(path); ok {
+	//	On Windows, launching the app using a URI will start a new instance of the app,
+	//	a new window. That behavior doesn't align with iOS/Android/macOS, where the deeplink
+	//	sends the event to the running app (if any).
+	if hwnd, _ := windows.FindWindow(appID); hwnd != 0 {
 		if startupURI != "" {
 			broadcastURI(hwnd, startupURI)
 		}
@@ -1036,15 +1047,13 @@ func init() {
 		return
 	}
 
-	for _, scheme := range schemesURIList {
-		go windows.RegisterScheme(scheme)
-	}
+	go windows.RegisterSchemes(appID, currentSchemes)
 }
 
 func broadcastURI(hwnd syscall.Handle, uri string) {
 	u := syscall.StringToUTF16Ptr(uri)
 	msg := &windows.CopyDataStruct{
-		DwData: windows.GIO_OPEN_URL,
+		DwData: _WM_OPEN_URL,
 		CbData: uint32(len(uri)*2 + 1),
 		LpData: uintptr(unsafe.Pointer(u)),
 	}

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"golang.org/x/sys/windows/registry"
 	"os"
-	"path/filepath"
 	"runtime"
 	"time"
 	"unicode/utf16"
@@ -323,10 +322,6 @@ const (
 	PAGE_READWRITE = 0x00000004
 )
 
-const (
-	GIO_OPEN_URL uintptr = iota + 1 // Custom message
-)
-
 var (
 	kernel32                   = syscall.NewLazySystemDLL("kernel32.dll")
 	_CreateMutex               = kernel32.NewProc("CreateMutexW")
@@ -350,6 +345,7 @@ var (
 	_DefWindowProc               = user32.NewProc("DefWindowProcW")
 	_DestroyWindow               = user32.NewProc("DestroyWindow")
 	_DispatchMessage             = user32.NewProc("DispatchMessageW")
+	_FindWindow                  = user32.NewProc("FindWindowW")
 	_EmptyClipboard              = user32.NewProc("EmptyClipboard")
 	_EnumWindows                 = user32.NewProc("EnumWindows")
 	_GetWindowThreadProcessID    = user32.NewProc("GetWindowThreadProcessId")
@@ -386,18 +382,19 @@ var (
 	_SetCapture                  = user32.NewProc("SetCapture")
 	_SetCursor                   = user32.NewProc("SetCursor")
 	_SetClipboardData            = user32.NewProc("SetClipboardData")
-	_SetForegroundWindow         = user32.NewProc("SetForegroundWindow")
-	_SetFocus                    = user32.NewProc("SetFocus")
-	_SetProcessDPIAware          = user32.NewProc("SetProcessDPIAware")
-	_SetTimer                    = user32.NewProc("SetTimer")
-	_SetWindowLong               = user32.NewProc("SetWindowLongPtrW")
-	_SetWindowLong32             = user32.NewProc("SetWindowLongW")
-	_SetWindowPlacement          = user32.NewProc("SetWindowPlacement")
-	_SetWindowPos                = user32.NewProc("SetWindowPos")
-	_SetWindowText               = user32.NewProc("SetWindowTextW")
-	_TranslateMessage            = user32.NewProc("TranslateMessage")
-	_UnregisterClass             = user32.NewProc("UnregisterClassW")
-	_UpdateWindow                = user32.NewProc("UpdateWindow")
+
+	_SetForegroundWindow = user32.NewProc("SetForegroundWindow")
+	_SetFocus            = user32.NewProc("SetFocus")
+	_SetProcessDPIAware  = user32.NewProc("SetProcessDPIAware")
+	_SetTimer            = user32.NewProc("SetTimer")
+	_SetWindowLong       = user32.NewProc("SetWindowLongPtrW")
+	_SetWindowLong32     = user32.NewProc("SetWindowLongW")
+	_SetWindowPlacement  = user32.NewProc("SetWindowPlacement")
+	_SetWindowPos        = user32.NewProc("SetWindowPos")
+	_SetWindowText       = user32.NewProc("SetWindowTextW")
+	_TranslateMessage    = user32.NewProc("TranslateMessage")
+	_UnregisterClass     = user32.NewProc("UnregisterClassW")
+	_UpdateWindow        = user32.NewProc("UpdateWindow")
 
 	shcore            = syscall.NewLazySystemDLL("shcore")
 	_GetDpiForMonitor = shcore.NewProc("GetDpiForMonitor")
@@ -461,6 +458,16 @@ func DestroyWindow(hwnd syscall.Handle) {
 
 func DispatchMessage(m *Msg) {
 	_DispatchMessage.Call(uintptr(unsafe.Pointer(m)))
+}
+
+func FindWindow(lpClassName string) (syscall.Handle, error) {
+	wclass := uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(lpClassName)))
+
+	hwnd, _, err := _FindWindow.Call(wclass, 0)
+	if hwnd == 0 {
+		return 0, fmt.Errorf("FindWindow failed: %v", err)
+	}
+	return syscall.Handle(hwnd), nil
 }
 
 func EmptyClipboard() error {
@@ -923,70 +930,123 @@ func (p *WindowPlacement) Set(Left, Top, Right, Bottom int) {
 	p.rcNormalPosition.Bottom = int32(Bottom)
 }
 
-func SearchHWND(path string) (syscall.Handle, bool) {
-	base := filepath.Base(path)
+func RegisteredSchemes(appid string) []string {
+	meta, err := registry.OpenKey(registry.CURRENT_USER, `Software\\`+appid, registry.ALL_ACCESS)
+	if err != nil {
+		return nil
+	}
+	defer meta.Close()
 
-	var resHWND syscall.Handle
-	fn := syscall.NewCallback(func(hwnd uintptr, lparam uintptr) uintptr {
-		var processID uint32
-		_GetWindowThreadProcessID.Call(hwnd, uintptr(unsafe.Pointer(&processID)))
+	schemes, _, _ := meta.GetStringsValue("URISchemes")
+	return schemes
+}
 
-		handle, _ := syscall.OpenProcess(syscall.PROCESS_QUERY_INFORMATION|syscall.PROCESS_VM_READ, false, processID)
-		if handle != 0 {
-			defer syscall.CloseHandle(handle)
+func RegisterSchemes(appid string, schemes []string) error {
+	reg := func(scheme string) error {
+		key, existent, err := registry.CreateKey(registry.CURRENT_USER, `Software\\Classes\\`+scheme, registry.ALL_ACCESS)
+		if err != nil {
+			return err
+		}
+		defer key.Close()
 
-			var buffer [4096]uint16
-			size := uint32(len(buffer))
-			_QueryFullProcessImageName.Call(uintptr(handle), 0, uintptr(unsafe.Pointer(&buffer)), uintptr(unsafe.Pointer(&size)))
-
-			if base == filepath.Base(syscall.UTF16ToString(buffer[:size])) {
-				resHWND = syscall.Handle(hwnd)
-				return 0
+		if existent {
+			// Check if the existent key belongs to the current application
+			id, _, err := key.GetStringValue("appid")
+			if err == nil && id != appid {
+				return fmt.Errorf("scheme %s already registered by another application", scheme)
 			}
 		}
 
-		return 1
-	})
+		path, err := os.Executable()
+		if err != nil {
+			return err
+		}
 
-	_EnumWindows.Call(fn, 0)
-	return resHWND, resHWND != 0
+		if err = key.SetStringValue("", "URL:"+scheme+" Protocol"); err != nil {
+			return err
+		}
+		if err = key.SetStringValue("URL Protocol", ""); err != nil {
+			return err
+		}
+		if err = key.SetStringValue("appid", appid); err != nil {
+			return err
+		}
+
+		icon, _, err := registry.CreateKey(key, `DefaultIcon`, registry.ALL_ACCESS)
+		if err != nil {
+			return err
+		}
+		defer icon.Close()
+
+		if err = icon.SetStringValue("", `"`+path+`",1`); err != nil {
+			return err
+		}
+
+		cmd, _, err := registry.CreateKey(key, `shell\\open\\command`, registry.ALL_ACCESS)
+		if err != nil {
+			return err
+		}
+		defer cmd.Close()
+
+		if err = cmd.SetStringValue("", `"`+path+`" -gio_launch_url "%1"`); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	for _, scheme := range schemes {
+		if scheme == "" {
+			continue // just in case
+		}
+		if err := reg(scheme); err != nil {
+			return err
+		}
+	}
+
+	meta, _, err := registry.CreateKey(registry.CURRENT_USER, `Software\\`+appid, registry.ALL_ACCESS)
+	if err != nil {
+		return err
+	}
+	defer meta.Close()
+
+	if err = meta.SetStringsValue("URISchemes", schemes); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func RegisterScheme(scheme string) error {
-	path, err := os.Executable()
+func UnregisterSchemes(appid string, schemes []string) {
+	classes, err := registry.OpenKey(registry.CURRENT_USER, `Software\\Classes`, registry.ALL_ACCESS)
 	if err != nil {
-		return err
+		return
 	}
+	defer classes.Close()
 
-	key, _, err := registry.CreateKey(registry.CURRENT_USER, `Software\\Classes\\`+scheme, registry.ALL_ACCESS)
-	if err != nil {
-		return err
+	for _, scheme := range schemes {
+		if scheme == "" {
+			continue // just in case
+		}
+
+		key, err := registry.OpenKey(classes, scheme, registry.ALL_ACCESS)
+		if err != nil {
+			continue
+		}
+
+		id, _, err := key.GetStringValue("appid")
+		if err == nil && id != appid {
+			continue
+		}
+
+		for _, k := range []string{`DefaultIcon`, `shell\\open\\command`, `shell\\open`, `shell`} {
+			registry.DeleteKey(key, k)
+		}
+
+		if err := key.Close(); err != nil {
+			continue
+		}
+
+		registry.DeleteKey(classes, scheme)
 	}
-	defer key.Close()
-
-	if err = key.SetStringValue("", "URL:"+scheme+" Protocol"); err != nil {
-		return err
-	}
-
-	if err = key.SetStringValue("URL Protocol", ""); err != nil {
-		return err
-	}
-
-	icon, _, err := registry.CreateKey(key, `DefaultIcon`, registry.ALL_ACCESS)
-	if err != nil {
-		return err
-	}
-	defer icon.Close()
-
-	if err = icon.SetStringValue("", `"`+path+`",1`); err != nil {
-		return err
-	}
-
-	cmd, _, err := registry.CreateKey(key, `shell\\open\\command`, registry.ALL_ACCESS)
-	if err != nil {
-		return err
-	}
-	defer cmd.Close()
-
-	return cmd.SetStringValue("", `"`+path+`" "%1"`)
 }

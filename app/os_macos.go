@@ -888,6 +888,7 @@ func newWindow(win *callbacks, options []Option) error {
 		w.w.Event(ViewEvent{View: uintptr(w.view), Layer: uintptr(layer)})
 		if startupURI != nil {
 			w.w.Event(transfer.URLEvent{URL: startupURI})
+			startupURI = nil
 		}
 	})
 	return <-errch
