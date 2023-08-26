@@ -460,22 +460,20 @@ func DispatchMessage(m *Msg) {
 	_DispatchMessage.Call(uintptr(unsafe.Pointer(m)))
 }
 
-func FindWindow(lpClassName string) (syscall.Handle, error) {
-	wclass := uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(lpClassName)))
-
-	hwnd, _, err := _FindWindow.Call(wclass, 0)
-	if hwnd == 0 {
-		return 0, fmt.Errorf("FindWindow failed: %v", err)
-	}
-	return syscall.Handle(hwnd), nil
-}
-
 func EmptyClipboard() error {
 	r, _, err := _EmptyClipboard.Call()
 	if r == 0 {
 		return fmt.Errorf("EmptyClipboard: %v", err)
 	}
 	return nil
+}
+
+func FindWindow(lpClassName string) (syscall.Handle, error) {
+	hwnd, _, err := _FindWindow.Call(uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(lpClassName))), 0)
+	if hwnd == 0 {
+		return 0, fmt.Errorf("FindWindow failed: %v", err)
+	}
+	return syscall.Handle(hwnd), nil
 }
 
 func GetWindowRect(hwnd syscall.Handle) Rect {
