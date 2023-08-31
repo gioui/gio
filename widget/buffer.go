@@ -94,10 +94,10 @@ func (e *editBuffer) gapLen() int {
 }
 
 func (e *editBuffer) ReadAt(p []byte, offset int64) (int, error) {
-	if len(p) == 0 {
+	if len(p) == 0 || offset < 0 {
 		return 0, nil
 	}
-	if offset == e.Size() {
+	if offset >= e.Size() {
 		return 0, io.EOF
 	}
 	var total int
