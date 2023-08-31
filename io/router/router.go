@@ -182,6 +182,8 @@ func (q *Router) Queue(events ...event.Event) bool {
 			}
 		case clipboard.Event:
 			q.cqueue.Push(e, &q.handlers)
+		case transfer.DataEvent:
+			q.pointer.queue.notifyPotentialTargets(&pointerHandler{sourceMimes: []string{e.Type}}, &q.handlers, e)
 		}
 	}
 	return q.handlers.HadEvents()
