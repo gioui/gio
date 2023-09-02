@@ -323,8 +323,7 @@ func (h InputOp) Add(o *op.Ops) {
 	if h.Tag == nil {
 		panic("Tag must be non-nil")
 	}
-	filter := h.Keys
-	data := ops.Write2(&o.Internal, ops.TypeKeyInputLen, h.Tag, &filter)
+	data := ops.Write2String(&o.Internal, ops.TypeKeyInputLen, h.Tag, string(h.Keys))
 	data[0] = byte(ops.TypeKeyInput)
 	data[1] = byte(h.Hint)
 }
@@ -343,7 +342,7 @@ func (h FocusOp) Add(o *op.Ops) {
 }
 
 func (s SnippetOp) Add(o *op.Ops) {
-	data := ops.Write2(&o.Internal, ops.TypeSnippetLen, s.Tag, &s.Text)
+	data := ops.Write2String(&o.Internal, ops.TypeSnippetLen, s.Tag, s.Text)
 	data[0] = byte(ops.TypeSnippet)
 	bo := binary.LittleEndian
 	bo.PutUint32(data[1:], uint32(s.Range.Start))

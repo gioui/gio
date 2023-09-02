@@ -40,12 +40,12 @@ type SelectedOp bool
 type DisabledOp bool
 
 func (l LabelOp) Add(o *op.Ops) {
-	data := ops.Write1(&o.Internal, ops.TypeSemanticLabelLen, string(l))
+	data := ops.Write1String(&o.Internal, ops.TypeSemanticLabelLen, string(l))
 	data[0] = byte(ops.TypeSemanticLabel)
 }
 
 func (d DescriptionOp) Add(o *op.Ops) {
-	data := ops.Write1(&o.Internal, ops.TypeSemanticDescLen, string(d))
+	data := ops.Write1String(&o.Internal, ops.TypeSemanticDescLen, string(d))
 	data[0] = byte(ops.TypeSemanticDesc)
 }
 

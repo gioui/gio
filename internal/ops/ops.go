@@ -19,6 +19,17 @@ type Ops struct {
 	data []byte
 	// refs hold external references for operations.
 	refs []interface{}
+	// stringRefs provides space for string references, pointers to which will
+	// be stored in refs. Storing a string directly in refs would cause a heap
+	// allocation, to store the string header in an interface value. The backing
+	// array of stringRefs, on the other hand, gets reused between calls to
+	// reset, making string references free on average.
+	//
+	// Appending to stringRefs might reallocate the backing array, which will
+	// leave pointers to the old array in refs. This temporarily causes a slight
+	// increase in memory usage, but this, too, amortizes away as the capacity
+	// of stringRefs approaches its stable maximum.
+	stringRefs []string
 	// nextStateID is the id allocated for the next
 	// StateOp.
 	nextStateID int
@@ -183,8 +194,12 @@ func Reset(o *Ops) {
 	for i := range o.refs {
 		o.refs[i] = nil
 	}
+	for i := range o.stringRefs {
+		o.stringRefs[i] = ""
+	}
 	o.data = o.data[:0]
 	o.refs = o.refs[:0]
+	o.stringRefs = o.stringRefs[:0]
 	o.nextStateID = 0
 	o.version++
 }
@@ -265,9 +280,23 @@ func Write1(o *Ops, n int, ref1 interface{}) []byte {
 	return o.data[len(o.data)-n:]
 }
 
+func Write1String(o *Ops, n int, ref1 string) []byte {
+	o.data = append(o.data, make([]byte, n)...)
+	o.stringRefs = append(o.stringRefs, ref1)
+	o.refs = append(o.refs, &o.stringRefs[len(o.stringRefs)-1])
+	return o.data[len(o.data)-n:]
+}
+
 func Write2(o *Ops, n int, ref1, ref2 interface{}) []byte {
 	o.data = append(o.data, make([]byte, n)...)
 	o.refs = append(o.refs, ref1, ref2)
+	return o.data[len(o.data)-n:]
+}
+
+func Write2String(o *Ops, n int, ref1 interface{}, ref2 string) []byte {
+	o.data = append(o.data, make([]byte, n)...)
+	o.stringRefs = append(o.stringRefs, ref2)
+	o.refs = append(o.refs, ref1, &o.stringRefs[len(o.stringRefs)-1])
 	return o.data[len(o.data)-n:]
 }
 

@@ -490,11 +490,11 @@ func (q *Router) collect() {
 			}
 			kc.softKeyboard(op.Show)
 		case ops.TypeKeyInput:
-			filter := encOp.Refs[1].(*key.Set)
+			filter := key.Set(*encOp.Refs[1].(*string))
 			op := key.InputOp{
 				Tag:  encOp.Refs[0].(event.Tag),
 				Hint: key.InputHint(encOp.Data[1]),
-				Keys: *filter,
+				Keys: filter,
 			}
 			a := pc.currentArea()
 			b := pc.currentAreaBounds()
@@ -532,10 +532,10 @@ func (q *Router) collect() {
 
 		// Semantic ops.
 		case ops.TypeSemanticLabel:
-			lbl := encOp.Refs[0].(string)
+			lbl := *encOp.Refs[0].(*string)
 			pc.semanticLabel(lbl)
 		case ops.TypeSemanticDesc:
-			desc := encOp.Refs[0].(string)
+			desc := *encOp.Refs[0].(*string)
 			pc.semanticDesc(desc)
 		case ops.TypeSemanticClass:
 			class := semantic.ClassOp(encOp.Data[1])
