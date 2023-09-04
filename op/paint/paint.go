@@ -9,6 +9,7 @@ import (
 	"image/draw"
 	"math"
 
+	"gioui.org/app/linked"
 	"gioui.org/f32"
 	"gioui.org/internal/ops"
 	"gioui.org/op"
@@ -144,4 +145,22 @@ func FillShape(ops *op.Ops, c color.NRGBA, shape clip.Op) {
 func Fill(ops *op.Ops, c color.NRGBA) {
 	ColorOp{Color: c}.Add(ops)
 	PaintOp{}.Add(ops)
+}
+
+type LinkedViewOp struct {
+	address *linked.LinkedView
+	area    image.Point
+}
+
+func NewLinkedViewOp(src linked.LinkedView, area image.Point) LinkedViewOp {
+	return LinkedViewOp{address: &src, area: area}
+}
+
+func (i LinkedViewOp) Add(o *op.Ops) {
+	data := ops.Write1(&o.Internal, ops.TypeLinkedViewLen, i.address)
+	data[0] = byte(ops.TypeLinkedView)
+}
+
+func (i LinkedViewOp) Size() image.Point {
+	return i.area
 }

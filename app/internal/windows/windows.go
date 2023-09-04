@@ -358,6 +358,8 @@ var (
 	_ReleaseDC                   = user32.NewProc("ReleaseDC")
 	_ScreenToClient              = user32.NewProc("ScreenToClient")
 	_ShowWindow                  = user32.NewProc("ShowWindow")
+	_CloseWindow                 = user32.NewProc("CloseWindow")
+	_SetParent                   = user32.NewProc("SetParent")
 	_SetCapture                  = user32.NewProc("SetCapture")
 	_SetCursor                   = user32.NewProc("SetCursor")
 	_SetClipboardData            = user32.NewProc("SetClipboardData")
@@ -760,6 +762,14 @@ func ReleaseDC(hdc syscall.Handle) {
 
 func SetForegroundWindow(hwnd syscall.Handle) {
 	_SetForegroundWindow.Call(uintptr(hwnd))
+}
+
+func SetParent(hwndc, hwndp syscall.Handle) {
+	_SetParent.Call(uintptr(hwndc), uintptr(hwndp))
+}
+
+func CloseWindow(hwnd syscall.Handle) {
+	_CloseWindow.Call(uintptr(hwnd))
 }
 
 func SetFocus(hwnd syscall.Handle) {

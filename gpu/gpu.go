@@ -18,6 +18,7 @@ import (
 	"time"
 	"unsafe"
 
+	"gioui.org/app/linked"
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/byteslice"
 	"gioui.org/internal/f32"
@@ -101,6 +102,8 @@ type drawState struct {
 	stop2  f32.Point
 	color1 color.NRGBA
 	color2 color.NRGBA
+
+	handle *linked.LinkedView
 }
 
 type pathOp struct {
@@ -159,6 +162,8 @@ type material struct {
 	// For materialTypeTexture.
 	data    imageOpData
 	uvTrans f32.Affine2D
+
+	handle *linked.LinkedView
 }
 
 // imageOpData is the shadow of paint.ImageOp.
@@ -220,6 +225,13 @@ func decodeLinearGradientOp(data []byte) linearGradientOpData {
 			A: data[21+3],
 		},
 	}
+}
+
+func decodeLinkedViewOp(data []byte, refs []interface{}) *linked.LinkedView {
+	if len(refs) > 0 {
+		return refs[0].(*linked.LinkedView)
+	}
+	return new(linked.LinkedView)
 }
 
 type clipType uint8
@@ -296,6 +308,7 @@ const (
 	materialColor materialType = iota
 	materialLinearGradient
 	materialTexture
+	materialLinkedView
 )
 
 // New creates a GPU for the given API.
@@ -924,6 +937,9 @@ loop:
 		case ops.TypeImage:
 			state.matType = materialTexture
 			state.image = decodeImageOp(encOp.Data, encOp.Refs)
+		case ops.TypeLinkedView:
+			state.matType = materialLinkedView
+			state.handle = decodeLinkedViewOp(encOp.Data, encOp.Refs)
 		case ops.TypePaint:
 			// Transform (if needed) the painting rectangle and if so generate a clip path,
 			// for those cases also compute a partialTrans that maps texture coordinates between
@@ -1035,6 +1051,9 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 		uvScale, uvOffset := texSpaceTransform(sr, sz)
 		m.uvTrans = partTrans.Mul(f32.Affine2D{}.Scale(f32.Point{}, uvScale).Offset(uvOffset))
 		m.data = d.image
+	case materialLinkedView:
+		m.material = materialLinkedView
+		m.handle = d.handle
 	}
 	return m
 }
@@ -1076,6 +1095,10 @@ func (r *renderer) drawOps(cache *resourceCache, ops []imageOp) {
 		switch m.material {
 		case materialTexture:
 			r.ctx.BindTexture(0, r.texHandle(cache, m.data))
+
+		case materialLinkedView:
+			(*m.handle).Move(img.clip)
+			continue
 		}
 		drc := img.clip
 
