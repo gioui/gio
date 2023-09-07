@@ -53,6 +53,8 @@ const (
 	TypeDefer
 	TypeTransform
 	TypePopTransform
+	TypePushOpacity
+	TypePopOpacity
 	TypeInvalidate
 	TypeImage
 	TypePaint
@@ -121,6 +123,7 @@ const (
 	ClipStack StackKind = iota
 	TransStack
 	PassStack
+	OpacityStack
 	_StackKind
 )
 
@@ -136,6 +139,8 @@ const (
 	TypeDeferLen            = 1
 	TypeTransformLen        = 1 + 1 + 4*6
 	TypePopTransformLen     = 1
+	TypePushOpacityLen      = 1 + 4
+	TypePopOpacityLen       = 1
 	TypeRedrawLen           = 1 + 8
 	TypeImageLen            = 1
 	TypePaintLen            = 1
@@ -381,6 +386,14 @@ func DecodeTransform(data []byte) (t f32.Affine2D, push bool) {
 	return f32.NewAffine2D(a, b, c, d, e, f), push
 }
 
+func DecodeOpacity(data []byte) float32 {
+	if OpType(data[0]) != TypePushOpacity {
+		panic("invalid op")
+	}
+	bo := binary.LittleEndian
+	return math.Float32frombits(bo.Uint32(data[1:]))
+}
+
 // DecodeSave decodes the state id of a save op.
 func DecodeSave(data []byte) int {
 	if OpType(data[0]) != TypeSave {
@@ -410,6 +423,8 @@ var opProps = [0x100]opProp{
 	TypeDefer:            {Size: TypeDeferLen, NumRefs: 0},
 	TypeTransform:        {Size: TypeTransformLen, NumRefs: 0},
 	TypePopTransform:     {Size: TypePopTransformLen, NumRefs: 0},
+	TypePushOpacity:      {Size: TypePushOpacityLen, NumRefs: 0},
+	TypePopOpacity:       {Size: TypePopOpacityLen, NumRefs: 0},
 	TypeInvalidate:       {Size: TypeRedrawLen, NumRefs: 0},
 	TypeImage:            {Size: TypeImageLen, NumRefs: 2},
 	TypePaint:            {Size: TypePaintLen, NumRefs: 0},
@@ -470,6 +485,10 @@ func (t OpType) String() string {
 		return "Transform"
 	case TypePopTransform:
 		return "PopTransform"
+	case TypePushOpacity:
+		return "PushOpacity"
+	case TypePopOpacity:
+		return "PopOpacity"
 	case TypeInvalidate:
 		return "Invalidate"
 	case TypeImage:

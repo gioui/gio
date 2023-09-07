@@ -90,10 +90,10 @@ type intersectUniforms struct {
 }
 
 type fboSet struct {
-	fbos []stencilFBO
+	fbos []FBO
 }
 
-type stencilFBO struct {
+type FBO struct {
 	size image.Point
 	tex  driver.Texture
 }
@@ -247,10 +247,10 @@ func newStenciler(ctx driver.Device) *stenciler {
 	return st
 }
 
-func (s *fboSet) resize(ctx driver.Device, sizes []image.Point) {
+func (s *fboSet) resize(ctx driver.Device, format driver.TextureFormat, sizes []image.Point) {
 	// Add fbos.
 	for i := len(s.fbos); i < len(sizes); i++ {
-		s.fbos = append(s.fbos, stencilFBO{})
+		s.fbos = append(s.fbos, FBO{})
 	}
 	// Resize fbos.
 	for i, sz := range sizes {
@@ -273,7 +273,7 @@ func (s *fboSet) resize(ctx driver.Device, sizes []image.Point) {
 			if sz.X > max {
 				sz.X = max
 			}
-			tex, err := ctx.NewTexture(driver.TextureFormatFloat, sz.X, sz.Y, driver.FilterNearest, driver.FilterNearest,
+			tex, err := ctx.NewTexture(format, sz.X, sz.Y, driver.FilterNearest, driver.FilterNearest,
 				driver.BufferBindingTexture|driver.BufferBindingFramebuffer)
 			if err != nil {
 				panic(err)
@@ -340,15 +340,15 @@ func (s *stenciler) beginIntersect(sizes []image.Point) {
 	// 8 bit coverage is enough, but OpenGL ES only supports single channel
 	// floating point formats. Replace with GL_RGB+GL_UNSIGNED_BYTE if
 	// no floating point support is available.
-	s.intersections.resize(s.ctx, sizes)
+	s.intersections.resize(s.ctx, driver.TextureFormatFloat, sizes)
 }
 
-func (s *stenciler) cover(idx int) stencilFBO {
+func (s *stenciler) cover(idx int) FBO {
 	return s.fbos.fbos[idx]
 }
 
 func (s *stenciler) begin(sizes []image.Point) {
-	s.fbos.resize(s.ctx, sizes)
+	s.fbos.resize(s.ctx, driver.TextureFormatFloat, sizes)
 }
 
 func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.Point, data pathData) {
