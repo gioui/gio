@@ -51,7 +51,6 @@ const (
 	TypeMacro OpType = iota + firstOpIndex
 	TypeCall
 	TypeDefer
-	TypePushTransform
 	TypeTransform
 	TypePopTransform
 	TypeInvalidate
@@ -135,7 +134,6 @@ const (
 	TypeMacroLen            = 1 + 4 + 4
 	TypeCallLen             = 1 + 4 + 4 + 4 + 4
 	TypeDeferLen            = 1
-	TypePushTransformLen    = 1 + 4*6
 	TypeTransformLen        = 1 + 1 + 4*6
 	TypePopTransformLen     = 1
 	TypeRedrawLen           = 1 + 8
@@ -410,7 +408,6 @@ var opProps = [0x100]opProp{
 	TypeMacro:            {Size: TypeMacroLen, NumRefs: 0},
 	TypeCall:             {Size: TypeCallLen, NumRefs: 1},
 	TypeDefer:            {Size: TypeDeferLen, NumRefs: 0},
-	TypePushTransform:    {Size: TypePushTransformLen, NumRefs: 0},
 	TypeTransform:        {Size: TypeTransformLen, NumRefs: 0},
 	TypePopTransform:     {Size: TypePopTransformLen, NumRefs: 0},
 	TypeInvalidate:       {Size: TypeRedrawLen, NumRefs: 0},
@@ -469,8 +466,6 @@ func (t OpType) String() string {
 		return "Call"
 	case TypeDefer:
 		return "Defer"
-	case TypePushTransform:
-		return "PushTransform"
 	case TypeTransform:
 		return "Transform"
 	case TypePopTransform:
