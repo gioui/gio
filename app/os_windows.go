@@ -32,11 +32,6 @@ type ViewEvent struct {
 	HWND uintptr
 }
 
-type winDeltas struct {
-	width  int32
-	height int32
-}
-
 type window struct {
 	hwnd        syscall.Handle
 	hdc         syscall.Handle
@@ -55,7 +50,6 @@ type window struct {
 	animating bool
 	focused   bool
 
-	deltas     winDeltas
 	borderSize image.Point
 	config     Config
 }
@@ -192,21 +186,11 @@ func createNativeWindow() (*window, error) {
 // It reads the window style and size/position and updates w.config.
 // If anything has changed it emits a ConfigEvent to notify the application.
 func (w *window) update() {
-	r := windows.GetWindowRect(w.hwnd)
-	size := image.Point{
-		X: int(r.Right - r.Left - w.deltas.width),
-		Y: int(r.Bottom - r.Top - w.deltas.height),
+	cr := windows.GetClientRect(w.hwnd)
+	w.config.Size = image.Point{
+		X: int(cr.Right - cr.Left),
+		Y: int(cr.Bottom - cr.Top),
 	}
-
-	// Check the window mode.
-	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
-	if style&windows.WS_OVERLAPPEDWINDOW == 0 {
-		size = image.Point{
-			X: int(r.Right - r.Left),
-			Y: int(r.Bottom - r.Top),
-		}
-	}
-	w.config.Size = size
 
 	w.borderSize = image.Pt(
 		windows.GetSystemMetrics(windows.SM_CXSIZEFRAME),
@@ -326,10 +310,27 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.hwnd = 0
 		windows.PostQuitMessage(0)
 	case windows.WM_NCCALCSIZE:
-		if !w.config.Decorated {
-			// No client areas; we draw decorations ourselves.
+		if w.config.Decorated {
+			// Let Windows handle decorations.
+			break
+		}
+		// No client areas; we draw decorations ourselves.
+		if wParam != 1 {
 			return 0
 		}
+		// lParam contains an NCCALCSIZE_PARAMS for us to adjust.
+		place := windows.GetWindowPlacement(w.hwnd)
+		if !place.IsMaximized() {
+			// Nothing do adjust.
+			return 0
+		}
+		// Adjust window position to avoid the extra padding in maximized
+		// state. See https://devblogs.microsoft.com/oldnewthing/20150304-00/?p=44543.
+		// Note that trying to do the adjustment in WM_GETMINMAXINFO is ignored by Windows.
+		szp := (*windows.NCCalcSizeParams)(unsafe.Pointer(uintptr(lParam)))
+		mi := windows.GetMonitorInfo(w.hwnd)
+		szp.Rgrc[0] = mi.WorkArea
+		return 0
 	case windows.WM_PAINT:
 		w.draw(true)
 	case windows.WM_SIZE:
@@ -349,18 +350,26 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		}
 	case windows.WM_GETMINMAXINFO:
 		mm := (*windows.MinMaxInfo)(unsafe.Pointer(uintptr(lParam)))
+		var bw, bh int32
+		if w.config.Decorated {
+			r := windows.GetWindowRect(w.hwnd)
+			cr := windows.GetClientRect(w.hwnd)
+			bw = r.Right - r.Left - (cr.Right - cr.Left)
+			bh = r.Bottom - r.Top - (cr.Bottom - cr.Top)
+		}
 		if p := w.config.MinSize; p.X > 0 || p.Y > 0 {
 			mm.PtMinTrackSize = windows.Point{
-				X: int32(p.X) + w.deltas.width,
-				Y: int32(p.Y) + w.deltas.height,
+				X: int32(p.X) + bw,
+				Y: int32(p.Y) + bh,
 			}
 		}
 		if p := w.config.MaxSize; p.X > 0 || p.Y > 0 {
 			mm.PtMaxTrackSize = windows.Point{
-				X: int32(p.X) + w.deltas.width,
-				Y: int32(p.Y) + w.deltas.height,
+				X: int32(p.X) + bw,
+				Y: int32(p.Y) + bh,
 			}
 		}
+		return 0
 	case windows.WM_SETCURSOR:
 		w.cursorIn = (lParam & 0xffff) == windows.HTCLIENT
 		if w.cursorIn {
@@ -693,23 +702,19 @@ func (w *window) Configure(options []Option) {
 		height = int32(w.config.Size.Y)
 		// Get the current window size and position.
 		wr := windows.GetWindowRect(w.hwnd)
-		// Set desired window size.
-		wr.Right = wr.Left + width
-		wr.Bottom = wr.Top + height
-		// Compute client size and position. Note that the client size is
-		// equal to the window size when we are in control of decorations.
-		r := wr
-		if w.config.Decorated {
-			windows.AdjustWindowRectEx(&r, uint32(style), 0, dwExStyle)
-		}
-		// Calculate difference between client and full window sizes.
-		w.deltas.width = r.Right - wr.Right + wr.Left - r.Left
-		w.deltas.height = r.Bottom - wr.Bottom + wr.Top - r.Top
-		// Set new window size and position.
 		x = wr.Left
 		y = wr.Top
-		width = r.Right - r.Left
-		height = r.Bottom - r.Top
+		if w.config.Decorated {
+			// Compute client size and position. Note that the client size is
+			// equal to the window size when we are in control of decorations.
+			r := windows.Rect{
+				Right:  width,
+				Bottom: height,
+			}
+			windows.AdjustWindowRectEx(&r, uint32(style), 0, dwExStyle)
+			width = r.Right - r.Left
+			height = r.Bottom - r.Top
+		}
 		if !w.config.Decorated {
 			// Enable drop shadows when we draw decorations.
 			windows.DwmExtendFrameIntoClientArea(w.hwnd, windows.Margins{-1, -1, -1, -1})
@@ -726,7 +731,7 @@ func (w *window) Configure(options []Option) {
 	windows.SetWindowPos(w.hwnd, 0, x, y, width, height, swpStyle)
 	windows.ShowWindow(w.hwnd, showMode)
 
-	w.w.Event(ConfigEvent{Config: w.config})
+	w.update()
 }
 
 func (w *window) WriteClipboard(s string) {

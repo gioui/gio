@@ -76,6 +76,21 @@ type MinMaxInfo struct {
 	PtMaxTrackSize Point
 }
 
+type NCCalcSizeParams struct {
+	Rgrc  [3]Rect
+	LpPos *WindowPos
+}
+
+type WindowPos struct {
+	HWND            syscall.Handle
+	HWNDInsertAfter syscall.Handle
+	x               int32
+	y               int32
+	cx              int32
+	cy              int32
+	flags           uint32
+}
+
 type WindowPlacement struct {
 	length           uint32
 	flags            uint32
@@ -331,6 +346,7 @@ var (
 	_DispatchMessage             = user32.NewProc("DispatchMessageW")
 	_EmptyClipboard              = user32.NewProc("EmptyClipboard")
 	_GetWindowRect               = user32.NewProc("GetWindowRect")
+	_GetClientRect               = user32.NewProc("GetClientRect")
 	_GetClipboardData            = user32.NewProc("GetClipboardData")
 	_GetDC                       = user32.NewProc("GetDC")
 	_GetDpiForWindow             = user32.NewProc("GetDpiForWindow")
@@ -460,6 +476,12 @@ func EmptyClipboard() error {
 func GetWindowRect(hwnd syscall.Handle) Rect {
 	var r Rect
 	_GetWindowRect.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&r)))
+	return r
+}
+
+func GetClientRect(hwnd syscall.Handle) Rect {
+	var r Rect
+	_GetClientRect.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&r)))
 	return r
 }
 
