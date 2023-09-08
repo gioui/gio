@@ -686,10 +686,9 @@ func (w *window) Configure(options []Option) {
 		showMode = windows.SW_SHOWMAXIMIZED
 
 	case Windowed:
-		windows.SetWindowText(w.hwnd, w.config.Title)
 		style |= winStyle
 		showMode = windows.SW_SHOWNORMAL
-		// Get target for client areaa size.
+		// Get target for client area size.
 		width = int32(w.config.Size.X)
 		height = int32(w.config.Size.Y)
 		// Get the current window size and position.
