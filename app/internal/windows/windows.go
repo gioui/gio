@@ -7,8 +7,6 @@ package windows
 
 import (
 	"fmt"
-	"golang.org/x/sys/windows/registry"
-	"os"
 	"runtime"
 	"time"
 	"unicode/utf16"
@@ -323,19 +321,12 @@ const (
 )
 
 var (
-	kernel32                   = syscall.NewLazySystemDLL("kernel32.dll")
-	_CreateMutex               = kernel32.NewProc("CreateMutexW")
-	_GetMutexInfo              = kernel32.NewProc("GetMutexInfo")
-	_GetModuleHandleW          = kernel32.NewProc("GetModuleHandleW")
-	_GlobalAlloc               = kernel32.NewProc("GlobalAlloc")
-	_GlobalFree                = kernel32.NewProc("GlobalFree")
-	_GlobalLock                = kernel32.NewProc("GlobalLock")
-	_GlobalUnlock              = kernel32.NewProc("GlobalUnlock")
-	_MapViewOfFile             = kernel32.NewProc("MapViewOfFile")
-	_OpenFileMapping           = kernel32.NewProc("OpenFileMappingW")
-	_ReleaseMutex              = kernel32.NewProc("ReleaseMutex")
-	_UnmapViewOfFile           = kernel32.NewProc("UnmapViewOfFile")
-	_QueryFullProcessImageName = kernel32.NewProc("QueryFullProcessImageNameW")
+	kernel32          = syscall.NewLazySystemDLL("kernel32.dll")
+	_GetModuleHandleW = kernel32.NewProc("GetModuleHandleW")
+	_GlobalAlloc      = kernel32.NewProc("GlobalAlloc")
+	_GlobalFree       = kernel32.NewProc("GlobalFree")
+	_GlobalLock       = kernel32.NewProc("GlobalLock")
+	_GlobalUnlock     = kernel32.NewProc("GlobalUnlock")
 
 	user32                       = syscall.NewLazySystemDLL("user32.dll")
 	_AdjustWindowRectEx          = user32.NewProc("AdjustWindowRectEx")
@@ -347,8 +338,6 @@ var (
 	_DispatchMessage             = user32.NewProc("DispatchMessageW")
 	_FindWindow                  = user32.NewProc("FindWindowW")
 	_EmptyClipboard              = user32.NewProc("EmptyClipboard")
-	_EnumWindows                 = user32.NewProc("EnumWindows")
-	_GetWindowThreadProcessID    = user32.NewProc("GetWindowThreadProcessId")
 	_GetWindowRect               = user32.NewProc("GetWindowRect")
 	_GetClipboardData            = user32.NewProc("GetClipboardData")
 	_GetDC                       = user32.NewProc("GetDC")
@@ -374,7 +363,6 @@ var (
 	_PostQuitMessage             = user32.NewProc("PostQuitMessage")
 	_ReleaseCapture              = user32.NewProc("ReleaseCapture")
 	_RegisterClassExW            = user32.NewProc("RegisterClassExW")
-	_RegisterWindowMessage       = user32.NewProc("RegisterWindowMessageW")
 	_ReleaseDC                   = user32.NewProc("ReleaseDC")
 	_ScreenToClient              = user32.NewProc("ScreenToClient")
 	_ShowWindow                  = user32.NewProc("ShowWindow")
@@ -688,65 +676,6 @@ func GlobalUnlock(h syscall.Handle) {
 	_GlobalUnlock.Call(uintptr(h))
 }
 
-func CreateMutex(name string) (ptr syscall.Handle, err error) {
-	r, _, err := _CreateMutex.Call(0, 0, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(name))))
-	switch err.(syscall.Errno) {
-	case ERROR_ALREADY_EXISTS:
-		return 0, err
-	}
-	return syscall.Handle(r), nil
-}
-
-func GetMutexInfo(h syscall.Handle) (pid, count uint32, err error) {
-	r, _, err := _GetMutexInfo.Call(uintptr(h), uintptr(unsafe.Pointer(&pid)), uintptr(unsafe.Pointer(&count)))
-	if r == 0 {
-		return 0, 0, fmt.Errorf("GetMutexInfo: %v", err)
-	}
-	return pid, count, nil
-}
-
-func CreateFileMapping(mode uint32, name string, size int) (ptr syscall.Handle, err error) {
-	return syscall.CreateFileMapping(syscall.InvalidHandle, nil, mode, 0, uint32(size), syscall.StringToUTF16Ptr("Local"+name))
-}
-
-func OpenFileMapping(mode int32, name string) (syscall.Handle, error) {
-	r, _, err := _OpenFileMapping.Call(uintptr(mode), 0, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr("Local"+name))))
-	if r == 0 {
-		return 0, fmt.Errorf("OpenFileMapping: %v", err)
-	}
-	return syscall.Handle(r), nil
-}
-
-func CloseFileMapping(h syscall.Handle) error {
-	return syscall.Close(h)
-}
-
-func MapViewOfFile(h syscall.Handle, mode int32, size int) ([]byte, error) {
-	r, _, err := _MapViewOfFile.Call(uintptr(h), uintptr(mode), 0, 0, uintptr(size))
-	if r == 0 {
-		return nil, fmt.Errorf("MapViewOfFile: %v", err)
-	}
-
-	slice := [3]uintptr{r, uintptr(size), uintptr(size)}
-	return *(*[]byte)(unsafe.Pointer(&slice)), nil
-}
-
-func UnmapViewOfFile(b []byte) error {
-	r, _, err := _UnmapViewOfFile.Call(uintptr(unsafe.Pointer(&b[0])))
-	if r == 0 {
-		return fmt.Errorf("UnmapViewOfFile: %v", err)
-	}
-	return nil
-}
-
-func ReleaseMutex(h uintptr) error {
-	r, _, err := _ReleaseMutex.Call(h)
-	if r == 0 {
-		return fmt.Errorf("ReleaseMutex: %v", err)
-	}
-	return nil
-}
-
 func KillTimer(hwnd syscall.Handle, nIDEvent uintptr) error {
 	r, _, err := _SetTimer.Call(uintptr(hwnd), uintptr(nIDEvent), 0, 0)
 	if r == 0 {
@@ -829,14 +758,6 @@ func RegisterClassEx(cls *WndClassEx) (uint16, error) {
 		return 0, fmt.Errorf("RegisterClassExW failed: %v", err)
 	}
 	return uint16(a), nil
-}
-
-func RegisterWindowMessage(name string) (uint32, error) {
-	r, _, err := _RegisterWindowMessage.Call(uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(name))))
-	if r == 0 {
-		return 0, fmt.Errorf("RegisterWindowMessage: %v", err)
-	}
-	return uint32(r), nil
 }
 
 func ReleaseDC(hdc syscall.Handle) {
@@ -925,125 +846,4 @@ func (p *WindowPlacement) Set(Left, Top, Right, Bottom int) {
 	p.rcNormalPosition.Top = int32(Top)
 	p.rcNormalPosition.Right = int32(Right)
 	p.rcNormalPosition.Bottom = int32(Bottom)
-}
-
-func RegisteredSchemes(appid string) []string {
-	meta, err := registry.OpenKey(registry.CURRENT_USER, `Software\\`+appid, registry.ALL_ACCESS)
-	if err != nil {
-		return nil
-	}
-	defer meta.Close()
-
-	schemes, _, _ := meta.GetStringsValue("URISchemes")
-	return schemes
-}
-
-func RegisterSchemes(appid string, schemes []string) error {
-	reg := func(scheme string) error {
-		key, existent, err := registry.CreateKey(registry.CURRENT_USER, `Software\\Classes\\`+scheme, registry.ALL_ACCESS)
-		if err != nil {
-			return err
-		}
-		defer key.Close()
-
-		if existent {
-			// Check if the existent key belongs to the current application
-			id, _, err := key.GetStringValue("appid")
-			if err == nil && id != appid {
-				return fmt.Errorf("scheme %s already registered by another application", scheme)
-			}
-		}
-
-		path, err := os.Executable()
-		if err != nil {
-			return err
-		}
-
-		if err = key.SetStringValue("", "URL:"+scheme+" Protocol"); err != nil {
-			return err
-		}
-		if err = key.SetStringValue("URL Protocol", ""); err != nil {
-			return err
-		}
-		if err = key.SetStringValue("appid", appid); err != nil {
-			return err
-		}
-
-		icon, _, err := registry.CreateKey(key, `DefaultIcon`, registry.ALL_ACCESS)
-		if err != nil {
-			return err
-		}
-		defer icon.Close()
-
-		if err = icon.SetStringValue("", `"`+path+`",1`); err != nil {
-			return err
-		}
-
-		cmd, _, err := registry.CreateKey(key, `shell\\open\\command`, registry.ALL_ACCESS)
-		if err != nil {
-			return err
-		}
-		defer cmd.Close()
-
-		if err = cmd.SetStringValue("", `"`+path+`" -gio_launch_url "%1"`); err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	for _, scheme := range schemes {
-		if scheme == "" {
-			continue // just in case
-		}
-		if err := reg(scheme); err != nil {
-			return err
-		}
-	}
-
-	meta, _, err := registry.CreateKey(registry.CURRENT_USER, `Software\\`+appid, registry.ALL_ACCESS)
-	if err != nil {
-		return err
-	}
-	defer meta.Close()
-
-	if err = meta.SetStringsValue("URISchemes", schemes); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func UnregisterSchemes(appid string, schemes []string) {
-	classes, err := registry.OpenKey(registry.CURRENT_USER, `Software\\Classes`, registry.ALL_ACCESS)
-	if err != nil {
-		return
-	}
-	defer classes.Close()
-
-	for _, scheme := range schemes {
-		if scheme == "" {
-			continue // just in case
-		}
-
-		key, err := registry.OpenKey(classes, scheme, registry.ALL_ACCESS)
-		if err != nil {
-			continue
-		}
-
-		id, _, err := key.GetStringValue("appid")
-		if err == nil && id != appid {
-			continue
-		}
-
-		for _, k := range []string{`DefaultIcon`, `shell\\open\\command`, `shell\\open`, `shell`} {
-			registry.DeleteKey(key, k)
-		}
-
-		if err := key.Close(); err != nil {
-			continue
-		}
-
-		registry.DeleteKey(classes, scheme)
-	}
 }

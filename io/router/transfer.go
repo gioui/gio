@@ -6,23 +6,22 @@ import (
 )
 
 type transferQueue struct {
-	initialized   bool
-	schemes       []transfer.SchemeOp
+	handlers      []transfer.SchemeOp
 	firstURLEvent transfer.URLEvent
 }
 
 func (q *transferQueue) Push(evt transfer.URLEvent, events *handlerEvents) {
-	if !q.initialized && q.firstURLEvent.URL == nil {
+	if q.handlers == nil && q.firstURLEvent.URL == nil {
 		q.firstURLEvent = evt
 		return
 	}
-	for _, op := range q.schemes {
+	for _, op := range q.handlers {
 		q.routeEvent(op, evt, events)
 	}
 }
 
 func (q *transferQueue) ProcessSchemeOp(op transfer.SchemeOp, events *handlerEvents) {
-	q.schemes = append(q.schemes, op)
+	q.handlers = append(q.handlers, op)
 	if q.firstURLEvent.URL != nil {
 		q.routeEvent(op, q.firstURLEvent, events)
 	}
@@ -35,11 +34,10 @@ func (q *transferQueue) routeEvent(op transfer.SchemeOp, e transfer.URLEvent, ev
 }
 
 func (q *transferQueue) Clear() {
-	if q.schemes != nil {
-		q.schemes = q.schemes[:0]
-	}
-	if q.initialized {
+	if q.handlers != nil {
+		q.handlers = q.handlers[:0]
 		q.firstURLEvent = transfer.URLEvent{}
+	} else {
+		q.handlers = []transfer.SchemeOp{}
 	}
-	q.initialized = true
 }
