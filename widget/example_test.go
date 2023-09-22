@@ -113,7 +113,11 @@ func ExampleDraggable_Layout() {
 		for _, ev := range gtx.Events(&drop) {
 			switch e := ev.(type) {
 			case transfer.DataEvent:
-				data := e.Open()
+				data, err := e.Open()
+				if err != nil {
+					fmt.Println("DataEvent Open error:", err)
+					break
+				}
 				fmt.Println(data.(offer).Data)
 			}
 		}

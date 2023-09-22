@@ -872,9 +872,9 @@ func (q *pointerQueue) deliverTransferDataEvent(p *pointerInfo, events *handlerE
 	transferIdx := len(q.transfers)
 	events.Add(p.dataTarget, transfer.DataEvent{
 		Type: src.offeredMime,
-		Open: func() io.ReadCloser {
+		Open: func() (io.ReadCloser, error) {
 			q.transfers[transferIdx] = nil
-			return src.data
+			return src.data, nil
 		},
 	})
 	q.transfers = append(q.transfers, src.data)

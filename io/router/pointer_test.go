@@ -982,8 +982,12 @@ func TestTransfer(t *testing.T) {
 		if got, want := dataEvent.Type, "file"; got != want {
 			t.Fatalf("got %s; want %s", got, want)
 		}
-		if got, want := dataEvent.Open(), ofr; got != want {
-			t.Fatalf("got %v; want %v", got, want)
+		gotReader, gotErr := dataEvent.Open()
+		if gotErr != nil {
+			t.Fatalf("got %s, expected nil", gotErr)
+		}
+		if gotReader != ofr {
+			t.Fatalf("got %v; want %v", gotReader, ofr)
 		}
 
 		// Drag and drop complete.
