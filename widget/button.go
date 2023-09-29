@@ -17,18 +17,16 @@ import (
 
 // Clickable represents a clickable area.
 type Clickable struct {
-	click  gesture.Click
-	clicks []Click
-	// prevClicks is the index into clicks that marks the clicks
-	// from the most recent Layout call. prevClicks is used to keep
-	// clicks bounded.
-	prevClicks int
-	history    []Press
+	click gesture.Click
+	// clicks is for saved clicks to support Clicked.
+	clicks  []Click
+	history []Press
 
-	keyTag       struct{}
-	requestFocus bool
-	focused      bool
-	pressedKey   string
+	keyTag        struct{}
+	requestFocus  bool
+	requestClicks int
+	focused       bool
+	pressedKey    string
 }
 
 // Click represents a click.
@@ -50,26 +48,24 @@ type Press struct {
 	Cancelled bool
 }
 
-// Click executes a simple programmatic click
+// Click executes a simple programmatic click.
 func (b *Clickable) Click() {
-	b.clicks = append(b.clicks, Click{
-		Modifiers: 0,
-		NumClicks: 1,
-	})
+	b.requestClicks++
 }
 
 // Clicked reports whether there are pending clicks as would be
 // reported by Clicks. If so, Clicked removes the earliest click.
-func (b *Clickable) Clicked() bool {
-	if len(b.clicks) == 0 {
-		return false
+func (b *Clickable) Clicked(gtx layout.Context) bool {
+	if len(b.clicks) > 0 {
+		b.clicks = b.clicks[1:]
+		return true
 	}
-	n := copy(b.clicks, b.clicks[1:])
-	b.clicks = b.clicks[:n]
-	if b.prevClicks > 0 {
-		b.prevClicks--
+	b.clicks = b.Update(gtx)
+	if len(b.clicks) > 0 {
+		b.clicks = b.clicks[1:]
+		return true
 	}
-	return true
+	return false
 }
 
 // Hovered reports whether a pointer is over the element.
@@ -92,23 +88,15 @@ func (b *Clickable) Focused() bool {
 	return b.focused
 }
 
-// Clicks returns and clear the clicks since the last call to Clicks.
-func (b *Clickable) Clicks() []Click {
-	clicks := b.clicks
-	b.clicks = nil
-	b.prevClicks = 0
-	return clicks
-}
-
 // History is the past pointer presses useful for drawing markers.
 // History is retained for a short duration (about a second).
 func (b *Clickable) History() []Press {
 	return b.history
 }
 
-// Layout and update the button state
+// Layout and update the button state.
 func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
-	b.update(gtx)
+	b.Update(gtx)
 	m := op.Record(gtx.Ops)
 	dims := w(gtx)
 	c := m.Stop()
@@ -122,14 +110,22 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 			keys = ""
 		}
 		key.InputOp{Tag: &b.keyTag, Keys: keys}.Add(gtx.Ops)
-		if b.requestFocus {
-			key.FocusOp{Tag: &b.keyTag}.Add(gtx.Ops)
-			b.requestFocus = false
-		}
-	} else {
-		b.focused = false
 	}
 	c.Add(gtx.Ops)
+	return dims
+}
+
+// Update the button state by processing events, and return the resulting
+// clicks, if any.
+func (b *Clickable) Update(gtx layout.Context) []Click {
+	b.clicks = nil
+	if gtx.Queue == nil {
+		b.focused = false
+	}
+	if b.requestFocus {
+		key.FocusOp{Tag: &b.keyTag}.Add(gtx.Ops)
+		b.requestFocus = false
+	}
 	for len(b.history) > 0 {
 		c := b.history[0]
 		if c.End.IsZero() || gtx.Now.Sub(c.End) < 1*time.Second {
@@ -138,26 +134,23 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 		n := copy(b.history, b.history[1:])
 		b.history = b.history[:n]
 	}
-	return dims
-}
-
-// update the button state by processing events.
-func (b *Clickable) update(gtx layout.Context) {
-	// Flush clicks from before the last update.
-	n := copy(b.clicks, b.clicks[b.prevClicks:])
-	b.clicks = b.clicks[:n]
-	b.prevClicks = n
-
+	var clicks []Click
+	if c := b.requestClicks; c > 0 {
+		b.requestClicks = 0
+		clicks = append(clicks, Click{
+			NumClicks: c,
+		})
+	}
 	for _, e := range b.click.Events(gtx) {
 		switch e.Kind {
 		case gesture.KindClick:
-			b.clicks = append(b.clicks, Click{
-				Modifiers: e.Modifiers,
-				NumClicks: e.NumClicks,
-			})
 			if l := len(b.history); l > 0 {
 				b.history[l-1].End = gtx.Now
 			}
+			clicks = append(clicks, Click{
+				Modifiers: e.Modifiers,
+				NumClicks: e.NumClicks,
+			})
 		case gesture.KindCancel:
 			for i := range b.history {
 				b.history[i].Cancelled = true
@@ -198,11 +191,12 @@ func (b *Clickable) update(gtx layout.Context) {
 				}
 				// only register a key as a click if the key was pressed and released while this button was focused
 				b.pressedKey = ""
-				b.clicks = append(b.clicks, Click{
+				clicks = append(clicks, Click{
 					Modifiers: e.Modifiers,
 					NumClicks: 1,
 				})
 			}
 		}
 	}
+	return clicks
 }

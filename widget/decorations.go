@@ -30,7 +30,7 @@ func (d *Decorations) LayoutMove(gtx layout.Context, w layout.Widget) layout.Dim
 }
 
 // Clickable returns the clickable for the given single action.
-func (d *Decorations) Clickable(action system.Action) *Clickable {
+func (d *Decorations) Clickable(gtx layout.Context, action system.Action) *Clickable {
 	if bits.OnesCount(uint(action)) != 1 {
 		panic(fmt.Errorf("not a single action"))
 	}
@@ -39,7 +39,7 @@ func (d *Decorations) Clickable(action system.Action) *Clickable {
 		d.clicks = append(d.clicks, make([]Clickable, n+1)...)
 	}
 	click := &d.clicks[idx]
-	if click.Clicked() {
+	if click.Clicked(gtx) {
 		if action == system.ActionMaximize {
 			if d.maximized {
 				d.maximized = false

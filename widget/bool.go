@@ -43,11 +43,11 @@ func (b *Bool) History() []Press {
 }
 
 func (b *Bool) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
+	for b.clk.Clicked(gtx) {
+		b.Value = !b.Value
+		b.changed = true
+	}
 	dims := b.clk.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		for b.clk.Clicked() {
-			b.Value = !b.Value
-			b.changed = true
-		}
 		semantic.SelectedOp(b.Value).Add(gtx.Ops)
 		semantic.EnabledOp(gtx.Queue != nil).Add(gtx.Ops)
 		return w(gtx)

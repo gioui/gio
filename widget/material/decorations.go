@@ -85,7 +85,7 @@ func (d DecorationsStyle) layoutDecorations(gtx layout.Context) layout.Dimension
 				default:
 					continue
 				}
-				cl := d.Decorations.Clickable(a)
+				cl := d.Decorations.Clickable(gtx, a)
 				dims := cl.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 					semantic.Button.Add(gtx.Ops)
 					return layout.Stack{Alignment: layout.Center}.Layout(gtx,

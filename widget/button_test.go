@@ -48,6 +48,7 @@ func TestClickable(t *testing.T) {
 		t.Error("button 2 should not have focus")
 	}
 	// frame: press & release return
+	frame()
 	r.Queue(
 		key.Event{
 			Name:  key.NameReturn,
@@ -58,11 +59,10 @@ func TestClickable(t *testing.T) {
 			State: key.Release,
 		},
 	)
-	frame()
-	if !b1.Clicked() {
+	if !b1.Clicked(gtx) {
 		t.Error("button 1 did not get clicked when it got return press & release")
 	}
-	if b2.Clicked() {
+	if b2.Clicked(gtx) {
 		t.Error("button 2 got clicked when it did not have focus")
 	}
 	// frame: press return down
@@ -73,7 +73,7 @@ func TestClickable(t *testing.T) {
 		},
 	)
 	frame()
-	if b1.Clicked() {
+	if b1.Clicked(gtx) {
 		t.Error("button 1 got clicked, even if it only got return press")
 	}
 	// frame: request focus for button 2
@@ -95,10 +95,10 @@ func TestClickable(t *testing.T) {
 		},
 	)
 	frame()
-	if b1.Clicked() {
+	if b1.Clicked(gtx) {
 		t.Error("button 1 got clicked, even if it had lost focus")
 	}
-	if b2.Clicked() {
+	if b2.Clicked(gtx) {
 		t.Error("button 2 should not have been clicked, as it only got return release")
 	}
 }
