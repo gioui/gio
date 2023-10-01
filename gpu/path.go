@@ -58,7 +58,7 @@ type coverUniforms struct {
 	uvCoverTransform [4]float32
 	uvTransformR1    [4]float32
 	uvTransformR2    [4]float32
-	_                float32
+	fbo              float32
 }
 
 type stenciler struct {
@@ -375,11 +375,11 @@ func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv ima
 	}
 }
 
-func (p *pather) cover(mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
-	p.coverer.cover(mat, col, col1, col2, scale, off, uvTrans, coverScale, coverOff)
+func (p *pather) cover(mat materialType, isFBO bool, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
+	p.coverer.cover(mat, isFBO, col, col1, col2, scale, off, uvTrans, coverScale, coverOff)
 }
 
-func (c *coverer) cover(mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
+func (c *coverer) cover(mat materialType, isFBO bool, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, uvTrans f32.Affine2D, coverScale, coverOff f32.Point) {
 	var uniforms *coverUniforms
 	switch mat {
 	case materialColor:
@@ -398,6 +398,10 @@ func (c *coverer) cover(mat materialType, col f32color.RGBA, col1, col2 f32color
 		c.texUniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}
 		c.texUniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
 		uniforms = &c.texUniforms.coverUniforms
+	}
+	uniforms.fbo = 0
+	if isFBO {
+		uniforms.fbo = 1
 	}
 	uniforms.transform = [4]float32{scale.X, scale.Y, off.X, off.Y}
 	uniforms.uvCoverTransform = [4]float32{coverScale.X, coverScale.Y, coverOff.X, coverOff.Y}

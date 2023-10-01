@@ -297,7 +297,8 @@ type blitUniforms struct {
 	uvTransformR1 [4]float32
 	uvTransformR2 [4]float32
 	opacity       float32
-	_             [3]float32
+	fbo           float32
+	_             [2]float32
 }
 
 type colorUniforms struct {
@@ -429,7 +430,7 @@ func (g *gpu) frame(target RenderTarget) error {
 	}
 	g.ctx.BeginRenderPass(defFBO, d)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
-	g.renderer.drawOps(g.cache, image.Point{}, g.renderer.blitter.viewport, g.drawOps.imageOps)
+	g.renderer.drawOps(g.cache, false, image.Point{}, g.renderer.blitter.viewport, g.drawOps.imageOps)
 	g.coverTimer.end()
 	g.ctx.EndRenderPass()
 	g.cleanupTimer.begin()
@@ -846,7 +847,7 @@ func (r *renderer) drawLayers(cache *resourceCache, layers []opacityLayer, ops [
 		}
 		r.ctx.Viewport(v.Min.X, v.Min.Y, v.Max.X, v.Max.Y)
 		f := r.layerFBOs.fbos[fbo]
-		r.drawOps(cache, l.clip.Min.Mul(-1), l.clip.Size(), ops[l.opStart:l.opEnd])
+		r.drawOps(cache, true, l.clip.Min.Mul(-1), l.clip.Size(), ops[l.opStart:l.opEnd])
 		sr := f32.FRect(v)
 		uvScale, uvOffset := texSpaceTransform(sr, f.size)
 		uvTrans := f32.Affine2D{}.Scale(f32.Point{}, uvScale).Offset(uvOffset)
@@ -1212,7 +1213,7 @@ func (r *renderer) prepareDrawOps(cache *resourceCache, ops []imageOp) {
 	}
 }
 
-func (r *renderer) drawOps(cache *resourceCache, opOff image.Point, viewport image.Point, ops []imageOp) {
+func (r *renderer) drawOps(cache *resourceCache, isFBO bool, opOff image.Point, viewport image.Point, ops []imageOp) {
 	var coverTex driver.Texture
 	for i := 0; i < len(ops); i++ {
 		img := ops[i]
@@ -1231,7 +1232,7 @@ func (r *renderer) drawOps(cache *resourceCache, opOff image.Point, viewport ima
 			p := r.blitter.pipelines[m.material]
 			r.ctx.BindPipeline(p.pipeline)
 			r.ctx.BindVertexBuffer(r.blitter.quadVerts, 0)
-			r.blitter.blit(m.material, m.color, m.color1, m.color2, scale, off, m.opacity, m.uvTrans)
+			r.blitter.blit(m.material, isFBO, m.color, m.color1, m.color2, scale, off, m.opacity, m.uvTrans)
 			continue
 		case clipTypePath:
 			fbo = r.pather.stenciler.cover(img.place.Idx)
@@ -1250,11 +1251,11 @@ func (r *renderer) drawOps(cache *resourceCache, opOff image.Point, viewport ima
 		p := r.pather.coverer.pipelines[m.material]
 		r.ctx.BindPipeline(p.pipeline)
 		r.ctx.BindVertexBuffer(r.blitter.quadVerts, 0)
-		r.pather.cover(m.material, m.color, m.color1, m.color2, scale, off, m.uvTrans, coverScale, coverOff)
+		r.pather.cover(m.material, isFBO, m.color, m.color1, m.color2, scale, off, m.uvTrans, coverScale, coverOff)
 	}
 }
 
-func (b *blitter) blit(mat materialType, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, opacity float32, uvTrans f32.Affine2D) {
+func (b *blitter) blit(mat materialType, fbo bool, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, opacity float32, uvTrans f32.Affine2D) {
 	p := b.pipelines[mat]
 	b.ctx.BindPipeline(p.pipeline)
 	var uniforms *blitUniforms
@@ -1275,6 +1276,10 @@ func (b *blitter) blit(mat materialType, col f32color.RGBA, col1, col2 f32color.
 		uniforms = &b.linearGradientUniforms.blitUniforms
 		uniforms.uvTransformR1 = [4]float32{t1, t2, t3, 0}
 		uniforms.uvTransformR2 = [4]float32{t4, t5, t6, 0}
+	}
+	uniforms.fbo = 0
+	if fbo {
+		uniforms.fbo = 1
 	}
 	uniforms.opacity = opacity
 	uniforms.transform = [4]float32{scale.X, scale.Y, off.X, off.Y}
