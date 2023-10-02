@@ -15,6 +15,8 @@ import (
 
 type ProgressBarStyle struct {
 	Color      color.NRGBA
+	Height     unit.Dp
+	Radius     unit.Dp
 	TrackColor color.NRGBA
 	Progress   float32
 }
@@ -22,6 +24,8 @@ type ProgressBarStyle struct {
 func ProgressBar(th *Theme, progress float32) ProgressBarStyle {
 	return ProgressBarStyle{
 		Progress:   progress,
+		Height:     unit.Dp(4),
+		Radius:     unit.Dp(2),
 		Color:      th.Palette.ContrastBg,
 		TrackColor: f32color.MulAlpha(th.Palette.Fg, 0x88),
 	}
@@ -29,10 +33,8 @@ func ProgressBar(th *Theme, progress float32) ProgressBarStyle {
 
 func (p ProgressBarStyle) Layout(gtx layout.Context) layout.Dimensions {
 	shader := func(width int, color color.NRGBA) layout.Dimensions {
-		const maxHeight = unit.Dp(4)
-		rr := gtx.Dp(2)
-
-		d := image.Point{X: width, Y: gtx.Dp(maxHeight)}
+		d := image.Point{X: width, Y: gtx.Dp(p.Height)}
+		rr := gtx.Dp(p.Radius)
 
 		defer clip.UniformRRect(image.Rectangle{Max: image.Pt(width, d.Y)}, rr).Push(gtx.Ops).Pop()
 		paint.ColorOp{Color: color}.Add(gtx.Ops)
