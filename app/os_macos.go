@@ -365,11 +365,11 @@ func (w *window) Configure(options []Option) {
 		case Minimized:
 			C.unhideWindow(window)
 		case Maximized:
+			if C.isWindowZoomed(window) != 0 {
+				C.zoomWindow(window)
+			}
 		}
 		w.config.Mode = Windowed
-		if C.isWindowZoomed(window) != 0 {
-			C.zoomWindow(window)
-		}
 		w.setTitle(prev, cnf)
 		if prev.Size != cnf.Size {
 			w.config.Size = cnf.Size
