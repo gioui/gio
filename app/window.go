@@ -1024,7 +1024,7 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) (size, offse
 	}
 	style.Layout(gtx)
 	// Update the window based on the actions on the decorations.
-	w.Perform(deco.Actions())
+	w.Perform(deco.Update(gtx))
 	// Offset to place the frame content below the decorations.
 	decoHeight := gtx.Dp(w.decorations.Config.decoHeight)
 	if w.decorations.currentHeight != decoHeight {
