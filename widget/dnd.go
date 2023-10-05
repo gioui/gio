@@ -17,18 +17,44 @@ type Draggable struct {
 	// Type contains the MIME type and matches transfer.SourceOp.
 	Type string
 
-	handle    struct{}
-	drag      gesture.Drag
-	click     f32.Point
-	pos       f32.Point
-	requested bool
-	request   string
+	handle struct{}
+	drag   gesture.Drag
+	click  f32.Point
+	pos    f32.Point
 }
 
 func (d *Draggable) Layout(gtx layout.Context, w, drag layout.Widget) layout.Dimensions {
 	if gtx.Queue == nil {
 		return w(gtx)
 	}
+	dims := w(gtx)
+
+	stack := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
+	d.drag.Add(gtx.Ops)
+	transfer.SourceOp{
+		Tag:  &d.handle,
+		Type: d.Type,
+	}.Add(gtx.Ops)
+	stack.Pop()
+
+	if drag != nil && d.drag.Pressed() {
+		rec := op.Record(gtx.Ops)
+		op.Offset(d.pos.Round()).Add(gtx.Ops)
+		drag(gtx)
+		op.Defer(gtx.Ops, rec.Stop())
+	}
+
+	return dims
+}
+
+// Dragging returns whether d is being dragged.
+func (d *Draggable) Dragging() bool {
+	return d.drag.Dragging()
+}
+
+// Update the draggable and returns the MIME type for which the Draggable was
+// requested to offer data, if any
+func (d *Draggable) Update(gtx layout.Context) (mime string, requested bool) {
 	pos := d.pos
 	for _, ev := range d.drag.Events(gtx.Metric, gtx.Queue, gesture.Both) {
 		switch ev.Kind {
@@ -42,48 +68,11 @@ func (d *Draggable) Layout(gtx layout.Context, w, drag layout.Widget) layout.Dim
 	d.pos = pos
 
 	for _, ev := range gtx.Queue.Events(&d.handle) {
-		switch e := ev.(type) {
-		case transfer.RequestEvent:
-			d.requested = true
-			d.request = e.Type
-		case transfer.CancelEvent:
-			d.requested = false
-			d.request = ""
+		if e, ok := ev.(transfer.RequestEvent); ok {
+			return e.Type, true
 		}
 	}
-
-	dims := w(gtx)
-
-	stack := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
-	d.drag.Add(gtx.Ops)
-	transfer.SourceOp{
-		Tag:  &d.handle,
-		Type: d.Type,
-	}.Add(gtx.Ops)
-	stack.Pop()
-
-	if drag != nil && d.drag.Pressed() {
-		rec := op.Record(gtx.Ops)
-		op.Offset(pos.Round()).Add(gtx.Ops)
-		drag(gtx)
-		op.Defer(gtx.Ops, rec.Stop())
-	}
-
-	return dims
-}
-
-// Dragging returns whether d is being dragged.
-func (d *Draggable) Dragging() bool {
-	return d.drag.Dragging()
-}
-
-// Requested returns the MIME type, if any, for which the Draggable was requested to offer data.
-func (d *Draggable) Requested() (mime string, requested bool) {
-	mime = d.request
-	requested = d.requested
-	d.requested = false
-	d.request = ""
-	return
+	return "", false
 }
 
 // Offer the data ready for a drop. Must be called after being Requested.
