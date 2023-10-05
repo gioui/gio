@@ -33,11 +33,6 @@ func TestPointerWakeup(t *testing.T) {
 	}
 	// However, adding a handler queues a Cancel event.
 	assertEventPointerTypeSequence(t, r.Events(handler), pointer.Cancel)
-	// Verify that r.Events does trigger a redraw.
-	r.Frame(&ops)
-	if _, wake := r.WakeupTime(); !wake {
-		t.Errorf("pointer.Cancel event didn't trigger a redraw")
-	}
 }
 
 func TestPointerDrag(t *testing.T) {

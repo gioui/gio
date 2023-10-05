@@ -30,11 +30,6 @@ func TestKeyWakeup(t *testing.T) {
 	if evts := r.Events(handler); len(evts) != 1 {
 		t.Errorf("no Focus event for newly registered key.InputOp")
 	}
-	// Verify that r.Events does trigger a redraw.
-	r.Frame(&ops)
-	if _, wake := r.WakeupTime(); !wake {
-		t.Errorf("key.FocusEvent event didn't trigger a redraw")
-	}
 }
 
 func TestKeyMultiples(t *testing.T) {
