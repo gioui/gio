@@ -62,7 +62,7 @@ func (s *Scrollbar) Layout(gtx layout.Context, axis layout.Axis, viewportStart, 
 
 	// Jump to a click in the track.
 	for _, event := range s.track.Events(gtx) {
-		if event.Type != gesture.TypeClick ||
+		if event.Kind != gesture.KindClick ||
 			event.Modifiers != key.Modifiers(0) ||
 			event.NumClicks > 1 {
 			continue

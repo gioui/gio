@@ -74,12 +74,12 @@ func (e *Enum) Layout(gtx layout.Context, k string, content layout.Widget) layou
 	}
 	clk := &state.click
 	for _, ev := range clk.Events(gtx) {
-		switch ev.Type {
-		case gesture.TypePress:
+		switch ev.Kind {
+		case gesture.KindPress:
 			if ev.Source == pointer.Mouse {
 				key.FocusOp{Tag: &state.tag}.Add(gtx.Ops)
 			}
-		case gesture.TypeClick:
+		case gesture.KindClick:
 			if state.key != e.Value {
 				e.Value = state.key
 				e.changed = true

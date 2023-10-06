@@ -110,7 +110,7 @@ func mouseClickEvents(times ...time.Duration) []event.Event {
 func filterMouseClicks(events []ClickEvent) []ClickEvent {
 	var clicks []ClickEvent
 	for _, ev := range events {
-		if ev.Type == TypeClick {
+		if ev.Kind == KindClick {
 			clicks = append(clicks, ev)
 		}
 	}

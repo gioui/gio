@@ -87,10 +87,10 @@ type Click struct {
 }
 
 // ClickEvent represent a click action, either a
-// TypePress for the beginning of a click or a
-// TypeClick for a completed click.
+// KindPress for the beginning of a click or a
+// KindClick for a completed click.
 type ClickEvent struct {
-	Type      ClickType
+	Kind      ClickKind
 	Position  image.Point
 	Source    pointer.Source
 	Modifiers key.Modifiers
@@ -99,7 +99,7 @@ type ClickEvent struct {
 	NumClicks int
 }
 
-type ClickType uint8
+type ClickKind uint8
 
 // Drag detects drag gestures in the form of pointer.Drag events.
 type Drag struct {
@@ -136,15 +136,15 @@ const (
 )
 
 const (
-	// TypePress is reported for the first pointer
+	// KindPress is reported for the first pointer
 	// press.
-	TypePress ClickType = iota
-	// TypeClick is reported when a click action
+	KindPress ClickKind = iota
+	// KindClick is reported when a click action
 	// is complete.
-	TypeClick
-	// TypeCancel is reported when the gesture is
+	KindClick
+	// KindCancel is reported when the gesture is
 	// cancelled.
-	TypeCancel
+	KindCancel
 )
 
 const (
@@ -192,9 +192,9 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 			}
 			c.pressed = false
 			if !c.entered || c.hovered {
-				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
+				events = append(events, ClickEvent{Kind: KindClick, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
 			} else {
-				events = append(events, ClickEvent{Type: TypeCancel})
+				events = append(events, ClickEvent{Kind: KindCancel})
 			}
 		case pointer.Cancel:
 			wasPressed := c.pressed
@@ -202,7 +202,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 			c.hovered = false
 			c.entered = false
 			if wasPressed {
-				events = append(events, ClickEvent{Type: TypeCancel})
+				events = append(events, ClickEvent{Kind: KindCancel})
 			}
 		case pointer.Press:
 			if c.pressed {
@@ -224,7 +224,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 				c.clicks = 1
 			}
 			c.clickedAt = e.Time
-			events = append(events, ClickEvent{Type: TypePress, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
+			events = append(events, ClickEvent{Kind: KindPress, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
 		case pointer.Leave:
 			if !c.pressed {
 				c.pid = e.PointerID
@@ -444,13 +444,13 @@ func (a Axis) String() string {
 	}
 }
 
-func (ct ClickType) String() string {
+func (ct ClickKind) String() string {
 	switch ct {
-	case TypePress:
+	case KindPress:
 		return "TypePress"
-	case TypeClick:
+	case KindClick:
 		return "TypeClick"
-	case TypeCancel:
+	case KindCancel:
 		return "TypeCancel"
 	default:
 		panic("invalid ClickType")

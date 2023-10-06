@@ -149,8 +149,8 @@ func (b *Clickable) update(gtx layout.Context) {
 	b.prevClicks = n
 
 	for _, e := range b.click.Events(gtx) {
-		switch e.Type {
-		case gesture.TypeClick:
+		switch e.Kind {
+		case gesture.KindClick:
 			b.clicks = append(b.clicks, Click{
 				Modifiers: e.Modifiers,
 				NumClicks: e.NumClicks,
@@ -158,14 +158,14 @@ func (b *Clickable) update(gtx layout.Context) {
 			if l := len(b.history); l > 0 {
 				b.history[l-1].End = gtx.Now
 			}
-		case gesture.TypeCancel:
+		case gesture.KindCancel:
 			for i := range b.history {
 				b.history[i].Cancelled = true
 				if b.history[i].End.IsZero() {
 					b.history[i].End = gtx.Now
 				}
 			}
-		case gesture.TypePress:
+		case gesture.KindPress:
 			if e.Source == pointer.Mouse {
 				key.FocusOp{Tag: &b.keyTag}.Add(gtx.Ops)
 			}

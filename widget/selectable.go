@@ -236,8 +236,8 @@ func (e *Selectable) processPointer(gtx layout.Context) {
 		switch evt := evt.(type) {
 		case gesture.ClickEvent:
 			switch {
-			case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
-				evt.Type == gesture.TypeClick && evt.Source != pointer.Mouse:
+			case evt.Kind == gesture.KindPress && evt.Source == pointer.Mouse,
+				evt.Kind == gesture.KindClick && evt.Source != pointer.Mouse:
 				prevCaretPos, _ := e.text.Selection()
 				e.text.MoveCoord(image.Point{
 					X: int(math.Round(float64(evt.Position.X))),
