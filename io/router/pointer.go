@@ -309,11 +309,11 @@ func (c *pointerCollector) semanticSelected(selected bool) {
 	area.semantic.content.selected = selected
 }
 
-func (c *pointerCollector) semanticDisabled(disabled bool) {
+func (c *pointerCollector) semanticEnabled(enabled bool) {
 	areaID := c.currentArea()
 	area := &c.q.areas[areaID]
 	area.semantic.valid = true
-	area.semantic.content.disabled = disabled
+	area.semantic.content.disabled = !enabled
 }
 
 func (c *pointerCollector) cursor(cursor pointer.Cursor) {

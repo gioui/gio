@@ -546,11 +546,11 @@ func (q *Router) collect() {
 			} else {
 				pc.semanticSelected(false)
 			}
-		case ops.TypeSemanticDisabled:
+		case ops.TypeSemanticEnabled:
 			if encOp.Data[1] != 0 {
-				pc.semanticDisabled(true)
+				pc.semanticEnabled(true)
 			} else {
-				pc.semanticDisabled(false)
+				pc.semanticEnabled(false)
 			}
 		}
 	}

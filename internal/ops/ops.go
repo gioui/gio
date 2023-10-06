@@ -84,7 +84,7 @@ const (
 	TypeSemanticDesc
 	TypeSemanticClass
 	TypeSemanticSelected
-	TypeSemanticDisabled
+	TypeSemanticEnabled
 	TypeSnippet
 	TypeSelection
 	TypeActionInput
@@ -170,7 +170,7 @@ const (
 	TypeSemanticDescLen     = 1
 	TypeSemanticClassLen    = 2
 	TypeSemanticSelectedLen = 2
-	TypeSemanticDisabledLen = 2
+	TypeSemanticEnabledLen  = 2
 	TypeSnippetLen          = 1 + 4 + 4
 	TypeSelectionLen        = 1 + 2*4 + 2*4 + 4 + 4
 	TypeActionInputLen      = 1 + 1
@@ -454,7 +454,7 @@ var opProps = [0x100]opProp{
 	TypeSemanticDesc:     {Size: TypeSemanticDescLen, NumRefs: 1},
 	TypeSemanticClass:    {Size: TypeSemanticClassLen, NumRefs: 0},
 	TypeSemanticSelected: {Size: TypeSemanticSelectedLen, NumRefs: 0},
-	TypeSemanticDisabled: {Size: TypeSemanticDisabledLen, NumRefs: 0},
+	TypeSemanticEnabled:  {Size: TypeSemanticEnabledLen, NumRefs: 0},
 	TypeSnippet:          {Size: TypeSnippetLen, NumRefs: 2},
 	TypeSelection:        {Size: TypeSelectionLen, NumRefs: 1},
 	TypeActionInput:      {Size: TypeActionInputLen, NumRefs: 0},

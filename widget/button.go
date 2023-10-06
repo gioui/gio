@@ -113,10 +113,10 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 	dims := w(gtx)
 	c := m.Stop()
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
-	disabled := gtx.Queue == nil
-	semantic.DisabledOp(disabled).Add(gtx.Ops)
+	enabled := gtx.Queue != nil
+	semantic.EnabledOp(enabled).Add(gtx.Ops)
 	b.click.Add(gtx.Ops)
-	if !disabled {
+	if enabled {
 		keys := key.Set("⏎|Space")
 		if !b.focused {
 			keys = ""

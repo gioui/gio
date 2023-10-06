@@ -116,14 +116,14 @@ func (e *Enum) Layout(gtx layout.Context, k string, content layout.Widget) layou
 	}
 
 	clk.Add(gtx.Ops)
-	disabled := gtx.Queue == nil
-	if !disabled {
+	enabled := gtx.Queue != nil
+	if enabled {
 		key.InputOp{Tag: &state.tag, Keys: "⏎|Space"}.Add(gtx.Ops)
 	} else if e.focus == k {
 		e.focused = false
 	}
 	semantic.SelectedOp(k == e.Value).Add(gtx.Ops)
-	semantic.DisabledOp(disabled).Add(gtx.Ops)
+	semantic.EnabledOp(enabled).Add(gtx.Ops)
 	c.Add(gtx.Ops)
 
 	return dims

@@ -78,7 +78,7 @@ func TestSemanticDescription(t *testing.T) {
 	semantic.DescriptionOp("description").Add(&ops)
 	semantic.LabelOp("label").Add(&ops)
 	semantic.Button.Add(&ops)
-	semantic.DisabledOp(true).Add(&ops)
+	semantic.EnabledOp(false).Add(&ops)
 	semantic.SelectedOp(true).Add(&ops)
 	var r Router
 	r.Frame(&ops)
