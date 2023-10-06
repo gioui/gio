@@ -33,7 +33,7 @@ func (f *Float) Layout(gtx layout.Context, axis layout.Axis, min, max float32, i
 
 	var de *pointer.Event
 	for _, e := range f.drag.Events(gtx.Metric, gtx, gesture.Axis(axis)) {
-		if e.Type == pointer.Press || e.Type == pointer.Drag {
+		if e.Kind == pointer.Press || e.Kind == pointer.Drag {
 			de = &e
 		}
 	}

@@ -259,7 +259,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.pointerButton(pointer.ButtonTertiary, false, lParam, getModifiers())
 	case windows.WM_CANCELMODE:
 		w.w.Event(pointer.Event{
-			Type: pointer.Cancel,
+			Kind: pointer.Cancel,
 		})
 	case windows.WM_SETFOCUS:
 		w.focused = true
@@ -288,7 +288,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		x, y := coordsFromlParam(lParam)
 		p := f32.Point{X: float32(x), Y: float32(y)}
 		w.w.Event(pointer.Event{
-			Type:      pointer.Move,
+			Kind:      pointer.Move,
 			Source:    pointer.Mouse,
 			Position:  p,
 			Buttons:   w.pointerBtns,
@@ -501,15 +501,15 @@ func (w *window) pointerButton(btn pointer.Buttons, press bool, lParam uintptr, 
 		windows.SetFocus(w.hwnd)
 	}
 
-	var typ pointer.Type
+	var kind pointer.Kind
 	if press {
-		typ = pointer.Press
+		kind = pointer.Press
 		if w.pointerBtns == 0 {
 			windows.SetCapture(w.hwnd)
 		}
 		w.pointerBtns |= btn
 	} else {
-		typ = pointer.Release
+		kind = pointer.Release
 		w.pointerBtns &^= btn
 		if w.pointerBtns == 0 {
 			windows.ReleaseCapture()
@@ -518,7 +518,7 @@ func (w *window) pointerButton(btn pointer.Buttons, press bool, lParam uintptr, 
 	x, y := coordsFromlParam(lParam)
 	p := f32.Point{X: float32(x), Y: float32(y)}
 	w.w.Event(pointer.Event{
-		Type:      typ,
+		Kind:      kind,
 		Source:    pointer.Mouse,
 		Position:  p,
 		Buttons:   w.pointerBtns,
@@ -553,7 +553,7 @@ func (w *window) scrollEvent(wParam, lParam uintptr, horizontal bool, kmods key.
 		}
 	}
 	w.w.Event(pointer.Event{
-		Type:      pointer.Scroll,
+		Kind:      pointer.Scroll,
 		Source:    pointer.Mouse,
 		Position:  p,
 		Buttons:   w.pointerBtns,

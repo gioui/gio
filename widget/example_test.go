@@ -47,13 +47,13 @@ func ExampleClickable_passthrough() {
 		pointer.Event{
 			Source:   pointer.Mouse,
 			Buttons:  pointer.ButtonPrimary,
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 			Position: f32.Pt(50, 50),
 		},
 		pointer.Event{
 			Source:   pointer.Mouse,
 			Buttons:  pointer.ButtonPrimary,
-			Type:     pointer.Release,
+			Kind:     pointer.Release,
 			Position: f32.Pt(50, 50),
 		},
 	)
@@ -125,15 +125,15 @@ func ExampleDraggable_Layout() {
 	// Send drag and drop gesture events.
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 			Position: f32.Pt(5, 5), // in the drag area
 		},
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(5, 5), // in the drop area
 		},
 		pointer.Event{
-			Type:     pointer.Release,
+			Kind:     pointer.Release,
 			Position: f32.Pt(30, 30), // in the drop area
 		},
 	)

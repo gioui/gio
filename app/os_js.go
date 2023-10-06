@@ -275,7 +275,7 @@ func (w *window) addEventListeners() {
 		}
 		w.touches = w.touches[:0]
 		w.w.Event(pointer.Event{
-			Type:   pointer.Cancel,
+			Kind:   pointer.Cancel,
 			Source: pointer.Touch,
 		})
 		return nil
@@ -398,7 +398,7 @@ func modifiersFor(e js.Value) key.Modifiers {
 	return mods
 }
 
-func (w *window) touchEvent(typ pointer.Type, e js.Value) {
+func (w *window) touchEvent(kind pointer.Kind, e js.Value) {
 	e.Call("preventDefault")
 	t := time.Duration(e.Get("timeStamp").Int()) * time.Millisecond
 	changedTouches := e.Get("changedTouches")
@@ -426,7 +426,7 @@ func (w *window) touchEvent(typ pointer.Type, e js.Value) {
 			Y: float32(y) * scale,
 		}
 		w.w.Event(pointer.Event{
-			Type:      typ,
+			Kind:      kind,
 			Source:    pointer.Touch,
 			Position:  pos,
 			PointerID: pid,
@@ -448,7 +448,7 @@ func (w *window) touchIDFor(touch js.Value) pointer.ID {
 	return pid
 }
 
-func (w *window) pointerEvent(typ pointer.Type, dx, dy float32, e js.Value) {
+func (w *window) pointerEvent(kind pointer.Kind, dx, dy float32, e js.Value) {
 	e.Call("preventDefault")
 	x, y := e.Get("clientX").Float(), e.Get("clientY").Float()
 	rect := w.cnv.Call("getBoundingClientRect")
@@ -476,7 +476,7 @@ func (w *window) pointerEvent(typ pointer.Type, dx, dy float32, e js.Value) {
 		btns |= pointer.ButtonTertiary
 	}
 	w.w.Event(pointer.Event{
-		Type:      typ,
+		Kind:      kind,
 		Source:    pointer.Mouse,
 		Buttons:   btns,
 		Position:  pos,

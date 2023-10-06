@@ -159,17 +159,17 @@ func TestEditorReadOnly(t *testing.T) {
 	gtx.Ops.Reset()
 	gtx.Queue = &testQueue{events: []event.Event{
 		pointer.Event{
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 			Buttons:  pointer.ButtonPrimary,
 			Position: f32.Pt(float32(dims.Size.X)*.5, 5),
 		},
 		pointer.Event{
-			Type:     pointer.Drag,
+			Kind:     pointer.Drag,
 			Buttons:  pointer.ButtonPrimary,
 			Position: layout.FPt(dims.Size).Mul(.5),
 		},
 		pointer.Event{
-			Type:     pointer.Release,
+			Kind:     pointer.Release,
 			Buttons:  pointer.ButtonPrimary,
 			Position: layout.FPt(dims.Size).Mul(.5),
 		},
@@ -947,13 +947,13 @@ g 2 4 6 8 g
 			events: []event.Event{
 				pointer.Event{
 					Buttons:  pointer.ButtonPrimary,
-					Type:     pointer.Press,
+					Kind:     pointer.Press,
 					Source:   pointer.Mouse,
 					Time:     tim,
 					Position: f32.Pt(textWidth(e, startPos.lineCol.line, 0, startPos.lineCol.col), textBaseline(e, startPos.lineCol.line)),
 				},
 				pointer.Event{
-					Type:     pointer.Release,
+					Kind:     pointer.Release,
 					Source:   pointer.Mouse,
 					Time:     tim,
 					Position: f32.Pt(textWidth(e, endPos.lineCol.line, 0, endPos.lineCol.col), textBaseline(e, endPos.lineCol.line)),

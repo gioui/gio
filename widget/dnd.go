@@ -31,7 +31,7 @@ func (d *Draggable) Layout(gtx layout.Context, w, drag layout.Widget) layout.Dim
 	}
 	pos := d.pos
 	for _, ev := range d.drag.Events(gtx.Metric, gtx.Queue, gesture.Both) {
-		switch ev.Type {
+		switch ev.Kind {
 		case pointer.Press:
 			d.click = ev.Position
 			pos = f32.Point{}

@@ -526,7 +526,7 @@ func gio_onMouse(view, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x, y, dx, 
 	case 2:
 		btn = pointer.ButtonTertiary
 	}
-	var typ pointer.Type
+	var typ pointer.Kind
 	switch cdir {
 	case C.MOUSE_MOVE:
 		typ = pointer.Move
@@ -550,7 +550,7 @@ func gio_onMouse(view, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x, y, dx, 
 		panic("invalid direction")
 	}
 	w.w.Event(pointer.Event{
-		Type:      typ,
+		Kind:      typ,
 		Source:    pointer.Mouse,
 		Time:      t,
 		Buttons:   w.pointerBtns,

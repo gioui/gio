@@ -278,10 +278,10 @@ func (e *Editor) processPointer(gtx layout.Context) {
 		case pointer.Event:
 			release := false
 			switch {
-			case evt.Type == pointer.Release && evt.Source == pointer.Mouse:
+			case evt.Kind == pointer.Release && evt.Source == pointer.Mouse:
 				release = true
 				fallthrough
-			case evt.Type == pointer.Drag && evt.Source == pointer.Mouse:
+			case evt.Kind == pointer.Drag && evt.Source == pointer.Mouse:
 				if e.dragging {
 					e.blinkStart = gtx.Now
 					e.text.MoveCoord(image.Point{

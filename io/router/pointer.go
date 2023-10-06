@@ -66,7 +66,7 @@ type pointerHandler struct {
 	area      int
 	active    bool
 	wantsGrab bool
-	types     pointer.Type
+	types     pointer.Kind
 	// min and max horizontal/vertical scroll
 	scrollRange image.Rectangle
 
@@ -242,7 +242,7 @@ func (c *pointerCollector) newHandler(tag event.Tag, events *handlerEvents) *poi
 		c.q.handlers[tag] = h
 		// Cancel handlers on (each) first appearance, but don't
 		// trigger redraw.
-		events.AddNoRedraw(tag, pointer.Event{Type: pointer.Cancel})
+		events.AddNoRedraw(tag, pointer.Event{Kind: pointer.Cancel})
 	}
 	h.active = true
 	h.area = areaID
@@ -268,16 +268,16 @@ func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
 	areaID := c.currentArea()
 	area := &c.q.areas[areaID]
 	area.semantic.content.tag = op.Tag
-	if op.Types&(pointer.Press|pointer.Release) != 0 {
+	if op.Kinds&(pointer.Press|pointer.Release) != 0 {
 		area.semantic.content.gestures |= ClickGesture
 	}
-	if op.Types&pointer.Scroll != 0 {
+	if op.Kinds&pointer.Scroll != 0 {
 		area.semantic.content.gestures |= ScrollGesture
 	}
 	area.semantic.valid = area.semantic.content.gestures != 0
 	h := c.newHandler(op.Tag, events)
 	h.wantsGrab = h.wantsGrab || op.Grab
-	h.types = h.types | op.Types
+	h.types = h.types | op.Kinds
 	h.scrollRange = op.ScrollBounds
 }
 
@@ -602,7 +602,7 @@ func (q *pointerQueue) Frame(events *handlerEvents) {
 
 func (q *pointerQueue) dropHandler(events *handlerEvents, tag event.Tag) {
 	if events != nil {
-		events.Add(tag, pointer.Event{Type: pointer.Cancel})
+		events.Add(tag, pointer.Event{Kind: pointer.Cancel})
 	}
 	for i := range q.pointers {
 		p := &q.pointers[i]
@@ -649,11 +649,11 @@ func (q *pointerQueue) Deliver(areaIdx int, e pointer.Event, events *handlerEven
 			continue
 		}
 		h := q.handlers[n.tag]
-		if e.Type&h.types == 0 {
+		if e.Kind&h.types == 0 {
 			continue
 		}
 		e := e
-		if e.Type == pointer.Scroll {
+		if e.Kind == pointer.Scroll {
 			if sx == 0 && sy == 0 {
 				break
 			}
@@ -663,7 +663,7 @@ func (q *pointerQueue) Deliver(areaIdx int, e pointer.Event, events *handlerEven
 		}
 		e.Position = q.invTransform(h.area, e.Position)
 		events.Add(n.tag, e)
-		if e.Type != pointer.Scroll {
+		if e.Kind != pointer.Scroll {
 			break
 		}
 	}
@@ -683,7 +683,7 @@ func (q *pointerQueue) SemanticArea(areaIdx int) (semanticContent, int) {
 }
 
 func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
-	if e.Type == pointer.Cancel {
+	if e.Kind == pointer.Cancel {
 		q.pointers = q.pointers[:0]
 		for k := range q.handlers {
 			q.dropHandler(events, k)
@@ -694,14 +694,14 @@ func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
 	p := &q.pointers[pidx]
 	p.last = e
 
-	switch e.Type {
+	switch e.Kind {
 	case pointer.Press:
 		q.deliverEnterLeaveEvents(p, events, e)
 		p.pressed = true
 		q.deliverEvent(p, events, e)
 	case pointer.Move:
 		if p.pressed {
-			e.Type = pointer.Drag
+			e.Kind = pointer.Drag
 		}
 		q.deliverEnterLeaveEvents(p, events, e)
 		q.deliverEvent(p, events, e)
@@ -735,7 +735,7 @@ func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e poi
 	var sx, sy = e.Scroll.X, e.Scroll.Y
 	for _, k := range p.handlers {
 		h := q.handlers[k]
-		if e.Type == pointer.Scroll {
+		if e.Kind == pointer.Scroll {
 			if sx == 0 && sy == 0 {
 				return
 			}
@@ -743,7 +743,7 @@ func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e poi
 			sx, e.Scroll.X = setScrollEvent(sx, h.scrollRange.Min.X, h.scrollRange.Max.X)
 			sy, e.Scroll.Y = setScrollEvent(sy, h.scrollRange.Min.Y, h.scrollRange.Max.Y)
 		}
-		if e.Type&h.types == 0 {
+		if e.Kind&h.types == 0 {
 			continue
 		}
 		e := e
@@ -758,7 +758,7 @@ func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e poi
 
 func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEvents, e pointer.Event) {
 	var hits []event.Tag
-	if e.Source != pointer.Mouse && !p.pressed && e.Type != pointer.Press {
+	if e.Source != pointer.Mouse && !p.pressed && e.Kind != pointer.Press {
 		// Consider non-mouse pointers leaving when they're released.
 	} else {
 		hits, q.cursor = q.opHit(e.Position)
@@ -790,9 +790,9 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 			continue
 		}
 		h := q.handlers[k]
-		e.Type = pointer.Leave
+		e.Kind = pointer.Leave
 
-		if e.Type&h.types != 0 {
+		if e.Kind&h.types != 0 {
 			e := e
 			e.Position = q.invTransform(h.area, e.Position)
 			events.Add(k, e)
@@ -804,9 +804,9 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 		if _, found := searchTag(p.entered, k); found {
 			continue
 		}
-		e.Type = pointer.Enter
+		e.Kind = pointer.Enter
 
-		if e.Type&h.types != 0 {
+		if e.Kind&h.types != 0 {
 			e := e
 			e.Position = q.invTransform(h.area, e.Position)
 			events.Add(k, e)

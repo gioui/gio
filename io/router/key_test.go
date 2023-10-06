@@ -279,7 +279,7 @@ func TestFocusScroll(t *testing.T) {
 	key.InputOp{Tag: h}.Add(ops)
 	pointer.InputOp{
 		Tag:          h,
-		Types:        pointer.Scroll,
+		Kinds:        pointer.Scroll,
 		ScrollBounds: image.Rect(-100, -100, 100, 100),
 	}.Add(ops)
 	// Test that h is scrolled even if behind another handler.
@@ -305,7 +305,7 @@ func TestFocusClick(t *testing.T) {
 	key.InputOp{Tag: h}.Add(ops)
 	pointer.InputOp{
 		Tag:   h,
-		Types: pointer.Press | pointer.Release,
+		Kinds: pointer.Press | pointer.Release,
 	}.Add(ops)
 	cl.Pop()
 	r.Frame(ops)

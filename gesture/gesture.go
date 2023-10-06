@@ -39,7 +39,7 @@ type Hover struct {
 func (h *Hover) Add(ops *op.Ops) {
 	pointer.InputOp{
 		Tag:   h,
-		Types: pointer.Enter | pointer.Leave,
+		Kinds: pointer.Enter | pointer.Leave,
 	}.Add(ops)
 }
 
@@ -50,7 +50,7 @@ func (h *Hover) Hovered(q event.Queue) bool {
 		if !ok {
 			continue
 		}
-		switch e.Type {
+		switch e.Kind {
 		case pointer.Leave, pointer.Cancel:
 			if h.entered && h.pid == e.PointerID {
 				h.entered = false
@@ -163,7 +163,7 @@ const touchSlop = unit.Dp(3)
 func (c *Click) Add(ops *op.Ops) {
 	pointer.InputOp{
 		Tag:   c,
-		Types: pointer.Press | pointer.Release | pointer.Enter | pointer.Leave,
+		Kinds: pointer.Press | pointer.Release | pointer.Enter | pointer.Leave,
 	}.Add(ops)
 }
 
@@ -185,7 +185,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 		if !ok {
 			continue
 		}
-		switch e.Type {
+		switch e.Kind {
 		case pointer.Release:
 			if !c.pressed || c.pid != e.PointerID {
 				break
@@ -254,7 +254,7 @@ func (s *Scroll) Add(ops *op.Ops, bounds image.Rectangle) {
 	oph := pointer.InputOp{
 		Tag:          s,
 		Grab:         s.grab,
-		Types:        pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll,
+		Kinds:        pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll,
 		ScrollBounds: bounds,
 	}
 	oph.Add(ops)
@@ -281,7 +281,7 @@ func (s *Scroll) Scroll(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) 
 		if !ok {
 			continue
 		}
-		switch e.Type {
+		switch e.Kind {
 		case pointer.Press:
 			if s.dragging {
 				break
@@ -368,7 +368,7 @@ func (d *Drag) Add(ops *op.Ops) {
 	pointer.InputOp{
 		Tag:   d,
 		Grab:  d.grab,
-		Types: pointer.Press | pointer.Drag | pointer.Release,
+		Kinds: pointer.Press | pointer.Drag | pointer.Release,
 	}.Add(ops)
 }
 
@@ -381,7 +381,7 @@ func (d *Drag) Events(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event
 			continue
 		}
 
-		switch e.Type {
+		switch e.Kind {
 		case pointer.Press:
 			if !(e.Buttons == pointer.ButtonPrimary || e.Source == pointer.Touch) {
 				continue

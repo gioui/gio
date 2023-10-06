@@ -273,7 +273,7 @@ func (q *Router) ScrollFocus(dist image.Point) {
 	}
 	area := q.key.queue.AreaFor(focus)
 	q.pointer.queue.Deliver(area, pointer.Event{
-		Type:   pointer.Scroll,
+		Kind:   pointer.Scroll,
 		Source: pointer.Touch,
 		Scroll: f32internal.FPt(dist),
 	}, &q.handlers)
@@ -317,9 +317,9 @@ func (q *Router) ClickFocus() {
 		Source:   pointer.Touch,
 	}
 	area := q.key.queue.AreaFor(focus)
-	e.Type = pointer.Press
+	e.Kind = pointer.Press
 	q.pointer.queue.Deliver(area, e, &q.handlers)
-	e.Type = pointer.Release
+	e.Kind = pointer.Release
 	q.pointer.queue.Deliver(area, e, &q.handlers)
 }
 
@@ -438,7 +438,7 @@ func (q *Router) collect() {
 			op := pointer.InputOp{
 				Tag:   encOp.Refs[0].(event.Tag),
 				Grab:  encOp.Data[1] != 0,
-				Types: pointer.Type(bo.Uint16(encOp.Data[2:])),
+				Kinds: pointer.Kind(bo.Uint16(encOp.Data[2:])),
 				ScrollBounds: image.Rectangle{
 					Min: image.Point{
 						X: int(int32(bo.Uint32(encOp.Data[4:]))),

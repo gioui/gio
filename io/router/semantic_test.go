@@ -74,7 +74,7 @@ func TestSemanticTree(t *testing.T) {
 
 func TestSemanticDescription(t *testing.T) {
 	var ops op.Ops
-	pointer.InputOp{Tag: new(int), Types: pointer.Press | pointer.Release}.Add(&ops)
+	pointer.InputOp{Tag: new(int), Kinds: pointer.Press | pointer.Release}.Add(&ops)
 	semantic.DescriptionOp("description").Add(&ops)
 	semantic.LabelOp("label").Add(&ops)
 	semantic.Button.Add(&ops)
