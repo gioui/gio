@@ -292,10 +292,10 @@ func (e *Selectable) processPointer(gtx layout.Context) {
 
 func (e *Selectable) clickDragEvents(gtx layout.Context) []event.Event {
 	var combinedEvents []event.Event
-	for _, evt := range e.clicker.Events(gtx) {
+	for _, evt := range e.clicker.Update(gtx) {
 		combinedEvents = append(combinedEvents, evt)
 	}
-	for _, evt := range e.dragger.Events(gtx.Metric, gtx, gesture.Both) {
+	for _, evt := range e.dragger.Update(gtx.Metric, gtx, gesture.Both) {
 		combinedEvents = append(combinedEvents, evt)
 	}
 	return combinedEvents

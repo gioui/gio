@@ -43,8 +43,8 @@ func (h *Hover) Add(ops *op.Ops) {
 	}.Add(ops)
 }
 
-// Hovered returns whether a pointer is inside the area.
-func (h *Hover) Hovered(q event.Queue) bool {
+// Update state and report whether a pointer is inside the area.
+func (h *Hover) Update(q event.Queue) bool {
 	for _, ev := range q.Events(h) {
 		e, ok := ev.(pointer.Event)
 		if !ok {
@@ -177,8 +177,8 @@ func (c *Click) Pressed() bool {
 	return c.pressed
 }
 
-// Events returns the next click events, if any.
-func (c *Click) Events(q event.Queue) []ClickEvent {
+// Update state and return the click events.
+func (c *Click) Update(q event.Queue) []ClickEvent {
 	var events []ClickEvent
 	for _, evt := range q.Events(c) {
 		e, ok := evt.(pointer.Event)
@@ -268,9 +268,8 @@ func (s *Scroll) Stop() {
 	s.flinger = fling.Animation{}
 }
 
-// Scroll detects the scrolling distance from the available events and
-// ongoing fling gestures.
-func (s *Scroll) Scroll(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) int {
+// Update state and report the scroll distance along axis.
+func (s *Scroll) Update(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) int {
 	if s.axis != axis {
 		s.axis = axis
 		return 0
@@ -372,8 +371,8 @@ func (d *Drag) Add(ops *op.Ops) {
 	}.Add(ops)
 }
 
-// Events returns the next drag events, if any.
-func (d *Drag) Events(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event {
+// Update state and return the drag events.
+func (d *Drag) Update(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event {
 	var events []pointer.Event
 	for _, e := range q.Events(d) {
 		e, ok := e.(pointer.Event)

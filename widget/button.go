@@ -141,7 +141,7 @@ func (b *Clickable) Update(gtx layout.Context) []Click {
 			NumClicks: c,
 		})
 	}
-	for _, e := range b.click.Events(gtx) {
+	for _, e := range b.click.Update(gtx) {
 		switch e.Kind {
 		case gesture.KindClick:
 			if l := len(b.history); l > 0 {

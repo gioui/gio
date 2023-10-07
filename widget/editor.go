@@ -225,7 +225,7 @@ func (e *Editor) processPointer(gtx layout.Context) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Scroll(gtx.Metric, gtx, gtx.Now, axis)
+	sdist := e.scroller.Update(gtx.Metric, gtx, gtx.Now, axis)
 	var soff int
 	if e.SingleLine {
 		e.text.ScrollRel(sdist, 0)
@@ -305,10 +305,10 @@ func (e *Editor) processPointer(gtx layout.Context) {
 
 func (e *Editor) clickDragEvents(gtx layout.Context) []event.Event {
 	var combinedEvents []event.Event
-	for _, evt := range e.clicker.Events(gtx) {
+	for _, evt := range e.clicker.Update(gtx) {
 		combinedEvents = append(combinedEvents, evt)
 	}
-	for _, evt := range e.dragger.Events(gtx.Metric, gtx, gesture.Both) {
+	for _, evt := range e.dragger.Update(gtx.Metric, gtx, gesture.Both) {
 		combinedEvents = append(combinedEvents, evt)
 	}
 	return combinedEvents
