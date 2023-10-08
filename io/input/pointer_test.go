@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"gioui.org/f32"
-	"gioui.org/gesture"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
@@ -1036,10 +1035,13 @@ func TestTransfer(t *testing.T) {
 	t.Run("valid target enter/leave events", func(t *testing.T) {
 		ops := new(op.Ops)
 		src, _ := setup(ops, "file", "file")
-		var hover gesture.Hover
 		pass := pointer.PassOp{}.Push(ops)
 		stack := clip.Rect(tgtArea).Push(ops)
-		hover.Add(ops)
+		tag := new(int)
+		pointer.InputOp{
+			Tag:   tag,
+			Kinds: pointer.Enter | pointer.Leave,
+		}.Add(ops)
 		stack.Pop()
 		pass.Pop()
 
@@ -1060,7 +1062,7 @@ func TestTransfer(t *testing.T) {
 				Kind:     pointer.Move,
 			},
 		)
-		assertEventPointerTypeSequence(t, r.Events(&hover), pointer.Cancel, pointer.Enter)
+		assertEventPointerTypeSequence(t, r.Events(tag), pointer.Cancel, pointer.Enter)
 
 		// Drop.
 		r.Queue(
@@ -1078,16 +1080,19 @@ func TestTransfer(t *testing.T) {
 			Data: ofr,
 		}.Add(ops)
 		r.Frame(ops)
-		assertEventPointerTypeSequence(t, r.Events(&hover), pointer.Leave)
+		assertEventPointerTypeSequence(t, r.Events(tag), pointer.Leave)
 	})
 
 	t.Run("invalid target NO enter/leave events", func(t *testing.T) {
 		ops := new(op.Ops)
 		src, _ := setup(ops, "file", "nofile")
-		var hover gesture.Hover
 		pass := pointer.PassOp{}.Push(ops)
 		stack := clip.Rect(tgtArea).Push(ops)
-		hover.Add(ops)
+		tag := new(int)
+		pointer.InputOp{
+			Tag:   tag,
+			Kinds: pointer.Enter | pointer.Leave,
+		}.Add(ops)
 		stack.Pop()
 		pass.Pop()
 
@@ -1108,7 +1113,7 @@ func TestTransfer(t *testing.T) {
 				Kind:     pointer.Move,
 			},
 		)
-		assertEventPointerTypeSequence(t, r.Events(&hover), pointer.Cancel)
+		assertEventPointerTypeSequence(t, r.Events(tag), pointer.Cancel)
 
 		// Drop.
 		r.Queue(
@@ -1126,7 +1131,7 @@ func TestTransfer(t *testing.T) {
 			Data: ofr,
 		}.Add(ops)
 		r.Frame(ops)
-		assertEventPointerTypeSequence(t, r.Events(&hover), pointer.Leave)
+		assertEventPointerTypeSequence(t, r.Events(tag), pointer.Leave)
 	})
 }
 
