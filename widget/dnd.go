@@ -24,7 +24,7 @@ type Draggable struct {
 }
 
 func (d *Draggable) Layout(gtx layout.Context, w, drag layout.Widget) layout.Dimensions {
-	if gtx.Source == nil {
+	if !gtx.Enabled() {
 		return w(gtx)
 	}
 	dims := w(gtx)

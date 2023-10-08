@@ -17,7 +17,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/internal/fling"
-	"gioui.org/io/event"
+	"gioui.org/io/input"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/op"
@@ -44,7 +44,7 @@ func (h *Hover) Add(ops *op.Ops) {
 }
 
 // Update state and report whether a pointer is inside the area.
-func (h *Hover) Update(q event.Queue) bool {
+func (h *Hover) Update(q input.Source) bool {
 	for _, ev := range q.Events(h) {
 		e, ok := ev.(pointer.Event)
 		if !ok {
@@ -178,7 +178,7 @@ func (c *Click) Pressed() bool {
 }
 
 // Update state and return the click events.
-func (c *Click) Update(q event.Queue) []ClickEvent {
+func (c *Click) Update(q input.Source) []ClickEvent {
 	var events []ClickEvent
 	for _, evt := range q.Events(c) {
 		e, ok := evt.(pointer.Event)
@@ -269,7 +269,7 @@ func (s *Scroll) Stop() {
 }
 
 // Update state and report the scroll distance along axis.
-func (s *Scroll) Update(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) int {
+func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis) int {
 	if s.axis != axis {
 		s.axis = axis
 		return 0
@@ -372,7 +372,7 @@ func (d *Drag) Add(ops *op.Ops) {
 }
 
 // Update state and return the drag events.
-func (d *Drag) Update(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event {
+func (d *Drag) Update(cfg unit.Metric, q input.Source, axis Axis) []pointer.Event {
 	var events []pointer.Event
 	for _, e := range q.Events(d) {
 		e, ok := e.(pointer.Event)

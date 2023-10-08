@@ -21,7 +21,7 @@ func TestClickable(t *testing.T) {
 		b1  widget.Clickable
 		b2  widget.Clickable
 	)
-	gtx := app.NewContext(&ops, app.FrameEvent{Source: &r})
+	gtx := app.NewContext(&ops, app.FrameEvent{Source: r.Source()})
 	layout := func() {
 		b1.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			return layout.Dimensions{Size: image.Pt(100, 100)}

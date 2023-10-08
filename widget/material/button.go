@@ -133,7 +133,7 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 				defer clip.UniformRRect(image.Rectangle{Max: gtx.Constraints.Min}, rr).Push(gtx.Ops).Pop()
 				background := b.Background
 				switch {
-				case gtx.Source == nil:
+				case !gtx.Enabled():
 					background = f32color.Disabled(b.Background)
 				case b.Button.Hovered() || b.Button.Focused():
 					background = f32color.Hovered(b.Background)
@@ -165,7 +165,7 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 				defer clip.UniformRRect(image.Rectangle{Max: gtx.Constraints.Min}, rr).Push(gtx.Ops).Pop()
 				background := b.Background
 				switch {
-				case gtx.Source == nil:
+				case !gtx.Enabled():
 					background = f32color.Disabled(b.Background)
 				case b.Button.Hovered() || b.Button.Focused():
 					background = f32color.Hovered(b.Background)

@@ -40,13 +40,13 @@ func (e *Enum) index(k string) *enumKey {
 
 // Update the state and report whether Value has changed by user interaction.
 func (e *Enum) Update(gtx layout.Context) bool {
-	if gtx.Source == nil {
+	if !gtx.Enabled() {
 		e.focused = false
 	}
 	e.hovering = false
 	changed := false
 	for _, state := range e.keys {
-		for _, ev := range state.click.Update(gtx) {
+		for _, ev := range state.click.Update(gtx.Source) {
 			switch ev.Kind {
 			case gesture.KindPress:
 				if ev.Source == pointer.Mouse {
@@ -117,12 +117,11 @@ func (e *Enum) Layout(gtx layout.Context, k string, content layout.Widget) layou
 	}
 	clk := &state.click
 	clk.Add(gtx.Ops)
-	enabled := gtx.Source != nil
-	if enabled {
+	if gtx.Enabled() {
 		key.InputOp{Tag: &state.tag, Keys: "⏎|Space"}.Add(gtx.Ops)
 	}
 	semantic.SelectedOp(k == e.Value).Add(gtx.Ops)
-	semantic.EnabledOp(enabled).Add(gtx.Ops)
+	semantic.EnabledOp(gtx.Enabled()).Add(gtx.Ops)
 	c.Add(gtx.Ops)
 
 	return dims

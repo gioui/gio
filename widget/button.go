@@ -101,10 +101,9 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 	dims := w(gtx)
 	c := m.Stop()
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
-	enabled := gtx.Source != nil
-	semantic.EnabledOp(enabled).Add(gtx.Ops)
+	semantic.EnabledOp(gtx.Enabled()).Add(gtx.Ops)
 	b.click.Add(gtx.Ops)
-	if enabled {
+	if gtx.Enabled() {
 		keys := key.Set("⏎|Space")
 		if !b.focused {
 			keys = ""
@@ -119,7 +118,7 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 // clicks, if any.
 func (b *Clickable) Update(gtx layout.Context) []Click {
 	b.clicks = nil
-	if gtx.Source == nil {
+	if !gtx.Enabled() {
 		b.focused = false
 	}
 	if b.requestFocus {
@@ -141,7 +140,7 @@ func (b *Clickable) Update(gtx layout.Context) []Click {
 			NumClicks: c,
 		})
 	}
-	for _, e := range b.click.Update(gtx) {
+	for _, e := range b.click.Update(gtx.Source) {
 		switch e.Kind {
 		case gesture.KindClick:
 			if l := len(b.history); l > 0 {

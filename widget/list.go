@@ -61,7 +61,7 @@ func (s *Scrollbar) Update(gtx layout.Context, axis layout.Axis, viewportStart, 
 	}
 
 	// Jump to a click in the track.
-	for _, event := range s.track.Update(gtx) {
+	for _, event := range s.track.Update(gtx.Source) {
 		if event.Kind != gesture.KindClick ||
 			event.Modifiers != key.Modifiers(0) ||
 			event.NumClicks > 1 {
@@ -80,7 +80,7 @@ func (s *Scrollbar) Update(gtx layout.Context, axis layout.Axis, viewportStart, 
 	}
 
 	// Offset to account for any drags.
-	for _, event := range s.drag.Update(gtx.Metric, gtx, gesture.Axis(axis)) {
+	for _, event := range s.drag.Update(gtx.Metric, gtx.Source, gesture.Axis(axis)) {
 		switch event.Kind {
 		case pointer.Drag:
 		case pointer.Release, pointer.Cancel:
@@ -136,7 +136,7 @@ func (s *Scrollbar) Update(gtx layout.Context, axis layout.Axis, viewportStart, 
 
 	// Process events from the indicator so that hover is
 	// detected properly.
-	_ = s.indicator.Update(gtx)
+	_ = s.indicator.Update(gtx.Source)
 }
 
 // AddTrack configures the track click listener for the scrollbar to use

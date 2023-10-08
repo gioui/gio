@@ -832,7 +832,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		w.metric = e2.Metric
 		w.hasNextFrame = false
 		e2.Frame = w.update
-		e2.Source = &w.queue
+		e2.Source = w.queue.Source()
 
 		// Prepare the decorations and update the frame insets.
 		wrapper := &w.decorations.Ops

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"gioui.org/io/event"
+	"gioui.org/io/input"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/unit"
@@ -53,8 +53,8 @@ type FrameEvent struct {
 	// Frame completes the FrameEvent by drawing the graphical operations
 	// from ops into the window.
 	Frame func(frame *op.Ops)
-	// Source supplies the events for event handlers.
-	Source event.Queue
+	// Source is the interface between the interface state and widgets.
+	Source input.Source
 }
 
 // Insets is the space taken up by

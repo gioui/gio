@@ -17,7 +17,7 @@ func TestDraggable(t *testing.T) {
 	var r input.Router
 	gtx := layout.Context{
 		Constraints: layout.Exact(image.Pt(100, 100)),
-		Source:      &r,
+		Source:      r.Source(),
 		Ops:         new(op.Ops),
 	}
 

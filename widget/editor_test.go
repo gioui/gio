@@ -103,7 +103,7 @@ func TestEditorReadOnly(t *testing.T) {
 			Max: image.Pt(100, 100),
 		},
 		Locale: english,
-		Source: r,
+		Source: r.Source(),
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fontSize := unit.Sp(10)
@@ -505,7 +505,7 @@ func TestEditorDimensions(t *testing.T) {
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Constraints{Max: image.Pt(100, 100)},
-		Source:      r,
+		Source:      r.Source(),
 		Locale:      english,
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
@@ -891,7 +891,7 @@ g 2 4 6 8 g
 	gtx := layout.Context{
 		Ops:    new(op.Ops),
 		Locale: english,
-		Source: r,
+		Source: r.Source(),
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	font := font.Font{}
@@ -900,13 +900,13 @@ g 2 4 6 8 g
 	var tim time.Duration
 	selected := func(start, end int) string {
 		// Layout once with no events; populate e.lines.
-		gtx.Source = nil
+		gtx = gtx.Disabled()
 		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 		e.Events() // throw away any events from this layout
 
 		e.Focus()
 		r.Frame(gtx.Ops)
-		gtx.Source = r
+		gtx.Source = r.Source()
 		// Build the selection events
 		startPos := e.text.closestToRune(start)
 		endPos := e.text.closestToRune(end)
@@ -972,7 +972,7 @@ g 2 4 6 8 g
 		// Constrain the editor to roughly 6 columns wide and redraw
 		gtx.Constraints = layout.Exact(image.Pt(36, 36))
 		// Keep existing selection
-		gtx.Source = nil
+		gtx = gtx.Disabled()
 		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 
 		caretStart := e.text.closestToRune(e.text.caret.start)
@@ -991,7 +991,7 @@ func TestSelectMove(t *testing.T) {
 	gtx := layout.Context{
 		Ops:    new(op.Ops),
 		Locale: english,
-		Source: r,
+		Source: r.Source(),
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	font := font.Font{}
@@ -1080,7 +1080,7 @@ func TestEditor_MaxLen(t *testing.T) {
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
-		Source:      r,
+		Source:      r.Source(),
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fontSize := unit.Sp(10)
@@ -1116,7 +1116,7 @@ func TestEditor_Filter(t *testing.T) {
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
-		Source:      r,
+		Source:      r.Source(),
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fontSize := unit.Sp(10)
@@ -1146,7 +1146,7 @@ func TestEditor_Submit(t *testing.T) {
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
-		Source:      r,
+		Source:      r.Source(),
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fontSize := unit.Sp(10)

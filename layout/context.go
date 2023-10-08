@@ -5,7 +5,7 @@ package layout
 import (
 	"time"
 
-	"gioui.org/io/event"
+	"gioui.org/io/input"
 	"gioui.org/io/system"
 	"gioui.org/op"
 	"gioui.org/unit"
@@ -20,9 +20,6 @@ type Context struct {
 	Constraints Constraints
 
 	Metric unit.Metric
-	// By convention, a nil Source is a signal to widgets to draw themselves
-	// in a disabled state.
-	Source event.Queue
 	// Now is the animation time.
 	Now time.Time
 
@@ -31,6 +28,7 @@ type Context struct {
 	// Interested users must look up and populate these values manually.
 	Locale system.Locale
 
+	input.Source
 	*op.Ops
 }
 
@@ -44,21 +42,9 @@ func (c Context) Sp(v unit.Sp) int {
 	return c.Metric.Sp(v)
 }
 
-// Events returns the events available for the key. If no
-// queue is configured, Events returns nil.
-func (c Context) Events(k event.Tag) []event.Event {
-	if c.Source == nil {
-		return nil
-	}
-	return c.Source.Events(k)
-}
-
-// Disabled returns a copy of this context with a nil Queue,
-// blocking events to widgets using it.
-//
-// By convention, a nil Queue is a signal to widgets to draw themselves
-// in a disabled state.
+// Disabled returns a copy of this context with a disabled Source,
+// blocking widgets from changing its state and receiving events.
 func (c Context) Disabled() Context {
-	c.Source = nil
+	c.Source = input.Source{}
 	return c
 }

@@ -38,7 +38,7 @@ func TestSelectableMove(t *testing.T) {
 	gtx := layout.Context{
 		Ops:    new(op.Ops),
 		Locale: english,
-		Source: r,
+		Source: r.Source(),
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fnt := font.Font{}

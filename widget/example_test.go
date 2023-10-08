@@ -25,7 +25,7 @@ func ExampleClickable_passthrough() {
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
-		Source:      &r,
+		Source:      r.Source(),
 	}
 
 	// widget lays out two buttons on top of each other.
@@ -75,7 +75,7 @@ func ExampleDraggable_Layout() {
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
-		Source:      &r,
+		Source:      r.Source(),
 	}
 	// mime is the type used to match drag and drop operations.
 	// It could be left empty in this example.

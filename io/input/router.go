@@ -1,13 +1,5 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-/*
-Package input implements Router, an event.Queue implementation
-that disambiguates and routes events to handlers declared
-in operation lists.
-
-Router is used by app.Window and is otherwise only useful for
-using Gio with external window implementations.
-*/
 package input
 
 import (
@@ -31,8 +23,8 @@ import (
 	"gioui.org/op"
 )
 
-// Router is a Queue implementation that routes events
-// to handlers declared in operation lists.
+// Router tracks the [io/event.Tag] identifiers of user interface widgets
+// and routes events to them. [Source] is its interface exposed to widgets.
 type Router struct {
 	savedTrans []f32.Affine2D
 	transStack []f32.Affine2D
@@ -53,6 +45,12 @@ type Router struct {
 	// InvalidateOp summary.
 	wakeup     bool
 	wakeupTime time.Time
+}
+
+// Source implements the interface between a Router and user interface widgets.
+// The value Source is disabled.
+type Source struct {
+	r *Router
 }
 
 // SemanticNode represents a node in the tree describing the components
@@ -95,7 +93,25 @@ type handlerEvents struct {
 	hadEvents bool
 }
 
-// Events returns the available events for the handler key.
+// Source returns a Source backed by this Router.
+func (q *Router) Source() Source {
+	return Source{r: q}
+}
+
+// Enabled reports whether the source is enabled. Only enabled
+// Sources deliver events and respond to commands.
+func (s Source) Enabled() bool {
+	return s.r != nil
+}
+
+// Events returns the available events for the handler tag.
+func (s Source) Events(k event.Tag) []event.Event {
+	if !s.Enabled() {
+		return nil
+	}
+	return s.r.Events(k)
+}
+
 func (q *Router) Events(k event.Tag) []event.Event {
 	events := q.handlers.Events(k)
 	return events

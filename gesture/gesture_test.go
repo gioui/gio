@@ -28,14 +28,14 @@ func TestHover(t *testing.T) {
 	r.Queue(
 		pointer.Event{Kind: pointer.Move, Position: f32.Pt(30, 30)},
 	)
-	if !h.Update(r) {
+	if !h.Update(r.Source()) {
 		t.Fatal("expected hovered")
 	}
 
 	r.Queue(
 		pointer.Event{Kind: pointer.Move, Position: f32.Pt(50, 50)},
 	)
-	if h.Update(r) {
+	if h.Update(r.Source()) {
 		t.Fatal("expected not hovered")
 	}
 }
@@ -75,7 +75,7 @@ func TestMouseClicks(t *testing.T) {
 			r.Frame(&ops)
 			r.Queue(tc.events...)
 
-			events := click.Update(&r)
+			events := click.Update(r.Source())
 			clicks := filterMouseClicks(events)
 			if got, want := len(clicks), len(tc.clicks); got != want {
 				t.Fatalf("got %d mouse clicks, expected %d", got, want)

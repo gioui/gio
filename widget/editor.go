@@ -225,7 +225,7 @@ func (e *Editor) processPointer(gtx layout.Context) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Update(gtx.Metric, gtx, gtx.Now, axis)
+	sdist := e.scroller.Update(gtx.Metric, gtx.Source, gtx.Now, axis)
 	var soff int
 	if e.SingleLine {
 		e.text.ScrollRel(sdist, 0)
@@ -305,10 +305,10 @@ func (e *Editor) processPointer(gtx layout.Context) {
 
 func (e *Editor) clickDragEvents(gtx layout.Context) []event.Event {
 	var combinedEvents []event.Event
-	for _, evt := range e.clicker.Update(gtx) {
+	for _, evt := range e.clicker.Update(gtx.Source) {
 		combinedEvents = append(combinedEvents, evt)
 	}
-	for _, evt := range e.dragger.Update(gtx.Metric, gtx, gesture.Both) {
+	for _, evt := range e.dragger.Update(gtx.Metric, gtx.Source, gesture.Both) {
 		combinedEvents = append(combinedEvents, evt)
 	}
 	return combinedEvents
@@ -677,14 +677,12 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 		}
 		e.showCaret = e.focused && (!blinking || dt%timePerBlink < timePerBlink/2)
 	}
-	disabled := gtx.Source == nil
-
 	semantic.Editor.Add(gtx.Ops)
 	if e.Len() > 0 {
 		e.paintSelection(gtx, selectMaterial)
 		e.paintText(gtx, textMaterial)
 	}
-	if !disabled {
+	if gtx.Enabled() {
 		e.paintCaret(gtx, textMaterial)
 	}
 	return visibleDims

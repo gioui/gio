@@ -70,7 +70,7 @@ func TestListPosition(t *testing.T) {
 		Constraints: Constraints{
 			Max: image.Pt(20, 10),
 		},
-		Source: r,
+		Source: r.Source(),
 	}
 	el := func(gtx Context, idx int) Dimensions {
 		return Dimensions{Size: image.Pt(10, 10)}
