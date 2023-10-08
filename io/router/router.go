@@ -88,7 +88,7 @@ const (
 // SemanticID uniquely identifies a SemanticDescription.
 //
 // By convention, the zero value denotes the non-existent ID.
-type SemanticID uint64
+type SemanticID uint
 
 type handlerEvents struct {
 	handlers  map[event.Tag][]event.Event

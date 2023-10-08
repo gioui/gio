@@ -750,7 +750,6 @@ func (w *window) initAccessibilityNodeInfo(env *C.JNIEnv, sem router.SemanticNod
 }
 
 func (w *window) virtualIDFor(id router.SemanticID) C.jint {
-	// TODO: Android virtual IDs are 32-bit Java integers, but childID is a int64.
 	if id == w.semantic.rootID {
 		return HOST_VIEW_ID
 	}
