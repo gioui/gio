@@ -61,7 +61,7 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 	paint.ColorOp{Color: e.HintColor}.Add(gtx.Ops)
 	hintColor := hintColorMacro.Stop()
 	selectionColorMacro := op.Record(gtx.Ops)
-	paint.ColorOp{Color: blendDisabledColor(gtx.Queue == nil, e.SelectionColor)}.Add(gtx.Ops)
+	paint.ColorOp{Color: blendDisabledColor(gtx.Source == nil, e.SelectionColor)}.Add(gtx.Ops)
 	selectionColor := selectionColorMacro.Stop()
 
 	var maxlines int

@@ -832,7 +832,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		w.metric = e2.Metric
 		w.hasNextFrame = false
 		e2.Frame = w.update
-		e2.Queue = &w.queue
+		e2.Source = &w.queue
 
 		// Prepare the decorations and update the frame insets.
 		wrapper := &w.decorations.Ops
@@ -1014,7 +1014,7 @@ func (w *Window) decorate(d driver, e FrameEvent, o *op.Ops) (size, offset image
 	gtx := layout.Context{
 		Ops:         o,
 		Now:         e.Now,
-		Queue:       e.Queue,
+		Source:      e.Source,
 		Metric:      e.Metric,
 		Constraints: layout.Exact(e.Size),
 	}

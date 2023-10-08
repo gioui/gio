@@ -40,7 +40,7 @@ func (e *Enum) index(k string) *enumKey {
 
 // Update the state and report whether Value has changed by user interaction.
 func (e *Enum) Update(gtx layout.Context) bool {
-	if gtx.Queue == nil {
+	if gtx.Source == nil {
 		e.focused = false
 	}
 	e.hovering = false
@@ -117,7 +117,7 @@ func (e *Enum) Layout(gtx layout.Context, k string, content layout.Widget) layou
 	}
 	clk := &state.click
 	clk.Add(gtx.Ops)
-	enabled := gtx.Queue != nil
+	enabled := gtx.Source != nil
 	if enabled {
 		key.InputOp{Tag: &state.tag, Keys: "⏎|Space"}.Add(gtx.Ops)
 	}

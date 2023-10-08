@@ -53,8 +53,8 @@ type FrameEvent struct {
 	// Frame completes the FrameEvent by drawing the graphical operations
 	// from ops into the window.
 	Frame func(frame *op.Ops)
-	// Queue supplies the events for event handlers.
-	Queue event.Queue
+	// Source supplies the events for event handlers.
+	Source event.Queue
 }
 
 // Insets is the space taken up by
@@ -96,7 +96,7 @@ func NewContext(ops *op.Ops, e FrameEvent) layout.Context {
 	return layout.Context{
 		Ops:         ops,
 		Now:         e.Now,
-		Queue:       e.Queue,
+		Source:      e.Source,
 		Metric:      e.Metric,
 		Constraints: layout.Exact(size),
 	}

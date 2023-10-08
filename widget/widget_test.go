@@ -22,7 +22,7 @@ func TestBool(t *testing.T) {
 		r   input.Router
 		b   widget.Bool
 	)
-	gtx := app.NewContext(&ops, app.FrameEvent{Queue: &r})
+	gtx := app.NewContext(&ops, app.FrameEvent{Source: &r})
 	layout := func() {
 		b.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			semantic.CheckBox.Add(gtx.Ops)

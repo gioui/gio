@@ -20,9 +20,9 @@ type Context struct {
 	Constraints Constraints
 
 	Metric unit.Metric
-	// By convention, a nil Queue is a signal to widgets to draw themselves
+	// By convention, a nil Source is a signal to widgets to draw themselves
 	// in a disabled state.
-	Queue event.Queue
+	Source event.Queue
 	// Now is the animation time.
 	Now time.Time
 
@@ -47,10 +47,10 @@ func (c Context) Sp(v unit.Sp) int {
 // Events returns the events available for the key. If no
 // queue is configured, Events returns nil.
 func (c Context) Events(k event.Tag) []event.Event {
-	if c.Queue == nil {
+	if c.Source == nil {
 		return nil
 	}
-	return c.Queue.Events(k)
+	return c.Source.Events(k)
 }
 
 // Disabled returns a copy of this context with a nil Queue,
@@ -59,6 +59,6 @@ func (c Context) Events(k event.Tag) []event.Event {
 // By convention, a nil Queue is a signal to widgets to draw themselves
 // in a disabled state.
 func (c Context) Disabled() Context {
-	c.Queue = nil
+	c.Source = nil
 	return c
 }

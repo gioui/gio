@@ -51,7 +51,7 @@ func (p ProgressBarStyle) Layout(gtx layout.Context) layout.Dimensions {
 		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			fillWidth := int(float32(progressBarWidth) * clamp1(p.Progress))
 			fillColor := p.Color
-			if gtx.Queue == nil {
+			if gtx.Source == nil {
 				fillColor = f32color.Disabled(fillColor)
 			}
 			return shader(fillWidth, fillColor)

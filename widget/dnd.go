@@ -24,7 +24,7 @@ type Draggable struct {
 }
 
 func (d *Draggable) Layout(gtx layout.Context, w, drag layout.Widget) layout.Dimensions {
-	if gtx.Queue == nil {
+	if gtx.Source == nil {
 		return w(gtx)
 	}
 	dims := w(gtx)
@@ -56,7 +56,7 @@ func (d *Draggable) Dragging() bool {
 // requested to offer data, if any
 func (d *Draggable) Update(gtx layout.Context) (mime string, requested bool) {
 	pos := d.pos
-	for _, ev := range d.drag.Update(gtx.Metric, gtx.Queue, gesture.Both) {
+	for _, ev := range d.drag.Update(gtx.Metric, gtx.Source, gesture.Both) {
 		switch ev.Kind {
 		case pointer.Press:
 			d.click = ev.Position
@@ -67,7 +67,7 @@ func (d *Draggable) Update(gtx layout.Context) (mime string, requested bool) {
 	}
 	d.pos = pos
 
-	for _, ev := range gtx.Queue.Events(&d.handle) {
+	for _, ev := range gtx.Source.Events(&d.handle) {
 		if e, ok := ev.(transfer.RequestEvent); ok {
 			return e.Type, true
 		}

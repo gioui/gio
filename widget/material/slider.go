@@ -56,7 +56,7 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	trans.Pop()
 
 	color := s.Color
-	if gtx.Queue == nil {
+	if gtx.Source == nil {
 		color = f32color.Disabled(color)
 	}
 

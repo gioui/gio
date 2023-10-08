@@ -677,7 +677,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 		}
 		e.showCaret = e.focused && (!blinking || dt%timePerBlink < timePerBlink/2)
 	}
-	disabled := gtx.Queue == nil
+	disabled := gtx.Source == nil
 
 	semantic.Editor.Add(gtx.Ops)
 	if e.Len() > 0 {

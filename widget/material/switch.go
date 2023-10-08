@@ -55,7 +55,7 @@ func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
 	if s.Switch.Value {
 		col = s.Color.Enabled
 	}
-	if gtx.Queue == nil {
+	if gtx.Source == nil {
 		col = f32color.Disabled(col)
 	}
 	trackColor := s.Color.Track

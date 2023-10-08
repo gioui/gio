@@ -101,7 +101,7 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 	dims := w(gtx)
 	c := m.Stop()
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
-	enabled := gtx.Queue != nil
+	enabled := gtx.Source != nil
 	semantic.EnabledOp(enabled).Add(gtx.Ops)
 	b.click.Add(gtx.Ops)
 	if enabled {
@@ -119,7 +119,7 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 // clicks, if any.
 func (b *Clickable) Update(gtx layout.Context) []Click {
 	b.clicks = nil
-	if gtx.Queue == nil {
+	if gtx.Source == nil {
 		b.focused = false
 	}
 	if b.requestFocus {

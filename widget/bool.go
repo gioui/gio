@@ -46,7 +46,7 @@ func (b *Bool) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 	b.Update(gtx)
 	dims := b.clk.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		semantic.SelectedOp(b.Value).Add(gtx.Ops)
-		semantic.EnabledOp(gtx.Queue != nil).Add(gtx.Ops)
+		semantic.EnabledOp(gtx.Source != nil).Add(gtx.Ops)
 		return w(gtx)
 	})
 	return dims

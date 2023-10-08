@@ -34,7 +34,7 @@ func FuzzIME(f *testing.F) {
 		e.Focus()
 
 		var r input.Router
-		gtx := layout.Context{Ops: new(op.Ops), Queue: &r}
+		gtx := layout.Context{Ops: new(op.Ops), Source: &r}
 		// Layout once to register focus.
 		e.Layout(gtx, cache, font.Font{}, unit.Sp(10), op.CallOp{}, op.CallOp{})
 		r.Frame(gtx.Ops)

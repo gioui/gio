@@ -60,7 +60,7 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 					return layout.UniformInset(2).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 						size := gtx.Dp(c.Size)
 						col := c.IconColor
-						if gtx.Queue == nil {
+						if gtx.Source == nil {
 							col = f32color.Disabled(col)
 						}
 						gtx.Constraints.Min = image.Point{X: size}
