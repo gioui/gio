@@ -44,10 +44,6 @@ type GPU interface {
 	Clear(color color.NRGBA)
 	// Frame draws the graphics operations from op into a viewport of target.
 	Frame(frame *op.Ops, target RenderTarget, viewport image.Point) error
-	// Profile returns the last available profiling information. Profiling
-	// information is requested when Frame sees an io/profile.Op, and the result
-	// is available through Profile at some later time.
-	Profile() string
 }
 
 type gpu struct {
@@ -73,7 +69,6 @@ type renderer struct {
 }
 
 type drawOps struct {
-	profile      bool
 	reader       ops.Reader
 	states       []f32.Affine2D
 	transStack   []f32.Affine2D
@@ -399,7 +394,7 @@ func (g *gpu) collect(viewport image.Point, frameOps *op.Ops) {
 	g.renderer.pather.viewport = viewport
 	g.drawOps.reset(viewport)
 	g.drawOps.collect(frameOps, viewport)
-	if g.drawOps.profile && g.timers == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
+	if false && g.timers == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
 		g.frameStart = time.Now()
 		g.timers = newTimers(g.ctx)
 		g.stencilTimer = g.timers.newTimer()
@@ -444,7 +439,7 @@ func (g *gpu) frame(target RenderTarget) error {
 	g.cache.frame()
 	g.drawOps.pathCache.frame()
 	g.cleanupTimer.end()
-	if g.drawOps.profile && g.timers.ready() {
+	if false && g.timers.ready() {
 		st, covt, cleant := g.stencilTimer.Elapsed, g.coverTimer.Elapsed, g.cleanupTimer.Elapsed
 		ft := st + covt + cleant
 		q := 100 * time.Microsecond
@@ -895,7 +890,6 @@ func (r *renderer) drawLayers(layers []opacityLayer, ops []imageOp) {
 }
 
 func (d *drawOps) reset(viewport image.Point) {
-	d.profile = false
 	d.viewport = viewport
 	d.imageOps = d.imageOps[:0]
 	d.pathOps = d.pathOps[:0]
@@ -989,8 +983,6 @@ func (d *drawOps) collectOps(r *ops.Reader, viewport f32.Rectangle) {
 loop:
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
-		case ops.TypeProfile:
-			d.profile = true
 		case ops.TypeTransform:
 			dop, push := ops.DecodeTransform(encOp.Data)
 			if push {

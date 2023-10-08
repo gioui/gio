@@ -76,7 +76,6 @@ const (
 	TypeAux
 	TypeClip
 	TypePopClip
-	TypeProfile
 	TypeCursor
 	TypePath
 	TypeStroke
@@ -162,7 +161,6 @@ const (
 	TypeAuxLen              = 1
 	TypeClipLen             = 1 + 4*4 + 1 + 1
 	TypePopClipLen          = 1
-	TypeProfileLen          = 1
 	TypeCursorLen           = 2
 	TypePathLen             = 8 + 1
 	TypeStrokeLen           = 1 + 4
@@ -446,7 +444,6 @@ var opProps = [0x100]opProp{
 	TypeAux:              {Size: TypeAuxLen, NumRefs: 0},
 	TypeClip:             {Size: TypeClipLen, NumRefs: 0},
 	TypePopClip:          {Size: TypePopClipLen, NumRefs: 0},
-	TypeProfile:          {Size: TypeProfileLen, NumRefs: 1},
 	TypeCursor:           {Size: TypeCursorLen, NumRefs: 0},
 	TypePath:             {Size: TypePathLen, NumRefs: 0},
 	TypeStroke:           {Size: TypeStrokeLen, NumRefs: 0},
@@ -531,8 +528,6 @@ func (t OpType) String() string {
 		return "Clip"
 	case TypePopClip:
 		return "PopClip"
-	case TypeProfile:
-		return "Profile"
 	case TypeCursor:
 		return "Cursor"
 	case TypePath:

@@ -93,7 +93,6 @@ type compute struct {
 		}
 	}
 	timers struct {
-		profile string
 		t       *timers
 		compact *timer
 		render  *timer
@@ -176,7 +175,6 @@ type materialUniforms struct {
 
 type collector struct {
 	hasher     maphash.Hash
-	profile    bool
 	reader     ops.Reader
 	states     []f32.Affine2D
 	clear      bool
@@ -597,7 +595,7 @@ func (g *compute) frame(target RenderTarget) error {
 	defer g.ctx.EndFrame()
 
 	t := &g.timers
-	if g.collector.profile && t.t == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
+	if false && t.t == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
 		t.t = newTimers(g.ctx)
 		t.compact = t.t.newTimer()
 		t.render = t.t.newTimer()
@@ -631,13 +629,13 @@ func (g *compute) frame(target RenderTarget) error {
 		return err
 	}
 	t.compact.end()
-	if g.collector.profile && t.t.ready() {
+	if false && t.t.ready() {
 		com, ren, blit := t.compact.Elapsed, t.render.Elapsed, t.blit.Elapsed
 		ft := com + ren + blit
 		q := 100 * time.Microsecond
 		ft = ft.Round(q)
 		com, ren, blit = com.Round(q), ren.Round(q), blit.Round(q)
-		t.profile = fmt.Sprintf("ft:%7s com: %7s ren:%7s blit:%7s", ft, com, ren, blit)
+		// t.profile = fmt.Sprintf("ft:%7s com: %7s ren:%7s blit:%7s", ft, com, ren, blit)
 	}
 	return nil
 }
@@ -659,10 +657,6 @@ func (g *compute) dumpAtlases() {
 			panic(err)
 		}
 	}
-}
-
-func (g *compute) Profile() string {
-	return g.timers.profile
 }
 
 func (g *compute) compactAllocs() error {
@@ -1656,7 +1650,6 @@ func (e *encoder) line(start, end f32.Point) {
 
 func (c *collector) reset() {
 	c.prevFrame, c.frame = c.frame, c.prevFrame
-	c.profile = false
 	c.clipStates = c.clipStates[:0]
 	c.transStack = c.transStack[:0]
 	c.frame.reset()
@@ -1736,8 +1729,6 @@ func (c *collector) collect(root *op.Ops, viewport image.Point, texOps *[]textur
 	c.addClip(&state, fview, fview, nil, ops.Key{}, 0, 0, false)
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
-		case ops.TypeProfile:
-			c.profile = true
 		case ops.TypeTransform:
 			dop, push := ops.DecodeTransform(encOp.Data)
 			if push {

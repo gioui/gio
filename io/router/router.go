@@ -25,7 +25,6 @@ import (
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
-	"gioui.org/io/profile"
 	"gioui.org/io/semantic"
 	"gioui.org/io/system"
 	"gioui.org/io/transfer"
@@ -54,10 +53,6 @@ type Router struct {
 	// InvalidateOp summary.
 	wakeup     bool
 	wakeupTime time.Time
-
-	// ProfileOp summary.
-	profHandlers map[event.Tag]struct{}
-	profile      profile.Event
 }
 
 // SemanticNode represents a node in the tree describing the components
@@ -103,10 +98,6 @@ type handlerEvents struct {
 // Events returns the available events for the handler key.
 func (q *Router) Events(k event.Tag) []event.Event {
 	events := q.handlers.Events(k)
-	if _, isprof := q.profHandlers[k]; isprof {
-		delete(q.profHandlers, k)
-		events = append(events, q.profile)
-	}
 	return events
 }
 
@@ -116,9 +107,6 @@ func (q *Router) Events(k event.Tag) []event.Event {
 func (q *Router) Frame(frame *op.Ops) {
 	q.handlers.Clear()
 	q.wakeup = false
-	for k := range q.profHandlers {
-		delete(q.profHandlers, k)
-	}
 	var ops *ops.Ops
 	if frame != nil {
 		ops = &frame.Internal
@@ -157,8 +145,6 @@ func (q *Router) QueueTopmost(events ...key.Event) bool {
 func (q *Router) Queue(events ...event.Event) bool {
 	for _, e := range events {
 		switch e := e.(type) {
-		case profile.Event:
-			q.profile = e
 		case pointer.Event:
 			q.pointer.queue.Push(e, &q.handlers)
 		case key.Event:
@@ -388,12 +374,6 @@ func (q *Router) collect() {
 				q.wakeup = true
 				q.wakeupTime = op.At
 			}
-		case ops.TypeProfile:
-			op := decodeProfileOp(encOp.Data, encOp.Refs)
-			if q.profHandlers == nil {
-				q.profHandlers = make(map[event.Tag]struct{})
-			}
-			q.profHandlers[op.Tag] = struct{}{}
 		case ops.TypeClipboardRead:
 			q.cqueue.ProcessReadClipboard(encOp.Refs)
 		case ops.TypeClipboardWrite:
@@ -556,12 +536,6 @@ func (q *Router) collect() {
 	}
 }
 
-// Profiling reports whether there was profile handlers in the
-// most recent Frame call.
-func (q *Router) Profiling() bool {
-	return len(q.profHandlers) > 0
-}
-
 // WakeupTime returns the most recent time for doing another frame,
 // as determined from the last call to Frame.
 func (q *Router) WakeupTime() (time.Time, bool) {
@@ -601,15 +575,6 @@ func (h *handlerEvents) Events(k event.Tag) []event.Event {
 func (h *handlerEvents) Clear() {
 	for k := range h.handlers {
 		delete(h.handlers, k)
-	}
-}
-
-func decodeProfileOp(d []byte, refs []interface{}) profile.Op {
-	if ops.OpType(d[0]) != ops.TypeProfile {
-		panic("invalid op")
-	}
-	return profile.Op{
-		Tag: refs[0].(event.Tag),
 	}
 }
 

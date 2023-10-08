@@ -21,7 +21,6 @@ import (
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
-	"gioui.org/io/profile"
 	"gioui.org/io/router"
 	"gioui.org/io/system"
 	"gioui.org/layout"
@@ -308,7 +307,7 @@ func (w *Window) frame(frame *op.Ops, viewport image.Point) error {
 	return w.gpu.Frame(frame, target, viewport)
 }
 
-func (w *Window) processFrame(d driver, frameStart time.Time) {
+func (w *Window) processFrame(d driver) {
 	for k := range w.semantic.ids {
 		delete(w.semantic.ids, k)
 	}
@@ -335,13 +334,6 @@ func (w *Window) processFrame(d driver, frameStart time.Time) {
 	if newState != oldState {
 		w.imeState = newState
 		d.EditorStateChanged(oldState, newState)
-	}
-	if q.Profiling() && w.gpu != nil {
-		frameDur := time.Since(frameStart)
-		frameDur = frameDur.Truncate(100 * time.Microsecond)
-		quantum := 100 * time.Microsecond
-		timings := fmt.Sprintf("tot:%7s %s", frameDur.Round(quantum), w.gpu.Profile())
-		q.Queue(profile.Event{Timings: timings})
 	}
 	if t, ok := q.WakeupTime(); ok {
 		w.setNextFrame(t)
@@ -844,10 +836,6 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 			break
 		}
 		w.metric = e2.Metric
-		var frameStart time.Time
-		if w.queue.q.Profiling() {
-			frameStart = time.Now()
-		}
 		w.hasNextFrame = false
 		e2.Frame = w.update
 		e2.Queue = &w.queue
@@ -891,7 +879,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 			close(w.destroy)
 			break
 		}
-		w.processFrame(d, frameStart)
+		w.processFrame(d)
 		w.updateCursor(d)
 	case system.DestroyEvent:
 		w.destroyGPU()
