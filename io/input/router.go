@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 /*
-Package router implements Router, a event.Queue implementation
-that that disambiguates and routes events to handlers declared
+Package input implements Router, an event.Queue implementation
+that disambiguates and routes events to handlers declared
 in operation lists.
 
 Router is used by app.Window and is otherwise only useful for
 using Gio with external window implementations.
 */
-package router
+package input
 
 import (
 	"encoding/binary"

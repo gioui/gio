@@ -7,8 +7,8 @@ import (
 
 	"gioui.org/font"
 	"gioui.org/font/gofont"
+	"gioui.org/io/input"
 	"gioui.org/io/key"
-	"gioui.org/io/router"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/text"
@@ -34,7 +34,7 @@ func TestSelectableZeroValue(t *testing.T) {
 
 // Verify that an existing selection is dismissed when you press arrow keys.
 func TestSelectableMove(t *testing.T) {
-	r := new(router.Router)
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops:    new(op.Ops),
 		Locale: english,

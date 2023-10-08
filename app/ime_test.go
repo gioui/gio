@@ -11,8 +11,8 @@ import (
 
 	"gioui.org/font"
 	"gioui.org/font/gofont"
+	"gioui.org/io/input"
 	"gioui.org/io/key"
-	"gioui.org/io/router"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/text"
@@ -33,7 +33,7 @@ func FuzzIME(f *testing.F) {
 		e := new(widget.Editor)
 		e.Focus()
 
-		var r router.Router
+		var r input.Router
 		gtx := layout.Context{Ops: new(op.Ops), Queue: &r}
 		// Layout once to register focus.
 		e.Layout(gtx, cache, font.Font{}, unit.Sp(10), op.CallOp{}, op.CallOp{})

@@ -7,8 +7,8 @@ import (
 	"image"
 
 	"gioui.org/f32"
+	"gioui.org/io/input"
 	"gioui.org/io/pointer"
-	"gioui.org/io/router"
 	"gioui.org/io/transfer"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -21,7 +21,7 @@ func ExampleClickable_passthrough() {
 	// pointer events can be passed down for the underlying
 	// widgets to pick them up.
 	var button1, button2 widget.Clickable
-	var r router.Router
+	var r input.Router
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
@@ -71,7 +71,7 @@ func ExampleClickable_passthrough() {
 }
 
 func ExampleDraggable_Layout() {
-	var r router.Router
+	var r input.Router
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),

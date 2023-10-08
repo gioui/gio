@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"gioui.org/app"
+	"gioui.org/io/input"
 	"gioui.org/io/key"
-	"gioui.org/io/router"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/widget"
@@ -17,7 +17,7 @@ import (
 func TestClickable(t *testing.T) {
 	var (
 		ops op.Ops
-		r   router.Router
+		r   input.Router
 		b1  widget.Clickable
 		b2  widget.Clickable
 	)

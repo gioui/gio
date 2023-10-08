@@ -138,9 +138,9 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/io/clipboard"
+	"gioui.org/io/input"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
-	"gioui.org/io/router"
 	"gioui.org/io/semantic"
 	"gioui.org/io/system"
 	"gioui.org/unit"
@@ -164,10 +164,10 @@ type window struct {
 	config Config
 
 	semantic struct {
-		hoverID router.SemanticID
-		rootID  router.SemanticID
-		focusID router.SemanticID
-		diffs   []router.SemanticID
+		hoverID input.SemanticID
+		rootID  input.SemanticID
+		focusID input.SemanticID
+		diffs   []input.SemanticID
 	}
 }
 
@@ -661,7 +661,7 @@ func Java_org_gioui_GioView_onClearA11yFocus(env *C.JNIEnv, class C.jclass, view
 	}
 }
 
-func (w *window) initAccessibilityNodeInfo(env *C.JNIEnv, sem router.SemanticNode, off image.Point, info C.jobject) error {
+func (w *window) initAccessibilityNodeInfo(env *C.JNIEnv, sem input.SemanticNode, off image.Point, info C.jobject) error {
 	for _, ch := range sem.Children {
 		err := callVoidMethod(env, info, android.accessibilityNodeInfo.addChild, jvalue(w.view), jvalue(w.virtualIDFor(ch.ID)))
 		if err != nil {
@@ -704,7 +704,7 @@ func (w *window) initAccessibilityNodeInfo(env *C.JNIEnv, sem router.SemanticNod
 			panic(err)
 		}
 	}
-	if d.Gestures&router.ClickGesture != 0 {
+	if d.Gestures&input.ClickGesture != 0 {
 		addAction(ACTION_CLICK)
 	}
 	clsName := android.strings.androidViewView
@@ -749,18 +749,18 @@ func (w *window) initAccessibilityNodeInfo(env *C.JNIEnv, sem router.SemanticNod
 	return nil
 }
 
-func (w *window) virtualIDFor(id router.SemanticID) C.jint {
+func (w *window) virtualIDFor(id input.SemanticID) C.jint {
 	if id == w.semantic.rootID {
 		return HOST_VIEW_ID
 	}
 	return C.jint(id)
 }
 
-func (w *window) semIDFor(virtID C.jint) router.SemanticID {
+func (w *window) semIDFor(virtID C.jint) input.SemanticID {
 	if virtID == HOST_VIEW_ID {
 		return w.semantic.rootID
 	}
-	return router.SemanticID(virtID)
+	return input.SemanticID(virtID)
 }
 
 func (w *window) detach(env *C.JNIEnv) {

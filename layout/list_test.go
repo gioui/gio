@@ -8,8 +8,8 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/io/event"
+	"gioui.org/io/input"
 	"gioui.org/io/pointer"
-	"gioui.org/io/router"
 	"gioui.org/op"
 )
 
@@ -64,7 +64,7 @@ func TestListScrollToEnd(t *testing.T) {
 
 func TestListPosition(t *testing.T) {
 	_s := func(e ...event.Event) []event.Event { return e }
-	r := new(router.Router)
+	r := new(input.Router)
 	gtx := Context{
 		Ops: new(op.Ops),
 		Constraints: Constraints{

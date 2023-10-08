@@ -9,8 +9,8 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/io/event"
+	"gioui.org/io/input"
 	"gioui.org/io/pointer"
-	"gioui.org/io/router"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 )
@@ -22,7 +22,7 @@ func TestHover(t *testing.T) {
 	stack := clip.Rect(rect).Push(ops)
 	h.Add(ops)
 	stack.Pop()
-	r := new(router.Router)
+	r := new(input.Router)
 	r.Frame(ops)
 
 	r.Queue(
@@ -71,7 +71,7 @@ func TestMouseClicks(t *testing.T) {
 			var ops op.Ops
 			click.Add(&ops)
 
-			var r router.Router
+			var r input.Router
 			r.Frame(&ops)
 			r.Queue(tc.events...)
 

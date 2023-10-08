@@ -20,9 +20,9 @@ import (
 	"gioui.org/font"
 	"gioui.org/font/gofont"
 	"gioui.org/font/opentype"
+	"gioui.org/io/input"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
-	"gioui.org/io/router"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -96,7 +96,7 @@ func assertContents(t *testing.T, e *Editor, contents string, selectionStart, se
 // TestEditorReadOnly ensures that mouse and keyboard interactions with readonly
 // editors do nothing but manipulate the text selection.
 func TestEditorReadOnly(t *testing.T) {
-	r := new(router.Router)
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops: new(op.Ops),
 		Constraints: layout.Constraints{
@@ -501,7 +501,7 @@ func TestEditorLigature(t *testing.T) {
 
 func TestEditorDimensions(t *testing.T) {
 	e := new(Editor)
-	r := new(router.Router)
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Constraints{Max: image.Pt(100, 100)},
@@ -887,7 +887,7 @@ f 2 4 6 8 f
 g 2 4 6 8 g
 `)
 
-	r := new(router.Router)
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops:    new(op.Ops),
 		Locale: english,
@@ -987,7 +987,7 @@ func TestSelectMove(t *testing.T) {
 	e := new(Editor)
 	e.SetText(`0123456789`)
 
-	r := new(router.Router)
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops:    new(op.Ops),
 		Locale: english,
@@ -1076,7 +1076,7 @@ func TestEditor_MaxLen(t *testing.T) {
 	}
 
 	e.SetText("2345678")
-	r := new(router.Router)
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
@@ -1112,7 +1112,7 @@ func TestEditor_Filter(t *testing.T) {
 	}
 
 	e.SetText("2345678")
-	r := new(router.Router)
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
@@ -1142,7 +1142,7 @@ func TestEditor_Submit(t *testing.T) {
 	e := new(Editor)
 	e.Submit = true
 
-	r := new(router.Router)
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),

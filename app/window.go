@@ -19,9 +19,9 @@ import (
 	"gioui.org/internal/debug"
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
+	"gioui.org/io/input"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
-	"gioui.org/io/router"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -76,7 +76,7 @@ type Window struct {
 	// metric is the metric from the most recent frame.
 	metric unit.Metric
 
-	queue       router.Router
+	queue       input.Router
 	cursor      pointer.Cursor
 	decorations struct {
 		op.Ops
@@ -101,10 +101,10 @@ type Window struct {
 	semantic struct {
 		// uptodate tracks whether the fields below are up to date.
 		uptodate bool
-		root     router.SemanticID
-		prevTree []router.SemanticNode
-		tree     []router.SemanticNode
-		ids      map[router.SemanticID]router.SemanticNode
+		root     input.SemanticID
+		prevTree []input.SemanticNode
+		tree     []input.SemanticNode
+		ids      map[input.SemanticID]input.SemanticNode
 	}
 
 	imeState editorState
@@ -121,7 +121,7 @@ type Window struct {
 }
 
 type editorState struct {
-	router.EditorState
+	input.EditorState
 	compose key.Range
 }
 
@@ -188,7 +188,7 @@ func NewWindow(options ...Option) *Window {
 	w.decorations.enabled = cnf.Decorated
 	w.decorations.height = decoHeight
 	w.imeState.compose = key.Range{Start: -1, End: -1}
-	w.semantic.ids = make(map[router.SemanticID]router.SemanticNode)
+	w.semantic.ids = make(map[input.SemanticID]input.SemanticNode)
 	w.callbacks.w = w
 	w.eventState.initialOpts = options
 	return w
@@ -308,9 +308,9 @@ func (w *Window) processFrame(d driver) {
 	w.semantic.uptodate = false
 	q := &w.queue
 	switch q.TextInputState() {
-	case router.TextInputOpen:
+	case input.TextInputOpen:
 		d.ShowTextInput(true)
-	case router.TextInputClose:
+	case input.TextInputClose:
 		d.ShowTextInput(false)
 	}
 	if hint, ok := q.TextInputHint(); ok {
@@ -501,19 +501,19 @@ func (c *callbacks) Event(e event.Event) bool {
 }
 
 // SemanticRoot returns the ID of the semantic root.
-func (c *callbacks) SemanticRoot() router.SemanticID {
+func (c *callbacks) SemanticRoot() input.SemanticID {
 	c.w.updateSemantics()
 	return c.w.semantic.root
 }
 
 // LookupSemantic looks up a semantic node from an ID. The zero ID denotes the root.
-func (c *callbacks) LookupSemantic(semID router.SemanticID) (router.SemanticNode, bool) {
+func (c *callbacks) LookupSemantic(semID input.SemanticID) (input.SemanticNode, bool) {
 	c.w.updateSemantics()
 	n, found := c.w.semantic.ids[semID]
 	return n, found
 }
 
-func (c *callbacks) AppendSemanticDiffs(diffs []router.SemanticID) []router.SemanticID {
+func (c *callbacks) AppendSemanticDiffs(diffs []input.SemanticID) []input.SemanticID {
 	c.w.updateSemantics()
 	if tree := c.w.semantic.prevTree; len(tree) > 0 {
 		c.w.collectSemanticDiffs(&diffs, c.w.semantic.prevTree[0])
@@ -521,7 +521,7 @@ func (c *callbacks) AppendSemanticDiffs(diffs []router.SemanticID) []router.Sema
 	return diffs
 }
 
-func (c *callbacks) SemanticAt(pos f32.Point) (router.SemanticID, bool) {
+func (c *callbacks) SemanticAt(pos f32.Point) (input.SemanticID, bool) {
 	c.w.updateSemantics()
 	return c.w.queue.SemanticAt(pos)
 }
@@ -565,19 +565,19 @@ func (c *callbacks) SetEditorSnippet(r key.Range) {
 	c.Event(key.SnippetEvent(r))
 }
 
-func (w *Window) moveFocus(dir router.FocusDirection, d driver) {
+func (w *Window) moveFocus(dir input.FocusDirection, d driver) {
 	if w.queue.MoveFocus(dir) {
 		w.queue.RevealFocus(w.viewport)
 	} else {
 		var v image.Point
 		switch dir {
-		case router.FocusRight:
+		case input.FocusRight:
 			v = image.Pt(+1, 0)
-		case router.FocusLeft:
+		case input.FocusLeft:
 			v = image.Pt(-1, 0)
-		case router.FocusDown:
+		case input.FocusDown:
 			v = image.Pt(0, +1)
-		case router.FocusUp:
+		case input.FocusUp:
 			v = image.Pt(0, -1)
 		default:
 			return
@@ -767,7 +767,7 @@ func (w *Window) updateSemantics() {
 }
 
 // collectSemanticDiffs traverses the previous semantic tree, noting changed nodes.
-func (w *Window) collectSemanticDiffs(diffs *[]router.SemanticID, n router.SemanticNode) {
+func (w *Window) collectSemanticDiffs(diffs *[]input.SemanticID, n input.SemanticNode) {
 	newNode, exists := w.semantic.ids[n.ID]
 	// Ignore deleted nodes, as their disappearance will be reported through an
 	// ancestor node.
@@ -895,17 +895,17 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 				isMobile := runtime.GOOS == "ios" || runtime.GOOS == "android"
 				switch {
 				case e.Name == key.NameTab && e.Modifiers == 0:
-					w.moveFocus(router.FocusForward, d)
+					w.moveFocus(input.FocusForward, d)
 				case e.Name == key.NameTab && e.Modifiers == key.ModShift:
-					w.moveFocus(router.FocusBackward, d)
+					w.moveFocus(input.FocusBackward, d)
 				case e.Name == key.NameUpArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(router.FocusUp, d)
+					w.moveFocus(input.FocusUp, d)
 				case e.Name == key.NameDownArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(router.FocusDown, d)
+					w.moveFocus(input.FocusDown, d)
 				case e.Name == key.NameLeftArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(router.FocusLeft, d)
+					w.moveFocus(input.FocusLeft, d)
 				case e.Name == key.NameRightArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(router.FocusRight, d)
+					w.moveFocus(input.FocusRight, d)
 				default:
 					handled = false
 				}

@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"gioui.org/f32"
+	"gioui.org/io/input"
 	"gioui.org/io/pointer"
-	"gioui.org/io/router"
 	"gioui.org/io/transfer"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -14,7 +14,7 @@ import (
 )
 
 func TestDraggable(t *testing.T) {
-	var r router.Router
+	var r input.Router
 	gtx := layout.Context{
 		Constraints: layout.Exact(image.Pt(100, 100)),
 		Queue:       &r,

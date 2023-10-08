@@ -8,8 +8,8 @@ import (
 
 	"gioui.org/app"
 	"gioui.org/f32"
+	"gioui.org/io/input"
 	"gioui.org/io/pointer"
-	"gioui.org/io/router"
 	"gioui.org/io/semantic"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -19,7 +19,7 @@ import (
 func TestBool(t *testing.T) {
 	var (
 		ops op.Ops
-		r   router.Router
+		r   input.Router
 		b   widget.Bool
 	)
 	gtx := app.NewContext(&ops, app.FrameEvent{Queue: &r})

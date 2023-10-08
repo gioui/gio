@@ -1,4 +1,6 @@
-package router
+// SPDX-License-Identifier: Unlicense OR MIT
+
+package input
 
 import (
 	"testing"
