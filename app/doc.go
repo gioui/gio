@@ -17,12 +17,10 @@ FrameEvent that prompts an update of the window contents.
 
 For example:
 
-	import "gioui.org/unit"
-
 	w := app.NewWindow()
 	for {
 		e := w.NextEvent()
-		if e, ok := e.(system.FrameEvent); ok {
+		if e, ok := e.(app.FrameEvent); ok {
 			ops.Reset()
 			// Add operations to ops.
 			...

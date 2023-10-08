@@ -666,7 +666,7 @@ func (w *window) draw(sync bool) {
 	}
 
 	w.w.Event(frameEvent{
-		FrameEvent: system.FrameEvent{
+		FrameEvent: FrameEvent{
 			Now:    time.Now(),
 			Size:   size,
 			Insets: insets,
@@ -676,10 +676,10 @@ func (w *window) draw(sync bool) {
 	})
 }
 
-func (w *window) getConfig() (image.Point, system.Insets, unit.Metric) {
+func (w *window) getConfig() (image.Point, Insets, unit.Metric) {
 	invscale := unit.Dp(1. / w.scale)
 	return image.Pt(w.config.Size.X, w.config.Size.Y),
-		system.Insets{
+		Insets{
 			Bottom: unit.Dp(w.inset.Y) * invscale,
 			Right:  unit.Dp(w.inset.X) * invscale,
 		}, unit.Metric{

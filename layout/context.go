@@ -3,7 +3,6 @@
 package layout
 
 import (
-	"image"
 	"time"
 
 	"gioui.org/io/event"
@@ -33,43 +32,6 @@ type Context struct {
 	Locale system.Locale
 
 	*op.Ops
-}
-
-// NewContext is a shorthand for
-//
-//	Context{
-//	  Ops: ops,
-//	  Now: e.Now,
-//	  Queue: e.Queue,
-//	  Config: e.Config,
-//	  Constraints: Exact(e.Size),
-//	}
-//
-// NewContext calls ops.Reset and adjusts ops for e.Insets.
-func NewContext(ops *op.Ops, e system.FrameEvent) Context {
-	ops.Reset()
-
-	size := e.Size
-
-	if e.Insets != (system.Insets{}) {
-		left := e.Metric.Dp(e.Insets.Left)
-		top := e.Metric.Dp(e.Insets.Top)
-		op.Offset(image.Point{
-			X: left,
-			Y: top,
-		}).Add(ops)
-
-		size.X -= left + e.Metric.Dp(e.Insets.Right)
-		size.Y -= top + e.Metric.Dp(e.Insets.Bottom)
-	}
-
-	return Context{
-		Ops:         ops,
-		Now:         e.Now,
-		Queue:       e.Queue,
-		Metric:      e.Metric,
-		Constraints: Exact(size),
-	}
 }
 
 // Dp converts v to pixels.

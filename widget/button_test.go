@@ -6,9 +6,9 @@ import (
 	"image"
 	"testing"
 
+	"gioui.org/app"
 	"gioui.org/io/key"
 	"gioui.org/io/router"
-	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/widget"
@@ -21,7 +21,7 @@ func TestClickable(t *testing.T) {
 		b1  widget.Clickable
 		b2  widget.Clickable
 	)
-	gtx := layout.NewContext(&ops, system.FrameEvent{Queue: &r})
+	gtx := app.NewContext(&ops, app.FrameEvent{Queue: &r})
 	layout := func() {
 		b1.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			return layout.Dimensions{Size: image.Pt(100, 100)}

@@ -156,13 +156,13 @@ func (w *window) draw(sync bool) {
 	}
 	dppp := unit.Dp(1. / m.PxPerDp)
 	w.w.Event(frameEvent{
-		FrameEvent: system.FrameEvent{
+		FrameEvent: FrameEvent{
 			Now: time.Now(),
 			Size: image.Point{
 				X: int(params.width + .5),
 				Y: int(params.height + .5),
 			},
-			Insets: system.Insets{
+			Insets: Insets{
 				Top:    unit.Dp(params.top) * dppp,
 				Bottom: unit.Dp(params.bottom) * dppp,
 				Left:   unit.Dp(params.left) * dppp,

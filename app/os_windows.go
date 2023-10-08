@@ -621,7 +621,7 @@ func (w *window) draw(sync bool) {
 	dpi := windows.GetWindowDPI(w.hwnd)
 	cfg := configForDPI(dpi)
 	w.w.Event(frameEvent{
-		FrameEvent: system.FrameEvent{
+		FrameEvent: FrameEvent{
 			Now:    time.Now(),
 			Size:   w.config.Size,
 			Metric: cfg,

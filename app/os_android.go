@@ -836,14 +836,14 @@ func (w *window) draw(env *C.JNIEnv, sync bool) {
 	const inchPrDp = 1.0 / 160
 	ppdp := float32(w.dpi) * inchPrDp
 	dppp := unit.Dp(1.0 / ppdp)
-	insets := system.Insets{
+	insets := Insets{
 		Top:    unit.Dp(w.insets.top) * dppp,
 		Bottom: unit.Dp(w.insets.bottom) * dppp,
 		Left:   unit.Dp(w.insets.left) * dppp,
 		Right:  unit.Dp(w.insets.right) * dppp,
 	}
 	w.callbacks.Event(frameEvent{
-		FrameEvent: system.FrameEvent{
+		FrameEvent: FrameEvent{
 			Now:    time.Now(),
 			Size:   w.config.Size,
 			Insets: insets,

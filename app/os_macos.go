@@ -777,7 +777,7 @@ func (w *window) draw() {
 	cfg := configFor(w.scale)
 	w.setStage(system.StageRunning)
 	w.w.Event(frameEvent{
-		FrameEvent: system.FrameEvent{
+		FrameEvent: FrameEvent{
 			Now:    time.Now(),
 			Size:   w.config.Size,
 			Metric: cfg,

@@ -994,7 +994,7 @@ func (w *Window) fallbackDecorate() bool {
 }
 
 // decorate the window if enabled and returns the corresponding Insets.
-func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) (size, offset image.Point) {
+func (w *Window) decorate(d driver, e FrameEvent, o *op.Ops) (size, offset image.Point) {
 	if !w.fallbackDecorate() {
 		return e.Size, image.Pt(0, 0)
 	}

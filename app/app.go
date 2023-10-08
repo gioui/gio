@@ -3,9 +3,16 @@
 package app
 
 import (
+	"image"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"gioui.org/io/event"
+	"gioui.org/layout"
+	"gioui.org/op"
+	"gioui.org/unit"
 )
 
 // extraArgs contains extra arguments to append to
@@ -30,13 +37,68 @@ var extraArgs string
 // is not supported. Default value of ID is filepath.Base(os.Args[0]).
 var ID = ""
 
-func init() {
-	if extraArgs != "" {
-		args := strings.Split(extraArgs, "|")
-		os.Args = append(os.Args, args...)
+// A FrameEvent requests a new frame in the form of a list of
+// operations that describes what to display and how to handle
+// input.
+type FrameEvent struct {
+	// Now is the current animation. Use Now instead of time.Now to
+	// synchronize animation and to avoid the time.Now call overhead.
+	Now time.Time
+	// Metric converts device independent dp and sp to device pixels.
+	Metric unit.Metric
+	// Size is the dimensions of the window.
+	Size image.Point
+	// Insets represent the space occupied by system decorations and controls.
+	Insets Insets
+	// Frame completes the FrameEvent by drawing the graphical operations
+	// from ops into the window.
+	Frame func(frame *op.Ops)
+	// Queue supplies the events for event handlers.
+	Queue event.Queue
+}
+
+// Insets is the space taken up by
+// system decoration such as translucent
+// system bars and software keyboards.
+type Insets struct {
+	// Values are in pixels.
+	Top, Bottom, Left, Right unit.Dp
+}
+
+// NewContext is a shorthand for
+//
+//	layout.Context{
+//	  Ops: ops,
+//	  Now: e.Now,
+//	  Queue: e.Queue,
+//	  Config: e.Config,
+//	  Constraints: layout.Exact(e.Size),
+//	}
+//
+// NewContext calls ops.Reset and adjusts ops for e.Insets.
+func NewContext(ops *op.Ops, e FrameEvent) layout.Context {
+	ops.Reset()
+
+	size := e.Size
+
+	if e.Insets != (Insets{}) {
+		left := e.Metric.Dp(e.Insets.Left)
+		top := e.Metric.Dp(e.Insets.Top)
+		op.Offset(image.Point{
+			X: left,
+			Y: top,
+		}).Add(ops)
+
+		size.X -= left + e.Metric.Dp(e.Insets.Right)
+		size.Y -= top + e.Metric.Dp(e.Insets.Bottom)
 	}
-	if ID == "" {
-		ID = filepath.Base(os.Args[0])
+
+	return layout.Context{
+		Ops:         ops,
+		Now:         e.Now,
+		Queue:       e.Queue,
+		Metric:      e.Metric,
+		Constraints: layout.Exact(size),
 	}
 }
 
@@ -62,4 +124,16 @@ func DataDir() (string, error) {
 // running windows.
 func Main() {
 	osMain()
+}
+
+func (FrameEvent) ImplementsEvent() {}
+
+func init() {
+	if extraArgs != "" {
+		args := strings.Split(extraArgs, "|")
+		os.Args = append(os.Args, args...)
+	}
+	if ID == "" {
+		ID = filepath.Base(os.Args[0])
+	}
 }

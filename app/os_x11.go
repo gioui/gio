@@ -458,7 +458,7 @@ loop:
 
 		if (anim || syn) && w.config.Size.X != 0 && w.config.Size.Y != 0 {
 			w.w.Event(frameEvent{
-				FrameEvent: system.FrameEvent{
+				FrameEvent: FrameEvent{
 					Now:    time.Now(),
 					Size:   w.config.Size,
 					Metric: w.metric,

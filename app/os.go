@@ -132,7 +132,7 @@ func (o Orientation) String() string {
 }
 
 type frameEvent struct {
-	system.FrameEvent
+	FrameEvent
 
 	Sync bool
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"gioui.org/io/system"
+	"gioui.org/app"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/unit"
@@ -15,7 +15,7 @@ import (
 
 func TestListAnchorStrategies(t *testing.T) {
 	var ops op.Ops
-	gtx := layout.NewContext(&ops, system.FrameEvent{
+	gtx := app.NewContext(&ops, app.FrameEvent{
 		Metric: unit.Metric{
 			PxPerDp: 1,
 			PxPerSp: 1,
