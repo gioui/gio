@@ -76,7 +76,7 @@ type Window struct {
 	// metric is the metric from the most recent frame.
 	metric unit.Metric
 
-	queue       queue
+	queue       router.Router
 	cursor      pointer.Cursor
 	decorations struct {
 		op.Ops
@@ -130,12 +130,6 @@ type callbacks struct {
 	d          driver
 	busy       bool
 	waitEvents []event.Event
-}
-
-// queue is an event.Queue implementation that distributes system events
-// to the input handlers declared in the most recent frame.
-type queue struct {
-	q router.Router
 }
 
 // NewWindow creates a new window for a set of window
@@ -279,7 +273,7 @@ func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame
 				return err
 			}
 		}
-		w.queue.q.Frame(frame)
+		w.queue.Frame(frame)
 		// Let the client continue as soon as possible, in particular before
 		// a potentially blocking Present.
 		signal()
@@ -312,7 +306,7 @@ func (w *Window) processFrame(d driver) {
 		delete(w.semantic.ids, k)
 	}
 	w.semantic.uptodate = false
-	q := &w.queue.q
+	q := &w.queue
 	switch q.TextInputState() {
 	case router.TextInputOpen:
 		d.ShowTextInput(true)
@@ -529,7 +523,7 @@ func (c *callbacks) AppendSemanticDiffs(diffs []router.SemanticID) []router.Sema
 
 func (c *callbacks) SemanticAt(pos f32.Point) (router.SemanticID, bool) {
 	c.w.updateSemantics()
-	return c.w.queue.q.SemanticAt(pos)
+	return c.w.queue.SemanticAt(pos)
 }
 
 func (c *callbacks) EditorState() editorState {
@@ -572,8 +566,8 @@ func (c *callbacks) SetEditorSnippet(r key.Range) {
 }
 
 func (w *Window) moveFocus(dir router.FocusDirection, d driver) {
-	if w.queue.q.MoveFocus(dir) {
-		w.queue.q.RevealFocus(w.viewport)
+	if w.queue.MoveFocus(dir) {
+		w.queue.RevealFocus(w.viewport)
 	} else {
 		var v image.Point
 		switch dir {
@@ -590,18 +584,18 @@ func (w *Window) moveFocus(dir router.FocusDirection, d driver) {
 		}
 		const scrollABit = unit.Dp(50)
 		dist := v.Mul(int(w.metric.Dp(scrollABit)))
-		w.queue.q.ScrollFocus(dist)
+		w.queue.ScrollFocus(dist)
 	}
 }
 
 func (c *callbacks) ClickFocus() {
-	c.w.queue.q.ClickFocus()
+	c.w.queue.ClickFocus()
 	c.w.setNextFrame(time.Time{})
 	c.w.updateAnimation(c.d)
 }
 
 func (c *callbacks) ActionAt(p f32.Point) (system.Action, bool) {
-	return c.w.queue.q.ActionAt(p)
+	return c.w.queue.ActionAt(p)
 }
 
 func (e *editorState) Replace(r key.Range, text string) {
@@ -765,7 +759,7 @@ func (w *Window) updateSemantics() {
 	}
 	w.semantic.uptodate = true
 	w.semantic.prevTree, w.semantic.tree = w.semantic.tree, w.semantic.prevTree
-	w.semantic.tree = w.queue.q.AppendSemantics(w.semantic.tree[:0])
+	w.semantic.tree = w.queue.AppendSemantics(w.semantic.tree[:0])
 	w.semantic.root = w.semantic.tree[0].ID
 	for _, n := range w.semantic.tree {
 		w.semantic.ids[n.ID] = n
@@ -855,7 +849,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		}
 		// Scroll to focus if viewport is shrinking in any dimension.
 		if old, new := w.viewport.Size(), viewport.Size(); new.X < old.X || new.Y < old.Y {
-			w.queue.q.RevealFocus(viewport)
+			w.queue.RevealFocus(viewport)
 		}
 		w.viewport = viewport
 		viewSize := e2.Size
@@ -894,7 +888,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		w.out <- e2
 	case wakeupEvent:
 	case event.Event:
-		handled := w.queue.q.Queue(e2)
+		handled := w.queue.Queue(e2)
 		if e, ok := e.(key.Event); ok && !handled {
 			if e.State == key.Press {
 				handled = true
@@ -919,7 +913,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 			// As a special case, the top-most input handler receives all unhandled
 			// events.
 			if !handled {
-				handled = w.queue.q.QueueTopmost(e)
+				handled = w.queue.QueueTopmost(e)
 			}
 		}
 		w.updateCursor(d)
@@ -982,7 +976,7 @@ func (w *Window) NextEvent() event.Event {
 }
 
 func (w *Window) updateCursor(d driver) {
-	if c := w.queue.q.Cursor(); c != w.cursor {
+	if c := w.queue.Cursor(); c != w.cursor {
 		w.cursor = c
 		d.SetCursor(c)
 	}
@@ -1071,10 +1065,6 @@ func (w *Window) Perform(actions system.Action) {
 			return
 		}
 	}
-}
-
-func (q *queue) Events(k event.Tag) []event.Event {
-	return q.q.Events(k)
 }
 
 // Title sets the title of the window.
