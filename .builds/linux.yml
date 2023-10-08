@@ -67,11 +67,6 @@ tasks:
      CGO_ENABLED=1 GOARCH=386 go test ./...
      GOOS=windows go test -exec=wine ./...
      GOOS=js GOARCH=wasm go build -o /dev/null ./...
- - install_chrome: |
-     curl -s https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-     sudo sh -c 'echo "deb [arch=amd64] https://dl-ssl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
-     sudo apt-get -qq update
-     sudo apt-get -qq install -y google-chrome-stable
  - install_jdk8: |
      curl -so jdk.deb "https://cdn.azul.com/zulu/bin/zulu8.42.0.21-ca-jdk8.0.232-linux_amd64.deb"
      sudo apt-get -qq install -y -f ./jdk.deb
