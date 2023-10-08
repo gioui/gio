@@ -8,6 +8,7 @@ import (
 	"gioui.org/font"
 	"gioui.org/font/gofont"
 	"gioui.org/io/key"
+	"gioui.org/io/router"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/text"
@@ -33,9 +34,11 @@ func TestSelectableZeroValue(t *testing.T) {
 
 // Verify that an existing selection is dismissed when you press arrow keys.
 func TestSelectableMove(t *testing.T) {
+	r := new(router.Router)
 	gtx := layout.Context{
 		Ops:    new(op.Ops),
 		Locale: english,
+		Queue:  r,
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fnt := font.Font{}
@@ -44,13 +47,18 @@ func TestSelectableMove(t *testing.T) {
 	str := `0123456789`
 
 	// Layout once to populate e.lines and get focus.
-	gtx.Queue = newQueue(key.FocusEvent{Focus: true})
 	s := new(Selectable)
 
+	s.Focus()
 	s.SetText(str)
+	// Set up selection so the Selectable filters for all 4 directional keys.
 	s.Layout(gtx, cache, font.Font{}, fontSize, op.CallOp{}, op.CallOp{})
+	r.Frame(gtx.Ops)
+	s.SetCaret(3, 6)
+	s.Layout(gtx, cache, font.Font{}, fontSize, op.CallOp{}, op.CallOp{})
+	r.Frame(gtx.Ops)
 
-	testKey := func(keyName string) {
+	for _, keyName := range []string{key.NameLeftArrow, key.NameRightArrow, key.NameUpArrow, key.NameDownArrow} {
 		// Select 345
 		s.SetCaret(3, 6)
 		if start, end := s.Selection(); start != 3 || end != 6 {
@@ -61,19 +69,15 @@ func TestSelectableMove(t *testing.T) {
 		}
 
 		// Press the key
-		gtx.Queue = newQueue(key.Event{State: key.Press, Name: keyName})
+		r.Queue(key.Event{State: key.Press, Name: keyName})
 		s.SetText(str)
 		s.Layout(gtx, cache, fnt, fontSize, op.CallOp{}, op.CallOp{})
+		r.Frame(gtx.Ops)
 
 		if expected, got := "", s.SelectedText(); expected != got {
 			t.Errorf("KeyName %s, expected %q, got %q", keyName, expected, got)
 		}
 	}
-
-	testKey(key.NameLeftArrow)
-	testKey(key.NameRightArrow)
-	testKey(key.NameUpArrow)
-	testKey(key.NameDownArrow)
 }
 
 func TestSelectableConfigurations(t *testing.T) {
