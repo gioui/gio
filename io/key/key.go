@@ -56,14 +56,6 @@ type SoftKeyboardOp struct {
 	Show bool
 }
 
-// FocusOp sets or clears the keyboard focus. It replaces any previous
-// FocusOp in the same frame.
-type FocusOp struct {
-	// Tag is the new focus. The focus is cleared if Tag is nil, or if Tag
-	// has no InputOp in the same frame.
-	Tag event.Tag
-}
-
 // SelectionOp updates the selection for an input handler.
 type SelectionOp struct {
 	Tag event.Tag
@@ -242,6 +234,13 @@ func (m Modifiers) Contain(m2 Modifiers) bool {
 	return m&m2 == m2
 }
 
+// FocusCmd requests to set or clear the keyboard focus.
+type FocusCmd struct {
+	// Tag is the new focus. The focus is cleared if Tag is nil, or if Tag
+	// has no InputOp in the same frame.
+	Tag event.Tag
+}
+
 func (k Set) Contains(name string, mods Modifiers) bool {
 	ks := string(k)
 	for len(ks) > 0 {
@@ -346,11 +345,6 @@ func (h SoftKeyboardOp) Add(o *op.Ops) {
 	}
 }
 
-func (h FocusOp) Add(o *op.Ops) {
-	data := ops.Write1(&o.Internal, ops.TypeKeyFocusLen, h.Tag)
-	data[0] = byte(ops.TypeKeyFocus)
-}
-
 func (s SnippetOp) Add(o *op.Ops) {
 	data := ops.Write2String(&o.Internal, ops.TypeSnippetLen, s.Tag, s.Text)
 	data[0] = byte(ops.TypeSnippet)
@@ -376,6 +370,8 @@ func (Event) ImplementsEvent()          {}
 func (FocusEvent) ImplementsEvent()     {}
 func (SnippetEvent) ImplementsEvent()   {}
 func (SelectionEvent) ImplementsEvent() {}
+
+func (FocusCmd) ImplementsCommand() {}
 
 func (m Modifiers) String() string {
 	var strs []string

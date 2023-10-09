@@ -44,14 +44,6 @@ type keyHandler struct {
 	filter   key.Set
 }
 
-// keyCollector tracks state required to update a keyQueue
-// from key ops.
-type keyCollector struct {
-	q       *keyQueue
-	focus   event.Tag
-	changed bool
-}
-
 type dirFocusEntry struct {
 	tag    event.Tag
 	row    int
@@ -99,8 +91,7 @@ func (q *keyQueue) Reset() {
 	q.dirOrder = q.dirOrder[:0]
 }
 
-func (q *keyQueue) Frame(events *handlerEvents, collector keyCollector) {
-	changed, focus := collector.changed, collector.focus
+func (q *keyQueue) Frame(events *handlerEvents) {
 	for k, h := range q.handlers {
 		if !h.visible {
 			delete(q.handlers, k)
@@ -109,13 +100,10 @@ func (q *keyQueue) Frame(events *handlerEvents, collector keyCollector) {
 				q.focus = nil
 				q.state = TextInputClose
 			}
-		} else if h.new && k != focus {
+		} else if h.new && k != q.focus {
 			// Reset the handler on (each) first appearance, but don't trigger redraw.
 			events.AddNoRedraw(k, key.FocusEvent{Focus: false})
 		}
-	}
-	if changed {
-		q.setFocus(focus, events)
 	}
 	q.updateFocusLayout()
 }
@@ -187,7 +175,7 @@ func (q *keyQueue) MoveFocus(dir key.FocusDirection, events *handlerEvents) bool
 			}
 		}
 		order = (order + len(q.order)) % len(q.order)
-		q.setFocus(q.order[order], events)
+		q.Focus(q.order[order], events)
 		return true
 	case key.FocusRight, key.FocusLeft:
 		next := order
@@ -200,7 +188,7 @@ func (q *keyQueue) MoveFocus(dir key.FocusDirection, events *handlerEvents) bool
 		if 0 <= next && next < len(q.dirOrder) {
 			newFocus := q.dirOrder[next]
 			if newFocus.row == focus.row {
-				q.setFocus(newFocus.tag, events)
+				q.Focus(newFocus.tag, events)
 				return true
 			}
 		}
@@ -237,7 +225,7 @@ func (q *keyQueue) MoveFocus(dir key.FocusDirection, events *handlerEvents) bool
 			order += delta
 		}
 		if closest != nil {
-			q.setFocus(closest, events)
+			q.Focus(closest, events)
 			return true
 		}
 	}
@@ -258,7 +246,7 @@ func (q *keyQueue) Accepts(t event.Tag, e key.Event) bool {
 	return q.handlers[t].filter.Contains(e.Name, e.Modifiers)
 }
 
-func (q *keyQueue) setFocus(focus event.Tag, events *handlerEvents) {
+func (q *keyQueue) Focus(focus event.Tag, events *handlerEvents) {
 	if focus != nil {
 		if _, exists := q.handlers[focus]; !exists {
 			focus = nil
@@ -280,51 +268,46 @@ func (q *keyQueue) setFocus(focus event.Tag, events *handlerEvents) {
 	}
 }
 
-func (k *keyCollector) focusOp(tag event.Tag) {
-	k.focus = tag
-	k.changed = true
-}
-
-func (k *keyCollector) softKeyboard(show bool) {
+func (q *keyQueue) softKeyboard(show bool) {
 	if show {
-		k.q.state = TextInputOpen
+		q.state = TextInputOpen
 	} else {
-		k.q.state = TextInputClose
+		q.state = TextInputClose
 	}
 }
 
-func (k *keyCollector) handlerFor(tag event.Tag, area int, bounds image.Rectangle) *keyHandler {
-	h, ok := k.q.handlers[tag]
+func (q *keyQueue) handlerFor(tag event.Tag, area int, bounds image.Rectangle) *keyHandler {
+	h, ok := q.handlers[tag]
 	if !ok {
 		h = &keyHandler{new: true, order: -1}
-		k.q.handlers[tag] = h
+		q.handlers[tag] = h
 	}
 	if h.order == -1 {
-		h.order = len(k.q.order)
-		k.q.order = append(k.q.order, tag)
-		k.q.dirOrder = append(k.q.dirOrder, dirFocusEntry{tag: tag, area: area, bounds: bounds})
+		h.order = len(q.order)
+		q.order = append(q.order, tag)
+		q.dirOrder = append(q.dirOrder, dirFocusEntry{tag: tag, area: area, bounds: bounds})
 	}
 	return h
 }
 
-func (k *keyCollector) inputOp(op key.InputOp, area int, bounds image.Rectangle) {
-	h := k.handlerFor(op.Tag, area, bounds)
+func (q *keyQueue) inputOp(op key.InputOp, area int, bounds image.Rectangle) {
+	h := q.handlerFor(op.Tag, area, bounds)
 	h.visible = true
 	h.hint = op.Hint
 	h.filter = op.Keys
 }
 
-func (k *keyCollector) selectionOp(t f32.Affine2D, op key.SelectionOp) {
-	if op.Tag == k.q.focus {
-		k.q.content.Selection.Range = op.Range
-		k.q.content.Selection.Caret = op.Caret
-		k.q.content.Selection.Transform = t
+func (q *keyQueue) selectionOp(t f32.Affine2D, op key.SelectionOp) {
+	if op.Tag == q.focus {
+		q.content.Selection.Range = op.Range
+		q.content.Selection.Caret = op.Caret
+		q.content.Selection.Transform = t
 	}
 }
 
-func (k *keyCollector) snippetOp(op key.SnippetOp) {
-	if op.Tag == k.q.focus {
-		k.q.content.Snippet = op.Snippet
+func (q *keyQueue) snippetOp(op key.SnippetOp) {
+	if op.Tag == q.focus {
+		q.content.Snippet = op.Snippet
 	}
 }
 

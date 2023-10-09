@@ -33,8 +33,7 @@ type Router struct {
 		collector pointerCollector
 	}
 	key struct {
-		queue     keyQueue
-		collector keyCollector
+		queue keyQueue
 	}
 	cqueue clipboardQueue
 
@@ -45,12 +44,21 @@ type Router struct {
 	// InvalidateOp summary.
 	wakeup     bool
 	wakeupTime time.Time
+
+	// Changes queued for next call to Frame.
+	commands []Command
 }
 
 // Source implements the interface between a Router and user interface widgets.
 // The value Source is disabled.
 type Source struct {
 	r *Router
+}
+
+// Command represents a request such as moving the focus, or initiating a clipboard read.
+// Commands are queued by calling [Source.Queue].
+type Command interface {
+	ImplementsCommand()
 }
 
 // SemanticNode represents a node in the tree describing the components
@@ -98,6 +106,15 @@ func (q *Router) Source() Source {
 	return Source{r: q}
 }
 
+// Queue a command to be executed after the current frame
+// has completed.
+func (s Source) Queue(c Command) {
+	if !s.Enabled() {
+		return
+	}
+	s.r.queue(c)
+}
+
 // Enabled reports whether the source is enabled. Only enabled
 // Sources deliver events and respond to commands.
 func (s Source) Enabled() bool {
@@ -129,9 +146,10 @@ func (q *Router) Frame(frame *op.Ops) {
 	}
 	q.reader.Reset(ops)
 	q.collect()
-
+	q.executeCommands()
 	q.pointer.queue.Frame(&q.handlers)
-	q.key.queue.Frame(&q.handlers, q.key.collector)
+	q.key.queue.Frame(&q.handlers)
+
 	if q.handlers.HadEvents() {
 		q.wakeup = true
 		q.wakeupTime = time.Time{}
@@ -187,6 +205,20 @@ func (q *Router) Queue(events ...event.Event) bool {
 		}
 	}
 	return q.handlers.HadEvents()
+}
+
+func (q *Router) queue(f Command) {
+	q.commands = append(q.commands, f)
+}
+
+func (q *Router) executeCommands() {
+	for _, req := range q.commands {
+		switch req := req.(type) {
+		case key.FocusCmd:
+			q.key.queue.Focus(req.Tag, &q.handlers)
+		}
+	}
+	q.commands = nil
 }
 
 func rangeOverlaps(r1, r2 key.Range) bool {
@@ -377,8 +409,7 @@ func (q *Router) collect() {
 	pc := &q.pointer.collector
 	pc.q = &q.pointer.queue
 	pc.reset()
-	kc := &q.key.collector
-	*kc = keyCollector{q: &q.key.queue}
+	kq := &q.key.queue
 	q.key.queue.Reset()
 	var t f32.Affine2D
 	bo := binary.LittleEndian
@@ -473,18 +504,11 @@ func (q *Router) collect() {
 			act := system.Action(encOp.Data[1])
 			pc.actionInputOp(act)
 
-		// Key ops.
-		case ops.TypeKeyFocus:
-			tag, _ := encOp.Refs[0].(event.Tag)
-			op := key.FocusOp{
-				Tag: tag,
-			}
-			kc.focusOp(op.Tag)
 		case ops.TypeKeySoftKeyboard:
 			op := key.SoftKeyboardOp{
 				Show: encOp.Data[1] != 0,
 			}
-			kc.softKeyboard(op.Show)
+			kq.softKeyboard(op.Show)
 		case ops.TypeKeyInput:
 			filter := key.Set(*encOp.Refs[1].(*string))
 			op := key.InputOp{
@@ -495,7 +519,7 @@ func (q *Router) collect() {
 			a := pc.currentArea()
 			b := pc.currentAreaBounds()
 			pc.keyInputOp(op)
-			kc.inputOp(op, a, b)
+			kq.inputOp(op, a, b)
 		case ops.TypeSnippet:
 			op := key.SnippetOp{
 				Tag: encOp.Refs[0].(event.Tag),
@@ -507,7 +531,7 @@ func (q *Router) collect() {
 					Text: *(encOp.Refs[1].(*string)),
 				},
 			}
-			kc.snippetOp(op)
+			kq.snippetOp(op)
 		case ops.TypeSelection:
 			op := key.SelectionOp{
 				Tag: encOp.Refs[0].(event.Tag),
@@ -524,7 +548,7 @@ func (q *Router) collect() {
 					Descent: math.Float32frombits(bo.Uint32(encOp.Data[21:])),
 				},
 			}
-			kc.selectionOp(t, op)
+			kq.selectionOp(t, op)
 
 		// Semantic ops.
 		case ops.TypeSemanticLabel:

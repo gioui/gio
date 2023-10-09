@@ -69,7 +69,6 @@ const (
 	TypeTarget
 	TypeOffer
 	TypeKeyInput
-	TypeKeyFocus
 	TypeKeySoftKeyboard
 	TypeSave
 	TypeLoad
@@ -154,7 +153,6 @@ const (
 	TypeTargetLen           = 1
 	TypeOfferLen            = 1
 	TypeKeyInputLen         = 1 + 1
-	TypeKeyFocusLen         = 1 + 1
 	TypeKeySoftKeyboardLen  = 1 + 1
 	TypeSaveLen             = 1 + 4
 	TypeLoadLen             = 1 + 4
@@ -437,7 +435,6 @@ var opProps = [0x100]opProp{
 	TypeTarget:           {Size: TypeTargetLen, NumRefs: 2},
 	TypeOffer:            {Size: TypeOfferLen, NumRefs: 3},
 	TypeKeyInput:         {Size: TypeKeyInputLen, NumRefs: 2},
-	TypeKeyFocus:         {Size: TypeKeyFocusLen, NumRefs: 1},
 	TypeKeySoftKeyboard:  {Size: TypeKeySoftKeyboardLen, NumRefs: 0},
 	TypeSave:             {Size: TypeSaveLen, NumRefs: 0},
 	TypeLoad:             {Size: TypeLoadLen, NumRefs: 0},
@@ -514,8 +511,6 @@ func (t OpType) String() string {
 		return "Offer"
 	case TypeKeyInput:
 		return "KeyInput"
-	case TypeKeyFocus:
-		return "KeyFocus"
 	case TypeKeySoftKeyboard:
 		return "KeySoftKeyboard"
 	case TypeSave:

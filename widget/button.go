@@ -122,7 +122,7 @@ func (b *Clickable) Update(gtx layout.Context) []Click {
 		b.focused = false
 	}
 	if b.requestFocus {
-		key.FocusOp{Tag: &b.keyTag}.Add(gtx.Ops)
+		gtx.Queue(key.FocusCmd{Tag: &b.keyTag})
 		b.requestFocus = false
 	}
 	for len(b.history) > 0 {
@@ -159,7 +159,7 @@ func (b *Clickable) Update(gtx layout.Context) []Click {
 			}
 		case gesture.KindPress:
 			if e.Source == pointer.Mouse {
-				key.FocusOp{Tag: &b.keyTag}.Add(gtx.Ops)
+				gtx.Queue(key.FocusCmd{Tag: &b.keyTag})
 			}
 			b.history = append(b.history, Press{
 				Position: e.Position,
