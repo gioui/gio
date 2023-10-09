@@ -11,7 +11,6 @@ package key
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math"
 	"strings"
 
@@ -366,10 +365,6 @@ func (Event) ImplementsEvent()          {}
 func (FocusEvent) ImplementsEvent()     {}
 func (SnippetEvent) ImplementsEvent()   {}
 func (SelectionEvent) ImplementsEvent() {}
-
-func (e Event) String() string {
-	return fmt.Sprintf("%v %v %v}", e.Name, e.Modifiers, e.State)
-}
 
 func (m Modifiers) String() string {
 	var strs []string
