@@ -37,7 +37,7 @@ func TestKeyMultiples(t *testing.T) {
 	ops := new(op.Ops)
 	r := new(Router)
 
-	key.SoftKeyboardOp{Show: true}.Add(ops)
+	r.Source().Queue(key.SoftKeyboardCmd{Show: true})
 	key.InputOp{Tag: &handlers[0]}.Add(ops)
 	r.Source().Queue(key.FocusCmd{Tag: &handlers[2]})
 	key.InputOp{Tag: &handlers[1]}.Add(ops)
@@ -61,11 +61,11 @@ func TestKeyStacked(t *testing.T) {
 
 	key.InputOp{Tag: &handlers[0]}.Add(ops)
 	r.Source().Queue(key.FocusCmd{})
-	key.SoftKeyboardOp{Show: false}.Add(ops)
+	r.Source().Queue(key.SoftKeyboardCmd{Show: false})
 	key.InputOp{Tag: &handlers[1]}.Add(ops)
 	r.Source().Queue(key.FocusCmd{Tag: &handlers[1]})
 	key.InputOp{Tag: &handlers[2]}.Add(ops)
-	key.SoftKeyboardOp{Show: true}.Add(ops)
+	r.Source().Queue(key.SoftKeyboardCmd{Show: true})
 	key.InputOp{Tag: &handlers[3]}.Add(ops)
 
 	r.Frame(ops)
@@ -84,7 +84,7 @@ func TestKeySoftKeyboardNoFocus(t *testing.T) {
 
 	// It's possible to open the keyboard
 	// without any active focus:
-	key.SoftKeyboardOp{Show: true}.Add(ops)
+	r.Source().Queue(key.SoftKeyboardCmd{Show: true})
 
 	r.Frame(ops)
 
@@ -100,7 +100,7 @@ func TestKeyRemoveFocus(t *testing.T) {
 	// New InputOp with Focus and Keyboard:
 	key.InputOp{Tag: &handlers[0], Keys: "Short-Tab"}.Add(ops)
 	r.Source().Queue(key.FocusCmd{Tag: &handlers[0]})
-	key.SoftKeyboardOp{Show: true}.Add(ops)
+	r.Source().Queue(key.SoftKeyboardCmd{Show: true})
 
 	// New InputOp without any focus:
 	key.InputOp{Tag: &handlers[1], Keys: "Short-Tab"}.Add(ops)
@@ -152,7 +152,7 @@ func TestKeyRemoveFocus(t *testing.T) {
 	// exists in the previous frame:
 	r.Source().Queue(key.FocusCmd{Tag: &handlers[0]})
 	key.InputOp{Tag: &handlers[0]}.Add(ops)
-	key.SoftKeyboardOp{Show: true}.Add(ops)
+	r.Source().Queue(key.SoftKeyboardCmd{Show: true})
 
 	// Remove focus.
 	key.InputOp{Tag: &handlers[1]}.Add(ops)
@@ -173,7 +173,7 @@ func TestKeyFocusedInvisible(t *testing.T) {
 	// Set new InputOp with focus:
 	r.Source().Queue(key.FocusCmd{Tag: &handlers[0]})
 	key.InputOp{Tag: &handlers[0]}.Add(ops)
-	key.SoftKeyboardOp{Show: true}.Add(ops)
+	r.Source().Queue(key.SoftKeyboardCmd{Show: true})
 
 	// Set new InputOp without focus:
 	key.InputOp{Tag: &handlers[1]}.Add(ops)

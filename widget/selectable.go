@@ -211,7 +211,7 @@ func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font,
 	key.InputOp{Tag: l, Keys: keys}.Add(gtx.Ops)
 	if l.requestFocus {
 		gtx.Queue(key.FocusCmd{Tag: l})
-		key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)
+		gtx.Queue(key.SoftKeyboardCmd{Show: true})
 	}
 	l.requestFocus = false
 

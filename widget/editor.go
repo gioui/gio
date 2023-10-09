@@ -646,7 +646,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 	key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keys}.Add(gtx.Ops)
 	if e.requestFocus {
 		gtx.Queue(key.FocusCmd{Tag: &e.eventKey})
-		key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)
+		gtx.Queue(key.SoftKeyboardCmd{Show: true})
 	}
 	e.requestFocus = false
 

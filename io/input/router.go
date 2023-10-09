@@ -216,6 +216,8 @@ func (q *Router) executeCommands() {
 		switch req := req.(type) {
 		case key.FocusCmd:
 			q.key.queue.Focus(req.Tag, &q.handlers)
+		case key.SoftKeyboardCmd:
+			q.key.queue.softKeyboard(req.Show)
 		}
 	}
 	q.commands = nil
@@ -504,11 +506,6 @@ func (q *Router) collect() {
 			act := system.Action(encOp.Data[1])
 			pc.actionInputOp(act)
 
-		case ops.TypeKeySoftKeyboard:
-			op := key.SoftKeyboardOp{
-				Show: encOp.Data[1] != 0,
-			}
-			kq.softKeyboard(op.Show)
 		case ops.TypeKeyInput:
 			filter := key.Set(*encOp.Refs[1].(*string))
 			op := key.InputOp{

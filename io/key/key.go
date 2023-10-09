@@ -34,6 +34,11 @@ type InputOp struct {
 	Keys Set
 }
 
+// SoftKeyboardCmd shows or hides the on-screen keyboard, if available.
+type SoftKeyboardCmd struct {
+	Show bool
+}
+
 // Set is an expression that describes a set of key combinations, in the form
 // "<modifiers>-<keyset>|...".  Modifiers are separated by dashes, optional
 // modifiers are enclosed by parentheses.  A key set is either a literal key
@@ -49,12 +54,6 @@ type InputOp struct {
 //   - Shift-A matches A key if shift is pressed, and no other modifier.
 //   - Shift-(Ctrl)-A matches A if shift is pressed, and optionally ctrl.
 type Set string
-
-// SoftKeyboardOp shows or hide the on-screen keyboard, if available.
-// It replaces any previous SoftKeyboardOp.
-type SoftKeyboardOp struct {
-	Show bool
-}
 
 // SelectionOp updates the selection for an input handler.
 type SelectionOp struct {
@@ -337,14 +336,6 @@ func (h InputOp) Add(o *op.Ops) {
 	data[1] = byte(h.Hint)
 }
 
-func (h SoftKeyboardOp) Add(o *op.Ops) {
-	data := ops.Write(&o.Internal, ops.TypeKeySoftKeyboardLen)
-	data[0] = byte(ops.TypeKeySoftKeyboard)
-	if h.Show {
-		data[1] = 1
-	}
-}
-
 func (s SnippetOp) Add(o *op.Ops) {
 	data := ops.Write2String(&o.Internal, ops.TypeSnippetLen, s.Tag, s.Text)
 	data[0] = byte(ops.TypeSnippet)
@@ -371,7 +362,8 @@ func (FocusEvent) ImplementsEvent()     {}
 func (SnippetEvent) ImplementsEvent()   {}
 func (SelectionEvent) ImplementsEvent() {}
 
-func (FocusCmd) ImplementsCommand() {}
+func (FocusCmd) ImplementsCommand()        {}
+func (SoftKeyboardCmd) ImplementsCommand() {}
 
 func (m Modifiers) String() string {
 	var strs []string
