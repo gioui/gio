@@ -65,17 +65,6 @@ const (
 	TextInputOpen
 )
 
-type FocusDirection int
-
-const (
-	FocusRight FocusDirection = iota
-	FocusLeft
-	FocusUp
-	FocusDown
-	FocusForward
-	FocusBackward
-)
-
 // InputState returns the last text input state as
 // determined in Frame.
 func (q *keyQueue) InputState() TextInputState {
@@ -171,7 +160,7 @@ func (q *keyQueue) updateFocusLayout() {
 }
 
 // MoveFocus attempts to move the focus in the direction of dir, returning true if it succeeds.
-func (q *keyQueue) MoveFocus(dir FocusDirection, events *handlerEvents) bool {
+func (q *keyQueue) MoveFocus(dir key.FocusDirection, events *handlerEvents) bool {
 	if len(q.dirOrder) == 0 {
 		return false
 	}
@@ -181,17 +170,17 @@ func (q *keyQueue) MoveFocus(dir FocusDirection, events *handlerEvents) bool {
 	}
 	focus := q.dirOrder[order]
 	switch dir {
-	case FocusForward, FocusBackward:
+	case key.FocusForward, key.FocusBackward:
 		if len(q.order) == 0 {
 			break
 		}
 		order := 0
-		if dir == FocusBackward {
+		if dir == key.FocusBackward {
 			order = -1
 		}
 		if q.focus != nil {
 			order = q.handlers[q.focus].order
-			if dir == FocusForward {
+			if dir == key.FocusForward {
 				order++
 			} else {
 				order--
@@ -200,11 +189,11 @@ func (q *keyQueue) MoveFocus(dir FocusDirection, events *handlerEvents) bool {
 		order = (order + len(q.order)) % len(q.order)
 		q.setFocus(q.order[order], events)
 		return true
-	case FocusRight, FocusLeft:
+	case key.FocusRight, key.FocusLeft:
 		next := order
 		if q.focus != nil {
 			next = order + 1
-			if dir == FocusLeft {
+			if dir == key.FocusLeft {
 				next = order - 1
 			}
 		}
@@ -215,9 +204,9 @@ func (q *keyQueue) MoveFocus(dir FocusDirection, events *handlerEvents) bool {
 				return true
 			}
 		}
-	case FocusUp, FocusDown:
+	case key.FocusUp, key.FocusDown:
 		delta := +1
-		if dir == FocusUp {
+		if dir == key.FocusUp {
 			delta = -1
 		}
 		nextRow := 0

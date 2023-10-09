@@ -241,26 +241,26 @@ func TestDirectionalFocus(t *testing.T) {
 	}
 	r.Frame(ops)
 
-	r.MoveFocus(FocusLeft)
+	r.MoveFocus(key.FocusLeft)
 	assertFocus(t, r, &handlers[0])
-	r.MoveFocus(FocusLeft)
+	r.MoveFocus(key.FocusLeft)
 	assertFocus(t, r, &handlers[0])
-	r.MoveFocus(FocusRight)
+	r.MoveFocus(key.FocusRight)
 	assertFocus(t, r, &handlers[1])
-	r.MoveFocus(FocusRight)
+	r.MoveFocus(key.FocusRight)
 	assertFocus(t, r, &handlers[1])
-	r.MoveFocus(FocusDown)
+	r.MoveFocus(key.FocusDown)
 	assertFocus(t, r, &handlers[2])
-	r.MoveFocus(FocusDown)
+	r.MoveFocus(key.FocusDown)
 	assertFocus(t, r, &handlers[2])
-	r.MoveFocus(FocusLeft)
+	r.MoveFocus(key.FocusLeft)
 	assertFocus(t, r, &handlers[3])
-	r.MoveFocus(FocusUp)
+	r.MoveFocus(key.FocusUp)
 	assertFocus(t, r, &handlers[0])
 
-	r.MoveFocus(FocusForward)
+	r.MoveFocus(key.FocusForward)
 	assertFocus(t, r, &handlers[1])
-	r.MoveFocus(FocusBackward)
+	r.MoveFocus(key.FocusBackward)
 	assertFocus(t, r, &handlers[0])
 }
 
@@ -285,7 +285,7 @@ func TestFocusScroll(t *testing.T) {
 	parent.Pop()
 	r.Frame(ops)
 
-	r.MoveFocus(FocusLeft)
+	r.MoveFocus(key.FocusLeft)
 	r.RevealFocus(image.Rect(0, 0, 15, 40))
 	evts := r.Events(h)
 	assertScrollEvent(t, evts[len(evts)-1], f32.Pt(6, -9))
@@ -305,14 +305,14 @@ func TestFocusClick(t *testing.T) {
 	cl.Pop()
 	r.Frame(ops)
 
-	r.MoveFocus(FocusLeft)
+	r.MoveFocus(key.FocusLeft)
 	r.ClickFocus()
 	assertEventPointerTypeSequence(t, r.Events(h), pointer.Cancel, pointer.Press, pointer.Release)
 }
 
 func TestNoFocus(t *testing.T) {
 	r := new(Router)
-	r.MoveFocus(FocusForward)
+	r.MoveFocus(key.FocusForward)
 }
 
 func TestKeyRouting(t *testing.T) {

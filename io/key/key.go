@@ -225,6 +225,17 @@ const (
 	NameBack           = "Back"
 )
 
+type FocusDirection int
+
+const (
+	FocusRight FocusDirection = iota
+	FocusLeft
+	FocusUp
+	FocusDown
+	FocusForward
+	FocusBackward
+)
+
 // Contain reports whether m contains all modifiers
 // in m2.
 func (m Modifiers) Contain(m2 Modifiers) bool {

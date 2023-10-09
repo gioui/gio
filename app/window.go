@@ -565,19 +565,19 @@ func (c *callbacks) SetEditorSnippet(r key.Range) {
 	c.Event(key.SnippetEvent(r))
 }
 
-func (w *Window) moveFocus(dir input.FocusDirection, d driver) {
+func (w *Window) moveFocus(dir key.FocusDirection, d driver) {
 	if w.queue.MoveFocus(dir) {
 		w.queue.RevealFocus(w.viewport)
 	} else {
 		var v image.Point
 		switch dir {
-		case input.FocusRight:
+		case key.FocusRight:
 			v = image.Pt(+1, 0)
-		case input.FocusLeft:
+		case key.FocusLeft:
 			v = image.Pt(-1, 0)
-		case input.FocusDown:
+		case key.FocusDown:
 			v = image.Pt(0, +1)
-		case input.FocusUp:
+		case key.FocusUp:
 			v = image.Pt(0, -1)
 		default:
 			return
@@ -895,17 +895,17 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 				isMobile := runtime.GOOS == "ios" || runtime.GOOS == "android"
 				switch {
 				case e.Name == key.NameTab && e.Modifiers == 0:
-					w.moveFocus(input.FocusForward, d)
+					w.moveFocus(key.FocusForward, d)
 				case e.Name == key.NameTab && e.Modifiers == key.ModShift:
-					w.moveFocus(input.FocusBackward, d)
+					w.moveFocus(key.FocusBackward, d)
 				case e.Name == key.NameUpArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(input.FocusUp, d)
+					w.moveFocus(key.FocusUp, d)
 				case e.Name == key.NameDownArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(input.FocusDown, d)
+					w.moveFocus(key.FocusDown, d)
 				case e.Name == key.NameLeftArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(input.FocusLeft, d)
+					w.moveFocus(key.FocusLeft, d)
 				case e.Name == key.NameRightArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(input.FocusRight, d)
+					w.moveFocus(key.FocusRight, d)
 				default:
 					handled = false
 				}

@@ -236,7 +236,7 @@ func (q *Router) queueKeyEvent(e key.Event) {
 	}
 }
 
-func (q *Router) MoveFocus(dir FocusDirection) bool {
+func (q *Router) MoveFocus(dir key.FocusDirection) bool {
 	return q.key.queue.MoveFocus(dir, &q.handlers)
 }
 
