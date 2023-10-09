@@ -316,8 +316,8 @@ func (w *Window) processFrame(d driver) {
 	if hint, ok := q.TextInputHint(); ok {
 		d.SetInputHint(hint)
 	}
-	if txt, ok := q.WriteClipboard(); ok {
-		d.WriteClipboard(txt)
+	if mime, txt, ok := q.WriteClipboard(); ok {
+		d.WriteClipboard(mime, txt)
 	}
 	if q.ReadClipboard() {
 		d.ReadClipboard()
@@ -370,13 +370,6 @@ func (w *Window) Option(opts ...Option) {
 			return
 		}
 	}
-}
-
-// WriteClipboard writes a string to the clipboard.
-func (w *Window) WriteClipboard(s string) {
-	w.driverDefer(func(d driver) {
-		d.WriteClipboard(s)
-	})
 }
 
 // Run f in the same thread as the native window event loop, and wait for f to

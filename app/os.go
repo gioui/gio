@@ -160,7 +160,7 @@ type driver interface {
 	// ReadClipboard requests the clipboard content.
 	ReadClipboard()
 	// WriteClipboard requests a clipboard write.
-	WriteClipboard(s string)
+	WriteClipboard(mime string, s []byte)
 	// Configure the window.
 	Configure([]Option)
 	// SetCursor updates the current cursor to name.

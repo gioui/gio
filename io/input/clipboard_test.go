@@ -3,6 +3,8 @@
 package input
 
 import (
+	"io"
+	"strings"
 	"testing"
 
 	"gioui.org/io/clipboard"
@@ -84,23 +86,24 @@ func TestQueueProcessWriteClipboard(t *testing.T) {
 	ops, router := new(op.Ops), new(Router)
 	ops.Reset()
 
-	clipboard.WriteOp{Text: "Write 1"}.Add(ops)
+	const mime = "application/text"
+	router.Source().Queue(clipboard.WriteCmd{Type: mime, Data: io.NopCloser(strings.NewReader("Write 1"))})
 
 	router.Frame(ops)
-	assertClipboardWriteOp(t, router, "Write 1")
+	assertClipboardWriteCmd(t, router, mime, "Write 1")
 	ops.Reset()
 
-	// No WriteOp
+	// No WriteCmd
 
 	router.Frame(ops)
-	assertClipboardWriteOp(t, router, "")
+	assertClipboardWriteCmd(t, router, "", "")
 	ops.Reset()
 
-	clipboard.WriteOp{Text: "Write 2"}.Add(ops)
+	router.Source().Queue(clipboard.WriteCmd{Type: mime, Data: io.NopCloser(strings.NewReader("Write 2"))})
 
 	router.Frame(ops)
 	assertClipboardReadOp(t, router, 0)
-	assertClipboardWriteOp(t, router, "Write 2")
+	assertClipboardWriteCmd(t, router, mime, "Write 2")
 	ops.Reset()
 }
 
@@ -141,16 +144,19 @@ func assertClipboardReadOpDuplicated(t *testing.T, router *Router, expected int)
 	}
 }
 
-func assertClipboardWriteOp(t *testing.T, router *Router, expected string) {
+func assertClipboardWriteCmd(t *testing.T, router *Router, mimeExp, expected string) {
 	t.Helper()
 	if (router.cqueue.text != nil) != (expected != "") {
 		t.Error("text not defined")
 	}
-	text, ok := router.cqueue.WriteClipboard()
+	mime, text, ok := router.cqueue.WriteClipboard()
 	if ok != (expected != "") {
 		t.Error("duplicated requests")
 	}
-	if text != expected {
+	if string(mime) != mimeExp {
+		t.Errorf("got MIME type %s, expected %s", mime, mimeExp)
+	}
+	if string(text) != expected {
 		t.Errorf("got text %s, expected %s", text, expected)
 	}
 }

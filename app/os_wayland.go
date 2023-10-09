@@ -1033,8 +1033,8 @@ func (w *window) ReadClipboard() {
 	}()
 }
 
-func (w *window) WriteClipboard(s string) {
-	w.disp.writeClipboard([]byte(s))
+func (w *window) WriteClipboard(mime string, s []byte) {
+	w.disp.writeClipboard(s)
 }
 
 func (w *window) Configure(options []Option) {

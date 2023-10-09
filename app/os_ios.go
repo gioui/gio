@@ -268,8 +268,8 @@ func (w *window) ReadClipboard() {
 	w.w.Event(clipboard.Event{Text: content})
 }
 
-func (w *window) WriteClipboard(s string) {
-	u16 := utf16.Encode([]rune(s))
+func (w *window) WriteClipboard(mime string, s []byte) {
+	u16 := utf16.Encode([]rune(string(s)))
 	var chars *C.unichar
 	if len(u16) > 0 {
 		chars = (*C.unichar)(unsafe.Pointer(&u16[0]))

@@ -3,6 +3,8 @@
 package clipboard
 
 import (
+	"io"
+
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
 	"gioui.org/op"
@@ -13,15 +15,16 @@ type Event struct {
 	Text string
 }
 
+// WriteCmd copies Text to the clipboard.
+type WriteCmd struct {
+	Type string
+	Data io.ReadCloser
+}
+
 // ReadOp requests the text of the clipboard, delivered to
 // the current handler through an Event.
 type ReadOp struct {
 	Tag event.Tag
-}
-
-// WriteOp copies Text to the clipboard.
-type WriteOp struct {
-	Text string
 }
 
 func (h ReadOp) Add(o *op.Ops) {
@@ -29,9 +32,6 @@ func (h ReadOp) Add(o *op.Ops) {
 	data[0] = byte(ops.TypeClipboardRead)
 }
 
-func (h WriteOp) Add(o *op.Ops) {
-	data := ops.Write1String(&o.Internal, ops.TypeClipboardWriteLen, h.Text)
-	data[0] = byte(ops.TypeClipboardWrite)
-}
-
 func (Event) ImplementsEvent() {}
+
+func (WriteCmd) ImplementsCommand() {}

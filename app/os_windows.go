@@ -735,8 +735,8 @@ func (w *window) Configure(options []Option) {
 	w.update()
 }
 
-func (w *window) WriteClipboard(s string) {
-	w.writeClipboard(s)
+func (w *window) WriteClipboard(mime string, s []byte) {
+	w.writeClipboard(string(s))
 }
 
 func (w *window) writeClipboard(s string) error {

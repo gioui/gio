@@ -151,8 +151,8 @@ func (w *x11Window) ReadClipboard() {
 	C.XConvertSelection(w.x, w.atoms.clipboard, w.atoms.utf8string, w.atoms.clipboardContent, w.xw, C.CurrentTime)
 }
 
-func (w *x11Window) WriteClipboard(s string) {
-	w.clipboard.content = []byte(s)
+func (w *x11Window) WriteClipboard(mime string, s []byte) {
+	w.clipboard.content = s
 	C.XSetSelectionOwner(w.x, w.atoms.clipboard, w.xw, C.CurrentTime)
 	C.XSetSelectionOwner(w.x, w.atoms.primary, w.xw, C.CurrentTime)
 }

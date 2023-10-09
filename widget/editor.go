@@ -417,7 +417,7 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 		case "C", "X":
 			e.scratch = e.text.SelectedText(e.scratch)
 			if text := string(e.scratch); text != "" {
-				clipboard.WriteOp{Text: text}.Add(gtx.Ops)
+				gtx.Queue(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(text))})
 				if k.Name == "X" && !e.ReadOnly {
 					e.Delete(1)
 				}

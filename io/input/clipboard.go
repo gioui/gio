@@ -3,6 +3,9 @@
 package input
 
 import (
+	"io"
+
+	"gioui.org/io/clipboard"
 	"gioui.org/io/event"
 )
 
@@ -10,18 +13,19 @@ type clipboardQueue struct {
 	receivers map[event.Tag]struct{}
 	// request avoid read clipboard every frame while waiting.
 	requested bool
-	text      *string
+	mime      string
+	text      []byte
 }
 
-// WriteClipboard returns the most recent text to be copied
+// WriteClipboard returns the most recent data to be copied
 // to the clipboard, if any.
-func (q *clipboardQueue) WriteClipboard() (string, bool) {
+func (q *clipboardQueue) WriteClipboard() (mime string, content []byte, ok bool) {
 	if q.text == nil {
-		return "", false
+		return "", nil, false
 	}
-	text := *q.text
+	content = q.text
 	q.text = nil
-	return text, true
+	return q.mime, content, true
 }
 
 // ReadClipboard reports if any new handler is waiting
@@ -41,8 +45,14 @@ func (q *clipboardQueue) Push(e event.Event, events *handlerEvents) {
 	}
 }
 
-func (q *clipboardQueue) ProcessWriteClipboard(refs []interface{}) {
-	q.text = refs[0].(*string)
+func (q *clipboardQueue) ProcessWriteClipboard(req clipboard.WriteCmd) {
+	defer req.Data.Close()
+	content, err := io.ReadAll(req.Data)
+	if err != nil {
+		return
+	}
+	q.mime = req.Type
+	q.text = content
 }
 
 func (q *clipboardQueue) ProcessReadClipboard(refs []interface{}) {

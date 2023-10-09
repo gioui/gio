@@ -222,6 +222,8 @@ func (q *Router) executeCommands() {
 			q.key.queue.setSnippet(req)
 		case transfer.OfferCmd:
 			q.pointer.queue.offerData(req, &q.handlers)
+		case clipboard.WriteCmd:
+			q.cqueue.ProcessWriteClipboard(req)
 		}
 	}
 	q.commands = nil
@@ -374,9 +376,9 @@ func (q *Router) TextInputHint() (key.InputHint, bool) {
 	return q.key.queue.InputHint()
 }
 
-// WriteClipboard returns the most recent text to be copied
+// WriteClipboard returns the most recent content to be copied
 // to the clipboard, if any.
-func (q *Router) WriteClipboard() (string, bool) {
+func (q *Router) WriteClipboard() (mime string, content []byte, ok bool) {
 	return q.cqueue.WriteClipboard()
 }
 
@@ -429,8 +431,6 @@ func (q *Router) collect() {
 			}
 		case ops.TypeClipboardRead:
 			q.cqueue.ProcessReadClipboard(encOp.Refs)
-		case ops.TypeClipboardWrite:
-			q.cqueue.ProcessWriteClipboard(encOp.Refs)
 		case ops.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
 			if extra := id - len(q.savedTrans) + 1; extra > 0 {

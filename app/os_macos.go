@@ -308,8 +308,8 @@ func (w *window) ReadClipboard() {
 	w.w.Event(clipboard.Event{Text: content})
 }
 
-func (w *window) WriteClipboard(s string) {
-	cstr := stringToNSString(s)
+func (w *window) WriteClipboard(mime string, s []byte) {
+	cstr := stringToNSString(string(s))
 	defer C.CFRelease(cstr)
 	C.writeClipboard(cstr)
 }

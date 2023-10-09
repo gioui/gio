@@ -1295,9 +1295,9 @@ func newWindow(window *callbacks, options []Option) error {
 	return <-mainWindow.errs
 }
 
-func (w *window) WriteClipboard(s string) {
+func (w *window) WriteClipboard(mime string, s []byte) {
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
-		jstr := javaString(env, s)
+		jstr := javaString(env, string(s))
 		callStaticVoidMethod(env, android.gioCls, android.mwriteClipboard,
 			jvalue(android.appCtx), jvalue(jstr))
 	})

@@ -64,7 +64,6 @@ const (
 	TypePopPass
 	TypePointerInput
 	TypeClipboardRead
-	TypeClipboardWrite
 	TypeSource
 	TypeTarget
 	TypeKeyInput
@@ -144,7 +143,6 @@ const (
 	TypePopPassLen          = 1
 	TypePointerInputLen     = 1 + 1 + 1*2 + 2*4 + 2*4
 	TypeClipboardReadLen    = 1
-	TypeClipboardWriteLen   = 1
 	TypeSourceLen           = 1
 	TypeTargetLen           = 1
 	TypeKeyInputLen         = 1 + 1
@@ -422,7 +420,6 @@ var opProps = [0x100]opProp{
 	TypePopPass:          {Size: TypePopPassLen, NumRefs: 0},
 	TypePointerInput:     {Size: TypePointerInputLen, NumRefs: 1},
 	TypeClipboardRead:    {Size: TypeClipboardReadLen, NumRefs: 1},
-	TypeClipboardWrite:   {Size: TypeClipboardWriteLen, NumRefs: 1},
 	TypeSource:           {Size: TypeSourceLen, NumRefs: 2},
 	TypeTarget:           {Size: TypeTargetLen, NumRefs: 2},
 	TypeKeyInput:         {Size: TypeKeyInputLen, NumRefs: 2},
@@ -489,8 +486,6 @@ func (t OpType) String() string {
 		return "PointerInput"
 	case TypeClipboardRead:
 		return "ClipboardRead"
-	case TypeClipboardWrite:
-		return "ClipboardWrite"
 	case TypeSource:
 		return "Source"
 	case TypeTarget:
