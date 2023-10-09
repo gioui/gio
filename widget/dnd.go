@@ -77,12 +77,8 @@ func (d *Draggable) Update(gtx layout.Context) (mime string, requested bool) {
 
 // Offer the data ready for a drop. Must be called after being Requested.
 // The mime must be one in the requested list.
-func (d *Draggable) Offer(ops *op.Ops, mime string, data io.ReadCloser) {
-	transfer.OfferOp{
-		Tag:  &d.handle,
-		Type: mime,
-		Data: data,
-	}.Add(ops)
+func (d *Draggable) Offer(gtx layout.Context, mime string, data io.ReadCloser) {
+	gtx.Queue(transfer.OfferCmd{Tag: &d.handle, Type: mime, Data: data})
 }
 
 // Pos returns the drag position relative to its initial click position.

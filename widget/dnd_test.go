@@ -51,12 +51,12 @@ func TestDraggable(t *testing.T) {
 		},
 	)
 	ofr := &offer{data: "hello"}
-	drag.Offer(gtx.Ops, "file", ofr)
+	drag.Offer(gtx, "file", ofr)
 	r.Frame(gtx.Ops)
 
 	evs := r.Events(drag)
-	if len(evs) != 1 {
-		t.Fatalf("expected 1 event, got %d", len(evs))
+	if len(evs) != 2 {
+		t.Fatalf("expected 2 event, got %d", len(evs))
 	}
 	ev := evs[0].(transfer.DataEvent)
 	ev.Open = nil

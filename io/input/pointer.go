@@ -72,8 +72,6 @@ type pointerHandler struct {
 
 	sourceMimes []string
 	targetMimes []string
-	offeredMime string
-	data        io.ReadCloser
 }
 
 type areaOp struct {
@@ -236,16 +234,23 @@ func (c *pointerCollector) newHandler(tag event.Tag, events *handlerEvents) *poi
 		tag:  tag,
 		pass: c.state.pass > 0,
 	})
-	h, ok := c.q.handlers[tag]
+	h := c.q.handlerFor(tag, events)
+	h.area = areaID
+	return h
+}
+
+func (q *pointerQueue) handlerFor(tag event.Tag, events *handlerEvents) *pointerHandler {
+	h, ok := q.handlers[tag]
 	if !ok {
-		h = new(pointerHandler)
-		c.q.handlers[tag] = h
+		h = &pointerHandler{
+			area: -1,
+		}
+		q.handlers[tag] = h
 		// Cancel handlers on (each) first appearance, but don't
 		// trigger redraw.
 		events.AddNoRedraw(tag, pointer.Event{Kind: pointer.Cancel})
 	}
 	h.active = true
-	h.area = areaID
 	return h
 }
 
@@ -332,10 +337,27 @@ func (c *pointerCollector) targetOp(op transfer.TargetOp, events *handlerEvents)
 	h.targetMimes = append(h.targetMimes, op.Type)
 }
 
-func (c *pointerCollector) offerOp(op transfer.OfferOp, events *handlerEvents) {
-	h := c.newHandler(op.Tag, events)
-	h.offeredMime = op.Type
-	h.data = op.Data
+func (q *pointerQueue) offerData(req transfer.OfferCmd, events *handlerEvents) {
+	transferIdx := len(q.transfers)
+	q.transfers = append(q.transfers, req.Data)
+	for i := range q.pointers {
+		p := &q.pointers[i]
+		if p.dataSource != req.Tag {
+			continue
+		}
+		defer q.deliverTransferCancelEvent(p, events)
+		if p.dataTarget == nil {
+			return
+		}
+		events.Add(p.dataTarget, transfer.DataEvent{
+			Type: req.Type,
+			Open: func() io.ReadCloser {
+				q.transfers[transferIdx] = nil
+				return req.Data
+			},
+		})
+		break
+	}
 }
 
 func (c *pointerCollector) reset() {
@@ -537,6 +559,7 @@ func (q *pointerQueue) reset() {
 	for _, h := range q.handlers {
 		// Reset handler.
 		h.active = false
+		h.area = -1
 		h.wantsGrab = false
 		h.types = 0
 		h.sourceMimes = h.sourceMimes[:0]
@@ -596,7 +619,6 @@ func (q *pointerQueue) Frame(events *handlerEvents) {
 	for i := range q.pointers {
 		p := &q.pointers[i]
 		q.deliverEnterLeaveEvents(p, events, p.last)
-		q.deliverTransferDataEvent(p, events)
 	}
 }
 
@@ -790,10 +812,10 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 			continue
 		}
 		h := q.handlers[k]
+		e := e
 		e.Kind = pointer.Leave
 
 		if e.Kind&h.types != 0 {
-			e := e
 			e.Position = q.invTransform(h.area, e.Position)
 			events.Add(k, e)
 		}
@@ -804,10 +826,10 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 		if _, found := searchTag(p.entered, k); found {
 			continue
 		}
+		e := e
 		e.Kind = pointer.Enter
 
 		if e.Kind&h.types != 0 {
-			e := e
 			e.Position = q.invTransform(h.area, e.Position)
 			events.Add(k, e)
 		}
@@ -855,32 +877,6 @@ func (q *pointerQueue) deliverDropEvent(p *pointerInfo, events *handlerEvents) {
 	q.deliverTransferCancelEvent(p, events)
 }
 
-func (q *pointerQueue) deliverTransferDataEvent(p *pointerInfo, events *handlerEvents) {
-	if p.dataSource == nil {
-		return
-	}
-	src := q.handlers[p.dataSource]
-	if src.data == nil {
-		// Data not received yet.
-		return
-	}
-	if p.dataTarget == nil {
-		q.deliverTransferCancelEvent(p, events)
-		return
-	}
-	// Send the offered data to the target.
-	transferIdx := len(q.transfers)
-	events.Add(p.dataTarget, transfer.DataEvent{
-		Type: src.offeredMime,
-		Open: func() io.ReadCloser {
-			q.transfers[transferIdx] = nil
-			return src.data
-		},
-	})
-	q.transfers = append(q.transfers, src.data)
-	p.dataTarget = nil
-}
-
 func (q *pointerQueue) deliverTransferCancelEvent(p *pointerInfo, events *handlerEvents) {
 	events.Add(p.dataSource, transfer.CancelEvent{})
 	// Cancel all potential targets.
@@ -890,8 +886,6 @@ func (q *pointerQueue) deliverTransferCancelEvent(p *pointerInfo, events *handle
 			events.Add(k, transfer.CancelEvent{})
 		}
 	}
-	src.offeredMime = ""
-	src.data = nil
 	p.dataSource = nil
 	p.dataTarget = nil
 }

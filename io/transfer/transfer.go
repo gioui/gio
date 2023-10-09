@@ -2,11 +2,11 @@
 //
 // The transfer protocol is as follows:
 //
-//   - Data sources are registered with SourceOps, data targets with TargetOps.
-//   - A data source receives a RequestEvent when a transfer is initiated.
-//     It must respond with an OfferOp.
-//   - The target receives a DataEvent when transferring to it. It must close
-//     the event data after use.
+//   - Data sources use [SourceFilter] to receive [InitiateEvent]s when a drag
+//     is initiated, and [RequestEvent]s for each initiation of a data transfer.
+//     Sources respond to requests with [OfferCommand].
+//   - Data targets use [TargetFilter] to receive [DataEvent]s for receiving data.
+//     The target must close the data event after use.
 //
 // When a user initiates a pointer-guided drag and drop transfer, the
 // source as well as all potential targets receive an InitiateEvent.
@@ -25,6 +25,21 @@ import (
 	"gioui.org/op"
 )
 
+// OfferCmd is used by data sources as a response to a RequestEvent.
+type OfferCmd struct {
+	Tag event.Tag
+	// Type is the MIME type of Data.
+	// It must be the Type from the corresponding RequestEvent.
+	Type string
+	// Data contains the offered data. It is closed when the
+	// transfer is complete or cancelled.
+	// Data must be kept valid until closed, and it may be used from
+	// a goroutine separate from the one processing the frame..
+	Data io.ReadCloser
+}
+
+func (OfferCmd) ImplementsCommand() {}
+
 // SourceOp registers a tag as a data source for a MIME type.
 // Use multiple SourceOps if a tag supports multiple types.
 type SourceOp struct {
@@ -41,19 +56,6 @@ type TargetOp struct {
 	Type string
 }
 
-// OfferOp is used by data sources as a response to a RequestEvent.
-type OfferOp struct {
-	Tag event.Tag
-	// Type is the MIME type of Data.
-	// It must be the Type from the corresponding RequestEvent.
-	Type string
-	// Data contains the offered data. It is closed when the
-	// transfer is complete or cancelled.
-	// Data must be kept valid until closed, and it may be used from
-	// a goroutine separate from the one processing the frame..
-	Data io.ReadCloser
-}
-
 func (op SourceOp) Add(o *op.Ops) {
 	data := ops.Write2(&o.Internal, ops.TypeSourceLen, op.Tag, op.Type)
 	data[0] = byte(ops.TypeSource)
@@ -64,18 +66,8 @@ func (op TargetOp) Add(o *op.Ops) {
 	data[0] = byte(ops.TypeTarget)
 }
 
-// Add the offer to the list of operations.
-// It panics if the Data field is not set.
-func (op OfferOp) Add(o *op.Ops) {
-	if op.Data == nil {
-		panic("invalid nil data in OfferOp")
-	}
-	data := ops.Write3(&o.Internal, ops.TypeOfferLen, op.Tag, op.Type, op.Data)
-	data[0] = byte(ops.TypeOffer)
-}
-
 // RequestEvent requests data from a data source. The source must
-// respond with an OfferOp.
+// respond with an OfferCmd.
 type RequestEvent struct {
 	// Type is the first matched type between the source and the target.
 	Type string

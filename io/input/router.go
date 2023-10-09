@@ -5,7 +5,6 @@ package input
 import (
 	"encoding/binary"
 	"image"
-	"io"
 	"strings"
 	"time"
 
@@ -221,6 +220,8 @@ func (q *Router) executeCommands() {
 			q.key.queue.softKeyboard(req.Show)
 		case key.SnippetCmd:
 			q.key.queue.setSnippet(req)
+		case transfer.OfferCmd:
+			q.pointer.queue.offerData(req, &q.handlers)
 		}
 	}
 	q.commands = nil
@@ -498,13 +499,6 @@ func (q *Router) collect() {
 				Type: encOp.Refs[1].(string),
 			}
 			pc.targetOp(op, &q.handlers)
-		case ops.TypeOffer:
-			op := transfer.OfferOp{
-				Tag:  encOp.Refs[0].(event.Tag),
-				Type: encOp.Refs[1].(string),
-				Data: encOp.Refs[2].(io.ReadCloser),
-			}
-			pc.offerOp(op, &q.handlers)
 		case ops.TypeActionInput:
 			act := system.Action(encOp.Data[1])
 			pc.actionInputOp(act)

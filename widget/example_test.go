@@ -94,7 +94,7 @@ func ExampleDraggable_Layout() {
 		// drag must respond with an Offer event when requested.
 		// Use the drag method for this.
 		if m, ok := drag.Update(gtx); ok {
-			drag.Offer(gtx.Ops, m, offer{Data: "hello world"})
+			drag.Offer(gtx, m, offer{Data: "hello world"})
 		}
 
 		// Setup the area for drops.

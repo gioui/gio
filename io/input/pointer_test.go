@@ -821,15 +821,6 @@ func TestTransfer(t *testing.T) {
 	// Cancel is received when the pointer is first seen.
 	cancel := pointer.Event{Kind: pointer.Cancel}
 
-	t.Run("transfer.Offer should panic on nil Data", func(t *testing.T) {
-		defer func() {
-			if recover() == nil {
-				t.Error("expected panic upon invalid data")
-			}
-		}()
-		transfer.OfferOp{}.Add(new(op.Ops))
-	})
-
 	t.Run("drop on no target", func(t *testing.T) {
 		ops := new(op.Ops)
 		src, tgt := setup(ops, "file", "file")
@@ -959,16 +950,13 @@ func TestTransfer(t *testing.T) {
 
 		// Offer valid type and data.
 		ofr := &offer{data: "hello"}
-		transfer.OfferOp{
-			Tag:  src,
-			Type: "file",
-			Data: ofr,
-		}.Add(ops)
+		r.Source().Queue(transfer.OfferCmd{Tag: src, Type: "file", Data: ofr})
 		r.Frame(ops)
 		evs := r.Events(tgt)
-		if len(evs) != 1 {
-			t.Fatalf("unexpected number of events: %d, want 1", len(evs))
+		if len(evs) != 2 {
+			t.Fatalf("unexpected number of events: %d, want 2", len(evs))
 		}
+		assertEventSequence(t, evs[1:], transfer.CancelEvent{})
 		dataEvent, ok := evs[0].(transfer.DataEvent)
 		if !ok {
 			t.Fatalf("unexpected event type: %T, want %T", dataEvent, transfer.DataEvent{})
@@ -984,9 +972,8 @@ func TestTransfer(t *testing.T) {
 		if ofr.closed {
 			t.Error("offer closed prematurely")
 		}
-		r.Frame(ops)
 		assertEventSequence(t, r.Events(src), transfer.CancelEvent{})
-		assertEventSequence(t, r.Events(tgt), transfer.CancelEvent{})
+		r.Frame(ops)
 	})
 
 	t.Run("drop on valid target, DataEvent not used", func(t *testing.T) {
@@ -1017,121 +1004,15 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 		ofr := &offer{data: "hello"}
-		transfer.OfferOp{
-			Tag:  src,
-			Type: "file",
-			Data: ofr,
-		}.Add(ops)
-		r.Frame(ops)
-		// DataEvent should be used here. The next frame should close it as unused.
+		r.Source().Queue(transfer.OfferCmd{Tag: src, Type: "file", Data: ofr})
 		r.Frame(ops)
 		assertEventSequence(t, r.Events(src), transfer.CancelEvent{})
-		assertEventSequence(t, r.Events(tgt), transfer.CancelEvent{})
+		// Ignore DataEvent and verify that the next frame closes it as unused.
+		assertEventSequence(t, r.Events(tgt)[1:], transfer.CancelEvent{})
+		r.Frame(ops)
 		if !ofr.closed {
 			t.Error("offer was not closed")
 		}
-	})
-
-	t.Run("valid target enter/leave events", func(t *testing.T) {
-		ops := new(op.Ops)
-		src, _ := setup(ops, "file", "file")
-		pass := pointer.PassOp{}.Push(ops)
-		stack := clip.Rect(tgtArea).Push(ops)
-		tag := new(int)
-		pointer.InputOp{
-			Tag:   tag,
-			Kinds: pointer.Enter | pointer.Leave,
-		}.Add(ops)
-		stack.Pop()
-		pass.Pop()
-
-		var r Router
-		r.Frame(ops)
-		// Drag.
-		r.Queue(
-			pointer.Event{
-				Position: f32.Pt(10, 10),
-				Kind:     pointer.Press,
-			},
-			pointer.Event{
-				Position: f32.Pt(10, 10),
-				Kind:     pointer.Move,
-			},
-			pointer.Event{
-				Position: f32.Pt(40, 10),
-				Kind:     pointer.Move,
-			},
-		)
-		assertEventPointerTypeSequence(t, r.Events(tag), pointer.Cancel, pointer.Enter)
-
-		// Drop.
-		r.Queue(
-			pointer.Event{
-				Position: f32.Pt(40, 10),
-				Kind:     pointer.Release,
-			},
-		)
-
-		// Offer valid type and data.
-		ofr := &offer{data: "hello"}
-		transfer.OfferOp{
-			Tag:  src,
-			Type: "file",
-			Data: ofr,
-		}.Add(ops)
-		r.Frame(ops)
-		assertEventPointerTypeSequence(t, r.Events(tag), pointer.Leave)
-	})
-
-	t.Run("invalid target NO enter/leave events", func(t *testing.T) {
-		ops := new(op.Ops)
-		src, _ := setup(ops, "file", "nofile")
-		pass := pointer.PassOp{}.Push(ops)
-		stack := clip.Rect(tgtArea).Push(ops)
-		tag := new(int)
-		pointer.InputOp{
-			Tag:   tag,
-			Kinds: pointer.Enter | pointer.Leave,
-		}.Add(ops)
-		stack.Pop()
-		pass.Pop()
-
-		var r Router
-		r.Frame(ops)
-		// Drag.
-		r.Queue(
-			pointer.Event{
-				Position: f32.Pt(10, 10),
-				Kind:     pointer.Press,
-			},
-			pointer.Event{
-				Position: f32.Pt(10, 10),
-				Kind:     pointer.Move,
-			},
-			pointer.Event{
-				Position: f32.Pt(40, 10),
-				Kind:     pointer.Move,
-			},
-		)
-		assertEventPointerTypeSequence(t, r.Events(tag), pointer.Cancel)
-
-		// Drop.
-		r.Queue(
-			pointer.Event{
-				Position: f32.Pt(40, 10),
-				Kind:     pointer.Release,
-			},
-		)
-
-		// Offer valid type and data.
-		ofr := &offer{data: "hello"}
-		transfer.OfferOp{
-			Tag:  src,
-			Type: "file",
-			Data: ofr,
-		}.Add(ops)
-		r.Frame(ops)
-		assertEventPointerTypeSequence(t, r.Events(tag), pointer.Leave)
 	})
 }
 
