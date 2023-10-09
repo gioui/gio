@@ -10,7 +10,6 @@ events.
 package key
 
 import (
-	"encoding/binary"
 	"strings"
 
 	"gioui.org/f32"
@@ -45,6 +44,12 @@ type SelectionCmd struct {
 	Caret
 }
 
+// SnippetCmd updates the content snippet for an input handler.
+type SnippetCmd struct {
+	Tag event.Tag
+	Snippet
+}
+
 // Set is an expression that describes a set of key combinations, in the form
 // "<modifiers>-<keyset>|...".  Modifiers are separated by dashes, optional
 // modifiers are enclosed by parentheses.  A key set is either a literal key
@@ -60,12 +65,6 @@ type SelectionCmd struct {
 //   - Shift-A matches A key if shift is pressed, and no other modifier.
 //   - Shift-(Ctrl)-A matches A if shift is pressed, and optionally ctrl.
 type Set string
-
-// SnippetOp updates the content snippet for an input handler.
-type SnippetOp struct {
-	Tag event.Tag
-	Snippet
-}
 
 // Range represents a range of text, such as an editor's selection.
 // Start and End are in runes.
@@ -335,14 +334,6 @@ func (h InputOp) Add(o *op.Ops) {
 	data[1] = byte(h.Hint)
 }
 
-func (s SnippetOp) Add(o *op.Ops) {
-	data := ops.Write2String(&o.Internal, ops.TypeSnippetLen, s.Tag, s.Text)
-	data[0] = byte(ops.TypeSnippet)
-	bo := binary.LittleEndian
-	bo.PutUint32(data[1:], uint32(s.Range.Start))
-	bo.PutUint32(data[5:], uint32(s.Range.End))
-}
-
 func (EditEvent) ImplementsEvent()      {}
 func (Event) ImplementsEvent()          {}
 func (FocusEvent) ImplementsEvent()     {}
@@ -352,6 +343,7 @@ func (SelectionEvent) ImplementsEvent() {}
 func (FocusCmd) ImplementsCommand()        {}
 func (SoftKeyboardCmd) ImplementsCommand() {}
 func (SelectionCmd) ImplementsCommand()    {}
+func (SnippetCmd) ImplementsCommand()      {}
 
 func (m Modifiers) String() string {
 	var strs []string

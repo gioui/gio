@@ -315,9 +315,9 @@ func (q *keyQueue) editorState() EditorState {
 	return s
 }
 
-func (q *keyQueue) snippetOp(op key.SnippetOp) {
-	if op.Tag == q.focus {
-		q.content.Snippet = op.Snippet
+func (q *keyQueue) setSnippet(req key.SnippetCmd) {
+	if req.Tag == q.focus {
+		q.content.Snippet = req.Snippet
 	}
 }
 

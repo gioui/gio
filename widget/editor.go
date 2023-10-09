@@ -554,7 +554,7 @@ func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, siz
 	return e.layout(gtx, textMaterial, selectMaterial)
 }
 
-// updateSnippet adds a key.SnippetOp if the snippet content or position
+// updateSnippet queues a key.SnippetCmd if the snippet content or position
 // have changed. off and len are in runes.
 func (e *Editor) updateSnippet(gtx layout.Context, start, end int) {
 	if start > end {
@@ -594,10 +594,7 @@ func (e *Editor) updateSnippet(gtx layout.Context, start, end int) {
 		return
 	}
 	e.ime.snippet = newSnip
-	key.SnippetOp{
-		Tag:     &e.eventKey,
-		Snippet: newSnip,
-	}.Add(gtx.Ops)
+	gtx.Queue(key.SnippetCmd{Tag: &e.eventKey, Snippet: newSnip})
 }
 
 func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.CallOp) layout.Dimensions {

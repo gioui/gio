@@ -219,6 +219,8 @@ func (q *Router) executeCommands() {
 			q.key.queue.Focus(req.Tag, &q.handlers)
 		case key.SoftKeyboardCmd:
 			q.key.queue.softKeyboard(req.Show)
+		case key.SnippetCmd:
+			q.key.queue.setSnippet(req)
 		}
 	}
 	q.commands = nil
@@ -518,18 +520,6 @@ func (q *Router) collect() {
 			b := pc.currentAreaBounds()
 			pc.keyInputOp(op)
 			kq.inputOp(op, t, a, b)
-		case ops.TypeSnippet:
-			op := key.SnippetOp{
-				Tag: encOp.Refs[0].(event.Tag),
-				Snippet: key.Snippet{
-					Range: key.Range{
-						Start: int(int32(bo.Uint32(encOp.Data[1:]))),
-						End:   int(int32(bo.Uint32(encOp.Data[5:]))),
-					},
-					Text: *(encOp.Refs[1].(*string)),
-				},
-			}
-			kq.snippetOp(op)
 
 		// Semantic ops.
 		case ops.TypeSemanticLabel:
