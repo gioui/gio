@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"image"
 	"io"
-	"math"
 	"strings"
 	"time"
 
@@ -214,6 +213,8 @@ func (q *Router) queue(f Command) {
 func (q *Router) executeCommands() {
 	for _, req := range q.commands {
 		switch req := req.(type) {
+		case key.SelectionCmd:
+			q.key.queue.setSelection(req)
 		case key.FocusCmd:
 			q.key.queue.Focus(req.Tag, &q.handlers)
 		case key.SoftKeyboardCmd:
@@ -403,7 +404,7 @@ func (q *Router) AppendSemantics(nodes []SemanticNode) []SemanticNode {
 // EditorState returns the editor state for the focused handler, or the
 // zero value if there is none.
 func (q *Router) EditorState() EditorState {
-	return q.key.queue.content
+	return q.key.queue.editorState()
 }
 
 func (q *Router) collect() {
@@ -516,7 +517,7 @@ func (q *Router) collect() {
 			a := pc.currentArea()
 			b := pc.currentAreaBounds()
 			pc.keyInputOp(op)
-			kq.inputOp(op, a, b)
+			kq.inputOp(op, t, a, b)
 		case ops.TypeSnippet:
 			op := key.SnippetOp{
 				Tag: encOp.Refs[0].(event.Tag),
@@ -529,23 +530,6 @@ func (q *Router) collect() {
 				},
 			}
 			kq.snippetOp(op)
-		case ops.TypeSelection:
-			op := key.SelectionOp{
-				Tag: encOp.Refs[0].(event.Tag),
-				Range: key.Range{
-					Start: int(int32(bo.Uint32(encOp.Data[1:]))),
-					End:   int(int32(bo.Uint32(encOp.Data[5:]))),
-				},
-				Caret: key.Caret{
-					Pos: f32.Point{
-						X: math.Float32frombits(bo.Uint32(encOp.Data[9:])),
-						Y: math.Float32frombits(bo.Uint32(encOp.Data[13:])),
-					},
-					Ascent:  math.Float32frombits(bo.Uint32(encOp.Data[17:])),
-					Descent: math.Float32frombits(bo.Uint32(encOp.Data[21:])),
-				},
-			}
-			kq.selectionOp(t, op)
 
 		// Semantic ops.
 		case ops.TypeSemanticLabel:

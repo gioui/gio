@@ -537,11 +537,7 @@ func (e *Editor) Update(gtx layout.Context) {
 		}
 		if newSel != e.ime.selection {
 			e.ime.selection = newSel
-			key.SelectionOp{
-				Tag:   &e.eventKey,
-				Range: newSel.rng,
-				Caret: newSel.caret,
-			}.Add(gtx.Ops)
+			gtx.Queue(key.SelectionCmd{Tag: &e.eventKey, Range: newSel.rng, Caret: newSel.caret})
 		}
 
 		e.updateSnippet(gtx, e.ime.start, e.ime.end)

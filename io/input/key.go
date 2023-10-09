@@ -42,6 +42,7 @@ type keyHandler struct {
 	order    int
 	dirOrder int
 	filter   key.Set
+	trans    f32.Affine2D
 }
 
 type dirFocusEntry struct {
@@ -290,19 +291,28 @@ func (q *keyQueue) handlerFor(tag event.Tag, area int, bounds image.Rectangle) *
 	return h
 }
 
-func (q *keyQueue) inputOp(op key.InputOp, area int, bounds image.Rectangle) {
+func (q *keyQueue) inputOp(op key.InputOp, t f32.Affine2D, area int, bounds image.Rectangle) {
 	h := q.handlerFor(op.Tag, area, bounds)
 	h.visible = true
 	h.hint = op.Hint
 	h.filter = op.Keys
+	h.trans = t
 }
 
-func (q *keyQueue) selectionOp(t f32.Affine2D, op key.SelectionOp) {
-	if op.Tag == q.focus {
-		q.content.Selection.Range = op.Range
-		q.content.Selection.Caret = op.Caret
-		q.content.Selection.Transform = t
+func (q *keyQueue) setSelection(req key.SelectionCmd) {
+	if req.Tag != q.focus {
+		return
 	}
+	q.content.Selection.Range = req.Range
+	q.content.Selection.Caret = req.Caret
+}
+
+func (q *keyQueue) editorState() EditorState {
+	s := q.content
+	if f := q.focus; f != nil {
+		s.Selection.Transform = q.handlers[f].trans
+	}
+	return s
 }
 
 func (q *keyQueue) snippetOp(op key.SnippetOp) {

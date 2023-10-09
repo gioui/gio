@@ -11,7 +11,6 @@ package key
 
 import (
 	"encoding/binary"
-	"math"
 	"strings"
 
 	"gioui.org/f32"
@@ -39,6 +38,13 @@ type SoftKeyboardCmd struct {
 	Show bool
 }
 
+// SelectionCmd updates the selection for an input handler.
+type SelectionCmd struct {
+	Tag event.Tag
+	Range
+	Caret
+}
+
 // Set is an expression that describes a set of key combinations, in the form
 // "<modifiers>-<keyset>|...".  Modifiers are separated by dashes, optional
 // modifiers are enclosed by parentheses.  A key set is either a literal key
@@ -54,13 +60,6 @@ type SoftKeyboardCmd struct {
 //   - Shift-A matches A key if shift is pressed, and no other modifier.
 //   - Shift-(Ctrl)-A matches A if shift is pressed, and optionally ctrl.
 type Set string
-
-// SelectionOp updates the selection for an input handler.
-type SelectionOp struct {
-	Tag event.Tag
-	Range
-	Caret
-}
 
 // SnippetOp updates the content snippet for an input handler.
 type SnippetOp struct {
@@ -344,18 +343,6 @@ func (s SnippetOp) Add(o *op.Ops) {
 	bo.PutUint32(data[5:], uint32(s.Range.End))
 }
 
-func (s SelectionOp) Add(o *op.Ops) {
-	data := ops.Write1(&o.Internal, ops.TypeSelectionLen, s.Tag)
-	data[0] = byte(ops.TypeSelection)
-	bo := binary.LittleEndian
-	bo.PutUint32(data[1:], uint32(s.Start))
-	bo.PutUint32(data[5:], uint32(s.End))
-	bo.PutUint32(data[9:], math.Float32bits(s.Pos.X))
-	bo.PutUint32(data[13:], math.Float32bits(s.Pos.Y))
-	bo.PutUint32(data[17:], math.Float32bits(s.Ascent))
-	bo.PutUint32(data[21:], math.Float32bits(s.Descent))
-}
-
 func (EditEvent) ImplementsEvent()      {}
 func (Event) ImplementsEvent()          {}
 func (FocusEvent) ImplementsEvent()     {}
@@ -364,6 +351,7 @@ func (SelectionEvent) ImplementsEvent() {}
 
 func (FocusCmd) ImplementsCommand()        {}
 func (SoftKeyboardCmd) ImplementsCommand() {}
+func (SelectionCmd) ImplementsCommand()    {}
 
 func (m Modifiers) String() string {
 	var strs []string
