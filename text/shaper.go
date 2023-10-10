@@ -458,7 +458,13 @@ func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
 			l.advance += g.xAdvance
 		}
 		// runOffset computes how far into the run the dot should be positioned.
-		runOffset := l.advance
+		//
+		// xOffset will change when letter after different letter
+		// example: "Tool"
+		//  	the first  o with -1 xOffset
+		//  	the second o with  0 xOffset
+		// and the glyph boxes are overlapping, because of the xOffset
+		runOffset := l.advance + g.xOffset
 		if rtl {
 			runOffset = run.Advance - l.advance
 		}
