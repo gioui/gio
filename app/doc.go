@@ -12,16 +12,16 @@ Create a new Window by calling NewWindow. On mobile platforms or when Gio
 is embedded in another project, NewWindow merely connects with a previously
 created window.
 
-A Window is run by receiving events from its Events channel. The most
-important event is FrameEvent that prompts an update of the window
-contents and state.
+A Window is run by calling NextEvent in a loop. The most important event is
+FrameEvent that prompts an update of the window contents.
 
 For example:
 
 	import "gioui.org/unit"
 
 	w := app.NewWindow()
-	for e := range w.Events() {
+	for {
+		e := w.NextEvent()
 		if e, ok := e.(system.FrameEvent); ok {
 			ops.Reset()
 			// Add operations to ops.
@@ -50,7 +50,8 @@ For example, to display a blank but otherwise functional window:
 	func main() {
 		go func() {
 			w := app.NewWindow()
-			for range w.Events() {
+			for {
+				w.NextEvent()
 			}
 		}()
 		app.Main()
