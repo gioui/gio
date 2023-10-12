@@ -3,9 +3,7 @@ package material_test
 import (
 	"image"
 	"testing"
-	"time"
 
-	"gioui.org/app"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/unit"
@@ -14,18 +12,17 @@ import (
 )
 
 func TestListAnchorStrategies(t *testing.T) {
-	var ops op.Ops
-	gtx := app.NewContext(&ops, app.FrameEvent{
+	gtx := layout.Context{
+		Ops: new(op.Ops),
 		Metric: unit.Metric{
 			PxPerDp: 1,
 			PxPerSp: 1,
 		},
-		Now: time.Now(),
-		Size: image.Point{
+		Constraints: layout.Exact(image.Point{
 			X: 500,
 			Y: 500,
-		},
-	})
+		}),
+	}
 	gtx.Constraints.Min = image.Point{}
 
 	var spaceConstraints layout.Constraints
