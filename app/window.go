@@ -67,7 +67,7 @@ type Window struct {
 	frameAck chan struct{}
 	destroy  chan struct{}
 
-	stage        system.Stage
+	stage        Stage
 	animating    bool
 	hasNextFrame bool
 	nextFrame    time.Time
@@ -374,8 +374,8 @@ func (w *Window) Option(opts ...Option) {
 
 // Run f in the same thread as the native window event loop, and wait for f to
 // return or the window to close. Run is guaranteed not to deadlock if it is
-// invoked during the handling of a ViewEvent, system.FrameEvent,
-// system.StageEvent; call Run in a separate goroutine to avoid deadlock in all
+// invoked during the handling of a ViewEvent, FrameEvent,
+// StageEvent; call Run in a separate goroutine to avoid deadlock in all
 // other cases.
 //
 // Note that most programs should not call Run; configuring a Window with
@@ -404,7 +404,7 @@ func (w *Window) driverDefer(f func(d driver)) {
 
 func (w *Window) updateAnimation(d driver) {
 	animate := false
-	if w.stage >= system.StageInactive && w.hasNextFrame {
+	if w.stage >= StageInactive && w.hasNextFrame {
 		if dt := time.Until(w.nextFrame); dt <= 0 {
 			animate = true
 		} else {
@@ -801,8 +801,8 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 	default:
 	}
 	switch e2 := e.(type) {
-	case system.StageEvent:
-		if e2.Stage < system.StageInactive {
+	case StageEvent:
+		if e2.Stage < StageInactive {
 			if w.gpu != nil {
 				w.ctx.Lock()
 				w.gpu.Release()
@@ -818,7 +818,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		if e2.Size == (image.Point{}) {
 			panic(errors.New("internal error: zero-sized Draw"))
 		}
-		if w.stage < system.StageInactive {
+		if w.stage < StageInactive {
 			// No drawing if not visible.
 			break
 		}
@@ -862,13 +862,13 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		deco.Add(wrapper)
 		if err := w.validateAndProcess(d, viewSize, e2.Sync, wrapper, signal); err != nil {
 			w.destroyGPU()
-			w.out <- system.DestroyEvent{Err: err}
+			w.out <- DestroyEvent{Err: err}
 			close(w.destroy)
 			break
 		}
 		w.processFrame(d)
 		w.updateCursor(d)
-	case system.DestroyEvent:
+	case DestroyEvent:
 		w.destroyGPU()
 		w.out <- e2
 		close(w.destroy)
@@ -920,7 +920,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 }
 
 // NextEvent blocks until an event is received from the window, such as
-// [io/system.FrameEvent]. It blocks forever if called after [io/system.DestroyEvent]
+// [FrameEvent]. It blocks forever if called after [DestroyEvent]
 // has been returned.
 func (w *Window) NextEvent() event.Event {
 	state := &w.eventState
@@ -928,7 +928,7 @@ func (w *Window) NextEvent() event.Event {
 		state.created = true
 		if err := newWindow(&w.callbacks, state.initialOpts); err != nil {
 			close(w.destroy)
-			return system.DestroyEvent{Err: err}
+			return DestroyEvent{Err: err}
 		}
 	}
 	for {

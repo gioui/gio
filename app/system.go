@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// Package system contains events usually handled at the top-level
-// program level.
-package system
+package app
 
 // DestroyEvent is the last event sent through
 // a window event channel.

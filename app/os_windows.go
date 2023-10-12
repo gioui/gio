@@ -37,7 +37,7 @@ type window struct {
 	hwnd        syscall.Handle
 	hdc         syscall.Handle
 	w           *callbacks
-	stage       system.Stage
+	stage       Stage
 	pointerBtns pointer.Buttons
 
 	// cursorIn tracks whether the cursor was inside the window according
@@ -269,11 +269,11 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.focused = false
 		w.w.Event(key.FocusEvent{Focus: false})
 	case windows.WM_NCACTIVATE:
-		if w.stage >= system.StageInactive {
+		if w.stage >= StageInactive {
 			if wParam == windows.TRUE {
-				w.setStage(system.StageRunning)
+				w.setStage(StageRunning)
 			} else {
-				w.setStage(system.StageInactive)
+				w.setStage(StageInactive)
 			}
 		}
 	case windows.WM_NCHITTEST:
@@ -302,7 +302,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.scrollEvent(wParam, lParam, true, getModifiers())
 	case windows.WM_DESTROY:
 		w.w.Event(ViewEvent{})
-		w.w.Event(system.DestroyEvent{})
+		w.w.Event(DestroyEvent{})
 		if w.hdc != 0 {
 			windows.ReleaseDC(w.hdc)
 			w.hdc = 0
@@ -339,15 +339,15 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		switch wParam {
 		case windows.SIZE_MINIMIZED:
 			w.config.Mode = Minimized
-			w.setStage(system.StagePaused)
+			w.setStage(StagePaused)
 		case windows.SIZE_MAXIMIZED:
 			w.config.Mode = Maximized
-			w.setStage(system.StageRunning)
+			w.setStage(StageRunning)
 		case windows.SIZE_RESTORED:
 			if w.config.Mode != Fullscreen {
 				w.config.Mode = Windowed
 			}
-			w.setStage(system.StageRunning)
+			w.setStage(StageRunning)
 		}
 	case windows.WM_GETMINMAXINFO:
 		mm := (*windows.MinMaxInfo)(unsafe.Pointer(uintptr(lParam)))
@@ -608,10 +608,10 @@ func (w *window) Wakeup() {
 	}
 }
 
-func (w *window) setStage(s system.Stage) {
+func (w *window) setStage(s Stage) {
 	if s != w.stage {
 		w.stage = s
-		w.w.Event(system.StageEvent{Stage: s})
+		w.w.Event(StageEvent{Stage: s})
 	}
 }
 

@@ -120,7 +120,7 @@ func newWindow(win *callbacks, options []Option) error {
 		w.Configure(options)
 		w.blur()
 		w.w.Event(ViewEvent{Element: cont})
-		w.w.Event(system.StageEvent{Stage: system.StageRunning})
+		w.w.Event(StageEvent{Stage: StageRunning})
 		w.resize()
 		w.draw(true)
 		for {
@@ -213,12 +213,12 @@ func (w *window) addEventListeners() {
 		return w.browserHistory.Call("back")
 	})
 	w.addEventListener(w.document, "visibilitychange", func(this js.Value, args []js.Value) interface{} {
-		ev := system.StageEvent{}
+		ev := StageEvent{}
 		switch w.document.Get("visibilityState").String() {
 		case "hidden", "prerender", "unloaded":
-			ev.Stage = system.StagePaused
+			ev.Stage = StagePaused
 		default:
-			ev.Stage = system.StageRunning
+			ev.Stage = StageRunning
 		}
 		w.w.Event(ev)
 		return nil

@@ -249,7 +249,7 @@ type ViewEvent struct {
 type window struct {
 	view        C.CFTypeRef
 	w           *callbacks
-	stage       system.Stage
+	stage       Stage
 	displayLink *displayLink
 	// redraw is a single entry channel for making sure only one
 	// display link redraw request is in flight.
@@ -488,12 +488,12 @@ func (w *window) runOnMain(f func()) {
 	})
 }
 
-func (w *window) setStage(stage system.Stage) {
+func (w *window) setStage(stage Stage) {
 	if stage == w.stage {
 		return
 	}
 	w.stage = stage
-	w.w.Event(system.StageEvent{Stage: stage})
+	w.w.Event(StageEvent{Stage: stage})
 }
 
 //export gio_onKeys
@@ -583,11 +583,11 @@ func gio_onDraw(view C.CFTypeRef) {
 func gio_onFocus(view C.CFTypeRef, focus C.int) {
 	w := mustView(view)
 	w.w.Event(key.FocusEvent{Focus: focus == 1})
-	if w.stage >= system.StageInactive {
+	if w.stage >= StageInactive {
 		if focus == 0 {
-			w.setStage(system.StageInactive)
+			w.setStage(StageInactive)
 		} else {
-			w.setStage(system.StageRunning)
+			w.setStage(StageRunning)
 		}
 	}
 	w.SetCursor(w.cursor)
@@ -782,7 +782,7 @@ func (w *window) draw() {
 		return
 	}
 	cfg := configFor(w.scale)
-	w.setStage(system.StageRunning)
+	w.setStage(StageRunning)
 	w.w.Event(frameEvent{
 		FrameEvent: FrameEvent{
 			Now:    time.Now(),
@@ -804,7 +804,7 @@ func configFor(scale float32) unit.Metric {
 func gio_onClose(view C.CFTypeRef) {
 	w := mustView(view)
 	w.w.Event(ViewEvent{})
-	w.w.Event(system.DestroyEvent{})
+	w.w.Event(DestroyEvent{})
 	w.displayLink.Close()
 	w.displayLink = nil
 	deleteView(view)
@@ -815,13 +815,13 @@ func gio_onClose(view C.CFTypeRef) {
 //export gio_onHide
 func gio_onHide(view C.CFTypeRef) {
 	w := mustView(view)
-	w.setStage(system.StagePaused)
+	w.setStage(StagePaused)
 }
 
 //export gio_onShow
 func gio_onShow(view C.CFTypeRef) {
 	w := mustView(view)
-	w.setStage(system.StageRunning)
+	w.setStage(StageRunning)
 }
 
 //export gio_onFullscreen
@@ -841,14 +841,14 @@ func gio_onWindowed(view C.CFTypeRef) {
 //export gio_onAppHide
 func gio_onAppHide() {
 	for _, w := range viewMap {
-		w.setStage(system.StagePaused)
+		w.setStage(StagePaused)
 	}
 }
 
 //export gio_onAppShow
 func gio_onAppShow() {
 	for _, w := range viewMap {
-		w.setStage(system.StageRunning)
+		w.setStage(StageRunning)
 	}
 }
 

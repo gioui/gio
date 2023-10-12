@@ -158,7 +158,7 @@ type window struct {
 	fontScale float32
 	insets    pixelInsets
 
-	stage     system.Stage
+	stage     Stage
 	started   bool
 	animating bool
 
@@ -503,7 +503,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 	w.loadConfig(env, class)
 	w.Configure(wopts.options)
 	w.SetInputHint(key.HintAny)
-	w.setStage(system.StagePaused)
+	w.setStage(StagePaused)
 	w.callbacks.Event(ViewEvent{View: uintptr(view)})
 	return C.jlong(w.handle)
 }
@@ -518,7 +518,7 @@ func Java_org_gioui_GioView_onDestroyView(env *C.JNIEnv, class C.jclass, handle 
 func Java_org_gioui_GioView_onStopView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := cgo.Handle(handle).Value().(*window)
 	w.started = false
-	w.setStage(system.StagePaused)
+	w.setStage(StagePaused)
 }
 
 //export Java_org_gioui_GioView_onStartView
@@ -534,7 +534,7 @@ func Java_org_gioui_GioView_onStartView(env *C.JNIEnv, class C.jclass, handle C.
 func Java_org_gioui_GioView_onSurfaceDestroyed(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := cgo.Handle(handle).Value().(*window)
 	w.win = nil
-	w.setStage(system.StagePaused)
+	w.setStage(StagePaused)
 }
 
 //export Java_org_gioui_GioView_onSurfaceChanged
@@ -556,7 +556,7 @@ func Java_org_gioui_GioView_onLowMemory(env *C.JNIEnv, class C.jclass) {
 func Java_org_gioui_GioView_onConfigurationChanged(env *C.JNIEnv, class C.jclass, view C.jlong) {
 	w := cgo.Handle(view).Value().(*window)
 	w.loadConfig(env, class)
-	if w.stage >= system.StageInactive {
+	if w.stage >= StageInactive {
 		w.draw(env, true)
 	}
 }
@@ -567,7 +567,7 @@ func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view 
 	if !exist {
 		return
 	}
-	if w.stage < system.StageInactive {
+	if w.stage < StageInactive {
 		return
 	}
 	if w.animating {
@@ -600,7 +600,7 @@ func Java_org_gioui_GioView_onWindowInsets(env *C.JNIEnv, class C.jclass, view C
 		left:   int(left),
 		right:  int(right),
 	}
-	if w.stage >= system.StageInactive {
+	if w.stage >= StageInactive {
 		w.draw(env, true)
 	}
 }
@@ -779,16 +779,16 @@ func (w *window) setVisible(env *C.JNIEnv) {
 	if width == 0 || height == 0 {
 		return
 	}
-	w.setStage(system.StageRunning)
+	w.setStage(StageRunning)
 	w.draw(env, true)
 }
 
-func (w *window) setStage(stage system.Stage) {
+func (w *window) setStage(stage Stage) {
 	if stage == w.stage {
 		return
 	}
 	w.stage = stage
-	w.callbacks.Event(system.StageEvent{stage})
+	w.callbacks.Event(StageEvent{stage})
 }
 
 func (w *window) setVisual(visID int) error {

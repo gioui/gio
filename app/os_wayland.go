@@ -194,7 +194,7 @@ type window struct {
 		dir            f32.Point
 	}
 
-	stage             system.Stage
+	stage             Stage
 	dead              bool
 	lastFrameCallback *C.struct_wl_callback
 
@@ -277,7 +277,7 @@ func newWLWindow(callbacks *callbacks, options []Option) error {
 
 		err := w.loop()
 		w.w.Event(WaylandViewEvent{})
-		w.w.Event(system.DestroyEvent{Err: err})
+		w.w.Event(DestroyEvent{Err: err})
 	}()
 	return nil
 }
@@ -551,7 +551,7 @@ func gio_onXdgSurfaceConfigure(data unsafe.Pointer, wmSurf *C.struct_xdg_surface
 	w.serial = serial
 	w.redraw = true
 	C.xdg_surface_ack_configure(wmSurf, serial)
-	w.setStage(system.StageRunning)
+	w.setStage(StageRunning)
 }
 
 //export gio_onToplevelClose
@@ -1677,9 +1677,9 @@ func (w *window) updateOutputs() {
 		w.redraw = true
 	}
 	if !found {
-		w.setStage(system.StagePaused)
+		w.setStage(StagePaused)
 	} else {
-		w.setStage(system.StageRunning)
+		w.setStage(StageRunning)
 		w.redraw = true
 	}
 }
@@ -1725,12 +1725,12 @@ func (w *window) draw() {
 	})
 }
 
-func (w *window) setStage(s system.Stage) {
+func (w *window) setStage(s Stage) {
 	if s == w.stage {
 		return
 	}
 	w.stage = s
-	w.w.Event(system.StageEvent{Stage: s})
+	w.w.Event(StageEvent{Stage: s})
 }
 
 func (w *window) display() *C.struct_wl_display {

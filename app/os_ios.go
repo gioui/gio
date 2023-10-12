@@ -131,7 +131,7 @@ func onCreate(view, controller C.CFTypeRef) {
 	w.w.SetDriver(w)
 	views[view] = w
 	w.Configure(wopts.options)
-	w.w.Event(system.StageEvent{Stage: system.StagePaused})
+	w.w.Event(StageEvent{Stage: StagePaused})
 	w.w.Event(ViewEvent{ViewController: uintptr(controller)})
 }
 
@@ -149,7 +149,7 @@ func (w *window) draw(sync bool) {
 	wasVisible := w.visible
 	w.visible = true
 	if !wasVisible {
-		w.w.Event(system.StageEvent{Stage: system.StageRunning})
+		w.w.Event(StageEvent{Stage: StageRunning})
 	}
 	const inchPrDp = 1.0 / 163
 	m := unit.Metric{
@@ -180,7 +180,7 @@ func (w *window) draw(sync bool) {
 func onStop(view C.CFTypeRef) {
 	w := views[view]
 	w.visible = false
-	w.w.Event(system.StageEvent{Stage: system.StagePaused})
+	w.w.Event(StageEvent{Stage: StagePaused})
 }
 
 //export onDestroy
@@ -188,7 +188,7 @@ func onDestroy(view C.CFTypeRef) {
 	w := views[view]
 	delete(views, view)
 	w.w.Event(ViewEvent{})
-	w.w.Event(system.DestroyEvent{})
+	w.w.Event(DestroyEvent{})
 	w.displayLink.Close()
 	w.view = 0
 }

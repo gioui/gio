@@ -93,7 +93,7 @@ type x11Window struct {
 		// _NET_WM_STATE_MAXIMIZED_VERT
 		wmStateMaximizedVert C.Atom
 	}
-	stage  system.Stage
+	stage  Stage
 	metric unit.Metric
 	notify struct {
 		read, write int
@@ -395,12 +395,12 @@ func (w *x11Window) window() (C.Window, int, int) {
 	return w.xw, w.config.Size.X, w.config.Size.Y
 }
 
-func (w *x11Window) setStage(s system.Stage) {
+func (w *x11Window) setStage(s Stage) {
 	if s == w.stage {
 		return
 	}
 	w.stage = s
-	w.w.Event(system.StageEvent{Stage: s})
+	w.w.Event(StageEvent{Stage: s})
 }
 
 func (w *x11Window) loop() {
@@ -837,10 +837,10 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 		C.XMapWindow(dpy, win)
 		w.Configure(options)
 		w.w.Event(X11ViewEvent{Display: unsafe.Pointer(dpy), Window: uintptr(win)})
-		w.setStage(system.StageRunning)
+		w.setStage(StageRunning)
 		w.loop()
 		w.w.Event(X11ViewEvent{})
-		w.w.Event(system.DestroyEvent{Err: nil})
+		w.w.Event(DestroyEvent{Err: nil})
 		w.destroy()
 	}()
 	return nil
