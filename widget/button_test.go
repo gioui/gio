@@ -6,7 +6,6 @@ import (
 	"image"
 	"testing"
 
-	"gioui.org/app"
 	"gioui.org/io/input"
 	"gioui.org/io/key"
 	"gioui.org/layout"
@@ -16,12 +15,14 @@ import (
 
 func TestClickable(t *testing.T) {
 	var (
-		ops op.Ops
-		r   input.Router
-		b1  widget.Clickable
-		b2  widget.Clickable
+		r  input.Router
+		b1 widget.Clickable
+		b2 widget.Clickable
 	)
-	gtx := app.NewContext(&ops, app.FrameEvent{Source: r.Source()})
+	gtx := layout.Context{
+		Ops:    new(op.Ops),
+		Source: r.Source(),
+	}
 	layout := func() {
 		b1.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			return layout.Dimensions{Size: image.Pt(100, 100)}
@@ -32,7 +33,7 @@ func TestClickable(t *testing.T) {
 		})
 	}
 	frame := func() {
-		ops.Reset()
+		gtx.Reset()
 		layout()
 		r.Frame(gtx.Ops)
 	}

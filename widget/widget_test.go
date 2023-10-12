@@ -6,7 +6,6 @@ import (
 	"image"
 	"testing"
 
-	"gioui.org/app"
 	"gioui.org/f32"
 	"gioui.org/io/input"
 	"gioui.org/io/pointer"
@@ -18,11 +17,13 @@ import (
 
 func TestBool(t *testing.T) {
 	var (
-		ops op.Ops
-		r   input.Router
-		b   widget.Bool
+		r input.Router
+		b widget.Bool
 	)
-	gtx := app.NewContext(&ops, app.FrameEvent{Source: r.Source()})
+	gtx := layout.Context{
+		Ops:    new(op.Ops),
+		Source: r.Source(),
+	}
 	layout := func() {
 		b.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			semantic.CheckBox.Add(gtx.Ops)
@@ -44,7 +45,7 @@ func TestBool(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
-	ops.Reset()
+	gtx.Reset()
 	layout()
 	r.Frame(gtx.Ops)
 	tree := r.AppendSemantics(nil)
