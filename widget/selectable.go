@@ -199,8 +199,8 @@ func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font,
 	pointer.CursorText.Add(gtx.Ops)
 	var keys key.Set
 	if l.focused {
-		const keyFilterAllArrows = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
-		keys = keyFilterAllArrows
+		const keyFilter = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,X,A]"
+		keys = keyFilter
 	}
 	key.InputOp{Tag: l, Keys: keys}.Add(gtx.Ops)
 	if l.requestFocus {
