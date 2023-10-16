@@ -297,7 +297,9 @@ func (w *window) contextView() C.CFTypeRef {
 
 func (w *window) ReadClipboard() {
 	cstr := C.readClipboard()
-	defer C.CFRelease(cstr)
+	if cstr != 0 {
+		defer C.CFRelease(cstr)
+	}
 	content := nsstringToString(cstr)
 	w.w.Event(clipboard.Event{Text: content})
 }
