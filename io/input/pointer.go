@@ -244,10 +244,19 @@ func (q *pointerQueue) handlerFor(tag event.Tag, events *handlerEvents) *pointer
 		h = &pointerHandler{
 			area: -1,
 		}
+		if q.handlers == nil {
+			q.handlers = make(map[event.Tag]*pointerHandler)
+		}
 		q.handlers[tag] = h
 		// Cancel handlers on (each) first appearance, but don't
 		// trigger redraw.
 		events.AddNoRedraw(tag, pointer.Event{Kind: pointer.Cancel})
+	}
+	if !h.active {
+		h.types = 0
+		h.scrollRange = image.Rectangle{}
+		h.sourceMimes = h.sourceMimes[:0]
+		h.targetMimes = h.targetMimes[:0]
 	}
 	h.active = true
 	return h
@@ -288,20 +297,17 @@ func (q *pointerQueue) grab(req pointer.GrabCmd, events *handlerEvents) {
 	}
 }
 
-func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
+func (c *pointerCollector) inputOp(tag event.Tag, events *handlerEvents) {
 	areaID := c.currentArea()
 	area := &c.q.areas[areaID]
-	area.semantic.content.tag = op.Tag
-	if op.Kinds&(pointer.Press|pointer.Release) != 0 {
-		area.semantic.content.gestures |= ClickGesture
-	}
-	if op.Kinds&pointer.Scroll != 0 {
-		area.semantic.content.gestures |= ScrollGesture
-	}
-	area.semantic.valid = area.semantic.content.gestures != 0
-	h := c.newHandler(op.Tag, events)
-	h.types = h.types | op.Kinds
-	h.scrollRange = op.ScrollBounds
+	area.semantic.content.tag = tag
+	c.newHandler(tag, events)
+}
+
+func (q *pointerQueue) filterTag(tag event.Tag, f pointer.Filter, events *handlerEvents) {
+	h := q.handlerFor(tag, events)
+	h.types = h.types | f.Kinds
+	h.scrollRange = h.scrollRange.Union(f.ScrollBounds)
 }
 
 func (c *pointerCollector) semanticLabel(lbl string) {
@@ -345,14 +351,14 @@ func (c *pointerCollector) cursor(cursor pointer.Cursor) {
 	area.cursor = cursor
 }
 
-func (c *pointerCollector) sourceOp(op transfer.SourceOp, events *handlerEvents) {
-	h := c.newHandler(op.Tag, events)
-	h.sourceMimes = append(h.sourceMimes, op.Type)
+func (q *pointerQueue) sourceFilter(tag event.Tag, f transfer.SourceFilter, events *handlerEvents) {
+	h := q.handlerFor(tag, events)
+	h.sourceMimes = append(h.sourceMimes, f.Type)
 }
 
-func (c *pointerCollector) targetOp(op transfer.TargetOp, events *handlerEvents) {
-	h := c.newHandler(op.Tag, events)
-	h.targetMimes = append(h.targetMimes, op.Type)
+func (q *pointerQueue) targetFilter(tag event.Tag, f transfer.TargetFilter, events *handlerEvents) {
+	h := q.handlerFor(tag, events)
+	h.targetMimes = append(h.targetMimes, f.Type)
 }
 
 func (q *pointerQueue) offerData(req transfer.OfferCmd, events *handlerEvents) {
@@ -571,16 +577,9 @@ func (q *pointerQueue) hit(areaIdx int, p f32.Point) (bool, pointer.Cursor) {
 }
 
 func (q *pointerQueue) reset() {
-	if q.handlers == nil {
-		q.handlers = make(map[event.Tag]*pointerHandler)
-	}
 	for _, h := range q.handlers {
 		// Reset handler.
-		h.active = false
 		h.area = -1
-		h.types = 0
-		h.sourceMimes = h.sourceMimes[:0]
-		h.targetMimes = h.targetMimes[:0]
 	}
 	q.hitTree = q.hitTree[:0]
 	q.areas = q.areas[:0]
@@ -612,6 +611,18 @@ func (q *pointerQueue) Frame(events *handlerEvents) {
 		if !h.active {
 			q.dropHandler(nil, k)
 			delete(q.handlers, k)
+			continue
+		}
+		h.active = false
+		if h.area != -1 {
+			area := &q.areas[h.area]
+			if h.types&(pointer.Press|pointer.Release) != 0 {
+				area.semantic.content.gestures |= ClickGesture
+			}
+			if h.types&pointer.Scroll != 0 {
+				area.semantic.content.gestures |= ScrollGesture
+			}
+			area.semantic.valid = area.semantic.content.gestures != 0
 		}
 	}
 	for i := range q.pointers {
@@ -669,7 +680,7 @@ func (q *pointerQueue) Deliver(areaIdx int, e pointer.Event, events *handlerEven
 			continue
 		}
 		h := q.handlers[n.tag]
-		if e.Kind&h.types == 0 {
+		if h == nil || e.Kind&h.types == 0 {
 			continue
 		}
 		e := e

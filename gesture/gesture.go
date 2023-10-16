@@ -17,6 +17,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/internal/fling"
+	"gioui.org/io/event"
 	"gioui.org/io/input"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
@@ -37,15 +38,12 @@ type Hover struct {
 
 // Add the gesture to detect hovering over the current pointer area.
 func (h *Hover) Add(ops *op.Ops) {
-	pointer.InputOp{
-		Tag:   h,
-		Kinds: pointer.Enter | pointer.Leave,
-	}.Add(ops)
+	event.InputOp(ops, h)
 }
 
 // Update state and report whether a pointer is inside the area.
 func (h *Hover) Update(q input.Source) bool {
-	for _, ev := range q.Events(h) {
+	for _, ev := range q.Events(h, pointer.Filter{Kinds: pointer.Enter | pointer.Leave}) {
 		e, ok := ev.(pointer.Event)
 		if !ok {
 			continue
@@ -114,7 +112,6 @@ type Drag struct {
 // movements as well as drag and fling touch gestures.
 type Scroll struct {
 	dragging  bool
-	axis      Axis
 	estimator fling.Extrapolation
 	flinger   fling.Animation
 	pid       pointer.ID
@@ -159,10 +156,7 @@ const touchSlop = unit.Dp(3)
 
 // Add the handler to the operation list to receive click events.
 func (c *Click) Add(ops *op.Ops) {
-	pointer.InputOp{
-		Tag:   c,
-		Kinds: pointer.Press | pointer.Release | pointer.Enter | pointer.Leave,
-	}.Add(ops)
+	event.InputOp(ops, c)
 }
 
 // Hovered returns whether a pointer is inside the area.
@@ -178,7 +172,7 @@ func (c *Click) Pressed() bool {
 // Update state and return the click events.
 func (c *Click) Update(q input.Source) []ClickEvent {
 	var events []ClickEvent
-	for _, evt := range q.Events(c) {
+	for _, evt := range q.Events(c, pointer.Filter{Kinds: pointer.Press | pointer.Release | pointer.Enter | pointer.Leave}) {
 		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue
@@ -248,13 +242,8 @@ func (ClickEvent) ImplementsEvent() {}
 // Add the handler to the operation list to receive scroll events.
 // The bounds variable refers to the scrolling boundaries
 // as defined in io/pointer.InputOp.
-func (s *Scroll) Add(ops *op.Ops, bounds image.Rectangle) {
-	oph := pointer.InputOp{
-		Tag:          s,
-		Kinds:        pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll,
-		ScrollBounds: bounds,
-	}
-	oph.Add(ops)
+func (s *Scroll) Add(ops *op.Ops) {
+	event.InputOp(ops, s)
 	if s.flinger.Active() {
 		op.InvalidateOp{}.Add(ops)
 	}
@@ -266,13 +255,13 @@ func (s *Scroll) Stop() {
 }
 
 // Update state and report the scroll distance along axis.
-func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis) int {
-	if s.axis != axis {
-		s.axis = axis
-		return 0
-	}
+func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis, bounds image.Rectangle) int {
 	total := 0
-	for _, evt := range q.Events(s) {
+	f := pointer.Filter{
+		Kinds:        pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll,
+		ScrollBounds: bounds,
+	}
+	for _, evt := range q.Events(s, f) {
 		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue
@@ -289,7 +278,7 @@ func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis)
 			}
 			s.Stop()
 			s.estimator = fling.Extrapolation{}
-			v := s.val(e.Position)
+			v := s.val(axis, e.Position)
 			s.last = int(math.Round(float64(v)))
 			s.estimator.Sample(e.Time, v)
 			s.dragging = true
@@ -306,7 +295,7 @@ func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis)
 		case pointer.Cancel:
 			s.dragging = false
 		case pointer.Scroll:
-			switch s.axis {
+			switch axis {
 			case Horizontal:
 				s.scroll += e.Scroll.X
 			case Vertical:
@@ -319,7 +308,7 @@ func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis)
 			if !s.dragging || s.pid != e.PointerID {
 				continue
 			}
-			val := s.val(e.Position)
+			val := s.val(axis, e.Position)
 			s.estimator.Sample(e.Time, val)
 			v := int(math.Round(float64(val)))
 			dist := s.last - v
@@ -338,8 +327,8 @@ func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis)
 	return total
 }
 
-func (s *Scroll) val(p f32.Point) float32 {
-	if s.axis == Horizontal {
+func (s *Scroll) val(axis Axis, p f32.Point) float32 {
+	if axis == Horizontal {
 		return p.X
 	} else {
 		return p.Y
@@ -360,16 +349,13 @@ func (s *Scroll) State() ScrollState {
 
 // Add the handler to the operation list to receive drag events.
 func (d *Drag) Add(ops *op.Ops) {
-	pointer.InputOp{
-		Tag:   d,
-		Kinds: pointer.Press | pointer.Drag | pointer.Release,
-	}.Add(ops)
+	event.InputOp(ops, d)
 }
 
 // Update state and return the drag events.
 func (d *Drag) Update(cfg unit.Metric, q input.Source, axis Axis) []pointer.Event {
 	var events []pointer.Event
-	for _, e := range q.Events(d) {
+	for _, e := range q.Events(d, pointer.Filter{Kinds: pointer.Press | pointer.Drag | pointer.Release}) {
 		e, ok := e.(pointer.Event)
 		if !ok {
 			continue

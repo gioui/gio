@@ -900,7 +900,6 @@ g 2 4 6 8 g
 	var tim time.Duration
 	selected := func(start, end int) string {
 		// Layout once with no events; populate e.lines.
-		gtx = gtx.Disabled()
 		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 		e.Events() // throw away any events from this layout
 

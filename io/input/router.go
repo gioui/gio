@@ -119,16 +119,27 @@ func (s Source) Enabled() bool {
 	return s.r != nil
 }
 
-// Events returns the available events for the handler tag.
-func (s Source) Events(k event.Tag) []event.Event {
+// Events returns the events for the handler tag that matches one
+// or more of filters.
+func (s Source) Events(k event.Tag, filters ...event.Filter) []event.Event {
 	if !s.Enabled() {
 		return nil
 	}
-	return s.r.Events(k)
+	return s.r.Events(k, filters...)
 }
 
-func (q *Router) Events(k event.Tag) []event.Event {
-	events := q.handlers.Events(k)
+func (q *Router) Events(k event.Tag, filters ...event.Filter) []event.Event {
+	for _, f := range filters {
+		switch f := f.(type) {
+		case pointer.Filter:
+			q.pointer.queue.filterTag(k, f, &q.handlers)
+		case transfer.SourceFilter:
+			q.pointer.queue.sourceFilter(k, f, &q.handlers)
+		case transfer.TargetFilter:
+			q.pointer.queue.targetFilter(k, f, &q.handlers)
+		}
+	}
+	events := q.handlers.Events(k, filters...)
 	return events
 }
 
@@ -424,7 +435,6 @@ func (q *Router) collect() {
 	kq := &q.key.queue
 	q.key.queue.Reset()
 	var t f32.Affine2D
-	bo := binary.LittleEndian
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeInvalidate:
@@ -464,42 +474,18 @@ func (q *Router) collect() {
 			q.transStack = q.transStack[:n-1]
 			pc.setTrans(t)
 
+		case ops.TypeInput:
+			tag := encOp.Refs[0].(event.Tag)
+			pc.inputOp(tag, &q.handlers)
+
 		// Pointer ops.
 		case ops.TypePass:
 			pc.pass()
 		case ops.TypePopPass:
 			pc.popPass()
-		case ops.TypePointerInput:
-			op := pointer.InputOp{
-				Tag:   encOp.Refs[0].(event.Tag),
-				Kinds: pointer.Kind(bo.Uint16(encOp.Data[1:])),
-				ScrollBounds: image.Rectangle{
-					Min: image.Point{
-						X: int(int32(bo.Uint32(encOp.Data[3:]))),
-						Y: int(int32(bo.Uint32(encOp.Data[7:]))),
-					},
-					Max: image.Point{
-						X: int(int32(bo.Uint32(encOp.Data[11:]))),
-						Y: int(int32(bo.Uint32(encOp.Data[15:]))),
-					},
-				},
-			}
-			pc.inputOp(op, &q.handlers)
 		case ops.TypeCursor:
 			name := pointer.Cursor(encOp.Data[1])
 			pc.cursor(name)
-		case ops.TypeSource:
-			op := transfer.SourceOp{
-				Tag:  encOp.Refs[0].(event.Tag),
-				Type: encOp.Refs[1].(string),
-			}
-			pc.sourceOp(op, &q.handlers)
-		case ops.TypeTarget:
-			op := transfer.TargetOp{
-				Tag:  encOp.Refs[0].(event.Tag),
-				Type: encOp.Refs[1].(string),
-			}
-			pc.targetOp(op, &q.handlers)
 		case ops.TypeActionInput:
 			act := system.Action(encOp.Data[1])
 			pc.actionInputOp(act)
@@ -570,12 +556,55 @@ func (h *handlerEvents) HadEvents() bool {
 	return u
 }
 
-func (h *handlerEvents) Events(k event.Tag) []event.Event {
+func (h *handlerEvents) Events(k event.Tag, filters ...event.Filter) []event.Event {
+	var filtered []event.Event
 	if events, ok := h.handlers[k]; ok {
-		h.handlers[k] = h.handlers[k][:0]
-		return events
+		i := 0
+		for i < len(events) {
+			e := events[i]
+			if filtersMatches(filters, e) {
+				filtered = append(filtered, e)
+				events = append(events[:i], events[i+1:]...)
+			} else {
+				i++
+			}
+		}
+		h.handlers[k] = events
 	}
-	return nil
+	return filtered
+}
+
+func filtersMatches(filters []event.Filter, e event.Event) bool {
+	switch e := e.(type) {
+	case pointer.Event:
+		for _, f := range filters {
+			if f, ok := f.(pointer.Filter); ok && f.Kinds&e.Kind == e.Kind {
+				return true
+			}
+		}
+	case transfer.CancelEvent, transfer.InitiateEvent:
+		for _, f := range filters {
+			switch f.(type) {
+			case transfer.SourceFilter, transfer.TargetFilter:
+				return true
+			}
+		}
+	case transfer.RequestEvent:
+		for _, f := range filters {
+			if f, ok := f.(transfer.SourceFilter); ok && f.Type == e.Type {
+				return true
+			}
+		}
+	case transfer.DataEvent:
+		for _, f := range filters {
+			if f, ok := f.(transfer.TargetFilter); ok && f.Type == e.Type {
+				return true
+			}
+		}
+	default:
+		return true
+	}
+	return false
 }
 
 func (h *handlerEvents) Clear() {

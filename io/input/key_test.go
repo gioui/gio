@@ -269,25 +269,24 @@ func TestFocusScroll(t *testing.T) {
 	r := new(Router)
 	h := new(int)
 
+	f := pointer.Filter{
+		Kinds:        pointer.Scroll,
+		ScrollBounds: image.Rect(-100, -100, 100, 100),
+	}
+	r.Events(h, f)
 	parent := clip.Rect(image.Rect(1, 1, 14, 39)).Push(ops)
 	cl := clip.Rect(image.Rect(10, -20, 20, 30)).Push(ops)
 	key.InputOp{Tag: h}.Add(ops)
-	pointer.InputOp{
-		Tag:          h,
-		Kinds:        pointer.Scroll,
-		ScrollBounds: image.Rect(-100, -100, 100, 100),
-	}.Add(ops)
+	event.InputOp(ops, h)
 	// Test that h is scrolled even if behind another handler.
-	pointer.InputOp{
-		Tag: new(int),
-	}.Add(ops)
+	event.InputOp(ops, new(int))
 	cl.Pop()
 	parent.Pop()
 	r.Frame(ops)
 
 	r.MoveFocus(key.FocusLeft)
 	r.RevealFocus(image.Rect(0, 0, 15, 40))
-	evts := r.Events(h)
+	evts := r.Events(h, f)
 	assertScrollEvent(t, evts[len(evts)-1], f32.Pt(6, -9))
 }
 
@@ -296,18 +295,20 @@ func TestFocusClick(t *testing.T) {
 	r := new(Router)
 	h := new(int)
 
+	f := pointer.Filter{
+		Kinds: pointer.Press | pointer.Release,
+	}
+	assertEventPointerTypeSequence(t, r.Events(h, f), pointer.Cancel)
 	cl := clip.Rect(image.Rect(0, 0, 10, 10)).Push(ops)
 	key.InputOp{Tag: h}.Add(ops)
-	pointer.InputOp{
-		Tag:   h,
-		Kinds: pointer.Press | pointer.Release,
-	}.Add(ops)
+	event.InputOp(ops, h)
 	cl.Pop()
 	r.Frame(ops)
 
 	r.MoveFocus(key.FocusLeft)
 	r.ClickFocus()
-	assertEventPointerTypeSequence(t, r.Events(h), pointer.Cancel, pointer.Press, pointer.Release)
+
+	assertEventPointerTypeSequence(t, r.Events(h, f), pointer.Press, pointer.Release)
 }
 
 func TestNoFocus(t *testing.T) {

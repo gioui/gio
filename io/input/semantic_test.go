@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"gioui.org/f32"
+	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/io/semantic"
 	"gioui.org/op"
@@ -74,13 +75,18 @@ func TestSemanticTree(t *testing.T) {
 
 func TestSemanticDescription(t *testing.T) {
 	var ops op.Ops
-	pointer.InputOp{Tag: new(int), Kinds: pointer.Press | pointer.Release}.Add(&ops)
+
+	h := new(int)
+	event.InputOp(&ops, h)
 	semantic.DescriptionOp("description").Add(&ops)
 	semantic.LabelOp("label").Add(&ops)
 	semantic.Button.Add(&ops)
 	semantic.EnabledOp(false).Add(&ops)
 	semantic.SelectedOp(true).Add(&ops)
 	var r Router
+	r.Events(h, pointer.Filter{
+		Kinds: pointer.Press | pointer.Release,
+	})
 	r.Frame(&ops)
 	tree := r.AppendSemantics(nil)
 	got := tree[0].Desc

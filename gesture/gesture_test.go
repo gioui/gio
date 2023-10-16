@@ -23,6 +23,7 @@ func TestHover(t *testing.T) {
 	h.Add(ops)
 	stack.Pop()
 	r := new(input.Router)
+	h.Update(r.Source())
 	r.Frame(ops)
 
 	r.Queue(
@@ -72,6 +73,7 @@ func TestMouseClicks(t *testing.T) {
 			click.Add(&ops)
 
 			var r input.Router
+			click.Update(r.Source())
 			r.Frame(&ops)
 			r.Queue(tc.events...)
 

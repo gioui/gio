@@ -225,7 +225,19 @@ func (e *Editor) processPointer(gtx layout.Context) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Update(gtx.Metric, gtx.Source, gtx.Now, axis)
+	var scrollRange image.Rectangle
+	textDims := e.text.FullDimensions()
+	visibleDims := e.text.Dimensions()
+	if e.SingleLine {
+		scrollOffX := e.text.ScrollOff().X
+		scrollRange.Min.X = min(-scrollOffX, 0)
+		scrollRange.Max.X = max(0, textDims.Size.X-(scrollOffX+visibleDims.Size.X))
+	} else {
+		scrollOffY := e.text.ScrollOff().Y
+		scrollRange.Min.Y = -scrollOffY
+		scrollRange.Max.Y = max(0, textDims.Size.Y-(scrollOffY+visibleDims.Size.Y))
+	}
+	sdist := e.scroller.Update(gtx.Metric, gtx.Source, gtx.Now, axis, scrollRange)
 	var soff int
 	if e.SingleLine {
 		e.text.ScrollRel(sdist, 0)
@@ -320,7 +332,7 @@ func (e *Editor) processKey(gtx layout.Context) {
 	}
 	// adjust keeps track of runes dropped because of MaxLen.
 	var adjust int
-	for _, ke := range gtx.Events(&e.eventKey) {
+	for _, ke := range gtx.Events(&e.eventKey, transfer.TargetFilter{Type: "application/text"}) {
 		e.blinkStart = gtx.Now
 		switch ke := ke.(type) {
 		case key.FocusEvent:
@@ -609,7 +621,6 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 		e.scrollCaret = false
 		e.text.ScrollToCaret()
 	}
-	textDims := e.text.FullDimensions()
 	visibleDims := e.text.Dimensions()
 
 	defer clip.Rect(image.Rectangle{Max: visibleDims.Size}).Push(gtx.Ops).Pop()
@@ -642,17 +653,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 	}
 	key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keys}.Add(gtx.Ops)
 
-	var scrollRange image.Rectangle
-	if e.SingleLine {
-		scrollOffX := e.text.ScrollOff().X
-		scrollRange.Min.X = min(-scrollOffX, 0)
-		scrollRange.Max.X = max(0, textDims.Size.X-(scrollOffX+visibleDims.Size.X))
-	} else {
-		scrollOffY := e.text.ScrollOff().Y
-		scrollRange.Min.Y = -scrollOffY
-		scrollRange.Max.Y = max(0, textDims.Size.Y-(scrollOffY+visibleDims.Size.Y))
-	}
-	e.scroller.Add(gtx.Ops, scrollRange)
+	e.scroller.Add(gtx.Ops)
 
 	e.clicker.Add(gtx.Ops)
 	e.dragger.Add(gtx.Ops)

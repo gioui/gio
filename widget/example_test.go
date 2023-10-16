@@ -5,8 +5,11 @@ package widget_test
 import (
 	"fmt"
 	"image"
+	"io"
+	"strings"
 
 	"gioui.org/f32"
+	"gioui.org/io/event"
 	"gioui.org/io/input"
 	"gioui.org/io/pointer"
 	"gioui.org/io/transfer"
@@ -79,7 +82,7 @@ func ExampleDraggable_Layout() {
 	}
 	// mime is the type used to match drag and drop operations.
 	// It could be left empty in this example.
-	mime := "MyMime"
+	const mime = "MyMime"
 	drag := &widget.Draggable{Type: mime}
 	var drop int
 	// widget lays out the drag and drop handlers and processes
@@ -94,7 +97,7 @@ func ExampleDraggable_Layout() {
 		// drag must respond with an Offer event when requested.
 		// Use the drag method for this.
 		if m, ok := drag.Update(gtx); ok {
-			drag.Offer(gtx, m, offer{Data: "hello world"})
+			drag.Offer(gtx, m, io.NopCloser(strings.NewReader("hello world")))
 		}
 
 		// Setup the area for drops.
@@ -102,17 +105,17 @@ func ExampleDraggable_Layout() {
 			Min: image.Pt(20, 20),
 			Max: image.Pt(40, 40),
 		}.Push(gtx.Ops)
-		transfer.TargetOp{
-			Tag:  &drop,
-			Type: mime, // this must match the drag Type for the drop to succeed
-		}.Add(gtx.Ops)
+		event.InputOp(gtx.Ops, &drop)
 		ds.Pop()
+
 		// Check for the received data.
-		for _, ev := range gtx.Events(&drop) {
+		for _, ev := range gtx.Events(&drop, transfer.TargetFilter{Type: mime}) {
 			switch e := ev.(type) {
 			case transfer.DataEvent:
 				data := e.Open()
-				fmt.Println(data.(offer).Data)
+				defer data.Close()
+				content, _ := io.ReadAll(data)
+				fmt.Println(string(content))
 			}
 		}
 	}
@@ -145,10 +148,3 @@ func ExampleDraggable_Layout() {
 	// Output:
 	// hello world
 }
-
-type offer struct {
-	Data string
-}
-
-func (offer) Read([]byte) (int, error) { return 0, nil }
-func (offer) Close() error             { return nil }

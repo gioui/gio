@@ -62,9 +62,7 @@ const (
 	TypeLinearGradient
 	TypePass
 	TypePopPass
-	TypePointerInput
-	TypeSource
-	TypeTarget
+	TypeInput
 	TypeKeyInput
 	TypeSave
 	TypeLoad
@@ -140,9 +138,7 @@ const (
 	TypeLinearGradientLen   = 1 + 8*2 + 4*2
 	TypePassLen             = 1
 	TypePopPassLen          = 1
-	TypePointerInputLen     = 1 + 1*2 + 2*4 + 2*4
-	TypeSourceLen           = 1
-	TypeTargetLen           = 1
+	TypeInputLen            = 1
 	TypeKeyInputLen         = 1 + 1
 	TypeSaveLen             = 1 + 4
 	TypeLoadLen             = 1 + 4
@@ -416,9 +412,7 @@ var opProps = [0x100]opProp{
 	TypeLinearGradient:   {Size: TypeLinearGradientLen, NumRefs: 0},
 	TypePass:             {Size: TypePassLen, NumRefs: 0},
 	TypePopPass:          {Size: TypePopPassLen, NumRefs: 0},
-	TypePointerInput:     {Size: TypePointerInputLen, NumRefs: 1},
-	TypeSource:           {Size: TypeSourceLen, NumRefs: 2},
-	TypeTarget:           {Size: TypeTargetLen, NumRefs: 2},
+	TypeInput:            {Size: TypeInputLen, NumRefs: 1},
 	TypeKeyInput:         {Size: TypeKeyInputLen, NumRefs: 2},
 	TypeSave:             {Size: TypeSaveLen, NumRefs: 0},
 	TypeLoad:             {Size: TypeLoadLen, NumRefs: 0},
@@ -479,12 +473,8 @@ func (t OpType) String() string {
 		return "Pass"
 	case TypePopPass:
 		return "PopPass"
-	case TypePointerInput:
-		return "PointerInput"
-	case TypeSource:
-		return "Source"
-	case TypeTarget:
-		return "Target"
+	case TypeInput:
+		return "Input"
 	case TypeKeyInput:
 		return "KeyInput"
 	case TypeSave:

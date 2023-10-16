@@ -2,10 +2,10 @@
 //
 // The transfer protocol is as follows:
 //
-//   - Data sources use [SourceFilter] to receive [InitiateEvent]s when a drag
-//     is initiated, and [RequestEvent]s for each initiation of a data transfer.
-//     Sources respond to requests with [OfferCommand].
-//   - Data targets use [TargetFilter] to receive [DataEvent]s for receiving data.
+//   - Data sources use [SourceFilter] to receive an [InitiateEvent] when a drag
+//     is initiated, and an [RequestEvent] for each initiation of a data transfer.
+//     Sources respond to requests with [OfferCmd].
+//   - Data targets use [TargetFilter] to receive an [DataEvent] for receiving data.
 //     The target must close the data event after use.
 //
 // When a user initiates a pointer-guided drag and drop transfer, the
@@ -20,9 +20,7 @@ package transfer
 import (
 	"io"
 
-	"gioui.org/internal/ops"
 	"gioui.org/io/event"
-	"gioui.org/op"
 )
 
 // OfferCmd is used by data sources as a response to a RequestEvent.
@@ -34,36 +32,25 @@ type OfferCmd struct {
 	// Data contains the offered data. It is closed when the
 	// transfer is complete or cancelled.
 	// Data must be kept valid until closed, and it may be used from
-	// a goroutine separate from the one processing the frame..
+	// a goroutine separate from the one processing the frame.
 	Data io.ReadCloser
 }
 
 func (OfferCmd) ImplementsCommand() {}
 
-// SourceOp registers a tag as a data source for a MIME type.
-// Use multiple SourceOps if a tag supports multiple types.
-type SourceOp struct {
-	Tag event.Tag
+// SourceFilter filters for any [RequestEvent] that match a MIME type
+// as well as [InitiateEvent] and [CancelEvent].
+// Use multiple filters to offer multiple types.
+type SourceFilter struct {
 	// Type is the MIME type supported by this source.
 	Type string
 }
 
-// TargetOp registers a tag as a data target.
-// Use multiple TargetOps if a tag supports multiple types.
-type TargetOp struct {
-	Tag event.Tag
+// TargetFilter filters for any [DataEvent] whose type matches a MIME type
+// as well as [CancelEvent]. Use multiple filters to accept multiple types.
+type TargetFilter struct {
 	// Type is the MIME type accepted by this target.
 	Type string
-}
-
-func (op SourceOp) Add(o *op.Ops) {
-	data := ops.Write2(&o.Internal, ops.TypeSourceLen, op.Tag, op.Type)
-	data[0] = byte(ops.TypeSource)
-}
-
-func (op TargetOp) Add(o *op.Ops) {
-	data := ops.Write2(&o.Internal, ops.TypeTargetLen, op.Tag, op.Type)
-	data[0] = byte(ops.TypeTarget)
 }
 
 // RequestEvent requests data from a data source. The source must
@@ -99,3 +86,6 @@ type DataEvent struct {
 }
 
 func (DataEvent) ImplementsEvent() {}
+
+func (SourceFilter) ImplementsFilter() {}
+func (TargetFilter) ImplementsFilter() {}

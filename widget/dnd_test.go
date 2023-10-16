@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"gioui.org/f32"
+	"gioui.org/io/event"
 	"gioui.org/io/input"
 	"gioui.org/io/pointer"
 	"gioui.org/io/transfer"
@@ -29,12 +30,11 @@ func TestDraggable(t *testing.T) {
 		return layout.Dimensions{Size: gtx.Constraints.Min}
 	}, nil)
 	stack := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
-	transfer.TargetOp{
-		Tag:  drag,
-		Type: drag.Type,
-	}.Add(gtx.Ops)
+	event.InputOp(gtx.Ops, drag)
 	stack.Pop()
 
+	drag.Update(gtx)
+	r.Events(drag, transfer.TargetFilter{Type: drag.Type})
 	r.Frame(gtx.Ops)
 	r.Queue(
 		pointer.Event{
@@ -52,9 +52,11 @@ func TestDraggable(t *testing.T) {
 	)
 	ofr := &offer{data: "hello"}
 	drag.Offer(gtx, "file", ofr)
+	drag.Update(gtx)
+	r.Events(drag, transfer.TargetFilter{Type: drag.Type})
 	r.Frame(gtx.Ops)
 
-	evs := r.Events(drag)
+	evs := r.Events(drag, transfer.TargetFilter{Type: drag.Type})
 	if len(evs) != 2 {
 		t.Fatalf("expected 2 event, got %d", len(evs))
 	}

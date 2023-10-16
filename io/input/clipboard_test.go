@@ -29,8 +29,8 @@ func TestClipboardDuplicateEvent(t *testing.T) {
 	}
 	router.Queue(event)
 	assertClipboardReadCmd(t, router, 0)
-	assertClipboardEvent(t, router.Events(&handler[0]), true)
-	assertClipboardEvent(t, router.Events(&handler[1]), true)
+	assertClipboardEvent(t, router.Events(&handler[0], transfer.TargetFilter{Type: "application/text"}), true)
+	assertClipboardEvent(t, router.Events(&handler[1], transfer.TargetFilter{Type: "application/text"}), true)
 	ops.Reset()
 
 	// No ReadCmd
@@ -81,7 +81,7 @@ func TestQueueProcessReadClipboard(t *testing.T) {
 	}
 	router.Queue(event)
 	assertClipboardReadCmd(t, router, 0)
-	assertClipboardEvent(t, router.Events(&handler[0]), true)
+	assertClipboardEvent(t, router.Events(&handler[0], transfer.TargetFilter{Type: "application/text"}), true)
 	ops.Reset()
 
 	// No ReadCmd

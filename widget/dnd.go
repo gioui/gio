@@ -5,6 +5,7 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/gesture"
+	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/io/transfer"
 	"gioui.org/layout"
@@ -31,10 +32,7 @@ func (d *Draggable) Layout(gtx layout.Context, w, drag layout.Widget) layout.Dim
 
 	stack := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
 	d.drag.Add(gtx.Ops)
-	transfer.SourceOp{
-		Tag:  &d.handle,
-		Type: d.Type,
-	}.Add(gtx.Ops)
+	event.InputOp(gtx.Ops, &d.handle)
 	stack.Pop()
 
 	if drag != nil && d.drag.Pressed() {
@@ -67,7 +65,7 @@ func (d *Draggable) Update(gtx layout.Context) (mime string, requested bool) {
 	}
 	d.pos = pos
 
-	for _, ev := range gtx.Source.Events(&d.handle) {
+	for _, ev := range gtx.Events(&d.handle, transfer.SourceFilter{Type: d.Type}) {
 		if e, ok := ev.(transfer.RequestEvent); ok {
 			return e.Type, true
 		}
