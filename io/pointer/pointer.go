@@ -60,9 +60,6 @@ type PassStack struct {
 // events.
 type InputOp struct {
 	Tag event.Tag
-	// Grab, if set, request that the handler get
-	// Grabbed priority.
-	Grab bool
 	// Kinds is a bitwise-or of event types to receive.
 	Kinds Kind
 	// ScrollBounds describe the maximum scrollable distances in both
@@ -71,6 +68,12 @@ type InputOp struct {
 	// ScrollBounds.Min.X <= e.Scroll.X <= ScrollBounds.Max.X (horizontal axis)
 	// ScrollBounds.Min.Y <= e.Scroll.Y <= ScrollBounds.Max.Y (vertical axis)
 	ScrollBounds image.Rectangle
+}
+
+// GrabCmd requests a pointer grab on the pointer identified by ID.
+type GrabCmd struct {
+	Tag event.Tag
+	ID  ID
 }
 
 type ID uint16
@@ -250,15 +253,12 @@ func (op InputOp) Add(o *op.Ops) {
 	}
 	data := ops.Write1(&o.Internal, ops.TypePointerInputLen, op.Tag)
 	data[0] = byte(ops.TypePointerInput)
-	if op.Grab {
-		data[1] = 1
-	}
 	bo := binary.LittleEndian
-	bo.PutUint16(data[2:], uint16(op.Kinds))
-	bo.PutUint32(data[4:], uint32(op.ScrollBounds.Min.X))
-	bo.PutUint32(data[8:], uint32(op.ScrollBounds.Min.Y))
-	bo.PutUint32(data[12:], uint32(op.ScrollBounds.Max.X))
-	bo.PutUint32(data[16:], uint32(op.ScrollBounds.Max.Y))
+	bo.PutUint16(data[1:], uint16(op.Kinds))
+	bo.PutUint32(data[3:], uint32(op.ScrollBounds.Min.X))
+	bo.PutUint32(data[7:], uint32(op.ScrollBounds.Min.Y))
+	bo.PutUint32(data[11:], uint32(op.ScrollBounds.Max.X))
+	bo.PutUint32(data[15:], uint32(op.ScrollBounds.Max.Y))
 }
 
 func (t Kind) String() string {
@@ -404,3 +404,5 @@ func (c Cursor) String() string {
 }
 
 func (Event) ImplementsEvent() {}
+
+func (GrabCmd) ImplementsCommand() {}

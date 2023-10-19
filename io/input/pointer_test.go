@@ -86,7 +86,7 @@ func TestPointerGrab(t *testing.T) {
 
 	types := pointer.Press | pointer.Release
 
-	pointer.InputOp{Tag: handler1, Kinds: types, Grab: true}.Add(&ops)
+	pointer.InputOp{Tag: handler1, Kinds: types}.Add(&ops)
 	pointer.InputOp{Tag: handler2, Kinds: types}.Add(&ops)
 	pointer.InputOp{Tag: handler3, Kinds: types}.Add(&ops)
 
@@ -98,6 +98,7 @@ func TestPointerGrab(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
+	r.Source().Queue(pointer.GrabCmd{Tag: handler1})
 	assertEventPointerTypeSequence(t, r.Events(handler1), pointer.Cancel, pointer.Press)
 	assertEventPointerTypeSequence(t, r.Events(handler2), pointer.Cancel, pointer.Press)
 	assertEventPointerTypeSequence(t, r.Events(handler3), pointer.Cancel, pointer.Press)
@@ -120,7 +121,7 @@ func TestPointerGrabSameHandlerTwice(t *testing.T) {
 
 	types := pointer.Press | pointer.Release
 
-	pointer.InputOp{Tag: handler1, Kinds: types, Grab: true}.Add(&ops)
+	pointer.InputOp{Tag: handler1, Kinds: types}.Add(&ops)
 	pointer.InputOp{Tag: handler1, Kinds: types}.Add(&ops)
 	pointer.InputOp{Tag: handler2, Kinds: types}.Add(&ops)
 
@@ -132,6 +133,7 @@ func TestPointerGrabSameHandlerTwice(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
+	r.Source().Queue(pointer.GrabCmd{Tag: handler1})
 	assertEventPointerTypeSequence(t, r.Events(handler1), pointer.Cancel, pointer.Press)
 	assertEventPointerTypeSequence(t, r.Events(handler2), pointer.Cancel, pointer.Press)
 	r.Frame(&ops)

@@ -140,7 +140,7 @@ const (
 	TypeLinearGradientLen   = 1 + 8*2 + 4*2
 	TypePassLen             = 1
 	TypePopPassLen          = 1
-	TypePointerInputLen     = 1 + 1 + 1*2 + 2*4 + 2*4
+	TypePointerInputLen     = 1 + 1*2 + 2*4 + 2*4
 	TypeSourceLen           = 1
 	TypeTargetLen           = 1
 	TypeKeyInputLen         = 1 + 1

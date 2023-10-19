@@ -226,6 +226,8 @@ func (q *Router) executeCommands() {
 			q.cqueue.ProcessWriteClipboard(req)
 		case clipboard.ReadCmd:
 			q.cqueue.ProcessReadClipboard(req.Tag)
+		case pointer.GrabCmd:
+			q.pointer.queue.grab(req, &q.handlers)
 		}
 	}
 	q.commands = nil
@@ -470,16 +472,15 @@ func (q *Router) collect() {
 		case ops.TypePointerInput:
 			op := pointer.InputOp{
 				Tag:   encOp.Refs[0].(event.Tag),
-				Grab:  encOp.Data[1] != 0,
-				Kinds: pointer.Kind(bo.Uint16(encOp.Data[2:])),
+				Kinds: pointer.Kind(bo.Uint16(encOp.Data[1:])),
 				ScrollBounds: image.Rectangle{
 					Min: image.Point{
-						X: int(int32(bo.Uint32(encOp.Data[4:]))),
-						Y: int(int32(bo.Uint32(encOp.Data[8:]))),
+						X: int(int32(bo.Uint32(encOp.Data[3:]))),
+						Y: int(int32(bo.Uint32(encOp.Data[7:]))),
 					},
 					Max: image.Point{
-						X: int(int32(bo.Uint32(encOp.Data[12:]))),
-						Y: int(int32(bo.Uint32(encOp.Data[16:]))),
+						X: int(int32(bo.Uint32(encOp.Data[11:]))),
+						Y: int(int32(bo.Uint32(encOp.Data[15:]))),
 					},
 				},
 			}

@@ -63,10 +63,9 @@ type pointerInfo struct {
 }
 
 type pointerHandler struct {
-	area      int
-	active    bool
-	wantsGrab bool
-	types     pointer.Kind
+	area   int
+	active bool
+	types  pointer.Kind
 	// min and max horizontal/vertical scroll
 	scrollRange image.Rectangle
 
@@ -269,6 +268,26 @@ func (c *pointerCollector) actionInputOp(act system.Action) {
 	area.action = act
 }
 
+func (q *pointerQueue) grab(req pointer.GrabCmd, events *handlerEvents) {
+	for _, p := range q.pointers {
+		if !p.pressed || p.id != req.ID {
+			continue
+		}
+		for i, k2 := range p.handlers {
+			if k2 == req.Tag {
+				// Drop other handlers that lost their grab.
+				dropped := q.scratch[:0]
+				dropped = append(dropped, p.handlers[:i]...)
+				dropped = append(dropped, p.handlers[i+1:]...)
+				for _, tag := range dropped {
+					q.dropHandler(events, tag)
+				}
+				return
+			}
+		}
+	}
+}
+
 func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
 	areaID := c.currentArea()
 	area := &c.q.areas[areaID]
@@ -281,7 +300,6 @@ func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
 	}
 	area.semantic.valid = area.semantic.content.gestures != 0
 	h := c.newHandler(op.Tag, events)
-	h.wantsGrab = h.wantsGrab || op.Grab
 	h.types = h.types | op.Kinds
 	h.scrollRange = op.ScrollBounds
 }
@@ -560,7 +578,6 @@ func (q *pointerQueue) reset() {
 		// Reset handler.
 		h.active = false
 		h.area = -1
-		h.wantsGrab = false
 		h.types = 0
 		h.sourceMimes = h.sourceMimes[:0]
 		h.targetMimes = h.targetMimes[:0]
@@ -595,25 +612,6 @@ func (q *pointerQueue) Frame(events *handlerEvents) {
 		if !h.active {
 			q.dropHandler(nil, k)
 			delete(q.handlers, k)
-		}
-		if h.wantsGrab {
-			for _, p := range q.pointers {
-				if !p.pressed {
-					continue
-				}
-				for i, k2 := range p.handlers {
-					if k2 == k {
-						// Drop other handlers that lost their grab.
-						dropped := q.scratch[:0]
-						dropped = append(dropped, p.handlers[:i]...)
-						dropped = append(dropped, p.handlers[i+1:]...)
-						for _, tag := range dropped {
-							q.dropHandler(events, tag)
-						}
-						break
-					}
-				}
-			}
 		}
 	}
 	for i := range q.pointers {

@@ -107,7 +107,6 @@ type Drag struct {
 	pressed  bool
 	pid      pointer.ID
 	start    f32.Point
-	grab     bool
 }
 
 // Scroll detects scroll gestures and reduces them to
@@ -119,7 +118,6 @@ type Scroll struct {
 	estimator fling.Extrapolation
 	flinger   fling.Animation
 	pid       pointer.ID
-	grab      bool
 	last      int
 	// Leftover scroll.
 	scroll float32
@@ -253,7 +251,6 @@ func (ClickEvent) ImplementsEvent() {}
 func (s *Scroll) Add(ops *op.Ops, bounds image.Rectangle) {
 	oph := pointer.InputOp{
 		Tag:          s,
-		Grab:         s.grab,
 		Kinds:        pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll,
 		ScrollBounds: bounds,
 	}
@@ -308,7 +305,6 @@ func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis)
 			fallthrough
 		case pointer.Cancel:
 			s.dragging = false
-			s.grab = false
 		case pointer.Scroll:
 			switch s.axis {
 			case Horizontal:
@@ -330,7 +326,7 @@ func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis)
 			if e.Priority < pointer.Grabbed {
 				slop := cfg.Dp(touchSlop)
 				if dist := dist; dist >= slop || -slop >= dist {
-					s.grab = true
+					q.Queue(pointer.GrabCmd{Tag: s, ID: e.PointerID})
 				}
 			} else {
 				s.last = v
@@ -366,7 +362,6 @@ func (s *Scroll) State() ScrollState {
 func (d *Drag) Add(ops *op.Ops) {
 	pointer.InputOp{
 		Tag:   d,
-		Grab:  d.grab,
 		Kinds: pointer.Press | pointer.Drag | pointer.Release,
 	}.Add(ops)
 }
@@ -408,7 +403,7 @@ func (d *Drag) Update(cfg unit.Metric, q input.Source, axis Axis) []pointer.Even
 				diff := e.Position.Sub(d.start)
 				slop := cfg.Dp(touchSlop)
 				if diff.X*diff.X+diff.Y*diff.Y > float32(slop*slop) {
-					d.grab = true
+					q.Queue(pointer.GrabCmd{Tag: d, ID: e.PointerID})
 				}
 			}
 		case pointer.Release, pointer.Cancel:
@@ -417,7 +412,6 @@ func (d *Drag) Update(cfg unit.Metric, q input.Source, axis Axis) []pointer.Even
 				continue
 			}
 			d.dragging = false
-			d.grab = false
 		}
 
 		events = append(events, e)
