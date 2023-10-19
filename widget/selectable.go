@@ -304,7 +304,7 @@ func (e *Selectable) clickDragEvents(gtx layout.Context) []event.Event {
 }
 
 func (e *Selectable) processKey(gtx layout.Context) {
-	for _, ke := range gtx.Events(e) {
+	for _, ke := range gtx.Events(e, key.FocusFilter{}) {
 		switch ke := ke.(type) {
 		case key.FocusEvent:
 			e.focused = ke.Focus

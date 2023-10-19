@@ -59,7 +59,7 @@ func (e *Enum) Update(gtx layout.Context) bool {
 				}
 			}
 		}
-		for _, ev := range gtx.Events(&state.tag) {
+		for _, ev := range gtx.Events(&state.tag, key.FocusFilter{}) {
 			switch ev := ev.(type) {
 			case key.FocusEvent:
 				if ev.Focus {

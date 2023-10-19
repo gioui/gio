@@ -162,7 +162,7 @@ func (b *Clickable) Update(gtx layout.Context) []Click {
 			})
 		}
 	}
-	for _, e := range gtx.Events(&b.keyTag) {
+	for _, e := range gtx.Events(&b.keyTag, key.FocusFilter{}) {
 		switch e := e.(type) {
 		case key.FocusEvent:
 			b.focused = e.Focus

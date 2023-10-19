@@ -36,13 +36,14 @@ type keyQueue struct {
 type keyHandler struct {
 	// visible will be true if the InputOp is present
 	// in the current frame.
-	visible  bool
-	new      bool
-	hint     key.InputHint
-	order    int
-	dirOrder int
-	filter   key.Set
-	trans    f32.Affine2D
+	visible   bool
+	new       bool
+	focusable bool
+	hint      key.InputHint
+	order     int
+	dirOrder  int
+	filter    key.Set
+	trans     f32.Affine2D
 }
 
 type dirFocusEntry struct {
@@ -87,11 +88,7 @@ func (q *keyQueue) InputHint() (key.InputHint, bool) {
 }
 
 func (q *keyQueue) Reset() {
-	if q.handlers == nil {
-		q.handlers = make(map[event.Tag]*keyHandler)
-	}
 	for _, h := range q.handlers {
-		h.visible, h.new = false, false
 		h.order = -1
 		h.hint = key.HintAny
 	}
@@ -101,17 +98,24 @@ func (q *keyQueue) Reset() {
 
 func (q *keyQueue) Frame(events *handlerEvents) {
 	for k, h := range q.handlers {
-		if !h.visible {
-			delete(q.handlers, k)
+		if !h.visible || !h.focusable {
 			if q.focus == k {
-				// Remove focus from the handler that is no longer visible.
+				// Remove focus from the handler that is no longer focusable.
 				q.focus = nil
 				q.state = TextInputClose
 			}
-		} else if h.new && k != q.focus {
+			if !h.visible && !h.focusable {
+				delete(q.handlers, k)
+				continue
+			}
+		}
+		if h.new && k != q.focus {
 			// Reset the handler on (each) first appearance, but don't trigger redraw.
 			events.AddNoRedraw(k, key.FocusEvent{Focus: false})
 		}
+		h.new = false
+		h.visible = false
+		h.focusable = false
 	}
 	q.updateFocusLayout()
 }
@@ -284,10 +288,18 @@ func (q *keyQueue) softKeyboard(show bool) {
 	}
 }
 
+func (q *keyQueue) focusable(tag event.Tag) {
+	h := q.handlerFor(tag)
+	h.focusable = true
+}
+
 func (q *keyQueue) handlerFor(tag event.Tag) *keyHandler {
 	h, ok := q.handlers[tag]
 	if !ok {
 		h = &keyHandler{new: true, order: -1}
+		if q.handlers == nil {
+			q.handlers = make(map[event.Tag]*keyHandler)
+		}
 		q.handlers[tag] = h
 	}
 	return h
@@ -300,8 +312,8 @@ func (q *keyQueue) inputOp(op key.InputOp, t f32.Affine2D, area int, bounds imag
 		q.order = append(q.order, op.Tag)
 		q.dirOrder = append(q.dirOrder, dirFocusEntry{tag: op.Tag, area: area, bounds: bounds})
 	}
-	h.visible = true
 	h.filter = op.Keys
+	h.visible = true
 	h.trans = t
 }
 

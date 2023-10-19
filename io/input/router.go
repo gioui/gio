@@ -131,6 +131,8 @@ func (s Source) Events(k event.Tag, filters ...event.Filter) []event.Event {
 func (q *Router) Events(k event.Tag, filters ...event.Filter) []event.Event {
 	for _, f := range filters {
 		switch f := f.(type) {
+		case key.FocusFilter:
+			q.key.queue.focusable(k)
 		case pointer.Filter:
 			q.pointer.queue.filterTag(k, f, &q.handlers)
 		case transfer.SourceFilter:
@@ -581,6 +583,12 @@ func (h *handlerEvents) Events(k event.Tag, filters ...event.Filter) []event.Eve
 
 func filtersMatches(filters []event.Filter, e event.Event) bool {
 	switch e := e.(type) {
+	case key.FocusEvent, key.SnippetEvent, key.EditEvent, key.SelectionEvent:
+		for _, f := range filters {
+			if _, ok := f.(key.FocusFilter); ok {
+				return true
+			}
+		}
 	case pointer.Event:
 		for _, f := range filters {
 			if f, ok := f.(pointer.Filter); ok && f.Kinds&e.Kind == e.Kind {

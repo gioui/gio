@@ -128,6 +128,9 @@ type EditEvent struct {
 	Text  string
 }
 
+// FocusFilter matches [FocusEvent]s.
+type FocusFilter struct{}
+
 // InputHint changes the on-screen-keyboard type. That hints the
 // type of data that might be entered by the user.
 type InputHint uint8
@@ -356,6 +359,8 @@ func (FocusCmd) ImplementsCommand()        {}
 func (SoftKeyboardCmd) ImplementsCommand() {}
 func (SelectionCmd) ImplementsCommand()    {}
 func (SnippetCmd) ImplementsCommand()      {}
+
+func (FocusFilter) ImplementsFilter() {}
 
 func (m Modifiers) String() string {
 	var strs []string
