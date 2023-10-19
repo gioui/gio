@@ -55,11 +55,10 @@ func (q *clipboardQueue) ProcessWriteClipboard(req clipboard.WriteCmd) {
 	q.text = content
 }
 
-func (q *clipboardQueue) ProcessReadClipboard(refs []interface{}) {
+func (q *clipboardQueue) ProcessReadClipboard(tag event.Tag) {
 	if q.receivers == nil {
 		q.receivers = make(map[event.Tag]struct{})
 	}
-	tag := refs[0].(event.Tag)
 	if _, ok := q.receivers[tag]; !ok {
 		q.receivers[tag] = struct{}{}
 		q.requested = false

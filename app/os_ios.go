@@ -72,17 +72,19 @@ import "C"
 
 import (
 	"image"
+	"io"
 	"runtime"
 	"runtime/debug"
+	"strings"
 	"time"
 	"unicode/utf16"
 	"unsafe"
 
 	"gioui.org/f32"
-	"gioui.org/io/clipboard"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
 	"gioui.org/unit"
 )
 
@@ -265,7 +267,12 @@ func (w *window) ReadClipboard() {
 	cstr := C.readClipboard()
 	defer C.CFRelease(cstr)
 	content := nsstringToString(cstr)
-	w.w.Event(clipboard.Event{Text: content})
+	w.w.Event(transfer.DataEvent{
+		Type: "application/text",
+		Open: func() io.ReadCloser {
+			return io.NopCloser(strings.NewReader(content))
+		},
+	})
 }
 
 func (w *window) WriteClipboard(mime string, s []byte) {

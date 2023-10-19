@@ -198,7 +198,7 @@ func (q *Router) Queue(events ...event.Event) bool {
 			if f := q.key.queue.focus; f != nil {
 				q.handlers.Add(f, e)
 			}
-		case clipboard.Event:
+		case transfer.DataEvent:
 			q.cqueue.Push(e, &q.handlers)
 		}
 	}
@@ -224,6 +224,8 @@ func (q *Router) executeCommands() {
 			q.pointer.queue.offerData(req, &q.handlers)
 		case clipboard.WriteCmd:
 			q.cqueue.ProcessWriteClipboard(req)
+		case clipboard.ReadCmd:
+			q.cqueue.ProcessReadClipboard(req.Tag)
 		}
 	}
 	q.commands = nil
@@ -429,8 +431,6 @@ func (q *Router) collect() {
 				q.wakeup = true
 				q.wakeupTime = op.At
 			}
-		case ops.TypeClipboardRead:
-			q.cqueue.ProcessReadClipboard(encOp.Refs)
 		case ops.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
 			if extra := id - len(q.savedTrans) + 1; extra > 0 {

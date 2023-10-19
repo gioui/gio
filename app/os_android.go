@@ -123,12 +123,14 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
 	"runtime"
 	"runtime/cgo"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf16"
@@ -137,12 +139,12 @@ import (
 	"gioui.org/internal/f32color"
 
 	"gioui.org/f32"
-	"gioui.org/io/clipboard"
 	"gioui.org/io/input"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/semantic"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
 	"gioui.org/unit"
 )
 
@@ -1311,7 +1313,12 @@ func (w *window) ReadClipboard() {
 			return
 		}
 		content := goString(env, C.jstring(c))
-		w.callbacks.Event(clipboard.Event{Text: content})
+		w.callbacks.Event(transfer.DataEvent{
+			Type: "application/text",
+			Open: func() io.ReadCloser {
+				return io.NopCloser(strings.NewReader(content))
+			},
+		})
 	})
 }
 

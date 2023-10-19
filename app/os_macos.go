@@ -8,16 +8,18 @@ package app
 import (
 	"errors"
 	"image"
+	"io"
 	"runtime"
+	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"gioui.org/internal/f32"
-	"gioui.org/io/clipboard"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
 	"gioui.org/unit"
 
 	_ "gioui.org/internal/cocoainit"
@@ -305,7 +307,12 @@ func (w *window) ReadClipboard() {
 		defer C.CFRelease(cstr)
 	}
 	content := nsstringToString(cstr)
-	w.w.Event(clipboard.Event{Text: content})
+	w.w.Event(transfer.DataEvent{
+		Type: "application/text",
+		Open: func() io.ReadCloser {
+			return io.NopCloser(strings.NewReader(content))
+		},
+	})
 }
 
 func (w *window) WriteClipboard(mime string, s []byte) {

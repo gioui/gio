@@ -25,10 +25,10 @@ import (
 	"gioui.org/app/internal/xkb"
 	"gioui.org/f32"
 	"gioui.org/internal/fling"
-	"gioui.org/io/clipboard"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
 	"gioui.org/unit"
 )
 
@@ -209,7 +209,7 @@ type window struct {
 	wsize        image.Point // window config size before going fullscreen or maximized
 	inCompositor bool        // window is moving or being resized
 
-	clipReads chan clipboard.Event
+	clipReads chan transfer.DataEvent
 
 	wakeups chan struct{}
 }
@@ -354,7 +354,7 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 		ppdp:      ppdp,
 		ppsp:      ppdp,
 		wakeups:   make(chan struct{}, 1),
-		clipReads: make(chan clipboard.Event, 1),
+		clipReads: make(chan transfer.DataEvent, 1),
 	}
 	w.surf = C.wl_compositor_create_surface(d.compositor)
 	if w.surf == nil {
@@ -1021,14 +1021,18 @@ func (w *window) ReadClipboard() {
 	r, err := w.disp.readClipboard()
 	// Send empty responses on unavailable clipboards or errors.
 	if r == nil || err != nil {
-		w.w.Event(clipboard.Event{})
 		return
 	}
 	// Don't let slow clipboard transfers block event loop.
 	go func() {
 		defer r.Close()
 		data, _ := io.ReadAll(r)
-		w.clipReads <- clipboard.Event{Text: string(data)}
+		w.clipReads <- transfer.DataEvent{
+			Type: "application/text",
+			Open: func() io.ReadCloser {
+				return io.NopCloser(bytes.NewReader(data))
+			},
+		}
 		w.Wakeup()
 	}()
 }

@@ -30,16 +30,18 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"io"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
 
 	"gioui.org/f32"
-	"gioui.org/io/clipboard"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
 	"gioui.org/unit"
 
 	syscall "golang.org/x/sys/unix"
@@ -650,7 +652,12 @@ func (h *x11EventHandler) handleEvents() bool {
 				break
 			}
 			str := C.GoStringN((*C.char)(unsafe.Pointer(text.value)), C.int(text.nitems))
-			w.w.Event(clipboard.Event{Text: str})
+			w.w.Event(transfer.DataEvent{
+				Type: "application/text",
+				Open: func() io.ReadCloser {
+					return io.NopCloser(strings.NewReader(str))
+				},
+			})
 		case C.SelectionRequest:
 			cevt := (*C.XSelectionRequestEvent)(unsafe.Pointer(xev))
 			if (cevt.selection != w.atoms.clipboard && cevt.selection != w.atoms.primary) || cevt.property == C.None {

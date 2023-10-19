@@ -21,6 +21,7 @@ import (
 	"gioui.org/io/pointer"
 	"gioui.org/io/semantic"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
@@ -377,10 +378,13 @@ func (e *Editor) processKey(gtx layout.Context) {
 				})
 			}
 		// Complete a paste event, initiated by Shortcut-V in Editor.command().
-		case clipboard.Event:
+		case transfer.DataEvent:
 			e.scrollCaret = true
 			e.scroller.Stop()
-			e.Insert(ke.Text)
+			content, err := io.ReadAll(ke.Open())
+			if err == nil {
+				e.Insert(string(content))
+			}
 		case key.SelectionEvent:
 			e.scrollCaret = true
 			e.scroller.Stop()
@@ -411,7 +415,7 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 		// half is in Editor.processKey() under clipboard.Event.
 		case "V":
 			if !e.ReadOnly {
-				clipboard.ReadOp{Tag: &e.eventKey}.Add(gtx.Ops)
+				gtx.Queue(clipboard.ReadCmd{Tag: &e.eventKey})
 			}
 		// Copy or Cut selection -- ignored if nothing selected.
 		case "C", "X":

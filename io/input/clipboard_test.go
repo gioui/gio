@@ -9,6 +9,7 @@ import (
 
 	"gioui.org/io/clipboard"
 	"gioui.org/io/event"
+	"gioui.org/io/transfer"
 	"gioui.org/op"
 )
 
@@ -16,30 +17,35 @@ func TestClipboardDuplicateEvent(t *testing.T) {
 	ops, router, handler := new(op.Ops), new(Router), make([]int, 2)
 
 	// Both must receive the event once
-	clipboard.ReadOp{Tag: &handler[0]}.Add(ops)
-	clipboard.ReadOp{Tag: &handler[1]}.Add(ops)
+	router.Source().Queue(clipboard.ReadCmd{Tag: &handler[0]})
+	router.Source().Queue(clipboard.ReadCmd{Tag: &handler[1]})
 
 	router.Frame(ops)
-	event := clipboard.Event{Text: "Test"}
+	event := transfer.DataEvent{
+		Type: "application/text",
+		Open: func() io.ReadCloser {
+			return io.NopCloser(strings.NewReader("Test"))
+		},
+	}
 	router.Queue(event)
-	assertClipboardReadOp(t, router, 0)
+	assertClipboardReadCmd(t, router, 0)
 	assertClipboardEvent(t, router.Events(&handler[0]), true)
 	assertClipboardEvent(t, router.Events(&handler[1]), true)
 	ops.Reset()
 
-	// No ReadOp
+	// No ReadCmd
 
 	router.Frame(ops)
-	assertClipboardReadOp(t, router, 0)
+	assertClipboardReadCmd(t, router, 0)
 	assertClipboardEvent(t, router.Events(&handler[0]), false)
 	assertClipboardEvent(t, router.Events(&handler[1]), false)
 	ops.Reset()
 
-	clipboard.ReadOp{Tag: &handler[0]}.Add(ops)
+	router.Source().Queue(clipboard.ReadCmd{Tag: &handler[0]})
 
 	router.Frame(ops)
 	// No ClipboardEvent sent
-	assertClipboardReadOp(t, router, 1)
+	assertClipboardReadCmd(t, router, 1)
 	assertClipboardEvent(t, router.Events(&handler[0]), false)
 	assertClipboardEvent(t, router.Events(&handler[1]), false)
 	ops.Reset()
@@ -50,34 +56,39 @@ func TestQueueProcessReadClipboard(t *testing.T) {
 	ops.Reset()
 
 	// Request read
-	clipboard.ReadOp{Tag: &handler[0]}.Add(ops)
+	router.Source().Queue(clipboard.ReadCmd{Tag: &handler[0]})
 
 	router.Frame(ops)
-	assertClipboardReadOp(t, router, 1)
+	assertClipboardReadCmd(t, router, 1)
 	ops.Reset()
 
 	for i := 0; i < 3; i++ {
-		// No ReadOp
+		// No ReadCmd
 		// One receiver must still wait for response
 
 		router.Frame(ops)
-		assertClipboardReadOpDuplicated(t, router, 1)
+		assertClipboardReadDuplicated(t, router, 1)
 		ops.Reset()
 	}
 
 	router.Frame(ops)
 	// Send the clipboard event
-	event := clipboard.Event{Text: "Text 2"}
+	event := transfer.DataEvent{
+		Type: "application/text",
+		Open: func() io.ReadCloser {
+			return io.NopCloser(strings.NewReader("Text 2"))
+		},
+	}
 	router.Queue(event)
-	assertClipboardReadOp(t, router, 0)
+	assertClipboardReadCmd(t, router, 0)
 	assertClipboardEvent(t, router.Events(&handler[0]), true)
 	ops.Reset()
 
-	// No ReadOp
+	// No ReadCmd
 	// There's no receiver waiting
 
 	router.Frame(ops)
-	assertClipboardReadOp(t, router, 0)
+	assertClipboardReadCmd(t, router, 0)
 	assertClipboardEvent(t, router.Events(&handler[0]), false)
 	ops.Reset()
 }
@@ -102,7 +113,7 @@ func TestQueueProcessWriteClipboard(t *testing.T) {
 	router.Source().Queue(clipboard.WriteCmd{Type: mime, Data: io.NopCloser(strings.NewReader("Write 2"))})
 
 	router.Frame(ops)
-	assertClipboardReadOp(t, router, 0)
+	assertClipboardReadCmd(t, router, 0)
 	assertClipboardWriteCmd(t, router, mime, "Write 2")
 	ops.Reset()
 }
@@ -112,7 +123,7 @@ func assertClipboardEvent(t *testing.T, events []event.Event, expected bool) {
 	var evtClipboard int
 	for _, e := range events {
 		switch e.(type) {
-		case clipboard.Event:
+		case transfer.DataEvent:
 			evtClipboard++
 		}
 	}
@@ -124,7 +135,7 @@ func assertClipboardEvent(t *testing.T, events []event.Event, expected bool) {
 	}
 }
 
-func assertClipboardReadOp(t *testing.T, router *Router, expected int) {
+func assertClipboardReadCmd(t *testing.T, router *Router, expected int) {
 	t.Helper()
 	if len(router.cqueue.receivers) != expected {
 		t.Error("unexpected number of receivers")
@@ -134,7 +145,7 @@ func assertClipboardReadOp(t *testing.T, router *Router, expected int) {
 	}
 }
 
-func assertClipboardReadOpDuplicated(t *testing.T, router *Router, expected int) {
+func assertClipboardReadDuplicated(t *testing.T, router *Router, expected int) {
 	t.Helper()
 	if len(router.cqueue.receivers) != expected {
 		t.Error("receivers removed")

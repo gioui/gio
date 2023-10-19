@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"io"
 	"runtime"
 	"sort"
 	"strings"
@@ -22,10 +23,10 @@ import (
 	gowindows "golang.org/x/sys/windows"
 
 	"gioui.org/f32"
-	"gioui.org/io/clipboard"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
 )
 
 type ViewEvent struct {
@@ -667,7 +668,12 @@ func (w *window) readClipboard() error {
 	}
 	defer windows.GlobalUnlock(mem)
 	content := gowindows.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
-	w.w.Event(clipboard.Event{Text: content})
+	w.w.Event(transfer.DataEvent{
+		Type: "application/text",
+		Open: func() io.ReadCloser {
+			return io.NopCloser(strings.NewReader(content))
+		},
+	})
 	return nil
 }
 

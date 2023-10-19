@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	"strings"
 	"syscall/js"
 	"time"
@@ -15,10 +16,10 @@ import (
 	"gioui.org/internal/f32color"
 
 	"gioui.org/f32"
-	"gioui.org/io/clipboard"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
 	"gioui.org/unit"
 )
 
@@ -101,7 +102,12 @@ func newWindow(win *callbacks, options []Option) error {
 	})
 	w.clipboardCallback = w.funcOf(func(this js.Value, args []js.Value) interface{} {
 		content := args[0].String()
-		go win.Event(clipboard.Event{Text: content})
+		go win.Event(transfer.DataEvent{
+			Type: "application/text",
+			Open: func() io.ReadCloser {
+				return io.NopCloser(strings.NewReader(content))
+			},
+		})
 		return nil
 	})
 	w.addEventListeners()
