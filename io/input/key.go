@@ -58,6 +58,11 @@ const (
 	TextInputOpen
 )
 
+func (q *keyQueue) inputHint(op key.InputHintOp) {
+	h := q.handlerFor(op.Tag)
+	h.hint = op.Hint
+}
+
 // InputState returns the last text input state as
 // determined in Frame.
 func (q *keyQueue) InputState() TextInputState {
@@ -66,7 +71,8 @@ func (q *keyQueue) InputState() TextInputState {
 	return state
 }
 
-// InputHint returns the input mode from the most recent key.InputOp.
+// InputHint returns the input hint from the focused handler and whether it was
+// changed since the last call.
 func (q *keyQueue) InputHint() (key.InputHint, bool) {
 	if q.focus == nil {
 		return q.hint, false
@@ -87,6 +93,7 @@ func (q *keyQueue) Reset() {
 	for _, h := range q.handlers {
 		h.visible, h.new = false, false
 		h.order = -1
+		h.hint = key.HintAny
 	}
 	q.order = q.order[:0]
 	q.dirOrder = q.dirOrder[:0]
@@ -277,24 +284,23 @@ func (q *keyQueue) softKeyboard(show bool) {
 	}
 }
 
-func (q *keyQueue) handlerFor(tag event.Tag, area int, bounds image.Rectangle) *keyHandler {
+func (q *keyQueue) handlerFor(tag event.Tag) *keyHandler {
 	h, ok := q.handlers[tag]
 	if !ok {
 		h = &keyHandler{new: true, order: -1}
 		q.handlers[tag] = h
 	}
-	if h.order == -1 {
-		h.order = len(q.order)
-		q.order = append(q.order, tag)
-		q.dirOrder = append(q.dirOrder, dirFocusEntry{tag: tag, area: area, bounds: bounds})
-	}
 	return h
 }
 
 func (q *keyQueue) inputOp(op key.InputOp, t f32.Affine2D, area int, bounds image.Rectangle) {
-	h := q.handlerFor(op.Tag, area, bounds)
+	h := q.handlerFor(op.Tag)
+	if h.order == -1 {
+		h.order = len(q.order)
+		q.order = append(q.order, op.Tag)
+		q.dirOrder = append(q.dirOrder, dirFocusEntry{tag: op.Tag, area: area, bounds: bounds})
+	}
 	h.visible = true
-	h.hint = op.Hint
 	h.filter = op.Keys
 	h.trans = t
 }

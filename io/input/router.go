@@ -494,13 +494,18 @@ func (q *Router) collect() {
 			filter := key.Set(*encOp.Refs[1].(*string))
 			op := key.InputOp{
 				Tag:  encOp.Refs[0].(event.Tag),
-				Hint: key.InputHint(encOp.Data[1]),
 				Keys: filter,
 			}
 			a := pc.currentArea()
 			b := pc.currentAreaBounds()
 			pc.keyInputOp(op)
 			kq.inputOp(op, t, a, b)
+		case ops.TypeKeyInputHint:
+			op := key.InputHintOp{
+				Tag:  encOp.Refs[0].(event.Tag),
+				Hint: key.InputHint(encOp.Data[1]),
+			}
+			kq.inputHint(op)
 
 		// Semantic ops.
 		case ops.TypeSemanticLabel:

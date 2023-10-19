@@ -651,7 +651,8 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 			keys = keyFilterAllArrows
 		}
 	}
-	key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keys}.Add(gtx.Ops)
+	key.InputOp{Tag: &e.eventKey, Keys: keys}.Add(gtx.Ops)
+	key.InputHintOp{Tag: &e.eventKey, Hint: e.InputHint}.Add(gtx.Ops)
 
 	e.scroller.Add(gtx.Ops)
 

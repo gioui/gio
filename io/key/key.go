@@ -23,13 +23,17 @@ import (
 // focused key handler.
 type InputOp struct {
 	Tag event.Tag
-	// Hint describes the type of text expected by Tag.
-	Hint InputHint
 	// Keys is the set of keys Tag can handle. That is, Tag will only
 	// receive an Event if its key and modifiers are accepted by Keys.Contains.
 	// As a special case, the topmost (first added) InputOp handler receives all
 	// unhandled events.
 	Keys Set
+}
+
+// InputHintOp describes the type of text expected by a tag.
+type InputHintOp struct {
+	Tag  event.Tag
+	Hint InputHint
 }
 
 // SoftKeyboardCmd shows or hides the on-screen keyboard, if available.
@@ -331,6 +335,14 @@ func (h InputOp) Add(o *op.Ops) {
 	}
 	data := ops.Write2String(&o.Internal, ops.TypeKeyInputLen, h.Tag, string(h.Keys))
 	data[0] = byte(ops.TypeKeyInput)
+}
+
+func (h InputHintOp) Add(o *op.Ops) {
+	if h.Tag == nil {
+		panic("Tag must be non-nil")
+	}
+	data := ops.Write1(&o.Internal, ops.TypeKeyInputHintLen, h.Tag)
+	data[0] = byte(ops.TypeKeyInputHint)
 	data[1] = byte(h.Hint)
 }
 
