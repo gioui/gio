@@ -238,17 +238,17 @@ func (x *Context) UpdateMask(depressed, latched, locked, depressedGroup, latched
 		C.xkb_layout_index_t(depressedGroup), C.xkb_layout_index_t(latchedGroup), C.xkb_layout_index_t(lockedGroup))
 }
 
-func convertKeysym(s C.xkb_keysym_t) (string, bool) {
+func convertKeysym(s C.xkb_keysym_t) (key.Name, bool) {
 	if 'a' <= s && s <= 'z' {
-		return string(rune(s - 'a' + 'A')), true
+		return key.Name(rune(s - 'a' + 'A')), true
 	}
 	if C.XKB_KEY_KP_0 <= s && s <= C.XKB_KEY_KP_9 {
-		return string(rune(s - C.XKB_KEY_KP_0 + '0')), true
+		return key.Name(rune(s - C.XKB_KEY_KP_0 + '0')), true
 	}
 	if ' ' < s && s <= '~' {
-		return string(rune(s)), true
+		return key.Name(rune(s)), true
 	}
-	var n string
+	var n key.Name
 	switch s {
 	case C.XKB_KEY_Escape:
 		n = key.NameEscape

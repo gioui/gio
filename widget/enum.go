@@ -4,6 +4,7 @@ package widget
 
 import (
 	"gioui.org/gesture"
+	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/semantic"
@@ -59,7 +60,13 @@ func (e *Enum) Update(gtx layout.Context) bool {
 				}
 			}
 		}
-		for _, ev := range gtx.Events(&state.tag, key.FocusFilter{}) {
+		filters := []event.Filter{
+			key.FocusFilter{},
+		}
+		if e.focused && e.focus == state.key {
+			filters = append(filters, key.Filter{Name: key.NameReturn}, key.Filter{Name: key.NameSpace})
+		}
+		for _, ev := range gtx.Events(&state.tag, filters...) {
 			switch ev := ev.(type) {
 			case key.FocusEvent:
 				if ev.Focus {
@@ -69,7 +76,7 @@ func (e *Enum) Update(gtx layout.Context) bool {
 					e.focused = false
 				}
 			case key.Event:
-				if !e.focused || ev.State != key.Release {
+				if ev.State != key.Release {
 					break
 				}
 				if ev.Name != key.NameReturn && ev.Name != key.NameSpace {
@@ -117,9 +124,7 @@ func (e *Enum) Layout(gtx layout.Context, k string, content layout.Widget) layou
 	}
 	clk := &state.click
 	clk.Add(gtx.Ops)
-	if gtx.Enabled() {
-		key.InputOp{Tag: &state.tag, Keys: "⏎|Space"}.Add(gtx.Ops)
-	}
+	event.InputOp(gtx.Ops, &state.tag)
 	semantic.SelectedOp(k == e.Value).Add(gtx.Ops)
 	semantic.EnabledOp(gtx.Enabled()).Add(gtx.Ops)
 	c.Add(gtx.Ops)

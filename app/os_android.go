@@ -899,8 +899,8 @@ func runInJVM(jvm *C.JavaVM, f func(env *C.JNIEnv)) {
 	f(env)
 }
 
-func convertKeyCode(code C.jint) (string, bool) {
-	var n string
+func convertKeyCode(code C.jint) (key.Name, bool) {
+	var n key.Name
 	switch code {
 	case C.AKEYCODE_FORWARD_DEL:
 		n = key.NameDeleteForward

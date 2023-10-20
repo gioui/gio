@@ -204,12 +204,7 @@ func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font,
 	dims := l.text.Dimensions()
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
 	pointer.CursorText.Add(gtx.Ops)
-	var keys key.Set
-	if l.focused {
-		const keyFilter = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,X,A]"
-		keys = keyFilter
-	}
-	key.InputOp{Tag: l, Keys: keys}.Add(gtx.Ops)
+	event.InputOp(gtx.Ops, l)
 
 	l.clicker.Add(gtx.Ops)
 	l.dragger.Add(gtx.Ops)
@@ -304,7 +299,27 @@ func (e *Selectable) clickDragEvents(gtx layout.Context) []event.Event {
 }
 
 func (e *Selectable) processKey(gtx layout.Context) {
-	for _, ke := range gtx.Events(e, key.FocusFilter{}) {
+	filters := []event.Filter{
+		key.FocusFilter{},
+	}
+	if e.focused {
+		filters = append(filters,
+			key.Filter{Name: key.NameLeftArrow, Optional: key.ModShortcutAlt | key.ModShift},
+			key.Filter{Name: key.NameRightArrow, Optional: key.ModShortcutAlt | key.ModShift},
+			key.Filter{Name: key.NameUpArrow, Optional: key.ModShortcutAlt | key.ModShift},
+			key.Filter{Name: key.NameDownArrow, Optional: key.ModShortcutAlt | key.ModShift},
+
+			key.Filter{Name: key.NamePageUp, Optional: key.ModShift},
+			key.Filter{Name: key.NamePageDown, Optional: key.ModShift},
+			key.Filter{Name: key.NameEnd, Optional: key.ModShift},
+			key.Filter{Name: key.NameHome, Optional: key.ModShift},
+
+			key.Filter{Name: "C", Required: key.ModShortcut},
+			key.Filter{Name: "X", Required: key.ModShortcut},
+			key.Filter{Name: "A", Required: key.ModShortcut},
+		)
+	}
+	for _, ke := range gtx.Events(e, filters...) {
 		switch ke := ke.(type) {
 		case key.FocusEvent:
 			e.focused = ke.Focus

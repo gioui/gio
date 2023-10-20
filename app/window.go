@@ -903,11 +903,6 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 					handled = false
 				}
 			}
-			// As a special case, the top-most input handler receives all unhandled
-			// events.
-			if !handled {
-				handled = w.queue.QueueTopmost(e)
-			}
 		}
 		w.updateCursor(d)
 		if handled {

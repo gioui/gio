@@ -10,7 +10,6 @@ import (
 	f32internal "gioui.org/internal/f32"
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
-	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/semantic"
 	"gioui.org/io/system"
@@ -43,7 +42,6 @@ type hitNode struct {
 
 	// For handler nodes.
 	tag  event.Tag
-	ktag event.Tag
 	pass bool
 }
 
@@ -260,15 +258,6 @@ func (q *pointerQueue) handlerFor(tag event.Tag, events *handlerEvents) *pointer
 	}
 	h.active = true
 	return h
-}
-
-func (c *pointerCollector) keyInputOp(op key.InputOp) {
-	areaID := c.currentArea()
-	c.addHitNode(hitNode{
-		area: areaID,
-		ktag: op.Tag,
-		pass: true,
-	})
 }
 
 func (c *pointerCollector) actionInputOp(act system.Action) {

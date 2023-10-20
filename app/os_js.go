@@ -752,8 +752,8 @@ func osMain() {
 	select {}
 }
 
-func translateKey(k string) (string, bool) {
-	var n string
+func translateKey(k string) (key.Name, bool) {
+	var n key.Name
 
 	switch k {
 	case "ArrowUp":
@@ -820,7 +820,7 @@ func translateKey(k string) (string, bool) {
 		r, s := utf8.DecodeRuneInString(k)
 		// If there is exactly one printable character, return that.
 		if s == len(k) && unicode.IsPrint(r) {
-			return strings.ToUpper(k), true
+			return key.Name(strings.ToUpper(k)), true
 		}
 		return "", false
 	}

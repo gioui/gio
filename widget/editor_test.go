@@ -124,6 +124,9 @@ func TestEditorReadOnly(t *testing.T) {
 	gtx.Ops.Reset()
 	layoutEditor()
 	r.Frame(gtx.Ops)
+	gtx.Ops.Reset()
+	layoutEditor()
+	r.Frame(gtx.Ops)
 
 	// Select everything.
 	gtx.Ops.Reset()
@@ -1005,8 +1008,11 @@ func TestSelectMove(t *testing.T) {
 	gtx.Ops.Reset()
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 	r.Frame(gtx.Ops)
+	gtx.Ops.Reset()
+	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	r.Frame(gtx.Ops)
 
-	for _, keyName := range []string{key.NameLeftArrow, key.NameRightArrow, key.NameUpArrow, key.NameDownArrow} {
+	for _, keyName := range []key.Name{key.NameLeftArrow, key.NameRightArrow, key.NameUpArrow, key.NameDownArrow} {
 		// Select 345
 		e.SetCaret(3, 6)
 		if expected, got := "345", e.SelectedText(); expected != got {

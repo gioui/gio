@@ -39,10 +39,11 @@ type keyHandler struct {
 	visible   bool
 	new       bool
 	focusable bool
+	active    bool
 	hint      key.InputHint
 	order     int
 	dirOrder  int
-	filter    key.Set
+	filters   []key.Filter
 	trans     f32.Affine2D
 }
 
@@ -116,6 +117,7 @@ func (q *keyQueue) Frame(events *handlerEvents) {
 		h.new = false
 		h.visible = false
 		h.focusable = false
+		h.active = false
 	}
 	q.updateFocusLayout()
 }
@@ -255,7 +257,25 @@ func (q *keyQueue) AreaFor(t event.Tag) int {
 }
 
 func (q *keyQueue) Accepts(t event.Tag, e key.Event) bool {
-	return q.handlers[t].filter.Contains(e.Name, e.Modifiers)
+	for _, f := range q.handlers[t].filters {
+		if keyFilterMatch(f, e) {
+			return true
+		}
+	}
+	return false
+}
+
+func keyFilterMatch(f key.Filter, e key.Event) bool {
+	if f.Name != e.Name {
+		return false
+	}
+	if e.Modifiers&f.Required != f.Required {
+		return false
+	}
+	if e.Modifiers&^(f.Required|f.Optional) != 0 {
+		return false
+	}
+	return true
 }
 
 func (q *keyQueue) Focus(focus event.Tag, events *handlerEvents) {
@@ -288,6 +308,15 @@ func (q *keyQueue) softKeyboard(show bool) {
 	}
 }
 
+func (q *keyQueue) filter(tag event.Tag, f key.Filter) {
+	h := q.handlerFor(tag)
+	if !h.active {
+		h.active = true
+		h.filters = h.filters[:0]
+	}
+	h.filters = append(h.filters, f)
+}
+
 func (q *keyQueue) focusable(tag event.Tag) {
 	h := q.handlerFor(tag)
 	h.focusable = true
@@ -305,14 +334,13 @@ func (q *keyQueue) handlerFor(tag event.Tag) *keyHandler {
 	return h
 }
 
-func (q *keyQueue) inputOp(op key.InputOp, t f32.Affine2D, area int, bounds image.Rectangle) {
-	h := q.handlerFor(op.Tag)
+func (q *keyQueue) inputOp(tag event.Tag, t f32.Affine2D, area int, bounds image.Rectangle) {
+	h := q.handlerFor(tag)
 	if h.order == -1 {
 		h.order = len(q.order)
-		q.order = append(q.order, op.Tag)
-		q.dirOrder = append(q.dirOrder, dirFocusEntry{tag: op.Tag, area: area, bounds: bounds})
+		q.order = append(q.order, tag)
+		q.dirOrder = append(q.dirOrder, dirFocusEntry{tag: tag, area: area, bounds: bounds})
 	}
-	h.filter = op.Keys
 	h.visible = true
 	h.trans = t
 }

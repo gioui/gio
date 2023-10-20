@@ -870,11 +870,11 @@ func (w *window) raise() {
 		windows.SWP_NOMOVE|windows.SWP_NOSIZE|windows.SWP_SHOWWINDOW)
 }
 
-func convertKeyCode(code uintptr) (string, bool) {
+func convertKeyCode(code uintptr) (key.Name, bool) {
 	if '0' <= code && code <= '9' || 'A' <= code && code <= 'Z' {
-		return string(rune(code)), true
+		return key.Name(rune(code)), true
 	}
-	var r string
+	var r key.Name
 
 	switch code {
 	case windows.VK_ESCAPE:

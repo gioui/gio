@@ -310,7 +310,7 @@ func (w *window) SetCursor(cursor pointer.Cursor) {
 	w.cursor = windowSetCursor(w.cursor, cursor)
 }
 
-func (w *window) onKeyCommand(name string) {
+func (w *window) onKeyCommand(name key.Name) {
 	w.w.Event(key.Event{
 		Name: name,
 	})

@@ -57,8 +57,10 @@ func TestSelectableMove(t *testing.T) {
 	s.SetCaret(3, 6)
 	s.Layout(gtx, cache, font.Font{}, fontSize, op.CallOp{}, op.CallOp{})
 	r.Frame(gtx.Ops)
+	s.Layout(gtx, cache, font.Font{}, fontSize, op.CallOp{}, op.CallOp{})
+	r.Frame(gtx.Ops)
 
-	for _, keyName := range []string{key.NameLeftArrow, key.NameRightArrow, key.NameUpArrow, key.NameDownArrow} {
+	for _, keyName := range []key.Name{key.NameLeftArrow, key.NameRightArrow, key.NameUpArrow, key.NameDownArrow} {
 		// Select 345
 		s.SetCaret(3, 6)
 		if start, end := s.Selection(); start != 3 || end != 6 {

@@ -920,8 +920,8 @@ func osMain() {
 	C.gio_main()
 }
 
-func convertKey(k rune) (string, bool) {
-	var n string
+func convertKey(k rune) (key.Name, bool) {
+	var n key.Name
 	switch k {
 	case 0x1b:
 		n = key.NameEscape
@@ -982,7 +982,7 @@ func convertKey(k rune) (string, bool) {
 		if !unicode.IsPrint(k) {
 			return "", false
 		}
-		n = string(k)
+		n = key.Name(k)
 	}
 	return n, true
 }

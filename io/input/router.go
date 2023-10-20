@@ -131,6 +131,8 @@ func (s Source) Events(k event.Tag, filters ...event.Filter) []event.Event {
 func (q *Router) Events(k event.Tag, filters ...event.Filter) []event.Event {
 	for _, f := range filters {
 		switch f := f.(type) {
+		case key.Filter:
+			q.key.queue.filter(k, f)
 		case key.FocusFilter:
 			q.key.queue.focusable(k)
 		case pointer.Filter:
@@ -165,25 +167,6 @@ func (q *Router) Frame(frame *op.Ops) {
 		q.wakeup = true
 		q.wakeupTime = time.Time{}
 	}
-}
-
-// Queue key events to the topmost handler.
-func (q *Router) QueueTopmost(events ...key.Event) bool {
-	var topmost event.Tag
-	pq := &q.pointer.queue
-	for _, h := range pq.hitTree {
-		if h.ktag != nil {
-			topmost = h.ktag
-			break
-		}
-	}
-	if topmost == nil {
-		return false
-	}
-	for _, e := range events {
-		q.handlers.Add(topmost, e)
-	}
-	return q.handlers.HadEvents()
 }
 
 // Queue events and report whether at least one handler had an event queued.
@@ -273,7 +256,7 @@ func (q *Router) queueKeyEvent(e key.Event) {
 	if focused {
 		// If there is a focused tag, traverse its ancestry through the
 		// hit tree to search for handlers.
-		for ; pq.hitTree[idx].ktag != f; idx-- {
+		for ; pq.hitTree[idx].tag != f; idx-- {
 		}
 	}
 	for idx != -1 {
@@ -283,11 +266,11 @@ func (q *Router) queueKeyEvent(e key.Event) {
 		} else {
 			idx--
 		}
-		if n.ktag == nil {
+		if n.tag == nil {
 			continue
 		}
-		if kq.Accepts(n.ktag, e) {
-			q.handlers.Add(n.ktag, e)
+		if kq.Accepts(n.tag, e) {
+			q.handlers.Add(n.tag, e)
 			break
 		}
 	}
@@ -479,6 +462,9 @@ func (q *Router) collect() {
 		case ops.TypeInput:
 			tag := encOp.Refs[0].(event.Tag)
 			pc.inputOp(tag, &q.handlers)
+			a := pc.currentArea()
+			b := pc.currentAreaBounds()
+			kq.inputOp(tag, t, a, b)
 
 		// Pointer ops.
 		case ops.TypePass:
@@ -491,17 +477,6 @@ func (q *Router) collect() {
 		case ops.TypeActionInput:
 			act := system.Action(encOp.Data[1])
 			pc.actionInputOp(act)
-
-		case ops.TypeKeyInput:
-			filter := key.Set(*encOp.Refs[1].(*string))
-			op := key.InputOp{
-				Tag:  encOp.Refs[0].(event.Tag),
-				Keys: filter,
-			}
-			a := pc.currentArea()
-			b := pc.currentAreaBounds()
-			pc.keyInputOp(op)
-			kq.inputOp(op, t, a, b)
 		case ops.TypeKeyInputHint:
 			op := key.InputHintOp{
 				Tag:  encOp.Refs[0].(event.Tag),
@@ -583,6 +558,14 @@ func (h *handlerEvents) Events(k event.Tag, filters ...event.Filter) []event.Eve
 
 func filtersMatches(filters []event.Filter, e event.Event) bool {
 	switch e := e.(type) {
+	case key.Event:
+		for _, f := range filters {
+			if f, ok := f.(key.Filter); ok {
+				if keyFilterMatch(f, e) {
+					return true
+				}
+			}
+		}
 	case key.FocusEvent, key.SnippetEvent, key.EditEvent, key.SelectionEvent:
 		for _, f := range filters {
 			if _, ok := f.(key.FocusFilter); ok {
@@ -614,8 +597,6 @@ func filtersMatches(filters []event.Filter, e event.Event) bool {
 				return true
 			}
 		}
-	default:
-		return true
 	}
 	return false
 }

@@ -1008,7 +1008,7 @@ func TestDeferredInputOp(t *testing.T) {
 
 	var r Router
 	m := op.Record(&ops)
-	key.InputOp{Tag: new(int)}.Add(&ops)
+	event.InputOp(&ops, new(int))
 	call := m.Stop()
 
 	op.Defer(&ops, call)

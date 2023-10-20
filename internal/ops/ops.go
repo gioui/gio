@@ -63,7 +63,6 @@ const (
 	TypePass
 	TypePopPass
 	TypeInput
-	TypeKeyInput
 	TypeKeyInputHint
 	TypeSave
 	TypeLoad
@@ -140,7 +139,6 @@ const (
 	TypePassLen             = 1
 	TypePopPassLen          = 1
 	TypeInputLen            = 1
-	TypeKeyInputLen         = 1
 	TypeKeyInputHintLen     = 1 + 1
 	TypeSaveLen             = 1 + 4
 	TypeLoadLen             = 1 + 4
@@ -415,7 +413,6 @@ var opProps = [0x100]opProp{
 	TypePass:             {Size: TypePassLen, NumRefs: 0},
 	TypePopPass:          {Size: TypePopPassLen, NumRefs: 0},
 	TypeInput:            {Size: TypeInputLen, NumRefs: 1},
-	TypeKeyInput:         {Size: TypeKeyInputLen, NumRefs: 2},
 	TypeKeyInputHint:     {Size: TypeKeyInputHintLen, NumRefs: 1},
 	TypeSave:             {Size: TypeSaveLen, NumRefs: 0},
 	TypeLoad:             {Size: TypeLoadLen, NumRefs: 0},
@@ -478,8 +475,6 @@ func (t OpType) String() string {
 		return "PopPass"
 	case TypeInput:
 		return "Input"
-	case TypeKeyInput:
-		return "KeyInput"
 	case TypeKeyInputHint:
 		return "KeyInputHint"
 	case TypeSave:

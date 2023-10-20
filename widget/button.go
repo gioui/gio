@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gioui.org/gesture"
+	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/semantic"
@@ -25,7 +26,7 @@ type Clickable struct {
 	keyTag        struct{}
 	requestClicks int
 	focused       bool
-	pressedKey    string
+	pressedKey    key.Name
 }
 
 // Click represents a click.
@@ -102,13 +103,7 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
 	semantic.EnabledOp(gtx.Enabled()).Add(gtx.Ops)
 	b.click.Add(gtx.Ops)
-	if gtx.Enabled() {
-		keys := key.Set("⏎|Space")
-		if !b.focused {
-			keys = ""
-		}
-		key.InputOp{Tag: &b.keyTag, Keys: keys}.Add(gtx.Ops)
-	}
+	event.InputOp(gtx.Ops, &b.keyTag)
 	c.Add(gtx.Ops)
 	return dims
 }
@@ -162,7 +157,13 @@ func (b *Clickable) Update(gtx layout.Context) []Click {
 			})
 		}
 	}
-	for _, e := range gtx.Events(&b.keyTag, key.FocusFilter{}) {
+	filters := []event.Filter{
+		key.FocusFilter{},
+	}
+	if b.focused {
+		filters = append(filters, key.Filter{Name: key.NameReturn}, key.Filter{Name: key.NameSpace})
+	}
+	for _, e := range gtx.Events(&b.keyTag, filters...) {
 		switch e := e.(type) {
 		case key.FocusEvent:
 			b.focused = e.Focus

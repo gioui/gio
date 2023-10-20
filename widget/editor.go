@@ -330,9 +330,57 @@ func (e *Editor) processKey(gtx layout.Context) {
 	if e.text.Changed() {
 		e.events = append(e.events, ChangeEvent{})
 	}
+	filters := []event.Filter{key.FocusFilter{}, transfer.TargetFilter{Type: "application/text"}}
+	if e.focused {
+		filters = append(filters,
+			key.Filter{Name: key.NameEnter, Optional: key.ModShift},
+			key.Filter{Name: key.NameReturn, Optional: key.ModShift},
+
+			key.Filter{Name: "Z", Required: key.ModShortcut, Optional: key.ModShift},
+			key.Filter{Name: "C", Required: key.ModShortcut},
+			key.Filter{Name: "V", Required: key.ModShortcut},
+			key.Filter{Name: "X", Required: key.ModShortcut},
+			key.Filter{Name: "A", Required: key.ModShortcut},
+
+			key.Filter{Name: key.NameDeleteBackward, Optional: key.ModShortcutAlt | key.ModShift},
+			key.Filter{Name: key.NameDeleteForward, Optional: key.ModShortcutAlt | key.ModShift},
+
+			key.Filter{Name: key.NameHome, Optional: key.ModShift},
+			key.Filter{Name: key.NameEnd, Optional: key.ModShift},
+			key.Filter{Name: key.NamePageDown, Optional: key.ModShift},
+			key.Filter{Name: key.NamePageUp, Optional: key.ModShift},
+		)
+		caret, _ := e.text.Selection()
+		if caret > 0 {
+			if gtx.Locale.Direction.Progression() == system.FromOrigin {
+				filters = append(filters,
+					key.Filter{Name: key.NameLeftArrow, Optional: key.ModShortcutAlt | key.ModShift},
+					key.Filter{Name: key.NameUpArrow, Optional: key.ModShortcutAlt | key.ModShift},
+				)
+			} else {
+				filters = append(filters,
+					key.Filter{Name: key.NameRightArrow, Optional: key.ModShortcutAlt | key.ModShift},
+					key.Filter{Name: key.NameDownArrow, Optional: key.ModShortcutAlt | key.ModShift},
+				)
+			}
+		}
+		if caret < e.text.Len() {
+			if gtx.Locale.Direction.Progression() == system.FromOrigin {
+				filters = append(filters,
+					key.Filter{Name: key.NameRightArrow, Optional: key.ModShortcutAlt | key.ModShift},
+					key.Filter{Name: key.NameDownArrow, Optional: key.ModShortcutAlt | key.ModShift},
+				)
+			} else {
+				filters = append(filters,
+					key.Filter{Name: key.NameLeftArrow, Optional: key.ModShortcutAlt | key.ModShift},
+					key.Filter{Name: key.NameUpArrow, Optional: key.ModShortcutAlt | key.ModShift},
+				)
+			}
+		}
+	}
 	// adjust keeps track of runes dropped because of MaxLen.
 	var adjust int
-	for _, ke := range gtx.Events(&e.eventKey, transfer.TargetFilter{Type: "application/text"}, key.FocusFilter{}) {
+	for _, ke := range gtx.Events(&e.eventKey, filters...) {
 		e.blinkStart = gtx.Now
 		switch ke := ke.(type) {
 		case key.FocusEvent:
@@ -625,33 +673,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 
 	defer clip.Rect(image.Rectangle{Max: visibleDims.Size}).Push(gtx.Ops).Pop()
 	pointer.CursorText.Add(gtx.Ops)
-	var keys key.Set
-	if e.focused {
-		const keyFilterNoLeftUp = "(ShortAlt)-(Shift)-[→,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
-		const keyFilterNoRightDown = "(ShortAlt)-(Shift)-[←,↑]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
-		const keyFilterNoArrows = "(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
-		const keyFilterAllArrows = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
-		caret, _ := e.text.Selection()
-		switch {
-		case caret == 0 && caret == e.text.Len():
-			keys = keyFilterNoArrows
-		case caret == 0:
-			if gtx.Locale.Direction.Progression() == system.FromOrigin {
-				keys = keyFilterNoLeftUp
-			} else {
-				keys = keyFilterNoRightDown
-			}
-		case caret == e.text.Len():
-			if gtx.Locale.Direction.Progression() == system.FromOrigin {
-				keys = keyFilterNoRightDown
-			} else {
-				keys = keyFilterNoLeftUp
-			}
-		default:
-			keys = keyFilterAllArrows
-		}
-	}
-	key.InputOp{Tag: &e.eventKey, Keys: keys}.Add(gtx.Ops)
+	event.InputOp(gtx.Ops, &e.eventKey)
 	key.InputHintOp{Tag: &e.eventKey, Hint: e.InputHint}.Add(gtx.Ops)
 
 	e.scroller.Add(gtx.Ops)
