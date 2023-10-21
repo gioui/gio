@@ -69,11 +69,10 @@ type Editor struct {
 	buffer *editBuffer
 	// scratch is a byte buffer that is reused to efficiently read portions of text
 	// from the textView.
-	scratch      []byte
-	eventKey     int
-	blinkStart   time.Time
-	focused      bool
-	requestFocus bool
+	scratch    []byte
+	eventKey   int
+	blinkStart time.Time
+	focused    bool
 
 	// ime tracks the state relevant to input methods.
 	ime struct {
@@ -246,7 +245,7 @@ func (e *Editor) processPointer(gtx layout.Context) {
 					X: int(math.Round(float64(evt.Position.X))),
 					Y: int(math.Round(float64(evt.Position.Y))),
 				})
-				e.requestFocus = true
+				e.Focus(gtx)
 				if e.scroller.State() != gesture.StateFlinging {
 					e.scrollCaret = true
 				}
@@ -492,8 +491,9 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 }
 
 // Focus requests the input focus for the Editor.
-func (e *Editor) Focus() {
-	e.requestFocus = true
+func (e *Editor) Focus(gtx layout.Context) {
+	gtx.Queue(key.FocusCmd{Tag: &e.eventKey})
+	gtx.Queue(key.SoftKeyboardCmd{Show: true})
 }
 
 // Focused returns whether the editor is focused or not.
@@ -644,11 +644,6 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 		}
 	}
 	key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keys}.Add(gtx.Ops)
-	if e.requestFocus {
-		gtx.Queue(key.FocusCmd{Tag: &e.eventKey})
-		gtx.Queue(key.SoftKeyboardCmd{Show: true})
-	}
-	e.requestFocus = false
 
 	var scrollRange image.Rectangle
 	if e.SingleLine {

@@ -31,10 +31,10 @@ func FuzzIME(f *testing.F) {
 	f.Fuzz(func(t *testing.T, cmds []byte) {
 		cache := text.NewShaper(text.WithCollection(gofont.Collection()))
 		e := new(widget.Editor)
-		e.Focus()
 
 		var r input.Router
 		gtx := layout.Context{Ops: new(op.Ops), Source: r.Source()}
+		e.Focus(gtx)
 		// Layout once to register focus.
 		e.Layout(gtx, cache, font.Font{}, unit.Sp(10), op.CallOp{}, op.CallOp{})
 		r.Frame(gtx.Ops)
