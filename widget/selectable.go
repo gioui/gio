@@ -70,15 +70,14 @@ type Selectable struct {
 	source          stringSource
 	// scratch is a buffer reused to efficiently read text out of the
 	// textView.
-	scratch      []byte
-	lastValue    string
-	text         textView
-	focused      bool
-	requestFocus bool
-	dragging     bool
-	dragger      gesture.Drag
-	scroller     gesture.Scroll
-	scrollOff    image.Point
+	scratch   []byte
+	lastValue string
+	text      textView
+	focused   bool
+	dragging  bool
+	dragger   gesture.Drag
+	scroller  gesture.Scroll
+	scrollOff image.Point
 
 	clicker gesture.Click
 	// events is the list of events not yet processed.
@@ -99,8 +98,9 @@ func (l *Selectable) initialize() {
 }
 
 // Focus requests the input focus for the label.
-func (l *Selectable) Focus() {
-	l.requestFocus = true
+func (l *Selectable) Focus(gtx layout.Context) {
+	gtx.Queue(key.FocusCmd{Tag: l})
+	gtx.Queue(key.SoftKeyboardCmd{Show: true})
 }
 
 // Focused returns whether the label is focused or not.
@@ -209,11 +209,6 @@ func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font,
 		keys = keyFilter
 	}
 	key.InputOp{Tag: l, Keys: keys}.Add(gtx.Ops)
-	if l.requestFocus {
-		gtx.Queue(key.FocusCmd{Tag: l})
-		gtx.Queue(key.SoftKeyboardCmd{Show: true})
-	}
-	l.requestFocus = false
 
 	l.clicker.Add(gtx.Ops)
 	l.dragger.Add(gtx.Ops)
@@ -249,7 +244,7 @@ func (e *Selectable) processPointer(gtx layout.Context) {
 					X: int(math.Round(float64(evt.Position.X))),
 					Y: int(math.Round(float64(evt.Position.Y))),
 				})
-				e.requestFocus = true
+				e.Focus(gtx)
 				if evt.Modifiers == key.ModShift {
 					start, end := e.text.Selection()
 					// If they clicked closer to the end, then change the end to
