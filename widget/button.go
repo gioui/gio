@@ -23,7 +23,6 @@ type Clickable struct {
 	history []Press
 
 	keyTag        struct{}
-	requestFocus  bool
 	requestClicks int
 	focused       bool
 	pressedKey    string
@@ -79,8 +78,8 @@ func (b *Clickable) Pressed() bool {
 }
 
 // Focus requests the input focus for the element.
-func (b *Clickable) Focus() {
-	b.requestFocus = true
+func (b *Clickable) Focus(gtx layout.Context) {
+	gtx.Queue(key.FocusCmd{Tag: &b.keyTag})
 }
 
 // Focused reports whether b has focus.
@@ -120,10 +119,6 @@ func (b *Clickable) Update(gtx layout.Context) []Click {
 	b.clicks = nil
 	if !gtx.Enabled() {
 		b.focused = false
-	}
-	if b.requestFocus {
-		gtx.Queue(key.FocusCmd{Tag: &b.keyTag})
-		b.requestFocus = false
 	}
 	for len(b.history) > 0 {
 		c := b.history[0]

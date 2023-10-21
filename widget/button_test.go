@@ -37,7 +37,7 @@ func TestClickable(t *testing.T) {
 		r.Frame(gtx.Ops)
 	}
 	// frame: request focus for button 1
-	b1.Focus()
+	b1.Focus(gtx)
 	frame()
 	// frame: gain focus for button 1
 	frame()
@@ -77,7 +77,7 @@ func TestClickable(t *testing.T) {
 		t.Error("button 1 got clicked, even if it only got return press")
 	}
 	// frame: request focus for button 2
-	b2.Focus()
+	b2.Focus(gtx)
 	frame()
 	// frame: gain focus for button 2
 	frame()
