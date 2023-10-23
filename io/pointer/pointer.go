@@ -51,7 +51,7 @@ type PassOp struct {
 type PassStack struct {
 	ops     *ops.Ops
 	id      ops.StackID
-	macroID int
+	macroID uint32
 }
 
 // InputOp declares an input handler ready for pointer

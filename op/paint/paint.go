@@ -48,7 +48,7 @@ type PaintOp struct {
 // until Pop is called.
 type OpacityStack struct {
 	id      ops.StackID
-	macroID int
+	macroID uint32
 	ops     *ops.Ops
 }
 

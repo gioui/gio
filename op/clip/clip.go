@@ -29,7 +29,7 @@ type Op struct {
 type Stack struct {
 	ops     *ops.Ops
 	id      ops.StackID
-	macroID int
+	macroID uint32
 }
 
 var pathSeed maphash.Seed

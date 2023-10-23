@@ -111,7 +111,7 @@ type TransformOp struct {
 // TransformStack represents a TransformOp pushed on the transformation stack.
 type TransformStack struct {
 	id      ops.StackID
-	macroID int
+	macroID uint32
 	ops     *ops.Ops
 }
 

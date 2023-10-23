@@ -26,8 +26,8 @@ type EncodedOp struct {
 // Key is a unique key for a given op.
 type Key struct {
 	ops     *Ops
-	pc      int
-	version int
+	pc      uint32
+	version uint32
 }
 
 // Shadow of op.MacroOp.
@@ -39,8 +39,8 @@ type macroOp struct {
 
 // PC is an instruction counter for an operation list.
 type PC struct {
-	data int
-	refs int
+	data uint32
+	refs uint32
 }
 
 type macro struct {
@@ -128,7 +128,7 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 				if nrefs != 1 {
 					panic("internal error: unexpected number of macro refs")
 				}
-				deferData := Write1(&r.deferOps, n, refs[0])
+				deferData := Write1(&r.deferOps, int(n), refs[0])
 				copy(deferData, data)
 				r.pc.data += n
 				r.pc.refs += nrefs
@@ -154,8 +154,8 @@ func (r *Reader) Decode() (EncodedOp, bool) {
 				r.pc = op.endpc
 			} else {
 				// Treat an incomplete macro as containing all remaining ops.
-				r.pc.data = len(r.ops.data)
-				r.pc.refs = len(r.ops.refs)
+				r.pc.data = uint32(len(r.ops.data))
+				r.pc.refs = uint32(len(r.ops.refs))
 			}
 			continue
 		}
@@ -171,8 +171,8 @@ func (op *opMacroDef) decode(data []byte) {
 	}
 	bo := binary.LittleEndian
 	data = data[:TypeMacroLen]
-	op.endpc.data = int(int32(bo.Uint32(data[1:])))
-	op.endpc.refs = int(int32(bo.Uint32(data[5:])))
+	op.endpc.data = bo.Uint32(data[1:])
+	op.endpc.refs = bo.Uint32(data[5:])
 }
 
 func (m *macroOp) decode(data []byte, refs []interface{}) {
@@ -183,8 +183,8 @@ func (m *macroOp) decode(data []byte, refs []interface{}) {
 	data = data[:TypeCallLen]
 
 	m.ops = refs[0].(*Ops)
-	m.start.data = int(int32(bo.Uint32(data[1:])))
-	m.start.refs = int(int32(bo.Uint32(data[5:])))
-	m.end.data = int(int32(bo.Uint32(data[9:])))
-	m.end.refs = int(int32(bo.Uint32(data[13:])))
+	m.start.data = bo.Uint32(data[1:])
+	m.start.refs = bo.Uint32(data[5:])
+	m.end.data = bo.Uint32(data[9:])
+	m.end.refs = bo.Uint32(data[13:])
 }

@@ -14,7 +14,7 @@ import (
 
 type Ops struct {
 	// version is incremented at each Reset.
-	version int
+	version uint32
 	// data contains the serialized operations.
 	data []byte
 	// refs hold external references for operations.
@@ -32,7 +32,7 @@ type Ops struct {
 	stringRefs []string
 	// nextStateID is the id allocated for the next
 	// StateOp.
-	nextStateID int
+	nextStateID uint32
 	// multipOp indicates a multi-op such as clip.Path is being added.
 	multipOp bool
 
@@ -91,23 +91,23 @@ const (
 )
 
 type StackID struct {
-	id   int
-	prev int
+	id   uint32
+	prev uint32
 }
 
 // StateOp represents a saved operation snapshot to be restored
 // later.
 type StateOp struct {
-	id      int
-	macroID int
+	id      uint32
+	macroID uint32
 	ops     *Ops
 }
 
 // stack tracks the integer identities of stack operations to ensure correct
 // pairing of their push and pop methods.
 type stack struct {
-	currentID int
-	nextID    int
+	currentID uint32
+	nextID    uint32
 }
 
 type StackKind uint8
@@ -266,11 +266,11 @@ func AddCall(o *Ops, callOps *Ops, pc PC, end PC) {
 	bo.PutUint32(data[13:], uint32(end.refs))
 }
 
-func PushOp(o *Ops, kind StackKind) (StackID, int) {
+func PushOp(o *Ops, kind StackKind) (StackID, uint32) {
 	return o.stacks[kind].push(), o.macroStack.currentID
 }
 
-func PopOp(o *Ops, kind StackKind, sid StackID, macroID int) {
+func PopOp(o *Ops, kind StackKind, sid StackID, macroID uint32) {
 	if o.macroStack.currentID != macroID {
 		panic("stack push and pop must not cross macro boundary")
 	}
@@ -310,7 +310,7 @@ func Write3(o *Ops, n int, ref1, ref2, ref3 interface{}) []byte {
 }
 
 func PCFor(o *Ops) PC {
-	return PC{data: len(o.data), refs: len(o.refs)}
+	return PC{data: uint32(len(o.data)), refs: uint32(len(o.refs))}
 }
 
 func (s *stack) push() StackID {
@@ -460,17 +460,17 @@ var opProps = [0x100]opProp{
 	TypeActionInput:      {Size: TypeActionInputLen, NumRefs: 0},
 }
 
-func (t OpType) props() (size, numRefs int) {
+func (t OpType) props() (size, numRefs uint32) {
 	v := opProps[t]
-	return int(v.Size), int(v.NumRefs)
+	return uint32(v.Size), uint32(v.NumRefs)
 }
 
-func (t OpType) Size() int {
-	return int(opProps[t].Size)
+func (t OpType) Size() uint32 {
+	return uint32(opProps[t].Size)
 }
 
-func (t OpType) NumRefs() int {
-	return int(opProps[t].NumRefs)
+func (t OpType) NumRefs() uint32 {
+	return uint32(opProps[t].NumRefs)
 }
 
 func (t OpType) String() string {
