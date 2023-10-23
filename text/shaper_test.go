@@ -51,9 +51,9 @@ func TestWrappingTruncation(t *testing.T) {
 			for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
 				glyphs = append(glyphs, g)
 				if g.Flags&FlagTruncator != 0 && g.Flags&FlagClusterBreak != 0 {
-					truncatedRunes += g.Runes
+					truncatedRunes += int(g.Runes)
 				} else {
-					untruncatedRunes += g.Runes
+					untruncatedRunes += int(g.Runes)
 				}
 				if g.Flags&FlagLineBreak != 0 {
 					lineCount++
@@ -117,9 +117,9 @@ func TestWrappingForcedTruncation(t *testing.T) {
 			for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
 				glyphs = append(glyphs, g)
 				if g.Flags&FlagTruncator != 0 && g.Flags&FlagClusterBreak != 0 {
-					truncatedRunes += g.Runes
+					truncatedRunes += int(g.Runes)
 				} else {
-					untruncatedRunes += g.Runes
+					untruncatedRunes += int(g.Runes)
 				}
 				if g.Flags&FlagLineBreak != 0 {
 					lineCount++
@@ -191,9 +191,9 @@ func TestShapingNewlineHandling(t *testing.T) {
 				for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
 					glyphs = append(glyphs, g)
 					if g.Flags&FlagTruncator == 0 {
-						runes += g.Runes
+						runes += int(g.Runes)
 					} else {
-						truncated += g.Runes
+						truncated += int(g.Runes)
 					}
 				}
 				if expected := len([]rune(tc.textInput)) - tc.expectedTruncated; expected != runes {
@@ -571,7 +571,7 @@ func TestShapeStringRuneAccounting(t *testing.T) {
 					}
 					totalRunes := 0
 					for _, g := range glyphs {
-						totalRunes += g.Runes
+						totalRunes += int(g.Runes)
 					}
 					if inputRunes := len([]rune(tc.input)); totalRunes != inputRunes {
 						t.Errorf("input contained %d runes, but glyphs contained %d", inputRunes, totalRunes)

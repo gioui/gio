@@ -138,7 +138,7 @@ func (it *textIterator) processGlyph(g text.Glyph, ok bool) (_ text.Glyph, visib
 	if it.maxLines > 0 {
 		if g.Flags&text.FlagTruncator != 0 && g.Flags&text.FlagClusterBreak != 0 {
 			// A glyph carrying both of these flags provides the count of truncated runes.
-			it.truncated = g.Runes
+			it.truncated = int(g.Runes)
 		}
 		if g.Flags&text.FlagLineBreak != 0 {
 			it.linesSeen++
