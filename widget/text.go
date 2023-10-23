@@ -492,14 +492,19 @@ func (e *textView) layoutText(lt *text.Shaper) {
 	it := textIterator{viewport: image.Rectangle{Max: image.Point{X: math.MaxInt, Y: math.MaxInt}}}
 	if lt != nil {
 		lt.Layout(e.params, r)
-		for glyph, ok := it.processGlyph(lt.NextGlyph()); ok; glyph, ok = it.processGlyph(lt.NextGlyph()) {
-			e.index.Glyph(glyph)
+		for {
+			g, ok := lt.NextGlyph()
+			if !it.processGlyph(g, ok) {
+				break
+			}
+			e.index.Glyph(g)
 		}
 	} else {
 		// Make a fake glyph for every rune in the reader.
 		b := bufio.NewReader(r)
 		for _, _, err := b.ReadRune(); err != io.EOF; _, _, err = b.ReadRune() {
-			g, _ := it.processGlyph(text.Glyph{Runes: 1, Flags: text.FlagClusterBreak}, true)
+			g := text.Glyph{Runes: 1, Flags: text.FlagClusterBreak}
+			_ = it.processGlyph(g, true)
 			e.index.Glyph(g)
 		}
 	}

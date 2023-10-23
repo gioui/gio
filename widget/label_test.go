@@ -146,10 +146,7 @@ func TestGlyphIterator(t *testing.T) {
 			glyphs := getGlyphs(16, 0, maxWidth, text.Start, tc.str)
 			it := textIterator{viewport: tc.viewport, maxLines: tc.maxLines}
 			for i, g := range glyphs {
-				gOut, ok := it.processGlyph(g, true)
-				if gOut != g {
-					t.Errorf("textIterator modified glyphs[%d], original:\n%#+v, modified:\n%#+v", i, g, gOut)
-				}
+				ok := it.processGlyph(g, true)
 				if !ok && i != tc.stopAtGlyph {
 					t.Errorf("expected iterator to stop at glyph %d, stopped at %d", tc.stopAtGlyph, i)
 				}
