@@ -117,7 +117,7 @@ func onCreate(view, controller C.CFTypeRef) {
 	w := &window{
 		view: view,
 	}
-	dl, err := NewDisplayLink(func() {
+	dl, err := newDisplayLink(func() {
 		w.draw(false)
 	})
 	if err != nil {

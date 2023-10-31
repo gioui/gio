@@ -886,7 +886,7 @@ func newOSWindow() (*window, error) {
 		scale:  scale,
 		redraw: make(chan struct{}, 1),
 	}
-	dl, err := NewDisplayLink(func() {
+	dl, err := newDisplayLink(func() {
 		select {
 		case w.redraw <- struct{}{}:
 		default:
