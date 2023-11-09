@@ -284,6 +284,7 @@ func (s *shaperImpl) addFace(f font.Face, md giofont.Font) {
 	if _, ok := s.faceToIndex[f.Font]; ok {
 		return
 	}
+	s.logger.Printf("loaded face %s(style:%s, weight:%d)", md.Typeface, md.Style, md.Weight)
 	idx := len(s.faces)
 	s.faceToIndex[f.Font] = idx
 	s.faces = append(s.faces, f)
