@@ -517,15 +517,10 @@ func (e *Editor) initBuffer() {
 	e.text.WrapPolicy = e.WrapPolicy
 }
 
-// Layout lays out the editor using the provided textMaterial as the paint material
-// for the text glyphs+caret and the selectMaterial as the paint material for the
-// selection rectangle.
-func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, textMaterial, selectMaterial op.CallOp) layout.Dimensions {
+// Update the state of the editor in response to input events.
+func (e *Editor) Update(gtx layout.Context) {
 	e.initBuffer()
-	e.text.Update(gtx, lt, font, size, e.processEvents)
-
-	dims := e.layout(gtx, textMaterial, selectMaterial)
-
+	e.processEvents(gtx)
 	if e.focused {
 		// Notify IME of selection if it changed.
 		newSel := e.ime.selection
@@ -551,8 +546,16 @@ func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, siz
 
 		e.updateSnippet(gtx, e.ime.start, e.ime.end)
 	}
+}
 
-	return dims
+// Layout lays out the editor using the provided textMaterial as the paint material
+// for the text glyphs+caret and the selectMaterial as the paint material for the
+// selection rectangle.
+func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, textMaterial, selectMaterial op.CallOp) layout.Dimensions {
+	e.Update(gtx)
+
+	e.text.Layout(gtx, lt, font, size)
+	return e.layout(gtx, textMaterial, selectMaterial)
 }
 
 // updateSnippet adds a key.SnippetOp if the snippet content or position

@@ -182,18 +182,24 @@ func (l *Selectable) Truncated() bool {
 	return l.text.Truncated()
 }
 
+// Update the state of the selectable in response to input events.
+func (l *Selectable) Update(gtx layout.Context) {
+	l.initialize()
+	l.handleEvents(gtx)
+}
+
 // Layout clips to the dimensions of the selectable, updates the shaped text, configures input handling, and paints
 // the text and selection rectangles. The provided textMaterial and selectionMaterial ops are used to set the
 // paint material for the text and selection rectangles, respectively.
 func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, textMaterial, selectionMaterial op.CallOp) layout.Dimensions {
-	l.initialize()
+	l.Update(gtx)
 	l.text.LineHeight = l.LineHeight
 	l.text.LineHeightScale = l.LineHeightScale
 	l.text.Alignment = l.Alignment
 	l.text.MaxLines = l.MaxLines
 	l.text.Truncator = l.Truncator
 	l.text.WrapPolicy = l.WrapPolicy
-	l.text.Update(gtx, lt, font, size, l.handleEvents)
+	l.text.Layout(gtx, lt, font, size)
 	dims := l.text.Dimensions()
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
 	pointer.CursorText.Add(gtx.Ops)

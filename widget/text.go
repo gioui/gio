@@ -228,10 +228,8 @@ func (e *textView) calculateViewSize(gtx layout.Context) image.Point {
 	return gtx.Constraints.Constrain(base)
 }
 
-// Update the text, reshaping it as necessary. If not nil, eventHandling will be invoked after reshaping the text to
-// allow parent widgets to adapt to any changes in text content or positioning. If eventHandling modifies the contents
-// of the textView, it is guaranteed to be reshaped (and ready for painting) before Update returns.
-func (e *textView) Update(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, eventHandling func(gtx layout.Context)) {
+// Layout the text, reshaping it as necessary.
+func (e *textView) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp) {
 	if e.params.Locale != gtx.Locale {
 		e.params.Locale = gtx.Locale
 		e.invalidate()
@@ -289,10 +287,6 @@ func (e *textView) Update(gtx layout.Context, lt *text.Shaper, font font.Font, s
 	}
 
 	e.makeValid()
-	if eventHandling != nil {
-		eventHandling(gtx)
-		e.makeValid()
-	}
 
 	if viewSize := e.calculateViewSize(gtx); viewSize != e.viewSize {
 		e.viewSize = viewSize
