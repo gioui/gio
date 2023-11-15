@@ -38,11 +38,12 @@ func (q *clipboardQueue) ReadClipboard() bool {
 	return true
 }
 
-func (q *clipboardQueue) Push(e event.Event, events *handlerEvents) {
+func (q *clipboardQueue) Push(evts []taggedEvent, e event.Event) []taggedEvent {
 	for r := range q.receivers {
-		events.Add(r, e)
+		evts = append(evts, taggedEvent{tag: r, event: e})
 		delete(q.receivers, r)
 	}
+	return evts
 }
 
 func (q *clipboardQueue) ProcessWriteClipboard(req clipboard.WriteCmd) {

@@ -35,7 +35,7 @@ type Router struct {
 	}
 	cqueue clipboardQueue
 
-	handlers handlerEvents
+	events []taggedEvent
 
 	reader ops.Reader
 
@@ -94,9 +94,10 @@ const (
 // By convention, the zero value denotes the non-existent ID.
 type SemanticID uint
 
-type handlerEvents struct {
-	handlers  map[event.Tag][]event.Event
-	hadEvents bool
+// taggedEvent represents an event and its target handler.
+type taggedEvent struct {
+	event event.Event
+	tag   event.Tag
 }
 
 // Source returns a Source backed by this Router.
@@ -129,7 +130,7 @@ func (s Source) Events(k event.Tag, filters ...event.Filter) []event.Event {
 }
 
 func (q *Router) Events(k event.Tag, filters ...event.Filter) []event.Event {
-	var resetEvents []event.Event
+	var evts []event.Event
 	for _, f := range filters {
 		switch f := f.(type) {
 		case key.Filter:
@@ -137,12 +138,12 @@ func (q *Router) Events(k event.Tag, filters ...event.Filter) []event.Event {
 		case key.FocusFilter:
 			q.key.queue.focusable(k)
 			if reset, ok := q.key.queue.ResetEvent(k); ok {
-				resetEvents = append(resetEvents, reset)
+				evts = append(evts, reset)
 			}
 		case pointer.Filter:
 			q.pointer.queue.filterTag(k, f)
 			if reset, ok := q.pointer.queue.ResetEvent(k); ok {
-				resetEvents = append(resetEvents, reset)
+				evts = append(evts, reset)
 			}
 		case transfer.SourceFilter:
 			q.pointer.queue.sourceFilter(k, f)
@@ -150,15 +151,26 @@ func (q *Router) Events(k event.Tag, filters ...event.Filter) []event.Event {
 			q.pointer.queue.targetFilter(k, f)
 		}
 	}
-	events := q.handlers.Events(k, filters...)
-	return append(resetEvents, events...)
+	i := 0
+	for i < len(q.events) {
+		e := q.events[i]
+		if e.tag == k {
+			q.events = append(q.events[:i], q.events[i+1:]...)
+			if filtersMatches(filters, e.event) {
+				evts = append(evts, e.event)
+			}
+		} else {
+			i++
+		}
+	}
+	return evts
 }
 
 // Frame replaces the declared handlers from the supplied
 // operation list. The text input state, wakeup time and whether
 // there are active profile handlers is also saved.
 func (q *Router) Frame(frame *op.Ops) {
-	q.handlers.Clear()
+	q.events = q.events[:0]
 	q.wakeup = false
 	var ops *ops.Ops
 	if frame != nil {
@@ -166,24 +178,26 @@ func (q *Router) Frame(frame *op.Ops) {
 	}
 	q.reader.Reset(ops)
 	q.collect()
-	q.executeCommands()
-	q.pointer.queue.Frame(&q.handlers)
+	evts := q.executeCommands(nil)
+	evts = q.pointer.queue.Frame(evts)
 	q.key.queue.Frame()
+	q.addEvents(evts)
 
-	if q.handlers.HadEvents() {
+	if len(evts) > 0 {
 		q.wakeup = true
 		q.wakeupTime = time.Time{}
 	}
 }
 
-// Queue events and report whether at least one handler had an event queued.
+// Queue events and report whether at least one event matched a handler.
 func (q *Router) Queue(events ...event.Event) bool {
+	var evts []taggedEvent
 	for _, e := range events {
 		switch e := e.(type) {
 		case pointer.Event:
-			q.pointer.queue.Push(e, &q.handlers)
+			evts = q.pointer.queue.Push(evts, e)
 		case key.Event:
-			q.queueKeyEvent(e)
+			evts = q.queueKeyEvent(evts, e)
 		case key.SnippetEvent:
 			// Expand existing, overlapping snippet.
 			if r := q.key.queue.content.Snippet.Range; rangeOverlaps(r, key.Range(e)) {
@@ -195,45 +209,51 @@ func (q *Router) Queue(events ...event.Event) bool {
 				}
 			}
 			if f := q.key.queue.focus; f != nil {
-				q.handlers.Add(f, e)
+				evts = append(evts, taggedEvent{tag: f, event: e})
 			}
 		case key.EditEvent, key.FocusEvent, key.SelectionEvent:
 			if f := q.key.queue.focus; f != nil {
-				q.handlers.Add(f, e)
+				evts = append(evts, taggedEvent{tag: f, event: e})
 			}
 		case transfer.DataEvent:
-			q.cqueue.Push(e, &q.handlers)
+			evts = q.cqueue.Push(evts, e)
 		}
 	}
-	return q.handlers.HadEvents()
+	q.addEvents(evts)
+	return len(evts) > 0
 }
 
 func (q *Router) queue(f Command) {
 	q.commands = append(q.commands, f)
 }
 
-func (q *Router) executeCommands() {
+func (q *Router) executeCommands(evts []taggedEvent) []taggedEvent {
 	for _, req := range q.commands {
 		switch req := req.(type) {
 		case key.SelectionCmd:
 			q.key.queue.setSelection(req)
 		case key.FocusCmd:
-			q.key.queue.Focus(req.Tag, &q.handlers)
+			evts = q.key.queue.Focus(evts, req.Tag)
 		case key.SoftKeyboardCmd:
 			q.key.queue.softKeyboard(req.Show)
 		case key.SnippetCmd:
 			q.key.queue.setSnippet(req)
 		case transfer.OfferCmd:
-			q.pointer.queue.offerData(req, &q.handlers)
+			evts = q.pointer.queue.offerData(evts, req)
 		case clipboard.WriteCmd:
 			q.cqueue.ProcessWriteClipboard(req)
 		case clipboard.ReadCmd:
 			q.cqueue.ProcessReadClipboard(req.Tag)
 		case pointer.GrabCmd:
-			q.pointer.queue.grab(req, &q.handlers)
+			evts = q.pointer.queue.grab(evts, req)
 		}
 	}
 	q.commands = nil
+	return evts
+}
+
+func (q *Router) addEvents(evts []taggedEvent) {
+	q.events = append(q.events, evts...)
 }
 
 func rangeOverlaps(r1, r2 key.Range) bool {
@@ -250,12 +270,12 @@ func rangeNorm(r key.Range) key.Range {
 	return r
 }
 
-func (q *Router) queueKeyEvent(e key.Event) {
+func (q *Router) queueKeyEvent(evts []taggedEvent, e key.Event) []taggedEvent {
 	kq := &q.key.queue
 	f := q.key.queue.focus
 	if f != nil && kq.Accepts(f, e) {
-		q.handlers.Add(f, e)
-		return
+		evts = append(evts, taggedEvent{tag: f, event: e})
+		return evts
 	}
 	pq := &q.pointer.queue
 	idx := len(pq.hitTree) - 1
@@ -277,14 +297,17 @@ func (q *Router) queueKeyEvent(e key.Event) {
 			continue
 		}
 		if kq.Accepts(n.tag, e) {
-			q.handlers.Add(n.tag, e)
+			evts = append(evts, taggedEvent{tag: n.tag, event: e})
 			break
 		}
 	}
+	return evts
 }
 
 func (q *Router) MoveFocus(dir key.FocusDirection) bool {
-	return q.key.queue.MoveFocus(dir, &q.handlers)
+	evts := q.key.queue.MoveFocus(nil, dir)
+	q.addEvents(evts)
+	return len(evts) > 0
 }
 
 // RevealFocus scrolls the current focus (if any) into viewport
@@ -321,11 +344,11 @@ func (q *Router) ScrollFocus(dist image.Point) {
 		return
 	}
 	area := q.key.queue.AreaFor(focus)
-	q.pointer.queue.Deliver(area, pointer.Event{
+	q.addEvents(q.pointer.queue.Deliver(area, pointer.Event{
 		Kind:   pointer.Scroll,
 		Source: pointer.Touch,
 		Scroll: f32internal.FPt(dist),
-	}, &q.handlers)
+	}))
 }
 
 func max(p1, p2 image.Point) image.Point {
@@ -367,9 +390,9 @@ func (q *Router) ClickFocus() {
 	}
 	area := q.key.queue.AreaFor(focus)
 	e.Kind = pointer.Press
-	q.pointer.queue.Deliver(area, e, &q.handlers)
+	q.addEvents(q.pointer.queue.Deliver(area, e))
 	e.Kind = pointer.Release
-	q.pointer.queue.Deliver(area, e, &q.handlers)
+	q.addEvents(q.pointer.queue.Deliver(area, e))
 }
 
 // TextInputState returns the input state from the most recent
@@ -523,42 +546,6 @@ func (q *Router) WakeupTime() (time.Time, bool) {
 	return q.wakeupTime, q.wakeup
 }
 
-func (h *handlerEvents) init() {
-	if h.handlers == nil {
-		h.handlers = make(map[event.Tag][]event.Event)
-	}
-}
-
-func (h *handlerEvents) Add(k event.Tag, e event.Event) {
-	h.init()
-	h.handlers[k] = append(h.handlers[k], e)
-	h.hadEvents = true
-}
-
-func (h *handlerEvents) HadEvents() bool {
-	u := h.hadEvents
-	h.hadEvents = false
-	return u
-}
-
-func (h *handlerEvents) Events(k event.Tag, filters ...event.Filter) []event.Event {
-	var filtered []event.Event
-	if events, ok := h.handlers[k]; ok {
-		i := 0
-		for i < len(events) {
-			e := events[i]
-			if filtersMatches(filters, e) {
-				filtered = append(filtered, e)
-				events = append(events[:i], events[i+1:]...)
-			} else {
-				i++
-			}
-		}
-		h.handlers[k] = events
-	}
-	return filtered
-}
-
 func filtersMatches(filters []event.Filter, e event.Event) bool {
 	switch e := e.(type) {
 	case key.Event:
@@ -602,12 +589,6 @@ func filtersMatches(filters []event.Filter, e event.Event) bool {
 		}
 	}
 	return false
-}
-
-func (h *handlerEvents) Clear() {
-	for k := range h.handlers {
-		delete(h.handlers, k)
-	}
 }
 
 func decodeInvalidateOp(d []byte) op.InvalidateOp {

@@ -167,10 +167,10 @@ func (q *keyQueue) updateFocusLayout() {
 	}
 }
 
-// MoveFocus attempts to move the focus in the direction of dir, returning true if it succeeds.
-func (q *keyQueue) MoveFocus(dir key.FocusDirection, events *handlerEvents) bool {
+// MoveFocus attempts to move the focus in the direction of dir.
+func (q *keyQueue) MoveFocus(evts []taggedEvent, dir key.FocusDirection) []taggedEvent {
 	if len(q.dirOrder) == 0 {
-		return false
+		return nil
 	}
 	order := 0
 	if q.focus != nil {
@@ -195,8 +195,7 @@ func (q *keyQueue) MoveFocus(dir key.FocusDirection, events *handlerEvents) bool
 			}
 		}
 		order = (order + len(q.order)) % len(q.order)
-		q.Focus(q.order[order], events)
-		return true
+		return q.Focus(evts, q.order[order])
 	case key.FocusRight, key.FocusLeft:
 		next := order
 		if q.focus != nil {
@@ -208,8 +207,7 @@ func (q *keyQueue) MoveFocus(dir key.FocusDirection, events *handlerEvents) bool
 		if 0 <= next && next < len(q.dirOrder) {
 			newFocus := q.dirOrder[next]
 			if newFocus.row == focus.row {
-				q.Focus(newFocus.tag, events)
-				return true
+				return q.Focus(evts, newFocus.tag)
 			}
 		}
 	case key.FocusUp, key.FocusDown:
@@ -245,11 +243,10 @@ func (q *keyQueue) MoveFocus(dir key.FocusDirection, events *handlerEvents) bool
 			order += delta
 		}
 		if closest != nil {
-			q.Focus(closest, events)
-			return true
+			return q.Focus(evts, closest)
 		}
 	}
-	return false
+	return nil
 }
 
 func (q *keyQueue) BoundsFor(t event.Tag) image.Rectangle {
@@ -284,26 +281,27 @@ func keyFilterMatch(f key.Filter, e key.Event) bool {
 	return true
 }
 
-func (q *keyQueue) Focus(focus event.Tag, events *handlerEvents) {
+func (q *keyQueue) Focus(evts []taggedEvent, focus event.Tag) []taggedEvent {
 	if focus != nil {
 		if _, exists := q.handlers[focus]; !exists {
 			focus = nil
 		}
 	}
 	if focus == q.focus {
-		return
+		return evts
 	}
 	q.content = EditorState{}
 	if q.focus != nil {
-		events.Add(q.focus, key.FocusEvent{Focus: false})
+		evts = append(evts, taggedEvent{tag: q.focus, event: key.FocusEvent{Focus: false}})
 	}
 	q.focus = focus
 	if q.focus != nil {
-		events.Add(q.focus, key.FocusEvent{Focus: true})
+		evts = append(evts, taggedEvent{tag: q.focus, event: key.FocusEvent{Focus: true}})
 	}
 	if q.focus == nil || q.state == TextInputKeep {
 		q.state = TextInputClose
 	}
+	return evts
 }
 
 func (q *keyQueue) softKeyboard(show bool) {
