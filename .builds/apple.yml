@@ -8,16 +8,21 @@ packages:
  - libxml2-dev
  - libssl-dev
  - libz-dev
- - llvm-dev # for cctools
- - uuid-dev ## for cctools
+ - llvm-dev # cctools
+ - uuid-dev # cctools
+ - ninja-build # cctools
+ - systemtap-sdt-dev # cctools
+ - libbsd-dev # cctools
+ - linux-libc-dev # cctools
  - libplist-utils # for gogio
 sources:
  - https://git.sr.ht/~eliasnaur/applesdks
  - https://git.sr.ht/~eliasnaur/gio
  - https://git.sr.ht/~eliasnaur/giouiorg
- - https://github.com/tpoechtrager/cctools-port.git
- - https://github.com/tpoechtrager/apple-libtapi.git
- - https://github.com/mackyle/xar.git
+ - https://github.com/tpoechtrager/cctools-port
+ - https://github.com/tpoechtrager/apple-libtapi
+ - https://github.com/tpoechtrager/apple-libdispatch
+ - https://github.com/mackyle/xar
 environment:
    APPLE_TOOLCHAIN_ROOT: /home/build/appletools
    PATH: /home/build/sdk/go/bin:/home/build/go/bin:/usr/bin
@@ -42,6 +47,11 @@ tasks:
  - install_appletoolchain: |
      cd giouiorg
      go build -o $APPLE_TOOLCHAIN_ROOT/tools ./cmd/appletoolchain
+ - build_libdispatch: |
+     cd apple-libdispatch
+     cmake -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_INSTALL_PREFIX=$APPLE_TOOLCHAIN_ROOT/libdispatch .
+     ninja
+     ninja install
  - build_xar: |
      cd xar/xar
      ac_cv_lib_crypto_OpenSSL_add_all_ciphers=yes CC=clang ./autogen.sh --prefix=/usr
@@ -53,7 +63,7 @@ tasks:
      ./install.sh
  - build_cctools: |
      cd cctools-port/cctools
-     ./configure --prefix $APPLE_TOOLCHAIN_ROOT/toolchain --with-libtapi=$APPLE_TOOLCHAIN_ROOT/libtapi --target=x86_64-apple-darwin19
+     ./configure --target=x86_64-apple-darwin19 --prefix $APPLE_TOOLCHAIN_ROOT/toolchain --with-libtapi=$APPLE_TOOLCHAIN_ROOT/libtapi --with-libdispatch=$APPLE_TOOLCHAIN_ROOT/libdispatch --with-libblocksruntime=$APPLE_TOOLCHAIN_ROOT/libdispatch
      make install
  - test_macos: |
      cd gio
