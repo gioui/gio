@@ -118,3 +118,36 @@ func (s Stack) Layout(gtx Context, children ...StackChild) Dimensions {
 		Baseline: baseline,
 	}
 }
+
+// Background lays out single child widget on top of a background,
+// centering, if necessary.
+type Background struct{}
+
+// Layout a widget and then add a background to it.
+func (Background) Layout(gtx Context, background, widget Widget) Dimensions {
+	macro := op.Record(gtx.Ops)
+	wdims := widget(gtx)
+	baseline := wdims.Baseline
+	call := macro.Stop()
+
+	cgtx := gtx
+	cgtx.Constraints.Min = gtx.Constraints.Constrain(wdims.Size)
+	bdims := background(cgtx)
+
+	if bdims.Size != wdims.Size {
+		p := image.Point{
+			X: (bdims.Size.X - wdims.Size.X) / 2,
+			Y: (bdims.Size.Y - wdims.Size.Y) / 2,
+		}
+		baseline += (bdims.Size.Y - wdims.Size.Y) / 2
+		trans := op.Offset(p).Push(gtx.Ops)
+		defer trans.Pop()
+	}
+
+	call.Add(gtx.Ops)
+
+	return Dimensions{
+		Size:     bdims.Size,
+		Baseline: baseline,
+	}
+}
