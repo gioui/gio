@@ -24,8 +24,6 @@ type pointerQueue struct {
 	pointers  []pointerInfo
 	transfers []io.ReadCloser // pending data transfers
 
-	scratch []event.Tag
-
 	semantic struct {
 		idsAssigned bool
 		lastID      SemanticID
@@ -271,18 +269,13 @@ func (q *pointerQueue) grab(req pointer.GrabCmd, events *handlerEvents) {
 		if !p.pressed || p.id != req.ID {
 			continue
 		}
-		for i, k2 := range p.handlers {
-			if k2 == req.Tag {
-				// Drop other handlers that lost their grab.
-				dropped := q.scratch[:0]
-				dropped = append(dropped, p.handlers[:i]...)
-				dropped = append(dropped, p.handlers[i+1:]...)
-				for _, tag := range dropped {
-					q.dropHandler(events, tag)
-				}
-				return
+		// Drop other handlers that lost their grab.
+		for i := len(p.handlers) - 1; i >= 0; i-- {
+			if tag := p.handlers[i]; tag != req.Tag {
+				q.dropHandler(events, tag)
 			}
 		}
+		break
 	}
 }
 
@@ -538,7 +531,7 @@ func (q *pointerQueue) hitTest(pos f32.Point, onNode func(*hitNode) bool) pointe
 }
 
 func (q *pointerQueue) opHit(pos f32.Point) ([]event.Tag, pointer.Cursor) {
-	hits := q.scratch[:0]
+	var hits []event.Tag
 	cursor := q.hitTest(pos, func(n *hitNode) bool {
 		if n.tag != nil {
 			if _, exists := q.handlers[n.tag]; exists {
@@ -547,7 +540,6 @@ func (q *pointerQueue) opHit(pos f32.Point) ([]event.Tag, pointer.Cursor) {
 		}
 		return true
 	})
-	q.scratch = hits[:0]
 	return hits, cursor
 }
 
@@ -810,7 +802,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 				}
 			}
 		} else {
-			p.handlers = append(p.handlers[:0], hits...)
+			p.handlers = hits
 		}
 	}
 	// Deliver Leave events.
@@ -841,7 +833,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 			events.Add(k, e)
 		}
 	}
-	p.entered = append(p.entered[:0], hits...)
+	p.entered = hits
 }
 
 func (q *pointerQueue) deliverDragEvent(p *pointerInfo, events *handlerEvents) {
