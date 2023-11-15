@@ -22,13 +22,12 @@ func TestInputWakeup(t *testing.T) {
 
 	var r Router
 	// Test that merely adding a handler doesn't trigger redraw.
-	r.Events(handler, key.FocusFilter{})
+	evts := r.Events(handler, key.FocusFilter{})
 	r.Frame(&ops)
 	if _, wake := r.WakeupTime(); wake {
 		t.Errorf("adding key.InputOp triggered a redraw")
 	}
-	// However, adding a handler queues a Focus(false) event.
-	if evts := r.Events(handler, key.FocusFilter{}); len(evts) != 1 {
+	if len(evts) != 1 {
 		t.Errorf("no Focus event for newly registered key.InputOp")
 	}
 }
@@ -47,15 +46,14 @@ func TestKeyMultiples(t *testing.T) {
 	event.InputOp(ops, &handlers[2])
 
 	for i := range handlers {
-		r.Events(&handlers[i], key.FocusFilter{})
+		assertKeyEvent(t, r.Events(&handlers[i], key.FocusFilter{}), false)
 	}
 
 	r.Frame(ops)
 
-	assertKeyEvent(t, r.Events(&handlers[0], key.FocusFilter{}), false)
-	assertKeyEvent(t, r.Events(&handlers[1], key.FocusFilter{}), false)
 	assertKeyEvent(t, r.Events(&handlers[2], key.FocusFilter{}), true)
 	assertFocus(t, r, &handlers[2])
+
 	assertKeyboard(t, r, TextInputOpen)
 }
 
@@ -74,15 +72,12 @@ func TestKeyStacked(t *testing.T) {
 	event.InputOp(ops, &handlers[3])
 
 	for i := range handlers {
-		r.Events(&handlers[i], key.FocusFilter{})
+		assertKeyEvent(t, r.Events(&handlers[i], key.FocusFilter{}), false)
 	}
 
 	r.Frame(ops)
 
-	assertKeyEvent(t, r.Events(&handlers[0], key.FocusFilter{}), false)
 	assertKeyEvent(t, r.Events(&handlers[1], key.FocusFilter{}), true)
-	assertKeyEvent(t, r.Events(&handlers[2], key.FocusFilter{}), false)
-	assertKeyEvent(t, r.Events(&handlers[3], key.FocusFilter{}), false)
 	assertFocus(t, r, &handlers[1])
 	assertKeyboard(t, r, TextInputOpen)
 }
@@ -119,7 +114,7 @@ func TestKeyRemoveFocus(t *testing.T) {
 		key.Filter{Name: key.NameTab, Required: key.ModShortcut},
 	}
 	for i := range handlers {
-		r.Events(&handlers[i], filters...)
+		assertKeyEvent(t, r.Events(&handlers[i], filters...), false)
 	}
 
 	r.Frame(ops)
@@ -129,7 +124,6 @@ func TestKeyRemoveFocus(t *testing.T) {
 	r.Queue(evt)
 
 	assertKeyEvent(t, r.Events(&handlers[0], filters...), true, evt)
-	assertKeyEvent(t, r.Events(&handlers[1], filters...), false)
 	assertFocus(t, r, &handlers[0])
 	assertKeyboard(t, r, TextInputOpen)
 
@@ -195,13 +189,12 @@ func TestKeyFocusedInvisible(t *testing.T) {
 	event.InputOp(ops, &handlers[1])
 
 	for i := range handlers {
-		r.Events(&handlers[i], key.FocusFilter{})
+		assertKeyEvent(t, r.Events(&handlers[i], key.FocusFilter{}), false)
 	}
 
 	r.Frame(ops)
 
 	assertKeyEvent(t, r.Events(&handlers[0], key.FocusFilter{}), true)
-	assertKeyEvent(t, r.Events(&handlers[1], key.FocusFilter{}), false)
 	assertFocus(t, r, &handlers[0])
 	assertKeyboard(t, r, TextInputOpen)
 
@@ -238,12 +231,11 @@ func TestKeyFocusedInvisible(t *testing.T) {
 	event.InputOp(ops, &handlers[1])
 
 	for i := range handlers {
-		r.Events(&handlers[i], key.FocusFilter{})
+		assertKeyEventUnexpected(t, r.Events(&handlers[i], key.FocusFilter{}))
 	}
 
 	r.Frame(ops)
 
-	assertKeyEvent(t, r.Events(&handlers[0], key.FocusFilter{}), false)
 	assertKeyEventUnexpected(t, r.Events(&handlers[1], key.FocusFilter{}))
 	assertFocus(t, r, nil)
 	assertKeyboard(t, r, TextInputClose)
@@ -393,11 +385,15 @@ func TestKeyRouting(t *testing.T) {
 
 	// With no focus, the events should traverse the final branch of the hit tree
 	// searching for handlers.
-	assertKeyEvent(t, r.Events(&handlers[4], fa...), false, A)
-	assertKeyEvent(t, r.Events(&handlers[3], key.FocusFilter{}), false)
-	assertKeyEvent(t, r.Events(&handlers[2], fa...), false)
-	assertKeyEvent(t, r.Events(&handlers[1], fb...), false, B)
-	assertKeyEvent(t, r.Events(&handlers[0], fa...), false)
+	if evts := r.Events(&handlers[4], fa...); len(evts) != 1 || evts[0] != A {
+		t.Errorf("expected key event")
+	}
+	r.Events(&handlers[3], key.FocusFilter{})
+	r.Events(&handlers[2], fa...)
+	if evts := r.Events(&handlers[1], fb...); len(evts) != 1 || evts[0] != B {
+		t.Errorf("expected key event")
+	}
+	r.Events(&handlers[0], fa...)
 
 	r2 := new(Router)
 
@@ -414,11 +410,10 @@ func TestKeyRouting(t *testing.T) {
 
 	// With focus, the events should traverse the branch of the hit tree
 	// containing the focused element.
-	assertKeyEvent(t, r2.Events(&handlers[4], fa...), false)
 	assertKeyEvent(t, r2.Events(&handlers[3], key.FocusFilter{}), true)
-	assertKeyEvent(t, r2.Events(&handlers[2], fa...), false)
-	assertKeyEvent(t, r2.Events(&handlers[1], fb...), false)
-	assertKeyEvent(t, r2.Events(&handlers[0], fa...), false, A)
+	if evts := r2.Events(&handlers[0], fa...); len(evts) != 1 || evts[0] != A {
+		t.Errorf("expected key event")
+	}
 }
 
 func assertKeyEvent(t *testing.T, events []event.Event, expectedFocus bool, expectedInputs ...event.Event) {

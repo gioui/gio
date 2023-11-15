@@ -129,22 +129,29 @@ func (s Source) Events(k event.Tag, filters ...event.Filter) []event.Event {
 }
 
 func (q *Router) Events(k event.Tag, filters ...event.Filter) []event.Event {
+	var resetEvents []event.Event
 	for _, f := range filters {
 		switch f := f.(type) {
 		case key.Filter:
 			q.key.queue.filter(k, f)
 		case key.FocusFilter:
 			q.key.queue.focusable(k)
+			if reset, ok := q.key.queue.ResetEvent(k); ok {
+				resetEvents = append(resetEvents, reset)
+			}
 		case pointer.Filter:
-			q.pointer.queue.filterTag(k, f, &q.handlers)
+			q.pointer.queue.filterTag(k, f)
+			if reset, ok := q.pointer.queue.ResetEvent(k); ok {
+				resetEvents = append(resetEvents, reset)
+			}
 		case transfer.SourceFilter:
-			q.pointer.queue.sourceFilter(k, f, &q.handlers)
+			q.pointer.queue.sourceFilter(k, f)
 		case transfer.TargetFilter:
-			q.pointer.queue.targetFilter(k, f, &q.handlers)
+			q.pointer.queue.targetFilter(k, f)
 		}
 	}
 	events := q.handlers.Events(k, filters...)
-	return events
+	return append(resetEvents, events...)
 }
 
 // Frame replaces the declared handlers from the supplied
@@ -161,7 +168,7 @@ func (q *Router) Frame(frame *op.Ops) {
 	q.collect()
 	q.executeCommands()
 	q.pointer.queue.Frame(&q.handlers)
-	q.key.queue.Frame(&q.handlers)
+	q.key.queue.Frame()
 
 	if q.handlers.HadEvents() {
 		q.wakeup = true
@@ -461,7 +468,7 @@ func (q *Router) collect() {
 
 		case ops.TypeInput:
 			tag := encOp.Refs[0].(event.Tag)
-			pc.inputOp(tag, &q.handlers)
+			pc.inputOp(tag)
 			a := pc.currentArea()
 			b := pc.currentAreaBounds()
 			kq.inputOp(tag, t, a, b)
@@ -522,13 +529,9 @@ func (h *handlerEvents) init() {
 	}
 }
 
-func (h *handlerEvents) AddNoRedraw(k event.Tag, e event.Event) {
+func (h *handlerEvents) Add(k event.Tag, e event.Event) {
 	h.init()
 	h.handlers[k] = append(h.handlers[k], e)
-}
-
-func (h *handlerEvents) Add(k event.Tag, e event.Event) {
-	h.AddNoRedraw(k, e)
 	h.hadEvents = true
 }
 

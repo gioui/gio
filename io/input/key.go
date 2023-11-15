@@ -36,8 +36,10 @@ type keyQueue struct {
 type keyHandler struct {
 	// visible will be true if the InputOp is present
 	// in the current frame.
-	visible   bool
-	new       bool
+	visible bool
+	// reset tracks whether the handler has seen a
+	// focus reset.
+	reset     bool
 	focusable bool
 	active    bool
 	hint      key.InputHint
@@ -97,7 +99,16 @@ func (q *keyQueue) Reset() {
 	q.dirOrder = q.dirOrder[:0]
 }
 
-func (q *keyQueue) Frame(events *handlerEvents) {
+func (q *keyQueue) ResetEvent(k event.Tag) (event.Event, bool) {
+	h, ok := q.handlers[k]
+	if !ok || h.reset {
+		return nil, false
+	}
+	h.reset = true
+	return key.FocusEvent{Focus: false}, true
+}
+
+func (q *keyQueue) Frame() {
 	for k, h := range q.handlers {
 		if !h.visible || !h.focusable {
 			if q.focus == k {
@@ -110,11 +121,6 @@ func (q *keyQueue) Frame(events *handlerEvents) {
 				continue
 			}
 		}
-		if h.new && k != q.focus {
-			// Reset the handler on (each) first appearance, but don't trigger redraw.
-			events.AddNoRedraw(k, key.FocusEvent{Focus: false})
-		}
-		h.new = false
 		h.visible = false
 		h.focusable = false
 		h.active = false
@@ -325,7 +331,7 @@ func (q *keyQueue) focusable(tag event.Tag) {
 func (q *keyQueue) handlerFor(tag event.Tag) *keyHandler {
 	h, ok := q.handlers[tag]
 	if !ok {
-		h = &keyHandler{new: true, order: -1}
+		h = &keyHandler{order: -1}
 		if q.handlers == nil {
 			q.handlers = make(map[event.Tag]*keyHandler)
 		}

@@ -61,7 +61,10 @@ type pointerInfo struct {
 }
 
 type pointerHandler struct {
-	area   int
+	area int
+	// setup tracks whether the handler has received
+	// the pointer.Cancel event that resets its state.
+	setup  bool
 	active bool
 	types  pointer.Kind
 	// min and max horizontal/vertical scroll
@@ -224,19 +227,19 @@ func (c *pointerCollector) addHitNode(n hitNode) {
 }
 
 // newHandler returns the current handler or a new one for tag.
-func (c *pointerCollector) newHandler(tag event.Tag, events *handlerEvents) *pointerHandler {
+func (c *pointerCollector) newHandler(tag event.Tag) *pointerHandler {
 	areaID := c.currentArea()
 	c.addHitNode(hitNode{
 		area: areaID,
 		tag:  tag,
 		pass: c.state.pass > 0,
 	})
-	h := c.q.handlerFor(tag, events)
+	h := c.q.handlerFor(tag)
 	h.area = areaID
 	return h
 }
 
-func (q *pointerQueue) handlerFor(tag event.Tag, events *handlerEvents) *pointerHandler {
+func (q *pointerQueue) handlerFor(tag event.Tag) *pointerHandler {
 	h, ok := q.handlers[tag]
 	if !ok {
 		h = &pointerHandler{
@@ -246,9 +249,6 @@ func (q *pointerQueue) handlerFor(tag event.Tag, events *handlerEvents) *pointer
 			q.handlers = make(map[event.Tag]*pointerHandler)
 		}
 		q.handlers[tag] = h
-		// Cancel handlers on (each) first appearance, but don't
-		// trigger redraw.
-		events.AddNoRedraw(tag, pointer.Event{Kind: pointer.Cancel})
 	}
 	if !h.active {
 		h.types = 0
@@ -286,17 +286,26 @@ func (q *pointerQueue) grab(req pointer.GrabCmd, events *handlerEvents) {
 	}
 }
 
-func (c *pointerCollector) inputOp(tag event.Tag, events *handlerEvents) {
+func (c *pointerCollector) inputOp(tag event.Tag) {
 	areaID := c.currentArea()
 	area := &c.q.areas[areaID]
 	area.semantic.content.tag = tag
-	c.newHandler(tag, events)
+	c.newHandler(tag)
 }
 
-func (q *pointerQueue) filterTag(tag event.Tag, f pointer.Filter, events *handlerEvents) {
-	h := q.handlerFor(tag, events)
+func (q *pointerQueue) filterTag(tag event.Tag, f pointer.Filter) {
+	h := q.handlerFor(tag)
 	h.types = h.types | f.Kinds
 	h.scrollRange = h.scrollRange.Union(f.ScrollBounds)
+}
+
+func (q *pointerQueue) ResetEvent(tag event.Tag) (event.Event, bool) {
+	h, ok := q.handlers[tag]
+	if !ok || h.setup {
+		return nil, false
+	}
+	h.setup = true
+	return pointer.Event{Kind: pointer.Cancel}, true
 }
 
 func (c *pointerCollector) semanticLabel(lbl string) {
@@ -340,13 +349,13 @@ func (c *pointerCollector) cursor(cursor pointer.Cursor) {
 	area.cursor = cursor
 }
 
-func (q *pointerQueue) sourceFilter(tag event.Tag, f transfer.SourceFilter, events *handlerEvents) {
-	h := q.handlerFor(tag, events)
+func (q *pointerQueue) sourceFilter(tag event.Tag, f transfer.SourceFilter) {
+	h := q.handlerFor(tag)
 	h.sourceMimes = append(h.sourceMimes, f.Type)
 }
 
-func (q *pointerQueue) targetFilter(tag event.Tag, f transfer.TargetFilter, events *handlerEvents) {
-	h := q.handlerFor(tag, events)
+func (q *pointerQueue) targetFilter(tag event.Tag, f transfer.TargetFilter) {
+	h := q.handlerFor(tag)
 	h.targetMimes = append(h.targetMimes, f.Type)
 }
 
