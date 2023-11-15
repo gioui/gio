@@ -32,8 +32,10 @@ type Event struct {
 	Time time.Duration
 	// Buttons are the set of pressed mouse buttons for this event.
 	Buttons Buttons
-	// Position is the position of the event, relative to
-	// the current transformation, as set by op.TransformOp.
+	// Position is the coordinates of the event in the local coordinate
+	// system of the receiving tag. The transformation from global window
+	// coordinates to local coordinates is performed by the inverse of
+	// the effective transformation of the tag.
 	Position f32.Point
 	// Scroll is the scroll amount, if any.
 	Scroll f32.Point
