@@ -15,8 +15,20 @@ import (
 	"gioui.org/op/clip"
 )
 
+// ImageFilter is the scaling filter for images.
+type ImageFilter byte
+
+const (
+	// FilterLinear uses linear interpolation for scaling.
+	FilterLinear ImageFilter = iota
+	// FilterNearest uses nearest neighbor interpolation for scaling.
+	FilterNearest
+)
+
 // ImageOp sets the brush to an image.
 type ImageOp struct {
+	Filter ImageFilter
+
 	uniform bool
 	color   color.NRGBA
 	src     *image.RGBA
@@ -103,6 +115,7 @@ func (i ImageOp) Add(o *op.Ops) {
 	}
 	data := ops.Write2(&o.Internal, ops.TypeImageLen, i.src, i.handle)
 	data[0] = byte(ops.TypeImage)
+	data[1] = byte(i.Filter)
 }
 
 func (c ColorOp) Add(o *op.Ops) {

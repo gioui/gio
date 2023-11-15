@@ -142,7 +142,7 @@ const (
 	TypePushOpacityLen      = 1 + 4
 	TypePopOpacityLen       = 1
 	TypeRedrawLen           = 1 + 8
-	TypeImageLen            = 1
+	TypeImageLen            = 1 + 1
 	TypePaintLen            = 1
 	TypeColorLen            = 1 + 4
 	TypeLinearGradientLen   = 1 + 8*2 + 4*2

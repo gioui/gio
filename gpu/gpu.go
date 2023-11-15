@@ -186,10 +186,16 @@ type material struct {
 	uvTrans f32.Affine2D
 }
 
+const (
+	filterLinear  = 0
+	filterNearest = 1
+)
+
 // imageOpData is the shadow of paint.ImageOp.
 type imageOpData struct {
 	src    *image.RGBA
 	handle interface{}
+	filter byte
 }
 
 type linearGradientOpData struct {
@@ -207,6 +213,7 @@ func decodeImageOp(data []byte, refs []interface{}) imageOpData {
 	return imageOpData{
 		src:    refs[0].(*image.RGBA),
 		handle: handle,
+		filter: data[1],
 	}
 }
 
@@ -454,19 +461,41 @@ func (g *gpu) Profile() string {
 }
 
 func (r *renderer) texHandle(cache *resourceCache, data imageOpData) driver.Texture {
+	type cachekey struct {
+		filter byte
+		handle any
+	}
+	key := cachekey{
+		filter: data.filter,
+		handle: data.handle,
+	}
+
 	var tex *texture
-	t, exists := cache.get(data.handle)
+	t, exists := cache.get(key)
 	if !exists {
 		t = &texture{
 			src: data.src,
 		}
-		cache.put(data.handle, t)
+		cache.put(key, t)
 	}
 	tex = t.(*texture)
 	if tex.tex != nil {
 		return tex.tex
 	}
-	handle, err := r.ctx.NewTexture(driver.TextureFormatSRGBA, data.src.Bounds().Dx(), data.src.Bounds().Dy(), driver.FilterLinearMipmapLinear, driver.FilterLinear, driver.BufferBindingTexture)
+
+	var minFilter, magFilter driver.TextureFilter
+	switch data.filter {
+	case filterLinear:
+		minFilter, magFilter = driver.FilterLinearMipmapLinear, driver.FilterLinear
+	case filterNearest:
+		minFilter, magFilter = driver.FilterNearest, driver.FilterNearest
+	}
+
+	handle, err := r.ctx.NewTexture(driver.TextureFormatSRGBA,
+		data.src.Bounds().Dx(), data.src.Bounds().Dy(),
+		minFilter, magFilter,
+		driver.BufferBindingTexture,
+	)
 	if err != nil {
 		panic(err)
 	}
