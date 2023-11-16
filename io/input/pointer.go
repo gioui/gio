@@ -17,12 +17,9 @@ import (
 )
 
 type pointerQueue struct {
-	hitTree   []hitNode
-	areas     []areaNode
-	cursor    pointer.Cursor
-	handlers  map[event.Tag]*pointerHandler
-	pointers  []pointerInfo
-	transfers []io.ReadCloser // pending data transfers
+	hitTree  []hitNode
+	areas    []areaNode
+	handlers map[event.Tag]*pointerHandler
 
 	semantic struct {
 		idsAssigned bool
@@ -41,6 +38,12 @@ type hitNode struct {
 	// For handler nodes.
 	tag  event.Tag
 	pass bool
+}
+
+// pointerState is the input state related to pointer events.
+type pointerState struct {
+	cursor   pointer.Cursor
+	pointers []pointerInfo
 }
 
 type pointerInfo struct {
@@ -264,8 +267,9 @@ func (c *pointerCollector) actionInputOp(act system.Action) {
 	area.action = act
 }
 
-func (q *pointerQueue) grab(evts []taggedEvent, req pointer.GrabCmd) []taggedEvent {
-	for _, p := range q.pointers {
+func (q *pointerQueue) grab(state pointerState, req pointer.GrabCmd) (pointerState, []taggedEvent) {
+	var evts []taggedEvent
+	for _, p := range state.pointers {
 		if !p.pressed || p.id != req.ID {
 			continue
 		}
@@ -276,12 +280,12 @@ func (q *pointerQueue) grab(evts []taggedEvent, req pointer.GrabCmd) []taggedEve
 					tag:   tag,
 					event: pointer.Event{Kind: pointer.Cancel},
 				})
-				q.dropHandler(tag)
+				state = dropHandler(state, tag)
 			}
 		}
 		break
 	}
-	return evts
+	return state, evts
 }
 
 func (c *pointerCollector) inputOp(tag event.Tag) {
@@ -357,29 +361,25 @@ func (q *pointerQueue) targetFilter(tag event.Tag, f transfer.TargetFilter) {
 	h.targetMimes = append(h.targetMimes, f.Type)
 }
 
-func (q *pointerQueue) offerData(evts []taggedEvent, req transfer.OfferCmd) []taggedEvent {
-	transferIdx := len(q.transfers)
-	q.transfers = append(q.transfers, req.Data)
-	for i := range q.pointers {
-		p := q.pointers[i]
+func (q *pointerQueue) offerData(state pointerState, req transfer.OfferCmd) (pointerState, []taggedEvent) {
+	var evts []taggedEvent
+	for i, p := range state.pointers {
 		if p.dataSource != req.Tag {
 			continue
 		}
-		if p.dataTarget == nil {
-			q.pointers[i], evts = q.deliverTransferCancelEvent(p, evts)
-			break
+		if p.dataTarget != nil {
+			evts = append(evts, taggedEvent{tag: p.dataTarget, event: transfer.DataEvent{
+				Type: req.Type,
+				Open: func() io.ReadCloser {
+					return req.Data
+				},
+			}})
 		}
-		evts = append(evts, taggedEvent{tag: p.dataTarget, event: transfer.DataEvent{
-			Type: req.Type,
-			Open: func() io.ReadCloser {
-				q.transfers[transferIdx] = nil
-				return req.Data
-			},
-		}})
-		q.pointers[i], evts = q.deliverTransferCancelEvent(p, evts)
+		state.pointers = append([]pointerInfo{}, state.pointers...)
+		state.pointers[i], evts = q.deliverTransferCancelEvent(p, evts)
 		break
 	}
-	return evts
+	return state, evts
 }
 
 func (c *pointerCollector) reset() {
@@ -595,18 +595,12 @@ func (q *pointerQueue) reset() {
 			delete(q.semantic.contentIDs, k)
 		}
 	}
-	for _, rc := range q.transfers {
-		if rc != nil {
-			rc.Close()
-		}
-	}
-	q.transfers = nil
 }
 
-func (q *pointerQueue) Frame(evts []taggedEvent) []taggedEvent {
+func (q *pointerQueue) Frame(state pointerState) (pointerState, []taggedEvent) {
 	for k, h := range q.handlers {
 		if !h.active {
-			q.dropHandler(k)
+			state = dropHandler(state, k)
 			delete(q.handlers, k)
 			continue
 		}
@@ -622,38 +616,51 @@ func (q *pointerQueue) Frame(evts []taggedEvent) []taggedEvent {
 			area.semantic.valid = area.semantic.content.gestures != 0
 		}
 	}
-	for i := range q.pointers {
-		p := q.pointers[i]
-		q.pointers[i], evts = q.deliverEnterLeaveEvents(p, evts, p.last)
+	var evts []taggedEvent
+	for i, p := range state.pointers {
+		changed := false
+		p, evts, state.cursor, changed = q.deliverEnterLeaveEvents(state.cursor, p, evts, p.last)
+		if changed {
+			state.pointers = append([]pointerInfo{}, state.pointers...)
+			state.pointers[i] = p
+		}
 	}
-	return evts
+	return state, evts
 }
 
-func (q *pointerQueue) dropHandler(tag event.Tag) {
-	for i := range q.pointers {
-		p := &q.pointers[i]
-		for i := len(p.handlers) - 1; i >= 0; i-- {
-			if p.handlers[i] == tag {
-				p.handlers = append(p.handlers[:i], p.handlers[i+1:]...)
+func dropHandler(state pointerState, tag event.Tag) pointerState {
+	pointers := state.pointers
+	state.pointers = nil
+	for _, p := range pointers {
+		handlers := p.handlers
+		p.handlers = nil
+		for _, h := range handlers {
+			if h != tag {
+				p.handlers = append(p.handlers, h)
 			}
 		}
-		for i := len(p.entered) - 1; i >= 0; i-- {
-			if p.entered[i] == tag {
-				p.entered = append(p.entered[:i], p.entered[i+1:]...)
+		entered := p.entered
+		p.entered = nil
+		for _, h := range entered {
+			if h != tag {
+				p.entered = append(p.entered, h)
 			}
 		}
+		state.pointers = append(state.pointers, p)
 	}
+	return state
 }
 
 // pointerOf returns the pointerInfo index corresponding to the pointer in e.
-func (q *pointerQueue) pointerOf(e pointer.Event) int {
-	for i, p := range q.pointers {
+func (s pointerState) pointerOf(e pointer.Event) (pointerState, int) {
+	for i, p := range s.pointers {
 		if p.id == e.PointerID {
-			return i
+			return s, i
 		}
 	}
-	q.pointers = append(q.pointers, pointerInfo{id: e.PointerID})
-	return len(q.pointers) - 1
+	n := len(s.pointers)
+	s.pointers = append(s.pointers[:n:n], pointerInfo{id: e.PointerID})
+	return s, len(s.pointers) - 1
 }
 
 // Deliver is like Push, but delivers an event to a particular area.
@@ -710,7 +717,8 @@ func (q *pointerQueue) SemanticArea(areaIdx int) (semanticContent, int) {
 	return semanticContent{}, -1
 }
 
-func (q *pointerQueue) Push(evts []taggedEvent, e pointer.Event) []taggedEvent {
+func (q *pointerQueue) Push(state pointerState, e pointer.Event) (pointerState, []taggedEvent) {
+	var evts []taggedEvent
 	if e.Kind == pointer.Cancel {
 		for k := range q.handlers {
 			evts = append(evts, taggedEvent{
@@ -718,25 +726,22 @@ func (q *pointerQueue) Push(evts []taggedEvent, e pointer.Event) []taggedEvent {
 				tag:   k,
 			})
 		}
-		q.pointers = q.pointers[:0]
-		for k := range q.handlers {
-			q.dropHandler(k)
-		}
-		return evts
+		state.pointers = nil
+		return state, evts
 	}
-	pidx := q.pointerOf(e)
-	p := q.pointers[pidx]
+	state, pidx := state.pointerOf(e)
+	p := state.pointers[pidx]
 
 	switch e.Kind {
 	case pointer.Press:
-		p, evts = q.deliverEnterLeaveEvents(p, evts, e)
+		p, evts, state.cursor, _ = q.deliverEnterLeaveEvents(state.cursor, p, evts, e)
 		p.pressed = true
 		evts = q.deliverEvent(p, evts, e)
 	case pointer.Move:
 		if p.pressed {
 			e.Kind = pointer.Drag
 		}
-		p, evts = q.deliverEnterLeaveEvents(p, evts, e)
+		p, evts, state.cursor, _ = q.deliverEnterLeaveEvents(state.cursor, p, evts, e)
 		evts = q.deliverEvent(p, evts, e)
 		if p.pressed {
 			p, evts = q.deliverDragEvent(p, evts)
@@ -744,23 +749,25 @@ func (q *pointerQueue) Push(evts []taggedEvent, e pointer.Event) []taggedEvent {
 	case pointer.Release:
 		evts = q.deliverEvent(p, evts, e)
 		p.pressed = false
-		p, evts = q.deliverEnterLeaveEvents(p, evts, e)
+		p, evts, state.cursor, _ = q.deliverEnterLeaveEvents(state.cursor, p, evts, e)
 		p, evts = q.deliverDropEvent(p, evts)
 	case pointer.Scroll:
-		p, evts = q.deliverEnterLeaveEvents(p, evts, e)
+		p, evts, state.cursor, _ = q.deliverEnterLeaveEvents(state.cursor, p, evts, e)
 		evts = q.deliverEvent(p, evts, e)
 	default:
 		panic("unsupported pointer event type")
 	}
 
-	q.pointers[pidx] = p
 	p.last = e
 
 	if !p.pressed && len(p.entered) == 0 {
 		// No longer need to track pointer.
-		q.pointers = append(q.pointers[:pidx], q.pointers[pidx+1:]...)
+		state.pointers = append(state.pointers[:pidx:pidx], state.pointers[pidx+1:]...)
+	} else {
+		state.pointers = append([]pointerInfo{}, state.pointers...)
+		state.pointers[pidx] = p
 	}
-	return evts
+	return state, evts
 }
 
 func (q *pointerQueue) deliverEvent(p pointerInfo, evts []taggedEvent, e pointer.Event) []taggedEvent {
@@ -794,12 +801,13 @@ func (q *pointerQueue) deliverEvent(p pointerInfo, evts []taggedEvent, e pointer
 	return evts
 }
 
-func (q *pointerQueue) deliverEnterLeaveEvents(p pointerInfo, evts []taggedEvent, e pointer.Event) (pointerInfo, []taggedEvent) {
+func (q *pointerQueue) deliverEnterLeaveEvents(cursor pointer.Cursor, p pointerInfo, evts []taggedEvent, e pointer.Event) (pointerInfo, []taggedEvent, pointer.Cursor, bool) {
+	changed := false
 	var hits []event.Tag
 	if e.Source != pointer.Mouse && !p.pressed && e.Kind != pointer.Press {
 		// Consider non-mouse pointers leaving when they're released.
 	} else {
-		hits, q.cursor = q.opHit(e.Position)
+		hits, cursor = q.opHit(e.Position)
 		if p.pressed {
 			// Filter out non-participating handlers,
 			// except potential transfer targets when a transfer has been initiated.
@@ -819,6 +827,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p pointerInfo, evts []taggedEvent
 				}
 			}
 		} else {
+			changed = true
 			p.handlers = hits
 		}
 	}
@@ -827,6 +836,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p pointerInfo, evts []taggedEvent
 		if _, found := searchTag(hits, k); found {
 			continue
 		}
+		changed = true
 		h := q.handlers[k]
 		e := e
 		e.Kind = pointer.Leave
@@ -842,6 +852,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p pointerInfo, evts []taggedEvent
 		if _, found := searchTag(p.entered, k); found {
 			continue
 		}
+		changed = true
 		e := e
 		e.Kind = pointer.Enter
 
@@ -851,7 +862,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p pointerInfo, evts []taggedEvent
 		}
 	}
 	p.entered = hits
-	return p, evts
+	return p, evts, cursor, changed
 }
 
 func (q *pointerQueue) deliverDragEvent(p pointerInfo, evts []taggedEvent) (pointerInfo, []taggedEvent) {

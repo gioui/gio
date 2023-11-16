@@ -28,9 +28,9 @@ func TestClipboardDuplicateEvent(t *testing.T) {
 		},
 	}
 	router.Queue(event)
-	assertClipboardReadCmd(t, router, 0)
 	assertClipboardEvent(t, router.Events(&handler[0], transfer.TargetFilter{Type: "application/text"}), true)
 	assertClipboardEvent(t, router.Events(&handler[1], transfer.TargetFilter{Type: "application/text"}), true)
+	assertClipboardReadCmd(t, router, 0)
 	ops.Reset()
 
 	// No ReadCmd
@@ -80,8 +80,8 @@ func TestQueueProcessReadClipboard(t *testing.T) {
 		},
 	}
 	router.Queue(event)
-	assertClipboardReadCmd(t, router, 0)
 	assertClipboardEvent(t, router.Events(&handler[0], transfer.TargetFilter{Type: "application/text"}), true)
+	assertClipboardReadCmd(t, router, 0)
 	ops.Reset()
 
 	// No ReadCmd
@@ -137,20 +137,20 @@ func assertClipboardEvent(t *testing.T, events []event.Event, expected bool) {
 
 func assertClipboardReadCmd(t *testing.T, router *Router, expected int) {
 	t.Helper()
-	if len(router.cqueue.receivers) != expected {
-		t.Error("unexpected number of receivers")
+	if got := len(router.lastState().receivers); got != expected {
+		t.Errorf("unexpected %d receivers, got %d", expected, got)
 	}
-	if router.cqueue.ReadClipboard() != (expected > 0) {
+	if router.ClipboardRequested() != (expected > 0) {
 		t.Error("missing requests")
 	}
 }
 
 func assertClipboardReadDuplicated(t *testing.T, router *Router, expected int) {
 	t.Helper()
-	if len(router.cqueue.receivers) != expected {
+	if len(router.lastState().receivers) != expected {
 		t.Error("receivers removed")
 	}
-	if router.cqueue.ReadClipboard() != false {
+	if router.ClipboardRequested() != false {
 		t.Error("duplicated requests")
 	}
 }

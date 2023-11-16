@@ -9,8 +9,12 @@ import (
 	"gioui.org/io/event"
 )
 
+// clipboardState contains the state for clipboard event routing.
+type clipboardState struct {
+	receivers []event.Tag
+}
+
 type clipboardQueue struct {
-	receivers map[event.Tag]struct{}
 	// request avoid read clipboard every frame while waiting.
 	requested bool
 	mime      string
@@ -28,22 +32,21 @@ func (q *clipboardQueue) WriteClipboard() (mime string, content []byte, ok bool)
 	return q.mime, content, true
 }
 
-// ReadClipboard reports if any new handler is waiting
+// ClipboardRequested reports if any new handler is waiting
 // to read the clipboard.
-func (q *clipboardQueue) ReadClipboard() bool {
-	if len(q.receivers) == 0 || q.requested {
-		return false
-	}
-	q.requested = true
-	return true
+func (q *clipboardQueue) ClipboardRequested(state clipboardState) bool {
+	req := len(state.receivers) > 0 && q.requested
+	q.requested = false
+	return req
 }
 
-func (q *clipboardQueue) Push(evts []taggedEvent, e event.Event) []taggedEvent {
-	for r := range q.receivers {
+func (q *clipboardQueue) Push(state clipboardState, e event.Event) (clipboardState, []taggedEvent) {
+	var evts []taggedEvent
+	for _, r := range state.receivers {
 		evts = append(evts, taggedEvent{tag: r, event: e})
-		delete(q.receivers, r)
 	}
-	return evts
+	state.receivers = nil
+	return state, evts
 }
 
 func (q *clipboardQueue) ProcessWriteClipboard(req clipboard.WriteCmd) {
@@ -56,12 +59,14 @@ func (q *clipboardQueue) ProcessWriteClipboard(req clipboard.WriteCmd) {
 	q.text = content
 }
 
-func (q *clipboardQueue) ProcessReadClipboard(tag event.Tag) {
-	if q.receivers == nil {
-		q.receivers = make(map[event.Tag]struct{})
+func (q *clipboardQueue) ProcessReadClipboard(state clipboardState, tag event.Tag) clipboardState {
+	for _, k := range state.receivers {
+		if k == tag {
+			return state
+		}
 	}
-	if _, ok := q.receivers[tag]; !ok {
-		q.receivers[tag] = struct{}{}
-		q.requested = false
-	}
+	n := len(state.receivers)
+	state.receivers = append(state.receivers[:n:n], tag)
+	q.requested = true
+	return state
 }

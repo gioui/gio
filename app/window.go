@@ -319,7 +319,7 @@ func (w *Window) processFrame(d driver) {
 	if mime, txt, ok := q.WriteClipboard(); ok {
 		d.WriteClipboard(mime, txt)
 	}
-	if q.ReadClipboard() {
+	if q.ClipboardRequested() {
 		d.ReadClipboard()
 	}
 	oldState := w.imeState

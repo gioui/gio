@@ -1037,6 +1037,7 @@ func TestPassCursor(t *testing.T) {
 		Position: f32.Pt(10, 10),
 		Kind:     pointer.Move,
 	})
+	r.Frame(&ops)
 	if got := r.Cursor(); want != got {
 		t.Errorf("got cursor %v, want %v", got, want)
 	}
