@@ -475,13 +475,13 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 		// half is in Editor.processKey() under clipboard.Event.
 		case "V":
 			if !e.ReadOnly {
-				gtx.Queue(clipboard.ReadCmd{Tag: &e.eventKey})
+				gtx.Execute(clipboard.ReadCmd{Tag: &e.eventKey})
 			}
 		// Copy or Cut selection -- ignored if nothing selected.
 		case "C", "X":
 			e.scratch = e.text.SelectedText(e.scratch)
 			if text := string(e.scratch); text != "" {
-				gtx.Queue(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(text))})
+				gtx.Execute(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(text))})
 				if k.Name == "X" && !e.ReadOnly {
 					e.Delete(1)
 				}
@@ -556,8 +556,8 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 
 // Focus requests the input focus for the Editor.
 func (e *Editor) Focus(gtx layout.Context) {
-	gtx.Queue(key.FocusCmd{Tag: &e.eventKey})
-	gtx.Queue(key.SoftKeyboardCmd{Show: true})
+	gtx.Execute(key.FocusCmd{Tag: &e.eventKey})
+	gtx.Execute(key.SoftKeyboardCmd{Show: true})
 }
 
 // Focused returns whether the editor is focused or not.
@@ -601,7 +601,7 @@ func (e *Editor) Update(gtx layout.Context) {
 		}
 		if newSel != e.ime.selection {
 			e.ime.selection = newSel
-			gtx.Queue(key.SelectionCmd{Tag: &e.eventKey, Range: newSel.rng, Caret: newSel.caret})
+			gtx.Execute(key.SelectionCmd{Tag: &e.eventKey, Range: newSel.rng, Caret: newSel.caret})
 		}
 
 		e.updateSnippet(gtx, e.ime.start, e.ime.end)
@@ -658,7 +658,7 @@ func (e *Editor) updateSnippet(gtx layout.Context, start, end int) {
 		return
 	}
 	e.ime.snippet = newSnip
-	gtx.Queue(key.SnippetCmd{Tag: &e.eventKey, Snippet: newSnip})
+	gtx.Execute(key.SnippetCmd{Tag: &e.eventKey, Snippet: newSnip})
 }
 
 func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.CallOp) layout.Dimensions {

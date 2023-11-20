@@ -99,10 +99,10 @@ func TestPointerGrab(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
-	r.Source().Queue(pointer.GrabCmd{Tag: handler1})
 	assertEventPointerTypeSequence(t, r.Events(handler1, filter), pointer.Press)
 	assertEventPointerTypeSequence(t, r.Events(handler2, filter), pointer.Press)
 	assertEventPointerTypeSequence(t, r.Events(handler3, filter), pointer.Press)
+	r.Source().Execute(pointer.GrabCmd{Tag: handler1})
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
@@ -136,9 +136,9 @@ func TestPointerGrabSameHandlerTwice(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
-	r.Source().Queue(pointer.GrabCmd{Tag: handler1})
 	assertEventPointerTypeSequence(t, r.Events(handler1, filter), pointer.Press)
 	assertEventPointerTypeSequence(t, r.Events(handler2, filter), pointer.Press)
+	r.Source().Execute(pointer.GrabCmd{Tag: handler1})
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
@@ -941,7 +941,7 @@ func TestTransfer(t *testing.T) {
 
 		// Offer valid type and data.
 		ofr := &offer{data: "hello"}
-		r.Source().Queue(transfer.OfferCmd{Tag: src, Type: "file", Data: ofr})
+		r.Source().Execute(transfer.OfferCmd{Tag: src, Type: "file", Data: ofr})
 		r.Frame(ops)
 		assertEventSequence(t, r.Events(src, transfer.SourceFilter{Type: "file"}), transfer.CancelEvent{})
 		evs := r.Events(tgt, transfer.TargetFilter{Type: "file"})
@@ -989,9 +989,9 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 		ofr := &offer{data: "hello"}
-		r.Source().Queue(transfer.OfferCmd{Tag: src, Type: "file", Data: ofr})
 		r.Events(src, transfer.SourceFilter{Type: "file"})
 		r.Events(tgt, transfer.TargetFilter{Type: "file"})
+		r.Source().Execute(transfer.OfferCmd{Tag: src, Type: "file", Data: ofr})
 		r.Frame(ops)
 		assertEventSequence(t, r.Events(src, transfer.SourceFilter{Type: "file"}), transfer.CancelEvent{})
 		// Ignore DataEvent and verify that the next frame closes it as unused.

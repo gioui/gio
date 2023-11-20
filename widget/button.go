@@ -80,7 +80,7 @@ func (b *Clickable) Pressed() bool {
 
 // Focus requests the input focus for the element.
 func (b *Clickable) Focus(gtx layout.Context) {
-	gtx.Queue(key.FocusCmd{Tag: &b.keyTag})
+	gtx.Execute(key.FocusCmd{Tag: &b.keyTag})
 }
 
 // Focused reports whether b has focus.
@@ -149,7 +149,7 @@ func (b *Clickable) Update(gtx layout.Context) []Click {
 			}
 		case gesture.KindPress:
 			if e.Source == pointer.Mouse {
-				gtx.Queue(key.FocusCmd{Tag: &b.keyTag})
+				gtx.Execute(key.FocusCmd{Tag: &b.keyTag})
 			}
 			b.history = append(b.history, Press{
 				Position: e.Position,

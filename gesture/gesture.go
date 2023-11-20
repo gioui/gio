@@ -315,7 +315,7 @@ func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis,
 			if e.Priority < pointer.Grabbed {
 				slop := cfg.Dp(touchSlop)
 				if dist := dist; dist >= slop || -slop >= dist {
-					q.Queue(pointer.GrabCmd{Tag: s, ID: e.PointerID})
+					q.Execute(pointer.GrabCmd{Tag: s, ID: e.PointerID})
 				}
 			} else {
 				s.last = v
@@ -389,7 +389,7 @@ func (d *Drag) Update(cfg unit.Metric, q input.Source, axis Axis) []pointer.Even
 				diff := e.Position.Sub(d.start)
 				slop := cfg.Dp(touchSlop)
 				if diff.X*diff.X+diff.Y*diff.Y > float32(slop*slop) {
-					q.Queue(pointer.GrabCmd{Tag: d, ID: e.PointerID})
+					q.Execute(pointer.GrabCmd{Tag: d, ID: e.PointerID})
 				}
 			}
 		case pointer.Release, pointer.Cancel:

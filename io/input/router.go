@@ -38,8 +38,8 @@ type Router struct {
 	cqueue clipboardQueue
 
 	// states is the list of pending state changes resulting from
-	// incoming events. The first element is the current state,
-	// if any.
+	// incoming events. The first element, if present, contains the state
+	// and events for the current frame.
 	changes []stateChange
 
 	reader ops.Reader
@@ -53,6 +53,10 @@ type Router struct {
 
 	// transfers is the pending transfer.DataEvent.Open functions.
 	transfers []io.ReadCloser
+
+	// deferring is set if command execution and event delivery is deferred
+	// to the next frame.
+	deferring bool
 
 	// scratchFilter is for garbage-free construction of ephemeral filters.
 	scratchFilter filter
@@ -109,7 +113,9 @@ type SemanticID uint
 type handler struct {
 	// active tracks whether the handler was active in the current
 	// frame. Router deletes state belonging to inactive handlers during Frame.
-	active  bool
+	active bool
+	// old is true iff the handler was aded in a previous frame.
+	old     bool
 	pointer pointerHandler
 	key     keyHandler
 	// filter the handler has asked for through event handling
@@ -129,6 +135,8 @@ type filter struct {
 // stateChange represents the new state and outgoing events
 // resulting from an incoming event.
 type stateChange struct {
+	// event, if set, is the trigger for the change.
+	event  event.Event
 	state  inputState
 	events []taggedEvent
 }
@@ -152,13 +160,12 @@ func (q *Router) Source() Source {
 	return Source{r: q}
 }
 
-// Queue a command to be executed after the current frame
-// has completed.
-func (s Source) Queue(c Command) {
+// Execute a command.
+func (s Source) Execute(c Command) {
 	if !s.Enabled() {
 		return
 	}
-	s.r.queue(c)
+	s.r.execute(c)
 }
 
 // Enabled reports whether the source is enabled. Only enabled
@@ -195,6 +202,9 @@ func (q *Router) Events(k event.Tag, filters ...event.Filter) []event.Event {
 		}
 	}
 	h.nextFilter.Merge(q.scratchFilter)
+	if q.deferring {
+		return events
+	}
 	// Accumulate events from state changes until there are no more
 	// matching events.
 	matchedIdx := 0
@@ -234,6 +244,20 @@ func (q *Router) collapseState(idx int) {
 // operation list. The text input state, wakeup time and whether
 // there are active profile handlers is also saved.
 func (q *Router) Frame(frame *op.Ops) {
+	var remaining []event.Event
+	if n := len(q.changes); n > 0 {
+		if q.deferring {
+			// Collect events for replay.
+			for _, ch := range q.changes[1:] {
+				remaining = append(remaining, ch.event)
+			}
+			q.changes = append(q.changes[:0], stateChange{state: q.changes[0].state})
+		} else {
+			// Collapse state.
+			state := q.changes[n-1].state
+			q.changes = append(q.changes[:0], stateChange{state: state})
+		}
+	}
 	for _, rc := range q.transfers {
 		if rc != nil {
 			rc.Close()
@@ -241,11 +265,7 @@ func (q *Router) Frame(frame *op.Ops) {
 	}
 	q.transfers = nil
 	q.wakeup = false
-	// Collapse state and clear events.
-	if n := len(q.changes); n > 1 {
-		state := q.changes[n-1].state
-		q.changes = append(q.changes[:0], stateChange{state: state})
-	}
+	q.deferring = false
 	for _, h := range q.handlers {
 		h.filter, h.nextFilter = h.nextFilter, h.filter
 		h.nextFilter.Reset()
@@ -263,12 +283,17 @@ func (q *Router) Frame(frame *op.Ops) {
 			delete(q.handlers, k)
 		} else {
 			h.active = false
+			h.old = true
 		}
 	}
 	q.executeCommands()
-	q.changePointerState(q.pointer.queue.Frame(q.handlers, q.lastState().pointerState))
-	kstate := q.key.queue.Frame(q.handlers, q.lastState().keyState)
-	q.changeKeyState(kstate, nil)
+	q.Queue(remaining...)
+	st := q.lastState()
+	pst, evts := q.pointer.queue.Frame(q.handlers, st.pointerState)
+	st.pointerState = pst
+	st.keyState = q.key.queue.Frame(q.handlers, q.lastState().keyState)
+	q.changeState(nil, st, evts)
+
 	// Collapse state and events.
 	q.collapseState(len(q.changes) - 1)
 
@@ -324,9 +349,11 @@ func (q *Router) processEvent(e event.Event) bool {
 	state := q.lastState()
 	switch e := e.(type) {
 	case pointer.Event:
-		return q.changePointerState(q.pointer.queue.Push(q.handlers, state.pointerState, e))
+		pstate, evts := q.pointer.queue.Push(q.handlers, state.pointerState, e)
+		state.pointerState = pstate
+		return q.changeState(e, state, evts)
 	case key.Event:
-		return q.addEvents(q.queueKeyEvent(state.keyState, e))
+		return q.changeState(e, state, q.queueKeyEvent(state.keyState, e))
 	case key.SnippetEvent:
 		// Expand existing, overlapping snippet.
 		if r := state.content.Snippet.Range; rangeOverlaps(r, key.Range(e)) {
@@ -341,22 +368,58 @@ func (q *Router) processEvent(e event.Event) bool {
 		if f := state.focus; f != nil {
 			evts = append(evts, taggedEvent{tag: f, event: e})
 		}
-		return q.addEvents(evts)
+		return q.changeState(e, state, evts)
 	case key.EditEvent, key.FocusEvent, key.SelectionEvent:
 		var evts []taggedEvent
 		if f := state.focus; f != nil {
 			evts = append(evts, taggedEvent{tag: f, event: e})
 		}
-		return q.addEvents(evts)
+		return q.changeState(e, state, evts)
 	case transfer.DataEvent:
-		return q.changeClipboardState(q.cqueue.Push(state.clipboardState, e))
+		cstate, evts := q.cqueue.Push(state.clipboardState, e)
+		state.clipboardState = cstate
+		return q.changeState(e, state, evts)
 	default:
 		panic("unknown event type")
 	}
 }
 
-func (q *Router) queue(f Command) {
-	q.commands = append(q.commands, f)
+func (q *Router) execute(c Command) {
+	// The command can be executed immediately if:
+	//
+	// - event delivery is not frozen, and
+	// - the influencing tag and event receivers were all seen
+	//   in the previous frame, and
+	// - no event receiver has completed their event handling.
+	if !q.deferring {
+		tag, ch := q.executeCommand(c)
+		immediate := true
+		if tag != nil {
+			h, ok := q.handlers[tag]
+			immediate = immediate && ok && h.old
+		}
+		for _, e := range ch.events {
+			h, ok := q.handlers[e.tag]
+			immediate = immediate && ok && h.old && !h.nextFilter.Matches(e.event)
+		}
+		if immediate {
+			// Hold on to the remaining events for state replay.
+			var evts []event.Event
+			for _, ch := range q.changes {
+				if ch.event != nil {
+					evts = append(evts, ch.event)
+				}
+			}
+			if len(q.changes) > 1 {
+				q.changes = q.changes[:1]
+			}
+			q.changeState(nil, ch.state, ch.events)
+			q.Queue(evts...)
+			return
+		}
+	}
+	q.deferring = true
+	q.commands = append(q.commands, c)
 }
 
 func (q *Router) state() inputState {
@@ -373,58 +436,47 @@ func (q *Router) lastState() inputState {
 	return inputState{}
 }
 
-func (q *Router) changeClipboardState(cstate clipboardState, evts []taggedEvent) bool {
-	state := q.lastState()
-	state.clipboardState = cstate
-	return q.changeState(state, evts)
-}
-
-func (q *Router) changeKeyState(kstate keyState, evts []taggedEvent) bool {
-	state := q.lastState()
-	state.keyState = kstate
-	return q.changeState(state, evts)
-}
-
-func (q *Router) changePointerState(pstate pointerState, evts []taggedEvent) bool {
-	state := q.lastState()
-	state.pointerState = pstate
-	return q.changeState(state, evts)
-}
-
 func (q *Router) executeCommands() {
-	for _, req := range q.commands {
-		state := q.lastState()
-		switch req := req.(type) {
-		case key.SelectionCmd:
-			kstate := q.key.queue.setSelection(state.keyState, req)
-			q.changeKeyState(kstate, nil)
-		case key.FocusCmd:
-			q.changeKeyState(q.key.queue.Focus(q.handlers, state.keyState, req.Tag))
-		case key.SoftKeyboardCmd:
-			kstate := state.keyState.softKeyboard(req.Show)
-			q.changeKeyState(kstate, nil)
-		case key.SnippetCmd:
-			kstate := q.key.queue.setSnippet(state.keyState, req)
-			q.changeKeyState(kstate, nil)
-		case transfer.OfferCmd:
-			q.changePointerState(q.pointer.queue.offerData(q.handlers, state.pointerState, req))
-		case clipboard.WriteCmd:
-			q.cqueue.ProcessWriteClipboard(req)
-		case clipboard.ReadCmd:
-			cstate := q.cqueue.ProcessReadClipboard(state.clipboardState, req.Tag)
-			q.changeClipboardState(cstate, nil)
-		case pointer.GrabCmd:
-			q.changePointerState(q.pointer.queue.grab(state.pointerState, req))
-		}
+	for _, c := range q.commands {
+		_, ch := q.executeCommand(c)
+		q.changeState(nil, ch.state, ch.events)
 	}
 	q.commands = nil
 }
 
-func (q *Router) addEvents(evts []taggedEvent) bool {
-	return q.changeState(q.lastState(), evts)
+// executeCommand the command and return the resulting state change along with the
+// tag the state change depended on, if any.
+func (q *Router) executeCommand(c Command) (event.Tag, stateChange) {
+	state := q.state()
+	var evts []taggedEvent
+	var tag event.Tag
+	switch req := c.(type) {
+	case key.SelectionCmd:
+		tag = req.Tag
+		state.keyState = q.key.queue.setSelection(state.keyState, req)
+	case key.FocusCmd:
+		tag = req.Tag
+		state.keyState, evts = q.key.queue.Focus(q.handlers, state.keyState, req.Tag)
+	case key.SoftKeyboardCmd:
+		state.keyState = state.keyState.softKeyboard(req.Show)
+	case key.SnippetCmd:
+		tag = req.Tag
+		state.keyState = q.key.queue.setSnippet(state.keyState, req)
+	case transfer.OfferCmd:
+		tag = req.Tag
+		state.pointerState, evts = q.pointer.queue.offerData(q.handlers, state.pointerState, req)
+	case clipboard.WriteCmd:
+		q.cqueue.ProcessWriteClipboard(req)
+	case clipboard.ReadCmd:
+		state.clipboardState = q.cqueue.ProcessReadClipboard(state.clipboardState, req.Tag)
+	case pointer.GrabCmd:
+		tag = req.Tag
+		state.pointerState, evts = q.pointer.queue.grab(state.pointerState, req)
+	}
+	return tag, stateChange{state: state, events: evts}
 }
 
-func (q *Router) changeState(state inputState, evts []taggedEvent) bool {
+func (q *Router) changeState(e event.Event, state inputState, evts []taggedEvent) bool {
 	// Wrap pointer.DataEvent.Open functions to detect them not being called.
 	for i := range evts {
 		e := &evts[i]
@@ -439,16 +491,18 @@ func (q *Router) changeState(state inputState, evts []taggedEvent) bool {
 			e.event = de
 		}
 	}
-	n := len(q.changes)
-	// We must add a new state change if
-	//
-	//  - there is no first state change, or
-	//  - the state change is not atomic from the perspective of the handlers.
-	if len(q.changes) == 0 || (len(evts) > 0 && len(q.changes[n-1].events) > 0) {
-		q.changes = append(q.changes, stateChange{state: state, events: evts})
+	// Initialize the first change to contain the current state
+	// and events that are bound for the current frame.
+	if len(q.changes) == 0 {
+		q.changes = append(q.changes, stateChange{})
+	}
+	if e != nil && len(evts) > 0 {
+		// An event triggered events bound for user receivers. Add a state change to be
+		// able to redo the change in case of a command execution.
+		q.changes = append(q.changes, stateChange{event: e, state: state, events: evts})
 	} else {
 		// Otherwise, merge with previous change.
-		prev := &q.changes[n-1]
+		prev := &q.changes[len(q.changes)-1]
 		prev.state = state
 		prev.events = append(prev.events, evts...)
 	}
@@ -504,8 +558,10 @@ func (q *Router) queueKeyEvent(state keyState, e key.Event) []taggedEvent {
 }
 
 func (q *Router) MoveFocus(dir key.FocusDirection) bool {
-	ks, evts := q.key.queue.MoveFocus(q.handlers, q.lastState().keyState, dir)
-	return q.changeKeyState(ks, evts)
+	state := q.lastState()
+	kstate, evts := q.key.queue.MoveFocus(q.handlers, state.keyState, dir)
+	state.keyState = kstate
+	return q.changeState(nil, state, evts)
 }
 
 // RevealFocus scrolls the current focus (if any) into viewport
@@ -546,7 +602,7 @@ func (q *Router) ScrollFocus(dist image.Point) {
 	}
 	kh := &q.handlers[focus].key
 	area := q.key.queue.AreaFor(kh)
-	q.addEvents(q.pointer.queue.Deliver(q.handlers, area, pointer.Event{
+	q.changeState(nil, q.lastState(), q.pointer.queue.Deliver(q.handlers, area, pointer.Event{
 		Kind:   pointer.Scroll,
 		Source: pointer.Touch,
 		Scroll: f32internal.FPt(dist),
@@ -593,16 +649,19 @@ func (q *Router) ClickFocus() {
 	}
 	area := q.key.queue.AreaFor(kh)
 	e.Kind = pointer.Press
-	q.addEvents(q.pointer.queue.Deliver(q.handlers, area, e))
+	state := q.lastState()
+	q.changeState(nil, state, q.pointer.queue.Deliver(q.handlers, area, e))
 	e.Kind = pointer.Release
-	q.addEvents(q.pointer.queue.Deliver(q.handlers, area, e))
+	q.changeState(nil, state, q.pointer.queue.Deliver(q.handlers, area, e))
 }
 
 // TextInputState returns the input state from the most recent
 // call to Frame.
 func (q *Router) TextInputState() TextInputState {
-	kstate, s := q.state().InputState()
-	q.changeKeyState(kstate, nil)
+	state := q.state()
+	kstate, s := state.InputState()
+	state.keyState = kstate
+	q.changeState(nil, state, nil)
 	return s
 }
 
@@ -713,7 +772,7 @@ func (q *Router) collect() {
 			pc.inputOp(tag, &s.pointer)
 			a := pc.currentArea()
 			b := pc.currentAreaBounds()
-			if s.filter.focusable {
+			if s.filter.key.focusable {
 				kq.inputOp(tag, &s.key, t, a, b)
 			}
 

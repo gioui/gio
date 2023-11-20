@@ -100,8 +100,8 @@ func (l *Selectable) initialize() {
 
 // Focus requests the input focus for the label.
 func (l *Selectable) Focus(gtx layout.Context) {
-	gtx.Queue(key.FocusCmd{Tag: l})
-	gtx.Queue(key.SoftKeyboardCmd{Show: true})
+	gtx.Execute(key.FocusCmd{Tag: l})
+	gtx.Execute(key.SoftKeyboardCmd{Show: true})
 }
 
 // Focused returns whether the label is focused or not.
@@ -348,7 +348,7 @@ func (e *Selectable) command(gtx layout.Context, k key.Event) {
 		case "C", "X":
 			e.scratch = e.text.SelectedText(e.scratch)
 			if text := string(e.scratch); text != "" {
-				gtx.Queue(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(text))})
+				gtx.Execute(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(text))})
 			}
 		// Select all
 		case "A":

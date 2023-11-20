@@ -17,8 +17,8 @@ func TestClipboardDuplicateEvent(t *testing.T) {
 	ops, router, handler := new(op.Ops), new(Router), make([]int, 2)
 
 	// Both must receive the event once
-	router.Source().Queue(clipboard.ReadCmd{Tag: &handler[0]})
-	router.Source().Queue(clipboard.ReadCmd{Tag: &handler[1]})
+	router.Source().Execute(clipboard.ReadCmd{Tag: &handler[0]})
+	router.Source().Execute(clipboard.ReadCmd{Tag: &handler[1]})
 
 	router.Frame(ops)
 	event := transfer.DataEvent{
@@ -41,7 +41,7 @@ func TestClipboardDuplicateEvent(t *testing.T) {
 	assertClipboardEvent(t, router.Events(&handler[1]), false)
 	ops.Reset()
 
-	router.Source().Queue(clipboard.ReadCmd{Tag: &handler[0]})
+	router.Source().Execute(clipboard.ReadCmd{Tag: &handler[0]})
 
 	router.Frame(ops)
 	// No ClipboardEvent sent
@@ -56,7 +56,7 @@ func TestQueueProcessReadClipboard(t *testing.T) {
 	ops.Reset()
 
 	// Request read
-	router.Source().Queue(clipboard.ReadCmd{Tag: &handler[0]})
+	router.Source().Execute(clipboard.ReadCmd{Tag: &handler[0]})
 
 	router.Frame(ops)
 	assertClipboardReadCmd(t, router, 1)
@@ -94,28 +94,18 @@ func TestQueueProcessReadClipboard(t *testing.T) {
 }
 
 func TestQueueProcessWriteClipboard(t *testing.T) {
-	ops, router := new(op.Ops), new(Router)
-	ops.Reset()
+	router := new(Router)
 
 	const mime = "application/text"
-	router.Source().Queue(clipboard.WriteCmd{Type: mime, Data: io.NopCloser(strings.NewReader("Write 1"))})
+	router.Source().Execute(clipboard.WriteCmd{Type: mime, Data: io.NopCloser(strings.NewReader("Write 1"))})
 
-	router.Frame(ops)
 	assertClipboardWriteCmd(t, router, mime, "Write 1")
-	ops.Reset()
-
-	// No WriteCmd
-
-	router.Frame(ops)
 	assertClipboardWriteCmd(t, router, "", "")
-	ops.Reset()
 
-	router.Source().Queue(clipboard.WriteCmd{Type: mime, Data: io.NopCloser(strings.NewReader("Write 2"))})
+	router.Source().Execute(clipboard.WriteCmd{Type: mime, Data: io.NopCloser(strings.NewReader("Write 2"))})
 
-	router.Frame(ops)
 	assertClipboardReadCmd(t, router, 0)
 	assertClipboardWriteCmd(t, router, mime, "Write 2")
-	ops.Reset()
 }
 
 func assertClipboardEvent(t *testing.T, events []event.Event, expected bool) {

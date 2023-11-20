@@ -37,9 +37,8 @@ func TestKeyMultiples(t *testing.T) {
 	ops := new(op.Ops)
 	r := new(Router)
 
-	r.Source().Queue(key.SoftKeyboardCmd{Show: true})
+	r.Source().Execute(key.SoftKeyboardCmd{Show: true})
 	event.InputOp(ops, &handlers[0])
-	r.Source().Queue(key.FocusCmd{Tag: &handlers[2]})
 	event.InputOp(ops, &handlers[1])
 
 	// The last one must be focused:
@@ -51,6 +50,7 @@ func TestKeyMultiples(t *testing.T) {
 
 	r.Frame(ops)
 
+	r.Source().Execute(key.FocusCmd{Tag: &handlers[2]})
 	assertKeyEvent(t, r.Events(&handlers[2], key.FocusFilter{}), true)
 	assertFocus(t, r, &handlers[2])
 
@@ -63,12 +63,12 @@ func TestKeyStacked(t *testing.T) {
 	r := new(Router)
 
 	event.InputOp(ops, &handlers[0])
-	r.Source().Queue(key.FocusCmd{})
-	r.Source().Queue(key.SoftKeyboardCmd{Show: false})
+	r.Source().Execute(key.FocusCmd{})
+	r.Source().Execute(key.SoftKeyboardCmd{Show: false})
 	event.InputOp(ops, &handlers[1])
-	r.Source().Queue(key.FocusCmd{Tag: &handlers[1]})
+	r.Source().Execute(key.FocusCmd{Tag: &handlers[1]})
 	event.InputOp(ops, &handlers[2])
-	r.Source().Queue(key.SoftKeyboardCmd{Show: true})
+	r.Source().Execute(key.SoftKeyboardCmd{Show: true})
 	event.InputOp(ops, &handlers[3])
 
 	for i := range handlers {
@@ -88,7 +88,7 @@ func TestKeySoftKeyboardNoFocus(t *testing.T) {
 
 	// It's possible to open the keyboard
 	// without any active focus:
-	r.Source().Queue(key.SoftKeyboardCmd{Show: true})
+	r.Source().Execute(key.SoftKeyboardCmd{Show: true})
 
 	r.Frame(ops)
 
@@ -103,8 +103,8 @@ func TestKeyRemoveFocus(t *testing.T) {
 
 	// New InputOp with Focus and Keyboard:
 	event.InputOp(ops, &handlers[0])
-	r.Source().Queue(key.FocusCmd{Tag: &handlers[0]})
-	r.Source().Queue(key.SoftKeyboardCmd{Show: true})
+	r.Source().Execute(key.FocusCmd{Tag: &handlers[0]})
+	r.Source().Execute(key.SoftKeyboardCmd{Show: true})
 
 	// New InputOp without any focus:
 	event.InputOp(ops, &handlers[1])
@@ -136,7 +136,7 @@ func TestKeyRemoveFocus(t *testing.T) {
 	event.InputOp(ops, &handlers[1])
 
 	// Remove focus by focusing on a tag that don't exist.
-	r.Source().Queue(key.FocusCmd{Tag: new(int)})
+	r.Source().Execute(key.FocusCmd{Tag: new(int)})
 
 	r.Frame(ops)
 
@@ -148,27 +148,27 @@ func TestKeyRemoveFocus(t *testing.T) {
 
 	event.InputOp(ops, &handlers[0])
 	event.InputOp(ops, &handlers[1])
-
-	r.Frame(ops)
 
 	assertKeyEventUnexpected(t, r.Events(&handlers[0], key.FocusFilter{}))
 	assertKeyEventUnexpected(t, r.Events(&handlers[1], key.FocusFilter{}))
 	assertFocus(t, r, nil)
 	assertKeyboard(t, r, TextInputClose)
 
+	r.Frame(ops)
 	ops.Reset()
 
 	// Set focus to InputOp which already
 	// exists in the previous frame:
-	r.Source().Queue(key.FocusCmd{Tag: &handlers[0]})
+	r.Source().Execute(key.FocusCmd{Tag: &handlers[0]})
 	event.InputOp(ops, &handlers[0])
-	r.Source().Queue(key.SoftKeyboardCmd{Show: true})
+	r.Source().Execute(key.SoftKeyboardCmd{Show: true})
+	assertFocus(t, r, &handlers[0])
+
+	ops.Reset()
 
 	// Remove focus.
 	event.InputOp(ops, &handlers[1])
-	r.Source().Queue(key.FocusCmd{})
-
-	r.Frame(ops)
+	r.Source().Execute(key.FocusCmd{})
 
 	assertKeyEventUnexpected(t, r.Events(&handlers[1], key.FocusFilter{}))
 	assertFocus(t, r, nil)
@@ -181,9 +181,9 @@ func TestKeyFocusedInvisible(t *testing.T) {
 	r := new(Router)
 
 	// Set new InputOp with focus:
-	r.Source().Queue(key.FocusCmd{Tag: &handlers[0]})
+	r.Source().Execute(key.FocusCmd{Tag: &handlers[0]})
 	event.InputOp(ops, &handlers[0])
-	r.Source().Queue(key.SoftKeyboardCmd{Show: true})
+	r.Source().Execute(key.SoftKeyboardCmd{Show: true})
 
 	// Set new InputOp without focus:
 	event.InputOp(ops, &handlers[1])
@@ -403,7 +403,7 @@ func TestKeyRouting(t *testing.T) {
 	r2.Events(&handlers[3], key.FocusFilter{})
 	r2.Events(&handlers[4], fa...)
 
-	r2.Source().Queue(key.FocusCmd{Tag: &handlers[3]})
+	r2.Source().Execute(key.FocusCmd{Tag: &handlers[3]})
 	r2.Frame(ops)
 
 	r2.Queue(A, B)

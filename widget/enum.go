@@ -51,7 +51,7 @@ func (e *Enum) Update(gtx layout.Context) bool {
 			switch ev.Kind {
 			case gesture.KindPress:
 				if ev.Source == pointer.Mouse {
-					gtx.Queue(key.FocusCmd{Tag: &state.tag})
+					gtx.Execute(key.FocusCmd{Tag: &state.tag})
 				}
 			case gesture.KindClick:
 				if state.key != e.Value {
