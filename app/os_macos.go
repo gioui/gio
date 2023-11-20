@@ -192,6 +192,10 @@ static CFTypeRef windowForView(CFTypeRef viewRef) {
 }
 
 static void raiseWindow(CFTypeRef windowRef) {
+	NSRunningApplication *currentApp = [NSRunningApplication currentApplication];
+	if (![currentApp isActive]) {
+		[currentApp activateWithOptions:(NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps)];
+	}
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	[window makeKeyAndOrderFront:nil];
 }
