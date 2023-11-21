@@ -27,6 +27,7 @@ import (
 type Router struct {
 	savedTrans []f32.Affine2D
 	transStack []f32.Affine2D
+	handlers   map[event.Tag]*handler
 	pointer    struct {
 		queue     pointerQueue
 		collector pointerCollector
@@ -101,6 +102,15 @@ const (
 // By convention, the zero value denotes the non-existent ID.
 type SemanticID uint
 
+// handler contains the per-handler state tracked by a [Router].
+type handler struct {
+	// active tracks whether the handler was active in the current
+	// frame. Router deletes state belonging to inactive handlers during Frame.
+	active  bool
+	pointer pointerHandler
+	key     keyHandler
+}
+
 // stateChange represents the new state and outgoing events
 // resulting from an incoming event.
 type stateChange struct {
@@ -153,25 +163,26 @@ func (s Source) Events(k event.Tag, filters ...event.Filter) []event.Event {
 
 func (q *Router) Events(k event.Tag, filters ...event.Filter) []event.Event {
 	var events []event.Event
+	h := q.stateFor(k)
 	// Record handler filters and add reset events.
 	for _, f := range filters {
 		switch f := f.(type) {
 		case key.Filter:
-			q.key.queue.filter(k, f)
+			h.key.Filter(f)
 		case key.FocusFilter:
-			q.key.queue.focusable(k)
-			if reset, ok := q.key.queue.ResetEvent(k); ok {
+			h.key.Focusable()
+			if reset, ok := h.key.ResetEvent(); ok {
 				events = append(events, reset)
 			}
 		case pointer.Filter:
-			q.pointer.queue.filterTag(k, f)
-			if reset, ok := q.pointer.queue.ResetEvent(k); ok {
+			h.pointer.Filter(k, f)
+			if reset, ok := h.pointer.ResetEvent(); ok {
 				events = append(events, reset)
 			}
 		case transfer.SourceFilter:
-			q.pointer.queue.sourceFilter(k, f)
+			h.pointer.SourceFilter(k, f)
 		case transfer.TargetFilter:
-			q.pointer.queue.targetFilter(k, f)
+			h.pointer.TargetFilter(k, f)
 		}
 	}
 	// Accumulate events from state changes until there are no more
@@ -225,15 +236,26 @@ func (q *Router) Frame(frame *op.Ops) {
 		state := q.changes[n-1].state
 		q.changes = append(q.changes[:0], stateChange{state: state})
 	}
+	for _, h := range q.handlers {
+		h.pointer.Reset()
+		h.key.Reset()
+	}
 	var ops *ops.Ops
 	if frame != nil {
 		ops = &frame.Internal
 	}
 	q.reader.Reset(ops)
 	q.collect()
+	for k, h := range q.handlers {
+		if !h.active {
+			delete(q.handlers, k)
+		} else {
+			h.active = false
+		}
+	}
 	q.executeCommands()
-	q.changePointerState(q.pointer.queue.Frame(q.lastState().pointerState))
-	kstate := q.key.queue.Frame(q.lastState().keyState)
+	q.changePointerState(q.pointer.queue.Frame(q.handlers, q.lastState().pointerState))
+	kstate := q.key.queue.Frame(q.handlers, q.lastState().keyState)
 	q.changeKeyState(kstate, nil)
 	// Collapse state and events.
 	q.collapseState(len(q.changes) - 1)
@@ -258,7 +280,7 @@ func (q *Router) processEvent(e event.Event) bool {
 	state := q.lastState()
 	switch e := e.(type) {
 	case pointer.Event:
-		return q.changePointerState(q.pointer.queue.Push(state.pointerState, e))
+		return q.changePointerState(q.pointer.queue.Push(q.handlers, state.pointerState, e))
 	case key.Event:
 		return q.addEvents(q.queueKeyEvent(state.keyState, e))
 	case key.SnippetEvent:
@@ -333,7 +355,7 @@ func (q *Router) executeCommands() {
 			kstate := q.key.queue.setSelection(state.keyState, req)
 			q.changeKeyState(kstate, nil)
 		case key.FocusCmd:
-			q.changeKeyState(q.key.queue.Focus(state.keyState, req.Tag))
+			q.changeKeyState(q.key.queue.Focus(q.handlers, state.keyState, req.Tag))
 		case key.SoftKeyboardCmd:
 			kstate := state.keyState.softKeyboard(req.Show)
 			q.changeKeyState(kstate, nil)
@@ -341,7 +363,7 @@ func (q *Router) executeCommands() {
 			kstate := q.key.queue.setSnippet(state.keyState, req)
 			q.changeKeyState(kstate, nil)
 		case transfer.OfferCmd:
-			q.changePointerState(q.pointer.queue.offerData(state.pointerState, req))
+			q.changePointerState(q.pointer.queue.offerData(q.handlers, state.pointerState, req))
 		case clipboard.WriteCmd:
 			q.cqueue.ProcessWriteClipboard(req)
 		case clipboard.ReadCmd:
@@ -404,10 +426,9 @@ func rangeNorm(r key.Range) key.Range {
 }
 
 func (q *Router) queueKeyEvent(state keyState, e key.Event) []taggedEvent {
-	kq := &q.key.queue
 	f := state.focus
 	var evts []taggedEvent
-	if f != nil && kq.Accepts(f, e) {
+	if f != nil && q.handlers[f].key.Accepts(e) {
 		evts = append(evts, taggedEvent{tag: f, event: e})
 		return evts
 	}
@@ -430,7 +451,7 @@ func (q *Router) queueKeyEvent(state keyState, e key.Event) []taggedEvent {
 		if n.tag == nil {
 			continue
 		}
-		if kq.Accepts(n.tag, e) {
+		if q.handlers[n.tag].key.Accepts(e) {
 			evts = append(evts, taggedEvent{tag: n.tag, event: e})
 			break
 		}
@@ -439,7 +460,7 @@ func (q *Router) queueKeyEvent(state keyState, e key.Event) []taggedEvent {
 }
 
 func (q *Router) MoveFocus(dir key.FocusDirection) bool {
-	ks, evts := q.key.queue.MoveFocus(q.lastState().keyState, dir)
+	ks, evts := q.key.queue.MoveFocus(q.handlers, q.lastState().keyState, dir)
 	return q.changeKeyState(ks, evts)
 }
 
@@ -451,8 +472,9 @@ func (q *Router) RevealFocus(viewport image.Rectangle) {
 	if focus == nil {
 		return
 	}
-	bounds := q.key.queue.BoundsFor(focus)
-	area := q.key.queue.AreaFor(focus)
+	kh := &q.handlers[focus].key
+	bounds := q.key.queue.BoundsFor(kh)
+	area := q.key.queue.AreaFor(kh)
 	viewport = q.pointer.queue.ClipFor(area, viewport)
 
 	topleft := bounds.Min.Sub(viewport.Min)
@@ -478,8 +500,9 @@ func (q *Router) ScrollFocus(dist image.Point) {
 	if focus == nil {
 		return
 	}
-	area := q.key.queue.AreaFor(focus)
-	q.addEvents(q.pointer.queue.Deliver(area, pointer.Event{
+	kh := &q.handlers[focus].key
+	area := q.key.queue.AreaFor(kh)
+	q.addEvents(q.pointer.queue.Deliver(q.handlers, area, pointer.Event{
 		Kind:   pointer.Scroll,
 		Source: pointer.Touch,
 		Scroll: f32internal.FPt(dist),
@@ -517,17 +540,18 @@ func (q *Router) ClickFocus() {
 	if focus == nil {
 		return
 	}
-	bounds := q.key.queue.BoundsFor(focus)
+	kh := &q.handlers[focus].key
+	bounds := q.key.queue.BoundsFor(kh)
 	center := bounds.Max.Add(bounds.Min).Div(2)
 	e := pointer.Event{
 		Position: f32.Pt(float32(center.X), float32(center.Y)),
 		Source:   pointer.Touch,
 	}
-	area := q.key.queue.AreaFor(focus)
+	area := q.key.queue.AreaFor(kh)
 	e.Kind = pointer.Press
-	q.addEvents(q.pointer.queue.Deliver(area, e))
+	q.addEvents(q.pointer.queue.Deliver(q.handlers, area, e))
 	e.Kind = pointer.Release
-	q.addEvents(q.pointer.queue.Deliver(area, e))
+	q.addEvents(q.pointer.queue.Deliver(q.handlers, area, e))
 }
 
 // TextInputState returns the input state from the most recent
@@ -540,7 +564,7 @@ func (q *Router) TextInputState() TextInputState {
 
 // TextInputHint returns the input mode from the most recent key.InputOp.
 func (q *Router) TextInputHint() (key.InputHint, bool) {
-	return q.key.queue.InputHint(q.state().keyState)
+	return q.key.queue.InputHint(q.handlers, q.state().keyState)
 }
 
 // WriteClipboard returns the most recent content to be copied
@@ -576,14 +600,27 @@ func (q *Router) AppendSemantics(nodes []SemanticNode) []SemanticNode {
 // EditorState returns the editor state for the focused handler, or the
 // zero value if there is none.
 func (q *Router) EditorState() EditorState {
-	return q.key.queue.editorState(q.state().keyState)
+	return q.key.queue.editorState(q.handlers, q.state().keyState)
+}
+
+func (q *Router) stateFor(tag event.Tag) *handler {
+	s, ok := q.handlers[tag]
+	if !ok {
+		s = new(handler)
+		if q.handlers == nil {
+			q.handlers = make(map[event.Tag]*handler)
+		}
+		q.handlers[tag] = s
+	}
+	s.active = true
+	return s
 }
 
 func (q *Router) collect() {
 	q.transStack = q.transStack[:0]
 	pc := &q.pointer.collector
 	pc.q = &q.pointer.queue
-	pc.reset()
+	pc.Reset()
 	kq := &q.key.queue
 	q.key.queue.Reset()
 	var t f32.Affine2D
@@ -628,10 +665,13 @@ func (q *Router) collect() {
 
 		case ops.TypeInput:
 			tag := encOp.Refs[0].(event.Tag)
-			pc.inputOp(tag)
+			s := q.stateFor(tag)
+			pc.inputOp(tag, &s.pointer)
 			a := pc.currentArea()
 			b := pc.currentAreaBounds()
-			kq.inputOp(tag, t, a, b)
+			if s.filter.focusable {
+				kq.inputOp(tag, &s.key, t, a, b)
+			}
 
 		// Pointer ops.
 		case ops.TypePass:
@@ -649,7 +689,8 @@ func (q *Router) collect() {
 				Tag:  encOp.Refs[0].(event.Tag),
 				Hint: key.InputHint(encOp.Data[1]),
 			}
-			kq.inputHint(op)
+			s := q.stateFor(op.Tag)
+			s.key.inputHint(op.Hint)
 
 		// Semantic ops.
 		case ops.TypeSemanticLabel:
