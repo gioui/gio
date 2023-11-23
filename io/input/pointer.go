@@ -66,12 +66,6 @@ type pointerHandler struct {
 	// setup tracks whether the handler has received
 	// the pointer.Cancel event that resets its state.
 	setup bool
-	// filter is the combined filter of every filter the handler has
-	// asked for through event handling in the previous frame. It is
-	// used for routing events in the current frame.
-	filter pointerFilter
-	// prevFilter is the filter being built in the current frame.
-	nextFilter pointerFilter
 }
 
 // pointerFilter represents the union of a set of pointer filters.
@@ -249,8 +243,6 @@ func (c *pointerCollector) newHandler(tag event.Tag, state *pointerHandler) {
 
 func (s *pointerHandler) Reset() {
 	s.areaPlusOne = 0
-	s.filter = s.nextFilter
-	s.nextFilter = pointerFilter{}
 }
 
 func (c *pointerCollector) actionInputOp(act system.Action) {
@@ -287,9 +279,73 @@ func (c *pointerCollector) inputOp(tag event.Tag, state *pointerHandler) {
 	c.newHandler(tag, state)
 }
 
-func (s *pointerHandler) Filter(tag event.Tag, f pointer.Filter) {
-	s.nextFilter.kinds = s.nextFilter.kinds | f.Kinds
-	s.nextFilter.scrollRange = s.nextFilter.scrollRange.Union(f.ScrollBounds)
+func (p *pointerFilter) Add(f event.Filter) {
+	switch f := f.(type) {
+	case transfer.SourceFilter:
+		for _, m := range p.sourceMimes {
+			if m == f.Type {
+				return
+			}
+		}
+		p.sourceMimes = append(p.sourceMimes, f.Type)
+	case transfer.TargetFilter:
+		for _, m := range p.targetMimes {
+			if m == f.Type {
+				return
+			}
+		}
+		p.targetMimes = append(p.targetMimes, f.Type)
+	case pointer.Filter:
+		p.kinds = p.kinds | f.Kinds
+		p.scrollRange = p.scrollRange.Union(f.ScrollBounds)
+	}
+}
+
+func (p *pointerFilter) Matches(e event.Event) bool {
+	switch e := e.(type) {
+	case pointer.Event:
+		return e.Kind&p.kinds == e.Kind
+	case transfer.CancelEvent, transfer.InitiateEvent:
+		return len(p.sourceMimes) > 0 || len(p.targetMimes) > 0
+	case transfer.RequestEvent:
+		for _, t := range p.sourceMimes {
+			if t == e.Type {
+				return true
+			}
+		}
+	case transfer.DataEvent:
+		for _, t := range p.targetMimes {
+			if t == e.Type {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (p *pointerFilter) Merge(p2 pointerFilter) {
+	p.kinds = p.kinds | p2.kinds
+	p.scrollRange = p.scrollRange.Union(p2.scrollRange)
+	p.sourceMimes = append(p.sourceMimes, p2.sourceMimes...)
+	p.targetMimes = append(p.targetMimes, p2.targetMimes...)
+}
+
+// clampScroll splits a scroll distance in the remaining scroll and the
+// scroll accepted by the filter.
+func (p *pointerFilter) clampScroll(scroll f32.Point) (left, scrolled f32.Point) {
+	left.X, scrolled.X = clampSplit(scroll.X, p.scrollRange.Min.X, p.scrollRange.Max.X)
+	left.Y, scrolled.Y = clampSplit(scroll.Y, p.scrollRange.Min.Y, p.scrollRange.Max.Y)
+	return
+}
+
+func clampSplit(v float32, min, max int) (float32, float32) {
+	if m := float32(max); v > m {
+		return v - m, m
+	}
+	if m := float32(min); v < m {
+		return v - m, m
+	}
+	return 0, v
 }
 
 func (s *pointerHandler) ResetEvent() (event.Event, bool) {
@@ -339,14 +395,6 @@ func (c *pointerCollector) cursor(cursor pointer.Cursor) {
 	areaID := c.currentArea()
 	area := &c.q.areas[areaID]
 	area.cursor = cursor
-}
-
-func (s *pointerHandler) SourceFilter(tag event.Tag, f transfer.SourceFilter) {
-	s.nextFilter.sourceMimes = append(s.nextFilter.sourceMimes, f.Type)
-}
-
-func (s *pointerHandler) TargetFilter(tag event.Tag, f transfer.TargetFilter) {
-	s.nextFilter.targetMimes = append(s.nextFilter.targetMimes, f.Type)
 }
 
 func (q *pointerQueue) offerData(handlers map[event.Tag]*handler, state pointerState, req transfer.OfferCmd) (pointerState, []taggedEvent) {
@@ -572,10 +620,10 @@ func (q *pointerQueue) Frame(handlers map[event.Tag]*handler, state pointerState
 	for _, h := range handlers {
 		if h.pointer.areaPlusOne != 0 {
 			area := &q.areas[h.pointer.areaPlusOne-1]
-			if h.pointer.filter.kinds&(pointer.Press|pointer.Release) != 0 {
+			if h.filter.pointer.kinds&(pointer.Press|pointer.Release) != 0 {
 				area.semantic.content.gestures |= ClickGesture
 			}
-			if h.pointer.filter.kinds&pointer.Scroll != 0 {
+			if h.filter.pointer.kinds&pointer.Scroll != 0 {
 				area.semantic.content.gestures |= ScrollGesture
 			}
 			area.semantic.valid = area.semantic.content.gestures != 0
@@ -630,7 +678,7 @@ func (s pointerState) pointerOf(e pointer.Event) (pointerState, int) {
 
 // Deliver is like Push, but delivers an event to a particular area.
 func (q *pointerQueue) Deliver(handlers map[event.Tag]*handler, areaIdx int, e pointer.Event) []taggedEvent {
-	var sx, sy = e.Scroll.X, e.Scroll.Y
+	scroll := e.Scroll
 	idx := len(q.hitTree) - 1
 	// Locate first potential receiver.
 	for idx != -1 {
@@ -645,18 +693,15 @@ func (q *pointerQueue) Deliver(handlers map[event.Tag]*handler, areaIdx int, e p
 		n := &q.hitTree[idx]
 		idx = n.next
 		h, ok := handlers[n.tag]
-		if !ok || e.Kind&h.pointer.filter.kinds == 0 {
+		if !ok || !h.filter.pointer.Matches(e) {
 			continue
 		}
-		f := h.pointer.filter
 		e := e
 		if e.Kind == pointer.Scroll {
-			if sx == 0 && sy == 0 {
+			if scroll == (f32.Point{}) {
 				break
 			}
-			// Distribute the scroll to the handler based on its ScrollRange.
-			sx, e.Scroll.X = setScrollEvent(sx, f.scrollRange.Min.X, f.scrollRange.Max.X)
-			sy, e.Scroll.Y = setScrollEvent(sy, f.scrollRange.Min.Y, f.scrollRange.Max.Y)
+			scroll, e.Scroll = h.filter.pointer.clampScroll(scroll)
 		}
 		e.Position = q.invTransform(h.pointer.areaPlusOne-1, e.Position)
 		evts = append(evts, taggedEvent{tag: n.tag, event: e})
@@ -739,23 +784,21 @@ func (q *pointerQueue) deliverEvent(handlers map[event.Tag]*handler, p pointerIn
 		e.Priority = pointer.Grabbed
 		foremost = false
 	}
-	var sx, sy = e.Scroll.X, e.Scroll.Y
+	scroll := e.Scroll
 	for _, k := range p.handlers {
 		h, ok := handlers[k]
 		if !ok {
 			continue
 		}
-		f := h.pointer.filter
+		f := h.filter.pointer
+		if !f.Matches(e) {
+			continue
+		}
 		if e.Kind == pointer.Scroll {
-			if sx == 0 && sy == 0 {
+			if scroll == (f32.Point{}) {
 				return evts
 			}
-			// Distribute the scroll to the handler based on its ScrollRange.
-			sx, e.Scroll.X = setScrollEvent(sx, f.scrollRange.Min.X, f.scrollRange.Max.X)
-			sy, e.Scroll.Y = setScrollEvent(sy, f.scrollRange.Min.Y, f.scrollRange.Max.Y)
-		}
-		if e.Kind&f.kinds == 0 {
-			continue
+			scroll, e.Scroll = f.clampScroll(scroll)
 		}
 		e := e
 		if foremost {
@@ -774,9 +817,9 @@ func (q *pointerQueue) deliverEnterLeaveEvents(handlers map[event.Tag]*handler, 
 	if e.Source != pointer.Mouse && !p.pressed && e.Kind != pointer.Press {
 		// Consider non-mouse pointers leaving when they're released.
 	} else {
-		var transSrc *pointerHandler
+		var transSrc *pointerFilter
 		if p.dataSource != nil {
-			transSrc = &handlers[p.dataSource].pointer
+			transSrc = &handlers[p.dataSource].filter.pointer
 		}
 		cursor = q.hitTest(e.Position, func(n *hitNode) bool {
 			h, ok := handlers[n.tag]
@@ -792,7 +835,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(handlers map[event.Tag]*handler, 
 					add = true
 				}
 				if transSrc != nil {
-					if _, ok := firstMimeMatch(transSrc, &h.pointer); ok {
+					if _, ok := firstMimeMatch(transSrc, &h.filter.pointer); ok {
 						add = true
 					}
 				}
@@ -820,7 +863,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(handlers map[event.Tag]*handler, 
 		e := e
 		e.Kind = pointer.Leave
 
-		if e.Kind&h.pointer.filter.kinds != 0 {
+		if h.filter.pointer.Matches(e) {
 			e.Position = q.invTransform(h.pointer.areaPlusOne-1, e.Position)
 			evts = append(evts, taggedEvent{tag: k, event: e})
 		}
@@ -838,7 +881,7 @@ func (q *pointerQueue) deliverEnterLeaveEvents(handlers map[event.Tag]*handler, 
 		e := e
 		e.Kind = pointer.Enter
 
-		if e.Kind&h.pointer.filter.kinds != 0 {
+		if h.filter.pointer.Matches(e) {
 			e.Position = q.invTransform(h.pointer.areaPlusOne-1, e.Position)
 			evts = append(evts, taggedEvent{tag: k, event: e})
 		}
@@ -853,15 +896,15 @@ func (q *pointerQueue) deliverDragEvent(handlers map[event.Tag]*handler, p point
 	}
 	// Identify the data source.
 	for _, k := range p.entered {
-		src := &handlers[k].pointer
-		if len(src.filter.sourceMimes) == 0 {
+		src := &handlers[k].filter.pointer
+		if len(src.sourceMimes) == 0 {
 			continue
 		}
 		// One data source handler per pointer.
 		p.dataSource = k
 		// Notify all potential targets.
 		for k, tgt := range handlers {
-			if _, ok := firstMimeMatch(src, &tgt.pointer); ok {
+			if _, ok := firstMimeMatch(src, &tgt.filter.pointer); ok {
 				evts = append(evts, taggedEvent{tag: k, event: transfer.InitiateEvent{}})
 			}
 		}
@@ -875,10 +918,10 @@ func (q *pointerQueue) deliverDropEvent(handlers map[event.Tag]*handler, p point
 		return p, evts
 	}
 	// Request data from the source.
-	src := &handlers[p.dataSource].pointer
+	src := &handlers[p.dataSource].filter.pointer
 	for _, k := range p.entered {
 		h := handlers[k]
-		if m, ok := firstMimeMatch(src, &h.pointer); ok {
+		if m, ok := firstMimeMatch(src, &h.filter.pointer); ok {
 			p.dataTarget = k
 			evts = append(evts, taggedEvent{tag: p.dataSource, event: transfer.RequestEvent{Type: m}})
 			return p, evts
@@ -891,9 +934,9 @@ func (q *pointerQueue) deliverDropEvent(handlers map[event.Tag]*handler, p point
 func (q *pointerQueue) deliverTransferCancelEvent(handlers map[event.Tag]*handler, p pointerInfo, evts []taggedEvent) (pointerInfo, []taggedEvent) {
 	evts = append(evts, taggedEvent{tag: p.dataSource, event: transfer.CancelEvent{}})
 	// Cancel all potential targets.
-	src := &handlers[p.dataSource].pointer
+	src := &handlers[p.dataSource].filter.pointer
 	for k, h := range handlers {
-		if _, ok := firstMimeMatch(src, &h.pointer); ok {
+		if _, ok := firstMimeMatch(src, &h.filter.pointer); ok {
 			evts = append(evts, taggedEvent{tag: k, event: transfer.CancelEvent{}})
 		}
 	}
@@ -934,9 +977,9 @@ func addHandler(tags []event.Tag, tag event.Tag) []event.Tag {
 }
 
 // firstMimeMatch returns the first type match between src and tgt.
-func firstMimeMatch(src, tgt *pointerHandler) (first string, matched bool) {
-	for _, m1 := range tgt.filter.targetMimes {
-		for _, m2 := range src.filter.sourceMimes {
+func firstMimeMatch(src, tgt *pointerFilter) (first string, matched bool) {
+	for _, m1 := range tgt.targetMimes {
+		for _, m2 := range src.sourceMimes {
 			if m1 == m2 {
 				return m1, true
 			}
@@ -970,14 +1013,4 @@ func (a *areaNode) bounds() image.Rectangle {
 		Min: a.trans.Transform(f32internal.FPt(a.area.rect.Min)),
 		Max: a.trans.Transform(f32internal.FPt(a.area.rect.Max)),
 	}.Round()
-}
-
-func setScrollEvent(scroll float32, min, max int) (left, scrolled float32) {
-	if v := float32(max); scroll > v {
-		return scroll - v, v
-	}
-	if v := float32(min); scroll < v {
-		return scroll - v, v
-	}
-	return 0, scroll
 }

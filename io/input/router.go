@@ -53,6 +53,9 @@ type Router struct {
 
 	// transfers is the pending transfer.DataEvent.Open functions.
 	transfers []io.ReadCloser
+
+	// scratchFilter is for garbage-free construction of ephemeral filters.
+	scratchFilter filter
 }
 
 // Source implements the interface between a Router and user interface widgets.
@@ -109,6 +112,18 @@ type handler struct {
 	active  bool
 	pointer pointerHandler
 	key     keyHandler
+	// filter the handler has asked for through event handling
+	// in the previous frame. It is used for routing events in the
+	// current frame.
+	filter filter
+	// prevFilter is the filter being built in the current frame.
+	nextFilter filter
+}
+
+// filter is the union of a set of [io/event.Filters].
+type filter struct {
+	pointer pointerFilter
+	key     keyFilter
 }
 
 // stateChange represents the new state and outgoing events
@@ -164,27 +179,22 @@ func (s Source) Events(k event.Tag, filters ...event.Filter) []event.Event {
 func (q *Router) Events(k event.Tag, filters ...event.Filter) []event.Event {
 	var events []event.Event
 	h := q.stateFor(k)
+	q.scratchFilter.Reset()
 	// Record handler filters and add reset events.
 	for _, f := range filters {
-		switch f := f.(type) {
-		case key.Filter:
-			h.key.Filter(f)
+		q.scratchFilter.Add(f)
+		switch f.(type) {
 		case key.FocusFilter:
-			h.key.Focusable()
 			if reset, ok := h.key.ResetEvent(); ok {
 				events = append(events, reset)
 			}
 		case pointer.Filter:
-			h.pointer.Filter(k, f)
 			if reset, ok := h.pointer.ResetEvent(); ok {
 				events = append(events, reset)
 			}
-		case transfer.SourceFilter:
-			h.pointer.SourceFilter(k, f)
-		case transfer.TargetFilter:
-			h.pointer.TargetFilter(k, f)
 		}
 	}
+	h.nextFilter.Merge(q.scratchFilter)
 	// Accumulate events from state changes until there are no more
 	// matching events.
 	matchedIdx := 0
@@ -193,7 +203,7 @@ func (q *Router) Events(k event.Tag, filters ...event.Filter) []event.Event {
 		j := 0
 		for j < len(change.events) {
 			evt := change.events[j]
-			if evt.tag != k || !filtersMatches(filters, evt.event) {
+			if evt.tag != k || !q.scratchFilter.Matches(evt.event) {
 				j++
 				continue
 			}
@@ -237,6 +247,8 @@ func (q *Router) Frame(frame *op.Ops) {
 		q.changes = append(q.changes[:0], stateChange{state: state})
 	}
 	for _, h := range q.handlers {
+		h.filter, h.nextFilter = h.nextFilter, h.filter
+		h.nextFilter.Reset()
 		h.pointer.Reset()
 		h.key.Reset()
 	}
@@ -274,6 +286,38 @@ func (q *Router) Queue(events ...event.Event) bool {
 		matched = matched || hadEvents
 	}
 	return matched
+}
+
+func (f *filter) Reset() {
+	*f = filter{
+		key: keyFilter{
+			// Re-use filter slice storage.
+			filters: f.key.filters[:0],
+		},
+	}
+}
+
+func (f *filter) Add(flt event.Filter) {
+	switch flt := flt.(type) {
+	case key.Filter:
+		f.key.Add(flt)
+	case key.FocusFilter:
+		f.key.Add(flt)
+	case pointer.Filter:
+		f.pointer.Add(flt)
+	case transfer.SourceFilter, transfer.TargetFilter:
+		f.pointer.Add(flt)
+	}
+}
+
+// Merge f2 into f.
+func (f *filter) Merge(f2 filter) {
+	f.key.Merge(f2.key)
+	f.pointer.Merge(f2.pointer)
+}
+
+func (f *filter) Matches(e event.Event) bool {
+	return f.key.Matches(e) || f.pointer.Matches(e)
 }
 
 func (q *Router) processEvent(e event.Event) bool {
@@ -428,7 +472,7 @@ func rangeNorm(r key.Range) key.Range {
 func (q *Router) queueKeyEvent(state keyState, e key.Event) []taggedEvent {
 	f := state.focus
 	var evts []taggedEvent
-	if f != nil && q.handlers[f].key.Accepts(e) {
+	if f != nil && q.handlers[f].filter.key.Matches(e) {
 		evts = append(evts, taggedEvent{tag: f, event: e})
 		return evts
 	}
@@ -451,7 +495,7 @@ func (q *Router) queueKeyEvent(state keyState, e key.Event) []taggedEvent {
 		if n.tag == nil {
 			continue
 		}
-		if q.handlers[n.tag].key.Accepts(e) {
+		if q.handlers[n.tag].filter.key.Matches(e) {
 			evts = append(evts, taggedEvent{tag: n.tag, event: e})
 			break
 		}
@@ -722,51 +766,6 @@ func (q *Router) collect() {
 // as determined from the last call to Frame.
 func (q *Router) WakeupTime() (time.Time, bool) {
 	return q.wakeupTime, q.wakeup
-}
-
-func filtersMatches(filters []event.Filter, e event.Event) bool {
-	switch e := e.(type) {
-	case key.Event:
-		for _, f := range filters {
-			if f, ok := f.(key.Filter); ok {
-				if keyFilterMatch(f, e) {
-					return true
-				}
-			}
-		}
-	case key.FocusEvent, key.SnippetEvent, key.EditEvent, key.SelectionEvent:
-		for _, f := range filters {
-			if _, ok := f.(key.FocusFilter); ok {
-				return true
-			}
-		}
-	case pointer.Event:
-		for _, f := range filters {
-			if f, ok := f.(pointer.Filter); ok && f.Kinds&e.Kind == e.Kind {
-				return true
-			}
-		}
-	case transfer.CancelEvent, transfer.InitiateEvent:
-		for _, f := range filters {
-			switch f.(type) {
-			case transfer.SourceFilter, transfer.TargetFilter:
-				return true
-			}
-		}
-	case transfer.RequestEvent:
-		for _, f := range filters {
-			if f, ok := f.(transfer.SourceFilter); ok && f.Type == e.Type {
-				return true
-			}
-		}
-	case transfer.DataEvent:
-		for _, f := range filters {
-			if f, ok := f.(transfer.TargetFilter); ok && f.Type == e.Type {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func decodeInvalidateOp(d []byte) op.InvalidateOp {
