@@ -124,6 +124,8 @@ type handler struct {
 	filter filter
 	// prevFilter is the filter being built in the current frame.
 	nextFilter filter
+	// processedFilter is the filters that have exhausted available events.
+	processedFilter filter
 }
 
 // filter is the union of a set of [io/event.Filters].
@@ -185,6 +187,17 @@ func (s Source) Events(k event.Tag, filters ...event.Filter) []event.Event {
 
 func (q *Router) Events(k event.Tag, filters ...event.Filter) []event.Event {
 	var events []event.Event
+	for {
+		e, ok := q.nextEvent(k, filters...)
+		if !ok {
+			break
+		}
+		events = append(events, e)
+	}
+	return events
+}
+
+func (q *Router) nextEvent(k event.Tag, filters ...event.Filter) (event.Event, bool) {
 	h := q.stateFor(k)
 	q.scratchFilter.Reset()
 	// Record handler filters and add reset events.
@@ -193,38 +206,34 @@ func (q *Router) Events(k event.Tag, filters ...event.Filter) []event.Event {
 		switch f.(type) {
 		case key.FocusFilter:
 			if reset, ok := h.key.ResetEvent(); ok {
-				events = append(events, reset)
+				return reset, true
 			}
 		case pointer.Filter:
 			if reset, ok := h.pointer.ResetEvent(); ok {
-				events = append(events, reset)
+				return reset, true
 			}
 		}
 	}
 	h.nextFilter.Merge(q.scratchFilter)
-	if q.deferring {
-		return events
-	}
-	// Accumulate events from state changes until there are no more
-	// matching events.
-	matchedIdx := 0
-	for i := range q.changes {
-		change := &q.changes[i]
-		j := 0
-		for j < len(change.events) {
-			evt := change.events[j]
-			if evt.tag != k || !q.scratchFilter.Matches(evt.event) {
-				j++
-				continue
+	if !q.deferring {
+		for i := range q.changes {
+			change := &q.changes[i]
+			j := 0
+			for j < len(change.events) {
+				evt := change.events[j]
+				if evt.tag != k || !q.scratchFilter.Matches(evt.event) {
+					j++
+					continue
+				}
+				change.events = append(change.events[:j], change.events[j+1:]...)
+				// Fast forward state to last matched.
+				q.collapseState(i)
+				return evt.event, true
 			}
-			events = append(events, evt.event)
-			change.events = append(change.events[:j], change.events[j+1:]...)
-			matchedIdx = i
 		}
 	}
-	// Fast forward state to last matched.
-	q.collapseState(matchedIdx)
-	return events
+	h.processedFilter.Merge(q.scratchFilter)
+	return nil, false
 }
 
 // collapseState in the interval [1;idx] into q.changes[0].
@@ -269,6 +278,7 @@ func (q *Router) Frame(frame *op.Ops) {
 	for _, h := range q.handlers {
 		h.filter, h.nextFilter = h.nextFilter, h.filter
 		h.nextFilter.Reset()
+		h.processedFilter.Reset()
 		h.pointer.Reset()
 		h.key.Reset()
 	}
@@ -400,7 +410,7 @@ func (q *Router) execute(c Command) {
 		}
 		for _, e := range ch.events {
 			h, ok := q.handlers[e.tag]
-			immediate = immediate && ok && h.old && !h.nextFilter.Matches(e.event)
+			immediate = immediate && ok && h.old && !h.processedFilter.Matches(e.event)
 		}
 		if immediate {
 			// Hold on to the remaining events for state replay.
