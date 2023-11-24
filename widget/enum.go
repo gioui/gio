@@ -66,7 +66,11 @@ func (e *Enum) Update(gtx layout.Context) bool {
 		if e.focused && e.focus == state.key {
 			filters = append(filters, key.Filter{Name: key.NameReturn}, key.Filter{Name: key.NameSpace})
 		}
-		for _, ev := range gtx.Events(&state.tag, filters...) {
+		for {
+			ev, ok := gtx.Event(&state.tag, filters...)
+			if !ok {
+				break
+			}
 			switch ev := ev.(type) {
 			case key.FocusEvent:
 				if ev.Focus {

@@ -176,28 +176,16 @@ func (s Source) Enabled() bool {
 	return s.r != nil
 }
 
-// Events returns the events for the handler tag that matches one
+// Event returns the next event for the handler tag that matches one
 // or more of filters.
-func (s Source) Events(k event.Tag, filters ...event.Filter) []event.Event {
+func (s Source) Event(k event.Tag, filters ...event.Filter) (event.Event, bool) {
 	if !s.Enabled() {
-		return nil
+		return nil, false
 	}
-	return s.r.Events(k, filters...)
+	return s.r.Event(k, filters...)
 }
 
-func (q *Router) Events(k event.Tag, filters ...event.Filter) []event.Event {
-	var events []event.Event
-	for {
-		e, ok := q.nextEvent(k, filters...)
-		if !ok {
-			break
-		}
-		events = append(events, e)
-	}
-	return events
-}
-
-func (q *Router) nextEvent(k event.Tag, filters ...event.Filter) (event.Event, bool) {
+func (q *Router) Event(k event.Tag, filters ...event.Filter) (event.Event, bool) {
 	h := q.stateFor(k)
 	q.scratchFilter.Reset()
 	// Record handler filters and add reset events.

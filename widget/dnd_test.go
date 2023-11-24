@@ -34,7 +34,7 @@ func TestDraggable(t *testing.T) {
 	stack.Pop()
 
 	drag.Update(gtx)
-	r.Events(drag, transfer.TargetFilter{Type: drag.Type})
+	r.Event(drag, transfer.TargetFilter{Type: drag.Type})
 	r.Frame(gtx.Ops)
 	r.Queue(
 		pointer.Event{
@@ -52,20 +52,26 @@ func TestDraggable(t *testing.T) {
 	)
 	ofr := &offer{data: "hello"}
 	drag.Update(gtx)
-	r.Events(drag, transfer.TargetFilter{Type: drag.Type})
+	r.Event(drag, transfer.TargetFilter{Type: drag.Type})
 	drag.Offer(gtx, "file", ofr)
-	r.Frame(gtx.Ops)
 
-	evs := r.Events(drag, transfer.TargetFilter{Type: drag.Type})
-	if len(evs) != 2 {
-		t.Fatalf("expected 3 event, got %d", len(evs))
+	e, ok := r.Event(drag, transfer.TargetFilter{Type: drag.Type})
+	if !ok {
+		t.Fatalf("expected event")
 	}
-	ev := evs[0].(transfer.DataEvent)
+	ev := e.(transfer.DataEvent)
 	if got, want := ev.Type, "file"; got != want {
 		t.Errorf("expected %v; got %v", got, want)
 	}
 	if ofr.closed {
 		t.Error("offer closed prematurely")
+	}
+	e, ok = r.Event(drag, transfer.TargetFilter{Type: drag.Type})
+	if !ok {
+		t.Fatalf("expected event")
+	}
+	if _, ok := e.(transfer.CancelEvent); !ok {
+		t.Fatalf("expected transfer.CancelEvent event")
 	}
 	r.Frame(gtx.Ops)
 	if !ofr.closed {

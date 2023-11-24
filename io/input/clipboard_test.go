@@ -28,8 +28,8 @@ func TestClipboardDuplicateEvent(t *testing.T) {
 		},
 	}
 	router.Queue(event)
-	assertClipboardEvent(t, router.Events(&handler[0], transfer.TargetFilter{Type: "application/text"}), true)
-	assertClipboardEvent(t, router.Events(&handler[1], transfer.TargetFilter{Type: "application/text"}), true)
+	assertClipboardEvent(t, events(router, &handler[0], transfer.TargetFilter{Type: "application/text"}), true)
+	assertClipboardEvent(t, events(router, &handler[1], transfer.TargetFilter{Type: "application/text"}), true)
 	assertClipboardReadCmd(t, router, 0)
 	ops.Reset()
 
@@ -37,8 +37,8 @@ func TestClipboardDuplicateEvent(t *testing.T) {
 
 	router.Frame(ops)
 	assertClipboardReadCmd(t, router, 0)
-	assertClipboardEvent(t, router.Events(&handler[0]), false)
-	assertClipboardEvent(t, router.Events(&handler[1]), false)
+	assertClipboardEvent(t, events(router, &handler[0]), false)
+	assertClipboardEvent(t, events(router, &handler[1]), false)
 	ops.Reset()
 
 	router.Source().Execute(clipboard.ReadCmd{Tag: &handler[0]})
@@ -46,8 +46,8 @@ func TestClipboardDuplicateEvent(t *testing.T) {
 	router.Frame(ops)
 	// No ClipboardEvent sent
 	assertClipboardReadCmd(t, router, 1)
-	assertClipboardEvent(t, router.Events(&handler[0]), false)
-	assertClipboardEvent(t, router.Events(&handler[1]), false)
+	assertClipboardEvent(t, events(router, &handler[0]), false)
+	assertClipboardEvent(t, events(router, &handler[1]), false)
 	ops.Reset()
 }
 
@@ -80,7 +80,7 @@ func TestQueueProcessReadClipboard(t *testing.T) {
 		},
 	}
 	router.Queue(event)
-	assertClipboardEvent(t, router.Events(&handler[0], transfer.TargetFilter{Type: "application/text"}), true)
+	assertClipboardEvent(t, events(router, &handler[0], transfer.TargetFilter{Type: "application/text"}), true)
 	assertClipboardReadCmd(t, router, 0)
 	ops.Reset()
 
@@ -89,7 +89,7 @@ func TestQueueProcessReadClipboard(t *testing.T) {
 
 	router.Frame(ops)
 	assertClipboardReadCmd(t, router, 0)
-	assertClipboardEvent(t, router.Events(&handler[0]), false)
+	assertClipboardEvent(t, events(router, &handler[0]), false)
 	ops.Reset()
 }
 

@@ -15,7 +15,7 @@ func TestNoFilterAllocs(t *testing.T) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			s.Events(nil, pointer.Filter{})
+			s.Event(nil, pointer.Filter{})
 		}
 	})
 	if allocs := b.AllocsPerOp(); allocs != 0 {

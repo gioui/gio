@@ -380,7 +380,11 @@ func (e *Editor) processKey(gtx layout.Context) {
 	}
 	// adjust keeps track of runes dropped because of MaxLen.
 	var adjust int
-	for _, ke := range gtx.Events(&e.eventKey, filters...) {
+	for {
+		ke, ok := gtx.Event(&e.eventKey, filters...)
+		if !ok {
+			break
+		}
 		e.blinkStart = gtx.Now
 		switch ke := ke.(type) {
 		case key.FocusEvent:

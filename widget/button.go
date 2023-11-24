@@ -163,7 +163,11 @@ func (b *Clickable) Update(gtx layout.Context) []Click {
 	if b.focused {
 		filters = append(filters, key.Filter{Name: key.NameReturn}, key.Filter{Name: key.NameSpace})
 	}
-	for _, e := range gtx.Events(&b.keyTag, filters...) {
+	for {
+		e, ok := gtx.Event(&b.keyTag, filters...)
+		if !ok {
+			break
+		}
 		switch e := e.(type) {
 		case key.FocusEvent:
 			b.focused = e.Focus

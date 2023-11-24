@@ -84,7 +84,7 @@ func TestSemanticDescription(t *testing.T) {
 	semantic.EnabledOp(false).Add(&ops)
 	semantic.SelectedOp(true).Add(&ops)
 	var r Router
-	r.Events(h, pointer.Filter{
+	events(&r, h, pointer.Filter{
 		Kinds: pointer.Press | pointer.Release,
 	})
 	r.Frame(&ops)

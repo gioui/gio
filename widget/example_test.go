@@ -109,7 +109,11 @@ func ExampleDraggable_Layout() {
 		ds.Pop()
 
 		// Check for the received data.
-		for _, ev := range gtx.Events(&drop, transfer.TargetFilter{Type: mime}) {
+		for {
+			ev, ok := gtx.Event(&drop, transfer.TargetFilter{Type: mime})
+			if !ok {
+				break
+			}
 			switch e := ev.(type) {
 			case transfer.DataEvent:
 				data := e.Open()

@@ -65,8 +65,12 @@ func (d *Draggable) Update(gtx layout.Context) (mime string, requested bool) {
 	}
 	d.pos = pos
 
-	for _, ev := range gtx.Events(&d.handle, transfer.SourceFilter{Type: d.Type}) {
-		if e, ok := ev.(transfer.RequestEvent); ok {
+	for {
+		e, ok := gtx.Event(&d.handle, transfer.SourceFilter{Type: d.Type})
+		if !ok {
+			break
+		}
+		if e, ok := e.(transfer.RequestEvent); ok {
 			return e.Type, true
 		}
 	}

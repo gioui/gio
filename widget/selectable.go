@@ -319,7 +319,11 @@ func (e *Selectable) processKey(gtx layout.Context) {
 			key.Filter{Name: "A", Required: key.ModShortcut},
 		)
 	}
-	for _, ke := range gtx.Events(e, filters...) {
+	for {
+		ke, ok := gtx.Event(e, filters...)
+		if !ok {
+			break
+		}
 		switch ke := ke.(type) {
 		case key.FocusEvent:
 			e.focused = ke.Focus

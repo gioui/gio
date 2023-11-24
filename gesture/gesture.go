@@ -43,7 +43,11 @@ func (h *Hover) Add(ops *op.Ops) {
 
 // Update state and report whether a pointer is inside the area.
 func (h *Hover) Update(q input.Source) bool {
-	for _, ev := range q.Events(h, pointer.Filter{Kinds: pointer.Enter | pointer.Leave}) {
+	for {
+		ev, ok := q.Event(h, pointer.Filter{Kinds: pointer.Enter | pointer.Leave})
+		if !ok {
+			break
+		}
 		e, ok := ev.(pointer.Event)
 		if !ok {
 			continue
@@ -172,7 +176,11 @@ func (c *Click) Pressed() bool {
 // Update state and return the click events.
 func (c *Click) Update(q input.Source) []ClickEvent {
 	var events []ClickEvent
-	for _, evt := range q.Events(c, pointer.Filter{Kinds: pointer.Press | pointer.Release | pointer.Enter | pointer.Leave}) {
+	for {
+		evt, ok := q.Event(c, pointer.Filter{Kinds: pointer.Press | pointer.Release | pointer.Enter | pointer.Leave})
+		if !ok {
+			break
+		}
 		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue
@@ -261,7 +269,11 @@ func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis,
 		Kinds:        pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll,
 		ScrollBounds: bounds,
 	}
-	for _, evt := range q.Events(s, f) {
+	for {
+		evt, ok := q.Event(s, f)
+		if !ok {
+			break
+		}
 		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue
@@ -355,8 +367,12 @@ func (d *Drag) Add(ops *op.Ops) {
 // Update state and return the drag events.
 func (d *Drag) Update(cfg unit.Metric, q input.Source, axis Axis) []pointer.Event {
 	var events []pointer.Event
-	for _, e := range q.Events(d, pointer.Filter{Kinds: pointer.Press | pointer.Drag | pointer.Release}) {
-		e, ok := e.(pointer.Event)
+	for {
+		ev, ok := q.Event(d, pointer.Filter{Kinds: pointer.Press | pointer.Drag | pointer.Release})
+		if !ok {
+			break
+		}
+		e, ok := ev.(pointer.Event)
 		if !ok {
 			continue
 		}
