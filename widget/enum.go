@@ -47,7 +47,11 @@ func (e *Enum) Update(gtx layout.Context) bool {
 	e.hovering = false
 	changed := false
 	for _, state := range e.keys {
-		for _, ev := range state.click.Update(gtx.Source) {
+		for {
+			ev, ok := state.click.Update(gtx.Source)
+			if !ok {
+				break
+			}
 			switch ev.Kind {
 			case gesture.KindPress:
 				if ev.Source == pointer.Mouse {

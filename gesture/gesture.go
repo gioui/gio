@@ -173,9 +173,8 @@ func (c *Click) Pressed() bool {
 	return c.pressed
 }
 
-// Update state and return the click events.
-func (c *Click) Update(q input.Source) []ClickEvent {
-	var events []ClickEvent
+// Update state and return the next click events, if any.
+func (c *Click) Update(q input.Source) (ClickEvent, bool) {
 	for {
 		evt, ok := q.Event(c, pointer.Filter{Kinds: pointer.Press | pointer.Release | pointer.Enter | pointer.Leave})
 		if !ok {
@@ -192,9 +191,15 @@ func (c *Click) Update(q input.Source) []ClickEvent {
 			}
 			c.pressed = false
 			if !c.entered || c.hovered {
-				events = append(events, ClickEvent{Kind: KindClick, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
+				return ClickEvent{
+					Kind:      KindClick,
+					Position:  e.Position.Round(),
+					Source:    e.Source,
+					Modifiers: e.Modifiers,
+					NumClicks: c.clicks,
+				}, true
 			} else {
-				events = append(events, ClickEvent{Kind: KindCancel})
+				return ClickEvent{Kind: KindCancel}, true
 			}
 		case pointer.Cancel:
 			wasPressed := c.pressed
@@ -202,7 +207,7 @@ func (c *Click) Update(q input.Source) []ClickEvent {
 			c.hovered = false
 			c.entered = false
 			if wasPressed {
-				events = append(events, ClickEvent{Kind: KindCancel})
+				return ClickEvent{Kind: KindCancel}, true
 			}
 		case pointer.Press:
 			if c.pressed {
@@ -224,7 +229,7 @@ func (c *Click) Update(q input.Source) []ClickEvent {
 				c.clicks = 1
 			}
 			c.clickedAt = e.Time
-			events = append(events, ClickEvent{Kind: KindPress, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
+			return ClickEvent{Kind: KindPress, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks}, true
 		case pointer.Leave:
 			if !c.pressed {
 				c.pid = e.PointerID
@@ -242,7 +247,7 @@ func (c *Click) Update(q input.Source) []ClickEvent {
 			}
 		}
 	}
-	return events
+	return ClickEvent{}, false
 }
 
 func (ClickEvent) ImplementsEvent() {}
@@ -364,9 +369,8 @@ func (d *Drag) Add(ops *op.Ops) {
 	event.InputOp(ops, d)
 }
 
-// Update state and return the drag events.
-func (d *Drag) Update(cfg unit.Metric, q input.Source, axis Axis) []pointer.Event {
-	var events []pointer.Event
+// Update state and return the next drag event, if any.
+func (d *Drag) Update(cfg unit.Metric, q input.Source, axis Axis) (pointer.Event, bool) {
 	for {
 		ev, ok := q.Event(d, pointer.Filter{Kinds: pointer.Press | pointer.Drag | pointer.Release})
 		if !ok {
@@ -416,10 +420,10 @@ func (d *Drag) Update(cfg unit.Metric, q input.Source, axis Axis) []pointer.Even
 			d.dragging = false
 		}
 
-		events = append(events, e)
+		return e, true
 	}
 
-	return events
+	return pointer.Event{}, false
 }
 
 // Dragging reports whether it is currently in use.

@@ -316,10 +316,18 @@ func (e *Editor) processPointer(gtx layout.Context) {
 
 func (e *Editor) clickDragEvents(gtx layout.Context) []event.Event {
 	var combinedEvents []event.Event
-	for _, evt := range e.clicker.Update(gtx.Source) {
+	for {
+		evt, ok := e.clicker.Update(gtx.Source)
+		if !ok {
+			break
+		}
 		combinedEvents = append(combinedEvents, evt)
 	}
-	for _, evt := range e.dragger.Update(gtx.Metric, gtx.Source, gesture.Both) {
+	for {
+		evt, ok := e.dragger.Update(gtx.Metric, gtx.Source, gesture.Both)
+		if !ok {
+			break
+		}
 		combinedEvents = append(combinedEvents, evt)
 	}
 	return combinedEvents
