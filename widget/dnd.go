@@ -18,10 +18,9 @@ type Draggable struct {
 	// Type contains the MIME type and matches transfer.SourceOp.
 	Type string
 
-	handle struct{}
-	drag   gesture.Drag
-	click  f32.Point
-	pos    f32.Point
+	drag  gesture.Drag
+	click f32.Point
+	pos   f32.Point
 }
 
 func (d *Draggable) Layout(gtx layout.Context, w, drag layout.Widget) layout.Dimensions {
@@ -32,7 +31,7 @@ func (d *Draggable) Layout(gtx layout.Context, w, drag layout.Widget) layout.Dim
 
 	stack := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
 	d.drag.Add(gtx.Ops)
-	event.InputOp(gtx.Ops, &d.handle)
+	event.InputOp(gtx.Ops, d)
 	stack.Pop()
 
 	if drag != nil && d.drag.Pressed() {
@@ -66,7 +65,7 @@ func (d *Draggable) Update(gtx layout.Context) (mime string, requested bool) {
 	d.pos = pos
 
 	for {
-		e, ok := gtx.Event(&d.handle, transfer.SourceFilter{Type: d.Type})
+		e, ok := gtx.Event(d, transfer.SourceFilter{Type: d.Type})
 		if !ok {
 			break
 		}
@@ -80,7 +79,7 @@ func (d *Draggable) Update(gtx layout.Context) (mime string, requested bool) {
 // Offer the data ready for a drop. Must be called after being Requested.
 // The mime must be one in the requested list.
 func (d *Draggable) Offer(gtx layout.Context, mime string, data io.ReadCloser) {
-	gtx.Execute(transfer.OfferCmd{Tag: &d.handle, Type: mime, Data: data})
+	gtx.Execute(transfer.OfferCmd{Tag: d, Type: mime, Data: data})
 }
 
 // Pos returns the drag position relative to its initial click position.

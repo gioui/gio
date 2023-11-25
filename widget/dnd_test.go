@@ -25,16 +25,17 @@ func TestDraggable(t *testing.T) {
 	drag := &Draggable{
 		Type: "file",
 	}
+	tgt := new(int)
 	defer pointer.PassOp{}.Push(gtx.Ops).Pop()
 	dims := drag.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Dimensions{Size: gtx.Constraints.Min}
 	}, nil)
 	stack := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
-	event.InputOp(gtx.Ops, drag)
+	event.InputOp(gtx.Ops, tgt)
 	stack.Pop()
 
 	drag.Update(gtx)
-	r.Event(drag, transfer.TargetFilter{Type: drag.Type})
+	r.Event(tgt, transfer.TargetFilter{Type: drag.Type})
 	r.Frame(gtx.Ops)
 	r.Queue(
 		pointer.Event{
@@ -52,10 +53,10 @@ func TestDraggable(t *testing.T) {
 	)
 	ofr := &offer{data: "hello"}
 	drag.Update(gtx)
-	r.Event(drag, transfer.TargetFilter{Type: drag.Type})
+	r.Event(tgt, transfer.TargetFilter{Type: drag.Type})
 	drag.Offer(gtx, "file", ofr)
 
-	e, ok := r.Event(drag, transfer.TargetFilter{Type: drag.Type})
+	e, ok := r.Event(tgt, transfer.TargetFilter{Type: drag.Type})
 	if !ok {
 		t.Fatalf("expected event")
 	}
@@ -66,7 +67,7 @@ func TestDraggable(t *testing.T) {
 	if ofr.closed {
 		t.Error("offer closed prematurely")
 	}
-	e, ok = r.Event(drag, transfer.TargetFilter{Type: drag.Type})
+	e, ok = r.Event(tgt, transfer.TargetFilter{Type: drag.Type})
 	if !ok {
 		t.Fatalf("expected event")
 	}

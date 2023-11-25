@@ -21,7 +21,6 @@ type Clickable struct {
 	click   gesture.Click
 	history []Press
 
-	keyTag        struct{}
 	requestClicks int
 	focused       bool
 	pressedKey    key.Name
@@ -69,7 +68,7 @@ func (b *Clickable) Pressed() bool {
 
 // Focus requests the input focus for the element.
 func (b *Clickable) Focus(gtx layout.Context) {
-	gtx.Execute(key.FocusCmd{Tag: &b.keyTag})
+	gtx.Execute(key.FocusCmd{Tag: b})
 }
 
 // Focused reports whether b has focus.
@@ -97,7 +96,7 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
 	semantic.EnabledOp(gtx.Enabled()).Add(gtx.Ops)
 	b.click.Add(gtx.Ops)
-	event.InputOp(gtx.Ops, &b.keyTag)
+	event.InputOp(gtx.Ops, b)
 	c.Add(gtx.Ops)
 	return dims
 }
@@ -141,7 +140,7 @@ func (b *Clickable) Update(gtx layout.Context) (Click, bool) {
 			}
 		case gesture.KindPress:
 			if e.Source == pointer.Mouse {
-				gtx.Execute(key.FocusCmd{Tag: &b.keyTag})
+				gtx.Execute(key.FocusCmd{Tag: b})
 			}
 			b.history = append(b.history, Press{
 				Position: e.Position,
@@ -156,7 +155,7 @@ func (b *Clickable) Update(gtx layout.Context) (Click, bool) {
 		filters = append(filters, key.Filter{Name: key.NameReturn}, key.Filter{Name: key.NameSpace})
 	}
 	for {
-		e, ok := gtx.Event(&b.keyTag, filters...)
+		e, ok := gtx.Event(b, filters...)
 		if !ok {
 			break
 		}

@@ -71,7 +71,6 @@ type Editor struct {
 	// scratch is a byte buffer that is reused to efficiently read portions of text
 	// from the textView.
 	scratch    []byte
-	eventKey   int
 	blinkStart time.Time
 	focused    bool
 
@@ -381,7 +380,7 @@ func (e *Editor) processKey(gtx layout.Context) {
 	// adjust keeps track of runes dropped because of MaxLen.
 	var adjust int
 	for {
-		ke, ok := gtx.Event(&e.eventKey, filters...)
+		ke, ok := gtx.Event(e, filters...)
 		if !ok {
 			break
 		}
@@ -479,7 +478,7 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 		// half is in Editor.processKey() under clipboard.Event.
 		case "V":
 			if !e.ReadOnly {
-				gtx.Execute(clipboard.ReadCmd{Tag: &e.eventKey})
+				gtx.Execute(clipboard.ReadCmd{Tag: e})
 			}
 		// Copy or Cut selection -- ignored if nothing selected.
 		case "C", "X":
@@ -560,7 +559,7 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 
 // Focus requests the input focus for the Editor.
 func (e *Editor) Focus(gtx layout.Context) {
-	gtx.Execute(key.FocusCmd{Tag: &e.eventKey})
+	gtx.Execute(key.FocusCmd{Tag: e})
 	gtx.Execute(key.SoftKeyboardCmd{Show: true})
 }
 
@@ -605,7 +604,7 @@ func (e *Editor) Update(gtx layout.Context) {
 		}
 		if newSel != e.ime.selection {
 			e.ime.selection = newSel
-			gtx.Execute(key.SelectionCmd{Tag: &e.eventKey, Range: newSel.rng, Caret: newSel.caret})
+			gtx.Execute(key.SelectionCmd{Tag: e, Range: newSel.rng, Caret: newSel.caret})
 		}
 
 		e.updateSnippet(gtx, e.ime.start, e.ime.end)
@@ -662,7 +661,7 @@ func (e *Editor) updateSnippet(gtx layout.Context, start, end int) {
 		return
 	}
 	e.ime.snippet = newSnip
-	gtx.Execute(key.SnippetCmd{Tag: &e.eventKey, Snippet: newSnip})
+	gtx.Execute(key.SnippetCmd{Tag: e, Snippet: newSnip})
 }
 
 func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.CallOp) layout.Dimensions {
@@ -677,8 +676,8 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 
 	defer clip.Rect(image.Rectangle{Max: visibleDims.Size}).Push(gtx.Ops).Pop()
 	pointer.CursorText.Add(gtx.Ops)
-	event.InputOp(gtx.Ops, &e.eventKey)
-	key.InputHintOp{Tag: &e.eventKey, Hint: e.InputHint}.Add(gtx.Ops)
+	event.InputOp(gtx.Ops, e)
+	key.InputHintOp{Tag: e, Hint: e.InputHint}.Add(gtx.Ops)
 
 	e.scroller.Add(gtx.Ops)
 
