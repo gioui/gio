@@ -66,11 +66,6 @@ func (b *Clickable) Pressed() bool {
 	return b.click.Pressed()
 }
 
-// Focus requests the input focus for the element.
-func (b *Clickable) Focus(gtx layout.Context) {
-	gtx.Execute(key.FocusCmd{Tag: b})
-}
-
 // Focused reports whether b has focus.
 func (b *Clickable) Focused() bool {
 	return b.focused

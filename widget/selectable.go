@@ -98,12 +98,6 @@ func (l *Selectable) initialize() {
 	}
 }
 
-// Focus requests the input focus for the label.
-func (l *Selectable) Focus(gtx layout.Context) {
-	gtx.Execute(key.FocusCmd{Tag: l})
-	gtx.Execute(key.SoftKeyboardCmd{Show: true})
-}
-
 // Focused returns whether the label is focused or not.
 func (l *Selectable) Focused() bool {
 	return l.focused
@@ -240,7 +234,7 @@ func (e *Selectable) processPointer(gtx layout.Context) {
 					X: int(math.Round(float64(evt.Position.X))),
 					Y: int(math.Round(float64(evt.Position.Y))),
 				})
-				e.Focus(gtx)
+				gtx.Execute(key.FocusCmd{Tag: e})
 				if evt.Modifiers == key.ModShift {
 					start, end := e.text.Selection()
 					// If they clicked closer to the end, then change the end to

@@ -257,7 +257,7 @@ func (e *Editor) processPointer(gtx layout.Context) {
 					X: int(math.Round(float64(evt.Position.X))),
 					Y: int(math.Round(float64(evt.Position.Y))),
 				})
-				e.Focus(gtx)
+				gtx.Execute(key.FocusCmd{Tag: e})
 				if e.scroller.State() != gesture.StateFlinging {
 					e.scrollCaret = true
 				}
@@ -558,11 +558,6 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 	case key.NameEnd:
 		e.text.MoveEnd(selAct)
 	}
-}
-
-// Focus requests the input focus for the Editor.
-func (e *Editor) Focus(gtx layout.Context) {
-	gtx.Execute(key.FocusCmd{Tag: e})
 }
 
 // Focused returns whether the editor is focused or not.

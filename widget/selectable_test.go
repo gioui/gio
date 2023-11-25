@@ -49,7 +49,7 @@ func TestSelectableMove(t *testing.T) {
 	// Layout once to populate e.lines and get focus.
 	s := new(Selectable)
 
-	s.Focus(gtx)
+	gtx.Execute(key.FocusCmd{Tag: s})
 	s.SetText(str)
 	// Set up selection so the Selectable filters for all 4 directional keys.
 	s.Layout(gtx, cache, font.Font{}, fontSize, op.CallOp{}, op.CallOp{})

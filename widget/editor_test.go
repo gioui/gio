@@ -115,7 +115,7 @@ func TestEditorReadOnly(t *testing.T) {
 	if cStart != cEnd {
 		t.Errorf("unexpected initial caret positions")
 	}
-	e.Focus(gtx)
+	gtx.Execute(key.FocusCmd{Tag: e})
 	layoutEditor := func() layout.Dimensions {
 		return e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 	}
@@ -514,7 +514,7 @@ func TestEditorDimensions(t *testing.T) {
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fontSize := unit.Sp(10)
 	font := font.Font{}
-	e.Focus(gtx)
+	gtx.Execute(key.FocusCmd{Tag: e})
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 	r.Frame(gtx.Ops)
 	r.Queue(key.EditEvent{Text: "A"})
@@ -906,7 +906,7 @@ g 2 4 6 8 g
 		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 		e.Events() // throw away any events from this layout
 
-		e.Focus(gtx)
+		gtx.Execute(key.FocusCmd{Tag: e})
 		r.Frame(gtx.Ops)
 		gtx.Source = r.Source()
 		// Build the selection events
@@ -1000,7 +1000,7 @@ func TestSelectMove(t *testing.T) {
 	fontSize := unit.Sp(10)
 
 	// Layout once to populate e.lines and get focus.
-	e.Focus(gtx)
+	gtx.Execute(key.FocusCmd{Tag: e})
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 	r.Frame(gtx.Ops)
 	// Set up selecton so the Editor key handler filters for all 4 directional keys.
@@ -1090,7 +1090,7 @@ func TestEditor_MaxLen(t *testing.T) {
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fontSize := unit.Sp(10)
 	font := font.Font{}
-	e.Focus(gtx)
+	gtx.Execute(key.FocusCmd{Tag: e})
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 	r.Frame(gtx.Ops)
 	r.Queue(
@@ -1126,7 +1126,7 @@ func TestEditor_Filter(t *testing.T) {
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fontSize := unit.Sp(10)
 	font := font.Font{}
-	e.Focus(gtx)
+	gtx.Execute(key.FocusCmd{Tag: e})
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 	r.Frame(gtx.Ops)
 	r.Queue(
@@ -1156,7 +1156,7 @@ func TestEditor_Submit(t *testing.T) {
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fontSize := unit.Sp(10)
 	font := font.Font{}
-	e.Focus(gtx)
+	gtx.Execute(key.FocusCmd{Tag: e})
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 	r.Frame(gtx.Ops)
 	r.Queue(
