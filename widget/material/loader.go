@@ -47,7 +47,7 @@ func (l LoaderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}.Add(gtx.Ops)
 	defer op.Offset(image.Pt(-radius, -radius)).Push(gtx.Ops).Pop()
 	paint.PaintOp{}.Add(gtx.Ops)
-	op.InvalidateOp{}.Add(gtx.Ops)
+	gtx.Execute(op.InvalidateCmd{})
 	return layout.Dimensions{
 		Size: sz,
 	}

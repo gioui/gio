@@ -339,8 +339,8 @@ func (w *Window) processFrame(d driver) {
 // If the window is inactive, the event is sent when the window becomes active.
 //
 // Note that Invalidate is intended for externally triggered updates, such as a
-// response from a network request. InvalidateOp is more efficient for animation
-// and similar internal updates.
+// response from a network request. The [op.InvalidateCmd] command is more efficient
+// for animation.
 //
 // Invalidate is safe for concurrent use.
 func (w *Window) Invalidate() {

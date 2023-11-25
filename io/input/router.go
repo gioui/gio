@@ -3,7 +3,6 @@
 package input
 
 import (
-	"encoding/binary"
 	"image"
 	"io"
 	"strings"
@@ -44,7 +43,7 @@ type Router struct {
 
 	reader ops.Reader
 
-	// InvalidateOp summary.
+	// InvalidateCmd summary.
 	wakeup     bool
 	wakeupTime time.Time
 
@@ -261,7 +260,6 @@ func (q *Router) Frame(frame *op.Ops) {
 		}
 	}
 	q.transfers = nil
-	q.wakeup = false
 	q.deferring = false
 	for _, h := range q.handlers {
 		h.filter, h.nextFilter = h.nextFilter, h.filter
@@ -470,6 +468,11 @@ func (q *Router) executeCommand(c Command) (event.Tag, stateChange) {
 	case pointer.GrabCmd:
 		tag = req.Tag
 		state.pointerState, evts = q.pointer.queue.grab(state.pointerState, req)
+	case op.InvalidateCmd:
+		if !q.wakeup || req.At.Before(q.wakeupTime) {
+			q.wakeup = true
+			q.wakeupTime = req.At
+		}
 	}
 	return tag, stateChange{state: state, events: evts}
 }
@@ -727,12 +730,6 @@ func (q *Router) collect() {
 	var t f32.Affine2D
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
-		case ops.TypeInvalidate:
-			op := decodeInvalidateOp(encOp.Data)
-			if !q.wakeup || op.At.Before(q.wakeupTime) {
-				q.wakeup = true
-				q.wakeupTime = op.At
-			}
 		case ops.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
 			if extra := id - len(q.savedTrans) + 1; extra > 0 {
@@ -822,19 +819,9 @@ func (q *Router) collect() {
 // WakeupTime returns the most recent time for doing another frame,
 // as determined from the last call to Frame.
 func (q *Router) WakeupTime() (time.Time, bool) {
-	return q.wakeupTime, q.wakeup
-}
-
-func decodeInvalidateOp(d []byte) op.InvalidateOp {
-	bo := binary.LittleEndian
-	if ops.OpType(d[0]) != ops.TypeInvalidate {
-		panic("invalid op")
-	}
-	var o op.InvalidateOp
-	if nanos := bo.Uint64(d[1:]); nanos > 0 {
-		o.At = time.Unix(0, int64(nanos))
-	}
-	return o
+	w := q.wakeup
+	q.wakeup = false
+	return q.wakeupTime, w
 }
 
 func (s SemanticGestures) String() string {

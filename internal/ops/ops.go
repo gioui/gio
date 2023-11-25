@@ -55,7 +55,6 @@ const (
 	TypePopTransform
 	TypePushOpacity
 	TypePopOpacity
-	TypeInvalidate
 	TypeImage
 	TypePaint
 	TypeColor
@@ -405,7 +404,6 @@ var opProps = [0x100]opProp{
 	TypePopTransform:     {Size: TypePopTransformLen, NumRefs: 0},
 	TypePushOpacity:      {Size: TypePushOpacityLen, NumRefs: 0},
 	TypePopOpacity:       {Size: TypePopOpacityLen, NumRefs: 0},
-	TypeInvalidate:       {Size: TypeRedrawLen, NumRefs: 0},
 	TypeImage:            {Size: TypeImageLen, NumRefs: 2},
 	TypePaint:            {Size: TypePaintLen, NumRefs: 0},
 	TypeColor:            {Size: TypeColorLen, NumRefs: 0},
@@ -459,8 +457,6 @@ func (t OpType) String() string {
 		return "PushOpacity"
 	case TypePopOpacity:
 		return "PopOpacity"
-	case TypeInvalidate:
-		return "Invalidate"
 	case TypeImage:
 		return "Image"
 	case TypePaint:

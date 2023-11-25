@@ -53,7 +53,6 @@ The MacroOp records a list of operations to be executed later:
 	ops := new(op.Ops)
 	macro := op.Record(ops)
 	// Record operations by adding them.
-	op.InvalidateOp{}.Add(ops)
 	...
 	// End recording.
 	call := macro.Stop()
@@ -96,9 +95,9 @@ type CallOp struct {
 	end   ops.PC
 }
 
-// InvalidateOp requests a redraw at the given time. Use
+// InvalidateCmd requests a redraw at the given time. Use
 // the zero value to request an immediate redraw.
-type InvalidateOp struct {
+type InvalidateCmd struct {
 	At time.Time
 }
 
@@ -181,19 +180,6 @@ func (c CallOp) Add(o *Ops) {
 	ops.AddCall(&o.Internal, c.ops, c.start, c.end)
 }
 
-func (r InvalidateOp) Add(o *Ops) {
-	data := ops.Write(&o.Internal, ops.TypeRedrawLen)
-	data[0] = byte(ops.TypeInvalidate)
-	bo := binary.LittleEndian
-	// UnixNano cannot represent the zero time.
-	if t := r.At; !t.IsZero() {
-		nanos := t.UnixNano()
-		if nanos > 0 {
-			bo.PutUint64(data[1:], uint64(nanos))
-		}
-	}
-}
-
 // Offset converts an offset to a TransformOp.
 func Offset(off image.Point) TransformOp {
 	offf := f32.Pt(float32(off.X), float32(off.Y))
@@ -240,3 +226,5 @@ func (t TransformStack) Pop() {
 	data := ops.Write(t.ops, ops.TypePopTransformLen)
 	data[0] = byte(ops.TypePopTransform)
 }
+
+func (InvalidateCmd) ImplementsCommand() {}

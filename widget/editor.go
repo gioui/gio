@@ -692,8 +692,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 		const timePerBlink = time.Second / blinksPerSecond
 		nextBlink := now.Add(timePerBlink/2 - dt%(timePerBlink/2))
 		if blinking {
-			redraw := op.InvalidateOp{At: nextBlink}
-			redraw.Add(gtx.Ops)
+			gtx.Execute(op.InvalidateCmd{At: nextBlink})
 		}
 		e.showCaret = e.focused && (!blinking || dt%timePerBlink < timePerBlink/2)
 	}

@@ -252,9 +252,6 @@ func (ClickEvent) ImplementsEvent() {}
 // as defined in io/pointer.InputOp.
 func (s *Scroll) Add(ops *op.Ops) {
 	event.InputOp(ops, s)
-	if s.flinger.Active() {
-		op.InvalidateOp{}.Add(ops)
-	}
 }
 
 // Stop any remaining fling movement.
@@ -336,6 +333,9 @@ func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis,
 		}
 	}
 	total += s.flinger.Tick(t)
+	if s.flinger.Active() {
+		q.Execute(op.InvalidateCmd{})
+	}
 	return total
 }
 
