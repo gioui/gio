@@ -18,9 +18,7 @@ import (
 
 // Clickable represents a clickable area.
 type Clickable struct {
-	click gesture.Click
-	// clicks is for saved clicks to support Clicked.
-	clicks  []Click
+	click   gesture.Click
 	history []Press
 
 	keyTag        struct{}
@@ -53,19 +51,10 @@ func (b *Clickable) Click() {
 	b.requestClicks++
 }
 
-// Clicked reports whether there are pending clicks. If so, Clicked
-// removes the earliest click.
+// Clicked calls Update and reports whether a click was registered.
 func (b *Clickable) Clicked(gtx layout.Context) bool {
-	if len(b.clicks) > 0 {
-		b.clicks = b.clicks[1:]
-		return true
-	}
-	b.clicks = b.Update(gtx)
-	if len(b.clicks) > 0 {
-		b.clicks = b.clicks[1:]
-		return true
-	}
-	return false
+	_, clicked := b.Update(gtx)
+	return clicked
 }
 
 // Hovered reports whether a pointer is over the element.
@@ -96,7 +85,12 @@ func (b *Clickable) History() []Press {
 
 // Layout and update the button state.
 func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
-	b.Update(gtx)
+	for {
+		_, ok := b.Update(gtx)
+		if !ok {
+			break
+		}
+	}
 	m := op.Record(gtx.Ops)
 	dims := w(gtx)
 	c := m.Stop()
@@ -108,10 +102,9 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 	return dims
 }
 
-// Update the button state by processing events, and return the resulting
-// clicks, if any.
-func (b *Clickable) Update(gtx layout.Context) []Click {
-	b.clicks = nil
+// Update the button state by processing events, and return the next
+// click, if any.
+func (b *Clickable) Update(gtx layout.Context) (Click, bool) {
 	if !gtx.Enabled() {
 		b.focused = false
 	}
@@ -123,12 +116,11 @@ func (b *Clickable) Update(gtx layout.Context) []Click {
 		n := copy(b.history, b.history[1:])
 		b.history = b.history[:n]
 	}
-	var clicks []Click
 	if c := b.requestClicks; c > 0 {
 		b.requestClicks = 0
-		clicks = append(clicks, Click{
+		return Click{
 			NumClicks: c,
-		})
+		}, true
 	}
 	for _, e := range b.click.Update(gtx.Source) {
 		switch e.Kind {
@@ -136,10 +128,10 @@ func (b *Clickable) Update(gtx layout.Context) []Click {
 			if l := len(b.history); l > 0 {
 				b.history[l-1].End = gtx.Now
 			}
-			clicks = append(clicks, Click{
+			return Click{
 				Modifiers: e.Modifiers,
 				NumClicks: e.NumClicks,
-			})
+			}, true
 		case gesture.KindCancel:
 			for i := range b.history {
 				b.history[i].Cancelled = true
@@ -190,12 +182,12 @@ func (b *Clickable) Update(gtx layout.Context) []Click {
 				}
 				// only register a key as a click if the key was pressed and released while this button was focused
 				b.pressedKey = ""
-				clicks = append(clicks, Click{
+				return Click{
 					Modifiers: e.Modifiers,
 					NumClicks: 1,
-				})
+				}, true
 			}
 		}
 	}
-	return clicks
+	return Click{}, false
 }
