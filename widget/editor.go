@@ -390,6 +390,9 @@ func (e *Editor) processKey(gtx layout.Context) {
 			e.focused = ke.Focus
 			// Reset IME state.
 			e.ime.imeState = imeState{}
+			if ke.Focus {
+				gtx.Execute(key.SoftKeyboardCmd{Show: true})
+			}
 		case key.Event:
 			if !e.focused || ke.State != key.Press {
 				break
@@ -560,7 +563,6 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 // Focus requests the input focus for the Editor.
 func (e *Editor) Focus(gtx layout.Context) {
 	gtx.Execute(key.FocusCmd{Tag: e})
-	gtx.Execute(key.SoftKeyboardCmd{Show: true})
 }
 
 // Focused returns whether the editor is focused or not.
