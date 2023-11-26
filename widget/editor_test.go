@@ -1177,6 +1177,29 @@ func TestEditor_Submit(t *testing.T) {
 	}
 }
 
+func TestNoFilterAllocs(t *testing.T) {
+	b := testing.Benchmark(func(b *testing.B) {
+		r := new(input.Router)
+		e := new(Editor)
+		gtx := layout.Context{
+			Ops: new(op.Ops),
+			Constraints: layout.Constraints{
+				Max: image.Pt(100, 100),
+			},
+			Locale: english,
+			Source: r.Source(),
+		}
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			e.Update(gtx)
+		}
+	})
+	if allocs := b.AllocsPerOp(); allocs != 0 {
+		t.Fatalf("expected 0 AllocsPerOp, got %d", allocs)
+	}
+}
+
 // textWidth is a text helper for building simple selection events.
 // It assumes single-run lines, which isn't safe with non-test text
 // data.

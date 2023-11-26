@@ -147,17 +147,12 @@ func (b *Clickable) Update(gtx layout.Context) (Click, bool) {
 			})
 		}
 	}
-	filters := []event.Filter{
-		key.FocusFilter{Target: b},
-	}
-	if b.focused {
-		filters = append(filters,
-			key.Filter{Target: b, Name: key.NameReturn},
-			key.Filter{Target: b, Name: key.NameSpace},
-		)
-	}
 	for {
-		e, ok := gtx.Event(filters...)
+		e, ok := gtx.Event(
+			key.FocusFilter{Target: b},
+			key.Filter{Focus: b, Name: key.NameReturn},
+			key.Filter{Focus: b, Name: key.NameSpace},
+		)
 		if !ok {
 			break
 		}

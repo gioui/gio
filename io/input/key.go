@@ -49,10 +49,7 @@ type keyHandler struct {
 	trans        f32.Affine2D
 }
 
-type keyFilter struct {
-	focusable bool
-	filters   []key.Filter
-}
+type keyFilter []key.Filter
 
 type dirFocusEntry struct {
 	tag    event.Tag
@@ -112,7 +109,7 @@ func (k *keyHandler) ResetEvent() (event.Event, bool) {
 
 func (q *keyQueue) Frame(handlers map[event.Tag]*handler, state keyState) keyState {
 	if state.focus != nil {
-		if h, ok := handlers[state.focus]; !ok || !h.filter.key.focusable || !h.key.visible {
+		if h, ok := handlers[state.focus]; !ok || !h.filter.focusable || !h.key.visible {
 			// Remove focus from the handler that is no longer focusable.
 			state.focus = nil
 			state.state = TextInputClose
@@ -253,21 +250,19 @@ func (q *keyQueue) AreaFor(k *keyHandler) int {
 	return q.dirOrder[order].area
 }
 
-func (k *keyFilter) Matches(e event.Event) bool {
-	switch e := e.(type) {
-	case key.Event:
-		for _, f := range k.filters {
-			if keyFilterMatch(f, e) {
-				return true
-			}
+func (k *keyFilter) Matches(focus event.Tag, e key.Event) bool {
+	for _, f := range *k {
+		if keyFilterMatch(focus, f, e) {
+			return true
 		}
-	case key.FocusEvent, key.SnippetEvent, key.EditEvent, key.SelectionEvent:
-		return k.focusable
 	}
 	return false
 }
 
-func keyFilterMatch(f key.Filter, e key.Event) bool {
+func keyFilterMatch(focus event.Tag, f key.Filter, e key.Event) bool {
+	if f.Focus != nil && f.Focus != focus {
+		return false
+	}
 	if f.Name != e.Name {
 		return false
 	}
@@ -308,23 +303,17 @@ func (s keyState) softKeyboard(show bool) keyState {
 	return s
 }
 
-func (k *keyFilter) Add(f event.Filter) {
-	switch f := f.(type) {
-	case key.FocusFilter:
-		k.focusable = true
-	case key.Filter:
-		for _, f2 := range k.filters {
-			if f == f2 {
-				return
-			}
+func (k *keyFilter) Add(f key.Filter) {
+	for _, f2 := range *k {
+		if f == f2 {
+			return
 		}
-		k.filters = append(k.filters, f)
 	}
+	*k = append(*k, f)
 }
 
 func (k *keyFilter) Merge(k2 keyFilter) {
-	k.focusable = k.focusable || k2.focusable
-	k.filters = append(k.filters, k2.filters...)
+	*k = append(*k, k2...)
 }
 
 func (q *keyQueue) inputOp(tag event.Tag, state *keyHandler, t f32.Affine2D, area int, bounds image.Rectangle) {

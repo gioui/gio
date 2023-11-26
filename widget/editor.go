@@ -333,57 +333,47 @@ func (e *Editor) clickDragEvents(gtx layout.Context) []event.Event {
 	return combinedEvents
 }
 
+func condFilter(pred bool, f key.Filter) event.Filter {
+	if pred {
+		return f
+	} else {
+		return nil
+	}
+}
+
 func (e *Editor) processKey(gtx layout.Context) {
 	if e.text.Changed() {
 		e.events = append(e.events, ChangeEvent{})
 	}
-	filters := []event.Filter{key.FocusFilter{Target: e}, transfer.TargetFilter{Target: e, Type: "application/text"}}
-	if e.focused {
-		filters = append(filters,
-			key.Filter{Target: e, Name: key.NameEnter, Optional: key.ModShift},
-			key.Filter{Target: e, Name: key.NameReturn, Optional: key.ModShift},
+	caret, _ := e.text.Selection()
+	atBeginning := caret == 0
+	atEnd := caret == e.text.Len()
+	if gtx.Locale.Direction.Progression() != system.FromOrigin {
+		atEnd, atBeginning = atBeginning, atEnd
+	}
+	filters := []event.Filter{
+		key.FocusFilter{Target: e},
+		transfer.TargetFilter{Target: e, Type: "application/text"},
+		key.Filter{Focus: e, Name: key.NameEnter, Optional: key.ModShift},
+		key.Filter{Focus: e, Name: key.NameReturn, Optional: key.ModShift},
 
-			key.Filter{Target: e, Name: "Z", Required: key.ModShortcut, Optional: key.ModShift},
-			key.Filter{Target: e, Name: "C", Required: key.ModShortcut},
-			key.Filter{Target: e, Name: "V", Required: key.ModShortcut},
-			key.Filter{Target: e, Name: "X", Required: key.ModShortcut},
-			key.Filter{Target: e, Name: "A", Required: key.ModShortcut},
+		key.Filter{Focus: e, Name: "Z", Required: key.ModShortcut, Optional: key.ModShift},
+		key.Filter{Focus: e, Name: "C", Required: key.ModShortcut},
+		key.Filter{Focus: e, Name: "V", Required: key.ModShortcut},
+		key.Filter{Focus: e, Name: "X", Required: key.ModShortcut},
+		key.Filter{Focus: e, Name: "A", Required: key.ModShortcut},
 
-			key.Filter{Target: e, Name: key.NameDeleteBackward, Optional: key.ModShortcutAlt | key.ModShift},
-			key.Filter{Target: e, Name: key.NameDeleteForward, Optional: key.ModShortcutAlt | key.ModShift},
+		key.Filter{Focus: e, Name: key.NameDeleteBackward, Optional: key.ModShortcutAlt | key.ModShift},
+		key.Filter{Focus: e, Name: key.NameDeleteForward, Optional: key.ModShortcutAlt | key.ModShift},
 
-			key.Filter{Target: e, Name: key.NameHome, Optional: key.ModShift},
-			key.Filter{Target: e, Name: key.NameEnd, Optional: key.ModShift},
-			key.Filter{Target: e, Name: key.NamePageDown, Optional: key.ModShift},
-			key.Filter{Target: e, Name: key.NamePageUp, Optional: key.ModShift},
-		)
-		caret, _ := e.text.Selection()
-		if caret > 0 {
-			if gtx.Locale.Direction.Progression() == system.FromOrigin {
-				filters = append(filters,
-					key.Filter{Target: e, Name: key.NameLeftArrow, Optional: key.ModShortcutAlt | key.ModShift},
-					key.Filter{Target: e, Name: key.NameUpArrow, Optional: key.ModShortcutAlt | key.ModShift},
-				)
-			} else {
-				filters = append(filters,
-					key.Filter{Target: e, Name: key.NameRightArrow, Optional: key.ModShortcutAlt | key.ModShift},
-					key.Filter{Target: e, Name: key.NameDownArrow, Optional: key.ModShortcutAlt | key.ModShift},
-				)
-			}
-		}
-		if caret < e.text.Len() {
-			if gtx.Locale.Direction.Progression() == system.FromOrigin {
-				filters = append(filters,
-					key.Filter{Target: e, Name: key.NameRightArrow, Optional: key.ModShortcutAlt | key.ModShift},
-					key.Filter{Target: e, Name: key.NameDownArrow, Optional: key.ModShortcutAlt | key.ModShift},
-				)
-			} else {
-				filters = append(filters,
-					key.Filter{Target: e, Name: key.NameLeftArrow, Optional: key.ModShortcutAlt | key.ModShift},
-					key.Filter{Target: e, Name: key.NameUpArrow, Optional: key.ModShortcutAlt | key.ModShift},
-				)
-			}
-		}
+		key.Filter{Focus: e, Name: key.NameHome, Optional: key.ModShift},
+		key.Filter{Focus: e, Name: key.NameEnd, Optional: key.ModShift},
+		key.Filter{Focus: e, Name: key.NamePageDown, Optional: key.ModShift},
+		key.Filter{Focus: e, Name: key.NamePageUp, Optional: key.ModShift},
+		condFilter(!atBeginning, key.Filter{Focus: e, Name: key.NameLeftArrow, Optional: key.ModShortcutAlt | key.ModShift}),
+		condFilter(!atBeginning, key.Filter{Focus: e, Name: key.NameUpArrow, Optional: key.ModShortcutAlt | key.ModShift}),
+		condFilter(!atEnd, key.Filter{Focus: e, Name: key.NameRightArrow, Optional: key.ModShortcutAlt | key.ModShift}),
+		condFilter(!atEnd, key.Filter{Focus: e, Name: key.NameDownArrow, Optional: key.ModShortcutAlt | key.ModShift}),
 	}
 	// adjust keeps track of runes dropped because of MaxLen.
 	var adjust int

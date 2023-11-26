@@ -64,17 +64,12 @@ func (e *Enum) Update(gtx layout.Context) bool {
 				}
 			}
 		}
-		filters := []event.Filter{
-			key.FocusFilter{Target: &state.tag},
-		}
-		if e.focused && e.focus == state.key {
-			filters = append(filters,
-				key.Filter{Target: &state.tag, Name: key.NameReturn},
-				key.Filter{Target: &state.tag, Name: key.NameSpace},
-			)
-		}
 		for {
-			ev, ok := gtx.Event(filters...)
+			ev, ok := gtx.Event(
+				key.FocusFilter{Target: &state.tag},
+				key.Filter{Focus: &state.tag, Name: key.NameReturn},
+				key.Filter{Focus: &state.tag, Name: key.NameSpace},
+			)
 			if !ok {
 				break
 			}

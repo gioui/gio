@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-/*
-Package key implements key and text events and operations.
-
-The InputOp operations is used for declaring key input handlers. Use
-an implementation of the Queue interface from package ui to receive
-events.
-*/
+// Package key implements key and text events and operations.
 package key
 
 import (
@@ -20,7 +14,9 @@ import (
 
 // Filter matches any [Event] that matches the parameters.
 type Filter struct {
-	Target event.Tag
+	// Focus is the tag that must be focused for the filter to match. It has no effect
+	// if it is nil.
+	Focus event.Tag
 	// Required is the set of modifiers that must be included in events matched.
 	Required Modifiers
 	// Optional is the set of modifiers that may be included in events matched.

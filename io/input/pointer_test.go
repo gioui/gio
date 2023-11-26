@@ -69,9 +69,6 @@ func events(r *Router, h event.Tag, filters ...event.Filter) []event.Event {
 	// Hack to facilitate transition to per-filter tags.
 	for i, f := range filters {
 		switch f := f.(type) {
-		case key.Filter:
-			f.Target = h
-			filters[i] = f
 		case key.FocusFilter:
 			f.Target = h
 			filters[i] = f

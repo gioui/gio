@@ -301,28 +301,23 @@ func (e *Selectable) clickDragEvents(gtx layout.Context) []event.Event {
 }
 
 func (e *Selectable) processKey(gtx layout.Context) {
-	filters := []event.Filter{
-		key.FocusFilter{Target: e},
-	}
-	if e.focused {
-		filters = append(filters,
-			key.Filter{Target: e, Name: key.NameLeftArrow, Optional: key.ModShortcutAlt | key.ModShift},
-			key.Filter{Target: e, Name: key.NameRightArrow, Optional: key.ModShortcutAlt | key.ModShift},
-			key.Filter{Target: e, Name: key.NameUpArrow, Optional: key.ModShortcutAlt | key.ModShift},
-			key.Filter{Target: e, Name: key.NameDownArrow, Optional: key.ModShortcutAlt | key.ModShift},
-
-			key.Filter{Target: e, Name: key.NamePageUp, Optional: key.ModShift},
-			key.Filter{Target: e, Name: key.NamePageDown, Optional: key.ModShift},
-			key.Filter{Target: e, Name: key.NameEnd, Optional: key.ModShift},
-			key.Filter{Target: e, Name: key.NameHome, Optional: key.ModShift},
-
-			key.Filter{Target: e, Name: "C", Required: key.ModShortcut},
-			key.Filter{Target: e, Name: "X", Required: key.ModShortcut},
-			key.Filter{Target: e, Name: "A", Required: key.ModShortcut},
-		)
-	}
 	for {
-		ke, ok := gtx.Event(filters...)
+		ke, ok := gtx.Event(
+			key.FocusFilter{Target: e},
+			key.Filter{Focus: e, Name: key.NameLeftArrow, Optional: key.ModShortcutAlt | key.ModShift},
+			key.Filter{Focus: e, Name: key.NameRightArrow, Optional: key.ModShortcutAlt | key.ModShift},
+			key.Filter{Focus: e, Name: key.NameUpArrow, Optional: key.ModShortcutAlt | key.ModShift},
+			key.Filter{Focus: e, Name: key.NameDownArrow, Optional: key.ModShortcutAlt | key.ModShift},
+
+			key.Filter{Focus: e, Name: key.NamePageUp, Optional: key.ModShift},
+			key.Filter{Focus: e, Name: key.NamePageDown, Optional: key.ModShift},
+			key.Filter{Focus: e, Name: key.NameEnd, Optional: key.ModShift},
+			key.Filter{Focus: e, Name: key.NameHome, Optional: key.ModShift},
+
+			key.Filter{Focus: e, Name: "C", Required: key.ModShortcut},
+			key.Filter{Focus: e, Name: "X", Required: key.ModShortcut},
+			key.Filter{Focus: e, Name: "A", Required: key.ModShortcut},
+		)
 		if !ok {
 			break
 		}

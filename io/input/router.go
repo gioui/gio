@@ -33,6 +33,12 @@ type Router struct {
 	}
 	key struct {
 		queue keyQueue
+		// The following fields have the same purpose as the fields in
+		// type handler, but for key.Events.
+		filter          keyFilter
+		nextFilter      keyFilter
+		processedFilter keyFilter
+		scratchFilter   keyFilter
 	}
 	cqueue clipboardQueue
 	// states is the list of pending state changes resulting from
@@ -120,8 +126,8 @@ type handler struct {
 
 // filter is the union of a set of [io/event.Filters].
 type filter struct {
-	pointer pointerFilter
-	key     keyFilter
+	pointer   pointerFilter
+	focusable bool
 }
 
 // taggedFilter is a filter for a particular tag.
@@ -183,11 +189,13 @@ func (s Source) Event(filters ...event.Filter) (event.Event, bool) {
 func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
 	// Merge filters into scratch filters.
 	q.scratchFilters = q.scratchFilters[:0]
+	q.key.scratchFilter = q.key.scratchFilter[:0]
 	for _, f := range filters {
 		var t event.Tag
 		switch f := f.(type) {
 		case key.Filter:
-			t = f.Target
+			q.key.scratchFilter = append(q.key.scratchFilter, f)
+			continue
 		case transfer.SourceFilter:
 			t = f.Target
 		case transfer.TargetFilter:
@@ -210,8 +218,17 @@ func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
 		}
 		if filter == nil {
 			n := len(q.scratchFilters)
-			q.scratchFilters = append(q.scratchFilters, taggedFilter{tag: t})
-			filter = &q.scratchFilters[n].filter
+			if n < cap(q.scratchFilters) {
+				// Re-use previously allocated filter.
+				q.scratchFilters = q.scratchFilters[:n+1]
+				tf := &q.scratchFilters[n]
+				tf.tag = t
+				filter = &tf.filter
+				filter.Reset()
+			} else {
+				q.scratchFilters = append(q.scratchFilters, taggedFilter{tag: t})
+				filter = &q.scratchFilters[n].filter
+			}
 		}
 		filter.Add(f)
 	}
@@ -220,6 +237,8 @@ func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
 		h.filter.Merge(tf.filter)
 		h.nextFilter.Merge(tf.filter)
 	}
+	q.key.filter = append(q.key.filter, q.key.scratchFilter...)
+	q.key.nextFilter = append(q.key.nextFilter, q.key.scratchFilter...)
 	// Deliver reset event, if any.
 	for _, f := range filters {
 		switch f := f.(type) {
@@ -245,13 +264,23 @@ func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
 		for i := range q.changes {
 			change := &q.changes[i]
 			for j, evt := range change.events {
-				for _, tf := range q.scratchFilters {
-					if evt.tag == tf.tag && tf.filter.Matches(evt.event) {
-						change.events = append(change.events[:j], change.events[j+1:]...)
-						// Fast forward state to last matched.
-						q.collapseState(i)
-						return evt.event, true
+				match := false
+				switch e := evt.event.(type) {
+				case key.Event:
+					match = q.key.scratchFilter.Matches(change.state.keyState.focus, e)
+				default:
+					for _, tf := range q.scratchFilters {
+						if evt.tag == tf.tag && tf.filter.Matches(evt.event) {
+							match = true
+							break
+						}
 					}
+				}
+				if match {
+					change.events = append(change.events[:j], change.events[j+1:]...)
+					// Fast forward state to last matched.
+					q.collapseState(i)
+					return evt.event, true
 				}
 			}
 		}
@@ -260,6 +289,7 @@ func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
 		h := q.stateFor(tf.tag)
 		h.processedFilter.Merge(tf.filter)
 	}
+	q.key.processedFilter = append(q.key.processedFilter, q.key.scratchFilter...)
 	return nil, false
 }
 
@@ -308,6 +338,8 @@ func (q *Router) Frame(frame *op.Ops) {
 		h.pointer.Reset()
 		h.key.Reset()
 	}
+	q.key.filter, q.key.nextFilter = q.key.nextFilter, q.key.filter
+	q.key.nextFilter = q.key.nextFilter[:0]
 	var ops *ops.Ops
 	if frame != nil {
 		ops = &frame.Internal
@@ -348,21 +380,10 @@ func (q *Router) Queue(events ...event.Event) bool {
 	return matched
 }
 
-func (f *filter) Reset() {
-	*f = filter{
-		key: keyFilter{
-			// Re-use filter slice storage.
-			filters: f.key.filters[:0],
-		},
-	}
-}
-
 func (f *filter) Add(flt event.Filter) {
 	switch flt := flt.(type) {
-	case key.Filter:
-		f.key.Add(flt)
 	case key.FocusFilter:
-		f.key.Add(flt)
+		f.focusable = true
 	case pointer.Filter:
 		f.pointer.Add(flt)
 	case transfer.SourceFilter, transfer.TargetFilter:
@@ -372,12 +393,26 @@ func (f *filter) Add(flt event.Filter) {
 
 // Merge f2 into f.
 func (f *filter) Merge(f2 filter) {
-	f.key.Merge(f2.key)
+	f.focusable = f.focusable || f2.focusable
 	f.pointer.Merge(f2.pointer)
 }
 
 func (f *filter) Matches(e event.Event) bool {
-	return f.key.Matches(e) || f.pointer.Matches(e)
+	switch e.(type) {
+	case key.FocusEvent, key.SnippetEvent, key.EditEvent, key.SelectionEvent:
+		return f.focusable
+	default:
+		return f.pointer.Matches(e)
+	}
+}
+
+func (f *filter) Reset() {
+	*f = filter{
+		pointer: pointerFilter{
+			sourceMimes: f.pointer.sourceMimes[:0],
+			targetMimes: f.pointer.targetMimes[:0],
+		},
+	}
 }
 
 func (q *Router) processEvent(e event.Event) bool {
@@ -388,7 +423,11 @@ func (q *Router) processEvent(e event.Event) bool {
 		state.pointerState = pstate
 		return q.changeState(e, state, evts)
 	case key.Event:
-		return q.changeState(e, state, q.queueKeyEvent(state.keyState, e))
+		var evts []taggedEvent
+		if q.key.filter.Matches(state.keyState.focus, e) {
+			evts = append(evts, taggedEvent{event: e})
+		}
+		return q.changeState(e, state, evts)
 	case key.SnippetEvent:
 		// Expand existing, overlapping snippet.
 		if r := state.content.Snippet.Range; rangeOverlaps(r, key.Range(e)) {
@@ -547,40 +586,6 @@ func rangeNorm(r key.Range) key.Range {
 		r.End, r.Start = r.Start, r.End
 	}
 	return r
-}
-
-func (q *Router) queueKeyEvent(state keyState, e key.Event) []taggedEvent {
-	f := state.focus
-	var evts []taggedEvent
-	if f != nil && q.handlers[f].filter.key.Matches(e) {
-		evts = append(evts, taggedEvent{tag: f, event: e})
-		return evts
-	}
-	pq := &q.pointer.queue
-	idx := len(pq.hitTree) - 1
-	focused := f != nil
-	if focused {
-		// If there is a focused tag, traverse its ancestry through the
-		// hit tree to search for handlers.
-		for ; pq.hitTree[idx].tag != f; idx-- {
-		}
-	}
-	for idx != -1 {
-		n := &pq.hitTree[idx]
-		if focused {
-			idx = n.next
-		} else {
-			idx--
-		}
-		if n.tag == nil {
-			continue
-		}
-		if q.handlers[n.tag].filter.key.Matches(e) {
-			evts = append(evts, taggedEvent{tag: n.tag, event: e})
-			break
-		}
-	}
-	return evts
 }
 
 func (q *Router) MoveFocus(dir key.FocusDirection) bool {
@@ -795,7 +800,7 @@ func (q *Router) collect() {
 			pc.inputOp(tag, &s.pointer)
 			a := pc.currentArea()
 			b := pc.currentAreaBounds()
-			if s.filter.key.focusable {
+			if s.filter.focusable {
 				kq.inputOp(tag, &s.key, t, a, b)
 			}
 
