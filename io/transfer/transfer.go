@@ -42,6 +42,8 @@ func (OfferCmd) ImplementsCommand() {}
 // as well as [InitiateEvent] and [CancelEvent].
 // Use multiple filters to offer multiple types.
 type SourceFilter struct {
+	// Target is a tag included in a previous event.Op.
+	Target event.Tag
 	// Type is the MIME type supported by this source.
 	Type string
 }
@@ -49,6 +51,8 @@ type SourceFilter struct {
 // TargetFilter filters for any [DataEvent] whose type matches a MIME type
 // as well as [CancelEvent]. Use multiple filters to accept multiple types.
 type TargetFilter struct {
+	// Target is a tag included in a previous event.Op.
+	Target event.Tag
 	// Type is the MIME type accepted by this target.
 	Type string
 }

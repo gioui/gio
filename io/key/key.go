@@ -18,8 +18,9 @@ import (
 	"gioui.org/op"
 )
 
-// Filter matches [Event]s.
+// Filter matches any [Event] that matches the parameters.
 type Filter struct {
+	Target event.Tag
 	// Required is the set of modifiers that must be included in events matched.
 	Required Modifiers
 	// Optional is the set of modifiers that may be included in events matched.
@@ -108,8 +109,12 @@ type EditEvent struct {
 	Text  string
 }
 
-// FocusFilter matches [FocusEvent]s.
-type FocusFilter struct{}
+// FocusFilter matches any [FocusEvent], [EditEvent], [SnippetEvent],
+// or [SelectionEvent] with the specified target.
+type FocusFilter struct {
+	// Target is a tag specified in a previous event.Op.
+	Target event.Tag
+}
 
 // InputHint changes the on-screen-keyboard type. That hints the
 // type of data that might be entered by the user.

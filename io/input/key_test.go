@@ -294,6 +294,7 @@ func TestFocusScroll(t *testing.T) {
 	filters := []event.Filter{
 		key.FocusFilter{},
 		pointer.Filter{
+			Target:       h,
 			Kinds:        pointer.Scroll,
 			ScrollBounds: image.Rect(-100, -100, 100, 100),
 		},
@@ -322,7 +323,8 @@ func TestFocusClick(t *testing.T) {
 	filters := []event.Filter{
 		key.FocusFilter{},
 		pointer.Filter{
-			Kinds: pointer.Press | pointer.Release,
+			Target: h,
+			Kinds:  pointer.Press | pointer.Release,
 		},
 	}
 	assertEventPointerTypeSequence(t, events(r, h, filters...), pointer.Cancel)

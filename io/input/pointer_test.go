@@ -19,6 +19,17 @@ import (
 	"gioui.org/op/clip"
 )
 
+func TestPointerNilTarget(t *testing.T) {
+	r := new(Router)
+	r.Event(pointer.Filter{Kinds: pointer.Press})
+	r.Frame(new(op.Ops))
+	r.Queue(pointer.Event{Kind: pointer.Press})
+	// Nil Targets should not receive events.
+	if _, ok := r.Event(pointer.Filter{Kinds: pointer.Press}); ok {
+		t.Errorf("nil target received event")
+	}
+}
+
 func TestPointerWakeup(t *testing.T) {
 	handler := new(int)
 	var ops op.Ops
@@ -55,9 +66,29 @@ func TestPointerDrag(t *testing.T) {
 }
 
 func events(r *Router, h event.Tag, filters ...event.Filter) []event.Event {
+	// Hack to facilitate transition to per-filter tags.
+	for i, f := range filters {
+		switch f := f.(type) {
+		case key.Filter:
+			f.Target = h
+			filters[i] = f
+		case key.FocusFilter:
+			f.Target = h
+			filters[i] = f
+		case transfer.SourceFilter:
+			f.Target = h
+			filters[i] = f
+		case transfer.TargetFilter:
+			f.Target = h
+			filters[i] = f
+		case pointer.Filter:
+			f.Target = h
+			filters[i] = f
+		}
+	}
 	var events []event.Event
 	for {
-		e, ok := r.Event(h, filters...)
+		e, ok := r.Event(filters...)
 		if !ok {
 			break
 		}

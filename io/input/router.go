@@ -35,30 +35,23 @@ type Router struct {
 		queue keyQueue
 	}
 	cqueue clipboardQueue
-
 	// states is the list of pending state changes resulting from
 	// incoming events. The first element, if present, contains the state
 	// and events for the current frame.
 	changes []stateChange
-
-	reader ops.Reader
-
+	reader  ops.Reader
 	// InvalidateCmd summary.
 	wakeup     bool
 	wakeupTime time.Time
-
 	// Changes queued for next call to Frame.
 	commands []Command
-
 	// transfers is the pending transfer.DataEvent.Open functions.
 	transfers []io.ReadCloser
-
 	// deferring is set if command execution and event delivery is deferred
 	// to the next frame.
 	deferring bool
-
-	// scratchFilter is for garbage-free construction of ephemeral filters.
-	scratchFilter filter
+	// scratchFilters is for garbage-free construction of ephemeral filters.
+	scratchFilters []taggedFilter
 }
 
 // Source implements the interface between a Router and user interface widgets.
@@ -131,6 +124,12 @@ type filter struct {
 	key     keyFilter
 }
 
+// taggedFilter is a filter for a particular tag.
+type taggedFilter struct {
+	tag    event.Tag
+	filter filter
+}
+
 // stateChange represents the new state and outgoing events
 // resulting from an incoming event.
 type stateChange struct {
@@ -173,51 +172,94 @@ func (s Source) Enabled() bool {
 	return s.r != nil
 }
 
-// Event returns the next event for the handler tag that matches one
-// or more of filters.
-func (s Source) Event(k event.Tag, filters ...event.Filter) (event.Event, bool) {
+// Event returns the next event that matches at least one of filters.
+func (s Source) Event(filters ...event.Filter) (event.Event, bool) {
 	if !s.Enabled() {
 		return nil, false
 	}
-	return s.r.Event(k, filters...)
+	return s.r.Event(filters...)
 }
 
-func (q *Router) Event(k event.Tag, filters ...event.Filter) (event.Event, bool) {
-	h := q.stateFor(k)
-	q.scratchFilter.Reset()
-	// Record handler filters and add reset events.
+func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
+	// Merge filters into scratch filters.
+	q.scratchFilters = q.scratchFilters[:0]
 	for _, f := range filters {
-		q.scratchFilter.Add(f)
-		switch f.(type) {
+		var t event.Tag
+		switch f := f.(type) {
+		case key.Filter:
+			t = f.Target
+		case transfer.SourceFilter:
+			t = f.Target
+		case transfer.TargetFilter:
+			t = f.Target
 		case key.FocusFilter:
+			t = f.Target
+		case pointer.Filter:
+			t = f.Target
+		}
+		if t == nil {
+			continue
+		}
+		var filter *filter
+		for i := range q.scratchFilters {
+			s := &q.scratchFilters[i]
+			if s.tag == t {
+				filter = &s.filter
+				break
+			}
+		}
+		if filter == nil {
+			n := len(q.scratchFilters)
+			q.scratchFilters = append(q.scratchFilters, taggedFilter{tag: t})
+			filter = &q.scratchFilters[n].filter
+		}
+		filter.Add(f)
+	}
+	for _, tf := range q.scratchFilters {
+		h := q.stateFor(tf.tag)
+		h.filter.Merge(tf.filter)
+		h.nextFilter.Merge(tf.filter)
+	}
+	// Deliver reset event, if any.
+	for _, f := range filters {
+		switch f := f.(type) {
+		case key.FocusFilter:
+			if f.Target == nil {
+				break
+			}
+			h := q.stateFor(f.Target)
 			if reset, ok := h.key.ResetEvent(); ok {
 				return reset, true
 			}
 		case pointer.Filter:
+			if f.Target == nil {
+				break
+			}
+			h := q.stateFor(f.Target)
 			if reset, ok := h.pointer.ResetEvent(); ok {
 				return reset, true
 			}
 		}
 	}
-	h.nextFilter.Merge(q.scratchFilter)
 	if !q.deferring {
 		for i := range q.changes {
 			change := &q.changes[i]
-			j := 0
-			for j < len(change.events) {
-				evt := change.events[j]
-				if evt.tag != k || !q.scratchFilter.Matches(evt.event) {
-					j++
-					continue
+			for j, evt := range change.events {
+				for _, tf := range q.scratchFilters {
+					if evt.tag == tf.tag && tf.filter.Matches(evt.event) {
+						change.events = append(change.events[:j], change.events[j+1:]...)
+						// Fast forward state to last matched.
+						q.collapseState(i)
+						return evt.event, true
+					}
 				}
-				change.events = append(change.events[:j], change.events[j+1:]...)
-				// Fast forward state to last matched.
-				q.collapseState(i)
-				return evt.event, true
 			}
 		}
 	}
-	h.processedFilter.Merge(q.scratchFilter)
+	for _, tf := range q.scratchFilters {
+		h := q.stateFor(tf.tag)
+		h.processedFilter.Merge(tf.filter)
+	}
 	return nil, false
 }
 
@@ -691,6 +733,9 @@ func (q *Router) EditorState() EditorState {
 }
 
 func (q *Router) stateFor(tag event.Tag) *handler {
+	if tag == nil {
+		panic("internal error: nil tag")
+	}
 	s, ok := q.handlers[tag]
 	if !ok {
 		s = new(handler)

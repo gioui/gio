@@ -302,27 +302,27 @@ func (e *Selectable) clickDragEvents(gtx layout.Context) []event.Event {
 
 func (e *Selectable) processKey(gtx layout.Context) {
 	filters := []event.Filter{
-		key.FocusFilter{},
+		key.FocusFilter{Target: e},
 	}
 	if e.focused {
 		filters = append(filters,
-			key.Filter{Name: key.NameLeftArrow, Optional: key.ModShortcutAlt | key.ModShift},
-			key.Filter{Name: key.NameRightArrow, Optional: key.ModShortcutAlt | key.ModShift},
-			key.Filter{Name: key.NameUpArrow, Optional: key.ModShortcutAlt | key.ModShift},
-			key.Filter{Name: key.NameDownArrow, Optional: key.ModShortcutAlt | key.ModShift},
+			key.Filter{Target: e, Name: key.NameLeftArrow, Optional: key.ModShortcutAlt | key.ModShift},
+			key.Filter{Target: e, Name: key.NameRightArrow, Optional: key.ModShortcutAlt | key.ModShift},
+			key.Filter{Target: e, Name: key.NameUpArrow, Optional: key.ModShortcutAlt | key.ModShift},
+			key.Filter{Target: e, Name: key.NameDownArrow, Optional: key.ModShortcutAlt | key.ModShift},
 
-			key.Filter{Name: key.NamePageUp, Optional: key.ModShift},
-			key.Filter{Name: key.NamePageDown, Optional: key.ModShift},
-			key.Filter{Name: key.NameEnd, Optional: key.ModShift},
-			key.Filter{Name: key.NameHome, Optional: key.ModShift},
+			key.Filter{Target: e, Name: key.NamePageUp, Optional: key.ModShift},
+			key.Filter{Target: e, Name: key.NamePageDown, Optional: key.ModShift},
+			key.Filter{Target: e, Name: key.NameEnd, Optional: key.ModShift},
+			key.Filter{Target: e, Name: key.NameHome, Optional: key.ModShift},
 
-			key.Filter{Name: "C", Required: key.ModShortcut},
-			key.Filter{Name: "X", Required: key.ModShortcut},
-			key.Filter{Name: "A", Required: key.ModShortcut},
+			key.Filter{Target: e, Name: "C", Required: key.ModShortcut},
+			key.Filter{Target: e, Name: "X", Required: key.ModShortcut},
+			key.Filter{Target: e, Name: "A", Required: key.ModShortcut},
 		)
 	}
 	for {
-		ke, ok := gtx.Event(e, filters...)
+		ke, ok := gtx.Event(filters...)
 		if !ok {
 			break
 		}

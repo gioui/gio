@@ -54,8 +54,11 @@ type PassStack struct {
 	macroID uint32
 }
 
-// Filter matches [Event]s.
+// Filter matches every [Event] that target the Tag and whose kind is
+// included in Kinds. Note that only tags specified in [event.Op] can
+// be targeted by pointer events.
 type Filter struct {
+	Target event.Tag
 	// Kinds is a bitwise-or of event types to match.
 	Kinds Kind
 	// ScrollBounds describe the maximum scrollable distances in both

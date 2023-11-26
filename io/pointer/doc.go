@@ -5,36 +5,19 @@ Package pointer implements pointer events and operations.
 A pointer is either a mouse controlled cursor or a touch
 object such as a finger.
 
-The InputOp operation is used to declare a handler ready for pointer
-events. Use an event.Queue to receive events.
-
-# Kinds
-
-Only events that match a specified list of types are delivered to a handler.
-
-For example, to receive Press, Drag, and Release events (but not Move, Enter,
-Leave, or Scroll):
-
-	var ops op.Ops
-	var h *Handler = ...
-
-	pointer.InputOp{
-		Tag:   h,
-		Kinds: pointer.Press | pointer.Drag | pointer.Release,
-	}.Add(ops)
-
-Cancel events are always delivered.
+The [event.Op] operation is used to declare a handler ready for pointer
+events.
 
 # Hit areas
 
-Clip operations from package op/clip are used for specifying
-hit areas where subsequent InputOps are active.
+Clip operations from package [op/clip] are used for specifying
+hit areas where handlers may receive events.
 
 For example, to set up a handler with a rectangular hit area:
 
 	r := image.Rectangle{...}
 	area := clip.Rect(r).Push(ops)
-	pointer.InputOp{Tag: h}.Add(ops)
+	event.Op{Tag: h}.Add(ops)
 	area.Pop()
 
 Note that hit areas behave similar to painting: the effective area of a stack
@@ -54,11 +37,11 @@ For example:
 	var h1, h2 *Handler
 
 	area := clip.Rect(...).Push(ops)
-	pointer.InputOp{Tag: h1}.Add(Ops)
+	event.Op{Tag: h1}.Add(Ops)
 	area.Pop()
 
 	area := clip.Rect(...).Push(ops)
-	pointer.InputOp{Tag: h2}.Add(ops)
+	event.Op{Tag: h2}.Add(ops)
 	area.Pop()
 
 implies a tree of two inner nodes, each with one pointer handler attached.
