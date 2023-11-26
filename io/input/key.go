@@ -281,11 +281,6 @@ func keyFilterMatch(f key.Filter, e key.Event) bool {
 }
 
 func (q *keyQueue) Focus(handlers map[event.Tag]*handler, state keyState, focus event.Tag) (keyState, []taggedEvent) {
-	if focus != nil {
-		if h, exists := handlers[focus]; !exists || !h.filter.key.focusable || !h.key.visible {
-			focus = nil
-		}
-	}
 	if focus == state.focus {
 		return state, nil
 	}

@@ -112,9 +112,7 @@ type SemanticID uint
 type handler struct {
 	// active tracks whether the handler was active in the current
 	// frame. Router deletes state belonging to inactive handlers during Frame.
-	active bool
-	// old is true iff the handler was aded in a previous frame.
-	old     bool
+	active  bool
 	pointer pointerHandler
 	key     keyHandler
 	// filter the handler has asked for through event handling
@@ -279,7 +277,6 @@ func (q *Router) Frame(frame *op.Ops) {
 			delete(q.handlers, k)
 		} else {
 			h.active = false
-			h.old = true
 		}
 	}
 	q.executeCommands()
@@ -381,22 +378,14 @@ func (q *Router) processEvent(e event.Event) bool {
 }
 
 func (q *Router) execute(c Command) {
-	// The command can be executed immediately if:
-	//
-	// - event delivery is not frozen, and
-	// - the influencing tag and event receivers were all seen
-	//   in the previous frame, and
-	// - no event receiver has completed their event handling.
+	// The command can be executed immediately if event delivery is not frozen, and
+	// no event receiver has completed their event handling.
 	if !q.deferring {
-		tag, ch := q.executeCommand(c)
+		ch := q.executeCommand(c)
 		immediate := true
-		if tag != nil {
-			h, ok := q.handlers[tag]
-			immediate = immediate && ok && h.old
-		}
 		for _, e := range ch.events {
 			h, ok := q.handlers[e.tag]
-			immediate = immediate && ok && h.old && !h.processedFilter.Matches(e.event)
+			immediate = immediate && (!ok || !h.processedFilter.Matches(e.event))
 		}
 		if immediate {
 			// Hold on to the remaining events for state replay.
@@ -434,7 +423,7 @@ func (q *Router) lastState() inputState {
 
 func (q *Router) executeCommands() {
 	for _, c := range q.commands {
-		_, ch := q.executeCommand(c)
+		ch := q.executeCommand(c)
 		q.changeState(nil, ch.state, ch.events)
 	}
 	q.commands = nil
@@ -442,31 +431,25 @@ func (q *Router) executeCommands() {
 
 // executeCommand the command and return the resulting state change along with the
 // tag the state change depended on, if any.
-func (q *Router) executeCommand(c Command) (event.Tag, stateChange) {
+func (q *Router) executeCommand(c Command) stateChange {
 	state := q.state()
 	var evts []taggedEvent
-	var tag event.Tag
 	switch req := c.(type) {
 	case key.SelectionCmd:
-		tag = req.Tag
 		state.keyState = q.key.queue.setSelection(state.keyState, req)
 	case key.FocusCmd:
-		tag = req.Tag
 		state.keyState, evts = q.key.queue.Focus(q.handlers, state.keyState, req.Tag)
 	case key.SoftKeyboardCmd:
 		state.keyState = state.keyState.softKeyboard(req.Show)
 	case key.SnippetCmd:
-		tag = req.Tag
 		state.keyState = q.key.queue.setSnippet(state.keyState, req)
 	case transfer.OfferCmd:
-		tag = req.Tag
 		state.pointerState, evts = q.pointer.queue.offerData(q.handlers, state.pointerState, req)
 	case clipboard.WriteCmd:
 		q.cqueue.ProcessWriteClipboard(req)
 	case clipboard.ReadCmd:
 		state.clipboardState = q.cqueue.ProcessReadClipboard(state.clipboardState, req.Tag)
 	case pointer.GrabCmd:
-		tag = req.Tag
 		state.pointerState, evts = q.pointer.queue.grab(state.pointerState, req)
 	case op.InvalidateCmd:
 		if !q.wakeup || req.At.Before(q.wakeupTime) {
@@ -474,7 +457,7 @@ func (q *Router) executeCommand(c Command) (event.Tag, stateChange) {
 			q.wakeupTime = req.At
 		}
 	}
-	return tag, stateChange{state: state, events: evts}
+	return stateChange{state: state, events: evts}
 }
 
 func (q *Router) changeState(e event.Event, state inputState, evts []taggedEvent) bool {

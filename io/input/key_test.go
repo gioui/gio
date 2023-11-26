@@ -62,6 +62,10 @@ func TestKeyStacked(t *testing.T) {
 	ops := new(op.Ops)
 	r := new(Router)
 
+	for i := range handlers {
+		assertKeyEvent(t, events(r, &handlers[i], key.FocusFilter{}), false)
+	}
+
 	event.InputOp(ops, &handlers[0])
 	r.Source().Execute(key.FocusCmd{})
 	r.Source().Execute(key.SoftKeyboardCmd{Show: false})
@@ -70,10 +74,6 @@ func TestKeyStacked(t *testing.T) {
 	event.InputOp(ops, &handlers[2])
 	r.Source().Execute(key.SoftKeyboardCmd{Show: true})
 	event.InputOp(ops, &handlers[3])
-
-	for i := range handlers {
-		assertKeyEvent(t, events(r, &handlers[i], key.FocusFilter{}), false)
-	}
 
 	r.Frame(ops)
 
@@ -101,14 +101,6 @@ func TestKeyRemoveFocus(t *testing.T) {
 	ops := new(op.Ops)
 	r := new(Router)
 
-	// New InputOp with Focus and Keyboard:
-	event.InputOp(ops, &handlers[0])
-	r.Source().Execute(key.FocusCmd{Tag: &handlers[0]})
-	r.Source().Execute(key.SoftKeyboardCmd{Show: true})
-
-	// New InputOp without any focus:
-	event.InputOp(ops, &handlers[1])
-
 	filters := []event.Filter{
 		key.FocusFilter{},
 		key.Filter{Name: key.NameTab, Required: key.ModShortcut},
@@ -116,6 +108,13 @@ func TestKeyRemoveFocus(t *testing.T) {
 	for i := range handlers {
 		assertKeyEvent(t, events(r, &handlers[i], filters...), false)
 	}
+	// New InputOp with Focus and Keyboard:
+	event.InputOp(ops, &handlers[0])
+	r.Source().Execute(key.FocusCmd{Tag: &handlers[0]})
+	r.Source().Execute(key.SoftKeyboardCmd{Show: true})
+
+	// New InputOp without any focus:
+	event.InputOp(ops, &handlers[1])
 
 	r.Frame(ops)
 
@@ -180,6 +179,10 @@ func TestKeyFocusedInvisible(t *testing.T) {
 	ops := new(op.Ops)
 	r := new(Router)
 
+	for i := range handlers {
+		assertKeyEvent(t, events(r, &handlers[i], key.FocusFilter{}), false)
+	}
+
 	// Set new InputOp with focus:
 	r.Source().Execute(key.FocusCmd{Tag: &handlers[0]})
 	event.InputOp(ops, &handlers[0])
@@ -187,10 +190,6 @@ func TestKeyFocusedInvisible(t *testing.T) {
 
 	// Set new InputOp without focus:
 	event.InputOp(ops, &handlers[1])
-
-	for i := range handlers {
-		assertKeyEvent(t, events(r, &handlers[i], key.FocusFilter{}), false)
-	}
 
 	r.Frame(ops)
 
