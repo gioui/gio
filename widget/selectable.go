@@ -77,8 +77,6 @@ type Selectable struct {
 	focused   bool
 	dragging  bool
 	dragger   gesture.Drag
-	scroller  gesture.Scroll
-	scrollOff image.Point
 
 	clicker gesture.Click
 	// events is the list of events not yet processed.

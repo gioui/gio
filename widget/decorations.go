@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/bits"
 
-	"gioui.org/gesture"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op/clip"
@@ -12,11 +11,7 @@ import (
 
 // Decorations handles the states of window decorations.
 type Decorations struct {
-	clicks map[int]*Clickable
-	resize [8]struct {
-		gesture.Hover
-		gesture.Drag
-	}
+	clicks    map[int]*Clickable
 	maximized bool
 }
 

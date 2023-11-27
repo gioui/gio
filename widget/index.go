@@ -347,10 +347,6 @@ type Region struct {
 	Baseline int
 }
 
-// region is identical to Region except that its coordinates are in document
-// space instead of a widget coordinate space.
-type region = Region
-
 // locate returns highlight regions covering the glyphs that represent the runes in
 // [startRune,endRune). If the rects parameter is non-nil, locate will use it to
 // return results instead of allocating, provided that there is enough capacity.

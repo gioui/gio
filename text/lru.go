@@ -163,10 +163,6 @@ type layoutKey struct {
 	lineHeightScale    float32
 }
 
-type pathKey struct {
-	gidHash uint64
-}
-
 const maxSize = 1000
 
 func gidsEqual(a []glyphInfo, glyphs []Glyph) bool {

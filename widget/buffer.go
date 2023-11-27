@@ -11,9 +11,6 @@ import (
 
 // editBuffer implements a gap buffer for text editing.
 type editBuffer struct {
-	// pos is the byte position for Read and ReadRune.
-	pos int
-
 	// The gap start and end in bytes.
 	gapstart, gapend int
 	text             []byte

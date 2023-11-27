@@ -97,10 +97,6 @@ func (l Label) LayoutDetailed(gtx layout.Context, lt *text.Shaper, font font.Fon
 	return dims, TextInfo{Truncated: it.truncated}
 }
 
-func r2p(r clip.Rect) clip.Op {
-	return clip.Stroke{Path: r.Path(), Width: 1}.Op()
-}
-
 // textIterator computes the bounding box of and paints text.
 type textIterator struct {
 	// viewport is the rectangle of document coordinates that the iterator is
