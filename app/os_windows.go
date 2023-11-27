@@ -879,20 +879,14 @@ func (w *window) onOpenURI(uri string) bool {
 		return false
 	}
 
-	found := false
 	for _, scheme := range strings.Split(schemesURI, ",") {
 		if u.Scheme == scheme {
-			found = true
-			break
+			w.w.Event(transfer.URLEvent{URL: u})
+			return true
 		}
 	}
 
-	if !found {
-		return false
-	}
-
-	w.w.Event(transfer.URLEvent{URL: u})
-	return true
+	return false
 }
 
 func convertKeyCode(code uintptr) (string, bool) {

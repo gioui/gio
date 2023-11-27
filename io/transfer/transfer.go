@@ -115,8 +115,9 @@ func (DataEvent) ImplementsEvent() {}
 // Use multiple SchemeOps if a tag supports multiple schemes,
 // or use an empty scheme to listen for all schemes.
 //
-// The app must be compiled with the `-schemes <scheme>` flag,
-// in gogio, to be able to receive URLEvents.
+// Note that only schemes registered with the platform receive
+// URLEvents. Use a packaging tool such as [gioui.org/cmd/gogio]
+// to register schemes.
 type SchemeOp struct {
 	Tag event.Tag
 

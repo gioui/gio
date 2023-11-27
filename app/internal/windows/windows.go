@@ -105,8 +105,6 @@ const (
 
 	CW_USEDEFAULT = -2147483648
 
-	ERROR_ALREADY_EXISTS = 183
-
 	GWL_STYLE = ^(uintptr(16) - 1) // -16
 
 	GCS_COMPSTR       = 0x0008
@@ -119,8 +117,7 @@ const (
 	CFS_POINT        = 0x0002
 	CFS_CANDIDATEPOS = 0x0040
 
-	HWND_TOPMOST   = ^(uint32(1) - 1) // -1
-	HWND_BROADCAST = 0xFFFF
+	HWND_TOPMOST = ^(uint32(1) - 1) // -1
 
 	HTCAPTION     = 2
 	HTCLIENT      = 1
@@ -313,11 +310,6 @@ const (
 	LR_MONOCHROME       = 0x00000001
 	LR_SHARED           = 0x00008000
 	LR_VGACOLOR         = 0x00000080
-
-	FILE_MAP_WRITE = 0x0002
-	FILE_MAP_READ  = 0x0004
-
-	PAGE_READWRITE = 0x00000004
 )
 
 var (
