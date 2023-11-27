@@ -8,70 +8,58 @@ import (
 	"testing"
 
 	"gioui.org/io/clipboard"
-	"gioui.org/io/event"
 	"gioui.org/io/transfer"
 	"gioui.org/op"
 )
 
 func TestClipboardDuplicateEvent(t *testing.T) {
-	ops, router, handler := new(op.Ops), new(Router), make([]int, 2)
+	ops, r, handlers := new(op.Ops), new(Router), make([]int, 2)
 
-	// Both must receive the event once
-	router.Source().Execute(clipboard.ReadCmd{Tag: &handler[0]})
-	router.Source().Execute(clipboard.ReadCmd{Tag: &handler[1]})
+	// Both must receive the event once.
+	r.Source().Execute(clipboard.ReadCmd{Tag: &handlers[0]})
+	r.Source().Execute(clipboard.ReadCmd{Tag: &handlers[1]})
 
-	router.Frame(ops)
 	event := transfer.DataEvent{
 		Type: "application/text",
 		Open: func() io.ReadCloser {
 			return io.NopCloser(strings.NewReader("Test"))
 		},
 	}
-	router.Queue(event)
-	assertClipboardEvent(t, events(router, &handler[0], transfer.TargetFilter{Type: "application/text"}), true)
-	assertClipboardEvent(t, events(router, &handler[1], transfer.TargetFilter{Type: "application/text"}), true)
-	assertClipboardReadCmd(t, router, 0)
-	ops.Reset()
+	r.Queue(event)
+	for i := range handlers {
+		f := transfer.TargetFilter{Target: &handlers[i], Type: "application/text"}
+		assertEventTypeSequence(t, events(r, -1, f), transfer.DataEvent{})
+	}
+	assertClipboardReadCmd(t, r, 0)
 
-	// No ReadCmd
+	r.Source().Execute(clipboard.ReadCmd{Tag: &handlers[0]})
 
-	router.Frame(ops)
-	assertClipboardReadCmd(t, router, 0)
-	assertClipboardEvent(t, events(router, &handler[0]), false)
-	assertClipboardEvent(t, events(router, &handler[1]), false)
-	ops.Reset()
-
-	router.Source().Execute(clipboard.ReadCmd{Tag: &handler[0]})
-
-	router.Frame(ops)
+	r.Frame(ops)
 	// No ClipboardEvent sent
-	assertClipboardReadCmd(t, router, 1)
-	assertClipboardEvent(t, events(router, &handler[0]), false)
-	assertClipboardEvent(t, events(router, &handler[1]), false)
-	ops.Reset()
+	assertClipboardReadCmd(t, r, 1)
+	for i := range handlers {
+		f := transfer.TargetFilter{Target: &handlers[i]}
+		assertEventTypeSequence(t, events(r, -1, f))
+	}
 }
 
 func TestQueueProcessReadClipboard(t *testing.T) {
-	ops, router, handler := new(op.Ops), new(Router), make([]int, 2)
-	ops.Reset()
+	ops, r, handler := new(op.Ops), new(Router), make([]int, 2)
 
 	// Request read
-	router.Source().Execute(clipboard.ReadCmd{Tag: &handler[0]})
+	r.Source().Execute(clipboard.ReadCmd{Tag: &handler[0]})
 
-	router.Frame(ops)
-	assertClipboardReadCmd(t, router, 1)
+	assertClipboardReadCmd(t, r, 1)
 	ops.Reset()
 
 	for i := 0; i < 3; i++ {
 		// No ReadCmd
 		// One receiver must still wait for response
 
-		router.Frame(ops)
-		assertClipboardReadDuplicated(t, router, 1)
-		ops.Reset()
+		r.Frame(ops)
+		assertClipboardReadDuplicated(t, r, 1)
 	}
 
-	router.Frame(ops)
 	// Send the clipboard event
 	event := transfer.DataEvent{
 		Type: "application/text",
@@ -79,55 +67,29 @@ func TestQueueProcessReadClipboard(t *testing.T) {
 			return io.NopCloser(strings.NewReader("Text 2"))
 		},
 	}
-	router.Queue(event)
-	assertClipboardEvent(t, events(router, &handler[0], transfer.TargetFilter{Type: "application/text"}), true)
-	assertClipboardReadCmd(t, router, 0)
-	ops.Reset()
-
-	// No ReadCmd
-	// There's no receiver waiting
-
-	router.Frame(ops)
-	assertClipboardReadCmd(t, router, 0)
-	assertClipboardEvent(t, events(router, &handler[0]), false)
-	ops.Reset()
+	r.Queue(event)
+	assertEventTypeSequence(t, events(r, -1, transfer.TargetFilter{Target: &handler[0], Type: "application/text"}), transfer.DataEvent{})
+	assertClipboardReadCmd(t, r, 0)
 }
 
 func TestQueueProcessWriteClipboard(t *testing.T) {
-	router := new(Router)
+	r := new(Router)
 
 	const mime = "application/text"
-	router.Source().Execute(clipboard.WriteCmd{Type: mime, Data: io.NopCloser(strings.NewReader("Write 1"))})
+	r.Source().Execute(clipboard.WriteCmd{Type: mime, Data: io.NopCloser(strings.NewReader("Write 1"))})
 
-	assertClipboardWriteCmd(t, router, mime, "Write 1")
-	assertClipboardWriteCmd(t, router, "", "")
+	assertClipboardWriteCmd(t, r, mime, "Write 1")
+	assertClipboardWriteCmd(t, r, "", "")
 
-	router.Source().Execute(clipboard.WriteCmd{Type: mime, Data: io.NopCloser(strings.NewReader("Write 2"))})
+	r.Source().Execute(clipboard.WriteCmd{Type: mime, Data: io.NopCloser(strings.NewReader("Write 2"))})
 
-	assertClipboardReadCmd(t, router, 0)
-	assertClipboardWriteCmd(t, router, mime, "Write 2")
-}
-
-func assertClipboardEvent(t *testing.T, events []event.Event, expected bool) {
-	t.Helper()
-	var evtClipboard int
-	for _, e := range events {
-		switch e.(type) {
-		case transfer.DataEvent:
-			evtClipboard++
-		}
-	}
-	if evtClipboard <= 0 && expected {
-		t.Error("expected to receive some event")
-	}
-	if evtClipboard > 0 && !expected {
-		t.Error("unexpected event received")
-	}
+	assertClipboardReadCmd(t, r, 0)
+	assertClipboardWriteCmd(t, r, mime, "Write 2")
 }
 
 func assertClipboardReadCmd(t *testing.T, router *Router, expected int) {
 	t.Helper()
-	if got := len(router.lastState().receivers); got != expected {
+	if got := len(router.state().receivers); got != expected {
 		t.Errorf("unexpected %d receivers, got %d", expected, got)
 	}
 	if router.ClipboardRequested() != (expected > 0) {
@@ -137,7 +99,7 @@ func assertClipboardReadCmd(t *testing.T, router *Router, expected int) {
 
 func assertClipboardReadDuplicated(t *testing.T, router *Router, expected int) {
 	t.Helper()
-	if len(router.lastState().receivers) != expected {
+	if len(router.state().receivers) != expected {
 		t.Error("receivers removed")
 	}
 	if router.ClipboardRequested() != false {

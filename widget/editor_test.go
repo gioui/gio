@@ -902,11 +902,11 @@ g 2 4 6 8 g
 
 	var tim time.Duration
 	selected := func(start, end int) string {
+		gtx.Execute(key.FocusCmd{Tag: e})
 		// Layout once with no events; populate e.lines.
 		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 		e.Events() // throw away any events from this layout
 
-		gtx.Execute(key.FocusCmd{Tag: e})
 		r.Frame(gtx.Ops)
 		gtx.Source = r.Source()
 		// Build the selection events

@@ -62,36 +62,7 @@ func TestPointerDrag(t *testing.T) {
 			Position: f32.Pt(150, 150),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler, f), pointer.Enter, pointer.Press, pointer.Leave, pointer.Drag)
-}
-
-func events(r *Router, h event.Tag, filters ...event.Filter) []event.Event {
-	// Hack to facilitate transition to per-filter tags.
-	for i, f := range filters {
-		switch f := f.(type) {
-		case key.FocusFilter:
-			f.Target = h
-			filters[i] = f
-		case transfer.SourceFilter:
-			f.Target = h
-			filters[i] = f
-		case transfer.TargetFilter:
-			f.Target = h
-			filters[i] = f
-		case pointer.Filter:
-			f.Target = h
-			filters[i] = f
-		}
-	}
-	var events []event.Event
-	for {
-		e, ok := r.Event(filters...)
-		if !ok {
-			break
-		}
-		events = append(events, e)
-	}
-	return events
+	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Enter, pointer.Press, pointer.Leave, pointer.Drag)
 }
 
 func TestPointerDragNegative(t *testing.T) {
@@ -113,7 +84,7 @@ func TestPointerDragNegative(t *testing.T) {
 			Position: f32.Pt(-150, -150),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler, f), pointer.Enter, pointer.Press, pointer.Leave, pointer.Drag)
+	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Enter, pointer.Press, pointer.Leave, pointer.Drag)
 }
 
 func TestPointerGrab(t *testing.T) {
@@ -122,16 +93,18 @@ func TestPointerGrab(t *testing.T) {
 	handler3 := new(int)
 	var ops op.Ops
 
-	filter := pointer.Filter{Kinds: pointer.Press | pointer.Release}
+	filter := func(t event.Tag) event.Filter {
+		return pointer.Filter{Target: t, Kinds: pointer.Press | pointer.Release}
+	}
 
 	event.InputOp(&ops, handler1)
 	event.InputOp(&ops, handler2)
 	event.InputOp(&ops, handler3)
 
 	var r Router
-	assertEventPointerTypeSequence(t, events(&r, handler1, filter), pointer.Cancel)
-	assertEventPointerTypeSequence(t, events(&r, handler2, filter), pointer.Cancel)
-	assertEventPointerTypeSequence(t, events(&r, handler3, filter), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler3)), pointer.Cancel)
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
@@ -139,9 +112,9 @@ func TestPointerGrab(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, filter), pointer.Press)
-	assertEventPointerTypeSequence(t, events(&r, handler2, filter), pointer.Press)
-	assertEventPointerTypeSequence(t, events(&r, handler3, filter), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler3)), pointer.Press)
 	r.Source().Execute(pointer.GrabCmd{Tag: handler1})
 	r.Frame(&ops)
 	r.Queue(
@@ -150,9 +123,9 @@ func TestPointerGrab(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, filter), pointer.Release)
-	assertEventPointerTypeSequence(t, events(&r, handler2, filter), pointer.Cancel)
-	assertEventPointerTypeSequence(t, events(&r, handler3, filter), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Release)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler3)), pointer.Cancel)
 }
 
 func TestPointerGrabSameHandlerTwice(t *testing.T) {
@@ -160,15 +133,17 @@ func TestPointerGrabSameHandlerTwice(t *testing.T) {
 	handler2 := new(int)
 	var ops op.Ops
 
-	filter := pointer.Filter{Kinds: pointer.Press | pointer.Release}
+	filter := func(t event.Tag) event.Filter {
+		return pointer.Filter{Target: t, Kinds: pointer.Press | pointer.Release}
+	}
 
 	event.InputOp(&ops, handler1)
 	event.InputOp(&ops, handler1)
 	event.InputOp(&ops, handler2)
 
 	var r Router
-	assertEventPointerTypeSequence(t, events(&r, handler1, filter), pointer.Cancel)
-	assertEventPointerTypeSequence(t, events(&r, handler2, filter), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Cancel)
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
@@ -176,8 +151,8 @@ func TestPointerGrabSameHandlerTwice(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, filter), pointer.Press)
-	assertEventPointerTypeSequence(t, events(&r, handler2, filter), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Press)
 	r.Source().Execute(pointer.GrabCmd{Tag: handler1})
 	r.Frame(&ops)
 	r.Queue(
@@ -186,8 +161,8 @@ func TestPointerGrabSameHandlerTwice(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, filter), pointer.Release)
-	assertEventPointerTypeSequence(t, events(&r, handler2, filter), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Release)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Cancel)
 }
 
 func TestPointerMove(t *testing.T) {
@@ -195,8 +170,11 @@ func TestPointerMove(t *testing.T) {
 	handler2 := new(int)
 	var ops op.Ops
 
-	f := pointer.Filter{
-		Kinds: pointer.Move | pointer.Enter | pointer.Leave,
+	filter := func(t event.Tag) event.Filter {
+		return pointer.Filter{
+			Target: t,
+			Kinds:  pointer.Move | pointer.Enter | pointer.Leave,
+		}
 	}
 
 	// Handler 1 area: (0, 0) - (100, 100)
@@ -209,8 +187,8 @@ func TestPointerMove(t *testing.T) {
 	r1.Pop()
 
 	var r Router
-	assertEventPointerTypeSequence(t, events(&r, handler1, f), pointer.Cancel)
-	assertEventPointerTypeSequence(t, events(&r, handler2, f), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Cancel)
 	r.Frame(&ops)
 	r.Queue(
 		// Hit both handlers.
@@ -232,8 +210,8 @@ func TestPointerMove(t *testing.T) {
 			Kind: pointer.Cancel,
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, f), pointer.Enter, pointer.Move, pointer.Move, pointer.Leave, pointer.Cancel)
-	assertEventPointerTypeSequence(t, events(&r, handler2, f), pointer.Enter, pointer.Move, pointer.Leave, pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Enter, pointer.Move, pointer.Move, pointer.Leave, pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Enter, pointer.Move, pointer.Leave, pointer.Cancel)
 }
 
 func TestPointerTypes(t *testing.T) {
@@ -241,13 +219,14 @@ func TestPointerTypes(t *testing.T) {
 	var ops op.Ops
 	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
 	f := pointer.Filter{
-		Kinds: pointer.Press | pointer.Release,
+		Target: handler,
+		Kinds:  pointer.Press | pointer.Release,
 	}
 	event.InputOp(&ops, handler)
 	r1.Pop()
 
 	var r Router
-	assertEventPointerTypeSequence(t, events(&r, handler, f), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Cancel)
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
@@ -263,7 +242,7 @@ func TestPointerTypes(t *testing.T) {
 			Position: f32.Pt(150, 150),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler, f), pointer.Press, pointer.Release)
+	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Press, pointer.Release)
 }
 
 func TestPointerSystemAction(t *testing.T) {
@@ -311,29 +290,38 @@ func TestPointerPriority(t *testing.T) {
 	var r Router
 
 	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
-	f1 := pointer.Filter{
-		Kinds:        pointer.Scroll,
-		ScrollBounds: image.Rectangle{Max: image.Point{X: 100}},
+	f1 := func(t event.Tag) event.Filter {
+		return pointer.Filter{
+			Target:       t,
+			Kinds:        pointer.Scroll,
+			ScrollBounds: image.Rectangle{Max: image.Point{X: 100}},
+		}
 	}
-	events(&r, handler1, f1)
+	events(&r, -1, f1(handler1))
 	event.InputOp(&ops, handler1)
 
 	r2 := clip.Rect(image.Rect(0, 0, 100, 50)).Push(&ops)
-	f2 := pointer.Filter{
-		Kinds:        pointer.Scroll,
-		ScrollBounds: image.Rectangle{Max: image.Point{X: 20}},
+	f2 := func(t event.Tag) event.Filter {
+		return pointer.Filter{
+			Target:       t,
+			Kinds:        pointer.Scroll,
+			ScrollBounds: image.Rectangle{Max: image.Point{X: 20}},
+		}
 	}
-	events(&r, handler2, f2)
+	events(&r, -1, f2(handler2))
 	event.InputOp(&ops, handler2)
 	r2.Pop()
 	r1.Pop()
 
 	r3 := clip.Rect(image.Rect(0, 100, 100, 200)).Push(&ops)
-	f3 := pointer.Filter{
-		Kinds:        pointer.Scroll,
-		ScrollBounds: image.Rectangle{Min: image.Point{X: -20, Y: -40}},
+	f3 := func(t event.Tag) event.Filter {
+		return pointer.Filter{
+			Target:       t,
+			Kinds:        pointer.Scroll,
+			ScrollBounds: image.Rectangle{Min: image.Point{X: -20, Y: -40}},
+		}
 	}
-	events(&r, handler3, f3)
+	events(&r, -1, f3(handler3))
 	event.InputOp(&ops, handler3)
 	r3.Pop()
 
@@ -364,9 +352,9 @@ func TestPointerPriority(t *testing.T) {
 		},
 	)
 
-	hev1 := events(&r, handler1, f1)
-	hev2 := events(&r, handler2, f2)
-	hev3 := events(&r, handler3, f3)
+	hev1 := events(&r, -1, f1(handler1))
+	hev2 := events(&r, -1, f2(handler2))
+	hev3 := events(&r, -1, f3(handler3))
 	assertEventPointerTypeSequence(t, hev1, pointer.Scroll, pointer.Scroll)
 	assertEventPointerTypeSequence(t, hev2, pointer.Scroll)
 	assertEventPointerTypeSequence(t, hev3, pointer.Scroll)
@@ -402,8 +390,8 @@ func TestPointerEnterLeave(t *testing.T) {
 	// First event for a handler is always a Cancel.
 	// Only handler2 should receive the enter/move events because it is on top
 	// and handler1 is not an ancestor in the hit tree.
-	assertEventPointerTypeSequence(t, events(&r, handler1, f1))
-	assertEventPointerTypeSequence(t, events(&r, handler2, f2), pointer.Enter, pointer.Move)
+	assertEventPointerTypeSequence(t, events(&r, -1, f1))
+	assertEventPointerTypeSequence(t, events(&r, -1, f2), pointer.Enter, pointer.Move)
 
 	// Leave the second area by moving into the first.
 	r.Queue(
@@ -413,8 +401,8 @@ func TestPointerEnterLeave(t *testing.T) {
 		},
 	)
 	// The cursor leaves handler2 and enters handler1.
-	assertEventPointerTypeSequence(t, events(&r, handler1, f1), pointer.Enter, pointer.Move)
-	assertEventPointerTypeSequence(t, events(&r, handler2, f2), pointer.Leave)
+	assertEventPointerTypeSequence(t, events(&r, -1, f1), pointer.Enter, pointer.Move)
+	assertEventPointerTypeSequence(t, events(&r, -1, f2), pointer.Leave)
 
 	// Move, but stay within the same hit area.
 	r.Queue(
@@ -423,8 +411,8 @@ func TestPointerEnterLeave(t *testing.T) {
 			Position: f32.Pt(40, 40),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, f1), pointer.Move)
-	assertEventPointerTypeSequence(t, events(&r, handler2, f2))
+	assertEventPointerTypeSequence(t, events(&r, -1, f1), pointer.Move)
+	assertEventPointerTypeSequence(t, events(&r, -1, f2))
 
 	// Move outside of both inputs.
 	r.Queue(
@@ -433,8 +421,8 @@ func TestPointerEnterLeave(t *testing.T) {
 			Position: f32.Pt(300, 300),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, f1), pointer.Leave)
-	assertEventPointerTypeSequence(t, events(&r, handler2, f2))
+	assertEventPointerTypeSequence(t, events(&r, -1, f1), pointer.Leave)
+	assertEventPointerTypeSequence(t, events(&r, -1, f2))
 
 	// Check that a Press event generates Enter Events.
 	r.Queue(
@@ -443,8 +431,8 @@ func TestPointerEnterLeave(t *testing.T) {
 			Position: f32.Pt(125, 125),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, f1))
-	assertEventPointerTypeSequence(t, events(&r, handler2, f2), pointer.Enter, pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, f1))
+	assertEventPointerTypeSequence(t, events(&r, -1, f2), pointer.Enter, pointer.Press)
 
 	// Check that a drag only affects the participating handlers.
 	r.Queue(
@@ -459,8 +447,8 @@ func TestPointerEnterLeave(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, f1))
-	assertEventPointerTypeSequence(t, events(&r, handler2, f2), pointer.Leave, pointer.Drag, pointer.Enter, pointer.Drag)
+	assertEventPointerTypeSequence(t, events(&r, -1, f1))
+	assertEventPointerTypeSequence(t, events(&r, -1, f2), pointer.Leave, pointer.Drag, pointer.Enter, pointer.Drag)
 
 	// Check that a Release event generates Enter/Leave Events.
 	r.Queue(
@@ -470,9 +458,9 @@ func TestPointerEnterLeave(t *testing.T) {
 				25),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, f1), pointer.Enter)
+	assertEventPointerTypeSequence(t, events(&r, -1, f1), pointer.Enter)
 	// The second handler gets the release event because the press started inside it.
-	assertEventPointerTypeSequence(t, events(&r, handler2, f2), pointer.Release, pointer.Leave)
+	assertEventPointerTypeSequence(t, events(&r, -1, f2), pointer.Release, pointer.Leave)
 }
 
 func TestMultipleAreas(t *testing.T) {
@@ -487,7 +475,7 @@ func TestMultipleAreas(t *testing.T) {
 	event.InputOp(&ops, handler)
 	r1.Pop()
 
-	assertEventPointerTypeSequence(t, events(&r, handler, f))
+	assertEventPointerTypeSequence(t, events(&r, -1, f))
 	r.Frame(&ops)
 	// Hit first area, then second area, then both.
 	r.Queue(
@@ -504,7 +492,7 @@ func TestMultipleAreas(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler, f), pointer.Enter, pointer.Move, pointer.Move, pointer.Move)
+	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Enter, pointer.Move, pointer.Move, pointer.Move)
 }
 
 func TestPointerEnterLeaveNested(t *testing.T) {
@@ -512,7 +500,12 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	handler2 := new(int)
 	var ops op.Ops
 
-	f := pointer.Filter{Kinds: pointer.Press | pointer.Move | pointer.Release | pointer.Enter | pointer.Leave}
+	filter := func(t event.Tag) event.Filter {
+		return pointer.Filter{
+			Target: t,
+			Kinds:  pointer.Press | pointer.Move | pointer.Release | pointer.Enter | pointer.Leave,
+		}
+	}
 
 	// Handler 1 area: (0, 0) - (100, 100)
 	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
@@ -525,8 +518,8 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	r1.Pop()
 
 	var r Router
-	assertEventPointerTypeSequence(t, events(&r, handler1, f), pointer.Cancel)
-	assertEventPointerTypeSequence(t, events(&r, handler2, f), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Cancel)
 	r.Frame(&ops)
 	// Hit both handlers.
 	r.Queue(
@@ -537,8 +530,8 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	)
 	// First event for a handler is always a Cancel.
 	// Both handlers should receive the Enter and Move events because handler2 is a child of handler1.
-	assertEventPointerTypeSequence(t, events(&r, handler1, f), pointer.Enter, pointer.Move)
-	assertEventPointerTypeSequence(t, events(&r, handler2, f), pointer.Enter, pointer.Move)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Enter, pointer.Move)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Enter, pointer.Move)
 
 	// Leave the second area by moving into the first.
 	r.Queue(
@@ -547,8 +540,8 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 			Position: f32.Pt(20, 20),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, f), pointer.Move)
-	assertEventPointerTypeSequence(t, events(&r, handler2, f), pointer.Leave)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Move)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Leave)
 
 	// Move, but stay within the same hit area.
 	r.Queue(
@@ -557,8 +550,8 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 			Position: f32.Pt(10, 10),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, f), pointer.Move)
-	assertEventPointerTypeSequence(t, events(&r, handler2, f))
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Move)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)))
 
 	// Move outside of both inputs.
 	r.Queue(
@@ -567,8 +560,8 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 			Position: f32.Pt(200, 200),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, f), pointer.Leave)
-	assertEventPointerTypeSequence(t, events(&r, handler2, f))
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Leave)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)))
 
 	// Check that a Press event generates Enter Events.
 	r.Queue(
@@ -577,8 +570,8 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, f), pointer.Enter, pointer.Press)
-	assertEventPointerTypeSequence(t, events(&r, handler2, f), pointer.Enter, pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Enter, pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Enter, pointer.Press)
 
 	// Check that a Release event generates Enter/Leave Events.
 	r.Queue(
@@ -587,8 +580,8 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 			Position: f32.Pt(20, 20),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, f), pointer.Release)
-	assertEventPointerTypeSequence(t, events(&r, handler2, f), pointer.Release, pointer.Leave)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Release)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Release, pointer.Leave)
 }
 
 func TestPointerActiveInputDisappears(t *testing.T) {
@@ -606,7 +599,7 @@ func TestPointerActiveInputDisappears(t *testing.T) {
 			Position: f32.Pt(25, 25),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, f), pointer.Enter, pointer.Move)
+	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Enter, pointer.Move)
 	r.Frame(&ops)
 
 	// Re-render with handler missing.
@@ -618,7 +611,7 @@ func TestPointerActiveInputDisappears(t *testing.T) {
 			Position: f32.Pt(25, 25),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, handler1, f), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Cancel)
 }
 
 func TestMultitouch(t *testing.T) {
@@ -655,8 +648,8 @@ func TestMultitouch(t *testing.T) {
 			PointerID: p2,
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, h1, f1), pointer.Enter, pointer.Press)
-	assertEventPointerTypeSequence(t, events(&r, h2, f2), pointer.Enter, pointer.Press, pointer.Release)
+	assertEventPointerTypeSequence(t, events(&r, -1, f1), pointer.Enter, pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, f2), pointer.Enter, pointer.Press, pointer.Release)
 }
 
 func TestCursor(t *testing.T) {
@@ -743,7 +736,6 @@ func TestCursor(t *testing.T) {
 			}
 			r.Frame(ops)
 			r.Queue(tc.events...)
-			r.Frame(ops)
 			// The cursor should now have been changed if the mouse moved over the declared area.
 			if got, want := r.Cursor(), tc.want; got != want {
 				t.Errorf("got %q; want %q", got, want)
@@ -772,21 +764,23 @@ func TestPassOp(t *testing.T) {
 	root.Pop()
 
 	var r Router
-	f := pointer.Filter{Kinds: pointer.Press}
-	assertEventPointerTypeSequence(t, events(&r, h1, f), pointer.Cancel)
-	assertEventPointerTypeSequence(t, events(&r, h2, f), pointer.Cancel)
-	assertEventPointerTypeSequence(t, events(&r, h3, f), pointer.Cancel)
-	assertEventPointerTypeSequence(t, events(&r, h4, f), pointer.Cancel)
+	filter := func(t event.Tag) event.Filter {
+		return pointer.Filter{Target: t, Kinds: pointer.Press}
+	}
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(h1)), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(h2)), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(h3)), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(h4)), pointer.Cancel)
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
 			Kind: pointer.Press,
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, h1, f), pointer.Press)
-	assertEventPointerTypeSequence(t, events(&r, h2, f), pointer.Press)
-	assertEventPointerTypeSequence(t, events(&r, h3, f), pointer.Press)
-	assertEventPointerTypeSequence(t, events(&r, h4, f), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(h1)), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(h2)), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(h3)), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(h4)), pointer.Press)
 }
 
 func TestAreaPassthrough(t *testing.T) {
@@ -797,16 +791,17 @@ func TestAreaPassthrough(t *testing.T) {
 	clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops).Pop()
 	var r Router
 	f := pointer.Filter{
-		Kinds: pointer.Press,
+		Target: h,
+		Kinds:  pointer.Press,
 	}
-	assertEventPointerTypeSequence(t, events(&r, h, f), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Cancel)
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
 			Kind: pointer.Press,
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, h, f), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Press)
 }
 
 func TestEllipse(t *testing.T) {
@@ -818,9 +813,10 @@ func TestEllipse(t *testing.T) {
 	cl.Pop()
 	var r Router
 	f := pointer.Filter{
-		Kinds: pointer.Press,
+		Target: h,
+		Kinds:  pointer.Press,
 	}
-	assertEventPointerTypeSequence(t, events(&r, h, f), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Cancel)
 	r.Frame(&ops)
 	r.Queue(
 		// Outside ellipse.
@@ -837,7 +833,7 @@ func TestEllipse(t *testing.T) {
 			Kind:     pointer.Press,
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, h, f), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Press)
 }
 
 func TestTransfer(t *testing.T) {
@@ -845,8 +841,8 @@ func TestTransfer(t *testing.T) {
 	tgtArea := srcArea.Add(image.Pt(40, 0))
 	setup := func(r *Router, ops *op.Ops, srcType, tgtType string) (src, tgt event.Tag) {
 		src, tgt = new(int), new(int)
-		events(r, src, transfer.SourceFilter{Type: srcType})
-		events(r, tgt, transfer.TargetFilter{Type: tgtType})
+		events(r, -1, transfer.SourceFilter{Target: src, Type: srcType})
+		events(r, -1, transfer.TargetFilter{Target: tgt, Type: tgtType})
 
 		srcStack := clip.Rect(srcArea).Push(ops)
 		event.InputOp(ops, src)
@@ -875,8 +871,8 @@ func TestTransfer(t *testing.T) {
 				Kind:     pointer.Move,
 			},
 		)
-		assertEventSequence(t, events(&r, src, transfer.SourceFilter{Type: "file"}))
-		assertEventSequence(t, events(&r, tgt, transfer.TargetFilter{Type: "file"}), transfer.InitiateEvent{})
+		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}))
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.InitiateEvent{})
 
 		// Drop.
 		r.Queue(
@@ -889,8 +885,8 @@ func TestTransfer(t *testing.T) {
 				Kind:     pointer.Release,
 			},
 		)
-		assertEventSequence(t, events(&r, src, transfer.SourceFilter{Type: "file"}), transfer.CancelEvent{})
-		assertEventSequence(t, events(&r, tgt, transfer.TargetFilter{Type: "file"}), transfer.CancelEvent{})
+		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}), transfer.CancelEvent{})
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.CancelEvent{})
 	})
 
 	t.Run("drag with valid and invalid targets", func(t *testing.T) {
@@ -898,7 +894,7 @@ func TestTransfer(t *testing.T) {
 		var r Router
 		src, tgt1 := setup(&r, ops, "file", "file")
 		tgt2 := new(int)
-		events(&r, tgt2, transfer.TargetFilter{Type: "nofile"})
+		events(&r, -1, transfer.TargetFilter{Target: tgt2, Type: "nofile"})
 		stack := clip.Rect(tgtArea).Push(ops)
 		event.InputOp(ops, tgt2)
 		stack.Pop()
@@ -914,9 +910,9 @@ func TestTransfer(t *testing.T) {
 				Kind:     pointer.Move,
 			},
 		)
-		assertEventSequence(t, events(&r, src, transfer.SourceFilter{Type: "file"}))
-		assertEventSequence(t, events(&r, tgt1, transfer.TargetFilter{Type: "file"}), transfer.InitiateEvent{})
-		assertEventSequence(t, events(&r, tgt2, transfer.TargetFilter{Type: "nofile"}))
+		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}))
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt1, Type: "file"}), transfer.InitiateEvent{})
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt2, Type: "nofile"}))
 	})
 
 	t.Run("drop on invalid target", func(t *testing.T) {
@@ -935,8 +931,8 @@ func TestTransfer(t *testing.T) {
 				Kind:     pointer.Move,
 			},
 		)
-		assertEventSequence(t, events(&r, src, transfer.SourceFilter{Type: "file"}))
-		assertEventSequence(t, events(&r, tgt, transfer.TargetFilter{Type: "nofile"}))
+		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}))
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "nofile"}))
 
 		// Drop.
 		r.Queue(
@@ -945,8 +941,8 @@ func TestTransfer(t *testing.T) {
 				Kind:     pointer.Release,
 			},
 		)
-		assertEventSequence(t, events(&r, src, transfer.SourceFilter{Type: "file"}), transfer.CancelEvent{})
-		assertEventSequence(t, events(&r, tgt, transfer.TargetFilter{Type: "nofile"}))
+		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}), transfer.CancelEvent{})
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "nofile"}))
 	})
 
 	t.Run("drop on valid target", func(t *testing.T) {
@@ -954,7 +950,7 @@ func TestTransfer(t *testing.T) {
 		var r Router
 		src, tgt := setup(&r, ops, "file", "file")
 		// Make the target also a source. This should have no effect.
-		events(&r, tgt, transfer.SourceFilter{Type: "file"})
+		events(&r, -1, transfer.SourceFilter{Target: tgt, Type: "file"})
 		r.Frame(ops)
 		// Drag.
 		r.Queue(
@@ -967,8 +963,7 @@ func TestTransfer(t *testing.T) {
 				Kind:     pointer.Move,
 			},
 		)
-		assertEventSequence(t, events(&r, src, transfer.SourceFilter{Type: "file"}))
-		assertEventSequence(t, events(&r, tgt, transfer.TargetFilter{Type: "file"}), transfer.InitiateEvent{})
+		assertEventSequence(t, events(&r, 1, transfer.TargetFilter{Target: tgt, Type: "file"}), transfer.InitiateEvent{})
 
 		// Drop.
 		r.Queue(
@@ -977,14 +972,13 @@ func TestTransfer(t *testing.T) {
 				Kind:     pointer.Release,
 			},
 		)
-		assertEventSequence(t, events(&r, src, transfer.SourceFilter{Type: "file"}), transfer.RequestEvent{Type: "file"})
+		assertEventSequence(t, events(&r, 1, transfer.SourceFilter{Target: src, Type: "file"}), transfer.RequestEvent{Type: "file"})
 
 		// Offer valid type and data.
 		ofr := &offer{data: "hello"}
 		r.Source().Execute(transfer.OfferCmd{Tag: src, Type: "file", Data: ofr})
-		r.Frame(ops)
-		assertEventSequence(t, events(&r, src, transfer.SourceFilter{Type: "file"}), transfer.CancelEvent{})
-		evs := events(&r, tgt, transfer.TargetFilter{Type: "file"})
+		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}), transfer.CancelEvent{})
+		evs := events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "file"})
 		if len(evs) != 2 {
 			t.Fatalf("unexpected number of events: %d, want 2", len(evs))
 		}
@@ -1011,7 +1005,7 @@ func TestTransfer(t *testing.T) {
 		var r Router
 		src, tgt := setup(&r, ops, "file", "file")
 		// Make the target also a source. This should have no effect.
-		events(&r, tgt, transfer.SourceFilter{Type: "file"})
+		events(&r, -1, transfer.SourceFilter{Target: tgt, Type: "file"})
 		r.Frame(ops)
 		// Drag.
 		r.Queue(
@@ -1029,13 +1023,13 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 		ofr := &offer{data: "hello"}
-		events(&r, src, transfer.SourceFilter{Type: "file"})
-		events(&r, tgt, transfer.TargetFilter{Type: "file"})
-		r.Source().Execute(transfer.OfferCmd{Tag: src, Type: "file", Data: ofr})
+		events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"})
+		events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "file"})
 		r.Frame(ops)
-		assertEventSequence(t, events(&r, src, transfer.SourceFilter{Type: "file"}), transfer.CancelEvent{})
+		r.Source().Execute(transfer.OfferCmd{Tag: src, Type: "file", Data: ofr})
+		assertEventSequence(t, events(&r, -1, transfer.SourceFilter{Target: src, Type: "file"}), transfer.CancelEvent{})
 		// Ignore DataEvent and verify that the next frame closes it as unused.
-		assertEventSequence(t, events(&r, tgt, transfer.TargetFilter{Type: "file"})[1:], transfer.CancelEvent{})
+		assertEventSequence(t, events(&r, -1, transfer.TargetFilter{Target: tgt, Type: "file"})[1:], transfer.CancelEvent{})
 		r.Frame(ops)
 		if !ofr.closed {
 			t.Error("offer was not closed")
@@ -1099,9 +1093,10 @@ func (o *offer) Close() error {
 // rectangular area.
 func addPointerHandler(r *Router, ops *op.Ops, tag event.Tag, area image.Rectangle) pointer.Filter {
 	f := pointer.Filter{
-		Kinds: pointer.Press | pointer.Release | pointer.Move | pointer.Drag | pointer.Enter | pointer.Leave,
+		Target: tag,
+		Kinds:  pointer.Press | pointer.Release | pointer.Move | pointer.Drag | pointer.Enter | pointer.Leave,
 	}
-	events(r, tag, f)
+	events(r, -1, f)
 	defer clip.Rect(area).Push(ops).Pop()
 	event.InputOp(ops, tag)
 	return f
@@ -1143,6 +1138,29 @@ func assertEventSequence(t *testing.T, got []event.Event, expected ...event.Even
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("expected %s events, got %s", eventsToString(expected), eventsToString(got))
 	}
+}
+
+// assertEventTypeSequence checks that the provided event types match expected.
+func assertEventTypeSequence(t *testing.T, got []event.Event, expected ...event.Event) {
+	t.Helper()
+	match := len(expected) == len(got)
+	if match {
+		for i, ge := range got {
+			exp := expected[i]
+			match = match && reflect.TypeOf(ge) == reflect.TypeOf(exp)
+		}
+	}
+	if !match {
+		t.Errorf("expected event types %s, got %s", eventTypesToString(expected), eventTypesToString(got))
+	}
+}
+
+func eventTypesToString(evs []event.Event) string {
+	var s []string
+	for _, e := range evs {
+		s = append(s, fmt.Sprintf("%T", e))
+	}
+	return "[" + strings.Join(s, ",") + "]"
 }
 
 func eventsToString(evs []event.Event) string {
@@ -1218,7 +1236,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 					},
 				}).
 					Push(&ops)
-				events(&r, handlers[i], pointer.Filter{Kinds: pointer.Move})
+				events(&r, -1, pointer.Filter{Target: handlers[i], Kinds: pointer.Move})
 				event.InputOp(&ops, handlers[i])
 			}
 			r.Frame(&ops)
@@ -1234,4 +1252,19 @@ func BenchmarkRouterAdd(b *testing.B) {
 			}
 		})
 	}
+}
+
+func events(r *Router, n int, filters ...event.Filter) []event.Event {
+	var events []event.Event
+	for {
+		if n != -1 && len(events) == n {
+			break
+		}
+		e, ok := r.Event(filters...)
+		if !ok {
+			break
+		}
+		events = append(events, e)
+	}
+	return events
 }
