@@ -14,6 +14,25 @@ import (
 	"gioui.org/op/clip"
 )
 
+func TestDeferred(t *testing.T) {
+	r := new(Router)
+	h := new(int)
+	f := []event.Filter{
+		key.FocusFilter{Target: h},
+		key.Filter{Name: "A"},
+	}
+	// Provoke deferring by exhausting events for h.
+	events(r, -1, f...)
+	r.Source().Execute(key.FocusCmd{Tag: h})
+	ke := key.Event{Name: "A"}
+	r.Queue(ke)
+	// All events are deferred at this point.
+	assertEventSequence(t, events(r, -1, f...))
+	r.Frame(new(op.Ops))
+	// But delivered after a frame.
+	assertEventSequence(t, events(r, -1, f...), key.FocusEvent{Focus: true}, ke)
+}
+
 func TestInputWakeup(t *testing.T) {
 	handler := new(int)
 	var ops op.Ops
