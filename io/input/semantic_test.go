@@ -77,7 +77,7 @@ func TestSemanticDescription(t *testing.T) {
 	var ops op.Ops
 
 	h := new(int)
-	event.InputOp(&ops, h)
+	event.Op(&ops, h)
 	semantic.DescriptionOp("description").Add(&ops)
 	semantic.LabelOp("label").Add(&ops)
 	semantic.Button.Add(&ops)

@@ -130,7 +130,7 @@ func (e *Enum) Layout(gtx layout.Context, k string, content layout.Widget) layou
 	}
 	clk := &state.click
 	clk.Add(gtx.Ops)
-	event.InputOp(gtx.Ops, &state.tag)
+	event.Op(gtx.Ops, &state.tag)
 	semantic.SelectedOp(k == e.Value).Add(gtx.Ops)
 	semantic.EnabledOp(gtx.Enabled()).Add(gtx.Ops)
 	c.Add(gtx.Ops)

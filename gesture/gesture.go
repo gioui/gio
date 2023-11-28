@@ -38,7 +38,7 @@ type Hover struct {
 
 // Add the gesture to detect hovering over the current pointer area.
 func (h *Hover) Add(ops *op.Ops) {
-	event.InputOp(ops, h)
+	event.Op(ops, h)
 }
 
 // Update state and report whether a pointer is inside the area.
@@ -163,7 +163,7 @@ const touchSlop = unit.Dp(3)
 
 // Add the handler to the operation list to receive click events.
 func (c *Click) Add(ops *op.Ops) {
-	event.InputOp(ops, c)
+	event.Op(ops, c)
 }
 
 // Hovered returns whether a pointer is inside the area.
@@ -260,9 +260,9 @@ func (ClickEvent) ImplementsEvent() {}
 
 // Add the handler to the operation list to receive scroll events.
 // The bounds variable refers to the scrolling boundaries
-// as defined in io/pointer.InputOp.
+// as defined in [pointer.Filter].
 func (s *Scroll) Add(ops *op.Ops) {
-	event.InputOp(ops, s)
+	event.Op(ops, s)
 }
 
 // Stop any remaining fling movement.
@@ -373,7 +373,7 @@ func (s *Scroll) State() ScrollState {
 
 // Add the handler to the operation list to receive drag events.
 func (d *Drag) Add(ops *op.Ops) {
-	event.InputOp(ops, d)
+	event.Op(ops, d)
 }
 
 // Update state and return the next drag event, if any.

@@ -31,7 +31,7 @@ func TestDraggable(t *testing.T) {
 		return layout.Dimensions{Size: gtx.Constraints.Min}
 	}, nil)
 	stack := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
-	event.InputOp(gtx.Ops, tgt)
+	event.Op(gtx.Ops, tgt)
 	stack.Pop()
 
 	drag.Update(gtx)

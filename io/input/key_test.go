@@ -73,7 +73,7 @@ func TestInputWakeup(t *testing.T) {
 	handler := new(int)
 	var ops op.Ops
 	// InputOps shouldn't trigger redraws.
-	event.InputOp(&ops, handler)
+	event.Op(&ops, handler)
 
 	var r Router
 	// Reset events shouldn't either.
@@ -192,7 +192,7 @@ func TestKeyFocusedInvisible(t *testing.T) {
 
 	// Respawn the first element:
 	// It must receive one `Event{Focus: false}`.
-	event.InputOp(ops, &handlers[0])
+	event.Op(ops, &handlers[0])
 
 	assertEventSequence(t, events(r, -1, key.FocusFilter{Target: &handlers[0]}), key.FocusEvent{Focus: false})
 }
@@ -214,7 +214,7 @@ func TestDirectionalFocus(t *testing.T) {
 
 	for i, bounds := range handlers {
 		cl := clip.Rect(bounds).Push(ops)
-		event.InputOp(ops, &handlers[i])
+		event.Op(ops, &handlers[i])
 		cl.Pop()
 		events(r, -1, key.FocusFilter{Target: &handlers[i]})
 	}
@@ -259,9 +259,9 @@ func TestFocusScroll(t *testing.T) {
 	events(r, -1, filters...)
 	parent := clip.Rect(image.Rect(1, 1, 14, 39)).Push(ops)
 	cl := clip.Rect(image.Rect(10, -20, 20, 30)).Push(ops)
-	event.InputOp(ops, h)
+	event.Op(ops, h)
 	// Test that h is scrolled even if behind another handler.
-	event.InputOp(ops, new(int))
+	event.Op(ops, new(int))
 	cl.Pop()
 	parent.Pop()
 	r.Frame(ops)
@@ -286,7 +286,7 @@ func TestFocusClick(t *testing.T) {
 	}
 	assertEventPointerTypeSequence(t, events(r, -1, filters...), pointer.Cancel)
 	cl := clip.Rect(image.Rect(0, 0, 10, 10)).Push(ops)
-	event.InputOp(ops, h)
+	event.Op(ops, h)
 	cl.Pop()
 	r.Frame(ops)
 

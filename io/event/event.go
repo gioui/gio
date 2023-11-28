@@ -22,9 +22,9 @@ type Filter interface {
 	ImplementsFilter()
 }
 
-// InputOp declares a tag for input routing at the current transformation
+// Op declares a tag for input routing at the current transformation
 // and clip area hierarchy. It panics if tag is nil.
-func InputOp(o *op.Ops, tag Tag) {
+func Op(o *op.Ops, tag Tag) {
 	if tag == nil {
 		panic("Tag must be non-nil")
 	}

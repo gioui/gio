@@ -31,7 +31,7 @@ func (d *Draggable) Layout(gtx layout.Context, w, drag layout.Widget) layout.Dim
 
 	stack := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
 	d.drag.Add(gtx.Ops)
-	event.InputOp(gtx.Ops, d)
+	event.Op(gtx.Ops, d)
 	stack.Pop()
 
 	if drag != nil && d.drag.Pressed() {

@@ -93,7 +93,7 @@ func (b *Clickable) layout(t event.Tag, gtx layout.Context, w layout.Widget) lay
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
 	semantic.EnabledOp(gtx.Enabled()).Add(gtx.Ops)
 	b.click.Add(gtx.Ops)
-	event.InputOp(gtx.Ops, t)
+	event.Op(gtx.Ops, t)
 	c.Add(gtx.Ops)
 	return dims
 }

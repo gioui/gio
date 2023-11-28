@@ -105,7 +105,7 @@ func ExampleDraggable_Layout() {
 			Min: image.Pt(20, 20),
 			Max: image.Pt(40, 40),
 		}.Push(gtx.Ops)
-		event.InputOp(gtx.Ops, &drop)
+		event.Op(gtx.Ops, &drop)
 		ds.Pop()
 
 		// Check for the received data.

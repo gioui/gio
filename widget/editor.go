@@ -662,7 +662,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 
 	defer clip.Rect(image.Rectangle{Max: visibleDims.Size}).Push(gtx.Ops).Pop()
 	pointer.CursorText.Add(gtx.Ops)
-	event.InputOp(gtx.Ops, e)
+	event.Op(gtx.Ops, e)
 	key.InputHintOp{Tag: e, Hint: e.InputHint}.Add(gtx.Ops)
 
 	e.scroller.Add(gtx.Ops)

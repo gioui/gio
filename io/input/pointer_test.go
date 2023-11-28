@@ -107,9 +107,9 @@ func TestPointerGrab(t *testing.T) {
 		return pointer.Filter{Target: t, Kinds: pointer.Press | pointer.Release | pointer.Cancel}
 	}
 
-	event.InputOp(&ops, handler1)
-	event.InputOp(&ops, handler2)
-	event.InputOp(&ops, handler3)
+	event.Op(&ops, handler1)
+	event.Op(&ops, handler2)
+	event.Op(&ops, handler3)
 
 	var r Router
 	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Cancel)
@@ -146,9 +146,9 @@ func TestPointerGrabSameHandlerTwice(t *testing.T) {
 		return pointer.Filter{Target: t, Kinds: pointer.Press | pointer.Release | pointer.Cancel}
 	}
 
-	event.InputOp(&ops, handler1)
-	event.InputOp(&ops, handler1)
-	event.InputOp(&ops, handler2)
+	event.Op(&ops, handler1)
+	event.Op(&ops, handler1)
+	event.Op(&ops, handler2)
 
 	var r Router
 	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Cancel)
@@ -187,10 +187,10 @@ func TestPointerMove(t *testing.T) {
 
 	// Handler 1 area: (0, 0) - (100, 100)
 	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
-	event.InputOp(&ops, handler1)
+	event.Op(&ops, handler1)
 	// Handler 2 area: (50, 50) - (100, 100) (areas intersect).
 	r2 := clip.Rect(image.Rect(50, 50, 200, 200)).Push(&ops)
-	event.InputOp(&ops, handler2)
+	event.Op(&ops, handler2)
 	r2.Pop()
 	r1.Pop()
 
@@ -230,7 +230,7 @@ func TestPointerTypes(t *testing.T) {
 		Target: handler,
 		Kinds:  pointer.Press | pointer.Release | pointer.Cancel,
 	}
-	event.InputOp(&ops, handler)
+	event.Op(&ops, handler)
 	r1.Pop()
 
 	var r Router
@@ -306,7 +306,7 @@ func TestPointerPriority(t *testing.T) {
 		}
 	}
 	events(&r, -1, f1(handler1))
-	event.InputOp(&ops, handler1)
+	event.Op(&ops, handler1)
 
 	r2 := clip.Rect(image.Rect(0, 0, 100, 50)).Push(&ops)
 	f2 := func(t event.Tag) event.Filter {
@@ -317,7 +317,7 @@ func TestPointerPriority(t *testing.T) {
 		}
 	}
 	events(&r, -1, f2(handler2))
-	event.InputOp(&ops, handler2)
+	event.Op(&ops, handler2)
 	r2.Pop()
 	r1.Pop()
 
@@ -330,7 +330,7 @@ func TestPointerPriority(t *testing.T) {
 		}
 	}
 	events(&r, -1, f3(handler3))
-	event.InputOp(&ops, handler3)
+	event.Op(&ops, handler3)
 	r3.Pop()
 
 	r.Frame(&ops)
@@ -480,7 +480,7 @@ func TestMultipleAreas(t *testing.T) {
 	f := addPointerHandler(&r, &ops, handler, image.Rect(0, 0, 100, 100))
 	r1 := clip.Rect(image.Rect(50, 50, 200, 200)).Push(&ops)
 	// Test that declaring a handler twice doesn't affect event handling.
-	event.InputOp(&ops, handler)
+	event.Op(&ops, handler)
 	r1.Pop()
 
 	assertEventPointerTypeSequence(t, events(&r, -1, f))
@@ -517,11 +517,11 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 
 	// Handler 1 area: (0, 0) - (100, 100)
 	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
-	event.InputOp(&ops, handler1)
+	event.Op(&ops, handler1)
 
 	// Handler 2 area: (25, 25) - (75, 75) (nested within first).
 	r2 := clip.Rect(image.Rect(25, 25, 75, 75)).Push(&ops)
-	event.InputOp(&ops, handler2)
+	event.Op(&ops, handler2)
 	r2.Pop()
 	r1.Pop()
 
@@ -758,15 +758,15 @@ func TestPassOp(t *testing.T) {
 	h1, h2, h3, h4 := new(int), new(int), new(int), new(int)
 	area := clip.Rect(image.Rect(0, 0, 100, 100))
 	root := area.Push(&ops)
-	event.InputOp(&ops, &h1)
-	event.InputOp(&ops, h1)
+	event.Op(&ops, &h1)
+	event.Op(&ops, h1)
 	child1 := area.Push(&ops)
-	event.InputOp(&ops, h2)
+	event.Op(&ops, h2)
 	child1.Pop()
 	child2 := area.Push(&ops)
 	pass := pointer.PassOp{}.Push(&ops)
-	event.InputOp(&ops, h3)
-	event.InputOp(&ops, h4)
+	event.Op(&ops, h3)
+	event.Op(&ops, h4)
 	pass.Pop()
 	child2.Pop()
 	root.Pop()
@@ -795,7 +795,7 @@ func TestAreaPassthrough(t *testing.T) {
 	var ops op.Ops
 
 	h := new(int)
-	event.InputOp(&ops, h)
+	event.Op(&ops, h)
 	clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops).Pop()
 	var r Router
 	f := pointer.Filter{
@@ -817,7 +817,7 @@ func TestEllipse(t *testing.T) {
 
 	h := new(int)
 	cl := clip.Ellipse(image.Rect(0, 0, 100, 100)).Push(&ops)
-	event.InputOp(&ops, h)
+	event.Op(&ops, h)
 	cl.Pop()
 	var r Router
 	f := pointer.Filter{
@@ -853,11 +853,11 @@ func TestTransfer(t *testing.T) {
 		events(r, -1, transfer.TargetFilter{Target: tgt, Type: tgtType})
 
 		srcStack := clip.Rect(srcArea).Push(ops)
-		event.InputOp(ops, src)
+		event.Op(ops, src)
 		srcStack.Pop()
 
 		tgt1Stack := clip.Rect(tgtArea).Push(ops)
-		event.InputOp(ops, tgt)
+		event.Op(ops, tgt)
 		tgt1Stack.Pop()
 
 		return src, tgt
@@ -904,7 +904,7 @@ func TestTransfer(t *testing.T) {
 		tgt2 := new(int)
 		events(&r, -1, transfer.TargetFilter{Target: tgt2, Type: "nofile"})
 		stack := clip.Rect(tgtArea).Push(ops)
-		event.InputOp(ops, tgt2)
+		event.Op(ops, tgt2)
 		stack.Pop()
 		r.Frame(ops)
 		// Initiate a drag.
@@ -1050,7 +1050,7 @@ func TestDeferredInputOp(t *testing.T) {
 
 	var r Router
 	m := op.Record(&ops)
-	event.InputOp(&ops, new(int))
+	event.Op(&ops, new(int))
 	call := m.Stop()
 
 	op.Defer(&ops, call)
@@ -1063,13 +1063,13 @@ func TestPassCursor(t *testing.T) {
 
 	rect := clip.Rect(image.Rect(0, 0, 100, 100))
 	background := rect.Push(&ops)
-	event.InputOp(&ops, 1)
+	event.Op(&ops, 1)
 	pointer.CursorDefault.Add(&ops)
 	background.Pop()
 
 	overlayPass := pointer.PassOp{}.Push(&ops)
 	overlay := rect.Push(&ops)
-	event.InputOp(&ops, 2)
+	event.Op(&ops, 2)
 	want := pointer.CursorPointer
 	want.Add(&ops)
 	overlay.Pop()
@@ -1106,7 +1106,7 @@ func addPointerHandler(r *Router, ops *op.Ops, tag event.Tag, area image.Rectang
 	}
 	events(r, -1, f)
 	defer clip.Rect(area).Push(ops).Pop()
-	event.InputOp(ops, tag)
+	event.Op(ops, tag)
 	return f
 }
 
@@ -1245,7 +1245,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 				}).
 					Push(&ops)
 				events(&r, -1, pointer.Filter{Target: handlers[i], Kinds: pointer.Move})
-				event.InputOp(&ops, handlers[i])
+				event.Op(&ops, handlers[i])
 			}
 			r.Frame(&ops)
 			b.ReportAllocs()

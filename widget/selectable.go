@@ -196,7 +196,7 @@ func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font,
 	dims := l.text.Dimensions()
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
 	pointer.CursorText.Add(gtx.Ops)
-	event.InputOp(gtx.Ops, l)
+	event.Op(gtx.Ops, l)
 
 	l.clicker.Add(gtx.Ops)
 	l.dragger.Add(gtx.Ops)
