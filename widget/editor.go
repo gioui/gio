@@ -72,7 +72,6 @@ type Editor struct {
 	// from the textView.
 	scratch    []byte
 	blinkStart time.Time
-	focused    bool
 
 	// ime tracks the state relevant to input methods.
 	ime struct {
@@ -385,14 +384,13 @@ func (e *Editor) processKey(gtx layout.Context) {
 		e.blinkStart = gtx.Now
 		switch ke := ke.(type) {
 		case key.FocusEvent:
-			e.focused = ke.Focus
 			// Reset IME state.
 			e.ime.imeState = imeState{}
 			if ke.Focus {
 				gtx.Execute(key.SoftKeyboardCmd{Show: true})
 			}
 		case key.Event:
-			if !e.focused || ke.State != key.Press {
+			if !gtx.Focused(e) || ke.State != key.Press {
 				break
 			}
 			if !e.ReadOnly && e.Submit && (ke.Name == key.NameReturn || ke.Name == key.NameEnter) {
@@ -558,11 +556,6 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 	}
 }
 
-// Focused returns whether the editor is focused or not.
-func (e *Editor) Focused() bool {
-	return e.focused
-}
-
 // initBuffer should be invoked first in every exported function that accesses
 // text state. It ensures that the underlying text widget is both ready to use
 // and has its fields synced with the editor.
@@ -583,27 +576,25 @@ func (e *Editor) initBuffer() {
 func (e *Editor) Update(gtx layout.Context) {
 	e.initBuffer()
 	e.processEvents(gtx)
-	if e.focused {
-		// Notify IME of selection if it changed.
-		newSel := e.ime.selection
-		start, end := e.text.Selection()
-		newSel.rng = key.Range{
-			Start: start,
-			End:   end,
-		}
-		caretPos, carAsc, carDesc := e.text.CaretInfo()
-		newSel.caret = key.Caret{
-			Pos:     layout.FPt(caretPos),
-			Ascent:  float32(carAsc),
-			Descent: float32(carDesc),
-		}
-		if newSel != e.ime.selection {
-			e.ime.selection = newSel
-			gtx.Execute(key.SelectionCmd{Tag: e, Range: newSel.rng, Caret: newSel.caret})
-		}
-
-		e.updateSnippet(gtx, e.ime.start, e.ime.end)
+	// Notify IME of selection if it changed.
+	newSel := e.ime.selection
+	start, end := e.text.Selection()
+	newSel.rng = key.Range{
+		Start: start,
+		End:   end,
 	}
+	caretPos, carAsc, carDesc := e.text.CaretInfo()
+	newSel.caret = key.Caret{
+		Pos:     layout.FPt(caretPos),
+		Ascent:  float32(carAsc),
+		Descent: float32(carDesc),
+	}
+	if newSel != e.ime.selection {
+		e.ime.selection = newSel
+		gtx.Execute(key.SelectionCmd{Tag: e, Range: newSel.rng, Caret: newSel.caret})
+	}
+
+	e.updateSnippet(gtx, e.ime.start, e.ime.end)
 }
 
 // Layout lays out the editor using the provided textMaterial as the paint material
@@ -679,7 +670,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 	e.clicker.Add(gtx.Ops)
 	e.dragger.Add(gtx.Ops)
 	e.showCaret = false
-	if e.focused {
+	if gtx.Focused(e) {
 		now := gtx.Now
 		dt := now.Sub(e.blinkStart)
 		blinking := dt < maxBlinkDuration
@@ -688,7 +679,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 		if blinking {
 			gtx.Execute(op.InvalidateCmd{At: nextBlink})
 		}
-		e.showCaret = e.focused && (!blinking || dt%timePerBlink < timePerBlink/2)
+		e.showCaret = !blinking || dt%timePerBlink < timePerBlink/2
 	}
 	semantic.Editor.Add(gtx.Ops)
 	if e.Len() > 0 {
@@ -705,7 +696,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 // material to set the painting material for the selection.
 func (e *Editor) paintSelection(gtx layout.Context, material op.CallOp) {
 	e.initBuffer()
-	if !e.focused {
+	if !gtx.Focused(e) {
 		return
 	}
 	e.text.PaintSelection(gtx, material)

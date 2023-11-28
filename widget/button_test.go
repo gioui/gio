@@ -39,10 +39,10 @@ func TestClickable(t *testing.T) {
 	}
 	gtx.Execute(key.FocusCmd{Tag: &b1})
 	frame()
-	if !b1.Focused() {
+	if !gtx.Focused(&b1) {
 		t.Error("button 1 did not gain focus")
 	}
-	if b2.Focused() {
+	if gtx.Focused(&b2) {
 		t.Error("button 2 should not have focus")
 	}
 	r.Queue(
@@ -73,10 +73,10 @@ func TestClickable(t *testing.T) {
 	frame()
 	gtx.Execute(key.FocusCmd{Tag: &b2})
 	frame()
-	if b1.Focused() {
+	if gtx.Focused(&b1) {
 		t.Error("button 1 should not have focus")
 	}
-	if !b2.Focused() {
+	if !gtx.Focused(&b2) {
 		t.Error("button 2 did not gain focus")
 	}
 	r.Queue(

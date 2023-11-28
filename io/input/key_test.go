@@ -318,8 +318,8 @@ func TestKeyRouting(t *testing.T) {
 
 func assertFocus(t *testing.T, router *Router, expected event.Tag) {
 	t.Helper()
-	if got := router.state().focus; got != expected {
-		t.Errorf("expected %v to be focused, got %v", expected, got)
+	if !router.Source().Focused(expected) {
+		t.Errorf("expected %v to be focused", expected)
 	}
 }
 

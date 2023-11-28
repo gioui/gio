@@ -184,6 +184,15 @@ func (s Source) Enabled() bool {
 	return s.r != nil
 }
 
+// Focused reports whether tag is focused, according to the most recent
+// [key.FocusEvent] delivered.
+func (s Source) Focused(tag event.Tag) bool {
+	if !s.Enabled() {
+		return false
+	}
+	return s.r.state().keyState.focus == tag
+}
+
 // Event returns the next event that matches at least one of filters.
 func (s Source) Event(filters ...event.Filter) (event.Event, bool) {
 	if !s.Enabled() {

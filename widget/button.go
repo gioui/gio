@@ -22,7 +22,6 @@ type Clickable struct {
 	history []Press
 
 	requestClicks int
-	focused       bool
 	pressedKey    key.Name
 }
 
@@ -52,7 +51,11 @@ func (b *Clickable) Click() {
 
 // Clicked calls Update and reports whether a click was registered.
 func (b *Clickable) Clicked(gtx layout.Context) bool {
-	_, clicked := b.Update(gtx)
+	return b.clicked(b, gtx)
+}
+
+func (b *Clickable) clicked(t event.Tag, gtx layout.Context) bool {
+	_, clicked := b.update(t, gtx)
 	return clicked
 }
 
@@ -66,11 +69,6 @@ func (b *Clickable) Pressed() bool {
 	return b.click.Pressed()
 }
 
-// Focused reports whether b has focus.
-func (b *Clickable) Focused() bool {
-	return b.focused
-}
-
 // History is the past pointer presses useful for drawing markers.
 // History is retained for a short duration (about a second).
 func (b *Clickable) History() []Press {
@@ -79,8 +77,12 @@ func (b *Clickable) History() []Press {
 
 // Layout and update the button state.
 func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
+	return b.layout(b, gtx, w)
+}
+
+func (b *Clickable) layout(t event.Tag, gtx layout.Context, w layout.Widget) layout.Dimensions {
 	for {
-		_, ok := b.Update(gtx)
+		_, ok := b.update(t, gtx)
 		if !ok {
 			break
 		}
@@ -91,7 +93,7 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
 	semantic.EnabledOp(gtx.Enabled()).Add(gtx.Ops)
 	b.click.Add(gtx.Ops)
-	event.InputOp(gtx.Ops, b)
+	event.InputOp(gtx.Ops, t)
 	c.Add(gtx.Ops)
 	return dims
 }
@@ -99,9 +101,10 @@ func (b *Clickable) Layout(gtx layout.Context, w layout.Widget) layout.Dimension
 // Update the button state by processing events, and return the next
 // click, if any.
 func (b *Clickable) Update(gtx layout.Context) (Click, bool) {
-	if !gtx.Enabled() {
-		b.focused = false
-	}
+	return b.update(b, gtx)
+}
+
+func (b *Clickable) update(t event.Tag, gtx layout.Context) (Click, bool) {
 	for len(b.history) > 0 {
 		c := b.history[0]
 		if c.End.IsZero() || gtx.Now.Sub(c.End) < 1*time.Second {
@@ -139,7 +142,7 @@ func (b *Clickable) Update(gtx layout.Context) (Click, bool) {
 			}
 		case gesture.KindPress:
 			if e.Source == pointer.Mouse {
-				gtx.Execute(key.FocusCmd{Tag: b})
+				gtx.Execute(key.FocusCmd{Tag: t})
 			}
 			b.history = append(b.history, Press{
 				Position: e.Position,
@@ -149,21 +152,20 @@ func (b *Clickable) Update(gtx layout.Context) (Click, bool) {
 	}
 	for {
 		e, ok := gtx.Event(
-			key.FocusFilter{Target: b},
-			key.Filter{Focus: b, Name: key.NameReturn},
-			key.Filter{Focus: b, Name: key.NameSpace},
+			key.FocusFilter{Target: t},
+			key.Filter{Focus: t, Name: key.NameReturn},
+			key.Filter{Focus: t, Name: key.NameSpace},
 		)
 		if !ok {
 			break
 		}
 		switch e := e.(type) {
 		case key.FocusEvent:
-			b.focused = e.Focus
-			if !b.focused {
+			if e.Focus {
 				b.pressedKey = ""
 			}
 		case key.Event:
-			if !b.focused {
+			if !gtx.Focused(t) {
 				break
 			}
 			if e.Name != key.NameReturn && e.Name != key.NameSpace {

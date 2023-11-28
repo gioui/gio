@@ -35,6 +35,6 @@ func CheckBox(th *Theme, checkBox *widget.Bool, label string) CheckBoxStyle {
 func (c CheckBoxStyle) Layout(gtx layout.Context) layout.Dimensions {
 	return c.CheckBox.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		semantic.CheckBox.Add(gtx.Ops)
-		return c.layout(gtx, c.CheckBox.Value, c.CheckBox.Hovered() || c.CheckBox.Focused())
+		return c.layout(gtx, c.CheckBox.Value, c.CheckBox.Hovered() || gtx.Focused(c.CheckBox))
 	})
 }

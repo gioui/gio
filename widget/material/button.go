@@ -96,7 +96,7 @@ func Clickable(gtx layout.Context, button *widget.Clickable, w layout.Widget) la
 		return layout.Background{}.Layout(gtx,
 			func(gtx layout.Context) layout.Dimensions {
 				defer clip.Rect{Max: gtx.Constraints.Min}.Push(gtx.Ops).Pop()
-				if button.Hovered() || button.Focused() {
+				if button.Hovered() || gtx.Focused(button) {
 					paint.Fill(gtx.Ops, f32color.Hovered(color.NRGBA{}))
 				}
 				for _, c := range button.History() {
@@ -135,7 +135,7 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 				switch {
 				case !gtx.Enabled():
 					background = f32color.Disabled(b.Background)
-				case b.Button.Hovered() || b.Button.Focused():
+				case b.Button.Hovered() || gtx.Focused(b.Button):
 					background = f32color.Hovered(b.Background)
 				}
 				paint.Fill(gtx.Ops, background)
@@ -167,7 +167,7 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 				switch {
 				case !gtx.Enabled():
 					background = f32color.Disabled(b.Background)
-				case b.Button.Hovered() || b.Button.Focused():
+				case b.Button.Hovered() || gtx.Focused(b.Button):
 					background = f32color.Hovered(b.Background)
 				}
 				paint.Fill(gtx.Ops, background)

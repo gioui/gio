@@ -16,7 +16,7 @@ type Bool struct {
 // Update the widget state and report whether Value was changed.
 func (b *Bool) Update(gtx layout.Context) bool {
 	changed := false
-	for b.clk.Clicked(gtx) {
+	for b.clk.clicked(b, gtx) {
 		b.Value = !b.Value
 		changed = true
 	}
@@ -33,18 +33,13 @@ func (b *Bool) Pressed() bool {
 	return b.clk.Pressed()
 }
 
-// Focused reports whether b has focus.
-func (b *Bool) Focused() bool {
-	return b.clk.Focused()
-}
-
 func (b *Bool) History() []Press {
 	return b.clk.History()
 }
 
 func (b *Bool) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
 	b.Update(gtx)
-	dims := b.clk.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+	dims := b.clk.layout(b, gtx, func(gtx layout.Context) layout.Dimensions {
 		semantic.SelectedOp(b.Value).Add(gtx.Ops)
 		semantic.EnabledOp(gtx.Enabled()).Add(gtx.Ops)
 		return w(gtx)
