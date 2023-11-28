@@ -19,6 +19,16 @@ import (
 	"gioui.org/op/clip"
 )
 
+func TestFilterReset(t *testing.T) {
+	r := new(Router)
+	if _, ok := r.Event(pointer.Filter{}); ok {
+		t.Fatal("empty filter matched reset event")
+	}
+	if _, ok := r.Event(pointer.Filter{Kinds: pointer.Cancel}); ok {
+		t.Fatal("second call to Event matched reset event")
+	}
+}
+
 func TestPointerNilTarget(t *testing.T) {
 	r := new(Router)
 	r.Event(pointer.Filter{Kinds: pointer.Press})

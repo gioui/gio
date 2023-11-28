@@ -255,7 +255,7 @@ func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
 				break
 			}
 			h := q.stateFor(f.Target)
-			if reset, ok := h.pointer.ResetEvent(); ok {
+			if reset, ok := h.pointer.ResetEvent(); ok && h.filter.pointer.Matches(reset) {
 				return reset, true
 			}
 		}
