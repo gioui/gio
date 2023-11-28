@@ -224,7 +224,7 @@ func TestFocusClick(t *testing.T) {
 		key.FocusFilter{Target: h},
 		pointer.Filter{
 			Target: h,
-			Kinds:  pointer.Press | pointer.Release,
+			Kinds:  pointer.Press | pointer.Release | pointer.Cancel,
 		},
 	}
 	assertEventPointerTypeSequence(t, events(r, -1, filters...), pointer.Cancel)

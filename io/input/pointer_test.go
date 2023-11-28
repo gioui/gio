@@ -94,7 +94,7 @@ func TestPointerGrab(t *testing.T) {
 	var ops op.Ops
 
 	filter := func(t event.Tag) event.Filter {
-		return pointer.Filter{Target: t, Kinds: pointer.Press | pointer.Release}
+		return pointer.Filter{Target: t, Kinds: pointer.Press | pointer.Release | pointer.Cancel}
 	}
 
 	event.InputOp(&ops, handler1)
@@ -112,11 +112,10 @@ func TestPointerGrab(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Press)
-	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Press)
-	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler3)), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, 1, filter(handler1)), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, 1, filter(handler2)), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, 1, filter(handler3)), pointer.Press)
 	r.Source().Execute(pointer.GrabCmd{Tag: handler1})
-	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
 			Kind:     pointer.Release,
@@ -134,7 +133,7 @@ func TestPointerGrabSameHandlerTwice(t *testing.T) {
 	var ops op.Ops
 
 	filter := func(t event.Tag) event.Filter {
-		return pointer.Filter{Target: t, Kinds: pointer.Press | pointer.Release}
+		return pointer.Filter{Target: t, Kinds: pointer.Press | pointer.Release | pointer.Cancel}
 	}
 
 	event.InputOp(&ops, handler1)
@@ -151,10 +150,9 @@ func TestPointerGrabSameHandlerTwice(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
-	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Press)
-	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, 1, filter(handler1)), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, 1, filter(handler2)), pointer.Press)
 	r.Source().Execute(pointer.GrabCmd{Tag: handler1})
-	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
 			Kind:     pointer.Release,
@@ -173,7 +171,7 @@ func TestPointerMove(t *testing.T) {
 	filter := func(t event.Tag) event.Filter {
 		return pointer.Filter{
 			Target: t,
-			Kinds:  pointer.Move | pointer.Enter | pointer.Leave,
+			Kinds:  pointer.Move | pointer.Enter | pointer.Leave | pointer.Cancel,
 		}
 	}
 
@@ -220,7 +218,7 @@ func TestPointerTypes(t *testing.T) {
 	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
 	f := pointer.Filter{
 		Target: handler,
-		Kinds:  pointer.Press | pointer.Release,
+		Kinds:  pointer.Press | pointer.Release | pointer.Cancel,
 	}
 	event.InputOp(&ops, handler)
 	r1.Pop()
@@ -503,7 +501,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	filter := func(t event.Tag) event.Filter {
 		return pointer.Filter{
 			Target: t,
-			Kinds:  pointer.Press | pointer.Move | pointer.Release | pointer.Enter | pointer.Leave,
+			Kinds:  pointer.Press | pointer.Move | pointer.Release | pointer.Enter | pointer.Leave | pointer.Cancel,
 		}
 	}
 
@@ -765,7 +763,7 @@ func TestPassOp(t *testing.T) {
 
 	var r Router
 	filter := func(t event.Tag) event.Filter {
-		return pointer.Filter{Target: t, Kinds: pointer.Press}
+		return pointer.Filter{Target: t, Kinds: pointer.Press | pointer.Cancel}
 	}
 	assertEventPointerTypeSequence(t, events(&r, -1, filter(h1)), pointer.Cancel)
 	assertEventPointerTypeSequence(t, events(&r, -1, filter(h2)), pointer.Cancel)
@@ -792,7 +790,7 @@ func TestAreaPassthrough(t *testing.T) {
 	var r Router
 	f := pointer.Filter{
 		Target: h,
-		Kinds:  pointer.Press,
+		Kinds:  pointer.Press | pointer.Cancel,
 	}
 	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Cancel)
 	r.Frame(&ops)
@@ -814,7 +812,7 @@ func TestEllipse(t *testing.T) {
 	var r Router
 	f := pointer.Filter{
 		Target: h,
-		Kinds:  pointer.Press,
+		Kinds:  pointer.Press | pointer.Cancel,
 	}
 	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Cancel)
 	r.Frame(&ops)
@@ -1094,7 +1092,7 @@ func (o *offer) Close() error {
 func addPointerHandler(r *Router, ops *op.Ops, tag event.Tag, area image.Rectangle) pointer.Filter {
 	f := pointer.Filter{
 		Target: tag,
-		Kinds:  pointer.Press | pointer.Release | pointer.Move | pointer.Drag | pointer.Enter | pointer.Leave,
+		Kinds:  pointer.Press | pointer.Release | pointer.Move | pointer.Drag | pointer.Enter | pointer.Leave | pointer.Cancel,
 	}
 	events(r, -1, f)
 	defer clip.Rect(area).Push(ops).Pop()
