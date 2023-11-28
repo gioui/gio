@@ -14,6 +14,24 @@ import (
 	"gioui.org/op/clip"
 )
 
+func TestInputHint(t *testing.T) {
+	r := new(Router)
+	if hint, changed := r.TextInputHint(); hint != key.HintAny || changed {
+		t.Fatal("unexpected hint")
+	}
+	ops := new(op.Ops)
+	h := new(int)
+	key.InputHintOp{Tag: h, Hint: key.HintEmail}.Add(ops)
+	r.Frame(ops)
+	if hint, changed := r.TextInputHint(); hint != key.HintAny || changed {
+		t.Fatal("unexpected hint")
+	}
+	r.Source().Execute(key.FocusCmd{Tag: h})
+	if hint, changed := r.TextInputHint(); hint != key.HintEmail || !changed {
+		t.Fatal("unexpected hint")
+	}
+}
+
 func TestDeferred(t *testing.T) {
 	r := new(Router)
 	h := new(int)
