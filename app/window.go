@@ -335,7 +335,7 @@ func (w *Window) processFrame(d driver) {
 	w.updateAnimation(d)
 }
 
-// Invalidate the window such that a FrameEvent will be generated immediately.
+// Invalidate the window such that a [FrameEvent] will be generated immediately.
 // If the window is inactive, the event is sent when the window becomes active.
 //
 // Note that Invalidate is intended for externally triggered updates, such as a
@@ -374,12 +374,12 @@ func (w *Window) Option(opts ...Option) {
 
 // Run f in the same thread as the native window event loop, and wait for f to
 // return or the window to close. Run is guaranteed not to deadlock if it is
-// invoked during the handling of a ViewEvent, FrameEvent,
-// StageEvent; call Run in a separate goroutine to avoid deadlock in all
+// invoked during the handling of a [ViewEvent], [FrameEvent],
+// [StageEvent]; call Run in a separate goroutine to avoid deadlock in all
 // other cases.
 //
 // Note that most programs should not call Run; configuring a Window with
-// CustomRenderer is a notable exception.
+// [CustomRenderer] is a notable exception.
 func (w *Window) Run(f func()) {
 	done := make(chan struct{})
 	w.driverDefer(func(d driver) {
@@ -724,7 +724,7 @@ func (w *Window) destroyGPU() {
 	}
 }
 
-// waitFrame waits for the client to either call FrameEvent.Frame
+// waitFrame waits for the client to either call [FrameEvent.Frame]
 // or to continue event handling.
 func (w *Window) waitFrame(d driver) *op.Ops {
 	for {
