@@ -250,20 +250,20 @@ func (q *keyQueue) AreaFor(k *keyHandler) int {
 	return q.dirOrder[order].area
 }
 
-func (k *keyFilter) Matches(focus event.Tag, e key.Event) bool {
+func (k *keyFilter) Matches(focus event.Tag, e key.Event, system bool) bool {
 	for _, f := range *k {
-		if keyFilterMatch(focus, f, e) {
+		if keyFilterMatch(focus, f, e, system) {
 			return true
 		}
 	}
 	return false
 }
 
-func keyFilterMatch(focus event.Tag, f key.Filter, e key.Event) bool {
+func keyFilterMatch(focus event.Tag, f key.Filter, e key.Event, system bool) bool {
 	if f.Focus != nil && f.Focus != focus {
 		return false
 	}
-	if f.Name != e.Name {
+	if (f.Name != "" || system) && f.Name != e.Name {
 		return false
 	}
 	if e.Modifiers&f.Required != f.Required {

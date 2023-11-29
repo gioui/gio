@@ -107,6 +107,12 @@ const (
 // By convention, the zero value denotes the non-existent ID.
 type SemanticID uint
 
+// SystemEvent is a marker for events that have platform specific
+// side-effects. SystemEvents are never matched by catch-all filters.
+type SystemEvent struct {
+	Event event.Event
+}
+
 // handler contains the per-handler state tracked by a [Router].
 type handler struct {
 	// active tracks whether the handler was active in the current
@@ -267,7 +273,7 @@ func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
 				match := false
 				switch e := evt.event.(type) {
 				case key.Event:
-					match = q.key.scratchFilter.Matches(change.state.keyState.focus, e)
+					match = q.key.scratchFilter.Matches(change.state.keyState.focus, e, false)
 				default:
 					for _, tf := range q.scratchFilters {
 						if evt.tag == tf.tag && tf.filter.Matches(evt.event) {
@@ -363,21 +369,17 @@ func (q *Router) Frame(frame *op.Ops) {
 
 	// Collapse state and events.
 	q.collapseState(len(q.changes) - 1)
-
-	if len(q.changes) > 0 && len(q.changes[0].events) > 0 {
-		q.wakeup = true
-		q.wakeupTime = time.Time{}
-	}
 }
 
 // Queue events and report whether at least one event matched a handler.
-func (q *Router) Queue(events ...event.Event) bool {
-	matched := false
+func (q *Router) Queue(events ...event.Event) {
 	for _, e := range events {
-		hadEvents := q.processEvent(e)
-		matched = matched || hadEvents
+		se, system := e.(SystemEvent)
+		if system {
+			e = se.Event
+		}
+		q.processEvent(e, system)
 	}
-	return matched
 }
 
 func (f *filter) Add(flt event.Filter) {
@@ -415,19 +417,19 @@ func (f *filter) Reset() {
 	}
 }
 
-func (q *Router) processEvent(e event.Event) bool {
+func (q *Router) processEvent(e event.Event, system bool) {
 	state := q.lastState()
 	switch e := e.(type) {
 	case pointer.Event:
 		pstate, evts := q.pointer.queue.Push(q.handlers, state.pointerState, e)
 		state.pointerState = pstate
-		return q.changeState(e, state, evts)
+		q.changeState(e, state, evts)
 	case key.Event:
 		var evts []taggedEvent
-		if q.key.filter.Matches(state.keyState.focus, e) {
+		if q.key.filter.Matches(state.keyState.focus, e, system) {
 			evts = append(evts, taggedEvent{event: e})
 		}
-		return q.changeState(e, state, evts)
+		q.changeState(e, state, evts)
 	case key.SnippetEvent:
 		// Expand existing, overlapping snippet.
 		if r := state.content.Snippet.Range; rangeOverlaps(r, key.Range(e)) {
@@ -442,17 +444,17 @@ func (q *Router) processEvent(e event.Event) bool {
 		if f := state.focus; f != nil {
 			evts = append(evts, taggedEvent{tag: f, event: e})
 		}
-		return q.changeState(e, state, evts)
+		q.changeState(e, state, evts)
 	case key.EditEvent, key.FocusEvent, key.SelectionEvent:
 		var evts []taggedEvent
 		if f := state.focus; f != nil {
 			evts = append(evts, taggedEvent{tag: f, event: e})
 		}
-		return q.changeState(e, state, evts)
+		q.changeState(e, state, evts)
 	case transfer.DataEvent:
 		cstate, evts := q.cqueue.Push(state.clipboardState, e)
 		state.clipboardState = cstate
-		return q.changeState(e, state, evts)
+		q.changeState(e, state, evts)
 	default:
 		panic("unknown event type")
 	}
@@ -541,7 +543,7 @@ func (q *Router) executeCommand(c Command) stateChange {
 	return stateChange{state: state, events: evts}
 }
 
-func (q *Router) changeState(e event.Event, state inputState, evts []taggedEvent) bool {
+func (q *Router) changeState(e event.Event, state inputState, evts []taggedEvent) {
 	// Wrap pointer.DataEvent.Open functions to detect them not being called.
 	for i := range evts {
 		e := &evts[i]
@@ -571,7 +573,6 @@ func (q *Router) changeState(e event.Event, state inputState, evts []taggedEvent
 		prev.state = state
 		prev.events = append(prev.events, evts...)
 	}
-	return len(evts) > 0
 }
 
 func rangeOverlaps(r1, r2 key.Range) bool {
@@ -588,11 +589,11 @@ func rangeNorm(r key.Range) key.Range {
 	return r
 }
 
-func (q *Router) MoveFocus(dir key.FocusDirection) bool {
+func (q *Router) MoveFocus(dir key.FocusDirection) {
 	state := q.lastState()
 	kstate, evts := q.key.queue.MoveFocus(q.handlers, state.keyState, dir)
 	state.keyState = kstate
-	return q.changeState(nil, state, evts)
+	q.changeState(nil, state, evts)
 }
 
 // RevealFocus scrolls the current focus (if any) into viewport
@@ -852,9 +853,13 @@ func (q *Router) collect() {
 // WakeupTime returns the most recent time for doing another frame,
 // as determined from the last call to Frame.
 func (q *Router) WakeupTime() (time.Time, bool) {
-	w := q.wakeup
+	t, w := q.wakeupTime, q.wakeup
 	q.wakeup = false
-	return q.wakeupTime, w
+	// Pending events always trigger wakeups.
+	if len(q.changes) > 1 || len(q.changes) == 1 && len(q.changes[0].events) > 0 {
+		t, w = time.Time{}, true
+	}
+	return t, w
 }
 
 func (s SemanticGestures) String() string {
@@ -864,3 +869,5 @@ func (s SemanticGestures) String() string {
 	}
 	return strings.Join(gestures, ",")
 }
+
+func (SystemEvent) ImplementsEvent() {}

@@ -558,8 +558,9 @@ func (c *callbacks) SetEditorSnippet(r key.Range) {
 	c.Event(key.SnippetEvent(r))
 }
 
-func (w *Window) moveFocus(dir key.FocusDirection, d driver) {
-	if w.queue.MoveFocus(dir) {
+func (w *Window) moveFocus(dir key.FocusDirection) {
+	w.queue.MoveFocus(dir)
+	if _, handled := w.queue.WakeupTime(); handled {
 		w.queue.RevealFocus(w.viewport)
 	} else {
 		var v image.Point
@@ -881,32 +882,37 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		w.out <- e2
 	case wakeupEvent:
 	case event.Event:
-		handled := w.queue.Queue(e2)
-		if e, ok := e.(key.Event); ok && !handled {
-			if e.State == key.Press {
-				handled = true
-				isMobile := runtime.GOOS == "ios" || runtime.GOOS == "android"
-				switch {
-				case e.Name == key.NameTab && e.Modifiers == 0:
-					w.moveFocus(key.FocusForward, d)
-				case e.Name == key.NameTab && e.Modifiers == key.ModShift:
-					w.moveFocus(key.FocusBackward, d)
-				case e.Name == key.NameUpArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(key.FocusUp, d)
-				case e.Name == key.NameDownArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(key.FocusDown, d)
-				case e.Name == key.NameLeftArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(key.FocusLeft, d)
-				case e.Name == key.NameRightArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(key.FocusRight, d)
-				default:
-					handled = false
-				}
+		focusDir := key.FocusDirection(-1)
+		if e, ok := e2.(key.Event); ok && e.State == key.Press {
+			isMobile := runtime.GOOS == "ios" || runtime.GOOS == "android"
+			switch {
+			case e.Name == key.NameTab && e.Modifiers == 0:
+				focusDir = key.FocusForward
+			case e.Name == key.NameTab && e.Modifiers == key.ModShift:
+				focusDir = key.FocusBackward
+			case e.Name == key.NameUpArrow && e.Modifiers == 0 && isMobile:
+				focusDir = key.FocusUp
+			case e.Name == key.NameDownArrow && e.Modifiers == 0 && isMobile:
+				focusDir = key.FocusDown
+			case e.Name == key.NameLeftArrow && e.Modifiers == 0 && isMobile:
+				focusDir = key.FocusLeft
+			case e.Name == key.NameRightArrow && e.Modifiers == 0 && isMobile:
+				focusDir = key.FocusRight
 			}
+		}
+		e := e2
+		if focusDir != -1 {
+			e = input.SystemEvent{Event: e}
+		}
+		w.queue.Queue(e)
+		t, handled := w.queue.WakeupTime()
+		if focusDir != -1 && !handled {
+			w.moveFocus(focusDir)
+			t, handled = w.queue.WakeupTime()
 		}
 		w.updateCursor(d)
 		if handled {
-			w.setNextFrame(time.Time{})
+			w.setNextFrame(t)
 			w.updateAnimation(d)
 		}
 		return handled

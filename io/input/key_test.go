@@ -14,6 +14,24 @@ import (
 	"gioui.org/op/clip"
 )
 
+func TestAllMatchKeyFilter(t *testing.T) {
+	r := new(Router)
+	r.Event(key.Filter{})
+	ke := key.Event{Name: "A"}
+	r.Queue(ke)
+	// Catch-all gets all non-system events.
+	assertEventSequence(t, events(r, -1, key.Filter{}), ke)
+
+	r = new(Router)
+	r.Event(key.Filter{Name: "A"})
+	r.Queue(SystemEvent{ke})
+	if _, handled := r.WakeupTime(); !handled {
+		t.Errorf("system event was unexpectedly ignored")
+	}
+	// Only specific filters match system events.
+	assertEventSequence(t, events(r, -1, key.Filter{Name: "A"}), ke)
+}
+
 func TestInputHint(t *testing.T) {
 	r := new(Router)
 	if hint, changed := r.TextInputHint(); hint != key.HintAny || changed {
@@ -66,11 +84,13 @@ func TestInputWakeup(t *testing.T) {
 		t.Errorf("InputOp or the resetting FocusEvent triggered a wakeup")
 	}
 	// And neither does events that don't match anything.
-	if r.Queue(key.SnippetEvent{}) {
+	r.Queue(key.SnippetEvent{})
+	if _, handled := r.WakeupTime(); handled {
 		t.Errorf("a not-matching event triggered a wakeup")
 	}
 	// However, events that does match should trigger wakeup.
-	if !r.Queue(key.Event{Name: "A"}) {
+	r.Queue(key.Event{Name: "A"})
+	if _, handled := r.WakeupTime(); !handled {
 		t.Errorf("a key.Event didn't trigger redraw")
 	}
 }
