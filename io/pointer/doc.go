@@ -8,7 +8,7 @@ object such as a finger.
 The InputOp operation is used to declare a handler ready for pointer
 events. Use an event.Queue to receive events.
 
-# Types
+# Kinds
 
 Only events that match a specified list of types are delivered to a handler.
 
@@ -20,7 +20,7 @@ Leave, or Scroll):
 
 	pointer.InputOp{
 		Tag:   h,
-		Types: pointer.Press | pointer.Drag | pointer.Release,
+		Kinds: pointer.Press | pointer.Drag | pointer.Release,
 	}.Add(ops)
 
 Cancel events are always delivered.
