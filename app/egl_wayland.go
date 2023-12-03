@@ -69,7 +69,17 @@ func (c *wlContext) Refresh() error {
 	}
 	c.eglWin = eglWin
 	eglSurf := egl.NativeWindowType(uintptr(unsafe.Pointer(eglWin)))
-	return c.Context.CreateSurface(eglSurf, width, height)
+	if err := c.Context.CreateSurface(eglSurf, width, height); err != nil {
+		return err
+	}
+	if err := c.Context.MakeCurrent(); err != nil {
+		return err
+	}
+	defer c.Context.ReleaseCurrent()
+	// We're in charge of the frame callbacks, don't let eglSwapBuffers
+	// wait for callbacks that may never arrive.
+	c.Context.EnableVSync(false)
+	return nil
 }
 
 func (c *wlContext) Lock() error {

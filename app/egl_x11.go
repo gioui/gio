@@ -46,8 +46,8 @@ func (c *x11Context) Refresh() error {
 	if err := c.Context.MakeCurrent(); err != nil {
 		return err
 	}
+	defer c.Context.ReleaseCurrent()
 	c.Context.EnableVSync(true)
-	c.Context.ReleaseCurrent()
 	return nil
 }
 

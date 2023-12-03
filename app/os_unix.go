@@ -9,6 +9,7 @@ import (
 	"errors"
 	"unsafe"
 
+	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 )
 
@@ -49,7 +50,7 @@ type windowDriver func(*callbacks, []Option) error
 // let each driver initialize these variables with their own version of createWindow.
 var wlDriver, x11Driver windowDriver
 
-func newWindow(window *callbacks, options []Option) error {
+func newWindow(window *callbacks, options []Option) {
 	var errFirst error
 	for _, d := range []windowDriver{wlDriver, x11Driver} {
 		if d == nil {
@@ -57,16 +58,39 @@ func newWindow(window *callbacks, options []Option) error {
 		}
 		err := d(window, options)
 		if err == nil {
-			return nil
+			return
 		}
 		if errFirst == nil {
 			errFirst = err
 		}
 	}
-	if errFirst != nil {
-		return errFirst
+	window.SetDriver(&dummyDriver{
+		win:     window,
+		wakeups: make(chan event.Event, 1),
+	})
+	if errFirst == nil {
+		errFirst = errors.New("app: no window driver available")
 	}
-	return errors.New("app: no window driver available")
+	window.ProcessEvent(DestroyEvent{Err: errFirst})
+}
+
+type dummyDriver struct {
+	win     *callbacks
+	wakeups chan event.Event
+}
+
+func (d *dummyDriver) Event() event.Event {
+	if e, ok := d.win.nextEvent(); ok {
+		return e
+	}
+	return <-d.wakeups
+}
+
+func (d *dummyDriver) Invalidate() {
+	select {
+	case d.wakeups <- wakeupEvent{}:
+	default:
+	}
 }
 
 // xCursor contains mapping from pointer.Cursor to XCursor.

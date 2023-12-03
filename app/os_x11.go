@@ -38,10 +38,12 @@ import (
 	"unsafe"
 
 	"gioui.org/f32"
+	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
 	"gioui.org/io/transfer"
+	"gioui.org/op"
 	"gioui.org/unit"
 
 	syscall "golang.org/x/sys/unix"
@@ -98,7 +100,6 @@ type x11Window struct {
 	notify struct {
 		read, write int
 	}
-	dead bool
 
 	animating bool
 
@@ -111,6 +112,11 @@ type x11Window struct {
 	config Config
 
 	wakeups chan struct{}
+	handler x11EventHandler
+	buf     [100]byte
+
+	// invMy avoids the race between destroy and Invalidate.
+	invMu sync.Mutex
 }
 
 var (
@@ -234,7 +240,7 @@ func (w *x11Window) Configure(options []Option) {
 	if cnf.Decorated != prev.Decorated {
 		w.config.Decorated = cnf.Decorated
 	}
-	w.w.Event(ConfigEvent{Config: w.config})
+	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
 func (w *x11Window) setTitle(prev, cnf Config) {
@@ -377,10 +383,46 @@ func (w *x11Window) sendWMStateEvent(action C.long, atom1, atom2 C.ulong) {
 
 var x11OneByte = make([]byte, 1)
 
-func (w *x11Window) Wakeup() {
+func (w *x11Window) ProcessEvent(e event.Event) {
+	w.w.ProcessEvent(e)
+}
+
+func (w *x11Window) shutdown(err error) {
+	w.ProcessEvent(X11ViewEvent{})
+	w.ProcessEvent(DestroyEvent{Err: err})
+}
+
+func (w *x11Window) Event() event.Event {
+	for {
+		evt, ok := w.w.nextEvent()
+		if !ok {
+			w.dispatch()
+			continue
+		}
+		if _, destroy := evt.(DestroyEvent); destroy {
+			w.destroy()
+		}
+		return evt
+	}
+}
+
+func (w *x11Window) Run(f func()) {
+	f()
+}
+
+func (w *x11Window) Frame(frame *op.Ops) {
+	w.w.ProcessFrame(frame, nil)
+}
+
+func (w *x11Window) Invalidate() {
 	select {
 	case w.wakeups <- struct{}{}:
 	default:
+	}
+	w.invMu.Lock()
+	defer w.invMu.Unlock()
+	if w.x == nil {
+		return
 	}
 	if _, err := syscall.Write(w.notify.write, x11OneByte); err != nil && err != syscall.EAGAIN {
 		panic(fmt.Errorf("failed to write to pipe: %v", err))
@@ -400,11 +442,23 @@ func (w *x11Window) setStage(s Stage) {
 		return
 	}
 	w.stage = s
-	w.w.Event(StageEvent{Stage: s})
+	w.ProcessEvent(StageEvent{Stage: s})
 }
 
-func (w *x11Window) loop() {
-	h := x11EventHandler{w: w, xev: new(C.XEvent), text: make([]byte, 4)}
+func (w *x11Window) dispatch() {
+	if w.x == nil {
+		// Only Invalidate can wake us up.
+		<-w.wakeups
+		w.w.Invalidate()
+		return
+	}
+
+	select {
+	case <-w.wakeups:
+		w.w.Invalidate()
+	default:
+	}
+
 	xfd := C.XConnectionNumber(w.x)
 
 	// Poll for events and notifications.
@@ -414,64 +468,52 @@ func (w *x11Window) loop() {
 	}
 	xEvents := &pollfds[0].Revents
 	// Plenty of room for a backlog of notifications.
-	buf := make([]byte, 100)
 
-loop:
-	for !w.dead {
-		var syn, anim bool
-		// Check for pending draw events before checking animation or blocking.
-		// This fixes an issue on Xephyr where on startup XPending() > 0 but
-		// poll will still block. This also prevents no-op calls to poll.
-		if syn = h.handleEvents(); !syn {
-			anim = w.animating
-			if !anim {
-				// Clear poll events.
-				*xEvents = 0
-				// Wait for X event or gio notification.
-				if _, err := syscall.Poll(pollfds, -1); err != nil && err != syscall.EINTR {
-					panic(fmt.Errorf("x11 loop: poll failed: %w", err))
-				}
-				switch {
-				case *xEvents&syscall.POLLIN != 0:
-					syn = h.handleEvents()
-					if w.dead {
-						break loop
-					}
-				case *xEvents&(syscall.POLLERR|syscall.POLLHUP) != 0:
-					break loop
-				}
+	var syn, anim bool
+	// Check for pending draw events before checking animation or blocking.
+	// This fixes an issue on Xephyr where on startup XPending() > 0 but
+	// poll will still block. This also prevents no-op calls to poll.
+	if syn = w.handler.handleEvents(); !syn {
+		anim = w.animating
+		if !anim {
+			// Clear poll events.
+			*xEvents = 0
+			// Wait for X event or gio notification.
+			if _, err := syscall.Poll(pollfds, -1); err != nil && err != syscall.EINTR {
+				panic(fmt.Errorf("x11 loop: poll failed: %w", err))
+			}
+			switch {
+			case *xEvents&syscall.POLLIN != 0:
+				syn = w.handler.handleEvents()
+			case *xEvents&(syscall.POLLERR|syscall.POLLHUP) != 0:
 			}
 		}
-		// Clear notifications.
-		for {
-			_, err := syscall.Read(w.notify.read, buf)
-			if err == syscall.EAGAIN {
-				break
-			}
-			if err != nil {
-				panic(fmt.Errorf("x11 loop: read from notify pipe failed: %w", err))
-			}
+	}
+	// Clear notifications.
+	for {
+		_, err := syscall.Read(w.notify.read, w.buf[:])
+		if err == syscall.EAGAIN {
+			break
 		}
-		select {
-		case <-w.wakeups:
-			w.w.Event(wakeupEvent{})
-		default:
+		if err != nil {
+			panic(fmt.Errorf("x11 loop: read from notify pipe failed: %w", err))
 		}
-
-		if (anim || syn) && w.config.Size.X != 0 && w.config.Size.Y != 0 {
-			w.w.Event(frameEvent{
-				FrameEvent: FrameEvent{
-					Now:    time.Now(),
-					Size:   w.config.Size,
-					Metric: w.metric,
-				},
-				Sync: syn,
-			})
-		}
+	}
+	if (anim || syn) && w.config.Size.X != 0 && w.config.Size.Y != 0 {
+		w.ProcessEvent(frameEvent{
+			FrameEvent: FrameEvent{
+				Now:    time.Now(),
+				Size:   w.config.Size,
+				Metric: w.metric,
+			},
+			Sync: syn,
+		})
 	}
 }
 
 func (w *x11Window) destroy() {
+	w.invMu.Lock()
+	defer w.invMu.Unlock()
 	if w.notify.write != 0 {
 		syscall.Close(w.notify.write)
 		w.notify.write = 0
@@ -486,6 +528,7 @@ func (w *x11Window) destroy() {
 	}
 	C.XDestroyWindow(w.x, w.xw)
 	C.XCloseDisplay(w.x)
+	w.x = nil
 }
 
 // atom is a wrapper around XInternAtom. Callers should cache the result
@@ -543,7 +586,7 @@ func (h *x11EventHandler) handleEvents() bool {
 					// There's no support for IME yet.
 					w.w.EditorInsert(ee.Text)
 				} else {
-					w.w.Event(e)
+					w.ProcessEvent(e)
 				}
 			}
 		case C.ButtonPress, C.ButtonRelease:
@@ -605,10 +648,10 @@ func (h *x11EventHandler) handleEvents() bool {
 				w.pointerBtns &^= btn
 			}
 			ev.Buttons = w.pointerBtns
-			w.w.Event(ev)
+			w.ProcessEvent(ev)
 		case C.MotionNotify:
 			mevt := (*C.XMotionEvent)(unsafe.Pointer(xev))
-			w.w.Event(pointer.Event{
+			w.ProcessEvent(pointer.Event{
 				Kind:    pointer.Move,
 				Source:  pointer.Mouse,
 				Buttons: w.pointerBtns,
@@ -623,14 +666,14 @@ func (h *x11EventHandler) handleEvents() bool {
 			// redraw only on the last expose event
 			redraw = (*C.XExposeEvent)(unsafe.Pointer(xev)).count == 0
 		case C.FocusIn:
-			w.w.Event(key.FocusEvent{Focus: true})
+			w.ProcessEvent(key.FocusEvent{Focus: true})
 		case C.FocusOut:
-			w.w.Event(key.FocusEvent{Focus: false})
+			w.ProcessEvent(key.FocusEvent{Focus: false})
 		case C.ConfigureNotify: // window configuration change
 			cevt := (*C.XConfigureEvent)(unsafe.Pointer(xev))
 			if sz := image.Pt(int(cevt.width), int(cevt.height)); sz != w.config.Size {
 				w.config.Size = sz
-				w.w.Event(ConfigEvent{Config: w.config})
+				w.ProcessEvent(ConfigEvent{Config: w.config})
 			}
 			// redraw will be done by a later expose event
 		case C.SelectionNotify:
@@ -652,7 +695,7 @@ func (h *x11EventHandler) handleEvents() bool {
 				break
 			}
 			str := C.GoStringN((*C.char)(unsafe.Pointer(text.value)), C.int(text.nitems))
-			w.w.Event(transfer.DataEvent{
+			w.ProcessEvent(transfer.DataEvent{
 				Type: "application/text",
 				Open: func() io.ReadCloser {
 					return io.NopCloser(strings.NewReader(str))
@@ -711,7 +754,7 @@ func (h *x11EventHandler) handleEvents() bool {
 			cevt := (*C.XClientMessageEvent)(unsafe.Pointer(xev))
 			switch *(*C.long)(unsafe.Pointer(&cevt.data)) {
 			case C.long(w.atoms.evDelWindow):
-				w.dead = true
+				w.shutdown(nil)
 				return false
 			}
 		}
@@ -793,8 +836,10 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 		wakeups:      make(chan struct{}, 1),
 		config:       Config{Size: cnf.Size},
 	}
+	w.handler = x11EventHandler{w: w, xev: new(C.XEvent), text: make([]byte, 4)}
 	w.notify.read = pipe[0]
 	w.notify.write = pipe[1]
+	w.w.SetDriver(w)
 
 	if err := w.updateXkbKeymap(); err != nil {
 		w.destroy()
@@ -830,19 +875,11 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 	// extensions
 	C.XSetWMProtocols(dpy, win, &w.atoms.evDelWindow, 1)
 
-	go func() {
-		w.w.SetDriver(w)
-
-		// make the window visible on the screen
-		C.XMapWindow(dpy, win)
-		w.Configure(options)
-		w.w.Event(X11ViewEvent{Display: unsafe.Pointer(dpy), Window: uintptr(win)})
-		w.setStage(StageRunning)
-		w.loop()
-		w.w.Event(X11ViewEvent{})
-		w.w.Event(DestroyEvent{Err: nil})
-		w.destroy()
-	}()
+	// make the window visible on the screen
+	C.XMapWindow(dpy, win)
+	w.Configure(options)
+	w.ProcessEvent(X11ViewEvent{Display: unsafe.Pointer(dpy), Window: uintptr(win)})
+	w.setStage(StageRunning)
 	return nil
 }
 

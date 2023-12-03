@@ -16,10 +16,12 @@ import (
 	"unicode/utf8"
 
 	"gioui.org/internal/f32"
+	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
 	"gioui.org/io/transfer"
+	"gioui.org/op"
 	"gioui.org/unit"
 
 	_ "gioui.org/internal/cocoainit"
@@ -256,6 +258,7 @@ type window struct {
 	redraw      chan struct{}
 	cursor      pointer.Cursor
 	pointerBtns pointer.Buttons
+	loop        *eventLoop
 
 	scale  float32
 	config Config
@@ -274,23 +277,11 @@ var nextTopLeft C.NSPoint
 // mustView is like lookupView, except that it panics
 // if the view isn't mapped.
 func mustView(view C.CFTypeRef) *window {
-	w, ok := lookupView(view)
-	if !ok {
+	w, exists := viewMap[view]
+	if !exists {
 		panic("no window for view")
 	}
 	return w
-}
-
-func lookupView(view C.CFTypeRef) (*window, bool) {
-	w, exists := viewMap[view]
-	if !exists {
-		return nil, false
-	}
-	return w, true
-}
-
-func deleteView(view C.CFTypeRef) {
-	delete(viewMap, view)
 }
 
 func insertView(view C.CFTypeRef, w *window) {
@@ -307,7 +298,7 @@ func (w *window) ReadClipboard() {
 		defer C.CFRelease(cstr)
 	}
 	content := nsstringToString(cstr)
-	w.w.Event(transfer.DataEvent{
+	w.ProcessEvent(transfer.DataEvent{
 		Type: "application/text",
 		Open: func() io.ReadCloser {
 			return io.NopCloser(strings.NewReader(content))
@@ -420,7 +411,7 @@ func (w *window) Configure(options []Option) {
 		C.setWindowStandardButtonHidden(window, C.NSWindowMiniaturizeButton, barTrans)
 		C.setWindowStandardButtonHidden(window, C.NSWindowZoomButton, barTrans)
 	}
-	w.w.Event(ConfigEvent{Config: w.config})
+	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
 func (w *window) setTitle(prev, cnf Config) {
@@ -493,7 +484,7 @@ func (w *window) setStage(stage Stage) {
 		return
 	}
 	w.stage = stage
-	w.w.Event(StageEvent{Stage: stage})
+	w.ProcessEvent(StageEvent{Stage: stage})
 }
 
 //export gio_onKeys
@@ -507,7 +498,7 @@ func gio_onKeys(view, cstr C.CFTypeRef, ti C.double, mods C.NSUInteger, keyDown 
 	w := mustView(view)
 	for _, k := range str {
 		if n, ok := convertKey(k); ok {
-			w.w.Event(key.Event{
+			w.ProcessEvent(key.Event{
 				Name:      n,
 				Modifiers: kmods,
 				State:     ks,
@@ -562,7 +553,7 @@ func gio_onMouse(view, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x, y, dx, 
 	default:
 		panic("invalid direction")
 	}
-	w.w.Event(pointer.Event{
+	w.ProcessEvent(pointer.Event{
 		Kind:      typ,
 		Source:    pointer.Mouse,
 		Time:      t,
@@ -582,7 +573,7 @@ func gio_onDraw(view C.CFTypeRef) {
 //export gio_onFocus
 func gio_onFocus(view C.CFTypeRef, focus C.int) {
 	w := mustView(view)
-	w.w.Event(key.FocusEvent{Focus: focus == 1})
+	w.ProcessEvent(key.FocusEvent{Focus: focus == 1})
 	if w.stage >= StageInactive {
 		if focus == 0 {
 			w.setStage(StageInactive)
@@ -776,14 +767,14 @@ func (w *window) draw() {
 	}
 	if sz != w.config.Size {
 		w.config.Size = sz
-		w.w.Event(ConfigEvent{Config: w.config})
+		w.ProcessEvent(ConfigEvent{Config: w.config})
 	}
 	if sz.X == 0 || sz.Y == 0 {
 		return
 	}
 	cfg := configFor(w.scale)
 	w.setStage(StageRunning)
-	w.w.Event(frameEvent{
+	w.ProcessEvent(frameEvent{
 		FrameEvent: FrameEvent{
 			Now:    time.Now(),
 			Size:   w.config.Size,
@@ -791,6 +782,27 @@ func (w *window) draw() {
 		},
 		Sync: true,
 	})
+}
+
+func (w *window) ProcessEvent(e event.Event) {
+	w.w.ProcessEvent(e)
+	w.loop.FlushEvents()
+}
+
+func (w *window) Event() event.Event {
+	return w.loop.Event()
+}
+
+func (w *window) Invalidate() {
+	w.loop.Invalidate()
+}
+
+func (w *window) Run(f func()) {
+	w.loop.Run(f)
+}
+
+func (w *window) Frame(frame *op.Ops) {
+	w.loop.Frame(frame)
 }
 
 func configFor(scale float32) unit.Metric {
@@ -803,11 +815,12 @@ func configFor(scale float32) unit.Metric {
 //export gio_onClose
 func gio_onClose(view C.CFTypeRef) {
 	w := mustView(view)
-	w.w.Event(ViewEvent{})
-	w.w.Event(DestroyEvent{})
+	w.ProcessEvent(ViewEvent{})
+	w.setStage(StagePaused)
+	w.ProcessEvent(DestroyEvent{})
 	w.displayLink.Close()
 	w.displayLink = nil
-	deleteView(view)
+	delete(viewMap, view)
 	C.CFRelease(w.view)
 	w.view = 0
 }
@@ -828,14 +841,14 @@ func gio_onShow(view C.CFTypeRef) {
 func gio_onFullscreen(view C.CFTypeRef) {
 	w := mustView(view)
 	w.config.Mode = Fullscreen
-	w.w.Event(ConfigEvent{Config: w.config})
+	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
 //export gio_onWindowed
 func gio_onWindowed(view C.CFTypeRef) {
 	w := mustView(view)
 	w.config.Mode = Windowed
-	w.w.Event(ConfigEvent{Config: w.config})
+	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
 //export gio_onAppHide
@@ -857,20 +870,23 @@ func gio_onFinishLaunching() {
 	close(launched)
 }
 
-func newWindow(win *callbacks, options []Option) error {
+func newWindow(win *callbacks, options []Option) {
 	<-launched
-	errch := make(chan error)
+	res := make(chan struct{})
 	runOnMain(func() {
-		w, err := newOSWindow()
-		if err != nil {
-			errch <- err
+		w := &window{
+			redraw: make(chan struct{}, 1),
+			w:      win,
+		}
+		w.loop = newEventLoop(w.w, w.wakeup)
+		win.SetDriver(w)
+		res <- struct{}{}
+		if err := w.init(); err != nil {
+			w.ProcessEvent(DestroyEvent{Err: err})
 			return
 		}
-		errch <- nil
-		w.w = win
 		window := C.gio_createWindow(w.view, 0, 0, 0, 0, 0, 0)
 		w.updateWindowMode()
-		win.SetDriver(w)
 		w.Configure(options)
 		if nextTopLeft.x == 0 && nextTopLeft.y == 0 {
 			// cascadeTopLeftFromPoint treats (0, 0) as a no-op,
@@ -881,22 +897,18 @@ func newWindow(win *callbacks, options []Option) error {
 		// makeKeyAndOrderFront assumes ownership of our window reference.
 		C.makeKeyAndOrderFront(window)
 		layer := C.layerForView(w.view)
-		w.w.Event(ViewEvent{View: uintptr(w.view), Layer: uintptr(layer)})
+		w.ProcessEvent(ViewEvent{View: uintptr(w.view), Layer: uintptr(layer)})
 	})
-	return <-errch
+	<-res
 }
 
-func newOSWindow() (*window, error) {
+func (w *window) init() error {
 	view := C.gio_createView()
 	if view == 0 {
-		return nil, errors.New("newOSWindows: failed to create view")
+		return errors.New("newOSWindow: failed to create view")
 	}
 	scale := float32(C.getViewBackingScale(view))
-	w := &window{
-		view:   view,
-		scale:  scale,
-		redraw: make(chan struct{}, 1),
-	}
+	w.scale = scale
 	dl, err := newDisplayLink(func() {
 		select {
 		case w.redraw <- struct{}{}:
@@ -910,10 +922,11 @@ func newOSWindow() (*window, error) {
 	w.displayLink = dl
 	if err != nil {
 		C.CFRelease(view)
-		return nil, err
+		return err
 	}
 	insertView(view, w)
-	return w, nil
+	w.view = view
+	return nil
 }
 
 func osMain() {

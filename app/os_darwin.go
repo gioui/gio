@@ -260,8 +260,9 @@ func windowSetCursor(from, to pointer.Cursor) pointer.Cursor {
 	return to
 }
 
-func (w *window) Wakeup() {
+func (w *window) wakeup() {
 	runOnMain(func() {
-		w.w.Event(wakeupEvent{})
+		w.loop.Wakeup()
+		w.loop.FlushEvents()
 	})
 }

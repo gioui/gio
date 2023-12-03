@@ -56,7 +56,7 @@ CGFloat _keyboardHeight;
 - (void)applicationWillEnterForeground:(UIApplication *)application {
 	UIView *drawView = self.view.subviews[0];
 	if (drawView != nil) {
-		gio_onDraw((__bridge CFTypeRef)drawView);
+		onStart((__bridge CFTypeRef)drawView);
 	}
 }
 

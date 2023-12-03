@@ -65,8 +65,8 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	private final InputMethodManager imm;
 	private final float scrollXScale;
 	private final float scrollYScale;
+	private final AccessibilityManager accessManager;
 	private int keyboardHint;
-	private AccessibilityManager accessManager;
 
 	private long nhandle;
 

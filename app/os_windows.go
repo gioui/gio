@@ -19,10 +19,12 @@ import (
 	syscall "golang.org/x/sys/windows"
 
 	"gioui.org/app/internal/windows"
+	"gioui.org/op"
 	"gioui.org/unit"
 	gowindows "golang.org/x/sys/windows"
 
 	"gioui.org/f32"
+	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
@@ -53,6 +55,10 @@ type window struct {
 
 	borderSize image.Point
 	config     Config
+	loop       *eventLoop
+
+	// invMu avoids the race between destroying the window and Invalidate.
+	invMu sync.Mutex
 }
 
 const _WM_WAKEUP = windows.WM_USER + iota
@@ -85,36 +91,38 @@ func osMain() {
 	select {}
 }
 
-func newWindow(window *callbacks, options []Option) error {
-	cerr := make(chan error)
+func newWindow(win *callbacks, options []Option) {
+	done := make(chan struct{})
 	go func() {
 		// GetMessage and PeekMessage can filter on a window HWND, but
 		// then thread-specific messages such as WM_QUIT are ignored.
 		// Instead lock the thread so window messages arrive through
 		// unfiltered GetMessage calls.
 		runtime.LockOSThread()
-		w, err := createNativeWindow()
+
+		w := &window{
+			w: win,
+		}
+		w.loop = newEventLoop(w.w, w.wakeup)
+		w.w.SetDriver(w)
+		err := w.init()
+		done <- struct{}{}
 		if err != nil {
-			cerr <- err
+			w.ProcessEvent(DestroyEvent{Err: err})
 			return
 		}
-		cerr <- nil
 		winMap.Store(w.hwnd, w)
 		defer winMap.Delete(w.hwnd)
-		w.w = window
-		w.w.SetDriver(w)
-		w.w.Event(ViewEvent{HWND: uintptr(w.hwnd)})
+		w.ProcessEvent(ViewEvent{HWND: uintptr(w.hwnd)})
 		w.Configure(options)
 		windows.SetForegroundWindow(w.hwnd)
 		windows.SetFocus(w.hwnd)
 		// Since the window class for the cursor is null,
 		// set it here to show the cursor.
 		w.SetCursor(pointer.CursorDefault)
-		if err := w.loop(); err != nil {
-			panic(err)
-		}
+		w.runLoop()
 	}()
-	return <-cerr
+	<-done
 }
 
 // initResources initializes the resources global.
@@ -149,13 +157,13 @@ func initResources() error {
 
 const dwExStyle = windows.WS_EX_APPWINDOW | windows.WS_EX_WINDOWEDGE
 
-func createNativeWindow() (*window, error) {
+func (w *window) init() error {
 	var resErr error
 	resources.once.Do(func() {
 		resErr = initResources()
 	})
 	if resErr != nil {
-		return nil, resErr
+		return resErr
 	}
 	const dwStyle = windows.WS_OVERLAPPEDWINDOW
 
@@ -171,16 +179,15 @@ func createNativeWindow() (*window, error) {
 		resources.handle,
 		0)
 	if err != nil {
-		return nil, err
-	}
-	w := &window{
-		hwnd: hwnd,
+		return err
 	}
 	w.hdc, err = windows.GetDC(hwnd)
 	if err != nil {
-		return nil, err
+		windows.DestroyWindow(hwnd)
+		return err
 	}
-	return w, nil
+	w.hwnd = hwnd
+	return nil
 }
 
 // update() handles changes done by the user, and updates the configuration.
@@ -197,7 +204,7 @@ func (w *window) update() {
 		windows.GetSystemMetrics(windows.SM_CXSIZEFRAME),
 		windows.GetSystemMetrics(windows.SM_CYSIZEFRAME),
 	)
-	w.w.Event(ConfigEvent{Config: w.config})
+	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
 func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr {
@@ -238,7 +245,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 				e.State = key.Release
 			}
 
-			w.w.Event(e)
+			w.ProcessEvent(e)
 
 			if (wParam == windows.VK_F10) && (msg == windows.WM_SYSKEYDOWN || msg == windows.WM_SYSKEYUP) {
 				// Reserve F10 for ourselves, and don't let it open the system menu. Other Windows programs
@@ -259,15 +266,15 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_MBUTTONUP:
 		w.pointerButton(pointer.ButtonTertiary, false, lParam, getModifiers())
 	case windows.WM_CANCELMODE:
-		w.w.Event(pointer.Event{
+		w.ProcessEvent(pointer.Event{
 			Kind: pointer.Cancel,
 		})
 	case windows.WM_SETFOCUS:
 		w.focused = true
-		w.w.Event(key.FocusEvent{Focus: true})
+		w.ProcessEvent(key.FocusEvent{Focus: true})
 	case windows.WM_KILLFOCUS:
 		w.focused = false
-		w.w.Event(key.FocusEvent{Focus: false})
+		w.ProcessEvent(key.FocusEvent{Focus: false})
 	case windows.WM_NCACTIVATE:
 		if w.stage >= StageInactive {
 			if wParam == windows.TRUE {
@@ -288,7 +295,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_MOUSEMOVE:
 		x, y := coordsFromlParam(lParam)
 		p := f32.Point{X: float32(x), Y: float32(y)}
-		w.w.Event(pointer.Event{
+		w.ProcessEvent(pointer.Event{
 			Kind:      pointer.Move,
 			Source:    pointer.Mouse,
 			Position:  p,
@@ -301,14 +308,16 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_MOUSEHWHEEL:
 		w.scrollEvent(wParam, lParam, true, getModifiers())
 	case windows.WM_DESTROY:
-		w.w.Event(ViewEvent{})
-		w.w.Event(DestroyEvent{})
+		w.ProcessEvent(ViewEvent{})
+		w.ProcessEvent(DestroyEvent{})
 		if w.hdc != 0 {
 			windows.ReleaseDC(w.hdc)
 			w.hdc = 0
 		}
+		w.invMu.Lock()
 		// The system destroys the HWND for us.
 		w.hwnd = 0
+		w.invMu.Unlock()
 		windows.PostQuitMessage(0)
 	case windows.WM_NCCALCSIZE:
 		if w.config.Decorated {
@@ -328,7 +337,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		// Adjust window position to avoid the extra padding in maximized
 		// state. See https://devblogs.microsoft.com/oldnewthing/20150304-00/?p=44543.
 		// Note that trying to do the adjustment in WM_GETMINMAXINFO is ignored by Windows.
-		szp := (*windows.NCCalcSizeParams)(unsafe.Pointer(uintptr(lParam)))
+		szp := (*windows.NCCalcSizeParams)(unsafe.Pointer(lParam))
 		mi := windows.GetMonitorInfo(w.hwnd)
 		szp.Rgrc[0] = mi.WorkArea
 		return 0
@@ -350,7 +359,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			w.setStage(StageRunning)
 		}
 	case windows.WM_GETMINMAXINFO:
-		mm := (*windows.MinMaxInfo)(unsafe.Pointer(uintptr(lParam)))
+		mm := (*windows.MinMaxInfo)(unsafe.Pointer(lParam))
 		var bw, bh int32
 		if w.config.Decorated {
 			r := windows.GetWindowRect(w.hwnd)
@@ -378,7 +387,8 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			return windows.TRUE
 		}
 	case _WM_WAKEUP:
-		w.w.Event(wakeupEvent{})
+		w.loop.Wakeup()
+		w.loop.FlushEvents()
 	case windows.WM_IME_STARTCOMPOSITION:
 		imc := windows.ImmGetContext(w.hwnd)
 		if imc == 0 {
@@ -518,7 +528,7 @@ func (w *window) pointerButton(btn pointer.Buttons, press bool, lParam uintptr, 
 	}
 	x, y := coordsFromlParam(lParam)
 	p := f32.Point{X: float32(x), Y: float32(y)}
-	w.w.Event(pointer.Event{
+	w.ProcessEvent(pointer.Event{
 		Kind:      kind,
 		Source:    pointer.Mouse,
 		Position:  p,
@@ -553,7 +563,7 @@ func (w *window) scrollEvent(wParam, lParam uintptr, horizontal bool, kmods key.
 			sp.Y = -dist
 		}
 	}
-	w.w.Event(pointer.Event{
+	w.ProcessEvent(pointer.Event{
 		Kind:      pointer.Scroll,
 		Source:    pointer.Mouse,
 		Position:  p,
@@ -565,7 +575,7 @@ func (w *window) scrollEvent(wParam, lParam uintptr, horizontal bool, kmods key.
 }
 
 // Adapted from https://blogs.msdn.microsoft.com/oldnewthing/20060126-00/?p=32513/
-func (w *window) loop() error {
+func (w *window) runLoop() {
 	msg := new(windows.Msg)
 loop:
 	for {
@@ -576,7 +586,7 @@ loop:
 		}
 		switch ret := windows.GetMessage(msg, 0, 0, 0); ret {
 		case -1:
-			return errors.New("GetMessage failed")
+			panic(errors.New("GetMessage failed"))
 		case 0:
 			// WM_QUIT received.
 			break loop
@@ -584,7 +594,6 @@ loop:
 		windows.TranslateMessage(msg)
 		windows.DispatchMessage(msg)
 	}
-	return nil
 }
 
 func (w *window) EditorStateChanged(old, new editorState) {
@@ -602,7 +611,35 @@ func (w *window) SetAnimating(anim bool) {
 	w.animating = anim
 }
 
-func (w *window) Wakeup() {
+func (w *window) ProcessEvent(e event.Event) {
+	w.w.ProcessEvent(e)
+	w.loop.FlushEvents()
+}
+
+func (w *window) Event() event.Event {
+	return w.loop.Event()
+}
+
+func (w *window) Invalidate() {
+	w.loop.Invalidate()
+}
+
+func (w *window) Run(f func()) {
+	w.loop.Run(f)
+}
+
+func (w *window) Frame(frame *op.Ops) {
+	w.loop.Frame(frame)
+}
+
+func (w *window) wakeup() {
+	w.invMu.Lock()
+	defer w.invMu.Unlock()
+	if w.hwnd == 0 {
+		w.loop.Wakeup()
+		w.loop.FlushEvents()
+		return
+	}
 	if err := windows.PostMessage(w.hwnd, _WM_WAKEUP, 0, 0); err != nil {
 		panic(err)
 	}
@@ -611,7 +648,7 @@ func (w *window) Wakeup() {
 func (w *window) setStage(s Stage) {
 	if s != w.stage {
 		w.stage = s
-		w.w.Event(StageEvent{Stage: s})
+		w.ProcessEvent(StageEvent{Stage: s})
 	}
 }
 
@@ -621,7 +658,7 @@ func (w *window) draw(sync bool) {
 	}
 	dpi := windows.GetWindowDPI(w.hwnd)
 	cfg := configForDPI(dpi)
-	w.w.Event(frameEvent{
+	w.ProcessEvent(frameEvent{
 		FrameEvent: FrameEvent{
 			Now:    time.Now(),
 			Size:   w.config.Size,
@@ -668,7 +705,7 @@ func (w *window) readClipboard() error {
 	}
 	defer windows.GlobalUnlock(mem)
 	content := gowindows.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
-	w.w.Event(transfer.DataEvent{
+	w.ProcessEvent(transfer.DataEvent{
 		Type: "application/text",
 		Open: func() io.ReadCloser {
 			return io.NopCloser(strings.NewReader(content))
