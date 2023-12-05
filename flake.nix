@@ -3,7 +3,7 @@
   description = "Gio build environment";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs";
+    nixpkgs.url = "github:NixOS/nixpkgs/23.11";
     android.url = "github:tadfisher/android-nixpkgs";
     android.inputs.nixpkgs.follows = "nixpkgs";
   };
@@ -33,10 +33,10 @@
             default = with pkgs; mkShell
               ({
                 ANDROID_SDK_ROOT = "${android-sdk}/share/android-sdk";
-                JAVA_HOME = jdk8.home;
+                JAVA_HOME = jdk17.home;
                 packages = [
                   android-sdk
-                  jdk8
+                  jdk17
                   clang
                 ] ++ (if stdenv.isLinux then [
                   vulkan-headers
@@ -46,7 +46,7 @@
                   xorg.libXcursor
                   xorg.libXfixes
                   libGL
-                  pkgconfig
+                  pkg-config
                 ] else if stdenv.isDarwin then [
                   darwin.apple_sdk_11_0.frameworks.Foundation
                   darwin.apple_sdk_11_0.frameworks.Metal
