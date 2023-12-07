@@ -29,8 +29,8 @@ type Scrollbar struct {
 	oldDragPos float32
 }
 
-// Layout updates the internal state of the scrollbar based on events
-// since the previous call to Layout. The provided axis will be used to
+// Update updates the internal state of the scrollbar based on events
+// since the previous call to Update. The provided axis will be used to
 // normalize input event coordinates and constraints into an axis-
 // independent format. viewportStart is the position of the beginning
 // of the scrollable viewport relative to the underlying content expressed
@@ -39,7 +39,7 @@ type Scrollbar struct {
 // as a value in the range [0,1]. For example, if viewportStart is 0.25
 // and viewportEnd is .5, the viewport described by the scrollbar is
 // currently showing the second quarter of the underlying content.
-func (s *Scrollbar) Layout(gtx layout.Context, axis layout.Axis, viewportStart, viewportEnd float32) layout.Dimensions {
+func (s *Scrollbar) Update(gtx layout.Context, axis layout.Axis, viewportStart, viewportEnd float32) {
 	// Calculate the length of the major axis of the scrollbar. This is
 	// the length of the track within which pointer events occur, and is
 	// used to scale those interactions.
@@ -137,8 +137,6 @@ func (s *Scrollbar) Layout(gtx layout.Context, axis layout.Axis, viewportStart, 
 	// Process events from the indicator so that hover is
 	// detected properly.
 	_ = s.indicator.Update(gtx)
-
-	return layout.Dimensions{}
 }
 
 // AddTrack configures the track click listener for the scrollbar to use
