@@ -191,6 +191,12 @@ static void handleMouse(NSView *view, NSEvent *event, int typ, CGFloat dx, CGFlo
     r = [self convertRect:r toView:nil];
     return [[self window] convertRectToScreen:r];
 }
+- (void)applicationWillUnhide:(NSNotification *)notification {
+	gio_onShow((__bridge CFTypeRef)self);
+}
+- (void)applicationDidHide:(NSNotification *)notification {
+	gio_onHide((__bridge CFTypeRef)self);
+}
 @end
 
 // Delegates are weakly referenced from their peers. Nothing
@@ -374,6 +380,15 @@ CFTypeRef gio_createView(void) {
 		GioView* view = [[GioView alloc] initWithFrame:frame];
 		view.wantsLayer = YES;
 		view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
+
+		[[NSNotificationCenter defaultCenter] addObserver:view
+												 selector:@selector(applicationWillUnhide:)
+													 name:NSApplicationWillUnhideNotification
+												   object:nil];
+		[[NSNotificationCenter defaultCenter] addObserver:view
+												 selector:@selector(applicationDidHide:)
+													 name:NSApplicationDidHideNotification
+												   object:nil];
 		return CFBridgingRetain(view);
 	}
 }
@@ -383,12 +398,6 @@ CFTypeRef gio_createView(void) {
 	[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 	[NSApp activateIgnoringOtherApps:YES];
 	gio_onFinishLaunching();
-}
-- (void)applicationDidHide:(NSNotification *)aNotification {
-	gio_onAppHide();
-}
-- (void)applicationWillUnhide:(NSNotification *)notification {
-	gio_onAppShow();
 }
 @end
 

@@ -851,20 +851,6 @@ func gio_onWindowed(view C.CFTypeRef) {
 	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
-//export gio_onAppHide
-func gio_onAppHide() {
-	for _, w := range viewMap {
-		w.setStage(StagePaused)
-	}
-}
-
-//export gio_onAppShow
-func gio_onAppShow() {
-	for _, w := range viewMap {
-		w.setStage(StageRunning)
-	}
-}
-
 //export gio_onFinishLaunching
 func gio_onFinishLaunching() {
 	close(launched)
