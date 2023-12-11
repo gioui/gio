@@ -36,6 +36,14 @@ import (
 type Option func(unit.Metric, *Config)
 
 // Window represents an operating system window.
+//
+// The zero-value Window is useful, and calling any method on
+// it creates and shows a new GUI window. On iOS or Android,
+// the first Window represents the the window previously
+// created by the platform.
+//
+// More than one Window is not supported on iOS, Android,
+// WebAssembly.
 type Window struct {
 	ctx context
 	gpu gpu.GPU
@@ -70,7 +78,6 @@ type Window struct {
 		*material.Theme
 		*widget.Decorations
 	}
-	callbacks callbacks
 	nocontext bool
 	// semantic data, lazily evaluated if requested by a backend to speed up
 	// the cases where semantic data is not needed.
@@ -85,9 +92,8 @@ type Window struct {
 	imeState editorState
 	driver   driver
 	// basic is the driver interface that is needed even after the window is gone.
-	basic       basicDriver
-	once        sync.Once
-	initialOpts []Option
+	basic basicDriver
+	once  sync.Once
 	// coalesced tracks the most recent events waiting to be delivered
 	// to the client.
 	coalesced eventSummary
@@ -111,56 +117,6 @@ type eventSummary struct {
 
 type callbacks struct {
 	w *Window
-}
-
-// NewWindow creates a new window for a set of window
-// options. The options are hints; the platform is free to
-// ignore or adjust them.
-//
-// If the current program is running on iOS or Android,
-// NewWindow returns the window previously created by the
-// platform.
-//
-// Calling NewWindow more than once is not supported on
-// iOS, Android, WebAssembly.
-func NewWindow(options ...Option) *Window {
-	debug.Parse()
-	// Measure decoration height.
-	deco := new(widget.Decorations)
-	theme := material.NewTheme()
-	theme.Shaper = text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Regular()))
-	decoStyle := material.Decorations(theme, deco, 0, "")
-	gtx := layout.Context{
-		Ops: new(op.Ops),
-		// Measure in Dp.
-		Metric: unit.Metric{},
-	}
-	// Allow plenty of space.
-	gtx.Constraints.Max.Y = 200
-	dims := decoStyle.Layout(gtx)
-	decoHeight := unit.Dp(dims.Size.Y)
-	defaultOptions := []Option{
-		Size(800, 600),
-		Title("Gio"),
-		Decorated(true),
-		decoHeightOpt(decoHeight),
-	}
-	options = append(defaultOptions, options...)
-	var cnf Config
-	cnf.apply(unit.Metric{}, options)
-
-	w := &Window{
-		nocontext: cnf.CustomRenderer,
-	}
-	w.decorations.Theme = theme
-	w.decorations.Decorations = deco
-	w.decorations.enabled = cnf.Decorated
-	w.decorations.height = decoHeight
-	w.imeState.compose = key.Range{Start: -1, End: -1}
-	w.semantic.ids = make(map[input.SemanticID]input.SemanticNode)
-	w.callbacks.w = w
-	w.initialOpts = options
-	return w
 }
 
 func decoHeightOpt(h unit.Dp) Option {
@@ -324,11 +280,13 @@ func (w *Window) Invalidate() {
 	w.basic.Invalidate()
 }
 
-// Option applies the options to the window.
+// Option applies the options to the window. The options are hints; the platform is
+// free to ignore or adjust them.
 func (w *Window) Option(opts ...Option) {
 	if len(opts) == 0 {
 		return
 	}
+	w.init(opts...)
 	w.Run(func() {
 		cnf := Config{Decorated: w.decorations.enabled}
 		for _, opt := range opts {
@@ -738,9 +696,41 @@ func (w *Window) NextEvent() event.Event {
 	return w.basic.Event()
 }
 
-func (w *Window) init() {
+func (w *Window) init(initial ...Option) {
 	w.once.Do(func() {
-		newWindow(&w.callbacks, w.initialOpts)
+		debug.Parse()
+		// Measure decoration height.
+		deco := new(widget.Decorations)
+		theme := material.NewTheme()
+		theme.Shaper = text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Regular()))
+		decoStyle := material.Decorations(theme, deco, 0, "")
+		gtx := layout.Context{
+			Ops: new(op.Ops),
+			// Measure in Dp.
+			Metric: unit.Metric{},
+		}
+		// Allow plenty of space.
+		gtx.Constraints.Max.Y = 200
+		dims := decoStyle.Layout(gtx)
+		decoHeight := unit.Dp(dims.Size.Y)
+		defaultOptions := []Option{
+			Size(800, 600),
+			Title("Gio"),
+			Decorated(true),
+			decoHeightOpt(decoHeight),
+		}
+		options := append(defaultOptions, initial...)
+		var cnf Config
+		cnf.apply(unit.Metric{}, options)
+
+		w.nocontext = cnf.CustomRenderer
+		w.decorations.Theme = theme
+		w.decorations.Decorations = deco
+		w.decorations.enabled = cnf.Decorated
+		w.decorations.height = decoHeight
+		w.imeState.compose = key.Range{Start: -1, End: -1}
+		w.semantic.ids = make(map[input.SemanticID]input.SemanticNode)
+		newWindow(&callbacks{w}, options)
 	})
 }
 
