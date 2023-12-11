@@ -11,6 +11,7 @@
 __attribute__ ((visibility ("hidden"))) Class gio_layerClass(void);
 
 @interface GioView: UIView <UIKeyInput>
+@property uintptr_t handle;
 @end
 
 @implementation GioViewController
@@ -54,33 +55,33 @@ CGFloat _keyboardHeight;
 }
 
 - (void)applicationWillEnterForeground:(UIApplication *)application {
-	UIView *drawView = self.view.subviews[0];
-	if (drawView != nil) {
-		onStart((__bridge CFTypeRef)drawView);
+	GioView *view = (GioView *)self.view.subviews[0];
+	if (view != nil) {
+		onStart(view.handle);
 	}
 }
 
 - (void)applicationDidEnterBackground:(UIApplication *)application {
-	UIView *drawView = self.view.subviews[0];
-	if (drawView != nil) {
-		onStop((__bridge CFTypeRef)drawView);
+	GioView *view = (GioView *)self.view.subviews[0];
+	if (view != nil) {
+		onStop(view.handle);
 	}
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
 	[super viewDidDisappear:animated];
-	CFTypeRef viewRef = (__bridge CFTypeRef)self.view.subviews[0];
-	onDestroy(viewRef);
+	GioView *view = (GioView *)self.view.subviews[0];
+	onDestroy(view.handle);
 }
 
 - (void)viewDidLayoutSubviews {
 	[super viewDidLayoutSubviews];
-	UIView *view = self.view.subviews[0];
+	GioView *view = (GioView *)self.view.subviews[0];
 	CGRect frame = self.view.bounds;
 	// Adjust view bounds to make room for the keyboard.
 	frame.size.height -= _keyboardHeight;
 	view.frame = frame;
-	gio_onDraw((__bridge CFTypeRef)view);
+	gio_onDraw(view.handle);
 }
 
 - (void)didReceiveMemoryWarning {
@@ -101,11 +102,10 @@ CGFloat _keyboardHeight;
 }
 @end
 
-static void handleTouches(int last, UIView *view, NSSet<UITouch *> *touches, UIEvent *event) {
+static void handleTouches(int last, GioView *view, NSSet<UITouch *> *touches, UIEvent *event) {
 	CGFloat scale = view.contentScaleFactor;
 	NSUInteger i = 0;
 	NSUInteger n = [touches count];
-	CFTypeRef viewRef = (__bridge CFTypeRef)view;
 	for (UITouch *touch in touches) {
 		CFTypeRef touchRef = (__bridge CFTypeRef)touch;
 		i++;
@@ -116,7 +116,7 @@ static void handleTouches(int last, UIView *view, NSSet<UITouch *> *touches, UIE
 			CGPoint loc = [coalescedTouch locationInView:view];
 			j++;
 			int lastTouch = last && i == n && j == m;
-			onTouch(lastTouch, viewRef, touchRef, touch.phase, loc.x*scale, loc.y*scale, [coalescedTouch timestamp]);
+			onTouch(view.handle, lastTouch, touchRef, touch.phase, loc.x*scale, loc.y*scale, [coalescedTouch timestamp]);
 		}
 	}
 }
@@ -151,13 +151,13 @@ NSArray<UIKeyCommand *> *_keyCommands;
 
 - (void)onWindowDidBecomeKey:(NSNotification *)note {
 	if (self.isFirstResponder) {
-		onFocus((__bridge CFTypeRef)self, YES);
+		onFocus(self.handle, YES);
 	}
 }
 
 - (void)onWindowDidResignKey:(NSNotification *)note {
 	if (self.isFirstResponder) {
-		onFocus((__bridge CFTypeRef)self, NO);
+		onFocus(self.handle, NO);
 	}
 }
 
@@ -178,7 +178,7 @@ NSArray<UIKeyCommand *> *_keyCommands;
 }
 
 - (void)insertText:(NSString *)text {
-	onText((__bridge CFTypeRef)self, (__bridge CFTypeRef)text);
+	onText(self.handle, (__bridge CFTypeRef)text);
 }
 
 - (BOOL)canBecomeFirstResponder {
@@ -190,23 +190,23 @@ NSArray<UIKeyCommand *> *_keyCommands;
 }
 
 - (void)deleteBackward {
-	onDeleteBackward((__bridge CFTypeRef)self);
+	onDeleteBackward(self.handle);
 }
 
 - (void)onUpArrow {
-	onUpArrow((__bridge CFTypeRef)self);
+	onUpArrow(self.handle);
 }
 
 - (void)onDownArrow {
-	onDownArrow((__bridge CFTypeRef)self);
+	onDownArrow(self.handle);
 }
 
 - (void)onLeftArrow {
-	onLeftArrow((__bridge CFTypeRef)self);
+	onLeftArrow(self.handle);
 }
 
 - (void)onRightArrow {
-	onRightArrow((__bridge CFTypeRef)self);
+	onRightArrow(self.handle);
 }
 
 - (NSArray<UIKeyCommand *> *)keyCommands {
@@ -270,4 +270,9 @@ void gio_showCursor() {
 
 void gio_setCursor(NSUInteger curID) {
 	// Not supported.
+}
+
+void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle) {
+	GioView *v = (__bridge GioView *)viewRef;
+	v.handle = handle;
 }

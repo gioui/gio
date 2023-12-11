@@ -12,6 +12,8 @@ package app
 #include <UIKit/UIKit.h>
 #include <stdint.h>
 
+__attribute__ ((visibility ("hidden"))) void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle);
+
 struct drawParams {
 	CGFloat dpi, sdpi;
 	CGFloat width, height;
@@ -74,6 +76,7 @@ import (
 	"image"
 	"io"
 	"runtime"
+	"runtime/cgo"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -110,8 +113,6 @@ type window struct {
 
 var mainWindow = newWindowRendezvous()
 
-var views = make(map[C.CFTypeRef]*window)
-
 func init() {
 	// Darwin requires UI operations happen on the main thread only.
 	runtime.LockOSThread()
@@ -135,15 +136,19 @@ func onCreate(view, controller C.CFTypeRef) {
 		return
 	}
 	w.displayLink = dl
-	views[view] = w
+	C.gio_viewSetHandle(view, C.uintptr_t(cgo.NewHandle(w)))
 	w.Configure(wopts.options)
 	w.ProcessEvent(StageEvent{Stage: StageRunning})
 	w.ProcessEvent(ViewEvent{ViewController: uintptr(controller)})
 }
 
+func viewFor(h C.uintptr_t) *window {
+	return cgo.Handle(h).Value().(*window)
+}
+
 //export gio_onDraw
-func gio_onDraw(view C.CFTypeRef) {
-	w := views[view]
+func gio_onDraw(h C.uintptr_t) {
+	w := viewFor(h)
 	w.draw(true)
 }
 
@@ -181,34 +186,34 @@ func (w *window) draw(sync bool) {
 }
 
 //export onStop
-func onStop(view C.CFTypeRef) {
-	w := views[view]
+func onStop(h C.uintptr_t) {
+	w := viewFor(h)
 	w.hidden = true
 	w.ProcessEvent(StageEvent{Stage: StagePaused})
 }
 
 //export onStart
-func onStart(view C.CFTypeRef) {
-	w := views[view]
+func onStart(h C.uintptr_t) {
+	w := viewFor(h)
 	w.hidden = false
 	w.ProcessEvent(StageEvent{Stage: StageRunning})
 	w.draw(true)
 }
 
 //export onDestroy
-func onDestroy(view C.CFTypeRef) {
-	w := views[view]
+func onDestroy(h C.uintptr_t) {
+	w := viewFor(h)
 	w.ProcessEvent(ViewEvent{})
 	w.ProcessEvent(DestroyEvent{})
 	w.displayLink.Close()
 	w.displayLink = nil
-	delete(views, view)
+	cgo.Handle(h).Delete()
 	w.view = 0
 }
 
 //export onFocus
-func onFocus(view C.CFTypeRef, focus int) {
-	w := views[view]
+func onFocus(h C.uintptr_t, focus int) {
+	w := viewFor(h)
 	w.ProcessEvent(key.FocusEvent{Focus: focus != 0})
 }
 
@@ -219,38 +224,38 @@ func onLowMemory() {
 }
 
 //export onUpArrow
-func onUpArrow(view C.CFTypeRef) {
-	views[view].onKeyCommand(key.NameUpArrow)
+func onUpArrow(h C.uintptr_t) {
+	viewFor(h).onKeyCommand(key.NameUpArrow)
 }
 
 //export onDownArrow
-func onDownArrow(view C.CFTypeRef) {
-	views[view].onKeyCommand(key.NameDownArrow)
+func onDownArrow(h C.uintptr_t) {
+	viewFor(h).onKeyCommand(key.NameDownArrow)
 }
 
 //export onLeftArrow
-func onLeftArrow(view C.CFTypeRef) {
-	views[view].onKeyCommand(key.NameLeftArrow)
+func onLeftArrow(h C.uintptr_t) {
+	viewFor(h).onKeyCommand(key.NameLeftArrow)
 }
 
 //export onRightArrow
-func onRightArrow(view C.CFTypeRef) {
-	views[view].onKeyCommand(key.NameRightArrow)
+func onRightArrow(h C.uintptr_t) {
+	viewFor(h).onKeyCommand(key.NameRightArrow)
 }
 
 //export onDeleteBackward
-func onDeleteBackward(view C.CFTypeRef) {
-	views[view].onKeyCommand(key.NameDeleteBackward)
+func onDeleteBackward(h C.uintptr_t) {
+	viewFor(h).onKeyCommand(key.NameDeleteBackward)
 }
 
 //export onText
-func onText(view, str C.CFTypeRef) {
-	w := views[view]
+func onText(h C.uintptr_t, str C.CFTypeRef) {
+	w := viewFor(h)
 	w.w.EditorInsert(nsstringToString(str))
 }
 
 //export onTouch
-func onTouch(last C.int, view, touchRef C.CFTypeRef, phase C.NSInteger, x, y C.CGFloat, ti C.double) {
+func onTouch(h C.uintptr_t, last C.int, touchRef C.CFTypeRef, phase C.NSInteger, x, y C.CGFloat, ti C.double) {
 	var kind pointer.Kind
 	switch phase {
 	case C.UITouchPhaseBegan:
@@ -264,7 +269,7 @@ func onTouch(last C.int, view, touchRef C.CFTypeRef, phase C.NSInteger, x, y C.C
 	default:
 		return
 	}
-	w := views[view]
+	w := viewFor(h)
 	t := time.Duration(float64(ti) * float64(time.Second))
 	p := f32.Point{X: float32(x), Y: float32(y)}
 	w.ProcessEvent(pointer.Event{
