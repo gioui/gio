@@ -10,6 +10,7 @@ import (
 	"image"
 	"io"
 	"runtime"
+	"runtime/cgo"
 	"strings"
 	"time"
 	"unicode"
@@ -41,6 +42,7 @@ import (
 __attribute__ ((visibility ("hidden"))) void gio_main(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight);
+__attribute__ ((visibility ("hidden"))) void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle);
 
 static void writeClipboard(CFTypeRef str) {
 	@autoreleasepool {
@@ -264,9 +266,6 @@ type window struct {
 	config Config
 }
 
-// viewMap is the mapping from Cocoa NSViews to Go windows.
-var viewMap = make(map[C.CFTypeRef]*window)
-
 // launched is closed when applicationDidFinishLaunching is called.
 var launched = make(chan struct{})
 
@@ -274,18 +273,8 @@ var launched = make(chan struct{})
 // cascadeTopLeftFromPoint.
 var nextTopLeft C.NSPoint
 
-// mustView is like lookupView, except that it panics
-// if the view isn't mapped.
-func mustView(view C.CFTypeRef) *window {
-	w, exists := viewMap[view]
-	if !exists {
-		panic("no window for view")
-	}
-	return w
-}
-
-func insertView(view C.CFTypeRef, w *window) {
-	viewMap[view] = w
+func windowFor(h C.uintptr_t) *window {
+	return cgo.Handle(h).Value().(*window)
 }
 
 func (w *window) contextView() C.CFTypeRef {
@@ -488,14 +477,14 @@ func (w *window) setStage(stage Stage) {
 }
 
 //export gio_onKeys
-func gio_onKeys(view, cstr C.CFTypeRef, ti C.double, mods C.NSUInteger, keyDown C.bool) {
+func gio_onKeys(h C.uintptr_t, cstr C.CFTypeRef, ti C.double, mods C.NSUInteger, keyDown C.bool) {
 	str := nsstringToString(cstr)
 	kmods := convertMods(mods)
 	ks := key.Release
 	if keyDown {
 		ks = key.Press
 	}
-	w := mustView(view)
+	w := windowFor(h)
 	for _, k := range str {
 		if n, ok := convertKey(k); ok {
 			w.ProcessEvent(key.Event{
@@ -508,15 +497,15 @@ func gio_onKeys(view, cstr C.CFTypeRef, ti C.double, mods C.NSUInteger, keyDown 
 }
 
 //export gio_onText
-func gio_onText(view, cstr C.CFTypeRef) {
+func gio_onText(h C.uintptr_t, cstr C.CFTypeRef) {
 	str := nsstringToString(cstr)
-	w := mustView(view)
+	w := windowFor(h)
 	w.w.EditorInsert(str)
 }
 
 //export gio_onMouse
-func gio_onMouse(view, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x, y, dx, dy C.CGFloat, ti C.double, mods C.NSUInteger) {
-	w := mustView(view)
+func gio_onMouse(h C.uintptr_t, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x, y, dx, dy C.CGFloat, ti C.double, mods C.NSUInteger) {
+	w := windowFor(h)
 	t := time.Duration(float64(ti)*float64(time.Second) + .5)
 	xf, yf := float32(x)*w.scale, float32(y)*w.scale
 	dxf, dyf := float32(dx)*w.scale, float32(dy)*w.scale
@@ -565,14 +554,14 @@ func gio_onMouse(view, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x, y, dx, 
 }
 
 //export gio_onDraw
-func gio_onDraw(view C.CFTypeRef) {
-	w := mustView(view)
+func gio_onDraw(h C.uintptr_t) {
+	w := windowFor(h)
 	w.draw()
 }
 
 //export gio_onFocus
-func gio_onFocus(view C.CFTypeRef, focus C.int) {
-	w := mustView(view)
+func gio_onFocus(h C.uintptr_t, focus C.int) {
+	w := windowFor(h)
 	w.ProcessEvent(key.FocusEvent{Focus: focus == 1})
 	if w.stage >= StageInactive {
 		if focus == 0 {
@@ -585,15 +574,15 @@ func gio_onFocus(view C.CFTypeRef, focus C.int) {
 }
 
 //export gio_onChangeScreen
-func gio_onChangeScreen(view C.CFTypeRef, did uint64) {
-	w := mustView(view)
+func gio_onChangeScreen(h C.uintptr_t, did uint64) {
+	w := windowFor(h)
 	w.displayLink.SetDisplayID(did)
 	C.setNeedsDisplay(w.view)
 }
 
 //export gio_hasMarkedText
-func gio_hasMarkedText(view C.CFTypeRef) C.int {
-	w := mustView(view)
+func gio_hasMarkedText(h C.uintptr_t) C.int {
+	w := windowFor(h)
 	state := w.w.EditorState()
 	if state.compose.Start != -1 {
 		return 1
@@ -602,8 +591,8 @@ func gio_hasMarkedText(view C.CFTypeRef) C.int {
 }
 
 //export gio_markedRange
-func gio_markedRange(view C.CFTypeRef) C.NSRange {
-	w := mustView(view)
+func gio_markedRange(h C.uintptr_t) C.NSRange {
+	w := windowFor(h)
 	state := w.w.EditorState()
 	rng := state.compose
 	start, end := rng.Start, rng.End
@@ -618,8 +607,8 @@ func gio_markedRange(view C.CFTypeRef) C.NSRange {
 }
 
 //export gio_selectedRange
-func gio_selectedRange(view C.CFTypeRef) C.NSRange {
-	w := mustView(view)
+func gio_selectedRange(h C.uintptr_t) C.NSRange {
+	w := windowFor(h)
 	state := w.w.EditorState()
 	rng := state.Selection
 	start, end := rng.Start, rng.End
@@ -634,14 +623,14 @@ func gio_selectedRange(view C.CFTypeRef) C.NSRange {
 }
 
 //export gio_unmarkText
-func gio_unmarkText(view C.CFTypeRef) {
-	w := mustView(view)
+func gio_unmarkText(h C.uintptr_t) {
+	w := windowFor(h)
 	w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
 }
 
 //export gio_setMarkedText
-func gio_setMarkedText(view, cstr C.CFTypeRef, selRange C.NSRange, replaceRange C.NSRange) {
-	w := mustView(view)
+func gio_setMarkedText(h C.uintptr_t, cstr C.CFTypeRef, selRange C.NSRange, replaceRange C.NSRange) {
+	w := windowFor(h)
 	str := nsstringToString(cstr)
 	state := w.w.EditorState()
 	rng := state.compose
@@ -680,8 +669,8 @@ func gio_setMarkedText(view, cstr C.CFTypeRef, selRange C.NSRange, replaceRange 
 }
 
 //export gio_substringForProposedRange
-func gio_substringForProposedRange(view C.CFTypeRef, crng C.NSRange, actual C.NSRangePointer) C.CFTypeRef {
-	w := mustView(view)
+func gio_substringForProposedRange(h C.uintptr_t, crng C.NSRange, actual C.NSRangePointer) C.CFTypeRef {
+	w := windowFor(h)
 	state := w.w.EditorState()
 	start, end := state.Snippet.Start, state.Snippet.End
 	if start > end {
@@ -701,8 +690,8 @@ func gio_substringForProposedRange(view C.CFTypeRef, crng C.NSRange, actual C.NS
 }
 
 //export gio_insertText
-func gio_insertText(view, cstr C.CFTypeRef, crng C.NSRange) {
-	w := mustView(view)
+func gio_insertText(h C.uintptr_t, cstr C.CFTypeRef, crng C.NSRange) {
+	w := windowFor(h)
 	state := w.w.EditorState()
 	rng := state.compose
 	if rng.Start == -1 {
@@ -726,13 +715,13 @@ func gio_insertText(view, cstr C.CFTypeRef, crng C.NSRange) {
 }
 
 //export gio_characterIndexForPoint
-func gio_characterIndexForPoint(view C.CFTypeRef, p C.NSPoint) C.NSUInteger {
+func gio_characterIndexForPoint(h C.uintptr_t, p C.NSPoint) C.NSUInteger {
 	return C.NSNotFound
 }
 
 //export gio_firstRectForCharacterRange
-func gio_firstRectForCharacterRange(view C.CFTypeRef, crng C.NSRange, actual C.NSRangePointer) C.NSRect {
-	w := mustView(view)
+func gio_firstRectForCharacterRange(h C.uintptr_t, crng C.NSRange, actual C.NSRangePointer) C.NSRect {
+	w := windowFor(h)
 	state := w.w.EditorState()
 	sel := state.Selection
 	u16start := state.UTF16Index(sel.Start)
@@ -813,40 +802,40 @@ func configFor(scale float32) unit.Metric {
 }
 
 //export gio_onClose
-func gio_onClose(view C.CFTypeRef) {
-	w := mustView(view)
+func gio_onClose(h C.uintptr_t) {
+	w := windowFor(h)
 	w.ProcessEvent(ViewEvent{})
 	w.setStage(StagePaused)
 	w.ProcessEvent(DestroyEvent{})
 	w.displayLink.Close()
 	w.displayLink = nil
-	delete(viewMap, view)
+	cgo.Handle(h).Delete()
 	C.CFRelease(w.view)
 	w.view = 0
 }
 
 //export gio_onHide
-func gio_onHide(view C.CFTypeRef) {
-	w := mustView(view)
+func gio_onHide(h C.uintptr_t) {
+	w := windowFor(h)
 	w.setStage(StagePaused)
 }
 
 //export gio_onShow
-func gio_onShow(view C.CFTypeRef) {
-	w := mustView(view)
+func gio_onShow(h C.uintptr_t) {
+	w := windowFor(h)
 	w.setStage(StageRunning)
 }
 
 //export gio_onFullscreen
-func gio_onFullscreen(view C.CFTypeRef) {
-	w := mustView(view)
+func gio_onFullscreen(h C.uintptr_t) {
+	w := windowFor(h)
 	w.config.Mode = Fullscreen
 	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
 //export gio_onWindowed
-func gio_onWindowed(view C.CFTypeRef) {
-	w := mustView(view)
+func gio_onWindowed(h C.uintptr_t) {
+	w := windowFor(h)
 	w.config.Mode = Windowed
 	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
@@ -910,7 +899,7 @@ func (w *window) init() error {
 		C.CFRelease(view)
 		return err
 	}
-	insertView(view, w)
+	C.gio_viewSetHandle(view, C.uintptr_t(cgo.NewHandle(w)))
 	w.view = view
 	return nil
 }
