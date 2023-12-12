@@ -3,7 +3,7 @@
 //go:build darwin && ios
 // +build darwin,ios
 
-package log
+package app
 
 /*
 #cgo CFLAGS: -Werror -fmodules -fobjc-arc -x objective-c

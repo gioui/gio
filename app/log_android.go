@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package log
+package app
 
 /*
 #cgo LDFLAGS: -llog
@@ -22,7 +22,7 @@ import (
 // 1024 is the truncation limit from android/log.h, plus a \n.
 const logLineLimit = 1024
 
-var logTag = C.CString(appID)
+var logTag = C.CString(ID)
 
 func init() {
 	// Android's logcat already includes timestamps.

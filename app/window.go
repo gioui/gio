@@ -28,8 +28,6 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
-
-	_ "gioui.org/app/internal/log"
 )
 
 // Option configures a window.
