@@ -396,5 +396,12 @@ func gio_runMain() {
 	runMain()
 }
 
+func (w *window) wakeup() {
+	runOnMain(func() {
+		w.loop.Wakeup()
+		w.loop.FlushEvents()
+	})
+}
+
 func (UIKitViewEvent) implementsViewEvent() {}
 func (UIKitViewEvent) ImplementsEvent()     {}

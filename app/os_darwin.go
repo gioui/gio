@@ -15,8 +15,8 @@ __attribute__ ((visibility ("hidden"))) void gio_hideCursor();
 __attribute__ ((visibility ("hidden"))) void gio_showCursor();
 __attribute__ ((visibility ("hidden"))) void gio_setCursor(NSUInteger curID);
 
-static bool isMainThread() {
-	return [NSThread isMainThread];
+static int isMainThread() {
+	return [NSThread isMainThread] ? 1 : 0;
 }
 
 static NSUInteger nsstringLength(CFTypeRef cstr) {
@@ -77,7 +77,7 @@ var mainFuncs = make(chan func(), 1)
 
 // runOnMain runs the function on the main thread.
 func runOnMain(f func()) {
-	if C.isMainThread() {
+	if isMainThread() {
 		f()
 		return
 	}
@@ -85,6 +85,10 @@ func runOnMain(f func()) {
 		mainFuncs <- f
 		C.gio_wakeupMainThread()
 	}()
+}
+
+func isMainThread() bool {
+	return C.isMainThread() != 0
 }
 
 //export gio_dispatchMainFuncs
@@ -258,11 +262,4 @@ func windowSetCursor(from, to pointer.Cursor) pointer.Cursor {
 	}
 	C.gio_setCursor(C.NSUInteger(macosCursorID[to]))
 	return to
-}
-
-func (w *window) wakeup() {
-	runOnMain(func() {
-		w.loop.Wakeup()
-		w.loop.FlushEvents()
-	})
 }

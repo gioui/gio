@@ -39,7 +39,7 @@ import (
 #define MOUSE_DOWN 3
 #define MOUSE_SCROLL 4
 
-__attribute__ ((visibility ("hidden"))) void gio_main(void);
+__attribute__ ((visibility ("hidden"))) void gio_initApp(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight);
 __attribute__ ((visibility ("hidden"))) void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle);
@@ -289,6 +289,16 @@ static void invalidateCharacterCoordinates(CFTypeRef viewRef) {
 		}
 	}
 }
+
+static void dispatchEvent(void) {
+	@autoreleasepool {
+		NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny
+		                                        untilDate:[NSDate distantFuture]
+		                                           inMode:NSDefaultRunLoopMode
+		                                          dequeue:YES];
+		[NSApp sendEvent:event];
+	}
+}
 */
 import "C"
 
@@ -323,12 +333,15 @@ type window struct {
 	config Config
 }
 
-// launched is closed when applicationDidFinishLaunching is called.
+// launched is closed after gio_initApp returns.
 var launched = make(chan struct{})
 
 // nextTopLeft is the offset to use for the next window's call to
 // cascadeTopLeftFromPoint.
 var nextTopLeft C.NSPoint
+
+// mainThreadWindow is the window currently in control of the main thread.
+var mainThreadWindow *window
 
 func windowFor(h C.uintptr_t) *window {
 	return cgo.Handle(h).Value().(*window)
@@ -822,23 +835,51 @@ func (w *window) draw() {
 
 func (w *window) ProcessEvent(e event.Event) {
 	w.w.ProcessEvent(e)
-	w.loop.FlushEvents()
+	// The main thread window deliver events in Event.
+	if w != mainThreadWindow {
+		w.loop.FlushEvents()
+	}
 }
 
 func (w *window) Event() event.Event {
-	return w.loop.Event()
+	if !isMainThread() {
+		return w.loop.Event()
+	}
+	mainThreadWindow = w
+	defer func() { mainThreadWindow = nil }()
+	for {
+		if evt, ok := w.loop.win.nextEvent(); ok {
+			return evt
+		}
+		C.dispatchEvent()
+		gio_dispatchMainFuncs()
+	}
 }
 
 func (w *window) Invalidate() {
+	if isMainThread() {
+		mainThreadWindow = w
+		defer func() { mainThreadWindow = nil }()
+	}
 	w.loop.Invalidate()
 }
 
 func (w *window) Run(f func()) {
+	if isMainThread() {
+		mainThreadWindow = w
+		defer func() { mainThreadWindow = nil }()
+	}
 	w.loop.Run(f)
 }
 
 func (w *window) Frame(frame *op.Ops) {
-	w.loop.Frame(frame)
+	if !isMainThread() {
+		w.loop.Frame(frame)
+		return
+	}
+	mainThreadWindow = w
+	defer func() { mainThreadWindow = nil }()
+	w.loop.win.ProcessFrame(frame, nil)
 }
 
 func configFor(scale float32) unit.Metric {
@@ -898,20 +939,27 @@ func gio_onWindowed(h C.uintptr_t) {
 	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
-//export gio_onFinishLaunching
-func gio_onFinishLaunching() {
-	close(launched)
-}
-
 func newWindow(win *callbacks, options []Option) {
-	<-launched
-	res := make(chan struct{})
-	runOnMain(func() {
-		w := &window{
-			redraw: make(chan struct{}, 1),
-			w:      win,
+	w := &window{
+		redraw: make(chan struct{}, 1),
+		w:      win,
+	}
+	w.loop = newEventLoop(w.w, w.wakeup)
+	if isMainThread() {
+		mainThreadWindow = w
+		defer func() { mainThreadWindow = nil }()
+		select {
+		case <-launched:
+		default:
+			// If we're the main thread, initialize the GUI.
+			C.gio_initApp()
+			close(launched)
 		}
-		w.loop = newEventLoop(w.w, w.wakeup)
+	} else {
+		<-launched
+	}
+	res := make(chan struct{}, 1)
+	runOnMain(func() {
 		win.SetDriver(w)
 		res <- struct{}{}
 		if err := w.init(); err != nil {
@@ -965,7 +1013,12 @@ func (w *window) init() error {
 }
 
 func osMain() {
-	C.gio_main()
+	C.gio_initApp()
+	close(launched)
+	for {
+		C.dispatchEvent()
+		gio_dispatchMainFuncs()
+	}
 }
 
 func convertKey(k rune) (key.Name, bool) {
@@ -1050,6 +1103,15 @@ func convertMods(mods C.NSUInteger) key.Modifiers {
 		kmods |= key.ModShift
 	}
 	return kmods
+}
+
+func (w *window) wakeup() {
+	runOnMain(func() {
+		w.loop.Wakeup()
+		if w != mainThreadWindow {
+			w.loop.FlushEvents()
+		}
+	})
 }
 
 func (AppKitViewEvent) implementsViewEvent() {}

@@ -276,3 +276,9 @@ void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle) {
 	GioView *v = (__bridge GioView *)viewRef;
 	v.handle = handle;
 }
+
+void gio_wakeupMainThread(void) {
+	dispatch_async(dispatch_get_main_queue(), ^{
+		gio_dispatchMainFuncs();
+	});
+}

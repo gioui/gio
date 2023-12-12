@@ -348,7 +348,6 @@ static BOOL isEqualNSCursor(NSCursor *c1, SEL name2) {
 	// Don't pass commands up the responder chain.
 	// They will end up in a beep.
 }
-
 - (BOOL)hasMarkedText {
 	int res = gio_hasMarkedText(self.handle);
 	return res ? YES : NO;
@@ -613,11 +612,22 @@ void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle) {
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
 	[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 	[NSApp activateIgnoringOtherApps:YES];
-	gio_onFinishLaunching();
+	// Force the [NSApp run] call to return.
+	[NSApp stop:nil];
+	NSEvent *dummy = [NSEvent otherEventWithType:NSEventTypeApplicationDefined
+	              location:NSZeroPoint
+	         modifierFlags:0
+	             timestamp:0
+	          windowNumber:0
+	               context:nil
+	               subtype:0
+	                 data1:0
+	                 data2:0];
+	[NSApp postEvent:dummy atStart:YES];
 }
 @end
 
-void gio_main() {
+void gio_initApp() {
 	@autoreleasepool {
 		[GioApplication sharedApplication];
 		GioAppDelegate *del = [[GioAppDelegate alloc] init];
@@ -641,6 +651,22 @@ void gio_main() {
 
 		globalWindowDel = [[GioWindowDelegate alloc] init];
 
+		// Runs until stopped by applicationDidFinishLaunching.
 		[NSApp run];
+	}
+}
+
+void gio_wakeupMainThread(void) {
+	@autoreleasepool {
+		NSEvent *dummy = [NSEvent otherEventWithType:NSEventTypeApplicationDefined
+		              location:NSZeroPoint
+		         modifierFlags:0
+		             timestamp:0
+		          windowNumber:0
+		               context:nil
+		               subtype:0
+		                 data1:0
+		                 data2:0];
+		[NSApp postEvent:dummy atStart:YES];
 	}
 }
