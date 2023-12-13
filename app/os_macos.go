@@ -62,148 +62,204 @@ static CFTypeRef readClipboard(void) {
 }
 
 static CGFloat viewHeight(CFTypeRef viewRef) {
-	NSView *view = (__bridge NSView *)viewRef;
-	return [view bounds].size.height;
+	@autoreleasepool {
+		NSView *view = (__bridge NSView *)viewRef;
+		return [view bounds].size.height;
+	}
 }
 
 static CGFloat viewWidth(CFTypeRef viewRef) {
-	NSView *view = (__bridge NSView *)viewRef;
-	return [view bounds].size.width;
+	@autoreleasepool {
+		NSView *view = (__bridge NSView *)viewRef;
+		return [view bounds].size.width;
+	}
 }
 
 static CGFloat getScreenBackingScale(void) {
-	return [NSScreen.mainScreen backingScaleFactor];
+	@autoreleasepool {
+		return [NSScreen.mainScreen backingScaleFactor];
+	}
 }
 
 static CGFloat getViewBackingScale(CFTypeRef viewRef) {
-	NSView *view = (__bridge NSView *)viewRef;
-	return [view.window backingScaleFactor];
+	@autoreleasepool {
+		NSView *view = (__bridge NSView *)viewRef;
+		return [view.window backingScaleFactor];
+	}
 }
 
 static void setNeedsDisplay(CFTypeRef viewRef) {
-	NSView *view = (__bridge NSView *)viewRef;
-	[view setNeedsDisplay:YES];
+	@autoreleasepool {
+		NSView *view = (__bridge NSView *)viewRef;
+		[view setNeedsDisplay:YES];
+	}
 }
 
 static NSPoint cascadeTopLeftFromPoint(CFTypeRef windowRef, NSPoint topLeft) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	return [window cascadeTopLeftFromPoint:topLeft];
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		return [window cascadeTopLeftFromPoint:topLeft];
+	}
 }
 
 static void makeKeyAndOrderFront(CFTypeRef windowRef) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	[window makeKeyAndOrderFront:nil];
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		[window makeKeyAndOrderFront:nil];
+	}
 }
 
 static void toggleFullScreen(CFTypeRef windowRef) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	[window toggleFullScreen:nil];
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		[window toggleFullScreen:nil];
+	}
 }
 
 static NSWindowStyleMask getWindowStyleMask(CFTypeRef windowRef) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	return [window styleMask];
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		return [window styleMask];
+	}
 }
 
 static void setWindowStyleMask(CFTypeRef windowRef, NSWindowStyleMask mask) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	window.styleMask = mask;
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		window.styleMask = mask;
+	}
 }
 
 static void setWindowTitleVisibility(CFTypeRef windowRef, NSWindowTitleVisibility state) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	window.titleVisibility = state;
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		window.titleVisibility = state;
+	}
 }
 
 static void setWindowTitlebarAppearsTransparent(CFTypeRef windowRef, int transparent) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	window.titlebarAppearsTransparent = (BOOL)transparent;
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		window.titlebarAppearsTransparent = (BOOL)transparent;
+	}
 }
 
 static void setWindowStandardButtonHidden(CFTypeRef windowRef, NSWindowButton btn, int hide) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	[window standardWindowButton:btn].hidden = (BOOL)hide;
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		[window standardWindowButton:btn].hidden = (BOOL)hide;
+	}
 }
 
 static void performWindowDragWithEvent(CFTypeRef windowRef, CFTypeRef evt) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	[window performWindowDragWithEvent:(__bridge NSEvent*)evt];
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		[window performWindowDragWithEvent:(__bridge NSEvent*)evt];
+	}
 }
 
 static void closeWindow(CFTypeRef windowRef) {
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	[window performClose:nil];
+	@autoreleasepool {
+		NSWindow* window = (__bridge NSWindow *)windowRef;
+		[window performClose:nil];
+	}
 }
 
 static void setSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	NSSize size = NSMakeSize(width, height);
-	[window setContentSize:size];
+	@autoreleasepool {
+		NSWindow* window = (__bridge NSWindow *)windowRef;
+		NSSize size = NSMakeSize(width, height);
+		[window setContentSize:size];
+	}
 }
 
 static void setMinSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	window.contentMinSize = NSMakeSize(width, height);
+	@autoreleasepool {
+		NSWindow* window = (__bridge NSWindow *)windowRef;
+		window.contentMinSize = NSMakeSize(width, height);
+	}
 }
 
 static void setMaxSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	window.contentMaxSize = NSMakeSize(width, height);
+	@autoreleasepool {
+		NSWindow* window = (__bridge NSWindow *)windowRef;
+		window.contentMaxSize = NSMakeSize(width, height);
+	}
 }
 
 static void setScreenFrame(CFTypeRef windowRef, CGFloat x, CGFloat y, CGFloat w, CGFloat h) {
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	NSRect r = NSMakeRect(x, y, w, h);
-	[window setFrame:r display:YES];
+	@autoreleasepool {
+		NSWindow* window = (__bridge NSWindow *)windowRef;
+		NSRect r = NSMakeRect(x, y, w, h);
+		[window setFrame:r display:YES];
+	}
 }
 
 static void hideWindow(CFTypeRef windowRef) {
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	[window miniaturize:window];
+	@autoreleasepool {
+		NSWindow* window = (__bridge NSWindow *)windowRef;
+		[window miniaturize:window];
+	}
 }
 
 static void unhideWindow(CFTypeRef windowRef) {
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	[window deminiaturize:window];
+	@autoreleasepool {
+		NSWindow* window = (__bridge NSWindow *)windowRef;
+		[window deminiaturize:window];
+	}
 }
 
 static NSRect getScreenFrame(CFTypeRef windowRef) {
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	return [[window screen] frame];
+	@autoreleasepool {
+		NSWindow* window = (__bridge NSWindow *)windowRef;
+		return [[window screen] frame];
+	}
 }
 
 static void setTitle(CFTypeRef windowRef, CFTypeRef titleRef) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	window.title = (__bridge NSString *)titleRef;
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		window.title = (__bridge NSString *)titleRef;
+	}
 }
 
 static int isWindowZoomed(CFTypeRef windowRef) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	return window.zoomed ? 1 : 0;
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		return window.zoomed ? 1 : 0;
+	}
 }
 
 static void zoomWindow(CFTypeRef windowRef) {
-	NSWindow *window = (__bridge NSWindow *)windowRef;
-	[window zoom:nil];
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		[window zoom:nil];
+	}
 }
 
 static CFTypeRef layerForView(CFTypeRef viewRef) {
-	NSView *view = (__bridge NSView *)viewRef;
-	return (__bridge CFTypeRef)view.layer;
+	@autoreleasepool {
+		NSView *view = (__bridge NSView *)viewRef;
+		return (__bridge CFTypeRef)view.layer;
+	}
 }
 
 static CFTypeRef windowForView(CFTypeRef viewRef) {
-	NSView *view = (__bridge NSView *)viewRef;
-	return (__bridge CFTypeRef)view.window;
+	@autoreleasepool {
+		NSView *view = (__bridge NSView *)viewRef;
+		return (__bridge CFTypeRef)view.window;
+	}
 }
 
 static void raiseWindow(CFTypeRef windowRef) {
-	NSRunningApplication *currentApp = [NSRunningApplication currentApplication];
-	if (![currentApp isActive]) {
-		[currentApp activateWithOptions:(NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps)];
+	@autoreleasepool {
+		NSRunningApplication *currentApp = [NSRunningApplication currentApplication];
+		if (![currentApp isActive]) {
+			[currentApp activateWithOptions:(NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps)];
+		}
+		NSWindow* window = (__bridge NSWindow *)windowRef;
+		[window makeKeyAndOrderFront:nil];
 	}
-	NSWindow* window = (__bridge NSWindow *)windowRef;
-	[window makeKeyAndOrderFront:nil];
 }
 
 static CFTypeRef createInputContext(CFTypeRef clientRef) {
@@ -215,23 +271,23 @@ static CFTypeRef createInputContext(CFTypeRef clientRef) {
 }
 
 static void discardMarkedText(CFTypeRef viewRef) {
-    @autoreleasepool {
+	@autoreleasepool {
 		id<NSTextInputClient> view = (__bridge id<NSTextInputClient>)viewRef;
 		NSTextInputContext *ctx = [NSTextInputContext currentInputContext];
 		if (view == [ctx client]) {
 			[ctx discardMarkedText];
 		}
-    }
+	}
 }
 
 static void invalidateCharacterCoordinates(CFTypeRef viewRef) {
-    @autoreleasepool {
+	@autoreleasepool {
 		id<NSTextInputClient> view = (__bridge id<NSTextInputClient>)viewRef;
 		NSTextInputContext *ctx = [NSTextInputContext currentInputContext];
 		if (view == [ctx client]) {
 			[ctx invalidateCharacterCoordinates];
 		}
-    }
+	}
 }
 */
 import "C"
@@ -241,7 +297,7 @@ func init() {
 	runtime.LockOSThread()
 }
 
-// ViewEvent notified the client of changes to the window AppKit handles.
+// ViewEvent notifies the client of changes to the window AppKit handles.
 // The handles are retained until another ViewEvent is sent.
 type ViewEvent struct {
 	// View is a CFTypeRef for the NSView for the window.

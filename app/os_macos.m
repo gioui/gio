@@ -254,14 +254,16 @@ void gio_showCursor() {
 // some cursors are not public, this tries to use a private cursor
 // and uses fallback when the use of private cursor fails.
 void gio_trySetPrivateCursor(SEL cursorName, NSCursor* fallback) {
-	if ([NSCursor respondsToSelector:cursorName]) {
-		id object = [NSCursor performSelector:cursorName];
-		if ([object isKindOfClass:[NSCursor class]]) {
-			[(NSCursor*)object set];
-			return;
+	@autoreleasepool {
+		if ([NSCursor respondsToSelector:cursorName]) {
+			id object = [NSCursor performSelector:cursorName];
+			if ([object isKindOfClass:[NSCursor class]]) {
+				[(NSCursor*)object set];
+				return;
+			}
 		}
+		[fallback set];
 	}
-	[fallback set];
 }
 
 void gio_setCursor(NSUInteger curID) {
@@ -401,8 +403,10 @@ CFTypeRef gio_createView(void) {
 }
 
 void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle) {
-	GioView *v = (__bridge GioView *)viewRef;
-	v.handle = handle;
+	@autoreleasepool {
+		GioView *v = (__bridge GioView *)viewRef;
+		v.handle = handle;
+	}
 }
 
 @implementation GioAppDelegate
