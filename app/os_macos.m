@@ -90,9 +90,6 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 }
 - (void)viewDidMoveToWindow {
 	gio_onAttached(self.handle, self.window != nil ? 1 : 0);
-	if (self.window == nil) {
-		gio_onClose(self.handle);
-	}
 }
 - (void)mouseDown:(NSEvent *)event {
 	handleMouse(self, event, MOUSE_DOWN, 0, 0);
@@ -204,6 +201,9 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 }
 - (void)applicationDidHide:(NSNotification *)notification {
 	gio_onHide(self.handle);
+}
+- (void)dealloc {
+	gio_onDestroy(self.handle);
 }
 @end
 

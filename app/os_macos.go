@@ -869,14 +869,13 @@ func gio_onAttached(h C.uintptr_t, attached C.int) {
 	}
 }
 
-//export gio_onClose
-func gio_onClose(h C.uintptr_t) {
+//export gio_onDestroy
+func gio_onDestroy(h C.uintptr_t) {
 	w := windowFor(h)
 	w.ProcessEvent(DestroyEvent{})
 	w.displayLink.Close()
 	w.displayLink = nil
 	cgo.Handle(h).Delete()
-	C.CFRelease(w.view)
 	w.view = 0
 }
 
@@ -927,6 +926,8 @@ func newWindow(win *callbacks, options []Option) {
 			return
 		}
 		window := C.gio_createWindow(w.view, 0, 0, 0, 0, 0, 0)
+		// Release our reference now that the NSWindow has it.
+		C.CFRelease(w.view)
 		w.updateWindowMode()
 		w.Configure(options)
 		if nextTopLeft.x == 0 && nextTopLeft.y == 0 {
