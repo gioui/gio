@@ -89,6 +89,7 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	return layer;
 }
 - (void)viewDidMoveToWindow {
+	gio_onAttached(self.handle, self.window != nil ? 1 : 0);
 	if (self.window == nil) {
 		gio_onClose(self.handle);
 	}

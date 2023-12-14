@@ -857,11 +857,21 @@ func configFor(scale float32) unit.Metric {
 	}
 }
 
+//export gio_onAttached
+func gio_onAttached(h C.uintptr_t, attached C.int) {
+	w := windowFor(h)
+	if attached != 0 {
+		layer := C.layerForView(w.view)
+		w.ProcessEvent(ViewEvent{View: uintptr(w.view), Layer: uintptr(layer)})
+	} else {
+		w.ProcessEvent(ViewEvent{})
+		w.setStage(StagePaused)
+	}
+}
+
 //export gio_onClose
 func gio_onClose(h C.uintptr_t) {
 	w := windowFor(h)
-	w.ProcessEvent(ViewEvent{})
-	w.setStage(StagePaused)
 	w.ProcessEvent(DestroyEvent{})
 	w.displayLink.Close()
 	w.displayLink = nil
@@ -927,8 +937,6 @@ func newWindow(win *callbacks, options []Option) {
 		nextTopLeft = C.cascadeTopLeftFromPoint(window, nextTopLeft)
 		// makeKeyAndOrderFront assumes ownership of our window reference.
 		C.makeKeyAndOrderFront(window)
-		layer := C.layerForView(w.view)
-		w.ProcessEvent(ViewEvent{View: uintptr(w.view), Layer: uintptr(layer)})
 	})
 	<-res
 }
