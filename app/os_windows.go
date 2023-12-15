@@ -31,7 +31,7 @@ import (
 	"gioui.org/io/transfer"
 )
 
-type ViewEvent struct {
+type Win32ViewEvent struct {
 	HWND uintptr
 }
 
@@ -113,7 +113,7 @@ func newWindow(win *callbacks, options []Option) {
 		}
 		winMap.Store(w.hwnd, w)
 		defer winMap.Delete(w.hwnd)
-		w.ProcessEvent(ViewEvent{HWND: uintptr(w.hwnd)})
+		w.ProcessEvent(Win32ViewEvent{HWND: uintptr(w.hwnd)})
 		w.Configure(options)
 		windows.SetForegroundWindow(w.hwnd)
 		windows.SetFocus(w.hwnd)
@@ -308,7 +308,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_MOUSEHWHEEL:
 		w.scrollEvent(wParam, lParam, true, getModifiers())
 	case windows.WM_DESTROY:
-		w.ProcessEvent(ViewEvent{})
+		w.ProcessEvent(Win32ViewEvent{})
 		w.ProcessEvent(DestroyEvent{})
 		if w.hdc != 0 {
 			windows.ReleaseDC(w.hdc)
@@ -1011,4 +1011,5 @@ func configForDPI(dpi int) unit.Metric {
 	}
 }
 
-func (_ ViewEvent) ImplementsEvent() {}
+func (Win32ViewEvent) implementsViewEvent() {}
+func (Win32ViewEvent) ImplementsEvent()     {}

@@ -205,9 +205,9 @@ type pixelInsets struct {
 	top, bottom, left, right int
 }
 
-// ViewEvent is sent whenever the Window's underlying Android view
+// AndroidViewEvent is sent whenever the Window's underlying Android view
 // changes.
-type ViewEvent struct {
+type AndroidViewEvent struct {
 	// View is a JNI global reference to the android.view.View
 	// instance backing the Window. The reference is valid until
 	// the next ViewEvent is received.
@@ -514,7 +514,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 	w.setConfig(env, cnf)
 	w.SetInputHint(w.inputHint)
 	w.setStage(StagePaused)
-	w.processEvent(ViewEvent{View: uintptr(view)})
+	w.processEvent(AndroidViewEvent{View: uintptr(view)})
 	return C.jlong(w.handle)
 }
 
@@ -805,7 +805,7 @@ func (w *window) semIDFor(virtID C.jint) input.SemanticID {
 
 func (w *window) detach(env *C.JNIEnv) {
 	callVoidMethod(env, w.view, gioView.unregister)
-	w.processEvent(ViewEvent{})
+	w.processEvent(AndroidViewEvent{})
 	w.handle.Delete()
 	C.jni_DeleteGlobalRef(env, w.view)
 	w.view = 0
@@ -1504,4 +1504,5 @@ func Java_org_gioui_Gio_scheduleMainFuncs(env *C.JNIEnv, cls C.jclass) {
 	}
 }
 
-func (_ ViewEvent) ImplementsEvent() {}
+func (AndroidViewEvent) implementsViewEvent() {}
+func (AndroidViewEvent) ImplementsEvent()     {}

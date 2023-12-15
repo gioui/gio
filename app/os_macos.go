@@ -297,9 +297,9 @@ func init() {
 	runtime.LockOSThread()
 }
 
-// ViewEvent notifies the client of changes to the window AppKit handles.
-// The handles are retained until another ViewEvent is sent.
-type ViewEvent struct {
+// AppKitViewEvent notifies the client of changes to the window AppKit handles.
+// The handles are retained until another AppKitViewEvent is sent.
+type AppKitViewEvent struct {
 	// View is a CFTypeRef for the NSView for the window.
 	View uintptr
 	// Layer is a CFTypeRef of the CALayer of View.
@@ -862,9 +862,9 @@ func gio_onAttached(h C.uintptr_t, attached C.int) {
 	w := windowFor(h)
 	if attached != 0 {
 		layer := C.layerForView(w.view)
-		w.ProcessEvent(ViewEvent{View: uintptr(w.view), Layer: uintptr(layer)})
+		w.ProcessEvent(AppKitViewEvent{View: uintptr(w.view), Layer: uintptr(layer)})
 	} else {
-		w.ProcessEvent(ViewEvent{})
+		w.ProcessEvent(AppKitViewEvent{})
 		w.setStage(StagePaused)
 	}
 }
@@ -1057,4 +1057,5 @@ func convertMods(mods C.NSUInteger) key.Modifiers {
 	return kmods
 }
 
-func (_ ViewEvent) ImplementsEvent() {}
+func (AppKitViewEvent) implementsViewEvent() {}
+func (AppKitViewEvent) ImplementsEvent()     {}

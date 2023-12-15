@@ -25,7 +25,7 @@ import (
 	"gioui.org/unit"
 )
 
-type ViewEvent struct {
+type JSViewEvent struct {
 	Element js.Value
 }
 
@@ -114,7 +114,7 @@ func newWindow(win *callbacks, options []Option) {
 
 	w.Configure(options)
 	w.blur()
-	w.processEvent(ViewEvent{Element: cont})
+	w.processEvent(JSViewEvent{Element: cont})
 	w.processEvent(StageEvent{Stage: StageRunning})
 	w.resize()
 	w.draw(true)
@@ -830,4 +830,5 @@ func translateKey(k string) (key.Name, bool) {
 	return n, true
 }
 
-func (_ ViewEvent) ImplementsEvent() {}
+func (JSViewEvent) implementsViewEvent() {}
+func (JSViewEvent) ImplementsEvent()     {}

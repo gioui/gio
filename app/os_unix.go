@@ -13,13 +13,6 @@ import (
 	"gioui.org/io/pointer"
 )
 
-// ViewEvent provides handles to the underlying window objects for the
-// current display protocol.
-type ViewEvent interface {
-	implementsViewEvent()
-	ImplementsEvent()
-}
-
 type X11ViewEvent struct {
 	// Display is a pointer to the X11 Display created by XOpenDisplay.
 	Display unsafe.Pointer

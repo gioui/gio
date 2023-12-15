@@ -93,7 +93,7 @@ import (
 	"gioui.org/unit"
 )
 
-type ViewEvent struct {
+type UIKitViewEvent struct {
 	// ViewController is a CFTypeRef for the UIViewController backing a Window.
 	ViewController uintptr
 }
@@ -139,7 +139,7 @@ func onCreate(view, controller C.CFTypeRef) {
 	C.gio_viewSetHandle(view, C.uintptr_t(cgo.NewHandle(w)))
 	w.Configure(wopts.options)
 	w.ProcessEvent(StageEvent{Stage: StageRunning})
-	w.ProcessEvent(ViewEvent{ViewController: uintptr(controller)})
+	w.ProcessEvent(UIKitViewEvent{ViewController: uintptr(controller)})
 }
 
 func viewFor(h C.uintptr_t) *window {
@@ -203,7 +203,7 @@ func onStart(h C.uintptr_t) {
 //export onDestroy
 func onDestroy(h C.uintptr_t) {
 	w := viewFor(h)
-	w.ProcessEvent(ViewEvent{})
+	w.ProcessEvent(UIKitViewEvent{})
 	w.ProcessEvent(DestroyEvent{})
 	w.displayLink.Close()
 	w.displayLink = nil
@@ -398,4 +398,5 @@ func gio_runMain() {
 	runMain()
 }
 
-func (_ ViewEvent) ImplementsEvent() {}
+func (UIKitViewEvent) implementsViewEvent() {}
+func (UIKitViewEvent) ImplementsEvent()     {}

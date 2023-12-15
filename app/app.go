@@ -56,6 +56,13 @@ type FrameEvent struct {
 	Source input.Source
 }
 
+// ViewEvent provides handles to the underlying window objects for the
+// current display protocol.
+type ViewEvent interface {
+	implementsViewEvent()
+	ImplementsEvent()
+}
+
 // Insets is the space taken up by
 // system decoration such as translucent
 // system bars and software keyboards.
