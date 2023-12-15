@@ -253,17 +253,15 @@ void gio_showCursor() {
 
 // some cursors are not public, this tries to use a private cursor
 // and uses fallback when the use of private cursor fails.
-void gio_trySetPrivateCursor(SEL cursorName, NSCursor* fallback) {
-	@autoreleasepool {
-		if ([NSCursor respondsToSelector:cursorName]) {
-			id object = [NSCursor performSelector:cursorName];
-			if ([object isKindOfClass:[NSCursor class]]) {
-				[(NSCursor*)object set];
-				return;
-			}
+static void trySetPrivateCursor(SEL cursorName, NSCursor* fallback) {
+	if ([NSCursor respondsToSelector:cursorName]) {
+		id object = [NSCursor performSelector:cursorName];
+		if ([object isKindOfClass:[NSCursor class]]) {
+			[(NSCursor*)object set];
+			return;
 		}
-		[fallback set];
 	}
+	[fallback set];
 }
 
 void gio_setCursor(NSUInteger curID) {
@@ -287,7 +285,7 @@ void gio_setCursor(NSUInteger curID) {
 				break;
 			case 6: // pointer.CursorAllScroll
 				// For some reason, using _moveCursor fails on Monterey.
-				// gio_trySetPrivateCursor(@selector(_moveCursor), NSCursor.arrowCursor);
+				// trySetPrivateCursor(@selector(_moveCursor), NSCursor.arrowCursor);
 				[NSCursor.arrowCursor set];
 				break;
 			case 7: // pointer.CursorColResize
@@ -297,33 +295,31 @@ void gio_setCursor(NSUInteger curID) {
 				[NSCursor.resizeUpDownCursor set];
 				break;
 			case 9: // pointer.CursorGrab
-				// [NSCursor.openHandCursor set];
-				gio_trySetPrivateCursor(@selector(openHandCursor), NSCursor.arrowCursor);
+				[NSCursor.openHandCursor set];
 				break;
 			case 10: // pointer.CursorGrabbing
-				// [NSCursor.closedHandCursor set];
-				gio_trySetPrivateCursor(@selector(closedHandCursor), NSCursor.arrowCursor);
+				[NSCursor.closedHandCursor set];
 				break;
 			case 11: // pointer.CursorNotAllowed
 				[NSCursor.operationNotAllowedCursor set];
 				break;
 			case 12: // pointer.CursorWait
-				gio_trySetPrivateCursor(@selector(busyButClickableCursor), NSCursor.arrowCursor);
+				trySetPrivateCursor(@selector(busyButClickableCursor), NSCursor.arrowCursor);
 				break;
 			case 13: // pointer.CursorProgress
-				gio_trySetPrivateCursor(@selector(busyButClickableCursor), NSCursor.arrowCursor);
+				trySetPrivateCursor(@selector(busyButClickableCursor), NSCursor.arrowCursor);
 				break;
 			case 14: // pointer.CursorNorthWestResize
-				gio_trySetPrivateCursor(@selector(_windowResizeNorthWestCursor), NSCursor.resizeUpDownCursor);
+				trySetPrivateCursor(@selector(_windowResizeNorthWestCursor), NSCursor.resizeUpDownCursor);
 				break;
 			case 15: // pointer.CursorNorthEastResize
-				gio_trySetPrivateCursor(@selector(_windowResizeNorthEastCursor), NSCursor.resizeUpDownCursor);
+				trySetPrivateCursor(@selector(_windowResizeNorthEastCursor), NSCursor.resizeUpDownCursor);
 				break;
 			case 16: // pointer.CursorSouthWestResize
-				gio_trySetPrivateCursor(@selector(_windowResizeSouthWestCursor), NSCursor.resizeUpDownCursor);
+				trySetPrivateCursor(@selector(_windowResizeSouthWestCursor), NSCursor.resizeUpDownCursor);
 				break;
 			case 17: // pointer.CursorSouthEastResize
-				gio_trySetPrivateCursor(@selector(_windowResizeSouthEastCursor), NSCursor.resizeUpDownCursor);
+				trySetPrivateCursor(@selector(_windowResizeSouthEastCursor), NSCursor.resizeUpDownCursor);
 				break;
 			case 18: // pointer.CursorNorthSouthResize
 				[NSCursor.resizeUpDownCursor set];
@@ -344,10 +340,10 @@ void gio_setCursor(NSUInteger curID) {
 				[NSCursor.resizeDownCursor set];
 				break;
 			case 24: // pointer.CursorNorthEastSouthWestResize
-				gio_trySetPrivateCursor(@selector(_windowResizeNorthEastSouthWestCursor), NSCursor.resizeUpDownCursor);
+				trySetPrivateCursor(@selector(_windowResizeNorthEastSouthWestCursor), NSCursor.resizeUpDownCursor);
 				break;
 			case 25: // pointer.CursorNorthWestSouthEastResize
-				gio_trySetPrivateCursor(@selector(_windowResizeNorthWestSouthEastCursor), NSCursor.resizeUpDownCursor);
+				trySetPrivateCursor(@selector(_windowResizeNorthWestSouthEastCursor), NSCursor.resizeUpDownCursor);
 				break;
 			default:
 				[NSCursor.arrowCursor set];
