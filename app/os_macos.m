@@ -69,6 +69,212 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	gio_onMouse(view.handle, (__bridge CFTypeRef)event, typ, event.buttonNumber, p.x, height - p.y, dx, dy, [event timestamp], [event modifierFlags]);
 }
 
+@interface GioApplication: NSApplication
+@end
+
+// Variables for tracking resizes.
+static struct {
+	NSPoint dir;
+	NSEvent *lastMouseDown;
+	NSPoint off;
+} resizeState = {};
+
+static NSBitmapImageRep *nsImageBitmap(NSImage *img) {
+	NSArray<NSImageRep *> *reps = img.representations;
+	if ([reps count] == 0) {
+		return nil;
+	}
+	NSImageRep *rep = reps[0];
+	if (![rep isKindOfClass:[NSBitmapImageRep class]]) {
+		return nil;
+	}
+	return (NSBitmapImageRep *)rep;
+}
+
+static NSCursor *lookupPrivateNSCursor(SEL name) {
+	if (![NSCursor respondsToSelector:name]) {
+		return nil;
+	}
+	id obj = [NSCursor performSelector:name];
+	if (![obj isKindOfClass:[NSCursor class]]) {
+		return nil;
+	}
+	return (NSCursor *)obj;
+}
+
+static BOOL isEqualNSCursor(NSCursor *c1, SEL name2) {
+	NSCursor *c2 = lookupPrivateNSCursor(name2);
+	if (c2 == nil || !NSEqualPoints(c1.hotSpot, c2.hotSpot)) {
+		return NO;
+	}
+	NSImage *img1 = c1.image;
+	NSImage *img2 = c2.image;
+	if (!NSEqualSizes(img1.size, img2.size)) {
+		return NO;
+	}
+	NSBitmapImageRep *bit1 = nsImageBitmap(img1);
+	NSBitmapImageRep *bit2 = nsImageBitmap(img2);
+	if (bit1 == nil || bit2 == nil) {
+		return NO;
+	}
+	NSInteger n1 = bit1.numberOfPlanes*bit1.bytesPerPlane;
+	NSInteger n2 = bit1.numberOfPlanes*bit1.bytesPerPlane;
+	if (n1 != n2) {
+		return NO;
+	}
+	if (memcmp(bit1.bitmapData, bit2.bitmapData, n1) != 0) {
+		return NO;
+	}
+	return YES;
+}
+
+@implementation GioApplication
+- (NSEvent *)nextEventMatchingMask:(NSEventMask)mask
+                         untilDate:(NSDate *)expiration
+                            inMode:(NSRunLoopMode)mode
+                           dequeue:(BOOL)deqFlag {
+	if ([mode isEqualToString:NSEventTrackingRunLoopMode]) {
+		NSEvent *l = resizeState.lastMouseDown;
+		if (l != nil) {
+			//lastMouseDown = nil;
+			NSCursor *cur = [NSCursor currentSystemCursor];
+			NSPoint dir = {};
+			NSPoint off = {};
+			NSSize wsz = [l window].frame.size;
+			NSPoint center = NSMakePoint(wsz.width/2, wsz.height/2);
+			NSPoint p = [l locationInWindow];
+			if (p.x >= center.x) {
+				dir.x = 1;
+				off.x = p.x - wsz.width;
+			} else {
+				dir.x = -1;
+				off.x = p.x;
+			}
+			if (p.y >= center.y) {
+				dir.y = 1;
+				off.y = p.y - wsz.height;
+			} else {
+				dir.y = -1;
+				off.y = p.y;
+			}
+			// The button down coordinate distinguish the four quadrants. Use the
+			// cursor image to determine the precise direction.
+			SEL nw = @selector(_windowResizeNorthWestCursor);
+			SEL n = @selector(_windowResizeNorthCursor);
+			SEL ne = @selector(_windowResizeNorthEastCursor);
+			SEL e = @selector(_windowResizeEastCursor);
+			SEL se = @selector(_windowResizeSouthEastCursor);
+			SEL s = @selector(_windowResizeSouthCursor);
+			SEL sw = @selector(_windowResizeSouthWestCursor);
+			SEL w = @selector(_windowResizeWestCursor);
+			SEL ns = @selector(_windowResizeNorthSouthCursor);
+			SEL ew = @selector(_windowResizeEastWestCursor);
+			SEL nwse = @selector(_windowResizeNorthWestSouthEastCursor);
+			SEL nesw = @selector(_windowResizeNorthEastSouthWestCursor);
+			BOOL match = YES;
+			if (dir.x != 0 && (isEqualNSCursor(cur, ew) || isEqualNSCursor(cur, w) || isEqualNSCursor(cur, e))) {
+				dir.y = 0;
+			}
+			if (dir.y != 0 && (isEqualNSCursor(cur, ns) || isEqualNSCursor(cur, s) || isEqualNSCursor(cur, n))) {
+					dir.x = 0;
+			}
+			// If none of the cursors matched, we may deduce that the resize
+			// direction is one of the corners. However, to ensure that at least
+			// one cursor matches, check the corner cursors.
+			if (dir.x == 1 && dir.y == 1) {
+				if (!isEqualNSCursor(cur, nesw) && !isEqualNSCursor(cur, sw)) {
+					dir = NSZeroPoint;
+				}
+			} else if (dir.x == 1 && dir.y == -1) {
+				if (!isEqualNSCursor(cur, nwse) && !isEqualNSCursor(cur, nw)) {
+					dir = NSZeroPoint;
+				}
+			} else if (dir.x == -1 && dir.y == 1) {
+				if (!isEqualNSCursor(cur, nwse) && !isEqualNSCursor(cur, se)) {
+					dir = NSZeroPoint;
+				}
+			} else if (dir.x == -1 && dir.y == -1) {
+				if (!isEqualNSCursor(cur, nesw) && !isEqualNSCursor(cur, ne)) {
+					dir = NSZeroPoint;
+				}
+			}
+			if (!NSEqualPoints(dir, NSZeroPoint)) {
+				NSEvent *cancel = [NSEvent mouseEventWithType:NSEventTypeLeftMouseUp
+											                       location:l.locationInWindow
+											                  modifierFlags:l.modifierFlags
+											                      timestamp:l.timestamp
+											                   windowNumber:l.windowNumber
+											                        context:l.context
+											                    eventNumber:l.eventNumber
+											                     clickCount:l.clickCount
+											                       pressure:l.pressure];
+				resizeState.off = off;
+				resizeState.dir = dir;
+				return cancel;
+			}
+		}
+	}
+	return [super nextEventMatchingMask:mask untilDate:expiration inMode:mode dequeue:deqFlag];
+}
+@end
+
+@interface GioWindow: NSWindow
+@end
+
+@implementation GioWindow
+- (void)sendEvent:(NSEvent *)evt {
+	if (evt.type == NSEventTypeLeftMouseDown) {
+		resizeState.lastMouseDown = evt;
+	}
+	NSPoint dir = resizeState.dir;
+	if (NSEqualPoints(dir, NSZeroPoint)) {
+		[super sendEvent:evt];
+		return;
+	}
+	switch (evt.type) {
+	default:
+		return;
+	case NSEventTypeLeftMouseUp:
+		resizeState.dir = NSZeroPoint;
+		resizeState.lastMouseDown = nil;
+		return;
+	case NSEventTypeLeftMouseDragged:
+		// Ok to proceed.
+		break;
+	}
+	NSPoint loc = evt.locationInWindow;
+	NSPoint off = resizeState.off;
+	loc.x -= off.x;
+	loc.y -= off.y;
+	NSRect frame = [self frame];
+	NSSize min = [self minSize];
+	NSSize max = [self maxSize];
+	CGFloat width = frame.size.width;
+	if (dir.x > 0) {
+		width = loc.x;
+	} else if (dir.x < 0) {
+		width -= loc.x;
+	}
+	width = MIN(max.width, MAX(min.width, width));
+	if (dir.x < 0) {
+		frame.origin.x += frame.size.width - width;
+	}
+	frame.size.width = width;
+	CGFloat height = frame.size.height;
+	if (dir.y > 0) {
+		height = loc.y;
+	} else if (dir.y < 0) {
+		height -= loc.y;
+	}
+	height = MIN(max.height, MAX(min.height, height));
+	if (dir.y < 0) {
+		frame.origin.y += frame.size.height - height;
+	}
+	frame.size.height = height;
+	[self setFrame:frame display:YES animate:NO];
+}
+@end
+
 @implementation GioView
 - (void)setFrameSize:(NSSize)newSize {
 	[super setFrameSize:newSize];
@@ -255,14 +461,11 @@ void gio_showCursor() {
 // some cursors are not public, this tries to use a private cursor
 // and uses fallback when the use of private cursor fails.
 static void trySetPrivateCursor(SEL cursorName, NSCursor* fallback) {
-	if ([NSCursor respondsToSelector:cursorName]) {
-		id object = [NSCursor performSelector:cursorName];
-		if ([object isKindOfClass:[NSCursor class]]) {
-			[(NSCursor*)object set];
-			return;
-		}
+	NSCursor *cur = lookupPrivateNSCursor(cursorName);
+	if (cur == nil) {
+		cur = fallback;
 	}
-	[fallback set];
+	[cur set];
 }
 
 void gio_setCursor(NSUInteger curID) {
@@ -361,7 +564,7 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height, CGF
 			NSMiniaturizableWindowMask |
 			NSClosableWindowMask;
 
-		NSWindow* window = [[NSWindow alloc] initWithContentRect:rect
+		GioWindow* window = [[GioWindow alloc] initWithContentRect:rect
 													   styleMask:styleMask
 														 backing:NSBackingStoreBuffered
 														   defer:NO];
@@ -416,7 +619,7 @@ void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle) {
 
 void gio_main() {
 	@autoreleasepool {
-		[NSApplication sharedApplication];
+		[GioApplication sharedApplication];
 		GioAppDelegate *del = [[GioAppDelegate alloc] init];
 		[NSApp setDelegate:del];
 
