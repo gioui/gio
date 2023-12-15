@@ -161,7 +161,7 @@ type window struct {
 	fontScale float32
 	insets    pixelInsets
 
-	stage     Stage
+	visible   bool
 	started   bool
 	animating bool
 
@@ -509,11 +509,11 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		w.detach(env)
 	}
 	w.view = view
+	w.visible = false
 	w.handle = cgo.NewHandle(w)
 	w.loadConfig(env, class)
 	w.setConfig(env, cnf)
 	w.SetInputHint(w.inputHint)
-	w.setStage(StagePaused)
 	w.processEvent(AndroidViewEvent{View: uintptr(view)})
 	return C.jlong(w.handle)
 }
@@ -528,7 +528,7 @@ func Java_org_gioui_GioView_onDestroyView(env *C.JNIEnv, class C.jclass, handle 
 func Java_org_gioui_GioView_onStopView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := cgo.Handle(handle).Value().(*window)
 	w.started = false
-	w.setStage(StagePaused)
+	w.visible = false
 }
 
 //export Java_org_gioui_GioView_onStartView
@@ -544,7 +544,7 @@ func Java_org_gioui_GioView_onStartView(env *C.JNIEnv, class C.jclass, handle C.
 func Java_org_gioui_GioView_onSurfaceDestroyed(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := cgo.Handle(handle).Value().(*window)
 	w.win = nil
-	w.setStage(StagePaused)
+	w.visible = false
 }
 
 //export Java_org_gioui_GioView_onSurfaceChanged
@@ -566,9 +566,7 @@ func Java_org_gioui_GioView_onLowMemory(env *C.JNIEnv, class C.jclass) {
 func Java_org_gioui_GioView_onConfigurationChanged(env *C.JNIEnv, class C.jclass, view C.jlong) {
 	w := cgo.Handle(view).Value().(*window)
 	w.loadConfig(env, class)
-	if w.stage >= StageInactive {
-		w.draw(env, true)
-	}
+	w.draw(env, true)
 }
 
 //export Java_org_gioui_GioView_onFrameCallback
@@ -577,10 +575,7 @@ func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view 
 	if !exist {
 		return
 	}
-	if w.stage < StageInactive {
-		return
-	}
-	if w.animating {
+	if w.visible && w.animating {
 		w.draw(env, false)
 		callVoidMethod(env, w.view, gioView.postFrameCallback)
 	}
@@ -610,9 +605,7 @@ func Java_org_gioui_GioView_onWindowInsets(env *C.JNIEnv, class C.jclass, view C
 		left:   int(left),
 		right:  int(right),
 	}
-	if w.stage >= StageInactive {
-		w.draw(env, true)
-	}
+	w.draw(env, true)
 }
 
 //export Java_org_gioui_GioView_initializeAccessibilityNodeInfo
@@ -816,16 +809,8 @@ func (w *window) setVisible(env *C.JNIEnv) {
 	if width == 0 || height == 0 {
 		return
 	}
-	w.setStage(StageRunning)
+	w.visible = true
 	w.draw(env, true)
-}
-
-func (w *window) setStage(stage Stage) {
-	if stage == w.stage {
-		return
-	}
-	w.stage = stage
-	w.processEvent(StageEvent{stage})
 }
 
 func (w *window) setVisual(visID int) error {
@@ -864,6 +849,9 @@ func (w *window) SetAnimating(anim bool) {
 }
 
 func (w *window) draw(env *C.JNIEnv, sync bool) {
+	if !w.visible {
+		return
+	}
 	size := image.Pt(int(C.ANativeWindow_getWidth(w.win)), int(C.ANativeWindow_getHeight(w.win)))
 	if size != w.config.Size {
 		w.config.Size = size

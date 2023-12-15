@@ -199,7 +199,7 @@ type window struct {
 		dir            f32.Point
 	}
 
-	stage             Stage
+	configured        bool
 	lastFrameCallback *C.struct_wl_callback
 
 	animating bool
@@ -549,7 +549,7 @@ func gio_onXdgSurfaceConfigure(data unsafe.Pointer, wmSurf *C.struct_xdg_surface
 	w := callbackLoad(data).(*window)
 	w.serial = serial
 	C.xdg_surface_ack_configure(wmSurf, serial)
-	w.setStage(StageRunning)
+	w.configured = true
 	w.draw(true)
 }
 
@@ -1738,10 +1738,7 @@ func (w *window) updateOutputs() {
 		C.wl_surface_set_buffer_scale(w.surf, C.int32_t(w.scale))
 		w.draw(true)
 	}
-	if !found {
-		w.setStage(StagePaused)
-	} else {
-		w.setStage(StageRunning)
+	if found {
 		w.draw(true)
 	}
 }
@@ -1755,6 +1752,9 @@ func (w *window) getConfig() (image.Point, unit.Metric) {
 }
 
 func (w *window) draw(sync bool) {
+	if !w.configured {
+		return
+	}
 	w.flushScroll()
 	size, cfg := w.getConfig()
 	if cfg == (unit.Metric{}) {
@@ -1783,14 +1783,6 @@ func (w *window) draw(sync bool) {
 		},
 		Sync: sync,
 	})
-}
-
-func (w *window) setStage(s Stage) {
-	if s == w.stage {
-		return
-	}
-	w.stage = s
-	w.ProcessEvent(StageEvent{Stage: s})
 }
 
 func (w *window) display() *C.struct_wl_display {

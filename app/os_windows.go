@@ -39,7 +39,6 @@ type window struct {
 	hwnd        syscall.Handle
 	hdc         syscall.Handle
 	w           *callbacks
-	stage       Stage
 	pointerBtns pointer.Buttons
 
 	// cursorIn tracks whether the cursor was inside the window according
@@ -275,14 +274,6 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_KILLFOCUS:
 		w.focused = false
 		w.ProcessEvent(key.FocusEvent{Focus: false})
-	case windows.WM_NCACTIVATE:
-		if w.stage >= StageInactive {
-			if wParam == windows.TRUE {
-				w.setStage(StageRunning)
-			} else {
-				w.setStage(StageInactive)
-			}
-		}
 	case windows.WM_NCHITTEST:
 		if w.config.Decorated {
 			// Let the system handle it.
@@ -348,15 +339,12 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		switch wParam {
 		case windows.SIZE_MINIMIZED:
 			w.config.Mode = Minimized
-			w.setStage(StagePaused)
 		case windows.SIZE_MAXIMIZED:
 			w.config.Mode = Maximized
-			w.setStage(StageRunning)
 		case windows.SIZE_RESTORED:
 			if w.config.Mode != Fullscreen {
 				w.config.Mode = Windowed
 			}
-			w.setStage(StageRunning)
 		}
 	case windows.WM_GETMINMAXINFO:
 		mm := (*windows.MinMaxInfo)(unsafe.Pointer(lParam))
@@ -642,13 +630,6 @@ func (w *window) wakeup() {
 	}
 	if err := windows.PostMessage(w.hwnd, _WM_WAKEUP, 0, 0); err != nil {
 		panic(err)
-	}
-}
-
-func (w *window) setStage(s Stage) {
-	if s != w.stage {
-		w.stage = s
-		w.ProcessEvent(StageEvent{Stage: s})
 	}
 }
 

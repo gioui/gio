@@ -138,7 +138,6 @@ func onCreate(view, controller C.CFTypeRef) {
 	w.displayLink = dl
 	C.gio_viewSetHandle(view, C.uintptr_t(cgo.NewHandle(w)))
 	w.Configure(wopts.options)
-	w.ProcessEvent(StageEvent{Stage: StageRunning})
 	w.ProcessEvent(UIKitViewEvent{ViewController: uintptr(controller)})
 }
 
@@ -189,14 +188,12 @@ func (w *window) draw(sync bool) {
 func onStop(h C.uintptr_t) {
 	w := viewFor(h)
 	w.hidden = true
-	w.ProcessEvent(StageEvent{Stage: StagePaused})
 }
 
 //export onStart
 func onStart(h C.uintptr_t) {
 	w := viewFor(h)
 	w.hidden = false
-	w.ProcessEvent(StageEvent{Stage: StageRunning})
 	w.draw(true)
 }
 

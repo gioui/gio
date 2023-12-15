@@ -115,7 +115,6 @@ func newWindow(win *callbacks, options []Option) {
 	w.Configure(options)
 	w.blur()
 	w.processEvent(JSViewEvent{Element: cont})
-	w.processEvent(StageEvent{Stage: StageRunning})
 	w.resize()
 	w.draw(true)
 }
@@ -194,17 +193,6 @@ func (w *window) addEventListeners() {
 			return w.browserHistory.Call("forward")
 		}
 		return w.browserHistory.Call("back")
-	})
-	w.addEventListener(w.document, "visibilitychange", func(this js.Value, args []js.Value) interface{} {
-		ev := StageEvent{}
-		switch w.document.Get("visibilityState").String() {
-		case "hidden", "prerender", "unloaded":
-			ev.Stage = StagePaused
-		default:
-			ev.Stage = StageRunning
-		}
-		w.processEvent(ev)
-		return nil
 	})
 	w.addEventListener(w.cnv, "mousemove", func(this js.Value, args []js.Value) interface{} {
 		w.pointerEvent(pointer.Move, 0, 0, args[0])

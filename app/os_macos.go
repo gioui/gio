@@ -309,7 +309,8 @@ type AppKitViewEvent struct {
 type window struct {
 	view        C.CFTypeRef
 	w           *callbacks
-	stage       Stage
+	anim        bool
+	visible     bool
 	displayLink *displayLink
 	// redraw is a single entry channel for making sure only one
 	// display link redraw request is in flight.
@@ -507,7 +508,8 @@ func (w *window) ShowTextInput(show bool) {}
 func (w *window) SetInputHint(_ key.InputHint) {}
 
 func (w *window) SetAnimating(anim bool) {
-	if anim {
+	w.anim = anim
+	if w.anim && w.visible {
 		w.displayLink.Start()
 	} else {
 		w.displayLink.Stop()
@@ -522,14 +524,6 @@ func (w *window) runOnMain(f func()) {
 			f()
 		}
 	})
-}
-
-func (w *window) setStage(stage Stage) {
-	if stage == w.stage {
-		return
-	}
-	w.stage = stage
-	w.ProcessEvent(StageEvent{Stage: stage})
 }
 
 //export gio_onKeys
@@ -619,13 +613,6 @@ func gio_onDraw(h C.uintptr_t) {
 func gio_onFocus(h C.uintptr_t, focus C.int) {
 	w := windowFor(h)
 	w.ProcessEvent(key.FocusEvent{Focus: focus == 1})
-	if w.stage >= StageInactive {
-		if focus == 0 {
-			w.setStage(StageInactive)
-		} else {
-			w.setStage(StageRunning)
-		}
-	}
 	w.SetCursor(w.cursor)
 }
 
@@ -804,6 +791,10 @@ func (w *window) draw() {
 	case <-w.redraw:
 	default:
 	}
+	w.visible = true
+	if w.anim {
+		w.SetAnimating(w.anim)
+	}
 	w.scale = float32(C.getViewBackingScale(w.view))
 	wf, hf := float32(C.viewWidth(w.view)), float32(C.viewHeight(w.view))
 	sz := image.Point{
@@ -818,7 +809,6 @@ func (w *window) draw() {
 		return
 	}
 	cfg := configFor(w.scale)
-	w.setStage(StageRunning)
 	w.ProcessEvent(frameEvent{
 		FrameEvent: FrameEvent{
 			Now:    time.Now(),
@@ -865,7 +855,8 @@ func gio_onAttached(h C.uintptr_t, attached C.int) {
 		w.ProcessEvent(AppKitViewEvent{View: uintptr(w.view), Layer: uintptr(layer)})
 	} else {
 		w.ProcessEvent(AppKitViewEvent{})
-		w.setStage(StagePaused)
+		w.visible = false
+		w.SetAnimating(w.anim)
 	}
 }
 
@@ -882,13 +873,14 @@ func gio_onDestroy(h C.uintptr_t) {
 //export gio_onHide
 func gio_onHide(h C.uintptr_t) {
 	w := windowFor(h)
-	w.setStage(StagePaused)
+	w.visible = false
+	w.SetAnimating(w.anim)
 }
 
 //export gio_onShow
 func gio_onShow(h C.uintptr_t) {
 	w := windowFor(h)
-	w.setStage(StageRunning)
+	w.draw()
 }
 
 //export gio_onFullscreen
@@ -956,7 +948,9 @@ func (w *window) init() error {
 			return
 		}
 		w.runOnMain(func() {
-			C.setNeedsDisplay(w.view)
+			if w.visible {
+				C.setNeedsDisplay(w.view)
+			}
 		})
 	})
 	w.displayLink = dl

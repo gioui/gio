@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"reflect"
 	"runtime"
 	"sync"
 	"time"
@@ -53,7 +54,6 @@ type Window struct {
 		update chan time.Time
 	}
 
-	stage        Stage
 	animating    bool
 	hasNextFrame bool
 	nextFrame    time.Time
@@ -109,7 +109,6 @@ type eventSummary struct {
 	cfg     *ConfigEvent
 	view    *ViewEvent
 	frame   *frameEvent
-	stage   *StageEvent
 	destroy *DestroyEvent
 }
 
@@ -328,7 +327,7 @@ func (w *Window) updateAnimation() {
 		return
 	}
 	animate := false
-	if w.stage >= StageInactive && w.hasNextFrame {
+	if w.hasNextFrame {
 		if dt := time.Until(w.nextFrame); dt <= 0 {
 			animate = true
 		} else {
@@ -566,10 +565,6 @@ func (c *callbacks) nextEvent() (event.Event, bool) {
 		e := *s.cfg
 		s.cfg = nil
 		return e, true
-	case s.stage != nil:
-		e := *s.stage
-		s.stage = nil
-		return e, true
 	case s.frame != nil:
 		e := *s.frame
 		s.frame = nil
@@ -582,27 +577,11 @@ func (c *callbacks) nextEvent() (event.Event, bool) {
 
 func (w *Window) processEvent(e event.Event) bool {
 	switch e2 := e.(type) {
-	case StageEvent:
-		if e2.Stage < StageInactive {
-			if w.gpu != nil {
-				w.ctx.Lock()
-				w.gpu.Release()
-				w.gpu = nil
-				w.ctx.Unlock()
-			}
-		}
-		w.stage = e2.Stage
-		w.updateAnimation()
-		w.coalesced.stage = &e2
 	case wakeupEvent:
 		w.coalesced.wakeup = true
 	case frameEvent:
 		if e2.Size == (image.Point{}) {
 			panic(errors.New("internal error: zero-sized Draw"))
-		}
-		if w.stage < StageInactive {
-			// No drawing if not visible.
-			break
 		}
 		w.metric = e2.Metric
 		w.hasNextFrame = false
@@ -643,6 +622,12 @@ func (w *Window) processEvent(e event.Event) bool {
 		}
 		w.coalesced.destroy = &e2
 	case ViewEvent:
+		if reflect.ValueOf(e2).IsZero() && w.gpu != nil {
+			w.ctx.Lock()
+			w.gpu.Release()
+			w.gpu = nil
+			w.ctx.Unlock()
+		}
 		w.coalesced.view = &e2
 	case ConfigEvent:
 		w.decorations.Config = e2.Config
