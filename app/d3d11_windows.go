@@ -60,10 +60,10 @@ func (c *d3d11Context) RenderTarget() (gpu.RenderTarget, error) {
 }
 
 func (c *d3d11Context) Present() error {
-	err := c.swchain.Present(1, 0)
-	if err == nil {
-		return nil
-	}
+	return wrapErr(c.swchain.Present(1, 0))
+}
+
+func wrapErr(err error) error {
 	if err, ok := err.(d3d11.ErrorCode); ok {
 		switch err.Code {
 		case d3d11.DXGI_STATUS_OCCLUDED:
@@ -84,7 +84,7 @@ func (c *d3d11Context) Refresh() error {
 	}
 	c.releaseFBO()
 	if err := c.swchain.ResizeBuffers(0, 0, 0, d3d11.DXGI_FORMAT_UNKNOWN, 0); err != nil {
-		return err
+		return wrapErr(err)
 	}
 	c.width = width
 	c.height = height
