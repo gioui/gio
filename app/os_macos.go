@@ -1012,15 +1012,6 @@ func (w *window) init() error {
 	return nil
 }
 
-func osMain() {
-	C.gio_initApp()
-	close(launched)
-	for {
-		C.dispatchEvent()
-		gio_dispatchMainFuncs()
-	}
-}
-
 func convertKey(k rune) (key.Name, bool) {
 	var n key.Name
 	switch k {

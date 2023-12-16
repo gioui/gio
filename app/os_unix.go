@@ -33,10 +33,6 @@ type WaylandViewEvent struct {
 func (WaylandViewEvent) implementsViewEvent() {}
 func (WaylandViewEvent) ImplementsEvent()     {}
 
-func osMain() {
-	select {}
-}
-
 type windowDriver func(*callbacks, []Option) error
 
 // Instead of creating files with build tags for each combination of wayland +/- x11

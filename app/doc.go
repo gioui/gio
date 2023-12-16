@@ -33,28 +33,12 @@ For example:
 A program must keep receiving events from the event channel until
 [DestroyEvent] is received.
 
-# Main
+# Main Thread
 
-The Main function must be called from a program's main function, to hand over
-control of the main thread to operating systems that need it.
-
-Because Main is also blocking on some platforms, the event loop of a Window must run in a goroutine.
-
-For example, to display a blank but otherwise functional window:
-
-	package main
-
-	import "gioui.org/app"
-
-	func main() {
-		go func() {
-			w := app.NewWindow()
-			for {
-				w.Event()
-			}
-		}()
-		app.Main()
-	}
+Some GUI platform need access to the main thread of the program. To avoid a
+deadlock on such platforms, at least one Window must have its Event method
+called by the main goroutine. It doesn't have to be any particular Window;
+even a destroyed Window suffices.
 
 # Permissions
 

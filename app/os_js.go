@@ -741,10 +741,6 @@ func (w *window) navigationColor(c color.NRGBA) {
 	theme.Set("content", fmt.Sprintf("#%06X", []uint8{rgba.R, rgba.G, rgba.B}))
 }
 
-func osMain() {
-	select {}
-}
-
 func translateKey(k string) (key.Name, bool) {
 	var n key.Name
 

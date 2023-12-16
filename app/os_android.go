@@ -1317,9 +1317,6 @@ func findClass(env *C.JNIEnv, name string) C.jclass {
 	return C.jni_FindClass(env, cn)
 }
 
-func osMain() {
-}
-
 func newWindow(window *callbacks, options []Option) {
 	mainWindow.in <- windowAndConfig{window, options}
 	<-mainWindow.windows

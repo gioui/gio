@@ -388,9 +388,6 @@ func newWindow(win *callbacks, options []Option) {
 	<-mainWindow.windows
 }
 
-func osMain() {
-}
-
 //export gio_runMain
 func gio_runMain() {
 	runMain()

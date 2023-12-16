@@ -684,6 +684,13 @@ func (w *Window) processEvent(e event.Event) bool {
 
 // Event blocks until an event is received from the window, such as
 // [FrameEvent], or until [Invalidate] is called.
+//
+// Note: if more than one Window is active, at least one must have
+// its Event called from the main goroutine that runs the main
+// function. This is necessary because some operating system GUI
+// implementations require control of the main thread.
+// For this reason, it is allowed to call Event even after a
+// DestroyEvent has been received.
 func (w *Window) Event() event.Event {
 	w.init()
 	return w.basic.Event()

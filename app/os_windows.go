@@ -85,10 +85,6 @@ var resources struct {
 	cursor syscall.Handle
 }
 
-func osMain() {
-	select {}
-}
-
 func newWindow(win *callbacks, options []Option) {
 	done := make(chan struct{})
 	go func() {
