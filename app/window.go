@@ -672,9 +672,9 @@ func (w *Window) processEvent(e event.Event) bool {
 	return true
 }
 
-// NextEvent blocks until an event is received from the window, such as
+// Event blocks until an event is received from the window, such as
 // [FrameEvent], or until [Invalidate] is called.
-func (w *Window) NextEvent() event.Event {
+func (w *Window) Event() event.Event {
 	w.init()
 	return w.basic.Event()
 }
