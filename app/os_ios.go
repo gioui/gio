@@ -211,7 +211,8 @@ func onDestroy(h C.uintptr_t) {
 //export onFocus
 func onFocus(h C.uintptr_t, focus int) {
 	w := viewFor(h)
-	w.ProcessEvent(key.FocusEvent{Focus: focus != 0})
+	w.config.Focused = focus != 0
+	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
 //export onLowMemory

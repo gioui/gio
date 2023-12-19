@@ -657,9 +657,11 @@ func (h *x11EventHandler) handleEvents() bool {
 			// redraw only on the last expose event
 			redraw = (*C.XExposeEvent)(unsafe.Pointer(xev)).count == 0
 		case C.FocusIn:
-			w.ProcessEvent(key.FocusEvent{Focus: true})
+			w.config.Focused = true
+			w.ProcessEvent(ConfigEvent{Config: w.config})
 		case C.FocusOut:
-			w.ProcessEvent(key.FocusEvent{Focus: false})
+			w.config.Focused = false
+			w.ProcessEvent(ConfigEvent{Config: w.config})
 		case C.ConfigureNotify: // window configuration change
 			cevt := (*C.XConfigureEvent)(unsafe.Pointer(xev))
 			if sz := image.Pt(int(cevt.width), int(cevt.height)); sz != w.config.Size {
