@@ -14,7 +14,11 @@ package app
 
 CALayer *gio_layerFactory(void) {
 	@autoreleasepool {
-		return [CAMetalLayer layer];
+		CAMetalLayer *l = [CAMetalLayer layer];
+		l.autoresizingMask = kCALayerHeightSizable|kCALayerWidthSizable;
+		l.needsDisplayOnBoundsChange = YES;
+		l.presentsWithTransaction = YES;
+		return l;
 	}
 }
 

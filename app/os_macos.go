@@ -195,6 +195,14 @@ static void setScreenFrame(CFTypeRef windowRef, CGFloat x, CGFloat y, CGFloat w,
 	}
 }
 
+static void resetLayerFrame(CFTypeRef viewRef) {
+	@autoreleasepool {
+		NSView* view = (__bridge NSView *)viewRef;
+		NSRect r = view.frame;
+		view.layer.frame = r;
+	}
+}
+
 static void hideWindow(CFTypeRef windowRef) {
 	@autoreleasepool {
 		NSWindow* window = (__bridge NSWindow *)windowRef;
@@ -456,6 +464,9 @@ func (w *window) Configure(options []Option) {
 		C.setWindowStandardButtonHidden(window, C.NSWindowCloseButton, barTrans)
 		C.setWindowStandardButtonHidden(window, C.NSWindowMiniaturizeButton, barTrans)
 		C.setWindowStandardButtonHidden(window, C.NSWindowZoomButton, barTrans)
+		// When toggling the titlebar, the layer doesn't update its frame
+		// until the next resize. Force it.
+		C.resetLayerFrame(w.view)
 	}
 	w.ProcessEvent(ConfigEvent{Config: w.config})
 }

@@ -21,7 +21,10 @@ Class gio_layerClass(void) {
 static CFTypeRef getMetalLayer(CFTypeRef viewRef) {
 	@autoreleasepool {
 		UIView *view = (__bridge UIView *)viewRef;
-		return CFBridgingRetain(view.layer);
+		CAMetalLayer *l = (CAMetalLayer *)view.layer;
+		l.needsDisplayOnBoundsChange = YES;
+		l.presentsWithTransaction = YES;
+		return CFBridgingRetain(l);
 	}
 }
 
