@@ -60,8 +60,9 @@ static void presentDrawable(CFTypeRef queueRef, CFTypeRef drawableRef) {
 		id<MTLDrawable> drawable = (__bridge id<MTLDrawable>)drawableRef;
 		id<MTLCommandQueue> queue = (__bridge id<MTLCommandQueue>)queueRef;
 		id<MTLCommandBuffer> cmdBuffer = [queue commandBuffer];
-		[cmdBuffer presentDrawable:drawable];
 		[cmdBuffer commit];
+		[cmdBuffer waitUntilScheduled];
+		[drawable present];
 	}
 }
 
