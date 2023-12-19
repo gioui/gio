@@ -50,7 +50,6 @@ type window struct {
 	placement *windows.WindowPlacement
 
 	animating bool
-	focused   bool
 
 	borderSize image.Point
 	config     Config
@@ -269,11 +268,11 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			Kind: pointer.Cancel,
 		})
 	case windows.WM_SETFOCUS:
-		w.focused = true
-		w.ProcessEvent(key.FocusEvent{Focus: true})
+		w.config.Focused = true
+		w.ProcessEvent(ConfigEvent{Config: w.config})
 	case windows.WM_KILLFOCUS:
-		w.focused = false
-		w.ProcessEvent(key.FocusEvent{Focus: false})
+		w.config.Focused = false
+		w.ProcessEvent(ConfigEvent{Config: w.config})
 	case windows.WM_NCHITTEST:
 		if w.config.Decorated {
 			// Let the system handle it.
@@ -496,7 +495,7 @@ func (w *window) hitTest(x, y int) uintptr {
 }
 
 func (w *window) pointerButton(btn pointer.Buttons, press bool, lParam uintptr, kmods key.Modifiers) {
-	if !w.focused {
+	if !w.config.Focused {
 		windows.SetFocus(w.hwnd)
 	}
 

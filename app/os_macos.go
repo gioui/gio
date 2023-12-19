@@ -612,8 +612,9 @@ func gio_onDraw(h C.uintptr_t) {
 //export gio_onFocus
 func gio_onFocus(h C.uintptr_t, focus C.int) {
 	w := windowFor(h)
-	w.ProcessEvent(key.FocusEvent{Focus: focus == 1})
 	w.SetCursor(w.cursor)
+	w.config.Focused = focus == 1
+	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
 //export gio_onChangeScreen

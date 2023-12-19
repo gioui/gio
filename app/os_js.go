@@ -258,11 +258,13 @@ func (w *window) addEventListeners() {
 		return nil
 	})
 	w.addEventListener(w.tarea, "focus", func(this js.Value, args []js.Value) interface{} {
-		w.processEvent(key.FocusEvent{Focus: true})
+		w.config.Focused = true
+		w.processEvent(ConfigEvent{Config: w.config})
 		return nil
 	})
 	w.addEventListener(w.tarea, "blur", func(this js.Value, args []js.Value) interface{} {
-		w.processEvent(key.FocusEvent{Focus: false})
+		w.config.Focused = false
+		w.processEvent(ConfigEvent{Config: w.config})
 		w.blur()
 		return nil
 	})

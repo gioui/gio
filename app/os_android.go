@@ -593,7 +593,8 @@ func Java_org_gioui_GioView_onBack(env *C.JNIEnv, class C.jclass, view C.jlong) 
 //export Java_org_gioui_GioView_onFocusChange
 func Java_org_gioui_GioView_onFocusChange(env *C.JNIEnv, class C.jclass, view C.jlong, focus C.jboolean) {
 	w := cgo.Handle(view).Value().(*window)
-	w.processEvent(key.FocusEvent{Focus: focus == C.JNI_TRUE})
+	w.config.Focused = focus == C.JNI_TRUE
+	w.processEvent(ConfigEvent{Config: w.config})
 }
 
 //export Java_org_gioui_GioView_onWindowInsets

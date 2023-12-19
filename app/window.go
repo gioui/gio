@@ -630,9 +630,19 @@ func (w *Window) processEvent(e event.Event) bool {
 		}
 		w.coalesced.view = &e2
 	case ConfigEvent:
+		wasFocused := w.decorations.Config.Focused
 		w.decorations.Config = e2.Config
 		e2.Config = w.effectiveConfig()
 		w.coalesced.cfg = &e2
+		if f := w.decorations.Config.Focused; f != wasFocused {
+			w.queue.Queue(key.FocusEvent{Focus: f})
+		}
+		t, handled := w.queue.WakeupTime()
+		if handled {
+			w.setNextFrame(t)
+			w.updateAnimation()
+		}
+		return handled
 	case event.Event:
 		focusDir := key.FocusDirection(-1)
 		if e, ok := e2.(key.Event); ok && e.State == key.Press {

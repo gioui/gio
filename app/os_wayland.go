@@ -1222,7 +1222,8 @@ func gio_onKeyboardEnter(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, se
 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
 	s.keyboardFocus = w
 	s.disp.repeat.Stop(0)
-	w.ProcessEvent(key.FocusEvent{Focus: true})
+	w.config.Focused = true
+	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
 //export gio_onKeyboardLeave
@@ -1231,7 +1232,8 @@ func gio_onKeyboardLeave(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, se
 	s.serial = serial
 	s.disp.repeat.Stop(0)
 	w := s.keyboardFocus
-	w.ProcessEvent(key.FocusEvent{Focus: false})
+	w.config.Focused = false
+	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
 //export gio_onKeyboardKey
