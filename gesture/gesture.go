@@ -446,13 +446,13 @@ func (a Axis) String() string {
 func (ct ClickKind) String() string {
 	switch ct {
 	case KindPress:
-		return "TypePress"
+		return "KindPress"
 	case KindClick:
-		return "TypeClick"
+		return "KindClick"
 	case KindCancel:
-		return "TypeCancel"
+		return "KindCancel"
 	default:
-		panic("invalid ClickType")
+		panic("invalid ClickKind")
 	}
 }
 
