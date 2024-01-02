@@ -53,8 +53,8 @@ func (b *Clickable) Click() {
 	b.requestClicks++
 }
 
-// Clicked reports whether there are pending clicks as would be
-// reported by Clicks. If so, Clicked removes the earliest click.
+// Clicked reports whether there are pending clicks. If so, Clicked
+// removes the earliest click.
 func (b *Clickable) Clicked(gtx layout.Context) bool {
 	if len(b.clicks) > 0 {
 		b.clicks = b.clicks[1:]
