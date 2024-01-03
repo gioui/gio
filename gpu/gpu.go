@@ -51,7 +51,7 @@ type GPU interface {
 }
 
 type gpu struct {
-	cache *resourceCache
+	cache *textureCache
 
 	profile                                string
 	timers                                 *timers
@@ -359,7 +359,7 @@ func NewWithDevice(d driver.Device) (GPU, error) {
 
 func newGPU(ctx driver.Device) (*gpu, error) {
 	g := &gpu{
-		cache: newResourceCache(),
+		cache: newTextureCache(),
 	}
 	g.drawOps.pathCache = newOpCache()
 	if err := g.init(ctx); err != nil {
@@ -460,12 +460,8 @@ func (g *gpu) Profile() string {
 	return g.profile
 }
 
-func (r *renderer) texHandle(cache *resourceCache, data imageOpData) driver.Texture {
-	type cachekey struct {
-		filter byte
-		handle any
-	}
-	key := cachekey{
+func (r *renderer) texHandle(cache *textureCache, data imageOpData) driver.Texture {
+	key := textureCacheKey{
 		filter: data.filter,
 		handle: data.handle,
 	}
@@ -1211,7 +1207,7 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 	return m
 }
 
-func (r *renderer) uploadImages(cache *resourceCache, ops []imageOp) {
+func (r *renderer) uploadImages(cache *textureCache, ops []imageOp) {
 	for i := range ops {
 		img := &ops[i]
 		m := img.material

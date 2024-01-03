@@ -8,8 +8,13 @@ import (
 	"gioui.org/internal/f32"
 )
 
-type resourceCache struct {
-	res map[interface{}]resourceCacheValue
+type textureCacheKey struct {
+	filter byte
+	handle any
+}
+
+type textureCache struct {
+	res map[textureCacheKey]resourceCacheValue
 }
 
 type resourceCacheValue struct {
@@ -37,13 +42,13 @@ type opCacheValue struct {
 	keep bool
 }
 
-func newResourceCache() *resourceCache {
-	return &resourceCache{
-		res: make(map[interface{}]resourceCacheValue),
+func newTextureCache() *textureCache {
+	return &textureCache{
+		res: make(map[textureCacheKey]resourceCacheValue),
 	}
 }
 
-func (r *resourceCache) get(key interface{}) (resource, bool) {
+func (r *textureCache) get(key textureCacheKey) (resource, bool) {
 	v, exists := r.res[key]
 	if !exists {
 		return nil, false
@@ -55,17 +60,17 @@ func (r *resourceCache) get(key interface{}) (resource, bool) {
 	return v.resource, exists
 }
 
-func (r *resourceCache) put(key interface{}, val resource) {
+func (r *textureCache) put(key textureCacheKey, val resource) {
 	v, exists := r.res[key]
 	if exists && v.used {
-		panic(fmt.Errorf("key exists, %p", key))
+		panic(fmt.Errorf("key exists, %v", key))
 	}
 	v.used = true
 	v.resource = val
 	r.res[key] = v
 }
 
-func (r *resourceCache) frame() {
+func (r *textureCache) frame() {
 	for k, v := range r.res {
 		if v.used {
 			v.used = false
@@ -77,7 +82,7 @@ func (r *resourceCache) frame() {
 	}
 }
 
-func (r *resourceCache) release() {
+func (r *textureCache) release() {
 	for _, v := range r.res {
 		v.resource.release()
 	}
