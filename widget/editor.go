@@ -246,7 +246,11 @@ func (e *Editor) processPointer(gtx layout.Context) {
 					X: int(math.Round(float64(evt.Position.X))),
 					Y: int(math.Round(float64(evt.Position.Y))),
 				})
-				e.requestFocus = true
+
+				if !e.ReadOnly {
+					e.requestFocus = true
+				}
+
 				if e.scroller.State() != gesture.StateFlinging {
 					e.scrollCaret = true
 				}
@@ -493,7 +497,9 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 
 // Focus requests the input focus for the Editor.
 func (e *Editor) Focus() {
-	e.requestFocus = true
+	if !e.ReadOnly {
+		e.requestFocus = true
+	}
 }
 
 // Focused returns whether the editor is focused or not.
@@ -646,9 +652,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 	key.InputOp{Tag: &e.eventKey, Hint: e.InputHint, Keys: keys}.Add(gtx.Ops)
 	if e.requestFocus {
 		key.FocusOp{Tag: &e.eventKey}.Add(gtx.Ops)
-		if !e.ReadOnly {
-			key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)
-		}
+		key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)
 	}
 	e.requestFocus = false
 
