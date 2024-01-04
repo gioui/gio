@@ -35,12 +35,12 @@ func TestBool(t *testing.T) {
 	r.Queue(
 		pointer.Event{
 			Source:   pointer.Touch,
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 			Position: f32.Pt(50, 50),
 		},
 		pointer.Event{
 			Source:   pointer.Touch,
-			Type:     pointer.Release,
+			Kind:     pointer.Release,
 			Position: f32.Pt(50, 50),
 		},
 	)

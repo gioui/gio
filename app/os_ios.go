@@ -117,7 +117,7 @@ func onCreate(view, controller C.CFTypeRef) {
 	w := &window{
 		view: view,
 	}
-	dl, err := NewDisplayLink(func() {
+	dl, err := newDisplayLink(func() {
 		w.draw(false)
 	})
 	if err != nil {
@@ -236,16 +236,16 @@ func onText(view, str C.CFTypeRef) {
 
 //export onTouch
 func onTouch(last C.int, view, touchRef C.CFTypeRef, phase C.NSInteger, x, y C.CGFloat, ti C.double) {
-	var typ pointer.Type
+	var kind pointer.Kind
 	switch phase {
 	case C.UITouchPhaseBegan:
-		typ = pointer.Press
+		kind = pointer.Press
 	case C.UITouchPhaseMoved:
-		typ = pointer.Move
+		kind = pointer.Move
 	case C.UITouchPhaseEnded:
-		typ = pointer.Release
+		kind = pointer.Release
 	case C.UITouchPhaseCancelled:
-		typ = pointer.Cancel
+		kind = pointer.Cancel
 	default:
 		return
 	}
@@ -253,7 +253,7 @@ func onTouch(last C.int, view, touchRef C.CFTypeRef, phase C.NSInteger, x, y C.C
 	t := time.Duration(float64(ti) * float64(time.Second))
 	p := f32.Point{X: float32(x), Y: float32(y)}
 	w.w.Event(pointer.Event{
-		Type:      typ,
+		Kind:      kind,
 		Source:    pointer.Touch,
 		PointerID: w.lookupTouch(last != 0, touchRef),
 		Position:  p,

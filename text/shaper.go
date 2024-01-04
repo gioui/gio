@@ -121,7 +121,7 @@ type Glyph struct {
 	// belongs to. If Flags does not contain FlagClusterBreak, this value will
 	// always be zero. The final glyph in the cluster contains the runes count
 	// for the entire cluster.
-	Runes int
+	Runes uint16
 	// Flags encode special properties of this glyph.
 	Flags Flags
 }
@@ -469,7 +469,7 @@ func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
 			Ascent:  line.ascent,
 			Descent: line.descent,
 			Advance: g.xAdvance,
-			Runes:   g.runeCount,
+			Runes:   uint16(g.runeCount),
 			Offset: fixed.Point26_6{
 				X: g.xOffset,
 				Y: g.yOffset,
@@ -505,7 +505,7 @@ func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
 		if endOfCluster {
 			glyph.Flags |= FlagClusterBreak
 			if run.truncator {
-				glyph.Runes += l.txt.unreadRuneCount
+				glyph.Runes += uint16(l.txt.unreadRuneCount)
 			}
 		} else {
 			glyph.Runes = 0

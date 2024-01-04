@@ -12,12 +12,11 @@ import (
 
 // Decorations handles the states of window decorations.
 type Decorations struct {
-	clicks []Clickable
+	clicks map[int]*Clickable
 	resize [8]struct {
 		gesture.Hover
 		gesture.Drag
 	}
-	actions   system.Action
 	maximized bool
 }
 
@@ -35,22 +34,13 @@ func (d *Decorations) Clickable(action system.Action) *Clickable {
 		panic(fmt.Errorf("not a single action"))
 	}
 	idx := bits.TrailingZeros(uint(action))
-	if n := idx - len(d.clicks); n >= 0 {
-		d.clicks = append(d.clicks, make([]Clickable, n+1)...)
-	}
-	click := &d.clicks[idx]
-	if click.Clicked() {
-		if action == system.ActionMaximize {
-			if d.maximized {
-				d.maximized = false
-				d.actions |= system.ActionUnmaximize
-			} else {
-				d.maximized = true
-				d.actions |= system.ActionMaximize
-			}
-		} else {
-			d.actions |= action
+	click, found := d.clicks[idx]
+	if !found {
+		click = new(Clickable)
+		if d.clicks == nil {
+			d.clicks = make(map[int]*Clickable)
 		}
+		d.clicks[idx] = click
 	}
 	return click
 }
@@ -66,11 +56,27 @@ func (d *Decorations) Perform(actions system.Action) {
 	}
 }
 
-// Actions returns the set of actions activated by the user.
-func (d *Decorations) Actions() system.Action {
-	a := d.actions
-	d.actions = 0
-	return a
+// Update the state and return the set of actions activated by the user.
+func (d *Decorations) Update(gtx layout.Context) system.Action {
+	var actions system.Action
+	for idx, clk := range d.clicks {
+		if !clk.Clicked(gtx) {
+			continue
+		}
+		action := system.Action(1 << idx)
+		switch {
+		case action == system.ActionMaximize && d.maximized:
+			action = system.ActionUnmaximize
+		case action == system.ActionUnmaximize && !d.maximized:
+			action = system.ActionMaximize
+		}
+		switch action {
+		case system.ActionMaximize, system.ActionUnmaximize:
+			d.maximized = !d.maximized
+		}
+		actions |= action
+	}
+	return actions
 }
 
 // Maximized returns whether the window is maximized.

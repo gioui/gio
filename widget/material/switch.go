@@ -39,6 +39,7 @@ func Switch(th *Theme, swtch *widget.Bool, description string) SwitchStyle {
 
 // Layout updates the switch and displays it.
 func (s SwitchStyle) Layout(gtx layout.Context) layout.Dimensions {
+	s.Switch.Update(gtx)
 	trackWidth := gtx.Dp(36)
 	trackHeight := gtx.Dp(16)
 	thumbSize := gtx.Dp(20)

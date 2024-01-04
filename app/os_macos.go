@@ -192,6 +192,10 @@ static CFTypeRef windowForView(CFTypeRef viewRef) {
 }
 
 static void raiseWindow(CFTypeRef windowRef) {
+	NSRunningApplication *currentApp = [NSRunningApplication currentApplication];
+	if (![currentApp isActive]) {
+		[currentApp activateWithOptions:(NSApplicationActivateAllWindows | NSApplicationActivateIgnoringOtherApps)];
+	}
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	[window makeKeyAndOrderFront:nil];
 }
@@ -297,7 +301,9 @@ func (w *window) contextView() C.CFTypeRef {
 
 func (w *window) ReadClipboard() {
 	cstr := C.readClipboard()
-	defer C.CFRelease(cstr)
+	if cstr != 0 {
+		defer C.CFRelease(cstr)
+	}
 	content := nsstringToString(cstr)
 	w.w.Event(clipboard.Event{Text: content})
 }
@@ -365,11 +371,11 @@ func (w *window) Configure(options []Option) {
 		case Minimized:
 			C.unhideWindow(window)
 		case Maximized:
+			if C.isWindowZoomed(window) != 0 {
+				C.zoomWindow(window)
+			}
 		}
 		w.config.Mode = Windowed
-		if C.isWindowZoomed(window) != 0 {
-			C.zoomWindow(window)
-		}
 		w.setTitle(prev, cnf)
 		if prev.Size != cnf.Size {
 			w.config.Size = cnf.Size
@@ -526,7 +532,7 @@ func gio_onMouse(view, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x, y, dx, 
 	case 2:
 		btn = pointer.ButtonTertiary
 	}
-	var typ pointer.Type
+	var typ pointer.Kind
 	switch cdir {
 	case C.MOUSE_MOVE:
 		typ = pointer.Move
@@ -550,7 +556,7 @@ func gio_onMouse(view, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x, y, dx, 
 		panic("invalid direction")
 	}
 	w.w.Event(pointer.Event{
-		Type:      typ,
+		Kind:      typ,
 		Source:    pointer.Mouse,
 		Time:      t,
 		Buttons:   w.pointerBtns,
@@ -884,7 +890,7 @@ func newOSWindow() (*window, error) {
 		scale:  scale,
 		redraw: make(chan struct{}, 1),
 	}
-	dl, err := NewDisplayLink(func() {
+	dl, err := newDisplayLink(func() {
 		select {
 		case w.redraw <- struct{}{}:
 		default:

@@ -124,7 +124,7 @@ func stringToNSString(str string) C.CFTypeRef {
 	return C.newNSString(chars, C.NSUInteger(len(u16)))
 }
 
-func NewDisplayLink(callback func()) (*displayLink, error) {
+func newDisplayLink(callback func()) (*displayLink, error) {
 	d := &displayLink{
 		callback: callback,
 		done:     make(chan struct{}),

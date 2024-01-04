@@ -7,7 +7,6 @@ import (
 	"os"
 	"sort"
 	"testing"
-	"time"
 
 	colEmoji "eliasnaur.com/font/noto/emoji/color"
 	"gioui.org/font"
@@ -47,10 +46,6 @@ var (
 		return collection
 	}()
 )
-
-func init() {
-	rand.Seed(int64(time.Now().Nanosecond()))
-}
 
 func runBenchmarkPermutations(b *testing.B, benchmark func(b *testing.B, runes int, locale system.Locale, document string)) {
 	docKeys := maps.Keys(documents)
@@ -127,11 +122,12 @@ func BenchmarkLabelDynamic(b *testing.B) {
 		font := font.Font{}
 		runes := []rune(txt)[:runeCount]
 		l := Label{}
+		r := rand.New(rand.NewSource(42))
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			// simulate a constantly changing string
-			a := rand.Intn(len(runes))
-			b := rand.Intn(len(runes))
+			a := r.Intn(len(runes))
+			b := r.Intn(len(runes))
 			runes[a], runes[b] = runes[b], runes[a]
 			l.Layout(gtx, cache, font, fontSize, string(runes), op.CallOp{})
 			if render {
@@ -196,11 +192,12 @@ func BenchmarkEditorDynamic(b *testing.B) {
 		runes := []rune(txt)[:runeCount]
 		e := Editor{}
 		e.SetText(string(runes))
+		r := rand.New(rand.NewSource(42))
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			// simulate a constantly changing string
-			a := rand.Intn(e.Len())
-			b := rand.Intn(e.Len())
+			a := r.Intn(e.Len())
+			b := r.Intn(e.Len())
 			e.SetCaret(a, a+1)
 			takeStr := e.SelectedText()
 			e.Insert("")

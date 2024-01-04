@@ -103,6 +103,30 @@ func ExampleStack() {
 	// Expand: {(50,50) (100,100)}
 }
 
+func ExampleBackground() {
+	gtx := layout.Context{
+		Ops: new(op.Ops),
+		Constraints: layout.Constraints{
+			Max: image.Point{X: 100, Y: 100},
+		},
+	}
+
+	layout.Background{}.Layout(gtx,
+		// Force widget to the same size as the second.
+		func(gtx layout.Context) layout.Dimensions {
+			fmt.Printf("Expand: %v\n", gtx.Constraints)
+			return layoutWidget(gtx, 10, 10)
+		},
+		// Rigid 50x50 widget.
+		func(gtx layout.Context) layout.Dimensions {
+			return layoutWidget(gtx, 50, 50)
+		},
+	)
+
+	// Output:
+	// Expand: {(50,50) (100,100)}
+}
+
 func ExampleList() {
 	gtx := layout.Context{
 		Ops: new(op.Ops),

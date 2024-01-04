@@ -953,18 +953,18 @@ func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.j
 //export Java_org_gioui_GioView_onTouchEvent
 func Java_org_gioui_GioView_onTouchEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, action, pointerID, tool C.jint, x, y, scrollX, scrollY C.jfloat, jbtns C.jint, t C.jlong) {
 	w := cgo.Handle(handle).Value().(*window)
-	var typ pointer.Type
+	var kind pointer.Kind
 	switch action {
 	case C.AMOTION_EVENT_ACTION_DOWN, C.AMOTION_EVENT_ACTION_POINTER_DOWN:
-		typ = pointer.Press
+		kind = pointer.Press
 	case C.AMOTION_EVENT_ACTION_UP, C.AMOTION_EVENT_ACTION_POINTER_UP:
-		typ = pointer.Release
+		kind = pointer.Release
 	case C.AMOTION_EVENT_ACTION_CANCEL:
-		typ = pointer.Cancel
+		kind = pointer.Cancel
 	case C.AMOTION_EVENT_ACTION_MOVE:
-		typ = pointer.Move
+		kind = pointer.Move
 	case C.AMOTION_EVENT_ACTION_SCROLL:
-		typ = pointer.Scroll
+		kind = pointer.Scroll
 	default:
 		return
 	}
@@ -994,7 +994,7 @@ func Java_org_gioui_GioView_onTouchEvent(env *C.JNIEnv, class C.jclass, handle C
 		return
 	}
 	w.callbacks.Event(pointer.Event{
-		Type:      typ,
+		Kind:      kind,
 		Source:    src,
 		Buttons:   btns,
 		PointerID: pointer.ID(pointerID),

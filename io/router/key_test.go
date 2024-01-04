@@ -30,11 +30,6 @@ func TestKeyWakeup(t *testing.T) {
 	if evts := r.Events(handler); len(evts) != 1 {
 		t.Errorf("no Focus event for newly registered key.InputOp")
 	}
-	// Verify that r.Events does trigger a redraw.
-	r.Frame(&ops)
-	if _, wake := r.WakeupTime(); !wake {
-		t.Errorf("key.FocusEvent event didn't trigger a redraw")
-	}
 }
 
 func TestKeyMultiples(t *testing.T) {
@@ -279,7 +274,7 @@ func TestFocusScroll(t *testing.T) {
 	key.InputOp{Tag: h}.Add(ops)
 	pointer.InputOp{
 		Tag:          h,
-		Types:        pointer.Scroll,
+		Kinds:        pointer.Scroll,
 		ScrollBounds: image.Rect(-100, -100, 100, 100),
 	}.Add(ops)
 	// Test that h is scrolled even if behind another handler.
@@ -305,7 +300,7 @@ func TestFocusClick(t *testing.T) {
 	key.InputOp{Tag: h}.Add(ops)
 	pointer.InputOp{
 		Tag:   h,
-		Types: pointer.Press | pointer.Release,
+		Kinds: pointer.Press | pointer.Release,
 	}.Add(ops)
 	cl.Pop()
 	r.Frame(ops)

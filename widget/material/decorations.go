@@ -88,18 +88,18 @@ func (d DecorationsStyle) layoutDecorations(gtx layout.Context) layout.Dimension
 				cl := d.Decorations.Clickable(a)
 				dims := cl.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 					semantic.Button.Add(gtx.Ops)
-					return layout.Stack{Alignment: layout.Center}.Layout(gtx,
-						layout.Expanded(func(gtx layout.Context) layout.Dimensions {
+					return layout.Background{}.Layout(gtx,
+						func(gtx layout.Context) layout.Dimensions {
 							defer clip.Rect{Max: gtx.Constraints.Min}.Push(gtx.Ops).Pop()
 							for _, c := range cl.History() {
 								drawInk(gtx, c)
 							}
 							return layout.Dimensions{Size: gtx.Constraints.Min}
-						}),
-						layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+						},
+						func(gtx layout.Context) layout.Dimensions {
 							paint.ColorOp{Color: d.Foreground}.Add(gtx.Ops)
 							return inset.Layout(gtx, w)
-						}),
+						},
 					)
 				})
 				size.X += dims.Size.X

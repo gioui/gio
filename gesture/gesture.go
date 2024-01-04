@@ -39,18 +39,18 @@ type Hover struct {
 func (h *Hover) Add(ops *op.Ops) {
 	pointer.InputOp{
 		Tag:   h,
-		Types: pointer.Enter | pointer.Leave,
+		Kinds: pointer.Enter | pointer.Leave,
 	}.Add(ops)
 }
 
-// Hovered returns whether a pointer is inside the area.
-func (h *Hover) Hovered(q event.Queue) bool {
+// Update state and report whether a pointer is inside the area.
+func (h *Hover) Update(q event.Queue) bool {
 	for _, ev := range q.Events(h) {
 		e, ok := ev.(pointer.Event)
 		if !ok {
 			continue
 		}
-		switch e.Type {
+		switch e.Kind {
 		case pointer.Leave, pointer.Cancel:
 			if h.entered && h.pid == e.PointerID {
 				h.entered = false
@@ -87,10 +87,10 @@ type Click struct {
 }
 
 // ClickEvent represent a click action, either a
-// TypePress for the beginning of a click or a
-// TypeClick for a completed click.
+// KindPress for the beginning of a click or a
+// KindClick for a completed click.
 type ClickEvent struct {
-	Type      ClickType
+	Kind      ClickKind
 	Position  image.Point
 	Source    pointer.Source
 	Modifiers key.Modifiers
@@ -99,7 +99,7 @@ type ClickEvent struct {
 	NumClicks int
 }
 
-type ClickType uint8
+type ClickKind uint8
 
 // Drag detects drag gestures in the form of pointer.Drag events.
 type Drag struct {
@@ -136,15 +136,15 @@ const (
 )
 
 const (
-	// TypePress is reported for the first pointer
+	// KindPress is reported for the first pointer
 	// press.
-	TypePress ClickType = iota
-	// TypeClick is reported when a click action
+	KindPress ClickKind = iota
+	// KindClick is reported when a click action
 	// is complete.
-	TypeClick
-	// TypeCancel is reported when the gesture is
+	KindClick
+	// KindCancel is reported when the gesture is
 	// cancelled.
-	TypeCancel
+	KindCancel
 )
 
 const (
@@ -163,7 +163,7 @@ const touchSlop = unit.Dp(3)
 func (c *Click) Add(ops *op.Ops) {
 	pointer.InputOp{
 		Tag:   c,
-		Types: pointer.Press | pointer.Release | pointer.Enter | pointer.Leave,
+		Kinds: pointer.Press | pointer.Release | pointer.Enter | pointer.Leave,
 	}.Add(ops)
 }
 
@@ -177,24 +177,24 @@ func (c *Click) Pressed() bool {
 	return c.pressed
 }
 
-// Events returns the next click events, if any.
-func (c *Click) Events(q event.Queue) []ClickEvent {
+// Update state and return the click events.
+func (c *Click) Update(q event.Queue) []ClickEvent {
 	var events []ClickEvent
 	for _, evt := range q.Events(c) {
 		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue
 		}
-		switch e.Type {
+		switch e.Kind {
 		case pointer.Release:
 			if !c.pressed || c.pid != e.PointerID {
 				break
 			}
 			c.pressed = false
 			if !c.entered || c.hovered {
-				events = append(events, ClickEvent{Type: TypeClick, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
+				events = append(events, ClickEvent{Kind: KindClick, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
 			} else {
-				events = append(events, ClickEvent{Type: TypeCancel})
+				events = append(events, ClickEvent{Kind: KindCancel})
 			}
 		case pointer.Cancel:
 			wasPressed := c.pressed
@@ -202,7 +202,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 			c.hovered = false
 			c.entered = false
 			if wasPressed {
-				events = append(events, ClickEvent{Type: TypeCancel})
+				events = append(events, ClickEvent{Kind: KindCancel})
 			}
 		case pointer.Press:
 			if c.pressed {
@@ -224,7 +224,7 @@ func (c *Click) Events(q event.Queue) []ClickEvent {
 				c.clicks = 1
 			}
 			c.clickedAt = e.Time
-			events = append(events, ClickEvent{Type: TypePress, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
+			events = append(events, ClickEvent{Kind: KindPress, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
 		case pointer.Leave:
 			if !c.pressed {
 				c.pid = e.PointerID
@@ -254,7 +254,7 @@ func (s *Scroll) Add(ops *op.Ops, bounds image.Rectangle) {
 	oph := pointer.InputOp{
 		Tag:          s,
 		Grab:         s.grab,
-		Types:        pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll,
+		Kinds:        pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll,
 		ScrollBounds: bounds,
 	}
 	oph.Add(ops)
@@ -268,9 +268,8 @@ func (s *Scroll) Stop() {
 	s.flinger = fling.Animation{}
 }
 
-// Scroll detects the scrolling distance from the available events and
-// ongoing fling gestures.
-func (s *Scroll) Scroll(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) int {
+// Update state and report the scroll distance along axis.
+func (s *Scroll) Update(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) int {
 	if s.axis != axis {
 		s.axis = axis
 		return 0
@@ -281,7 +280,7 @@ func (s *Scroll) Scroll(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) 
 		if !ok {
 			continue
 		}
-		switch e.Type {
+		switch e.Kind {
 		case pointer.Press:
 			if s.dragging {
 				break
@@ -368,12 +367,12 @@ func (d *Drag) Add(ops *op.Ops) {
 	pointer.InputOp{
 		Tag:   d,
 		Grab:  d.grab,
-		Types: pointer.Press | pointer.Drag | pointer.Release,
+		Kinds: pointer.Press | pointer.Drag | pointer.Release,
 	}.Add(ops)
 }
 
-// Events returns the next drag events, if any.
-func (d *Drag) Events(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event {
+// Update state and return the drag events.
+func (d *Drag) Update(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event {
 	var events []pointer.Event
 	for _, e := range q.Events(d) {
 		e, ok := e.(pointer.Event)
@@ -381,7 +380,7 @@ func (d *Drag) Events(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event
 			continue
 		}
 
-		switch e.Type {
+		switch e.Kind {
 		case pointer.Press:
 			if !(e.Buttons == pointer.ButtonPrimary || e.Source == pointer.Touch) {
 				continue
@@ -444,16 +443,16 @@ func (a Axis) String() string {
 	}
 }
 
-func (ct ClickType) String() string {
+func (ct ClickKind) String() string {
 	switch ct {
-	case TypePress:
-		return "TypePress"
-	case TypeClick:
-		return "TypeClick"
-	case TypeCancel:
-		return "TypeCancel"
+	case KindPress:
+		return "KindPress"
+	case KindClick:
+		return "KindClick"
+	case KindCancel:
+		return "KindCancel"
 	default:
-		panic("invalid ClickType")
+		panic("invalid ClickKind")
 	}
 }
 

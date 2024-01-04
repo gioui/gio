@@ -139,7 +139,7 @@ func TestEditorReadOnly(t *testing.T) {
 	// Type some new characters.
 	gtx.Ops.Reset()
 	gtx.Queue = &testQueue{events: []event.Event{key.EditEvent{Range: key.Range{Start: cStart2, End: cEnd2}, Text: "something else"}}}
-	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	e.Update(gtx)
 	textContent2 := e.Text()
 	if textContent2 != textContent {
 		t.Errorf("readonly editor modified by key.EditEvent")
@@ -159,22 +159,22 @@ func TestEditorReadOnly(t *testing.T) {
 	gtx.Ops.Reset()
 	gtx.Queue = &testQueue{events: []event.Event{
 		pointer.Event{
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 			Buttons:  pointer.ButtonPrimary,
 			Position: f32.Pt(float32(dims.Size.X)*.5, 5),
 		},
 		pointer.Event{
-			Type:     pointer.Drag,
+			Kind:     pointer.Drag,
 			Buttons:  pointer.ButtonPrimary,
 			Position: layout.FPt(dims.Size).Mul(.5),
 		},
 		pointer.Event{
-			Type:     pointer.Release,
+			Kind:     pointer.Release,
 			Buttons:  pointer.ButtonPrimary,
 			Position: layout.FPt(dims.Size).Mul(.5),
 		},
 	}}
-	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	e.Update(gtx)
 	cStart3, cEnd3 := e.Selection()
 	if cStart3 == cStart2 || cEnd3 == cEnd2 {
 		t.Errorf("expected mouse interaction to change selection.")
@@ -285,44 +285,10 @@ func TestEditor(t *testing.T) {
 	e.MoveCaret(-3, -3)
 	assertCaret(t, e, 1, 1, len("æbc\na"))
 	e.text.Mask = '*'
-	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	e.Update(gtx)
 	assertCaret(t, e, 1, 1, len("æbc\na"))
 	e.MoveCaret(-3, -3)
 	assertCaret(t, e, 0, 2, len("æb"))
-	/*
-		    NOTE(whereswaldon): it isn't possible to check the raw glyph data
-		    like this anymore. How should we handle this?
-			e.Mask = '\U0001F92B'
-			e.Layout(gtx, cache, font, fontSize, op.CallOp{},op.CallOp{})
-			e.moveEnd(selectionClear)
-			assertCaret(t, e, 0, 3, len("æbc"))
-
-			// When a password mask is applied, it should replace all visible glyphs
-			spaces := 0
-			for _, r := range textSample {
-				if unicode.IsSpace(r) {
-					spaces++
-				}
-			}
-			nonSpaces := len([]rune(textSample)) - spaces
-			glyphCounts := make(map[int]int)
-			// This loop assumes a single-run text, which we know is safe here.
-			for _, line := range e.lines {
-				for _, glyph := range line.Runs[0].Glyphs {
-					glyphCounts[int(glyph.ID)]++
-				}
-			}
-			if len(glyphCounts) > 2 {
-				t.Errorf("masked text contained glyphs other than mask and whitespace")
-			}
-
-			for gid, count := range glyphCounts {
-				if count != spaces && count != nonSpaces {
-					t.Errorf("glyph with id %d occurred %d times, expected either %d or %d", gid, count, spaces, nonSpaces)
-				}
-			}
-
-	*/
 	// Test that moveLine applies x offsets from previous moves.
 	e.SetText("long line\nshort")
 	e.SetCaret(0, 0)
@@ -680,11 +646,8 @@ func TestEditorMoveWord(t *testing.T) {
 			Constraints: layout.Exact(image.Pt(100, 100)),
 			Locale:      english,
 		}
-		cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
-		fontSize := unit.Sp(10)
-		font := font.Font{}
 		e.SetText(t)
-		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+		e.Update(gtx)
 		return e
 	}
 	for ii, tt := range tests {
@@ -785,11 +748,8 @@ func TestEditorInsert(t *testing.T) {
 			Constraints: layout.Exact(image.Pt(100, 100)),
 			Locale:      english,
 		}
-		cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
-		fontSize := unit.Sp(10)
-		font := font.Font{}
 		e.SetText(t)
-		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+		e.Update(gtx)
 		return e
 	}
 	for ii, tt := range tests {
@@ -875,11 +835,8 @@ func TestEditorDeleteWord(t *testing.T) {
 			Constraints: layout.Exact(image.Pt(100, 100)),
 			Locale:      english,
 		}
-		cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
-		fontSize := unit.Sp(10)
-		font := font.Font{}
 		e.SetText(t)
-		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+		e.Update(gtx)
 		return e
 	}
 	for ii, tt := range tests {
@@ -947,13 +904,13 @@ g 2 4 6 8 g
 			events: []event.Event{
 				pointer.Event{
 					Buttons:  pointer.ButtonPrimary,
-					Type:     pointer.Press,
+					Kind:     pointer.Press,
 					Source:   pointer.Mouse,
 					Time:     tim,
 					Position: f32.Pt(textWidth(e, startPos.lineCol.line, 0, startPos.lineCol.col), textBaseline(e, startPos.lineCol.line)),
 				},
 				pointer.Event{
-					Type:     pointer.Release,
+					Kind:     pointer.Release,
 					Source:   pointer.Mouse,
 					Time:     tim,
 					Position: f32.Pt(textWidth(e, endPos.lineCol.line, 0, endPos.lineCol.col), textBaseline(e, endPos.lineCol.line)),

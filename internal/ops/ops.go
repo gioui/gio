@@ -14,7 +14,7 @@ import (
 
 type Ops struct {
 	// version is incremented at each Reset.
-	version int
+	version uint32
 	// data contains the serialized operations.
 	data []byte
 	// refs hold external references for operations.
@@ -32,7 +32,7 @@ type Ops struct {
 	stringRefs []string
 	// nextStateID is the id allocated for the next
 	// StateOp.
-	nextStateID int
+	nextStateID uint32
 	// multipOp indicates a multi-op such as clip.Path is being added.
 	multipOp bool
 
@@ -51,9 +51,10 @@ const (
 	TypeMacro OpType = iota + firstOpIndex
 	TypeCall
 	TypeDefer
-	TypePushTransform
 	TypeTransform
 	TypePopTransform
+	TypePushOpacity
+	TypePopOpacity
 	TypeInvalidate
 	TypeImage
 	TypePaint
@@ -83,30 +84,30 @@ const (
 	TypeSemanticDesc
 	TypeSemanticClass
 	TypeSemanticSelected
-	TypeSemanticDisabled
+	TypeSemanticEnabled
 	TypeSnippet
 	TypeSelection
 	TypeActionInput
 )
 
 type StackID struct {
-	id   int
-	prev int
+	id   uint32
+	prev uint32
 }
 
 // StateOp represents a saved operation snapshot to be restored
 // later.
 type StateOp struct {
-	id      int
-	macroID int
+	id      uint32
+	macroID uint32
 	ops     *Ops
 }
 
 // stack tracks the integer identities of stack operations to ensure correct
 // pairing of their push and pop methods.
 type stack struct {
-	currentID int
-	nextID    int
+	currentID uint32
+	nextID    uint32
 }
 
 type StackKind uint8
@@ -122,6 +123,7 @@ const (
 	ClipStack StackKind = iota
 	TransStack
 	PassStack
+	OpacityStack
 	_StackKind
 )
 
@@ -135,11 +137,12 @@ const (
 	TypeMacroLen            = 1 + 4 + 4
 	TypeCallLen             = 1 + 4 + 4 + 4 + 4
 	TypeDeferLen            = 1
-	TypePushTransformLen    = 1 + 4*6
 	TypeTransformLen        = 1 + 1 + 4*6
 	TypePopTransformLen     = 1
+	TypePushOpacityLen      = 1 + 4
+	TypePopOpacityLen       = 1
 	TypeRedrawLen           = 1 + 8
-	TypeImageLen            = 1
+	TypeImageLen            = 1 + 1
 	TypePaintLen            = 1
 	TypeColorLen            = 1 + 4
 	TypeLinearGradientLen   = 1 + 8*2 + 4*2
@@ -167,7 +170,7 @@ const (
 	TypeSemanticDescLen     = 1
 	TypeSemanticClassLen    = 2
 	TypeSemanticSelectedLen = 2
-	TypeSemanticDisabledLen = 2
+	TypeSemanticEnabledLen  = 2
 	TypeSnippetLen          = 1 + 4 + 4
 	TypeSelectionLen        = 1 + 2*4 + 2*4 + 4 + 4
 	TypeActionInputLen      = 1 + 1
@@ -263,11 +266,11 @@ func AddCall(o *Ops, callOps *Ops, pc PC, end PC) {
 	bo.PutUint32(data[13:], uint32(end.refs))
 }
 
-func PushOp(o *Ops, kind StackKind) (StackID, int) {
+func PushOp(o *Ops, kind StackKind) (StackID, uint32) {
 	return o.stacks[kind].push(), o.macroStack.currentID
 }
 
-func PopOp(o *Ops, kind StackKind, sid StackID, macroID int) {
+func PopOp(o *Ops, kind StackKind, sid StackID, macroID uint32) {
 	if o.macroStack.currentID != macroID {
 		panic("stack push and pop must not cross macro boundary")
 	}
@@ -307,7 +310,7 @@ func Write3(o *Ops, n int, ref1, ref2, ref3 interface{}) []byte {
 }
 
 func PCFor(o *Ops) PC {
-	return PC{data: len(o.data), refs: len(o.refs)}
+	return PC{data: uint32(len(o.data)), refs: uint32(len(o.refs))}
 }
 
 func (s *stack) push() StackID {
@@ -383,6 +386,14 @@ func DecodeTransform(data []byte) (t f32.Affine2D, push bool) {
 	return f32.NewAffine2D(a, b, c, d, e, f), push
 }
 
+func DecodeOpacity(data []byte) float32 {
+	if OpType(data[0]) != TypePushOpacity {
+		panic("invalid op")
+	}
+	bo := binary.LittleEndian
+	return math.Float32frombits(bo.Uint32(data[1:]))
+}
+
 // DecodeSave decodes the state id of a save op.
 func DecodeSave(data []byte) int {
 	if OpType(data[0]) != TypeSave {
@@ -410,9 +421,10 @@ var opProps = [0x100]opProp{
 	TypeMacro:            {Size: TypeMacroLen, NumRefs: 0},
 	TypeCall:             {Size: TypeCallLen, NumRefs: 1},
 	TypeDefer:            {Size: TypeDeferLen, NumRefs: 0},
-	TypePushTransform:    {Size: TypePushTransformLen, NumRefs: 0},
 	TypeTransform:        {Size: TypeTransformLen, NumRefs: 0},
 	TypePopTransform:     {Size: TypePopTransformLen, NumRefs: 0},
+	TypePushOpacity:      {Size: TypePushOpacityLen, NumRefs: 0},
+	TypePopOpacity:       {Size: TypePopOpacityLen, NumRefs: 0},
 	TypeInvalidate:       {Size: TypeRedrawLen, NumRefs: 0},
 	TypeImage:            {Size: TypeImageLen, NumRefs: 2},
 	TypePaint:            {Size: TypePaintLen, NumRefs: 0},
@@ -442,23 +454,23 @@ var opProps = [0x100]opProp{
 	TypeSemanticDesc:     {Size: TypeSemanticDescLen, NumRefs: 1},
 	TypeSemanticClass:    {Size: TypeSemanticClassLen, NumRefs: 0},
 	TypeSemanticSelected: {Size: TypeSemanticSelectedLen, NumRefs: 0},
-	TypeSemanticDisabled: {Size: TypeSemanticDisabledLen, NumRefs: 0},
+	TypeSemanticEnabled:  {Size: TypeSemanticEnabledLen, NumRefs: 0},
 	TypeSnippet:          {Size: TypeSnippetLen, NumRefs: 2},
 	TypeSelection:        {Size: TypeSelectionLen, NumRefs: 1},
 	TypeActionInput:      {Size: TypeActionInputLen, NumRefs: 0},
 }
 
-func (t OpType) props() (size, numRefs int) {
+func (t OpType) props() (size, numRefs uint32) {
 	v := opProps[t]
-	return int(v.Size), int(v.NumRefs)
+	return uint32(v.Size), uint32(v.NumRefs)
 }
 
-func (t OpType) Size() int {
-	return int(opProps[t].Size)
+func (t OpType) Size() uint32 {
+	return uint32(opProps[t].Size)
 }
 
-func (t OpType) NumRefs() int {
-	return int(opProps[t].NumRefs)
+func (t OpType) NumRefs() uint32 {
+	return uint32(opProps[t].NumRefs)
 }
 
 func (t OpType) String() string {
@@ -469,12 +481,14 @@ func (t OpType) String() string {
 		return "Call"
 	case TypeDefer:
 		return "Defer"
-	case TypePushTransform:
-		return "PushTransform"
 	case TypeTransform:
 		return "Transform"
 	case TypePopTransform:
 		return "PopTransform"
+	case TypePushOpacity:
+		return "PushOpacity"
+	case TypePopOpacity:
+		return "PopOpacity"
 	case TypeInvalidate:
 		return "Invalidate"
 	case TypeImage:

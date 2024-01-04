@@ -3,9 +3,8 @@
 package text
 
 import (
-	"encoding/binary"
-	"hash/maphash"
 	"image"
+	"sync/atomic"
 
 	giofont "gioui.org/font"
 	"gioui.org/io/system"
@@ -88,32 +87,32 @@ type glyphValue[V any] struct {
 }
 
 type glyphLRU[V any] struct {
-	seed  maphash.Seed
+	seed  uint64
 	cache lru[uint64, glyphValue[V]]
 }
+
+var seed uint32
 
 // hashGlyphs computes a hash key based on the ID and X offset of
 // every glyph in the slice.
 func (c *glyphLRU[V]) hashGlyphs(gs []Glyph) uint64 {
-	if c.seed == (maphash.Seed{}) {
-		c.seed = maphash.MakeSeed()
+	if c.seed == 0 {
+		c.seed = uint64(atomic.AddUint32(&seed, 3900798947))
 	}
-	var h maphash.Hash
-	h.SetSeed(c.seed)
-	var b [8]byte
-	firstX := fixed.Int26_6(0)
-	for i, g := range gs {
-		if i == 0 {
-			firstX = g.X
-		}
-		// Cache glyph X offsets relative to the first glyph.
-		binary.LittleEndian.PutUint32(b[:4], uint32(g.X-firstX))
-		h.Write(b[:4])
-		binary.LittleEndian.PutUint64(b[:], uint64(g.ID))
-		h.Write(b[:])
+	if len(gs) == 0 {
+		return 0
 	}
-	sum := h.Sum64()
-	return sum
+
+	h := c.seed
+	firstX := gs[0].X
+	for _, g := range gs {
+		h += uint64(g.X - firstX)
+		h *= 6585573582091643
+		h += uint64(g.ID)
+		h *= 3650802748644053
+	}
+
+	return h
 }
 
 func (c *glyphLRU[V]) Get(key uint64, gs []Glyph) (V, bool) {

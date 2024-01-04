@@ -182,25 +182,31 @@ func (l *Selectable) Truncated() bool {
 	return l.text.Truncated()
 }
 
+// Update the state of the selectable in response to input events.
+func (l *Selectable) Update(gtx layout.Context) {
+	l.initialize()
+	l.handleEvents(gtx)
+}
+
 // Layout clips to the dimensions of the selectable, updates the shaped text, configures input handling, and paints
 // the text and selection rectangles. The provided textMaterial and selectionMaterial ops are used to set the
 // paint material for the text and selection rectangles, respectively.
 func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, textMaterial, selectionMaterial op.CallOp) layout.Dimensions {
-	l.initialize()
+	l.Update(gtx)
 	l.text.LineHeight = l.LineHeight
 	l.text.LineHeightScale = l.LineHeightScale
 	l.text.Alignment = l.Alignment
 	l.text.MaxLines = l.MaxLines
 	l.text.Truncator = l.Truncator
 	l.text.WrapPolicy = l.WrapPolicy
-	l.text.Update(gtx, lt, font, size, l.handleEvents)
+	l.text.Layout(gtx, lt, font, size)
 	dims := l.text.Dimensions()
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
 	pointer.CursorText.Add(gtx.Ops)
 	var keys key.Set
 	if l.focused {
-		const keyFilterAllArrows = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⏎,⌤]|(ShortAlt)-(Shift)-[⌫,⌦]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,V,X,A]|Short-(Shift)-Z"
-		keys = keyFilterAllArrows
+		const keyFilter = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,X,A]"
+		keys = keyFilter
 	}
 	key.InputOp{Tag: l, Keys: keys}.Add(gtx.Ops)
 	if l.requestFocus {
@@ -236,8 +242,8 @@ func (e *Selectable) processPointer(gtx layout.Context) {
 		switch evt := evt.(type) {
 		case gesture.ClickEvent:
 			switch {
-			case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
-				evt.Type == gesture.TypeClick && evt.Source != pointer.Mouse:
+			case evt.Kind == gesture.KindPress && evt.Source == pointer.Mouse,
+				evt.Kind == gesture.KindClick && evt.Source != pointer.Mouse:
 				prevCaretPos, _ := e.text.Selection()
 				e.text.MoveCoord(image.Point{
 					X: int(math.Round(float64(evt.Position.X))),
@@ -271,10 +277,10 @@ func (e *Selectable) processPointer(gtx layout.Context) {
 		case pointer.Event:
 			release := false
 			switch {
-			case evt.Type == pointer.Release && evt.Source == pointer.Mouse:
+			case evt.Kind == pointer.Release && evt.Source == pointer.Mouse:
 				release = true
 				fallthrough
-			case evt.Type == pointer.Drag && evt.Source == pointer.Mouse:
+			case evt.Kind == pointer.Drag && evt.Source == pointer.Mouse:
 				if e.dragging {
 					e.text.MoveCoord(image.Point{
 						X: int(math.Round(float64(evt.Position.X))),
@@ -292,10 +298,10 @@ func (e *Selectable) processPointer(gtx layout.Context) {
 
 func (e *Selectable) clickDragEvents(gtx layout.Context) []event.Event {
 	var combinedEvents []event.Event
-	for _, evt := range e.clicker.Events(gtx) {
+	for _, evt := range e.clicker.Update(gtx) {
 		combinedEvents = append(combinedEvents, evt)
 	}
-	for _, evt := range e.dragger.Events(gtx.Metric, gtx, gesture.Both) {
+	for _, evt := range e.dragger.Update(gtx.Metric, gtx, gesture.Both) {
 		combinedEvents = append(combinedEvents, evt)
 	}
 	return combinedEvents

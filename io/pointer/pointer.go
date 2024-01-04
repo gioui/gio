@@ -18,7 +18,7 @@ import (
 
 // Event is a pointer event.
 type Event struct {
-	Type   Type
+	Kind   Kind
 	Source Source
 	// PointerID is the id for the pointer and can be used
 	// to track a particular pointer from Press to
@@ -32,8 +32,10 @@ type Event struct {
 	Time time.Duration
 	// Buttons are the set of pressed mouse buttons for this event.
 	Buttons Buttons
-	// Position is the position of the event, relative to
-	// the current transformation, as set by op.TransformOp.
+	// Position is the coordinates of the event in the local coordinate
+	// system of the receiving tag. The transformation from global window
+	// coordinates to local coordinates is performed by the inverse of
+	// the effective transformation of the tag.
 	Position f32.Point
 	// Scroll is the scroll amount, if any.
 	Scroll f32.Point
@@ -51,7 +53,7 @@ type PassOp struct {
 type PassStack struct {
 	ops     *ops.Ops
 	id      ops.StackID
-	macroID int
+	macroID uint32
 }
 
 // InputOp declares an input handler ready for pointer
@@ -61,8 +63,8 @@ type InputOp struct {
 	// Grab, if set, request that the handler get
 	// Grabbed priority.
 	Grab bool
-	// Types is a bitwise-or of event types to receive.
-	Types Type
+	// Kinds is a bitwise-or of event types to receive.
+	Kinds Kind
 	// ScrollBounds describe the maximum scrollable distances in both
 	// axes. Specifically, any Event e delivered to Tag will satisfy
 	//
@@ -73,8 +75,8 @@ type InputOp struct {
 
 type ID uint16
 
-// Type of an Event.
-type Type uint
+// Kind of an Event.
+type Kind uint
 
 // Priority of an Event.
 type Priority uint8
@@ -169,7 +171,7 @@ const (
 const (
 	// A Cancel event is generated when the current gesture is
 	// interrupted by other handlers or the system.
-	Cancel Type = (1 << iota) >> 1
+	Cancel Kind = (1 << iota) >> 1
 	// Press of a pointer.
 	Press
 	// Release of a pointer.
@@ -243,7 +245,7 @@ func (op InputOp) Add(o *op.Ops) {
 	if b := op.ScrollBounds; b.Min.X > 0 || b.Max.X < 0 || b.Min.Y > 0 || b.Max.Y < 0 {
 		panic(fmt.Errorf("invalid scroll range value %v", b))
 	}
-	if op.Types>>16 > 0 {
+	if op.Kinds>>16 > 0 {
 		panic(fmt.Errorf("value in Types overflows uint16"))
 	}
 	data := ops.Write1(&o.Internal, ops.TypePointerInputLen, op.Tag)
@@ -252,19 +254,19 @@ func (op InputOp) Add(o *op.Ops) {
 		data[1] = 1
 	}
 	bo := binary.LittleEndian
-	bo.PutUint16(data[2:], uint16(op.Types))
+	bo.PutUint16(data[2:], uint16(op.Kinds))
 	bo.PutUint32(data[4:], uint32(op.ScrollBounds.Min.X))
 	bo.PutUint32(data[8:], uint32(op.ScrollBounds.Min.Y))
 	bo.PutUint32(data[12:], uint32(op.ScrollBounds.Max.X))
 	bo.PutUint32(data[16:], uint32(op.ScrollBounds.Max.Y))
 }
 
-func (t Type) String() string {
+func (t Kind) String() string {
 	if t == Cancel {
 		return "Cancel"
 	}
 	var buf strings.Builder
-	for tt := Type(1); tt > 0; tt <<= 1 {
+	for tt := Kind(1); tt > 0; tt <<= 1 {
 		if t&tt > 0 {
 			if buf.Len() > 0 {
 				buf.WriteByte('|')
@@ -275,7 +277,7 @@ func (t Type) String() string {
 	return buf.String()
 }
 
-func (t Type) string() string {
+func (t Kind) string() string {
 	switch t {
 	case Press:
 		return "Press"

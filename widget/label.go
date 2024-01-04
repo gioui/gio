@@ -134,17 +134,17 @@ type textIterator struct {
 
 // processGlyph checks whether the glyph is visible within the iterator's configured
 // viewport and (if so) updates the iterator's text dimensions to include the glyph.
-func (it *textIterator) processGlyph(g text.Glyph, ok bool) (_ text.Glyph, visibleOrBefore bool) {
+func (it *textIterator) processGlyph(g text.Glyph, ok bool) (visibleOrBefore bool) {
 	if it.maxLines > 0 {
 		if g.Flags&text.FlagTruncator != 0 && g.Flags&text.FlagClusterBreak != 0 {
 			// A glyph carrying both of these flags provides the count of truncated runes.
-			it.truncated = g.Runes
+			it.truncated = int(g.Runes)
 		}
 		if g.Flags&text.FlagLineBreak != 0 {
 			it.linesSeen++
 		}
 		if it.linesSeen == it.maxLines && g.Flags&text.FlagParagraphBreak != 0 {
-			return g, false
+			return false
 		}
 	}
 	// Compute the maximum extent to which glyphs overhang on the horizontal
@@ -191,7 +191,7 @@ func (it *textIterator) processGlyph(g text.Glyph, ok bool) (_ text.Glyph, visib
 		it.bounds.Max.X = max(it.bounds.Max.X, logicalBounds.Max.X)
 		it.bounds.Max.Y = max(it.bounds.Max.Y, logicalBounds.Max.Y)
 	}
-	return g, ok && !below
+	return ok && !below
 }
 
 func fixedToFloat(i fixed.Int26_6) float32 {
@@ -206,7 +206,7 @@ func fixedToFloat(i fixed.Int26_6) float32 {
 // This design is awkward, but prevents the line slice from escaping
 // to the heap.
 func (it *textIterator) paintGlyph(gtx layout.Context, shaper *text.Shaper, glyph text.Glyph, line []text.Glyph) ([]text.Glyph, bool) {
-	_, visibleOrBefore := it.processGlyph(glyph, true)
+	visibleOrBefore := it.processGlyph(glyph, true)
 	if it.visible {
 		if len(line) == 0 {
 			it.lineOff = f32.Point{X: fixedToFloat(glyph.X), Y: float32(glyph.Y)}.Sub(layout.FPt(it.viewport.Min))

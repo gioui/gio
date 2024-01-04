@@ -94,10 +94,7 @@ type wlDisplay struct {
 
 	// Notification pipe fds.
 	notify struct {
-		read int
-
-		mu    sync.Mutex
-		write int
+		read, write int
 	}
 
 	repeat repeatState
@@ -794,7 +791,7 @@ func gio_onTouchDown(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.
 		Y: fromFixed(y) * float32(w.scale),
 	}
 	w.w.Event(pointer.Event{
-		Type:      pointer.Press,
+		Kind:      pointer.Press,
 		Source:    pointer.Touch,
 		Position:  w.lastTouch,
 		PointerID: pointer.ID(id),
@@ -810,7 +807,7 @@ func gio_onTouchUp(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.ui
 	w := s.touchFoci[id]
 	delete(s.touchFoci, id)
 	w.w.Event(pointer.Event{
-		Type:      pointer.Release,
+		Kind:      pointer.Release,
 		Source:    pointer.Touch,
 		Position:  w.lastTouch,
 		PointerID: pointer.ID(id),
@@ -828,7 +825,7 @@ func gio_onTouchMotion(data unsafe.Pointer, touch *C.struct_wl_touch, t C.uint32
 		Y: fromFixed(y) * float32(w.scale),
 	}
 	w.w.Event(pointer.Event{
-		Type:      pointer.Move,
+		Kind:      pointer.Move,
 		Position:  w.lastTouch,
 		Source:    pointer.Touch,
 		PointerID: pointer.ID(id),
@@ -847,7 +844,7 @@ func gio_onTouchCancel(data unsafe.Pointer, touch *C.struct_wl_touch) {
 	for id, w := range s.touchFoci {
 		delete(s.touchFoci, id)
 		w.w.Event(pointer.Event{
-			Type:   pointer.Cancel,
+			Kind:   pointer.Cancel,
 			Source: pointer.Touch,
 		})
 	}
@@ -872,7 +869,7 @@ func gio_onPointerLeave(data unsafe.Pointer, p *C.struct_wl_pointer, serial C.ui
 	s.serial = serial
 	if w.inCompositor {
 		w.inCompositor = false
-		w.w.Event(pointer.Event{Type: pointer.Cancel})
+		w.w.Event(pointer.Event{Kind: pointer.Cancel})
 	}
 }
 
@@ -920,21 +917,21 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 			}
 		}
 	}
-	var typ pointer.Type
+	var kind pointer.Kind
 	switch state {
 	case 0:
 		w.pointerBtns &^= btn
-		typ = pointer.Release
+		kind = pointer.Release
 		// Move or resize gestures no longer applies.
 		w.inCompositor = false
 	case 1:
 		w.pointerBtns |= btn
-		typ = pointer.Press
+		kind = pointer.Press
 	}
 	w.flushScroll()
 	w.resetFling()
 	w.w.Event(pointer.Event{
-		Type:      typ,
+		Kind:      kind,
 		Source:    pointer.Mouse,
 		Buttons:   w.pointerBtns,
 		Position:  w.lastPos,
@@ -1445,11 +1442,6 @@ func (w *window) SetAnimating(anim bool) {
 // Wakeup wakes up the event loop through the notification pipe.
 func (d *wlDisplay) wakeup() {
 	oneByte := make([]byte, 1)
-	d.notify.mu.Lock()
-	defer d.notify.mu.Unlock()
-	if d.notify.write == 0 {
-		return
-	}
 	if _, err := syscall.Write(d.notify.write, oneByte); err != nil && err != syscall.EAGAIN {
 		panic(fmt.Errorf("failed to write to pipe: %v", err))
 	}
@@ -1581,7 +1573,7 @@ func (w *window) flushScroll() {
 		return
 	}
 	w.w.Event(pointer.Event{
-		Type:      pointer.Scroll,
+		Kind:      pointer.Scroll,
 		Source:    pointer.Mouse,
 		Buttons:   w.pointerBtns,
 		Position:  w.lastPos,
@@ -1604,7 +1596,7 @@ func (w *window) onPointerMotion(x, y C.wl_fixed_t, t C.uint32_t) {
 		Y: fromFixed(y) * float32(w.scale),
 	}
 	w.w.Event(pointer.Event{
-		Type:      pointer.Move,
+		Kind:      pointer.Move,
 		Position:  w.lastPos,
 		Buttons:   w.pointerBtns,
 		Source:    pointer.Mouse,
@@ -1828,12 +1820,10 @@ func newWLDisplay() (*wlDisplay, error) {
 }
 
 func (d *wlDisplay) destroy() {
-	d.notify.mu.Lock()
 	if d.notify.write != 0 {
 		syscall.Close(d.notify.write)
 		d.notify.write = 0
 	}
-	d.notify.mu.Unlock()
 	if d.notify.read != 0 {
 		syscall.Close(d.notify.read)
 		d.notify.read = 0

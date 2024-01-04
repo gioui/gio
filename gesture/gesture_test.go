@@ -26,16 +26,16 @@ func TestHover(t *testing.T) {
 	r.Frame(ops)
 
 	r.Queue(
-		pointer.Event{Type: pointer.Move, Position: f32.Pt(30, 30)},
+		pointer.Event{Kind: pointer.Move, Position: f32.Pt(30, 30)},
 	)
-	if !h.Hovered(r) {
+	if !h.Update(r) {
 		t.Fatal("expected hovered")
 	}
 
 	r.Queue(
-		pointer.Event{Type: pointer.Move, Position: f32.Pt(50, 50)},
+		pointer.Event{Kind: pointer.Move, Position: f32.Pt(50, 50)},
 	)
-	if h.Hovered(r) {
+	if h.Update(r) {
 		t.Fatal("expected not hovered")
 	}
 }
@@ -75,7 +75,7 @@ func TestMouseClicks(t *testing.T) {
 			r.Frame(&ops)
 			r.Queue(tc.events...)
 
-			events := click.Events(&r)
+			events := click.Update(&r)
 			clicks := filterMouseClicks(events)
 			if got, want := len(clicks), len(tc.clicks); got != want {
 				t.Fatalf("got %d mouse clicks, expected %d", got, want)
@@ -92,7 +92,7 @@ func TestMouseClicks(t *testing.T) {
 
 func mouseClickEvents(times ...time.Duration) []event.Event {
 	press := pointer.Event{
-		Type:    pointer.Press,
+		Kind:    pointer.Press,
 		Source:  pointer.Mouse,
 		Buttons: pointer.ButtonPrimary,
 	}
@@ -101,7 +101,7 @@ func mouseClickEvents(times ...time.Duration) []event.Event {
 		press := press
 		press.Time = t
 		release := press
-		release.Type = pointer.Release
+		release.Kind = pointer.Release
 		events = append(events, press, release)
 	}
 	return events
@@ -110,7 +110,7 @@ func mouseClickEvents(times ...time.Duration) []event.Event {
 func filterMouseClicks(events []ClickEvent) []ClickEvent {
 	var clicks []ClickEvent
 	for _, ev := range events {
-		if ev.Type == TypeClick {
+		if ev.Kind == KindClick {
 			clicks = append(clicks, ev)
 		}
 	}

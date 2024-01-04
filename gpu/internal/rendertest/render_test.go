@@ -359,6 +359,73 @@ func TestImageRGBA(t *testing.T) {
 	})
 }
 
+func TestImageRGBA_ScaleLinear(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		w := newWindow(t, 128, 128)
+		defer clip.Rect{Max: image.Pt(128, 128)}.Push(o).Pop()
+		op.Affine(f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(64, 64))).Add(o)
+
+		im := image.NewRGBA(image.Rect(0, 0, 2, 2))
+		im.Set(0, 0, colornames.Red)
+		im.Set(1, 0, colornames.Green)
+		im.Set(0, 1, colornames.White)
+		im.Set(1, 1, colornames.Black)
+
+		op := paint.NewImageOp(im)
+		op.Filter = paint.FilterLinear
+		op.Add(o)
+
+		paint.PaintOp{}.Add(o)
+
+		if err := w.Frame(o); err != nil {
+			t.Error(err)
+		}
+	}, func(r result) {
+		r.expect(0, 0, colornames.Red)
+		r.expect(8, 8, colornames.Red)
+
+		// TODO: this currently seems to do srgb scaling
+		// instead of linear rgb scaling,
+		r.expect(64-4, 0, color.RGBA{R: 197, G: 87, B: 0, A: 255})
+		r.expect(64+4, 0, color.RGBA{R: 175, G: 98, B: 0, A: 255})
+
+		r.expect(127, 0, colornames.Green)
+		r.expect(127-8, 8, colornames.Green)
+	})
+}
+
+func TestImageRGBA_ScaleNearest(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		w := newWindow(t, 128, 128)
+		op.Affine(f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(64, 64))).Add(o)
+
+		im := image.NewRGBA(image.Rect(0, 0, 2, 2))
+		im.Set(0, 0, colornames.Red)
+		im.Set(1, 0, colornames.Green)
+		im.Set(0, 1, colornames.White)
+		im.Set(1, 1, colornames.Black)
+
+		op := paint.NewImageOp(im)
+		op.Filter = paint.FilterNearest
+		op.Add(o)
+
+		paint.PaintOp{}.Add(o)
+
+		if err := w.Frame(o); err != nil {
+			t.Error(err)
+		}
+	}, func(r result) {
+		r.expect(0, 0, colornames.Red)
+		r.expect(8, 8, colornames.Red)
+
+		r.expect(64-4, 0, colornames.Red)
+		r.expect(64+4, 0, colornames.Green)
+
+		r.expect(127, 0, colornames.Green)
+		r.expect(127-8, 8, colornames.Green)
+	})
+}
+
 func TestGapsInPath(t *testing.T) {
 	ops := new(op.Ops)
 	var p clip.Path
@@ -410,6 +477,22 @@ func TestGapsInPath(t *testing.T) {
 				r.expect(60, 20, colornames.Red)
 			},
 		)
+	})
+}
+
+func TestOpacity(t *testing.T) {
+	run(t, func(ops *op.Ops) {
+		opc1 := paint.PushOpacity(ops, .3)
+		// Fill screen to exercize the glClear optimization.
+		paint.FillShape(ops, color.NRGBA{R: 255, A: 255}, clip.Rect{Max: image.Pt(1024, 1024)}.Op())
+		opc2 := paint.PushOpacity(ops, .6)
+		paint.FillShape(ops, color.NRGBA{G: 255, A: 255}, clip.Rect{Min: image.Pt(20, 10), Max: image.Pt(64, 128)}.Op())
+		opc2.Pop()
+		opc1.Pop()
+		opc3 := paint.PushOpacity(ops, .6)
+		paint.FillShape(ops, color.NRGBA{G: 255, A: 255}, clip.Rect{Min: image.Pt(50+20, 10), Max: image.Pt(50+64, 128)}.Op())
+		opc3.Pop()
+	}, func(r result) {
 	})
 }
 

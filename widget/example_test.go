@@ -47,23 +47,21 @@ func ExampleClickable_passthrough() {
 		pointer.Event{
 			Source:   pointer.Mouse,
 			Buttons:  pointer.ButtonPrimary,
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 			Position: f32.Pt(50, 50),
 		},
 		pointer.Event{
 			Source:   pointer.Mouse,
 			Buttons:  pointer.ButtonPrimary,
-			Type:     pointer.Release,
+			Kind:     pointer.Release,
 			Position: f32.Pt(50, 50),
 		},
 	)
-	// The second layout ensures that the click event is registered by the buttons.
-	widget()
 
-	if button1.Clicked() {
+	if button1.Clicked(gtx) {
 		fmt.Println("button1 clicked!")
 	}
-	if button2.Clicked() {
+	if button2.Clicked(gtx) {
 		fmt.Println("button2 clicked!")
 	}
 
@@ -95,7 +93,7 @@ func ExampleDraggable_Layout() {
 		drag.Layout(gtx, w, w)
 		// drag must respond with an Offer event when requested.
 		// Use the drag method for this.
-		if m, ok := drag.Requested(); ok {
+		if m, ok := drag.Update(gtx); ok {
 			drag.Offer(gtx.Ops, m, offer{Data: "hello world"})
 		}
 
@@ -125,15 +123,15 @@ func ExampleDraggable_Layout() {
 	// Send drag and drop gesture events.
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 			Position: f32.Pt(5, 5), // in the drag area
 		},
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(5, 5), // in the drop area
 		},
 		pointer.Event{
-			Type:     pointer.Release,
+			Kind:     pointer.Release,
 			Position: f32.Pt(30, 30), // in the drop area
 		},
 	)

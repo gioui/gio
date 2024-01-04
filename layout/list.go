@@ -144,7 +144,7 @@ func (l *List) Dragging() bool {
 }
 
 func (l *List) update(gtx Context) {
-	d := l.scroll.Scroll(gtx.Metric, gtx, gtx.Now, gesture.Axis(l.Axis))
+	d := l.scroll.Update(gtx.Metric, gtx, gtx.Now, gesture.Axis(l.Axis))
 	l.scrollDelta = d
 	l.Position.Offset += d
 }

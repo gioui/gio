@@ -547,7 +547,7 @@ func (h *x11EventHandler) handleEvents() bool {
 		case C.ButtonPress, C.ButtonRelease:
 			bevt := (*C.XButtonEvent)(unsafe.Pointer(xev))
 			ev := pointer.Event{
-				Type:   pointer.Press,
+				Kind:   pointer.Press,
 				Source: pointer.Mouse,
 				Position: f32.Point{
 					X: float32(bevt.x),
@@ -557,7 +557,7 @@ func (h *x11EventHandler) handleEvents() bool {
 				Modifiers: w.xkb.Modifiers(),
 			}
 			if bevt._type == C.ButtonRelease {
-				ev.Type = pointer.Release
+				ev.Kind = pointer.Release
 			}
 			var btn pointer.Buttons
 			const scrollScale = 10
@@ -569,7 +569,7 @@ func (h *x11EventHandler) handleEvents() bool {
 			case C.Button3:
 				btn = pointer.ButtonSecondary
 			case C.Button4:
-				ev.Type = pointer.Scroll
+				ev.Kind = pointer.Scroll
 				// scroll up or left (if shift is pressed).
 				if ev.Modifiers == key.ModShift {
 					ev.Scroll.X = -scrollScale
@@ -578,7 +578,7 @@ func (h *x11EventHandler) handleEvents() bool {
 				}
 			case C.Button5:
 				// scroll down or right (if shift is pressed).
-				ev.Type = pointer.Scroll
+				ev.Kind = pointer.Scroll
 				if ev.Modifiers == key.ModShift {
 					ev.Scroll.X = +scrollScale
 				} else {
@@ -587,11 +587,11 @@ func (h *x11EventHandler) handleEvents() bool {
 			case 6:
 				// http://xahlee.info/linux/linux_x11_mouse_button_number.html
 				// scroll left.
-				ev.Type = pointer.Scroll
+				ev.Kind = pointer.Scroll
 				ev.Scroll.X = -scrollScale * 2
 			case 7:
 				// scroll right
-				ev.Type = pointer.Scroll
+				ev.Kind = pointer.Scroll
 				ev.Scroll.X = +scrollScale * 2
 			default:
 				continue
@@ -607,7 +607,7 @@ func (h *x11EventHandler) handleEvents() bool {
 		case C.MotionNotify:
 			mevt := (*C.XMotionEvent)(unsafe.Pointer(xev))
 			w.w.Event(pointer.Event{
-				Type:    pointer.Move,
+				Kind:    pointer.Move,
 				Source:  pointer.Mouse,
 				Buttons: w.pointerBtns,
 				Position: f32.Point{

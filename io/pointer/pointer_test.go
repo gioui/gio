@@ -8,7 +8,7 @@ import (
 
 func TestTypeString(t *testing.T) {
 	for _, tc := range []struct {
-		typ Type
+		typ Kind
 		res string
 	}{
 		{Cancel, "Cancel"},

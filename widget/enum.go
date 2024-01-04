@@ -20,8 +20,6 @@ type Enum struct {
 	focus   string
 	focused bool
 
-	changed bool
-
 	keys []*enumKey
 }
 
@@ -40,11 +38,55 @@ func (e *Enum) index(k string) *enumKey {
 	return nil
 }
 
-// Changed reports whether Value has changed by user interaction since the last
-// call to Changed.
-func (e *Enum) Changed() bool {
-	changed := e.changed
-	e.changed = false
+// Update the state and report whether Value has changed by user interaction.
+func (e *Enum) Update(gtx layout.Context) bool {
+	if gtx.Queue == nil {
+		e.focused = false
+	}
+	e.hovering = false
+	changed := false
+	for _, state := range e.keys {
+		for _, ev := range state.click.Update(gtx) {
+			switch ev.Kind {
+			case gesture.KindPress:
+				if ev.Source == pointer.Mouse {
+					key.FocusOp{Tag: &state.tag}.Add(gtx.Ops)
+				}
+			case gesture.KindClick:
+				if state.key != e.Value {
+					e.Value = state.key
+					changed = true
+				}
+			}
+		}
+		for _, ev := range gtx.Events(&state.tag) {
+			switch ev := ev.(type) {
+			case key.FocusEvent:
+				if ev.Focus {
+					e.focused = true
+					e.focus = state.key
+				} else if state.key == e.focus {
+					e.focused = false
+				}
+			case key.Event:
+				if !e.focused || ev.State != key.Release {
+					break
+				}
+				if ev.Name != key.NameReturn && ev.Name != key.NameSpace {
+					break
+				}
+				if state.key != e.Value {
+					e.Value = state.key
+					changed = true
+				}
+			}
+		}
+		if state.click.Hovered() {
+			e.hovered = state.key
+			e.hovering = true
+		}
+	}
+
 	return changed
 }
 
@@ -60,6 +102,7 @@ func (e *Enum) Focused() (string, bool) {
 
 // Layout adds the event handler for the key k.
 func (e *Enum) Layout(gtx layout.Context, k string, content layout.Widget) layout.Dimensions {
+	e.Update(gtx)
 	m := op.Record(gtx.Ops)
 	dims := content(gtx)
 	c := m.Stop()
@@ -73,57 +116,13 @@ func (e *Enum) Layout(gtx layout.Context, k string, content layout.Widget) layou
 		e.keys = append(e.keys, state)
 	}
 	clk := &state.click
-	for _, ev := range clk.Events(gtx) {
-		switch ev.Type {
-		case gesture.TypePress:
-			if ev.Source == pointer.Mouse {
-				key.FocusOp{Tag: &state.tag}.Add(gtx.Ops)
-			}
-		case gesture.TypeClick:
-			if state.key != e.Value {
-				e.Value = state.key
-				e.changed = true
-			}
-		}
-	}
-	for _, ev := range gtx.Events(&state.tag) {
-		switch ev := ev.(type) {
-		case key.FocusEvent:
-			if ev.Focus {
-				e.focused = true
-				e.focus = state.key
-			} else if state.key == e.focus {
-				e.focused = false
-			}
-		case key.Event:
-			if !e.focused || ev.State != key.Release {
-				break
-			}
-			if ev.Name != key.NameReturn && ev.Name != key.NameSpace {
-				break
-			}
-			if state.key != e.Value {
-				e.Value = state.key
-				e.changed = true
-			}
-		}
-	}
-	if clk.Hovered() {
-		e.hovered = k
-		e.hovering = true
-	} else if e.hovered == k {
-		e.hovering = false
-	}
-
 	clk.Add(gtx.Ops)
-	disabled := gtx.Queue == nil
-	if !disabled {
+	enabled := gtx.Queue != nil
+	if enabled {
 		key.InputOp{Tag: &state.tag, Keys: "⏎|Space"}.Add(gtx.Ops)
-	} else if e.focus == k {
-		e.focused = false
 	}
 	semantic.SelectedOp(k == e.Value).Add(gtx.Ops)
-	semantic.DisabledOp(disabled).Add(gtx.Ops)
+	semantic.EnabledOp(enabled).Add(gtx.Ops)
 	c.Add(gtx.Ops)
 
 	return dims

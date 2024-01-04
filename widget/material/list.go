@@ -144,7 +144,7 @@ func (s ScrollbarStyle) Layout(gtx layout.Context, axis layout.Axis, viewportSta
 	gtx.Constraints.Min = convert(gtx.Constraints.Min)
 	gtx.Constraints.Max = gtx.Constraints.Min
 
-	s.Scrollbar.Layout(gtx, axis, viewportStart, viewportEnd)
+	s.Scrollbar.Update(gtx, axis, viewportStart, viewportEnd)
 
 	// Darken indicator if hovered.
 	if s.Scrollbar.IndicatorHovered() {
@@ -165,12 +165,9 @@ func (s ScrollbarStyle) layout(gtx layout.Context, axis layout.Axis, viewportSta
 	if axis == layout.Horizontal {
 		inset.Top, inset.Bottom, inset.Left, inset.Right = inset.Left, inset.Right, inset.Top, inset.Bottom
 	}
-	// Capture the outer constraints because layout.Stack will reset
-	// the minimum to zero.
-	outerConstraints := gtx.Constraints
 
-	return layout.Stack{}.Layout(gtx,
-		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
+	return layout.Background{}.Layout(gtx,
+		func(gtx layout.Context) layout.Dimensions {
 			// Lay out the draggable track underneath the scroll indicator.
 			area := image.Rectangle{
 				Max: gtx.Constraints.Min,
@@ -186,10 +183,9 @@ func (s ScrollbarStyle) layout(gtx layout.Context, axis layout.Axis, viewportSta
 			s.Scrollbar.AddTrack(gtx.Ops)
 
 			paint.FillShape(gtx.Ops, s.Track.Color, clip.Rect(area).Op())
-			return layout.Dimensions{}
-		}),
-		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-			gtx.Constraints = outerConstraints
+			return layout.Dimensions{Size: gtx.Constraints.Min}
+		},
+		func(gtx layout.Context) layout.Dimensions {
 			return inset.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 				// Use axis-independent constraints.
 				gtx.Constraints.Min = axis.Convert(gtx.Constraints.Min)
@@ -231,7 +227,7 @@ func (s ScrollbarStyle) layout(gtx layout.Context, axis layout.Axis, viewportSta
 
 				return layout.Dimensions{Size: axis.Convert(gtx.Constraints.Min)}
 			})
-		}),
+		},
 	)
 }
 

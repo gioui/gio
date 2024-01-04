@@ -11,15 +11,15 @@ type Bool struct {
 	Value bool
 
 	clk Clickable
-
-	changed bool
 }
 
-// Changed reports whether Value has changed since the last
-// call to Changed.
-func (b *Bool) Changed() bool {
-	changed := b.changed
-	b.changed = false
+// Update the widget state and report whether Value was changed.
+func (b *Bool) Update(gtx layout.Context) bool {
+	changed := false
+	for b.clk.Clicked(gtx) {
+		b.Value = !b.Value
+		changed = true
+	}
 	return changed
 }
 
@@ -43,13 +43,10 @@ func (b *Bool) History() []Press {
 }
 
 func (b *Bool) Layout(gtx layout.Context, w layout.Widget) layout.Dimensions {
+	b.Update(gtx)
 	dims := b.clk.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		for b.clk.Clicked() {
-			b.Value = !b.Value
-			b.changed = true
-		}
 		semantic.SelectedOp(b.Value).Add(gtx.Ops)
-		semantic.DisabledOp(gtx.Queue == nil).Add(gtx.Ops)
+		semantic.EnabledOp(gtx.Queue != nil).Add(gtx.Ops)
 		return w(gtx)
 	})
 	return dims

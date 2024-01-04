@@ -39,15 +39,15 @@ func TestDraggable(t *testing.T) {
 	r.Queue(
 		pointer.Event{
 			Position: f32.Pt(10, 10),
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 		},
 		pointer.Event{
 			Position: f32.Pt(20, 10),
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 		},
 		pointer.Event{
 			Position: f32.Pt(20, 10),
-			Type:     pointer.Release,
+			Kind:     pointer.Release,
 		},
 	)
 	ofr := &offer{data: "hello"}
