@@ -36,7 +36,7 @@
 // Theme-global parameters: For changing the look of all widgets drawn with a
 // particular theme, adjust the `Theme` fields:
 //
-//	theme.Color.Primary = color.NRGBA{...}
+//	theme.Palette.Fg = color.NRGBA{...}
 //
 // Widget-local parameters: For changing the look of a particular widget,
 // adjust the widget specific theme object:
