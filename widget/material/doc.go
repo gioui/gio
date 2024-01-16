@@ -49,7 +49,7 @@
 // though the underlying state is the same. A widget.Clickable can be drawn as a
 // round icon button:
 //
-//	icon := material.NewIcon(...)
+//	icon := widget.NewIcon(...)
 //
 //	material.IconButton(theme, icon).Layout(gtx, button)
 //
