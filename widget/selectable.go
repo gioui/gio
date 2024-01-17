@@ -79,10 +79,6 @@ type Selectable struct {
 	dragger   gesture.Drag
 
 	clicker gesture.Click
-	// events is the list of events not yet processed.
-	events []EditorEvent
-	// prevEvents is the number of events from the previous frame.
-	prevEvents int
 }
 
 // initialize must be called at the beginning of any exported method that
@@ -175,10 +171,11 @@ func (l *Selectable) Truncated() bool {
 	return l.text.Truncated()
 }
 
-// Update the state of the selectable in response to input events.
-func (l *Selectable) Update(gtx layout.Context) {
+// Update the state of the selectable in response to input events. It returns whether the
+// text selection changed during event processing.
+func (l *Selectable) Update(gtx layout.Context) bool {
 	l.initialize()
-	l.handleEvents(gtx)
+	return l.handleEvents(gtx)
 }
 
 // Layout clips to the dimensions of the selectable, updates the shaped text, configures input handling, and paints
@@ -206,18 +203,16 @@ func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font,
 	return dims
 }
 
-func (l *Selectable) handleEvents(gtx layout.Context) {
-	// Flush events from before the previous Layout.
-	n := copy(l.events, l.events[l.prevEvents:])
-	l.events = l.events[:n]
-	l.prevEvents = n
+func (l *Selectable) handleEvents(gtx layout.Context) (selectionChanged bool) {
 	oldStart, oldLen := min(l.text.Selection()), l.text.SelectionLen()
+	defer func() {
+		if newStart, newLen := min(l.text.Selection()), l.text.SelectionLen(); oldStart != newStart || oldLen != newLen {
+			selectionChanged = true
+		}
+	}()
 	l.processPointer(gtx)
 	l.processKey(gtx)
-	// Queue a SelectEvent if the selection changed, including if it went away.
-	if newStart, newLen := min(l.text.Selection()), l.text.SelectionLen(); oldStart != newStart || oldLen != newLen {
-		l.events = append(l.events, SelectEvent{})
-	}
+	return selectionChanged
 }
 
 func (e *Selectable) processPointer(gtx layout.Context) {
@@ -387,14 +382,6 @@ func (e *Selectable) command(gtx layout.Context, k key.Event) {
 	case key.NameEnd:
 		e.text.MoveEnd(selAct)
 	}
-}
-
-// Events returns available text events.
-func (l *Selectable) Events() []EditorEvent {
-	events := l.events
-	l.events = nil
-	l.prevEvents = 0
-	return events
 }
 
 // Regions returns visible regions covering the rune range [start,end).
