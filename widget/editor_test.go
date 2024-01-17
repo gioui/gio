@@ -905,7 +905,6 @@ g 2 4 6 8 g
 		gtx.Execute(key.FocusCmd{Tag: e})
 		// Layout once with no events; populate e.lines.
 		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
-		e.Events() // throw away any events from this layout
 
 		r.Frame(gtx.Ops)
 		gtx.Source = r.Source()
@@ -929,14 +928,13 @@ g 2 4 6 8 g
 		)
 		tim += time.Second // Avoid multi-clicks.
 
-		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
-		for _, evt := range e.Events() {
-			switch evt.(type) {
-			case SelectEvent:
-				return e.SelectedText()
+		for {
+			_, ok := e.Update(gtx) // throw away any events from this layout
+			if !ok {
+				break
 			}
 		}
-		return ""
+		return e.SelectedText()
 	}
 	type screenPos image.Point
 	logicalPosMatch := func(t *testing.T, n int, label string, expected screenPos, actual combinedPos) {
@@ -1162,12 +1160,18 @@ func TestEditor_Submit(t *testing.T) {
 	r.Queue(
 		key.EditEvent{Range: key.Range{Start: 0, End: 0}, Text: "ab1\n"},
 	)
-	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 
+	got := []EditorEvent{}
+	for {
+		ev, ok := e.Update(gtx)
+		if !ok {
+			break
+		}
+		got = append(got, ev)
+	}
 	if got, want := e.Text(), "ab1"; got != want {
 		t.Errorf("editor failed to filter newline")
 	}
-	got := e.Events()
 	want := []EditorEvent{
 		ChangeEvent{},
 		SubmitEvent{Text: e.Text()},

@@ -87,16 +87,14 @@ type Editor struct {
 
 	clicker gesture.Click
 
-	// events is the list of events not yet processed.
-	events []EditorEvent
-	// prevEvents is the number of events from the previous frame.
-	prevEvents int
 	// history contains undo history.
 	history []modification
 	// nextHistoryIdx is the index within the history of the next modification. This
 	// is only not len(history) immediately after undo operations occur. It is framed as the "next" value
 	// to make the zero value consistent.
 	nextHistoryIdx int
+
+	pending []EditorEvent
 }
 
 type offEntry struct {
@@ -189,30 +187,37 @@ const (
 	maxBlinkDuration = 10 * time.Second
 )
 
-// Events returns available editor events.
-func (e *Editor) Events() []EditorEvent {
-	events := e.events
-	e.events = nil
-	e.prevEvents = 0
-	return events
-}
-
-func (e *Editor) processEvents(gtx layout.Context) {
-	// Flush events from before the previous Layout.
-	n := copy(e.events, e.events[e.prevEvents:])
-	e.events = e.events[:n]
-	e.prevEvents = n
-
-	oldStart, oldLen := min(e.text.Selection()), e.text.SelectionLen()
-	e.processPointer(gtx)
-	e.processKey(gtx)
-	// Queue a SelectEvent if the selection changed, including if it went away.
-	if newStart, newLen := min(e.text.Selection()), e.text.SelectionLen(); oldStart != newStart || oldLen != newLen {
-		e.events = append(e.events, SelectEvent{})
+func (e *Editor) processEvents(gtx layout.Context) (ev EditorEvent, ok bool) {
+	if len(e.pending) > 0 {
+		out := e.pending[0]
+		e.pending = e.pending[:copy(e.pending, e.pending[1:])]
+		return out, true
 	}
+	selStart, selEnd := e.Selection()
+	defer func() {
+		afterSelStart, afterSelEnd := e.Selection()
+		if selStart != afterSelStart || selEnd != afterSelEnd {
+			if ok {
+				e.pending = append(e.pending, SelectEvent{})
+			} else {
+				ev = SelectEvent{}
+				ok = true
+			}
+		}
+	}()
+
+	ev, ok = e.processPointer(gtx)
+	if ok {
+		return ev, ok
+	}
+	ev, ok = e.processKey(gtx)
+	if ok {
+		return ev, ok
+	}
+	return nil, false
 }
 
-func (e *Editor) processPointer(gtx layout.Context) {
+func (e *Editor) processPointer(gtx layout.Context) (EditorEvent, bool) {
 	sbounds := e.text.ScrollBounds()
 	var smin, smax int
 	var axis gesture.Axis
@@ -244,92 +249,96 @@ func (e *Editor) processPointer(gtx layout.Context) {
 		e.text.ScrollRel(0, sdist)
 		soff = e.text.ScrollOff().Y
 	}
-	for _, evt := range e.clickDragEvents(gtx) {
-		switch evt := evt.(type) {
-		case gesture.ClickEvent:
-			switch {
-			case evt.Kind == gesture.KindPress && evt.Source == pointer.Mouse,
-				evt.Kind == gesture.KindClick && evt.Source != pointer.Mouse:
-				prevCaretPos, _ := e.text.Selection()
-				e.blinkStart = gtx.Now
-				e.text.MoveCoord(image.Point{
-					X: int(math.Round(float64(evt.Position.X))),
-					Y: int(math.Round(float64(evt.Position.Y))),
-				})
-				gtx.Execute(key.FocusCmd{Tag: e})
-				if e.scroller.State() != gesture.StateFlinging {
-					e.scrollCaret = true
-				}
-
-				if evt.Modifiers == key.ModShift {
-					start, end := e.text.Selection()
-					// If they clicked closer to the end, then change the end to
-					// where the caret used to be (effectively swapping start & end).
-					if abs(end-start) < abs(start-prevCaretPos) {
-						e.text.SetCaret(start, prevCaretPos)
-					}
-				} else {
-					e.text.ClearSelection()
-				}
-				e.dragging = true
-
-				// Process multi-clicks.
-				switch {
-				case evt.NumClicks == 2:
-					e.text.MoveWord(-1, selectionClear)
-					e.text.MoveWord(1, selectionExtend)
-					e.dragging = false
-				case evt.NumClicks >= 3:
-					e.text.MoveStart(selectionClear)
-					e.text.MoveEnd(selectionExtend)
-					e.dragging = false
-				}
-			}
-		case pointer.Event:
-			release := false
-			switch {
-			case evt.Kind == pointer.Release && evt.Source == pointer.Mouse:
-				release = true
-				fallthrough
-			case evt.Kind == pointer.Drag && evt.Source == pointer.Mouse:
-				if e.dragging {
-					e.blinkStart = gtx.Now
-					e.text.MoveCoord(image.Point{
-						X: int(math.Round(float64(evt.Position.X))),
-						Y: int(math.Round(float64(evt.Position.Y))),
-					})
-					e.scrollCaret = true
-
-					if release {
-						e.dragging = false
-					}
-				}
-			}
-		}
-	}
-
-	if (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin) {
-		e.scroller.Stop()
-	}
-}
-
-func (e *Editor) clickDragEvents(gtx layout.Context) []event.Event {
-	var combinedEvents []event.Event
 	for {
 		evt, ok := e.clicker.Update(gtx.Source)
 		if !ok {
 			break
 		}
-		combinedEvents = append(combinedEvents, evt)
+		ev, ok := e.processPointerEvent(gtx, evt)
+		if ok {
+			return ev, ok
+		}
 	}
 	for {
 		evt, ok := e.dragger.Update(gtx.Metric, gtx.Source, gesture.Both)
 		if !ok {
 			break
 		}
-		combinedEvents = append(combinedEvents, evt)
+		ev, ok := e.processPointerEvent(gtx, evt)
+		if ok {
+			return ev, ok
+		}
 	}
-	return combinedEvents
+
+	if (sdist > 0 && soff >= smax) || (sdist < 0 && soff <= smin) {
+		e.scroller.Stop()
+	}
+	return nil, false
+}
+
+func (e *Editor) processPointerEvent(gtx layout.Context, ev event.Event) (EditorEvent, bool) {
+	switch evt := ev.(type) {
+	case gesture.ClickEvent:
+		switch {
+		case evt.Kind == gesture.KindPress && evt.Source == pointer.Mouse,
+			evt.Kind == gesture.KindClick && evt.Source != pointer.Mouse:
+			prevCaretPos, _ := e.text.Selection()
+			e.blinkStart = gtx.Now
+			e.text.MoveCoord(image.Point{
+				X: int(math.Round(float64(evt.Position.X))),
+				Y: int(math.Round(float64(evt.Position.Y))),
+			})
+			gtx.Execute(key.FocusCmd{Tag: e})
+			if e.scroller.State() != gesture.StateFlinging {
+				e.scrollCaret = true
+			}
+
+			if evt.Modifiers == key.ModShift {
+				start, end := e.text.Selection()
+				// If they clicked closer to the end, then change the end to
+				// where the caret used to be (effectively swapping start & end).
+				if abs(end-start) < abs(start-prevCaretPos) {
+					e.text.SetCaret(start, prevCaretPos)
+				}
+			} else {
+				e.text.ClearSelection()
+			}
+			e.dragging = true
+
+			// Process multi-clicks.
+			switch {
+			case evt.NumClicks == 2:
+				e.text.MoveWord(-1, selectionClear)
+				e.text.MoveWord(1, selectionExtend)
+				e.dragging = false
+			case evt.NumClicks >= 3:
+				e.text.MoveStart(selectionClear)
+				e.text.MoveEnd(selectionExtend)
+				e.dragging = false
+			}
+		}
+	case pointer.Event:
+		release := false
+		switch {
+		case evt.Kind == pointer.Release && evt.Source == pointer.Mouse:
+			release = true
+			fallthrough
+		case evt.Kind == pointer.Drag && evt.Source == pointer.Mouse:
+			if e.dragging {
+				e.blinkStart = gtx.Now
+				e.text.MoveCoord(image.Point{
+					X: int(math.Round(float64(evt.Position.X))),
+					Y: int(math.Round(float64(evt.Position.Y))),
+				})
+				e.scrollCaret = true
+
+				if release {
+					e.dragging = false
+				}
+			}
+		}
+	}
+	return nil, false
 }
 
 func condFilter(pred bool, f key.Filter) event.Filter {
@@ -340,9 +349,9 @@ func condFilter(pred bool, f key.Filter) event.Filter {
 	}
 }
 
-func (e *Editor) processKey(gtx layout.Context) {
+func (e *Editor) processKey(gtx layout.Context) (EditorEvent, bool) {
 	if e.text.Changed() {
-		e.events = append(e.events, ChangeEvent{})
+		return ChangeEvent{}, true
 	}
 	caret, _ := e.text.Selection()
 	atBeginning := caret == 0
@@ -396,15 +405,17 @@ func (e *Editor) processKey(gtx layout.Context) {
 			if !e.ReadOnly && e.Submit && (ke.Name == key.NameReturn || ke.Name == key.NameEnter) {
 				if !ke.Modifiers.Contain(key.ModShift) {
 					e.scratch = e.text.Text(e.scratch)
-					e.events = append(e.events, SubmitEvent{
+					return SubmitEvent{
 						Text: string(e.scratch),
-					})
-					continue
+					}, true
 				}
 			}
-			e.command(gtx, ke)
 			e.scrollCaret = true
 			e.scroller.Stop()
+			ev, ok := e.command(gtx, ke)
+			if ok {
+				return ev, ok
+			}
 		case key.SnippetEvent:
 			e.updateSnippet(gtx, ke.Start, ke.End)
 		case key.EditEvent:
@@ -431,13 +442,15 @@ func (e *Editor) processKey(gtx layout.Context) {
 			// Reset caret xoff.
 			e.text.MoveCaret(0, 0)
 			if submit {
-				if e.text.Changed() {
-					e.events = append(e.events, ChangeEvent{})
-				}
 				e.scratch = e.text.Text(e.scratch)
-				e.events = append(e.events, SubmitEvent{
+				submitEvent := SubmitEvent{
 					Text: string(e.scratch),
-				})
+				}
+				if e.text.Changed() {
+					e.pending = append(e.pending, submitEvent)
+					return ChangeEvent{}, true
+				}
+				return submitEvent, true
 			}
 		// Complete a paste event, initiated by Shortcut-V in Editor.command().
 		case transfer.DataEvent:
@@ -445,7 +458,9 @@ func (e *Editor) processKey(gtx layout.Context) {
 			e.scroller.Stop()
 			content, err := io.ReadAll(ke.Open())
 			if err == nil {
-				e.Insert(string(content))
+				if e.Insert(string(content)) != 0 {
+					return ChangeEvent{}, true
+				}
 			}
 		case key.SelectionEvent:
 			e.scrollCaret = true
@@ -457,11 +472,12 @@ func (e *Editor) processKey(gtx layout.Context) {
 		}
 	}
 	if e.text.Changed() {
-		e.events = append(e.events, ChangeEvent{})
+		return ChangeEvent{}, true
 	}
+	return nil, false
 }
 
-func (e *Editor) command(gtx layout.Context, k key.Event) {
+func (e *Editor) command(gtx layout.Context, k key.Event) (EditorEvent, bool) {
 	direction := 1
 	if gtx.Locale.Direction.Progression() == system.TowardOrigin {
 		direction = -1
@@ -485,7 +501,9 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 			if text := string(e.scratch); text != "" {
 				gtx.Execute(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(text))})
 				if k.Name == "X" && !e.ReadOnly {
-					e.Delete(1)
+					if e.Delete(1) != 0 {
+						return ChangeEvent{}, true
+					}
 				}
 			}
 		// Select all
@@ -494,33 +512,47 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 		case "Z":
 			if !e.ReadOnly {
 				if k.Modifiers.Contain(key.ModShift) {
-					e.redo()
+					if ev, ok := e.redo(); ok {
+						return ev, ok
+					}
 				} else {
-					e.undo()
+					if ev, ok := e.undo(); ok {
+						return ev, ok
+					}
 				}
 			}
 		}
-		return
+		return nil, false
 	}
 	switch k.Name {
 	case key.NameReturn, key.NameEnter:
 		if !e.ReadOnly {
-			e.Insert("\n")
+			if e.Insert("\n") != 0 {
+				return ChangeEvent{}, true
+			}
 		}
 	case key.NameDeleteBackward:
 		if !e.ReadOnly {
 			if moveByWord {
-				e.deleteWord(-1)
+				if e.deleteWord(-1) != 0 {
+					return ChangeEvent{}, true
+				}
 			} else {
-				e.Delete(-1)
+				if e.Delete(-1) != 0 {
+					return ChangeEvent{}, true
+				}
 			}
 		}
 	case key.NameDeleteForward:
 		if !e.ReadOnly {
 			if moveByWord {
-				e.deleteWord(1)
+				if e.deleteWord(1) != 0 {
+					return ChangeEvent{}, true
+				}
 			} else {
-				e.Delete(1)
+				if e.Delete(1) != 0 {
+					return ChangeEvent{}, true
+				}
 			}
 		}
 	case key.NameUpArrow:
@@ -554,6 +586,7 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 	case key.NameEnd:
 		e.text.MoveEnd(selAct)
 	}
+	return nil, false
 }
 
 // initBuffer should be invoked first in every exported function that accesses
@@ -572,10 +605,13 @@ func (e *Editor) initBuffer() {
 	e.text.WrapPolicy = e.WrapPolicy
 }
 
-// Update the state of the editor in response to input events.
-func (e *Editor) Update(gtx layout.Context) {
+// Update the state of the editor in response to input events. Update consumes editor
+// input events until there are no remaining events or an editor event is generated.
+// To fully update the state of the editor, callers should call Update until it returns
+// false.
+func (e *Editor) Update(gtx layout.Context) (EditorEvent, bool) {
 	e.initBuffer()
-	e.processEvents(gtx)
+	event, ok := e.processEvents(gtx)
 	// Notify IME of selection if it changed.
 	newSel := e.ime.selection
 	start, end := e.text.Selection()
@@ -595,13 +631,19 @@ func (e *Editor) Update(gtx layout.Context) {
 	}
 
 	e.updateSnippet(gtx, e.ime.start, e.ime.end)
+	return event, ok
 }
 
 // Layout lays out the editor using the provided textMaterial as the paint material
 // for the text glyphs+caret and the selectMaterial as the paint material for the
 // selection rectangle.
 func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, textMaterial, selectMaterial op.CallOp) layout.Dimensions {
-	e.Update(gtx)
+	for {
+		_, ok := e.Update(gtx)
+		if !ok {
+			break
+		}
+	}
 
 	e.text.Layout(gtx, lt, font, size)
 	return e.layout(gtx, textMaterial, selectMaterial)
@@ -760,10 +802,10 @@ func (e *Editor) CaretCoords() f32.Point {
 //
 // If there is a selection, it is deleted and counts as a single grapheme
 // cluster.
-func (e *Editor) Delete(graphemeClusters int) {
+func (e *Editor) Delete(graphemeClusters int) (deletedRunes int) {
 	e.initBuffer()
 	if graphemeClusters == 0 {
-		return
+		return 0
 	}
 
 	start, end := e.text.Selection()
@@ -779,9 +821,10 @@ func (e *Editor) Delete(graphemeClusters int) {
 	// Reset xoff.
 	e.text.MoveCaret(0, 0)
 	e.ClearSelection()
+	return end - start
 }
 
-func (e *Editor) Insert(s string) {
+func (e *Editor) Insert(s string) (insertedRunes int) {
 	e.initBuffer()
 	if e.SingleLine {
 		s = strings.ReplaceAll(s, "\n", " ")
@@ -795,6 +838,7 @@ func (e *Editor) Insert(s string) {
 	e.text.MoveCaret(0, 0)
 	e.SetCaret(start+moves, start+moves)
 	e.scrollCaret = true
+	return moves
 }
 
 // modification represents a change to the contents of the editor buffer.
@@ -814,10 +858,10 @@ type modification struct {
 
 // undo applies the modification at e.history[e.historyIdx] and decrements
 // e.historyIdx.
-func (e *Editor) undo() {
+func (e *Editor) undo() (EditorEvent, bool) {
 	e.initBuffer()
 	if len(e.history) < 1 || e.nextHistoryIdx == 0 {
-		return
+		return nil, false
 	}
 	mod := e.history[e.nextHistoryIdx-1]
 	replaceEnd := mod.StartRune + utf8.RuneCountInString(mod.ApplyContent)
@@ -825,14 +869,15 @@ func (e *Editor) undo() {
 	caretEnd := mod.StartRune + utf8.RuneCountInString(mod.ReverseContent)
 	e.SetCaret(caretEnd, mod.StartRune)
 	e.nextHistoryIdx--
+	return ChangeEvent{}, true
 }
 
 // redo applies the modification at e.history[e.historyIdx] and increments
 // e.historyIdx.
-func (e *Editor) redo() {
+func (e *Editor) redo() (EditorEvent, bool) {
 	e.initBuffer()
 	if len(e.history) < 1 || e.nextHistoryIdx == len(e.history) {
-		return
+		return nil, false
 	}
 	mod := e.history[e.nextHistoryIdx]
 	end := mod.StartRune + utf8.RuneCountInString(mod.ReverseContent)
@@ -840,6 +885,7 @@ func (e *Editor) redo() {
 	caretEnd := mod.StartRune + utf8.RuneCountInString(mod.ApplyContent)
 	e.SetCaret(caretEnd, mod.StartRune)
 	e.nextHistoryIdx++
+	return ChangeEvent{}, true
 }
 
 // replace the text between start and end with s. Indices are in runes.
@@ -923,18 +969,18 @@ func (e *Editor) MoveCaret(startDelta, endDelta int) {
 // Positive is forward, negative is backward.
 // Absolute values greater than one will delete that many words.
 // The selection counts as a single word.
-func (e *Editor) deleteWord(distance int) {
+func (e *Editor) deleteWord(distance int) (deletedRunes int) {
 	if distance == 0 {
 		return
 	}
 
 	start, end := e.text.Selection()
 	if start != end {
-		e.Delete(1)
+		deletedRunes = e.Delete(1)
 		distance -= sign(distance)
 	}
 	if distance == 0 {
-		return
+		return deletedRunes
 	}
 
 	// split the distance information into constituent parts to be
@@ -974,7 +1020,8 @@ func (e *Editor) deleteWord(distance int) {
 			runes += 1
 		}
 	}
-	e.Delete(runes * direction)
+	deletedRunes += e.Delete(runes * direction)
+	return deletedRunes
 }
 
 // SelectionLen returns the length of the selection, in runes; it is
