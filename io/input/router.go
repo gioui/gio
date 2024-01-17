@@ -380,7 +380,7 @@ func (q *Router) Frame(frame *op.Ops) {
 	q.collapseState(len(q.changes) - 1)
 }
 
-// Queue events and report whether at least one event matched a handler.
+// Queue events to be routed.
 func (q *Router) Queue(events ...event.Event) {
 	for _, e := range events {
 		se, system := e.(SystemEvent)
