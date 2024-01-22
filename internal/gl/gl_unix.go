@@ -665,7 +665,7 @@ func (f *Functions) load(forceES bool) error {
 	case runtime.GOOS == "android":
 		libNames = []string{"libGLESv2.so", "libGLESv3.so"}
 	default:
-		libNames = []string{"libGLESv2.so.2"}
+		libNames = []string{"libGLESv2.so.2", "libGLESv2.so.3.0"}
 	}
 	for _, lib := range libNames {
 		if h := dlopen(lib); h != nil {
