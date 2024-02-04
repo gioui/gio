@@ -22,7 +22,7 @@
 //
 //	theme := material.NewTheme(...)
 //
-//	material.Button(theme, "Click me!").Layout(gtx, button)
+//	material.Button(theme, button, "Click me!").Layout(gtx)
 //
 // # Customization
 //
@@ -41,9 +41,9 @@
 // Widget-local parameters: For changing the look of a particular widget,
 // adjust the widget specific theme object:
 //
-//	btn := material.Button(theme, "Click me!")
+//	btn := material.Button(theme, button, "Click me!")
 //	btn.Font.Style = text.Italic
-//	btn.Layout(gtx, button)
+//	btn.Layout(gtx)
 //
 // Widget variants: A widget can have several distinct representations even
 // though the underlying state is the same. A widget.Clickable can be drawn as a
@@ -51,7 +51,7 @@
 //
 //	icon := widget.NewIcon(...)
 //
-//	material.IconButton(theme, icon).Layout(gtx, button)
+//	material.IconButton(theme, button, icon, "Click me!").Layout(gtx)
 //
 // Specialized widgets: Theme both define a generic Label method
 // that takes a text size, and specialized methods for standard text
