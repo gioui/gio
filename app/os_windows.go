@@ -5,7 +5,12 @@ package app
 import (
 	"errors"
 	"fmt"
+	"gioui.org/io/transfer"
+	syscall "golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 	"image"
+	"net/url"
+	"os"
 	"runtime"
 	"sort"
 	"strings"
@@ -15,11 +20,8 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	syscall "golang.org/x/sys/windows"
-
 	"gioui.org/app/internal/windows"
 	"gioui.org/unit"
-	gowindows "golang.org/x/sys/windows"
 
 	"gioui.org/f32"
 	"gioui.org/io/clipboard"
@@ -54,7 +56,10 @@ type window struct {
 	config     Config
 }
 
-const _WM_WAKEUP = windows.WM_USER + iota
+const (
+	_WM_WAKEUP = windows.WM_USER + iota
+	_WM_OPEN_URL
+)
 
 type gpuAPI struct {
 	priority    int
@@ -103,6 +108,10 @@ func newWindow(window *callbacks, options []Option) error {
 		w.w = window
 		w.w.SetDriver(w)
 		w.w.Event(ViewEvent{HWND: uintptr(w.hwnd)})
+		if startupURI != "" {
+			w.onOpenURI(startupURI)
+			startupURI = ""
+		}
 		w.Configure(options)
 		windows.SetForegroundWindow(w.hwnd)
 		windows.SetFocus(w.hwnd)
@@ -136,7 +145,7 @@ func initResources() error {
 		LpfnWndProc:   syscall.NewCallback(windowProc),
 		HInstance:     hInst,
 		HIcon:         icon,
-		LpszClassName: syscall.StringToUTF16Ptr("GioWindow"),
+		LpszClassName: syscall.StringToUTF16Ptr(ID),
 	}
 	cls, err := windows.RegisterClassEx(&wcls)
 	if err != nil {
@@ -432,6 +441,20 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_IME_ENDCOMPOSITION:
 		w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
 		return windows.TRUE
+	case windows.WM_COPYDATA:
+		data := (*windows.CopyDataStruct)(unsafe.Pointer(lParam))
+		switch data.DwData {
+		case _WM_OPEN_URL:
+			if schemesURI == "" {
+				return windows.TRUE
+			}
+
+			uri := syscall.UTF16PtrToString((*uint16)(unsafe.Pointer(data.LpData)))
+			if w.onOpenURI(uri) {
+				w.Perform(system.ActionRaise)
+			}
+			return windows.TRUE
+		}
 	}
 
 	return windows.DefWindowProc(hwnd, msg, wParam, lParam)
@@ -666,7 +689,7 @@ func (w *window) readClipboard() error {
 		return err
 	}
 	defer windows.GlobalUnlock(mem)
-	content := gowindows.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
+	content := syscall.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
 	w.w.Event(clipboard.Event{Text: content})
 	return nil
 }
@@ -747,7 +770,7 @@ func (w *window) writeClipboard(s string) error {
 	if err := windows.EmptyClipboard(); err != nil {
 		return err
 	}
-	u16, err := gowindows.UTF16FromString(s)
+	u16, err := syscall.UTF16FromString(s)
 	if err != nil {
 		return err
 	}
@@ -864,6 +887,22 @@ func (w *window) raise() {
 		windows.SWP_NOMOVE|windows.SWP_NOSIZE|windows.SWP_SHOWWINDOW)
 }
 
+func (w *window) onOpenURI(uri string) bool {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return false
+	}
+
+	for _, scheme := range strings.Split(schemesURI, ",") {
+		if u.Scheme == scheme {
+			w.w.Event(transfer.URLEvent{URL: u})
+			return true
+		}
+	}
+
+	return false
+}
+
 func convertKeyCode(code uintptr) (string, bool) {
 	if '0' <= code && code <= '9' || 'A' <= code && code <= 'Z' {
 		return string(rune(code)), true
@@ -965,6 +1004,189 @@ func configForDPI(dpi int) unit.Metric {
 	return unit.Metric{
 		PxPerDp: ppdp,
 		PxPerSp: ppdp,
+	}
+}
+
+// schemesURI is a list of schemes, comma separated, that must be
+// defined using -X compiler ldflag, that used in gogio.
+var schemesURI string
+
+// startupURI is the URI that started the app, if any.
+var startupURI string
+
+func init() {
+	var currentSchemes []string
+	if schemesURI != "" {
+		currentSchemes = strings.Split(schemesURI, ",")
+	}
+
+	oldSchemes := registeredSchemes(ID)
+	for _, s := range currentSchemes {
+		for i, o := range oldSchemes {
+			if s == o {
+				oldSchemes = append(oldSchemes[:i], oldSchemes[i+1:]...)
+				break
+			}
+		}
+	}
+
+	if len(oldSchemes) > 0 {
+		go unregisterSchemes(ID, oldSchemes)
+	}
+
+	if len(currentSchemes) == 0 {
+		return
+	}
+
+	if len(os.Args) == 3 && os.Args[1] == "-gio_launch_url" {
+		startupURI = os.Args[2]
+	}
+
+	// On Windows, launching the app using a URI will start a new instance of the app,
+	// a new window. That behavior, by default, doesn't align with iOS/Android/macOS, where
+	// the deeplink sends the event to the running app (if any). We are emulating it.
+	if hwnd, _ := windows.FindWindow(ID); hwnd != 0 {
+		if startupURI != "" {
+			broadcastURI(hwnd, startupURI)
+		}
+		os.Exit(0)
+		return
+	}
+
+	go registerSchemes(ID, currentSchemes)
+}
+
+func broadcastURI(hwnd syscall.Handle, uri string) {
+	u := syscall.StringToUTF16Ptr(uri)
+	msg := &windows.CopyDataStruct{
+		DwData: _WM_OPEN_URL,
+		CbData: uint32(len(uri)*2 + 1),
+		LpData: uintptr(unsafe.Pointer(u)),
+	}
+
+	windows.SendMessage(hwnd, windows.WM_COPYDATA, 0, uintptr(unsafe.Pointer(msg)))
+	runtime.KeepAlive(u)
+	runtime.KeepAlive(msg)
+}
+
+func registeredSchemes(appid string) []string {
+	meta, err := registry.OpenKey(registry.CURRENT_USER, `Software\\`+appid, registry.ALL_ACCESS)
+	if err != nil {
+		return nil
+	}
+	defer meta.Close()
+
+	schemes, _, _ := meta.GetStringsValue("URISchemes")
+	return schemes
+}
+
+func registerSchemes(appid string, schemes []string) error {
+	reg := func(scheme string) error {
+		key, existent, err := registry.CreateKey(registry.CURRENT_USER, `Software\\Classes\\`+scheme, registry.ALL_ACCESS)
+		if err != nil {
+			return err
+		}
+		defer key.Close()
+
+		if existent {
+			// Check if the existent key belongs to the current application
+			id, _, err := key.GetStringValue("appid")
+			if err != nil || id != appid {
+				return fmt.Errorf("scheme %s already registered by another application", scheme)
+			}
+		}
+
+		path, err := os.Executable()
+		if err != nil {
+			return err
+		}
+
+		if err = key.SetStringValue("", "URL:"+scheme+" Protocol"); err != nil {
+			return err
+		}
+		if err = key.SetStringValue("URL Protocol", ""); err != nil {
+			return err
+		}
+		if err = key.SetStringValue("appid", appid); err != nil {
+			return err
+		}
+
+		icon, _, err := registry.CreateKey(key, `DefaultIcon`, registry.ALL_ACCESS)
+		if err != nil {
+			return err
+		}
+		defer icon.Close()
+
+		if err = icon.SetStringValue("", `"`+path+`",1`); err != nil {
+			return err
+		}
+
+		cmd, _, err := registry.CreateKey(key, `shell\\open\\command`, registry.ALL_ACCESS)
+		if err != nil {
+			return err
+		}
+		defer cmd.Close()
+
+		if err = cmd.SetStringValue("", `"`+path+`" -gio_launch_url "%1"`); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	for _, scheme := range schemes {
+		if scheme == "" {
+			continue // just in case
+		}
+		if err := reg(scheme); err != nil {
+			return err
+		}
+	}
+
+	meta, _, err := registry.CreateKey(registry.CURRENT_USER, `Software\\`+appid, registry.ALL_ACCESS)
+	if err != nil {
+		return err
+	}
+	defer meta.Close()
+
+	if err = meta.SetStringsValue("URISchemes", schemes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func unregisterSchemes(appid string, schemes []string) {
+	classes, err := registry.OpenKey(registry.CURRENT_USER, `Software\\Classes`, registry.ALL_ACCESS)
+	if err != nil {
+		return
+	}
+	defer classes.Close()
+
+	for _, scheme := range schemes {
+		if scheme == "" {
+			continue // just in case
+		}
+
+		key, err := registry.OpenKey(classes, scheme, registry.ALL_ACCESS)
+		if err != nil {
+			continue
+		}
+
+		id, _, err := key.GetStringValue("appid")
+		if err == nil && id != appid {
+			continue
+		}
+
+		for _, k := range []string{`DefaultIcon`, `shell\\open\\command`, `shell\\open`, `shell`} {
+			registry.DeleteKey(key, k)
+		}
+
+		if err := key.Close(); err != nil {
+			continue
+		}
+
+		registry.DeleteKey(classes, scheme)
 	}
 }
 

@@ -65,6 +65,7 @@ const (
 	TypePointerInput
 	TypeClipboardRead
 	TypeClipboardWrite
+	TypeScheme
 	TypeSource
 	TypeTarget
 	TypeOffer
@@ -151,6 +152,7 @@ const (
 	TypePointerInputLen     = 1 + 1 + 1*2 + 2*4 + 2*4
 	TypeClipboardReadLen    = 1
 	TypeClipboardWriteLen   = 1
+	TypeSchemeLen           = 1
 	TypeSourceLen           = 1
 	TypeTargetLen           = 1
 	TypeOfferLen            = 1
@@ -435,6 +437,7 @@ var opProps = [0x100]opProp{
 	TypePointerInput:     {Size: TypePointerInputLen, NumRefs: 1},
 	TypeClipboardRead:    {Size: TypeClipboardReadLen, NumRefs: 1},
 	TypeClipboardWrite:   {Size: TypeClipboardWriteLen, NumRefs: 1},
+	TypeScheme:           {Size: TypeSchemeLen, NumRefs: 2},
 	TypeSource:           {Size: TypeSourceLen, NumRefs: 2},
 	TypeTarget:           {Size: TypeTargetLen, NumRefs: 2},
 	TypeOffer:            {Size: TypeOfferLen, NumRefs: 3},
@@ -509,6 +512,8 @@ func (t OpType) String() string {
 		return "ClipboardRead"
 	case TypeClipboardWrite:
 		return "ClipboardWrite"
+	case TypeScheme:
+		return "Scheme"
 	case TypeSource:
 		return "Source"
 	case TypeTarget:

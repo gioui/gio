@@ -46,6 +46,7 @@ type Router struct {
 		collector keyCollector
 	}
 	cqueue clipboardQueue
+	tqueue transferQueue
 
 	handlers handlerEvents
 
@@ -115,6 +116,7 @@ func (q *Router) Events(k event.Tag) []event.Event {
 // there are active profile handlers is also saved.
 func (q *Router) Frame(frame *op.Ops) {
 	q.handlers.Clear()
+	q.tqueue.Clear()
 	q.wakeup = false
 	for k := range q.profHandlers {
 		delete(q.profHandlers, k)
@@ -182,6 +184,8 @@ func (q *Router) Queue(events ...event.Event) bool {
 			}
 		case clipboard.Event:
 			q.cqueue.Push(e, &q.handlers)
+		case transfer.URLEvent:
+			q.tqueue.Push(e, &q.handlers)
 		}
 	}
 	return q.handlers.HadEvents()
@@ -454,6 +458,12 @@ func (q *Router) collect() {
 		case ops.TypeCursor:
 			name := pointer.Cursor(encOp.Data[1])
 			pc.cursor(name)
+		case ops.TypeScheme:
+			op := transfer.SchemeOp{
+				Tag:    encOp.Refs[0].(event.Tag),
+				Scheme: encOp.Refs[1].(string),
+			}
+			q.tqueue.ProcessSchemeOp(op, &q.handlers)
 		case ops.TypeSource:
 			op := transfer.SourceOp{
 				Tag:  encOp.Refs[0].(event.Tag),

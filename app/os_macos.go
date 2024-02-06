@@ -7,7 +7,9 @@ package app
 
 import (
 	"errors"
+	"gioui.org/io/transfer"
 	"image"
+	"net/url"
 	"runtime"
 	"time"
 	"unicode"
@@ -850,6 +852,23 @@ func gio_onFinishLaunching() {
 	close(launched)
 }
 
+var startupURI *url.URL
+
+//export gio_onOpenURI
+func gio_onOpenURI(uri C.CFTypeRef) {
+	u, err := url.Parse(nsstringToString(uri))
+	if err != nil {
+		return
+	}
+	if len(viewMap) == 0 {
+		startupURI = u
+		return
+	}
+	for _, w := range viewMap {
+		w.w.Event(transfer.URLEvent{URL: u})
+	}
+}
+
 func newWindow(win *callbacks, options []Option) error {
 	<-launched
 	errch := make(chan error)
@@ -875,6 +894,10 @@ func newWindow(win *callbacks, options []Option) error {
 		C.makeKeyAndOrderFront(window)
 		layer := C.layerForView(w.view)
 		w.w.Event(ViewEvent{View: uintptr(w.view), Layer: uintptr(layer)})
+		if startupURI != nil {
+			w.w.Event(transfer.URLEvent{URL: startupURI})
+			startupURI = nil
+		}
 	})
 	return <-errch
 }

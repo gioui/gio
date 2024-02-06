@@ -19,6 +19,7 @@ package transfer
 
 import (
 	"io"
+	"net/url"
 
 	"gioui.org/internal/ops"
 	"gioui.org/io/event"
@@ -54,11 +55,13 @@ type OfferOp struct {
 	Data io.ReadCloser
 }
 
+// Add the source to the list of operations.
 func (op SourceOp) Add(o *op.Ops) {
 	data := ops.Write2(&o.Internal, ops.TypeSourceLen, op.Tag, op.Type)
 	data[0] = byte(ops.TypeSource)
 }
 
+// Add the target to the list of operations.
 func (op TargetOp) Add(o *op.Ops) {
 	data := ops.Write2(&o.Internal, ops.TypeTargetLen, op.Tag, op.Type)
 	data[0] = byte(ops.TypeTarget)
@@ -107,3 +110,40 @@ type DataEvent struct {
 }
 
 func (DataEvent) ImplementsEvent() {}
+
+// SchemeOp registers a tag as a lister for a scheme updates.
+// Use multiple SchemeOps if a tag supports multiple schemes,
+// or use an empty scheme to listen for all schemes.
+//
+// Note that only schemes registered with the platform receive
+// URLEvents. Use a packaging tool such as [gioui.org/cmd/gogio]
+// to register schemes.
+type SchemeOp struct {
+	Tag event.Tag
+
+	// Scheme is the scheme to listen for, empty string to listen any scheme.
+	Scheme string
+}
+
+// Add the scheme to the list of operations.
+func (op SchemeOp) Add(o *op.Ops) {
+	data := ops.Write2(&o.Internal, ops.TypeSchemeLen, op.Tag, op.Scheme)
+	data[0] = byte(ops.TypeScheme)
+}
+
+// URLEvent is generated when the app is invoked with a URL. This event is sent to
+// all SchemeOps that match the URL scheme.
+//
+// In order to receive URLEvents, it's necessary to use SchemeOp and the app must
+// register a scheme. The scheme can be registered using gogio, with `-schemes <scheme>`
+// flag.
+//
+// Due to differences between OSes, URLEvent might not be generated when the URL is
+// larger than 2048 characters. Domain names using non-ASCII characters have
+// undefined behavior, it can be either encoded as Punycode, QueryEscape,
+// or even as raw UTF-8.
+type URLEvent struct {
+	URL *url.URL
+}
+
+func (URLEvent) ImplementsEvent() {}
