@@ -14,6 +14,9 @@
 // with the source. When a drag gesture completes, a CancelEvent is sent
 // to the source and all potential targets.
 //
+// DataEvent is also sent when the application is asked by the operating system
+// to open one or more files.
+//
 // Note that the RequestEvent is sent to the source upon drop.
 package transfer
 
@@ -100,10 +103,15 @@ func (CancelEvent) ImplementsEvent() {}
 // DataEvent is sent to the target receiving the transfer.
 type DataEvent struct {
 	// Type is the MIME type of Data.
+	// Type will be "application/octet-stream" for unknown data types.
 	Type string
-	// Open returns the transfer data. It is only valid to call Open in the frame
-	// the DataEvent is received. The caller must close the return value after use.
-	Open func() io.ReadCloser
+	// URI is the identifier of the resource being transferred. It can be set if
+	// the DataEvent concerns a file or an online resource.
+	URI string
+	// Open returns the transfer data. It is only valid to call Open in the
+	// frame the DataEvent is received.
+	// The caller must close the return value after use.
+	Open func() (io.ReadCloser, error)
 }
 
 func (DataEvent) ImplementsEvent() {}

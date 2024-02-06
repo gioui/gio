@@ -938,6 +938,10 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		if handled {
 			w.setNextFrame(time.Time{})
 			w.updateAnimation(d)
+		} else {
+			// Currently this can only happen with open file OS directives on
+			// macOS.
+			w.out <- e2
 		}
 		return handled
 	}

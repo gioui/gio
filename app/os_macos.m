@@ -390,6 +390,10 @@ CFTypeRef gio_createView(void) {
 - (void)applicationWillUnhide:(NSNotification *)notification {
 	gio_onAppShow();
 }
+- (BOOL)application:(NSApplication *)sender openFile:(NSString *)filename {
+  	gio_openFile((__bridge CFTypeRef)filename);
+  return YES;
+}
 @end
 
 void gio_main() {

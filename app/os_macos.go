@@ -8,6 +8,10 @@ package app
 import (
 	"errors"
 	"image"
+	"io"
+	"mime"
+	"os"
+	"path"
 	"runtime"
 	"time"
 	"unicode"
@@ -18,6 +22,7 @@ import (
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
 	"gioui.org/unit"
 
 	_ "gioui.org/internal/cocoainit"
@@ -264,6 +269,10 @@ var viewMap = make(map[C.CFTypeRef]*window)
 
 // launched is closed when applicationDidFinishLaunching is called.
 var launched = make(chan struct{})
+
+// openFiles captures all the openFile events happening
+// applicationDidFinishLaunching is called.
+var openFiles []string
 
 // nextTopLeft is the offset to use for the next window's call to
 // cascadeTopLeftFromPoint.
@@ -850,6 +859,20 @@ func gio_onFinishLaunching() {
 	close(launched)
 }
 
+//export gio_openFile
+func gio_openFile(cfile C.CFTypeRef) {
+	file := nsstringToString(cfile)
+	if len(viewMap) == 0 {
+		// Must do this because openFile is called before
+		// applicationDidFinishLaunching therefore no view is available here.
+		openFiles = append(openFiles, file)
+		return
+	}
+	for _, w := range viewMap {
+		sendOpenFileEvent(w, file)
+	}
+}
+
 func newWindow(win *callbacks, options []Option) error {
 	<-launched
 	errch := make(chan error)
@@ -875,8 +898,27 @@ func newWindow(win *callbacks, options []Option) error {
 		C.makeKeyAndOrderFront(window)
 		layer := C.layerForView(w.view)
 		w.w.Event(ViewEvent{View: uintptr(w.view), Layer: uintptr(layer)})
+		// Now send DataTransfer events for any file which has been used to open
+		// this application from the OS.
+		for _, file := range openFiles {
+			sendOpenFileEvent(w, file)
+		}
 	})
 	return <-errch
+}
+
+func sendOpenFileEvent(w *window, file string) {
+	mimeType := mime.TypeByExtension(path.Ext(file))
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+	w.w.Event(transfer.DataEvent{
+		Type: mimeType,
+		URI:  file,
+		Open: func() (io.ReadCloser, error) {
+			return os.Open(file)
+		},
+	})
 }
 
 func newOSWindow() (*window, error) {
