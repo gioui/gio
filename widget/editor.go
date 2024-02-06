@@ -325,6 +325,9 @@ func (e *Editor) processKey(gtx layout.Context) {
 		switch ke := ke.(type) {
 		case key.FocusEvent:
 			e.focused = ke.Focus
+			if e.focused {
+				key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)
+			}
 			// Reset IME state.
 			e.ime.imeState = imeState{}
 		case key.Event:
