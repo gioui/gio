@@ -224,6 +224,7 @@ const (
 	NameF11            = "F11"
 	NameF12            = "F12"
 	NameBack           = "Back"
+	NameDash           = "Dash"
 )
 
 // Contain reports whether m contains all modifiers
@@ -242,7 +243,15 @@ func (k Set) Contains(name string, mods Modifiers) bool {
 		var modSet, keySet string
 		sep := strings.LastIndex(chord, "-")
 		if sep != -1 {
-			modSet, keySet = chord[:sep], chord[sep+1:]
+			if sep == len(chord)-1 {
+				if sep != 0 {
+					modSet, keySet = chord[:sep-1], "-"
+				} else {
+					modSet, keySet = "", "-"
+				}
+			} else {
+				modSet, keySet = chord[:sep], chord[sep+1:]
+			}
 		} else {
 			modSet, keySet = "", chord
 		}
