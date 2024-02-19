@@ -40,6 +40,10 @@ static jclass jni_GetObjectClass(JNIEnv *env, jobject obj) {
 	return (*env)->GetObjectClass(env, obj);
 }
 
+static jobject jni_NewObject(JNIEnv *env, jclass clazz, jmethodID methodID) {
+	return (*env)->NewObject(env, clazz, methodID);
+}
+
 static jmethodID jni_GetMethodID(JNIEnv *env, jclass clazz, const char *name, const char *sig) {
 	return (*env)->GetMethodID(env, clazz, name, sig);
 }
@@ -227,9 +231,11 @@ var android struct {
 	// gioCls is the class of the Gio class.
 	gioCls C.jclass
 
-	mwriteClipboard   C.jmethodID
-	mreadClipboard    C.jmethodID
-	mwakeupMainThread C.jmethodID
+	mwriteClipboard        C.jmethodID
+	mreadClipboard         C.jmethodID
+	mwakeupMainThread      C.jmethodID
+	startForegroundService C.jmethodID
+	stopService            C.jmethodID
 
 	// android.view.accessibility.AccessibilityNodeInfo class.
 	accessibilityNodeInfo struct {
@@ -429,6 +435,10 @@ func initJVM(env *C.JNIEnv, gio C.jclass, ctx C.jobject) {
 	android.mwriteClipboard = getStaticMethodID(env, gio, "writeClipboard", "(Landroid/content/Context;Ljava/lang/String;)V")
 	android.mreadClipboard = getStaticMethodID(env, gio, "readClipboard", "(Landroid/content/Context;)Ljava/lang/String;")
 	android.mwakeupMainThread = getStaticMethodID(env, gio, "wakeupMainThread", "()V")
+
+	cls = getObjectClass(env, android.appCtx)
+	android.stopService = getMethodID(env, cls, "stopService", "(Landroid/content/Intent;)Z")
+	android.startForegroundService = getStaticMethodID(env, gio, "startForegroundService", "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;")
 
 	intern := func(s string) C.jstring {
 		ref := C.jni_NewGlobalRef(env, C.jobject(javaString(env, s)))
@@ -1461,3 +1471,53 @@ func Java_org_gioui_Gio_scheduleMainFuncs(env *C.JNIEnv, cls C.jclass) {
 }
 
 func (_ ViewEvent) ImplementsEvent() {}
+
+var foregroundService struct {
+	intent C.jobject
+	mu     sync.Mutex
+	stop   map[*int]bool
+}
+
+// startForeground starts the foreground service on android
+func startForeground(title, text string) (stop func(), err error) {
+	foregroundService.mu.Lock()
+	defer foregroundService.mu.Unlock()
+	if len(foregroundService.stop) == 0 {
+		runInJVM(javaVM(), func(env *C.JNIEnv) {
+			foregroundService.intent, err = callStaticObjectMethod(env, android.gioCls,
+				android.startForegroundService,
+				jvalue(android.appCtx),
+				jvalue(javaString(env, title)),
+				jvalue(javaString(env, text)),
+			)
+			if err == nil {
+				// get a reference across JNI sessions to the returned intent
+				foregroundService.intent = C.jni_NewGlobalRef(env, foregroundService.intent)
+
+			} else {
+				panic(err)
+			}
+		})
+	}
+	if err != nil {
+		return nil, err
+	}
+	ref := new(int)
+	foregroundService.stop[ref] = true
+	return func() {
+		foregroundService.mu.Lock()
+		defer foregroundService.mu.Unlock()
+		delete(foregroundService.stop, ref)
+		if len(foregroundService.stop) == 0 {
+			runInJVM(javaVM(), func(env *C.JNIEnv) {
+				defer C.jni_DeleteGlobalRef(env, foregroundService.intent)
+				callVoidMethod(env, android.appCtx, android.stopService, jvalue(foregroundService.intent))
+			})
+		}
+	}, nil
+
+}
+
+func init() {
+	foregroundService.stop = make(map[*int]bool)
+}
