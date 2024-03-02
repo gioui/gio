@@ -25,12 +25,13 @@ CGFloat _keyboardHeight;
 	self.view.layoutMargins = UIEdgeInsetsMake(0, 0, 0, 0);
 	UIView *drawView = [[GioView alloc] initWithFrame:zeroFrame];
 	[self.view addSubview: drawView];
-#ifndef TARGET_OS_TV
+#if !TARGET_OS_TV
 	drawView.multipleTouchEnabled = YES;
 #endif
 	drawView.preservesSuperviewLayoutMargins = YES;
 	drawView.layoutMargins = UIEdgeInsetsMake(0, 0, 0, 0);
 	onCreate((__bridge CFTypeRef)drawView, (__bridge CFTypeRef)self);
+#if !TARGET_OS_TV
 	[[NSNotificationCenter defaultCenter] addObserver:self
 											 selector:@selector(keyboardWillChange:)
 												 name:UIKeyboardWillShowNotification
@@ -43,6 +44,7 @@ CGFloat _keyboardHeight;
 											 selector:@selector(keyboardWillHide:)
 												 name:UIKeyboardWillHideNotification
 											   object:nil];
+#endif
 	[[NSNotificationCenter defaultCenter] addObserver: self
 											 selector: @selector(applicationDidEnterBackground:)
 												 name: UIApplicationDidEnterBackgroundNotification
@@ -88,6 +90,7 @@ CGFloat _keyboardHeight;
 	[super didReceiveMemoryWarning];
 }
 
+#if !TARGET_OS_TV
 - (void)keyboardWillChange:(NSNotification *)note {
 	NSDictionary *userInfo = note.userInfo;
 	CGRect f = [userInfo[UIKeyboardFrameEndUserInfoKey] CGRectValue];
@@ -99,6 +102,7 @@ CGFloat _keyboardHeight;
 	_keyboardHeight = 0.0;
 	[self.view setNeedsLayout];
 }
+#endif
 @end
 
 static void handleTouches(int last, UIView *view, NSSet<UITouch *> *touches, UIEvent *event) {
