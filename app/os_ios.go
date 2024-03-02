@@ -21,6 +21,7 @@ struct drawParams {
 };
 
 static void writeClipboard(unichar *chars, NSUInteger length) {
+#if !TARGET_OS_TV
 	@autoreleasepool {
 		NSString *s = [NSString string];
 		if (length > 0) {
@@ -29,13 +30,18 @@ static void writeClipboard(unichar *chars, NSUInteger length) {
 		UIPasteboard *p = UIPasteboard.generalPasteboard;
 		p.string = s;
 	}
+#endif
 }
 
 static CFTypeRef readClipboard(void) {
+#if !TARGET_OS_TV
 	@autoreleasepool {
 		UIPasteboard *p = UIPasteboard.generalPasteboard;
 		return (__bridge_retained CFTypeRef)p.string;
 	}
+#else
+	return nil;
+#endif
 }
 
 static void showTextInput(CFTypeRef viewRef) {
