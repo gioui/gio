@@ -302,10 +302,7 @@ func (w *Window) Option(opts ...Option) {
 }
 
 // Run f in the same thread as the native window event loop, and wait for f to
-// return or the window to close. Run is guaranteed not to deadlock if it is
-// invoked during the handling of a [ViewEvent], [FrameEvent],
-// [StageEvent]; call Run in a separate goroutine to avoid deadlock in all
-// other cases.
+// return or the window to close.
 //
 // Note that most programs should not call Run; configuring a Window with
 // [CustomRenderer] is a notable exception.
