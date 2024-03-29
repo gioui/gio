@@ -284,9 +284,9 @@ func TestIndexPositionBidi(t *testing.T) {
 			name:   "bidi rtl",
 			glyphs: bidiRTLText,
 			expectedXs: []fixed.Int26_6{
-				2665, 3291, 3861, 4431, 4716, 5286, 5856, 6109, 6621, 7133, 2665, 2380, 1577, 985, 687, 266, // Positions on line 0.
+				2646, 3272, 3842, 4412, 4697, 5267, 5837, 6090, 6602, 7114, 2646, 2380, 1577, 985, 687, 266, // Positions on line 0.
 
-				7886, 7118, 6350, 5582, 4814, 4529, 4231, 3933, 3667, 2300, 2585, 3155, 3667, 2300, 2015, 1709, 1117, 266, // Positions on line 1.
+				7867, 7099, 6331, 5563, 4795, 4510, 4212, 3914, 3648, 2281, 2566, 3136, 3648, 2281, 2015, 1709, 1117, 266, // Positions on line 1.
 
 				8794, 8026, 7258, 6490, 5722, 5437, 4922, 4540, 4134, 3868, 0, 290, 860, 1430, 1715, 1989, 2559, 3071, 3583, // Positions on line 2.
 
@@ -402,7 +402,7 @@ func TestIndexPositionLines(t *testing.T) {
 					xOff:    fixed.Int26_6(0),
 					yOff:    22,
 					glyphs:  15,
-					width:   fixed.Int26_6(7133),
+					width:   fixed.Int26_6(7114),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
@@ -410,7 +410,7 @@ func TestIndexPositionLines(t *testing.T) {
 					xOff:    fixed.Int26_6(0),
 					yOff:    41,
 					glyphs:  15,
-					width:   fixed.Int26_6(7886),
+					width:   fixed.Int26_6(7867),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
@@ -477,18 +477,18 @@ func TestIndexPositionLines(t *testing.T) {
 			glyphs: bidiRTLTextOpp,
 			expectedLines: []lineInfo{
 				{
-					xOff:    fixed.Int26_6(3107),
+					xOff:    fixed.Int26_6(3126),
 					yOff:    22,
 					glyphs:  15,
-					width:   fixed.Int26_6(7133),
+					width:   fixed.Int26_6(7114),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
 				{
-					xOff:    fixed.Int26_6(2354),
+					xOff:    fixed.Int26_6(2373),
 					yOff:    41,
 					glyphs:  15,
-					width:   fixed.Int26_6(7886),
+					width:   fixed.Int26_6(7867),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
