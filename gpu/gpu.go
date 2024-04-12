@@ -930,7 +930,7 @@ func (d *drawOps) newPathOp() *pathOp {
 	return &d.pathOpCache[len(d.pathOpCache)-1]
 }
 
-func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey opKey, bounds f32.Rectangle, off f32.Point, push bool) {
+func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey opKey, bounds f32.Rectangle, off f32.Point) {
 	npath := d.newPathOp()
 	*npath = pathOp{
 		parent:    state.cpath,
@@ -1055,7 +1055,7 @@ loop:
 				quads.aux, bounds, _ = d.boundsForTransformedRect(bounds, trans)
 				quads.key = opKey{Key: encOp.Key}
 			}
-			d.addClipPath(&state, quads.aux, quads.key, bounds, off, true)
+			d.addClipPath(&state, quads.aux, quads.key, bounds, off)
 			quads = quadsOp{}
 		case ops.TypePopClip:
 			state.cpath = state.cpath.parent
@@ -1100,7 +1100,7 @@ loop:
 				// this transformed rectangle.
 				k := opKey{Key: encOp.Key}
 				k.SetTransform(t) // TODO: This call has no effect.
-				d.addClipPath(&state, clipData, k, bnd, off, false)
+				d.addClipPath(&state, clipData, k, bnd, off)
 			}
 
 			bounds := cl.Round()
