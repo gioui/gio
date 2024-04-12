@@ -261,7 +261,7 @@ type texture struct {
 type blitter struct {
 	ctx                    driver.Device
 	viewport               image.Point
-	pipelines              [3]*pipeline
+	pipelines              [2][3]*pipeline
 	colUniforms            *blitColUniforms
 	texUniforms            *blitTexUniforms
 	linearGradientUniforms *blitLinearGradientUniforms
@@ -560,12 +560,24 @@ func newBlitter(ctx driver.Device) *blitter {
 func (b *blitter) release() {
 	b.quadVerts.Release()
 	for _, p := range b.pipelines {
-		p.Release()
+		for _, p := range p {
+			p.Release()
+		}
 	}
 }
 
-func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.Sources, uniforms [3]interface{}) ([3]*pipeline, error) {
-	var pipelines [3]*pipeline
+func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.Sources, uniforms [3]interface{}) (pipelines [2][3]*pipeline, err error) {
+	defer func() {
+		if err != nil {
+			for _, p := range pipelines {
+				for _, p := range p {
+					if p != nil {
+						p.Release()
+					}
+				}
+			}
+		}
+	}()
 	blend := driver.BlendDesc{
 		Enable:    true,
 		SrcFactor: driver.BlendFactorOne,
@@ -583,86 +595,76 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 		return pipelines, err
 	}
 	defer vsh.Release()
-	{
-		fsh, err := b.NewFragmentShader(fsSrc[materialTexture])
-		if err != nil {
-			return pipelines, err
+	for i, format := range []driver.TextureFormat{driver.TextureFormatOutput, driver.TextureFormatSRGBA} {
+		{
+			fsh, err := b.NewFragmentShader(fsSrc[materialTexture])
+			if err != nil {
+				return pipelines, err
+			}
+			defer fsh.Release()
+			pipe, err := b.NewPipeline(driver.PipelineDesc{
+				VertexShader:   vsh,
+				FragmentShader: fsh,
+				BlendDesc:      blend,
+				VertexLayout:   layout,
+				PixelFormat:    format,
+				Topology:       driver.TopologyTriangleStrip,
+			})
+			if err != nil {
+				return pipelines, err
+			}
+			var vertBuffer *uniformBuffer
+			if u := uniforms[materialTexture]; u != nil {
+				vertBuffer = newUniformBuffer(b, u)
+			}
+			pipelines[i][materialTexture] = &pipeline{pipe, vertBuffer}
 		}
-		defer fsh.Release()
-		pipe, err := b.NewPipeline(driver.PipelineDesc{
-			VertexShader:   vsh,
-			FragmentShader: fsh,
-			BlendDesc:      blend,
-			VertexLayout:   layout,
-			PixelFormat:    driver.TextureFormatOutput,
-			Topology:       driver.TopologyTriangleStrip,
-		})
-		if err != nil {
-			return pipelines, err
+		{
+			var vertBuffer *uniformBuffer
+			fsh, err := b.NewFragmentShader(fsSrc[materialColor])
+			if err != nil {
+				return pipelines, err
+			}
+			defer fsh.Release()
+			pipe, err := b.NewPipeline(driver.PipelineDesc{
+				VertexShader:   vsh,
+				FragmentShader: fsh,
+				BlendDesc:      blend,
+				VertexLayout:   layout,
+				PixelFormat:    format,
+				Topology:       driver.TopologyTriangleStrip,
+			})
+			if err != nil {
+				return pipelines, err
+			}
+			if u := uniforms[materialColor]; u != nil {
+				vertBuffer = newUniformBuffer(b, u)
+			}
+			pipelines[i][materialColor] = &pipeline{pipe, vertBuffer}
 		}
-		var vertBuffer *uniformBuffer
-		if u := uniforms[materialTexture]; u != nil {
-			vertBuffer = newUniformBuffer(b, u)
+		{
+			var vertBuffer *uniformBuffer
+			fsh, err := b.NewFragmentShader(fsSrc[materialLinearGradient])
+			if err != nil {
+				return pipelines, err
+			}
+			defer fsh.Release()
+			pipe, err := b.NewPipeline(driver.PipelineDesc{
+				VertexShader:   vsh,
+				FragmentShader: fsh,
+				BlendDesc:      blend,
+				VertexLayout:   layout,
+				PixelFormat:    format,
+				Topology:       driver.TopologyTriangleStrip,
+			})
+			if err != nil {
+				return pipelines, err
+			}
+			if u := uniforms[materialLinearGradient]; u != nil {
+				vertBuffer = newUniformBuffer(b, u)
+			}
+			pipelines[i][materialLinearGradient] = &pipeline{pipe, vertBuffer}
 		}
-		pipelines[materialTexture] = &pipeline{pipe, vertBuffer}
-	}
-	{
-		var vertBuffer *uniformBuffer
-		fsh, err := b.NewFragmentShader(fsSrc[materialColor])
-		if err != nil {
-			pipelines[materialTexture].Release()
-			return pipelines, err
-		}
-		defer fsh.Release()
-		pipe, err := b.NewPipeline(driver.PipelineDesc{
-			VertexShader:   vsh,
-			FragmentShader: fsh,
-			BlendDesc:      blend,
-			VertexLayout:   layout,
-			PixelFormat:    driver.TextureFormatOutput,
-			Topology:       driver.TopologyTriangleStrip,
-		})
-		if err != nil {
-			pipelines[materialTexture].Release()
-			return pipelines, err
-		}
-		if u := uniforms[materialColor]; u != nil {
-			vertBuffer = newUniformBuffer(b, u)
-		}
-		pipelines[materialColor] = &pipeline{pipe, vertBuffer}
-	}
-	{
-		var vertBuffer *uniformBuffer
-		fsh, err := b.NewFragmentShader(fsSrc[materialLinearGradient])
-		if err != nil {
-			pipelines[materialTexture].Release()
-			pipelines[materialColor].Release()
-			return pipelines, err
-		}
-		defer fsh.Release()
-		pipe, err := b.NewPipeline(driver.PipelineDesc{
-			VertexShader:   vsh,
-			FragmentShader: fsh,
-			BlendDesc:      blend,
-			VertexLayout:   layout,
-			PixelFormat:    driver.TextureFormatOutput,
-			Topology:       driver.TopologyTriangleStrip,
-		})
-		if err != nil {
-			pipelines[materialTexture].Release()
-			pipelines[materialColor].Release()
-			return pipelines, err
-		}
-		if u := uniforms[materialLinearGradient]; u != nil {
-			vertBuffer = newUniformBuffer(b, u)
-		}
-		pipelines[materialLinearGradient] = &pipeline{pipe, vertBuffer}
-	}
-	if err != nil {
-		for _, p := range pipelines {
-			p.Release()
-		}
-		return pipelines, err
 	}
 	return pipelines, nil
 }
@@ -1244,9 +1246,13 @@ func (r *renderer) drawOps(isFBO bool, opOff image.Point, viewport image.Point, 
 
 		scale, off := clipSpaceTransform(drc, viewport)
 		var fbo FBO
+		fboIdx := 0
+		if isFBO {
+			fboIdx = 1
+		}
 		switch img.clipType {
 		case clipTypeNone:
-			p := r.blitter.pipelines[m.material]
+			p := r.blitter.pipelines[fboIdx][m.material]
 			r.ctx.BindPipeline(p.pipeline)
 			r.ctx.BindVertexBuffer(r.blitter.quadVerts, 0)
 			r.blitter.blit(m.material, isFBO, m.color, m.color1, m.color2, scale, off, m.opacity, m.uvTrans)
@@ -1265,7 +1271,7 @@ func (r *renderer) drawOps(isFBO bool, opOff image.Point, viewport image.Point, 
 			Max: img.place.Pos.Add(drc.Size()),
 		}
 		coverScale, coverOff := texSpaceTransform(f32.FRect(uv), fbo.size)
-		p := r.pather.coverer.pipelines[m.material]
+		p := r.pather.coverer.pipelines[fboIdx][m.material]
 		r.ctx.BindPipeline(p.pipeline)
 		r.ctx.BindVertexBuffer(r.blitter.quadVerts, 0)
 		r.pather.cover(m.material, isFBO, m.color, m.color1, m.color2, scale, off, m.uvTrans, coverScale, coverOff)
@@ -1273,7 +1279,11 @@ func (r *renderer) drawOps(isFBO bool, opOff image.Point, viewport image.Point, 
 }
 
 func (b *blitter) blit(mat materialType, fbo bool, col f32color.RGBA, col1, col2 f32color.RGBA, scale, off f32.Point, opacity float32, uvTrans f32.Affine2D) {
-	p := b.pipelines[mat]
+	fboIdx := 0
+	if fbo {
+		fboIdx = 1
+	}
+	p := b.pipelines[fboIdx][mat]
 	b.ctx.BindPipeline(p.pipeline)
 	var uniforms *blitUniforms
 	switch mat {

@@ -30,7 +30,7 @@ type pather struct {
 
 type coverer struct {
 	ctx                    driver.Device
-	pipelines              [3]*pipeline
+	pipelines              [2][3]*pipeline
 	texUniforms            *coverTexUniforms
 	colUniforms            *coverColUniforms
 	linearGradientUniforms *coverLinearGradientUniforms
@@ -309,7 +309,9 @@ func (p *pather) release() {
 
 func (c *coverer) release() {
 	for _, p := range c.pipelines {
-		p.Release()
+		for _, p := range p {
+			p.Release()
+		}
 	}
 }
 
@@ -405,7 +407,11 @@ func (c *coverer) cover(mat materialType, isFBO bool, col f32color.RGBA, col1, c
 	}
 	uniforms.transform = [4]float32{scale.X, scale.Y, off.X, off.Y}
 	uniforms.uvCoverTransform = [4]float32{coverScale.X, coverScale.Y, coverOff.X, coverOff.Y}
-	c.pipelines[mat].UploadUniforms(c.ctx)
+	fboIdx := 0
+	if isFBO {
+		fboIdx = 1
+	}
+	c.pipelines[fboIdx][mat].UploadUniforms(c.ctx)
 	c.ctx.DrawArrays(0, 4)
 }
 
