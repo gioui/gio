@@ -867,7 +867,7 @@ func (r *renderer) drawLayers(layers []opacityLayer, ops []imageOp) {
 			Min: l.place.Pos,
 			Max: l.place.Pos.Add(l.clip.Size()),
 		}
-		r.ctx.Viewport(v.Min.X, v.Min.Y, v.Max.X, v.Max.Y)
+		r.ctx.Viewport(v.Min.X, v.Min.Y, v.Dx(), v.Dy())
 		f := r.layerFBOs.fbos[fbo]
 		r.drawOps(true, l.clip.Min.Mul(-1), l.clip.Size(), ops[l.opStart:l.opEnd])
 		sr := f32.FRect(v)
@@ -1232,7 +1232,7 @@ func (r *renderer) prepareDrawOps(ops []imageOp) {
 	}
 }
 
-func (r *renderer) drawOps(isFBO bool, opOff image.Point, viewport image.Point, ops []imageOp) {
+func (r *renderer) drawOps(isFBO bool, opOff, viewport image.Point, ops []imageOp) {
 	var coverTex driver.Texture
 	for i := 0; i < len(ops); i++ {
 		img := ops[i]

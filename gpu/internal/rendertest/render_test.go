@@ -483,14 +483,14 @@ func TestGapsInPath(t *testing.T) {
 func TestOpacity(t *testing.T) {
 	run(t, func(ops *op.Ops) {
 		opc1 := paint.PushOpacity(ops, .3)
-		// Fill screen to exercize the glClear optimization.
+		// Fill screen to exercise the glClear optimization.
 		paint.FillShape(ops, color.NRGBA{R: 255, A: 255}, clip.Rect{Max: image.Pt(1024, 1024)}.Op())
 		opc2 := paint.PushOpacity(ops, .6)
 		paint.FillShape(ops, color.NRGBA{G: 255, A: 255}, clip.Rect{Min: image.Pt(20, 10), Max: image.Pt(64, 128)}.Op())
 		opc2.Pop()
 		opc1.Pop()
 		opc3 := paint.PushOpacity(ops, .6)
-		paint.FillShape(ops, color.NRGBA{G: 255, A: 255}, clip.Rect{Min: image.Pt(50+20, 10), Max: image.Pt(50+64, 128)}.Op())
+		paint.FillShape(ops, color.NRGBA{B: 255, A: 255}, clip.Ellipse(image.Rectangle{Min: image.Pt(20+20, 10), Max: image.Pt(50+64, 128)}).Op(ops))
 		opc3.Pop()
 	}, func(r result) {
 	})
