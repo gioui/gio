@@ -300,9 +300,9 @@ func TestPointerPriority(t *testing.T) {
 	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
 	f1 := func(t event.Tag) event.Filter {
 		return pointer.Filter{
-			Target:       t,
-			Kinds:        pointer.Scroll,
-			ScrollBounds: image.Rectangle{Max: image.Point{X: 100}},
+			Target:  t,
+			Kinds:   pointer.Scroll,
+			ScrollX: pointer.ScrollRange{Max: 100},
 		}
 	}
 	events(&r, -1, f1(handler1))
@@ -311,9 +311,9 @@ func TestPointerPriority(t *testing.T) {
 	r2 := clip.Rect(image.Rect(0, 0, 100, 50)).Push(&ops)
 	f2 := func(t event.Tag) event.Filter {
 		return pointer.Filter{
-			Target:       t,
-			Kinds:        pointer.Scroll,
-			ScrollBounds: image.Rectangle{Max: image.Point{X: 20}},
+			Target:  t,
+			Kinds:   pointer.Scroll,
+			ScrollX: pointer.ScrollRange{Max: 20},
 		}
 	}
 	events(&r, -1, f2(handler2))
@@ -324,9 +324,10 @@ func TestPointerPriority(t *testing.T) {
 	r3 := clip.Rect(image.Rect(0, 100, 100, 200)).Push(&ops)
 	f3 := func(t event.Tag) event.Filter {
 		return pointer.Filter{
-			Target:       t,
-			Kinds:        pointer.Scroll,
-			ScrollBounds: image.Rectangle{Min: image.Point{X: -20, Y: -40}},
+			Target:  t,
+			Kinds:   pointer.Scroll,
+			ScrollX: pointer.ScrollRange{Min: -20},
+			ScrollY: pointer.ScrollRange{Min: -40},
 		}
 	}
 	events(&r, -1, f3(handler3))

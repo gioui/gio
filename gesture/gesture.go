@@ -271,12 +271,13 @@ func (s *Scroll) Stop() {
 }
 
 // Update state and report the scroll distance along axis.
-func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis, bounds image.Rectangle) int {
+func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis, scrollx, scrolly pointer.ScrollRange) int {
 	total := 0
 	f := pointer.Filter{
-		Target:       s,
-		Kinds:        pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll | pointer.Cancel,
-		ScrollBounds: bounds,
+		Target:  s,
+		Kinds:   pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll | pointer.Cancel,
+		ScrollX: scrollx,
+		ScrollY: scrolly,
 	}
 	for {
 		evt, ok := q.Event(f)

@@ -72,7 +72,7 @@ type pointerHandler struct {
 type pointerFilter struct {
 	kinds pointer.Kind
 	// min and max horizontal/vertical scroll
-	scrollRange image.Rectangle
+	scrollX, scrollY pointer.ScrollRange
 
 	sourceMimes []string
 	targetMimes []string
@@ -297,7 +297,8 @@ func (p *pointerFilter) Add(f event.Filter) {
 		p.targetMimes = append(p.targetMimes, f.Type)
 	case pointer.Filter:
 		p.kinds = p.kinds | f.Kinds
-		p.scrollRange = p.scrollRange.Union(f.ScrollBounds)
+		p.scrollX = p.scrollX.Union(f.ScrollX)
+		p.scrollY = p.scrollY.Union(f.ScrollY)
 	}
 }
 
@@ -325,7 +326,8 @@ func (p *pointerFilter) Matches(e event.Event) bool {
 
 func (p *pointerFilter) Merge(p2 pointerFilter) {
 	p.kinds = p.kinds | p2.kinds
-	p.scrollRange = p.scrollRange.Union(p2.scrollRange)
+	p.scrollX = p.scrollX.Union(p2.scrollX)
+	p.scrollY = p.scrollY.Union(p2.scrollY)
 	p.sourceMimes = append(p.sourceMimes, p2.sourceMimes...)
 	p.targetMimes = append(p.targetMimes, p2.targetMimes...)
 }
@@ -333,8 +335,8 @@ func (p *pointerFilter) Merge(p2 pointerFilter) {
 // clampScroll splits a scroll distance in the remaining scroll and the
 // scroll accepted by the filter.
 func (p *pointerFilter) clampScroll(scroll f32.Point) (left, scrolled f32.Point) {
-	left.X, scrolled.X = clampSplit(scroll.X, p.scrollRange.Min.X, p.scrollRange.Max.X)
-	left.Y, scrolled.Y = clampSplit(scroll.Y, p.scrollRange.Min.Y, p.scrollRange.Max.Y)
+	left.X, scrolled.X = clampSplit(scroll.X, p.scrollX.Min, p.scrollX.Max)
+	left.Y, scrolled.Y = clampSplit(scroll.Y, p.scrollY.Min, p.scrollY.Max)
 	return
 }
 

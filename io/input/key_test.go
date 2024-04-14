@@ -251,9 +251,10 @@ func TestFocusScroll(t *testing.T) {
 	filters := []event.Filter{
 		key.FocusFilter{Target: h},
 		pointer.Filter{
-			Target:       h,
-			Kinds:        pointer.Scroll,
-			ScrollBounds: image.Rect(-100, -100, 100, 100),
+			Target:  h,
+			Kinds:   pointer.Scroll,
+			ScrollX: pointer.ScrollRange{Min: -100, Max: +100},
+			ScrollY: pointer.ScrollRange{Min: -100, Max: +100},
 		},
 	}
 	events(r, -1, filters...)

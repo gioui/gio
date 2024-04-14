@@ -3,7 +3,6 @@
 package pointer
 
 import (
-	"image"
 	"strings"
 	"time"
 
@@ -61,12 +60,19 @@ type Filter struct {
 	Target event.Tag
 	// Kinds is a bitwise-or of event types to match.
 	Kinds Kind
-	// ScrollBounds describe the maximum scrollable distances in both
-	// axes. Specifically, any Event e delivered to Tag will satisfy
+	// ScrollX and ScrollY constrain the range of scrolling events delivered
+	// to Target. Specifically, any Event e delivered to Tag will satisfy
 	//
-	// ScrollBounds.Min.X <= e.Scroll.X <= ScrollBounds.Max.X (horizontal axis)
-	// ScrollBounds.Min.Y <= e.Scroll.Y <= ScrollBounds.Max.Y (vertical axis)
-	ScrollBounds image.Rectangle
+	// ScrollX.Min <= e.Scroll.X <= ScrollX.Max (horizontal axis)
+	// ScrollY.Min <= e.Scroll.Y <= ScrollY.Max (vertical axis)
+	ScrollX ScrollRange
+	ScrollY ScrollRange
+}
+
+// ScrollRange describes the range of scrolling distances in an
+// axis.
+type ScrollRange struct {
+	Min, Max int
 }
 
 // GrabCmd requests a pointer grab on the pointer identified by ID.
@@ -218,6 +224,13 @@ const (
 	// ButtonTertiary is the tertiary button, usually the middle button.
 	ButtonTertiary
 )
+
+func (s ScrollRange) Union(s2 ScrollRange) ScrollRange {
+	return ScrollRange{
+		Min: min(s.Min, s2.Min),
+		Max: max(s.Max, s2.Max),
+	}
+}
 
 // Push the current pass mode to the pass stack and set the pass mode.
 func (p PassOp) Push(o *op.Ops) PassStack {

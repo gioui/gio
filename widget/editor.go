@@ -228,19 +228,19 @@ func (e *Editor) processPointer(gtx layout.Context) (EditorEvent, bool) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	var scrollRange image.Rectangle
+	var scrollX, scrollY pointer.ScrollRange
 	textDims := e.text.FullDimensions()
 	visibleDims := e.text.Dimensions()
 	if e.SingleLine {
 		scrollOffX := e.text.ScrollOff().X
-		scrollRange.Min.X = min(-scrollOffX, 0)
-		scrollRange.Max.X = max(0, textDims.Size.X-(scrollOffX+visibleDims.Size.X))
+		scrollX.Min = min(-scrollOffX, 0)
+		scrollX.Max = max(0, textDims.Size.X-(scrollOffX+visibleDims.Size.X))
 	} else {
 		scrollOffY := e.text.ScrollOff().Y
-		scrollRange.Min.Y = -scrollOffY
-		scrollRange.Max.Y = max(0, textDims.Size.Y-(scrollOffY+visibleDims.Size.Y))
+		scrollY.Min = -scrollOffY
+		scrollY.Max = max(0, textDims.Size.Y-(scrollOffY+visibleDims.Size.Y))
 	}
-	sdist := e.scroller.Update(gtx.Metric, gtx.Source, gtx.Now, axis, scrollRange)
+	sdist := e.scroller.Update(gtx.Metric, gtx.Source, gtx.Now, axis, scrollX, scrollY)
 	var soff int
 	if e.SingleLine {
 		e.text.ScrollRel(sdist, 0)

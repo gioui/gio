@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"gioui.org/gesture"
+	"gioui.org/io/pointer"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 )
@@ -158,11 +159,12 @@ func (l *List) update(gtx Context) {
 			max = 0
 		}
 	}
-	scrollRange := image.Rectangle{
-		Min: l.Axis.Convert(image.Pt(min, 0)),
-		Max: l.Axis.Convert(image.Pt(max, 0)),
+	xrange := pointer.ScrollRange{Min: min, Max: max}
+	yrange := pointer.ScrollRange{}
+	if l.Axis == Vertical {
+		xrange, yrange = yrange, xrange
 	}
-	d := l.scroll.Update(gtx.Metric, gtx.Source, gtx.Now, gesture.Axis(l.Axis), scrollRange)
+	d := l.scroll.Update(gtx.Metric, gtx.Source, gtx.Now, gesture.Axis(l.Axis), xrange, yrange)
 	l.scrollDelta = d
 	l.Position.Offset += d
 }
