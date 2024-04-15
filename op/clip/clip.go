@@ -138,6 +138,9 @@ type Path struct {
 func (p *Path) Pos() f32.Point { return p.pen }
 
 // Begin the path, storing the path data and final Op into ops.
+//
+// Caller must also call End to finish the drawing.
+// Forgetting to call it will result in a "panic: cannot mix multi ops with single ones".
 func (p *Path) Begin(o *op.Ops) {
 	*p = Path{
 		ops:     &o.Internal,
