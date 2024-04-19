@@ -49,7 +49,8 @@ type window struct {
 	// placement saves the previous window position when in full screen mode.
 	placement *windows.WindowPlacement
 
-	animating bool
+	animating   bool
+	initialized bool
 
 	borderSize image.Point
 	config     Config
@@ -104,7 +105,6 @@ func newWindow(win *callbacks, options []Option) {
 		w.loop = newEventLoop(w.w, w.wakeup)
 		w.w.SetDriver(w)
 		err := w.init()
-		done <- struct{}{}
 		if err != nil {
 			w.ProcessEvent(DestroyEvent{Err: err})
 			return
@@ -118,6 +118,9 @@ func newWindow(win *callbacks, options []Option) {
 		// Since the window class for the cursor is null,
 		// set it here to show the cursor.
 		w.SetCursor(pointer.CursorDefault)
+		w.initialized = true
+		done <- struct{}{}
+		w.loop.FlushEvents()
 		w.runLoop()
 	}()
 	<-done
@@ -600,7 +603,9 @@ func (w *window) SetAnimating(anim bool) {
 
 func (w *window) ProcessEvent(e event.Event) {
 	w.w.ProcessEvent(e)
-	w.loop.FlushEvents()
+	if w.initialized {
+		w.loop.FlushEvents()
+	}
 }
 
 func (w *window) Event() event.Event {
