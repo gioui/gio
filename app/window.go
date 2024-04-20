@@ -769,8 +769,12 @@ func (w *Window) decorate(e FrameEvent, o *op.Ops) image.Point {
 	}
 	// Update the window based on the actions on the decorations.
 	opts, acts := splitActions(deco.Update(gtx))
-	w.driver.Configure(opts)
-	w.driver.Perform(acts)
+	if len(opts) > 0 {
+		w.driver.Configure(opts)
+	}
+	if acts != 0 {
+		w.driver.Perform(acts)
+	}
 	style.Layout(gtx)
 	// Offset to place the frame content below the decorations.
 	decoHeight := gtx.Dp(w.decorations.Config.decoHeight)
