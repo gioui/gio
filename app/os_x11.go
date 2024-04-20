@@ -389,6 +389,7 @@ func (w *x11Window) ProcessEvent(e event.Event) {
 func (w *x11Window) shutdown(err error) {
 	w.ProcessEvent(X11ViewEvent{})
 	w.ProcessEvent(DestroyEvent{Err: err})
+	w.destroy()
 }
 
 func (w *x11Window) Event() event.Event {
@@ -397,9 +398,6 @@ func (w *x11Window) Event() event.Event {
 		if !ok {
 			w.dispatch()
 			continue
-		}
-		if _, destroy := evt.(DestroyEvent); destroy {
-			w.destroy()
 		}
 		return evt
 	}
@@ -464,7 +462,12 @@ func (w *x11Window) dispatch() {
 	// Check for pending draw events before checking animation or blocking.
 	// This fixes an issue on Xephyr where on startup XPending() > 0 but
 	// poll will still block. This also prevents no-op calls to poll.
-	if syn = w.handler.handleEvents(); !syn {
+	syn = w.handler.handleEvents()
+	if w.x == nil {
+		// handleEvents received a close request and destroyed the window.
+		return
+	}
+	if !syn {
 		anim = w.animating
 		if !anim {
 			// Clear poll events.
