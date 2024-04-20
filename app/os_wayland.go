@@ -216,6 +216,8 @@ type window struct {
 
 	wakeups chan struct{}
 
+	closing bool
+
 	// invMu avoids the race between the destruction of disp and
 	// Invalidate waking it up.
 	invMu sync.Mutex
@@ -556,7 +558,7 @@ func gio_onXdgSurfaceConfigure(data unsafe.Pointer, wmSurf *C.struct_xdg_surface
 //export gio_onToplevelClose
 func gio_onToplevelClose(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel) {
 	w := callbackLoad(data).(*window)
-	w.close(nil)
+	w.closing = true
 }
 
 //export gio_onToplevelConfigure
@@ -1139,7 +1141,7 @@ func (w *window) Perform(actions system.Action) {
 	walkActions(actions, func(action system.Action) {
 		switch action {
 		case system.ActionClose:
-			w.close(nil)
+			w.closing = true
 		}
 	})
 }
@@ -1366,6 +1368,11 @@ func gio_onFrameDone(data unsafe.Pointer, callback *C.struct_wl_callback, t C.ui
 func (w *window) close(err error) {
 	w.ProcessEvent(WaylandViewEvent{})
 	w.ProcessEvent(DestroyEvent{Err: err})
+	w.destroy()
+	w.invMu.Lock()
+	w.disp.destroy()
+	w.disp = nil
+	w.invMu.Unlock()
 }
 
 func (w *window) dispatch() {
@@ -1374,7 +1381,7 @@ func (w *window) dispatch() {
 		w.w.Invalidate()
 		return
 	}
-	if err := w.disp.dispatch(); err != nil {
+	if err := w.disp.dispatch(); err != nil || w.closing {
 		w.close(err)
 		return
 	}
@@ -1398,13 +1405,6 @@ func (w *window) Event() event.Event {
 		if !ok {
 			w.dispatch()
 			continue
-		}
-		if _, destroy := evt.(DestroyEvent); destroy {
-			w.destroy()
-			w.invMu.Lock()
-			w.disp.destroy()
-			w.disp = nil
-			w.invMu.Unlock()
 		}
 		return evt
 	}
@@ -1515,6 +1515,10 @@ func (d *wlDisplay) wakeup() {
 }
 
 func (w *window) destroy() {
+	if w.lastFrameCallback != nil {
+		C.wl_callback_destroy(w.lastFrameCallback)
+		w.lastFrameCallback = nil
+	}
 	if w.cursor.surf != nil {
 		C.wl_surface_destroy(w.cursor.surf)
 	}
