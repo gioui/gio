@@ -479,6 +479,9 @@ func (w *x11Window) dispatch() {
 			switch {
 			case *xEvents&syscall.POLLIN != 0:
 				syn = w.handler.handleEvents()
+				if w.x == nil {
+					return
+				}
 			case *xEvents&(syscall.POLLERR|syscall.POLLHUP) != 0:
 			}
 		}
