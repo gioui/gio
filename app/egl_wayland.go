@@ -69,7 +69,7 @@ func (c *wlContext) Refresh() error {
 	}
 	c.eglWin = eglWin
 	eglSurf := egl.NativeWindowType(uintptr(unsafe.Pointer(eglWin)))
-	if err := c.Context.CreateSurface(eglSurf, width, height); err != nil {
+	if err := c.Context.CreateSurface(eglSurf); err != nil {
 		return err
 	}
 	if err := c.Context.MakeCurrent(); err != nil {

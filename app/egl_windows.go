@@ -5,8 +5,6 @@
 package app
 
 import (
-	"golang.org/x/sys/windows"
-
 	"gioui.org/internal/egl"
 )
 
@@ -24,6 +22,18 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
+			win, _, _ := w.HWND()
+			eglSurf := egl.NativeWindowType(win)
+			if err := ctx.CreateSurface(eglSurf); err != nil {
+				ctx.Release()
+				return nil, err
+			}
+			if err := ctx.MakeCurrent(); err != nil {
+				ctx.Release()
+				return nil, err
+			}
+			defer ctx.ReleaseCurrent()
+			ctx.EnableVSync(true)
 			return &glContext{win: w, Context: ctx}, nil
 		},
 	})
@@ -37,21 +47,6 @@ func (c *glContext) Release() {
 }
 
 func (c *glContext) Refresh() error {
-	c.Context.ReleaseSurface()
-	var (
-		win           windows.Handle
-		width, height int
-	)
-	win, width, height = c.win.HWND()
-	eglSurf := egl.NativeWindowType(win)
-	if err := c.Context.CreateSurface(eglSurf, width, height); err != nil {
-		return err
-	}
-	if err := c.Context.MakeCurrent(); err != nil {
-		return err
-	}
-	c.Context.EnableVSync(true)
-	c.Context.ReleaseCurrent()
 	return nil
 }
 
