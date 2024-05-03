@@ -256,7 +256,7 @@ func TestEditor(t *testing.T) {
 	// Regression test for bad in-cluster rune offset math.
 	e.SetText("æbc")
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
-	e.text.MoveEnd(selectionClear)
+	e.text.MoveLineEnd(selectionClear)
 	assertCaret(t, e, 0, 3, len("æbc"))
 
 	textSample := "æbc\naøå••"
@@ -268,7 +268,7 @@ func TestEditor(t *testing.T) {
 	}
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 	assertCaret(t, e, 0, 0, 0)
-	e.text.MoveEnd(selectionClear)
+	e.text.MoveLineEnd(selectionClear)
 	assertCaret(t, e, 0, 3, len("æbc"))
 	e.MoveCaret(+1, +1)
 	assertCaret(t, e, 1, 0, len("æbc\n"))
@@ -276,7 +276,7 @@ func TestEditor(t *testing.T) {
 	assertCaret(t, e, 0, 3, len("æbc"))
 	e.text.MoveLines(+1, selectionClear)
 	assertCaret(t, e, 1, 4, len("æbc\naøå•"))
-	e.text.MoveEnd(selectionClear)
+	e.text.MoveLineEnd(selectionClear)
 	assertCaret(t, e, 1, 5, len("æbc\naøå••"))
 	e.MoveCaret(+1, +1)
 	assertCaret(t, e, 1, 5, len("æbc\naøå••"))
@@ -300,7 +300,7 @@ func TestEditor(t *testing.T) {
 	// Test that moveLine applies x offsets from previous moves.
 	e.SetText("long line\nshort")
 	e.SetCaret(0, 0)
-	e.text.MoveEnd(selectionClear)
+	e.text.MoveLineEnd(selectionClear)
 	e.text.MoveLines(+1, selectionClear)
 	e.text.MoveLines(-1, selectionClear)
 	assertCaret(t, e, 0, utf8.RuneCountInString("long line"), len("long line"))
@@ -342,14 +342,14 @@ func TestEditorRTL(t *testing.T) {
 	e.MoveCaret(+1, +1)
 	assertCaret(t, e, 0, 3, len("الح"))
 	// Move to the "end" of the line. This moves to the left edge of the line.
-	e.text.MoveEnd(selectionClear)
+	e.text.MoveLineEnd(selectionClear)
 	assertCaret(t, e, 0, 4, len("الحب"))
 
 	sentence := "الحب سماء لا\nتمط غير الأحلام"
 	e.SetText(sentence)
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 	assertCaret(t, e, 0, 0, 0)
-	e.text.MoveEnd(selectionClear)
+	e.text.MoveLineEnd(selectionClear)
 	assertCaret(t, e, 0, 12, len("الحب سماء لا"))
 	e.MoveCaret(+1, +1)
 	assertCaret(t, e, 1, 0, len("الحب سماء لا\n"))
@@ -361,7 +361,7 @@ func TestEditorRTL(t *testing.T) {
 	assertCaret(t, e, 0, 12, len("الحب سماء لا"))
 	e.text.MoveLines(+1, selectionClear)
 	assertCaret(t, e, 1, 14, len("الحب سماء لا\nتمط غير الأحلا"))
-	e.text.MoveEnd(selectionClear)
+	e.text.MoveLineEnd(selectionClear)
 	assertCaret(t, e, 1, 15, len("الحب سماء لا\nتمط غير الأحلام"))
 	e.MoveCaret(+1, +1)
 	assertCaret(t, e, 1, 15, len("الحب سماء لا\nتمط غير الأحلام"))
@@ -417,7 +417,7 @@ func TestEditorLigature(t *testing.T) {
 	assertCaret(t, e, 0, 0, 0)
 	e.SetText("fl") // just a ligature
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
-	e.text.MoveEnd(selectionClear)
+	e.text.MoveLineEnd(selectionClear)
 	assertCaret(t, e, 0, 2, len("fl"))
 	e.MoveCaret(-1, -1)
 	assertCaret(t, e, 0, 1, len("f"))
@@ -428,7 +428,7 @@ func TestEditorLigature(t *testing.T) {
 	e.SetText("flaffl•ffi\n•fflfi") // 3 ligatures on line 0, 2 on line 1
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 	assertCaret(t, e, 0, 0, 0)
-	e.text.MoveEnd(selectionClear)
+	e.text.MoveLineEnd(selectionClear)
 	assertCaret(t, e, 0, 10, len("ffaffl•ffi"))
 	e.MoveCaret(+1, +1)
 	assertCaret(t, e, 1, 0, len("ffaffl•ffi\n"))
@@ -481,7 +481,7 @@ func TestEditorLigature(t *testing.T) {
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 	// Ensure that all runes in the final cluster of a line are properly
 	// decoded when moving to the end of the line. This is a regression test.
-	e.text.MoveEnd(selectionClear)
+	e.text.MoveLineEnd(selectionClear)
 	// The first line was broken by line wrapping, not a newline character, and has a trailing
 	// whitespace. However, we should never be able to reach the "other side" of such a trailing
 	// whitespace glyph.
@@ -548,8 +548,10 @@ const (
 	moveRune
 	moveLine
 	movePage
-	moveStart
-	moveEnd
+	moveTextStart
+	moveTextEnd
+	moveLineStart
+	moveLineEnd
 	moveCoord
 	moveWord
 	deleteWord
@@ -599,10 +601,14 @@ func TestEditorCaretConsistency(t *testing.T) {
 				e.text.MoveLines(int(distance), selectionClear)
 			case movePage:
 				e.text.MovePages(int(distance), selectionClear)
-			case moveStart:
-				e.text.MoveStart(selectionClear)
-			case moveEnd:
-				e.text.MoveEnd(selectionClear)
+			case moveLineStart:
+				e.text.MoveLineStart(selectionClear)
+			case moveLineEnd:
+				e.text.MoveLineEnd(selectionClear)
+			case moveTextStart:
+				e.text.MoveTextStart(selectionClear)
+			case moveTextEnd:
+				e.text.MoveTextEnd(selectionClear)
 			case moveCoord:
 				e.text.MoveCoord(image.Pt(int(x), int(y)))
 			case moveWord:
@@ -879,7 +885,7 @@ func (editMutation) Generate(rand *rand.Rand, size int) reflect.Value {
 // to make it much narrower (which makes the lines in the editor reflow), and
 // then verifies that the updated (col, line) positions of the selected text
 // are where we expect.
-func TestEditorSelect(t *testing.T) {
+func TestEditorSelectReflow(t *testing.T) {
 	e := new(Editor)
 	e.SetText(`a 2 4 6 8 a
 b 2 4 6 8 b
@@ -979,6 +985,60 @@ g 2 4 6 8 g
 		caretEnd := e.text.closestToRune(e.text.caret.end)
 		logicalPosMatch(t, n, "start", tst.startPos, caretEnd)
 		logicalPosMatch(t, n, "end", tst.endPos, caretStart)
+	}
+}
+
+func TestEditorSelectShortcuts(t *testing.T) {
+	tFont := font.Font{}
+	tFontSize := unit.Sp(10)
+	tShaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
+	var tEditor = &Editor{
+		SingleLine: false,
+		ReadOnly:   true,
+	}
+	lines := "abc abc abc\ndef def def\nghi ghi ghi"
+	tEditor.SetText(lines)
+	type testCase struct {
+		// Initial text selection.
+		startPos, endPos int
+		// Keyboard shortcut to execute.
+		keyEvent key.Event
+		// Expected text selection.
+		selection string
+	}
+
+	pos1, pos2 := 14, 21
+	for n, tst := range []testCase{
+		{pos1, pos2, key.Event{Name: "A", Modifiers: key.ModShortcut}, lines},
+		{pos2, pos1, key.Event{Name: "A", Modifiers: key.ModShortcut}, lines},
+		{pos1, pos2, key.Event{Name: key.NameHome, Modifiers: key.ModShift}, "def def d"},
+		{pos1, pos2, key.Event{Name: key.NameEnd, Modifiers: key.ModShift}, "ef"},
+		{pos2, pos1, key.Event{Name: key.NameHome, Modifiers: key.ModShift}, "de"},
+		{pos2, pos1, key.Event{Name: key.NameEnd, Modifiers: key.ModShift}, "f def def"},
+		{pos1, pos2, key.Event{Name: key.NameHome, Modifiers: key.ModShortcut | key.ModShift}, "abc abc abc\ndef def d"},
+		{pos1, pos2, key.Event{Name: key.NameEnd, Modifiers: key.ModShortcut | key.ModShift}, "ef\nghi ghi ghi"},
+		{pos2, pos1, key.Event{Name: key.NameHome, Modifiers: key.ModShortcut | key.ModShift}, "abc abc abc\nde"},
+		{pos2, pos1, key.Event{Name: key.NameEnd, Modifiers: key.ModShortcut | key.ModShift}, "f def def\nghi ghi ghi"},
+	} {
+		tRouter := new(input.Router)
+		gtx := layout.Context{
+			Ops:         new(op.Ops),
+			Locale:      english,
+			Constraints: layout.Exact(image.Pt(100, 100)),
+			Source:      tRouter.Source(),
+		}
+		gtx.Execute(key.FocusCmd{Tag: tEditor})
+		tEditor.Layout(gtx, tShaper, tFont, tFontSize, op.CallOp{}, op.CallOp{})
+
+		tEditor.SetCaret(tst.startPos, tst.endPos)
+		if cStart, cEnd := tEditor.Selection(); cStart != tst.startPos || cEnd != tst.endPos {
+			t.Errorf("TestEditorSelect %d: initial selection", n)
+		}
+		tRouter.Queue(tst.keyEvent)
+		tEditor.Update(gtx)
+		if got := tEditor.SelectedText(); got != tst.selection {
+			t.Errorf("TestEditorSelect %d: Expected %q, got %q", n, tst.selection, got)
+		}
 	}
 }
 

@@ -247,8 +247,8 @@ func (e *Selectable) processPointer(gtx layout.Context) {
 					e.text.MoveWord(1, selectionExtend)
 					e.dragging = false
 				case evt.NumClicks >= 3:
-					e.text.MoveStart(selectionClear)
-					e.text.MoveEnd(selectionExtend)
+					e.text.MoveLineStart(selectionClear)
+					e.text.MoveLineEnd(selectionExtend)
 					e.dragging = false
 				}
 			}
@@ -378,9 +378,9 @@ func (e *Selectable) command(gtx layout.Context, k key.Event) {
 	case key.NamePageDown:
 		e.text.MovePages(+1, selAct)
 	case key.NameHome:
-		e.text.MoveStart(selAct)
+		e.text.MoveLineStart(selAct)
 	case key.NameEnd:
-		e.text.MoveEnd(selAct)
+		e.text.MoveLineEnd(selAct)
 	}
 }
 

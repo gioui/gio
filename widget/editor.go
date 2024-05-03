@@ -312,8 +312,8 @@ func (e *Editor) processPointerEvent(gtx layout.Context, ev event.Event) (Editor
 				e.text.MoveWord(1, selectionExtend)
 				e.dragging = false
 			case evt.NumClicks >= 3:
-				e.text.MoveStart(selectionClear)
-				e.text.MoveEnd(selectionExtend)
+				e.text.MoveLineStart(selectionClear)
+				e.text.MoveLineEnd(selectionExtend)
 				e.dragging = false
 			}
 		}
@@ -374,8 +374,8 @@ func (e *Editor) processKey(gtx layout.Context) (EditorEvent, bool) {
 		key.Filter{Focus: e, Name: key.NameDeleteBackward, Optional: key.ModShortcutAlt | key.ModShift},
 		key.Filter{Focus: e, Name: key.NameDeleteForward, Optional: key.ModShortcutAlt | key.ModShift},
 
-		key.Filter{Focus: e, Name: key.NameHome, Optional: key.ModShift},
-		key.Filter{Focus: e, Name: key.NameEnd, Optional: key.ModShift},
+		key.Filter{Focus: e, Name: key.NameHome, Optional: key.ModShortcut | key.ModShift},
+		key.Filter{Focus: e, Name: key.NameEnd, Optional: key.ModShortcut | key.ModShift},
 		key.Filter{Focus: e, Name: key.NamePageDown, Optional: key.ModShift},
 		key.Filter{Focus: e, Name: key.NamePageUp, Optional: key.ModShift},
 		condFilter(!atBeginning, key.Filter{Focus: e, Name: key.NameLeftArrow, Optional: key.ModShortcutAlt | key.ModShift}),
@@ -521,6 +521,10 @@ func (e *Editor) command(gtx layout.Context, k key.Event) (EditorEvent, bool) {
 					}
 				}
 			}
+		case key.NameHome:
+			e.text.MoveTextStart(selAct)
+		case key.NameEnd:
+			e.text.MoveTextEnd(selAct)
 		}
 		return nil, false
 	}
@@ -582,9 +586,9 @@ func (e *Editor) command(gtx layout.Context, k key.Event) (EditorEvent, bool) {
 	case key.NamePageDown:
 		e.text.MovePages(+1, selAct)
 	case key.NameHome:
-		e.text.MoveStart(selAct)
+		e.text.MoveLineStart(selAct)
 	case key.NameEnd:
-		e.text.MoveEnd(selAct)
+		e.text.MoveLineEnd(selAct)
 	}
 	return nil, false
 }
