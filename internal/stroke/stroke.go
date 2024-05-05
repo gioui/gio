@@ -327,6 +327,9 @@ func strokePathNorm(p0, p1, p2 f32.Point, t, d float32) f32.Point {
 func rot90CW(p f32.Point) f32.Point { return f32.Pt(+p.Y, -p.X) }
 
 func normPt(p f32.Point, l float32) f32.Point {
+	if (p.X == 0 && p.Y == l) || (p.Y == 0 && p.X == l) {
+		return f32.Point{X: p.X, Y: p.Y}
+	}
 	d := math.Hypot(float64(p.X), float64(p.Y))
 	l64 := float64(l)
 	if math.Abs(d-l64) < 1e-10 {
