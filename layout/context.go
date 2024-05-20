@@ -45,6 +45,6 @@ func (c Context) Sp(v unit.Sp) int {
 // Disabled returns a copy of this context with a disabled Source,
 // blocking widgets from changing its state and receiving events.
 func (c Context) Disabled() Context {
-	c.Source = input.Source{}
+	c.Source = input.NewDisabledSource()
 	return c
 }

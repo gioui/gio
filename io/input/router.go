@@ -58,12 +58,37 @@ type Router struct {
 	deferring bool
 	// scratchFilters is for garbage-free construction of ephemeral filters.
 	scratchFilters []taggedFilter
+	// source is the interface expose to widgets.
+	source Source
 }
 
-// Source implements the interface between a Router and user interface widgets.
-// The value Source is disabled.
-type Source struct {
+// Source is the interface between a Router and user interface widgets.
+type Source interface {
+	// Execute a command.
+	Execute(Command)
+
+	// Enabled reports whether the source is enabled. Only enabled
+	// Sources deliver events and respond to commands.
+	Enabled() bool
+
+	// Focused reports whether tag is focused, according to the most recent
+	// [key.FocusEvent] delivered.
+	Focused(tag event.Tag) bool
+
+	// Event returns the next event that matches at least one of filters.
+	Event(filters ...event.Filter) (event.Event, bool)
+}
+
+// source implements the Source interface.
+type source struct {
 	r *Router
+}
+
+var disabledSource Source = source{}
+
+// NewDisabledSource returns a Source that is disabled.
+func NewDisabledSource() Source {
+	return disabledSource
 }
 
 // Command represents a request such as moving the focus, or initiating a clipboard read.
@@ -167,11 +192,15 @@ type taggedEvent struct {
 
 // Source returns a Source backed by this Router.
 func (q *Router) Source() Source {
-	return Source{r: q}
+	if q.source == nil {
+		q.source = source{r: q}
+	}
+
+	return q.source
 }
 
 // Execute a command.
-func (s Source) Execute(c Command) {
+func (s source) Execute(c Command) {
 	if !s.Enabled() {
 		return
 	}
@@ -180,13 +209,13 @@ func (s Source) Execute(c Command) {
 
 // Enabled reports whether the source is enabled. Only enabled
 // Sources deliver events and respond to commands.
-func (s Source) Enabled() bool {
+func (s source) Enabled() bool {
 	return s.r != nil
 }
 
 // Focused reports whether tag is focused, according to the most recent
 // [key.FocusEvent] delivered.
-func (s Source) Focused(tag event.Tag) bool {
+func (s source) Focused(tag event.Tag) bool {
 	if !s.Enabled() {
 		return false
 	}
@@ -194,7 +223,7 @@ func (s Source) Focused(tag event.Tag) bool {
 }
 
 // Event returns the next event that matches at least one of filters.
-func (s Source) Event(filters ...event.Filter) (event.Event, bool) {
+func (s source) Event(filters ...event.Filter) (event.Event, bool) {
 	if !s.Enabled() {
 		return nil, false
 	}
