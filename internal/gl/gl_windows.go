@@ -361,6 +361,9 @@ func (c *Functions) GetProgrami(p Program, pname Enum) int {
 }
 func (c *Functions) GetProgramInfoLog(p Program) string {
 	n := c.GetProgrami(p, INFO_LOG_LENGTH)
+	if n == 0 {
+		return ""
+	}
 	buf := make([]byte, n)
 	syscall.Syscall6(_glGetProgramInfoLog.Addr(), 4, uintptr(p.V), uintptr(len(buf)), 0, uintptr(unsafe.Pointer(&buf[0])), 0, 0)
 	return string(buf)
