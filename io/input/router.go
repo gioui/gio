@@ -171,7 +171,9 @@ func (q *Router) Source() Source {
 }
 
 // Execute a command.
-func (s Source) Execute(c Command) {
+//
+//go:noinline
+func (s *Source) Execute(c Command) {
 	if !s.Enabled() {
 		return
 	}
@@ -180,13 +182,13 @@ func (s Source) Execute(c Command) {
 
 // Enabled reports whether the source is enabled. Only enabled
 // Sources deliver events and respond to commands.
-func (s Source) Enabled() bool {
+func (s *Source) Enabled() bool {
 	return s.r != nil
 }
 
 // Focused reports whether tag is focused, according to the most recent
 // [key.FocusEvent] delivered.
-func (s Source) Focused(tag event.Tag) bool {
+func (s *Source) Focused(tag event.Tag) bool {
 	if !s.Enabled() {
 		return false
 	}
@@ -194,7 +196,9 @@ func (s Source) Focused(tag event.Tag) bool {
 }
 
 // Event returns the next event that matches at least one of filters.
-func (s Source) Event(filters ...event.Filter) (event.Event, bool) {
+//
+//go:noinline
+func (s *Source) Event(filters ...event.Filter) (event.Event, bool) {
 	if !s.Enabled() {
 		return nil, false
 	}
