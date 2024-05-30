@@ -9,7 +9,6 @@ import (
 	"image/color"
 	"reflect"
 	"runtime"
-	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -36,14 +35,14 @@ type Option func(unit.Metric, *Config)
 
 // Window represents an operating system window.
 //
-// The zero-value Window is useful, and calling any method on
-// it creates and shows a new GUI window. On iOS or Android,
-// the first Window represents the the window previously
-// created by the platform.
+// The zero-value Window is useful; the GUI window is created and shown the first
+// time the [Event] method is called. On iOS or Android, the first Window represents
+// the window previously created by the platform.
 //
-// More than one Window is not supported on iOS, Android,
-// WebAssembly.
+// More than one Window is not supported on iOS, Android, WebAssembly.
 type Window struct {
+	initialOpts []Option
+
 	ctx context
 	gpu gpu.GPU
 	// timer tracks the delayed invalidate goroutine.
@@ -91,7 +90,6 @@ type Window struct {
 	driver   driver
 	// basic is the driver interface that is needed even after the window is gone.
 	basic basicDriver
-	once  sync.Once
 	// coalesced tracks the most recent events waiting to be delivered
 	// to the client.
 	coalesced eventSummary
@@ -273,8 +271,9 @@ func (w *Window) updateState() {
 //
 // Invalidate is safe for concurrent use.
 func (w *Window) Invalidate() {
-	w.init()
-	w.basic.Invalidate()
+	if w.basic != nil {
+		w.basic.Invalidate()
+	}
 }
 
 // Option applies the options to the window. The options are hints; the platform is
@@ -283,7 +282,10 @@ func (w *Window) Option(opts ...Option) {
 	if len(opts) == 0 {
 		return
 	}
-	w.init(opts...)
+	if w.basic == nil {
+		w.initialOpts = append(w.initialOpts, opts...)
+		return
+	}
 	w.Run(func() {
 		cnf := Config{Decorated: w.decorations.enabled}
 		for _, opt := range opts {
@@ -302,13 +304,14 @@ func (w *Window) Option(opts ...Option) {
 }
 
 // Run f in the same thread as the native window event loop, and wait for f to
-// return or the window to close.
+// return or the window to close. If the window has not yet been created,
+// Run calls f directly.
 //
 // Note that most programs should not call Run; configuring a Window with
 // [CustomRenderer] is a notable exception.
 func (w *Window) Run(f func()) {
-	w.init()
 	if w.driver == nil {
+		f()
 		return
 	}
 	done := make(chan struct{})
@@ -680,48 +683,50 @@ func (w *Window) processEvent(e event.Event) bool {
 }
 
 // Event blocks until an event is received from the window, such as
-// [FrameEvent], or until [Invalidate] is called.
+// [FrameEvent], or until [Invalidate] is called. The window is created
+// and shown the first time Event is called.
 func (w *Window) Event() event.Event {
-	w.init()
+	if w.basic == nil {
+		w.init()
+	}
 	return w.basic.Event()
 }
 
-func (w *Window) init(initial ...Option) {
-	w.once.Do(func() {
-		debug.Parse()
-		// Measure decoration height.
-		deco := new(widget.Decorations)
-		theme := material.NewTheme()
-		theme.Shaper = text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Regular()))
-		decoStyle := material.Decorations(theme, deco, 0, "")
-		gtx := layout.Context{
-			Ops: new(op.Ops),
-			// Measure in Dp.
-			Metric: unit.Metric{},
-		}
-		// Allow plenty of space.
-		gtx.Constraints.Max.Y = 200
-		dims := decoStyle.Layout(gtx)
-		decoHeight := unit.Dp(dims.Size.Y)
-		defaultOptions := []Option{
-			Size(800, 600),
-			Title("Gio"),
-			Decorated(true),
-			decoHeightOpt(decoHeight),
-		}
-		options := append(defaultOptions, initial...)
-		var cnf Config
-		cnf.apply(unit.Metric{}, options)
+func (w *Window) init() {
+	debug.Parse()
+	// Measure decoration height.
+	deco := new(widget.Decorations)
+	theme := material.NewTheme()
+	theme.Shaper = text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Regular()))
+	decoStyle := material.Decorations(theme, deco, 0, "")
+	gtx := layout.Context{
+		Ops: new(op.Ops),
+		// Measure in Dp.
+		Metric: unit.Metric{},
+	}
+	// Allow plenty of space.
+	gtx.Constraints.Max.Y = 200
+	dims := decoStyle.Layout(gtx)
+	decoHeight := unit.Dp(dims.Size.Y)
+	defaultOptions := []Option{
+		Size(800, 600),
+		Title("Gio"),
+		Decorated(true),
+		decoHeightOpt(decoHeight),
+	}
+	options := append(defaultOptions, w.initialOpts...)
+	w.initialOpts = nil
+	var cnf Config
+	cnf.apply(unit.Metric{}, options)
 
-		w.nocontext = cnf.CustomRenderer
-		w.decorations.Theme = theme
-		w.decorations.Decorations = deco
-		w.decorations.enabled = cnf.Decorated
-		w.decorations.height = decoHeight
-		w.imeState.compose = key.Range{Start: -1, End: -1}
-		w.semantic.ids = make(map[input.SemanticID]input.SemanticNode)
-		newWindow(&callbacks{w}, options)
-	})
+	w.nocontext = cnf.CustomRenderer
+	w.decorations.Theme = theme
+	w.decorations.Decorations = deco
+	w.decorations.enabled = cnf.Decorated
+	w.decorations.height = decoHeight
+	w.imeState.compose = key.Range{Start: -1, End: -1}
+	w.semantic.ids = make(map[input.SemanticID]input.SemanticNode)
+	newWindow(&callbacks{w}, options)
 }
 
 func (w *Window) updateCursor() {
