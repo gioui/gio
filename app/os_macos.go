@@ -326,7 +326,6 @@ type window struct {
 	cursor      pointer.Cursor
 	pointerBtns pointer.Buttons
 	loop        *eventLoop
-	initialized bool
 
 	scale  float32
 	config Config
@@ -834,9 +833,7 @@ func (w *window) draw() {
 
 func (w *window) ProcessEvent(e event.Event) {
 	w.w.ProcessEvent(e)
-	if w.initialized {
-		w.loop.FlushEvents()
-	}
+	w.loop.FlushEvents()
 }
 
 func (w *window) Event() event.Event {
@@ -927,6 +924,7 @@ func newWindow(win *callbacks, options []Option) {
 		}
 		w.loop = newEventLoop(w.w, w.wakeup)
 		win.SetDriver(w)
+		res <- struct{}{}
 		if err := w.init(); err != nil {
 			w.ProcessEvent(DestroyEvent{Err: err})
 			return
@@ -944,9 +942,6 @@ func newWindow(win *callbacks, options []Option) {
 		nextTopLeft = C.cascadeTopLeftFromPoint(window, nextTopLeft)
 		// makeKeyAndOrderFront assumes ownership of our window reference.
 		C.makeKeyAndOrderFront(window)
-		w.initialized = true
-		res <- struct{}{}
-		w.loop.FlushEvents()
 	})
 	<-res
 }
