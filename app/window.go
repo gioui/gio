@@ -93,7 +93,7 @@ type Window struct {
 	// coalesced tracks the most recent events waiting to be delivered
 	// to the client.
 	coalesced eventSummary
-	// frame tracks the most recently frame event.
+	// frame tracks the most recent frame event.
 	lastFrame struct {
 		sync bool
 		size image.Point

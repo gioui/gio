@@ -176,7 +176,7 @@ type context interface {
 // basicDriver is the subset of [driver] that may be called even after
 // a window is destroyed.
 type basicDriver interface {
-	// Event blocks until an even is available and returns it.
+	// Event blocks until an event is available and returns it.
 	Event() event.Event
 	// Invalidate requests a FrameEvent.
 	Invalidate()
