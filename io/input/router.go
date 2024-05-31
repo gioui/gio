@@ -170,14 +170,6 @@ func (q *Router) Source() Source {
 	return Source{r: q}
 }
 
-// Execute a command.
-func (s Source) Execute(c Command) {
-	if !s.Enabled() {
-		return
-	}
-	s.r.execute(c)
-}
-
 // Enabled reports whether the source is enabled. Only enabled
 // Sources deliver events and respond to commands.
 func (s Source) Enabled() bool {
@@ -193,12 +185,34 @@ func (s Source) Focused(tag event.Tag) bool {
 	return s.r.state().keyState.focus == tag
 }
 
+// SourceExecuteProcessor is the default command processor for a Source,
+// usually it should NOT be overridden.
+//
+// There's few legitimate reasons to override this function, one of them is to
+// implement a custom command processor or testing.
+var SourceExecuteProcessor = (*Router).Execute
+
+// Execute a command.
+func (s Source) Execute(c Command) {
+	if !s.Enabled() {
+		return
+	}
+	SourceExecuteProcessor(s.r, c)
+}
+
+// SourceEventProcessor is the default event processor for a Source,
+// usually it should NOT be overridden.
+//
+// There's few legitimate reasons to override this function, one of them is to
+// implement a custom event processor or testing.
+var SourceEventProcessor = (*Router).Event
+
 // Event returns the next event that matches at least one of filters.
 func (s Source) Event(filters ...event.Filter) (event.Event, bool) {
 	if !s.Enabled() {
 		return nil, false
 	}
-	return s.r.Event(filters...)
+	return SourceEventProcessor(s.r, filters...)
 }
 
 func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
@@ -469,7 +483,7 @@ func (q *Router) processEvent(e event.Event, system bool) {
 	}
 }
 
-func (q *Router) execute(c Command) {
+func (q *Router) Execute(c Command) {
 	// The command can be executed immediately if event delivery is not frozen, and
 	// no event receiver has completed their event handling.
 	if !q.deferring {
