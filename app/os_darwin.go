@@ -75,9 +75,13 @@ var displayLinks sync.Map
 
 var mainFuncs = make(chan func(), 1)
 
+func isMainThread() bool {
+	return bool(C.isMainThread())
+}
+
 // runOnMain runs the function on the main thread.
 func runOnMain(f func()) {
-	if C.isMainThread() {
+	if isMainThread() {
 		f()
 		return
 	}

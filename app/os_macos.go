@@ -976,6 +976,9 @@ func (w *window) init() error {
 }
 
 func osMain() {
+	if !isMainThread() {
+		panic("app.Main must run on the main goroutine")
+	}
 	C.gio_main()
 }
 
