@@ -280,3 +280,23 @@ void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle) {
 	GioView *v = (__bridge GioView *)viewRef;
 	v.handle = handle;
 }
+
+@interface _gioAppDelegate : UIResponder <UIApplicationDelegate>
+@property (strong, nonatomic) UIWindow *window;
+@end
+
+@implementation _gioAppDelegate
+- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+	self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
+	GioViewController *controller = [[GioViewController alloc] initWithNibName:nil bundle:nil];
+	self.window.rootViewController = controller;
+	[self.window makeKeyAndVisible];
+	return YES;
+}
+@end
+
+int gio_applicationMain(int argc, char *argv[]) {
+	@autoreleasepool {
+		return UIApplicationMain(argc, argv, nil, NSStringFromClass([_gioAppDelegate class]));
+	}
+}

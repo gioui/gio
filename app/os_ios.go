@@ -12,6 +12,7 @@ package app
 #include <UIKit/UIKit.h>
 #include <stdint.h>
 
+__attribute__ ((visibility ("hidden"))) int gio_applicationMain(int argc, char *argv[]);
 __attribute__ ((visibility ("hidden"))) void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle);
 
 struct drawParams {
@@ -81,6 +82,7 @@ import "C"
 import (
 	"image"
 	"io"
+	"os"
 	"runtime"
 	"runtime/cgo"
 	"runtime/debug"
@@ -394,12 +396,47 @@ func newWindow(win *callbacks, options []Option) {
 	<-mainWindow.windows
 }
 
+var mainMode = mainModeUndefined
+
+const (
+	mainModeUndefined = iota
+	mainModeExe
+	mainModeLibrary
+)
+
 func osMain() {
+	if !isMainThread() {
+		panic("app.Main must be run on the main goroutine")
+	}
+	switch mainMode {
+	case mainModeUndefined:
+		mainMode = mainModeExe
+		var argv []*C.char
+		for _, arg := range os.Args {
+			a := C.CString(arg)
+			defer C.free(unsafe.Pointer(a))
+			argv = append(argv, a)
+		}
+		C.gio_applicationMain(C.int(len(argv)), unsafe.SliceData(argv))
+	case mainModeExe:
+		panic("app.Main may be called only once")
+	case mainModeLibrary:
+		// Do nothing, we're embedded as a library.
+	}
 }
 
 //export gio_runMain
 func gio_runMain() {
-	runMain()
+	if !isMainThread() {
+		panic("app.Main must be run on the main goroutine")
+	}
+	switch mainMode {
+	case mainModeUndefined:
+		mainMode = mainModeLibrary
+		runMain()
+	case mainModeExe:
+		// Do nothing, main has already been called.
+	}
 }
 
 func (UIKitViewEvent) implementsViewEvent() {}
