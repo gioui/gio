@@ -37,11 +37,11 @@ For example:
 	var h1, h2 *Handler
 
 	area := clip.Rect(...).Push(ops)
-	event.Op{Tag: h1}.Add(Ops)
+	event.Op(Ops, h1)
 	area.Pop()
 
 	area := clip.Rect(...).Push(ops)
-	event.Op{Tag: h2}.Add(ops)
+	event.Op(Ops, h2)
 	area.Pop()
 
 implies a tree of two inner nodes, each with one pointer handler attached.
