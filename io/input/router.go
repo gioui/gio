@@ -35,10 +35,9 @@ type Router struct {
 		queue keyQueue
 		// The following fields have the same purpose as the fields in
 		// type handler, but for key.Events.
-		filter          keyFilter
-		nextFilter      keyFilter
-		processedFilter keyFilter
-		scratchFilter   keyFilter
+		filter        keyFilter
+		nextFilter    keyFilter
+		scratchFilter keyFilter
 	}
 	cqueue clipboardQueue
 	// states is the list of pending state changes resulting from
@@ -304,7 +303,6 @@ func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
 		h := q.stateFor(tf.tag)
 		h.processedFilter.Merge(tf.filter)
 	}
-	q.key.processedFilter = append(q.key.processedFilter, q.key.scratchFilter...)
 	return nil, false
 }
 
