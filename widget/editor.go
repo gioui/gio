@@ -289,6 +289,9 @@ func (e *Editor) processPointerEvent(gtx layout.Context, ev event.Event) (Editor
 				Y: int(math.Round(float64(evt.Position.Y))),
 			})
 			gtx.Execute(key.FocusCmd{Tag: e})
+			if !e.ReadOnly {
+				gtx.Execute(key.SoftKeyboardCmd{Show: true})
+			}
 			if e.scroller.State() != gesture.StateFlinging {
 				e.scrollCaret = true
 			}
@@ -395,7 +398,7 @@ func (e *Editor) processKey(gtx layout.Context) (EditorEvent, bool) {
 		case key.FocusEvent:
 			// Reset IME state.
 			e.ime.imeState = imeState{}
-			if ke.Focus {
+			if ke.Focus && !e.ReadOnly {
 				gtx.Execute(key.SoftKeyboardCmd{Show: true})
 			}
 		case key.Event:

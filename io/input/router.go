@@ -567,6 +567,14 @@ func (q *Router) changeState(e event.Event, state inputState, evts []taggedEvent
 			e.event = de
 		}
 	}
+	for i := range evts {
+		e := &evts[i]
+		if fe, ok := e.event.(key.FocusEvent); ok {
+			if !fe.Focus {
+				state.keyState.focus = nil
+			}
+		}
+	}
 	// Initialize the first change to contain the current state
 	// and events that are bound for the current frame.
 	if len(q.changes) == 0 {

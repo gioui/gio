@@ -47,13 +47,17 @@ __attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(void);
 }
 - (void)windowDidBecomeKey:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
-  GioView *view = (GioView *)window.contentView;
-	gio_onFocus(view.handle, 1);
+	GioView *view = (GioView *)window.contentView;
+	if ([window firstResponder] == view) {
+		gio_onFocus(view.handle, 1);
+	}
 }
 - (void)windowDidResignKey:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
-  GioView *view = (GioView *)window.contentView;
-	gio_onFocus(view.handle, 0);
+	GioView *view = (GioView *)window.contentView;
+	if ([window firstResponder] == view) {
+		gio_onFocus(view.handle, 0);
+	}
 }
 @end
 
@@ -204,6 +208,14 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 }
 - (void)dealloc {
 	gio_onDestroy(self.handle);
+}
+- (BOOL) becomeFirstResponder {
+	gio_onFocus(self.handle, 1);
+	return [super becomeFirstResponder];
+ }
+- (BOOL) resignFirstResponder {
+	gio_onFocus(self.handle, 0);
+	return [super resignFirstResponder];
 }
 @end
 
