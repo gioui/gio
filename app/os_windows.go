@@ -132,13 +132,19 @@ func initResources() error {
 	}
 	resources.cursor = c
 	icon, _ := windows.LoadImage(hInst, iconID, windows.IMAGE_ICON, 0, 0, windows.LR_DEFAULTSIZE|windows.LR_SHARED)
+
+	appid, err := syscall.UTF16PtrFromString(ID)
+	if err != nil {
+		return err
+	}
+
 	wcls := windows.WndClassEx{
 		CbSize:        uint32(unsafe.Sizeof(windows.WndClassEx{})),
 		Style:         windows.CS_HREDRAW | windows.CS_VREDRAW | windows.CS_OWNDC,
 		LpfnWndProc:   syscall.NewCallback(windowProc),
 		HInstance:     hInst,
 		HIcon:         icon,
-		LpszClassName: syscall.StringToUTF16Ptr("GioWindow"),
+		LpszClassName: appid,
 	}
 	cls, err := windows.RegisterClassEx(&wcls)
 	if err != nil {
