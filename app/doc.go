@@ -48,7 +48,7 @@ For example, to display a blank but otherwise functional window:
 
 	func main() {
 		go func() {
-			w := app.NewWindow()
+			w := new(app.Window)
 			for {
 				w.Event()
 			}
