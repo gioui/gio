@@ -48,13 +48,18 @@ For example, to display a blank but otherwise functional window:
 
 	func main() {
 		go func() {
-			w := app.NewWindow()
+			w := new(app.Window)
 			for {
 				w.Event()
 			}
 		}()
 		app.Main()
 	}
+
+# Events
+
+The [Events] iterator yields app-specific events such as [URLEvent]. [Window.Event]
+yields events that target a particular window.
 
 # Permissions
 

@@ -3,7 +3,10 @@
 package app
 
 import (
+	"gioui.org/io/event"
+	"golang.org/x/net/idna"
 	"image"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,6 +57,15 @@ type FrameEvent struct {
 	Frame func(frame *op.Ops)
 	// Source is the interface between the window and widgets.
 	Source input.Source
+}
+
+// URLEvent is generated for external requests to open a URL. Unlike window specific events,
+// it is delivered through the [Events] iterator.
+//
+// In order to receive URLEvents the program must register one or more URL schemes. A scheme can
+// be registered using gogio, with the `-schemes` flag.
+type URLEvent struct {
+	URL *url.URL
 }
 
 // ViewEvent provides handles to the underlying window objects for the
@@ -136,7 +148,29 @@ func Main() {
 	osMain()
 }
 
+// Events is an iterator that yields events that are not specific to any window,
+// such as [URLEvent]. It never returns.
+//
+// Events must be called by the main goroutine, and replaces the
+// call to [Main].
+func Events(yield func(event.Event) bool) {
+	yieldGlobalEvent = yield
+	osMain()
+}
+
+var yieldGlobalEvent func(evt event.Event) bool
+
+func processGlobalEvent(evt event.Event) {
+	if yieldGlobalEvent == nil {
+		return
+	}
+	if !yieldGlobalEvent(evt) {
+		yieldGlobalEvent = nil
+	}
+}
+
 func (FrameEvent) ImplementsEvent() {}
+func (URLEvent) ImplementsEvent()   {}
 
 func init() {
 	if extraArgs != "" {
@@ -146,4 +180,21 @@ func init() {
 	if ID == "" {
 		ID = filepath.Base(os.Args[0])
 	}
+}
+
+// newURLEvent creates a URLEvent from a raw URL string, handling Punycode decoding.
+func newURLEvent(rawurl string) (URLEvent, error) {
+	u, err := url.Parse(rawurl)
+	if err != nil {
+		return URLEvent{}, err
+	}
+	u.Host, err = idna.Punycode.ToUnicode(u.Hostname())
+	if err != nil {
+		return URLEvent{}, err
+	}
+	u, err = url.Parse(u.String())
+	if err != nil {
+		return URLEvent{}, err
+	}
+	return URLEvent{URL: u}, nil
 }

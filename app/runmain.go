@@ -25,6 +25,6 @@ func runMain() {
 		// Indirect call, since the linker does not know the address of main when
 		// laying down this package.
 		fn := mainMain
-		fn()
+		go fn()
 	})
 }
