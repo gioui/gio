@@ -293,6 +293,10 @@ void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle) {
 	[self.window makeKeyAndVisible];
 	return YES;
 }
+- (BOOL)application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey, id> *)options {
+    gio_onOpenURI((__bridge CFTypeRef)url.absoluteString);
+	return YES;
+}
 @end
 
 int gio_applicationMain(int argc, char *argv[]) {

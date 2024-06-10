@@ -421,6 +421,11 @@ void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle) {
 	[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 	[NSApp activateIgnoringOtherApps:YES];
 }
+- (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)urls {
+	for (NSURL *url in urls) {
+		gio_onOpenURI((__bridge CFTypeRef)url.absoluteString);
+	}
+}
 @end
 
 void gio_main() {

@@ -997,6 +997,16 @@ func gio_onFinishLaunching() {
 	close(launched)
 }
 
+//export gio_onOpenURI
+func gio_onOpenURI(uri C.CFTypeRef) {
+	evt, err := newURLEvent(nsstringToString(uri))
+	if err != nil {
+		return
+	}
+
+	processGlobalEvent(evt)
+}
+
 func newWindow(win *callbacks, options []Option) {
 	<-launched
 	res := make(chan struct{})

@@ -427,6 +427,15 @@ func osMain() {
 	select {}
 }
 
+//export gio_onOpenURI
+func gio_onOpenURI(uri C.CFTypeRef) {
+	evt, err := newURLEvent(nsstringToString(uri))
+	if err != nil {
+		return
+	}
+	processGlobalEvent(evt)
+}
+
 //export gio_runMain
 func gio_runMain() {
 	if !isMainThread() {

@@ -56,6 +56,11 @@ For example, to display a blank but otherwise functional window:
 		app.Main()
 	}
 
+# Events
+
+The [Events] iterator yields app-specific events such as [URLEvent]. [Window.Event]
+yields events that target a particular window.
+
 # Permissions
 
 The packages under gioui.org/app/permission should be imported
