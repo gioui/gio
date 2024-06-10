@@ -405,11 +405,12 @@ const (
 )
 
 func osMain() {
-	if !isMainThread() {
-		panic("app.Main must be run on the main goroutine")
-	}
 	switch mainMode {
 	case mainModeUndefined:
+		if !isMainThread() {
+			panic("app.Main must be run on the main goroutine")
+		}
+
 		mainMode = mainModeExe
 		var argv []*C.char
 		for _, arg := range os.Args {
@@ -423,6 +424,7 @@ func osMain() {
 	case mainModeLibrary:
 		// Do nothing, we're embedded as a library.
 	}
+	select {}
 }
 
 //export gio_runMain

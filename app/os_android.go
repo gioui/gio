@@ -1318,6 +1318,7 @@ func findClass(env *C.JNIEnv, name string) C.jclass {
 }
 
 func osMain() {
+	select {}
 }
 
 func newWindow(window *callbacks, options []Option) {
