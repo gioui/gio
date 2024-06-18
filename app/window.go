@@ -41,7 +41,8 @@ type Option func(unit.Metric, *Config)
 //
 // More than one Window is not supported on iOS, Android, WebAssembly.
 type Window struct {
-	initialOpts []Option
+	initialOpts    []Option
+	initialActions []system.Action
 
 	ctx context
 	gpu gpu.GPU
@@ -727,6 +728,10 @@ func (w *Window) init() {
 	w.imeState.compose = key.Range{Start: -1, End: -1}
 	w.semantic.ids = make(map[input.SemanticID]input.SemanticNode)
 	newWindow(&callbacks{w}, options)
+	for _, acts := range w.initialActions {
+		w.Perform(acts)
+	}
+	w.initialActions = nil
 }
 
 func (w *Window) updateCursor() {
@@ -824,6 +829,10 @@ func (w *Window) Perform(actions system.Action) {
 	opts, acts := splitActions(actions)
 	w.Option(opts...)
 	if acts == 0 {
+		return
+	}
+	if w.basic == nil {
+		w.initialActions = append(w.initialActions, acts)
 		return
 	}
 	w.Run(func() {
