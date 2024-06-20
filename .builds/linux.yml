@@ -80,6 +80,8 @@ tasks:
      unzip -q ndk.zip
      rm ndk.zip
      mv android-ndk-* ndk-bundle
+     # sdkmanager needs lots of file descriptors
+     ulimit -n 10000
      yes|sdkmanager --licenses
      sdkmanager "platforms;android-31" "build-tools;32.0.0"
  - test_android: |
