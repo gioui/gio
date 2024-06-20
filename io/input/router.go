@@ -274,28 +274,29 @@ func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
 			}
 		}
 	}
-	if !q.deferring {
-		for i := range q.changes {
-			change := &q.changes[i]
-			for j, evt := range change.events {
-				match := false
-				switch e := evt.event.(type) {
-				case key.Event:
-					match = q.key.scratchFilter.Matches(change.state.keyState.focus, e, false)
-				default:
-					for _, tf := range q.scratchFilters {
-						if evt.tag == tf.tag && tf.filter.Matches(evt.event) {
-							match = true
-							break
-						}
+	for i := range q.changes {
+		if q.deferring && i > 0 {
+			break
+		}
+		change := &q.changes[i]
+		for j, evt := range change.events {
+			match := false
+			switch e := evt.event.(type) {
+			case key.Event:
+				match = q.key.scratchFilter.Matches(change.state.keyState.focus, e, false)
+			default:
+				for _, tf := range q.scratchFilters {
+					if evt.tag == tf.tag && tf.filter.Matches(evt.event) {
+						match = true
+						break
 					}
 				}
-				if match {
-					change.events = append(change.events[:j], change.events[j+1:]...)
-					// Fast forward state to last matched.
-					q.collapseState(i)
-					return evt.event, true
-				}
+			}
+			if match {
+				change.events = append(change.events[:j], change.events[j+1:]...)
+				// Fast forward state to last matched.
+				q.collapseState(i)
+				return evt.event, true
 			}
 		}
 	}

@@ -1086,6 +1086,33 @@ func TestPassCursor(t *testing.T) {
 	}
 }
 
+func TestPartialEvent(t *testing.T) {
+	var ops op.Ops
+	var r Router
+
+	rect := clip.Rect(image.Rect(0, 0, 100, 100))
+	background := rect.Push(&ops)
+	event.Op(&ops, 1)
+	background.Pop()
+
+	overlayPass := pointer.PassOp{}.Push(&ops)
+	overlay := rect.Push(&ops)
+	event.Op(&ops, 2)
+	overlay.Pop()
+	overlayPass.Pop()
+	assertEventSequence(t, events(&r, -1, pointer.Filter{Target: 1, Kinds: pointer.Press}))
+	assertEventSequence(t, events(&r, -1, pointer.Filter{Target: 2, Kinds: pointer.Press}))
+	r.Frame(&ops)
+	r.Queue(pointer.Event{
+		Kind: pointer.Press,
+	})
+	assertEventSequence(t, events(&r, -1, pointer.Filter{Target: 1, Kinds: pointer.Press}, key.FocusFilter{Target: 1}),
+		key.FocusEvent{}, pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Priority: pointer.Shared})
+	r.Source().Execute(key.FocusCmd{Tag: 1})
+	assertEventSequence(t, events(&r, -1, pointer.Filter{Target: 2, Kinds: pointer.Press}),
+		pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Priority: pointer.Foremost})
+}
+
 // offer satisfies io.ReadCloser for use in data transfers.
 type offer struct {
 	data   string
