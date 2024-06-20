@@ -313,15 +313,15 @@ func (q *Router) collapseState(idx int) {
 	}
 	first := &q.changes[0]
 	first.state = q.changes[idx].state
-	for i := 1; i <= idx; i++ {
-		first.events = append(first.events, q.changes[i].events...)
+	for _, ch := range q.changes[1 : idx+1] {
+		first.events = append(first.events, ch.events...)
 	}
 	q.changes = append(q.changes[:1], q.changes[idx+1:]...)
 }
 
-// Frame replaces the declared handlers from the supplied
-// operation list. The text input state, wakeup time and whether
-// there are active profile handlers is also saved.
+// Frame completes the current frame and starts a new with the
+// handlers from the frame argument. Remaining events are discarded,
+// unless they were deferred by a command.
 func (q *Router) Frame(frame *op.Ops) {
 	var remaining []event.Event
 	if n := len(q.changes); n > 0 {
