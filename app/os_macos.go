@@ -1074,3 +1074,6 @@ func convertMods(mods C.NSUInteger) key.Modifiers {
 
 func (AppKitViewEvent) implementsViewEvent() {}
 func (AppKitViewEvent) ImplementsEvent()     {}
+func (a AppKitViewEvent) Valid() bool {
+	return a != (AppKitViewEvent{})
+}

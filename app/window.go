@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"reflect"
 	"runtime"
 	"sync"
 	"time"
@@ -643,7 +642,7 @@ func (w *Window) processEvent(e event.Event) bool {
 		}
 		w.coalesced.destroy = &e2
 	case ViewEvent:
-		if reflect.ValueOf(e2).IsZero() && w.gpu != nil {
+		if !e2.Valid() && w.gpu != nil {
 			w.ctx.Lock()
 			w.gpu.Release()
 			w.gpu = nil

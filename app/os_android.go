@@ -1495,3 +1495,6 @@ func Java_org_gioui_Gio_scheduleMainFuncs(env *C.JNIEnv, cls C.jclass) {
 
 func (AndroidViewEvent) implementsViewEvent() {}
 func (AndroidViewEvent) ImplementsEvent()     {}
+func (a AndroidViewEvent) Valid() bool {
+	return a != (AndroidViewEvent{})
+}

@@ -21,6 +21,9 @@ type X11ViewEvent struct {
 
 func (X11ViewEvent) implementsViewEvent() {}
 func (X11ViewEvent) ImplementsEvent()     {}
+func (x X11ViewEvent) Valid() bool {
+	return x != (X11ViewEvent{})
+}
 
 type WaylandViewEvent struct {
 	// Display is the *wl_display returned by wl_display_connect.
@@ -31,6 +34,9 @@ type WaylandViewEvent struct {
 
 func (WaylandViewEvent) implementsViewEvent() {}
 func (WaylandViewEvent) ImplementsEvent()     {}
+func (w WaylandViewEvent) Valid() bool {
+	return w != (WaylandViewEvent{})
+}
 
 func osMain() {
 	select {}

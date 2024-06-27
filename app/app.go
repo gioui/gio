@@ -61,6 +61,10 @@ type FrameEvent struct {
 type ViewEvent interface {
 	implementsViewEvent()
 	ImplementsEvent()
+	// Valid will return true when the ViewEvent does contains valid handles.
+	// If a window receives an invalid ViewEvent, it should deinitialize any
+	// state referring to handles from a previous ViewEvent.
+	Valid() bool
 }
 
 // Insets is the space taken up by

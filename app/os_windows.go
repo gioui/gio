@@ -981,3 +981,6 @@ func configForDPI(dpi int) unit.Metric {
 
 func (Win32ViewEvent) implementsViewEvent() {}
 func (Win32ViewEvent) ImplementsEvent()     {}
+func (w Win32ViewEvent) Valid() bool {
+	return w != (Win32ViewEvent{})
+}
