@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"reflect"
 	"runtime"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -89,8 +90,11 @@ type Window struct {
 	}
 	imeState editorState
 	driver   driver
-	// basic is the driver interface that is needed even after the window is gone.
-	basic basicDriver
+
+	// invMu protects mayInvalidate.
+	invMu         sync.Mutex
+	mayInvalidate bool
+
 	// coalesced tracks the most recent events waiting to be delivered
 	// to the client.
 	coalesced eventSummary
@@ -272,8 +276,11 @@ func (w *Window) updateState() {
 //
 // Invalidate is safe for concurrent use.
 func (w *Window) Invalidate() {
-	if w.basic != nil {
-		w.basic.Invalidate()
+	w.invMu.Lock()
+	defer w.invMu.Unlock()
+	if w.mayInvalidate {
+		w.mayInvalidate = false
+		w.driver.Invalidate()
 	}
 }
 
@@ -283,7 +290,7 @@ func (w *Window) Option(opts ...Option) {
 	if len(opts) == 0 {
 		return
 	}
-	if w.basic == nil {
+	if w.driver == nil {
 		w.initialOpts = append(w.initialOpts, opts...)
 		return
 	}
@@ -378,11 +385,8 @@ func (w *Window) setNextFrame(at time.Time) {
 	}
 }
 
-func (c *callbacks) SetDriver(d basicDriver) {
-	c.w.basic = d
-	if d, ok := d.(driver); ok {
-		c.w.driver = d
-	}
+func (c *callbacks) SetDriver(d driver) {
+	c.w.driver = d
 }
 
 func (c *callbacks) ProcessFrame(frame *op.Ops, ack chan<- struct{}) {
@@ -549,9 +553,15 @@ func (c *callbacks) Invalidate() {
 }
 
 func (c *callbacks) nextEvent() (event.Event, bool) {
-	s := &c.w.coalesced
-	// Every event counts as a wakeup.
-	defer func() { s.wakeup = false }()
+	return c.w.nextEvent()
+}
+
+func (w *Window) nextEvent() (event.Event, bool) {
+	s := &w.coalesced
+	defer func() {
+		// Every event counts as a wakeup.
+		s.wakeup = false
+	}()
 	switch {
 	case s.view != nil:
 		e := *s.view
@@ -573,6 +583,9 @@ func (c *callbacks) nextEvent() (event.Event, bool) {
 	case s.wakeup:
 		return wakeupEvent{}, true
 	}
+	w.invMu.Lock()
+	defer w.invMu.Unlock()
+	w.mayInvalidate = w.driver != nil
 	return nil, false
 }
 
@@ -617,7 +630,6 @@ func (w *Window) processEvent(e event.Event) bool {
 	case DestroyEvent:
 		w.destroyGPU()
 		w.driver = nil
-		w.basic = nil
 		if q := w.timer.quit; q != nil {
 			q <- struct{}{}
 			<-q
@@ -688,10 +700,17 @@ func (w *Window) processEvent(e event.Event) bool {
 // [FrameEvent], or until [Invalidate] is called. The window is created
 // and shown the first time Event is called.
 func (w *Window) Event() event.Event {
-	if w.basic == nil {
+	if w.driver == nil {
 		w.init()
 	}
-	return w.basic.Event()
+	if w.driver == nil {
+		e, ok := w.nextEvent()
+		if !ok {
+			panic("window initializion failed without a DestroyEvent")
+		}
+		return e
+	}
+	return w.driver.Event()
 }
 
 func (w *Window) init() {
@@ -832,7 +851,7 @@ func (w *Window) Perform(actions system.Action) {
 	if acts == 0 {
 		return
 	}
-	if w.basic == nil {
+	if w.driver == nil {
 		w.initialActions = append(w.initialActions, acts)
 		return
 	}

@@ -9,7 +9,6 @@ import (
 	"errors"
 	"unsafe"
 
-	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 )
 
@@ -57,33 +56,10 @@ func newWindow(window *callbacks, options []Option) {
 			errFirst = err
 		}
 	}
-	window.SetDriver(&dummyDriver{
-		win:     window,
-		wakeups: make(chan event.Event, 1),
-	})
 	if errFirst == nil {
 		errFirst = errors.New("app: no window driver available")
 	}
 	window.ProcessEvent(DestroyEvent{Err: errFirst})
-}
-
-type dummyDriver struct {
-	win     *callbacks
-	wakeups chan event.Event
-}
-
-func (d *dummyDriver) Event() event.Event {
-	if e, ok := d.win.nextEvent(); ok {
-		return e
-	}
-	return <-d.wakeups
-}
-
-func (d *dummyDriver) Invalidate() {
-	select {
-	case d.wakeups <- wakeupEvent{}:
-	default:
-	}
 }
 
 // xCursor contains mapping from pointer.Cursor to XCursor.

@@ -54,9 +54,6 @@ type window struct {
 	borderSize image.Point
 	config     Config
 	loop       *eventLoop
-
-	// invMu avoids the race between destroying the window and Invalidate.
-	invMu sync.Mutex
 }
 
 const _WM_WAKEUP = windows.WM_USER + iota
@@ -304,10 +301,8 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			windows.ReleaseDC(w.hdc)
 			w.hdc = 0
 		}
-		w.invMu.Lock()
 		// The system destroys the HWND for us.
 		w.hwnd = 0
-		w.invMu.Unlock()
 		windows.PostQuitMessage(0)
 	case windows.WM_NCCALCSIZE:
 		if w.config.Decorated {
@@ -620,13 +615,6 @@ func (w *window) Frame(frame *op.Ops) {
 }
 
 func (w *window) wakeup() {
-	w.invMu.Lock()
-	defer w.invMu.Unlock()
-	if w.hwnd == 0 {
-		w.loop.Wakeup()
-		w.loop.FlushEvents()
-		return
-	}
 	if err := windows.PostMessage(w.hwnd, _WM_WAKEUP, 0, 0); err != nil {
 		panic(err)
 	}

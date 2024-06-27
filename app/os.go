@@ -173,19 +173,13 @@ type context interface {
 	Unlock()
 }
 
-// basicDriver is the subset of [driver] that may be called even after
-// a window is destroyed.
-type basicDriver interface {
+// driver is the interface for the platform implementation
+// of a window.
+type driver interface {
 	// Event blocks until an event is available and returns it.
 	Event() event.Event
 	// Invalidate requests a FrameEvent.
 	Invalidate()
-}
-
-// driver is the interface for the platform implementation
-// of a window.
-type driver interface {
-	basicDriver
 	// SetAnimating sets the animation flag. When the window is animating,
 	// FrameEvents are delivered as fast as the display can handle them.
 	SetAnimating(anim bool)

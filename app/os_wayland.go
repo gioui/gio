@@ -217,10 +217,6 @@ type window struct {
 	wakeups chan struct{}
 
 	closing bool
-
-	// invMu avoids the race between the destruction of disp and
-	// Invalidate waking it up.
-	invMu sync.Mutex
 }
 
 type poller struct {
@@ -1369,10 +1365,8 @@ func (w *window) close(err error) {
 	w.ProcessEvent(WaylandViewEvent{})
 	w.ProcessEvent(DestroyEvent{Err: err})
 	w.destroy()
-	w.invMu.Lock()
 	w.disp.destroy()
 	w.disp = nil
-	w.invMu.Unlock()
 }
 
 func (w *window) dispatch() {
@@ -1416,11 +1410,7 @@ func (w *window) Invalidate() {
 	default:
 		return
 	}
-	w.invMu.Lock()
-	defer w.invMu.Unlock()
-	if w.disp != nil {
-		w.disp.wakeup()
-	}
+	w.disp.wakeup()
 }
 
 func (w *window) Run(f func()) {
