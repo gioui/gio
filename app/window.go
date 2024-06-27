@@ -617,6 +617,7 @@ func (w *Window) processEvent(e event.Event) bool {
 	case DestroyEvent:
 		w.destroyGPU()
 		w.driver = nil
+		w.basic = nil
 		if q := w.timer.quit; q != nil {
 			q <- struct{}{}
 			<-q
