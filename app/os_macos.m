@@ -6,7 +6,7 @@
 
 #include "_cgo_export.h"
 
-__attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(void);
+__attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(BOOL presentWithTrans);
 
 @interface GioAppDelegate : NSObject<NSApplicationDelegate>
 @end
@@ -16,6 +16,7 @@ __attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(void);
 
 @interface GioView : NSView <CALayerDelegate,NSTextInputClient>
 @property uintptr_t handle;
+@property BOOL presentWithTrans;
 @end
 
 @implementation GioWindowDelegate
@@ -88,7 +89,7 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	gio_onDraw(self.handle);
 }
 - (CALayer *)makeBackingLayer {
-	CALayer *layer = gio_layerFactory();
+	CALayer *layer = gio_layerFactory(self.presentWithTrans);
 	layer.delegate = self;
 	return layer;
 }
@@ -392,10 +393,11 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height, CGF
 	}
 }
 
-CFTypeRef gio_createView(void) {
+CFTypeRef gio_createView(int presentWithTrans) {
 	@autoreleasepool {
 		NSRect frame = NSMakeRect(0, 0, 0, 0);
 		GioView* view = [[GioView alloc] initWithFrame:frame];
+		view.presentWithTrans = presentWithTrans ? YES : NO;
 		view.wantsLayer = YES;
 		view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
 

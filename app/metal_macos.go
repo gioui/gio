@@ -12,12 +12,12 @@ package app
 #import <QuartzCore/CAMetalLayer.h>
 #include <CoreFoundation/CoreFoundation.h>
 
-CALayer *gio_layerFactory(void) {
+CALayer *gio_layerFactory(BOOL presentWithTrans) {
 	@autoreleasepool {
 		CAMetalLayer *l = [CAMetalLayer layer];
 		l.autoresizingMask = kCALayerHeightSizable|kCALayerWidthSizable;
 		l.needsDisplayOnBoundsChange = YES;
-		l.presentsWithTransaction = YES;
+		l.presentsWithTransaction = presentWithTrans;
 		return l;
 	}
 }

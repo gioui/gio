@@ -40,7 +40,7 @@ import (
 #define MOUSE_SCROLL 4
 
 __attribute__ ((visibility ("hidden"))) void gio_main(void);
-__attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(void);
+__attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(int presentWithTrans);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight);
 __attribute__ ((visibility ("hidden"))) void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle);
 
@@ -925,7 +925,9 @@ func newWindow(win *callbacks, options []Option) {
 		w.loop = newEventLoop(w.w, w.wakeup)
 		win.SetDriver(w)
 		res <- struct{}{}
-		if err := w.init(); err != nil {
+		var cnf Config
+		cnf.apply(unit.Metric{}, options)
+		if err := w.init(cnf.CustomRenderer); err != nil {
 			w.ProcessEvent(DestroyEvent{Err: err})
 			return
 		}
@@ -946,8 +948,12 @@ func newWindow(win *callbacks, options []Option) {
 	<-res
 }
 
-func (w *window) init() error {
-	view := C.gio_createView()
+func (w *window) init(customRenderer bool) error {
+	presentWithTrans := 1
+	if customRenderer {
+		presentWithTrans = 0
+	}
+	view := C.gio_createView(C.int(presentWithTrans))
 	if view == 0 {
 		return errors.New("newOSWindow: failed to create view")
 	}
