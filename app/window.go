@@ -108,11 +108,12 @@ type Window struct {
 }
 
 type eventSummary struct {
-	wakeup  bool
-	cfg     *ConfigEvent
-	view    *ViewEvent
-	frame   *frameEvent
-	destroy *DestroyEvent
+	wakeup       bool
+	cfg          *ConfigEvent
+	view         *ViewEvent
+	frame        *frameEvent
+	framePending bool
+	destroy      *DestroyEvent
 }
 
 type callbacks struct {
@@ -219,6 +220,7 @@ func (w *Window) frame(frame *op.Ops, viewport image.Point) error {
 }
 
 func (w *Window) processFrame(frame *op.Ops, ack chan<- struct{}) {
+	w.coalesced.framePending = false
 	wrapper := &w.decorations.Ops
 	off := op.Offset(w.lastFrame.off).Push(wrapper)
 	ops.AddCall(&wrapper.Internal, &frame.Internal, ops.PC{}, ops.PCFor(&frame.Internal))
@@ -563,6 +565,10 @@ func (w *Window) nextEvent() (event.Event, bool) {
 		s.wakeup = false
 	}()
 	switch {
+	case s.framePending:
+		// If the user didn't call FrameEvent.Event, process
+		// an empty frame.
+		w.processFrame(new(op.Ops), nil)
 	case s.view != nil:
 		e := *s.view
 		s.view = nil
@@ -579,6 +585,7 @@ func (w *Window) nextEvent() (event.Event, bool) {
 	case s.frame != nil:
 		e := *s.frame
 		s.frame = nil
+		s.framePending = true
 		return e.FrameEvent, true
 	case s.wakeup:
 		return wakeupEvent{}, true
