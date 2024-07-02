@@ -387,6 +387,9 @@ func (w *Window) setNextFrame(at time.Time) {
 }
 
 func (c *callbacks) SetDriver(d driver) {
+	if d == nil {
+		panic("nil driver")
+	}
 	c.w.driver = d
 }
 
@@ -635,6 +638,9 @@ func (w *Window) processEvent(e event.Event) bool {
 		w.coalesced.frame = &e2
 	case DestroyEvent:
 		w.destroyGPU()
+		w.invMu.Lock()
+		w.mayInvalidate = false
+		w.invMu.Unlock()
 		w.driver = nil
 		if q := w.timer.quit; q != nil {
 			q <- struct{}{}
