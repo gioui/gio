@@ -1633,6 +1633,14 @@ func (w *window) flushScroll() {
 	if total == (f32.Point{}) {
 		return
 	}
+	if w.scroll.steps == (image.Point{}) {
+		w.fling.xExtrapolation.SampleDelta(w.scroll.time, -w.scroll.dist.X)
+		w.fling.yExtrapolation.SampleDelta(w.scroll.time, -w.scroll.dist.Y)
+	}
+	// Zero scroll distance prior to calling ProcessEvent, otherwise we may recursively
+	// re-process the scroll distance.
+	w.scroll.dist = f32.Point{}
+	w.scroll.steps = image.Point{}
 	w.ProcessEvent(pointer.Event{
 		Kind:      pointer.Scroll,
 		Source:    pointer.Mouse,
@@ -1642,12 +1650,6 @@ func (w *window) flushScroll() {
 		Time:      w.scroll.time,
 		Modifiers: w.disp.xkb.Modifiers(),
 	})
-	if w.scroll.steps == (image.Point{}) {
-		w.fling.xExtrapolation.SampleDelta(w.scroll.time, -w.scroll.dist.X)
-		w.fling.yExtrapolation.SampleDelta(w.scroll.time, -w.scroll.dist.Y)
-	}
-	w.scroll.dist = f32.Point{}
-	w.scroll.steps = image.Point{}
 }
 
 func (w *window) onPointerMotion(x, y C.wl_fixed_t, t C.uint32_t) {
