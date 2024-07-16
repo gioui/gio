@@ -266,7 +266,6 @@ const (
 	WM_MOUSEWHEEL           = 0x020A
 	WM_MOUSEHWHEEL          = 0x020E
 	WM_NCACTIVATE           = 0x0086
-	WM_NCLBUTTONDBLCLK      = 0x00A3
 	WM_NCHITTEST            = 0x0084
 	WM_NCCALCSIZE           = 0x0083
 	WM_PAINT                = 0x000F
