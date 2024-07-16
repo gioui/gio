@@ -326,12 +326,6 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		mi := windows.GetMonitorInfo(w.hwnd)
 		szp.Rgrc[0] = mi.WorkArea
 		return 0
-	case windows.WM_NCLBUTTONDBLCLK:
-		if !w.config.Decorated {
-			// Override Windows behaviour when we
-			// draw decorations.
-			return 0
-		}
 	case windows.WM_PAINT:
 		w.draw(true)
 	case windows.WM_SIZE:
