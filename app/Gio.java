@@ -5,6 +5,8 @@ package org.gioui;
 import android.content.ClipboardManager;
 import android.content.ClipData;
 import android.content.Context;
+import android.content.Intent;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -65,4 +67,21 @@ public final class Gio {
 	}
 
 	static private native void scheduleMainFuncs();
+
+	static Intent startForegroundService(Context ctx, String title, String text) throws ClassNotFoundException {
+		Intent intent = new Intent();
+		intent.setClass(ctx, ctx.getClassLoader().loadClass("org/gioui/GioForegroundService"));
+		intent.putExtra("title", title);
+		intent.putExtra("text", text);
+
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			// Use startForegroundService for API level 26 and later
+			ctx.startForegroundService(intent);
+		} else {
+			// Use startService for API level 25 and earlier
+			ctx.startService(intent);
+		}
+
+		return intent;
+	}
 }
