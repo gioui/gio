@@ -5,6 +5,8 @@ package app
 import (
 	"errors"
 	"fmt"
+	"gioui.org/io/transfer"
+	"github.com/ddkwork/golibrary/mylog"
 	"image"
 	"image/color"
 	"runtime"
@@ -600,6 +602,17 @@ func (w *Window) nextEvent() (event.Event, bool) {
 
 func (w *Window) processEvent(e event.Event) bool {
 	switch e2 := e.(type) {
+	case transfer.DataEvent:
+		mylog.Info("drop file", e2.Type)
+		w.queue.Queue(e2)
+		return true
+		t, handled := w.queue.WakeupTime()
+		w.updateCursor()
+		if handled {
+			w.setNextFrame(t)
+			w.updateAnimation()
+		}
+		return true
 	case wakeupEvent:
 		w.coalesced.wakeup = true
 	case frameEvent:

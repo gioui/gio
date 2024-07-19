@@ -5,8 +5,12 @@ package app
 import (
 	"errors"
 	"fmt"
+	"github.com/ddkwork/golibrary/mylog"
 	"image"
 	"io"
+	"mime"
+	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -163,7 +167,7 @@ func (w *window) init() error {
 	const dwStyle = windows.WS_OVERLAPPEDWINDOW
 
 	hwnd, err := windows.CreateWindowEx(
-		dwExStyle,
+		dwExStyle|WS_EX_ACCEPTFILES,
 		resources.class,
 		"",
 		dwStyle|windows.WS_CLIPSIBLINGS|windows.WS_CLIPCHILDREN,
@@ -211,6 +215,18 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	w := win.(*window)
 
 	switch msg {
+	case WM_DROPFILES:
+		fileUrl := genDropFilesEventArg(wParam).Files[0]
+		fileExtension := filepath.Ext(fileUrl)
+		mime := mime.TypeByExtension(fileExtension) //todo bug
+		mime = mime
+		dataEvent := transfer.DataEvent{
+			Type: fileUrl,
+			Open: func() io.ReadCloser {
+				return mylog.Check2(os.Open(fileUrl))
+			},
+		}
+		w.ProcessEvent(dataEvent)
 	case windows.WM_UNICHAR:
 		if wParam == windows.UNICODE_NOCHAR {
 			// Tell the system that we accept WM_UNICHAR messages.
