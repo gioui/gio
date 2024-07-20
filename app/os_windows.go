@@ -206,7 +206,7 @@ func (w *window) update() {
 var dragHandler = func(files []string) {}
 
 func FileDropCallback(fn func(files []string)) {
-	dragHandler = fn
+	dragHandler = fn //todo need locker?
 }
 
 func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr {

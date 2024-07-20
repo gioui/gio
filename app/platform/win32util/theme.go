@@ -159,17 +159,13 @@ func SetWindowTheme(hwnd HWND, appName string, subIdList string) uintptr {
 		MustStringToUTF16uintptr(appName),
 		subID,
 	))
-
 	return ret
 }
 
 func IsCurrentlyDarkMode() bool {
 	key := mylog.Check2(registry.OpenKey(registry.CURRENT_USER, `SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize`, registry.QUERY_VALUE))
-
 	defer key.Close()
-
 	AppsUseLightTheme, _ := mylog.Check3(key.GetIntegerValue("AppsUseLightTheme"))
-
 	return AppsUseLightTheme == 0
 }
 

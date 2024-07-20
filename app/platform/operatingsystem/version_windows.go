@@ -22,7 +22,6 @@ func (w *WindowsVersionInfo) IsWindowsVersionAtLeast(major, minor, buildNumber i
 
 func GetWindowsVersionInfo() (*WindowsVersionInfo, error) {
 	key := mylog.Check2(registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE))
-
 	return &WindowsVersionInfo{
 		Major:          regDWORDKeyAsInt(key, "CurrentMajorVersionNumber"),
 		Minor:          regDWORDKeyAsInt(key, "CurrentMinorVersionNumber"),

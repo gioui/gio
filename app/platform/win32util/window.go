@@ -16,7 +16,6 @@ func LoadIconWithResourceID(instance HINSTANCE, res uintptr) HICON {
 	ret, _ := mylog.Check3(procLoadIcon.Call(
 		uintptr(instance),
 		res))
-
 	return HICON(ret)
 }
 
@@ -24,7 +23,6 @@ func LoadCursorWithResourceID(instance HINSTANCE, res uintptr) HCURSOR {
 	ret, _ := mylog.Check3(procLoadCursor.Call(
 		uintptr(instance),
 		res))
-
 	return HCURSOR(ret)
 }
 
@@ -35,9 +33,7 @@ func RegisterClassEx(wndClassEx *WNDCLASSEX) ATOM {
 
 func RegisterClass(className string, wndproc uintptr, instance HINSTANCE) error {
 	classNamePtr := mylog.Check2(syscall.UTF16PtrFromString(className))
-
 	icon := LoadIconWithResourceID(instance, IDI_APPLICATION)
-
 	var wc WNDCLASSEX
 	wc.CbSize = uint32(unsafe.Sizeof(wc))
 	wc.Style = CS_HREDRAW | CS_VREDRAW
@@ -49,17 +45,14 @@ func RegisterClass(className string, wndproc uintptr, instance HINSTANCE) error 
 	wc.LpszClassName = classNamePtr
 	wc.LpszMenuName = nil
 	wc.HIconSm = icon
-
 	if ret := RegisterClassEx(&wc); ret == 0 {
 		return syscall.GetLastError()
 	}
-
 	return nil
 }
 
 func CreateWindow(className string, instance HINSTANCE, parent HWND, exStyle, style uint) HWND {
 	classNamePtr := lo.Must(syscall.UTF16PtrFromString(className))
-
 	result := CreateWindowEx(
 		exStyle,
 		classNamePtr,
@@ -78,7 +71,6 @@ func CreateWindow(className string, instance HINSTANCE, parent HWND, exStyle, st
 		errStr := fmt.Sprintf("Error occurred in CreateWindow(%s, %v, %d, %d)", className, parent, exStyle, style)
 		panic(errStr)
 	}
-
 	return result
 }
 
@@ -99,26 +91,20 @@ func CreateWindowEx(exStyle uint, className, windowName *uint16,
 		uintptr(menu),
 		uintptr(instance),
 		uintptr(param)))
-
 	return HWND(ret)
 }
 
 func MustStringToUTF16Ptr(input string) *uint16 {
-	ret := mylog.Check2(syscall.UTF16PtrFromString(input))
-
-	return ret
+	return mylog.Check2(syscall.UTF16PtrFromString(input))
 }
 
 func MustStringToUTF16uintptr(input string) uintptr {
 	ret := mylog.Check2(syscall.UTF16PtrFromString(input))
-
 	return uintptr(unsafe.Pointer(ret))
 }
 
 func MustUTF16FromString(input string) []uint16 {
-	ret := mylog.Check2(syscall.UTF16FromString(input))
-
-	return ret
+	return mylog.Check2(syscall.UTF16FromString(input))
 }
 
 func UTF16PtrToString(input uintptr) string {
