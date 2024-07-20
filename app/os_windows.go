@@ -5,12 +5,9 @@ package app
 import (
 	"errors"
 	"fmt"
-	"github.com/ddkwork/golibrary/mylog"
+	"gioui.org/app/platform/win32util"
 	"image"
 	"io"
-	"mime"
-	"os"
-	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -206,7 +203,15 @@ func (w *window) update() {
 	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
+var dragHandler = func(files []string) {}
+
+func FileDropCallback(fn func(files []string)) {
+	dragHandler = fn
+}
+
 func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr {
+	win32util.SetTheme(uintptr(hwnd), true)
+
 	win, exists := winMap.Load(hwnd)
 	if !exists {
 		return windows.DefWindowProc(hwnd, msg, wParam, lParam)
@@ -216,17 +221,19 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 
 	switch msg {
 	case WM_DROPFILES:
-		fileUrl := genDropFilesEventArg(wParam).Files[0]
-		fileExtension := filepath.Ext(fileUrl)
-		mime := mime.TypeByExtension(fileExtension) //todo bug
-		mime = mime
-		dataEvent := transfer.DataEvent{
-			Type: fileUrl,
-			Open: func() io.ReadCloser {
-				return mylog.Check2(os.Open(fileUrl))
-			},
-		}
-		w.ProcessEvent(dataEvent)
+		dragHandler(genDropFilesEventArg(wParam).Files)
+
+		//fileUrl := genDropFilesEventArg(wParam).Files[0]
+		//fileExtension := filepath.Ext(fileUrl)
+		//mime := mime.TypeByExtension(fileExtension) //todo bug
+		//mime = mime
+		//dataEvent := transfer.DataEvent{
+		//	Type: fileUrl,
+		//	Open: func() io.ReadCloser {
+		//		return mylog.Check2(os.Open(fileUrl))
+		//	},
+		//}
+		//w.ProcessEvent(dataEvent)
 	case windows.WM_UNICHAR:
 		if wParam == windows.UNICODE_NOCHAR {
 			// Tell the system that we accept WM_UNICHAR messages.
