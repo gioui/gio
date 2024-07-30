@@ -60,7 +60,7 @@ type Router struct {
 }
 
 // Source implements the interface between a Router and user interface widgets.
-// The value Source is disabled.
+// The zero-value Source is disabled.
 type Source struct {
 	r *Router
 }
