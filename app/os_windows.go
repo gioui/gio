@@ -450,9 +450,6 @@ func getModifiers() key.Modifiers {
 // hitTest returns the non-client area hit by the point, needed to
 // process WM_NCHITTEST.
 func (w *window) hitTest(x, y int) uintptr {
-	if w.config.Mode == Fullscreen {
-		return windows.HTCLIENT
-	}
 	if w.config.Mode != Windowed {
 		// Only windowed mode should allow resizing.
 		return windows.HTCLIENT
