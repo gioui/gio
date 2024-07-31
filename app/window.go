@@ -656,6 +656,7 @@ func (w *Window) processEvent(e event.Event) bool {
 		}
 		w.coalesced.view = &e2
 	case ConfigEvent:
+		w.decorations.Decorations.Maximized = e2.Config.Mode == Maximized
 		wasFocused := w.decorations.Config.Focused
 		w.decorations.Config = e2.Config
 		e2.Config = w.effectiveConfig()
@@ -801,7 +802,6 @@ func (w *Window) decorate(e FrameEvent, o *op.Ops) image.Point {
 	default:
 		panic(fmt.Errorf("unknown WindowMode %v", m))
 	}
-	deco.Perform(actions)
 	gtx := layout.Context{
 		Ops:         o,
 		Now:         e.Now,
