@@ -185,7 +185,7 @@ func (w *window) init() error {
 	return nil
 }
 
-// update() handles changes done by the user, and updates the configuration.
+// update handles changes done by the user, and updates the configuration.
 // It reads the window style and size/position and updates w.config.
 // If anything has changed it emits a ConfigEvent to notify the application.
 func (w *window) update() {
@@ -199,7 +199,18 @@ func (w *window) update() {
 		windows.GetSystemMetrics(windows.SM_CXSIZEFRAME),
 		windows.GetSystemMetrics(windows.SM_CYSIZEFRAME),
 	)
+	p := windows.GetWindowPlacement(w.hwnd)
+	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
+	switch {
+	case p.IsMaximized() && style&windows.WS_OVERLAPPEDWINDOW != 0:
+		w.config.Mode = Maximized
+	case p.IsMaximized():
+		w.config.Mode = Fullscreen
+	default:
+		w.config.Mode = Windowed
+	}
 	w.ProcessEvent(ConfigEvent{Config: w.config})
+	w.draw(true)
 }
 
 func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr {
@@ -328,18 +339,12 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		return 0
 	case windows.WM_PAINT:
 		w.draw(true)
+	case windows.WM_STYLECHANGED:
+		w.update()
+	case windows.WM_WINDOWPOSCHANGED:
+		w.update()
 	case windows.WM_SIZE:
 		w.update()
-		switch wParam {
-		case windows.SIZE_MINIMIZED:
-			w.config.Mode = Minimized
-		case windows.SIZE_MAXIMIZED:
-			w.config.Mode = Maximized
-		case windows.SIZE_RESTORED:
-			if w.config.Mode != Fullscreen {
-				w.config.Mode = Windowed
-			}
-		}
 	case windows.WM_GETMINMAXINFO:
 		mm := (*windows.MinMaxInfo)(unsafe.Pointer(lParam))
 		var bw, bh int32
@@ -681,8 +686,11 @@ func (w *window) readClipboard() error {
 func (w *window) Configure(options []Option) {
 	dpi := windows.GetSystemDPI()
 	metric := configForDPI(dpi)
-	w.config.apply(metric, options)
-	windows.SetWindowText(w.hwnd, w.config.Title)
+	cnf := w.config
+	cnf.apply(metric, options)
+	w.config.Title = cnf.Title
+	w.config.Decorated = cnf.Decorated
+	windows.SetWindowText(w.hwnd, cnf.Title)
 
 	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
 	var showMode int32
@@ -690,7 +698,7 @@ func (w *window) Configure(options []Option) {
 	swpStyle := uintptr(windows.SWP_NOZORDER | windows.SWP_FRAMECHANGED)
 	winStyle := uintptr(windows.WS_OVERLAPPEDWINDOW)
 	style &^= winStyle
-	switch w.config.Mode {
+	switch cnf.Mode {
 	case Minimized:
 		style |= winStyle
 		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
@@ -705,13 +713,13 @@ func (w *window) Configure(options []Option) {
 		style |= winStyle
 		showMode = windows.SW_SHOWNORMAL
 		// Get target for client area size.
-		width = int32(w.config.Size.X)
-		height = int32(w.config.Size.Y)
+		width = int32(cnf.Size.X)
+		height = int32(cnf.Size.Y)
 		// Get the current window size and position.
 		wr := windows.GetWindowRect(w.hwnd)
 		x = wr.Left
 		y = wr.Top
-		if w.config.Decorated {
+		if cnf.Decorated {
 			// Compute client size and position. Note that the client size is
 			// equal to the window size when we are in control of decorations.
 			r := windows.Rect{
@@ -721,8 +729,7 @@ func (w *window) Configure(options []Option) {
 			windows.AdjustWindowRectEx(&r, uint32(style), 0, dwExStyle)
 			width = r.Right - r.Left
 			height = r.Bottom - r.Top
-		}
-		if !w.config.Decorated {
+		} else {
 			// Enable drop shadows when we draw decorations.
 			windows.DwmExtendFrameIntoClientArea(w.hwnd, windows.Margins{-1, -1, -1, -1})
 		}
@@ -738,8 +745,6 @@ func (w *window) Configure(options []Option) {
 	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style)
 	windows.SetWindowPos(w.hwnd, 0, x, y, width, height, swpStyle)
 	windows.ShowWindow(w.hwnd, showMode)
-
-	w.update()
 }
 
 func (w *window) WriteClipboard(mime string, s []byte) {
