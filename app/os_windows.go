@@ -736,10 +736,6 @@ func (w *window) Configure(options []Option) {
 
 	case Fullscreen:
 		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
-		mi := windows.GetMonitorInfo(w.hwnd)
-		x, y = mi.Monitor.Left, mi.Monitor.Top
-		width = mi.Monitor.Right - mi.Monitor.Left
-		height = mi.Monitor.Bottom - mi.Monitor.Top
 		showMode = windows.SW_SHOWMAXIMIZED
 	}
 	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style)
