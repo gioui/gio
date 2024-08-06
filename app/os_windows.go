@@ -563,7 +563,8 @@ func (w *window) runLoop() {
 	msg := new(windows.Msg)
 loop:
 	for {
-		if w.hwnd != 0 && w.animating && !windows.PeekMessage(msg, 0, 0, 0, windows.PM_NOREMOVE) {
+		anim := w.animating
+		if anim && !windows.PeekMessage(msg, 0, 0, 0, windows.PM_NOREMOVE) {
 			w.draw(false)
 			continue
 		}
