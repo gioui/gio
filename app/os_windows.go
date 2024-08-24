@@ -348,23 +348,22 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		}
 	case windows.WM_GETMINMAXINFO:
 		mm := (*windows.MinMaxInfo)(unsafe.Pointer(lParam))
-		var bw, bh int32
-		if w.config.Decorated {
+		if w.config.Decorated && w.config.barWidth == 0 && w.config.barHeight == 0 {
 			r := windows.GetWindowRect(w.hwnd)
 			cr := windows.GetClientRect(w.hwnd)
-			bw = r.Right - r.Left - (cr.Right - cr.Left)
-			bh = r.Bottom - r.Top - (cr.Bottom - cr.Top)
+			w.config.barWidth = r.Right - r.Left - (cr.Right - cr.Left)
+			w.config.barHeight = r.Bottom - r.Top - (cr.Bottom - cr.Top)
 		}
 		if p := w.config.MinSize; p.X > 0 || p.Y > 0 {
 			mm.PtMinTrackSize = windows.Point{
-				X: int32(p.X) + bw,
-				Y: int32(p.Y) + bh,
+				X: int32(p.X) + w.config.barWidth,
+				Y: int32(p.Y) + w.config.barHeight,
 			}
 		}
 		if p := w.config.MaxSize; p.X > 0 || p.Y > 0 {
 			mm.PtMaxTrackSize = windows.Point{
-				X: int32(p.X) + bw,
-				Y: int32(p.Y) + bh,
+				X: int32(p.X) + w.config.barWidth,
+				Y: int32(p.Y) + w.config.barHeight,
 			}
 		}
 		return 0

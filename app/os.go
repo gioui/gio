@@ -50,6 +50,9 @@ type Config struct {
 	// decoHeight is the height of the fallback decoration for platforms such
 	// as Wayland that may need fallback client-side decorations.
 	decoHeight unit.Dp
+	// barWidth and barHeight are parameters related to window decorations.
+	barWidth   int32
+	barHeight  int32
 }
 
 // ConfigEvent is sent whenever the configuration of a Window changes.
