@@ -45,6 +45,12 @@ type Config struct {
 	CustomRenderer bool
 	// Decorated reports whether window decorations are provided automatically.
 	Decorated bool
+
+	// HiddenMinimizeButton hide the window's minimize button (only works for windows and macOS)
+	HiddenMinimizeButton bool
+	// HiddenMaximizeButton hide the window's maximize button (only works for windows and macOS)
+	HiddenMaximizeButton bool
+
 	// Focused reports whether has the keyboard focus.
 	Focused bool
 	// decoHeight is the height of the fallback decoration for platforms such
