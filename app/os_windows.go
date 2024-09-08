@@ -691,6 +691,8 @@ func (w *window) Configure(options []Option) {
 	cnf.apply(metric, options)
 	w.config.Title = cnf.Title
 	w.config.Decorated = cnf.Decorated
+	w.config.MinSize = cnf.MinSize
+	w.config.MaxSize = cnf.MaxSize
 	windows.SetWindowText(w.hwnd, cnf.Title)
 
 	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
