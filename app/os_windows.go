@@ -46,14 +46,13 @@ type window struct {
 	cursorIn bool
 	cursor   syscall.Handle
 
-	// placement saves the previous window position when in full screen mode.
-	placement *windows.WindowPlacement
-
 	animating bool
 
 	borderSize image.Point
 	config     Config
-	loop       *eventLoop
+	// frameDims stores the last seen window frame width and height.
+	frameDims image.Point
+	loop      *eventLoop
 }
 
 const _WM_WAKEUP = windows.WM_USER + iota
@@ -189,17 +188,24 @@ func (w *window) init() error {
 // It reads the window style and size/position and updates w.config.
 // If anything has changed it emits a ConfigEvent to notify the application.
 func (w *window) update() {
-	cr := windows.GetClientRect(w.hwnd)
-	w.config.Size = image.Point{
-		X: int(cr.Right - cr.Left),
-		Y: int(cr.Bottom - cr.Top),
+	p := windows.GetWindowPlacement(w.hwnd)
+	if !p.IsMinimized() {
+		r := windows.GetWindowRect(w.hwnd)
+		cr := windows.GetClientRect(w.hwnd)
+		w.config.Size = image.Point{
+			X: int(cr.Right - cr.Left),
+			Y: int(cr.Bottom - cr.Top),
+		}
+		w.frameDims = image.Point{
+			X: int(r.Right - r.Left),
+			Y: int(r.Bottom - r.Top),
+		}.Sub(w.config.Size)
 	}
 
 	w.borderSize = image.Pt(
 		windows.GetSystemMetrics(windows.SM_CXSIZEFRAME),
 		windows.GetSystemMetrics(windows.SM_CYSIZEFRAME),
 	)
-	p := windows.GetWindowPlacement(w.hwnd)
 	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
 	switch {
 	case p.IsMaximized() && style&windows.WS_OVERLAPPEDWINDOW != 0:
@@ -347,23 +353,23 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.update()
 	case windows.WM_GETMINMAXINFO:
 		mm := (*windows.MinMaxInfo)(unsafe.Pointer(lParam))
-		var bw, bh int32
+
+		var frameDims image.Point
 		if w.config.Decorated {
-			r := windows.GetWindowRect(w.hwnd)
-			cr := windows.GetClientRect(w.hwnd)
-			bw = r.Right - r.Left - (cr.Right - cr.Left)
-			bh = r.Bottom - r.Top - (cr.Bottom - cr.Top)
+			frameDims = w.frameDims
 		}
 		if p := w.config.MinSize; p.X > 0 || p.Y > 0 {
+			p = p.Add(frameDims)
 			mm.PtMinTrackSize = windows.Point{
-				X: int32(p.X) + bw,
-				Y: int32(p.Y) + bh,
+				X: int32(p.X),
+				Y: int32(p.Y),
 			}
 		}
 		if p := w.config.MaxSize; p.X > 0 || p.Y > 0 {
+			p = p.Add(frameDims)
 			mm.PtMaxTrackSize = windows.Point{
-				X: int32(p.X) + bw,
-				Y: int32(p.Y) + bh,
+				X: int32(p.X),
+				Y: int32(p.Y),
 			}
 		}
 		return 0
