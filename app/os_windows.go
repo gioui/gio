@@ -107,8 +107,8 @@ func newWindow(win *callbacks, options []Option) {
 		}
 		winMap.Store(w.hwnd, w)
 		defer winMap.Delete(w.hwnd)
-		w.ProcessEvent(Win32ViewEvent{HWND: uintptr(w.hwnd)})
 		w.Configure(options)
+		w.ProcessEvent(Win32ViewEvent{HWND: uintptr(w.hwnd)})
 		windows.SetForegroundWindow(w.hwnd)
 		windows.SetFocus(w.hwnd)
 		// Since the window class for the cursor is null,
