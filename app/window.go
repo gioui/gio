@@ -335,10 +335,7 @@ func (w *Window) updateAnimation() {
 			w.scheduleInvalidate(w.nextFrame)
 		}
 	}
-	if animate != w.animating {
-		w.animating = animate
-		w.driver.SetAnimating(animate)
-	}
+	w.driver.SetAnimating(animate)
 }
 
 func (w *Window) scheduleInvalidate(t time.Time) {
