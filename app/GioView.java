@@ -260,6 +260,10 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	}
 
 	private void setHighRefreshRate() {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+			return;
+		}
+
 		Context context = getContext();
 		Display display = context.getDisplay();
 		Display.Mode[] supportedModes = display.getSupportedModes();
