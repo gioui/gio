@@ -394,6 +394,8 @@ func (c *callbacks) SetDriver(d driver) {
 	if d == nil {
 		panic("nil driver")
 	}
+	c.w.invMu.Lock()
+	defer c.w.invMu.Unlock()
 	c.w.driver = d
 }
 
@@ -647,8 +649,8 @@ func (w *Window) processEvent(e event.Event) bool {
 		w.destroyGPU()
 		w.invMu.Lock()
 		w.mayInvalidate = false
-		w.invMu.Unlock()
 		w.driver = nil
+		w.invMu.Unlock()
 		if q := w.timer.quit; q != nil {
 			q <- struct{}{}
 			<-q
