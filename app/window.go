@@ -726,7 +726,7 @@ func (w *Window) Event() event.Event {
 	if w.driver == nil {
 		e, ok := w.nextEvent()
 		if !ok {
-			panic("window initializion failed without a DestroyEvent")
+			panic("window initialization failed without a DestroyEvent")
 		}
 		return e
 	}
