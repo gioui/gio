@@ -15,6 +15,7 @@ __attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(BOOL presentWi
 @end
 
 @interface GioView : NSView <CALayerDelegate,NSTextInputClient>
+@property NSEvent *lastKeyDown;
 @property uintptr_t handle;
 @property BOOL presentWithTrans;
 @end
@@ -132,7 +133,10 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	handleMouse(self, event, MOUSE_SCROLL, dx, dy);
 }
 - (void)keyDown:(NSEvent *)event {
+	// Stash the event for use by doCommandBySelector.
+	self.lastKeyDown = event;
 	[self interpretKeyEvents:[NSArray arrayWithObject:event]];
+	self.lastKeyDown = nil;
 	NSString *keys = [event charactersIgnoringModifiers];
 	gio_onKeys(self.handle, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], true);
 }
@@ -143,9 +147,47 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 - (void)insertText:(id)string {
 	gio_onText(self.handle, (__bridge CFTypeRef)string);
 }
-- (void)doCommandBySelector:(SEL)sel {
-	// Don't pass commands up the responder chain.
-	// They will end up in a beep.
+- (void)doCommandBySelector:(SEL)action {
+	NSEvent *event = self.lastKeyDown;
+	if (event == nil) {
+		return;
+	}
+	int key = 0;
+	if (action == @selector(deleteBackward:)) {
+		key = KEY_DELETE_BACKWARD;
+	} else if (action == @selector(deleteForward:)) {
+		key = NSDeleteFunctionKey;
+	} else if (action == @selector(insertNewline:)) {
+		NSString *keys = [event charactersIgnoringModifiers];
+		if ([keys isEqualToString:@"\r"]) {
+			key = KEY_RETURN;
+		} else {
+			key = KEY_ENTER;
+		}
+	} else if (action == @selector(moveUp:)) {
+		key = NSUpArrowFunctionKey;
+	} else if (action == @selector(moveDown:)) {
+		key = NSDownArrowFunctionKey;
+	} else if (action == @selector(moveLeft:)) {
+		key = NSLeftArrowFunctionKey;
+	} else if (action == @selector(moveRight:)) {
+		key = NSRightArrowFunctionKey;
+	} else if (action == @selector(cancelOperation:)) {
+		key = KEY_ESCAPE;
+	} else if (action == @selector(insertTab:)) {
+		key = KEY_TAB;
+	} else if (action == @selector(scrollToBeginningOfDocument:)) {
+		key = NSHomeFunctionKey;
+	} else if (action == @selector(scrollToEndOfDocument:)) {
+		key = NSEndFunctionKey;
+	} else if (action == @selector(scrollPageUp:)) {
+		key = NSPageUpFunctionKey;
+	} else if (action == @selector(scrollPageDown:)) {
+		key = NSPageDownFunctionKey;
+	} else {
+		return;
+	}
+	gio_onCommandBySelector(self.handle, key, [event timestamp], [event modifierFlags]);
 }
 
 - (BOOL)hasMarkedText {
@@ -183,6 +225,10 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 }
 - (void)insertText:(id)string
   replacementRange:(NSRange)replaceRange {
+	NSEvent *event = self.lastKeyDown;
+	if (event == nil) {
+		return;
+	}
 	NSString *str;
 	// string is either an NSAttributedString or an NSString.
 	if ([string isKindOfClass:[NSAttributedString class]]) {
@@ -190,7 +236,7 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	} else {
 		str = string;
 	}
-	gio_insertText(self.handle, (__bridge CFTypeRef)str, replaceRange);
+	gio_insertText(self.handle, (__bridge CFTypeRef)str, replaceRange, [event timestamp], [event modifierFlags]);
 }
 - (NSUInteger)characterIndexForPoint:(NSPoint)p {
 	return gio_characterIndexForPoint(self.handle, p);
