@@ -195,8 +195,6 @@ type driver interface {
 	Configure([]Option)
 	// SetCursor updates the current cursor to name.
 	SetCursor(cursor pointer.Cursor)
-	// Wakeup wakes up the event loop and sends a WakeupEvent.
-	// Wakeup()
 	// Perform actions on the window.
 	Perform(system.Action)
 	// EditorStateChanged notifies the driver that the editor state changed.
