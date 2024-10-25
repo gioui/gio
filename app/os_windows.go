@@ -314,6 +314,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_DESTROY:
 		w.ProcessEvent(Win32ViewEvent{})
 		w.ProcessEvent(DestroyEvent{})
+		w.w = nil
 		if w.hdc != 0 {
 			windows.ReleaseDC(w.hdc)
 			w.hdc = 0
@@ -321,6 +322,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		// The system destroys the HWND for us.
 		w.hwnd = 0
 		windows.PostQuitMessage(0)
+		return 0
 	case windows.WM_NCCALCSIZE:
 		if w.config.Decorated {
 			// Let Windows handle decorations.
