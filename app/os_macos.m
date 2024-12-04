@@ -140,6 +140,10 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	NSString *keys = [event charactersIgnoringModifiers];
 	gio_onKeys(self.handle, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], true);
 }
+- (void)flagsChanged:(NSEvent *)event {
+	[self interpretKeyEvents:[NSArray arrayWithObject:event]];
+	gio_onFlagsChanged(self.handle, [event modifierFlags]);
+}
 - (void)keyUp:(NSEvent *)event {
 	NSString *keys = [event charactersIgnoringModifiers];
 	gio_onKeys(self.handle, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], false);

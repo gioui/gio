@@ -346,6 +346,7 @@ type window struct {
 	cursor      pointer.Cursor
 	pointerBtns pointer.Buttons
 	loop        *eventLoop
+	lastMods    C.NSUInteger
 
 	scale  float32
 	config Config
@@ -599,6 +600,32 @@ func (w *window) commandKey(k rune, ti C.double, mods C.NSUInteger) bool {
 		State:     key.Press,
 	})
 	return true
+}
+
+//export gio_onFlagsChanged
+func gio_onFlagsChanged(h C.uintptr_t, curMods C.NSUInteger) {
+	w := windowFor(h)
+
+	mods := []C.NSUInteger{C.NSControlKeyMask, C.NSAlternateKeyMask, C.NSShiftKeyMask, C.NSCommandKeyMask}
+	keys := []key.Name{key.NameCtrl, key.NameAlt, key.NameShift, key.NameCommand}
+
+	for i, mod := range mods {
+		wasPressed := w.lastMods&mod != 0
+		isPressed := curMods&mod != 0
+
+		if wasPressed != isPressed {
+			st := key.Release
+			if isPressed {
+				st = key.Press
+			}
+			w.ProcessEvent(key.Event{
+				Name:  keys[i],
+				State: st,
+			})
+		}
+	}
+
+	w.lastMods = curMods
 }
 
 //export gio_onText
