@@ -318,6 +318,11 @@ static void invalidateCharacterCoordinates(CFTypeRef viewRef) {
 		}
 	}
 }
+
+static void setFocus(CFTypeRef viewRef) {
+     NSView *view = (__bridge NSView *)viewRef;
+     [view.window makeFirstResponder:view];
+}
 */
 import "C"
 
@@ -526,7 +531,11 @@ func (w *window) EditorStateChanged(old, new editorState) {
 	}
 }
 
-func (w *window) ShowTextInput(show bool) {}
+func (w *window) ShowTextInput(show bool) {
+	if show && !w.config.Focused {
+		C.setFocus(w.view)
+	}
+}
 
 func (w *window) SetInputHint(_ key.InputHint) {}
 
