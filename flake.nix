@@ -3,7 +3,7 @@
   description = "Gio build environment";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/23.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     android.url = "github:tadfisher/android-nixpkgs";
     android.inputs.nixpkgs.follows = "nixpkgs";
   };
@@ -47,12 +47,6 @@
                   xorg.libXfixes
                   libGL
                   pkg-config
-                ] else if stdenv.isDarwin then [
-                  darwin.apple_sdk_11_0.frameworks.Foundation
-                  darwin.apple_sdk_11_0.frameworks.Metal
-                  darwin.apple_sdk_11_0.frameworks.QuartzCore
-                  darwin.apple_sdk_11_0.frameworks.AppKit
-                  darwin.apple_sdk_11_0.MacOSX-SDK
                 ] else [ ]);
               } // (if stdenv.isLinux then {
                 LD_LIBRARY_PATH = "${vulkan-loader}/lib";
