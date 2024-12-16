@@ -12,10 +12,9 @@ import (
 
 	"github.com/go-text/typesetting/di"
 	"github.com/go-text/typesetting/font"
+	gotextot "github.com/go-text/typesetting/font/opentype"
 	"github.com/go-text/typesetting/fontscan"
 	"github.com/go-text/typesetting/language"
-	"github.com/go-text/typesetting/opentype/api"
-	"github.com/go-text/typesetting/opentype/api/metadata"
 	"github.com/go-text/typesetting/shaping"
 	"golang.org/x/exp/slices"
 	"golang.org/x/image/math/fixed"
@@ -201,7 +200,7 @@ type runLayout struct {
 	// Direction is the layout direction of the glyphs.
 	Direction system.TextDirection
 	// face is the font face that the ID of each Glyph in the Layout refers to.
-	face font.Face
+	face *font.Face
 	// truncator indicates that this run is a text truncator standing in for remaining
 	// text.
 	truncator bool
@@ -211,8 +210,8 @@ type runLayout struct {
 type shaperImpl struct {
 	// Fields for tracking fonts/faces.
 	fontMap      *fontscan.FontMap
-	faces        []font.Face
-	faceToIndex  map[font.Font]int
+	faces        []*font.Face
+	faceToIndex  map[*font.Font]int
 	faceMeta     []giofont.Font
 	defaultFaces []string
 	logger       interface {
@@ -254,7 +253,7 @@ func newShaperImpl(systemFonts bool, collection []FontFace) *shaperImpl {
 	var shaper shaperImpl
 	shaper.logger = newDebugLogger()
 	shaper.fontMap = fontscan.NewFontMap(shaper.logger)
-	shaper.faceToIndex = make(map[font.Font]int)
+	shaper.faceToIndex = make(map[*font.Font]int)
 	if systemFonts {
 		str, err := os.UserCacheDir()
 		if err != nil {
@@ -282,7 +281,7 @@ func (s *shaperImpl) Load(f FontFace) {
 	s.addFace(f.Face.Face(), f.Font)
 }
 
-func (s *shaperImpl) addFace(f font.Face, md giofont.Font) {
+func (s *shaperImpl) addFace(f *font.Face, md giofont.Font) {
 	if _, ok := s.faceToIndex[f.Font]; ok {
 		return
 	}
@@ -377,11 +376,11 @@ func (s *shaperImpl) splitBidi(input shaping.Input) []shaping.Input {
 // ResolveFace allows shaperImpl to implement shaping.FontMap, wrapping its fontMap
 // field and ensuring that any faces loaded as part of the search are registered with
 // ids so that they can be referred to by a GlyphID.
-func (s *shaperImpl) ResolveFace(r rune) font.Face {
+func (s *shaperImpl) ResolveFace(r rune) *font.Face {
 	face := s.fontMap.ResolveFace(r)
 	if face != nil {
 		family, aspect := s.fontMap.FontMetadata(face.Font)
-		md := opentype.DescriptionToFont(metadata.Description{
+		md := opentype.DescriptionToFont(font.Description{
 			Family: family,
 			Aspect: aspect,
 		})
@@ -663,7 +662,7 @@ func (s *shaperImpl) Shape(pathOps *op.Ops, gs []Glyph) clip.PathSpec {
 		scaleFactor := fixedToFloat(ppem) / float32(face.Upem())
 		glyphData := face.GlyphData(gid)
 		switch glyphData := glyphData.(type) {
-		case api.GlyphOutline:
+		case font.GlyphOutline:
 			outline := glyphData
 			// Move to glyph position.
 			pos := f32.Point{
@@ -678,9 +677,9 @@ func (s *shaperImpl) Shape(pathOps *op.Ops, gs []Glyph) clip.PathSpec {
 			for _, fseg := range outline.Segments {
 				nargs := 1
 				switch fseg.Op {
-				case api.SegmentOpQuadTo:
+				case gotextot.SegmentOpQuadTo:
 					nargs = 2
-				case api.SegmentOpCubeTo:
+				case gotextot.SegmentOpCubeTo:
 					nargs = 3
 				}
 				var args [3]f32.Point
@@ -695,13 +694,13 @@ func (s *shaperImpl) Shape(pathOps *op.Ops, gs []Glyph) clip.PathSpec {
 					}
 				}
 				switch fseg.Op {
-				case api.SegmentOpMoveTo:
+				case gotextot.SegmentOpMoveTo:
 					builder.Move(args[0])
-				case api.SegmentOpLineTo:
+				case gotextot.SegmentOpLineTo:
 					builder.Line(args[0])
-				case api.SegmentOpQuadTo:
+				case gotextot.SegmentOpQuadTo:
 					builder.Quad(args[0], args[1])
-				case api.SegmentOpCubeTo:
+				case gotextot.SegmentOpCubeTo:
 					builder.Cube(args[0], args[1], args[2])
 				default:
 					panic("unsupported segment op")
@@ -742,16 +741,16 @@ func (s *shaperImpl) Bitmaps(ops *op.Ops, gs []Glyph) op.CallOp {
 		}
 		glyphData := face.GlyphData(gid)
 		switch glyphData := glyphData.(type) {
-		case api.GlyphBitmap:
+		case font.GlyphBitmap:
 			var imgOp paint.ImageOp
 			var imgSize image.Point
 			bitmapData, ok := s.bitmapGlyphCache.Get(g.ID)
 			if !ok {
 				var img image.Image
 				switch glyphData.Format {
-				case api.PNG, api.JPG, api.TIFF:
+				case font.PNG, font.JPG, font.TIFF:
 					img, _, _ = image.Decode(bytes.NewReader(glyphData.Data))
-				case api.BlackAndWhite:
+				case font.BlackAndWhite:
 					// This is a complex family of uncompressed bitmaps that don't seem to be
 					// very common in practice. We can try adding support later if needed.
 					fallthrough
@@ -807,7 +806,7 @@ type langConfig struct {
 }
 
 // toInput converts its parameters into a shaping.Input.
-func toInput(face font.Face, ppem fixed.Int26_6, lc langConfig, runes []rune) shaping.Input {
+func toInput(face *font.Face, ppem fixed.Int26_6, lc langConfig, runes []rune) shaping.Input {
 	var input shaping.Input
 	input.Direction = lc.Direction
 	input.Text = runes
@@ -867,7 +866,7 @@ func toGioGlyphs(in []shaping.Glyph, ppem fixed.Int26_6, faceIdx int) []glyph {
 }
 
 // toLine converts the output into a Line with the provided dominant text direction.
-func toLine(faceToIndex map[font.Font]int, o shaping.Line, dir system.TextDirection) line {
+func toLine(faceToIndex map[*font.Font]int, o shaping.Line, dir system.TextDirection) line {
 	if len(o) < 1 {
 		return line{}
 	}
@@ -881,7 +880,7 @@ func toLine(faceToIndex map[font.Font]int, o shaping.Line, dir system.TextDirect
 		if run.Size > maxSize {
 			maxSize = run.Size
 		}
-		var font font.Font
+		var font *font.Font
 		if run.Face != nil {
 			font = run.Face.Font
 		}

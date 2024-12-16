@@ -34,7 +34,7 @@ type Font struct {
 // Face is an opaque handle to a typeface. The concrete implementation depends
 // upon the kind of font and shaper in use.
 type Face interface {
-	Face() font.Face
+	Face() *font.Face
 }
 
 // Typeface identifies a list of font families to attempt to use for displaying
