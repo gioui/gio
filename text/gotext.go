@@ -490,6 +490,7 @@ func wrapPolicyToGoText(p WrapPolicy) shaping.LineBreakPolicy {
 // shapeAndWrapText invokes the text shaper and returns wrapped lines in the shaper's native format.
 func (s *shaperImpl) shapeAndWrapText(params Parameters, txt []rune) (_ []shaping.Line, truncated int) {
 	wc := shaping.WrapConfig{
+		Direction:          mapDirection(params.Locale.Direction),
 		TruncateAfterLines: params.MaxLines,
 		TextContinues:      params.forceTruncate,
 		BreakPolicy:        wrapPolicyToGoText(params.WrapPolicy),
@@ -871,8 +872,9 @@ func toLine(faceToIndex map[*font.Font]int, o shaping.Line, dir system.TextDirec
 		return line{}
 	}
 	line := line{
-		runs:      make([]runLayout, len(o)),
-		direction: dir,
+		runs:        make([]runLayout, len(o)),
+		direction:   dir,
+		visualOrder: make([]int, len(o)),
 	}
 	maxSize := fixed.Int26_6(0)
 	for i := range o {
@@ -890,11 +892,13 @@ func toLine(faceToIndex map[*font.Font]int, o shaping.Line, dir system.TextDirec
 				Count:  run.Runes.Count,
 				Offset: line.runeCount,
 			},
-			Direction: unmapDirection(run.Direction),
-			face:      run.Face,
-			Advance:   run.Advance,
-			PPEM:      run.Size,
+			Direction:      unmapDirection(run.Direction),
+			face:           run.Face,
+			Advance:        run.Advance,
+			PPEM:           run.Size,
+			VisualPosition: int(run.VisualIndex),
 		}
+		line.visualOrder[run.VisualIndex] = i
 		line.runeCount += run.Runes.Count
 		line.width += run.Advance
 		if line.ascent < run.LineBounds.Ascent {
@@ -905,64 +909,11 @@ func toLine(faceToIndex map[*font.Font]int, o shaping.Line, dir system.TextDirec
 		}
 	}
 	line.lineHeight = maxSize
-	computeVisualOrder(&line)
-	return line
-}
-
-// computeVisualOrder will populate the Line's VisualOrder field and the
-// VisualPosition field of each element in Runs.
-func computeVisualOrder(l *line) {
-	l.visualOrder = make([]int, len(l.runs))
-	const none = -1
-	bidiRangeStart := none
-
-	// visPos returns the visual position for an individual logically-indexed
-	// run in this line, taking only the line's overall text direction into
-	// account.
-	visPos := func(logicalIndex int) int {
-		if l.direction.Progression() == system.TowardOrigin {
-			return len(l.runs) - 1 - logicalIndex
-		}
-		return logicalIndex
-	}
-
-	// resolveBidi populated the line's VisualOrder fields for the elements in the
-	// half-open range [bidiRangeStart:bidiRangeEnd) indicating that those elements
-	// should be displayed in reverse-visual order.
-	resolveBidi := func(bidiRangeStart, bidiRangeEnd int) {
-		firstVisual := bidiRangeEnd - 1
-		// Just found the end of a bidi range.
-		for startIdx := bidiRangeStart; startIdx < bidiRangeEnd; startIdx++ {
-			pos := visPos(firstVisual)
-			l.runs[startIdx].VisualPosition = pos
-			l.visualOrder[pos] = startIdx
-			firstVisual--
-		}
-		bidiRangeStart = none
-	}
-	for runIdx, run := range l.runs {
-		if run.Direction.Progression() != l.direction.Progression() {
-			if bidiRangeStart == none {
-				bidiRangeStart = runIdx
-			}
-			continue
-		} else if bidiRangeStart != none {
-			// Just found the end of a bidi range.
-			resolveBidi(bidiRangeStart, runIdx)
-			bidiRangeStart = none
-		}
-		pos := visPos(runIdx)
-		l.runs[runIdx].VisualPosition = pos
-		l.visualOrder[pos] = runIdx
-	}
-	if bidiRangeStart != none {
-		// We ended iteration within a bidi segment, resolve it.
-		resolveBidi(bidiRangeStart, len(l.runs))
-	}
 	// Iterate and resolve the X of each run.
 	x := fixed.Int26_6(0)
-	for _, runIdx := range l.visualOrder {
-		l.runs[runIdx].X = x
-		x += l.runs[runIdx].Advance
+	for _, runIdx := range line.visualOrder {
+		line.runs[runIdx].X = x
+		x += line.runs[runIdx].Advance
 	}
+	return line
 }
