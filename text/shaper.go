@@ -76,6 +76,11 @@ type Parameters struct {
 	// text with a MaxLines. It is unexported because this behavior only makes sense for the
 	// shaper to control when it iterates paragraphs of text.
 	forceTruncate bool
+
+	// DisableSpaceTrim prevents the width of the final whitespace glyph on a line from being zeroed.
+	// This is desirable for text editors (so that the whitespace can be selected), but is undesirable
+	// for ordinary display text.
+	DisableSpaceTrim bool
 }
 
 type FontFace = giofont.FontFace

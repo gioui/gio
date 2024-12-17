@@ -490,10 +490,11 @@ func wrapPolicyToGoText(p WrapPolicy) shaping.LineBreakPolicy {
 // shapeAndWrapText invokes the text shaper and returns wrapped lines in the shaper's native format.
 func (s *shaperImpl) shapeAndWrapText(params Parameters, txt []rune) (_ []shaping.Line, truncated int) {
 	wc := shaping.WrapConfig{
-		Direction:          mapDirection(params.Locale.Direction),
-		TruncateAfterLines: params.MaxLines,
-		TextContinues:      params.forceTruncate,
-		BreakPolicy:        wrapPolicyToGoText(params.WrapPolicy),
+		Direction:                     mapDirection(params.Locale.Direction),
+		TruncateAfterLines:            params.MaxLines,
+		TextContinues:                 params.forceTruncate,
+		BreakPolicy:                   wrapPolicyToGoText(params.WrapPolicy),
+		DisableTrailingWhitespaceTrim: params.DisableSpaceTrim,
 	}
 	families := s.defaultFaces
 	if params.Font.Typeface != "" {
