@@ -9,8 +9,6 @@ import (
 	"unsafe"
 
 	syscall "golang.org/x/sys/windows"
-
-	"gioui.org/internal/gl"
 )
 
 type (
@@ -24,23 +22,23 @@ type (
 )
 
 var (
-	libEGL                  = syscall.NewLazyDLL("libEGL.dll")
-	_eglChooseConfig        = libEGL.NewProc("eglChooseConfig")
-	_eglCreateContext       = libEGL.NewProc("eglCreateContext")
-	_eglCreateWindowSurface = libEGL.NewProc("eglCreateWindowSurface")
-	_eglDestroyContext      = libEGL.NewProc("eglDestroyContext")
-	_eglDestroySurface      = libEGL.NewProc("eglDestroySurface")
-	_eglGetConfigAttrib     = libEGL.NewProc("eglGetConfigAttrib")
-	_eglGetDisplay          = libEGL.NewProc("eglGetDisplay")
-	_eglGetError            = libEGL.NewProc("eglGetError")
-	_eglInitialize          = libEGL.NewProc("eglInitialize")
-	_eglMakeCurrent         = libEGL.NewProc("eglMakeCurrent")
-	_eglReleaseThread       = libEGL.NewProc("eglReleaseThread")
-	_eglSwapInterval        = libEGL.NewProc("eglSwapInterval")
-	_eglSwapBuffers         = libEGL.NewProc("eglSwapBuffers")
-	_eglTerminate           = libEGL.NewProc("eglTerminate")
-	_eglQueryString         = libEGL.NewProc("eglQueryString")
-	_eglWaitClient          = libEGL.NewProc("eglWaitClient")
+	libEGL                  = syscall.DLL{}
+	_eglChooseConfig        *syscall.Proc
+	_eglCreateContext       *syscall.Proc
+	_eglCreateWindowSurface *syscall.Proc
+	_eglDestroyContext      *syscall.Proc
+	_eglDestroySurface      *syscall.Proc
+	_eglGetConfigAttrib     *syscall.Proc
+	_eglGetDisplay          *syscall.Proc
+	_eglGetError            *syscall.Proc
+	_eglInitialize          *syscall.Proc
+	_eglMakeCurrent         *syscall.Proc
+	_eglReleaseThread       *syscall.Proc
+	_eglSwapInterval        *syscall.Proc
+	_eglSwapBuffers         *syscall.Proc
+	_eglTerminate           *syscall.Proc
+	_eglQueryString         *syscall.Proc
+	_eglWaitClient          *syscall.Proc
 )
 
 var loadOnce sync.Once
@@ -54,21 +52,45 @@ func loadEGL() error {
 }
 
 func loadDLLs() error {
-	if err := loadDLL(libEGL, "libEGL.dll"); err != nil {
+	if err := loadDLL(&libEGL, "libEGL.dll"); err != nil {
 		return err
 	}
-	if err := loadDLL(gl.LibGLESv2, "libGLESv2.dll"); err != nil {
-		return err
+
+	procs := map[string]**syscall.Proc{
+		"eglChooseConfig":        &_eglChooseConfig,
+		"eglCreateContext":       &_eglCreateContext,
+		"eglCreateWindowSurface": &_eglCreateWindowSurface,
+		"eglDestroyContext":      &_eglDestroyContext,
+		"eglDestroySurface":      &_eglDestroySurface,
+		"eglGetConfigAttrib":     &_eglGetConfigAttrib,
+		"eglGetDisplay":          &_eglGetDisplay,
+		"eglGetError":            &_eglGetError,
+		"eglInitialize":          &_eglInitialize,
+		"eglMakeCurrent":         &_eglMakeCurrent,
+		"eglReleaseThread":       &_eglReleaseThread,
+		"eglSwapInterval":        &_eglSwapInterval,
+		"eglSwapBuffers":         &_eglSwapBuffers,
+		"eglTerminate":           &_eglTerminate,
+		"eglQueryString":         &_eglQueryString,
+		"eglWaitClient":          &_eglWaitClient,
 	}
-	// d3dcompiler_47.dll is needed internally for shader compilation to function.
-	return loadDLL(syscall.NewLazyDLL("d3dcompiler_47.dll"), "d3dcompiler_47.dll")
+	for name, proc := range procs {
+		p, err := libEGL.FindProc(name)
+		if err != nil {
+			return fmt.Errorf("failed to locate %s in %s: %w", name, libEGL.Name, err)
+		}
+		*proc = p
+	}
+	return nil
 }
 
-func loadDLL(dll *syscall.LazyDLL, name string) error {
-	err := dll.Load()
+func loadDLL(dll *syscall.DLL, name string) error {
+	handle, err := syscall.LoadLibraryEx(name, 0, syscall.LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)
 	if err != nil {
 		return fmt.Errorf("egl: failed to load %s: %v", name, err)
 	}
+	dll.Handle = handle
+	dll.Name = name
 	return nil
 }
 
