@@ -147,7 +147,9 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	gio_onText(self.handle, (__bridge CFTypeRef)string);
 }
 - (void)doCommandBySelector:(SEL)action {
-	gio_onCommandBySelector(self.handle);
+	if (!gio_onCommandBySelector(self.handle)) {
+		[super doCommandBySelector:action];
+	}
 }
 - (BOOL)hasMarkedText {
 	int res = gio_hasMarkedText(self.handle);

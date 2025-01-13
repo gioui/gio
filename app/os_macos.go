@@ -354,9 +354,14 @@ type window struct {
 	config Config
 
 	keysDown map[key.Name]struct{}
-	// doCommandBySelectorCalled tracks whether a call to
-	// interpretKeys resulted in a callback.
-	doCommandBySelectorCalled bool
+	// cmdKeys is for storing the current key event while
+	// waiting for a doCommandBySelector.
+	cmdKeys cmdKeys
+}
+
+type cmdKeys struct {
+	eventStr  string
+	eventMods key.Modifiers
 }
 
 // launched is closed when applicationDidFinishLaunching is called.
@@ -558,47 +563,64 @@ func (w *window) runOnMain(f func()) {
 //export gio_onKeys
 func gio_onKeys(h C.uintptr_t, event C.CFTypeRef, cstr C.CFTypeRef, ti C.double, mods C.NSUInteger, keyDown C.bool) {
 	w := windowFor(h)
+	if w.keysDown == nil {
+		w.keysDown = make(map[key.Name]struct{})
+	}
 	str := nsstringToString(cstr)
 	kmods := convertMods(mods)
 	ks := key.Release
 	if keyDown {
 		ks = key.Press
-		w.doCommandBySelectorCalled = false
+		w.cmdKeys.eventStr = str
+		w.cmdKeys.eventMods = kmods
 		C.interpretKeyEvents(w.view, event)
 	}
 	for _, k := range str {
 		if n, ok := convertKey(k); ok {
+			ke := key.Event{
+				Name:      n,
+				Modifiers: kmods,
+				State:     ks,
+			}
 			if keyDown {
-				if !w.doCommandBySelectorCalled {
-					if _, isCmd := convertCommandKey(k); isCmd {
-						// doCommandBySelector was not called,
-						// so this event was swallowed by an IME.
-						return
-					}
+				w.keysDown[ke.Name] = struct{}{}
+				if _, isCmd := convertCommandKey(k); isCmd || kmods.Contain(key.ModCommand) {
+					// doCommandBySelector already processed the event.
+					return
 				}
-				if w.keysDown == nil {
-					w.keysDown = make(map[key.Name]struct{})
-				}
-				w.keysDown[n] = struct{}{}
 			} else {
 				if _, pressed := w.keysDown[n]; !pressed {
 					continue
 				}
 				delete(w.keysDown, n)
 			}
-			w.ProcessEvent(key.Event{
-				Name:      n,
-				Modifiers: kmods,
-				State:     ks,
-			})
+			w.ProcessEvent(ke)
 		}
 	}
 }
 
 //export gio_onCommandBySelector
-func gio_onCommandBySelector(h C.uintptr_t) {
+func gio_onCommandBySelector(h C.uintptr_t) C.bool {
 	w := windowFor(h)
-	w.doCommandBySelectorCalled = true
+	ev := w.cmdKeys
+	w.cmdKeys = cmdKeys{}
+	handled := false
+	for _, k := range ev.eventStr {
+		n, ok := convertCommandKey(k)
+		if !ok && ev.eventMods.Contain(key.ModCommand) {
+			n, ok = convertKey(k)
+		}
+		if !ok {
+			continue
+		}
+		ke := key.Event{
+			Name:      n,
+			Modifiers: ev.eventMods,
+			State:     key.Press,
+		}
+		handled = w.processEvent(ke) || handled
+	}
+	return C.bool(handled)
 }
 
 //export gio_onFlagsChanged
@@ -905,8 +927,13 @@ func (w *window) draw() {
 }
 
 func (w *window) ProcessEvent(e event.Event) {
-	w.w.ProcessEvent(e)
+	w.processEvent(e)
+}
+
+func (w *window) processEvent(e event.Event) bool {
+	handled := w.w.ProcessEvent(e)
 	w.loop.FlushEvents()
+	return handled
 }
 
 func (w *window) Event() event.Event {
