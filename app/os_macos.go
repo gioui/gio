@@ -320,6 +320,13 @@ static void interpretKeyEvents(CFTypeRef viewRef, CFTypeRef eventRef) {
 		[view interpretKeyEvents:[NSArray arrayWithObject:event]];
 	}
 }
+
+static int isMiniaturized(CFTypeRef windowRef) {
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		return window.miniaturized ? 1 : 0;
+	}
+}
 */
 import "C"
 
@@ -543,7 +550,7 @@ func (w *window) SetInputHint(_ key.InputHint) {}
 func (w *window) SetAnimating(anim bool) {
 	w.anim = anim
 	window := C.windowForView(w.view)
-	if w.anim && window != 0 {
+	if w.anim && window != 0 && C.isMiniaturized(window) == 0 {
 		w.displayLink.Start()
 	} else {
 		w.displayLink.Stop()
