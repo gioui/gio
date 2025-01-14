@@ -572,7 +572,8 @@ func (w *window) runLoop() {
 loop:
 	for {
 		anim := w.animating
-		if anim && !windows.PeekMessage(msg, 0, 0, 0, windows.PM_NOREMOVE) {
+		p := windows.GetWindowPlacement(w.hwnd)
+		if anim && !p.IsMinimized() && !windows.PeekMessage(msg, 0, 0, 0, windows.PM_NOREMOVE) {
 			w.draw(false)
 			continue
 		}
