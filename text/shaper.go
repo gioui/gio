@@ -544,7 +544,7 @@ func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
 				// of a valid cursor position they can use for "after" such a newline,
 				// taking text alignment into account.
 				l.pararagraphStart.X = l.txt.alignment.Align(line.direction, 0, l.txt.alignWidth)
-				l.pararagraphStart.Y = glyph.Y + int32(line.lineHeight.Ceil())
+				l.pararagraphStart.Y = glyph.Y + int32(line.lineHeight.Round())
 			}
 		}
 		return glyph, true
