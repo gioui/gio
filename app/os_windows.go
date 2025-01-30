@@ -750,6 +750,16 @@ func (w *window) Configure(options []Option) {
 		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
 		showMode = windows.SW_SHOWMAXIMIZED
 	}
+
+	// Disable maximize button if MaxSize is set.
+	if cnf.MaxSize != (image.Point{X: 0, Y: 0}) {
+		style &^= windows.WS_MAXIMIZEBOX
+		// Disable window resizing if MinSize and MaxSize are equal.
+		if cnf.MinSize == cnf.MaxSize {
+			style &^= windows.WS_THICKFRAME
+		}
+	}
+
 	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style)
 	windows.SetWindowPos(w.hwnd, 0, x, y, width, height, swpStyle)
 	windows.ShowWindow(w.hwnd, showMode)
