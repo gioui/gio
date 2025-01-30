@@ -3,13 +3,13 @@ package text
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"testing"
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
 	"github.com/go-text/typesetting/font"
 	"github.com/go-text/typesetting/shaping"
-	"golang.org/x/exp/slices"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
 

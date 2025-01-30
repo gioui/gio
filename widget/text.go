@@ -5,6 +5,7 @@ import (
 	"image"
 	"io"
 	"math"
+	"slices"
 	"sort"
 	"unicode"
 	"unicode/utf8"
@@ -17,7 +18,6 @@ import (
 	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
-	"golang.org/x/exp/slices"
 	"golang.org/x/image/math/fixed"
 )
 

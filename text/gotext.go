@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"slices"
 
 	"github.com/go-text/typesetting/di"
 	"github.com/go-text/typesetting/font"
@@ -16,7 +17,6 @@ import (
 	"github.com/go-text/typesetting/fontscan"
 	"github.com/go-text/typesetting/language"
 	"github.com/go-text/typesetting/shaping"
-	"golang.org/x/exp/slices"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/text/unicode/bidi"
 
