@@ -96,7 +96,7 @@ func newMtlContext(w *window) (*mtlContext, error) {
 		return nil, errors.New("metal: CAMetalLayer construction failed")
 	}
 	queue := C.newCommandQueue(dev)
-	if layer == 0 {
+	if queue == 0 {
 		C.CFRelease(dev)
 		C.CFRelease(layer)
 		return nil, errors.New("metal: [MTLDevice newCommandQueue] failed")
