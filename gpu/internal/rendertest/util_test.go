@@ -90,7 +90,9 @@ func run(t *testing.T, f func(o *op.Ops), c func(r result)) {
 			name := fmt.Sprintf("%s-%d-bad.png", t.Name(), i)
 			saveImage(t, name, img)
 		}
-		c(result{t: t, img: img})
+		if c != nil {
+			c(result{t: t, img: img})
+		}
 	}
 }
 
