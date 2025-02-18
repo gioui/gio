@@ -1055,6 +1055,7 @@ loop:
 			} else {
 				quads.aux, bounds, _ = d.boundsForTransformedRect(bounds, trans)
 				quads.key = opKey{Key: encOp.Key}
+				quads.key = quads.key.SetTransform(trans)
 			}
 			d.addClipPath(&state, quads.aux, quads.key, bounds, off)
 			quads = quadsOp{}
@@ -1100,7 +1101,7 @@ loop:
 				// The paint operation is sheared or rotated, add a clip path representing
 				// this transformed rectangle.
 				k := opKey{Key: encOp.Key}
-				k.SetTransform(t) // TODO: This call has no effect.
+				k = k.SetTransform(t)
 				d.addClipPath(&state, clipData, k, bnd, off)
 			}
 

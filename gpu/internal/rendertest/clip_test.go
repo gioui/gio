@@ -293,3 +293,20 @@ func TestStrokedRect(t *testing.T) {
 	}, func(r result) {
 	})
 }
+
+func TestInstancedRects(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		macro := op.Record(o)
+		clip := clip.Rect{Max: image.Pt(20, 20)}.Push(o)
+		paint.ColorOp{Color: color.NRGBA{R: 0x80, A: 0xFF}}.Add(o)
+		paint.PaintOp{}.Add(o)
+		clip.Pop()
+		c := macro.Stop()
+
+		for i := 0; i < 2; i++ {
+			op.Affine(f32.Affine2D{}.Rotate(f32.Pt(0, 0), .2)).Add(o)
+			c.Add(o)
+			op.Offset(image.Pt(20, 20)).Add(o)
+		}
+	}, nil)
+}
