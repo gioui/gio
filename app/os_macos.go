@@ -534,7 +534,7 @@ func (w *window) SetCursor(cursor pointer.Cursor) {
 }
 
 func (w *window) EditorStateChanged(old, new editorState) {
-	if old.Selection.Range != new.Selection.Range || old.Snippet != new.Snippet {
+	if old.Selection.Range != new.Selection.Range || !areSnippetsConsistent(old.Snippet, new.Snippet) {
 		C.discardMarkedText(w.view)
 		w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
 	}
