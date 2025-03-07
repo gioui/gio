@@ -9,11 +9,11 @@ package gpu
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
 	"math"
-	"os"
 	"reflect"
 	"time"
 	"unsafe"
@@ -343,13 +343,12 @@ func New(api API) (GPU, error) {
 func NewWithDevice(d driver.Device) (GPU, error) {
 	d.BeginFrame(nil, false, image.Point{})
 	defer d.EndFrame()
-	forceCompute := os.Getenv("GIORENDERER") == "forcecompute"
 	feats := d.Caps().Features
 	switch {
-	case !forceCompute && feats.Has(driver.FeatureFloatRenderTargets) && feats.Has(driver.FeatureSRGB):
+	case feats.Has(driver.FeatureFloatRenderTargets) && feats.Has(driver.FeatureSRGB):
 		return newGPU(d)
 	}
-	return newCompute(d)
+	return nil, errors.New("no available GPU driver")
 }
 
 func newGPU(ctx driver.Device) (*gpu, error) {
@@ -1056,6 +1055,7 @@ loop:
 			} else {
 				quads.aux, bounds, _ = d.boundsForTransformedRect(bounds, trans)
 				quads.key = opKey{Key: encOp.Key}
+				quads.key = quads.key.SetTransform(trans)
 			}
 			d.addClipPath(&state, quads.aux, quads.key, bounds, off)
 			quads = quadsOp{}
@@ -1101,7 +1101,7 @@ loop:
 				// The paint operation is sheared or rotated, add a clip path representing
 				// this transformed rectangle.
 				k := opKey{Key: encOp.Key}
-				k.SetTransform(t) // TODO: This call has no effect.
+				k = k.SetTransform(t)
 				d.addClipPath(&state, clipData, k, bnd, off)
 			}
 
@@ -1484,7 +1484,7 @@ func (d *drawOps) buildVerts(pathData []byte, tr f32.Affine2D, outline bool, str
 // as needed and feeds them to the supplied splitter.
 func decodeToOutlineQuads(qs *quadSplitter, tr f32.Affine2D, pathData []byte) {
 	for len(pathData) >= scene.CommandSize+4 {
-		qs.contour = bo.Uint32(pathData)
+		qs.contour = binary.LittleEndian.Uint32(pathData)
 		cmd := ops.DecodeCommand(pathData[4:])
 		switch cmd.Op() {
 		case scene.OpLine:
@@ -1578,4 +1578,16 @@ func (d *drawOps) boundsForTransformedRect(r f32.Rectangle, tr f32.Affine2D) (au
 func isPureOffset(t f32.Affine2D) bool {
 	a, b, _, d, e, _ := t.Elems()
 	return a == 1 && b == 0 && d == 0 && e == 1
+}
+
+func newShaders(ctx driver.Device, vsrc, fsrc shader.Sources) (vert driver.VertexShader, frag driver.FragmentShader, err error) {
+	vert, err = ctx.NewVertexShader(vsrc)
+	if err != nil {
+		return
+	}
+	frag, err = ctx.NewFragmentShader(fsrc)
+	if err != nil {
+		vert.Release()
+	}
+	return
 }

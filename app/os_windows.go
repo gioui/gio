@@ -314,6 +314,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 	case windows.WM_DESTROY:
 		w.ProcessEvent(Win32ViewEvent{})
 		w.ProcessEvent(DestroyEvent{})
+		w.w = nil
 		if w.hdc != 0 {
 			windows.ReleaseDC(w.hdc)
 			w.hdc = 0
@@ -321,6 +322,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		// The system destroys the HWND for us.
 		w.hwnd = 0
 		windows.PostQuitMessage(0)
+		return 0
 	case windows.WM_NCCALCSIZE:
 		if w.config.Decorated {
 			// Let Windows handle decorations.
@@ -570,7 +572,8 @@ func (w *window) runLoop() {
 loop:
 	for {
 		anim := w.animating
-		if anim && !windows.PeekMessage(msg, 0, 0, 0, windows.PM_NOREMOVE) {
+		p := windows.GetWindowPlacement(w.hwnd)
+		if anim && !p.IsMinimized() && !windows.PeekMessage(msg, 0, 0, 0, windows.PM_NOREMOVE) {
 			w.draw(false)
 			continue
 		}
@@ -756,6 +759,10 @@ func (w *window) Configure(options []Option) {
 		style &^= windows.WS_MAXIMIZEBOX
 	} else {
 		style |= windows.WS_MAXIMIZEBOX
+	}
+	// Disable window resizing if MinSize and MaxSize are equal.
+	if cnf.MaxSize != (image.Point{X: 0, Y: 0}) && cnf.MinSize == cnf.MaxSize {
+		style &^= windows.WS_THICKFRAME
 	}
 	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style)
 	windows.SetWindowPos(w.hwnd, 0, x, y, width, height, swpStyle)

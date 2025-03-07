@@ -610,6 +610,7 @@ func (e *Editor) initBuffer() {
 	e.text.SingleLine = e.SingleLine
 	e.text.Mask = e.Mask
 	e.text.WrapPolicy = e.WrapPolicy
+	e.text.DisableSpaceTrim = true
 }
 
 // Update the state of the editor in response to input events. Update consumes editor

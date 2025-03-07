@@ -175,7 +175,7 @@ func (c *vkContext) refresh(surf vk.Surface, width, height int) error {
 	if err != nil {
 		return err
 	}
-	minExt, maxExt := caps.MinExtent(), caps.MaxExtent()
+	minExt, maxExt := vk.SurfaceCapabilitiesMinExtent(caps), vk.SurfaceCapabilitiesMaxExtent(caps)
 	if width < minExt.X || maxExt.X < width || height < minExt.Y || maxExt.Y < height {
 		return errOutOfDate
 	}

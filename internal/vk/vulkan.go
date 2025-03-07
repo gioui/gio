@@ -1893,27 +1893,27 @@ func BuildWriteDescriptorSetBuffer(set DescriptorSet, binding int, typ Descripto
 	}
 }
 
-func (r PushConstantRange) StageFlags() ShaderStageFlags {
+func PushConstantRangeStageFlags(r PushConstantRange) ShaderStageFlags {
 	return r.stageFlags
 }
 
-func (r PushConstantRange) Offset() int {
+func PushConstantRangeOffset(r PushConstantRange) int {
 	return int(r.offset)
 }
 
-func (r PushConstantRange) Size() int {
+func PushConstantRangeSize(r PushConstantRange) int {
 	return int(r.size)
 }
 
-func (p QueueFamilyProperties) Flags() QueueFlags {
+func QueueFamilyPropertiesFlags(p QueueFamilyProperties) QueueFlags {
 	return p.queueFlags
 }
 
-func (c SurfaceCapabilities) MinExtent() image.Point {
+func SurfaceCapabilitiesMinExtent(c SurfaceCapabilities) image.Point {
 	return image.Pt(int(c.minImageExtent.width), int(c.minImageExtent.height))
 }
 
-func (c SurfaceCapabilities) MaxExtent() image.Point {
+func SurfaceCapabilitiesMaxExtent(c SurfaceCapabilities) image.Point {
 	return image.Pt(int(c.maxImageExtent.width), int(c.maxImageExtent.height))
 }
 

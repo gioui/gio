@@ -132,8 +132,7 @@ func TestTexturedStrokeClipped(t *testing.T) {
 		defer clip.RRect{Rect: image.Rect(-30, -30, 60, 60)}.Push(o).Pop()
 		defer op.Offset(image.Pt(-10, -10)).Push(o).Pop()
 		paint.PaintOp{}.Add(o)
-	}, func(r result) {
-	})
+	}, nil)
 }
 
 func TestTexturedStroke(t *testing.T) {
@@ -146,8 +145,7 @@ func TestTexturedStroke(t *testing.T) {
 		}.Op().Push(o).Pop()
 		defer op.Offset(image.Pt(-10, -10)).Push(o).Pop()
 		paint.PaintOp{}.Add(o)
-	}, func(r result) {
-	})
+	}, nil)
 }
 
 func TestPaintClippedTexture(t *testing.T) {
@@ -252,8 +250,7 @@ func TestPathReuse(t *testing.T) {
 		stroke := clip.Stroke{Path: spec, Width: 3}.Op().Push(o)
 		paint.Fill(o, color.NRGBA{B: 0xFF, A: 0xFF})
 		stroke.Pop()
-	}, func(r result) {
-	})
+	}, nil)
 }
 
 func TestPathInterleave(t *testing.T) {
@@ -290,6 +287,22 @@ func TestStrokedRect(t *testing.T) {
 				Width: 5,
 			}.Op(),
 		)
-	}, func(r result) {
-	})
+	}, nil)
+}
+
+func TestInstancedRects(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		macro := op.Record(o)
+		clip := clip.Rect{Max: image.Pt(20, 20)}.Push(o)
+		paint.ColorOp{Color: color.NRGBA{R: 0x80, A: 0xFF}}.Add(o)
+		paint.PaintOp{}.Add(o)
+		clip.Pop()
+		c := macro.Stop()
+
+		for i := 0; i < 2; i++ {
+			op.Affine(f32.Affine2D{}.Rotate(f32.Pt(0, 0), .2)).Add(o)
+			c.Add(o)
+			op.Offset(image.Pt(20, 20)).Add(o)
+		}
+	}, nil)
 }

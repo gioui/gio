@@ -4,14 +4,15 @@ package app
 
 import (
 	"log"
-	"syscall"
 	"unsafe"
+
+	syscall "golang.org/x/sys/windows"
 )
 
 type logger struct{}
 
 var (
-	kernel32           = syscall.NewLazyDLL("kernel32")
+	kernel32           = syscall.NewLazySystemDLL("kernel32")
 	outputDebugStringW = kernel32.NewProc("OutputDebugStringW")
 	debugView          *logger
 )

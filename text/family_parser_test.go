@@ -1,9 +1,8 @@
 package text
 
 import (
+	"slices"
 	"testing"
-
-	"golang.org/x/exp/slices"
 )
 
 func TestParser(t *testing.T) {

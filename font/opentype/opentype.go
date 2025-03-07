@@ -16,23 +16,21 @@ import (
 	_ "image/png"
 
 	giofont "gioui.org/font"
-	"github.com/go-text/typesetting/font"
-	fontapi "github.com/go-text/typesetting/opentype/api/font"
-	"github.com/go-text/typesetting/opentype/api/metadata"
-	"github.com/go-text/typesetting/opentype/loader"
+	fontapi "github.com/go-text/typesetting/font"
+	"github.com/go-text/typesetting/font/opentype"
 )
 
 // Face is a thread-safe representation of a loaded font. For efficiency, applications
 // should construct a face for any given font file once, reusing it across different
 // text shapers.
 type Face struct {
-	face font.Font
+	face *fontapi.Font
 	font giofont.Font
 }
 
 // Parse constructs a Face from source bytes.
 func Parse(src []byte) (Face, error) {
-	ld, err := loader.NewLoader(bytes.NewReader(src))
+	ld, err := opentype.NewLoader(bytes.NewReader(src))
 	if err != nil {
 		return Face{}, err
 	}
@@ -49,11 +47,11 @@ func Parse(src []byte) (Face, error) {
 // ParseCollection parse an Opentype font file, with support for collections.
 // Single font files are supported, returning a slice with length 1.
 // The returned fonts are automatically wrapped in a text.FontFace with
-// inferred font metadata.
+// inferred font font.
 // BUG(whereswaldon): the only Variant that can be detected automatically is
 // "Mono".
 func ParseCollection(src []byte) ([]giofont.FontFace, error) {
-	lds, err := loader.NewLoaders(bytes.NewReader(src))
+	lds, err := opentype.NewLoaders(bytes.NewReader(src))
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +74,7 @@ func ParseCollection(src []byte) ([]giofont.FontFace, error) {
 	return out, nil
 }
 
-func DescriptionToFont(md metadata.Description) giofont.Font {
+func DescriptionToFont(md fontapi.Description) giofont.Font {
 	return giofont.Font{
 		Typeface: giofont.Typeface(md.Family),
 		Style:    gioStyle(md.Aspect.Style),
@@ -84,30 +82,30 @@ func DescriptionToFont(md metadata.Description) giofont.Font {
 	}
 }
 
-func FontToDescription(font giofont.Font) metadata.Description {
-	return metadata.Description{
+func FontToDescription(font giofont.Font) fontapi.Description {
+	return fontapi.Description{
 		Family: string(font.Typeface),
-		Aspect: metadata.Aspect{
+		Aspect: fontapi.Aspect{
 			Style:  mdStyle(font.Style),
 			Weight: mdWeight(font.Weight),
 		},
 	}
 }
 
-// parseLoader parses the contents of the loader into a face and its metadata.
-func parseLoader(ld *loader.Loader) (font.Font, giofont.Font, error) {
+// parseLoader parses the contents of the loader into a face and its font.
+func parseLoader(ld *opentype.Loader) (*fontapi.Font, giofont.Font, error) {
 	ft, err := fontapi.NewFont(ld)
 	if err != nil {
 		return nil, giofont.Font{}, err
 	}
-	data := DescriptionToFont(metadata.Metadata(ld))
+	data := DescriptionToFont(ft.Describe())
 	return ft, data, nil
 }
 
 // Face returns a thread-unsafe wrapper for this Face suitable for use by a single shaper.
 // Face many be invoked any number of times and is safe so long as each return value is
 // only used by one goroutine.
-func (f Face) Face() font.Face {
+func (f Face) Face() *fontapi.Face {
 	return &fontapi.Face{Font: f.face}
 }
 
@@ -119,74 +117,74 @@ func (f Face) Font() giofont.Font {
 	return f.font
 }
 
-func gioStyle(s metadata.Style) giofont.Style {
+func gioStyle(s fontapi.Style) giofont.Style {
 	switch s {
-	case metadata.StyleItalic:
+	case fontapi.StyleItalic:
 		return giofont.Italic
-	case metadata.StyleNormal:
+	case fontapi.StyleNormal:
 		fallthrough
 	default:
 		return giofont.Regular
 	}
 }
 
-func mdStyle(g giofont.Style) metadata.Style {
+func mdStyle(g giofont.Style) fontapi.Style {
 	switch g {
 	case giofont.Italic:
-		return metadata.StyleItalic
+		return fontapi.StyleItalic
 	case giofont.Regular:
 		fallthrough
 	default:
-		return metadata.StyleNormal
+		return fontapi.StyleNormal
 	}
 }
 
-func gioWeight(w metadata.Weight) giofont.Weight {
+func gioWeight(w fontapi.Weight) giofont.Weight {
 	switch w {
-	case metadata.WeightThin:
+	case fontapi.WeightThin:
 		return giofont.Thin
-	case metadata.WeightExtraLight:
+	case fontapi.WeightExtraLight:
 		return giofont.ExtraLight
-	case metadata.WeightLight:
+	case fontapi.WeightLight:
 		return giofont.Light
-	case metadata.WeightNormal:
+	case fontapi.WeightNormal:
 		return giofont.Normal
-	case metadata.WeightMedium:
+	case fontapi.WeightMedium:
 		return giofont.Medium
-	case metadata.WeightSemibold:
+	case fontapi.WeightSemibold:
 		return giofont.SemiBold
-	case metadata.WeightBold:
+	case fontapi.WeightBold:
 		return giofont.Bold
-	case metadata.WeightExtraBold:
+	case fontapi.WeightExtraBold:
 		return giofont.ExtraBold
-	case metadata.WeightBlack:
+	case fontapi.WeightBlack:
 		return giofont.Black
 	default:
 		return giofont.Normal
 	}
 }
 
-func mdWeight(g giofont.Weight) metadata.Weight {
+func mdWeight(g giofont.Weight) fontapi.Weight {
 	switch g {
 	case giofont.Thin:
-		return metadata.WeightThin
+		return fontapi.WeightThin
 	case giofont.ExtraLight:
-		return metadata.WeightExtraLight
+		return fontapi.WeightExtraLight
 	case giofont.Light:
-		return metadata.WeightLight
+		return fontapi.WeightLight
 	case giofont.Normal:
-		return metadata.WeightNormal
+		return fontapi.WeightNormal
 	case giofont.Medium:
-		return metadata.WeightMedium
+		return fontapi.WeightMedium
 	case giofont.SemiBold:
-		return metadata.WeightSemibold
+		return fontapi.WeightSemibold
 	case giofont.Bold:
-		return metadata.WeightBold
+		return fontapi.WeightBold
 	case giofont.ExtraBold:
-		return metadata.WeightExtraBold
+		return fontapi.WeightExtraBold
 	case giofont.Black:
-		return metadata.WeightBlack
+		return fontapi.WeightBlack
 	default:
-		return metadata.WeightNormal
+		return fontapi.WeightNormal
 	}
 }

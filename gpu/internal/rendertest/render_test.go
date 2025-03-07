@@ -124,8 +124,7 @@ func TestDeferredPaint(t *testing.T) {
 		defer clip.Rect(image.Rect(0, 0, 80, 80)).Op().Push(o).Pop()
 		paint.ColorOp{Color: color.NRGBA{A: 0x60, B: 0xff}}.Add(o)
 		paint.PaintOp{}.Add(o)
-	}, func(r result) {
-	})
+	}, nil)
 }
 
 func constSqPath() clip.Op {
@@ -323,7 +322,7 @@ func TestLinearGradientAngled(t *testing.T) {
 		cl = clip.Rect(image.Rect(0, 64, 64, 128)).Push(ops)
 		paint.PaintOp{}.Add(ops)
 		cl.Pop()
-	}, func(r result) {})
+	}, nil)
 }
 
 func TestZeroImage(t *testing.T) {
@@ -492,8 +491,7 @@ func TestOpacity(t *testing.T) {
 		opc3 := paint.PushOpacity(ops, .6)
 		paint.FillShape(ops, color.NRGBA{B: 255, A: 255}, clip.Ellipse(image.Rectangle{Min: image.Pt(20+20, 10), Max: image.Pt(50+64, 128)}).Op(ops))
 		opc3.Pop()
-	}, func(r result) {
-	})
+	}, nil)
 }
 
 // lerp calculates linear interpolation with color b and p.

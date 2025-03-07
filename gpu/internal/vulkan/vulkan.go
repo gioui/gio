@@ -862,8 +862,8 @@ func (b *Backend) BindUniforms(buffer driver.Buffer) {
 	buf := buffer.(*Buffer)
 	cmdBuf := b.currentCmdBuf()
 	for _, s := range b.pipe.pushRanges {
-		off := s.Offset()
-		vk.CmdPushConstants(cmdBuf, b.pipe.desc.layout, s.StageFlags(), off, buf.store[off:off+s.Size()])
+		off := vk.PushConstantRangeOffset(s)
+		vk.CmdPushConstants(cmdBuf, b.pipe.desc.layout, vk.PushConstantRangeStageFlags(s), off, buf.store[off:off+vk.PushConstantRangeSize(s)])
 	}
 }
 

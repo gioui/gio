@@ -312,6 +312,21 @@ static void invalidateCharacterCoordinates(CFTypeRef viewRef) {
 		}
 	}
 }
+
+static void interpretKeyEvents(CFTypeRef viewRef, CFTypeRef eventRef) {
+	@autoreleasepool {
+		NSView *view = (__bridge NSView *)viewRef;
+		NSEvent *event = (__bridge NSEvent *)eventRef;
+		[view interpretKeyEvents:[NSArray arrayWithObject:event]];
+	}
+}
+
+static int isMiniaturized(CFTypeRef windowRef) {
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		return window.miniaturized ? 1 : 0;
+	}
+}
 */
 import "C"
 
@@ -340,9 +355,20 @@ type window struct {
 	cursor      pointer.Cursor
 	pointerBtns pointer.Buttons
 	loop        *eventLoop
+	lastMods    C.NSUInteger
 
 	scale  float32
 	config Config
+
+	keysDown map[key.Name]struct{}
+	// cmdKeys is for storing the current key event while
+	// waiting for a doCommandBySelector.
+	cmdKeys cmdKeys
+}
+
+type cmdKeys struct {
+	eventStr  string
+	eventMods key.Modifiers
 }
 
 // launched is closed when applicationDidFinishLaunching is called.
@@ -511,7 +537,7 @@ func (w *window) SetCursor(cursor pointer.Cursor) {
 }
 
 func (w *window) EditorStateChanged(old, new editorState) {
-	if old.Selection.Range != new.Selection.Range || old.Snippet != new.Snippet {
+	if old.Selection.Range != new.Selection.Range || !areSnippetsConsistent(old.Snippet, new.Snippet) {
 		C.discardMarkedText(w.view)
 		w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
 	}
@@ -527,7 +553,7 @@ func (w *window) SetInputHint(_ key.InputHint) {}
 func (w *window) SetAnimating(anim bool) {
 	w.anim = anim
 	window := C.windowForView(w.view)
-	if w.anim && window != 0 {
+	if w.anim && window != 0 && C.isMiniaturized(window) == 0 {
 		w.displayLink.Start()
 	} else {
 		w.displayLink.Stop()
@@ -545,23 +571,92 @@ func (w *window) runOnMain(f func()) {
 }
 
 //export gio_onKeys
-func gio_onKeys(h C.uintptr_t, cstr C.CFTypeRef, ti C.double, mods C.NSUInteger, keyDown C.bool) {
+func gio_onKeys(h C.uintptr_t, event C.CFTypeRef, cstr C.CFTypeRef, ti C.double, mods C.NSUInteger, keyDown C.bool) {
+	w := windowFor(h)
+	if w.keysDown == nil {
+		w.keysDown = make(map[key.Name]struct{})
+	}
 	str := nsstringToString(cstr)
 	kmods := convertMods(mods)
 	ks := key.Release
 	if keyDown {
 		ks = key.Press
+		w.cmdKeys.eventStr = str
+		w.cmdKeys.eventMods = kmods
+		C.interpretKeyEvents(w.view, event)
 	}
-	w := windowFor(h)
 	for _, k := range str {
 		if n, ok := convertKey(k); ok {
-			w.ProcessEvent(key.Event{
+			ke := key.Event{
 				Name:      n,
 				Modifiers: kmods,
 				State:     ks,
+			}
+			if keyDown {
+				w.keysDown[ke.Name] = struct{}{}
+				if _, isCmd := convertCommandKey(k); isCmd || kmods.Contain(key.ModCommand) {
+					// doCommandBySelector already processed the event.
+					return
+				}
+			} else {
+				if _, pressed := w.keysDown[n]; !pressed {
+					continue
+				}
+				delete(w.keysDown, n)
+			}
+			w.ProcessEvent(ke)
+		}
+	}
+}
+
+//export gio_onCommandBySelector
+func gio_onCommandBySelector(h C.uintptr_t) C.bool {
+	w := windowFor(h)
+	ev := w.cmdKeys
+	w.cmdKeys = cmdKeys{}
+	handled := false
+	for _, k := range ev.eventStr {
+		n, ok := convertCommandKey(k)
+		if !ok && ev.eventMods.Contain(key.ModCommand) {
+			n, ok = convertKey(k)
+		}
+		if !ok {
+			continue
+		}
+		ke := key.Event{
+			Name:      n,
+			Modifiers: ev.eventMods,
+			State:     key.Press,
+		}
+		handled = w.processEvent(ke) || handled
+	}
+	return C.bool(handled)
+}
+
+//export gio_onFlagsChanged
+func gio_onFlagsChanged(h C.uintptr_t, curMods C.NSUInteger) {
+	w := windowFor(h)
+
+	mods := []C.NSUInteger{C.NSControlKeyMask, C.NSAlternateKeyMask, C.NSShiftKeyMask, C.NSCommandKeyMask}
+	keys := []key.Name{key.NameCtrl, key.NameAlt, key.NameShift, key.NameCommand}
+
+	for i, mod := range mods {
+		wasPressed := w.lastMods&mod != 0
+		isPressed := curMods&mod != 0
+
+		if wasPressed != isPressed {
+			st := key.Release
+			if isPressed {
+				st = key.Press
+			}
+			w.ProcessEvent(key.Event{
+				Name:  keys[i],
+				State: st,
 			})
 		}
 	}
+
+	w.lastMods = curMods
 }
 
 //export gio_onText
@@ -754,6 +849,15 @@ func gio_substringForProposedRange(h C.uintptr_t, crng C.NSRange, actual C.NSRan
 //export gio_insertText
 func gio_insertText(h C.uintptr_t, cstr C.CFTypeRef, crng C.NSRange) {
 	w := windowFor(h)
+	str := nsstringToString(cstr)
+	// macOS IME in some cases calls insertText for command keys such as backspace
+	// instead of doCommandBySelector.
+	for _, r := range str {
+		if _, ok := convertCommandKey(r); ok {
+			w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+			return
+		}
+	}
 	state := w.w.EditorState()
 	rng := state.compose
 	if rng.Start == -1 {
@@ -765,7 +869,6 @@ func gio_insertText(h C.uintptr_t, cstr C.CFTypeRef, crng C.NSRange) {
 			End:   state.RunesIndex(int(crng.location + crng.length)),
 		}
 	}
-	str := nsstringToString(cstr)
 	w.w.EditorReplace(rng, str)
 	w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
 	start := rng.Start
@@ -834,8 +937,13 @@ func (w *window) draw() {
 }
 
 func (w *window) ProcessEvent(e event.Event) {
-	w.w.ProcessEvent(e)
+	w.processEvent(e)
+}
+
+func (w *window) processEvent(e event.Event) bool {
+	handled := w.w.ProcessEvent(e)
 	w.loop.FlushEvents()
+	return handled
 }
 
 func (w *window) Event() event.Event {
@@ -960,10 +1068,10 @@ func osMain() {
 	C.gio_main()
 }
 
-func convertKey(k rune) (key.Name, bool) {
+func convertCommandKey(k rune) (key.Name, bool) {
 	var n key.Name
 	switch k {
-	case 0x1b:
+	case '\x1b': // ASCII escape.
 		n = key.NameEscape
 	case C.NSLeftArrowFunctionKey:
 		n = key.NameLeftArrow
@@ -973,22 +1081,36 @@ func convertKey(k rune) (key.Name, bool) {
 		n = key.NameUpArrow
 	case C.NSDownArrowFunctionKey:
 		n = key.NameDownArrow
-	case 0xd:
+	case '\r':
 		n = key.NameReturn
-	case 0x3:
+	case '\x03':
 		n = key.NameEnter
 	case C.NSHomeFunctionKey:
 		n = key.NameHome
 	case C.NSEndFunctionKey:
 		n = key.NameEnd
-	case 0x7f:
+	case '\x7f', '\b':
 		n = key.NameDeleteBackward
 	case C.NSDeleteFunctionKey:
 		n = key.NameDeleteForward
+	case '\t', 0x19:
+		n = key.NameTab
 	case C.NSPageUpFunctionKey:
 		n = key.NamePageUp
 	case C.NSPageDownFunctionKey:
 		n = key.NamePageDown
+	default:
+		return "", false
+	}
+	return n, true
+}
+
+func convertKey(k rune) (key.Name, bool) {
+	if n, ok := convertCommandKey(k); ok {
+		return n, true
+	}
+	var n key.Name
+	switch k {
 	case C.NSF1FunctionKey:
 		n = key.NameF1
 	case C.NSF2FunctionKey:
@@ -1013,8 +1135,6 @@ func convertKey(k rune) (key.Name, bool) {
 		n = key.NameF11
 	case C.NSF12FunctionKey:
 		n = key.NameF12
-	case 0x09, 0x19:
-		n = key.NameTab
 	case 0x20:
 		n = key.NameSpace
 	default:

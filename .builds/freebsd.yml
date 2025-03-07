@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Unlicense OR MIT
-image: freebsd/13.x
+image: freebsd/latest
 packages:
  - libX11
  - libxkbcommon

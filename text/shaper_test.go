@@ -2,6 +2,7 @@ package text
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -10,7 +11,6 @@ import (
 	"gioui.org/font/gofont"
 	"gioui.org/font/opentype"
 	"gioui.org/io/system"
-	"golang.org/x/exp/slices"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
 )

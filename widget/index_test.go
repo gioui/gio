@@ -2,12 +2,18 @@ package widget
 
 import (
 	"bytes"
+	"image"
+	"image/png"
 	"io"
+	"os"
 	"testing"
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
 	"gioui.org/font"
 	"gioui.org/font/opentype"
+	"gioui.org/gpu/headless"
+	"gioui.org/layout"
+	"gioui.org/op"
 	"gioui.org/text"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
@@ -16,11 +22,11 @@ import (
 // makePosTestText returns two bidi samples of shaped text at the given
 // font size and wrapped to the given line width. The runeLimit, if nonzero,
 // truncates the sample text to ensure shorter output for expensive tests.
-func makePosTestText(fontSize, lineWidth int, alignOpposite bool) (source string, bidiLTR, bidiRTL []text.Glyph) {
+func makePosTestText(fontSize, lineWidth int, alignOpposite bool) (shaper *text.Shaper, source string, bidiLTR, bidiRTL []text.Glyph) {
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
 
-	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection([]font.FontFace{
+	shaper = text.NewShaper(text.NoSystemFonts(), text.WithCollection([]font.FontFace{
 		{
 			Font: font.Font{Typeface: "LTR"},
 			Face: ltrFace,
@@ -58,7 +64,7 @@ func makePosTestText(fontSize, lineWidth int, alignOpposite bool) (source string
 	for g, ok := shaper.NextGlyph(); ok; g, ok = shaper.NextGlyph() {
 		bidiRTL = append(bidiRTL, g)
 	}
-	return bidiSource, bidiLTR, bidiRTL
+	return shaper, bidiSource, bidiLTR, bidiRTL
 }
 
 // makeAccountingTestText shapes text designed to stress rune accounting
@@ -260,7 +266,7 @@ func TestIndexPositionWhitespace(t *testing.T) {
 func TestIndexPositionBidi(t *testing.T) {
 	fontSize := 16
 	lineWidth := fontSize * 10
-	_, bidiLTRText, bidiRTLText := makePosTestText(fontSize, lineWidth, false)
+	shaper, _, bidiLTRText, bidiRTLText := makePosTestText(fontSize, lineWidth, false)
 	type testcase struct {
 		name       string
 		glyphs     []text.Glyph
@@ -284,13 +290,12 @@ func TestIndexPositionBidi(t *testing.T) {
 			name:   "bidi rtl",
 			glyphs: bidiRTLText,
 			expectedXs: []fixed.Int26_6{
-				2646, 3272, 3842, 4412, 4697, 5267, 5837, 6090, 6602, 7114, 2646, 2380, 1577, 985, 687, 266, // Positions on line 0.
-
-				7867, 7099, 6331, 5563, 4795, 4510, 4212, 3914, 3648, 2281, 2566, 3136, 3648, 2281, 2015, 1709, 1117, 266, // Positions on line 1.
-
-				8794, 8026, 7258, 6490, 5722, 5437, 4922, 4540, 4134, 3868, 0, 290, 860, 1430, 1715, 1989, 2559, 3071, 3583, // Positions on line 2.
-
-				324, 894, 1464, 2034, 324, 0, // Positions on line 3.
+				// Line 0
+				5718, 6344, 6914, 7484, 7769, 8339, 8909, 9162, 9674, 10186, 5718, 5452, 4649, 4057, 3759, 3338, 3072, 2304, 1536, 768, 0,
+				// Line 1
+				9170, 8872, 8574, 8308, 6941, 7226, 7796, 8308, 6941, 6675, 6369, 5777, 4926, 4660, 3892, 3124, 2356, 1588, 1303, 788, 406, 0,
+				// Line 2
+				324, 614, 1184, 1754, 2039, 2313, 2883, 3395, 3907, 4192, 4762, 5332, 5902, 324, 0,
 			},
 		},
 	} {
@@ -337,6 +342,35 @@ func TestIndexPositionBidi(t *testing.T) {
 			printPositions(t, gi.positions)
 			if t.Failed() {
 				printGlyphs(t, tc.glyphs)
+				width := lineWidth
+				height := 100
+				cap := image.NewRGBA(image.Rect(0, 0, width, height))
+				w, _ := headless.NewWindow(width, height)
+				defer w.Release()
+				ops := new(op.Ops)
+				gtx := layout.Context{
+					Constraints: layout.Constraints{Max: image.Pt(width, height)},
+					Ops:         ops,
+				}
+				it := textIterator{viewport: image.Rectangle{Max: image.Point{X: width, Y: height}}}
+				for _, g := range tc.glyphs {
+					it.processGlyph(g, true)
+				}
+				var glyphs [32]text.Glyph
+				line := glyphs[:0]
+				for _, g := range gi.glyphs {
+					var ok bool
+					if line, ok = it.paintGlyph(gtx, shaper, g, line); !ok {
+						break
+					}
+				}
+				w.Frame(ops)
+				w.Screenshot(cap)
+				b := new(bytes.Buffer)
+				_ = png.Encode(b, cap)
+				screenshotName := tc.name + ".png"
+				_ = os.WriteFile(screenshotName, b.Bytes(), 0o644)
+				t.Logf("wrote %q", screenshotName)
 			}
 		})
 	}
@@ -345,8 +379,8 @@ func TestIndexPositionBidi(t *testing.T) {
 func TestIndexPositionLines(t *testing.T) {
 	fontSize := 16
 	lineWidth := fontSize * 10
-	source1, bidiLTRText, bidiRTLText := makePosTestText(fontSize, lineWidth, false)
-	source2, bidiLTRTextOpp, bidiRTLTextOpp := makePosTestText(fontSize, lineWidth, true)
+	_, source1, bidiLTRText, bidiRTLText := makePosTestText(fontSize, lineWidth, false)
+	_, source2, bidiLTRTextOpp, bidiRTLTextOpp := makePosTestText(fontSize, lineWidth, true)
 	type testcase struct {
 		name          string
 		source        string
@@ -379,7 +413,7 @@ func TestIndexPositionLines(t *testing.T) {
 					xOff:    fixed.Int26_6(0),
 					yOff:    60,
 					glyphs:  18,
-					width:   fixed.Int26_6(8813),
+					width:   fixed.Int26_6(8528),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
@@ -401,32 +435,24 @@ func TestIndexPositionLines(t *testing.T) {
 				{
 					xOff:    fixed.Int26_6(0),
 					yOff:    22,
-					glyphs:  15,
-					width:   fixed.Int26_6(7114),
+					glyphs:  20,
+					width:   fixed.Int26_6(10186),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
 				{
 					xOff:    fixed.Int26_6(0),
 					yOff:    41,
-					glyphs:  15,
-					width:   fixed.Int26_6(7867),
+					glyphs:  19,
+					width:   fixed.Int26_6(9170),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
 				{
 					xOff:    fixed.Int26_6(0),
 					yOff:    60,
-					glyphs:  18,
-					width:   fixed.Int26_6(8794),
-					ascent:  fixed.Int26_6(1407),
-					descent: fixed.Int26_6(756),
-				},
-				{
-					xOff:    fixed.Int26_6(0),
-					yOff:    79,
-					glyphs:  4,
-					width:   fixed.Int26_6(2034),
+					glyphs:  13,
+					width:   fixed.Int26_6(5902),
 					ascent:  fixed.Int26_6(968),
 					descent: fixed.Int26_6(216),
 				},
@@ -454,10 +480,10 @@ func TestIndexPositionLines(t *testing.T) {
 					descent: fixed.Int26_6(756),
 				},
 				{
-					xOff:    fixed.Int26_6(1427),
+					xOff:    fixed.Int26_6(1712),
 					yOff:    60,
 					glyphs:  18,
-					width:   fixed.Int26_6(8813),
+					width:   fixed.Int26_6(8528),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
@@ -477,34 +503,26 @@ func TestIndexPositionLines(t *testing.T) {
 			glyphs: bidiRTLTextOpp,
 			expectedLines: []lineInfo{
 				{
-					xOff:    fixed.Int26_6(3126),
+					xOff:    fixed.Int26_6(54),
 					yOff:    22,
-					glyphs:  15,
-					width:   fixed.Int26_6(7114),
+					glyphs:  20,
+					width:   fixed.Int26_6(10186),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
 				{
-					xOff:    fixed.Int26_6(2373),
+					xOff:    fixed.Int26_6(1070),
 					yOff:    41,
-					glyphs:  15,
-					width:   fixed.Int26_6(7867),
+					glyphs:  19,
+					width:   fixed.Int26_6(9170),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
 				{
-					xOff:    fixed.Int26_6(1446),
+					xOff:    fixed.Int26_6(4338),
 					yOff:    60,
-					glyphs:  18,
-					width:   fixed.Int26_6(8794),
-					ascent:  fixed.Int26_6(1407),
-					descent: fixed.Int26_6(756),
-				},
-				{
-					xOff:    fixed.Int26_6(8206),
-					yOff:    79,
-					glyphs:  4,
-					width:   fixed.Int26_6(2034),
+					glyphs:  13,
+					width:   fixed.Int26_6(5902),
 					ascent:  fixed.Int26_6(968),
 					descent: fixed.Int26_6(216),
 				},

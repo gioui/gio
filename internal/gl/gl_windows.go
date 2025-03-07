@@ -3,103 +3,217 @@
 package gl
 
 import (
+	"fmt"
 	"math"
 	"runtime"
+	"sync"
 	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
 
+func loadGLESv2Procs() error {
+	dllName := "libGLESv2.dll"
+	handle, err := windows.LoadLibraryEx(dllName, 0, windows.LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)
+	if err != nil {
+		return fmt.Errorf("gl: failed to load %s: %v", dllName, err)
+	}
+	gles := windows.DLL{Handle: handle, Name: dllName}
+	// d3dcompiler_47.dll is needed internally for shader compilation to function.
+	dllName = "d3dcompiler_47.dll"
+	_, err = windows.LoadLibraryEx(dllName, 0, windows.LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)
+	if err != nil {
+		return fmt.Errorf("gl: failed to load %s: %v", dllName, err)
+	}
+	procs := map[string]**windows.Proc{
+		"glActiveTexture":                       &_glActiveTexture,
+		"glAttachShader":                        &_glAttachShader,
+		"glBeginQuery":                          &_glBeginQuery,
+		"glBindAttribLocation":                  &_glBindAttribLocation,
+		"glBindBuffer":                          &_glBindBuffer,
+		"glBindBufferBase":                      &_glBindBufferBase,
+		"glBindFramebuffer":                     &_glBindFramebuffer,
+		"glBindRenderbuffer":                    &_glBindRenderbuffer,
+		"glBindTexture":                         &_glBindTexture,
+		"glBindVertexArray":                     &_glBindVertexArray,
+		"glBlendEquation":                       &_glBlendEquation,
+		"glBlendFuncSeparate":                   &_glBlendFuncSeparate,
+		"glBufferData":                          &_glBufferData,
+		"glBufferSubData":                       &_glBufferSubData,
+		"glCheckFramebufferStatus":              &_glCheckFramebufferStatus,
+		"glClear":                               &_glClear,
+		"glClearColor":                          &_glClearColor,
+		"glClearDepthf":                         &_glClearDepthf,
+		"glDeleteQueries":                       &_glDeleteQueries,
+		"glDeleteVertexArrays":                  &_glDeleteVertexArrays,
+		"glCompileShader":                       &_glCompileShader,
+		"glCopyTexSubImage2D":                   &_glCopyTexSubImage2D,
+		"glGenerateMipmap":                      &_glGenerateMipmap,
+		"glGenBuffers":                          &_glGenBuffers,
+		"glGenFramebuffers":                     &_glGenFramebuffers,
+		"glGenVertexArrays":                     &_glGenVertexArrays,
+		"glGetUniformBlockIndex":                &_glGetUniformBlockIndex,
+		"glCreateProgram":                       &_glCreateProgram,
+		"glGenRenderbuffers":                    &_glGenRenderbuffers,
+		"glCreateShader":                        &_glCreateShader,
+		"glGenTextures":                         &_glGenTextures,
+		"glDeleteBuffers":                       &_glDeleteBuffers,
+		"glDeleteFramebuffers":                  &_glDeleteFramebuffers,
+		"glDeleteProgram":                       &_glDeleteProgram,
+		"glDeleteShader":                        &_glDeleteShader,
+		"glDeleteRenderbuffers":                 &_glDeleteRenderbuffers,
+		"glDeleteTextures":                      &_glDeleteTextures,
+		"glDepthFunc":                           &_glDepthFunc,
+		"glDepthMask":                           &_glDepthMask,
+		"glDisableVertexAttribArray":            &_glDisableVertexAttribArray,
+		"glDisable":                             &_glDisable,
+		"glDrawArrays":                          &_glDrawArrays,
+		"glDrawElements":                        &_glDrawElements,
+		"glEnable":                              &_glEnable,
+		"glEnableVertexAttribArray":             &_glEnableVertexAttribArray,
+		"glEndQuery":                            &_glEndQuery,
+		"glFinish":                              &_glFinish,
+		"glFlush":                               &_glFlush,
+		"glFramebufferRenderbuffer":             &_glFramebufferRenderbuffer,
+		"glFramebufferTexture2D":                &_glFramebufferTexture2D,
+		"glGenQueries":                          &_glGenQueries,
+		"glGetError":                            &_glGetError,
+		"glGetRenderbufferParameteriv":          &_glGetRenderbufferParameteriv,
+		"glGetFloatv":                           &_glGetFloatv,
+		"glGetFramebufferAttachmentParameteriv": &_glGetFramebufferAttachmentParameteriv,
+		"glGetIntegerv":                         &_glGetIntegerv,
+		"glGetIntegeri_v":                       &_glGetIntegeri_v,
+		"glGetProgramiv":                        &_glGetProgramiv,
+		"glGetProgramInfoLog":                   &_glGetProgramInfoLog,
+		"glGetQueryObjectuiv":                   &_glGetQueryObjectuiv,
+		"glGetShaderiv":                         &_glGetShaderiv,
+		"glGetShaderInfoLog":                    &_glGetShaderInfoLog,
+		"glGetString":                           &_glGetString,
+		"glGetUniformLocation":                  &_glGetUniformLocation,
+		"glGetVertexAttribiv":                   &_glGetVertexAttribiv,
+		"glGetVertexAttribPointerv":             &_glGetVertexAttribPointerv,
+		"glInvalidateFramebuffer":               &_glInvalidateFramebuffer,
+		"glIsEnabled":                           &_glIsEnabled,
+		"glLinkProgram":                         &_glLinkProgram,
+		"glPixelStorei":                         &_glPixelStorei,
+		"glReadPixels":                          &_glReadPixels,
+		"glRenderbufferStorage":                 &_glRenderbufferStorage,
+		"glScissor":                             &_glScissor,
+		"glShaderSource":                        &_glShaderSource,
+		"glTexImage2D":                          &_glTexImage2D,
+		"glTexStorage2D":                        &_glTexStorage2D,
+		"glTexSubImage2D":                       &_glTexSubImage2D,
+		"glTexParameteri":                       &_glTexParameteri,
+		"glUniformBlockBinding":                 &_glUniformBlockBinding,
+		"glUniform1f":                           &_glUniform1f,
+		"glUniform1i":                           &_glUniform1i,
+		"glUniform2f":                           &_glUniform2f,
+		"glUniform3f":                           &_glUniform3f,
+		"glUniform4f":                           &_glUniform4f,
+		"glUseProgram":                          &_glUseProgram,
+		"glVertexAttribPointer":                 &_glVertexAttribPointer,
+		"glViewport":                            &_glViewport,
+	}
+	for name, proc := range procs {
+		p, err := gles.FindProc(name)
+		if err != nil {
+			return fmt.Errorf("failed to locate %s in %s: %w", name, gles.Name, err)
+		}
+		*proc = p
+	}
+	return nil
+}
+
 var (
-	LibGLESv2                              = windows.NewLazyDLL("libGLESv2.dll")
-	_glActiveTexture                       = LibGLESv2.NewProc("glActiveTexture")
-	_glAttachShader                        = LibGLESv2.NewProc("glAttachShader")
-	_glBeginQuery                          = LibGLESv2.NewProc("glBeginQuery")
-	_glBindAttribLocation                  = LibGLESv2.NewProc("glBindAttribLocation")
-	_glBindBuffer                          = LibGLESv2.NewProc("glBindBuffer")
-	_glBindBufferBase                      = LibGLESv2.NewProc("glBindBufferBase")
-	_glBindFramebuffer                     = LibGLESv2.NewProc("glBindFramebuffer")
-	_glBindRenderbuffer                    = LibGLESv2.NewProc("glBindRenderbuffer")
-	_glBindTexture                         = LibGLESv2.NewProc("glBindTexture")
-	_glBindVertexArray                     = LibGLESv2.NewProc("glBindVertexArray")
-	_glBlendEquation                       = LibGLESv2.NewProc("glBlendEquation")
-	_glBlendFuncSeparate                   = LibGLESv2.NewProc("glBlendFuncSeparate")
-	_glBufferData                          = LibGLESv2.NewProc("glBufferData")
-	_glBufferSubData                       = LibGLESv2.NewProc("glBufferSubData")
-	_glCheckFramebufferStatus              = LibGLESv2.NewProc("glCheckFramebufferStatus")
-	_glClear                               = LibGLESv2.NewProc("glClear")
-	_glClearColor                          = LibGLESv2.NewProc("glClearColor")
-	_glClearDepthf                         = LibGLESv2.NewProc("glClearDepthf")
-	_glDeleteQueries                       = LibGLESv2.NewProc("glDeleteQueries")
-	_glDeleteVertexArrays                  = LibGLESv2.NewProc("glDeleteVertexArrays")
-	_glCompileShader                       = LibGLESv2.NewProc("glCompileShader")
-	_glCopyTexSubImage2D                   = LibGLESv2.NewProc("glCopyTexSubImage2D")
-	_glGenerateMipmap                      = LibGLESv2.NewProc("glGenerateMipmap")
-	_glGenBuffers                          = LibGLESv2.NewProc("glGenBuffers")
-	_glGenFramebuffers                     = LibGLESv2.NewProc("glGenFramebuffers")
-	_glGenVertexArrays                     = LibGLESv2.NewProc("glGenVertexArrays")
-	_glGetUniformBlockIndex                = LibGLESv2.NewProc("glGetUniformBlockIndex")
-	_glCreateProgram                       = LibGLESv2.NewProc("glCreateProgram")
-	_glGenRenderbuffers                    = LibGLESv2.NewProc("glGenRenderbuffers")
-	_glCreateShader                        = LibGLESv2.NewProc("glCreateShader")
-	_glGenTextures                         = LibGLESv2.NewProc("glGenTextures")
-	_glDeleteBuffers                       = LibGLESv2.NewProc("glDeleteBuffers")
-	_glDeleteFramebuffers                  = LibGLESv2.NewProc("glDeleteFramebuffers")
-	_glDeleteProgram                       = LibGLESv2.NewProc("glDeleteProgram")
-	_glDeleteShader                        = LibGLESv2.NewProc("glDeleteShader")
-	_glDeleteRenderbuffers                 = LibGLESv2.NewProc("glDeleteRenderbuffers")
-	_glDeleteTextures                      = LibGLESv2.NewProc("glDeleteTextures")
-	_glDepthFunc                           = LibGLESv2.NewProc("glDepthFunc")
-	_glDepthMask                           = LibGLESv2.NewProc("glDepthMask")
-	_glDisableVertexAttribArray            = LibGLESv2.NewProc("glDisableVertexAttribArray")
-	_glDisable                             = LibGLESv2.NewProc("glDisable")
-	_glDrawArrays                          = LibGLESv2.NewProc("glDrawArrays")
-	_glDrawElements                        = LibGLESv2.NewProc("glDrawElements")
-	_glEnable                              = LibGLESv2.NewProc("glEnable")
-	_glEnableVertexAttribArray             = LibGLESv2.NewProc("glEnableVertexAttribArray")
-	_glEndQuery                            = LibGLESv2.NewProc("glEndQuery")
-	_glFinish                              = LibGLESv2.NewProc("glFinish")
-	_glFlush                               = LibGLESv2.NewProc("glFlush")
-	_glFramebufferRenderbuffer             = LibGLESv2.NewProc("glFramebufferRenderbuffer")
-	_glFramebufferTexture2D                = LibGLESv2.NewProc("glFramebufferTexture2D")
-	_glGenQueries                          = LibGLESv2.NewProc("glGenQueries")
-	_glGetError                            = LibGLESv2.NewProc("glGetError")
-	_glGetRenderbufferParameteriv          = LibGLESv2.NewProc("glGetRenderbufferParameteriv")
-	_glGetFloatv                           = LibGLESv2.NewProc("glGetFloatv")
-	_glGetFramebufferAttachmentParameteriv = LibGLESv2.NewProc("glGetFramebufferAttachmentParameteriv")
-	_glGetIntegerv                         = LibGLESv2.NewProc("glGetIntegerv")
-	_glGetIntegeri_v                       = LibGLESv2.NewProc("glGetIntegeri_v")
-	_glGetProgramiv                        = LibGLESv2.NewProc("glGetProgramiv")
-	_glGetProgramInfoLog                   = LibGLESv2.NewProc("glGetProgramInfoLog")
-	_glGetQueryObjectuiv                   = LibGLESv2.NewProc("glGetQueryObjectuiv")
-	_glGetShaderiv                         = LibGLESv2.NewProc("glGetShaderiv")
-	_glGetShaderInfoLog                    = LibGLESv2.NewProc("glGetShaderInfoLog")
-	_glGetString                           = LibGLESv2.NewProc("glGetString")
-	_glGetUniformLocation                  = LibGLESv2.NewProc("glGetUniformLocation")
-	_glGetVertexAttribiv                   = LibGLESv2.NewProc("glGetVertexAttribiv")
-	_glGetVertexAttribPointerv             = LibGLESv2.NewProc("glGetVertexAttribPointerv")
-	_glInvalidateFramebuffer               = LibGLESv2.NewProc("glInvalidateFramebuffer")
-	_glIsEnabled                           = LibGLESv2.NewProc("glIsEnabled")
-	_glLinkProgram                         = LibGLESv2.NewProc("glLinkProgram")
-	_glPixelStorei                         = LibGLESv2.NewProc("glPixelStorei")
-	_glReadPixels                          = LibGLESv2.NewProc("glReadPixels")
-	_glRenderbufferStorage                 = LibGLESv2.NewProc("glRenderbufferStorage")
-	_glScissor                             = LibGLESv2.NewProc("glScissor")
-	_glShaderSource                        = LibGLESv2.NewProc("glShaderSource")
-	_glTexImage2D                          = LibGLESv2.NewProc("glTexImage2D")
-	_glTexStorage2D                        = LibGLESv2.NewProc("glTexStorage2D")
-	_glTexSubImage2D                       = LibGLESv2.NewProc("glTexSubImage2D")
-	_glTexParameteri                       = LibGLESv2.NewProc("glTexParameteri")
-	_glUniformBlockBinding                 = LibGLESv2.NewProc("glUniformBlockBinding")
-	_glUniform1f                           = LibGLESv2.NewProc("glUniform1f")
-	_glUniform1i                           = LibGLESv2.NewProc("glUniform1i")
-	_glUniform2f                           = LibGLESv2.NewProc("glUniform2f")
-	_glUniform3f                           = LibGLESv2.NewProc("glUniform3f")
-	_glUniform4f                           = LibGLESv2.NewProc("glUniform4f")
-	_glUseProgram                          = LibGLESv2.NewProc("glUseProgram")
-	_glVertexAttribPointer                 = LibGLESv2.NewProc("glVertexAttribPointer")
-	_glViewport                            = LibGLESv2.NewProc("glViewport")
+	glInitOnce                             sync.Once
+	_glActiveTexture                       *windows.Proc
+	_glAttachShader                        *windows.Proc
+	_glBeginQuery                          *windows.Proc
+	_glBindAttribLocation                  *windows.Proc
+	_glBindBuffer                          *windows.Proc
+	_glBindBufferBase                      *windows.Proc
+	_glBindFramebuffer                     *windows.Proc
+	_glBindRenderbuffer                    *windows.Proc
+	_glBindTexture                         *windows.Proc
+	_glBindVertexArray                     *windows.Proc
+	_glBlendEquation                       *windows.Proc
+	_glBlendFuncSeparate                   *windows.Proc
+	_glBufferData                          *windows.Proc
+	_glBufferSubData                       *windows.Proc
+	_glCheckFramebufferStatus              *windows.Proc
+	_glClear                               *windows.Proc
+	_glClearColor                          *windows.Proc
+	_glClearDepthf                         *windows.Proc
+	_glDeleteQueries                       *windows.Proc
+	_glDeleteVertexArrays                  *windows.Proc
+	_glCompileShader                       *windows.Proc
+	_glCopyTexSubImage2D                   *windows.Proc
+	_glGenerateMipmap                      *windows.Proc
+	_glGenBuffers                          *windows.Proc
+	_glGenFramebuffers                     *windows.Proc
+	_glGenVertexArrays                     *windows.Proc
+	_glGetUniformBlockIndex                *windows.Proc
+	_glCreateProgram                       *windows.Proc
+	_glGenRenderbuffers                    *windows.Proc
+	_glCreateShader                        *windows.Proc
+	_glGenTextures                         *windows.Proc
+	_glDeleteBuffers                       *windows.Proc
+	_glDeleteFramebuffers                  *windows.Proc
+	_glDeleteProgram                       *windows.Proc
+	_glDeleteShader                        *windows.Proc
+	_glDeleteRenderbuffers                 *windows.Proc
+	_glDeleteTextures                      *windows.Proc
+	_glDepthFunc                           *windows.Proc
+	_glDepthMask                           *windows.Proc
+	_glDisableVertexAttribArray            *windows.Proc
+	_glDisable                             *windows.Proc
+	_glDrawArrays                          *windows.Proc
+	_glDrawElements                        *windows.Proc
+	_glEnable                              *windows.Proc
+	_glEnableVertexAttribArray             *windows.Proc
+	_glEndQuery                            *windows.Proc
+	_glFinish                              *windows.Proc
+	_glFlush                               *windows.Proc
+	_glFramebufferRenderbuffer             *windows.Proc
+	_glFramebufferTexture2D                *windows.Proc
+	_glGenQueries                          *windows.Proc
+	_glGetError                            *windows.Proc
+	_glGetRenderbufferParameteriv          *windows.Proc
+	_glGetFloatv                           *windows.Proc
+	_glGetFramebufferAttachmentParameteriv *windows.Proc
+	_glGetIntegerv                         *windows.Proc
+	_glGetIntegeri_v                       *windows.Proc
+	_glGetProgramiv                        *windows.Proc
+	_glGetProgramInfoLog                   *windows.Proc
+	_glGetQueryObjectuiv                   *windows.Proc
+	_glGetShaderiv                         *windows.Proc
+	_glGetShaderInfoLog                    *windows.Proc
+	_glGetString                           *windows.Proc
+	_glGetUniformLocation                  *windows.Proc
+	_glGetVertexAttribiv                   *windows.Proc
+	_glGetVertexAttribPointerv             *windows.Proc
+	_glInvalidateFramebuffer               *windows.Proc
+	_glIsEnabled                           *windows.Proc
+	_glLinkProgram                         *windows.Proc
+	_glPixelStorei                         *windows.Proc
+	_glReadPixels                          *windows.Proc
+	_glRenderbufferStorage                 *windows.Proc
+	_glScissor                             *windows.Proc
+	_glShaderSource                        *windows.Proc
+	_glTexImage2D                          *windows.Proc
+	_glTexStorage2D                        *windows.Proc
+	_glTexSubImage2D                       *windows.Proc
+	_glTexParameteri                       *windows.Proc
+	_glUniformBlockBinding                 *windows.Proc
+	_glUniform1f                           *windows.Proc
+	_glUniform1i                           *windows.Proc
+	_glUniform2f                           *windows.Proc
+	_glUniform3f                           *windows.Proc
+	_glUniform4f                           *windows.Proc
+	_glUseProgram                          *windows.Proc
+	_glVertexAttribPointer                 *windows.Proc
+	_glViewport                            *windows.Proc
 )
 
 type Functions struct {
@@ -115,7 +229,11 @@ func NewFunctions(ctx Context, forceES bool) (*Functions, error) {
 	if ctx != nil {
 		panic("non-nil context")
 	}
-	return new(Functions), nil
+	var err error
+	glInitOnce.Do(func() {
+		err = loadGLESv2Procs()
+	})
+	return new(Functions), err
 }
 
 func (c *Functions) ActiveTexture(t Enum) {

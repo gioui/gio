@@ -132,22 +132,25 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	handleMouse(self, event, MOUSE_SCROLL, dx, dy);
 }
 - (void)keyDown:(NSEvent *)event {
-	[self interpretKeyEvents:[NSArray arrayWithObject:event]];
 	NSString *keys = [event charactersIgnoringModifiers];
-	gio_onKeys(self.handle, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], true);
+	gio_onKeys(self.handle, (__bridge CFTypeRef)event, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], true);
+}
+- (void)flagsChanged:(NSEvent *)event {
+	[self interpretKeyEvents:[NSArray arrayWithObject:event]];
+	gio_onFlagsChanged(self.handle, [event modifierFlags]);
 }
 - (void)keyUp:(NSEvent *)event {
 	NSString *keys = [event charactersIgnoringModifiers];
-	gio_onKeys(self.handle, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], false);
+	gio_onKeys(self.handle, (__bridge CFTypeRef)event, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], false);
 }
 - (void)insertText:(id)string {
 	gio_onText(self.handle, (__bridge CFTypeRef)string);
 }
-- (void)doCommandBySelector:(SEL)sel {
-	// Don't pass commands up the responder chain.
-	// They will end up in a beep.
+- (void)doCommandBySelector:(SEL)action {
+	if (!gio_onCommandBySelector(self.handle)) {
+		[super doCommandBySelector:action];
+	}
 }
-
 - (BOOL)hasMarkedText {
 	int res = gio_hasMarkedText(self.handle);
 	return res ? YES : NO;
