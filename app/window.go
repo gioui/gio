@@ -970,17 +970,21 @@ func Decorated(enabled bool) Option {
 	}
 }
 
-// HiddenMinimizeButton controls whether show minimize button on macos and windows
-func HiddenMinimizeButton(hidden bool) Option {
+// MinimizeButtonHidden hides the minimize button of the window.
+//
+// MinimizeButtonHidden is supported on Windows and macOS.
+func MinimizeButtonHidden(hidden bool) Option {
 	return func(_ unit.Metric, cnf *Config) {
-		cnf.HiddenMinimizeButton = hidden
+		cnf.MinimizeButtonHidden = hidden
 	}
 }
 
-// HiddenMaximizeButton controls whether show maximize button on macos and windows
-func HiddenMaximizeButton(hidden bool) Option {
+// MaximizeButtonHidden hides the maximize button of the window.
+//
+// MaximizeButtonHidden is supported on Windows and macOS.
+func MaximizeButtonHidden(hidden bool) Option {
 	return func(_ unit.Metric, cnf *Config) {
-		cnf.HiddenMaximizeButton = hidden
+		cnf.MaximizeButtonHidden = hidden
 	}
 }
 

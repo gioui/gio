@@ -470,10 +470,10 @@ func (w *window) Configure(options []Option) {
 	C.setWindowStyleMask(window, mask)
 	C.setWindowStandardButtonHidden(window, C.NSWindowCloseButton, barTrans)
 	// no decorated or hide minimize and maximize buttons
-	w.config.HiddenMinimizeButton = cnf.HiddenMinimizeButton
-	w.config.HiddenMaximizeButton = cnf.HiddenMaximizeButton
-	C.setWindowStandardButtonHidden(window, C.NSWindowMiniaturizeButton, toInt(!cnf.Decorated || cnf.HiddenMinimizeButton))
-	C.setWindowStandardButtonHidden(window, C.NSWindowZoomButton, toInt(!cnf.Decorated || cnf.HiddenMaximizeButton))
+	w.config.MinimizeButtonHidden = cnf.MinimizeButtonHidden
+	w.config.MaximizeButtonHidden = cnf.MaximizeButtonHidden
+	C.setWindowStandardButtonHidden(window, C.NSWindowMiniaturizeButton, toInt(!cnf.Decorated || cnf.MinimizeButtonHidden))
+	C.setWindowStandardButtonHidden(window, C.NSWindowZoomButton, toInt(!cnf.Decorated || cnf.MaximizeButtonHidden))
 	// When toggling the titlebar, the layer doesn't update its frame
 	// until the next resize. Force it.
 	C.resetLayerFrame(w.view)

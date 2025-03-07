@@ -747,12 +747,12 @@ func (w *window) Configure(options []Option) {
 		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
 		showMode = windows.SW_SHOWMAXIMIZED
 	}
-	if w.config.HiddenMinimizeButton {
+	if w.config.MinimizeButtonHidden {
 		style &^= windows.WS_MINIMIZEBOX
 	} else {
 		style |= windows.WS_MINIMIZEBOX
 	}
-	if w.config.HiddenMaximizeButton {
+	if w.config.MaximizeButtonHidden {
 		style &^= windows.WS_MAXIMIZEBOX
 	} else {
 		style |= windows.WS_MAXIMIZEBOX
