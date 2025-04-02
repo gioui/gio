@@ -1169,7 +1169,7 @@ func (w *window) updateCursor() {
 	if ptr == nil {
 		return
 	}
-	w.setCursor(ptr, w.serial)
+	w.setCursor(ptr, w.seat.serial)
 }
 
 func (w *window) setCursor(pointer *C.struct_wl_pointer, serial C.uint32_t) {
@@ -1178,7 +1178,7 @@ func (w *window) setCursor(pointer *C.struct_wl_pointer, serial C.uint32_t) {
 		c = w.cursor.cursor
 	}
 	if c == nil {
-		C.wl_pointer_set_cursor(pointer, w.serial, nil, 0, 0)
+		C.wl_pointer_set_cursor(pointer, serial, nil, 0, 0)
 		return
 	}
 	// Get images[0].
