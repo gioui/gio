@@ -116,6 +116,8 @@ type wlSeat struct {
 
 	// The most recent input serial.
 	serial C.uint32_t
+	// The most recent pointer enter serial.
+	pointerSerial C.uint32_t
 
 	pointerFocus  *window
 	keyboardFocus *window
@@ -851,6 +853,7 @@ func gio_onTouchCancel(data unsafe.Pointer, touch *C.struct_wl_touch) {
 func gio_onPointerEnter(data unsafe.Pointer, pointer *C.struct_wl_pointer, serial C.uint32_t, surf *C.struct_wl_surface, x, y C.wl_fixed_t) {
 	s := callbackLoad(data).(*wlSeat)
 	s.serial = serial
+	s.pointerSerial = serial
 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
 	w.seat = s
 	s.pointerFocus = w
@@ -1169,7 +1172,7 @@ func (w *window) updateCursor() {
 	if ptr == nil {
 		return
 	}
-	w.setCursor(ptr, w.seat.serial)
+	w.setCursor(ptr, w.seat.pointerSerial)
 }
 
 func (w *window) setCursor(pointer *C.struct_wl_pointer, serial C.uint32_t) {
