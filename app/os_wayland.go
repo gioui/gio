@@ -156,7 +156,6 @@ type repeatState struct {
 type window struct {
 	w          *callbacks
 	disp       *wlDisplay
-	seat       *wlSeat
 	surf       *C.struct_wl_surface
 	wmSurf     *C.struct_xdg_surface
 	topLvl     *C.struct_xdg_toplevel
@@ -855,7 +854,6 @@ func gio_onPointerEnter(data unsafe.Pointer, pointer *C.struct_wl_pointer, seria
 	s.serial = serial
 	s.pointerSerial = serial
 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
-	w.seat = s
 	s.pointerFocus = w
 	w.setCursor(pointer, serial)
 	w.lastPos = f32.Point{X: fromFixed(x), Y: fromFixed(y)}
@@ -864,9 +862,9 @@ func gio_onPointerEnter(data unsafe.Pointer, pointer *C.struct_wl_pointer, seria
 //export gio_onPointerLeave
 func gio_onPointerLeave(data unsafe.Pointer, p *C.struct_wl_pointer, serial C.uint32_t, surf *C.struct_wl_surface) {
 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
-	w.seat = nil
 	s := callbackLoad(data).(*wlSeat)
 	s.serial = serial
+	s.pointerFocus = nil
 	if w.inCompositor {
 		w.inCompositor = false
 		w.ProcessEvent(pointer.Event{Kind: pointer.Cancel})
@@ -966,6 +964,9 @@ func gio_onPointerAxis(data unsafe.Pointer, p *C.struct_wl_pointer, t, axis C.ui
 func gio_onPointerFrame(data unsafe.Pointer, p *C.struct_wl_pointer) {
 	s := callbackLoad(data).(*wlSeat)
 	w := s.pointerFocus
+	if w == nil {
+		return
+	}
 	w.flushScroll()
 	w.flushFling()
 }
@@ -1146,16 +1147,17 @@ func (w *window) Perform(actions system.Action) {
 }
 
 func (w *window) move(serial C.uint32_t) {
-	s := w.seat
-	if !w.inCompositor && s != nil {
-		w.inCompositor = true
-		C.xdg_toplevel_move(w.topLvl, s.seat, serial)
+	s := w.disp.seat
+	if w.inCompositor || s.pointerFocus != w {
+		return
 	}
+	w.inCompositor = true
+	C.xdg_toplevel_move(w.topLvl, s.seat, serial)
 }
 
 func (w *window) resize(serial, edge C.uint32_t) {
-	s := w.seat
-	if w.inCompositor || s == nil {
+	s := w.disp.seat
+	if w.inCompositor || s.pointerFocus != w {
 		return
 	}
 	w.inCompositor = true
@@ -1168,11 +1170,12 @@ func (w *window) SetCursor(cursor pointer.Cursor) {
 }
 
 func (w *window) updateCursor() {
-	ptr := w.disp.seat.pointer
-	if ptr == nil {
+	s := w.disp.seat
+	ptr := s.pointer
+	if ptr == nil || s.pointerFocus != w {
 		return
 	}
-	w.setCursor(ptr, w.seat.pointerSerial)
+	w.setCursor(ptr, s.pointerSerial)
 }
 
 func (w *window) setCursor(pointer *C.struct_wl_pointer, serial C.uint32_t) {
