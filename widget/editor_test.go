@@ -934,11 +934,7 @@ g 2 4 6 8 g
 		)
 		tim += time.Second // Avoid multi-clicks.
 
-		for {
-			_, ok := e.Update(gtx) // throw away any events from this layout
-			if !ok {
-				break
-			}
+		for range e.Update(gtx) { // throw away any events from this layout
 		}
 		return e.SelectedText()
 	}
@@ -1222,12 +1218,8 @@ func TestEditor_Submit(t *testing.T) {
 	)
 
 	got := []EditorEvent{}
-	for {
-		ev, ok := e.Update(gtx)
-		if !ok {
-			break
-		}
-		got = append(got, ev)
+	for event := range e.Update(gtx) {
+		got = append(got, event)
 	}
 	if got, want := e.Text(), "ab1"; got != want {
 		t.Errorf("editor failed to filter newline")
