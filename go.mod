@@ -1,8 +1,6 @@
 module gioui.org
 
-go 1.24.0
-
-toolchain go1.24.1
+go 1.24.1
 
 require (
 	eliasnaur.com/font v0.0.0-20230308162249-dd43949cb42d
@@ -14,4 +12,10 @@ require (
 	golang.org/x/sys v0.32.0
 	golang.org/x/text v0.24.0
 )
-require github.com/ddkwork/golibrary  v0.1.2-0.20250415124605-de715c1ec5fa
+
+require github.com/ddkwork/golibrary v0.1.2-0.20250415124605-de715c1ec5fa
+
+require (
+	github.com/google/go-cmp v0.7.0 // indirect
+	golang.org/x/tools v0.32.0 // indirect
+)
