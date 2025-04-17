@@ -398,7 +398,7 @@ func (e *Editor) processKey(gtx layout.Context) iter.Seq[EditorEvent] {
 		}
 		// adjust keeps track of runes dropped because of MaxLen.
 		var adjust int
-		for ke := range gtx.Event(filters...) {
+		for ke := range gtx.Events(filters...) {
 			e.blinkStart = gtx.Now
 			switch ke := ke.(type) {
 			case key.FocusEvent:
@@ -505,7 +505,7 @@ func (e *Editor) command(gtx layout.Context, k key.Event) iter.Seq[EditorEvent] 
 		if k.Modifiers.Contain(key.ModShortcut) {
 			switch k.Name {
 			// Initiate a paste operation, by requesting the clipboard contents; other
-			// half is in Editor.processKey() under clipboard.Event.
+			// half is in Editor.processKey() under clipboard.Events.
 			case "V":
 				if !e.ReadOnly {
 					gtx.Execute(clipboard.ReadCmd{Tag: e})

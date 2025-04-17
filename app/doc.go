@@ -8,7 +8,7 @@ See https://gioui.org for instructions to set up and run Gio programs.
 
 # Windows
 
-A Window is run by calling its Event method in a loop. The first time a
+A Window is run by calling its Events method in a loop. The first time a
 method on Window is called, a new GUI window is created and shown. On mobile
 platforms or when Gio is embedded in another project, Window merely connects
 with a previously created GUI window.
@@ -20,7 +20,7 @@ For example:
 
 	w := new(app.Window)
 	for {
-		e := w.Event()
+		e := w.Events()
 		if e, ok := e.(app.FrameEvent); ok {
 			ops.Reset()
 			// Add operations to ops.
@@ -50,7 +50,7 @@ For example, to display a blank but otherwise functional window:
 		go func() {
 			w := app.NewWindow()
 			for {
-				w.Event()
+				w.Events()
 			}
 		}()
 		app.Main()

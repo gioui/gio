@@ -110,7 +110,7 @@ func ExampleDraggable_Layout() {
 
 		// Check for the received data.
 		for {
-			ev, ok := gtx.Event(transfer.TargetFilter{Target: &drop, Type: mime})
+			ev, ok := gtx.Events(transfer.TargetFilter{Target: &drop, Type: mime})
 			if !ok {
 				break
 			}

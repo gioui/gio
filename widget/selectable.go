@@ -291,7 +291,7 @@ func (e *Selectable) clickDragEvents(gtx layout.Context) iter.Seq[event.Event] {
 }
 
 func (e *Selectable) processKey(gtx layout.Context) {
-	for ke := range gtx.Event(
+	for ke := range gtx.Events(
 		key.FocusFilter{Target: e},
 		key.Filter{Focus: e, Name: key.NameLeftArrow, Optional: key.ModShortcutAlt | key.ModShift},
 		key.Filter{Focus: e, Name: key.NameRightArrow, Optional: key.ModShortcutAlt | key.ModShift},

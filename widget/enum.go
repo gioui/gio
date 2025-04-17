@@ -61,7 +61,7 @@ func (e *Enum) Update(gtx layout.Context) bool {
 				}
 			}
 		}
-		for ev := range gtx.Event(
+		for ev := range gtx.Events(
 			key.FocusFilter{Target: &state.tag},
 			key.Filter{Focus: &state.tag, Name: key.NameReturn},
 			key.Filter{Focus: &state.tag, Name: key.NameSpace},

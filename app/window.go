@@ -37,7 +37,7 @@ type Option func(unit.Metric, *Config)
 // Window represents an operating system window.
 //
 // The zero-value Window is useful; the GUI window is created and shown the first
-// time the [Event] method is called. On iOS or Android, the first Window represents
+// time the [Events] method is called. On iOS or Android, the first Window represents
 // the window previously created by the platform.
 //
 // More than one Window is not supported on iOS, Android, WebAssembly.
@@ -445,7 +445,10 @@ func (c *callbacks) SetComposingRegion(r key.Range) {
 func (c *callbacks) EditorInsert(text string) {
 	sel := c.w.imeState.Selection.Range
 	c.EditorReplace(sel, text)
-	start := min(sel.End, sel.Start)
+	start := sel.Start
+	if sel.End < start {
+		start = sel.End
+	}
 	sel.Start = start + utf8.RuneCountInString(text)
 	sel.End = sel.Start
 	c.SetEditorSelection(sel)
@@ -573,7 +576,7 @@ func (w *Window) nextEvent() iter.Seq[event.Event] {
 		}()
 		switch {
 		case s.framePending:
-			// If the user didn't call FrameEvent.Event, process
+			// If the user didn't call FrameEvent.Events, process
 			// an empty frame.
 			w.processFrame(new(op.Ops), nil)
 		case s.view != nil:
@@ -736,16 +739,8 @@ func (w *Window) Event() event.Event {
 	}
 	if w.driver == nil {
 		for e := range w.nextEvent() {
-			if e == nil {
-				panic("window initialization failed without a DestroyEvent")
-			}
 			return e
 		}
-		//e, ok := w.nextEvent()
-		//if !ok {
-		//	panic("window initialization failed without a DestroyEvent")
-		//}
-		//return e
 	}
 	return w.driver.Event()
 }
@@ -989,7 +984,7 @@ func Decorated(enabled bool) Option {
 
 // flushEvent is sent to detect when the user program
 // has completed processing of all prior events. Its an
-// [io/event.Event] but only for internal use.
+// [io/event.Events] but only for internal use.
 type flushEvent struct{}
 
 func (t flushEvent) ImplementsEvent() {}

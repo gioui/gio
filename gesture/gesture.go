@@ -44,7 +44,7 @@ func (h *Hover) Add(ops *op.Ops) {
 
 // Update state and report whether a pointer is inside the area.
 func (h *Hover) Update(q input.Source) bool {
-	for ev := range q.Event(pointer.Filter{
+	for ev := range q.Events(pointer.Filter{
 		Target: h,
 		Kinds:  pointer.Enter | pointer.Leave | pointer.Cancel,
 	}) {
@@ -176,7 +176,7 @@ func (c *Click) Pressed() bool {
 // Update state and return the next click events, if any.
 func (c *Click) Update(q input.Source) iter.Seq[ClickEvent] {
 	return func(yield func(ClickEvent) bool) {
-		for evt := range q.Event(pointer.Filter{
+		for evt := range q.Events(pointer.Filter{
 			Target: c,
 			Kinds:  pointer.Press | pointer.Release | pointer.Enter | pointer.Leave | pointer.Cancel,
 		}) {
@@ -281,7 +281,7 @@ func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis,
 		ScrollX: scrollx,
 		ScrollY: scrolly,
 	}
-	for evt := range q.Event(f) {
+	for evt := range q.Events(f) {
 		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue
@@ -378,7 +378,7 @@ func (d *Drag) Add(ops *op.Ops) {
 // Update state and return the next drag event, if any.
 func (d *Drag) Update(cfg unit.Metric, q input.Source, axis Axis) iter.Seq[pointer.Event] {
 	return func(yield func(pointer.Event) bool) {
-		for ev := range q.Event(pointer.Filter{
+		for ev := range q.Events(pointer.Filter{
 			Target: d,
 			Kinds:  pointer.Press | pointer.Drag | pointer.Release | pointer.Cancel,
 		}) {
@@ -429,7 +429,6 @@ func (d *Drag) Update(cfg unit.Metric, q input.Source, axis Axis) iter.Seq[point
 				return
 			}
 		}
-		//yield(pointer.Event{})//既然是无效事件，不应该让下层yield到?
 	}
 }
 

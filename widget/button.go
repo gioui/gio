@@ -146,7 +146,7 @@ func (b *Clickable) update(t event.Tag, gtx layout.Context) (Click, bool) { //to
 			})
 		}
 	}
-	for e := range gtx.Event(
+	for e := range gtx.Events(
 		key.FocusFilter{Target: t},
 		key.Filter{Focus: t, Name: key.NameReturn},
 		key.Filter{Focus: t, Name: key.NameSpace},

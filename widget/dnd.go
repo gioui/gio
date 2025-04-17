@@ -66,7 +66,7 @@ func (d *Draggable) Update(gtx layout.Context) iter.Seq[string] {
 			}
 		}
 		d.pos = pos
-		for e := range gtx.Event(transfer.SourceFilter{Target: d, Type: d.Type}) {
+		for e := range gtx.Events(transfer.SourceFilter{Target: d, Type: d.Type}) {
 			if e, ok := e.(transfer.RequestEvent); ok {
 				if !yield(e.Type) {
 					return

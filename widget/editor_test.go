@@ -159,7 +159,7 @@ func TestEditorReadOnly(t *testing.T) {
 	dims := layoutEditor()
 	textContent2 = e.Text()
 	if textContent2 != textContent {
-		t.Errorf("readonly editor modified by delete key.Event")
+		t.Errorf("readonly editor modified by delete key.Events")
 	}
 
 	// Click and drag from the middle of the first line

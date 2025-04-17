@@ -3,7 +3,6 @@
 package input
 
 import (
-	"github.com/ddkwork/golibrary/mylog"
 	"image"
 	"io"
 	"iter"
@@ -203,9 +202,9 @@ func (s Source) Focused(tag event.Tag) bool {
 	return s.r.state().keyState.focus == tag
 }
 
-// Event returns the next event that matches at least one of filters.
+// Events returns the next event that matches at least one of filters.
 // If the source is disabled, no events will be reported.
-func (s Source) Event(filters ...event.Filter) iter.Seq[event.Event] {
+func (s Source) Events(filters ...event.Filter) iter.Seq[event.Event] {
 	return func(yield func(event.Event) bool) {
 		if !s.Enabled() {
 			return
@@ -321,7 +320,6 @@ func (q *Router) Event(filters ...event.Filter) iter.Seq[event.Event] {
 				if match {
 					change.events = slices.Delete(change.events, j, j+1) //todo: panic: runtime error: invalid memory address or nil pointer dereference
 					// Fast forward state to last matched.
-					mylog.CheckNil(evt.event)
 					q.collapseState(i)
 					if !yield(evt.event) {
 						return
