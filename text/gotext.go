@@ -356,7 +356,7 @@ func (s *shaperImpl) splitBidi(input shaping.Input) []shaping.Input {
 	if err != nil {
 		return []shaping.Input{input}
 	}
-	for i := 0; i < out.NumRuns(); i++ {
+	for i := range out.NumRuns() {
 		currentInput := input
 		run := out.Run(i)
 		dir := run.Direction()
@@ -685,7 +685,7 @@ func (s *shaperImpl) Shape(pathOps *op.Ops, gs []Glyph) clip.PathSpec {
 					nargs = 3
 				}
 				var args [3]f32.Point
-				for i := 0; i < nargs; i++ {
+				for i := range nargs {
 					a := f32.Point{
 						X: fseg.Args[i].X * scaleFactor,
 						Y: -fseg.Args[i].Y * scaleFactor,

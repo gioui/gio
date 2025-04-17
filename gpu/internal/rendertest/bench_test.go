@@ -66,8 +66,8 @@ func BenchmarkDrawUICached(b *testing.B) {
 	defer w.Release()
 	drawCore(gtx, th)
 	w.Frame(gtx.Ops)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		w.Frame(gtx.Ops)
 	}
 	finishBenchmark(b, w)
@@ -83,8 +83,8 @@ func BenchmarkDrawUI(b *testing.B) {
 	drawCore(gtx, th)
 	w.Frame(gtx.Ops)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for i := 0; b.Loop(); i++ {
 		resetOps(gtx)
 
 		off := float32(math.Mod(float64(i)/10, 10))
@@ -105,8 +105,8 @@ func BenchmarkDrawUITransformed(b *testing.B) {
 	drawCore(gtx, th)
 	w.Frame(gtx.Ops)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for i := 0; b.Loop(); i++ {
 		resetOps(gtx)
 
 		angle := float32(math.Mod(float64(i)/1000, 0.05))
@@ -130,8 +130,8 @@ func Benchmark1000Circles(b *testing.B) {
 	draw1000Circles(gtx)
 	w.Frame(gtx.Ops)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		resetOps(gtx)
 		draw1000Circles(gtx)
 		w.Frame(gtx.Ops)
@@ -147,8 +147,8 @@ func Benchmark1000CirclesInstanced(b *testing.B) {
 	draw1000CirclesInstanced(gtx)
 	w.Frame(gtx.Ops)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		resetOps(gtx)
 		draw1000CirclesInstanced(gtx)
 		w.Frame(gtx.Ops)
@@ -158,9 +158,9 @@ func Benchmark1000CirclesInstanced(b *testing.B) {
 
 func draw1000Circles(gtx layout.Context) {
 	ops := gtx.Ops
-	for x := 0; x < 100; x++ {
+	for x := range 100 {
 		op.Offset(image.Pt(x*10, 0)).Add(ops)
-		for y := 0; y < 10; y++ {
+		for y := range 10 {
 			paint.FillShape(ops,
 				color.NRGBA{R: 100 + uint8(x), G: 100 + uint8(y), B: 100, A: 120},
 				clip.RRect{Rect: image.Rect(0, 0, 10, 10), NE: 5, SE: 5, SW: 5, NW: 5}.Op(ops),
@@ -179,9 +179,9 @@ func draw1000CirclesInstanced(gtx layout.Context) {
 	cl.Pop()
 	c := r.Stop()
 
-	for x := 0; x < 100; x++ {
+	for x := range 100 {
 		op.Offset(image.Pt(x*10, 0)).Add(ops)
-		for y := 0; y < 10; y++ {
+		for y := range 10 {
 			paint.ColorOp{Color: color.NRGBA{R: 100 + uint8(x), G: 100 + uint8(y), B: 100, A: 120}}.Add(ops)
 			c.Add(ops)
 			op.Offset(image.Pt(0, 100)).Add(ops)
@@ -204,9 +204,9 @@ func drawIndividualShapes(gtx layout.Context, th *material.Theme) chan op.CallOp
 	go func() {
 		ops := &op1
 		c := op.Record(ops)
-		for x := 0; x < 9; x++ {
+		for x := range 9 {
 			op.Offset(image.Pt(x*50, 0)).Add(ops)
-			for y := 0; y < 9; y++ {
+			for y := range 9 {
 				paint.FillShape(ops,
 					color.NRGBA{R: 100 + uint8(x), G: 100 + uint8(y), B: 100, A: 120},
 					clip.RRect{Rect: image.Rect(0, 0, 25, 25), NE: 10, SE: 10, SW: 10, NW: 10}.Op(ops),
@@ -233,8 +233,8 @@ func drawShapeInstances(gtx layout.Context, th *material.Theme) chan op.CallOp {
 
 		squares.Add(ops)
 		rad := float32(0)
-		for x := 0; x < 20; x++ {
-			for y := 0; y < 20; y++ {
+		for x := range 20 {
+			for y := range 20 {
 				t := op.Offset(image.Pt(x*50+25, y*50+25)).Push(ops)
 				c.Add(ops)
 				t.Pop()
@@ -253,7 +253,7 @@ func drawText(gtx layout.Context, th *material.Theme) chan op.CallOp {
 		c := op.Record(ops)
 
 		txt := material.H6(th, "")
-		for x := 0; x < 40; x++ {
+		for x := range 40 {
 			txt.Text = textRows[x]
 			t := op.Offset(image.Pt(0, 24*x)).Push(ops)
 			gtx.Ops = ops

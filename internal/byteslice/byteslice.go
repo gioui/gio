@@ -10,7 +10,7 @@ import (
 )
 
 // Struct returns a byte slice view of a struct.
-func Struct(s interface{}) []byte {
+func Struct(s any) []byte {
 	v := reflect.ValueOf(s)
 	sz := int(v.Elem().Type().Size())
 	return unsafe.Slice((*byte)(unsafe.Pointer(v.Pointer())), sz)
@@ -27,7 +27,7 @@ func Uint32(s []uint32) []byte {
 }
 
 // Slice returns a byte slice view of a slice.
-func Slice(s interface{}) []byte {
+func Slice(s any) []byte {
 	v := reflect.ValueOf(s)
 	first := v.Index(0)
 	sz := int(first.Type().Size())

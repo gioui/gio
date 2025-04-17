@@ -125,7 +125,7 @@ func verifyTree(t *testing.T, parent SemanticID, n SemanticNode) {
 }
 
 func printTree(indent int, n SemanticNode) {
-	for i := 0; i < indent; i++ {
+	for range indent {
 		fmt.Print("\t")
 	}
 	fmt.Printf("%d: %+v\n", n.ID, n.Desc)

@@ -20,7 +20,7 @@ type Reader struct {
 type EncodedOp struct {
 	Key  Key
 	Data []byte
-	Refs []interface{}
+	Refs []any
 }
 
 // Key is a unique key for a given op.
@@ -175,7 +175,7 @@ func (op *opMacroDef) decode(data []byte) {
 	op.endpc.refs = bo.Uint32(data[5:])
 }
 
-func (m *macroOp) decode(data []byte, refs []interface{}) {
+func (m *macroOp) decode(data []byte, refs []any) {
 	if len(data) < TypeCallLen || len(refs) < 1 || OpType(data[0]) != TypeCall {
 		panic("invalid op")
 	}

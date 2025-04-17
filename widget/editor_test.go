@@ -159,7 +159,7 @@ func TestEditorReadOnly(t *testing.T) {
 	dims := layoutEditor()
 	textContent2 = e.Text()
 	if textContent2 != textContent {
-		t.Errorf("readonly editor modified by delete key.Event")
+		t.Errorf("readonly editor modified by delete key.Events")
 	}
 
 	// Click and drag from the middle of the first line
@@ -934,11 +934,7 @@ g 2 4 6 8 g
 		)
 		tim += time.Second // Avoid multi-clicks.
 
-		for {
-			_, ok := e.Update(gtx) // throw away any events from this layout
-			if !ok {
-				break
-			}
+		for range e.Update(gtx) { // throw away any events from this layout
 		}
 		return e.SelectedText()
 	}
@@ -1222,12 +1218,8 @@ func TestEditor_Submit(t *testing.T) {
 	)
 
 	got := []EditorEvent{}
-	for {
-		ev, ok := e.Update(gtx)
-		if !ok {
-			break
-		}
-		got = append(got, ev)
+	for event := range e.Update(gtx) {
+		got = append(got, event)
 	}
 	if got, want := e.Text(), "ab1"; got != want {
 		t.Errorf("editor failed to filter newline")
@@ -1255,7 +1247,7 @@ func TestNoFilterAllocs(t *testing.T) {
 		}
 		b.ReportAllocs()
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			e.Update(gtx)
 		}
 	})

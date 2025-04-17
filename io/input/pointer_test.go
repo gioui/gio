@@ -21,11 +21,18 @@ import (
 
 func TestFilterReset(t *testing.T) {
 	r := new(Router)
-	if _, ok := r.Event(pointer.Filter{}); ok {
-		t.Fatal("empty filter matched reset event")
+	//if _, ok := r.Events(pointer.Filter{}); ok {
+	//	t.Fatal("empty filter matched reset event")
+	//}
+	for range r.Event(pointer.Filter{}) {
+		t.Fatal("empty filter matched reset event") //todo test
 	}
-	if _, ok := r.Event(pointer.Filter{Kinds: pointer.Cancel}); ok {
-		t.Fatal("second call to Event matched reset event")
+
+	//if _, ok := r.Events(pointer.Filter{Kinds: pointer.Cancel}); ok {
+	//	t.Fatal("second call to Events matched reset event")
+	//}
+	for range r.Event(pointer.Filter{Kinds: pointer.Cancel}) {
+		t.Fatal("second call to Events matched reset event")
 	}
 }
 
@@ -35,7 +42,7 @@ func TestPointerNilTarget(t *testing.T) {
 	r.Frame(new(op.Ops))
 	r.Queue(pointer.Event{Kind: pointer.Press})
 	// Nil Targets should not receive events.
-	if _, ok := r.Event(pointer.Filter{Kinds: pointer.Press}); ok {
+	for range r.Event(pointer.Filter{Kinds: pointer.Press}) {
 		t.Errorf("nil target received event")
 	}
 }
@@ -1256,7 +1263,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 		handlerCount := i
 		b.Run(fmt.Sprintf("%d-handlers", i), func(b *testing.B) {
 			handlers := make([]event.Tag, handlerCount)
-			for i := 0; i < handlerCount; i++ {
+			for i := range handlerCount {
 				h := new(int)
 				*h = i
 				handlers[i] = h
@@ -1278,7 +1285,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 			r.Frame(&ops)
 			b.ReportAllocs()
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				r.Queue(
 					pointer.Event{
 						Kind:     pointer.Move,
@@ -1290,17 +1297,15 @@ func BenchmarkRouterAdd(b *testing.B) {
 	}
 }
 
-func events(r *Router, n int, filters ...event.Filter) []event.Event {
+func events(r *Router, n int, filters ...event.Filter) []event.Event { //todo use seq
 	var events []event.Event
 	for {
 		if n != -1 && len(events) == n {
 			break
 		}
-		e, ok := r.Event(filters...)
-		if !ok {
-			break
+		for e := range r.Event(filters...) {
+			events = append(events, e)
 		}
-		events = append(events, e)
 	}
 	return events
 }

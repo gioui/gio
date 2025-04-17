@@ -61,19 +61,15 @@ func (s *Scrollbar) Update(gtx layout.Context, axis layout.Axis, viewportStart, 
 	}
 
 	// Jump to a click in the track.
-	for {
-		event, ok := s.track.Update(gtx.Source)
-		if !ok {
-			break
-		}
-		if event.Kind != gesture.KindClick ||
-			event.Modifiers != key.Modifiers(0) ||
-			event.NumClicks > 1 {
+	for clickEvent := range s.track.Update(gtx.Source) {
+		if clickEvent.Kind != gesture.KindClick ||
+			clickEvent.Modifiers != key.Modifiers(0) ||
+			clickEvent.NumClicks > 1 {
 			continue
 		}
 		pos := axis.Convert(image.Point{
-			X: int(event.Position.X),
-			Y: int(event.Position.Y),
+			X: int(clickEvent.Position.X),
+			Y: int(clickEvent.Position.Y),
 		})
 		normalizedPos := float32(pos.X) / trackHeight
 		// Clicking on the indicator should not jump to that position on the track. The user might've just intended to
@@ -82,13 +78,8 @@ func (s *Scrollbar) Update(gtx layout.Context, axis layout.Axis, viewportStart, 
 			centerOnClick(normalizedPos)
 		}
 	}
-
 	// Offset to account for any drags.
-	for {
-		event, ok := s.drag.Update(gtx.Metric, gtx.Source, gesture.Axis(axis))
-		if !ok {
-			break
-		}
+	for event := range s.drag.Update(gtx.Metric, gtx.Source, gesture.Axis(axis)) {
 		switch event.Kind {
 		case pointer.Drag:
 		case pointer.Release, pointer.Cancel:
@@ -144,10 +135,8 @@ func (s *Scrollbar) Update(gtx layout.Context, axis layout.Axis, viewportStart, 
 
 	// Process events from the indicator so that hover is
 	// detected properly.
-	for {
-		if _, ok := s.indicator.Update(gtx.Source); !ok {
-			break
-		}
+	for range s.indicator.Update(gtx.Source) {
+
 	}
 }
 

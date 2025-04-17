@@ -49,8 +49,8 @@ func buildSquares(size int) paint.ImageOp {
 	sub := size / 4
 	im := image.NewNRGBA(image.Rect(0, 0, size, size))
 	c1, c2 := image.NewUniform(colornames.Green), image.NewUniform(colornames.Blue)
-	for r := 0; r < 4; r++ {
-		for c := 0; c < 4; c++ {
+	for r := range 4 {
+		for c := range 4 {
 			c1, c2 = c2, c1
 			draw.Draw(im, image.Rect(r*sub, c*sub, r*sub+sub, c*sub+sub), c1, image.Point{}, draw.Over)
 		}
@@ -78,7 +78,7 @@ func run(t *testing.T, f func(o *op.Ops), c func(r result)) {
 	var img *image.RGBA
 	var err error
 	ops := new(op.Ops)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		ops.Reset()
 		img, err = drawImage(t, 128, ops, f)
 		if err != nil {

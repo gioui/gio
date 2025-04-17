@@ -91,7 +91,7 @@ func TestInputWakeup(t *testing.T) {
 	// However, events that does match should trigger wakeup.
 	r.Queue(key.Event{Name: "A"})
 	if _, handled := r.WakeupTime(); !handled {
-		t.Errorf("a key.Event didn't trigger redraw")
+		t.Errorf("a key.Events didn't trigger redraw")
 	}
 }
 
@@ -191,7 +191,7 @@ func TestKeyFocusedInvisible(t *testing.T) {
 	ops.Reset()
 
 	// Respawn the first element:
-	// It must receive one `Event{Focus: false}`.
+	// It must receive one `Events{Focus: false}`.
 	event.Op(ops, &handlers[0])
 
 	assertEventSequence(t, events(r, -1, key.FocusFilter{Target: &handlers[0]}), key.FocusEvent{Focus: false})

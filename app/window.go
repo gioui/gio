@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"iter"
 	"runtime"
 	"sync"
 	"time"
@@ -36,7 +37,7 @@ type Option func(unit.Metric, *Config)
 // Window represents an operating system window.
 //
 // The zero-value Window is useful; the GUI window is created and shown the first
-// time the [Event] method is called. On iOS or Android, the first Window represents
+// time the [Events] method is called. On iOS or Android, the first Window represents
 // the window previously created by the platform.
 //
 // More than one Window is not supported on iOS, Android, WebAssembly.
@@ -562,46 +563,60 @@ func (c *callbacks) Invalidate() {
 	c.w.processEvent(wakeupEvent{})
 }
 
-func (c *callbacks) nextEvent() (event.Event, bool) {
-	return c.w.nextEvent()
+func (c *callbacks) nextEvent() iter.Seq[event.Event] {
+	return c.w.events()
 }
 
-func (w *Window) nextEvent() (event.Event, bool) {
-	s := &w.coalesced
-	defer func() {
-		// Every event counts as a wakeup.
-		s.wakeup = false
-	}()
-	switch {
-	case s.framePending:
-		// If the user didn't call FrameEvent.Event, process
-		// an empty frame.
-		w.processFrame(new(op.Ops), nil)
-	case s.view != nil:
-		e := *s.view
-		s.view = nil
-		return e, true
-	case s.destroy != nil:
-		e := *s.destroy
-		// Clear pending events after DestroyEvent is delivered.
-		*s = eventSummary{}
-		return e, true
-	case s.cfg != nil:
-		e := *s.cfg
-		s.cfg = nil
-		return e, true
-	case s.frame != nil:
-		e := *s.frame
-		s.frame = nil
-		s.framePending = true
-		return e.FrameEvent, true
-	case s.wakeup:
-		return wakeupEvent{}, true
+func (w *Window) events() iter.Seq[event.Event] {
+	return func(yield func(event.Event) bool) {
+		for {
+			s := &w.coalesced
+			defer func() { //todo Possible resource leak, 'defer' is called in the 'for' loop
+				// Every event counts as a wakeup.
+				s.wakeup = false
+			}()
+			switch {
+			case s.framePending:
+				// If the user didn't call FrameEvent.Events, process
+				// an empty frame.
+				w.processFrame(new(op.Ops), nil)
+			case s.view != nil:
+				e := *s.view
+				s.view = nil
+				if !yield(e) {
+					return
+				}
+			case s.destroy != nil:
+				e := *s.destroy
+				// Clear pending events after DestroyEvent is delivered.
+				*s = eventSummary{}
+				if !yield(e) {
+					return
+				}
+			case s.cfg != nil:
+				e := *s.cfg
+				s.cfg = nil
+				if !yield(e) {
+					return
+				}
+			case s.frame != nil:
+				e := *s.frame
+				s.frame = nil
+				s.framePending = true
+				if !yield(e.FrameEvent) {
+					return
+				}
+			case s.wakeup:
+				if !yield(wakeupEvent{}) {
+					return
+				}
+			}
+			w.invMu.Lock()
+			defer w.invMu.Unlock()
+			w.mayInvalidate = w.driver != nil
+			break
+		}
 	}
-	w.invMu.Lock()
-	defer w.invMu.Unlock()
-	w.mayInvalidate = w.driver != nil
-	return nil, false
 }
 
 func (w *Window) processEvent(e event.Event) bool {
@@ -726,11 +741,9 @@ func (w *Window) Event() event.Event {
 		w.init()
 	}
 	if w.driver == nil {
-		e, ok := w.nextEvent()
-		if !ok {
-			panic("window initialization failed without a DestroyEvent")
+		for e := range w.events() {
+			return e
 		}
-		return e
 	}
 	return w.driver.Event()
 }
@@ -974,7 +987,7 @@ func Decorated(enabled bool) Option {
 
 // flushEvent is sent to detect when the user program
 // has completed processing of all prior events. Its an
-// [io/event.Event] but only for internal use.
+// [io/event.Events] but only for internal use.
 type flushEvent struct{}
 
 func (t flushEvent) ImplementsEvent() {}

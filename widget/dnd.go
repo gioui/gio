@@ -1,12 +1,13 @@
 package widget
 
 import (
+	"gioui.org/io/pointer"
 	"io"
+	"iter"
 
 	"gioui.org/f32"
 	"gioui.org/gesture"
 	"gioui.org/io/event"
-	"gioui.org/io/pointer"
 	"gioui.org/io/transfer"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -51,33 +52,29 @@ func (d *Draggable) Dragging() bool {
 
 // Update the draggable and returns the MIME type for which the Draggable was
 // requested to offer data, if any
-func (d *Draggable) Update(gtx layout.Context) (mime string, requested bool) {
-	pos := d.pos
-	for {
-		ev, ok := d.drag.Update(gtx.Metric, gtx.Source, gesture.Both)
-		if !ok {
-			break
+// func (d *Draggable) Update(gtx layout.Context) (mime string, requested bool) {
+func (d *Draggable) Update(gtx layout.Context) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		pos := d.pos
+		for ev := range d.drag.Update(gtx.Metric, gtx.Source, gesture.Both) {
+			switch ev.Kind {
+			case pointer.Press:
+				d.click = ev.Position
+				pos = f32.Point{}
+			case pointer.Drag, pointer.Release:
+				pos = ev.Position.Sub(d.click)
+			}
 		}
-		switch ev.Kind {
-		case pointer.Press:
-			d.click = ev.Position
-			pos = f32.Point{}
-		case pointer.Drag, pointer.Release:
-			pos = ev.Position.Sub(d.click)
+		d.pos = pos
+		for e := range gtx.Events(transfer.SourceFilter{Target: d, Type: d.Type}) {
+			if e, ok := e.(transfer.RequestEvent); ok {
+				if !yield(e.Type) {
+					return
+				}
+			}
 		}
+		//return "", false
 	}
-	d.pos = pos
-
-	for {
-		e, ok := gtx.Event(transfer.SourceFilter{Target: d, Type: d.Type})
-		if !ok {
-			break
-		}
-		if e, ok := e.(transfer.RequestEvent); ok {
-			return e.Type, true
-		}
-	}
-	return "", false
 }
 
 // Offer the data ready for a drop. Must be called after being Requested.
