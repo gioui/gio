@@ -96,7 +96,8 @@ func ExampleDraggable_Layout() {
 		drag.Layout(gtx, w, w)
 		// drag must respond with an Offer event when requested.
 		// Use the drag method for this.
-		if m, ok := drag.Update(gtx); ok {
+
+		for m := range drag.Update(gtx) {
 			drag.Offer(gtx, m, io.NopCloser(strings.NewReader("hello world")))
 		}
 
@@ -109,11 +110,7 @@ func ExampleDraggable_Layout() {
 		ds.Pop()
 
 		// Check for the received data.
-		for {
-			ev, ok := gtx.Events(transfer.TargetFilter{Target: &drop, Type: mime})
-			if !ok {
-				break
-			}
+		for ev := range gtx.Events(transfer.TargetFilter{Target: &drop, Type: mime}) {
 			switch e := ev.(type) {
 			case transfer.DataEvent:
 				data := e.Open()
