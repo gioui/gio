@@ -301,11 +301,7 @@ func (e *eventLoop) FlushEvents() {
 	}
 	e.delivering = true
 	defer func() { e.delivering = false }()
-	for {
-		evt, ok := e.win.nextEvent()
-		if !ok {
-			break
-		}
+	for evt := range e.win.nextEvent() {
 		e.deliverEvent(evt)
 	}
 }

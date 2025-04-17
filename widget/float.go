@@ -48,11 +48,7 @@ func (f *Float) Layout(gtx layout.Context, axis layout.Axis, pointerMargin unit.
 // The range of f is set by the minimum constraints main axis value.
 func (f *Float) Update(gtx layout.Context) bool {
 	changed := false
-	for {
-		e, ok := f.drag.Update(gtx.Metric, gtx.Source, gesture.Axis(f.axis))
-		if !ok {
-			break
-		}
+	for e := range f.drag.Update(gtx.Metric, gtx.Source, gesture.Axis(f.axis)) {
 		if f.length > 0 && (e.Kind == pointer.Press || e.Kind == pointer.Drag) {
 			pos := e.Position.X
 			if f.axis == layout.Vertical {

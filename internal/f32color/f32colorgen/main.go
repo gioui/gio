@@ -16,7 +16,7 @@ func main() {
 	flag.Parse()
 
 	var b bytes.Buffer
-	printf := func(content string, args ...interface{}) {
+	printf := func(content string, args ...any) {
 		fmt.Fprintf(&b, content, args...)
 	}
 

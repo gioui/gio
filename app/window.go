@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"iter"
 	"runtime"
 	"sync"
 	"time"
@@ -444,10 +445,7 @@ func (c *callbacks) SetComposingRegion(r key.Range) {
 func (c *callbacks) EditorInsert(text string) {
 	sel := c.w.imeState.Selection.Range
 	c.EditorReplace(sel, text)
-	start := sel.Start
-	if sel.End < start {
-		start = sel.End
-	}
+	start := min(sel.End, sel.Start)
 	sel.Start = start + utf8.RuneCountInString(text)
 	sel.End = sel.Start
 	c.SetEditorSelection(sel)
@@ -562,46 +560,57 @@ func (c *callbacks) Invalidate() {
 	c.w.processEvent(wakeupEvent{})
 }
 
-func (c *callbacks) nextEvent() (event.Event, bool) {
+func (c *callbacks) nextEvent() iter.Seq[event.Event] {
 	return c.w.nextEvent()
 }
 
-func (w *Window) nextEvent() (event.Event, bool) {
-	s := &w.coalesced
-	defer func() {
-		// Every event counts as a wakeup.
-		s.wakeup = false
-	}()
-	switch {
-	case s.framePending:
-		// If the user didn't call FrameEvent.Event, process
-		// an empty frame.
-		w.processFrame(new(op.Ops), nil)
-	case s.view != nil:
-		e := *s.view
-		s.view = nil
-		return e, true
-	case s.destroy != nil:
-		e := *s.destroy
-		// Clear pending events after DestroyEvent is delivered.
-		*s = eventSummary{}
-		return e, true
-	case s.cfg != nil:
-		e := *s.cfg
-		s.cfg = nil
-		return e, true
-	case s.frame != nil:
-		e := *s.frame
-		s.frame = nil
-		s.framePending = true
-		return e.FrameEvent, true
-	case s.wakeup:
-		return wakeupEvent{}, true
+func (w *Window) nextEvent() iter.Seq[event.Event] {
+	return func(yield func(event.Event) bool) {
+		s := &w.coalesced
+		defer func() {
+			// Every event counts as a wakeup.
+			s.wakeup = false
+		}()
+		switch {
+		case s.framePending:
+			// If the user didn't call FrameEvent.Event, process
+			// an empty frame.
+			w.processFrame(new(op.Ops), nil)
+		case s.view != nil:
+			e := *s.view
+			s.view = nil
+			if !yield(e) {
+				return
+			}
+		case s.destroy != nil:
+			e := *s.destroy
+			// Clear pending events after DestroyEvent is delivered.
+			*s = eventSummary{}
+			if !yield(e) {
+				return
+			}
+		case s.cfg != nil:
+			e := *s.cfg
+			s.cfg = nil
+			if !yield(e) {
+				return
+			}
+		case s.frame != nil:
+			e := *s.frame
+			s.frame = nil
+			s.framePending = true
+			if !yield(e.FrameEvent) {
+				return
+			}
+		case s.wakeup:
+			if !yield(wakeupEvent{}) {
+				return
+			}
+		}
+		w.invMu.Lock()
+		defer w.invMu.Unlock()
+		w.mayInvalidate = w.driver != nil
 	}
-	w.invMu.Lock()
-	defer w.invMu.Unlock()
-	w.mayInvalidate = w.driver != nil
-	return nil, false
 }
 
 func (w *Window) processEvent(e event.Event) bool {
@@ -726,11 +735,17 @@ func (w *Window) Event() event.Event {
 		w.init()
 	}
 	if w.driver == nil {
-		e, ok := w.nextEvent()
-		if !ok {
-			panic("window initialization failed without a DestroyEvent")
+		for e := range w.nextEvent() {
+			if e == nil {
+				panic("window initialization failed without a DestroyEvent")
+			}
+			return e
 		}
-		return e
+		//e, ok := w.nextEvent()
+		//if !ok {
+		//	panic("window initialization failed without a DestroyEvent")
+		//}
+		//return e
 	}
 	return w.driver.Event()
 }

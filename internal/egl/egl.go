@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"gioui.org/gpu"
+	"slices"
 )
 
 type Context struct {
@@ -154,12 +155,7 @@ func (c *Context) EnableVSync(enable bool) {
 }
 
 func hasExtension(exts []string, ext string) bool {
-	for _, e := range exts {
-		if ext == e {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(exts, ext)
 }
 
 func createContext(disp _EGLDisplay) (*eglContext, error) {

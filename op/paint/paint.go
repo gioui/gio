@@ -35,7 +35,7 @@ type ImageOp struct {
 
 	// handle is a key to uniquely identify this ImageOp
 	// in a map of cached textures.
-	handle interface{}
+	handle any
 }
 
 // ColorOp sets the brush to a constant color.

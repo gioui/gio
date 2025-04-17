@@ -4,11 +4,13 @@ package input
 
 import (
 	"image"
+	"iter"
 	"sort"
 
 	"gioui.org/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
+	"slices"
 )
 
 // EditorState represents the state of an editor needed by input handlers.
@@ -99,12 +101,14 @@ func (q *keyQueue) Reset() {
 	q.dirOrder = q.dirOrder[:0]
 }
 
-func (k *keyHandler) ResetEvent() (event.Event, bool) {
-	if k.reset {
-		return nil, false
+func (k *keyHandler) ResetEvent() iter.Seq[event.Event] {
+	return func(yield func(event.Event) bool) {
+		if k.reset {
+			return
+		}
+		k.reset = true
+		yield(key.FocusEvent{Focus: false})
 	}
-	k.reset = true
-	return key.FocusEvent{Focus: false}, true
 }
 
 func (q *keyQueue) Frame(handlers map[event.Tag]*handler, state keyState) keyState {
@@ -304,10 +308,8 @@ func (s keyState) softKeyboard(show bool) keyState {
 }
 
 func (k *keyFilter) Add(f key.Filter) {
-	for _, f2 := range *k {
-		if f == f2 {
-			return
-		}
+	if slices.Contains(*k, f) {
+		return
 	}
 	*k = append(*k, f)
 }

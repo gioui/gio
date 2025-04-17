@@ -1256,7 +1256,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 		handlerCount := i
 		b.Run(fmt.Sprintf("%d-handlers", i), func(b *testing.B) {
 			handlers := make([]event.Tag, handlerCount)
-			for i := 0; i < handlerCount; i++ {
+			for i := range handlerCount {
 				h := new(int)
 				*h = i
 				handlers[i] = h
@@ -1278,7 +1278,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 			r.Frame(&ops)
 			b.ReportAllocs()
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				r.Queue(
 					pointer.Event{
 						Kind:     pointer.Move,

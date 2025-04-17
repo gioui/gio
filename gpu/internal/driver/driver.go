@@ -217,7 +217,7 @@ func flipImageY(stride, height int, pixels []byte) {
 	// Flip image in y-direction. OpenGL's origin is in the lower
 	// left corner.
 	row := make([]uint8, stride)
-	for y := 0; y < height/2; y++ {
+	for y := range height / 2 {
 		y1 := height - y - 1
 		dest := y1 * stride
 		src := y * stride
