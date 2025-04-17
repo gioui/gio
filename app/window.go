@@ -564,55 +564,58 @@ func (c *callbacks) Invalidate() {
 }
 
 func (c *callbacks) nextEvent() iter.Seq[event.Event] {
-	return c.w.nextEvent()
+	return c.w.events()
 }
 
-func (w *Window) nextEvent() iter.Seq[event.Event] {
+func (w *Window) events() iter.Seq[event.Event] {
 	return func(yield func(event.Event) bool) {
-		s := &w.coalesced
-		defer func() {
-			// Every event counts as a wakeup.
-			s.wakeup = false
-		}()
-		switch {
-		case s.framePending:
-			// If the user didn't call FrameEvent.Events, process
-			// an empty frame.
-			w.processFrame(new(op.Ops), nil)
-		case s.view != nil:
-			e := *s.view
-			s.view = nil
-			if !yield(e) {
-				return
+		for {
+			s := &w.coalesced
+			defer func() { //todo Possible resource leak, 'defer' is called in the 'for' loop
+				// Every event counts as a wakeup.
+				s.wakeup = false
+			}()
+			switch {
+			case s.framePending:
+				// If the user didn't call FrameEvent.Events, process
+				// an empty frame.
+				w.processFrame(new(op.Ops), nil)
+			case s.view != nil:
+				e := *s.view
+				s.view = nil
+				if !yield(e) {
+					return
+				}
+			case s.destroy != nil:
+				e := *s.destroy
+				// Clear pending events after DestroyEvent is delivered.
+				*s = eventSummary{}
+				if !yield(e) {
+					return
+				}
+			case s.cfg != nil:
+				e := *s.cfg
+				s.cfg = nil
+				if !yield(e) {
+					return
+				}
+			case s.frame != nil:
+				e := *s.frame
+				s.frame = nil
+				s.framePending = true
+				if !yield(e.FrameEvent) {
+					return
+				}
+			case s.wakeup:
+				if !yield(wakeupEvent{}) {
+					return
+				}
 			}
-		case s.destroy != nil:
-			e := *s.destroy
-			// Clear pending events after DestroyEvent is delivered.
-			*s = eventSummary{}
-			if !yield(e) {
-				return
-			}
-		case s.cfg != nil:
-			e := *s.cfg
-			s.cfg = nil
-			if !yield(e) {
-				return
-			}
-		case s.frame != nil:
-			e := *s.frame
-			s.frame = nil
-			s.framePending = true
-			if !yield(e.FrameEvent) {
-				return
-			}
-		case s.wakeup:
-			if !yield(wakeupEvent{}) {
-				return
-			}
+			w.invMu.Lock()
+			defer w.invMu.Unlock()
+			w.mayInvalidate = w.driver != nil
+			break
 		}
-		w.invMu.Lock()
-		defer w.invMu.Unlock()
-		w.mayInvalidate = w.driver != nil
 	}
 }
 
@@ -738,7 +741,7 @@ func (w *Window) Event() event.Event {
 		w.init()
 	}
 	if w.driver == nil {
-		for e := range w.nextEvent() {
+		for e := range w.events() {
 			return e
 		}
 	}
