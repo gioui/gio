@@ -760,8 +760,10 @@ func (w *window) Configure(options []Option) {
 		}
 	}
 
-	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style)
+	// Note: these invocation all trigger the windows callback method which may process a pending system.ActionCenter
+	// action, so SetWindowPos should come first so as to not "overwrite" system.ActionCenter.
 	windows.SetWindowPos(w.hwnd, 0, x, y, width, height, swpStyle)
+	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style)
 	windows.ShowWindow(w.hwnd, showMode)
 }
 
