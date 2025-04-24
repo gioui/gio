@@ -257,6 +257,17 @@ func (q *pointerQueue) grab(state pointerState, req pointer.GrabCmd) (pointerSta
 		if !p.pressed || p.id != req.ID {
 			continue
 		}
+		// Verify that the grabber is among the handlers.
+		found := false
+		for _, tag := range p.handlers {
+			if tag == req.Tag {
+				found = true
+				break
+			}
+		}
+		if !found {
+			continue
+		}
 		// Drop other handlers that lost their grab.
 		for i := len(p.handlers) - 1; i >= 0; i-- {
 			if tag := p.handlers[i]; tag != req.Tag {

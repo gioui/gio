@@ -97,6 +97,39 @@ func TestPointerDragNegative(t *testing.T) {
 	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Enter, pointer.Press, pointer.Leave, pointer.Drag)
 }
 
+func TestIgnoredGrab(t *testing.T) {
+	handler1 := new(int)
+	handler2 := new(int)
+	var ops op.Ops
+
+	filter := func(t event.Tag) event.Filter {
+		return pointer.Filter{Target: t, Kinds: pointer.Press | pointer.Release | pointer.Cancel}
+	}
+
+	event.Op(&ops, handler1)
+	event.Op(&ops, handler2)
+	var r Router
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Cancel)
+	r.Frame(&ops)
+	r.Queue(
+		pointer.Event{
+			Kind:     pointer.Press,
+			Position: f32.Pt(50, 50),
+		},
+		pointer.Event{
+			Kind:     pointer.Release,
+			Position: f32.Pt(50, 50),
+		},
+	)
+	assertEventPointerTypeSequence(t, events(&r, 1, filter(handler1)), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, 1, filter(handler2)), pointer.Press)
+	r.Source().Execute(pointer.GrabCmd{Tag: handler1})
+	r.Source().Execute(pointer.GrabCmd{Tag: handler2})
+	assertEventPointerTypeSequence(t, events(&r, 1, filter(handler1)), pointer.Release)
+	assertEventPointerTypeSequence(t, events(&r, 1, filter(handler2)), pointer.Cancel)
+}
+
 func TestPointerGrab(t *testing.T) {
 	handler1 := new(int)
 	handler2 := new(int)
