@@ -400,9 +400,9 @@ func TestPointerPriority(t *testing.T) {
 	assertEventPointerTypeSequence(t, hev1, pointer.Scroll, pointer.Scroll)
 	assertEventPointerTypeSequence(t, hev2, pointer.Scroll)
 	assertEventPointerTypeSequence(t, hev3, pointer.Scroll)
-	assertEventPriorities(t, hev1, pointer.Shared, pointer.Foremost)
-	assertEventPriorities(t, hev2, pointer.Foremost)
-	assertEventPriorities(t, hev3, pointer.Foremost)
+	assertEventPriorities(t, hev1, pointer.Shared, pointer.Shared)
+	assertEventPriorities(t, hev2, pointer.Shared)
+	assertEventPriorities(t, hev3, pointer.Shared)
 	assertScrollEvent(t, hev1[0], f32.Pt(30, 0))
 	assertScrollEvent(t, hev2[0], f32.Pt(20, 0))
 	assertScrollEvent(t, hev1[1], f32.Pt(50, 0))
@@ -1143,7 +1143,7 @@ func TestPartialEvent(t *testing.T) {
 		key.FocusEvent{}, pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Priority: pointer.Shared})
 	r.Source().Execute(key.FocusCmd{Tag: 1})
 	assertEventSequence(t, events(&r, -1, pointer.Filter{Target: 2, Kinds: pointer.Press}),
-		pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Priority: pointer.Foremost})
+		pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Priority: pointer.Shared})
 }
 
 // offer satisfies io.ReadCloser for use in data transfers.

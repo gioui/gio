@@ -792,10 +792,8 @@ func (q *pointerQueue) Push(handlers map[event.Tag]*handler, state pointerState,
 }
 
 func (q *pointerQueue) deliverEvent(handlers map[event.Tag]*handler, p pointerInfo, evts []taggedEvent, e pointer.Event) []taggedEvent {
-	foremost := true
 	if p.pressed && len(p.handlers) == 1 {
 		e.Priority = pointer.Grabbed
-		foremost = false
 	}
 	scroll := e.Scroll
 	for _, k := range p.handlers {
@@ -814,10 +812,6 @@ func (q *pointerQueue) deliverEvent(handlers map[event.Tag]*handler, p pointerIn
 			scroll, e.Scroll = f.clampScroll(scroll)
 		}
 		e := e
-		if foremost {
-			foremost = false
-			e.Priority = pointer.Foremost
-		}
 		e.Position = q.invTransform(h.pointer.areaPlusOne-1, e.Position)
 		evts = append(evts, taggedEvent{event: e, tag: k})
 	}
