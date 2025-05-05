@@ -43,8 +43,7 @@ type Event struct {
 
 // PassOp sets the pass-through mode. InputOps added while the pass-through
 // mode is set don't block events to siblings.
-type PassOp struct {
-}
+type PassOp struct{}
 
 // PassStack represents a PassOp on the pass stack.
 type PassStack struct {

@@ -4,10 +4,10 @@ package input
 
 import (
 	"io"
+	"slices"
 
 	"gioui.org/io/clipboard"
 	"gioui.org/io/event"
-	"slices"
 )
 
 // clipboardState contains the state for clipboard event routing.

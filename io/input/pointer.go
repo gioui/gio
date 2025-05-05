@@ -5,6 +5,7 @@ package input
 import (
 	"image"
 	"io"
+	"slices"
 
 	"gioui.org/f32"
 	f32internal "gioui.org/internal/f32"
@@ -14,7 +15,6 @@ import (
 	"gioui.org/io/semantic"
 	"gioui.org/io/system"
 	"gioui.org/io/transfer"
-	"slices"
 )
 
 type pointerQueue struct {

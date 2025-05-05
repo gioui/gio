@@ -152,9 +152,7 @@ func newDirect3D11Device(api driver.Direct3D11) (driver.Device, error) {
 }
 
 func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport image.Point) driver.Texture {
-	var (
-		renderTarget *d3d11.RenderTargetView
-	)
+	var renderTarget *d3d11.RenderTargetView
 	if target != nil {
 		switch t := target.(type) {
 		case driver.Direct3D11RenderTarget:

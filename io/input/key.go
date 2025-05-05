@@ -4,12 +4,12 @@ package input
 
 import (
 	"image"
+	"slices"
 	"sort"
 
 	"gioui.org/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
-	"slices"
 )
 
 // EditorState represents the state of an editor needed by input handlers.

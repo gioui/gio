@@ -19,6 +19,7 @@ static VkResult vkCreateWaylandSurfaceKHR(PFN_vkCreateWaylandSurfaceKHR f, VkIns
 }
 */
 import "C"
+
 import (
 	"fmt"
 	"unsafe"

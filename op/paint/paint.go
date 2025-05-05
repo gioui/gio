@@ -53,8 +53,7 @@ type LinearGradientOp struct {
 }
 
 // PaintOp fills the current clip area with the current brush.
-type PaintOp struct {
-}
+type PaintOp struct{}
 
 // OpacityStack represents an opacity applied to all painting operations
 // until Pop is called.

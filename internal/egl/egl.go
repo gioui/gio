@@ -9,10 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"strings"
 
 	"gioui.org/gpu"
-	"slices"
 )
 
 type Context struct {

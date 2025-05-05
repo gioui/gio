@@ -5,6 +5,7 @@ package input
 import (
 	"image"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -19,7 +20,6 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/io/transfer"
 	"gioui.org/op"
-	"slices"
 )
 
 // Router tracks the [io/event.Tag] identifiers of user interface widgets

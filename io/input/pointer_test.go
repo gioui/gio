@@ -711,26 +711,31 @@ func TestCursor(t *testing.T) {
 		cursors []pointer.Cursor
 		want    pointer.Cursor
 	}{
-		{label: "no movement",
+		{
+			label:   "no movement",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			want:    pointer.CursorDefault,
 		},
-		{label: "move inside",
+		{
+			label:   "move inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events:  _at(50, 50),
 			want:    pointer.CursorPointer,
 		},
-		{label: "move outside",
+		{
+			label:   "move outside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events:  _at(200, 200),
 			want:    pointer.CursorDefault,
 		},
-		{label: "move back inside",
+		{
+			label:   "move back inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events:  _at(50, 50),
 			want:    pointer.CursorPointer,
 		},
-		{label: "send key events while inside",
+		{
+			label:   "send key events while inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events: []event.Event{
 				key.Event{Name: "A", State: key.Press},
@@ -738,7 +743,8 @@ func TestCursor(t *testing.T) {
 			},
 			want: pointer.CursorPointer,
 		},
-		{label: "send key events while outside",
+		{
+			label:   "send key events while outside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events: append(
 				_at(200, 200),
@@ -747,7 +753,8 @@ func TestCursor(t *testing.T) {
 			),
 			want: pointer.CursorDefault,
 		},
-		{label: "add new input on top while inside",
+		{
+			label:   "add new input on top while inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer, pointer.CursorCrosshair},
 			events: append(
 				_at(50, 50),
@@ -758,7 +765,8 @@ func TestCursor(t *testing.T) {
 			),
 			want: pointer.CursorCrosshair,
 		},
-		{label: "remove input on top while inside",
+		{
+			label:   "remove input on top while inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events: append(
 				_at(50, 50),

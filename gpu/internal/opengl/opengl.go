@@ -8,6 +8,7 @@ import (
 	"image"
 	"math/bits"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 	"unsafe"
@@ -15,7 +16,6 @@ import (
 	"gioui.org/gpu/internal/driver"
 	"gioui.org/internal/gl"
 	"gioui.org/shader"
-	"slices"
 )
 
 // Backend implements driver.Device.

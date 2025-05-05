@@ -26,6 +26,7 @@ package app
 
 */
 import "C"
+
 import (
 	"errors"
 	"fmt"
@@ -751,9 +752,7 @@ func (h *x11EventHandler) handleEvents() bool {
 	return redraw
 }
 
-var (
-	x11Threads sync.Once
-)
+var x11Threads sync.Once
 
 func init() {
 	x11Driver = newX11Window

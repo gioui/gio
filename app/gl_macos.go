@@ -8,7 +8,6 @@ package app
 import (
 	"errors"
 	"runtime"
-
 	"unsafe"
 
 	"gioui.org/gpu"

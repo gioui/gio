@@ -42,7 +42,7 @@ func main() {
 		panic(err)
 	}
 
-	err = os.WriteFile(*out, data, 0755)
+	err = os.WriteFile(*out, data, 0o755)
 	if err != nil {
 		panic(err)
 	}

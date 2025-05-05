@@ -15,6 +15,7 @@ import (
 	"image/color"
 	"math"
 	"reflect"
+	"slices"
 	"time"
 	"unsafe"
 
@@ -35,7 +36,6 @@ import (
 	_ "gioui.org/gpu/internal/metal"
 	_ "gioui.org/gpu/internal/opengl"
 	_ "gioui.org/gpu/internal/vulkan"
-	"slices"
 )
 
 type GPU interface {

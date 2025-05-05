@@ -440,7 +440,6 @@ func flattenQuadBezier(qs StrokeQuads, p0, p1, p2 f32.Point, d, flatness float32
 }
 
 func (qs *StrokeQuads) addLine(p0, ctrl, p1 f32.Point, t, d float32) {
-
 	switch i := len(*qs); i {
 	case 0:
 		p0 = p0.Add(strokePathNorm(p0, ctrl, p1, 0, d))
@@ -473,7 +472,6 @@ func quadInterp(p, q f32.Point, t float32) f32.Point {
 // quadBezierSplit returns the pair of triplets (from,ctrl,to) Bézier curve,
 // split before (resp. after) the provided parametric t value.
 func quadBezierSplit(p0, p1, p2 f32.Point, t float32) (f32.Point, f32.Point, f32.Point, f32.Point, f32.Point, f32.Point) {
-
 	var (
 		b0 = p0
 		b1 = quadInterp(p0, p1, t)
