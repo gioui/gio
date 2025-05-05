@@ -35,7 +35,7 @@ func TestDraggable(t *testing.T) {
 	stack.Pop()
 
 	drag.Update(gtx)
-	r.Event(transfer.TargetFilter{Target: tgt, Type: drag.Type})
+	r.Events(transfer.TargetFilter{Target: tgt, Type: drag.Type})
 	r.Frame(gtx.Ops)
 	r.Queue(
 		pointer.Event{
@@ -53,30 +53,26 @@ func TestDraggable(t *testing.T) {
 	)
 	ofr := &offer{data: "hello"}
 	drag.Update(gtx)
-	r.Event(transfer.TargetFilter{Target: tgt, Type: drag.Type})
+	r.Events(transfer.TargetFilter{Target: tgt, Type: drag.Type})
 	drag.Offer(gtx, "file", ofr)
 
-	e, ok := r.Event(transfer.TargetFilter{Target: tgt, Type: drag.Type})
-	if !ok {
-		t.Fatalf("expected event")
-	}
-	ev := e.(transfer.DataEvent)
-	if got, want := ev.Type, "file"; got != want {
-		t.Errorf("expected %v; got %v", got, want)
-	}
-	if ofr.closed {
-		t.Error("offer closed prematurely")
-	}
-	e, ok = r.Event(transfer.TargetFilter{Target: tgt, Type: drag.Type})
-	if !ok {
-		t.Fatalf("expected event")
-	}
-	if _, ok := e.(transfer.CancelEvent); !ok {
-		t.Fatalf("expected transfer.CancelEvent event")
-	}
-	r.Frame(gtx.Ops)
-	if !ofr.closed {
-		t.Error("offer was not closed")
+	for e := range r.Events(transfer.TargetFilter{Target: tgt, Type: drag.Type}) {
+		ev := e.(transfer.DataEvent)
+		if got, want := ev.Type, "file"; got != want {
+			t.Errorf("expected %v; got %v", got, want)
+		}
+		if ofr.closed {
+			t.Error("offer closed prematurely")
+		}
+		for e := range r.Events(transfer.TargetFilter{Target: tgt, Type: drag.Type}) {
+			if _, ok := e.(transfer.CancelEvent); !ok {
+				t.Fatalf("expected transfer.CancelEvent event")
+			}
+			r.Frame(gtx.Ops)
+			if !ofr.closed {
+				t.Error("offer was not closed")
+			}
+		}
 	}
 }
 

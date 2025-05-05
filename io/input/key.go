@@ -4,6 +4,7 @@ package input
 
 import (
 	"image"
+	"iter"
 	"sort"
 
 	"gioui.org/f32"
@@ -99,12 +100,14 @@ func (q *keyQueue) Reset() {
 	q.dirOrder = q.dirOrder[:0]
 }
 
-func (k *keyHandler) ResetEvent() (event.Event, bool) {
-	if k.reset {
-		return nil, false
+func (k *keyHandler) ResetEvent() iter.Seq[event.Event] {
+	return func(yield func(event.Event) bool) {
+		if k.reset {
+			return
+		}
+		k.reset = true
+		yield(key.FocusEvent{Focus: false})
 	}
-	k.reset = true
-	return key.FocusEvent{Focus: false}, true
 }
 
 func (q *keyQueue) Frame(handlers map[event.Tag]*handler, state keyState) keyState {

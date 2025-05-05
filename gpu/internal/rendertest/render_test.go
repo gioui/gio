@@ -24,7 +24,6 @@ func TestTransformMacro(t *testing.T) {
 	c := constSqPath()
 
 	run(t, func(o *op.Ops) {
-
 		// render the first Stacked item
 		m1 := op.Record(o)
 		dr := image.Rect(0, 0, 128, 50)
@@ -142,8 +141,10 @@ func constSqPath() clip.Op {
 
 func constSqCirc() clip.Op {
 	innerOps := new(op.Ops)
-	return clip.RRect{Rect: image.Rect(0, 0, 40, 40),
-		NW: 20, NE: 20, SW: 20, SE: 20}.Op(innerOps)
+	return clip.RRect{
+		Rect: image.Rect(0, 0, 40, 40),
+		NW:   20, NE: 20, SW: 20, SE: 20,
+	}.Op(innerOps)
 }
 
 func drawChild(ops *op.Ops, text clip.Op) op.CallOp {

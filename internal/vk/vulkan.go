@@ -385,6 +385,7 @@ static VkResult vkQueuePresentKHR(PFN_vkQueuePresentKHR f, VkQueue queue, const 
 }
 */
 import "C"
+
 import (
 	"errors"
 	"fmt"
@@ -1167,7 +1168,6 @@ func CreateFramebuffer(d Device, rp RenderPass, view ImageView, width, height in
 		return nilFramebuffer, fmt.Errorf("vulkan: vkCreateFramebuffer: %w", err)
 	}
 	return fbo, nil
-
 }
 
 func DestroyFramebuffer(d Device, f Framebuffer) {

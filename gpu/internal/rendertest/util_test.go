@@ -153,7 +153,7 @@ func verifyRef(t *testing.T, img *image.RGBA, frame int) (ok bool) {
 	}
 	path = filepath.Join("refs", path+".png")
 	if *dumpImages {
-		if err := os.MkdirAll(filepath.Dir(path), 0766); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0o766); err != nil {
 			if !os.IsExist(err) {
 				t.Error(err)
 				return
@@ -287,7 +287,7 @@ func saveImage(t testing.TB, file string, img *image.RGBA) {
 		t.Error(err)
 		return
 	}
-	if err := os.WriteFile(file, buf.Bytes(), 0666); err != nil {
+	if err := os.WriteFile(file, buf.Bytes(), 0o666); err != nil {
 		t.Error(err)
 		return
 	}

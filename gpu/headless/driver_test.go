@@ -21,8 +21,10 @@ import (
 
 var dumpImages = flag.Bool("saveimages", false, "save test images")
 
-var clearCol = color.NRGBA{A: 0xff, R: 0xde, G: 0xad, B: 0xbe}
-var clearColExpect = f32color.NRGBAToRGBA(clearCol)
+var (
+	clearCol       = color.NRGBA{A: 0xff, R: 0xde, G: 0xad, B: 0xbe}
+	clearColExpect = f32color.NRGBAToRGBA(clearCol)
+)
 
 func TestFramebufferClear(t *testing.T) {
 	b := newDriver(t)
@@ -202,5 +204,5 @@ func saveImage(file string, img image.Image) error {
 	if err := png.Encode(&buf, img); err != nil {
 		return err
 	}
-	return os.WriteFile(file, buf.Bytes(), 0666)
+	return os.WriteFile(file, buf.Bytes(), 0o666)
 }

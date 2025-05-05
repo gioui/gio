@@ -126,7 +126,8 @@ func TestShapingAlignWidth(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			lines := shaper.LayoutString(Parameters{PxPerEm: ppem,
+			lines := shaper.LayoutString(Parameters{
+				PxPerEm:  ppem,
 				MinWidth: tc.minWidth,
 				MaxWidth: tc.maxWidth,
 				Locale:   english,
@@ -174,7 +175,6 @@ func TestNewlineSynthesis(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-
 			doc := shaper.LayoutRunes(Parameters{
 				PxPerEm:  ppem,
 				MaxWidth: 200,
@@ -207,7 +207,6 @@ func TestNewlineSynthesis(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 // simpleGlyph returns a simple square glyph with the provided cluster

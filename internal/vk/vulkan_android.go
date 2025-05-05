@@ -17,6 +17,7 @@ static VkResult vkCreateAndroidSurfaceKHR(PFN_vkCreateAndroidSurfaceKHR f, VkIns
 }
 */
 import "C"
+
 import (
 	"fmt"
 	"unsafe"

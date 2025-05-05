@@ -176,7 +176,6 @@ func TestStrokedPathZeroWidth(t *testing.T) {
 			paint.Fill(o, red)
 			cl.Pop()
 		}
-
 	}, func(r result) {
 		r.expect(0, 0, transparent)
 		r.expect(10, 50, colornames.Black)

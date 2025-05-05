@@ -104,7 +104,7 @@ func (b *Clickable) Update(gtx layout.Context) (Click, bool) {
 	return b.update(b, gtx)
 }
 
-func (b *Clickable) update(t event.Tag, gtx layout.Context) (Click, bool) {
+func (b *Clickable) update(t event.Tag, gtx layout.Context) (Click, bool) { // todo iter
 	for len(b.history) > 0 {
 		c := b.history[0]
 		if c.End.IsZero() || gtx.Now.Sub(c.End) < 1*time.Second {
@@ -119,11 +119,7 @@ func (b *Clickable) update(t event.Tag, gtx layout.Context) (Click, bool) {
 			NumClicks: c,
 		}, true
 	}
-	for {
-		e, ok := b.click.Update(gtx.Source)
-		if !ok {
-			break
-		}
+	for e := range b.click.Update(gtx.Source) {
 		switch e.Kind {
 		case gesture.KindClick:
 			if l := len(b.history); l > 0 {
@@ -150,15 +146,11 @@ func (b *Clickable) update(t event.Tag, gtx layout.Context) (Click, bool) {
 			})
 		}
 	}
-	for {
-		e, ok := gtx.Event(
-			key.FocusFilter{Target: t},
-			key.Filter{Focus: t, Name: key.NameReturn},
-			key.Filter{Focus: t, Name: key.NameSpace},
-		)
-		if !ok {
-			break
-		}
+	for e := range gtx.Events(
+		key.FocusFilter{Target: t},
+		key.Filter{Focus: t, Name: key.NameReturn},
+		key.Filter{Focus: t, Name: key.NameSpace},
+	) {
 		switch e := e.(type) {
 		case key.FocusEvent:
 			if e.Focus {
