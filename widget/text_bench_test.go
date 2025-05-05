@@ -92,7 +92,7 @@ func BenchmarkLabelStatic(b *testing.B) {
 		runesStr := string(runes)
 		l := Label{}
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			l.Layout(gtx, cache, font, fontSize, runesStr, op.CallOp{})
 			if render {
 				win.Frame(gtx.Ops)
@@ -124,7 +124,7 @@ func BenchmarkLabelDynamic(b *testing.B) {
 		l := Label{}
 		r := rand.New(rand.NewSource(42))
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			// simulate a constantly changing string
 			a := r.Intn(len(runes))
 			b := r.Intn(len(runes))
@@ -161,7 +161,7 @@ func BenchmarkEditorStatic(b *testing.B) {
 		e := Editor{}
 		e.SetText(runesStr)
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 			if render {
 				win.Frame(gtx.Ops)
@@ -194,7 +194,7 @@ func BenchmarkEditorDynamic(b *testing.B) {
 		e.SetText(string(runes))
 		r := rand.New(rand.NewSource(42))
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			// simulate a constantly changing string
 			a := r.Intn(e.Len())
 			b := r.Intn(e.Len())

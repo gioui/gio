@@ -41,17 +41,17 @@ var sink RGBA
 
 func BenchmarkLinearFromSRGB(b *testing.B) {
 	b.Run("opaque", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for i := 0; b.Loop(); i++ {
 			sink = LinearFromSRGB(color.NRGBA{R: byte(i), G: byte(i >> 8), B: byte(i >> 16), A: 0xFF})
 		}
 	})
 	b.Run("translucent", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for i := 0; b.Loop(); i++ {
 			sink = LinearFromSRGB(color.NRGBA{R: byte(i), G: byte(i >> 8), B: byte(i >> 16), A: 0x50})
 		}
 	})
 	b.Run("transparent", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for i := 0; b.Loop(); i++ {
 			sink = LinearFromSRGB(color.NRGBA{R: byte(i), G: byte(i >> 8), B: byte(i >> 16), A: 0x00})
 		}
 	})

@@ -223,7 +223,7 @@ type Functions struct {
 	uintptrs [100]uintptr
 }
 
-type Context interface{}
+type Context any
 
 func NewFunctions(ctx Context, forceES bool) (*Functions, error) {
 	if ctx != nil {
@@ -622,6 +622,6 @@ func cString(s string) []byte {
 
 // issue34474KeepAlive calls runtime.KeepAlive as a
 // workaround for golang.org/issue/34474.
-func issue34474KeepAlive(v interface{}) {
+func issue34474KeepAlive(v any) {
 	runtime.KeepAlive(v)
 }

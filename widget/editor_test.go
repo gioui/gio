@@ -1255,7 +1255,7 @@ func TestNoFilterAllocs(t *testing.T) {
 		}
 		b.ReportAllocs()
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			e.Update(gtx)
 		}
 	})

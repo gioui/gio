@@ -87,7 +87,7 @@ func (qs *StrokeQuads) lineTo(pt f32.Point) {
 func (qs *StrokeQuads) arc(f1, f2 f32.Point, angle float32) {
 	pen := qs.pen()
 	m, segments := ArcTransform(pen, f1.Add(pen), f2.Add(pen), angle)
-	for i := 0; i < segments; i++ {
+	for range segments {
 		p0 := qs.pen()
 		p1 := m.Transform(p0)
 		p2 := m.Transform(p1)

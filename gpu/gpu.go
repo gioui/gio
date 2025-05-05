@@ -35,6 +35,7 @@ import (
 	_ "gioui.org/gpu/internal/metal"
 	_ "gioui.org/gpu/internal/opengl"
 	_ "gioui.org/gpu/internal/vulkan"
+	"slices"
 )
 
 type GPU interface {
@@ -189,7 +190,7 @@ const (
 // imageOpData is the shadow of paint.ImageOp.
 type imageOpData struct {
 	src    *image.RGBA
-	handle interface{}
+	handle any
 	filter byte
 }
 
@@ -200,7 +201,7 @@ type linearGradientOpData struct {
 	color2 color.NRGBA
 }
 
-func decodeImageOp(data []byte, refs []interface{}) imageOpData {
+func decodeImageOp(data []byte, refs []any) imageOpData {
 	handle := refs[1]
 	if handle == nil {
 		return imageOpData{}
@@ -547,7 +548,7 @@ func newBlitter(ctx driver.Device) *blitter {
 	b.texUniforms = new(blitTexUniforms)
 	b.linearGradientUniforms = new(blitLinearGradientUniforms)
 	pipelines, err := createColorPrograms(ctx, gio.Shader_blit_vert, gio.Shader_blit_frag,
-		[3]interface{}{b.colUniforms, b.linearGradientUniforms, b.texUniforms},
+		[3]any{b.colUniforms, b.linearGradientUniforms, b.texUniforms},
 	)
 	if err != nil {
 		panic(err)
@@ -565,7 +566,7 @@ func (b *blitter) release() {
 	}
 }
 
-func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.Sources, uniforms [3]interface{}) (pipelines [2][3]*pipeline, err error) {
+func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.Sources, uniforms [3]any) (pipelines [2][3]*pipeline, err error) {
 	defer func() {
 		if err != nil {
 			for _, p := range pipelines {
@@ -822,7 +823,7 @@ func (r *renderer) packLayers(layers []opacityLayer) []opacityLayer {
 			layers[l.parent].clip = b.Union(l.clip)
 		}
 		if l.clip.Empty() {
-			layers = append(layers[:i], layers[i+1:]...)
+			layers = slices.Delete(layers, i, i+1)
 		}
 	}
 	// Pack layers.
@@ -1316,7 +1317,7 @@ func (b *blitter) blit(mat materialType, fbo bool, col f32color.RGBA, col1, col2
 
 // newUniformBuffer creates a new GPU uniform buffer backed by the
 // structure uniformBlock points to.
-func newUniformBuffer(b driver.Device, uniformBlock interface{}) *uniformBuffer {
+func newUniformBuffer(b driver.Device, uniformBlock any) *uniformBuffer {
 	ref := reflect.ValueOf(uniformBlock)
 	// Determine the size of the uniforms structure, *uniforms.
 	size := ref.Elem().Type().Size()

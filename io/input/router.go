@@ -19,6 +19,7 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/io/transfer"
 	"gioui.org/op"
+	"slices"
 )
 
 // Router tracks the [io/event.Tag] identifiers of user interface widgets
@@ -302,7 +303,7 @@ func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
 				}
 			}
 			if match {
-				change.events = append(change.events[:j], change.events[j+1:]...)
+				change.events = slices.Delete(change.events, j, j+1)
 				// Fast forward state to last matched.
 				q.collapseState(i)
 				return evt.event, true
