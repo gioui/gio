@@ -96,8 +96,10 @@ type BlendFactor uint8
 
 type Topology uint8
 
-type TextureFilter uint8
-type TextureFormat uint8
+type (
+	TextureFilter uint8
+	TextureFormat uint8
+)
 
 type BufferBinding uint8
 

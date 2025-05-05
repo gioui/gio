@@ -40,6 +40,7 @@ static CFTypeRef newNSString(unichar *chars, NSUInteger length) {
 }
 */
 import "C"
+
 import (
 	"errors"
 	"sync"

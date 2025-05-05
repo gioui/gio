@@ -5,6 +5,8 @@ package input
 import (
 	"image"
 	"io"
+	"iter"
+	"slices"
 	"strings"
 	"time"
 
@@ -200,133 +202,153 @@ func (s Source) Focused(tag event.Tag) bool {
 	return s.r.state().keyState.focus == tag
 }
 
-// Event returns the next event that matches at least one of filters.
+// Events returns the next event that matches at least one of filters.
 // If the source is disabled, no events will be reported.
-func (s Source) Event(filters ...event.Filter) (event.Event, bool) {
-	if !s.Enabled() {
-		return nil, false
+func (s Source) Events(filters ...event.Filter) iter.Seq[event.Event] {
+	return func(yield func(event.Event) bool) {
+		if !s.Enabled() {
+			return
+		}
+		for e := range s.r.Events(filters...) {
+			if !yield(e) {
+				return
+			}
+		}
 	}
-	return s.r.Event(filters...)
 }
 
-func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
-	// Merge filters into scratch filters.
-	q.scratchFilters = q.scratchFilters[:0]
-	q.key.scratchFilter = q.key.scratchFilter[:0]
-	for _, f := range filters {
-		var t event.Tag
-		switch f := f.(type) {
-		case key.Filter:
-			q.key.scratchFilter = append(q.key.scratchFilter, f)
-			continue
-		case transfer.SourceFilter:
-			t = f.Target
-		case transfer.TargetFilter:
-			t = f.Target
-		case key.FocusFilter:
-			t = f.Target
-		case pointer.Filter:
-			t = f.Target
-		}
-		if t == nil {
-			continue
-		}
-		var filter *filter
-		for i := range q.scratchFilters {
-			s := &q.scratchFilters[i]
-			if s.tag == t {
-				filter = &s.filter
-				break
+func (q *Router) Events(filters ...event.Filter) iter.Seq[event.Event] {
+	return func(yield func(event.Event) bool) {
+		// Merge filters into scratch filters.
+		q.scratchFilters = q.scratchFilters[:0]
+		q.key.scratchFilter = q.key.scratchFilter[:0]
+		for _, f := range filters {
+			var t event.Tag
+			switch f := f.(type) {
+			case key.Filter:
+				q.key.scratchFilter = append(q.key.scratchFilter, f)
+				continue
+			case transfer.SourceFilter:
+				t = f.Target
+			case transfer.TargetFilter:
+				t = f.Target
+			case key.FocusFilter:
+				t = f.Target
+			case pointer.Filter:
+				t = f.Target
 			}
+			if t == nil {
+				continue
+			}
+			var filter *filter
+			for i := range q.scratchFilters {
+				s := &q.scratchFilters[i]
+				if s.tag == t {
+					filter = &s.filter
+					break
+				}
+			}
+			if filter == nil {
+				n := len(q.scratchFilters)
+				if n < cap(q.scratchFilters) {
+					// Re-use previously allocated filter.
+					q.scratchFilters = q.scratchFilters[:n+1]
+					tf := &q.scratchFilters[n]
+					tf.tag = t
+					filter = &tf.filter
+					filter.Reset()
+				} else {
+					q.scratchFilters = append(q.scratchFilters, taggedFilter{tag: t})
+					filter = &q.scratchFilters[n].filter
+				}
+			}
+			filter.Add(f)
 		}
-		if filter == nil {
-			n := len(q.scratchFilters)
-			if n < cap(q.scratchFilters) {
-				// Re-use previously allocated filter.
-				q.scratchFilters = q.scratchFilters[:n+1]
-				tf := &q.scratchFilters[n]
-				tf.tag = t
-				filter = &tf.filter
-				filter.Reset()
-			} else {
-				q.scratchFilters = append(q.scratchFilters, taggedFilter{tag: t})
-				filter = &q.scratchFilters[n].filter
-			}
+		for _, tf := range q.scratchFilters {
+			h := q.stateFor(tf.tag)
+			h.filter.Merge(tf.filter)
+			h.nextFilter.Merge(tf.filter)
 		}
-		filter.Add(f)
-	}
-	for _, tf := range q.scratchFilters {
-		h := q.stateFor(tf.tag)
-		h.filter.Merge(tf.filter)
-		h.nextFilter.Merge(tf.filter)
-	}
-	q.key.filter = append(q.key.filter, q.key.scratchFilter...)
-	q.key.nextFilter = append(q.key.nextFilter, q.key.scratchFilter...)
-	// Deliver reset event, if any.
-	for _, f := range filters {
-		switch f := f.(type) {
-		case key.FocusFilter:
-			if f.Target == nil {
-				break
-			}
-			h := q.stateFor(f.Target)
-			if reset, ok := h.key.ResetEvent(); ok {
-				return reset, true
-			}
-		case pointer.Filter:
-			if f.Target == nil {
-				break
-			}
-			h := q.stateFor(f.Target)
-			if reset, ok := h.pointer.ResetEvent(); ok && h.filter.pointer.Matches(reset) {
-				return reset, true
-			}
-		}
-	}
-	for i := range q.changes {
-		if q.deferring && i > 0 {
-			break
-		}
-		change := &q.changes[i]
-		for j, evt := range change.events {
-			match := false
-			switch e := evt.event.(type) {
-			case key.Event:
-				match = q.key.scratchFilter.Matches(change.state.keyState.focus, e, false)
-			default:
-				for _, tf := range q.scratchFilters {
-					if evt.tag == tf.tag && tf.filter.Matches(evt.event) {
-						match = true
-						break
+		q.key.filter = append(q.key.filter, q.key.scratchFilter...)
+		q.key.nextFilter = append(q.key.nextFilter, q.key.scratchFilter...)
+		// Deliver reset event, if any.
+		for _, f := range filters {
+			switch f := f.(type) {
+			case key.FocusFilter:
+				if f.Target == nil {
+					break
+				}
+				h := q.stateFor(f.Target)
+				for e := range h.key.ResetEvent() {
+					if !yield(e) {
+						return
+					}
+				}
+			case pointer.Filter:
+				if f.Target == nil {
+					break
+				}
+				h := q.stateFor(f.Target)
+				for e := range h.pointer.ResetEvent() {
+					if !yield(e) {
+						return
+					}
+					if !h.filter.pointer.Matches(e) {
+						return
 					}
 				}
 			}
-			if match {
-				change.events = append(change.events[:j], change.events[j+1:]...)
-				// Fast forward state to last matched.
-				q.collapseState(i)
-				return evt.event, true
+		}
+		for i, c := range q.changes {
+			if q.deferring && i > 0 {
+				break
+			}
+			change := &c
+			for j, evt := range change.events {
+				match := false
+				switch e := evt.event.(type) {
+				case key.Event:
+					match = q.key.scratchFilter.Matches(change.state.keyState.focus, e, false)
+				default:
+					for _, tf := range q.scratchFilters {
+						if evt.tag == tf.tag && tf.filter.Matches(evt.event) {
+							match = true
+							break
+						}
+					}
+				}
+				if match {
+					change.events = slices.Delete(change.events, j, j+1) // todo: panic: runtime error: invalid memory address or nil pointer dereference
+					// Fast forward state to last matched.
+					q.collapseState(i)
+					if !yield(evt.event) {
+						return
+					}
+				}
 			}
 		}
+		for _, tf := range q.scratchFilters {
+			h := q.stateFor(tf.tag)
+			h.processedFilter.Merge(tf.filter)
+		}
 	}
-	for _, tf := range q.scratchFilters {
-		h := q.stateFor(tf.tag)
-		h.processedFilter.Merge(tf.filter)
-	}
-	return nil, false
 }
 
 // collapseState in the interval [1;idx] into q.changes[0].
-func (q *Router) collapseState(idx int) {
-	if idx == 0 {
+func (q *Router) collapseState(i int) {
+	if i < 0 {
 		return
 	}
+	if i >= len(q.changes) {
+		return
+		panic("index out of range")
+	}
 	first := &q.changes[0]
-	first.state = q.changes[idx].state
-	for _, ch := range q.changes[1 : idx+1] {
+	first.state = q.changes[i].state
+	for _, ch := range q.changes[1 : i+1] {
 		first.events = append(first.events, ch.events...)
 	}
-	q.changes = append(q.changes[:1], q.changes[idx+1:]...)
+	q.changes = append(q.changes[:1], q.changes[i+1:]...)
 }
 
 // Frame completes the current frame and starts a new with the

@@ -21,21 +21,28 @@ import (
 
 func TestFilterReset(t *testing.T) {
 	r := new(Router)
-	if _, ok := r.Event(pointer.Filter{}); ok {
-		t.Fatal("empty filter matched reset event")
+	// if _, ok := r.Events(pointer.Filter{}); ok {
+	//	t.Fatal("empty filter matched reset event")
+	// }
+	for range r.Events(pointer.Filter{}) {
+		t.Fatal("empty filter matched reset event") // todo test
 	}
-	if _, ok := r.Event(pointer.Filter{Kinds: pointer.Cancel}); ok {
-		t.Fatal("second call to Event matched reset event")
+
+	// if _, ok := r.Events(pointer.Filter{Kinds: pointer.Cancel}); ok {
+	//	t.Fatal("second call to Events matched reset event")
+	// }
+	for range r.Events(pointer.Filter{Kinds: pointer.Cancel}) {
+		t.Fatal("second call to Events matched reset event")
 	}
 }
 
 func TestPointerNilTarget(t *testing.T) {
 	r := new(Router)
-	r.Event(pointer.Filter{Kinds: pointer.Press})
+	r.Events(pointer.Filter{Kinds: pointer.Press})
 	r.Frame(new(op.Ops))
 	r.Queue(pointer.Event{Kind: pointer.Press})
 	// Nil Targets should not receive events.
-	if _, ok := r.Event(pointer.Filter{Kinds: pointer.Press}); ok {
+	for range r.Events(pointer.Filter{Kinds: pointer.Press}) {
 		t.Errorf("nil target received event")
 	}
 }
@@ -711,26 +718,31 @@ func TestCursor(t *testing.T) {
 		cursors []pointer.Cursor
 		want    pointer.Cursor
 	}{
-		{label: "no movement",
+		{
+			label:   "no movement",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			want:    pointer.CursorDefault,
 		},
-		{label: "move inside",
+		{
+			label:   "move inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events:  _at(50, 50),
 			want:    pointer.CursorPointer,
 		},
-		{label: "move outside",
+		{
+			label:   "move outside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events:  _at(200, 200),
 			want:    pointer.CursorDefault,
 		},
-		{label: "move back inside",
+		{
+			label:   "move back inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events:  _at(50, 50),
 			want:    pointer.CursorPointer,
 		},
-		{label: "send key events while inside",
+		{
+			label:   "send key events while inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events: []event.Event{
 				key.Event{Name: "A", State: key.Press},
@@ -738,7 +750,8 @@ func TestCursor(t *testing.T) {
 			},
 			want: pointer.CursorPointer,
 		},
-		{label: "send key events while outside",
+		{
+			label:   "send key events while outside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events: append(
 				_at(200, 200),
@@ -747,7 +760,8 @@ func TestCursor(t *testing.T) {
 			),
 			want: pointer.CursorDefault,
 		},
-		{label: "add new input on top while inside",
+		{
+			label:   "add new input on top while inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer, pointer.CursorCrosshair},
 			events: append(
 				_at(50, 50),
@@ -758,7 +772,8 @@ func TestCursor(t *testing.T) {
 			),
 			want: pointer.CursorCrosshair,
 		},
-		{label: "remove input on top while inside",
+		{
+			label:   "remove input on top while inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events: append(
 				_at(50, 50),
@@ -1323,17 +1338,15 @@ func BenchmarkRouterAdd(b *testing.B) {
 	}
 }
 
-func events(r *Router, n int, filters ...event.Filter) []event.Event {
+func events(r *Router, n int, filters ...event.Filter) []event.Event { // todo use seq
 	var events []event.Event
 	for {
 		if n != -1 && len(events) == n {
 			break
 		}
-		e, ok := r.Event(filters...)
-		if !ok {
-			break
+		for e := range r.Events(filters...) {
+			events = append(events, e)
 		}
-		events = append(events, e)
 	}
 	return events
 }

@@ -73,10 +73,11 @@ func makeAccountingTestText(str string, fontSize, lineWidth int) (txt []text.Gly
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
 
-	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection([]font.FontFace{{
-		Font: font.Font{Typeface: "LTR"},
-		Face: ltrFace,
-	},
+	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection([]font.FontFace{
+		{
+			Font: font.Font{Typeface: "LTR"},
+			Face: ltrFace,
+		},
 		{
 			Font: font.Font{Typeface: "RTL"},
 			Face: rtlFace,
@@ -99,10 +100,11 @@ func getGlyphs(fontSize, minWidth, lineWidth int, align text.Alignment, str stri
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
 
-	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection([]font.FontFace{{
-		Font: font.Font{Typeface: "LTR"},
-		Face: ltrFace,
-	},
+	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection([]font.FontFace{
+		{
+			Font: font.Font{Typeface: "LTR"},
+			Face: ltrFace,
+		},
 		{
 			Font: font.Font{Typeface: "RTL"},
 			Face: rtlFace,
@@ -258,7 +260,6 @@ func TestIndexPositionWhitespace(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 // TestIndexPositionBidi tests whether the index correct generates cursor positions for
@@ -646,6 +647,7 @@ func TestIndexPositionRunes(t *testing.T) {
 		})
 	}
 }
+
 func printPositions(t *testing.T, positions []combinedPos) {
 	t.Helper()
 	for i, p := range positions {
@@ -734,6 +736,7 @@ func TestGraphemeReaderNext(t *testing.T) {
 		})
 	}
 }
+
 func TestGraphemeReaderGraphemes(t *testing.T) {
 	latinDoc := bytes.NewReader([]byte(latinDocument))
 	arabicDoc := bytes.NewReader([]byte(arabicDocument))
@@ -795,6 +798,7 @@ func TestGraphemeReaderGraphemes(t *testing.T) {
 		})
 	}
 }
+
 func BenchmarkGraphemeReaderNext(b *testing.B) {
 	latinDoc := bytes.NewReader([]byte(latinDocument))
 	arabicDoc := bytes.NewReader([]byte(arabicDocument))
@@ -844,6 +848,7 @@ func BenchmarkGraphemeReaderNext(b *testing.B) {
 		})
 	}
 }
+
 func BenchmarkGraphemeReaderGraphemes(b *testing.B) {
 	latinDoc := bytes.NewReader([]byte(latinDocument))
 	arabicDoc := bytes.NewReader([]byte(arabicDocument))

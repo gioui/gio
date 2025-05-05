@@ -16,7 +16,7 @@ func main() {
 	flag.Parse()
 
 	var b bytes.Buffer
-	printf := func(content string, args ...interface{}) {
+	printf := func(content string, args ...any) {
 		fmt.Fprintf(&b, content, args...)
 	}
 
@@ -42,7 +42,7 @@ func main() {
 		panic(err)
 	}
 
-	err = os.WriteFile(*out, data, 0755)
+	err = os.WriteFile(*out, data, 0o755)
 	if err != nil {
 		panic(err)
 	}

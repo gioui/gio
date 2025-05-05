@@ -247,9 +247,11 @@ func (f *Functions) getExtension(name string) js.Value {
 func (f *Functions) ActiveTexture(t Enum) {
 	f._activeTexture.Invoke(int(t))
 }
+
 func (f *Functions) AttachShader(p Program, s Shader) {
 	f._attachShader.Invoke(js.Value(p), js.Value(s))
 }
+
 func (f *Functions) BeginQuery(target Enum, query Query) {
 	if !f.EXT_disjoint_timer_query_webgl2.IsNull() {
 		f._beginQuery.Invoke(int(target), js.Value(query))
@@ -257,36 +259,47 @@ func (f *Functions) BeginQuery(target Enum, query Query) {
 		f.EXT_disjoint_timer_query.Call("beginQueryEXT", int(target), js.Value(query))
 	}
 }
+
 func (f *Functions) BindAttribLocation(p Program, a Attrib, name string) {
 	f._bindAttribLocation.Invoke(js.Value(p), int(a), name)
 }
+
 func (f *Functions) BindBuffer(target Enum, b Buffer) {
 	f._bindBuffer.Invoke(int(target), js.Value(b))
 }
+
 func (f *Functions) BindBufferBase(target Enum, index int, b Buffer) {
 	f._bindBufferBase.Invoke(int(target), index, js.Value(b))
 }
+
 func (f *Functions) BindFramebuffer(target Enum, fb Framebuffer) {
 	f._bindFramebuffer.Invoke(int(target), js.Value(fb))
 }
+
 func (f *Functions) BindRenderbuffer(target Enum, rb Renderbuffer) {
 	f._bindRenderbuffer.Invoke(int(target), js.Value(rb))
 }
+
 func (f *Functions) BindTexture(target Enum, t Texture) {
 	f._bindTexture.Invoke(int(target), js.Value(t))
 }
+
 func (f *Functions) BindImageTexture(unit int, t Texture, level int, layered bool, layer int, access, format Enum) {
 	panic("not implemented")
 }
+
 func (f *Functions) BindVertexArray(a VertexArray) {
 	panic("not supported")
 }
+
 func (f *Functions) BlendEquation(mode Enum) {
 	f._blendEquation.Invoke(int(mode))
 }
+
 func (f *Functions) BlendFuncSeparate(srcRGB, dstRGB, srcA, dstA Enum) {
 	f._blendFunc.Invoke(int(srcRGB), int(dstRGB), int(srcA), int(dstA))
 }
+
 func (f *Functions) BufferData(target Enum, size int, usage Enum, data []byte) {
 	if data == nil {
 		f._bufferData.Invoke(int(target), size, int(usage))
@@ -297,9 +310,11 @@ func (f *Functions) BufferData(target Enum, size int, usage Enum, data []byte) {
 		f._bufferData.Invoke(int(target), f.byteArrayOf(data), int(usage))
 	}
 }
+
 func (f *Functions) BufferSubData(target Enum, offset int, src []byte) {
 	f._bufferSubData.Invoke(int(target), offset, f.byteArrayOf(src))
 }
+
 func (f *Functions) CheckFramebufferStatus(target Enum) Enum {
 	status := Enum(f._checkFramebufferStatus.Invoke(int(target)).Int())
 	if status != FRAMEBUFFER_COMPLETE && f.Ctx.Call("isContextLost").Bool() {
@@ -308,54 +323,71 @@ func (f *Functions) CheckFramebufferStatus(target Enum) Enum {
 	}
 	return status
 }
+
 func (f *Functions) Clear(mask Enum) {
 	f._clear.Invoke(int(mask))
 }
+
 func (f *Functions) ClearColor(red, green, blue, alpha float32) {
 	f._clearColor.Invoke(red, green, blue, alpha)
 }
+
 func (f *Functions) ClearDepthf(d float32) {
 	f._clearDepth.Invoke(d)
 }
+
 func (f *Functions) CompileShader(s Shader) {
 	f._compileShader.Invoke(js.Value(s))
 }
+
 func (f *Functions) CopyTexSubImage2D(target Enum, level, xoffset, yoffset, x, y, width, height int) {
 	f._copyTexSubImage2D.Invoke(int(target), level, xoffset, yoffset, x, y, width, height)
 }
+
 func (f *Functions) CreateBuffer() Buffer {
 	return Buffer(f._createBuffer.Invoke())
 }
+
 func (f *Functions) CreateFramebuffer() Framebuffer {
 	return Framebuffer(f._createFramebuffer.Invoke())
 }
+
 func (f *Functions) CreateProgram() Program {
 	return Program(f._createProgram.Invoke())
 }
+
 func (f *Functions) CreateQuery() Query {
 	return Query(f._createQuery.Invoke())
 }
+
 func (f *Functions) CreateRenderbuffer() Renderbuffer {
 	return Renderbuffer(f._createRenderbuffer.Invoke())
 }
+
 func (f *Functions) CreateShader(ty Enum) Shader {
 	return Shader(f._createShader.Invoke(int(ty)))
 }
+
 func (f *Functions) CreateTexture() Texture {
 	return Texture(f._createTexture.Invoke())
 }
+
 func (f *Functions) CreateVertexArray() VertexArray {
 	panic("not supported")
 }
+
 func (f *Functions) DeleteBuffer(v Buffer) {
 	f._deleteBuffer.Invoke(js.Value(v))
 }
+
 func (f *Functions) DeleteFramebuffer(v Framebuffer) {
 	f._deleteFramebuffer.Invoke(js.Value(v))
 }
+
 func (f *Functions) DeleteProgram(p Program) {
 	f._deleteProgram.Invoke(js.Value(p))
 }
+
 func (f *Functions) DeleteQuery(query Query) {
 	if !f.EXT_disjoint_timer_query_webgl2.IsNull() {
 		f._deleteQuery.Invoke(js.Value(query))
@@ -363,45 +395,59 @@ func (f *Functions) DeleteQuery(query Query) {
 		f.EXT_disjoint_timer_query.Call("deleteQueryEXT", js.Value(query))
 	}
 }
+
 func (f *Functions) DeleteShader(s Shader) {
 	f._deleteShader.Invoke(js.Value(s))
 }
+
 func (f *Functions) DeleteRenderbuffer(v Renderbuffer) {
 	f._deleteRenderbuffer.Invoke(js.Value(v))
 }
+
 func (f *Functions) DeleteTexture(v Texture) {
 	f._deleteTexture.Invoke(js.Value(v))
 }
+
 func (f *Functions) DeleteVertexArray(a VertexArray) {
 	panic("not implemented")
 }
+
 func (f *Functions) DepthFunc(fn Enum) {
 	f._depthFunc.Invoke(int(fn))
 }
+
 func (f *Functions) DepthMask(mask bool) {
 	f._depthMask.Invoke(mask)
 }
+
 func (f *Functions) DisableVertexAttribArray(a Attrib) {
 	f._disableVertexAttribArray.Invoke(int(a))
 }
+
 func (f *Functions) Disable(cap Enum) {
 	f._disable.Invoke(int(cap))
 }
+
 func (f *Functions) DrawArrays(mode Enum, first, count int) {
 	f._drawArrays.Invoke(int(mode), first, count)
 }
+
 func (f *Functions) DrawElements(mode Enum, count int, ty Enum, offset int) {
 	f._drawElements.Invoke(int(mode), count, int(ty), offset)
 }
+
 func (f *Functions) DispatchCompute(x, y, z int) {
 	panic("not implemented")
 }
+
 func (f *Functions) Enable(cap Enum) {
 	f._enable.Invoke(int(cap))
 }
+
 func (f *Functions) EnableVertexAttribArray(a Attrib) {
 	f._enableVertexAttribArray.Invoke(int(a))
 }
+
 func (f *Functions) EndQuery(target Enum) {
 	if !f.EXT_disjoint_timer_query_webgl2.IsNull() {
 		f._endQuery.Invoke(int(target))
@@ -409,28 +455,36 @@ func (f *Functions) EndQuery(target Enum) {
 		f.EXT_disjoint_timer_query.Call("endQueryEXT", int(target))
 	}
 }
+
 func (f *Functions) Finish() {
 	f._finish.Invoke()
 }
+
 func (f *Functions) Flush() {
 	f._flush.Invoke()
 }
+
 func (f *Functions) FramebufferRenderbuffer(target, attachment, renderbuffertarget Enum, renderbuffer Renderbuffer) {
 	f._framebufferRenderbuffer.Invoke(int(target), int(attachment), int(renderbuffertarget), js.Value(renderbuffer))
 }
+
 func (f *Functions) FramebufferTexture2D(target, attachment, texTarget Enum, t Texture, level int) {
 	f._framebufferTexture2D.Invoke(int(target), int(attachment), int(texTarget), js.Value(t), level)
 }
+
 func (f *Functions) GenerateMipmap(target Enum) {
 	f._generateMipmap.Invoke(int(target))
 }
+
 func (f *Functions) GetError() Enum {
 	// Avoid slow getError calls. See gio#179.
 	return 0
 }
+
 func (f *Functions) GetRenderbufferParameteri(target, pname Enum) int {
 	return paramVal(f._getRenderbufferParameteri.Invoke(int(pname)))
 }
+
 func (f *Functions) GetFramebufferAttachmentParameteri(target, attachment, pname Enum) int {
 	if !f.isWebGL2 && pname == FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING {
 		// FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING is only available on WebGL 2
@@ -438,6 +492,7 @@ func (f *Functions) GetFramebufferAttachmentParameteri(target, attachment, pname
 	}
 	return paramVal(f._getFramebufferAttachmentParameter.Invoke(int(target), int(attachment), int(pname)))
 }
+
 func (f *Functions) GetBinding(pname Enum) Object {
 	obj := f._getParameter.Invoke(int(pname))
 	if !obj.Truthy() {
@@ -445,6 +500,7 @@ func (f *Functions) GetBinding(pname Enum) Object {
 	}
 	return Object(obj)
 }
+
 func (f *Functions) GetBindingi(pname Enum, idx int) Object {
 	obj := f._getIndexedParameter.Invoke(int(pname), idx)
 	if !obj.Truthy() {
@@ -452,6 +508,7 @@ func (f *Functions) GetBindingi(pname Enum, idx int) Object {
 	}
 	return Object(obj)
 }
+
 func (f *Functions) GetInteger(pname Enum) int {
 	if !f.isWebGL2 {
 		switch pname {
@@ -461,9 +518,11 @@ func (f *Functions) GetInteger(pname Enum) int {
 	}
 	return paramVal(f._getParameter.Invoke(int(pname)))
 }
+
 func (f *Functions) GetFloat(pname Enum) float32 {
 	return float32(f._getParameter.Invoke(int(pname)).Float())
 }
+
 func (f *Functions) GetInteger4(pname Enum) [4]int {
 	arr := f._getParameter.Invoke(int(pname))
 	var res [4]int
@@ -472,6 +531,7 @@ func (f *Functions) GetInteger4(pname Enum) [4]int {
 	}
 	return res
 }
+
 func (f *Functions) GetFloat4(pname Enum) [4]float32 {
 	arr := f._getParameter.Invoke(int(pname))
 	var res [4]float32
@@ -480,12 +540,15 @@ func (f *Functions) GetFloat4(pname Enum) [4]float32 {
 	}
 	return res
 }
+
 func (f *Functions) GetProgrami(p Program, pname Enum) int {
 	return paramVal(f._getProgramParameter.Invoke(js.Value(p), int(pname)))
 }
+
 func (f *Functions) GetProgramInfoLog(p Program) string {
 	return f._getProgramInfoLog.Invoke(js.Value(p)).String()
 }
+
 func (f *Functions) GetQueryObjectuiv(query Query, pname Enum) uint {
 	if !f.EXT_disjoint_timer_query_webgl2.IsNull() {
 		return uint(paramVal(f._getQueryParameter.Invoke(js.Value(query), int(pname))))
@@ -493,12 +556,15 @@ func (f *Functions) GetQueryObjectuiv(query Query, pname Enum) uint {
 		return uint(paramVal(f.EXT_disjoint_timer_query.Call("getQueryObjectEXT", js.Value(query), int(pname))))
 	}
 }
+
 func (f *Functions) GetShaderi(s Shader, pname Enum) int {
 	return paramVal(f._getShaderParameter.Invoke(js.Value(s), int(pname)))
 }
+
 func (f *Functions) GetShaderInfoLog(s Shader) string {
 	return f._getShaderInfoLog.Invoke(js.Value(s)).String()
 }
+
 func (f *Functions) GetString(pname Enum) string {
 	switch pname {
 	case EXTENSIONS:
@@ -512,15 +578,19 @@ func (f *Functions) GetString(pname Enum) string {
 		return f._getParameter.Invoke(int(pname)).String()
 	}
 }
+
 func (f *Functions) GetUniformBlockIndex(p Program, name string) uint {
 	return uint(paramVal(f._getUniformBlockIndex.Invoke(js.Value(p), name)))
 }
+
 func (f *Functions) GetUniformLocation(p Program, name string) Uniform {
 	return Uniform(f._getUniformLocation.Invoke(js.Value(p), name))
 }
+
 func (f *Functions) GetVertexAttrib(index int, pname Enum) int {
 	return paramVal(f._getVertexAttrib.Invoke(index, int(pname)))
 }
+
 func (f *Functions) GetVertexAttribBinding(index int, pname Enum) Object {
 	obj := f._getVertexAttrib.Invoke(index, int(pname))
 	if !obj.Truthy() {
@@ -528,9 +598,11 @@ func (f *Functions) GetVertexAttribBinding(index int, pname Enum) Object {
 	}
 	return Object(obj)
 }
+
 func (f *Functions) GetVertexAttribPointer(index int, pname Enum) uintptr {
 	return uintptr(f._getVertexAttribOffset.Invoke(index, int(pname)).Int())
 }
+
 func (f *Functions) InvalidateFramebuffer(target, attachment Enum) {
 	fn := f.Ctx.Get("invalidateFramebuffer")
 	if !fn.IsUndefined() {
@@ -541,74 +613,97 @@ func (f *Functions) InvalidateFramebuffer(target, attachment Enum) {
 		f._invalidateFramebuffer.Invoke(int(target), f.int32Buf)
 	}
 }
+
 func (f *Functions) IsEnabled(cap Enum) bool {
 	return f._isEnabled.Invoke(int(cap)).Truthy()
 }
+
 func (f *Functions) LinkProgram(p Program) {
 	f._linkProgram.Invoke(js.Value(p))
 }
+
 func (f *Functions) PixelStorei(pname Enum, param int) {
 	f._pixelStorei.Invoke(int(pname), param)
 }
+
 func (f *Functions) MemoryBarrier(barriers Enum) {
 	panic("not implemented")
 }
+
 func (f *Functions) MapBufferRange(target Enum, offset, length int, access Enum) []byte {
 	panic("not implemented")
 }
+
 func (f *Functions) RenderbufferStorage(target, internalformat Enum, width, height int) {
 	f._renderbufferStorage.Invoke(int(target), int(internalformat), width, height)
 }
+
 func (f *Functions) ReadPixels(x, y, width, height int, format, ty Enum, data []byte) {
 	ba := f.byteArrayOf(data)
 	f._readPixels.Invoke(x, y, width, height, int(format), int(ty), ba)
 	js.CopyBytesToGo(data, ba)
 }
+
 func (f *Functions) Scissor(x, y, width, height int32) {
 	f._scissor.Invoke(x, y, width, height)
 }
+
 func (f *Functions) ShaderSource(s Shader, src string) {
 	f._shaderSource.Invoke(js.Value(s), src)
 }
+
 func (f *Functions) TexImage2D(target Enum, level int, internalFormat Enum, width, height int, format, ty Enum) {
 	f._texImage2D.Invoke(int(target), int(level), int(internalFormat), int(width), int(height), 0, int(format), int(ty), nil)
 }
+
 func (f *Functions) TexStorage2D(target Enum, levels int, internalFormat Enum, width, height int) {
 	f._texStorage2D.Invoke(int(target), levels, int(internalFormat), width, height)
 }
+
 func (f *Functions) TexSubImage2D(target Enum, level int, x, y, width, height int, format, ty Enum, data []byte) {
 	f._texSubImage2D.Invoke(int(target), level, x, y, width, height, int(format), int(ty), f.byteArrayOf(data))
 }
+
 func (f *Functions) TexParameteri(target, pname Enum, param int) {
 	f._texParameteri.Invoke(int(target), int(pname), int(param))
 }
+
 func (f *Functions) UniformBlockBinding(p Program, uniformBlockIndex uint, uniformBlockBinding uint) {
 	f._uniformBlockBinding.Invoke(js.Value(p), int(uniformBlockIndex), int(uniformBlockBinding))
 }
+
 func (f *Functions) Uniform1f(dst Uniform, v float32) {
 	f._uniform1f.Invoke(js.Value(dst), v)
 }
+
 func (f *Functions) Uniform1i(dst Uniform, v int) {
 	f._uniform1i.Invoke(js.Value(dst), v)
 }
+
 func (f *Functions) Uniform2f(dst Uniform, v0, v1 float32) {
 	f._uniform2f.Invoke(js.Value(dst), v0, v1)
 }
+
 func (f *Functions) Uniform3f(dst Uniform, v0, v1, v2 float32) {
 	f._uniform3f.Invoke(js.Value(dst), v0, v1, v2)
 }
+
 func (f *Functions) Uniform4f(dst Uniform, v0, v1, v2, v3 float32) {
 	f._uniform4f.Invoke(js.Value(dst), v0, v1, v2, v3)
 }
+
 func (f *Functions) UseProgram(p Program) {
 	f._useProgram.Invoke(js.Value(p))
 }
+
 func (f *Functions) UnmapBuffer(target Enum) bool {
 	panic("not implemented")
 }
+
 func (f *Functions) VertexAttribPointer(dst Attrib, size int, ty Enum, normalized bool, stride, offset int) {
 	f._vertexAttribPointer.Invoke(int(dst), size, int(ty), normalized, stride, offset)
 }
+
 func (f *Functions) Viewport(x, y, width, height int) {
 	f._viewport.Invoke(x, y, width, height)
 }

@@ -47,14 +47,11 @@ func (e *Enum) Update(gtx layout.Context) bool {
 	e.hovering = false
 	changed := false
 	for _, state := range e.keys {
-		for {
-			ev, ok := state.click.Update(gtx.Source)
-			if !ok {
-				break
-			}
-			switch ev.Kind {
+
+		for clickEvent := range state.click.Update(gtx.Source) {
+			switch clickEvent.Kind {
 			case gesture.KindPress:
-				if ev.Source == pointer.Mouse {
+				if clickEvent.Source == pointer.Mouse {
 					gtx.Execute(key.FocusCmd{Tag: &state.tag})
 				}
 			case gesture.KindClick:
@@ -64,15 +61,11 @@ func (e *Enum) Update(gtx layout.Context) bool {
 				}
 			}
 		}
-		for {
-			ev, ok := gtx.Event(
-				key.FocusFilter{Target: &state.tag},
-				key.Filter{Focus: &state.tag, Name: key.NameReturn},
-				key.Filter{Focus: &state.tag, Name: key.NameSpace},
-			)
-			if !ok {
-				break
-			}
+		for ev := range gtx.Events(
+			key.FocusFilter{Target: &state.tag},
+			key.Filter{Focus: &state.tag, Name: key.NameReturn},
+			key.Filter{Focus: &state.tag, Name: key.NameSpace},
+		) {
 			switch ev := ev.(type) {
 			case key.FocusEvent:
 				if ev.Focus {
@@ -94,6 +87,7 @@ func (e *Enum) Update(gtx layout.Context) bool {
 				}
 			}
 		}
+
 		if state.click.Hovered() {
 			e.hovered = state.key
 			e.hovering = true
