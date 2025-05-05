@@ -52,7 +52,7 @@ func TestQueueProcessReadClipboard(t *testing.T) {
 	assertClipboardReadCmd(t, r, 1)
 	ops.Reset()
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		// No ReadCmd
 		// One receiver must still wait for response
 

@@ -35,7 +35,7 @@ type ImageOp struct {
 
 	// handle is a key to uniquely identify this ImageOp
 	// in a map of cached textures.
-	handle interface{}
+	handle any
 }
 
 // ColorOp sets the brush to a constant color.
@@ -53,8 +53,7 @@ type LinearGradientOp struct {
 }
 
 // PaintOp fills the current clip area with the current brush.
-type PaintOp struct {
-}
+type PaintOp struct{}
 
 // OpacityStack represents an opacity applied to all painting operations
 // until Pop is called.

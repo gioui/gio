@@ -711,26 +711,31 @@ func TestCursor(t *testing.T) {
 		cursors []pointer.Cursor
 		want    pointer.Cursor
 	}{
-		{label: "no movement",
+		{
+			label:   "no movement",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			want:    pointer.CursorDefault,
 		},
-		{label: "move inside",
+		{
+			label:   "move inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events:  _at(50, 50),
 			want:    pointer.CursorPointer,
 		},
-		{label: "move outside",
+		{
+			label:   "move outside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events:  _at(200, 200),
 			want:    pointer.CursorDefault,
 		},
-		{label: "move back inside",
+		{
+			label:   "move back inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events:  _at(50, 50),
 			want:    pointer.CursorPointer,
 		},
-		{label: "send key events while inside",
+		{
+			label:   "send key events while inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events: []event.Event{
 				key.Event{Name: "A", State: key.Press},
@@ -738,7 +743,8 @@ func TestCursor(t *testing.T) {
 			},
 			want: pointer.CursorPointer,
 		},
-		{label: "send key events while outside",
+		{
+			label:   "send key events while outside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events: append(
 				_at(200, 200),
@@ -747,7 +753,8 @@ func TestCursor(t *testing.T) {
 			),
 			want: pointer.CursorDefault,
 		},
-		{label: "add new input on top while inside",
+		{
+			label:   "add new input on top while inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer, pointer.CursorCrosshair},
 			events: append(
 				_at(50, 50),
@@ -758,7 +765,8 @@ func TestCursor(t *testing.T) {
 			),
 			want: pointer.CursorCrosshair,
 		},
-		{label: "remove input on top while inside",
+		{
+			label:   "remove input on top while inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events: append(
 				_at(50, 50),
@@ -1289,7 +1297,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 		handlerCount := i
 		b.Run(fmt.Sprintf("%d-handlers", i), func(b *testing.B) {
 			handlers := make([]event.Tag, handlerCount)
-			for i := 0; i < handlerCount; i++ {
+			for i := range handlerCount {
 				h := new(int)
 				*h = i
 				handlers[i] = h
@@ -1311,7 +1319,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 			r.Frame(&ops)
 			b.ReportAllocs()
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				r.Queue(
 					pointer.Event{
 						Kind:     pointer.Move,

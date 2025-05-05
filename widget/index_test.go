@@ -73,10 +73,11 @@ func makeAccountingTestText(str string, fontSize, lineWidth int) (txt []text.Gly
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
 
-	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection([]font.FontFace{{
-		Font: font.Font{Typeface: "LTR"},
-		Face: ltrFace,
-	},
+	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection([]font.FontFace{
+		{
+			Font: font.Font{Typeface: "LTR"},
+			Face: ltrFace,
+		},
 		{
 			Font: font.Font{Typeface: "RTL"},
 			Face: rtlFace,
@@ -99,10 +100,11 @@ func getGlyphs(fontSize, minWidth, lineWidth int, align text.Alignment, str stri
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
 
-	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection([]font.FontFace{{
-		Font: font.Font{Typeface: "LTR"},
-		Face: ltrFace,
-	},
+	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection([]font.FontFace{
+		{
+			Font: font.Font{Typeface: "LTR"},
+			Face: ltrFace,
+		},
 		{
 			Font: font.Font{Typeface: "RTL"},
 			Face: rtlFace,
@@ -245,7 +247,7 @@ func TestIndexPositionWhitespace(t *testing.T) {
 			if len(gi.positions) != len(tc.expected) {
 				t.Errorf("expected %d positions, got %d", len(tc.expected), len(gi.positions))
 			}
-			for i := 0; i < min(len(gi.positions), len(tc.expected)); i++ {
+			for i := range min(len(gi.positions), len(tc.expected)) {
 				actual := gi.positions[i]
 				expected := tc.expected[i]
 				if actual != expected {
@@ -258,7 +260,6 @@ func TestIndexPositionWhitespace(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 // TestIndexPositionBidi tests whether the index correct generates cursor positions for
@@ -312,7 +313,7 @@ func TestIndexPositionBidi(t *testing.T) {
 			lastLine := 0
 			lastCol := -1
 			lastY := 0
-			for i := 0; i < min(len(gi.positions), len(tc.expectedXs)); i++ {
+			for i := range min(len(gi.positions), len(tc.expectedXs)) {
 				actualX := gi.positions[i].x
 				expectedX := tc.expectedXs[i]
 				if actualX != expectedX {
@@ -538,7 +539,7 @@ func TestIndexPositionLines(t *testing.T) {
 			if len(gi.lines) != len(tc.expectedLines) {
 				t.Errorf("expected %d lines, got %d", len(tc.expectedLines), len(gi.lines))
 			}
-			for i := 0; i < min(len(gi.lines), len(tc.expectedLines)); i++ {
+			for i := range min(len(gi.lines), len(tc.expectedLines)) {
 				actual := gi.lines[i]
 				expected := tc.expectedLines[i]
 				if actual != expected {
@@ -623,7 +624,7 @@ func TestIndexPositionRunes(t *testing.T) {
 			if len(gi.positions) != len(tc.expected) {
 				t.Errorf("expected %d positions, got %d", len(tc.expected), len(gi.positions))
 			}
-			for i := 0; i < min(len(gi.positions), len(tc.expected)); i++ {
+			for i := range min(len(gi.positions), len(tc.expected)) {
 				actual := gi.positions[i]
 				expected := tc.expected[i]
 				if expected.runes != actual.runes {
@@ -646,6 +647,7 @@ func TestIndexPositionRunes(t *testing.T) {
 		})
 	}
 }
+
 func printPositions(t *testing.T, positions []combinedPos) {
 	t.Helper()
 	for i, p := range positions {
@@ -720,7 +722,7 @@ func TestGraphemeReaderNext(t *testing.T) {
 			if len(asRunes) != len(runes) {
 				t.Errorf("expected %d runes, got %d", len(asRunes), len(runes))
 			}
-			for i := 0; i < max(len(asRunes), len(runes)); i++ {
+			for i := range max(len(asRunes), len(runes)) {
 				if i < min(len(asRunes), len(runes)) {
 					if runes[i] != asRunes[i] {
 						t.Errorf("expected runes[%d]=%d, got %d", i, asRunes[i], runes[i])
@@ -734,6 +736,7 @@ func TestGraphemeReaderNext(t *testing.T) {
 		})
 	}
 }
+
 func TestGraphemeReaderGraphemes(t *testing.T) {
 	latinDoc := bytes.NewReader([]byte(latinDocument))
 	arabicDoc := bytes.NewReader([]byte(arabicDocument))
@@ -787,7 +790,7 @@ func TestGraphemeReaderGraphemes(t *testing.T) {
 			if len(asRunes)+1 < len(graphemes) {
 				t.Errorf("expected <= %d graphemes, got %d", len(asRunes)+1, len(graphemes))
 			}
-			for i := 0; i < len(graphemes)-1; i++ {
+			for i := range len(graphemes) - 1 {
 				if graphemes[i] >= graphemes[i+1] {
 					t.Errorf("graphemes[%d](%d) >= graphemes[%d](%d)", i, graphemes[i], i+1, graphemes[i+1])
 				}
@@ -795,6 +798,7 @@ func TestGraphemeReaderGraphemes(t *testing.T) {
 		})
 	}
 }
+
 func BenchmarkGraphemeReaderNext(b *testing.B) {
 	latinDoc := bytes.NewReader([]byte(latinDocument))
 	arabicDoc := bytes.NewReader([]byte(arabicDocument))
@@ -831,7 +835,7 @@ func BenchmarkGraphemeReaderNext(b *testing.B) {
 		var paragraph []rune = make([]rune, 4096)
 		b.Run(tc.name, func(b *testing.B) {
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				pr.SetSource(tc.input)
 
 				ok := true
@@ -844,6 +848,7 @@ func BenchmarkGraphemeReaderNext(b *testing.B) {
 		})
 	}
 }
+
 func BenchmarkGraphemeReaderGraphemes(b *testing.B) {
 	latinDoc := bytes.NewReader([]byte(latinDocument))
 	arabicDoc := bytes.NewReader([]byte(arabicDocument))
@@ -879,7 +884,7 @@ func BenchmarkGraphemeReaderGraphemes(b *testing.B) {
 	} {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				pr.SetSource(tc.input)
 				for g := tc.read(); len(g) > 0; g = tc.read() {
 					_ = g

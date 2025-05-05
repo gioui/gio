@@ -201,7 +201,7 @@ func BenchmarkTransformOffset(b *testing.B) {
 	o := Point{X: 0.5, Y: 0.5}
 	aff := Affine2D{}.Offset(o)
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		p = aff.Transform(p)
 	}
 	_ = p
@@ -211,7 +211,7 @@ func BenchmarkTransformScale(b *testing.B) {
 	p := Point{X: 1, Y: 2}
 	s := Point{X: 0.5, Y: 0.5}
 	aff := Affine2D{}.Scale(Point{}, s)
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		p = aff.Transform(p)
 	}
 	_ = p
@@ -221,7 +221,7 @@ func BenchmarkTransformRotate(b *testing.B) {
 	p := Point{X: 1, Y: 2}
 	a := float32(math.Pi / 2)
 	aff := Affine2D{}.Rotate(Point{}, a)
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		p = aff.Transform(p)
 	}
 	_ = p
@@ -231,7 +231,7 @@ func BenchmarkTransformTranslateMultiply(b *testing.B) {
 	a := Affine2D{}.Offset(Point{X: 1, Y: 1}).Rotate(Point{}, math.Pi/3)
 	t := Affine2D{}.Offset(Point{X: 0.5, Y: 0.5})
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		a = a.Mul(t)
 	}
 }
@@ -240,7 +240,7 @@ func BenchmarkTransformScaleMultiply(b *testing.B) {
 	a := Affine2D{}.Offset(Point{X: 1, Y: 1}).Rotate(Point{}, math.Pi/3)
 	t := Affine2D{}.Offset(Point{X: 0.5, Y: 0.5}).Scale(Point{}, Point{X: 0.4, Y: -0.5})
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		a = a.Mul(t)
 	}
 }
@@ -249,7 +249,7 @@ func BenchmarkTransformMultiply(b *testing.B) {
 	a := Affine2D{}.Offset(Point{X: 1, Y: 1}).Rotate(Point{}, math.Pi/3)
 	t := Affine2D{}.Offset(Point{X: 0.5, Y: 0.5}).Rotate(Point{}, math.Pi/7)
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		a = a.Mul(t)
 	}
 }

@@ -186,6 +186,6 @@ func eglWaitClient() bool {
 
 // issue34474KeepAlive calls runtime.KeepAlive as a
 // workaround for golang.org/issue/34474.
-func issue34474KeepAlive(v interface{}) {
+func issue34474KeepAlive(v any) {
 	runtime.KeepAlive(v)
 }

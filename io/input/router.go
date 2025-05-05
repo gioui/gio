@@ -5,6 +5,7 @@ package input
 import (
 	"image"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -302,7 +303,7 @@ func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
 				}
 			}
 			if match {
-				change.events = append(change.events[:j], change.events[j+1:]...)
+				change.events = slices.Delete(change.events, j, j+1)
 				// Fast forward state to last matched.
 				q.collapseState(i)
 				return evt.event, true

@@ -176,7 +176,6 @@ func TestStrokedPathZeroWidth(t *testing.T) {
 			paint.Fill(o, red)
 			cl.Pop()
 		}
-
 	}, func(r result) {
 		r.expect(0, 0, transparent)
 		r.expect(10, 50, colornames.Black)
@@ -299,7 +298,7 @@ func TestInstancedRects(t *testing.T) {
 		clip.Pop()
 		c := macro.Stop()
 
-		for i := 0; i < 2; i++ {
+		for range 2 {
 			op.Affine(f32.Affine2D{}.Rotate(f32.Pt(0, 0), .2)).Add(o)
 			c.Add(o)
 			op.Offset(image.Pt(20, 20)).Add(o)

@@ -35,10 +35,10 @@ func TestPathLRU(t *testing.T) {
 }
 
 func testLRU(t *testing.T, put func(i int), get func(i int) bool) {
-	for i := 0; i < maxSize; i++ {
+	for i := range maxSize {
 		put(i)
 	}
-	for i := 0; i < maxSize; i++ {
+	for i := range maxSize {
 		if !get(i) {
 			t.Fatalf("key %d was evicted", i)
 		}

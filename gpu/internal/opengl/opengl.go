@@ -8,6 +8,7 @@ import (
 	"image"
 	"math/bits"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 	"unsafe"
@@ -717,10 +718,7 @@ func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, min
 	if mipmap {
 		nmipmaps := 1
 		if mipmap {
-			dim := width
-			if height > dim {
-				dim = height
-			}
+			dim := max(height, width)
 			log2 := 32 - bits.LeadingZeros32(uint32(dim)) - 1
 			nmipmaps = log2 + 1
 		}
@@ -1132,7 +1130,7 @@ func (b *Backend) setupVertexArrays() {
 		enabled[inp.Location] = true
 		b.glstate.vertexAttribPointer(b.funcs, buf.obj, inp.Location, l.Size, gltyp, false, p.layout.Stride, buf.offset+l.Offset)
 	}
-	for i := 0; i < max; i++ {
+	for i := range max {
 		b.glstate.setVertexAttribArray(b.funcs, i, enabled[i])
 	}
 }
@@ -1175,7 +1173,7 @@ func (t *texture) ReadPixels(src image.Rectangle, pixels []byte, stride int) err
 	} else {
 		tmp := make([]byte, w*h*4)
 		t.backend.funcs.ReadPixels(src.Min.X, src.Min.Y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, tmp)
-		for y := 0; y < h; y++ {
+		for y := range h {
 			copy(pixels[y*stride:], tmp[y*w*4:])
 		}
 	}
@@ -1357,12 +1355,7 @@ func alphaTripleFor(ver [2]int) textureTriple {
 }
 
 func hasExtension(exts []string, ext string) bool {
-	for _, e := range exts {
-		if ext == e {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(exts, ext)
 }
 
 func firstBufferType(typ driver.BufferBinding) gl.Enum {

@@ -17,9 +17,8 @@ func BenchmarkStack(b *testing.B) {
 		},
 	}
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		gtx.Ops.Reset()
 
 		Stack{}.Layout(gtx,
@@ -41,9 +40,8 @@ func BenchmarkBackground(b *testing.B) {
 		},
 	}
 	b.ReportAllocs()
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		gtx.Ops.Reset()
 
 		Background{}.Layout(gtx,

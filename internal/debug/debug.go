@@ -34,7 +34,7 @@ func Parse() {
 		}
 		print := false
 		silent := false
-		for _, part := range strings.Split(val, ",") {
+		for part := range strings.SplitSeq(val, ",") {
 			switch part {
 			case textSubsystem:
 				Text.Store(true)
