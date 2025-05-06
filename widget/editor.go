@@ -269,7 +269,7 @@ func (e *Editor) processPointer(gtx layout.Context) iter.Seq[EditorEvent] {
 				}
 			}
 		}
-		for evt := range e.dragger.Update(gtx.Metric, gtx.Source, gesture.Both) {
+		for evt := range e.dragger.Events(gtx.Metric, gtx.Source, gesture.Both) {
 			for editorEvent := range e.processPointerEvent(gtx, evt) {
 				if !yield(editorEvent) {
 					return

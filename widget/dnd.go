@@ -56,7 +56,7 @@ func (d *Draggable) Dragging() bool {
 func (d *Draggable) Update(gtx layout.Context) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		pos := d.pos
-		for ev := range d.drag.Update(gtx.Metric, gtx.Source, gesture.Both) {
+		for ev := range d.drag.Events(gtx.Metric, gtx.Source, gesture.Both) {
 			switch ev.Kind {
 			case pointer.Press:
 				d.click = ev.Position

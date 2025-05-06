@@ -79,7 +79,7 @@ func (s *Scrollbar) Update(gtx layout.Context, axis layout.Axis, viewportStart, 
 		}
 	}
 	// Offset to account for any drags.
-	for event := range s.drag.Update(gtx.Metric, gtx.Source, gesture.Axis(axis)) {
+	for event := range s.drag.Events(gtx.Metric, gtx.Source, gesture.Axis(axis)) {
 		switch event.Kind {
 		case pointer.Drag:
 		case pointer.Release, pointer.Cancel:

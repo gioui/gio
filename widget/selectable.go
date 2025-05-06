@@ -282,7 +282,7 @@ func (e *Selectable) clickDragEvents(gtx layout.Context) iter.Seq[event.Event] {
 				return
 			}
 		}
-		for evt := range e.dragger.Update(gtx.Metric, gtx.Source, gesture.Both) {
+		for evt := range e.dragger.Events(gtx.Metric, gtx.Source, gesture.Both) {
 			if !yield(evt) {
 				return
 			}

@@ -200,7 +200,7 @@ func decomposeQR(A *matrix) (*matrix, *matrix, bool) {
 		for j := range Q.cols {
 			Q.set(i, j, Q.get(i, j)*invNorm)
 		}
-		// Update Rt.
+		// Events Rt.
 		for j := i; j < Rt.cols; j++ {
 			Rt.set(i, j, dot(Q.col(i), A.col(j)))
 		}
