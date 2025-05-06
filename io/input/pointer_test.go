@@ -21,16 +21,9 @@ import (
 
 func TestFilterReset(t *testing.T) {
 	r := new(Router)
-	// if _, ok := r.Events(pointer.Filter{}); ok {
-	//	t.Fatal("empty filter matched reset event")
-	// }
 	for range r.Events(pointer.Filter{}) {
-		t.Fatal("empty filter matched reset event") // todo test
+		t.Fatal("empty filter matched reset event")
 	}
-
-	// if _, ok := r.Events(pointer.Filter{Kinds: pointer.Cancel}); ok {
-	//	t.Fatal("second call to Events matched reset event")
-	// }
 	for range r.Events(pointer.Filter{Kinds: pointer.Cancel}) {
 		t.Fatal("second call to Events matched reset event")
 	}
