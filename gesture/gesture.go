@@ -11,6 +11,7 @@ package gesture
 
 import (
 	"image"
+	"iter"
 	"math"
 	"runtime"
 	"time"
@@ -43,14 +44,10 @@ func (h *Hover) Add(ops *op.Ops) {
 
 // Update state and report whether a pointer is inside the area.
 func (h *Hover) Update(q input.Source) bool {
-	for {
-		ev, ok := q.Event(pointer.Filter{
-			Target: h,
-			Kinds:  pointer.Enter | pointer.Leave | pointer.Cancel,
-		})
-		if !ok {
-			break
-		}
+	for ev := range q.Events(pointer.Filter{
+		Target: h,
+		Kinds:  pointer.Enter | pointer.Leave | pointer.Cancel,
+	}) {
 		e, ok := ev.(pointer.Event)
 		if !ok {
 			continue
@@ -177,83 +174,88 @@ func (c *Click) Pressed() bool {
 }
 
 // Update state and return the next click events, if any.
-func (c *Click) Update(q input.Source) (ClickEvent, bool) {
-	for {
-		evt, ok := q.Event(pointer.Filter{
+func (c *Click) Update(q input.Source) iter.Seq[ClickEvent] {
+	return func(yield func(ClickEvent) bool) {
+		for evt := range q.Events(pointer.Filter{
 			Target: c,
 			Kinds:  pointer.Press | pointer.Release | pointer.Enter | pointer.Leave | pointer.Cancel,
-		})
-		if !ok {
-			break
-		}
-		e, ok := evt.(pointer.Event)
-		if !ok {
-			continue
-		}
-		switch e.Kind {
-		case pointer.Release:
-			if !c.pressed || c.pid != e.PointerID {
-				break
+		}) {
+			e, ok := evt.(pointer.Event)
+			if !ok {
+				continue
 			}
-			c.pressed = false
-			if !c.entered || c.hovered {
-				return ClickEvent{
-					Kind:      KindClick,
-					Position:  e.Position.Round(),
-					Source:    e.Source,
-					Modifiers: e.Modifiers,
-					NumClicks: c.clicks,
-				}, true
-			} else {
-				return ClickEvent{Kind: KindCancel}, true
-			}
-		case pointer.Cancel:
-			wasPressed := c.pressed
-			c.pressed = false
-			c.hovered = false
-			c.entered = false
-			if wasPressed {
-				return ClickEvent{Kind: KindCancel}, true
-			}
-		case pointer.Press:
-			if c.pressed {
-				break
-			}
-			if e.Source == pointer.Mouse && e.Buttons != pointer.ButtonPrimary {
-				break
-			}
-			if !c.hovered {
-				c.pid = e.PointerID
-			}
-			if c.pid != e.PointerID {
-				break
-			}
-			c.pressed = true
-			if e.Time-c.clickedAt < doubleClickDuration {
-				c.clicks++
-			} else {
-				c.clicks = 1
-			}
-			c.clickedAt = e.Time
-			return ClickEvent{Kind: KindPress, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks}, true
-		case pointer.Leave:
-			if !c.pressed {
-				c.pid = e.PointerID
-			}
-			if c.pid == e.PointerID {
+			switch e.Kind {
+			case pointer.Release:
+				if !c.pressed || c.pid != e.PointerID {
+					break
+				}
+				c.pressed = false
+				if !c.entered || c.hovered {
+					if !yield(ClickEvent{
+						Kind:      KindClick,
+						Position:  e.Position.Round(),
+						Source:    e.Source,
+						Modifiers: e.Modifiers,
+						NumClicks: c.clicks,
+					}) {
+						return
+					}
+				} else {
+					if !yield(ClickEvent{Kind: KindCancel}) {
+						return
+					}
+				}
+			case pointer.Cancel:
+				wasPressed := c.pressed
+				c.pressed = false
 				c.hovered = false
-			}
-		case pointer.Enter:
-			if !c.pressed {
-				c.pid = e.PointerID
-			}
-			if c.pid == e.PointerID {
-				c.hovered = true
-				c.entered = true
+				c.entered = false
+				if wasPressed {
+					if !yield(ClickEvent{Kind: KindCancel}) {
+						return
+					}
+				}
+			case pointer.Press:
+				if c.pressed {
+					break
+				}
+				if e.Source == pointer.Mouse && e.Buttons != pointer.ButtonPrimary {
+					break
+				}
+				if !c.hovered {
+					c.pid = e.PointerID
+				}
+				if c.pid != e.PointerID {
+					break
+				}
+				c.pressed = true
+				if e.Time-c.clickedAt < doubleClickDuration {
+					c.clicks++
+				} else {
+					c.clicks = 1
+				}
+				c.clickedAt = e.Time
+				if !yield(ClickEvent{Kind: KindPress, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks}) {
+					return
+				}
+			case pointer.Leave:
+				if !c.pressed {
+					c.pid = e.PointerID
+				}
+				if c.pid == e.PointerID {
+					c.hovered = false
+				}
+			case pointer.Enter:
+				if !c.pressed {
+					c.pid = e.PointerID
+				}
+				if c.pid == e.PointerID {
+					c.hovered = true
+					c.entered = true
+				}
 			}
 		}
 	}
-	return ClickEvent{}, false
 }
 
 func (ClickEvent) ImplementsEvent() {}
@@ -279,11 +281,7 @@ func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis,
 		ScrollX: scrollx,
 		ScrollY: scrolly,
 	}
-	for {
-		evt, ok := q.Event(f)
-		if !ok {
-			break
-		}
+	for evt := range q.Events(f) {
 		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue
@@ -378,63 +376,60 @@ func (d *Drag) Add(ops *op.Ops) {
 }
 
 // Update state and return the next drag event, if any.
-func (d *Drag) Update(cfg unit.Metric, q input.Source, axis Axis) (pointer.Event, bool) {
-	for {
-		ev, ok := q.Event(pointer.Filter{
+func (d *Drag) Update(cfg unit.Metric, q input.Source, axis Axis) iter.Seq[pointer.Event] {
+	return func(yield func(pointer.Event) bool) {
+		for ev := range q.Events(pointer.Filter{
 			Target: d,
 			Kinds:  pointer.Press | pointer.Drag | pointer.Release | pointer.Cancel,
-		})
-		if !ok {
-			break
-		}
-		e, ok := ev.(pointer.Event)
-		if !ok {
-			continue
-		}
+		}) {
+			e, ok := ev.(pointer.Event)
+			if !ok {
+				continue
+			}
 
-		switch e.Kind {
-		case pointer.Press:
-			if !(e.Buttons == pointer.ButtonPrimary || e.Source == pointer.Touch) {
-				continue
-			}
-			d.pressed = true
-			if d.dragging {
-				continue
-			}
-			d.dragging = true
-			d.pid = e.PointerID
-			d.start = e.Position
-		case pointer.Drag:
-			if !d.dragging || e.PointerID != d.pid {
-				continue
-			}
-			switch axis {
-			case Horizontal:
-				e.Position.Y = d.start.Y
-			case Vertical:
-				e.Position.X = d.start.X
-			case Both:
-				// Do nothing
-			}
-			if e.Priority < pointer.Grabbed {
-				diff := e.Position.Sub(d.start)
-				slop := cfg.Dp(touchSlop)
-				if diff.X*diff.X+diff.Y*diff.Y > float32(slop*slop) {
-					q.Execute(pointer.GrabCmd{Tag: d, ID: e.PointerID})
+			switch e.Kind {
+			case pointer.Press:
+				if !(e.Buttons == pointer.ButtonPrimary || e.Source == pointer.Touch) {
+					continue
 				}
+				d.pressed = true
+				if d.dragging {
+					continue
+				}
+				d.dragging = true
+				d.pid = e.PointerID
+				d.start = e.Position
+			case pointer.Drag:
+				if !d.dragging || e.PointerID != d.pid {
+					continue
+				}
+				switch axis {
+				case Horizontal:
+					e.Position.Y = d.start.Y
+				case Vertical:
+					e.Position.X = d.start.X
+				case Both:
+					// Do nothing
+				}
+				if e.Priority < pointer.Grabbed {
+					diff := e.Position.Sub(d.start)
+					slop := cfg.Dp(touchSlop)
+					if diff.X*diff.X+diff.Y*diff.Y > float32(slop*slop) {
+						q.Execute(pointer.GrabCmd{Tag: d, ID: e.PointerID})
+					}
+				}
+			case pointer.Release, pointer.Cancel:
+				d.pressed = false
+				if !d.dragging || e.PointerID != d.pid {
+					continue
+				}
+				d.dragging = false
 			}
-		case pointer.Release, pointer.Cancel:
-			d.pressed = false
-			if !d.dragging || e.PointerID != d.pid {
-				continue
+			if !yield(e) {
+				return
 			}
-			d.dragging = false
 		}
-
-		return e, true
 	}
-
-	return pointer.Event{}, false
 }
 
 // Dragging reports whether it is currently in use.

@@ -78,13 +78,9 @@ func TestMouseClicks(t *testing.T) {
 			r.Queue(tc.events...)
 
 			var clicks []ClickEvent
-			for {
-				ev, ok := click.Update(r.Source())
-				if !ok {
-					break
-				}
-				if ev.Kind == KindClick {
-					clicks = append(clicks, ev)
+			for clickEvent := range click.Update(r.Source()) {
+				if clickEvent.Kind == KindClick {
+					clicks = append(clicks, clickEvent)
 				}
 			}
 			if got, want := len(clicks), len(tc.clicks); got != want {

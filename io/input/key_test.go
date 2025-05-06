@@ -16,14 +16,14 @@ import (
 
 func TestAllMatchKeyFilter(t *testing.T) {
 	r := new(Router)
-	r.Event(key.Filter{})
+	r.Events(key.Filter{})
 	ke := key.Event{Name: "A"}
 	r.Queue(ke)
 	// Catch-all gets all non-system events.
 	assertEventSequence(t, events(r, -1, key.Filter{}), ke)
 
 	r = new(Router)
-	r.Event(key.Filter{Name: "A"})
+	r.Events(key.Filter{Name: "A"})
 	r.Queue(SystemEvent{ke})
 	if _, handled := r.WakeupTime(); !handled {
 		t.Errorf("system event was unexpectedly ignored")
@@ -91,7 +91,7 @@ func TestInputWakeup(t *testing.T) {
 	// However, events that does match should trigger wakeup.
 	r.Queue(key.Event{Name: "A"})
 	if _, handled := r.WakeupTime(); !handled {
-		t.Errorf("a key.Event didn't trigger redraw")
+		t.Errorf("a key.Events didn't trigger redraw")
 	}
 }
 
@@ -191,7 +191,7 @@ func TestKeyFocusedInvisible(t *testing.T) {
 	ops.Reset()
 
 	// Respawn the first element:
-	// It must receive one `Event{Focus: false}`.
+	// It must receive one `Events{Focus: false}`.
 	event.Op(ops, &handlers[0])
 
 	assertEventSequence(t, events(r, -1, key.FocusFilter{Target: &handlers[0]}), key.FocusEvent{Focus: false})

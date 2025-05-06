@@ -5,6 +5,7 @@ package input
 import (
 	"image"
 	"io"
+	"iter"
 	"slices"
 
 	"gioui.org/f32"
@@ -348,12 +349,14 @@ func clampSplit(v float32, min, max int) (float32, float32) {
 	return 0, v
 }
 
-func (s *pointerHandler) ResetEvent() (event.Event, bool) {
-	if s.setup {
-		return nil, false
+func (s *pointerHandler) ResetEvent() iter.Seq[event.Event] {
+	return func(yield func(event.Event) bool) {
+		if s.setup {
+			return
+		}
+		s.setup = true
+		yield(pointer.Event{Kind: pointer.Cancel})
 	}
-	s.setup = true
-	return pointer.Event{Kind: pointer.Cancel}, true
 }
 
 func (c *pointerCollector) semanticLabel(lbl string) {
