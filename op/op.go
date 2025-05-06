@@ -10,7 +10,7 @@ controlling the execution of other operations.
 
 Ops represents a list of operations. The most important use
 for an Ops list is to describe a complete user interface update
-to a ui/app.Window's Update method.
+to a ui/app.Window's Events method.
 
 Drawing a colored square:
 
