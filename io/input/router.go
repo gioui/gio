@@ -340,8 +340,7 @@ func (q *Router) collapseState(i int) {
 		return
 	}
 	if i >= len(q.changes) {
-		// return
-		panic("index out of range") // todo: panic: runtime error: index out of range
+		return
 	}
 	first := &q.changes[0]
 	first.state = q.changes[i].state
