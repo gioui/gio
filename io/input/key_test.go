@@ -16,7 +16,8 @@ import (
 
 func TestAllMatchKeyFilter(t *testing.T) {
 	r := new(Router)
-	r.Events(key.Filter{})
+	for range r.Events(key.Filter{}) {
+	}
 	ke := key.Event{Name: "A"}
 	r.Queue(ke)
 	// Catch-all gets all non-system events.
