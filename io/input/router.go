@@ -289,11 +289,8 @@ func (q *Router) Events(filters ...event.Filter) iter.Seq[event.Event] {
 					break
 				}
 				h := q.stateFor(f.Target)
-				for e := range h.pointer.ResetEvent() {
-					if !yield(e) {
-						return
-					}
-					if !h.filter.pointer.Matches(e) {
+				if reset, ok := h.pointer.ResetEvent(); ok && h.filter.pointer.Matches(reset) {
+					if !yield(reset) {
 						return
 					}
 				}
