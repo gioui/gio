@@ -336,9 +336,9 @@ func (q *Router) collapseState(i int) {
 	if i < 0 {
 		return
 	}
-	if i >= len(q.changes) {
-		return
-	}
+	// if i >= len(q.changes) {//next pr
+	// 	return
+	// }
 	first := &q.changes[0]
 	first.state = q.changes[i].state
 	for _, ch := range q.changes[1 : i+1] {
