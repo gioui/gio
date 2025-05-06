@@ -279,8 +279,8 @@ func (q *Router) Events(filters ...event.Filter) iter.Seq[event.Event] {
 					break
 				}
 				h := q.stateFor(f.Target)
-				for e := range h.key.ResetEvent() {
-					if !yield(e) {
+				if reset, ok := h.key.ResetEvent(); ok {
+					if !yield(reset) {
 						return
 					}
 				}
