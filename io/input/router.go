@@ -315,7 +315,7 @@ func (q *Router) Events(filters ...event.Filter) iter.Seq[event.Event] {
 					}
 				}
 				if match {
-					change.events = slices.Delete(change.events, j, j+1) // todo: panic: runtime error: invalid memory address or nil pointer dereference
+					change.events = slices.Delete(change.events, j, j+1)
 					// Fast forward state to last matched.
 					q.collapseState(i)
 					if !yield(evt.event) {
