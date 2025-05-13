@@ -148,7 +148,7 @@ type eventLoop struct {
 	invalidates chan struct{}
 	// immediateInvalidates is an optimistic invalidates that doesn't require a wakeup.
 	immediateInvalidates chan struct{}
-	// events is where the platform backend delivers events bound for the
+	// Update is where the platform backend delivers events bound for the
 	// user program.
 	events   chan event.Event
 	frames   chan *op.Ops

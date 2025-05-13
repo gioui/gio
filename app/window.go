@@ -794,7 +794,7 @@ func (w *Window) decorate(e FrameEvent, o *op.Ops) image.Point {
 	allActions := system.ActionMinimize | system.ActionMaximize | system.ActionUnmaximize |
 		system.ActionClose | system.ActionMove
 	style := material.Decorations(w.decorations.Theme, deco, allActions, w.decorations.Config.Title)
-	// Events the decorations based on the current window mode.
+	// Update the decorations based on the current window mode.
 	var actions system.Action
 	switch m := w.decorations.Config.Mode; m {
 	case Windowed:
@@ -815,7 +815,7 @@ func (w *Window) decorate(e FrameEvent, o *op.Ops) image.Point {
 		Metric:      e.Metric,
 		Constraints: layout.Exact(e.Size),
 	}
-	// Events the window based on the actions on the decorations.
+	// Update the window based on the actions on the decorations.
 	opts, acts := splitActions(deco.Update(gtx))
 	if len(opts) > 0 {
 		w.driver.Configure(opts)

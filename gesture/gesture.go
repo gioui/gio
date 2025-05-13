@@ -375,7 +375,7 @@ func (d *Drag) Add(ops *op.Ops) {
 	event.Op(ops, d)
 }
 
-// Events state and return the next drag event, if any.
+// Update state and return the next drag event, if any.
 func (d *Drag) Events(cfg unit.Metric, q input.Source, axis Axis) iter.Seq[pointer.Event] {
 	return func(yield func(pointer.Event) bool) {
 		for ev := range q.Events(pointer.Filter{

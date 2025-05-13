@@ -202,7 +202,7 @@ func (s Source) Focused(tag event.Tag) bool {
 	return s.r.state().keyState.focus == tag
 }
 
-// Events returns the next event that matches at least one of filters.
+// Update returns the next event that matches at least one of filters.
 // If the source is disabled, no events will be reported.
 func (s Source) Events(filters ...event.Filter) iter.Seq[event.Event] {
 	return func(yield func(event.Event) bool) {
