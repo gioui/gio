@@ -905,6 +905,9 @@ func (e *Editor) undo() iter.Seq[EditorEvent] {
 		caretEnd := mod.StartRune + utf8.RuneCountInString(mod.ReverseContent)
 		e.SetCaret(caretEnd, mod.StartRune)
 		e.nextHistoryIdx--
+		if !yield(ChangeEvent{}) {
+			return
+		}
 	}
 }
 
@@ -922,6 +925,9 @@ func (e *Editor) redo() iter.Seq[EditorEvent] {
 		caretEnd := mod.StartRune + utf8.RuneCountInString(mod.ApplyContent)
 		e.SetCaret(caretEnd, mod.StartRune)
 		e.nextHistoryIdx++
+		if !yield(ChangeEvent{}) {
+			return
+		}
 	}
 }
 
