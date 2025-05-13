@@ -212,7 +212,8 @@ func (e *Editor) processEvents(gtx layout.Context) iter.Seq[EditorEvent] {
 			}
 		}()
 		for editorEvent := range e.processPointer(gtx) {
-			if yield(editorEvent) {
+			if !yield(editorEvent) {
+				return
 			}
 		}
 		for editorEvent := range e.processPointer(gtx) {
@@ -666,7 +667,9 @@ func (e *Editor) Update(gtx layout.Context) iter.Seq[EditorEvent] {
 
 		e.updateSnippet(gtx, e.ime.start, e.ime.end)
 		for editorEvent := range e.processEvents(gtx) {
-			yield(editorEvent)
+			if !yield(editorEvent) {
+				return
+			}
 		}
 	}
 }
