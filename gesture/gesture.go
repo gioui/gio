@@ -322,6 +322,8 @@ func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis,
 				s.scroll += e.Scroll.X
 			case Vertical:
 				s.scroll += e.Scroll.Y
+			case Both:
+				s.scroll += e.Scroll.X + e.Scroll.Y
 			}
 			iscroll := int(s.scroll)
 			s.scroll -= float32(iscroll)
@@ -353,10 +355,15 @@ func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis,
 }
 
 func (s *Scroll) val(axis Axis, p f32.Point) float32 {
-	if axis == Horizontal {
+	switch axis {
+	case Horizontal:
 		return p.X
-	} else {
+	case Vertical:
 		return p.Y
+	case Both:
+		return p.X + p.Y
+	default:
+		return 0
 	}
 }
 
