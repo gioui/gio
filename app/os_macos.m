@@ -6,7 +6,7 @@
 
 #include "_cgo_export.h"
 
-__attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(void);
+__attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(BOOL presentWithTrans);
 
 @interface GioAppDelegate : NSObject<NSApplicationDelegate>
 @end
@@ -16,28 +16,29 @@ __attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(void);
 
 @interface GioView : NSView <CALayerDelegate,NSTextInputClient>
 @property uintptr_t handle;
+@property BOOL presentWithTrans;
 @end
 
 @implementation GioWindowDelegate
 - (void)windowWillMiniaturize:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
   GioView *view = (GioView *)window.contentView;
-	gio_onHide(view.handle);
+	gio_onDraw(view.handle);
 }
 - (void)windowDidDeminiaturize:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
   GioView *view = (GioView *)window.contentView;
-	gio_onShow(view.handle);
+	gio_onDraw(view.handle);
 }
 - (void)windowWillEnterFullScreen:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
   GioView *view = (GioView *)window.contentView;
-	gio_onFullscreen(view.handle);
+	gio_onDraw(view.handle);
 }
 - (void)windowWillExitFullScreen:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
   GioView *view = (GioView *)window.contentView;
-	gio_onWindowed(view.handle);
+	gio_onDraw(view.handle);
 }
 - (void)windowDidChangeScreen:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
@@ -88,7 +89,7 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	gio_onDraw(self.handle);
 }
 - (CALayer *)makeBackingLayer {
-	CALayer *layer = gio_layerFactory();
+	CALayer *layer = gio_layerFactory(self.presentWithTrans);
 	layer.delegate = self;
 	return layer;
 }
@@ -131,22 +132,25 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	handleMouse(self, event, MOUSE_SCROLL, dx, dy);
 }
 - (void)keyDown:(NSEvent *)event {
-	[self interpretKeyEvents:[NSArray arrayWithObject:event]];
 	NSString *keys = [event charactersIgnoringModifiers];
-	gio_onKeys(self.handle, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], true);
+	gio_onKeys(self.handle, (__bridge CFTypeRef)event, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], true);
+}
+- (void)flagsChanged:(NSEvent *)event {
+	[self interpretKeyEvents:[NSArray arrayWithObject:event]];
+	gio_onFlagsChanged(self.handle, [event modifierFlags]);
 }
 - (void)keyUp:(NSEvent *)event {
 	NSString *keys = [event charactersIgnoringModifiers];
-	gio_onKeys(self.handle, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], false);
+	gio_onKeys(self.handle, (__bridge CFTypeRef)event, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], false);
 }
 - (void)insertText:(id)string {
 	gio_onText(self.handle, (__bridge CFTypeRef)string);
 }
-- (void)doCommandBySelector:(SEL)sel {
-	// Don't pass commands up the responder chain.
-	// They will end up in a beep.
+- (void)doCommandBySelector:(SEL)action {
+	if (!gio_onCommandBySelector(self.handle)) {
+		[super doCommandBySelector:action];
+	}
 }
-
 - (BOOL)hasMarkedText {
 	int res = gio_hasMarkedText(self.handle);
 	return res ? YES : NO;
@@ -201,10 +205,10 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
     return [[self window] convertRectToScreen:r];
 }
 - (void)applicationWillUnhide:(NSNotification *)notification {
-	gio_onShow(self.handle);
+	gio_onDraw(self.handle);
 }
 - (void)applicationDidHide:(NSNotification *)notification {
-	gio_onHide(self.handle);
+	gio_onDraw(self.handle);
 }
 - (void)dealloc {
 	gio_onDestroy(self.handle);
@@ -386,16 +390,16 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height, CGF
 		[window setAcceptsMouseMovedEvents:YES];
 		NSView *view = (__bridge NSView *)viewRef;
 		[window setContentView:view];
-		[window makeFirstResponder:view];
 		window.delegate = globalWindowDel;
 		return (__bridge_retained CFTypeRef)window;
 	}
 }
 
-CFTypeRef gio_createView(void) {
+CFTypeRef gio_createView(int presentWithTrans) {
 	@autoreleasepool {
 		NSRect frame = NSMakeRect(0, 0, 0, 0);
 		GioView* view = [[GioView alloc] initWithFrame:frame];
+		view.presentWithTrans = presentWithTrans ? YES : NO;
 		view.wantsLayer = YES;
 		view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
 

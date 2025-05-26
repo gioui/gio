@@ -992,7 +992,7 @@ func TestEditorSelectShortcuts(t *testing.T) {
 	tFont := font.Font{}
 	tFontSize := unit.Sp(10)
 	tShaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
-	var tEditor = &Editor{
+	tEditor := &Editor{
 		SingleLine: false,
 		ReadOnly:   true,
 	}
@@ -1255,7 +1255,7 @@ func TestNoFilterAllocs(t *testing.T) {
 		}
 		b.ReportAllocs()
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			e.Update(gtx)
 		}
 	})

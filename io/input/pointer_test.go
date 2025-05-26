@@ -97,6 +97,39 @@ func TestPointerDragNegative(t *testing.T) {
 	assertEventPointerTypeSequence(t, events(&r, -1, f), pointer.Enter, pointer.Press, pointer.Leave, pointer.Drag)
 }
 
+func TestIgnoredGrab(t *testing.T) {
+	handler1 := new(int)
+	handler2 := new(int)
+	var ops op.Ops
+
+	filter := func(t event.Tag) event.Filter {
+		return pointer.Filter{Target: t, Kinds: pointer.Press | pointer.Release | pointer.Cancel}
+	}
+
+	event.Op(&ops, handler1)
+	event.Op(&ops, handler2)
+	var r Router
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler1)), pointer.Cancel)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Cancel)
+	r.Frame(&ops)
+	r.Queue(
+		pointer.Event{
+			Kind:     pointer.Press,
+			Position: f32.Pt(50, 50),
+		},
+		pointer.Event{
+			Kind:     pointer.Release,
+			Position: f32.Pt(50, 50),
+		},
+	)
+	assertEventPointerTypeSequence(t, events(&r, 1, filter(handler1)), pointer.Press)
+	assertEventPointerTypeSequence(t, events(&r, 1, filter(handler2)), pointer.Press)
+	r.Source().Execute(pointer.GrabCmd{Tag: handler1})
+	r.Source().Execute(pointer.GrabCmd{Tag: handler2})
+	assertEventPointerTypeSequence(t, events(&r, 1, filter(handler1)), pointer.Release)
+	assertEventPointerTypeSequence(t, events(&r, 1, filter(handler2)), pointer.Cancel)
+}
+
 func TestPointerGrab(t *testing.T) {
 	handler1 := new(int)
 	handler2 := new(int)
@@ -367,9 +400,9 @@ func TestPointerPriority(t *testing.T) {
 	assertEventPointerTypeSequence(t, hev1, pointer.Scroll, pointer.Scroll)
 	assertEventPointerTypeSequence(t, hev2, pointer.Scroll)
 	assertEventPointerTypeSequence(t, hev3, pointer.Scroll)
-	assertEventPriorities(t, hev1, pointer.Shared, pointer.Foremost)
-	assertEventPriorities(t, hev2, pointer.Foremost)
-	assertEventPriorities(t, hev3, pointer.Foremost)
+	assertEventPriorities(t, hev1, pointer.Shared, pointer.Shared)
+	assertEventPriorities(t, hev2, pointer.Shared)
+	assertEventPriorities(t, hev3, pointer.Shared)
 	assertScrollEvent(t, hev1[0], f32.Pt(30, 0))
 	assertScrollEvent(t, hev2[0], f32.Pt(20, 0))
 	assertScrollEvent(t, hev1[1], f32.Pt(50, 0))
@@ -678,26 +711,31 @@ func TestCursor(t *testing.T) {
 		cursors []pointer.Cursor
 		want    pointer.Cursor
 	}{
-		{label: "no movement",
+		{
+			label:   "no movement",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			want:    pointer.CursorDefault,
 		},
-		{label: "move inside",
+		{
+			label:   "move inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events:  _at(50, 50),
 			want:    pointer.CursorPointer,
 		},
-		{label: "move outside",
+		{
+			label:   "move outside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events:  _at(200, 200),
 			want:    pointer.CursorDefault,
 		},
-		{label: "move back inside",
+		{
+			label:   "move back inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events:  _at(50, 50),
 			want:    pointer.CursorPointer,
 		},
-		{label: "send key events while inside",
+		{
+			label:   "send key events while inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events: []event.Event{
 				key.Event{Name: "A", State: key.Press},
@@ -705,7 +743,8 @@ func TestCursor(t *testing.T) {
 			},
 			want: pointer.CursorPointer,
 		},
-		{label: "send key events while outside",
+		{
+			label:   "send key events while outside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events: append(
 				_at(200, 200),
@@ -714,7 +753,8 @@ func TestCursor(t *testing.T) {
 			),
 			want: pointer.CursorDefault,
 		},
-		{label: "add new input on top while inside",
+		{
+			label:   "add new input on top while inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer, pointer.CursorCrosshair},
 			events: append(
 				_at(50, 50),
@@ -725,7 +765,8 @@ func TestCursor(t *testing.T) {
 			),
 			want: pointer.CursorCrosshair,
 		},
-		{label: "remove input on top while inside",
+		{
+			label:   "remove input on top while inside",
 			cursors: []pointer.Cursor{pointer.CursorPointer},
 			events: append(
 				_at(50, 50),
@@ -1086,6 +1127,33 @@ func TestPassCursor(t *testing.T) {
 	}
 }
 
+func TestPartialEvent(t *testing.T) {
+	var ops op.Ops
+	var r Router
+
+	rect := clip.Rect(image.Rect(0, 0, 100, 100))
+	background := rect.Push(&ops)
+	event.Op(&ops, 1)
+	background.Pop()
+
+	overlayPass := pointer.PassOp{}.Push(&ops)
+	overlay := rect.Push(&ops)
+	event.Op(&ops, 2)
+	overlay.Pop()
+	overlayPass.Pop()
+	assertEventSequence(t, events(&r, -1, pointer.Filter{Target: 1, Kinds: pointer.Press}))
+	assertEventSequence(t, events(&r, -1, pointer.Filter{Target: 2, Kinds: pointer.Press}))
+	r.Frame(&ops)
+	r.Queue(pointer.Event{
+		Kind: pointer.Press,
+	})
+	assertEventSequence(t, events(&r, -1, pointer.Filter{Target: 1, Kinds: pointer.Press}, key.FocusFilter{Target: 1}),
+		key.FocusEvent{}, pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Priority: pointer.Shared})
+	r.Source().Execute(key.FocusCmd{Tag: 1})
+	assertEventSequence(t, events(&r, -1, pointer.Filter{Target: 2, Kinds: pointer.Press}),
+		pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Priority: pointer.Shared})
+}
+
 // offer satisfies io.ReadCloser for use in data transfers.
 type offer struct {
 	data   string
@@ -1229,7 +1297,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 		handlerCount := i
 		b.Run(fmt.Sprintf("%d-handlers", i), func(b *testing.B) {
 			handlers := make([]event.Tag, handlerCount)
-			for i := 0; i < handlerCount; i++ {
+			for i := range handlerCount {
 				h := new(int)
 				*h = i
 				handlers[i] = h
@@ -1251,7 +1319,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 			r.Frame(&ops)
 			b.ReportAllocs()
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				r.Queue(
 					pointer.Event{
 						Kind:     pointer.Move,

@@ -4,6 +4,7 @@ package input
 
 import (
 	"io"
+	"slices"
 
 	"gioui.org/io/clipboard"
 	"gioui.org/io/event"
@@ -60,10 +61,8 @@ func (q *clipboardQueue) ProcessWriteClipboard(req clipboard.WriteCmd) {
 }
 
 func (q *clipboardQueue) ProcessReadClipboard(state clipboardState, tag event.Tag) clipboardState {
-	for _, k := range state.receivers {
-		if k == tag {
-			return state
-		}
+	if slices.Contains(state.receivers, tag) {
+		return state
 	}
 	n := len(state.receivers)
 	state.receivers = append(state.receivers[:n:n], tag)

@@ -43,8 +43,7 @@ type Event struct {
 
 // PassOp sets the pass-through mode. InputOps added while the pass-through
 // mode is set don't block events to siblings.
-type PassOp struct {
-}
+type PassOp struct{}
 
 // PassStack represents a PassOp on the pass stack.
 type PassStack struct {
@@ -207,9 +206,6 @@ const (
 	// Shared priority is for handlers that
 	// are part of a matching set larger than 1.
 	Shared Priority = iota
-	// Foremost priority is like Shared, but the
-	// handler is the foremost of the matching set.
-	Foremost
 	// Grabbed is used for matching sets of size 1.
 	Grabbed
 )
@@ -295,8 +291,6 @@ func (p Priority) String() string {
 	switch p {
 	case Shared:
 		return "Shared"
-	case Foremost:
-		return "Foremost"
 	case Grabbed:
 		return "Grabbed"
 	default:

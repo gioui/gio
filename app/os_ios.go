@@ -475,3 +475,6 @@ func gio_runMain() {
 
 func (UIKitViewEvent) implementsViewEvent() {}
 func (UIKitViewEvent) ImplementsEvent()     {}
+func (u UIKitViewEvent) Valid() bool {
+	return u != (UIKitViewEvent{})
+}

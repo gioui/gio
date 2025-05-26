@@ -29,7 +29,7 @@ environment:
 tasks:
  - install_go: |
      mkdir -p /home/build/sdk
-     curl -s https://dl.google.com/go/go1.22.2.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
+     curl -s https://dl.google.com/go/go1.24.2.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
  - prepare_toolchain: |
      mkdir -p $APPLE_TOOLCHAIN_ROOT
      cd $APPLE_TOOLCHAIN_ROOT
@@ -71,4 +71,4 @@ tasks:
      CC=$APPLE_TOOLCHAIN_ROOT/tools/clang-macos GOOS=darwin CGO_ENABLED=1 go build ./...
  - test_ios: |
      cd gio
-     CC=$APPLE_TOOLCHAIN_ROOT/tools/clang-ios GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build -tags ios ./...
+     CGO_CFLAGS=-Wno-deprecated-module-dot-map CC=$APPLE_TOOLCHAIN_ROOT/tools/clang-ios GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build -tags ios ./...

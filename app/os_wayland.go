@@ -116,6 +116,8 @@ type wlSeat struct {
 
 	// The most recent input serial.
 	serial C.uint32_t
+	// The most recent pointer enter serial.
+	pointerSerial C.uint32_t
 
 	pointerFocus  *window
 	keyboardFocus *window
@@ -154,7 +156,6 @@ type repeatState struct {
 type window struct {
 	w          *callbacks
 	disp       *wlDisplay
-	seat       *wlSeat
 	surf       *C.struct_wl_surface
 	wmSurf     *C.struct_xdg_surface
 	topLvl     *C.struct_xdg_toplevel
@@ -217,10 +218,6 @@ type window struct {
 	wakeups chan struct{}
 
 	closing bool
-
-	// invMu avoids the race between the destruction of disp and
-	// Invalidate waking it up.
-	invMu sync.Mutex
 }
 
 type poller struct {
@@ -855,8 +852,8 @@ func gio_onTouchCancel(data unsafe.Pointer, touch *C.struct_wl_touch) {
 func gio_onPointerEnter(data unsafe.Pointer, pointer *C.struct_wl_pointer, serial C.uint32_t, surf *C.struct_wl_surface, x, y C.wl_fixed_t) {
 	s := callbackLoad(data).(*wlSeat)
 	s.serial = serial
+	s.pointerSerial = serial
 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
-	w.seat = s
 	s.pointerFocus = w
 	w.setCursor(pointer, serial)
 	w.lastPos = f32.Point{X: fromFixed(x), Y: fromFixed(y)}
@@ -865,9 +862,9 @@ func gio_onPointerEnter(data unsafe.Pointer, pointer *C.struct_wl_pointer, seria
 //export gio_onPointerLeave
 func gio_onPointerLeave(data unsafe.Pointer, p *C.struct_wl_pointer, serial C.uint32_t, surf *C.struct_wl_surface) {
 	w := callbackLoad(unsafe.Pointer(surf)).(*window)
-	w.seat = nil
 	s := callbackLoad(data).(*wlSeat)
 	s.serial = serial
+	s.pointerFocus = nil
 	if w.inCompositor {
 		w.inCompositor = false
 		w.ProcessEvent(pointer.Event{Kind: pointer.Cancel})
@@ -967,6 +964,9 @@ func gio_onPointerAxis(data unsafe.Pointer, p *C.struct_wl_pointer, t, axis C.ui
 func gio_onPointerFrame(data unsafe.Pointer, p *C.struct_wl_pointer) {
 	s := callbackLoad(data).(*wlSeat)
 	w := s.pointerFocus
+	if w == nil {
+		return
+	}
 	w.flushScroll()
 	w.flushFling()
 }
@@ -1147,16 +1147,17 @@ func (w *window) Perform(actions system.Action) {
 }
 
 func (w *window) move(serial C.uint32_t) {
-	s := w.seat
-	if !w.inCompositor && s != nil {
-		w.inCompositor = true
-		C.xdg_toplevel_move(w.topLvl, s.seat, serial)
+	s := w.disp.seat
+	if w.inCompositor || s.pointerFocus != w {
+		return
 	}
+	w.inCompositor = true
+	C.xdg_toplevel_move(w.topLvl, s.seat, serial)
 }
 
 func (w *window) resize(serial, edge C.uint32_t) {
-	s := w.seat
-	if w.inCompositor || s == nil {
+	s := w.disp.seat
+	if w.inCompositor || s.pointerFocus != w {
 		return
 	}
 	w.inCompositor = true
@@ -1169,11 +1170,12 @@ func (w *window) SetCursor(cursor pointer.Cursor) {
 }
 
 func (w *window) updateCursor() {
-	ptr := w.disp.seat.pointer
-	if ptr == nil {
+	s := w.disp.seat
+	ptr := s.pointer
+	if ptr == nil || s.pointerFocus != w {
 		return
 	}
-	w.setCursor(ptr, w.serial)
+	w.setCursor(ptr, s.pointerSerial)
 }
 
 func (w *window) setCursor(pointer *C.struct_wl_pointer, serial C.uint32_t) {
@@ -1182,7 +1184,7 @@ func (w *window) setCursor(pointer *C.struct_wl_pointer, serial C.uint32_t) {
 		c = w.cursor.cursor
 	}
 	if c == nil {
-		C.wl_pointer_set_cursor(pointer, w.serial, nil, 0, 0)
+		C.wl_pointer_set_cursor(pointer, serial, nil, 0, 0)
 		return
 	}
 	// Get images[0].
@@ -1369,10 +1371,8 @@ func (w *window) close(err error) {
 	w.ProcessEvent(WaylandViewEvent{})
 	w.ProcessEvent(DestroyEvent{Err: err})
 	w.destroy()
-	w.invMu.Lock()
 	w.disp.destroy()
 	w.disp = nil
-	w.invMu.Unlock()
 }
 
 func (w *window) dispatch() {
@@ -1416,11 +1416,7 @@ func (w *window) Invalidate() {
 	default:
 		return
 	}
-	w.invMu.Lock()
-	defer w.invMu.Unlock()
-	if w.disp != nil {
-		w.disp.wakeup()
-	}
+	w.disp.wakeup()
 }
 
 func (w *window) Run(f func()) {
@@ -1643,6 +1639,14 @@ func (w *window) flushScroll() {
 	if total == (f32.Point{}) {
 		return
 	}
+	if w.scroll.steps == (image.Point{}) {
+		w.fling.xExtrapolation.SampleDelta(w.scroll.time, -w.scroll.dist.X)
+		w.fling.yExtrapolation.SampleDelta(w.scroll.time, -w.scroll.dist.Y)
+	}
+	// Zero scroll distance prior to calling ProcessEvent, otherwise we may recursively
+	// re-process the scroll distance.
+	w.scroll.dist = f32.Point{}
+	w.scroll.steps = image.Point{}
 	w.ProcessEvent(pointer.Event{
 		Kind:      pointer.Scroll,
 		Source:    pointer.Mouse,
@@ -1652,12 +1656,6 @@ func (w *window) flushScroll() {
 		Time:      w.scroll.time,
 		Modifiers: w.disp.xkb.Modifiers(),
 	})
-	if w.scroll.steps == (image.Point{}) {
-		w.fling.xExtrapolation.SampleDelta(w.scroll.time, -w.scroll.dist.X)
-		w.fling.yExtrapolation.SampleDelta(w.scroll.time, -w.scroll.dist.Y)
-	}
-	w.scroll.dist = f32.Point{}
-	w.scroll.steps = image.Point{}
 }
 
 func (w *window) onPointerMotion(x, y C.wl_fixed_t, t C.uint32_t) {

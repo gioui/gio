@@ -5,6 +5,7 @@ package input
 import (
 	"image"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -60,9 +61,10 @@ type Router struct {
 }
 
 // Source implements the interface between a Router and user interface widgets.
-// The value Source is disabled.
+// The zero-value Source is disabled.
 type Source struct {
-	r *Router
+	r        *Router
+	disabled bool
 }
 
 // Command represents a request such as moving the focus, or initiating a clipboard read.
@@ -177,10 +179,17 @@ func (s Source) Execute(c Command) {
 	s.r.execute(c)
 }
 
+// Disabled returns a copy of this source that don't deliver any events.
+func (s Source) Disabled() Source {
+	s2 := s
+	s2.disabled = true
+	return s2
+}
+
 // Enabled reports whether the source is enabled. Only enabled
-// Sources deliver events and respond to commands.
+// Sources deliver events.
 func (s Source) Enabled() bool {
-	return s.r != nil
+	return s.r != nil && !s.disabled
 }
 
 // Focused reports whether tag is focused, according to the most recent
@@ -193,6 +202,7 @@ func (s Source) Focused(tag event.Tag) bool {
 }
 
 // Event returns the next event that matches at least one of filters.
+// If the source is disabled, no events will be reported.
 func (s Source) Event(filters ...event.Filter) (event.Event, bool) {
 	if !s.Enabled() {
 		return nil, false
@@ -276,28 +286,29 @@ func (q *Router) Event(filters ...event.Filter) (event.Event, bool) {
 			}
 		}
 	}
-	if !q.deferring {
-		for i := range q.changes {
-			change := &q.changes[i]
-			for j, evt := range change.events {
-				match := false
-				switch e := evt.event.(type) {
-				case key.Event:
-					match = q.key.scratchFilter.Matches(change.state.keyState.focus, e, false)
-				default:
-					for _, tf := range q.scratchFilters {
-						if evt.tag == tf.tag && tf.filter.Matches(evt.event) {
-							match = true
-							break
-						}
+	for i := range q.changes {
+		if q.deferring && i > 0 {
+			break
+		}
+		change := &q.changes[i]
+		for j, evt := range change.events {
+			match := false
+			switch e := evt.event.(type) {
+			case key.Event:
+				match = q.key.scratchFilter.Matches(change.state.keyState.focus, e, false)
+			default:
+				for _, tf := range q.scratchFilters {
+					if evt.tag == tf.tag && tf.filter.Matches(evt.event) {
+						match = true
+						break
 					}
 				}
-				if match {
-					change.events = append(change.events[:j], change.events[j+1:]...)
-					// Fast forward state to last matched.
-					q.collapseState(i)
-					return evt.event, true
-				}
+			}
+			if match {
+				change.events = slices.Delete(change.events, j, j+1)
+				// Fast forward state to last matched.
+				q.collapseState(i)
+				return evt.event, true
 			}
 		}
 	}
@@ -315,15 +326,15 @@ func (q *Router) collapseState(idx int) {
 	}
 	first := &q.changes[0]
 	first.state = q.changes[idx].state
-	for i := 1; i <= idx; i++ {
-		first.events = append(first.events, q.changes[i].events...)
+	for _, ch := range q.changes[1 : idx+1] {
+		first.events = append(first.events, ch.events...)
 	}
 	q.changes = append(q.changes[:1], q.changes[idx+1:]...)
 }
 
-// Frame replaces the declared handlers from the supplied
-// operation list. The text input state, wakeup time and whether
-// there are active profile handlers is also saved.
+// Frame completes the current frame and starts a new with the
+// handlers from the frame argument. Remaining events are discarded,
+// unless they were deferred by a command.
 func (q *Router) Frame(frame *op.Ops) {
 	var remaining []event.Event
 	if n := len(q.changes); n > 0 {

@@ -822,3 +822,6 @@ func translateKey(k string) (key.Name, bool) {
 
 func (JSViewEvent) implementsViewEvent() {}
 func (JSViewEvent) ImplementsEvent()     {}
+func (j JSViewEvent) Valid() bool {
+	return !(j.Element.IsNull() || j.Element.IsUndefined())
+}

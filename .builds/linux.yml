@@ -40,7 +40,7 @@ secrets:
 tasks:
  - install_go: |
      mkdir -p /home/build/sdk
-     curl -s https://dl.google.com/go/go1.22.2.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
+     curl -s https://dl.google.com/go/go1.24.2.linux-amd64.tar.gz | tar -C /home/build/sdk -xzf -
  - check_gofmt: |
      cd gio
      test -z "$(gofmt -s -l .)"
@@ -80,6 +80,8 @@ tasks:
      unzip -q ndk.zip
      rm ndk.zip
      mv android-ndk-* ndk-bundle
+     # sdkmanager needs lots of file descriptors
+     ulimit -n 10000
      yes|sdkmanager --licenses
      sdkmanager "platforms;android-31" "build-tools;32.0.0"
  - test_android: |

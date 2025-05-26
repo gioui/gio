@@ -3,14 +3,13 @@ package text
 import (
 	"fmt"
 	"math"
-	"reflect"
+	"slices"
 	"strconv"
 	"testing"
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
 	"github.com/go-text/typesetting/font"
 	"github.com/go-text/typesetting/shaping"
-	"golang.org/x/exp/slices"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
 
@@ -127,7 +126,8 @@ func TestShapingAlignWidth(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			lines := shaper.LayoutString(Parameters{PxPerEm: ppem,
+			lines := shaper.LayoutString(Parameters{
+				PxPerEm:  ppem,
 				MinWidth: tc.minWidth,
 				MaxWidth: tc.maxWidth,
 				Locale:   english,
@@ -175,7 +175,6 @@ func TestNewlineSynthesis(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-
 			doc := shaper.LayoutRunes(Parameters{
 				PxPerEm:  ppem,
 				MaxWidth: 200,
@@ -208,7 +207,6 @@ func TestNewlineSynthesis(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 // simpleGlyph returns a simple square glyph with the provided cluster
@@ -445,120 +443,6 @@ func TestToLine(t *testing.T) {
 			}
 			if runesSeen.Count != maxRunes {
 				t.Errorf("input covered %d runes, output only covers %d", maxRunes, runesSeen.Count)
-			}
-		})
-	}
-}
-
-func TestComputeVisualOrder(t *testing.T) {
-	type testcase struct {
-		name                string
-		input               line
-		expectedVisualOrder []int
-	}
-	for _, tc := range []testcase{
-		{
-			name: "ltr",
-			input: line{
-				direction: system.LTR,
-				runs: []runLayout{
-					{Direction: system.LTR},
-					{Direction: system.LTR},
-					{Direction: system.LTR},
-				},
-			},
-			expectedVisualOrder: []int{0, 1, 2},
-		},
-		{
-			name: "rtl",
-			input: line{
-				direction: system.RTL,
-				runs: []runLayout{
-					{Direction: system.RTL},
-					{Direction: system.RTL},
-					{Direction: system.RTL},
-				},
-			},
-			expectedVisualOrder: []int{2, 1, 0},
-		},
-		{
-			name: "bidi-ltr",
-			input: line{
-				direction: system.LTR,
-				runs: []runLayout{
-					{Direction: system.LTR},
-					{Direction: system.RTL},
-					{Direction: system.RTL},
-					{Direction: system.RTL},
-					{Direction: system.LTR},
-				},
-			},
-			expectedVisualOrder: []int{0, 3, 2, 1, 4},
-		},
-		{
-			name: "bidi-ltr-complex",
-			input: line{
-				direction: system.LTR,
-				runs: []runLayout{
-					{Direction: system.RTL},
-					{Direction: system.RTL},
-					{Direction: system.LTR},
-					{Direction: system.RTL},
-					{Direction: system.RTL},
-					{Direction: system.LTR},
-					{Direction: system.RTL},
-					{Direction: system.RTL},
-					{Direction: system.LTR},
-					{Direction: system.RTL},
-					{Direction: system.RTL},
-				},
-			},
-			expectedVisualOrder: []int{1, 0, 2, 4, 3, 5, 7, 6, 8, 10, 9},
-		},
-		{
-			name: "bidi-rtl",
-			input: line{
-				direction: system.RTL,
-				runs: []runLayout{
-					{Direction: system.RTL},
-					{Direction: system.LTR},
-					{Direction: system.LTR},
-					{Direction: system.LTR},
-					{Direction: system.RTL},
-				},
-			},
-			expectedVisualOrder: []int{4, 1, 2, 3, 0},
-		},
-		{
-			name: "bidi-rtl-complex",
-			input: line{
-				direction: system.RTL,
-				runs: []runLayout{
-					{Direction: system.LTR},
-					{Direction: system.LTR},
-					{Direction: system.RTL},
-					{Direction: system.LTR},
-					{Direction: system.LTR},
-					{Direction: system.RTL},
-					{Direction: system.LTR},
-					{Direction: system.LTR},
-					{Direction: system.RTL},
-					{Direction: system.LTR},
-					{Direction: system.LTR},
-				},
-			},
-			expectedVisualOrder: []int{9, 10, 8, 6, 7, 5, 3, 4, 2, 0, 1},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			computeVisualOrder(&tc.input)
-			if !reflect.DeepEqual(tc.input.visualOrder, tc.expectedVisualOrder) {
-				t.Errorf("expected visual order %v, got %v", tc.expectedVisualOrder, tc.input.visualOrder)
-			}
-			for i, visualIndex := range tc.input.visualOrder {
-				if pos := tc.input.runs[visualIndex].VisualPosition; pos != i {
-					t.Errorf("line.VisualOrder[%d]=%d, but line.Runs[%d].VisualPosition=%d", i, visualIndex, visualIndex, pos)
-				}
 			}
 		})
 	}

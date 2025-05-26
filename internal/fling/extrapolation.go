@@ -90,7 +90,7 @@ func (e *Extrapolation) Estimate() Estimate {
 	first := e.get(0)
 	t := first.t
 	// Walk backwards collecting samples.
-	for i := 0; i < len(e.samples); i++ {
+	for i := range e.samples {
 		p := e.get(-i)
 		age := first.t - p.t
 		if age >= maxAge || t-p.t >= maxSampleGap {
@@ -172,9 +172,9 @@ func decomposeQR(A *matrix) (*matrix, *matrix, bool) {
 	// https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process
 	Q := newMatrix(A.rows, A.cols)  // Column-major.
 	Rt := newMatrix(A.rows, A.rows) // R transposed, row-major.
-	for i := 0; i < Q.rows; i++ {
+	for i := range Q.rows {
 		// Copy A column.
-		for j := 0; j < Q.cols; j++ {
+		for j := range Q.cols {
 			Q.set(i, j, A.get(i, j))
 		}
 		// Subtract projections. Note that int the projection
@@ -184,9 +184,9 @@ func decomposeQR(A *matrix) (*matrix, *matrix, bool) {
 		// the normalized column e replaces u, where <e, e> = 1:
 		//
 		// proje a = <e, a>/<e, e> e = <e, a> e
-		for j := 0; j < i; j++ {
+		for j := range i {
 			d := dot(Q.col(j), Q.col(i))
-			for k := 0; k < Q.cols; k++ {
+			for k := range Q.cols {
 				Q.set(i, k, Q.get(i, k)-d*Q.get(j, k))
 			}
 		}
@@ -197,7 +197,7 @@ func decomposeQR(A *matrix) (*matrix, *matrix, bool) {
 			return nil, nil, false
 		}
 		invNorm := 1 / n
-		for j := 0; j < Q.cols; j++ {
+		for j := range Q.cols {
 			Q.set(i, j, Q.get(i, j)*invNorm)
 		}
 		// Update Rt.
@@ -261,8 +261,8 @@ func (m *matrix) approxEqual(m2 *matrix) bool {
 		return false
 	}
 	const epsilon = 0.00001
-	for row := 0; row < m.rows; row++ {
-		for col := 0; col < m.cols; col++ {
+	for row := range m.rows {
+		for col := range m.cols {
 			d := m2.get(row, col) - m.get(row, col)
 			if d < -epsilon || d > epsilon {
 				return false
@@ -278,8 +278,8 @@ func (m *matrix) transpose() *matrix {
 		cols: m.rows,
 		data: make([]float32, len(m.data)),
 	}
-	for i := 0; i < m.rows; i++ {
-		for j := 0; j < m.cols; j++ {
+	for i := range m.rows {
+		for j := range m.cols {
 			t.set(j, i, m.get(i, j))
 		}
 	}
@@ -295,10 +295,10 @@ func (m *matrix) mul(m2 *matrix) *matrix {
 		cols: m2.cols,
 		data: make([]float32, m.rows*m2.cols),
 	}
-	for i := 0; i < mm.rows; i++ {
-		for j := 0; j < mm.cols; j++ {
+	for i := range mm.rows {
+		for j := range mm.cols {
 			var v float32
-			for k := 0; k < m.rows; k++ {
+			for k := range m.rows {
 				v += m.get(k, j) * m2.get(i, k)
 			}
 			mm.set(i, j, v)
@@ -309,8 +309,8 @@ func (m *matrix) mul(m2 *matrix) *matrix {
 
 func (m *matrix) String() string {
 	var b strings.Builder
-	for i := 0; i < m.rows; i++ {
-		for j := 0; j < m.cols; j++ {
+	for i := range m.rows {
+		for j := range m.cols {
 			v := m.get(i, j)
 			b.WriteString(strconv.FormatFloat(float64(v), 'g', -1, 32))
 			b.WriteString(", ")

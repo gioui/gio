@@ -29,6 +29,8 @@ type List struct {
 	ScrollToEnd bool
 	// Alignment is the cross axis alignment of list elements.
 	Alignment Alignment
+	// ScrollAnyAxis allows any scroll axis to scroll the list, not just the main axis.
+	ScrollAnyAxis bool
 
 	cs          Constraints
 	scroll      gesture.Scroll
@@ -159,12 +161,19 @@ func (l *List) update(gtx Context) {
 			max = 0
 		}
 	}
+
 	xrange := pointer.ScrollRange{Min: min, Max: max}
 	yrange := pointer.ScrollRange{}
-	if l.Axis == Vertical {
+
+	axis := gesture.Axis(l.Axis)
+	if l.ScrollAnyAxis {
+		axis = gesture.Both
+		yrange = xrange
+	} else if l.Axis == Vertical {
 		xrange, yrange = yrange, xrange
 	}
-	d := l.scroll.Update(gtx.Metric, gtx.Source, gtx.Now, gesture.Axis(l.Axis), xrange, yrange)
+	d := l.scroll.Update(gtx.Metric, gtx.Source, gtx.Now, axis, xrange, yrange)
+
 	l.scrollDelta = d
 	l.Position.Offset += d
 }
@@ -308,10 +317,6 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 			cross = (maxCross - sz.Y) / 2
 		}
 		childSize := sz.X
-		min := pos
-		if min < 0 {
-			min = 0
-		}
 		pt := l.Axis.Convert(image.Pt(pos, cross))
 		trans := op.Offset(pt).Push(ops)
 		child.call.Add(ops)

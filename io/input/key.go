@@ -4,6 +4,7 @@ package input
 
 import (
 	"image"
+	"slices"
 	"sort"
 
 	"gioui.org/f32"
@@ -304,10 +305,8 @@ func (s keyState) softKeyboard(show bool) keyState {
 }
 
 func (k *keyFilter) Add(f key.Filter) {
-	for _, f2 := range *k {
-		if f == f2 {
-			return
-		}
+	if slices.Contains(*k, f) {
+		return
 	}
 	*k = append(*k, f)
 }

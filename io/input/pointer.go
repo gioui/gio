@@ -5,6 +5,7 @@ package input
 import (
 	"image"
 	"io"
+	"slices"
 
 	"gioui.org/f32"
 	f32internal "gioui.org/internal/f32"
@@ -258,6 +259,11 @@ func (q *pointerQueue) grab(state pointerState, req pointer.GrabCmd) (pointerSta
 		if !p.pressed || p.id != req.ID {
 			continue
 		}
+		// Verify that the grabber is among the handlers.
+		found := slices.Contains(p.handlers, req.Tag)
+		if !found {
+			continue
+		}
 		// Drop other handlers that lost their grab.
 		for i := len(p.handlers) - 1; i >= 0; i-- {
 			if tag := p.handlers[i]; tag != req.Tag {
@@ -283,17 +289,13 @@ func (c *pointerCollector) inputOp(tag event.Tag, state *pointerHandler) {
 func (p *pointerFilter) Add(f event.Filter) {
 	switch f := f.(type) {
 	case transfer.SourceFilter:
-		for _, m := range p.sourceMimes {
-			if m == f.Type {
-				return
-			}
+		if slices.Contains(p.sourceMimes, f.Type) {
+			return
 		}
 		p.sourceMimes = append(p.sourceMimes, f.Type)
 	case transfer.TargetFilter:
-		for _, m := range p.targetMimes {
-			if m == f.Type {
-				return
-			}
+		if slices.Contains(p.targetMimes, f.Type) {
+			return
 		}
 		p.targetMimes = append(p.targetMimes, f.Type)
 	case transfer.URLFilter:
@@ -318,16 +320,12 @@ func (p *pointerFilter) Matches(e event.Event) bool {
 	case transfer.CancelEvent, transfer.InitiateEvent:
 		return len(p.sourceMimes) > 0 || len(p.targetMimes) > 0
 	case transfer.RequestEvent:
-		for _, t := range p.sourceMimes {
-			if t == e.Type {
-				return true
-			}
+		if slices.Contains(p.sourceMimes, e.Type) {
+			return true
 		}
 	case transfer.DataEvent:
-		for _, t := range p.targetMimes {
-			if t == e.Type {
-				return true
-			}
+		if slices.Contains(p.targetMimes, e.Type) {
+			return true
 		}
 	case transfer.URLEvent:
 		for _, t := range p.scheme {
@@ -429,7 +427,7 @@ func (q *pointerQueue) offerData(handlers map[event.Tag]*handler, state pointerS
 				},
 			}})
 		}
-		state.pointers = append([]pointerInfo{}, state.pointers...)
+		state.pointers = slices.Clone(state.pointers)
 		state.pointers[i], evts = q.deliverTransferCancelEvent(handlers, p, evts)
 		break
 	}
@@ -621,7 +619,7 @@ func (q *pointerQueue) reset() {
 	for k, ids := range q.semantic.contentIDs {
 		for i := len(ids) - 1; i >= 0; i-- {
 			if !ids[i].used {
-				ids = append(ids[:i], ids[i+1:]...)
+				ids = slices.Delete(ids, i, i+1)
 			} else {
 				ids[i].used = false
 			}
@@ -652,7 +650,7 @@ func (q *pointerQueue) Frame(handlers map[event.Tag]*handler, state pointerState
 		changed := false
 		p, evts, state.cursor, changed = q.deliverEnterLeaveEvents(handlers, state.cursor, p, evts, p.last)
 		if changed {
-			state.pointers = append([]pointerInfo{}, state.pointers...)
+			state.pointers = slices.Clone(state.pointers)
 			state.pointers[i] = p
 		}
 	}
@@ -788,19 +786,17 @@ func (q *pointerQueue) Push(handlers map[event.Tag]*handler, state pointerState,
 
 	if !p.pressed && len(p.entered) == 0 {
 		// No longer need to track pointer.
-		state.pointers = append(state.pointers[:pidx:pidx], state.pointers[pidx+1:]...)
+		state.pointers = slices.Concat(state.pointers[:pidx:pidx], state.pointers[pidx+1:])
 	} else {
-		state.pointers = append([]pointerInfo{}, state.pointers...)
+		state.pointers = slices.Clone(state.pointers)
 		state.pointers[pidx] = p
 	}
 	return state, evts
 }
 
 func (q *pointerQueue) deliverEvent(handlers map[event.Tag]*handler, p pointerInfo, evts []taggedEvent, e pointer.Event) []taggedEvent {
-	foremost := true
 	if p.pressed && len(p.handlers) == 1 {
 		e.Priority = pointer.Grabbed
-		foremost = false
 	}
 	scroll := e.Scroll
 	for _, k := range p.handlers {
@@ -819,10 +815,6 @@ func (q *pointerQueue) deliverEvent(handlers map[event.Tag]*handler, p pointerIn
 			scroll, e.Scroll = f.clampScroll(scroll)
 		}
 		e := e
-		if foremost {
-			foremost = false
-			e.Priority = pointer.Foremost
-		}
 		e.Position = q.invTransform(h.pointer.areaPlusOne-1, e.Position)
 		evts = append(evts, taggedEvent{event: e, tag: k})
 	}
@@ -986,10 +978,8 @@ func searchTag(tags []event.Tag, tag event.Tag) (int, bool) {
 
 // addHandler adds tag to the slice if not present.
 func addHandler(tags []event.Tag, tag event.Tag) []event.Tag {
-	for _, t := range tags {
-		if t == tag {
-			return tags
-		}
+	if slices.Contains(tags, tag) {
+		return tags
 	}
 	return append(tags, tag)
 }
@@ -997,10 +987,8 @@ func addHandler(tags []event.Tag, tag event.Tag) []event.Tag {
 // firstMimeMatch returns the first type match between src and tgt.
 func firstMimeMatch(src, tgt *pointerFilter) (first string, matched bool) {
 	for _, m1 := range tgt.targetMimes {
-		for _, m2 := range src.sourceMimes {
-			if m1 == m2 {
-				return m1, true
-			}
+		if slices.Contains(src.sourceMimes, m1) {
+			return m1, true
 		}
 	}
 	return "", false

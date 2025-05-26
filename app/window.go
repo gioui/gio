@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"reflect"
 	"runtime"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -41,7 +41,8 @@ type Option func(unit.Metric, *Config)
 //
 // More than one Window is not supported on iOS, Android, WebAssembly.
 type Window struct {
-	initialOpts []Option
+	initialOpts    []Option
+	initialActions []system.Action
 
 	ctx context
 	gpu gpu.GPU
@@ -88,8 +89,14 @@ type Window struct {
 	}
 	imeState editorState
 	driver   driver
-	// basic is the driver interface that is needed even after the window is gone.
-	basic basicDriver
+	// gpuErr tracks the GPU error that is to be reported when
+	// the window is closed.
+	gpuErr error
+
+	// invMu protects mayInvalidate.
+	invMu         sync.Mutex
+	mayInvalidate bool
+
 	// coalesced tracks the most recent events waiting to be delivered
 	// to the client.
 	coalesced eventSummary
@@ -103,11 +110,12 @@ type Window struct {
 }
 
 type eventSummary struct {
-	wakeup  bool
-	cfg     *ConfigEvent
-	view    *ViewEvent
-	frame   *frameEvent
-	destroy *DestroyEvent
+	wakeup       bool
+	cfg          *ConfigEvent
+	view         *ViewEvent
+	frame        *frameEvent
+	framePending bool
+	destroy      *DestroyEvent
 }
 
 type callbacks struct {
@@ -214,6 +222,7 @@ func (w *Window) frame(frame *op.Ops, viewport image.Point) error {
 }
 
 func (w *Window) processFrame(frame *op.Ops, ack chan<- struct{}) {
+	w.coalesced.framePending = false
 	wrapper := &w.decorations.Ops
 	off := op.Offset(w.lastFrame.off).Push(wrapper)
 	ops.AddCall(&wrapper.Internal, &frame.Internal, ops.PC{}, ops.PCFor(&frame.Internal))
@@ -221,7 +230,8 @@ func (w *Window) processFrame(frame *op.Ops, ack chan<- struct{}) {
 	w.lastFrame.deco.Add(wrapper)
 	if err := w.validateAndProcess(w.lastFrame.size, w.lastFrame.sync, wrapper, ack); err != nil {
 		w.destroyGPU()
-		w.driver.ProcessEvent(DestroyEvent{Err: err})
+		w.gpuErr = err
+		w.driver.Perform(system.ActionClose)
 		return
 	}
 	w.updateState()
@@ -271,8 +281,11 @@ func (w *Window) updateState() {
 //
 // Invalidate is safe for concurrent use.
 func (w *Window) Invalidate() {
-	if w.basic != nil {
-		w.basic.Invalidate()
+	w.invMu.Lock()
+	defer w.invMu.Unlock()
+	if w.mayInvalidate {
+		w.mayInvalidate = false
+		w.driver.Invalidate()
 	}
 }
 
@@ -282,7 +295,7 @@ func (w *Window) Option(opts ...Option) {
 	if len(opts) == 0 {
 		return
 	}
-	if w.basic == nil {
+	if w.driver == nil {
 		w.initialOpts = append(w.initialOpts, opts...)
 		return
 	}
@@ -374,11 +387,13 @@ func (w *Window) setNextFrame(at time.Time) {
 	}
 }
 
-func (c *callbacks) SetDriver(d basicDriver) {
-	c.w.basic = d
-	if d, ok := d.(driver); ok {
-		c.w.driver = d
+func (c *callbacks) SetDriver(d driver) {
+	if d == nil {
+		panic("nil driver")
 	}
+	c.w.invMu.Lock()
+	defer c.w.invMu.Unlock()
+	c.w.driver = d
 }
 
 func (c *callbacks) ProcessFrame(frame *op.Ops, ack chan<- struct{}) {
@@ -426,10 +441,7 @@ func (c *callbacks) SetComposingRegion(r key.Range) {
 func (c *callbacks) EditorInsert(text string) {
 	sel := c.w.imeState.Selection.Range
 	c.EditorReplace(sel, text)
-	start := sel.Start
-	if sel.End < start {
-		start = sel.End
-	}
+	start := min(sel.End, sel.Start)
 	sel.Start = start + utf8.RuneCountInString(text)
 	sel.End = sel.Start
 	c.SetEditorSelection(sel)
@@ -545,10 +557,20 @@ func (c *callbacks) Invalidate() {
 }
 
 func (c *callbacks) nextEvent() (event.Event, bool) {
-	s := &c.w.coalesced
-	// Every event counts as a wakeup.
-	defer func() { s.wakeup = false }()
+	return c.w.nextEvent()
+}
+
+func (w *Window) nextEvent() (event.Event, bool) {
+	s := &w.coalesced
+	defer func() {
+		// Every event counts as a wakeup.
+		s.wakeup = false
+	}()
 	switch {
+	case s.framePending:
+		// If the user didn't call FrameEvent.Event, process
+		// an empty frame.
+		w.processFrame(new(op.Ops), nil)
 	case s.view != nil:
 		e := *s.view
 		s.view = nil
@@ -565,10 +587,14 @@ func (c *callbacks) nextEvent() (event.Event, bool) {
 	case s.frame != nil:
 		e := *s.frame
 		s.frame = nil
+		s.framePending = true
 		return e.FrameEvent, true
 	case s.wakeup:
 		return wakeupEvent{}, true
 	}
+	w.invMu.Lock()
+	defer w.invMu.Unlock()
+	w.mayInvalidate = w.driver != nil
 	return nil, false
 }
 
@@ -611,15 +637,21 @@ func (w *Window) processEvent(e event.Event) bool {
 		e2.Size = e2.Size.Sub(offset)
 		w.coalesced.frame = &e2
 	case DestroyEvent:
+		if w.gpuErr != nil {
+			e2.Err = w.gpuErr
+		}
 		w.destroyGPU()
+		w.invMu.Lock()
+		w.mayInvalidate = false
 		w.driver = nil
+		w.invMu.Unlock()
 		if q := w.timer.quit; q != nil {
 			q <- struct{}{}
 			<-q
 		}
 		w.coalesced.destroy = &e2
 	case ViewEvent:
-		if reflect.ValueOf(e2).IsZero() && w.gpu != nil {
+		if !e2.Valid() && w.gpu != nil {
 			w.ctx.Lock()
 			w.gpu.Release()
 			w.gpu = nil
@@ -627,6 +659,7 @@ func (w *Window) processEvent(e event.Event) bool {
 		}
 		w.coalesced.view = &e2
 	case ConfigEvent:
+		w.decorations.Decorations.Maximized = e2.Config.Mode == Maximized
 		wasFocused := w.decorations.Config.Focused
 		w.decorations.Config = e2.Config
 		e2.Config = w.effectiveConfig()
@@ -683,10 +716,17 @@ func (w *Window) processEvent(e event.Event) bool {
 // [FrameEvent], or until [Invalidate] is called. The window is created
 // and shown the first time Event is called.
 func (w *Window) Event() event.Event {
-	if w.basic == nil {
+	if w.driver == nil {
 		w.init()
 	}
-	return w.basic.Event()
+	if w.driver == nil {
+		e, ok := w.nextEvent()
+		if !ok {
+			panic("window initialization failed without a DestroyEvent")
+		}
+		return e
+	}
+	return w.driver.Event()
 }
 
 func (w *Window) init() {
@@ -724,6 +764,10 @@ func (w *Window) init() {
 	w.imeState.compose = key.Range{Start: -1, End: -1}
 	w.semantic.ids = make(map[input.SemanticID]input.SemanticNode)
 	newWindow(&callbacks{w}, options)
+	for _, acts := range w.initialActions {
+		w.Perform(acts)
+	}
+	w.initialActions = nil
 }
 
 func (w *Window) updateCursor() {
@@ -761,7 +805,6 @@ func (w *Window) decorate(e FrameEvent, o *op.Ops) image.Point {
 	default:
 		panic(fmt.Errorf("unknown WindowMode %v", m))
 	}
-	deco.Perform(actions)
 	gtx := layout.Context{
 		Ops:         o,
 		Now:         e.Now,
@@ -821,6 +864,10 @@ func (w *Window) Perform(actions system.Action) {
 	opts, acts := splitActions(actions)
 	w.Option(opts...)
 	if acts == 0 {
+		return
+	}
+	if w.driver == nil {
+		w.initialActions = append(w.initialActions, acts)
 		return
 	}
 	w.Run(func() {

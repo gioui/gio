@@ -152,9 +152,7 @@ func newDirect3D11Device(api driver.Direct3D11) (driver.Device, error) {
 }
 
 func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport image.Point) driver.Texture {
-	var (
-		renderTarget *d3d11.RenderTargetView
-	)
+	var renderTarget *d3d11.RenderTargetView
 	if target != nil {
 		switch t := target.(type) {
 		case driver.Direct3D11RenderTarget:
@@ -229,10 +227,7 @@ func (b *Backend) NewTexture(format driver.TextureFormat, width, height int, min
 		// Flags required by ID3D11DeviceContext::GenerateMips.
 		bindFlags |= d3d11.BIND_SHADER_RESOURCE | d3d11.BIND_RENDER_TARGET
 		miscFlags |= d3d11.RESOURCE_MISC_GENERATE_MIPS
-		dim := width
-		if height > dim {
-			dim = height
-		}
+		dim := max(height, width)
 		log2 := 32 - bits.LeadingZeros32(uint32(dim)) - 1
 		nmipmaps = log2 + 1
 	}
@@ -802,7 +797,7 @@ func (t *Texture) ReadPixels(src image.Rectangle, pixels []byte, stride int) err
 	mapSize := dstPitch * h
 	data := sliceOf(resMap.PData, mapSize)
 	width := w * 4
-	for r := 0; r < h; r++ {
+	for r := range h {
 		pixels := pixels[r*srcPitch:]
 		copy(pixels[:width], data[r*dstPitch:])
 	}

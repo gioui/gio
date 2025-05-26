@@ -26,6 +26,7 @@ package app
 
 */
 import "C"
+
 import (
 	"errors"
 	"fmt"
@@ -113,9 +114,6 @@ type x11Window struct {
 	wakeups chan struct{}
 	handler x11EventHandler
 	buf     [100]byte
-
-	// invMy avoids the race between destroy and Invalidate.
-	invMu sync.Mutex
 }
 
 var (
@@ -416,11 +414,6 @@ func (w *x11Window) Invalidate() {
 	case w.wakeups <- struct{}{}:
 	default:
 	}
-	w.invMu.Lock()
-	defer w.invMu.Unlock()
-	if w.x == nil {
-		return
-	}
 	if _, err := syscall.Write(w.notify.write, x11OneByte); err != nil && err != syscall.EAGAIN {
 		panic(fmt.Errorf("failed to write to pipe: %v", err))
 	}
@@ -509,8 +502,6 @@ func (w *x11Window) dispatch() {
 }
 
 func (w *x11Window) destroy() {
-	w.invMu.Lock()
-	defer w.invMu.Unlock()
 	if w.notify.write != 0 {
 		syscall.Close(w.notify.write)
 		w.notify.write = 0
@@ -761,9 +752,7 @@ func (h *x11EventHandler) handleEvents() bool {
 	return redraw
 }
 
-var (
-	x11Threads sync.Once
-)
+var x11Threads sync.Once
 
 func init() {
 	x11Driver = newX11Window

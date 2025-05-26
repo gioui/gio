@@ -42,9 +42,8 @@ func (c Context) Sp(v unit.Sp) int {
 	return c.Metric.Sp(v)
 }
 
-// Disabled returns a copy of this context with a disabled Source,
-// blocking widgets from changing its state and receiving events.
+// Disabled returns a copy of this context that don't deliver any events.
 func (c Context) Disabled() Context {
-	c.Source = input.Source{}
+	c.Source = c.Source.Disabled()
 	return c
 }

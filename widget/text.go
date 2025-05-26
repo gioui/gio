@@ -5,6 +5,7 @@ import (
 	"image"
 	"io"
 	"math"
+	"slices"
 	"sort"
 	"unicode"
 	"unicode/utf8"
@@ -17,7 +18,6 @@ import (
 	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
-	"golang.org/x/exp/slices"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -61,6 +61,9 @@ type textView struct {
 	Truncator string
 	// WrapPolicy configures how displayed text will be broken into lines.
 	WrapPolicy text.WrapPolicy
+	// DisableSpaceTrim configures whether trailing whitespace on a line will have its
+	// width zeroed. Set to true for editors, but false for non-editable text.
+	DisableSpaceTrim bool
 	// Mask replaces the visual display of each rune in the contents with the given rune.
 	// Newline characters are not masked. When non-zero, the unmasked contents
 	// are accessed by Len, Text, and SetText.
@@ -283,6 +286,10 @@ func (e *textView) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, s
 	}
 	if e.LineHeightScale != e.params.LineHeightScale {
 		e.params.LineHeightScale = e.LineHeightScale
+		e.invalidate()
+	}
+	if e.DisableSpaceTrim != e.params.DisableSpaceTrim {
+		e.params.DisableSpaceTrim = e.DisableSpaceTrim
 		e.invalidate()
 	}
 
@@ -710,7 +717,7 @@ func (e *textView) MoveWord(distance int, selAct selectionAction) {
 		}
 		return r
 	}
-	for ii := 0; ii < words; ii++ {
+	for range words {
 		for r := next(); unicode.IsSpace(r) && !atEnd(); r = next() {
 			e.MoveCaret(direction, 0)
 			caret = e.closestToRune(e.caret.start)

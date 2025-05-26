@@ -9,15 +9,14 @@ import (
 	"io"
 	"log"
 	"os"
+	"slices"
 
 	"github.com/go-text/typesetting/di"
 	"github.com/go-text/typesetting/font"
+	gotextot "github.com/go-text/typesetting/font/opentype"
 	"github.com/go-text/typesetting/fontscan"
 	"github.com/go-text/typesetting/language"
-	"github.com/go-text/typesetting/opentype/api"
-	"github.com/go-text/typesetting/opentype/api/metadata"
 	"github.com/go-text/typesetting/shaping"
-	"golang.org/x/exp/slices"
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/text/unicode/bidi"
 
@@ -201,7 +200,7 @@ type runLayout struct {
 	// Direction is the layout direction of the glyphs.
 	Direction system.TextDirection
 	// face is the font face that the ID of each Glyph in the Layout refers to.
-	face font.Face
+	face *font.Face
 	// truncator indicates that this run is a text truncator standing in for remaining
 	// text.
 	truncator bool
@@ -211,8 +210,8 @@ type runLayout struct {
 type shaperImpl struct {
 	// Fields for tracking fonts/faces.
 	fontMap      *fontscan.FontMap
-	faces        []font.Face
-	faceToIndex  map[font.Font]int
+	faces        []*font.Face
+	faceToIndex  map[*font.Font]int
 	faceMeta     []giofont.Font
 	defaultFaces []string
 	logger       interface {
@@ -254,7 +253,7 @@ func newShaperImpl(systemFonts bool, collection []FontFace) *shaperImpl {
 	var shaper shaperImpl
 	shaper.logger = newDebugLogger()
 	shaper.fontMap = fontscan.NewFontMap(shaper.logger)
-	shaper.faceToIndex = make(map[font.Font]int)
+	shaper.faceToIndex = make(map[*font.Font]int)
 	if systemFonts {
 		str, err := os.UserCacheDir()
 		if err != nil {
@@ -282,7 +281,7 @@ func (s *shaperImpl) Load(f FontFace) {
 	s.addFace(f.Face.Face(), f.Font)
 }
 
-func (s *shaperImpl) addFace(f font.Face, md giofont.Font) {
+func (s *shaperImpl) addFace(f *font.Face, md giofont.Font) {
 	if _, ok := s.faceToIndex[f.Font]; ok {
 		return
 	}
@@ -357,7 +356,7 @@ func (s *shaperImpl) splitBidi(input shaping.Input) []shaping.Input {
 	if err != nil {
 		return []shaping.Input{input}
 	}
-	for i := 0; i < out.NumRuns(); i++ {
+	for i := range out.NumRuns() {
 		currentInput := input
 		run := out.Run(i)
 		dir := run.Direction()
@@ -377,11 +376,11 @@ func (s *shaperImpl) splitBidi(input shaping.Input) []shaping.Input {
 // ResolveFace allows shaperImpl to implement shaping.FontMap, wrapping its fontMap
 // field and ensuring that any faces loaded as part of the search are registered with
 // ids so that they can be referred to by a GlyphID.
-func (s *shaperImpl) ResolveFace(r rune) font.Face {
+func (s *shaperImpl) ResolveFace(r rune) *font.Face {
 	face := s.fontMap.ResolveFace(r)
 	if face != nil {
 		family, aspect := s.fontMap.FontMetadata(face.Font)
-		md := opentype.DescriptionToFont(metadata.Description{
+		md := opentype.DescriptionToFont(font.Description{
 			Family: family,
 			Aspect: aspect,
 		})
@@ -491,9 +490,11 @@ func wrapPolicyToGoText(p WrapPolicy) shaping.LineBreakPolicy {
 // shapeAndWrapText invokes the text shaper and returns wrapped lines in the shaper's native format.
 func (s *shaperImpl) shapeAndWrapText(params Parameters, txt []rune) (_ []shaping.Line, truncated int) {
 	wc := shaping.WrapConfig{
-		TruncateAfterLines: params.MaxLines,
-		TextContinues:      params.forceTruncate,
-		BreakPolicy:        wrapPolicyToGoText(params.WrapPolicy),
+		Direction:                     mapDirection(params.Locale.Direction),
+		TruncateAfterLines:            params.MaxLines,
+		TextContinues:                 params.forceTruncate,
+		BreakPolicy:                   wrapPolicyToGoText(params.WrapPolicy),
+		DisableTrailingWhitespaceTrim: params.DisableSpaceTrim,
 	}
 	families := s.defaultFaces
 	if params.Font.Typeface != "" {
@@ -663,7 +664,7 @@ func (s *shaperImpl) Shape(pathOps *op.Ops, gs []Glyph) clip.PathSpec {
 		scaleFactor := fixedToFloat(ppem) / float32(face.Upem())
 		glyphData := face.GlyphData(gid)
 		switch glyphData := glyphData.(type) {
-		case api.GlyphOutline:
+		case font.GlyphOutline:
 			outline := glyphData
 			// Move to glyph position.
 			pos := f32.Point{
@@ -678,13 +679,13 @@ func (s *shaperImpl) Shape(pathOps *op.Ops, gs []Glyph) clip.PathSpec {
 			for _, fseg := range outline.Segments {
 				nargs := 1
 				switch fseg.Op {
-				case api.SegmentOpQuadTo:
+				case gotextot.SegmentOpQuadTo:
 					nargs = 2
-				case api.SegmentOpCubeTo:
+				case gotextot.SegmentOpCubeTo:
 					nargs = 3
 				}
 				var args [3]f32.Point
-				for i := 0; i < nargs; i++ {
+				for i := range nargs {
 					a := f32.Point{
 						X: fseg.Args[i].X * scaleFactor,
 						Y: -fseg.Args[i].Y * scaleFactor,
@@ -695,13 +696,13 @@ func (s *shaperImpl) Shape(pathOps *op.Ops, gs []Glyph) clip.PathSpec {
 					}
 				}
 				switch fseg.Op {
-				case api.SegmentOpMoveTo:
+				case gotextot.SegmentOpMoveTo:
 					builder.Move(args[0])
-				case api.SegmentOpLineTo:
+				case gotextot.SegmentOpLineTo:
 					builder.Line(args[0])
-				case api.SegmentOpQuadTo:
+				case gotextot.SegmentOpQuadTo:
 					builder.Quad(args[0], args[1])
-				case api.SegmentOpCubeTo:
+				case gotextot.SegmentOpCubeTo:
 					builder.Cube(args[0], args[1], args[2])
 				default:
 					panic("unsupported segment op")
@@ -742,16 +743,16 @@ func (s *shaperImpl) Bitmaps(ops *op.Ops, gs []Glyph) op.CallOp {
 		}
 		glyphData := face.GlyphData(gid)
 		switch glyphData := glyphData.(type) {
-		case api.GlyphBitmap:
+		case font.GlyphBitmap:
 			var imgOp paint.ImageOp
 			var imgSize image.Point
 			bitmapData, ok := s.bitmapGlyphCache.Get(g.ID)
 			if !ok {
 				var img image.Image
 				switch glyphData.Format {
-				case api.PNG, api.JPG, api.TIFF:
+				case font.PNG, font.JPG, font.TIFF:
 					img, _, _ = image.Decode(bytes.NewReader(glyphData.Data))
-				case api.BlackAndWhite:
+				case font.BlackAndWhite:
 					// This is a complex family of uncompressed bitmaps that don't seem to be
 					// very common in practice. We can try adding support later if needed.
 					fallthrough
@@ -807,7 +808,7 @@ type langConfig struct {
 }
 
 // toInput converts its parameters into a shaping.Input.
-func toInput(face font.Face, ppem fixed.Int26_6, lc langConfig, runes []rune) shaping.Input {
+func toInput(face *font.Face, ppem fixed.Int26_6, lc langConfig, runes []rune) shaping.Input {
 	var input shaping.Input
 	input.Direction = lc.Direction
 	input.Text = runes
@@ -867,13 +868,14 @@ func toGioGlyphs(in []shaping.Glyph, ppem fixed.Int26_6, faceIdx int) []glyph {
 }
 
 // toLine converts the output into a Line with the provided dominant text direction.
-func toLine(faceToIndex map[font.Font]int, o shaping.Line, dir system.TextDirection) line {
+func toLine(faceToIndex map[*font.Font]int, o shaping.Line, dir system.TextDirection) line {
 	if len(o) < 1 {
 		return line{}
 	}
 	line := line{
-		runs:      make([]runLayout, len(o)),
-		direction: dir,
+		runs:        make([]runLayout, len(o)),
+		direction:   dir,
+		visualOrder: make([]int, len(o)),
 	}
 	maxSize := fixed.Int26_6(0)
 	for i := range o {
@@ -881,7 +883,7 @@ func toLine(faceToIndex map[font.Font]int, o shaping.Line, dir system.TextDirect
 		if run.Size > maxSize {
 			maxSize = run.Size
 		}
-		var font font.Font
+		var font *font.Font
 		if run.Face != nil {
 			font = run.Face.Font
 		}
@@ -891,11 +893,13 @@ func toLine(faceToIndex map[font.Font]int, o shaping.Line, dir system.TextDirect
 				Count:  run.Runes.Count,
 				Offset: line.runeCount,
 			},
-			Direction: unmapDirection(run.Direction),
-			face:      run.Face,
-			Advance:   run.Advance,
-			PPEM:      run.Size,
+			Direction:      unmapDirection(run.Direction),
+			face:           run.Face,
+			Advance:        run.Advance,
+			PPEM:           run.Size,
+			VisualPosition: int(run.VisualIndex),
 		}
+		line.visualOrder[run.VisualIndex] = i
 		line.runeCount += run.Runes.Count
 		line.width += run.Advance
 		if line.ascent < run.LineBounds.Ascent {
@@ -906,64 +910,11 @@ func toLine(faceToIndex map[font.Font]int, o shaping.Line, dir system.TextDirect
 		}
 	}
 	line.lineHeight = maxSize
-	computeVisualOrder(&line)
-	return line
-}
-
-// computeVisualOrder will populate the Line's VisualOrder field and the
-// VisualPosition field of each element in Runs.
-func computeVisualOrder(l *line) {
-	l.visualOrder = make([]int, len(l.runs))
-	const none = -1
-	bidiRangeStart := none
-
-	// visPos returns the visual position for an individual logically-indexed
-	// run in this line, taking only the line's overall text direction into
-	// account.
-	visPos := func(logicalIndex int) int {
-		if l.direction.Progression() == system.TowardOrigin {
-			return len(l.runs) - 1 - logicalIndex
-		}
-		return logicalIndex
-	}
-
-	// resolveBidi populated the line's VisualOrder fields for the elements in the
-	// half-open range [bidiRangeStart:bidiRangeEnd) indicating that those elements
-	// should be displayed in reverse-visual order.
-	resolveBidi := func(bidiRangeStart, bidiRangeEnd int) {
-		firstVisual := bidiRangeEnd - 1
-		// Just found the end of a bidi range.
-		for startIdx := bidiRangeStart; startIdx < bidiRangeEnd; startIdx++ {
-			pos := visPos(firstVisual)
-			l.runs[startIdx].VisualPosition = pos
-			l.visualOrder[pos] = startIdx
-			firstVisual--
-		}
-		bidiRangeStart = none
-	}
-	for runIdx, run := range l.runs {
-		if run.Direction.Progression() != l.direction.Progression() {
-			if bidiRangeStart == none {
-				bidiRangeStart = runIdx
-			}
-			continue
-		} else if bidiRangeStart != none {
-			// Just found the end of a bidi range.
-			resolveBidi(bidiRangeStart, runIdx)
-			bidiRangeStart = none
-		}
-		pos := visPos(runIdx)
-		l.runs[runIdx].VisualPosition = pos
-		l.visualOrder[pos] = runIdx
-	}
-	if bidiRangeStart != none {
-		// We ended iteration within a bidi segment, resolve it.
-		resolveBidi(bidiRangeStart, len(l.runs))
-	}
 	// Iterate and resolve the X of each run.
 	x := fixed.Int26_6(0)
-	for _, runIdx := range l.visualOrder {
-		l.runs[runIdx].X = x
-		x += l.runs[runIdx].Advance
+	for _, runIdx := range line.visualOrder {
+		line.runs[runIdx].X = x
+		x += line.runs[runIdx].Advance
 	}
+	return line
 }

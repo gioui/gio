@@ -18,7 +18,7 @@ type Ops struct {
 	// data contains the serialized operations.
 	data []byte
 	// refs hold external references for operations.
-	refs []interface{}
+	refs []any
 	// stringRefs provides space for string references, pointers to which will
 	// be stored in refs. Storing a string directly in refs would cause a heap
 	// allocation, to store the string header in an interface value. The backing
@@ -256,7 +256,7 @@ func PopOp(o *Ops, kind StackKind, sid StackID, macroID uint32) {
 	o.stacks[kind].pop(sid)
 }
 
-func Write1(o *Ops, n int, ref1 interface{}) []byte {
+func Write1(o *Ops, n int, ref1 any) []byte {
 	o.data = append(o.data, make([]byte, n)...)
 	o.refs = append(o.refs, ref1)
 	return o.data[len(o.data)-n:]
@@ -269,20 +269,20 @@ func Write1String(o *Ops, n int, ref1 string) []byte {
 	return o.data[len(o.data)-n:]
 }
 
-func Write2(o *Ops, n int, ref1, ref2 interface{}) []byte {
+func Write2(o *Ops, n int, ref1, ref2 any) []byte {
 	o.data = append(o.data, make([]byte, n)...)
 	o.refs = append(o.refs, ref1, ref2)
 	return o.data[len(o.data)-n:]
 }
 
-func Write2String(o *Ops, n int, ref1 interface{}, ref2 string) []byte {
+func Write2String(o *Ops, n int, ref1 any, ref2 string) []byte {
 	o.data = append(o.data, make([]byte, n)...)
 	o.stringRefs = append(o.stringRefs, ref2)
 	o.refs = append(o.refs, ref1, &o.stringRefs[len(o.stringRefs)-1])
 	return o.data[len(o.data)-n:]
 }
 
-func Write3(o *Ops, n int, ref1, ref2, ref3 interface{}) []byte {
+func Write3(o *Ops, n int, ref1, ref2, ref3 any) []byte {
 	o.data = append(o.data, make([]byte, n)...)
 	o.refs = append(o.refs, ref1, ref2, ref3)
 	return o.data[len(o.data)-n:]

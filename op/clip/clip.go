@@ -275,7 +275,7 @@ func (p *Path) QuadTo(ctrl, to f32.Point) {
 // negative clockwise.
 func (p *Path) ArcTo(f1, f2 f32.Point, angle float32) {
 	m, segments := stroke.ArcTransform(p.pen, f1, f2, angle)
-	for i := 0; i < segments; i++ {
+	for range segments {
 		p0 := p.pen
 		p1 := m.Transform(p0)
 		p2 := m.Transform(p1)

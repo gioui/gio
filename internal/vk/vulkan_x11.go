@@ -17,6 +17,7 @@ static VkResult vkCreateXlibSurfaceKHR(PFN_vkCreateXlibSurfaceKHR f, VkInstance 
 }
 */
 import "C"
+
 import (
 	"fmt"
 	"unsafe"

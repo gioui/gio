@@ -52,7 +52,7 @@ func BenchmarkSplitCubic(b *testing.B) {
 			from, ctrl0, ctrl1, to := s.from, s.ctrl0, s.ctrl1, s.to
 			quads := make([]QuadSegment, s.segments)
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				quads = SplitCubic(from, ctrl0, ctrl1, to, quads[:0])
 			}
 			if len(quads) != s.segments {

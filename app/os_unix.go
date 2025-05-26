@@ -9,7 +9,6 @@ import (
 	"errors"
 	"unsafe"
 
-	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 )
 
@@ -22,6 +21,9 @@ type X11ViewEvent struct {
 
 func (X11ViewEvent) implementsViewEvent() {}
 func (X11ViewEvent) ImplementsEvent()     {}
+func (x X11ViewEvent) Valid() bool {
+	return x != (X11ViewEvent{})
+}
 
 type WaylandViewEvent struct {
 	// Display is the *wl_display returned by wl_display_connect.
@@ -32,6 +34,9 @@ type WaylandViewEvent struct {
 
 func (WaylandViewEvent) implementsViewEvent() {}
 func (WaylandViewEvent) ImplementsEvent()     {}
+func (w WaylandViewEvent) Valid() bool {
+	return w != (WaylandViewEvent{})
+}
 
 func osMain() {
 	select {}
@@ -57,33 +62,10 @@ func newWindow(window *callbacks, options []Option) {
 			errFirst = err
 		}
 	}
-	window.SetDriver(&dummyDriver{
-		win:     window,
-		wakeups: make(chan event.Event, 1),
-	})
 	if errFirst == nil {
 		errFirst = errors.New("app: no window driver available")
 	}
 	window.ProcessEvent(DestroyEvent{Err: errFirst})
-}
-
-type dummyDriver struct {
-	win     *callbacks
-	wakeups chan event.Event
-}
-
-func (d *dummyDriver) Event() event.Event {
-	if e, ok := d.win.nextEvent(); ok {
-		return e
-	}
-	return <-d.wakeups
-}
-
-func (d *dummyDriver) Invalidate() {
-	select {
-	case d.wakeups <- wakeupEvent{}:
-	default:
-	}
 }
 
 // xCursor contains mapping from pointer.Cursor to XCursor.

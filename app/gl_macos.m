@@ -7,7 +7,7 @@
 #include <OpenGL/OpenGL.h>
 #include "_cgo_export.h"
 
-CALayer *gio_layerFactory(void) {
+CALayer *gio_layerFactory(BOOL presentWithTrans) {
 	@autoreleasepool {
 		return [CALayer layer];
 	}

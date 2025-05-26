@@ -76,6 +76,11 @@ type Parameters struct {
 	// text with a MaxLines. It is unexported because this behavior only makes sense for the
 	// shaper to control when it iterates paragraphs of text.
 	forceTruncate bool
+
+	// DisableSpaceTrim prevents the width of the final whitespace glyph on a line from being zeroed.
+	// This is desirable for text editors (so that the whitespace can be selected), but is undesirable
+	// for ordinary display text.
+	DisableSpaceTrim bool
 }
 
 type FontFace = giofont.FontFace
@@ -199,7 +204,15 @@ func (f Flags) String() string {
 
 type GlyphID uint64
 
-// Shaper converts strings of text into glyphs that can be displayed.
+// Shaper converts strings of text into glyphs that can be displayed. The same
+// Shaper should not be used in different goroutines.
+//
+// The Shaper controls text layout and has a cache, implemented as a map, and
+// so laying out text in two different goroutines can easily result in
+// concurrent access to said map, resulting in a panic.
+//
+// Practically speaking, this means you should use different Shapers for
+// different top-level windows.
 type Shaper struct {
 	config struct {
 		disableSystemFonts bool
@@ -531,7 +544,7 @@ func (l *Shaper) NextGlyph() (_ Glyph, ok bool) {
 				// of a valid cursor position they can use for "after" such a newline,
 				// taking text alignment into account.
 				l.pararagraphStart.X = l.txt.alignment.Align(line.direction, 0, l.txt.alignWidth)
-				l.pararagraphStart.Y = glyph.Y + int32((glyph.Ascent + glyph.Descent).Ceil())
+				l.pararagraphStart.Y = glyph.Y + int32(line.lineHeight.Round())
 			}
 		}
 		return glyph, true

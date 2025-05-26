@@ -24,7 +24,6 @@ func TestTransformMacro(t *testing.T) {
 	c := constSqPath()
 
 	run(t, func(o *op.Ops) {
-
 		// render the first Stacked item
 		m1 := op.Record(o)
 		dr := image.Rect(0, 0, 128, 50)
@@ -124,8 +123,7 @@ func TestDeferredPaint(t *testing.T) {
 		defer clip.Rect(image.Rect(0, 0, 80, 80)).Op().Push(o).Pop()
 		paint.ColorOp{Color: color.NRGBA{A: 0x60, B: 0xff}}.Add(o)
 		paint.PaintOp{}.Add(o)
-	}, func(r result) {
-	})
+	}, nil)
 }
 
 func constSqPath() clip.Op {
@@ -143,8 +141,10 @@ func constSqPath() clip.Op {
 
 func constSqCirc() clip.Op {
 	innerOps := new(op.Ops)
-	return clip.RRect{Rect: image.Rect(0, 0, 40, 40),
-		NW: 20, NE: 20, SW: 20, SE: 20}.Op(innerOps)
+	return clip.RRect{
+		Rect: image.Rect(0, 0, 40, 40),
+		NW:   20, NE: 20, SW: 20, SE: 20,
+	}.Op(innerOps)
 }
 
 func drawChild(ops *op.Ops, text clip.Op) op.CallOp {
@@ -323,7 +323,7 @@ func TestLinearGradientAngled(t *testing.T) {
 		cl = clip.Rect(image.Rect(0, 64, 64, 128)).Push(ops)
 		paint.PaintOp{}.Add(ops)
 		cl.Pop()
-	}, func(r result) {})
+	}, nil)
 }
 
 func TestZeroImage(t *testing.T) {
@@ -492,8 +492,7 @@ func TestOpacity(t *testing.T) {
 		opc3 := paint.PushOpacity(ops, .6)
 		paint.FillShape(ops, color.NRGBA{B: 255, A: 255}, clip.Ellipse(image.Rectangle{Min: image.Pt(20+20, 10), Max: image.Pt(50+64, 128)}).Op(ops))
 		opc3.Pop()
-	}, func(r result) {
-	})
+	}, nil)
 }
 
 // lerp calculates linear interpolation with color b and p.

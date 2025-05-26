@@ -150,7 +150,7 @@ func newCoverer(ctx driver.Device) *coverer {
 	c.texUniforms = new(coverTexUniforms)
 	c.linearGradientUniforms = new(coverLinearGradientUniforms)
 	pipelines, err := createColorPrograms(ctx, gio.Shader_cover_vert, gio.Shader_cover_frag,
-		[3]interface{}{c.colUniforms, c.linearGradientUniforms, c.texUniforms},
+		[3]any{c.colUniforms, c.linearGradientUniforms, c.texUniforms},
 	)
 	if err != nil {
 		panic(err)
@@ -162,7 +162,7 @@ func newCoverer(ctx driver.Device) *coverer {
 func newStenciler(ctx driver.Device) *stenciler {
 	// Allocate a suitably large index buffer for drawing paths.
 	indices := make([]uint16, pathBatchSize*6)
-	for i := 0; i < pathBatchSize; i++ {
+	for i := range pathBatchSize {
 		i := uint16(i)
 		indices[i*6+0] = i*4 + 0
 		indices[i*6+1] = i*4 + 1

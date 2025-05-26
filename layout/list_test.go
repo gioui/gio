@@ -88,7 +88,8 @@ func TestListPosition(t *testing.T) {
 		{label: "1 visible 0 hidden", num: 1, count: 1, last: 10},
 		{label: "2 visible 0 hidden", num: 2, count: 2},
 		{label: "2 visible 1 hidden", num: 3, count: 2},
-		{label: "3 visible 0 hidden small scroll", num: 3, count: 3, offset: 5, last: -5,
+		{
+			label: "3 visible 0 hidden small scroll", num: 3, count: 3, offset: 5, last: -5,
 			scroll: _s(
 				pointer.Event{
 					Source:   pointer.Mouse,
@@ -107,8 +108,10 @@ func TestListPosition(t *testing.T) {
 					Kind:     pointer.Release,
 					Position: f32.Pt(5, 0),
 				},
-			)},
-		{label: "3 visible 0 hidden small scroll 2", num: 3, count: 3, offset: 3, last: -7,
+			),
+		},
+		{
+			label: "3 visible 0 hidden small scroll 2", num: 3, count: 3, offset: 3, last: -7,
 			scroll: _s(
 				pointer.Event{
 					Source:   pointer.Mouse,
@@ -127,8 +130,10 @@ func TestListPosition(t *testing.T) {
 					Kind:     pointer.Release,
 					Position: f32.Pt(5, 0),
 				},
-			)},
-		{label: "2 visible 1 hidden large scroll", num: 3, count: 2, first: 1,
+			),
+		},
+		{
+			label: "2 visible 1 hidden large scroll", num: 3, count: 2, first: 1,
 			scroll: _s(
 				pointer.Event{
 					Source:   pointer.Mouse,
@@ -147,7 +152,8 @@ func TestListPosition(t *testing.T) {
 					Kind:     pointer.Release,
 					Position: f32.Pt(15, 0),
 				},
-			)},
+			),
+		},
 	} {
 		t.Run(tc.label, func(t *testing.T) {
 			gtx.Ops.Reset()
