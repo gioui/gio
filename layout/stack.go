@@ -20,10 +20,6 @@ type Stack struct {
 type StackChild struct {
 	expanded bool
 	widget   Widget
-
-	// Scratch space.
-	call op.CallOp
-	dims Dimensions
 }
 
 // Stacked returns a Stack child that is laid out with no minimum
@@ -52,6 +48,20 @@ func (s Stack) Layout(gtx Context, children ...StackChild) Dimensions {
 	// First lay out Stacked children.
 	cgtx := gtx
 	cgtx.Constraints.Min = image.Point{}
+	// Note: previously the scratch space was inside StackChild.
+	// child.call.Add(gtx.Ops) confused the go escape analysis and caused the
+	// entired children slice to be allocated on the heap, including all widgets
+	// in it. This produced a lot of object allocations. Now the scratch space
+	// is separate from children, and for cases len(children) <= 32, we will
+	// allocate the scratch space on the stack. For cases len(children) > 32,
+	// only the scratch space gets allocated from the heap, during append.
+	type scratchSpace struct {
+		call op.CallOp
+		dims Dimensions
+	}
+	var scratchArray [32]scratchSpace
+	scratch := scratchArray[:0]
+	scratch = append(scratch, make([]scratchSpace, len(children))...)
 	for i, w := range children {
 		if w.expanded {
 			continue
@@ -65,8 +75,8 @@ func (s Stack) Layout(gtx Context, children ...StackChild) Dimensions {
 		if h := dims.Size.Y; h > maxSZ.Y {
 			maxSZ.Y = h
 		}
-		children[i].call = call
-		children[i].dims = dims
+		scratch[i].call = call
+		scratch[i].dims = dims
 	}
 	// Then lay out Expanded children.
 	for i, w := range children {
@@ -83,14 +93,14 @@ func (s Stack) Layout(gtx Context, children ...StackChild) Dimensions {
 		if h := dims.Size.Y; h > maxSZ.Y {
 			maxSZ.Y = h
 		}
-		children[i].call = call
-		children[i].dims = dims
+		scratch[i].call = call
+		scratch[i].dims = dims
 	}
 
 	maxSZ = gtx.Constraints.Constrain(maxSZ)
 	var baseline int
-	for _, ch := range children {
-		sz := ch.dims.Size
+	for _, scratchChild := range scratch {
+		sz := scratchChild.dims.Size
 		var p image.Point
 		switch s.Alignment {
 		case N, S, Center:
@@ -105,10 +115,10 @@ func (s Stack) Layout(gtx Context, children ...StackChild) Dimensions {
 			p.Y = maxSZ.Y - sz.Y
 		}
 		trans := op.Offset(p).Push(gtx.Ops)
-		ch.call.Add(gtx.Ops)
+		scratchChild.call.Add(gtx.Ops)
 		trans.Pop()
 		if baseline == 0 {
-			if b := ch.dims.Baseline; b != 0 {
+			if b := scratchChild.dims.Baseline; b != 0 {
 				baseline = b + maxSZ.Y - sz.Y - p.Y
 			}
 		}

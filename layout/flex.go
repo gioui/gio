@@ -30,10 +30,6 @@ type FlexChild struct {
 	weight float32
 
 	widget Widget
-
-	// Scratch space.
-	call op.CallOp
-	dims Dimensions
 }
 
 // Spacing determine the spacing mode for a Flex.
@@ -88,6 +84,20 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 	remaining := mainMax
 	var totalWeight float32
 	cgtx := gtx
+	// Note: previously the scratch space was inside FlexChild.
+	// child.call.Add(gtx.Ops) confused the go escape analysis and caused the
+	// entired children slice to be allocated on the heap, including all widgets
+	// in it. This produced a lot of object allocations. Now the scratch space
+	// is separate from children, and for cases len(children) <= 32, we will
+	// allocate the scratch space on the stack. For cases len(children) > 32,
+	// only the scratch space gets allocated from the heap, during append.
+	type scratchSpace struct {
+		call op.CallOp
+		dims Dimensions
+	}
+	var scratchArray [32]scratchSpace
+	scratch := scratchArray[:0]
+	scratch = append(scratch, make([]scratchSpace, len(children))...)
 	// Lay out Rigid children.
 	for i, child := range children {
 		if child.flex {
@@ -104,8 +114,8 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 		if remaining < 0 {
 			remaining = 0
 		}
-		children[i].call = c
-		children[i].dims = dims
+		scratch[i].call = c
+		scratch[i].dims = dims
 	}
 	if w := f.WeightSum; w != 0 {
 		totalWeight = w
@@ -139,16 +149,16 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 		if remaining < 0 {
 			remaining = 0
 		}
-		children[i].call = c
-		children[i].dims = dims
+		scratch[i].call = c
+		scratch[i].dims = dims
 	}
 	maxCross := crossMin
 	var maxBaseline int
-	for _, child := range children {
-		if c := f.Axis.Convert(child.dims.Size).Y; c > maxCross {
+	for _, scratchChild := range scratch {
+		if c := f.Axis.Convert(scratchChild.dims.Size).Y; c > maxCross {
 			maxCross = c
 		}
-		if b := child.dims.Size.Y - child.dims.Baseline; b > maxBaseline {
+		if b := scratchChild.dims.Size.Y - scratchChild.dims.Baseline; b > maxBaseline {
 			maxBaseline = b
 		}
 	}
@@ -169,8 +179,8 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 			mainSize += space / (len(children) * 2)
 		}
 	}
-	for i, child := range children {
-		dims := child.dims
+	for i, scratchChild := range scratch {
+		dims := scratchChild.dims
 		b := dims.Size.Y - dims.Baseline
 		var cross int
 		switch f.Alignment {
@@ -185,7 +195,7 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 		}
 		pt := f.Axis.Convert(image.Pt(mainSize, cross))
 		trans := op.Offset(pt).Push(gtx.Ops)
-		child.call.Add(gtx.Ops)
+		scratchChild.call.Add(gtx.Ops)
 		trans.Pop()
 		mainSize += f.Axis.Convert(dims.Size).X
 		if i < len(children)-1 {
