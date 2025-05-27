@@ -36,10 +36,9 @@ type Win32ViewEvent struct {
 }
 
 type window struct {
-	hwnd        syscall.Handle
-	hdc         syscall.Handle
-	w           *callbacks
-	pointerBtns pointer.Buttons
+	hwnd syscall.Handle
+	hdc  syscall.Handle
+	w    *callbacks
 
 	// cursorIn tracks whether the cursor was inside the window according
 	// to the most recent WM_SETCURSOR.
@@ -175,6 +174,12 @@ func (w *window) init() error {
 	if err != nil {
 		return err
 	}
+	if err := windows.RegisterTouchWindow(hwnd, 0); err != nil {
+		return err
+	}
+	if err := windows.EnableMouseInPointer(1); err != nil {
+		return err
+	}
 	w.hdc, err = windows.GetDC(hwnd)
 	if err != nil {
 		windows.DestroyWindow(hwnd)
@@ -265,18 +270,32 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 				return 0
 			}
 		}
-	case windows.WM_LBUTTONDOWN:
-		w.pointerButton(pointer.ButtonPrimary, true, lParam, getModifiers())
-	case windows.WM_LBUTTONUP:
-		w.pointerButton(pointer.ButtonPrimary, false, lParam, getModifiers())
-	case windows.WM_RBUTTONDOWN:
-		w.pointerButton(pointer.ButtonSecondary, true, lParam, getModifiers())
-	case windows.WM_RBUTTONUP:
-		w.pointerButton(pointer.ButtonSecondary, false, lParam, getModifiers())
-	case windows.WM_MBUTTONDOWN:
-		w.pointerButton(pointer.ButtonTertiary, true, lParam, getModifiers())
-	case windows.WM_MBUTTONUP:
-		w.pointerButton(pointer.ButtonTertiary, false, lParam, getModifiers())
+	case windows.WM_POINTERDOWN, windows.WM_POINTERUP, windows.WM_POINTERUPDATE, windows.WM_POINTERCAPTURECHANGED:
+		pid := getPointerIDwParam(wParam)
+		pi, err := windows.GetPointerInfo(uint32(pid))
+		if err != nil {
+			panic(err)
+		}
+		switch msg {
+		case windows.WM_POINTERDOWN:
+			windows.SetCapture(w.hwnd)
+		case windows.WM_POINTERUP:
+			windows.ReleaseCapture()
+		}
+
+		kind := pointer.Move
+		switch pi.ButtonChangeType {
+		case windows.POINTER_CHANGE_FIRSTBUTTON_DOWN, windows.POINTER_CHANGE_SECONDBUTTON_DOWN, windows.POINTER_CHANGE_THIRDBUTTON_DOWN, windows.POINTER_CHANGE_FOURTHBUTTON_DOWN, windows.POINTER_CHANGE_FIFTHBUTTON_DOWN:
+			kind = pointer.Press
+		case windows.POINTER_CHANGE_FIRSTBUTTON_UP, windows.POINTER_CHANGE_SECONDBUTTON_UP, windows.POINTER_CHANGE_THIRDBUTTON_UP, windows.POINTER_CHANGE_FOURTHBUTTON_UP, windows.POINTER_CHANGE_FIFTHBUTTON_UP:
+			kind = pointer.Release
+		}
+
+		if (pi.PointerFlags&windows.POINTER_FLAG_CANCELED != 0) || (msg == windows.WM_POINTERCAPTURECHANGED) {
+			kind = pointer.Cancel
+		}
+
+		w.pointerUpdate(pi, pid, kind, lParam)
 	case windows.WM_CANCELMODE:
 		w.ProcessEvent(pointer.Event{
 			Kind: pointer.Cancel,
@@ -296,20 +315,9 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		np := windows.Point{X: int32(x), Y: int32(y)}
 		windows.ScreenToClient(w.hwnd, &np)
 		return w.hitTest(int(np.X), int(np.Y))
-	case windows.WM_MOUSEMOVE:
-		x, y := coordsFromlParam(lParam)
-		p := f32.Point{X: float32(x), Y: float32(y)}
-		w.ProcessEvent(pointer.Event{
-			Kind:      pointer.Move,
-			Source:    pointer.Mouse,
-			Position:  p,
-			Buttons:   w.pointerBtns,
-			Time:      windows.GetMessageTime(),
-			Modifiers: getModifiers(),
-		})
-	case windows.WM_MOUSEWHEEL:
+	case windows.WM_POINTERWHEEL:
 		w.scrollEvent(wParam, lParam, false, getModifiers())
-	case windows.WM_MOUSEHWHEEL:
+	case windows.WM_POINTERHWHEEL:
 		w.scrollEvent(wParam, lParam, true, getModifiers())
 	case windows.WM_DESTROY:
 		w.ProcessEvent(Win32ViewEvent{})
@@ -499,34 +507,28 @@ func (w *window) hitTest(x, y int) uintptr {
 	return windows.HTCLIENT
 }
 
-func (w *window) pointerButton(btn pointer.Buttons, press bool, lParam uintptr, kmods key.Modifiers) {
+func (w *window) pointerUpdate(pi windows.PointerInfo, pid pointer.ID, kind pointer.Kind, lParam uintptr) {
 	if !w.config.Focused {
 		windows.SetFocus(w.hwnd)
 	}
 
-	var kind pointer.Kind
-	if press {
-		kind = pointer.Press
-		if w.pointerBtns == 0 {
-			windows.SetCapture(w.hwnd)
-		}
-		w.pointerBtns |= btn
-	} else {
-		kind = pointer.Release
-		w.pointerBtns &^= btn
-		if w.pointerBtns == 0 {
-			windows.ReleaseCapture()
-		}
+	src := pointer.Touch
+	if pi.PointerType == windows.PT_MOUSE {
+		src = pointer.Mouse
 	}
+
 	x, y := coordsFromlParam(lParam)
-	p := f32.Point{X: float32(x), Y: float32(y)}
+	np := windows.Point{X: int32(x), Y: int32(y)}
+	windows.ScreenToClient(w.hwnd, &np)
+	p := f32.Point{X: float32(np.X), Y: float32(np.Y)}
 	w.ProcessEvent(pointer.Event{
 		Kind:      kind,
-		Source:    pointer.Mouse,
+		Source:    src,
 		Position:  p,
-		Buttons:   w.pointerBtns,
+		PointerID: pid,
+		Buttons:   getPointerButtons(pi),
 		Time:      windows.GetMessageTime(),
-		Modifiers: kmods,
+		Modifiers: getModifiers(),
 	})
 }
 
@@ -537,6 +539,12 @@ func coordsFromlParam(lParam uintptr) (int, int) {
 }
 
 func (w *window) scrollEvent(wParam, lParam uintptr, horizontal bool, kmods key.Modifiers) {
+	pid := getPointerIDwParam(wParam)
+	pi, err := windows.GetPointerInfo(uint32(pid))
+	if err != nil {
+		panic(err)
+	}
+
 	x, y := coordsFromlParam(lParam)
 	// The WM_MOUSEWHEEL coordinates are in screen coordinates, in contrast
 	// to other mouse events.
@@ -559,7 +567,7 @@ func (w *window) scrollEvent(wParam, lParam uintptr, horizontal bool, kmods key.
 		Kind:      pointer.Scroll,
 		Source:    pointer.Mouse,
 		Position:  p,
-		Buttons:   w.pointerBtns,
+		Buttons:   getPointerButtons(pi),
 		Scroll:    sp,
 		Modifiers: kmods,
 		Time:      windows.GetMessageTime(),
@@ -1004,4 +1012,46 @@ func (Win32ViewEvent) implementsViewEvent() {}
 func (Win32ViewEvent) ImplementsEvent()     {}
 func (w Win32ViewEvent) Valid() bool {
 	return w != (Win32ViewEvent{})
+}
+
+// LOWORD (minwindef.h)
+func loWord(val uint32) uint16 {
+	return uint16(val & 0xFFFF)
+}
+
+// GET_POINTERID_WPARAM (winuser.h)
+func getPointerIDwParam(wParam uintptr) pointer.ID {
+	return pointer.ID(loWord(uint32(wParam)))
+}
+
+func getPointerButtons(pi windows.PointerInfo) pointer.Buttons {
+	var btns pointer.Buttons
+
+	if pi.PointerFlags&windows.POINTER_FLAG_FIRSTBUTTON != 0 {
+		btns |= pointer.ButtonPrimary
+	} else {
+		btns &^= pointer.ButtonPrimary
+	}
+	if pi.PointerFlags&windows.POINTER_FLAG_SECONDBUTTON != 0 {
+		btns |= pointer.ButtonSecondary
+	} else {
+		btns &^= pointer.ButtonSecondary
+	}
+	if pi.PointerFlags&windows.POINTER_FLAG_THIRDBUTTON != 0 {
+		btns |= pointer.ButtonTertiary
+	} else {
+		btns &^= pointer.ButtonTertiary
+	}
+	if pi.PointerFlags&windows.POINTER_FLAG_FOURTHBUTTON != 0 {
+		btns |= pointer.ButtonQuaternary
+	} else {
+		btns &^= pointer.ButtonQuaternary
+	}
+	if pi.PointerFlags&windows.POINTER_FLAG_FIFTHBUTTON != 0 {
+		btns |= pointer.ButtonQuinary
+	} else {
+		btns &^= pointer.ButtonQuinary
+	}
+
+	return btns
 }
