@@ -219,6 +219,12 @@ const (
 	ButtonSecondary
 	// ButtonTertiary is the tertiary button, usually the middle button.
 	ButtonTertiary
+	// ButtonQuaternary is the fourth button, usually used for browser
+	// navigation (back)
+	ButtonQuaternary
+	// ButtonQuinary is the fifth button, usually used for browser
+	// navigation (forward)
+	ButtonQuinary
 )
 
 func (s ScrollRange) Union(s2 ScrollRange) ScrollRange {
@@ -325,6 +331,12 @@ func (b Buttons) String() string {
 	}
 	if b.Contain(ButtonTertiary) {
 		strs = append(strs, "ButtonTertiary")
+	}
+	if b.Contain(ButtonQuaternary) {
+		strs = append(strs, "ButtonQuaternary")
+	}
+	if b.Contain(ButtonQuinary) {
+		strs = append(strs, "ButtonQuinary")
 	}
 	return strings.Join(strs, "|")
 }
