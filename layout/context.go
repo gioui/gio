@@ -28,6 +28,10 @@ type Context struct {
 	// Interested users must look up and populate these values manually.
 	Locale system.Locale
 
+	// Values is a map of program global data associated with the context.
+	// It is not for use by widgets.
+	Values map[string]any
+
 	input.Source
 	*op.Ops
 }
