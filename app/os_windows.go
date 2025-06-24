@@ -710,6 +710,8 @@ func (w *window) Configure(options []Option) {
 	w.config.Decorated = cnf.Decorated
 	w.config.MinSize = cnf.MinSize
 	w.config.MaxSize = cnf.MaxSize
+	w.config.MinimizeButtonHidden = cnf.MinimizeButtonHidden
+	w.config.MaximizeButtonHidden = cnf.MaximizeButtonHidden
 	windows.SetWindowText(w.hwnd, cnf.Title)
 
 	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
@@ -771,7 +773,9 @@ func (w *window) Configure(options []Option) {
 
 	// Disable maximize button if MaxSize is set.
 	if cnf.MaxSize != (image.Point{X: 0, Y: 0}) {
-		style &^= windows.WS_MAXIMIZEBOX
+		// On Windows, clicking maximize button will maximize the window to its' max size, so we don't hide the button.
+		// style &^= windows.WS_MAXIMIZEBOX
+
 		// Disable window resizing if MinSize and MaxSize are equal.
 		if cnf.MinSize == cnf.MaxSize {
 			style &^= windows.WS_THICKFRAME
