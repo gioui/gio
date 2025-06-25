@@ -9,6 +9,97 @@ import (
 	"gioui.org/internal/f32"
 )
 
+func TestNormPt(t *testing.T) {
+	type scenario struct {
+		l           float32
+		ptIn, ptOut f32.Point
+	}
+
+	scenarios := []scenario{
+		// l>0 & X
+		{l: +20, ptIn: f32.Point{X: +30, Y: 0}, ptOut: f32.Point{X: +20, Y: 0}},
+		{l: +20, ptIn: f32.Point{X: +20, Y: 0}, ptOut: f32.Point{X: +20, Y: 0}},
+		{l: +20, ptIn: f32.Point{X: +10, Y: 0}, ptOut: f32.Point{X: +20, Y: 0}},
+		{l: +20, ptIn: f32.Point{X: -10, Y: 0}, ptOut: f32.Point{X: -20, Y: 0}},
+		{l: +20, ptIn: f32.Point{X: -20, Y: 0}, ptOut: f32.Point{X: -20, Y: 0}},
+		{l: +20, ptIn: f32.Point{X: -30, Y: 0}, ptOut: f32.Point{X: -20, Y: 0}},
+
+		// l<0 & X
+		{l: -20, ptIn: f32.Point{X: +30, Y: 0}, ptOut: f32.Point{X: -20, Y: 0}},
+		{l: -20, ptIn: f32.Point{X: +20, Y: 0}, ptOut: f32.Point{X: -20, Y: 0}},
+		{l: -20, ptIn: f32.Point{X: +10, Y: 0}, ptOut: f32.Point{X: -20, Y: 0}},
+		{l: -20, ptIn: f32.Point{X: -10, Y: 0}, ptOut: f32.Point{X: +20, Y: 0}},
+		{l: -20, ptIn: f32.Point{X: -20, Y: 0}, ptOut: f32.Point{X: +20, Y: 0}},
+		{l: -20, ptIn: f32.Point{X: -30, Y: 0}, ptOut: f32.Point{X: +20, Y: 0}},
+
+		// l>0 & Y
+		{l: +20, ptIn: f32.Point{X: 0, Y: +30}, ptOut: f32.Point{X: 0, Y: +20}},
+		{l: +20, ptIn: f32.Point{X: 0, Y: +20}, ptOut: f32.Point{X: 0, Y: +20}},
+		{l: +20, ptIn: f32.Point{X: 0, Y: +10}, ptOut: f32.Point{X: 0, Y: +20}},
+		{l: +20, ptIn: f32.Point{X: 0, Y: -10}, ptOut: f32.Point{X: 0, Y: -20}},
+		{l: +20, ptIn: f32.Point{X: 0, Y: -20}, ptOut: f32.Point{X: 0, Y: -20}},
+		{l: +20, ptIn: f32.Point{X: 0, Y: -30}, ptOut: f32.Point{X: 0, Y: -20}},
+
+		// l<0 & Y
+		{l: -20, ptIn: f32.Point{X: 0, Y: +30}, ptOut: f32.Point{X: 0, Y: -20}},
+		{l: -20, ptIn: f32.Point{X: 0, Y: +20}, ptOut: f32.Point{X: 0, Y: -20}},
+		{l: -20, ptIn: f32.Point{X: 0, Y: +10}, ptOut: f32.Point{X: 0, Y: -20}},
+		{l: -20, ptIn: f32.Point{X: 0, Y: -10}, ptOut: f32.Point{X: 0, Y: +20}},
+		{l: -20, ptIn: f32.Point{X: 0, Y: -20}, ptOut: f32.Point{X: 0, Y: +20}},
+		{l: -20, ptIn: f32.Point{X: 0, Y: -30}, ptOut: f32.Point{X: 0, Y: +20}},
+
+		// l>0 && X=Y
+		{l: +20, ptIn: f32.Point{X: +90, Y: +90}, ptOut: f32.Point{X: +14.142137, Y: +14.142137}},
+		{l: +20, ptIn: f32.Point{X: +30, Y: +30}, ptOut: f32.Point{X: +14.142136, Y: +14.142136}},
+		{l: +20, ptIn: f32.Point{X: +20, Y: +20}, ptOut: f32.Point{X: +14.142136, Y: +14.142136}},
+		{l: +20, ptIn: f32.Point{X: +10, Y: +10}, ptOut: f32.Point{X: +14.142136, Y: +14.142136}},
+		{l: +20, ptIn: f32.Point{X: -10, Y: -10}, ptOut: f32.Point{X: -14.142136, Y: -14.142136}},
+		{l: +20, ptIn: f32.Point{X: -20, Y: -20}, ptOut: f32.Point{X: -14.142136, Y: -14.142136}},
+		{l: +20, ptIn: f32.Point{X: -30, Y: -30}, ptOut: f32.Point{X: -14.142136, Y: -14.142136}},
+		{l: +20, ptIn: f32.Point{X: -90, Y: -90}, ptOut: f32.Point{X: -14.142137, Y: -14.142137}},
+
+		// l>0 && X=-Y
+		{l: +20, ptIn: f32.Point{X: +90, Y: -90}, ptOut: f32.Point{X: +14.142137, Y: -14.142137}},
+		{l: +20, ptIn: f32.Point{X: +30, Y: -30}, ptOut: f32.Point{X: +14.142136, Y: -14.142136}},
+		{l: +20, ptIn: f32.Point{X: +20, Y: -20}, ptOut: f32.Point{X: +14.142136, Y: -14.142136}},
+		{l: +20, ptIn: f32.Point{X: +10, Y: -10}, ptOut: f32.Point{X: +14.142136, Y: -14.142136}},
+		{l: +20, ptIn: f32.Point{X: -10, Y: +10}, ptOut: f32.Point{X: -14.142136, Y: +14.142136}},
+		{l: +20, ptIn: f32.Point{X: -20, Y: +20}, ptOut: f32.Point{X: -14.142136, Y: +14.142136}},
+		{l: +20, ptIn: f32.Point{X: -30, Y: +30}, ptOut: f32.Point{X: -14.142136, Y: +14.142136}},
+		{l: +20, ptIn: f32.Point{X: -90, Y: +90}, ptOut: f32.Point{X: -14.142137, Y: +14.142137}},
+
+		// l<0 && X=Y
+		{l: -20, ptIn: f32.Point{X: +90, Y: +90}, ptOut: f32.Point{X: -14.142137, Y: -14.142137}},
+		{l: -20, ptIn: f32.Point{X: +30, Y: +30}, ptOut: f32.Point{X: -14.142136, Y: -14.142136}},
+		{l: -20, ptIn: f32.Point{X: +20, Y: +20}, ptOut: f32.Point{X: -14.142136, Y: -14.142136}},
+		{l: -20, ptIn: f32.Point{X: +10, Y: +10}, ptOut: f32.Point{X: -14.142136, Y: -14.142136}},
+		{l: -20, ptIn: f32.Point{X: -10, Y: -10}, ptOut: f32.Point{X: +14.142136, Y: +14.142136}},
+		{l: -20, ptIn: f32.Point{X: -20, Y: -20}, ptOut: f32.Point{X: +14.142136, Y: +14.142136}},
+		{l: -20, ptIn: f32.Point{X: -30, Y: -30}, ptOut: f32.Point{X: +14.142136, Y: +14.142136}},
+		{l: -20, ptIn: f32.Point{X: -90, Y: -90}, ptOut: f32.Point{X: +14.142137, Y: +14.142137}},
+
+		// l<0 && X=-Y
+		{l: -20, ptIn: f32.Point{X: +90, Y: -90}, ptOut: f32.Point{X: -14.142137, Y: +14.142137}},
+		{l: -20, ptIn: f32.Point{X: +30, Y: -30}, ptOut: f32.Point{X: -14.142136, Y: +14.142136}},
+		{l: -20, ptIn: f32.Point{X: +20, Y: -20}, ptOut: f32.Point{X: -14.142136, Y: +14.142136}},
+		{l: -20, ptIn: f32.Point{X: +10, Y: -10}, ptOut: f32.Point{X: -14.142136, Y: +14.142136}},
+		{l: -20, ptIn: f32.Point{X: -10, Y: +10}, ptOut: f32.Point{X: +14.142136, Y: -14.142136}},
+		{l: -20, ptIn: f32.Point{X: -20, Y: +20}, ptOut: f32.Point{X: +14.142136, Y: -14.142136}},
+		{l: -20, ptIn: f32.Point{X: -30, Y: +30}, ptOut: f32.Point{X: +14.142136, Y: -14.142136}},
+		{l: -20, ptIn: f32.Point{X: -90, Y: +90}, ptOut: f32.Point{X: +14.142137, Y: -14.142137}},
+	}
+
+	for i, s := range scenarios {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			actual := normPt(s.ptIn, s.l)
+			if actual != s.ptOut {
+				t.Errorf("in: %v*%v, expected: %v, actual: %v", s.l, s.ptIn, s.ptOut, actual)
+			}
+		})
+
+	}
+}
+
 func BenchmarkSplitCubic(b *testing.B) {
 	type scenario struct {
 		segments               int
