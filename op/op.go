@@ -138,6 +138,23 @@ func Defer(o *Ops, c CallOp) {
 	c.Add(o)
 }
 
+func Defer2(o *Ops, c CallOp) {
+	if c.ops == nil {
+		return
+	}
+	state := ops.Save(&o.Internal)
+	// Wrap c in a macro that loads the saved state before execution.
+	m := Record(o)
+	state.Load()
+	c.Add(o)
+	c = m.Stop()
+	// A Defer is recorded as a TypeDefer followed by the
+	// wrapped macro.
+	data := ops.Write(&o.Internal, ops.TypeDeferLen)
+	data[0] = byte(ops.TypeDefer)
+	c.Add(o)
+}
+
 // Reset the Ops, preparing it for re-use. Reset invalidates
 // any recorded macros.
 func (o *Ops) Reset() {
