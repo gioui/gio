@@ -771,8 +771,9 @@ func (w *window) Configure(options []Option) {
 		style |= windows.WS_MAXIMIZEBOX
 	}
 
-	// Disable maximize button if MaxSize is set.
-	if cnf.MaxSize != (image.Point{X: 0, Y: 0}) && cnf.MinSize == cnf.MaxSize {
+	// Disable window resizing if MinSize and MaxSize are equal.
+	if cnf.MaxSize != (image.Point{}) && cnf.MinSize == cnf.MaxSize {
+		style &^= windows.WS_MAXIMIZEBOX
 		style &^= windows.WS_THICKFRAME
 	}
 

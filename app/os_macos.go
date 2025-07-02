@@ -41,7 +41,7 @@ import (
 
 __attribute__ ((visibility ("hidden"))) void gio_main(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(int presentWithTrans);
-__attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight);
+__attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height);
 __attribute__ ((visibility ("hidden"))) void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle);
 
 static void writeClipboard(CFTypeRef str) {
@@ -192,6 +192,7 @@ static void setMaxSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
 	@autoreleasepool {
 		NSWindow* window = (__bridge NSWindow *)windowRef;
 		window.contentMaxSize = NSMakeSize(width, height);
+		window.maxFullScreenContentSize = NSMakeSize(width, height);
 	}
 }
 
@@ -1013,7 +1014,7 @@ func newWindow(win *callbacks, options []Option) {
 			w.ProcessEvent(DestroyEvent{Err: err})
 			return
 		}
-		window := C.gio_createWindow(w.view, C.CGFloat(cnf.Size.X), C.CGFloat(cnf.Size.Y), 0, 0, 0, 0)
+		window := C.gio_createWindow(w.view, C.CGFloat(cnf.Size.X), C.CGFloat(cnf.Size.Y))
 		// Release our reference now that the NSWindow has it.
 		C.CFRelease(w.view)
 		w.Configure(options)

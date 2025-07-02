@@ -369,7 +369,7 @@ void gio_setCursor(NSUInteger curID) {
 	}
 }
 
-CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height, CGFloat minWidth, CGFloat minHeight, CGFloat maxWidth, CGFloat maxHeight) {
+CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height) {
 	@autoreleasepool {
 		NSRect rect = NSMakeRect(0, 0, width, height);
 		NSUInteger styleMask = NSTitledWindowMask |
@@ -381,12 +381,6 @@ CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height, CGF
 													   styleMask:styleMask
 														 backing:NSBackingStoreBuffered
 														   defer:NO];
-		if (minWidth > 0 || minHeight > 0) {
-			window.contentMinSize = NSMakeSize(minWidth, minHeight);
-		}
-		if (maxWidth > 0 || maxHeight > 0) {
-			window.contentMaxSize = NSMakeSize(maxWidth, maxHeight);
-		}
 		[window setAcceptsMouseMovedEvents:YES];
 		NSView *view = (__bridge NSView *)viewRef;
 		[window setContentView:view];

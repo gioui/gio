@@ -38,7 +38,24 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
-		return &wlContext{Context: ctx, win: w}, nil
+
+		surf, width, height := w.surface()
+		if surf == nil {
+			return nil, errors.New("wayland: no surface")
+		}
+		eglWin := C.wl_egl_window_create(surf, C.int(width), C.int(height))
+		if eglWin == nil {
+			return nil, errors.New("wayland: wl_egl_window_create failed")
+		}
+		eglSurf := egl.NativeWindowType(uintptr(unsafe.Pointer(eglWin)))
+		if err := ctx.CreateSurface(eglSurf); err != nil {
+			return nil, err
+		}
+		// We're in charge of the frame callbacks, don't let eglSwapBuffers
+		// wait for callbacks that may never arrive.
+		ctx.EnableVSync(false)
+
+		return &wlContext{Context: ctx, win: w, eglWin: eglWin}, nil
 	}
 }
 
@@ -54,31 +71,11 @@ func (c *wlContext) Release() {
 }
 
 func (c *wlContext) Refresh() error {
-	c.Context.ReleaseSurface()
-	if c.eglWin != nil {
-		C.wl_egl_window_destroy(c.eglWin)
-		c.eglWin = nil
-	}
 	surf, width, height := c.win.surface()
 	if surf == nil {
 		return errors.New("wayland: no surface")
 	}
-	eglWin := C.wl_egl_window_create(surf, C.int(width), C.int(height))
-	if eglWin == nil {
-		return errors.New("wayland: wl_egl_window_create failed")
-	}
-	c.eglWin = eglWin
-	eglSurf := egl.NativeWindowType(uintptr(unsafe.Pointer(eglWin)))
-	if err := c.Context.CreateSurface(eglSurf); err != nil {
-		return err
-	}
-	if err := c.Context.MakeCurrent(); err != nil {
-		return err
-	}
-	defer c.Context.ReleaseCurrent()
-	// We're in charge of the frame callbacks, don't let eglSwapBuffers
-	// wait for callbacks that may never arrive.
-	c.Context.EnableVSync(false)
+	C.wl_egl_window_resize(c.eglWin, C.int(width), C.int(height), 0, 0)
 	return nil
 }
 
