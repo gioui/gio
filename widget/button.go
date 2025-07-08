@@ -9,7 +9,6 @@ import (
 	"gioui.org/gesture"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
-	"gioui.org/io/pointer"
 	"gioui.org/io/semantic"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -141,9 +140,6 @@ func (b *Clickable) update(t event.Tag, gtx layout.Context) (Click, bool) {
 				}
 			}
 		case gesture.KindPress:
-			if e.Source == pointer.Mouse {
-				gtx.Execute(key.FocusCmd{Tag: t})
-			}
 			b.history = append(b.history, Press{
 				Position: e.Position,
 				Start:    gtx.Now,
