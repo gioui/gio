@@ -44,7 +44,7 @@ func (im Image) Layout(gtx layout.Context) layout.Dimensions {
 	defer clip.Rect{Max: dims.Size}.Push(gtx.Ops).Pop()
 
 	pixelScale := scale * gtx.Metric.PxPerDp
-	trans = trans.Mul(f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(pixelScale, pixelScale)))
+	trans = trans.Mul(f32.AffineId().Scale(f32.Point{}, f32.Pt(pixelScale, pixelScale)))
 	defer op.Affine(trans).Push(gtx.Ops).Pop()
 
 	im.Src.Add(gtx.Ops)

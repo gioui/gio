@@ -893,7 +893,7 @@ func gio_firstRectForCharacterRange(h C.uintptr_t, crng C.NSRange, actual C.NSRa
 	// Transform to NSView local coordinates (lower left origin, undo backing scale).
 	scale := 1. / float32(C.getViewBackingScale(w.view))
 	height := float32(C.viewHeight(w.view))
-	local := f32.Affine2D{}.Scale(f32.Pt(0, 0), f32.Pt(scale, -scale)).Offset(f32.Pt(0, height))
+	local := f32.AffineId().Scale(f32.Pt(0, 0), f32.Pt(scale, -scale)).Offset(f32.Pt(0, height))
 	t := local.Mul(sel.Transform)
 	bounds := f32.Rectangle{
 		Min: t.Transform(sel.Pos.Sub(f32.Pt(0, sel.Ascent))),

@@ -872,7 +872,7 @@ func (r *renderer) drawLayers(layers []opacityLayer, ops []imageOp) {
 		r.drawOps(true, l.clip.Min.Mul(-1), l.clip.Size(), ops[l.opStart:l.opEnd])
 		sr := f32.FRect(v)
 		uvScale, uvOffset := texSpaceTransform(sr, f.size)
-		uvTrans := f32.Affine2D{}.Scale(f32.Point{}, uvScale).Offset(uvOffset)
+		uvTrans := f32.AffineId().Scale(f32.Point{}, uvScale).Offset(uvOffset)
 		// Replace layer ops with one textured op.
 		ops[l.opStart] = imageOp{
 			clip: l.clip,
@@ -1196,7 +1196,7 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 		sr.Min.Y += float32(clip.Min.Y-dr.Min.Y) * sdy / dy
 		sr.Max.Y -= float32(dr.Max.Y-clip.Max.Y) * sdy / dy
 		uvScale, uvOffset := texSpaceTransform(sr, sz)
-		m.uvTrans = partTrans.Mul(f32.Affine2D{}.Scale(f32.Point{}, uvScale).Offset(uvOffset))
+		m.uvTrans = partTrans.Mul(f32.AffineId().Scale(f32.Point{}, uvScale).Offset(uvOffset))
 		m.data = d.image
 	}
 	return m
@@ -1371,7 +1371,7 @@ func gradientSpaceTransform(clip image.Rectangle, off f32.Point, stop1, stop2 f3
 
 	// TODO: optimize
 	zp := f32.Point{}
-	return f32.Affine2D{}.
+	return f32.AffineId().
 		Scale(zp, layout.FPt(clip.Size())).            // scale to pixel space
 		Offset(zp.Sub(off).Add(layout.FPt(clip.Min))). // offset to clip space
 		Offset(zp.Sub(stop1)).                         // offset to first stop point

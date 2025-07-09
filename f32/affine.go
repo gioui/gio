@@ -30,6 +30,15 @@ func NewAffine2D(sx, hx, ox, hy, sy, oy float32) Affine2D {
 	}
 }
 
+// AffineId returns an identity transformation matrix that represents no transformation
+// when applied.
+func AffineId() Affine2D {
+	return NewAffine2D(
+		1, 0, 0,
+		0, 1, 0,
+	)
+}
+
 // Offset the transformation.
 func (a Affine2D) Offset(offset Point) Affine2D {
 	return Affine2D{

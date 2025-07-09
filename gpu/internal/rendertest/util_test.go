@@ -302,5 +302,5 @@ func newWindow(t testing.TB, width, height int) *headless.Window {
 }
 
 func scale(sx, sy float32) op.TransformOp {
-	return op.Affine(f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(sx, sy)))
+	return op.Affine(f32.AffineId().Scale(f32.Point{}, f32.Pt(sx, sy)))
 }

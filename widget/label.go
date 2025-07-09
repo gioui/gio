@@ -210,7 +210,7 @@ func (it *textIterator) paintGlyph(gtx layout.Context, shaper *text.Shaper, glyp
 		line = append(line, glyph)
 	}
 	if glyph.Flags&text.FlagLineBreak != 0 || cap(line)-len(line) == 0 || !visibleOrBefore {
-		t := op.Affine(f32.Affine2D{}.Offset(it.lineOff)).Push(gtx.Ops)
+		t := op.Affine(f32.AffineId().Offset(it.lineOff)).Push(gtx.Ops)
 		path := shaper.Shape(line)
 		outline := clip.Outline{Path: path}.Op().Push(gtx.Ops)
 		it.material.Add(gtx.Ops)

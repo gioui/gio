@@ -183,7 +183,7 @@ func (c CallOp) Add(o *Ops) {
 // Offset converts an offset to a TransformOp.
 func Offset(off image.Point) TransformOp {
 	offf := f32.Pt(float32(off.X), float32(off.Y))
-	return Affine(f32.Affine2D{}.Offset(offf))
+	return Affine(f32.AffineId().Offset(offf))
 }
 
 // Affine creates a TransformOp representing the transformation a.

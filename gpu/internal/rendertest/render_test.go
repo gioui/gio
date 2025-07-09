@@ -87,10 +87,10 @@ func TestNoClipFromPaint(t *testing.T) {
 	// ensure that a paint operation does not pollute the state
 	// by leaving any clip paths in place.
 	run(t, func(o *op.Ops) {
-		a := f32.Affine2D{}.Rotate(f32.Pt(20, 20), math.Pi/4)
+		a := f32.AffineId().Rotate(f32.Pt(20, 20), math.Pi/4)
 		defer op.Affine(a).Push(o).Pop()
 		paint.FillShape(o, red, clip.Rect(image.Rect(10, 10, 30, 30)).Op())
-		a = f32.Affine2D{}.Rotate(f32.Pt(20, 20), -math.Pi/4)
+		a = f32.AffineId().Rotate(f32.Pt(20, 20), -math.Pi/4)
 		defer op.Affine(a).Push(o).Pop()
 
 		paint.FillShape(o, black, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
@@ -109,7 +109,7 @@ func TestDeferredPaint(t *testing.T) {
 		paint.PaintOp{}.Add(o)
 		cl.Pop()
 
-		t := op.Affine(f32.Affine2D{}.Offset(f32.Pt(20, 20))).Push(o)
+		t := op.Affine(f32.AffineId().Offset(f32.Pt(20, 20))).Push(o)
 		m := op.Record(o)
 		cl2 := clip.Rect(image.Rect(0, 0, 80, 80)).Op().Push(o)
 		paint.ColorOp{Color: color.NRGBA{A: 0x60, R: 0xff, G: 0xff}}.Add(o)
@@ -119,7 +119,7 @@ func TestDeferredPaint(t *testing.T) {
 		op.Defer(o, paintMacro)
 		t.Pop()
 
-		defer op.Affine(f32.Affine2D{}.Offset(f32.Pt(10, 10))).Push(o).Pop()
+		defer op.Affine(f32.AffineId().Offset(f32.Pt(10, 10))).Push(o).Pop()
 		defer clip.Rect(image.Rect(0, 0, 80, 80)).Op().Push(o).Pop()
 		paint.ColorOp{Color: color.NRGBA{A: 0x60, B: 0xff}}.Add(o)
 		paint.PaintOp{}.Add(o)
@@ -260,7 +260,7 @@ func TestLinearGradient(t *testing.T) {
 				Color2: g.To,
 			}.Add(ops)
 			cl := clip.RRect{Rect: gr.Round()}.Push(ops)
-			t1 := op.Affine(f32.Affine2D{}.Offset(pixelAligned.Min)).Push(ops)
+			t1 := op.Affine(f32.AffineId().Offset(pixelAligned.Min)).Push(ops)
 			t2 := scale(pixelAligned.Dx()/128, 1).Push(ops)
 			paint.PaintOp{}.Add(ops)
 			t2.Pop()
@@ -363,7 +363,7 @@ func TestImageRGBA_ScaleLinear(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		w := newWindow(t, 128, 128)
 		defer clip.Rect{Max: image.Pt(128, 128)}.Push(o).Pop()
-		op.Affine(f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(64, 64))).Add(o)
+		op.Affine(f32.AffineId().Scale(f32.Point{}, f32.Pt(64, 64))).Add(o)
 
 		im := image.NewRGBA(image.Rect(0, 0, 2, 2))
 		im.Set(0, 0, colornames.Red)
@@ -397,7 +397,7 @@ func TestImageRGBA_ScaleLinear(t *testing.T) {
 func TestImageRGBA_ScaleNearest(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		w := newWindow(t, 128, 128)
-		op.Affine(f32.Affine2D{}.Scale(f32.Point{}, f32.Pt(64, 64))).Add(o)
+		op.Affine(f32.AffineId().Scale(f32.Point{}, f32.Pt(64, 64))).Add(o)
 
 		im := image.NewRGBA(image.Rect(0, 0, 2, 2))
 		im.Set(0, 0, colornames.Red)

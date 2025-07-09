@@ -299,7 +299,7 @@ func TestInstancedRects(t *testing.T) {
 		c := macro.Stop()
 
 		for range 2 {
-			op.Affine(f32.Affine2D{}.Rotate(f32.Pt(0, 0), .2)).Add(o)
+			op.Affine(f32.AffineId().Rotate(f32.Pt(0, 0), .2)).Add(o)
 			c.Add(o)
 			op.Offset(image.Pt(20, 20)).Add(o)
 		}

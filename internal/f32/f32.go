@@ -19,6 +19,8 @@ type Affine2D = f32.Affine2D
 
 var NewAffine2D = f32.NewAffine2D
 
+var AffineId = f32.AffineId
+
 // A Rectangle contains the points (X, Y) where Min.X <= X < Max.X,
 // Min.Y <= Y < Max.Y.
 type Rectangle struct {

@@ -39,7 +39,7 @@ func (fit Fit) scale(cs layout.Constraints, pos layout.Direction, dims layout.Di
 
 		offset := pos.Position(widgetSize, dims.Size)
 		dims.Baseline += offset.Y
-		return dims, f32.Affine2D{}.Offset(layout.FPt(offset))
+		return dims, f32.AffineId().Offset(layout.FPt(offset))
 	}
 
 	scale := f32.Point{
@@ -73,7 +73,7 @@ func (fit Fit) scale(cs layout.Constraints, pos layout.Direction, dims layout.Di
 
 			offset := pos.Position(widgetSize, dims.Size)
 			dims.Baseline += offset.Y
-			return dims, f32.Affine2D{}.Offset(layout.FPt(offset))
+			return dims, f32.AffineId().Offset(layout.FPt(offset))
 		}
 	case Fill:
 	}
@@ -85,7 +85,7 @@ func (fit Fit) scale(cs layout.Constraints, pos layout.Direction, dims layout.Di
 	dims.Baseline = int(float32(dims.Baseline) * scale.Y)
 
 	offset := pos.Position(scaledSize, dims.Size)
-	trans := f32.Affine2D{}.
+	trans := f32.AffineId().
 		Scale(f32.Point{}, scale).
 		Offset(layout.FPt(offset))
 

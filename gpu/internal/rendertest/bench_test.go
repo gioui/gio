@@ -88,7 +88,7 @@ func BenchmarkDrawUI(b *testing.B) {
 		resetOps(gtx)
 
 		off := float32(math.Mod(float64(i)/10, 10))
-		t := op.Affine(f32.Affine2D{}.Offset(f32.Pt(off, off))).Push(gtx.Ops)
+		t := op.Affine(f32.AffineId().Offset(f32.Pt(off, off))).Push(gtx.Ops)
 
 		drawCore(gtx, th)
 
@@ -110,7 +110,7 @@ func BenchmarkDrawUITransformed(b *testing.B) {
 		resetOps(gtx)
 
 		angle := float32(math.Mod(float64(i)/1000, 0.05))
-		a := f32.Affine2D{}.Shear(f32.Point{}, angle, angle).Rotate(f32.Point{}, angle)
+		a := f32.AffineId().Shear(f32.Point{}, angle, angle).Rotate(f32.Point{}, angle)
 		t := op.Affine(a).Push(gtx.Ops)
 
 		drawCore(gtx, th)

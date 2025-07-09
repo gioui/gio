@@ -767,7 +767,7 @@ func (s *shaperImpl) Bitmaps(ops *op.Ops, gs []Glyph) op.CallOp {
 				imgOp = bitmapData.img
 				imgSize = bitmapData.size
 			}
-			off := op.Affine(f32.Affine2D{}.Offset(f32.Point{
+			off := op.Affine(f32.AffineId().Offset(f32.Point{
 				X: fixedToFloat((g.X - x) - g.Offset.X),
 				Y: fixedToFloat(g.Offset.Y + g.Bounds.Min.Y),
 			})).Push(ops)
@@ -783,7 +783,7 @@ func (s *shaperImpl) Bitmaps(ops *op.Ops, gs []Glyph) op.CallOp {
 					Y: g.Bounds.Max.Y.Round(),
 				},
 			}.Size()
-			aff := op.Affine(f32.Affine2D{}.Scale(f32.Point{}, f32.Point{
+			aff := op.Affine(f32.AffineId().Scale(f32.Point{}, f32.Point{
 				X: float32(glyphSize.X) / float32(imgSize.X),
 				Y: float32(glyphSize.Y) / float32(imgSize.Y),
 			})).Push(ops)
