@@ -220,7 +220,7 @@ const (
 	// ButtonTertiary is the tertiary button, usually the middle button.
 	ButtonTertiary
 	// ButtonQuaternary is the fourth button, usually used for browser
-	// navigation (back)
+	// navigation (backward)
 	ButtonQuaternary
 	// ButtonQuinary is the fifth button, usually used for browser
 	// navigation (forward)

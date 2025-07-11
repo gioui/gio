@@ -884,11 +884,13 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 	s := callbackLoad(data).(*wlSeat)
 	s.serial = serial
 	w := s.pointerFocus
-	// From linux-event-codes.h.
+	// From Linux: include/uapi/linux/input-event-codes.h
 	const (
 		BTN_LEFT   = 0x110
 		BTN_RIGHT  = 0x111
 		BTN_MIDDLE = 0x112
+		BTN_SIDE   = 0x113
+		BTN_EXTRA  = 0x114
 	)
 	var btn pointer.Buttons
 	switch wbtn {
@@ -898,6 +900,10 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 		btn = pointer.ButtonSecondary
 	case BTN_MIDDLE:
 		btn = pointer.ButtonTertiary
+	case BTN_SIDE:
+		btn = pointer.ButtonQuaternary
+	case BTN_EXTRA:
+		btn = pointer.ButtonQuinary
 	default:
 		return
 	}
