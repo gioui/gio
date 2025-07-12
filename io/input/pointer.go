@@ -144,7 +144,9 @@ const (
 )
 
 func (c *pointerCollector) resetState() {
-	c.state = collectState{}
+	c.state = collectState{
+		t: f32.AffineId(),
+	}
 	c.nodeStack = c.nodeStack[:0]
 	// Pop every node except the root.
 	if len(c.q.hitTree) > 0 {

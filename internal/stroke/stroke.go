@@ -581,12 +581,10 @@ func ArcTransform(p, f1, f2 f32.Point, angle float32) (transform f32.Affine2D, s
 		}
 	}
 
-	var (
-		θ   = angle / float32(segments)
-		ref f32.Affine2D // transform from absolute frame to ellipse-based one
-		rot f32.Affine2D // rotation matrix for each segment
-		inv f32.Affine2D // transform from ellipse-based frame to absolute one
-	)
+	θ := angle / float32(segments)
+	ref := f32.AffineId() // transform from absolute frame to ellipse-based one
+	rot := f32.AffineId() // rotation matrix for each segment
+	inv := f32.AffineId() // transform from ellipse-based frame to absolute one
 	center := f32.Point{
 		X: 0.5 * (f1.X + f2.X),
 		Y: 0.5 * (f1.Y + f2.Y),

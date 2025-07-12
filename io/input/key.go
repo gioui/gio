@@ -281,6 +281,7 @@ func (q *keyQueue) Focus(handlers map[event.Tag]*handler, state keyState, focus 
 		return state, nil
 	}
 	state.content = EditorState{}
+	state.content.Selection.Transform = f32.AffineId()
 	var evts []taggedEvent
 	if state.focus != nil {
 		evts = append(evts, taggedEvent{tag: state.focus, event: key.FocusEvent{Focus: false}})

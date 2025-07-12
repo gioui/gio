@@ -779,13 +779,15 @@ func (q *Router) collect() {
 	pc.Reset()
 	kq := &q.key.queue
 	q.key.queue.Reset()
-	var t f32.Affine2D
+	t := f32.AffineId()
 	for encOp, ok := q.reader.Decode(); ok; encOp, ok = q.reader.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeSave:
 			id := ops.DecodeSave(encOp.Data)
 			if extra := id - len(q.savedTrans) + 1; extra > 0 {
-				q.savedTrans = append(q.savedTrans, make([]f32.Affine2D, extra)...)
+				for range extra {
+					q.savedTrans = append(q.savedTrans, f32.AffineId())
+				}
 			}
 			q.savedTrans[id] = t
 		case ops.TypeLoad:

@@ -957,7 +957,9 @@ func (d *drawOps) addClipPath(state *drawState, aux []byte, auxKey opKey, bounds
 
 func (d *drawOps) save(id int, state f32.Affine2D) {
 	if extra := id - len(d.states) + 1; extra > 0 {
-		d.states = append(d.states, make([]f32.Affine2D, extra)...)
+		for range extra {
+			d.states = append(d.states, f32.AffineId())
+		}
 	}
 	d.states[id] = state
 }
@@ -972,12 +974,13 @@ func (k opKey) SetTransform(t f32.Affine2D) opKey {
 }
 
 func (d *drawOps) collectOps(r *ops.Reader, viewport f32.Rectangle) {
-	var (
-		quads quadsOp
-		state drawState
-	)
+	var quads quadsOp
+	state := drawState{
+		t: f32.AffineId(),
+	}
 	reset := func() {
 		state = drawState{
+			t:     f32.AffineId(),
 			color: color.NRGBA{A: 0xff},
 		}
 	}
@@ -1163,6 +1166,7 @@ func expandPathOp(p *pathOp, clip image.Rectangle) {
 func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32.Affine2D, clip image.Rectangle) material {
 	m := material{
 		opacity: 1.,
+		uvTrans: f32.AffineId(),
 	}
 	switch d.matType {
 	case materialColor:
@@ -1521,6 +1525,7 @@ func decodeToOutlineQuads(qs *quadSplitter, tr f32.Affine2D, pathData []byte) {
 
 // create GPU vertices for transformed r, find the bounds and establish texture transform.
 func (d *drawOps) boundsForTransformedRect(r f32.Rectangle, tr f32.Affine2D) (aux []byte, bnd f32.Rectangle, ptr f32.Affine2D) {
+	ptr = f32.AffineId()
 	if isPureOffset(tr) {
 		// fast-path to allow blitting of pure rectangles
 		_, _, ox, _, _, oy := tr.Elems()
@@ -1573,7 +1578,7 @@ func (d *drawOps) boundsForTransformedRect(r f32.Rectangle, tr f32.Affine2D) (au
 	sx, sy := P2.X-P3.X, P2.Y-P3.Y
 	ptr = f32.NewAffine2D(sx, P2.X-P1.X, P1.X-sx, sy, P2.Y-P1.Y, P1.Y-sy).Invert()
 
-	return
+	return aux, bnd, ptr
 }
 
 func isPureOffset(t f32.Affine2D) bool {
