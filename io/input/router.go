@@ -628,11 +628,11 @@ func (q *Router) RevealFocus(viewport image.Rectangle) {
 	viewport = q.pointer.queue.ClipFor(area, viewport)
 
 	topleft := bounds.Min.Sub(viewport.Min)
-	topleft = max(topleft, bounds.Max.Sub(viewport.Max))
-	topleft = min(image.Pt(0, 0), topleft)
+	topleft = maxPoint(topleft, bounds.Max.Sub(viewport.Max))
+	topleft = minPoint(image.Pt(0, 0), topleft)
 	bottomright := bounds.Max.Sub(viewport.Max)
-	bottomright = min(bottomright, bounds.Min.Sub(viewport.Min))
-	bottomright = max(image.Pt(0, 0), bottomright)
+	bottomright = minPoint(bottomright, bounds.Min.Sub(viewport.Min))
+	bottomright = maxPoint(image.Pt(0, 0), bottomright)
 	s := topleft
 	if s.X == 0 {
 		s.X = bottomright.X
@@ -659,7 +659,7 @@ func (q *Router) ScrollFocus(dist image.Point) {
 	}))
 }
 
-func max(p1, p2 image.Point) image.Point {
+func maxPoint(p1, p2 image.Point) image.Point {
 	m := p1
 	if p2.X > m.X {
 		m.X = p2.X
@@ -670,7 +670,7 @@ func max(p1, p2 image.Point) image.Point {
 	return m
 }
 
-func min(p1, p2 image.Point) image.Point {
+func minPoint(p1, p2 image.Point) image.Point {
 	m := p1
 	if p2.X < m.X {
 		m.X = p2.X

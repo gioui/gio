@@ -56,13 +56,6 @@ func (l *document) reset() {
 	l.unreadRuneCount = 0
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 // A line contains the measurements of a line of text.
 type line struct {
 	// runs contains sequences of shaped glyphs with common attributes. The order

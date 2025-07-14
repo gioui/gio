@@ -1093,20 +1093,6 @@ func (e *Editor) Regions(start, end int, regions []Region) []Region {
 	return e.text.Regions(start, end, regions)
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func abs(n int) int {
 	if n < 0 {
 		return -n
