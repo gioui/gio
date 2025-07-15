@@ -214,8 +214,9 @@ func (p *Path) LineTo(to f32.Point) {
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
 	p.cmd(data[4:], scene.Line(p.pen, to))
-	p.pen = to
+	p.expand(p.pen)
 	p.expand(to)
+	p.pen = to
 }
 
 func (p *Path) cmd(data []byte, c scene.Command) {
@@ -263,9 +264,10 @@ func (p *Path) QuadTo(ctrl, to f32.Point) {
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
 	p.cmd(data[4:], scene.Quad(p.pen, ctrl, to))
-	p.pen = to
+	p.expand(p.pen)
 	p.expand(ctrl)
 	p.expand(to)
+	p.pen = to
 }
 
 // ArcTo adds an elliptical arc to the path. The implied ellipse is defined
@@ -307,10 +309,11 @@ func (p *Path) CubeTo(ctrl0, ctrl1, to f32.Point) {
 	bo := binary.LittleEndian
 	bo.PutUint32(data[0:], uint32(p.contour))
 	p.cmd(data[4:], scene.Cubic(p.pen, ctrl0, ctrl1, to))
-	p.pen = to
+	p.expand(p.pen)
 	p.expand(ctrl0)
 	p.expand(ctrl1)
 	p.expand(to)
+	p.pen = to
 }
 
 // Close closes the path contour.
