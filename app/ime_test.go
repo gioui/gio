@@ -6,6 +6,7 @@
 package app
 
 import (
+	"gioui.org/f32"
 	"testing"
 	"unicode/utf8"
 
@@ -40,6 +41,7 @@ func FuzzIME(f *testing.F) {
 		r.Frame(gtx.Ops)
 
 		var state editorState
+		state.Selection.Transform = f32.AffineId()
 		const (
 			cmdReplace = iota
 			cmdSelect
@@ -139,6 +141,7 @@ func FuzzIME(f *testing.F) {
 
 func TestEditorIndices(t *testing.T) {
 	var s editorState
+	s.Selection.Transform = f32.AffineId()
 	const str = "Hello, 😀"
 	s.Snippet = key.Snippet{
 		Text: str,
