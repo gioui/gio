@@ -16,6 +16,10 @@ func TestNormPt(t *testing.T) {
 	}
 
 	scenarios := []scenario{
+		// l!=0 && X=Y=0
+		{l: 10, ptIn: f32.Point{X: 0, Y: 0}, ptOut: f32.Point{X: 0, Y: 0}},
+		{l: -10, ptIn: f32.Point{X: 0, Y: 0}, ptOut: f32.Point{X: 0, Y: 0}},
+
 		// l>0 & X
 		{l: +20, ptIn: f32.Point{X: +30, Y: 0}, ptOut: f32.Point{X: +20, Y: 0}},
 		{l: +20, ptIn: f32.Point{X: +20, Y: 0}, ptOut: f32.Point{X: +20, Y: 0}},
