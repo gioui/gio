@@ -327,7 +327,7 @@ func strokePathNorm(p0, p1, p2 f32.Point, t, d float32) f32.Point {
 func rot90CW(p f32.Point) f32.Point { return f32.Pt(+p.Y, -p.X) }
 
 func normPt(p f32.Point, l float32) f32.Point {
-	if p.X == 0 && p.Y == 0 {
+	if (p.X == 0 && p.Y == 0) || l == 0 {
 		return f32.Point{}
 	}
 	isVerticalUnit := p.X == 0 && (p.Y == l || p.Y == -l)
