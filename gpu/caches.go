@@ -4,8 +4,7 @@ package gpu
 
 import (
 	"fmt"
-
-	"gioui.org/internal/f32"
+	"image"
 )
 
 type textureCacheKey struct {
@@ -36,7 +35,7 @@ type opCache struct {
 type opCacheValue struct {
 	data pathData
 
-	bounds f32.Rectangle
+	bounds image.Rectangle
 	// the fields below are handled by opCache
 	key  opKey
 	keep bool
