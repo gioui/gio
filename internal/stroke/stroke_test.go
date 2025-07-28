@@ -91,6 +91,16 @@ func TestNormPt(t *testing.T) {
 		{l: -20, ptIn: f32.Point{X: -20, Y: +20}, ptOut: f32.Point{X: +14.142136, Y: -14.142136}},
 		{l: -20, ptIn: f32.Point{X: -30, Y: +30}, ptOut: f32.Point{X: +14.142136, Y: -14.142136}},
 		{l: -20, ptIn: f32.Point{X: -90, Y: +90}, ptOut: f32.Point{X: +14.142137, Y: -14.142137}},
+
+		// l!=0 && Hypot=l
+		{l: 5, ptIn: f32.Point{X: 3, Y: 4}, ptOut: f32.Point{X: 3, Y: 4}},
+		{l: 5, ptIn: f32.Point{X: 3, Y: -4}, ptOut: f32.Point{X: 3, Y: -4}},
+		{l: 5, ptIn: f32.Point{X: -3, Y: -4}, ptOut: f32.Point{X: -3, Y: -4}},
+		{l: 5, ptIn: f32.Point{X: -3, Y: 4}, ptOut: f32.Point{X: -3, Y: 4}},
+		{l: -5, ptIn: f32.Point{X: 3, Y: 4}, ptOut: f32.Point{X: -3, Y: -4}},
+		{l: -5, ptIn: f32.Point{X: 3, Y: -4}, ptOut: f32.Point{X: -3, Y: 4}},
+		{l: -5, ptIn: f32.Point{X: -3, Y: -4}, ptOut: f32.Point{X: 3, Y: 4}},
+		{l: -5, ptIn: f32.Point{X: -3, Y: 4}, ptOut: f32.Point{X: 3, Y: -4}},
 	}
 
 	for i, s := range scenarios {

@@ -342,7 +342,11 @@ func normPt(p f32.Point, l float32) f32.Point {
 	d := math.Hypot(float64(p.X), float64(p.Y))
 	l64 := float64(l)
 	if math.Abs(d-l64) < 1e-10 {
-		return f32.Point{}
+		if math.Signbit(float64(l)) {
+			return f32.Point{X: -p.X, Y: -p.Y}
+		} else {
+			return f32.Point{X: p.X, Y: p.Y}
+		}
 	}
 	n := float32(l64 / d)
 	return f32.Point{X: p.X * n, Y: p.Y * n}
