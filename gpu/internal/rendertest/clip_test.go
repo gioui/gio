@@ -40,6 +40,25 @@ func TestPaintClippedRect(t *testing.T) {
 	})
 }
 
+func TestPaintClippedRectOffset(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		defer op.Affine(f32.AffineId().Offset(f32.Pt(0.5, 0.5))).Push(o).Pop()
+		defer clip.RRect{Rect: image.Rect(25, 25, 60, 60)}.Push(o).Pop()
+		paint.FillShape(o, red, clip.Rect(image.Rect(0, 0, 50, 50)).Op())
+	}, func(r result) {
+		r.expect(0, 0, transparent)
+		r.expect(24, 35, transparent)
+		r.expect(24, 24, transparent)
+		r.expect(25, 25, color.RGBA{R: 137, A: 64})
+		r.expect(25, 35, color.RGBA{R: 187, A: 128})
+		r.expect(35, 25, color.RGBA{R: 187, A: 128})
+		r.expect(50, 50, color.RGBA{R: 137, A: 64})
+		r.expect(51, 51, transparent)
+		r.expect(50, 0, transparent)
+		r.expect(10, 50, transparent)
+	})
+}
+
 func TestPaintClippedCircle(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		const r = 10

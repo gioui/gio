@@ -1036,7 +1036,7 @@ loop:
 			op.Decode(encOp.Data)
 			quads.key.outline = op.Outline
 			bounds := f32.FRect(op.Bounds)
-			trans, off := state.t.Split()
+			trans, off := transformOffset(state.t)
 			if len(quads.aux) > 0 {
 				// There is a clipping path, build the gpu data and update the
 				// cache key such that it will be equal only if the transform is the
@@ -1083,7 +1083,7 @@ loop:
 			// Transform (if needed) the painting rectangle and if so generate a clip path,
 			// for those cases also compute a partialTrans that maps texture coordinates between
 			// the new bounding rectangle and the transformed original paint rectangle.
-			t, off := state.t.Split()
+			t, off := transformOffset(state.t)
 			// Fill the clip area, unless the material is a (bounded) image.
 			// TODO: Find a tighter bound.
 			inf := float32(1e6)
@@ -1526,12 +1526,9 @@ func decodeToOutlineQuads(qs *quadSplitter, tr f32.Affine2D, pathData []byte) {
 // create GPU vertices for transformed r, find the bounds and establish texture transform.
 func (d *drawOps) boundsForTransformedRect(r f32.Rectangle, tr f32.Affine2D) (aux []byte, bnd f32.Rectangle, ptr f32.Affine2D) {
 	ptr = f32.AffineId()
-	if isPureOffset(tr) {
-		// fast-path to allow blitting of pure rectangles
-		_, _, ox, _, _, oy := tr.Elems()
-		off := f32.Pt(ox, oy)
-		bnd.Min = r.Min.Add(off)
-		bnd.Max = r.Max.Add(off)
+	if tr == f32.AffineId() {
+		// fast-path to allow blitting of pure rectangles.
+		bnd = r
 		return
 	}
 
@@ -1581,9 +1578,16 @@ func (d *drawOps) boundsForTransformedRect(r f32.Rectangle, tr f32.Affine2D) (au
 	return aux, bnd, ptr
 }
 
-func isPureOffset(t f32.Affine2D) bool {
-	a, b, _, d, e, _ := t.Elems()
-	return a == 1 && b == 0 && d == 0 && e == 1
+// transformOffset a transform into two parts, one which is pure integer offset
+// and the other representing the scaling, shearing and rotation and fractional
+// offset.
+func transformOffset(t f32.Affine2D) (f32.Affine2D, f32.Point) {
+	sx, hx, ox, hy, sy, oy := t.Elems()
+	iox, fox := math.Modf(float64(ox))
+	ioy, foy := math.Modf(float64(oy))
+	ft := f32.NewAffine2D(sx, hx, float32(fox), hy, sy, float32(foy))
+	ip := f32.Pt(float32(iox), float32(ioy))
+	return ft, ip
 }
 
 func newShaders(ctx driver.Device, vsrc, fsrc shader.Sources) (vert driver.VertexShader, frag driver.FragmentShader, err error) {
