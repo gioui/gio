@@ -19,10 +19,10 @@ type quadSplitter struct {
 
 func encodeQuadTo(data []byte, meta uint32, from, ctrl, to f32.Point) {
 	// inlined code:
-	//   encodeVertex(data, meta, -1, 1, from, ctrl, to)
+	//   encodeVertex(data, meta, 1, -1, from, ctrl, to)
 	//   encodeVertex(data[vertStride:], meta, 1, 1, from, ctrl, to)
 	//   encodeVertex(data[vertStride*2:], meta, -1, -1, from, ctrl, to)
-	//   encodeVertex(data[vertStride*3:], meta, 1, -1, from, ctrl, to)
+	//   encodeVertex(data[vertStride*3:], meta, -1, 1, from, ctrl, to)
 	// this code needs to stay in sync with `vertex.encode`.
 
 	bo := binary.LittleEndian
@@ -48,10 +48,10 @@ func encodeQuadTo(data []byte, meta uint32, from, ctrl, to f32.Point) {
 }
 
 const (
-	nwCorner = 1*0.25 + 0*0.5
-	neCorner = 1*0.25 + 1*0.5
-	swCorner = 0*0.25 + 0*0.5
-	seCorner = 0*0.25 + 1*0.5
+	nwCorner = 1*0.5 + 0*0.25
+	neCorner = 1*0.5 + 1*0.25
+	swCorner = 0*0.5 + 0*0.25
+	seCorner = 0*0.5 + 1*0.25
 )
 
 func encodeVertex(data []byte, meta uint32, cornerx, cornery int16, from, ctrl, to f32.Point) {
