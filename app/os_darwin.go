@@ -5,7 +5,7 @@ package app
 /*
 #include <Foundation/Foundation.h>
 
-__attribute__ ((visibility ("hidden"))) void gio_wakeupMainThread(void);
+__attribute__ ((visibility ("hidden"))) void gio_runOnMain(uintptr_t h);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createDisplayLink(void);
 __attribute__ ((visibility ("hidden"))) void gio_releaseDisplayLink(CFTypeRef dl);
 __attribute__ ((visibility ("hidden"))) int gio_startDisplayLink(CFTypeRef dl);
@@ -43,6 +43,7 @@ import "C"
 
 import (
 	"errors"
+	"runtime/cgo"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -74,8 +75,6 @@ type displayLink struct {
 // displayLinks maps CFTypeRefs to *displayLinks.
 var displayLinks sync.Map
 
-var mainFuncs = make(chan func(), 1)
-
 func isMainThread() bool {
 	return bool(C.isMainThread())
 }
@@ -86,22 +85,15 @@ func runOnMain(f func()) {
 		f()
 		return
 	}
-	go func() {
-		mainFuncs <- f
-		C.gio_wakeupMainThread()
-	}()
+	C.gio_runOnMain(C.uintptr_t(cgo.NewHandle(f)))
 }
 
-//export gio_dispatchMainFuncs
-func gio_dispatchMainFuncs() {
-	for {
-		select {
-		case f := <-mainFuncs:
-			f()
-		default:
-			return
-		}
-	}
+//export gio_runFunc
+func gio_runFunc(h C.uintptr_t) {
+	handle := cgo.Handle(h)
+	defer handle.Delete()
+	f := handle.Value().(func())
+	f()
 }
 
 // nsstringToString converts a NSString to a Go string.
