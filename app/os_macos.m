@@ -420,7 +420,6 @@ void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle) {
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
 	[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 	[NSApp activateIgnoringOtherApps:YES];
-	gio_onFinishLaunching();
 }
 @end
 
@@ -449,5 +448,27 @@ void gio_main() {
 		globalWindowDel = [[GioWindowDelegate alloc] init];
 
 		[NSApp run];
+	}
+}
+
+@interface AppListener : NSObject
+@end
+
+static AppListener *appListener;
+
+@implementation AppListener
+- (void)launchFinished:(NSNotification *)notification {
+	appListener = nil;
+	gio_onFinishLaunching();
+}
+@end
+
+void gio_init() {
+	@autoreleasepool {
+		appListener = [[AppListener alloc] init];
+		[[NSNotificationCenter defaultCenter] addObserver:appListener
+												 selector:@selector(launchFinished:)
+													 name:NSApplicationDidFinishLaunchingNotification
+												   object:nil];
 	}
 }

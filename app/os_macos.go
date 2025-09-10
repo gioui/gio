@@ -40,6 +40,7 @@ import (
 #define MOUSE_SCROLL 4
 
 __attribute__ ((visibility ("hidden"))) void gio_main(void);
+__attribute__ ((visibility ("hidden"))) void gio_init(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(int presentWithTrans);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height);
 __attribute__ ((visibility ("hidden"))) void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle);
@@ -334,6 +335,8 @@ import "C"
 func init() {
 	// Darwin requires that UI operations happen on the main thread only.
 	runtime.LockOSThread()
+	// Register launch finished listener.
+	C.gio_init()
 }
 
 // AppKitViewEvent notifies the client of changes to the window AppKit handles.
