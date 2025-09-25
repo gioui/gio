@@ -1061,7 +1061,13 @@ func (w *window) Configure(options []Option) {
 	cnf := w.config
 	cnf.apply(cfg, options)
 	w.config.decoHeight = cnf.decoHeight
-
+	if w.decor != nil && (prev.Decorated != cnf.Decorated || !w.configured) {
+		if cnf.Decorated {
+			C.zxdg_toplevel_decoration_v1_set_mode(w.decor, C.ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE)
+		} else {
+			C.zxdg_toplevel_decoration_v1_set_mode(w.decor, C.ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE)
+		}
+	}
 	switch cnf.Mode {
 	case Fullscreen:
 		switch prev.Mode {
