@@ -200,6 +200,7 @@ type window struct {
 		dir            f32.Point
 	}
 
+	alreadyDecorated  bool
 	configured        bool
 	lastFrameCallback *C.struct_wl_callback
 
@@ -1061,12 +1062,13 @@ func (w *window) Configure(options []Option) {
 	cnf := w.config
 	cnf.apply(cfg, options)
 	w.config.decoHeight = cnf.decoHeight
-	if w.decor != nil && (prev.Decorated != cnf.Decorated || !w.configured) {
+	if w.decor != nil && (prev.Decorated != cnf.Decorated || !w.alreadyDecorated) {
 		if cnf.Decorated {
 			C.zxdg_toplevel_decoration_v1_set_mode(w.decor, C.ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE)
 		} else {
 			C.zxdg_toplevel_decoration_v1_set_mode(w.decor, C.ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE)
 		}
+		w.alreadyDecorated = true
 	}
 	switch cnf.Mode {
 	case Fullscreen:
