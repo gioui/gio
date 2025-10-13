@@ -210,6 +210,9 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 - (void)applicationDidHide:(NSNotification *)notification {
 	gio_onDraw(self.handle);
 }
+- (void)applicationWillTerminate:(NSNotification *)notification {
+	gio_onDestroy(self.handle);
+}
 - (void)dealloc {
 	gio_onDestroy(self.handle);
 }
@@ -404,6 +407,10 @@ CFTypeRef gio_createView(int presentWithTrans) {
 		[[NSNotificationCenter defaultCenter] addObserver:view
 												 selector:@selector(applicationDidHide:)
 													 name:NSApplicationDidHideNotification
+												   object:nil];
+		[[NSNotificationCenter defaultCenter] addObserver:view
+												 selector:@selector(applicationWillTerminate:)
+													 name:NSApplicationWillTerminateNotification
 												   object:nil];
 		return CFBridgingRetain(view);
 	}
