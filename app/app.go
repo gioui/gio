@@ -130,8 +130,8 @@ func NewContext(ops *op.Ops, e FrameEvent) layout.Context {
 // On iOS NSDocumentDirectory is queried.
 // For Android Context.getFilesDir is used.
 //
-// BUG: DataDir blocks on Android until init functions
-// have completed.
+// Note that on Android, DataDir blocks until main is called.
+// Don't call it from init functions or global variable initializers.
 func DataDir() (string, error) {
 	return dataDir()
 }
