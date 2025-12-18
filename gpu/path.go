@@ -334,7 +334,7 @@ func (p *pather) begin(sizes []image.Point) {
 	p.stenciler.begin(sizes)
 }
 
-func (p *pather) stencilPath(bounds image.Rectangle, offset image.Point, uv image.Point, data pathData) {
+func (p *pather) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.Point, data pathData) {
 	p.stenciler.stencilPath(bounds, offset, uv, data)
 }
 
@@ -353,14 +353,14 @@ func (s *stenciler) begin(sizes []image.Point) {
 	s.fbos.resize(s.ctx, driver.TextureFormatFloat, sizes)
 }
 
-func (s *stenciler) stencilPath(bounds image.Rectangle, offset image.Point, uv image.Point, data pathData) {
+func (s *stenciler) stencilPath(bounds image.Rectangle, offset f32.Point, uv image.Point, data pathData) {
 	s.ctx.Viewport(uv.X, uv.Y, bounds.Dx(), bounds.Dy())
 	// Transform UI coordinates to OpenGL coordinates.
 	texSize := f32.Point{X: float32(bounds.Dx()), Y: float32(bounds.Dy())}
 	scale := f32.Point{X: 2 / texSize.X, Y: 2 / texSize.Y}
 	orig := f32.Point{X: -1 - float32(bounds.Min.X)*2/texSize.X, Y: -1 - float32(bounds.Min.Y)*2/texSize.Y}
 	s.pipeline.uniforms.transform = [4]float32{scale.X, scale.Y, orig.X, orig.Y}
-	s.pipeline.uniforms.pathOffset = [2]float32{float32(offset.X), float32(offset.Y)}
+	s.pipeline.uniforms.pathOffset = [2]float32{offset.X, offset.Y}
 	s.pipeline.pipeline.UploadUniforms(s.ctx)
 	// Draw in batches that fit in uint16 indices.
 	start := 0
