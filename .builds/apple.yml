@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Unlicense OR MIT
-image: debian/testing
+image: debian/stable
 packages:
  - clang
  - cmake
