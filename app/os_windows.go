@@ -734,6 +734,8 @@ func (w *window) Configure(options []Option) {
 	w.config.Decorated = cnf.Decorated
 	w.config.MinSize = cnf.MinSize
 	w.config.MaxSize = cnf.MaxSize
+	w.config.MinimizeButtonHidden = cnf.MinimizeButtonHidden
+	w.config.MaximizeButtonHidden = cnf.MaximizeButtonHidden
 	windows.SetWindowText(w.hwnd, cnf.Title)
 
 	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
@@ -781,6 +783,16 @@ func (w *window) Configure(options []Option) {
 	case Fullscreen:
 		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
 		showMode = windows.SW_SHOWMAXIMIZED
+	}
+	if w.config.MinimizeButtonHidden {
+		style &^= windows.WS_MINIMIZEBOX
+	} else {
+		style |= windows.WS_MINIMIZEBOX
+	}
+	if w.config.MaximizeButtonHidden {
+		style &^= windows.WS_MAXIMIZEBOX
+	} else {
+		style |= windows.WS_MAXIMIZEBOX
 	}
 
 	// Disable window resizing if MinSize and MaxSize are equal.
