@@ -312,7 +312,7 @@ func splitByScript(inputs []shaping.Input, documentDir di.Direction, buf []shapi
 			r := input.Text[i]
 			runeScript := language.LookupScript(r)
 
-			if runeScript == language.Common || runeScript == currentInput.Script {
+			if runeScript == language.Common || runeScript == language.Inherited || runeScript == currentInput.Script {
 				continue
 			}
 
@@ -661,7 +661,7 @@ func (s *shaperImpl) Shape(pathOps *op.Ops, gs []Glyph) clip.PathSpec {
 			outline := glyphData
 			// Move to glyph position.
 			pos := f32.Point{
-				X: fixedToFloat((g.X - x) - g.Offset.X),
+				X: fixedToFloat((g.X - x) + g.Offset.X),
 				Y: -fixedToFloat(g.Offset.Y),
 			}
 			builder.Move(pos.Sub(lastPos))
@@ -761,7 +761,7 @@ func (s *shaperImpl) Bitmaps(ops *op.Ops, gs []Glyph) op.CallOp {
 				imgSize = bitmapData.size
 			}
 			off := op.Affine(f32.AffineId().Offset(f32.Point{
-				X: fixedToFloat((g.X - x) - g.Offset.X),
+				X: fixedToFloat((g.X - x) + g.Offset.X),
 				Y: fixedToFloat(g.Offset.Y + g.Bounds.Min.Y),
 			})).Push(ops)
 			cl := clip.Rect{Max: imgSize}.Push(ops)

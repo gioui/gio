@@ -10,6 +10,8 @@ import (
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
 	"github.com/go-text/typesetting/font"
 	"github.com/go-text/typesetting/shaping"
+	"github.com/go-text/typesetting/language"
+	"github.com/go-text/typesetting/di"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
 
@@ -589,6 +591,106 @@ func TestGlyphIDPacking(t *testing.T) {
 			}
 			if actualGID != tc.gid {
 				t.Errorf("expected gid %d, got %d", tc.gid, actualGID)
+			}
+		})
+	}
+}
+
+// TestArabicDiacriticClustering verifies that Arabic diacritics (which usually have
+// script 'Inherited') are correctly clustered with their base Arabic letters,
+// rather than being split into a separate shaping run.
+func TestArabicDiacriticClustering(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         []rune
+		wantRuns      int
+		wantScript    language.Script
+		wantDirection di.Direction
+	}{
+		{
+			name: "Arabic Letter + Diacritic",
+			// \u0628 => BEH
+			// \u0650 => KASRA (Diacritic)
+			input:         []rune{'\u0628', '\u0650'},
+			wantRuns:      1,
+			wantScript:    language.Arabic,
+			wantDirection: di.DirectionRTL,
+		},
+		{
+			name: "Arabic Word with Multiple Diacritics",
+			input: []rune{
+				'\u0628', // BEH
+				'\u0650', // KASRA
+				'\u0633', // SEEN
+				'\u0652', // SUKUN
+				'\u0645', // MEEM
+				'\u0650', // KASRA
+			},
+			wantRuns:      1,
+			wantScript:    language.Arabic,
+			wantDirection: di.DirectionRTL,
+		},
+		{
+			name: "Mixed Script (CONTROL Case) #1",
+			// Arabic Letter + Latin Letter
+			// THESE MUST SPLIT TO 2.
+			input:         []rune{'\u0628', 'A'},
+			wantRuns:      2,
+			wantScript:    language.Arabic,
+			wantDirection: di.DirectionRTL,
+		},
+		{
+			name: "Mixed Script (CONTROL Case) #2",
+			// Arabic Letter + Diacritic + Diacritic + Latin Letter + Arabic Letter + Diacritic
+			// THESE MUST SPLIT TO 3.
+			input:         []rune{'\u0628', '\u0651', '\u0650', 'A', '\u0628', '\u0650'},
+			wantRuns:      3,
+			wantScript:    language.Arabic,
+			wantDirection: di.DirectionRTL,
+		},
+		{
+			name: "Mixed Script (A little 'stress' test)",
+			// Latin 's' + Arabic Kasra + Latin 'r' + Arabic Fatha
+			// this technically valid unicode!
+			// the diacritics should inherit "Latin"
+			input:         []rune{'s', '\u0651', '\u0650', 'r', '\u064E'},
+			wantRuns:      1,
+			wantScript:    language.Latin,
+			wantDirection: di.DirectionLTR,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inputs := []shaping.Input{{
+				Text:      tt.input,
+				RunStart:  0,
+				RunEnd:    len(tt.input),
+				Direction: tt.wantDirection,
+				Script:    language.Arabic,
+				Face:      nil,             // face doesn't really matter for splitting anyway
+				Size:      fixed.I(10),
+			}}
+
+			got := splitByScript(inputs, tt.wantDirection, nil)
+
+			if len(got) != tt.wantRuns {
+				t.Fatalf("splitByScript produced %d runs, expected %d. \nRun details: %+v", len(got), tt.wantRuns, got)
+			}
+
+			// this is for the single-run cases
+			// we need to verify the integrity of the single run
+			// to ensure
+			//     - the truncation didn't happen early on (when first hitting a diacritic)
+			//     - and the right dominant script label was used
+			if tt.wantRuns == 1 {
+				run := got[0]
+				if run.RunEnd != len(tt.input) {
+					t.Errorf("Run truncated early. End = %d, expected %d", run.RunEnd, len(tt.input))
+				}
+				if run.Script != tt.wantScript {
+					t.Errorf("Run assigned wrong script. Got %s, expected %s", run.Script, tt.wantScript)
+				}
 			}
 		})
 	}
