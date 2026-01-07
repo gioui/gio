@@ -218,8 +218,6 @@ type AndroidViewEvent struct {
 
 type jvalue uint64 // The largest JNI type fits in 64 bits.
 
-var dataDirChan = make(chan string, 1)
-
 var android struct {
 	// mu protects all fields of this structure. However, once a
 	// non-nil jvm is returned from javaVM, all the other fields may
@@ -295,8 +293,7 @@ var mainWindow = newWindowRendezvous()
 var mainFuncs = make(chan func(env *C.JNIEnv), 1)
 
 var (
-	dataDirOnce sync.Once
-	dataPath    string
+	dataPath string
 )
 
 var (
@@ -343,9 +340,9 @@ func (w *window) NewContext() (context, error) {
 }
 
 func dataDir() (string, error) {
-	dataDirOnce.Do(func() {
-		dataPath = <-dataDirChan
-	})
+	if dataPath == "" {
+		panic("DataDir isn't valid before main")
+	}
 	return dataPath, nil
 }
 
@@ -398,7 +395,7 @@ func Java_org_gioui_Gio_runGoMain(env *C.JNIEnv, class C.jclass, jdataDir C.jbyt
 		os.Setenv("HOME", dataDir)
 	}
 
-	dataDirChan <- dataDir
+	dataPath = dataDir
 	C.jni_ReleaseByteArrayElements(env, jdataDir, dirBytes)
 
 	runMain()
