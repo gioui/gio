@@ -7,6 +7,7 @@
 package app
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -15,8 +16,10 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -171,14 +174,17 @@ type window struct {
 	lastTouch   f32.Point
 
 	cursor struct {
-		theme  *C.struct_wl_cursor_theme
+		theme *C.struct_wl_cursor_theme
+		// cursor is the currently used cursor.
 		cursor *C.struct_wl_cursor
 		// system is the active cursor for system gestures
 		// such as border resizes and window moves. It
 		// is nil if the pointer is not in a system gesture
 		// area.
-		system  *C.struct_wl_cursor
-		surf    *C.struct_wl_surface
+		system *C.struct_wl_cursor
+		surf   *C.struct_wl_surface
+		// preloaded cursors for commonly used window operations.
+		// prevents hitting the disc every time.
 		cursors struct {
 			pointer         *C.struct_wl_cursor
 			resizeNorth     *C.struct_wl_cursor
@@ -376,22 +382,15 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 	defer C.free(unsafe.Pointer(id))
 	C.xdg_toplevel_set_app_id(w.topLvl, id)
 
-	cursorTheme := C.CString(os.Getenv("XCURSOR_THEME"))
+	theme, cursorSize := getCursorTheme()
+	cursorTheme := C.CString(theme)
 	defer C.free(unsafe.Pointer(cursorTheme))
-	cursorSize := 32
-	if envSize, ok := os.LookupEnv("XCURSOR_SIZE"); ok && envSize != "" {
-		size, err := strconv.Atoi(envSize)
-		if err == nil {
-			cursorSize = size
-		}
-	}
-
 	w.cursor.theme = C.wl_cursor_theme_load(cursorTheme, C.int(cursorSize*w.scale), d.shm)
 	if w.cursor.theme == nil {
 		w.destroy()
 		return nil, errors.New("wayland: wl_cursor_theme_load failed")
 	}
-	w.loadCursors()
+	w.preloadCursors()
 	w.cursor.cursor = w.cursor.cursors.pointer
 	if w.cursor.cursor == nil {
 		w.destroy()
@@ -416,7 +415,7 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 	return w, nil
 }
 
-func (w *window) loadCursors() {
+func (w *window) preloadCursors() {
 	w.cursor.cursors.pointer = w.loadCursor(pointer.CursorDefault)
 	w.cursor.cursors.resizeNorth = w.loadCursor(pointer.CursorNorthResize)
 	w.cursor.cursors.resizeSouth = w.loadCursor(pointer.CursorSouthResize)
@@ -441,6 +440,90 @@ func (w *window) loadCursor(name pointer.Cursor) *C.struct_wl_cursor {
 		c = w.cursor.cursors.pointer
 	}
 	return c
+}
+
+func getCursorTheme() (string, int) {
+	type cursorTheme struct {
+		name string
+		size int
+	}
+
+	const defaultCursorSize = 32
+	var ct cursorTheme
+
+	kdeTheme, kdeSize := getKDECursorTheme()
+	var themesToTry = []cursorTheme{
+		{"breeze_cursors", kdeSize},    // KDE default
+		{"Adwaita", defaultCursorSize}, // GNOME default
+		{"", defaultCursorSize},        // system default
+	}
+	if kdeTheme != "" {
+		themesToTry = append([]cursorTheme{{kdeTheme, kdeSize}}, themesToTry...)
+	}
+	if os.Getenv("XCURSOR_THEME") != "" {
+		themesToTry = append([]cursorTheme{{os.Getenv("XCURSOR_THEME"), defaultCursorSize}}, themesToTry...)
+	}
+
+	for _, theme := range themesToTry {
+		if !themeExists(theme.name) {
+			continue
+		}
+		ct = theme
+		break
+	}
+
+	if envSize, ok := os.LookupEnv("XCURSOR_SIZE"); ok && envSize != "" {
+		size, err := strconv.Atoi(envSize)
+		if err == nil {
+			ct.size = size
+		}
+	}
+
+	return ct.name, ct.size
+}
+
+func getKDECursorTheme() (string, int) {
+	var cursorTheme string
+	var cursorSize = 24
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return cursorTheme, cursorSize
+	}
+	configPath := filepath.Join(homeDir, ".config", "kcminputrc")
+	file, err := os.Open(configPath)
+	if err != nil {
+		return cursorTheme, cursorSize
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "cursorTheme=") {
+			cursorTheme = strings.TrimPrefix(line, "cursorTheme=")
+		} else if strings.HasPrefix(line, "cursorSize=") {
+			fmt.Sscanf(line, "cursorSize=%d", &cursorSize)
+		}
+	}
+
+	return cursorTheme, cursorSize
+}
+
+func themeExists(themeName string) bool {
+	if themeName == "" {
+		return true
+	}
+	searchPaths := []string{
+		"/usr/share/icons/" + themeName + "/cursors",
+		os.ExpandEnv("$HOME/.local/share/icons/" + themeName + "/cursors"),
+	}
+	for _, path := range searchPaths {
+		if _, err := os.Lstat(path); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func callbackDelete(k unsafe.Pointer) {
