@@ -667,11 +667,15 @@ func (w *Window) processEvent(e event.Event) bool {
 		w.decorations.Config = e2.Config
 		e2.Config = w.effectiveConfig()
 		w.coalesced.cfg = &e2
+
+		handled := false
 		if f := w.decorations.Config.Focused; f != wasFocused {
 			w.queue.Queue(key.FocusEvent{Focus: f})
+			// Ensures focus change is processed on android.
+			handled = true
 		}
-		t, handled := w.queue.WakeupTime()
-		if handled {
+		t, h := w.queue.WakeupTime()
+		if handled || h {
 			w.setNextFrame(t)
 			w.updateAnimation()
 		}
