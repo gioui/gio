@@ -45,6 +45,8 @@ type Config struct {
 	CustomRenderer bool
 	// Decorated reports whether window decorations are provided automatically.
 	Decorated bool
+	// TopMost windows render above all other non-top-most windows.
+	TopMost bool
 	// Focused reports whether has the keyboard focus.
 	Focused bool
 	// decoHeight is the height of the fallback decoration for platforms such

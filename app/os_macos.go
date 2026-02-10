@@ -241,6 +241,13 @@ static void setTitle(CFTypeRef windowRef, CFTypeRef titleRef) {
 	}
 }
 
+static void setWindowLevel(CFTypeRef windowRef, NSWindowLevel level) {
+	@autoreleasepool {
+		NSWindow *window = (__bridge NSWindow *)windowRef;
+		window.level = level;
+	}
+}
+
 static int isWindowZoomed(CFTypeRef windowRef) {
 	@autoreleasepool {
 		NSWindow *window = (__bridge NSWindow *)windowRef;
@@ -494,6 +501,9 @@ func (w *window) Configure(options []Option) {
 		mask |= style
 		barTrans = C.YES
 		titleVis = C.NSWindowTitleHidden
+	}
+	if cnf.TopMost {
+		C.setWindowLevel(window, C.NSFloatingWindowLevel)
 	}
 	C.setWindowTitlebarAppearsTransparent(window, barTrans)
 	C.setWindowTitleVisibility(window, titleVis)

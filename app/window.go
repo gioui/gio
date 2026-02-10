@@ -969,6 +969,15 @@ func Decorated(enabled bool) Option {
 	}
 }
 
+// TopMost windows will be rendered above all other non-top-most windows.
+//
+// TopMost windows are only supported on MacOS currently.
+func TopMost(enabled bool) Option {
+	return func(_ unit.Metric, cnf *Config) {
+		cnf.TopMost = enabled
+	}
+}
+
 // flushEvent is sent to detect when the user program
 // has completed processing of all prior events. Its an
 // [io/event.Event] but only for internal use.
