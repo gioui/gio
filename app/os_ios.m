@@ -9,6 +9,7 @@
 #include "framework_ios.h"
 
 __attribute__ ((visibility ("hidden"))) Class gio_layerClass(void);
+__attribute__ ((visibility ("hidden"))) int gio_hitTest(uintptr_t handle, CGFloat x, CGFloat y);
 
 @interface GioView: UIView <UIKeyInput>
 @property uintptr_t handle;
@@ -133,6 +134,16 @@ NSArray<UIKeyCommand *> *_keyCommands;
 + (Class)layerClass {
     return gio_layerClass();
 }
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (self) {
+        // Ensure user interaction is enabled for hit testing.
+        self.userInteractionEnabled = YES;
+        // Ensure the view is opaque to touch events.
+        self.opaque = NO;
+    }
+    return self;
+}
 - (void)willMoveToWindow:(UIWindow *)newWindow {
 	self.contentScaleFactor = newWindow.screen.nativeScale;
     if (@available(iOS 13.0, *)) {
@@ -215,6 +226,32 @@ NSArray<UIKeyCommand *> *_keyCommands;
 
 - (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
 	handleTouches(1, self, touches, event);
+}
+
+// hitTest returns true if the point should be handled by Gio,
+// false if it should be passed through to external views.
+- (BOOL)hitTestPoint:(CGPoint)point {
+	if (self.handle == 0) {
+		return YES;
+	}
+	return gio_hitTest(self.handle, point.x * self.contentScaleFactor, point.y * self.contentScaleFactor);
+}
+
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+	// Check if this point is within an external view's bounds.
+	// If so, return nil to allow the event to pass through.
+	if (![self hitTestPoint:point]) {
+		return nil;
+	}
+	return [super hitTest:point withEvent:event];
+}
+
+- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
+	// Allow touch events to pass through if the point is in an external region.
+	if (![self hitTestPoint:point]) {
+		return NO;
+	}
+	return [super pointInside:point withEvent:event];
 }
 
 - (void)insertText:(NSString *)text {
@@ -315,6 +352,37 @@ void gio_setCursor(NSUInteger curID) {
 void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle) {
 	GioView *v = (__bridge GioView *)viewRef;
 	v.handle = handle;
+}
+
+void gio_setEmbedViewPosition(CFTypeRef viewRef, CFTypeRef viewID, int x, int y, int w, int h, int zOrder) {
+	GioView *gioView = (__bridge GioView *)viewRef;
+	UIView *view = (__bridge UIView *)viewID;
+	UIView *parent = [gioView superview];
+	
+	if (zOrder == 0) {
+		[view setHidden:YES];
+		return;
+	}
+	
+	[view setHidden:NO];
+	
+	NSInteger expectedIndex = zOrder - 1;
+	NSInteger currentIndex = [parent.subviews indexOfObject:view];
+	
+	if (currentIndex != expectedIndex) {
+		[view removeFromSuperview];
+		if (expectedIndex < [parent.subviews count]) {
+			[parent insertSubview:view atIndex:expectedIndex];
+		} else {
+			[parent insertSubview:view belowSubview:gioView];
+		}
+	}
+
+	CGFloat scale = gioView.contentScaleFactor;
+	CGRect newFrame = CGRectMake(x / scale, y / scale, w / scale, h / scale);
+	if (!CGRectEqualToRect([view frame], newFrame)) {
+		[view setFrame:newFrame];
+	}
 }
 
 @interface _gioAppDelegate : UIResponder <UIApplicationDelegate>

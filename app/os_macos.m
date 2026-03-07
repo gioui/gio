@@ -7,6 +7,7 @@
 #include "_cgo_export.h"
 
 __attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(BOOL presentWithTrans);
+__attribute__ ((visibility ("hidden"))) int gio_hitTest(uintptr_t handle, CGFloat x, CGFloat y);
 
 @interface GioAppDelegate : NSObject<NSApplicationDelegate>
 @end
@@ -131,6 +132,31 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	CGFloat dy = -event.scrollingDeltaY;
 	handleMouse(self, event, MOUSE_SCROLL, dx, dy);
 }
+// hitTestPoint returns true if the point should be handled by Gio,
+// false if it should be passed through to external views.
+- (BOOL)hitTestPoint:(NSPoint)point {
+	if (self.handle == 0) {
+		return YES;
+	}
+	// Convert point to pixels to match EmbedRegions coordinates.
+	CGFloat scale = self.window.backingScaleFactor;
+	CGFloat xPx = point.x * scale;
+	CGFloat yPx = (self.bounds.size.height - point.y) * scale;
+	return gio_hitTest(self.handle, xPx, yPx);
+}
+- (NSView *)hitTest:(NSPoint)point {
+	// Check if this point is within an external view's bounds.
+	// If so, return nil to allow the event to pass through.
+	if (![self hitTestPoint:point]) {
+		return nil;
+	}
+	return self;
+}
+
+- (BOOL)mouseDownCanMoveWindow {
+	// Allow the window to be moved by dragging in areas not handled by Gio.
+	return YES;
+}
 - (void)keyDown:(NSEvent *)event {
 	NSString *keys = [event charactersIgnoringModifiers];
 	gio_onKeys(self.handle, (__bridge CFTypeRef)event, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], true);
@@ -213,11 +239,14 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 - (void)dealloc {
 	gio_onDestroy(self.handle);
 }
-- (BOOL) becomeFirstResponder {
+- (BOOL)acceptsFirstResponder {
+	return YES;
+}
+- (BOOL)becomeFirstResponder {
 	gio_onFocus(self.handle, 1);
 	return [super becomeFirstResponder];
  }
-- (BOOL) resignFirstResponder {
+- (BOOL)resignFirstResponder {
 	gio_onFocus(self.handle, 0);
 	return [super resignFirstResponder];
 }
@@ -475,5 +504,72 @@ void gio_init() {
 												 selector:@selector(launchFinished:)
 													 name:NSApplicationDidFinishLaunchingNotification
 												   object:nil];
+	}
+}
+
+// Helper function to find index of a view in its superview's subviews array
+static NSInteger indexOfView(NSView *parent, NSView *view) {
+	NSArray *subviews = [parent subviews];
+	for (NSInteger i = 0; i < [subviews count]; i++) {
+		if ([subviews objectAtIndex:i] == view) {
+			return i;
+		}
+	}
+	return NSNotFound;
+}
+
+void gio_setEmbedViewPosition(CFTypeRef viewRef, CFTypeRef viewID, int x, int y, int w, int h, int zOrder) {
+	@autoreleasepool {
+		GioView *gioView = (__bridge GioView *)viewRef;
+		NSView *view = (__bridge NSView *)viewID;
+		NSView *parent = [gioView superview];
+		
+		if (parent == nil) {
+			return;
+		}
+		
+		if (zOrder == 0) {
+			[view setHidden:YES];
+			return;
+		}
+		
+		[view setHidden:NO];
+		
+		NSInteger expectedIndex = zOrder;
+		NSInteger currentIndex = indexOfView(parent, view);
+		
+		if (currentIndex != expectedIndex) {
+			[view removeFromSuperview];
+
+			NSInteger gioIndex = indexOfView(parent, gioView);
+			NSArray *subviews = [parent subviews];
+			if (expectedIndex < [subviews count] && expectedIndex >= 0) {
+				// Insert before the view at expectedIndex
+				NSView *relativeTo = [subviews objectAtIndex:expectedIndex];
+				[parent addSubview:view positioned:NSWindowBelow relativeTo:relativeTo];
+			} else if (gioIndex != NSNotFound) {
+				// Insert before GioView if expected index is beyond current count
+				[parent addSubview:view positioned:NSWindowBelow relativeTo:gioView];
+			} else {
+				[parent addSubview:view];
+			}
+		}
+		
+		// Convert pixel coordinates to points (AppKit uses points, not pixels).
+		CGFloat scale = gioView.window.backingScaleFactor;
+		CGFloat xPt = x / scale;
+		CGFloat yPt = y / scale;
+		CGFloat wPt = w / scale;
+		CGFloat hPt = h / scale;
+		
+		// Convert from Gio coordinates (top-left origin) to AppKit coordinates (bottom-left origin).
+		CGFloat gioHeight = gioView.bounds.size.height;
+		NSRect frameInGioView = NSMakeRect(xPt, gioHeight - yPt - hPt, wPt, hPt);
+		
+		// Convert from gioView's coordinate space to parent's coordinate space.
+		NSRect newFrame = [gioView convertRect:frameInGioView toView:parent];
+		if (!NSEqualRects([view frame], newFrame)) {
+			[view setFrame:newFrame];
+		}
 	}
 }

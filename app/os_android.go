@@ -138,6 +138,7 @@ import (
 
 	"gioui.org/io/transfer"
 
+	"gioui.org/gpu"
 	"gioui.org/internal/f32color"
 	"gioui.org/op"
 
@@ -176,30 +177,35 @@ type window struct {
 		focusID input.SemanticID
 		diffs   []input.SemanticID
 	}
+
+	// embedRegions tracks areas for hit testing.
+	embedRegions gpu.EmbedRegions
 }
 
 // gioView hold cached JNI methods for GioView.
 var gioView struct {
-	once               sync.Once
-	getDensity         C.jmethodID
-	getFontScale       C.jmethodID
-	showTextInput      C.jmethodID
-	hideTextInput      C.jmethodID
-	setInputHint       C.jmethodID
-	postFrameCallback  C.jmethodID
-	invalidate         C.jmethodID // requests draw, called from UI thread
-	setCursor          C.jmethodID
-	setOrientation     C.jmethodID
-	setNavigationColor C.jmethodID
-	setStatusColor     C.jmethodID
-	setFullscreen      C.jmethodID
-	unregister         C.jmethodID
-	sendA11yEvent      C.jmethodID
-	sendA11yChange     C.jmethodID
-	isA11yActive       C.jmethodID
-	restartInput       C.jmethodID
-	updateSelection    C.jmethodID
-	updateCaret        C.jmethodID
+	once                 sync.Once
+	getDensity           C.jmethodID
+	getFontScale         C.jmethodID
+	showTextInput        C.jmethodID
+	hideTextInput        C.jmethodID
+	setInputHint         C.jmethodID
+	postFrameCallback    C.jmethodID
+	invalidate           C.jmethodID // requests draw, called from UI thread
+	setCursor            C.jmethodID
+	setOrientation       C.jmethodID
+	setNavigationColor   C.jmethodID
+	setStatusColor       C.jmethodID
+	setFullscreen        C.jmethodID
+	unregister           C.jmethodID
+	sendA11yEvent        C.jmethodID
+	sendA11yChange       C.jmethodID
+	isA11yActive         C.jmethodID
+	restartInput         C.jmethodID
+	updateSelection      C.jmethodID
+	updateCaret          C.jmethodID
+	updateLayout         C.jmethodID
+	setEmbedViewPosition C.jmethodID
 }
 
 type pixelInsets struct {
@@ -486,6 +492,8 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.restartInput = getMethodID(env, class, "restartInput", "()V")
 		m.updateSelection = getMethodID(env, class, "updateSelection", "()V")
 		m.updateCaret = getMethodID(env, class, "updateCaret", "(FFFFFFFFFF)V")
+		m.updateLayout = getMethodID(env, class, "updateLayout", "()V")
+		m.setEmbedViewPosition = getMethodID(env, class, "setEmbedViewPosition", "(Landroid/view/View;IIIII)Z")
 	})
 	view = C.jni_NewGlobalRef(env, view)
 	wopts := <-mainWindow.out
@@ -910,6 +918,23 @@ func (w *window) draw(env *C.JNIEnv, sync bool) {
 			callVoidMethod(env, w.view, gioView.sendA11yChange, jvalue(w.virtualIDFor(id)))
 		}
 	}
+
+	currentRegions, lostRegions := w.callbacks.EmbeddedRegions()
+	var needsUpdate bool
+	for index, region := range currentRegions.Views {
+		if ok, _ := callBooleanMethod(env, w.view, gioView.setEmbedViewPosition, jvalue(region.View), jvalue(region.Area.Min.X), jvalue(region.Area.Min.Y), jvalue(region.Area.Dx()), jvalue(region.Area.Dy()), jvalue(index+1)); ok {
+			needsUpdate = true
+		}
+	}
+	for _, lost := range lostRegions {
+		if ok, _ := callBooleanMethod(env, w.view, gioView.setEmbedViewPosition, jvalue(lost.View), jvalue(0), jvalue(0), jvalue(0), jvalue(0), jvalue(0)); ok {
+			needsUpdate = true
+		}
+	}
+	if needsUpdate {
+		callVoidMethod(env, w.view, gioView.updateLayout)
+	}
+	w.embedRegions = currentRegions
 }
 
 func runInJVM(jvm *C.JavaVM, f func(env *C.JNIEnv)) {
@@ -982,6 +1007,15 @@ func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.j
 	if pressed == C.JNI_TRUE && r != 0 && r != '\n' { // Checking for "\n" to prevent duplication with key.NameEnter (gio#224).
 		w.callbacks.EditorInsert(string(rune(r)))
 	}
+}
+
+//export Java_org_gioui_GioView_hitTest
+func Java_org_gioui_GioView_hitTest(env *C.JNIEnv, class C.jclass, handle C.jlong, x, y C.jfloat) C.jboolean {
+	w := cgo.Handle(handle).Value().(*window)
+	if w.embedRegions.Contains(f32.Point{X: float32(x), Y: float32(y)}) {
+		return C.JNI_FALSE
+	}
+	return C.JNI_TRUE
 }
 
 //export Java_org_gioui_GioView_onTouchEvent

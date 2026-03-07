@@ -218,7 +218,10 @@ func (w *Window) frame(frame *op.Ops, viewport image.Point) error {
 	if err != nil {
 		return err
 	}
-	return w.gpu.Frame(frame, target, viewport)
+	if err := w.gpu.Frame(frame, target, viewport); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (w *Window) processFrame(frame *op.Ops, ack chan<- struct{}) {
@@ -405,6 +408,13 @@ func (c *callbacks) ProcessFrame(frame *op.Ops, ack chan<- struct{}) {
 
 func (c *callbacks) ProcessEvent(e event.Event) bool {
 	return c.w.processEvent(e)
+}
+
+func (c *callbacks) EmbeddedRegions() (active gpu.EmbedRegions, lost []gpu.EmbedView) {
+	if c.w.gpu == nil {
+		return gpu.EmbedRegions{}, nil
+	}
+	return c.w.gpu.EmbedRegions()
 }
 
 // SemanticRoot returns the ID of the semantic root.
