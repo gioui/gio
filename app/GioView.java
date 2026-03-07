@@ -16,6 +16,7 @@ import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
@@ -55,6 +56,8 @@ import android.view.accessibility.AccessibilityNodeProvider;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
 
 import java.io.UnsupportedEncodingException;
 
@@ -84,9 +87,12 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		// Late initialization of the Go runtime to wait for a valid context.
 		Gio.init(context.getApplicationContext());
 
+		setZOrderOnTop(true);
+
 		// Set background color to transparent to avoid a flickering
 		// issue on ChromeOS.
 		setBackgroundColor(Color.argb(0, 0, 0, 0));
+		getHolder().setFormat(PixelFormat.TRANSPARENT);
 
 		ViewConfiguration conf = ViewConfiguration.get(context);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -151,6 +157,22 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		// so assume it's good for us as well.
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
 			requestUnbufferedDispatch(event);
+		}
+
+		// Check if touch event should be handled by Gio or passed through
+		// to external views. Only check at the beginning of a trace so drags
+		// crossing over external regions are not truncated.
+		if (nhandle != 0) {
+			int action = event.getActionMasked();
+			if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
+				int idx = event.getActionIndex();
+				float x = event.getX(idx);
+				float y = event.getY(idx);
+				if (!hitTest(nhandle, x, y)) {
+					// Event is on an external view, don't consume it.
+					return false;
+				}
+			}
 		}
 
 		dispatchMotionEvent(event);
@@ -549,6 +571,62 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		imm.updateCursorAnchorInfo(this, inf);
 	}
 
+	boolean setEmbedViewPosition(View view, int x, int y, int w, int h, int zOrder) {
+		ViewGroup parent = (ViewGroup) this.getParent();
+		boolean isLayoutUpdated = false;
+		
+		if (zOrder == 0) {
+			view.setVisibility(View.GONE);
+			view.requestLayout();
+			return true;
+		}
+		
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+			// On API 21+: use Z for draw ordering without mutating the view
+			// hierarchy, so GioView's SurfaceView surface is never destroyed.
+			if (view.getVisibility() != View.VISIBLE) {
+				view.setVisibility(View.VISIBLE);
+				isLayoutUpdated = true;
+			}
+			if (view.getZ() != (float) zOrder) {
+				// Suppress any outline-based drop shadow the Z value would produce.
+				view.setOutlineProvider(null);
+				view.setZ((float) zOrder);
+				isLayoutUpdated = true;
+			}
+		}
+
+		ViewGroup.LayoutParams lp = view.getLayoutParams();
+		if (lp == null || lp.width != w || lp.height != h) {
+			view.setLayoutParams(new FrameLayout.LayoutParams(w, h));
+			isLayoutUpdated = true;
+		}
+
+		int oldX = (int) view.getX();
+		int oldY = (int) view.getY();
+		if (oldX != x || oldY != y) {
+			view.setX(x);
+			view.setY(y);
+			isLayoutUpdated = true;
+		}
+
+		if (isLayoutUpdated) {
+			view.invalidate();
+			view.requestLayout();
+			this.invalidate();
+		}
+
+		return isLayoutUpdated;
+	}
+
+	public void updateLayout() {
+		ViewGroup parent = (ViewGroup) this.getParent();
+		if (parent != null) {
+			parent.bringChildToFront(this);
+			parent.forceLayout();
+		}
+	}
+
 	static private native long onCreateView(GioView view);
 	static private native void onDestroyView(long handle);
 	static private native void onStartView(long handle);
@@ -583,6 +661,9 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	static private native int imeToRunes(long handle, int chars);
 	// imeToUTF16 converts the rune index into Java characters.
 	static private native int imeToUTF16(long handle, int runes);
+	// hitTest returns true if the point should be handled by Gio,
+	// false if it should be passed through to external views.
+	static private native boolean hitTest(long handle, float x, float y);
 
 	private class GioInputConnection implements InputConnection {
 		private int batchDepth;

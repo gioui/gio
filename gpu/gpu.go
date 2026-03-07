@@ -3,7 +3,7 @@
 /*
 Package gpu implements the rendering of Gio drawing operations. It
 is used by package app and package gpu/headless and is otherwise not
-useful except for integrating with external window implementations.
+useful except for integrating with embed window implementations.
 */
 package gpu
 
@@ -44,6 +44,26 @@ type GPU interface {
 	Clear(color color.NRGBA)
 	// Frame draws the graphics operations from op into a viewport of target.
 	Frame(frame *op.Ops, target RenderTarget, viewport image.Point) error
+	// EmbedRegions returns the regions occupied by EmbedOps from the last frame.
+	EmbedRegions() (current EmbedRegions, previous []EmbedView)
+}
+
+// EmbedRegions tracks embed regions for hit testing.
+type EmbedRegions struct {
+	// Pass regions are embed view areas where events should pass through.
+	Pass []f32.Rectangle
+	// Blockers are Gio overlay areas where events should be handled by Gio, but are inside Pass.
+	Blockers []f32.Rectangle
+	// Views are the embed views
+	Views []EmbedView
+}
+
+// EmbedView is a single embed view.
+type EmbedView struct {
+	// Area includes off-screen parts of the embed view.
+	Area    f32.Rectangle
+	View    uintptr
+	Surface uintptr
 }
 
 type gpu struct {
@@ -66,23 +86,27 @@ type renderer struct {
 	intersections packer
 	layers        packer
 	layerFBOs     fboSet
+	clearPipeline driver.Pipeline
 }
 
 type drawOps struct {
-	reader       ops.Reader
-	states       []f32.Affine2D
-	transStack   []f32.Affine2D
-	layers       []opacityLayer
-	opacityStack []int
-	vertCache    []byte
-	viewport     image.Point
-	clear        bool
-	clearColor   f32color.RGBA
-	imageOps     []imageOp
-	pathOps      []*pathOp
-	pathOpCache  []pathOp
-	qs           quadSplitter
-	pathCache    *opCache
+	reader              ops.Reader
+	states              []f32.Affine2D
+	transStack          []f32.Affine2D
+	layers              []opacityLayer
+	opacityStack        []int
+	vertCache           []byte
+	viewport            image.Point
+	clear               bool
+	clearColor          f32color.RGBA
+	imageOps            []imageOp
+	pathOps             []*pathOp
+	pathOpCache         []pathOp
+	qs                  quadSplitter
+	pathCache           *opCache
+	embedRegions        EmbedRegions
+	embedRegionsOld     []EmbedView
+	embedRegionsScratch []EmbedView
 }
 
 type opacityLayer struct {
@@ -114,6 +138,8 @@ type drawState struct {
 	stop2  f32.Point
 	color1 color.NRGBA
 	color2 color.NRGBA
+
+	embed EmbedView
 }
 
 type pathOp struct {
@@ -179,6 +205,8 @@ type material struct {
 	data    imageOpData
 	tex     driver.Texture
 	uvTrans f32.Affine2D
+	// For materialTypeEmbed.
+	embed EmbedView
 }
 
 const (
@@ -209,6 +237,15 @@ func decodeImageOp(data []byte, refs []any) imageOpData {
 		src:    refs[0].(*image.RGBA),
 		handle: handle,
 		filter: data[1],
+	}
+}
+
+func decodeEmbedOp(data []byte, refs []any) EmbedView {
+	view := refs[0]
+	surface := refs[1]
+	return EmbedView{
+		View:    view.(uintptr),
+		Surface: surface.(uintptr),
 	}
 }
 
@@ -261,7 +298,7 @@ type texture struct {
 type blitter struct {
 	ctx                    driver.Device
 	viewport               image.Point
-	pipelines              [2][3]*pipeline
+	pipelines              [2][4]*pipeline
 	colUniforms            *blitColUniforms
 	texUniforms            *blitTexUniforms
 	linearGradientUniforms *blitLinearGradientUniforms
@@ -326,6 +363,7 @@ const (
 	materialColor materialType = iota
 	materialLinearGradient
 	materialTexture
+	materialEmbed
 )
 
 // New creates a GPU for the given API.
@@ -381,6 +419,20 @@ func (g *gpu) Frame(frameOps *op.Ops, target RenderTarget, viewport image.Point)
 	return g.frame(target)
 }
 
+func (g *gpu) EmbedRegions() (embedRegions EmbedRegions, lost []EmbedView) {
+oldLoop:
+	for _, old := range g.drawOps.embedRegionsOld {
+		for _, current := range g.drawOps.embedRegions.Views {
+			if current.View == old.View {
+				continue oldLoop
+			}
+		}
+		g.drawOps.embedRegionsScratch = append(g.drawOps.embedRegionsScratch, old)
+	}
+
+	return g.drawOps.embedRegions, g.drawOps.embedRegionsScratch
+}
+
 func (g *gpu) collect(viewport image.Point, frameOps *op.Ops) {
 	g.renderer.blitter.viewport = viewport
 	g.renderer.pather.viewport = viewport
@@ -424,13 +476,14 @@ func (g *gpu) frame(target RenderTarget) error {
 	}
 	g.ctx.BeginRenderPass(defFBO, d)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
-	g.renderer.drawOps(false, image.Point{}, g.renderer.blitter.viewport, g.drawOps.imageOps)
+	g.renderer.drawOps(false, image.Point{}, g.renderer.blitter.viewport, g.drawOps.imageOps, &g.drawOps.embedRegions)
 	g.coverTimer.end()
 	g.ctx.EndRenderPass()
 	g.cleanupTimer.begin()
 	g.cache.frame()
 	g.drawOps.pathCache.frame()
 	g.cleanupTimer.end()
+
 	if false && g.timers.ready() {
 		st, covt, cleant := g.stencilTimer.Elapsed, g.coverTimer.Elapsed, g.cleanupTimer.Elapsed
 		ft := st + covt + cleant
@@ -562,7 +615,7 @@ func (b *blitter) release() {
 	}
 }
 
-func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.Sources, uniforms [3][]byte) (pipelines [2][3]*pipeline, err error) {
+func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.Sources, uniforms [3][]byte) (pipelines [2][4]*pipeline, err error) {
 	defer func() {
 		if err != nil {
 			for _, p := range pipelines {
@@ -577,6 +630,12 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 	blend := driver.BlendDesc{
 		SrcFactor: driver.BlendFactorOne,
 		DstFactor: driver.BlendFactorOneMinusSrcAlpha,
+	}
+	// Clear blend: result = src * 0 + dst * 0 = transparent.
+	clearBlend := driver.BlendDesc{
+		Enable:    true,
+		SrcFactor: driver.BlendFactorZero,
+		DstFactor: driver.BlendFactorZero,
 	}
 	layout := driver.VertexLayout{
 		Inputs: []driver.InputDesc{
@@ -659,6 +718,30 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 				vertBuffer = newUniformBuffer(b, u)
 			}
 			pipelines[i][materialLinearGradient] = &pipeline{pipe, vertBuffer}
+		}
+		// Create the embed pipeline with clear blend.
+		{
+			var vertBuffer *uniformBuffer
+			fsh, err := b.NewFragmentShader(fsSrc[materialColor])
+			if err != nil {
+				return pipelines, err
+			}
+			defer fsh.Release()
+			pipe, err := b.NewPipeline(driver.PipelineDesc{
+				VertexShader:   vsh,
+				FragmentShader: fsh,
+				BlendDesc:      clearBlend,
+				VertexLayout:   layout,
+				PixelFormat:    format,
+				Topology:       driver.TopologyTriangleStrip,
+			})
+			if err != nil {
+				return pipelines, err
+			}
+			if u := uniforms[materialColor]; u != nil {
+				vertBuffer = newUniformBuffer(b, u)
+			}
+			pipelines[i][materialEmbed] = &pipeline{pipe, vertBuffer}
 		}
 	}
 	return pipelines, nil
@@ -864,7 +947,7 @@ func (r *renderer) drawLayers(layers []opacityLayer, ops []imageOp) {
 		}
 		r.ctx.Viewport(v.Min.X, v.Min.Y, v.Dx(), v.Dy())
 		f := r.layerFBOs.fbos[fbo]
-		r.drawOps(true, l.clip.Min.Mul(-1), l.clip.Size(), ops[l.opStart:l.opEnd])
+		r.drawOps(true, l.clip.Min.Mul(-1), l.clip.Size(), ops[l.opStart:l.opEnd], nil)
 		sr := f32.FRect(v)
 		uvScale, uvOffset := texSpaceTransform(sr, f.size)
 		uvTrans := f32.AffineId().Scale(f32.Point{}, uvScale).Offset(uvOffset)
@@ -895,6 +978,14 @@ func (d *drawOps) reset(viewport image.Point) {
 	d.transStack = d.transStack[:0]
 	d.layers = d.layers[:0]
 	d.opacityStack = d.opacityStack[:0]
+	d.embedRegionsOld = d.embedRegionsOld[:0]
+	for _, v := range d.embedRegions.Views {
+		d.embedRegionsOld = append(d.embedRegionsOld, v)
+	}
+	d.embedRegions.Pass = d.embedRegions.Pass[:0]
+	d.embedRegions.Blockers = d.embedRegions.Blockers[:0]
+	d.embedRegions.Views = d.embedRegions.Views[:0]
+	d.embedRegionsScratch = d.embedRegionsScratch[:0]
 }
 
 func (d *drawOps) collect(root *op.Ops, viewport image.Point) {
@@ -1074,6 +1165,9 @@ loop:
 		case ops.TypeImage:
 			state.matType = materialTexture
 			state.image = decodeImageOp(encOp.Data, encOp.Refs)
+		case ops.TypeEmbed:
+			state.matType = materialEmbed
+			state.embed = decodeEmbedOp(encOp.Data, encOp.Refs)
 		case ops.TypePaint:
 			// Transform (if needed) the painting rectangle and if so generate a clip path,
 			// for those cases also compute a partialTrans that maps texture coordinates between
@@ -1088,6 +1182,8 @@ loop:
 				dst = f32.Rectangle{Max: layout.FPt(sz)}
 			}
 			clipData, bnd, partialTrans := d.boundsForTransformedRect(dst, t)
+
+			cpathBefore := state.cpath
 			cl := viewport.Intersect(bnd.Add(off))
 			if state.cpath != nil {
 				cl = state.cpath.intersect.Intersect(cl)
@@ -1116,6 +1212,16 @@ loop:
 				d.clear = true
 				continue
 			}
+			// For embed materials, store the clip rect for deferred callback invocation.
+			if mat.material == materialEmbed {
+				if cpathBefore != nil {
+					state.embed.Area = f32.FRect(cpathBefore.bounds.Add(cpathBefore.off).Round())
+				} else {
+					state.embed.Area = f32.Rectangle{Max: f32.Point{X: float32(d.viewport.X), Y: float32(d.viewport.Y)}}
+				}
+				d.embedRegions.Views = append(d.embedRegions.Views, state.embed)
+			}
+
 			img := imageOp{
 				path:     state.cpath,
 				clip:     bounds,
@@ -1197,6 +1303,10 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 		uvScale, uvOffset := texSpaceTransform(sr, sz)
 		m.uvTrans = partTrans.Mul(f32.AffineId().Scale(f32.Point{}, uvScale).Offset(uvOffset))
 		m.data = d.image
+	case materialEmbed:
+		m.material = materialEmbed
+		m.color = f32color.RGBA{A: 0}
+		m.opaque = false
 	}
 	return m
 }
@@ -1232,8 +1342,38 @@ func (r *renderer) prepareDrawOps(ops []imageOp) {
 	}
 }
 
-func (r *renderer) drawOps(isFBO bool, opOff, viewport image.Point, ops []imageOp) {
+func (r *renderer) drawOps(isFBO bool, opOff, viewport image.Point, ops []imageOp, embedRegions *EmbedRegions) {
 	var coverTex driver.Texture
+
+	if embedRegions != nil {
+		for i := 0; i < len(ops); i++ {
+			img := ops[i]
+			if img.material.material == materialEmbed {
+				drc := f32.FRect(img.clip.Add(opOff))
+				embedRegions.Pass = append(embedRegions.Pass, drc)
+
+				for j := i + 1; i < len(ops); i++ {
+					img := ops[i]
+					// Skip embed ops and transparent ops.
+					if img.material.material == materialEmbed || img.material.opacity == 0 {
+						j += img.layerOps
+						continue
+					}
+
+					coverClip := img.clip.Add(opOff)
+					coverRect := f32.FRect(coverClip)
+
+					if intersect := drc.Intersect(coverRect); !intersect.Empty() {
+						embedRegions.Blockers = append(embedRegions.Blockers, intersect)
+					}
+					j += img.layerOps
+				}
+			}
+			i += img.layerOps
+		}
+	}
+
+	// Render pass: draw all operations.
 	for i := 0; i < len(ops); i++ {
 		img := ops[i]
 		i += img.layerOps
@@ -1289,6 +1429,9 @@ func (b *blitter) blit(mat materialType, fbo bool, col f32color.RGBA, col1, col2
 	switch mat {
 	case materialColor:
 		b.colUniforms.color = col
+		uniforms = &b.colUniforms.blitUniforms
+	case materialEmbed:
+		b.colUniforms.color = f32color.RGBA{A: 0}
 		uniforms = &b.colUniforms.blitUniforms
 	case materialTexture:
 		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
@@ -1590,4 +1733,23 @@ func newShaders(ctx driver.Device, vsrc, fsrc shader.Sources) (vert driver.Verte
 		vert.Release()
 	}
 	return
+}
+
+func (e EmbedRegions) Contains(point f32.Point) bool {
+	found := false
+	for _, r := range e.Pass {
+		if r.Min.X <= point.X && r.Max.X >= point.X && r.Min.Y <= point.Y && r.Max.Y >= point.Y {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return false
+	}
+	for _, r := range e.Blockers {
+		if point.X >= r.Min.X && point.X <= r.Max.X && point.Y >= r.Min.Y && point.Y <= r.Max.Y {
+			return false
+		}
+	}
+	return true
 }
