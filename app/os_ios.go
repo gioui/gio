@@ -14,6 +14,7 @@ package app
 
 __attribute__ ((visibility ("hidden"))) int gio_applicationMain(int argc, char *argv[]);
 __attribute__ ((visibility ("hidden"))) void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle);
+__attribute__ ((visibility ("hidden"))) void gio_setZOrderOnTop(CFTypeRef viewRef, int onTop);
 
 struct drawParams {
 	CGFloat dpi, sdpi;
@@ -92,6 +93,7 @@ import (
 	"unsafe"
 
 	"gioui.org/f32"
+	"gioui.org/gpu"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
@@ -117,6 +119,19 @@ type window struct {
 	config Config
 
 	pointerMap []C.CFTypeRef
+
+	externalRegions gpu.ExternalRegions
+	externalUsed bool
+}
+
+// SetExternalRegions updates the external regions for hit testing.
+func (w *window) SetExternalRegions(regions gpu.ExternalRegions) {
+	w.externalRegions = regions
+	// If ExternalOps are used and z-order hasn't been set yet, bring GioView to front.
+	if len(regions.Pass) > 0 && !w.externalUsed {
+		w.externalUsed = true
+		C.gio_setZOrderOnTop(w.view, 1)
+	}
 }
 
 var mainWindow = newWindowRendezvous()
@@ -151,6 +166,15 @@ func onCreate(view, controller C.CFTypeRef) {
 
 func viewFor(h C.uintptr_t) *window {
 	return cgo.Handle(h).Value().(*window)
+}
+
+//export gio_hitTest
+func gio_hitTest(h C.uintptr_t, x, y C.CGFloat) C.int {
+	w := viewFor(h)
+	if w.externalRegions.Contains(f32.Point{X: float32(x), Y: float32(y)}) {
+		return 0
+	}
+	return 1
 }
 
 //export gio_onDraw

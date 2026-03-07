@@ -24,6 +24,9 @@ static CFTypeRef getMetalLayer(CFTypeRef viewRef) {
 		CAMetalLayer *l = (CAMetalLayer *)view.layer;
 		l.needsDisplayOnBoundsChange = YES;
 		l.presentsWithTransaction = YES;
+		// Enable transparency for external views.
+		l.opaque = NO;
+		l.backgroundColor = [UIColor clearColor].CGColor;
 		return CFBridgingRetain(l);
 	}
 }

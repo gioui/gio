@@ -13,6 +13,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"gioui.org/gpu"
 	"gioui.org/internal/f32color"
 	"gioui.org/op"
 
@@ -614,6 +615,8 @@ func (w *window) SetCursor(cursor pointer.Cursor) {
 	style := w.cnv.Get("style")
 	style.Set("cursor", webCursor[cursor])
 }
+
+func (w *window) SetExternalRegions(regions gpu.ExternalRegions) {}
 
 func (w *window) ShowTextInput(show bool) {
 	// Run in a goroutine to avoid a deadlock if the

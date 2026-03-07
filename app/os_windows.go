@@ -5,13 +5,11 @@ package app
 import (
 	"errors"
 	"fmt"
-	"gioui.org/io/transfer"
-	syscall "golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/registry"
 	"image"
 	"io"
 	"os"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -20,7 +18,12 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
+	"gioui.org/io/transfer"
+	syscall "golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
+
 	"gioui.org/app/internal/windows"
+	"gioui.org/gpu"
 	"gioui.org/op"
 	"gioui.org/unit"
 	gowindows "golang.org/x/sys/windows"
@@ -37,9 +40,12 @@ type Win32ViewEvent struct {
 }
 
 type window struct {
+	// hwnd is the parent window that receives input messages.
 	hwnd syscall.Handle
-	hdc  syscall.Handle
-	w    *callbacks
+	// gioHwnd is the child window where Gio renders.
+	gioHwnd syscall.Handle
+	hdc     syscall.Handle
+	w       *callbacks
 
 	// cursorIn tracks whether the cursor was inside the window according
 	// to the most recent WM_SETCURSOR.
@@ -53,6 +59,8 @@ type window struct {
 	// frameDims stores the last seen window frame width and height.
 	frameDims image.Point
 	loop      *eventLoop
+
+	externalRegions gpu.ExternalRegions
 }
 
 const _WM_WAKEUP = windows.WM_USER + iota
@@ -109,7 +117,9 @@ func newWindow(win *callbacks, options []Option) {
 			return
 		}
 		winMap.Store(w.hwnd, w)
+		winMap.Store(w.gioHwnd, w)
 		defer winMap.Delete(w.hwnd)
+		defer winMap.Delete(w.gioHwnd)
 		w.Configure(options)
 		w.ProcessEvent(Win32ViewEvent{HWND: uintptr(w.hwnd)})
 		windows.SetForegroundWindow(w.hwnd)
@@ -170,6 +180,7 @@ func (w *window) init() error {
 	}
 	const dwStyle = windows.WS_OVERLAPPEDWINDOW
 
+	// Create parent window - receives input, not rendered to.
 	hwnd, err := windows.CreateWindowEx(
 		dwExStyle,
 		resources.class,
@@ -184,18 +195,44 @@ func (w *window) init() error {
 	if err != nil {
 		return err
 	}
-	if err := windows.RegisterTouchWindow(hwnd, 0); err != nil {
-		return err
-	}
-	if err := windows.EnableMouseInPointer(1); err != nil {
-		return err
-	}
-	w.hdc, err = windows.GetDC(hwnd)
+
+	// Create child window for Gio rendering.
+	// This makes Gio a sibling to external views, enabling z-order control.
+	gioHwnd, err := windows.CreateWindowEx(
+		0,
+		resources.class,
+		"",
+		windows.WS_CHILD|windows.WS_VISIBLE|windows.WS_CLIPSIBLINGS,
+		0, 0, 0, 0,
+		hwnd,
+		0,
+		resources.handle,
+		0)
 	if err != nil {
 		windows.DestroyWindow(hwnd)
 		return err
 	}
+
+	if err := windows.RegisterTouchWindow(hwnd, 0); err != nil {
+		windows.DestroyWindow(gioHwnd)
+		windows.DestroyWindow(hwnd)
+		return err
+	}
+	if err := windows.EnableMouseInPointer(1); err != nil {
+		windows.DestroyWindow(gioHwnd)
+		windows.DestroyWindow(hwnd)
+		return err
+	}
+
+	// Get DC from the Gio child window.
+	w.hdc, err = windows.GetDC(gioHwnd)
+	if err != nil {
+		windows.DestroyWindow(gioHwnd)
+		windows.DestroyWindow(hwnd)
+		return err
+	}
 	w.hwnd = hwnd
+	w.gioHwnd = gioHwnd
 	return nil
 }
 
@@ -215,6 +252,11 @@ func (w *window) update() {
 			X: int(r.Right - r.Left),
 			Y: int(r.Bottom - r.Top),
 		}.Sub(w.config.Size)
+
+		// Resize the Gio child window to match parent client area.
+		if w.gioHwnd != 0 {
+			windows.MoveWindow(w.gioHwnd, 0, 0, int32(w.config.Size.X), int32(w.config.Size.Y), true)
+		}
 	}
 
 	w.borderSize = image.Pt(
@@ -337,7 +379,12 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			windows.ReleaseDC(w.hdc)
 			w.hdc = 0
 		}
-		// The system destroys the HWND for us.
+		// Destroy the Gio child window.
+		if w.gioHwnd != 0 {
+			windows.DestroyWindow(w.gioHwnd)
+			w.gioHwnd = 0
+		}
+		// The system destroys the parent HWND for us.
 		w.hwnd = 0
 		windows.PostQuitMessage(0)
 		return 0
@@ -495,6 +542,11 @@ func getModifiers() key.Modifiers {
 // hitTest returns the non-client area hit by the point, needed to
 // process WM_NCHITTEST.
 func (w *window) hitTest(x, y int) uintptr {
+	// Check if point is in any external pass region.
+	if w.externalRegions.Contains(f32.Pt(float32(x), float32(y))) {
+		return windows.HTTRANSPARENT
+	}
+
 	if w.config.Mode != Windowed {
 		// Only windowed mode should allow resizing.
 		return windows.HTCLIENT
@@ -892,8 +944,82 @@ func (w *window) HDC() syscall.Handle {
 	return w.hdc
 }
 
+// SetExternalRegions updates the external regions for hit testing and window region.
+func (w *window) SetExternalRegions(regions gpu.ExternalRegions) {
+	if w.gioHwnd == 0 {
+		return
+	}
+
+	rc := windows.GetClientRect(w.gioHwnd)
+	width, height := int(rc.Right-rc.Left), int(rc.Bottom-rc.Top)
+
+	if width <= 0 || height <= 0 {
+		return
+	}
+
+	if slices.Equal(w.externalRegions.Pass, regions.Pass) && slices.Equal(w.externalRegions.Blockers, regions.Blockers) {
+		return
+	}
+
+	w.externalRegions.Pass = append(w.externalRegions.Pass[:0], regions.Pass...)
+	w.externalRegions.Blockers = append(w.externalRegions.Blockers[:0], regions.Blockers...)
+
+	w.updateWindowRegion(width, height)
+}
+
+// updateWindowRegion sets the window region on the Gio child window to create holes
+// where external views should show through.
+func (w *window) updateWindowRegion(width, height int) {
+	// If no external pass regions, reset to full window bounds.
+	if len(w.externalRegions.Pass) == 0 {
+		windows.SetWindowRgn(w.gioHwnd, 0, true)
+		return
+	}
+
+	// Create result region, initially full window.
+	resultRgn := windows.CreateRectRgn(0, 0, int32(width), int32(height))
+	if resultRgn == 0 {
+		return
+	}
+
+	// Subtract each pass region (hole).
+	for _, pass := range w.externalRegions.Pass {
+		// Clamp to window bounds.
+		x1, y1 := int32(pass.Min.X), int32(pass.Min.Y)
+		x2, y2 := int32(pass.Max.X), int32(pass.Max.Y)
+		if x1 < 0 {
+			x1 = 0
+		}
+		if y1 < 0 {
+			y1 = 0
+		}
+		if x2 > int32(width) {
+			x2 = int32(width)
+		}
+		if y2 > int32(height) {
+			y2 = int32(height)
+		}
+		if x1 >= x2 || y1 >= y2 {
+			continue
+		}
+
+		holeRgn := windows.CreateRectRgn(x1, y1, x2, y2)
+		if holeRgn == 0 {
+			continue
+		}
+		windows.CombineRgn(resultRgn, resultRgn, holeRgn, windows.RGN_DIFF)
+		windows.DeleteObject(holeRgn)
+	}
+
+	// Apply region to Gio child window.
+	if !windows.SetWindowRgn(w.gioHwnd, resultRgn, true) {
+		windows.DeleteObject(resultRgn)
+	}
+}
+
+// HWND returns the Gio child window handle (for rendering context) and window size.
 func (w *window) HWND() (syscall.Handle, int, int) {
-	return w.hwnd, w.config.Size.X, w.config.Size.Y
+	return w.gioHwnd, w.config.Size.X, w.config.Size.Y
 }
 
 func (w *window) Perform(acts system.Action) {

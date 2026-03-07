@@ -9,7 +9,11 @@
 
 CALayer *gio_layerFactory(BOOL presentWithTrans) {
 	@autoreleasepool {
-		return [CALayer layer];
+		CALayer *l = [CALayer layer];
+		// Enable transparency for external views.
+		l.opaque = NO;
+		l.backgroundColor = [NSColor clearColor].CGColor;
+		return l;
 	}
 }
 

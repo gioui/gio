@@ -16,6 +16,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"gioui.org/gpu"
 	"gioui.org/internal/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
@@ -44,6 +45,7 @@ __attribute__ ((visibility ("hidden"))) void gio_init(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(int presentWithTrans);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height);
 __attribute__ ((visibility ("hidden"))) void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle);
+__attribute__ ((visibility ("hidden"))) void gio_setZOrderOnTop(CFTypeRef viewRef, int onTop);
 
 static void writeClipboard(CFTypeRef str) {
 	@autoreleasepool {
@@ -368,6 +370,19 @@ type window struct {
 	// cmdKeys is for storing the current key event while
 	// waiting for a doCommandBySelector.
 	cmdKeys cmdKeys
+
+	externalRegions gpu.ExternalRegions
+	externalUsed bool
+}
+
+// SetExternalRegions updates the external regions for hit testing.
+func (w *window) SetExternalRegions(regions gpu.ExternalRegions) {
+	w.externalRegions = regions
+	// If ExternalOps are used and z-order hasn't been set yet, bring GioView to front.
+	if len(regions.Pass) > 0 && !w.externalUsed {
+		w.externalUsed = true
+		C.gio_setZOrderOnTop(w.view, 1)
+	}
 }
 
 type cmdKeys struct {
@@ -384,6 +399,15 @@ var nextTopLeft C.NSPoint
 
 func windowFor(h C.uintptr_t) *window {
 	return cgo.Handle(h).Value().(*window)
+}
+
+//export gio_hitTest
+func gio_hitTest(h C.uintptr_t, x, y C.CGFloat) C.int {
+	w := windowFor(h)
+	if w.externalRegions.Contains(f32.Point{X: float32(x), Y: float32(y)}) {
+		return 0
+	}
+	return 1
 }
 
 func (w *window) contextView() C.CFTypeRef {

@@ -55,6 +55,22 @@ type LinearGradientOp struct {
 // PaintOp fills the current clip area with the current brush.
 type PaintOp struct{}
 
+// ExternalOp is a special paint operation that marks an area to be rendered
+// by an external view (such as a webview, camera preview, or ad view).
+//
+// The external view is positioned behind Gio's rendering, and ExternalOp
+// makes the Gio canvas transparent and allows touch/clicks events to
+// go through.
+type ExternalOp struct {
+	// callback is called during rendering to set where the external view should be rendered, and its z-index.
+	// visible is the part of the external view that is visible on screen.
+	// area is the full area of the external view, even if partially or fully off-screen.
+	callback func(visible image.Rectangle, area image.Rectangle, zIndex int)
+
+	// handle is a key to uniquely identify this ExternalOp
+	handle any
+}
+
 // OpacityStack represents an opacity applied to all painting operations
 // until Pop is called.
 type OpacityStack struct {
@@ -149,6 +165,27 @@ func (c LinearGradientOp) Add(o *op.Ops) {
 func (d PaintOp) Add(o *op.Ops) {
 	data := ops.Write(&o.Internal, ops.TypePaintLen)
 	data[0] = byte(ops.TypePaint)
+}
+
+// NewExternalOp creates an ExternalOp.
+//
+// ExternalOp is similar to ImageOp or ColorOp. But, it allows you to render the clip area with an external view, such
+// as a webview, camera preview, or ad view. The rendering of such external view is your responsibility.
+//
+// The resulting ExternalOp should be used only once per frame.
+func NewExternalOp(callback func(visibleArea image.Rectangle, elementArea image.Rectangle, zIndex int)) ExternalOp {
+	return ExternalOp{
+		callback: callback,
+		handle:   new(int),
+	}
+}
+
+func (e ExternalOp) Add(o *op.Ops) {
+	if e.callback == nil {
+		return
+	}
+	data := ops.Write2(&o.Internal, ops.TypeExternalLen, e.callback, e.handle)
+	data[0] = byte(ops.TypeExternal)
 }
 
 // FillShape fills the clip shape with a color.

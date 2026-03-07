@@ -205,6 +205,8 @@ type driver interface {
 	Frame(frame *op.Ops)
 	// ProcessEvent processes an event.
 	ProcessEvent(e event.Event)
+	// SetExternalRegions updates regions for external view hit testing.
+	SetExternalRegions(gpu.ExternalRegions)
 }
 
 type windowRendezvous struct {

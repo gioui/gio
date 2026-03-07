@@ -7,6 +7,8 @@
 #include "_cgo_export.h"
 
 __attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(BOOL presentWithTrans);
+__attribute__ ((visibility ("hidden"))) int gio_hitTest(uintptr_t handle, CGFloat x, CGFloat y);
+__attribute__ ((visibility ("hidden"))) void gio_setZOrderOnTop(CFTypeRef viewRef, int onTop);
 
 @interface GioAppDelegate : NSObject<NSApplicationDelegate>
 @end
@@ -131,6 +133,35 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 	CGFloat dy = -event.scrollingDeltaY;
 	handleMouse(self, event, MOUSE_SCROLL, dx, dy);
 }
+// hitTestPoint returns true if the point should be handled by Gio,
+// false if it should be passed through to external views.
+- (BOOL)hitTestPoint:(NSPoint)point {
+	if (self.handle == 0) {
+		return YES;
+	}
+	return gio_hitTest(self.handle, point.x, self.bounds.size.height - point.y);
+}
+- (NSView *)hitTest:(NSPoint)point {
+	// Check if this point is within an external view's bounds.
+	// If so, return nil to allow the event to pass through.
+	if (![self hitTestPoint:point]) {
+		return nil;
+	}
+	return [super hitTest:point];
+}
+
+- (BOOL)mouseDownCanMoveWindow {
+	// Allow the window to be moved by dragging in areas not handled by Gio.
+	return YES;
+}
+// setZOrderOnTop adjusts the layer z-position to control stacking order.
+- (void)setZOrderOnTop:(BOOL)onTop {
+	if (onTop) {
+		self.layer.zPosition = 1000.0; // Bring to front
+	} else {
+		self.layer.zPosition = 0.0;
+	}
+}
 - (void)keyDown:(NSEvent *)event {
 	NSString *keys = [event charactersIgnoringModifiers];
 	gio_onKeys(self.handle, (__bridge CFTypeRef)event, (__bridge CFTypeRef)keys, [event timestamp], [event modifierFlags], true);
@@ -213,11 +244,14 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 - (void)dealloc {
 	gio_onDestroy(self.handle);
 }
-- (BOOL) becomeFirstResponder {
+- (BOOL)acceptsFirstResponder {
+	return YES;
+}
+- (BOOL)becomeFirstResponder {
 	gio_onFocus(self.handle, 1);
 	return [super becomeFirstResponder];
  }
-- (BOOL) resignFirstResponder {
+- (BOOL)resignFirstResponder {
 	gio_onFocus(self.handle, 0);
 	return [super resignFirstResponder];
 }
@@ -475,5 +509,12 @@ void gio_init() {
 												 selector:@selector(launchFinished:)
 													 name:NSApplicationDidFinishLaunchingNotification
 												   object:nil];
+	}
+}
+
+void gio_setZOrderOnTop(CFTypeRef viewRef, int onTop) {
+	@autoreleasepool {
+		GioView *v = (__bridge GioView *)viewRef;
+		[v setZOrderOnTop:(onTop != 0)];
 	}
 }
