@@ -56,6 +56,9 @@ type window struct {
 	composing             bool
 	requestFocus          bool
 
+	lastInputText string
+	snippetRange  key.Range
+
 	config    Config
 	inset     f32.Point
 	scale     float32
@@ -130,8 +133,10 @@ func getContainer(doc js.Value) js.Value {
 }
 
 func createTextArea(doc js.Value) js.Value {
-	tarea := doc.Call("createElement", "input")
+	tarea := doc.Call("createElement", "textarea")
 	style := tarea.Get("style")
+	// Position absolute so left/top coordinates actually place the element
+	style.Set("position", "absolute")
 	style.Set("width", "1px")
 	style.Set("height", "1px")
 	style.Set("opacity", "0")
@@ -141,6 +146,12 @@ func createTextArea(doc js.Value) js.Value {
 	tarea.Set("autocorrect", "off")
 	tarea.Set("autocapitalize", "off")
 	tarea.Set("spellcheck", false)
+	// Enable multiline text input for better composition support on some browsers.
+	tarea.Set("rows", 1)
+	style.Set("resize", "none")
+	style.Set("overflow", "hidden")
+	style.Set("white-space", "pre-wrap")
+	style.Set("word-break", "normal")
 	return tarea
 }
 
@@ -282,14 +293,42 @@ func (w *window) addEventListeners() {
 	})
 	w.addEventListener(w.tarea, "compositionend", func(this js.Value, args []js.Value) interface{} {
 		w.composing = false
-		w.flushInput()
+
+		// Unmark the composition region in Gio.
+		w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
 		return nil
 	})
 	w.addEventListener(w.tarea, "input", func(this js.Value, args []js.Value) interface{} {
-		if w.composing {
+		// Only send input events if the text ACTUALLY changed compared to our last known browser DOM state.
+		val := w.tarea.Get("value").String()
+		if val == w.lastInputText {
 			return nil
 		}
-		w.flushInput()
+
+		selStart := w.tarea.Get("selectionStart").Int()
+		selEnd := w.tarea.Get("selectionEnd").Int()
+
+		// The DOM textarea mirrors the current Snippet.
+		// Replace the entire Snippet in Gio with the new DOM textarea value.
+		w.w.EditorReplace(w.snippetRange, val)
+		w.lastInputText = val
+
+		// Safely track the new length of this snippet so rapid subsequent inputs
+		// do not overwrite the wrong number of characters before EditorStateChanged syncs.
+		w.snippetRange.End = w.snippetRange.Start + utf8.RuneCountInString(val)
+
+		// Map the new browser selection back into Gio's editor.
+		st := w.w.EditorState()
+		sel := key.Range{
+			Start: st.RunesIndex(selStart),
+			End:   st.RunesIndex(selEnd),
+		}
+		w.w.SetEditorSelection(sel)
+
+		if w.composing {
+			// If composing, just mark the whole active insertion as composing.
+			w.w.SetComposingRegion(sel)
+		}
 		return nil
 	})
 	w.addEventListener(w.tarea, "paste", func(this js.Value, args []js.Value) interface{} {
@@ -304,12 +343,6 @@ func (w *window) addEventListeners() {
 
 func (w *window) addHistory() {
 	w.browserHistory.Call("pushState", nil, nil, w.window.Get("location").Get("href"))
-}
-
-func (w *window) flushInput() {
-	val := w.tarea.Get("value").String()
-	w.tarea.Set("value", "")
-	w.w.EditorInsert(string(val))
 }
 
 func (w *window) blur() {
@@ -343,17 +376,72 @@ func (w *window) keyboard(hint key.InputHint) {
 		m = "text"
 	}
 	w.tarea.Set("inputMode", m)
+
+	// Update autocomplete / autocorrect attributes.
+	var autocomplete, autocorrect, autocapitalize string
+	var spellcheck bool
+
+	switch hint {
+	case key.HintAny, key.HintText:
+		autocomplete, autocorrect, autocapitalize, spellcheck = "on", "on", "on", true
+	case key.HintEmail:
+		autocomplete, autocorrect, autocapitalize, spellcheck = "email", "off", "off", false
+	case key.HintURL:
+		autocomplete, autocorrect, autocapitalize, spellcheck = "url", "off", "off", false
+	case key.HintTelephone:
+		autocomplete, autocorrect, autocapitalize, spellcheck = "tel", "off", "off", false
+	case key.HintPassword:
+		autocomplete, autocorrect, autocapitalize, spellcheck = "current-password", "off", "off", false
+	default: // key.HintNumeric and others
+		autocomplete, autocorrect, autocapitalize, spellcheck = "off", "off", "off", false
+	}
+
+	w.tarea.Set("autocomplete", autocomplete)
+	w.tarea.Set("autocorrect", autocorrect)
+	w.tarea.Set("autocapitalize", autocapitalize)
+	w.tarea.Set("spellcheck", spellcheck)
 }
 
 func (w *window) keyEvent(e js.Value, ks key.State) {
 	k := e.Get("key").String()
+
 	if n, ok := translateKey(k); ok {
-		cmd := key.Event{
-			Name:      n,
-			Modifiers: modifiersFor(e),
-			State:     ks,
+		isJSHandledEdit := false
+		switch n {
+		case key.NameDeleteBackward:
+			if w.tarea.Get("selectionStart").Int() > 0 {
+				isJSHandledEdit = true
+			}
+		case key.NameDeleteForward:
+			if w.tarea.Get("selectionStart").Int() < w.tarea.Get("value").Length() {
+				isJSHandledEdit = true
+			}
 		}
-		w.processEvent(cmd)
+
+		if ks == key.Press {
+			isMod := n == key.NameAlt || n == key.NameCommand || n == key.NameCtrl || n == key.NameShift
+			isFunc := n == key.NameUpArrow || n == key.NameDownArrow || n == key.NameLeftArrow || n == key.NameRightArrow ||
+				n == key.NamePageUp || n == key.NamePageDown || n == key.NameHome || n == key.NameEnd ||
+				n == key.NameEscape || n == key.NameReturn || n == key.NameEnter || n == key.NameTab
+
+			if !isJSHandledEdit && (n == key.NameDeleteBackward || n == key.NameDeleteForward) {
+				isFunc = true
+			}
+
+			if isMod || isFunc {
+				// Gio will request the browser to change the selection/carret position natively.
+				e.Call("preventDefault")
+			}
+		}
+
+		if !isJSHandledEdit {
+			cmd := key.Event{
+				Name:      n,
+				Modifiers: modifiersFor(e),
+				State:     ks,
+			}
+			w.processEvent(cmd)
+		}
 	}
 }
 
@@ -521,7 +609,52 @@ func (w *window) funcOf(f func(this js.Value, args []js.Value) interface{}) js.F
 	return jsf
 }
 
-func (w *window) EditorStateChanged(old, new editorState) {}
+func (w *window) EditorStateChanged(old, new editorState) {
+	if w.composing {
+		// Do not interfere with browser state while composing.
+		return
+	}
+
+	// Move DOM element to position the caret.
+	if old.Snippet != new.Snippet {
+		if new.Snippet.Text != w.lastInputText {
+			w.tarea.Set("value", new.Snippet.Text)
+			w.lastInputText = new.Snippet.Text
+		}
+		w.snippetRange = new.Snippet.Range
+	}
+
+	if old.Selection.Range != new.Selection.Range || old.Snippet != new.Snippet {
+		if new.Selection.Range.Start != -1 && new.Selection.Range.End != -1 {
+			start := new.UTF16Index(new.Selection.Range.Start) - new.UTF16Index(new.Snippet.Start)
+			end := new.UTF16Index(new.Selection.Range.End) - new.UTF16Index(new.Snippet.Start)
+
+			if start > end {
+				start, end = end, start
+			}
+
+			if start >= 0 && end >= 0 {
+				w.tarea.Set("selectionStart", start)
+				w.tarea.Set("selectionEnd", end)
+			}
+		}
+	}
+
+	// Move DOM element to position the caret.
+	if old.Selection.Caret != new.Selection.Caret || old.Selection.Transform != new.Selection.Transform {
+		pos := new.Selection.Transform.Transform(new.Selection.Caret.Pos.Add(f32.Pt(0, new.Selection.Caret.Descent)))
+		bounds := w.cnv.Call("getBoundingClientRect")
+		left := bounds.Get("left").Float() + float64(pos.X)/float64(w.scale)
+		top := bounds.Get("top").Float() + float64(pos.Y-new.Selection.Caret.Ascent)/float64(w.scale)
+		height := float64(new.Selection.Caret.Ascent+new.Selection.Caret.Descent) / float64(w.scale)
+
+		style := w.tarea.Get("style")
+		style.Set("left", fmt.Sprintf("%fpx", left))
+		style.Set("top", fmt.Sprintf("%fpx", top))
+		style.Set("height", fmt.Sprintf("%fpx", height))
+		style.Set("width", "1px")
+	}
+}
 
 func (w *window) SetAnimating(anim bool) {
 	w.animating = anim
