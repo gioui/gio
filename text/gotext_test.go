@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
-	"github.com/go-text/typesetting/font"
-	"github.com/go-text/typesetting/shaping"
-	"github.com/go-text/typesetting/language"
 	"github.com/go-text/typesetting/di"
+	"github.com/go-text/typesetting/font"
+	"github.com/go-text/typesetting/language"
+	"github.com/go-text/typesetting/shaping"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
 
@@ -668,7 +668,7 @@ func TestArabicDiacriticClustering(t *testing.T) {
 				RunEnd:    len(tt.input),
 				Direction: tt.wantDirection,
 				Script:    language.Arabic,
-				Face:      nil,             // face doesn't really matter for splitting anyway
+				Face:      nil, // face doesn't really matter for splitting anyway
 				Size:      fixed.I(10),
 			}}
 
