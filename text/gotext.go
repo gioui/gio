@@ -656,53 +656,60 @@ func (s *shaperImpl) Shape(pathOps *op.Ops, gs []Glyph) clip.PathSpec {
 		}
 		scaleFactor := fixedToFloat(ppem) / float32(face.Upem())
 		glyphData := face.GlyphData(gid)
+
+		var outline font.GlyphOutline
 		switch glyphData := glyphData.(type) {
 		case font.GlyphOutline:
-			outline := glyphData
-			// Move to glyph position.
-			pos := f32.Point{
-				X: fixedToFloat((g.X - x) + g.Offset.X),
-				Y: -fixedToFloat(g.Offset.Y),
-			}
-			builder.Move(pos.Sub(lastPos))
-			lastPos = pos
-			var lastArg f32.Point
-
-			// Convert fonts.Segments to relative segments.
-			for _, fseg := range outline.Segments {
-				nargs := 1
-				switch fseg.Op {
-				case gotextot.SegmentOpQuadTo:
-					nargs = 2
-				case gotextot.SegmentOpCubeTo:
-					nargs = 3
-				}
-				var args [3]f32.Point
-				for i := range nargs {
-					a := f32.Point{
-						X: fseg.Args[i].X * scaleFactor,
-						Y: -fseg.Args[i].Y * scaleFactor,
-					}
-					args[i] = a.Sub(lastArg)
-					if i == nargs-1 {
-						lastArg = a
-					}
-				}
-				switch fseg.Op {
-				case gotextot.SegmentOpMoveTo:
-					builder.Move(args[0])
-				case gotextot.SegmentOpLineTo:
-					builder.Line(args[0])
-				case gotextot.SegmentOpQuadTo:
-					builder.Quad(args[0], args[1])
-				case gotextot.SegmentOpCubeTo:
-					builder.Cube(args[0], args[1], args[2])
-				default:
-					panic("unsupported segment op")
-				}
-			}
-			lastPos = lastPos.Add(lastArg)
+			outline = glyphData
+		case font.GlyphSVG:
+			outline = glyphData.Outline
+		default:
+			continue
 		}
+
+		// Move to glyph position.
+		pos := f32.Point{
+			X: fixedToFloat((g.X - x) - g.Offset.X),
+			Y: -fixedToFloat(g.Offset.Y),
+		}
+		builder.Move(pos.Sub(lastPos))
+		lastPos = pos
+		var lastArg f32.Point
+
+		// Convert fonts.Segments to relative segments.
+		for _, fseg := range outline.Segments {
+			nargs := 1
+			switch fseg.Op {
+			case gotextot.SegmentOpQuadTo:
+				nargs = 2
+			case gotextot.SegmentOpCubeTo:
+				nargs = 3
+			}
+			var args [3]f32.Point
+			for i := range nargs {
+				a := f32.Point{
+					X: fseg.Args[i].X * scaleFactor,
+					Y: -fseg.Args[i].Y * scaleFactor,
+				}
+				args[i] = a.Sub(lastArg)
+				if i == nargs-1 {
+					lastArg = a
+				}
+			}
+			switch fseg.Op {
+			case gotextot.SegmentOpMoveTo:
+				builder.Move(args[0])
+			case gotextot.SegmentOpLineTo:
+				builder.Line(args[0])
+			case gotextot.SegmentOpQuadTo:
+				builder.Quad(args[0], args[1])
+			case gotextot.SegmentOpCubeTo:
+				builder.Cube(args[0], args[1], args[2])
+			default:
+				panic("unsupported segment op")
+			}
+		}
+		lastPos = lastPos.Add(lastArg)
 	}
 	return builder.End()
 }
