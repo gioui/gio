@@ -48,6 +48,16 @@ public final class GioActivity extends Activity {
 		super.onStop();
 	}
 
+	@Override public void onPause() {
+        super.onPause();
+        view.pause();
+	}
+
+	@Override public void onResume() {
+        super.onResume();
+        view.resume();
+	}
+
 	@Override public void onConfigurationChanged(Configuration c) {
 		super.onConfigurationChanged(c);
 		view.configurationChanged();

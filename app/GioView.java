@@ -62,7 +62,6 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	private static boolean jniLoaded;
 
 	private final SurfaceHolder.Callback surfCallbacks;
-	private final View.OnFocusChangeListener focusCallback;
 	private final InputMethodManager imm;
 	private final float scrollXScale;
 	private final float scrollYScale;
@@ -114,12 +113,6 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		nhandle = onCreateView(this);
 		setFocusable(true);
 		setFocusableInTouchMode(true);
-		focusCallback = new View.OnFocusChangeListener() {
-			@Override public void onFocusChange(View v, boolean focus) {
-				GioView.this.onFocusChange(nhandle, focus);
-			}
-		};
-		setOnFocusChangeListener(focusCallback);
 		surfCallbacks = new SurfaceHolder.Callback() {
 			@Override public void surfaceCreated(SurfaceHolder holder) {
 				// Ignore; surfaceChanged is guaranteed to be called immediately after this.
@@ -480,6 +473,18 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		if (nhandle != 0) {
 			onStopView(nhandle);
 		}
+	}
+
+	public void pause() {
+		if (nhandle != 0) {
+		    onFocusChange(nhandle, false);
+        }
+	}
+
+	public void resume() {
+		if (nhandle != 0) {
+		    onFocusChange(nhandle, true);
+        }
 	}
 
 	public void destroy() {
