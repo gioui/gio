@@ -437,8 +437,7 @@ func (s *shaperImpl) shapeText(ppem fixed.Int26_6, lc system.Locale, txt []rune)
 						Height:       input.Size,
 						XBearing:     0,
 						YBearing:     0,
-						XAdvance:     input.Size,
-						YAdvance:     input.Size,
+						Advance:      input.Size,
 						XOffset:      0,
 						YOffset:      0,
 						ClusterIndex: input.RunStart,
@@ -836,7 +835,7 @@ func unmapDirection(d di.Direction) system.TextDirection {
 
 // toGioGlyphs converts text shaper glyphs into the minimal representation
 // that Gio needs.
-func toGioGlyphs(in []shaping.Glyph, ppem fixed.Int26_6, faceIdx int) []glyph {
+func toGioGlyphs(in []shaping.Glyph, ppem fixed.Int26_6, faceIdx int, dir di.Direction) []glyph {
 	out := make([]glyph, 0, len(in))
 	for _, g := range in {
 		// To better understand how to calculate the bounding box, see here:
@@ -845,13 +844,18 @@ func toGioGlyphs(in []shaping.Glyph, ppem fixed.Int26_6, faceIdx int) []glyph {
 		bounds.Min.X = g.XBearing
 		bounds.Min.Y = -g.YBearing
 		bounds.Max = bounds.Min.Add(fixed.Point26_6{X: g.Width, Y: -g.Height})
+
+		var xAdvance, yAdvance fixed.Int26_6 = g.Advance, 0
+		if dir.IsVertical() {
+			xAdvance, yAdvance = 0, g.Advance
+		}
 		out = append(out, glyph{
 			id:           newGlyphID(ppem, faceIdx, g.GlyphID),
-			clusterIndex: g.ClusterIndex,
-			runeCount:    g.RuneCount,
-			glyphCount:   g.GlyphCount,
-			xAdvance:     g.XAdvance,
-			yAdvance:     g.YAdvance,
+			clusterIndex: g.TextIndex(),
+			runeCount:    g.RunesCount(),
+			glyphCount:   g.GlyphsCount(),
+			xAdvance:     xAdvance,
+			yAdvance:     yAdvance,
 			xOffset:      g.XOffset,
 			yOffset:      g.YOffset,
 			bounds:       bounds,
@@ -881,7 +885,7 @@ func toLine(faceToIndex map[*font.Font]int, o shaping.Line, dir system.TextDirec
 			font = run.Face.Font
 		}
 		line.runs[i] = runLayout{
-			Glyphs: toGioGlyphs(run.Glyphs, run.Size, faceToIndex[font]),
+			Glyphs: toGioGlyphs(run.Glyphs, run.Size, faceToIndex[font], run.Direction),
 			Runes: Range{
 				Count:  run.Runes.Count,
 				Offset: line.runeCount,
