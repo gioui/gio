@@ -121,7 +121,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"gioui.org/io/transfer"
 	"image"
 	"image/color"
 	"io"
@@ -136,6 +135,8 @@ import (
 	"time"
 	"unicode/utf16"
 	"unsafe"
+
+	"gioui.org/io/transfer"
 
 	"gioui.org/internal/f32color"
 	"gioui.org/op"
@@ -162,7 +163,6 @@ type window struct {
 	insets    pixelInsets
 
 	visible   bool
-	focused   bool
 	started   bool
 	animating bool
 
@@ -527,7 +527,6 @@ func Java_org_gioui_GioView_onStopView(env *C.JNIEnv, class C.jclass, handle C.j
 	w := cgo.Handle(handle).Value().(*window)
 	w.started = false
 	w.visible = false
-	w.sendConfigEvent()
 }
 
 //export Java_org_gioui_GioView_onStartView
@@ -544,7 +543,6 @@ func Java_org_gioui_GioView_onSurfaceDestroyed(env *C.JNIEnv, class C.jclass, ha
 	w := cgo.Handle(handle).Value().(*window)
 	w.win = nil
 	w.visible = false
-	w.sendConfigEvent()
 }
 
 //export Java_org_gioui_GioView_onSurfaceChanged
@@ -590,8 +588,8 @@ func Java_org_gioui_GioView_onBack(env *C.JNIEnv, class C.jclass, view C.jlong) 
 //export Java_org_gioui_GioView_onFocusChange
 func Java_org_gioui_GioView_onFocusChange(env *C.JNIEnv, class C.jclass, view C.jlong, focus C.jboolean) {
 	w := cgo.Handle(view).Value().(*window)
-	w.focused = focus == C.JNI_TRUE
-	w.sendConfigEvent()
+	w.config.Focused = focus == C.JNI_TRUE
+	w.processEvent(ConfigEvent{Config: w.config})
 }
 
 //export Java_org_gioui_GioView_onWindowInsets
@@ -817,13 +815,7 @@ func (w *window) setVisible(env *C.JNIEnv) {
 		return
 	}
 	w.visible = true
-	w.sendConfigEvent()
 	w.draw(env, true)
-}
-
-func (w *window) sendConfigEvent() {
-	w.config.Focused = w.visible && w.focused
-	w.processEvent(ConfigEvent{Config: w.config})
 }
 
 func (w *window) setVisual(visID int) error {
@@ -868,7 +860,7 @@ func (w *window) draw(env *C.JNIEnv, sync bool) {
 	size := image.Pt(int(C.ANativeWindow_getWidth(w.win)), int(C.ANativeWindow_getHeight(w.win)))
 	if size != w.config.Size {
 		w.config.Size = size
-		w.sendConfigEvent()
+		w.processEvent(ConfigEvent{Config: w.config})
 	}
 	if size.X == 0 || size.Y == 0 {
 		return
@@ -1404,7 +1396,7 @@ func (w *window) setConfig(env *C.JNIEnv, cnf Config) {
 	if cnf.Decorated != prev.Decorated {
 		w.config.Decorated = cnf.Decorated
 	}
-	w.sendConfigEvent()
+	w.processEvent(ConfigEvent{Config: w.config})
 }
 
 func (w *window) Perform(system.Action) {}
