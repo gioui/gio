@@ -121,7 +121,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"gioui.org/io/transfer"
 	"image"
 	"image/color"
 	"io"
@@ -147,6 +146,7 @@ import (
 	"gioui.org/io/pointer"
 	"gioui.org/io/semantic"
 	"gioui.org/io/system"
+	"gioui.org/io/transfer"
 	"gioui.org/unit"
 )
 
@@ -527,6 +527,8 @@ func Java_org_gioui_GioView_onStopView(env *C.JNIEnv, class C.jclass, handle C.j
 	w := cgo.Handle(handle).Value().(*window)
 	w.started = false
 	w.visible = false
+	w.focused = false
+
 	w.sendConfigEvent()
 }
 
@@ -534,6 +536,8 @@ func Java_org_gioui_GioView_onStopView(env *C.JNIEnv, class C.jclass, handle C.j
 func Java_org_gioui_GioView_onStartView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := cgo.Handle(handle).Value().(*window)
 	w.started = true
+	w.focused = true
+
 	if w.win != nil {
 		w.setVisible(env)
 	}
