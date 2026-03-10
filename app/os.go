@@ -47,7 +47,7 @@ type Config struct {
 	Decorated bool
 	// TopMost windows render above all other non-top-most windows.
 	TopMost bool
-	// Focused reports whether has the keyboard focus.
+	// Focused reports whether the window is focused.
 	Focused bool
 	// decoHeight is the height of the fallback decoration for platforms such
 	// as Wayland that may need fallback client-side decorations.

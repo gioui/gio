@@ -134,23 +134,59 @@ NSArray<UIKeyCommand *> *_keyCommands;
     return gio_layerClass();
 }
 - (void)willMoveToWindow:(UIWindow *)newWindow {
+	self.contentScaleFactor = newWindow.screen.nativeScale;
+    if (@available(iOS 13.0, *)) {
+        [self registerSceneNotifications:newWindow];
+    }else{
+        [self registerWindowNotifications:newWindow];
+    }
+}
+
+- (void)registerSceneNotifications:(UIWindow *)newWindow {
+        if (self.window != nil) {
+            [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                  name:UISceneDidActivateNotification
+                                                  object:self.window.windowScene];
+            [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                  name:UISceneWillDeactivateNotification
+                                                  object:self.window.windowScene];
+        }
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                              selector:@selector(onSceneDidActivate:)
+                                              name:UISceneDidActivateNotification
+                                              object:newWindow.windowScene];
+
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                              selector:@selector(onSceneWillDeactivate:)
+                                              name:UISceneWillDeactivateNotification
+                                              object:newWindow.windowScene];
+}
+
+- (void)onSceneDidActivate:(NSNotification *)note API_AVAILABLE(ios(13.0)){
+    onFocus(self.handle, YES);
+}
+
+- (void)onSceneWillDeactivate:(NSNotification *)note API_AVAILABLE(ios(13.0)){
+    onFocus(self.handle, NO);
+}
+
+- (void)registerWindowNotifications:(UIWindow *)newWindow {
 	if (self.window != nil) {
 		[[NSNotificationCenter defaultCenter] removeObserver:self
-														name:UIWindowDidBecomeKeyNotification
-													  object:self.window];
+											  name:UIWindowDidBecomeKeyNotification
+										      object:self.window];
 		[[NSNotificationCenter defaultCenter] removeObserver:self
-														name:UIWindowDidResignKeyNotification
-													  object:self.window];
+											  name:UIWindowDidResignKeyNotification
+											  object:self.window];
 	}
-	self.contentScaleFactor = newWindow.screen.nativeScale;
 	[[NSNotificationCenter defaultCenter] addObserver:self
-											 selector:@selector(onWindowDidBecomeKey:)
-												 name:UIWindowDidBecomeKeyNotification
-											   object:newWindow];
+										  selector:@selector(onWindowDidBecomeKey:)
+										  name:UIWindowDidBecomeKeyNotification
+										  object:newWindow];
 	[[NSNotificationCenter defaultCenter] addObserver:self
-											 selector:@selector(onWindowDidResignKey:)
-												 name:UIWindowDidResignKeyNotification
-											   object:newWindow];
+										  selector:@selector(onWindowDidResignKey:)
+										  name:UIWindowDidResignKeyNotification
+										  object:newWindow];
 }
 
 - (void)onWindowDidBecomeKey:(NSNotification *)note {
