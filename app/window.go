@@ -200,6 +200,7 @@ func (w *Window) validateAndProcess(size image.Point, sync bool, frame *op.Ops, 
 		var err error
 		if w.gpu != nil {
 			err = w.ctx.Present()
+			w.gpu.InvokeExternalCallbacks()
 			w.ctx.Unlock()
 		}
 		return err
@@ -218,7 +219,11 @@ func (w *Window) frame(frame *op.Ops, viewport image.Point) error {
 	if err != nil {
 		return err
 	}
-	return w.gpu.Frame(frame, target, viewport)
+	if err := w.gpu.Frame(frame, target, viewport); err != nil {
+		return err
+	}
+	w.driver.SetExternalRegions(w.gpu.ExternalRegions())
+	return nil
 }
 
 func (w *Window) processFrame(frame *op.Ops, ack chan<- struct{}) {

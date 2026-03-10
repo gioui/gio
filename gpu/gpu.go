@@ -38,6 +38,14 @@ import (
 	_ "gioui.org/gpu/internal/vulkan"
 )
 
+// ExternalRegions tracks areas for hit testing.
+type ExternalRegions struct {
+	// Pass regions are external view areas where events should pass through.
+	Pass []f32.Rectangle
+	// Blockers are Gio overlay areas where events should be handled by Gio, but are inside Pass.
+	Blockers []f32.Rectangle
+}
+
 type GPU interface {
 	// Release non-Go resources. The GPU is no longer valid after Release.
 	Release()
@@ -45,6 +53,10 @@ type GPU interface {
 	Clear(color color.NRGBA)
 	// Frame draws the graphics operations from op into a viewport of target.
 	Frame(frame *op.Ops, target RenderTarget, viewport image.Point) error
+	// ExternalRegions returns the regions occupied by ExternalOps from the last frame.
+	ExternalRegions() ExternalRegions
+	// InvokeExternalCallbacks notifies external views of their position.
+	InvokeExternalCallbacks()
 }
 
 type gpu struct {
@@ -67,23 +79,27 @@ type renderer struct {
 	intersections packer
 	layers        packer
 	layerFBOs     fboSet
+	clearPipeline driver.Pipeline
 }
 
 type drawOps struct {
-	reader       ops.Reader
-	states       []f32.Affine2D
-	transStack   []f32.Affine2D
-	layers       []opacityLayer
-	opacityStack []int
-	vertCache    []byte
-	viewport     image.Point
-	clear        bool
-	clearColor   f32color.RGBA
-	imageOps     []imageOp
-	pathOps      []*pathOp
-	pathOpCache  []pathOp
-	qs           quadSplitter
-	pathCache    *opCache
+	reader          ops.Reader
+	states          []f32.Affine2D
+	transStack      []f32.Affine2D
+	layers          []opacityLayer
+	opacityStack    []int
+	vertCache       []byte
+	viewport        image.Point
+	clear           bool
+	clearColor      f32color.RGBA
+	imageOps        []imageOp
+	pathOps         []*pathOp
+	pathOpCache     []pathOp
+	qs              quadSplitter
+	pathCache       *opCache
+	externalRegions ExternalRegions
+	externals       []externalOpData
+	lastExternals   []externalOpData
 }
 
 type opacityLayer struct {
@@ -115,6 +131,8 @@ type drawState struct {
 	stop2  f32.Point
 	color1 color.NRGBA
 	color2 color.NRGBA
+
+	external externalOpData
 }
 
 type pathOp struct {
@@ -180,6 +198,8 @@ type material struct {
 	data    imageOpData
 	tex     driver.Texture
 	uvTrans f32.Affine2D
+	// For materialTypeExternal.
+	external externalOpData
 }
 
 const (
@@ -192,6 +212,14 @@ type imageOpData struct {
 	src    *image.RGBA
 	handle any
 	filter byte
+}
+
+// externalOpData is the shadow of paint.ExternalOp.
+type externalOpData struct {
+	callback func(visible image.Rectangle, area image.Rectangle, zIndex int)
+	handle   any
+	rect     image.Rectangle
+	area     image.Rectangle
 }
 
 type linearGradientOpData struct {
@@ -262,11 +290,13 @@ type texture struct {
 type blitter struct {
 	ctx                    driver.Device
 	viewport               image.Point
-	pipelines              [2][3]*pipeline
+	pipelines              [2][4]*pipeline
 	colUniforms            *blitColUniforms
 	texUniforms            *blitTexUniforms
 	linearGradientUniforms *blitLinearGradientUniforms
 	quadVerts              driver.Buffer
+	// clearPipeline clears to transparent.
+	clearPipeline driver.Pipeline
 }
 
 type blitColUniforms struct {
@@ -327,6 +357,7 @@ const (
 	materialColor materialType = iota
 	materialLinearGradient
 	materialTexture
+	materialExternal
 )
 
 // New creates a GPU for the given API.
@@ -432,13 +463,14 @@ func (g *gpu) frame(target RenderTarget) error {
 	}
 	g.ctx.BeginRenderPass(defFBO, d)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
-	g.renderer.drawOps(false, image.Point{}, g.renderer.blitter.viewport, g.drawOps.imageOps)
+	g.renderer.drawOps(false, image.Point{}, g.renderer.blitter.viewport, g.drawOps.imageOps, &g.drawOps.externalRegions)
 	g.coverTimer.end()
 	g.ctx.EndRenderPass()
 	g.cleanupTimer.begin()
 	g.cache.frame()
 	g.drawOps.pathCache.frame()
 	g.cleanupTimer.end()
+
 	if false && g.timers.ready() {
 		st, covt, cleant := g.stencilTimer.Elapsed, g.coverTimer.Elapsed, g.cleanupTimer.Elapsed
 		ft := st + covt + cleant
@@ -453,6 +485,14 @@ func (g *gpu) frame(target RenderTarget) error {
 
 func (g *gpu) Profile() string {
 	return g.profile
+}
+
+func (g *gpu) ExternalRegions() ExternalRegions {
+	return g.drawOps.externalRegions
+}
+
+func (g *gpu) InvokeExternalCallbacks() {
+	g.drawOps.invokeExternalCallbacks()
 }
 
 func (r *renderer) texHandle(cache *textureCache, data imageOpData) driver.Texture {
@@ -547,13 +587,14 @@ func newBlitter(ctx driver.Device) *blitter {
 	b.colUniforms = new(blitColUniforms)
 	b.texUniforms = new(blitTexUniforms)
 	b.linearGradientUniforms = new(blitLinearGradientUniforms)
-	pipelines, err := createColorPrograms(ctx, gio.Shader_blit_vert, gio.Shader_blit_frag,
+	pipelines, clearPipes, err := createColorPrograms(ctx, gio.Shader_blit_vert, gio.Shader_blit_frag,
 		[3]any{b.colUniforms, b.linearGradientUniforms, b.texUniforms},
 	)
 	if err != nil {
 		panic(err)
 	}
 	b.pipelines = pipelines
+	b.clearPipeline = clearPipes
 	return b
 }
 
@@ -566,7 +607,7 @@ func (b *blitter) release() {
 	}
 }
 
-func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.Sources, uniforms [3]any) (pipelines [2][3]*pipeline, err error) {
+func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.Sources, uniforms [3]any) (pipelines [2][4]*pipeline, clearPipeline driver.Pipeline, err error) {
 	defer func() {
 		if err != nil {
 			for _, p := range pipelines {
@@ -583,6 +624,12 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 		SrcFactor: driver.BlendFactorOne,
 		DstFactor: driver.BlendFactorOneMinusSrcAlpha,
 	}
+	// Clear blend: result = src * 0 + dst * 0 = transparent.
+	clearBlend := driver.BlendDesc{
+		Enable:    true,
+		SrcFactor: driver.BlendFactorZero,
+		DstFactor: driver.BlendFactorZero,
+	}
 	layout := driver.VertexLayout{
 		Inputs: []driver.InputDesc{
 			{Type: shader.DataTypeFloat, Size: 2, Offset: 0},
@@ -592,14 +639,14 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 	}
 	vsh, err := b.NewVertexShader(vsSrc)
 	if err != nil {
-		return pipelines, err
+		return pipelines, clearPipeline, err
 	}
 	defer vsh.Release()
 	for i, format := range []driver.TextureFormat{driver.TextureFormatOutput, driver.TextureFormatSRGBA} {
 		{
 			fsh, err := b.NewFragmentShader(fsSrc[materialTexture])
 			if err != nil {
-				return pipelines, err
+				return pipelines, clearPipeline, err
 			}
 			defer fsh.Release()
 			pipe, err := b.NewPipeline(driver.PipelineDesc{
@@ -611,7 +658,7 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 				Topology:       driver.TopologyTriangleStrip,
 			})
 			if err != nil {
-				return pipelines, err
+				return pipelines, clearPipeline, err
 			}
 			var vertBuffer *uniformBuffer
 			if u := uniforms[materialTexture]; u != nil {
@@ -623,7 +670,7 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 			var vertBuffer *uniformBuffer
 			fsh, err := b.NewFragmentShader(fsSrc[materialColor])
 			if err != nil {
-				return pipelines, err
+				return pipelines, clearPipeline, err
 			}
 			defer fsh.Release()
 			pipe, err := b.NewPipeline(driver.PipelineDesc{
@@ -635,7 +682,7 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 				Topology:       driver.TopologyTriangleStrip,
 			})
 			if err != nil {
-				return pipelines, err
+				return pipelines, clearPipeline, err
 			}
 			if u := uniforms[materialColor]; u != nil {
 				vertBuffer = newUniformBuffer(b, u)
@@ -646,7 +693,7 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 			var vertBuffer *uniformBuffer
 			fsh, err := b.NewFragmentShader(fsSrc[materialLinearGradient])
 			if err != nil {
-				return pipelines, err
+				return pipelines, clearPipeline, err
 			}
 			defer fsh.Release()
 			pipe, err := b.NewPipeline(driver.PipelineDesc{
@@ -658,15 +705,39 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 				Topology:       driver.TopologyTriangleStrip,
 			})
 			if err != nil {
-				return pipelines, err
+				return pipelines, clearPipeline, err
 			}
 			if u := uniforms[materialLinearGradient]; u != nil {
 				vertBuffer = newUniformBuffer(b, u)
 			}
 			pipelines[i][materialLinearGradient] = &pipeline{pipe, vertBuffer}
 		}
+		// Create the external pipeline with clear blend.
+		{
+			var vertBuffer *uniformBuffer
+			fsh, err := b.NewFragmentShader(fsSrc[materialColor])
+			if err != nil {
+				return pipelines, clearPipeline, err
+			}
+			defer fsh.Release()
+			pipe, err := b.NewPipeline(driver.PipelineDesc{
+				VertexShader:   vsh,
+				FragmentShader: fsh,
+				BlendDesc:      clearBlend,
+				VertexLayout:   layout,
+				PixelFormat:    format,
+				Topology:       driver.TopologyTriangleStrip,
+			})
+			if err != nil {
+				return pipelines, clearPipeline, err
+			}
+			if u := uniforms[materialColor]; u != nil {
+				vertBuffer = newUniformBuffer(b, u)
+			}
+			pipelines[i][materialExternal] = &pipeline{pipe, vertBuffer}
+		}
 	}
-	return pipelines, nil
+	return pipelines, clearPipeline, nil
 }
 
 func (r *renderer) stencilClips(pathCache *opCache, ops []*pathOp) {
@@ -869,7 +940,7 @@ func (r *renderer) drawLayers(layers []opacityLayer, ops []imageOp) {
 		}
 		r.ctx.Viewport(v.Min.X, v.Min.Y, v.Dx(), v.Dy())
 		f := r.layerFBOs.fbos[fbo]
-		r.drawOps(true, l.clip.Min.Mul(-1), l.clip.Size(), ops[l.opStart:l.opEnd])
+		r.drawOps(true, l.clip.Min.Mul(-1), l.clip.Size(), ops[l.opStart:l.opEnd], nil)
 		sr := f32.FRect(v)
 		uvScale, uvOffset := texSpaceTransform(sr, f.size)
 		uvTrans := f32.AffineId().Scale(f32.Point{}, uvScale).Offset(uvOffset)
@@ -900,6 +971,28 @@ func (d *drawOps) reset(viewport image.Point) {
 	d.transStack = d.transStack[:0]
 	d.layers = d.layers[:0]
 	d.opacityStack = d.opacityStack[:0]
+	d.externalRegions.Pass = d.externalRegions.Pass[:0]
+	d.externalRegions.Blockers = d.externalRegions.Blockers[:0]
+	d.lastExternals = append(d.lastExternals[:0], d.externals...)
+	d.externals = d.externals[:0]
+}
+
+func (d *drawOps) invokeExternalCallbacks() {
+nextLast:
+	for _, last := range d.lastExternals {
+		for _, ext := range d.externals {
+			if last.handle == ext.handle {
+				continue nextLast
+			}
+		}
+		// View disappeared
+		last.callback(image.Rectangle{}, image.Rectangle{}, 0)
+	}
+
+	// Notify active views with their positions.
+	for i, ext := range d.externals {
+		ext.callback(ext.rect, ext.area, i+1)
+	}
 }
 
 func (d *drawOps) collect(root *op.Ops, viewport image.Point) {
@@ -1079,6 +1172,11 @@ loop:
 		case ops.TypeImage:
 			state.matType = materialTexture
 			state.image = decodeImageOp(encOp.Data, encOp.Refs)
+		case ops.TypeExternal:
+			state.matType = materialExternal
+			state.external.callback = encOp.Refs[0].(func(visible image.Rectangle, area image.Rectangle, zIndex int))
+			state.external.handle = encOp.Refs[1]
+			d.externals = append(d.externals, state.external)
 		case ops.TypePaint:
 			// Transform (if needed) the painting rectangle and if so generate a clip path,
 			// for those cases also compute a partialTrans that maps texture coordinates between
@@ -1093,11 +1191,24 @@ loop:
 				dst = f32.Rectangle{Max: layout.FPt(sz)}
 			}
 			clipData, bnd, partialTrans := d.boundsForTransformedRect(dst, t)
+
+			cpathBefore := state.cpath
 			cl := viewport.Intersect(bnd.Add(off))
 			if state.cpath != nil {
 				cl = state.cpath.intersect.Intersect(cl)
 			}
 			if cl.Empty() {
+				if state.matType == materialExternal {
+					lastIdx := len(d.externals) - 1
+					if lastIdx >= 0 {
+						d.externals[lastIdx].rect = image.Rectangle{}
+						if cpathBefore != nil {
+							d.externals[lastIdx].area = cpathBefore.bounds.Add(cpathBefore.off).Round()
+						} else {
+							d.externals[lastIdx].area = image.Rectangle{Max: d.viewport}
+						}
+					}
+				}
 				continue
 			}
 
@@ -1121,6 +1232,19 @@ loop:
 				d.clear = true
 				continue
 			}
+			// For external materials, store the clip rect for deferred callback invocation.
+			if mat.material == materialExternal {
+				lastIdx := len(d.externals) - 1
+				if lastIdx >= 0 {
+					d.externals[lastIdx].rect = bounds
+					if cpathBefore != nil {
+						d.externals[lastIdx].area = cpathBefore.bounds.Add(cpathBefore.off).Round()
+					} else {
+						d.externals[lastIdx].area = image.Rectangle{Max: d.viewport}
+					}
+				}
+			}
+
 			img := imageOp{
 				path:     state.cpath,
 				clip:     bounds,
@@ -1202,6 +1326,12 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 		uvScale, uvOffset := texSpaceTransform(sr, sz)
 		m.uvTrans = partTrans.Mul(f32.AffineId().Scale(f32.Point{}, uvScale).Offset(uvOffset))
 		m.data = d.image
+	case materialExternal:
+		m.material = materialExternal
+		m.external = d.external
+		m.color = f32color.RGBA{A: 0}
+		m.opaque = false
+		m.external.rect = rect.Add(off).Round()
 	}
 	return m
 }
@@ -1237,8 +1367,38 @@ func (r *renderer) prepareDrawOps(ops []imageOp) {
 	}
 }
 
-func (r *renderer) drawOps(isFBO bool, opOff, viewport image.Point, ops []imageOp) {
+func (r *renderer) drawOps(isFBO bool, opOff, viewport image.Point, ops []imageOp, externalRegions *ExternalRegions) {
 	var coverTex driver.Texture
+
+	if externalRegions != nil {
+		for i := 0; i < len(ops); i++ {
+			img := ops[i]
+			if img.material.material == materialExternal {
+				drc := f32.FRect(img.clip.Add(opOff))
+				externalRegions.Pass = append(externalRegions.Pass, drc)
+
+				for j := i + 1; i < len(ops); i++ {
+					img := ops[i]
+					// Skip external ops and transparent ops.
+					if img.material.material == materialExternal || img.material.opacity == 0 {
+						j += img.layerOps
+						continue
+					}
+
+					coverClip := img.clip.Add(opOff)
+					coverRect := f32.FRect(coverClip)
+
+					if intersect := drc.Intersect(coverRect); !intersect.Empty() {
+						externalRegions.Blockers = append(externalRegions.Blockers, intersect)
+					}
+					j += img.layerOps
+				}
+			}
+			i += img.layerOps
+		}
+	}
+
+	// Render pass: draw all operations.
 	for i := 0; i < len(ops); i++ {
 		img := ops[i]
 		i += img.layerOps
@@ -1294,6 +1454,9 @@ func (b *blitter) blit(mat materialType, fbo bool, col f32color.RGBA, col1, col2
 	switch mat {
 	case materialColor:
 		b.colUniforms.color = col
+		uniforms = &b.colUniforms.blitUniforms
+	case materialExternal:
+		b.colUniforms.color = f32color.RGBA{A: 0}
 		uniforms = &b.colUniforms.blitUniforms
 	case materialTexture:
 		t1, t2, t3, t4, t5, t6 := uvTrans.Elems()
@@ -1600,4 +1763,23 @@ func newShaders(ctx driver.Device, vsrc, fsrc shader.Sources) (vert driver.Verte
 		vert.Release()
 	}
 	return
+}
+
+func (e ExternalRegions) Contains(point f32.Point) bool {
+	found := false
+	for _, r := range e.Pass {
+		if r.Min.X <= point.X && r.Max.X >= point.X && r.Min.Y <= point.Y && r.Max.Y >= point.Y {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return false
+	}
+	for _, r := range e.Blockers {
+		if point.X >= r.Min.X && point.X <= r.Max.X && point.Y >= r.Min.Y && point.Y <= r.Max.Y {
+			return false
+		}
+	}
+	return true
 }

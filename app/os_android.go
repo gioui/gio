@@ -137,6 +137,7 @@ import (
 	"unicode/utf16"
 	"unsafe"
 
+	"gioui.org/gpu"
 	"gioui.org/internal/f32color"
 	"gioui.org/op"
 
@@ -176,6 +177,11 @@ type window struct {
 		focusID input.SemanticID
 		diffs   []input.SemanticID
 	}
+
+	// externalRegions tracks areas for hit testing.
+	externalRegions gpu.ExternalRegions
+	// externalUsed tracks whether ExternalOps have been used this frame.
+	externalUsed bool
 }
 
 // gioView hold cached JNI methods for GioView.
@@ -200,6 +206,7 @@ var gioView struct {
 	restartInput       C.jmethodID
 	updateSelection    C.jmethodID
 	updateCaret        C.jmethodID
+	setZOrder          C.jmethodID
 }
 
 type pixelInsets struct {
@@ -486,6 +493,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.restartInput = getMethodID(env, class, "restartInput", "()V")
 		m.updateSelection = getMethodID(env, class, "updateSelection", "()V")
 		m.updateCaret = getMethodID(env, class, "updateCaret", "(FFFFFFFFFF)V")
+		m.setZOrder = getMethodID(env, class, "setZOrder", "(Z)V")
 	})
 	view = C.jni_NewGlobalRef(env, view)
 	wopts := <-mainWindow.out
@@ -990,6 +998,27 @@ func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.j
 	if pressed == C.JNI_TRUE && r != 0 && r != '\n' { // Checking for "\n" to prevent duplication with key.NameEnter (gio#224).
 		w.callbacks.EditorInsert(string(rune(r)))
 	}
+}
+
+// SetExternalRegions updates the external regions for hit testing.
+func (w *window) SetExternalRegions(regions gpu.ExternalRegions) {
+	w.externalRegions = regions
+	// If ExternalOps are used and z-order hasn't been set yet, set GioView on top.
+	if len(regions.Pass) > 0 && !w.externalUsed {
+		w.externalUsed = true
+		runInJVM(javaVM(), func(env *C.JNIEnv) {
+			callVoidMethod(env, w.view, gioView.setZOrder, jvalue(1))
+		})
+	}
+}
+
+//export Java_org_gioui_GioView_hitTest
+func Java_org_gioui_GioView_hitTest(env *C.JNIEnv, class C.jclass, handle C.jlong, x, y C.jfloat) C.jboolean {
+	w := cgo.Handle(handle).Value().(*window)
+	if w.externalRegions.Contains(f32.Point{X: float32(x), Y: float32(y)}) {
+		return C.JNI_FALSE
+	}
+	return C.JNI_TRUE
 }
 
 //export Java_org_gioui_GioView_onTouchEvent

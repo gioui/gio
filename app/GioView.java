@@ -16,6 +16,7 @@ import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
@@ -87,6 +88,11 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		// Set background color to transparent to avoid a flickering
 		// issue on ChromeOS.
 		setBackgroundColor(Color.argb(0, 0, 0, 0));
+		getHolder().setFormat(PixelFormat.TRANSPARENT);
+		
+		// Ensure GioView is on top of other views when ExternalOps are used.
+		// This is initially false and set to true when the first ExternalOp is seen.
+		setZOrderOnTop(false);
 
 		ViewConfiguration conf = ViewConfiguration.get(context);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -151,6 +157,22 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		// so assume it's good for us as well.
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
 			requestUnbufferedDispatch(event);
+		}
+
+		// Check if touch event should be handled by Gio or passed through
+		// to external views. Only check at the beginning of a trace so drags
+		// crossing over external regions are not truncated.
+		if (nhandle != 0) {
+			int action = event.getActionMasked();
+			if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
+				int idx = event.getActionIndex();
+				float x = event.getX(idx);
+				float y = event.getY(idx);
+				if (!hitTest(nhandle, x, y)) {
+					// Event is on an external view, don't consume it.
+					return false;
+				}
+			}
 		}
 
 		dispatchMotionEvent(event);
@@ -583,6 +605,14 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	static private native int imeToRunes(long handle, int chars);
 	// imeToUTF16 converts the rune index into Java characters.
 	static private native int imeToUTF16(long handle, int runes);
+	// hitTest returns true if the point should be handled by Gio,
+	// false if it should be passed through to external views.
+	static private native boolean hitTest(long handle, float x, float y);
+	// setZOrderOnTop is called when ExternalOps are used to ensure
+	// Gio renders on top of external views.
+	public void setZOrder(boolean onTop) {
+		setZOrderOnTop(onTop);
+	}
 
 	private class GioInputConnection implements InputConnection {
 		private int batchDepth;

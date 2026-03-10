@@ -209,6 +209,7 @@ const (
 
 	HWND_TOPMOST = ^(uint32(1) - 1) // -1
 
+	HTTRANSPARENT = ^uintptr(0) // -1, pass through to underlying window
 	HTCAPTION     = 2
 	HTCLIENT      = 1
 	HTLEFT        = 10
@@ -219,6 +220,15 @@ const (
 	HTBOTTOM      = 15
 	HTBOTTOMLEFT  = 16
 	HTBOTTOMRIGHT = 17
+
+	// Region operations for CombineRgn
+	RGN_AND       = 1
+	RGN_OR        = 2
+	RGN_XOR       = 3
+	RGN_DIFF      = 4
+	RGN_COPY      = 5
+	RGN_NULL      = 1
+	RGN_ERROR     = 0
 
 	IDC_APPSTARTING = 32650 // Standard arrow and small hourglass
 	IDC_ARROW       = 32512 // Standard arrow
@@ -378,6 +388,7 @@ const (
 	WS_THICKFRAME  = 0x00040000
 	WS_MINIMIZEBOX = 0x00020000
 	WS_MAXIMIZEBOX = 0x00010000
+	WS_CHILD       = 0x40000000
 
 	WS_EX_APPWINDOW  = 0x00040000
 	WS_EX_WINDOWEDGE = 0x00000100
@@ -472,6 +483,7 @@ var (
 	_SetWindowLong32             = user32.NewProc("SetWindowLongW")
 	_SetWindowPlacement          = user32.NewProc("SetWindowPlacement")
 	_SetWindowPos                = user32.NewProc("SetWindowPos")
+	_SetWindowRgn                = user32.NewProc("SetWindowRgn")
 	_SetWindowText               = user32.NewProc("SetWindowTextW")
 	_TranslateMessage            = user32.NewProc("TranslateMessage")
 	_UnregisterClass             = user32.NewProc("UnregisterClassW")
@@ -480,8 +492,11 @@ var (
 	shcore            = syscall.NewLazySystemDLL("shcore")
 	_GetDpiForMonitor = shcore.NewProc("GetDpiForMonitor")
 
-	gdi32          = syscall.NewLazySystemDLL("gdi32")
-	_GetDeviceCaps = gdi32.NewProc("GetDeviceCaps")
+	gdi32               = syscall.NewLazySystemDLL("gdi32")
+	_GetDeviceCaps      = gdi32.NewProc("GetDeviceCaps")
+	_CreateRectRgn      = gdi32.NewProc("CreateRectRgn")
+	_CombineRgn         = gdi32.NewProc("CombineRgn")
+	_DeleteObject       = gdi32.NewProc("DeleteObject")
 
 	imm32                    = syscall.NewLazySystemDLL("imm32")
 	_ImmGetContext           = imm32.NewProc("ImmGetContext")
@@ -992,4 +1007,33 @@ func (p *WindowPlacement) Set(Left, Top, Right, Bottom int) {
 	p.rcNormalPosition.Top = int32(Top)
 	p.rcNormalPosition.Right = int32(Right)
 	p.rcNormalPosition.Bottom = int32(Bottom)
+}
+
+// CreateRectRgn creates a rectangular region.
+func CreateRectRgn(left, top, right, bottom int32) syscall.Handle {
+	r, _, _ := _CreateRectRgn.Call(uintptr(left), uintptr(top), uintptr(right), uintptr(bottom))
+	return syscall.Handle(r)
+}
+
+// CombineRgn combines two regions.
+func CombineRgn(dst, src1, src2 syscall.Handle, mode int) int {
+	r, _, _ := _CombineRgn.Call(uintptr(dst), uintptr(src1), uintptr(src2), uintptr(mode))
+	return int(r)
+}
+
+// DeleteObject deletes a GDI object.
+func DeleteObject(h syscall.Handle) bool {
+	r, _, _ := _DeleteObject.Call(uintptr(h))
+	return r != 0
+}
+
+// SetWindowRgn sets the window region for hit testing.
+// Pass 0 as hRgn to reset to the full window rect.
+func SetWindowRgn(hwnd syscall.Handle, hRgn syscall.Handle, redraw bool) bool {
+	var redrawInt uintptr
+	if redraw {
+		redrawInt = 1
+	}
+	r, _, _ := _SetWindowRgn.Call(uintptr(hwnd), uintptr(hRgn), redrawInt)
+	return r != 0
 }
