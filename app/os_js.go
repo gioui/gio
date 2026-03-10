@@ -406,27 +406,12 @@ func (w *window) keyEvent(e js.Value, ks key.State) {
 	k := e.Get("key").String()
 
 	if n, ok := translateKey(k); ok {
-		isJSHandledEdit := false
-		switch n {
-		case key.NameDeleteBackward:
-			if w.tarea.Get("selectionStart").Int() > 0 {
-				isJSHandledEdit = true
-			}
-		case key.NameDeleteForward:
-			if w.tarea.Get("selectionStart").Int() < w.tarea.Get("value").Length() {
-				isJSHandledEdit = true
-			}
-		}
-
 		if ks == key.Press {
-			isMod := n == key.NameAlt || n == key.NameCommand || n == key.NameCtrl || n == key.NameShift
+			isMod := n == key.NameAlt || n == key.NameCommand || n == key.NameCtrl || n == key.NameShift || n == key.NameSuper
 			isFunc := n == key.NameUpArrow || n == key.NameDownArrow || n == key.NameLeftArrow || n == key.NameRightArrow ||
 				n == key.NamePageUp || n == key.NamePageDown || n == key.NameHome || n == key.NameEnd ||
-				n == key.NameEscape || n == key.NameReturn || n == key.NameEnter || n == key.NameTab
-
-			if !isJSHandledEdit && (n == key.NameDeleteBackward || n == key.NameDeleteForward) {
-				isFunc = true
-			}
+				n == key.NameEscape || n == key.NameReturn || n == key.NameEnter || n == key.NameTab ||
+				n == key.NameDeleteBackward || n == key.NameDeleteForward
 
 			if isMod || isFunc {
 				// Gio will request the browser to change the selection/carret position natively.
@@ -434,14 +419,12 @@ func (w *window) keyEvent(e js.Value, ks key.State) {
 			}
 		}
 
-		if !isJSHandledEdit {
-			cmd := key.Event{
-				Name:      n,
-				Modifiers: modifiersFor(e),
-				State:     ks,
-			}
-			w.processEvent(cmd)
+		cmd := key.Event{
+			Name:      n,
+			Modifiers: modifiersFor(e),
+			State:     ks,
 		}
+		w.processEvent(cmd)
 	}
 }
 
@@ -502,6 +485,12 @@ func modifiersFor(e js.Value) key.Modifiers {
 	if e.Call("getModifierState", "Shift").Bool() {
 		mods |= key.ModShift
 	}
+	if e.Call("getModifierState", "Meta").Bool() {
+		mods |= key.ModCommand
+	}
+	if e.Call("getModifierState", "OS").Bool() {
+		mods |= key.ModSuper
+	}
 	return mods
 }
 
@@ -521,6 +510,9 @@ func (w *window) touchEvent(kind pointer.Kind, e js.Value) {
 	}
 	if e.Get("ctrlKey").Bool() {
 		mods |= key.ModCtrl
+	}
+	if e.Get("metaKey").Bool() {
+		mods |= key.ModCommand
 	}
 	for i := 0; i < n; i++ {
 		touch := changedTouches.Index(i)
@@ -668,10 +660,9 @@ func (w *window) ReadClipboard() {
 	if w.clipboard.IsUndefined() {
 		return
 	}
-	if w.clipboard.Get("readText").IsUndefined() {
-		return
+	if w.clipboard.Get("readText").Truthy() {
+		w.clipboard.Call("readText").Call("then", w.clipboardCallback)
 	}
-	w.clipboard.Call("readText", w.clipboard).Call("then", w.clipboardCallback)
 }
 
 func (w *window) WriteClipboard(mime string, s []byte) {
