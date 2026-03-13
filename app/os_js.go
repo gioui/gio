@@ -53,11 +53,9 @@ type window struct {
 	screenOrientation     js.Value
 	cleanfuncs            []func()
 	touches               []js.Value
-	composing             bool
+	composing             int
+	lastCursor            int
 	requestFocus          bool
-
-	lastInputText string
-	snippetRange  key.Range
 
 	config    Config
 	inset     f32.Point
@@ -87,6 +85,7 @@ func newWindow(win *callbacks, options []Option) {
 		clipboard: js.Global().Get("navigator").Get("clipboard"),
 		wakeups:   make(chan struct{}, 1),
 		w:         win,
+		composing: -1,
 	}
 	w.w.SetDriver(w)
 	w.requestAnimationFrame = w.window.Get("requestAnimationFrame")
@@ -274,7 +273,15 @@ func (w *window) addEventListeners() {
 		return nil
 	})
 	w.addEventListener(w.tarea, "blur", func(this js.Value, args []js.Value) interface{} {
+		if w.composing != -1 {
+			// If we're composing, try to cancel.
+			// On Javascript is not possible to cancel the composition once started.
+			w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+			w.composing = -1
+		}
+
 		w.config.Focused = false
+		w.lastCursor = 0 // Reset cursor tracking on blur
 		w.processEvent(ConfigEvent{Config: w.config})
 		w.blur()
 		return nil
@@ -288,47 +295,205 @@ func (w *window) addEventListeners() {
 		return nil
 	})
 	w.addEventListener(w.tarea, "compositionstart", func(this js.Value, args []js.Value) interface{} {
-		w.composing = true
+		st := w.w.EditorState()
+		sel := st.Selection.Range
+		if sel.Start == -1 {
+			sel.Start = 0
+			sel.End = 0
+		}
+		w.w.SetEditorSnippet(key.Range{Start: sel.Start, End: sel.End})
+		w.composing = sel.Start
 		return nil
 	})
 	w.addEventListener(w.tarea, "compositionend", func(this js.Value, args []js.Value) interface{} {
-		w.composing = false
+		finalText := w.tarea.Get("value").String()
 
-		// Unmark the composition region in Gio.
-		w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+		if w.composing != -1 && finalText != "" {
+			// Replace the entire composition range with the final text.
+			compEnd := w.composing + utf8.RuneCountInString(finalText)
+			replaceRange := key.Range{Start: w.composing, End: compEnd}
+			w.w.EditorReplace(replaceRange, finalText)
+			w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+
+			// Position cursor after the final composition text.
+			newEnd := w.composing + utf8.RuneCountInString(finalText)
+			w.w.SetEditorSelection(key.Range{Start: newEnd, End: newEnd})
+		}
+
+		w.composing = -1
+		w.tarea.Set("value", "")
 		return nil
 	})
 	w.addEventListener(w.tarea, "input", func(this js.Value, args []js.Value) interface{} {
-		// Only send input events if the text ACTUALLY changed compared to our last known browser DOM state.
-		val := w.tarea.Get("value").String()
-		if val == w.lastInputText {
-			return nil
+		e := args[0]
+		inputType := e.Get("inputType").String()
+
+		dataVal := e.Get("data")
+		var data string
+		if dataVal.Truthy() {
+			data = dataVal.String()
 		}
 
-		selStart := w.tarea.Get("selectionStart").Int()
-		selEnd := w.tarea.Get("selectionEnd").Int()
-
-		// The DOM textarea mirrors the current Snippet.
-		// Replace the entire Snippet in Gio with the new DOM textarea value.
-		w.w.EditorReplace(w.snippetRange, val)
-		w.lastInputText = val
-
-		// Safely track the new length of this snippet so rapid subsequent inputs
-		// do not overwrite the wrong number of characters before EditorStateChanged syncs.
-		w.snippetRange.End = w.snippetRange.Start + utf8.RuneCountInString(val)
-
-		// Map the new browser selection back into Gio's editor.
+		// Get the current textarea value.
+		tareaValue := w.tarea.Get("value").String()
 		st := w.w.EditorState()
-		sel := key.Range{
-			Start: st.RunesIndex(selStart),
-			End:   st.RunesIndex(selEnd),
-		}
-		w.w.SetEditorSelection(sel)
 
-		if w.composing {
-			// If composing, just mark the whole active insertion as composing.
-			w.w.SetComposingRegion(sel)
+		sel := st.Selection.Range
+		var absStart, absEnd int
+
+		snippetStart := st.Snippet.Range.Start
+		snippetEnd := st.Snippet.Range.End
+
+		cursorPos := sel.Start
+		selectionEnd := sel.End
+		if cursorPos < 0 {
+			cursorPos = 0
+			selectionEnd = 0
 		}
+
+		// Check if we need to expand the snippet to include the range.
+		if st.Snippet.Range.Start == 0 && st.Snippet.Range.End == 0 && tareaValue != "" {
+			// Empty snippet - set it to include the selection/cursor.
+			w.w.SetEditorSnippet(key.Range{Start: cursorPos, End: selectionEnd})
+			absStart = cursorPos
+			absEnd = selectionEnd
+		} else if cursorPos < snippetStart || selectionEnd > snippetEnd {
+			// Selection is outside the snippet
+			newStart := snippetStart
+			newEnd := snippetEnd
+			if cursorPos < newStart {
+				newStart = cursorPos
+			}
+			if selectionEnd > newEnd {
+				newEnd = selectionEnd
+			}
+			w.w.SetEditorSnippet(key.Range{Start: newStart, End: newEnd})
+			// Refresh state after snippet update.
+			st = w.w.EditorState()
+			// Use the selection range directly.
+			absStart = cursorPos
+			absEnd = selectionEnd
+		} else {
+			// Selection is within snippet to absolute positions.
+			absStart = cursorPos
+			absEnd = selectionEnd
+		}
+
+		switch inputType {
+		case "insertCompositionText":
+			if w.composing == -1 {
+				break
+			}
+
+			compEnd := absEnd
+			if compEnd < w.composing {
+				compEnd = w.composing
+			}
+			replaceRange := key.Range{Start: w.composing, End: compEnd}
+			w.w.EditorReplace(replaceRange, data)
+
+			newEnd := w.composing + utf8.RuneCountInString(data)
+			w.w.SetComposingRegion(key.Range{Start: w.composing, End: newEnd})
+			w.w.SetEditorSelection(key.Range{Start: newEnd, End: newEnd})
+
+		case "deleteContentBackward", "deleteContentForward", "deleteByCut":
+			if w.composing != -1 {
+				compEnd := w.composing + utf8.RuneCountInString(tareaValue)
+				replaceRange := key.Range{Start: w.composing, End: compEnd}
+				w.w.EditorReplace(replaceRange, tareaValue)
+
+				newEnd := w.composing + utf8.RuneCountInString(tareaValue)
+				w.w.SetComposingRegion(key.Range{Start: w.composing, End: newEnd})
+				w.w.SetEditorSelection(key.Range{Start: newEnd, End: newEnd})
+			} else {
+				replaceRange := key.Range{Start: absStart, End: absEnd}
+				w.w.EditorReplace(replaceRange, "")
+				w.w.SetEditorSelection(key.Range{Start: absStart, End: absStart})
+			}
+
+		case "insertReplacementText":
+			if w.composing != -1 {
+				// During composition, replace the entire composition.
+				compEnd := w.composing + utf8.RuneCountInString(data)
+				replaceRange := key.Range{Start: w.composing, End: compEnd}
+				w.w.EditorReplace(replaceRange, data)
+
+				newEnd := w.composing + utf8.RuneCountInString(data)
+				w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+				w.w.SetEditorSelection(key.Range{Start: newEnd, End: newEnd})
+				w.composing = -1
+				w.lastCursor = newEnd
+			} else {
+				// Safari sends "insertReplacementText" for autocorrect, but the cursor is at the end of the word, so we need to find the word start.
+				insertLen := utf8.RuneCountInString(data)
+				wordStart := absStart
+				
+				if absStart > snippetStart {
+					relPos := absStart - snippetStart
+					snippetRunes := []rune(st.Snippet.Text)
+					
+					for i := relPos - 1; i >= 0; i-- {
+						if i >= len(snippetRunes) {
+							continue
+						}
+						r := snippetRunes[i]
+						if r == ' ' || r == '\t' || r == '\n' || r == '\r' {
+							break
+						}
+						wordStart = snippetStart + i
+					}
+				}
+				
+				replaceRange := key.Range{Start: wordStart, End: absStart}
+				w.w.EditorReplace(replaceRange, data)
+
+				newCursor := wordStart + insertLen
+				w.w.SetEditorSelection(key.Range{Start: newCursor, End: newCursor})
+				w.lastCursor = newCursor
+			}
+
+		case "insertText":
+			if w.composing != -1 {
+				compEnd := w.composing + utf8.RuneCountInString(data)
+				replaceRange := key.Range{Start: w.composing, End: compEnd}
+				w.w.EditorReplace(replaceRange, data)
+
+				newEnd := w.composing + utf8.RuneCountInString(data)
+				w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+				w.w.SetEditorSelection(key.Range{Start: newEnd, End: newEnd})
+				w.composing = -1
+				w.lastCursor = newEnd
+			} else {
+				insertLen := utf8.RuneCountInString(data)
+				replaceRange := key.Range{Start: absStart, End: absStart}
+				if absStart != absEnd {
+					replaceRange = key.Range{Start: absStart, End: absEnd}
+				}
+
+				newCursor := replaceRange.Start + insertLen
+				w.w.EditorReplace(replaceRange, data)
+				w.w.SetEditorSelection(key.Range{Start: newCursor, End: newCursor})
+				w.lastCursor = newCursor
+			}
+
+		default: // paste and other input types
+			if w.composing != -1 {
+				compEnd := w.composing + utf8.RuneCountInString(tareaValue)
+				replaceRange := key.Range{Start: w.composing, End: compEnd}
+				w.w.EditorReplace(replaceRange, tareaValue)
+
+				newEnd := w.composing + utf8.RuneCountInString(tareaValue)
+				w.w.SetComposingRegion(key.Range{Start: w.composing, End: newEnd})
+				w.w.SetEditorSelection(key.Range{Start: newEnd, End: newEnd})
+			} else {
+				replaceRange := key.Range{Start: absStart, End: absEnd}
+				w.w.EditorReplace(replaceRange, tareaValue)
+
+				newCursor := absStart + utf8.RuneCountInString(tareaValue)
+				w.w.SetEditorSelection(key.Range{Start: newCursor, End: newCursor})
+			}
+		}
+
 		return nil
 	})
 	w.addEventListener(w.tarea, "paste", func(this js.Value, args []js.Value) interface{} {
@@ -602,33 +767,71 @@ func (w *window) funcOf(f func(this js.Value, args []js.Value) interface{}) js.F
 }
 
 func (w *window) EditorStateChanged(old, new editorState) {
-	if w.composing {
+	if w.composing != -1 {
 		// Do not interfere with browser state while composing.
+		// On Javascript is not possible to cancel the composition once started!
 		return
 	}
 
-	// Move DOM element to position the caret.
+	// Update textarea value to match the snippet.
 	if old.Snippet != new.Snippet {
-		if new.Snippet.Text != w.lastInputText {
-			w.tarea.Set("value", new.Snippet.Text)
-			w.lastInputText = new.Snippet.Text
-		}
-		w.snippetRange = new.Snippet.Range
+		w.tarea.Set("value", new.Snippet.Text)
 	}
 
+	// Update selection to match Gio's selection.
 	if old.Selection.Range != new.Selection.Range || old.Snippet != new.Snippet {
 		if new.Selection.Range.Start != -1 && new.Selection.Range.End != -1 {
-			start := new.UTF16Index(new.Selection.Range.Start) - new.UTF16Index(new.Snippet.Start)
-			end := new.UTF16Index(new.Selection.Range.End) - new.UTF16Index(new.Snippet.Start)
+			// Calculate selection positions relative to snippet start.
+			// The textarea contains only the snippet text.
+			snippetStart := new.Snippet.Range.Start
+			snippetEnd := new.Snippet.Range.End
+
+			selStart := new.Selection.Range.Start
+			selEnd := new.Selection.Range.End
+			if selStart < snippetStart {
+				selStart = snippetStart
+			}
+			if selStart > snippetEnd {
+				selStart = snippetEnd
+			}
+			if selEnd < snippetStart {
+				selEnd = snippetStart
+			}
+			if selEnd > snippetEnd {
+				selEnd = snippetEnd
+			}
+
+			// Convert absolute rune positions to UTF-16 positions for the textarea.
+			startUTF16 := new.UTF16Index(selStart)
+			endUTF16 := new.UTF16Index(selEnd)
+
+			// Convert to snippet-relative UTF-16 positions.
+			snippetStartUTF16 := new.UTF16Index(snippetStart)
+			start := startUTF16 - snippetStartUTF16
+			end := endUTF16 - snippetStartUTF16
+
+			if start < 0 {
+				start = 0
+			}
+			if end < 0 {
+				end = 0
+			}
+
+			// Calculate max UTF-16 length of snippet text.
+			textLen := new.UTF16Index(snippetEnd) - snippetStartUTF16
+			if start > textLen {
+				start = textLen
+			}
+			if end > textLen {
+				end = textLen
+			}
 
 			if start > end {
 				start, end = end, start
 			}
 
-			if start >= 0 && end >= 0 {
-				w.tarea.Set("selectionStart", start)
-				w.tarea.Set("selectionEnd", end)
-			}
+			w.tarea.Set("selectionStart", start)
+			w.tarea.Set("selectionEnd", end)
 		}
 	}
 
@@ -745,6 +948,13 @@ func (w *window) ShowTextInput(show bool) {
 	if show {
 		w.focus()
 	} else {
+		// If we're composing, end composition first by clearing the textarea.
+		// That is a attempt to force the browser to end composition.
+		if w.composing != -1 {
+			w.tarea.Set("value", "")
+			w.composing = -1
+			w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+		}
 		w.blur()
 	}
 }
