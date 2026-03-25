@@ -14,7 +14,6 @@ import android.app.FragmentTransaction;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
@@ -37,8 +36,8 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowInsets;
 import android.view.Surface;
-import android.view.SurfaceView;
-import android.view.SurfaceHolder;
+import android.view.TextureView;
+import android.graphics.SurfaceTexture;
 import android.view.Window;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
@@ -61,10 +60,10 @@ import android.widget.FrameLayout;
 
 import java.io.UnsupportedEncodingException;
 
-public final class GioView extends SurfaceView implements Choreographer.FrameCallback {
+public final class GioView extends TextureView implements Choreographer.FrameCallback {
 	private static boolean jniLoaded;
 
-	private final SurfaceHolder.Callback surfCallbacks;
+
 	private final InputMethodManager imm;
 	private final float scrollXScale;
 	private final float scrollYScale;
@@ -87,12 +86,7 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		// Late initialization of the Go runtime to wait for a valid context.
 		Gio.init(context.getApplicationContext());
 
-		setZOrderOnTop(true);
-
-		// Set background color to transparent to avoid a flickering
-		// issue on ChromeOS.
-		setBackgroundColor(Color.argb(0, 0, 0, 0));
-		getHolder().setFormat(PixelFormat.TRANSPARENT);
+		setOpaque(false);
 
 		ViewConfiguration conf = ViewConfiguration.get(context);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -119,18 +113,21 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		nhandle = onCreateView(this);
 		setFocusable(true);
 		setFocusableInTouchMode(true);
-		surfCallbacks = new SurfaceHolder.Callback() {
-			@Override public void surfaceCreated(SurfaceHolder holder) {
-				// Ignore; surfaceChanged is guaranteed to be called immediately after this.
+		setSurfaceTextureListener(new SurfaceTextureListener() {
+			@Override public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+				onSurfaceChanged(nhandle, new Surface(surface));
 			}
-			@Override public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-				onSurfaceChanged(nhandle, getHolder().getSurface());
+			@Override public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+				onSurfaceChanged(nhandle, new Surface(surface));
 			}
-			@Override public void surfaceDestroyed(SurfaceHolder holder) {
+			@Override public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
 				onSurfaceDestroyed(nhandle);
+				return true;
 			}
-		};
-		getHolder().addCallback(surfCallbacks);
+			@Override public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+				// Ignore.
+			}
+		});
 	}
 
 	@Override public boolean onKeyDown(int keyCode, KeyEvent event) {
@@ -517,7 +514,6 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 
 	protected void unregister() {
 		setOnFocusChangeListener(null);
-		getHolder().removeCallback(surfCallbacks);
 		nhandle = 0;
 	}
 
@@ -572,7 +568,6 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	}
 
 	boolean setEmbedViewPosition(View view, int x, int y, int w, int h, int zOrder) {
-		ViewGroup parent = (ViewGroup) this.getParent();
 		boolean isLayoutUpdated = false;
 		
 		if (zOrder == 0) {
@@ -581,19 +576,16 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 			return true;
 		}
 		
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-			// On API 21+: use Z for draw ordering without mutating the view
-			// hierarchy, so GioView's SurfaceView surface is never destroyed.
-			if (view.getVisibility() != View.VISIBLE) {
-				view.setVisibility(View.VISIBLE);
-				isLayoutUpdated = true;
-			}
-			if (view.getZ() != (float) zOrder) {
-				// Suppress any outline-based drop shadow the Z value would produce.
-				view.setOutlineProvider(null);
-				view.setZ((float) zOrder);
-				isLayoutUpdated = true;
-			}
+		if (view.getVisibility() != View.VISIBLE) {
+			view.setVisibility(View.VISIBLE);
+			isLayoutUpdated = true;
+		}
+		
+		if (view.getZ() != (float) zOrder) {
+			// Suppress any outline-based drop shadow the Z value would produce.
+			view.setOutlineProvider(null);
+			view.setZ((float) zOrder);
+			isLayoutUpdated = true;
 		}
 
 		ViewGroup.LayoutParams lp = view.getLayoutParams();

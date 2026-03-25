@@ -631,11 +631,9 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 		SrcFactor: driver.BlendFactorOne,
 		DstFactor: driver.BlendFactorOneMinusSrcAlpha,
 	}
-	// Clear blend: result = src * 0 + dst * 0 = transparent.
+	// Clear blend: result = src = transparent (blending disabled).
 	clearBlend := driver.BlendDesc{
-		Enable:    true,
-		SrcFactor: driver.BlendFactorZero,
-		DstFactor: driver.BlendFactorZero,
+		Enable: false,
 	}
 	layout := driver.VertexLayout{
 		Inputs: []driver.InputDesc{
