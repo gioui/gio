@@ -61,12 +61,8 @@ func (h *Hover) Update(q input.Source) bool {
 				h.entered = false
 			}
 		case pointer.Enter:
-			if !h.entered {
-				h.pid = e.PointerID
-			}
-			if h.pid == e.PointerID {
-				h.entered = true
-			}
+			h.pid = e.PointerID
+			h.entered = true
 		}
 	}
 	return h.entered
@@ -222,12 +218,7 @@ func (c *Click) Update(q input.Source) (ClickEvent, bool) {
 			if e.Source == pointer.Mouse && e.Buttons != pointer.ButtonPrimary {
 				break
 			}
-			if !c.hovered {
-				c.pid = e.PointerID
-			}
-			if c.pid != e.PointerID {
-				break
-			}
+			c.pid = e.PointerID
 			c.pressed = true
 			if e.Time-c.clickedAt < doubleClickDuration {
 				c.clicks++

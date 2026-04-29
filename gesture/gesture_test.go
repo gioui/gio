@@ -100,6 +100,78 @@ func TestMouseClicks(t *testing.T) {
 	}
 }
 
+func TestClickPointerIDReassignment(t *testing.T) {
+	// A Click must accept a Press from a PointerID that differs from the
+	// one its hovered state was previously associated with. Some backends
+	// reassign a single physical pointer's ID over its lifetime — e.g. the
+	// Windows pointer API across focus changes — and locking the gesture
+	// to the first observed ID would silently drop every subsequent press.
+	//
+	// The sequence below puts the gesture into the buggy state through
+	// public events alone: a press under PointerID 1 starts an active
+	// press cycle, a Move under PointerID 2 arrives mid-press (which the
+	// router routes as an Enter for PID 2 but the gesture's Enter handler
+	// is a no-op for pid while pressed), then PID 1 releases. After this,
+	// the router has the gesture entered for PID 2 (so the next event
+	// under PID 2 won't trigger another Enter) but the gesture itself
+	// still has pid=1.
+	var click Click
+	var ops op.Ops
+	rect := image.Rect(0, 0, 100, 100)
+	stack := clip.Rect(rect).Push(&ops)
+	click.Add(&ops)
+	stack.Pop()
+
+	var r input.Router
+	click.Update(r.Source())
+	r.Frame(&ops)
+
+	drain := func() {
+		for {
+			if _, ok := click.Update(r.Source()); !ok {
+				return
+			}
+		}
+	}
+
+	// Press under PointerID 1.
+	r.Queue(
+		pointer.Event{Kind: pointer.Move, Source: pointer.Mouse, Position: f32.Pt(50, 50), PointerID: 1},
+		pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Buttons: pointer.ButtonPrimary, Position: f32.Pt(50, 50), PointerID: 1},
+	)
+	drain()
+
+	// Move under PointerID 2 while PointerID 1 is still pressed. The
+	// router records the gesture as entered for PointerID 2 but the
+	// gesture's Enter handler is a no-op for pid because c.pressed.
+	r.Queue(pointer.Event{Kind: pointer.Move, Source: pointer.Mouse, Position: f32.Pt(50, 50), PointerID: 2})
+	drain()
+
+	// Release PointerID 1. PointerID 1's press tracking ends; the
+	// gesture's recorded pid stays at 1.
+	r.Queue(pointer.Event{Kind: pointer.Release, Source: pointer.Mouse, Position: f32.Pt(50, 50), PointerID: 1})
+	drain()
+
+	// Press under PointerID 2. The router won't refire Enter for PID 2
+	// (the gesture is already in PID 2's entered set), so the gesture's
+	// only chance to refresh its pid is the Press handler itself.
+	r.Queue(pointer.Event{Kind: pointer.Press, Source: pointer.Mouse, Buttons: pointer.ButtonPrimary, Position: f32.Pt(50, 50), PointerID: 2})
+
+	var sawPress bool
+	for {
+		ev, ok := click.Update(r.Source())
+		if !ok {
+			break
+		}
+		if ev.Kind == KindPress {
+			sawPress = true
+		}
+	}
+	if !sawPress {
+		t.Fatal("expected KindPress for press under reassigned PointerID; gesture dropped the press because of stale recorded pid")
+	}
+}
+
 func mouseClickEvents(times ...time.Duration) []event.Event {
 	press := pointer.Event{
 		Kind:    pointer.Press,
