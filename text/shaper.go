@@ -259,10 +259,6 @@ func WithCollection(collection []FontFace) ShaperOption {
 }
 
 // NewShaper constructs a shaper with the provided options.
-//
-// NewShaper must be called after [app.NewWindow], unless the [NoSystemFonts]
-// option is specified. This is an unfortunate restriction caused by some platforms
-// such as Android.
 func NewShaper(options ...ShaperOption) *Shaper {
 	l := &Shaper{}
 	for _, opt := range options {
