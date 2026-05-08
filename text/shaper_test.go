@@ -450,8 +450,8 @@ func printLinePositioning(t *testing.T, lines []line, glyphs []Glyph) {
 			for g := start; ; g += inc {
 				glyph := run.Glyphs[g]
 				if glyphCursor < len(glyphs) {
-					t.Logf("glyph %2d, adv %3d, runes %2d, glyphs %d - glyphs[%2d] flags %s", g, glyph.xAdvance, glyph.runeCount, glyph.glyphCount, glyphCursor, glyphs[glyphCursor].Flags)
-					t.Logf("glyph %2d, adv %3d, runes %2d, glyphs %d - n/a", g, glyph.xAdvance, glyph.runeCount, glyph.glyphCount)
+					t.Logf("glyph %2d, adv %3d, runes %2d, glyphs %d - glyphs[%2d] flags %s", g, glyph.advance, glyph.runeCount, glyph.glyphCount, glyphCursor, glyphs[glyphCursor].Flags)
+					t.Logf("glyph %2d, adv %3d, runes %2d, glyphs %d - n/a", g, glyph.advance, glyph.runeCount, glyph.glyphCount)
 				}
 				glyphCursor++
 				if g == end {

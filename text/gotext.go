@@ -103,8 +103,7 @@ func (l *line) insertTrailingSyntheticNewline(newLineClusterIdx int) {
 		clusterIndex: newLineClusterIdx,
 		glyphCount:   0,
 		runeCount:    1,
-		xAdvance:     0,
-		yAdvance:     0,
+		advance:      0,
 		xOffset:      0,
 		yOffset:      0,
 	}
@@ -160,9 +159,9 @@ type glyph struct {
 	// runeCount is the quantity of runes in the source text that this glyph
 	// corresponds to.
 	runeCount int
-	// xAdvance and yAdvance describe the distance the dot moves when
-	// laying out the glyph on the X or Y axis.
-	xAdvance, yAdvance fixed.Int26_6
+	// advance is the distance the dot moves when laying out the glyph along
+	// the run's primary axis.
+	advance fixed.Int26_6
 	// xOffset and yOffset describe offsets from the dot that should be
 	// applied when rendering the glyph.
 	xOffset, yOffset fixed.Int26_6
@@ -438,8 +437,7 @@ func (s *shaperImpl) shapeText(ppem fixed.Int26_6, lc system.Locale, txt []rune)
 						Height:       input.Size,
 						XBearing:     0,
 						YBearing:     0,
-						XAdvance:     input.Size,
-						YAdvance:     input.Size,
+						Advance:      input.Size,
 						XOffset:      0,
 						YOffset:      0,
 						ClusterIndex: input.RunStart,
@@ -855,11 +853,10 @@ func toGioGlyphs(in []shaping.Glyph, ppem fixed.Int26_6, faceIdx int) []glyph {
 		bounds.Max = bounds.Min.Add(fixed.Point26_6{X: g.Width, Y: -g.Height})
 		out = append(out, glyph{
 			id:           newGlyphID(ppem, faceIdx, g.GlyphID),
-			clusterIndex: g.ClusterIndex,
-			runeCount:    g.RuneCount,
-			glyphCount:   g.GlyphCount,
-			xAdvance:     g.XAdvance,
-			yAdvance:     g.YAdvance,
+			clusterIndex: g.TextIndex(),
+			runeCount:    g.RunesCount(),
+			glyphCount:   g.GlyphsCount(),
+			advance:      g.Advance,
 			xOffset:      g.XOffset,
 			yOffset:      g.YOffset,
 			bounds:       bounds,
