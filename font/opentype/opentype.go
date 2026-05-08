@@ -106,7 +106,7 @@ func parseLoader(ld *opentype.Loader) (*fontapi.Font, giofont.Font, error) {
 // Face many be invoked any number of times and is safe so long as each return value is
 // only used by one goroutine.
 func (f Face) Face() *fontapi.Face {
-	return &fontapi.Face{Font: f.face}
+	return fontapi.NewFace(f.face)
 }
 
 // FontFace returns a text.Font with populated font metadata for the
