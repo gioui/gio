@@ -270,8 +270,9 @@ func newShaperImpl(systemFonts bool, collection []FontFace) *shaperImpl {
 // in the order in which they are loaded, with the first face being the default.
 func (s *shaperImpl) Load(f FontFace) {
 	desc := opentype.FontToDescription(f.Font)
-	s.fontMap.AddFace(f.Face.Face(), fontscan.Location{File: fmt.Sprint(desc)}, desc)
-	s.addFace(f.Face.Face(), f.Font)
+	face := f.Face.Face()
+	s.fontMap.AddFace(face, fontscan.Location{File: fmt.Sprint(desc)}, desc)
+	s.addFace(face, f.Font)
 }
 
 func (s *shaperImpl) addFace(f *font.Face, md giofont.Font) {
