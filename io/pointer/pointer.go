@@ -19,7 +19,9 @@ type Event struct {
 	Source Source
 	// PointerID is the id for the pointer and can be used
 	// to track a particular pointer from Press to
-	// Release.
+	// Release. Populated for Press, Release, Move, Drag,
+	// Enter, Leave, and Cancel; Scroll events are not
+	// bound to a tracked pointer and leave it zero.
 	PointerID ID
 	// Priority is the priority of the receiving handler
 	// for this event.

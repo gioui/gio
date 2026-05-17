@@ -1345,3 +1345,40 @@ func events(r *Router, n int, filters ...event.Filter) []event.Event {
 	}
 	return events
 }
+
+// TestPointerScrollDoesNotTrackPointer queues two events over two cursor
+// regions. The Move puts the live pointer over the button (CursorPointer);
+// the Scroll happens over the cell (CursorText) and must not update the
+// cursor.
+func TestPointerScrollDoesNotTrackPointer(t *testing.T) {
+	var ops op.Ops
+
+	button := clip.Rect(image.Rect(0, 0, 50, 50)).Push(&ops)
+	pointer.CursorPointer.Add(&ops)
+	button.Pop()
+
+	cell := clip.Rect(image.Rect(100, 0, 200, 50)).Push(&ops)
+	pointer.CursorText.Add(&ops)
+	cell.Pop()
+
+	var r Router
+	r.Frame(&ops)
+	r.Queue(
+		pointer.Event{
+			Kind:     pointer.Move,
+			Source:   pointer.Mouse,
+			Position: f32.Pt(25, 25),
+		},
+		pointer.Event{
+			Kind:     pointer.Scroll,
+			Source:   pointer.Mouse,
+			Position: f32.Pt(150, 25),
+			Scroll:   f32.Pt(0, 1),
+		},
+	)
+
+	if got, want := r.Cursor(), pointer.CursorPointer; got != want {
+		t.Errorf("got %q, want %q (scroll position must not update the cursor; "+
+			"the live pointer's last position is what determines it)", got, want)
+	}
+}

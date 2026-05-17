@@ -739,6 +739,10 @@ func (q *pointerQueue) Push(handlers map[event.Tag]*handler, state pointerState,
 		state.pointers = nil
 		return state, evts
 	}
+	if e.Kind == pointer.Scroll {
+		// Scroll events are not bound to a pointer; see pointer.Event.PointerID.
+		return state, q.deliverScrollEvent(handlers, evts, e)
+	}
 	state, pidx := state.pointerOf(e)
 	p := state.pointers[pidx]
 
@@ -761,9 +765,6 @@ func (q *pointerQueue) Push(handlers map[event.Tag]*handler, state pointerState,
 		p.pressed = false
 		p, evts, state.cursor, _ = q.deliverEnterLeaveEvents(handlers, state.cursor, p, evts, e)
 		p, evts = q.deliverDropEvent(handlers, p, evts)
-	case pointer.Scroll:
-		p, evts, state.cursor, _ = q.deliverEnterLeaveEvents(handlers, state.cursor, p, evts, e)
-		evts = q.deliverEvent(handlers, p, evts, e)
 	default:
 		panic("unsupported pointer event type")
 	}
@@ -778,6 +779,18 @@ func (q *pointerQueue) Push(handlers map[event.Tag]*handler, state pointerState,
 		state.pointers[pidx] = p
 	}
 	return state, evts
+}
+
+// deliverScrollEvent delivers scroll events to the handlers hit by the event coordinate.
+func (q *pointerQueue) deliverScrollEvent(handlers map[event.Tag]*handler, evts []taggedEvent, e pointer.Event) []taggedEvent {
+	var hits []event.Tag
+	q.hitTest(e.Position, func(n *hitNode) bool {
+		if _, ok := handlers[n.tag]; ok {
+			hits = addHandler(hits, n.tag)
+		}
+		return true
+	})
+	return q.deliverEvent(handlers, pointerInfo{handlers: hits}, evts, e)
 }
 
 func (q *pointerQueue) deliverEvent(handlers map[event.Tag]*handler, p pointerInfo, evts []taggedEvent, e pointer.Event) []taggedEvent {
