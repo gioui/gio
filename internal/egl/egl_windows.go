@@ -41,14 +41,10 @@ var (
 	_eglWaitClient          *syscall.Proc
 )
 
-var loadOnce sync.Once
+var loadOnce = sync.OnceValue(loadDLLs)
 
 func loadEGL() error {
-	var err error
-	loadOnce.Do(func() {
-		err = loadDLLs()
-	})
-	return err
+	return loadOnce()
 }
 
 func loadDLLs() error {
