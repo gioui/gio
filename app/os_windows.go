@@ -369,8 +369,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.update()
 	case windows.WM_WINDOWPOSCHANGED:
 		w.update()
-	case windows.WM_SIZE:
-		w.update()
+		return 0
 	case windows.WM_GETMINMAXINFO:
 		mm := (*windows.MinMaxInfo)(unsafe.Pointer(lParam))
 
