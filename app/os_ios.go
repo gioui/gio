@@ -13,6 +13,8 @@ package app
 
 __attribute__ ((visibility ("hidden"))) int gio_applicationMain(int argc, char *argv[]);
 __attribute__ ((visibility ("hidden"))) void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle);
+__attribute__ ((visibility ("hidden"))) void gio_setZOrderOnTop(CFTypeRef viewRef, int onTop);
+__attribute__ ((visibility ("hidden"))) void gio_setEmbedViewPosition(CFTypeRef viewRef, CFTypeRef viewExternal, int x, int y, int w, int h, int zOrder);
 
 struct drawParams {
 	CGFloat dpi, sdpi;
@@ -91,6 +93,7 @@ import (
 	"unsafe"
 
 	"gioui.org/f32"
+	"gioui.org/gpu"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
@@ -116,6 +119,26 @@ type window struct {
 	config Config
 
 	pointerMap []C.CFTypeRef
+
+	externalRegions gpu.EmbedRegions
+	externalUsed    bool
+}
+
+// processEmbedView updates the external regions for hit testing and positions external views.
+func (w *window) processEmbedView(regions gpu.EmbedRegions, lost []gpu.EmbedView) {
+	if len(regions.Views) == 0 && len(lost) == 0 {
+		return
+	}
+
+	w.externalRegions = regions
+	// Position current embed views.
+	for index, region := range regions.Views {
+		C.gio_setEmbedViewPosition(w.view, C.CFTypeRef(region.View), C.int(region.Area.Min.X), C.int(region.Area.Min.Y), C.int(region.Area.Dx()), C.int(region.Area.Dy()), C.int(index+1))
+	}
+	// Hide lost views.
+	for _, lostView := range lost {
+		C.gio_setEmbedViewPosition(w.view, C.CFTypeRef(lostView.View), 0, 0, 0, 0, 0)
+	}
 }
 
 var mainWindow = newWindowRendezvous()
@@ -150,6 +173,15 @@ func onCreate(view, controller C.CFTypeRef) {
 
 func viewFor(h C.uintptr_t) *window {
 	return cgo.Handle(h).Value().(*window)
+}
+
+//export gio_hitTest
+func gio_hitTest(h C.uintptr_t, x, y C.CGFloat) C.int {
+	w := viewFor(h)
+	if w.externalRegions.Contains(f32.Point{X: float32(x), Y: float32(y)}) {
+		return 0
+	}
+	return 1
 }
 
 //export gio_onDraw
@@ -189,6 +221,10 @@ func (w *window) draw(sync bool) {
 		},
 		Sync: sync,
 	})
+
+	// Process embed view positions.
+	current, lost := w.w.EmbeddedRegions()
+	w.processEmbedView(current, lost)
 }
 
 //export onStop

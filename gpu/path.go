@@ -30,7 +30,7 @@ type pather struct {
 
 type coverer struct {
 	ctx                    driver.Device
-	pipelines              [2][3]*pipeline
+	pipelines              [2][4]*pipeline
 	texUniforms            *coverTexUniforms
 	colUniforms            *coverColUniforms
 	linearGradientUniforms *coverLinearGradientUniforms
@@ -386,6 +386,10 @@ func (c *coverer) cover(mat materialType, isFBO bool, col f32color.RGBA, col1, c
 	switch mat {
 	case materialColor:
 		c.colUniforms.color = col
+		uniforms = &c.colUniforms.coverUniforms
+	case materialEmbed:
+		// External view uses transparent color with clear blend to "punch through".
+		c.colUniforms.color = f32color.RGBA{A: 0}
 		uniforms = &c.colUniforms.coverUniforms
 	case materialLinearGradient:
 		c.linearGradientUniforms.color1 = col1

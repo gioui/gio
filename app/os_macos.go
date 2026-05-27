@@ -16,6 +16,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"gioui.org/gpu"
 	"gioui.org/internal/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
@@ -44,6 +45,8 @@ __attribute__ ((visibility ("hidden"))) void gio_init(void);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createView(int presentWithTrans);
 __attribute__ ((visibility ("hidden"))) CFTypeRef gio_createWindow(CFTypeRef viewRef, CGFloat width, CGFloat height);
 __attribute__ ((visibility ("hidden"))) void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle);
+__attribute__ ((visibility ("hidden"))) void gio_setZOrderOnTop(CFTypeRef viewRef, int onTop);
+__attribute__ ((visibility ("hidden"))) void gio_setEmbedViewPosition(CFTypeRef viewRef, CFTypeRef viewID, int x, int y, int w, int h, int zOrder);
 
 static void writeClipboard(CFTypeRef str) {
 	@autoreleasepool {
@@ -375,6 +378,23 @@ type window struct {
 	// cmdKeys is for storing the current key event while
 	// waiting for a doCommandBySelector.
 	cmdKeys cmdKeys
+
+	externalRegions gpu.EmbedRegions
+}
+
+// processEmbedView updates the external regions for hit testing and positions external views.
+func (w *window) processEmbedView(regions gpu.EmbedRegions, lost []gpu.EmbedView) {
+	if len(regions.Views) == 0 && len(lost) == 0 {
+		return
+	}
+	w.externalRegions = regions
+
+	for index, region := range regions.Views {
+		C.gio_setEmbedViewPosition(w.view, C.CFTypeRef(region.View), C.int(region.Area.Min.X), C.int(region.Area.Min.Y), C.int(region.Area.Dx()), C.int(region.Area.Dy()), C.int(index+1))
+	}
+	for _, lostView := range lost {
+		C.gio_setEmbedViewPosition(w.view, C.CFTypeRef(lostView.View), 0, 0, 0, 0, 0)
+	}
 }
 
 type cmdKeys struct {
@@ -391,6 +411,15 @@ var nextTopLeft C.NSPoint
 
 func windowFor(h C.uintptr_t) *window {
 	return cgo.Handle(h).Value().(*window)
+}
+
+//export gio_hitTest
+func gio_hitTest(h C.uintptr_t, x, y C.CGFloat) C.int {
+	w := windowFor(h)
+	if w.externalRegions.Contains(f32.Point{X: float32(x), Y: float32(y)}) {
+		return 0
+	}
+	return 1
 }
 
 func (w *window) contextView() C.CFTypeRef {
@@ -945,6 +974,10 @@ func (w *window) draw() {
 		},
 		Sync: true,
 	})
+
+	// Process embed view positions.
+	current, lost := w.w.EmbeddedRegions()
+	w.processEmbedView(current, lost)
 }
 
 func (w *window) ProcessEvent(e event.Event) {
