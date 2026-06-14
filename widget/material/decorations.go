@@ -5,7 +5,6 @@ import (
 	"image/color"
 
 	"gioui.org/f32"
-	"gioui.org/io/semantic"
 	"gioui.org/io/system"
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -86,21 +85,10 @@ func (d DecorationsStyle) layoutDecorations(gtx layout.Context) layout.Dimension
 					continue
 				}
 				cl := d.Decorations.Clickable(a)
-				dims := cl.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-					semantic.Button.Add(gtx.Ops)
-					return layout.Background{}.Layout(gtx,
-						func(gtx layout.Context) layout.Dimensions {
-							defer clip.Rect{Max: gtx.Constraints.Min}.Push(gtx.Ops).Pop()
-							for _, c := range cl.History() {
-								drawInk(gtx, c)
-							}
-							return layout.Dimensions{Size: gtx.Constraints.Min}
-						},
-						func(gtx layout.Context) layout.Dimensions {
-							paint.ColorOp{Color: d.Foreground}.Add(gtx.Ops)
-							return inset.Layout(gtx, w)
-						},
-					)
+				dims := Clickable(gtx, cl, func(gtx layout.Context) layout.Dimensions {
+					system.ActionInputOp(a).Add(gtx.Ops)
+					paint.ColorOp{Color: d.Foreground}.Add(gtx.Ops)
+					return inset.Layout(gtx, w)
 				})
 				size.X += dims.Size.X
 				if size.Y < dims.Size.Y {
