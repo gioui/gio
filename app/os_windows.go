@@ -494,34 +494,32 @@ func getModifiers() key.Modifiers {
 // hitTest returns the non-client area hit by the point, needed to
 // process WM_NCHITTEST.
 func (w *window) hitTest(x, y int) uintptr {
-	if w.config.Mode != Windowed {
-		// Only windowed mode should allow resizing.
-		return windows.HTCLIENT
-	}
-	// Check for resize handle before system actions; otherwise it can be impossible to
-	// resize a custom-decorations window when the system move area is flush with the
-	// edge of the window.
-	top := y <= w.borderSize.Y
-	bottom := y >= w.config.Size.Y-w.borderSize.Y
-	left := x <= w.borderSize.X
-	right := x >= w.config.Size.X-w.borderSize.X
-	switch {
-	case top && left:
-		return windows.HTTOPLEFT
-	case top && right:
-		return windows.HTTOPRIGHT
-	case bottom && left:
-		return windows.HTBOTTOMLEFT
-	case bottom && right:
-		return windows.HTBOTTOMRIGHT
-	case top:
-		return windows.HTTOP
-	case bottom:
-		return windows.HTBOTTOM
-	case left:
-		return windows.HTLEFT
-	case right:
-		return windows.HTRIGHT
+	if w.config.Mode == Windowed {
+		// Check for resize handle before system actions; otherwise it can be impossible to
+		// resize a custom-decorations window when the system move area is flush with the
+		// edge of the window.
+		top := y <= w.borderSize.Y
+		bottom := y >= w.config.Size.Y-w.borderSize.Y
+		left := x <= w.borderSize.X
+		right := x >= w.config.Size.X-w.borderSize.X
+		switch {
+		case top && left:
+			return windows.HTTOPLEFT
+		case top && right:
+			return windows.HTTOPRIGHT
+		case bottom && left:
+			return windows.HTBOTTOMLEFT
+		case bottom && right:
+			return windows.HTBOTTOMRIGHT
+		case top:
+			return windows.HTTOP
+		case bottom:
+			return windows.HTBOTTOM
+		case left:
+			return windows.HTLEFT
+		case right:
+			return windows.HTRIGHT
+		}
 	}
 	p := f32.Pt(float32(x), float32(y))
 	if a, ok := w.w.ActionAt(p); ok && a == system.ActionMove {
