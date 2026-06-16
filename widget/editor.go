@@ -25,6 +25,7 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
+	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
 )
@@ -107,8 +108,9 @@ type imeState struct {
 		rng   key.Range
 		caret key.Caret
 	}
-	snippet    key.Snippet
-	start, end int
+	snippet     key.Snippet
+	composition key.Range
+	start, end  int
 }
 
 type maskReader struct {
@@ -398,9 +400,12 @@ func (e *Editor) processKey(gtx layout.Context) (EditorEvent, bool) {
 		case key.FocusEvent:
 			// Reset IME state.
 			e.ime.imeState = imeState{}
+			e.ime.composition = key.Range{Start: -1, End: -1}
 			if ke.Focus && !e.ReadOnly {
 				gtx.Execute(key.SoftKeyboardCmd{Show: true})
 			}
+		case key.CompositionEvent:
+			e.ime.composition = key.Range(ke)
 		case key.Event:
 			if !gtx.Focused(e) || ke.State != key.Press {
 				break
@@ -735,6 +740,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 	if e.Len() > 0 {
 		e.paintSelection(gtx, selectMaterial)
 		e.paintText(gtx, textMaterial)
+		e.paintComposition(gtx, textMaterial)
 	}
 	if gtx.Enabled() {
 		e.paintCaret(gtx, textMaterial)
@@ -757,6 +763,28 @@ func (e *Editor) paintSelection(gtx layout.Context, material op.CallOp) {
 func (e *Editor) paintText(gtx layout.Context, material op.CallOp) {
 	e.initBuffer()
 	e.text.PaintText(gtx, material)
+}
+
+func (e *Editor) paintComposition(gtx layout.Context, material op.CallOp) {
+	e.initBuffer()
+	r := e.ime.composition
+	if r.Start == -1 || r.Start == r.End {
+		return
+	}
+	e.text.regions = e.text.Regions(r.Start, r.End, e.text.regions)
+	thickness := max(gtx.Dp(unit.Dp(1)), 1)
+	for _, region := range e.text.regions {
+		y := region.Bounds.Max.Y - max(region.Baseline/3, thickness)
+		underline := image.Rect(region.Bounds.Min.X, y, region.Bounds.Max.X, y+thickness)
+		underline = underline.Intersect(image.Rectangle{Max: e.text.viewSize})
+		if underline.Empty() {
+			continue
+		}
+		stack := clip.Rect(underline).Push(gtx.Ops)
+		material.Add(gtx.Ops)
+		paint.PaintOp{}.Add(gtx.Ops)
+		stack.Pop()
+	}
 }
 
 // paintCaret paints the text glyphs using the provided material to set the fill material

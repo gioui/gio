@@ -439,6 +439,7 @@ func (c *callbacks) EditorState() editorState {
 
 func (c *callbacks) SetComposingRegion(r key.Range) {
 	c.w.imeState.compose = r
+	c.w.driver.ProcessEvent(key.CompositionEvent(r))
 }
 
 func (c *callbacks) EditorInsert(text string) {

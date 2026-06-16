@@ -77,6 +77,9 @@ type Caret struct {
 // SelectionEvent is generated when an input method changes the selection.
 type SelectionEvent Range
 
+// CompositionEvent is generated when an input method changes the composing range.
+type CompositionEvent Range
+
 // SnippetEvent is generated when the snippet range is updated by an
 // input method.
 type SnippetEvent Range
@@ -243,11 +246,12 @@ func (h InputHintOp) Add(o *op.Ops) {
 	data[1] = byte(h.Hint)
 }
 
-func (EditEvent) ImplementsEvent()      {}
-func (Event) ImplementsEvent()          {}
-func (FocusEvent) ImplementsEvent()     {}
-func (SnippetEvent) ImplementsEvent()   {}
-func (SelectionEvent) ImplementsEvent() {}
+func (EditEvent) ImplementsEvent()        {}
+func (Event) ImplementsEvent()            {}
+func (FocusEvent) ImplementsEvent()       {}
+func (CompositionEvent) ImplementsEvent() {}
+func (SnippetEvent) ImplementsEvent()     {}
+func (SelectionEvent) ImplementsEvent()   {}
 
 func (FocusCmd) ImplementsCommand()        {}
 func (SoftKeyboardCmd) ImplementsCommand() {}

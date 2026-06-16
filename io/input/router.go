@@ -419,7 +419,7 @@ func (f *filter) Merge(f2 filter) {
 
 func (f *filter) Matches(e event.Event) bool {
 	switch e.(type) {
-	case key.FocusEvent, key.SnippetEvent, key.EditEvent, key.SelectionEvent:
+	case key.FocusEvent, key.SnippetEvent, key.EditEvent, key.SelectionEvent, key.CompositionEvent:
 		return f.focusable
 	default:
 		return f.pointer.Matches(e)
@@ -458,6 +458,13 @@ func (q *Router) processEvent(e event.Event, system bool) {
 				e.End = r.End
 			}
 		}
+		var evts []taggedEvent
+		if f := state.focus; f != nil {
+			evts = append(evts, taggedEvent{tag: f, event: e})
+		}
+		q.changeState(e, state, evts)
+	case key.CompositionEvent:
+		e = key.CompositionEvent(rangeNorm(key.Range(e)))
 		var evts []taggedEvent
 		if f := state.focus; f != nil {
 			evts = append(evts, taggedEvent{tag: f, event: e})
