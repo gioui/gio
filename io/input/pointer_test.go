@@ -255,6 +255,45 @@ func TestPointerMove(t *testing.T) {
 	assertEventPointerTypeSequence(t, events(&r, -1, filter(handler2)), pointer.Enter, pointer.Move, pointer.Leave, pointer.Cancel)
 }
 
+func TestPointerLeave(t *testing.T) {
+	handler := new(int)
+	var ops op.Ops
+
+	filter := pointer.Filter{
+		Target: handler,
+		Kinds:  pointer.Move | pointer.Enter | pointer.Leave | pointer.Cancel,
+	}
+	defer clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops).Pop()
+	event.Op(&ops, handler)
+
+	var r Router
+	events(&r, -1, filter)
+	r.Frame(&ops)
+	r.Queue(
+		pointer.Event{
+			Kind:      pointer.Move,
+			Source:    pointer.Mouse,
+			PointerID: 1,
+			Position:  f32.Pt(50, 50),
+		},
+		pointer.Event{
+			Kind:      pointer.Leave,
+			Source:    pointer.Mouse,
+			PointerID: 1,
+			Position:  f32.Pt(50, 50),
+		},
+	)
+	assertEventPointerTypeSequence(t, events(&r, -1, filter), pointer.Enter, pointer.Move, pointer.Leave)
+
+	r.Queue(pointer.Event{
+		Kind:      pointer.Move,
+		Source:    pointer.Mouse,
+		PointerID: 1,
+		Position:  f32.Pt(50, 50),
+	})
+	assertEventPointerTypeSequence(t, events(&r, -1, filter), pointer.Enter, pointer.Move)
+}
+
 func TestPointerTypes(t *testing.T) {
 	handler := new(int)
 	var ops op.Ops

@@ -760,6 +760,8 @@ func (q *pointerQueue) Push(handlers map[event.Tag]*handler, state pointerState,
 		if p.pressed {
 			p, evts = q.deliverDragEvent(handlers, p, evts)
 		}
+	case pointer.Leave:
+		p, evts, state.cursor, _ = q.deliverEnterLeaveEvents(handlers, state.cursor, p, evts, e)
 	case pointer.Release:
 		evts = q.deliverEvent(handlers, p, evts, e)
 		p.pressed = false
@@ -823,7 +825,7 @@ func (q *pointerQueue) deliverEvent(handlers map[event.Tag]*handler, p pointerIn
 func (q *pointerQueue) deliverEnterLeaveEvents(handlers map[event.Tag]*handler, cursor pointer.Cursor, p pointerInfo, evts []taggedEvent, e pointer.Event) (pointerInfo, []taggedEvent, pointer.Cursor, bool) {
 	changed := false
 	var hits []event.Tag
-	if e.Source != pointer.Mouse && !p.pressed && e.Kind != pointer.Press {
+	if e.Kind == pointer.Leave || e.Source != pointer.Mouse && !p.pressed && e.Kind != pointer.Press {
 		// Consider non-mouse pointers leaving when they're released.
 	} else {
 		var transSrc *pointerFilter
