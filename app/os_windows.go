@@ -412,6 +412,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		icaret := image.Pt(int(caret.X+.5), int(caret.Y+.5))
 		windows.ImmSetCompositionWindow(imc, icaret.X, icaret.Y)
 		windows.ImmSetCandidateWindow(imc, icaret.X, icaret.Y)
+		return windows.TRUE
 	case windows.WM_IME_COMPOSITION:
 		imc := windows.ImmGetContext(w.hwnd)
 		if imc == 0 {
