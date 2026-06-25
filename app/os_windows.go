@@ -910,17 +910,13 @@ func (w *window) Perform(acts system.Action) {
 			y := (mi.Bottom - mi.Top - dy) / 2
 			windows.SetWindowPos(w.hwnd, 0, x, y, dx, dy, windows.SWP_NOZORDER|windows.SWP_FRAMECHANGED)
 		case system.ActionRaise:
-			w.raise()
+			windows.SetForegroundWindow(w.hwnd)
+			windows.SetWindowPos(w.hwnd, windows.HWND_TOP, 0, 0, 0, 0,
+				windows.SWP_NOMOVE|windows.SWP_NOSIZE|windows.SWP_SHOWWINDOW)
 		case system.ActionClose:
 			windows.PostMessage(w.hwnd, windows.WM_CLOSE, 0, 0)
 		}
 	})
-}
-
-func (w *window) raise() {
-	windows.SetForegroundWindow(w.hwnd)
-	windows.SetWindowPos(w.hwnd, windows.HWND_TOPMOST, 0, 0, 0, 0,
-		windows.SWP_NOMOVE|windows.SWP_NOSIZE|windows.SWP_SHOWWINDOW)
 }
 
 func convertKeyCode(code uintptr) (key.Name, bool) {
