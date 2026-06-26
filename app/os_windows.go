@@ -699,7 +699,13 @@ func (w *window) ReadClipboard() {
 	w.readClipboard()
 }
 
-func (w *window) readClipboard() error {
+func (w *window) readClipboard() (cerr error) {
+	defer func() {
+		if cerr != nil {
+			w.processDataEvent("")
+		}
+	}()
+
 	if err := windows.OpenClipboard(w.hwnd); err != nil {
 		return err
 	}
@@ -714,13 +720,17 @@ func (w *window) readClipboard() error {
 	}
 	defer windows.GlobalUnlock(mem)
 	content := gowindows.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
+	w.processDataEvent(content)
+	return nil
+}
+
+func (w *window) processDataEvent(content string) {
 	w.ProcessEvent(transfer.DataEvent{
 		Type: "application/text",
 		Open: func() io.ReadCloser {
 			return io.NopCloser(strings.NewReader(content))
 		},
 	})
-	return nil
 }
 
 func (w *window) Configure(options []Option) {
