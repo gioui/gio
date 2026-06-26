@@ -747,7 +747,16 @@ func (w *window) Configure(options []Option) {
 	style := windows.GetWindowLong(w.hwnd, windows.GWL_STYLE)
 	var showMode int32
 	var x, y, width, height int32
-	swpStyle := uintptr(windows.SWP_NOZORDER | windows.SWP_FRAMECHANGED)
+	swpStyle := uintptr(windows.SWP_FRAMECHANGED)
+	if cnf.TopMost == w.config.TopMost {
+		// Don't change the z-order if TopMost didn't change.
+		swpStyle |= windows.SWP_NOZORDER
+	}
+	hwndAfter := windows.HWND_NOTOPMOST
+	if cnf.TopMost {
+		hwndAfter = windows.HWND_TOPMOST
+	}
+	w.config.TopMost = cnf.TopMost
 	winStyle := uintptr(windows.WS_OVERLAPPEDWINDOW)
 	style &^= winStyle
 	switch cnf.Mode {
@@ -799,7 +808,7 @@ func (w *window) Configure(options []Option) {
 
 	// Note: these invocation all trigger the windows callback method which may process a pending system.ActionCenter
 	// action, so SetWindowPos should come first so as to not "overwrite" system.ActionCenter.
-	windows.SetWindowPos(w.hwnd, 0, x, y, width, height, swpStyle)
+	windows.SetWindowPos(w.hwnd, hwndAfter, x, y, width, height, swpStyle)
 	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style)
 	windows.ShowWindow(w.hwnd, showMode)
 }

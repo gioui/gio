@@ -207,8 +207,9 @@ const (
 	CFS_POINT        = 0x0002
 	CFS_CANDIDATEPOS = 0x0040
 
-	HWND_TOP     = syscall.Handle(0)
-	HWND_TOPMOST = ^(syscall.Handle(1) - 1) // -1
+	HWND_TOP       = syscall.Handle(0)
+	HWND_TOPMOST   = ^(syscall.Handle(1) - 1) // -1
+	HWND_NOTOPMOST = ^(syscall.Handle(2) - 1) // -2
 
 	HTCAPTION     = 2
 	HTCLIENT      = 1
