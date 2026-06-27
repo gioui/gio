@@ -972,7 +972,7 @@ func Decorated(enabled bool) Option {
 
 // TopMost windows will be rendered above all other non-top-most windows.
 //
-// TopMost windows are only supported on MacOS currently.
+// TopMost windows are supported on macOS, Windows.
 func TopMost(enabled bool) Option {
 	return func(_ unit.Metric, cnf *Config) {
 		cnf.TopMost = enabled
