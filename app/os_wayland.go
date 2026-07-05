@@ -1121,6 +1121,7 @@ func (w *window) setWindowConstraints() {
 	if scaled := w.config.MaxSize.Div(w.scale); scaled != (image.Point{}) {
 		C.xdg_toplevel_set_max_size(w.topLvl, C.int32_t(scaled.X), C.int32_t(scaled.Y+decoHeight))
 	}
+	w.updateOpaqueRegion()
 }
 
 // decoHeight returns the adjustment for client-side decorations, if applicable.
@@ -1724,6 +1725,12 @@ func (w *window) systemGesture() (*C.struct_wl_cursor, C.uint32_t) {
 }
 
 func (w *window) updateOpaqueRegion() {
+	if !w.config.Decorated {
+		// Don't mark CSD windows as opaque so the compositor can apply
+		// rounded corners and transparency effects.
+		C.wl_surface_set_opaque_region(w.surf, nil)
+		return
+	}
 	reg := C.wl_compositor_create_region(w.disp.compositor)
 	C.wl_region_add(reg, 0, 0, C.int32_t(w.size.X), C.int32_t(w.size.Y))
 	C.wl_surface_set_opaque_region(w.surf, reg)
