@@ -16,6 +16,10 @@ type editorState struct {
 	compose key.Range
 }
 
+func shouldCancelComposition(old, new editorState) bool {
+	return old.Selection.Range != new.Selection.Range || !areSnippetsConsistent(old.Snippet, new.Snippet)
+}
+
 func (e *editorState) Replace(r key.Range, text string) {
 	if r.Start > r.End {
 		r.Start, r.End = r.End, r.Start

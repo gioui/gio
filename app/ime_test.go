@@ -161,3 +161,33 @@ func TestEditorIndices(t *testing.T) {
 		}
 	}
 }
+
+func TestShouldCancelComposition(t *testing.T) {
+	base := editorState{}
+	base.Selection.Range = key.Range{Start: 12, End: 12}
+	base.Snippet = key.Snippet{
+		Range: key.Range{Start: 12, End: 17},
+		Text:  "hello",
+	}
+
+	expanded := base
+	expanded.Snippet = key.Snippet{
+		Range: key.Range{Start: 10, End: 17},
+		Text:  "拼音hello",
+	}
+	if shouldCancelComposition(base, expanded) {
+		t.Fatal("expanded but consistent snippet should not cancel composition")
+	}
+
+	changedText := base
+	changedText.Snippet.Text = "hullo"
+	if !shouldCancelComposition(base, changedText) {
+		t.Fatal("changed snippet text should cancel composition")
+	}
+
+	movedSelection := base
+	movedSelection.Selection.Range = key.Range{Start: 13, End: 13}
+	if !shouldCancelComposition(base, movedSelection) {
+		t.Fatal("changed selection should cancel composition")
+	}
+}
