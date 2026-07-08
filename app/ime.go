@@ -20,10 +20,27 @@ func shouldCancelComposition(old, new editorState) bool {
 	return old.Selection.Range != new.Selection.Range || !areSnippetsConsistent(old.Snippet, new.Snippet)
 }
 
-func (e *editorState) Replace(r key.Range, text string) {
+// imeRange is the range currently owned by the IME. While composing, both
+// preedit updates and commits replace that range; otherwise they replace the
+// editor selection.
+func imeRange(state editorState) key.Range {
+	rng := state.compose
+	if rng.Start == -1 {
+		rng = state.Selection.Range
+	}
+	return normRange(rng)
+}
+
+// normRange makes text replacement independent of the selection direction.
+func normRange(r key.Range) key.Range {
 	if r.Start > r.End {
 		r.Start, r.End = r.End, r.Start
 	}
+	return r
+}
+
+func (e *editorState) Replace(r key.Range, text string) {
+	r = normRange(r)
 	runes := []rune(text)
 	newEnd := r.Start + len(runes)
 	adjust := func(pos int) int {

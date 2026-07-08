@@ -105,8 +105,9 @@ type offEntry struct {
 
 type imeState struct {
 	selection struct {
-		rng   key.Range
-		caret key.Caret
+		rng               key.Range
+		caret             key.Caret
+		compositionBounds image.Rectangle
 	}
 	snippet     key.Snippet
 	composition key.Range
@@ -625,7 +626,13 @@ func (e *Editor) initBuffer() {
 func (e *Editor) Update(gtx layout.Context) (EditorEvent, bool) {
 	e.initBuffer()
 	event, ok := e.processEvents(gtx)
-	// Notify IME of selection if it changed.
+	e.updateIMEState(gtx)
+
+	e.updateSnippet(gtx, e.ime.start, e.ime.end)
+	return event, ok
+}
+
+func (e *Editor) updateIMEState(gtx layout.Context) {
 	newSel := e.ime.selection
 	start, end := e.text.Selection()
 	newSel.rng = key.Range{
@@ -638,13 +645,16 @@ func (e *Editor) Update(gtx layout.Context) (EditorEvent, bool) {
 		Ascent:  float32(carAsc),
 		Descent: float32(carDesc),
 	}
+	newSel.compositionBounds = e.compositionBounds()
 	if newSel != e.ime.selection {
 		e.ime.selection = newSel
-		gtx.Execute(key.SelectionCmd{Tag: e, Range: newSel.rng, Caret: newSel.caret})
+		gtx.Execute(key.SelectionCmd{
+			Tag:               e,
+			Range:             newSel.rng,
+			Caret:             newSel.caret,
+			CompositionBounds: newSel.compositionBounds,
+		})
 	}
-
-	e.updateSnippet(gtx, e.ime.start, e.ime.end)
-	return event, ok
 }
 
 // Layout lays out the editor using the provided textMaterial as the paint material
@@ -713,6 +723,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 		e.scrollCaret = false
 		e.text.ScrollToCaret()
 	}
+	e.updateIMEState(gtx)
 	visibleDims := e.text.Dimensions()
 
 	defer clip.Rect(image.Rectangle{Max: visibleDims.Size}).Push(gtx.Ops).Pop()
@@ -785,6 +796,29 @@ func (e *Editor) paintComposition(gtx layout.Context, material op.CallOp) {
 		paint.PaintOp{}.Add(gtx.Ops)
 		stack.Pop()
 	}
+}
+
+// compositionBounds returns the part of the composing text visible in the editor.
+func (e *Editor) compositionBounds() image.Rectangle {
+	r := e.ime.composition
+	if r.Start == -1 || r.Start == r.End {
+		return image.Rectangle{}
+	}
+	e.text.regions = e.text.Regions(r.Start, r.End, e.text.regions)
+	visible := image.Rectangle{Max: e.text.viewSize}
+	var bounds image.Rectangle
+	for _, region := range e.text.regions {
+		r := region.Bounds.Intersect(visible)
+		if r.Empty() {
+			continue
+		}
+		if bounds.Empty() {
+			bounds = r
+		} else {
+			bounds = bounds.Union(r)
+		}
+	}
+	return bounds
 }
 
 // paintCaret paints the text glyphs using the provided material to set the fill material
