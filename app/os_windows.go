@@ -625,7 +625,7 @@ func (w *window) EditorStateChanged(old, new editorState) {
 		return
 	}
 	defer windows.ImmReleaseContext(w.hwnd, imc)
-	if old.Selection.Range != new.Selection.Range || old.Snippet != new.Snippet {
+	if shouldCancelComposition(old, new) {
 		windows.ImmNotifyIME(imc, windows.NI_COMPOSITIONSTR, windows.CPS_CANCEL, 0)
 	}
 }
