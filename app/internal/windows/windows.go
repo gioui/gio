@@ -204,8 +204,8 @@ const (
 	GCS_RESULTREADSTR = 0x0200
 	GCS_RESULTSTR     = 0x0800
 
-	CFS_POINT        = 0x0002
-	CFS_CANDIDATEPOS = 0x0040
+	CFS_POINT   = 0x0002
+	CFS_EXCLUDE = 0x0080
 
 	HWND_TOP       = syscall.Handle(0)
 	HWND_TOPMOST   = ^(syscall.Handle(1) - 1) // -1
@@ -762,12 +762,13 @@ func ImmSetCompositionWindow(imc syscall.Handle, x, y int) {
 	_ImmSetCompositionWindow.Call(uintptr(imc), uintptr(unsafe.Pointer(&f)))
 }
 
-func ImmSetCandidateWindow(imc syscall.Handle, x, y int) {
+func ImmSetCandidateWindow(imc syscall.Handle, x, y int, r Rect) {
 	f := CandidateForm{
-		dwStyle: CFS_CANDIDATEPOS,
+		dwStyle: CFS_EXCLUDE,
 		ptCurrentPos: Point{
 			X: int32(x), Y: int32(y),
 		},
+		rcArea: r,
 	}
 	_ImmSetCandidateWindow.Call(uintptr(imc), uintptr(unsafe.Pointer(&f)))
 }

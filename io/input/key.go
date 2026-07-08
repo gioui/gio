@@ -18,6 +18,7 @@ type EditorState struct {
 		Transform f32.Affine2D
 		key.Range
 		key.Caret
+		CompositionBounds image.Rectangle
 	}
 	Snippet key.Snippet
 }
@@ -332,6 +333,7 @@ func (q *keyQueue) setSelection(state keyState, req key.SelectionCmd) keyState {
 	}
 	state.content.Selection.Range = req.Range
 	state.content.Selection.Caret = req.Caret
+	state.content.Selection.CompositionBounds = req.CompositionBounds
 	return state
 }
 

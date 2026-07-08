@@ -4,6 +4,7 @@ package app
 
 import (
 	"gioui.org/f32"
+	"image"
 	"testing"
 	"unicode/utf8"
 
@@ -162,6 +163,42 @@ func TestEditorIndices(t *testing.T) {
 	}
 }
 
+func TestIMERange(t *testing.T) {
+	editorStateWithSelection := func(compose, selection key.Range) editorState {
+		var state editorState
+		state.compose = compose
+		state.Selection.Range = selection
+		return state
+	}
+	for _, tc := range []struct {
+		name string
+		in   editorState
+		want key.Range
+	}{
+		{
+			name: "selection fallback",
+			in:   editorStateWithSelection(key.Range{Start: -1, End: -1}, key.Range{Start: 2, End: 5}),
+			want: key.Range{Start: 2, End: 5},
+		},
+		{
+			name: "composition wins",
+			in:   editorStateWithSelection(key.Range{Start: 4, End: 9}, key.Range{Start: 1, End: 1}),
+			want: key.Range{Start: 4, End: 9},
+		},
+		{
+			name: "normalize reversed",
+			in: editorState{
+				compose: key.Range{Start: 8, End: 3},
+			},
+			want: key.Range{Start: 3, End: 8},
+		},
+	} {
+		if got := imeRange(tc.in); got != tc.want {
+			t.Errorf("%s: imeRange() = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
 func TestShouldCancelComposition(t *testing.T) {
 	base := editorState{}
 	base.Selection.Range = key.Range{Start: 12, End: 12}
@@ -189,5 +226,41 @@ func TestShouldCancelComposition(t *testing.T) {
 	movedSelection.Selection.Range = key.Range{Start: 13, End: 13}
 	if !shouldCancelComposition(base, movedSelection) {
 		t.Fatal("changed selection should cancel composition")
+	}
+}
+
+func TestEditorCompositionBounds(t *testing.T) {
+	cache := text.NewShaper(text.WithCollection(gofont.Collection()))
+	e := new(widget.Editor)
+	e.SetText("hello world")
+
+	var r input.Router
+	var ops op.Ops
+	gtx := layout.Context{
+		Ops:         &ops,
+		Source:      r.Source(),
+		Constraints: layout.Exact(image.Pt(300, 100)),
+	}
+	gtx.Execute(key.FocusCmd{Tag: e})
+
+	layoutEditor := func() {
+		ops.Reset()
+		gtx.Ops = &ops
+		gtx.Source = r.Source()
+		e.Layout(gtx, cache, font.Font{}, unit.Sp(12), op.CallOp{}, op.CallOp{})
+		r.Frame(gtx.Ops)
+	}
+
+	layoutEditor()
+	r.Queue(key.CompositionEvent{Start: 0, End: 5})
+	layoutEditor()
+	if bounds := r.EditorState().Selection.CompositionBounds; bounds.Empty() {
+		t.Fatalf("expected non-empty composition bounds")
+	}
+
+	r.Queue(key.CompositionEvent{Start: -1, End: -1})
+	layoutEditor()
+	if bounds := r.EditorState().Selection.CompositionBounds; !bounds.Empty() {
+		t.Fatalf("expected empty composition bounds, got %v", bounds)
 	}
 }
