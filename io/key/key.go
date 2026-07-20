@@ -23,6 +23,10 @@ type Filter struct {
 	Optional Modifiers
 	// Name of the key to be matched. As a special case, the empty
 	// Name matches every key not matched by any other filter.
+	//
+	// However, keys with platform specific side-effects, such as Tab
+	// and Shift-Tab for changing focus, are only matched by filters
+	// that specify their Name explicitly. See [gioui.org/io/input.SystemEvent].
 	Name Name
 }
 
