@@ -361,8 +361,10 @@ func perpDot(p, q f32.Point) float32 {
 }
 
 func angleBetween(n0, n1 f32.Point) float64 {
-	return math.Atan2(float64(n1.Y), float64(n1.X)) -
+	angle := math.Atan2(float64(n1.Y), float64(n1.X)) -
 		math.Atan2(float64(n0.Y), float64(n0.X))
+	// Keep joins on the shortest arc when atan2 wraps at +/-Pi.
+	return math.Remainder(angle, 2*math.Pi)
 }
 
 // strokePathCurv returns the curvature at t, along the quadratic Bézier
