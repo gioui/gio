@@ -81,6 +81,7 @@ type textView struct {
 	lastMask        rune
 	viewSize        image.Point
 	valid           bool
+	version         uint64
 	regions         []Region
 	dims            layout.Dimensions
 
@@ -573,6 +574,7 @@ func (e *textView) runeOffset(r int) int {
 func (e *textView) invalidate() {
 	e.offIndex = e.offIndex[:0]
 	e.valid = false
+	e.version++
 }
 
 // Replace the text between start and end with s. Indices are in runes.
