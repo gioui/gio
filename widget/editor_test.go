@@ -1142,6 +1142,42 @@ func TestSelectMove(t *testing.T) {
 	}
 }
 
+func TestEditorIMEStateInvalidation(t *testing.T) {
+	e := new(Editor)
+	e.SingleLine = true
+	e.SetText("hello world")
+	e.ime.composition = key.Range{Start: 0, End: 5}
+	gtx := layout.Context{
+		Ops:         new(op.Ops),
+		Constraints: layout.Exact(image.Pt(50, 20)),
+		Locale:      english,
+	}
+	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
+	e.Layout(gtx, shaper, font.Font{}, unit.Sp(10), op.CallOp{}, op.CallOp{})
+
+	e.text.regions = nil
+	e.updateIMEState(gtx)
+	if len(e.text.regions) != 0 {
+		t.Fatal("unchanged IME state traversed text regions")
+	}
+
+	check := func(name string, change func()) {
+		e.text.regions = nil
+		change()
+		e.updateIMEState(gtx)
+		if len(e.text.regions) == 0 {
+			t.Fatalf("%s: changed IME state did not traverse text regions", name)
+		}
+	}
+	check("selection", func() { e.SetCaret(1, 1) })
+	check("content", func() { e.text.Replace(0, 1, "H") })
+	check("scroll", func() { e.text.ScrollRel(10, 0) })
+	check("constraints", func() {
+		gtx.Constraints = layout.Exact(image.Pt(40, 20))
+		e.text.Layout(gtx, shaper, font.Font{}, unit.Sp(10))
+	})
+}
+
 func TestEditor_Read(t *testing.T) {
 	s := "hello world"
 	buf := make([]byte, len(s))

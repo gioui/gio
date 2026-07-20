@@ -111,6 +111,9 @@ type imeState struct {
 	}
 	snippet     key.Snippet
 	composition key.Range
+	lastCompose key.Range
+	textVersion uint64
+	scrollOff   image.Point
 	start, end  int
 }
 
@@ -633,12 +636,24 @@ func (e *Editor) Update(gtx layout.Context) (EditorEvent, bool) {
 }
 
 func (e *Editor) updateIMEState(gtx layout.Context) {
-	newSel := e.ime.selection
 	start, end := e.text.Selection()
-	newSel.rng = key.Range{
+	rng := key.Range{
 		Start: start,
 		End:   end,
 	}
+	scrollOff := e.text.ScrollOff()
+	if rng == e.ime.selection.rng &&
+		e.ime.composition == e.ime.lastCompose &&
+		e.text.version == e.ime.textVersion &&
+		scrollOff == e.ime.scrollOff {
+		return
+	}
+	e.ime.lastCompose = e.ime.composition
+	e.ime.textVersion = e.text.version
+	e.ime.scrollOff = scrollOff
+
+	newSel := e.ime.selection
+	newSel.rng = rng
 	caretPos, carAsc, carDesc := e.text.CaretInfo()
 	newSel.caret = key.Caret{
 		Pos:     layout.FPt(caretPos),

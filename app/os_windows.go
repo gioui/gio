@@ -416,6 +416,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			return windows.TRUE
 		}
 		defer windows.ImmReleaseContext(w.hwnd, imc)
+		defer w.updateIMEWindows(imc)
 		state := w.w.EditorState()
 		if lParam&windows.GCS_RESULTSTR != 0 {
 			// RESULTSTR is committed text. Keep it separate from COMPSTR so a
@@ -427,6 +428,9 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			end := start + utf8.RuneCountInString(result)
 			w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
 			w.w.SetEditorSelection(key.Range{Start: end, End: end})
+			if lParam&windows.GCS_COMPSTR == 0 {
+				return windows.TRUE
+			}
 			state = w.w.EditorState()
 		}
 		if lParam&windows.GCS_COMPSTR != 0 {
@@ -451,22 +455,24 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 				pos = state.RunesIndex(state.UTF16Index(rng.Start) + rel)
 			}
 			w.w.SetEditorSelection(key.Range{Start: pos, End: pos})
-		} else if lParam&(windows.GCS_DELTASTART|windows.GCS_CURSORPOS) != 0 && state.compose.Start != -1 {
-			// Some composition messages only move the IME cursor or clause start.
-			rng := normRange(state.compose)
-			comp := rng
-			if lParam&windows.GCS_DELTASTART != 0 {
-				start := windows.ImmGetCompositionValue(imc, windows.GCS_DELTASTART)
-				comp.Start = state.RunesIndex(state.UTF16Index(comp.Start) + start)
-				w.w.SetComposingRegion(comp)
-			}
-			if lParam&windows.GCS_CURSORPOS != 0 {
-				rel := windows.ImmGetCompositionValue(imc, windows.GCS_CURSORPOS)
-				pos := state.RunesIndex(state.UTF16Index(rng.Start) + rel)
-				w.w.SetEditorSelection(key.Range{Start: pos, End: pos})
-			}
+			return windows.TRUE
 		}
-		w.updateIMEWindows(imc)
+		if lParam&(windows.GCS_DELTASTART|windows.GCS_CURSORPOS) == 0 || state.compose.Start == -1 {
+			return windows.TRUE
+		}
+		// Some composition messages only move the IME cursor or clause start.
+		rng := normRange(state.compose)
+		comp := rng
+		if lParam&windows.GCS_DELTASTART != 0 {
+			start := windows.ImmGetCompositionValue(imc, windows.GCS_DELTASTART)
+			comp.Start = state.RunesIndex(state.UTF16Index(comp.Start) + start)
+			w.w.SetComposingRegion(comp)
+		}
+		if lParam&windows.GCS_CURSORPOS != 0 {
+			rel := windows.ImmGetCompositionValue(imc, windows.GCS_CURSORPOS)
+			pos := state.RunesIndex(state.UTF16Index(rng.Start) + rel)
+			w.w.SetEditorSelection(key.Range{Start: pos, End: pos})
+		}
 		return windows.TRUE
 	case windows.WM_IME_ENDCOMPOSITION:
 		w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
