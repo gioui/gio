@@ -39,11 +39,11 @@ type Context struct {
 	utf8Buf   []byte
 }
 
-var (
-	_XKB_MOD_NAME_CTRL  = []byte("Control\x00")
-	_XKB_MOD_NAME_SHIFT = []byte("Shift\x00")
-	_XKB_MOD_NAME_ALT   = []byte("Mod1\x00")
-	_XKB_MOD_NAME_LOGO  = []byte("Mod4\x00")
+const (
+	_XKB_MOD_NAME_CTRL  = "Control\x00"
+	_XKB_MOD_NAME_SHIFT = "Shift\x00"
+	_XKB_MOD_NAME_ALT   = "Mod1\x00"
+	_XKB_MOD_NAME_LOGO  = "Mod4\x00"
 )
 
 func (x *Context) Destroy() {
@@ -120,7 +120,7 @@ func (x *Context) LoadKeymap(format int, fd int, size int) error {
 		return fmt.Errorf("newXKB: mmap of keymap failed: %v", err)
 	}
 	defer syscall.Munmap(mapData)
-	keyMap := C.xkb_keymap_new_from_buffer(x.Ctx, (*C.char)(unsafe.Pointer(&mapData[0])), C.size_t(size-1), C.XKB_KEYMAP_FORMAT_TEXT_V1, C.XKB_KEYMAP_COMPILE_NO_FLAGS)
+	keyMap := C.xkb_keymap_new_from_buffer(x.Ctx, (*C.char)(unsafe.Pointer(unsafe.SliceData(mapData))), C.size_t(size-1), C.XKB_KEYMAP_FORMAT_TEXT_V1, C.XKB_KEYMAP_COMPILE_NO_FLAGS)
 	if keyMap == nil {
 		return errors.New("newXKB: xkb_keymap_new_from_buffer failed")
 	}
@@ -140,16 +140,16 @@ func (x *Context) Modifiers() key.Modifiers {
 		return mods
 	}
 
-	if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_CTRL[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
+	if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(unsafe.StringData(_XKB_MOD_NAME_CTRL))), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
 		mods |= key.ModCtrl
 	}
-	if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_SHIFT[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
+	if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(unsafe.StringData(_XKB_MOD_NAME_SHIFT))), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
 		mods |= key.ModShift
 	}
-	if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_ALT[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
+	if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(unsafe.StringData(_XKB_MOD_NAME_ALT))), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
 		mods |= key.ModAlt
 	}
-	if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(&_XKB_MOD_NAME_LOGO[0])), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
+	if C.xkb_state_mod_name_is_active(x.state, (*C.char)(unsafe.Pointer(unsafe.StringData(_XKB_MOD_NAME_LOGO))), C.XKB_STATE_MODS_EFFECTIVE) == 1 {
 		mods |= key.ModSuper
 	}
 	return mods
@@ -183,10 +183,10 @@ func (x *Context) DispatchKey(keyCode uint32, state key.State) (events []event.E
 	case C.XKB_COMPOSE_CANCELLED, C.XKB_COMPOSE_COMPOSING:
 		return
 	case C.XKB_COMPOSE_COMPOSED:
-		size := C.xkb_compose_state_get_utf8(x.compState, (*C.char)(unsafe.Pointer(&x.utf8Buf[0])), C.size_t(len(x.utf8Buf)))
+		size := C.xkb_compose_state_get_utf8(x.compState, (*C.char)(unsafe.Pointer(unsafe.SliceData(x.utf8Buf))), C.size_t(len(x.utf8Buf)))
 		if int(size) >= len(x.utf8Buf) {
 			x.utf8Buf = make([]byte, size+1)
-			size = C.xkb_compose_state_get_utf8(x.compState, (*C.char)(unsafe.Pointer(&x.utf8Buf[0])), C.size_t(len(x.utf8Buf)))
+			size = C.xkb_compose_state_get_utf8(x.compState, (*C.char)(unsafe.Pointer(unsafe.SliceData(x.utf8Buf))), C.size_t(len(x.utf8Buf)))
 		}
 		C.xkb_compose_state_reset(x.compState)
 		str = x.utf8Buf[:size]
@@ -214,10 +214,10 @@ func (x *Context) DispatchKey(keyCode uint32, state key.State) (events []event.E
 }
 
 func (x *Context) charsForKeycode(keyCode C.xkb_keycode_t) []byte {
-	size := C.xkb_state_key_get_utf8(x.state, keyCode, (*C.char)(unsafe.Pointer(&x.utf8Buf[0])), C.size_t(len(x.utf8Buf)))
+	size := C.xkb_state_key_get_utf8(x.state, keyCode, (*C.char)(unsafe.Pointer(unsafe.SliceData(x.utf8Buf))), C.size_t(len(x.utf8Buf)))
 	if int(size) >= len(x.utf8Buf) {
 		x.utf8Buf = make([]byte, size+1)
-		size = C.xkb_state_key_get_utf8(x.state, keyCode, (*C.char)(unsafe.Pointer(&x.utf8Buf[0])), C.size_t(len(x.utf8Buf)))
+		size = C.xkb_state_key_get_utf8(x.state, keyCode, (*C.char)(unsafe.Pointer(unsafe.SliceData(x.utf8Buf))), C.size_t(len(x.utf8Buf)))
 	}
 	return x.utf8Buf[:size]
 }

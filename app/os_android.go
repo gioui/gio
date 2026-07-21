@@ -1232,18 +1232,12 @@ func javaBool(b bool) C.jboolean {
 
 func javaString(env *C.JNIEnv, str string) C.jstring {
 	utf16Chars := utf16.Encode([]rune(str))
-	var ptr *C.jchar
-	if len(utf16Chars) > 0 {
-		ptr = (*C.jchar)(unsafe.Pointer(&utf16Chars[0]))
-	}
+	ptr := (*C.jchar)(unsafe.Pointer(unsafe.SliceData(utf16Chars)))
 	return C.jni_NewString(env, ptr, C.int(len(utf16Chars)))
 }
 
 func varArgs(args []jvalue) *C.jvalue {
-	if len(args) == 0 {
-		return nil
-	}
-	return (*C.jvalue)(unsafe.Pointer(&args[0]))
+	return (*C.jvalue)(unsafe.Pointer(unsafe.SliceData(args)))
 }
 
 func callStaticVoidMethod(env *C.JNIEnv, cls C.jclass, method C.jmethodID, args ...jvalue) error {

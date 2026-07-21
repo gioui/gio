@@ -1168,7 +1168,7 @@ func broadcastURI(hwnd syscall.Handle, uri string) {
 
 	pinner := new(runtime.Pinner)
 	defer pinner.Unpin()
-	pinner.Pin(unsafe.Pointer(&data[0]))
+	pinner.Pin(unsafe.Pointer(unsafe.SliceData(data)))
 
 	msg := &windows.CopyDataStruct{
 		DwData: copyDataURLType,

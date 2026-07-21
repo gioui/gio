@@ -438,7 +438,7 @@ type Buffer struct {
 	size    int
 	buffer  C.CFTypeRef
 
-	// store is the buffer contents For buffers not allocated on the GPU.
+	// store is the buffer contents for buffers not allocated on the GPU.
 	store []byte
 }
 
@@ -636,14 +636,6 @@ func (b *Backend) NewPipeline(desc driver.PipelineDesc) (driver.Pipeline, error)
 		formats[index] = vertFormatFor(vsh.inputs[i])
 		offsets[index] = C.NSUInteger(inp.Offset)
 	}
-	var (
-		fmtPtr *C.MTLVertexFormat
-		offPtr *C.NSUInteger
-	)
-	if len(layout) > 0 {
-		fmtPtr = &formats[0]
-		offPtr = &offsets[0]
-	}
 	srcFactor := blendFactorFor(desc.BlendDesc.SrcFactor)
 	dstFactor := blendFactorFor(desc.BlendDesc.DstFactor)
 	blend := C.int(0)
@@ -660,7 +652,7 @@ func (b *Backend) NewPipeline(desc driver.PipelineDesc) (driver.Pipeline, error)
 		fsh.function,
 		pf,
 		attributeBufferIndex,
-		C.NSUInteger(len(layout)), fmtPtr, offPtr,
+		C.NSUInteger(len(layout)), unsafe.SliceData(formats), unsafe.SliceData(offsets),
 		C.NSUInteger(desc.VertexLayout.Stride),
 		blend, srcFactor, dstFactor,
 		2, // Number of vertex buffers.
@@ -770,10 +762,10 @@ func (b *Backend) NewFragmentShader(src shader.Sources) (driver.FragmentShader, 
 }
 
 func (b *Backend) newShader(src shader.Sources) (*Shader, error) {
-	vsrc := []byte(src.MetalLib)
+	vsrc := src.MetalLib
 	cname := C.CString(src.Name)
 	defer C.free(unsafe.Pointer(cname))
-	vlib := C.newLibrary(b.dev, cname, unsafe.Pointer(&vsrc[0]), C.size_t(len(vsrc)))
+	vlib := C.newLibrary(b.dev, cname, unsafe.Pointer(unsafe.StringData(vsrc)), C.size_t(len(vsrc)))
 	if vlib == 0 {
 		return nil, fmt.Errorf("metal: vertex shader %q load failed", src.Name)
 	}
@@ -859,7 +851,7 @@ func (b *Backend) DispatchCompute(x, y, z int) {
 	if enc == 0 {
 		panic("no active compute pass")
 	}
-	C.computeEncSetBytes(enc, unsafe.Pointer(&b.bufSizes[0]), C.NSUInteger(len(b.bufSizes)*4), spvBufferSizeConstantsBinding)
+	C.computeEncSetBytes(enc, unsafe.Pointer(unsafe.SliceData(b.bufSizes)), C.NSUInteger(len(b.bufSizes)*4), spvBufferSizeConstantsBinding)
 	threadgroupsPerGrid := C.MTLSize{
 		width: C.NSUInteger(x), height: C.NSUInteger(y), depth: C.NSUInteger(z),
 	}
@@ -1000,7 +992,7 @@ func (b *Backend) BindStorageBuffer(binding int, buffer driver.Buffer) {
 	if buf.buffer != 0 {
 		C.computeEncSetBuffer(enc, C.NSUInteger(binding), buf.buffer)
 	} else if buf.size > 0 {
-		C.computeEncSetBytes(enc, unsafe.Pointer(&buf.store[0]), C.NSUInteger(buf.size), C.NSUInteger(binding))
+		C.computeEncSetBytes(enc, unsafe.Pointer(unsafe.SliceData(buf.store)), C.NSUInteger(buf.size), C.NSUInteger(binding))
 	}
 }
 
@@ -1014,8 +1006,8 @@ func (b *Backend) BindUniforms(buf driver.Buffer) {
 		C.renderEncSetVertexBuffer(enc, bf.buffer, uniformBufferIndex, 0)
 		C.renderEncSetFragmentBuffer(enc, bf.buffer, uniformBufferIndex, 0)
 	} else if bf.size > 0 {
-		C.renderEncSetVertexBytes(enc, unsafe.Pointer(&bf.store[0]), C.NSUInteger(bf.size), uniformBufferIndex)
-		C.renderEncSetFragmentBytes(enc, unsafe.Pointer(&bf.store[0]), C.NSUInteger(bf.size), uniformBufferIndex)
+		C.renderEncSetVertexBytes(enc, unsafe.Pointer(unsafe.SliceData(bf.store)), C.NSUInteger(bf.size), uniformBufferIndex)
+		C.renderEncSetFragmentBytes(enc, unsafe.Pointer(unsafe.SliceData(bf.store)), C.NSUInteger(bf.size), uniformBufferIndex)
 	}
 }
 

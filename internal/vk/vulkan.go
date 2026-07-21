@@ -1343,10 +1343,8 @@ func CmdPipelineBarrier(cmdBuf CommandBuffer, srcStage, dstStage PipelineStageFl
 }
 
 func CmdPushConstants(cmdBuf CommandBuffer, layout PipelineLayout, stages ShaderStageFlags, offset int, data []byte) {
-	if len(data) == 0 {
-		return
-	}
-	C.vkCmdPushConstants(funcs.vkCmdPushConstants, cmdBuf, layout, stages, C.uint32_t(offset), C.uint32_t(len(data)), unsafe.Pointer(&data[0]))
+	C.vkCmdPushConstants(funcs.vkCmdPushConstants, cmdBuf, layout, stages, C.uint32_t(offset), C.uint32_t(len(data)),
+		unsafe.Pointer(unsafe.SliceData(data)))
 }
 
 func CmdBindPipeline(cmdBuf CommandBuffer, bindPoint PipelineBindPoint, pipe Pipeline) {

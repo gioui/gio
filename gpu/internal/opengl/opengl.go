@@ -1028,19 +1028,19 @@ func (p *uniforms) update(funcs *gl.Functions, buf *buffer) {
 		switch {
 		case u.typ == shader.DataTypeFloat && u.size == 1:
 			data := data[:4]
-			v := *(*[1]float32)(unsafe.Pointer(&data[0]))
+			v := *(*[1]float32)(unsafe.Pointer(unsafe.SliceData(data)))
 			funcs.Uniform1f(u.uniform, v[0])
 		case u.typ == shader.DataTypeFloat && u.size == 2:
 			data := data[:8]
-			v := *(*[2]float32)(unsafe.Pointer(&data[0]))
+			v := *(*[2]float32)(unsafe.Pointer(unsafe.SliceData(data)))
 			funcs.Uniform2f(u.uniform, v[0], v[1])
 		case u.typ == shader.DataTypeFloat && u.size == 3:
 			data := data[:12]
-			v := *(*[3]float32)(unsafe.Pointer(&data[0]))
+			v := *(*[3]float32)(unsafe.Pointer(unsafe.SliceData(data)))
 			funcs.Uniform3f(u.uniform, v[0], v[1], v[2])
 		case u.typ == shader.DataTypeFloat && u.size == 4:
 			data := data[:16]
-			v := *(*[4]float32)(unsafe.Pointer(&data[0]))
+			v := *(*[4]float32)(unsafe.Pointer(unsafe.SliceData(data)))
 			funcs.Uniform4f(u.uniform, v[0], v[1], v[2], v[3])
 		default:
 			panic("unsupported uniform data type or size")

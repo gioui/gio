@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 //go:build darwin || linux || freebsd || openbsd
-// +build darwin linux freebsd openbsd
 
 package gl
 
@@ -520,7 +519,7 @@ static void glBlitFramebuffer(_glBlitFramebuffer f, GLint srcX0, GLint srcY0, GL
 */
 import "C"
 
-type Context interface{}
+type Context any
 
 type Functions struct {
 	// Query caches.
@@ -880,19 +879,12 @@ func (f *Functions) BlitFramebuffer(sx0, sy0, sx1, sy1, dx0, dy0, dx1, dy1 int, 
 }
 
 func (f *Functions) BufferData(target Enum, size int, usage Enum, data []byte) {
-	var p unsafe.Pointer
-	if len(data) > 0 {
-		p = unsafe.Pointer(&data[0])
-	}
-	C.glBufferData(f.glBufferData, C.GLenum(target), C.GLsizeiptr(size), p, C.GLenum(usage))
+	C.glBufferData(f.glBufferData, C.GLenum(target), C.GLsizeiptr(size), unsafe.Pointer(unsafe.SliceData(data)), C.GLenum(usage))
 }
 
 func (f *Functions) BufferSubData(target Enum, offset int, src []byte) {
-	var p unsafe.Pointer
-	if len(src) > 0 {
-		p = unsafe.Pointer(&src[0])
-	}
-	C.glBufferSubData(f.glBufferSubData, C.GLenum(target), C.GLintptr(offset), C.GLsizeiptr(len(src)), p)
+	C.glBufferSubData(f.glBufferSubData, C.GLenum(target), C.GLintptr(offset), C.GLsizeiptr(len(src)),
+		unsafe.Pointer(unsafe.SliceData(src)))
 }
 
 func (f *Functions) CheckFramebufferStatus(target Enum) Enum {
@@ -1121,19 +1113,16 @@ func (f *Functions) GetProgrami(p Program, pname Enum) int {
 
 func (f *Functions) GetProgramBinary(p Program) []byte {
 	sz := f.GetProgrami(p, PROGRAM_BINARY_LENGTH)
-	if sz == 0 {
-		return nil
-	}
 	buf := make([]byte, sz)
 	var format C.GLenum
-	C.glGetProgramBinary(f.glGetProgramBinary, C.GLuint(p.V), C.GLsizei(sz), nil, &format, unsafe.Pointer(&buf[0]))
+	C.glGetProgramBinary(f.glGetProgramBinary, C.GLuint(p.V), C.GLsizei(sz), nil, &format, unsafe.Pointer(unsafe.SliceData(buf)))
 	return buf
 }
 
 func (f *Functions) GetProgramInfoLog(p Program) string {
 	n := f.GetProgrami(p, INFO_LOG_LENGTH)
 	buf := make([]byte, n)
-	C.glGetProgramInfoLog(f.glGetProgramInfoLog, C.GLuint(p.V), C.GLsizei(len(buf)), nil, (*C.GLchar)(unsafe.Pointer(&buf[0])))
+	C.glGetProgramInfoLog(f.glGetProgramInfoLog, C.GLuint(p.V), C.GLsizei(len(buf)), nil, (*C.GLchar)(unsafe.Pointer(unsafe.SliceData(buf))))
 	return string(buf)
 }
 
@@ -1150,7 +1139,8 @@ func (f *Functions) GetShaderi(s Shader, pname Enum) int {
 func (f *Functions) GetShaderInfoLog(s Shader) string {
 	n := f.GetShaderi(s, INFO_LOG_LENGTH)
 	buf := make([]byte, n)
-	C.glGetShaderInfoLog(f.glGetShaderInfoLog, C.GLuint(s.V), C.GLsizei(len(buf)), nil, (*C.GLchar)(unsafe.Pointer(&buf[0])))
+	C.glGetShaderInfoLog(f.glGetShaderInfoLog, C.GLuint(s.V), C.GLsizei(len(buf)), nil,
+		(*C.GLchar)(unsafe.Pointer(unsafe.SliceData(buf))))
 	return string(buf)
 }
 
@@ -1239,11 +1229,8 @@ func (f *Functions) Scissor(x, y, width, height int32) {
 }
 
 func (f *Functions) ReadPixels(x, y, width, height int, format, ty Enum, data []byte) {
-	var p unsafe.Pointer
-	if len(data) > 0 {
-		p = unsafe.Pointer(&data[0])
-	}
-	C.glReadPixels(f.glReadPixels, C.GLint(x), C.GLint(y), C.GLsizei(width), C.GLsizei(height), C.GLenum(format), C.GLenum(ty), p)
+	C.glReadPixels(f.glReadPixels, C.GLint(x), C.GLint(y), C.GLsizei(width), C.GLsizei(height), C.GLenum(format), C.GLenum(ty),
+		unsafe.Pointer(unsafe.SliceData(data)))
 }
 
 func (f *Functions) RenderbufferStorage(target, internalformat Enum, width, height int) {
@@ -1266,11 +1253,8 @@ func (f *Functions) TexStorage2D(target Enum, levels int, internalFormat Enum, w
 }
 
 func (f *Functions) TexSubImage2D(target Enum, level int, x int, y int, width int, height int, format Enum, ty Enum, data []byte) {
-	var p unsafe.Pointer
-	if len(data) > 0 {
-		p = unsafe.Pointer(&data[0])
-	}
-	C.glTexSubImage2D(f.glTexSubImage2D, C.GLenum(target), C.GLint(level), C.GLint(x), C.GLint(y), C.GLsizei(width), C.GLsizei(height), C.GLenum(format), C.GLenum(ty), p)
+	C.glTexSubImage2D(f.glTexSubImage2D, C.GLenum(target), C.GLint(level), C.GLint(x), C.GLint(y), C.GLsizei(width), C.GLsizei(height), C.GLenum(format), C.GLenum(ty),
+		unsafe.Pointer(unsafe.SliceData(data)))
 }
 
 func (f *Functions) TexParameteri(target, pname Enum, param int) {

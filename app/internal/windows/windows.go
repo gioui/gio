@@ -743,7 +743,7 @@ func ImmGetCompositionString(imc syscall.Handle, key int) string {
 		return ""
 	}
 	u16 := make([]uint16, size/unsafe.Sizeof(uint16(0)))
-	_ImmGetCompositionString.Call(uintptr(imc), uintptr(key), uintptr(unsafe.Pointer(&u16[0])), size)
+	_ImmGetCompositionString.Call(uintptr(imc), uintptr(key), uintptr(unsafe.Pointer(unsafe.SliceData(u16))), size)
 	return string(utf16.Decode(u16))
 }
 
