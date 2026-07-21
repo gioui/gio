@@ -129,8 +129,8 @@ func TestFramebuffers(t *testing.T) {
 	fbo1 := newFBO(t, b, sz)
 	fbo2 := newFBO(t, b, sz)
 	fcol1, fcol2 := f32color.LinearFromSRGB(col1), f32color.LinearFromSRGB(col2)
-	d := driver.LoadDesc{Action: driver.LoadActionClear}
-	d.ClearColor = fcol1
+	d := driver.LoadDesc{Action: driver.LoadActionClear,
+		ClearColor: fcol1}
 	b.BeginRenderPass(fbo1, d)
 	b.EndRenderPass()
 	d.ClearColor = fcol2

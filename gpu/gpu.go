@@ -816,8 +816,8 @@ func (r *renderer) packStencils(pops *[]*pathOp) {
 
 func (r *renderer) packLayers(layers []opacityLayer) []opacityLayer {
 	// Make every layer bounds contain nested layers; cull empty layers.
-	for i := len(layers) - 1; i >= 0; i-- {
-		l := layers[i]
+	for i, l := range slices.Backward(layers) {
+
 		if l.parent != -1 {
 			b := layers[l.parent].clip
 			layers[l.parent].clip = b.Union(l.clip)
@@ -852,8 +852,8 @@ func (r *renderer) drawLayers(layers []opacityLayer, ops []imageOp) {
 	}
 	fbo := -1
 	r.layerFBOs.resize(r.ctx, driver.TextureFormatSRGBA, r.layers.sizes)
-	for i := len(layers) - 1; i >= 0; i-- {
-		l := layers[i]
+	for _, l := range slices.Backward(layers) {
+
 		if fbo != l.place.Idx {
 			if fbo != -1 {
 				r.ctx.EndRenderPass()

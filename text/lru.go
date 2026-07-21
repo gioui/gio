@@ -91,13 +91,13 @@ type glyphLRU[V any] struct {
 	cache lru[uint64, glyphValue[V]]
 }
 
-var seed uint32
+var seed atomic.Uint32
 
 // hashGlyphs computes a hash key based on the ID and X offset of
 // every glyph in the slice.
 func (c *glyphLRU[V]) hashGlyphs(gs []Glyph) uint64 {
 	if c.seed == 0 {
-		c.seed = uint64(atomic.AddUint32(&seed, 3900798947))
+		c.seed = uint64(seed.Add(3900798947))
 	}
 	if len(gs) == 0 {
 		return 0
