@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 //go:build linux || windows || freebsd || openbsd
-// +build linux windows freebsd openbsd
 
 package egl
 

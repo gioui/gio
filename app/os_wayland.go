@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 //go:build ((linux && !android) || freebsd) && !nowayland
-// +build linux,!android freebsd
-// +build !nowayland
 
 package app
 
@@ -45,9 +43,9 @@ import (
 //go:generate wayland-scanner client-header /usr/share/wayland-protocols/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml wayland_xdg_decoration.h
 //go:generate wayland-scanner private-code /usr/share/wayland-protocols/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml wayland_xdg_decoration.c
 
-//go:generate sed -i "1s;^;//go:build ((linux \\&\\& !android) || freebsd) \\&\\& !nowayland\\n// +build linux,!android freebsd\\n// +build !nowayland\\n\\n;" wayland_xdg_shell.c
-//go:generate sed -i "1s;^;//go:build ((linux \\&\\& !android) || freebsd) \\&\\& !nowayland\\n// +build linux,!android freebsd\\n// +build !nowayland\\n\\n;" wayland_xdg_decoration.c
-//go:generate sed -i "1s;^;//go:build ((linux \\&\\& !android) || freebsd) \\&\\& !nowayland\\n// +build linux,!android freebsd\\n// +build !nowayland\\n\\n;" wayland_text_input.c
+//go:generate sed -i "1s;^;//go:build ((linux \\&\\& !android) || freebsd) \\&\\& !nowayland\\n\\n;" wayland_xdg_shell.c
+//go:generate sed -i "1s;^;//go:build ((linux \\&\\& !android) || freebsd) \\&\\& !nowayland\\n\\n;" wayland_xdg_decoration.c
+//go:generate sed -i "1s;^;//go:build ((linux \\&\\& !android) || freebsd) \\&\\& !nowayland\\n\\n;" wayland_text_input.c
 
 /*
 #cgo linux pkg-config: wayland-client wayland-cursor

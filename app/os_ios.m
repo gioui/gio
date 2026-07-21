@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build darwin,ios
-
 @import UIKit;
 
 #include <stdint.h>

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build darwin,ios,nometal
+//go:build nometal
 
 @import UIKit;
 @import OpenGLES;
