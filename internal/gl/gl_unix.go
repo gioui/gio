@@ -1238,10 +1238,9 @@ func (f *Functions) RenderbufferStorage(target, internalformat Enum, width, heig
 }
 
 func (f *Functions) ShaderSource(s Shader, src string) {
-	csrc := C.CString(src)
-	defer C.free(unsafe.Pointer(csrc))
 	strlen := C.GLint(len(src))
-	C.glShaderSource(f.glShaderSource, C.GLuint(s.V), 1, &csrc, &strlen)
+	pstr := unsafe.StringData(src)
+	C.glShaderSource(f.glShaderSource, C.GLuint(s.V), 1, (**C.GLchar)(unsafe.Pointer(&pstr)), &strlen)
 }
 
 func (f *Functions) TexImage2D(target Enum, level int, internalFormat Enum, width int, height int, format Enum, ty Enum) {
