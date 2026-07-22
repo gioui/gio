@@ -24,6 +24,29 @@ typedef struct {
 	NSUInteger size;
 } slice;
 
+typedef struct {
+	CFTypeRef obj;
+	char *err;
+} CFTypeAndError;
+
+static CFTypeAndError error(NSError *err) {
+	char *errStr = strdup(err.localizedDescription.UTF8String);
+	if (errStr == NULL) {
+		abort();
+	}
+	CFTypeAndError res = {
+		.err = errStr,
+	};
+	return res;
+}
+
+static CFTypeAndError ok(id obj) {
+	CFTypeAndError res = {
+		.obj = CFBridgingRetain(obj),
+	};
+	return res;
+}
+
 static CFTypeRef queueNewBuffer(CFTypeRef queueRef) {
 	@autoreleasepool {
 		id<MTLCommandQueue> queue = (__bridge id<MTLCommandQueue>)queueRef;
@@ -318,13 +341,17 @@ static slice bufferContents(CFTypeRef bufRef) {
 	}
 }
 
-static CFTypeRef newLibrary(CFTypeRef devRef, char *name, void *mtllib, size_t size) {
+static CFTypeAndError newLibrary(CFTypeRef devRef, char *name, void *mtllib, size_t size) {
 	@autoreleasepool {
 		id<MTLDevice> dev = (__bridge id<MTLDevice>)devRef;
 		dispatch_data_t data = dispatch_data_create(mtllib, size, DISPATCH_TARGET_QUEUE_DEFAULT, DISPATCH_DATA_DESTRUCTOR_DEFAULT);
-		id<MTLLibrary> lib = [dev newLibraryWithData:data error:nil];
+		NSError *err = NULL;
+		id<MTLLibrary> lib = [dev newLibraryWithData:data error:&err];
+		if (lib == nil) {
+			return error(err);
+		}
 		lib.label = [NSString stringWithUTF8String:name];
-		return CFBridgingRetain(lib);
+		return ok(lib);
 	}
 }
 
@@ -336,15 +363,20 @@ static CFTypeRef libraryNewFunction(CFTypeRef libRef, char *funcName) {
 	}
 }
 
-static CFTypeRef newComputePipeline(CFTypeRef devRef, CFTypeRef funcRef) {
+static CFTypeAndError newComputePipeline(CFTypeRef devRef, CFTypeRef funcRef) {
 	@autoreleasepool {
 		id<MTLDevice> dev = (__bridge id<MTLDevice>)devRef;
 		id<MTLFunction> func = (__bridge id<MTLFunction>)funcRef;
-		return CFBridgingRetain([dev newComputePipelineStateWithFunction:func error:nil]);
+		NSError *err = NULL;
+		id<MTLComputePipelineState> s = [dev newComputePipelineStateWithFunction:func error:&err];
+		if (s == nil) {
+			return error(err);
+		}
+		return ok(s);
 	}
 }
 
-static CFTypeRef newRenderPipeline(CFTypeRef devRef, CFTypeRef vertFunc, CFTypeRef fragFunc, MTLPixelFormat pixelFormat, NSUInteger bufIdx, NSUInteger nverts, MTLVertexFormat *fmts, NSUInteger *offsets, NSUInteger stride, int blend, MTLBlendFactor srcFactor, MTLBlendFactor dstFactor, NSUInteger nvertBufs, NSUInteger nfragBufs) {
+static CFTypeAndError newRenderPipeline(CFTypeRef devRef, CFTypeRef vertFunc, CFTypeRef fragFunc, MTLPixelFormat pixelFormat, NSUInteger bufIdx, NSUInteger nverts, MTLVertexFormat *fmts, NSUInteger *offsets, NSUInteger stride, int blend, MTLBlendFactor srcFactor, MTLBlendFactor dstFactor, NSUInteger nvertBufs, NSUInteger nfragBufs) {
 	@autoreleasepool {
 		id<MTLDevice> dev = (__bridge id<MTLDevice>)devRef;
 		id<MTLFunction> vfunc = (__bridge id<MTLFunction>)vertFunc;
@@ -376,8 +408,13 @@ static CFTypeRef newRenderPipeline(CFTypeRef devRef, CFTypeRef vertFunc, CFTypeR
 		desc.colorAttachments[0].sourceRGBBlendFactor = srcFactor;
 		desc.colorAttachments[0].destinationAlphaBlendFactor = dstFactor;
 		desc.colorAttachments[0].destinationRGBBlendFactor = dstFactor;
-		return CFBridgingRetain([dev newRenderPipelineStateWithDescriptor:desc
-																	error:nil]);
+		NSError *err = NULL;
+		id<MTLRenderPipelineState> s = [dev newRenderPipelineStateWithDescriptor:desc
+											error:&err];
+		if (s == nil) {
+			return error(err);
+		}
+		return ok(s);
 	}
 }
 */
@@ -646,7 +683,7 @@ func (b *Backend) NewPipeline(desc driver.PipelineDesc) (driver.Pipeline, error)
 	if f := desc.PixelFormat; f != driver.TextureFormatOutput {
 		pf = pixelFormatFor(f)
 	}
-	pipe := C.newRenderPipeline(
+	pipe, err := splitErr(C.newRenderPipeline(
 		b.dev,
 		vsh.function,
 		fsh.function,
@@ -657,20 +694,11 @@ func (b *Backend) NewPipeline(desc driver.PipelineDesc) (driver.Pipeline, error)
 		blend, srcFactor, dstFactor,
 		2, // Number of vertex buffers.
 		1, // Number of fragment buffers.
-	)
-	if pipe == 0 {
-		return nil, errors.New("metal: pipeline construction failed")
+	))
+	if err != nil {
+		return nil, fmt.Errorf("metal: pipeline construction failed: %w", err)
 	}
 	return &Pipeline{pipeline: pipe, topology: primitiveFor(desc.Topology)}, nil
-}
-
-func dataTypeSize(d shader.DataType) int {
-	switch d {
-	case shader.DataTypeFloat:
-		return 4
-	default:
-		panic("unsupported data type")
-	}
 }
 
 func blendFactorFor(f driver.BlendFactor) C.MTLBlendFactor {
@@ -746,9 +774,9 @@ func (b *Backend) NewComputeProgram(src shader.Sources) (driver.Program, error) 
 		return nil, err
 	}
 	defer sh.Release()
-	pipe := C.newComputePipeline(b.dev, sh.function)
-	if pipe == 0 {
-		return nil, fmt.Errorf("metal: compute program %q load failed", src.Name)
+	pipe, err := splitErr(C.newComputePipeline(b.dev, sh.function))
+	if err != nil {
+		return nil, fmt.Errorf("metal: compute program %q load failed: %w", src.Name, err)
 	}
 	return &Program{pipeline: pipe, groupSize: src.WorkgroupSize}, nil
 }
@@ -761,13 +789,21 @@ func (b *Backend) NewFragmentShader(src shader.Sources) (driver.FragmentShader, 
 	return b.newShader(src)
 }
 
+func splitErr(o C.CFTypeAndError) (C.CFTypeRef, error) {
+	if o.err != nil {
+		defer C.free(unsafe.Pointer(o.err))
+		return 0, errors.New(C.GoString(o.err))
+	}
+	return o.obj, nil
+}
+
 func (b *Backend) newShader(src shader.Sources) (*Shader, error) {
 	vsrc := src.MetalLib
 	cname := C.CString(src.Name)
 	defer C.free(unsafe.Pointer(cname))
-	vlib := C.newLibrary(b.dev, cname, unsafe.Pointer(unsafe.StringData(vsrc)), C.size_t(len(vsrc)))
-	if vlib == 0 {
-		return nil, fmt.Errorf("metal: vertex shader %q load failed", src.Name)
+	vlib, err := splitErr(C.newLibrary(b.dev, cname, unsafe.Pointer(unsafe.StringData(vsrc)), C.size_t(len(vsrc))))
+	if err != nil {
+		return nil, fmt.Errorf("metal: shader %q load failed: %w", src.Name, err)
 	}
 	defer C.CFRelease(vlib)
 	funcName := C.CString("main0")
