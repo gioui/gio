@@ -207,13 +207,9 @@ func (w *Window) validateAndProcess(size image.Point, sync bool, frame *op.Ops, 
 }
 
 func (w *Window) frame(frame *op.Ops, viewport image.Point) error {
-	if runtime.GOOS == "js" {
-		// Use transparent black when Gio is embedded, to allow mixing of Gio and
-		// foreign content below.
-		w.gpu.Clear(color.NRGBA{A: 0x00, R: 0x00, G: 0x00, B: 0x00})
-	} else {
-		w.gpu.Clear(color.NRGBA{A: 0xff, R: 0xff, G: 0xff, B: 0xff})
-	}
+	// Use transparent clear color to support window transparency and
+	// compositor-drawn rounded corners on Wayland/macOS.
+	w.gpu.Clear(color.NRGBA{A: 0x00, R: 0x00, G: 0x00, B: 0x00})
 	target, err := w.ctx.RenderTarget()
 	if err != nil {
 		return err
