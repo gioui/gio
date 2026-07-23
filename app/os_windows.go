@@ -10,6 +10,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 	"image"
 	"io"
+	"math"
 	"os"
 	"runtime"
 	"sort"
@@ -407,11 +408,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			return windows.TRUE
 		}
 		defer windows.ImmReleaseContext(w.hwnd, imc)
-		sel := w.w.EditorState().Selection
-		caret := sel.Transform.Transform(sel.Caret.Pos.Add(f32.Pt(0, sel.Caret.Descent)))
-		icaret := image.Pt(int(caret.X+.5), int(caret.Y+.5))
-		windows.ImmSetCompositionWindow(imc, icaret.X, icaret.Y)
-		windows.ImmSetCandidateWindow(imc, icaret.X, icaret.Y)
+		w.updateIMEWindows(imc)
 		return windows.TRUE
 	case windows.WM_IME_COMPOSITION:
 		imc := windows.ImmGetContext(w.hwnd)
@@ -419,39 +416,63 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			return windows.TRUE
 		}
 		defer windows.ImmReleaseContext(w.hwnd, imc)
+		defer w.updateIMEWindows(imc)
 		state := w.w.EditorState()
-		rng := state.compose
-		if rng.Start == -1 {
-			rng = state.Selection.Range
+		if lParam&windows.GCS_RESULTSTR != 0 {
+			// RESULTSTR is committed text. Keep it separate from COMPSTR so a
+			// preedit update never looks like a commit.
+			rng := imeRange(state)
+			result := windows.ImmGetCompositionString(imc, windows.GCS_RESULTSTR)
+			start := rng.Start
+			w.w.EditorReplace(rng, result)
+			end := start + utf8.RuneCountInString(result)
+			w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+			w.w.SetEditorSelection(key.Range{Start: end, End: end})
+			if lParam&windows.GCS_COMPSTR == 0 {
+				return windows.TRUE
+			}
+			state = w.w.EditorState()
 		}
-		if rng.Start > rng.End {
-			rng.Start, rng.End = rng.End, rng.Start
+		if lParam&windows.GCS_COMPSTR != 0 {
+			// COMPSTR is still preedit text, so keep the composing range alive.
+			rng := imeRange(state)
+			replacement := windows.ImmGetCompositionString(imc, windows.GCS_COMPSTR)
+			end := rng.Start + utf8.RuneCountInString(replacement)
+			w.w.EditorReplace(rng, replacement)
+			state = w.w.EditorState()
+			comp := key.Range{
+				Start: rng.Start,
+				End:   end,
+			}
+			if lParam&windows.GCS_DELTASTART != 0 {
+				start := windows.ImmGetCompositionValue(imc, windows.GCS_DELTASTART)
+				comp.Start = state.RunesIndex(state.UTF16Index(comp.Start) + start)
+			}
+			w.w.SetComposingRegion(comp)
+			pos := end
+			if lParam&windows.GCS_CURSORPOS != 0 {
+				rel := windows.ImmGetCompositionValue(imc, windows.GCS_CURSORPOS)
+				pos = state.RunesIndex(state.UTF16Index(rng.Start) + rel)
+			}
+			w.w.SetEditorSelection(key.Range{Start: pos, End: pos})
+			return windows.TRUE
 		}
-		var replacement string
-		switch {
-		case lParam&windows.GCS_RESULTSTR != 0:
-			replacement = windows.ImmGetCompositionString(imc, windows.GCS_RESULTSTR)
-		case lParam&windows.GCS_COMPSTR != 0:
-			replacement = windows.ImmGetCompositionString(imc, windows.GCS_COMPSTR)
+		if lParam&(windows.GCS_DELTASTART|windows.GCS_CURSORPOS) == 0 || state.compose.Start == -1 {
+			return windows.TRUE
 		}
-		end := rng.Start + utf8.RuneCountInString(replacement)
-		w.w.EditorReplace(rng, replacement)
-		state = w.w.EditorState()
-		comp := key.Range{
-			Start: rng.Start,
-			End:   end,
-		}
+		// Some composition messages only move the IME cursor or clause start.
+		rng := normRange(state.compose)
+		comp := rng
 		if lParam&windows.GCS_DELTASTART != 0 {
 			start := windows.ImmGetCompositionValue(imc, windows.GCS_DELTASTART)
 			comp.Start = state.RunesIndex(state.UTF16Index(comp.Start) + start)
+			w.w.SetComposingRegion(comp)
 		}
-		w.w.SetComposingRegion(comp)
-		pos := end
 		if lParam&windows.GCS_CURSORPOS != 0 {
 			rel := windows.ImmGetCompositionValue(imc, windows.GCS_CURSORPOS)
-			pos = state.RunesIndex(state.UTF16Index(rng.Start) + rel)
+			pos := state.RunesIndex(state.UTF16Index(rng.Start) + rel)
+			w.w.SetEditorSelection(key.Range{Start: pos, End: pos})
 		}
-		w.w.SetEditorSelection(key.Range{Start: pos, End: pos})
 		return windows.TRUE
 	case windows.WM_IME_ENDCOMPOSITION:
 		w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
@@ -490,6 +511,65 @@ func getModifiers() key.Modifiers {
 		kmods |= key.ModShift
 	}
 	return kmods
+}
+
+// updateIMEWindows keeps the Windows IME popup near the text being edited.
+func (w *window) updateIMEWindows(imc syscall.Handle) {
+	sel := w.w.EditorState().Selection
+	top := sel.Transform.Transform(sel.Caret.Pos.Add(f32.Pt(0, -sel.Caret.Ascent)))
+	base := sel.Transform.Transform(sel.Caret.Pos)
+	bottom := sel.Transform.Transform(sel.Caret.Pos.Add(f32.Pt(0, sel.Caret.Descent)))
+
+	itop := image.Pt(int(top.X+.5), int(top.Y+.5))
+	ibase := image.Pt(int(base.X+.5), int(base.Y+.5))
+	ibottom := image.Pt(int(bottom.X+.5), int(bottom.Y+.5))
+	if ibottom.Y <= itop.Y {
+		ibottom.Y = itop.Y + 1
+	}
+	exclude := windows.Rect{
+		Left:   int32(ibase.X),
+		Top:    int32(itop.Y),
+		Right:  int32(ibase.X + 1),
+		Bottom: int32(ibottom.Y),
+	}
+	x, y := ibottom.X, ibottom.Y
+	if !sel.CompositionBounds.Empty() {
+		exclude = transformRect(sel.Transform, sel.CompositionBounds)
+		x = int(exclude.Left)
+		y = int(exclude.Bottom)
+	}
+	windows.ImmSetCompositionWindow(imc, x, y)
+	windows.ImmSetCandidateWindow(imc, x, y, exclude)
+}
+
+// transformRect maps a local rectangle to window coordinates. Transform all
+// corners because an affine transform may flip or rotate the rectangle.
+func transformRect(t f32.Affine2D, r image.Rectangle) windows.Rect {
+	p0 := t.Transform(f32.Pt(float32(r.Min.X), float32(r.Min.Y)))
+	p1 := t.Transform(f32.Pt(float32(r.Max.X), float32(r.Min.Y)))
+	p2 := t.Transform(f32.Pt(float32(r.Max.X), float32(r.Max.Y)))
+	p3 := t.Transform(f32.Pt(float32(r.Min.X), float32(r.Max.Y)))
+
+	minX := min(min(p0.X, p1.X), min(p2.X, p3.X))
+	minY := min(min(p0.Y, p1.Y), min(p2.Y, p3.Y))
+	maxX := max(max(p0.X, p1.X), max(p2.X, p3.X))
+	maxY := max(max(p0.Y, p1.Y), max(p2.Y, p3.Y))
+	left := int32(math.Floor(float64(minX)))
+	top := int32(math.Floor(float64(minY)))
+	right := int32(math.Ceil(float64(maxX)))
+	bottom := int32(math.Ceil(float64(maxY)))
+	if right <= left {
+		right = left + 1
+	}
+	if bottom <= top {
+		bottom = top + 1
+	}
+	return windows.Rect{
+		Left:   left,
+		Top:    top,
+		Right:  right,
+		Bottom: bottom,
+	}
 }
 
 // hitTest returns the non-client area hit by the point, needed to
@@ -625,7 +705,12 @@ func (w *window) EditorStateChanged(old, new editorState) {
 		return
 	}
 	defer windows.ImmReleaseContext(w.hwnd, imc)
-	if old.Selection.Range != new.Selection.Range || old.Snippet != new.Snippet {
+	if old.Selection.Caret != new.Selection.Caret ||
+		old.Selection.Transform != new.Selection.Transform ||
+		old.Selection.CompositionBounds != new.Selection.CompositionBounds {
+		w.updateIMEWindows(imc)
+	}
+	if shouldCancelComposition(old, new) {
 		windows.ImmNotifyIME(imc, windows.NI_COMPOSITIONSTR, windows.CPS_CANCEL, 0)
 	}
 }
