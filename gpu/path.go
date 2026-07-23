@@ -209,7 +209,6 @@ func newStenciler(ctx driver.Device) *stenciler {
 		FragmentShader: fsh,
 		VertexLayout:   progLayout,
 		BlendDesc: driver.BlendDesc{
-			Enable:    true,
 			SrcFactor: driver.BlendFactorOne,
 			DstFactor: driver.BlendFactorOne,
 		},
@@ -233,7 +232,6 @@ func newStenciler(ctx driver.Device) *stenciler {
 		FragmentShader: fsh,
 		VertexLayout:   iprogLayout,
 		BlendDesc: driver.BlendDesc{
-			Enable:    true,
 			SrcFactor: driver.BlendFactorDstColor,
 			DstFactor: driver.BlendFactorZero,
 		},

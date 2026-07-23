@@ -70,6 +70,10 @@ func TestInputShader(t *testing.T) {
 		VertexLayout:   layout,
 		PixelFormat:    driver.TextureFormatSRGBA,
 		Topology:       driver.TopologyTriangles,
+		BlendDesc: driver.BlendDesc{
+			SrcFactor: driver.BlendFactorOne,
+			DstFactor: driver.BlendFactorZero,
+		},
 	})
 	if err != nil {
 		t.Fatal(err)

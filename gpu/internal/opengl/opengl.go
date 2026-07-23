@@ -1184,7 +1184,7 @@ func (b *Backend) BindPipeline(pl driver.Pipeline) {
 	p := pl.(*pipeline)
 	b.state.pipeline = p
 	b.glstate.useProgram(b.funcs, p.prog.obj)
-	b.SetBlend(p.blend.Enable)
+	b.SetBlend(p.blend.IsEnabled())
 	b.BlendFunc(p.blend.SrcFactor, p.blend.DstFactor)
 }
 

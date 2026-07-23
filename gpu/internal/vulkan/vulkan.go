@@ -451,7 +451,7 @@ func (b *Backend) NewPipeline(desc driver.PipelineDesc) (driver.Pipeline, error)
 		return nil, mapErr(err)
 	}
 	defer vk.DestroyRenderPass(b.dev, pass)
-	pipe, err := vk.CreateGraphicsPipeline(b.dev, pass, vs.module, fs.module, blend.Enable, factorFor(blend.SrcFactor), factorFor(blend.DstFactor), top, binds, attrs, descPool.layout)
+	pipe, err := vk.CreateGraphicsPipeline(b.dev, pass, vs.module, fs.module, blend.IsEnabled(), factorFor(blend.SrcFactor), factorFor(blend.DstFactor), top, binds, attrs, descPool.layout)
 	if err != nil {
 		descPool.release(b.dev)
 		return nil, mapErr(err)

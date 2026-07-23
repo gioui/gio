@@ -579,7 +579,6 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 		}
 	}()
 	blend := driver.BlendDesc{
-		Enable:    true,
 		SrcFactor: driver.BlendFactorOne,
 		DstFactor: driver.BlendFactorOneMinusSrcAlpha,
 	}

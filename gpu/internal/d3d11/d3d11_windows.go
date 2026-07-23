@@ -522,7 +522,7 @@ func (b *Backend) newBlendState(desc driver.BlendDesc) (*d3d11.BlendState, error
 	t0.RenderTargetWriteMask = d3d11.COLOR_WRITE_ENABLE_ALL
 	t0.BlendOp = d3d11.BLEND_OP_ADD
 	t0.BlendOpAlpha = d3d11.BLEND_OP_ADD
-	if desc.Enable {
+	if desc.IsEnabled() {
 		t0.BlendEnable = 1
 	}
 	scol, salpha := toBlendFactor(desc.SrcFactor)

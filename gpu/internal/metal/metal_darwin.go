@@ -676,7 +676,7 @@ func (b *Backend) NewPipeline(desc driver.PipelineDesc) (driver.Pipeline, error)
 	srcFactor := blendFactorFor(desc.BlendDesc.SrcFactor)
 	dstFactor := blendFactorFor(desc.BlendDesc.DstFactor)
 	blend := C.int(0)
-	if desc.BlendDesc.Enable {
+	if desc.BlendDesc.IsEnabled() {
 		blend = 1
 	}
 	pf := b.pixelFmt
