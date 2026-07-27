@@ -260,6 +260,7 @@ const (
 	SW_SHOWMAXIMIZED = 3
 	SW_SHOWNORMAL    = 1
 	SW_SHOW          = 5
+	SW_RESTORE       = 9
 
 	SWP_FRAMECHANGED  = 0x0020
 	SWP_NOMOVE        = 0x0002
@@ -461,6 +462,7 @@ var (
 	_ReleaseDC                   = user32.NewProc("ReleaseDC")
 	_ScreenToClient              = user32.NewProc("ScreenToClient")
 	_ShowWindow                  = user32.NewProc("ShowWindow")
+	_IsIconic                    = user32.NewProc("IsIconic")
 	_SendMessage                 = user32.NewProc("SendMessageW")
 	_SetCapture                  = user32.NewProc("SetCapture")
 	_SetCursor                   = user32.NewProc("SetCursor")
@@ -962,6 +964,12 @@ func ScreenToClient(hwnd syscall.Handle, p *Point) {
 
 func ShowWindow(hwnd syscall.Handle, nCmdShow int32) {
 	_ShowWindow.Call(uintptr(hwnd), uintptr(nCmdShow))
+}
+
+// IsIconic reports whether the window is minimized.
+func IsIconic(hwnd syscall.Handle) bool {
+	r, _, _ := _IsIconic.Call(uintptr(hwnd))
+	return r != 0
 }
 
 func TranslateMessage(m *Msg) {

@@ -929,6 +929,13 @@ func (w *window) Perform(acts system.Action) {
 			y := (mi.Bottom - mi.Top - dy) / 2
 			windows.SetWindowPos(w.hwnd, 0, x, y, dx, dy, windows.SWP_NOZORDER|windows.SWP_FRAMECHANGED)
 		case system.ActionRaise:
+			// A minimized window has to be restored before it can be
+			// brought to the front; SetForegroundWindow on its own
+			// leaves it minimized, so raising an iconified window did
+			// nothing at all.
+			if windows.IsIconic(w.hwnd) {
+				windows.ShowWindow(w.hwnd, windows.SW_RESTORE)
+			}
 			windows.SetForegroundWindow(w.hwnd)
 			windows.SetWindowPos(w.hwnd, windows.HWND_TOP, 0, 0, 0, 0,
 				windows.SWP_NOMOVE|windows.SWP_NOSIZE|windows.SWP_SHOWWINDOW)
