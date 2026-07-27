@@ -236,6 +236,8 @@ const (
 	IDC_UPARROW     = 32516 // Vertical arrow
 	IDC_WAIT        = 32514 // Hour
 
+	IDI_APPLICATION = 32512 // Default application icon
+
 	INFINITE = 0xFFFFFFFF
 
 	LOGPIXELSX = 88

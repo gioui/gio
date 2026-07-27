@@ -135,7 +135,19 @@ func initResources() error {
 		return err
 	}
 	resources.cursor = c
-	icon, _ := windows.LoadImage(hInst, iconID, windows.IMAGE_ICON, 0, 0, windows.LR_DEFAULTSIZE|windows.LR_SHARED)
+	// Prefer an icon supplied at IDI_APPLICATION, which is where a
+	// resource author puts an icon meant for the window and title bar.
+	// Fall back to the first icon group for resources built without
+	// one, which is the previous behavior. A binary with no icon
+	// resources at all keeps an icon-less window class, as before.
+	var icon syscall.Handle
+	for _, id := range []uint32{windows.IDI_APPLICATION, iconID} {
+		h, err := windows.LoadImage(hInst, id, windows.IMAGE_ICON, 0, 0, windows.LR_DEFAULTSIZE|windows.LR_SHARED)
+		if err == nil {
+			icon = h
+			break
+		}
+	}
 
 	appid, err := syscall.UTF16PtrFromString(ID)
 	if err != nil {
