@@ -4,6 +4,7 @@
 package key
 
 import (
+	"image"
 	"strings"
 
 	"gioui.org/f32"
@@ -46,6 +47,9 @@ type SelectionCmd struct {
 	Tag event.Tag
 	Range
 	Caret
+	// CompositionBounds is the visible bounds of the composing text, relative to
+	// the input handler. It is empty when there is no visible composing text.
+	CompositionBounds image.Rectangle
 }
 
 // SnippetCmd updates the content snippet for an input handler.

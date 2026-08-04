@@ -105,11 +105,15 @@ type offEntry struct {
 
 type imeState struct {
 	selection struct {
-		rng   key.Range
-		caret key.Caret
+		rng               key.Range
+		caret             key.Caret
+		compositionBounds image.Rectangle
 	}
 	snippet     key.Snippet
 	composition key.Range
+	lastCompose key.Range
+	textVersion uint64
+	scrollOff   image.Point
 	start, end  int
 }
 
@@ -625,26 +629,47 @@ func (e *Editor) initBuffer() {
 func (e *Editor) Update(gtx layout.Context) (EditorEvent, bool) {
 	e.initBuffer()
 	event, ok := e.processEvents(gtx)
-	// Notify IME of selection if it changed.
-	newSel := e.ime.selection
+	e.updateIMEState(gtx)
+
+	e.updateSnippet(gtx, e.ime.start, e.ime.end)
+	return event, ok
+}
+
+func (e *Editor) updateIMEState(gtx layout.Context) {
 	start, end := e.text.Selection()
-	newSel.rng = key.Range{
+	rng := key.Range{
 		Start: start,
 		End:   end,
 	}
+	scrollOff := e.text.ScrollOff()
+	if rng == e.ime.selection.rng &&
+		e.ime.composition == e.ime.lastCompose &&
+		e.text.version == e.ime.textVersion &&
+		scrollOff == e.ime.scrollOff {
+		return
+	}
+	e.ime.lastCompose = e.ime.composition
+	e.ime.textVersion = e.text.version
+	e.ime.scrollOff = scrollOff
+
+	newSel := e.ime.selection
+	newSel.rng = rng
 	caretPos, carAsc, carDesc := e.text.CaretInfo()
 	newSel.caret = key.Caret{
 		Pos:     layout.FPt(caretPos),
 		Ascent:  float32(carAsc),
 		Descent: float32(carDesc),
 	}
+	newSel.compositionBounds = e.compositionBounds()
 	if newSel != e.ime.selection {
 		e.ime.selection = newSel
-		gtx.Execute(key.SelectionCmd{Tag: e, Range: newSel.rng, Caret: newSel.caret})
+		gtx.Execute(key.SelectionCmd{
+			Tag:               e,
+			Range:             newSel.rng,
+			Caret:             newSel.caret,
+			CompositionBounds: newSel.compositionBounds,
+		})
 	}
-
-	e.updateSnippet(gtx, e.ime.start, e.ime.end)
-	return event, ok
 }
 
 // Layout lays out the editor using the provided textMaterial as the paint material
@@ -713,6 +738,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 		e.scrollCaret = false
 		e.text.ScrollToCaret()
 	}
+	e.updateIMEState(gtx)
 	visibleDims := e.text.Dimensions()
 
 	defer clip.Rect(image.Rectangle{Max: visibleDims.Size}).Push(gtx.Ops).Pop()
@@ -785,6 +811,29 @@ func (e *Editor) paintComposition(gtx layout.Context, material op.CallOp) {
 		paint.PaintOp{}.Add(gtx.Ops)
 		stack.Pop()
 	}
+}
+
+// compositionBounds returns the part of the composing text visible in the editor.
+func (e *Editor) compositionBounds() image.Rectangle {
+	r := e.ime.composition
+	if r.Start == -1 || r.Start == r.End {
+		return image.Rectangle{}
+	}
+	e.text.regions = e.text.Regions(r.Start, r.End, e.text.regions)
+	visible := image.Rectangle{Max: e.text.viewSize}
+	var bounds image.Rectangle
+	for _, region := range e.text.regions {
+		r := region.Bounds.Intersect(visible)
+		if r.Empty() {
+			continue
+		}
+		if bounds.Empty() {
+			bounds = r
+		} else {
+			bounds = bounds.Union(r)
+		}
+	}
+	return bounds
 }
 
 // paintCaret paints the text glyphs using the provided material to set the fill material
