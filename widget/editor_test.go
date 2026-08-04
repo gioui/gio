@@ -1174,7 +1174,7 @@ func TestEditorIMEStateInvalidation(t *testing.T) {
 	check("scroll", func() { e.text.ScrollRel(10, 0) })
 	check("constraints", func() {
 		gtx.Constraints = layout.Exact(image.Pt(40, 20))
-		e.text.Layout(gtx, shaper, font.Font{}, unit.Sp(10))
+		e.Layout(gtx, shaper, font.Font{}, unit.Sp(10), op.CallOp{}, op.CallOp{})
 	})
 }
 
