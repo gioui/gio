@@ -703,11 +703,11 @@ func GetWindowDPI(hwnd syscall.Handle) int {
 	}
 }
 
-func GetWindowPlacement(hwnd syscall.Handle) *WindowPlacement {
+func GetWindowPlacement(hwnd syscall.Handle) WindowPlacement {
 	var wp WindowPlacement
 	wp.length = uint32(unsafe.Sizeof(wp))
 	_GetWindowPlacement.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&wp)))
-	return &wp
+	return wp
 }
 
 func GetMonitorInfo(hwnd syscall.Handle) MonitorInfo {
