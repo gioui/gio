@@ -1020,10 +1020,10 @@ func (w *window) Perform(acts system.Action) {
 			r := windows.GetWindowRect(w.hwnd)
 			dx := r.Right - r.Left
 			dy := r.Bottom - r.Top
-			// Calculate center position on current monitor.
-			mi := windows.GetMonitorInfo(w.hwnd).Monitor
-			x := (mi.Right - mi.Left - dx) / 2
-			y := (mi.Bottom - mi.Top - dy) / 2
+			// Center in the usable area of the current monitor.
+			area := windows.GetMonitorInfo(w.hwnd).WorkArea
+			x := (area.Right + area.Left - dx) / 2
+			y := (area.Bottom + area.Top - dy) / 2
 			windows.SetWindowPos(w.hwnd, 0, x, y, dx, dy, windows.SWP_NOZORDER|windows.SWP_FRAMECHANGED)
 		case system.ActionRaise:
 			// A minimized window has to be restored before it can be
