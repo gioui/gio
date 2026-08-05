@@ -1,36 +1,22 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// Package byteslice provides byte slice views of other Go values  such as
+// Package byteslice provides byte slice views of other Go values such as
 // slices and structs.
 package byteslice
 
 import (
-	"reflect"
 	"unsafe"
 )
 
-// Struct returns a byte slice view of a struct.
-func Struct(s any) []byte {
-	v := reflect.ValueOf(s)
-	sz := int(v.Elem().Type().Size())
-	return unsafe.Slice((*byte)(unsafe.Pointer(v.Pointer())), sz)
-}
-
-// Uint32 returns a byte slice view of a uint32 slice.
-func Uint32(s []uint32) []byte {
-	n := len(s)
-	if n == 0 {
-		return nil
-	}
-	blen := n * int(unsafe.Sizeof(s[0]))
-	return unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(s))), blen)
+// View returns a byte slice view of a value.
+func View[T any](s *T) []byte {
+	sz := unsafe.Sizeof(*s)
+	return unsafe.Slice((*byte)(unsafe.Pointer(s)), sz)
 }
 
 // Slice returns a byte slice view of a slice.
-func Slice(s any) []byte {
-	v := reflect.ValueOf(s)
-	first := v.Index(0)
-	sz := int(first.Type().Size())
-	res := unsafe.Slice((*byte)(unsafe.Pointer(v.Pointer())), sz*v.Cap())
-	return res[:sz*v.Len()]
+func Slice[T any](s []T) []byte {
+	sz := unsafe.Sizeof(s[0])
+	res := unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(s))), sz*uintptr(cap(s)))
+	return res[:sz*uintptr(len(s))]
 }

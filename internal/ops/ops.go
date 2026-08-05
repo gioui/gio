@@ -339,12 +339,12 @@ func (s StateOp) Load() {
 
 func DecodeCommand(d []byte) scene.Command {
 	var cmd scene.Command
-	copy(byteslice.Uint32(cmd[:]), d)
+	copy(byteslice.Slice(cmd[:]), d)
 	return cmd
 }
 
 func EncodeCommand(out []byte, cmd scene.Command) {
-	copy(out, byteslice.Uint32(cmd[:]))
+	copy(out, byteslice.Slice(cmd[:]))
 }
 
 func DecodeTransform(data []byte) (t f32.Affine2D, push bool) {

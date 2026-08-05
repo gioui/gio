@@ -150,7 +150,11 @@ func newCoverer(ctx driver.Device) *coverer {
 	c.texUniforms = new(coverTexUniforms)
 	c.linearGradientUniforms = new(coverLinearGradientUniforms)
 	pipelines, err := createColorPrograms(ctx, gio.Shader_cover_vert, gio.Shader_cover_frag,
-		[3]any{c.colUniforms, c.linearGradientUniforms, c.texUniforms},
+		[...][]byte{
+			byteslice.View(c.colUniforms),
+			byteslice.View(c.linearGradientUniforms),
+			byteslice.View(c.texUniforms),
+		},
 	)
 	if err != nil {
 		panic(err)
@@ -203,7 +207,7 @@ func newStenciler(ctx driver.Device) *stenciler {
 	defer vsh.Release()
 	defer fsh.Release()
 	st.pipeline.uniforms = new(stencilUniforms)
-	vertUniforms := newUniformBuffer(ctx, st.pipeline.uniforms)
+	vertUniforms := newUniformBuffer(ctx, byteslice.View(st.pipeline.uniforms))
 	pipe, err := st.ctx.NewPipeline(driver.PipelineDesc{
 		VertexShader:   vsh,
 		FragmentShader: fsh,
@@ -226,7 +230,7 @@ func newStenciler(ctx driver.Device) *stenciler {
 	defer vsh.Release()
 	defer fsh.Release()
 	st.ipipeline.uniforms = new(intersectUniforms)
-	vertUniforms = newUniformBuffer(ctx, &st.ipipeline.uniforms.vert)
+	vertUniforms = newUniformBuffer(ctx, byteslice.View(&st.ipipeline.uniforms.vert))
 	ipipe, err := st.ctx.NewPipeline(driver.PipelineDesc{
 		VertexShader:   vsh,
 		FragmentShader: fsh,
