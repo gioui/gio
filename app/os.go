@@ -153,7 +153,7 @@ type eventLoop struct {
 	// events is where the platform backend delivers events bound for the
 	// user program.
 	events   chan event.Event
-	frames   chan *op.Ops
+	frames   chan frameOps
 	frameAck chan struct{}
 	// delivering avoids re-entrant event delivery.
 	delivering bool
@@ -204,7 +204,7 @@ type driver interface {
 	// Run a function on the window thread.
 	Run(f func())
 	// Frame receives a frame.
-	Frame(frame *op.Ops)
+	Frame(frame *op.Ops, quads []gpu.Quad)
 	// ProcessEvent processes an event.
 	ProcessEvent(e event.Event)
 }
@@ -242,6 +242,11 @@ func newWindowRendezvous() *windowRendezvous {
 	return wr
 }
 
+type frameOps struct {
+	ops   *op.Ops
+	quads []gpu.Quad
+}
+
 func newEventLoop(w *callbacks, wakeup func()) *eventLoop {
 	return &eventLoop{
 		win:                  w,
@@ -249,7 +254,7 @@ func newEventLoop(w *callbacks, wakeup func()) *eventLoop {
 		events:               make(chan event.Event),
 		invalidates:          make(chan struct{}, 1),
 		immediateInvalidates: make(chan struct{}),
-		frames:               make(chan *op.Ops),
+		frames:               make(chan frameOps),
 		frameAck:             make(chan struct{}),
 		driverFuncs:          make(chan func(), 1),
 	}
@@ -257,8 +262,8 @@ func newEventLoop(w *callbacks, wakeup func()) *eventLoop {
 
 // Frame receives a frame and waits for its processing. It is called by
 // the client goroutine.
-func (e *eventLoop) Frame(frame *op.Ops) {
-	e.frames <- frame
+func (e *eventLoop) Frame(frame *op.Ops, quads []gpu.Quad) {
+	e.frames <- frameOps{frame, quads}
 	<-e.frameAck
 }
 
@@ -313,7 +318,7 @@ func (e *eventLoop) FlushEvents() {
 }
 
 func (e *eventLoop) deliverEvent(evt event.Event) {
-	var frames <-chan *op.Ops
+	var frames <-chan frameOps
 	for {
 		select {
 		case f := <-e.driverFuncs:

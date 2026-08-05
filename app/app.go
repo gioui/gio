@@ -3,14 +3,16 @@
 package app
 
 import (
-	"gioui.org/io/event"
-	"golang.org/x/net/idna"
 	"image"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"gioui.org/gpu"
+	"gioui.org/io/event"
+	"golang.org/x/net/idna"
 
 	"gioui.org/io/input"
 	"gioui.org/layout"
@@ -54,7 +56,7 @@ type FrameEvent struct {
 	Insets Insets
 	// Frame completes the FrameEvent by drawing the graphical operations
 	// from ops into the window.
-	Frame func(frame *op.Ops)
+	Frame func(frame *op.Ops, cmds []gpu.Quad)
 	// Source is the interface between the window and widgets.
 	Source input.Source
 }

@@ -15,6 +15,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"gioui.org/gpu"
 	"gioui.org/internal/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
@@ -968,8 +969,8 @@ func (w *window) Run(f func()) {
 	w.loop.Run(f)
 }
 
-func (w *window) Frame(frame *op.Ops) {
-	w.loop.Frame(frame)
+func (w *window) Frame(frame *op.Ops, quads []gpu.Quad) {
+	w.loop.Frame(frame, quads)
 }
 
 func configFor(scale float32) unit.Metric {

@@ -128,7 +128,7 @@ func decoHeightOpt(h unit.Dp) Option {
 	}
 }
 
-func (w *Window) validateAndProcess(size image.Point, sync bool, frame *op.Ops, sigChan chan<- struct{}) error {
+func (w *Window) validateAndProcess(size image.Point, sync bool, frame frameOps, sigChan chan<- struct{}) error {
 	signal := func() {
 		if sigChan != nil {
 			// We're done with frame, let the client continue.
@@ -193,7 +193,7 @@ func (w *Window) validateAndProcess(size image.Point, sync bool, frame *op.Ops, 
 				return err
 			}
 		}
-		w.queue.Frame(frame)
+		w.queue.Frame(frame.ops)
 		// Let the client continue as soon as possible, in particular before
 		// a potentially blocking Present.
 		signal()
@@ -206,7 +206,7 @@ func (w *Window) validateAndProcess(size image.Point, sync bool, frame *op.Ops, 
 	}
 }
 
-func (w *Window) frame(frame *op.Ops, viewport image.Point) error {
+func (w *Window) frame(frame frameOps, viewport image.Point) error {
 	if runtime.GOOS == "js" {
 		// Use transparent black when Gio is embedded, to allow mixing of Gio and
 		// foreign content below.
@@ -218,17 +218,17 @@ func (w *Window) frame(frame *op.Ops, viewport image.Point) error {
 	if err != nil {
 		return err
 	}
-	return w.gpu.Frame(frame, target, viewport)
+	return w.gpu.Frame(frame.ops, frame.quads, target, viewport)
 }
 
-func (w *Window) processFrame(frame *op.Ops, ack chan<- struct{}) {
+func (w *Window) processFrame(frame frameOps, ack chan<- struct{}) {
 	w.coalesced.framePending = false
 	wrapper := &w.decorations.Ops
 	off := op.Offset(w.lastFrame.off).Push(wrapper)
-	ops.AddCall(&wrapper.Internal, &frame.Internal, ops.PC{}, ops.PCFor(&frame.Internal))
+	ops.AddCall(&wrapper.Internal, &frame.ops.Internal, ops.PC{}, ops.PCFor(&frame.ops.Internal))
 	off.Pop()
 	w.lastFrame.deco.Add(wrapper)
-	if err := w.validateAndProcess(w.lastFrame.size, w.lastFrame.sync, wrapper, ack); err != nil {
+	if err := w.validateAndProcess(w.lastFrame.size, w.lastFrame.sync, frameOps{wrapper, frame.quads}, ack); err != nil {
 		w.destroyGPU()
 		w.gpuErr = err
 		w.driver.Perform(system.ActionClose)
@@ -399,7 +399,7 @@ func (c *callbacks) SetDriver(d driver) {
 	c.w.driver = d
 }
 
-func (c *callbacks) ProcessFrame(frame *op.Ops, ack chan<- struct{}) {
+func (c *callbacks) ProcessFrame(frame frameOps, ack chan<- struct{}) {
 	c.w.processFrame(frame, ack)
 }
 
@@ -574,7 +574,7 @@ func (w *Window) nextEvent() (event.Event, bool) {
 	case s.framePending:
 		// If the user didn't call FrameEvent.Event, process
 		// an empty frame.
-		w.processFrame(new(op.Ops), nil)
+		w.processFrame(frameOps{new(op.Ops), nil}, nil)
 	case s.view != nil:
 		e := *s.view
 		s.view = nil

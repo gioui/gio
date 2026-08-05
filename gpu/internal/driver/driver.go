@@ -28,6 +28,8 @@ type Device interface {
 	NewComputeProgram(shader shader.Sources) (Program, error)
 	NewVertexShader(src shader.Sources) (VertexShader, error)
 	NewFragmentShader(src shader.Sources) (FragmentShader, error)
+	CompileVertexShader(src string, inputs []shader.InputLocation) (VertexShader, error)
+	CompileFragmentShader(src string) (FragmentShader, error)
 	NewPipeline(desc PipelineDesc) (Pipeline, error)
 
 	Viewport(x, y, width, height int)
