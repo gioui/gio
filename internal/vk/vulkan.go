@@ -390,7 +390,6 @@ import (
 	"fmt"
 	"image"
 	"math"
-	"reflect"
 	"runtime"
 	"sync"
 	"unsafe"
@@ -1533,11 +1532,10 @@ func DestroyBuffer(d Device, buf Buffer) {
 }
 
 func CreateShaderModule(d Device, spirv string) (ShaderModule, error) {
-	ptr := unsafe.Pointer((*reflect.StringHeader)(unsafe.Pointer(&spirv)).Data)
 	inf := C.VkShaderModuleCreateInfo{
 		sType:    C.VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
 		codeSize: C.size_t(len(spirv)),
-		pCode:    (*C.uint32_t)(ptr),
+		pCode:    (*C.uint32_t)(unsafe.Pointer(unsafe.StringData(spirv))),
 	}
 
 	var mod C.VkShaderModule
