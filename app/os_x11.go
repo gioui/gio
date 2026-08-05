@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 //go:build ((linux && !android) || freebsd || openbsd) && !nox11
-// +build linux,!android freebsd openbsd
-// +build !nox11
 
 package app
 
@@ -730,10 +728,7 @@ func (h *x11EventHandler) handleEvents() bool {
 				notify()
 			case w.atoms.plaintext, w.atoms.utf8string, w.atoms.gtk_text_buffer_contents:
 				content := w.clipboard.content
-				var ptr *C.uchar
-				if len(content) > 0 {
-					ptr = (*C.uchar)(unsafe.Pointer(&content[0]))
-				}
+				ptr := (*C.uchar)(unsafe.Pointer(unsafe.SliceData(content)))
 				C.XChangeProperty(w.x, cevt.requestor, cevt.property, cevt.target,
 					8 /* bitwidth */, C.PropModeReplace,
 					ptr, C.int(len(content)),
@@ -887,8 +882,8 @@ func x11DetectUIScale(dpy *C.Display) float32 {
 				t *C.char
 				v C.XrmValue
 			)
-			if C.XrmGetResource(db, (*C.char)(unsafe.Pointer(&[]byte("Xft.dpi\x00")[0])),
-				(*C.char)(unsafe.Pointer(&[]byte("Xft.Dpi\x00")[0])), &t, &v) != C.False {
+			if C.XrmGetResource(db, (*C.char)(unsafe.Pointer(unsafe.StringData("Xft.dpi\x00"))),
+				(*C.char)(unsafe.Pointer(unsafe.StringData("Xft.Dpi\x00"))), &t, &v) != C.False {
 				if t != nil && C.GoString(t) == "String" {
 					f, err := strconv.ParseFloat(C.GoString(v.addr), 32)
 					if err == nil {

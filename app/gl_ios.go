@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-//go:build darwin && ios && nometal
+//go:build nometal
 
 package app
 

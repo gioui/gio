@@ -266,8 +266,8 @@ func (q *pointerQueue) grab(state pointerState, req pointer.GrabCmd) (pointerSta
 			continue
 		}
 		// Drop other handlers that lost their grab.
-		for i := len(p.handlers) - 1; i >= 0; i-- {
-			if tag := p.handlers[i]; tag != req.Tag {
+		for _, tag := range slices.Backward(p.handlers) {
+			if tag != req.Tag {
 				evts = append(evts, taggedEvent{
 					tag:   tag,
 					event: pointer.Event{Kind: pointer.Cancel},

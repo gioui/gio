@@ -102,11 +102,8 @@ func nsstringToString(str C.CFTypeRef) string {
 		return ""
 	}
 	n := C.nsstringLength(str)
-	if n == 0 {
-		return ""
-	}
 	chars := make([]uint16, n)
-	C.nsstringGetCharacters(str, (*C.unichar)(unsafe.Pointer(&chars[0])), 0, n)
+	C.nsstringGetCharacters(str, (*C.unichar)(unsafe.Pointer(unsafe.SliceData(chars))), 0, n)
 	utf8 := utf16.Decode(chars)
 	return string(utf8)
 }
@@ -114,10 +111,7 @@ func nsstringToString(str C.CFTypeRef) string {
 // stringToNSString converts a Go string to a retained NSString.
 func stringToNSString(str string) C.CFTypeRef {
 	u16 := utf16.Encode([]rune(str))
-	var chars *C.unichar
-	if len(u16) > 0 {
-		chars = (*C.unichar)(unsafe.Pointer(&u16[0]))
-	}
+	chars := (*C.unichar)(unsafe.Pointer(unsafe.SliceData(u16)))
 	return C.newNSString(chars, C.NSUInteger(len(u16)))
 }
 

@@ -4,6 +4,7 @@
 package key
 
 import (
+	"image"
 	"strings"
 
 	"gioui.org/f32"
@@ -23,6 +24,10 @@ type Filter struct {
 	Optional Modifiers
 	// Name of the key to be matched. As a special case, the empty
 	// Name matches every key not matched by any other filter.
+	//
+	// However, keys with platform specific side-effects, such as Tab
+	// and Shift-Tab for changing focus, are only matched by filters
+	// that specify their Name explicitly. See [gioui.org/io/input.SystemEvent].
 	Name Name
 }
 
@@ -42,6 +47,9 @@ type SelectionCmd struct {
 	Tag event.Tag
 	Range
 	Caret
+	// CompositionBounds is the visible bounds of the composing text, relative to
+	// the input handler. It is empty when there is no visible composing text.
+	CompositionBounds image.Rectangle
 }
 
 // SnippetCmd updates the content snippet for an input handler.

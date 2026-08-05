@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-// +build darwin,!ios
+//go:build darwin && !ios
 
 #import <AppKit/AppKit.h>
 

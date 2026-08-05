@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 //go:build windows
-// +build windows
 
 package windows
 
@@ -204,8 +203,8 @@ const (
 	GCS_RESULTREADSTR = 0x0200
 	GCS_RESULTSTR     = 0x0800
 
-	CFS_POINT        = 0x0002
-	CFS_CANDIDATEPOS = 0x0040
+	CFS_POINT   = 0x0002
+	CFS_EXCLUDE = 0x0080
 
 	HWND_TOP       = syscall.Handle(0)
 	HWND_TOPMOST   = ^(syscall.Handle(1) - 1) // -1
@@ -237,6 +236,8 @@ const (
 	IDC_UPARROW     = 32516 // Vertical arrow
 	IDC_WAIT        = 32514 // Hour
 
+	IDI_APPLICATION = 32512 // Default application icon
+
 	INFINITE = 0xFFFFFFFF
 
 	LOGPIXELSX = 88
@@ -261,6 +262,7 @@ const (
 	SW_SHOWMAXIMIZED = 3
 	SW_SHOWNORMAL    = 1
 	SW_SHOW          = 5
+	SW_RESTORE       = 9
 
 	SWP_FRAMECHANGED  = 0x0020
 	SWP_NOMOVE        = 0x0002
@@ -462,6 +464,7 @@ var (
 	_ReleaseDC                   = user32.NewProc("ReleaseDC")
 	_ScreenToClient              = user32.NewProc("ScreenToClient")
 	_ShowWindow                  = user32.NewProc("ShowWindow")
+	_IsIconic                    = user32.NewProc("IsIconic")
 	_SendMessage                 = user32.NewProc("SendMessageW")
 	_SetCapture                  = user32.NewProc("SetCapture")
 	_SetCursor                   = user32.NewProc("SetCursor")
@@ -700,11 +703,11 @@ func GetWindowDPI(hwnd syscall.Handle) int {
 	}
 }
 
-func GetWindowPlacement(hwnd syscall.Handle) *WindowPlacement {
+func GetWindowPlacement(hwnd syscall.Handle) WindowPlacement {
 	var wp WindowPlacement
 	wp.length = uint32(unsafe.Sizeof(wp))
 	_GetWindowPlacement.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&wp)))
-	return &wp
+	return wp
 }
 
 func GetMonitorInfo(hwnd syscall.Handle) MonitorInfo {
@@ -743,7 +746,7 @@ func ImmGetCompositionString(imc syscall.Handle, key int) string {
 		return ""
 	}
 	u16 := make([]uint16, size/unsafe.Sizeof(uint16(0)))
-	_ImmGetCompositionString.Call(uintptr(imc), uintptr(key), uintptr(unsafe.Pointer(&u16[0])), size)
+	_ImmGetCompositionString.Call(uintptr(imc), uintptr(key), uintptr(unsafe.Pointer(unsafe.SliceData(u16))), size)
 	return string(utf16.Decode(u16))
 }
 
@@ -762,12 +765,13 @@ func ImmSetCompositionWindow(imc syscall.Handle, x, y int) {
 	_ImmSetCompositionWindow.Call(uintptr(imc), uintptr(unsafe.Pointer(&f)))
 }
 
-func ImmSetCandidateWindow(imc syscall.Handle, x, y int) {
+func ImmSetCandidateWindow(imc syscall.Handle, x, y int, r Rect) {
 	f := CandidateForm{
-		dwStyle: CFS_CANDIDATEPOS,
+		dwStyle: CFS_EXCLUDE,
 		ptCurrentPos: Point{
 			X: int32(x), Y: int32(y),
 		},
+		rcArea: r,
 	}
 	_ImmSetCandidateWindow.Call(uintptr(imc), uintptr(unsafe.Pointer(&f)))
 }
@@ -963,6 +967,12 @@ func ScreenToClient(hwnd syscall.Handle, p *Point) {
 
 func ShowWindow(hwnd syscall.Handle, nCmdShow int32) {
 	_ShowWindow.Call(uintptr(hwnd), uintptr(nCmdShow))
+}
+
+// IsIconic reports whether the window is minimized.
+func IsIconic(hwnd syscall.Handle) bool {
+	r, _, _ := _IsIconic.Call(uintptr(hwnd))
+	return r != 0
 }
 
 func TranslateMessage(m *Msg) {

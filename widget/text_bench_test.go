@@ -171,6 +171,34 @@ func BenchmarkEditorStatic(b *testing.B) {
 	})
 }
 
+func BenchmarkEditorIMEState(b *testing.B) {
+	gtx := layout.Context{
+		Ops:         new(op.Ops),
+		Constraints: layout.Exact(image.Pt(200, 1000)),
+		Locale:      english,
+	}
+	shaper := text.NewShaper(text.NoSystemFonts(), text.WithCollection(benchFonts))
+	e := new(Editor)
+	e.SetText(string([]rune(latinDocument)[:1000]))
+	e.ime.composition.Start = 0
+	e.ime.composition.End = e.Len()
+	e.Layout(gtx, shaper, font.Font{}, unit.Sp(10), op.CallOp{}, op.CallOp{})
+
+	b.Run("unchanged", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			e.updateIMEState(gtx)
+		}
+	})
+	b.Run("invalidated", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			e.text.version++
+			e.updateIMEState(gtx)
+		}
+	})
+}
+
 func BenchmarkEditorDynamic(b *testing.B) {
 	runBenchmarkPermutations(b, func(b *testing.B, runeCount int, locale system.Locale, txt string) {
 		var win *headless.Window

@@ -887,7 +887,7 @@ func (d *Device) CreatePixelShader(bytecode []byte) (*PixelShader, error) {
 		d.Vtbl.CreatePixelShader,
 		5,
 		uintptr(unsafe.Pointer(d)),
-		uintptr(unsafe.Pointer(&bytecode[0])),
+		uintptr(unsafe.Pointer(unsafe.SliceData(bytecode))),
 		uintptr(len(bytecode)),
 		0, // pClassLinkage
 		uintptr(unsafe.Pointer(&shader)),
@@ -905,7 +905,7 @@ func (d *Device) CreateVertexShader(bytecode []byte) (*VertexShader, error) {
 		d.Vtbl.CreateVertexShader,
 		5,
 		uintptr(unsafe.Pointer(d)),
-		uintptr(unsafe.Pointer(&bytecode[0])),
+		uintptr(unsafe.Pointer(unsafe.SliceData(bytecode))),
 		uintptr(len(bytecode)),
 		0, // pClassLinkage
 		uintptr(unsafe.Pointer(&shader)),
@@ -923,7 +923,7 @@ func (d *Device) CreateComputeShader(bytecode []byte) (*ComputeShader, error) {
 		d.Vtbl.CreateComputeShader,
 		5,
 		uintptr(unsafe.Pointer(d)),
-		uintptr(unsafe.Pointer(&bytecode[0])),
+		uintptr(unsafe.Pointer(unsafe.SliceData(bytecode))),
 		uintptr(len(bytecode)),
 		0, // pClassLinkage
 		uintptr(unsafe.Pointer(&shader)),
@@ -996,7 +996,7 @@ func (d *Device) CreateInputLayout(descs []INPUT_ELEMENT_DESC, bytecode []byte) 
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(pdesc)),
 		uintptr(len(descs)),
-		uintptr(unsafe.Pointer(&bytecode[0])),
+		uintptr(unsafe.Pointer(unsafe.SliceData(bytecode))),
 		uintptr(len(bytecode)),
 		uintptr(unsafe.Pointer(&layout)),
 	)
@@ -1395,7 +1395,7 @@ func (c *DeviceContext) UpdateSubresource(res *Resource, dstBox *BOX, rowPitch, 
 		uintptr(unsafe.Pointer(res)),
 		0, // DstSubresource
 		uintptr(unsafe.Pointer(dstBox)),
-		uintptr(unsafe.Pointer(&data[0])),
+		uintptr(unsafe.Pointer(unsafe.SliceData(data))),
 		uintptr(rowPitch),
 		uintptr(depthPitch),
 		0, 0,

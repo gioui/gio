@@ -23,7 +23,7 @@ func Uint32(s []uint32) []byte {
 		return nil
 	}
 	blen := n * int(unsafe.Sizeof(s[0]))
-	return unsafe.Slice((*byte)(unsafe.Pointer(&s[0])), blen)
+	return unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(s))), blen)
 }
 
 // Slice returns a byte slice view of a slice.

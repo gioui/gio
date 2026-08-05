@@ -88,7 +88,6 @@ type InputDesc struct {
 }
 
 type BlendDesc struct {
-	Enable               bool
 	SrcFactor, DstFactor BlendFactor
 }
 
@@ -200,6 +199,20 @@ var ErrContentLost = errors.New("buffer content lost")
 
 func (f Features) Has(feats Features) bool {
 	return f&feats == feats
+}
+
+func (b BlendDesc) IsEnabled() bool {
+	switch b.SrcFactor {
+	case BlendFactorOne, BlendFactorZero, BlendFactorOneMinusSrcAlpha:
+	default:
+		return true
+	}
+	switch b.DstFactor {
+	case BlendFactorZero:
+	default:
+		return true
+	}
+	return false
 }
 
 func DownloadImage(d Device, t Texture, img *image.RGBA) error {

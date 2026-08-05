@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
 //go:build !nometal
-// +build !nometal
 
 package app
 

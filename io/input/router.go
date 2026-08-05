@@ -109,7 +109,12 @@ const (
 type SemanticID uint
 
 // SystemEvent is a marker for events that have platform specific
-// side-effects. SystemEvents are never matched by catch-all filters.
+// side-effects. SystemEvents are never matched by catch-all filters;
+// only filters that explicitly match the event, such as a
+// [gioui.org/io/key.Filter] with a non-empty Name, receive them.
+// [gioui.org/app.Window] uses SystemEvent for keys reserved for focus
+// navigation: Tab and Shift-Tab, and on mobile the arrow keys. If no
+// handler matches such an event, the window moves focus instead.
 type SystemEvent struct {
 	Event event.Event
 }

@@ -292,11 +292,7 @@ func (c *Functions) BlendFuncSeparate(srcRGB, dstRGB, srcA, dstA Enum) {
 }
 
 func (c *Functions) BufferData(target Enum, size int, usage Enum, data []byte) {
-	var p unsafe.Pointer
-	if len(data) > 0 {
-		p = unsafe.Pointer(&data[0])
-	}
-	syscall.Syscall6(_glBufferData.Addr(), 4, uintptr(target), uintptr(size), uintptr(p), uintptr(usage), 0, 0)
+	syscall.Syscall6(_glBufferData.Addr(), 4, uintptr(target), uintptr(size), uintptr(unsafe.Pointer(unsafe.SliceData(data))), uintptr(usage), 0, 0)
 }
 
 func (f *Functions) BufferSubData(target Enum, offset int, src []byte) {
@@ -543,11 +539,8 @@ func (c *Functions) GetProgrami(p Program, pname Enum) int {
 
 func (c *Functions) GetProgramInfoLog(p Program) string {
 	n := c.GetProgrami(p, INFO_LOG_LENGTH)
-	if n == 0 {
-		return ""
-	}
 	buf := make([]byte, n)
-	syscall.Syscall6(_glGetProgramInfoLog.Addr(), 4, uintptr(p.V), uintptr(len(buf)), 0, uintptr(unsafe.Pointer(&buf[0])), 0, 0)
+	syscall.Syscall6(_glGetProgramInfoLog.Addr(), 4, uintptr(p.V), uintptr(len(buf)), 0, uintptr(unsafe.Pointer(unsafe.SliceData(buf))), 0, 0)
 	return string(buf)
 }
 
@@ -564,7 +557,7 @@ func (c *Functions) GetShaderi(s Shader, pname Enum) int {
 func (c *Functions) GetShaderInfoLog(s Shader) string {
 	n := c.GetShaderi(s, INFO_LOG_LENGTH)
 	buf := make([]byte, n)
-	syscall.Syscall6(_glGetShaderInfoLog.Addr(), 4, uintptr(s.V), uintptr(len(buf)), 0, uintptr(unsafe.Pointer(&buf[0])), 0, 0)
+	syscall.Syscall6(_glGetShaderInfoLog.Addr(), 4, uintptr(s.V), uintptr(len(buf)), 0, uintptr(unsafe.Pointer(unsafe.SliceData(buf))), 0, 0)
 	return string(buf)
 }
 
@@ -640,9 +633,9 @@ func (c *Functions) Scissor(x, y, width, height int32) {
 }
 
 func (c *Functions) ShaderSource(s Shader, src string) {
-	var n uintptr = uintptr(len(src))
-	psrc := &src
-	syscall.Syscall6(_glShaderSource.Addr(), 4, uintptr(s.V), 1, uintptr(unsafe.Pointer(psrc)), uintptr(unsafe.Pointer(&n)), 0, 0)
+	n := uintptr(len(src))
+	psrc := unsafe.StringData(src)
+	syscall.Syscall6(_glShaderSource.Addr(), 4, uintptr(s.V), 1, uintptr(unsafe.Pointer(&psrc)), uintptr(unsafe.Pointer(&n)), 0, 0)
 	issue34474KeepAlive(psrc)
 }
 

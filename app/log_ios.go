@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-//go:build darwin && ios
-
 package app
 
 /*
@@ -38,7 +36,7 @@ func newNSLogWriter() io.Writer {
 		lineBuf := bufio.NewReaderSize(r, 1024)
 		// The buffer to pass to C, including the terminating '\0'.
 		buf := make([]byte, lineBuf.Size()+1)
-		cbuf := (*C.char)(unsafe.Pointer(&buf[0]))
+		cbuf := (*C.char)(unsafe.Pointer(unsafe.SliceData(buf)))
 		for {
 			line, _, err := lineBuf.ReadLine()
 			if err != nil {

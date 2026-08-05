@@ -51,7 +51,7 @@ func (w *androidLogWriter) Write(data []byte) (int, error) {
 		copy(buf, msg)
 		// Terminating '\0'.
 		buf[len(msg)] = 0
-		C.__android_log_write(C.ANDROID_LOG_INFO, logTag, (*C.char)(unsafe.Pointer(&buf[0])))
+		C.__android_log_write(C.ANDROID_LOG_INFO, logTag, (*C.char)(unsafe.Pointer(unsafe.SliceData(buf))))
 		n += len(msg)
 		data = data[len(msg):]
 	}
@@ -70,7 +70,7 @@ func logFd(fd uintptr) {
 		lineBuf := bufio.NewReaderSize(r, logLineLimit)
 		// The buffer to pass to C, including the terminating '\0'.
 		buf := make([]byte, lineBuf.Size()+1)
-		cbuf := (*C.char)(unsafe.Pointer(&buf[0]))
+		cbuf := (*C.char)(unsafe.Pointer(unsafe.SliceData(buf)))
 		for {
 			line, _, err := lineBuf.ReadLine()
 			if err != nil {
