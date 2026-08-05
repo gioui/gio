@@ -346,26 +346,19 @@ func NewWithDevice(d driver.Device) (GPU, error) {
 	feats := d.Caps().Features
 	switch {
 	case feats.Has(driver.FeatureFloatRenderTargets) && feats.Has(driver.FeatureSRGB):
-		return newGPU(d)
+		return newGPU(d), nil
 	}
 	return nil, errors.New("no available GPU driver")
 }
 
-func newGPU(ctx driver.Device) (*gpu, error) {
+func newGPU(ctx driver.Device) *gpu {
 	g := &gpu{
 		cache: newTextureCache(),
 	}
-	g.drawOps.pathCache = newOpCache()
-	if err := g.init(ctx); err != nil {
-		return nil, err
-	}
-	return g, nil
-}
-
-func (g *gpu) init(ctx driver.Device) error {
 	g.ctx = ctx
+	g.drawOps.pathCache = newOpCache()
 	g.renderer = newRenderer(ctx)
-	return nil
+	return g
 }
 
 func (g *gpu) Clear(col color.NRGBA) {
