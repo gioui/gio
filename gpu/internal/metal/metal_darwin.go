@@ -355,6 +355,22 @@ static CFTypeAndError newLibrary(CFTypeRef devRef, char *name, void *mtllib, siz
 	}
 }
 
+static CFTypeAndError newLibraryWithSource(CFTypeRef devRef, const char *src) {
+	@autoreleasepool {
+		id<MTLDevice> dev = (__bridge id<MTLDevice>)devRef;
+		MTLCompileOptions *opts = [MTLCompileOptions new];
+		// Go requires iOS 12 and macOS 13, which guarantees Metal 2.1.
+		opts.languageVersion = MTLLanguageVersion2_1;
+		NSString *srcStr = [NSString stringWithUTF8String:src];
+		NSError *err = NULL;
+		id<MTLLibrary> lib = [dev newLibraryWithSource:srcStr options:opts error:&err];
+		if (lib == nil) {
+			return error(err);
+		}
+		return ok(lib);
+	}
+}
+
 static CFTypeRef libraryNewFunction(CFTypeRef libRef, char *funcName) {
 	@autoreleasepool {
 		id<MTLLibrary> lib = (__bridge id<MTLLibrary>)libRef;
@@ -719,18 +735,64 @@ func blendFactorFor(f driver.BlendFactor) C.MTLBlendFactor {
 func vertFormatFor(f shader.InputLocation) C.MTLVertexFormat {
 	t := f.Type
 	s := f.Size
-	switch {
-	case t == shader.DataTypeFloat && s == 1:
-		return C.MTLVertexFormatFloat
-	case t == shader.DataTypeFloat && s == 2:
-		return C.MTLVertexFormatFloat2
-	case t == shader.DataTypeFloat && s == 3:
-		return C.MTLVertexFormatFloat3
-	case t == shader.DataTypeFloat && s == 4:
-		return C.MTLVertexFormatFloat4
-	default:
-		panic("unsupported data type")
+	switch t {
+	case shader.DataTypeFloat:
+		switch s {
+		case 1:
+			return C.MTLVertexFormatFloat
+		case 2:
+			return C.MTLVertexFormatFloat2
+		case 3:
+			return C.MTLVertexFormatFloat3
+		case 4:
+			return C.MTLVertexFormatFloat4
+		}
+	case shader.DataTypeInt8:
+		switch s {
+		case 1:
+			return C.MTLVertexFormatChar
+		case 2:
+			return C.MTLVertexFormatChar2
+		case 3:
+			return C.MTLVertexFormatChar3
+		case 4:
+			return C.MTLVertexFormatChar4
+		}
+	case shader.DataTypeUInt8N:
+		switch s {
+		case 1:
+			return C.MTLVertexFormatUCharNormalized
+		case 2:
+			return C.MTLVertexFormatUChar2Normalized
+		case 3:
+			return C.MTLVertexFormatUChar3Normalized
+		case 4:
+			return C.MTLVertexFormatUChar4Normalized
+		}
+	case shader.DataTypeInt16:
+		switch s {
+		case 1:
+			return C.MTLVertexFormatShort
+		case 2:
+			return C.MTLVertexFormatShort2
+		case 3:
+			return C.MTLVertexFormatShort3
+		case 4:
+			return C.MTLVertexFormatShort4
+		}
+	case shader.DataTypeUInt32:
+		switch s {
+		case 1:
+			return C.MTLVertexFormatUInt
+		case 2:
+			return C.MTLVertexFormatUInt2
+		case 3:
+			return C.MTLVertexFormatUInt3
+		case 4:
+			return C.MTLVertexFormatUInt4
+		}
 	}
+	panic("unsupported data type")
 }
 
 func pixelFormatFor(f driver.TextureFormat) C.MTLPixelFormat {
@@ -781,6 +843,14 @@ func (b *Backend) NewComputeProgram(src shader.Sources) (driver.Program, error) 
 	return &Program{pipeline: pipe, groupSize: src.WorkgroupSize}, nil
 }
 
+func (b *Backend) CompileVertexShader(src string, inputs []shader.InputLocation) (driver.VertexShader, error) {
+	return b.compileShader(src, inputs)
+}
+
+func (b *Backend) CompileFragmentShader(src string) (driver.FragmentShader, error) {
+	return b.compileShader(src, nil)
+}
+
 func (b *Backend) NewVertexShader(src shader.Sources) (driver.VertexShader, error) {
 	return b.newShader(src)
 }
@@ -795,6 +865,23 @@ func splitErr(o C.CFTypeAndError) (C.CFTypeRef, error) {
 		return 0, errors.New(C.GoString(o.err))
 	}
 	return o.obj, nil
+}
+
+func (b *Backend) compileShader(src string, inputs []shader.InputLocation) (*Shader, error) {
+	csrc := C.CString(src)
+	defer C.free(unsafe.Pointer(csrc))
+	vlib, err := splitErr(C.newLibraryWithSource(b.dev, csrc))
+	if err != nil {
+		return nil, fmt.Errorf("metal: shader compile failed: %w", err)
+	}
+	defer C.CFRelease(vlib)
+	funcName := C.CString("main0")
+	defer C.free(unsafe.Pointer(funcName))
+	f := C.libraryNewFunction(vlib, funcName)
+	if f == 0 {
+		return nil, fmt.Errorf("metal: main function not found in shader")
+	}
+	return &Shader{function: f, inputs: inputs}, nil
 }
 
 func (b *Backend) newShader(src shader.Sources) (*Shader, error) {

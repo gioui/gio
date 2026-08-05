@@ -43,7 +43,7 @@ type GPU interface {
 	// Clear sets the clear color for the next Frame.
 	Clear(color color.NRGBA)
 	// Frame draws the graphics operations from op into a viewport of target.
-	Frame(frame *op.Ops, target RenderTarget, viewport image.Point) error
+	Frame(frame *op.Ops, quads []Quad, target RenderTarget, viewport image.Point) error
 }
 
 type gpu struct {
@@ -56,6 +56,8 @@ type gpu struct {
 	drawOps                                drawOps
 	ctx                                    driver.Device
 	renderer                               *renderer
+
+	gpu2 *gpu2
 }
 
 type renderer struct {
@@ -346,7 +348,13 @@ func NewWithDevice(d driver.Device) (GPU, error) {
 	feats := d.Caps().Features
 	switch {
 	case feats.Has(driver.FeatureFloatRenderTargets) && feats.Has(driver.FeatureSRGB):
-		return newGPU(d), nil
+		g2, err := newGPU2(d)
+		if err != nil {
+			return nil, err
+		}
+		g := newGPU(d)
+		g.gpu2 = g2
+		return g, nil
 	}
 	return nil, errors.New("no available GPU driver")
 }
@@ -367,6 +375,9 @@ func (g *gpu) Clear(col color.NRGBA) {
 }
 
 func (g *gpu) Release() {
+	if g.gpu2 != nil {
+		g.gpu2.Release()
+	}
 	g.renderer.release()
 	g.drawOps.pathCache.release()
 	g.cache.release()
@@ -376,9 +387,9 @@ func (g *gpu) Release() {
 	g.ctx.Release()
 }
 
-func (g *gpu) Frame(frameOps *op.Ops, target RenderTarget, viewport image.Point) error {
+func (g *gpu) Frame(frameOps *op.Ops, quads []Quad, target RenderTarget, viewport image.Point) error {
 	g.collect(viewport, frameOps)
-	return g.frame(target)
+	return g.frame(quads, target)
 }
 
 func (g *gpu) collect(viewport image.Point, frameOps *op.Ops) {
@@ -395,7 +406,7 @@ func (g *gpu) collect(viewport image.Point, frameOps *op.Ops) {
 	}
 }
 
-func (g *gpu) frame(target RenderTarget) error {
+func (g *gpu) frame(quads []Quad, target RenderTarget) error {
 	viewport := g.renderer.blitter.viewport
 	defFBO := g.ctx.BeginFrame(target, g.drawOps.clear, viewport)
 	defer g.ctx.EndFrame()
@@ -426,6 +437,9 @@ func (g *gpu) frame(target RenderTarget) error {
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
 	g.renderer.drawOps(false, image.Point{}, g.renderer.blitter.viewport, g.drawOps.imageOps)
 	g.coverTimer.end()
+	if err := g.gpu2.Frame(viewport, quads); err != nil {
+		return err
+	}
 	g.ctx.EndRenderPass()
 	g.cleanupTimer.begin()
 	g.cache.frame()

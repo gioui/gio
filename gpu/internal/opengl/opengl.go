@@ -892,6 +892,14 @@ func (b *Backend) NewComputeProgram(src shader.Sources) (driver.Program, error) 
 	}, nil
 }
 
+func (b *Backend) CompileVertexShader(src string, inputs []shader.InputLocation) (driver.VertexShader, error) {
+	panic("unfinished business")
+}
+
+func (b *Backend) CompileFragmentShader(src string) (driver.FragmentShader, error) {
+	panic("unfinished business")
+}
+
 func (b *Backend) NewVertexShader(src shader.Sources) (driver.VertexShader, error) {
 	glslSrc := b.glslFor(src)
 	sh, err := gl.CreateShader(b.funcs, gl.VERTEX_SHADER, glslSrc)
@@ -1122,7 +1130,7 @@ func (b *Backend) setupVertexArrays() {
 		switch l.Type {
 		case shader.DataTypeFloat:
 			gltyp = gl.FLOAT
-		case shader.DataTypeShort:
+		case shader.DataTypeInt16:
 			gltyp = gl.SHORT
 		default:
 			panic("unsupported data type")

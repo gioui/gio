@@ -131,7 +131,7 @@ func (w *Window) Size() image.Point {
 func (w *Window) Frame(frame *op.Ops) error {
 	return contextDo(w.ctx, func() error {
 		w.gpu.Clear(color.NRGBA{})
-		return w.gpu.Frame(frame, w.fboTex, w.size)
+		return w.gpu.Frame(frame, nil, w.fboTex, w.size)
 	})
 }
 
