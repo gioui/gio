@@ -111,6 +111,10 @@ type wlSeat struct {
 	touch    *C.struct_wl_touch
 	keyboard *C.struct_wl_keyboard
 	im       *C.struct_zwp_text_input_v3
+	imFocus  *window
+	imActive bool
+	imHint   key.InputHint
+	imState  textInputState
 
 	// The most recent input serial.
 	serial C.uint32_t
@@ -167,6 +171,8 @@ type window struct {
 	pointerBtns pointer.Buttons
 	lastPos     f32.Point
 	lastTouch   f32.Point
+	textInput   bool
+	inputHint   key.InputHint
 
 	cursor struct {
 		theme  *C.struct_wl_cursor_theme
@@ -486,6 +492,8 @@ func (s *wlSeat) destroy() {
 		C.zwp_text_input_v3_destroy(s.im)
 		s.im = nil
 	}
+	s.imFocus = nil
+	s.resetTextInputState()
 	if s.pointer != nil {
 		C.wl_pointer_release(s.pointer)
 	}
@@ -506,11 +514,25 @@ func (s *wlSeat) destroy() {
 	}
 }
 
-func (s *wlSeat) updateCaps(caps C.uint32_t) {
+func (s *wlSeat) initTextInput() {
 	if s.im == nil && s.disp.imm != nil {
 		s.im = C.zwp_text_input_manager_v3_get_text_input(s.disp.imm, s.seat)
 		C.zwp_text_input_v3_add_listener(s.im, &C.gio_zwp_text_input_v3_listener, unsafe.Pointer(s.seat))
 	}
+}
+
+func (s *wlSeat) commitTextInput() {
+	C.zwp_text_input_v3_commit(s.im)
+	s.imState.serial++
+}
+
+func (s *wlSeat) resetTextInputState() {
+	s.imActive = false
+	s.imState.reset()
+}
+
+func (s *wlSeat) updateCaps(caps C.uint32_t) {
+	s.initTextInput()
 	switch {
 	case s.pointer == nil && caps&C.WL_SEAT_CAPABILITY_POINTER != 0:
 		s.pointer = C.wl_seat_get_pointer(s.seat)
@@ -687,6 +709,7 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 		}
 		callbackStore(unsafe.Pointer(s), d.seat)
 		C.wl_seat_add_listener(s, &C.gio_seat_listener, unsafe.Pointer(s))
+		d.seat.initTextInput()
 		d.bindDataDevice()
 	case "wl_shm":
 		d.shm = (*C.struct_wl_shm)(C.wl_registry_bind(reg, name, &C.wl_shm_interface, 1))
@@ -694,9 +717,11 @@ func gio_onRegistryGlobal(data unsafe.Pointer, reg *C.struct_wl_registry, name C
 		d.wm = (*C.struct_xdg_wm_base)(C.wl_registry_bind(reg, name, &C.xdg_wm_base_interface, 1))
 	case "zxdg_decoration_manager_v1":
 		d.decor = (*C.struct_zxdg_decoration_manager_v1)(C.wl_registry_bind(reg, name, &C.zxdg_decoration_manager_v1_interface, 1))
-		// TODO: Implement and test text-input support.
-		/*case "zwp_text_input_manager_v3":
-		d.imm = (*C.struct_zwp_text_input_manager_v3)(C.wl_registry_bind(reg, name, &C.zwp_text_input_manager_v3_interface, 1))*/
+	case "zwp_text_input_manager_v3":
+		d.imm = (*C.struct_zwp_text_input_manager_v3)(C.wl_registry_bind(reg, name, &C.zwp_text_input_manager_v3_interface, 1))
+		if d.seat != nil {
+			d.seat.initTextInput()
+		}
 	case "wl_data_device_manager":
 		d.dataDeviceManager = (*C.struct_wl_data_device_manager)(C.wl_registry_bind(reg, name, &C.wl_data_device_manager_interface, 3))
 		d.bindDataDevice()
@@ -1256,7 +1281,6 @@ func gio_onKeyboardKey(data unsafe.Pointer, keyboard *C.struct_wl_keyboard, seri
 	ks := mapXKBKeyState(uint32(state))
 	for _, e := range w.disp.xkb.DispatchKey(kc, ks) {
 		if ee, ok := e.(key.EditEvent); ok {
-			// There's no support for IME yet.
 			w.w.EditorInsert(ee.Text)
 		} else {
 			w.ProcessEvent(e)
@@ -1351,7 +1375,6 @@ func (r *repeatState) Repeat(d *wlDisplay) {
 		}
 		for _, e := range d.xkb.DispatchKey(r.key, key.Press) {
 			if ee, ok := e.(key.EditEvent); ok {
-				// There's no support for IME yet.
 				r.win.w.EditorInsert(ee.Text)
 			} else {
 				r.win.ProcessEvent(e)
@@ -1515,6 +1538,11 @@ func (d *wlDisplay) wakeup() {
 }
 
 func (w *window) destroy() {
+	if s := w.disp.seat; s != nil && s.imFocus == w {
+		s.imState.clearPreedit(w.w)
+		s.imFocus = nil
+		s.resetTextInputState()
+	}
 	if w.lastFrameCallback != nil {
 		C.wl_callback_destroy(w.lastFrameCallback)
 		w.lastFrameCallback = nil
@@ -1561,30 +1589,174 @@ func gio_onKeyboardRepeatInfo(data unsafe.Pointer, keyboard *C.struct_wl_keyboar
 	d.repeat.delay = time.Duration(delay) * time.Millisecond
 }
 
+func (s *wlSeat) sendSurroundingText(snapshot textInputSnapshot) {
+	text := C.CString(snapshot.text)
+	defer C.free(unsafe.Pointer(text))
+	C.zwp_text_input_v3_set_surrounding_text(s.im, text, C.int32_t(snapshot.cursor), C.int32_t(snapshot.anchor))
+	s.imState.sent = snapshot
+	s.imState.sentValid = true
+}
+
+// refreshTextInput reports the current editor state to the input method.
+func (s *wlSeat) refreshTextInput(w *window) {
+	snapshot, status := prepareSurroundingText(w.w)
+	if status == surroundingAwaitingSnippet {
+		return
+	}
+	if status == surroundingReady {
+		if !s.imState.sentValid {
+			// The session was enabled without surrounding text, so the
+			// compositor may ignore it now. Restart the session instead.
+			s.activateTextInput(w)
+			return
+		}
+		s.sendSurroundingText(snapshot)
+	}
+	cause := uint32(C.ZWP_TEXT_INPUT_V3_CHANGE_CAUSE_INPUT_METHOD)
+	if s.imState.external {
+		cause = uint32(C.ZWP_TEXT_INPUT_V3_CHANGE_CAUSE_OTHER)
+	}
+	C.zwp_text_input_v3_set_text_change_cause(s.im, C.uint32_t(cause))
+	s.sendCursorRectangle(w)
+	s.commitTextInput()
+	s.imState.dirty = false
+	s.imState.external = false
+}
+
+func (s *wlSeat) sendCursorRectangle(w *window) {
+	sel := w.w.EditorState().Selection
+	top := sel.Transform.Transform(sel.Caret.Pos.Sub(f32.Pt(0, sel.Caret.Ascent)))
+	bottom := sel.Transform.Transform(sel.Caret.Pos.Add(f32.Pt(0, sel.Caret.Descent)))
+	scale := float32(max(1, w.scale))
+	minX, maxX := min(top.X, bottom.X)/scale, max(top.X, bottom.X)/scale
+	minY, maxY := min(top.Y, bottom.Y)/scale, max(top.Y, bottom.Y)/scale
+	x, y := math.Floor(float64(minX)), math.Floor(float64(minY))
+	maxXI, maxYI := math.Ceil(float64(maxX)), math.Ceil(float64(maxY))
+	C.zwp_text_input_v3_set_cursor_rectangle(s.im,
+		C.int32_t(x), C.int32_t(y), C.int32_t(maxXI-x), C.int32_t(maxYI-y))
+}
+
+func textInputContentType(hint key.InputHint) (uint32, uint32) {
+	var hints, purpose uint32
+	switch hint {
+	case key.HintText:
+		hints = C.ZWP_TEXT_INPUT_V3_CONTENT_HINT_COMPLETION | C.ZWP_TEXT_INPUT_V3_CONTENT_HINT_SPELLCHECK
+	case key.HintNumeric:
+		purpose = C.ZWP_TEXT_INPUT_V3_CONTENT_PURPOSE_NUMBER
+	case key.HintEmail:
+		purpose = C.ZWP_TEXT_INPUT_V3_CONTENT_PURPOSE_EMAIL
+	case key.HintURL:
+		purpose = C.ZWP_TEXT_INPUT_V3_CONTENT_PURPOSE_URL
+	case key.HintTelephone:
+		purpose = C.ZWP_TEXT_INPUT_V3_CONTENT_PURPOSE_PHONE
+	case key.HintPassword:
+		hints = C.ZWP_TEXT_INPUT_V3_CONTENT_HINT_HIDDEN_TEXT | C.ZWP_TEXT_INPUT_V3_CONTENT_HINT_SENSITIVE_DATA
+		purpose = C.ZWP_TEXT_INPUT_V3_CONTENT_PURPOSE_PASSWORD
+	}
+	return hints, purpose
+}
+
+func (s *wlSeat) activateTextInput(w *window) {
+	snapshot, status := prepareSurroundingText(w.w)
+	if status == surroundingAwaitingSnippet {
+		return
+	}
+	if s.imActive {
+		s.imState.clearPreedit(w.w)
+	}
+	s.resetTextInputState()
+	C.zwp_text_input_v3_disable(s.im)
+	C.zwp_text_input_v3_enable(s.im)
+	hints, purpose := textInputContentType(w.inputHint)
+	C.zwp_text_input_v3_set_content_type(s.im, C.uint32_t(hints), C.uint32_t(purpose))
+	// Enabling without surrounding text tells the compositor we can't
+	// provide it. sentValid records that.
+	if status == surroundingReady {
+		s.sendSurroundingText(snapshot)
+	}
+	s.sendCursorRectangle(w)
+	s.commitTextInput()
+	s.imActive = true
+	s.imHint = w.inputHint
+}
+
+func (s *wlSeat) deactivateTextInput(w *window) {
+	if !s.imActive {
+		return
+	}
+	s.imState.clearPreedit(w.w)
+	C.zwp_text_input_v3_disable(s.im)
+	s.commitTextInput()
+	s.resetTextInputState()
+}
+
 //export gio_onTextInputEnter
 func gio_onTextInputEnter(data unsafe.Pointer, im *C.struct_zwp_text_input_v3, surf *C.struct_wl_surface) {
+	s := callbackLoad(data).(*wlSeat)
+	w := callbackLoad(unsafe.Pointer(surf)).(*window)
+	s.imFocus = w
+	s.resetTextInputState()
+	if w.textInput {
+		s.activateTextInput(w)
+	} else {
+		C.zwp_text_input_v3_disable(s.im)
+		s.commitTextInput()
+	}
 }
 
 //export gio_onTextInputLeave
 func gio_onTextInputLeave(data unsafe.Pointer, im *C.struct_zwp_text_input_v3, surf *C.struct_wl_surface) {
+	s := callbackLoad(data).(*wlSeat)
+	if s.imFocus == nil || s.imFocus.surf != surf {
+		return
+	}
+	s.imState.clearPreedit(s.imFocus.w)
+	s.imFocus = nil
+	s.resetTextInputState()
 }
 
 //export gio_onTextInputPreeditString
 func gio_onTextInputPreeditString(data unsafe.Pointer, im *C.struct_zwp_text_input_v3, ctxt *C.char, begin, end C.int32_t) {
+	s := callbackLoad(data).(*wlSeat)
+	s.imState.pending.preedit = ""
+	s.imState.pending.preeditSet = ctxt != nil
+	if ctxt != nil {
+		s.imState.pending.preedit = C.GoString(ctxt)
+	}
+	s.imState.pending.preeditSelection = key.Range{Start: int(begin), End: int(end)}
 }
 
 //export gio_onTextInputCommitString
 func gio_onTextInputCommitString(data unsafe.Pointer, im *C.struct_zwp_text_input_v3, ctxt *C.char) {
+	s := callbackLoad(data).(*wlSeat)
+	s.imState.pending.commit = ""
+	s.imState.pending.commitSet = ctxt != nil
+	if ctxt != nil {
+		s.imState.pending.commit = C.GoString(ctxt)
+	}
 }
 
 //export gio_onTextInputDeleteSurroundingText
 func gio_onTextInputDeleteSurroundingText(data unsafe.Pointer, im *C.struct_zwp_text_input_v3, before, after C.uint32_t) {
+	s := callbackLoad(data).(*wlSeat)
+	s.imState.pending.deleteBefore = uint32(before)
+	s.imState.pending.deleteAfter = uint32(after)
 }
 
 //export gio_onTextInputDone
 func gio_onTextInputDone(data unsafe.Pointer, im *C.struct_zwp_text_input_v3, serial C.uint32_t) {
 	s := callbackLoad(data).(*wlSeat)
-	s.serial = serial
+	if s.imFocus == nil {
+		s.imState.pending = textInputUpdate{}
+		return
+	}
+	if s.imState.applyDone(s.imFocus.w, uint32(serial)) && s.imActive {
+		if s.imHint != s.imFocus.inputHint {
+			s.activateTextInput(s.imFocus)
+			return
+		}
+		s.refreshTextInput(s.imFocus)
+	}
 }
 
 //export gio_onDataSourceTarget
@@ -1802,11 +1974,91 @@ func (w *window) surface() (*C.struct_wl_surface, int, int) {
 	return w.surf, sz.X, sz.Y
 }
 
-func (w *window) ShowTextInput(show bool) {}
+func (w *window) ShowTextInput(show bool) {
+	w.textInput = show
+	s := w.disp.seat
+	if s == nil || s.im == nil || s.imFocus != w {
+		return
+	}
+	if show {
+		if !s.imActive {
+			s.activateTextInput(w)
+		}
+	} else {
+		s.deactivateTextInput(w)
+	}
+}
 
-func (w *window) SetInputHint(_ key.InputHint) {}
+func (w *window) SetInputHint(hint key.InputHint) {
+	if w.inputHint == hint {
+		return
+	}
+	w.inputHint = hint
+	s := w.disp.seat
+	if s != nil && s.im != nil && s.imFocus == w && s.imActive {
+		s.activateTextInput(w)
+	}
+}
 
-func (w *window) EditorStateChanged(old, new editorState) {}
+func (w *window) EditorStateChanged(old, new editorState) {
+	s := w.disp.seat
+	if s == nil || s.im == nil || s.imFocus != w || !w.textInput {
+		return
+	}
+	if !s.imActive {
+		s.activateTextInput(w)
+		return
+	}
+	if s.imHint != w.inputHint {
+		s.activateTextInput(w)
+		return
+	}
+	selectionChanged := old.Selection.Range != new.Selection.Range
+	textChanged := selectionChanged || !areSnippetsConsistent(old.Snippet, new.Snippet)
+	if s.imState.stale {
+		// The last done serial didn't match a commit; defer protocol
+		// updates until a matching done, then report all changes.
+		s.imState.dirty = true
+		s.imState.external = s.imState.external || textChanged
+		return
+	}
+	if s.imState.dirty {
+		s.imState.external = s.imState.external || textChanged
+		s.refreshTextInput(w)
+		return
+	}
+	cancelled := shouldCancelComposition(old, new) && new.compose.Start != -1
+	if cancelled {
+		s.imState.clearPreedit(w.w)
+	}
+	surroundingChanged := cancelled || selectionChanged || old.Snippet != new.Snippet
+	caretChanged := old.Selection.Caret != new.Selection.Caret || old.Selection.Transform != new.Selection.Transform
+	needsCommit := false
+	if surroundingChanged {
+		snapshot, status := prepareSurroundingText(w.w)
+		switch status {
+		case surroundingReady:
+			if !s.imState.sentValid {
+				s.activateTextInput(w)
+				return
+			}
+			s.sendSurroundingText(snapshot)
+			if textChanged {
+				C.zwp_text_input_v3_set_text_change_cause(s.im, C.ZWP_TEXT_INPUT_V3_CHANGE_CAUSE_OTHER)
+			}
+			needsCommit = true
+		}
+	}
+	if caretChanged {
+		s.sendCursorRectangle(w)
+		needsCommit = true
+	}
+	if needsCommit {
+		s.commitTextInput()
+		s.imState.dirty = false
+		s.imState.external = false
+	}
+}
 
 func (w *window) NewContext() (context, error) {
 	var firstErr error

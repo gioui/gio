@@ -3,13 +3,16 @@
 package app
 
 import (
-	"gioui.org/f32"
 	"image"
+	"reflect"
+	"strings"
 	"testing"
 	"unicode/utf8"
 
+	"gioui.org/f32"
 	"gioui.org/font"
 	"gioui.org/font/gofont"
+	"gioui.org/io/event"
 	"gioui.org/io/input"
 	"gioui.org/io/key"
 	"gioui.org/layout"
@@ -262,5 +265,347 @@ func TestEditorCompositionBounds(t *testing.T) {
 	layoutEditor()
 	if bounds := r.EditorState().Selection.CompositionBounds; !bounds.Empty() {
 		t.Fatalf("expected empty composition bounds, got %v", bounds)
+	}
+}
+
+type textInputTestDriver struct {
+	driver
+	events []event.Event
+}
+
+func (d *textInputTestDriver) ProcessEvent(e event.Event) {
+	d.events = append(d.events, e)
+}
+
+func newTextInputTestEditor(state editorState) (*callbacks, *textInputTestDriver) {
+	d := new(textInputTestDriver)
+	w := &Window{driver: d, imeState: state}
+	return &callbacks{w: w}, d
+}
+
+func textInputTestState(text string, selection key.Range) editorState {
+	var state editorState
+	state.Selection.Transform = f32.AffineId()
+	state.Selection.Range = selection
+	state.Snippet = key.Snippet{
+		Range: key.Range{End: utf8.RuneCountInString(text)},
+		Text:  text,
+	}
+	state.compose = key.Range{Start: -1, End: -1}
+	return state
+}
+
+func TestTextInputAppliesPreedit(t *testing.T) {
+	state := textInputTestState("ab", key.Range{Start: 1, End: 1})
+	editor, _ := newTextInputTestEditor(state)
+	s := textInputState{pending: textInputUpdate{
+		preedit:          "拼音",
+		preeditSet:       true,
+		preeditSelection: key.Range{Start: 0, End: 3},
+	}}
+	if !s.apply(editor) {
+		t.Fatal("done did not report a changed editor state")
+	}
+	if got, want := editor.EditorState().Snippet.Text, "a拼音b"; got != want {
+		t.Fatalf("text after done = %q, want %q", got, want)
+	}
+}
+
+func TestTextInputAppliesTransactionInProtocolOrder(t *testing.T) {
+	state := textInputTestState("abc旧def", key.Range{Start: 4, End: 4})
+	state.compose = key.Range{Start: 3, End: 4}
+	editor, d := newTextInputTestEditor(state)
+	s := textInputState{
+		sent: textInputSnapshot{text: "abcdef", cursor: 3, anchor: 3},
+		pending: textInputUpdate{
+			deleteBefore:     1,
+			deleteAfter:      1,
+			commit:           "中",
+			commitSet:        true,
+			preedit:          "かな",
+			preeditSet:       true,
+			preeditSelection: key.Range{Start: 0, End: len("か")},
+		},
+	}
+	if !s.apply(editor) {
+		t.Fatal("transaction did not change editor state")
+	}
+	if s.pending != (textInputUpdate{}) {
+		t.Fatalf("pending state after done = %+v, want zero value", s.pending)
+	}
+	got := editor.EditorState()
+	if want := "ab中かなef"; got.Snippet.Text != want {
+		t.Fatalf("text = %q, want %q", got.Snippet.Text, want)
+	}
+	if want := (key.Range{Start: 3, End: 5}); got.compose != want {
+		t.Fatalf("compose = %+v, want %+v", got.compose, want)
+	}
+	if want := (key.Range{Start: 3, End: 4}); got.Selection.Range != want {
+		t.Fatalf("selection = %+v, want %+v", got.Selection.Range, want)
+	}
+	wantEvents := []event.Event{
+		key.EditEvent{Range: key.Range{Start: 3, End: 4}, Text: ""},
+		key.SnippetEvent(key.Range{Start: 0, End: 6}),
+		key.CompositionEvent(key.Range{Start: -1, End: -1}),
+		key.SelectionEvent(key.Range{Start: 3, End: 3}),
+		key.EditEvent{Range: key.Range{Start: 2, End: 4}, Text: ""},
+		key.SnippetEvent(key.Range{Start: 0, End: 4}),
+		key.SelectionEvent(key.Range{Start: 2, End: 2}),
+		key.EditEvent{Range: key.Range{Start: 2, End: 2}, Text: "中"},
+		key.SnippetEvent(key.Range{Start: 0, End: 5}),
+		key.SelectionEvent(key.Range{Start: 3, End: 3}),
+		key.EditEvent{Range: key.Range{Start: 3, End: 3}, Text: "かな"},
+		key.SnippetEvent(key.Range{Start: 0, End: 7}),
+		key.CompositionEvent(key.Range{Start: 3, End: 5}),
+		key.SelectionEvent(key.Range{Start: 3, End: 4}),
+	}
+	if !reflect.DeepEqual(d.events, wantEvents) {
+		t.Fatalf("events:\n got: %#v\nwant: %#v", d.events, wantEvents)
+	}
+}
+
+func TestTextInputNullableEmptyEvents(t *testing.T) {
+	t.Run("empty done preserves selection", func(t *testing.T) {
+		state := textInputTestState("abc", key.Range{Start: 1, End: 2})
+		editor, _ := newTextInputTestEditor(state)
+		if (&textInputState{}).apply(editor) {
+			t.Fatal("empty done changed an unrelated selection")
+		}
+		if got := editor.EditorState(); got != state {
+			t.Fatalf("state after empty done = %+v, want %+v", got, state)
+		}
+	})
+
+	for _, tc := range []struct {
+		name        string
+		pending     textInputUpdate
+		wantText    string
+		wantCompose key.Range
+	}{
+		{
+			name:        "empty commit",
+			pending:     textInputUpdate{commitSet: true},
+			wantText:    "ac",
+			wantCompose: key.Range{Start: -1, End: -1},
+		},
+		{
+			name:        "empty preedit",
+			pending:     textInputUpdate{preeditSet: true},
+			wantText:    "ac",
+			wantCompose: key.Range{Start: 1, End: 1},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			state := textInputTestState("abc", key.Range{Start: 1, End: 2})
+			editor, _ := newTextInputTestEditor(state)
+			s := textInputState{pending: tc.pending}
+			if !s.apply(editor) {
+				t.Fatal("non-null empty event did not change selected text")
+			}
+			got := editor.EditorState()
+			if got.Snippet.Text != tc.wantText {
+				t.Fatalf("text = %q, want %q", got.Snippet.Text, tc.wantText)
+			}
+			if got.compose != tc.wantCompose {
+				t.Fatalf("compose = %+v, want %+v", got.compose, tc.wantCompose)
+			}
+		})
+	}
+}
+
+func TestTextInputPreeditReplacement(t *testing.T) {
+	t.Run("absent preedit clears old composition", func(t *testing.T) {
+		state := textInputTestState("a拼b", key.Range{Start: 2, End: 2})
+		state.compose = key.Range{Start: 1, End: 2}
+		editor, _ := newTextInputTestEditor(state)
+		if !(&textInputState{}).apply(editor) {
+			t.Fatal("empty pending preedit did not clear old composition")
+		}
+		got := editor.EditorState()
+		if got.Snippet.Text != "ab" || got.compose != (key.Range{Start: -1, End: -1}) {
+			t.Fatalf("state after clear = %+v, want text %q and no composition", got, "ab")
+		}
+	})
+
+	t.Run("identical preedit needs no refresh", func(t *testing.T) {
+		state := textInputTestState("a拼b", key.Range{Start: 2, End: 2})
+		state.compose = key.Range{Start: 1, End: 2}
+		editor, _ := newTextInputTestEditor(state)
+		s := textInputState{pending: textInputUpdate{
+			preedit:          "拼",
+			preeditSet:       true,
+			preeditSelection: key.Range{Start: len("拼"), End: len("拼")},
+		}}
+		if s.apply(editor) {
+			t.Fatal("identical preedit and cursor requested a state refresh")
+		}
+		if got := editor.EditorState(); got != state {
+			t.Fatalf("state after identical preedit = %+v, want %+v", got, state)
+		}
+	})
+}
+
+func TestTextInputDoneSerial(t *testing.T) {
+	t.Run("empty stale done does not refresh", func(t *testing.T) {
+		state := textInputTestState("ab", key.Range{Start: 1, End: 1})
+		editor, _ := newTextInputTestEditor(state)
+		s := textInputState{serial: 2}
+		if s.applyDone(editor, 1) {
+			t.Fatal("empty stale done requested a state refresh")
+		}
+		if s.dirty {
+			t.Fatal("empty stale done left a deferred refresh")
+		}
+		if !s.stale {
+			t.Fatal("mismatched done did not mark the state stale")
+		}
+	})
+
+	t.Run("stale edit applies without refresh", func(t *testing.T) {
+		state := textInputTestState("ab", key.Range{Start: 1, End: 1})
+		editor, _ := newTextInputTestEditor(state)
+		s := textInputState{
+			serial:  2,
+			pending: textInputUpdate{commit: "中", commitSet: true},
+		}
+		if s.applyDone(editor, 1) {
+			t.Fatal("stale done allowed a state refresh")
+		}
+		if !s.dirty {
+			t.Fatal("stale edit did not retain a deferred refresh")
+		}
+		if !s.stale {
+			t.Fatal("mismatched done did not mark the state stale")
+		}
+		if got, want := editor.EditorState().Snippet.Text, "a中b"; got != want {
+			t.Fatalf("stale done did not apply edit: got %q, want %q", got, want)
+		}
+		if !s.applyDone(editor, 2) {
+			t.Fatal("matching empty done did not release the deferred refresh")
+		}
+		if s.stale {
+			t.Fatal("matching done did not clear staleness")
+		}
+	})
+
+	t.Run("matching edit refreshes", func(t *testing.T) {
+		state := textInputTestState("ab", key.Range{Start: 1, End: 1})
+		editor, _ := newTextInputTestEditor(state)
+		s := textInputState{
+			serial:  2,
+			pending: textInputUpdate{commit: "中", commitSet: true},
+		}
+		if !s.applyDone(editor, 2) {
+			t.Fatal("matching changed done did not request a state refresh")
+		}
+		if !s.dirty {
+			t.Fatal("matching changed done did not retain its refresh")
+		}
+		if s.stale {
+			t.Fatal("matching done marked the state stale")
+		}
+	})
+}
+
+func TestTextInputSurroundingText(t *testing.T) {
+	t.Run("removes preedit", func(t *testing.T) {
+		state := textInputTestState("前pre後", key.Range{Start: 2, End: 2})
+		state.compose = key.Range{Start: 1, End: 4}
+		snapshot, status := textInputSurrounding(state)
+		if status != surroundingReady {
+			t.Fatalf("status = %v, want ready", status)
+		}
+		if snapshot.text != "前後" || snapshot.cursor != len("前") || snapshot.anchor != len("前") {
+			t.Fatalf("snapshot = %+v, want text %q with cursor and anchor %d", snapshot, "前後", len("前"))
+		}
+	})
+
+	t.Run("windows at UTF-8 boundaries", func(t *testing.T) {
+		text := strings.Repeat("界", 2000)
+		state := textInputTestState(text, key.Range{Start: 1000, End: 1000})
+		snapshot, status := textInputSurrounding(state)
+		if status != surroundingReady {
+			t.Fatalf("status = %v, want ready", status)
+		}
+		if len(snapshot.text) > maxSurroundingTextBytes {
+			t.Fatalf("surrounding text has %d bytes, maximum is %d", len(snapshot.text), maxSurroundingTextBytes)
+		}
+		if !utf8.ValidString(snapshot.text) {
+			t.Fatal("surrounding text ends inside a UTF-8 code point")
+		}
+		if snapshot.cursor < 0 || snapshot.cursor > len(snapshot.text) ||
+			snapshot.cursor < len(snapshot.text) && !utf8.RuneStart(snapshot.text[snapshot.cursor]) {
+			t.Fatalf("cursor %d is not a valid UTF-8 boundary", snapshot.cursor)
+		}
+		// Windowing must not move the caret.
+		caret := snapshot.start + utf8.RuneCountInString(snapshot.text[:snapshot.cursor])
+		if want := state.Selection.Start; caret != want {
+			t.Fatalf("windowed cursor resolves to rune %d, want %d", caret, want)
+		}
+	})
+
+	t.Run("maps offsets through a partial snippet", func(t *testing.T) {
+		// A snippet covering runes 10..16 of a larger document.
+		state := textInputTestState("甲乙選択丙丁", key.Range{Start: 12, End: 14})
+		state.Snippet.Range = key.Range{Start: 10, End: 16}
+		snapshot, status := textInputSurrounding(state)
+		if status != surroundingReady {
+			t.Fatalf("status = %v, want ready", status)
+		}
+		if snapshot.start != 10 {
+			t.Fatalf("start = %d, want 10", snapshot.start)
+		}
+		if snapshot.cursor != len("甲乙") || snapshot.anchor != len("甲乙選択") {
+			t.Fatalf("snapshot = %+v, want cursor %d and anchor %d",
+				snapshot, len("甲乙"), len("甲乙選択"))
+		}
+		// Deletions map back to document offsets, not snippet offsets.
+		rng, ok := snapshot.convertRange(uint32(len("乙")), uint32(len("丙")))
+		if !ok {
+			t.Fatal("valid UTF-8 delete range was rejected")
+		}
+		if want := (key.Range{Start: 11, End: 15}); rng != want {
+			t.Fatalf("delete range = %+v, want %+v", rng, want)
+		}
+	})
+
+	t.Run("preserves logical offsets for reversed bidi selection", func(t *testing.T) {
+		state := textInputTestState("aمرحباb", key.Range{Start: 6, End: 2})
+		snapshot, status := textInputSurrounding(state)
+		if status != surroundingReady {
+			t.Fatalf("status = %v, want ready", status)
+		}
+		// Cursor and anchor are UTF-8 byte offsets in logical order,
+		// and their direction is preserved.
+		if want := len("aمرحبا"); snapshot.cursor != want {
+			t.Fatalf("cursor = %d, want %d", snapshot.cursor, want)
+		}
+		if want := len("aم"); snapshot.anchor != want {
+			t.Fatalf("anchor = %d, want %d", snapshot.anchor, want)
+		}
+	})
+
+	t.Run("rejects selection larger than limit", func(t *testing.T) {
+		text := strings.Repeat("界", 1400)
+		state := textInputTestState(text, key.Range{Start: 0, End: 1400})
+		if _, status := textInputSurrounding(state); status != surroundingUnavailable {
+			t.Fatalf("status = %v, want unavailable", status)
+		}
+	})
+}
+
+func TestTextInputDeleteRangeUsesUTF8Bytes(t *testing.T) {
+	text := "甲乙選択丙丁"
+	for _, snapshot := range []textInputSnapshot{
+		{text: text, start: 10, cursor: len("甲乙"), anchor: len("甲乙選択")},
+		{text: text, start: 10, cursor: len("甲乙選択"), anchor: len("甲乙")},
+	} {
+		rng, ok := snapshot.convertRange(uint32(len("乙")), uint32(len("丙")))
+		if !ok {
+			t.Fatal("valid UTF-8 delete range was rejected")
+		}
+		if want := (key.Range{Start: 11, End: 15}); rng != want {
+			t.Fatalf("delete range = %+v, want %+v", rng, want)
+		}
 	}
 }
