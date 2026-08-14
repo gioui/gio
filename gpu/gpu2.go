@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"image"
-	"image/draw"
 	"reflect"
 
 	"gioui.org/gpu/internal/driver"
@@ -13,18 +12,16 @@ import (
 )
 
 type Call struct {
+	Pos  image.Point
 	F    any
 	Refs []any
 	Args []uint32
 }
 
 type Quad struct {
-	Dr      image.Rectangle
-	Src     Call
-	Pos     image.Point
-	Mask    Call
-	MaskOff image.Point
-	Op      draw.Op
+	Clip  image.Rectangle
+	Op    Call
+	Masks []Call
 }
 
 type gpu2 struct {
@@ -88,12 +85,12 @@ func (g *gpu2) init() (err error) {
 	vsh, err := g.ctx.CompileVertexShader(vsrc, []shader.InputLocation{
 		{
 			Location: 0,
-			Type:     shader.DataTypeInt16,
+			Type:     driver.DataTypeInt16,
 			Size:     2,
 		},
 		{
 			Location: 1,
-			Type:     shader.DataTypeUInt32,
+			Type:     driver.DataTypeUInt32,
 			Size:     1,
 		},
 	})
@@ -108,8 +105,8 @@ func (g *gpu2) init() (err error) {
 	defer fsh.Release()
 	layout := driver.VertexLayout{
 		Inputs: []driver.InputDesc{
-			{Type: shader.DataTypeInt16, Size: 2, Offset: 0},
-			{Type: shader.DataTypeUInt32, Size: 1, Offset: 2 * 2},
+			{Type: driver.DataTypeInt16, Size: 2, Offset: 0},
+			{Type: driver.DataTypeUInt32, Size: 1, Offset: 2 * 2},
 		},
 		Stride: 2*2 + 1*4,
 	}
@@ -136,16 +133,20 @@ func (g *gpu2) init() (err error) {
 }
 
 func (g *gpu2) Frame(viewport image.Point, quads []Quad) error {
+	return nil
 	var verts []byte
 	fmt.Println("FRAME")
 	for i, q := range quads {
-		tn := reflect.TypeOf(q.Src.F).Elem().Name()
-		fmt.Printf("%+v (%s) (%T)\n", q.Dr, tn, q.Mask.F)
-		r := q.Dr
+		tn := reflect.TypeOf(q.Op.F).Elem().Name()
+		fmt.Printf("%+v %T\n", q.Clip, q.Op.F)
+		for _, m := range q.Masks {
+			fmt.Printf("\tmask: %T\n", m.F)
+		}
+		r := q.Clip
 		col := []byte{0x20 + uint8(i)*20, uint8(i), 0xff - uint8(i), 0xcc}
 		switch tn {
 		case "rgbaUniform":
-			binary.BigEndian.PutUint32(col, q.Src.Args[0])
+			binary.BigEndian.PutUint32(col, q.Op.Args[0])
 		}
 		verts = binary.NativeEndian.AppendUint16(verts, uint16(r.Min.X))
 		verts = binary.NativeEndian.AppendUint16(verts, uint16(r.Min.Y))

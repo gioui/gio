@@ -736,7 +736,7 @@ func vertFormatFor(f shader.InputLocation) C.MTLVertexFormat {
 	t := f.Type
 	s := f.Size
 	switch t {
-	case shader.DataTypeFloat:
+	case driver.DataTypeFloat:
 		switch s {
 		case 1:
 			return C.MTLVertexFormatFloat
@@ -747,7 +747,7 @@ func vertFormatFor(f shader.InputLocation) C.MTLVertexFormat {
 		case 4:
 			return C.MTLVertexFormatFloat4
 		}
-	case shader.DataTypeInt8:
+	case driver.DataTypeInt8:
 		switch s {
 		case 1:
 			return C.MTLVertexFormatChar
@@ -758,7 +758,7 @@ func vertFormatFor(f shader.InputLocation) C.MTLVertexFormat {
 		case 4:
 			return C.MTLVertexFormatChar4
 		}
-	case shader.DataTypeUInt8N:
+	case driver.DataTypeUInt8N:
 		switch s {
 		case 1:
 			return C.MTLVertexFormatUCharNormalized
@@ -769,7 +769,7 @@ func vertFormatFor(f shader.InputLocation) C.MTLVertexFormat {
 		case 4:
 			return C.MTLVertexFormatUChar4Normalized
 		}
-	case shader.DataTypeInt16:
+	case driver.DataTypeInt16:
 		switch s {
 		case 1:
 			return C.MTLVertexFormatShort
@@ -780,7 +780,7 @@ func vertFormatFor(f shader.InputLocation) C.MTLVertexFormat {
 		case 4:
 			return C.MTLVertexFormatShort4
 		}
-	case shader.DataTypeUInt32:
+	case driver.DataTypeUInt32:
 		switch s {
 		case 1:
 			return C.MTLVertexFormatUInt

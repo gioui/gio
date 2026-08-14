@@ -152,7 +152,7 @@ type uniforms struct {
 type uniformLocation struct {
 	uniform gl.Uniform
 	offset  int
-	typ     shader.DataType
+	typ     driver.DataType
 	size    int
 }
 
@@ -1034,19 +1034,19 @@ func (p *uniforms) update(funcs *gl.Functions, buf *buffer) {
 		}
 		data := data[u.offset:]
 		switch {
-		case u.typ == shader.DataTypeFloat && u.size == 1:
+		case u.typ == driver.DataTypeFloat && u.size == 1:
 			data := data[:4]
 			v := *(*[1]float32)(unsafe.Pointer(unsafe.SliceData(data)))
 			funcs.Uniform1f(u.uniform, v[0])
-		case u.typ == shader.DataTypeFloat && u.size == 2:
+		case u.typ == driver.DataTypeFloat && u.size == 2:
 			data := data[:8]
 			v := *(*[2]float32)(unsafe.Pointer(unsafe.SliceData(data)))
 			funcs.Uniform2f(u.uniform, v[0], v[1])
-		case u.typ == shader.DataTypeFloat && u.size == 3:
+		case u.typ == driver.DataTypeFloat && u.size == 3:
 			data := data[:12]
 			v := *(*[3]float32)(unsafe.Pointer(unsafe.SliceData(data)))
 			funcs.Uniform3f(u.uniform, v[0], v[1], v[2])
-		case u.typ == shader.DataTypeFloat && u.size == 4:
+		case u.typ == driver.DataTypeFloat && u.size == 4:
 			data := data[:16]
 			v := *(*[4]float32)(unsafe.Pointer(unsafe.SliceData(data)))
 			funcs.Uniform4f(u.uniform, v[0], v[1], v[2], v[3])
@@ -1128,9 +1128,9 @@ func (b *Backend) setupVertexArrays() {
 		l := layout.Inputs[i]
 		var gltyp gl.Enum
 		switch l.Type {
-		case shader.DataTypeFloat:
+		case driver.DataTypeFloat:
 			gltyp = gl.FLOAT
-		case shader.DataTypeInt16:
+		case driver.DataTypeInt16:
 			gltyp = gl.SHORT
 		default:
 			panic("unsupported data type")

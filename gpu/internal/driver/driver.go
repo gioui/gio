@@ -148,6 +148,20 @@ type Texture interface {
 	Release()
 }
 
+type DataType = shader.DataType
+
+const (
+	DataTypeInt8  = shader.DataTypeInt
+	DataTypeInt16 = shader.DataTypeShort
+	DataTypeInt32 = shader.DataTypeInt
+	DataTypeFloat = shader.DataTypeFloat
+)
+
+const (
+	DataTypeUInt32 shader.DataType = 100 + iota
+	DataTypeUInt8N
+)
+
 const (
 	BufferBindingIndices BufferBinding = 1 << iota
 	BufferBindingVertices
