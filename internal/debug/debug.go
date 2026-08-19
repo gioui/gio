@@ -13,11 +13,15 @@ import (
 const (
 	debugVariable = "GIODEBUG"
 	textSubsystem = "text"
+	imeSubsystem  = "ime"
 	silentFeature = "silent"
 )
 
 // Text controls whether the text subsystem has debug logging enabled.
 var Text atomic.Bool
+
+// Ime controls whether the IME subsystem has debug logging enabled.
+var Ime atomic.Bool
 
 var parseOnce sync.Once
 
@@ -38,6 +42,8 @@ func Parse() {
 			switch part {
 			case textSubsystem:
 				Text.Store(true)
+			case imeSubsystem:
+				Ime.Store(true)
 			case silentFeature:
 				silent = true
 			default:

@@ -14,3 +14,5 @@ require (
 )
 
 require golang.org/x/net v0.48.0
+
+require github.com/godbus/dbus/v5 v5.2.2
