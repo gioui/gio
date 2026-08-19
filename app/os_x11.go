@@ -30,10 +30,12 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 	"unsafe"
 
 	"gioui.org/f32"
@@ -47,6 +49,7 @@ import (
 
 	syscall "golang.org/x/sys/unix"
 
+	"gioui.org/app/internal/ibus"
 	"gioui.org/app/internal/xkb"
 )
 
@@ -61,6 +64,7 @@ type x11Window struct {
 	xkb          *xkb.Context
 	xkbEventBase C.int
 	xw           C.Window
+	ibus         *ibus.IBus
 
 	atoms struct {
 		// "UTF8_STRING".
@@ -109,9 +113,10 @@ type x11Window struct {
 	cursor pointer.Cursor
 	config Config
 
-	wakeups chan struct{}
-	handler x11EventHandler
-	buf     [100]byte
+	wakeups     chan struct{}
+	dispatchFns chan func()
+	handler     x11EventHandler
+	buf         [100]byte
 }
 
 var (
@@ -331,7 +336,12 @@ func (w *x11Window) ShowTextInput(show bool) {}
 
 func (w *x11Window) SetInputHint(_ key.InputHint) {}
 
-func (w *x11Window) EditorStateChanged(old, new editorState) {}
+func (w *x11Window) EditorStateChanged(old, new editorState) {
+	if shouldCancelComposition(old, new) {
+		w.ibus.Reset()
+		w.w.SetComposingRegion(key.Range{-1, -1})
+	}
+}
 
 // close the window.
 func (w *x11Window) close() {
@@ -347,6 +357,7 @@ func (w *x11Window) close() {
 	arr := (*[5]C.long)(unsafe.Pointer(&ev.data))
 	arr[0] = C.long(w.atoms.evDelWindow)
 	arr[1] = C.CurrentTime
+	w.ibus.Stop()
 	C.XSendEvent(w.x, w.xw, C.False, C.NoEventMask, &xev)
 }
 
@@ -412,6 +423,10 @@ func (w *x11Window) Invalidate() {
 	case w.wakeups <- struct{}{}:
 	default:
 	}
+	w.invalidate()
+}
+
+func (w *x11Window) invalidate() {
 	if _, err := syscall.Write(w.notify.write, x11OneByte); err != nil && err != syscall.EAGAIN {
 		panic(fmt.Errorf("failed to write to pipe: %v", err))
 	}
@@ -437,6 +452,16 @@ func (w *x11Window) dispatch() {
 	case <-w.wakeups:
 		w.w.Invalidate()
 	default:
+	}
+
+dispatchFnsLoop:
+	for {
+		select {
+		case fn := <-w.dispatchFns:
+			fn()
+		default:
+			break dispatchFnsLoop
+		}
 	}
 
 	xfd := C.XConnectionNumber(w.x)
@@ -512,6 +537,7 @@ func (w *x11Window) destroy() {
 		w.xkb.Destroy()
 		w.xkb = nil
 	}
+	w.ibus.Stop()
 	C.XDestroyWindow(w.x, w.xw)
 	C.XCloseDisplay(w.x)
 	w.x = nil
@@ -567,13 +593,43 @@ func (h *x11EventHandler) handleEvents() bool {
 				ks = key.Release
 			}
 			kevt := (*C.XKeyPressedEvent)(unsafe.Pointer(xev))
-			_, events := h.w.xkb.DispatchKey(uint32(kevt.keycode), ks)
-			for _, e := range events {
-				if ee, ok := e.(key.EditEvent); ok {
-					// There's no support for IME yet.
-					w.w.EditorInsert(ee.Text)
-				} else {
-					w.ProcessEvent(e)
+			sym, events := h.w.xkb.DispatchKey(uint32(kevt.keycode), ks)
+			handledByIME := false
+			if _type == C.KeyPress {
+				handledByIME = w.ibus.ProcessKey(sym, uint32(kevt.keycode), uint32(kevt.state))
+				if handledByIME {
+					// Update IME cursor position
+					sel := w.w.EditorState().Selection
+					top := sel.Transform.Transform(sel.Caret.Pos.Add(f32.Pt(0, -sel.Caret.Ascent)))
+					bottom := sel.Transform.Transform(sel.Caret.Pos.Add(f32.Pt(0, sel.Caret.Descent)))
+					var pos image.Rectangle
+					pos.Min = image.Pt(int(top.X+.5), int(top.Y+.5))
+					pos.Max = image.Pt(int(bottom.X+.5), int(bottom.Y+.5))
+					if pos.Max.Y <= pos.Min.Y {
+						pos.Max.Y = pos.Min.Y + 1
+					}
+					if pos.Max.X <= pos.Min.X {
+						pos.Max.X = pos.Min.X + 1
+					}
+					root := C.XDefaultRootWindow(w.x)
+					var dstX, dstY C.int
+					var childReturn C.Window
+					C.XTranslateCoordinates(w.x, w.xw, root, 0, 0, &dstX, &dstY, &childReturn)
+					_ = childReturn
+					pos.Min.X += int(dstX)
+					pos.Min.Y += int(dstY)
+					pos.Max.X += int(dstX)
+					pos.Max.Y += int(dstY)
+					w.ibus.SetCursorLocation(pos)
+				}
+			}
+			if !handledByIME {
+				for _, e := range events {
+					if ee, ok := e.(key.EditEvent); ok {
+						w.w.EditorInsert(ee.Text)
+					} else {
+						w.ProcessEvent(e)
+					}
 				}
 			}
 		case C.ButtonPress, C.ButtonRelease:
@@ -655,9 +711,11 @@ func (h *x11EventHandler) handleEvents() bool {
 		case C.FocusIn:
 			w.config.Focused = true
 			w.ProcessEvent(ConfigEvent{Config: w.config})
+			w.ibus.Focused(true)
 		case C.FocusOut:
 			w.config.Focused = false
 			w.ProcessEvent(ConfigEvent{Config: w.config})
+			w.ibus.Focused(false)
 		case C.ConfigureNotify: // window configuration change
 			cevt := (*C.XConfigureEvent)(unsafe.Pointer(xev))
 			if sz := image.Pt(int(cevt.width), int(cevt.height)); sz != w.config.Size {
@@ -818,6 +876,7 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 		xkb:          xkb,
 		xkbEventBase: xkbEventBase,
 		wakeups:      make(chan struct{}, 1),
+		dispatchFns:  make(chan func(), 20),
 		config:       Config{Size: cnf.Size},
 	}
 	w.handler = x11EventHandler{w: w, xev: new(C.XEvent), text: make([]byte, 4)}
@@ -858,6 +917,11 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 
 	// extensions
 	C.XSetWMProtocols(dpy, win, &w.atoms.evDelWindow, 1)
+
+	// IBus IME
+	if strings.Contains(os.Getenv("XMODIFIERS"), "@im=ibus") {
+		w.ibus, _ = ibus.Start(C.GoString(C.XDisplayString(dpy)), (*ibusEventHandler)(w))
+	}
 
 	// make the window visible on the screen
 	C.XMapWindow(dpy, win)
@@ -921,4 +985,39 @@ func (w *x11Window) updateXkbKeymap() error {
 	}
 	w.xkb.SetKeymap(unsafe.Pointer(keymap), unsafe.Pointer(state))
 	return nil
+}
+
+type ibusEventHandler x11Window
+
+func (h *ibusEventHandler) Event(new string, sel key.Range, visible, preedit bool) {
+	w := (*x11Window)(h)
+	handlefn := func() {
+		state := w.w.EditorState()
+		rng := imeRange(state)
+		if rng.Start != rng.End || new != "" {
+			w.w.EditorReplace(rng, new)
+		}
+		end := rng.Start + utf8.RuneCountInString(new)
+		if preedit && visible {
+			rng.End = end
+			w.w.SetComposingRegion(rng)
+			if sel.Start < 0 || sel.End < 0 {
+				w.w.SetEditorSelection(key.Range{Start: rng.End, End: rng.End})
+			} else {
+				w.w.SetEditorSelection(key.Range{Start: rng.Start + sel.Start, End: rng.Start + sel.End})
+			}
+		} else {
+			w.w.SetComposingRegion(key.Range{Start: -1, End: -1})
+			w.w.SetEditorSelection(key.Range{Start: end, End: end})
+		}
+	}
+	// This function is executed in the dbus event handling goroutine.
+	// If we block in this function dbus will not be able to use its connection
+	// which means that as soon as we receive a keypress from the X server the
+	// dbus call to process it will also block, leading to a deadlock.
+	select {
+	case w.dispatchFns <- handlefn:
+		w.invalidate()
+	default:
+	}
 }
