@@ -20,6 +20,10 @@ __attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(BOOL presentWi
 @end
 
 @implementation GioWindowDelegate
+- (BOOL)windowShouldClose:(NSWindow *)window {
+	GioView *view = (GioView *)window.contentView;
+	return gio_onCloseRequest(view.handle) != 0;
+}
 - (void)windowWillMiniaturize:(NSNotification *)notification {
 	NSWindow *window = (NSWindow *)[notification object];
   GioView *view = (GioView *)window.contentView;

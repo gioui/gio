@@ -338,6 +338,12 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		np := windows.Point{X: int32(x), Y: int32(y)}
 		windows.ScreenToClient(w.hwnd, &np)
 		return w.hitTest(int(np.X), int(np.Y))
+	case windows.WM_CLOSE:
+		e := &ClosingEvent{}
+		w.ProcessEvent(e)
+		if e.abort {
+			return 0
+		}
 	case windows.WM_POINTERWHEEL:
 		w.scrollEvent(wParam, lParam, false, getModifiers())
 	case windows.WM_POINTERHWHEEL:

@@ -106,8 +106,10 @@ type x11Window struct {
 	clipboard struct {
 		content []byte
 	}
-	cursor pointer.Cursor
-	config Config
+	cursor    pointer.Cursor
+	config    Config
+	closing   *ClosingEvent
+	delivered *ClosingEvent
 
 	wakeups chan struct{}
 	handler x11EventHandler
@@ -333,7 +335,7 @@ func (w *x11Window) SetInputHint(_ key.InputHint) {}
 
 func (w *x11Window) EditorStateChanged(old, new editorState) {}
 
-// close the window.
+// close asks the event loop to process a close request.
 func (w *x11Window) close() {
 	var xev C.XEvent
 	ev := (*C.XClientMessageEvent)(unsafe.Pointer(&xev))
@@ -390,10 +392,21 @@ func (w *x11Window) shutdown(err error) {
 
 func (w *x11Window) Event() event.Event {
 	for {
+		if w.delivered != nil {
+			e := w.delivered
+			w.delivered = nil
+			if !e.abort {
+				w.shutdown(nil)
+			}
+		}
 		evt, ok := w.w.nextEvent()
 		if !ok {
 			w.dispatch()
 			continue
+		}
+		if e, ok := evt.(*ClosingEvent); ok && e == w.closing {
+			w.delivered = w.closing
+			w.closing = nil
 		}
 		return evt
 	}
@@ -740,8 +753,13 @@ func (h *x11EventHandler) handleEvents() bool {
 			cevt := (*C.XClientMessageEvent)(unsafe.Pointer(xev))
 			switch *(*C.long)(unsafe.Pointer(&cevt.data)) {
 			case C.long(w.atoms.evDelWindow):
-				w.shutdown(nil)
-				return false
+				if w.closing != nil {
+					return true
+				}
+				e := &ClosingEvent{}
+				w.closing = e
+				w.ProcessEvent(e)
+				return true
 			}
 		}
 	}
