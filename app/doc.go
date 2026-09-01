@@ -61,6 +61,10 @@ For example, to display a blank but otherwise functional window:
 The [Events] iterator yields app-specific events such as [URLEvent]. [Window.Event]
 yields events that target a particular window.
 
+On Windows, macOS, Wayland, and X11, [Window.Event] yields a [ClosingEvent]
+when the user requests to close a window. The window closes unless the
+application calls [ClosingEvent.Abort] while handling the event.
+
 # Permissions
 
 The packages under gioui.org/app/permission should be imported

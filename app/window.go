@@ -115,6 +115,7 @@ type eventSummary struct {
 	view         *ViewEvent
 	frame        *frameEvent
 	framePending bool
+	closing      *ClosingEvent
 	destroy      *DestroyEvent
 }
 
@@ -579,6 +580,10 @@ func (w *Window) nextEvent() (event.Event, bool) {
 		e := *s.view
 		s.view = nil
 		return e, true
+	case s.closing != nil:
+		e := s.closing
+		s.closing = nil
+		return e, true
 	case s.destroy != nil:
 		e := *s.destroy
 		// Clear pending events after DestroyEvent is delivered.
@@ -654,6 +659,8 @@ func (w *Window) processEvent(e event.Event) bool {
 			<-q
 		}
 		w.coalesced.destroy = &e2
+	case *ClosingEvent:
+		w.coalesced.closing = e2
 	case ViewEvent:
 		if !e2.Valid() && w.gpu != nil {
 			w.ctx.Lock()

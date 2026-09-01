@@ -221,7 +221,9 @@ type window struct {
 
 	wakeups chan struct{}
 
-	closing bool
+	closing    bool
+	closeEvent *ClosingEvent
+	delivered  *ClosingEvent
 }
 
 type poller struct {
@@ -575,7 +577,7 @@ func gio_onXdgSurfaceConfigure(data unsafe.Pointer, wmSurf *C.struct_xdg_surface
 //export gio_onToplevelClose
 func gio_onToplevelClose(data unsafe.Pointer, topLvl *C.struct_xdg_toplevel) {
 	w := callbackLoad(data).(*window)
-	w.closing = true
+	w.requestClose()
 }
 
 //export gio_onToplevelConfigure
@@ -1170,7 +1172,7 @@ func (w *window) Perform(actions system.Action) {
 	walkActions(actions, func(action system.Action) {
 		switch action {
 		case system.ActionClose:
-			w.closing = true
+			w.requestClose()
 		}
 	})
 }
@@ -1430,13 +1432,34 @@ func (w *window) ProcessEvent(e event.Event) {
 
 func (w *window) Event() event.Event {
 	for {
+		if w.delivered != nil {
+			e := w.delivered
+			w.delivered = nil
+			if !e.abort {
+				w.closing = true
+				w.disp.wakeup()
+			}
+		}
 		evt, ok := w.w.nextEvent()
 		if !ok {
 			w.dispatch()
 			continue
 		}
+		if e, ok := evt.(*ClosingEvent); ok && e == w.closeEvent {
+			w.delivered = w.closeEvent
+			w.closeEvent = nil
+		}
 		return evt
 	}
+}
+
+func (w *window) requestClose() {
+	if w.closeEvent != nil {
+		return
+	}
+	e := &ClosingEvent{}
+	w.closeEvent = e
+	w.ProcessEvent(e)
 }
 
 func (w *window) Invalidate() {
