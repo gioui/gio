@@ -5,6 +5,7 @@ package text
 import (
 	"bufio"
 	"io"
+	"iter"
 	"strings"
 	"unicode/utf8"
 
@@ -224,8 +225,9 @@ type Shaper struct {
 	bitmapShapeCache bitmapShapeCache
 	layoutCache      layoutCache
 
-	reader    *bufio.Reader
-	paragraph []byte
+	reader     *bufio.Reader
+	paragraph  []byte
+	iterString string
 
 	// Iterator state.
 	brokeParagraph   bool
@@ -281,13 +283,13 @@ func (l *Shaper) init() {
 // iteratively calling NextGlyph.
 func (l *Shaper) Layout(params Parameters, txt io.Reader) {
 	l.init()
-	l.layoutText(params, txt, "")
+	l.layoutText(params, "", txt)
 }
 
 // LayoutString is Layout for strings.
 func (l *Shaper) LayoutString(params Parameters, str string) {
 	l.init()
-	l.layoutText(params, nil, str)
+	l.layoutText(params, str, nil)
 }
 
 func (l *Shaper) reset(align Alignment) {
@@ -297,27 +299,31 @@ func (l *Shaper) reset(align Alignment) {
 	l.txt.alignment = align
 }
 
-// layoutText lays out a large text document by breaking it into paragraphs and laying
-// out each of them separately. This allows the shaping results to be cached independently
-// by paragraph. Only one of txt and str should be provided.
-func (l *Shaper) layoutText(params Parameters, txt io.Reader, str string) {
-	l.reset(params.Alignment)
-	if txt == nil && len(str) == 0 {
-		l.txt.append(l.layoutParagraph(params, "", nil))
-		return
-	}
-	l.reader.Reset(txt)
-	truncating := params.MaxLines > 0
-	var done bool
-	var endByte int
-	for !done {
-		l.paragraph = l.paragraph[:0]
-		if txt != nil {
+func (l *Shaper) iterateParagraphByReader(txt io.Reader) iter.Seq2[string, bool] {
+	return func(yield func(string, bool) bool) {
+		if txt == nil {
+			if !yield("", true) {
+				return
+			}
+			return
+		}
+		l.reader.Reset(txt)
+		done := false
+		first := true
+
+		for !done {
+			l.paragraph = l.paragraph[:0]
 			for {
 				b, err := l.reader.ReadByte()
 				if err != nil {
 					// EOF or any other error ends processing here.
 					done = true
+					if len(l.paragraph) == 0 {
+						if first && !yield("", true) {
+							return
+						}
+						return
+					}
 					break
 				}
 				l.paragraph = append(l.paragraph, b)
@@ -326,65 +332,111 @@ func (l *Shaper) layoutText(params Parameters, txt io.Reader, str string) {
 				}
 			}
 			if !done {
-				_, re := l.reader.ReadByte()
-				done = re != nil
-				if !done {
-					_ = l.reader.UnreadByte()
+				// Check if we have reached EOF to report accurate done state.
+				_, err := l.reader.ReadByte()
+				if err != nil {
+					done = true
+				} else {
+					l.reader.UnreadByte()
 				}
 			}
-		} else {
-			idx := strings.IndexByte(str, '\n')
+			if !yield(string(l.paragraph), done) {
+				return
+			}
+			first = false
+		}
+	}
+}
+
+func (l *Shaper) countUnreadByReader() int {
+	unreadRunes := 0
+	for {
+		_, _, e := l.reader.ReadRune()
+		if e != nil {
+			break
+		}
+		unreadRunes++
+	}
+	return unreadRunes
+}
+
+func (l *Shaper) iterateParagraphByString(txt string) iter.Seq2[string, bool] {
+	return func(yield func(string, bool) bool) {
+		l.iterString = txt
+		if l.iterString == "" {
+			if !yield("", true) {
+				return
+			}
+			return
+		}
+		done := false
+		for !done {
+			l.paragraph = l.paragraph[:0]
+			endByte := -1
+			idx := strings.IndexByte(l.iterString, '\n')
 			if idx == -1 {
 				done = true
-				endByte = len(str)
+				endByte = len(l.iterString)
 			} else {
 				endByte = idx + 1
-				done = endByte == len(str)
+				done = endByte == len(l.iterString)
+			}
+			paragraph := l.iterString[:endByte]
+			l.iterString = l.iterString[endByte:]
+			if !yield(paragraph, done) {
+				return
 			}
 		}
-		if len(str[:endByte]) > 0 || (len(l.paragraph) > 0 || len(l.txt.lines) == 0) {
-			params.forceTruncate = truncating && !done
-			lines := l.layoutParagraph(params, str[:endByte], l.paragraph)
+	}
+}
+
+func (l *Shaper) countUnreadByString() int {
+	return utf8.RuneCountInString(l.iterString)
+}
+
+// layoutText lays out a document that is broken into paragraphs by the provided [paragraphIterator].
+// This allows the shaping results to be cached independently by paragraph.
+func (l *Shaper) layoutText(params Parameters, str string, txt io.Reader) {
+	l.reset(params.Alignment)
+	truncating := params.MaxLines > 0
+	// IMPORTANT: Keep these two loop bodies in sync. If we try to unify them by making the
+	// iterator implementation dynamic, Go fails to inline the whole loop and we add tons of
+	// unnecessary allocs.
+	if txt == nil {
+		for paragraph, isLast := range l.iterateParagraphByString(str) {
+			params.forceTruncate = truncating && !isLast
+			lines := l.layoutParagraph(params, paragraph)
+			l.txt.append(lines)
 			if truncating {
 				params.MaxLines -= len(lines.lines)
 				if params.MaxLines == 0 {
-					done = true
 					// We've truncated the text, but we need to account for all of the runes we never
 					// decoded in the truncator.
-					var unreadRunes int
-					if txt == nil {
-						unreadRunes = utf8.RuneCountInString(str[endByte:])
-					} else {
-						for {
-							_, _, e := l.reader.ReadRune()
-							if e != nil {
-								break
-							}
-							unreadRunes++
-						}
-					}
-					l.txt.unreadRuneCount = unreadRunes
+					l.txt.unreadRuneCount = l.countUnreadByString()
+					break
 				}
 			}
+		}
+	} else {
+		for paragraph, isLast := range l.iterateParagraphByReader(txt) {
+			params.forceTruncate = truncating && !isLast
+			lines := l.layoutParagraph(params, paragraph)
 			l.txt.append(lines)
+			if truncating {
+				params.MaxLines -= len(lines.lines)
+				if params.MaxLines == 0 {
+					// We've truncated the text, but we need to account for all of the runes we never
+					// decoded in the truncator.
+					l.txt.unreadRuneCount = l.countUnreadByReader()
+					break
+				}
+			}
 		}
-		if done {
-			return
-		}
-		str = str[endByte:]
 	}
 }
 
 // layoutParagraph shapes and wraps a paragraph using the provided parameters.
-// It accepts the paragraph data in either string or rune format, preferring the
-// string in order to hit the shaper cache more quickly.
-func (l *Shaper) layoutParagraph(params Parameters, asStr string, asBytes []byte) document {
-	if l == nil {
-		return document{}
-	}
-	if len(asStr) == 0 && len(asBytes) > 0 {
-		asStr = string(asBytes)
-	}
+func (l *Shaper) layoutParagraph(params Parameters, asStr string) document {
 	// Alignment is not part of the cache key because changing it does not impact shaping.
 	lk := layoutKey{
 		ppem:            params.PxPerEm,
