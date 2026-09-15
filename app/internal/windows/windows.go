@@ -194,6 +194,8 @@ const (
 
 	CW_USEDEFAULT = -2147483648
 
+	DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = ^uintptr(3) // -4
+
 	GWL_STYLE = ^(uintptr(16) - 1) // -16
 
 	GCS_COMPSTR       = 0x0008
@@ -266,6 +268,7 @@ const (
 	SW_RESTORE       = 9
 
 	SWP_FRAMECHANGED  = 0x0020
+	SWP_NOACTIVATE    = 0x0010
 	SWP_NOMOVE        = 0x0002
 	SWP_NOOWNERZORDER = 0x0200
 	SWP_NOSIZE        = 0x0001
@@ -488,7 +491,7 @@ var (
 	_SetClipboardData            = user32.NewProc("SetClipboardData")
 	_SetForegroundWindow         = user32.NewProc("SetForegroundWindow")
 	_SetFocus                    = user32.NewProc("SetFocus")
-	_SetProcessDPIAware          = user32.NewProc("SetProcessDPIAware")
+	_SetThreadDPIContext         = user32.NewProc("SetThreadDpiAwarenessContext")
 	_SetTimer                    = user32.NewProc("SetTimer")
 	_SetWindowLong               = user32.NewProc("SetWindowLongPtrW")
 	_SetWindowLong32             = user32.NewProc("SetWindowLongW")
@@ -952,8 +955,8 @@ func SetFocus(hwnd syscall.Handle) {
 	_SetFocus.Call(uintptr(hwnd))
 }
 
-func SetProcessDPIAware() {
-	_SetProcessDPIAware.Call()
+func SetThreadDPIAware() {
+	_SetThreadDPIContext.Call(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)
 }
 
 func SetCapture(hwnd syscall.Handle) syscall.Handle {
