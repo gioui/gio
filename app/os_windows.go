@@ -96,7 +96,12 @@ func newWindow(win *callbacks, options []Option) {
 		// then thread-specific messages such as WM_QUIT are ignored.
 		// Instead lock the thread so window messages arrive through
 		// unfiltered GetMessage calls.
+		//
+		// Don't call UnLockOSThread, so that the Go runtime doesn't
+		// reuse a thread with thread-specific settings such as DPI
+		// awareness.
 		runtime.LockOSThread()
+		windows.SetThreadDpiAwarenessContext()
 
 		w := &window{
 			w: win,
@@ -125,7 +130,6 @@ func newWindow(win *callbacks, options []Option) {
 
 // initResources initializes the resources global.
 func initResources() error {
-	windows.SetProcessDPIAware()
 	hInst, err := windows.GetModuleHandle()
 	if err != nil {
 		return err
@@ -269,8 +273,18 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		// The message is processed.
 		return windows.TRUE
 	case windows.WM_DPICHANGED:
-		// Let Windows know we're prepared for runtime DPI changes.
-		return windows.TRUE
+		// Windows provides a rectangle scaled for the new monitor DPI.
+		r := (*windows.Rect)(unsafe.Pointer(lParam))
+		windows.SetWindowPos(
+			w.hwnd,
+			0,
+			r.Left,
+			r.Top,
+			r.Right-r.Left,
+			r.Bottom-r.Top,
+			windows.SWP_NOACTIVATE|windows.SWP_NOZORDER,
+		)
+		return 0
 	case windows.WM_ERASEBKGND:
 		// Avoid flickering between GPU content and background color.
 		return windows.TRUE
@@ -837,7 +851,7 @@ func (w *window) processDataEvent(content string) {
 }
 
 func (w *window) Configure(options []Option) {
-	dpi := windows.GetSystemDPI()
+	dpi := windows.GetWindowDPI(w.hwnd)
 	metric := configForDPI(dpi)
 	cnf := w.config
 	cnf.apply(metric, options)
