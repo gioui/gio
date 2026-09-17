@@ -790,11 +790,13 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 
 // paintSelection paints the contrasting background for selected text using the provided
 // material to set the painting material for the selection.
+//
+// The focus guard is intentionally omitted here so that a selection stays
+// highlighted while an editor context menu is open (EN_NOHIDESEL behavior).
+// Clearing the highlight as soon as the editor loses focus makes copy/cut
+// look broken while the menu is showing.
 func (e *Editor) paintSelection(gtx layout.Context, material op.CallOp) {
 	e.initBuffer()
-	if !gtx.Focused(e) {
-		return
-	}
 	e.text.PaintSelection(gtx, material)
 }
 
