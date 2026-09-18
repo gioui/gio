@@ -67,8 +67,11 @@ type Selectable struct {
 	// LineHeightScale applies a scaling factor to the LineHeight. If zero, a
 	// sensible default will be used.
 	LineHeightScale float32
-	initialized     bool
-	source          stringSource
+	// PaintSelectionWhenUnfocused controls whether the selection is highlighted
+	// even when the selectable does not have focus.
+	PaintSelectionWhenUnfocused bool
+	initialized                 bool
+	source                      stringSource
 	// scratch is a buffer reused to efficiently read text out of the
 	// textView.
 	scratch   []byte
@@ -100,7 +103,7 @@ func (l *Selectable) Focused() bool {
 // paintSelection paints the contrasting background for selected text.
 func (l *Selectable) paintSelection(gtx layout.Context, material op.CallOp) {
 	l.initialize()
-	if !l.focused {
+	if !l.focused && !l.PaintSelectionWhenUnfocused {
 		return
 	}
 	l.text.PaintSelection(gtx, material)
