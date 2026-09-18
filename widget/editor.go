@@ -67,6 +67,9 @@ type Editor struct {
 	Filter string
 	// WrapPolicy configures how displayed text will be broken into lines.
 	WrapPolicy text.WrapPolicy
+	// PaintSelectionWhenUnfocused controls whether the selection is highlighted
+	// even when the editor does not have focus.
+	PaintSelectionWhenUnfocused bool
 
 	buffer *editBuffer
 	// scratch is a byte buffer that is reused to efficiently read portions of text
@@ -792,7 +795,7 @@ func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.Call
 // material to set the painting material for the selection.
 func (e *Editor) paintSelection(gtx layout.Context, material op.CallOp) {
 	e.initBuffer()
-	if !gtx.Focused(e) {
+	if !gtx.Focused(e) && !e.PaintSelectionWhenUnfocused {
 		return
 	}
 	e.text.PaintSelection(gtx, material)
