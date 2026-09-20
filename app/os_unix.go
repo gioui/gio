@@ -29,6 +29,8 @@ type WaylandViewEvent struct {
 	Display unsafe.Pointer
 	// Surface is the *wl_surface returned by wl_compositor_create_surface.
 	Surface unsafe.Pointer
+	// Toplevel is the *xdg_toplevel returned by xdg_surface_get_toplevel.
+	Toplevel unsafe.Pointer
 }
 
 func (WaylandViewEvent) implementsViewEvent() {}

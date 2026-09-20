@@ -280,8 +280,9 @@ func newWLWindow(callbacks *callbacks, options []Option) error {
 	C.wl_surface_commit(w.surf)
 
 	w.ProcessEvent(WaylandViewEvent{
-		Display: unsafe.Pointer(w.display()),
-		Surface: unsafe.Pointer(w.surf),
+		Display:  unsafe.Pointer(w.display()),
+		Surface:  unsafe.Pointer(w.surf),
+		Toplevel: unsafe.Pointer(w.topLvl),
 	})
 	return nil
 }
