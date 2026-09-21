@@ -251,6 +251,41 @@ func TestStrokedPathBalloon(t *testing.T) {
 	})
 }
 
+func TestPathWithoutCommands(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		var path clip.Path
+		path.Begin(o)
+		path.Close()
+		spec := path.End()
+
+		stroke := clip.Stroke{Path: spec, Width: 16}.Op().Push(o)
+		paint.Fill(o, color.NRGBA{B: 0xFF, A: 0xFF})
+		stroke.Pop()
+	}, func(r result) {
+		r.expect(0, 0, transparent)
+		r.expect(4, 4, transparent)
+	})
+}
+
+func TestPathWithoutSegments(t *testing.T) {
+	run(t, func(o *op.Ops) {
+		var path clip.Path
+		path.Begin(o)
+		path.MoveTo(f32.Pt(32, 32))
+		path.Close()
+		spec := path.End()
+
+		stroke := clip.Stroke{Path: spec, Width: 16}.Op().Push(o)
+		paint.Fill(o, color.NRGBA{B: 0xFF, A: 0xFF})
+		stroke.Pop()
+	}, func(r result) {
+		r.expect(0, 0, transparent)
+		r.expect(4, 4, transparent)
+		r.expect(28, 28, transparent)
+		r.expect(36, 36, transparent)
+	})
+}
+
 func TestPathReuse(t *testing.T) {
 	run(t, func(o *op.Ops) {
 		var path clip.Path

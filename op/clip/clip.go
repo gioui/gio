@@ -49,7 +49,8 @@ func (p Op) Push(o *op.Ops) Stack {
 func (p Op) add(o *op.Ops) {
 	path := p.path
 
-	if !path.hasSegments && p.width > 0 {
+	hasSegments := path.hasSegments
+	if !hasSegments && p.width > 0 {
 		switch p.path.shape {
 		case ops.Rect:
 			b := f32internal.FRect(path.bounds)
@@ -61,6 +62,7 @@ func (p Op) add(o *op.Ops) {
 			rect.LineTo(f32.Pt(b.Min.X, b.Max.Y))
 			rect.Close()
 			path = rect.End()
+			hasSegments = true
 		case ops.Path:
 			// Nothing to do.
 		default:
@@ -68,7 +70,7 @@ func (p Op) add(o *op.Ops) {
 		}
 	}
 	bo := binary.LittleEndian
-	if path.hasSegments {
+	if hasSegments {
 		data := ops.Write(&o.Internal, ops.TypePathLen)
 		data[0] = byte(ops.TypePath)
 		bo.PutUint64(data[1:], path.hash)
@@ -76,7 +78,7 @@ func (p Op) add(o *op.Ops) {
 	}
 
 	bounds := path.bounds
-	if p.width > 0 {
+	if hasSegments && p.width > 0 {
 		// Expand bounds to cover stroke.
 		half := int(p.width*.5 + .5)
 		bounds.Min.X -= half
