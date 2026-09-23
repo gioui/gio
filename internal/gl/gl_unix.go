@@ -662,9 +662,9 @@ func (f *Functions) load(forceES bool) error {
 	case runtime.GOOS == "ios":
 		libNames = []string{"/System/Library/Frameworks/OpenGLES.framework/OpenGLES"}
 	case runtime.GOOS == "android":
-		libNames = []string{"libGLESv2.so", "libGLESv3.so"}
+		libNames = []string{"libGLESv3.so", "libGLESv2.so"}
 	default:
-		libNames = []string{"libGLESv2.so.2", "libGLESv2.so.3.0"}
+		libNames = []string{"libGLESv2.so.3.0", "libGLESv2.so.2"}
 	}
 	for _, lib := range libNames {
 		if h := dlopen(lib); h != nil {
