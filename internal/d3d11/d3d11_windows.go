@@ -664,7 +664,10 @@ const (
 
 	MAP_READ = 1
 
-	DXGI_SWAP_EFFECT_DISCARD = 0
+	DXGI_SWAP_EFFECT_DISCARD      = 0
+	DXGI_SWAP_EFFECT_FLIP_DISCARD = 4
+
+	RTV_DIMENSION_TEXTURE2D = 4
 
 	FEATURE_LEVEL_9_1  = 0x9100
 	FEATURE_LEVEL_9_3  = 0x9300
@@ -1038,14 +1041,25 @@ func (d *Device) CreateTexture2D(desc *TEXTURE2D_DESC) (*Texture2D, error) {
 	return tex, nil
 }
 
-func (d *Device) CreateRenderTargetView(res *Resource) (*RenderTargetView, error) {
+// RENDER_TARGET_VIEW_DESC is D3D11_RENDER_TARGET_VIEW_DESC with its
+// trailing union flattened; the largest member is D3D11_TEX2D_ARRAY_RTV
+// at 12 bytes. For a RTV_DIMENSION_TEXTURE2D view only MipSlice is read.
+type RENDER_TARGET_VIEW_DESC struct {
+	Format        uint32
+	ViewDimension uint32
+	MipSlice      uint32
+	FirstArrSlice uint32
+	ArraySize     uint32
+}
+
+func (d *Device) CreateRenderTargetView(res *Resource, desc RENDER_TARGET_VIEW_DESC) (*RenderTargetView, error) {
 	var target *RenderTargetView
 	r, _, _ := syscall.Syscall6(
 		d.Vtbl.CreateRenderTargetView,
 		4,
 		uintptr(unsafe.Pointer(d)),
 		uintptr(unsafe.Pointer(res)),
-		0, // pDesc
+		uintptr(unsafe.Pointer(&desc)),
 		uintptr(unsafe.Pointer(&target)),
 		0, 0,
 	)
@@ -1645,18 +1659,24 @@ func CreateSwapChain(dev *Device, hwnd windows.Handle) (*IDXGISwapChain, error) 
 	}
 	swchain, err := (*IDXGIFactory)(unsafe.Pointer(dxgiFactory)).CreateSwapChain(
 		(*IUnknown)(unsafe.Pointer(dev)),
+		// The flip presentation model is required by modern drivers;
+		// several of them mishandle the legacy blt model and present
+		// nothing at all. Flip forbids an sRGB backbuffer format and
+		// needs at least two buffers, so gamma correctness moves to the
+		// sRGB render target view the caller creates over the
+		// backbuffer.
 		&DXGI_SWAP_CHAIN_DESC{
 			BufferDesc: DXGI_MODE_DESC{
-				Format: DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+				Format: DXGI_FORMAT_R8G8B8A8_UNORM,
 			},
 			SampleDesc: DXGI_SAMPLE_DESC{
 				Count: 1,
 			},
 			BufferUsage:  DXGI_USAGE_RENDER_TARGET_OUTPUT,
-			BufferCount:  1,
+			BufferCount:  2,
 			OutputWindow: hwnd,
 			Windowed:     1,
-			SwapEffect:   DXGI_SWAP_EFFECT_DISCARD,
+			SwapEffect:   DXGI_SWAP_EFFECT_FLIP_DISCARD,
 		},
 	)
 	IUnknownRelease(unsafe.Pointer(dxgiFactory), dxgiFactory.Vtbl.Release)
