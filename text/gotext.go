@@ -218,9 +218,9 @@ type shaperImpl struct {
 
 	// Scratch buffers used to avoid re-allocating slices during routine internal
 	// shaping operations.
-	splitScratch1, splitScratch2 []shaping.Input
-	outScratchBuf                []shaping.Output
-	scratchRunes                 []rune
+	segmenter     shaping.Segmenter
+	outScratchBuf []shaping.Output
+	scratchRunes  []rune
 
 	// bitmapGlyphCache caches extracted bitmap glyph images.
 	bitmapGlyphCache bitmapCache
@@ -285,87 +285,6 @@ func (s *shaperImpl) addFace(f *font.Face, md giofont.Font) {
 	s.faceMeta = append(s.faceMeta, md)
 }
 
-// splitByScript divides the inputs into new, smaller inputs on script boundaries
-// and correctly sets the text direction per-script. It will
-// use buf as the backing memory for the returned slice if buf is non-nil.
-func splitByScript(inputs []shaping.Input, documentDir di.Direction, buf []shaping.Input) []shaping.Input {
-	var splitInputs []shaping.Input
-	if buf == nil {
-		splitInputs = make([]shaping.Input, 0, len(inputs))
-	} else {
-		splitInputs = buf
-	}
-	for _, input := range inputs {
-		currentInput := input
-		if input.RunStart == input.RunEnd {
-			return []shaping.Input{input}
-		}
-		firstNonCommonRune := input.RunStart
-		for i := firstNonCommonRune; i < input.RunEnd; i++ {
-			if language.LookupScript(input.Text[i]) != language.Common {
-				firstNonCommonRune = i
-				break
-			}
-		}
-		currentInput.Script = language.LookupScript(input.Text[firstNonCommonRune])
-		for i := firstNonCommonRune + 1; i < input.RunEnd; i++ {
-			r := input.Text[i]
-			runeScript := language.LookupScript(r)
-
-			if runeScript == language.Common || runeScript == language.Inherited || runeScript == currentInput.Script {
-				continue
-			}
-
-			if i != input.RunStart {
-				currentInput.RunEnd = i
-				splitInputs = append(splitInputs, currentInput)
-			}
-
-			currentInput = input
-			currentInput.RunStart = i
-			currentInput.Script = runeScript
-			// In the future, it may make sense to try to guess the language of the text here as well,
-			// but this is a complex process.
-		}
-		// close and add the last input
-		currentInput.RunEnd = input.RunEnd
-		splitInputs = append(splitInputs, currentInput)
-	}
-
-	return splitInputs
-}
-
-func (s *shaperImpl) splitBidi(input shaping.Input) []shaping.Input {
-	var splitInputs []shaping.Input
-	if input.Direction.Axis() != di.Horizontal || input.RunStart == input.RunEnd {
-		return []shaping.Input{input}
-	}
-	def := bidi.LeftToRight
-	if input.Direction.Progression() == di.TowardTopLeft {
-		def = bidi.RightToLeft
-	}
-	s.bidiParagraph.SetString(string(input.Text), bidi.DefaultDirection(def))
-	out, err := s.bidiParagraph.Order()
-	if err != nil {
-		return []shaping.Input{input}
-	}
-	for i := range out.NumRuns() {
-		currentInput := input
-		run := out.Run(i)
-		dir := run.Direction()
-		_, endRune := run.Pos()
-		currentInput.RunEnd = endRune + 1
-		if dir == bidi.RightToLeft {
-			currentInput.Direction = di.DirectionRTL
-		} else {
-			currentInput.Direction = di.DirectionLTR
-		}
-		splitInputs = append(splitInputs, currentInput)
-		input.RunStart = currentInput.RunEnd
-	}
-	return splitInputs
-}
-
 // ResolveFace allows shaperImpl to implement shaping.FontMap, wrapping its fontMap
 // field and ensuring that any faces loaded as part of the search are registered with
 // ids so that they can be referred to by a GlyphID.
@@ -383,22 +302,6 @@ func (s *shaperImpl) ResolveFace(r rune) *font.Face {
 	return nil
 }
 
-// splitByFaces divides the inputs by font coverage in the provided faces. It will use the slice provided in buf
-// as the backing storage of the returned slice if buf is non-nil.
-func (s *shaperImpl) splitByFaces(inputs []shaping.Input, buf []shaping.Input) []shaping.Input {
-	var split []shaping.Input
-	if buf == nil {
-		split = make([]shaping.Input, 0, len(inputs))
-	} else {
-		split = buf
-	}
-	for _, input := range inputs {
-		s.fontMap.SetScript(input.Script)
-		split = append(split, shaping.SplitByFace(input, s)...)
-	}
-	return split
-}
-
 // shapeText invokes the text shaper and returns the raw text data in the shaper's native
 // format. It does not wrap lines.
 func (s *shaperImpl) shapeText(ppem fixed.Int26_6, lc system.Locale, txt []rune) []shaping.Output {
@@ -414,10 +317,7 @@ func (s *shaperImpl) shapeText(ppem fixed.Int26_6, lc system.Locale, txt []rune)
 		// the empty string contains no runes.
 		input.Face = s.faces[0]
 	}
-	// Break input on font glyph coverage.
-	inputs := s.splitBidi(input)
-	inputs = splitByScript(inputs, lcfg.Direction, s.splitScratch2[:0])
-	inputs = s.splitByFaces(inputs, s.splitScratch1[:0])
+	inputs := s.segmenter.Split(input, s)
 	// Shape all inputs.
 	if needed := len(inputs) - len(s.outScratchBuf); needed > 0 {
 		s.outScratchBuf = slices.Grow(s.outScratchBuf, needed)
