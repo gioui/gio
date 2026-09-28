@@ -45,11 +45,9 @@ func TestWrappingTruncation(t *testing.T) {
 			}, textInput)
 			lineCount := 0
 			lastGlyphWasLineBreak := false
-			glyphs := []Glyph{}
 			untruncatedRunes := 0
 			truncatedRunes := 0
 			for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
-				glyphs = append(glyphs, g)
 				if g.Flags&FlagTruncator != 0 && g.Flags&FlagClusterBreak != 0 {
 					truncatedRunes += int(g.Runes)
 				} else {
@@ -111,11 +109,9 @@ func TestWrappingForcedTruncation(t *testing.T) {
 				Locale:    english,
 			}, textInput)
 			lineCount := 0
-			glyphs := []Glyph{}
 			untruncatedRunes := 0
 			truncatedRunes := 0
 			for g, ok := cache.NextGlyph(); ok; g, ok = cache.NextGlyph() {
-				glyphs = append(glyphs, g)
 				if g.Flags&FlagTruncator != 0 && g.Flags&FlagClusterBreak != 0 {
 					truncatedRunes += int(g.Runes)
 				} else {
