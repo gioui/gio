@@ -302,6 +302,13 @@ func (s *shaperImpl) ResolveFace(r rune) *font.Face {
 	return nil
 }
 
+func (s *shaperImpl) SetScript(script language.Script) {
+	s.fontMap.SetScript(script)
+}
+
+// Ensure shaperImpl implements the FontmapScript interface.
+var _ (shaping.FontmapScript) = (*shaperImpl)(nil)
+
 // shapeText invokes the text shaper and returns the raw text data in the shaper's native
 // format. It does not wrap lines.
 func (s *shaperImpl) shapeText(ppem fixed.Int26_6, lc system.Locale, txt []rune) []shaping.Output {
