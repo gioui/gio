@@ -129,6 +129,9 @@ func onCreate(view, controller C.CFTypeRef) {
 	w := &window{
 		view: view,
 		w:    wopts.window,
+		config: Config{
+			Focused: true,
+		},
 	}
 	w.loop = newEventLoop(w.w, w.wakeup)
 	w.w.SetDriver(w)
