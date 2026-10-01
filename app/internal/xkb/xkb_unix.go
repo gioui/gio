@@ -177,6 +177,13 @@ func (x *Context) DispatchKey(keyCode uint32, state key.State) (symbol uint32, e
 		}
 		events = append(events, cmd)
 	}
+	// Only advance the compose state machine on key PRESS. Feeding it on
+	// RELEASE resolves a pending dead key into its raw glyph (e.g. '~')
+	// and leaks it as a spurious EditEvent. xkbcommon documents that the
+	// keysym to feed is "usually obtained after a key-press event".
+	if state != key.Press {
+		return
+	}
 	C.xkb_compose_state_feed(x.compState, sym)
 	var str []byte
 	switch C.xkb_compose_state_get_status(x.compState) {
