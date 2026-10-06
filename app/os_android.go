@@ -499,10 +499,13 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		w.callbacks.SetDriver(w)
 		cnf.apply(unit.Metric{}, wopts.options)
 		windows[wopts.window] = w
+		mainWindow.windows <- struct{}{}
 	} else {
+		// The view was re-created for an existing window, for example
+		// when Android re-creates the activity after a configuration
+		// change. newWindow is not waiting for this view.
 		cnf = w.config
 	}
-	mainWindow.windows <- struct{}{}
 	if w.view != 0 {
 		w.detach(env)
 	}
