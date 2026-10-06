@@ -558,7 +558,6 @@ func TestIndexPositionRunes(t *testing.T) {
 	// source is crafted to contain multiple consecutive RTL runs (by
 	// changing scripts within the RTL).
 	source := "The\nquick سماء של\nום لا fox\nتمط של\nום."
-	testText := makeAccountingTestText(source, fontSize, lineWidth)
 	type testcase struct {
 		name     string
 		source   string
@@ -569,7 +568,7 @@ func TestIndexPositionRunes(t *testing.T) {
 		{
 			name:   "many newlines",
 			source: source,
-			glyphs: testText,
+			glyphs: makeAccountingTestText(source, fontSize, lineWidth),
 			expected: []combinedPos{
 				{runes: 0, lineCol: screenPos{line: 0, col: 0}, runIndex: 0, towardOrigin: false},
 				{runes: 1, lineCol: screenPos{line: 0, col: 1}, runIndex: 0, towardOrigin: false},
@@ -596,7 +595,7 @@ func TestIndexPositionRunes(t *testing.T) {
 				{runes: 21, lineCol: screenPos{line: 2, col: 3}, runIndex: 1, towardOrigin: true},
 				{runes: 22, lineCol: screenPos{line: 2, col: 4}, runIndex: 1, towardOrigin: true},
 				{runes: 23, lineCol: screenPos{line: 2, col: 5}, runIndex: 1, towardOrigin: true},
-				{runes: 24, lineCol: screenPos{line: 2, col: 6}, runIndex: 1, towardOrigin: true},
+				{runes: 23, lineCol: screenPos{line: 2, col: 5}, runIndex: 2, towardOrigin: false},
 				{runes: 24, lineCol: screenPos{line: 2, col: 6}, runIndex: 2, towardOrigin: false},
 				{runes: 25, lineCol: screenPos{line: 2, col: 7}, runIndex: 2, towardOrigin: false},
 				{runes: 26, lineCol: screenPos{line: 2, col: 8}, runIndex: 2, towardOrigin: false},
@@ -611,7 +610,8 @@ func TestIndexPositionRunes(t *testing.T) {
 				{runes: 35, lineCol: screenPos{line: 4, col: 0}, runIndex: 0, towardOrigin: true},
 				{runes: 36, lineCol: screenPos{line: 4, col: 1}, runIndex: 0, towardOrigin: true},
 				{runes: 37, lineCol: screenPos{line: 4, col: 2}, runIndex: 0, towardOrigin: true},
-				{runes: 38, lineCol: screenPos{line: 4, col: 3}, runIndex: 0, towardOrigin: true},
+				{runes: 37, lineCol: screenPos{line: 4, col: 2}, runIndex: 1, towardOrigin: false},
+				{runes: 38, lineCol: screenPos{line: 4, col: 3}, runIndex: 1, towardOrigin: false},
 			},
 		},
 	} {
