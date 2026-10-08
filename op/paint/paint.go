@@ -32,6 +32,9 @@ type ImageOp struct {
 	uniform bool
 	color   color.NRGBA
 	src     *image.RGBA
+	// ext is set instead of src when the pixels live in a GPU texture
+	// already. See Texture.
+	ext Texture
 
 	// handle is a key to uniquely identify this ImageOp
 	// in a map of cached textures.
@@ -97,6 +100,9 @@ func NewImageOp(src image.Image) ImageOp {
 }
 
 func (i ImageOp) Size() image.Point {
+	if i.ext != nil {
+		return i.ext.Bounds().Size()
+	}
 	if i.src == nil {
 		return image.Point{}
 	}
@@ -109,6 +115,16 @@ func (i ImageOp) Add(o *op.Ops) {
 			Color: i.color,
 		}.Add(o)
 		return
+	} else if i.ext != nil {
+		if i.ext.Bounds().Empty() {
+			return
+		}
+		// The renderer reads the size from the handle; src is a placeholder
+		// that keeps the op encoding unchanged.
+		data := ops.Write2(&o.Internal, ops.TypeImageLen, extPlaceholder, i.ext)
+		data[0] = byte(ops.TypeImage)
+		data[1] = byte(i.Filter)
+		return
 	} else if i.src == nil || i.src.Bounds().Empty() {
 		return
 	}
@@ -116,6 +132,10 @@ func (i ImageOp) Add(o *op.Ops) {
 	data[0] = byte(ops.TypeImage)
 	data[1] = byte(i.Filter)
 }
+
+// extPlaceholder stands in for the pixels of a Texture backed image, which
+// never has any on the CPU.
+var extPlaceholder = image.NewRGBA(image.Rect(0, 0, 1, 1))
 
 func (c ColorOp) Add(o *op.Ops) {
 	data := ops.Write(&o.Internal, ops.TypeColorLen)

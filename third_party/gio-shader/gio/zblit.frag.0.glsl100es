@@ -1,0 +1,19 @@
+#version 100
+precision highp float;
+precision highp int;
+
+struct Color
+{
+    vec4 color;
+};
+
+uniform Color _color;
+
+varying highp float opacity;
+varying highp vec2 vUV;
+
+void main()
+{
+    gl_FragData[0] = _color.color * opacity;
+}
+

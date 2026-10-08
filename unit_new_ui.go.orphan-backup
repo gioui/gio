@@ -1,0 +1,202 @@
+package main
+
+import (
+	"image"
+
+	"gioui.org/font"
+	"gioui.org/io/key"
+	"gioui.org/layout"
+	"gioui.org/unit"
+	"gioui.org/widget"
+	"gioui.org/widget/material"
+)
+
+// The New unit dialog.
+//
+// It is a modal over the whole window rather than a panel of the object window,
+// because it writes a file: the user should not be able to click their way past
+// it and forget what it was about. It says what it is going to do — the race the
+// unit will belong to and the folder it will be written into — because the one
+// thing a generated unit cannot work out for itself is which race asked for it.
+
+// openNewUnitDialog puts the dialog up for the given race, with the name field
+// ready and empty. The race is the one the object window was showing: the unit
+// belongs where the user was looking, and making them choose again would be a
+// second question with the same answer.
+func (ui *uiState) openNewUnitDialog() {
+	race := ui.currentRace()
+	if race == nil {
+		ui.statusText = "Choose a race before creating a unit"
+		return
+	}
+	ui.closeUnitPickers()
+	ui.newUnitDialog = true
+	ui.newUnitStatus = ""
+	ui.newUnitNameEditor.SetText("")
+}
+
+// closeNewUnitDialog puts the dialog away, and the name with it: a name left in
+// the field would be offered again as though it were a fresh one.
+func (ui *uiState) closeNewUnitDialog() {
+	ui.newUnitDialog = false
+	ui.newUnitStatus = ""
+	ui.newUnitNameEditor.SetText("")
+}
+
+// newUnitFolderLabel is where a new unit of the current race will be written.
+func (ui *uiState) newUnitFolderLabel() string {
+	race := ui.currentRace()
+	if race == nil {
+		return ""
+	}
+	return unitTemplateName{Race: race.name, Name: "name"}.unitTemplateVirtualPath()
+}
+
+// layoutNewUnitDialog draws the dialog as an overlay over the whole window: a
+// catcher that takes the click meant for the window behind it, the card, and
+// nothing else.
+func (ui *uiState) layoutNewUnitDialog(gtx layout.Context) layout.Dimensions {
+	cardW := gtx.Dp(unit.Dp(420))
+	cardH := gtx.Dp(unit.Dp(228))
+	// Recorded for tests, the same as the picker list: without it a test has
+	// to guess where the card landed and probes the window around it.
+	ui.newUnitCardBox = image.Rect(gtx.Constraints.Max.X/2-cardW/2, gtx.Constraints.Max.Y/2-cardH/2, gtx.Constraints.Max.X/2+cardW/2, gtx.Constraints.Max.Y/2+cardH/2)
+	// A Stack puts a child smaller than itself at the given corner, and its
+	// zero value is the top left, so the card is centred by naming the
+	// alignment rather than by wrapping it: layout.Center centres within the
+	// constraints' minimum, which a stack's children do not carry.
+	return layout.Stack{Alignment: layout.Center}.Layout(gtx,
+		// The catcher first, so the card is painted over it and takes the
+		// clicks meant for itself. It has to be a Stacked child: a Stack lays
+		// its Expanded children out last, which would paint the catcher over
+		// the card and swallow every click meant for the card.
+		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+			return ui.newUnitDismissClick.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return layout.Dimensions{Size: gtx.Constraints.Max}
+			})
+		}),
+		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+			gtx.Constraints.Min = image.Pt(cardW, cardH)
+			gtx.Constraints.Max = image.Pt(cardW, cardH)
+			return widget.Border{Color: cBorder, Width: unit.Dp(1), CornerRadius: unit.Dp(4)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+				return layout.Stack{}.Layout(gtx,
+					layout.Expanded(func(gtx layout.Context) layout.Dimensions {
+						rrect(gtx, cPanelBg, gtx.Constraints.Max, gtx.Dp(4))
+						return layout.Dimensions{Size: gtx.Constraints.Max}
+					}),
+					layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+						return layout.Inset{Top: unit.Dp(16), Bottom: unit.Dp(16), Left: unit.Dp(16), Right: unit.Dp(16)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+							return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+								layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+									l := material.Label(ui.th, unit.Sp(14), "New unit")
+									l.Font.Weight = font.Medium
+									l.Color = cText
+									return l.Layout(gtx)
+								}),
+								layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
+								layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+									l := material.Label(ui.th, unit.Sp(11), "Written to "+ui.newUnitFolderLabel())
+									l.Color = cTextDim
+									return l.Layout(gtx)
+								}),
+								layout.Rigid(layout.Spacer{Height: unit.Dp(10)}.Layout),
+								layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+									h := gtx.Dp(unit.Dp(28))
+									gtx.Constraints.Min.Y = h
+									gtx.Constraints.Max.Y = h
+									return widget.Border{Color: cBorderLight, Width: unit.Dp(1), CornerRadius: unit.Dp(3)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+										return layout.Inset{Left: unit.Dp(8), Right: unit.Dp(8)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+											ed := material.Editor(ui.th, &ui.newUnitNameEditor, "")
+											ed.TextSize = unit.Sp(11)
+											ed.HintColor = cTextDim
+											ed.Hint = "chaos_hound"
+											return ed.Layout(gtx)
+										})
+									})
+								}),
+								layout.Rigid(layout.Spacer{Height: unit.Dp(8)}.Layout),
+								layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+									if ui.newUnitStatus == "" {
+										return layout.Dimensions{}
+									}
+									l := material.Label(ui.th, unit.Sp(10), ui.newUnitStatus)
+									l.Color = cTreeThis
+									return l.Layout(gtx)
+								}),
+								layout.Flexed(1, func(gtx layout.Context) layout.Dimensions { return layout.Dimensions{} }),
+								layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+									return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
+										layout.Flexed(1, flexGap()),
+										layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+											return ui.dialogButton(gtx, &ui.newUnitCancel, "Cancel", false)
+										}),
+										layout.Rigid(layout.Spacer{Width: unit.Dp(8)}.Layout),
+										layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+											return ui.dialogButton(gtx, &ui.newUnitOk, "Create", true)
+										}),
+									)
+								}),
+							)
+						})
+					}),
+				)
+			})
+		}),
+	)
+}
+
+// handleNewUnitDialogInput owns the dialog while it is up. It is read before
+// everything else, so a click on the window behind it reaches nothing.
+func (ui *uiState) handleNewUnitDialogInput(gtx layout.Context) {
+	submitted := false
+	for {
+		ev, ok := ui.newUnitNameEditor.Update(gtx)
+		if !ok {
+			break
+		}
+		if _, isSubmit := ev.(widget.SubmitEvent); isSubmit {
+			submitted = true
+		}
+	}
+	// A click on the dimmed window behind the card is a way out, the same as
+	// Escape: both say "not now" and change nothing.
+	if ui.newUnitDismissClick.Clicked(gtx) && !ui.newUnitOk.Clicked(gtx) && !ui.newUnitCancel.Clicked(gtx) {
+		ui.closeNewUnitDialog()
+		return
+	}
+	if ui.newUnitCancel.Clicked(gtx) {
+		ui.closeNewUnitDialog()
+		return
+	}
+	if !ui.newUnitOk.Clicked(gtx) && !submitted {
+		// Escape leaves the dialog, which a dialog the keyboard can reach has
+		// to allow.
+		for {
+			ev, ok := gtx.Event(key.Filter{Name: key.NameEscape})
+			if !ok {
+				break
+			}
+			if e, ok := ev.(key.Event); ok && e.State == key.Press {
+				ui.closeNewUnitDialog()
+				return
+			}
+		}
+		return
+	}
+	race := ui.currentRace()
+	if race == nil {
+		ui.newUnitStatus = "No race is selected, so there is nowhere to write the unit"
+		return
+	}
+	virtual, err := ui.createNewUnit(race.name, ui.newUnitNameEditor.Text())
+	if err != nil {
+		// A refused name is said in the dialog and the dialog stays up, so the
+		// name can be corrected instead of retyped.
+		ui.newUnitStatus = err.Error()
+		return
+	}
+	ui.closeNewUnitDialog()
+	// The unit is written; opening it is what makes the next step — the model,
+	// the icon, the name id — a click away rather than a search through the mod.
+	ui.openRgd(virtual)
+}

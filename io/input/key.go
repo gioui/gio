@@ -67,6 +67,7 @@ const (
 )
 
 func (k *keyHandler) inputHint(hint key.InputHint) {
+	k.visible = true
 	k.hint = hint
 }
 

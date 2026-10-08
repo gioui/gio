@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"log"
 	"math"
 	"math/bits"
 	"unsafe"
@@ -26,7 +27,16 @@ type Backend struct {
 	viewport   d3d11.VIEWPORT
 
 	pipeline *Pipeline
-	vert     struct {
+	// rasterizer is the state Gio draws with. Custom passes may install
+	// their own, so it is re-bound before every Gio draw call.
+	rasterizer *d3d11.RasterizerState
+	// Cached state for custom passes, see raw_windows.go.
+	rawViewport    d3d11.VIEWPORT
+	rawRasterizers map[uint32]*d3d11.RasterizerState
+	rawDepthStates map[uint32]*d3d11.DepthStencilState
+	rawStride      int
+
+	vert struct {
 		buffer *Buffer
 		offset int
 	}
@@ -36,6 +46,10 @@ type Backend struct {
 	caps driver.Caps
 
 	floatFormat uint32
+
+	// Draws and DrawIdx count draw calls since the last read, which is how a
+	// log line tells draws that happened from draws that were lost.
+	Draws, DrawIdx int
 }
 
 type Pipeline struct {
@@ -61,6 +75,9 @@ type Texture struct {
 	height  int
 	mipmap  bool
 	foreign bool
+	// external is set for textures adopted from a custom pass. Gio does
+	// not own the underlying ID3D11Texture2D and must not release it.
+	external bool
 }
 
 type VertexShader struct {
@@ -115,8 +132,10 @@ func detectFloatFormat(dev *d3d11.Device) (uint32, bool) {
 func newDirect3D11Device(api driver.Direct3D11) (driver.Device, error) {
 	dev := (*d3d11.Device)(api.Device)
 	b := &Backend{
-		dev: dev,
-		ctx: dev.GetImmediateContext(),
+		dev:            dev,
+		ctx:            dev.GetImmediateContext(),
+		rawRasterizers: make(map[uint32]*d3d11.RasterizerState),
+		rawDepthStates: make(map[uint32]*d3d11.DepthStencilState),
 		caps: driver.Caps{
 			MaxTextureSize: 2048, // 9.1 maximum
 			Features:       driver.FeatureSRGB,
@@ -148,6 +167,7 @@ func newDirect3D11Device(api driver.Direct3D11) (driver.Device, error) {
 	}
 	defer d3d11.IUnknownRelease(unsafe.Pointer(state), state.Vtbl.Release)
 	b.ctx.RSSetState(state)
+	b.rasterizer = state
 	return b, nil
 }
 
@@ -164,6 +184,11 @@ func (b *Backend) BeginFrame(target driver.RenderTarget, clear bool, viewport im
 		}
 	}
 	b.ctx.OMSetRenderTargets(renderTarget, nil)
+	if renderTarget == nil {
+		// Draws with no target are silently dropped by the driver: the
+		// frame would then show nothing but the clear color.
+		log.Printf("3D preview: BeginFrame with no render target, draws will be dropped")
+	}
 	return &Texture{backend: b, renderTarget: renderTarget, foreign: true}
 }
 
@@ -188,6 +213,12 @@ func (b *Backend) CopyTexture(dstTex driver.Texture, dstOrigin image.Point, srcT
 }
 
 func (b *Backend) EndFrame() {
+}
+
+// StateSnapshot reports the pipeline state the context actually holds, for
+// logging between frames.
+func (b *Backend) StateSnapshot() string {
+	return b.ctx.StateSnapshot()
 }
 
 func (b *Backend) Caps() driver.Caps {
@@ -564,11 +595,13 @@ func (b *Backend) Viewport(x, y, width, height int) {
 
 func (b *Backend) DrawArrays(off, count int) {
 	b.prepareDraw()
+	b.Draws++
 	b.ctx.Draw(uint32(count), uint32(off))
 }
 
 func (b *Backend) DrawElements(off, count int) {
 	b.prepareDraw()
+	b.DrawIdx++
 	b.ctx.DrawIndexed(uint32(count), uint32(off), 0)
 }
 
@@ -581,6 +614,10 @@ func (b *Backend) prepareDraw() {
 	b.ctx.PSSetShader(p.frag)
 	b.ctx.IASetInputLayout(p.layout)
 	b.ctx.OMSetBlendState(p.blend, nil, 0xffffffff)
+	if b.rasterizer != nil {
+		// Undo any rasterizer state a custom pass left behind.
+		b.ctx.RSSetState(b.rasterizer)
+	}
 	if b.vert.buffer != nil {
 		b.ctx.IASetVertexBuffers(b.vert.buffer.buf, uint32(p.stride), uint32(b.vert.offset))
 	}
@@ -645,7 +682,9 @@ func (t *Texture) Release() {
 	if t.uaView != nil {
 		d3d11.IUnknownRelease(unsafe.Pointer(t.uaView), t.uaView.Vtbl.Release)
 	}
-	d3d11.IUnknownRelease(unsafe.Pointer(t.tex), t.tex.Vtbl.Release)
+	if t.tex != nil && !t.external {
+		d3d11.IUnknownRelease(unsafe.Pointer(t.tex), t.tex.Vtbl.Release)
+	}
 	*t = Texture{}
 }
 

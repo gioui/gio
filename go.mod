@@ -1,6 +1,6 @@
 module gioui.org
 
-go 1.24.0
+go 1.25.0
 
 require (
 	eliasnaur.com/font v0.0.0-20230308162249-dd43949cb42d
@@ -13,6 +13,15 @@ require (
 	golang.org/x/text v0.32.0
 )
 
-require golang.org/x/net v0.48.0
+require (
+	github.com/ebitengine/purego v0.11.0
+	golang.org/x/net v0.48.0
+)
 
 require github.com/godbus/dbus/v5 v5.2.2
+
+require github.com/christerso/vulkan-go v0.0.0-20260618152204-bff25e5b7646
+
+replace github.com/christerso/vulkan-go => ./third_party/vulkan-go
+
+replace gioui.org/shader => ./third_party/gio-shader

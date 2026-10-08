@@ -1,0 +1,28 @@
+# GPU programs for the Gio project
+
+This repository contains source code for the [Gio](https://gioui.org)
+project. It also contains the generators and derived versions for use with the
+GPU APIs supported by Gio.
+
+# Generating CPU fallbacks
+
+The `piet/gencpu.sh` script updates the piet-gpu binaries:
+
+```
+$ cd piet
+$ ./gencpu.sh
+```
+
+# Development shell with Nix
+
+Use Nix flakes to set up a development shell with the tool available
+for running `go generate`:
+
+```
+$ nix develop
+$ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer go generate ./...
+```
+
+## Issues and contributions
+
+See the [Gio contribution guide](https://gioui.org/doc/contribute).

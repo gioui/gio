@@ -59,7 +59,23 @@ func newContext() (context, error) {
 
 // NewWindow creates a new headless window.
 func NewWindow(width, height int) (*Window, error) {
-	ctx, err := newContext()
+	return newWindow(newContext, width, height)
+}
+
+// NewVulkanWindow creates a new headless window on the Vulkan backend,
+// whatever backend is preferred otherwise. It reports an error when Vulkan is
+// not available, which a caller testing the Vulkan paths takes as a skip.
+func NewVulkanWindow(width, height int) (*Window, error) {
+	return newWindow(func() (context, error) {
+		if newContextFallback == nil {
+			return nil, errors.New("headless: no Vulkan backend available")
+		}
+		return newContextFallback()
+	}, width, height)
+}
+
+func newWindow(newCtx func() (context, error), width, height int) (*Window, error) {
+	ctx, err := newCtx()
 	if err != nil {
 		return nil, err
 	}
@@ -154,4 +170,20 @@ func contextDo(ctx context, f func() error) error {
 		errCh <- err
 	}()
 	return <-errCh
+}
+
+// D3D11 returns a handle for issuing custom Direct3D 11 passes against this
+// window, or an error if its backend is not Direct3D 11.
+func (w *Window) D3D11() (*gpu.D3D11, error) {
+	dev, ok := w.gpu.(gpu.D3D11Device)
+	if !ok {
+		return nil, errors.New("headless: the backend is not Direct3D 11")
+	}
+	var d *gpu.D3D11
+	err := contextDo(w.ctx, func() error {
+		var err error
+		d, err = dev.D3D11()
+		return err
+	})
+	return d, err
 }

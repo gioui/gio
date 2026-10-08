@@ -43,6 +43,11 @@ type PC struct {
 	refs uint32
 }
 
+// Bytes returns the total byte offset of this PC.
+func (pc PC) Bytes() int {
+	return int(pc.data)
+}
+
 type macro struct {
 	ops   *Ops
 	retPC PC
@@ -59,6 +64,11 @@ func (pc PC) Add(op OpType) PC {
 		data: pc.data + size,
 		refs: pc.refs + numRefs,
 	}
+}
+
+// PC returns the current program counter (byte offset) of the reader.
+func (r *Reader) PC() PC {
+	return r.pc
 }
 
 // Reset start reading from the beginning of ops.

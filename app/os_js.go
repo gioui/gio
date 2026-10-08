@@ -67,6 +67,12 @@ type window struct {
 	wakeups       chan struct{}
 
 	contextStatus contextStatus
+
+	// Pointer event coalescing: batch mousemove events per frame.
+	pendingMove    js.Value // latest coalesced mousemove event
+	moveEventValid bool     // true if pendingMove holds a valid event
+	moveCoalesced  bool     // true if rAF callback is already scheduled
+	flushMoveFunc  js.Func  // reusable rAF callback (created once)
 }
 
 func newWindow(win *callbacks, options []Option) {
@@ -99,6 +105,15 @@ func newWindow(win *callbacks, options []Option) {
 	}
 	w.redraw = w.funcOf(func(this js.Value, args []js.Value) interface{} {
 		w.draw(false)
+		return nil
+	})
+	w.flushMoveFunc = w.funcOf(func(this js.Value, p []js.Value) interface{} {
+		if w.moveEventValid {
+			evt := w.pendingMove
+			w.moveEventValid = false
+			w.moveCoalesced = false
+			w.pointerEvent(pointer.Move, 0, 0, evt)
+		}
 		return nil
 	})
 	w.clipboardCallback = w.funcOf(func(this js.Value, args []js.Value) interface{} {
@@ -205,7 +220,13 @@ func (w *window) addEventListeners() {
 		return w.browserHistory.Call("back")
 	})
 	w.addEventListener(w.cnv, "mousemove", func(this js.Value, args []js.Value) interface{} {
-		w.pointerEvent(pointer.Move, 0, 0, args[0])
+		// Coalesce: store latest move, flush on next rAF.
+		w.pendingMove = args[0]
+		w.moveEventValid = true
+		if !w.moveCoalesced {
+			w.moveCoalesced = true
+			w.requestAnimationFrame.Invoke(w.flushMoveFunc)
+		}
 		return nil
 	})
 	w.addEventListener(w.cnv, "mousedown", func(this js.Value, args []js.Value) interface{} {

@@ -442,43 +442,46 @@ var (
 	_GlobalLock       = kernel32.NewProc("GlobalLock")
 	_GlobalUnlock     = kernel32.NewProc("GlobalUnlock")
 
-	user32                        = syscall.NewLazySystemDLL("user32.dll")
-	_AdjustWindowRectEx           = user32.NewProc("AdjustWindowRectEx")
-	_CallMsgFilter                = user32.NewProc("CallMsgFilterW")
-	_CloseClipboard               = user32.NewProc("CloseClipboard")
-	_CreateWindowEx               = user32.NewProc("CreateWindowExW")
-	_DefWindowProc                = user32.NewProc("DefWindowProcW")
-	_DestroyWindow                = user32.NewProc("DestroyWindow")
-	_DispatchMessage              = user32.NewProc("DispatchMessageW")
-	_FindWindow                   = user32.NewProc("FindWindowW")
-	_EmptyClipboard               = user32.NewProc("EmptyClipboard")
-	_EnableMouseInPointer         = user32.NewProc("EnableMouseInPointer")
-	_GetWindowRect                = user32.NewProc("GetWindowRect")
-	_GetClientRect                = user32.NewProc("GetClientRect")
-	_GetClipboardData             = user32.NewProc("GetClipboardData")
-	_GetDC                        = user32.NewProc("GetDC")
-	_GetDpiForWindow              = user32.NewProc("GetDpiForWindow")
-	_GetKeyState                  = user32.NewProc("GetKeyState")
-	_GetMessage                   = user32.NewProc("GetMessageW")
-	_GetMessageTime               = user32.NewProc("GetMessageTime")
-	_GetMonitorInfo               = user32.NewProc("GetMonitorInfoW")
-	_GetPointerInfo               = user32.NewProc("GetPointerInfo")
-	_GetSystemMetrics             = user32.NewProc("GetSystemMetrics")
-	_GetWindowLong                = user32.NewProc("GetWindowLongPtrW")
-	_GetWindowLong32              = user32.NewProc("GetWindowLongW")
-	_GetWindowPlacement           = user32.NewProc("GetWindowPlacement")
-	_LoadCursor                   = user32.NewProc("LoadCursorW")
-	_LoadImage                    = user32.NewProc("LoadImageW")
-	_MonitorFromPoint             = user32.NewProc("MonitorFromPoint")
-	_MonitorFromRect              = user32.NewProc("MonitorFromRect")
-	_MoveWindow                   = user32.NewProc("MoveWindow")
-	_MsgWaitForMultipleObjectsEx  = user32.NewProc("MsgWaitForMultipleObjectsEx")
-	_OpenClipboard                = user32.NewProc("OpenClipboard")
-	_PeekMessage                  = user32.NewProc("PeekMessageW")
-	_PostMessage                  = user32.NewProc("PostMessageW")
-	_PostQuitMessage              = user32.NewProc("PostQuitMessage")
-	_ReleaseCapture               = user32.NewProc("ReleaseCapture")
-	_RegisterClassExW             = user32.NewProc("RegisterClassExW")
+	user32                       = syscall.NewLazySystemDLL("user32.dll")
+	_AdjustWindowRectEx          = user32.NewProc("AdjustWindowRectEx")
+	_CallMsgFilter               = user32.NewProc("CallMsgFilterW")
+	_CloseClipboard              = user32.NewProc("CloseClipboard")
+	_CreateWindowEx              = user32.NewProc("CreateWindowExW")
+	_DefWindowProc               = user32.NewProc("DefWindowProcW")
+	_DestroyWindow               = user32.NewProc("DestroyWindow")
+	_DispatchMessage             = user32.NewProc("DispatchMessageW")
+	_FindWindow                  = user32.NewProc("FindWindowW")
+	_EmptyClipboard              = user32.NewProc("EmptyClipboard")
+	_EnableMouseInPointer        = user32.NewProc("EnableMouseInPointer")
+	_GetWindowRect               = user32.NewProc("GetWindowRect")
+	_GetClientRect               = user32.NewProc("GetClientRect")
+	_GetClipboardData            = user32.NewProc("GetClipboardData")
+	_GetDC                       = user32.NewProc("GetDC")
+	_GetDpiForWindow             = user32.NewProc("GetDpiForWindow")
+	_GetKeyState                 = user32.NewProc("GetKeyState")
+	_GetMessage                  = user32.NewProc("GetMessageW")
+	_GetMessageTime              = user32.NewProc("GetMessageTime")
+	_GetMonitorInfo              = user32.NewProc("GetMonitorInfoW")
+	_GetPointerInfo              = user32.NewProc("GetPointerInfo")
+	_GetSystemMetrics            = user32.NewProc("GetSystemMetrics")
+	_GetWindowLong               = user32.NewProc("GetWindowLongPtrW")
+	_GetWindowLong32             = user32.NewProc("GetWindowLongW")
+	_GetWindowPlacement          = user32.NewProc("GetWindowPlacement")
+	_LoadCursor                  = user32.NewProc("LoadCursorW")
+	_LoadImage                   = user32.NewProc("LoadImageW")
+	_MonitorFromPoint            = user32.NewProc("MonitorFromPoint")
+	_MonitorFromRect             = user32.NewProc("MonitorFromRect")
+	_MoveWindow                  = user32.NewProc("MoveWindow")
+	_MsgWaitForMultipleObjectsEx = user32.NewProc("MsgWaitForMultipleObjectsEx")
+	_OpenClipboard               = user32.NewProc("OpenClipboard")
+	_PeekMessage                 = user32.NewProc("PeekMessageW")
+	_PostMessage                 = user32.NewProc("PostMessageW")
+	_PostQuitMessage             = user32.NewProc("PostQuitMessage")
+	_ReleaseCapture              = user32.NewProc("ReleaseCapture")
+	_RegisterClassExW            = user32.NewProc("RegisterClassExW")
+	// Note the singular spelling: the user32.dll export is
+	// "RegisterPointerInputTarget" even though it takes an array of types.
+	_RegisterPointerInputTargets  = user32.NewProc("RegisterPointerInputTarget")
 	_RegisterTouchWindow          = user32.NewProc("RegisterTouchWindow")
 	_ReleaseDC                    = user32.NewProc("ReleaseDC")
 	_ScreenToClient               = user32.NewProc("ScreenToClient")
@@ -571,6 +574,26 @@ func RegisterTouchWindow(hwnd syscall.Handle, flags uint32) error {
 	r1, _, err := _RegisterTouchWindow.Call(uintptr(hwnd), uintptr(flags))
 	if r1 == 0 {
 		return fmt.Errorf("RegisterTouchWindow failed: %v", err)
+	}
+	return nil
+}
+
+// RegisterPointerInputTargets tells Windows to deliver pointer messages for
+// the given input types to hwnd. Without this, enabling mouse-in-pointer (see
+// EnableMouseInPointer) leaves the mouse without any input at all: the system
+// stops sending WM_MOUSE* messages and no WM_POINTER* messages are sent either,
+// so the window never sees clicks.
+func RegisterPointerInputTargets(hwnd syscall.Handle, targetTypes []POINTER_INPUT_TYPE) error {
+	if len(targetTypes) == 0 {
+		return nil
+	}
+	buf := make([]uintptr, len(targetTypes))
+	for i, t := range targetTypes {
+		buf[i] = uintptr(t)
+	}
+	r1, _, err := _RegisterPointerInputTargets.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
+	if r1 == 0 {
+		return fmt.Errorf("RegisterPointerInputTargets failed: %v", err)
 	}
 	return nil
 }

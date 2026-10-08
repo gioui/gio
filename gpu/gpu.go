@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"log"
 	"math"
 	"slices"
 	"time"
@@ -27,11 +28,12 @@ import (
 	"gioui.org/internal/stroke"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/paint"
 	"gioui.org/shader"
 	"gioui.org/shader/gio"
 
 	// Register backends.
-	_ "gioui.org/gpu/internal/d3d11"
+	d3d11 "gioui.org/gpu/internal/d3d11"
 	_ "gioui.org/gpu/internal/metal"
 	_ "gioui.org/gpu/internal/opengl"
 	_ "gioui.org/gpu/internal/vulkan"
@@ -66,6 +68,17 @@ type renderer struct {
 	intersections packer
 	layers        packer
 	layerFBOs     fboSet
+
+	// Texture upload throttling: limit new GPU uploads per frame
+	// to avoid first-frame jank when loading large images.
+	pendingTextures []textureUploadJob
+	texUploadsThis  int
+}
+
+type textureUploadJob struct {
+	cacheKey textureCacheKey
+	src      *image.RGBA
+	filter   byte
 }
 
 type drawOps struct {
@@ -83,6 +96,13 @@ type drawOps struct {
 	pathOpCache  []pathOp
 	qs           quadSplitter
 	pathCache    *opCache
+
+	// Dirty-region tracking: detect when ops content changed
+	// vs only viewport changed (zoom/pan).
+	opsDirty       bool // true if ops content changed this frame
+	prevOpsBytes   int  // total bytes decoded from ops reader
+	prevImageCount int  // number of imageOps from previous frame
+	prevPathCount  int  // number of pathOps from previous frame
 }
 
 type opacityLayer struct {
@@ -205,11 +225,23 @@ func decodeImageOp(data []byte, refs []any) imageOpData {
 	if handle == nil {
 		return imageOpData{}
 	}
+	src := refs[0].(*image.RGBA)
+	if ext, ok := handle.(paint.Texture); ok {
+		// The pixels of a texture backed image are not on the CPU, so the
+		// placeholder carries nothing but the size the renderer needs.
+		src = boundsOnlyImage(ext.Bounds())
+	}
 	return imageOpData{
-		src:    refs[0].(*image.RGBA),
+		src:    src,
 		handle: handle,
 		filter: data[1],
 	}
+}
+
+// boundsOnlyImage returns an image with the given bounds and no pixels, for
+// images that are never read back.
+func boundsOnlyImage(r image.Rectangle) *image.RGBA {
+	return &image.RGBA{Rect: r}
 }
 
 func decodeColorOp(data []byte) color.NRGBA {
@@ -395,10 +427,26 @@ func (g *gpu) collect(viewport image.Point, frameOps *op.Ops) {
 	}
 }
 
+// gpuFrameLogAt throttles the once-a-second frame diagnostics line.
+var gpuFrameLogAt time.Time
+
 func (g *gpu) frame(target RenderTarget) error {
 	viewport := g.renderer.blitter.viewport
 	defFBO := g.ctx.BeginFrame(target, g.drawOps.clear, viewport)
 	defer g.ctx.EndFrame()
+	// A once-a-second line about what this frame actually contained: counts
+	// say whether the op stream survived to the renderer, the draw counters
+	// say whether the renderer issued the draws, and the clear flag says
+	// whether the backbuffer was about to be filled before them.
+	logAt := time.Now()
+	logIt := gpuFrameLogAt.IsZero() || logAt.Sub(gpuFrameLogAt) >= time.Second
+	clearNow := g.drawOps.clear
+	nImg, nPath, nLayer := len(g.drawOps.imageOps), len(g.drawOps.pathOps), len(g.drawOps.layers)
+
+	// Full pipeline: build paths, stencils, intersections.
+	// NOTE: dirty-region skip was removed — BeginFrame clears
+	// the stencil buffer every frame, so stencilClips must always
+	// run or text/UI elements render as colored rectangles.
 	g.drawOps.buildPaths(g.ctx)
 	for _, img := range g.drawOps.imageOps {
 		expandPathOp(img.path, img.clip)
@@ -410,6 +458,7 @@ func (g *gpu) frame(target RenderTarget) error {
 	g.renderer.prepareIntersections(g.drawOps.imageOps)
 	g.renderer.intersect(g.drawOps.imageOps)
 	g.stencilTimer.end()
+
 	g.coverTimer.begin()
 	g.renderer.uploadImages(g.cache, g.drawOps.imageOps)
 	g.renderer.prepareDrawOps(g.drawOps.imageOps)
@@ -431,6 +480,18 @@ func (g *gpu) frame(target RenderTarget) error {
 	g.cache.frame()
 	g.drawOps.pathCache.frame()
 	g.cleanupTimer.end()
+	if logIt {
+		gpuFrameLogAt = logAt
+		draws, idxDraws := -1, -1
+		snap := ""
+		if b, ok := g.ctx.(*d3d11.Backend); ok {
+			draws, idxDraws = b.Draws, b.DrawIdx
+			b.Draws, b.DrawIdx = 0, 0
+			snap = b.StateSnapshot()
+		}
+		log.Printf("3D preview: gio frame: images=%d paths=%d layers=%d clear=%v viewport=%dx%d draws=%d idxdraws=%d state: %s",
+			nImg, nPath, nLayer, clearNow, viewport.X, viewport.Y, draws, idxDraws, snap)
+	}
 	if false && g.timers.ready() {
 		st, covt, cleant := g.stencilTimer.Elapsed, g.coverTimer.Elapsed, g.cleanupTimer.Elapsed
 		ft := st + covt + cleant
@@ -452,7 +513,11 @@ func (r *renderer) texHandle(cache *textureCache, data imageOpData) driver.Textu
 		filter: data.filter,
 		handle: data.handle,
 	}
-
+	if ext, ok := data.handle.(paint.Texture); ok {
+		if tex, ok := r.externalTexture(cache, key, ext, data.filter); ok {
+			return tex
+		}
+	}
 	var tex *texture
 	t, exists := cache.get(key)
 	if !exists {
@@ -907,6 +972,19 @@ func (d *drawOps) collect(root *op.Ops, viewport image.Point) {
 	}
 	d.reader.Reset(ops)
 	d.collectOps(&d.reader, viewf)
+
+	// Dirty-region detection: compare ops content with previous frame.
+	// If byte count and op counts match, ops content is unchanged
+	// (only viewport/zoom changed) — skip expensive GPU pipeline.
+	curBytes := d.reader.PC().Bytes()
+	curImgCount := len(d.imageOps)
+	curPathCount := len(d.pathOps)
+	d.opsDirty = (curBytes != d.prevOpsBytes ||
+		curImgCount != d.prevImageCount ||
+		curPathCount != d.prevPathCount)
+	d.prevOpsBytes = curBytes
+	d.prevImageCount = curImgCount
+	d.prevPathCount = curPathCount
 }
 
 func (d *drawOps) buildPaths(ctx driver.Device) {
@@ -966,7 +1044,10 @@ func (k opKey) SetTransform(t f32.Affine2D) opKey {
 	k.hy = hy
 	k.sy = sy
 	return k
-}
+} // EnableEarlyClipCulling toggles the early clip culling optimization.
+// When enabled, clips that don't intersect the viewport are skipped entirely
+// (no dummy pathOps created). Set to false if UI rendering artifacts appear.
+var EnableEarlyClipCulling = false // disabled: culls screen-space UI at close zoom
 
 func (d *drawOps) collectOps(r *ops.Reader, viewport f32.Rectangle) {
 	var quads quadsOp
@@ -980,8 +1061,23 @@ func (d *drawOps) collectOps(r *ops.Reader, viewport f32.Rectangle) {
 		}
 	}
 	reset()
+	skipDepth := 0
 loop:
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
+		// Early clip culling: skip ops inside clips that don't intersect viewport.
+		// No dummy pathOps are created — the clip subtree is simply skipped.
+		if EnableEarlyClipCulling && skipDepth > 0 {
+			switch ops.OpType(encOp.Data[0]) {
+			case ops.TypeClip:
+				skipDepth++
+				continue
+			case ops.TypePopClip:
+				skipDepth--
+				continue
+			default:
+				continue
+			}
+		}
 		switch ops.OpType(encOp.Data[0]) {
 		case ops.TypeTransform:
 			dop, push := ops.DecodeTransform(encOp.Data)
@@ -1055,6 +1151,13 @@ loop:
 				quads.aux, bounds, _ = d.boundsForTransformedRect(bounds, trans)
 				quads.key = opKey{Key: encOp.Key}
 				quads.key = quads.key.SetTransform(trans)
+			}
+			if EnableEarlyClipCulling {
+				clipScreen := bounds.Add(off)
+				if clipScreen.Max.X <= viewport.Min.X || clipScreen.Min.X >= viewport.Max.X ||
+					clipScreen.Max.Y <= viewport.Min.Y || clipScreen.Min.Y >= viewport.Max.Y {
+					skipDepth = 1
+				}
 			}
 			d.addClipPath(&state, quads.aux, quads.key, bounds, off)
 			quads = quadsOp{}
@@ -1201,14 +1304,133 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 	return m
 }
 
+// maxTexturesPerFrame limits new GPU texture uploads per frame.
+// Textures beyond this limit are deferred to the next frame.
+const maxTexturesPerFrame = 32
+
 func (r *renderer) uploadImages(cache *textureCache, ops []imageOp) {
+	r.texUploadsThis = 0
+
+	// Process deferred textures from previous frames first.
+	n := len(r.pendingTextures)
+	for i := 0; i < n; i++ {
+		job := &r.pendingTextures[0]
+		t, exists := cache.get(job.cacheKey)
+		if !exists {
+			t = &texture{src: job.src}
+			cache.put(job.cacheKey, t)
+		}
+		tex := t.(*texture)
+		if tex.tex == nil {
+			if r.texUploadsThis >= maxTexturesPerFrame {
+				break // defer remaining to next frame
+			}
+			tex.tex = r.createTexture(job.src, job.filter)
+			r.texUploadsThis++
+		}
+		r.pendingTextures = r.pendingTextures[1:]
+	}
+
+	// Process current frame's textures.
 	for i := range ops {
 		img := &ops[i]
 		m := img.material
 		if m.material == materialTexture {
-			img.material.tex = r.texHandle(cache, m.data)
+			img.material.tex = r.texHandleThrottled(cache, m.data)
 		}
 	}
+}
+
+func (r *renderer) createTexture(src *image.RGBA, filter byte) driver.Texture {
+	var minFilter, magFilter driver.TextureFilter
+	switch filter {
+	case filterLinear:
+		minFilter, magFilter = driver.FilterLinearMipmapLinear, driver.FilterLinear
+	case filterNearest:
+		minFilter, magFilter = driver.FilterNearest, driver.FilterNearest
+	}
+	handle, err := r.ctx.NewTexture(driver.TextureFormatSRGBA,
+		src.Bounds().Dx(), src.Bounds().Dy(),
+		minFilter, magFilter,
+		driver.BufferBindingTexture,
+	)
+	if err != nil {
+		panic(err)
+	}
+	driver.UploadImage(handle, image.Pt(0, 0), src)
+	return handle
+}
+
+func (r *renderer) texHandleThrottled(cache *textureCache, data imageOpData) driver.Texture {
+	key := textureCacheKey{
+		filter: data.filter,
+		handle: data.handle,
+	}
+	if ext, ok := data.handle.(paint.Texture); ok {
+		if tex, ok := r.externalTexture(cache, key, ext, data.filter); ok {
+			return tex
+		}
+	}
+	var tex *texture
+	t, exists := cache.get(key)
+	if !exists {
+		t = &texture{src: data.src}
+		cache.put(key, t)
+	}
+	tex = t.(*texture)
+	if tex.tex != nil {
+		return tex.tex
+	}
+
+	// Throttle: defer if limit reached.
+	if r.texUploadsThis >= maxTexturesPerFrame {
+		r.pendingTextures = append(r.pendingTextures, textureUploadJob{
+			cacheKey: key,
+			src:      data.src,
+			filter:   data.filter,
+		})
+		return tex.tex // nil — will be uploaded next frame
+	}
+
+	tex.tex = r.createTexture(data.src, data.filter)
+	r.texUploadsThis++
+	return tex.tex
+}
+
+// externalTexture adopts a texture whose pixels are already on the GPU so the
+// blitter can sample it in place. It reports false if the backend cannot adopt
+// foreign resources, in which case the caller falls back to uploading pixels.
+func (r *renderer) externalTexture(cache *textureCache, key textureCacheKey, src paint.Texture, filter byte) (driver.Texture, bool) {
+	dev, ok := r.ctx.(driver.ExternalTextureDevice)
+	if !ok {
+		return nil, false
+	}
+	t, exists := cache.get(key)
+	if !exists {
+		t = &texture{}
+		cache.put(key, t)
+	}
+	tex := t.(*texture)
+	if tex.tex != nil {
+		return tex.tex, true
+	}
+	minFilter, magFilter := driver.FilterLinearMipmapLinear, driver.FilterLinear
+	if filter == filterNearest {
+		minFilter, magFilter = driver.FilterNearest, driver.FilterNearest
+	}
+	handle, err := dev.NewExternalTexture(driver.ExternalTexture{
+		Handle:    src.GPUTexture(),
+		Format:    driver.TextureFormatSRGBA,
+		Bounds:    src.Bounds().Size(),
+		Mip:       1,
+		MinFilter: minFilter,
+		MagFilter: magFilter,
+	})
+	if err != nil {
+		panic(err)
+	}
+	tex.tex = handle
+	return tex.tex, true
 }
 
 func (r *renderer) prepareDrawOps(ops []imageOp) {

@@ -5,6 +5,7 @@ package d3d11
 import (
 	"fmt"
 	"math"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -611,11 +612,12 @@ type RASTERIZER_DESC struct {
 }
 
 var (
-	IID_Texture2D    = GUID{0x6f15aaf2, 0xd208, 0x4e89, 0x9a, 0xb4, 0x48, 0x95, 0x35, 0xd3, 0x4f, 0x9c}
-	IID_IDXGIDebug   = GUID{0x119E7452, 0xDE9E, 0x40fe, 0x88, 0x06, 0x88, 0xF9, 0x0C, 0x12, 0xB4, 0x41}
-	IID_IDXGIDevice  = GUID{0x54ec77fa, 0x1377, 0x44e6, 0x8c, 0x32, 0x88, 0xfd, 0x5f, 0x44, 0xc8, 0x4c}
-	IID_IDXGIFactory = GUID{0x7b7166ec, 0x21c7, 0x44ae, 0xb2, 0x1a, 0xc9, 0xae, 0x32, 0x1a, 0xe3, 0x69}
-	IID_ID3D11Debug  = GUID{0x79cf2233, 0x7536, 0x4948, 0x9d, 0x36, 0x1e, 0x46, 0x92, 0xdc, 0x57, 0x60}
+	IID_Texture2D       = GUID{0x6f15aaf2, 0xd208, 0x4e89, 0x9a, 0xb4, 0x48, 0x95, 0x35, 0xd3, 0x4f, 0x9c}
+	IID_IDXGIDebug      = GUID{0x119E7452, 0xDE9E, 0x40fe, 0x88, 0x06, 0x88, 0xF9, 0x0C, 0x12, 0xB4, 0x41}
+	IID_IDXGIDevice     = GUID{0x54ec77fa, 0x1377, 0x44e6, 0x8c, 0x32, 0x88, 0xfd, 0x5f, 0x44, 0xc8, 0x4c}
+	IID_IDXGIFactory    = GUID{0x7b7166ec, 0x21c7, 0x44ae, 0xb2, 0x1a, 0xc9, 0xae, 0x32, 0x1a, 0xe3, 0x69}
+	IID_ID3D11Debug     = GUID{0x79cf2233, 0x7536, 0x4948, 0x9d, 0x36, 0x1e, 0x46, 0x92, 0xdc, 0x57, 0x60}
+	IID_ID3D11InfoQueue = GUID{0x6543dbb6, 0x7b33, 0x46f9, 0x8f, 0xe1, 0x77, 0xd9, 0x13, 0xf3, 0xdf, 0x17}
 
 	DXGI_DEBUG_ALL = GUID{0xe48ae283, 0xda80, 0x490b, 0x87, 0xe6, 0x43, 0xe9, 0xa9, 0xcf, 0xda, 0x8}
 )
@@ -1128,6 +1130,190 @@ func (d *Debug) ReportLiveDeviceObjects(flags uint32) {
 	)
 }
 
+// INFO_QUEUE_MESSAGE is D3D11_MESSAGE: the description pointer is filled by
+// the runtime and points into the caller's own buffer.
+type INFO_QUEUE_MESSAGE struct {
+	Severity          uint32
+	Category          uint32
+	ID                uint32
+	Description       *byte
+	DescriptionLength uintptr
+}
+
+// InfoQueue is ID3D11InfoQueue, which on a debug device collects everything
+// the validation layer complained about.
+type InfoQueue struct {
+	Vtbl *struct {
+		_IUnknownVTbl
+		SetMessageCountLimit uintptr
+		ClearStoredMessages  uintptr
+		GetMessage           uintptr
+		GetNumStoredMessages uintptr
+	}
+}
+
+// InfoQueue returns the device's message queue, which only carries messages
+// when the device was created with the debug flag.
+func (d *Device) InfoQueue() (*InfoQueue, error) {
+	intf, err := IUnknownQueryInterface(unsafe.Pointer(d), d.Vtbl.QueryInterface, &IID_ID3D11InfoQueue)
+	if err != nil {
+		return nil, err
+	}
+	return (*InfoQueue)(unsafe.Pointer(intf)), nil
+}
+
+// SetMessageCountLimit caps how many messages are kept before draining.
+func (q *InfoQueue) SetMessageCountLimit(limit uint64) {
+	syscall.Syscall(q.Vtbl.SetMessageCountLimit, 2, uintptr(unsafe.Pointer(q)), uintptr(limit), 0)
+}
+
+// NumStoredMessages is how many messages are waiting to be read.
+func (q *InfoQueue) NumStoredMessages() uint64 {
+	r, _, _ := syscall.Syscall(q.Vtbl.GetNumStoredMessages, 1, uintptr(unsafe.Pointer(q)), 0, 0)
+	return uint64(r)
+}
+
+// ClearStoredMessages empties the queue after a drain.
+func (q *InfoQueue) ClearStoredMessages() {
+	syscall.Syscall(q.Vtbl.ClearStoredMessages, 1, uintptr(unsafe.Pointer(q)), 0, 0)
+}
+
+// GetMessage reads one message as "severity: text".
+func (q *InfoQueue) GetMessage(index uint64) (string, bool) {
+	var need uintptr
+	r, _, _ := syscall.Syscall6(q.Vtbl.GetMessage, 4,
+		uintptr(unsafe.Pointer(q)), uintptr(index), 0,
+		uintptr(unsafe.Pointer(&need)), 0, 0)
+	_ = r
+	if need <= unsafe.Sizeof(INFO_QUEUE_MESSAGE{}) || need > 1<<20 {
+		return "", false
+	}
+	buf := make([]byte, need)
+	r, _, _ = syscall.Syscall6(q.Vtbl.GetMessage, 4,
+		uintptr(unsafe.Pointer(q)), uintptr(index),
+		uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&need)), 0, 0)
+	if r != 0 { // not S_OK
+		return "", false
+	}
+	msg := (*INFO_QUEUE_MESSAGE)(unsafe.Pointer(&buf[0]))
+	if msg.Description == nil || msg.DescriptionLength == 0 {
+		return "", false
+	}
+	n := int(msg.DescriptionLength)
+	if n > len(buf) {
+		n = len(buf)
+	}
+	text := string(unsafe.Slice(msg.Description, n))
+	text = strings.TrimRight(text, "\x00")
+	sev := [...]string{"CORRUPTION", "ERROR", "WARNING", "INFO", "MESSAGE"}[min(int(msg.Severity), 4)]
+	return sev + ": " + text, true
+}
+
+// StateSnapshot reads the pipeline state the context actually holds and
+// renders it as one line: the render target, the viewport, the shaders, the
+// input layout and the bound buffers. A draw call issued with no render
+// target or no vertex shader is discarded by the driver without a word,
+// which is exactly the kind of silence this is meant to break.
+func (ctx *DeviceContext) StateSnapshot() string {
+	var (
+		rtv               *RenderTargetView
+		dsv               *DepthStencilView
+		vs                *VertexShader
+		ps                *PixelShader
+		lay               *InputLayout
+		vb                *Buffer
+		ib                *Buffer
+		rs                *RasterizerState
+		dss               *DepthStencilState
+		blend             *BlendState
+		topo              uint32
+		idxFormat, idxOff uint32
+		stride, vboff     uint32
+		nVP               uint32 = 1
+		vp                VIEWPORT
+	)
+	syscall.SyscallN(ctx.Vtbl.OMGetRenderTargets, uintptr(unsafe.Pointer(ctx)), 1,
+		uintptr(unsafe.Pointer(&rtv)), uintptr(unsafe.Pointer(&dsv)))
+	syscall.SyscallN(ctx.Vtbl.VSGetShader, uintptr(unsafe.Pointer(ctx)),
+		uintptr(unsafe.Pointer(&vs)), 0, 0)
+	syscall.SyscallN(ctx.Vtbl.PSGetShader, uintptr(unsafe.Pointer(ctx)),
+		uintptr(unsafe.Pointer(&ps)), 0, 0)
+	syscall.SyscallN(ctx.Vtbl.IAGetInputLayout, uintptr(unsafe.Pointer(ctx)),
+		uintptr(unsafe.Pointer(&lay)))
+	syscall.SyscallN(ctx.Vtbl.IAGetVertexBuffers, uintptr(unsafe.Pointer(ctx)), 0, 1,
+		uintptr(unsafe.Pointer(&vb)), uintptr(unsafe.Pointer(&stride)), uintptr(unsafe.Pointer(&vboff)))
+	syscall.SyscallN(ctx.Vtbl.IAGetIndexBuffer, uintptr(unsafe.Pointer(ctx)),
+		uintptr(unsafe.Pointer(&ib)), uintptr(unsafe.Pointer(&idxFormat)), uintptr(unsafe.Pointer(&idxOff)))
+	syscall.SyscallN(ctx.Vtbl.IAGetPrimitiveTopology, uintptr(unsafe.Pointer(ctx)),
+		uintptr(unsafe.Pointer(&topo)))
+	syscall.SyscallN(ctx.Vtbl.RSGetViewports, uintptr(unsafe.Pointer(ctx)),
+		uintptr(unsafe.Pointer(&nVP)), uintptr(unsafe.Pointer(&vp)))
+	syscall.SyscallN(ctx.Vtbl.RSGetState, uintptr(unsafe.Pointer(ctx)), uintptr(unsafe.Pointer(&rs)))
+	syscall.SyscallN(ctx.Vtbl.OMGetDepthStencilState, uintptr(unsafe.Pointer(ctx)),
+		uintptr(unsafe.Pointer(&dss)), 0)
+	syscall.SyscallN(ctx.Vtbl.OMGetBlendState, uintptr(unsafe.Pointer(ctx)),
+		uintptr(unsafe.Pointer(&blend)), 0, 0)
+	ns := func(v any) string {
+		if v == nil {
+			return "nil"
+		}
+		switch t := v.(type) {
+		case *RenderTargetView:
+			if t == nil {
+				return "nil"
+			}
+			// The address identifies WHICH render target is bound: the
+			// window back buffer, a model texture or an internal FBO.
+			return fmt.Sprintf("%x", uintptr(unsafe.Pointer(t)))
+		case *DepthStencilView:
+			return boolStr(t != nil)
+		case *VertexShader:
+			return boolStr(t != nil)
+		case *PixelShader:
+			return boolStr(t != nil)
+		case *InputLayout:
+			return boolStr(t != nil)
+		case *Buffer:
+			return boolStr(t != nil)
+		case *RasterizerState:
+			return boolStr(t != nil)
+		case *DepthStencilState:
+			return boolStr(t != nil)
+		case *BlendState:
+			return boolStr(t != nil)
+		}
+		return "?"
+	}
+	line := fmt.Sprintf("rtv=%s dsv=%s vs=%s ps=%s layout=%s vb0=%s ib=%s topo=%d viewports=%d vp=%.0fx%.0f rs=%s dss=%s blend=%s",
+		ns(rtv), ns(dsv), ns(vs), ns(ps), ns(lay), ns(vb), ns(ib), topo, nVP, vp.Width, vp.Height,
+		ns(rs), ns(dss), ns(blend))
+	// Every Get method above returns an interface with an incremented
+	// reference count. Leak those references and the render target view pins
+	// the swap chain back buffer, so the next ResizeBuffers fails with
+	// DXGI_ERROR_INVALID_CALL and the application closes.
+	for _, obj := range []unsafe.Pointer{
+		unsafe.Pointer(rtv), unsafe.Pointer(dsv), unsafe.Pointer(vs), unsafe.Pointer(ps),
+		unsafe.Pointer(lay), unsafe.Pointer(vb), unsafe.Pointer(ib), unsafe.Pointer(rs),
+		unsafe.Pointer(dss), unsafe.Pointer(blend),
+	} {
+		if obj == nil {
+			continue
+		}
+		// All of these types begin with a pointer to a vtable whose first
+		// three entries are IUnknown's, so one layout fits them all.
+		vtbl := *(**struct{ _IUnknownVTbl })(obj)
+		IUnknownRelease(obj, vtbl.Release)
+	}
+	return line
+}
+
+func boolStr(b bool) string {
+	if b {
+		return "set"
+	}
+	return "nil"
+}
+
 func (s *IDXGISwapChain) GetDesc() (DXGI_SWAP_CHAIN_DESC, error) {
 	var desc DXGI_SWAP_CHAIN_DESC
 	r, _, _ := syscall.Syscall(
@@ -1388,17 +1574,28 @@ func (c *DeviceContext) PSSetShader(s *PixelShader) {
 }
 
 func (c *DeviceContext) UpdateSubresource(res *Resource, dstBox *BOX, rowPitch, depthPitch uint32, data []byte) {
+	c.UpdateSubresourceMip(res, dstBox, 0, rowPitch, depthPitch, data)
+}
+
+// UpdateSubresourceMip is UpdateSubresource with the destination subresource
+// named. The index is not an offset into anything: for a plain 2D texture it
+// is the mip level, so leaving it at 0 writes every level over the top of the
+// first one and leaves the rest uninitialised.
+func (c *DeviceContext) UpdateSubresourceMip(res *Resource, dstBox *BOX, subresource, rowPitch, depthPitch uint32, data []byte) {
+	// SrcBoxCount must be passed as well: it is the eighth argument, and
+	// leaving it out makes the call read whatever the stack held.
 	syscall.Syscall9(
 		c.Vtbl.UpdateSubresource,
-		7,
+		8,
 		uintptr(unsafe.Pointer(c)),
 		uintptr(unsafe.Pointer(res)),
-		0, // DstSubresource
+		uintptr(subresource),
 		uintptr(unsafe.Pointer(dstBox)),
 		uintptr(unsafe.Pointer(unsafe.SliceData(data))),
 		uintptr(rowPitch),
 		uintptr(depthPitch),
-		0, 0,
+		0, // SrcBoxCount
+		0,
 	)
 }
 

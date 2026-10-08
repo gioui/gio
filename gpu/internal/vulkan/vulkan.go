@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-//go:build (linux || freebsd) && !novulkan
+//go:build (linux || freebsd || windows) && !novulkan
 
 package vulkan
 
@@ -39,6 +39,12 @@ type Backend struct {
 	waitStages []vk.PipelineStageFlags
 	sigSems    []vk.Semaphore
 	fence      vk.Fence
+
+	// customActive marks a custom pass as recording. While it is set the
+	// only command buffer in flight is the pass's own, so a transfer
+	// recorded through ensureCmdBuf would land inside the render pass and
+	// submitAndWait would end the buffer the pass still has to finish.
+	customActive bool
 
 	allPipes []*Pipeline
 
@@ -81,6 +87,12 @@ type Texture struct {
 	height     int
 	acquire    vk.Semaphore
 	foreign    bool
+	// adopted marks a texture Gio adopted from a custom pass: it does not
+	// own the image, and releasing it hands the release back to the
+	// texture that created it, which keeps the image alive while Gio
+	// still paints it.
+	adopted   bool
+	onRelease func()
 
 	scope struct {
 		stage  vk.PipelineStageFlags
@@ -695,6 +707,16 @@ func (t *Texture) Upload(offset, size image.Point, pixels []byte, stride int) {
 }
 
 func (t *Texture) Release() {
+	if t.adopted {
+		// The image belongs to the custom pass that rendered it; let go
+		// of our share and let that pass decide when to destroy it.
+		onRelease := t.onRelease
+		*t = Texture{}
+		if onRelease != nil {
+			onRelease()
+		}
+		return
+	}
 	if t.foreign {
 		panic("external textures cannot be released")
 	}

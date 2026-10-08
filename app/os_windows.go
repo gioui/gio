@@ -10,6 +10,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 	"image"
 	"io"
+	"log"
 	"math"
 	"os"
 	"runtime"
@@ -92,6 +93,18 @@ func osMain() {
 func newWindow(win *callbacks, options []Option) {
 	done := make(chan struct{})
 	go func() {
+		// A panic on this goroutine (it runs the message loop and all GPU
+		// work) bypasses the client's recover and kills the process without
+		// a trace. Log it to the application log before exiting so the
+		// failure is diagnosable.
+		defer func() {
+			if r := recover(); r != nil {
+				buf := make([]byte, 8192)
+				n := runtime.Stack(buf, false)
+				log.Printf("3D preview: FATAL: panic in the window loop: %v\n%s", r, buf[:n])
+				os.Exit(2)
+			}
+		}()
 		// GetMessage and PeekMessage can filter on a window HWND, but
 		// then thread-specific messages such as WM_QUIT are ignored.
 		// Instead lock the thread so window messages arrive through
@@ -207,6 +220,12 @@ func (w *window) init() error {
 	if err := windows.EnableMouseInPointer(1); err != nil {
 		return err
 	}
+	// Mouse-in-pointer promotes the mouse to a pointer device, which stops
+	// WM_MOUSE* from being delivered. Opting the window into mouse pointer
+	// messages is what actually makes clicks reach the event queue. A failure
+	// here only costs us the mouse, so it must not prevent the window from
+	// being created.
+	_ = windows.RegisterPointerInputTargets(hwnd, []windows.POINTER_INPUT_TYPE{windows.PT_MOUSE})
 	w.hdc, err = windows.GetDC(hwnd)
 	if err != nil {
 		windows.DestroyWindow(hwnd)

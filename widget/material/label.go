@@ -4,6 +4,7 @@ package material
 
 import (
 	"image/color"
+	"sync"
 
 	"gioui.org/font"
 	"gioui.org/internal/f32color"
@@ -14,6 +15,26 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget"
 )
+
+// labelWidthCache caches MeasureWidth results to avoid repeated text shaping.
+// Key: text+size+font, Value: pixel width.
+type labelWidthCacheKey struct {
+	text    string
+	size    unit.Sp
+	font    font.Font
+}
+
+var (
+	labelWidthCacheMu sync.Mutex
+	labelWidthCache   = make(map[labelWidthCacheKey]int)
+)
+
+// ClearLabelWidthCache removes all cached measurements. Call when fonts change.
+func ClearLabelWidthCache() {
+	labelWidthCacheMu.Lock()
+	labelWidthCache = make(map[labelWidthCacheKey]int)
+	labelWidthCacheMu.Unlock()
+}
 
 // LabelStyle configures the presentation of text. If the State field is set, the
 // label will be laid out as interactive (able to be selected and copied). Otherwise,
@@ -151,4 +172,48 @@ func (l LabelStyle) Layout(gtx layout.Context) layout.Dimensions {
 		LineHeightScale: l.LineHeightScale,
 	}
 	return tl.Layout(gtx, l.Shaper, l.Font, l.TextSize, l.Text, textColor)
+}
+
+// MeasureWidth returns the pixel width of txt with this label's font/size settings.
+// Results are cached globally — repeated calls with the same text+font+size are free.
+// Uses a temporary op.Ops so no rendering ops are produced.
+func (l LabelStyle) MeasureWidth(gtx layout.Context, txt string) int {
+	k := labelWidthCacheKey{text: txt, size: l.TextSize, font: l.Font}
+	labelWidthCacheMu.Lock()
+	if w, ok := labelWidthCache[k]; ok {
+		labelWidthCacheMu.Unlock()
+		return w
+	}
+	labelWidthCacheMu.Unlock()
+
+	// Measure using a temporary op.Ops (no visible output).
+	var tempOps op.Ops
+	sub := gtx
+	sub.Ops = &tempOps
+	sub.Constraints.Min.X = 0
+	sub.Constraints.Max.X = 1e9
+	sub.Constraints.Min.Y = 0
+	sub.Constraints.Max.Y = 1e9
+
+	origText := l.Text
+	l.Text = txt
+	l.Alignment = text.Start
+	l.MaxLines = 0
+	l.Truncator = ""
+	l.WrapPolicy = text.WrapWords
+	l.State = nil // no selection
+	textColorMacro := op.Record(sub.Ops)
+	paint.ColorOp{Color: l.Color}.Add(sub.Ops)
+	textColor := textColorMacro.Stop()
+	tl := widget.Label{
+		Alignment: l.Alignment,
+	}
+	dims := tl.Layout(sub, l.Shaper, l.Font, l.TextSize, l.Text, textColor)
+	l.Text = origText
+
+	w := dims.Size.X
+	labelWidthCacheMu.Lock()
+	labelWidthCache[k] = w
+	labelWidthCacheMu.Unlock()
+	return w
 }

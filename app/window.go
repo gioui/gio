@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"log"
+	"os"
 	"runtime"
 	"sync"
 	"time"
@@ -159,10 +161,12 @@ func (w *Window) validateAndProcess(size image.Point, sync bool, frame *op.Ops, 
 				}
 				w.destroyGPU()
 				if errors.Is(err, gpu.ErrDeviceLost) {
+					log.Printf("3D preview: device lost while refreshing the surface (%v), rebuilding GPU", err)
 					continue
 				}
 				return err
 			}
+			log.Printf("3D preview: gpu surface refreshed %dx%d", size.X, size.Y)
 		}
 		if w.ctx != nil {
 			if err := w.ctx.Lock(); err != nil {
@@ -178,6 +182,7 @@ func (w *Window) validateAndProcess(size image.Point, sync bool, frame *op.Ops, 
 				return err
 			}
 			w.gpu = gpu
+			log.Printf("3D preview: gpu device ready, drawing first frame")
 		}
 		if w.gpu != nil {
 			if err := w.frame(frame, size); err != nil {
@@ -189,10 +194,12 @@ func (w *Window) validateAndProcess(size image.Point, sync bool, frame *op.Ops, 
 				}
 				w.destroyGPU()
 				if errors.Is(err, gpu.ErrDeviceLost) {
+					log.Printf("3D preview: device lost while drawing a frame (%v), rebuilding GPU", err)
 					continue
 				}
 				return err
 			}
+			probeBackbufferOnce(w.ctx)
 		}
 		w.queue.Frame(frame)
 		// Let the client continue as soon as possible, in particular before
@@ -201,6 +208,11 @@ func (w *Window) validateAndProcess(size image.Point, sync bool, frame *op.Ops, 
 		var err error
 		if w.gpu != nil {
 			err = w.ctx.Present()
+			if err == nil {
+				firstPresentOnce.Do(func() {
+					log.Printf("3D preview: first frame presented")
+				})
+			}
 			w.ctx.Unlock()
 		}
 		return err
@@ -219,7 +231,59 @@ func (w *Window) frame(frame *op.Ops, viewport image.Point) error {
 	if err != nil {
 		return err
 	}
+	firstRenderTargetOnce.Do(func() {
+		log.Printf("3D preview: first render target acquired, submitting frame")
+	})
 	return w.gpu.Frame(frame, target, viewport)
+}
+
+// backbufferProbeAt throttles the once-a-second backbuffer diagnostics line.
+var backbufferProbeAt time.Time
+
+// One-shot markers for the first frame: a crash between two of them in the
+// log pinpoints the failing stage of the Vulkan (or any) frame setup.
+var (
+	firstRenderTargetOnce sync.Once
+	firstPresentOnce      sync.Once
+)
+
+// backbufferProbeEnabled gates the backbuffer readback: it copies the whole
+// back buffer to the CPU once a second, which is too expensive to keep on in
+// production. Set DOW_BACKBUFFER_PROBE=1 to turn it on while diagnosing.
+var backbufferProbeEnabled = os.Getenv("DOW_BACKBUFFER_PROBE") != ""
+
+// probeBackbufferOnce reads the back buffer back after the frame is drawn and
+// logs what it holds, for backends that can. It answers the question a draw
+// counter cannot: whether the draws that were issued reached the pixels the
+// window is about to present.
+func probeBackbufferOnce(ctx context) {
+	now := time.Now()
+	if !backbufferProbeAt.IsZero() && now.Sub(backbufferProbeAt) < time.Second {
+		return
+	}
+	p, ok := ctx.(interface{ ProbeBackbuffer() (string, error) })
+	if !ok {
+		return
+	}
+	backbufferProbeAt = now
+	if backbufferProbeEnabled {
+		info, err := p.ProbeBackbuffer()
+		if err != nil {
+			log.Printf("3D preview: backbuffer probe failed: %v", err)
+		} else {
+			log.Printf("3D preview: backbuffer %s", info)
+		}
+	}
+	if d, ok := ctx.(interface{ DrainDebugMessages() []string }); ok {
+		msgs := d.DrainDebugMessages()
+		if len(msgs) > 16 {
+			log.Printf("3D preview: d3d11: %d more messages suppressed", len(msgs)-16)
+			msgs = msgs[:16]
+		}
+		for _, msg := range msgs {
+			log.Printf("3D preview: d3d11: %s", msg)
+		}
+	}
 }
 
 func (w *Window) processFrame(frame *op.Ops, ack chan<- struct{}) {
