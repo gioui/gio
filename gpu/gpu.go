@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"log"
 	"math"
 	"slices"
 	"time"
@@ -33,7 +32,7 @@ import (
 	"gioui.org/shader/gio"
 
 	// Register backends.
-	d3d11 "gioui.org/gpu/internal/d3d11"
+	_ "gioui.org/gpu/internal/d3d11"
 	_ "gioui.org/gpu/internal/metal"
 	_ "gioui.org/gpu/internal/opengl"
 	_ "gioui.org/gpu/internal/vulkan"
@@ -427,22 +426,10 @@ func (g *gpu) collect(viewport image.Point, frameOps *op.Ops) {
 	}
 }
 
-// gpuFrameLogAt throttles the once-a-second frame diagnostics line.
-var gpuFrameLogAt time.Time
-
 func (g *gpu) frame(target RenderTarget) error {
 	viewport := g.renderer.blitter.viewport
 	defFBO := g.ctx.BeginFrame(target, g.drawOps.clear, viewport)
 	defer g.ctx.EndFrame()
-	// A once-a-second line about what this frame actually contained: counts
-	// say whether the op stream survived to the renderer, the draw counters
-	// say whether the renderer issued the draws, and the clear flag says
-	// whether the backbuffer was about to be filled before them.
-	logAt := time.Now()
-	logIt := gpuFrameLogAt.IsZero() || logAt.Sub(gpuFrameLogAt) >= time.Second
-	clearNow := g.drawOps.clear
-	nImg, nPath, nLayer := len(g.drawOps.imageOps), len(g.drawOps.pathOps), len(g.drawOps.layers)
-
 	// Full pipeline: build paths, stencils, intersections.
 	// NOTE: dirty-region skip was removed — BeginFrame clears
 	// the stencil buffer every frame, so stencilClips must always
@@ -480,18 +467,6 @@ func (g *gpu) frame(target RenderTarget) error {
 	g.cache.frame()
 	g.drawOps.pathCache.frame()
 	g.cleanupTimer.end()
-	if logIt {
-		gpuFrameLogAt = logAt
-		draws, idxDraws := -1, -1
-		snap := ""
-		if b, ok := g.ctx.(*d3d11.Backend); ok {
-			draws, idxDraws = b.Draws, b.DrawIdx
-			b.Draws, b.DrawIdx = 0, 0
-			snap = b.StateSnapshot()
-		}
-		log.Printf("3D preview: gio frame: images=%d paths=%d layers=%d clear=%v viewport=%dx%d draws=%d idxdraws=%d state: %s",
-			nImg, nPath, nLayer, clearNow, viewport.X, viewport.Y, draws, idxDraws, snap)
-	}
 	if false && g.timers.ready() {
 		st, covt, cleant := g.stencilTimer.Elapsed, g.coverTimer.Elapsed, g.cleanupTimer.Elapsed
 		ft := st + covt + cleant

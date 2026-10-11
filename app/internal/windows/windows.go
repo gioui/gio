@@ -437,6 +437,7 @@ const (
 var (
 	kernel32          = syscall.NewLazySystemDLL("kernel32.dll")
 	_GetModuleHandleW = kernel32.NewProc("GetModuleHandleW")
+	_GetTickCount64   = kernel32.NewProc("GetTickCount64")
 	_GlobalAlloc      = kernel32.NewProc("GlobalAlloc")
 	_GlobalFree       = kernel32.NewProc("GlobalFree")
 	_GlobalLock       = kernel32.NewProc("GlobalLock")
@@ -461,6 +462,7 @@ var (
 	_GetKeyState                 = user32.NewProc("GetKeyState")
 	_GetMessage                  = user32.NewProc("GetMessageW")
 	_GetMessageTime              = user32.NewProc("GetMessageTime")
+	_GetCursorPos                = user32.NewProc("GetCursorPos")
 	_GetMonitorInfo              = user32.NewProc("GetMonitorInfoW")
 	_GetPointerInfo              = user32.NewProc("GetPointerInfo")
 	_GetSystemMetrics            = user32.NewProc("GetSystemMetrics")
@@ -726,6 +728,21 @@ func GetMessage(m *Msg, hwnd syscall.Handle, wMsgFilterMin, wMsgFilterMax uint32
 
 func GetMessageTime() time.Duration {
 	r, _, _ := _GetMessageTime.Call()
+	return time.Duration(r) * time.Millisecond
+}
+
+// GetCursorPos reports the cursor position in screen coordinates, the same
+// space the raw WM_POINTER position is in.
+func GetCursorPos(p *Point) bool {
+	r, _, _ := _GetCursorPos.Call(uintptr(unsafe.Pointer(p)))
+	return r != 0
+}
+
+// GetTickCount64 is the same clock GetMessageTime reads — milliseconds
+// since the system started — without its 32-bit wrap, so subtracting one
+// from the other gives the age of the message being processed.
+func GetTickCount64() time.Duration {
+	r, _, _ := _GetTickCount64.Call()
 	return time.Duration(r) * time.Millisecond
 }
 

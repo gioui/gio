@@ -677,6 +677,16 @@ func (w *window) pointerUpdate(pi windows.PointerInfo, pid pointer.ID, kind poin
 	}
 
 	x, y := coordsFromlParam(lParam)
+	if kind == pointer.Move && pi.PointerType == windows.PT_MOUSE {
+		// On a mouse Move, the message's position (lParam and PtPixelLocation
+		// alike) comes back scaled by 0.8 at this display scale, so the first
+		// Move after every press jumped 20% of the way toward the origin. Press
+		// and release carry the true position, and so does GetCursorPos.
+		var cur windows.Point
+		if windows.GetCursorPos(&cur) {
+			x, y = int(cur.X), int(cur.Y)
+		}
+	}
 	np := windows.Point{X: int32(x), Y: int32(y)}
 	windows.ScreenToClient(w.hwnd, &np)
 	p := f32.Point{X: float32(np.X), Y: float32(np.Y)}

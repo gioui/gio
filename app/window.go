@@ -166,7 +166,6 @@ func (w *Window) validateAndProcess(size image.Point, sync bool, frame *op.Ops, 
 				}
 				return err
 			}
-			log.Printf("3D preview: gpu surface refreshed %dx%d", size.X, size.Y)
 		}
 		if w.ctx != nil {
 			if err := w.ctx.Lock(); err != nil {
