@@ -313,12 +313,6 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		if err != nil {
 			panic(err)
 		}
-		switch msg {
-		case windows.WM_POINTERDOWN:
-			windows.SetCapture(w.hwnd)
-		case windows.WM_POINTERUP:
-			windows.ReleaseCapture()
-		}
 
 		kind := pointer.Move
 		switch pi.ButtonChangeType {
