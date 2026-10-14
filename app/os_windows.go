@@ -89,6 +89,11 @@ func osMain() {
 	select {}
 }
 
+func init() {
+	// Use monitor-aware coordinates for pointer events before creating any windows.
+	windows.SetProcessDpiAwarenessContext(windows.DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)
+}
+
 func newWindow(win *callbacks, options []Option) {
 	done := make(chan struct{})
 	go func() {

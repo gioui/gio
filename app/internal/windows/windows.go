@@ -501,6 +501,8 @@ var (
 	_UnregisterClass              = user32.NewProc("UnregisterClassW")
 	_UpdateWindow                 = user32.NewProc("UpdateWindow")
 
+	_SetProcessDpiAwarenessContext = user32.NewProc("SetProcessDpiAwarenessContext")
+
 	shcore            = syscall.NewLazySystemDLL("shcore")
 	_GetDpiForMonitor = shcore.NewProc("GetDpiForMonitor")
 
@@ -956,6 +958,16 @@ func SetFocus(hwnd syscall.Handle) {
 
 func SetThreadDpiAwarenessContext() {
 	_SetThreadDpiAwarenessContext.Call(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)
+}
+
+// SetProcessDpiAwarenessContext sets the process-wide DPI awareness context
+// and reports whether it succeeded. Windows before 1703 lacks the function.
+func SetProcessDpiAwarenessContext(value uintptr) bool {
+	if _SetProcessDpiAwarenessContext.Find() != nil {
+		return false
+	}
+	r, _, _ := _SetProcessDpiAwarenessContext.Call(value)
+	return r != 0
 }
 
 func SetCapture(hwnd syscall.Handle) syscall.Handle {
