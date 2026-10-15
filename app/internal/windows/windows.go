@@ -477,7 +477,6 @@ var (
 	_PeekMessage                  = user32.NewProc("PeekMessageW")
 	_PostMessage                  = user32.NewProc("PostMessageW")
 	_PostQuitMessage              = user32.NewProc("PostQuitMessage")
-	_ReleaseCapture               = user32.NewProc("ReleaseCapture")
 	_RegisterClassExW             = user32.NewProc("RegisterClassExW")
 	_RegisterTouchWindow          = user32.NewProc("RegisterTouchWindow")
 	_ReleaseDC                    = user32.NewProc("ReleaseDC")
@@ -485,7 +484,6 @@ var (
 	_ShowWindow                   = user32.NewProc("ShowWindow")
 	_IsIconic                     = user32.NewProc("IsIconic")
 	_SendMessage                  = user32.NewProc("SendMessageW")
-	_SetCapture                   = user32.NewProc("SetCapture")
 	_SetCursor                    = user32.NewProc("SetCursor")
 	_SetClipboardData             = user32.NewProc("SetClipboardData")
 	_SetForegroundWindow          = user32.NewProc("SetForegroundWindow")
@@ -500,8 +498,6 @@ var (
 	_TranslateMessage             = user32.NewProc("TranslateMessage")
 	_UnregisterClass              = user32.NewProc("UnregisterClassW")
 	_UpdateWindow                 = user32.NewProc("UpdateWindow")
-
-	_SetProcessDpiAwarenessContext = user32.NewProc("SetProcessDpiAwarenessContext")
 
 	shcore            = syscall.NewLazySystemDLL("shcore")
 	_GetDpiForMonitor = shcore.NewProc("GetDpiForMonitor")
@@ -923,11 +919,6 @@ func PostMessage(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) error 
 	return nil
 }
 
-func ReleaseCapture() bool {
-	r, _, _ := _ReleaseCapture.Call()
-	return r != 0
-}
-
 func RegisterClassEx(cls *WndClassEx) (uint16, error) {
 	a, _, err := _RegisterClassExW.Call(uintptr(unsafe.Pointer(cls)))
 	if a == 0 {
@@ -958,21 +949,6 @@ func SetFocus(hwnd syscall.Handle) {
 
 func SetThreadDpiAwarenessContext() {
 	_SetThreadDpiAwarenessContext.Call(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)
-}
-
-// SetProcessDpiAwarenessContext sets the process-wide DPI awareness context
-// and reports whether it succeeded. Windows before 1703 lacks the function.
-func SetProcessDpiAwarenessContext(value uintptr) bool {
-	if _SetProcessDpiAwarenessContext.Find() != nil {
-		return false
-	}
-	r, _, _ := _SetProcessDpiAwarenessContext.Call(value)
-	return r != 0
-}
-
-func SetCapture(hwnd syscall.Handle) syscall.Handle {
-	r, _, _ := _SetCapture.Call(uintptr(hwnd))
-	return syscall.Handle(r)
 }
 
 func SetClipboardData(format uint32, mem syscall.Handle) error {

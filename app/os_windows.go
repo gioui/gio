@@ -89,11 +89,6 @@ func osMain() {
 	select {}
 }
 
-func init() {
-	// Use monitor-aware coordinates for pointer events before creating any windows.
-	windows.SetProcessDpiAwarenessContext(windows.DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)
-}
-
 func newWindow(win *callbacks, options []Option) {
 	done := make(chan struct{})
 	go func() {
@@ -317,12 +312,6 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		pi, err := windows.GetPointerInfo(uint32(pid))
 		if err != nil {
 			panic(err)
-		}
-		switch msg {
-		case windows.WM_POINTERDOWN:
-			windows.SetCapture(w.hwnd)
-		case windows.WM_POINTERUP:
-			windows.ReleaseCapture()
 		}
 
 		kind := pointer.Move
