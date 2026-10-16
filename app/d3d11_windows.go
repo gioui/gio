@@ -94,7 +94,13 @@ func (c *d3d11Context) Refresh() error {
 		return err
 	}
 	texture := (*d3d11.Resource)(unsafe.Pointer(backBuffer))
-	renderTarget, err := c.dev.CreateRenderTargetView(texture)
+	// The swapchain backbuffer is created non-sRGB because the flip
+	// presentation model rejects sRGB formats. View it as sRGB here so
+	// the renderer's linear values are still converted on write.
+	renderTarget, err := c.dev.CreateRenderTargetView(texture, d3d11.RENDER_TARGET_VIEW_DESC{
+		Format:        d3d11.DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+		ViewDimension: d3d11.RTV_DIMENSION_TEXTURE2D,
+	})
 	d3d11.IUnknownRelease(unsafe.Pointer(backBuffer), backBuffer.Vtbl.Release)
 	if err != nil {
 		return err
