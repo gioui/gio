@@ -15,9 +15,11 @@ import (
 )
 
 type lineInfo struct {
-	xOff            fixed.Int26_6
-	yOff            int
-	width           fixed.Int26_6
+	xOff  fixed.Int26_6
+	yOff  int
+	width fixed.Int26_6
+	// endX is the logical line end, which may be inside a bidi line.
+	endX            fixed.Int26_6
 	ascent, descent fixed.Int26_6
 	glyphs          int
 }
@@ -221,6 +223,7 @@ func (g *glyphIndex) Glyph(gl text.Glyph) {
 			xOff:    g.currentLineMin,
 			yOff:    int(gl.Y),
 			width:   g.currentLineMax - g.currentLineMin,
+			endX:    g.positions[len(g.positions)-1].x,
 			ascent:  g.positions[len(g.positions)-1].ascent,
 			descent: g.positions[len(g.positions)-1].descent,
 			glyphs:  g.currentLineGlyphs,
@@ -271,6 +274,22 @@ func (g *glyphIndex) closestToLineCol(lineCol screenPos) combinedPos {
 		prior.x = g.lines[lineCol.line].getLineEnd()
 		return prior
 	}
+	return pos
+}
+
+// lineEndPosition returns the last caret position of line, at its logical end.
+// In a bidi line that end can be inside the line.
+func (g *glyphIndex) lineEndPosition(line int) combinedPos {
+	i := sort.Search(len(g.positions), func(i int) bool {
+		return g.positions[i].lineCol.line > line
+	})
+	if i == 0 {
+		return combinedPos{}
+	}
+	pos := g.positions[i-1]
+	// At a soft wrap the position moves to the next line, so use the end
+	// recorded when the line was closed.
+	pos.x = g.lines[line].endX
 	return pos
 }
 
@@ -414,7 +433,7 @@ func (g *glyphIndex) locate(viewport image.Rectangle, startRune, endRune int, re
 		}
 		if lineIdx != caretEnd.lineCol.line {
 			// This line does not contain the end of the selection.
-			selectionEnd = g.closestToLineCol(screenPos{line: lineIdx, col: math.MaxInt})
+			selectionEnd = g.lineEndPosition(lineIdx)
 		}
 
 		var (

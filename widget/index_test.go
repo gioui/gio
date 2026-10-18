@@ -125,6 +125,107 @@ func getGlyphs(fontSize, minWidth, lineWidth int, align text.Alignment, str stri
 	return txt
 }
 
+// TestIndexLocateRTLWrapped checks that a selection starting on the first line of
+// a wrapped right-to-left paragraph covers that line.
+func TestIndexLocateRTLWrapped(t *testing.T) {
+	const value = "لا لا لا لا لا لا لا لا لا لا لا لا لا لا لا"
+	glyphs := getGlyphs(16, 0, 100, text.Start, value)
+	var index glyphIndex
+	for _, glyph := range glyphs {
+		index.Glyph(glyph)
+	}
+	if len(index.lines) < 2 {
+		t.Fatalf("expected a wrapped paragraph, got %d lines", len(index.lines))
+	}
+	runes := len([]rune(value))
+	viewport := image.Rectangle{Max: image.Pt(1000, 1000)}
+
+	full := index.locate(viewport, 0, runes, nil)
+	if len(full) < 2 {
+		t.Fatalf("expected a region per line, got %v", full)
+	}
+	// The whole line must be covered, up to its left edge (allowing overhang).
+	first := full[0].Bounds
+	if first.Dx() == 0 || first.Min.X > 10 {
+		t.Fatalf("selection of the whole first line = %v", first)
+	}
+
+	// A selection starting inside the line covers its left part only.
+	partial := index.locate(viewport, 5, runes, nil)
+	if len(partial) < 2 {
+		t.Fatalf("expected a region per line, got %v", partial)
+	}
+	if got := partial[0].Bounds; got.Min.X > 10 || got.Max.X >= first.Max.X {
+		t.Fatalf("partial first line selection = %v, want the left part of %v", got, first)
+	}
+}
+
+func TestIndexLocateWrappedWord(t *testing.T) {
+	for _, value := range []string{"abcdefghijklmno", "لالالالالالالالا"} {
+		t.Run(value, func(t *testing.T) {
+			var index glyphIndex
+			for _, glyph := range makeAccountingTestText(value, 16, 30) {
+				index.Glyph(glyph)
+			}
+			if len(index.lines) < 2 {
+				t.Fatalf("expected a wrapped word, got %d lines", len(index.lines))
+			}
+			regions := index.locate(image.Rect(0, 0, 1000, 1000), 0, len([]rune(value)), nil)
+			if len(regions) == 0 {
+				t.Fatal("selection has no regions")
+			}
+			line := index.lines[0]
+			if got := regions[0].Bounds; got.Min.X != line.xOff.Round() || got.Max.X != line.getLineEnd().Round() {
+				t.Fatalf("first line selection = %v, want X range %d..%d",
+					got, line.xOff.Round(), line.getLineEnd().Round())
+			}
+		})
+	}
+}
+
+func TestIndexLocateMixedLineEnd(t *testing.T) {
+	const value = "Hello لا\nWorld"
+	for _, tc := range []struct {
+		name       string
+		start, end int
+	}{
+		{name: "whole ligature", start: 6, end: 14},
+		{name: "partial ligature", start: 7, end: 14},
+		{name: "reversed selection", start: 14, end: 6},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var index glyphIndex
+			for _, glyph := range getGlyphs(16, 0, 100, text.Start, value) {
+				index.Glyph(glyph)
+			}
+			viewport := image.Rect(0, 0, 100, 100)
+			regions := index.locate(viewport, tc.start, tc.end, nil)
+			start := min(tc.start, tc.end)
+			endPos, _ := index.closestToRune(8)
+			startPos, _ := index.closestToRune(start)
+			left := endPos.x.Round()
+			right := startPos.x.Round()
+			if start == 6 {
+				// Rune 6 also has a caret on the LTR side of the run boundary.
+				right = index.lines[0].getLineEnd().Round()
+			}
+			var covered int
+			for _, region := range regions {
+				if region.Bounds.Empty() || region.Bounds.Max.Y-region.Baseline != index.lines[0].yOff {
+					continue
+				}
+				if region.Bounds.Min.X != left || region.Bounds.Max.X != right {
+					t.Fatalf("first line selection = %v, want X range %d..%d", region.Bounds, left, right)
+				}
+				covered++
+			}
+			if covered != 1 {
+				t.Fatalf("got %d nonempty regions on the first line, want 1", covered)
+			}
+		})
+	}
+}
+
 // TestIndexPositionWhitespace checks that the index correctly generates cursor positions
 // for empty lines and the empty string.
 func TestIndexPositionWhitespace(t *testing.T) {
@@ -399,6 +500,7 @@ func TestIndexPositionLines(t *testing.T) {
 					yOff:    22,
 					glyphs:  15,
 					width:   fixed.Int26_6(7133),
+					endX:    fixed.Int26_6(4753),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
@@ -407,6 +509,7 @@ func TestIndexPositionLines(t *testing.T) {
 					yOff:    41,
 					glyphs:  15,
 					width:   fixed.Int26_6(7905),
+					endX:    fixed.Int26_6(5890),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
@@ -415,6 +518,7 @@ func TestIndexPositionLines(t *testing.T) {
 					yOff:    60,
 					glyphs:  18,
 					width:   fixed.Int26_6(8528),
+					endX:    fixed.Int26_6(8528),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
@@ -423,6 +527,7 @@ func TestIndexPositionLines(t *testing.T) {
 					yOff:    79,
 					glyphs:  4,
 					width:   fixed.Int26_6(2034),
+					endX:    fixed.Int26_6(2034),
 					ascent:  fixed.Int26_6(968),
 					descent: fixed.Int26_6(216),
 				},
@@ -469,6 +574,7 @@ func TestIndexPositionLines(t *testing.T) {
 					yOff:    22,
 					glyphs:  15,
 					width:   fixed.Int26_6(7133),
+					endX:    fixed.Int26_6(7860),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
@@ -477,6 +583,7 @@ func TestIndexPositionLines(t *testing.T) {
 					yOff:    41,
 					glyphs:  15,
 					width:   fixed.Int26_6(7905),
+					endX:    fixed.Int26_6(8225),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
@@ -485,6 +592,7 @@ func TestIndexPositionLines(t *testing.T) {
 					yOff:    60,
 					glyphs:  18,
 					width:   fixed.Int26_6(8528),
+					endX:    fixed.Int26_6(10240),
 					ascent:  fixed.Int26_6(1407),
 					descent: fixed.Int26_6(756),
 				},
@@ -493,6 +601,7 @@ func TestIndexPositionLines(t *testing.T) {
 					yOff:    79,
 					glyphs:  4,
 					width:   fixed.Int26_6(2034),
+					endX:    fixed.Int26_6(10240),
 					ascent:  fixed.Int26_6(968),
 					descent: fixed.Int26_6(216),
 				},
@@ -505,6 +614,7 @@ func TestIndexPositionLines(t *testing.T) {
 			expectedLines: []lineInfo{
 				{
 					xOff:    fixed.Int26_6(54),
+					endX:    fixed.Int26_6(54),
 					yOff:    22,
 					glyphs:  20,
 					width:   fixed.Int26_6(10186),
@@ -513,6 +623,7 @@ func TestIndexPositionLines(t *testing.T) {
 				},
 				{
 					xOff:    fixed.Int26_6(1070),
+					endX:    fixed.Int26_6(1070),
 					yOff:    41,
 					glyphs:  19,
 					width:   fixed.Int26_6(9170),
@@ -521,6 +632,7 @@ func TestIndexPositionLines(t *testing.T) {
 				},
 				{
 					xOff:    fixed.Int26_6(4338),
+					endX:    fixed.Int26_6(4338),
 					yOff:    60,
 					glyphs:  13,
 					width:   fixed.Int26_6(5902),
