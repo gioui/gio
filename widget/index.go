@@ -393,6 +393,37 @@ type Region struct {
 	Baseline int
 }
 
+// selectionGlyphs returns the glyph range covering [startRune, endRune).
+// A partially selected cluster is included as a whole.
+func (g *glyphIndex) selectionGlyphs(startRune, endRune int) (start, end int) {
+	if startRune > endRune {
+		startRune, endRune = endRune, startRune
+	}
+	if startRune == endRune {
+		return 0, 0
+	}
+	var runeOffset, clusterStart int
+	for i, glyph := range g.glyphs {
+		// Only the last glyph in a cluster has a rune count.
+		if glyph.Flags&text.FlagClusterBreak == 0 {
+			continue
+		}
+		nextRune := runeOffset + int(glyph.Runes)
+		if runeOffset < endRune && nextRune > startRune {
+			if end == 0 {
+				start = clusterStart
+			}
+			end = i + 1
+		}
+		if nextRune >= endRune {
+			break
+		}
+		runeOffset = nextRune
+		clusterStart = i + 1
+	}
+	return start, end
+}
+
 // locate returns highlight regions covering the glyphs that represent the runes in
 // [startRune,endRune). If the rects parameter is non-nil, locate will use it to
 // return results instead of allocating, provided that there is enough capacity.

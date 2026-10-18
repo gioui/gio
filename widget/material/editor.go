@@ -32,7 +32,9 @@ type EditorStyle struct {
 	HintColor color.NRGBA
 	// SelectionColor is the color of the background for selected text.
 	SelectionColor color.NRGBA
-	Editor         *widget.Editor
+	// SelectedTextColor is the color of selected text. If zero alpha, Color is used.
+	SelectedTextColor color.NRGBA
+	Editor            *widget.Editor
 
 	shaper *text.Shaper
 }
@@ -87,6 +89,7 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}
 	e.Editor.LineHeight = e.LineHeight
 	e.Editor.LineHeightScale = e.LineHeightScale
+	e.Editor.SelectedTextColor = e.SelectedTextColor
 	dims = e.Editor.Layout(gtx, e.shaper, e.Font, e.TextSize, textColor, selectionColor)
 	if e.Editor.Len() == 0 {
 		call.Add(gtx.Ops)

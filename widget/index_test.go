@@ -125,6 +125,37 @@ func getGlyphs(fontSize, minWidth, lineWidth int, align text.Alignment, str stri
 	return txt
 }
 
+func TestIndexSelectionGlyphs(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		text               string
+		startRune, endRune int
+		start, end         int
+	}{
+		{name: "first character", text: "Hello", startRune: 0, endRune: 1, start: 0, end: 1},
+		{name: "middle character", text: "Hello", startRune: 2, endRune: 3, start: 2, end: 3},
+		{name: "reversed selection", text: "Hello", startRune: 3, endRune: 2, start: 2, end: 3},
+		{name: "empty selection", text: "Hello", startRune: 2, endRune: 2},
+		{name: "all characters", text: "Hello", startRune: 0, endRune: 5, start: 0, end: 5},
+		{name: "second line", text: "Hello\nWorld", startRune: 6, endRune: 11, start: 6, end: 11},
+		{name: "right to left", text: "سلام", startRune: 0, endRune: 1, start: 0, end: 1},
+		{name: "combining mark", text: "x\u0301y", startRune: 0, endRune: 2, start: 0, end: 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			glyphs := getGlyphs(16, 0, 300, text.Start, tc.text)
+			var index glyphIndex
+			for _, glyph := range glyphs {
+				index.Glyph(glyph)
+			}
+			start, end := index.selectionGlyphs(tc.startRune, tc.endRune)
+			if start != tc.start || end != tc.end {
+				t.Fatalf("selectionGlyphs(%d, %d) = (%d, %d), want (%d, %d)",
+					tc.startRune, tc.endRune, start, end, tc.start, tc.end)
+			}
+		})
+	}
+}
+
 // TestIndexLocateRTLWrapped checks that a selection starting on the first line of
 // a wrapped right-to-left paragraph covers that line.
 func TestIndexLocateRTLWrapped(t *testing.T) {
