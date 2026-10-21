@@ -5,6 +5,7 @@ package org.gioui;
 import android.content.ClipboardManager;
 import android.content.ClipData;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -41,6 +42,21 @@ public final class Gio {
 	}
 
 	static private native void runGoMain(byte[] dataDir, Context context);
+
+	static void startForeground(Context ctx, String title, String text) {
+		Intent i = new Intent(ctx, GioForegroundService.class);
+		i.putExtra("title", title);
+		i.putExtra("text", text);
+		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+			ctx.startForegroundService(i);
+		} else {
+			ctx.startService(i);
+		}
+	}
+
+	static void stopForeground(Context ctx) {
+		ctx.stopService(new Intent(ctx, GioForegroundService.class));
+	}
 
 	static void writeClipboard(Context ctx, String s) {
 		ClipboardManager m = (ClipboardManager)ctx.getSystemService(Context.CLIPBOARD_SERVICE);

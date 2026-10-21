@@ -234,6 +234,8 @@ var android struct {
 	mwriteClipboard   C.jmethodID
 	mreadClipboard    C.jmethodID
 	mwakeupMainThread C.jmethodID
+	mstartForeground  C.jmethodID
+	mstopForeground   C.jmethodID
 
 	// android.view.accessibility.AccessibilityNodeInfo class.
 	accessibilityNodeInfo struct {
@@ -432,6 +434,8 @@ func initJVM(env *C.JNIEnv, gio C.jclass, ctx C.jobject) {
 	android.mwriteClipboard = getStaticMethodID(env, gio, "writeClipboard", "(Landroid/content/Context;Ljava/lang/String;)V")
 	android.mreadClipboard = getStaticMethodID(env, gio, "readClipboard", "(Landroid/content/Context;)Ljava/lang/String;")
 	android.mwakeupMainThread = getStaticMethodID(env, gio, "wakeupMainThread", "()V")
+	android.mstartForeground = getStaticMethodID(env, gio, "startForeground", "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)V")
+	android.mstopForeground = getStaticMethodID(env, gio, "stopForeground", "(Landroid/content/Context;)V")
 
 	intern := func(s string) C.jstring {
 		ref := C.jni_NewGlobalRef(env, C.jobject(javaString(env, s)))
@@ -1561,4 +1565,19 @@ func (AndroidViewEvent) implementsViewEvent() {}
 func (AndroidViewEvent) ImplementsEvent()     {}
 func (a AndroidViewEvent) Valid() bool {
 	return a != (AndroidViewEvent{})
+}
+
+func startForeground(opts ForegroundOptions) error {
+	var err error
+	runInJVM(javaVM(), func(env *C.JNIEnv) {
+		err = callStaticVoidMethod(env, android.gioCls, android.mstartForeground,
+			jvalue(android.appCtx), jvalue(javaString(env, opts.Title)), jvalue(javaString(env, opts.Text)))
+	})
+	return err
+}
+
+func stopForeground() {
+	runInJVM(javaVM(), func(env *C.JNIEnv) {
+		callStaticVoidMethod(env, android.gioCls, android.mstopForeground, jvalue(android.appCtx))
+	})
 }
