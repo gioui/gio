@@ -3,6 +3,7 @@
 package org.gioui;
 
 import android.app.Activity;
+import android.os.Build;
 import android.os.Bundle;
 import android.content.Intent;
 import android.content.res.Configuration;
@@ -10,6 +11,8 @@ import android.view.ViewGroup;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 
 public final class GioActivity extends Activity {
 	private GioView view;
@@ -31,6 +34,19 @@ public final class GioActivity extends Activity {
             layer.addView(view);
             setContentView(layer);
             onNewIntent(this.getIntent());
+
+            // With predictive back, the default for apps targeting SDK 36 or newer,
+            // onBackPressed is never called. https://developer.android.com/guide/navigation/custom-back/predictive-back-gesture
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                    new OnBackInvokedCallback() {
+                        @Override public void onBackInvoked() {
+                            if (!view.backPressed())
+                                GioActivity.super.onBackPressed();
+                        }
+                    });
+            }
 	}
 
 	@Override public void onDestroy() {
