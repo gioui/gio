@@ -8,6 +8,7 @@ import (
 	"image"
 	"math"
 	"math/bits"
+	"sync"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -88,6 +89,8 @@ type Buffer struct {
 	size      int
 	immutable bool
 }
+
+var bufferPool sync.Pool = sync.Pool{New: func() any { return &Buffer{} }}
 
 func init() {
 	driver.NewDirect3D11Device = newDirect3D11Device
@@ -472,7 +475,9 @@ func (b *Backend) newBuffer(typ driver.BufferBinding, size int, data []byte, imm
 			return nil, err
 		}
 	}
-	return &Buffer{backend: b, buf: buf, bind: bind, size: size, resView: resView, uaView: uaView, immutable: immutable}, nil
+	buffer := bufferPool.Get().(*Buffer)
+	*buffer = Buffer{backend: b, buf: buf, bind: bind, size: size, resView: resView, uaView: uaView, immutable: immutable}
+	return buffer, nil
 }
 
 func (b *Backend) NewComputeProgram(shader shader.Sources) (driver.Program, error) {
@@ -750,6 +755,7 @@ func (b *Buffer) Release() {
 	}
 	d3d11.IUnknownRelease(unsafe.Pointer(b.buf), b.buf.Vtbl.Release)
 	*b = Buffer{}
+	bufferPool.Put(b) // Return to pool for reuse. Note: this means that you should not use the buffer after calling Release.
 }
 
 func (t *Texture) ReadPixels(src image.Rectangle, pixels []byte, stride int) error {
