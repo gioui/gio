@@ -130,6 +130,7 @@ import (
 	"runtime"
 	"runtime/cgo"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -962,27 +963,86 @@ func convertKeyCode(code C.jint) (key.Name, bool) {
 		n = key.NameLeftArrow
 	case C.AKEYCODE_DPAD_RIGHT:
 		n = key.NameRightArrow
+	case C.AKEYCODE_TAB:
+		n = key.NameTab
+	case C.AKEYCODE_ESCAPE:
+		n = key.NameEscape
+	case C.AKEYCODE_MOVE_HOME:
+		n = key.NameHome
+	case C.AKEYCODE_MOVE_END:
+		n = key.NameEnd
+	case C.AKEYCODE_PAGE_UP:
+		n = key.NamePageUp
+	case C.AKEYCODE_PAGE_DOWN:
+		n = key.NamePageDown
+	case C.AKEYCODE_SPACE:
+		n = key.NameSpace
 	default:
-		return "", false
+		// Letters, digits and symbols are named by their character, as on
+		// the desktop, so a chord such as Ctrl+C reaches a key.Filter.
+		switch c := int(code); {
+		case c >= C.AKEYCODE_A && c <= C.AKEYCODE_Z:
+			n = key.Name(rune('A' + c - C.AKEYCODE_A))
+		case c >= C.AKEYCODE_0 && c <= C.AKEYCODE_9:
+			n = key.Name(rune('0' + c - C.AKEYCODE_0))
+		case c >= C.AKEYCODE_F1 && c <= C.AKEYCODE_F12:
+			n = key.Name("F" + strconv.Itoa(c-C.AKEYCODE_F1+1))
+		default:
+			s, ok := symbolKeys[c]
+			if !ok {
+				return "", false
+			}
+			n = s
+		}
 	}
 	return n, true
 }
 
+// symbolKeys names the symbol keys of a keyboard by their unshifted character.
+var symbolKeys = map[int]key.Name{
+	C.AKEYCODE_GRAVE: "`", C.AKEYCODE_MINUS: "-", C.AKEYCODE_EQUALS: "=",
+	C.AKEYCODE_LEFT_BRACKET: "[", C.AKEYCODE_RIGHT_BRACKET: "]", C.AKEYCODE_BACKSLASH: "\\",
+	C.AKEYCODE_SEMICOLON: ";", C.AKEYCODE_APOSTROPHE: "'", C.AKEYCODE_COMMA: ",",
+	C.AKEYCODE_PERIOD: ".", C.AKEYCODE_SLASH: "/",
+}
+
+// convertMeta is an Android key event's meta state as modifiers. Only the left
+// Alt is Alt: the right one is AltGr on many layouts, which types characters.
+func convertMeta(meta C.jint) key.Modifiers {
+	var m key.Modifiers
+	if meta&C.AMETA_CTRL_ON != 0 {
+		m |= key.ModCtrl
+	}
+	if meta&C.AMETA_SHIFT_ON != 0 {
+		m |= key.ModShift
+	}
+	if meta&C.AMETA_ALT_LEFT_ON != 0 {
+		m |= key.ModAlt
+	}
+	if meta&C.AMETA_META_ON != 0 {
+		m |= key.ModSuper
+	}
+	return m
+}
+
 //export Java_org_gioui_GioView_onKeyEvent
-func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, keyCode, r C.jint, pressed C.jboolean, t C.jlong) {
+func Java_org_gioui_GioView_onKeyEvent(env *C.JNIEnv, class C.jclass, handle C.jlong, keyCode, r, meta C.jint, pressed C.jboolean, t C.jlong) {
 	w := cgo.Handle(handle).Value().(*window)
 	if pressed == C.JNI_TRUE && keyCode == C.AKEYCODE_DPAD_CENTER {
 		w.callbacks.ClickFocus()
 		return
 	}
+	mods := convertMeta(meta)
 	if n, ok := convertKeyCode(keyCode); ok {
 		state := key.Release
 		if pressed == C.JNI_TRUE {
 			state = key.Press
 		}
-		w.processEvent(key.Event{Name: n, State: state})
+		w.processEvent(key.Event{Name: n, Modifiers: mods, State: state})
 	}
-	if pressed == C.JNI_TRUE && r != 0 && r != '\n' { // Checking for "\n" to prevent duplication with key.NameEnter (gio#224).
+	// A control character is a key event, as Enter is (gio#224), and a chord with
+	// Ctrl or Meta is a shortcut, not text.
+	if pressed == C.JNI_TRUE && r >= 0x20 && r != 0x7f && mods&(key.ModCtrl|key.ModAlt|key.ModSuper) == 0 {
 		w.callbacks.EditorInsert(string(rune(r)))
 	}
 }

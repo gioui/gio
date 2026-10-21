@@ -129,14 +129,14 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 
 	@Override public boolean onKeyDown(int keyCode, KeyEvent event) {
 		if (nhandle != 0) {
-			onKeyEvent(nhandle, keyCode, event.getUnicodeChar(), true, event.getEventTime());
+			onKeyEvent(nhandle, keyCode, event.getUnicodeChar(), event.getMetaState(), true, event.getEventTime());
 		}
 		return false;
 	}
 
 	@Override public boolean onKeyUp(int keyCode, KeyEvent event) {
 		if (nhandle != 0) {
-			onKeyEvent(nhandle, keyCode, event.getUnicodeChar(), false, event.getEventTime());
+			onKeyEvent(nhandle, keyCode, event.getUnicodeChar(), event.getMetaState(), false, event.getEventTime());
 		}
 		return false;
 	}
@@ -559,7 +559,7 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	static private native void onWindowInsets(long handle, int top, int right, int bottom, int left);
 	static public native void onLowMemory();
 	static private native void onTouchEvent(long handle, int action, int pointerID, int tool, float x, float y, float scrollX, float scrollY, int buttons, long time);
-	static private native void onKeyEvent(long handle, int code, int character, boolean pressed, long time);
+	static private native void onKeyEvent(long handle, int code, int character, int meta, boolean pressed, long time);
 	static private native void onFrameCallback(long handle);
 	static private native boolean onBack(long handle);
 	static private native void onFocusChange(long handle, boolean focus);
@@ -683,8 +683,8 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		@Override public boolean performEditorAction(int editorAction) {
 			long eventTime = SystemClock.uptimeMillis();
 			// Translate to enter key.
-			onKeyEvent(nhandle, KeyEvent.KEYCODE_ENTER, '\n', true, eventTime);
-			onKeyEvent(nhandle, KeyEvent.KEYCODE_ENTER, '\n', false, eventTime);
+			onKeyEvent(nhandle, KeyEvent.KEYCODE_ENTER, '\n', 0, true, eventTime);
+			onKeyEvent(nhandle, KeyEvent.KEYCODE_ENTER, '\n', 0, false, eventTime);
 			return true;
 		}
 
@@ -698,7 +698,7 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 
 		@Override public boolean sendKeyEvent(KeyEvent event) {
 			boolean pressed = event.getAction() == KeyEvent.ACTION_DOWN;
-			onKeyEvent(nhandle, event.getKeyCode(), event.getUnicodeChar(), pressed, event.getEventTime());
+			onKeyEvent(nhandle, event.getKeyCode(), event.getUnicodeChar(), event.getMetaState(), pressed, event.getEventTime());
 			return true;
 		}
 
