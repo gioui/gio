@@ -1113,6 +1113,8 @@ func convertKeyCode(code uintptr) (key.Name, bool) {
 		r = key.NamePageUp
 	case windows.VK_NEXT:
 		r = key.NamePageDown
+	case windows.VK_INSERT:
+		r = key.NameInsert
 	case windows.VK_F1:
 		r = key.NameF1
 	case windows.VK_F2:

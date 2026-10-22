@@ -1107,6 +1107,8 @@ func translateKey(k string) (key.Name, bool) {
 		n = key.NamePageUp
 	case "PageDown":
 		n = key.NamePageDown
+	case "Insert":
+		n = key.NameInsert
 	case "Tab":
 		n = key.NameTab
 	case " ":

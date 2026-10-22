@@ -281,6 +281,8 @@ func convertKeysym(s C.xkb_keysym_t) (key.Name, bool) {
 		n = key.NamePageUp
 	case C.XKB_KEY_Page_Down:
 		n = key.NamePageDown
+	case C.XKB_KEY_Insert:
+		n = key.NameInsert
 	case C.XKB_KEY_F1:
 		n = key.NameF1
 	case C.XKB_KEY_F2:
@@ -353,8 +355,7 @@ func convertKeysym(s C.xkb_keysym_t) (key.Name, bool) {
 	case C.XKB_KEY_KP_Begin:
 		n = key.NameHome
 	case C.XKB_KEY_KP_Insert:
-		// not supported
-		return "", false
+		n = key.NameInsert
 	case C.XKB_KEY_KP_Delete:
 		n = key.NameDeleteForward
 	case C.XKB_KEY_KP_Multiply:

@@ -289,6 +289,7 @@ const (
 	VK_END    = 0x23
 	VK_ESCAPE = 0x1b
 	VK_HOME   = 0x24
+	VK_INSERT = 0x2d
 	VK_LEFT   = 0x25
 	VK_NEXT   = 0x22
 	VK_PRIOR  = 0x21
