@@ -691,6 +691,10 @@ func gio_onMouse(h C.uintptr_t, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x
 		btn = pointer.ButtonSecondary
 	case 2:
 		btn = pointer.ButtonTertiary
+	case 3:
+		btn = pointer.ButtonQuaternary
+	case 4:
+		btn = pointer.ButtonQuinary
 	}
 	var typ pointer.Kind
 	switch cdir {
