@@ -694,6 +694,10 @@ func (h *x11EventHandler) handleEvents() bool {
 				// scroll right
 				ev.Kind = pointer.Scroll
 				ev.Scroll.X = +scrollScale * 2
+			case 8:
+				btn = pointer.ButtonQuaternary
+			case 9:
+				btn = pointer.ButtonQuinary
 			default:
 				continue
 			}
