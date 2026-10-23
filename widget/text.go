@@ -327,6 +327,17 @@ func (e *textView) PaintSelection(gtx layout.Context, material op.CallOp) {
 // PaintText clips and paints the visible text glyph outlines using the provided
 // material to fill the glyphs.
 func (e *textView) PaintText(gtx layout.Context, material op.CallOp) {
+	e.paintText(gtx, material, op.CallOp{})
+}
+
+// PaintSelectedText paints the text, filling the glyphs inside the selection with
+// selectedMaterial and the rest with material. A zero selectedMaterial paints
+// everything with material.
+func (e *textView) PaintSelectedText(gtx layout.Context, material, selectedMaterial op.CallOp) {
+	e.paintText(gtx, material, selectedMaterial)
+}
+
+func (e *textView) paintText(gtx layout.Context, material, selectedMaterial op.CallOp) {
 	m := op.Record(gtx.Ops)
 	viewport := image.Rectangle{
 		Min: e.scrollOff,
@@ -336,6 +347,17 @@ func (e *textView) PaintText(gtx layout.Context, material op.CallOp) {
 		viewport: viewport,
 		material: material,
 	}
+	if selectedMaterial != (op.CallOp{}) && e.caret.start != e.caret.end {
+		it.selectedMaterial = selectedMaterial
+		it.selectionStart, it.selectionEnd = e.index.selectionGlyphs(e.caret.start, e.caret.end)
+		// A bidi line can produce several rectangles; sort them so they can be
+		// walked left to right.
+		e.regions = e.index.locate(viewport, e.caret.start, e.caret.end, e.regions)
+		slices.SortFunc(e.regions, func(a, b Region) int {
+			return a.Bounds.Min.X - b.Bounds.Min.X
+		})
+		it.selectionRegions = e.regions
+	}
 
 	startGlyph := 0
 	for _, line := range e.index.lines {
@@ -344,6 +366,7 @@ func (e *textView) PaintText(gtx layout.Context, material op.CallOp) {
 		}
 		startGlyph += line.glyphs
 	}
+	it.glyphIndex = startGlyph
 	var glyphs [32]text.Glyph
 	line := glyphs[:0]
 	for _, g := range e.index.glyphs[startGlyph:] {
