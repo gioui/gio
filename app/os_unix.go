@@ -11,6 +11,14 @@ import (
 	"gioui.org/io/pointer"
 )
 
+// passwordManagerHintType is the clipboard type that marks sensitive content
+// for clipboard managers, with the data passwordManagerHintValue. It is the
+// convention of KDE's Klipper, which then keeps no history entry.
+const (
+	passwordManagerHintType  = "x-kde-passwordManagerHint"
+	passwordManagerHintValue = "secret"
+)
+
 type X11ViewEvent struct {
 	// Display is a pointer to the X11 Display created by XOpenDisplay.
 	Display unsafe.Pointer

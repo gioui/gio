@@ -137,8 +137,8 @@ type wlSeat struct {
 	// source represents the clipboard content of the most recent
 	// clipboard write, if any.
 	source *C.struct_wl_data_source
-	// content is the data belonging to source.
-	content []byte
+	// content is the content belonging to source.
+	content clipboardContent
 }
 
 type repeatState struct {
@@ -287,7 +287,7 @@ func newWLWindow(callbacks *callbacks, options []Option) error {
 	return nil
 }
 
-func (d *wlDisplay) writeClipboard(content []byte) error {
+func (d *wlDisplay) writeClipboard(content clipboardContent) error {
 	s := d.seat
 	if s == nil {
 		return nil
@@ -296,7 +296,7 @@ func (d *wlDisplay) writeClipboard(content []byte) error {
 	if s.source != nil {
 		C.wl_data_source_destroy(s.source)
 		s.source = nil
-		s.content = nil
+		s.content = clipboardContent{}
 	}
 	if d.dataDeviceManager == nil || s.dataDev == nil {
 		return nil
@@ -304,6 +304,13 @@ func (d *wlDisplay) writeClipboard(content []byte) error {
 	s.content = content
 	s.source = C.wl_data_device_manager_create_data_source(d.dataDeviceManager)
 	C.wl_data_source_add_listener(s.source, &C.gio_data_source_listener, unsafe.Pointer(s.seat))
+	// The hint is offered before the content, like the markers on the
+	// other platforms.
+	if content.sensitive {
+		hint := C.CString(passwordManagerHintType)
+		C.wl_data_source_offer(s.source, hint)
+		C.free(unsafe.Pointer(hint))
+	}
 	for _, mime := range clipboardMimeTypes {
 		C.wl_data_source_offer(s.source, C.CString(mime))
 	}
@@ -1077,8 +1084,8 @@ func (w *window) ReadClipboard() {
 	}()
 }
 
-func (w *window) WriteClipboard(mime string, s []byte) {
-	w.disp.writeClipboard(s)
+func (w *window) WriteClipboard(c clipboardContent) {
+	w.disp.writeClipboard(c)
 }
 
 func (w *window) Configure(options []Option) {
@@ -1792,7 +1799,15 @@ func gio_onDataSourceTarget(data unsafe.Pointer, source *C.struct_wl_data_source
 //export gio_onDataSourceSend
 func gio_onDataSourceSend(data unsafe.Pointer, source *C.struct_wl_data_source, mime *C.char, fd C.int32_t) {
 	s := callbackLoad(data).(*wlSeat)
-	content := s.content
+	content := s.content.data
+	if C.GoString(mime) == passwordManagerHintType {
+		// The hint is all a clipboard manager asking for it gets, never the
+		// content.
+		content = nil
+		if s.content.sensitive {
+			content = []byte(passwordManagerHintValue)
+		}
+	}
 	go func() {
 		defer syscall.Close(int(fd))
 		syscall.Write(int(fd), content)
@@ -1803,7 +1818,7 @@ func gio_onDataSourceSend(data unsafe.Pointer, source *C.struct_wl_data_source, 
 func gio_onDataSourceCancelled(data unsafe.Pointer, source *C.struct_wl_data_source) {
 	s := callbackLoad(data).(*wlSeat)
 	if s.source == source {
-		s.content = nil
+		s.content = clipboardContent{}
 		s.source = nil
 	}
 	C.wl_data_source_destroy(source)

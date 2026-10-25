@@ -738,6 +738,12 @@ func (q *Router) WriteClipboard() (mime string, content []byte, ok bool) {
 	return q.cqueue.WriteClipboard()
 }
 
+// ClipboardSensitive reports whether the content most recently returned by
+// WriteClipboard is marked as sensitive, see [clipboard.WriteCmd].
+func (q *Router) ClipboardSensitive() bool {
+	return q.cqueue.sensitive
+}
+
 // ClipboardRequested reports if any new handler is waiting
 // to read the clipboard.
 func (q *Router) ClipboardRequested() bool {

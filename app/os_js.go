@@ -868,14 +868,14 @@ func (w *window) ReadClipboard() {
 	}
 }
 
-func (w *window) WriteClipboard(mime string, s []byte) {
+func (w *window) WriteClipboard(c clipboardContent) {
 	if w.clipboard.IsUndefined() {
 		return
 	}
 	if w.clipboard.Get("writeText").IsUndefined() {
 		return
 	}
-	w.clipboard.Call("writeText", string(s))
+	w.clipboard.Call("writeText", string(c.data))
 }
 
 func (w *window) Configure(options []Option) {

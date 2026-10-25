@@ -123,3 +123,22 @@ func assertClipboardWriteCmd(t *testing.T, router *Router, mimeExp, expected str
 		t.Errorf("got text %s, expected %s", text, expected)
 	}
 }
+
+func TestClipboardWriteSensitive(t *testing.T) {
+	r := new(Router)
+	write := func(text string, sensitive bool) {
+		r.Source().Execute(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(text)), Sensitive: sensitive})
+		r.Frame(new(op.Ops))
+		if _, _, ok := r.WriteClipboard(); !ok {
+			t.Fatalf("no write of %q", text)
+		}
+	}
+	write("secret", true)
+	if !r.ClipboardSensitive() {
+		t.Error("a sensitive write is not marked as sensitive")
+	}
+	write("plain", false)
+	if r.ClipboardSensitive() {
+		t.Error("a plain write is marked as sensitive")
+	}
+}

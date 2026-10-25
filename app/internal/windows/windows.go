@@ -479,6 +479,7 @@ var (
 	_PostMessage                  = user32.NewProc("PostMessageW")
 	_PostQuitMessage              = user32.NewProc("PostQuitMessage")
 	_RegisterClassExW             = user32.NewProc("RegisterClassExW")
+	_RegisterClipboardFormat      = user32.NewProc("RegisterClipboardFormatW")
 	_RegisterTouchWindow          = user32.NewProc("RegisterTouchWindow")
 	_ReleaseDC                    = user32.NewProc("ReleaseDC")
 	_ScreenToClient               = user32.NewProc("ScreenToClient")
@@ -926,6 +927,18 @@ func RegisterClassEx(cls *WndClassEx) (uint16, error) {
 		return 0, fmt.Errorf("RegisterClassExW failed: %v", err)
 	}
 	return uint16(a), nil
+}
+
+func RegisterClipboardFormat(name string) (uint32, error) {
+	n, err := syscall.UTF16PtrFromString(name)
+	if err != nil {
+		return 0, err
+	}
+	r, _, err := _RegisterClipboardFormat.Call(uintptr(unsafe.Pointer(n)))
+	if r == 0 {
+		return 0, fmt.Errorf("RegisterClipboardFormatW: %v", err)
+	}
+	return uint32(r), nil
 }
 
 func ReleaseDC(hdc syscall.Handle) {

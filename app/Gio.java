@@ -4,10 +4,13 @@ package org.gioui;
 
 import android.content.ClipboardManager;
 import android.content.ClipData;
+import android.content.ClipDescription;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PersistableBundle;
 
 import java.io.UnsupportedEncodingException;
 
@@ -58,9 +61,18 @@ public final class Gio {
 		ctx.stopService(new Intent(ctx, GioForegroundService.class));
 	}
 
-	static void writeClipboard(Context ctx, String s) {
+	static void writeClipboard(Context ctx, String s, boolean sensitive) {
 		ClipboardManager m = (ClipboardManager)ctx.getSystemService(Context.CLIPBOARD_SERVICE);
-		m.setPrimaryClip(ClipData.newPlainText(null, s));
+		ClipData clip = ClipData.newPlainText(null, s);
+		// Android 13 and later hide sensitive content in the clipboard
+		// preview, earlier versions ignore the extra. The constant is
+		// inlined at compile time, the extras need API 24.
+		if (sensitive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+			PersistableBundle extras = new PersistableBundle();
+			extras.putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true);
+			clip.getDescription().setExtras(extras);
+		}
+		m.setPrimaryClip(clip);
 	}
 
 	static String readClipboard(Context ctx) {

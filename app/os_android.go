@@ -431,7 +431,7 @@ func initJVM(env *C.JNIEnv, gio C.jclass, ctx C.jobject) {
 	cls = findClass(env, "android/graphics/Rect")
 	android.rect.cls = C.jclass(C.jni_NewGlobalRef(env, C.jobject(cls)))
 	android.rect.cons = getMethodID(env, cls, "<init>", "(IIII)V")
-	android.mwriteClipboard = getStaticMethodID(env, gio, "writeClipboard", "(Landroid/content/Context;Ljava/lang/String;)V")
+	android.mwriteClipboard = getStaticMethodID(env, gio, "writeClipboard", "(Landroid/content/Context;Ljava/lang/String;Z)V")
 	android.mreadClipboard = getStaticMethodID(env, gio, "readClipboard", "(Landroid/content/Context;)Ljava/lang/String;")
 	android.mwakeupMainThread = getStaticMethodID(env, gio, "wakeupMainThread", "()V")
 	android.mstartForeground = getStaticMethodID(env, gio, "startForeground", "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)V")
@@ -1393,11 +1393,15 @@ func newWindow(window *callbacks, options []Option) {
 	<-mainWindow.windows
 }
 
-func (w *window) WriteClipboard(mime string, s []byte) {
+func (w *window) WriteClipboard(c clipboardContent) {
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
-		jstr := javaString(env, string(s))
+		jstr := javaString(env, string(c.data))
+		jsensitive := jvalue(C.JNI_FALSE)
+		if c.sensitive {
+			jsensitive = jvalue(C.JNI_TRUE)
+		}
 		callStaticVoidMethod(env, android.gioCls, android.mwriteClipboard,
-			jvalue(android.appCtx), jvalue(jstr))
+			jvalue(android.appCtx), jvalue(jstr), jsensitive)
 	})
 }
 

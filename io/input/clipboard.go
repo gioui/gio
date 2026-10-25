@@ -20,6 +20,8 @@ type clipboardQueue struct {
 	requested bool
 	mime      string
 	text      []byte
+	// sensitive is whether text is marked as sensitive.
+	sensitive bool
 }
 
 // WriteClipboard returns the most recent data to be copied
@@ -58,6 +60,7 @@ func (q *clipboardQueue) ProcessWriteClipboard(req clipboard.WriteCmd) {
 	}
 	q.mime = req.Type
 	q.text = content
+	q.sensitive = req.Sensitive
 }
 
 func (q *clipboardQueue) ProcessReadClipboard(state clipboardState, tag event.Tag) clipboardState {

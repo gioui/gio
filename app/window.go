@@ -262,7 +262,11 @@ func (w *Window) updateState() {
 		w.driver.SetInputHint(hint)
 	}
 	if mime, txt, ok := q.WriteClipboard(); ok {
-		w.driver.WriteClipboard(mime, txt)
+		w.driver.WriteClipboard(clipboardContent{
+			mime:      mime,
+			data:      txt,
+			sensitive: q.ClipboardSensitive(),
+		})
 	}
 	if q.ClipboardRequested() {
 		w.driver.ReadClipboard()
