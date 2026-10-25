@@ -65,6 +65,13 @@ On Windows, macOS, Wayland, and X11, [Window.Event] yields a [ClosingEvent]
 when the user requests to close a window. The window closes unless the
 application calls [ClosingEvent.Abort] while handling the event.
 
+# iOS
+
+Gio programs need iOS 13 or tvOS 13 and run with the UIScene life cycle.
+The Info.plist of the app must contain a UIApplicationSceneManifest, which
+needs no scene configurations; the gogio tool adds it. Without it, the app
+starts without a window.
+
 # Permissions
 
 The packages under gioui.org/app/permission should be imported

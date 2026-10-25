@@ -280,21 +280,53 @@ void gio_viewSetHandle(CFTypeRef viewRef, uintptr_t handle) {
 	v.handle = handle;
 }
 
-@interface _gioAppDelegate : UIResponder <UIApplicationDelegate>
+// sceneWindow is the window of the scene life cycle. It outlives a
+// scene that UIKit disconnects, because there is only one Gio window
+// and its GioViewController cannot be created a second time.
+static UIWindow *sceneWindow;
+
+@interface _gioSceneDelegate : UIResponder <UIWindowSceneDelegate>
 @property (strong, nonatomic) UIWindow *window;
 @end
 
-@implementation _gioAppDelegate
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-	self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
-	GioViewController *controller = [[GioViewController alloc] initWithNibName:nil bundle:nil];
-	self.window.rootViewController = controller;
+@implementation _gioSceneDelegate
+- (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions {
+	if (![scene isKindOfClass:[UIWindowScene class]] || ![session.role isEqualToString:UIWindowSceneSessionRoleApplication]) {
+		return;
+	}
+	UIWindowScene *windowScene = (UIWindowScene *)scene;
+	if (sceneWindow == nil) {
+		sceneWindow = [[UIWindow alloc] initWithWindowScene:windowScene];
+		GioViewController *controller = [[GioViewController alloc] initWithNibName:nil bundle:nil];
+		sceneWindow.rootViewController = controller;
+	} else {
+		sceneWindow.windowScene = windowScene;
+	}
+	self.window = sceneWindow;
 	[self.window makeKeyAndVisible];
-	return YES;
+	[self scene:scene openURLContexts:connectionOptions.URLContexts];
 }
-- (BOOL)application:(UIApplication *)app openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenURLOptionsKey, id> *)options {
-    gio_onOpenURI((__bridge CFTypeRef)url.absoluteString);
-	return YES;
+
+- (void)scene:(UIScene *)scene openURLContexts:(NSSet<UIOpenURLContext *> *)URLContexts {
+	for (UIOpenURLContext *context in URLContexts) {
+		gio_onOpenURI((__bridge CFTypeRef)context.URL.absoluteString);
+	}
+}
+@end
+
+@interface _gioAppDelegate : UIResponder <UIApplicationDelegate>
+@end
+
+@implementation _gioAppDelegate
+// The scene manifest in the Info.plist needs no scene configurations:
+// the main scene gets _gioSceneDelegate unless the Info.plist configures
+// a delegate for it.
+- (UISceneConfiguration *)application:(UIApplication *)application configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession options:(UISceneConnectionOptions *)options {
+	UISceneConfiguration *config = [connectingSceneSession.configuration copy];
+	if (config.delegateClass == nil && [connectingSceneSession.role isEqualToString:UIWindowSceneSessionRoleApplication]) {
+		config.delegateClass = [_gioSceneDelegate class];
+	}
+	return config;
 }
 @end
 
