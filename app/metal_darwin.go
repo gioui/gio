@@ -33,10 +33,8 @@ static void setupLayer(CFTypeRef layerRef, CFTypeRef devRef) {
 		layer.device = dev;
 		// Package gpu assumes an sRGB-encoded framebuffer.
 		layer.pixelFormat = MTLPixelFormatBGRA8Unorm_sRGB;
-		if (@available(iOS 11.0, *)) {
-			// Never let nextDrawable time out and return nil.
-			layer.allowsNextDrawableTimeout = NO;
-		}
+		// Never let nextDrawable time out and return nil.
+		layer.allowsNextDrawableTimeout = NO;
 	}
 }
 

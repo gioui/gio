@@ -393,14 +393,10 @@ static CFTypeAndError newRenderPipeline(CFTypeRef devRef, CFTypeRef vertFunc, CF
 		desc.fragmentFunction = ffunc;
 		desc.vertexDescriptor = vdesc;
 		for (NSUInteger i = 0; i < nvertBufs; i++) {
-			if (@available(iOS 11.0, *)) {
-				desc.vertexBuffers[i].mutability = MTLMutabilityImmutable;
-			}
+			desc.vertexBuffers[i].mutability = MTLMutabilityImmutable;
 		}
 		for (NSUInteger i = 0; i < nfragBufs; i++) {
-			if (@available(iOS 11.0, *)) {
-				desc.fragmentBuffers[i].mutability = MTLMutabilityImmutable;
-			}
+			desc.fragmentBuffers[i].mutability = MTLMutabilityImmutable;
 		}
 		desc.colorAttachments[0].pixelFormat = pixelFormat;
 		desc.colorAttachments[0].blendingEnabled = blend ? YES : NO;

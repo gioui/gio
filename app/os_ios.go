@@ -59,12 +59,9 @@ static struct drawParams viewDrawParams(CFTypeRef viewRef) {
 	// Use 163 as the standard ppi on iOS.
 	params.dpi = 163*scale;
 	params.sdpi = params.dpi;
-	UIEdgeInsets insets = v.layoutMargins;
-	if (@available(iOS 11.0, tvOS 11.0, *)) {
-		UIFontMetrics *metrics = [UIFontMetrics defaultMetrics];
-		params.sdpi = [metrics scaledValueForValue:params.sdpi];
-		insets = v.safeAreaInsets;
-	}
+	UIFontMetrics *metrics = [UIFontMetrics defaultMetrics];
+	params.sdpi = [metrics scaledValueForValue:params.sdpi];
+	UIEdgeInsets insets = v.safeAreaInsets;
 	params.width = v.bounds.size.width*scale;
 	params.height = v.bounds.size.height*scale;
 	params.top = insets.top*scale;
