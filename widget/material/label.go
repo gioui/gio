@@ -25,6 +25,8 @@ type LabelStyle struct {
 	Color color.NRGBA
 	// SelectionColor is the color of the background for selected text.
 	SelectionColor color.NRGBA
+	// SelectedTextColor is the color of selected text. If zero alpha, Color is used.
+	SelectedTextColor color.NRGBA
 	// Alignment specify the text alignment.
 	Alignment text.Alignment
 	// MaxLines limits the number of lines. Zero means no limit.
@@ -140,6 +142,7 @@ func (l LabelStyle) Layout(gtx layout.Context) layout.Dimensions {
 		l.State.WrapPolicy = l.WrapPolicy
 		l.State.LineHeight = l.LineHeight
 		l.State.LineHeightScale = l.LineHeightScale
+		l.State.SelectedTextColor = l.SelectedTextColor
 		return l.State.Layout(gtx, l.Shaper, l.Font, l.TextSize, textColor, selectColor)
 	}
 	tl := widget.Label{
