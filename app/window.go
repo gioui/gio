@@ -117,6 +117,8 @@ type eventSummary struct {
 	framePending bool
 	closing      *ClosingEvent
 	destroy      *DestroyEvent
+	// drops queues FileDropEvents so each path is delivered separately.
+	drops []FileDropEvent
 }
 
 type callbacks struct {
@@ -596,6 +598,10 @@ func (w *Window) nextEvent() (event.Event, bool) {
 		// Clear pending events after DestroyEvent is delivered.
 		*s = eventSummary{}
 		return e, true
+	case len(s.drops) > 0:
+		e := s.drops[0]
+		s.drops = s.drops[1:]
+		return e, true
 	case s.cfg != nil:
 		e := *s.cfg
 		s.cfg = nil
@@ -668,6 +674,8 @@ func (w *Window) processEvent(e event.Event) bool {
 		w.coalesced.destroy = &e2
 	case *ClosingEvent:
 		w.coalesced.closing = e2
+	case FileDropEvent:
+		w.coalesced.drops = append(w.coalesced.drops, e2)
 	case ViewEvent:
 		if !e2.Valid() && w.gpu != nil {
 			w.ctx.Lock()

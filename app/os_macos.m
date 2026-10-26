@@ -14,7 +14,7 @@ __attribute__ ((visibility ("hidden"))) CALayer *gio_layerFactory(BOOL presentWi
 @interface GioWindowDelegate : NSObject<NSWindowDelegate>
 @end
 
-@interface GioView : NSView <CALayerDelegate,NSTextInputClient>
+@interface GioView : NSView <CALayerDelegate,NSTextInputClient,NSDraggingDestination>
 @property uintptr_t handle;
 @property BOOL presentWithTrans;
 @end
@@ -208,6 +208,53 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
     r = [self convertRect:r toView:nil];
     return [[self window] convertRectToScreen:r];
 }
+- (void)magnifyWithEvent:(NSEvent *)event {
+	NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
+	CGFloat height = self.bounds.size.height;
+	gio_onMagnify(self.handle, p.x, height - p.y, event.magnification, [event timestamp], [event modifierFlags]);
+}
+- (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)sender {
+	NSPasteboard *pboard = [sender draggingPasteboard];
+	if ([pboard.types containsObject:NSPasteboardTypeFileURL] ||
+	    [pboard.types containsObject:NSFilenamesPboardType]) {
+		return NSDragOperationCopy;
+	}
+	return NSDragOperationNone;
+}
+
+- (BOOL)prepareForDragOperation:(id<NSDraggingInfo>)sender {
+	return [self draggingEntered:sender] != NSDragOperationNone;
+}
+
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)sender {
+	NSPasteboard *pboard = [sender draggingPasteboard];
+	NSArray<NSURL *> *urls = [pboard readObjectsForClasses:@[[NSURL class]]
+		options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
+	NSMutableArray<NSString *> *paths = [NSMutableArray array];
+	for (NSURL *url in urls) {
+		if (url.isFileURL && url.path.length > 0) {
+			[paths addObject:url.path];
+		}
+	}
+	// Older drags (or providers without file URLs) expose plain filenames.
+	if (paths.count == 0 && [pboard.types containsObject:NSFilenamesPboardType]) {
+		NSArray *names = [pboard propertyListForType:NSFilenamesPboardType];
+		for (id name in names) {
+			if ([name isKindOfClass:[NSString class]] && [name length] > 0) {
+				[paths addObject:name];
+			}
+		}
+	}
+	if (paths.count == 0) {
+		gio_onFileDropEmpty(self.handle);
+	} else {
+		for (NSString *path in paths) {
+			gio_onFileDropPath(self.handle, (char *)[path UTF8String]);
+		}
+	}
+	return YES;
+}
+
 - (void)applicationWillUnhide:(NSNotification *)notification {
 	gio_onDraw(self.handle);
 }
@@ -401,6 +448,7 @@ CFTypeRef gio_createView(int presentWithTrans) {
 		NSRect frame = NSMakeRect(0, 0, 0, 0);
 		GioView* view = [[GioView alloc] initWithFrame:frame];
 		view.presentWithTrans = presentWithTrans ? YES : NO;
+		[view registerForDraggedTypes:@[NSPasteboardTypeFileURL, NSFilenamesPboardType]];
 		view.wantsLayer = YES;
 		view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
 

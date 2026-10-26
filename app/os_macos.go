@@ -730,6 +730,42 @@ func gio_onMouse(h C.uintptr_t, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x
 	})
 }
 
+//export gio_onMagnify
+func gio_onMagnify(h C.uintptr_t, x, y, delta C.CGFloat, ti C.double, mods C.NSUInteger) {
+	if delta == 0 {
+		return
+	}
+	w := windowFor(h)
+	t := time.Duration(float64(ti)*float64(time.Second) + .5)
+	w.ProcessEvent(pointer.Event{
+		Kind:      pointer.Scroll,
+		Source:    pointer.Mouse,
+		Time:      t,
+		Position:  f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale},
+		Scroll:    f32.Point{Y: magnifyScroll(float64(delta))},
+		Modifiers: convertMods(mods) | key.ModCtrl,
+	})
+}
+
+//export gio_onFileDropPath
+func gio_onFileDropPath(h C.uintptr_t, path *C.char) {
+	if path == nil {
+		return
+	}
+	p := C.GoString(path)
+	if p == "" {
+		return
+	}
+	w := windowFor(h)
+	w.ProcessEvent(FileDropEvent{Paths: []string{p}})
+}
+
+//export gio_onFileDropEmpty
+func gio_onFileDropEmpty(h C.uintptr_t) {
+	w := windowFor(h)
+	w.ProcessEvent(FileDropEvent{})
+}
+
 //export gio_onDraw
 func gio_onDraw(h C.uintptr_t) {
 	w := windowFor(h)

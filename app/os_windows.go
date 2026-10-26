@@ -60,6 +60,16 @@ const _WM_WAKEUP = windows.WM_USER + iota
 
 const copyDataURLType = 0xffffff00
 
+// WM_DROPFILES is sent after DragAcceptFiles registered the window.
+const wmDropFiles = 0x0233
+
+var (
+	shell32             = syscall.NewLazyDLL("shell32.dll")
+	procDragAcceptFiles = shell32.NewProc("DragAcceptFiles")
+	procDragQueryFileW  = shell32.NewProc("DragQueryFileW")
+	procDragFinish      = shell32.NewProc("DragFinish")
+)
+
 type gpuAPI struct {
 	priority    int
 	initializer func(w *window) (context, error)
@@ -204,6 +214,8 @@ func (w *window) init() error {
 	if err := windows.RegisterTouchWindow(hwnd, 0); err != nil {
 		return err
 	}
+	// Accept files dropped from Explorer (WM_DROPFILES).
+	_, _, _ = procDragAcceptFiles.Call(uintptr(hwnd), 1)
 	if err := windows.EnableMouseInPointer(1); err != nil {
 		return err
 	}
@@ -249,6 +261,34 @@ func (w *window) update() {
 	}
 	w.ProcessEvent(ConfigEvent{Config: w.config})
 	w.draw(true)
+}
+
+// handleDropFiles copies the dropped paths and delivers one FileDropEvent per
+// file.  It must not open documents here: the event loop does that.
+func handleDropFiles(hDrop syscall.Handle, w *window) {
+	count, _, _ := procDragQueryFileW.Call(uintptr(hDrop), 0xffffffff, 0, 0)
+	paths := make([]string, 0, count)
+	for i := uintptr(0); i < count; i++ {
+		size, _, _ := procDragQueryFileW.Call(uintptr(hDrop), i, 0, 0)
+		if size == 0 {
+			continue
+		}
+		buf := make([]uint16, size+1)
+		if r, _, _ := procDragQueryFileW.Call(uintptr(hDrop), i, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf))); r == 0 {
+			continue
+		}
+		if path := syscall.UTF16ToString(buf); path != "" {
+			paths = append(paths, path)
+		}
+	}
+	_, _, _ = procDragFinish.Call(uintptr(hDrop))
+	if len(paths) == 0 {
+		w.ProcessEvent(FileDropEvent{})
+		return
+	}
+	for _, path := range paths {
+		w.ProcessEvent(FileDropEvent{Paths: []string{path}})
+	}
 }
 
 func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr {
@@ -392,6 +432,9 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 			return 0
 		}
 		szp.Rgrc[0] = mi.WorkArea
+		return 0
+	case wmDropFiles:
+		handleDropFiles(syscall.Handle(wParam), w)
 		return 0
 	case windows.WM_PAINT:
 		w.draw(true)
