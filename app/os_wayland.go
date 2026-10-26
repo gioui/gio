@@ -368,6 +368,8 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 		wakeups:   make(chan struct{}, 1),
 		clipReads: make(chan transfer.DataEvent, 1),
 	}
+	// Default to server-side decorations.
+	w.config.Decorated = true
 	w.surf = C.wl_compositor_create_surface(d.compositor)
 	if w.surf == nil {
 		w.destroy()
@@ -1094,6 +1096,13 @@ func (w *window) Configure(options []Option) {
 	cnf := w.config
 	cnf.apply(cfg, options)
 	w.config.decoHeight = cnf.decoHeight
+	if w.decor != nil && prev.Decorated != cnf.Decorated {
+		if cnf.Decorated {
+			C.zxdg_toplevel_decoration_v1_set_mode(w.decor, C.ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE)
+		} else {
+			C.zxdg_toplevel_decoration_v1_set_mode(w.decor, C.ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE)
+		}
+	}
 
 	switch cnf.Mode {
 	case Fullscreen:
