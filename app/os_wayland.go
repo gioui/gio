@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-//go:build ((linux && !android) || freebsd) && !nowayland
+//go:build ((linux && !android) || freebsd) && !nowayland && !gio_ohos && !openharmony
 
 package app
 

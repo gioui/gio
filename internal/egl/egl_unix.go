@@ -5,7 +5,8 @@
 package egl
 
 /*
-#cgo linux,!android  pkg-config: egl
+#cgo linux,!android,!gio_ohos,!openharmony pkg-config: egl
+#cgo gio_ohos openharmony LDFLAGS: -lEGL
 #cgo freebsd openbsd android LDFLAGS: -lEGL
 #cgo freebsd CFLAGS: -I/usr/local/include
 #cgo freebsd LDFLAGS: -L/usr/local/lib

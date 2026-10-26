@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-//go:build linux || freebsd
+//go:build (linux || freebsd) && !gio_ohos && !openharmony
 
 package vk
 

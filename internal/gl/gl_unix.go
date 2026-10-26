@@ -648,6 +648,10 @@ func dlopen(lib string) unsafe.Pointer {
 	return C.dlopen(clib, C.RTLD_NOW|C.RTLD_LOCAL)
 }
 
+// ohosLibNames is injected by names_gio_ohos.go; keeping the platform table
+// out of the desktop switch avoids dlopening a partial desktop GLES build.
+var ohosLibNames []string
+
 func (f *Functions) load(forceES bool) error {
 	var (
 		loadErr  error
@@ -655,6 +659,8 @@ func (f *Functions) load(forceES bool) error {
 		handles  []unsafe.Pointer
 	)
 	switch {
+	case len(ohosLibNames) > 0:
+		libNames = ohosLibNames
 	case runtime.GOOS == "darwin" && !forceES:
 		libNames = []string{"/System/Library/Frameworks/OpenGL.framework/OpenGL"}
 	case runtime.GOOS == "darwin" && forceES:

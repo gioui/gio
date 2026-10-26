@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-//go:build android || ios
+//go:build android || ios || openharmony || gio_ohos
 
 package app
 
