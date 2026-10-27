@@ -617,3 +617,7 @@ func boolInt(b bool) C.int {
 	}
 	return 0
 }
+
+func (w *window) Capabilities() pointer.Capabilities {
+	return pointer.CapabilityPinch | pointer.CapabilityTouch
+}

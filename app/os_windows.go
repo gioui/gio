@@ -1549,3 +1549,8 @@ func unregisterSchemes(appid string, schemes []string) {
 		registry.DeleteKey(classes, scheme)
 	}
 }
+
+func (w *window) Capabilities() pointer.Capabilities {
+	return pointer.CapabilityPinch | pointer.CapabilityRotate |
+		pointer.CapabilityTouch | pointer.CapabilityPen
+}

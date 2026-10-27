@@ -1364,3 +1364,8 @@ func (AppKitViewEvent) ImplementsEvent()     {}
 func (a AppKitViewEvent) Valid() bool {
 	return a != (AppKitViewEvent{})
 }
+
+func (w *window) Capabilities() pointer.Capabilities {
+	return pointer.CapabilityPinch | pointer.CapabilityRotate |
+		pointer.CapabilitySwipe | pointer.CapabilityTrackpad
+}

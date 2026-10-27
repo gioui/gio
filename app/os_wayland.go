@@ -124,17 +124,13 @@ type wlSeat struct {
 	swipe    *C.struct_zwp_pointer_gesture_swipe_v1
 	hold     *C.struct_zwp_pointer_gesture_hold_v1
 
-	gestureID      uint32
-	gestureKind    pointer.Kind
-	gestureWin     *window
-	gestureFingers uint8
-	swipeAccum     f32.Point
-	pinchRotation  float32
-	im             *C.struct_zwp_text_input_v3
-	imFocus        *window
-	imActive       bool
-	imHint         key.InputHint
-	imState        textInputState
+	gestureState waylandGestureState
+	gestureWin   *window
+	im           *C.struct_zwp_text_input_v3
+	imFocus      *window
+	imActive     bool
+	imHint       key.InputHint
+	imState      textInputState
 
 	// The most recent input serial.
 	serial C.uint32_t
@@ -2292,21 +2288,11 @@ func fromFixed(v C.wl_fixed_t) float32 {
 	return float32(f)
 }
 
-func (s *wlSeat) gestureEvent(kind pointer.Kind, phase pointer.GesturePhase, t C.uint32_t) {
-	w := s.gestureWin
-	if w == nil {
-		return
-	}
-	w.ProcessEvent(pointer.Event{
-		Kind:      kind,
-		Source:    pointer.Trackpad,
-		GestureID: s.gestureID,
-		Phase:     phase,
-		Fingers:   s.gestureFingers,
-		Position:  w.lastPos,
-		Time:      time.Duration(t) * time.Millisecond,
-		Modifiers: w.disp.xkb.Modifiers(),
-	})
+func (s *wlSeat) deliverGesture(w *window, ev pointer.Event, t C.uint32_t) {
+	ev.Position = w.lastPos
+	ev.Time = time.Duration(t) * time.Millisecond
+	ev.Modifiers = w.disp.xkb.Modifiers()
+	w.ProcessEvent(ev)
 }
 
 func (s *wlSeat) gestureBegin(kind pointer.Kind, surf *C.struct_wl_surface, t C.uint32_t, fingers C.uint32_t) {
@@ -2317,16 +2303,8 @@ func (s *wlSeat) gestureBegin(kind pointer.Kind, surf *C.struct_wl_surface, t C.
 	if !ok || w == nil {
 		return
 	}
-	s.gestureID++
-	s.gestureKind = kind
 	s.gestureWin = w
-	if fingers > 255 {
-		fingers = 255
-	}
-	s.gestureFingers = uint8(fingers)
-	s.swipeAccum = f32.Point{}
-	s.pinchRotation = 0
-	s.gestureEvent(kind, pointer.GestureBegin, t)
+	s.deliverGesture(w, s.gestureState.begin(kind, uint32(fingers)), t)
 }
 
 //export gio_onPinchBegin
@@ -2339,24 +2317,10 @@ func gio_onPinchBegin(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_pin
 //export gio_onPinchUpdate
 func gio_onPinchUpdate(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_pinch_v1, t C.uint32_t, dx, dy, scale, rotation C.wl_fixed_t) {
 	s := callbackLoad(data).(*wlSeat)
-	w := s.gestureWin
-	if w == nil {
+	if s.gestureWin == nil {
 		return
 	}
-	s.pinchRotation += float32(fromFixed(rotation)) * math.Pi / 180
-	w.ProcessEvent(pointer.Event{
-		Kind:      pointer.Pinch,
-		Source:    pointer.Trackpad,
-		GestureID: s.gestureID,
-		Phase:     pointer.GestureUpdate,
-		Scale:     fromFixed(scale),
-		Rotation:  s.pinchRotation,
-		Swipe:     f32.Pt(fromFixed(dx), fromFixed(dy)),
-		Fingers:   s.gestureFingers,
-		Position:  w.lastPos,
-		Time:      time.Duration(t) * time.Millisecond,
-		Modifiers: w.disp.xkb.Modifiers(),
-	})
+	s.deliverGesture(s.gestureWin, s.gestureState.pinchUpdate(fromFixed(scale), fromFixed(rotation), fromFixed(dx), fromFixed(dy)), t)
 }
 
 //export gio_onPinchEnd
@@ -2365,11 +2329,7 @@ func gio_onPinchEnd(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_pinch
 	if s.gestureWin == nil {
 		return
 	}
-	phase := pointer.GestureEnd
-	if cancelled != 0 {
-		phase = pointer.GestureCancel
-	}
-	s.gestureEvent(pointer.Pinch, phase, t)
+	s.deliverGesture(s.gestureWin, s.gestureState.end(cancelled != 0), t)
 	s.gestureWin = nil
 }
 
@@ -2383,22 +2343,10 @@ func gio_onSwipeBegin(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_swi
 //export gio_onSwipeUpdate
 func gio_onSwipeUpdate(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_swipe_v1, t C.uint32_t, dx, dy C.wl_fixed_t) {
 	s := callbackLoad(data).(*wlSeat)
-	w := s.gestureWin
-	if w == nil {
+	if s.gestureWin == nil {
 		return
 	}
-	s.swipeAccum = s.swipeAccum.Add(f32.Pt(fromFixed(dx), fromFixed(dy)))
-	w.ProcessEvent(pointer.Event{
-		Kind:      pointer.Swipe,
-		Source:    pointer.Trackpad,
-		GestureID: s.gestureID,
-		Phase:     pointer.GestureUpdate,
-		Swipe:     s.swipeAccum,
-		Fingers:   s.gestureFingers,
-		Position:  w.lastPos,
-		Time:      time.Duration(t) * time.Millisecond,
-		Modifiers: w.disp.xkb.Modifiers(),
-	})
+	s.deliverGesture(s.gestureWin, s.gestureState.swipeUpdate(fromFixed(dx), fromFixed(dy)), t)
 }
 
 //export gio_onSwipeEnd
@@ -2407,11 +2355,7 @@ func gio_onSwipeEnd(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_swipe
 	if s.gestureWin == nil {
 		return
 	}
-	phase := pointer.GestureEnd
-	if cancelled != 0 {
-		phase = pointer.GestureCancel
-	}
-	s.gestureEvent(pointer.Swipe, phase, t)
+	s.deliverGesture(s.gestureWin, s.gestureState.end(cancelled != 0), t)
 	s.gestureWin = nil
 }
 
@@ -2428,10 +2372,17 @@ func gio_onHoldEnd(data unsafe.Pointer, obj *C.struct_zwp_pointer_gesture_hold_v
 	if s.gestureWin == nil {
 		return
 	}
-	phase := pointer.GestureEnd
-	if cancelled != 0 {
-		phase = pointer.GestureCancel
-	}
-	s.gestureEvent(pointer.Hold, phase, t)
+	s.deliverGesture(s.gestureWin, s.gestureState.end(cancelled != 0), t)
 	s.gestureWin = nil
+}
+
+func (w *window) Capabilities() pointer.Capabilities {
+	caps := pointer.CapabilityTrackpad
+	if w.disp != nil && w.disp.gestures != nil {
+		caps |= pointer.CapabilityPinch | pointer.CapabilitySwipe
+		if w.disp.gesturesVersion >= 3 {
+			caps |= pointer.CapabilityHold
+		}
+	}
+	return caps
 }

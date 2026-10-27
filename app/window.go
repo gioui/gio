@@ -302,6 +302,21 @@ func (w *Window) Invalidate() {
 	}
 }
 
+// Capabilities reports native pointer and gesture support for the window.
+// A zero result means no native semantic gestures. Backends that cannot
+// query capabilities return zero.
+func (w *Window) Capabilities() pointer.Capabilities {
+	if w.driver == nil {
+		return 0
+	}
+	if c, ok := w.driver.(interface {
+		Capabilities() pointer.Capabilities
+	}); ok {
+		return c.Capabilities()
+	}
+	return 0
+}
+
 // Option applies the options to the window. The options are hints; the platform is
 // free to ignore or adjust them.
 func (w *Window) Option(opts ...Option) {
