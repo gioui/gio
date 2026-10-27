@@ -200,6 +200,9 @@ func newWindow(callbacks *callbacks, options []Option) {
 	}
 	w.loop = newEventLoop(callbacks, w.wakeup)
 	callbacks.SetDriver(w)
+	if abi := int(C.gio_ohos_host_abi_version()); abi < int(C.GIO_OHOS_ABI_VERSION) {
+		ohosWarnf("host-abi", "OHOS shim ABI %d < %d; extended features disabled", abi, int(C.GIO_OHOS_ABI_VERSION))
+	}
 
 	ohosState.mu.Lock()
 	metric := ohosState.metric
@@ -526,6 +529,16 @@ func ohosCursorNumber(cursor pointer.Cursor) int {
 //export gio_ohos_install_host
 func gio_ohos_install_host(host *C.gio_ohos_host) {
 	C.gio_ohos_store_host(host)
+}
+
+//export gio_ohos_install_host_v3
+func gio_ohos_install_host_v3(host *C.gio_ohos_host_v3, size C.size_t) {
+	C.gio_ohos_store_host_v3(host, size)
+}
+
+//export gio_ohos_abi_version
+func gio_ohos_abi_version() C.int {
+	return C.GIO_OHOS_ABI_VERSION
 }
 
 //export gio_ohos_configure

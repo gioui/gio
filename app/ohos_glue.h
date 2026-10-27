@@ -12,13 +12,15 @@
 #ifndef GIO_OHOS_GLUE_H
 #define GIO_OHOS_GLUE_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define GIO_OHOS_ABI_VERSION 2
+#define GIO_OHOS_ABI_VERSION 3
+#define GIO_OHOS_ABI2_VERSION 2
 #define GIO_OHOS_ABI1_ENTRIES 14
 
 /* Host callback table, implemented by the napi shim. */
@@ -46,10 +48,41 @@ typedef struct gio_ohos_host {
     void (*ime_keyboard_status)(void *user, int status);
 } gio_ohos_host;
 
+/* ABI 3 extensions.  This is a separate structure so that an older shim
+ * passing a gio_ohos_host (v2) can never be read past its allocation.
+ * Every callback may be NULL; callers must probe. */
+typedef struct gio_ohos_host_v3 {
+    gio_ohos_host v2;                 /* MUST stay first */
+
+    /* Window management. */
+    void (*set_window_mode)(void *user, int mode);       /* 0 windowed 1 fullscreen 2 minimized 3 maximized */
+    void (*set_title)(void *user, const char *title);
+    void (*set_orientation)(void *user, int orientation); /* 0 any 1 landscape 2 portrait */
+    void (*set_status_color)(void *user, uint32_t argb);
+    void (*set_navigation_color)(void *user, uint32_t argb);
+    void (*set_top_most)(void *user, int topmost);
+    void (*set_window_limits)(void *user, int minw, int minh, int maxw, int maxh); /* 0 = unlimited */
+    void (*pick_file_ex)(void *user, int mode, const char *mimes, int multiple);
+    void (*request_close)(void *user);
+    void (*raise_window)(void *user);
+    void (*center_window)(void *user);
+    void (*start_window_move)(void *user);
+
+    /* Accessibility. */
+    void (*semantics_update)(void *user, const char *json, int length);
+    void (*semantics_announce)(void *user, const char *text);
+
+    /* Optional: let the shim own the continuous vsync loop. */
+    void (*set_animating)(void *user, int animating);
+} gio_ohos_host_v3;
+
 /* Copies the host table into static storage.  Must be called before
- * gio_ohos_run; later calls replace the table. */
+ * gio_ohos_run; later calls replace the table.  store_host is the v2
+ * entry point; store_host_v3 copies min(size, sizeof(v3)) and zero-fills. */
 void gio_ohos_store_host(const gio_ohos_host *host);
+void gio_ohos_store_host_v3(const gio_ohos_host_v3 *host, size_t size);
 int gio_ohos_host_ready(void);
+int gio_ohos_host_abi_version(void);
 
 /* Thin wrappers around OH_NativeWindow_NativeWindowHandleOpt (variadic,
  * which cgo cannot call directly).  They live in this translation unit so
@@ -80,6 +113,10 @@ void gio_call_ime_keyboard_status(int status);
 /* ABI 1: install_host / configure / run / surface_* / touch / axis / key /
  * text / focus / clipboard / lifecycle / log (14). */
 void gio_ohos_install_host(gio_ohos_host *host);
+/* ABI 3: queries the Go-side ABI version and installs the extended host
+ * table with an explicit size.  Older shims keep using install_host. */
+int gio_ohos_abi_version(void);
+void gio_ohos_install_host_v3(gio_ohos_host_v3 *host, size_t size);
 void gio_ohos_configure(char *dataDir, char *cacheDir, float density, float fontScale);
 void gio_ohos_run(void);
 void gio_ohos_surface_created(void *window, int width, int height);

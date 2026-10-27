@@ -7,11 +7,14 @@
 // emitted twice.
 #include <string.h>
 
+#ifndef GIO_OHOS_HOST_TEST
 #include <native_buffer/buffer_common.h>
 #include <native_window/external_window.h>
+#endif
 
 #include "ohos_glue.h"
 
+#ifndef GIO_OHOS_HOST_TEST
 void gio_ohos_set_buffer_geometry(void *window, int width, int height) {
     if (window == NULL) {
         return;
@@ -26,22 +29,48 @@ void gio_ohos_set_buffer_format(void *window, int format) {
     }
     OH_NativeWindow_NativeWindowHandleOpt((OHNativeWindow *)window, SET_FORMAT, (int32_t)format);
 }
+#endif
 
-static gio_ohos_host gio_host;
+static gio_ohos_host_v3 gio_host_v3;
 static int gio_host_ready;
+static int gio_host_abi;
+
+/* Existing callbacks keep their short spelling. */
+#define gio_host (gio_host_v3.v2)
 
 void gio_ohos_store_host(const gio_ohos_host *host) {
+    memset(&gio_host_v3, 0, sizeof(gio_host_v3));
     if (host == NULL) {
-        memset(&gio_host, 0, sizeof(gio_host));
         gio_host_ready = 0;
+        gio_host_abi = 0;
         return;
     }
-    gio_host = *host;
+    memcpy(&gio_host_v3.v2, host, sizeof(*host));
     gio_host_ready = 1;
+    gio_host_abi = GIO_OHOS_ABI2_VERSION;
+}
+
+void gio_ohos_store_host_v3(const gio_ohos_host_v3 *host, size_t size) {
+    memset(&gio_host_v3, 0, sizeof(gio_host_v3));
+    if (host == NULL || size == 0) {
+        gio_host_ready = 0;
+        gio_host_abi = 0;
+        return;
+    }
+    size_t n = size < sizeof(gio_host_v3) ? size : sizeof(gio_host_v3);
+    memcpy(&gio_host_v3, host, n);
+    gio_host_ready = 1;
+    gio_host_abi = n > offsetof(gio_ohos_host_v3, set_window_mode)
+                       ? GIO_OHOS_ABI_VERSION
+                       : GIO_OHOS_ABI2_VERSION;
 }
 
 int gio_ohos_host_ready(void) {
     return gio_host_ready;
+}
+
+int gio_ohos_host_abi_version(void) {
+    return gio_host_abi;
 }
 
 #define GIO_HOST_CALL(fn, ...) do { \
