@@ -3,7 +3,7 @@
 > 依据：[input-gestures-cross-platform.md](input-gestures-cross-platform.md) 的矩阵、源码复核与平台 API 结论。
 > 状态：方案文档，暂未修改源码。
 > 目标：把 Gio 从“鼠标/触摸 + Scroll”升级为“可区分设备、可拿语义手势、可回退识别”的输入模型，并修正 Windows/macOS/Wayland/OHOS 的具体缺口。
-> 实施进展（2026-10-27）：事件模型与语义手势路由、macOS pinch/rotate/swipe、OHOS axis pinch、Windows PT_* 分类/触控板注册、gesture.Pinch/Rotate 回退识别器已落地；Wayland、Windows pinch/rotate、gesture.Swipe/Hold、Android/iOS/Web 接线仍待做。
+> 实施进展（2026-10-27）：事件模型与语义手势路由、macOS pinch/rotate/swipe、OHOS axis pinch、Windows PT_* 分类/触控板注册、gesture.Pinch/Rotate/Swipe/Hold 回退识别器已落地；Wayland、Windows pinch/rotate、Android/iOS/Web 接线仍待做。
 
 ---
 
@@ -280,7 +280,7 @@ func Capabilities() Capabilities
 2. 增加 Kind Pinch/Rotate/Swipe/Hold、GesturePhase、Event 字段。
 3. 路由层增加语义手势分支；取消/结束清理。
 4. 增加 Pinch/Rotate/Swipe/Hold 的 Filter/Matches 测试。
-5. 增加 gesture 包状态机：Pinch/Rotate 已完成；Swipe/Hold 待做。
+5. gesture 包状态机：Pinch/Rotate/Swipe/Hold 已完成。
 6. 性能：事件路径 0 alloc；加 benchmark。
 
 验收：
@@ -526,7 +526,7 @@ func Capabilities() Capabilities
 | io/pointer/pointer.go | Source/Kind/Event/Phase |
 | io/input/pointer.go | 语义手势路由、cancel、filter |
 | io/input/pointer_test.go | 新旧 Kind 行为 |
-| gesture/gesture.go + gesture/multitouch.go | Pinch/Rotate 已完成；Swipe/Hold 待做 |
+| gesture/gesture.go + gesture/multitouch.go + gesture/swipe.go + gesture/hold.go | Pinch/Rotate/Swipe/Hold 已完成 |
 | app/os_windows.go | PT_* 分类、RegisterTouchpadCapableWindow、手势 |
 | app/os_macos.go/.m | NSEvent 手势、phase、语义 Pinch/Rotate/Swipe |
 | app/os_wayland.go/.c | pointer-gestures、axis_source |
