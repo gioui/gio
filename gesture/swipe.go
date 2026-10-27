@@ -5,7 +5,6 @@ package gesture
 import (
 	"gioui.org/f32"
 	"gioui.org/io/event"
-	"gioui.org/io/input"
 	"gioui.org/io/pointer"
 	"gioui.org/op"
 )
@@ -33,7 +32,7 @@ func (s *Swipe) Add(ops *op.Ops) {
 
 // Update consumes raw pointer events and returns the next semantic Swipe
 // event, if any.
-func (s *Swipe) Update(q input.Source) (pointer.Event, bool) {
+func (s *Swipe) Update(q PointerSource) (pointer.Event, bool) {
 	if len(s.pending) > 0 {
 		e := s.pending[0]
 		s.pending = s.pending[1:]

@@ -8,7 +8,6 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/io/event"
-	"gioui.org/io/input"
 	"gioui.org/io/pointer"
 	"gioui.org/op"
 )
@@ -45,7 +44,7 @@ func (h *Hold) Add(ops *op.Ops) {
 
 // Update consumes raw pointer events and checks the hold timer. The caller
 // should invoke Update every frame with the current time.
-func (h *Hold) Update(q input.Source, now time.Time) (pointer.Event, bool) {
+func (h *Hold) Update(q PointerSource, now time.Time) (pointer.Event, bool) {
 	if len(h.pending) > 0 {
 		e := h.pending[0]
 		h.pending = h.pending[1:]

@@ -7,10 +7,16 @@ import (
 
 	"gioui.org/f32"
 	"gioui.org/io/event"
-	"gioui.org/io/input"
 	"gioui.org/io/pointer"
 	"gioui.org/op"
 )
+
+// PointerSource is the event-source subset needed by the multi-touch
+// recognizers. input.Source implements it; tests and backends can provide
+// their own replay source.
+type PointerSource interface {
+	Event(filters ...event.Filter) (event.Event, bool)
+}
 
 // Pinch detects two-finger pinch gestures from raw touch events and emits
 // semantic pointer.Pinch events. It is intended as a fallback for platforms
@@ -37,7 +43,7 @@ func (p *Pinch) Add(ops *op.Ops) {
 
 // Update consumes raw pointer events and returns the next semantic Pinch
 // event, if any.
-func (p *Pinch) Update(q input.Source) (pointer.Event, bool) {
+func (p *Pinch) Update(q PointerSource) (pointer.Event, bool) {
 	if len(p.pending) > 0 {
 		e := p.pending[0]
 		p.pending = p.pending[1:]
@@ -218,7 +224,7 @@ func (r *Rotate) Add(ops *op.Ops) {
 
 // Update consumes raw pointer events and returns the next semantic Rotate
 // event, if any.
-func (r *Rotate) Update(q input.Source) (pointer.Event, bool) {
+func (r *Rotate) Update(q PointerSource) (pointer.Event, bool) {
 	if len(r.pending) > 0 {
 		e := r.pending[0]
 		r.pending = r.pending[1:]

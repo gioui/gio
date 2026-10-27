@@ -16,6 +16,7 @@ import (
 	"gioui.org/app"
 	"gioui.org/f32"
 	"gioui.org/font/gofont"
+	"gioui.org/gesture"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
@@ -49,6 +50,14 @@ type appState struct {
 	lastPress    time.Duration
 	lastPressPos f32.Point
 	lastPressBtn pointer.Buttons
+
+	pinch         gesture.Pinch
+	rotate        gesture.Rotate
+	swipe         gesture.Swipe
+	hold          gesture.Hold
+	fallbackCount map[pointer.Kind]int
+	fallbackLast  pointer.Event
+	fallbackHas   bool
 }
 
 func main() {
@@ -75,8 +84,9 @@ func loop(w *app.Window) error {
 	// font for it, so load the Go font collection explicitly.
 	theme.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
 	a := &appState{
-		theme:  theme,
-		counts: make(map[pointer.Kind]int),
+		theme:         theme,
+		counts:        make(map[pointer.Kind]int),
+		fallbackCount: make(map[pointer.Kind]int),
 	}
 	var ops op.Ops
 	for {
@@ -92,6 +102,7 @@ func loop(w *app.Window) error {
 }
 
 func (a *appState) layout(gtx layout.Context) layout.Dimensions {
+	a.advanceFallback(gtx.Now)
 	return layout.UniformInset(unit.Dp(16)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
@@ -108,6 +119,9 @@ func (a *appState) layout(gtx layout.Context) layout.Dimensions {
 			}),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				return a.counterRow(gtx)
+			}),
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				return a.fallbackRow(gtx)
 			}),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				return layout.Spacer{Height: unit.Dp(10)}.Layout(gtx)
@@ -137,6 +151,12 @@ func (a *appState) counterRow(gtx layout.Context) layout.Dimensions {
 		a.clicks = 0
 		a.doubleClicks = 0
 		a.lastPress = 0
+		a.fallbackCount = make(map[pointer.Kind]int)
+		a.fallbackHas = false
+		a.pinch = gesture.Pinch{}
+		a.rotate = gesture.Rotate{}
+		a.swipe = gesture.Swipe{}
+		a.hold = gesture.Hold{}
 	}
 	return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
@@ -151,6 +171,13 @@ func (a *appState) counterRow(gtx layout.Context) layout.Dimensions {
 			return material.Body2(a.theme, txt).Layout(gtx)
 		}),
 	)
+}
+
+func (a *appState) fallbackRow(gtx layout.Context) layout.Dimensions {
+	txt := fmt.Sprintf("Fallback (raw touch): Pinch %d  Rotate %d  Swipe %d  Hold %d",
+		a.fallbackCount[pointer.Pinch], a.fallbackCount[pointer.Rotate],
+		a.fallbackCount[pointer.Swipe], a.fallbackCount[pointer.Hold])
+	return material.Body2(a.theme, txt).Layout(gtx)
 }
 
 func (a *appState) panel(gtx layout.Context) layout.Dimensions {
@@ -168,13 +195,13 @@ func (a *appState) panel(gtx layout.Context) layout.Dimensions {
 		if !ok {
 			continue
 		}
-		a.record(pe)
+		a.record(pe, gtx.Now)
 	}
 
 	return layout.Dimensions{Size: sz}
 }
 
-func (a *appState) record(e pointer.Event) {
+func (a *appState) record(e pointer.Event, now time.Time) {
 	a.last = e
 	a.has = true
 	a.counts[e.Kind]++
@@ -202,6 +229,79 @@ func (a *appState) record(e pointer.Event) {
 	}
 	log.Printf("gesture kind=%v source=%v phase=%v buttons=%v scale=%.4f rotation=%.4f swipe=%v fingers=%d pos=%v id=%d",
 		e.Kind, e.Source, phaseLabel(e), e.Buttons, e.Scale, e.Rotation, e.Swipe, e.Fingers, e.Position, e.GestureID)
+	a.feedFallback(e, now)
+}
+
+type replaySource struct {
+	events []pointer.Event
+	i      int
+}
+
+func (r *replaySource) Event(filters ...event.Filter) (event.Event, bool) {
+	if r.i >= len(r.events) {
+		return nil, false
+	}
+	e := r.events[r.i]
+	r.i++
+	return e, true
+}
+
+func rawPointerKind(k pointer.Kind) bool {
+	switch k {
+	case pointer.Press, pointer.Move, pointer.Drag, pointer.Release, pointer.Cancel:
+		return true
+	default:
+		return false
+	}
+}
+
+func (a *appState) feedFallback(e pointer.Event, now time.Time) {
+	if !rawPointerKind(e.Kind) {
+		return
+	}
+	a.drain(&a.pinch, e)
+	a.drain(&a.rotate, e)
+	a.drain(&a.swipe, e)
+	src := &replaySource{events: []pointer.Event{e}}
+	for {
+		fe, ok := a.hold.Update(src, now)
+		if !ok {
+			break
+		}
+		a.recordFallback(fe)
+	}
+}
+
+func (a *appState) drain(p interface {
+	Update(gesture.PointerSource) (pointer.Event, bool)
+}, e pointer.Event) {
+	src := &replaySource{events: []pointer.Event{e}}
+	for {
+		fe, ok := p.Update(src)
+		if !ok {
+			return
+		}
+		a.recordFallback(fe)
+	}
+}
+
+func (a *appState) advanceFallback(now time.Time) {
+	src := &replaySource{}
+	for {
+		fe, ok := a.hold.Update(src, now)
+		if !ok {
+			return
+		}
+		a.recordFallback(fe)
+	}
+}
+
+func (a *appState) recordFallback(e pointer.Event) {
+	a.fallbackCount[e.Kind]++
+	a.fallbackLast = e
+	a.fallbackHas = true
+	log.Printf("fallback kind=%v source=%v phase=%v scale=%.4f rotation=%.4f swipe=%v fingers=%d",
+		e.Kind, e.Source, phaseLabel(e), e.Scale, e.Rotation, e.Swipe, e.Fingers)
 }
 
 func (a *appState) details(gtx layout.Context) layout.Dimensions {

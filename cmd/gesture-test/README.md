@@ -66,3 +66,22 @@ GOROOT=/opt/homebrew/Cellar/go/1.27.1/libexec \
 macOS 可能把三指滑动识别成系统手势（Mission Control/切换桌面）或滚动，而不是 `swipeWithEvent`。
 如果“轻扫切换页面”是“双指左右滚动”，三指通常也会被当作滚动；把它改成“用三指轻扫”（或“用两指或三指轻扫”）后再测 `Swipe`。
 这不是 Gio 能强制覆盖的，具体入口：系统设置 → 触控板 → 更多手势。
+
+## OHOS / 触摸屏
+
+手机触摸屏通常没有原生语义手势，只有原始 `pointer.Touch` 事件。因此测试窗口有两行计数：
+
+- `Pinch/Rotate/Swipe/Hold`：后端原生语义事件；
+- `Fallback (raw touch)`：测试程序用 `gesture` 包从原始双指/三指触摸识别。
+
+OHOS 手机上的预期：
+
+| 操作 | 预期 |
+|---|---|
+| 双指捏合/张开 | Fallback Pinch 增加，Scale 连续 |
+| 双指旋转 | Fallback Rotate 增加 |
+| 三指滑动 | Fallback Swipe 增加 |
+| 双指长按 500ms | Fallback Hold 增加 |
+| 单指点击/拖动 | Press/Move/Drag、Clicks/Double 正常 |
+
+构建为 OHOS c-shared 库时，`ohos.go` 提供 shim 需要的 `gpofd_start`、`gpofd_open_uri`、`gpofd_abi_version`。
