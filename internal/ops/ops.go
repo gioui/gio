@@ -77,6 +77,7 @@ const (
 	TypeSemanticSelected
 	TypeSemanticEnabled
 	TypeActionInput
+	TypeEmbed
 )
 
 type StackID struct {
@@ -153,6 +154,7 @@ const (
 	TypeSemanticSelectedLen = 2
 	TypeSemanticEnabledLen  = 2
 	TypeActionInputLen      = 1 + 1
+	TypeEmbedLen            = 1
 )
 
 func (op *ClipOp) Decode(data []byte) {
@@ -426,6 +428,7 @@ var opProps = [0x100]opProp{
 	TypeSemanticSelected: {Size: TypeSemanticSelectedLen, NumRefs: 0},
 	TypeSemanticEnabled:  {Size: TypeSemanticEnabledLen, NumRefs: 0},
 	TypeActionInput:      {Size: TypeActionInputLen, NumRefs: 0},
+	TypeEmbed:            {Size: TypeEmbedLen, NumRefs: 2},
 }
 
 func (t OpType) props() (size, numRefs uint32) {
@@ -491,6 +494,8 @@ func (t OpType) String() string {
 		return "Stroke"
 	case TypeSemanticLabel:
 		return "SemanticDescription"
+	case TypeEmbed:
+		return "Embed"
 	default:
 		panic("unknown OpType")
 	}

@@ -41,7 +41,9 @@ CFTypeRef gio_createGLLayer(void) {
 		return nil;
 	}
 	layer.drawableProperties = @{kEAGLDrawablePropertyColorFormat: kEAGLColorFormatSRGBA8};
-	layer.opaque = YES;
+	// Enable transparency for external views.
+	layer.opaque = NO;
+	layer.backgroundColor = [UIColor clearColor].CGColor;
 	layer.anchorPoint = CGPointMake(0, 0);
 	return CFBridgingRetain(layer);
 }

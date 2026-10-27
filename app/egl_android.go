@@ -11,6 +11,7 @@ package app
 import "C"
 
 import (
+	"fmt"
 	"unsafe"
 
 	"gioui.org/internal/egl"
@@ -55,6 +56,23 @@ func (c *androidContext) Lock() error {
 	if c.eglSurf != nil {
 		if err := c.Context.CreateSurface(c.eglSurf); err != nil {
 			return err
+		}
+		if format := C.ANativeWindow_getFormat(c.win.win); format >= 0x100 && format <= 0x1ff {
+			// Some drivers turn sRGB surfaces into vendor buffer formats that
+			// SurfaceFlinger treats as opaque, even when their pixels have alpha.
+			// Retry with a standard native format and let Gio emulate sRGB.
+			c.Context.ReleaseSurface()
+			c.Context.DisableSRGB()
+			if err := c.win.setVisual(c.Context.VisualID()); err != nil {
+				return err
+			}
+			if err := c.Context.CreateSurface(c.eglSurf); err != nil {
+				return err
+			}
+			if format := C.ANativeWindow_getFormat(c.win.win); format >= 0x100 && format <= 0x1ff {
+				c.eglSurf = nil
+				return fmt.Errorf("Android EGL surface uses opaque native buffer format %#x", format)
+			}
 		}
 		c.eglSurf = nil
 	}
