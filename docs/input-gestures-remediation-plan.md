@@ -28,7 +28,7 @@
 | WP1 gesture 回退 | 完成 | Pinch/Rotate/Swipe/Hold 有 host 测试；未接各后端 |
 | WP2 Windows 来源/注册 | 完成 | PT_TOUCHPAD/PT_PEN/PT_TOUCH 分类；RegisterTouchpadCapableWindow |
 | WP2 Windows 触摸屏手势 | 完成 | WM_GESTURE zoom/rotate；GID_ROTATE 32768/圈换算；仅交叉编译+转换单测 |
-| WP3 macOS 语义手势 | 完成（代码） | magnify/rotate/swipe、NSEventPhase；已编译测试，未做硬件手势验收 |
+| WP3 macOS 语义手势 | 完成（代码 + 本机验收） | 2026-10-27 本机验证 pinch/rotate/scroll、左右键、双击、真实触点数；三指 Swipe 受系统“轻扫切换页面”设置影响 |
 | WP5 OHOS pinch | 完成（Go） | axis pinch → Pinch；host/race 测试；未做真机多指验收 |
 | 文档 | 完成 | 本文件 + [input-gestures-cross-platform.md](input-gestures-cross-platform.md) |
 
@@ -67,7 +67,7 @@
 | Windows `go test -c` | 通过 |
 | macOS 后端编译/测试 | 通过 |
 | OHOS arm64 交叉编译 | 通过 |
-| 新增语义手势真机验收 | **未完成**（macOS/Windows/OHOS 只有编译或 host 测试） |
+| 新增语义手势真机验收 | **macOS 通过**；Windows/OHOS 仍待设备验收（当前只有编译/host 测试） |
 
 ---
 
