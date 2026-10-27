@@ -181,6 +181,14 @@ void gio_call_pick_file_ex(int mode, const char *mimes, int multiple) {
     GIO_HOST3_CALL(pick_file_ex, mode, mimes, multiple);
 }
 
+int gio_call_request_permission(const char *name, int requestID) {
+    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI_VERSION && gio_host_v3.request_permission != NULL) {
+        gio_host_v3.request_permission(gio_host_v3.v2.user, name, requestID);
+        return 1;
+    }
+    return 0;
+}
+
 int gio_call_request_close(void) {
     if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI_VERSION && gio_host_v3.request_close != NULL) {
         gio_host_v3.request_close(gio_host_v3.v2.user);

@@ -68,6 +68,7 @@ type ohosHost interface {
 	Apply(ohosConfigDelta)
 	HostSetAnimating(bool)
 	RequestClose() bool
+	RequestPermission(name string, id int) bool
 	RaiseWindow()
 	CenterWindow()
 	StartWindowMove()

@@ -57,13 +57,20 @@
 - `pick_file_ex(mode,mimes,multiple)` → `gio_ohos_pick_result` / `pick_error`。
 - `set_clipboard_data` 用于 Go 写出二进制；shim 必须复制 data。
 
-## 7. 无障碍（S10）
+## 7. 权限
+
+- Go 调 `request_permission(name, requestID)`；shim 完成后调
+  `gio_ohos_permission_result(requestID, granted, errMsg)`。
+- 权限名使用 OHOS 原生字符串（如 `ohos.permission.CAMERA`）；Go 侧提供常量。
+- `request_permission` 为 NULL 时 Go 立即回调 unsupported。
+
+## 8. 无障碍（S10）
 
 - `semantics_update(json,len)`：节点 diff；schema 见 S10 实现。
 - `semantics_announce(text)`：播报。
 - `gio_ohos_semantic_action(id,action)`：读屏触发点击/滚动。
 
-## 8. 降级
+## 9. 降级
 
 - 未实现的能力保持 NULL；Go 只警告一次。
 - 不得因为缺少可选回调而崩溃或阻塞。

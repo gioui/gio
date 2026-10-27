@@ -44,6 +44,7 @@ typedef struct gio_ohos_host_v3 {
     void (*set_top_most)(void*, int);
     void (*set_window_limits)(void*, int minw,int minh,int maxw,int maxh);
     void (*pick_file_ex)(void*, int mode, const char *mimes, int multiple);
+    void (*request_permission)(void*, const char *name, int requestID);
     void (*request_close)(void*);
     void (*raise_window)(void*);
     void (*center_window)(void*);
@@ -85,5 +86,7 @@ int host = gio_ohos_host_abi_version(); // 已安装 shim 的版本
 | 窗口管理 | 已实现（v3 调用） | 待实现 |
 | IME | 已实现（复用 textInputState） | 待实现单位对齐 |
 | 文件拖放/二进制剪贴板 | 已实现 | 待实现 |
+| 运行时权限 | 已实现（request_permission/result） | 待实现 |
+| 特性开关 | SYNC_FRAME / NO_A11Y 已实现；IME_LEGACY 未实现 | — |
 | 无障碍 | 待实现（S10） | 待评估 ArkUI 虚拟节点 |
 | 多窗口 | 未支持 | 未支持 |

@@ -63,6 +63,9 @@ typedef struct gio_ohos_host_v3 {
     void (*set_top_most)(void *user, int topmost);
     void (*set_window_limits)(void *user, int minw, int minh, int maxw, int maxh); /* 0 = unlimited */
     void (*pick_file_ex)(void *user, int mode, const char *mimes, int multiple);
+    /* Ask the platform for a runtime permission. Result arrives via
+     * gio_ohos_permission_result. */
+    void (*request_permission)(void *user, const char *name, int requestID);
     void (*request_close)(void *user);
     void (*raise_window)(void *user);
     void (*center_window)(void *user);
@@ -120,6 +123,8 @@ void gio_call_set_window_limits(int minw, int minh, int maxw, int maxh);
 void gio_call_pick_file_ex(int mode, const char *mimes, int multiple);
 /* Returns 1 when the shim implements request_close. */
 int gio_call_request_close(void);
+/* Returns 1 when the shim implements request_permission. */
+int gio_call_request_permission(const char *name, int requestID);
 void gio_call_raise_window(void);
 void gio_call_center_window(void);
 void gio_call_start_window_move(void);
@@ -177,6 +182,7 @@ void gio_ohos_density(float density, float fontScale);
 void gio_ohos_drop(char *uris_json);            /* JSON array of absolute paths */
 void gio_ohos_clipboard_data(char *mime, void *data, int length);
 void gio_ohos_semantic_action(int nodeID, int action); /* 0 click 1 scroll forward 2 backward */
+void gio_ohos_permission_result(int requestID, int granted, char *errMsg);
 
 #ifdef __cplusplus
 }

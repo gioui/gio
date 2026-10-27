@@ -81,6 +81,7 @@ const (
 	ohosEvDrop
 	ohosEvClipboardData
 	ohosEvSemanticAction
+	ohosEvPermission
 )
 
 // ohosEvent is one platform callback, copied from C before it enters the
@@ -134,6 +135,7 @@ type ohosSink interface {
 	ohosPickResult(mode int, uris []string)
 	ohosPickError(mode int, msg string)
 	ohosSemanticAction(id, action int)
+	ohosPermissionResult(id int, granted bool, errMsg string)
 	ohosLog(msg string)
 }
 
@@ -287,6 +289,8 @@ func (p *ohosPump) Handle(e ohosEvent) {
 		p.drop(e.text)
 	case ohosEvSemanticAction:
 		p.sink.ohosSemanticAction(e.a, e.b)
+	case ohosEvPermission:
+		p.sink.ohosPermissionResult(e.a, e.b != 0, e.text)
 	}
 }
 
@@ -342,6 +346,13 @@ func (p *ohosPump) requestFrameSync(sync bool) {
 		p.frameSync = true
 	}
 	if p.destroyed || p.life != ohosForeground || !p.valid || p.config.Size == (image.Point{}) {
+		return
+	}
+	if ohosSyncFrameEnabled() {
+		sync := p.frameSync
+		p.frameRequested = false
+		p.frameSync = false
+		p.frame(sync)
 		return
 	}
 	if p.frameRequested {

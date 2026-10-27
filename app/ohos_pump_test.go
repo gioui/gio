@@ -29,6 +29,7 @@ type fakeSink struct {
 	picks    []string
 	pickErr  string
 	semActs  [][2]int
+	perms    [][3]interface{}
 	logs     []string
 }
 
@@ -45,6 +46,9 @@ func (f *fakeSink) ohosPickResult(mode int, uris []string) { f.picks = append(f.
 func (f *fakeSink) ohosPickError(mode int, msg string)     { f.pickErr = msg }
 func (f *fakeSink) ohosSemanticAction(id, action int) {
 	f.semActs = append(f.semActs, [2]int{id, action})
+}
+func (f *fakeSink) ohosPermissionResult(id int, granted bool, errMsg string) {
+	f.perms = append(f.perms, [3]interface{}{id, granted, errMsg})
 }
 func (f *fakeSink) ohosLog(msg string) { f.logs = append(f.logs, msg) }
 

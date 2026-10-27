@@ -321,6 +321,29 @@ func (w *window) RequestClose() bool {
 	return C.gio_call_request_close() != 0
 }
 
+func (w *window) RequestPermission(name string, id int) bool {
+	cn := C.CString(name)
+	defer C.free(unsafe.Pointer(cn))
+	return C.gio_call_request_permission(cn, C.int(id)) != 0
+}
+
+// OHOSRequestPermission asks the platform for a runtime permission. The
+// callback runs on the window loop. It returns false if no window is active
+// or the shim does not implement request_permission; in that case the
+// callback is invoked synchronously with an error.
+func OHOSRequestPermission(permission string, callback func(granted bool, err error)) bool {
+	ohosState.mu.Lock()
+	w := ohosState.win
+	ohosState.mu.Unlock()
+	if w == nil {
+		if callback != nil {
+			callback(false, errOHOSPermissionNoWindow)
+		}
+		return false
+	}
+	return requestOHOSPermission(w, permission, callback)
+}
+
 func (w *window) RaiseWindow() {
 	C.gio_call_raise_window()
 }
@@ -463,7 +486,7 @@ func (w *window) ohosLog(msg string) {
 // SemanticsChanged publishes the changed part of the semantic tree. On the
 // first frame the whole tree is sent so the shim has a baseline.
 func (w *window) SemanticsChanged() {
-	if w.closed.Load() {
+	if w.closed.Load() || !ohosA11yEnabled() {
 		return
 	}
 	root := w.callbacks.SemanticRoot()
@@ -499,6 +522,10 @@ func (w *window) SemanticsChanged() {
 
 // ohosSemanticAction synthesizes a pointer gesture for an accessibility
 // action: 0 click, 1 scroll forward, 2 scroll backward.
+func (w *window) ohosPermissionResult(id int, granted bool, errMsg string) {
+	deliverOHOSPermission(id, granted, errMsg)
+}
+
 func (w *window) ohosSemanticAction(id, action int) {
 	if w.closed.Load() {
 		return

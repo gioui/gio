@@ -167,6 +167,16 @@ func gio_ohos_semantic_action(nodeID, action C.int) {
 	enqueueOhos(ohosEvent{kind: ohosEvSemanticAction, a: int(nodeID), b: int(action)})
 }
 
+//export gio_ohos_permission_result
+func gio_ohos_permission_result(requestID, granted C.int, errMsg *C.char) {
+	enqueueOhos(ohosEvent{
+		kind: ohosEvPermission,
+		a:    int(requestID),
+		b:    int(granted),
+		text: cString(errMsg),
+	})
+}
+
 //export gio_ohos_lifecycle
 func gio_ohos_lifecycle(state C.int) {
 	enqueueOhos(ohosEvent{kind: ohosEvLifecycle, life: ohosLifecycle(state)})
@@ -298,6 +308,9 @@ func OHOSPickFileWithOptions(mode int, mimes []string, multiple bool) {
 
 // OHOSAnnounce asks the platform accessibility service to announce text.
 func OHOSAnnounce(text string) {
+	if !ohosA11yEnabled() {
+		return
+	}
 	ctext := C.CString(text)
 	defer C.free(unsafe.Pointer(ctext))
 	C.gio_call_semantics_announce(ctext)

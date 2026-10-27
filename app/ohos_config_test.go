@@ -21,14 +21,22 @@ type fakeHost struct {
 	raises    int
 	centers   int
 	moves     int
+	permNames []string
+	permIDs   []int
+	permOK    bool
 }
 
 func (f *fakeHost) Apply(d ohosConfigDelta) { f.deltas = append(f.deltas, d) }
 func (f *fakeHost) HostSetAnimating(b bool) { f.animating = append(f.animating, b) }
 func (f *fakeHost) RequestClose() bool      { f.closes++; return f.closeOK }
-func (f *fakeHost) RaiseWindow()            { f.raises++ }
-func (f *fakeHost) CenterWindow()           { f.centers++ }
-func (f *fakeHost) StartWindowMove()        { f.moves++ }
+func (f *fakeHost) RequestPermission(name string, id int) bool {
+	f.permNames = append(f.permNames, name)
+	f.permIDs = append(f.permIDs, id)
+	return f.permOK
+}
+func (f *fakeHost) RaiseWindow()     { f.raises++ }
+func (f *fakeHost) CenterWindow()    { f.centers++ }
+func (f *fakeHost) StartWindowMove() { f.moves++ }
 
 func TestOHOSPlanConfig(t *testing.T) {
 	old := Config{}
@@ -198,5 +206,61 @@ func TestOHOSPumpMetricChange(t *testing.T) {
 	fe := f.events[0].(frameEvent)
 	if fe.Metric != (unit.Metric{PxPerDp: 3, PxPerSp: 4}) || fe.Insets.Top != unit.Dp(10) {
 		t.Fatalf("frame metric/insets = %+v/%+v", fe.Metric, fe.Insets)
+	}
+}
+
+func TestOHOSPermissionDelivery(t *testing.T) {
+	h := new(fakeHost)
+	h.permOK = true
+	type result struct {
+		granted bool
+		err     error
+	}
+	ch := make(chan result, 1)
+	ok := requestOHOSPermission(h, OHOSPermissionCamera, func(granted bool, err error) {
+		ch <- result{granted, err}
+	})
+	if !ok || len(h.permNames) != 1 || h.permNames[0] != OHOSPermissionCamera {
+		t.Fatalf("request = %v, host=%v", ok, h.permNames)
+	}
+	id := h.permIDs[0]
+	deliverOHOSPermission(id, true, "")
+	got := <-ch
+	if !got.granted || got.err != nil {
+		t.Fatalf("result = %+v", got)
+	}
+	// A duplicate result must be ignored.
+	deliverOHOSPermission(id, false, "late")
+	select {
+	case r := <-ch:
+		t.Fatalf("unexpected duplicate: %+v", r)
+	default:
+	}
+}
+
+func TestOHOSPermissionUnsupported(t *testing.T) {
+	h := new(fakeHost)
+	h.permOK = false
+	var got error
+	ok := requestOHOSPermission(h, OHOSPermissionMicrophone, func(granted bool, err error) {
+		if granted {
+			t.Error("unsupported request must not be granted")
+		}
+		got = err
+	})
+	if ok || got == nil {
+		t.Fatalf("ok=%v err=%v", ok, got)
+	}
+}
+
+func TestOHOSPumpPermissionResult(t *testing.T) {
+	p, f := newTestPump()
+	p.Handle(ohosEvent{kind: ohosEvPermission, a: 7, b: 1, text: ""})
+	if len(f.perms) != 1 || f.perms[0][0] != 7 || f.perms[0][1] != true {
+		t.Fatalf("perms = %v", f.perms)
+	}
+	p.Handle(ohosEvent{kind: ohosEvPermission, a: 8, b: 0, text: "denied"})
+	if len(f.perms) != 2 || f.perms[1][2] != "denied" {
+		t.Fatalf("perms = %v", f.perms)
 	}
 }

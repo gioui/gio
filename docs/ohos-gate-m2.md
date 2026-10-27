@@ -65,9 +65,9 @@ S11（本报告 + 基准）为收口阶段。
 | shim v3 实现 | 待做 | 仓库外 `libgpofdohos`；Go 侧已按判空降级 |
 | 无障碍完整虚拟树 | 待验证 | 当前 JSON/announce/action 已就绪，ArkUI 支持需真机确认 |
 | 多窗口 | 未支持 | `ohosState` 单窗口；需 ABI v4 window id |
-| 权限（相机/麦克风/存储） | 未支持 | 需 shim 启动前申请 |
+| 权限（相机/麦克风/存储） | Go 侧已支持 | `request_permission` 已实现；shim 需对接系统弹窗 |
 | Vulkan | 未启用 | 当前 EGL/GLES3 |
-| 特性开关 | 未实现 | `GIO_OHOS_IME_LEGACY` 等仅在设计文档中 |
+| 特性开关 | 部分实现 | `GIO_OHOS_SYNC_FRAME`、`GIO_OHOS_NO_A11Y` 已实现；`GIO_OHOS_IME_LEGACY` 未实现 |
 
 ## 5. 回滚
 
