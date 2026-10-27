@@ -27,7 +27,7 @@ S11（本报告 + 基准）为收口阶段。
 
 | 检查 | 命令 | 结果 |
 |---|---|---|
-| OHOS host 单测 | `go test ./app -tags gio_ohos_test` | 通过（48 个 OHOS 测试） |
+| OHOS host 单测 | `go test ./app -tags gio_ohos_test` | 通过（53 个 OHOS 测试） |
 | 竞态 | `go test -race ./app -tags gio_ohos_test` | 通过 |
 | 全仓测试 | `go test ./...` | 通过 |
 | C ABI 契约 | `./script/test-ohos-abi.sh` | 通过（含 ASan） |
@@ -78,3 +78,13 @@ S11（本报告 + 基准）为收口阶段。
 - Go owner：自动化 Gate 通过
 - shim owner：待 v3 实现后真机签署
 - QA：真机 Gate 待执行
+
+## 7. Gate 后增量
+
+| 提交 | 内容 |
+|---|---|
+| `6ad87df3` | 运行时权限桥（`OHOSRequestPermission` + `request_permission`/`permission_result`）；`GIO_OHOS_SYNC_FRAME`、`GIO_OHOS_NO_A11Y` 开关 |
+
+新增自动化覆盖：权限投递/重复结果/不支持降级、flags 解析、同步帧回退。真机权限弹窗仍需 shim 对接。
+
+仍待 ABI/平台支持：多窗口（需 window id，ABI v4）、Vulkan surface、完整无障碍虚拟树、v1 shim 尺寸安全、`GIO_OHOS_IME_LEGACY`。
