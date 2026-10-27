@@ -168,6 +168,8 @@ type window struct {
 	visible   bool
 	started   bool
 	animating bool
+	atomic    bool
+	frameSync bool
 
 	win       *C.ANativeWindow
 	config    Config
@@ -182,8 +184,8 @@ type window struct {
 
 	// embedRegions tracks areas for hit testing.
 	embedRegions gpu.EmbedRegions
-	// embedViews owns the last positions and order applied to native views.
-	embedViews []gpu.EmbedView
+	// frameRegions owns the geometry awaiting its matching surface buffer.
+	frameRegions gpu.EmbedRegions
 }
 
 // gioView hold cached JNI methods for GioView.
@@ -209,6 +211,8 @@ var gioView struct {
 	updateSelection      C.jmethodID
 	updateCaret          C.jmethodID
 	setEmbedViewPosition C.jmethodID
+	canDrawFrame         C.jmethodID
+	presentFrame         C.jmethodID
 }
 
 type pixelInsets struct {
@@ -500,6 +504,8 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.updateSelection = getMethodID(env, class, "updateSelection", "()V")
 		m.updateCaret = getMethodID(env, class, "updateCaret", "(FFFFFFFFFF)V")
 		m.setEmbedViewPosition = getMethodID(env, class, "setEmbedViewPosition", "(Landroid/view/View;IIIII)V")
+		m.canDrawFrame = getMethodID(env, class, "canDrawFrame", "()Z")
+		m.presentFrame = getMethodID(env, class, "presentFrame", "()V")
 	})
 	view = C.jni_NewGlobalRef(env, view)
 	wopts := <-mainWindow.out
@@ -525,7 +531,8 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 	}
 	w.view = view
 	w.visible = false
-	w.embedViews = w.embedViews[:0]
+	w.atomic = false
+	w.frameSync = false
 	w.handle = cgo.NewHandle(w)
 	w.loadConfig(env, class)
 	w.setConfig(env, cnf)
@@ -560,16 +567,27 @@ func Java_org_gioui_GioView_onStartView(env *C.JNIEnv, class C.jclass, handle C.
 func Java_org_gioui_GioView_onSurfaceDestroyed(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := cgo.Handle(handle).Value().(*window)
 	w.visible = false
+	w.atomic = false
 	w.setNativeWindow(nil)
 }
 
 //export Java_org_gioui_GioView_onSurfaceChanged
-func Java_org_gioui_GioView_onSurfaceChanged(env *C.JNIEnv, class C.jclass, handle C.jlong, surf C.jobject) {
+func Java_org_gioui_GioView_onSurfaceChanged(env *C.JNIEnv, class C.jclass, handle C.jlong, surf C.jobject, atomic C.jboolean) {
 	w := cgo.Handle(handle).Value().(*window)
+	w.atomic = atomic == C.JNI_TRUE
 	w.setNativeWindow(C.ANativeWindow_fromSurface(env, surf))
 	if w.started {
 		w.setVisible(env)
 	}
+}
+
+//export Java_org_gioui_GioView_onFrameReady
+func Java_org_gioui_GioView_onFrameReady(env *C.JNIEnv, class C.jclass, handle C.jlong) C.jboolean {
+	w := cgo.Handle(handle).Value().(*window)
+	if w.applyEmbedViews(env) {
+		return C.JNI_TRUE
+	}
+	return C.JNI_FALSE
 }
 
 //export Java_org_gioui_GioView_onLowMemory
@@ -824,8 +842,8 @@ func (w *window) detach(env *C.JNIEnv) {
 	w.visible = false
 	w.processEvent(AndroidViewEvent{})
 	w.setNativeWindow(nil)
-	w.embedViews = w.embedViews[:0]
 	w.embedRegions = gpu.EmbedRegions{}
+	w.frameRegions = gpu.EmbedRegions{}
 	w.handle.Delete()
 	C.jni_DeleteGlobalRef(env, w.view)
 	w.view = 0
@@ -887,6 +905,18 @@ func (w *window) draw(env *C.JNIEnv, sync bool) {
 	if !w.visible {
 		return
 	}
+	w.frameSync = w.frameSync || sync
+	if w.atomic {
+		ready, err := callBooleanMethod(env, w.view, gioView.canDrawFrame)
+		if err != nil {
+			panic(err)
+		}
+		if !ready {
+			return
+		}
+	}
+	sync = w.frameSync
+	w.frameSync = false
 	size := image.Pt(int(C.ANativeWindow_getWidth(w.win)), int(C.ANativeWindow_getHeight(w.win)))
 	if size != w.config.Size {
 		w.config.Size = size
@@ -940,22 +970,57 @@ func (w *window) draw(env *C.JNIEnv, sync bool) {
 			callVoidMethod(env, w.view, gioView.sendA11yChange, jvalue(w.virtualIDFor(id)))
 		}
 	}
+}
 
-	currentRegions, lostRegions := w.callbacks.EmbeddedRegions()
-	if !slices.Equal(currentRegions.Views, w.embedViews) {
-		for index, region := range currentRegions.Views {
-			if err := callVoidMethod(env, w.view, gioView.setEmbedViewPosition, jvalue(region.View), jvalue(region.Area.Min.X), jvalue(region.Area.Min.Y), jvalue(region.Area.Dx()), jvalue(region.Area.Dy()), jvalue(index+1)); err != nil {
-				panic(err)
-			}
-		}
-		w.embedViews = append(w.embedViews[:0], currentRegions.Views...)
+// BeforePresent captures geometry before the client can reuse its frame.
+func (w *window) BeforePresent() {
+	regions, _ := w.callbacks.EmbeddedRegions()
+	w.frameRegions.Pass = append(w.frameRegions.Pass[:0], regions.Pass...)
+	w.frameRegions.Blockers = append(w.frameRegions.Blockers[:0], regions.Blockers...)
+	w.frameRegions.Views = append(w.frameRegions.Views[:0], regions.Views...)
+	if !w.atomic {
+		runInJVM(javaVM(), func(env *C.JNIEnv) {
+			w.applyEmbedViews(env)
+		})
 	}
-	for _, lost := range lostRegions {
-		if err := callVoidMethod(env, w.view, gioView.setEmbedViewPosition, jvalue(lost.View), jvalue(0), jvalue(0), jvalue(0), jvalue(0), jvalue(0)); err != nil {
+}
+
+func (w *window) AfterPresent() error {
+	if !w.atomic {
+		return nil
+	}
+	var err error
+	runInJVM(javaVM(), func(env *C.JNIEnv) {
+		err = callVoidMethod(env, w.view, gioView.presentFrame)
+	})
+	return err
+}
+
+// applyEmbedViews runs only when the matching buffer is available on the atomic path.
+func (w *window) applyEmbedViews(env *C.JNIEnv) bool {
+	previous := w.embedRegions.Views
+	w.embedRegions, w.frameRegions = w.frameRegions, w.embedRegions
+	views := w.embedRegions.Views
+	if slices.Equal(views, previous) {
+		return false
+	}
+	for index, region := range views {
+		if err := callVoidMethod(env, w.view, gioView.setEmbedViewPosition, jvalue(region.View), jvalue(region.Area.Min.X), jvalue(region.Area.Min.Y), jvalue(region.Area.Dx()), jvalue(region.Area.Dy()), jvalue(index+1)); err != nil {
 			panic(err)
 		}
 	}
-	w.embedRegions = currentRegions
+oldViews:
+	for _, old := range previous {
+		for _, region := range views {
+			if region.View == old.View {
+				continue oldViews
+			}
+		}
+		if err := callVoidMethod(env, w.view, gioView.setEmbedViewPosition, jvalue(old.View), jvalue(0), jvalue(0), jvalue(0), jvalue(0), jvalue(0)); err != nil {
+			panic(err)
+		}
+	}
+	return true
 }
 
 func runInJVM(jvm *C.JavaVM, f func(env *C.JNIEnv)) {

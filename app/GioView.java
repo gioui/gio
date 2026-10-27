@@ -18,9 +18,15 @@ import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
+import android.hardware.HardwareBuffer;
+import android.hardware.DataSpace;
+import android.hardware.SyncFence;
+import android.media.Image;
+import android.media.ImageReader;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.SystemClock;
 import android.text.TextUtils;
 import android.text.Selection;
@@ -28,6 +34,7 @@ import android.text.SpannableStringBuilder;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Choreographer;
+import android.view.AttachedSurfaceControl;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.KeyCharacterMap;
@@ -39,6 +46,7 @@ import android.view.ViewConfiguration;
 import android.view.WindowInsets;
 import android.view.Surface;
 import android.view.SurfaceHolder;
+import android.view.SurfaceControl;
 import android.view.SurfaceView;
 import android.view.Window;
 import android.view.WindowInsetsController;
@@ -61,6 +69,10 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import java.io.UnsupportedEncodingException;
+import java.io.IOException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 public final class GioView extends SurfaceView implements Choreographer.FrameCallback {
 	private static boolean jniLoaded;
@@ -73,6 +85,8 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	private int keyboardHint;
 
 	private long nhandle;
+	private AtomicSurface atomicSurface;
+	private boolean atomicUnavailable;
 
 	public GioView(Context context) {
 		this(context, null);
@@ -127,16 +141,262 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 			}
 			@Override public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
 				if (nhandle != 0) {
-					onSurfaceChanged(nhandle, holder.getSurface());
+					onSurfaceDestroyed(nhandle);
+					releaseAtomicSurface();
+					if (Build.VERSION.SDK_INT >= 33 && !atomicUnavailable && width > 0 && height > 0 && isHardwareAccelerated() && getRootSurfaceControl() != null) {
+						try {
+							atomicSurface = new AtomicSurface(GioView.this, width, height);
+						} catch (RuntimeException unsupported) {
+							// Keep direct presentation when the buffer usage is unsupported.
+							atomicUnavailable = true;
+						}
+					}
+					onSurfaceChanged(nhandle, atomicSurface != null ? atomicSurface.reader.getSurface() : holder.getSurface(), atomicSurface != null);
 				}
 			}
 			@Override public void surfaceDestroyed(SurfaceHolder holder) {
 				if (nhandle != 0) {
 					onSurfaceDestroyed(nhandle);
 				}
+				releaseAtomicSurface();
 			}
 		};
 		getHolder().addCallback(surfCallbacks);
+	}
+
+	// Kept in an API 33 helper so older Android versions retain direct SurfaceView rendering.
+	private static final class AtomicSurface {
+		private static final Executor releases = Executors.newSingleThreadExecutor();
+		private static final Handler images;
+		static {
+			HandlerThread thread = new HandlerThread("Gio images");
+			thread.start();
+			images = new Handler(thread.getLooper());
+		}
+		final GioView view;
+		final ImageReader reader;
+		final SurfaceControl control;
+		final AttachedSurfaceControl root;
+		boolean pending;
+		boolean redraw;
+		private boolean closed;
+		private boolean waiting;
+		private int inFlight;
+
+		AtomicSurface(GioView view, int width, int height) {
+			this.view = view;
+			root = view.getRootSurfaceControl();
+			long usage = HardwareBuffer.USAGE_GPU_COLOR_OUTPUT | HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_COMPOSER_OVERLAY;
+			if (!HardwareBuffer.isSupported(width, height, HardwareBuffer.RGBA_8888, 1, usage)) {
+				throw new UnsupportedOperationException("compositor buffers unavailable");
+			}
+			reader = new ImageReader.Builder(width, height)
+				.setDefaultHardwareBufferFormat(HardwareBuffer.RGBA_8888)
+				.setDefaultDataSpace(DataSpace.DATASPACE_SRGB)
+				.setUsage(usage)
+				.setMaxImages(3)
+				.build();
+			try {
+				control = new SurfaceControl.Builder()
+					.setName("Gio")
+					.setParent(view.getSurfaceControl())
+					.setOpaque(false)
+					.setHidden(true)
+					.build();
+			} catch (RuntimeException error) {
+				reader.close();
+				throw error;
+			}
+			reader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
+				@Override public void onImageAvailable(ImageReader source) {
+					acquire();
+				}
+			}, images);
+		}
+
+		void present() {
+			pending = true;
+		}
+
+		private void acquire() {
+			synchronized (this) {
+				if (closed) {
+					return;
+				}
+				if (inFlight >= reader.getMaxImages()) {
+					waiting = true;
+					return;
+				}
+				inFlight++;
+			}
+			Image acquired = null;
+			try {
+				// Acquisition can wait for the GPU, so it must stay off the UI thread.
+				acquired = reader.acquireNextImage();
+			} catch (RuntimeException unsupported) {
+				// Some EGL visuals cannot be acquired by this reader on newer Android.
+				fallback();
+			} finally {
+				if (acquired == null) {
+					released();
+				}
+			}
+			if (acquired != null) {
+				final Image image = acquired;
+				view.getContext().getMainExecutor().execute(new Runnable() {
+					@Override public void run() {
+						if (closed) {
+							image.close();
+							released();
+						} else {
+							submit(image);
+						}
+					}
+				});
+			}
+		}
+
+		private void submit(final Image image) {
+			boolean transferred = false;
+			boolean queued = false;
+			final SurfaceControl.Transaction transaction = new SurfaceControl.Transaction();
+			try (HardwareBuffer buffer = image.getHardwareBuffer();
+					SyncFence fence = image.getFence()) {
+				transaction.setBuffer(control, buffer, fence, new Consumer<SyncFence>() {
+					@Override public void accept(final SyncFence releaseFence) {
+						// Image.setFence is a no-op on Android 13. Wait away from the UI
+						// thread before allowing the producer to reuse this buffer.
+						releases.execute(new Runnable() {
+							@Override public void run() {
+								try {
+									if (releaseFence != null && releaseFence.isValid()) {
+										releaseFence.awaitForever();
+									}
+								} finally {
+									if (releaseFence != null) {
+										releaseFence.close();
+									}
+									image.close();
+									released();
+								}
+							}
+						});
+					}
+				});
+				transferred = true;
+				transaction.setVisibility(control, true)
+					.setLayer(control, 1)
+					.setBufferTransform(control, 0)
+					.setCrop(control, image.getCropRect())
+					// Gio also encodes sRGB when EGL uses its linear-surface fallback.
+					.setDataSpace(control, DataSpace.DATASPACE_SRGB)
+					.addTransactionCommittedListener(view.getContext().getMainExecutor(), new SurfaceControl.TransactionCommittedListener() {
+						@Override public void onTransactionCommitted() {
+							// Android 13 retains this object until its render-thread callback.
+							transaction.close();
+							committed();
+						}
+					});
+				if (onFrameReady(view.nhandle)) {
+					root.applyTransactionOnDraw(transaction);
+					view.getRootView().invalidate();
+				} else {
+					// No native geometry changed; avoid an unnecessary HWUI draw.
+					transaction.apply();
+				}
+				queued = true;
+			} catch (IOException error) {
+				fallback();
+			} finally {
+				if (!queued) {
+					transaction.close();
+				}
+				if (!transferred) {
+					image.close();
+					released();
+				}
+			}
+		}
+
+		private void fallback() {
+			view.getContext().getMainExecutor().execute(new Runnable() {
+				@Override public void run() {
+					if (closed || view.nhandle == 0) {
+						return;
+					}
+					view.atomicUnavailable = true;
+					onSurfaceDestroyed(view.nhandle);
+					view.releaseAtomicSurface();
+					onSurfaceChanged(view.nhandle, view.getHolder().getSurface(), false);
+				}
+			});
+		}
+
+		private void committed() {
+			if (closed) {
+				return;
+			}
+			pending = false;
+			if (redraw) {
+				redraw = false;
+				// Resume now so waiting for HWUI doesn't skip another vsync.
+				view.doFrame(System.nanoTime());
+			}
+		}
+
+		private synchronized void released() {
+			inFlight--;
+			if (closed && inFlight == 0) {
+				reader.close();
+			} else if (!closed && waiting) {
+				waiting = false;
+				images.post(new Runnable() {
+					@Override public void run() {
+						acquire();
+					}
+				});
+			}
+		}
+
+		synchronized void close() {
+			if (closed) {
+				return;
+			}
+			closed = true;
+			reader.setOnImageAvailableListener(null, null);
+			// The root owns this transaction; do not reuse or close it before drawing.
+			root.applyTransactionOnDraw(new SurfaceControl.Transaction()
+				.setBuffer(control, null).reparent(control, null));
+			try (SurfaceControl.Transaction transaction = new SurfaceControl.Transaction()) {
+				// Also retire the displayed buffer when no further root draw occurs.
+				transaction.setBuffer(control, null).reparent(control, null).apply();
+			}
+			control.release();
+			if (inFlight == 0) {
+				reader.close();
+			}
+		}
+	}
+
+	private void releaseAtomicSurface() {
+		if (atomicSurface != null) {
+			atomicSurface.close();
+			atomicSurface = null;
+		}
+	}
+
+	boolean canDrawFrame() {
+		if (atomicSurface != null && atomicSurface.pending) {
+			atomicSurface.redraw = true;
+			return false;
+		}
+		return true;
+	}
+
+	void presentFrame() {
+		if (atomicSurface != null) {
+			atomicSurface.present();
+		}
 	}
 
 	@Override public boolean onKeyDown(int keyCode, KeyEvent event) {
@@ -525,6 +785,7 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 		setOnFocusChangeListener(null);
 		Choreographer.getInstance().removeFrameCallback(this);
 		getHolder().removeCallback(surfCallbacks);
+		releaseAtomicSurface();
 		nhandle = 0;
 	}
 
@@ -632,7 +893,8 @@ public final class GioView extends SurfaceView implements Choreographer.FrameCal
 	static private native void onStartView(long handle);
 	static private native void onStopView(long handle);
 	static private native void onSurfaceDestroyed(long handle);
-	static private native void onSurfaceChanged(long handle, Surface surface);
+	static private native void onSurfaceChanged(long handle, Surface surface, boolean atomic);
+	static private native boolean onFrameReady(long handle);
 	static private native void onConfigurationChanged(long handle);
 	static private native void onWindowInsets(long handle, int top, int right, int bottom, int left);
 	static public native void onLowMemory();

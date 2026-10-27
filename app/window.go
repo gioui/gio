@@ -195,6 +195,12 @@ func (w *Window) validateAndProcess(size image.Point, sync bool, frame *op.Ops, 
 			}
 		}
 		w.queue.Frame(frame)
+		// Capture native view changes before the client can reuse its frame.
+		if w.gpu != nil {
+			if d, ok := w.driver.(interface{ BeforePresent() }); ok {
+				d.BeforePresent()
+			}
+		}
 		// Let the client continue as soon as possible, in particular before
 		// a potentially blocking Present.
 		signal()
@@ -202,6 +208,11 @@ func (w *Window) validateAndProcess(size image.Point, sync bool, frame *op.Ops, 
 		if w.gpu != nil {
 			err = w.ctx.Present()
 			w.ctx.Unlock()
+			if err == nil {
+				if d, ok := w.driver.(interface{ AfterPresent() error }); ok {
+					err = d.AfterPresent()
+				}
+			}
 			if errors.Is(err, gpu.ErrDeviceLost) {
 				// The frame is already released to the client and can't be
 				// retried. Re-create the GPU context in the next frame.
