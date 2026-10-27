@@ -12,6 +12,7 @@
 | [architecture.md](architecture.md) | 分层、核心抽象、一帧/一次事件的完整流程、并发模型、平台矩阵、fork 增量 | 新加入的开发者、架构评审 |
 | [module-reference.md](module-reference.md) | 50 个包逐个说明：职责、关键类型、依赖、问题 | 要改某个模块的人 |
 | [input-gestures-cross-platform.md](input-gestures-cross-platform.md) | 跨平台触控板/触摸屏/手势支持矩阵、各系统 API、Gio 差距与事件模型建议 | 输入/手势/后端开发者 |
+| [input-gestures-remediation-plan.md](input-gestures-remediation-plan.md) | 手势优化提升方案：事件模型、WP0–WP9、里程碑、测试矩阵、兼容与回滚 | 技术负责人、后端开发者 |
 | [risks-and-optimizations.md](risks-and-optimizations.md) | 架构风险、性能瓶颈、可读性问题、路线图、目标架构、验收指标 | 技术负责人、性能优化 |
 | [verification.md](verification.md) | 构建/测试/覆盖率、基准数据、已复现缺陷、staticcheck 清单、复现命令 | 想复核结论的人 |
 | [ohos-backend.md](ohos-backend.md) | 本 fork 的 OHOS 后端专项：架构、功能矩阵、风险、未提交改动 | 维护 OHOS 分支的人 |
