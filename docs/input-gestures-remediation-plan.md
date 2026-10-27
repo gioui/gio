@@ -37,23 +37,23 @@
 | 优先级 | 工作包 | 剩余内容 | 估算 | 依赖/阻塞 |
 |---|---|---|---|---|
 | P0 | WP4 Wayland | bind `zwp_pointer_gestures_v1`；pinch/swipe/hold；保留 `axis_source` | 4 天 | 需要 Linux + Wayland 头/wayland-scanner；本机没有 |
-| P0 | WP2 Windows 触控板 | `InteractionContext`/触控板帧解析，输出 pinch/rotate/pan | 3 天 | 需要 Precision Touchpad 设备验证 |
-| P1 | WP5 OHOS 全量 | rotate/swipe/hold 合成或 shim 转发；可选 gesture 导出 | 3 天 Go + 3 天 shim | 需要 OHOS 多点/2in1 设备 |
+| P0 | WP2 Windows Precision Touchpad | `InteractionContext`/触控板帧解析，输出 pinch/rotate/pan | 3 天 | 需要 Precision Touchpad 设备验证 |
+| P1 | WP5 OHOS 收尾 | Hold 真机验收；2in1 触控板 rotate/swipe 验证；补接入文档；可选 ABI 导出 | 1–2 天；可选 3 天 shim | 需要 Hold/2in1 设备 |
 | P1 | WP6 Android/iOS | 原生 ScaleGestureDetector/UIGestureRecognizer 或后端接入 gesture 包；iPad 间接指针/hover | 4 天 | 需要 Android/iPad 设备 |
 | P2 | WP7 Web | Pointer Events 优先、wheel ctrl 回退、Safari GestureEvent、touch-action | 2 天 | 需要浏览器矩阵 |
-| P2 | WP8 仲裁/能力 | pointer.Capabilities；Windows 全局手势 opt-in；各平台系统手势说明 | 3 天 | 需先完成平台接入 |
-| P2 | WP9 测试/CI | 后端事件 golden trace；真机矩阵；CI 手势测试 | 3 天 | 依赖设备 |
+| P2 | WP8 仲裁/能力 | pointer.Capabilities；Windows 全局手势 opt-in；各平台系统手势说明；避免原生+回退双触发 | 3 天 | 需先完成平台接入 |
+| P2 | WP9 测试/CI | 后端事件 golden trace；真机矩阵；CI 手势测试；模拟器 GPU shader 兼容 | 3–4 天 | 依赖设备/模拟器 |
 | P3 | M4 长尾 | Pen 压力/倾斜、原始触控板帧、触觉 | 1–2 周 | 单独立项 |
 
-**剩余合计**：约 22 Go 人日 + 3 天 shim；单人含缓冲约 5 周，双人约 3 周。
+**剩余合计**：约 20 Go 人日（含 1–2 天 OHOS 收尾）+ 可选 3 天 shim；单人含缓冲约 4–5 周，双人约 3 周。
 
 ### 建议执行顺序
 
 1. **Wayland**：完成 M1 最后一个桌面平台；需要 Linux 开发环境。
 2. **Windows InteractionContext**：补齐 Precision Touchpad，而不只触摸屏 WM_GESTURE。
-3. **OHOS rotate/swipe/hold**：完成 M2 的 OHOS 手势矩阵。
+3. **OHOS 收尾**：Hold 真机验收、2in1 触控板验证、接入文档。
 4. **Android/iOS**：把已完成的 gesture 回退包接到后端，或接原生识别器。
-5. **Web**、**仲裁/能力**、**真机矩阵**。
+5. **Web**、**仲裁/能力**、**真机矩阵/模拟器 GPU**。
 6. **Pen/原始帧**按需进入 M4。
 
 ### 当前验证现状
