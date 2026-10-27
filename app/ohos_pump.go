@@ -5,6 +5,7 @@
 package app
 
 import (
+	"fmt"
 	"image"
 	"io"
 	"strings"
@@ -134,6 +135,13 @@ type ohosPump struct {
 
 	// destroySent avoids delivering DestroyEvent twice.
 	destroySent bool
+
+	// activeTouches 是当前按下的触点。axis pinch 只在没有触点时接受
+	// （触控板）；单指触摸会错误上报 pinch，双指由原生 pointer 处理。
+	activeTouches map[int]bool
+	touchSeen     bool
+	pinchActive   bool
+	lastPinch     float32
 }
 
 func newOhosPump(sink ohosSink, metric unit.Metric) *ohosPump {
@@ -144,10 +152,11 @@ func newOhosPump(sink ohosSink, metric unit.Metric) *ohosPump {
 		metric.PxPerSp = metric.PxPerDp
 	}
 	return &ohosPump{
-		sink:   sink,
-		metric: metric,
-		life:   ohosForeground,
-		config: Config{Decorated: true, Focused: true},
+		sink:          sink,
+		metric:        metric,
+		life:          ohosForeground,
+		config:        Config{Decorated: true, Focused: true},
+		activeTouches: make(map[int]bool),
 	}
 }
 
@@ -237,6 +246,9 @@ func (p *ohosPump) surface(win uintptr, w, h int, sync bool) {
 }
 
 func (p *ohosPump) surfaceDestroyed() {
+	p.activeTouches = make(map[int]bool)
+	p.pinchActive = false
+	p.lastPinch = 0
 	if p.valid {
 		p.valid = false
 		p.surfaceWin = 0
@@ -275,11 +287,15 @@ func (p *ohosPump) SetAnimating(anim bool) {
 
 // tick is a vsync callback from the shim.
 func (p *ohosPump) tick() {
-	if !p.animating || p.life != ohosForeground || !p.valid {
+	if p.life != ohosForeground || !p.valid {
 		return
 	}
+	// 每个 vsync 回调都要出帧：静态界面由 touch/axis 等事件请求单帧，
+	// 不能因为没有设置 animating 就把这一帧丢掉。
 	p.frame(false)
-	p.sink.ohosRequestFrame()
+	if p.animating {
+		p.sink.ohosRequestFrame()
+	}
 }
 
 func (p *ohosPump) frame(sync bool) {
@@ -331,6 +347,9 @@ func (p *ohosPump) setLifecycle(l ohosLifecycle) {
 	switch l {
 	case ohosBackground:
 		p.life = ohosBackground
+		p.activeTouches = make(map[int]bool)
+		p.pinchActive = false
+		p.lastPinch = 0
 	case ohosForeground:
 		p.life = ohosForeground
 		if p.valid {
@@ -347,6 +366,8 @@ func (p *ohosPump) setLifecycle(l ohosLifecycle) {
 
 // touch translates a pointer callback.  action: 0 down, 1 move, 2 up, 3 cancel.
 func (p *ohosPump) touch(e ohosEvent) {
+	p.touchSeen = true
+	p.sink.ohosLog(fmt.Sprintf("ohos touch id=%d action=%d x=%.1f y=%.1f", e.id, e.action, e.x, e.y))
 	var kind pointer.Kind
 	switch e.action {
 	case 0:
@@ -360,6 +381,18 @@ func (p *ohosPump) touch(e ohosEvent) {
 	default:
 		return
 	}
+	if p.activeTouches == nil {
+		p.activeTouches = make(map[int]bool)
+	}
+	if kind == pointer.Release || kind == pointer.Cancel {
+		delete(p.activeTouches, e.id)
+	} else {
+		p.activeTouches[e.id] = true
+	}
+	if len(p.activeTouches) == 0 {
+		p.pinchActive = false
+		p.lastPinch = 0
+	}
 	p.sink.ohosDeliver(pointer.Event{
 		Kind:      kind,
 		Source:    pointer.Touch,
@@ -368,6 +401,9 @@ func (p *ohosPump) touch(e ohosEvent) {
 		Position:  f32.Pt(e.x, e.y),
 		Modifiers: ohosModifiers(e.mods),
 	})
+	// 触摸事件不会自动触发重绘；每个 Move 都必须请求一帧，否则只有第一下
+	// 能更新画面（单指只移动一次、捏合只跳一次）。
+	p.sink.ohosRequestFrame()
 }
 
 // mouse translates a mouse callback.  action: 0 press, 1 release, 2 move.
@@ -400,13 +436,41 @@ func (p *ohosPump) mouse(e ohosEvent) {
 		Position:  f32.Pt(e.x, e.y),
 		Modifiers: ohosModifiers(e.mods),
 	})
+	p.sink.ohosRequestFrame()
 }
 
 func (p *ohosPump) axis(e ohosEvent) {
-	if !ohosAxisChanged(float64(e.dy), float64(e.dx), float64(e.scale)) {
+	scale := float64(e.scale)
+	p.sink.ohosLog(fmt.Sprintf("ohos axis active=%d touchSeen=%v scale=%.3f dy=%.3f", len(p.activeTouches), p.touchSeen, scale, e.dy))
+	// 手机触摸会错误上报单指 pinch；只要本窗口见过任何原生触点，
+	// 就不再接受 axis pinch。纯触控板窗口从未有 touch 事件，仍可走 axis。
+	if p.touchSeen && scale != 0 && scale != 1 {
+		scale = 0
+	}
+	if scale == 1 {
+		p.pinchActive = false
+		p.lastPinch = 0
+		scale = 0
+	}
+	if scale != 0 {
+		if !p.pinchActive {
+			p.pinchActive = true
+			p.lastPinch = float32(scale)
+			scale = 0
+		} else {
+			prev := float64(p.lastPinch)
+			p.lastPinch = float32(scale)
+			if prev > 0 {
+				scale /= prev
+			} else {
+				scale = 0
+			}
+		}
+	}
+	if !ohosAxisChanged(float64(e.dy), float64(e.dx), scale) {
 		return
 	}
-	scroll, mods := ohosAxisScroll(float64(e.dy), float64(e.dx), float64(e.scale), e.mods)
+	scroll, mods := ohosAxisScroll(float64(e.dy), float64(e.dx), scale, e.mods)
 	p.sink.ohosDeliver(pointer.Event{
 		Kind:      pointer.Scroll,
 		Source:    pointer.Mouse,
@@ -415,6 +479,7 @@ func (p *ohosPump) axis(e ohosEvent) {
 		Scroll:    scroll,
 		Modifiers: mods,
 	})
+	p.sink.ohosRequestFrame()
 }
 
 // key translates a hardware key callback.  action: 0 down, 1 up.

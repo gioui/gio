@@ -76,6 +76,58 @@ func TestOHOSKeyNames(t *testing.T) {
 	}
 }
 
+func TestOHOSTouchAndAxisRequestFrame(t *testing.T) {
+	p, f := newTestPump()
+	p.touch(ohosEvent{action: 1, id: 1, x: 10, y: 20})
+	if f.frames != 1 {
+		t.Fatalf("touch Move must request a frame, got %d", f.frames)
+	}
+	p.axis(ohosEvent{dy: 12, x: 10, y: 20})
+	if f.frames != 2 {
+		t.Fatalf("axis scroll must request a frame, got %d", f.frames)
+	}
+}
+
+func TestOHOSPinchRequiresTouchpad(t *testing.T) {
+	p, f := newTestPump()
+	p.touch(ohosEvent{action: 0, id: 1, x: 10, y: 10})
+	f.events = nil
+	p.axis(ohosEvent{scale: 1.2, x: 10, y: 10})
+	if len(f.events) != 0 {
+		t.Fatalf("single touch must ignore axis pinch: %#v", f.events)
+	}
+	p.touch(ohosEvent{action: 0, id: 2, x: 20, y: 10})
+	f.events = nil
+	p.axis(ohosEvent{scale: 1.3, x: 15, y: 10})
+	if len(f.events) != 0 {
+		t.Fatalf("two touches must ignore axis pinch and use pointer pinches: %#v", f.events)
+	}
+	p.touch(ohosEvent{action: 2, id: 1, x: 10, y: 10})
+	p.touch(ohosEvent{action: 2, id: 2, x: 20, y: 10})
+	f.events = nil
+	// 触摸设备即使抬手后也不再接受 axis pinch（系统会在 UP 后补发 pinch）。
+	p.axis(ohosEvent{scale: 1.2, x: 10, y: 10})
+	p.axis(ohosEvent{scale: 1.44, x: 10, y: 10})
+	if len(f.events) != 0 {
+		t.Fatalf("touch device must ignore axis pinch even after release: %#v", f.events)
+	}
+
+	// 纯触控板窗口从未出现 touch，axis pinch 仍可用。
+	p2, f2 := newTestPump()
+	p2.axis(ohosEvent{scale: 1.2, x: 10, y: 10})
+	if len(f2.events) != 0 {
+		t.Fatalf("first touchpad sample must only establish baseline: %#v", f2.events)
+	}
+	p2.axis(ohosEvent{scale: 1.44, x: 10, y: 10})
+	if len(f2.events) != 1 {
+		t.Fatalf("second touchpad sample must emit one scroll: %#v", f2.events)
+	}
+	pe, ok := f2.events[0].(pointer.Event)
+	if !ok || pe.Scroll.Y >= 0 || !pe.Modifiers.Contain(key.ModCtrl) {
+		t.Fatalf("touchpad pinch must zoom in: %#v", f2.events[0])
+	}
+}
+
 func TestOHOSPrintable(t *testing.T) {
 	cases := []struct {
 		code int
@@ -184,10 +236,10 @@ func TestOHOSPumpAnimation(t *testing.T) {
 		t.Fatalf("tick must draw and request the next frame: events=%d frames=%d", len(f.events), f.frames)
 	}
 	p.SetAnimating(false)
-	f.events = nil
+	f.events, f.frames = nil, 0
 	p.Handle(ohosEvent{kind: ohosEvFrame})
-	if len(f.events) != 0 {
-		t.Fatalf("no frames after animation stops: %#v", f.events)
+	if len(f.events) != 1 || f.frames != 0 {
+		t.Fatalf("stray vsync must draw once without starting another loop: events=%#v frames=%d", f.events, f.frames)
 	}
 }
 
