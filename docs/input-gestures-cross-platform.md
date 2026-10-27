@@ -2,7 +2,7 @@
 
 > 范围：Windows、macOS、Linux（X11/Wayland）、Android、iOS/iPadOS、HarmonyOS/OpenHarmony、Web；并对照 Gio 当前实现。
 > 结论用于决定 Gio 的输入事件模型与 OHOS/桌面后端下一步改造，不替代各平台 API 文档。
-> 实现进展（2026-10-27）：pointer 事件模型（Source/Kind/Phase/Scale/Rotation/Swipe）与语义手势路由已落地；macOS pinch/rotate/swipe、OHOS axis pinch、Windows PT_* 分类与 Precision Touchpad 注册已接入；Wayland/Android/iOS/Web 与 Windows pinch/rotate 仍待做。
+> 实现进展（2026-10-27）：pointer 事件模型（Source/Kind/Phase/Scale/Rotation/Swipe）与语义手势路由已落地；macOS pinch/rotate/swipe、OHOS axis pinch、Windows PT_* 分类与 Precision Touchpad 注册、gesture.Pinch/Rotate 回退识别器已接入；Wayland/Android/iOS/Web 接线与 Windows pinch/rotate 仍待做。
 
 ---
 
