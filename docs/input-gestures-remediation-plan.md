@@ -28,6 +28,7 @@
 | WP1 gesture 回退 | 完成 | Pinch/Rotate/Swipe/Hold 有 host 测试；未接各后端 |
 | WP2 Windows 来源/注册 | 完成 | PT_TOUCHPAD/PT_PEN/PT_TOUCH 分类；RegisterTouchpadCapableWindow |
 | WP2 Windows 触摸屏手势 | 完成 | WM_GESTURE zoom/rotate；GID_ROTATE 32768/圈换算；仅交叉编译+转换单测 |
+| WP4 Wayland 语义手势 | 完成（代码 + 协议绑定验证） | Fedora 44：`zwp_pointer_gestures_v1` v3，pinch/swipe/hold 对象创建成功；尚无真实触控板手势回放 |
 | WP3 macOS 语义手势 | 完成（代码 + 本机验收） | 2026-10-27 本机验证 pinch/rotate/scroll、左右键、双击、真实触点数；三指 Swipe 受系统“轻扫切换页面”设置影响 |
 | WP5 OHOS pinch | 完成（Go） | axis pinch → Pinch；host/race 测试；未做真机多指验收 |
 | 文档 | 完成 | 本文件 + [input-gestures-cross-platform.md](input-gestures-cross-platform.md) |
@@ -36,7 +37,7 @@
 
 | 优先级 | 工作包 | 剩余内容 | 估算 | 依赖/阻塞 |
 |---|---|---|---|---|
-| P0 | WP4 Wayland | bind `zwp_pointer_gestures_v1`；pinch/swipe/hold；保留 `axis_source` | 4 天 | 需要 Linux + Wayland 头/wayland-scanner；本机没有 |
+| P0 | WP4 Wayland 验收 | 用真实 USB 触控板回放 pinch/rotate/swipe/hold；核对 Scale/Rotation/Swipe/Fingers | 1 天 | 需要 USB 触控板直通 Fedora；虚拟设备被 libinput jump detector 丢弃 |
 | P0 | WP2 Windows Precision Touchpad | `InteractionContext`/触控板帧解析，输出 pinch/rotate/pan | 3 天 | 需要 Precision Touchpad 设备验证 |
 | P1 | WP5 OHOS 收尾 | Hold 真机验收；2in1 触控板 rotate/swipe 验证；补接入文档；可选 ABI 导出 | 1–2 天；可选 3 天 shim | 需要 Hold/2in1 设备 |
 | P1 | WP6 Android/iOS | 原生 ScaleGestureDetector/UIGestureRecognizer 或后端接入 gesture 包；iPad 间接指针/hover | 4 天 | 需要 Android/iPad 设备 |
@@ -45,7 +46,7 @@
 | P2 | WP9 测试/CI | 后端事件 golden trace；真机矩阵；CI 手势测试；模拟器 GPU shader 兼容 | 3–4 天 | 依赖设备/模拟器 |
 | P3 | M4 长尾 | Pen 压力/倾斜、原始触控板帧、触觉 | 1–2 周 | 单独立项 |
 
-**剩余合计**：约 20 Go 人日（含 1–2 天 OHOS 收尾）+ 可选 3 天 shim；单人含缓冲约 4–5 周，双人约 3 周。
+**剩余合计**：约 17 Go 人日（含 Wayland/OHOS 验收）+ 可选 3 天 shim；单人含缓冲约 4 周，双人约 2.5 周。
 
 ### 建议执行顺序
 
