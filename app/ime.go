@@ -391,6 +391,64 @@ func (s textInputSnapshot) convertRange(before, after uint32) (key.Range, bool) 
 	return key.Range{Start: s.start + beforeRune, End: s.start + afterRune}, true
 }
 
+// shiftRuneOffset moves a UTF-8 byte offset by delta runes, refusing to
+// cross the string boundaries.
+func shiftRuneOffset(text string, offset, delta int) (int, bool) {
+	if offset < 0 || offset > len(text) {
+		return 0, false
+	}
+	if offset < len(text) && !utf8.RuneStart(text[offset]) {
+		return 0, false
+	}
+	if delta < 0 {
+		for ; delta < 0; delta++ {
+			if offset == 0 {
+				return 0, false
+			}
+			_, n := utf8.DecodeLastRuneInString(text[:offset])
+			offset -= n
+		}
+		return offset, true
+	}
+	for ; delta > 0; delta-- {
+		if offset == len(text) {
+			return 0, false
+		}
+		_, n := utf8.DecodeRuneInString(text[offset:])
+		offset += n
+	}
+	return offset, true
+}
+
+// byteDeltaForRunes converts a deletion expressed in runes relative to the
+// selection into the byte deltas expected by convertRange.
+func (s textInputSnapshot) byteDeltaForRunes(before, after int) (uint32, uint32, bool) {
+	if before < 0 || after < 0 {
+		return 0, 0, false
+	}
+	selectionStart := min(s.cursor, s.anchor)
+	selectionEnd := max(s.cursor, s.anchor)
+	start, ok := shiftRuneOffset(s.text, selectionStart, -before)
+	if !ok {
+		return 0, 0, false
+	}
+	end, ok := shiftRuneOffset(s.text, selectionEnd, after)
+	if !ok {
+		return 0, 0, false
+	}
+	return uint32(selectionStart - start), uint32(end - selectionEnd), true
+}
+
+// convertRuneRange converts a deletion expressed in runes into an absolute
+// document range.
+func (s textInputSnapshot) convertRuneRange(before, after int) (key.Range, bool) {
+	b, a, ok := s.byteDeltaForRunes(before, after)
+	if !ok {
+		return key.Range{}, false
+	}
+	return s.convertRange(b, a)
+}
+
 // requestSurroundingText asks the editor for a snippet covering the
 // selection and composition, with context on both sides.
 func requestSurroundingText(e *callbacks) {

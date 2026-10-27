@@ -25,7 +25,6 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"gioui.org/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
@@ -86,6 +85,7 @@ type window struct {
 	inputHint key.InputHint
 	textInput bool
 	animating bool
+	ime       ohosIME
 }
 
 var ohosState = struct {
@@ -345,7 +345,13 @@ func (w *window) ShowTextInput(show bool) {
 		return
 	}
 	w.textInput = show
+	w.ime.keyboard = show
+	w.ime.resetWire()
 	C.gio_call_show_keyboard(boolInt(show))
+	C.gio_call_ime_keyboard_status(boolInt(show))
+	if show {
+		w.updateIME()
+	}
 }
 
 func (w *window) SetInputHint(hint key.InputHint) {
@@ -353,7 +359,8 @@ func (w *window) SetInputHint(hint key.InputHint) {
 		return
 	}
 	w.inputHint = hint
-	C.gio_call_ime_config(C.int(ohosInputHint(hint)))
+	w.ime.setHint(hint)
+	w.updateIME()
 }
 
 func (w *window) ReadClipboard() {
@@ -395,44 +402,24 @@ func (w *window) ohosEditorInsert(text string) {
 	if text == "" {
 		return
 	}
-	w.callbacks.EditorInsert(text)
+	w.ime.commit(w.callbacks, text)
+	w.updateIME()
 }
 
 func (w *window) ohosEditorPreedit(text string, selStart, selEnd int) {
-	st := w.callbacks.EditorState()
-	if st.compose.Start != -1 {
-		w.callbacks.EditorReplace(normRange(st.compose), "")
-		w.callbacks.SetComposingRegion(key.Range{Start: -1, End: -1})
-	}
-	rng := normRange(st.Selection.Range)
-	runes := []rune(text)
-	if text != "" {
-		w.callbacks.EditorReplace(rng, text)
-	}
-	start := rng.Start
-	end := start + len(runes)
-	if text == "" {
-		end = start
-	}
-	w.callbacks.SetComposingRegion(key.Range{Start: start, End: end})
-	selStart += start
-	selEnd += start
-	if selStart < start || selStart > end {
-		selStart = end
-	}
-	if selEnd < start || selEnd > end {
-		selEnd = selStart
-	}
-	w.callbacks.SetEditorSelection(key.Range{Start: selStart, End: selEnd})
+	w.ime.preedit(w.callbacks, text, selStart, selEnd)
+	w.updateIME()
 }
 
 func (w *window) ohosEditorDelete(before, after int) {
-	st := w.callbacks.EditorState()
-	if rng, ok := ohosDeleteRange(st, before, after); ok && rng.Start != rng.End {
-		w.callbacks.EditorReplace(rng, "")
-		pos := rng.Start
-		w.callbacks.SetEditorSelection(key.Range{Start: pos, End: pos})
+	if !w.ime.delete(w.callbacks, before, after) {
+		st := w.callbacks.EditorState()
+		if rng, ok := ohosDeleteRange(st, before, after); ok && rng.Start != rng.End {
+			w.callbacks.EditorReplace(rng, "")
+			w.callbacks.SetEditorSelection(key.Range{Start: rng.Start, End: rng.Start})
+		}
 	}
+	w.updateIME()
 }
 
 func (w *window) ohosEditorMove(direction int) {
@@ -443,7 +430,8 @@ func (w *window) ohosEditorMove(direction int) {
 }
 
 func (w *window) ohosEditorSelect(start, end int) {
-	w.callbacks.SetEditorSelection(key.Range{Start: start, End: end})
+	w.ime.selectRange(w.callbacks, start, end)
+	w.updateIME()
 }
 
 func (w *window) ohosEditorEnter(enterType int) {
@@ -472,31 +460,32 @@ func (w *window) ohosLog(msg string) {
 // updateIME reports the surrounding text, selection and caret rectangle to
 // the platform input method.  It runs on the loop goroutine.
 func (w *window) updateIME() {
+	if w.closed.Load() {
+		return
+	}
 	if !w.textInput {
-		C.gio_call_ime_config(C.int(ohosInputHint(w.inputHint)))
+		C.gio_call_ime_config(C.int(w.ime.hint))
 		return
 	}
 	st := w.callbacks.EditorState()
-	sn := st.Snippet
-	text := sn.Text
-	sel := normRange(st.Selection.Range)
-	start := sel.Start - sn.Start
-	end := sel.End - sn.Start
-	runes := []rune(text)
-	if start < 0 || end < 0 || start > len(runes) || end > len(runes) {
-		start, end = 0, 0
+	sn, status := textInputSurrounding(st)
+	if status == surroundingAwaitingSnippet {
+		requestSurroundingText(w.callbacks)
+		return
 	}
-	ctext := C.CString(text)
+	if status != surroundingReady {
+		return
+	}
+	wire, ok := w.ime.build(st, sn, w.textInput)
+	if !ok || !w.ime.changed(wire) {
+		return
+	}
+	ctext := C.CString(wire.text)
 	defer C.free(unsafe.Pointer(ctext))
-	C.gio_call_ime_selection(ctext, C.int(len(text)), C.int(start), C.int(end))
-
-	c := st.Selection
-	top := c.Transform.Transform(c.Caret.Pos.Sub(f32.Pt(0, c.Caret.Ascent)))
-	bottom := c.Transform.Transform(c.Caret.Pos.Add(f32.Pt(0, c.Caret.Descent)))
-	x0, x1 := min32(top.X, bottom.X), max32(top.X, bottom.X)
-	y0, y1 := min32(top.Y, bottom.Y), max32(top.Y, bottom.Y)
-	C.gio_call_ime_cursor(C.float(x0), C.float(y0), C.float(x1-x0), C.float(y1-y0))
-	C.gio_call_ime_config(C.int(ohosInputHint(w.inputHint)))
+	C.gio_call_ime_selection(ctext, C.int(wire.length), C.int(wire.start), C.int(wire.end))
+	r := wire.caret
+	C.gio_call_ime_cursor(C.float(r.Min.X), C.float(r.Min.Y), C.float(r.Dx()), C.float(r.Dy()))
+	C.gio_call_ime_config(C.int(wire.hint))
 }
 
 func (w *window) EditorStateChanged(old, new editorState) {
@@ -510,38 +499,6 @@ func boolInt(b bool) C.int {
 		return 1
 	}
 	return 0
-}
-
-func ohosInputHint(h key.InputHint) int {
-	switch h {
-	case key.HintText:
-		return 1
-	case key.HintNumeric:
-		return 2
-	case key.HintEmail:
-		return 3
-	case key.HintURL:
-		return 4
-	case key.HintTelephone:
-		return 5
-	case key.HintPassword:
-		return 6
-	}
-	return 0
-}
-
-func min32(a, b float32) float32 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max32(a, b float32) float32 {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 func ohosCursorNumber(cursor pointer.Cursor) int {
