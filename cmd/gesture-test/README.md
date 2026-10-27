@@ -38,7 +38,7 @@ GOROOT=/opt/homebrew/Cellar/go/1.27.1/libexec \
 - Scale：相对 begin 的绝对值，1 表示无变化
 - Rotation：相对 begin 的累计弧度
 - Swipe：相对 begin 的逻辑中心位移
-- Fingers：参与手指数；macOS 精确触控板滚动为 2，鼠标滚轮为 0
+- Fingers：参与手指数；macOS 精确触控板滚动使用真实触点数（2 或 3），拿不到时为 0；鼠标滚轮为 0
 - Buttons：当前按下的鼠标键
 - Position/PointerID/GestureID/Time
 
@@ -63,5 +63,6 @@ GOROOT=/opt/homebrew/Cellar/go/1.27.1/libexec \
 
 ### macOS 三指手势说明
 
-macOS 可能把三指滑动识别成系统手势（Mission Control/切换桌面）或滚动，而不是 `swipeWithEvent`。可在
-系统设置 → 触控板 → 更多手势中检查“在页面之间轻扫”和“三指拖移”等设置；这不是 Gio 能强制覆盖的。
+macOS 可能把三指滑动识别成系统手势（Mission Control/切换桌面）或滚动，而不是 `swipeWithEvent`。
+如果“轻扫切换页面”是“双指左右滚动”，三指通常也会被当作滚动；把它改成“用三指轻扫”（或“用两指或三指轻扫”）后再测 `Swipe`。
+这不是 Gio 能强制覆盖的，具体入口：系统设置 → 触控板 → 更多手势。

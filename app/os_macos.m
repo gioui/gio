@@ -137,6 +137,22 @@ static void handleMouse(GioView *view, NSEvent *event, int typ, CGFloat dx, CGFl
 - (void)otherMouseUp:(NSEvent *)event {
 	handleMouse(self, event, MOUSE_UP, 0, 0);
 }
+- (void)touchesBeganWithEvent:(NSEvent *)event {
+	[self updateTouchCount:event];
+}
+- (void)touchesMovedWithEvent:(NSEvent *)event {
+	[self updateTouchCount:event];
+}
+- (void)touchesEndedWithEvent:(NSEvent *)event {
+	[self updateTouchCount:event];
+}
+- (void)touchesCancelledWithEvent:(NSEvent *)event {
+	[self updateTouchCount:event];
+}
+- (void)updateTouchCount:(NSEvent *)event {
+	NSSet *touches = [event touchesMatchingPhase:NSTouchPhaseTouching inView:self];
+	gio_onTouchCount(self.handle, (int)touches.count);
+}
 - (void)mouseMoved:(NSEvent *)event {
 	handleMouse(self, event, MOUSE_MOVE, 0, 0);
 }
@@ -480,6 +496,11 @@ CFTypeRef gio_createView(int presentWithTrans) {
 		[view registerForDraggedTypes:@[NSPasteboardTypeFileURL, NSFilenamesPboardType]];
 		view.wantsLayer = YES;
 		view.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
+		// Track the number of fingers on the trackpad so scroll events can
+		// report an accurate Fingers count. Touch events are not forwarded as
+		// pointer events; only the count is used.
+		view.acceptsTouchEvents = YES;
+		view.wantsRestingTouches = NO;
 
 		[[NSNotificationCenter defaultCenter] addObserver:view
 												 selector:@selector(applicationWillUnhide:)

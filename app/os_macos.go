@@ -374,6 +374,7 @@ type window struct {
 	gestureID       uint32
 	gestureScale    float32
 	gestureRotation float32
+	touchCount      uint8
 
 	keysDown map[key.Name]struct{}
 	// cmdKeys is for storing the current key event while
@@ -728,7 +729,7 @@ func gio_onMouse(h C.uintptr_t, evt C.CFTypeRef, cdir C.int, cbtn C.NSInteger, x
 	fingers := uint8(0)
 	if typ == pointer.Scroll && precise != 0 {
 		src = pointer.Trackpad
-		fingers = 2
+		fingers = w.touchCount
 	}
 	w.ProcessEvent(pointer.Event{
 		Kind:      typ,
@@ -763,6 +764,18 @@ func (w *window) beginMacGesture() {
 	w.gestureRotation = 0
 }
 
+//export gio_onTouchCount
+func gio_onTouchCount(h C.uintptr_t, count C.int) {
+	w := windowFor(h)
+	if count < 0 {
+		count = 0
+	}
+	if count > 255 {
+		count = 255
+	}
+	w.touchCount = uint8(count)
+}
+
 //export gio_onMagnify
 func gio_onMagnify(h C.uintptr_t, x, y, delta C.CGFloat, ti C.double, mods C.NSUInteger, cphase C.int) {
 	w := windowFor(h)
@@ -778,13 +791,17 @@ func gio_onMagnify(h C.uintptr_t, x, y, delta C.CGFloat, ti C.double, mods C.NSU
 		w.gestureScale *= float32(1 + float64(delta))
 	}
 	t := time.Duration(float64(ti)*float64(time.Second) + .5)
+	fingers := uint8(2)
+	if w.touchCount > 0 {
+		fingers = w.touchCount
+	}
 	w.ProcessEvent(pointer.Event{
 		Kind:      pointer.Pinch,
 		Source:    pointer.Trackpad,
 		GestureID: w.gestureID,
 		Phase:     phase,
 		Scale:     w.gestureScale,
-		Fingers:   2,
+		Fingers:   fingers,
 		Time:      t,
 		Position:  f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale},
 		Modifiers: convertMods(mods),
@@ -808,13 +825,17 @@ func gio_onRotate(h C.uintptr_t, x, y, degrees C.CGFloat, ti C.double, mods C.NS
 	}
 	w.gestureRotation += float32(float64(degrees) * math.Pi / 180)
 	t := time.Duration(float64(ti)*float64(time.Second) + .5)
+	fingers := uint8(2)
+	if w.touchCount > 0 {
+		fingers = w.touchCount
+	}
 	w.ProcessEvent(pointer.Event{
 		Kind:      pointer.Rotate,
 		Source:    pointer.Trackpad,
 		GestureID: w.gestureID,
 		Phase:     phase,
 		Rotation:  w.gestureRotation,
-		Fingers:   2,
+		Fingers:   fingers,
 		Time:      t,
 		Position:  f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale},
 		Modifiers: convertMods(mods),
@@ -829,13 +850,17 @@ func gio_onRotate(h C.uintptr_t, x, y, degrees C.CGFloat, ti C.double, mods C.NS
 func gio_onSwipe(h C.uintptr_t, x, y, dx, dy C.CGFloat, ti C.double, mods C.NSUInteger) {
 	w := windowFor(h)
 	w.gestureID++
+	fingers := uint8(3)
+	if w.touchCount > 0 {
+		fingers = w.touchCount
+	}
 	w.ProcessEvent(pointer.Event{
 		Kind:      pointer.Swipe,
 		Source:    pointer.Trackpad,
 		GestureID: w.gestureID,
 		Phase:     pointer.GestureEnd,
 		Swipe:     f32.Point{X: float32(dx) * w.scale, Y: float32(dy) * w.scale},
-		Fingers:   3,
+		Fingers:   fingers,
 		Position:  f32.Point{X: float32(x) * w.scale, Y: float32(y) * w.scale},
 		Time:      time.Duration(float64(ti)*float64(time.Second) + .5),
 		Modifiers: convertMods(mods),
