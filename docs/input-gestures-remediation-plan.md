@@ -3,7 +3,7 @@
 > 依据：[input-gestures-cross-platform.md](input-gestures-cross-platform.md) 的矩阵、源码复核与平台 API 结论。
 > 状态：实施中；已完成部分与剩余工作见 §0.0。
 > 目标：把 Gio 从“鼠标/触摸 + Scroll”升级为“可区分设备、可拿语义手势、可回退识别”的输入模型，并修正 Windows/macOS/Wayland/OHOS 的具体缺口。
-> 实施进展（2026-10-27）：事件模型与语义手势路由、macOS pinch/rotate/swipe、OHOS axis pinch、Windows PT_* 分类/触控板注册 + WM_GESTURE pinch/rotate、gesture.Pinch/Rotate/Swipe/Hold 回退识别器已落地；Wayland、Windows Precision Touchpad 的 InteractionContext、Android/iOS/Web 接线仍待做。
+> 实施进展（2026-10-27）：事件模型与语义手势路由、macOS pinch/rotate/swipe、Wayland `zwp_pointer_gestures_v1`、OHOS 真机 pinch/rotate/swipe、Windows PT_* 分类/触控板注册 + WM_GESTURE pinch/rotate、gesture.Pinch/Rotate/Swipe/Hold 与互斥 ZoomRotate 已落地；Wayland 真触控板验收、Windows Precision Touchpad 的 InteractionContext、OHOS Hold、Android/iOS/Web 接线仍待做。
 
 ## 0.0 执行状态（截至 2026-10-27）
 
@@ -18,6 +18,10 @@
 | `89616c02` | gesture.Swipe/Hold 回退识别器 |
 | `6c8c4a29` | Windows PT_* 分类、Precision Touchpad 注册、WM_GESTURE pinch/rotate |
 | `da4360a8` | 删除 macOS magnify-to-scroll 旧工具 |
+| `e218fc2c` | Wayland pointer-gestures pinch/swipe/hold 实现 |
+| `ddf79b37` | gesture.ZoomRotate 互斥仲裁器 |
+| `67344c58` | OHOS stale/重复触点恢复、两指手势隔离 |
+| `e756d245` | 测试程序日志区压缩 |
 
 ### 已完成
 
@@ -25,12 +29,12 @@
 |---|---|---|
 | WP0 安全网 | 部分 | 旧 Press/Move/Scroll 测试保持全绿；尚无完整 golden trace 回放 |
 | WP1 事件模型与路由 | 完成 | `io/pointer`、`io/input` 单测；旧 Filter 不收新 Kind |
-| WP1 gesture 回退 | 完成 | Pinch/Rotate/Swipe/Hold 有 host 测试；未接各后端 |
+| WP1 gesture 回退 | 完成 | Pinch/Rotate/Swipe/Hold + ZoomRotate 有 host 测试；测试程序已接 macOS/OHOS |
 | WP2 Windows 来源/注册 | 完成 | PT_TOUCHPAD/PT_PEN/PT_TOUCH 分类；RegisterTouchpadCapableWindow |
 | WP2 Windows 触摸屏手势 | 完成 | WM_GESTURE zoom/rotate；GID_ROTATE 32768/圈换算；仅交叉编译+转换单测 |
-| WP4 Wayland 语义手势 | 完成（代码 + 协议绑定验证） | Fedora 44：`zwp_pointer_gestures_v1` v3，pinch/swipe/hold 对象创建成功；尚无真实触控板手势回放 |
 | WP3 macOS 语义手势 | 完成（代码 + 本机验收） | 2026-10-27 本机验证 pinch/rotate/scroll、左右键、双击、真实触点数；三指 Swipe 受系统“轻扫切换页面”设置影响 |
-| WP5 OHOS pinch | 完成（Go） | axis pinch → Pinch；host/race 测试；未做真机多指验收 |
+| WP4 Wayland 语义手势 | 实现完成；协议绑定通过 | Fedora 44：`zwp_pointer_gestures_v1` v3，pinch/swipe/hold 对象创建成功；真实触控板 E2E 未完成 |
+| WP5 OHOS 手势 | 核心完成 + 真机验收 | VYG-AL00 验证连续 pinch/rotate/swipe、单指/双击；Hold 未验；2in1 未验 |
 | 文档 | 完成 | 本文件 + [input-gestures-cross-platform.md](input-gestures-cross-platform.md) |
 
 ### 剩余工作
@@ -50,7 +54,7 @@
 
 ### 建议执行顺序
 
-1. **Wayland**：完成 M1 最后一个桌面平台；需要 Linux 开发环境。
+1. **Wayland 真触控板验收**：实现已完成；需要 USB 触控板直通 Fedora。
 2. **Windows InteractionContext**：补齐 Precision Touchpad，而不只触摸屏 WM_GESTURE。
 3. **OHOS 收尾**：Hold 真机验收、2in1 触控板验证、接入文档。
 4. **Android/iOS**：把已完成的 gesture 回退包接到后端，或接原生识别器。
@@ -68,7 +72,10 @@
 | Windows `go test -c` | 通过 |
 | macOS 后端编译/测试 | 通过 |
 | OHOS arm64 交叉编译 | 通过 |
-| 新增语义手势真机验收 | **macOS 通过**；Windows/OHOS 仍待设备验收（当前只有编译/host 测试） |
+| 新增语义手势真机验收 | **macOS、OHOS VYG-AL00 通过**；Windows 仍待设备验收 |
+| Wayland 构建/协议绑定 | Fedora 44 `go build -tags novulkan` 通过；manager/pinch/swipe/hold 对象创建成功 |
+| Wayland 手势 E2E | **未完成**：虚拟触控板被 libinput jump detector 丢弃，需真实 USB 触控板 |
+| OHOS 模拟器 | 安装成功，但 GPU shader 初始化崩溃（`version '450' is not supported`） |
 
 ---
 
@@ -80,9 +87,9 @@
 |---|---|---|---|
 | P0-1 | io/pointer 没有 Trackpad/Pen 来源，没有 Pinch/Rotate/Swipe/Hold | 应用无法正确实现缩放/旋转/多指手势 | 扩展事件模型 |
 | P0-2 | macOS pinch 被降级为 Ctrl+Scroll | 语义错误；无法拿 scale/旋转 | 直接映射 NSEvent 手势 |
-| P0-3 | Wayland 未绑定 pointer-gestures，忽略 axis_source | Linux 触控板手势完全缺失 | 绑定协议 |
+| P0-3 | Wayland 未绑定 pointer-gestures，忽略 axis_source | Linux 触控板手势完全缺失 | 绑定协议（实现完成，真实触控板验收待做） |
 | P0-4 | Windows PT_TOUCHPAD 被归为 Touch，且未注册 Precision Touchpad | Windows 触控板原始帧/手势不可用 | 修正分类 + 注册 |
-| P0-5 | OHOS axis pinch 只合成 Scroll | 语义丢失；无法与 Ctrl+滚轮区分 | 输出 Pinch 语义事件 |
+| P0-5 | OHOS axis pinch 只合成 Scroll | 语义丢失；无法与 Ctrl+滚轮区分 | 输出 Pinch 语义事件（已完成） |
 
 ### 四个主战场
 
