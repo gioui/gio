@@ -75,6 +75,7 @@ const (
 	ohosEvAction
 	ohosEvWindowMode
 	ohosEvOrientation
+	ohosEvMetric
 )
 
 // ohosEvent is one platform callback, copied from C before it enters the
@@ -107,6 +108,8 @@ type ohosEvent struct {
 	opts []Option
 	// sysAction carries a system.Action for ohosEvAction.
 	sysAction system.Action
+	// metric carries a runtime density/font-scale change.
+	metric unit.Metric
 }
 
 // ohosSink receives the effects of the event pump.  The real implementation
@@ -268,6 +271,8 @@ func (p *ohosPump) Handle(e ohosEvent) {
 		p.setWindowMode(e.a)
 	case ohosEvOrientation:
 		p.setOrientation(e.a)
+	case ohosEvMetric:
+		p.SetMetric(e.metric)
 	}
 }
 
@@ -701,6 +706,21 @@ func (p *ohosPump) setWindowMode(mode int) {
 	}
 	p.config.Mode = m
 	p.applyConfigDelta(ohosConfigDelta{ModeSet: true, Mode: m})
+}
+
+// SetMetric applies a runtime density/font-scale change and relayouts.
+func (p *ohosPump) SetMetric(m unit.Metric) {
+	if p.destroyed || m == p.metric {
+		return
+	}
+	if m.PxPerDp <= 0 {
+		m.PxPerDp = 1
+	}
+	if m.PxPerSp <= 0 {
+		m.PxPerSp = m.PxPerDp
+	}
+	p.metric = m
+	p.requestFrameSync(true)
 }
 
 func (p *ohosPump) setOrientation(o int) {

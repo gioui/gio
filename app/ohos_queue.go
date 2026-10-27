@@ -91,7 +91,7 @@ func ohosEventCritical(k ohosEventKind) bool {
 		ohosEvLifecycle, ohosEvKey, ohosEvText, ohosEvFocus,
 		ohosEvPreedit, ohosEvIMEDelete, ohosEvIMEMove, ohosEvIMESelection,
 		ohosEvIMEEnter, ohosEvIMEKeyboard, ohosEvPickResult, ohosEvPickError,
-		ohosEvConfigure, ohosEvInsets, ohosEvInvalidate:
+		ohosEvConfigure, ohosEvInsets, ohosEvInvalidate, ohosEvMetric:
 		return true
 	}
 	return false

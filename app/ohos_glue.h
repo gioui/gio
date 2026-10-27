@@ -163,6 +163,11 @@ void gio_ohos_ime_keyboard(int status);       /* 0 hidden 1 shown */
 void gio_ohos_pick_result(int mode, char *uris); /* '\n' separated */
 void gio_ohos_pick_error(int mode, char *msg);
 
+/* ABI 3 events. */
+void gio_ohos_window_mode(int mode);        /* 0 windowed 1 fullscreen 2 minimized 3 maximized */
+void gio_ohos_orientation(int orientation); /* 0 any 1 landscape 2 portrait */
+void gio_ohos_density(float density, float fontScale);
+
 #ifdef __cplusplus
 }
 #endif

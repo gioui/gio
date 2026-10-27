@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"gioui.org/io/system"
+	"gioui.org/unit"
 )
 
 type fakeHost struct {
@@ -173,5 +174,29 @@ func TestOHOSPumpSetAnimatingHost(t *testing.T) {
 	p.SetAnimating(false)
 	if len(h.animating) != 2 || h.animating[1] {
 		t.Fatalf("host animating = %#v", h.animating)
+	}
+}
+
+func TestOHOSPumpMetricChange(t *testing.T) {
+	p, f := newTestPump()
+	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 7, w: 300, h: 300})
+	p.Handle(ohosEvent{kind: ohosEvFrame})
+	f.events, f.frames = nil, 0
+
+	p.Handle(ohosEvent{kind: ohosEvInsets, top: 30})
+	p.Handle(ohosEvent{kind: ohosEvMetric, metric: unit.Metric{PxPerDp: 3, PxPerSp: 4}})
+	if p.metric != (unit.Metric{PxPerDp: 3, PxPerSp: 4}) {
+		t.Fatalf("metric = %+v", p.metric)
+	}
+	if f.frames != 1 {
+		t.Fatalf("metric change must coalesce into one frame, got %d", f.frames)
+	}
+	p.Handle(ohosEvent{kind: ohosEvFrame})
+	if len(f.events) != 1 {
+		t.Fatalf("frame missing: %#v", f.events)
+	}
+	fe := f.events[0].(frameEvent)
+	if fe.Metric != (unit.Metric{PxPerDp: 3, PxPerSp: 4}) || fe.Insets.Top != unit.Dp(10) {
+		t.Fatalf("frame metric/insets = %+v/%+v", fe.Metric, fe.Insets)
 	}
 }

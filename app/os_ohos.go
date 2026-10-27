@@ -536,18 +536,37 @@ func gio_ohos_configure(dataDir, cacheDir *C.char, density, fontScale C.float) {
 	setEnvDefault("TMPDIR", filepath.Join(c, "tmp"))
 	_ = os.MkdirAll(filepath.Join(c, "tmp"), 0o750)
 
-	m := unit.Metric{PxPerDp: float32(density), PxPerSp: float32(density) * float32(fontScale)}
+	ohosState.mu.Lock()
+	ohosState.dataDir = d
+	ohosState.cacheDir = c
+	ohosState.mu.Unlock()
+	ohosApplyMetric(ohosMetric(float32(density), float32(fontScale)))
+}
+
+//export gio_ohos_density
+func gio_ohos_density(density, fontScale C.float) {
+	ohosApplyMetric(ohosMetric(float32(density), float32(fontScale)))
+}
+
+func ohosMetric(density, fontScale float32) unit.Metric {
+	m := unit.Metric{PxPerDp: density, PxPerSp: density * fontScale}
 	if m.PxPerDp <= 0 {
 		m.PxPerDp = 1
 	}
 	if m.PxPerSp <= 0 {
 		m.PxPerSp = m.PxPerDp
 	}
+	return m
+}
+
+func ohosApplyMetric(m unit.Metric) {
 	ohosState.mu.Lock()
-	ohosState.dataDir = d
-	ohosState.cacheDir = c
 	ohosState.metric = m
+	live := ohosState.win != nil
 	ohosState.mu.Unlock()
+	if live {
+		enqueueOhos(ohosEvent{kind: ohosEvMetric, metric: m})
+	}
 }
 
 //export gio_ohos_run
