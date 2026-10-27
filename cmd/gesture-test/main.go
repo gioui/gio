@@ -29,7 +29,7 @@ import (
 	"gioui.org/widget/material"
 )
 
-const history = 14
+const history = 5
 
 var allKinds = pointer.Press | pointer.Release | pointer.Move | pointer.Drag |
 	pointer.Enter | pointer.Leave | pointer.Cancel | pointer.Scroll |
@@ -317,7 +317,7 @@ func (a *appState) details(gtx layout.Context) layout.Dimensions {
 	lines := []string{
 		fmt.Sprintf("Last: %v  source=%v  phase=%v", e.Kind, e.Source, phaseLabel(e)),
 		fmt.Sprintf("scale=%.4f  rotation=%.4f rad  swipe=%v  fingers=%d", e.Scale, e.Rotation, e.Swipe, e.Fingers),
-		fmt.Sprintf("position=%v  pointerID=%d  gestureID=%d  time=%v  buttons=%v", e.Position, e.PointerID, e.GestureID, e.Time, e.Buttons),
+		fmt.Sprintf("pos=%v  id=%d  gid=%d  buttons=%v", e.Position, e.PointerID, e.GestureID, e.Buttons),
 	}
 	children := []layout.FlexChild{
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
@@ -344,8 +344,8 @@ func (a *appState) log(gtx layout.Context) layout.Dimensions {
 	children := make([]layout.FlexChild, 0, len(a.events))
 	for i := len(a.events) - 1; i >= 0; i-- {
 		e := a.events[i]
-		txt := fmt.Sprintf("%v %-8v %-9v buttons=%-9v scale=%.3f rot=%.3f swipe=%v fingers=%d",
-			e.Kind, e.Source, phaseLabel(e), buttonsString(e.Buttons), e.Scale, e.Rotation, e.Swipe, e.Fingers)
+		txt := fmt.Sprintf("%v %v %v  S=%.2f R=%.2f F=%d",
+			e.Kind, e.Source, phaseLabel(e), e.Scale, e.Rotation, e.Fingers)
 		children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return material.Caption(a.theme, txt).Layout(gtx)
 		}))
