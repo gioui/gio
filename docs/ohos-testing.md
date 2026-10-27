@@ -1,6 +1,6 @@
 # OHOS 测试指南
 
-> 当前分支 `fix/ohos-m0`，已实现 S0–S8（生命周期/帧/ABI/窗口/IME/输入/环境/文件），S9 文档/CI，S10 无障碍待做。
+> 当前分支 `fix/ohos-m0`，已实现 S0–S10（生命周期/帧/ABI/窗口/IME/输入/环境/文件/文档/无障碍）。Gate 结果见 [ohos-gate-m2.md](ohos-gate-m2.md)。
 > 真机 Gate 仍需在 OHOS 设备上执行（本机无设备）。
 
 ## 1. Host 测试（无需 OHOS SDK）
