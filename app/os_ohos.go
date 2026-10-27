@@ -246,7 +246,9 @@ func (w *window) deliver(e event.Event) {
 
 func (w *window) Event() event.Event { return w.loop.Event() }
 
-func (w *window) Invalidate() { w.loop.Invalidate() }
+func (w *window) Invalidate() {
+	w.enqueue(ohosEvent{kind: ohosEvInvalidate})
+}
 
 func (w *window) Run(f func()) {
 	if w.closed.Load() {

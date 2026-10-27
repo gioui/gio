@@ -59,6 +59,7 @@ const (
 	ohosEvClipboard
 	ohosEvLifecycle
 	ohosEvFrame
+	ohosEvInvalidate
 	ohosEvInsets
 	ohosEvPreedit
 	ohosEvIMEDelete
@@ -133,6 +134,13 @@ type ohosPump struct {
 	life       ohosLifecycle
 	surfaceWin uintptr
 
+	// frameRequested is set by requestFrame and cleared by tick. It
+	// coalesces any number of redraw requests into one vsync frame.
+	frameRequested bool
+	// frameSync remembers that the pending frame must refresh the GPU
+	// surface (surface change or insets change).
+	frameSync bool
+
 	// destroyed is set exactly once by Stop. After it is set the pump
 	// ignores all further callbacks.
 	destroyed bool
@@ -184,6 +192,7 @@ func (p *ohosPump) Handle(e ohosEvent) {
 	case ohosEvText:
 		if e.text != "" {
 			p.sink.ohosEditorInsert(e.text)
+			p.requestFrame()
 		}
 	case ohosEvFocus:
 		p.setFocused(e.focus)
@@ -193,23 +202,30 @@ func (p *ohosPump) Handle(e ohosEvent) {
 		p.setLifecycle(e.life)
 	case ohosEvFrame:
 		p.tick()
+	case ohosEvInvalidate:
+		p.Invalidate()
 	case ohosEvInsets:
 		p.setInsets(ohosInsets{Top: e.top, Right: e.right, Bottom: e.bottom, Left: e.left})
 	case ohosEvPreedit:
 		p.sink.ohosEditorPreedit(e.text, e.a, e.b)
 		p.sink.ohosIMEChanged()
+		p.requestFrame()
 	case ohosEvIMEDelete:
 		p.sink.ohosEditorDelete(e.a, e.b)
 		p.sink.ohosIMEChanged()
+		p.requestFrame()
 	case ohosEvIMEMove:
 		p.sink.ohosEditorMove(e.a)
 		p.sink.ohosIMEChanged()
+		p.requestFrame()
 	case ohosEvIMESelection:
 		p.sink.ohosEditorSelect(e.a, e.b)
 		p.sink.ohosIMEChanged()
+		p.requestFrame()
 	case ohosEvIMEEnter:
 		p.sink.ohosEditorEnter(e.a)
 		p.sink.ohosIMEChanged()
+		p.requestFrame()
 	case ohosEvIMEKeyboard:
 		// The shim reports keyboard visibility; insets arrive separately.
 	case ohosEvPickResult:
@@ -236,6 +252,8 @@ func (p *ohosPump) surface(win uintptr, w, h int, sync bool) {
 	if win == 0 || w <= 0 || h <= 0 {
 		p.valid = false
 		p.config.Size = image.Point{}
+		p.frameRequested = false
+		p.frameSync = false
 		return
 	}
 	first := !p.valid
@@ -246,13 +264,15 @@ func (p *ohosPump) surface(win uintptr, w, h int, sync bool) {
 		p.sink.ohosDeliver(OHOSViewEvent{Window: win})
 	}
 	p.sink.ohosDeliver(ConfigEvent{Config: p.config})
-	p.frame(sync)
+	p.requestFrameSync(sync)
 }
 
 func (p *ohosPump) surfaceDestroyed() {
 	p.activeTouches = make(map[int]bool)
 	p.pinchActive = false
 	p.lastPinch = 0
+	p.frameRequested = false
+	p.frameSync = false
 	if p.valid {
 		p.valid = false
 		p.surfaceWin = 0
@@ -267,15 +287,28 @@ func (p *ohosPump) surfaceInfo() (uintptr, image.Point) {
 	return p.surfaceWin, p.config.Size
 }
 
-// Invalidate requests a frame.  Background windows produce none.
-func (p *ohosPump) Invalidate() {
+// requestFrame coalesces redraw requests and asks the shim for one vsync.
+func (p *ohosPump) requestFrame() {
+	p.requestFrameSync(false)
+}
+
+func (p *ohosPump) requestFrameSync(sync bool) {
+	if sync {
+		p.frameSync = true
+	}
 	if p.destroyed || p.life != ohosForeground || !p.valid || p.config.Size == (image.Point{}) {
 		return
 	}
-	p.frame(false)
-	if p.animating {
-		p.sink.ohosRequestFrame()
+	if p.frameRequested {
+		return
 	}
+	p.frameRequested = true
+	p.sink.ohosRequestFrame()
+}
+
+// Invalidate requests a frame. Background windows produce none.
+func (p *ohosPump) Invalidate() {
+	p.requestFrame()
 }
 
 // SetAnimating starts/stops the vsync loop.
@@ -284,8 +317,8 @@ func (p *ohosPump) SetAnimating(anim bool) {
 		return
 	}
 	p.animating = anim
-	if anim && p.life == ohosForeground && p.valid {
-		p.sink.ohosRequestFrame()
+	if anim {
+		p.requestFrame()
 	}
 }
 
@@ -294,11 +327,15 @@ func (p *ohosPump) tick() {
 	if p.destroyed || p.life != ohosForeground || !p.valid {
 		return
 	}
-	// 每个 vsync 回调都要出帧：静态界面由 touch/axis 等事件请求单帧，
-	// 不能因为没有设置 animating 就把这一帧丢掉。
-	p.frame(false)
+	if !p.frameRequested && !p.animating {
+		return
+	}
+	sync := p.frameSync
+	p.frameRequested = false
+	p.frameSync = false
+	p.frame(sync)
 	if p.animating {
-		p.sink.ohosRequestFrame()
+		p.requestFrame()
 	}
 }
 
@@ -336,6 +373,7 @@ func (p *ohosPump) setFocused(focused bool) {
 	}
 	p.config.Focused = focused
 	p.sink.ohosDeliver(ConfigEvent{Config: p.config})
+	p.requestFrameSync(true)
 }
 
 func (p *ohosPump) setInsets(in ohosInsets) {
@@ -344,7 +382,7 @@ func (p *ohosPump) setInsets(in ohosInsets) {
 	}
 	p.insets = in
 	// Re-layout so insets (and therefore RevealFocus) take effect.
-	p.frame(true)
+	p.requestFrameSync(true)
 }
 
 func (p *ohosPump) setLifecycle(l ohosLifecycle) {
@@ -354,10 +392,12 @@ func (p *ohosPump) setLifecycle(l ohosLifecycle) {
 		p.activeTouches = make(map[int]bool)
 		p.pinchActive = false
 		p.lastPinch = 0
+		p.frameRequested = false
+		p.frameSync = false
 	case ohosForeground:
 		p.life = ohosForeground
 		if p.valid {
-			p.frame(true)
+			p.requestFrameSync(true)
 		}
 	case ohosDestroyed:
 		p.life = ohosDestroyed
@@ -372,6 +412,8 @@ func (p *ohosPump) Stop() {
 		return
 	}
 	p.destroyed = true
+	p.frameRequested = false
+	p.frameSync = false
 	p.sink.ohosDeliver(DestroyEvent{})
 }
 
@@ -411,9 +453,7 @@ func (p *ohosPump) touch(e ohosEvent) {
 		Position:  f32.Pt(e.x, e.y),
 		Modifiers: ohosModifiers(e.mods),
 	})
-	// 触摸事件不会自动触发重绘；每个 Move 都必须请求一帧，否则只有第一下
-	// 能更新画面（单指只移动一次、捏合只跳一次）。
-	p.sink.ohosRequestFrame()
+	p.requestFrame()
 }
 
 // mouse translates a mouse callback.  action: 0 press, 1 release, 2 move.
@@ -446,7 +486,7 @@ func (p *ohosPump) mouse(e ohosEvent) {
 		Position:  f32.Pt(e.x, e.y),
 		Modifiers: ohosModifiers(e.mods),
 	})
-	p.sink.ohosRequestFrame()
+	p.requestFrame()
 }
 
 func (p *ohosPump) axis(e ohosEvent) {
@@ -488,7 +528,7 @@ func (p *ohosPump) axis(e ohosEvent) {
 		Scroll:    scroll,
 		Modifiers: mods,
 	})
-	p.sink.ohosRequestFrame()
+	p.requestFrame()
 }
 
 // key translates a hardware key callback.  action: 0 down, 1 up.
@@ -508,6 +548,7 @@ func (p *ohosPump) key(e ohosEvent) {
 			p.sink.ohosEditorInsert(text)
 		}
 	}
+	p.requestFrame()
 }
 
 func (p *ohosPump) clipboard(mime, text string) {
@@ -536,9 +577,11 @@ func (p *ohosPump) Configure(options []Option) {
 	cnf := p.config
 	cnf.apply(p.metric, options)
 	cnf.Decorated = true
-	if cnf.Size == (image.Point{}) {
-		cnf.Size = p.config.Size
-	}
+	// Size is owned by the surface: a mobile window cannot be resized by
+	// the application, and letting an Option change it makes EGL use a
+	// geometry different from the XComponent.
+	cnf.Size = p.config.Size
 	p.config = cnf
 	p.sink.ohosDeliver(ConfigEvent{Config: p.config})
+	p.requestFrame()
 }

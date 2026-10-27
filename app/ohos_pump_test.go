@@ -78,13 +78,25 @@ func TestOHOSKeyNames(t *testing.T) {
 
 func TestOHOSTouchAndAxisRequestFrame(t *testing.T) {
 	p, f := newTestPump()
+	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 7, w: 100, h: 100})
+	p.Handle(ohosEvent{kind: ohosEvFrame})
+	f.events, f.frames = nil, 0
 	p.touch(ohosEvent{action: 1, id: 1, x: 10, y: 20})
 	if f.frames != 1 {
 		t.Fatalf("touch Move must request a frame, got %d", f.frames)
 	}
 	p.axis(ohosEvent{dy: 12, x: 10, y: 20})
-	if f.frames != 2 {
-		t.Fatalf("axis scroll must request a frame, got %d", f.frames)
+	if f.frames != 1 {
+		t.Fatalf("axis must coalesce into the pending frame, got %d", f.frames)
+	}
+	f.events = nil
+	p.Handle(ohosEvent{kind: ohosEvFrame})
+	if len(f.events) != 1 {
+		t.Fatalf("pending frame must be delivered once: %#v", f.events)
+	}
+	p.Handle(ohosEvent{kind: ohosEvFrame})
+	if len(f.events) != 1 {
+		t.Fatalf("idle tick must not draw: %#v", f.events)
 	}
 }
 
@@ -188,8 +200,8 @@ func TestOHOSPumpFirstFrameAndZeroSize(t *testing.T) {
 		t.Fatalf("zero-sized surface must not emit events: %#v", f.events)
 	}
 	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 7, w: 800, h: 600})
-	if len(f.events) != 3 {
-		t.Fatalf("want view+config+frame, got %#v", f.events)
+	if len(f.events) != 2 || f.frames != 1 {
+		t.Fatalf("want view+config and one pending frame, got events=%#v frames=%d", f.events, f.frames)
 	}
 	if v, ok := f.events[0].(OHOSViewEvent); !ok || v.Window != 7 {
 		t.Fatalf("first event must be a valid view event: %#v", f.events[0])
@@ -197,9 +209,13 @@ func TestOHOSPumpFirstFrameAndZeroSize(t *testing.T) {
 	if _, ok := f.events[1].(ConfigEvent); !ok {
 		t.Fatalf("second event must be ConfigEvent: %#v", f.events[1])
 	}
+	p.Handle(ohosEvent{kind: ohosEvFrame})
+	if len(f.events) != 3 {
+		t.Fatalf("vsync must deliver the pending frame: %#v", f.events)
+	}
 	fe, ok := f.events[2].(frameEvent)
 	if !ok || !fe.Sync || fe.Size != image.Pt(800, 600) {
-		t.Fatalf("third event must be a sync frame: %#v", f.events[2])
+		t.Fatalf("surface frame must be sync: %#v", f.events[2])
 	}
 	if got := fe.Insets; got != (Insets{}) {
 		t.Fatalf("empty insets must be zero: %v", got)
@@ -209,7 +225,8 @@ func TestOHOSPumpFirstFrameAndZeroSize(t *testing.T) {
 func TestOHOSPumpBackgroundStopsFrames(t *testing.T) {
 	p, f := newTestPump()
 	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 7, w: 800, h: 600})
-	f.events = nil
+	p.Handle(ohosEvent{kind: ohosEvFrame})
+	f.events, f.frames = nil, 0
 	p.Handle(ohosEvent{kind: ohosEvLifecycle, life: ohosBackground})
 	p.Invalidate()
 	p.SetAnimating(true)
@@ -218,14 +235,19 @@ func TestOHOSPumpBackgroundStopsFrames(t *testing.T) {
 		t.Fatalf("background must not draw or request frames: events=%#v frames=%d", f.events, f.frames)
 	}
 	p.Handle(ohosEvent{kind: ohosEvLifecycle, life: ohosForeground})
+	if f.frames != 1 || len(f.events) != 0 {
+		t.Fatalf("foreground must request one frame: events=%#v frames=%d", f.events, f.frames)
+	}
+	p.Handle(ohosEvent{kind: ohosEvFrame})
 	if len(f.events) != 1 {
-		t.Fatalf("foreground must draw once: %#v", f.events)
+		t.Fatalf("foreground frame must draw once: %#v", f.events)
 	}
 }
 
 func TestOHOSPumpAnimation(t *testing.T) {
 	p, f := newTestPump()
 	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 7, w: 100, h: 100})
+	p.Handle(ohosEvent{kind: ohosEvFrame})
 	f.events, f.frames = nil, 0
 	p.SetAnimating(true)
 	if f.frames != 1 {
@@ -238,8 +260,13 @@ func TestOHOSPumpAnimation(t *testing.T) {
 	p.SetAnimating(false)
 	f.events, f.frames = nil, 0
 	p.Handle(ohosEvent{kind: ohosEvFrame})
+	// The frame requested by the previous tick may still arrive once.
 	if len(f.events) != 1 || f.frames != 0 {
-		t.Fatalf("stray vsync must draw once without starting another loop: events=%#v frames=%d", f.events, f.frames)
+		t.Fatalf("stopping animation must not request another frame: events=%#v frames=%d", f.events, f.frames)
+	}
+	p.Handle(ohosEvent{kind: ohosEvFrame})
+	if len(f.events) != 1 {
+		t.Fatalf("loop must stop after the in-flight frame: %#v", f.events)
 	}
 }
 
@@ -304,21 +331,26 @@ func TestOHOSPumpInput(t *testing.T) {
 func TestOHOSPumpClipboardAndInsets(t *testing.T) {
 	p, f := newTestPump()
 	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 7, w: 100, h: 100})
-	f.events = nil
+	p.Handle(ohosEvent{kind: ohosEvFrame})
+	f.events, f.frames = nil, 0
 	p.Handle(ohosEvent{kind: ohosEvClipboard, text: "text/plain", text2: "hello 中文"})
 	de := f.events[0].(transfer.DataEvent)
 	b, _ := io.ReadAll(de.Open())
 	if string(b) != "hello 中文" {
 		t.Fatalf("clipboard = %q", b)
 	}
-	f.events = nil
+	f.events, f.frames = nil, 0
 	p.Handle(ohosEvent{kind: ohosEvInsets, top: 20, right: 0, bottom: 40, left: 0})
+	if len(f.events) != 0 || f.frames != 1 {
+		t.Fatalf("insets must request a sync frame: events=%#v frames=%d", f.events, f.frames)
+	}
+	p.Handle(ohosEvent{kind: ohosEvFrame})
 	if len(f.events) != 1 {
-		t.Fatalf("insets must trigger a sync frame: %#v", f.events)
+		t.Fatalf("pending insets frame missing: %#v", f.events)
 	}
 	fe := f.events[0].(frameEvent)
-	if fe.Insets.Bottom != unit.Dp(20) || fe.Insets.Top != unit.Dp(10) {
-		t.Fatalf("insets = %+v", fe.Insets)
+	if !fe.Sync || fe.Insets.Bottom != unit.Dp(20) || fe.Insets.Top != unit.Dp(10) {
+		t.Fatalf("insets frame = %+v", fe)
 	}
 }
 
@@ -386,5 +418,47 @@ func TestOHOSPumpStopIsIdempotent(t *testing.T) {
 	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 1, w: 10, h: 10})
 	if len(f.events) != 0 || f.frames != 0 {
 		t.Fatalf("pump must be inert after Stop: events=%#v frames=%d", f.events, f.frames)
+	}
+}
+
+func TestOHOSPumpInvalidateCoalesces(t *testing.T) {
+	p, f := newTestPump()
+	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 7, w: 100, h: 100})
+	p.Handle(ohosEvent{kind: ohosEvFrame})
+	f.events, f.frames = nil, 0
+	p.Invalidate()
+	p.Invalidate()
+	p.Invalidate()
+	if f.frames != 1 {
+		t.Fatalf("invalidates must coalesce, frames=%d", f.frames)
+	}
+	p.Handle(ohosEvent{kind: ohosEvFrame})
+	if len(f.events) != 1 {
+		t.Fatalf("want one frame, got %#v", f.events)
+	}
+	p.Handle(ohosEvent{kind: ohosEvFrame})
+	if len(f.events) != 1 {
+		t.Fatalf("idle tick must not draw, got %#v", f.events)
+	}
+}
+
+func TestOHOSPumpConfigureKeepsSurfaceSize(t *testing.T) {
+	p, f := newTestPump()
+	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 7, w: 800, h: 600})
+	p.Handle(ohosEvent{kind: ohosEvFrame})
+	f.events, f.frames = nil, 0
+	p.Configure([]Option{Size(100, 100)})
+	if p.config.Size != image.Pt(800, 600) {
+		t.Fatalf("surface size must win, got %v", p.config.Size)
+	}
+	if f.frames != 1 {
+		t.Fatalf("configure must request a frame, got %d", f.frames)
+	}
+	if len(f.events) != 1 {
+		t.Fatalf("configure must emit ConfigEvent: %#v", f.events)
+	}
+	ce, ok := f.events[0].(ConfigEvent)
+	if !ok || ce.Config.Size != image.Pt(800, 600) {
+		t.Fatalf("ConfigEvent = %#v", f.events[0])
 	}
 }

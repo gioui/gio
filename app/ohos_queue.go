@@ -37,8 +37,8 @@ func (q *ohosQueue) push(e ohosEvent) bool {
 				*last = e
 				return true
 			}
-		case ohosEvConfigure:
-			if last.kind == ohosEvConfigure {
+		case ohosEvConfigure, ohosEvInvalidate:
+			if last.kind == e.kind {
 				*last = e
 				return true
 			}
@@ -90,7 +90,8 @@ func ohosEventCritical(k ohosEventKind) bool {
 	case ohosEvSurfaceCreated, ohosEvSurfaceChanged, ohosEvSurfaceDestroyed,
 		ohosEvLifecycle, ohosEvKey, ohosEvText, ohosEvFocus,
 		ohosEvPreedit, ohosEvIMEDelete, ohosEvIMEMove, ohosEvIMESelection,
-		ohosEvIMEEnter, ohosEvIMEKeyboard, ohosEvPickResult, ohosEvPickError:
+		ohosEvIMEEnter, ohosEvIMEKeyboard, ohosEvPickResult, ohosEvPickError,
+		ohosEvConfigure, ohosEvInsets, ohosEvInvalidate:
 		return true
 	}
 	return false
