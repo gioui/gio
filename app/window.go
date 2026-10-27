@@ -625,12 +625,16 @@ func (w *Window) processEvent(e event.Event) bool {
 	case wakeupEvent:
 		w.coalesced.wakeup = true
 	case frameEvent:
+		d := w.driver
+		if d == nil {
+			return false
+		}
 		if e2.Size == (image.Point{}) {
 			panic(errors.New("internal error: zero-sized Draw"))
 		}
 		w.metric = e2.Metric
 		w.hasNextFrame = false
-		e2.Frame = w.driver.Frame
+		e2.Frame = d.Frame
 		e2.Source = w.queue.Source()
 		// Prepare the decorations and update the frame insets.
 		viewport := image.Rectangle{
@@ -670,6 +674,8 @@ func (w *Window) processEvent(e event.Event) bool {
 		if q := w.timer.quit; q != nil {
 			q <- struct{}{}
 			<-q
+			w.timer.quit = nil
+			w.timer.update = nil
 		}
 		w.coalesced.destroy = &e2
 	case *ClosingEvent:

@@ -370,3 +370,21 @@ func TestOHOSDebugFlag(t *testing.T) {
 		t.Fatal("GIO_OHOS_DEBUG=false must disable diagnostics")
 	}
 }
+
+func TestOHOSPumpStopIsIdempotent(t *testing.T) {
+	p, f := newTestPump()
+	p.Stop()
+	p.Stop()
+	if len(f.events) != 1 {
+		t.Fatalf("Stop must deliver one DestroyEvent: %#v", f.events)
+	}
+	if _, ok := f.events[0].(DestroyEvent); !ok {
+		t.Fatalf("want DestroyEvent, got %#v", f.events)
+	}
+	f.events = nil
+	p.Handle(ohosEvent{kind: ohosEvTouch, action: 0, id: 1})
+	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 1, w: 10, h: 10})
+	if len(f.events) != 0 || f.frames != 0 {
+		t.Fatalf("pump must be inert after Stop: events=%#v frames=%d", f.events, f.frames)
+	}
+}

@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	"gioui.org/f32"
@@ -74,7 +75,13 @@ type window struct {
 	loop      *eventLoop
 	pump      *ohosPump
 
-	wakeupCh chan struct{}
+	qmu    sync.Mutex
+	queue  ohosQueue
+	closed atomic.Bool
+
+	wakeupCh    chan struct{}
+	done        chan struct{}
+	destroyOnce sync.Once
 
 	inputHint key.InputHint
 	textInput bool
@@ -83,60 +90,112 @@ type window struct {
 
 var ohosState = struct {
 	mu       sync.Mutex
-	queue    []ohosEvent
-	notify   chan struct{}
+	win      *window
+	staging  []ohosEvent
 	metric   unit.Metric
 	dataDir  string
 	cacheDir string
 }{
-	notify: make(chan struct{}, 1),
 	metric: unit.Metric{PxPerDp: 1, PxPerSp: 1},
 }
 
+// enqueueOhos routes a platform callback to the current window. Callbacks
+// that arrive before the first window are staged and handed over atomically
+// by newWindow; callbacks after destroy are dropped.
 func enqueueOhos(e ohosEvent) {
 	ohosState.mu.Lock()
-	ohosState.queue = append(ohosState.queue, e)
+	w := ohosState.win
+	if w == nil {
+		if len(ohosState.staging) < ohosQueueLimit || ohosEventCritical(e.kind) {
+			ohosState.staging = append(ohosState.staging, e)
+		}
+		ohosState.mu.Unlock()
+		return
+	}
 	ohosState.mu.Unlock()
+	w.enqueue(e)
+}
+
+// enqueue appends to this window's queue and wakes its loop.
+func (w *window) enqueue(e ohosEvent) {
+	if w.closed.Load() {
+		return
+	}
+	w.qmu.Lock()
+	if w.closed.Load() {
+		w.qmu.Unlock()
+		return
+	}
+	ok := w.queue.push(e)
+	w.qmu.Unlock()
+	if !ok {
+		return
+	}
 	select {
-	case ohosState.notify <- struct{}{}:
+	case w.wakeupCh <- struct{}{}:
 	default:
 	}
 }
 
-// drainEvents delivers every queued callback on the loop goroutine.
-func (w *window) drainEvents() {
-	for {
-		ohosState.mu.Lock()
-		if len(ohosState.queue) == 0 {
-			ohosState.mu.Unlock()
-			return
-		}
-		evs := ohosState.queue
-		ohosState.queue = nil
-		ohosState.mu.Unlock()
-		for _, e := range evs {
-			w.pump.Handle(e)
-		}
+// drainEvents handles one batch. It returns false when the queue is empty.
+func (w *window) drainEvents() bool {
+	w.qmu.Lock()
+	batch := w.queue.take()
+	w.qmu.Unlock()
+	if len(batch) == 0 {
+		return false
 	}
+	for _, e := range batch {
+		w.pump.Handle(e)
+	}
+	w.qmu.Lock()
+	w.queue.recycle(batch)
+	w.qmu.Unlock()
+	return true
 }
 
 func (w *window) loopRun(options []Option) {
 	w.pump.ApplyOptions(options)
 	for {
-		w.drainEvents()
+		for w.drainEvents() {
+			if w.pump.destroyed {
+				w.close()
+				return
+			}
+		}
 		select {
-		case <-ohosState.notify:
 		case <-w.wakeupCh:
 			w.loop.Wakeup()
 			w.loop.FlushEvents()
+		case <-w.done:
+			return
 		}
 	}
+}
+
+// close stops the loop and releases the window's queue. It is idempotent.
+func (w *window) close() {
+	w.destroyOnce.Do(func() {
+		ohosState.mu.Lock()
+		if ohosState.win == w {
+			ohosState.win = nil
+			ohosState.staging = nil
+		}
+		w.qmu.Lock()
+		w.closed.Store(true)
+		w.queue.clear()
+		w.qmu.Unlock()
+		ohosState.mu.Unlock()
+		w.loop.Close()
+		close(w.done)
+	})
 }
 
 func newWindow(callbacks *callbacks, options []Option) {
 	w := &window{
 		callbacks: callbacks,
 		wakeupCh:  make(chan struct{}, 1),
+		done:      make(chan struct{}),
 		inputHint: key.HintAny,
 	}
 	w.loop = newEventLoop(callbacks, w.wakeup)
@@ -150,9 +209,15 @@ func newWindow(callbacks *callbacks, options []Option) {
 	if metric.PxPerSp <= 0 {
 		metric.PxPerSp = metric.PxPerDp
 	}
+	w.pump = newOhosPump(w, metric)
+	staging := ohosState.staging
+	ohosState.staging = nil
+	ohosState.win = w
+	w.qmu.Lock()
+	w.queue.items = append(w.queue.items, staging...)
+	w.qmu.Unlock()
 	ohosState.mu.Unlock()
 
-	w.pump = newOhosPump(w, metric)
 	go w.loopRun(options)
 }
 
@@ -168,9 +233,14 @@ func (w *window) ProcessEvent(e event.Event) { w.deliver(e) }
 // calls from driver functions are safe because eventLoop.FlushEvents guards
 // against nested delivery.
 func (w *window) deliver(e event.Event) {
-	if !w.callbacks.ProcessEvent(e) {
-		return
+	if w.closed.Load() {
+		if _, ok := e.(DestroyEvent); !ok {
+			return
+		}
 	}
+	// Always flush: ConfigEvent and other coalesced events may report
+	// "not handled" but still need to reach the client.
+	w.callbacks.ProcessEvent(e)
 	w.loop.FlushEvents()
 }
 
@@ -178,7 +248,12 @@ func (w *window) Event() event.Event { return w.loop.Event() }
 
 func (w *window) Invalidate() { w.loop.Invalidate() }
 
-func (w *window) Run(f func()) { w.loop.Run(f) }
+func (w *window) Run(f func()) {
+	if w.closed.Load() {
+		return
+	}
+	w.loop.Run(f)
+}
 
 func (w *window) Frame(frame *op.Ops) { w.loop.Frame(frame) }
 
@@ -198,34 +273,49 @@ func (w *window) NewContext() (context, error) {
 
 func (w *window) SetAnimating(anim bool) {
 	w.animating = anim
-	enqueueOhos(ohosEvent{kind: ohosEvSetAnimating, anim: anim})
+	w.enqueue(ohosEvent{kind: ohosEvSetAnimating, anim: anim})
 }
 
 func (w *window) Configure(options []Option) {
-	enqueueOhos(ohosEvent{kind: ohosEvConfigure, opts: options})
+	w.enqueue(ohosEvent{kind: ohosEvConfigure, opts: options})
 }
 
 func (w *window) SetCursor(cursor pointer.Cursor) {
+	if w.closed.Load() {
+		return
+	}
 	C.gio_call_set_cursor(C.int(ohosCursorNumber(cursor)))
 }
 
 func (w *window) ShowTextInput(show bool) {
+	if w.closed.Load() {
+		return
+	}
 	w.textInput = show
 	C.gio_call_show_keyboard(boolInt(show))
 }
 
 func (w *window) SetInputHint(hint key.InputHint) {
+	if w.closed.Load() {
+		return
+	}
 	w.inputHint = hint
 	C.gio_call_ime_config(C.int(ohosInputHint(hint)))
 }
 
 func (w *window) ReadClipboard() {
+	if w.closed.Load() {
+		return
+	}
 	mime := C.CString("text/plain")
 	defer C.free(unsafe.Pointer(mime))
 	C.gio_call_get_clipboard(mime)
 }
 
 func (w *window) WriteClipboard(mime string, s []byte) {
+	if w.closed.Load() {
+		return
+	}
 	cmime := C.CString(mime)
 	defer C.free(unsafe.Pointer(cmime))
 	ctext := C.CString(string(s))
@@ -234,8 +324,11 @@ func (w *window) WriteClipboard(mime string, s []byte) {
 }
 
 func (w *window) Perform(actions system.Action) {
+	if w.closed.Load() {
+		return
+	}
 	if actions&system.ActionClose != 0 {
-		w.deliver(DestroyEvent{})
+		w.enqueue(ohosEvent{kind: ohosEvLifecycle, life: ohosDestroyed})
 	}
 }
 

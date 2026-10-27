@@ -133,8 +133,9 @@ type ohosPump struct {
 	life       ohosLifecycle
 	surfaceWin uintptr
 
-	// destroySent avoids delivering DestroyEvent twice.
-	destroySent bool
+	// destroyed is set exactly once by Stop. After it is set the pump
+	// ignores all further callbacks.
+	destroyed bool
 
 	// activeTouches 是当前按下的触点。axis pinch 只在没有触点时接受
 	// （触控板）；单指触摸会错误上报 pinch，双指由原生 pointer 处理。
@@ -162,6 +163,9 @@ func newOhosPump(sink ohosSink, metric unit.Metric) *ohosPump {
 
 // Handle processes one platform callback.
 func (p *ohosPump) Handle(e ohosEvent) {
+	if p.destroyed {
+		return
+	}
 	switch e.kind {
 	case ohosEvSurfaceCreated:
 		p.surface(e.win, e.w, e.h, true)
@@ -265,7 +269,7 @@ func (p *ohosPump) surfaceInfo() (uintptr, image.Point) {
 
 // Invalidate requests a frame.  Background windows produce none.
 func (p *ohosPump) Invalidate() {
-	if p.life != ohosForeground || !p.valid || p.config.Size == (image.Point{}) {
+	if p.destroyed || p.life != ohosForeground || !p.valid || p.config.Size == (image.Point{}) {
 		return
 	}
 	p.frame(false)
@@ -276,7 +280,7 @@ func (p *ohosPump) Invalidate() {
 
 // SetAnimating starts/stops the vsync loop.
 func (p *ohosPump) SetAnimating(anim bool) {
-	if p.animating == anim {
+	if p.destroyed || p.animating == anim {
 		return
 	}
 	p.animating = anim
@@ -287,7 +291,7 @@ func (p *ohosPump) SetAnimating(anim bool) {
 
 // tick is a vsync callback from the shim.
 func (p *ohosPump) tick() {
-	if p.life != ohosForeground || !p.valid {
+	if p.destroyed || p.life != ohosForeground || !p.valid {
 		return
 	}
 	// 每个 vsync 回调都要出帧：静态界面由 touch/axis 等事件请求单帧，
@@ -299,7 +303,7 @@ func (p *ohosPump) tick() {
 }
 
 func (p *ohosPump) frame(sync bool) {
-	if !p.valid || p.config.Size.X <= 0 || p.config.Size.Y <= 0 {
+	if p.destroyed || !p.valid || p.config.Size.X <= 0 || p.config.Size.Y <= 0 {
 		return
 	}
 	p.sink.ohosDeliver(frameEvent{
@@ -357,11 +361,18 @@ func (p *ohosPump) setLifecycle(l ohosLifecycle) {
 		}
 	case ohosDestroyed:
 		p.life = ohosDestroyed
-		if !p.destroySent {
-			p.destroySent = true
-			p.sink.ohosDeliver(DestroyEvent{})
-		}
+		p.Stop()
 	}
+}
+
+// Stop delivers DestroyEvent once and makes the pump inert. It is called
+// from the loop goroutine.
+func (p *ohosPump) Stop() {
+	if p.destroyed {
+		return
+	}
+	p.destroyed = true
+	p.sink.ohosDeliver(DestroyEvent{})
 }
 
 // touch translates a pointer callback.  action: 0 down, 1 move, 2 up, 3 cancel.

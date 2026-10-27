@@ -6,6 +6,7 @@ import (
 	"errors"
 	"image"
 	"image/color"
+	"sync"
 
 	"gioui.org/io/event"
 	"gioui.org/io/key"
@@ -157,6 +158,10 @@ type eventLoop struct {
 	frameAck chan struct{}
 	// delivering avoids re-entrant event delivery.
 	delivering bool
+	// done is closed when the backend loop stops. It lets client-side
+	// calls such as Run and Frame return instead of blocking forever.
+	done      chan struct{}
+	closeOnce sync.Once
 }
 
 type frameEvent struct {
@@ -252,14 +257,27 @@ func newEventLoop(w *callbacks, wakeup func()) *eventLoop {
 		frames:               make(chan *op.Ops),
 		frameAck:             make(chan struct{}),
 		driverFuncs:          make(chan func(), 1),
+		done:                 make(chan struct{}),
 	}
+}
+
+// Close marks the loop as stopped. It is safe to call more than once.
+func (e *eventLoop) Close() {
+	e.closeOnce.Do(func() { close(e.done) })
 }
 
 // Frame receives a frame and waits for its processing. It is called by
 // the client goroutine.
 func (e *eventLoop) Frame(frame *op.Ops) {
-	e.frames <- frame
-	<-e.frameAck
+	select {
+	case e.frames <- frame:
+	case <-e.done:
+		return
+	}
+	select {
+	case <-e.frameAck:
+	case <-e.done:
+	}
 }
 
 // Event returns the next available event. It is called by the client
@@ -292,8 +310,25 @@ func (e *eventLoop) Invalidate() {
 
 // Run f in the window loop thread. It is called by the client goroutine.
 func (e *eventLoop) Run(f func()) {
-	e.driverFuncs <- f
+	select {
+	case <-e.done:
+		return
+	default:
+	}
+	ran := make(chan struct{})
+	select {
+	case e.driverFuncs <- func() {
+		defer close(ran)
+		f()
+	}:
+	case <-e.done:
+		return
+	}
 	e.wakeup()
+	select {
+	case <-ran:
+	case <-e.done:
+	}
 }
 
 // FlushEvents delivers pending events to the client.
@@ -335,6 +370,8 @@ func (e *eventLoop) deliverEvent(evt event.Event) {
 			e.win.Invalidate()
 		case <-e.immediateInvalidates:
 			e.win.Invalidate()
+		case <-e.done:
+			return
 		}
 	}
 }
