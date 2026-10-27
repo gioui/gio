@@ -30,8 +30,6 @@ public final class GioActivity extends Activity {
             ));
             view.setFocusable(true);
             view.setFocusableInTouchMode(true);
-			view.setOutlineProvider(null);
-			view.setZ(Float.MAX_VALUE);
 
             layer.addView(view);
             setContentView(layer);

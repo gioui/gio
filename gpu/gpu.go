@@ -633,7 +633,8 @@ func createColorPrograms(b driver.Device, vsSrc shader.Sources, fsSrc [3]shader.
 	}
 	// Clear blend: result = src = transparent (blending disabled).
 	clearBlend := driver.BlendDesc{
-		Enable: false,
+		SrcFactor: driver.BlendFactorOne,
+		DstFactor: driver.BlendFactorZero,
 	}
 	layout := driver.VertexLayout{
 		Inputs: []driver.InputDesc{
@@ -1350,8 +1351,8 @@ func (r *renderer) drawOps(isFBO bool, opOff, viewport image.Point, ops []imageO
 				drc := f32.FRect(img.clip.Add(opOff))
 				embedRegions.Pass = append(embedRegions.Pass, drc)
 
-				for j := i + 1; i < len(ops); i++ {
-					img := ops[i]
+				for j := i + 1; j < len(ops); j++ {
+					img := ops[j]
 					// Skip embed ops and transparent ops.
 					if img.material.material == materialEmbed || img.material.opacity == 0 {
 						j += img.layerOps
@@ -1507,11 +1508,11 @@ func gradientSpaceTransform(clip image.Rectangle, off f32.Point, stop1, stop2 f3
 	// TODO: optimize
 	zp := f32.Point{}
 	return f32.AffineId().
-		Scale(zp, layout.FPt(clip.Size())).            // scale to pixel space
+		Scale(zp, layout.FPt(clip.Size())). // scale to pixel space
 		Offset(zp.Sub(off).Add(layout.FPt(clip.Min))). // offset to clip space
-		Offset(zp.Sub(stop1)).                         // offset to first stop point
-		Rotate(zp, a).                                 // rotate to align gradient
-		Scale(zp, f32.Pt(1/l, 1/l))                    // scale gradient to right size
+		Offset(zp.Sub(stop1)). // offset to first stop point
+		Rotate(zp, a). // rotate to align gradient
+		Scale(zp, f32.Pt(1/l, 1/l)) // scale gradient to right size
 }
 
 // clipSpaceTransform returns the scale and offset that transforms the given

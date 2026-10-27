@@ -130,6 +130,7 @@ import (
 	"runtime"
 	"runtime/cgo"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -181,6 +182,8 @@ type window struct {
 
 	// embedRegions tracks areas for hit testing.
 	embedRegions gpu.EmbedRegions
+	// embedViews owns the last positions and order applied to native views.
+	embedViews []gpu.EmbedView
 }
 
 // gioView hold cached JNI methods for GioView.
@@ -205,7 +208,6 @@ var gioView struct {
 	restartInput         C.jmethodID
 	updateSelection      C.jmethodID
 	updateCaret          C.jmethodID
-	updateLayout         C.jmethodID
 	setEmbedViewPosition C.jmethodID
 }
 
@@ -497,8 +499,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 		m.restartInput = getMethodID(env, class, "restartInput", "()V")
 		m.updateSelection = getMethodID(env, class, "updateSelection", "()V")
 		m.updateCaret = getMethodID(env, class, "updateCaret", "(FFFFFFFFFF)V")
-		m.updateLayout = getMethodID(env, class, "updateLayout", "()V")
-		m.setEmbedViewPosition = getMethodID(env, class, "setEmbedViewPosition", "(Landroid/view/View;IIIII)Z")
+		m.setEmbedViewPosition = getMethodID(env, class, "setEmbedViewPosition", "(Landroid/view/View;IIIII)V")
 	})
 	view = C.jni_NewGlobalRef(env, view)
 	wopts := <-mainWindow.out
@@ -524,6 +525,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 	}
 	w.view = view
 	w.visible = false
+	w.embedViews = w.embedViews[:0]
 	w.handle = cgo.NewHandle(w)
 	w.loadConfig(env, class)
 	w.setConfig(env, cnf)
@@ -557,14 +559,14 @@ func Java_org_gioui_GioView_onStartView(env *C.JNIEnv, class C.jclass, handle C.
 //export Java_org_gioui_GioView_onSurfaceDestroyed
 func Java_org_gioui_GioView_onSurfaceDestroyed(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := cgo.Handle(handle).Value().(*window)
-	w.win = nil
 	w.visible = false
+	w.setNativeWindow(nil)
 }
 
 //export Java_org_gioui_GioView_onSurfaceChanged
 func Java_org_gioui_GioView_onSurfaceChanged(env *C.JNIEnv, class C.jclass, handle C.jlong, surf C.jobject) {
 	w := cgo.Handle(handle).Value().(*window)
-	w.win = C.ANativeWindow_fromSurface(env, surf)
+	w.setNativeWindow(C.ANativeWindow_fromSurface(env, surf))
 	if w.started {
 		w.setVisible(env)
 	}
@@ -819,10 +821,22 @@ func (w *window) semIDFor(virtID C.jint) input.SemanticID {
 
 func (w *window) detach(env *C.JNIEnv) {
 	callVoidMethod(env, w.view, gioView.unregister)
+	w.visible = false
 	w.processEvent(AndroidViewEvent{})
+	w.setNativeWindow(nil)
+	w.embedViews = w.embedViews[:0]
+	w.embedRegions = gpu.EmbedRegions{}
 	w.handle.Delete()
 	C.jni_DeleteGlobalRef(env, w.view)
 	w.view = 0
+}
+
+// setNativeWindow takes ownership of the reference acquired by ANativeWindow_fromSurface.
+func (w *window) setNativeWindow(win *C.ANativeWindow) {
+	if w.win != nil {
+		C.ANativeWindow_release(w.win)
+	}
+	w.win = win
 }
 
 func (w *window) setVisible(env *C.JNIEnv) {
@@ -928,19 +942,18 @@ func (w *window) draw(env *C.JNIEnv, sync bool) {
 	}
 
 	currentRegions, lostRegions := w.callbacks.EmbeddedRegions()
-	var needsUpdate bool
-	for index, region := range currentRegions.Views {
-		if ok, _ := callBooleanMethod(env, w.view, gioView.setEmbedViewPosition, jvalue(region.View), jvalue(region.Area.Min.X), jvalue(region.Area.Min.Y), jvalue(region.Area.Dx()), jvalue(region.Area.Dy()), jvalue(index+1)); ok {
-			needsUpdate = true
+	if !slices.Equal(currentRegions.Views, w.embedViews) {
+		for index, region := range currentRegions.Views {
+			if err := callVoidMethod(env, w.view, gioView.setEmbedViewPosition, jvalue(region.View), jvalue(region.Area.Min.X), jvalue(region.Area.Min.Y), jvalue(region.Area.Dx()), jvalue(region.Area.Dy()), jvalue(index+1)); err != nil {
+				panic(err)
+			}
 		}
+		w.embedViews = append(w.embedViews[:0], currentRegions.Views...)
 	}
 	for _, lost := range lostRegions {
-		if ok, _ := callBooleanMethod(env, w.view, gioView.setEmbedViewPosition, jvalue(lost.View), jvalue(0), jvalue(0), jvalue(0), jvalue(0), jvalue(0)); ok {
-			needsUpdate = true
+		if err := callVoidMethod(env, w.view, gioView.setEmbedViewPosition, jvalue(lost.View), jvalue(0), jvalue(0), jvalue(0), jvalue(0), jvalue(0)); err != nil {
+			panic(err)
 		}
-	}
-	if needsUpdate {
-		callVoidMethod(env, w.view, gioView.updateLayout)
 	}
 	w.embedRegions = currentRegions
 }

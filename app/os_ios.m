@@ -353,7 +353,7 @@ void gio_setEmbedViewPosition(CFTypeRef viewRef, CFTypeRef viewID, int x, int y,
 // and its GioViewController cannot be created a second time.
 static UIWindow *sceneWindow;
 
-@interface _gioAppDelegate : UIResponder <UIApplicationDelegate>
+@interface _gioSceneDelegate : UIResponder <UIWindowSceneDelegate>
 @property (strong, nonatomic) UIWindow *window;
 @end
 

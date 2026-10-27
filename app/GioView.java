@@ -14,6 +14,7 @@ import android.app.FragmentTransaction;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
@@ -28,6 +29,7 @@ import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Choreographer;
 import android.view.Display;
+import android.view.Gravity;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -36,8 +38,8 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowInsets;
 import android.view.Surface;
-import android.view.TextureView;
-import android.graphics.SurfaceTexture;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.Window;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
@@ -60,10 +62,10 @@ import android.widget.FrameLayout;
 
 import java.io.UnsupportedEncodingException;
 
-public final class GioView extends TextureView implements Choreographer.FrameCallback {
+public final class GioView extends SurfaceView implements Choreographer.FrameCallback {
 	private static boolean jniLoaded;
 
-
+	private final SurfaceHolder.Callback surfCallbacks;
 	private final InputMethodManager imm;
 	private final float scrollXScale;
 	private final float scrollYScale;
@@ -86,7 +88,13 @@ public final class GioView extends TextureView implements Choreographer.FrameCal
 		// Late initialization of the Go runtime to wait for a valid context.
 		Gio.init(context.getApplicationContext());
 
-		setOpaque(false);
+		setZOrderOnTop(true);
+		setBackgroundColor(Color.TRANSPARENT);
+		getHolder().setFormat(PixelFormat.RGBA_8888);
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+			setOutlineProvider(null);
+			setZ(Float.MAX_VALUE);
+		}
 
 		ViewConfiguration conf = ViewConfiguration.get(context);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -113,21 +121,22 @@ public final class GioView extends TextureView implements Choreographer.FrameCal
 		nhandle = onCreateView(this);
 		setFocusable(true);
 		setFocusableInTouchMode(true);
-		setSurfaceTextureListener(new SurfaceTextureListener() {
-			@Override public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-				onSurfaceChanged(nhandle, new Surface(surface));
+		surfCallbacks = new SurfaceHolder.Callback() {
+			@Override public void surfaceCreated(SurfaceHolder holder) {
+				// surfaceChanged follows immediately.
 			}
-			@Override public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-				onSurfaceChanged(nhandle, new Surface(surface));
+			@Override public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+				if (nhandle != 0) {
+					onSurfaceChanged(nhandle, holder.getSurface());
+				}
 			}
-			@Override public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-				onSurfaceDestroyed(nhandle);
-				return true;
+			@Override public void surfaceDestroyed(SurfaceHolder holder) {
+				if (nhandle != 0) {
+					onSurfaceDestroyed(nhandle);
+				}
 			}
-			@Override public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-				// Ignore.
-			}
-		});
+		};
+		getHolder().addCallback(surfCallbacks);
 	}
 
 	@Override public boolean onKeyDown(int keyCode, KeyEvent event) {
@@ -514,6 +523,8 @@ public final class GioView extends TextureView implements Choreographer.FrameCal
 
 	protected void unregister() {
 		setOnFocusChangeListener(null);
+		Choreographer.getInstance().removeFrameCallback(this);
+		getHolder().removeCallback(surfCallbacks);
 		nhandle = 0;
 	}
 
@@ -567,55 +578,52 @@ public final class GioView extends TextureView implements Choreographer.FrameCal
 		imm.updateCursorAnchorInfo(this, inf);
 	}
 
-	boolean setEmbedViewPosition(View view, int x, int y, int w, int h, int zOrder) {
-		boolean isLayoutUpdated = false;
-		
+	void setEmbedViewPosition(View view, int x, int y, int w, int h, int zOrder) {
 		if (zOrder == 0) {
 			view.setVisibility(View.GONE);
-			view.requestLayout();
-			return true;
+			return;
 		}
 		
 		if (view.getVisibility() != View.VISIBLE) {
 			view.setVisibility(View.VISIBLE);
-			isLayoutUpdated = true;
 		}
 		
-		if (view.getZ() != (float) zOrder) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && view.getZ() != (float) zOrder) {
 			// Suppress any outline-based drop shadow the Z value would produce.
 			view.setOutlineProvider(null);
 			view.setZ((float) zOrder);
-			isLayoutUpdated = true;
 		}
 
-		ViewGroup.LayoutParams lp = view.getLayoutParams();
-		if (lp == null || lp.width != w || lp.height != h) {
-			view.setLayoutParams(new FrameLayout.LayoutParams(w, h));
-			isLayoutUpdated = true;
+		ViewGroup.LayoutParams params = view.getLayoutParams();
+		FrameLayout.LayoutParams lp = params instanceof FrameLayout.LayoutParams ? (FrameLayout.LayoutParams)params : null;
+		// Fix the layout origin so resizing cannot move a centered/gravity-aligned
+		// view after applying its translation. Movement alone needs no layout pass.
+		if (lp == null || lp.width != w || lp.height != h || lp.gravity != (Gravity.TOP | Gravity.LEFT) ||
+				lp.leftMargin != 0 || lp.topMargin != 0 || lp.rightMargin != 0 || lp.bottomMargin != 0 ||
+				(Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 &&
+				 (lp.getMarginStart() != 0 || lp.getMarginEnd() != 0))) {
+			view.setLayoutParams(new FrameLayout.LayoutParams(w, h, Gravity.TOP | Gravity.LEFT));
 		}
 
-		int oldX = (int) view.getX();
-		int oldY = (int) view.getY();
-		if (oldX != x || oldY != y) {
-			view.setX(x);
-			view.setY(y);
-			isLayoutUpdated = true;
+		ViewGroup parent = (ViewGroup)view.getParent();
+		int translationX = x - (parent != null ? parent.getPaddingLeft() : 0);
+		int translationY = y - (parent != null ? parent.getPaddingTop() : 0);
+		if (view.getTranslationX() != translationX || view.getTranslationY() != translationY) {
+			view.setTranslationX(translationX);
+			view.setTranslationY(translationY);
 		}
 
-		if (isLayoutUpdated) {
-			view.invalidate();
-			view.requestLayout();
-			this.invalidate();
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+			// Before elevation support, use sibling order for drawing and hit testing.
+			view.bringToFront();
+			bringToFront();
 		}
-
-		return isLayoutUpdated;
 	}
 
 	public void updateLayout() {
 		ViewGroup parent = (ViewGroup) this.getParent();
-		if (parent != null) {
+		if (parent != null && parent.indexOfChild(this) != parent.getChildCount() - 1) {
 			parent.bringChildToFront(this);
-			parent.forceLayout();
 		}
 	}
 
