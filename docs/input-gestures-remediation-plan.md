@@ -1,9 +1,73 @@
 # 跨平台触控板与手势优化提升方案
 
 > 依据：[input-gestures-cross-platform.md](input-gestures-cross-platform.md) 的矩阵、源码复核与平台 API 结论。
-> 状态：方案文档，暂未修改源码。
+> 状态：实施中；已完成部分与剩余工作见 §0.0。
 > 目标：把 Gio 从“鼠标/触摸 + Scroll”升级为“可区分设备、可拿语义手势、可回退识别”的输入模型，并修正 Windows/macOS/Wayland/OHOS 的具体缺口。
 > 实施进展（2026-10-27）：事件模型与语义手势路由、macOS pinch/rotate/swipe、OHOS axis pinch、Windows PT_* 分类/触控板注册 + WM_GESTURE pinch/rotate、gesture.Pinch/Rotate/Swipe/Hold 回退识别器已落地；Wayland、Windows Precision Touchpad 的 InteractionContext、Android/iOS/Web 接线仍待做。
+
+## 0.0 执行状态（截至 2026-10-27）
+
+> 本次允许破坏性升级，不保留兼容开关。以下按已提交代码与可执行测试更新。
+
+### 已提交
+
+| 提交 | 内容 |
+|---|---|
+| `17f09a28` | pointer 事件模型：SourceTrackpad/Pen、Pinch/Rotate/Swipe/Hold、GestureID/Phase/Scale/Rotation/Swipe/Fingers、语义手势路由 |
+| `7b276e23` | gesture.Pinch/Rotate 回退识别器 |
+| `89616c02` | gesture.Swipe/Hold 回退识别器 |
+| `6c8c4a29` | Windows PT_* 分类、Precision Touchpad 注册、WM_GESTURE pinch/rotate |
+| `da4360a8` | 删除 macOS magnify-to-scroll 旧工具 |
+
+### 已完成
+
+| 模块 | 状态 | 证据/限制 |
+|---|---|---|
+| WP0 安全网 | 部分 | 旧 Press/Move/Scroll 测试保持全绿；尚无完整 golden trace 回放 |
+| WP1 事件模型与路由 | 完成 | `io/pointer`、`io/input` 单测；旧 Filter 不收新 Kind |
+| WP1 gesture 回退 | 完成 | Pinch/Rotate/Swipe/Hold 有 host 测试；未接各后端 |
+| WP2 Windows 来源/注册 | 完成 | PT_TOUCHPAD/PT_PEN/PT_TOUCH 分类；RegisterTouchpadCapableWindow |
+| WP2 Windows 触摸屏手势 | 完成 | WM_GESTURE zoom/rotate；GID_ROTATE 32768/圈换算；仅交叉编译+转换单测 |
+| WP3 macOS 语义手势 | 完成（代码） | magnify/rotate/swipe、NSEventPhase；已编译测试，未做硬件手势验收 |
+| WP5 OHOS pinch | 完成（Go） | axis pinch → Pinch；host/race 测试；未做真机多指验收 |
+| 文档 | 完成 | 本文件 + [input-gestures-cross-platform.md](input-gestures-cross-platform.md) |
+
+### 剩余工作
+
+| 优先级 | 工作包 | 剩余内容 | 估算 | 依赖/阻塞 |
+|---|---|---|---|---|
+| P0 | WP4 Wayland | bind `zwp_pointer_gestures_v1`；pinch/swipe/hold；保留 `axis_source` | 4 天 | 需要 Linux + Wayland 头/wayland-scanner；本机没有 |
+| P0 | WP2 Windows 触控板 | `InteractionContext`/触控板帧解析，输出 pinch/rotate/pan | 3 天 | 需要 Precision Touchpad 设备验证 |
+| P1 | WP5 OHOS 全量 | rotate/swipe/hold 合成或 shim 转发；可选 gesture 导出 | 3 天 Go + 3 天 shim | 需要 OHOS 多点/2in1 设备 |
+| P1 | WP6 Android/iOS | 原生 ScaleGestureDetector/UIGestureRecognizer 或后端接入 gesture 包；iPad 间接指针/hover | 4 天 | 需要 Android/iPad 设备 |
+| P2 | WP7 Web | Pointer Events 优先、wheel ctrl 回退、Safari GestureEvent、touch-action | 2 天 | 需要浏览器矩阵 |
+| P2 | WP8 仲裁/能力 | pointer.Capabilities；Windows 全局手势 opt-in；各平台系统手势说明 | 3 天 | 需先完成平台接入 |
+| P2 | WP9 测试/CI | 后端事件 golden trace；真机矩阵；CI 手势测试 | 3 天 | 依赖设备 |
+| P3 | M4 长尾 | Pen 压力/倾斜、原始触控板帧、触觉 | 1–2 周 | 单独立项 |
+
+**剩余合计**：约 22 Go 人日 + 3 天 shim；单人含缓冲约 5 周，双人约 3 周。
+
+### 建议执行顺序
+
+1. **Wayland**：完成 M1 最后一个桌面平台；需要 Linux 开发环境。
+2. **Windows InteractionContext**：补齐 Precision Touchpad，而不只触摸屏 WM_GESTURE。
+3. **OHOS rotate/swipe/hold**：完成 M2 的 OHOS 手势矩阵。
+4. **Android/iOS**：把已完成的 gesture 回退包接到后端，或接原生识别器。
+5. **Web**、**仲裁/能力**、**真机矩阵**。
+6. **Pen/原始帧**按需进入 M4。
+
+### 当前验证现状
+
+| 检查 | 结果 |
+|---|---|
+| `go test ./...` | 通过 |
+| `go test ./gesture` | 通过 |
+| `go test ./app -run TestWindowsGestureState` | 通过 |
+| `go test ./app -tags gio_ohos_test` / `-race` | 通过 |
+| Windows `go test -c` | 通过 |
+| macOS 后端编译/测试 | 通过 |
+| OHOS arm64 交叉编译 | 通过 |
+| 新增语义手势真机验收 | **未完成**（macOS/Windows/OHOS 只有编译或 host 测试） |
 
 ---
 
@@ -66,7 +130,7 @@
 - **可回退**：没有原生语义手势的平台，可用 gesture 包从原始多点识别。
 - **可仲裁**：应用能 opt-in；系统保留手势不被破坏。
 - **可测试**：router、gesture 状态机、后端映射都有 host 测试；真机有清单。
-- **可迁移**：旧应用不 opt-in 时行为不变；macOS 旧 Ctrl+Scroll 有过渡开关。
+- **可迁移**：旧应用不 opt-in 时行为不变；本次不做 macOS Ctrl+Scroll 过渡兼容。
 
 ### 1.2 非目标
 
@@ -454,7 +518,7 @@ func Capabilities() Capabilities
 
 ---
 
-## 8. 兼容与迁移
+## 8. 破坏性变更与迁移
 
 本次允许破坏性升级，**不保留兼容性开关**：
 
