@@ -45,9 +45,18 @@
 ### 4.3 交互
 
 - 点击“文件”菜单：菜单展开正常。
-- 点击“打开…”：系统文件选择器打开，列出 PDF。
-- 文件选择器内点击/选择在当前 `uitest` 注入下未生效（UI 未变化），但 picker 本身已由 Gio 调起。
+- 点击“打开…”：系统文件选择器打开，列出 PDF；用户确认 PDF 可正常打开。
 - 关闭文档后显示“未打开文档”空状态，说明菜单/页面状态更新链路正常。
+- 用户确认：横竖屏切换后页面重排、状态栏/导航条 Insets 正常。
+- 用户确认：中文 IME 正常；emoji 原为方框。
+
+### 4.4 Emoji 修复
+
+- 原因：应用 `internal/ui/theme` 只注册了 Go 默认字体 + CJK 字体，没有注册系统 emoji 字体。
+- Gio `text.Shaper` 已支持 CBDT/CBLC 位图字形（`Bitmaps`）；补上
+  `/system/fonts/HMOSColorEmojiCompat.ttf`、`HMOSColorEmojiFlags.ttf` 候选即可。
+- 已提交 gpofd 侧修复 `3901af0`（theme.go + theme_test.go）。
+- 真机复测：在“注释 → 批注内容”输入 `😀中文🎉`，彩色 emoji 与中文均正常显示。
 
 ## 5. 未验证项
 
