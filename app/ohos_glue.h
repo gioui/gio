@@ -69,6 +69,9 @@ typedef struct gio_ohos_host_v3 {
     void (*start_window_move)(void *user);
 
     /* Accessibility. */
+    /* Clipboard with explicit length, safe for NUL bytes. */
+    void (*set_clipboard_data)(void *user, const char *mime, const void *data, int length);
+
     void (*semantics_update)(void *user, const char *json, int length);
     void (*semantics_announce)(void *user, const char *text);
 
@@ -94,6 +97,8 @@ void gio_ohos_set_buffer_format(void *window, int format);
  * tolerate a missing host/entry. */
 void gio_call_show_keyboard(int show);
 void gio_call_set_clipboard(const char *mime, const char *text);
+/* Returns 1 when the shim supports length-delimited clipboard data. */
+int gio_call_set_clipboard_data(const char *mime, const void *data, int length);
 void gio_call_get_clipboard(const char *mime);
 void gio_call_set_cursor(int cursor);
 void gio_call_invalidate(void);
@@ -167,6 +172,8 @@ void gio_ohos_pick_error(int mode, char *msg);
 void gio_ohos_window_mode(int mode);        /* 0 windowed 1 fullscreen 2 minimized 3 maximized */
 void gio_ohos_orientation(int orientation); /* 0 any 1 landscape 2 portrait */
 void gio_ohos_density(float density, float fontScale);
+void gio_ohos_drop(char *uris_json);            /* JSON array of absolute paths */
+void gio_ohos_clipboard_data(char *mime, void *data, int length);
 
 #ifdef __cplusplus
 }

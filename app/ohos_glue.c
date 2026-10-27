@@ -93,6 +93,14 @@ void gio_call_set_clipboard(const char *mime, const char *text) {
     GIO_HOST_CALL(set_clipboard, mime, text);
 }
 
+int gio_call_set_clipboard_data(const char *mime, const void *data, int length) {
+    if (gio_host_ready && gio_host_abi >= GIO_OHOS_ABI_VERSION && gio_host_v3.set_clipboard_data != NULL) {
+        gio_host_v3.set_clipboard_data(gio_host_v3.v2.user, mime, data, length);
+        return 1;
+    }
+    return 0;
+}
+
 void gio_call_get_clipboard(const char *mime) {
     GIO_HOST_CALL(get_clipboard, mime);
 }

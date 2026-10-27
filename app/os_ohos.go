@@ -21,6 +21,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -378,6 +379,9 @@ func (w *window) WriteClipboard(mime string, s []byte) {
 	}
 	cmime := C.CString(mime)
 	defer C.free(unsafe.Pointer(cmime))
+	if len(s) > 0 && C.gio_call_set_clipboard_data(cmime, unsafe.Pointer(&s[0]), C.int(len(s))) != 0 {
+		return
+	}
 	ctext := C.CString(string(s))
 	defer C.free(unsafe.Pointer(ctext))
 	C.gio_call_set_clipboard(cmime, ctext)
@@ -629,6 +633,20 @@ func gio_ohos_clipboard(mime, text *C.char) {
 	enqueueOhos(ohosEvent{kind: ohosEvClipboard, text: cString(mime), text2: cString(text)})
 }
 
+//export gio_ohos_clipboard_data
+func gio_ohos_clipboard_data(mime *C.char, data unsafe.Pointer, length C.int) {
+	enqueueOhos(ohosEvent{
+		kind: ohosEvClipboardData,
+		text: cString(mime),
+		data: C.GoBytes(data, length),
+	})
+}
+
+//export gio_ohos_drop
+func gio_ohos_drop(uris *C.char) {
+	enqueueOhos(ohosEvent{kind: ohosEvDrop, text: cString(uris)})
+}
+
 //export gio_ohos_lifecycle
 func gio_ohos_lifecycle(state C.int) {
 	enqueueOhos(ohosEvent{kind: ohosEvLifecycle, life: ohosLifecycle(state)})
@@ -747,6 +765,15 @@ func (p *ohosPickBridge) deliver(mode int, uris []string, errMsg string) {
 // delivered to the handler installed by SetOHOSPickHandler.
 func OHOSPickFile(mode int) {
 	C.gio_call_pick_file(C.int(mode))
+}
+
+// OHOSPickFileWithOptions asks for a picker filtered by MIME types. multiple
+// allows selecting more than one file. Requires shim ABI 3; older shims
+// fall back to OHOSPickFile behavior.
+func OHOSPickFileWithOptions(mode int, mimes []string, multiple bool) {
+	cmimes := C.CString(strings.Join(mimes, ","))
+	defer C.free(unsafe.Pointer(cmimes))
+	C.gio_call_pick_file_ex(C.int(mode), cmimes, boolInt(multiple))
 }
 
 // OHOSLog forwards a message to hilog through the shim.

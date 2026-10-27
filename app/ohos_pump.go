@@ -5,6 +5,8 @@
 package app
 
 import (
+	"bytes"
+	"encoding/json"
 	"image"
 	"io"
 	"strings"
@@ -76,6 +78,8 @@ const (
 	ohosEvWindowMode
 	ohosEvOrientation
 	ohosEvMetric
+	ohosEvDrop
+	ohosEvClipboardData
 )
 
 // ohosEvent is one platform callback, copied from C before it enters the
@@ -110,6 +114,8 @@ type ohosEvent struct {
 	sysAction system.Action
 	// metric carries a runtime density/font-scale change.
 	metric unit.Metric
+	// data carries a length-delimited clipboard payload.
+	data []byte
 }
 
 // ohosSink receives the effects of the event pump.  The real implementation
@@ -221,6 +227,8 @@ func (p *ohosPump) Handle(e ohosEvent) {
 		p.setFocused(e.focus)
 	case ohosEvClipboard:
 		p.clipboard(e.text, e.text2)
+	case ohosEvClipboardData:
+		p.clipboardData(e.text, e.data)
 	case ohosEvLifecycle:
 		p.setLifecycle(e.life)
 	case ohosEvFrame:
@@ -273,6 +281,8 @@ func (p *ohosPump) Handle(e ohosEvent) {
 		p.setOrientation(e.a)
 	case ohosEvMetric:
 		p.SetMetric(e.metric)
+	case ohosEvDrop:
+		p.drop(e.text)
 	}
 }
 
@@ -599,6 +609,34 @@ func (p *ohosPump) key(e ohosEvent) {
 			p.sink.ohosEditorInsert(text)
 		}
 	}
+	p.requestFrame()
+}
+
+func (p *ohosPump) clipboardData(mime string, data []byte) {
+	if mime == "" {
+		mime = "application/octet-stream"
+	}
+	content := append([]byte(nil), data...)
+	p.sink.ohosDeliver(transfer.DataEvent{
+		Type: mime,
+		Open: func() io.ReadCloser {
+			return io.NopCloser(bytes.NewReader(content))
+		},
+	})
+}
+
+// drop decodes the shim's JSON array of absolute paths. A plain
+// newline-separated list is accepted for older shims.
+func (p *ohosPump) drop(text string) {
+	var paths []string
+	if err := json.Unmarshal([]byte(text), &paths); err != nil {
+		for _, line := range strings.Split(text, "\n") {
+			if line = strings.TrimSpace(line); line != "" {
+				paths = append(paths, line)
+			}
+		}
+	}
+	p.sink.ohosDeliver(FileDropEvent{Paths: paths})
 	p.requestFrame()
 }
 
