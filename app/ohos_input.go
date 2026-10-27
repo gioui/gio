@@ -55,7 +55,22 @@ const (
 	ohosKeyF12          = 2101
 	ohosKeyNumpad0      = 2103
 	ohosKeyNumpad9      = 2112
+	ohosKeyNumpadDivide = 2113
+	ohosKeyNumpadMul    = 2114
+	ohosKeyNumpadSub    = 2115
+	ohosKeyNumpadAdd    = 2116
+	ohosKeyNumpadDot    = 2117
+	ohosKeyNumpadComma  = 2118
 	ohosKeyNumpadEnter  = 2119
+	ohosKeyNumpadEquals = 2120
+	ohosKeyNumpadLParen = 2121
+	ohosKeyNumpadRParen = 2122
+	ohosKeyCapsLock     = 2074
+	ohosKeyScrollLock   = 2075
+	ohosKeyNumLock      = 2102
+	ohosKeyMenu         = 2067
+	ohosKeyHelp         = 2625
+	ohosKeyPrint        = 2645
 	ohosKeyDpadUp       = 2012
 	ohosKeyDpadDown     = 2013
 	ohosKeyDpadLeft     = 2014
@@ -69,6 +84,9 @@ const (
 	ohosModShift = 1 << 1
 	ohosModAlt   = 1 << 2
 	ohosModFn    = 1 << 3
+	// ArkUI reports Meta/Super separately on some devices. Map it to
+	// key.ModSuper rather than dropping it.
+	ohosModMeta = 1 << 4
 )
 
 // ohosPinchScroll converts a relative pinch scale (1.0 = unchanged, opening
@@ -123,6 +141,36 @@ func ohosKeyName(code int) (key.Name, bool) {
 		return key.NameSpace, true
 	case ohosKeyInsert:
 		return key.NameInsert, true
+	case ohosKeyCapsLock:
+		return "CapsLock", true
+	case ohosKeyScrollLock:
+		return "ScrollLock", true
+	case ohosKeyNumLock:
+		return "NumLock", true
+	case ohosKeyMenu:
+		return "Menu", true
+	case ohosKeyHelp:
+		return "Help", true
+	case ohosKeyPrint:
+		return "PrintScreen", true
+	case ohosKeyNumpadDivide:
+		return "/", true
+	case ohosKeyNumpadMul:
+		return "*", true
+	case ohosKeyNumpadSub:
+		return "-", true
+	case ohosKeyNumpadAdd:
+		return "+", true
+	case ohosKeyNumpadDot:
+		return ".", true
+	case ohosKeyNumpadComma:
+		return ",", true
+	case ohosKeyNumpadEquals:
+		return "=", true
+	case ohosKeyNumpadLParen:
+		return "(", true
+	case ohosKeyNumpadRParen:
+		return ")", true
 	}
 	switch c := code; {
 	case c >= ohosKeyA && c <= ohosKeyZ:
@@ -183,6 +231,9 @@ func ohosModifiers(mods int) key.Modifiers {
 	if mods&ohosModAlt != 0 {
 		m |= key.ModAlt
 	}
+	if mods&ohosModMeta != 0 {
+		m |= key.ModSuper
+	}
 	return m
 }
 
@@ -190,7 +241,7 @@ func ohosModifiers(mods int) key.Modifiers {
 // Ctrl, Alt or Super are shortcuts, not text (same rule as the Android and
 // Wayland backends).  Shift is applied for letters, digits and punctuation.
 func ohosPrintable(code int, mods int) (string, bool) {
-	if mods&(ohosModCtrl|ohosModAlt) != 0 {
+	if mods&(ohosModCtrl|ohosModAlt|ohosModMeta) != 0 {
 		return "", false
 	}
 	shift := mods&ohosModShift != 0
@@ -208,6 +259,24 @@ func ohosPrintable(code int, mods int) (string, bool) {
 		return string(rune('0' + c - ohosKey0)), true
 	case c >= ohosKeyNumpad0 && c <= ohosKeyNumpad9:
 		return string(rune('0' + c - ohosKeyNumpad0)), true
+	case c == ohosKeyNumpadDivide:
+		return "/", true
+	case c == ohosKeyNumpadMul:
+		return "*", true
+	case c == ohosKeyNumpadSub:
+		return "-", true
+	case c == ohosKeyNumpadAdd:
+		return "+", true
+	case c == ohosKeyNumpadDot:
+		return ".", true
+	case c == ohosKeyNumpadComma:
+		return ",", true
+	case c == ohosKeyNumpadEquals:
+		return "=", true
+	case c == ohosKeyNumpadLParen:
+		return "(", true
+	case c == ohosKeyNumpadRParen:
+		return ")", true
 	case c == ohosKeySpace:
 		return " ", true
 	}

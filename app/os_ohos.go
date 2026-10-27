@@ -501,34 +501,6 @@ func boolInt(b bool) C.int {
 	return 0
 }
 
-func ohosCursorNumber(cursor pointer.Cursor) int {
-	// Values mirror the ArkUI cursor enum used by the shim; 0 restores the
-	// default arrow.
-	switch cursor {
-	case pointer.CursorText, pointer.CursorVerticalText:
-		return 1
-	case pointer.CursorPointer:
-		return 2
-	case pointer.CursorCrosshair:
-		return 3
-	case pointer.CursorWait:
-		return 4
-	case pointer.CursorProgress:
-		return 5
-	case pointer.CursorGrab, pointer.CursorGrabbing:
-		return 6
-	case pointer.CursorColResize, pointer.CursorEastWestResize, pointer.CursorWestResize, pointer.CursorEastResize:
-		return 7
-	case pointer.CursorRowResize, pointer.CursorNorthSouthResize, pointer.CursorNorthResize, pointer.CursorSouthResize:
-		return 8
-	case pointer.CursorNotAllowed:
-		return 9
-	case pointer.CursorNone:
-		return -1
-	}
-	return 0
-}
-
 // ---- ABI 1 exports ----
 
 //export gio_ohos_install_host

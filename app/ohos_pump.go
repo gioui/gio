@@ -155,9 +155,15 @@ type ohosPump struct {
 	// activeTouches 是当前按下的触点。axis pinch 只在没有触点时接受
 	// （触控板）；单指触摸会错误上报 pinch，双指由原生 pointer 处理。
 	activeTouches map[int]bool
-	touchSeen     bool
 	pinchActive   bool
 	lastPinch     float32
+	lastTouch     time.Time
+
+	mouseButtons pointer.Buttons
+	start        time.Time
+
+	lastKeyText string
+	lastKeyAt   time.Time
 }
 
 func newOhosPump(sink ohosSink, host ohosHost, metric unit.Metric) *ohosPump {
@@ -174,6 +180,7 @@ func newOhosPump(sink ohosSink, host ohosHost, metric unit.Metric) *ohosPump {
 		life:          ohosForeground,
 		config:        Config{Decorated: true, Focused: true},
 		activeTouches: make(map[int]bool),
+		start:         time.Now(),
 	}
 }
 
@@ -199,6 +206,11 @@ func (p *ohosPump) Handle(e ohosEvent) {
 		p.key(e)
 	case ohosEvText:
 		if e.text != "" {
+			// A hardware key may already have inserted the same text; drop
+			// the duplicate if it arrives within the same key frame.
+			if e.text == p.lastKeyText && time.Since(p.lastKeyAt) < 50*time.Millisecond {
+				break
+			}
 			p.sink.ohosEditorInsert(e.text)
 			p.requestFrame()
 		}
@@ -389,6 +401,10 @@ func (p *ohosPump) setFocused(focused bool) {
 		return
 	}
 	p.config.Focused = focused
+	if !focused {
+		p.mouseButtons = 0
+		p.activeTouches = make(map[int]bool)
+	}
 	p.sink.ohosDeliver(ConfigEvent{Config: p.config})
 	p.requestFrameSync(true)
 }
@@ -409,6 +425,8 @@ func (p *ohosPump) setLifecycle(l ohosLifecycle) {
 		p.activeTouches = make(map[int]bool)
 		p.pinchActive = false
 		p.lastPinch = 0
+		p.lastTouch = time.Time{}
+		p.mouseButtons = 0
 		p.frameRequested = false
 		p.frameSync = false
 	case ohosForeground:
@@ -436,7 +454,7 @@ func (p *ohosPump) Stop() {
 
 // touch translates a pointer callback.  action: 0 down, 1 move, 2 up, 3 cancel.
 func (p *ohosPump) touch(e ohosEvent) {
-	p.touchSeen = true
+	p.lastTouch = time.Now()
 	var kind pointer.Kind
 	switch e.action {
 	case 0:
@@ -469,6 +487,7 @@ func (p *ohosPump) touch(e ohosEvent) {
 		// Positions arrive in surface pixels.
 		Position:  f32.Pt(e.x, e.y),
 		Modifiers: ohosModifiers(e.mods),
+		Time:      time.Since(p.start),
 	})
 	p.requestFrame()
 }
@@ -495,23 +514,32 @@ func (p *ohosPump) mouse(e ohosEvent) {
 	case 3:
 		btns = pointer.ButtonTertiary
 	}
+	switch kind {
+	case pointer.Press:
+		p.mouseButtons |= btns
+	case pointer.Release:
+		p.mouseButtons &^= btns
+	}
 	p.sink.ohosDeliver(pointer.Event{
 		Kind:      kind,
 		Source:    pointer.Mouse,
-		Buttons:   btns,
+		Buttons:   p.mouseButtons,
 		PointerID: 1,
 		Position:  f32.Pt(e.x, e.y),
 		Modifiers: ohosModifiers(e.mods),
+		Time:      time.Since(p.start),
 	})
 	p.requestFrame()
 }
 
 func (p *ohosPump) axis(e ohosEvent) {
 	scale := float64(e.scale)
-	// 手机触摸会错误上报单指 pinch；只要本窗口见过任何原生触点，
-	// 就不再接受 axis pinch。纯触控板窗口从未有 touch 事件，仍可走 axis。
-	if p.touchSeen && scale != 0 && scale != 1 {
-		scale = 0
+	// 触摸设备会在触摸后补发单指 pinch。只要还有触点，或最近 150ms
+	// 内出现过触摸，就忽略 axis pinch；纯触控板窗口没有触摸历史。
+	if len(p.activeTouches) > 0 || (!p.lastTouch.IsZero() && time.Since(p.lastTouch) < 150*time.Millisecond) {
+		if scale != 0 && scale != 1 {
+			scale = 0
+		}
 	}
 	if scale == 1 {
 		p.pinchActive = false
@@ -562,6 +590,7 @@ func (p *ohosPump) key(e ohosEvent) {
 	p.sink.ohosDeliver(key.Event{Name: name, Modifiers: mods, State: state})
 	if state == key.Press {
 		if text, ok := ohosPrintable(e.code, e.mods); ok {
+			p.lastKeyText, p.lastKeyAt = text, time.Now()
 			p.sink.ohosEditorInsert(text)
 		}
 	}
