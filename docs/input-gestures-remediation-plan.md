@@ -3,7 +3,7 @@
 > 依据：[input-gestures-cross-platform.md](input-gestures-cross-platform.md) 的矩阵、源码复核与平台 API 结论。
 > 状态：方案文档，暂未修改源码。
 > 目标：把 Gio 从“鼠标/触摸 + Scroll”升级为“可区分设备、可拿语义手势、可回退识别”的输入模型，并修正 Windows/macOS/Wayland/OHOS 的具体缺口。
-> 实施进展（2026-10-27）：事件模型与语义手势路由、macOS pinch/rotate/swipe、OHOS axis pinch、Windows PT_* 分类/触控板注册、gesture.Pinch/Rotate/Swipe/Hold 回退识别器已落地；Wayland、Windows pinch/rotate、Android/iOS/Web 接线仍待做。
+> 实施进展（2026-10-27）：事件模型与语义手势路由、macOS pinch/rotate/swipe、OHOS axis pinch、Windows PT_* 分类/触控板注册 + WM_GESTURE pinch/rotate、gesture.Pinch/Rotate/Swipe/Hold 回退识别器已落地；Wayland、Windows Precision Touchpad 的 InteractionContext、Android/iOS/Web 接线仍待做。
 
 ---
 
@@ -297,8 +297,8 @@ func Capabilities() Capabilities
 
 1. 启动时 RegisterTouchpadCapableWindow。
 2. pointerUpdate 按 PointerType 分类：PT_TOUCHPAD → Trackpad，PT_PEN → Pen，PT_TOUCH → Touch，PT_MOUSE → Mouse。
-3. 触控板双指：接 WM_POINTER 帧，用 InteractionContext 产出 Pinch/Rotate/Pan；或先解析触点距离/角度输出 Pinch/Rotate。
-4. 触摸屏：接 WM_GESTURE 的 zoom/rotate/pan → 语义事件（可选，M2）。
+3. 触控板双指：接 WM_POINTER 帧，用 InteractionContext 产出 Pinch/Rotate/Pan；仍待做。
+4. 触摸屏：接 WM_GESTURE 的 zoom/rotate/pan → 语义事件（zoom/rotate 已完成，pan 可按需）。
 5. 三指全局手势：TouchpadGesturesController 仅在前台且显式 opt-in；默认不抢。
 6. 滚动：保留 WM_POINTERWHEEL；触控板双指平移与 Scroll 区分。
 

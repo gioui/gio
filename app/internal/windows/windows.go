@@ -67,6 +67,25 @@ type Point struct {
 	X, Y int32
 }
 
+// Points is a POINTS: two 16-bit screen coordinates.
+type Points struct {
+	X, Y int16
+}
+
+// GestureInfo mirrors GESTUREINFO. Keep the field order and types in sync
+// with winuser.h; the struct is passed to GetGestureInfo.
+type GestureInfo struct {
+	CbSize       uint32
+	Flags        uint32
+	ID           uint32
+	HwndTarget   syscall.Handle
+	PtsLocation  Points
+	DwInstanceID uint32
+	DwSequenceID uint32
+	UllArguments uint64
+	CbExtraArgs  uint32
+}
+
 type MinMaxInfo struct {
 	PtReserved     Point
 	PtMaxSize      Point
@@ -375,20 +394,33 @@ const (
 	WM_POINTERUPDATE         = 0x0245
 	WM_POINTERWHEEL          = 0x024E
 	WM_POINTERHWHEEL         = 0x024F
-	WM_QUIT                  = 0x0012
-	WM_RBUTTONDOWN           = 0x0204
-	WM_RBUTTONUP             = 0x0205
-	WM_SETCURSOR             = 0x0020
-	WM_SETFOCUS              = 0x0007
-	WM_SHOWWINDOW            = 0x0018
-	WM_SIZE                  = 0x0005
-	WM_STYLECHANGED          = 0x007D
-	WM_SYSKEYDOWN            = 0x0104
-	WM_SYSKEYUP              = 0x0105
-	WM_TIMER                 = 0x0113
-	WM_UNICHAR               = 0x0109
-	WM_USER                  = 0x0400
-	WM_WINDOWPOSCHANGED      = 0x0047
+	WM_GESTURE               = 0x0119
+	WM_GESTURENOTIFY         = 0x011A
+
+	// Gesture flags.
+	GF_BEGIN   = 0x1
+	GF_INERTIA = 0x2
+	GF_END     = 0x4
+
+	// Gesture IDs.
+	GID_ZOOM   = 3
+	GID_PAN    = 4
+	GID_ROTATE = 5
+
+	WM_QUIT             = 0x0012
+	WM_RBUTTONDOWN      = 0x0204
+	WM_RBUTTONUP        = 0x0205
+	WM_SETCURSOR        = 0x0020
+	WM_SETFOCUS         = 0x0007
+	WM_SHOWWINDOW       = 0x0018
+	WM_SIZE             = 0x0005
+	WM_STYLECHANGED     = 0x007D
+	WM_SYSKEYDOWN       = 0x0104
+	WM_SYSKEYUP         = 0x0105
+	WM_TIMER            = 0x0113
+	WM_UNICHAR          = 0x0109
+	WM_USER             = 0x0400
+	WM_WINDOWPOSCHANGED = 0x0047
 
 	WS_CLIPCHILDREN     = 0x02000000
 	WS_CLIPSIBLINGS     = 0x04000000
@@ -464,6 +496,8 @@ var (
 	_GetMessageTime                = user32.NewProc("GetMessageTime")
 	_GetMonitorInfo                = user32.NewProc("GetMonitorInfoW")
 	_GetPointerInfo                = user32.NewProc("GetPointerInfo")
+	_GetGestureInfo                = user32.NewProc("GetGestureInfo")
+	_CloseGestureInfoHandle        = user32.NewProc("CloseGestureInfoHandle")
 	_RegisterTouchpadCapableWindow = user32.NewProc("RegisterTouchpadCapableWindow")
 	_GetSystemMetrics              = user32.NewProc("GetSystemMetrics")
 	_GetWindowLong                 = user32.NewProc("GetWindowLongPtrW")
@@ -573,6 +607,19 @@ func RegisterTouchWindow(hwnd syscall.Handle, flags uint32) error {
 		return fmt.Errorf("RegisterTouchWindow failed: %v", err)
 	}
 	return nil
+}
+
+func GetGestureInfo(handle uintptr) (GestureInfo, error) {
+	info := GestureInfo{CbSize: uint32(unsafe.Sizeof(GestureInfo{}))}
+	r1, _, err := _GetGestureInfo.Call(handle, uintptr(unsafe.Pointer(&info)))
+	if r1 == 0 {
+		return GestureInfo{}, fmt.Errorf("GetGestureInfo failed: %v", err)
+	}
+	return info, nil
+}
+
+func CloseGestureInfoHandle(handle uintptr) {
+	_, _, _ = _CloseGestureInfoHandle.Call(handle)
 }
 
 func RegisterTouchpadCapableWindow(hwnd syscall.Handle, enable bool) error {

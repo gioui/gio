@@ -252,7 +252,7 @@ type Event struct {
 | Android | MotionEvent 多点 | generic motion | ❌ | ❌ | ❌ | ❌ |
 | iOS | UITouch | ❌ | ❌ | ❌ | ❌ | ❌ |
 | OHOS | XComponent touch | AxisEvent | Pinch（axis） | ❌ | ❌ | ❌ |
-| Windows | WM_POINTER；PT_TOUCHPAD 已分类 | WM_POINTERWHEEL | ❌ 尚未接 InteractionContext | ❌ | ❌ | ✅ Trackpad/Pen 分类 |
+| Windows | WM_POINTER；PT_TOUCHPAD 已分类 | WM_POINTERWHEEL | ◐ WM_GESTURE 触摸屏；触控板待接 InteractionContext | ◐ WM_GESTURE | ❌ | ✅ Trackpad/Pen 分类 |
 | Web | Touch Events | wheel | ❌（可能 ctrl+wheel） | ❌ | ❌ | ❌ |
 
 ### 6.3 关键问题

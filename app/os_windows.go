@@ -54,6 +54,8 @@ type window struct {
 	// frameDims stores the last seen window frame width and height.
 	frameDims image.Point
 	loop      *eventLoop
+
+	gestures windowsGestureState
 }
 
 const _WM_WAKEUP = windows.WM_USER + iota
@@ -399,6 +401,11 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.scrollEvent(wParam, lParam, false, getModifiers())
 	case windows.WM_POINTERHWHEEL:
 		w.scrollEvent(wParam, lParam, true, getModifiers())
+	case windows.WM_GESTURE:
+		w.gesture(lParam)
+	case windows.WM_GESTURENOTIFY:
+		// Gesture configuration is handled by the default window procedure.
+		break
 	case windows.WM_DESTROY:
 		w.ProcessEvent(Win32ViewEvent{})
 		w.ProcessEvent(DestroyEvent{})
@@ -717,6 +724,48 @@ func (w *window) pointerUpdate(pi windows.PointerInfo, pid pointer.ID, kind poin
 		Time:      windows.GetMessageTime(),
 		Modifiers: getModifiers(),
 	})
+}
+
+func (w *window) gesture(handle uintptr) {
+	gi, err := windows.GetGestureInfo(handle)
+	if err != nil {
+		return
+	}
+	defer windows.CloseGestureInfoHandle(handle)
+	np := windows.Point{X: int32(gi.PtsLocation.X), Y: int32(gi.PtsLocation.Y)}
+	windows.ScreenToClient(w.hwnd, &np)
+	pos := f32.Point{X: float32(np.X), Y: float32(np.Y)}
+	begin := gi.Flags&windows.GF_BEGIN != 0
+	end := gi.Flags&windows.GF_END != 0
+	t := time.Duration(windows.GetMessageTime()) * time.Millisecond
+	switch gi.ID {
+	case windows.GID_ZOOM:
+		id, phase, scale := w.gestures.zoom(gi.UllArguments, begin, end)
+		w.ProcessEvent(pointer.Event{
+			Kind:      pointer.Pinch,
+			Source:    pointer.Touch,
+			GestureID: id,
+			Phase:     phase,
+			Scale:     scale,
+			Fingers:   2,
+			Position:  pos,
+			Modifiers: getModifiers(),
+			Time:      t,
+		})
+	case windows.GID_ROTATE:
+		id, phase, rotation := w.gestures.rotate(gi.UllArguments, begin, end)
+		w.ProcessEvent(pointer.Event{
+			Kind:      pointer.Rotate,
+			Source:    pointer.Touch,
+			GestureID: id,
+			Phase:     phase,
+			Rotation:  rotation,
+			Fingers:   2,
+			Position:  pos,
+			Modifiers: getModifiers(),
+			Time:      t,
+		})
+	}
 }
 
 func coordsFromlParam(lParam uintptr) (int, int) {
