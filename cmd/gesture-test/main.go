@@ -223,6 +223,9 @@ func (a *appState) record(e pointer.Event, now time.Time) {
 			a.lastPressBtn = e.Buttons
 		}
 	}
+	if e.Kind == pointer.Press || e.Kind == pointer.Release || e.Kind == pointer.Cancel {
+		debugLog(fmt.Sprintf("raw %v id=%d pos=%v", e.Kind, e.PointerID, e.Position))
+	}
 	a.events = append(a.events, e)
 	if len(a.events) > history {
 		a.events = a.events[len(a.events)-history:]

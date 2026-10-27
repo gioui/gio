@@ -28,6 +28,7 @@ type Pinch struct {
 	id1, id2  pointer.ID
 	hasTwo    bool
 	active    bool
+	blocked   bool
 	source    pointer.Source
 	startDist float32
 	lastScale float32
@@ -82,11 +83,23 @@ func (p *Pinch) handle(e pointer.Event) {
 	switch e.Kind {
 	case pointer.Press:
 		p.points[e.PointerID] = e.Position
-		if !p.hasTwo {
+		if len(p.points) > 2 {
+			if p.active {
+				p.emit(pointer.GestureCancel, e)
+			}
+			p.active = false
+			p.hasTwo = false
+			p.blocked = true
+			return
+		}
+		if !p.blocked && !p.hasTwo {
 			p.source = e.Source
 			p.pickPair()
 		}
 	case pointer.Move, pointer.Drag:
+		if p.blocked {
+			return
+		}
 		if _, ok := p.points[e.PointerID]; !ok {
 			return
 		}
@@ -101,7 +114,15 @@ func (p *Pinch) handle(e pointer.Event) {
 			}
 			p.active = false
 			p.hasTwo = false
+			p.blocked = false
 			clear(p.points)
+			return
+		}
+		if p.blocked {
+			delete(p.points, e.PointerID)
+			if len(p.points) == 0 {
+				p.blocked = false
+			}
 			return
 		}
 		if !p.active {
@@ -127,7 +148,7 @@ func (p *Pinch) handle(e pointer.Event) {
 }
 
 func (p *Pinch) pickPair() {
-	if p.hasTwo || len(p.points) < 2 {
+	if p.hasTwo || len(p.points) != 2 {
 		return
 	}
 	first := true
@@ -215,6 +236,7 @@ type Rotate struct {
 	id1, id2    pointer.ID
 	hasTwo      bool
 	active      bool
+	blocked     bool
 	source      pointer.Source
 	lastAngle   float32
 	rotation    float32
@@ -270,11 +292,23 @@ func (r *Rotate) handle(e pointer.Event) {
 	switch e.Kind {
 	case pointer.Press:
 		r.points[e.PointerID] = e.Position
-		if !r.hasTwo {
+		if len(r.points) > 2 {
+			if r.active {
+				r.emit(pointer.GestureCancel, e)
+			}
+			r.active = false
+			r.hasTwo = false
+			r.blocked = true
+			return
+		}
+		if !r.blocked && !r.hasTwo {
 			r.source = e.Source
 			r.pickPair()
 		}
 	case pointer.Move, pointer.Drag:
+		if r.blocked {
+			return
+		}
 		if _, ok := r.points[e.PointerID]; !ok {
 			return
 		}
@@ -289,7 +323,15 @@ func (r *Rotate) handle(e pointer.Event) {
 			}
 			r.active = false
 			r.hasTwo = false
+			r.blocked = false
 			clear(r.points)
+			return
+		}
+		if r.blocked {
+			delete(r.points, e.PointerID)
+			if len(r.points) == 0 {
+				r.blocked = false
+			}
 			return
 		}
 		if !r.active {
@@ -315,7 +357,7 @@ func (r *Rotate) handle(e pointer.Event) {
 }
 
 func (r *Rotate) pickPair() {
-	if r.hasTwo || len(r.points) < 2 {
+	if r.hasTwo || len(r.points) != 2 {
 		return
 	}
 	first := true
@@ -353,6 +395,13 @@ func (r *Rotate) emitUpdate(e pointer.Event) {
 	}
 	for delta < -math.Pi {
 		delta += 2 * math.Pi
+	}
+	// A single event cannot rotate by more than a right angle. A larger
+	// jump is a coordinate/id discontinuity, not real rotation; reset the
+	// reference instead of accumulating a bogus ±π.
+	if abs32(delta) > math.Pi/2 {
+		r.lastAngle = a
+		return
 	}
 	r.lastAngle = a
 	r.rotation += delta

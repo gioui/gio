@@ -505,6 +505,7 @@ func (p *ohosPump) Stop() {
 
 // touch translates a pointer callback.  action: 0 down, 1 move, 2 up, 3 cancel.
 func (p *ohosPump) touch(e ohosEvent) {
+	prevTouch := p.lastTouch
 	p.lastTouch = time.Now()
 	var kind pointer.Kind
 	switch e.action {
@@ -521,6 +522,14 @@ func (p *ohosPump) touch(e ohosEvent) {
 	}
 	if p.activeTouches == nil {
 		p.activeTouches = make(map[int]bool)
+	}
+	// If the platform lost the final Release of the previous gesture, a
+	// later Press arrives while pointers are still marked active. Cancel
+	// the stale pointers so the router and recognizers can start fresh.
+	if kind == pointer.Press && len(p.activeTouches) > 0 {
+		if p.activeTouches[e.id] || time.Since(prevTouch) > 500*time.Millisecond {
+			p.cancelActiveTouches()
+		}
 	}
 	if kind == pointer.Press && p.pinchActive {
 		p.emitPinch(pointer.GestureCancel, p.lastPinch, e)

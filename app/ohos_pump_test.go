@@ -302,6 +302,23 @@ func TestOHOSPumpBackgroundCancelsActiveTouches(t *testing.T) {
 	}
 }
 
+func TestOHOSPumpStalePressCancelsPrevious(t *testing.T) {
+	p, f := newTestPump()
+	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 7, w: 800, h: 600})
+	p.Handle(ohosEvent{kind: ohosEvTouch, action: 0, id: 3, x: 10, y: 20})
+	f.events = nil
+	p.Handle(ohosEvent{kind: ohosEvTouch, action: 0, id: 3, x: 30, y: 40})
+	if len(f.events) != 2 {
+		t.Fatalf("want cancel+press, got %#v", f.events)
+	}
+	if e := f.events[0].(pointer.Event); e.Kind != pointer.Cancel || e.PointerID != 3 {
+		t.Fatalf("want stale cancel, got %+v", e)
+	}
+	if e := f.events[1].(pointer.Event); e.Kind != pointer.Press || e.PointerID != 3 {
+		t.Fatalf("want new press, got %+v", e)
+	}
+}
+
 func TestOHOSPumpAnimation(t *testing.T) {
 	p, f := newTestPump()
 	p.Handle(ohosEvent{kind: ohosEvSurfaceCreated, win: 7, w: 100, h: 100})
