@@ -15,12 +15,14 @@ import (
 
 	"gioui.org/app"
 	"gioui.org/f32"
+	"gioui.org/font/gofont"
 	"gioui.org/io/event"
 	"gioui.org/io/pointer"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
+	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
@@ -31,6 +33,8 @@ const history = 14
 var allKinds = pointer.Press | pointer.Release | pointer.Move | pointer.Drag |
 	pointer.Enter | pointer.Leave | pointer.Cancel | pointer.Scroll |
 	pointer.Pinch | pointer.Rotate | pointer.Swipe | pointer.Hold
+
+var debugLog = func(string) {}
 
 type appState struct {
 	theme  *material.Theme
@@ -48,6 +52,7 @@ type appState struct {
 }
 
 func main() {
+	debugLog("gesture-test: main")
 	go func() {
 		w := new(app.Window)
 		w.Option(
@@ -56,6 +61,7 @@ func main() {
 			app.MinSize(unit.Dp(640), unit.Dp(480)),
 		)
 		if err := loop(w); err != nil {
+			debugLog("gesture-test: loop error: " + err.Error())
 			log.Print(err)
 		}
 		os.Exit(0)
@@ -64,8 +70,12 @@ func main() {
 }
 
 func loop(w *app.Window) error {
+	theme := material.NewTheme()
+	// material.NewTheme leaves Shaper zero; OHOS cannot discover a system
+	// font for it, so load the Go font collection explicitly.
+	theme.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
 	a := &appState{
-		theme:  material.NewTheme(),
+		theme:  theme,
 		counts: make(map[pointer.Kind]int),
 	}
 	var ops op.Ops
